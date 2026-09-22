@@ -74,7 +74,7 @@ public:
     {
         CZFile* f = cs->GetFile();
         //COLORREF c = 0;//black?
-        TCHAR* e = f->GetExt();
+        wchar_t* e = f->GetExt();
         int r = 0, g = 0, b = 0;
         if (e != NULL)
         {

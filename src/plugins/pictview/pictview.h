@@ -6,7 +6,7 @@
 
 #include "renderer.h"
 
-extern LPCTSTR CAPTURE;
+extern const wchar_t* CAPTURE;
 
 typedef PVCODE(WINAPI* TPVReadImage2)(LPPVHandle Img, HDC PaintDC, RECT* pDRect, TProgressProc Progress, void* AppSpecific, int ImageIndex);
 typedef PVCODE(WINAPI* TPVCloseImage)(LPPVHandle Img);
@@ -144,7 +144,6 @@ typedef struct tagGlobals
         DWORD JPEGQuality;
         DWORD JPEGSubsampling;
         DWORD TIFFStripSize;
-        TCHAR InitDir[32768];
         BOOL RememberPath; // Remember path when saving screenshots and clipboard pastes
     } Save;
 
@@ -192,11 +191,11 @@ typedef DWORD TwoDWords[2];
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
-    virtual BOOL WINAPI ViewFile(LPCTSTR name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                  BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex);
-    virtual BOOL WINAPI CanViewFile(LPCTSTR name);
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name);
 };
 
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
@@ -448,7 +447,7 @@ protected:
 //
 
 char* LoadStr(int resID);
-WCHAR* LoadStrW(int resID);
+std::wstring LoadStrW(int resID);
 BOOL InitViewer(HWND hParentWnd);
 void ReleaseViewer();
 BOOL InitEXIF(HWND hParent, BOOL bSilent);
@@ -484,9 +483,9 @@ extern CPVW32DLL PVW32DLL;
 
 extern HINSTANCE EXIFLibrary;
 
-extern LPCTSTR PLUGIN_NAME_EN;
-extern LPCTSTR TIP_WINDOW_CLASSNAME;
-extern LPCTSTR CLIPBOARD;
+extern const wchar_t* PLUGIN_NAME_EN;
+extern const wchar_t* TIP_WINDOW_CLASSNAME;
+extern const wchar_t* CLIPBOARD;
 
 extern BOOL SalamanderRegistered; // TRUE = Salamander is licensed (a valid registration key was found)
 
@@ -494,6 +493,7 @@ extern int PredefinedZooms[];
 void TrailZeros(LPTSTR buff);
 
 extern SGlobals G;
+extern std::wstring SaveInitialDirectory;
 
 extern MENU_TEMPLATE_ITEM PopupMenuTemplate[];
 

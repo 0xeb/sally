@@ -56,8 +56,9 @@
 #include "unarjdll.h"
 #include "unarj.h"
 #include "unarjspl.h"
+#include "unarj_text.h"
 
-extern LPTSTR PathFindExtension(LPTSTR pszPath);
+#include <new>
 
 //***********************************************************************************
 //
@@ -65,13 +66,14 @@ extern LPTSTR PathFindExtension(LPTSTR pszPath);
 //
 
 HANDLE ArcFile = INVALID_HANDLE_VALUE;
-CPathBuffer ArcName; // Heap-allocated for long path support
+std::wstring ArcName;
 DWORD ArcFileSize;
 DWORD ArcFilePos;
 
 FARJChangeVolProc ChangeVolProc;
 FARJProcessDataProc ProcessDataProc;
 FARJErrorProc ErrorProc;
+FARJArchiveVolumeProc ArchiveVolumeProc;
 
 unsigned char InputBuffer[INBUFSIZ];
 unsigned char* InPtr;
@@ -80,8 +82,6 @@ unsigned char* InEnd;
 DWORD NextFileOffset;
 
 BOOL SuccedingVolume;
-
-CDynamicString* AchiveVolumes = NULL;
 
 const SYSTEMTIME MinTime = {1980, 01, 2, 01, 00, 00, 00, 000};
 
@@ -94,7 +94,7 @@ int bitcount;
 long compsize;
 long origsize;
 uchar subbitbuf;
-uchar header[HEADERSIZE_MAX];
+std::vector<uchar> header;
 int file_type;
 DWORD ext_size;
 
@@ -366,15 +366,20 @@ long FindHeader()
         if (arcpos >= lastpos)
             break;
         ushort headersize = GetWord();
-        if (headersize <= HEADERSIZE_MAX)
+        try
         {
+            header.resize(headersize);
             crc = CRC_MASK;
-            ReadCrc(header, headersize);
+            ReadCrc(header.data(), headersize);
             if ((crc ^ CRC_MASK) == GetDWord())
             {
                 Seek(arcpos, FILE_BEGIN);
                 return arcpos;
             }
+        }
+        catch (const std::bad_alloc&)
+        {
+            Error(AE_BADDATA);
         }
     }
     Error(AE_BADARC);
@@ -411,17 +416,28 @@ int ReadHeader(BOOL first, CARJHeaderData* headerData)
             Error(AE_BADARC);
         return 0; /* end of archive */
     }
-    if (headersize > HEADERSIZE_MAX)
+    if (headersize < FIRST_HDR_SIZE)
         Error(AE_BADDATA);
 
+    try
+    {
+        header.resize(headersize);
+    }
+    catch (const std::bad_alloc&)
+    {
+        Error(AE_BADDATA);
+    }
+
     crc = CRC_MASK;
-    ReadCrc(header, headersize);
+    ReadCrc(header.data(), headersize);
     header_crc = GetDWord();
     if ((crc ^ CRC_MASK) != header_crc)
         Error(AE_BADDATA);
 
-    setup_get(header);
+    setup_get(header.data());
     uchar first_hdr_size = get_byte();
+    if (first_hdr_size < FIRST_HDR_SIZE || first_hdr_size >= headersize)
+        Error(AE_BADDATA);
     headerData->ArcVer = arj_nbr = get_byte();
     headerData->ArcVerMin = arj_x_nbr = get_byte();
     headerData->HostOS = host_os = get_byte();
@@ -450,14 +466,19 @@ int ReadHeader(BOOL first, CARJHeaderData* headerData)
     else
         ext_size = 0;
 
-    char* hdr_filename = (char*)&header[first_hdr_size];
-    lstrcpyn(headerData->FileName, hdr_filename, ARJ_MAX_PATH);
+    char* hdr_filename = reinterpret_cast<char*>(header.data() + first_hdr_size);
+    const size_t availableNameBytes = headersize - first_hdr_size;
+    const size_t memberNameLength = strnlen_s(hdr_filename, availableNameBytes);
+    if (memberNameLength == availableNameBytes)
+        Error(AE_BADDATA);
+    std::string memberName(hdr_filename, memberNameLength);
     if (host_os != OS && host_os != 11) // neither DOS nor Win32
-        FixParity((uchar*)headerData->FileName, lstrlen(headerData->FileName));
+        FixParity(reinterpret_cast<uchar*>(memberName.data()), static_cast<DWORD>(memberName.size()));
     if ((arj_flags & PATHSYM_FLAG) != 0)
-        DecodePath(headerData->FileName);
-    EnsureBackslashes(headerData->FileName);
-    OemToChar(headerData->FileName, headerData->FileName);
+        DecodePath(memberName.data());
+    EnsureBackslashes(memberName.data());
+    if (!DecodeArjMemberName(memberName.data(), memberName.size(), headerData->FileName))
+        Error(AE_BADDATA);
 
     /*hdr_comment = (char *)&header[first_hdr_size + strlen(hdr_filename) + 1];
   lstrcpyn(comment, hdr_comment, sizeof(comment));
@@ -547,8 +568,8 @@ void OpenArcFile()
     CALL_STACK_MESSAGE1("OpenArcFile()");
     while (1)
     {
-        ArcFile = CreateFile(ArcName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                             FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+        ArcFile = CreateFileW(ArcName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                              FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (ArcFile != INVALID_HANDLE_VALUE)
             break; // ok
         if (!ErrorProc(AE_OPEN, EF_RETRY))
@@ -681,51 +702,30 @@ void NextVolume(BOOL forceQuestion)
     CloseHandle(ArcFile);
     ArcFile = INVALID_HANDLE_VALUE;
 
-    CPathBuffer prevName; // Heap-allocated for long path support
-    char* ptr = strrchr(ArcName.Get(), '\\');
-    if (!ptr)
-        ptr = ArcName.Get();
-    else
-        ptr++;
-    strcpy(prevName, ptr);
+    const size_t slash = ArcName.find_last_of(L'\\');
+    const std::wstring prevName = slash == std::wstring::npos
+                                      ? ArcName
+                                      : ArcName.substr(slash + 1);
 
-    char* ext = PathFindExtension(ArcName.Get());
-    if (lstrcmpi(ext, ".arj") == 0)
-    {
-        lstrcpy(ext, ".a01");
-    }
+    std::wstring nextName;
+    if (TryBuildNextArjVolumePath(ArcName, nextName))
+        ArcName.swap(nextName);
     else
-    {
-        if ((toupper(ext[1]) == 'A' || isdigit(ext[1])) &&
-            isdigit(ext[2]) && isdigit(ext[3]))
-        {
-            int n;
-            if (toupper(ext[1]) == 'A')
-                n = atoi(ext + 2);
-            else
-                n = atoi(ext + 1);
-            n++;
-            if (n > 99 || isdigit(ext[1]))
-                sprintf(ext, ".%03d", n);
-            else
-                sprintf(ext, ".a%02d", n);
-        }
-        else
-            forceQuestion = TRUE;
-    }
-    DWORD attr = SalamanderGeneral->SalGetFileAttributes(ArcName);
+        forceQuestion = TRUE;
+
+    DWORD attr = SalamanderGeneral->SalGetFileAttributes(ArcName.c_str());
     if (!forceQuestion && attr != -1 && !(attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        if (!ChangeVolProc(ArcName, prevName, CVM_NOTIFY))
+        if (!ChangeVolProc(ArcName, prevName.c_str(), CVM_NOTIFY))
             throw 0;
     }
     else
     {
         while (1)
         {
-            if (!ChangeVolProc(ArcName, prevName, CVM_ASK))
+            if (!ChangeVolProc(ArcName, prevName.c_str(), CVM_ASK))
                 throw 0;
-            attr = SalamanderGeneral->SalGetFileAttributes(ArcName);
+            attr = SalamanderGeneral->SalGetFileAttributes(ArcName.c_str());
             if (attr != -1 && !(attr & FILE_ATTRIBUTE_DIRECTORY))
                 break; // ok we have it, moving on
         }
@@ -743,13 +743,15 @@ ARJOpenArchive(CARJOpenData* openData)
 {
     CALL_STACK_MESSAGE1("ARJOpenArchive()");
     ArcFile = INVALID_HANDLE_VALUE;
-    lstrcpy(ArcName, openData->ArcName);
+    if (openData->ArcName == NULL)
+        return FALSE;
+    ArcName = openData->ArcName;
     ChangeVolProc = openData->ARJChangeVolProc;
     ProcessDataProc = openData->ARJProcessDataProc;
     ErrorProc = openData->ARJErrorProc;
-    if (AchiveVolumes != NULL)
-        TRACE_E("ARJOpenArchive(): unexpected situation: AchiveVolumes is not NULL!");
-    AchiveVolumes = openData->AchiveVolumes;
+    if (ArchiveVolumeProc != NULL)
+        TRACE_E("ARJOpenArchive(): unexpected situation: ArchiveVolumeProc is not NULL!");
+    ArchiveVolumeProc = openData->ARJArchiveVolumeProc;
 
     MakeCrcTable();
 
@@ -768,7 +770,7 @@ ARJOpenArchive(CARJOpenData* openData)
             CloseHandle(ArcFile);
             ArcFile = INVALID_HANDLE_VALUE;
         }
-        AchiveVolumes = NULL;
+        ArchiveVolumeProc = NULL;
         return FALSE;
     }
 }
@@ -777,7 +779,7 @@ BOOL WINAPI
 ARJCloseArchive()
 {
     CALL_STACK_MESSAGE1("ARJCloseArchive()");
-    AchiveVolumes = NULL;
+    ArchiveVolumeProc = NULL;
     if (ArcFile != INVALID_HANDLE_VALUE)
     {
         CloseHandle(ArcFile);
@@ -798,12 +800,12 @@ ARJReadHeader(CARJHeaderData* headerData)
                 break;
             if (!SuccedingVolume)
             {
-                *headerData->FileName = 0;
+                headerData->FileName.clear();
                 break;
             }
             NextVolume(FALSE);
-            if (AchiveVolumes != NULL)
-                AchiveVolumes->Add(ArcName, -2);
+            if (ArchiveVolumeProc != NULL)
+                ArchiveVolumeProc(ArcName.c_str());
         }
 
         return TRUE;
@@ -854,8 +856,8 @@ ARJProcessFile(int operation, LPDWORD size)
             }
             if (size)
                 *size = ext_size + origsize;
-            if (AchiveVolumes != NULL)
-                AchiveVolumes->Add(ArcName, -2);
+            if (ArchiveVolumeProc != NULL)
+                ArchiveVolumeProc(ArcName.c_str());
         }
 
         return TRUE;

@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <tlhelp32.h>
+#include "common/DiagnosticTextEncoding.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
 #include "shiconov_diag.h"
@@ -43,19 +44,111 @@
 #include "snooper.h"
 #include "gui.h"
 
-char BugReportReasonBreak[BUG_REPORT_REASON_MAX]; // if not empty, displayed below the "Break" message
+static std::wstring BugReportReasonBreak; // if not empty, displayed below the "Break" message
 
-static struct CBugReportReasonBreak_Init
+void SetBugReportReasonBreak(std::wstring reason)
 {
-    CBugReportReasonBreak_Init() { BugReportReasonBreak[0] = 0; }
-} __BugReportReasonBreak_Init;
+    BugReportReasonBreak = std::move(reason);
+}
+
+const wchar_t* GetBugReportReasonBreak()
+{
+    return BugReportReasonBreak.c_str();
+}
 
 TIndirectArray<char> GlobalModulesStore(50, 20);
 TDirectArray<DWORD> GlobalModulesListTimeStore(50, 20); // x64_OK
 
+static char* DupAnsiString(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+
+    const size_t length = strlen(text) + 1;
+    char* copy = (char*)malloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
+
+static CPluginData* FindPluginDataByDllName(const wchar_t* dllName)
+{
+    if (dllName == NULL)
+        return NULL;
+
+    return Plugins.GetPluginData(dllName);
+}
+
 static IRegistry* GetBugReportRegistry()
 {
     return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
+
+// Forward declaration - defined near AddNewlyLoadedModulesToGlobalModulesStore
+// further down, used earlier by PrintBugReport. Both callers have their own __try, so the
+// wide->narrow conversion lives in this ordinary (no __try) function instead of a local
+// std::string in their bodies - see its definition for the full rationale.
+static BOOL CopyModuleTextNarrow(char* dest, size_t destSize, const wchar_t* wideSrc) noexcept;
+
+// Registry strings remain dynamically owned UTF-16 until this crash-report byte sink. Some BIOS
+// values are REG_MULTI_SZ; the historical report printed only the first element, which is retained.
+static BOOL CopyRegistryTextNarrow(IRegistry* registry, HKEY key, const wchar_t* valueName,
+                                   char* dest, size_t destSize) noexcept
+{
+    if (registry == NULL || dest == NULL || destSize == 0)
+        return FALSE;
+    dest[0] = 0;
+    try
+    {
+        std::wstring value;
+        RegistryResult result = registry->GetString(key, valueName, value);
+        if (!result.success && result.errorCode == ERROR_INVALID_DATATYPE)
+        {
+            RegValueType type = RegValueType::None;
+            std::vector<uint8_t> data;
+            result = registry->GetValue(key, valueName, type, data);
+            if (!result.success || type != RegValueType::MultiString ||
+                (data.size() % sizeof(wchar_t)) != 0)
+            {
+                return FALSE;
+            }
+
+            value.resize(data.size() / sizeof(wchar_t));
+            if (!data.empty())
+                memcpy(value.data(), data.data(), data.size());
+            const size_t terminator = value.find(L'\0');
+            if (terminator != std::wstring::npos)
+                value.resize(terminator);
+        }
+        if (!result.success)
+            return FALSE;
+        return CopyModuleTextNarrow(dest, destSize, value.c_str());
+    }
+    catch (...)
+    {
+        dest[0] = 0;
+        return FALSE;
+    }
+}
+
+static BOOL GetEnvironmentPathReportText(BOOL systemDirectory, char* dest,
+                                         size_t destSize) noexcept
+{
+    if (dest == NULL || destSize == 0 || gEnvironment == NULL)
+        return FALSE;
+    dest[0] = 0;
+    try
+    {
+        std::wstring path;
+        const EnvResult result = systemDirectory ? gEnvironment->GetSystemDirectory(path)
+                                                 : gEnvironment->GetWindowsDirectory(path);
+        return result.success && CopyModuleTextNarrow(dest, destSize, path.c_str());
+    }
+    catch (...)
+    {
+        dest[0] = 0;
+        return FALSE;
+    }
 }
 
 //
@@ -142,21 +235,21 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     MEMORY_BASIC_INFORMATION mbi;
     if (VirtualQuery(hModule, &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        lstrcpynA(buffer, "unknown", bufferLen);
         return FALSE;
     }
 
     HRSRC hRes = FindResource(hModule, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
     if (hRes == NULL)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        lstrcpynA(buffer, "unknown", bufferLen);
         return FALSE;
     }
 
     HGLOBAL hVer = LoadResource(hModule, hRes);
     if (hVer == NULL)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        lstrcpynA(buffer, "unknown", bufferLen);
         return FALSE;
     }
 
@@ -164,7 +257,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     const BYTE* first = (BYTE*)LockResource(hVer);
     if (resSize == 0 || first == 0)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        lstrcpynA(buffer, "unknown", bufferLen);
         return FALSE;
     }
     const BYTE* iterator = first + sizeof(VS_VERSIONINFO_HEADER);
@@ -176,7 +269,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
         iterator++;
         if (iterator + 4 >= first + resSize)
         {
-            lstrcpyn(buffer, "unknown", bufferLen);
+            lstrcpynA(buffer, "unknown", bufferLen);
             return FALSE;
         }
     }
@@ -186,7 +279,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     char buff[200];
     sprintf(buff, "%u.%u.%u.%u", HIWORD(ffi->dwFileVersionMS), LOWORD(ffi->dwFileVersionMS),
             HIWORD(ffi->dwFileVersionLS), LOWORD(ffi->dwFileVersionLS));
-    lstrcpyn(buffer, buff, bufferLen);
+    lstrcpynA(buffer, buff, bufferLen);
     return TRUE;
 }
 
@@ -234,9 +327,18 @@ MonitorEnumProc(HMONITOR hMonitor, HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dw
     int index = 0;
     while (EnumDisplayDevices(NULL, index, &dd, 0))
     {
-        if (StrICmp((const char*)dd.DeviceName, mi.szDevice) == 0)
+        // DISPLAY_DEVICE/MONITORINFOEX are the SDK's UNICODE-macro-driven typedefs;
+        // both DeviceName and szDevice are already WCHAR[32] under _UNICODE, so they compare
+        // directly there - the (const char*) reinterpret cast was only a no-op in the narrow
+        // build (both fields already char[32] there), never a real behavior difference.
+        if (_wcsicmp(dd.DeviceName, mi.szDevice) == 0)
         {
-            sprintf(buf, "Monitor %d Device Name.c_str(): %s", data->Index, dd.DeviceString);
+            // DISPLAY_DEVICE's DeviceString is WCHAR[128] under _UNICODE; buf is
+            // this function's own narrow-only text buffer.
+            const int prefixLength = sprintf_s(buf, "Monitor %d Device Name: ", data->Index);
+            if (prefixLength >= 0)
+                CopyModuleTextNarrow(buf + prefixLength, sizeof(buf) - prefixLength,
+                                     dd.DeviceString);
             data->PrintLine(data->Param, buf, TRUE);
             break;
         }
@@ -361,7 +463,7 @@ public:
             myName++;
         else
             myName = name;
-        module.Name = DupStr(myName);
+        module.Name = DupAnsiString(myName);
         if (module.Name == NULL)
             return FALSE;
         module.BaseAddress = baseAdderess;
@@ -423,9 +525,16 @@ typedef void(WINAPI* PGNSI)(LPSYSTEM_INFO);
 #define BUFSIZE 80
 #define SM_SERVERR2 89
 
-BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbuf)
+BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbuf,
+                        size_t avbufCapacity)
 {
-    static OSVERSIONINFOEX osvi;
+    // Explicitly OSVERSIONINFOEXA - the code below deliberately resolves and calls
+    // "GetVersionExA" by name, so the struct it fills must always be the A layout. This is a
+    // SEPARATE variable from the OSVERSIONINFOEX further down, which SalGetVersionEx (a
+    // project-owned, wchar_t-generic-by-design function) fills instead - the two calls need
+    // different struct widths and must not share storage.
+    static OSVERSIONINFOEXA osvi;
+    static OSVERSIONINFOEX osviSal;
     static SYSTEM_INFO si;
     static BOOL bOsVersionInfoEx;
     static PGNSI pGNSI;
@@ -435,23 +544,23 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
 
     // avoid deprecated warning (the function may be removed from the SDK in the future)
     typedef BOOL(WINAPI * FDynGetVersionExA)(LPOSVERSIONINFOA lpVersionInformation);
-    FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetVersionExA");
+    FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetVersionExA");
     if (DynGetVersionExA != NULL)
     {
-        ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-        osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+        ZeroMemory(&osvi, sizeof(OSVERSIONINFOEXA));
+        osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXA);
 
         // Try calling GetVersionEx using the OSVERSIONINFOEX structure.
         // If that fails, try using the OSVERSIONINFO structure.
-        if ((bOsVersionInfoEx = DynGetVersionExA((LPOSVERSIONINFO)&osvi)) == 0)
+        if ((bOsVersionInfoEx = DynGetVersionExA((LPOSVERSIONINFOA)&osvi)) == 0)
         {
             // If OSVERSIONINFOEX doesn't work, try OSVERSIONINFO.
-            osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-            if (!DynGetVersionExA((OSVERSIONINFO*)&osvi))
+            osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOA);
+            if (!DynGetVersionExA((LPOSVERSIONINFOA)&osvi))
                 return FALSE;
         }
 
-        sprintf(buf, "GetVersionEx Version.c_str() %u.%u (Build %u)", osvi.dwMajorVersion,
+        sprintf(buf, "GetVersionEx Version %u.%u (Build %u)", osvi.dwMajorVersion,
                 osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
         if (bOsVersionInfoEx)
         {
@@ -461,16 +570,16 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
         PrintLine(param, buf, TRUE);
     }
 
-    ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-    SalGetVersionEx(&osvi, FALSE); // !!! SLOW, original GetVersionEx() is deprecated !!!
-    sprintf(buf, "SalGetVersionEx Version.c_str() %u.%u (Build %u)", osvi.dwMajorVersion,
-            osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
-    sprintf(buf + strlen(buf), " SP %u.%u, SMask %u, PType %u, PlatId %u", osvi.wServicePackMajor,
-            osvi.wServicePackMinor, osvi.wSuiteMask, osvi.wProductType, osvi.dwPlatformId);
+    ZeroMemory(&osviSal, sizeof(OSVERSIONINFOEX));
+    SalGetVersionEx(&osviSal, FALSE); // !!! SLOW, original GetVersionEx() is deprecated !!!
+    sprintf(buf, "SalGetVersionEx Version %u.%u (Build %u)", osviSal.dwMajorVersion,
+            osviSal.dwMinorVersion, osviSal.dwBuildNumber & 0xFFFF);
+    sprintf(buf + strlen(buf), " SP %u.%u, SMask %u, PType %u, PlatId %u", osviSal.wServicePackMajor,
+            osviSal.wServicePackMinor, osviSal.wSuiteMask, osviSal.wProductType, osviSal.dwPlatformId);
     PrintLine(param, buf, TRUE);
 
     // Call GetNativeSystemInfo if supported or GetSystemInfo otherwise.
-    pGNSI = (PGNSI)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetNativeSystemInfo"); // Min: XP
+    pGNSI = (PGNSI)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "GetNativeSystemInfo"); // Min: XP
     if (pGNSI != NULL)
     {
         pGNSI(&si);
@@ -484,18 +593,24 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
         PrintLine(param, buf, TRUE);
     }
 
-    EnvGetSystemDirectoryA(gEnvironment, avbuf, MAX_PATH);
+    if (!GetEnvironmentPathReportText(TRUE, avbuf, avbufCapacity))
+        lstrcpynA(avbuf, "(unavailable)", static_cast<int>(avbufCapacity));
     sprintf(buf, "System directory: %s", avbuf);
     PrintLine(param, buf, TRUE);
-    EnvGetWindowsDirectoryA(gEnvironment, avbuf, MAX_PATH);
+    if (!GetEnvironmentPathReportText(FALSE, avbuf, avbufCapacity))
+        lstrcpynA(avbuf, "(unavailable)", static_cast<int>(avbufCapacity));
     sprintf(buf, "Windows directory: %s", avbuf);
     PrintLine(param, buf, TRUE);
 
     return TRUE;
 }
 
-const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
+const char* FindModuleName(char* buf, size_t bufCapacity, void* address,
+                           BOOL unloadedName = FALSE)
 {
+    if (buf == NULL || bufCapacity == 0)
+        return "";
+    buf[0] = 0;
     int i;
     for (i = 0; i < GlobalModulesStore.Count; i++)
     {
@@ -512,26 +627,20 @@ const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
                     s = strstr(s, "): ");
                     if (s != NULL)
                     {
+                        const char* moduleText = s + 3;
+                        const char* moduleDetail = strstr(moduleText, " (");
+                        const size_t moduleLength = moduleDetail != NULL
+                                                            ? static_cast<size_t>(moduleDetail - moduleText)
+                                                            : strlen(moduleText);
+                        const int moduleChars = static_cast<int>(
+                            moduleLength > 0x7FFFFFFF ? 0x7FFFFFFF : moduleLength);
                         if (unloadedName)
-                        {
-                            strcpy(buf, "(UNLOADED: ");
-                            lstrcpyn(buf + 11, s + 3, MAX_PATH - 12);
-                            s = strstr(buf + 11, " (");
-                            if (s != NULL)
-                                *s = 0; // if the module is listed as "%s (%s)", name, fullName -- trim fullName
-                            strcat(buf, ")");
-                        }
+                            _snprintf_s(buf, bufCapacity, _TRUNCATE, "(UNLOADED: %.*s)",
+                                        moduleChars, moduleText);
                         else
-                        {
-                            strcpy(buf, " (");
-                            lstrcpyn(buf + 2, s + 3, MAX_PATH - 3);
-                            s = strstr(buf + 2, " (");
-                            if (s != NULL)
-                                *s = 0; // if the module is listed as "%s (%s)", name, fullName -- trim fullName
-                            if (strlen(buf) < MAX_PATH - 15)
-                                sprintf(buf + strlen(buf), ": 0x%X", (DWORD)((char*)address - addr));
-                            strcat(buf, ")");
-                        }
+                            _snprintf_s(buf, bufCapacity, _TRUNCATE, " (%.*s: 0x%X)",
+                                        moduleChars, moduleText,
+                                        (DWORD)((char*)address - addr));
                         return buf;
                     }
                 }
@@ -542,6 +651,73 @@ const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
 }
 
 static CModulesInfo ModulesInfo;
+
+// The bug report is a narrow text file by design and this code runs while the process is
+// crashing. The formatted size remains dynamically owned UTF-16 until this named diagnostic
+// byte sink.
+static void AppendDiskSizeA(char* dst, int dstSizeInChars, const CQuadWord& size)
+{
+    const std::wstring wide = PrintDiskSize(size, 0);
+    int used = (int)strlen(dst);
+    if (used < dstSizeInChars - 1)
+        CopyModuleTextNarrow(dst + used, static_cast<size_t>(dstSizeInChars - used),
+                             wide.c_str());
+}
+
+// The bug report is an ACP byte stream. Keep its encoding at this named sink while the
+// numeric value and locale separator stay native-wide everywhere else.
+static void AppendNumberA(char* dst, int dstSizeInChars, const CQuadWord& number)
+{
+    const std::wstring wide = NumberToStr(number);
+    const int used = static_cast<int>(strlen(dst));
+    if (used < dstSizeInChars - 1)
+        CopyModuleTextNarrow(dst + used, static_cast<size_t>(dstSizeInChars - used), wide.c_str());
+}
+
+static BOOL GetDosDeviceReportText(BYTE driveNum, char* target, size_t targetSize)
+{
+    std::wstring deviceName;
+    if (!MyQueryDosDeviceW(driveNum, deviceName))
+        return FALSE;
+    CopyModuleTextNarrow(target, targetSize, deviceName.c_str());
+    return TRUE;
+}
+
+static BOOL GetVolumeReportText(const wchar_t* root, char* volumeName,
+                                size_t volumeNameSize, char* fileSystemName,
+                                size_t fileSystemNameSize,
+                                DWORD* volumeSerialNumber,
+                                DWORD* maximumComponentLength,
+                                DWORD* fileSystemFlags)
+{
+    std::wstring volumeNameW;
+    std::wstring fileSystemNameW;
+    if (!MyGetVolumeInformationW(root, NULL, NULL, NULL, &volumeNameW,
+                                 volumeSerialNumber, maximumComponentLength,
+                                 fileSystemFlags, &fileSystemNameW))
+        return FALSE;
+    CopyModuleTextNarrow(volumeName, volumeNameSize, volumeNameW.c_str());
+    CopyModuleTextNarrow(fileSystemName, fileSystemNameSize,
+                         fileSystemNameW.c_str());
+    return TRUE;
+}
+
+// Keep C++ ownership outside PrintBugReport: that function contains SEH
+// __try blocks and therefore cannot contain objects that require unwinding.
+static BOOL AppendPluginFSPathA(CPluginFSInterfaceEncapsulation* pluginFS,
+                                char* target, size_t targetSize)
+{
+    if (pluginFS == NULL || target == NULL || targetSize == 0)
+        return FALSE;
+    std::wstring path;
+    if (!pluginFS->GetCurrentPathW(path))
+        return FALSE;
+    const size_t used = strlen(target);
+    if (used >= targetSize)
+        return FALSE;
+    CopyModuleTextNarrow(target + used, targetSize - used, path.c_str());
+    return TRUE;
+}
 
 void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, DWORD ShellExtCrashID,
                                 FPrintLine PrintLine, void* param)
@@ -555,12 +731,20 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
     static char buf[1024];
     static char num[50];
-    static char avbuf[MAX_PATH];
-    static char nameBuf[MAX_PATH];
+    // Final crash-report byte scratch. Its capacity is derived from the external
+    // MODULEENTRY32W component contract and worst-case UTF-8 expansion, not a path limit.
+    static char avbuf[sizeof(((MODULEENTRY32*)0)->szExePath) * 2 + 1];
+    static char nameBuf[sizeof(((MODULEENTRY32*)0)->szExePath) * 2 + 1];
+    static char volumeNameA[2000];
+    static char fileSystemNameA[200];
+    static char deviceNameA[4096];
     // Scratch for the shell-integration sections. Static like the rest: this runs inside a
     // process that may already be crashing, so we do not want it on the stack. Sized for a
     // \uXXXX-escaped long path plus the surrounding fields.
     static char BugReportDiagBuf[4096];
+    // Fixed crash-path byte scratch is intentional. The semantic reason is dynamically
+    // owned UTF-16; this diagnostic sink may truncate but never feeds runtime behavior.
+    static char BugReportReasonBreakA[6001];
 
     strcpy(buf, SALAMANDER_TEXT_VERSION);
 #ifdef _DEBUG
@@ -584,7 +768,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
             case EXCEPTION_ACCESS_VIOLATION:
             {
-                lstrcpy(avbuf, "access violation");
+                lstrcpyA(avbuf, "access violation");
                 if (Exception->ExceptionRecord->NumberParameters >= 2)
                 {
                     sprintf(avbuf + strlen(avbuf), ": %s on 0x%p",
@@ -620,7 +804,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             PrintLine(param, buf, TRUE);
             sprintf(buf, "Exception origin: thread ID = 0x%X, execution address = 0x%p%s", ThreadID,
                     Exception->ExceptionRecord->ExceptionAddress,
-                    FindModuleName(nameBuf, Exception->ExceptionRecord->ExceptionAddress));
+                    FindModuleName(nameBuf, _countof(nameBuf),
+                                   Exception->ExceptionRecord->ExceptionAddress));
             PrintLine(param, buf, TRUE);
             if (IsDebuggerPresent())
             {
@@ -643,10 +828,16 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 #endif // CALLSTK_DISABLE
         }
 
-        if (BugReportReasonBreak[0] != 0)
+        const wchar_t* bugReportReasonBreak = GetBugReportReasonBreak();
+        if (bugReportReasonBreak[0] != 0)
         {
             PrintLine(param, "Break was used.", FALSE);
-            PrintLine(param, BugReportReasonBreak, FALSE);
+            // The report writer is intentionally ANSI. Escaping here preserves every
+            // UTF-16 code unit without a locale-dependent CP_ACP conversion while the
+            // crash-path producers and retained reason remain wide.
+            AppendAsciiEscapedW(bugReportReasonBreak, BugReportReasonBreakA,
+                                (int)sizeof(BugReportReasonBreakA));
+            PrintLine(param, BugReportReasonBreakA, FALSE);
             PrintLine(param, "", FALSE);
         }
 
@@ -699,14 +890,14 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 {
                     sprintf(buf, "Thread with Exception (ID: 0x%X)", stack->ThreadID);
                     char* term = buf + strlen(buf);
-                    const char* dll = stack->GetPluginDLLName();
+                    const wchar_t* dll = stack->GetPluginDLLName();
                     if (dll != NULL)
                     {
                         __try
                         {
-                            CPluginData* data = Plugins.GetPluginData(dll);
+                            CPluginData* data = FindPluginDataByDllName(dll);
                             if (data != NULL)
-                                sprintf(term, ": in %s", data->Name.c_str());
+                                sprintf(term, ": in %ls", data->Name.c_str());
                         }
                         __except (EXCEPTION_EXECUTE_HANDLER)
                         {
@@ -905,15 +1096,15 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                 {
                                     // spaces waste space; disable them and rather append the values
                                     //                if (j > 0)
-                                    //                  lstrcat(buf, " ");
+                                    //                  lstrcatA(buf, " ");
                                     __try
                                     {
-                                        sprintf(buf + lstrlen(buf), "%02X", *(iterator + j));
+                                        sprintf(buf + lstrlenA(buf), "%02X", *(iterator + j));
                                         j++;
                                     }
                                     __except (EXCEPTION_EXECUTE_HANDLER)
                                     {
-                                        lstrcat(buf, "(exception)");
+                                        lstrcatA(buf, "(exception)");
                                         j = 28;
                                     }
                                 }
@@ -1052,15 +1243,15 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                 {
                                     // spaces waste space; disable them and rather append the values
                                     //                if (j > 0)
-                                    //                  lstrcat(buf, " ");
+                                    //                  lstrcatA(buf, " ");
                                     __try
                                     {
-                                        sprintf(buf + lstrlen(buf), "%02X", *(iterator + j));
+                                        sprintf(buf + lstrlenA(buf), "%02X", *(iterator + j));
                                         j++;
                                     }
                                     __except (EXCEPTION_EXECUTE_HANDLER)
                                     {
-                                        lstrcat(buf, "(exception)");
+                                        lstrcatA(buf, "(exception)");
                                         j = 28;
                                     }
                                 }
@@ -1128,256 +1319,256 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         {
             PrintLine(param, "Window Handles:", FALSE);
 
-            lstrcpy(buf, "MainWindow=");
+            lstrcpyA(buf, "MainWindow=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftPanel=");
+            lstrcpyA(buf, "LeftPanel=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->LeftPanel);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftFilesBox=");
+            lstrcpyA(buf, "LeftFilesBox=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->ListBox);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->LeftPanel->ListBox);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftDirectoryLine=");
+            lstrcpyA(buf, "LeftDirectoryLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftToolBar=");
+            lstrcpyA(buf, "LeftToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine->ToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine->ToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftStatusLine=");
+            lstrcpyA(buf, "LeftStatusLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->StatusLine);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->LeftPanel->StatusLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightPanel=");
+            lstrcpyA(buf, "RightPanel=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->RightPanel);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightFilesBox=");
+            lstrcpyA(buf, "RightFilesBox=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->ListBox);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->RightPanel->ListBox);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightDirectoryLine=");
+            lstrcpyA(buf, "RightDirectoryLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->RightPanel->DirectoryLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightToolBar=");
+            lstrcpyA(buf, "RightToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine->ToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->RightPanel->DirectoryLine->ToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightStatusLine=");
+            lstrcpyA(buf, "RightStatusLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->StatusLine);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->RightPanel->StatusLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "TopRebar=");
+            lstrcpyA(buf, "TopRebar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->HTopRebar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->HTopRebar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "MenuBar=");
+            lstrcpyA(buf, "MenuBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->MenuBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->MenuBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "TopToolBar=");
+            lstrcpyA(buf, "TopToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->TopToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->TopToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "MiddleToolBar=");
+            lstrcpyA(buf, "MiddleToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->MiddleToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->MiddleToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "UMToolBar=");
+            lstrcpyA(buf, "UMToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->UMToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->UMToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "HPToolBar=");
+            lstrcpyA(buf, "HPToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->HPToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->HPToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "PluginsBar=");
+            lstrcpyA(buf, "PluginsBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->PluginsBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->PluginsBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "DriveBar=");
+            lstrcpyA(buf, "DriveBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->DriveBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->DriveBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "DriveBar2=");
+            lstrcpyA(buf, "DriveBar2=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->DriveBar2);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->DriveBar2);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "BottomToolBar=");
+            lstrcpyA(buf, "BottomToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->BottomToolBar);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->BottomToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "EditWindow=");
+            lstrcpyA(buf, "EditWindow=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->EditWindow);
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->EditWindow);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "EditLine=");
+            lstrcpyA(buf, "EditLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->EditWindow->GetEditLine());
+                sprintf(buf + lstrlenA(buf), "0x%p", MainWindow->EditWindow->GetEditLine());
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                lstrcatA(buf, "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
@@ -1453,8 +1644,6 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "ConfigWasImported = %d", Configuration.ConfigWasImported);
         PrintLine(param, buf, TRUE);
-        sprintf(buf, "UseSalOpen = %d", Configuration.UseSalOpen);
-        PrintLine(param, buf, TRUE);
         sprintf(buf, "NetwareFastDirMove = %d", Configuration.NetwareFastDirMove);
         PrintLine(param, buf, TRUE);
         sprintf(buf, "UseAsyncCopyAlg = %d", Configuration.UseAsyncCopyAlg);
@@ -1463,7 +1652,10 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "AutoSave = %d", Configuration.AutoSave);
         PrintLine(param, buf, TRUE);
-        sprintf(buf, "IfPathIsInaccessibleGoTo (isMyDocs = %d) = %s", Configuration.IfPathIsInaccessibleGoToIsMyDocs, Configuration.IfPathIsInaccessibleGoTo.Get());
+        AppendAsciiEscapedW(Configuration.IfPathIsInaccessibleGoTo.c_str(), BugReportDiagBuf,
+                            (int)sizeof(BugReportDiagBuf));
+        _snprintf_s(buf, _TRUNCATE, "IfPathIsInaccessibleGoTo (isMyDocs = %d) = %s",
+                    Configuration.IfPathIsInaccessibleGoToIsMyDocs, BugReportDiagBuf);
         PrintLine(param, buf, TRUE);
         sprintf(buf, "NoDrives = 0x%08X", SystemPolicies.GetNoDrives());
         PrintLine(param, buf, TRUE);
@@ -1473,7 +1665,9 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "EnableCustomIconOverlays = %d", Configuration.EnableCustomIconOverlays);
         PrintLine(param, buf, TRUE);
-        _snprintf_s(buf, _TRUNCATE, "DisabledCustomIconOverlays = %s", Configuration.DisabledCustomIconOverlays);
+        AppendAsciiEscapedW(Configuration.DisabledCustomIconOverlays, BugReportDiagBuf,
+                            (int)sizeof(BugReportDiagBuf));
+        _snprintf_s(buf, _TRUNCATE, "DisabledCustomIconOverlays = %s", BugReportDiagBuf);
         PrintLine(param, buf, TRUE);
         PrintLine(param, "", FALSE);
     }
@@ -1492,7 +1686,9 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
     {
         PrintLine(param, "Icon Overlays:", FALSE);
 
-        _snprintf_s(buf, _TRUNCATE, "Config root in use: %s", ShellOverlayDiag.Header.ConfigRoot);
+        AppendAsciiEscapedW(ShellOverlayDiag.Header.ConfigRoot.c_str(), BugReportDiagBuf,
+                            (int)sizeof(BugReportDiagBuf));
+        _snprintf_s(buf, _TRUNCATE, "Config root in use: %s", BugReportDiagBuf);
         PrintLine(param, buf, TRUE);
         _snprintf_s(buf, _TRUNCATE, "ANSI code page: %u   Registered: %d   Loaded: %d",
                     ShellOverlayDiag.Header.AnsiCodePage,
@@ -1572,7 +1768,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 {
                 case ptDisk:
                 {
-                    sprintf(buf, "Path = %s", panel->GetPath());
+                    // GetPathW is wide-only; %ls (not %s) is required here.
+                    sprintf(buf, "Path = %ls", panel->GetPathW());
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "PanelType = %d", panel->GetPanelType());
                     PrintLine(param, buf, TRUE);
@@ -1614,7 +1811,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "SortedWithDetectNum = %d", panel->SortedWithDetectNum);
                     PrintLine(param, buf, TRUE);
-                    sprintf(buf, "NextFocusName = %s", panel->NextFocusName.Get());
+                    sprintf(buf, "NextFocusName = %ls", panel->NextFocusNameW.c_str());
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "FocusFirstNewItem = %d", panel->FocusFirstNewItem);
                     PrintLine(param, buf, TRUE);
@@ -1645,9 +1842,10 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
                 case ptZIPArchive:
                 {
-                    sprintf(buf, "Archive = %s", panel->GetZIPArchive());
+                    // GetZIPArchive/GetZIPPath are wide-only; %ls is required here.
+                    sprintf(buf, "Archive = %ls", panel->GetZIPArchive());
                     PrintLine(param, buf, TRUE);
-                    sprintf(buf, "ArcPath = %s", panel->GetZIPPath());
+                    sprintf(buf, "ArcPath = %ls", panel->GetZIPPath());
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "Dirs = %d", panel->Dirs != NULL ? panel->Dirs->Count : -1);
                     PrintLine(param, buf, TRUE);
@@ -1662,18 +1860,19 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
                 case ptPluginFS:
                 {
-                    sprintf(buf, "FSPath = %s:", panel->GetPluginFS()->GetPluginFSName());
+                    sprintf(buf, "FSPath = %ls:", panel->GetPluginFS()->GetPluginFSName());
                     __try
                     {
                         if (!panel->GetPluginFS()->NotEmpty() ||
-                            !panel->GetPluginFS()->GetCurrentPath(buf + lstrlen(buf)))
+                            !AppendPluginFSPathA(panel->GetPluginFS(), buf,
+                                                 _countof(buf)))
                         {
-                            lstrcat(buf, !panel->GetPluginFS()->NotEmpty() ? "(empty)" : "(error)");
+                            lstrcatA(buf, !panel->GetPluginFS()->NotEmpty() ? "(empty)" : "(error)");
                         }
                     }
                     __except (EXCEPTION_EXECUTE_HANDLER)
                     {
-                        lstrcat(buf, "(exception)");
+                        lstrcatA(buf, "(exception)");
                     }
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "Plugin DLL is ");
@@ -1683,16 +1882,16 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         {
                             CPluginData* data = Plugins.GetPluginData(panel->GetPluginFS()->GetPluginInterfaceForFS()->GetInterface());
                             if (data != NULL)
-                                sprintf(buf + lstrlen(buf), "%s v. %s", data->DLLName.c_str(), data->Version.c_str());
+                                sprintf(buf + lstrlenA(buf), "%ls v. %ls", data->DLLName.c_str(), data->Version.c_str());
                             else
-                                lstrcat(buf, "(error)");
+                                lstrcatA(buf, "(error)");
                         }
                         else
-                            lstrcat(buf, "(empty)");
+                            lstrcatA(buf, "(empty)");
                     }
                     __except (EXCEPTION_EXECUTE_HANDLER)
                     {
-                        lstrcat(buf, "(exception)");
+                        lstrcatA(buf, "(exception)");
                     }
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "Dirs = %d", panel->Dirs != NULL ? panel->Dirs->Count : -1);
@@ -1740,6 +1939,11 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
         if (snap != (HANDLE)-1)
         {
+            // tlhelp32.h has no explicit-A form for this API: MODULEENTRY32/
+            // Module32First/Module32Next ARE the narrow names (Module32FirstW/MODULEENTRY32W
+            // are the only suffixed forms; UNICODE #defines the bare names away to those). No
+            // safe shortcut exists here - genuine P4/Task-30 scope, same shape as
+            // SE_RESTORE_NAME's lack of a wide form in reverse.
             static MODULEENTRY32 module;
             module.dwSize = sizeof(module);
             if (Module32First(snap, &module))
@@ -1748,18 +1952,27 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 {
                     if ((int)module.dwSize >= ((char*)(&(module.szExePath)) - (char*)(&(module.dwSize))))
                     {
-                        static char modulePath[MAX_PATH];
+                        static char modulePath[sizeof(module.szExePath) * 2 + 1];
                         if (module.dwSize == sizeof(module))
                         {
-                            lstrcpy(modulePath, module.szExePath);
+                            // module.szExePath/szModule are genuinely wchar_t-generic
+                            // (no explicit-A form exists on MODULEENTRY32 - see the comment
+                            // above); modulePath/nameBuf feed this function's narrow-only crash-
+                            // report text (buf, sprintf below). PrintBugReport has its own __try,
+                            // so this goes through CopyModuleTextNarrow (an ordinary function)
+                            // rather than a local std::string here - see its definition and
+                            // comment near AddNewlyLoadedModulesToGlobalModulesStore.
+                            CopyModuleTextNarrow(modulePath, _countof(modulePath), module.szExePath);
                         }
                         else
-                            lstrcpy(modulePath, "(unknown)");
-                        lstrcpy(nameBuf, module.szModule);
+                            lstrcpyA(modulePath, "(unknown)");
+                        CopyModuleTextNarrow(nameBuf, _countof(nameBuf), module.szModule);
                         static char ver[100];
                         GetModuleVersion((HINSTANCE)module.modBaseAddr, ver, 100);
-                        sprintf(buf, "0x%p (size: 0x%X) (ver: %s): %s (%s)", module.modBaseAddr, module.modBaseSize, ver,
-                                nameBuf, modulePath);
+                        _snprintf_s(buf, _countof(buf), _TRUNCATE,
+                                    "0x%p (size: 0x%X) (ver: %s): %s (%s)",
+                                    module.modBaseAddr, module.modBaseSize, ver, nameBuf,
+                                    modulePath);
                         if (isModuleLoaded != NULL && FindInGlobalModulesStore(buf, foundIndex) &&
                             foundIndex < globalModulesStoreCount)
                         {
@@ -1827,7 +2040,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         CPluginData* plugin;
         while ((plugin = Plugins.Get(pluginIndex++)) != NULL)
         {
-            sprintf(buf, "%s: %s v. %s", plugin->Name.c_str(), plugin->DLLName.c_str(), plugin->Version.c_str());
+            // CPluginData::Name/DLLName/Version are all std::wstring; %ls is required here.
+            sprintf(buf, "%ls: %ls v. %ls", plugin->Name.c_str(), plugin->DLLName.c_str(), plugin->Version.c_str());
             if (plugin->DLL != NULL)
                 sprintf(buf + strlen(buf), ", loaded (0x%p)", plugin->DLL);
             else
@@ -1863,11 +2077,11 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, FALSE);
         PrintLine(param, "", FALSE);
 
-        lstrcpy(buf, "Module Name.c_str(): ");
-        GetModuleFileName(HInstance, buf + strlen(buf), 1000);
+        lstrcpyA(buf, "Module Name: ");
+        GetModuleFileNameA(HInstance, buf + strlen(buf), 1000);
         PrintLine(param, buf, FALSE);
 
-        const char* cmdline = GetCommandLine();
+        const char* cmdline = GetCommandLineA();
         _snprintf_s(buf, _TRUNCATE, "Command Line: %s", cmdline);
         PrintLine(param, buf, FALSE);
 
@@ -1876,22 +2090,22 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
         LCID lcid = GetThreadLocale();
 
-        lstrcpy(buf, "Country: ");
-        GetLocaleInfo(lcid, LOCALE_ICOUNTRY, buf + strlen(buf), 100);
-        lstrcat(buf, " (");
-        GetLocaleInfo(lcid, LOCALE_SENGCOUNTRY, buf + strlen(buf), 100);
-        lstrcat(buf, ")");
+        lstrcpyA(buf, "Country: ");
+        GetLocaleInfoA(lcid, LOCALE_ICOUNTRY, buf + strlen(buf), 100);
+        lstrcatA(buf, " (");
+        GetLocaleInfoA(lcid, LOCALE_SENGCOUNTRY, buf + strlen(buf), 100);
+        lstrcatA(buf, ")");
         PrintLine(param, buf, FALSE);
 
-        lstrcpy(buf, "Language: ");
-        GetLocaleInfo(lcid, LOCALE_ILANGUAGE, buf + strlen(buf), 100);
-        lstrcat(buf, " (");
-        GetLocaleInfo(lcid, LOCALE_SENGLANGUAGE, buf + strlen(buf), 100);
-        lstrcat(buf, ")");
+        lstrcpyA(buf, "Language: ");
+        GetLocaleInfoA(lcid, LOCALE_ILANGUAGE, buf + strlen(buf), 100);
+        lstrcatA(buf, " (");
+        GetLocaleInfoA(lcid, LOCALE_SENGLANGUAGE, buf + strlen(buf), 100);
+        lstrcatA(buf, ")");
         PrintLine(param, buf, FALSE);
 
-        lstrcpy(buf, "Code Page: ");
-        GetLocaleInfo(lcid, LOCALE_IDEFAULTANSICODEPAGE, buf + strlen(buf), 100);
+        lstrcpyA(buf, "Code Page: ");
+        GetLocaleInfoA(lcid, LOCALE_IDEFAULTANSICODEPAGE, buf + strlen(buf), 100);
         PrintLine(param, buf, FALSE);
 
         PrintLine(param, "", FALSE);
@@ -1905,7 +2119,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
     __try
     {
-        PrintSystemVersion(PrintLine, param, buf, avbuf);
+        PrintSystemVersion(PrintLine, param, buf, avbuf, _countof(avbuf));
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -1918,7 +2132,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
     IRegistry* registry = GetBugReportRegistry();
     __try
     {
-        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, SAL_REG_KEY_MICROSOFT_IE_A, hKey).success)
+        if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE, SAL_REG_KEY_MICROSOFT_IE_W, hKey).success)
         {
             static char iver[50];
             static char build[50];
@@ -1926,29 +2140,29 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             iver[0] = 0;
             build[0] = 0;
             version[0] = 0;
-            GetStringA(registry, hKey, SAL_REG_VALUE_IE_IVER_A, iver, _countof(iver));
-            GetStringA(registry, hKey, SAL_REG_VALUE_BUILD_A, build, _countof(build));
-            GetStringA(registry, hKey, SAL_REG_VALUE_VERSION_A, version, _countof(version));
+            CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_IE_IVER_W, iver, _countof(iver));
+            CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_BUILD_W, build, _countof(build));
+            CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_VERSION_W, version, _countof(version));
 
             if (iver[0] != 0 || build[0] != 0 || version[0] != 0)
             {
-                lstrcpy(buf, "IE ");
+                lstrcpyA(buf, "IE ");
                 if (version[0] != 0)
                 {
-                    lstrcat(buf, "Version.c_str(): ");
-                    lstrcat(buf, version);
-                    lstrcat(buf, " ");
+                    lstrcatA(buf, "Version: ");
+                    lstrcatA(buf, version);
+                    lstrcatA(buf, " ");
                 }
                 if (build[0] != 0)
                 {
-                    lstrcat(buf, "Build: ");
-                    lstrcat(buf, build);
-                    lstrcat(buf, " ");
+                    lstrcatA(buf, "Build: ");
+                    lstrcatA(buf, build);
+                    lstrcatA(buf, " ");
                 }
                 if (iver[0] != 0)
                 {
-                    lstrcat(buf, "IVer: ");
-                    lstrcat(buf, iver);
+                    lstrcatA(buf, "IVer: ");
+                    lstrcatA(buf, iver);
                 }
                 PrintLine(param, buf, TRUE);
             }
@@ -1956,20 +2170,20 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             registry->CloseKey(hKey);
         }
 
-        sprintf(buf, "COMCTL32.DLL Version.c_str(): %u.%u", CCVerMajor, CCVerMinor);
+        sprintf(buf, "COMCTL32.DLL Version: %u.%u", CCVerMajor, CCVerMinor);
         PrintLine(param, buf, TRUE);
 
-        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         SAL_REG_KEY_WINDOWS_NT_CURRENT_VERSION_A, hKey).success)
+        if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE,
+                                  SAL_REG_KEY_WINDOWS_NT_CURRENT_VERSION_W, hKey).success)
         {
             char myBuff[100];
 
-            if (GetStringA(registry, hKey, SAL_REG_VALUE_WINDOWS_PRODUCT_NAME_A, myBuff, _countof(myBuff)).success)
+            if (CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_WINDOWS_PRODUCT_NAME_W, myBuff, _countof(myBuff)))
             {
                 sprintf(buf, "ProductName (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
             }
-            if (GetStringA(registry, hKey, SAL_REG_VALUE_WINDOWS_CURRENT_VERSION_A, myBuff, _countof(myBuff)).success)
+            if (CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_WINDOWS_CURRENT_VERSION_W, myBuff, _countof(myBuff)))
             {
                 sprintf(buf, "CurrentVersion (from registry): %s", myBuff);
                 PrintLine(param, buf, TRUE);
@@ -1980,13 +2194,14 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         // try to locate the main LiteStep window
 #define LM_GETREVID 9265
 #define LS_BUFSIZE 2048
-        HWND hLiteStepWnd = FindWindow("TApplication", "LiteStep");
+        // narrow literals - explicit FindWindowA.
+        HWND hLiteStepWnd = FindWindowA("TApplication", "LiteStep");
         if (hLiteStepWnd != NULL)
         {
             static char buffer[LS_BUFSIZE];
             buffer[0] = 0;
 
-            lstrcpy(buf, "LiteStep");
+            lstrcpyA(buf, "LiteStep");
 
             int msgflags = 0;
             msgflags |= (LS_BUFSIZE << 4);
@@ -1999,14 +2214,14 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 while (*p != 0 && *p != '\n')
                     p++;
                 *p = 0;
-                lstrcat(buf, " ");
-                lstrcat(buf, buffer);
+                lstrcatA(buf, " ");
+                lstrcatA(buf, buffer);
                 // Do whatever
             }
             else
             {
                 // it failed - at least report it is running
-                lstrcat(buf, " is present");
+                lstrcatA(buf, " is present");
             }
             PrintLine(param, buf, TRUE);
         }
@@ -2056,32 +2271,32 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "Processor Level: %u", si.wProcessorLevel);
         PrintLine(param, buf, TRUE);
-        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         SAL_REG_KEY_HARDWARE_CPU0_A, hKey).success)
+        if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE,
+                                  SAL_REG_KEY_HARDWARE_CPU0_W, hKey).success)
         {
             static char processorName[200];
             static char vendorName[200];
             DWORD mhz;
 
-            if (!GetStringA(registry, hKey, SAL_REG_VALUE_PROCESSOR_NAME_STRING_A, processorName, _countof(processorName)).success)
-                if (!GetStringA(registry, hKey, SAL_REG_VALUE_IDENTIFIER_A, processorName, _countof(processorName)).success) // probably unnecessary on W2K+
+            if (!CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_PROCESSOR_NAME_STRING_W, processorName, _countof(processorName)))
+                if (!CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_IDENTIFIER_W, processorName, _countof(processorName))) // probably unnecessary on W2K+
                     processorName[0] = 0;
-            if (!GetStringA(registry, hKey, SAL_REG_VALUE_VENDOR_IDENTIFIER_A, vendorName, _countof(vendorName)).success)
+            if (!CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_VENDOR_IDENTIFIER_W, vendorName, _countof(vendorName)))
                 vendorName[0] = 0;
-            if (!GetDWordA(registry, hKey, SAL_REG_VALUE_PROCESSOR_SPEED_MHZ_A, mhz).success)
+            if (!registry->GetDWord(hKey, SAL_REG_VALUE_PROCESSOR_SPEED_MHZ_W, mhz).success)
             {
                 if (!GetProcessorSpeed(&mhz))
                     mhz = 0;
             }
             if (vendorName[0] != 0)
-                sprintf(buf, "Processor Vendor Name.c_str(): %s", vendorName);
+                sprintf(buf, "Processor Vendor Name: %s", vendorName);
             PrintLine(param, buf, TRUE);
             if (processorName[0] != 0)
             {
                 char* ss = processorName;
                 while (*ss == ' ')
                     ss++; // Intel adds spaces before the processor name so it looks nicer in the Control Panel System window
-                sprintf(buf, "Processor Name.c_str(): %s", ss);
+                sprintf(buf, "Processor Name: %s", ss);
                 PrintLine(param, buf, TRUE);
             }
             if (mhz != 0)
@@ -2120,25 +2335,21 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             PrintLine(param, buf, TRUE);
         }
 
-        if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                         SAL_REG_KEY_HARDWARE_DESCRIPTION_SYSTEM_A, hKey).success)
+        if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE,
+                                  SAL_REG_KEY_HARDWARE_DESCRIPTION_SYSTEM_W, hKey).success)
         {
             static char bios[200];
 
-            DWORD bufferSize = 200;
             bios[0] = 0;
-            SalRegQueryValueEx(hKey, SAL_REG_VALUE_SYSTEM_BIOS_VERSION_A, NULL, NULL, (BYTE*)bios, &bufferSize);
-            bios[_countof(bios) - 1] = 0; // at least terminate the buffer with a zero
+            CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_SYSTEM_BIOS_VERSION_W, bios, _countof(bios));
             if (bios[0] != 0)
             {
-                sprintf(buf, "BIOS Version.c_str(): %s", bios);
+                sprintf(buf, "BIOS Version: %s", bios);
                 PrintLine(param, buf, TRUE);
             }
 
-            bufferSize = 200;
             bios[0] = 0;
-            SalRegQueryValueEx(hKey, SAL_REG_VALUE_SYSTEM_BIOS_DATE_A, NULL, NULL, (BYTE*)bios, &bufferSize);
-            bios[_countof(bios) - 1] = 0; // at least terminate the buffer with a zero
+            CopyRegistryTextNarrow(registry, hKey, SAL_REG_VALUE_SYSTEM_BIOS_DATE_W, bios, _countof(bios));
             if (bios[0] != 0)
             {
                 sprintf(buf, "BIOS Date: %s", bios);
@@ -2273,7 +2484,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                     const char* name;
                                     if (modInfo == NULL)
                                     {
-                                        name = FindModuleName(nameBuf, (void*)controlPc, TRUE);
+                                        name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                              (void*)controlPc, TRUE);
                                         if (*name == 0)
                                             name = "(unknown module)";
                                     }
@@ -2327,7 +2539,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                 const char* name;
                                 if (modInfo == NULL)
                                 {
-                                    name = FindModuleName(nameBuf, (void*)ctx.Eip, TRUE);
+                                    name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                          (void*)ctx.Eip, TRUE);
                                     if (*name == 0)
                                         name = "(unknown module)";
                                 }
@@ -2352,7 +2565,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                         modInfo = ModulesInfo.Find((void*)retAddr);
                                         if (modInfo == NULL)
                                         {
-                                            name = FindModuleName(nameBuf, (void*)retAddr, TRUE);
+                                            name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                                  (void*)retAddr, TRUE);
                                             if (*name == 0)
                                                 name = "(unknown module)";
                                         }
@@ -2418,7 +2632,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                             const char* name;
                             if (modInfo == NULL)
                             {
-                                name = FindModuleName(nameBuf, (void*)controlPc, TRUE);
+                                name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                      (void*)controlPc, TRUE);
                                 if (*name == 0)
                                     name = "(unknown module)";
                             }
@@ -2472,7 +2687,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         const char* name;
                         if (modInfo == NULL)
                         {
-                            name = FindModuleName(nameBuf, (void*)ctx.Eip, TRUE);
+                            name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                  (void*)ctx.Eip, TRUE);
                             if (*name == 0)
                                 name = "(unknown module)";
                         }
@@ -2497,7 +2713,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                 modInfo = ModulesInfo.Find((void*)retAddr);
                                 if (modInfo == NULL)
                                 {
-                                    name = FindModuleName(nameBuf, (void*)retAddr, TRUE);
+                                    name = FindModuleName(nameBuf, _countof(nameBuf),
+                                                          (void*)retAddr, TRUE);
                                     if (*name == 0)
                                         name = "(unknown module)";
                                 }
@@ -2566,10 +2783,11 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             // available drives
             // lowest bit corresponds to 'A', the second bit to 'B', ...
             DWORD netDrives; // bitfield of network drives
-            static char bufForGetNetworkDrives[10000];
+            static BYTE bufForGetNetworkDrives[10000];
             __try
             {
-                GetNetworkDrivesBody(netDrives, NULL, bufForGetNetworkDrives);
+                GetNetworkDrivesBody(netDrives, NULL, bufForGetNetworkDrives,
+                                     sizeof(bufForGetNetworkDrives));
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
@@ -2579,15 +2797,15 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             DWORD mask = GetLogicalDrives();
             int i = 1;
             char drive = 'A';
-            char root[10] = " :\\";
+            wchar_t rootW[4] = L" :\\";
             while (i != 0)
             {
                 if ((mask & i) || (netDrives & i)) // drive is accessible
                 {
                     BOOL accessible = (mask & i) != 0;
-                    root[0] = drive;
-                    UINT driveType = MyGetDriveType(root);
-                    strcpy(buf, root);
+                    rootW[0] = static_cast<wchar_t>(drive);
+                    UINT driveType = MyGetDriveTypeW(rootW);
+                    sprintf(buf, "%c:\\", drive);
                     if (driveType <= 6)
                     {
                         const char* drvTypeStrp[7] = {"unknown", "no root dir", "removable", "fixed", "remote", "cdrom", "ramdisk"};
@@ -2608,23 +2826,22 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                     if (getMoreInfo)
                     {
                         //---  GetVolumeInformation
-                        static char volumeName[1000]; // used later as a buffer
-                                                      //        static char buff[300];
                         DWORD volumeSerialNumber;
                         DWORD maximumComponentLength;
                         DWORD fileSystemFlags;
-                        static char fileSystemNameBuffer[100];
-                        BOOL err = (MyGetVolumeInformation(root, NULL, NULL, NULL, volumeName, 200,
-                                                           &volumeSerialNumber, &maximumComponentLength, &fileSystemFlags,
-                                                           fileSystemNameBuffer, 100) == 0);
+                        BOOL err = !GetVolumeReportText(
+                            rootW, volumeNameA, _countof(volumeNameA),
+                            fileSystemNameA, _countof(fileSystemNameA),
+                            &volumeSerialNumber, &maximumComponentLength,
+                            &fileSystemFlags);
                         if (!err)
                         {
                             buf[0] = 0;
-                            if (*volumeName != 0)
-                                sprintf(buf + strlen(buf), "  LB: %s", volumeName);
+                            if (volumeNameA[0] != 0)
+                                sprintf(buf + strlen(buf), "  LB: %s", volumeNameA);
                             sprintf(buf + strlen(buf), "  SN: %04X-%04X", HIWORD(volumeSerialNumber), LOWORD(volumeSerialNumber));
                             sprintf(buf + strlen(buf), "  FL: 0x%08X", fileSystemFlags);
-                            sprintf(buf + strlen(buf), "  FS: %s", fileSystemNameBuffer);
+                            sprintf(buf + strlen(buf), "  FS: %s", fileSystemNameA);
                             sprintf(buf + strlen(buf), "  LN: %s", maximumComponentLength > 100 ? "yes" : "no");
 
                             PrintLine(param, buf, TRUE);
@@ -2635,12 +2852,12 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         DWORD bytesPerSector;
                         DWORD numberOfFreeClusters;
                         DWORD totalNumberOfClusters;
-                        err = (MyGetDiskFreeSpace(root, &sectorsPerCluster, &bytesPerSector,
-                                                  &numberOfFreeClusters, &totalNumberOfClusters) == 0);
+                        err = (MyGetDiskFreeSpaceW(rootW, &sectorsPerCluster, &bytesPerSector,
+                                                   &numberOfFreeClusters, &totalNumberOfClusters) == 0);
 
                         CQuadWord diskTotalBytes = CQuadWord(-1, -1), diskFreeBytes;
                         ULARGE_INTEGER availBytes, totalBytes, freeBytes;
-                        if (GetDiskFreeSpaceEx(root, &availBytes, &totalBytes, &freeBytes))
+                        if (GetDiskFreeSpaceExW(rootW, &availBytes, &totalBytes, &freeBytes))
                         {
                             diskTotalBytes.Value = (unsigned __int64)totalBytes.QuadPart;
                             diskFreeBytes.Value = (unsigned __int64)freeBytes.QuadPart;
@@ -2656,23 +2873,26 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         if (!err)
                         {
                             strcpy(buf, "  BytePerSec: ");
-                            NumberToStr(buf + strlen(buf), CQuadWord(bytesPerSector, 0));
+                            AppendNumberA(buf, _countof(buf), CQuadWord(bytesPerSector, 0));
                             strcat(buf, "  SecPerClus: ");
-                            NumberToStr(buf + strlen(buf), CQuadWord(sectorsPerCluster, 0));
+                            AppendNumberA(buf, _countof(buf), CQuadWord(sectorsPerCluster, 0));
                             if (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0))
                                 strcat(buf, "  Clusters: ");
-                            NumberToStr(buf + strlen(buf), diskTotalBytes / (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0)));
+                            AppendNumberA(buf, _countof(buf), diskTotalBytes / (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0)));
                             PrintLine(param, buf, TRUE);
                         }
                         if (diskTotalBytes != CQuadWord(-1, -1))
                         {
+                            // PrintDiskSize is wchar_t* now. The crash
+                            // report is narrow by design and this runs on the crash path,
+                            // so append through a fixed buffer - no allocation.
                             strcpy(buf, "  Capacity: ");
-                            PrintDiskSize(buf + strlen(buf), diskTotalBytes, 0);
+                            AppendDiskSizeA(buf, _countof(buf), diskTotalBytes);
                             strcat(buf, "  Free: ");
-                            PrintDiskSize(buf + strlen(buf), diskFreeBytes, 0);
+                            AppendDiskSizeA(buf, _countof(buf), diskFreeBytes);
                             diskTotalBytes -= diskFreeBytes;
                             strcat(buf, "  Used: ");
-                            PrintDiskSize(buf + strlen(buf), diskTotalBytes, 0);
+                            AppendDiskSizeA(buf, _countof(buf), diskTotalBytes);
                             PrintLine(param, buf, TRUE);
                         }
                     }
@@ -2683,9 +2903,9 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
           else
             driveType = DRIVE_REMOTE;
           */
-                    if (MyQueryDosDevice(drive - 'A', nameBuf, MAX_PATH))
+                    if (GetDosDeviceReportText(drive - 'A', deviceNameA, _countof(deviceNameA)))
                     {
-                        sprintf(buf, "  Device: %s", nameBuf);
+                        sprintf(buf, "  Device: %s", deviceNameA);
                         PrintLine(param, buf, TRUE);
                     }
                 }
@@ -2712,7 +2932,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
 {
     if (GlobalModulesStore.Count == 0)
     {
-        char* s = DupStr(str);
+        char* s = DupAnsiString(str);
         if (s != NULL)
         {
             GlobalModulesListTimeStore.Add(GetTickCount());
@@ -2746,7 +2966,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
         {
             if (l == r || l > m - 1) // not found
             {
-                char* s = DupStr(str);
+                char* s = DupAnsiString(str);
                 if (s != NULL)
                 {
                     GlobalModulesListTimeStore.Insert(m, GetTickCount());
@@ -2772,7 +2992,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
         {
             if (l == r) // not found
             {
-                char* s = DupStr(str);
+                char* s = DupAnsiString(str);
                 if (s != NULL)
                 {
                     GlobalModulesListTimeStore.Insert(m + 1, GetTickCount());
@@ -2797,6 +3017,11 @@ void AddUniqueToGlobalModulesStore(const char* str)
     }
 }
 
+static BOOL CopyModuleTextNarrow(char* dest, size_t destSize, const wchar_t* wideSrc) noexcept
+{
+    return sally::diagnostic::CopyAcpLossy(wideSrc, dest, destSize) ? TRUE : FALSE;
+}
+
 void AddNewlyLoadedModulesToGlobalModulesStore()
 {
     char buf[500];
@@ -2805,6 +3030,8 @@ void AddNewlyLoadedModulesToGlobalModulesStore()
         HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, 0);
         if (snap != (HANDLE)-1)
         {
+            // no explicit-A form exists for this API - see the comment above the
+            // other MODULEENTRY32 site; genuine P4/Task-30 scope.
             MODULEENTRY32 module;
             module.dwSize = sizeof(module);
             if (Module32First(snap, &module))
@@ -2813,19 +3040,27 @@ void AddNewlyLoadedModulesToGlobalModulesStore()
                 {
                     if ((int)module.dwSize >= ((char*)(&(module.szExePath)) - (char*)(&(module.dwSize))))
                     {
-                        char moduleName[MAX_PATH]; // kept as char[] due to SEH __try constraint
-                        char modulePath[MAX_PATH]; // kept as char[] due to SEH __try constraint
+                        // Raw final diagnostic scratch is required by the surrounding SEH block.
+                        // Capacity derives from MODULEENTRY32W plus worst-case UTF-8 expansion.
+                        char moduleName[sizeof(module.szModule) * 2 + 1];
+                        char modulePath[sizeof(module.szExePath) * 2 + 1];
                         if (module.dwSize == sizeof(module))
                         {
-                            lstrcpy(modulePath, module.szExePath);
+                            // module.szExePath is genuinely wchar_t-generic (no
+                            // explicit-A form exists); this function has its own __try (below),
+                            // so the wide->narrow conversion goes through CopyModuleTextNarrow
+                            // (an ordinary function) rather than a local std::string here.
+                            CopyModuleTextNarrow(modulePath, _countof(modulePath), module.szExePath);
                         }
                         else
-                            lstrcpy(modulePath, "(unknown)");
-                        lstrcpy(moduleName, module.szModule);
+                            lstrcpyA(modulePath, "(unknown)");
+                        CopyModuleTextNarrow(moduleName, _countof(moduleName), module.szModule);
                         char ver[100];
                         GetModuleVersion((HINSTANCE)module.modBaseAddr, ver, 100);
-                        sprintf(buf, "0x%p (size: 0x%X) (ver: %s): %s (%s)", module.modBaseAddr, module.modBaseSize, ver,
-                                moduleName, modulePath);
+                        _snprintf_s(buf, _countof(buf), _TRUNCATE,
+                                    "0x%p (size: 0x%X) (ver: %s): %s (%s)",
+                                    module.modBaseAddr, module.modBaseSize, ver, moduleName,
+                                    modulePath);
                     }
                     else
                         sprintf(buf, "unknown module (dwSize = %u)", module.dwSize);

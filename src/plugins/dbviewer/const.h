@@ -11,7 +11,7 @@
 // [0, 0] - for open viewer windows: Salamander regenerated fonts, lists should call SetFont()
 #define WM_USER_SETTINGCHANGE WM_APP + 3248
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
 // generic Salamander interface - valid from plugin start until shutdown
 extern CSalamanderGeneralAbstract* SalGeneral;

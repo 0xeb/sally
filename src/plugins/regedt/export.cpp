@@ -4,40 +4,44 @@
 
 #include "precomp.h"
 
-CPathBuffer LastExportPath; // Heap-allocated for long path support
+// Wide: see editor.cpp's Command/Arguments/InitDir for why - GetValueW's REG_SZ
+// case is a raw memcpy of the registry's actual UTF-16LE bytes, so a narrow
+// buffer here was silently corrupted on every load/save.
+std::wstring LastExportPath;
 
-BOOL ExportKey(LPWSTR fullName)
+BOOL ExportKey(const wchar_t* fullName)
 {
     CALL_STACK_MESSAGE1("ExportKey()");
-    CPathBuffer file; // Heap-allocated for long path support
-    strcpy(file, LastExportPath);
-    SG->SalPathAddBackslash(file, file.Size());
+    std::wstring dialogFile = LastExportPath;
+    std::wstring path = fullName ? fullName : L"";
+    SPLSalPathAddBackslashOwned(dialogFile);
     while (1)
     {
         BOOL direct = FALSE;
-        CExportDialog dlg(GetParent(), fullName, file, &direct);
+        CExportDialog dlg(GetParent(), path, &dialogFile, &direct);
         if (dlg.Execute() != IDOK)
             return FALSE;
 
         // separate the user part from the FS path
         if (!direct)
         {
-            if (!RemoveFSNameFromPath(fullName))
+            if (!RemoveFSNameFromPath(path))
             {
                 Error(IDS_NOTREGEDTPATH);
                 continue; // show the dialog again
             }
-            if (!wcslen(fullName))
+            if (path.empty())
             {
                 Error(IDS_BADPATH);
                 continue; // show the dialog again
             }
         }
 
-        if (wcscmp(fullName, L"\\") != 0)
+        if (path != L"\\")
         {
-            RemoveTrailingSlashes(fullName);
-            if (!wcslen(fullName))
+            while (!path.empty() && path.back() == L'\\')
+                path.pop_back();
+            if (path.empty())
             {
                 Error(IDS_BADPATH);
                 continue; // show the dialog again
@@ -46,7 +50,7 @@ BOOL ExportKey(LPWSTR fullName)
 
         LPWSTR key;
         int root;
-        if (!ParseFullPath(fullName, key, root))
+        if (!ParseFullPath(path.data(), key, root))
         {
             Error(IDS_BADPATH);
             continue; // show the dialog again
@@ -65,8 +69,10 @@ BOOL ExportKey(LPWSTR fullName)
             RegCloseKey(hKey);
         }
 
+        const std::wstring file = dialogFile;
+
         // verify that the target file does not exist
-        DWORD attr = SG->SalGetFileAttributes(file);
+        DWORD attr = SG->SalGetFileAttributes(file.c_str());
         if (attr != -1)
         {
             if (attr & FILE_ATTRIBUTE_DIRECTORY)
@@ -74,64 +80,62 @@ BOOL ExportKey(LPWSTR fullName)
                 Error(IDS_FILENAMEISDIR);
                 continue; // show the dialog again
             }
-            if (SG->DialogQuestion(GetParent(), BUTTONS_YESNOCANCEL, file, LoadStr(IDS_OVERWRITE), LoadStr(IDS_OVERWRITETITLE)) != DIALOG_YES)
+            if (SG->DialogQuestion(GetParent(), BUTTONS_YESNOCANCEL, file.c_str(),
+                                   LoadStrW(IDS_OVERWRITE).c_str(), LoadStrW(IDS_OVERWRITETITLE).c_str()) != DIALOG_YES)
                 continue; // show the dialog again
-            SG->ClearReadOnlyAttr(file);
-            if (!DeleteFile(file))
+            SG->ClearReadOnlyAttr(file.c_str());
+            if (!DeleteFileW(file.c_str()))
             {
                 Error(IDS_REPLACEERROR);
                 continue; // show the dialog again
             }
         }
 
-        SG->CutDirectory(strcpy(LastExportPath, file));
+        LastExportPath = file;
+        SPLCutDirectoryOwned(SG, LastExportPath);
 
-        char command[4096];
+        std::wstring command;
         if (root != -1) // regedit.exe can do "export all", so we'll use it for this task even after XP
         {
             // starting with XP we invoke the reg.exe command line, see https://forum.altap.cz/viewtopic.php?f=24&t=5682
             // the advantage of reg.exe is that from Vista onward it does not require UAC elevation for exports
-            CPathBuffer sysdir; // Heap-allocated for long path support
-            if (!GetSystemDirectory(sysdir, sysdir.Size()))
-                *sysdir = 0;
-            else
-                SG->SalPathAddBackslash(sysdir, sysdir.Size());
-            SalPrintf(command, 4096, "\"%sreg.exe\" EXPORT \"%ls\" \"%s\"", sysdir.Get(),
-                      *fullName == L'\\' ? fullName + 1 : fullName, file.Get());
+            std::wstring sysdir;
+            SPLGetSystemDirectoryOwned(sysdir);
+            SPLSalPathAddBackslashOwned(sysdir);
+            command = L"\"" + sysdir + L"reg.exe\" EXPORT \"" +
+                      (path.front() == L'\\' ? path.substr(1) : path) + L"\" \"" + file + L"\"";
         }
         else
         {
-            CPathBuffer windir; // Heap-allocated for long path support
-            if (!GetWindowsDirectory(windir, windir.Size()))
-                *windir = 0;
-            else
-                SG->SalPathAddBackslash(windir, windir.Size());
+            std::wstring windir;
+            SPLGetWindowsDirectoryOwned(windir);
+            SPLSalPathAddBackslashOwned(windir);
             if (root != -1)
-                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\" \"%ls\"", windir.Get(), file.Get(),
-                          *fullName == L'\\' ? fullName + 1 : fullName);
+                command = L"\"" + windir + L"regedit.exe\" /e \"" + file + L"\" \"" +
+                          (path.front() == L'\\' ? path.substr(1) : path) + L"\"";
             else
-                SalPrintf(command, 4096, "\"%sregedit.exe\" /e \"%s\"", windir.Get(), file.Get());
+                command = L"\"" + windir + L"regedit.exe\" /e \"" + file + L"\"";
         }
 
-        STARTUPINFO si;
+        STARTUPINFOW si;
         PROCESS_INFORMATION pi;
-        memset(&si, 0, sizeof(STARTUPINFO));
-        si.cb = sizeof(STARTUPINFO);
+        memset(&si, 0, sizeof(si));
+        si.cb = sizeof(si);
         si.lpTitle = NULL;
         si.dwFlags = STARTF_USESHOWWINDOW;
         si.wShowWindow = SW_HIDE;
 
-        if (!CreateProcess(NULL, command, NULL, NULL, FALSE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                           NULL, NULL, &si, &pi))
-            return Error(IDS_PROCESS2, (root != -1) ? "reg.exe" : "regedit.exe");
+        if (!CreateProcessW(NULL, command.data(), NULL, NULL, FALSE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
+                            NULL, NULL, &si, &pi))
+            return Error(IDS_PROCESS2, (root != -1) ? L"reg.exe" : L"regedit.exe");
 
-        SG->CreateSafeWaitWindow(LoadStr(IDS_EXPORTING), LoadStr(IDS_PLUGINNAME), 500, FALSE, SG->GetMainWindowHWND());
+        SG->CreateSafeWaitWindow(LoadStrW(IDS_EXPORTING).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), 500, FALSE, SG->GetMainWindowHWND());
 
         WaitForSingleObject(pi.hProcess, INFINITE);
 
         SG->DestroySafeWaitWindow();
 
-        attr = SG->SalGetFileAttributes(file);
+        attr = SG->SalGetFileAttributes(file.c_str());
         if (attr == -1)
             Error(IDS_BADEXPORT);
 
@@ -139,10 +143,9 @@ BOOL ExportKey(LPWSTR fullName)
         CloseHandle(pi.hThread);
 
         // announce the change on the path (our file was added)
-        CPathBuffer changedPath; // Heap-allocated for long path support
-        lstrcpyn(changedPath, file, changedPath.Size());
-        SG->CutDirectory(changedPath);
-        SG->PostChangeOnPathNotification(changedPath, FALSE);
+        std::wstring changedPath = file;
+        SPLCutDirectoryOwned(SG, changedPath);
+        SG->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
 
         break;
     }

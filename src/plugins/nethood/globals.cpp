@@ -17,13 +17,13 @@ CSalamanderGUIAbstract* SalamanderGUI;
 CNethoodPluginInterface g_oNethoodPlugin;
 CNethoodPluginInterfaceForFS g_oNethoodFS;
 CNethoodCache g_oNethoodCache;
-TCHAR g_szAssignedFSName[MAX_PATH];
+std::wstring g_assignedFSName;
 size_t g_cchAssignedFSName;
 HINSTANCE g_hInstance;
 HINSTANCE g_hLangInstance;
 const CFileData** g_transferFileData;
 int* g_transferIsDir;
-char* g_transferBuffer;
+wchar_t* g_transferBuffer;
 int* g_transferLen;
 DWORD* g_transferRowData;
 CPluginDataInterfaceAbstract** g_transferPluginDataIface;
@@ -31,10 +31,10 @@ DWORD* g_transferActCustomData;
 CNethoodIcons g_oIcons;
 CNethoodPluginInterfaceForMenuExt g_oMenuExt;
 
-TCHAR g_aszRedirectPath[2][MAX_PATH];
+std::wstring g_redirectPaths[2];
 
 DWORD_PTR g_adwPostedThrobberQueue[POSTED_THROBBER_QUEUE_LEN];
 int g_iPostedThrobberQueue;
 
-TCHAR g_aszFocusShareName[2][MAX_SHARE_NAME];
+std::wstring g_focusShareNames[2];
 int g_iFocusSharePanel;

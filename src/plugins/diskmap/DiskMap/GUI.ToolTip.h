@@ -11,7 +11,7 @@
 #include "Utils.CZSmartIconLoader.h"
 #include "common/PanelTextPainter.h"
 
-const TCHAR szToolTipWindowClass[] = TEXT("Zar.DM.ToolTip.WC");
+const wchar_t szToolTipWindowClass[] = L"Zar.DM.ToolTip.WC";
 
 #define CS_DROPSHADOW 0x00020000
 #define SPI_GETDROPSHADOW 0x1024
@@ -109,9 +109,9 @@ protected:
 
     BOOL _isDirty;
 
-    TCHAR _stitle[2 * MAX_PATH + 1];
+    std::wstring _stitle;
     size_t _stitlelen;
-    TCHAR _sftype[MAX_TYPELEN];
+    wchar_t _sftype[MAX_TYPELEN];
     size_t _sftypelen;
 
     ETooltipType _type;
@@ -132,7 +132,7 @@ protected:
         return MyCreateWindow(
             isTopmost ? WS_EX_TOPMOST : 0, //WS_EX_TOPMOST,// | WS_EX_NOACTIVATE,
             szToolTipWindowClass,
-            TEXT("ToolTip"),
+            L"ToolTip",
             WS_BORDER | WS_POPUP,
             left, top,     //X, Y
             width, height, // WIDTH, HEIGHT
@@ -159,7 +159,7 @@ protected:
     {
         if (this->_file == NULL)
         {
-            this->_stitle[0] = TEXT('\0');
+            this->_stitle.clear();
             this->_stitlelen = 0;
             return;
         }
@@ -169,27 +169,27 @@ protected:
             switch (this->_pathFormat)
             {
             case ETPF_Absolute:
-                this->_stitlelen = this->_file->GetFullName(this->_stitle, ARRAYSIZE(this->_stitle));
+                this->_stitlelen = this->_file->GetFullName(this->_stitle);
                 break;
             case ETPF_RelativeRoot:
-                this->_stitlelen = this->_file->GetRelativeName(this->_rootRelDir, this->_stitle, ARRAYSIZE(this->_stitle));
+                this->_stitlelen = this->_file->GetRelativeName(this->_rootRelDir, this->_stitle);
                 break;
             case ETPF_RelativeView:
-                this->_stitlelen = this->_file->GetRelativeName(this->_viewRelDir, this->_stitle, ARRAYSIZE(this->_stitle));
+                this->_stitlelen = this->_file->GetRelativeName(this->_viewRelDir, this->_stitle);
                 break;
             case ETPF_FileName:
                 //this->_stitlelen = file->GetRelativeName(view, this->_stitle, ARRAYSIZE(this->_stitle));
-                _tcscpy(this->_stitle, this->_file->GetName());
+                this->_stitle = this->_file->GetName();
                 this->_stitlelen = this->_file->GetNameLen();
                 break;
             default:
-                this->_stitlelen = this->_file->GetFullName(this->_stitle, ARRAYSIZE(this->_stitle));
+                this->_stitlelen = this->_file->GetFullName(this->_stitle);
                 break;
             }
         }
         else
         {
-            this->_stitlelen = this->_file->GetFullName(this->_stitle, ARRAYSIZE(this->_stitle));
+            this->_stitlelen = this->_file->GetFullName(this->_stitle);
         }
     }
 
@@ -313,7 +313,7 @@ public:
 
         for (int i = 0; i < TT_LID_MAX; i++)
         {
-            GetTextExtentPoint32(hdc, this->_headers[i]->GetString(), (int)this->_headers[i]->GetLength(), &sz);
+            GetTextExtentPoint32W(hdc, this->_headers[i]->GetString(), (int)this->_headers[i]->GetLength(), &sz);
             width = max(sz.cx, width);
         }
         return width;
@@ -325,7 +325,7 @@ public:
 
         for (int i = 0; i < TT_LID_MAX; i++)
         {
-            GetTextExtentPoint32(hdc, this->_values[i]->GetString(), (int)this->_values[i]->GetLength(), &sz);
+            GetTextExtentPoint32W(hdc, this->_values[i]->GetString(), (int)this->_values[i]->GetLength(), &sz);
             width = max(sz.cx, width);
         }
         return width;
@@ -350,7 +350,7 @@ public:
         //this->_stitlelen = _tcslen(this->_stitle);
 
         dir->LoadFileInfo(NULL, this->_sftype);
-        this->_sftypelen = _tcslen(this->_sftype);
+        this->_sftypelen = wcslen(this->_sftype);
 
         if (this->_sFormatter)
         {
@@ -386,7 +386,7 @@ public:
         //this->_stitlelen = _tcslen(this->_stitle);
 
         file->LoadFileInfo(NULL, this->_sftype);
-        this->_sftypelen = _tcslen(this->_sftype);
+        this->_sftypelen = wcslen(this->_sftype);
 
         if (this->_sFormatter)
         {
@@ -416,18 +416,18 @@ public:
 
         HFONT hfold;
         hfold = SelectFont(hdc, this->_hftitle);
-        GetTextExtentPoint32(hdc, this->_stitle, (int)this->_stitlelen, &sz);
+        GetTextExtentPoint32W(hdc, this->_stitle.c_str(), (int)this->_stitlelen, &sz);
         wsz.cx = max(sz.cx + 32 + TT_MARGIN_X + TT_MARGIN_X, wsz.cx);
         this->_headerheight += sz.cy;
 
         //Select normal font
         SelectFont(hdc, this->_hfnormal);
         //Check type length
-        GetTextExtentPoint32(hdc, this->_sftype, (int)this->_sftypelen, &sz);
+        GetTextExtentPoint32W(hdc, this->_sftype, (int)this->_sftypelen, &sz);
         wsz.cx = max(sz.cx + 32 + TT_MARGIN_X + TT_MARGIN_X, wsz.cx);
 
         //Check normal font height
-        GetTextExtentPoint32(hdc, TEXT("W"), 1, &sz);
+        GetTextExtentPoint32W(hdc, L"W", 1, &sz);
         this->_headerheight += sz.cy; //even when type string is empty add the space so the tooltip doesn't change its size unexpectedly
 
         int dataheight = 0;
@@ -562,12 +562,12 @@ public:
         //File Name
         hfold = SelectFont(hdc, this->_hftitle);
         SIZE szc;
-        GetTextExtentPoint32(hdc, TEXT("W"), 1, &szc);
+        GetTextExtentPoint32W(hdc, L"W", 1, &szc);
 
         int linepos = TT_MARGIN_Y + max(16, szc.cy + TT_MARGIN_Y / 2);
         RECT rct = oR;
         rct.bottom = linepos + 1;
-        sally::ui::DrawPanelTextA(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + 0, ETO_OPAQUE, &rct, this->_stitle, (UINT)this->_stitlelen, NULL);
+        sally::ui::DrawPanelTextW(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + 0, ETO_OPAQUE, &rct, this->_stitle.c_str(), (UINT)this->_stitlelen, NULL);
 
         //Dividing line
         MoveToEx(hdc, TT_MARGIN_X + TT_MARGIN_X + 32, linepos, NULL);
@@ -576,13 +576,13 @@ public:
         //File Type
         SelectFont(hdc, this->_hfnormal);
         SIZE szn;
-        GetTextExtentPoint32(hdc, TEXT("W"), 1, &szn);
+        GetTextExtentPoint32W(hdc, L"W", 1, &szn);
 
         int y = TT_MARGIN_Y + this->_headerheight + TT_MARGIN_Y / 2;
 
         rct.top = rct.bottom;
         rct.bottom = y;
-        sally::ui::DrawPanelTextA(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + this->_headerheight - szn.cy, ETO_OPAQUE, &rct, this->_sftype, (UINT)this->_sftypelen, NULL);
+        sally::ui::DrawPanelTextW(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + this->_headerheight - szn.cy, ETO_OPAQUE, &rct, this->_sftype, (UINT)this->_sftypelen, NULL);
 
         for (int i = 0; i < TT_LINECOUNT; i++)
         {
@@ -597,17 +597,17 @@ public:
                 rct.bottom = y + szn.cy;
                 rct.left = oR.left;
                 rct.right = TT_MARGIN_X + this->_vals_x;
-                sally::ui::DrawPanelTextA(hdc, TT_MARGIN_X, y, ETO_OPAQUE, &rct, this->_headers[j]->GetString(), (UINT)this->_headers[j]->GetLength(), NULL);
+                sally::ui::DrawPanelTextW(hdc, TT_MARGIN_X, y, ETO_OPAQUE, &rct, this->_headers[j]->GetString(), (UINT)this->_headers[j]->GetLength(), NULL);
                 rct.left = rct.right;
                 rct.right = oR.right;
-                sally::ui::DrawPanelTextA(hdc, TT_MARGIN_X + this->_vals_x, y, ETO_OPAQUE, &rct, this->_values[j]->GetString(), (UINT)this->_values[j]->GetLength(), NULL);
+                sally::ui::DrawPanelTextW(hdc, TT_MARGIN_X + this->_vals_x, y, ETO_OPAQUE, &rct, this->_values[j]->GetString(), (UINT)this->_values[j]->GetLength(), NULL);
                 y += szn.cy;
             }
         }
         rct.left = oR.left;
         rct.top = rct.bottom;
         rct.bottom = oR.bottom;
-        sally::ui::DrawPanelTextA(hdc, 0, 0, ETO_OPAQUE, &rct, NULL, 0, NULL);
+        sally::ui::DrawPanelTextW(hdc, 0, 0, ETO_OPAQUE, &rct, NULL, 0, NULL);
 
         int iy = (this->_headerheight - 32) / 2;
         //TODO: Detect icon size
@@ -673,7 +673,7 @@ public:
         case WM_DESTROY:
             return this->OnDestroy(), 0;
         }
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProcW(hWnd, message, wParam, lParam);
     }
     static BOOL RegisterClass()
     {
@@ -687,9 +687,9 @@ public:
                 SystemParametersInfo(SPI_GETDROPSHADOW, 0, &isShadow, 0);
             }
 
-            WNDCLASSEX wcex;
+            WNDCLASSEXW wcex;
 
-            wcex.cbSize = sizeof(WNDCLASSEX);
+            wcex.cbSize = sizeof(WNDCLASSEXW);
 
             wcex.style = (isShadow ? CS_DROPSHADOW : 0);
             wcex.lpfnWndProc = CFileInfoTooltip::s_WndProc;
@@ -704,16 +704,16 @@ public:
             wcex.lpszClassName = szToolTipWindowClass;
             wcex.hIconSm = NULL;
 
-            a = ::RegisterClassEx(&wcex);
+            a = ::RegisterClassExW(&wcex);
         }
         BOOL ret = (a != NULL);
         return ret;
     }
     static BOOL UnregisterClass()
     {
-        BOOL ret = ::UnregisterClass(szToolTipWindowClass, CWindow::s_hInstance);
+        BOOL ret = ::UnregisterClassW(szToolTipWindowClass, CWindow::s_hInstance);
         if (!ret)
-            TRACE_E("UnregisterClass(szToolTipWindowClass) has failed");
+            TRACE_E("UnregisterClassW(szToolTipWindowClass) has failed");
         return ret;
     }
 };

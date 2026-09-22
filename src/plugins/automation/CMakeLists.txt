@@ -67,7 +67,6 @@ sal_add_plugin(NAME automation
     "${SAL_PLUGINS}/automation/scriptlist.cpp"
     "${SAL_PLUGINS}/automation/scriptsite.cpp"
     "${SAL_PLUGINS}/automation/shim.cpp"
-    "${SAL_PLUGINS}/automation/strconv.cpp"
     "${SAL_PLUGINS}/automation/waitwndaut.cpp"
     "${SAL_PLUGINS}/automation/generated/salamander_i.c"
   RC "${SAL_PLUGINS}/automation/automation.rc"

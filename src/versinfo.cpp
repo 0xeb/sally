@@ -6,6 +6,8 @@
 
 #include "versinfo.h"
 
+#include <limits>
+
 //*****************************************************************************
 //
 // CVersionBlock
@@ -273,49 +275,56 @@ BOOL CVersionInfo::ReadResource(HINSTANCE hInstance, int resID)
 }
 
 CVersionBlock*
-CVersionInfo::FindBlock(const char* block)
+CVersionInfo::FindBlock(const wchar_t* block)
 {
     if (Root == NULL)
     {
-        TRACE_E("CVersionInfo::QueryValue() Root==NULL!");
-        return FALSE;
+        TRACE_E("CVersionInfo::FindBlock() Root==NULL!");
+        return NULL;
     }
 
-    char tmp[2048];
-    lstrcpyn(tmp, block, 2048);
-
-    if (strcmp(tmp, "\\") == 0)
+    if (wcscmp(block, L"\\") == 0)
         return Root;
 
+    // Walk the wide path in place. This used to copy 'block' into a
+    // char[2048], strtok it, and convert every token BACK to wide through
+    // MultiByteToWideChar(CP_ACP) just to compare it with a WCHAR* key - a round trip
+    // through the code page for data that is UTF-16 by format, plus a silent truncation
+    // at 2048 characters. Both are gone. Runs of backslashes are skipped exactly as
+    // strtok did, so an input like "\\StringFileInfo\\..." behaves as before.
     CVersionBlock* blockIter = Root;
-    char* token = strtok(tmp, "\\");
-    while (token != NULL)
+    const wchar_t* token = block;
+    while (*token != 0)
     {
-        WCHAR wideToken[2048];
-        MultiByteToWideChar(CP_ACP, 0, token, -1, wideToken, sizeof(wideToken) / sizeof(WCHAR));
-        wideToken[sizeof(wideToken) / sizeof(WCHAR) - 1] = 0;
+        while (*token == L'\\')
+            token++;
+        if (*token == 0)
+            break;
+
+        const wchar_t* end = wcschr(token, L'\\');
+        const size_t len = (end != NULL) ? (size_t)(end - token) : wcslen(token);
+
         CVersionBlock* found = NULL;
         int i;
         for (i = 0; i < blockIter->Children.Count; i++)
         {
             CVersionBlock* child = blockIter->Children[i];
-            if (wcscmp(child->Key, wideToken) == 0)
+            if (wcsncmp(child->Key, token, len) == 0 && child->Key[len] == 0)
             {
                 found = child;
                 break;
             }
         }
-        if (found != NULL)
-            blockIter = found;
-        else
-            return FALSE;
+        if (found == NULL)
+            return NULL;
 
-        token = strtok(NULL, "\\");
+        blockIter = found;
+        token = (end != NULL) ? end : token + len;
     }
     return blockIter;
 }
 
-BOOL CVersionInfo::QueryValue(const char* block, BYTE** buffer, DWORD* size)
+BOOL CVersionInfo::QueryValue(const wchar_t* block, BYTE** buffer, DWORD* size)
 {
     CVersionBlock* found = FindBlock(block);
 
@@ -352,22 +361,17 @@ BOOL CVersionInfo::QueryValue(const char* block, BYTE** buffer, DWORD* size)
     return FALSE;
 }
 
-BOOL CVersionInfo::QueryString(const char* block, char* buffer, DWORD maxSize, WCHAR* bufferW, DWORD maxSizeW)
+BOOL CVersionInfo::QueryString(const wchar_t* block, WCHAR* buffer, DWORD maxSize)
 {
     BYTE* bf;
     DWORD sz;
     if (QueryValue(block, &bf, &sz))
     {
-        if (maxSizeW > 0 && bufferW != NULL)
-            lstrcpynW(bufferW, (WCHAR*)bf, min(sz + 1, maxSizeW));
-
+        // The value in a StringFileInfo block is UTF-16 in the resource.
+        // Copying it out verbatim is the whole job; the CP_ACP arm that used to stand here
+        // could only lose characters. 'sz' is a character count from QueryValue.
         if (maxSize > 0 && buffer != NULL)
-        {
-            WideCharToMultiByte(CP_ACP, 0, (WCHAR*)bf, sz, buffer, maxSize, NULL, NULL);
-            if (sz < maxSize)
-                buffer[sz] = 0;
-            buffer[maxSize - 1] = 0;
-        }
+            lstrcpynW(buffer, (WCHAR*)bf, min(sz + 1, maxSize));
         return TRUE;
     }
     return FALSE;
@@ -375,8 +379,11 @@ BOOL CVersionInfo::QueryString(const char* block, char* buffer, DWORD maxSize, W
 
 #ifdef VERSINFO_SUPPORT_WRITE
 
-BOOL CVersionInfo::SetString(const char* block, const char* buffer)
+BOOL CVersionInfo::SetString(const wchar_t* block, const wchar_t* buffer)
 {
+    if (block == NULL || buffer == NULL)
+        return FALSE;
+
     CVersionBlock* found = FindBlock(block);
 
     if (found == NULL)
@@ -391,16 +398,21 @@ BOOL CVersionInfo::SetString(const char* block, const char* buffer)
         return FALSE;
     }
 
-    int len = (int)strlen(buffer);
-    WCHAR* str = (WCHAR*)malloc((len + 1) * 2);
+    const size_t len = wcslen(buffer);
+    if (len > (std::numeric_limits<size_t>::max)() / sizeof(WCHAR) - 1)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+
+    WCHAR* str = static_cast<WCHAR*>(malloc((len + 1) * sizeof(WCHAR)));
     if (str == NULL)
     {
         TRACE_E(LOW_MEMORY);
         return FALSE;
     }
 
-    MultiByteToWideChar(CP_ACP, 0, buffer, len + 1, str, len + 1);
-    str[len] = 0;
+    wmemcpy(str, buffer, len + 1);
 
     free(found->Value);
     found->Value = str;
@@ -543,35 +555,3 @@ BOOL CVersionInfo::UpdateResource(HANDLE hUpdateRes, int resID)
 
 #endif //VERSINFO_SUPPORT_WRITE
 
-#ifdef VERSINFO_SUPPORT_DEBUG
-BOOL CVersionInfo::WriteResourceToFile(HINSTANCE hInstance, int resID, const char* fileName)
-{
-    BOOL ret = FALSE;
-    HRSRC hrsrc = FindResource(hInstance, MAKEINTRESOURCE(resID), RT_VERSION);
-    if (hrsrc != NULL)
-    {
-        DWORD size = SizeofResource(hInstance, hrsrc);
-        if (size > 0)
-        {
-            HGLOBAL hglb = LoadResource(hInstance, hrsrc);
-            if (hglb != NULL)
-            {
-                LPVOID data = LockResource(hglb);
-                if (data != NULL)
-                {
-                    BYTE* ptr = (BYTE*)data;
-                    HANDLE file = CreateFile(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-                    if (file != INVALID_HANDLE_VALUE)
-                    {
-                        DWORD written;
-                        if (WriteFile(file, ptr, size, &written, NULL) && written == size)
-                            ret = TRUE;
-                        CloseHandle(file);
-                    }
-                }
-            }
-        }
-    }
-    return ret;
-}
-#endif //VERSINFO_SUPPORT_DEBUG

@@ -208,7 +208,7 @@ protected:
 
     CQuadWord DataTotalSize; // total size of the transferred data in bytes: -1 = unknown
 
-    CPathBuffer TgtDiskFileName;           // if not "", this is the full name of the disk file to which data should be flushed (the file is overwritten; no resumes are performed here)
+    std::wstring TgtDiskFileName;          // if not empty, full local file path for direct flushing
     HANDLE TgtDiskFile;                       // target disk file for flushing data (NULL = we have not opened it yet)
     BOOL TgtDiskFileCreated;                  // TRUE if the target disk file for flushing data was created
     DWORD TgtFileLastError;                   // code of the last error reported by the disk thread when writing to the TgtDiskFileName file
@@ -252,10 +252,10 @@ public:
     // returns DecomprMissingStreamEnd (uses a critical section)
     //BOOL GetDecomprMissingStreamEnd();
 
-    // handing over data from the "data connection"; returns an allocated buffer with data and in 'length' (must not be
-    // NULL) their length; if a decompression error occurs (MODE Z) it returns TRUE in 'decomprErr' and if
-    // it is a data error, it returns an empty buffer; it returns NULL only when memory is insufficient
-    char* GiveData(int* length, BOOL* decomprErr);
+    // Transactionally hands the explicitly encoded bytes collected by this data connection to 'data'.
+    // If a MODE Z data error occurs, returns TRUE with an empty result and TRUE in 'decomprErr'.
+    // Returns FALSE only when the result cannot be materialized.
+    BOOL GiveData(std::string& data, BOOL* decomprErr) noexcept;
 
     // returns the status of the "data connection" (parameters must not be NULL): 'downloaded' (how much has already been
     // read/downloaded), 'total' (total size of the read/download - if unknown, returns -1),
@@ -284,7 +284,8 @@ public:
 
     // sets TgtDiskFileName and CurrentTransferMode, while also enabling flushing data
     // directly into the TgtDiskFileName file (uses FTPDiskThread)
-    void SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode);
+    BOOL SetDirectFlushParams(const wchar_t* tgtFileName,
+                              CCurrentTransferMode currentTransferMode) noexcept;
 
     // returns the state of the target file when flushing data directly to the TgtDiskFileName file;
     // in 'fileCreated' it returns TRUE if the file was created; in 'fileSize' it returns the size

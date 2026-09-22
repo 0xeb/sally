@@ -38,20 +38,21 @@ public:
     void __fastcall Synchronize();
     int __fastcall FileMenu(HWND Parent, int X, int Y);
 
-    virtual BOOL WINAPI GetCurrentPath(char* UserPart);
-    virtual BOOL WINAPI GetFullName(CFileData& File, int IsDir, char* Buf,
-                                    int BufSize);
-    virtual BOOL WINAPI GetFullFSPath(HWND Parent, const char* FSName,
-                                      char* Path, int PathSize, BOOL& Success);
-    virtual BOOL WINAPI GetRootPath(char* UserPart);
+    virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* UserPart);
+    virtual BOOL WINAPI GetFullName(CFileData& File, int IsDir,
+                                    CSalamanderStringBuffer* FullName);
+    virtual BOOL WINAPI GetFullFSPath(HWND Parent, const wchar_t* FSName,
+                                      CSalamanderStringBuffer* Path, BOOL& Success);
+    virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* UserPart);
 
     virtual BOOL WINAPI IsCurrentPath(int CurrentFSNameIndex, int FSNameIndex,
-                                      const char* UserPart);
+                                      const wchar_t* UserPart);
     virtual BOOL WINAPI IsOurPath(int CurrentFSNameIndex, int FSNameIndex,
-                                  const char* UserPart);
+                                  const wchar_t* UserPart);
 
-    virtual BOOL WINAPI ChangePath(int CurrentFSNameIndex, char* FSName,
-                                   int FSNameIndex, const char* UserPart, char* CutFileName,
+    virtual BOOL WINAPI ChangePath(int CurrentFSNameIndex, CSalamanderStringBuffer* FSName,
+                                   int FSNameIndex, const wchar_t* UserPart,
+                                   CSalamanderStringBuffer* CutFileName,
                                    BOOL* PathWasCut, BOOL ForceRefresh, int Mode);
     virtual BOOL WINAPI ListCurrentPath(CSalamanderDirectoryAbstract* Dir,
                                         CPluginDataInterfaceAbstract*& PluginData, int& IconsType,
@@ -75,33 +76,37 @@ public:
     virtual void WINAPI GetFSFreeSpace(CQuadWord* RetValue) {}
     virtual BOOL WINAPI GetNextDirectoryLineHotPath(const char* Text,
                                                     int PathLen, int& Offset);
-    virtual void WINAPI CompleteDirectoryLineHotPath(char* Path, int PathBufSize) {}
-    virtual BOOL WINAPI GetPathForMainWindowTitle(const char* FSName, int Mode,
-                                                  char* Buf, int BufSize)
+    virtual BOOL WINAPI CompleteDirectoryLineHotPath(CSalamanderStringBuffer* Path)
+    {
+        return Path != NULL && sally::plugin_abi::IsValidStringBuffer(*Path);
+    }
+    virtual BOOL WINAPI GetPathForMainWindowTitle(const wchar_t* FSName, int Mode,
+                                                  CSalamanderStringBuffer* Buf)
     {
         return FALSE;
     }
     virtual void WINAPI ShowInfoDialog(const char* FSName, HWND Parent);
-    virtual BOOL WINAPI ExecuteCommandLine(HWND Parent, char* Command,
+    virtual BOOL WINAPI ExecuteCommandLine(HWND Parent, CSalamanderStringBuffer* Command,
                                            int& SelFrom, int& SelTo);
-    virtual BOOL WINAPI QuickRename(const char* FSName, int Mode, HWND Parent, CFileData& File,
-                                    BOOL IsDir, char* NewName, BOOL& Cancel);
+    virtual BOOL WINAPI QuickRename(const wchar_t* FSName, int Mode, HWND Parent, CFileData& File,
+                                    BOOL IsDir, CSalamanderStringBuffer* NewName, BOOL& Cancel);
     virtual void WINAPI AcceptChangeOnPathNotification(const char* FSName,
                                                        const char* Path, BOOL IncludingSubdirs);
-    virtual BOOL WINAPI CreateDir(const char* FSName, int Mode, HWND Parent, char* NewName,
+    virtual BOOL WINAPI CreateDir(const wchar_t* FSName, int Mode, HWND Parent,
+                                  CSalamanderStringBuffer* NewName,
                                   BOOL& Cancel);
     virtual void WINAPI ViewFile(const char* FSName, HWND Parent,
                                  CSalamanderForViewFileOnFSAbstract* Salamander, CFileData& File);
     virtual BOOL WINAPI Delete(const char* FSName, int Mode, HWND Parent,
                                int Panel, int SelectedFiles, int SelectedDirs, BOOL& CancelOrError);
-    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL Copy, int Mode, const char* FSName,
+    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL Copy, int Mode, const wchar_t* FSName,
                                          HWND Parent, int Panel, int SelectedFiles, int SelectedDirs,
-                                         char* TargetPath, BOOL& OperationMask, BOOL& CancelOrHandlePath,
+                                         CSalamanderStringBuffer* TargetPath, BOOL& OperationMask, BOOL& CancelOrHandlePath,
                                          HWND DropTarget);
     virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
-                                               const char* FSName, HWND Parent, const char* SourcePath,
+                                               const wchar_t* FSName, HWND Parent, const wchar_t* SourcePath,
                                                SalEnumSelection2 Next, void* NextParam, int SourceFiles, int SourceDirs,
-                                               char* TargetPath, BOOL* InvalidPathOrCancel);
+                                               CSalamanderStringBuffer* TargetPath, BOOL* InvalidPathOrCancel);
     virtual BOOL WINAPI ChangeAttributes(const char* FSName, HWND Parent,
                                          int Panel, int SelectedFiles, int SelectedDirs);
     virtual void WINAPI ShowProperties(const char* FSName, HWND Parent,
@@ -114,7 +119,7 @@ public:
                                               DWORD* AllowedEffects);
     virtual BOOL WINAPI HandleMenuMsg(UINT uMsg, WPARAM wParam, LPARAM lParam,
                                       LRESULT* plResult);
-    virtual BOOL WINAPI GetNoItemsInPanelText(char* TextBuf, int TextBufSize);
+    virtual BOOL WINAPI GetNoItemsInPanelText(CSalamanderStringBuffer* TextBuf);
     virtual void WINAPI ShowSecurityInfo(HWND Parent);
 
     void __fastcall RefreshPanel();
@@ -169,7 +174,7 @@ private:
     void __fastcall OurPathChanged(const AnsiString Path, bool IncludingSubDirs);
     void __fastcall CurrentPathChanged(bool IncludingSubDirs);
     void __fastcall CreateFileList(int Panel, TOperationSide Side, bool Focused);
-    void __fastcall CreateFileList(AnsiString SourcePath,
+    void __fastcall CreateFileList(const std::wstring& SourcePath,
                                    SalEnumSelection2 Next, void* NextParam);
     void __fastcall CreateFileList(CFileData* File, TOperationSide Side);
     void __fastcall DestroyFileList();
@@ -180,6 +185,16 @@ private:
     bool __fastcall GetPanel(int& Panel, bool Opposite = false);
     AnsiString __fastcall FSName();
     AnsiString __fastcall FullFSPath(AnsiString Path);
+    BOOL CopyOrMoveFromFSBytes(BOOL Copy, int Mode, HWND Parent, int Panel,
+                               int SelectedFiles, int SelectedDirs,
+                               AnsiString& TargetPath, BOOL& OperationMask,
+                               BOOL& CancelOrHandlePath);
+    BOOL CopyOrMoveFromDiskToFSBytes(BOOL Copy, int Mode,
+                                     const AnsiString& FSName, HWND Parent,
+                                     const std::wstring& SourcePath,
+                                     SalEnumSelection2 Next, void* NextParam,
+                                     int SourceDirs, AnsiString& TargetPath,
+                                     BOOL* InvalidPathOrCancel);
     bool __fastcall StripFS(AnsiString& Path, bool AnyFS);
     bool __fastcall UnixPaths();
     void __fastcall DisconnectFromPanel(int Panel);
@@ -187,6 +202,9 @@ private:
     void __fastcall ScheduleTimer();
     void __fastcall ProcessQueue();
     bool __fastcall IsOurUserPart(const AnsiString UserPart);
+    BOOL __fastcall ChangePathBytes(int CurrentFSNameIndex, AnsiString* FSName,
+                                    int FSNameIndex, const char* UserPart,
+                                    BOOL* PathWasCut, BOOL ForceRefresh, int Mode);
     bool __fastcall RemoteTransfer(AnsiString TargetDirectory, AnsiString FileMask,
                                    bool SubDirs, bool NoConfirm, bool Move);
     void __fastcall RemoteTransfer(bool Move);
@@ -261,8 +279,8 @@ public:
 
     virtual BOOL WINAPI GetInfoLineContent(int Panel, const CFileData* File,
                                            BOOL IsDir, int SelectedFiles, int SelectedDirs, BOOL DisplaySize,
-                                           const CQuadWord& SelectedSize, char* Buffer, DWORD* HotTexts,
-                                           int& HotTextsCount) { return FALSE; };
+                                           const CQuadWord& SelectedSize, CSalamanderStringBuffer* Buffer,
+                                           CSalamanderTextRangeBuffer* HotTexts) { return FALSE; };
 
     virtual BOOL WINAPI CanBeCopiedToClipboard() { return TRUE; }
 

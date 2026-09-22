@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #ifndef QWORD
 typedef unsigned __int64 QWORD;
 typedef QWORD* LPQWORD;
@@ -12,57 +15,21 @@ typedef QWORD* LPQWORD;
 #define MAKEQWORD(lo, hi) (((QWORD)hi << 32) + lo)
 #endif
 
-BOOL PathAppend(WCHAR* path, WCHAR* more, int pathSize);
-BOOL CutDirectory(WCHAR* path, WCHAR* cutDir = NULL, int size = 0);
 WCHAR* DupStr(const WCHAR* str);
-char* DupStrA(const WCHAR* str);
-char* StrNCat(char* dest, const char* sour, int destSize);
 
-inline DWORD WStrToStr(char* dest, int destSize, const WCHAR* sour, int sourLen)
-{
-    int ret = WideCharToMultiByte(CP_ACP, 0, sour, sourLen, dest, destSize, NULL, NULL);
-    if (ret == 0 && destSize > 0)
-        dest[destSize - 1] = 0;
-    return ret;
-}
-
-inline DWORD WStrToStr(char* dest, int destSize, const WCHAR* sour)
-{
-    return WStrToStr(dest, destSize, sour, -1);
-}
-
-inline DWORD StrToWStr(WCHAR* dest, int destSize, const char* sour, int sourLen)
-{
-    int res = MultiByteToWideChar(CP_ACP, 0, sour, sourLen, dest, destSize);
-    if (res == 0 && destSize > 0)
-        dest[destSize - 1] = 0;
-    return res;
-}
-
-inline DWORD StrToWStr(WCHAR* dest, int destSize, const char* sour)
-{
-    return StrToWStr(dest, destSize, sour, -1);
-}
-
-void RemoveTrailingSlashes(char* path);
-void RemoveTrailingSlashes(LPWSTR path);
-
-BOOL RegOperationError(int lastError, int error, int title, int keyRoot, LPWSTR keyName,
+BOOL RegOperationError(int lastError, int error, int title, int keyRoot,
+                       const wchar_t* keyName,
                        LPBOOL skip, LPBOOL skipAllErrors);
 
-void LoadHistory(HKEY regKey, const char* keyPattern, LPWSTR* history,
-                 LPWSTR buffer, int bufferSize, CSalamanderRegistryAbstract* registry);
-void SaveHistory(HKEY regKey, const char* keyPattern, LPWSTR* history,
+void LoadHistory(HKEY regKey, const wchar_t* keyPattern, std::vector<std::wstring>& history,
+                 CSalamanderRegistryAbstract* registry);
+void SaveHistory(HKEY regKey, const wchar_t* keyPattern, const std::vector<std::wstring>& history,
                  CSalamanderRegistryAbstract* registry);
 
 BOOL TestForCancel();
 
-BOOL DuplicateChar(WCHAR dup, LPWSTR buffer, int bufferSize);
-LPWSTR UnDuplicateChar(WCHAR dup, LPWSTR buffer);
-
 BOOL ParseFullPath(WCHAR* path, WCHAR*& keyName, int& keyRoot);
 
-void ConvertHexToString(LPWSTR text, char* hex, int& len);
 BOOL ValidateHexString(LPWSTR text);
 
 // ****************************************************************************
@@ -101,15 +68,18 @@ public:
 
 // ****************************************************************************
 
-BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
-                     char* buffer, BOOL save = FALSE);
+BOOL ShowOpenFileDialog(HWND parent, const wchar_t* title, const wchar_t* filter,
+                        std::wstring& fileName, BOOL save = FALSE);
 
 BOOL RemoveFSNameFromPath(LPWSTR path);
+// std::wstring overload. The raw form shifts the buffer left with memmove, which
+// shortens the C string but leaves std::wstring::size() at the ORIGINAL length -
+// so the owner kept an embedded NUL plus stale tail characters, size()/empty()
+// answered about the old content, and the NUL later truncated the reg.exe
+// command line built from it. Always prefer this form for a wstring owner.
+BOOL RemoveFSNameFromPath(std::wstring& path);
 
-BOOL DecStringToNumber(char* string, QWORD& qw);
-BOOL HexStringToNumber(char* string, QWORD& qw);
-
-char* ReplaceUnsafeCharacters(char* string);
+wchar_t* ReplaceUnsafeCharacters(wchar_t* string);
 
 //LPDLGTEMPLATE LoadDlgTemplate(int id, DWORD &size);
 //LPDLGTEMPLATE ReplaceDlgTemplateFont(LPDLGTEMPLATE dlgTemplate, DWORD &size, LPCWSTR newFont);

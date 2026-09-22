@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -140,12 +140,12 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
 void FinalWait()
 {
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
     {
         if (DlgWin == NULL || !IsWindow(DlgWin) || !IsDialogMessage(DlgWin, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
     Sleep(500); // give the UI a chance to show 100%

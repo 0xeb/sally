@@ -4,6 +4,7 @@
 #pragma once
 
 #include <windows.h>
+#include <string>
 
 // Bounded, always-on ledger of Sally's last few shell context-menu interactions.
 //
@@ -43,7 +44,7 @@ enum class ShellMenuOwner
 struct ShellMenuDiagRecord
 {
     DWORD Tick = 0;                 // GetTickCount() when the menu was built
-    wchar_t DirPathW[MAX_PATH] = {};// panel path, wide (NOT the lossy GetPath() mirror)
+    std::wstring DirPathW;          // panel path, wide (NOT the lossy GetPathW() mirror)
     int SelCount = 0;               // selected items; 0 means background/directory menu
     bool Background = false;        // right-click on empty panel space
     bool AnyNameNeedsWide = false;  // at least one selected name does not round-trip CP_ACP
@@ -53,7 +54,7 @@ struct ShellMenuDiagRecord
 
     DWORD TrackedCmd = 0;           // what the tracker returned
     bool TopLevel = false;          // was that command a direct item of the root menu?
-    char Verb[64] = {};             // GCS_VERB result, empty when the lookup failed
+    std::wstring Verb;              // GCS_VERBW result, empty when the lookup failed
     HRESULT VerbHr = 0;
 
     ShellMenuOwner Owner = ShellMenuOwner::Unknown;
@@ -105,8 +106,10 @@ extern CShellMenuDiagLog ShellMenuDiag;
 // who hit these bugs turns on non-ASCII names. Returns the number of characters written.
 //
 // Pure formatting, so the bug-report section can be exercised headlessly.
-int FormatShellMenuDiagRecord(const ShellMenuDiagRecord& record, char* buf, int bufSize);
+int FormatShellMenuDiagRecord(const ShellMenuDiagRecord& record, char* buf, int bufSize) noexcept;
 
 // Appends 'text' to 'buf' with every non-ASCII code unit replaced by \uXXXX. Used by the
 // formatter above and by the overlay ledger; exposed for its own unit tests.
-int AppendAsciiEscapedW(const wchar_t* text, char* buf, int bufSize);
+std::string ReportAcpBytesW(const wchar_t* text);
+std::string AsciiEscapedW(const wchar_t* text);
+int AppendAsciiEscapedW(const wchar_t* text, char* buf, int bufSize) noexcept;

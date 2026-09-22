@@ -28,7 +28,6 @@ extern CNethoodCache g_oNethoodCache;
 
 CNethoodPluginDataInterface::CNethoodPluginDataInterface()
 {
-    m_szRedirectPath[0] = TEXT('\0');
 }
 
 CNethoodPluginDataInterface::~CNethoodPluginDataInterface()
@@ -64,14 +63,14 @@ CNethoodPluginDataInterface::ReleasePluginData(
 
 void WINAPI
 CNethoodPluginDataInterface::GetFileDataForUpDir(
-    __in const char* archivePath,
+    __in const wchar_t* archivePath,
     __inout CFileData& upDir)
 {
 }
 
 BOOL WINAPI
 CNethoodPluginDataInterface::GetFileDataForNewDir(
-    __in const char* dirName,
+    __in const wchar_t* dirName,
     __inout CFileData& dir)
 {
     return FALSE;
@@ -107,14 +106,14 @@ CNethoodPluginDataInterface::CompareFilesFromFS(
     __in const CFileData* file1,
     __in const CFileData* file2)
 {
-    return strcmp(file1->Name, file2->Name);
+    return wcscmp(file1->Name, file2->Name);
 }
 
 void WINAPI
 CNethoodPluginDataInterface::SetupView(
     __in BOOL leftPanel,
     __in CSalamanderViewAbstract* view,
-    __in const char* archivePath,
+    __in const wchar_t* archivePath,
     __in const CFileData* upperDir)
 {
     view->GetTransferVariables(
@@ -133,13 +132,13 @@ CNethoodPluginDataInterface::SetupView(
         SetupColumns(view);
     }
 
-    if (m_szRedirectPath[0] != TEXT('\0'))
+    if (!m_redirectPath.empty())
     {
         RedirectUncPathToSalamander(
             leftPanel ? PANEL_LEFT : PANEL_RIGHT,
-            m_szRedirectPath);
+            m_redirectPath.c_str());
 
-        m_szRedirectPath[0] = TEXT('\0');
+        m_redirectPath.clear();
     }
 }
 
@@ -168,11 +167,12 @@ CNethoodPluginDataInterface::GetInfoLineContent(
     __in int selectedDirs,
     __in BOOL displaySize,
     __in const CQuadWord& selectedSize,
-    __out_bcount(1000) char* buffer,
-    __out_ecount(100) DWORD* hotTexts,
-    __out int& hotTextsCount)
+    CSalamanderStringBuffer* buffer,
+    CSalamanderTextRangeBuffer* hotTexts)
 {
-    buffer[0] = TEXT('\0');
+    if (buffer == NULL || hotTexts == NULL)
+        return FALSE;
+    std::wstring text;
 
     if (file != NULL)
     {
@@ -186,13 +186,20 @@ CNethoodPluginDataInterface::GetInfoLineContent(
             g_oNethoodCache.LockCache();
 
             const CNethoodCacheNode& nodeData = g_oNethoodCache.GetItemData(node);
-            PCTSTR pszName = nodeData.GetName();
+            PCWSTR pszName = nodeData.GetName();
 
             if (pszName != NULL)
             {
-                StringCchPrintf(buffer, 1000, TEXT("<%s>"),
-                                pszName);
-                SalamanderGeneral->DuplicateBackslashes(buffer, 1000);
+                // GetName() is wide now (cache.h widened) - the
+                // narrow-bridge this comment used to describe is obsolete.
+                text.push_back(L'<');
+                for (const wchar_t* current = pszName; *current != L'\0'; ++current)
+                {
+                    if (*current == L'\\')
+                        text.push_back(L'\\');
+                    text.push_back(*current);
+                }
+                text.push_back(L'>');
             }
 
             g_oNethoodCache.UnlockCache();
@@ -210,23 +217,23 @@ CNethoodPluginDataInterface::GetInfoLineContent(
         // Some nodes selected.
 
         CQuadWord cSelected;
-        TCHAR szPluralString[256];
-        TCHAR szExpandedString[256];
-
         cSelected.SetUI64(selectedFiles + selectedDirs);
-
-        LoadString(GetLangInstance(), IDS_INFOLINE_SELECTION_PLURAL,
-                   szPluralString, COUNTOF(szPluralString));
-
-        SalamanderGeneral->ExpandPluralString(szExpandedString,
-                                              COUNTOF(szExpandedString), szPluralString, 1, &cSelected);
-
-        StringCchPrintf(buffer, 1000, szExpandedString,
-                        selectedFiles + selectedDirs);
+        const std::wstring expanded = SPLExpandPluralStringOwned(
+            SalamanderGeneral,
+            SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(),
+                                       IDS_INFOLINE_SELECTION_PLURAL).c_str(),
+            1, &cSelected);
+        text = SPLFormatStringOwned(expanded.c_str(),
+                                    selectedFiles + selectedDirs);
     }
 
-    return SalamanderGeneral->LookForSubTexts(buffer, hotTexts,
-                                              &hotTextsCount);
+    std::vector<CSalamanderTextRange> ranges;
+    if (!SPLLookForSubTextsOwned(SalamanderGeneral, text, ranges))
+        return FALSE;
+    return sally::plugin_abi::WriteTextAndRanges(
+               *buffer, *hotTexts, text, ranges)
+               ? TRUE
+               : FALSE;
 }
 
 BOOL WINAPI
@@ -307,8 +314,8 @@ void CNethoodPluginDataInterface::AddDescriptionColumn(
         0,
     };
 
-    LoadString(GetLangInstance(), IDS_COLUMN_COMMENTS, column.Name,
-               COUNTOF(column.Name));
+    LoadStringW(GetLangInstance(), IDS_COLUMN_COMMENTS, column.Name,
+                COUNTOF(column.Name));
     column.GetText = &CNethoodPluginDataInterface::GetCommentColumnText;
     column.LeftAlignment = TRUE;
     column.CustomData = ColumnDataComment;
@@ -325,20 +332,22 @@ void WINAPI CNethoodPluginDataInterface::GetCommentColumnText()
 {
     CNethoodCache::Node node;
 
-    g_transferBuffer[0] = '\0';
+    g_transferBuffer[0] = L'\0';
     *g_transferLen = 0;
 
     node = CNethoodFSInterface::GetNodeFromFileData(**g_transferFileData);
     if (node != NULL)
     {
-        PCTSTR pszComment;
+        PCWSTR pszComment;
         const CNethoodCacheNode& nodeData = g_oNethoodCache.GetItemData(node);
 
         pszComment = nodeData.GetComment();
         if (pszComment != NULL)
         {
-            StringCchCopy(g_transferBuffer, TRANSFER_BUFFER_MAX, pszComment);
-            *g_transferLen = static_cast<int>(_tcslen(g_transferBuffer));
+            // GetComment() is wide now (cache.h widened) - the
+            // narrow-bridge this comment used to describe is obsolete.
+            StringCchCopyW(g_transferBuffer, TRANSFER_BUFFER_MAX, pszComment);
+            *g_transferLen = static_cast<int>(wcslen(g_transferBuffer));
         }
     }
 }
@@ -359,13 +368,13 @@ int WINAPI CNethoodPluginDataInterface::GetSimpleIconIndex()
             /* Network shortcut can actually point to the local disk. */
             iIcon = CNethoodIcons::IconShare;
 
-            PCTSTR pszPath = nodeData.GetName();
-            if (pszPath && (*pszPath >= TEXT('a') && *pszPath <= TEXT('z') ||
-                            *pszPath >= TEXT('A') && *pszPath <= TEXT('Z')))
+            PCWSTR pszPath = nodeData.GetName();
+            if (pszPath && (*pszPath >= L'a' && *pszPath <= L'z' ||
+                            *pszPath >= L'A' && *pszPath <= L'Z'))
             {
                 /* The path starts with a drive letter. */
-                TCHAR szRoot[4] = {*pszPath, TEXT(':'), TEXT('\\'), TEXT('\0')};
-                if (GetDriveType(szRoot) != DRIVE_REMOTE)
+                wchar_t szRoot[4] = {*pszPath, L':', L'\\', L'\0'};
+                if (GetDriveTypeW(szRoot) != DRIVE_REMOTE)
                 {
                     iIcon = CNethoodIcons::IconSimpleDirectory;
                 }
@@ -424,14 +433,14 @@ int CNethoodPluginDataInterface::NodeTypeToIconIndex(
 
 void CNethoodPluginDataInterface::RedirectUncPathToSalamander(
     __in int iPanel,
-    __in PCTSTR pszUncPath)
+    __in PCWSTR pszUncPath)
 {
     assert(iPanel == PANEL_LEFT || iPanel == PANEL_RIGHT);
 
     // Shift iPanel to zero-based value.
     iPanel -= PANEL_LEFT;
-    assert(iPanel >= 0 && iPanel < COUNTOF(g_aszRedirectPath));
+    assert(iPanel >= 0 && iPanel < 2);
 
-    StringCchCopy(g_aszRedirectPath[iPanel], COUNTOF(g_aszRedirectPath[iPanel]), pszUncPath);
+    g_redirectPaths[iPanel].assign(pszUncPath);
     SalamanderGeneral->PostMenuExtCommand(MENUCMD_REDIRECT_BASE + iPanel, TRUE);
 }

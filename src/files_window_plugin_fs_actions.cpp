@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -16,6 +16,8 @@
 #include "pack.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/AnsiFallbackPolicy.h"
+#include "common/unicode/PanelPathPolicy.h"
 #include "common/IFileSystem.h"
 #include "common/widepath.h"
 #include "common/IEnvironment.h"
@@ -49,9 +51,13 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
     else
         count = 0;
 
-    CPathBuffer subject;    // +200 is a reserve (Windows creates paths longer than MAX_PATH)
-    CPathBuffer formatedFileName; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
-    char expanded[200];
+    // wide - CMessageBox::DialogProc reads Text.GetW() unconditionally (no
+    // IsWide() fallback), so a narrow-only 'str' below showed an EMPTY confirmation
+    // dialog body on every plugin-FS delete - not just a non-ASCII-name defect, this
+    // was blank for every deletion. subject/formatedFileName/expanded were narrow
+    // fixed scratch buffers used only to build 'str'; widened in place.
+    std::wstring formatedFileNameW;
+    std::wstring expandedW;
     if (count <= 1) // one selected item or none
     {
         int i;
@@ -68,12 +74,13 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
         }
         BOOL isDir = i < Dirs->Count;
         CFileData* f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-        AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-        lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+        formatedFileNameW = AlterFileNameW(f->Name,
+                                           Configuration.FileNameFormat, 0, isDir != FALSE);
+        expandedW = LoadStrW(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE);
     }
     else
     {
-        ExpandPluralFilesDirs(expanded, 200, count - selectedDirs, selectedDirs, epfdmNormal, FALSE);
+        expandedW = ExpandPluralFilesDirsTextW(count - selectedDirs, selectedDirs, epfdmNormal, FALSE);
     }
 
     int resID = 0;
@@ -92,12 +99,15 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
     CTruncatedString str;
     if (resID != 0)
     {
-        // IDS_COPY/IDS_MOVE contain ampersands, cancel it
-        char templ[200];
-        lstrcpyn(templ, LoadStr(resID), 200);
-        RemoveAmpersands(templ);
-        sprintf(subject, templ, expanded);
-        str.Set(subject, count > 1 ? NULL : formatedFileName.Get());
+        // IDS_COPYTO/IDS_MOVETO/IDS_CONFIRM_DELETE contain ampersands, cancel it
+        wchar_t templW[200];
+        lstrcpynW(templW, LoadStrW(resID), 200);
+        RemoveAmpersands(templW);
+        // same two-stage %s nesting as the sibling Pack/Unpack Subject fixes: templW's
+        // %s is filled with expandedW, whose own unfilled %s (single-item case) is then
+        // filled by SetW's internal substitution with the actual item name.
+        const std::wstring subjectW = FormatStrW(templW, expandedW.c_str());
+        str.SetW(subjectW.c_str(), count > 1 ? NULL : formatedFileNameW.c_str());
     }
 
     switch (type)
@@ -115,26 +125,26 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
             BOOL operationMask = FALSE;
             BOOL cancelOrHandlePath = FALSE;
 
-            CPathBuffer targetPath; // Heap-allocated for long path support
+            std::wstring targetPath;
             if (target->Is(ptDisk))
-                target->GetGeneralPath(targetPath, targetPath.Size());
+                target->GetGeneralPath(targetPath);
             else
-                targetPath[0] = 0;
+                targetPath.clear();
 
             BOOL ret = GetPluginFS()->CopyOrMoveFromFS(copy, 1, GetPluginFS()->GetPluginFSName(),
                                                        HWindow, panel, count - selectedDirs,
-                                                       selectedDirs, targetPath, operationMask,
+                                                       selectedDirs, targetPath, NULL, operationMask,
                                                        cancelOrHandlePath, NULL);
             while (!ret)
             {
                 if (!cancelOrHandlePath) // standard dialog
                 {
-                    if (CCopyMoveDialog(HWindow, targetPath, targetPath.Size(),
-                                        LoadStr(copy ? IDS_COPY : IDS_MOVE), &str,
-                                        copy ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
-                                        Configuration.CopyHistory, COPY_HISTORY_SIZE,
-                                        TRUE)
-                            .Execute() == IDOK)
+                    CCopyMoveDialog dlg(HWindow, targetPath,
+                                       LoadStrW(copy ? IDS_COPY : IDS_MOVE), &str,
+                                       copy ? IDD_COPYDIALOG : IDD_MOVEDIALOG,
+                                       Configuration.CopyHistory, COPY_HISTORY_SIZE,
+                                       TRUE);
+                    if (dlg.Execute() == IDOK)
                     {
                         UpdateWindow(MainWindow->HWindow);
 
@@ -142,7 +152,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                         cancelOrHandlePath = FALSE;
                         ret = GetPluginFS()->CopyOrMoveFromFS(copy, 2, GetPluginFS()->GetPluginFSName(),
                                                               HWindow, panel, count - selectedDirs,
-                                                              selectedDirs, targetPath, operationMask,
+                                                              selectedDirs, targetPath, NULL, operationMask,
                                                               cancelOrHandlePath, NULL);
                     }
                     else
@@ -158,64 +168,65 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                     MainWindow->UpdateDefaultDir(MainWindow->GetActivePanel() == this);
 
                     // for disk paths flip '/' to '\\' and drop duplicate '\\'
-                    if (targetPath[0] != 0 && targetPath[1] == ':' || // paths like X:...
-                        (targetPath[0] == '/' || targetPath[0] == '\\') &&
-                            (targetPath[1] == '/' || targetPath[1] == '\\')) // UNC paths
-                    {                                                        // this is a disk path (absolute or relative) - turn all '/' into '\\' and remove duplicate '\\'
+                    if (targetPath.size() >= 2 &&
+                        (targetPath[1] == L':' ||
+                         ((targetPath[0] == L'/' || targetPath[0] == L'\\') &&
+                          (targetPath[1] == L'/' || targetPath[1] == L'\\'))))
+                    { // this is a disk path (absolute or relative) - normalize its separators
                         SlashesToBackslashesAndRemoveDups(targetPath);
+                        targetPath.resize(wcslen(targetPath.c_str()));
                     }
 
-                    char errTitle[200];
-                    lstrcpyn(errTitle, LoadStr(copy ? IDS_ERRORCOPY : IDS_ERRORMOVE), 200);
+                    const wchar_t* errTitle = LoadStrW(copy ? IDS_ERRORCOPY : IDS_ERRORMOVE);
                     BOOL pathError = FALSE;
 
-                    int len = (int)strlen(targetPath);
-                    BOOL backslashAtEnd = (len > 0 && targetPath[len - 1] == '\\'); // path ends with backslash -> must be a directory
-                    BOOL mustBePath = (len == 2 && LowerCase[targetPath[0]] >= 'a' && LowerCase[targetPath[0]] <= 'z' &&
-                                       targetPath[1] == ':'); // a path like "c:" must stay a path after expansion (not a file)
+                    const size_t len = targetPath.size();
+                    BOOL backslashAtEnd = (len > 0 && targetPath[len - 1] == L'\\'); // path ends with backslash -> must be a directory
+                    const wchar_t drive = len > 0 ? sally::unicode::FoldCharW(targetPath[0]) : 0;
+                    BOOL mustBePath = (len == 2 && drive >= L'a' && drive <= L'z' &&
+                                       targetPath[1] == L':'); // a path like "c:" must stay a path after expansion (not a file)
 
                     int pathType;
                     BOOL pathIsDir;
-                    char* secondPart;
+                    wchar_t* secondPart;
                     int error;
-                    if (ParsePath(targetPath, pathType, pathIsDir, secondPart, errTitle, NULL, &error, MAX_PATH))
+                    std::wstring targetMask;
+                    if (ParsePathW(targetPath, pathType, pathIsDir, secondPart, errTitle, NULL, &error))
                     {
                         // instead of using a 'switch' statement, we use 'if' so that 'break' and 'continue' work properly
                         if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                         {
-                            char* mask;
-                            if (SalSplitWindowsPath(HWindow, LoadStr(copy ? IDS_COPY : IDS_MOVE),
-                                                    errTitle, count, targetPath, secondPart, pathIsDir,
-                                                    backslashAtEnd || mustBePath, NULL, NULL, mask))
+                            const size_t secondPartOffset = static_cast<size_t>(secondPart - targetPath.data());
+                            if (SalSplitWindowsPathOwnedW(HWindow, LoadStrW(copy ? IDS_COPY : IDS_MOVE),
+                                                          errTitle, count, targetPath, secondPartOffset,
+                                                          pathIsDir, backslashAtEnd || mustBePath,
+                                                          NULL, NULL, targetMask))
                             {
-                                if (!operationMask && mask != NULL &&
-                                    (strcmp(mask, "*.*") == 0 || strcmp(mask, "*") == 0))
-                                {              // masks not supported and mask is empty, cut it off
-                                    *mask = 0; // double-null terminated
-                                }
-                                if (!operationMask && mask != NULL && *mask != 0) // mask exists but isn't allowed
+                                if (!operationMask && !targetMask.empty() &&
+                                    (targetMask == L"*.*" || targetMask == L"*"))
+                                    targetMask.clear();
+                                if (!operationMask && !targetMask.empty()) // mask exists but isn't allowed
                                 {
-                                    char* e = targetPath + strlen(targetPath); // fix 'targetPath' (merge 'targetPath' and 'mask')
-                                    if (e > targetPath && *(e - 1) != '\\')
-                                        *e++ = '\\';
-                                    if (e != mask)
-                                        memmove(e, mask, strlen(mask) + 1); // move the mask if necessary
+                                    if (!targetPath.empty() && targetPath.back() != L'\\')
+                                        targetPath.push_back(L'\\');
+                                    targetPath += targetMask;
+                                    targetMask.clear();
 
-                                    gPrompter->ShowError(AnsiToWide(errTitle).c_str(), LoadStrW(IDS_FSCOPYMOVE_OPMASKSNOTSUP));
+                                    gPrompter->ShowError(errTitle, LoadStrW(IDS_FSCOPYMOVE_OPMASKSNOTSUP));
                                     pathError = TRUE; // path error -> mode==4
                                 }
                             }
                             else
+                            {
                                 pathError = TRUE; // path error -> mode==4
+                            }
                         }
                         else
                         {
-                            gPrompter->ShowError(AnsiToWide(errTitle).c_str(),
+                            gPrompter->ShowError(errTitle,
                                                  LoadStrW(pathType == PATH_TYPE_ARCHIVE ? IDS_FSCOPYMOVE_ONLYDISK_A : IDS_FSCOPYMOVE_ONLYDISK_FS));
                             if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
-                            {
-                                SalPathAddBackslash(targetPath, targetPath.Size());
-                            }
+                                SalPathAddBackslashW(targetPath);
                             pathError = TRUE; // path error -> mode==4
                         }
                     }
@@ -223,7 +234,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                     {
                         if (error == SPP_INCOMLETEPATH) // additionally report an error for a relative path on FS
                         {
-                            gPrompter->ShowError(AnsiToWide(errTitle).c_str(), LoadStrW(IDS_FSCOPYMOVE_INCOMPLETEPATH));
+                            gPrompter->ShowError(errTitle, LoadStrW(IDS_FSCOPYMOVE_INCOMPLETEPATH));
                         }
                         pathError = TRUE; // path error -> mode==4
                     }
@@ -233,15 +244,16 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                     ret = GetPluginFS()->CopyOrMoveFromFS(copy, pathError ? 4 : 3,
                                                           GetPluginFS()->GetPluginFSName(), HWindow, panel,
                                                           count - selectedDirs, selectedDirs, targetPath,
+                                                          pathError ? NULL : &targetMask,
                                                           operationMask, cancelOrHandlePath, NULL);
                 }
             }
 
             if (ret && !cancelOrHandlePath)
             {
-                if (targetPath[0] != 0) // switch focus to 'targetPath'
+                if (!targetPath.empty()) // switch focus to 'targetPath'
                 {
-                    lstrcpyn(NextFocusName, targetPath, NextFocusName.Size());
+                    NextFocusNameW = targetPath.c_str();
                     // RefreshDirectory may not run - the source might not have changed - just to be safe, post a message
                     PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
                 }
@@ -276,7 +288,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                         HICON hIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(WindowsVistaAndLater ? 16777 : 161), // delete icon
                                                                IMAGE_ICON, 32, 32, IconLRFlags));
                         int myRes = CMessageBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT,
-                                                LoadStr(IDS_CONFIRM_DELETE_TITLE), &str, NULL,
+                                                LoadStrW(IDS_CONFIRM_DELETE_TITLE), &str, NULL,
                                                 NULL, hIcon, 0, NULL, NULL, NULL, NULL)
                                         .Execute();
                         HANDLES(DestroyIcon(hIcon));
@@ -341,13 +353,13 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     CALL_STACK_MESSAGE1("CFilesWindow::DragDropToArcOrFS()");
     if (data->Data->Names.Count == 0)
         return; // nothing to do
-    if (data->Data->SrcPath[0] == 0)
+    if (data->Data->SrcPath.empty())
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SRCPATHUNICODEONLY));
         return;
     }
     if (data->Data->Names.Count > 1) // sort file and directory names for faster array searching
-        SortNames((char**)data->Data->Names.GetData(), 0, data->Data->Names.Count - 1);
+        SortNames(data->Data->Names.GetData(), 0, data->Data->Names.Count - 1);
 
     int* nameFound = NULL; // each name in data->Data->Names has TRUE/FALSE here (found/not found on disk)
     nameFound = (int*)malloc(sizeof(int) * data->Data->Names.Count);
@@ -368,21 +380,20 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     }
 
     // load complete data about files and directories, their names are in data->Data
-    CPathBuffer path;
-    lstrcpyn(path, data->Data->SrcPath, path.Size());
-    char* end = path + strlen(path);
-    SalPathAppend(path, "*", path.Size());
-    CPathBuffer text;
+    std::wstring path = data->Data->SrcPath;
+    std::wstring searchPath = path;
+    if (!searchPath.empty() && searchPath.back() != L'\\')
+        searchPath.push_back(L'\\');
+    searchPath.push_back(L'*');
+    std::wstring text;
     WIN32_FIND_DATAW file;
-    HANDLE find = SalFindFirstFileHW(path, &file);
-    *end = 0; // fix the path
+    HANDLE find = SalFindFirstFileHW(searchPath.c_str(), &file);
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
         {
-            std::wstring pathW = AnsiToWide(path);
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L": " + GetErrorTextW(err)).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (path + L": " + GetErrorTextOwned(err).c_str()).c_str());
             if (nameFound != NULL)
                 free(nameFound);
             delete baseDir;
@@ -393,7 +404,6 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     {
         BOOL ok = TRUE;
         CFileData newF;       // we no longer work with these items
-        newF.NameW = NULL;
         newF.PluginData = -1; // -1 is arbitrary, thevalue will be ignored
         newF.Association = 0;
         newF.Selected = 0;
@@ -412,10 +422,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                                                         (file.cFileName[1] == L'.' && file.cFileName[2] == 0)))
                 continue; // "." and ".."
 
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
             int foundIndex;
-            if (ContainsString(&data->Data->Names, cFileNameA, &foundIndex))
+            if (ContainsString(&data->Data->Names, file.cFileName, &foundIndex))
             {
                 if (nameFound[foundIndex] == FALSE)
                     nameFound[foundIndex] = TRUE;
@@ -425,7 +433,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
             else
                 continue; // user is not interested in this file/directory (name wasn't in the data object)
 
-            newF.Name = DupStr(cFileNameA);
+            newF.Name = DupStr(file.cFileName);
             newF.DosName = NULL;
             if (newF.Name == NULL)
             {
@@ -433,14 +441,14 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 testFindNextErr = FALSE;
                 break;
             }
-            newF.NameLen = strlen(newF.Name);
+            newF.NameLen = static_cast<DWORD>(wcslen(newF.Name)); // WIN32_FIND_DATA name is DWORD-bounded
             if (!Configuration.SortDirsByExt && (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // directory, certainly a disk
             {
                 newF.Ext = newF.Name + newF.NameLen; // directories have no extensions
             }
             else
             {
-                newF.Ext = strrchr(newF.Name, '.');
+                newF.Ext = wcsrchr(newF.Name, L'.');
                 if (newF.Ext == NULL)
                     newF.Ext = newF.Name + newF.NameLen; // ".cvspass" in Windows is an extension ...
                                                          //      if (newF.Ext == NULL || newF.Ext == newF.Name) newF.Ext = newF.Name + newF.NameLen;
@@ -450,9 +458,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
             if (file.cAlternateFileName[0] != 0)
             {
-                char cAltNameA[14];
-                WideCharToMultiByte(CP_ACP, 0, file.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                newF.DosName = DupStr(cAltNameA);
+                newF.DosName = DupStr(file.cAlternateFileName);
                 if (newF.DosName == NULL)
                 {
                     free(newF.Name);
@@ -480,8 +486,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     newF.IsLink = IsFileLink(newF.Ext);
             }
 
-            if ((newF.Attr & FILE_ATTRIBUTE_DIRECTORY) && !baseDir->AddDir("", newF, NULL) ||     // directory, certainly a disk
-                (newF.Attr & FILE_ATTRIBUTE_DIRECTORY) == 0 && !baseDir->AddFile("", newF, NULL)) // file
+            if ((newF.Attr & FILE_ATTRIBUTE_DIRECTORY) && !baseDir->AddDir(L"", newF, NULL) ||     // directory, certainly a disk
+                (newF.Attr & FILE_ATTRIBUTE_DIRECTORY) == 0 && !baseDir->AddFile(L"", newF, NULL)) // file
             {
                 free(newF.Name);
                 if (newF.DosName != NULL)
@@ -492,12 +498,11 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
             }
         } while (SalLPFindNextFile(find, &file));
         DWORD err = GetLastError();
-        HANDLES(FindClose(find));
+        SalLPFindClose(find);
 
         if (testFindNextErr && err != ERROR_NO_MORE_FILES)
         {
-            std::wstring pathW = AnsiToWide(path);
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (pathW + L": " + GetErrorTextW(err)).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (path + L": " + GetErrorTextOwned(err).c_str()).c_str());
             if (nameFound != NULL)
                 free(nameFound);
             delete baseDir;
@@ -529,7 +534,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     }
 
     if (!cancel && !FilesActionInProgress &&
-        CheckPath(TRUE, data->Data->SrcPath) == ERROR_SUCCESS)
+        CheckPath(TRUE, data->Data->SrcPath.c_str()) == ERROR_SUCCESS)
     { // perform the operation itself
         FilesActionInProgress = TRUE;
 
@@ -537,13 +542,13 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
         BeginStopRefresh(); // to suppress path change messages
 
         CPanelTmpEnumData dataEnum;
-        dataEnum.Dirs = baseDir->GetDirs("");
-        dataEnum.Files = baseDir->GetFiles("");
+        dataEnum.Dirs = baseDir->GetDirs(L"");
+        dataEnum.Files = baseDir->GetFiles(L"");
         dataEnum.IndexesCount = dataEnum.Dirs->Count + dataEnum.Files->Count;
         for (i = 0; i < dataEnum.IndexesCount; i++)
             nameFound[i] = i;
         dataEnum.Indexes = nameFound;
-        lstrcpyn(dataEnum.WorkPath, data->Data->SrcPath, MAX_PATH);
+        dataEnum.WorkPathW = data->Data->SrcPath;
         dataEnum.EnumLastIndex = -1;
 
         if (dataEnum.IndexesCount > 0)
@@ -555,15 +560,26 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 BOOL haveSize = FALSE;
                 CQuadWord size;
                 DWORD err;
-                std::wstring archiveW = AnsiToWide(data->ArchiveOrFSName);
-                HANDLE hFile = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
+                const std::wstring& archiveW = data->ArchiveOrFSName;
+                HANDLE hFile = gFileSystem->CreateFile(archiveW.c_str(), GENERIC_READ, 0, NULL,
+                                                       OPEN_EXISTING, 0, NULL);
+                DWORD openError = GetLastError();
+                HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile,
+                               __hoCreateFile, hFile, openError, TRUE);
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
-                    haveSize = SalGetFileSize(hFile, size, err);
-                    HANDLES(CloseHandle(hFile));
+                    uint64_t fileSize = 0;
+                    FileResult sizeResult = gFileSystem->GetHandleFileSize(hFile, &fileSize);
+                    haveSize = sizeResult.success;
+                    if (haveSize)
+                        size = CQuadWord((DWORD)fileSize, (DWORD)(fileSize >> 32));
+                    else
+                        err = sizeResult.errorCode;
+                    HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+                    gFileSystem->CloseFileHandle(hFile);
                 }
                 else
-                    err = GetLastError();
+                    err = openError;
                 if (haveSize)
                 {
                     nullFile = (size == CQuadWord(0, 0));
@@ -572,31 +588,31 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     DWORD nullFileAttrs;
                     if (nullFile)
                     {
-                        nullFileAttrs = GetFileAttributesW(archiveW.c_str());
-                        ClearReadOnlyAttrW(archiveW.c_str(), nullFileAttrs); // to allow deletion even if read-only
+                        nullFileAttrs = gFileSystem->GetFileAttributes(archiveW.c_str());
+                        ClearReadOnlyAttr(archiveW.c_str(), nullFileAttrs); // to allow deletion even if read-only
                         gFileSystem->DeleteFile(archiveW.c_str());
                     }
                     //---  actual packing
-                    EnvSetCurrentDirectoryA(gEnvironment, data->Data->SrcPath);
+                    gEnvironment->SetCurrentDirectory(data->Data->SrcPath.c_str());
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-                    if (PackCompress(HWindow, this, data->ArchiveOrFSName, data->ArchivePathOrUserPart,
-                                     !data->Copy, data->Data->SrcPath, PanelEnumDiskSelection, &dataEnum))
+                    if (PackCompress(HWindow, this, data->ArchiveOrFSName.c_str(), data->ArchivePathOrUserPart.c_str(),
+                                     !data->Copy, data->Data->SrcPath.c_str(), PanelEnumDiskSelection, &dataEnum))
                     {                   // packing succeeded
                         if (nullFile && // zero-length file might have had a different compressed attribute, set archive accordingly
                             nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
-                                                                 0, NULL, OPEN_EXISTING,
-                                                                 0, NULL));
+                            HANDLE hFile2 = gFileSystem->CreateFile(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
+                                                                   0, NULL, OPEN_EXISTING, 0, NULL);
+                            HANDLES_ADD_EX(__otQuiet, hFile2 != INVALID_HANDLE_VALUE, __htFile,
+                                           __hoCreateFile, hFile2, GetLastError(), TRUE);
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 // restore the "compressed" flag; on FAT and FAT32 it simply won't succeed
-                                USHORT state = (nullFileAttrs & FILE_ATTRIBUTE_COMPRESSED) ? COMPRESSION_FORMAT_DEFAULT : COMPRESSION_FORMAT_NONE;
-                                ULONG length;
-                                DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
-                                                sizeof(USHORT), NULL, 0, &length, FALSE);
-                                HANDLES(CloseHandle(hFile2));
-                                SetFileAttributesW(archiveW.c_str(), nullFileAttrs);
+                                gFileSystem->SetHandleCompression(
+                                    hFile2, (nullFileAttrs & FILE_ATTRIBUTE_COMPRESSED) != 0);
+                                HANDLES_REMOVE(hFile2, __htFile, "IFileSystem::CloseHandle");
+                                gFileSystem->CloseFileHandle(hFile2);
+                                gFileSystem->SetFileAttributes(archiveW.c_str(), nullFileAttrs);
                             }
                         }
                     }
@@ -604,22 +620,22 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         if (nullFile) // operation failed, we must recreate it
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
-                                                                 0, NULL, OPEN_ALWAYS,
-                                                                 0, NULL));
+                            HANDLE hFile2 = gFileSystem->CreateFile(archiveW.c_str(), GENERIC_READ | GENERIC_WRITE,
+                                                                   0, NULL, OPEN_ALWAYS, 0, NULL);
+                            HANDLES_ADD_EX(__otQuiet, hFile2 != INVALID_HANDLE_VALUE, __htFile,
+                                           __hoCreateFile, hFile2, GetLastError(), TRUE);
                             if (hFile2 != INVALID_HANDLE_VALUE)
                             {
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                                 {
                                     // restore the "compressed" flag; on FAT and FAT32 it simply won't succeed
-                                    USHORT state = (nullFileAttrs & FILE_ATTRIBUTE_COMPRESSED) ? COMPRESSION_FORMAT_DEFAULT : COMPRESSION_FORMAT_NONE;
-                                    ULONG length;
-                                    DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
-                                                    sizeof(USHORT), NULL, 0, &length, FALSE);
+                                    gFileSystem->SetHandleCompression(
+                                        hFile2, (nullFileAttrs & FILE_ATTRIBUTE_COMPRESSED) != 0);
                                 }
-                                HANDLES(CloseHandle(hFile2));
+                                HANDLES_REMOVE(hFile2, __htFile, "IFileSystem::CloseHandle");
+                                gFileSystem->CloseFileHandle(hFile2);
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                    SetFileAttributesW(archiveW.c_str(), nullFileAttrs);
+                                    gFileSystem->SetFileAttributes(archiveW.c_str(), nullFileAttrs);
                             }
                         }
                     }
@@ -630,19 +646,19 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
                     //---  refresh non-automatically refreshed directories
                     // change in the directory with the target archive (archive file is modified)
-                    lstrcpyn(text, data->ArchiveOrFSName, text.Size());
-                    CutDirectory(text); // 'text' is the archive name -> must always succeed
-                    MainWindow->PostChangeOnPathNotification(text, FALSE);
+                    text = data->ArchiveOrFSName;
+                    CutDirectoryW(text); // 'text' is the archive name -> must always succeed
+                    MainWindow->PostChangeOnPathNotificationW(text.c_str(), FALSE);
                     if (!data->Copy)
                     {
                         // changes on the source path (when moving files to the archive,
                         // files/directories should have been deleted)
-                        MainWindow->PostChangeOnPathNotification(data->Data->SrcPath, TRUE);
+                        MainWindow->PostChangeOnPathNotificationW(data->Data->SrcPath.c_str(), TRUE);
                     }
                 }
                 else
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(data->ArchiveOrFSName).c_str(), GetErrorTextW(err));
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), data->ArchiveOrFSName.c_str(), GetErrorTextOwned(err).c_str());
                     gPrompter->ShowError(LoadStrW(data->Copy ? IDS_ERRORCOPY : IDS_ERRORMOVE), msg.c_str());
                 }
             }
@@ -655,7 +671,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
                 // select the FS that performs the operation (priority: active, then new)
-                CPathBuffer targetPath; // Heap-allocated for long path support
+                std::wstring targetPath = data->ArchiveOrFSName + L":" + data->ArchivePathOrUserPart;
                 BOOL done = FALSE;
                 CPluginFSInterfaceEncapsulation* fs = NULL;
                 if (Is(ptPluginFS))
@@ -663,12 +679,11 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
                 int fsNameIndex;
                 if (fs != NULL && fs->NotEmpty() &&                                         // interface is valid
-                    fs->IsFSNameFromSamePluginAsThisFS(data->ArchiveOrFSName, fsNameIndex)) // FS name is from the same plugin (otherwise it's not worth trying)
+                    fs->IsFSNameFromSamePluginAsThisFS(data->ArchiveOrFSName.c_str(), fsNameIndex)) // FS name is from the same plugin (otherwise it's not worth trying)
                 {
                     BOOL invalidPathOrCancel;
-                    _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName.Get(), data->ArchivePathOrUserPart.Get());
                     if (fs->CopyOrMoveFromDiskToFS(data->Copy, 3, fs->GetPluginFSName(),
-                                                   HWindow, data->Data->SrcPath,
+                                                   HWindow, data->Data->SrcPath.c_str(),
                                                    PanelEnumDiskSelection, &dataEnum,
                                                    selFiles, selDirs, targetPath, &invalidPathOrCancel))
                     {
@@ -688,7 +703,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 {
                     int index;
                     int fsNameIndex2;
-                    if (Plugins.IsPluginFS(data->ArchiveOrFSName, index, fsNameIndex2)) // determine plugin index
+                    if (Plugins.IsPluginFS(data->ArchiveOrFSName.c_str(), index, fsNameIndex2)) // determine plugin index
                     {
                         // obtain the plug-in associated with the FS
                         CPluginData* plugin = Plugins.Get(index);
@@ -696,19 +711,18 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                         {
                             // open a new FS
                             // load the plug-in before obtaining DLLName, Version and plugin interfaces
-                            CPluginFSInterfaceAbstract* auxFS = plugin->OpenFS(data->ArchiveOrFSName, fsNameIndex2);
+                            CPluginFSInterfaceAbstract* auxFS = plugin->OpenFS(data->ArchiveOrFSName.c_str(), fsNameIndex2);
                             CPluginFSInterfaceEncapsulation pluginFS(auxFS, plugin->DLLName.c_str(), plugin->Version.c_str(),
                                                                      plugin->GetPluginInterfaceForFS()->GetInterface(),
                                                                      plugin->GetPluginInterface()->GetInterface(),
-                                                                     data->ArchiveOrFSName, fsNameIndex2, -1, 0,
+                                                                     data->ArchiveOrFSName.c_str(), fsNameIndex2, -1, 0,
                                                                      plugin->BuiltForVersion);
                             if (pluginFS.NotEmpty())
                             {
                                 Plugins.SetWorkingPluginFS(&pluginFS);
                                 BOOL invalidPathOrCancel;
-                                _snprintf_s(targetPath.Get(), targetPath.Size(), _TRUNCATE, "%s:%s", data->ArchiveOrFSName.Get(), data->ArchivePathOrUserPart.Get());
                                 if (!pluginFS.CopyOrMoveFromDiskToFS(data->Copy, 3, pluginFS.GetPluginFSName(),
-                                                                     HWindow, data->Data->SrcPath,
+                                                                     HWindow, data->Data->SrcPath.c_str(),
                                                                      PanelEnumDiskSelection, &dataEnum,
                                                                      selFiles, selDirs, targetPath,
                                                                      &invalidPathOrCancel))
@@ -731,7 +745,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     }
                     else
                     {
-                        TRACE_E("Unexpected situation in CFilesWindow::DragDropToArcOrFS() - file-system " << data->ArchiveOrFSName.Get() << " was not found.");
+                        TRACE_EW(L"Unexpected situation in CFilesWindow::DragDropToArcOrFS() - file-system " << data->ArchiveOrFSName << L" was not found.");
                     }
                 }
 
@@ -808,21 +822,21 @@ void CVisibleItemsArray::InvalidateArr()
     HANDLES(LeaveCriticalSection(&Monitor));
 }
 
-void SortNamesCS(char** names, int left, int right)
+void SortNamesCS(wchar_t** names, int left, int right)
 {
     int i = left, j = right;
-    char* pivot = names[(i + j) / 2];
+    wchar_t* pivot = names[(i + j) / 2];
 
     do
     {
-        while (strcmp(names[i], pivot) < 0 && i < right)
+        while (wcscmp(names[i], pivot) < 0 && i < right)
             i++;
-        while (strcmp(pivot, names[j]) < 0 && j > left)
+        while (wcscmp(pivot, names[j]) < 0 && j > left)
             j--;
 
         if (i <= j)
         {
-            char* swap = names[i];
+            wchar_t* swap = names[i];
             names[i] = names[j];
             names[j] = swap;
             i++;
@@ -861,7 +875,7 @@ void CVisibleItemsArray::RefreshArr(CFilesWindow* panel)
         count = 0;
     if (count > ArrNamesAllocated)
     {
-        char** n = (char**)realloc(ArrNames, count * sizeof(char*));
+        wchar_t** n = (wchar_t**)realloc(ArrNames, count * sizeof(wchar_t*));
         if (n != NULL)
         {
             ArrNames = n;
@@ -902,7 +916,7 @@ void CVisibleItemsArray::RefreshArr(CFilesWindow* panel)
     HANDLES(LeaveCriticalSection(&Monitor));
 }
 
-BOOL CVisibleItemsArray::ArrContains(const char* name, BOOL* isArrValid, int* versionNum)
+BOOL CVisibleItemsArray::ArrContains(const wchar_t* name, BOOL* isArrValid, int* versionNum)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CVisibleItemsArray::ArrContains()");
     HANDLES(EnterCriticalSection(&Monitor));
@@ -920,7 +934,7 @@ BOOL CVisibleItemsArray::ArrContains(const char* name, BOOL* isArrValid, int* ve
     while (1)
     {
         m = (l + r) / 2;
-        int res = strcmp(name, ArrNames[m]);
+        int res = wcscmp(name, ArrNames[m]);
         if (res == 0)
         {
             HANDLES(LeaveCriticalSection(&Monitor));
@@ -989,7 +1003,7 @@ void CCriteriaData::Reset()
     IgnoreADS = FALSE;
     SkipEmptyDirs = FALSE;
     UseMasks = FALSE;
-    Masks.SetMasksString("*.*");
+    Masks.SetMasksString(L"*.*");
     UseAdvanced = FALSE;
     Advanced.Reset();
     UseSpeedLimit = FALSE;
@@ -1037,8 +1051,13 @@ BOOL CCriteriaData::AgreeMasksAndAdvanced(const CFileData* file)
     return TRUE;
 }
 
-BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATA* file)
+BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATAW* file)
 {
+    // file->cFileName is already the exact wide name - narrowing it via
+    // WideCharToMultiByte(WC_NO_BEST_FIT_CHARS) just to feed the narrow AgreeMasks (itself
+    // a converting wrapper that re-widens via AnsiToWide, per masks.cpp's own
+    // comment) was a pointless double round-trip. For a name outside CP_ACP this could
+    // silently mis-decide include/exclude for a mask-filtered copy/move.
     if (UseMasks && !Masks.AgreeMasks(file->cFileName, NULL))
         return FALSE;
 
@@ -1052,38 +1071,18 @@ BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATA* file)
     return TRUE;
 }
 
-BOOL CCriteriaData::AgreeMasksAndAdvanced(const WIN32_FIND_DATAW* file)
-{
-    if (UseMasks)
-    {
-        char fileNameA[MAX_PATH];
-        WideCharToMultiByte(CP_ACP, 0, file->cFileName, -1, fileNameA, MAX_PATH, NULL, NULL);
-        if (!Masks.AgreeMasks(fileNameA, NULL))
-            return FALSE;
-    }
-
-    if (UseAdvanced)
-    {
-        CQuadWord size(file->nFileSizeLow, file->nFileSizeHigh);
-        if (!Advanced.Test(file->dwFileAttributes, &size, &file->ftLastWriteTime))
-            return FALSE;
-    }
-
-    return TRUE;
-}
-
-const char* CRITERIADATA_OVERWRITEOLDER_REG = "Overwrite Older";
-const char* CRITERIADATA_STARTONIDLE_REG = "Start On Idle";
-const char* CRITERIADATA_COPYSECURITY_REG = "Copy Security";
-const char* CRITERIADATA_COPYATTRIBUTES_REG = "Copy Attributes";
-const char* CRITERIADATA_PRESERVEDIRTIME_REG = "Preserve Dir Time";
-const char* CRITERIADATA_IGNOREADS_REG = "Ignore ADS";
-const char* CRITERIADATA_SKIPEMPTYDIRS_REG = "Skip Empty Dirs";
-const char* CRITERIADATA_USENAMEMASK_REG = "Use Name Masks";
-const char* CRITERIADATA_NAMEMASKS_REG = "Name Masks";
-const char* CRITERIADATA_USESPEEDLIMIT_REG = "Use Speed Limit";
-const char* CRITERIADATA_SPEEDLIMIT_REG = "Speed Limit";
-const char* CRITERIADATA_USEADVANCED_REG = "Use Advanced";
+const wchar_t* CRITERIADATA_OVERWRITEOLDER_REG = L"Overwrite Older";
+const wchar_t* CRITERIADATA_STARTONIDLE_REG = L"Start On Idle";
+const wchar_t* CRITERIADATA_COPYSECURITY_REG = L"Copy Security";
+const wchar_t* CRITERIADATA_COPYATTRIBUTES_REG = L"Copy Attributes";
+const wchar_t* CRITERIADATA_PRESERVEDIRTIME_REG = L"Preserve Dir Time";
+const wchar_t* CRITERIADATA_IGNOREADS_REG = L"Ignore ADS";
+const wchar_t* CRITERIADATA_SKIPEMPTYDIRS_REG = L"Skip Empty Dirs";
+const wchar_t* CRITERIADATA_USENAMEMASK_REG = L"Use Name Masks";
+const wchar_t* CRITERIADATA_NAMEMASKS_REG = L"Name Masks";
+const wchar_t* CRITERIADATA_USESPEEDLIMIT_REG = L"Use Speed Limit";
+const wchar_t* CRITERIADATA_SPEEDLIMIT_REG = L"Speed Limit";
+const wchar_t* CRITERIADATA_USEADVANCED_REG = L"Use Advanced";
 
 BOOL CCriteriaData::Save(HKEY hKey)
 {
@@ -1092,29 +1091,29 @@ BOOL CCriteriaData::Save(HKEY hKey)
     CCriteriaData def;
 
     if (OverwriteOlder != def.OverwriteOlder)
-        SetValue(hKey, CRITERIADATA_OVERWRITEOLDER_REG, REG_DWORD, &OverwriteOlder, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_OVERWRITEOLDER_REG, REG_DWORD, &OverwriteOlder, sizeof(DWORD));
     if (StartOnIdle != def.StartOnIdle)
-        SetValue(hKey, CRITERIADATA_STARTONIDLE_REG, REG_DWORD, &StartOnIdle, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_STARTONIDLE_REG, REG_DWORD, &StartOnIdle, sizeof(DWORD));
     if (CopySecurity != def.CopySecurity)
-        SetValue(hKey, CRITERIADATA_COPYSECURITY_REG, REG_DWORD, &CopySecurity, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_COPYSECURITY_REG, REG_DWORD, &CopySecurity, sizeof(DWORD));
     if (CopyAttrs != def.CopyAttrs)
-        SetValue(hKey, CRITERIADATA_COPYATTRIBUTES_REG, REG_DWORD, &CopyAttrs, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_COPYATTRIBUTES_REG, REG_DWORD, &CopyAttrs, sizeof(DWORD));
     if (PreserveDirTime != def.PreserveDirTime)
-        SetValue(hKey, CRITERIADATA_PRESERVEDIRTIME_REG, REG_DWORD, &PreserveDirTime, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_PRESERVEDIRTIME_REG, REG_DWORD, &PreserveDirTime, sizeof(DWORD));
     if (IgnoreADS != def.IgnoreADS)
-        SetValue(hKey, CRITERIADATA_IGNOREADS_REG, REG_DWORD, &IgnoreADS, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_IGNOREADS_REG, REG_DWORD, &IgnoreADS, sizeof(DWORD));
     if (SkipEmptyDirs != def.SkipEmptyDirs)
-        SetValue(hKey, CRITERIADATA_SKIPEMPTYDIRS_REG, REG_DWORD, &SkipEmptyDirs, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_SKIPEMPTYDIRS_REG, REG_DWORD, &SkipEmptyDirs, sizeof(DWORD));
     if (UseMasks != def.UseMasks)
-        SetValue(hKey, CRITERIADATA_USENAMEMASK_REG, REG_DWORD, &UseMasks, sizeof(DWORD));
-    if (strcmp(Masks.GetMasksString(), def.Masks.GetMasksString()) != 0)
-        SetValue(hKey, CRITERIADATA_NAMEMASKS_REG, REG_SZ, Masks.GetMasksString(), -1);
+        SetValueW(hKey, CRITERIADATA_USENAMEMASK_REG, REG_DWORD, &UseMasks, sizeof(DWORD));
+    if (wcscmp(Masks.GetMasksString(), def.Masks.GetMasksString()) != 0)
+        SetValueW(hKey, CRITERIADATA_NAMEMASKS_REG, REG_SZ, Masks.GetMasksString(), -1);
     if (UseSpeedLimit != def.UseSpeedLimit)
-        SetValue(hKey, CRITERIADATA_USESPEEDLIMIT_REG, REG_DWORD, &UseSpeedLimit, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_USESPEEDLIMIT_REG, REG_DWORD, &UseSpeedLimit, sizeof(DWORD));
     if (SpeedLimit != def.SpeedLimit)
-        SetValue(hKey, CRITERIADATA_SPEEDLIMIT_REG, REG_DWORD, &SpeedLimit, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_SPEEDLIMIT_REG, REG_DWORD, &SpeedLimit, sizeof(DWORD));
     if (UseAdvanced != def.UseAdvanced)
-        SetValue(hKey, CRITERIADATA_USEADVANCED_REG, REG_DWORD, &UseAdvanced, sizeof(DWORD));
+        SetValueW(hKey, CRITERIADATA_USEADVANCED_REG, REG_DWORD, &UseAdvanced, sizeof(DWORD));
 
     Advanced.Save(hKey);
 
@@ -1123,18 +1122,25 @@ BOOL CCriteriaData::Save(HKEY hKey)
 
 BOOL CCriteriaData::Load(HKEY hKey)
 {
-    GetValue(hKey, CRITERIADATA_OVERWRITEOLDER_REG, REG_DWORD, &OverwriteOlder, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_STARTONIDLE_REG, REG_DWORD, &StartOnIdle, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_COPYSECURITY_REG, REG_DWORD, &CopySecurity, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_COPYATTRIBUTES_REG, REG_DWORD, &CopyAttrs, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_PRESERVEDIRTIME_REG, REG_DWORD, &PreserveDirTime, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_IGNOREADS_REG, REG_DWORD, &IgnoreADS, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_SKIPEMPTYDIRS_REG, REG_DWORD, &SkipEmptyDirs, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_USENAMEMASK_REG, REG_DWORD, &UseMasks, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_NAMEMASKS_REG, REG_SZ, Masks.GetWritableMasksString(), MAX_GROUPMASK);
-    GetValue(hKey, CRITERIADATA_USESPEEDLIMIT_REG, REG_DWORD, &UseSpeedLimit, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_SPEEDLIMIT_REG, REG_DWORD, &SpeedLimit, sizeof(DWORD));
-    GetValue(hKey, CRITERIADATA_USEADVANCED_REG, REG_DWORD, &UseAdvanced, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_OVERWRITEOLDER_REG, REG_DWORD, &OverwriteOlder, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_STARTONIDLE_REG, REG_DWORD, &StartOnIdle, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_COPYSECURITY_REG, REG_DWORD, &CopySecurity, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_COPYATTRIBUTES_REG, REG_DWORD, &CopyAttrs, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_PRESERVEDIRTIME_REG, REG_DWORD, &PreserveDirTime, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_IGNOREADS_REG, REG_DWORD, &IgnoreADS, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_SKIPEMPTYDIRS_REG, REG_DWORD, &SkipEmptyDirs, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_USENAMEMASK_REG, REG_DWORD, &UseMasks, sizeof(DWORD));
+    // same boundary-conversion fix as main_window_config_persistence.cpp's
+    // mask configs (iteration 105) - reading narrow REG_SZ bytes directly into the wide
+    // buffer packed two ANSI bytes per wchar_t, corrupting the mask on every load. This
+    // one also undid iteration 104's CCopyMoveMoreDialog fix on every restart, since
+    // Criteria->Masks round-trips through this Load()/Save() pair.
+    std::wstring nameMasks;
+    GetStringValueW(hKey, CRITERIADATA_NAMEMASKS_REG, nameMasks);
+    Masks.SetMasksString(nameMasks.c_str());
+    GetValueW(hKey, CRITERIADATA_USESPEEDLIMIT_REG, REG_DWORD, &UseSpeedLimit, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_SPEEDLIMIT_REG, REG_DWORD, &SpeedLimit, sizeof(DWORD));
+    GetValueW(hKey, CRITERIADATA_USEADVANCED_REG, REG_DWORD, &UseAdvanced, sizeof(DWORD));
 
     Advanced.Load(hKey);
 
@@ -1172,12 +1178,12 @@ BOOL CCopyMoveOptions::Save(HKEY hKey)
 {
     ClearKey(hKey);
     HKEY subKey;
-    char buf[30];
+    wchar_t buf[30];
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        itoa(i + 1, buf, 10);
-        if (CreateKey(hKey, buf, subKey))
+        _itow(i + 1, buf, 10);
+        if (CreateKeyW(hKey, buf, subKey))
         {
             Items[i]->Save(subKey);
             CloseKey(subKey);
@@ -1191,16 +1197,16 @@ BOOL CCopyMoveOptions::Save(HKEY hKey)
 BOOL CCopyMoveOptions::Load(HKEY hKey)
 {
     HKEY subKey;
-    char buf[30];
+    wchar_t buf[30];
     int i = 1;
-    strcpy(buf, "1");
+    wcscpy(buf, L"1");
     Items.DestroyMembers();
-    while (OpenKey(hKey, buf, subKey) && i == 1) // for now read only the first item
+    while (OpenKeyW(hKey, buf, subKey) && i == 1) // for now read only the first item
     {
         CCriteriaData* item = new CCriteriaData();
         item->Load(subKey);
         Items.Add(item);
-        itoa(++i, buf, 10);
+        _itow(++i, buf, 10);
         CloseKey(subKey);
     }
     return TRUE;

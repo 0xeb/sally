@@ -6,11 +6,12 @@
 
 #define MessageCenterName "RemoteComparator"
 #define StartedEventName "RemoteComparatorStarted"
+#define REMOTE_PATH_CAPACITY 32768
 
 struct CRCMessage : public CMessage
 {
-    char CurrentDirectory[MAX_PATH];
-    char Path1[MAX_PATH];
-    char Path2[MAX_PATH];
+    wchar_t CurrentDirectory[REMOTE_PATH_CAPACITY];
+    wchar_t Path1[REMOTE_PATH_CAPACITY];
+    wchar_t Path2[REMOTE_PATH_CAPACITY];
     char ReleaseEvent[20];
 };

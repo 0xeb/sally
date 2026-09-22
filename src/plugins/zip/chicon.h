@@ -68,6 +68,6 @@ typedef struct
     LPVOID lpData;      // icon data
 } CIcon;
 
-BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCount, LPVOID manifest, DWORD manifestSize);
-int LoadIcons(const char* iconFile, DWORD index, CIcon** icons, int* count);
+BOOL ChangeSfxIconAndAddManifest(const wchar_t* sfxFile, CIcon* icons, int iconsCount, LPVOID manifest, DWORD manifestSize);
+int LoadIcons(const wchar_t* iconFile, DWORD index, CIcon** icons, int* count);
 void DestroyIcons(CIcon* icons, int count);

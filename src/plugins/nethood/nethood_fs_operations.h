@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <string>
+
 class CNethoodFSInterface;
 
 class CNethoodFSCacheConsumer : public CNethoodCacheEventConsumer
@@ -60,7 +62,7 @@ private:
     };
 
     /// Current path.
-    TCHAR m_szCurrentPath[MAX_PATH];
+    std::wstring m_currentPath;
 
     /// Cache node for this path.
     CNethoodCache::Node m_pathNode;
@@ -72,7 +74,7 @@ private:
     FSState m_state;
 
     /// Contains the UNC path to redirect to.
-    TCHAR m_szRedirectPath[MAX_PATH];
+    std::wstring m_redirectPath;
 
     /// Ignore the force refresh flag in the next ListCurrentPath?
     bool m_bIgnoreForceRefresh;
@@ -80,7 +82,7 @@ private:
     /// Contains accessible path found asynchronously from the enumeration
     /// thread. This member variable should be accessed while holding the
     /// cache lock.
-    TCHAR m_szAccessiblePath[MAX_PATH];
+    std::wstring m_accessiblePath;
 
     /// This contains the result of asynchronous enumeration.
     DWORD m_dwEnumerationResult;
@@ -110,7 +112,7 @@ private:
 
     void DisplayError(DWORD dwError);
 
-    bool PostRedirectPathToSalamander(__in PCTSTR pszPath);
+    bool PostRedirectPathToSalamander(__in PCWSTR pszPath);
 
     void StartThrobber();
 
@@ -132,14 +134,8 @@ public:
     //----------------------------------------------------------------------
     // CPluginFSInterfaceAbstract
 
-    /// Retrieves user portion of the current plugin's path.
-    /// \param userPart Caller supplied buffer. The method should copy user
-    ///        portion of the current path to it. The buffer is MAX_PATH
-    ///        characters in length.
-    /// \return If the method succeeds it should return nonzero value,
-    ///         otherwise it should return zero.
-    virtual BOOL WINAPI GetCurrentPath(
-        __out_ecount(MAX_PATH) char* userPart);
+    virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* userPart) override;
+    BOOL GetCurrentPathOwned(std::wstring& userPart);
 
     /// Retrieves user portion of the file, directory or up-dir on the
     /// current path.
@@ -155,20 +151,19 @@ public:
     ///         otherwise it should return zero.
     /// Implement this method to get the Alt+Insert behavior. Is is also
     /// used by the drag'n'drop manipulation and Ctrl+Shift+arrow handling.
-    virtual BOOL WINAPI GetFullName(
-        __in CFileData& file,
-        __in int isDir,
-        __out_ecount(bufSize) char* buf,
-        __in int bufSize);
-
-    virtual BOOL WINAPI GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize,
-                                      BOOL& success);
-    virtual BOOL WINAPI GetRootPath(char* userPart);
-    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
-    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
-    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                                   const char* userPart, char* cutFileName, BOOL* pathWasCut,
-                                   BOOL forceRefresh, int mode);
+    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir,
+                                    CSalamanderStringBuffer* fullName) override;
+    virtual BOOL WINAPI GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                      CSalamanderStringBuffer* path, BOOL& success) override;
+    virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart) override;
+    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                      const wchar_t* userPart) override;
+    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                                  const wchar_t* userPart) override;
+    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                                   int fsNameIndex, const wchar_t* userPart,
+                                   CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut,
+                                   BOOL forceRefresh, int mode) override;
     virtual BOOL WINAPI ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                         CPluginDataInterfaceAbstract*& pluginData,
                                         int& iconsType, BOOL forceRefresh);
@@ -176,10 +171,10 @@ public:
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ReleaseObject(HWND parent);
     virtual DWORD WINAPI GetSupportedServices();
-    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const char* fsName, char*& title,
+    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title,
                                                        HICON& icon, BOOL& destroyIcon);
     virtual HICON WINAPI GetFSIcon(BOOL& destroyIcon);
-    virtual void WINAPI GetDropEffect(const char* srcFSPath, const char* tgtFSPath,
+    virtual void WINAPI GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                                       DWORD allowedEffects, DWORD keyState,
                                       DWORD* dropEffect);
     virtual void WINAPI GetFSFreeSpace(CQuadWord* retValue);
@@ -203,11 +198,11 @@ public:
     /// the flag FS_SERVICE_GETNEXTDIRLINEHOTPATH returned from the
     /// GetSupportedServices method.
     virtual BOOL WINAPI GetNextDirectoryLineHotPath(
-        __in const char* text,
+        __in const wchar_t* text,
         __in int pathLen,
         __inout int& offset);
 
-    virtual void WINAPI CompleteDirectoryLineHotPath(char* path, int pathBufSize);
+    virtual BOOL WINAPI CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path);
 
     /// Retrieves title for the Salamander's main window.
     /// \param fsName Name of the current file system.
@@ -233,41 +228,40 @@ public:
     /// Also the user has to enable the option 'Display current path in
     /// main window title' in the Salamander's configuration.
     virtual BOOL WINAPI GetPathForMainWindowTitle(
-        __in const char* fsName,
+        __in const wchar_t* fsName,
         __in int mode,
-        __out_ecount(bufSize) char* buf,
-        __in int bufSize);
+        CSalamanderStringBuffer* buf);
 
-    virtual void WINAPI ShowInfoDialog(const char* fsName, HWND parent);
-    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo);
-    virtual BOOL WINAPI QuickRename(const char* fsName, int mode, HWND parent, CFileData& file,
-                                    BOOL isDir, char* newName, BOOL& cancel);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* fsName, const char* path,
+    virtual void WINAPI ShowInfoDialog(const wchar_t* fsName, HWND parent);
+    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo);
+    virtual BOOL WINAPI QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file,
+                                    BOOL isDir, CSalamanderStringBuffer* newName, BOOL& cancel);
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path,
                                                        BOOL includingSubdirs);
-    virtual BOOL WINAPI CreateDir(const char* fsName, int mode, HWND parent,
-                                  char* newName, BOOL& cancel);
-    virtual void WINAPI ViewFile(const char* fsName, HWND parent,
+    virtual BOOL WINAPI CreateDir(const wchar_t* fsName, int mode, HWND parent,
+                                  CSalamanderStringBuffer* newName, BOOL& cancel);
+    virtual void WINAPI ViewFile(const wchar_t* fsName, HWND parent,
                                  CSalamanderForViewFileOnFSAbstract* salamander,
                                  CFileData& file);
-    virtual BOOL WINAPI Delete(const char* fsName, int mode, HWND parent, int panel,
+    virtual BOOL WINAPI Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                                int selectedFiles, int selectedDirs, BOOL& cancelOrError);
-    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                          int panel, int selectedFiles, int selectedDirs,
-                                         char* targetPath, BOOL& operationMask,
+                                         CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                          BOOL& cancelOrHandlePath, HWND dropTarget);
-    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                               const char* sourcePath, SalEnumSelection2 next,
+    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                               const wchar_t* sourcePath, SalEnumSelection2 next,
                                                void* nextParam, int sourceFiles, int sourceDirs,
-                                               char* targetPath, BOOL* invalidPathOrCancel);
-    virtual BOOL WINAPI ChangeAttributes(const char* fsName, HWND parent, int panel,
+                                               CSalamanderStringBuffer* targetPath, BOOL* invalidPathOrCancel);
+    virtual BOOL WINAPI ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                                          int selectedFiles, int selectedDirs);
-    virtual void WINAPI ShowProperties(const char* fsName, HWND parent, int panel,
+    virtual void WINAPI ShowProperties(const wchar_t* fsName, HWND parent, int panel,
                                        int selectedFiles, int selectedDirs);
-    virtual void WINAPI ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+    virtual void WINAPI ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                     int panel, int selectedFiles, int selectedDirs);
-    virtual BOOL WINAPI OpenFindDialog(const char* fsName, int panel);
-    virtual void WINAPI OpenActiveFolder(const char* fsName, HWND parent);
-    virtual void WINAPI GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects);
+    virtual BOOL WINAPI OpenFindDialog(const wchar_t* fsName, int panel);
+    virtual void WINAPI OpenActiveFolder(const wchar_t* fsName, HWND parent);
+    virtual void WINAPI GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects);
 
     virtual BOOL WINAPI HandleMenuMsg(
         __in UINT uMsg,
@@ -276,8 +270,7 @@ public:
         __out LRESULT* plResult);
 
     virtual BOOL WINAPI GetNoItemsInPanelText(
-        __out_ecount(textBufSize) char* textBuf,
-        __in int textBufSize);
+        CSalamanderStringBuffer* textBuf);
 
     virtual void WINAPI ShowSecurityInfo(HWND parent) {}
 
@@ -296,7 +289,7 @@ public:
 
     static CNethoodCacheNode::Type GetNodeTypeFromFileData(__in const CFileData& file);
 
-    static bool IsRootPath(__in PCTSTR pszPath);
+    static bool IsRootPath(__in PCWSTR pszPath);
 
     static void SetHideServersInRoot(bool bHide)
     {

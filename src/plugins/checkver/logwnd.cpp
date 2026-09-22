@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 #include "checkver.h"
+#include "checkver_log_markup.h"
 #include "checkver.rh"
 #include "checkver.rh2"
 #include "lang\lang.rh"
@@ -27,9 +27,9 @@ HWND HWindow = NULL;
 RECT ClientRect;
 int YOffset = 0;
 
-const char* LOGWINDOW_CLASSNAME = "CheckVerLogWindow";
+const wchar_t* LOGWINDOW_CLASSNAME = L"CheckVerLogWindow";
 
-TDirectArray<char*> LogLines(100, 50); // lines kept in the log window
+TDirectArray<wchar_t*> LogLines(100, 50); // lines kept in the log window
 
 LRESULT APIENTRY LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -45,7 +45,10 @@ BOOL RegisterLogClass()
 {
     if (ClassIsRegistred)
         return TRUE;
-    WNDCLASS wc;
+    // W. The class, the line store and FlexWriteText below are all owned by
+    // this plugin end to end, so nothing ever forced them narrow - the log just shows URLs
+    // and server-supplied text, which is exactly the content that wants to be Unicode.
+    WNDCLASSW wc;
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = LogWindowProc;
     wc.cbClsExtra = 0;
@@ -56,7 +59,7 @@ BOOL RegisterLogClass()
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = LOGWINDOW_CLASSNAME;
-    if (RegisterClass(&wc) == 0)
+    if (RegisterClassW(&wc) == 0)
     {
         DWORD err = GetLastError();
         TRACE_E("RegisterClass has failed error=" << err);
@@ -71,7 +74,7 @@ void UnregisterLogClass()
 {
     if (ClassIsRegistred)
     {
-        if (!UnregisterClass(LOGWINDOW_CLASSNAME, HLanguage))
+        if (!UnregisterClassW(LOGWINDOW_CLASSNAME, HLanguage))
         {
             DWORD err = GetLastError();
             TRACE_E("UnregisterClass(LOGWINDOW_CLASSNAME) has failed error=" << err);
@@ -156,7 +159,7 @@ void ReleaseLogWindow(HWND hWindow)
 // FlexWriteText
 //
 
-BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hitIndex)
+BOOL FlexWriteText(HDC hDC, int x, int y, const wchar_t* text, int cchText, int* hitIndex)
 {
     // save the settings
     HFONT hOldFont = (HFONT)SelectObject(hDC, HNormalFont);
@@ -171,14 +174,14 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
     int len = 0; // number of characters to draw
 
     int ix;
-    for (ix = 0; text[ix] != '\0'; ix++)
+    for (ix = 0; text[ix] != L'\0'; ix++)
     {
-        if (text[ix] != '\t')
+        if (text[ix] != L'\t')
         {
             len = 0;
-            while (*(text + ix + len) != '\t' && *(text + ix + len) != 0)
+            while (*(text + ix + len) != L'\t' && *(text + ix + len) != 0)
                 len++;
-            GetTextExtentPoint32(hDC, text + ix, len, &size);
+            GetTextExtentPoint32W(hDC, text + ix, len, &size);
             if (hitIndex != NULL)
             {
                 if (hitX >= x && hitX < x + size.cx && link)
@@ -188,7 +191,7 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
                 }
             }
             else
-                TextOut(hDC, x, y, text + ix, len);
+                TextOutW(hDC, x, y, text + ix, len);
             ix += len - 1;
             x += size.cx;
         }
@@ -197,7 +200,7 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
             ix++;
             switch (text[ix])
             {
-            case 'n':
+            case L'n':
             {
                 SelectObject(hDC, HNormalFont);
                 SetTextColor(hDC, GetSysColor(COLOR_BTNTEXT));
@@ -205,7 +208,7 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
                 break;
             }
 
-            case 'b':
+            case L'b':
             {
                 SelectObject(hDC, HBoldFont);
                 SetTextColor(hDC, GetSysColor(COLOR_BTNTEXT));
@@ -213,7 +216,7 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
                 break;
             }
 
-            case 'u':
+            case L'u':
             {
                 SelectObject(hDC, HNormalFont);
                 SetTextColor(hDC, RGB(0, 0, 255));
@@ -221,27 +224,27 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
                 break;
             }
 
-            case 'l':
+            case L'l':
             {
                 // link - consume the URL
-                while (text[ix] != 0 && text[ix + 1] != '\t')
+                while (text[ix] != 0 && text[ix + 1] != L'\t')
                     ix++;
-                if (text[ix] != 0 && text[ix + 1] == '\t' && text[ix + 2] == 'i')
+                if (text[ix] != 0 && text[ix + 1] == L'\t' && text[ix + 2] == L'i')
                 {
                     // consume the item name
                     ix += 2;
-                    while (text[ix] != 0 && text[ix + 1] != '\t')
+                    while (text[ix] != 0 && text[ix + 1] != L'\t')
                         ix++;
                 }
                 break;
             }
 
-            case '\t':
+            case L'\t':
             {
                 len = 0;
-                while (*(text + ix + len) != '\t' && *(text + ix + len) != 0)
+                while (*(text + ix + len) != L'\t' && *(text + ix + len) != 0)
                     len++;
-                GetTextExtentPoint32(hDC, text + ix, len, &size);
+                GetTextExtentPoint32W(hDC, text + ix, len, &size);
                 if (hitIndex != NULL)
                 {
                     if (hitX >= x && hitX < x + size.cx && link)
@@ -251,7 +254,7 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
                     }
                 }
                 else
-                    TextOut(hDC, x, y, text + ix, len);
+                    TextOutW(hDC, x, y, text + ix, len);
                 ix += len - 1;
                 x += size.cx;
                 break;
@@ -267,8 +270,8 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
 
 void DrawLine(HDC hDC, int lineIndex, int yOffset)
 {
-    const char* line = LogLines[lineIndex];
-    FlexWriteText(hDC, LEFT_MARGIN, yOffset + 1, line, lstrlen(line), NULL);
+    const wchar_t* line = LogLines[lineIndex];
+    FlexWriteText(hDC, LEFT_MARGIN, yOffset + 1, line, lstrlenW(line), NULL);
 }
 
 void OnPaint(HDC hDC, BOOL lastOnly)
@@ -314,13 +317,13 @@ void ClearLogWindow()
     UpdateWindow(HWindow);
 }
 
-void AddLogLine(const char* line, BOOL scrollToEnd)
+void AddLogLine(const wchar_t* line, BOOL scrollToEnd)
 {
-    int len = lstrlen(line);
-    char* tmp = (char*)malloc(len + 1);
+    int len = lstrlenW(line);
+    wchar_t* tmp = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
     if (tmp == NULL)
         return;
-    memmove(tmp, line, len + 1);
+    memmove(tmp, line, (len + 1) * sizeof(wchar_t));
     LogLines.Add(tmp);
 
     int yOffset = -YOffset + TOP_MARGIN;
@@ -356,60 +359,24 @@ int GetLineIndexFromPoint(int y)
     return -1;
 }
 
-BOOL LinkHitTest(int x, int y, char* link, char* item)
+BOOL LinkHitTest(int x, int y, std::wstring* link)
 {
     if (link != NULL)
-        *link = 0;
-    if (item != NULL)
-        *item = 0;
+        link->clear();
     BOOL ret = FALSE;
     int lineIndex = GetLineIndexFromPoint(y);
     if (lineIndex != -1)
     {
-        const char* line = LogLines[lineIndex];
+        const wchar_t* line = LogLines[lineIndex];
         int charIndex;
         HDC hDC = GetDC(HWindow);
-        if (FlexWriteText(hDC, x - LEFT_MARGIN, 0, line, lstrlen(line), &charIndex))
+        if (FlexWriteText(hDC, x - LEFT_MARGIN, 0, line, lstrlenW(line), &charIndex))
         {
             //      TRACE_I("LineIndex="<<lineIndex<<" CharIndex="<<charIndex);
             if (link != NULL)
             {
-                // find the "\t"
-                const char* begin = line + charIndex;
-                while (*begin != 0 && *begin != '\t')
-                    begin++;
-                if (*begin == '\t')
-                    begin += 2;
-                {
-                    const char* end = begin;
-                    while (*end != 0 && *end != '\t')
-                        end++;
-                    int len = (int)(end - begin);
-                    if (len > 0)
-                    {
-                        memmove(link, begin, len);
-                        link[len] = 0;
-                        if (item != NULL && *end == '\t')
-                        {
-                            end++;
-                            if (*end == 'i')
-                            {
-                                end++;
-                                begin = end;
-                                while (*end != 0 && *end != '\t')
-                                    end++;
-                                len = (int)(end - begin);
-                                if (len > 0)
-                                {
-                                    memmove(item, begin, len);
-                                    item[len] = 0;
-                                }
-                            }
-                        }
-                    }
-                    else
-                        TRACE_E("Link was not found");
-                }
+                if (!checkver::ExtractFlexLink(line, static_cast<size_t>(charIndex), *link))
+                    TRACE_E("Link was not found");
             }
             ret = TRUE;
         }
@@ -446,7 +413,7 @@ LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
         p.x = GET_X_LPARAM(pos);
         p.y = GET_Y_LPARAM(pos);
         ScreenToClient(HWindow, &p);
-        BOOL link = LinkHitTest(p.x, p.y, NULL, NULL);
+        BOOL link = LinkHitTest(p.x, p.y, NULL);
         if (link && GetCapture() == NULL)
             SetCursor(HHandCursor);
         else
@@ -458,10 +425,10 @@ LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         int x = GET_X_LPARAM(lParam);
         int y = GET_Y_LPARAM(lParam);
-        char buff[1024];
-        BOOL link = LinkHitTest(x, y, buff, NULL);
-        if (link && buff[0] != 0)
-            ShellExecute(hWindow, "open", buff, NULL, NULL, SW_SHOWNORMAL);
+        std::wstring target;
+        BOOL link = LinkHitTest(x, y, &target);
+        if (link && !target.empty())
+            ShellExecuteW(hWindow, L"open", target.c_str(), NULL, NULL, SW_SHOWNORMAL);
         break;
     }
 
@@ -470,9 +437,9 @@ LogWindowProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
         POINT p;
         p.x = GET_X_LPARAM(lParam);
         p.y = GET_Y_LPARAM(lParam);
-        char link[1024];
-        LinkHitTest(p.x, p.y, link, NULL);
-        if (link[0] != 0)
+        std::wstring link;
+        LinkHitTest(p.x, p.y, &link);
+        if (!link.empty())
         {
             /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
    keep synchronized with the AppendMenu() calls below...
@@ -485,8 +452,8 @@ MENU_TEMPLATE_ITEM LogWindowMenu1[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 1, LoadStr(IDS_CTXMENU_OPEN));
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 2, LoadStr(IDS_CTXMENU_COPY));
+            AppendMenuW(hMenu, MF_STRING | MF_ENABLED, 1, LangStr(IDS_CTXMENU_OPEN).c_str());
+            AppendMenuW(hMenu, MF_STRING | MF_ENABLED, 2, LangStr(IDS_CTXMENU_COPY).c_str());
             ClientToScreen(HWindow, &p);
             BOOL cmd = TrackPopupMenu(hMenu, TPM_RETURNCMD | TPM_RIGHTBUTTON, p.x, p.y, 0, HWindow, NULL);
             DestroyMenu(hMenu);
@@ -496,13 +463,13 @@ MENU_TEMPLATE_ITEM LogWindowMenu1[] =
                 {
                 case 1:
                 {
-                    ShellExecute(hWindow, "open", link, NULL, NULL, SW_SHOWNORMAL);
+                    ShellExecuteW(hWindow, L"open", link.c_str(), NULL, NULL, SW_SHOWNORMAL);
                     break;
                 }
 
                 case 2:
                 {
-                    SalGeneral->CopyTextToClipboard(link, -1, TRUE, HWindow);
+                    SalGeneral->CopyTextToClipboard(link.c_str(), -1, TRUE, HWindow);
                     break;
                 }
                 }
@@ -565,5 +532,5 @@ MENU_TEMPLATE_ITEM LogWindowMenu1[] =
     }
     }
 
-    return DefWindowProc(hWindow, uMsg, wParam, lParam);
+    return DefWindowProcW(hWindow, uMsg, wParam, lParam);
 }

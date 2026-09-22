@@ -23,7 +23,7 @@ class CPEFile;
 
 typedef struct _CFG_DUMPER
 {
-    LPCTSTR pszKey;
+    const wchar_t* pszKey;
     int nTitleId;
     CPEDumper*(WINAPI* pfnFactory)(CPEFile*);
 } CFG_DUMPER;
@@ -40,4 +40,4 @@ extern unsigned g_cfgChainLength;
 
 int FindDumperInChain(const CFG_DUMPER* pDumperCfg);
 void BuildDefaultDumperChain();
-PCTSTR GetDumperTitleStr(int nTitleId);
+PCWSTR GetDumperTitleStr(int nTitleId);

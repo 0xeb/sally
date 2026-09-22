@@ -32,13 +32,13 @@ extern DWORD __HandlesMainThreadID;
 
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-#define HANDLES(function) __Handles.SetInfo(__FILE__, __LINE__).##function
-#define HANDLES_Q(function) __Handles.SetInfo(__FILE__, __LINE__, __otQuiet).##function
-#define HANDLES_COUNTS_TO_TRACE() __Handles.InformationsToTrace(FALSE)
-#define HANDLES_LIST_TO_TRACE() __Handles.InformationsToTrace(TRUE)
-#define HANDLES_ADD(type, origin, handle) __Handles.SetInfo(__FILE__, __LINE__).CheckCreate(TRUE, type, origin, handle)
-#define HANDLES_ADD_EX(outputType, success, type, origin, handle, error, synchronize) __Handles.SetInfo(__FILE__, __LINE__, outputType).CheckCreate(success, type, origin, handle, error, synchronize)
-#define HANDLES_REMOVE(handle, expType, function) __Handles.SetInfo(__FILE__, __LINE__).CheckClose(TRUE, handle, expType, function)
+#define HANDLES(function) GetHandles().SetInfo(__FILE__, __LINE__).##function
+#define HANDLES_Q(function) GetHandles().SetInfo(__FILE__, __LINE__, __otQuiet).##function
+#define HANDLES_COUNTS_TO_TRACE() GetHandles().InformationsToTrace(FALSE)
+#define HANDLES_LIST_TO_TRACE() GetHandles().InformationsToTrace(TRUE)
+#define HANDLES_ADD(type, origin, handle) GetHandles().SetInfo(__FILE__, __LINE__).CheckCreate(TRUE, type, origin, handle)
+#define HANDLES_ADD_EX(outputType, success, type, origin, handle, error, synchronize) GetHandles().SetInfo(__FILE__, __LINE__, outputType).CheckCreate(success, type, origin, handle, error, synchronize)
+#define HANDLES_REMOVE(handle, expType, function) GetHandles().SetInfo(__FILE__, __LINE__).CheckClose(TRUE, handle, expType, function)
 
 enum C__HandlesOutputType
 {
@@ -281,7 +281,7 @@ public:
     void CheckCreate(BOOL success, C__HandlesType type,
                      C__HandlesOrigin origin, const HANDLE handle,
                      DWORD error = ERROR_SUCCESS, BOOL synchronize = TRUE,
-                     const TCHAR* params = NULL, const char* paramsA = NULL,
+                     const wchar_t* params = NULL, const char* paramsA = NULL,
                      const WCHAR* paramsW = NULL);
 
     void CheckClose(BOOL success, const HANDLE handle, C__HandlesType expType,
@@ -306,48 +306,71 @@ public:
                               LPVOID lpParameter, DWORD dwCreationFlags,
                               LPDWORD lpThreadId);
 
-    BOOL CreateProcess(LPCTSTR lpApplicationName, LPTSTR lpCommandLine,
+    BOOL CreateProcess(LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
                        LPSECURITY_ATTRIBUTES lpProcessAttributes,
                        LPSECURITY_ATTRIBUTES lpThreadAttributes,
                        BOOL bInheritHandles, DWORD dwCreationFlags,
-                       LPVOID lpEnvironment, LPCTSTR lpCurrentDirectory,
+                       LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory,
                        LPSTARTUPINFO lpStartupInfo,
                        LPPROCESS_INFORMATION lpProcessInformation);
+
+    // Mirror-opposite guard, same rationale as RegOpenKeyA - under non-UNICODE the
+    // SDK's CreateProcess macro itself already expands to CreateProcessA, so the ambiguous member
+    // above IS this signature there. Only needed as its own name under UNICODE.
+    BOOL CreateProcessA(LPCSTR lpApplicationName, LPSTR lpCommandLine,
+                        LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                        LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                        BOOL bInheritHandles, DWORD dwCreationFlags,
+                        LPVOID lpEnvironment, LPCSTR lpCurrentDirectory,
+                        LPSTARTUPINFOA lpStartupInfo,
+                        LPPROCESS_INFORMATION lpProcessInformation);
 
     HANDLE OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle,
                        DWORD dwProcessId);
 
     HANDLE CreateMutex(LPSECURITY_ATTRIBUTES lpMutexAttributes,
-                       BOOL bInitialOwner, LPCTSTR lpName);
+                       BOOL bInitialOwner, LPCWSTR lpName);
+
+
+    // Mirror-opposite guard, same rationale as RegOpenKeyA above.
+    HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes,
+                        BOOL bInitialOwner, LPCSTR lpName);
 
     HANDLE OpenMutex(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                     LPCTSTR lpName);
+                     LPCWSTR lpName);
+
+
+    // Mirror-opposite guard, same rationale as RegOpenKeyA above.
+    HANDLE OpenMutexA(DWORD dwDesiredAccess, BOOL bInheritHandle,
+                      LPCSTR lpName);
 
     HANDLE CreateEvent(LPSECURITY_ATTRIBUTES lpEventAttributes,
-                       BOOL bManualReset, BOOL bInitialState, LPCTSTR lpName);
+                       BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName);
 
-    HANDLE OpenEvent(DWORD dwDesiredAccess, BOOL bInheritHandle, LPCTSTR lpName);
+    HANDLE OpenEvent(DWORD dwDesiredAccess, BOOL bInheritHandle, LPCWSTR lpName);
 
     HANDLE CreateSemaphore(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes,
                            LONG lInitialCount, LONG lMaximumCount,
-                           LPCTSTR lpName);
+                           LPCWSTR lpName);
 
     HANDLE OpenSemaphore(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                         LPCTSTR lpName);
+                         LPCWSTR lpName);
 
     HANDLE CreateWaitableTimer(LPSECURITY_ATTRIBUTES lpTimerAttributes,
-                               BOOL bManualReset, LPCTSTR lpTimerName);
+                               BOOL bManualReset, LPCWSTR lpTimerName);
 
     HANDLE OpenWaitableTimer(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                             LPCTSTR lpTimerName);
+                             LPCWSTR lpTimerName);
 
     HANDLE CreateFileMapping(HANDLE hFile,
                              LPSECURITY_ATTRIBUTES lpFileMappingAttributes,
                              DWORD flProtect, DWORD dwMaximumSizeHigh,
-                             DWORD dwMaximumSizeLow, LPCTSTR lpName);
+                             DWORD dwMaximumSizeLow, LPCWSTR lpName);
+
 
     HANDLE OpenFileMapping(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                           LPCTSTR lpName);
+                           LPCWSTR lpName);
+
 
     HANDLE CreateFileA(LPCSTR lpFileName, DWORD dwDesiredAccess,
                        DWORD dwShareMode,
@@ -361,14 +384,14 @@ public:
                        DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes,
                        HANDLE hTemplateFile);
 
-    HANDLE CreateMailslot(LPCTSTR lpName, DWORD nMaxMessageSize,
+    HANDLE CreateMailslot(LPCWSTR lpName, DWORD nMaxMessageSize,
                           DWORD lReadTimeout,
                           LPSECURITY_ATTRIBUTES lpSecurityAttributes);
 
     BOOL CreatePipe(PHANDLE hReadPipe, PHANDLE hWritePipe,
                     LPSECURITY_ATTRIBUTES lpPipeAttributes, DWORD nSize);
 
-    HANDLE CreateNamedPipe(LPCTSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
+    HANDLE CreateNamedPipe(LPCWSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
                            DWORD nMaxInstances, DWORD nOutBufferSize,
                            DWORD nInBufferSize, DWORD nDefaultTimeOut,
                            LPSECURITY_ATTRIBUTES lpSecurityAttributes);
@@ -415,7 +438,7 @@ public:
     HBITMAP CreateMappedBitmap(HINSTANCE hInstance, int idBitmap, UINT wFlags,
                                LPCOLORMAP lpColorMap, int iNumMaps);
 
-    HBITMAP LoadBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName);
+    HBITMAP LoadBitmap(HINSTANCE hInstance, LPCWSTR lpBitmapName);
 
     HPEN CreatePen(int fnPenStyle, int nWidth, COLORREF crColor);
 
@@ -444,7 +467,7 @@ public:
                      int fnWeight, DWORD fdwItalic, DWORD fdwUnderline,
                      DWORD fdwStrikeOut, DWORD fdwCharSet,
                      DWORD fdwOutputPrecision, DWORD fdwClipPrecision,
-                     DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCTSTR lpszFace);
+                     DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCWSTR lpszFace);
 
     HFONT CreateFontIndirectA(CONST LOGFONTA* lplf);
     HFONT CreateFontIndirectW(CONST LOGFONTW* lplf);
@@ -465,30 +488,30 @@ public:
 
     int ReleaseDC(HWND hWnd, HDC hDC);
 
-    HDC CreateDC(LPCTSTR lpszDriver, LPCTSTR lpszDevice, LPCTSTR lpszOutput,
+    HDC CreateDC(LPCWSTR lpszDriver, LPCWSTR lpszDevice, LPCWSTR lpszOutput,
                  CONST DEVMODE* lpInitData);
 
     HDC CreateCompatibleDC(HDC hdc);
 
-    HDC CreateIC(LPCTSTR lpszDriver, LPCTSTR lpszDevice, LPCTSTR lpszOutput,
+    HDC CreateIC(LPCWSTR lpszDriver, LPCWSTR lpszDevice, LPCWSTR lpszOutput,
                  CONST DEVMODE* lpdvmInit);
 
     BOOL DeleteDC(HDC hdc);
 
-    HDC CreateMetaFile(LPCTSTR lpszFile);
+    HDC CreateMetaFile(LPCWSTR lpszFile);
 
-    HDC CreateEnhMetaFile(HDC hdcRef, LPCTSTR lpFilename, CONST RECT* lpRect,
-                          LPCTSTR lpDescription);
+    HDC CreateEnhMetaFile(HDC hdcRef, LPCWSTR lpFilename, CONST RECT* lpRect,
+                          LPCWSTR lpDescription);
 
     HMETAFILE CloseMetaFile(HDC hdc);
 
     HENHMETAFILE CloseEnhMetaFile(HDC hdc);
 
-    HMETAFILE CopyMetaFile(HMETAFILE hmfSrc, LPCTSTR lpszFile);
+    HMETAFILE CopyMetaFile(HMETAFILE hmfSrc, LPCWSTR lpszFile);
 
-    HENHMETAFILE CopyEnhMetaFile(HENHMETAFILE hemfSrc, LPCTSTR lpszFile);
+    HENHMETAFILE CopyEnhMetaFile(HENHMETAFILE hemfSrc, LPCWSTR lpszFile);
 
-    HENHMETAFILE GetEnhMetaFile(LPCTSTR lpszMetaFile);
+    HENHMETAFILE GetEnhMetaFile(LPCWSTR lpszMetaFile);
 
     HENHMETAFILE SetWinMetaFileBits(UINT cbBuffer, CONST BYTE* lpbBuffer,
                                     HDC hdcRef, CONST METAFILEPICT* lpmfp);
@@ -512,14 +535,14 @@ public:
 
     HICON CopyIcon(HICON hIcon);
 
-    HICON LoadIcon(HINSTANCE hInstance, LPCTSTR lpIconName);
+    HICON LoadIcon(HINSTANCE hInstance, LPCWSTR lpIconName);
 
     BOOL DestroyIcon(HICON hIcon);
 
     HANDLE CopyImage(HANDLE hImage, UINT uType, int cxDesired, int cyDesired,
                      UINT fuFlags);
 
-    HANDLE LoadImage(HINSTANCE hinst, LPCTSTR lpszName, UINT uType,
+    HANDLE LoadImage(HINSTANCE hinst, LPCWSTR lpszName, UINT uType,
                      int cxDesired, int cyDesired, UINT fuLoad);
 
     HCURSOR CreateCursor(HINSTANCE hInst, int xHotSpot, int yHotSpot,
@@ -528,19 +551,39 @@ public:
 
     BOOL DestroyCursor(HCURSOR hCursor);
 
-    LONG RegCreateKey(HKEY hKey, LPCTSTR lpSubKey, PHKEY phkResult);
+    LONG RegCreateKey(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult);
 
-    LONG RegCreateKeyEx(HKEY hKey, LPCTSTR lpSubKey, DWORD Reserved,
-                        LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired,
+    LONG RegCreateKeyEx(HKEY hKey, LPCWSTR lpSubKey, DWORD Reserved,
+                        LPWSTR lpClass, DWORD dwOptions, REGSAM samDesired,
                         LPSECURITY_ATTRIBUTES lpSecurityAttributes,
                         PHKEY phkResult, LPDWORD lpdwDisposition);
 
-    LONG RegOpenKey(HKEY hKey, LPCTSTR lpSubKey, PHKEY phkResult);
 
-    LONG RegOpenKeyEx(HKEY hKey, LPCTSTR lpSubKey, DWORD ulOptions,
+    // Mirror-opposite guard, same rationale as RegOpenKeyA above.
+    LONG RegCreateKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD Reserved,
+                        LPSTR lpClass, DWORD dwOptions, REGSAM samDesired,
+                        LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                        PHKEY phkResult, LPDWORD lpdwDisposition);
+
+    LONG RegOpenKey(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult);
+
+
+    // Mirror-opposite guard of RegOpenKeyW above - under non-UNICODE the SDK's
+    // RegOpenKey macro itself already expands to RegOpenKeyA, so the ambiguous member above IS
+    // this signature there (an unguarded copy here would collide, C2084/C2535). Only needed as
+    // its own name under UNICODE, where callers with genuinely narrow subkey data
+    // (SAL_REG_KEY_..._A constants) call this explicitly because the ambiguous member resolves wide.
+    LONG RegOpenKeyA(HKEY hKey, LPCSTR lpSubKey, PHKEY phkResult);
+
+    LONG RegOpenKeyEx(HKEY hKey, LPCWSTR lpSubKey, DWORD ulOptions,
                       REGSAM samDesired, PHKEY phkResult);
 
-    LONG RegConnectRegistry(LPTSTR lpMachineName, HKEY hKey, PHKEY phkResult);
+
+    // Mirror-opposite guard, same rationale as RegOpenKeyA above.
+    LONG RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions,
+                      REGSAM samDesired, PHKEY phkResult);
+
+    LONG RegConnectRegistry(LPWSTR lpMachineName, HKEY hKey, PHKEY phkResult);
 
     LONG RegCloseKey(HKEY hKey);
 
@@ -556,7 +599,7 @@ public:
 
     HACCEL CreateAcceleratorTable(LPACCEL lpaccl, int cEntries);
 
-    HACCEL LoadAccelerators(HINSTANCE hInstance, LPCTSTR lpTableName);
+    HACCEL LoadAccelerators(HINSTANCE hInstance, LPCWSTR lpTableName);
 
     BOOL DestroyAcceleratorTable(HACCEL hAccel);
 
@@ -588,13 +631,21 @@ public:
 
     BOOL TlsFree(DWORD dwTlsIndex);
 
-    HINSTANCE LoadLibrary(LPCTSTR lpLibFileName);
+    HINSTANCE LoadLibrary(LPCWSTR lpLibFileName);
 
-#ifndef UNICODE
-    HINSTANCE LoadLibraryW(LPCWSTR lpLibFileName);
-#endif // UNICODE
 
-    HINSTANCE LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+    // Mirror-opposite guard of LoadLibraryW above - under non-UNICODE the SDK's
+    // LoadLibrary macro itself already expands to LoadLibraryA, so the ambiguous member above IS
+    // this signature there (an unguarded copy here would collide, C2084/C2535). Only needed as
+    // its own name under UNICODE, where callers with genuinely narrow module-name data call this
+    // explicitly because the ambiguous member resolves wide.
+    HINSTANCE LoadLibraryA(LPCSTR lpLibFileName);
+
+    HINSTANCE LoadLibraryEx(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+
+
+    // Same rationale as LoadLibraryA above.
+    HINSTANCE LoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 
     BOOL FreeLibrary(HMODULE hLibModule);
 
@@ -622,7 +673,7 @@ public:
 
     LPVOID GetEnvironmentStrings(VOID);
 
-    BOOL FreeEnvironmentStrings(LPTSTR lpszEnvironmentBlock);
+    BOOL FreeEnvironmentStrings(LPWSTR lpszEnvironmentBlock);
 
     HLOCAL LocalAlloc(UINT uFlags, UINT uBytes);
 
@@ -674,6 +725,17 @@ protected:
                       C__HandlesType expType);
 };
 
-extern C__Handles __Handles;
+// Function-local static (Meyer's singleton), not a plain global object. A plain
+// `extern C__Handles __Handles;` global is subject to the static-initialization-order fiasco:
+// any OTHER global object whose constructor (directly or via a member, e.g. CWinLibCS) calls a
+// HANDLES()-wrapped function needs __Handles's own constructor (which calls
+// InitializeCriticalSection) to have already run, but C++ does not order global-constructor
+// execution across translation units. This crashed on startup (EnterCriticalSection on an
+// uninitialized CRITICAL_SECTION) as soon as a call site newly reachable under Debug (an
+// fix) exercised the path from a global constructor - previously invisible only
+// because that exact call couldn't even compile. A function-local static is guaranteed by the
+// language to construct on first use, which is always after every global object exists, so
+// no ordering between GetHandles() and any other global's constructor is possible.
+C__Handles& GetHandles();
 
 #endif // HANDLES_ENABLE

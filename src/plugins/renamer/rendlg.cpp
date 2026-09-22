@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "spl_fs.h"
 
 int DialogWidth;
 int DialogHeight;
@@ -539,13 +540,13 @@ BOOL GetCounterParamFormat(HWND parent, char* buffer)
 BOOL GetTimeParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STIMEFORMAT, buffer, 1024);
+    return GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STIMEFORMAT, buffer, 1024);
 }
 
 BOOL GetDateParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, buffer, 1024);
+    return GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, buffer, 1024);
 }
 
 BOOL GetLowerCaseParam(HWND parent, char* buffer)
@@ -698,7 +699,16 @@ CRenamerDialog::CRenamerDialog(HWND parent)
 
     SalMaskGroup = SG->AllocSalamanderMaskGroup();
 
-    if (!SG->GetFilterFromPanel(PANEL_SOURCE, DefMask, MAX_GROUPMASK))
+    std::wstring defMaskW;
+    BOOL gotMask = SPLGetFilterFromPanelOwned(SG, PANEL_SOURCE, defMaskW);
+    if (gotMask)
+    {
+        const std::string defMask = WideToRenamerText(defMaskW.c_str());
+        gotMask = defMask.size() < MAX_GROUPMASK;
+        if (gotMask)
+            lstrcpynA(DefMask, defMask.c_str(), MAX_GROUPMASK);
+    }
+    if (!gotMask)
         strcpy(DefMask, "*.*");
     strcpy(Mask, DefMask);
     Subdirs = FALSE;
@@ -1062,7 +1072,7 @@ void CRenamerDialog::UpdateMenuItems()
     subMenu = MainMenu->GetSubMenu(CMD_OPTIONSPOPUP, FALSE);
     if (subMenu)
     {
-        if (RootLen == 0)
+        if (Root.empty())
             subMenu->EnableItem(CMD_RELATIVEPATH, FALSE, FALSE);
         subMenu->CheckRadioItem(CMD_FILENAMES, CMD_FULLPATH,
                                 CMD_FILENAMES + RenamerOptions.Spec, FALSE);
@@ -1141,8 +1151,10 @@ void CRenamerDialog::LoadSelection()
     int files = 0, dirs = 0;
     SG->GetPanelSelection(PANEL_SOURCE, &files, &dirs);
 
-    SG->GetPanelPath(PANEL_SOURCE, Root, Root.Size(), NULL, NULL);
-    RootLen = (int)strlen(Root);
+    std::wstring rootW;
+    if (!SPLGetPanelPathOwned(SG, PANEL_SOURCE, rootW))
+        return;
+    Root = std::move(rootW);
 
     // load the selection from the panel
     const CFileData* fd;
@@ -1150,13 +1162,13 @@ void CRenamerDialog::LoadSelection()
     if (files + dirs == 0)
     {
         fd = SG->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-        NotRenamedFiles.Add(new CSourceFile(fd, Root, RootLen, isDir));
+        NotRenamedFiles.Add(new CSourceFile(fd, Root.c_str(), Root.size(), isDir));
     }
     else
     {
         int i = 0;
         while ((fd = SG->GetPanelSelectedItem(PANEL_SOURCE, &i, &isDir)) != NULL)
-            NotRenamedFiles.Add(new CSourceFile(fd, Root, RootLen, isDir));
+            NotRenamedFiles.Add(new CSourceFile(fd, Root.c_str(), Root.size(), isDir));
     }
 }
 
@@ -1174,19 +1186,22 @@ void CRenamerDialog::ReloadSourceFiles()
     BOOL subdirs =
         SendDlgItemMessage(HWindow, IDC_SUBDIRS, BM_GETCHECK, 0, 0) == BST_CHECKED;
 
-    if (!GetDlgItemText(HWindow, IDC_MASK, mask, MAX_GROUPMASK))
+    wchar_t maskW[MAX_GROUPMASK];
+    if (!GetDlgItemTextW(HWindow, IDC_MASK, maskW, MAX_GROUPMASK))
     {
         Preview->SetItemCount(0, 0, 2);
-        SetDlgItemText(HWindow, IDS_COUNT, "");
+        SetDlgItemTextW(HWindow, IDS_COUNT, L"");
         return;
     }
 
-    SalMaskGroup->SetMasksString(mask, FALSE);
+    const std::string maskText = WideToRenamerText(maskW);
+    lstrcpynA(mask, maskText.c_str(), MAX_GROUPMASK);
+    SalMaskGroup->SetMasksString(maskW, FALSE);
     int err;
     if (!SalMaskGroup->PrepareMasks(err))
     {
         Preview->SetItemCount(0, 0, 2);
-        SetDlgItemText(HWindow, IDS_COUNT, "");
+        SetDlgItemTextW(HWindow, IDS_COUNT, L"");
         return;
     }
 
@@ -1198,8 +1213,7 @@ void CRenamerDialog::ReloadSourceFiles()
     EnableWindow(HWindow, FALSE);
 
     BOOL success = TRUE;
-    CPathBuffer pathBuf; // Heap-allocated for long path support
-    lstrcpyn(pathBuf, Root, pathBuf.Size());
+    std::wstring pathBuf = Root;
     SkipAllLongNames = FALSE;
     SkipAllBadDirs = FALSE;
     TRACE_I("start reading files");
@@ -1216,7 +1230,7 @@ void CRenamerDialog::ReloadSourceFiles()
             ProcessRenamed && i < RenamedFiles.Count ? RenamedFiles[i++] : NotRenamedFiles[j++];
         if (subdirs && item->IsDir)
         {
-            success = LoadSubdir(pathBuf, pathBuf.Size(), item->Name);
+            success = LoadSubdir(pathBuf, item->Name);
             if (!success)
                 break;
         }
@@ -1230,12 +1244,12 @@ void CRenamerDialog::ReloadSourceFiles()
             }
         }
         MSG msg;
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (!IsMenuBarMessage(&msg) && !IsDialogMessage(HWindow, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
         if (SourceFilesNeedUpdate)
@@ -1256,13 +1270,12 @@ void CRenamerDialog::ReloadSourceFiles()
 
         if (SourceFiles.Count > 0)
         {
-            char buf[200];
-            SG->ExpandPluralFilesDirs(buf, 200, SourceFiles.Count - dirs, dirs,
-                                      epfdmNormal, FALSE);
-            SetDlgItemText(HWindow, IDS_COUNT, buf);
+            const std::wstring text = SPLExpandPluralFilesDirsOwned(
+                SG, SourceFiles.Count - dirs, dirs, epfdmNormal, FALSE);
+            SetDlgItemTextW(HWindow, IDS_COUNT, text.c_str());
         }
         else
-            SetDlgItemText(HWindow, IDS_COUNT, "");
+            SetDlgItemTextW(HWindow, IDS_COUNT, L"");
 
         if (ManualMode)
         {
@@ -1289,7 +1302,7 @@ void CRenamerDialog::ReloadSourceFiles()
         else
         {
             Preview->SetItemCount(0, 0, 4);
-            SetDlgItemText(HWindow, IDS_COUNT, "");
+            SetDlgItemTextW(HWindow, IDS_COUNT, L"");
         }
     }
 
@@ -1305,38 +1318,31 @@ void CRenamerDialog::ReloadSourceFiles()
     SetWait(FALSE);
 }
 
-BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
+BOOL CRenamerDialog::LoadSubdir(std::wstring& path, const wchar_t* subdir)
 {
-    CALL_STACK_MESSAGE2("CRenamerDialog::LoadSubdir(, %s)", subdir);
-    BOOL b = SG->SalPathAppend(path, subdir, pathSize);
-    if (!b || !SG->SalPathAppend(path, "*.*", pathSize))
-    {
-        if (b)
-            SG->CutDirectory(path); // trim the subdirectory portion
-        BOOL skip;
-        FileError(HWindow, subdir, IDS_TOOLONGPATH, FALSE,
-                  &skip, &SkipAllLongNames, IDS_ERROR);
-        return skip;
-    }
+    CALL_STACK_MESSAGE2("CRenamerDialog::LoadSubdir(, %ls)", subdir);
+    const size_t parentLength = path.size();
+    AppendRenamerPath(path, subdir);
+    const size_t directoryLength = path.size();
+    AppendRenamerPath(path, L"*.*");
 
-    WIN32_FIND_DATA fd;
+    WIN32_FIND_DATAW fd;
     HANDLE hFind;
 
-    while ((hFind = FindFirstFile(path, &fd)) == INVALID_HANDLE_VALUE)
+    while ((hFind = FindFirstFileW(path.c_str(), &fd)) == INVALID_HANDLE_VALUE)
     {
         BOOL skip;
-        if (!FileError(HWindow, path, IDS_ERRREADDIR, TRUE,
+        if (!FileError(HWindow, path.c_str(), IDS_ERRREADDIR, TRUE,
                        &skip, &SkipAllBadDirs, IDS_ERROR))
         {
-            SG->CutDirectory(path); // trim the *.* wildcard
-            SG->CutDirectory(path); // trim the subdirectory portion
+            path.resize(parentLength);
             return skip;
         }
     }
 
-    SG->CutDirectory(path); // trim the *.* wildcard
+    path.resize(directoryLength);
 
-    int pathLen = (int)strlen(path);
+    const size_t pathLen = path.size();
     BOOL more = TRUE, ret = TRUE;
     do
     {
@@ -1345,10 +1351,10 @@ BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
             GetForegroundWindow() == HWindow)
         {
             MSG msg; // discard the buffered ESC key
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                 ;
-            if (SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELCNFRM),
-                                  LoadStr(IDS_QUESTION), MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES)
+            if (SG->SalMessageBox(HWindow, LangStr(IDS_CANCELCNFRM).c_str(),
+                                  LangStr(IDS_QUESTION).c_str(), MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES)
             {
                 ret = FALSE;
                 break;
@@ -1358,12 +1364,12 @@ BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
         }
 
         MSG msg;
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (!IsMenuBarMessage(&msg) && !IsDialogMessage(HWindow, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
 
@@ -1378,11 +1384,11 @@ BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
             Preview->SetItemCount(0, 0, 3);
         }
 
-        if (fd.cFileName[0] != 0 && strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, ".."))
+        if (fd.cFileName[0] != 0 && wcscmp(fd.cFileName, L".") && wcscmp(fd.cFileName, L".."))
         {
             if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
-                if (!LoadSubdir(path, pathSize, fd.cFileName))
+                if (!LoadSubdir(path, fd.cFileName))
                 {
                     ret = FALSE;
                     break;
@@ -1390,37 +1396,24 @@ BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
             }
             else
             {
-                char* ext = _tcsrchr(fd.cFileName, '.');
+                const wchar_t* ext = wcsrchr(fd.cFileName, L'.');
                 if (!ext)
-                    ext = fd.cFileName + strlen(fd.cFileName); // ".cvspass" is an extension in Windows
+                    ext = fd.cFileName + wcslen(fd.cFileName); // ".cvspass" is an extension in Windows
                 else
                     ext++;
 
                 if (SalMaskGroup->AgreeMasks(fd.cFileName, ext))
                 {
-                    CSourceFile* item = new CSourceFile(fd, path, pathLen);
-                    if ((int)item->NameLen < pathSize)
-                        SourceFiles.Add(item);
-                    else
-                    {
-                        BOOL skip;
-                        FileError(HWindow, item->FullName, IDS_TOOLONGPATH, FALSE,
-                                  &skip, &SkipAllLongNames, IDS_ERROR);
-                        delete item;
-                        if (!skip)
-                        {
-                            ret = FALSE;
-                            break;
-                        }
-                    }
+                    CSourceFile* item = new CSourceFile(fd, path.c_str(), pathLen);
+                    SourceFiles.Add(item);
                 }
             }
         }
 
-        while (!FindNextFile(hFind, &fd))
+        while (!FindNextFileW(hFind, &fd))
         {
             if (GetLastError() == ERROR_NO_MORE_FILES ||
-                !FileError(HWindow, path, IDS_ERRREADDIR, TRUE,
+                !FileError(HWindow, path.c_str(), IDS_ERRREADDIR, TRUE,
                            &ret, &SkipAllBadDirs, IDS_ERROR))
             {
                 more = FALSE;
@@ -1430,7 +1423,7 @@ BOOL CRenamerDialog::LoadSubdir(char* path, int pathSize, const char* subdir)
     } while (more);
 
     FindClose(hFind);
-    SG->CutDirectory(path); // trim the subdirectory portion
+    path.resize(parentLength);
 
     return ret;
 }
@@ -1441,9 +1434,9 @@ BOOL CRenamerDialog::ReloadManualModeEdit()
     if (!SourceFilesValid)
         return FALSE;
 
-    TBuffer<char> buf(TRUE);
+    TBuffer<wchar_t> buf(TRUE);
     int size = 0;
-    char* name;
+    wchar_t* name;
     int l;
     int i;
     for (i = 0; i < SourceFiles.Count; i++)
@@ -1454,25 +1447,25 @@ BOOL CRenamerDialog::ReloadManualModeEdit()
             name = SourceFiles[i]->Name;
             break;
         case rsRelativePath:
-            name = StripRoot(SourceFiles[i]->FullName, RootLen);
+            name = StripRoot(SourceFiles[i]->FullName, Root.size());
             break;
         case rsFullPath:
             name = SourceFiles[i]->FullName;
             break;
         }
-        l = (int)strlen(name);
+        l = (int)wcslen(name);
         if (!buf.Reserve(size + l + 2))
             return Error(IDS_LOWMEM);
-        memcpy(buf.Get() + size, name, l);
-        buf.Get()[size + l] = '\r';
-        buf.Get()[size + l + 1] = '\n';
+        memcpy(buf.Get() + size, name, l * sizeof(wchar_t));
+        buf.Get()[size + l] = L'\r';
+        buf.Get()[size + l + 1] = L'\n';
         size += l + 2;
     }
     if (!buf.Reserve(size + 1))
         return Error(IDS_LOWMEM);
     buf.Get()[size] = 0;
 
-    SendMessage(ManualEdit->HWindow, WM_SETTEXT, 0, (LPARAM)buf.Get());
+    SendMessageW(ManualEdit->HWindow, WM_SETTEXT, 0, (LPARAM)buf.Get());
 
     return TRUE;
 }
@@ -1507,7 +1500,7 @@ void CRenamerDialog::SetOptions(CRenamerOptions& options, char* mask,
     Subdirs = subdirs;
     RemoveSourcePath = removeSourcePath;
 
-    if (RootLen <= 0 && RenamerOptions.Spec == rsRelativePath)
+    if (Root.empty() && RenamerOptions.Spec == rsRelativePath)
         RenamerOptions.Spec = rsFileName;
 
     TransferData(ttDataToWindow);
@@ -1546,11 +1539,11 @@ void CRenamerDialog::Validate(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CRenamerDialog::Validate()");
     char mask[MAX_GROUPMASK];
     int err = 0;
-    ti.EditLine(IDC_MASK, mask, MAX_GROUPMASK);
-    SalMaskGroup->SetMasksString(mask, FALSE);
+    RenamerEditLine(ti, IDC_MASK, mask, MAX_GROUPMASK);
+    SalMaskGroup->SetMasksString(RenamerTextToWide(mask).c_str(), FALSE);
     if (strlen(mask) <= 0 || !SalMaskGroup->PrepareMasks(err))
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_INVALIDMASK), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_INVALIDMASK).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_START);
         MaskEdit->SetSel(err, err);
@@ -1571,7 +1564,7 @@ void CRenamerDialog::Validate(CTransferInfo& ti)
         }
         if (lines != SourceFiles.Count)
         {
-            SG->SalMessageBox(HWindow, LoadStr(IDS_BADLINECOUNT), LoadStr(IDS_ERROR),
+            SG->SalMessageBox(HWindow, LangStr(IDS_BADLINECOUNT).c_str(), LangStr(IDS_ERROR).c_str(),
                               MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_MANUAL);
             return;
@@ -1584,20 +1577,20 @@ void CRenamerDialog::Transfer(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CRenamerDialog::Transfer()");
     if (TransferDontSaveHistory)
     {
-        ti.EditLine(IDC_MASK, Mask, MAX_GROUPMASK);
-        ti.EditLine(IDC_NEWNAME, RenamerOptions.NewName.Get(), RenamerOptions.NewName.Size());
-        ti.EditLine(IDC_SEARCH, RenamerOptions.SearchFor.Get(), RenamerOptions.SearchFor.Size());
-        ti.EditLine(IDC_REPLACE, RenamerOptions.ReplaceWith.Get(), RenamerOptions.ReplaceWith.Size());
+        RenamerEditLine(ti, IDC_MASK, Mask, MAX_GROUPMASK);
+        RenamerEditLine(ti, IDC_NEWNAME, RenamerOptions.NewName);
+        RenamerEditLine(ti, IDC_SEARCH, RenamerOptions.SearchFor);
+        RenamerEditLine(ti, IDC_REPLACE, RenamerOptions.ReplaceWith);
     }
     else
     {
         HistoryComboBox(ti, IDC_MASK, Mask, MAX_GROUPMASK, MAX_HISTORY_ENTRIES, MaskHistory);
-        HistoryComboBox(ti, IDC_NEWNAME, RenamerOptions.NewName.Get(),
-                        RenamerOptions.NewName.Size(), MAX_HISTORY_ENTRIES, NewNameHistory);
-        HistoryComboBox(ti, IDC_SEARCH, RenamerOptions.SearchFor.Get(),
-                        RenamerOptions.SearchFor.Size(), MAX_HISTORY_ENTRIES, SearchHistory);
-        HistoryComboBox(ti, IDC_REPLACE, RenamerOptions.ReplaceWith.Get(),
-                        RenamerOptions.ReplaceWith.Size(), MAX_HISTORY_ENTRIES, ReplaceHistory);
+        HistoryComboBox(ti, IDC_NEWNAME, RenamerOptions.NewName,
+                        MAX_HISTORY_ENTRIES, NewNameHistory);
+        HistoryComboBox(ti, IDC_SEARCH, RenamerOptions.SearchFor,
+                        MAX_HISTORY_ENTRIES, SearchHistory);
+        HistoryComboBox(ti, IDC_REPLACE, RenamerOptions.ReplaceWith,
+                        MAX_HISTORY_ENTRIES, ReplaceHistory);
     }
     ti.CheckBox(IDC_SUBDIRS, Subdirs);
     ti.CheckBox(IDC_CASESENSITIVE, RenamerOptions.CaseSensitive);
@@ -1686,12 +1679,15 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDCANCEL:
         {
             MSGBOXEX_PARAMS mbp;
+            const std::wstring text = LangStr(IDS_CNFRM_CLOSE);
+            const std::wstring caption = LangStr(IDS_PLUGINNAME);
+            const std::wstring checkBoxText = LangStr(IDS_CNFRM_ESC_CLOSE2);
             memset(&mbp, 0, sizeof(mbp));
             mbp.HParent = HWindow;
-            mbp.Text = LoadStr(IDS_CNFRM_CLOSE);
-            mbp.Caption = LoadStr(IDS_PLUGINNAME);
+            mbp.Text = text.c_str();
+            mbp.Caption = caption.c_str();
             mbp.Flags = MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED;
-            mbp.CheckBoxText = LoadStr(IDS_CNFRM_ESC_CLOSE2);
+            mbp.CheckBoxText = checkBoxText.c_str();
             BOOL dontShow = !ConfirmESCClose;
             mbp.CheckBoxValue = &dontShow;
 
@@ -1707,8 +1703,8 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CMD_UNDO:
         {
             if (UndoStack.Count &&
-                SG->SalMessageBox(HWindow, LoadStr(IDS_UNDOQUEST),
-                                  LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES)
+                SG->SalMessageBox(HWindow, LangStr(IDS_UNDOQUEST).c_str(),
+                                  LangStr(IDS_QUESTION).c_str(), MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES)
             {
                 Undo();
             }
@@ -1873,16 +1869,17 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (ExportToTempFile())
                 {
-                    if (ExecuteEditor(TempFile) &&
-                        SG->SalMessageBox(HWindow, LoadStr(IDS_EXTEDIT),
-                                          LoadStr(IDS_PLUGINNAME), MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
+                    if (ExecuteEditor(TempFile.c_str()) &&
+                        SG->SalMessageBox(HWindow, LangStr(IDS_EXTEDIT).c_str(),
+                                          LangStr(IDS_PLUGINNAME).c_str(), MB_OKCANCEL | MB_ICONINFORMATION) == IDOK)
                     {
                         ImportFromTempFile();
                         Preview->Update(TRUE);
                         SendMessage(HWindow, WM_USER_CARETMOVE, 0, 0);
                     }
-                    SG->CutDirectory(TempFile);
-                    SG->RemoveTemporaryDir(TempFile);
+                    std::wstring tempDirectory = TempFile;
+                    if (SPLCutDirectoryOwned(SG, tempDirectory))
+                        SG->RemoveTemporaryDir(tempDirectory.c_str());
                 }
                 return TRUE;
             }
@@ -1969,7 +1966,7 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CMD_RELATIVEPATH:
         {
-            if (RootLen > 0)
+            if (!Root.empty())
             {
                 RenamerOptions.Spec = rsRelativePath;
                 SortBy = -1;
@@ -2075,9 +2072,9 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
             }
 
-            case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
-                Preview->GetDispInfo((LV_DISPINFO*)lParam);
+                Preview->GetDispInfo(reinterpret_cast<NMLVDISPINFOW*>(lParam));
                 break;
             }
 
@@ -2267,7 +2264,7 @@ void CRenamerDialog::NotifDlgJustCreated()
 //
 
 CRenamerDialogThread::CRenamerDialogThread()
-    : CThread("CRenamerDialogThread")
+    : CThread(L"CRenamerDialogThread")
 {
     CALL_STACK_MESSAGE1("CRenamerDialogThread::CRenamerDialogThread()");
     Dialog = new CRenamerDialog(NULL);
@@ -2317,17 +2314,17 @@ CRenamerDialogThread::Body()
     MSG msg;
     while (IsWindow(wnd))
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (msg.message == WM_QUIT)
-                break; // equivalent to the situation where GetMessage() returns FALSE
+                break; // equivalent to the situation where GetMessageW() returns FALSE
 
             if (!dlg->IsMenuBarMessage(&msg) &&
                 !TranslateAccelerator(wnd, HAccels, &msg) &&
                 !IsDialogMessage(wnd, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
         else

@@ -14,30 +14,27 @@ class CZIconLoader
 {
 protected:
     DWORD _flags;
-    TCHAR _filename[2 * MAX_PATH + 1];
+    std::wstring _filename;
+    std::wstring _fallbackFilename;
 
     static DWORD_PTR WINAPI LoadIconThreadProc(CWorkerThread* mythread, LPVOID lpParam)
     {
         CZIconLoader* self = (CZIconLoader*)lpParam;
-        HICON hicon = CZIconLoader::LoadIconSync(self->_filename, self->_flags);
+        HICON hicon = CZIconLoader::LoadIconSync(self->_filename.c_str(), self->_flags);
+        if (hicon == NULL && !self->_fallbackFilename.empty())
+            hicon = CZIconLoader::LoadIconSync(self->_fallbackFilename.c_str(), self->_flags | SHGFI_USEFILEATTRIBUTES);
         delete self;
         return (DWORD_PTR)hicon;
     }
     CZIconLoader(CZFile* file, DWORD flags)
     {
-        int len = (int)file->GetFullName(this->_filename, ARRAYSIZE(CZIconLoader::_filename));
-        //if the path is too long for SHGetFileInfo() to handle...
-        if (len > MAX_PATH)
-        {
-            _tcscpy(this->_filename, file->GetName());
-            flags |= SHGFI_USEFILEATTRIBUTES;
-            //flags &= ~SHGFI_ADDOVERLAYS; //seems unnecessary
-        }
+        file->GetFullName(this->_filename);
+        this->_fallbackFilename = file->GetName();
         this->_flags = flags;
     }
-    CZIconLoader(TCHAR const* path, DWORD flags)
+    CZIconLoader(wchar_t const* path, DWORD flags)
     {
-        _tcscpy(this->_filename, path);
+        this->_filename = path != NULL ? path : L"";
         this->_flags = flags;
     }
     ~CZIconLoader()
@@ -69,16 +66,19 @@ public:
     }
     static HICON LoadIconSync(CZFile* file, DWORD flags)
     {
-        CPathBuffer path;
-        file->GetFullName(path, path.Size());
-        return CZIconLoader::LoadIconSync(path, flags);
+        std::wstring path;
+        file->GetFullName(path);
+        HICON icon = CZIconLoader::LoadIconSync(path.c_str(), flags);
+        if (icon == NULL)
+            icon = CZIconLoader::LoadIconSync(file->GetName(), flags | SHGFI_USEFILEATTRIBUTES);
+        return icon;
     }
-    static HICON LoadIconSync(TCHAR* path, DWORD flags)
+    static HICON LoadIconSync(const wchar_t* path, DWORD flags)
     {
         flags |= SHGFI_ICON;     //get the icon
         flags &= SHGFI_ICONMASK; //remove unwanted flags
-        SHFILEINFO shfi;
-        if (SHGetFileInfo(path, 0, &shfi, sizeof(shfi), flags) == 0)
+        SHFILEINFOW shfi;
+        if (SHGetFileInfoW(path, 0, &shfi, sizeof(shfi), flags) == 0)
             return NULL;
         return shfi.hIcon;
     }

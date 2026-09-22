@@ -4,8 +4,9 @@
 
 #pragma once
 
-//#define WIN32_LEAN_AND_MEAN // exclude rarely-used stuff from Windows headers
-
+// Winsock 2 must precede Windows headers.
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <tchar.h>
 #include <commctrl.h>
@@ -15,6 +16,7 @@
 #include <process.h>
 #include <commctrl.h>
 #include <ostream> // for version 2.5 beta 7 and newer
+#include <optional>
 #include <string>
 #include <stdio.h>
 #include <time.h>
@@ -45,6 +47,8 @@
 #include "ftp.rh2"
 #include "lang\lang.rh"
 #include "ftputils.h"
+#include "ftp_text_codec.h"
+#include "ftp_owned_path.h"
 #include "ftp.h"
 #include "dialogs.h"
 #include "ssl.h"

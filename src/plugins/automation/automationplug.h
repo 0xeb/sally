@@ -97,18 +97,14 @@ protected:
 
     struct DIRECTORY_INFO
     {
-        TCHAR szDirectory[MAX_PATH];
-
-        void Set(PCTSTR pszDirectory)
-        {
-            StringCchCopy(szDirectory, _countof(szDirectory), pszDirectory);
-        }
+        explicit DIRECTORY_INFO(PCWSTR directory) : Directory(directory != NULL ? directory : L"") {}
+        std::wstring Directory;
     };
 
-    TDirectArray<DIRECTORY_INFO> m_aDirectories;
+    TIndirectArray<DIRECTORY_INFO> m_aDirectories;
 
-    /// Salamander directory.
-    CPathBuffer m_szSalDir;
+    /// Salamander directory used by the native $(SalDir) callback.
+    std::wstring m_szSalDir;
 
     void AddScriptContainerToMenu(
         const class CScriptContainer* pContainer,
@@ -116,7 +112,7 @@ protected:
         int nLevel);
 
     /// Callback for $(SalDir) expansion.
-    static PCTSTR CALLBACK ExpandSalDir(HWND hwndParent, void* pContext);
+    static const wchar_t* CALLBACK ExpandSalDir(HWND hwndParent, void* pContext);
 
 public:
     /// Constructor.
@@ -156,10 +152,10 @@ public:
     }
 
     /// Returns script directory, does not expand environment variables.
-    PCTSTR GetScriptDirectoryRaw(__in int iDir)
+    PCWSTR GetScriptDirectoryRaw(__in int iDir)
     {
         _ASSERTE(iDir < m_aDirectories.Count);
-        return m_aDirectories.At(iDir).szDirectory;
+        return m_aDirectories.At(iDir)->Directory.c_str();
     }
 
     /// Deletes all script directories from the list.
@@ -169,21 +165,15 @@ public:
     }
 
     /// Adds directory to the script directory list.
-    int AddScriptDirectory(PCTSTR pszDirectory)
+    int AddScriptDirectory(PCWSTR pszDirectory)
     {
-        DIRECTORY_INFO dir;
-
-        dir.Set(pszDirectory);
-        m_aDirectories.Add(dir);
+        m_aDirectories.Add(new DIRECTORY_INFO(pszDirectory));
 
         return m_aDirectories.Count - 1;
     }
 
     /// Expands variables contained in the provided file path.
-    bool ExpandPath(
-        __in PCTSTR pszPath,
-        __out_ecount(cchMax) PTSTR pszExpanded,
-        __in int cchMax);
+    bool ExpandPath(__in PCWSTR pszPath, std::wstring& expanded);
 
     // CPluginInterfaceAbstract
 
@@ -231,7 +221,7 @@ public:
 
     virtual void WINAPI ClearHistory(HWND parent) {}
 
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };

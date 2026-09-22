@@ -13,13 +13,13 @@ CTaskList TaskList;
 // process list je sdileny skrz vsechny salamander v lokani session
 // od AS 3.0 menime pojeti "Break" udalosti - vyvola v cili exception, takze mame "plnotucny" bug reprot, ale zaroven tim cil konci
 // proto menim nasledujici konstanty "AltapSalamander*" -> "AltapSalamander3*", abychom byli oddeleni od starsich verzi
-const char* AS_PROCESSLIST_NAME = "AltapSalamander3bProcessList";                               // sdilena pamet CProcessList
-const char* AS_PROCESSLIST_MUTEX_NAME = "AltapSalamander3bProcessListMutex";                    // synchronizace pro pristup do sdilene pameti
-const char* AS_PROCESSLIST_EVENT_NAME = "AltapSalamander3bProcessListEvent";                    // odpaleni udalosti (co se ma delat je ulozeno ve sdilene pameti)
-const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "AltapSalamander3bProcessListEventProcessed"; // odpalena udalost byla zpracovana
+const wchar_t* AS_PROCESSLIST_NAME = L"AltapSalamander3bProcessList";                               // sdilena pamet CProcessList
+const wchar_t* AS_PROCESSLIST_MUTEX_NAME = L"AltapSalamander3bProcessListMutex";                    // synchronizace pro pristup do sdilene pameti
+const wchar_t* AS_PROCESSLIST_EVENT_NAME = L"AltapSalamander3bProcessListEvent";                    // odpaleni udalosti (co se ma delat je ulozeno ve sdilene pameti)
+const wchar_t* AS_PROCESSLIST_EVENT_PROCESSED_NAME = L"AltapSalamander3bProcessListEventProcessed"; // odpalena udalost byla zpracovana
 
-const char* FIRST_SALAMANDER_MUTEX_NAME = "AltapSalamanderFirstInstance";     // zavedeno od AS 2.52 beta 1
-const char* LOADSAVE_REGISTRY_MUTEX_NAME = "AltapSalamanderLoadSaveRegistry"; // zavedeno od AS 2.52 beta 1
+const wchar_t* FIRST_SALAMANDER_MUTEX_NAME = L"AltapSalamanderFirstInstance";     // zavedeno od AS 2.52 beta 1
+const wchar_t* LOADSAVE_REGISTRY_MUTEX_NAME = L"AltapSalamanderLoadSaveRegistry"; // zavedeno od AS 2.52 beta 1
 
 //
 // ****************************************************************************
@@ -37,7 +37,7 @@ void EnableExceptionsOn64()
     typedef BOOL(WINAPI * FIsWow64Process)(HANDLE, PBOOL);
 #define PROCESS_CALLBACK_FILTER_ENABLED 0x1
 
-    HINSTANCE hDLL = LoadLibrary("KERNEL32.DLL");
+    HINSTANCE hDLL = LoadLibraryW(L"KERNEL32.DLL");
     if (hDLL != NULL)
     {
         FIsWow64Process isWow64 = (FIsWow64Process)GetProcAddress(hDLL, "IsWow64Process");
@@ -74,7 +74,7 @@ BOOL CTaskList::Init()
     OK = FALSE;
 
     //---  pokusime se pripojit na FMO-mutex - zaroven test jestli uz nejaky Salamander bezi
-    FMOMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, AS_PROCESSLIST_MUTEX_NAME));
+    FMOMutex = NOHANDLES(OpenMutexW(SYNCHRONIZE, FALSE, AS_PROCESSLIST_MUTEX_NAME));
     if (FMOMutex == NULL) // zadny Salamander 3.0 nebo novejsi v lokalni sessione = koncime
     {
         return FALSE;
@@ -87,17 +87,17 @@ BOOL CTaskList::Init()
             return FALSE; // fail
 
         //---  pripojime se na ostatni systemove objekty pro komunikaci
-        FMO = NOHANDLES(OpenFileMapping(FILE_MAP_WRITE, FALSE, AS_PROCESSLIST_NAME));
+        FMO = NOHANDLES(OpenFileMappingW(FILE_MAP_WRITE, FALSE, AS_PROCESSLIST_NAME));
         if (FMO == NULL)
             return FALSE;                                                                    // fail
         ProcessList = (CProcessList*)NOHANDLES(MapViewOfFile(FMO, FILE_MAP_WRITE, 0, 0, 0)); // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
         if (ProcessList == NULL)
             return FALSE; // fail
         // aby na event bylo mozne volat SetEvent(), musi mit nahozeny EVENT_MODIFY_STATE, pro Wait* potrebuje SYNCHRONIZE
-        Event = NOHANDLES(OpenEvent(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, AS_PROCESSLIST_EVENT_NAME));
+        Event = NOHANDLES(OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, AS_PROCESSLIST_EVENT_NAME));
         if (Event == NULL)
             return FALSE; // fail
-        EventProcessed = NOHANDLES(OpenEvent(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, AS_PROCESSLIST_EVENT_PROCESSED_NAME));
+        EventProcessed = NOHANDLES(OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, AS_PROCESSLIST_EVENT_PROCESSED_NAME));
         if (EventProcessed == NULL)
             return FALSE; // fail
 

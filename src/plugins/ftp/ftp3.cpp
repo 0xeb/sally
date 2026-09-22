@@ -1,13 +1,26 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 //
 // ****************************************************************************
 // CServerTypeList
 //
+
+static BOOL FormatRegistryListIndex(int index, std::wstring& keyName) noexcept
+{
+    try
+    {
+        std::wstring staged = std::to_wstring(index);
+        keyName.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
 
 BOOL CServerTypeList::AddServerType(const char* typeName, const char* autodetectCond, int columnsCount,
                                     const char* columnsStr[], const char* rulesForParsing)
@@ -53,17 +66,19 @@ BOOL CServerTypeList::AddServerType(const char* typeName, CServerType* copyFrom)
 void CServerTypeList::AddNamesToCombo(HWND combo, const char* serverType, int& index)
 {
     index = -1;
-    char buf[SERVERTYPE_MAX_SIZE + 101];
+    std::wstring displayName;
     if (serverType != NULL && *serverType == '*')
         serverType++;
     int i;
     for (i = 0; i < Count; i++)
     {
         CServerType* s = At(i);
-        SendMessage(combo, CB_ADDSTRING, 0,
-                    (LPARAM)GetTypeNameForUser(s->TypeName, buf, SERVERTYPE_MAX_SIZE + 101));
+        displayName.clear();
+        GetTypeNameForUser(s->TypeName, displayName);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)displayName.c_str());
         if (serverType != NULL && index == -1 &&
-            SalamanderGeneral->StrICmp(serverType, s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName) == 0)
+            FtpEqualLocalTextNoCase(serverType,
+                                    s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName))
         {
             index = i;
         }
@@ -72,10 +87,14 @@ void CServerTypeList::AddNamesToCombo(HWND combo, const char* serverType, int& i
 
 void CServerTypeList::AddNamesToListbox(HWND listbox)
 {
-    char buf[SERVERTYPE_MAX_SIZE + 101];
+    std::wstring displayName;
     int i;
     for (i = 0; i < Count; i++)
-        SendMessage(listbox, LB_ADDSTRING, 0, (LPARAM)GetTypeNameForUser(At(i)->TypeName, buf, SERVERTYPE_MAX_SIZE + 101));
+    {
+        displayName.clear();
+        GetTypeNameForUser(At(i)->TypeName, displayName);
+        SendMessageW(listbox, LB_ADDSTRING, 0, (LPARAM)displayName.c_str());
+    }
 }
 
 void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
@@ -84,15 +103,23 @@ void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
     if (registry->OpenKey(regKey, CONFIG_SERVERTYPES, actKey))
     {
         HKEY subKey;
-        char buf[30];
         int i = 0;
         DestroyMembers();
-        while (registry->OpenKey(actKey, _itoa(++i, buf, 10), subKey))
+        for (;;)
         {
+            std::wstring itemKey;
+            if (!FormatRegistryListIndex(++i, itemKey))
+            {
+                TRACE_E(LOW_MEMORY);
+                break;
+            }
+            if (!registry->OpenKey(actKey, itemKey.c_str(), subKey))
+                break;
             CServerType* item = new CServerType;
             if (item == NULL)
             {
                 TRACE_E(LOW_MEMORY);
+                registry->CloseKey(subKey);
                 break;
             }
             if (!item->Load(parent, subKey, registry)) // loading failed, we ignore this item
@@ -106,6 +133,7 @@ void CServerTypeList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
                 {
                     ResetState();
                     delete item;
+                    registry->CloseKey(subKey);
                     break;
                 }
             }
@@ -122,11 +150,16 @@ void CServerTypeList::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
     {
         registry->ClearKey(actKey);
         HKEY subKey;
-        char buf[30];
         int i;
         for (i = 0; i < Count; i++)
         {
-            if (registry->CreateKey(actKey, _itoa(i + 1, buf, 10), subKey))
+            std::wstring itemKey;
+            if (!FormatRegistryListIndex(i + 1, itemKey))
+            {
+                TRACE_E(LOW_MEMORY);
+                break;
+            }
+            if (registry->CreateKey(actKey, itemKey.c_str(), subKey))
             {
                 At(i)->Save(parent, subKey, registry);
                 registry->CloseKey(subKey);
@@ -178,7 +211,8 @@ BOOL CServerTypeList::ContainsTypeName(const char* typeName, CServerType* exclud
     {
         CServerType* s = At(i);
         if (s != exclude &&
-            SalamanderGeneral->StrICmp(typeName, s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName) == 0)
+            FtpEqualLocalTextNoCase(typeName,
+                                    s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName))
         {
             if (index != NULL)
                 *index = i;
@@ -218,16 +252,16 @@ BOOL CFTPServerList::CopyMembersToList(CFTPServerList& dstList)
     return TRUE;
 }
 
-BOOL CFTPServerList::AddServer(const char* itemName,
-                               const char* address,
-                               const char* initialPath,
+BOOL CFTPServerList::AddServer(const wchar_t* itemName,
+                               const wchar_t* address,
+                               const wchar_t* initialPath,
                                int anonymousConnection,
-                               const char* userName,
+                               const wchar_t* userName,
                                const BYTE* encryptedPassword,
                                int encryptedPasswordSize,
                                int savePassword,
                                int proxyServerUID,
-                               const char* targetPanelPath,
+                               const wchar_t* targetPanelPath,
                                const char* serverType,
                                int transferMode,
                                int port,
@@ -305,7 +339,7 @@ void CFTPServerList::AddNamesToListbox(HWND list)
     for (i = 0; i < Count; i++)
     {
         CFTPServer* s = At(i);
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)(s->ItemName == NULL ? "" : s->ItemName));
+        SendMessageW(list, LB_ADDSTRING, 0, (LPARAM)s->ItemName.c_str());
     }
 }
 
@@ -351,25 +385,28 @@ BOOL EncryptPasswordAux(BYTE** encryptedPassword, int* encryptedPasswordSize, BO
             if (!passwordManager->IsPasswordEncrypted(*encryptedPassword, *encryptedPasswordSize))
             {
                 // scrambled -> plain
-                char* plainPassword;
-                if (passwordManager->DecryptPassword(*encryptedPassword, *encryptedPasswordSize, &plainPassword))
+                std::wstring plainPassword;
+                if (FTPDecryptPasswordW(passwordManager, *encryptedPassword,
+                                        *encryptedPasswordSize, &plainPassword))
                 {
                     // plain -> AES
                     BYTE* buffEncryptedPassword = NULL;
                     int buffEncryptedPasswordSize = 0;
-                    if (plainPassword[0] == 0 ||
-                        passwordManager->EncryptPassword(plainPassword, &buffEncryptedPassword, &buffEncryptedPasswordSize, TRUE))
+                    if (plainPassword.empty() ||
+                        FTPEncryptPasswordW(passwordManager, plainPassword.c_str(),
+                                            &buffEncryptedPassword,
+                                            &buffEncryptedPasswordSize, TRUE))
                     {
-                        UpdateEncryptedPassword(encryptedPassword, encryptedPasswordSize, buffEncryptedPassword, buffEncryptedPasswordSize);
+                        if (!UpdateEncryptedPassword(encryptedPassword, encryptedPasswordSize,
+                                                     buffEncryptedPassword, buffEncryptedPasswordSize))
+                            ret = FALSE;
                         if (buffEncryptedPassword != NULL) // release the buffer allocated in EncryptPassword()
                         {
                             memset(buffEncryptedPassword, 0, buffEncryptedPasswordSize);
                             SalamanderGeneral->Free(buffEncryptedPassword);
                         }
                     }
-                    // zero out and free the temporary plain buffer
-                    memset(plainPassword, 0, lstrlen(plainPassword));
-                    SalamanderGeneral->Free(plainPassword);
+                    FTPSecureWipe(plainPassword);
                 }
             }
         }
@@ -378,25 +415,28 @@ BOOL EncryptPasswordAux(BYTE** encryptedPassword, int* encryptedPasswordSize, BO
             if (passwordManager->IsPasswordEncrypted(*encryptedPassword, *encryptedPasswordSize))
             {
                 // encrypted -> plain
-                char* plainPassword;
-                if (passwordManager->DecryptPassword(*encryptedPassword, *encryptedPasswordSize, &plainPassword)) // may return FALSE
+                std::wstring plainPassword;
+                if (FTPDecryptPasswordW(passwordManager, *encryptedPassword,
+                                        *encryptedPasswordSize, &plainPassword)) // may return FALSE
                 {
                     // plain -> scrambled
                     BYTE* scrambledPassword = NULL;
                     int scrambledPasswordSize = 0;
-                    if (plainPassword[0] == 0 ||
-                        passwordManager->EncryptPassword(plainPassword, &scrambledPassword, &scrambledPasswordSize, FALSE))
+                    if (plainPassword.empty() ||
+                        FTPEncryptPasswordW(passwordManager, plainPassword.c_str(),
+                                            &scrambledPassword,
+                                            &scrambledPasswordSize, FALSE))
                     {
-                        UpdateEncryptedPassword(encryptedPassword, encryptedPasswordSize, scrambledPassword, scrambledPasswordSize);
+                        if (!UpdateEncryptedPassword(encryptedPassword, encryptedPasswordSize,
+                                                     scrambledPassword, scrambledPasswordSize))
+                            ret = FALSE;
                         if (scrambledPassword != NULL) // release the buffer allocated in EncryptPassword()
                         {
                             memset(scrambledPassword, 0, scrambledPasswordSize);
                             SalamanderGeneral->Free(scrambledPassword);
                         }
                     }
-                    // zero out and free the temporary plain buffer
-                    memset(plainPassword, 0, lstrlen(plainPassword));
-                    SalamanderGeneral->Free(plainPassword);
+                    FTPSecureWipe(plainPassword);
                 }
                 else
                 {
@@ -428,15 +468,23 @@ void CFTPServerList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract*
     if (registry->OpenKey(regKey, CONFIG_FTPSERVERLIST, actKey))
     {
         HKEY subKey;
-        char buf[30];
         int i = 0;
         DestroyMembers();
-        while (registry->OpenKey(actKey, _itoa(++i, buf, 10), subKey))
+        for (;;)
         {
+            std::wstring itemKey;
+            if (!FormatRegistryListIndex(++i, itemKey))
+            {
+                TRACE_E(LOW_MEMORY);
+                break;
+            }
+            if (!registry->OpenKey(actKey, itemKey.c_str(), subKey))
+                break;
             CFTPServer* item = new CFTPServer;
             if (item == NULL)
             {
                 TRACE_E(LOW_MEMORY);
+                registry->CloseKey(subKey);
                 break;
             }
             if (!item->Load(parent, subKey, registry)) // loading failed, we ignore this item
@@ -450,6 +498,7 @@ void CFTPServerList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract*
                 {
                     ResetState();
                     delete item;
+                    registry->CloseKey(subKey);
                     break;
                 }
             }
@@ -466,11 +515,16 @@ void CFTPServerList::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract*
     {
         registry->ClearKey(actKey);
         HKEY subKey;
-        char buf[30];
         int i;
         for (i = 0; i < Count; i++)
         {
-            if (registry->CreateKey(actKey, _itoa(i + 1, buf, 10), subKey))
+            std::wstring itemKey;
+            if (!FormatRegistryListIndex(i + 1, itemKey))
+            {
+                TRACE_E(LOW_MEMORY);
+                break;
+            }
+            if (registry->CreateKey(actKey, itemKey.c_str(), subKey))
             {
                 At(i)->Save(parent, subKey, registry);
                 registry->CloseKey(subKey);
@@ -497,7 +551,7 @@ CConfiguration::CConfiguration()
     PriorityToPanelConnections = TRUE;
     EnableTotalSpeedLimit = FALSE;
     TotalSpeedLimit = 2;
-    strcpy(AnonymousPasswd, "name@someserver.com");
+    AnonymousPasswd = L"name@someserver.com";
 
     PassiveMode = FALSE;
     KeepAlive = TRUE;
@@ -548,15 +602,7 @@ CConfiguration::CConfiguration()
     ChangingPathInInactivePanel = FALSE;
     DisconnectCommandUsed = FALSE;
 
-    int i;
-    for (i = 0; i < COMMAND_HISTORY_SIZE; i++)
-        CommandHistory[i] = NULL;
     SendSecretCommand = FALSE;
-
-    for (i = 0; i < HOSTADDRESS_HISTORY_SIZE; i++)
-        HostAddressHistory[i] = NULL;
-    for (i = 0; i < INITIALPATH_HISTORY_SIZE; i++)
-        InitPathHistory[i] = NULL;
 
     AlwaysReconnect = FALSE;
     WarnWhenConLost = TRUE;
@@ -597,17 +643,9 @@ CConfiguration::CConfiguration()
 
 CConfiguration::~CConfiguration()
 {
-    int i;
-    for (i = 0; i < COMMAND_HISTORY_SIZE; i++)
-        if (CommandHistory[i] != NULL)
-            free(CommandHistory[i]);
-
-    for (i = 0; i < HOSTADDRESS_HISTORY_SIZE; i++)
-        if (HostAddressHistory[i] != NULL)
-            free(HostAddressHistory[i]);
-    for (i = 0; i < INITIALPATH_HISTORY_SIZE; i++)
-        if (InitPathHistory[i] != NULL)
-            free(InitPathHistory[i]);
+    FTPSecureWipe(AnonymousPasswd);
+    for (int i = 0; i < COMMAND_HISTORY_SIZE; i++)
+        FTPSecureWipe(CommandHistory[i]);
 
     HANDLES(DeleteCriticalSection(&ConParamsCS));
     HANDLES(DeleteCriticalSection(&ServerTypeListCS));
@@ -616,9 +654,9 @@ CConfiguration::~CConfiguration()
 BOOL CConfiguration::InitWithSalamanderGeneral()
 {
     // allocated through SalamanderGeneral, therefore it has to be here
-    FTPServerList.AddServer("Sally",
-                            "ftp.gnu.org",
-                            "/");
+    FTPServerList.AddServer(L"Sally",
+                            L"ftp.gnu.org",
+                            L"/");
 
     // description of the string in the array: "visible,ID,nameStrID,nameStr,descrStrID,descrStr,colType,emptyValue,leftAlignment,fixedWidth,width"
     const char* unix1Columns[] = {"1,name,0,\\0,0,\\0,1,\\0",    // name
@@ -1982,14 +2020,15 @@ BOOL CConfiguration::InitWithSalamanderGeneral()
                                  "# skip empty lines anywhere\r\n"
                                  "* skip_white_spaces();\r\n");
 
-    if ((CommandHistory[0] = _strdup("HELP")) != NULL)
-        CommandHistory[1] = _strdup("CDUP");
+    if (!FtpStoreWideText(L"HELP", CommandHistory[0]) ||
+        !FtpStoreWideText(L"CDUP", CommandHistory[1]))
+        return FALSE;
 
     ASCIIFileMasks = SalamanderGeneral->AllocSalamanderMaskGroup();
     if (ASCIIFileMasks != NULL)
     {
-        ASCIIFileMasks->SetMasksString("*.txt;*.*htm;*.*html;*.pl;*.php;*.php3;*.asp;*.cgi;*.css;*.bat;*.tcl;"
-                                       "*.diz;*.nfo;*.ini;*.mak;*.cpp;*.c;*.h;*.bas;*.pas;*.tex;*.log",
+        ASCIIFileMasks->SetMasksString(L"*.txt;*.*htm;*.*html;*.pl;*.php;*.php3;*.asp;*.cgi;*.css;*.bat;*.tcl;"
+                                       L"*.diz;*.nfo;*.ini;*.mak;*.cpp;*.c;*.h;*.bas;*.pas;*.tex;*.log",
                                        FALSE);
         return TRUE;
     }
@@ -2007,18 +2046,27 @@ void CConfiguration::ReleaseDataFromSalamanderGeneral()
     FTPProxyServerList.DestroyMembers(); // just in case (if it were deallocated through SalamanderGeneral)
 }
 
-void CConfiguration::GetAnonymousPasswd(char* buf, int bufSize)
+BOOL CConfiguration::GetAnonymousPasswd(std::wstring& password) noexcept
 {
+    std::wstring staged;
     HANDLES(EnterCriticalSection(&ConParamsCS));
-    lstrcpyn(buf, AnonymousPasswd, bufSize);
+    const BOOL result = FtpStoreWideText(AnonymousPasswd.c_str(), staged);
     HANDLES(LeaveCriticalSection(&ConParamsCS));
+    if (result)
+        password.swap(staged);
+    return result;
 }
 
-void CConfiguration::SetAnonymousPasswd(const char* passwd)
+BOOL CConfiguration::SetAnonymousPasswd(const wchar_t* password) noexcept
 {
+    std::wstring staged;
+    if (!FtpStoreWideText(password != NULL ? password : L"", staged))
+        return FALSE;
     HANDLES(EnterCriticalSection(&ConParamsCS));
-    lstrcpyn(AnonymousPasswd, passwd, PASSWORD_MAX_SIZE);
+    AnonymousPasswd.swap(staged);
     HANDLES(LeaveCriticalSection(&ConParamsCS));
+    FTPSecureWipe(staged);
+    return TRUE;
 }
 
 int CConfiguration::GetServerRepliesTimeout()

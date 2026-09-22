@@ -7,11 +7,14 @@
 #include <sddl.h>
 
 #include "common/IClipboard.h"
+#include "common/IFileSystem.h"
 #include "ui/IPrompter.h"
 #include "ui/UnicodeHistoryUtils.h"
+#include "common/unicode/ShellExtensionReason.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/fsutil.h"
+#include "common/OpenFileSelection.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -67,8 +70,8 @@ BOOL CALLBACK CloseAllOwnedEnabledDialogsEnumProc(HWND wnd, LPARAM lParam)
     LONG style = GetWindowLong(wnd, GWL_STYLE);
     if ((style & WS_CHILD) == 0 && IsWindowEnabled(wnd) && IsWindowVisible(wnd))
     {
-        char clsName[200];
-        if (GetClassName(wnd, clsName, _countof(clsName)) != 0 && strcmp(clsName, "#32770") == 0) // DIALOG class
+        wchar_t clsName[200];
+        if (GetClassNameW(wnd, clsName, _countof(clsName)) != 0 && wcscmp(clsName, L"#32770") == 0) // DIALOG class
         {
             HWND owner = wnd;
             while (1)
@@ -149,14 +152,15 @@ BOOL IsFileEnumSourcePanel(int srcUID, int* panel)
     return ret;
 }
 
-BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int* lastFileIndex, const char* lastFileName,
-                          BOOL preferSelected, BOOL onlyAssociatedExtensions, char* fileName,
+BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                          BOOL preferSelected, BOOL onlyAssociatedExtensions, std::wstring* fileName,
                           BOOL* noMoreFiles, BOOL* srcBusy, CPluginInterfaceAbstract* plugin,
                           BOOL* isFileSelected, BOOL select)
 {
-    CALL_STACK_MESSAGE9("GetFileNameForViewer(%d, %d, %d, %s, %d, %d, %s, , , %d)",
+    CALL_STACK_MESSAGE9("GetFileNameForViewer(%d, %d, %d, %ls, %d, %d, %ls, , , %d)",
                         requestType, srcUID, *lastFileIndex, lastFileName, preferSelected,
-                        onlyAssociatedExtensions, fileName, select);
+                         onlyAssociatedExtensions,
+                         fileName != NULL ? fileName->c_str() : L"", select);
     if (noMoreFiles != NULL)
         *noMoreFiles = FALSE;
     if (srcBusy != NULL)
@@ -174,11 +178,11 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
     FileNamesEnumData.RequestType = requestType;
     FileNamesEnumData.SrcUID = srcUID;
     FileNamesEnumData.LastFileIndex = *lastFileIndex;
-    lstrcpyn(FileNamesEnumData.LastFileName, lastFileName != NULL ? lastFileName : "", MAX_PATH);
+    FileNamesEnumData.LastFileName = lastFileName != NULL ? lastFileName : L"";
     FileNamesEnumData.PreferSelected = preferSelected;
     FileNamesEnumData.OnlyAssociatedExtensions = onlyAssociatedExtensions;
     FileNamesEnumData.Plugin = plugin;
-    FileNamesEnumData.FileName[0] = 0;
+    FileNamesEnumData.FileNameW.clear();
     FileNamesEnumData.TimedOut = FALSE;
     FileNamesEnumData.Found = FALSE;
     FileNamesEnumData.NoMoreFiles = FALSE;
@@ -209,7 +213,7 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
             HANDLES(EnterCriticalSection(&FileNamesEnumDataSect));
             *lastFileIndex = FileNamesEnumData.LastFileIndex;
             if (fileName != NULL)
-                lstrcpyn(fileName, FileNamesEnumData.FileName, MAX_PATH);
+                *fileName = FileNamesEnumData.FileNameW;
             if (noMoreFiles != NULL)
                 *noMoreFiles = FileNamesEnumData.NoMoreFiles;
             if (srcBusy != NULL)
@@ -227,7 +231,7 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
             {
                 *lastFileIndex = FileNamesEnumData.LastFileIndex;
                 if (fileName != NULL)
-                    lstrcpyn(fileName, FileNamesEnumData.FileName, MAX_PATH);
+                    *fileName = FileNamesEnumData.FileNameW;
                 if (noMoreFiles != NULL)
                     *noMoreFiles = FileNamesEnumData.NoMoreFiles;
                 if (srcBusy != NULL)
@@ -250,29 +254,29 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
     return ret;
 }
 
-BOOL GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
-                              BOOL preferSelected, BOOL onlyAssociatedExtensions, char* fileName,
+BOOL GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                              BOOL preferSelected, BOOL onlyAssociatedExtensions, std::wstring* fileName,
                               BOOL* noMoreFiles, BOOL* srcBusy,
                               CPluginInterfaceAbstract* plugin)
 {
     CALL_STACK_MESSAGE_NONE
     return GetFileNameForViewer(fnertFindNext, srcUID, lastFileIndex, lastFileName, preferSelected,
                                 onlyAssociatedExtensions, fileName, noMoreFiles,
-                                srcBusy, plugin, NULL, FALSE);
+                                 srcBusy, plugin, NULL, FALSE);
 }
 
-BOOL GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
+BOOL GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
                                   BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                  char* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
+                                  std::wstring* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
                                   CPluginInterfaceAbstract* plugin)
 {
     CALL_STACK_MESSAGE_NONE
     return GetFileNameForViewer(fnertFindPrevious, srcUID, lastFileIndex, lastFileName, preferSelected,
                                 onlyAssociatedExtensions, fileName, noMoreFiles,
-                                srcBusy, plugin, NULL, FALSE);
+                                 srcBusy, plugin, NULL, FALSE);
 }
 
-BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* lastFileName,
+BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
                                  BOOL* isFileSelected, BOOL* srcBusy)
 {
     CALL_STACK_MESSAGE_NONE
@@ -280,7 +284,7 @@ BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* last
                                 FALSE, NULL, NULL, srcBusy, NULL, isFileSelected, FALSE);
 }
 
-BOOL SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex, const char* lastFileName,
+BOOL SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
                                      BOOL select, BOOL* srcBusy)
 {
     CALL_STACK_MESSAGE_NONE
@@ -350,75 +354,38 @@ void EnumFileNamesRemoveSourceUID(HWND hWnd)
     HANDLES(LeaveCriticalSection(&FileNamesEnumDataSect));
 }
 
-void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
-                                const char* value, BOOL caseSensitiveValue)
+void AddValueToStdHistoryValues(wchar_t** historyArr, int historyItemsCount,
+                                const wchar_t* value, BOOL caseSensitiveValue)
 {
     CALL_STACK_MESSAGE1("AddValueToStdHistoryValues()");
-    if (historyItemsCount <= 0 || historyArr == NULL || value == NULL)
-    {
-        TRACE_E("AddValueToStdHistoryValues(): Incorrect parameters!");
-        return;
-    }
-    int from = -1;
-    int i;
-    for (i = 0; i < historyItemsCount; i++)
-    {
-        if (historyArr[i] != NULL &&
-            (!caseSensitiveValue && StrICmp(historyArr[i], value) == 0 ||
-             caseSensitiveValue && strcmp(historyArr[i], value) == 0))
-        {
-            from = i;
-            break;
-        }
-    }
-    if (from == -1 || from > 0)
-    {
-        if (from == -1)
-            from = historyItemsCount - 1;
-        char* text = DupStr(value);
-        if (text != NULL)
-        {
-            free(historyArr[from]);
-            for (i = from - 1; i >= 0; i--)
-                historyArr[i + 1] = historyArr[i];
-            historyArr[0] = text;
-        }
-    }
-}
-
-void AddValueToStdHistoryValuesW(wchar_t** historyArr, int historyItemsCount,
-                                 const wchar_t* value, BOOL caseSensitiveValue)
-{
-    CALL_STACK_MESSAGE1("AddValueToStdHistoryValuesW()");
     AddValueToWideHistory(historyArr, historyItemsCount, value, caseSensitiveValue);
 }
 
-void LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount)
-{
-    CALL_STACK_MESSAGE1("LoadComboFromStdHistoryValues()");
-    SendMessage(combo, CB_RESETCONTENT, 0, 0);
-    int i;
-    for (i = 0; i < historyItemsCount; i++)
-        if (historyArr[i] != NULL && strlen(historyArr[i]) > 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)historyArr[i]);
-}
 
-BOOL IsPathOnVolumeSupADS(const char* path, BOOL* isFAT32)
+// 2026-08-26: the narrow IsPathOnVolumeSupADS(char*, ...) was deleted - confirmed-dead
+// (zero real callers anywhere: core, plugins, tests - its only tests/ hits were a readBody() range
+// marker and a ratchet CountTokens() absence check, neither a real call). IsPathOnVolumeSupADSW
+// below is the only one actually used.
+
+// Wide sibling - asked of a lossy CP_ACP mirror, IsPathOnVolumeSupADS could
+// misreport ADS support for a non-ASCII panel/source path (same class of defect as
+// the earlier MyGetVolumeInformationW fix for the adjacent ACL-support query).
+BOOL IsPathOnVolumeSupADSW(const wchar_t* path, BOOL* isFAT32)
 {
-    CALL_STACK_MESSAGE1("IsPathOnVolumeSupADS()");
+    CALL_STACK_MESSAGE1("IsPathOnVolumeSupADSW()");
     DWORD fileSystemFlags;
-    char fileSystemNameBuffer[100];
+    std::wstring fileSystemName;
     if (isFAT32 != NULL)
         *isFAT32 = FALSE;
-    if (!MyGetVolumeInformation(path, NULL, NULL, NULL, NULL, 0, NULL, NULL, &fileSystemFlags, fileSystemNameBuffer, 100))
+    if (!MyGetVolumeInformationW(path, NULL, NULL, NULL, NULL, NULL, NULL, &fileSystemFlags, &fileSystemName))
     {
-        TRACE_E("MyGetVolumeInformation failed for: " << path);
+        TRACE_EW(L"MyGetVolumeInformationW failed for: " << path);
         return TRUE; // we would rather assume the filesystem supports ADS; if not, something will fail later
     }
     if (isFAT32 != NULL)
-        *isFAT32 = StrICmp(fileSystemNameBuffer, "FAT32") == 0;
-    return (fileSystemFlags & FILE_NAMED_STREAMS) != 0 && StrICmp(fileSystemNameBuffer, "FAT") != 0 || // flag for ADS support (+ not a FAT volume — incorrectly reports ADS support on Windows DFS server) or
-           StrICmp(fileSystemNameBuffer, "NTFS") == 0 && fileSystemFlags == 0x1F;                      // NTFS from NT 4.0
+        *isFAT32 = StrICmpW(fileSystemName.c_str(), L"FAT32") == 0;
+    return (fileSystemFlags & FILE_NAMED_STREAMS) != 0 && StrICmpW(fileSystemName.c_str(), L"FAT") != 0 || // flag for ADS support (+ not a FAT volume — incorrectly reports ADS support on Windows DFS server) or
+           StrICmpW(fileSystemName.c_str(), L"NTFS") == 0 && fileSystemFlags == 0x1F;                      // NTFS from NT 4.0
 }
 
 //******************************************************************************
@@ -426,18 +393,19 @@ BOOL IsPathOnVolumeSupADS(const char* path, BOOL* isFAT32)
 // PrintDiskSize
 //
 
-char* PrintDiskSize(char* buf, const CQuadWord& size2, int mode)
+std::wstring PrintDiskSize(const CQuadWord& size2, int mode)
 {
     CALL_STACK_MESSAGE3("PrintDiskSize(, %g, %d)", size2.GetDouble(), mode);
     CQuadWord size(size2);
 
-    buf[0] = 0;
+    std::wstring result;
     if (mode == 1 || mode == 2)
     {
-        char expanded[200];
-        ExpandPluralString(expanded, 200, HLanguage != NULL ? LoadStr(IDS_PLURAL_X_BYTES) : "{!}%s byte{s|0||1|s}", 1, &size);
-        char num[50];
-        sprintf(buf, expanded, NumberToStr(num, size));
+        const std::wstring expanded = ExpandPluralStringOwnedW(
+            HLanguage != NULL ? LoadStrW(IDS_PLURAL_X_BYTES) : L"{!}%s byte{s|0||1|s}",
+            1, &size);
+        const std::wstring number = NumberToStr(size);
+        result = FormatStrW(expanded.c_str(), number.c_str());
     }
     switch (mode)
     {
@@ -460,33 +428,33 @@ char* PrintDiskSize(char* buf, const CQuadWord& size2, int mode)
             else
                 break;
         }
-        const char* s = NULL;
+        const wchar_t* s = NULL;
         switch (i)
         {
         case 0:
         {
             if (mode == 0 || mode == 4)
-                s = HLanguage != NULL ? LoadStr(IDS_SIZE_B) : "B";
+                s = HLanguage != NULL ? LoadStrW(IDS_SIZE_B) : L"B";
             break;
         }
 
         case 1:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_KB) : "KB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_KB) : L"KB";
             break;
         case 2:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_MB) : "MB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_MB) : L"MB";
             break;
         case 3:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_GB) : "GB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_GB) : L"GB";
             break;
         case 4:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_TB) : "TB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_TB) : L"TB";
             break;
         case 5:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_PB) : "PB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_PB) : L"PB";
             break;
         case 6:
-            s = HLanguage != NULL ? LoadStr(IDS_SIZE_EB) : "EB";
+            s = HLanguage != NULL ? LoadStrW(IDS_SIZE_EB) : L"EB";
             break;
         }
 
@@ -496,37 +464,30 @@ char* PrintDiskSize(char* buf, const CQuadWord& size2, int mode)
                 sizeDouble += 1E-7; // we only use the first three digits; this removes 0.9999999 rounding glitches
             else
                 sizeDouble = 0;
-            char n[30];
+            std::wstring n;
             if (sizeDouble >= 999.5 && sizeDouble < 1000)
                 sizeDouble = 1000; // the "rounding" will not happen automatically
             if (sizeDouble >= 1000)
-                sprintf(n, "%.4g", sizeDouble);
+                n = FormatStrW(L"%.4g", sizeDouble);
             else
             {
-                sprintf(n, "%.3g", sizeDouble);
+                n = FormatStrW(L"%.3g", sizeDouble);
                 if (mode == 4)
                 {
-                    char* t = n + 1;
-                    if (*t == 0)
-                        strcpy(t, ".00"); // "2" -> "2.00"
-                    else
+                    if (n.size() == 1)
+                        n += L".00"; // "2" -> "2.00"
+                    else if (n[1] == L'.')
                     {
-                        if (*t == '.') // "2."
-                        {
-                            t += 2;
-                            if (*t == 0)
-                                strcpy(t, "0"); // "2.2" -> "2.20"
-                        }
-                        else
-                        {
-                            if (*++t == 0)
-                                strcpy(t, ".0"); // "22" -> "22.0"
-                        }
+                        if (n.size() == 3)
+                            n += L'0'; // "2.2" -> "2.20"
                     }
+                    else if (n.size() == 2)
+                        n += L".0"; // "22" -> "22.0"
                 }
             }
-            PointToLocalDecimalSeparator(n, _countof(n));
-            sprintf(buf + strlen(buf), "%s%s %s%s", (mode == 1) ? " (" : "", n, s, (mode == 1) ? ")" : "");
+            PointToLocalDecimalSeparator(n);
+            result += FormatStrW(L"%s%s %s%s", (mode == 1) ? L" (" : L"",
+                                 n.c_str(), s, (mode == 1) ? L")" : L"");
         }
         break;
     }
@@ -535,13 +496,13 @@ char* PrintDiskSize(char* buf, const CQuadWord& size2, int mode)
     {
         size += CQuadWord(1023, 0);
         size /= CQuadWord(1024, 0); // integer division! (it could also be done by bit-shifting, but...)
-        NumberToStr(buf, size);
-        strcat(buf, " ");
-        strcat(buf, HLanguage != NULL ? LoadStr(IDS_SIZE_KB) : "KB");
+        result = NumberToStr(size);
+        result += L' ';
+        result += HLanguage != NULL ? LoadStrW(IDS_SIZE_KB) : L"KB";
         break;
     }
     }
-    return buf;
+    return result;
 }
 
 //******************************************************************************
@@ -549,7 +510,7 @@ char* PrintDiskSize(char* buf, const CQuadWord& size2, int mode)
 // PrintTimeLeft
 //
 
-char* PrintTimeLeft(char* buf, CQuadWord const& secs)
+std::wstring PrintTimeLeft(CQuadWord const& secs)
 {
     CALL_STACK_MESSAGE1("PrintTimeLeft(,)");
     //  sprintf(buf, "%u:%02u:%02u", (int)(secs / CQuadWord(3600, 0)).Value,
@@ -559,30 +520,22 @@ char* PrintTimeLeft(char* buf, CQuadWord const& secs)
     int s = (int)(secs % CQuadWord(60, 0)).Value;
     int m = (int)((secs / CQuadWord(60, 0)) % CQuadWord(60, 0)).Value;
     int h = (int)(secs / CQuadWord(3600, 0)).Value;
-    int off = 0;
+    std::wstring result;
     if (h > 0)
-    {
-        int res = _snprintf_s(buf, 100, _TRUNCATE, ProgDlgHoursStr.c_str(), h);
-        if (res > 0)
-            off += res;
-    }
+        result = FormatStrW(ProgDlgHoursStr.c_str(), h);
     if (m > 0)
     {
-        if (off > 0 && off < 99)
-            buf[off++] = ' ';
-        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgMinutesStr.c_str(), m);
-        if (res > 0)
-            off += res;
+        if (!result.empty())
+            result += L' ';
+        result += FormatStrW(ProgDlgMinutesStr.c_str(), m);
     }
-    if (s > 0 || off == 0)
+    if (s > 0 || result.empty())
     {
-        if (off > 0 && off < 99)
-            buf[off++] = ' ';
-        int res = _snprintf_s(buf + off, 100 - off, _TRUNCATE, ProgDlgSecsStr.c_str(), s);
-        if (res > 0)
-            off += res;
+        if (!result.empty())
+            result += L' ';
+        result += FormatStrW(ProgDlgSecsStr.c_str(), s);
     }
-    return buf;
+    return result;
 }
 
 //
@@ -612,24 +565,24 @@ void CNames::SetCaseSensitive(BOOL caseSensitive)
     }
 }
 
-void SortNames(char* files[], int left, int right)
+void SortNames(wchar_t* files[], int left, int right)
 {
 
 LABEL_SortNames:
 
     int i = left, j = right;
-    char* pivot = files[(i + j) / 2];
+    wchar_t* pivot = files[(i + j) / 2];
 
     do
     {
-        while (StrICmp(files[i], pivot) < 0 && i < right)
+        while (StrICmpW(files[i], pivot) < 0 && i < right)
             i++;
-        while (StrICmp(pivot, files[j]) < 0 && j > left)
+        while (StrICmpW(pivot, files[j]) < 0 && j > left)
             j--;
 
         if (i <= j)
         {
-            char* swap = files[i];
+            wchar_t* swap = files[i];
             files[i] = files[j];
             files[j] = swap;
             i++;
@@ -674,24 +627,24 @@ LABEL_SortNames:
     }
 }
 
-void SortNamesCaseSensitive(char* files[], int left, int right)
+void SortNamesCaseSensitive(wchar_t* files[], int left, int right)
 {
 
 LABEL_SortNamesCaseSensitive:
 
     int i = left, j = right;
-    char* pivot = files[(i + j) / 2];
+    wchar_t* pivot = files[(i + j) / 2];
 
     do
     {
-        while (strcmp(files[i], pivot) < 0 && i < right)
+        while (wcscmp(files[i], pivot) < 0 && i < right)
             i++;
-        while (strcmp(pivot, files[j]) < 0 && j > left)
+        while (wcscmp(pivot, files[j]) < 0 && j > left)
             j--;
 
         if (i <= j)
         {
-            char* swap = files[i];
+            wchar_t* swap = files[i];
             files[i] = files[j];
             files[j] = swap;
             i++;
@@ -736,13 +689,13 @@ LABEL_SortNamesCaseSensitive:
     }
 }
 
-BOOL FindNameInArray(TDirectArray<char*>* items, const char* name, BOOL caseSensitive, int* foundOnIndex)
+BOOL FindNameInArray(TDirectArray<wchar_t*>* items, const wchar_t* name, BOOL caseSensitive, int* foundOnIndex)
 {
     int l = 0, r = items->Count - 1, m;
     while (1)
     {
         m = (l + r) / 2;
-        int res = caseSensitive ? strcmp(items->At(m), name) : StrICmp(items->At(m), name);
+        int res = caseSensitive ? wcscmp(items->At(m), name) : StrICmpW(items->At(m), name);
         if (res == 0)
         {
             if (foundOnIndex != NULL)
@@ -802,16 +755,16 @@ void CNames::Clear()
     Files.DestroyMembers();
 }
 
-BOOL CNames::Add(BOOL nameIsDir, const char* name)
+BOOL CNames::Add(BOOL nameIsDir, const wchar_t* name)
 {
-    char* dup = DupStr(name);
+    wchar_t* dup = DupStr(name);
     if (dup == NULL)
     {
         TRACE_E(LOW_MEMORY);
         return FALSE;
     }
 
-    TDirectArray<char*>* items = nameIsDir ? &Dirs : &Files;
+    TDirectArray<wchar_t*>* items = nameIsDir ? &Dirs : &Files;
 
     items->Add(dup);
     if (!items->IsGood())
@@ -825,9 +778,9 @@ BOOL CNames::Add(BOOL nameIsDir, const char* name)
     return TRUE;
 }
 
-BOOL CNames::Contains(BOOL nameIsDir, const char* name, int* foundOnIndex)
+BOOL CNames::Contains(BOOL nameIsDir, const wchar_t* name, int* foundOnIndex)
 {
-    TDirectArray<char*>* items;
+    TDirectArray<wchar_t*>* items;
     if (foundOnIndex != NULL)
         *foundOnIndex = -1;
     if (nameIsDir)
@@ -868,16 +821,13 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
         return TRUE;
     }
 
-    // Convert to ANSI for parsing (existing code expects ANSI)
-    std::string clipText = WideToAnsi(clipTextW);
-    const char* text = clipText.c_str();
-    const char* textEnd = text + clipText.length();
+    const wchar_t* text = clipTextW.c_str();
+    const wchar_t* textEnd = text + clipTextW.length();
 
     // search from the left for CR | LF | CRLF or the end of memory
     // add the found file and directory names to the array
-    CPathBuffer name;
-    const char* s = text;
-    const char* begin = s;
+    const wchar_t* s = text;
+    const wchar_t* begin = s;
     while (s <= textEnd)
     {
         // watch out! 's' and 'begin' will point past valid memory at the end => DO NOT READ
@@ -885,41 +835,28 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
         {
             if (s - begin > 0)
             {
-                if (s - begin < name.Size() - 1)
+                std::wstring name(begin, s);
+                // trim the backslash and whitespace at the end of the path
+                if (!name.empty() && name.back() == L'\\')
+                    name.pop_back();
+                while (!name.empty() && name.back() <= L' ')
+                    name.pop_back();
+
+                // keep only the leaf and trim whitespace at its beginning
+                const size_t separator = name.find_last_of(L'\\');
+                if (separator != std::wstring::npos)
+                    name.erase(0, separator + 1);
+                size_t first = 0;
+                while (first < name.length() && name[first] <= L' ')
+                    ++first;
+                if (first != 0)
+                    name.erase(0, first);
+
+                if (!name.empty())
                 {
-                    memcpy(name, begin, s - begin);
-                    name[s - begin] = 0;
-                    // trim the backslash at the end of the path
-                    char* end = name + (s - begin) - 1;
-                    if (*end == '\\')
-                    {
-                        *end = 0;
-                        end--;
-                    }
-                    // trim garbage at the end of the path
-                    while (end > name && *end <= ' ')
-                    {
-                        *end = 0;
-                        end--;
-                    }
-                    // trim full paths
-                    while (end > name && *end != '\\')
-                        end--;
-                    if (*end == '\\')
-                        end++;
-
-                    // trim garbage at the beginning of the path
-                    while (*end != 0 && *end <= ' ')
-                        end++;
-
-                    if (*end != 0)
-                    {
-                        if (!Add(FALSE, end))
-                            break;
-                    }
+                    if (!Add(FALSE, name.c_str()))
+                        break;
                 }
-                else
-                    TRACE_E("CNames::LoadFromClipboard(): path is too long, skipping.");
             }
             begin = s + 1; // we are at the terminator, move the start past it
         }
@@ -927,269 +864,6 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
     }
 
     return TRUE;
-}
-
-
-//******************************************************************************
-//
-// CDirectorySizes
-//
-
-CDirectorySizes::CDirectorySizes(const char* path, BOOL caseSensitive)
-    : Names(20, 50)
-{
-    Path = path;
-    CaseSensitive = caseSensitive;
-    NeedSort = FALSE;
-}
-
-CDirectorySizes::~CDirectorySizes()
-{
-    Clean();
-}
-
-void CDirectorySizes::Clean()
-{
-    int i;
-    for (i = 0; i < Names.Count; i++)
-        free(Names[i]);
-    Names.DestroyMembers();
-}
-
-BOOL CDirectorySizes::Add(const char* name, const CQuadWord* size)
-{
-    int nameLen = (int)strlen(name);
-    char* item = (char*)malloc(nameLen + 1 + sizeof(CQuadWord));
-    if (item == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return FALSE;
-    }
-
-    memcpy(item, name, nameLen + 1);
-    CQuadWord* itemSize = (CQuadWord*)(item + nameLen + 1);
-    *itemSize = *size;
-
-    Names.Add(item);
-    if (!Names.IsGood())
-    {
-        TRACE_E(LOW_MEMORY);
-        Names.ResetState();
-        return FALSE;
-    }
-
-    NeedSort = TRUE;
-
-    return TRUE;
-}
-
-const CQuadWord*
-CDirectorySizes::GetSize(const char* name)
-{
-    int index = GetIndex(name);
-    if (index == -1)
-        return NULL;
-    else
-    {
-        const char* item = Names[index];
-        CQuadWord* itemSize = (CQuadWord*)(item + strlen(item) + 1);
-        return itemSize;
-    }
-}
-
-void CDirectorySizes::Sort()
-{
-    if (!NeedSort) // not necessary; we are already sorted
-        return;
-
-    SortNames(Names.GetData(), 0, Names.Count - 1);
-
-    NeedSort = FALSE;
-}
-
-int CDirectorySizes::GetIndex(const char* name)
-{
-    if (Names.Count == 0)
-        return -1;
-
-    if (NeedSort)
-    {
-        TRACE_E("CDirectorySizes::GetIndex is called on unsorted data. Calling Sort() now.");
-        Sort();
-    }
-
-    int l = 0, r = Names.Count - 1, m;
-    while (1)
-    {
-        m = (l + r) / 2;
-        int res = CaseSensitive ? strcmp(Names[m], name) : StrICmp(Names[m], name);
-        if (res == 0)
-            return m; // found
-        else
-        {
-            if (res > 0)
-            {
-                if (l == r || l > m - 1)
-                    return -1; // not found
-                r = m - 1;
-            }
-            else
-            {
-                if (l == r)
-                    return -1; // not found
-                l = m + 1;
-            }
-        }
-    }
-}
-
-//******************************************************************************
-//
-// CDirectorySizesHolder
-//
-
-CDirectorySizesHolder::CDirectorySizesHolder()
-{
-    int i;
-    for (i = 0; i < DIRECOTRY_SIZES_COUNT; i++)
-        Items[i] = NULL;
-    ItemsCount = 0;
-}
-
-CDirectorySizesHolder::~CDirectorySizesHolder()
-{
-    Clean();
-}
-
-void CDirectorySizesHolder::Clean()
-{
-    int i;
-    for (i = 0; i < DIRECOTRY_SIZES_COUNT; i++)
-    {
-        if (Items[i] != NULL)
-        {
-            delete Items[i];
-            Items[i] = NULL;
-        }
-    }
-    ItemsCount = 0;
-}
-
-CDirectorySizes*
-CDirectorySizesHolder::Add(const char* path)
-{
-    // try to locate the requested path
-    int index = GetIndex(path);
-    if (index != -1)
-        return Items[index];
-
-    // the path does not exist; allocate it
-    CDirectorySizes* item = new CDirectorySizes(path, FALSE);
-    if (item == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return FALSE;
-    }
-
-    if (!item->IsGood())
-    {
-        delete item;
-        return FALSE;
-    }
-
-    if (ItemsCount >= DIRECOTRY_SIZES_COUNT)
-    {
-        // the array is full
-        // drop the item at index zero
-        delete Items[0];
-        // shift the array down
-        memmove(Items, Items + 1, sizeof(void*) * (DIRECOTRY_SIZES_COUNT - 1));
-        // append the item at the end
-        Items[ItemsCount] = item;
-    }
-    else
-    {
-        // append the item at the end
-        Items[ItemsCount] = item;
-        ItemsCount++;
-    }
-
-    return item;
-}
-
-CDirectorySizes*
-CDirectorySizesHolder::Get(const char* path)
-{
-    int index = GetIndex(path);
-    if (index != -1)
-        return Items[index];
-    else
-        return NULL;
-}
-
-int CDirectorySizesHolder::GetIndex(const char* path)
-{
-    int i;
-    for (i = 0; i < ItemsCount; i++)
-    {
-        if (stricmp(Items[i]->Path.c_str(), path) == 0)
-            return i;
-    }
-    return -1;
-}
-
-BOOL CDirectorySizesHolder::Store(CFilesWindow* panel)
-{
-    CDirectorySizes* item = Add(panel->GetPath());
-    if (item == NULL)
-        return FALSE;
-
-    // discard the previous directories and sizes
-    item->Clean();
-
-    // add directories for which the size is known
-    int first = 0;
-    if (panel->Dirs->Count > 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0)
-        first = 1;
-    int i;
-    for (i = first; i < panel->Dirs->Count; i++)
-    {
-        CFileData* dir = &panel->Dirs->At(i);
-        if (dir->SizeValid == 1)
-        {
-            if (!item->Add(dir->Name, &dir->Size))
-                return FALSE;
-        }
-    }
-
-    return TRUE;
-}
-
-void CDirectorySizesHolder::Restore(CFilesWindow* panel)
-{
-    int index = GetIndex(panel->GetPath());
-    if (index == -1)
-        return;
-
-    CDirectorySizes* item = Items[index];
-
-    int first = 0;
-    if (panel->Dirs->Count > 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0)
-        first = 1;
-    int i;
-    for (i = first; i < panel->Dirs->Count; i++)
-    {
-        CFileData* dir = &panel->Dirs->At(i);
-        if (dir->SizeValid == 0)
-        {
-            const CQuadWord* size = item->GetSize(dir->Name);
-            if (size != NULL)
-            {
-                dir->SizeValid = 1;
-                dir->Size = *size;
-            }
-        }
-    }
 }
 
 //******************************************************************************
@@ -1393,7 +1067,7 @@ CShellExecuteWnd::~CShellExecuteWnd()
         DestroyWindow(HWindow);
 }
 
-HWND CShellExecuteWnd::Create(HWND hParent, const char* format, ...)
+HWND CShellExecuteWnd::Create(HWND hParent, const wchar_t* format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -1404,8 +1078,13 @@ HWND CShellExecuteWnd::Create(HWND hParent, const char* format, ...)
     else
     {
         CanClose = FALSE;
-        CPathBuffer buff;
-        _vsnprintf_s(buff.Get(), buff.Size(), _TRUNCATE, format, args);
+        va_list measureArgs;
+        va_copy(measureArgs, args);
+        const int required = _vscwprintf(format, measureArgs);
+        va_end(measureArgs);
+        std::vector<wchar_t> formatted(required >= 0 ? static_cast<size_t>(required) + 1 : 1, L'\0');
+        if (required >= 0)
+            _vsnwprintf_s(formatted.data(), formatted.size(), _TRUNCATE, format, args);
 
         // we inherit the size of the parent window because some users complained that emails
         // opened from SS (via Mozilla) are displayed in a tiny window; some shell extensions probably
@@ -1424,14 +1103,14 @@ HWND CShellExecuteWnd::Create(HWND hParent, const char* format, ...)
         // confirmation dialog for deleting to the Recycle Bin, the background of the Find window will not repaint beneath it (this shell window,
         // which has WM_ERASEBKGND/WM_PAINT suppressed, will show up there)
         CWindow::CreateEx(WS_EX_TRANSPARENT,
-                          SHELLEXECUTE_CLASSNAME,
-                          buff,
-                          WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE, // without WS_CLIPSIBLINGS the main window flickered
-                          0, 0, r.right, r.bottom,
-                          hParent,
-                          (HMENU)0,
-                          HInstance,
-                          this);
+                           SHELLEXECUTE_CLASSNAMEW,
+                           formatted.data(),
+                           WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE, // without WS_CLIPSIBLINGS the main window flickered
+                           0, 0, r.right, r.bottom,
+                           hParent,
+                           (HMENU)0,
+                           HInstance,
+                           this);
     }
     va_end(args);
     if (HWindow != NULL)
@@ -1458,22 +1137,22 @@ CShellExecuteWnd::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (!CanClose)
         {
             MSG msg; // flush the message queue (WMP9 buffered Enter and pressed OK for us)
-            // while (PeekMessage(&msg, HWindow, 0, 0, PM_REMOVE));  // Petr: replaced it with just discarding messages from the keyboard (without TranslateMessage and DispatchMessage an endless loop threatens; observed when unloading Automation with memory leaks, before the message box about leaks appeared there was an infinite loop, WM_PAINT kept being added to the queue and we kept throwing it away)
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            // while (PeekMessageW(&msg, HWindow, 0, 0, PM_REMOVE));  // Petr: replaced it with just discarding messages from the keyboard (without TranslateMessage and DispatchMessage an endless loop threatens; observed when unloading Automation with memory leaks, before the message box about leaks appeared there was an infinite loop, WM_PAINT kept being added to the queue and we kept throwing it away)
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                 ;
 
             MSGBOXEX_PARAMS params;
             memset(&params, 0, sizeof(params));
             params.HParent = HWindow;
             params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION;
-            params.Caption = SALAMANDER_TEXT_VERSION;
-            params.Text = LoadStr(IDS_SHELLEXTBREAK2);
+            params.Caption = SALAMANDER_TEXT_VERSIONW();
+            const std::wstring message = LoadStrOwned(IDS_SHELLEXTBREAK2);
+            params.Text = message.c_str();
             SalMessageBoxEx(&params);
 
             // trigger a breakpoint
-            char text[200];
-            GetWindowText(HWindow, text, 200);
-            sprintf(BugReportReasonBreak, "Some faulty shell extension has destroyed our window.\r\n%s", text);
+            SetBugReportReasonBreak(L"Some faulty shell extension has destroyed our window.\r\n" +
+                                    GetWindowTextStringW(HWindow));
             TaskList.FireEvent(TASKLIST_TODO_BREAK, GetCurrentProcessId());
 
             // freeze this thread
@@ -1494,68 +1173,67 @@ CShellExecuteWnd::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 struct EnumWndStruct
 {
-    char* Iterator; // add the next window starting from this position
-    int Remains;    // how many characters remain before the end of the buffer?
+    std::wstring* Text;
     int Count;
 };
+
+static std::wstring GetWindowClassNameStringW(HWND hwnd)
+{
+    std::vector<wchar_t> className(64, L'\0');
+    for (;;)
+    {
+        const int copied = GetClassNameW(hwnd, className.data(), (int)className.size());
+        if (copied <= 0)
+            return std::wstring();
+        if ((size_t)copied < className.size() - 1)
+            return std::wstring(className.data(), copied);
+        className.resize(className.size() * 2, L'\0');
+    }
+}
 
 BOOL CALLBACK EnumChildProc(HWND hwnd, LPARAM lParam)
 {
     // is this a window whose class is SHELLEXECUTE_CLASSNAME?
-    char className[100];
-    if (GetClassName(hwnd, className, 100) > 0 && stricmp(className, SHELLEXECUTE_CLASSNAME) == 0)
+    const std::wstring className = GetWindowClassNameStringW(hwnd);
+    if (!className.empty() && _wcsicmp(className.c_str(), SHELLEXECUTE_CLASSNAMEW) == 0)
     {
         EnumWndStruct* data = (EnumWndStruct*)lParam;
         // the window title holds the requested string
-        if (data->Remains > 2)
+        const std::wstring title = GetWindowTextStringW(hwnd);
+        if (!title.empty())
         {
-            if (GetWindowTextLength(hwnd) > 0)
-            {
-                strcpy(data->Iterator, "\r\n"); // no need to guard against a buffer overflow; we have a three-character reserve
-                data->Remains -= 2;
-                data->Iterator += 2;
-                int chars = GetWindowText(hwnd, data->Iterator, data->Remains);
-                if (chars > 0)
-                {
-                    data->Iterator += chars;
-                    data->Remains -= chars;
-                }
-            }
+            Sally::Unicode::AppendShellExtensionWindowTitle(*data->Text, title);
         }
         data->Count++;
     }
     return TRUE; // keep searching; we want every window
 }
 
-int EnumCShellExecuteWnd(HWND hParent, char* text, int textMax)
+int EnumCShellExecuteWnd(HWND hParent, std::wstring& text)
 {
     // enumerate all child windows of hParent (also descends into sub-children)
     EnumWndStruct data;
-    data.Iterator = text;
-    data.Remains = textMax - 3; // reserve
+    data.Text = &text;
     data.Count = 0;
     EnumChildWindows(hParent, EnumChildProc, (LPARAM)&data);
-    *data.Iterator = 0; // terminator
     return data.Count;
 }
 
-int IsFileLink(const char* fileExtension)
+int IsFileLink(const wchar_t* fileExtension)
 {
-    // convert the extension characters to lowercase and detect whether it is a link
-    char lowerExt[7];
-    char* dstExt = lowerExt;
-    if (*fileExtension != 0)
-        *dstExt++ = LowerCase[*fileExtension++];
-    if (*fileExtension != 0)
-        *dstExt++ = LowerCase[*fileExtension++];
-    if (*fileExtension != 0)
-        *dstExt++ = LowerCase[*fileExtension++];
-    if (*fileExtension != 0)
-        return 0; // the extension is longer than three characters => cannot be .lnk, .url, or .pif
-    *((DWORD*)dstExt) = 0;
-    return (*(DWORD*)lowerExt == *(DWORD*)"lnk" ||
-            *(DWORD*)lowerExt == *(DWORD*)"pif" ||
-            *(DWORD*)lowerExt == *(DWORD*)"url")
+    // Was: fold three characters through LowerCase[] - a 256-entry BYTE table
+    // (common/str.h:23) indexed by a wchar_t, an out-of-bounds read above U+00FF - into a
+    // scratch buffer, then compare *(DWORD*)lowerExt against *(DWORD*)"lnk". A DWORD spans
+    // four narrow characters but only TWO wide ones, so once the extension went wide the
+    // comparison could never match and no file was reported as a link.
+    //
+    // _wcsicmp needs neither the scratch buffer nor the fold table, and the original's
+    // "longer than three characters" early-out is implicit: a longer extension cannot equal
+    // a three-character literal. Unlike the paint copy, this buffer fed nothing else, so
+    // there is no stored-key fold to keep in step.
+    return (_wcsicmp(fileExtension, L"lnk") == 0 ||
+            _wcsicmp(fileExtension, L"pif") == 0 ||
+            _wcsicmp(fileExtension, L"url") == 0)
                ? 1
                : 0;
 }
@@ -1563,7 +1241,7 @@ int IsFileLink(const char* fileExtension)
 // Wide version - no MAX_PATH buffers
 BOOL IsSambaDrivePathW(const wchar_t* path)
 {
-    std::wstring root = GetRootPathW(path);
+    std::wstring root = GetRootPath(path);
     if (root.empty())
         return FALSE;
 
@@ -1576,46 +1254,17 @@ BOOL IsSambaDrivePathW(const wchar_t* path)
     return FALSE;
 }
 
-// ANSI wrapper
-BOOL IsSambaDrivePath(const char* path)
-{
-    return IsSambaDrivePathW(AnsiToWide(path).c_str());
-}
+// 2026-08-26: the narrow ANSI wrapper IsSambaDrivePath(char*) was deleted -
+// confirmed-dead (zero callers anywhere: core, plugins, tests). IsSambaDrivePathW above is the
+// only one actually used.
 
-BOOL AddToListOfNames(char** list, char* listEnd, const char* name, int nameLen)
-{
-    if (strchr(name, ' ') != NULL) // if it contains a space, wrap it in quotation marks
-    {
-        if (*list + nameLen + 2 /* for the quotation marks */ <= listEnd)
-        {
-            *(*list)++ = '"';
-            memcpy(*list, name, nameLen);
-            *list += nameLen;
-            *(*list)++ = '"';
-        }
-        else
-            return FALSE;
-    }
-    else
-    {
-        if (*list + nameLen <= listEnd)
-        {
-            memcpy(*list, name, nameLen);
-            *list += nameLen;
-        }
-        else
-            return FALSE;
-    }
-    return TRUE;
-}
-
-CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* targetPath)
+CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const wchar_t* targetPath)
 {
     switch (upperDirState)
     {
     case tpsUnknown:
     {
-        DWORD attr = GetFileAttributesW(AnsiToWide(targetPath).c_str());
+        DWORD attr = gFileSystem->GetFileAttributes(targetPath);
         if (attr == INVALID_FILE_ATTRIBUTES)
         {
             TRACE_E("GetTargetPathState(): unexpected situation, target path should always exists!");
@@ -1630,7 +1279,7 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     case tpsEncryptedExisting:
     case tpsNotEncryptedExisting:
     {
-        DWORD attr = GetFileAttributesW(AnsiToWide(targetPath).c_str());
+        DWORD attr = gFileSystem->GetFileAttributes(targetPath);
         if (attr == INVALID_FILE_ATTRIBUTES) // the next subdirectory no longer exists, inherit the Encrypted attribute
             return upperDirState == tpsEncryptedExisting ? tpsEncryptedNotExisting : tpsNotEncryptedNotExisting;
         if (attr & FILE_ATTRIBUTE_ENCRYPTED)
@@ -1647,20 +1296,40 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     return tpsUnknown;
 }
 
-BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn)
+// Forwarder. LPOPENFILENAME IS LPOPENFILENAMEW now that UNICODE is unconditional,
+// so this and SafeGetOpenFileNameW had become the same function written twice - and the copy below was
+// the better one: it null-checks lpstrFile/nMaxFile before writing lpstrFile[0] (a plugin passing
+// a NULL buffer crashed here) and passes NULL rather than an empty string when the Documents
+// fallback itself fails. The signature stays spelled LPOPENFILENAME because it mirrors
+// CSalamanderGeneral::SafeGetOpenFileName (plugins/shared/spl_gen.h) exactly; that vtable slot is
+// unchanged.
+BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn) { return SafeGetOpenFileNameW(lpofn); }
+
+// Forwarder. LPOPENFILENAME IS LPOPENFILENAMEW now that UNICODE is unconditional,
+// so this and SafeGetSaveFileNameW had become the same function written twice - and the copy below was
+// the better one: it null-checks lpstrFile/nMaxFile before writing lpstrFile[0] (a plugin passing
+// a NULL buffer crashed here) and passes NULL rather than an empty string when the Documents
+// fallback itself fails. The signature stays spelled LPOPENFILENAME because it mirrors
+// CSalamanderGeneral::SafeGetSaveFileName (plugins/shared/spl_gen.h) exactly; that vtable slot is
+// unchanged.
+BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn) { return SafeGetSaveFileNameW(lpofn); }
+
+// Wide implementation shared by caller-owned and SDK buffer adapters.
+BOOL SafeGetOpenFileNameW(LPOPENFILENAMEW lpofn)
 {
-    BOOL ret = GetOpenFileName(lpofn);
+    BOOL ret = GetOpenFileNameW(lpofn);
     if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
     {
         // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
         // In that case, force Documents
-        CPathBuffer initDir;
-        const char* oldInitDir = lpofn->lpstrInitialDir;
-        lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, initDir.Size()))
-            initDir[0] = 0;
-        strcpy(lpofn->lpstrFile, "");
-        ret = GetOpenFileName(lpofn);
+        std::wstring initDir;
+        const wchar_t* oldInitDir = lpofn->lpstrInitialDir;
+        if (!GetMyDocumentsOrDesktopPathW(initDir))
+            initDir.clear();
+        lpofn->lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
+        if (lpofn->lpstrFile != NULL && lpofn->nMaxFile > 0)
+            lpofn->lpstrFile[0] = L'\0';
+        ret = GetOpenFileNameW(lpofn);
         lpofn->lpstrInitialDir = oldInitDir;
     }
     if (!ret && CommDlgExtendedError() != 0 /* only if this is not Cancel in the dialog */)
@@ -1668,25 +1337,99 @@ BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn)
     return ret;
 }
 
-BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn)
+// Wide sibling of SafeGetSaveFileName, mirroring SafeGetOpenFileNameW's shape.
+BOOL SafeGetSaveFileNameW(LPOPENFILENAMEW lpofn)
 {
-    BOOL ret = GetSaveFileName(lpofn);
+    BOOL ret = GetSaveFileNameW(lpofn);
     if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
     {
         // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
         // In that case, force Documents
-        CPathBuffer initDir;
-        const char* oldInitDir = lpofn->lpstrInitialDir;
-        lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, initDir.Size()))
-            initDir[0] = 0;
-        strcpy(lpofn->lpstrFile, "");
-        ret = GetSaveFileName(lpofn);
+        std::wstring initDir;
+        const wchar_t* oldInitDir = lpofn->lpstrInitialDir;
+        if (!GetMyDocumentsOrDesktopPathW(initDir))
+            initDir.clear();
+        lpofn->lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
+        if (lpofn->lpstrFile != NULL && lpofn->nMaxFile > 0)
+            lpofn->lpstrFile[0] = L'\0';
+        ret = GetSaveFileNameW(lpofn);
         lpofn->lpstrInitialDir = oldInitDir;
     }
     if (!ret && CommDlgExtendedError() != 0 /* only if this is not Cancel in the dialog */)
         TRACE_E("Cannot open SaveFile dialog box. CommDlgExtendedError()=" << CommDlgExtendedError());
     return ret;
+}
+
+static BOOL SafeGetFileNameOwnedW(LPOPENFILENAMEW lpofn, const std::wstring& seed,
+                                  std::vector<wchar_t>& buffer, BOOL save)
+{
+    if (lpofn == NULL)
+        return FALSE;
+
+    const LPWSTR callerBuffer = lpofn->lpstrFile;
+    const DWORD callerCapacity = lpofn->nMaxFile;
+
+    // Starting size for the result buffer - a guess, not a ceiling; the loop below
+    // grows it on FNERR_BUFFERTOOSMALL.
+    //
+    // It must not be derived from the seed. GetOpenFileNameW reports a short buffer
+    // only AFTER the user has chosen, by closing the dialog and failing, so each
+    // growth step costs a whole extra trip through the dialog. With the seed's length
+    // as the first guess, an empty seed produced a two-character buffer - and
+    // SafeGetOpenFileNamesOwnedW passes no seed at all, so every multi-select made the
+    // user pick their files twice.
+    static const size_t startingChars = 4096;
+    buffer.assign((std::max<size_t>)(seed.length() + 1, startingChars), L'\0');
+
+    BOOL selected = FALSE;
+    while (buffer.size() <= MAXDWORD)
+    {
+        std::copy(seed.begin(), seed.end(), buffer.begin());
+        buffer[seed.length()] = L'\0';
+        lpofn->lpstrFile = buffer.data();
+        lpofn->nMaxFile = static_cast<DWORD>(buffer.size());
+        selected = save ? SafeGetSaveFileNameW(lpofn) : SafeGetOpenFileNameW(lpofn);
+        if (selected || CommDlgExtendedError() != FNERR_BUFFERTOOSMALL)
+            break;
+
+        const size_t required = *reinterpret_cast<const WORD*>(buffer.data());
+        const size_t doubled = buffer.size() <= MAXDWORD / 2 ? buffer.size() * 2 : MAXDWORD;
+        const size_t nextSize = (std::max)(doubled, required + 1);
+        if (nextSize <= buffer.size() || nextSize > MAXDWORD)
+            break;
+        buffer.assign(nextSize, L'\0');
+    }
+
+    lpofn->lpstrFile = callerBuffer;
+    lpofn->nMaxFile = callerCapacity;
+    return selected;
+}
+
+BOOL SafeGetOpenFileNameOwnedW(LPOPENFILENAMEW lpofn, std::wstring& fileName)
+{
+    std::vector<wchar_t> buffer;
+    if (!SafeGetFileNameOwnedW(lpofn, fileName, buffer, FALSE))
+        return FALSE;
+    fileName.assign(buffer.data());
+    return TRUE;
+}
+
+BOOL SafeGetSaveFileNameOwnedW(LPOPENFILENAMEW lpofn, std::wstring& fileName)
+{
+    std::vector<wchar_t> buffer;
+    if (!SafeGetFileNameOwnedW(lpofn, fileName, buffer, TRUE))
+        return FALSE;
+    fileName.assign(buffer.data());
+    return TRUE;
+}
+
+BOOL SafeGetOpenFileNamesOwnedW(LPOPENFILENAMEW lpofn, std::vector<std::wstring>& fileNames)
+{
+    std::vector<wchar_t> buffer;
+    if (!SafeGetFileNameOwnedW(lpofn, std::wstring(), buffer, FALSE))
+        return FALSE;
+    fileNames = sally::unicode::DecodeOpenFileSelection(buffer.data(), buffer.size());
+    return TRUE;
 }
 
 // Wide version - no MAX_PATH buffer limitations
@@ -1699,15 +1442,14 @@ void GetIfPathIsInaccessibleGoToW(std::wstring& path, BOOL forceIsMyDocs)
         {
             std::wstring winPath;
             if (gEnvironment->GetWindowsDirectory(winPath).success)
-                path = GetRootPathW(winPath.c_str());
+                path = GetRootPath(winPath.c_str());
             else
                 path = L"C:\\";
         }
     }
     else
     {
-        // Configuration.IfPathIsInaccessibleGoTo is ANSI, convert to wide
-        path = AnsiToWide(Configuration.IfPathIsInaccessibleGoTo);
+        path = Configuration.IfPathIsInaccessibleGoTo;
         if (path.length() >= 2 && path[1] == L':')
         {
             path[0] = towupper(path[0]);
@@ -1717,14 +1459,6 @@ void GetIfPathIsInaccessibleGoToW(std::wstring& path, BOOL forceIsMyDocs)
             }
         }
     }
-}
-
-// ANSI version - thin wrapper around wide version
-void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
-{
-    std::wstring widePath;
-    GetIfPathIsInaccessibleGoToW(widePath, forceIsMyDocs);
-    WideToAnsi(widePath, path, MAX_PATH);
 }
 
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags)
@@ -1757,110 +1491,34 @@ HICON LoadArchiveIcon(int cx, int cy, UINT flags)
     return NULL;
 }
 
-BOOL DuplicateBackslashes(char* buffer, int bufferSize)
+BOOL DuplicateBackslashes(std::wstring& text) noexcept
 {
-    if (buffer == NULL)
+    try
     {
-        TRACE_E("Unexpected situation (1) in DuplicateBackslashes()");
-        return FALSE;
-    }
-    char* s = buffer;
-    int l = (int)strlen(buffer);
-    if (l >= bufferSize)
-    {
-        TRACE_E("Unexpected situation (2) in DuplicateBackslashes()");
-        return FALSE;
-    }
-    BOOL ret = TRUE;
-    while (*s != 0)
-    {
-        if (*s == '\\')
+        std::wstring escaped;
+        escaped.reserve(text.size());
+        for (wchar_t ch : text)
         {
-            if (l + 1 < bufferSize)
-            {
-                memmove(s + 1, s, l - (s - buffer) + 1); // double '\\'
-                l++;
-                s++;
-            }
-            else // it does not fit; trim the buffer
-            {
-                ret = FALSE;
-                memmove(s + 1, s, l - (s - buffer)); // double '\\', cut off one character
-                buffer[l] = 0;
-                s++;
-            }
+            escaped.push_back(ch);
+            if (ch == L'\\')
+                escaped.push_back(ch);
         }
-        s++;
+        text.swap(escaped);
+        return TRUE;
     }
-    return ret;
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
 }
 
-BOOL DuplicateDollars(char* buffer, int bufferSize)
-{
-    if (buffer == NULL)
-    {
-        TRACE_E("Unexpected situation (1) in DuplicateDollars()");
-        return FALSE;
-    }
-    char* s = buffer;
-    int l = (int)strlen(buffer);
-    if (l >= bufferSize)
-    {
-        TRACE_E("Unexpected situation (2) in DuplicateDollars()");
-        return FALSE;
-    }
-    BOOL ret = TRUE;
-    while (*s != 0)
-    {
-        if (*s == '$')
-        {
-            if (l + 1 < bufferSize)
-            {
-                memmove(s + 1, s, l - (s - buffer) + 1); // double the '$'
-                l++;
-                s++;
-            }
-            else // it does not fit; trim the buffer
-            {
-                ret = FALSE;
-                memmove(s + 1, s, l - (s - buffer)); // double the '$', cut off one character
-                buffer[l] = 0;
-                s++;
-            }
-        }
-        s++;
-    }
-    return ret;
-}
-
-BOOL AddDoubleQuotesIfNeeded(char* buf, int bufSize)
-{
-    char* beg = buf;
-    while (*beg != 0 && *beg <= ' ')
-        beg++;
-    char* end = beg + strlen(beg);
-    char* bufEnd = end;
-    while (end > beg && *(end - 1) <= ' ')
-        end--;
-    if (end > beg && (*beg != '"' || *(end - 1) != '"'))
-    {
-        char* sp = beg;
-        while (*++sp > ' ')
-            ;
-        if (sp < end) // the name contains at least one space, we need to add quotation marks
-        {
-            if ((bufEnd - buf) + 2 >= bufSize)
-                return FALSE; // not enough room in the buffer
-            memmove(end + 2, end, (bufEnd - end) + 1);
-            memmove(beg + 1, beg, end - beg);
-            *beg = '"';
-            *(end + 1) = '"';
-        }
-    }
-    return TRUE;
-}
-
-BOOL GetStringSid(LPTSTR* stringSid)
+BOOL GetStringSid(LPWSTR* stringSid)
 {
     *stringSid = NULL;
 
@@ -1899,7 +1557,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
     }
 
     // the caller must free the returned memory using LocalFree, see MSDN
-    ConvertSidToStringSid(pTokenUser->User.Sid, stringSid);
+    ConvertSidToStringSidW(pTokenUser->User.Sid, stringSid);
 
     free(pTokenUser);
 
@@ -1991,7 +1649,7 @@ BOOL GetSidMD5(BYTE* sidMD5)
     // grant the mutex every possible right (so opening between AsAdmin and User accounts works, for example)
     // calling ObtainAccessableMutex() would be cleaner; see its extensive comment
     SECURITY_ATTRIBUTES secAttr;
-    char secDesc[ SECURITY_DESCRIPTOR_MIN_LENGTH ];
+    wchar_t secDesc[ SECURITY_DESCRIPTOR_MIN_LENGTH ];
     secAttr.nLength = sizeof(secAttr);
     secAttr.bInheritHandle = FALSE;
     secAttr.lpSecurityDescriptor = &secDesc;
@@ -2171,27 +1829,37 @@ BOOL GetProcessIntegrityLevel(DWORD* integrityLevel)
     return ret;
 }
 
-LONG SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData)
+// Wide sibling.
+//
+// THE HAZARD HERE IS THE COUNT, NOT THE STRING. 'lpcbData' is a size in BYTES on
+// both sides of RegQueryValueW — it does NOT become a character count when the
+// data goes wide. So every terminator calculation the narrow version does by
+// indexing bytes has to be re-expressed: the last code unit lives at
+// index (*lpcbData / sizeof(wchar_t)) - 1, and reserving room for a terminator
+// costs sizeof(wchar_t), not 1. Getting that wrong would either truncate the
+// last character or silently write one WCHAR past the caller's buffer.
+LONG SalRegQueryValueW(HKEY hKey, LPCWSTR lpSubKey, LPWSTR lpData, PLONG lpcbData)
 {
     DWORD dataBufSize = lpData == NULL || lpcbData == NULL ? 0 : *lpcbData;
-    LONG ret = RegQueryValue(hKey, lpSubKey, lpData, lpcbData);
+    LONG ret = RegQueryValueW(hKey, lpSubKey, lpData, lpcbData);
     if (lpcbData != NULL &&
         (ret == ERROR_MORE_DATA || lpData == NULL && ret == ERROR_SUCCESS))
     {
-        (*lpcbData)++; // proactively ask for a possible extra null terminator
+        *lpcbData += (LONG)sizeof(wchar_t); // proactively ask for a possible extra null terminator
     }
     if (ret == ERROR_SUCCESS && lpData != NULL)
     {
-        if (*lpcbData < 1 || ((char*)lpData)[*lpcbData - 1] != 0)
+        const LONG units = *lpcbData / (LONG)sizeof(wchar_t);
+        if (units < 1 || lpData[units - 1] != 0)
         {
-            if ((DWORD)*lpcbData < dataBufSize) // only values of REG_SZ and REG_EXPAND_SZ type reach this point, so one null terminator is enough
+            if ((DWORD)*lpcbData + sizeof(wchar_t) <= dataBufSize) // REG_SZ / REG_EXPAND_SZ only, so one terminator is enough
             {
-                ((char*)lpData)[*lpcbData] = 0;
-                (*lpcbData)++;
+                lpData[units] = 0;
+                *lpcbData += (LONG)sizeof(wchar_t);
             }
             else // not enough room for the null terminator in the buffer
             {
-                (*lpcbData)++; // request the necessary null terminator
+                *lpcbData += (LONG)sizeof(wchar_t); // request the necessary null terminator
                 return ERROR_MORE_DATA;
             }
         }
@@ -2199,48 +1867,73 @@ LONG SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData)
     return ret;
 }
 
-LONG SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved,
+// Collapsed into a forwarder onto SalRegQueryValueW above, whose signature this
+// is byte-identical to. The body that used to live here was the NARROW original with (wchar_t*)
+// casts bolted on: it indexed the wchar_t array with *lpcbData - a BYTE count - so an unterminated
+// REG_SZ had its terminator written at byte offset 2 * (*lpcbData), past the caller's buffer.
+// Exactly the hazard SalRegQueryValueW's own header comment warns about. Forwarding deletes the
+// second, wrong copy of the terminator arithmetic rather than repairing it in parallel.
+// NOTE: consts.h:2668 still declares a NARROW SalRegQueryValue inside extern "C", so nothing can
+// reach this overload yet; widening that declaration is a separate ~10-caller cluster.
+LONG SalRegQueryValue(HKEY hKey, LPCWSTR lpSubKey, LPWSTR lpData, PLONG lpcbData)
+{
+    return SalRegQueryValueW(hKey, lpSubKey, lpData, lpcbData);
+}
+
+LONG SalRegQueryValueEx(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved,
                         LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
 {
     DWORD dataBufSize = lpData == NULL ? 0 : *lpcbData;
     DWORD type = REG_NONE;
-    LONG ret = RegQueryValueEx(hKey, lpValueName, lpReserved, &type, lpData, lpcbData);
+    // RegQueryValueExW: lpValueName is already LPCWSTR here, so the unsuffixed
+    // form was a live C2664 against RegQueryValueExA.
+    LONG ret = RegQueryValueExW(hKey, lpValueName, lpReserved, &type, lpData, lpcbData);
     if (lpType != NULL)
         *lpType = type;
     if (type == REG_SZ || type == REG_MULTI_SZ || type == REG_EXPAND_SZ)
     {
+        // THE COUNT IS IN BYTES, THE DATA IS IN WCHARs. RegQueryValueExW reports
+        // 'lpcbData' as a BYTE count - going wide does not turn it into a character count. This
+        // block used to index (wchar_t*)lpData with *lpcbData directly, so an unterminated REG_SZ
+        // got its terminator written at byte offset 2 * (*lpcbData): one whole value-length past
+        // the caller's buffer. Every terminator now costs sizeof(wchar_t) and every subscript goes
+        // through 'units', mirroring SalRegQueryValueW above.
         if (hKey != HKEY_PERFORMANCE_DATA &&
             lpcbData != NULL &&
             (ret == ERROR_MORE_DATA || lpData == NULL && ret == ERROR_SUCCESS))
         {
-            (*lpcbData) += type == REG_MULTI_SZ ? 2 : 1; // proactively ask for the possible extra null terminator(s)
+            // proactively ask for the possible extra null terminator(s)
+            (*lpcbData) += (type == REG_MULTI_SZ ? 2 : 1) * (DWORD)sizeof(wchar_t);
             return ret;
         }
         if (ret == ERROR_SUCCESS && lpData != NULL)
         {
-            if (*lpcbData < 1 || ((char*)lpData)[*lpcbData - 1] != 0)
+            wchar_t* data = (wchar_t*)lpData;
+            DWORD units = *lpcbData / (DWORD)sizeof(wchar_t);
+            if (units < 1 || data[units - 1] != 0)
             {
-                if (*lpcbData < dataBufSize)
+                if (*lpcbData + sizeof(wchar_t) <= dataBufSize)
                 {
-                    ((char*)lpData)[*lpcbData] = 0;
-                    (*lpcbData)++;
+                    data[units++] = 0;
+                    *lpcbData += (DWORD)sizeof(wchar_t);
                 }
                 else // not enough room for the null terminator in the buffer
                 {
-                    (*lpcbData) += type == REG_MULTI_SZ ? 2 : 1; // request the necessary null terminator(s)
+                    // request the necessary null terminator(s)
+                    (*lpcbData) += (type == REG_MULTI_SZ ? 2 : 1) * (DWORD)sizeof(wchar_t);
                     return ERROR_MORE_DATA;
                 }
             }
-            if (type == REG_MULTI_SZ && (*lpcbData < 2 || ((char*)lpData)[*lpcbData - 2] != 0))
+            if (type == REG_MULTI_SZ && (units < 2 || data[units - 2] != 0))
             {
-                if (*lpcbData < dataBufSize)
+                if (*lpcbData + sizeof(wchar_t) <= dataBufSize)
                 {
-                    ((char*)lpData)[*lpcbData] = 0;
-                    (*lpcbData)++;
+                    data[units++] = 0;
+                    *lpcbData += (DWORD)sizeof(wchar_t);
                 }
                 else // not enough room for the second null terminator in the buffer
                 {
-                    (*lpcbData)++; // request the necessary null terminator
+                    *lpcbData += (DWORD)sizeof(wchar_t); // request the necessary null terminator
                     return ERROR_MORE_DATA;
                 }
             }
@@ -2275,7 +1968,7 @@ DWORD SalGetProcessId(HANDLE hProcess)
     {
         // the function already existed in XPSP1, but there ZwQueryInformationProcess still worked 100%, see below
         typedef DWORD(WINAPI * PGetProcessId)(IN HANDLE Process);
-        HINSTANCE hDLL = NOHANDLES(LoadLibrary("kernel32.dll"));
+        HINSTANCE hDLL = NOHANDLES(LoadLibraryA("kernel32.dll"));
         if (hDLL != NULL)
         {
             PGetProcessId pGetProcessId = (PGetProcessId)GetProcAddress(hDLL, "GetProcessId");
@@ -2308,7 +2001,7 @@ DWORD SalGetProcessId(HANDLE hProcess)
 #endif
         typedef NTSTATUS(WINAPI * PFN_ZWQUERYINFORMATIONPROCESS)(HANDLE, PROCESSINFOCLASS, PVOID, ULONG, PULONG);
 
-        HINSTANCE hDLL = NOHANDLES(LoadLibrary("ntdll.dll"));
+        HINSTANCE hDLL = NOHANDLES(LoadLibraryA("ntdll.dll"));
         if (hDLL != NULL)
         {
             PFN_ZWQUERYINFORMATIONPROCESS fnProcInfo = PFN_ZWQUERYINFORMATIONPROCESS(GetProcAddress(hDLL, "ZwQueryInformationProcess"));

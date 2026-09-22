@@ -41,14 +41,14 @@ LRESULT CMainWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     case WM_KEYDOWN:
         return this->OnKey((UINT)(wParam), TRUE, (int)(short)LOWORD(lParam), (UINT)HIWORD(lParam))
                    ? 0
-                   : DefWindowProc(hWnd, message, wParam, lParam);
+                   : DefWindowProcW(hWnd, message, wParam, lParam);
 
     case WM_INITMENU:
         return this->OnInitMenu((HMENU)(wParam)), 0;
     case WM_COMMAND:
         return this->OnCommand((int)LOWORD(wParam), (HWND)lParam, (UINT)HIWORD(wParam))
                    ? 0
-                   : DefWindowProc(hWnd, message, wParam, lParam);
+                   : DefWindowProcW(hWnd, message, wParam, lParam);
 
     case WM_ENTERSIZEMOVE:
         return this->OnEnterSizeMove(), 0;
@@ -71,8 +71,8 @@ LRESULT CMainWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPar
     case WM_APPCOMMAND:
         return this->OnAppCommand((HWND)wParam, (short)GET_APPCOMMAND_LPARAM(lParam), (WORD)GET_DEVICE_LPARAM(lParam), (DWORD)GET_KEYSTATE_LPARAM(lParam))
                    ? TRUE
-                   : DefWindowProc(hWnd, message, wParam, lParam);
+                   : DefWindowProcW(hWnd, message, wParam, lParam);
     }
 
-    return DefWindowProc(hWnd, message, wParam, lParam);
+    return DefWindowProcW(hWnd, message, wParam, lParam);
 }

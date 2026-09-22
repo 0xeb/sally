@@ -11,6 +11,10 @@
 HBITMAP LoadBitmapAndMapColors(HINSTANCE hInst, HRSRC hRsrc, int mapCount,
                                COLORREF* mapColor, COLORREF* toColor);
 
+// A DIB is a BINARY BLOB, not text - dib.cpp:214/:228 define
+// these as LPSTR. The sweep widened the DECLARATIONS only; because these are
+// FREE functions the mismatch produced no C2511 and never entered the orphan
+// column. Found by scripts/freefn-width-scan.py.
 DWORD DIBHeight(LPSTR lpDIB);
 DWORD DIBWidth(LPSTR lpDIB);
 HBITMAP DIBToBitmap(HANDLE hDIB, HPALETTE hPal);

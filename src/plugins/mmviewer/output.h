@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "number_text.h"
+
 //****************************************************************************
 //
 // COutputInterface
@@ -13,12 +15,19 @@
 // live in an external DLL library.
 //
 
+std::wstring FStrW(const wchar_t* format, ...);
+
 class COutputInterface
 {
 public:
-    virtual BOOL AddItem(const char* name, const char* value) = 0;
+    // 'name' is a localized LABEL and is wide. 'value' stays bytes: it is
+    // lifted straight out of the media file, and this plugin sniffs its encoding per item
+    // (IsUTF8Text -> OIF_UTF8) and honours that at render time. Widening it would mean
+    // deciding the tag's encoding here instead, which is a decoding feature, not a widening.
+    virtual BOOL AddItem(const wchar_t* name, const char* value) = 0;
+    virtual BOOL AddItem(const wchar_t* name, const wchar_t* value) = 0;
     virtual BOOL AddSeparator() = 0;
-    virtual BOOL AddHeader(const char* name, BOOL superHeader = FALSE) = 0;
+    virtual BOOL AddHeader(const wchar_t* name, BOOL superHeader = FALSE) = 0;
 
     virtual BOOL PrepareForRender(HWND parentWnd) = 0;
 };
@@ -36,8 +45,9 @@ public:
 struct COutputItem
 {
     DWORD Flags;
-    char* Name;
-    char* Value;
+    wchar_t* Name; // localized label - wide
+    char* Value; // original media/parser bytes retained for encoded exports
+    wchar_t* DisplayValue; // decoded once for all live UI/clipboard consumers
     HWND hwnd; //edit box
 };
 
@@ -60,8 +70,9 @@ public:
     void DestroyItems();
 
     // methods from COutputInterface
-    virtual BOOL AddItem(const char* name, const char* value);
-    virtual BOOL AddHeader(const char* name, BOOL superHeader = FALSE);
+    virtual BOOL AddItem(const wchar_t* name, const char* value);
+    virtual BOOL AddItem(const wchar_t* name, const wchar_t* value);
+    virtual BOOL AddHeader(const wchar_t* name, BOOL superHeader = FALSE);
     virtual BOOL AddSeparator();
 
     virtual BOOL PrepareForRender(HWND parentWnd);

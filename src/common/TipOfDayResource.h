@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 
+#include "ModuleRelativePath.h"
+
 #include <windows.h>
+#include <functional>
+#include <limits>
+#include <new>
+#include <stdexcept>
 #include <string>
 
 namespace sally::tip_of_day
@@ -13,48 +19,58 @@ inline bool BuildModuleRelativePathFromModulePathW(const wchar_t* modulePath,
                                                    const wchar_t* relativePath,
                                                    std::wstring& result)
 {
-    result.clear();
-    if (modulePath == nullptr || modulePath[0] == 0 || relativePath == nullptr)
-        return false;
-
-    std::wstring base(modulePath);
-    size_t slash = base.find_last_of(L"\\/");
-    if (slash == std::wstring::npos)
-        return false;
-
-    result.assign(base.c_str(), slash + 1);
-    while (*relativePath == L'\\' || *relativePath == L'/')
-        ++relativePath;
-    result.append(relativePath);
-    return true;
+    return sally::path::BuildModuleRelativePath(modulePath, relativePath, result);
 }
 
 inline bool BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePath, std::wstring& result)
 {
-    result.clear();
-
-    for (DWORD capacity = MAX_PATH; capacity <= 32768; capacity *= 2)
+    DWORD capacity = 256;
+    for (;;)
     {
-        std::wstring modulePath(capacity, L'\0');
-        DWORD length = GetModuleFileNameW(module, modulePath.data(), capacity);
-        if (length == 0)
-            return false;
-        if (length < capacity - 1)
+        try
         {
-            modulePath.resize(length);
-            return BuildModuleRelativePathFromModulePathW(modulePath.c_str(), relativePath, result);
+            std::wstring modulePath(capacity, L'\0');
+            SetLastError(ERROR_SUCCESS);
+            const DWORD length = GetModuleFileNameW(module, modulePath.data(), capacity);
+            if (length == 0)
+                return false;
+            const DWORD error = GetLastError();
+            const bool truncated = length >= capacity ||
+                                   (length == capacity - 1 && error == ERROR_INSUFFICIENT_BUFFER);
+            if (!truncated)
+            {
+                modulePath.resize(length);
+                return BuildModuleRelativePathFromModulePathW(modulePath.c_str(), relativePath, result);
+            }
         }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return false;
+        }
+        catch (const std::length_error&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return false;
+        }
+        if (capacity > (std::numeric_limits<DWORD>::max)() / 2)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return false;
+        }
+        capacity *= 2;
     }
-    return false;
 }
 
-inline HANDLE OpenTipsFileForReadAtPathW(const wchar_t* fileName)
+using TipsFileOpener = std::function<HANDLE(const wchar_t*)>;
+
+inline HANDLE OpenTipsFileForReadAtPathW(const wchar_t* fileName, const TipsFileOpener& openFile)
 {
-    return CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    return openFile(fileName);
 }
 
-inline HANDLE OpenTipsFileForReadW(HINSTANCE module, std::wstring& fileName)
+inline HANDLE OpenTipsFileForReadW(HINSTANCE module, std::wstring& fileName,
+                                   const TipsFileOpener& openFile)
 {
     if (!BuildModuleRelativePathW(module, kTipsRelativePathW, fileName))
     {
@@ -62,6 +78,6 @@ inline HANDLE OpenTipsFileForReadW(HINSTANCE module, std::wstring& fileName)
         SetLastError(ERROR_PATH_NOT_FOUND);
         return INVALID_HANDLE_VALUE;
     }
-    return OpenTipsFileForReadAtPathW(fileName.c_str());
+    return OpenTipsFileForReadAtPathW(fileName.c_str(), openFile);
 }
 } // namespace sally::tip_of_day

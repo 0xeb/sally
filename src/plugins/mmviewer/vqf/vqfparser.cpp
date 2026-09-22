@@ -12,7 +12,7 @@
 #include "..\lang\lang.rh"
 #include "..\output.h"
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
 typedef struct _VQFTAG
 {
@@ -38,11 +38,11 @@ typedef struct
      ((((DWORD)value) >> 24) & 0x000000FF))
 
 CParserResultEnum
-CParserVQF::OpenFile(const char* fileName)
+CParserVQF::OpenFile(const wchar_t* fileName)
 {
     CloseFile();
 
-    f = fopen(fileName, "rb");
+    _wfopen_s(&f, fileName, L"rb");
 
     if (!f)
         return preOpenError;
@@ -149,12 +149,12 @@ CParserVQF::GetFileInfo(COutputInterface* output)
         }
 
         // dump
-        output->AddHeader(LoadStr(IDS_VQF_INFO));
+        output->AddHeader(LangStr(IDS_VQF_INFO).c_str());
         int i;
         for (i = 0; i < VQFTAGS; i++)
             if (vqftags[i].str)
             {
-                output->AddItem(LoadStr(vqftags[i].str_id), vqftags[i].str);
+                output->AddItem(LangStr(vqftags[i].str_id).c_str(), vqftags[i].str);
                 free(vqftags[i].str);
             }
 

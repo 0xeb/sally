@@ -14,18 +14,23 @@
 
 #pragma once
 
+#include <optional>
+#include <string>
+
 // macros to suppress unnecessary parts of WinLibLT (easier compilation):
 // ENABLE_PROPERTYDIALOG - if defined, property sheet dialog can be used (CPropertyDialog)
 
 // set custom texts for WinLib
-void SetWinLibStrings(const char* invalidNumber, // "not a number" (for number transfer buffers)
-                      const char* error);        // title "error" (for number transfer buffers)
+void SetWinLibStrings(LPCWSTR invalidNumber,           // "not a number" (for number transfer buffers)
+                      LPCWSTR error,                   // title "error" (for number transfer buffers)
+                      LPCWSTR textNotStorable = NULL); // text a narrow transfer buffer cannot hold;
+                                                       // NULL keeps the built-in English default
 
 // must be called before using WinLib; 'pluginName' is the plugin name (e.g. "DEMOPLUG"),
 // used to distinguish universal window class names (must differ between plugins,
 // otherwise class name collisions occur and WinLib will not work - only the first started
 // plugin will work); 'dllInstance' is the plugin module (used when registering universal WinLib classes)
-BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance);
+BOOL InitializeWinLib(LPCWSTR pluginName, HINSTANCE dllInstance);
 // must be called after using WinLib; 'dllInstance' is the plugin module (used when unregistering
 // the universal WinLib classes)
 void ReleaseWinLib(HINSTANCE dllInstance);
@@ -41,12 +46,16 @@ enum CWLS
 {
     WLS_INVALID_NUMBER,
     WLS_ERROR,
+    // Shown when a narrow (char*/std::string) transfer buffer cannot take what the
+    // user typed - too long for the buffer, or not representable in the system code
+    // page. The refusal itself is deliberate; saying nothing about it was not.
+    WLS_TEXT_NOT_STORABLE,
 
     WLS_COUNT
 };
 
-extern char CWINDOW_CLASSNAME[100];  // universal window class name
-extern char CWINDOW_CLASSNAME2[100]; // universal window class name - does not have CS_VREDRAW | CS_HREDRAW
+extern const wchar_t* CWINDOW_CLASSNAME;  // universal window class name
+extern const wchar_t* CWINDOW_CLASSNAME2; // universal window class name - does not have CS_VREDRAW | CS_HREDRAW
 
 // ****************************************************************************
 
@@ -116,17 +125,17 @@ protected:
 class CWindow : public CWindowsObject
 {
 public:
-    CWindow(CObjectOrigin origin = ooAllocated) : CWindowsObject(origin) { DefWndProc = DefWindowProc; }
+    CWindow(CObjectOrigin origin = ooAllocated) : CWindowsObject(origin) { DefWndProc = DefWindowProcW; }
     CWindow(HWND hDlg, int ctrlID, CObjectOrigin origin = ooAllocated)
         : CWindowsObject(origin)
     {
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         AttachToControl(hDlg, ctrlID);
     }
     CWindow(HWND hDlg, int ctrlID, UINT helpID, CObjectOrigin origin = ooAllocated)
         : CWindowsObject(helpID, origin)
     {
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         AttachToControl(hDlg, ctrlID);
     }
 
@@ -145,12 +154,12 @@ public:
                                        HICON hIcon,
                                        HCURSOR hCursor,
                                        HBRUSH hbrBackground,
-                                       LPCTSTR lpszMenuName,
-                                       LPCTSTR lpszClassName,
+                                       LPCWSTR lpszMenuName,
+                                       LPCWSTR lpszClassName,
                                        HICON hIconSm);
 
-    HWND Create(LPCTSTR lpszClassName,  // address of registered class name
-                LPCTSTR lpszWindowName, // address of window name
+    HWND Create(LPCWSTR lpszClassName,  // address of registered class name
+                LPCWSTR lpszWindowName, // address of window name
                 DWORD dwStyle,          // window style
                 int x,                  // horizontal position of window
                 int y,                  // vertical position of window
@@ -162,8 +171,8 @@ public:
                 LPVOID lpvParam);       // pointer to the created window object
 
     HWND CreateEx(DWORD dwExStyle,        // extended window style
-                  LPCTSTR lpszClassName,  // address of registered class name
-                  LPCTSTR lpszWindowName, // address of window name
+                  LPCWSTR lpszClassName,  // address of registered class name
+                  LPCWSTR lpszWindowName, // address of window name
                   DWORD dwStyle,          // window style
                   int x,                  // horizontal position of window
                   int y,                  // vertical position of window
@@ -212,16 +221,30 @@ public:
 
     BOOL IsGood() { return FailCtrlID == INT_MAX; }
     void ErrorOn(int ctrlID) { FailCtrlID = ctrlID; }
+    // ErrorOn() plus a message box. A narrow transfer buffer that refuses the typed
+    // text otherwise leaves the user with a dead OK button and no explanation.
+    void ReportTextNotStorable(int ctrlID);
     BOOL GetControl(HWND& ctrlHWnd, int ctrlID, BOOL ignoreIsGood = FALSE);
     void EnsureControlIsFocused(int ctrlID);
 
+    // Explicit ACP adapter for frozen/plugin byte owners. Window text stays UTF-16;
+    // transfer back is exact-or-refuse and never partially publishes into 'buffer'.
+    // The control is capped to the caller's buffer, which is genuinely fixed.
     void EditLine(int ctrlID, char* buffer, DWORD bufferSize, BOOL select = TRUE);
+    // Dynamic counterpart for explicitly encoded plugin byte owners. The edit
+    // control is uncapped and conversion back is transactional.
+    void EditLine(int ctrlID, std::string& value, BOOL select = TRUE);
+    // Dynamic native-wide owner. Window text is staged and published only after
+    // the complete value has been read successfully.
+    void EditLine(int ctrlID, std::wstring& value, BOOL select = TRUE);
+    // 'bufferSize' is in wchar_t characters, matching EM_LIMITTEXT/WM_GETTEXT.
+    void EditLine(int ctrlID, wchar_t* buffer, DWORD bufferSize, BOOL select = TRUE);
     void RadioButton(int ctrlID, int ctrlValue, int& value);
     void CheckBox(int ctrlID, int& value); // 0-unchecked, 1-checked, 2-grayed
 
     // validates double value (if not a number, it fails); decimal separator can be '.' or ',';
-    // 'format' is used in sprintf when converting the number to a string (e.g. "%.2f" or "%g")
-    void EditLine(int ctrlID, double& value, char* format, BOOL select = TRUE);
+    // 'format' is used in swprintf when converting the number to a string (e.g. L"%.2f" or L"%g")
+    void EditLine(int ctrlID, double& value, const wchar_t* format, BOOL select = TRUE);
 
     // validates int value (if not a number, it fails)
     void EditLine(int ctrlID, int& value, BOOL select = TRUE);
@@ -304,15 +327,15 @@ public:
     // DS_CONTROL | DS_3DLOOK | WS_CHILD | WS_CAPTION;
     // if we want to use the title directly from the resource, set 'title'==NULL and
     // 'flags'==0
-    CPropSheetPage(char* title, HINSTANCE modul, int resID,
+    CPropSheetPage(LPCWSTR title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
                    CObjectOrigin origin = ooStatic);
-    CPropSheetPage(char* title, HINSTANCE modul, int resID, int helpID,
+    CPropSheetPage(LPCWSTR title, HINSTANCE modul, int resID, int helpID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
                    CObjectOrigin origin = ooStatic);
     ~CPropSheetPage();
 
-    void Init(char* title, HINSTANCE modul, int resID,
+    void Init(LPCWSTR title, HINSTANCE modul, int resID,
               HICON icon, DWORD flags, CObjectOrigin origin);
 
     virtual BOOL ValidateData();
@@ -329,7 +352,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    char* Title;
+    std::optional<std::wstring> Title;
     DWORD Flags;
     HICON Icon;
 
@@ -348,7 +371,7 @@ public:
     // 'startPage' and 'lastPage' can be the same variable (value in/out);
     // 'flags' see help for 'PROPSHEETHEADER', mainly the constants
     // PSH_NOAPPLYNOW, PSH_USECALLBACK and PSH_HASHELP (otherwise 'flags'==0 is enough)
-    CPropertyDialog(HWND parent, HINSTANCE modul, char* caption,
+    CPropertyDialog(HWND parent, HINSTANCE modul, LPCWSTR caption,
                     int startPage, DWORD flags, HICON icon = NULL,
                     DWORD* lastPage = NULL, PFNPROPSHEETCALLBACK callback = NULL)
         : TIndirectArray<CPropSheetPage>(10, 5, dtNoDelete)
@@ -357,7 +380,7 @@ public:
         HWindow = NULL;
         Modul = modul;
         Icon = icon;
-        Caption = caption;
+        Caption = caption != NULL ? caption : L"";
         StartPage = startPage;
         Flags = flags;
         LastPage = lastPage;
@@ -373,7 +396,7 @@ protected:
     HWND HWindow;
     HINSTANCE Modul;
     HICON Icon;
-    char* Caption;
+    std::wstring Caption;
     int StartPage;
     DWORD Flags;
     PFNPROPSHEETCALLBACK Callback;

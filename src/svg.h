@@ -6,7 +6,7 @@
 
 struct NSVGrasterizer;
 struct NSVGimage;
-void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled);
+void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const wchar_t* svgName, int iconSize, COLORREF bkColor, BOOL enabled);
 
 // returns SysColor in format for SVG library (BGR instead of Win32 RGB)
 DWORD GetSVGSysColor(int index);
@@ -49,6 +49,9 @@ public:
 protected:
     // loads resource into memory, allocates a buffer one byte longer and null-terminates the resource
     // on success returns pointer to allocated memory (must be freed), on error returns NULL
+    // Genuinely byte-domain: the SVG resource is raw XML/UTF-8 text handed to
+    // nanosvg's char*-based parser, not a Sally UI string. Matches the .cpp definition and both
+    // of its own internal callers, which already declare their locals char*.
     char* LoadSVGResource(int resID);
 
     // Input 'sz' defines size in pixels to fit the SVG after conversion to bitmap.

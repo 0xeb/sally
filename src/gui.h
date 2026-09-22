@@ -20,9 +20,9 @@ public:
 
     // SetProgress can be called from any thread, internally sends WM_USER_SETPROGRESS
     // progress bar thread must run
-    void SetProgress(DWORD progress, const char* text = NULL);
+    void SetProgress(DWORD progress, const wchar_t* text = NULL);
     void SetProgress2(const CQuadWord& progressCurrent, const CQuadWord& progressTotal,
-                      const char* text = NULL);
+                      const wchar_t* text = NULL);
 
     void SetSelfMoveTime(DWORD time);
     void SetSelfMoveSpeed(DWORD moveTime);
@@ -48,7 +48,7 @@ protected:
                          // minimum is 10ms, default value is 50ms -- so 20 movements per second
                          // be careful with low values, animation can noticeably load the processor
     BOOL TimerIsRunning; // is timer running?
-    std::string Text;   // if not empty, will be displayed instead of number
+    std::wstring Text;  // if not empty, will be displayed instead of number
     HFONT HFont;         // font for progress bar
 };
 
@@ -68,25 +68,24 @@ public:
     ~CStaticText();
 
     // sets Text, returns TRUE on success and FALSE on memory shortage
-    BOOL SetText(const char* text);
-    BOOL SetTextW(const wchar_t* text);
+    BOOL SetText(const wchar_t* text);
 
-    // warning, returned Text may be NULL
-    const char* GetText() { return Text; }
+    // Always non-NULL now, and genuinely wide: it used to hand back a
+    // wchar_t*-typed buffer that actually held ANSI bytes.
+    const wchar_t* GetText() { return TextW.c_str(); }
 
     // sets Text (if it starts or ends with a space, puts it in double quotes),
     // returns TRUE on success and FALSE on memory shortage
-    BOOL SetTextToDblQuotesIfNeeded(const char* text);
-    BOOL SetTextToDblQuotesIfNeededW(const wchar_t* text);
+    BOOL SetTextToDblQuotesIfNeeded(const wchar_t* text);
 
     // on some filesystems there can be a different path separator
     // must be different from '\0';
-    void SetPathSeparator(char separator);
+    void SetPathSeparator(wchar_t separator);
 
     // assigns text that will be displayed as tooltip
-    BOOL SetToolTipText(const char* text);
+    BOOL SetToolTipText(const wchar_t* text);
 
-    // assigns window and id that will receive WM_USER_TTGETTEXT when tooltip is displayed
+    // assigns window and id that will receive WM_USER_TTGETTEXTW when tooltip is displayed
     void SetToolTip(HWND hNotifyWindow, DWORD id);
 
     // if set to TRUE, tooltip can be invoked by clicking on text or
@@ -111,25 +110,22 @@ protected:
     BOOL ShowHint();
 
     DWORD Flags;         // flags for control behavior
-    char* Text;          // allocated text
     std::wstring TextW;  // wide text source when Unicode rendering is needed
     int TextLen;         // string length
-    char* Text2;         // allocated text containing ellipsis; used only with STF_END_ELLIPSIS or STF_PATH_ELLIPSIS
     std::wstring Text2W; // wide ellipsized text for Unicode rendering
-    int Text2Len;        // Text2 length
+    int Text2Len;        // Text2W length, in characters
     int* AlpDX;          // array of substring lengths; used only with STF_END_ELLIPSIS or STF_PATH_ELLIPSIS
-    int AlpDXAllocated;  // AlpDX capacity, in ints. Tracked separately from
-                         // Allocated (which is ANSI byte capacity of Text)
-                         // because SetTextW sizes AlpDX by wide codepoint count
-                         // — under DBCS code pages or when wide-then-ANSI calls
-                         // interleave, Allocated and AlpDX capacity diverge.
-                         // GetTextExtentExPointW writes TextLen ints into AlpDX,
-                         // so this must be >= TextLen whenever ellipsis flags
-                         // are set.
+    int AlpDXAllocated;  // AlpDX capacity, in ints. This used to be
+                         // tracked against 'Allocated', the ANSI byte capacity of a
+                         // parallel narrow buffer, and the comment here reasoned at
+                         // length about DBCS code pages and interleaved wide/ANSI
+                         // calls. That whole arm is gone; there is one text now.
+                         // The invariant that remains is the only one that ever
+                         // mattered: GetTextExtentExPointW writes TextLen ints into
+                         // AlpDX, so this must be >= TextLen whenever an ellipsis
+                         // flag is set.
     int TextWidth;       // text width in points
     int TextHeight;      // text height in points
-    int Allocated;       // size of allocated buffer 'Text' (ANSI bytes)
-    BOOL UseWideText;    // render using TextW/Text2W instead of ANSI buffers
     int Width, Height;   // static dimensions
     CBitmap* Bitmap;     // cache for drawing; used only with STF_CACHED_PAINT
     HFONT HFont;         // font handle used for text drawing
@@ -137,10 +133,10 @@ protected:
     BOOL ClipDraw;       // need to clip drawing, otherwise we would go out of bounds
     BOOL Text2Draw;      // we will draw from buffer containing ellipsis
     int Alignment;       // 0=left, 1=center, 2=right
-    char PathSeparator;  // path separator; implicitly '\\'
+    wchar_t PathSeparator;  // path separator; implicitly '\\'
     BOOL MouseIsTracked; // we installed mouse leave tracking
     // tooltip support
-    std::string ToolTipText; // string that will be displayed as our tooltip
+    std::wstring ToolTipText; // string that will be displayed as our tooltip
     HWND HToolTipNW;   // notification window
     DWORD ToolTipID;   // and ID under which tool tip should ask for text
     BOOL HintMode;     // should we display tooltip as Hint?
@@ -160,9 +156,9 @@ public:
     // flags is a combination of values from the STF_* family (shared\spl_gui.h)
     CHyperLink(HWND hDlg, int ctrlID, DWORD flags = STF_UNDERLINE | STF_HYPERLINK_COLOR);
 
-    void SetActionOpen(const char* file);
+    void SetActionOpen(const wchar_t* file);
     void SetActionPostCommand(WORD command);
-    BOOL SetActionShowHint(const char* text);
+    BOOL SetActionShowHint(const wchar_t* text);
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -170,7 +166,7 @@ protected:
     BOOL ExecuteIt();
 
 protected:
-    CPathBuffer File; // if different from 0, passed to ShellExecute
+    std::wstring File; // if non-empty, passed to ShellExecute
     WORD Command;        // if different from 0, posted on action
     HWND HDialog;        // parent dialog
 };
@@ -247,7 +243,7 @@ protected:
     RECT ClientRect;
     // tooltip support
     BOOL MouseIsTracked;  // we installed mouse leave tracking
-    std::string ToolTipText;  // string that will be displayed as our tooltip
+    std::wstring ToolTipText; // string that will be displayed as our tooltip
     HWND HToolTipNW;      // notification window
     DWORD ToolTipID;      // and ID under which tool tip should ask for text
     DWORD DropDownUpTime; // time in [ms], when drop down was released, to protect against new pressing
@@ -260,9 +256,9 @@ public:
     ~CButton();
 
     // assigns text that will be displayed as tooltip
-    BOOL SetToolTipText(const char* text);
+    BOOL SetToolTipText(const wchar_t* text);
 
-    // assigns window and id that will receive WM_USER_TTGETTEXT when tooltip is displayed
+    // assigns window and id that will receive WM_USER_TTGETTEXTW when tooltip is displayed
     void SetToolTip(HWND hNotifyWindow, DWORD id);
 
     DWORD GetFlags();
@@ -477,4 +473,4 @@ HIMAGELIST CreateCheckboxImagelist(int itemSize);
 //
 // Note: old API LoadIcon() cannot handle larger icons, so we introduce this
 // function, which reads icons using the new LoadIconWithScaleDown()
-HICON SalLoadIcon(HINSTANCE hInst, LPCTSTR iconName, CIconSizeEnum iconSize);
+HICON SalLoadIcon(HINSTANCE hInst, LPCWSTR iconName, CIconSizeEnum iconSize);

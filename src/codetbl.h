@@ -10,8 +10,8 @@
 
 struct CCodeTablesData
 {
-    char* Name;      // name shown in menu, NULL means a separator
-    char Table[256]; // encoding table
+    wchar_t* Name;   // name shown in menu, NULL means a separator
+    char Table[256]; // byte-to-byte encoding table
 };
 
 enum CCodeTableStateEnum
@@ -25,16 +25,16 @@ class CCodeTable
 {
 protected:
     TIndirectArray<CCodeTablesData> Data;
-    char WinCodePage[101];            // Windows code page name (for Czech CP1250 - regional encoding)
+    wchar_t WinCodePage[101];            // Windows code page name (for Czech CP1250 - regional encoding)
     DWORD WinCodePageIdentifier;      // 1250, 1251, 1252, ...
-    char WinCodePageDescription[101]; // human - readable description (Central Europe, West Europe & U.S.)
-    CPathBuffer DirectoryName;        // directory name XXX: convert\XXX\convert.cfg
+    wchar_t WinCodePageDescription[101]; // human - readable description (Central Europe, West Europe & U.S.)
+    std::wstring DirectoryName;           // directory name XXX: convert\XXX\convert.cfg
     CCodeTableStateEnum State;
 
 public:
     // hWindow is the parent for message boxes;
     // dirName is the directory where convert.cfg is loaded (for example "centeuro")
-    CCodeTable(HWND hWindow, const char* dirName);
+    CCodeTable(HWND hWindow, const wchar_t* dirName);
     ~CCodeTable();
 
     CCodeTableStateEnum GetState() { return State; }
@@ -63,26 +63,25 @@ public:
     // frees the Preloaded array
     void FreePreloadedConversions();
     // returns all items from the Preloaded array one by one
-    BOOL EnumPreloadedConversions(int* index, const char** winCodePage,
+    BOOL EnumPreloadedConversions(int* index, const wchar_t** winCodePage,
                                   DWORD* winCodePageIdentifier,
-                                  const char** winCodePageDescription,
-                                  const char** dirName);
+                                  const wchar_t** winCodePageDescription,
+                                  const wchar_t** dirName);
 
     // if an item with path dirName is found, it sets index and returns TRUE
     // otherwise it returns FALSE
-    BOOL GetPreloadedIndex(const char* dirName, int* index);
+    BOOL GetPreloadedIndex(const wchar_t* dirName, int* index);
 
     // selects the best matching item from the Preloaded array
     // cfgDirName points to the recommended directory name (from the configuration)
-    // dirName must point to a buffer of MAX_PATH characters where the directory name is returned;
-    // if none exists, an empty string is returned
+    // Returns the directory name, or an empty string if no conversion exists.
     // criteria:
     //  1. cfgDirName
     //  2. item matching the OS code page
     //  3. westeuro
     //  4. first in the list
     //  5. if there is no item in the list, we will return an empty string
-    void GetBestPreloadedConversion(const char* cfgDirName, char* dirName);
+    std::wstring GetBestPreloadedConversion(const wchar_t* cfgDirName);
 
     // prepares the object for use (loads 'convert.cfg' script), hWindow is the parent window for message boxes
     // returns TRUE, only if other methods can be called
@@ -102,22 +101,28 @@ public:
     // sets codeType using the 'coding' (the coding name, '-' and ' ' and '&' are ignored)
     // returns TRUE if the table was found and codeType initialized
     // otherwise 'codeType' is set to 0 and FALSE is returned
-    BOOL GetCodeType(const char* coding, int& codeType);
+    BOOL GetCodeType(const wchar_t* coding, int& codeType);
     // checks validity of 'codeType' (range check)
     BOOL Valid(int codeType);
     // returns the name of the corresponding encoding (may contain '&' for a menu hotkey)
-    BOOL GetCodeName(int codeType, char* buffer, int bufferLen);
+    BOOL GetCodeName(int codeType, std::wstring& name);
     // returns all encodings one by one ('name' may contain '&' – menu hotkey)
-    BOOL EnumCodeTables(HWND parent, int* index, const char** name, const char** table);
+    BOOL EnumCodeTables(HWND parent, int* index, const wchar_t** name, const char** table);
     // returns WinCodePage
-    void GetWinCodePage(char* buf);
+    std::wstring GetWinCodePage();
     // checks from the 'pattern' buffer of length 'patternLen' whether it is text (a code page exists,
     // containing only allowed characters – displayable and control) and if it is text, also determines
     // its code page (most probable)
+    // 'pattern' is RAW FILE BYTES, not text: this routine sniffs which legacy
+    // code page a file is in, and that question can only be answered on UNDECODED data. The
+    // body agrees - ValidateUtf8((const uint8_t*)pattern), malloc(patternLen), and a penalty
+    // scorer that walks 'const unsigned char*'. An earlier pass widened it anyway; reverted.
+    // 'codePage' is a NAME and stays wide. Callers pass byte buffers (viewer_thread_buffering
+    // .cpp:1032 memcpy's straight from the file), so nothing wanted the wide form.
     void RecognizeFileType(const char* pattern, int patternLen, BOOL forceText,
-                           BOOL* isText, char* codePage);
+                           BOOL* isText, std::wstring* codePage);
     // returns the index of the conversion table from 'codePage' into WinCodePage; if not found, returns -1
-    int GetConversionToWinCodePage(const char* codePage);
+    int GetConversionToWinCodePage(const wchar_t* codePage);
 };
 
 extern CCodeTables CodeTables;

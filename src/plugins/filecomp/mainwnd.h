@@ -47,18 +47,13 @@ extern BOOL UsePalette;
 
 extern CBandParams BandsParams[2];
 
-extern const char* MAINWINDOW_CLASSNAME;
+extern LPCWSTR MAINWINDOW_CLASSNAME;
 
 class CMainWindow : public CWindow
 {
 protected:
-    std::string Path1Str,
-        Path2Str;  // Owned copies of path strings
     std::wstring Path1WStr,
-        Path2WStr; // Wide paths for Unicode/long path filenames
-    // Convenience pointers for compatibility
-    const char *Path1,
-        *Path2;
+        Path2WStr;
     DWORD HeaderHeight;
     CFileHeaderWindow* LeftHeader;
     CFileHeaderWindow* RightHeader;
@@ -104,8 +99,7 @@ protected:
     UINT ShowCmd;
 
 public:
-    CMainWindow(const char* path1, const char* path2, CCompareOptions* options, UINT showCmd,
-                const wchar_t* path1W = NULL, const wchar_t* path2W = NULL);
+    CMainWindow(const wchar_t* path1, const wchar_t* path2, CCompareOptions* options, UINT showCmd);
     virtual ~CMainWindow();
     BOOL Init();
     void EnableInput(BOOL enable);
@@ -122,9 +116,8 @@ public:
     void SaveRebarLayout();
     void RestoreRebarLayout();
     //void UpdateSelection();
-    void SpawnWorker(const char* path1, const char* path2, BOOL recompare,
-                     const CCompareOptions& options,
-                     const wchar_t* path1W = NULL, const wchar_t* path2W = NULL);
+    void SpawnWorker(const wchar_t* path1, const wchar_t* path2, BOOL recompare,
+                     const CCompareOptions& options);
     void SetActiveFileView(CFileViewID id) { Active = id; }
     void SetWait(BOOL wait);
     int GetChangeFirstLine(int line)
@@ -132,7 +125,7 @@ public:
         return int(ChangesToLines[ViewMode][LinesToChanges[line]]);
     }
     template <class CChar>
-    bool TextFilesDiffer(CTextCompareResults<CChar>* res, char* message, UINT& type, const char* (&encoding)[2]);
+    bool TextFilesDiffer(CTextCompareResults<CChar>* res, std::wstring& message, UINT& type, const wchar_t* (&encoding)[2]);
     friend class CFileViewWindow;
 
 protected:

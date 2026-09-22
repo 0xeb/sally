@@ -26,7 +26,7 @@ CDriveBar::CDriveBar(HWND hNotifyWindow, CObjectOrigin origin)
     CALL_STACK_MESSAGE_NONE
     List = NULL;
     // this initialization is also in WM_DESTROY because the window is only hidden and shown
-    CheckedDrive[0] = 0;
+    CheckedDrive.clear();
     HDrivesIcons = NULL;
     HDrivesIconsGray = NULL;
 }
@@ -70,7 +70,7 @@ BOOL CDriveBar::CreateDriveButtons(CDriveBar* copyDrivesListFrom)
     DriveTypeParam = 0;
     if (List == NULL)
     {
-        List = new CDrivesList(MainWindow->GetActivePanel(), "", (CDriveTypeEnum*)&DriveType, &DriveTypeParam,
+        List = new CDrivesList(MainWindow->GetActivePanel(), L"", (CDriveTypeEnum*)&DriveType, &DriveTypeParam,
                                &PostCmd, &PostCmdParam, &FromContextMenu);
     }
     else
@@ -142,7 +142,6 @@ void CDriveBar::Execute(DWORD id)
             if (DriveType != drvtPluginCmd)
                 panel->TopIndexMem.Clear(); // large jump
 
-            CPathBuffer path;
             switch (DriveType)
             {
             case drvtMyDocuments:
@@ -151,9 +150,9 @@ void CDriveBar::Execute(DWORD id)
             case drvtOneDrive:    // either the button itself or selected from drop down menu
             case drvtOneDriveBus: // either the button itself or selected from drop down menu
             {
-                panel->ChangePathToDrvType(HWindow, DriveType, DriveType == drvtOneDriveBus ? (const char*)DriveTypeParam : NULL);
+                panel->ChangePathToDrvType(HWindow, DriveType, DriveType == drvtOneDriveBus ? (const wchar_t*)DriveTypeParam : NULL);
                 if (DriveType == drvtOneDriveBus)
-                    free((char*)DriveTypeParam);
+                    free((wchar_t*)DriveTypeParam);
                 if ((DriveType == drvtOneDrive || DriveType == drvtOneDriveBus) &&
                     !fromDropDown && GetOneDriveStorages() > 1)
                 { // OneDrive should again be a drop down, refresh both Drive bars so the button updates
@@ -170,11 +169,17 @@ void CDriveBar::Execute(DWORD id)
             // is it Network?
             case drvtNeighborhood:
             {
-                if (GetTargetDirectory(panel->HWindow, panel->HWindow, LoadStr(IDS_CHANGEDRIVE),
-                                       LoadStr(IDS_CHANGEDRIVETEXT), path, TRUE))
+                // GetTargetDirectory's browse dialog (SHBrowseForFolder/
+                // SHGetPathFromIDList, unqualified - ANSI since core never defines UNICODE)
+                // best-fit-narrows the chosen server/share name before Sally ever sees it.
+                // GetTargetDirectoryW already exists and is used elsewhere (sally_path_utils.cpp,
+                // find_dialog_results.cpp) - apply the same precedented substitution here.
+                std::wstring pathW;
+                if (GetTargetDirectoryW(panel->HWindow, panel->HWindow, LoadStrW(IDS_CHANGEDRIVE),
+                                        LoadStrW(IDS_CHANGEDRIVETEXT), pathW, TRUE))
                 {
                     UpdateWindow(MainWindow->HWindow);
-                    panel->ChangePathToDisk(panel->HWindow, path);
+                    panel->ChangePathToDisk(panel->HWindow, pathW.c_str());
                 }
                 return;
             }
@@ -185,8 +190,8 @@ void CDriveBar::Execute(DWORD id)
             case drvtCDROM:
             case drvtRAMDisk:
             {
-                char drive = (char)DriveTypeParam;
-                panel->ChangePathToDisk(HWindow, DefaultDir[LowerCase[drive] - 'a'], -1, NULL,
+                wchar_t drive = (wchar_t)DriveTypeParam;
+                panel->ChangePathToDisk(HWindow, DefaultDir[LowerCase[drive] - 'a'].c_str(), -1, NULL,
                                         NULL, TRUE, FALSE, FALSE, NULL, FALSE);
                 return;
             }
@@ -194,7 +199,7 @@ void CDriveBar::Execute(DWORD id)
             case drvtPluginCmd:
             {
                 // code taken from files_window_directory_read.cpp, CFilesWindow::ChangeDrive()
-                const char* dllName = (const char*)DriveTypeParam;
+                const wchar_t* dllName = (const wchar_t*)DriveTypeParam;
                 CPluginData* data = Plugins.GetPluginData(dllName);
                 if (data != NULL) // plug-in exists, execute the command
                     data->ExecuteChangeDriveMenuItem(panel == MainWindow->LeftPanel ? PANEL_LEFT : PANEL_RIGHT);
@@ -208,12 +213,13 @@ void CDriveBar::Execute(DWORD id)
 void CDriveBar::SetCheckedDrive(CFilesWindow* panel, BOOL force)
 {
     BOOL isDiskOrArchive = panel->Is(ptDisk) || panel->Is(ptZIPArchive);
-    if (!force && isDiskOrArchive && strnicmp(CheckedDrive, panel->GetPath(), 2) == 0) // cache
+    if (!force && isDiskOrArchive && CheckedDrive.size() == 2 &&
+        StrNICmpW(CheckedDrive.c_str(), panel->GetPathW(), 2) == 0) // cache
         return;
     if (isDiskOrArchive)
-        lstrcpyn(CheckedDrive, panel->GetPath(), 3);
+        CheckedDrive.assign(panel->GetPathW(), wcsnlen(panel->GetPathW(), 2));
     else
-        CheckedDrive[0] = 0; // this cache does not work for FS
+        CheckedDrive.clear(); // this cache does not work for FS
     DWORD index;
     if (List == NULL || !List->FindPanelPathIndex(panel, &index))
         index = -1;
@@ -293,7 +299,7 @@ BOOL CDriveBar::OnContextMenu()
             PostCmd = 0;
             PostCmdParam = NULL;
             FromContextMenu = FALSE;
-            const char* dllName = NULL;
+            const wchar_t* dllName = NULL;
             List->OnContextMenu(TRUE, indexInList, panel == MainWindow->LeftPanel ? PANEL_LEFT : PANEL_RIGHT, &dllName);
             if (PostCmd != 0) // set only for drvtPluginFS and drvtPluginCmd; drvtPluginFS cannot be on Drive bar
             {
@@ -326,7 +332,7 @@ CDriveBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             delete List;
             List = NULL;
         }
-        CheckedDrive[0] = 0;
+        CheckedDrive.clear();
         break;
     }
     }

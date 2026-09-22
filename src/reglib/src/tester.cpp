@@ -4,8 +4,8 @@
 
 #include "precomp.h"
 
-#include <tchar.h>
 #include <crtdbg.h>
+#include <string>
 
 #include "regparse.h"
 
@@ -20,7 +20,7 @@ void EnableExceptionsOn64()
     typedef BOOL(WINAPI * FIsWow64Process)(HANDLE, PBOOL);
 #define PROCESS_CALLBACK_FILTER_ENABLED 0x1
 
-    HINSTANCE hDLL = LoadLibrary("KERNEL32.DLL");
+    HINSTANCE hDLL = LoadLibraryW(L"KERNEL32.DLL");
     if (hDLL != NULL)
     {
         FIsWow64Process isWow64 = (FIsWow64Process)GetProcAddress(hDLL, "IsWow64Process");
@@ -40,14 +40,25 @@ void EnableExceptionsOn64()
     }
 }
 
-int _tmain(int argc, TCHAR* argv[])
+static BOOL DumpRegistryToFile(CSalamanderRegistryExAbstractW* registry,
+                               const wchar_t* fileName, const wchar_t* clearKeyName)
+{
+    HANDLE file = CreateFileW(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, 0);
+    if (file == INVALID_HANDLE_VALUE)
+        return FALSE;
+    const BOOL result = registry->Dump(file, clearKeyName);
+    CloseHandle(file);
+    return result;
+}
+
+int wmain(int argc, wchar_t* argv[])
 {
     EnableExceptionsOn64();
 
     HANDLE hFile;
-    LPTSTR buf;
+    wchar_t* buf;
     DWORD size, nBytesRead;
-    CSalamanderRegistryExAbstract* pRegistry;
+    CSalamanderRegistryExAbstractW* pRegistry;
     int ret = 0;
 
     _CrtSetDbgFlag(_CRTDBG_LEAK_CHECK_DF | _CRTDBG_ALLOC_MEM_DF);
@@ -65,37 +76,34 @@ int _tmain(int argc, TCHAR* argv[])
 
     if ((argc == 3) && (argv[1][0] == '['))
     {
-        CSalamanderRegistryExAbstract* pSysRegistry = REG_SysRegistryFactory();
-        pRegistry = REG_MemRegistryFactory();
+        CSalamanderRegistryExAbstractW* pSysRegistry = REG_SysRegistryFactoryW();
+        pRegistry = REG_MemRegistryFactoryW();
 
         if (pSysRegistry && pRegistry)
         {
             // Copy system registry to file
-            TCHAR branch[MAX_PATH];
-
-            _tcscpy(branch, argv[1] + 1);
-            size_t len = _tcslen(branch);
-            if (len && (branch[len - 1] == ']'))
+            std::wstring branch(argv[1] + 1);
+            if (!branch.empty() && branch.back() == L']')
             {
-                branch[len - 1] = 0;
-                eRPE_ERROR regerr = CopyBranch(branch, pSysRegistry, pRegistry);
+                branch.pop_back();
+                eRPE_ERROR regerr = CopyRegistryBranchW(branch.c_str(), pSysRegistry, pRegistry);
                 if (RPE_OK == regerr)
                 {
-                    if (!pRegistry->Dump(argv[2], NULL))
+                    if (!DumpRegistryToFile(pRegistry, argv[2], NULL))
                     {
-                        _tprintf(_T("Dumping branch %s to file %s failed\n"), branch, argv[1]);
+                        wprintf(L"Dumping branch %s to file %s failed\n", branch.c_str(), argv[2]);
                         ret = 11;
                     }
                 }
                 else
                 {
-                    printf("Error %d: Could not copy branch %s from system registry\n", regerr, branch);
+                    wprintf(L"Error %d: Could not copy branch %s from system registry\n", regerr, branch.c_str());
                     ret = 12;
                 }
             }
             else
             {
-                _tprintf(_T("Invalid branch name %s\n"), argv[2]);
+                wprintf(L"Invalid branch name %s\n", argv[2]);
                 ret = 13;
             }
         }
@@ -111,10 +119,10 @@ int _tmain(int argc, TCHAR* argv[])
         return ret;
     }
 
-    hFile = CreateFile(argv[1], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, 0);
+    hFile = CreateFileW(argv[1], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, 0);
     if (INVALID_HANDLE_VALUE == hFile)
     {
-        _tprintf(_T("Error %d: Could not open %s\n"), errno, argv[1]);
+        wprintf(L"Error %d: Could not open %s\n", errno, argv[1]);
         return 1;
     }
     size = GetFileSize(hFile, NULL);
@@ -124,7 +132,7 @@ int _tmain(int argc, TCHAR* argv[])
         CloseHandle(hFile);
         return 2;
     }
-    buf = (LPTSTR)malloc(size + sizeof(WCHAR));
+    buf = (wchar_t*)malloc(size + sizeof(wchar_t));
     if (!buf)
     {
         printf("Error: Could not allocate %d bytes\n", size);
@@ -140,30 +148,32 @@ int _tmain(int argc, TCHAR* argv[])
     }
 
     *(WCHAR*)((LPBYTE)buf + size) = 0; // safety net for too short file
-    size = ConvertIfNeeded(&buf, size);
-    if (!size)
+    DWORD utf16ByteSize = 0;
+    eRPE_ERROR conversionError = ConvertRegistryFileToUtf16(&buf, size, utf16ByteSize);
+    if (conversionError != RPE_OK)
     {
-        printf("Error: Could not allocate memory\n");
+        printf("Error: Could not decode registry file: %d\n", conversionError);
         free(buf);
         CloseHandle(hFile);
         return 5;
     }
+    size = utf16ByteSize;
 
-    pRegistry = (argc == 2) ? REG_SysRegistryFactory() : REG_MemRegistryFactory();
+    pRegistry = (argc == 2) ? REG_SysRegistryFactoryW() : REG_MemRegistryFactoryW();
     if (pRegistry)
     {
-        eRPE_ERROR regerr = Parse(buf, pRegistry, FALSE);
+        eRPE_ERROR regerr = ParseRegistryFileW(buf, pRegistry, FALSE);
         if (RPE_OK == regerr)
         {
-            if (!pRegistry->Dump(argv[2], NULL))
+            if (!DumpRegistryToFile(pRegistry, argv[2], NULL))
             {
-                _tprintf(_T("Dumping to file %s failed\n"), argv[2]);
+                wprintf(L"Dumping to file %s failed\n", argv[2]);
                 ret = 6;
             }
         }
         else
         {
-            _tprintf(_T("Loading file %s failed: error %d\n"), argv[1], regerr);
+            wprintf(L"Loading file %s failed: error %d\n", argv[1], regerr);
             ret = 7;
         }
         pRegistry->Release();

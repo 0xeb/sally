@@ -105,7 +105,6 @@ public:
         int selectedDirs,
         BOOL displaySize,
         const CQuadWord& selectedSize,
-        char* buffer,
-        DWORD* hotTexts,
-        int& hotTextsCount) override;
+        CSalamanderStringBuffer* buffer,
+        CSalamanderTextRangeBuffer* hotTexts) override;
 };

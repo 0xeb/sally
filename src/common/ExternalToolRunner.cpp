@@ -4,12 +4,13 @@
 #include "common/ExternalToolRunner.h"
 
 #include <cwchar>
+#include <new>
 
 namespace
 {
-bool CommandLineTooLong(const wchar_t* commandLine)
+bool CommandLineTooLong(const std::wstring& commandLine)
 {
-    return commandLine != nullptr && std::wcslen(commandLine) >= 32767;
+    return commandLine.length() >= 32767;
 }
 } // namespace
 
@@ -24,8 +25,9 @@ IProcess* CExternalToolRunner::ResolveProcess() const
 }
 
 ExternalToolResult CExternalToolRunner::Launch(const ExternalToolRequest& request)
+try
 {
-    if (request.commandLine == nullptr || request.commandLine[0] == L'\0')
+    if (request.commandLine.empty())
         return ExternalToolResult::Error(ERROR_INVALID_PARAMETER);
     if (CommandLineTooLong(request.commandLine))
         return ExternalToolResult::Error(ERROR_FILENAME_EXCED_RANGE);
@@ -35,10 +37,11 @@ ExternalToolResult CExternalToolRunner::Launch(const ExternalToolRequest& reques
         return ExternalToolResult::Error(ERROR_INVALID_PARAMETER);
 
     ProcessStartInfo info;
+    info.applicationName = request.applicationName;
     info.commandLine = request.commandLine;
-    info.workingDirectory = (request.workingDirectory != nullptr && request.workingDirectory[0] != L'\0')
-                                ? request.workingDirectory
-                                : nullptr;
+    info.workingDirectory = request.workingDirectory;
+    info.environmentBlock = request.environmentBlock;
+    info.useEnvironment = request.useEnvironment;
     info.inheritHandles = request.inheritHandles;
     info.createNewConsole = request.createNewConsole;
     info.hideWindow = request.hideWindow;
@@ -64,6 +67,10 @@ ExternalToolResult CExternalToolRunner::Launch(const ExternalToolRequest& reques
     }
 
     return ExternalToolResult::Ok(launched, process->GetProcessId(launched), process);
+}
+catch (const std::bad_alloc&)
+{
+    return ExternalToolResult::Error(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 static CExternalToolRunner g_defaultExternalToolRunner;

@@ -27,14 +27,14 @@ struct CRenameScriptEntry;
 
 struct CUndoStackEntry
 {
-    char* Source;
-    char* Target;
+    wchar_t* Source;
+    wchar_t* Target;
     CSourceFile* RenamedFile;
     unsigned int IsDir : 1;
     unsigned int Blocks : 1;
     unsigned int Independent : 1; // for path components so the undo operation can be reattached
                                   // later
-    CUndoStackEntry(char* source, char* target, CSourceFile* renamedFile,
+    CUndoStackEntry(const wchar_t* source, const wchar_t* target, CSourceFile* renamedFile,
                     BOOL isDir, BOOL blocks);
     ~CUndoStackEntry();
 };
@@ -67,7 +67,7 @@ protected:
     BOOL TransferDontSaveHistory;
     BOOL WaitCursor;
     BOOL CloseOnEnable;
-    CPathBuffer TempFile; // Heap-allocated for long path support
+    std::wstring TempFile;
 
     CPreviewWindow* Preview;
     CComboboxEdit *MaskEdit, *NewName, *SearchFor, *ReplaceWith;
@@ -91,8 +91,7 @@ protected:
     BOOL SourceFilesValid;
     BOOL SourceFilesNeedUpdate;
     DWORD LastUpdateTime;
-    CPathBuffer Root; // Heap-allocated for long path support
-    int RootLen;
+    std::wstring Root;
 
     BOOL Errors;
     CProgressDialog* Progress;
@@ -128,7 +127,7 @@ public:
 
     void LoadSelection();
     void ReloadSourceFiles();
-    BOOL LoadSubdir(char* path, int pathSize, const char* subdir);
+    BOOL LoadSubdir(std::wstring& path, const wchar_t* subdir);
 
     BOOL ReloadManualModeEdit();
 
@@ -145,15 +144,15 @@ public:
     void Rename(BOOL validate);
     BOOL BuildScript(CRenameScriptEntry*& script, int& count,
                      BOOL validate, BOOL& somethingToDo);
-    int GetManualModeNewName(CSourceFile* file, int index,
-                             char* newName, int newNameSize, char*& newPart);
+    BOOL GetManualModeNewName(CSourceFile* file, int index,
+                              std::wstring& newName, size_t& newPartOffset);
     void ExecuteScript(CRenameScriptEntry* script, int count);
     void Undo();
 
-    BOOL MoveFile(char* sourceName, char* targetName, char* newPart,
+    BOOL MoveFile(const wchar_t* sourceName, const wchar_t* targetName, const wchar_t* newPart,
                   BOOL overwrite, BOOL isDir, BOOL& skip);
-    BOOL CheckAndCreateDirectory(char* directory, char* newPart, BOOL& skip);
-    BOOL CopyFile(char* sourceName, char* targetName, BOOL overwrite,
+    BOOL CheckAndCreateDirectory(std::wstring directory, size_t newPartOffset, BOOL& skip);
+    BOOL CopyFile(const wchar_t* sourceName, const wchar_t* targetName, BOOL overwrite,
                   BOOL& skip);
 
     BOOL ExportToTempFile();

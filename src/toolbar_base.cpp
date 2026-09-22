@@ -7,6 +7,7 @@
 #include "bitmap.h"
 #include "toolbar.h"
 #include "darkmode.h"
+#include "common/unicode/helpers.h"
 
 //*****************************************************************************
 //
@@ -41,11 +42,11 @@ CToolBarItem::~CToolBarItem()
         free(Name);
 }
 
-BOOL CToolBarItem::SetText(const char* text, int len)
+BOOL CToolBarItem::SetText(const wchar_t* text, int len)
 {
     CALL_STACK_MESSAGE_NONE
     if (text != NULL && len == -1)
-        len = lstrlen(text);
+        len = lstrlenW(text);
 
     if (Text != NULL)
     {
@@ -56,14 +57,18 @@ BOOL CToolBarItem::SetText(const char* text, int len)
 
     if (text != NULL)
     {
-        Text = (char*)malloc(len + 1);
+        // 'len' and 'TextLen' are CHARACTER counts and 'Text' is wchar_t*.
+        // The member was widened by the v108 sweep but this arithmetic was not: malloc(len + 1)
+        // reserved BYTES for a wide buffer and the memmove copied 'len' BYTES, i.e. half the
+        // characters, into an allocation half the size it needed. Both are in wchar_t now.
+        Text = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
         if (Text == NULL)
         {
             TRACE_E(LOW_MEMORY);
             return FALSE;
         }
         if (len > 0)
-            memmove(Text, text, len);
+            memmove(Text, text, len * sizeof(wchar_t));
         Text[len] = 0;
         TextLen = len;
     }
@@ -572,7 +577,10 @@ BOOL CToolBar::GetItemInfo2(DWORD position, BOOL byPosition, TLBI_ITEM_INFO2* ti
 
     if (tii->Mask & TLBI_MASK_TEXT)
     {
-        memmove(tii->Text, item->Text, item->TextLen);
+        // TextLen is a CHARACTER count. The byte-count memmove copied only
+        // the first half of the string and then terminated at the full index, so the tail was
+        // uninitialised heap. The index below was already right, which is why nothing caught it.
+        memmove(tii->Text, item->Text, item->TextLen * sizeof(wchar_t));
         tii->Text[item->TextLen] = 0;
     }
 
@@ -1117,22 +1125,33 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
     }
 
-    case WM_USER_TTGETTEXT:
+    case WM_USER_TTGETTEXTW:
     {
         DWORD index = (DWORD)wParam; // FIXME_X64 - verify cast to (DWORD)
-        char* text = (char*)lParam;
+        wchar_t* text = (wchar_t*)lParam;
         if (index >= 0 && index < (DWORD)Items.Count)
         {
             CToolBarItem* item = Items[index];
             if (item->Style & TLBI_STYLE_SEPARATOR)
                 return 0; // separator has no tooltip
+            // The comment that used to stand here said TOOLBAR_TOOLTIP::Buffer
+            // "is still 'char*'" and justified a CP_ACP round trip on that basis. It is
+            // 'wchar_t* Buffer' (spl_gui.h) since P1.4, the local below was already wchar_t, and
+            // all three core WM_USER_TBGETTOOLTIP handlers answer with lstrcpyW - so the
+            // conversion was the conversion layer applied to already-wide data.
+            // The v107 half of this sub-protocol is unaffected and still owed: compat/sdk107
+            // keeps 'char* Buffer', and bridging it belongs to the adapter, not to this path.
+            wchar_t reply[TOOLTIP_TEXT_MAX];
+            reply[0] = 0;
             TOOLBAR_TOOLTIP tt;
             tt.HToolBar = HWindow;
             tt.ID = item->ID;
             tt.Index = index;
-            tt.Buffer = text;
+            tt.Buffer = reply;
             tt.CustomData = item->CustomData;
             SendMessage(HNotifyWindow, WM_USER_TBGETTOOLTIP, (WPARAM)HWindow, (LPARAM)&tt);
+            if (reply[0] != 0)
+                lstrcpynW(text, reply, TOOLTIP_TEXT_MAX);
         }
         return 0;
     }

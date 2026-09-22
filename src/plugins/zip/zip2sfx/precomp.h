@@ -11,8 +11,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
+#include <limits>
 #include <ostream>
 #include <string>
+#include <vector>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)

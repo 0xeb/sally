@@ -16,7 +16,7 @@ protected:
 
     volatile int _requestedIconId;
     volatile DWORD _requestedFlags;
-    TCHAR _requestedFilename[2 * MAX_PATH + 1];
+    std::wstring _requestedFilename;
     volatile LPVOID _requestedlParam;
 
     static DWORD_PTR WINAPI WorkerThreadProc(CWorkerThread* mythread, LPVOID lpParam)
@@ -32,7 +32,7 @@ protected:
 
         DWORD iconFlags = 0;
         LPVOID iconlParam = NULL;
-        TCHAR iconFile[ARRAYSIZE(CZSmartIconLoader::_requestedFilename)];
+        std::wstring iconFile;
 
         while (true)
         {
@@ -41,10 +41,17 @@ protected:
             loadNewIcon = (currentIconId != this->_requestedIconId);
             if (loadNewIcon)
             {
-                iconFlags = this->_requestedFlags;
-                iconlParam = this->_requestedlParam;
-                memcpy(iconFile, this->_requestedFilename, ARRAYSIZE(CZSmartIconLoader::_requestedFilename) * sizeof(TCHAR));
-                currentIconId = this->_requestedIconId;
+                try
+                {
+                    iconFile = this->_requestedFilename;
+                    iconFlags = this->_requestedFlags;
+                    iconlParam = this->_requestedlParam;
+                    currentIconId = this->_requestedIconId;
+                }
+                catch (...)
+                {
+                    loadNewIcon = false;
+                }
             }
             this->_worker->GetLock()->Leave();
 
@@ -53,7 +60,7 @@ protected:
 
             if (loadNewIcon)
             {
-                HICON hicon = CZIconLoader::LoadIconSync(iconFile, iconFlags);
+                HICON hicon = CZIconLoader::LoadIconSync(iconFile.c_str(), iconFlags);
                 PostMessage(this->_owner, this->_msg, (WPARAM)hicon, (LPARAM)iconlParam);
             }
 
@@ -88,11 +95,13 @@ public:
     }
     void PlanLoadIcon(CZFile* file, DWORD flags)
     {
+        std::wstring requestedFilename;
+        file->GetFullName(requestedFilename);
         this->_worker->GetLock()->Enter();
         this->_requestedIconId++;
         this->_requestedFlags = flags;
         this->_requestedlParam = file;
-        file->GetFullName(this->_requestedFilename, ARRAYSIZE(CZSmartIconLoader::_requestedFilename));
+        this->_requestedFilename.swap(requestedFilename);
         this->_worker->GetLock()->Leave();
     }
     /*

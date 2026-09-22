@@ -12,7 +12,7 @@
 #include "mmviewer.h"
 #include "auxtools.h"
 
-int ExportToXML(const char* fname)
+int ExportToXML(const wchar_t* fname)
 {
     return FALSE;
 }

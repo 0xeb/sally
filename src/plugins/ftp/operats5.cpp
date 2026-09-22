@@ -276,7 +276,7 @@ int CFTPWorkersList::GetWorkerIndex(int workerID)
     return ret;
 }
 
-void CFTPWorkersList::GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* buf, int bufSize)
+void CFTPWorkersList::GetListViewDataFor(int index, NMLVDISPINFO* lvdi, std::wstring& text) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPWorkersList::GetListViewDataFor()");
 
@@ -284,7 +284,7 @@ void CFTPWorkersList::GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* bu
     LVITEM* itemData = &(lvdi->item);
     if (index >= 0 && index < Workers.Count) // index is valid
     {
-        Workers[index]->GetListViewData(itemData, buf, bufSize);
+        Workers[index]->GetListViewData(itemData, text);
     }
     else // for an invalid index (listview has not refreshed yet) we must return at least an empty item
     {
@@ -292,9 +292,8 @@ void CFTPWorkersList::GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* bu
             itemData->iImage = 0; // we have only one icon so far
         if (itemData->mask & LVIF_TEXT)
         {
-            if (bufSize > 0)
-                buf[0] = 0;
-            itemData->pszText = buf;
+            text.clear();
+            itemData->pszText = const_cast<LPWSTR>(text.c_str());
         }
     }
     HANDLES(LeaveCriticalSection(&WorkersListCritSect));
@@ -384,7 +383,7 @@ BOOL CFTPWorkersList::SomeWorkerIsWorking(BOOL* someIsWorkingAndNotPaused)
     return ret;
 }
 
-BOOL CFTPWorkersList::GetErrorDescr(int index, char* buf, int bufSize, CCertificate** unverifiedCertificate)
+BOOL CFTPWorkersList::GetErrorDescr(int index, std::wstring& errorText, CCertificate** unverifiedCertificate)
 {
     CALL_STACK_MESSAGE2("CFTPWorkersList::GetErrorDescr(%d, ,)", index);
 
@@ -399,7 +398,7 @@ BOOL CFTPWorkersList::GetErrorDescr(int index, char* buf, int bufSize, CCertific
     if (index >= 0 && index < Workers.Count) // index is valid
     {
         worker = Workers[index];
-        ret = worker->GetErrorDescr(buf, bufSize, &postActivate, unverifiedCertificate);
+        ret = worker->GetErrorDescr(errorText, &postActivate, unverifiedCertificate);
         if (postActivate)
             postActivate = worker->GetPostTarget(&msg, &uid);
     }
@@ -789,15 +788,14 @@ void CReturningConnections::CloseData()
 // CFTPFileToClose
 //
 
-CFTPFileToClose::CFTPFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
+CFTPFileToClose::CFTPFileToClose(const wchar_t* path, const wchar_t* name, HANDLE file, BOOL deleteIfEmpty,
                                  BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
                                  BOOL deleteFile, CQuadWord* setEndOfFile)
 {
     File = file;
     DeleteIfEmpty = deleteIfEmpty;
-    lstrcpyn(FileName, path, FileName.Size());
-    if (!SalamanderGeneral->SalPathAppend(FileName, name, FileName.Size()))
-        TRACE_E("Unexpected situation in CFTPFileToClose::CFTPFileToClose(): too long file name!");
+    FileName = path != NULL ? path : L"";
+    SPLSalPathAppendOwned(FileName, name);
     SetDateAndTime = setDateAndTime;
     if (SetDateAndTime && date != NULL)
         Date = *date;
@@ -822,9 +820,9 @@ CFTPFileToClose::CFTPFileToClose(const char* path, const char* name, HANDLE file
 // CDiskListingItem
 //
 
-CDiskListingItem::CDiskListingItem(const char* name, BOOL isDir, const CQuadWord& size)
+CDiskListingItem::CDiskListingItem(const wchar_t* name, BOOL isDir, const CQuadWord& size)
 {
-    Name = SalamanderGeneral->DupStr(name);
+    Name = name != NULL ? _wcsdup(name) : NULL;
     IsDir = isDir;
     Size = size;
 }
@@ -834,7 +832,7 @@ CDiskListingItem::CDiskListingItem(const char* name, BOOL isDir, const CQuadWord
 // CFTPDiskThread
 //
 
-CFTPDiskThread::CFTPDiskThread() : CThread("FTP Disk Thread"), Work(20, 50, dtNoDelete), FilesToClose(20, 50)
+CFTPDiskThread::CFTPDiskThread() : CThread(L"FTP Disk Thread"), Work(20, 50, dtNoDelete), FilesToClose(20, 50)
 {
     HANDLES(InitializeCriticalSection(&DiskCritSect));
     ContEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL)); // manual, nonsignaled
@@ -926,7 +924,7 @@ BOOL CFTPDiskThread::CancelWork(const CFTPDiskWork* work, BOOL* workIsInProgress
     return ret;
 }
 
-BOOL CFTPDiskThread::AddFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
+BOOL CFTPDiskThread::AddFileToClose(const wchar_t* path, const wchar_t* name, HANDLE file, BOOL deleteIfEmpty,
                                     BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
                                     BOOL deleteFile, CQuadWord* setEndOfFile, int* fileCloseIndex)
 {
@@ -998,36 +996,119 @@ BOOL CFTPDiskThread::WaitForFileClose(int fileCloseIndex, DWORD timeout)
 #define INVALID_FILE_ATTRIBUTES (-1)
 #endif // INVALID_FILE_ATTRIBUTES
 
-void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& needCopyBack,
-                 char* nameBackup, char* suffix)
+static BOOL BuildWideDiskChildPath(std::wstring& out, std::wstring_view path,
+                                   std::wstring_view name) noexcept
 {
-    BOOL isValid = SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name);
-    DWORD winErr = NO_ERROR;
-    BOOL alreadyExists = FALSE;
-    BOOL tooLongName = FALSE;
-    if (isValid)
+    try
     {
-        strcpy(fullName, localWork.Path);
-        if (!SalamanderGeneral->SalPathAppend(fullName, localWork.Name, PATH_MAX_PATH))
+        std::wstring staged(path);
+        const std::wstring stagedName(name);
+        SPLSalPathAppendOwned(staged, stagedName.c_str());
+        out.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+static BOOL MakeValidDiskName(std::wstring& name) noexcept
+{
+    std::wstring validName;
+    try
+    {
+        validName = name;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+    if (!SPLSalMakeValidFileNameComponentOwned(SalamanderGeneral, validName))
+        return FALSE;
+    name.swap(validName);
+    return TRUE;
+}
+
+static BOOL MakeAutorenameName(const std::wstring& baseName, int suffixNumber,
+                               BOOL preserveExtension, std::wstring& name) noexcept
+{
+    try
+    {
+        const std::wstring suffix = L" (" + std::to_wstring(suffixNumber) + L")";
+        const size_t extension = preserveExtension ? baseName.find_last_of(L'.') : std::wstring::npos;
+        std::wstring staged;
+        if (extension == std::wstring::npos)
         {
-            winErr = ERROR_FILENAME_EXCED_RANGE; // "file name is too long"
-            tooLongName = TRUE;
+            staged = baseName;
+            staged += suffix;
         }
         else
         {
+            staged.assign(baseName, 0, extension);
+            staged += suffix;
+            staged.append(baseName, extension, std::wstring::npos);
+        }
+        name.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+static void StripAutorenameSuffix(std::wstring& name, int& suffixNumber) noexcept
+{
+    if (name.size() < 4)
+        return;
+    const size_t extension = name.find_last_of(L'.');
+    if (extension == 0)
+        return;
+    const size_t close = extension == std::wstring::npos ? name.size() - 1 : extension - 1;
+    if (name[close] != L')')
+        return;
+    const size_t open = name.rfind(L" (", close);
+    if (open == std::wstring::npos || open + 2 >= close)
+        return;
+    int value = 0;
+    for (size_t i = open + 2; i < close; ++i)
+    {
+        if (name[i] < L'0' || name[i] > L'9' || value > (INT_MAX - 9) / 10)
+            return;
+        value = value * 10 + (name[i] - L'0');
+    }
+    if (value < 2)
+        return;
+    name.erase(open, close - open + 1);
+    suffixNumber = value;
+}
+
+void DoCreateDir(CFTPDiskWork& localWork, BOOL& workDone, BOOL& needCopyBack)
+{
+    BOOL isValid = SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name.c_str());
+    DWORD winErr = NO_ERROR;
+    BOOL alreadyExists = FALSE;
+    std::wstring fullName;
+    if (isValid)
+    {
+        if (!BuildWideDiskChildPath(fullName, localWork.Path, localWork.Name))
+            winErr = ERROR_NOT_ENOUGH_MEMORY;
+        else
+        {
             DWORD e;
-            if (!SalamanderGeneral->SalCreateDirectoryEx(fullName, &e))
+            if (!SalamanderGeneral->SalCreateDirectoryEx(fullName.c_str(), &e))
             {
                 winErr = e;
                 if (winErr != ERROR_ALREADY_EXISTS && winErr != ERROR_FILE_EXISTS)
                 { // check whether the error was caused by an existing file/directory, and continue searching for a name via autorename if needed
-                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                     if (attr != INVALID_FILE_ATTRIBUTES)
                         winErr = ERROR_ALREADY_EXISTS;
                 }
                 if (winErr == ERROR_ALREADY_EXISTS || winErr == ERROR_FILE_EXISTS)
                 {
-                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                     if (attr == INVALID_FILE_ATTRIBUTES)
                         winErr = GetLastError();
                     else
@@ -1116,71 +1197,46 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
             BOOL ok = FALSE;
             if (!isValid)
             {
-                SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
+                if (!MakeValidDiskName(localWork.Name))
+                {
+                    localWork.ProblemID = ITEMPR_LOWMEM;
+                    localWork.State = sqisFailed;
+                    needCopyBack = TRUE;
+                    return;
+                }
                 needCopyBack = TRUE;
             }
-            strcpy(fullName, localWork.Path);
-            char* pathEnd = fullName + strlen(fullName);
-            if (pathEnd > fullName && *(pathEnd - 1) != '\\')
-                *pathEnd++ = '\\';
-            int rest = PATH_MAX_PATH - (int)(pathEnd - fullName);
-            if (rest < 0)
-                rest = 0; // theoretically should never happen, but Windows extensions can do it (see paths starting with "\\?\")
-            int nameLen = (int)strlen(localWork.Name);
-            memcpy(nameBackup, localWork.Name, nameLen + 1);
-            BOOL firstRound = TRUE;
+            const std::wstring baseName = localWork.Name;
+            BOOL tryCurrentName = !isValid;
+            BOOL firstAttempt = TRUE;
             int itemProblem = ITEMPR_CANNOTCREATETGTDIR;
             int suffixCounter = 1;
             while (1)
             {
-                if (firstRound && !isValid && nameLen < rest) // test the "validated" name
-                    memcpy(pathEnd, localWork.Name, nameLen + 1);
-                else // append numbering to the end of the name (directories have no extension) (e.g. "(2)") + trim if necessary so the name fits into the full path
+                if (!tryCurrentName)
                 {
-                    if (firstRound && (tooLongName || !isValid) ||
-                        winErr == ERROR_FILE_EXISTS || winErr == ERROR_ALREADY_EXISTS)
+                    if (!firstAttempt && winErr != ERROR_FILE_EXISTS && winErr != ERROR_ALREADY_EXISTS)
+                        break;
+                    if (suffixCounter == INT_MAX ||
+                        !MakeAutorenameName(baseName, ++suffixCounter, FALSE, localWork.Name))
                     {
-                        if (firstRound && tooLongName)
-                            suffix[0] = 0;
-                        else
-                            sprintf(suffix, " (%d)", ++suffixCounter);
-                        int suffixLen = (int)strlen(suffix);
-                        if (suffixLen + 1 < rest) // at least 1 character of the name plus the suffix must fit
-                        {
-                            // generate a new name
-                            memcpy(localWork.Name, nameBackup, nameLen);
-                            needCopyBack = TRUE;
-                            if (nameLen + suffixLen < rest)
-                                memcpy(localWork.Name + nameLen, suffix, suffixLen + 1);
-                            else
-                                memcpy(localWork.Name + rest - (suffixLen + 1), suffix, suffixLen + 1);
-                            if (!SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name))
-                            { // the resulting name is not OK, we must adjust it
-                                int newLen = (int)strlen(localWork.Name);
-                                if (newLen + 1 >= rest)
-                                {
-                                    if (newLen > 1)
-                                        localWork.Name[newLen - 1] = 0;
-                                    else
-                                        localWork.Name[0] = '_';
-                                }
-                                SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
-                            }
-                            lstrcpyn(pathEnd, localWork.Name, rest); // build the full name for the new name
-                        }
-                        else
-                        {
-                            winErr = ERROR_FILENAME_EXCED_RANGE; // "file name is too long"
-                            break;
-                        }
+                        itemProblem = ITEMPR_LOWMEM;
+                        winErr = NO_ERROR;
+                        break;
                     }
-                    else
-                        break; // another attempt to create the directory makes no sense (it's not a name collision, syntax error, or overly long name), return an error
+                    needCopyBack = TRUE;
+                }
+                tryCurrentName = FALSE;
+                if (!BuildWideDiskChildPath(fullName, localWork.Path, localWork.Name))
+                {
+                    itemProblem = ITEMPR_LOWMEM;
+                    winErr = NO_ERROR;
+                    break;
                 }
                 // allocate the new name
                 if (localWork.NewTgtName != NULL)
                     free(localWork.NewTgtName);
-                localWork.NewTgtName = SalamanderGeneral->DupStr(localWork.Name);
+                localWork.NewTgtName = _wcsdup(localWork.Name.c_str());
                 if (localWork.NewTgtName == NULL)
                 {
                     itemProblem = ITEMPR_LOWMEM;
@@ -1188,12 +1244,12 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
                     break;
                 }
                 // try another directory name
-                if (!CreateDirectory(fullName, NULL))
+                if (!CreateDirectoryW(fullName.c_str(), NULL))
                 {
                     winErr = GetLastError();
                     if (winErr != ERROR_ALREADY_EXISTS && winErr != ERROR_FILE_EXISTS)
                     { // check whether the error was caused by an existing file/directory, and continue searching for a name via autorename if needed
-                        DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                        DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                         if (attr != INVALID_FILE_ATTRIBUTES)
                             winErr = ERROR_ALREADY_EXISTS;
                     }
@@ -1204,7 +1260,7 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
                     ok = TRUE;
                     break; // success, return OK + the new name
                 }
-                firstRound = FALSE;
+                firstAttempt = FALSE;
             }
 
             if (!ok)
@@ -1250,26 +1306,21 @@ CFTPQueueItemState DoCreateFileGetWantedErrorState(CFTPDiskWork& localWork)
     return state;
 }
 
-void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& needCopyBack,
-                  char* nameBackup, char* suffix)
+void DoCreateFile(CFTPDiskWork& localWork, BOOL& workDone, BOOL& needCopyBack)
 {
-    BOOL isValid = SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name);
+    BOOL isValid = SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name.c_str());
     DWORD winErr = NO_ERROR;
     BOOL alreadyExists = FALSE;
-    BOOL tooLongName = FALSE;
     HANDLE file = NULL;
+    std::wstring fullName;
     if (isValid)
     {
-        strcpy(fullName, localWork.Path);
-        if (!SalamanderGeneral->SalPathAppend(fullName, localWork.Name, localWork.Name.Size()))
-        {
-            winErr = ERROR_FILENAME_EXCED_RANGE; // "file name is too long"
-            tooLongName = TRUE;
-        }
+        if (!BuildWideDiskChildPath(fullName, localWork.Path, localWork.Name))
+            winErr = ERROR_NOT_ENOUGH_MEMORY;
         else
         {
             DWORD salCrErr;
-            file = SalamanderGeneral->SalCreateFileEx(fullName, GENERIC_WRITE, FILE_SHARE_READ, FILE_FLAG_SEQUENTIAL_SCAN, &salCrErr);
+            file = SalamanderGeneral->SalCreateFileEx(fullName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, FILE_FLAG_SEQUENTIAL_SCAN, &salCrErr);
             SetLastError(salCrErr);
             HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile,
                            __hoCreateFile, file, salCrErr, TRUE);
@@ -1278,13 +1329,13 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                 winErr = GetLastError();
                 if (winErr != ERROR_ALREADY_EXISTS && winErr != ERROR_FILE_EXISTS)
                 { // check whether the error was caused by an existing file/directory, and continue searching for a name via autorename if needed
-                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                     if (attr != INVALID_FILE_ATTRIBUTES)
                         winErr = ERROR_ALREADY_EXISTS;
                 }
                 if (winErr == ERROR_ALREADY_EXISTS || winErr == ERROR_FILE_EXISTS)
                 {
-                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                    DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                     if (attr == INVALID_FILE_ATTRIBUTES)
                         winErr = GetLastError();
                     else
@@ -1489,108 +1540,51 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             BOOL ok = FALSE;
             if (!isValid)
             {
-                SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
+                if (!MakeValidDiskName(localWork.Name))
+                {
+                    localWork.ProblemID = ITEMPR_LOWMEM;
+                    localWork.State = sqisFailed;
+                    needCopyBack = TRUE;
+                    break;
+                }
                 needCopyBack = TRUE;
             }
-            strcpy(fullName, localWork.Path);
-            char* pathEnd = fullName + strlen(fullName);
-            if (pathEnd > fullName && *(pathEnd - 1) != '\\')
-                *pathEnd++ = '\\';
-            int rest = localWork.Name.Size() - (int)(pathEnd - fullName);
-            if (rest < 0)
-                rest = 0; // theoretically should never happen, but Windows extensions can do it (see paths starting with "\\?\")
             int suffixCounter = 1;
-            BOOL firstRound = TRUE;
+            BOOL tryCurrentName = !isValid;
+            BOOL firstAttempt = TRUE;
+            std::wstring baseName = localWork.Name;
             if (isValid && localWork.AlreadyRenamedName) // second round of renaming: ensure "name (2)" -> "name (3)" instead of -> "name (2) (2)"
             {
-                char* s = localWork.Name + strlen(localWork.Name);
-                while (--s >= localWork.Name)
-                {
-                    if (*s == ')') // searching from the end for " (number)"
-                    {
-                        char* end = s + 1;
-                        int num = 0;
-                        int digit = 1;
-                        while (--s >= localWork.Name && *s >= '0' && *s <= '9')
-                        {
-                            num += digit * (*s - '0');
-                            digit *= 10;
-                        }
-                        if (s > localWork.Name && *s == '(' && *(s - 1) == ' ')
-                        {
-                            memmove(s - 1, end, strlen(end) + 1);
-                            suffixCounter = num;
-                            break;
-                        }
-                    }
-                }
-                firstRound = FALSE; // we want to start trying suffixes immediately (even if the "already renamed name" does not contain one)
+                StripAutorenameSuffix(baseName, suffixCounter);
+                tryCurrentName = FALSE; // start trying suffixes immediately
             }
-            int nameLen = (int)strlen(localWork.Name);
-            int extOffset = nameLen;
-            char* ext = strrchr(localWork.Name, '.');
-            //        if (ext != NULL && ext != localWork.Name) // ".cvspass" is treated as an extension in Windows ...
-            if (ext != NULL)
-                extOffset = (int)(ext - localWork.Name);
-            memcpy(nameBackup, localWork.Name, nameLen + 1);
             int itemProblem = ITEMPR_CANNOTCREATETGTFILE;
             while (1)
             {
-                if (firstRound && !isValid && nameLen < rest) // test the "validated" name
-                    memcpy(pathEnd, localWork.Name, nameLen + 1);
-                else // append numbering to the end of the name (directories have no extension) (e.g. "(2)") + trim if necessary so the name fits into the full path
+                if (!tryCurrentName)
                 {
-                    if (firstRound && (tooLongName || !isValid) ||
-                        winErr == ERROR_FILE_EXISTS || winErr == ERROR_ALREADY_EXISTS)
+                    if (!firstAttempt && winErr != ERROR_FILE_EXISTS && winErr != ERROR_ALREADY_EXISTS)
+                        break;
+                    if (suffixCounter == INT_MAX ||
+                        !MakeAutorenameName(baseName, ++suffixCounter, TRUE, localWork.Name))
                     {
-                        if (firstRound && tooLongName)
-                            suffix[0] = 0;
-                        else
-                            sprintf(suffix, " (%d)", ++suffixCounter);
-                        int suffixLen = (int)strlen(suffix);
-                        if (suffixLen + 1 < rest) // at least 1 character of the name plus the suffix must fit
-                        {
-                            // generate a new name
-                            needCopyBack = TRUE;
-                            if (suffixLen + 1 + (nameLen - extOffset) < rest) // if at least 1 character of the name + the suffix + the extension fits
-                            {                                                 // assemble: the largest possible part of the name + suffix + extension
-                                int off = (nameLen + suffixLen < rest) ? extOffset : (rest - 1 - suffixLen - (nameLen - extOffset));
-                                memcpy(localWork.Name, nameBackup, off);
-                                memcpy(localWork.Name + off, suffix, suffixLen);
-                                memcpy(localWork.Name + off + suffixLen, nameBackup + extOffset, nameLen - extOffset + 1);
-                            }
-                            else // the entire extension will not fit, shorten the name without respecting the extension
-                            {
-                                memcpy(localWork.Name, nameBackup, rest - (suffixLen + 1));
-                                memcpy(localWork.Name + rest - (suffixLen + 1), suffix, suffixLen + 1);
-                            }
-                            if (!SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name))
-                            { // the resulting name is not OK, we must adjust it
-                                int newLen = (int)strlen(localWork.Name);
-                                if (newLen + 1 >= rest)
-                                {
-                                    if (newLen > 1)
-                                        localWork.Name[newLen - 1] = 0;
-                                    else
-                                        localWork.Name[0] = '_';
-                                }
-                                SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
-                            }
-                            lstrcpyn(pathEnd, localWork.Name, rest); // build the full name for the new name
-                        }
-                        else
-                        {
-                            winErr = ERROR_FILENAME_EXCED_RANGE; // "file name is too long"
-                            break;
-                        }
+                        itemProblem = ITEMPR_LOWMEM;
+                        winErr = NO_ERROR;
+                        break;
                     }
-                    else
-                        break; // another attempt to create the file makes no sense (it's not a name collision, syntax error, or overly long name), return an error
+                    needCopyBack = TRUE;
+                }
+                tryCurrentName = FALSE;
+                if (!BuildWideDiskChildPath(fullName, localWork.Path, localWork.Name))
+                {
+                    itemProblem = ITEMPR_LOWMEM;
+                    winErr = NO_ERROR;
+                    break;
                 }
                 // allocate the new name
                 if (localWork.NewTgtName != NULL)
                     free(localWork.NewTgtName);
-                localWork.NewTgtName = SalamanderGeneral->DupStr(localWork.Name);
+                localWork.NewTgtName = _wcsdup(localWork.Name.c_str());
                 if (localWork.NewTgtName == NULL)
                 {
                     itemProblem = ITEMPR_LOWMEM;
@@ -1598,14 +1592,14 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                     break;
                 }
                 // try another file name
-                file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                file = HANDLES_Q(CreateFileW(fullName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                             CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                 if (file == INVALID_HANDLE_VALUE)
                 {
                     winErr = GetLastError();
                     if (winErr != ERROR_ALREADY_EXISTS && winErr != ERROR_FILE_EXISTS)
                     { // check whether the error was caused by an existing file/directory, and continue searching for a name via autorename if needed
-                        DWORD attr2 = SalamanderGeneral->SalGetFileAttributes(fullName);
+                        DWORD attr2 = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                         if (attr2 != INVALID_FILE_ATTRIBUTES)
                             winErr = ERROR_ALREADY_EXISTS;
                     }
@@ -1621,7 +1615,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                     needCopyBack = TRUE;
                     break; // success, return OK + the new name
                 }
-                firstRound = FALSE;
+                firstAttempt = FALSE;
             }
 
             if (!ok)
@@ -1640,7 +1634,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
         case 2: // resume (for already exists, transfer failed, and force action) + if reduceFileSize==TRUE we also need to shrink the file
         case 3: // resume or overwrite (for already exists, transfer failed, and force action)
         {
-            file = HANDLES_Q(CreateFile(fullName,
+            file = HANDLES_Q(CreateFileW(fullName.c_str(),
                                         GENERIC_READ /* we will read and check the overlap */ |
                                             GENERIC_WRITE,
                                         FILE_SHARE_READ, NULL,
@@ -1649,12 +1643,12 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             {
                 winErr = GetLastError();
                 // check whether it happens to be read-only (only via the attribute)
-                attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                 if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
                 { // try to clear the read-only attribute and open the file again
                     readonly = TRUE;
-                    SetFileAttributes(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
-                    file = HANDLES_Q(CreateFile(fullName,
+                    SetFileAttributesW(fullName.c_str(), attr & (~FILE_ATTRIBUTE_READONLY));
+                    file = HANDLES_Q(CreateFileW(fullName.c_str(),
                                                 GENERIC_READ /* we will read and check the overlap */ |
                                                     GENERIC_WRITE,
                                                 FILE_SHARE_READ, NULL,
@@ -1732,7 +1726,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             if (action == 2 /* resume */ || denyOverwrite)
             {
                 if (readonly)
-                    SetFileAttributes(fullName, attr); // restore the read-only attribute (failed to open the file)
+                    SetFileAttributesW(fullName.c_str(), attr); // restore the read-only attribute (failed to open the file)
 
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
                 localWork.WinError = winErr;
@@ -1747,14 +1741,14 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
         {
             if (action == 4) // check whether it happens to be read-only (only via the attribute), but only if we have not done so already
             {
-                attr = SalamanderGeneral->SalGetFileAttributes(fullName);
+                attr = SalamanderGeneral->SalGetFileAttributes(fullName.c_str());
                 if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
                 { // try to clear the read-only attribute
                     readonly = TRUE;
-                    SetFileAttributes(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
+                    SetFileAttributesW(fullName.c_str(), attr & (~FILE_ATTRIBUTE_READONLY));
                 }
             }
-            file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+            file = HANDLES_Q(CreateFileW(fullName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                         CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             if (file == INVALID_HANDLE_VALUE) // cannot open the file
             {
@@ -1767,9 +1761,9 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                 // (on Samba it is possible to allow deleting read-only files, which makes deleting a read-only file possible,
                 //  otherwise it cannot be deleted because Windows cannot remove a read-only file and at the same time
                 //  the "read-only" attribute cannot be cleared on that file because the current user is not the owner)
-                if (DeleteFile(fullName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" enabled
+                if (DeleteFileW(fullName.c_str())) // if it is read-only, it can be deleted only on Samba with "delete readonly" enabled
                 {
-                    file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                    file = HANDLES_Q(CreateFileW(fullName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                                 CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                     winErr = GetLastError();
                 }
@@ -1787,7 +1781,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             else
             {
                 if (readonly)
-                    SetFileAttributes(fullName, attr); // restore the read-only attribute (failed to delete the file)
+                    SetFileAttributesW(fullName.c_str(), attr); // restore the read-only attribute (failed to delete the file)
 
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
                 localWork.WinError = winErr;
@@ -1940,21 +1934,20 @@ void DoCheckOrWriteToFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    CPathBuffer srcPath;
-    lstrcpyn(srcPath, localWork.Path, srcPath.Size());
-    if (SalamanderGeneral->SalPathAppend(srcPath, localWork.Name, srcPath.Size()))
+    std::wstring srcPath;
+    if (BuildWideDiskChildPath(srcPath, localWork.Path, localWork.Name))
     {
         localWork.DiskListing = new TIndirectArray<CDiskListingItem>(100, 500);
         if (localWork.DiskListing != NULL && localWork.DiskListing->IsGood())
         {
-            SalamanderGeneral->SalPathAppend(srcPath, "*.*", srcPath.Size()); // cannot fail
-            char* srcPathEnd = strrchr(srcPath, '\\');                       // cannot fail either
-            WIN32_FIND_DATA fileData;
-            HANDLE search = HANDLES_Q(FindFirstFile(srcPath, &fileData));
+            SPLSalPathAppendOwned(srcPath, L"*.*");
+            const std::size_t srcPathEnd = srcPath.find_last_of(L'\\'); // cannot fail
+            WIN32_FIND_DATAW fileData;
+            HANDLE search = HANDLES_Q(FindFirstFileW(srcPath.c_str(), &fileData));
             if (search == INVALID_HANDLE_VALUE)
             {
                 DWORD err = GetLastError();
-                if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES) // this is an error - i.e. it's not just an empty listing
+                if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
                 {
                     localWork.State = sqisFailed;
                     localWork.ProblemID = ITEMPR_UPLOADCANNOTLISTSRCPATH;
@@ -1965,24 +1958,24 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
             {
                 do
                 {
-                    char* s = fileData.cFileName;
-                    if (*s == '.' && (*(s + 1) == 0 || *(s + 1) == '.' && *(s + 2) == 0))
-                        continue; // skip "." and ".."
-                    // links: size == 0, the file size must be obtained via SalGetFileSize2() afterwards
+                    const wchar_t* s = fileData.cFileName;
+                    if (*s == L'.' && (*(s + 1) == 0 || *(s + 1) == L'.' && *(s + 2) == 0))
+                        continue;
                     BOOL isDir = (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                     CQuadWord size(fileData.nFileSizeLow, fileData.nFileSizeHigh);
                     if (!isDir && (fileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0 &&
-                        srcPathEnd != NULL && (srcPathEnd + 1) - srcPath + strlen(fileData.cFileName) < srcPath.Size())
-                    { // it's a link and the full link name is not too long
-                        strcpy(srcPathEnd + 1, fileData.cFileName);
-                        DWORD err; // obtain the target file size
-                        if (!SalamanderGeneral->SalGetFileSize2(srcPath, size, &err))
-                        { // ignore errors; they will show up later + we do not strictly need the size, but log TRACE_E for debugging
-                            TRACE_E("DoListDirectory(): unable to get link target file size, name: " << srcPath << ", error: " << SalamanderGeneral->GetErrorText(err));
+                        srcPathEnd != std::wstring::npos)
+                    {
+                        const std::wstring linkPath =
+                            srcPath.substr(0, srcPathEnd + 1) + fileData.cFileName;
+                        DWORD err;
+                        if (!SalamanderGeneral->SalGetFileSize2(linkPath.c_str(), size, &err))
+                        {
+                            TRACE_E("DoListDirectory(): unable to get link target file size, error: " << err);
                             size.Set(fileData.nFileSizeLow, fileData.nFileSizeHigh);
                         }
                     }
-                    CDiskListingItem* item = new CDiskListingItem(s, isDir, size);
+                    CDiskListingItem* item = new CDiskListingItem(fileData.cFileName, isDir, size);
                     if (item != NULL && item->IsGood())
                     {
                         localWork.DiskListing->Add(item);
@@ -2005,7 +1998,7 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
                         localWork.ProblemID = ITEMPR_LOWMEM;
                         break;
                     }
-                } while (FindNextFile(search, &fileData));
+                } while (FindNextFileW(search, &fileData));
                 DWORD err = GetLastError();
                 HANDLES(FindClose(search));
                 if (localWork.State != sqisFailed && err != ERROR_NO_MORE_FILES)
@@ -2016,14 +2009,14 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
                 }
             }
         }
-        else // low memory
+        else
         {
             TRACE_E(LOW_MEMORY);
             localWork.State = sqisFailed;
             localWork.ProblemID = ITEMPR_LOWMEM;
         }
     }
-    else // the source path on disk is too long
+    else
     {
         localWork.State = sqisFailed;
         localWork.ProblemID = ITEMPR_INVALIDPATHTODIR;
@@ -2033,24 +2026,23 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
         delete localWork.DiskListing;
         localWork.DiskListing = NULL;
     }
-    needCopyBack = TRUE; // return the listing or an error
+    needCopyBack = TRUE;
 }
 
 void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    CPathBuffer delPath;
-    lstrcpyn(delPath, localWork.Path, delPath.Size());
-    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, delPath.Size()))
+    std::wstring delPath;
+    if (BuildWideDiskChildPath(delPath, localWork.Path, localWork.Name))
     {
-        DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
-        BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...
-        if (!RemoveDirectory(delPath))
+        DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath.c_str());
+        BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath.c_str(), attr); // so it can be deleted ...
+        if (!RemoveDirectoryW(delPath.c_str()))
         {
             DWORD err = GetLastError();
             if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND)
             { // if the directory no longer exists, everything is OK, otherwise print an error:
                 if (chAttrs)
-                    SetFileAttributes(delPath, attr); // deletion failed, so at least try to restore its attributes
+                    SetFileAttributesW(delPath.c_str(), attr); // deletion failed, so at least try to restore its attributes
                 localWork.State = sqisFailed;
                 localWork.ProblemID = ITEMPR_UNABLETODELETEDISKDIR;
                 localWork.WinError = err;
@@ -2068,19 +2060,18 @@ void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    CPathBuffer delPath;
-    lstrcpyn(delPath, localWork.Path, delPath.Size());
-    if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, delPath.Size()))
+    std::wstring delPath;
+    if (BuildWideDiskChildPath(delPath, localWork.Path, localWork.Name))
     {
-        DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
-        BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...
-        if (!DeleteFile(delPath))
+        DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath.c_str());
+        BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath.c_str(), attr); // so it can be deleted ...
+        if (!DeleteFileW(delPath.c_str()))
         {
             DWORD err = GetLastError();
             if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND)
             { // if the file no longer exists, everything is OK, otherwise print an error:
                 if (chAttrs)
-                    SetFileAttributes(delPath, attr); // deletion failed, so at least try to restore its attributes
+                    SetFileAttributesW(delPath.c_str(), attr); // deletion failed, so at least try to restore its attributes
                 localWork.State = sqisFailed;
                 localWork.ProblemID = ITEMPR_UNABLETODELETEDISKFILE;
                 localWork.WinError = err;
@@ -2099,13 +2090,12 @@ void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
 
 void DoOpenFileForReading(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(fileName, localWork.Path, fileName.Size());
+    std::wstring fileName;
     DWORD winError = NO_ERROR;
     BOOL ok = FALSE;
-    if (SalamanderGeneral->SalPathAppend(fileName, localWork.Name, fileName.Size()))
+    if (BuildWideDiskChildPath(fileName, localWork.Path, localWork.Name))
     {
-        HANDLE in = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+        HANDLE in = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_READ,
                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                          OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (in != INVALID_HANDLE_VALUE)
@@ -2249,12 +2239,7 @@ CFTPDiskThread::Body()
     localWork.NewTgtName = NULL;
     localWork.OpenedFile = NULL;
     localWork.DiskListing = NULL;
-    CPathBuffer fullName; // Heap-allocated for long path support
-    CPathBuffer nameBackup;
-    char suffix[20];
-#ifdef TRACE_ENABLE
-    char errBuf[300];
-#endif // TRACE_ENABLE
+    std::string errorText;
     while (1)
     {
         // check if there is any work or if the thread should terminate
@@ -2275,6 +2260,7 @@ CFTPDiskThread::Body()
         BOOL endThread = ShouldTerminate;
         CFTPFileToClose* fileToClose = NULL;
         CFTPDiskWork* work = NULL;
+        BOOL snapshotFailed = FALSE;
         if (FilesToClose.Count > 0) // closing files has the highest priority, then thread termination, and finally regular work
         {
             fileToClose = FilesToClose[0];
@@ -2288,7 +2274,16 @@ CFTPDiskThread::Body()
                 work = Work[0];
                 if (work != NULL)
                 {
-                    localWork.CopyFrom(work);
+                    if (!localWork.CopyFrom(*work))
+                    {
+                        localWork.Reset();
+                        localWork.SocketMsg = work->SocketMsg;
+                        localWork.SocketUID = work->SocketUID;
+                        localWork.MsgID = work->MsgID;
+                        localWork.ProblemID = ITEMPR_LOWMEM;
+                        localWork.State = sqisFailed;
+                        snapshotFailed = TRUE;
+                    }
                     WorkIsInProgress = TRUE;
                 }
             }
@@ -2341,14 +2336,16 @@ CFTPDiskThread::Body()
                     !LocalFileTimeToFileTime(&ft2, &ft))
                 {
                     DWORD err = GetLastError();
-                    TRACE_E("CFTPDiskThread::Body(): SystemTimeToFileTime() or LocalFileTimeToFileTime() failed: " << FTPGetErrorText(err, errBuf, 300));
+                    FTPGetErrorText(err, errorText);
+                    TRACE_E("CFTPDiskThread::Body(): SystemTimeToFileTime() or LocalFileTimeToFileTime() failed: " << errorText.c_str());
                 }
                 else
                 {
                     if (!SetFileTime(fileToClose->File, NULL, NULL, &ft))
                     {
                         DWORD err = GetLastError();
-                        TRACE_E("CFTPDiskThread::Body(): SetFileTime() failed: " << FTPGetErrorText(err, errBuf, 300));
+                        FTPGetErrorText(err, errorText);
+                        TRACE_E("CFTPDiskThread::Body(): SetFileTime() failed: " << errorText.c_str());
                     }
                 }
             }
@@ -2367,13 +2364,15 @@ CFTPDiskThread::Body()
                             if (SetEndOfFile(fileToClose->File) == 0)
                             {
                                 DWORD err = GetLastError();
-                                TRACE_E("CFTPDiskThread::Body(): SetEndOfFile failed: " << FTPGetErrorText(err, errBuf, 300));
+                                FTPGetErrorText(err, errorText);
+                                TRACE_E("CFTPDiskThread::Body(): SetEndOfFile failed: " << errorText.c_str());
                             }
                         }
                         else
                         {
                             DWORD err = GetLastError();
-                            TRACE_E("CFTPDiskThread::Body(): SetFilePointer failed: " << FTPGetErrorText(err, errBuf, 300));
+                            FTPGetErrorText(err, errorText);
+                            TRACE_E("CFTPDiskThread::Body(): SetFilePointer failed: " << errorText.c_str());
                         }
                     }
                     else
@@ -2382,12 +2381,13 @@ CFTPDiskThread::Body()
                 else
                 {
                     DWORD err = GetLastError();
-                    TRACE_E("CFTPDiskThread::Body(): GetFileSize failed: " << FTPGetErrorText(err, errBuf, 300));
+                    FTPGetErrorText(err, errorText);
+                    TRACE_E("CFTPDiskThread::Body(): GetFileSize failed: " << errorText.c_str());
                 }
             }
             HANDLES(CloseHandle(fileToClose->File));
             if (delFile)
-                DeleteFile(fileToClose->FileName);
+                DeleteFileW(fileToClose->FileName.c_str());
             delete fileToClose;
 
             HANDLES(EnterCriticalSection(&DiskCritSect));
@@ -2399,72 +2399,82 @@ CFTPDiskThread::Body()
         else
         {
             // perform the requested work
-            BOOL needCopyBack = FALSE;
+            BOOL needCopyBack = snapshotFailed;
             BOOL workDone = FALSE;
-            if (work != NULL) // ATTENTION: the 'work' object must not be accessed; it may no longer exist (only the pointer value may be tested, not the memory it points to)
+            if (work != NULL && !snapshotFailed) // ATTENTION: the 'work' object must not be accessed; it may no longer exist (only the pointer value may be tested, not the memory it points to)
             {
-                switch (localWork.Type)
+                try
                 {
-                case fdwtCreateDir:
-                {
-                    DoCreateDir(localWork, fullName, workDone, needCopyBack, nameBackup, suffix);
-                    break;
-                }
+                    switch (localWork.Type)
+                    {
+                    case fdwtCreateDir:
+                    {
+                        DoCreateDir(localWork, workDone, needCopyBack);
+                        break;
+                    }
 
-                case fdwtCreateFile:
-                case fdwtRetryCreatedFile:
-                case fdwtRetryResumedFile:
-                {
-                    DoCreateFile(localWork, fullName, workDone, needCopyBack, nameBackup, suffix);
-                    break;
-                }
+                    case fdwtCreateFile:
+                    case fdwtRetryCreatedFile:
+                    case fdwtRetryResumedFile:
+                    {
+                        DoCreateFile(localWork, workDone, needCopyBack);
+                        break;
+                    }
 
-                case fdwtCheckOrWriteFile:
-                {
-                    DoCheckOrWriteToFile(localWork, needCopyBack);
-                    break;
-                }
+                    case fdwtCheckOrWriteFile:
+                    {
+                        DoCheckOrWriteToFile(localWork, needCopyBack);
+                        break;
+                    }
 
-                case fdwtCreateAndWriteFile:
-                {
-                    FTPExecuteCreateAndWriteFileDiskWork(localWork, needCopyBack, workDone);
-                    break;
-                }
+                    case fdwtCreateAndWriteFile:
+                    {
+                        FTPExecuteCreateAndWriteFileDiskWork(localWork, needCopyBack, workDone);
+                        break;
+                    }
 
-                case fdwtListDir:
-                {
-                    DoListDirectory(localWork, needCopyBack);
-                    break;
-                }
+                    case fdwtListDir:
+                    {
+                        DoListDirectory(localWork, needCopyBack);
+                        break;
+                    }
 
-                case fdwtDeleteDir:
-                {
-                    DoDeleteDir(localWork, needCopyBack);
-                    break;
-                }
+                    case fdwtDeleteDir:
+                    {
+                        DoDeleteDir(localWork, needCopyBack);
+                        break;
+                    }
 
-                case fdwtOpenFileForReading:
-                {
-                    DoOpenFileForReading(localWork, needCopyBack);
-                    break;
-                }
+                    case fdwtOpenFileForReading:
+                    {
+                        DoOpenFileForReading(localWork, needCopyBack);
+                        break;
+                    }
 
-                case fdwtReadFile:
-                case fdwtReadFileInASCII:
-                {
-                    DoReadFile(localWork, needCopyBack, localWork.Type == fdwtReadFileInASCII);
-                    break;
-                }
+                    case fdwtReadFile:
+                    case fdwtReadFileInASCII:
+                    {
+                        DoReadFile(localWork, needCopyBack, localWork.Type == fdwtReadFileInASCII);
+                        break;
+                    }
 
-                case fdwtDeleteFile:
-                {
-                    DoDeleteFile(localWork, needCopyBack);
-                    break;
-                }
+                    case fdwtDeleteFile:
+                    {
+                        DoDeleteFile(localWork, needCopyBack);
+                        break;
+                    }
 
-                default:
-                    TRACE_E("CFTPDiskThread::Body(): unknown type of work: " << localWork.Type);
-                    break;
+                    default:
+                        TRACE_E("CFTPDiskThread::Body(): unknown type of work: " << localWork.Type);
+                        break;
+                    }
+                }
+                catch (...)
+                {
+                    localWork.ProblemID = ITEMPR_LOWMEM;
+                    localWork.WinError = NO_ERROR;
+                    localWork.State = sqisFailed;
+                    needCopyBack = TRUE;
                 }
             }
 
@@ -2475,10 +2485,13 @@ CFTPDiskThread::Body()
             {
                 if (needCopyBack)
                 {
-                    work->CopyFrom(&localWork); // take over the work results
-                    localWork.NewTgtName = NULL;
-                    localWork.OpenedFile = NULL;
-                    localWork.DiskListing = NULL;
+                    if (snapshotFailed)
+                    {
+                        work->ProblemID = ITEMPR_LOWMEM;
+                        work->State = sqisFailed;
+                    }
+                    else
+                        work->MoveFrom(localWork); // take over the work results without allocating
                 }
             }
             else
@@ -2521,8 +2534,10 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!RemoveDirectory(fullName))
-                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove directory: " << fullName);
+                            std::wstring createdPath;
+                            if (!BuildWideDiskChildPath(createdPath, localWork.Path, localWork.Name) ||
+                                !RemoveDirectoryW(createdPath.c_str()))
+                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove directory");
                         }
                         break;
                     }
@@ -2533,8 +2548,10 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!DeleteFile(fullName)) // the created file cannot have the read-only attribute; otherwise it could not be opened for writing
-                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove file: " << fullName);
+                            std::wstring createdPath;
+                            if (!BuildWideDiskChildPath(createdPath, localWork.Path, localWork.Name) ||
+                                !DeleteFileW(createdPath.c_str())) // the created file cannot have the read-only attribute; otherwise it could not be opened for writing
+                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove file");
                         }
                         break;
                     }
@@ -2543,8 +2560,8 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!DeleteFile(localWork.Name)) // the created file cannot have the read-only attribute
-                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove target file: " << localWork.Name);
+                            if (!DeleteFileW(localWork.DirectFileName.c_str())) // the created file cannot have the read-only attribute
+                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove target file");
                         }
                         // break; // intentionally no break here!
                     }

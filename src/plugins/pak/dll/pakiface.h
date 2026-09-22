@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <windows.h>
+
+#include <cstdarg>
+
 //flags for HandleError
 #define HE_RETRY 0x01
 
@@ -51,7 +55,10 @@ public:
     //'mode' specifies whether it should be opened for reading, writing, or both
     //combination of the PAK_READ_MODE and PAK_WRITE_MODE flags
     //returns TRUE on success
-    virtual BOOL OpenPak(const char* fileName, DWORD mode) = 0;
+    // 'fileName' is the real on-disk PAK path, unlike every other name in
+    // this interface (which are PAK's own byte-domain archive-internal entries) - wide so it
+    // opens correctly under non-ACP-representable folder names.
+    virtual BOOL OpenPak(const wchar_t* fileName, DWORD mode) = 0;
 
     //closes the PAK file
     virtual BOOL ClosePak() = 0;
@@ -100,8 +107,6 @@ public:
     //optimizes the PAK
     virtual BOOL OptimizePak() = 0;
 
-    //creates a message from the parameters passed to 'HandleError()'
-    virtual char* FormatMessage(char* buffer, int errorID, va_list arglist) = 0;
 };
 
 #ifdef PAK_DLL

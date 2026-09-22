@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 enum CCSVParserStatus
 {
     CSVE_OK,
@@ -109,7 +111,7 @@ public:
     // autoFirstRowAsName: detect firstRowAsColumnNames
     // firstRowAsColumnNames: when TRUE, contents of the first row are used as column names
     //                        (used when autoFirstRowAsName == FALSE or detection fails)
-    CCSVParser(const char* filename,
+    CCSVParser(const wchar_t* filename,
                BOOL autoSeparator, CChar separator,
                BOOL autoQualifier, CCSVParserTextQualifier textQualifier,
                BOOL autoFirstRowAsName, BOOL firstRowAsColumnNames);
@@ -142,7 +144,7 @@ private:
 class CCSVParserUTF8 : public CCSVParserBase
 {
 public:
-    CCSVParserUTF8(const char* filename,
+    CCSVParserUTF8(const wchar_t* filename,
                    BOOL autoSeparator, char separator,
                    BOOL autoQualifier, CCSVParserTextQualifier textQualifier,
                    BOOL autoFirstRowAsName, BOOL firstRowAsColumnNames);
@@ -160,6 +162,5 @@ public:
 
 private:
     CCSVParser<char> parser;
-    wchar_t* Buffer;
-    int BufferSize;
+    std::wstring Buffer;
 };

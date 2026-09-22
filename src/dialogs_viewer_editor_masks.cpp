@@ -6,7 +6,7 @@
 
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
-#include "common/widepath.h"
+#include "common/IPathService.h"
 #include "cfgdlg.h"
 #include "darkmode.h"
 #include "dialogs.h"
@@ -19,6 +19,21 @@
 #include "shellib.h"
 
 #include <uxtheme.h>
+
+// this build doesn't define _UNICODE, so <commctrl.h>'s ListView item
+// helpers resolve to the A form only; mirrors the same local macros already used by
+// the dbviewer/pictview plugins for the identical need.
+#define ListView_InsertItemW(hwndLV, pitemW) \
+    ((int)SNDMSG((hwndLV), LVM_INSERTITEMW, 0, (LPARAM)(const LV_ITEMW*)(pitemW)))
+#define ListView_InsertColumnW(hwndLV, iCol, pcolW) \
+    ((int)SNDMSG((hwndLV), LVM_INSERTCOLUMNW, (WPARAM)(int)(iCol), (LPARAM)(const LVCOLUMNW*)(pcolW)))
+#define ListView_SetItemTextW(hwndLV, i, iSubItem_, pszText_) \
+    {                                                         \
+        LV_ITEMW _ms_lvi;                                     \
+        _ms_lvi.iSubItem = iSubItem_;                         \
+        _ms_lvi.pszText = pszText_;                           \
+        SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
+    }
 
 static const UINT_PTR SIZE_RESULTS_COMBO_SKIN_SUBCLASS_ID = 1;
 static const UINT_PTR SIZE_RESULTS_COMBO_EDIT_SKIN_SUBCLASS_ID = 1;
@@ -519,35 +534,15 @@ static LRESULT CALLBACK SizeResultsComboSkinSubclassProc(HWND hwnd, UINT uMsg, W
 
 static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePath, std::wstring& path)
 {
-    DWORD capacity = MAX_PATH;
-    for (;;)
-    {
-        std::wstring modulePath;
-        modulePath.resize(capacity);
-
-        SetLastError(ERROR_SUCCESS);
-        DWORD len = GetModuleFileNameW(module, &modulePath[0], capacity);
-        if (len == 0)
-            return FALSE;
-
-        DWORD err = GetLastError();
-        // Some Windows versions report truncation as capacity - 1 plus ERROR_INSUFFICIENT_BUFFER.
-        BOOL truncated = len >= capacity || (len == capacity - 1 && err == ERROR_INSUFFICIENT_BUFFER);
-        if (!truncated)
-        {
-            modulePath.resize(len);
-            size_t slash = modulePath.find_last_of(L"\\/");
-            if (slash == std::wstring::npos)
-                return FALSE;
-            path.assign(modulePath, 0, slash + 1);
-            path.append(relativePath);
-            return TRUE;
-        }
-
-        if (capacity >= SAL_MAX_LONG_PATH)
-            return FALSE;
-        capacity = capacity > SAL_MAX_LONG_PATH / 2 ? SAL_MAX_LONG_PATH : capacity * 2;
-    }
+    std::wstring modulePath;
+    if (gPathService == NULL || !gPathService->GetModuleFileName(module, modulePath).success)
+        return FALSE;
+    const size_t slash = modulePath.find_last_of(L"\\/");
+    if (slash == std::wstring::npos)
+        return FALSE;
+    path.assign(modulePath, 0, slash + 1);
+    path.append(relativePath);
+    return TRUE;
 }
 
 //****************************************************************************
@@ -558,10 +553,10 @@ static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePa
 // this number keeps growing - is used as a source for unique IDs
 DWORD ViewerHandlerID = 0;
 
-CViewerMasksItem::CViewerMasksItem(const char* masks, const char* command, const char* arguments, const char* initDir,
+CViewerMasksItem::CViewerMasksItem(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir,
                                    int viewerType, BOOL oldType)
 {
-    CALL_STACK_MESSAGE7("CViewerMasksItem(%s, %s, %s, %s, %d, %d)",
+    CALL_STACK_MESSAGE7("CViewerMasksItem(%ls, %ls, %ls, %ls, %d, %d)",
                         masks, command, arguments, initDir, viewerType, oldType);
     OldType = oldType;
     Masks = NULL;
@@ -577,7 +572,7 @@ CViewerMasksItem::CViewerMasksItem()
     ViewerType = VIEWER_EXTERNAL;
     HandlerID = ViewerHandlerID++;
     OldType = FALSE;
-    Set("", "", "\"$(Name)\"", "$(FullPath)");
+    Set(L"", L"", L"\"$(Name)\"", L"$(FullPath)");
 }
 
 CViewerMasksItem::CViewerMasksItem(CViewerMasksItem& item)
@@ -601,9 +596,9 @@ BOOL CViewerMasksItem::IsGood()
     return Masks != NULL;
 }
 
-BOOL CViewerMasksItem::Set(const char* masks, const char* command, const char* arguments, const char* initDir)
+BOOL CViewerMasksItem::Set(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir)
 {
-    CALL_STACK_MESSAGE5("CViewerMasksItem::Set(%s, %s, %s, %s)", masks, command, arguments, initDir);
+    CALL_STACK_MESSAGE5("CViewerMasksItem::Set(%ls, %ls, %ls, %ls)", masks, command, arguments, initDir);
 
     if (Masks == NULL)
         Masks = new CMaskGroup;
@@ -655,9 +650,9 @@ BOOL CViewerMasks::Load(CViewerMasks& source)
 // this number keeps growing - is used as a source for unique IDs
 DWORD EditorHandlerID = 0;
 
-CEditorMasksItem::CEditorMasksItem(char* masks, char* command, char* arguments, char* initDir)
+CEditorMasksItem::CEditorMasksItem(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir)
 {
-    CALL_STACK_MESSAGE5("CEditorMasksItem(%s, %s, %s, %s)", masks, command, arguments, initDir);
+    CALL_STACK_MESSAGE5("CEditorMasksItem(%ls, %ls, %ls, %ls)", masks, command, arguments, initDir);
     Masks = new CMaskGroup;
     HandlerID = EditorHandlerID++;
     Set(masks, command, arguments, initDir);
@@ -668,7 +663,7 @@ CEditorMasksItem::CEditorMasksItem()
     CALL_STACK_MESSAGE1("CEditorMasksItem()");
     Masks = new CMaskGroup;
     HandlerID = EditorHandlerID++;
-    Set("", "", "\"$(Name)\"", "$(FullPath)");
+    Set(L"", L"", L"\"$(Name)\"", L"$(FullPath)");
 }
 
 CEditorMasksItem::CEditorMasksItem(CEditorMasksItem& item)
@@ -685,9 +680,9 @@ CEditorMasksItem::~CEditorMasksItem()
         delete Masks;
 }
 
-BOOL CEditorMasksItem::Set(const char* masks, const char* command, const char* arguments, const char* initDir)
+BOOL CEditorMasksItem::Set(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir)
 {
-    CALL_STACK_MESSAGE5("CEditorMasksItem::Set(%s, %s, %s, %s)", masks, command, arguments, initDir);
+    CALL_STACK_MESSAGE5("CEditorMasksItem::Set(%ls, %ls, %ls, %ls)", masks, command, arguments, initDir);
     if (Masks != NULL)
         Masks->SetMasksString(masks);
     Command = command;
@@ -838,9 +833,8 @@ CSizeResultsDlg::CSizeResultsDlg(HWND parent, const CQuadWord& size, const CQuad
 
 void CSizeResultsDlg::UpdateEstimate()
 {
-    char buf[100];
-    SendDlgItemMessage(HWindow, IDC_EST_CLUSTER, WM_GETTEXT, 11, (LPARAM)buf);
-    int bytesPerCluster = atoi(buf);
+    const std::wstring clusterText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_EST_CLUSTER));
+    int bytesPerCluster = _wtoi(clusterText.c_str());
 
     if (Sizes != NULL && Sizes->IsGood() && bytesPerCluster > 0)
     {
@@ -857,16 +851,15 @@ void CSizeResultsDlg::UpdateEstimate()
                          CQuadWord(bytesPerCluster - 1, 0);
         }
 
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_SIZE), PrintDiskSize(buf, estimated, 1));
+        SetWindowTextW(GetDlgItem(HWindow, IDC_EST_SIZE), PrintDiskSize(estimated, 1).c_str());
 
-        if (estimated == CQuadWord(0, 0))
-            strcpy(buf, "0 %");
-        else
+        std::wstring utilizationText = L"0 %";
+        if (estimated != CQuadWord(0, 0))
         {
-            sprintf(buf, "%-1.4lg %%", 100 * Size.GetDouble() / estimated.GetDouble());
-            PointToLocalDecimalSeparator(buf, _countof(buf));
+            utilizationText = FormatStrW(L"%-1.4lg %%", 100 * Size.GetDouble() / estimated.GetDouble());
+            PointToLocalDecimalSeparator(utilizationText);
         }
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_UTIL), buf);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_EST_UTIL), utilizationText.c_str());
 
         EnableWindow(GetDlgItem(HWindow, IDC_EST_SIZE), TRUE);
         EnableWindow(GetDlgItem(HWindow, IDC_EST_UTIL), TRUE);
@@ -875,8 +868,8 @@ void CSizeResultsDlg::UpdateEstimate()
     {
         EnableWindow(GetDlgItem(HWindow, IDC_EST_SIZE), FALSE);
         EnableWindow(GetDlgItem(HWindow, IDC_EST_UTIL), FALSE);
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_SIZE), UnknownText);
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_UTIL), UnknownText);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_EST_SIZE), UnknownText.c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDC_EST_UTIL), UnknownText.c_str());
     }
 }
 
@@ -902,31 +895,28 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_INITDIALOG:
     {
-        GetDlgItemText(HWindow, IDS_OCCUPIED, UnknownText, 100); // obtain the "unknown" string for later use
+        UnknownText = GetWindowTextStringW(GetDlgItem(HWindow, IDS_OCCUPIED));
 
-        char buf[100];
-
-        SetWindowText(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(buf, CQuadWord(Files, 0)));
-        SetWindowText(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(buf, CQuadWord(Dirs, 0)));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(CQuadWord(Files, 0)).c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(CQuadWord(Dirs, 0)).c_str());
 
         if (Occupied != CQuadWord(-1, -1))
         {
-            SetWindowText(GetDlgItem(HWindow, IDS_OCCUPIED), PrintDiskSize(buf, Occupied, 1));
-            if (Occupied == CQuadWord(0, 0))
-                strcpy(buf, "0 %");
-            else
+            SetWindowTextW(GetDlgItem(HWindow, IDS_OCCUPIED), PrintDiskSize(Occupied, 1).c_str());
+            std::wstring utilizationText = L"0 %";
+            if (Occupied != CQuadWord(0, 0))
             {
                 double result = 100 * Size.GetDouble() / Occupied.GetDouble();
                 // patch for a 2GB sparse file where 3.052e+006 % was shown instead of 3051757.83 %
                 // for values above 1000, lg prints exponential form so we use lf
                 // for smaller numbers lg is better because it prints 100 rather than 100.00
                 if (result > 1000)
-                    sprintf(buf, "%-1.2lf %%", result);
+                    utilizationText = FormatStrW(L"%-1.2lf %%", result);
                 else
-                    sprintf(buf, "%-1.4lg %%", result);
-                PointToLocalDecimalSeparator(buf, _countof(buf));
+                    utilizationText = FormatStrW(L"%-1.4lg %%", result);
+                PointToLocalDecimalSeparator(utilizationText);
             }
-            SetWindowText(GetDlgItem(HWindow, IDS_DISKUTILIZATION), buf);
+            SetWindowTextW(GetDlgItem(HWindow, IDS_DISKUTILIZATION), utilizationText.c_str());
         }
         else
         {
@@ -934,20 +924,17 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             EnableWindow(GetDlgItem(HWindow, IDS_DISKUTILIZATION), FALSE);
         }
 
-        SetWindowText(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(buf, Size, 1));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(Size, 1).c_str());
         if (Compressed != CQuadWord(-1, -1))
         {
-            SetWindowText(GetDlgItem(HWindow, IDS_COMPSIZE), PrintDiskSize(buf, Compressed, 1));
-            if (Size == CQuadWord(0, 0))
+            SetWindowTextW(GetDlgItem(HWindow, IDS_COMPSIZE), PrintDiskSize(Compressed, 1).c_str());
+            std::wstring ratioText = L"100 %";
+            if (Size != CQuadWord(0, 0))
             {
-                strcpy(buf, "100 %");
+                ratioText = FormatStrW(L"%-1.4lg %%", 100 * Compressed.GetDouble() / Size.GetDouble());
+                PointToLocalDecimalSeparator(ratioText);
             }
-            else
-            {
-                sprintf(buf, "%-1.4lg %%", 100 * Compressed.GetDouble() / Size.GetDouble());
-                PointToLocalDecimalSeparator(buf, _countof(buf));
-            }
-            SetWindowText(GetDlgItem(HWindow, IDS_COMPRATIO), buf);
+            SetWindowTextW(GetDlgItem(HWindow, IDS_COMPRATIO), ratioText.c_str());
         }
         else
         {
@@ -961,8 +948,13 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CFilesWindow* panel = MainWindow->GetNonActivePanel();
         if (panel->Is(ptDisk))
         {
+            // wide - same reparse-point-resolves-the-whole-path issue as
+            // CFilesWindow::RefreshDiskFreeSpace; GetPathW() is the authoritative source
+            // (fileswnd.h), the removed ANSI mirror a CP_ACP rendering that silently failed this
+            // probe for a non-ASCII path component, leaving clusterSize at its CD-sized
+            // 2048 default on an ordinary NTFS volume.
             DWORD sectorsPerCluster, bytesPerSector, numberOfFreeClusters, totalNumberOfClusters;
-            if (MyGetDiskFreeSpace(MainWindow->GetNonActivePanel()->GetPath(),
+            if (MyGetDiskFreeSpaceW(MainWindow->GetNonActivePanel()->GetPathW(),
                                    &sectorsPerCluster, &bytesPerSector,
                                    &numberOfFreeClusters, &totalNumberOfClusters))
             {
@@ -979,8 +971,9 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int i;
         for (i = 0; arr[i] != -1; i++)
         {
-            itoa(arr[i], buf, 10);
-            SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buf);
+            const std::wstring clusterText = std::to_wstring(arr[i]);
+            SendMessageW(hCombo, CB_ADDSTRING, 0,
+                         (LPARAM)clusterText.c_str());
             if (clusterSize == arr[i])
                 selIndex = i;
         }
@@ -989,8 +982,9 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SendMessage(hCombo, CB_SETCURSEL, selIndex, 0);
         else
         {
-            itoa(clusterSize, buf, 10);
-            SendMessage(hCombo, WM_SETTEXT, 0, (LPARAM)buf);
+            const std::wstring clusterText = std::to_wstring(clusterSize);
+            SendMessageW(hCombo, WM_SETTEXT, 0,
+                         (LPARAM)clusterText.c_str());
         }
 
         if (Sizes == NULL || !Sizes->IsGood())
@@ -1041,19 +1035,16 @@ void CSelectDialog::Validate(CTransferInfo& ti)
     {
         if (ti.Type == ttDataFromWindow)
         {
-            CPathBuffer buf; // Heap-allocated for long path support
-            strcpy(buf, Mask); // backup
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)Mask);
-            CMaskGroup mask(Mask);
+            const std::wstring candidate = GetWindowTextStringW(hWnd);
+            CMaskGroup mask(candidate.c_str());
             int errorPos;
             if (!mask.PrepareMasks(errorPos))
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
                 SetFocus(hWnd);
-                SendMessage(hWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
+                SendMessageW(hWnd, CB_SETEDITSEL, 0, MAKELPARAM(errorPos, errorPos + 1));
                 ti.ErrorOn(IDE_FILEMASK);
             }
-            strcpy(Mask, buf); // restoration
         }
     }
 }
@@ -1061,20 +1052,19 @@ void CSelectDialog::Validate(CTransferInfo& ti)
 void CSelectDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CSelectDialog::Transfer()");
-    char** history = Configuration.SelectHistory;
+    wchar_t** history = Configuration.SelectHistory;
     HWND hWnd;
     if (ti.GetControl(hWnd, IDE_FILEMASK))
     {
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, SELECT_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, MAX_PATH - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Mask);
+            SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Mask.c_str());
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)Mask);
-            AddValueToStdHistoryValues(history, SELECT_HISTORY_SIZE, Mask, FALSE);
+            Mask = GetWindowTextStringW(hWnd);
+            AddValueToStdHistoryValues(history, SELECT_HISTORY_SIZE, Mask.c_str(), FALSE);
         }
     }
 }
@@ -1091,7 +1081,7 @@ CSelectDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         break;
     }
@@ -1113,22 +1103,26 @@ CImportConfigDialog::~CImportConfigDialog()
 {
 }
 
-extern const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT];
+extern const wchar_t* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT];
 
 void CImportConfigDialog::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
-        char buff[5000];
-        char buff2[5000];
+        wchar_t buff[5000];
+        wchar_t buff2[5000];
 
         // CAPTION: Welcome to %s
-        GetWindowText(HWindow, buff, 5000);
-        _snprintf_s(buff2, _TRUNCATE, buff, SALAMANDER_TEXT_VERSION);
-        SetWindowText(HWindow, buff2);
+        GetWindowTextW(HWindow, buff, 5000);
+        // SALAMANDER_TEXT_VERSIONW(), not SALAMANDER_TEXT_VERSION: the format string and the
+        // destination are wide, and feeding the narrow spelling to a %s of a wide printf reads the
+        // rdata bytes two at a time - "Sally 5.0" came out as CJK and kept going past the literal
+        // until a wide NUL happened to appear. consts.h carries both spellings side by side.
+        _snwprintf_s(buff2, _TRUNCATE, buff, SALAMANDER_TEXT_VERSIONW());
+        SetWindowTextW(HWindow, buff2);
 
         // COMBOBOX Import Configuration
-        SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_IMPORTCFG_DEFCFG));
+        SendDlgItemMessageW(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_IMPORTCFG_DEFCFG));
         int selIndex = 0; // use the default item if nothing better is found
         int i;
         for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
@@ -1136,15 +1130,15 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
             if (ConfigurationExist[i])
             {
                 // detect whether this is "Sally", "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
-                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], "Sally") != NULL;
-                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
-                const char* name = sally              ? "Sally %s"
-                                   : openSalamander   ? "Open Salamander %s"
-                                   : altapSalamander  ? "Altap Salamander %s"
-                                                      : "Servant Salamander %s";
-                sprintf(buff, name, SalamanderConfigurationVersions[i]);
-                SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
+                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], L"Sally") != NULL;
+                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], L"Open Salamander") != NULL;
+                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], L"Altap Salamander") != NULL;
+                const wchar_t* name = sally              ? L"Sally %s"
+                                   : openSalamander   ? L"Open Salamander %s"
+                                   : altapSalamander  ? L"Altap Salamander %s"
+                                                      : L"Servant Salamander %s";
+                _snwprintf_s(buff, _TRUNCATE, name, SalamanderConfigurationVersions[i]);
+                SendDlgItemMessageW(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
                 if (selIndex == 0)
                     selIndex = 1; // the last configuration becomes default
             }
@@ -1153,7 +1147,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         {
             EnableWindow(GetDlgItem(HWindow, IDC_IMPORTCONFIG), FALSE);
         }
-        SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_SETCURSEL, selIndex, NULL);
+        SendDlgItemMessageW(HWindow, IDC_IMPORTCONFIG, CB_SETCURSEL, selIndex, NULL);
 
         // LISTVIEW Remove Configuration
         HWND hListView = GetDlgItem(HWindow, IDC_REMOVECONFIG);
@@ -1163,23 +1157,23 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         {
             if (ConfigurationExist[i])
             {
-                LVITEM lvi;
+                LVITEMW lvi;
                 lvi.mask = LVIF_TEXT | LVIF_STATE;
                 lvi.iItem = index;
                 lvi.iSubItem = 0;
                 lvi.state = 0;
 
                 // detect whether this is "Sally", "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
-                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], "Sally") != NULL;
-                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
-                const char* name = sally              ? "Sally %s"
-                                   : openSalamander   ? "Open Salamander %s"
-                                   : altapSalamander  ? "Altap Salamander %s"
-                                                      : "Servant Salamander %s";
-                sprintf(buff, name, SalamanderConfigurationVersions[i]);
+                BOOL sally = StrIStr(SalamanderConfigurationRoots[i], L"Sally") != NULL;
+                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], L"Open Salamander") != NULL;
+                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], L"Altap Salamander") != NULL;
+                const wchar_t* name = sally              ? L"Sally %s"
+                                   : openSalamander   ? L"Open Salamander %s"
+                                   : altapSalamander  ? L"Altap Salamander %s"
+                                                      : L"Servant Salamander %s";
+                _snwprintf_s(buff, _TRUNCATE, name, SalamanderConfigurationVersions[i]);
                 lvi.pszText = buff;
-                ListView_InsertItem(hListView, &lvi);
+                ListView_InsertItemW(hListView, &lvi);
                 index++;
                 if (selIndex == -1)
                 {
@@ -1193,7 +1187,7 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
     else
     {
         // COMBOBOX Import Configuration
-        int sel = (int)SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_GETCURSEL, 0, NULL);
+        int sel = (int)SendDlgItemMessageW(HWindow, IDC_IMPORTCONFIG, CB_GETCURSEL, 0, NULL);
         if (sel > 0)
         {
             sel--; // the first item is Don't import
@@ -1250,13 +1244,13 @@ CImportConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ListView_SetExtendedListViewStyle(hListView, origFlags | exFlags); // 4.71
 
         // add the Name column to the listview with columns
-        LVCOLUMN lvc;
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_FMT;
-        char buff[] = "aa";
+        wchar_t buff[] = L"aa";
         lvc.pszText = buff;
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(hListView, 0, &lvc);
+        ListView_InsertColumnW(hListView, 0, &lvc);
         ListView_SetColumnWidth(hListView, 0, LVSCW_AUTOSIZE);
 
         return ret;
@@ -1270,16 +1264,15 @@ CImportConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CLanguageSelectorDialog
 //
 
-CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, char* slgName, const char* pluginName)
-    : CCommonDialog(NULL, pluginName == NULL ? IDD_SLGSELECTOR : IDD_SLGSELECTORPLUG, hParent), Items(5, 5)
+CLanguageSelectorDialog::CLanguageSelectorDialog(HWND hParent, std::wstring& slgName, const wchar_t* pluginName)
+    : CCommonDialog(NULL, pluginName == NULL ? IDD_SLGSELECTOR : IDD_SLGSELECTORPLUG, hParent), Items(5, 5), SLGName(slgName)
 {
     Web = NULL;
-    SLGName = slgName;
     OpenedFromConfiguration = hParent != NULL && pluginName == NULL;
     OpenedForPlugin = pluginName != NULL;
     HListView = NULL;
     PluginName = pluginName;
-    ExitButtonLabel[0] = 0;
+    ExitButtonLabel.clear();
 }
 
 CLanguageSelectorDialog::~CLanguageSelectorDialog()
@@ -1300,16 +1293,23 @@ int CLanguageSelectorDialog::Execute()
     else
     {
         // load the template from the best available SLG
-        int index = GetPreferredLanguageIndex(SLGName);
+        int index = GetPreferredLanguageIndex(SLGName.c_str());
         std::wstring pathW;
-        std::wstring slgNameW = AnsiToWide(Items[index].FileName);
+        // Items[].FileName is already wchar_t*; the AnsiToWide here was
+        // the conversion layer applied to wide data (silent-failure class #2).
+        std::wstring slgNameW = Items[index].FileName;
         if (BuildModuleRelativePathW(HInstance, (L"lang\\" + slgNameW).c_str(), pathW))
             hTmpLanguage = HANDLES(LoadLibraryW(pathW.c_str()));
         if (hTmpLanguage != NULL)
             Modul = hTmpLanguage;
     }
-    if (!LoadString(Modul, IDS_SELLANGEXITBUTTON, ExitButtonLabel, 100))
-        strcpy(ExitButtonLabel, "Exit");
+    const wchar_t* exitButtonLabel = NULL;
+    const int exitButtonLabelLength = LoadStringW(Modul, IDS_SELLANGEXITBUTTON,
+                                                   reinterpret_cast<wchar_t*>(&exitButtonLabel), 0);
+    if (exitButtonLabelLength > 0)
+        ExitButtonLabel.assign(exitButtonLabel, exitButtonLabelLength);
+    else
+        ExitButtonLabel = L"Exit";
     int ret = (int)CCommonDialog::Execute();
     if (hTmpLanguage != NULL)
     {
@@ -1320,20 +1320,20 @@ int CLanguageSelectorDialog::Execute()
     return ret;
 }
 
-BOOL CLanguageSelectorDialog::GetSLGName(char* path, int index)
+BOOL CLanguageSelectorDialog::GetSLGName(std::wstring& path, int index)
 {
     if (index >= Items.Count)
         return FALSE;
-    lstrcpy(path, Items[index].FileName);
+    path = Items[index].FileName;
     return TRUE;
 }
 
-BOOL CLanguageSelectorDialog::SLGNameExists(const char* slgName)
+BOOL CLanguageSelectorDialog::SLGNameExists(const wchar_t* slgName)
 {
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (StrICmp(Items[i].FileName, slgName) == 0)
+        if (StrICmpW(Items[i].FileName, slgName) == 0)
             return TRUE;
     }
     return FALSE;
@@ -1345,14 +1345,14 @@ void CLanguageSelectorDialog::FillControls()
     if (index != -1)
     {
         SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW);
-        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web);
+        SetDlgItemTextW(HWindow, IDC_SLG_WEB, Items[index].Web);
         SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW);
         if (PluginName == NULL)
-            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
+            SetDlgItemTextW(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
         if (Web != NULL)
         {
-            char buff[300];
-            sprintf(buff, "http://%s", Items[index].Web);
+            wchar_t buff[300];
+            swprintf_s(buff, _countof(buff), L"http://%s", Items[index].Web);
             Web->SetActionOpen(buff);
         }
     }
@@ -1360,23 +1360,27 @@ void CLanguageSelectorDialog::FillControls()
 
 void CLanguageSelectorDialog::LoadListView()
 {
-    char buff[500];
+    wchar_t buff[500];
+    // wide - GetLanguageName narrows a language's own native display
+    // name through CP_ACP; this dialog already sets other controls wide
+    // (FillControls's SetDlgItemTextW for Author/Comment), so it's wide-capable.
+    wchar_t buffW[200];
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        LVITEM lvi;
+        LVITEMW lvi;
         lvi.mask = 0;
         lvi.iItem = i;
         lvi.iSubItem = 0;
-        ListView_InsertItem(HListView, &lvi);
+        ListView_InsertItemW(HListView, &lvi);
 
-        Items[i].GetLanguageName(buff, 200);
-        ListView_SetItemText(HListView, i, 0, buff);
-        sprintf(buff, "lang\\%s", Items[i].FileName);
-        ListView_SetItemText(HListView, i, 1, buff);
+        Items[i].GetLanguageName(buffW, 200);
+        ListView_SetItemTextW(HListView, i, 0, buffW);
+        swprintf_s(buff, _countof(buff), L"lang\\%s", Items[i].FileName);
+        ListView_SetItemTextW(HListView, i, 1, buff);
     }
 
-    int preferredIndex = GetPreferredLanguageIndex(SLGName);
+    int preferredIndex = GetPreferredLanguageIndex(SLGName.c_str());
     DWORD state = LVIS_SELECTED | LVIS_FOCUSED;
     ListView_SetItemState(HListView, preferredIndex, state, state);
     ListView_EnsureVisible(HListView, preferredIndex, FALSE);
@@ -1404,45 +1408,45 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index != -1)
         {
-            lstrcpy(SLGName, Items[index].FileName);
+            SLGName = Items[index].FileName;
             if (PluginName != NULL) // store the alternative language name only when selecting an alternative language for a plug-in
             {
                 if (Configuration.UseAsAltSLGInOtherPlugins)
-                    lstrcpy(Configuration.AltPluginSLGName, SLGName);
+                    Configuration.AltPluginSLGName = SLGName;
                 else
-                    Configuration.AltPluginSLGName[0] = 0;
+                    Configuration.AltPluginSLGName.clear();
             }
         }
     }
 }
 
-BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pluginDLL)
+BOOL CLanguageSelectorDialog::Initialize(const wchar_t* slgSearchPath, HINSTANCE pluginDLL)
 {
-    CPathBuffer path; // Heap-allocated for long path support
-    std::wstring pathW;
-    BOOL useWideSearchPath = FALSE;
+    std::wstring path;
     if (slgSearchPath == NULL)
     {
-        if (!BuildModuleRelativePathW(NULL, L"lang\\*.slg", pathW))
+        if (!BuildModuleRelativePathW(NULL, L"lang\\*.slg", path))
             return FALSE;
-        useWideSearchPath = TRUE;
     }
     else
-        lstrcpyn(path, slgSearchPath, path.Size());
+        path = slgSearchPath;
 
     WIN32_FIND_DATAW file;
-    HANDLE hFind = useWideSearchPath ? SalFindFirstFileWideH(pathW.c_str(), &file) : SalFindFirstFileHW(path, &file);
+    HANDLE hFind = SalFindFirstFileHW(path.c_str(), &file);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
         {
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-            char* point = strrchr(cFileNameA, '.');
-            if (point != NULL && stricmp(point + 1, "slg") == 0) // it was returning *.slg*
+            // cFileNameA was ALREADY wchar_t[] - the WideCharToMultiByte here
+            // narrowed file.cFileName through CP_ACP only to hand it straight back to wide
+            // consumers, and any .slg whose name CP_ACP cannot represent would have been
+            // dropped. Renamed to say what it holds.
+            const wchar_t* cFileName = file.cFileName;
+            const wchar_t* point = wcsrchr(cFileName, L'.');
+            if (point != NULL && _wcsicmp(point + 1, L"slg") == 0) // it was returning *.slg*
             {
                 CLanguage lang;
-                if (lang.Init(cFileNameA, pluginDLL))
+                if (lang.Init(cFileName, pluginDLL))
                 {
                     Items.Add(lang);
                     if (!Items.IsGood())
@@ -1454,12 +1458,12 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
                 }
             }
         } while (SalLPFindNextFile(hFind, &file));
-        HANDLES(FindClose(hFind));
+        SalLPFindClose(hFind);
     }
     return TRUE;
 }
 
-int CLanguageSelectorDialog::GetPreferredLanguageIndex(const char* selectSLGName, BOOL exactMatch)
+int CLanguageSelectorDialog::GetPreferredLanguageIndex(const wchar_t* selectSLGName, BOOL exactMatch)
 {
     WORD langID = GetUserDefaultUILanguage();
 
@@ -1470,13 +1474,13 @@ int CLanguageSelectorDialog::GetPreferredLanguageIndex(const char* selectSLGName
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        if (selectSLGName != NULL && stricmp(Items[i].FileName, selectSLGName) == 0)
+        if (selectSLGName != NULL && _wcsicmp(Items[i].FileName, selectSLGName) == 0)
             return i;
         if (localeIndex == -1 && Items[i].LanguageID == langID)
             localeIndex = i;
         if (primarylocaleIndex == -1 && PRIMARYLANGID(Items[i].LanguageID) == primaryID)
             primarylocaleIndex = i;
-        if (stricmp(Items[i].FileName, "english.slg") == 0)
+        if (_wcsicmp(Items[i].FileName, L"english.slg") == 0)
             englishIndex = i;
     }
     if (localeIndex == -1)
@@ -1524,23 +1528,23 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (!OpenedFromConfiguration && !OpenedForPlugin)
         {
             // put the program name in the title since this is the first window the user sees
-            SetWindowText(HWindow, MAINWINDOW_NAME);
+            SetWindowTextW(HWindow, L"Sally");
         }
         else
         {
             if (PluginName != NULL)
             {
                 // put the plug-in name in the title so the user knows which plug-in the language is for
-                char buf[200];
-                _snprintf_s(buf, _TRUNCATE, "%s: ", PluginName);
+                wchar_t buf[200];
+                _snwprintf_s(buf, _TRUNCATE, L"%s: ", PluginName);
                 buf[99] = 0; // use only 100 characters for the plug-in name so some space remains for the original title dialog
-                int len = (int)strlen(buf);
-                if (GetWindowText(HWindow, buf + len, 200 - len))
-                    SetWindowText(HWindow, buf);
+                int len = (int)wcslen(buf);
+                if (GetWindowTextW(HWindow, buf + len, 200 - len))
+                    SetWindowTextW(HWindow, buf);
             }
         }
         if (!OpenedFromConfiguration && PluginName == NULL) // turn the Cancel button into Exit
-            SetDlgItemText(HWindow, IDCANCEL, ExitButtonLabel);
+            SetDlgItemTextW(HWindow, IDCANCEL, ExitButtonLabel.c_str());
         if (PluginName != NULL) // disable closing
             EnableMenuItem(GetSystemMenu(HWindow, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
 
@@ -1553,19 +1557,19 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ListView_SetExtendedListViewStyle(HListView, origFlags | exFlags); // 4.71
 
         // add the Language and Path columns to the listview
-        char buff[100];
-        LVCOLUMN lvc;
+        wchar_t buff[100];
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_SUBITEM;
         lvc.pszText = buff;
         lvc.iSubItem = 0;
-        GetDlgItemText(HWindow, IDC_SLG_DESCR, buff, 100);
+        GetDlgItemTextW(HWindow, IDC_SLG_DESCR, buff, 100);
         DestroyWindow(GetDlgItem(HWindow, IDC_SLG_DESCR));
-        ListView_InsertColumn(HListView, 0, &lvc);
+        ListView_InsertColumnW(HListView, 0, &lvc);
 
         lvc.iSubItem = 1;
-        GetDlgItemText(HWindow, IDC_SLG_PATH, buff, 100);
+        GetDlgItemTextW(HWindow, IDC_SLG_PATH, buff, 100);
         DestroyWindow(GetDlgItem(HWindow, IDC_SLG_PATH));
-        ListView_InsertColumn(HListView, 1, &lvc);
+        ListView_InsertColumnW(HListView, 1, &lvc);
 
         // under W2K when launched via a shortcut set to MAXIMIZED
         // the dialog appeared maximized; SC_RESTORE fixes it
@@ -1579,7 +1583,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (PluginName != NULL && LOWORD(wParam) == IDCANCEL)
             return 0;
         if (LOWORD(wParam) == IDB_GETMORELANGS)
-            ShellExecute(HWindow, "open", "https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecuteW(HWindow, L"open", L"https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
         if (LOWORD(wParam) == IDB_REFRESHLANGS)
         {
             ListView_DeleteAllItems(HListView);
@@ -1590,9 +1594,11 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             Initialize();
             if (GetLanguagesCount() == 0) // should not happen because this dialog is loaded from the .slg module (that .slg cannot be deleted)
             {
-                MessageBox(HWindow, "Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                                    "Please reinstall Open Salamander.",
-                           SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+                // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already
+                // used at the equivalent startup-time check in sally_entry_lifecycle.cpp (198).
+                MessageBoxW(HWindow, L"Unable to find any language file (.SLG) in subdirectory LANG.\n"
+                                     L"Please reinstall Open Salamander.",
+                            SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
                 TRACE_E("CLanguageSelectorDialog: unexpected situation (no language file): calling ExitProcess(667).");
                 //          ExitProcess(667);
                 TerminateProcess(GetCurrentProcess(), 667); // harder exit (this call still performs some operations)
@@ -1669,28 +1675,31 @@ void CSkillLevelDialog::Transfer(CTransferInfo& ti)
 // CCompareArgsDlg
 //
 
-CCompareArgsDlg::CCompareArgsDlg(HWND parent, BOOL comparingFiles, char* compareName1,
-                                 char* compareName2, int* cnfrmShowNamesToCompare)
-    : CCommonDialog(HLanguage, IDD_USERMENUCOMPAREARGS, comparingFiles ? IDH_USERMENUCOMPAREARGS_F : IDH_USERMENUCOMPAREARGS_D, parent)
+CCompareArgsDlg::CCompareArgsDlg(HWND parent, BOOL comparingFiles, std::wstring& compareName1,
+                                 std::wstring& compareName2, int* cnfrmShowNamesToCompare)
+    // unicodeWnd=TRUE. DialogProc sets this dialog's own caption with
+    // SetWindowTextW, and on an ANSI-class dialog USER32 converts that straight
+    // back through CP_ACP - so the wide call was silently doing nothing. The
+    // caption is class-bound, unlike the SetDlgItemTextW calls beside it, which
+    // reach standard child controls that USER32 registers wide either way.
+    : CCommonDialog(HLanguage, IDD_USERMENUCOMPAREARGS, comparingFiles ? IDH_USERMENUCOMPAREARGS_F : IDH_USERMENUCOMPAREARGS_D, parent,
+                    ooStandard, NULL),
+      ComparingFiles(comparingFiles), CompareName1(compareName1), CompareName2(compareName2),
+      CnfrmShowNamesToCompare(cnfrmShowNamesToCompare)
 {
-    ComparingFiles = comparingFiles;
-    CompareName1 = compareName1;
-    CompareName2 = compareName2;
-    CnfrmShowNamesToCompare = cnfrmShowNamesToCompare;
 }
 
 void CCompareArgsDlg::Validate(CTransferInfo& ti)
 {
-    CPathBuffer buf; // Heap-allocated for long path support
-    ti.EditLine(IDE_UMC_NAME1, buf, buf.Size());
-    if (buf[0] == 0)
+    std::wstring value = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UMC_NAME1));
+    if (value.empty())
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
         ti.ErrorOn(IDE_UMC_NAME1);
         return;
     }
-    ti.EditLine(IDE_UMC_NAME2, buf, buf.Size());
-    if (buf[0] == 0)
+    value = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UMC_NAME2));
+    if (value.empty())
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_FF_EMPTYSTRING));
         ti.ErrorOn(IDE_UMC_NAME2);
@@ -1700,8 +1709,16 @@ void CCompareArgsDlg::Validate(CTransferInfo& ti)
 
 void CCompareArgsDlg::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDE_UMC_NAME1, CompareName1, SAL_MAX_LONG_PATH);
-    ti.EditLine(IDE_UMC_NAME2, CompareName2, SAL_MAX_LONG_PATH);
+    if (ti.Type == ttDataToWindow)
+    {
+        SetDlgItemTextW(HWindow, IDE_UMC_NAME1, CompareName1.c_str());
+        SetDlgItemTextW(HWindow, IDE_UMC_NAME2, CompareName2.c_str());
+    }
+    else
+    {
+        CompareName1 = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UMC_NAME1));
+        CompareName2 = GetWindowTextStringW(GetDlgItem(HWindow, IDE_UMC_NAME2));
+    }
 
     int c = !*CnfrmShowNamesToCompare;
     ti.CheckBox(IDC_UMC_SHOWTHISDLG, c);
@@ -1717,13 +1734,13 @@ CCompareArgsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!ComparingFiles)
         {
-            SetWindowText(HWindow, LoadStr(IDS_USERMENUCOMPAREARGSTITLE));
-            SetDlgItemText(HWindow, IDT_UMC_NAME1, LoadStr(IDS_USERMENUCOMPAREARG1));
-            SetDlgItemText(HWindow, IDT_UMC_NAME2, LoadStr(IDS_USERMENUCOMPAREARG2));
+            SetWindowTextW(HWindow, LoadStrW(IDS_USERMENUCOMPAREARGSTITLE));
+            SetDlgItemTextW(HWindow, IDT_UMC_NAME1, LoadStrW(IDS_USERMENUCOMPAREARG1));
+            SetDlgItemTextW(HWindow, IDT_UMC_NAME2, LoadStrW(IDS_USERMENUCOMPAREARG2));
         }
         CHyperLink* hl = new CHyperLink(HWindow, IDT_UMC_HOWTOREVERT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_UMCCONFIRMHOWTOREV));
+            hl->SetActionShowHint(LoadStrW(IDS_UMCCONFIRMHOWTOREV));
         break;
     }
 
@@ -1739,12 +1756,18 @@ CCompareArgsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BrowseCommand(HWindow, editID, IDS_ALLFILTER);
             else
             {
-                CPathBuffer path; // Heap-allocated for long path support
-                GetDlgItemText(HWindow, editID, path, path.Size());
-                if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_BROWSEUMCDIRTITLE),
-                                       LoadStr(IDS_BROWSEUMCDIRTEXT), path, FALSE, path))
+                // wide: GetTargetDirectory's browse dialog best-fit-narrows the
+                // chosen path before Sally ever sees it - same shape as the earlier
+                // siblings. Standard child controls (this edit box) are always registered wide
+                // by USER32 regardless of the dialog's own unicodeWnd setting (see this file's
+                // comment on CCompareArgsDlg above), so GetDlgItemTextW/
+                // SetDlgItemTextW are safe here independent of the dialog's own class.
+                const std::wstring initDirW = GetWindowTextStringW(GetDlgItem(HWindow, editID));
+                std::wstring pathW;
+                if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_BROWSEUMCDIRTITLE),
+                                        LoadStrW(IDS_BROWSEUMCDIRTEXT), pathW, FALSE, initDirW.c_str()))
                 {
-                    SetDlgItemText(HWindow, editID, path);
+                    SetDlgItemTextW(HWindow, editID, pathW.c_str());
                 }
             }
             return TRUE;

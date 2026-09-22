@@ -115,9 +115,31 @@ BOOL CSearchData::Initialize()
     return TRUE;
 }
 
+void CSearchData::Clear() noexcept
+{
+    if (Fail1 != NULL)
+        delete[] (Fail1);
+    if (Fail2 != NULL)
+        delete[] (Fail2);
+    if (Pattern != NULL)
+        free(Pattern);
+    if (OriginalPattern != NULL)
+        free(OriginalPattern);
+    Pattern = NULL;
+    Fail1 = Fail2 = NULL;
+    OriginalPattern = NULL;
+    Length = 0;
+    Flags = 0;
+}
+
 void CSearchData::SetFlags(WORD flags)
 {
     Flags = flags;
+    if (OriginalPattern == NULL || Length <= 0)
+    {
+        TRACE_E("Empty search pattern.");
+        return;
+    }
     if (Pattern == NULL)
         Pattern = (char*)malloc(Length + 1);
     if (Pattern == NULL)
@@ -153,54 +175,32 @@ void CSearchData::SetFlags(WORD flags)
 
 void CSearchData::Set(const char* pattern, WORD flags)
 {
-    if (pattern != NULL)
-        Length = (int)strlen(pattern);
-    else
-        Length = 0;
-    if (OriginalPattern != NULL)
-        free(OriginalPattern);
+    Clear();
+    if (pattern == NULL)
+        return;
+    Length = (int)strlen(pattern);
+    if (Length == 0)
+        return;
     OriginalPattern = (char*)malloc(Length + 1);
     if (OriginalPattern != NULL)
     {
         memcpy(OriginalPattern, pattern, Length);
         OriginalPattern[Length] = 0; // for compatibility with a normal string
-    }
-    if (Pattern != NULL)
-    {
-        free(Pattern);
-        Pattern = NULL;
-    }
-    if (Fail2 != NULL)
-    {
-        delete Fail2;
-        Fail2 = NULL;
     }
     SetFlags(flags);
 }
 
 void CSearchData::Set(const char* pattern, const int length, WORD flags)
 {
-    if (pattern != NULL)
-        Length = length;
-    else
-        Length = 0;
-    if (OriginalPattern != NULL)
-        free(OriginalPattern);
+    Clear();
+    if (pattern == NULL || length <= 0)
+        return;
+    Length = length;
     OriginalPattern = (char*)malloc(Length + 1);
     if (OriginalPattern != NULL)
     {
         memcpy(OriginalPattern, pattern, Length);
         OriginalPattern[Length] = 0; // for compatibility with a normal string
-    }
-    if (Pattern != NULL)
-    {
-        free(Pattern);
-        Pattern = NULL;
-    }
-    if (Fail2 != NULL)
-    {
-        delete Fail2;
-        Fail2 = NULL;
     }
     SetFlags(flags);
 }

@@ -9,13 +9,16 @@
 #include "drivelst.h"
 #include "cfgdlg.h"
 #include "plugins.h"
+#include "wide_commctrl.h"
 #include "fileswnd.h"
 #include "mainwnd.h"
 #include "toolbar.h"
 #include "zip.h"
 #include "common/IRegistry.h"
+#include "common/IFileSystem.h"
+#include "common/IPathService.h"
+#include "common/PluginCatalogTextEncoding.h"
 #include "common/unicode/helpers.h"
-#include "common/widepath.h"
 #include "pack.h"
 #include "dialogs.h"
 #include "common/peutils.h"
@@ -38,6 +41,80 @@ struct CDIBHeader
 static IRegistry* GetPluginsRegistryService()
 {
     return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
+
+static bool GetPluginsDirectory(std::wstring& directory)
+{
+    if (gPathService == nullptr ||
+        !gPathService->GetModuleFileName(HInstance, directory).success)
+        return false;
+
+    const size_t separator = directory.find_last_of(L"\\/");
+    if (separator == std::wstring::npos)
+        return false;
+
+    directory.erase(separator + 1);
+    directory += L"plugins";
+    return true;
+}
+
+static bool IsAbsolutePluginPath(const std::wstring& path)
+{
+    return (path.size() >= 2 && path[0] == L'\\' && path[1] == L'\\') ||
+           (path.size() >= 2 && path[1] == L':');
+}
+
+static std::wstring GetPluginFullPath(const std::wstring& pluginsDirectory,
+                                      const std::wstring& dllName)
+{
+    if (IsAbsolutePluginPath(dllName))
+        return dllName;
+    return pluginsDirectory + L"\\" + dllName;
+}
+
+static std::wstring EscapeMenuAmpersands(const std::wstring& text)
+{
+    std::wstring escaped;
+    escaped.reserve(text.size());
+    for (const wchar_t ch : text)
+    {
+        if (ch == L'&')
+            escaped.push_back(L'&');
+        escaped.push_back(ch);
+    }
+    return escaped;
+}
+
+static std::wstring RemoveMenuAmpersands(const std::wstring& text)
+{
+    std::wstring plain;
+    plain.reserve(text.size());
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] != L'&')
+            plain.push_back(text[i]);
+        else if (i + 1 < text.size() && text[i + 1] == L'&')
+            plain.push_back(text[i++]);
+    }
+    return plain;
+}
+
+static std::vector<std::wstring> SplitPluginExtensions(const std::wstring& extensions)
+{
+    std::vector<std::wstring> result;
+    if (extensions.empty())
+        return result;
+
+    size_t start = 0;
+    for (;;)
+    {
+        const size_t separator = extensions.find(L';', start);
+        result.push_back(extensions.substr(start, separator - start));
+        if (separator == std::wstring::npos)
+            break;
+        start = separator + 1;
+    }
+    return result;
 }
 
 //****************************************************************************
@@ -144,14 +221,14 @@ exitus:
     return ret;
 }
 
-BOOL SaveIconList(HKEY hKey, const char* valueName, CIconList* iconList)
+BOOL SaveIconList(HKEY hKey, const wchar_t* valueName, CIconList* iconList)
 {
     BYTE* rawPNG;
     DWORD rawPNGSize;
     if (iconList->SaveToPNG(&rawPNG, &rawPNGSize))
     {
         IRegistry* registry = GetPluginsRegistryService();
-        registry->SetBinary(hKey, AnsiToWideReg(valueName).c_str(), rawPNG, rawPNGSize);
+        registry->SetBinary(hKey, valueName, rawPNG, rawPNGSize);
         free(rawPNG);
         return TRUE;
     }
@@ -159,12 +236,12 @@ BOOL SaveIconList(HKEY hKey, const char* valueName, CIconList* iconList)
         return FALSE;
 }
 
-BOOL LoadIconList(HKEY hKey, const char* valueName, CIconList** iconList)
+BOOL LoadIconList(HKEY hKey, const wchar_t* valueName, CIconList** iconList)
 {
     IRegistry* registry = GetPluginsRegistryService();
     RegValueType valueType = RegValueType::None;
     std::vector<uint8_t> data;
-    auto result = registry->GetValue(hKey, AnsiToWideReg(valueName).c_str(), valueType, data);
+    auto result = registry->GetValue(hKey, valueName, valueType, data);
     if (!result.success || valueType != RegValueType::Binary)
         return FALSE;
 
@@ -409,13 +486,13 @@ CPlugins::~CPlugins()
     {
         if (Data[i]->GetLoaded())
         {
-            TRACE_E("Plugin " << Data[i]->Name << " is still loaded!");
+            TRACE_EW(L"Plugin " << Data[i]->Name << L" is still loaded!");
         }
     }
     HANDLES(DeleteCriticalSection(&DataCS));
 }
 
-BOOL CPlugins::IsPluginFS(const char* fsName, int& index, int& fsNameIndex)
+BOOL CPlugins::IsPluginFS(const wchar_t* fsName, int& index, int& fsNameIndex)
 {
     index = -1;
     fsNameIndex = -1;
@@ -428,7 +505,7 @@ BOOL CPlugins::IsPluginFS(const char* fsName, int& index, int& fsNameIndex)
             int j;
             for (j = 0; j < (int)p->FSNames.size(); j++)
             {
-                if (StrICmp(p->FSNames[j].c_str(), fsName) == 0)
+                if (StrICmpW(p->FSNames[j].c_str(), fsName) == 0)
                 {
                     index = i;
                     fsNameIndex = j;
@@ -440,7 +517,7 @@ BOOL CPlugins::IsPluginFS(const char* fsName, int& index, int& fsNameIndex)
     return FALSE;
 }
 
-BOOL CPlugins::AreFSNamesFromSamePlugin(const char* fsName1, const char* fsName2, int& fsName2Index)
+BOOL CPlugins::AreFSNamesFromSamePlugin(const wchar_t* fsName1, const wchar_t* fsName2, int& fsName2Index)
 {
     fsName2Index = -1;
     int i;
@@ -452,12 +529,12 @@ BOOL CPlugins::AreFSNamesFromSamePlugin(const char* fsName1, const char* fsName2
             int j;
             for (j = 0; j < (int)p->FSNames.size(); j++)
             {
-                if (StrICmp(p->FSNames[j].c_str(), fsName1) == 0) // fsName1 found
+                if (StrICmpW(p->FSNames[j].c_str(), fsName1) == 0) // fsName1 found
                 {
                     int k;
                     for (k = 0; k < (int)p->FSNames.size(); k++)
                     {
-                        if (StrICmp(p->FSNames[k].c_str(), fsName2) == 0)
+                        if (StrICmpW(p->FSNames[k].c_str(), fsName2) == 0)
                         {
                             fsName2Index = k;
                             return TRUE; // fsName2 found in the same plugin
@@ -481,7 +558,7 @@ BOOL CPlugins::FindLastCommand(int* pluginIndex, int* menuItemIndex, BOOL rebuil
         {
             CPluginData* p = Data[i];
             // locate the plugin
-            if (stricmp(p->DLLName.c_str(), LastPlgCmdPlugin.c_str()) == 0)
+            if (StrICmpW(p->DLLName.c_str(), LastPlgCmdPlugin.c_str()) == 0)
             {
                 if (p->GetLoaded()) // if the plugin isn't loaded we pretend we didn't find anything
                 {
@@ -639,11 +716,9 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
                           MENU_MASK_IMAGEINDEX | MENU_MASK_ID;
                 mi.Type = MENU_TYPE_STRING;
 
-                char pluginName[300];
-                lstrcpyn(pluginName, p->Name.c_str(), 299);
-                DuplicateAmpersands(pluginName, 299); // plugin name can contain '&'
+                const std::wstring pluginName = EscapeMenuAmpersands(p->Name);
 
-                mi.String = pluginName;
+                mi.String = const_cast<wchar_t*>(pluginName.c_str());
                 mi.ImageIndex = (p->PluginSubmenuIconIndex != -1) ? orderIndex : -1;
                 mi.SubMenu = new CMenuPopup();
                 p->SubMenu = (CMenuPopup*)mi.SubMenu; // assign this submenu to this plugin
@@ -658,12 +733,11 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
     CalculateStateCache();
 
     // set the Last Command item
-    char lastCmdStr[800];
+    std::wstring lastCmdStr;
     MENU_ITEM_INFO lcmii;
     lcmii.Type = MENU_TYPE_STRING;
     lcmii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_STATE | MENU_MASK_FLAGS;
     lcmii.Flags = MENU_FLAG_NOHOTKEY; // prevent AssignHotKeys from adding a hot key to this item
-    lcmii.String = lastCmdStr;
     BOOL setToDefaultItem = TRUE;
     int pluginIndex;
     int menuItemIndex;
@@ -676,44 +750,33 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
             lcmii.State = 0;
             pluginData->GetMenuItemStateType(pluginIndex, menuItemIndex, &lcmii);
 
-            lstrcpyn(lastCmdStr, pluginData->Name.c_str(), 299);
-            char* s = strchr(lastCmdStr, '('); // drop text in parentheses from plugin name ("WinSCP (SFTP/SCP Client)" -> "WinSCP")
-            if (s != NULL)
+            std::wstring pluginName = pluginData->Name;
+            const size_t open = pluginName.find(L'('); // drop text in parentheses from plugin name ("WinSCP (SFTP/SCP Client)" -> "WinSCP")
+            if (open != std::wstring::npos)
             {
-                char* e = strchr(s + 1, ')');
-                if (s > lastCmdStr && *(s - 1) == ' ')
-                    s--;
-                if (e != NULL)
-                    memmove(s, e + 1, strlen(e + 1) + 1);
-            }
-            DuplicateAmpersands(lastCmdStr, 299); // plugin name may contain '&'character
-            strcat(lastCmdStr, ": ");
-            int cmdNameOffset = (int)strlen(lastCmdStr);
-            strcpy(lastCmdStr + cmdNameOffset, menuItem->Name.c_str());
-
-            // remove the hint from the text if it is present
-            if ((menuItem->HotKey & HOTKEY_HINT) != 0)
-            {
-                char* p = lastCmdStr + cmdNameOffset;
-                while (*p != 0)
+                const size_t close = pluginName.find(L')', open + 1);
+                if (close != std::wstring::npos)
                 {
-                    if (*p == '\t')
-                    {
-                        *p = 0;
-                        break;
-                    }
-                    p++;
+                    const size_t eraseFrom = open > 0 && pluginName[open - 1] == L' ' ? open - 1 : open;
+                    pluginName.erase(eraseFrom, close + 1 - eraseFrom);
                 }
             }
+            lastCmdStr = EscapeMenuAmpersands(pluginName) + L": ";
+            std::wstring commandName = menuItem->Name;
+            if ((menuItem->HotKey & HOTKEY_HINT) != 0)
+            {
+                const size_t hint = commandName.find(L'\t');
+                if (hint != std::wstring::npos)
+                    commandName.erase(hint);
+            }
+            commandName = EscapeMenuAmpersands(RemoveMenuAmpersands(commandName));
+            lastCmdStr += commandName;
 
             // append the hot key from the original string
-            const char* hotKey = LoadStr(IDS_MENU_PLG_LASTCMD);
-            while (*hotKey != 0 && *hotKey != '\t')
+            const wchar_t* hotKey = LoadStrW(IDS_MENU_PLG_LASTCMD);
+            while (*hotKey != 0 && *hotKey != L'\t')
                 hotKey++;
-            strcat(lastCmdStr, hotKey);
-            // remove the ampersand so it doesn't interfere with plugin hot keys
-            RemoveAmpersands(lastCmdStr + cmdNameOffset);
-            DuplicateAmpersands(lastCmdStr + cmdNameOffset, 500); // if the command contained &&, we need to restore it
+            lastCmdStr += hotKey;
             setToDefaultItem = FALSE;
         }
     }
@@ -721,8 +784,9 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
     {
         // the old command isn't available, insert a disabled default item there
         lcmii.State = MENU_STATE_GRAYED;
-        strcpy(lastCmdStr, LoadStr(IDS_MENU_PLG_LASTCMD));
+        lastCmdStr = LoadStrW(IDS_MENU_PLG_LASTCMD);
     }
+    lcmii.String = const_cast<wchar_t*>(lastCmdStr.c_str());
     root->SetItemInfo(CM_LAST_PLUGIN_CMD, FALSE, &lcmii);
 }
 
@@ -855,7 +919,7 @@ void CPlugins::CalculateStateCache()
 
     // MENU_EVENT_SUBDIR
     BOOL upDir = (MainWindow->GetActivePanel()->Dirs->Count != 0 &&
-                  strcmp(MainWindow->GetActivePanel()->Dirs->At(0).Name, "..") == 0);
+                  wcscmp(MainWindow->GetActivePanel()->Dirs->At(0).Name, L"..") == 0);
     if (upDir)
         StateCache.ActualStateMask |= MENU_EVENT_SUBDIR;
 
@@ -1021,13 +1085,13 @@ void CPlugins::AddNamesToListView(HWND hListView, BOOL setOnly, int* numOfLoaded
             loaded++;
         if (!setOnly)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT;
             lvi.iItem = i;
             lvi.iSubItem = 0;
-            char buffEmpty[] = "";
+            wchar_t buffEmpty[] = L"";
             lvi.pszText = buffEmpty;
-            ListView_InsertItem(hListView, &lvi);
+            ListView_InsertItemW(hListView, &lvi);
         }
         // icon
         LVITEM lvi;
@@ -1037,14 +1101,14 @@ void CPlugins::AddNamesToListView(HWND hListView, BOOL setOnly, int* numOfLoaded
         lvi.iImage = orderIndex;
         ListView_SetItem(hListView, &lvi);
         // plugin name
-        ListView_SetItemText(hListView, i, 0, const_cast<char*>(plugin->Name.c_str()));
+        ListView_SetItemTextW(hListView, i, 0, const_cast<wchar_t*>(plugin->Name.c_str()));
         // loaded
-        ListView_SetItemText(hListView, i, 1,
-                             LoadStr(plugin->GetLoaded() ? IDS_PLUGINS_LOADED_YES : IDS_PLUGINS_LOADED_NO));
+        ListView_SetItemTextW(hListView, i, 1,
+                              const_cast<wchar_t*>(LoadStrW(plugin->GetLoaded() ? IDS_PLUGINS_LOADED_YES : IDS_PLUGINS_LOADED_NO)));
         // version
-        ListView_SetItemText(hListView, i, 2, const_cast<char*>(plugin->Version.c_str()));
+        ListView_SetItemTextW(hListView, i, 2, const_cast<wchar_t*>(plugin->Version.c_str()));
         // location
-        ListView_SetItemText(hListView, i, 3, const_cast<char*>(plugin->DLLName.c_str()));
+        ListView_SetItemTextW(hListView, i, 3, const_cast<wchar_t*>(plugin->DLLName.c_str()));
     }
     *numOfLoaded = loaded;
 }
@@ -1089,11 +1153,9 @@ BOOL CPlugins::AddNamesToMenu(CMenuPopup* menu, DWORD firstID, int maxCount, BOO
         {
             mii.ID = firstID + orderIndex;
 
-            char pluginName[300];
-            lstrcpyn(pluginName, data->Name.c_str(), 299);
-            DuplicateAmpersands(pluginName, 299); // plugin name may contain '&' character
+            const std::wstring pluginName = EscapeMenuAmpersands(data->Name);
 
-            mii.String = (LPTSTR)pluginName;
+            mii.String = const_cast<wchar_t*>(pluginName.c_str());
             mii.ImageIndex = (data->PluginIconIndex != -1) ? orderIndex : -1;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
         }
@@ -1103,7 +1165,7 @@ BOOL CPlugins::AddNamesToMenu(CMenuPopup* menu, DWORD firstID, int maxCount, BOO
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STATE | MENU_MASK_STRING;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(configurableOnly ? IDS_EMPTYPLUGINSMENU2 : IDS_EMPTYPLUGINSMENU1);
+        mii.String = LoadStrW(configurableOnly ? IDS_EMPTYPLUGINSMENU2 : IDS_EMPTYPLUGINSMENU1);
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
         return FALSE; // suppress hot key assignment
     }
@@ -1181,23 +1243,24 @@ void CPlugins::OnPluginConfiguration(HWND hParent, int index)
         TRACE_E("Unexpected situation in CPlugins::OnPluginConfiguration.");
 }
 
-BOOL LoadFSNames(HKEY itemKey, std::vector<std::string>* fsNames)
+BOOL LoadFSNames(HKEY itemKey, std::vector<std::wstring>* fsNames)
 {
-    char buf[1000];
-    if (GetValue(itemKey, SALAMANDER_PLUGINS_FSNAME, REG_SZ, buf, 1000))
+    std::wstring value;
+    if (GetStringValueW(itemKey, SALAMANDER_PLUGINS_FSNAME, value))
     {
         fsNames->clear();
-        char* s = buf;
-        char* end = s;
-        while (*end != 0)
+        size_t start = 0;
+        while (start < value.size())
         {
-            while (*end != 0 && *end != ':')
-                end++;
-            if (end > s)
-                fsNames->emplace_back(s, end);
-            if (*end != 0)
-                end++;
-            s = end;
+            const size_t end = value.find(L':', start);
+            if (end == std::wstring::npos)
+            {
+                fsNames->push_back(value.substr(start));
+                break;
+            }
+            if (end > start)
+                fsNames->push_back(value.substr(start, end - start));
+            start = end + 1;
         }
         return TRUE;
     }
@@ -1205,27 +1268,19 @@ BOOL LoadFSNames(HKEY itemKey, std::vector<std::string>* fsNames)
         return FALSE;
 }
 
-void SaveFSNames(HKEY itemKey, std::vector<std::string>* fsNames)
+void SaveFSNames(HKEY itemKey, std::vector<std::wstring>* fsNames)
 {
-    char buf[1000];
-    buf[0] = 0;
-    int remainingSize = sizeof(buf); // we store the list of fs-names into 'buf', with names separated by ':'
-    int i;
-    for (i = 0; remainingSize > 1 && i < (int)fsNames->size(); i++)
+    // One REG_SZ holding the fs-names separated by ':'. Building it with a
+    // std::wstring retires the fixed 1000-char buffer along with its truncation
+    // branch and the byte-vs-character bookkeeping that branch had to get right.
+    std::wstring buf;
+    for (size_t i = 0; i < fsNames->size(); i++)
     {
-        int len = _snprintf_s(buf + (sizeof(buf) - remainingSize), remainingSize, _TRUNCATE,
-                              (i + 1 != (int)fsNames->size()) ? "%s:" : "%s", (*fsNames)[i].c_str());
-        if (len < 0)
-        { // small buffer
-            TRACE_E("Fatal error: small buffer for storing fs-names to registry!");
-            buf[(sizeof(buf) - remainingSize)] = 0;
-            if ((sizeof(buf) - remainingSize) > 0 && buf[(sizeof(buf) - remainingSize) - 1] == ':')
-                buf[(sizeof(buf) - remainingSize) - 1] = 0;
-            break;
-        }
-        remainingSize -= len;
+        if (i != 0)
+            buf.push_back(L':');
+        buf += (*fsNames)[i];
     }
-    SetValue(itemKey, SALAMANDER_PLUGINS_FSNAME, REG_SZ, buf, -1);
+    SetValueW(itemKey, SALAMANDER_PLUGINS_FSNAME, REG_SZ, buf.c_str(), -1);
 }
 
 void CPlugins::Load(HWND parent, HKEY regKey)
@@ -1237,29 +1292,26 @@ void CPlugins::Load(HWND parent, HKEY regKey)
     DefaultConfiguration = FALSE;
     if (regKey != NULL)
     {
-        CPathBuffer pluginsDir; // Heap-allocated for long path support
-        GetModuleFileName(HInstance, pluginsDir, pluginsDir.Size());
-        char* s = strrchr(pluginsDir, '\\');
-        if (s != NULL)
-            strcpy(s + 1, "plugins");
+        std::wstring pluginsDir;
+        GetPluginsDirectory(pluginsDir);
 
         HKEY itemKey;
-        char buf[30];
+        wchar_t buf[30];
         int i = 1;
-        strcpy(buf, "1");
+        wcscpy_s(buf, L"1");
         BOOL view, edit, pack, unpack, config, loadsave, viewer, fs, loadOnStart, dynMenuExt, legacyCompatApproved;
-        CPathBuffer name; // Heap-allocated for long path support
-        CPathBuffer dllName; // Heap-allocated for long path support
-        CPathBuffer version; // Heap-allocated for long path support
-        CPathBuffer copyright; // Heap-allocated for long path support
-        CPathBuffer extensions; // Heap-allocated for long path support
-        CPathBuffer description; // Heap-allocated for long path support
-        CPathBuffer regKeyName; // Heap-allocated for long path support
-        std::vector<std::string> fsNames;
-        CPathBuffer fsCmdName; // Heap-allocated for long path support
-        CPathBuffer lastSLGName; // Heap-allocated for long path support
-        CPathBuffer pluginHomePageURL; // Heap-allocated for long path support
-        char thumbnailMasks[MAX_GROUPMASK];
+        std::wstring name;
+        std::wstring dllName;
+        std::wstring version;
+        std::wstring copyright;
+        std::wstring extensions;
+        std::wstring description;
+        std::wstring regKeyName;
+        std::vector<std::wstring> fsNames;
+        std::wstring fsCmdName;
+        std::wstring lastSLGName;
+        std::wstring pluginHomePageURL;
+        std::wstring thumbnailMasks;
         CIconList* pluginIcons;
         int pluginIconIndex;
         int pluginSubmenuIconIndex;
@@ -1270,45 +1322,45 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             BOOL ok = FALSE;
             loadOnStart = FALSE;
             legacyCompatApproved = FALSE;
-            thumbnailMasks[0] = 0;
-            lastSLGName[0] = 0;
-            pluginHomePageURL[0] = 0;
+            thumbnailMasks.clear();
+            lastSLGName.clear();
+            pluginHomePageURL.clear();
             pluginIcons = NULL;
             pluginIconIndex = -1;
             pluginSubmenuIconIndex = -1;
             showSubmenuPluginsBar = TRUE;
             if (Configuration.ConfigVersion < 7) // old version (functions stored separately as BOOLs)
             {
-                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, name.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, version.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, copyright.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, extensions.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, description.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, regKeyName.Size()) &&
+                ok = GetStringValueW(itemKey, SALAMANDER_PLUGINS_NAME, name) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_DLLNAME, dllName) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_VERSION, version) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, copyright) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, extensions) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, description) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, regKeyName) &&
                      LoadFSNames(itemKey, &fsNames) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_PANELVIEW, REG_DWORD, &view, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_PANELEDIT, REG_DWORD, &edit, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_CUSTPACK, REG_DWORD, &pack, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_CUSTUNPACK, REG_DWORD, &unpack, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_CONFIG, REG_DWORD, &config, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_LOADSAVE, REG_DWORD, &loadsave, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_VIEWER, REG_DWORD, &viewer, sizeof(DWORD)) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_FS, REG_DWORD, &fs, sizeof(DWORD));
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_PANELVIEW, REG_DWORD, &view, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_PANELEDIT, REG_DWORD, &edit, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_CUSTPACK, REG_DWORD, &pack, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_CUSTUNPACK, REG_DWORD, &unpack, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_CONFIG, REG_DWORD, &config, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_LOADSAVE, REG_DWORD, &loadsave, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_VIEWER, REG_DWORD, &viewer, sizeof(DWORD)) &&
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_FS, REG_DWORD, &fs, sizeof(DWORD));
                 dynMenuExt = FALSE;
             }
             else // new version (fstores functions in a single DWORD using bit fields)
             {
                 DWORD functions = 0;
-                ok = GetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, name, name.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, version, version.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, copyright, copyright.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, extensions, extensions.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, description, description.Size()) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, regKeyName, regKeyName.Size()) &&
+                ok = GetStringValueW(itemKey, SALAMANDER_PLUGINS_NAME, name) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_DLLNAME, dllName) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_VERSION, version) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, copyright) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, extensions) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, description) &&
+                     GetStringValueW(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, regKeyName) &&
                      LoadFSNames(itemKey, &fsNames) &&
-                     GetValue(itemKey, SALAMANDER_PLUGINS_FUNCTIONS, REG_DWORD, &functions, sizeof(DWORD));
+                     GetValueW(itemKey, SALAMANDER_PLUGINS_FUNCTIONS, REG_DWORD, &functions, sizeof(DWORD));
 
                 view = (functions & FUNCTION_PANELARCHIVERVIEW) != 0;
                 edit = (functions & FUNCTION_PANELARCHIVEREDIT) != 0;
@@ -1321,50 +1373,48 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 dynMenuExt = (functions & FUNCTION_DYNAMICMENUEXT) != 0;
 
                 DWORD loadOnStartDWORD;
-                if (GetValue(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD)))
+                if (GetValueW(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD)))
                 {
                     loadOnStart = loadOnStartDWORD != 0;
                 }
 
                 DWORD legacyCompatApprovedDWORD;
-                if (GetValue(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &legacyCompatApprovedDWORD, sizeof(DWORD)))
+                if (GetValueW(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &legacyCompatApprovedDWORD, sizeof(DWORD)))
                 {
                     legacyCompatApproved = legacyCompatApprovedDWORD != 0;
                 }
 
                 // these values don't have to be loaded (they may be missing in the configuration)
-                GetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, lastSLGName, lastSLGName.Size());
-                GetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, pluginHomePageURL, pluginHomePageURL.Size());
-                GetValue(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, REG_SZ, thumbnailMasks, MAX_GROUPMASK);
-                GetValue(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &pluginIconIndex, sizeof(DWORD));
-                GetValue(itemKey, SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX, REG_DWORD, &pluginSubmenuIconIndex, sizeof(DWORD));
-                if (!GetValue(itemKey, SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR, REG_DWORD, &showSubmenuPluginsBar, sizeof(DWORD)))
+                GetStringValueW(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, lastSLGName);
+                GetStringValueW(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, pluginHomePageURL);
+                GetStringValueW(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, thumbnailMasks);
+                GetValueW(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &pluginIconIndex, sizeof(DWORD));
+                GetValueW(itemKey, SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX, REG_DWORD, &pluginSubmenuIconIndex, sizeof(DWORD));
+                if (!GetValueW(itemKey, SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR, REG_DWORD, &showSubmenuPluginsBar, sizeof(DWORD)))
                 {
                     if (Configuration.ConfigVersion < 25)
-                        showSubmenuPluginsBar = PluginVisibleInBar(dllName);
+                        showSubmenuPluginsBar = PluginVisibleInBar(dllName.c_str());
                 }
 
                 LoadIconList(itemKey, SALAMANDER_PLUGINS_PLGICONLIST, &pluginIcons);
             }
             if (ok)
             {
-                CPathBuffer normalizedDLLName; // Heap-allocated for long path support
-                if (StrNICmp(dllName, pluginsDir, (int)strlen(pluginsDir)) == 0 && dllName[(int)strlen(pluginsDir)] == '\\')
-                {
-                    memmove(normalizedDLLName, dllName + strlen(pluginsDir) + 1, strlen(dllName) - strlen(pluginsDir) + 1 - 1);
-                }
-                else
-                    strcpy(normalizedDLLName, dllName);
+                std::wstring normalizedDLLName = dllName;
+                if (dllName.length() > pluginsDir.length() &&
+                    StrNICmpW(dllName.c_str(), pluginsDir.c_str(), static_cast<int>(pluginsDir.length())) == 0 &&
+                    dllName[pluginsDir.length()] == L'\\')
+                    normalizedDLLName.erase(0, pluginsDir.length() + 1);
                 int dummyIndex;
-                if (Plugins.FindDLL(normalizedDLLName, dummyIndex))
+                if (Plugins.FindDLL(normalizedDLLName.c_str(), dummyIndex))
                 {
                     err = FALSE; // although it's an error, we try to recover
                 }
                 else
                 {
-                    if (AddPlugin(name, normalizedDLLName, view, edit, pack, unpack, config, loadsave, viewer, fs,
-                                  dynMenuExt, version, copyright, description, regKeyName, extensions, &fsNames,
-                                  loadOnStart, lastSLGName, pluginHomePageURL[0] != 0 ? pluginHomePageURL.Get() : NULL))
+                    if (AddPlugin(name.c_str(), normalizedDLLName.c_str(), view, edit, pack, unpack, config, loadsave, viewer, fs,
+                                  dynMenuExt, version.c_str(), copyright.c_str(), description.c_str(), regKeyName.c_str(), extensions.c_str(), &fsNames,
+                                  loadOnStart, lastSLGName.c_str(), pluginHomePageURL.empty() ? NULL : pluginHomePageURL.c_str()))
                     {
                         err = FALSE;
                         CPluginData* p = Get(Data.Count - 1);
@@ -1396,23 +1446,23 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                         p->ShowSubmenuInPluginsBar = showSubmenuPluginsBar;
                         p->LegacyCompatApproved = legacyCompatApproved;
 
-                        if (thumbnailMasks[0] != 0)
+                        if (!thumbnailMasks.empty())
                         {
-                            p->ThumbnailMasks.SetMasksString(thumbnailMasks);
+                            p->ThumbnailMasks.SetMasksString(thumbnailMasks.c_str());
                             int err2;
                             if (!p->ThumbnailMasks.PrepareMasks(err2)) // error
                             {
-                                p->ThumbnailMasks.SetMasksString("");
+                                p->ThumbnailMasks.SetMasksString(L"");
                             }
                         }
 
-                        if (GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, fsCmdName, MAX_PATH))
+                        if (gRegistry->GetString(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, fsCmdName).success)
                         {
                             p->ChDrvMenuFSItemName = fsCmdName;
                             if (!p->ChDrvMenuFSItemName.empty())
                             {
                                 // ChDrvMenuFSItemIconIndex isn't stored when it is -1 (handles old configuration conversion as well)
-                                if (!GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDICON, REG_DWORD,
+                                if (!GetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDICON, REG_DWORD,
                                               &(p->ChDrvMenuFSItemIconIndex), sizeof(DWORD)))
                                 {
                                     p->ChDrvMenuFSItemIconIndex = -1;
@@ -1420,56 +1470,57 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                             }
                         }
 
-                        if (!GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDVISIBLE, REG_DWORD, &p->ChDrvMenuFSItemVisible, sizeof(DWORD)))
+                        if (!GetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDVISIBLE, REG_DWORD, &p->ChDrvMenuFSItemVisible, sizeof(DWORD)))
                             p->ChDrvMenuFSItemVisible = TRUE;
 
-                        if (!GetValue(itemKey, SALAMANDER_PLUGINS_ISNETHOOD, REG_DWORD, &p->PluginIsNethood, sizeof(DWORD)))
+                        if (!GetValueW(itemKey, SALAMANDER_PLUGINS_ISNETHOOD, REG_DWORD, &p->PluginIsNethood, sizeof(DWORD)))
                             p->PluginIsNethood = FALSE;
 
-                        if (!GetValue(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD)))
+                        if (!GetValueW(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD)))
                             p->PluginUsesPasswordManager = FALSE;
 
                         HKEY menuKey;
-                        if (p != NULL && OpenKey(itemKey, SALAMANDER_PLUGINS_MENU, menuKey))
+                        if (p != NULL && OpenKeyW(itemKey, SALAMANDER_PLUGINS_MENU, menuKey))
                         {
                             HKEY menuItemKey;
-                            char buf2[30];
+                            wchar_t buf2[30];
                             int i2 = 1;
-                            strcpy(buf2, "1");
+                            wcscpy_s(buf2, L"1");
                             while (OpenKey(menuKey, buf2, menuItemKey))
                             {
                                 DWORD state, id, skillLevel, iconIndex, type, hotKey;
                                 BOOL stateLoaded, idLoaded;
-                                idLoaded = GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMID, REG_DWORD, &id, sizeof(DWORD));
-                                stateLoaded = GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSTATE, REG_DWORD, &state, sizeof(DWORD));
+                                idLoaded = GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMID, REG_DWORD, &id, sizeof(DWORD));
+                                stateLoaded = GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSTATE, REG_DWORD, &state, sizeof(DWORD));
 
                                 // SkillLevel is saved only if it differs from MENU_SKILLLEVEL_ALL
                                 // saving registry space and ensures the conversion of old configurations
-                                if (!GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL, REG_DWORD, &skillLevel, sizeof(DWORD)))
+                                if (!GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL, REG_DWORD, &skillLevel, sizeof(DWORD)))
                                     skillLevel = MENU_SKILLLEVEL_ALL;
 
                                 // IconIndex is stored only if it differs from -1 (no icon)
                                 // saving registry space and ensures the conversion of old configurations;
                                 // for dynamic menus the icon isn't saved, therefore its index isn't saved either
                                 if (dynMenuExt ||
-                                    !GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMICONINDEX, REG_DWORD, &iconIndex, sizeof(DWORD)))
+                                    !GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMICONINDEX, REG_DWORD, &iconIndex, sizeof(DWORD)))
                                     iconIndex = -1;
 
                                 // Type is stored only if it differs from pmitItemOrSeparator
                                 // saving registry space and ensures the conversion of old configurations
-                                if (!GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMTYPE, REG_DWORD, &type, sizeof(DWORD)))
+                                if (!GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMTYPE, REG_DWORD, &type, sizeof(DWORD)))
                                     type = pmitItemOrSeparator;
 
                                 // HotKey is stored only if it differs from 0
                                 // saving registry space and ensures the conversion of old configurations
-                                if (!GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMHOTKEY, REG_DWORD, &hotKey, sizeof(DWORD)))
+                                if (!GetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMHOTKEY, REG_DWORD, &hotKey, sizeof(DWORD)))
                                     hotKey = 0;
 
-                                if (GetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, REG_SZ, name, MAX_PATH) &&
+                                std::wstring menuItemName;
+                                if (GetStringValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, menuItemName) &&
                                     stateLoaded && idLoaded &&
                                     (type == pmitItemOrSeparator || type == pmitStartSubmenu))
                                 { // regular or start-submenu menu item
-                                    p->AddMenuItem(iconIndex, name, hotKey, id, state == -1, HIWORD(state), LOWORD(state),
+                                    p->AddMenuItem(iconIndex, menuItemName.c_str(), hotKey, id, state == -1, HIWORD(state), LOWORD(state),
                                                    skillLevel, (CPluginMenuItemType)type);
                                 }
                                 else // separator or end-submenu
@@ -1486,7 +1537,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                                 }
 
                                 CloseKey(menuItemKey);
-                                itoa(++i2, buf2, 10);
+                                _itow_s(++i2, buf2, _countof(buf2), 10);
                             }
                             CloseKey(menuKey);
                         }
@@ -1508,31 +1559,31 @@ void CPlugins::Load(HWND parent, HKEY regKey)
                 break;
             }
 
-            itoa(++i, buf, 10);
+            _itow_s(++i, buf, _countof(buf), 10);
         }
     }
     else // default values
     {
-        if (!AddPlugin("ZIP", "zip\\zip.dll",
-                       TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, "1.32",
-                       "Copyright © 2000-2023 Open Salamander Authors",
-                       "ZIP archives support for Open Salamander.",
-                       "ZIP", "zip;pk3;jar", NULL, FALSE, NULL, NULL) ||
-            !AddPlugin("TAR", "tar\\tar.dll",
-                       TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, "3.3",
-                       "Copyright © 1999-2023 Open Salamander Authors",
-                       "Unix archives readonly support for Open Salamander.",
-                       "TAR", "tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio", NULL, FALSE, NULL, NULL) ||
-            !AddPlugin("PAK", "pak\\pak.dll",
-                       TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, "1.68",
-                       "Copyright © 1999-2023 Open Salamander Authors",
-                       "This plug-ing adds support for Quake PAK archives.",
-                       "PAK", "pak", NULL, FALSE, NULL, NULL) ||
-            !AddPlugin("Web Viewer", "webviewer\\webviewer.dll",
+        if (!AddPlugin(L"ZIP", L"zip\\zip.dll",
+                       TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, L"1.32",
+                       L"Copyright \u00A9 2000-2023 Open Salamander Authors",
+                       L"ZIP archives support for Open Salamander.",
+                       L"ZIP", L"zip;pk3;jar", NULL, FALSE, NULL, NULL) ||
+            !AddPlugin(L"TAR", L"tar\\tar.dll",
+                       TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, L"3.3",
+                       L"Copyright \u00A9 1999-2023 Open Salamander Authors",
+                       L"Unix archives readonly support for Open Salamander.",
+                       L"TAR", L"tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio", NULL, FALSE, NULL, NULL) ||
+            !AddPlugin(L"PAK", L"pak\\pak.dll",
+                       TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, L"1.68",
+                       L"Copyright \u00A9 1999-2023 Open Salamander Authors",
+                       L"This plug-ing adds support for Quake PAK archives.",
+                       L"PAK", L"pak", NULL, FALSE, NULL, NULL) ||
+            !AddPlugin(L"Web Viewer", L"webviewer\\webviewer.dll",
                        FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE,
-                       "1.1", "Copyright © 1999-2023 Open Salamander Authors",
-                       "Web Viewer for Open Salamander.",
-                       "WEBVIEWER", "", NULL, FALSE, NULL, NULL))
+                       L"1.1", L"Copyright \u00A9 1999-2023 Open Salamander Authors",
+                       L"Web Viewer for Open Salamander.",
+                       L"WEBVIEWER", L"", NULL, FALSE, NULL, NULL))
         {
             HANDLES(EnterCriticalSection(&DataCS));
             Data.DestroyMembers();
@@ -1547,21 +1598,21 @@ void CPlugins::LoadOrder(HWND parent, HKEY regKey)
 {
     if (regKey != NULL)
     {
-        CPathBuffer dllName; // Heap-allocated for long path support
+        std::wstring dllName;
         DWORD showInBar;
         HKEY itemKey;
-        char buf[30];
+        wchar_t buf[30];
         int i = 1;
-        strcpy(buf, "1");
+        wcscpy_s(buf, L"1");
         while (OpenKey(regKey, buf, itemKey))
         {
-            if (!GetValue(itemKey, SALAMANDER_PLUGINSORDER_SHOW, REG_DWORD, &showInBar, sizeof(DWORD)))
+            if (!GetValueW(itemKey, SALAMANDER_PLUGINSORDER_SHOW, REG_DWORD, &showInBar, sizeof(DWORD)))
                 showInBar = TRUE;
-            if (GetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, dllName, dllName.Size()))
+            if (GetStringValueW(itemKey, SALAMANDER_PLUGINS_DLLNAME, dllName))
             {
-                AddPluginToOrder(dllName, showInBar);
+                AddPluginToOrder(dllName.c_str(), showInBar);
             }
-            itoa(++i, buf, 10);
+            _itow_s(++i, buf, _countof(buf), 10);
             CloseKey(itemKey);
         }
     }
@@ -1574,22 +1625,22 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
     {
         ClearKey(regKey);
         HKEY itemKey;
-        char buf[30];
+        wchar_t buf[30];
         int i;
         for (i = 0; i < Data.Count; i++)
         {
-            itoa(i + 1, buf, 10);
+            _itow_s(i + 1, buf, _countof(buf), 10);
             if (CreateKey(regKey, buf, itemKey))
             {
                 CPluginData* p = Data[i];
 
-                SetValue(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, p->Name.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, p->DLLName.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, p->Version.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, p->Copyright.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, p->Extensions.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, p->Description.c_str(), -1);
-                SetValue(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, p->RegKeyName.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_NAME, REG_SZ, p->Name.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, p->DLLName.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_VERSION, REG_SZ, p->Version.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_COPYRIGHT, REG_SZ, p->Copyright.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_EXTENSIONS, REG_SZ, p->Extensions.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_DESCRIPTION, REG_SZ, p->Description.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_REGKEYNAME, REG_SZ, p->RegKeyName.c_str(), -1);
                 SaveFSNames(itemKey, &p->FSNames);
 
                 DWORD functions = 0;
@@ -1603,51 +1654,51 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 functions |= p->SupportFS ? FUNCTION_FILESYSTEM : 0;
                 functions |= p->SupportDynMenuExt ? FUNCTION_DYNAMICMENUEXT : 0;
 
-                SetValue(itemKey, SALAMANDER_PLUGINS_FUNCTIONS, REG_DWORD, &functions, sizeof(DWORD));
+                SetValueW(itemKey, SALAMANDER_PLUGINS_FUNCTIONS, REG_DWORD, &functions, sizeof(DWORD));
 
                 if (p->LoadOnStart) // will store only TRUE to save space in the registry
                 {
                     DWORD loadOnStartDWORD = TRUE;
-                    SetValue(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_LOADONSTART, REG_DWORD, &loadOnStartDWORD, sizeof(DWORD));
                 }
 
                 if (p->LegacyCompatApproved) // store only TRUE to save space in the registry
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &p->LegacyCompatApproved, sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED, REG_DWORD, &p->LegacyCompatApproved, sizeof(DWORD));
                 }
 
                 if (!p->ChDrvMenuFSItemName.empty()) // we have an FS command for the change-drive menu
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, p->ChDrvMenuFSItemName.c_str(), -1);
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, p->ChDrvMenuFSItemName.c_str(), -1);
 
                     // ChDrvMenuFSItemIconIndex isn't saved when it is -1 (handles old configuration conversion)
                     if (p->ChDrvMenuFSItemIconIndex != -1)
                     {
-                        SetValue(itemKey, SALAMANDER_PLUGINS_FSCMDICON, REG_DWORD,
+                        SetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDICON, REG_DWORD,
                                  &(p->ChDrvMenuFSItemIconIndex), sizeof(DWORD));
                     }
                 }
 
                 if (!p->ChDrvMenuFSItemVisible)
-                    SetValue(itemKey, SALAMANDER_PLUGINS_FSCMDVISIBLE, REG_DWORD, &p->ChDrvMenuFSItemVisible, sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_FSCMDVISIBLE, REG_DWORD, &p->ChDrvMenuFSItemVisible, sizeof(DWORD));
 
                 if (p->PluginIsNethood)
-                    SetValue(itemKey, SALAMANDER_PLUGINS_ISNETHOOD, REG_DWORD, &p->PluginIsNethood, sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_ISNETHOOD, REG_DWORD, &p->PluginIsNethood, sizeof(DWORD));
 
                 if (p->PluginUsesPasswordManager)
-                    SetValue(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_USESPASSWDMAN, REG_DWORD, &p->PluginUsesPasswordManager, sizeof(DWORD));
 
                 if (!p->LastSLGName.empty() && p->LastSLGName.c_str()[0] != 0) // store it if it is not an empty string
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, p->LastSLGName.c_str(), -1);
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_LASTSLGNAME, REG_SZ, p->LastSLGName.c_str(), -1);
                 }
                 if (!p->PluginHomePageURL.empty() && p->PluginHomePageURL.c_str()[0] != 0) // store it if is not an empty string
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, p->PluginHomePageURL.c_str(), -1);
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_HOMEPAGE, REG_SZ, p->PluginHomePageURL.c_str(), -1);
                 }
                 if (p->ThumbnailMasks.GetMasksString()[0] != 0) // store it if it is not an empty string
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, REG_SZ, p->ThumbnailMasks.GetMasksString(), -1);
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_THUMBMASKS, REG_SZ, p->ThumbnailMasks.GetMasksString(), -1);
                 }
                 if (p->PluginIcons != NULL) // store only if it exists
                 {
@@ -1655,45 +1706,45 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                 }
                 if (p->PluginIconIndex != -1) // store only if it is not -1
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &(p->PluginIconIndex), sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_PLGICONINDEX, REG_DWORD, &(p->PluginIconIndex), sizeof(DWORD));
                 }
                 if (p->PluginSubmenuIconIndex != -1) // store only if it is not -1
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX, REG_DWORD, &(p->PluginSubmenuIconIndex), sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX, REG_DWORD, &(p->PluginSubmenuIconIndex), sizeof(DWORD));
                 }
                 if (!p->ShowSubmenuInPluginsBar) // store only if it is not TRUE
                 {
-                    SetValue(itemKey, SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR, REG_DWORD, &(p->ShowSubmenuInPluginsBar), sizeof(DWORD));
+                    SetValueW(itemKey, SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR, REG_DWORD, &(p->ShowSubmenuInPluginsBar), sizeof(DWORD));
                 }
 
                 HKEY menuKey;
-                if (p->MenuItems.Count > 0 && CreateKey(itemKey, SALAMANDER_PLUGINS_MENU, menuKey))
+                if (p->MenuItems.Count > 0 && CreateKeyW(itemKey, SALAMANDER_PLUGINS_MENU, menuKey))
                 { // store new values
                     HKEY menuItemKey;
-                    char buf2[30];
+                    wchar_t buf2[30];
                     int i2;
                     for (i2 = 0; i2 < p->MenuItems.Count; i2++)
                     {
-                        itoa(i2 + 1, buf2, 10);
+                        _itow_s(i2 + 1, buf2, _countof(buf2), 10);
                         if (CreateKey(menuKey, buf2, menuItemKey))
                         {
                             CPluginMenuItem* item = p->MenuItems[i2];
                             if (!item->Name.empty() || item->StateMask == -1)
                             {                                                              // we store "state" only if it is an item or a separator with "call-get-state"
                                 DWORD state = p->SupportDynMenuExt ? -1 : item->StateMask; // dynamic menu: this hack handles the situation when a plugin with a dynamic menu switches to a static one during loading and fails in the entry point (the dynamic menu contents remain and if it lacks call-get-state items, the menu might appear even without loading the plugin)
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSTATE, REG_DWORD,
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSTATE, REG_DWORD,
                                          &state, sizeof(DWORD));
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMID, REG_DWORD,
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMID, REG_DWORD,
                                          &(item->ID), sizeof(DWORD));
                             }
                             if (!item->Name.empty()) // regular item - store the name
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, REG_SZ, item->Name.c_str(), -1);
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMNAME, REG_SZ, item->Name.c_str(), -1);
 
                             // SkillLevel is saved only if it differs from MENU_SKILLLEVEL_ALL
                             // saving registry space and ensuring the conversion of old configurations
                             if (item->SkillLevel != MENU_SKILLLEVEL_ALL)
                             {
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL, REG_DWORD,
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL, REG_DWORD,
                                          &(item->SkillLevel), sizeof(DWORD));
                             }
 
@@ -1702,7 +1753,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                             // for dynamic menus the icon is not stored, therefore we don’t save its index either
                             if (!p->SupportDynMenuExt && item->IconIndex != -1)
                             {
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMICONINDEX, REG_DWORD,
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMICONINDEX, REG_DWORD,
                                          &(item->IconIndex), sizeof(DWORD));
                             }
 
@@ -1711,7 +1762,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                             if (item->Type != pmitItemOrSeparator)
                             {
                                 DWORD type = item->Type;
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMTYPE, REG_DWORD, &type, sizeof(DWORD));
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMTYPE, REG_DWORD, &type, sizeof(DWORD));
                             }
 
                             // HotKey is stored only when it differs from zero
@@ -1719,7 +1770,7 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
                             if (item->HotKey != 0)
                             {
                                 DWORD hotKey = item->HotKey;
-                                SetValue(menuItemKey, SALAMANDER_PLUGINS_MENUITEMHOTKEY, REG_DWORD, &hotKey, sizeof(DWORD));
+                                SetValueW(menuItemKey, SALAMANDER_PLUGINS_MENUITEMHOTKEY, REG_DWORD, &hotKey, sizeof(DWORD));
                             }
 
                             CloseKey(menuItemKey);
@@ -1741,15 +1792,15 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
     {
         ClearKey(regKeyOrder);
         HKEY itemKey;
-        char buf[30];
+        wchar_t buf[30];
         int i;
         for (i = 0; i < (int)Order.size(); i++)
         {
-            itoa(i + 1, buf, 10);
+            _itow_s(i + 1, buf, _countof(buf), 10);
             if (CreateKey(regKeyOrder, buf, itemKey))
             {
                 CPluginOrder* order = &Order[i];
-                SetValue(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, order->DLLName.c_str(), -1);
+                SetValueW(itemKey, SALAMANDER_PLUGINS_DLLNAME, REG_SZ, order->DLLName.c_str(), -1);
                 CloseKey(itemKey);
             }
         }
@@ -1891,7 +1942,7 @@ CPlugins::GetPluginData(const CPluginInterfaceAbstract* plugin, int* lastIndex)
 }
 
 CPluginData*
-CPlugins::GetPluginData(const char* dllName)
+CPlugins::GetPluginData(const wchar_t* dllName)
 {
     if (dllName != NULL)
     {
@@ -1906,32 +1957,24 @@ CPlugins::GetPluginData(const char* dllName)
 }
 
 CPluginData*
-CPlugins::GetPluginDataFromSuffix(const char* dllSuffix)
+CPlugins::GetPluginDataFromSuffix(const wchar_t* dllSuffix)
 {
-    CALL_STACK_MESSAGE2("CPlugins::GetPluginDataFromSuffix(%s)", dllSuffix);
+    CALL_STACK_MESSAGE2("CPlugins::GetPluginDataFromSuffix(%ls)", dllSuffix);
     if (dllSuffix != NULL)
     {
-        // obtain the full name of the plugins directory
-        CPathBuffer fullDLLName; // Heap-allocated for long path support
-        GetModuleFileName(HInstance, fullDLLName, fullDLLName.Size());
-        char* name = strrchr(fullDLLName, '\\') + 1;
-        strcpy(name, "plugins\\");
-        name += strlen(name);
+        std::wstring pluginsDirectory;
+        const bool havePluginsDirectory = GetPluginsDirectory(pluginsDirectory);
 
-        int sufLen = (int)strlen(dllSuffix);
+        int sufLen = (int)wcslen(dllSuffix);
         int i;
         for (i = 0; i < Data.Count; i++)
         {
             CPluginData* data = Data[i];
-            const char* s = data->DLLName.c_str();
-            if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-                (*s == 0 || *(s + 1) != ':'))       // not "c:" -> realtive path to plugins
-            {
-                strcpy(name, data->DLLName.c_str());
-                s = fullDLLName;
-            }
-            int len = (int)strlen(s);
-            if (len >= sufLen && StrNICmp(s + len - sufLen, dllSuffix, sufLen) == 0)
+            if (!havePluginsDirectory && !IsAbsolutePluginPath(data->DLLName))
+                continue;
+            const std::wstring fullDLLName = GetPluginFullPath(pluginsDirectory, data->DLLName);
+            const int len = (int)fullDLLName.size();
+            if (len >= sufLen && StrNICmpW(fullDLLName.c_str() + len - sufLen, dllSuffix, sufLen) == 0)
             {
                 return data; // found
             }
@@ -2135,13 +2178,13 @@ void CPlugins::CheckData()
         {
             if (!IsArchiveIndexOK(PackerFormatConfig.GetPackerIndex(i), pftPanelEdit))
             {
-                TRACE_E("Invalid packer index in PackerFormatConfig, ext = " << PackerFormatConfig.GetExt(i)); // when importing configuration from version 2.0, this error is reported because UnCAB released with version 2.0 incorrectly claimed that it could pack archives; (which is nonsense, and this is where the error is corrected) — no further action needed...
+                TRACE_EW(L"Invalid packer index in PackerFormatConfig, ext = " << PackerFormatConfig.GetExt(i)); // when importing configuration from version 2.0, this error is reported because UnCAB released with version 2.0 incorrectly claimed that it could pack archives; (which is nonsense, and this is where the error is corrected) — no further action needed...
                 PackerFormatConfig.SetUsePacker(i, FALSE);                                                     // invalid packer index -> "packing is not supported"
             }
         }
         if (!IsArchiveIndexOK(PackerFormatConfig.GetUnpackerIndex(i), pftPanelView))
         {
-            TRACE_E("Invalid unpacker index in PackerFormatConfig, ext = " << PackerFormatConfig.GetExt(i));
+            TRACE_EW(L"Invalid unpacker index in PackerFormatConfig, ext = " << PackerFormatConfig.GetExt(i));
             PackerFormatConfig.DeleteFormat(i--);
         }
     }
@@ -2152,7 +2195,7 @@ void CPlugins::CheckData()
         int t = PackerConfig.GetPackerType(i);
         if (t > 0 || t < 0 && !IsArchiveIndexOK(t, pftCustomPack))
         {
-            TRACE_E("Invalid packer type in PackerConfig, title = " << PackerConfig.GetPackerTitle(i));
+            TRACE_EW(L"Invalid packer type in PackerConfig, title = " << PackerConfig.GetPackerTitle(i));
             PackerConfig.DeletePacker(i--);
         }
     }
@@ -2162,7 +2205,7 @@ void CPlugins::CheckData()
         int t = UnpackerConfig.GetUnpackerType(i);
         if (t > 0 || t < 0 && !IsArchiveIndexOK(t, pftCustomUnpack))
         {
-            TRACE_E("Invalid unpacker type in UnpackerConfig, title = " << UnpackerConfig.GetUnpackerTitle(i));
+            TRACE_EW(L"Invalid unpacker type in UnpackerConfig, title = " << UnpackerConfig.GetUnpackerTitle(i));
             UnpackerConfig.DeleteUnpacker(i--);
         }
     }
@@ -2183,7 +2226,7 @@ void CPlugins::CheckData()
                 t != VIEWER_INTERNAL &&                 // not internal
                 (t > 0 || Plugins.Get(-t - 1) == NULL)) // not a plugin either
             {
-                TRACE_E("Invalid viewer-type in (Alt)ViewerMasks, masks = " << (viewerMasks->At(i)->Masks != NULL ? viewerMasks->At(i)->Masks->GetMasksString() : "NULL"));
+                TRACE_EW(L"Invalid viewer-type in (Alt)ViewerMasks, masks = " << (viewerMasks->At(i)->Masks != NULL ? viewerMasks->At(i)->Masks->GetMasksString() : L"NULL"));
                 viewerMasks->Delete(i--);
             }
         }
@@ -2191,10 +2234,10 @@ void CPlugins::CheckData()
     MainWindow->LeaveViewerMasksCS();
 }
 
-BOOL CPlugins::AddPlugin(HWND parent, const char* fileName)
+BOOL CPlugins::AddPlugin(HWND parent, const wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("CPlugins::AddPlugin(, %s)", fileName);
-    static char emptyBuffer[] = "";
+    CALL_STACK_MESSAGE2("CPlugins::AddPlugin(, %ls)", fileName);
+    static wchar_t emptyBuffer[] = L"";
     if (AddPlugin(emptyBuffer, fileName, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
                   emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer, NULL, FALSE, emptyBuffer, NULL))
     {
@@ -2218,68 +2261,66 @@ BOOL CPlugins::AddPlugin(HWND parent, const char* fileName)
     return FALSE;
 }
 
-void CPlugins::GetUniqueRegKeyName(char* uniqueKeyName, const char* regKeyName)
+std::wstring CPlugins::GetUniqueRegKeyName(const wchar_t* regKeyName)
 {
-    CALL_STACK_MESSAGE2("CPlugins::GetUniqueRegKeyName(, %s)", regKeyName);
+    CALL_STACK_MESSAGE2("CPlugins::GetUniqueRegKeyName(%ls)", regKeyName);
+    const std::wstring baseName = regKeyName != NULL ? regKeyName : L"";
+    std::wstring uniqueKeyName = baseName;
     int number = 2;
-    strcpy(uniqueKeyName, regKeyName);
-    if (regKeyName[0] != 0)
+    if (!baseName.empty())
     {
         int i;
         for (i = 0; i < Data.Count; i++)
         {
-            if (StrICmp(uniqueKeyName, Data[i]->RegKeyName.c_str()) == 0) // not unique
+            if (StrICmpW(uniqueKeyName.c_str(), Data[i]->RegKeyName.c_str()) == 0) // not unique
             {
-                sprintf(uniqueKeyName + strlen(regKeyName), " (%d)", number++); // change key name
-                i = -1;                                                         // compare again
+                uniqueKeyName = baseName + L" (" + std::to_wstring(number++) + L")";
+                i = -1; // compare again
             }
         }
     }
+    return uniqueKeyName;
 }
 
-void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, std::vector<std::string>* uniqueFSNames,
-                               std::vector<std::string>* oldFSNames)
+std::wstring CPlugins::GetUniqueFSName(const wchar_t* fsName,
+                                       std::vector<std::wstring>* uniqueFSNames,
+                                       std::vector<std::wstring>* oldFSNames)
 {
-    CALL_STACK_MESSAGE2("CPlugins::GetUniqueFSName(, %s, ,)", fsName);
+    CALL_STACK_MESSAGE2("CPlugins::GetUniqueFSName(%ls, ,)", fsName);
     int number = 2;
-    lstrcpyn(uniqueFSName, fsName, MAX_PATH - 9); // leave a 9-character reserve at the end of the fs-name for digits when searching for a unique name
-    int offset = (int)strlen(uniqueFSName);
-    if (offset < 2)
+    std::wstring baseName = fsName != NULL ? fsName : L"";
+    if (baseName.length() < 2)
     {
-        TRACE_E("File system name is too short (" << fsName << ")");
-        strcpy(uniqueFSName, "fs");
-        offset = 2;
+        TRACE_EW(L"File system name is too short (" << baseName << L")");
+        baseName = L"fs";
     }
-    int i;
-    for (i = 0; i < offset; i++)
+    for (wchar_t& ch : baseName)
     {
-        if ((uniqueFSName[i] < 'a' || uniqueFSName[i] > 'z') &&
-            (uniqueFSName[i] < 'A' || uniqueFSName[i] > 'Z') &&
-            (uniqueFSName[i] < '0' || uniqueFSName[i] > '9') &&
-            uniqueFSName[i] != '_' &&
-            uniqueFSName[i] != '+' &&
-            uniqueFSName[i] != '-')
+        if ((ch < L'a' || ch > L'z') && (ch < L'A' || ch > L'Z') &&
+            (ch < L'0' || ch > L'9') && ch != L'_' && ch != L'+' && ch != L'-')
         {
-            TRACE_E("File system name '" << fsName << "' contains illegal character: '" << uniqueFSName[i] << "'");
-            uniqueFSName[i] = '_';
+            TRACE_EW(L"File system name '" << baseName << L"' contains illegal character: '" << ch << L"'");
+            ch = L'_';
         }
     }
+    std::wstring uniqueFSName = baseName;
 
     BOOL oldFSNameUsed = FALSE;
     if (oldFSNames != NULL)
     {
-        for (i = 0; i < (int)oldFSNames->size(); i++)
+        for (int i = 0; i < (int)oldFSNames->size(); i++)
         {
-            const char* s = (*oldFSNames)[i].c_str();
-            int len = (int)strlen(s);
-            if (len >= offset && StrNICmp(s, uniqueFSName, offset) == 0)
+            const wchar_t* s = (*oldFSNames)[i].c_str();
+            const size_t len = wcslen(s);
+            if (len >= baseName.length() &&
+                StrNICmpW(s, baseName.c_str(), static_cast<int>(baseName.length())) == 0)
             { // match except for a possible suffix; check if suffix is numeric (numbers are added when searching for a unique name)
-                const char* num = s + offset;
-                while (*num != 0 && *num >= '0' && *num <= '9')
+                const wchar_t* num = s + baseName.length();
+                while (*num != 0 && *num >= L'0' && *num <= L'9')
                     num++;
                 if (*num == 0) // numeric suffix -> this old fs-name can be used for the sought fs-name
                 {
-                    lstrcpyn(uniqueFSName + offset, s + offset, MAX_PATH - offset);
+                    uniqueFSName = s;
                     oldFSNameUsed = TRUE;
                     oldFSNames->erase(oldFSNames->begin() + i); // remove the used fs-name from the array
                     break;
@@ -2288,21 +2329,21 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, std::vect
         }
     }
 
-    for (i = 0; i < Data.Count; i++)
+    for (int i = 0; i < Data.Count; i++)
     {
         if (i == 0 && uniqueFSNames != NULL)
         {
             int j;
             for (j = 0; j < (int)uniqueFSNames->size(); j++)
             {
-                if (StrICmp(uniqueFSName, (*uniqueFSNames)[j].c_str()) == 0) // not unique
+                if (StrICmpW(uniqueFSName.c_str(), (*uniqueFSNames)[j].c_str()) == 0) // not unique
                 {
                     if (!oldFSNameUsed)
-                        sprintf(uniqueFSName + offset, "%d", number++); // change the key name
+                        uniqueFSName = baseName + std::to_wstring(number++);
                     else                                                // old name is no longer unique, search for another unique name
                     {
                         oldFSNameUsed = FALSE;
-                        uniqueFSName[offset] = 0;
+                        uniqueFSName = baseName;
                     }
                     i = -1; // compare again
                     break;
@@ -2316,54 +2357,51 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, std::vect
         int j;
         for (j = 0; j < (int)plugin->FSNames.size(); j++)
         {
-            if (StrICmp(uniqueFSName, plugin->FSNames[j].c_str()) == 0) // not unique
+            if (StrICmpW(uniqueFSName.c_str(), plugin->FSNames[j].c_str()) == 0) // not unique
             {
                 if (!oldFSNameUsed)
-                    sprintf(uniqueFSName + offset, "%d", number++); // change the key name
+                    uniqueFSName = baseName + std::to_wstring(number++);
                 else                                                // old name is no longer unique, search for another unique name
                 {
                     oldFSNameUsed = FALSE;
-                    uniqueFSName[offset] = 0;
+                    uniqueFSName = baseName;
                 }
                 i = -1; // compare again
                 break;
             }
         }
     }
+    return uniqueFSName;
 }
 
-BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPanelView,
+BOOL CPlugins::AddPlugin(const wchar_t* name, const wchar_t* dllName, BOOL supportPanelView,
                          BOOL supportPanelEdit, BOOL supportCustomPack, BOOL supportCustomUnpack,
                          BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
-                         BOOL supportFS, BOOL supportDynMenuExt, const char* version,
-                         const char* copyright, const char* description, const char* regKeyName,
-                         const char* extensions, std::vector<std::string>* fsNames, BOOL loadOnStart,
-                         char* lastSLGName, const char* pluginHomePageURL)
+                         BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
+                         const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
+                         const wchar_t* extensions, std::vector<std::wstring>* fsNames, BOOL loadOnStart,
+                         const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL)
 {
-    CALL_STACK_MESSAGE20("CPlugins::AddPlugin(%s, %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, , %d, %s, %s)",
+    // %ls, not %s: CALL_STACK_MESSAGE's format is narrow by design (callstk is floor),
+    // so a widened argument on %s is runtime garbage with no diagnostic. [P1.5c]
+    CALL_STACK_MESSAGE20("CPlugins::AddPlugin(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls, %ls)",
                          name, dllName, supportPanelView, supportPanelEdit, supportCustomPack,
                          supportCustomUnpack, supportConfiguration, supportLoadSave, supportViewer,
                          supportFS, supportDynMenuExt, version, copyright, description, regKeyName, extensions,
                          loadOnStart, lastSLGName, pluginHomePageURL);
     BOOL ret = FALSE;
 
-    CPathBuffer uniqueKeyName; // Heap-allocated for long path support
-    if (supportLoadSave)
-        GetUniqueRegKeyName(uniqueKeyName, regKeyName);
-    else
-        uniqueKeyName[0] = 0;
-    std::vector<std::string>* uniqueFSNames = NULL;
+    const std::wstring uniqueKeyName = supportLoadSave ? GetUniqueRegKeyName(regKeyName) : L"";
+    std::vector<std::wstring>* uniqueFSNames = NULL;
     if (supportFS && fsNames != NULL)
     {
-        uniqueFSNames = new std::vector<std::string>();
+        uniqueFSNames = new std::vector<std::wstring>();
         if (uniqueFSNames != NULL)
         {
             int i;
             for (i = 0; i < (int)fsNames->size(); i++)
             {
-                CPathBuffer uniqueFSName; // Heap-allocated for long path support
-                GetUniqueFSName(uniqueFSName, (*fsNames)[i].c_str(), uniqueFSNames, NULL);
-                uniqueFSNames->push_back(uniqueFSName.Get());
+                uniqueFSNames->push_back(GetUniqueFSName((*fsNames)[i].c_str(), uniqueFSNames, NULL));
             }
         }
         else
@@ -2376,7 +2414,7 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
                                             supportPanelEdit, supportCustomPack, supportCustomUnpack,
                                             supportConfiguration, supportLoadSave, supportViewer, supportFS,
                                             supportDynMenuExt, version, copyright, description,
-                                            uniqueKeyName, extensions, uniqueFSNames, loadOnStart,
+                                            uniqueKeyName.c_str(), extensions, uniqueFSNames, loadOnStart,
                                             lastSLGName, pluginHomePageURL);
         if (item != NULL)
         {
@@ -2399,30 +2437,13 @@ BOOL CPlugins::AddPlugin(const char* name, const char* dllName, BOOL supportPane
     return ret;
 }
 
-void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound, int& view,
+void CPlugins::FindViewEdit(const wchar_t* extensions, int exclude, BOOL& viewFound, int& view,
                             BOOL& editFound, int& edit)
 {
-    CALL_STACK_MESSAGE3("CPlugins::FindViewEdit(%s, %d, , , , )", extensions, exclude);
+    CALL_STACK_MESSAGE3("CPlugins::FindViewEdit(%ls, %d, , , , )", extensions, exclude);
     viewFound = editFound = FALSE;
-    // obtain an array of extensions from the extension string (extensions)
-    char ext[300];
-    int len = (int)strlen(extensions);
-    if (len > 299)
-        len = 299;
-    memcpy(ext, extensions, len);
-    ext[len] = 0;
-    TDirectArray<char*> extArray(10, 5); // array of extensions
-    char* s = ext + len;
-    while (s > ext)
-    {
-        while (--s >= ext && *s != ';')
-            ;
-        if (s >= ext)
-            *s = 0;
-        extArray.Add(s + 1); // either the first or one of a series of extensions
-    }
+    const std::vector<std::wstring> extArray = SplitPluginExtensions(extensions);
 
-    char ext2[300]; // copy of Extensions from all plugins, one by one
     int i;
     for (i = 0; i < Data.Count; i++)
     {
@@ -2430,22 +2451,13 @@ void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound
             continue; // this index cannot be the result
 
         CPluginData* p = Data[i];
-        len = (int)strlen(p->Extensions.c_str());
-        if (len > 299)
-            len = 299;
-        memcpy(ext2, p->Extensions.c_str(), len);
-        ext2[len] = 0;
-        s = ext2 + len;
-        while (s > ext2)
+        const std::vector<std::wstring> pluginExtensions = SplitPluginExtensions(p->Extensions);
+        for (const std::wstring& pluginExtension : pluginExtensions)
         {
-            while (--s >= ext2 && *s != ';')
-                ;
-            if (s >= ext2)
-                *s = 0;
-            int j;
-            for (j = 0; j < extArray.Count; j++)
+            bool found = false;
+            for (const std::wstring& extension : extArray)
             {
-                if (StrICmp(s + 1, extArray[j]) == 0) // the sets of extensions have a non-empty intersection
+                if (StrICmpW(pluginExtension.c_str(), extension.c_str()) == 0) // the sets of extensions have a non-empty intersection
                 {
                     if (p->SupportPanelView && !viewFound)
                     {
@@ -2457,11 +2469,12 @@ void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound
                         edit = -i - 1;
                         editFound = TRUE;
                     }
+                    found = true;
                     break;
                 }
             }
-            if (j < extArray.Count)
-                break; // already found, no point in continuing with 'i'
+            if (found)
+                break; // already found, no point in continuing with L'i'
         }
         if (viewFound && editFound)
             break;
@@ -2473,33 +2486,33 @@ void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound
         // in the externalArchivers array in CPlugins::FindViewEdit method
         struct
         {
-            const char* ext;
+            const wchar_t* ext;
             int index;
         } externalArchivers[] =
             {
-                {"J", 0},
-                {"RAR", 1},
-                // {"ARJ", 2},
-                {"LZH", 3},
-                {"UC2", 4},
-                // {"J", 5},
-                // {"RAR", 6},
-                {"ZIP", 7},
-                {"PK3", 7},
-                {"JAR", 7},
-                // {"ZIP;PK3;JAR", 8},
-                {"ARJ", 9},
-                {"ACE", 10},
-                // {"ACE", 11},
+                {L"J", 0},
+                {L"RAR", 1},
+                // {L"ARJ", 2},
+                {L"LZH", 3},
+                {L"UC2", 4},
+                // {L"J", 5},
+                // {L"RAR", 6},
+                {L"ZIP", 7},
+                {L"PK3", 7},
+                {L"JAR", 7},
+                // {L"ZIP;PK3;JAR", 8},
+                {L"ARJ", 9},
+                {L"ACE", 10},
+                // {L"ACE", 11},
                 {NULL, 0}};
 
         i = 0;
         while (externalArchivers[i].ext != NULL)
         {
-            int j;
-            for (j = 0; j < extArray.Count; j++)
+            size_t j;
+            for (j = 0; j < extArray.size(); j++)
             {
-                if (StrICmp(externalArchivers[i].ext, extArray[j]) == 0) // ext. archiver found
+                if (StrICmpW(externalArchivers[i].ext, extArray[j].c_str()) == 0) // ext. archiver found
                 {
                     if (!viewFound)
                     {
@@ -2521,12 +2534,12 @@ void CPlugins::FindViewEdit(const char* extensions, int exclude, BOOL& viewFound
     }
 }
 
-BOOL CPlugins::FindDLL(const char* dllName, int& index)
+BOOL CPlugins::FindDLL(const wchar_t* dllName, int& index)
 {
     int i;
     for (i = 0; i < Data.Count; i++)
     {
-        if (StrICmp(Data[i]->DLLName.c_str(), dllName) == 0)
+        if (StrICmpW(Data[i]->DLLName.c_str(), dllName) == 0)
         {
             index = i;
             return TRUE;
@@ -2681,97 +2694,99 @@ int CPlugins::GetViewerCount(int index)
 }
 
 // helper function for CPlugins::AutoInstallStdPluginsDir
-void SearchForPlugins(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATAW& data)
+void SearchForPlugins(const std::wstring& directory, std::vector<std::wstring>& foundFiles)
 {
-    strcpy(s++, "\\*");
-    HANDLE find = SalFindFirstFileHW(buf, &data);
+    // data.cFileName arrives WIDE from FindFirstFileW. This used to narrow it
+    // through WideCharToMultiByte, build a narrow path, then AnsiToWide it back to call the wide
+    // API - a full round trip through the code page for a name that was already correct.
+    const std::wstring searchMask = directory + L"\\*";
+    // SalFindFirstFileHW accepts a UTF-16 path and returns WIN32_FIND_DATAW.
+    WIN32_FIND_DATAW data;
+    HANDLE find = SalFindFirstFileHW(searchMask.c_str(), &data);
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
             if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
             {
-                char* str = strrchr(cFileNameA, '.');
-                //        if (str != NULL && str > cFileNameA && StrICmp(str, ".dll") == 0) // ".cvspass" in Windows is treated as an extension ...
-                if (str != NULL && StrICmp(str, ".dll") == 0)
+                const wchar_t* str = wcsrchr(data.cFileName, L'.');
+                if (str != NULL && StrICmpW(str, L".dll") == 0)
                 { // DLL extension, check if it exports SalamanderPluginEntry
-                    strcpy(s, cFileNameA);
-                    if (!DllExportsSalamanderEntry(AnsiToWide(buf).c_str()))
+                    const std::wstring file = directory + L"\\" + data.cFileName;
+                    if (!DllExportsSalamanderEntry(file.c_str()))
                     {
-                        TRACE_I("SearchForPlugins: skipping non-plugin DLL: " << buf);
+                        TRACE_IW(L"SearchForPlugins: skipping non-plugin DLL: " << file);
                         continue;
                     }
-                    str = DupStr(buf);
-                    if (str != NULL)
-                    {
-                        foundFiles.Add(str);
-                        if (!foundFiles.IsGood())
-                        {
-                            // foundFiles.ResetState();   // called outside the function, used for error detection
-                            free(str); // tough luck ...
-                        }
-                    }
-                    else
-                        TRACE_E(LOW_MEMORY);
+                    foundFiles.push_back(file);
                 }
             }
             else // it's a directory
             {
-                if (cFileNameA[0] != 0 && strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0)
+                if (data.cFileName[0] != 0 && wcscmp(data.cFileName, L".") != 0 &&
+                    wcscmp(data.cFileName, L"..") != 0)
                 { // not "." or "..", search the subdirectory...
-                    strcpy(s, cFileNameA);
-                    SearchForPlugins(buf, s + strlen(s), foundFiles, data);
+                    SearchForPlugins(directory + L"\\" + data.cFileName, foundFiles);
                 }
             }
         } while (SalLPFindNextFile(find, &data));
-        HANDLES(FindClose(find));
+        SalLPFindClose(find);
     }
 }
 
-BOOL SearchForAddedPlugins(char* buf, char* s, TIndirectArray<char>& foundFiles)
+BOOL SearchForAddedPlugins(const std::wstring& pluginsDirectory,
+                           std::vector<std::wstring>& foundFiles)
 { // returns TRUE if plugins from 'foundFiles' should be installed and all plugins loaded
-    strcpy(s, "\\plugins.ver");
-    HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(buf).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                                       FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    const std::wstring pluginsVerPath = pluginsDirectory + L"\\plugins.ver";
+    HANDLE file = gFileSystem->CreateFile(pluginsVerPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                          FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, GetLastError(), TRUE);
     if (file != INVALID_HANDLE_VALUE)
     {
+        // CMake writes plugins.ver as UTF-8. Keep it byte-owned until each complete path field
+        // reaches the one strict catalog decoder below.
+        std::string contents;
+        char chunk[4096];
+        for (;;)
+        {
+            DWORD read = 0;
+            if (!gFileSystem->ReadFromHandle(file, chunk, sizeof(chunk), &read).success)
+            {
+                HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+                gFileSystem->CloseFileHandle(file);
+                return FALSE;
+            }
+            if (read == 0)
+                break;
+            contents.append(chunk, read);
+        }
+        HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(file);
+
         BOOL isPluginVerNew = FALSE;
         int lastPluginVer = 0;
-        CPathBuffer line;
-        BOOL isEOF = FALSE;
-        BOOL firstRow = TRUE;
-        DWORD read, off;
-        off = 0;
-        while (isEOF || ReadFile(file, line + off, firstRow ? 20 : line.Size() - off, &read, NULL))
+        bool firstRow = true;
+        size_t cursor = 0;
+        while (cursor < contents.size())
         {
-            if (read == 0)
-                isEOF = TRUE;              // EOF, no point in reading the file further, just process the remaining buffer
-            char* end = line + off + read; // end of valid bytes in buffer
-            char* eol = line;              // first EOL byte (marks line end)
-            while (eol < end && (*eol == '\r' || *eol == '\n'))
-                eol++;         // skip EOLs (even multiple)
-            char* start = eol; // first byte of the line
-            while (eol < end && *eol != '\r' && *eol != '\n')
-                eol++; // search for EOL
-
-            // (start, eol) - next line, process it
-            if (start < eol) // not an empty line
+            while (cursor < contents.size() &&
+                   (contents[cursor] == '\r' || contents[cursor] == '\n'))
+                ++cursor;
+            const size_t start = cursor;
+            while (cursor < contents.size() &&
+                   contents[cursor] != '\r' && contents[cursor] != '\n')
+                ++cursor;
+            if (start < cursor)
             {
-                char* sep = start;
-                while (sep < eol && *sep != ':')
-                    sep++;
-                char num[20];
-                lstrcpyn(num, start, (int)min(20, sep - start + 1));
-                int ver = atoi(num);
-                CPathBuffer name; // Heap-allocated for long path support
-                if (sep + 1 < eol)
-                {
-                    lstrcpyn(name, sep + 1, (int)min(name.Size(), (eol - sep) - 1 + 1));
-                }
-                else
-                    name[0] = 0;
+                const std::string row = contents.substr(start, cursor - start);
+                const size_t separator = row.find(':');
+                const int ver = atoi(row.substr(0, separator).c_str());
+                const std::string nameBytes = separator != std::string::npos && separator + 1 < row.size()
+                                                  ? row.substr(separator + 1)
+                                                  : std::string();
+                std::wstring name;
+                if (!nameBytes.empty() && !sally::plugin_catalog::DecodePath(nameBytes, name))
+                    name.clear();
 
                 // (ver + name) - contents of the currently read line
                 if (firstRow) // first line of the file
@@ -2789,42 +2804,18 @@ BOOL SearchForAddedPlugins(char* buf, char* s, TIndirectArray<char>& foundFiles)
                 else // other lines of the file
                 {
                     if (ver > lastPluginVer && // newly added plugin
-                        name[0] != 0)          // only if the line is OK
+                        !name.empty())         // only if the line is OK
                     {
-                        if ((name[0] != '\\' || name[1] != '\\') && // not a UNC path
-                            name[1] != ':')                         // not a normal full path
-                        {                                           // path relative to the plugins directory
-                            int l = (int)(s - buf + 1);
-                            memmove(name + l, name, min((int)strlen(name) + 1, name.Size() - l));
-                            memcpy(name, buf, l); // assumes buf contains the path including backslash
-                        }
-                        DWORD attrs = GetFileAttributesW(AnsiToWide(name).c_str());
-                        if (attrs != 0xFFFFFFFF && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
+                        name = GetPluginFullPath(pluginsDirectory, name);
+                        DWORD attrs = gFileSystem->GetFileAttributes(name.c_str());
+                        if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
                         { // the name exists and it's a file
-                            char* str = DupStr(name);
-                            if (str != NULL)
-                            {
-                                foundFiles.Add(str);
-                                if (!foundFiles.IsGood())
-                                {
-                                    // foundFiles.ResetState();   // called outside the function, used for error detection
-                                    free(str); // unfortunate ...
-                                }
-                            }
-                            else
-                                TRACE_E(LOW_MEMORY);
+                            foundFiles.push_back(name);
                         }
                     }
                 }
             }
-
-            // cut off the processed part of the buffer
-            off = (DWORD)(end - eol);
-            if (off == 0 && isEOF)
-                break;
-            memmove(line, eol, off);
         }
-        HANDLES(CloseHandle(file));
         return isPluginVerNew;
     }
     else
@@ -2840,16 +2831,8 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
 
     BOOL ret = FALSE;
 
-    // obtain the "plugins" directory
-    CPathBuffer buf;
-    GetModuleFileName(HInstance, buf, buf.Size());
-    char* s = strrchr(buf, '\\');
-    if (s != NULL)
-    {
-        strcpy(s + 1, "plugins");
-        s = s + strlen(s);
-    }
-    else
+    std::wstring pluginsDirectory;
+    if (!GetPluginsDirectory(pluginsDirectory))
     {
         TRACE_E("Unexpected situation in CPlugins::ReadPluginsVer().");
         return ret; // should not happen
@@ -2858,60 +2841,50 @@ BOOL CPlugins::ReadPluginsVer(HWND parent, BOOL importFromOldConfig)
     LoadInfoBase |= LOADINFO_NEWPLUGINSVER;
 
     // we will search for added plugins listed in the plugins.ver file
-    TIndirectArray<char> foundFiles(10, 10);
-    if (SearchForAddedPlugins(buf, s, foundFiles))
+    std::vector<std::wstring> foundFiles;
+    if (SearchForAddedPlugins(pluginsDirectory, foundFiles))
     {
         ret = TRUE;
         // first uninstall plugins that no longer have a .dll file (are no longer supported)
         RemoveNoLongerExistingPlugins(!importFromOldConfig); // we must not delete the plugin key from the registry when importing from a previous Salamander version
 
         CWaitWindow analysing(parent, 0, FALSE, ooStatic, TRUE);
-        char textProgress[1000];
-        _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), LoadStr(IDS_AUTOINSTALLPLUGINS_INIT));
-        analysing.SetText(textProgress);
+        std::wstring textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), LoadStrW(IDS_AUTOINSTALLPLUGINS_INIT));
+        analysing.SetText(textProgress.c_str());
         analysing.Create();
 
         // for progress compute the number of existing plugins that will be loaded later
         int toLoadCount = GetNumOfPluginsToLoad();
 
         // set the total progress
-        analysing.SetProgressMax((foundFiles.IsGood() ? foundFiles.Count : 0) + toLoadCount);
+        analysing.SetProgressMax((int)foundFiles.size() + toLoadCount);
         int progress = 0;
 
-        if (foundFiles.IsGood())
+        for (const std::wstring& file : foundFiles)
         {
-            *s = 0; // correct the path in buf
-            CPathBuffer pluginName; // Heap-allocated for long path support
-            for (int i = 0; i < foundFiles.Count; i++)
+            const std::wstring directoryPrefix = pluginsDirectory + L"\\";
+            const std::wstring pluginName = file.size() > directoryPrefix.size() &&
+                                                    StrNICmpW(file.c_str(), directoryPrefix.c_str(), (int)directoryPrefix.size()) == 0
+                                                ? file.substr(directoryPrefix.size())
+                                                : file;
+            int index;
+            if (!Plugins.FindDLL(pluginName.c_str(), index))
             {
-                char* file = foundFiles[i];
-                if (StrNICmp(file, buf, (int)strlen(buf)) == 0 && file[strlen(buf)] == '\\')
-                {
-                    memmove(pluginName, file + strlen(buf) + 1, strlen(file) - strlen(buf) + 1 - 1);
-                }
-                else
-                    strcpy(pluginName, file);
-                int index;
-                if (!Plugins.FindDLL(pluginName, index))
-                {
-                    _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName.Get());
-                    analysing.SetText(textProgress);
+                textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), pluginName.c_str());
+                analysing.SetText(textProgress.c_str());
 
-                    Plugins.AddPlugin(parent, pluginName); // whatever we add will already be loaded (loading verifies it is a plugin)
-                }
-                analysing.SetProgressPos(++progress);
+                Plugins.AddPlugin(parent, pluginName.c_str()); // whatever we add will already be loaded (loading verifies it is a plugin)
             }
+            analysing.SetProgressPos(++progress);
         }
-        else
-            foundFiles.ResetState();
 
         // load all plugins so they can restore their data in Salamander...
         for (int i = 0; i < Data.Count; i++)
         {
             if (!Data[i]->GetLoaded())
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
-                analysing.SetText(textProgress);
+                textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
+                analysing.SetText(textProgress.c_str());
 
                 Data[i]->InitDLL(parent, TRUE, FALSE); // suppress the excessive repeated blinking of the cursor
 
@@ -2951,9 +2924,8 @@ BOOL CPlugins::TestAll(HWND parent)
     BOOL err = FALSE;
 
     CWaitWindow analysing(parent, 0, FALSE, ooStatic, TRUE);
-    char textProgress[1000];
-    _snprintf_s(textProgress, _TRUNCATE, "%s\n", LoadStr(IDS_LOADINGPLUGINS));
-    analysing.SetText(textProgress);
+    std::wstring textProgress = FormatStrW(L"%s\n", LoadStrW(IDS_LOADINGPLUGINS));
+    analysing.SetText(textProgress.c_str());
     analysing.Create();
 
     // for progress compute the number of plugins that will be loaded
@@ -2966,8 +2938,8 @@ BOOL CPlugins::TestAll(HWND parent)
         BOOL wasLoaded = Data[i]->GetLoaded();
         if (!wasLoaded)
         {
-            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
-            analysing.SetText(textProgress);
+            textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
+            analysing.SetText(textProgress.c_str());
         }
         if (!Data[i]->InitDLL(parent, FALSE, FALSE))
             err = TRUE;
@@ -3000,9 +2972,8 @@ void CPlugins::LoadAll(HWND parent)
     if (toLoadCount > 0)
     {
         CWaitWindow analysing(parent, 0, FALSE, ooStatic, TRUE);
-        char textProgress[1000];
-        _snprintf_s(textProgress, _TRUNCATE, "%s\n", LoadStr(IDS_LOADINGPLUGINS));
-        analysing.SetText(textProgress);
+        std::wstring textProgress = FormatStrW(L"%s\n", LoadStrW(IDS_LOADINGPLUGINS));
+        analysing.SetText(textProgress.c_str());
         analysing.Create();
 
         analysing.SetProgressMax(toLoadCount);
@@ -3012,8 +2983,8 @@ void CPlugins::LoadAll(HWND parent)
         {
             if (!Data[i]->GetLoaded())
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
-                analysing.SetText(textProgress);
+                textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_LOADINGPLUGINS), Data[i]->DLLName.c_str());
+                analysing.SetText(textProgress.c_str());
 
                 Data[i]->InitDLL(parent, TRUE);
 
@@ -3121,19 +3092,12 @@ void CPlugins::OpenPackOrUnpackDlgForMarkedPlugins(CPluginData** data, int* plug
 }
 
 void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadAllPlugins,
-                                             char* notLoadedPluginNames, int notLoadedPluginNamesSize,
+                                             wchar_t* notLoadedPluginNames, int notLoadedPluginNamesSize,
                                              int maxNotLoadedPluginNames, int* numOfSkippedNotLoadedPluginNames,
                                              HWND parent)
 {
-    CPathBuffer buf;
-    GetModuleFileName(HInstance, buf, buf.Size());
-    char* s = strrchr(buf, '\\');
-    if (s != NULL)
-    {
-        strcpy(s + 1, "plugins\\");
-        s = s + strlen(s);
-    }
-    else
+    std::wstring pluginsDirectory;
+    if (!GetPluginsDirectory(pluginsDirectory))
     {
         TRACE_E("Unexpected situation in CPlugins::RemoveNoLongerExistingPlugins().");
         return; // should not happen
@@ -3145,11 +3109,11 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
         *numOfSkippedNotLoadedPluginNames = 0;
 
     CWaitWindow analysing(parent, 0, FALSE, ooStatic, TRUE);
-    char textProgress[1000];
+    std::wstring textProgress;
     if (loadAllPlugins)
     {
-        _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), LoadStr(IDS_AUTOINSTALLPLUGINS_INIT));
-        analysing.SetText(textProgress);
+        textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), LoadStrW(IDS_AUTOINSTALLPLUGINS_INIT));
+        analysing.SetText(textProgress.c_str());
         analysing.Create();
     }
 
@@ -3160,37 +3124,30 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
     {
         if (!Data[i]->GetLoaded()) // applies only to unloaded plugins
         {
-            const char* fullName = Data[i]->DLLName.c_str();
-            if ((*fullName != '\\' || *(fullName + 1) != '\\') && // not UNC
-                (*fullName == 0 || *(fullName + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
-            {
-                strcpy(s, fullName);
-                fullName = buf;
-            }
+            const std::wstring fullName = GetPluginFullPath(pluginsDirectory, Data[i]->DLLName);
 
-            DWORD attr = GetFileAttributesW(AnsiToWide(fullName).c_str());
+            // DLLName is wide; the old AnsiToWide() here was a round trip
+            // over a name that had never been narrow.
+            DWORD attr = gFileSystem->GetFileAttributes(fullName.c_str());
             DWORD err = GetLastError();
             if (attr == INVALID_FILE_ATTRIBUTES &&
                 (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND || err == ERROR_BAD_PATHNAME))
             {
-                CPathBuffer pluginName; // Heap-allocated for long path support
-                pluginName[0] = 0;
+                std::wstring pluginName;
                 if (notLoadedPluginNames != NULL && !Data[i]->RegKeyName.empty())
-                {
-                    lstrcpyn(pluginName, Data[i]->Name.c_str(), pluginName.Size()); // if it has a registry key, store its name
-                }
+                    pluginName = Data[i]->Name; // if it has a registry key, store its name
                 if (Remove(parent, i, canDelPluginRegKey))
                 {
                     i--;
-                    if (pluginName[0] != 0)
+                    if (!pluginName.empty())
                     {
                         numOfNotLoaded++;
                         if (numOfNotLoaded <= maxNotLoadedPluginNames &&
-                            (int)strlen(notLoadedPluginNames) + 2 /*", "*/ + (int)strlen(pluginName) + 1 /*null*/ <= notLoadedPluginNamesSize)
+                            (int)wcslen(notLoadedPluginNames) + 2 /*", "*/ + (int)pluginName.size() + 1 /*null*/ <= notLoadedPluginNamesSize)
                         {
                             if (*notLoadedPluginNames != 0)
-                                strcat(notLoadedPluginNames, ", ");
-                            strcat(notLoadedPluginNames, pluginName);
+                                wcscat(notLoadedPluginNames, L", ");
+                            wcscat(notLoadedPluginNames, pluginName.c_str());
                         }
                         else
                         {
@@ -3216,8 +3173,8 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
         {
             if (!Data[i]->GetLoaded())
             {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
-                analysing.SetText(textProgress);
+                textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
+                analysing.SetText(textProgress.c_str());
 
                 if (!Data[i]->InitDLL(parent, TRUE, FALSE)) // suppress the excessive repeated blinking of the cursor
                 {
@@ -3225,11 +3182,11 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
                     { // if it has a registry key, store its name
                         numOfNotLoaded++;
                         if (numOfNotLoaded <= maxNotLoadedPluginNames &&
-                            (int)strlen(notLoadedPluginNames) + 2 /*", "*/ + (int)Data[i]->Name.size() + 1 /*null*/ <= notLoadedPluginNamesSize)
+                            (int)wcslen(notLoadedPluginNames) + 2 /*", "*/ + (int)Data[i]->Name.size() + 1 /*null*/ <= notLoadedPluginNamesSize)
                         {
                             if (*notLoadedPluginNames != 0)
-                                strcat(notLoadedPluginNames, ", ");
-                            strcat(notLoadedPluginNames, Data[i]->Name.c_str());
+                                wcscat(notLoadedPluginNames, L", ");
+                            wcscat(notLoadedPluginNames, Data[i]->Name.c_str());
                         }
                         else
                         {
@@ -3254,25 +3211,16 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
 {
     CALL_STACK_MESSAGE1("CPlugins::AutoInstallStdPluginsDir()");
 
-    // obtain the "plugins" directory
-    CPathBuffer buf;
-    GetModuleFileName(HInstance, buf, buf.Size());
-    char* s = strrchr(buf, '\\');
-    if (s != NULL)
-    {
-        strcpy(s + 1, "plugins");
-        s = s + strlen(s);
-    }
-    else
+    std::wstring pluginsDirectory;
+    if (!GetPluginsDirectory(pluginsDirectory))
     {
         TRACE_E("Unexpected situation in CPlugins::AutoInstallStdPluginsDir().");
         return; // should not happen
     }
 
     CWaitWindow analysing(parent, 0, FALSE, ooStatic, TRUE);
-    char textProgress[1000];
-    _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), LoadStr(IDS_AUTOINSTALLPLUGINS_INIT));
-    analysing.SetText(textProgress);
+    std::wstring textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), LoadStrW(IDS_AUTOINSTALLPLUGINS_INIT));
+    analysing.SetText(textProgress.c_str());
     analysing.Create();
 
     // first uninstall plugins that no longer have a .dll file (are no longer supported)
@@ -3281,59 +3229,49 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
     LoadInfoBase |= LOADINFO_NEWSALAMANDERVER;
 
     // search for *.dll in the "plugins" directory and its subdirectories
-    TIndirectArray<char> foundFiles(10, 10);
-    WIN32_FIND_DATAW data;
-    SearchForPlugins(buf, s, foundFiles, data);
+    std::vector<std::wstring> foundFiles;
+    SearchForPlugins(pluginsDirectory, foundFiles);
 
     // for progress compute the number of existing plugins that will be loaded later
     int toLoadCount = GetNumOfPluginsToLoad();
 
     // set the total progress
-    analysing.SetProgressMax((foundFiles.IsGood() ? foundFiles.Count : 0) + toLoadCount);
+    analysing.SetProgressMax((int)foundFiles.size() + toLoadCount);
     int progress = 0;
 
-    if (foundFiles.IsGood())
+    for (const std::wstring& file : foundFiles)
     {
-        *s = 0; // correct the path in buf
-        CPathBuffer pluginName; // Heap-allocated for long path support
-        for (int i = 0; i < foundFiles.Count; i++)
+        const std::wstring directoryPrefix = pluginsDirectory + L"\\";
+        const std::wstring pluginName = file.size() > directoryPrefix.size() &&
+                                                StrNICmpW(file.c_str(), directoryPrefix.c_str(), (int)directoryPrefix.size()) == 0
+                                            ? file.substr(directoryPrefix.size())
+                                            : file;
+        int index;
+        if (!Plugins.FindDLL(pluginName.c_str(), index))
         {
-            char* file = foundFiles[i];
-            if (StrNICmp(file, buf, (int)strlen(buf)) == 0 && file[strlen(buf)] == '\\')
-            {
-                memmove(pluginName, file + strlen(buf) + 1, strlen(file) - strlen(buf) + 1 - 1);
-            }
-            else
-                strcpy(pluginName, file);
-            int index;
-            if (!Plugins.FindDLL(pluginName, index))
-            {
-                _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), pluginName.Get());
-                analysing.SetText(textProgress);
+            textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), pluginName.c_str());
+            analysing.SetText(textProgress.c_str());
 
-                if (Plugins.AddPlugin(parent, pluginName)) // whatever we add, will already be loaded (loading verifies it is a plugin)
+            if (Plugins.AddPlugin(parent, pluginName.c_str())) // whatever we add, will already be loaded (loading verifies it is a plugin)
+            {
+                CPluginData* p = Plugins.Get(Plugins.GetCount() - 1);
+                if (StrICmpW(p->DLLName.c_str(), L"nethood\\nethood.dll") == 0)
                 {
-                    CPluginData* p = Plugins.Get(Plugins.GetCount() - 1);
-                    if (StrICmp(p->DLLName.c_str(), "nethood\\nethood.dll") == 0)
-                    {
-                        int index2 = AddPluginToOrder(p->DLLName.c_str(), TRUE);
-                        Plugins.ChangePluginsOrder(index2, 0);
-                    }
+                    int index2 = AddPluginToOrder(p->DLLName.c_str(), TRUE);
+                    Plugins.ChangePluginsOrder(index2, 0);
                 }
             }
-            analysing.SetProgressPos(++progress);
         }
+        analysing.SetProgressPos(++progress);
     }
-    else
-        foundFiles.ResetState();
 
     // load all plugins so they can restore their data in Salamander...
     for (int i = 0; i < Data.Count; i++)
     {
         if (!Data[i]->GetLoaded())
         {
-            _snprintf_s(textProgress, _TRUNCATE, "%s\n%s", LoadStr(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
-            analysing.SetText(textProgress);
+            textProgress = FormatStrW(L"%s\n%s", LoadStrW(IDS_AUTOINSTALLPLUGINS), Data[i]->DLLName.c_str());
+            analysing.SetText(textProgress.c_str());
 
             Data[i]->InitDLL(parent, TRUE, FALSE); // suppress the excessive repeated blinking of the cursor
 
@@ -3347,18 +3285,22 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
     DestroyWindow(analysing.HWindow);
 }
 
-BOOL CPlugins::EnumInstalledModules(int* index, char* module, char* version)
+BOOL CPlugins::EnumInstalledModules(int* index, std::wstring& module, std::wstring& version)
 {
     CALL_STACK_MESSAGE1("CPlugins::EnumInstalledModules()");
+    module.clear();
+    version.clear();
     if (*index == 0)
     {
         // obtain the full name of sally.exe
-        GetModuleFileName(HInstance, module, MAX_PATH);
+        if (gPathService == nullptr ||
+            !gPathService->GetModuleFileName(HInstance, module).success)
+            return FALSE;
         // obtain the version
-        const char* s = SALAMANDER_TEXT_VERSION;
-        while (*s != 0 && (*s < '0' || *s > '9'))
+        const wchar_t* s = SALAMANDER_TEXT_VERSIONW();
+        while (*s != 0 && (*s < L'0' || *s > L'9'))
             s++;
-        strcpy(version, s);
+        version = s;
         (*index)++;
         return TRUE;
     }
@@ -3368,19 +3310,17 @@ BOOL CPlugins::EnumInstalledModules(int* index, char* module, char* version)
         {
             CPluginData* data = Data[*index - 1];
             // obtain the full name of the DLL
-            const char* s = data->DLLName.c_str();
-            if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-                (*s == 0 || *(s + 1) != ':'))       // not "c:" -> relative path to packers
-            {
-                GetModuleFileName(HInstance, module, MAX_PATH);
-                char* p = strrchr(module, '\\') + 1;
-                strcpy(p, "plugins\\");
-                strcat(p, data->DLLName.c_str());
-            }
+            if (IsAbsolutePluginPath(data->DLLName))
+                module = data->DLLName;
             else
-                strcpy(module, s);
+            {
+                std::wstring pluginsDirectory;
+                if (!GetPluginsDirectory(pluginsDirectory))
+                    return FALSE;
+                module = GetPluginFullPath(pluginsDirectory, data->DLLName);
+            }
             // obtain the version
-            strcpy(version, data->Version.c_str());
+            version = data->Version;
             (*index)++;
             return TRUE;
         }
@@ -3396,9 +3336,9 @@ void CPlugins::Event(int event, DWORD param)
         Data[i]->Event(event, param);
 }
 
-void CPlugins::AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+void CPlugins::AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
 {
-    CALL_STACK_MESSAGE3("CPlugins::AcceptChangeOnPathNotification(%s, %d)", path, includingSubdirs);
+    CALL_STACK_MESSAGE3("CPlugins::AcceptChangeOnPathNotification(%ls, %d)", path, includingSubdirs);
     int i;
     for (i = 0; i < Data.Count; i++)
         Data[i]->AcceptChangeOnPathNotification(path, includingSubdirs);
@@ -3500,8 +3440,8 @@ BOOL CPlugins::HandleKeyDown(WPARAM wParam, LPARAM lParam, CFilesWindow* activeP
         // but for combinations like Ctrl+Shift+Alt+letter neither WM_CHAR nor WM_SYSCHAR arrive,
         // therefore WM_KEYDOWN and WM_SYSKEYDOWN must be used, which then subsequently send WM_CHAR and WM_SYSCHAR
         MSG msg;
-        PeekMessage(&msg, hParent, WM_SYSCHAR, WM_SYSCHAR, PM_REMOVE);
-        PeekMessage(&msg, hParent, WM_CHAR, WM_CHAR, PM_REMOVE);
+        PeekMessageW(&msg, hParent, WM_SYSCHAR, WM_SYSCHAR, PM_REMOVE);
+        PeekMessageW(&msg, hParent, WM_CHAR, WM_CHAR, PM_REMOVE);
 
         // lower the thread priority to "normal" so the operation doesn't burden the machine too much
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -3524,10 +3464,10 @@ BOOL CPlugins::HandleKeyDown(WPARAM wParam, LPARAM lParam, CFilesWindow* activeP
     return FALSE;
 }
 
-void CPlugins::SetLastPlgCmd(const char* dllName, int id)
+void CPlugins::SetLastPlgCmd(const wchar_t* dllName, int id)
 {
-    CALL_STACK_MESSAGE3("CPlugins::SetLastPlgCmd(%s, %d)", dllName, id);
-    LastPlgCmdPlugin = dllName ? dllName : ""; // if allocation fails, LastPlgCmdPlugin will be NULL and the menu will show the default item
+    CALL_STACK_MESSAGE3("CPlugins::SetLastPlgCmd(%ls, %d)", dllName, id);
+    LastPlgCmdPlugin = dllName ? dllName : L""; // if allocation fails, LastPlgCmdPlugin will be NULL and the menu will show the default item
     LastPlgCmdID = id;
 }
 
@@ -3552,7 +3492,7 @@ void CPlugins::ClearLastSLGNames()
         Data[i]->LastSLGName.clear();
 }
 
-BOOL CPlugins::GetFirstNethoodPluginFSName(char* fsName, CPluginData** nethoodPlugin)
+BOOL CPlugins::GetFirstNethoodPluginFSName(std::wstring* fsName, CPluginData** nethoodPlugin)
 {
     int i;
     for (i = 0; i < Data.Count; i++)
@@ -3561,7 +3501,7 @@ BOOL CPlugins::GetFirstNethoodPluginFSName(char* fsName, CPluginData** nethoodPl
         if (p->PluginIsNethood && p->SupportFS && !p->FSNames.empty())
         {
             if (fsName != NULL)
-                lstrcpyn(fsName, p->FSNames[0].c_str(), MAX_PATH);
+                *fsName = p->FSNames[0];
             if (nethoodPlugin != NULL)
                 *nethoodPlugin = p;
             return TRUE;

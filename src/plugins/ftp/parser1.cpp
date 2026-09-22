@@ -1,9 +1,8 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 // skips spaces, tabs and EOLs, returns TRUE if 's' has not reached the end of the string ('end')
 BOOL SkipWSAndEOLs(const char*& s, const char* end)
 {
@@ -125,7 +124,7 @@ BOOL SkipIdentifier(const char*& s, const char* end, int* errorResID, int emptyE
     }
 }
 
-CFTPParserFunctionCode FindFunctionCode(const char* name)
+CFTPParserFunctionCode FindFunctionCode(std::string_view name)
 {
     static const char* functionNames[] = {
         "skip_white_spaces",
@@ -195,7 +194,7 @@ CFTPParserFunctionCode FindFunctionCode(const char* name)
     };
     int i;
     for (i = 0; i < count; i++)
-        if (_stricmp(functionNames[i], name) == 0)
+        if (FtpEqualAsciiTokenNoCase(functionNames[i], name))
             return functionCodes[i];
     return fpfNone;
 }
@@ -250,8 +249,8 @@ BOOL CFTPParser::CompileNewRule(const char*& rules, const char* rulesEnd,
                     if (SkipIdentifier(rules, rulesEnd, errorResID, IDS_STPAR_ERR_INVALIDFUNCNAME))
                     {
                         funcExpected = FALSE; // we have already encountered the function
-                        char functionName[100];
-                        lstrcpyn(functionName, beg, (int)min(100, rules - beg + 1));
+                        const std::string_view functionName(
+                            beg, static_cast<size_t>(rules - beg));
                         CFTPParserFunctionCode func = FindFunctionCode(functionName);
                         if (func == fpfNone)
                         {
@@ -328,25 +327,32 @@ BOOL CFTPParser::CompileNewRule(const char*& rules, const char* rulesEnd,
 // CFTPParserRule
 //
 
-BOOL FindColumnIndex(const char* columnName, TIndirectArray<CSrvTypeColumn>* columns,
-                     int* columnIndex, int* errorResID)
+static BOOL EqualColumnIdentifier(std::string_view columnName, const char* candidate)
 {
-    if (_stricmp(columnName, "is_dir") == 0)
+    const char* value = candidate != NULL ? candidate : "";
+    const size_t length = strlen(value);
+    return columnName.size() == length && _strnicmp(columnName.data(), value, length) == 0;
+}
+
+BOOL FindColumnIndex(std::string_view columnName, TIndirectArray<CSrvTypeColumn>* columns,
+                      int* columnIndex, int* errorResID)
+{
+    if (EqualColumnIdentifier(columnName, "is_dir"))
         *columnIndex = COL_IND_ISDIR;
     else
     {
-        if (_stricmp(columnName, "is_hidden") == 0)
+        if (EqualColumnIdentifier(columnName, "is_hidden"))
             *columnIndex = COL_IND_ISHIDDEN;
         else
         {
-            if (_stricmp(columnName, "is_link") == 0)
+            if (EqualColumnIdentifier(columnName, "is_link"))
                 *columnIndex = COL_IND_ISLINK;
             else
             {
                 int i;
                 for (i = 0; i < columns->Count; i++)
                 {
-                    if (_stricmp(columnName, HandleNULLStr(columns->At(i)->ID)) == 0)
+                    if (EqualColumnIdentifier(columnName, columns->At(i)->ID))
                     {
                         if (columns->At(i)->Type == stctExt || columns->At(i)->Type == stctType)
                         {
@@ -367,7 +373,7 @@ BOOL FindColumnIndex(const char* columnName, TIndirectArray<CSrvTypeColumn>* col
     return TRUE;
 }
 
-BOOL FindStateVarOrBool(const char* name, CFTPParserStateVariables* var, int* boolVal)
+BOOL FindStateVarOrBool(std::string_view name, CFTPParserStateVariables* var, int* boolVal)
 {
     static const char* names[] = {
         "false",
@@ -392,7 +398,7 @@ BOOL FindStateVarOrBool(const char* name, CFTPParserStateVariables* var, int* bo
     int i;
     for (i = 0; i < count; i++)
     {
-        if (_stricmp(names[i], name) == 0)
+        if (FtpEqualAsciiTokenNoCase(names[i], name))
         {
             if (i < 2)
                 *boolVal = (i == 1);
@@ -479,9 +485,7 @@ BOOL CFTPParserRule::CompileNewFunction(CFTPParserFunctionCode func, const char*
                                     const char* beg = rules;
                                     if (SkipIdentifier(rules, rulesEnd, errorResID, IDS_STPAR_ERR_INVALIDCOLUMNID))
                                     {
-                                        char columnName[STC_ID_MAX_SIZE];
-                                        lstrcpyn(columnName, beg, (int)min(STC_ID_MAX_SIZE, rules - beg + 1));
-                                        if (!FindColumnIndex(columnName, columns, &columnIndex, errorResID))
+                                        if (!FindColumnIndex(std::string_view(beg, rules - beg), columns, &columnIndex, errorResID))
                                             return FALSE;
 
                                         // skip the closing '>' as well
@@ -650,8 +654,8 @@ BOOL CFTPParserRule::CompileNewFunction(CFTPParserFunctionCode func, const char*
                                 const char* beg = rules;
                                 if (SkipIdentifier(rules, rulesEnd, errorResID, IDS_STPAR_ERR_INVALVARORBOOL))
                                 {
-                                    char name[100];
-                                    lstrcpyn(name, beg, (int)min(100, rules - beg + 1));
+                                    const std::string_view name(
+                                        beg, static_cast<size_t>(rules - beg));
                                     CFTPParserStateVariables var = psvNone;
                                     int boolVal = -1;
                                     if (!FindStateVarOrBool(name, &var, &boolVal))
@@ -1576,8 +1580,11 @@ CFTPParserParameter::GetFuncParType(TIndirectArray<CSrvTypeColumn>* columns)
     }
 }
 
-char* GetStringStateVariable(CFTPParserStateVariables stateVar, const char* listing,
-                             const char* listingEnd, BOOL* needDealloc, BOOL* lowMemErr)
+static BOOL GetStringStateVariableBytes(CFTPParserStateVariables stateVar,
+                                        const char* listing,
+                                        const char* listingEnd,
+                                        const CFtpTextCodec& textCodec,
+                                        std::string_view& value) noexcept
 {
     switch (stateVar)
     {
@@ -1589,7 +1596,15 @@ char* GetStringStateVariable(CFTPParserStateVariables stateVar, const char* list
         if (stateVar == psvNextChar)
         {
             if (s < listingEnd)
-                s++;
+            {
+                size_t characterBytes = 0;
+                if (!FtpAdvanceEncodedCharacters(
+                        textCodec,
+                        std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                        1, characterBytes))
+                    return FALSE;
+                s += characterBytes;
+            }
         }
         else
         {
@@ -1604,58 +1619,21 @@ char* GetStringStateVariable(CFTPParserStateVariables stateVar, const char* list
                     s++;
             }
         }
-        char* str = (char*)malloc((s - listing) + 1);
-        if (str == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            *lowMemErr = TRUE;
-            break;
-        }
-        memcpy(str, listing, s - listing);
-        str[s - listing] = 0;
-        *needDealloc = TRUE;
-        return str;
+        value = std::string_view(listing, static_cast<size_t>(s - listing));
+        return TRUE;
     }
 
     default:
-        TRACE_E("GetStringStateVariable(): unknown state variable!");
-        break;
-    }
-    *needDealloc = FALSE;
-    return NULL;
-}
-
-const char*
-CFTPParserParameter::GetString(const char* listing, const char* listingEnd, BOOL* needDealloc,
-                               BOOL* lowMemErr)
-{
-#ifdef _DEBUG
-    if (Type != pptString &&
-        (Type != pptStateVar ||
-         StateVar != psvNextWord && StateVar != psvNextChar && StateVar != psvRestOfLine))
-    {
-        TRACE_E("Unexpected situation in CFTPParserParameter::GetString(): not a string!");
-        return NULL;
-    }
-#endif
-    if (Type == pptString)
-    {
-        *needDealloc = FALSE;
-        return String;
-    }
-    else
-    {
-        if (Type == pptStateVar)
-            return GetStringStateVariable(StateVar, listing, listingEnd, needDealloc, lowMemErr);
-        *needDealloc = FALSE;
-        return NULL;
+        TRACE_E("GetStringStateVariableBytes(): unknown state variable!");
+        return FALSE;
     }
 }
 
 BOOL CFTPParserParameter::GetBoolean(CFileData* file, BOOL* isDir,
                                      CFTPListingPluginDataInterface* dataIface,
                                      TIndirectArray<CSrvTypeColumn>* columns, const char* listing,
-                                     const char* listingEnd, CFTPParser* actualParser)
+                                     const char* listingEnd, CFTPParser* actualParser,
+                                     const CFtpTextCodec& textCodec)
 {
 #ifdef _DEBUG
     if (Type != pptBoolean && Type != pptExpression &&
@@ -1713,9 +1691,9 @@ BOOL CFTPParserParameter::GetBoolean(CFileData* file, BOOL* isDir,
                             case potBoolean:
                             {
                                 BOOL l = left->GetBoolean(file, isDir, dataIface, columns, listing,
-                                                          listingEnd, actualParser);
+                                                          listingEnd, actualParser, textCodec);
                                 BOOL r = right->GetBoolean(file, isDir, dataIface, columns, listing,
-                                                           listingEnd, actualParser);
+                                                           listingEnd, actualParser, textCodec);
                                 switch (BinOperator)
                                 {
                                 case pboEqual:
@@ -1730,67 +1708,46 @@ BOOL CFTPParserParameter::GetBoolean(CFileData* file, BOOL* isDir,
 
                             case potString:
                             {
-                                const char* lBeg;
-                                const char* lEnd;
-                                left->GetStringOperand(&lBeg, &lEnd, file, dataIface, columns, listing, listingEnd);
-                                const char* rBeg;
-                                const char* rEnd;
-                                right->GetStringOperand(&rBeg, &rEnd, file, dataIface, columns, listing, listingEnd);
+                                std::wstring leftText;
+                                std::wstring rightText;
+                                if (!left->GetStringOperand(leftText, file, dataIface, columns,
+                                                            listing, listingEnd, textCodec) ||
+                                    !right->GetStringOperand(rightText, file, dataIface, columns,
+                                                             listing, listingEnd, textCodec))
+                                    return FALSE;
                                 switch (BinOperator)
                                 {
                                 case pboEqual:
-                                    return lEnd - lBeg == rEnd - rBeg && strncmp(lBeg, rBeg, lEnd - lBeg) == 0;
+                                    return FtpCompareWideText(leftText, rightText, FALSE) ==
+                                           CFtpTextCompareStatus::Equal;
                                 case pboNotEqual:
-                                    return lEnd - lBeg != rEnd - rBeg || strncmp(lBeg, rBeg, lEnd - lBeg) != 0;
+                                    return FtpCompareWideText(leftText, rightText, FALSE) ==
+                                           CFtpTextCompareStatus::NotEqual;
 
                                 case pboStrEqual:
-                                    return lEnd - lBeg == rEnd - rBeg &&
-                                           SalamanderGeneral->StrNICmp(lBeg, rBeg, (int)(lEnd - lBeg)) == 0;
+                                    return FtpCompareWideText(leftText, rightText, TRUE) ==
+                                           CFtpTextCompareStatus::Equal;
                                 case pboStrNotEqual:
-                                    return lEnd - lBeg != rEnd - rBeg ||
-                                           SalamanderGeneral->StrNICmp(lBeg, rBeg, (int)(lEnd - lBeg)) != 0;
+                                    return FtpCompareWideText(leftText, rightText, TRUE) ==
+                                           CFtpTextCompareStatus::NotEqual;
 
                                 case pboSubStrIsInString:
                                 case pboSubStrIsNotInString:
                                 {
-                                    BOOL found = FALSE;
-                                    if (lBeg < lEnd) // non-empty sample to search for
-                                    {
-                                        const char* s = rBeg;
-                                        while (s < rEnd)
-                                        {
-                                            if (LowerCase[*lBeg] == LowerCase[*s]) // does the first letter of the pattern match
-                                            {                                      // searching for 'lBeg' in 's' (using the simplest algorithm - O(m*n), but almost O(1) in real cases)
-                                                const char* m = lBeg + 1;
-                                                const char* t = s + 1;
-                                                while (m < lEnd && t < rEnd && LowerCase[*m] == LowerCase[*t])
-                                                {
-                                                    m++;
-                                                    t++;
-                                                }
-                                                if (m == lEnd) // found
-                                                {
-                                                    found = TRUE;
-                                                    break;
-                                                }
-                                            }
-                                            s++;
-                                        }
-                                    }
-                                    else
-                                        found = TRUE;
-                                    if (BinOperator == pboSubStrIsInString)
-                                        return found;
-                                    else
-                                        return !found;
+                                    const CFtpTextCompareStatus comparison =
+                                        FtpContainsWideTextNoCase(rightText, leftText);
+                                    return comparison ==
+                                           (BinOperator == pboSubStrIsInString
+                                                ? CFtpTextCompareStatus::Equal
+                                                : CFtpTextCompareStatus::NotEqual);
                                 }
 
                                 case pboStrEndWithString:
-                                    return lEnd - lBeg >= rEnd - rBeg &&
-                                           SalamanderGeneral->StrNICmp(lEnd - (rEnd - rBeg), rBeg, (int)(rEnd - rBeg)) == 0;
+                                    return FtpEndsWithWideTextNoCase(leftText, rightText) ==
+                                           CFtpTextCompareStatus::Equal;
                                 case pboStrNotEndWithString:
-                                    return lEnd - lBeg < rEnd - rBeg ||
-                                           SalamanderGeneral->StrNICmp(lEnd - (rEnd - rBeg), rBeg, (int)(rEnd - rBeg)) != 0;
+                                    return FtpEndsWithWideTextNoCase(leftText, rightText) ==
+                                           CFtpTextCompareStatus::NotEqual;
 
                                 default:
                                     TRACE_E("Unexpected string operator in CFTPParserParameter::GetBoolean()");
@@ -1954,10 +1911,11 @@ void CFTPParserParameter::GetTimeOperand(CFTPTime* time, CFileData* file,
         dataIface->GetTimeFromColumn(*file, ColumnIndex, time);
 }
 
-void CFTPParserParameter::GetStringOperand(const char** beg, const char** end, CFileData* file,
+BOOL CFTPParserParameter::GetStringOperand(std::wstring& value, CFileData* file,
                                            CFTPListingPluginDataInterface* dataIface,
                                            TIndirectArray<CSrvTypeColumn>* columns,
-                                           const char* listing, const char* listingEnd)
+                                           const char* listing, const char* listingEnd,
+                                           const CFtpTextCodec& textCodec) noexcept
 {
 #ifdef _DEBUG
     if (Type != pptString &&
@@ -1967,54 +1925,47 @@ void CFTPParserParameter::GetStringOperand(const char** beg, const char** end, C
              columns->At(ColumnIndex)->Type != stctGeneralText))
     {
         TRACE_E("Unexpected situation in CFTPParserParameter::GetStringOperand(): not a string!");
-        *beg = NULL;
-        *end = NULL;
-        return;
+        return FALSE;
     }
 #endif
+    std::wstring staged;
     if (Type == pptString)
     {
-        *beg = String;
-        *end = String + (String == NULL ? 0 : strlen(String));
+        if (!FtpDecodeLocalText(String == NULL ? "" : String, staged))
+            return FALSE;
     }
     else
     {
         if (Type == pptStateVar)
         {
-            const char* s = listing;
-            if (StateVar == psvNextChar)
-            {
-                if (s < listingEnd)
-                    s++;
-            }
-            else
-            {
-                if (StateVar == psvNextWord)
-                {
-                    while (s < listingEnd && *s > ' ')
-                        s++;
-                }
-                else // psvRestOfLine
-                {
-                    while (s < listingEnd && *s != '\r' && *s != '\n')
-                        s++;
-                }
-            }
-            *beg = listing;
-            *end = s;
+            std::string_view bytes;
+            if (!GetStringStateVariableBytes(StateVar, listing, listingEnd,
+                                             textCodec, bytes) ||
+                !textCodec.Decode(bytes.data(), bytes.size(), staged))
+                return FALSE;
         }
         else
         {
             if (columns->At(ColumnIndex)->Type == stctName)
             {
-                *beg = file->Name;
-                *end = file->Name + (file->Name == NULL ? 0 : strlen(file->Name));
+                try
+                {
+                    staged = file->Name == NULL ? L"" : file->Name;
+                }
+                catch (...)
+                {
+                    return FALSE;
+                }
             }
             else
             {
-                *beg = dataIface->GetStringFromColumn(*file, ColumnIndex);
-                *end = *beg + (*beg == NULL ? 0 : strlen(*beg));
+                const char* bytes = dataIface->GetStringFromColumn(*file, ColumnIndex);
+                if (!textCodec.Decode(bytes == NULL ? "" : bytes,
+                                      bytes == NULL ? 0 : strlen(bytes), staged))
+                    return FALSE;
             }
         }
     }
+    value.swap(staged);
+    return TRUE;
 }

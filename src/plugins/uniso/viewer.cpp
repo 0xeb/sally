@@ -6,6 +6,7 @@
 #include "dbg.h"
 
 #include "isoimage.h"
+#include "uniso_text.h"
 
 #include "uniso.h"
 #include "uniso.rh"
@@ -33,121 +34,113 @@ CISOImage::CopyDateTimeRecord(CISOImage::CVolumeDateTime &date, BYTE bytes[])
 }
 */
 
-char* ViewerPrintSystemTime(SYSTEMTIME* st)
+static std::string GetTrackTypeText(CISOImage::Track* track)
 {
-    static char buffer[128];
+    CALL_STACK_MESSAGE1("GetTrackTypeText()");
 
-    char date[50], time[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st->wHour, st->wMinute, st->wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st->wDay, st->wMonth, st->wYear);
-
-    sprintf(buffer, "%s %s", date, time);
-    return buffer;
-}
-
-char* ViewerStrNcpy(char data[], int count)
-{
-    static char buffer[129]; // 128 chars + ending '\0'
-
-    if (count > sizeof(buffer) - 1)
-        count = sizeof(buffer) - 1; // we do not want to overwrite memory beyond the buffer
-    strncpy_s(buffer, count + 1, data, _TRUNCATE);
-
-    // kill trailing spaces
-    int idx = (int)strlen(buffer);
-    if (idx && !buffer[idx - 1])
-        idx--;
-    while (idx && (buffer[idx - 1] == ' '))
-        idx--;
-
-    buffer[idx] = '\0';
-
-    return buffer;
-}
-
-static char*
-getTrackTypeStr(CISOImage::Track* track)
-{
-    CALL_STACK_MESSAGE1("getTrackTypeStr( )");
-
-    static char buffer[64];
-
-    ZeroMemory(buffer, 64);
+    std::string text;
 
     switch (track->FSType)
     {
     case CISOImage::fsUnknown:
-        strcpy(buffer, "Unknown");
+        text = "Unknown";
         break;
     case CISOImage::fsAudio:
-        strcpy(buffer, "Audio");
+        text = "Audio";
         break;
     case CISOImage::fsISO9660:
-        strcpy(buffer, "ISO 9660");
+        text = "ISO 9660";
         break;
     case CISOImage::fsUDF_ISO9660:
-        strcpy(buffer, "UDF/ISO 9660");
+        text = "UDF/ISO 9660";
         break;
     case CISOImage::fsUDF_ISO9660_HFS:
-        strcpy(buffer, "UDF/ISO 9660/HFS+");
+        text = "UDF/ISO 9660/HFS+";
         break;
     case CISOImage::fsUDF_HFS:
-        strcpy(buffer, "UDF/HFS+");
+        text = "UDF/HFS+";
         break;
     case CISOImage::fsISO9660_HFS:
-        strcpy(buffer, "ISO 9660/HFS+");
+        text = "ISO 9660/HFS+";
         break;
     case CISOImage::fsHFS:
-        strcpy(buffer, "HFS+");
+        text = "HFS+";
         break;
     case CISOImage::fsUDF_ISO9660_APFS:
-        strcpy(buffer, "UDF/ISO 9660/APFS");
+        text = "UDF/ISO 9660/APFS";
         break;
     case CISOImage::fsUDF_APFS:
-        strcpy(buffer, "UDF/APFS");
+        text = "UDF/APFS";
         break;
     case CISOImage::fsISO9660_APFS:
-        strcpy(buffer, "ISO 9660/APFS");
+        text = "ISO 9660/APFS";
         break;
     case CISOImage::fsAPFS:
-        strcpy(buffer, "APFS");
+        text = "APFS";
         break;
     case CISOImage::fsUDF:
-        strcpy(buffer, "UDF");
+        text = "UDF";
         break;
     case CISOImage::fsData:
-        strcpy(buffer, "Data");
+        text = "Data";
         break;
     case CISOImage::fsXbox:
-        strcpy(buffer, "Xbox");
+        text = "Xbox";
         break;
     }
 
     if (track->Bootable)
     {
-        strcat(buffer, "/bootable");
+        text += "/bootable";
     }
 
     if (track->FSType != CISOImage::fsUnknown && track->FSType != CISOImage::fsAudio && track->FSType != CISOImage::fsHFS)
     {
         if (track->Mode == CISOImage::mMode1)
-            strcat(buffer, " (Mode 1)");
+            text += " (Mode 1)";
         else if (track->Mode == CISOImage::mMode2)
-            strcat(buffer, " (Mode 2)");
+            text += " (Mode 2)";
     }
 
-    return buffer;
+    return text;
 }
 
+static bool WriteLocalizedReportFormat(FILE* outStream, int resourceID, ...) noexcept
+{
+    try
+    {
+        std::string format;
+        if (!EncodeUnisoReportText(LangStr(resourceID), format))
+            return false;
+
+        va_list args;
+        va_start(args, resourceID);
+        const int written = vfprintf(outStream, format.c_str(), args);
+        va_end(args);
+        return written >= 0;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+// The LangStr format strings are narrowed here, and that is correct rather
+// than a shortcut: outStream is fopen(..., "w") - a BYTE-oriented stream - and this file
+// also writes many narrow literals to it. Mixing fwprintf onto the same FILE* would be
+// undefined. The info dump is a narrow text file, so the boundary is the stream itself.
 BOOL CISOImage::DumpInfo(FILE* outStream)
 {
     CALL_STACK_MESSAGE1("CISOImage::DumpInfo( )");
 
+    std::string imageLabel;
+    if (!EncodeUnisoReportText(GetLabel(), imageLabel))
+        return FALSE;
+
     // display information about sessions
-    fprintf(outStream, LoadStr(*GetLabel() ? IDS_INFO_LABEL_LABEL : IDS_INFO_LABEL), GetLabel());
-    fprintf(outStream, LoadStr(IDS_INFO_CNT_SESSIONS), Session.Count);
+    if (!WriteLocalizedReportFormat(outStream, *GetLabel() ? IDS_INFO_LABEL_LABEL : IDS_INFO_LABEL, imageLabel.c_str()) ||
+        !WriteLocalizedReportFormat(outStream, IDS_INFO_CNT_SESSIONS, Session.Count))
+        return FALSE;
 
     int session = 0;
     int limit = 0;
@@ -159,12 +152,19 @@ BOOL CISOImage::DumpInfo(FILE* outStream)
             int trks = Session[session];
             limit += Session[session];
             session++;
-            fprintf(outStream, LoadStr(IDS_INFO_SESSION_NUM), session);
-            fprintf(outStream, LoadStr(IDS_INFO_CNT_TRACKS), trks);
+            if (!WriteLocalizedReportFormat(outStream, IDS_INFO_SESSION_NUM, session) ||
+                !WriteLocalizedReportFormat(outStream, IDS_INFO_CNT_TRACKS, trks))
+                return FALSE;
         }
 
         DWORD size = (DWORD)((Tracks[i]->End - Tracks[i]->Start) / 1024);
-        fprintf(outStream, LoadStr(*Tracks[i]->GetLabel() ? IDS_INFO_TRACK_TYPE_SIZE_LABEL : IDS_INFO_TRACK_TYPE_SIZE), i + 1, getTrackTypeStr(Tracks[i]), size, Tracks[i]->GetLabel());
+        const std::string trackType = GetTrackTypeText(Tracks[i]);
+        std::string trackLabel;
+        if (!EncodeUnisoReportText(Tracks[i]->GetLabel(), trackLabel))
+            return FALSE;
+        if (!WriteLocalizedReportFormat(outStream, *Tracks[i]->GetLabel() ? IDS_INFO_TRACK_TYPE_SIZE_LABEL : IDS_INFO_TRACK_TYPE_SIZE,
+                                        i + 1, trackType.c_str(), size, trackLabel.c_str()))
+            return FALSE;
         if (OpenTrack(i, TRUE))
         {
             Tracks[i]->FileSystem->DumpInfo(outStream);
@@ -172,7 +172,7 @@ BOOL CISOImage::DumpInfo(FILE* outStream)
     } // for
 
     /*
-  fprintf(outStream, "Bootable:                      %s\n", Bootable ? LoadStr(IDS_YES): LoadStr(IDS_NO));
+  fprintf(outStream, "Bootable:                      %s\n", Bootable ? LangStr(IDS_YES).c_str(): LangStr(IDS_NO).c_str());
   if (Bootable)
   {
     fprintf(outStream, "Boot System Identifier:        %s\n", MyStrNcpy((char *)BootRecord.BootSystemIdentifier, 32));

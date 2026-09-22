@@ -59,7 +59,7 @@ struct SHufTable;
 class CGZip : public CZippedFile
 {
 public:
-    CGZip(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize);
+    CGZip(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize);
     virtual ~CGZip();
     BOOL Initialize(unsigned int& errorCode);
     void Cleanup();

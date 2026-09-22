@@ -28,17 +28,12 @@
 //   CMFTSnapshot
 //
 
-const char* const CMFTSnapshot<char>::STRING_EMPTY = "";
 const wchar_t* const CMFTSnapshot<wchar_t>::STRING_EMPTY = L"";
 
-const char* const CMFTSnapshot<char>::STRING_DOT = ".";
 const wchar_t* const CMFTSnapshot<wchar_t>::STRING_DOT = L".";
 
-const char* const CMFTSnapshot<char>::STRING_MFT = "$MFT";
 const wchar_t* const CMFTSnapshot<wchar_t>::STRING_MFT = L"$MFT";
 
-const char* const CMFTSnapshot<char>::STRING_EFS = "$EFS";
 const wchar_t* const CMFTSnapshot<wchar_t>::STRING_EFS = L"$EFS";
 
-const char* const CMFTSnapshot<char>::STRING_BITMAP = "$Bitmap";
 const wchar_t* const CMFTSnapshot<wchar_t>::STRING_BITMAP = L"$Bitmap";

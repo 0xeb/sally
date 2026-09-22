@@ -4,12 +4,12 @@
 
 #pragma once
 
-extern CPathBuffer Command;
-extern CPathBuffer Arguments;
-extern CPathBuffer InitDir;
+extern std::wstring Command;
+extern std::wstring Arguments;
+extern std::wstring InitDir;
 
 extern CSalamanderVarStrEntry ExpCommandVariables[];
 extern CSalamanderVarStrEntry ExpArgumentsVariables[];
 extern CSalamanderVarStrEntry ExpInitDirVariables[];
 
-BOOL ExecuteEditor(const char* tempFile);
+BOOL ExecuteEditor(const wchar_t* tempFile);

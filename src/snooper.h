@@ -9,14 +9,10 @@ class CFilesWindow;
 extern HANDLE RefreshFinishedEvent;
 extern int SnooperSuspended;
 
-void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // new directory for snooper
-void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // change of specified directory
-
-// Wide siblings of AddDirectory / ChangeDirectory. Use these when the panel's
-// wide path cache is populated (sally::unicode::HasWidePathW(panel->GetPathW()))
-// so that FindFirstChangeNotificationW receives the real Unicode bytes instead
-// of the lossy CP_ACP mirror — otherwise background change notifications stop
-// working for paths outside the active code page.
+// The ANSI AddDirectory/ChangeDirectory entry points are DELETED:
+// watching a lossy mirror watched the wrong path. Reach these through
+// IChangeNotifier (common/IChangeNotifier.h) rather than calling them directly;
+// they remain here only because the snooper thread owns the handles.
 void AddDirectoryW(CFilesWindow* win, const wchar_t* pathW, BOOL registerDevNotification);
 void ChangeDirectoryW(CFilesWindow* win, const wchar_t* newPathW, BOOL registerDevNotification);
 

@@ -74,53 +74,63 @@ CPluginFSInterface::ReleaseObject(HWND parent)
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetRootPath(char* userPart)
+CPluginFSInterface::GetRootPath(CSalamanderStringBuffer* userPart)
 {
-    userPart[0] = 0;
-    return TRUE;
+    return userPart != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*userPart, std::wstring());
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetCurrentPath(char* userPart)
+CPluginFSInterface::GetCurrentPath(CSalamanderStringBuffer* userPart)
 {
-    userPart[0] = 0;
-    return TRUE;
+    return userPart != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*userPart, std::wstring());
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
+CPluginFSInterface::GetFullName(CFileData& file, int isDir,
+                                CSalamanderStringBuffer* fullName)
 {
-    buf[0] = 0;
-    //  lstrcpyn(buf, Path, bufSize);  // if the path does not fit, the name definitely will not either (an error will be reported)
     if (isDir == 2)
-        return SalamanderGeneral->CutDirectory(buf, NULL); // up-dir
-    else
-        return SalamanderGeneral->SalPathAppend(buf, file.Name, bufSize);
+        return FALSE;
+    return fullName != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*fullName,
+                                                std::wstring(file.Name));
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success)
+CPluginFSInterface::GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                  CSalamanderStringBuffer* path, BOOL& success)
 {
+    success = FALSE;
     return FALSE; // translation is not possible, let Salamander report the error itself
 }
 
 BOOL WINAPI
-CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                  const wchar_t* userPart)
 {
     return FALSE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                              const wchar_t* userPart)
 {
     return TRUE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                               const char* userPart, char* cutFileName, BOOL* pathWasCut,
-                               BOOL forceRefresh, int mode)
+CPluginFSInterface::ChangePath(int currentFSNameIndex,
+                               CSalamanderStringBuffer* fsName, int fsNameIndex,
+                               const wchar_t* userPart,
+                               CSalamanderStringBuffer* cutFileName,
+                               BOOL* pathWasCut, BOOL forceRefresh, int mode)
 {
+    std::wstring fsNameValue;
+    if (fsName == NULL || !sally::plugin_abi::ReadStringBuffer(*fsName, fsNameValue))
+        return FALSE;
+    (void)fsNameValue;
     if (mode != 3 && (pathWasCut != NULL || cutFileName != NULL))
     {
         TRACE_E("Incorrect value of 'mode' in CPluginFSInterface::ChangePath().");
@@ -128,8 +138,9 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
     if (pathWasCut != NULL)
         *pathWasCut = FALSE;
-    if (cutFileName != NULL)
-        *cutFileName = 0;
+    if (cutFileName != NULL &&
+        !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+        return FALSE;
     if (ErrorState == fesFatal)
     {
         ErrorState = fesOK;
@@ -163,7 +174,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
     // if this is not the Desktop (empty PIDL), insert ".."
     if (!ILIsEmpty(currentPIDL))
     {
-        file.Name = SalamanderGeneral->DupStr("..");
+        file.Name = SalamanderGeneral->DupStr(L"..");
         if (file.Name == NULL)
             goto ON_FATAL_ERROR;
         file.NameLen = 2;
@@ -196,16 +207,17 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
         {
             if (SUCCEEDED(currentFolder->GetDisplayNameOf(idList, SHGDN_INFOLDER, &str)))
             {
-                CPathBuffer name; // Heap-allocated for long path support
-                if (SUCCEEDED(StrRetToBuf(&str, idList, name, name.Size())))
+                PWSTR name = NULL;
+                if (SUCCEEDED(StrRetToStrW(&str, idList, &name)))
                 {
                     file.Name = SalamanderGeneral->DupStr(name);
+                    CoTaskMemFree(name);
                     if (file.Name == NULL)
                     {
                         enumIDList->Release();
                         goto ON_FATAL_ERROR;
                     }
-                    file.NameLen = strlen(file.Name);
+                    file.NameLen = static_cast<DWORD>(wcslen(file.Name));
 
                     BOOL isDir = FALSE;
                     file.Hidden = 0;
@@ -221,7 +233,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                         file.Ext = file.Name + file.NameLen; // folders do not have extensions
                     else
                     {
-                        char* s = strrchr(file.Name, '.');
+                        wchar_t* s = wcsrchr(file.Name, L'.');
                         if (s != NULL)
                             file.Ext = s + 1; // ".cvspass" is treated as an extension in Windows
                         else
@@ -244,7 +256,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                     BOOL ret = isDir ? dir->AddDir(NULL, file, NULL) : dir->AddFile(NULL, file, NULL);
                     if (!ret)
                     {
-                        free(file.Name);
+                        SalamanderGeneral->Free(file.Name);
                         enumIDList->Release();
                         goto ON_FATAL_ERROR;
                     }
@@ -308,7 +320,7 @@ CPluginFSInterface::GetSupportedServices()
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetChangeDriveOrDisconnectItem(const char* fsName, char*& title, HICON& icon, BOOL& destroyIcon)
+CPluginFSInterface::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title, HICON& icon, BOOL& destroyIcon)
 {
     return FALSE;
 }
@@ -317,7 +329,8 @@ HICON WINAPI
 CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
 {
     HICON icon;
-    if (!SalamanderGeneral->GetFileIcon((LPCTSTR)CurrentPIDL, TRUE, &icon, SALICONSIZE_16, TRUE, TRUE))
+    if (!SalamanderGeneral->GetFileIconFromPIDL(CurrentPIDL, &icon,
+                                                SALICONSIZE_16, TRUE, TRUE))
         icon = NULL;
     destroyIcon = TRUE;
     return icon;
@@ -330,87 +343,87 @@ CPluginFSInterface::GetFSFreeSpace(CQuadWord* retValue)
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+CPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
 {
     return TRUE;
 }
 
 void WINAPI
-CPluginFSInterface::ShowInfoDialog(const char* fsName, HWND parent)
+CPluginFSInterface::ShowInfoDialog(const wchar_t* fsName, HWND parent)
 {
 }
 
 BOOL WINAPI
-CPluginFSInterface::ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo)
+CPluginFSInterface::ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo)
 {
-    return TRUE;
+    return command != NULL && sally::plugin_abi::IsValidStringBuffer(*command);
 }
 
 BOOL WINAPI
-CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                                char* newName, BOOL& cancel)
+CPluginFSInterface::QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
+                                CSalamanderStringBuffer* newName, BOOL& cancel)
 {
-    return TRUE;
+    return newName != NULL && sally::plugin_abi::IsValidStringBuffer(*newName);
 }
 
 void WINAPI
-CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs)
+CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs)
 {
 }
 
 BOOL WINAPI
-CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel)
+CPluginFSInterface::CreateDir(const wchar_t* fsName, int mode, HWND parent, CSalamanderStringBuffer* newName, BOOL& cancel)
 {
-    return TRUE;
+    return newName != NULL && sally::plugin_abi::IsValidStringBuffer(*newName);
 }
 
 void WINAPI
-CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
+CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
                              CSalamanderForViewFileOnFSAbstract* salamander,
                              CFileData& file)
 {
 }
 
 BOOL WINAPI
-CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
+CPluginFSInterface::Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                            int selectedFiles, int selectedDirs, BOOL& cancelOrError)
 {
     return TRUE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                      int panel, int selectedFiles, int selectedDirs,
-                                     char* targetPath, BOOL& operationMask,
+                                     CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                      BOOL& cancelOrHandlePath, HWND dropTarget)
 {
-    return TRUE; // success or error/cancel
+    return targetPath != NULL && sally::plugin_abi::IsValidStringBuffer(*targetPath);
 }
 
 BOOL WINAPI
-CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                           const char* sourcePath, SalEnumSelection2 next,
+CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                           const wchar_t* sourcePath, SalEnumSelection2 next,
                                            void* nextParam, int sourceFiles, int sourceDirs,
-                                           char* targetPath, BOOL* invalidPathOrCancel)
+                                           CSalamanderStringBuffer* targetPath, BOOL* invalidPathOrCancel)
 {
     return FALSE; // unknown 'mode'
 }
 
 BOOL WINAPI
-CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
+CPluginFSInterface::ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                                      int selectedFiles, int selectedDirs)
 {
     return FALSE; // cancel
 }
 
 void WINAPI
-CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
+CPluginFSInterface::OpenActiveFolder(const wchar_t* fsName, HWND parent)
 {
     SHELLEXECUTEINFO se;
     memset(&se, 0, sizeof(SHELLEXECUTEINFO));
     se.cbSize = sizeof(SHELLEXECUTEINFO);
     se.fMask = SEE_MASK_IDLIST;
-    se.lpVerb = "open";
+    se.lpVerb = L"open";
     se.hwnd = parent;
     se.nShow = SW_SHOWNORMAL;
     se.lpIDList = CurrentPIDL;
@@ -422,7 +435,7 @@ CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
 #define CMD_ID_LAST 0x7fff
 
 void WINAPI
-CPluginFSInterface::ShowProperties(const char* fsName, HWND parent, int panel,
+CPluginFSInterface::ShowProperties(const wchar_t* fsName, HWND parent, int panel,
                                    int selectedFiles, int selectedDirs)
 {
     LPCITEMIDLIST* pidlArray;
@@ -473,7 +486,7 @@ void RemoveUselessSeparatorsFromMenu(HMENU h)
 }
 
 void WINAPI
-CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                 int panel, int selectedFiles, int selectedDirs)
 {
     if (type == fscmItemsInPanel)

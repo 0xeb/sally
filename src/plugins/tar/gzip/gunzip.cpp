@@ -970,12 +970,12 @@ BOOL CGZip::InflateBlock()
 }
 
 // class constructor
-CGZip::CGZip(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : CZippedFile(filename, file, buffer, start, read, inputSize), CopyInProgress(FALSE), LastBlock(FALSE), CopyCount(0),
+CGZip::CGZip(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : CZippedFile(filename, file, buffer, start, read, inputSize), CopyInProgress(FALSE), LastBlock(FALSE), CopyCount(0),
                                                                                                                                        CopyDistance(0), BlockType(0), LiteralTable(NULL), LiteralBits(0), DistanceTable(NULL),
                                                                                                                                        DistanceBits(0), FixedLiteralTable(NULL), FixedLiteralBits(0), FixedDistanceTable(NULL),
                                                                                                                                        FixedDistanceBits(0), StoredLen(0), BitBuffer(0), BitCount(0), InProgress(FALSE)
 {
-    CALL_STACK_MESSAGE2("CGZip::CGZip(%s, , , )", filename);
+    CALL_STACK_MESSAGE2("CGZip::CGZip(%ls, , , )", filename);
 
     if (Ok)
     {
@@ -1074,32 +1074,27 @@ BOOL CGZip::Initialize(unsigned int& errorCode)
     // read the original file name when present
     if ((flags & ORIG_NAME) != 0)
     {
-        CPathBuffer buffer; char* tmp; // Heap-allocated for long path support
+        std::string buffer;
         unsigned char src;
-        tmp = buffer;
-        while (Ok && (src = FReadByte()) != '\0' && tmp - buffer < sizeof(buffer) - 1)
+        while (Ok && (src = FReadByte()) != '\0')
         {
             if (src != '/')
             {
                 // FIXME: Remove all invalid characters
-                *tmp++ = src == ':' ? '_' : src;
+                buffer.push_back(src == ':' ? '_' : static_cast<char>(src));
             }
             else
             {
                 // If path is given (e.g. /var/mailman/archives/private/grass5/2005-July.txt), take only file name
-                tmp = buffer;
+                buffer.clear();
             }
         }
-        *tmp = '\0';
-        // read the remainder of an overly long name
-        while (Ok && src != '\0')
-            src = FReadByte();
         if (!Ok)
         {
             errorCode = ErrorCode;
             return FALSE;
         }
-        SetOldName(buffer);
+        SetOldName(buffer.c_str());
     }
     // skip the comment when present
     if ((flags & COMMENT) != 0)
@@ -1186,7 +1181,7 @@ void CGZip::Cleanup()
         }
     }
     if (ErrorCode != 0)
-        SalamanderGeneral->ShowMessageBox(LoadErr(ErrorCode, LastError), LoadStr(IDS_GZERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LoadErr(ErrorCode, LastError), LangStr(IDS_GZERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
 }
 

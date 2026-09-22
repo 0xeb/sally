@@ -183,10 +183,10 @@ STDMETHODIMP CArchiveUpdateCallback::GetStream(UInt32 index,
             throw S_OK;
 
         const CFileItem* fi = (*FileItems)[ui->FileItemIndex];
-        ProcessedFileName = GetAnsiString(fi->Name);
+        ProcessedFileName = fi->Name;
 
         // Show file name in the progress dialog
-        SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_ADDTEXT, (LPARAM)(const char*)GetProcessedFile());
+        SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_ADDTEXT, (LPARAM)(const wchar_t*)GetProcessedFile());
 
         if (fi->IsDir)
             throw S_OK;
@@ -195,10 +195,12 @@ STDMETHODIMP CArchiveUpdateCallback::GetStream(UInt32 index,
         if (inStreamSpec == NULL)
         {
             MSGBOXEX_PARAMS mbep;
+            const std::wstring caption = LangStr(IDS_PLUGINNAME).c_str();
+            const std::wstring text = LangStr(IDS_INSUFFICIENT_MEMORY).c_str();
             ZeroMemory(&mbep, sizeof(mbep));
             mbep.HParent = hProgWnd;
-            mbep.Caption = LoadStr(IDS_PLUGINNAME);
-            mbep.Text = LoadStr(IDS_INSUFFICIENT_MEMORY);
+            mbep.Caption = caption.c_str();
+            mbep.Text = text.c_str();
             mbep.Flags = MSGBOXEX_ICONEXCLAMATION;
             SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_SHOWMBOXEX, (LPARAM)&mbep);
             throw E_FAIL;
@@ -210,19 +212,19 @@ STDMETHODIMP CArchiveUpdateCallback::GetStream(UInt32 index,
         do
         {
             mbRet = DIALOG_OK;
-            if (!inStreamSpec->Open(GetAnsiString(fi->FullPath)))
+            if (!inStreamSpec->Open(fi->FullPath))
             {
                 mbRet = DIALOG_SKIP;
                 if (!Silent)
                 {
                     DWORD err = ::GetLastError();
-                    AString fn = GetAnsiString(fi->FullPath);
                     // Warning: GetStream can get called from a parallel thread launched by 7za.dll!
                     CDialogErrorParams dep;
+                    const std::wstring errorText = SPLGetErrorTextOwned(SalamanderGeneral, err);
 
                     dep.Flags = BUTTONS_RETRYSKIPCANCEL;
-                    dep.FileName = fn;
-                    dep.Error = SalamanderGeneral->GetErrorText(err);
+                    dep.FileName = fi->FullPath;
+                    dep.Error = errorText.c_str();
                     mbRet = (int)SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_DIALOGERROR, (LPARAM)&dep);
                 }
             }

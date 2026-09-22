@@ -10,6 +10,9 @@
 #include "misc.h"
 #include "dialogs.h"
 
+#define CHECKSUM_WIDEN2(x) L##x
+#define CHECKSUM_WIDEN(x) CHECKSUM_WIDEN2(x)
+
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL - language-independent resources
@@ -38,19 +41,19 @@ SConfig Config = {
     {433, 301, 230, 80, 80},                     // VerDlgWidths
     {
         // Register all known algorthms here
-        {HT_CRC, true, IDS_COLUMN_CRC, IDS_COPYTOCBOARD_CRC, IDS_SAVE_FILTER_CRC, IDS_VERIFY_CRC, _T(".sfv"), "CRC", CRCFactory},
-        {HT_MD5, true, IDS_COLUMN_MD5, IDS_COPYTOCBOARD_MD5, IDS_SAVE_FILTER_MD5, IDS_VERIFY_MD5, _T(".md5"), "MD5", MD5Factory},
-        {HT_SHA1, true, IDS_COLUMN_SHA1, IDS_COPYTOCBOARD_SHA1, IDS_SAVE_FILTER_SHA1, IDS_VERIFY_SHA1, _T(".sha1"), "SHA1", SHA1Factory},
-        {HT_SHA256, true, IDS_COLUMN_SHA256, IDS_COPYTOCBOARD_SHA256, IDS_SAVE_FILTER_SHA256, IDS_VERIFY_SHA256, _T(".sha256"), "SHA256", SHA256Factory},
-        {HT_SHA512, true, IDS_COLUMN_SHA512, IDS_COPYTOCBOARD_SHA512, IDS_SAVE_FILTER_SHA512, IDS_VERIFY_SHA512, _T(".sha512"), "SHA512", SHA512Factory}}};
+        {HT_CRC, true, IDS_COLUMN_CRC, IDS_COPYTOCBOARD_CRC, IDS_SAVE_FILTER_CRC, IDS_VERIFY_CRC, L".sfv", L"CRC", CRCFactory},
+        {HT_MD5, true, IDS_COLUMN_MD5, IDS_COPYTOCBOARD_MD5, IDS_SAVE_FILTER_MD5, IDS_VERIFY_MD5, L".md5", L"MD5", MD5Factory},
+        {HT_SHA1, true, IDS_COLUMN_SHA1, IDS_COPYTOCBOARD_SHA1, IDS_SAVE_FILTER_SHA1, IDS_VERIFY_SHA1, L".sha1", L"SHA1", SHA1Factory},
+        {HT_SHA256, true, IDS_COLUMN_SHA256, IDS_COPYTOCBOARD_SHA256, IDS_SAVE_FILTER_SHA256, IDS_VERIFY_SHA256, L".sha256", L"SHA256", SHA256Factory},
+        {HT_SHA512, true, IDS_COLUMN_SHA512, IDS_COPYTOCBOARD_SHA512, IDS_SAVE_FILTER_SHA512, IDS_VERIFY_SHA512, L".sha512", L"SHA512", SHA512Factory}}};
 
 // Current config version
 #define CURRENT_CONFIG_VERSION 1 // AS 2.52b1 with CRC/MD5/SHA1/SHA256 columns
 
-static const char* CONFIG_VERSION = "Version";
-static const char* CONFIG_HASHTYPE = "Hash Type";
-static const char* CONFIG_CALCDLGWIDTHS = "Dialog Size 1";
-static const char* CONFIG_VERDLGWIDTHS = "Dialog Size 2";
+static const wchar_t* CONFIG_VERSION = L"Version";
+static const wchar_t* CONFIG_HASHTYPE = L"Hash Type";
+static const wchar_t* CONFIG_CALCDLGWIDTHS = L"Dialog Size 1";
+static const wchar_t* CONFIG_VERDLGWIDTHS = L"Dialog Size 2";
 
 // ****************************************************************************
 
@@ -62,11 +65,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         InitCommonControls();
     }
     return TRUE; // DLL can be loaded
-}
-
-char* LoadStr(int resID)
-{
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
 }
 
 //****************************************************************************
@@ -97,14 +95,18 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is designed for the current Salamander version and newer - verify that
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Checksum" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // (spl_vers.h) used by ~35 plugins - widen only at this call site via the same
+        // two-macro token-paste idiom already used for __WFILE__ in common/trace.h, rather
+        // than touching the shared macro itself.
+        MessageBoxW(salamander->GetParentWindow(),
+                    CHECKSUM_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Checksum" /* do not translate! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Checksum" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Checksum" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -115,21 +117,21 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderCrypt = SalamanderGeneral->GetSalamanderCrypt();
 
     // set the help file name
-    SalamanderGeneral->SetHelpFileName("checksum.chm");
+    SalamanderGeneral->SetHelpFileName(L"checksum.chm");
 
-    InitializeWinLib("Checksum" /* do not translate! */, DLLInstance);
+    InitializeWinLib(L"Checksum" /* do not translate! */, DLLInstance);
 
     SetupWinLibHelp(HTMLHelpCallback);
 
     // set the basic information about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "Checksum" /* do not translate! */);
+                                   CHECKSUM_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+                                   CHECKSUM_WIDEN(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"Checksum" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -141,13 +143,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUTTITLE), MB_OK | MB_ICONINFORMATION);
+    const std::wstring message = SPLFormatStringOwned(
+        L"%ls " CHECKSUM_WIDEN(VERSINFO_VERSION) L"\n\n" CHECKSUM_WIDEN(VERSINFO_COPYRIGHT) L"\n\n%ls",
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ABOUTTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -219,8 +219,8 @@ OnConfiguration(HWND hParent)
 
     if (bInConfiguration)
     {
-        SalamanderGeneral->SalMessageBox(hParent, LoadStr(IDS_CONFIG_CONFLICT),
-                                         LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+        SalamanderGeneral->SalMessageBox(hParent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CONFIG_CONFLICT).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
         return IDCANCEL;
     }
 
@@ -252,9 +252,9 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
 };
 */
 
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENU_VERIFY), SALHOTKEY('V', HOTKEYF_CONTROL | HOTKEYF_SHIFT), CMD_VERIFY, FALSE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENU_VERIFY).c_str(), SALHOTKEY('V', HOTKEYF_CONTROL | HOTKEYF_SHIFT), CMD_VERIFY, FALSE, MENU_EVENT_TRUE,
                             MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENU_CALCULATE), 0, CMD_CALCULATE, FALSE, MENU_EVENT_FILE_FOCUSED | MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIR_FOCUSED | MENU_EVENT_DIRS_SELECTED, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENU_CALCULATE).c_str(), 0, CMD_CALCULATE, FALSE, MENU_EVENT_FILE_FOCUSED | MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIR_FOCUSED | MENU_EVENT_DIRS_SELECTED, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
 
     // set the plugin icon
     HBITMAP hBmp = (HBITMAP)LoadImage(DLLInstance, MAKEINTRESOURCE(IDB_CHECKSUM),
@@ -276,7 +276,7 @@ CPluginInterface::GetInterfaceForMenuExt()
 //  CPluginInterfaceForMenuExt
 //
 
-CPathBuffer Focus_Path; // Heap-allocated for long path support
+std::wstring Focus_Path;
 
 BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* salamander,
                                                  HWND parent, int id, DWORD eventMask)
@@ -301,14 +301,15 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case CMD_FOCUSFILE:
     {
-        if (*Focus_Path != 0) // only if we were lucky enough not to hit the start of Salamander's BUSY mode
+        if (!Focus_Path.empty()) // only if we were lucky enough not to hit the start of Salamander's BUSY mode
         {
-            char* fname;
-            if (SalamanderGeneral->CutDirectory(Focus_Path, &fname))
+            std::wstring path = Focus_Path;
+            std::wstring fileName;
+            if (SPLCutDirectoryOwned(SalamanderGeneral, path, &fileName))
             {
                 SalamanderGeneral->SkipOneActivateRefresh(); // prevent the main window from refreshing when switching from the Verify dialog
-                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, Focus_Path, fname);
-                *Focus_Path = 0;
+                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, path.c_str(), fileName.c_str());
+                Focus_Path.clear();
             }
         }
         return TRUE;

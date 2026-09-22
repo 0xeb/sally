@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -33,10 +33,10 @@
 #include "dialogs.h"
 //#include "sfxmake/sfxmake.h"
 
-int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
+int CZipPack::PackToArchive(BOOL move, const wchar_t* sourcePath,
                             SalEnumSelection2 next, void* param)
 {
-    CALL_STACK_MESSAGE3("CZipPack::PackToArchive(%d, %s, , )", move, sourcePath);
+    CALL_STACK_MESSAGE3("CZipPack::PackToArchive(%d, %ls, , )", move, sourcePath);
     bool noexist = false;
     unsigned flags = 0;
 
@@ -46,18 +46,18 @@ int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
   {
     MSG msg;
     BOOL ret;
-    while (ret = GetMessage(&msg, NULL, 0, 0))// && IsWindow(Dlg))
+    while (ret = GetMessageW(&msg, NULL, 0, 0))// && IsWindow(Dlg))
     {
       if (//!TranslateAccelerator(dlg, Accel, &msg) &&
           !IsDialogMessage(dlg, &msg))
       {
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
       }
     }
   }*/
 
-    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName);
+    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName.c_str());
     if (ZipAttr == 0xFFFFFFFF)
     {
         int err = GetLastError();
@@ -68,7 +68,7 @@ int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
         }
         else
         {
-            ProcessError(IDS_ERRACCESS, err, ZipName, PE_NORETRY | PE_NOSKIP, NULL);
+            ProcessError(IDS_ERRACCESS, err, ZipName.c_str(), PE_NORETRY | PE_NOSKIP, NULL);
             return ErrorID = IDS_NODISPLAY;
         }
     }
@@ -89,16 +89,16 @@ int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
     if (Options.Action & PA_MULTIVOL && Config.Level < 1)
         return ErrorID = IDS_MULTISTORED;
 
-    SourcePath = sourcePath;
-    SourceLen = lstrlen(SourcePath);
-    if (*(SourcePath + SourceLen - 1) == '\\')
+    SourcePath = sourcePath != NULL ? sourcePath : L"";
+    if (!TryWideToZipText(SourcePath.c_str(), ArchiveSourcePrefix))
+        return ErrorID = IDS_TOOLONGZIPNAME;
+    SourceLen = static_cast<int>(ArchiveSourcePrefix.size());
+    if (SourceLen > 0 && ArchiveSourcePrefix.back() == '\\')
         SourceLen--;
     SkipAllIOErrors = false;
     Move = move ? true : false;
     Pack = true;
 
-    if (*OriginalCurrentDir)
-        SetCurrentDirectory(sourcePath);
     switch (Options.Action)
     {
     case PA_NORMAL:
@@ -133,17 +133,17 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
     //  if (ErrorID = LoadConfig())
     //    return ErrorID;
     Pack = false;
-    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName);
+    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName.c_str());
     if (ZipAttr == 0xFFFFFFFF)
     {
-        ProcessError(IDS_ERRACCESS, GetLastError(), ZipName, PE_NORETRY | PE_NOSKIP, NULL);
+        ProcessError(IDS_ERRACCESS, GetLastError(), ZipName.c_str(), PE_NORETRY | PE_NOSKIP, NULL);
         return ErrorID = IDS_NODISPLAY;
     }
     if (ZipAttr & FILE_ATTRIBUTE_READONLY)
     {
         return ErrorID = IDS_READONLY;
     }
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL, true, false);
     if (ret)
     {
@@ -154,10 +154,11 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
     }
     Options.Action = PA_NORMAL;
     Options.Encrypt = false;
-    TCHAR title[1024];
-    _stprintf(title, LoadStr(IDS_DELPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_DELPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     ErrorID = CheckZip();
     if (!ErrorID && EOCentrDir.DiskNum == 0xFFFF)
         ErrorID = IDS_MODIFICATION_NOT_SUPPORTED;
@@ -222,11 +223,11 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                                         rootDir.Size = 0;
                                         rootDir.StartDisk = 0;
                                         TempFile->FilePointer = /*EONewCentrDir.*/ NewCentrDirOffs;
-                                        rootDir.Name = (char*)malloc(lstrlen(ZipRoot) + 1);
+                                        rootDir.Name = (char*)malloc(lstrlenA(ZipRoot) + 1);
                                         buffer = (char*)malloc(MAX_HEADER_SIZE);
                                         if (buffer && rootDir.Name)
                                         {
-                                            lstrcpy(rootDir.Name, ZipRoot);
+                                            lstrcpyA(rootDir.Name, ZipRoot);
                                             rootDir.NameLen = RootLen;
                                             ErrorID = WriteLocalHeader(&rootDir, buffer);
                                             /*EONewCentrDir.*/ NewCentrDirOffs = /*(unsigned) */ TempFile->FilePointer;
@@ -241,7 +242,7 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                                         {
                                             if (RootLen && !Config.NoEmptyDirs && filesDeleted == filesInRoot && !exist)
                                             {
-                                                lstrcpy(rootDir.Name, ZipRoot);
+                                                lstrcpyA(rootDir.Name, ZipRoot);
                                                 ErrorID = WriteCentralHeader(&rootDir, buffer, TRUE, FPR_NORMAL);
                                             }
                                             if (!ErrorID)
@@ -274,7 +275,7 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                 if (ErrorID || UserBreak)
                 {
                     CloseCFile(TempFile);
-                    DeleteFile(TempName);
+                    DeleteFileW(TempName.c_str());
                 }
                 else
                 {
@@ -291,11 +292,11 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                         SetFileTime(TempFile->File, NULL, NULL, &NewestFileTime);
 
                     CloseCFile(TempFile);
-                    SalamanderGeneral->ClearReadOnlyAttr(ZipName);
-                    if (!DeleteFile(ZipName) ||
-                        !MoveFile(TempName, ZipName))
+                    SalamanderGeneral->ClearReadOnlyAttr(ZipName.c_str());
+                    if (!DeleteFileW(ZipName.c_str()) ||
+                        !MoveFileW(TempName.c_str(), ZipName.c_str()))
                         ErrorID = IDS_ERRRESTORE;
-                    SetFileAttributes(ZipName, ZipAttr | FILE_ATTRIBUTE_ARCHIVE);
+                    SetFileAttributesW(ZipName.c_str(), ZipAttr | FILE_ATTRIBUTE_ARCHIVE);
                 }
             }
             else
@@ -317,45 +318,67 @@ BOOL CZipPack::LoadDefaults()
     //Options.SfxSettings.IconIndex = -IDI_SFXICON;
 
     // Config->DefSfxFile is "" when we do not find any *.sfx, so we cannot package SFX
-    if (*Config.DefSfxFile)
+    if (!Config.DefSfxFile.empty())
     {
-        if (DefLanguage && lstrcmp(DefLanguage->FileName, Config.DefSfxFile))
+        std::string defaultSfxFile;
+        if (!TryWideToZipText(Config.DefSfxFile.c_str(), defaultSfxFile) ||
+            defaultSfxFile.size() >= _countof(Options.SfxSettings.SfxFile))
+            return FALSE;
+        if (DefLanguage && lstrcmpA(DefLanguage->FileName.c_str(), defaultSfxFile.c_str()))
         {
             delete DefLanguage;
             DefLanguage = NULL;
         }
-        lstrcpy(Options.SfxSettings.SfxFile, Config.DefSfxFile);
-        CPathBuffer file; // Heap-allocated for long path support
-        GetModuleFileName(DLLInstance, file, file.Size());
-        SalamanderGeneral->CutDirectory(file);
-        SalamanderGeneral->SalPathAppend(file, "sfx", file.Size());
-        SalamanderGeneral->SalPathAppend(file, Config.DefSfxFile, file.Size());
-        if (!DefLanguage && LoadSfxFileData(file, &DefLanguage))
+        lstrcpyA(Options.SfxSettings.SfxFile, defaultSfxFile.c_str());
+        std::wstring fileW;
+        if (!SPLGetModuleFileNameOwned(DLLInstance, fileW))
+            return FALSE;
+        SPLCutDirectoryOwned(SalamanderGeneral, fileW);
+        SPLSalPathAppendOwned(fileW, L"sfx");
+        SPLSalPathAppendOwned(fileW, Config.DefSfxFile.c_str());
+        if (!DefLanguage && LoadSfxFileData(fileW.c_str(), &DefLanguage))
         {
-            char err[512];
-            sprintf(err, LoadStr(IDS_UNABLEREADSFX2), file.Get());
-            SalamanderGeneral->ShowMessageBox(err, LoadStr(IDS_ERROR), MSGBOX_ERROR);
-            lstrcpy(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT));
-            lstrcpy(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
-            lstrcpy(Options.About, "Version 1.40");
-            lstrcpy(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
-            lstrcpy(Options.SfxSettings.Vendor, "Self-Extractor © 2000-2023 Open Salamander Authors");
-            lstrcpy(Options.SfxSettings.WWW, "https://github.com/0xeb/sally");
+            const std::wstring errorText = SPLFormatStringOwned(LangStr(IDS_UNABLEREADSFX2).c_str(), fileW.c_str());
+            SalamanderGeneral->ShowMessageBox(errorText.c_str(), LangStr(IDS_ERROR).c_str(), MSGBOX_ERROR);
+            // CSfxSettings is the SFX SCRIPT's serialized form - iosfxset.cpp
+            // writes each field out as SFX_<NAME>="..." bytes for the stub to parse. The width
+            // is the format's, not ours, so the defaults narrow as they go in.
+            lstrcpyA(Options.SfxSettings.Text, ZipLegacyFormatBytes(LangStr(IDS_DEFAULTTEXT).c_str()).c_str());
+            lstrcpyA(Options.SfxSettings.Title, ZipLegacyFormatBytes(LangStr(IDS_DEFSFXTITLE).c_str()).c_str());
+            lstrcpyA(Options.About, "Version 1.40");
+            lstrcpyA(Options.SfxSettings.ExtractBtnText, ZipLegacyFormatBytes(LangStr(IDS_DEFEXTRBUTTON).c_str()).c_str());
+            // Wide literal through the same named ACP boundary as the three fields above,
+            // with the (c) sign written as a universal character name.
+            //
+            // It used to be a narrow literal containing a UTF-8-encoded (c) sign, which was
+            // correct only while this file carried a UTF-8 BOM and MSVC therefore decoded the
+            // source as UTF-8. The BOM was dropped during the Unicode work, so the compiler
+            // began reading the file in the ACP and the two bytes became two characters -
+            // every generated self-extractor said "Self-Extractor A(c) 2000-2023". \u00A9
+            // names the character rather than spelling it in bytes, so the value no longer
+            // depends on how any compiler decides to read this file.
+            lstrcpyA(Options.SfxSettings.Vendor,
+                     ZipLegacyFormatBytes(L"Self-Extractor \u00A9 2000-2023 Open Salamander Authors").c_str());
+            lstrcpyA(Options.SfxSettings.WWW, "https://github.com/0xeb/sally");
         }
         else
         {
-            lstrcpy(Options.SfxSettings.Text, DefLanguage->DlgText);
-            lstrcpy(Options.SfxSettings.Title, DefLanguage->DlgTitle);
-            lstrcpyn(Options.About, DefLanguage->AboutLicenced, SE_MAX_ABOUT);
-            lstrcpy(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
-            lstrcpy(Options.SfxSettings.Vendor, DefLanguage->Vendor);
-            lstrcpy(Options.SfxSettings.WWW, DefLanguage->WWW);
+            lstrcpyA(Options.SfxSettings.Text, DefLanguage->DlgText);
+            lstrcpyA(Options.SfxSettings.Title, DefLanguage->DlgTitle);
+            lstrcpynA(Options.About, DefLanguage->AboutLicenced, SE_MAX_ABOUT);
+            lstrcpyA(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
+            lstrcpyA(Options.SfxSettings.Vendor, DefLanguage->Vendor);
+            lstrcpyA(Options.SfxSettings.WWW, DefLanguage->WWW);
         }
-        lstrcpy(Options.SfxSettings.TargetDir, "");
+        lstrcpyA(Options.SfxSettings.TargetDir, "");
 
-        GetModuleFileName(DLLInstance, Options.SfxSettings.IconFile, MAX_PATH);
+        std::wstring moduleFileW;
+        if (!SPLGetModuleFileNameOwned(DLLInstance, moduleFileW) ||
+            !CopyWideToZipText(moduleFileW.c_str(), Options.SfxSettings.IconFile,
+                               _countof(Options.SfxSettings.IconFile)))
+            return FALSE;
         Options.SfxSettings.IconIndex = -IDI_SFXICON;
-        int ret = LoadIcons(Options.SfxSettings.IconFile, Options.SfxSettings.IconIndex,
+        int ret = LoadIcons(moduleFileW.c_str(), Options.SfxSettings.IconIndex,
                             &Options.Icons, &Options.IconsCount);
         switch (ret)
         {
@@ -374,9 +397,9 @@ BOOL CZipPack::LoadDefaults()
         }
         if (ret)
         {
-            char buffer[1024];
             int e = GetLastError();
-            SalamanderGeneral->ShowMessageBox(FormatMessage(buffer, ret, e), LoadStr(IDS_ERROR), MSGBOX_ERROR);
+            const std::wstring message = FormatZipErrorMessage(ret, e);
+            SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_ERROR).c_str(), MSGBOX_ERROR);
             return FALSE;
         }
     }
@@ -392,7 +415,7 @@ int CZipPack::LoadExPackOptions(unsigned flags)
         return IDS_NODISPLAY;
     if (Config.ShowExOptions)
     {
-        if (PackDialog(SalamanderGeneral->GetMainWindowHWND(), this, &Config, &Options, ZipName, flags) != IDOK)
+        if (PackDialog(SalamanderGeneral->GetMainWindowHWND(), this, &Config, &Options, ZipName.c_str(), flags) != IDOK)
         {
             // do not store it; keep the old VolSizeCache
             int i;
@@ -414,7 +437,7 @@ int CZipPack::LoadExPackOptions(unsigned flags)
     {
         LastUsedSfxSet.Settings = Options.SfxSettings;
         // this name is only needed internally (it is checked for "" somewhere else)
-        lstrcpy(LastUsedSfxSet.Name, "Last Used");
+        lstrcpyA(LastUsedSfxSet.Name, "Last Used");
     }
     return 0;
 }
@@ -422,32 +445,30 @@ int CZipPack::LoadExPackOptions(unsigned flags)
 int CZipPack::CreateSFX()
 {
     CALL_STACK_MESSAGE1("CZipPack::CreateSFX()");
-    CPathBuffer exeName; // Heap-allocated for long path support
-
     //MenuSfx = true;
-    if (!*Config.DefSfxFile)
+    if (Config.DefSfxFile.empty())
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_NOSFXINSTALLED), LoadStr(IDS_ERROR), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_NOSFXINSTALLED).c_str(), LangStr(IDS_ERROR).c_str(), MSGBOX_ERROR);
         return ErrorID = IDS_NODISPLAY;
     }
 
     if (!LoadDefaults())
         return ErrorID = IDS_NODISPLAY;
 
-    lstrcpyn(exeName, ZipName, exeName.Size());
-    SalamanderGeneral->SalPathRenameExtension(exeName, ".exe", exeName.Size());
-    CCreateSFXDialog dlg(SalamanderGeneral->GetMainWindowHWND(), ZipName, exeName, &Options, this);
+    std::wstring exeName = ReplaceZipPathExtension(ZipName, L".exe");
+    CCreateSFXDialog dlg(SalamanderGeneral->GetMainWindowHWND(), ZipName,
+                         exeName, &Options, this);
     if (dlg.Proceed() != IDOK)
         return ErrorID = IDS_NODISPLAY;
 
     LastUsedSfxSet.Settings = Options.SfxSettings;
     // this name is only needed internally (it is checked for "" somewhere else)
-    lstrcpy(LastUsedSfxSet.Name, "Last Used");
+    lstrcpyA(LastUsedSfxSet.Name, "Last Used");
 
     if (Options.SfxSettings.Flags & SE_AUTO)
         Options.SfxSettings.Flags |= SE_NOTALLOWCHANGE;
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           false, false);
     if (ret)
@@ -462,10 +483,10 @@ int CZipPack::CreateSFX()
     if (ErrorID)
         return ErrorID;
 
-    if (TestIfExist(exeName))
+    if (TestIfExist(exeName.c_str()))
         return ErrorID;
 
-    ret = CreateCFile(&TempFile, exeName, GENERIC_WRITE, FILE_SHARE_READ,
+    ret = CreateCFile(&TempFile, exeName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                       false, false);
     if (ret)
@@ -476,18 +497,19 @@ int CZipPack::CreateSFX()
             return ErrorID = IDS_NODISPLAY;
     }
 
-    char title[1024];
-    sprintf(title, LoadStr(IDS_SFXPROGTITLE), SalamanderGeneral->SalPathFindFileName(exeName));
-    Salamander->OpenProgressDialog(title, FALSE, NULL, FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_SFXPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(exeName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), FALSE, NULL, FALSE);
     ProgressTotalSize = CQuadWord().SetUI64(ZipFile->Size);
-    ErrorID = WriteSfxExecutable(exeName, Options.SfxSettings.SfxFile, FALSE, 1);
+    ErrorID = WriteSfxExecutable(exeName.c_str(), Options.SfxSettings.SfxFile, FALSE, 1);
     if (!ErrorID)
     {
         if (!WriteSFXHeader("", unsigned(EOCentrDirOffs + ExtraBytes), (unsigned)ZipFile->Size))
             ErrorID = IDS_NODISPLAY;
         else
         {
-            Salamander->ProgressDialogAddText(LoadStr(IDS_COPYDATA), FALSE);
+            Salamander->ProgressDialogAddText(LoadStrW(IDS_COPYDATA).c_str(), FALSE);
             char* buffer = (char*)malloc(DECOMPRESS_INBUFFER_SIZE);
             if (!buffer)
                 ErrorID = IDS_LOWMEM;
@@ -503,7 +525,7 @@ int CZipPack::CreateSFX()
     Salamander->CloseProgressDialog();
     CloseCFile(TempFile);
     if (ErrorID)
-        DeleteFile(exeName);
+        DeleteFileW(exeName.c_str());
 
     return ErrorID;
 }
@@ -512,7 +534,7 @@ int CZipPack::CommentArchive()
 {
     CALL_STACK_MESSAGE1("CZipPack::CommentArchive()");
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           true, false);
     if (ret)
@@ -524,10 +546,10 @@ int CZipPack::CommentArchive()
         return ErrorID;
     }
 
-    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName);
+    ZipAttr = SalamanderGeneral->SalGetFileAttributes(ZipName.c_str());
     if (ZipAttr == 0xFFFFFFFF)
     {
-        ProcessError(IDS_ERRACCESS, GetLastError(), ZipName, PE_NORETRY | PE_NOSKIP, NULL);
+        ProcessError(IDS_ERRACCESS, GetLastError(), ZipName.c_str(), PE_NORETRY | PE_NOSKIP, NULL);
         return ErrorID = IDS_NODISPLAY;
     }
     Extract = true;
@@ -537,14 +559,16 @@ int CZipPack::CommentArchive()
 
     if (MultiVol)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_COMMENTMV), LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_COMMENTMV).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
     }
 
     EONewCentrDir = EOCentrDir;
     NewCentrDirSize = CentrDirSize;
     NewCentrDirOffs = CentrDirOffs;
 
-    void* temp = realloc(Comment, MAX_ZIPCOMMENT);
+    // The ZIP length field permits 0xffff bytes; retain one additional byte
+    // for the engine's local terminator without reducing the format limit.
+    void* temp = realloc(Comment, static_cast<size_t>(MAX_ZIPCOMMENT) + 1);
     if (!temp)
         return ErrorID = IDS_LOWMEM;
     Comment = (char*)temp;

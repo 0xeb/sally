@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -7,7 +7,9 @@
 #include "cfgdlg.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/text/CaseFolding.h"
 #include "common/IEnvironment.h"
+#include "common/IRegistry.h"
 #include "dialogs.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -38,10 +40,18 @@ CIconCache::~CIconCache()
     Destroy();
 }
 
-inline int CompareDWORDS(const char* s1, const char* s2, int length)
-{ // compares at most 'length' DWORDs
-    //  int res;
-    const char* end = s1 + length;
+// Raw DWORD-wise comparator over the packed sort keys. It is NOT
+// lexicographic (it compares four bytes at a time as a little-endian DWORD) -- it is a
+// consistent arbitrary total order, which is all the sort and the binary search need,
+// provided both use it. The keys (CIconData::NameAndData, CAssociationData::
+// ExtensionAndData) are wchar_t* and DWORD-aligned with zero padding, so the parameters
+// are void* and 'lengthBytes' is a BYTE span -- the old name said DWORDs but the code
+// always used it as a byte offset, and every caller now derives it from wcslen().
+inline int CompareDWORDS(const void* p1, const void* p2, int lengthBytes)
+{
+    const char* s1 = (const char*)p1;
+    const char* s2 = (const char*)p2;
+    const char* end = s1 + lengthBytes;
     while (s1 <= end)
     {
         //    if ((res = *(DWORD *)s1 - *(DWORD *)s2) != 0) return res;  // this doesn't work (try 0x8 and 0x0 in 4-bit numbers)
@@ -69,7 +79,7 @@ void CIconCache::SortArray(int left, int right, CPluginDataInterfaceEncapsulatio
         {
             if (Data[i].GetFSFileData() == NULL)
             {
-                TRACE_E("CIconCache::SortArray(): unexpected error: Icon Cache doesn't contain FSFileData for item: " << Data[i].NameAndData);
+                TRACE_EW(L"CIconCache::SortArray(): unexpected error: Icon Cache doesn't contain FSFileData for item: " << Data[i].NameAndData);
                 ok = FALSE;
                 break;
             }
@@ -90,8 +100,8 @@ void CIconCache::SortArrayInt(int left, int right)
 LABEL_SortArrayInt:
 
     int i = left, j = right;
-    char* pivot = Data[(i + j) / 2].NameAndData;
-    int length = (int)strlen(pivot);
+    wchar_t* pivot = Data[(i + j) / 2].NameAndData;
+    int length = (int)(wcslen(pivot) * sizeof(wchar_t));
 
     do
     {
@@ -209,13 +219,13 @@ LABEL_SortArrayForFSInt:
     }
 }
 
-BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
+BOOL CIconCache::GetIndex(const wchar_t* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
                           const CFileData* file)
 {
     if (Count == 0 || dataIface != NULL && file == NULL) // verify validity of 'file''
     {
         if (dataIface != NULL && file == NULL)
-            TRACE_E("CIconCache::GetIndex(): 'file' may not be NULL when 'dataIface' is not NULL! item=" << name);
+            TRACE_EW(L"CIconCache::GetIndex(): 'file' may not be NULL when 'dataIface' is not NULL! item=" << name);
         index = 0;
         return FALSE;
     }
@@ -232,8 +242,8 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
                 res = dataIface->CompareFilesFromFS(fileM, file);
             else
             {
-                TRACE_E("CIconCache::GetIndex(): unexpected error: Icon Cache doesn't contain FSFileData "
-                        "for item: "
+                TRACE_EW(L"CIconCache::GetIndex(): unexpected error: Icon Cache doesn't contain FSFileData "
+                        L"for item: "
                         << At(m).NameAndData);
                 index = 0;
                 return FALSE; // error -> return maybe: not found, insert at beginning of array
@@ -265,7 +275,7 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
     }
     else // classic search by name
     {
-        int length = (int)strlen(name);
+        int length = (int)(wcslen(name) * sizeof(wchar_t));
         int l = 0, r = Count - 1, m;
         int res;
         while (1)
@@ -486,8 +496,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             file1 = At(index1).GetFSFileData();
             if (file1 == NULL)
             {
-                TRACE_E("CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
-                        "for item: "
+                TRACE_EW(L"CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
+                        L"for item: "
                         << At(index1).NameAndData);
                 return;
             }
@@ -500,8 +510,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             file2 = icons->At(index2).GetFSFileData();
             if (file2 == NULL)
             {
-                TRACE_E("CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
-                        "for item: "
+                TRACE_EW(L"CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
+                        L"for item: "
                         << At(index2).NameAndData);
                 return;
             }
@@ -539,8 +549,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     file1 = At(index1).GetFSFileData();
                     if (file1 == NULL)
                     {
-                        TRACE_E("CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
-                                "for item: "
+                        TRACE_EW(L"CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
+                                L"for item: "
                                 << At(index1).NameAndData);
                         return;
                     }
@@ -556,8 +566,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     file2 = icons->At(index2).GetFSFileData();
                     if (file2 == NULL)
                     {
-                        TRACE_E("CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
-                                "for item: "
+                        TRACE_EW(L"CIconCache::GetIconsAndThumbsFrom(): unexpected error: Icon Cache doesn't contain FSFileData "
+                                L"for item: "
                                 << At(index2).NameAndData);
                         return;
                     }
@@ -570,12 +580,12 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
     else
     {
         int length;
-        char *name1, *name2;
+        wchar_t *name1, *name2;
 
         if (index1 < Count)
         {
             name1 = At(index1).NameAndData;
-            length = (int)strlen(name1);
+            length = (int)(wcslen(name1) * sizeof(wchar_t));
         }
         else
             return; // nothing to merge
@@ -633,9 +643,18 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                             {
                                 int offset = length + 4;
                                 offset -= (offset & 0x3); // offset % 4  (zarovnani po ctyrech bytech)
-                                if (*(CQuadWord*)(name1 + offset) == *(CQuadWord*)(name2 + offset) &&
-                                    CompareFileTime((FILETIME*)(name1 + offset + sizeof(CQuadWord)),
-                                                    (FILETIME*)(name2 + offset + sizeof(CQuadWord))) == 0)
+                                // name1/name2 are wchar_t* and 'offset' is a BYTE offset
+                                // (length is wcslen()*sizeof(wchar_t)) - adding it directly to a
+                                // wchar_t* silently doubles the advance (pointer arithmetic scales by
+                                // sizeof(wchar_t)), reading past the CQuadWord/FILETIME tag and into
+                                // whatever follows it (out-of-bounds for short names). Offset through
+                                // an explicit BYTE pointer instead, matching how this packed record is
+                                // built (files_window_directory_read.cpp's 'raw' BYTE* writer).
+                                BYTE* raw1 = (BYTE*)name1;
+                                BYTE* raw2 = (BYTE*)name2;
+                                if (*(CQuadWord*)(raw1 + offset) == *(CQuadWord*)(raw2 + offset) &&
+                                    CompareFileTime((FILETIME*)(raw1 + offset + sizeof(CQuadWord)),
+                                                    (FILETIME*)(raw2 + offset + sizeof(CQuadWord))) == 0)
                                 {
                                     newFlag = 5;
                                 }
@@ -651,7 +670,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                 if (++index1 < Count)
                 {
                     name1 = At(index1).NameAndData;
-                    length = (int)strlen(name1);
+                    length = (int)(wcslen(name1) * sizeof(wchar_t));
                 }
                 else
                     break; // nothing more to merge
@@ -699,21 +718,21 @@ void CIconCache::SetIconSize(CIconSizeEnum iconSize)
 
 // SEH wrapper: shell calls may crash due to buggy shell extensions.
 // Kept in a separate function because SEH prevents C++ object unwinding.
-static BOOL ReadDirectoryIconAndTypeSEH(const char* systemDir, CIconList* iconList, int index, CIconSizeEnum iconSize)
+static BOOL ReadDirectoryIconAndTypeSEH(const wchar_t* systemDir, CIconList* iconList, int index, CIconSizeEnum iconSize)
 {
-    SHFILEINFO shi;
+    SHFILEINFOW shi;
     HICON hIcon;
     __try
     {
-        if (GetFileIcon(systemDir, FALSE, &hIcon, iconSize, TRUE, TRUE))
+        if (GetFileIcon(systemDir, &hIcon, iconSize, TRUE, TRUE))
         {
             iconList->ReplaceIcon(index, hIcon);
             NOHANDLES(DestroyIcon(hIcon));
         }
-        if (SHGetFileInfo(systemDir, 0, &shi, sizeof(shi), SHGFI_TYPENAME) != 0)
+        if (SHGetFileInfoW(systemDir, 0, &shi, sizeof(shi), SHGFI_TYPENAME) != 0)
         {
-            lstrcpyn(FolderTypeName, shi.szTypeName, sizeof(FolderTypeName));
-            FolderTypeNameLen = (int)strlen(FolderTypeName);
+            lstrcpynW(FolderTypeName, shi.szTypeName, _countof(FolderTypeName));
+            FolderTypeNameLen = (int)wcslen(FolderTypeName);
         }
         return TRUE;
     }
@@ -726,13 +745,37 @@ static BOOL ReadDirectoryIconAndTypeSEH(const char* systemDir, CIconList* iconLi
 
 BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum iconSize)
 {
-    CPathBuffer systemDir;
-    EnvGetSystemDirectoryA(gEnvironment, systemDir, systemDir.Size());
-    return ReadDirectoryIconAndTypeSEH(systemDir, iconList, index, iconSize);
+    std::wstring systemDirW;
+    if (!gEnvironment->GetSystemDirectory(systemDirW).success)
+        return FALSE;
+    return ReadDirectoryIconAndTypeSEH(systemDirW.c_str(), iconList, index, iconSize);
 }
 
-BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName, LONG size,
-                         CAssociationData& data, char* iconLocation, int iconLocationSize, char* type, int typeSize)
+static RegistryResult ReadAssociationString(HKEY key, const wchar_t* valueName,
+                                            std::wstring& value, RegValueType* valueType = NULL)
+{
+    RegValueType type = RegValueType::None;
+    std::vector<uint8_t> bytes;
+    RegistryResult result = gRegistry->GetValue(key, valueName, type, bytes);
+    if (!result.success)
+        return result;
+    if (type != RegValueType::String && type != RegValueType::ExpandString)
+        return RegistryResult::Error(ERROR_INVALID_DATATYPE);
+    if (bytes.size() % sizeof(wchar_t) != 0)
+        return RegistryResult::Error(ERROR_INVALID_DATA);
+
+    const wchar_t* text = reinterpret_cast<const wchar_t*>(bytes.data());
+    size_t chars = bytes.size() / sizeof(wchar_t);
+    while (chars > 0 && text[chars - 1] == L'\0')
+        --chars;
+    value.assign(text, chars);
+    if (valueType != NULL)
+        *valueType = type;
+    return RegistryResult::Ok();
+}
+
+BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const wchar_t* keyName,
+                         CAssociationData& data, std::wstring& iconLocation, std::wstring* type)
 {
     BOOL found = FALSE;
     if (initFlagAndIndexes)
@@ -740,124 +783,106 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
         data.SetFlag(0);
         data.SetIndexAll(-1);
     }
-    iconLocation[0] = 0;
-    CPathBuffer keyNameBuf; // Heap-allocated for long path support
-    lstrcpyn(keyNameBuf, keyName, min(size, keyNameBuf.Size()));
-    HKEY openKey;
+    iconLocation.clear();
+    const std::wstring baseKey = keyName;
+    HKEY openKey = NULL;
 
     if (type != NULL)
     {
-        type[0] = 0;
+        type->clear();
 
         // file-type string obtained as value "" of subkey keyName
-        if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
+        if (gRegistry->OpenKeyRead(root, baseKey.c_str(), openKey).success)
         {
-            LONG tSize = typeSize;
-            if (SalRegQueryValue(openKey, "", type, &tSize) != ERROR_SUCCESS)
-                type[0] = 0;
-            HANDLES(RegCloseKey(openKey));
+            ReadAssociationString(openKey, NULL, *type);
+            gRegistry->CloseKey(openKey);
         }
     }
 
-    if (size - 1 + 7 <= keyNameBuf.Size()) // test na moznost otevirani pres asociace
+    std::wstring keyNameBuf = baseKey + SAL_REG_SUBKEY_SHELL_W;
+    if (gRegistry->OpenKeyRead(root, keyNameBuf.c_str(), openKey).success)
     {
-        memmove(keyNameBuf + size - 1, SAL_REG_SUBKEY_SHELL_A, sizeof(SAL_REG_SUBKEY_SHELL_A));
-        if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
-        { // if "\\shell" contains any subkey, it can be opened (association on Enter)
-            DWORD keys;
-            if (RegQueryInfoKey(openKey, NULL, NULL, NULL, &keys, NULL,
-                                NULL, NULL, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-            {
-                if (keys > 0)
-                    data.SetFlag(1);
-            }
-            HANDLES(RegCloseKey(openKey));
-        }
+        std::vector<std::wstring> commands;
+        if (gRegistry->EnumSubKeys(openKey, commands).success && !commands.empty())
+            data.SetFlag(1);
+        gRegistry->CloseKey(openKey);
     }
 
-    if (size - 1 + 21 <= keyNameBuf.Size())
+    keyNameBuf = baseKey + SAL_REG_SUBKEY_SHELLEX_ICON_HANDLER_W;
+    if (gRegistry->OpenKeyRead(root, keyNameBuf.c_str(), openKey).success)
     {
-        memmove(keyNameBuf + size - 1, SAL_REG_SUBKEY_SHELLEX_ICON_HANDLER_A, sizeof(SAL_REG_SUBKEY_SHELLEX_ICON_HANDLER_A));
         // if contains "\\ShellEx\\IconHandler", must be extracted from file
-        if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
+        found = TRUE;
+        gRegistry->CloseKey(openKey);
+        data.SetIndexAll(-2);
+    }
+
+    keyNameBuf = baseKey + SAL_REG_SUBKEY_DEFAULT_ICON_W;
+    if (!found && gRegistry->OpenKeyRead(root, keyNameBuf.c_str(), openKey).success)
+    {
+        std::wstring iconText;
+        RegValueType iconType = RegValueType::None;
+        if (ReadAssociationString(openKey, NULL, iconText, &iconType).success && !iconText.empty())
         {
             found = TRUE;
 
-            HANDLES(RegCloseKey(openKey));
-            data.SetIndexAll(-2);
-        }
-    }
-
-    if (!found && size - 1 + 13 <= keyNameBuf.Size())
-    {
-        memmove(keyNameBuf.Get() + size - 1, SAL_REG_SUBKEY_DEFAULT_ICON_A, sizeof(SAL_REG_SUBKEY_DEFAULT_ICON_A));
-        if (HANDLES_Q(RegOpenKey(root, keyNameBuf, &openKey)) == ERROR_SUCCESS)
-        {
-            CPathBuffer buf; // Heap-allocated for long path support
-            size = buf.Size(); // getting path to icon
-            DWORD type2 = REG_SZ;
-            DWORD err = SalRegQueryValueEx(openKey, SAL_REG_VALUE_DEFAULT_A, 0, &type2,
-                                           (LPBYTE)buf.Get(), (LPDWORD)&size);
-            if (err == ERROR_SUCCESS && size > 1)
+            if (iconType == RegValueType::ExpandString)
             {
-                found = TRUE;
-
-                if (type2 == REG_EXPAND_SZ)
-                {
-                    DWORD auxRes = ExpandEnvironmentStrings(buf, iconLocation, iconLocationSize);
-                    if (auxRes == 0 || (int)auxRes > iconLocationSize)
-                    {
-                        TRACE_E("ExpandEnvironmentStrings failed.");
-                        lstrcpyn(iconLocation, buf, iconLocationSize);
-                    }
-                }
+                std::wstring expanded;
+                if (gEnvironment->ExpandEnvironmentStrings(iconText.c_str(), expanded).success)
+                    iconLocation = std::move(expanded);
                 else
-                    lstrcpyn(iconLocation, buf, iconLocationSize);
-
-                // remove quotes in case "\"filename\",icon_number" (e.g. "\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\",0")
-                char* num = strrchr(iconLocation, ',');
-                if (num != NULL)
                 {
-                    char* numEnd = num;
-                    while (*(numEnd + 1) == ' ')
-                        numEnd++;
-                    if (*(numEnd + 1) == '-')
-                        numEnd++;
-                    if (*(numEnd + 1) == '+')
-                        numEnd++;
-                    char* numBeg = numEnd + 1;
-                    while (*++numEnd >= '0' && *numEnd <= '9')
-                        ;
-                    if (numBeg < numEnd && *numEnd == 0 &&                                   // icon number is after the last comma
-                        *iconLocation == '"' && num - 1 > iconLocation && *(num - 1) == '"') // quotes at the beginning and before the comma
-                    {                                                                        // remove quotes
-                        memmove(iconLocation, iconLocation + 1, (num - 1) - (iconLocation + 1));
-                        memmove(num - 2, num, numEnd - num + 1);
-                    }
-                }
-
-                char* s = buf; // distinguish type "%1" from "...%variable%..."
-                while (*s != 0)
-                {
-                    if (*s == '%')
-                    {
-                        s++;
-                        if (*s != '%')
-                        {
-                            while (*s != 0 && *s != ' ' && *s != '%')
-                                s++;
-                            if (*s != '%') // not an env. variable -> dynamic type
-                            {
-                                data.SetIndexAll(-2);
-                                break;
-                            }
-                        }
-                    }
-                    s++;
+                    TRACE_E("ExpandEnvironmentStrings failed.");
+                    iconLocation = iconText;
                 }
             }
-            HANDLES(RegCloseKey(openKey));
+            else
+                iconLocation = iconText;
+
+            // remove quotes in case "\"filename\",icon_number" (e.g. "\"C:\\Program Files\\VideoLAN\\VLC\\vlc.exe\",0")
+            const size_t comma = iconLocation.rfind(L',');
+            if (comma != std::wstring::npos)
+            {
+                size_t number = comma + 1;
+                while (number < iconLocation.length() && iconLocation[number] == L' ')
+                    ++number;
+                if (number < iconLocation.length() && iconLocation[number] == L'-')
+                    ++number;
+                if (number < iconLocation.length() && iconLocation[number] == L'+')
+                    ++number;
+                const size_t digits = number;
+                while (number < iconLocation.length() && iconLocation[number] >= L'0' && iconLocation[number] <= L'9')
+                    ++number;
+                if (digits < number && number == iconLocation.length() &&
+                    iconLocation.front() == L'"' && comma > 1 && iconLocation[comma - 1] == L'"')
+                {
+                    iconLocation.erase(comma - 1, 1);
+                    iconLocation.erase(0, 1);
+                }
+            }
+
+            const wchar_t* s = iconText.c_str(); // distinguish type "%1" from "...%variable%..."
+            while (*s != 0)
+            {
+                if (*s == L'%')
+                {
+                    s++;
+                    if (*s != L'%')
+                    {
+                        while (*s != 0 && *s != L' ' && *s != L'%')
+                            s++;
+                        if (*s != '%') // not an env. variable -> dynamic type
+                        {
+                            data.SetIndexAll(-2);
+                            break;
+                        }
+                    }
+                }
+                s++;
+            }
         }
+        gRegistry->CloseKey(openKey);
     }
     return found;
 }
@@ -923,7 +948,7 @@ void CAssociations::ColorsChanged()
         SimpleIconLists[i]->SetBkColor(bkColor);
 }
 
-BOOL CAssociations::GetIndex(const char* name, int& index)
+BOOL CAssociations::GetIndex(const wchar_t* name, int& index)
 {
     if (Count == 0)
     {
@@ -931,7 +956,7 @@ BOOL CAssociations::GetIndex(const char* name, int& index)
         return FALSE;
     }
 
-    int length = (int)strlen(name);
+    int length = (int)(wcslen(name) * sizeof(wchar_t));
     int l = 0, r = Count - 1, m;
     int res;
     while (1)
@@ -1045,8 +1070,8 @@ void CAssociations::SortArray(int left, int right)
 LABEL_SortArray:
 
     int i = left, j = right;
-    char* pivot = Data[(i + j) / 2].ExtensionAndData;
-    int length = (int)strlen(pivot);
+    wchar_t* pivot = Data[(i + j) / 2].ExtensionAndData;
+    int length = (int)(wcslen(pivot) * sizeof(wchar_t));
 
     do
     {
@@ -1102,19 +1127,30 @@ LABEL_SortArray:
     }
 }
 
-void CAssociations::InsertData(const char* /*origin*/, int index, BOOL overwriteItem, char* e, char* s, CAssociationData& data, LONG& size,
-                               const char* iconLocation, const char* type)
+void CAssociations::InsertData(const wchar_t* /*origin*/, int index, BOOL overwriteItem, wchar_t* e, wchar_t* s, CAssociationData& data, LONG& size,
+                               const wchar_t* iconLocation, const wchar_t* type)
 {
     //  TRACE_I(origin << (overwriteItem ? "overwriting existing record by: " : "") << "file association: ext=" << e <<
     //          ": index=" << data.GetIndex(ICONSIZE_16) << ": flag=" << data.GetFlag() << ": icon-location=" << iconLocation <<
     //          ": type=" << (type == NULL ? "" : type));
 
-    size = (LONG)(s - e) + 4;
-    size -= (size & 0x3); // size % 4  (alignment to four bytes)
-    int iLen = (int)strlen(iconLocation) + 1;
-    data.ExtensionAndData = (char*)malloc(size + iLen);
-    memcpy(data.ExtensionAndData, e, size);                   // extension + zero padding +
-    memcpy(data.ExtensionAndData + size, iconLocation, iLen); // icon-location
+    // The signature now matches icncache.h:293, which was already wide - the
+    // C2511 that mismatch produced is also what turned every At()/Insert() below into a C2352.
+    //
+    // `s - e` is a CHARACTER count, so the extension's byte span including its terminator is
+    // (chars + 1) * sizeof(wchar_t). The narrow original wrote the same round-up-to-4 as
+    // "+ 4 then mask off the low bits"; `(x + 3) & ~3` is that operation stated directly.
+    // The 4-byte alignment is required: CompareDWORDS reads the key in DWORD steps and runs
+    // PAST lengthBytes, which is also why the caller's *(DWORD*)s = 0 pad must stay.
+    size = (LONG)(((s - e) + 1) * sizeof(wchar_t));
+    size = (size + 3) & ~3;                                   // align to four bytes
+    int iLen = (int)((wcslen(iconLocation) + 1) * sizeof(wchar_t));
+    data.ExtensionAndData = (wchar_t*)malloc(size + iLen);
+    memcpy(data.ExtensionAndData, e, size); // extension + zero padding +
+    // size is a BYTE offset and ExtensionAndData is wchar_t*, so the old
+    // `+ size` scaled it by two and wrote the icon-location an extension too far. size is a
+    // multiple of 4, so the division is exact and keeps the maths in the pointer's own units.
+    memcpy(data.ExtensionAndData + size / sizeof(wchar_t), iconLocation, iLen); // icon-location
     if (type[0] != 0)
         data.Type = DupStr(type); // error -> file-type just won't be shown
     else
@@ -1147,112 +1183,104 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     {
         if (showWaitWnd)
             waitWnd.Create(); //j.r. for debugging shortcuts from desktop
-        oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        // LoadCursorW: the unsuffixed form is a UNICODE-flip lever and was the
+        // SECOND textapi needle in this file (the first is :817's ExpandEnvironmentStrings).
+        // ⚠ The (PCWSTR) cast is REQUIRED, not cosmetic: IDC_WAIT expands to MAKEINTRESOURCEA
+        // without UNICODE, i.e. an LPSTR, so LoadCursorW rejects it outright. The id packs an
+        // integer into a pointer, so the cast is width-neutral - this is the same idiom the
+        // tree already uses for (PCWSTR)IDI_EXCLAMATION at find_dialog_actions.cpp:429.
+        oldCur = SetCursor(LoadCursorW(NULL, (PCWSTR)IDC_WAIT));
         closeDialog = TRUE;
     }
     else
-        IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_ASSOCIATIONS));
+        IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_ASSOCIATIONS));
     //---  clear array + cache
     Release();
     //---  iterate through registry records about classes (extensions)
-    CPathBuffer ext;
-    CPathBuffer extType; // Heap-allocated for long path support
-    char *s, *e;
+    std::vector<wchar_t> ext;
+    wchar_t *s, *e;
 
-    CPathBuffer iconLocation;
-    CPathBuffer type; // Heap-allocated for long path support
-    HKEY extKey, openKey;
+    std::wstring iconLocation;
+    std::wstring type;
+    HKEY extKey = NULL, openKey = NULL;
     LONG size;
     CAssociationData data;
 
-    CPathBuffer errBuf;
-
     HKEY systemFileAssoc = NULL;
-    if (HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, SAL_REG_KEY_SYSTEM_FILE_ASSOCIATIONS_A, &systemFileAssoc)) != ERROR_SUCCESS)
-    {
+    if (!gRegistry->OpenKeyRead(HKEY_CLASSES_ROOT, SAL_REG_KEY_SYSTEM_FILE_ASSOCIATIONS_W,
+                                systemFileAssoc).success)
         systemFileAssoc = NULL;
-    }
 
     // Windows 2000 and newer also have "Open With..." associations stored for each user separately
     // in key HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
-    HKEY explorerFileExts;
-    if (HANDLES_Q(RegOpenKey(HKEY_CURRENT_USER, SAL_REG_KEY_EXPLORER_FILEEXTS_A,
-                             &explorerFileExts)) != ERROR_SUCCESS)
-    {
+    HKEY explorerFileExts = NULL;
+    if (!gRegistry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_EXPLORER_FILEEXTS_W,
+                                explorerFileExts).success)
         explorerFileExts = NULL;
-    }
 
-    DWORD i = 0;
-    LONG enumRet;
-    FILETIME ft;
-    while (1)
-    { // sequentially enumerate all extensions
-        DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
-        if ((enumRet = RegEnumKeyEx(HKEY_CLASSES_ROOT, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-        { // open extension key
-            if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
+    auto prepareExtension = [&](const std::wstring& name)
+    {
+        const std::wstring folded = sally::text::Fold(name.substr(1));
+        ext.assign(folded.begin(), folded.end());
+        ext.resize(folded.size() + 2, L'\0'); // InsertData reads through DWORD alignment.
+        e = ext.data();
+        s = e + folded.size();
+    };
+
+    std::vector<std::wstring> classNames;
+    RegistryResult enumResult = gRegistry->EnumSubKeys(HKEY_CLASSES_ROOT, classNames);
+    if (!enumResult.success)
+    {
+        std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOGETASSOC),
+                                      GetErrorTextOwned(enumResult.errorCode).c_str());
+        gPrompter->ShowError(LoadStrW(IDS_UNABLETOGETASSOCTITLE), msg.c_str());
+    }
+    else
+    {
+        for (const std::wstring& className : classNames)
+        {
+            if (!className.empty() && className[0] == L'.' &&
+                gRegistry->OpenKeyRead(HKEY_CLASSES_ROOT, className.c_str(), extKey).success)
             {
-                size = extType.Size(); // getting association type
-                iconLocation[0] = 0;
+                iconLocation.clear();
                 data.SetFlag(0);
                 data.SetIndexAll(-1);
-                type[0] = 0;
+                type.clear();
                 BOOL tryPerceivedType = FALSE;
-                BOOL addExt = (SalRegQueryValue(extKey, SAL_REG_VALUE_DEFAULT_A, extType, &size) == ERROR_SUCCESS && size > 1);
+                std::wstring extType;
+                BOOL addExt = ReadAssociationString(extKey, NULL, extType).success && !extType.empty();
                 if (addExt)
                 {
-                    // test for icon type (static/dynamic see .h)
-                    tryPerceivedType = !GetIconFromAssocAux(FALSE, HKEY_CLASSES_ROOT, extType, size, data, iconLocation, iconLocation.Size(), type, type.Size());
+                    tryPerceivedType = !GetIconFromAssocAux(FALSE, HKEY_CLASSES_ROOT,
+                                                            extType.c_str(), data, iconLocation, &type);
                 }
                 else
                     tryPerceivedType = TRUE;
                 if (tryPerceivedType && systemFileAssoc != NULL)
                 {
                     // first try to find 'ext' under the SystemFileAssociations key
-                    if (GetIconFromAssocAux(FALSE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
+                    if (GetIconFromAssocAux(FALSE, systemFileAssoc, className.c_str(),
+                                            data, iconLocation, NULL))
                         addExt = TRUE;
                     else
                     { // also try the key from the PerceivedType value (if defined)
-                        size = extType.Size();
-                        if (SalRegQueryValueEx(extKey, SAL_REG_VALUE_PERCEIVED_TYPE_A, NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        if (ReadAssociationString(extKey, SAL_REG_VALUE_PERCEIVED_TYPE_W,
+                                                  extType).success && !extType.empty())
                         {
-                            extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
-                            if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
+                            if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType.c_str(),
+                                                    data, iconLocation, NULL))
                                 addExt = TRUE;
                         }
                     }
                 }
                 if (addExt)
-                {                // convert ext. to lowercase + add to array
-                    e = ext + 1; // skip '.'
-                    s = e;
-                    while (*s != 0)
-                    {
-                        *s = LowerCase[*s];
-                        s++;
-                    }
-                    *(DWORD*)s = 0; // zero the end of string
-
-                    InsertData("", Count, FALSE, e, s, data, size, iconLocation, type);
+                {
+                    prepareExtension(className);
+                    InsertData(L"", Count, FALSE, e, s, data, size, iconLocation.c_str(), type.c_str());
                 }
-                HANDLES(RegCloseKey(extKey));
+                gRegistry->CloseKey(extKey);
             }
         }
-        else
-        {
-            if (enumRet != ERROR_NO_MORE_ITEMS)
-            {
-                // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) comes here
-                // one ERROR_MORE_DATA error, then a lot of ERROR_OUTOFMEMORY, has Microsoft Windows Server 2003,
-                // Standard Edition Service Pack 2 (Build 3790), increasing buffer to 10000 doesn't help, must
-                // terminate enumeration on first error, otherwise starts to cycle and eat memory (apparently
-                // an internal Windows error), nobody else reported it, so we don't deal with it further
-                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOGETASSOC), GetErrorTextW(enumRet));
-                gPrompter->ShowError(LoadStrW(IDS_UNABLETOGETASSOCTITLE), msg.c_str());
-            }
-            break; // end of enumeration
-        }
-        i++;
     }
     if (Count > 1)
         SortArray(0, Count - 1);
@@ -1261,107 +1289,92 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     // we load extensions not yet known from this key
     if (systemFileAssoc != NULL)
     {
-        i = 0;
-        while (1)
-        { // sequentially enumerate all extensions
-            DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
-            if ((enumRet = RegEnumKeyEx(systemFileAssoc, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-            { // open extension key
-                if (ext[0] == '.')
+        std::vector<std::wstring> systemNames;
+        enumResult = gRegistry->EnumSubKeys(systemFileAssoc, systemNames);
+        if (!enumResult.success)
+        {
+            std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOGETASSOC),
+                                          GetErrorTextOwned(enumResult.errorCode).c_str());
+            gPrompter->ShowError(LoadStrW(IDS_UNABLETOGETASSOCTITLE), msg.c_str());
+        }
+        else
+        {
+            for (const std::wstring& systemName : systemNames)
+            {
+                if (!systemName.empty() && systemName[0] == L'.')
                 {
-                    e = ext + 1; // skip '.'
-                    s = ext;
-                    while (*++s != 0)
-                        *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // zero the end of string
+                    prepareExtension(systemName);
 
                     int index;
                     if (!GetIndex(e, index)) // not found, makes sense to examine + possibly add
                     {
-                        if (GetIconFromAssocAux(TRUE, systemFileAssoc, ext, (LONG)strlen(ext) + 1, data, iconLocation, iconLocation.Size(), NULL, 0))
+                        if (GetIconFromAssocAux(TRUE, systemFileAssoc, systemName.c_str(),
+                                                data, iconLocation, NULL))
                         {
-                            InsertData("SystemFileAssociations: ", index, FALSE, e, s, data, size, iconLocation, "");
+                            InsertData(L"SystemFileAssociations: ", index, FALSE, e, s, data, size, iconLocation.c_str(), L"");
                         }
                     }
                 }
             }
-            else
-            {
-                if (enumRet != ERROR_NO_MORE_ITEMS)
-                {
-                    // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) comes here
-                    // one ERROR_MORE_DATA error, then a lot of ERROR_OUTOFMEMORY, has Microsoft Windows Server 2003,
-                    // Standard Edition Service Pack 2 (Build 3790), increasing buffer to 10000 doesn't help, must
-                    // terminate enumeration on first error, otherwise starts to cycle and eat memory (apparently
-                    // an internal Windows error), nobody else reported it, so we don't deal with it further
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOGETASSOC), GetErrorTextW(enumRet));
-                    gPrompter->ShowError(LoadStrW(IDS_UNABLETOGETASSOCTITLE), msg.c_str());
-                }
-                break; // end of enumeration
-            }
-            i++;
         }
     }
 
     if (explorerFileExts != NULL)
     {
-        i = 0;
-        while (1)
-        { // sequentially enumerate all extensions
-            DWORD extS = ext.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
-            if (RegEnumKeyEx(explorerFileExts, i, ext, &extS, NULL, NULL, NULL, &ft) == ERROR_SUCCESS)
-            { // open extension key
-                if (ext[0] == '.' && HANDLES_Q(RegOpenKey(explorerFileExts, ext, &extKey)) == ERROR_SUCCESS)
+        std::vector<std::wstring> userExtensions;
+        if (gRegistry->EnumSubKeys(explorerFileExts, userExtensions).success)
+        {
+            for (const std::wstring& userExtension : userExtensions)
+            {
+                if (!userExtension.empty() && userExtension[0] == L'.' &&
+                    gRegistry->OpenKeyRead(explorerFileExts, userExtension.c_str(), extKey).success)
                 {
-                    e = ext + 1; // skip '.'
-                    s = ext;
-                    while (*++s != 0)
-                        *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // zero the end of string
+                    prepareExtension(userExtension);
 
                     int index;
                     BOOL found = GetIndex(e, index);
-                    if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, SAL_REG_SUBKEY_USER_CHOICE_A, &openKey)) == ERROR_SUCCESS)
+                    if (WindowsVistaAndLater &&
+                        gRegistry->OpenKeyRead(extKey, SAL_REG_SUBKEY_USER_CHOICE_W, openKey).success)
                     {                    // try if associated via UserChoice key, if so, it's the highest priority record, so we possibly overwrite the existing association
-                        size = extType.Size(); // getting association type
-                        if (SalRegQueryValueEx(openKey, SAL_REG_VALUE_PROGID_A, NULL, NULL, (BYTE*)extType.Get(), (DWORD*)&size) == ERROR_SUCCESS && size > 1)
+                        std::wstring extType;
+                        if (ReadAssociationString(openKey, SAL_REG_VALUE_PROGID_W, extType).success &&
+                            !extType.empty())
                         {
-                            extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
-
-                            if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), type, type.Size()))
+                            if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType.c_str(),
+                                                    data, iconLocation, &type))
                             {
-                                InsertData("UserChoice: ", index, found, e, s, data, size, iconLocation, type); // found==TRUE means overwrite found association with the one from UserChoice
+                                InsertData(L"UserChoice: ", index, found, e, s, data, size, iconLocation.c_str(), type.c_str()); // found==TRUE means overwrite found association with the one from UserChoice
                                 found = TRUE;
                             }
                         }
-                        HANDLES(RegCloseKey(openKey));
+                        gRegistry->CloseKey(openKey);
                     }
                     if (!found) // also try if associated via OpenWithProgids key
                     {
-                        if (WindowsVistaAndLater && HANDLES_Q(RegOpenKey(extKey, SAL_REG_SUBKEY_OPEN_WITH_PROGIDS_A, &openKey)) == ERROR_SUCCESS)
+                        if (WindowsVistaAndLater &&
+                            gRegistry->OpenKeyRead(extKey, SAL_REG_SUBKEY_OPEN_WITH_PROGIDS_W,
+                                                   openKey).success)
                         {
-                            DWORD j = 0;
-                            size = extType.Size(); // getting association type
-                            while (RegEnumValue(openKey, j++, extType, (DWORD*)&size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+                            std::vector<std::wstring> progIds;
+                            if (gRegistry->EnumValues(openKey, progIds).success)
                             { // sequentially enumerate all association types
-                                if (extType[0] != 0)
+                                for (const std::wstring& extType : progIds)
                                 {
-                                    extType[extType.Size() - 1] = 0; // just to be sure (value may not be string type, then null-terminator may be missing)
-
-                                    if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, iconLocation.Size(), type, type.Size()))
+                                    if (!extType.empty() &&
+                                        GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT,
+                                                            extType.c_str(), data, iconLocation, &type))
                                     {
-                                        InsertData("OpenWithProgids: ", index, FALSE, e, s, data, size, iconLocation, type);
+                                        InsertData(L"OpenWithProgids: ", index, FALSE, e, s, data, size, iconLocation.c_str(), type.c_str());
                                         found = TRUE;
                                         break;
                                     }
                                 }
-                                size = extType.Size(); // getting association type
                             }
-                            HANDLES(RegCloseKey(openKey));
+                            gRegistry->CloseKey(openKey);
                         }
                     }
 
-                    if (SalRegQueryValueEx(extKey, SAL_REG_VALUE_APPLICATION_A, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+                    if (gRegistry->ValueExists(extKey, SAL_REG_VALUE_APPLICATION_W))
                     {
                         if (found) // found, set that it has association
                         {
@@ -1374,17 +1387,14 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                             data.SetFlag(1); // files with this extension can be opened
                             data.SetIndexAll(-1);
 
-                            InsertData("FileExts: Application: ", index, FALSE, e, s, data, size, "", "");
+                            InsertData(L"FileExts: Application: ", index, FALSE, e, s, data, size, L"", L"");
                         }
                     }
-                    HANDLES(RegCloseKey(extKey));
+                    gRegistry->CloseKey(extKey);
                 }
             }
-            else
-                break; // end of enumeration
-            i++;
         }
-        HANDLES(RegCloseKey(explorerFileExts));
+        gRegistry->CloseKey(explorerFileExts);
     }
 
     // adding fixed icons of all sizes to cache-bitmap CAssociations
@@ -1435,7 +1445,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     }
 
     if (systemFileAssoc != NULL)
-        HANDLES(RegCloseKey(systemFileAssoc));
+        gRegistry->CloseKey(systemFileAssoc);
     if (closeDialog)
     {
         SetCursor(oldCur);
@@ -1444,7 +1454,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     }
 }
 
-BOOL CAssociations::IsAssociated(char* ext, BOOL& addtoIconCache, CIconSizeEnum iconSize)
+BOOL CAssociations::IsAssociated(const wchar_t* ext, BOOL& addtoIconCache, CIconSizeEnum iconSize)
 {
     int index;
     if (GetIndex(ext, index))
@@ -1462,7 +1472,7 @@ BOOL CAssociations::IsAssociated(char* ext, BOOL& addtoIconCache, CIconSizeEnum 
     }
 }
 
-BOOL CAssociations::IsAssociatedStatic(char* ext, const char*& iconLocation, CIconSizeEnum iconSize)
+BOOL CAssociations::IsAssociatedStatic(const wchar_t* ext, const wchar_t*& iconLocation, CIconSizeEnum iconSize)
 {
     int index;
     if (GetIndex(ext, index))
@@ -1484,7 +1494,7 @@ BOOL CAssociations::IsAssociatedStatic(char* ext, const char*& iconLocation, CIc
     }
 }
 
-BOOL CAssociations::IsAssociated(char* ext)
+BOOL CAssociations::IsAssociated(const wchar_t* ext)
 {
     int index;
     if (GetIndex(ext, index))

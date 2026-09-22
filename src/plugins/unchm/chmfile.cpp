@@ -9,12 +9,49 @@
 //#include "lzx.h"
 #include "unchm.h"
 #include "chmfile.h"
+#include "unchm_text.h"
 
 #include "unchm.rh"
 #include "unchm.rh2"
 #include "lang\lang.rh"
 
-void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
+static std::wstring FormatLocaleTime(const SYSTEMTIME& time)
+{
+    const int required = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL, NULL, 0);
+    if (required > 0)
+    {
+        std::wstring value(static_cast<size_t>(required), L'\0');
+        const int written = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL,
+                                           value.data(), required);
+        if (written > 0)
+        {
+            value.resize(static_cast<size_t>(written - 1));
+            return value;
+        }
+    }
+    return SPLFormatStringOwned(L"%u:%02u:%02u", time.wHour, time.wMinute,
+                                time.wSecond);
+}
+
+static std::wstring FormatLocaleDate(const SYSTEMTIME& time)
+{
+    const int required = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
+                                        NULL, NULL, 0);
+    if (required > 0)
+    {
+        std::wstring value(static_cast<size_t>(required), L'\0');
+        const int written = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
+                                           NULL, value.data(), required);
+        if (written > 0)
+        {
+            value.resize(static_cast<size_t>(written - 1));
+            return value;
+        }
+    }
+    return SPLFormatStringOwned(L"%u.%u.%u", time.wDay, time.wMonth, time.wYear);
+}
+
+std::wstring GetInfo(const FILETIME* lastWrite, CQuadWord size)
 {
     CALL_STACK_MESSAGE2("GetInfo(, , 0x%I64X)", size.Value);
 
@@ -23,24 +60,21 @@ void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
     FileTimeToLocalFileTime(lastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
+    const std::wstring date = FormatLocaleDate(st);
+    const std::wstring time = FormatLocaleTime(st);
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, size);
+    return SPLFormatStringOwned(L"%ls, %ls, %ls", number.c_str(), date.c_str(),
+                                time.c_str());
 }
 
-BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent)
+BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent)
 {
     while (!WriteFile(hFile, lpBuffer, nBytesToWrite, pnBytesWritten, NULL))
     {
         int lastErr = GetLastError();
-        char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
+        const std::wstring error = SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
         if (SalamanderGeneral->DialogError(parent == NULL ? SalamanderGeneral->GetMsgBoxParent() : parent, BUTTONS_RETRYCANCEL,
-                                           fileName, error, LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
+                                           fileName, error.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_WRITEERROR).c_str()) != DIALOG_RETRY)
             return FALSE;
     }
     return TRUE;
@@ -62,7 +96,6 @@ CCHMFile::CCHMFile()
     ChmEnumerate = NULL;
     ChmRetrieveObject = NULL;
 
-    FileName = NULL;
 }
 
 CCHMFile::~CCHMFile()
@@ -70,29 +103,29 @@ CCHMFile::~CCHMFile()
     CALL_STACK_MESSAGE1("CCHMFile::~CCHMFile()");
     Close();
 
-    delete[] FileName;
 }
 
-BOOL CCHMFile::Open(const char* fileName, BOOL quiet /* = FALSE*/)
+BOOL CCHMFile::Open(const wchar_t* fileName, BOOL quiet /* = FALSE*/)
 {
-    CALL_STACK_MESSAGE3("CCHMFile::Open(%s, %d)", fileName, quiet);
+    CALL_STACK_MESSAGE3("CCHMFile::Open(%ls, %d)", fileName, quiet);
 
-    CPathBuffer dllPath; // Heap-allocated for long path support
-    if (!GetModuleFileName(DLLInstance, dllPath, dllPath.Size()))
+    std::wstring dllPath;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, dllPath) ||
+        !SPLCutDirectoryOwned(SalamanderGeneral, dllPath))
         return FALSE;
-    lstrcpy(strrchr(dllPath.Get(), '\\') + 1, "chmlib.dll");
+    SPLSalPathAppendOwned(dllPath, L"chmlib.dll");
 
-    HMODULE hDLL = LoadLibrary(dllPath);
+    HMODULE hDLL = LoadLibraryW(dllPath.c_str());
     if (hDLL != NULL)
     {
-        SalamanderDebug->AddModuleWithPossibleMemoryLeaks(dllPath);
-        ChmOpen = (CHM_OPEN_PROC)GetProcAddress(hDLL, "chm_open");
+        SalamanderDebug->AddModuleWithPossibleMemoryLeaks(dllPath.c_str());
+        ChmOpen = (CHM_OPEN_PROC)GetProcAddress(hDLL, "chm_open_w");
         ChmClose = (CHM_CLOSE_PROC)GetProcAddress(hDLL, "chm_close");
         ChmEnumerate = (CHM_ENUMERATE_PROC)GetProcAddress(hDLL, "chm_enumerate");
         ChmRetrieveObject = (CHM_RETRIEVE_OBJECT_PROC)GetProcAddress(hDLL, "chm_retrieve_object");
 
         // get filetime (must go before chm_open)
-        HANDLE hCHM = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hCHM = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hCHM != INVALID_HANDLE_VALUE)
         {
             GetFileTime(hCHM, NULL, NULL, &FileTime);
@@ -111,7 +144,7 @@ BOOL CCHMFile::Open(const char* fileName, BOOL quiet /* = FALSE*/)
             return Error(IDS_CANT_OPEN_FILE, quiet);
         else
         {
-            FileName = SalamanderGeneral->DupStr(fileName);
+            FileName = fileName;
             return TRUE;
         }
     }
@@ -164,15 +197,19 @@ BOOL CCHMFile::AddFileDir(struct chmUnitInfo* ui, CSalamanderDirectoryAbstract* 
     if (path[0] == '\\' && path <= bs)
         path++;
 
-    fd.Name = SalamanderGeneral->DupStr(fileName);
+    std::wstring fileNameW;
+    std::wstring pathW;
+    if (!DecodeChmPathUtf8(fileName, fileNameW) || !DecodeChmPathUtf8(path, pathW))
+        return Error(IDS_ERROR);
+    fd.Name = SalamanderGeneral->DupStr(fileNameW.c_str());
     if (fd.Name == NULL)
     {
         Error(IDS_INSUFFICIENT_MEMORY);
         return FALSE;
     } // if
 
-    fd.NameLen = strlen(fd.Name);
-    char* s = strrchr(fd.Name, '.');
+    fd.NameLen = static_cast<int>(wcslen(fd.Name));
+    wchar_t* s = wcsrchr(fd.Name, L'.');
     if (s != NULL)
         fd.Ext = s + 1; // ".cvspass" is an extension in Windows
     else
@@ -201,7 +238,7 @@ BOOL CCHMFile::AddFileDir(struct chmUnitInfo* ui, CSalamanderDirectoryAbstract* 
     // file
     fd.IsLink = SalamanderGeneral->IsFileLink(fd.Ext);
     fd.IsOffline = 0;
-    if (dir && !dir->AddFile(path, fd, pluginData))
+    if (dir && !dir->AddFile(pathW.c_str(), fd, pluginData))
     {
         free(fd.Name);
         dir->Clear(pluginData);
@@ -248,30 +285,26 @@ BOOL CCHMFile::EnumObjects(CSalamanderDirectoryAbstract* dir, CPluginDataInterfa
     return TRUE;
 }
 
-int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
+int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const wchar_t* srcPath, const wchar_t* path,
                             const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE5("CCHMFile::ExtractObject( , %s, %s, , %u, %d)", srcPath, path, silent, toSkip);
+    CALL_STACK_MESSAGE5("CCHMFile::ExtractObject( , %ls, %ls, , %u, %d)", srcPath, path, silent, toSkip);
 
-    CPathBuffer nameInArc;
-    strcpy(nameInArc, FileName);
-    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, nameInArc.Size());
-    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, nameInArc.Size());
+    std::wstring nameInArc(FileName);
+    SPLSalPathAppendOwned(nameInArc, srcPath);
+    SPLSalPathAppendOwned(nameInArc, fileData->Name);
 
     ///
-    CPathBuffer name; // Heap-allocated for long path support
-    strcpy(name, path);
-    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-        return UNPACK_ERROR;
+    std::wstring name(path);
+    SPLSalPathAppendOwned(name, fileData->Name);
 
-    char fileInfo[100];
     FILETIME ft = fileData->LastWrite;
-    GetInfo(fileInfo, &ft, fileData->Size);
+    const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
 
     DWORD attrs = fileData->Attr;
 
-    HANDLE file = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                     SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+    HANDLE file = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                     SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                      &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
 
     // set file time
@@ -305,7 +338,7 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
         if (len > 0)
         {
             ULONG written;
-            SafeWriteFile(file, buffer, (DWORD)len, &written, name, SalamanderGeneral->GetMainWindowHWND());
+            SafeWriteFile(file, buffer, (DWORD)len, &written, name.c_str(), SalamanderGeneral->GetMainWindowHWND());
             offset += len;
             remain.Value -= len;
         }
@@ -313,10 +346,9 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
         {
             if (silent == 0)
             {
-                char error[1024];
-                sprintf(error, LoadStr(IDS_ERROR_UNPACKING));
                 int userAction = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), ButtonFlags,
-                                                                fileData->Name, error, LoadStr(IDS_READERROR));
+                                                                fileData->Name, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR_UNPACKING).c_str(),
+                                                                SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_READERROR).c_str());
 
                 switch (userAction)
                 {
@@ -339,7 +371,7 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
 
         if (!salamander->ProgressAddSize((int)len, TRUE)) // delayedPaint==TRUE so we do not slow down
         {
-            salamander->ProgressDialogAddText(LoadStr(IDS_CANCELOPER), FALSE);
+            salamander->ProgressDialogAddText(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANCELOPER).c_str(), FALSE);
             salamander->ProgressEnableCancel(FALSE);
 
             ret = UNPACK_CANCEL;
@@ -360,22 +392,22 @@ int CCHMFile::ExtractObject(CSalamanderForOperationsAbstract* salamander, const 
         // because it is created with the read-only attribute, we must clear the R attribute
         // to allow the file to be deleted
         attrs &= ~FILE_ATTRIBUTE_READONLY;
-        if (!SetFileAttributes(name, attrs))
-            Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+        if (!SetFileAttributesW(name.c_str(), attrs))
+            Error(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 
         // the user canceled the operation
         // delete the incomplete file afterwards
-        if (!DeleteFile(name))
-            Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError());
+        if (!DeleteFileW(name.c_str()))
+            Error(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError());
     }
 
     return ret;
     //  return UNPACK_CANCEL;
 }
 
-BOOL CCHMFile::UnpackDir(const char* dirName, const CFileData* fileData)
+BOOL CCHMFile::UnpackDir(const wchar_t* dirName, const CFileData* fileData)
 {
-    CALL_STACK_MESSAGE3("CCHMFile::UnpackDir(%s, %p)", dirName, fileData);
+    CALL_STACK_MESSAGE3("CCHMFile::UnpackDir(%ls, %p)", dirName, fileData);
 
     if (!SalamanderGeneral->CheckAndCreateDirectory(dirName))
         return UNPACK_ERROR;
@@ -389,17 +421,17 @@ BOOL CCHMFile::UnpackDir(const char* dirName, const CFileData* fileData)
     attrs &= ~FILE_ATTRIBUTE_READONLY;
 
   if (!SetFileAttributes(dirName, attrs))
-    Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+    Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 */
 
     return UNPACK_OK;
 }
 
-int CCHMFile::ExtractAllObjects(CSalamanderForOperationsAbstract* salamander, char* srcPath,
-                                CSalamanderDirectoryAbstract const* dir, const char* mask,
-                                char* path, int pathBufSize, DWORD& silent, BOOL& toSkip)
+int CCHMFile::ExtractAllObjects(CSalamanderForOperationsAbstract* salamander, std::wstring& srcPath,
+                                CSalamanderDirectoryAbstract const* dir, const wchar_t* mask,
+                                std::wstring& path, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CCHMFile::ExtractAllObjects(, %s, , %s, %s, %d, %u, %d)", srcPath, mask, path, pathBufSize, silent, toSkip);
+    CALL_STACK_MESSAGE6("CCHMFile::ExtractAllObjects(, %ls, %ls, %ls, %u, %d)", srcPath.c_str(), mask, path.c_str(), silent, toSkip);
 
     int count = dir->GetFilesCount();
     int i;
@@ -413,29 +445,29 @@ int CCHMFile::ExtractAllObjects(CSalamanderForOperationsAbstract* salamander, ch
 
         if (SalamanderGeneral->AgreeMask(file->Name, mask, file->Ext[0] != 0))
         {
-            if (ExtractObject(salamander, srcPath, path, file, silent, toSkip) == UNPACK_CANCEL ||
+            if (ExtractObject(salamander, srcPath.c_str(), path.c_str(), file, silent, toSkip) == UNPACK_CANCEL ||
                 !salamander->ProgressAddSize(1, TRUE))
                 return UNPACK_CANCEL;
         }
     } // for
 
     count = dir->GetDirsCount();
-    int pathLen = (int)strlen(path);
-    int srcPathLen = (int)strlen(srcPath);
+    const size_t pathLen = path.size();
+    const size_t srcPathLen = srcPath.size();
     for (i = 0; i < count; i++)
     {
         CFileData const* file = dir->GetDir(i);
-        SalamanderGeneral->SalPathAppend(path, file->Name, pathBufSize);
-        if (UnpackDir(path, file) == UNPACK_CANCEL)
+        SPLSalPathAppendOwned(path, file->Name);
+        if (UnpackDir(path.c_str(), file) == UNPACK_CANCEL)
             return UNPACK_CANCEL;
 
         CSalamanderDirectoryAbstract const* subDir = dir->GetSalDir(i);
-        SalamanderGeneral->SalPathAppend(srcPath, file->Name, MAX_PATH);
-        if (ExtractAllObjects(salamander, srcPath, subDir, mask, path, pathBufSize, silent, toSkip) == UNPACK_CANCEL)
+        SPLSalPathAppendOwned(srcPath, file->Name);
+        if (ExtractAllObjects(salamander, srcPath, subDir, mask, path, silent, toSkip) == UNPACK_CANCEL)
             return UNPACK_CANCEL;
 
-        srcPath[srcPathLen] = '\0';
-        path[pathLen] = '\0';
+        srcPath.resize(srcPathLen);
+        path.resize(pathLen);
     }
 
     return UNPACK_OK;

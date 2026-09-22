@@ -1,11 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
+#include "common/text/PluralExpander.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/PanelPathPolicy.h" // EffectiveItemNameW
 #include "plugins.h"
 #include "fileswnd.h"
 #include "mainwnd.h"
@@ -282,21 +285,28 @@ void AddProgressSizeWithLimit(CCmpDirProgressDialog* progressDlg, DWORD read, CQ
     }
 }
 
+// file1/file2 are wide - both real callers build their full path from
+// GetPathW() now (the code page cannot always spell the removed ANSI mirror's mirror), so
+// re-narrowing them here would throw that away. CreateFileW/error text/progress display
+// all consume file1/file2 directly; no AnsiToWide round trip needed inside this function
+// anymore.
 BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
-                           const char* file1, const char* file2, const CQuadWord& bothFileSize,
+                           const wchar_t* file1, const wchar_t* file2, const CQuadWord& bothFileSize,
                            BOOL* different, BOOL* canceled)
 {
-    CPathBuffer message;
     BOOL ret = FALSE;
     *canceled = FALSE;
 
     //  DWORD totalTi = GetTickCount();
 
-    HANDLE hFile1 = HANDLES_Q(CreateFileW(AnsiToWide(file1).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? HANDLES_Q(CreateFileW(AnsiToWide(file2).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL))
+    HANDLE hFile1 = gFileSystem->CreateFile(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                            NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLES_ADD_EX(__otQuiet, hFile1 != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile1, GetLastError(), TRUE);
+    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? gFileSystem->CreateFile(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                                             NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL)
                                                    : INVALID_HANDLE_VALUE;
+    if (hFile1 != INVALID_HANDLE_VALUE)
+        HANDLES_ADD_EX(__otQuiet, hFile2 != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile2, GetLastError(), TRUE);
     DWORD err = GetLastError();
 
     if (!progressDlg->Continue()) // give the dialog a chance to repaint at 100% of the previous file (opening a file is the longest step (3ms) when copying small files (0.1ms))
@@ -343,11 +353,12 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         DWORD locRead;
                         BOOL canReadGroup = readingIsFast1 && (block % COMPARE_BLOCK_GROUP) == 0 && block + COMPARE_BLOCK_GROUP <= blockCount;
                         DWORD readBlockSize = canReadGroup ? COMPARE_BLOCK_GROUP * COMPARE_BLOCK_SIZE : COMPARE_BLOCK_SIZE;
-                        if (!ReadFile(hFile1, buffer1 + block * COMPARE_BLOCK_SIZE, readBlockSize, &locRead, NULL))
+                        const FileResult readResult = gFileSystem->ReadFromHandle(hFile1, buffer1 + block * COMPARE_BLOCK_SIZE, readBlockSize, &locRead);
+                        if (!readResult.success)
                         {
-                            err = GetLastError();
+                            err = readResult.errorCode;
                             readErr = TRUE;
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), AnsiToWide(file1).c_str(), GetErrorTextW(err));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), file1, GetErrorTextOwned(err).c_str());
                             progressDlg->FlushDataToControls();
                             if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
                             {
@@ -383,10 +394,10 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
           if (!ReadFile(hFile1, buffer1, bufSize, &read1, NULL))
           {
             err = GetLastError();
-            sprintf(message, LoadStr(IDS_ERROR_READING_FILE), file1, GetErrorText(err));
+            std::wstring message = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), file1, GetErrorTextOwned(err).c_str());
             progressDlg->FlushDataToControls();
-            if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+            if (SalMessageBoxW(hWindow, message.c_str(), LoadStrOwned(IDS_ERRORTITLE).c_str(),
+                               MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
             {
               *canceled = TRUE;
             }
@@ -403,11 +414,12 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         DWORD locRead;
                         BOOL canReadGroup = readingIsFast2 && (block % COMPARE_BLOCK_GROUP) == 0 && block + COMPARE_BLOCK_GROUP <= blockCount;
                         DWORD readBlockSize = canReadGroup ? COMPARE_BLOCK_GROUP * COMPARE_BLOCK_SIZE : COMPARE_BLOCK_SIZE;
-                        if (!ReadFile(hFile2, buffer2, readBlockSize, &locRead, NULL))
+                        const FileResult readResult = gFileSystem->ReadFromHandle(hFile2, buffer2, readBlockSize, &locRead);
+                        if (!readResult.success)
                         {
-                            err = GetLastError();
+                            err = readResult.errorCode;
                             readErr = TRUE;
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), AnsiToWide(file2).c_str(), GetErrorTextW(err));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), file2, GetErrorTextOwned(err).c_str());
                             progressDlg->FlushDataToControls();
                             if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
                             {
@@ -454,10 +466,10 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
           if (!ReadFile(hFile2, buffer2, bufSize, &read2, NULL))
           {
             err = GetLastError();
-            sprintf(message, LoadStr(IDS_ERROR_READING_FILE), file2, GetErrorText(err));
+            std::wstring message = FormatStrW(LoadStrW(IDS_ERROR_READING_FILE), file2, GetErrorTextOwned(err).c_str());
             progressDlg->FlushDataToControls();
-            if (SalMessageBox(hWindow, message, LoadStr(IDS_ERRORTITLE),
-                              MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
+            if (SalMessageBoxW(hWindow, message.c_str(), LoadStrOwned(IDS_ERRORTITLE).c_str(),
+                               MB_OKCANCEL | MB_ICONEXCLAMATION) == IDCANCEL)
             {
               *canceled = TRUE;
             }
@@ -502,22 +514,24 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                 free(buffer1);
                 //        free(buffer2);
             }
-            HANDLES(CloseHandle(hFile2));
+            HANDLES_REMOVE(hFile2, __htFile, "IFileSystem::CloseHandle");
+            gFileSystem->CloseFileHandle(hFile2);
         }
         else
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), AnsiToWide(file2).c_str(), GetErrorTextW(err));
+            std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), file2, GetErrorTextOwned(err).c_str());
             progressDlg->FlushDataToControls();
             if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
             {
                 *canceled = TRUE;
             }
         }
-        HANDLES(CloseHandle(hFile1));
+        HANDLES_REMOVE(hFile1, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(hFile1);
     }
     else
     {
-        std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), AnsiToWide(file1).c_str(), GetErrorTextW(err));
+        std::wstring msg = FormatStrW(LoadStrW(IDS_ERROR_OPENING_FILE), file1, GetErrorTextOwned(err).c_str());
         progressDlg->FlushDataToControls();
         if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel)
         {
@@ -543,32 +557,22 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 // supports ptDisk and ptZIPArchive
 
 BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progressDlg,
-                         CFilesWindow* panel, const char* subPath,
+                         CFilesWindow* panel, const wchar_t* subPath,
                          CFilesArray* dirs, CFilesArray* files, BOOL* canceled, BOOL getTotal)
 {
-    CPathBuffer message;
-    CPathBuffer path; // Heap-allocated for long path support
-
     BOOL ignFileNames = (flags & COMPARE_DIRECTORIES_IGNFILENAMES) != 0;
     BOOL ignDirNames = (flags & COMPARE_DIRECTORIES_IGNDIRNAMES) != 0;
 
     if (panel->Is(ptDisk))
     {
-        BOOL pathAppended = TRUE;
-        lstrcpyn(path, panel->GetPath(), path.Size());
-        pathAppended &= SalPathAppend(path, subPath, path.Size());
-        pathAppended &= SalPathAppend(path, "*", path.Size());
-        if (!pathAppended)
-        {
-            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-            *canceled = TRUE;
-            return FALSE;
-        }
+        std::wstring path = panel->GetPathW();
+        SalPathAppendW(path, subPath);
+        SalPathAppendW(path, L"*");
 
         DWORD counter = 0;
         WIN32_FIND_DATAW data;
         HANDLE hFind;
-        hFind = SalFindFirstFileHW(path, &data);
+        hFind = SalFindFirstFileHW(path.c_str(), &data);
         if (hFind == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -578,7 +582,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                     *canceled = FALSE; // we're only obtaining the size, no need to bother the user, skip the error
                 else
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(path).c_str(), GetErrorTextW(err));
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), path.c_str(), GetErrorTextOwned(err).c_str());
                     progressDlg->FlushDataToControls();
                     *canceled = gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type == PromptResult::kCancel;
                 }
@@ -588,17 +592,15 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         }
         do
         {
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-            if (cFileNameA[0] != 0 &&
-                (cFileNameA[0] != '.' ||
-                 (cFileNameA[1] != 0 && (cFileNameA[1] != '.' || cFileNameA[2] != 0))))
+            if (data.cFileName[0] != 0 &&
+                (data.cFileName[0] != L'.' ||
+                 (data.cFileName[1] != 0 && (data.cFileName[1] != L'.' || data.cFileName[2] != 0))))
             {
                 if (counter++ > 200) // after reading 200 items
                 {
                     if (!progressDlg->Continue()) // give the dialog a chance to repaint
                     {
-                        HANDLES(FindClose(hFind));
+                        SalLPFindClose(hFind);
                         *canceled = TRUE;
                         return FALSE;
                     }
@@ -608,7 +610,6 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 CFileData file;
                 // initialize structure members we won't modify further
                 file.DosName = NULL;
-                file.NameW = NULL;
                 file.PluginData = -1;
                 file.Association = 0;
                 file.Selected = 0;
@@ -623,18 +624,18 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 file.IsLink = 0;
                 file.IsOffline = 0;
 
-                int nameLen = (int)strlen(cFileNameA);
+                int nameLen = (int)wcslen(data.cFileName);
 
                 //--- name
-                file.Name = (char*)malloc(nameLen + 1); // allocation
+                file.Name = (wchar_t*)malloc((nameLen + 1) * sizeof(wchar_t)); // allocation
                 if (file.Name == NULL)
                 {
                     TRACE_E(LOW_MEMORY);
-                    HANDLES(FindClose(hFind));
+                    SalLPFindClose(hFind);
                     *canceled = TRUE;
                     return FALSE;
                 }
-                memmove(file.Name, cFileNameA, nameLen + 1); // copy text
+                memmove(file.Name, data.cFileName, (nameLen + 1) * sizeof(wchar_t)); // copy text
                 file.NameLen = nameLen;
 
                 //--- extension
@@ -644,12 +645,12 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 }
                 else
                 {
-                    const char* s = cFileNameA + nameLen;
-                    while (--s >= cFileNameA && *s != '.')
+                    const wchar_t* s = file.Name + nameLen;
+                    while (--s >= file.Name && *s != L'.')
                         ;
-                    //          if (s > cFileNameA) file.Ext = file.Name + (s - cFileNameA + 1); // ".cvspass" in Windows counts as an extension ...
-                    if (s >= cFileNameA)
-                        file.Ext = file.Name + (s - cFileNameA + 1);
+                    //          if (s > file.Name) file.Ext = file.Name + (s - file.Name + 1); // ".cvspass" in Windows counts as an extension ...
+                    if (s >= file.Name)
+                        file.Ext = file.Name + (s - file.Name + 1);
                     else
                         file.Ext = file.Name + file.NameLen;
                 }
@@ -661,14 +662,18 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
 
                 if (file.Attr & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    if (!ignDirNames || !Configuration.CompareIgnoreDirsMasks.AgreeMasks(file.Name, NULL))
+                    // wide: file.Name is the CP_ACP best-fit mirror of data.cFileName
+                    // (the same shape as files_window_directory_read.cpp) - match the
+                    // true wide name instead, since '?' is both the best-fit replacement char and
+                    // a mask wildcard.
+                    if (!ignDirNames || !Configuration.CompareIgnoreDirsMasks.AgreeMasks(data.cFileName, NULL))
                     {
                         dirs->Add(file);
                         if (!dirs->IsGood())
                         {
                             TRACE_E(LOW_MEMORY);
                             free(file.Name);
-                            HANDLES(FindClose(hFind));
+                            SalLPFindClose(hFind);
                             *canceled = TRUE;
                             return FALSE;
                         }
@@ -678,14 +683,14 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 }
                 else
                 {
-                    if (!ignFileNames || !Configuration.CompareIgnoreFilesMasks.AgreeMasks(file.Name, file.Ext))
+                    if (!ignFileNames || !Configuration.CompareIgnoreFilesMasks.AgreeMasks(data.cFileName, NULL))
                     {
                         files->Add(file);
                         if (!files->IsGood())
                         {
                             TRACE_E(LOW_MEMORY);
                             free(file.Name);
-                            HANDLES(FindClose(hFind));
+                            SalLPFindClose(hFind);
                             *canceled = TRUE;
                             return FALSE;
                         }
@@ -702,16 +707,16 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                 *canceled = FALSE; // we're only obtaining the size, no need to bother the user, skip the error
             else
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), AnsiToWide(path).c_str(), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), path.c_str(), GetErrorTextOwned(err).c_str());
                 progressDlg->FlushDataToControls();
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 *canceled = FALSE; // MB_OK always returns IDOK, not IDCANCEL
             }
-            HANDLES(FindClose(hFind));
+            SalLPFindClose(hFind);
             return FALSE;
         }
 
-        HANDLES(FindClose(hFind));
+        SalLPFindClose(hFind);
     }
     else if (panel->Is(ptZIPArchive))
     {
@@ -731,6 +736,8 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         for (i = 0; i < zipDirs->Count; i++)
         {
             CFileData* f = &zipDirs->At(i);
+            // wide: CFileData::Name is the sole wide field now (NameW retired) -
+            // pass it directly. NULL extension so AgreeMasks self-computes it from the wide name.
             if (!ignDirNames || !Configuration.CompareIgnoreDirsMasks.AgreeMasks(f->Name, NULL))
             {
                 dirs->Add(*f);
@@ -746,7 +753,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         for (i = 0; i < zipFiles->Count; i++)
         {
             CFileData* f = &zipFiles->At(i);
-            if (!ignFileNames || !Configuration.CompareIgnoreFilesMasks.AgreeMasks(f->Name, f->Ext))
+            if (!ignFileNames || !Configuration.CompareIgnoreFilesMasks.AgreeMasks(f->Name, NULL))
             {
                 files->Add(*f);
                 if (!files->IsGood())
@@ -782,8 +789,8 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
 // supports ptDisk and ptZIPArchive
 
 BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
-                    CFilesWindow* leftPanel, const char* leftSubDir, BOOL leftFAT,
-                    CFilesWindow* rightPanel, const char* rightSubDir, BOOL rightFAT,
+                    CFilesWindow* leftPanel, const wchar_t* leftSubDir, BOOL leftFAT,
+                    CFilesWindow* rightPanel, const wchar_t* rightSubDir, BOOL rightFAT,
                     DWORD flags, BOOL* different, BOOL* canceled,
                     BOOL getTotal, CQuadWord* total, int* foundDSTShifts)
 {
@@ -802,22 +809,15 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
             progressDlg->SetActualFileSize(CQuadWord(0, 0)); // set to 0%
 
         // set texts in the progress dialog
-        BOOL pathAppended = TRUE;
-
-        CPathBuffer message;
-        strcpy(message, leftPanel->GetPath());
-        pathAppended &= SalPathAppend(message, leftSubDir, message.Size());
-        progressDlg->SetSource(message);
-        strcpy(message, rightPanel->GetPath());
-        pathAppended &= SalPathAppend(message, rightSubDir, message.Size());
-        progressDlg->SetTarget(message);
-
-        if (!pathAppended)
-        {
-            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-            *canceled = TRUE;
-            return FALSE;
-        }
+        // The base panel path and leftSubDir/rightSubDir (built from
+        // CFileData::Name, the sole wide field since NameW's retirement) are both wide now -
+        // a single buffer serves the display text and the length check below.
+        std::wstring message = leftPanel->GetPathW();
+        SalPathAppendW(message, leftSubDir);
+        progressDlg->SetSource(message.c_str());
+        message = rightPanel->GetPathW();
+        SalPathAppendW(message, rightSubDir);
+        progressDlg->SetTarget(message.c_str());
 
         if (!progressDlg->Continue())
         {
@@ -991,26 +991,15 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         if (!getTotal)
                         {
                             // build full paths to both files
-                            pathAppended = TRUE;
+                            std::wstring leftFilePath = leftPanel->GetPathW();
+                            SalPathAppendW(leftFilePath, leftSubDir);
+                            SalPathAppendW(leftFilePath, leftFile->Name);
 
-                            CPathBuffer leftFilePath; // Heap-allocated for long path support
-                            strcpy(leftFilePath, leftPanel->GetPath());
-                            pathAppended &= SalPathAppend(leftFilePath, leftSubDir, leftFilePath.Size());
-                            pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, leftFilePath.Size());
+                            std::wstring rightFilePath = rightPanel->GetPathW();
+                            SalPathAppendW(rightFilePath, rightSubDir);
+                            SalPathAppendW(rightFilePath, rightFile->Name);
 
-                            CPathBuffer rightFilePath; // Heap-allocated for long path support
-                            strcpy(rightFilePath, rightPanel->GetPath());
-                            pathAppended &= SalPathAppend(rightFilePath, rightSubDir, rightFilePath.Size());
-                            pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, rightFilePath.Size());
-
-                            if (!pathAppended)
-                            {
-                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-                                *canceled = TRUE;
-                                return FALSE;
-                            }
-
-                            if (!CompareFilesByContent(hWindow, progressDlg, leftFilePath, rightFilePath,
+                            if (!CompareFilesByContent(hWindow, progressDlg, leftFilePath.c_str(), rightFilePath.c_str(),
                                                        leftFile->Size + rightFile->Size, different, canceled))
                             {
                                 return FALSE;
@@ -1043,25 +1032,15 @@ BOOL CompareDirsAux(HWND hWindow, CCmpDirProgressDialog* progressDlg,
     int i;
     for (i = 0; i < leftDirs.Count; i++)
     {
-        CPathBuffer newLeftSubDir; // Heap-allocated for long path support
-        CPathBuffer newRightSubDir; // Heap-allocated for long path support
-
-        strcpy(newLeftSubDir, leftSubDir);
-        BOOL pathAppended = TRUE;
-        pathAppended &= SalPathAppend(newLeftSubDir, leftDirs[i].Name, newLeftSubDir.Size());
-        strcpy(newRightSubDir, rightSubDir);
-        pathAppended &= SalPathAppend(newRightSubDir, rightDirs[i].Name, newRightSubDir.Size());
-        if (!pathAppended)
-        {
-            gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-            *canceled = TRUE;
-            return FALSE;
-        }
+        std::wstring newLeftSubDir = leftSubDir;
+        SalPathAppendW(newLeftSubDir, leftDirs[i].Name);
+        std::wstring newRightSubDir = rightSubDir;
+        SalPathAppendW(newRightSubDir, rightDirs[i].Name);
 
         int foundDSTShiftsInSubDir = 0;
         if (!CompareDirsAux(hWindow, progressDlg,
-                            leftPanel, newLeftSubDir, leftFAT,
-                            rightPanel, newRightSubDir, rightFAT,
+                            leftPanel, newLeftSubDir.c_str(), leftFAT,
+                            rightPanel, newRightSubDir.c_str(), rightFAT,
                             flags, different, canceled, getTotal,
                             total, &foundDSTShiftsInSubDir))
         {
@@ -1115,9 +1094,11 @@ void SkipIgnoredNames(BOOL ignoreNames, CMaskGroup* ignoreNamesMasks, BOOL dirs,
 {
     if (ignoreNames)
     {
+        // wide: CFileData::Name is the sole wide field now (NameW retired) -
+        // pass it directly. NULL extension so AgreeMasks self-computes it from the wide name.
         if (*l < left->Count)
         {
-            while (ignoreNamesMasks->AgreeMasks((*leftFile)->Name, dirs ? NULL : (*leftFile)->Ext))
+            while (ignoreNamesMasks->AgreeMasks((*leftFile)->Name, NULL))
             { // skip ignored names in the left panel
                 if (++(*l) < left->Count)
                     *leftFile = &left->At(*l);
@@ -1127,7 +1108,7 @@ void SkipIgnoredNames(BOOL ignoreNames, CMaskGroup* ignoreNamesMasks, BOOL dirs,
         }
         if (*r < right->Count)
         {
-            while (ignoreNamesMasks->AgreeMasks((*rightFile)->Name, dirs ? NULL : (*rightFile)->Ext))
+            while (ignoreNamesMasks->AgreeMasks((*rightFile)->Name, NULL))
             { // skip ignored names in the right panel
                 if (++(*r) < right->Count)
                     *rightFile = &right->At(*r);
@@ -1193,11 +1174,13 @@ void CMainWindow::CompareDirectories(DWORD flags)
     if (displayDialogBox)
     {
         // set texts in the progress dialog
-        CPathBuffer message;
-        LeftPanel->GetGeneralPath(message, message.Size());
-        progressDlg.SetSource(message);
-        RightPanel->GetGeneralPath(message, message.Size());
-        progressDlg.SetTarget(message);
+        // Wide, same reasoning as the CM_COMPAREDIRS same-path check above:
+        // GetGeneralPath's plugin-FS route can be a lossy ANSI mirror of the real wide path.
+        std::wstring messageW;
+        LeftPanel->GetGeneralPath(messageW);
+        progressDlg.SetSource(messageW.c_str());
+        RightPanel->GetGeneralPath(messageW);
+        progressDlg.SetTarget(messageW.c_str());
 
         hFocusedWnd = GetFocus();
         EnableWindow(HWindow, FALSE);
@@ -1224,15 +1207,18 @@ void CMainWindow::CompareDirectories(DWORD flags)
         BOOL rightFAT = FALSE;
         if (LeftPanel->Is(ptDisk))
         {
-            char fileSystem[20];
-            MyGetVolumeInformation(LeftPanel->GetPath(), NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, fileSystem, 20);
-            leftFAT = StrNICmp(fileSystem, "FAT", 3) == 0; // FAT and FAT32 use DOS time (precision only 2 seconds)
+            // Asked of the CP_ACP mirror, this could misread the file system
+            // for a non-ASCII panel path and silently disable the FAT timestamp-precision
+            // workaround below; GetPathW() is already the panel's authoritative value.
+            std::wstring fileSystemW;
+            MyGetVolumeInformationW(LeftPanel->GetPathW(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, &fileSystemW);
+            leftFAT = StrNICmpW(fileSystemW.c_str(), L"FAT", 3) == 0; // FAT and FAT32 use DOS time (precision only 2 seconds)
         }
         if (RightPanel->Is(ptDisk))
         {
-            char fileSystem[20];
-            MyGetVolumeInformation(RightPanel->GetPath(), NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, fileSystem, 20);
-            rightFAT = StrNICmp(fileSystem, "FAT", 3) == 0; // FAT and FAT32 use DOS time (precision only 2 seconds)
+            std::wstring fileSystemW;
+            MyGetVolumeInformationW(RightPanel->GetPathW(), NULL, NULL, NULL, NULL, NULL, NULL, NULL, &fileSystemW);
+            rightFAT = StrNICmpW(fileSystemW.c_str(), L"FAT", 3) == 0; // FAT and FAT32 use DOS time (precision only 2 seconds)
         }
         // stop loading icons to avoid competition with the comparison
         if (LeftPanel->UseSystemIcons || LeftPanel->UseThumbnails)
@@ -1362,24 +1348,15 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                         {
                                             if (!getTotal)
                                             {
-                                                CPathBuffer leftFilePath;  // Heap-allocated for long path support
-                                                CPathBuffer rightFilePath; // Heap-allocated for long path support
-                                                strcpy(leftFilePath, LeftPanel->GetPath());
-                                                strcpy(rightFilePath, RightPanel->GetPath());
-                                                BOOL pathAppended = TRUE;
-                                                pathAppended &= SalPathAppend(leftFilePath, leftFile->Name, leftFilePath.Size());
-                                                pathAppended &= SalPathAppend(rightFilePath, rightFile->Name, rightFilePath.Size());
-                                                if (!pathAppended)
-                                                {
-                                                    gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-                                                    canceled = TRUE;
-                                                    goto ABORT_COMPARE;
-                                                }
+                                                std::wstring leftFilePath = LeftPanel->GetPathW();
+                                                std::wstring rightFilePath = RightPanel->GetPathW();
+                                                SalPathAppendW(leftFilePath, leftFile->Name);
+                                                SalPathAppendW(rightFilePath, rightFile->Name);
 
                                                 BOOL different;
 
-                                                BOOL ret = CompareFilesByContent(progressDlg.HWindow, &progressDlg, leftFilePath,
-                                                                                 rightFilePath, leftFile->Size + rightFile->Size,
+                                                BOOL ret = CompareFilesByContent(progressDlg.HWindow, &progressDlg, leftFilePath.c_str(),
+                                                                                 rightFilePath.c_str(), leftFile->Size + rightFile->Size,
                                                                                  &different, &canceled);
                                                 if (ret)
                                                 {
@@ -1474,9 +1451,9 @@ void CMainWindow::CompareDirectories(DWORD flags)
             l = 0;
             r = 0;
 
-            if (left->Count > 0 && strcmp(left->At(0).Name, "..") == 0)
+            if (left->Count > 0 && wcscmp(left->At(0).Name, L"..") == 0)
                 l++;
-            if (right->Count > 0 && strcmp(right->At(0).Name, "..") == 0)
+            if (right->Count > 0 && wcscmp(right->At(0).Name, L"..") == 0)
                 r++;
 
             if (l < left->Count)
@@ -1532,54 +1509,42 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                     // we insert the subpath into the left/rightSubDir variables, which is
                                     // in the case of ptDisk relative to the panel path and in the case
                                     // of ptZIPArchive relative to the path to the archive
-                                    CPathBuffer leftSubDir;  // Heap-allocated for long path support
-                                    CPathBuffer rightSubDir; // Heap-allocated for long path support
+                                    std::wstring leftSubDir;
+                                    std::wstring rightSubDir;
 
                                     if (LeftPanel->Is(ptDisk))
                                     {
-                                        strcpy(leftSubDir, leftDir->Name);
+                                        leftSubDir = leftDir->Name;
                                     }
                                     else
                                     {
                                         if (LeftPanel->Is(ptZIPArchive))
                                         {
-                                            strcpy(leftSubDir, LeftPanel->GetZIPPath());
-                                            BOOL pathAppended = SalPathAppend(leftSubDir, leftDir->Name, leftSubDir.Size());
-                                            if (!pathAppended)
-                                            {
-                                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-                                                canceled = TRUE;
-                                                goto ABORT_COMPARE;
-                                            }
+                                            leftSubDir = LeftPanel->GetZIPPath();
+                                            SalPathAppendW(leftSubDir, leftDir->Name);
                                         }
                                         else
                                         {
                                             TRACE_E("not implemented");
-                                            leftSubDir[0] = 0;
+                                            leftSubDir.clear();
                                         }
                                     }
 
                                     if (RightPanel->Is(ptDisk))
                                     {
-                                        strcpy(rightSubDir, rightDir->Name);
+                                        rightSubDir = rightDir->Name;
                                     }
                                     else
                                     {
                                         if (RightPanel->Is(ptZIPArchive))
                                         {
-                                            strcpy(rightSubDir, RightPanel->GetZIPPath());
-                                            BOOL pathAppended = SalPathAppend(rightSubDir, rightDir->Name, rightSubDir.Size());
-                                            if (!pathAppended)
-                                            {
-                                                gPrompter->ShowError(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_TOOLONGNAME));
-                                                canceled = TRUE;
-                                                goto ABORT_COMPARE;
-                                            }
+                                            rightSubDir = RightPanel->GetZIPPath();
+                                            SalPathAppendW(rightSubDir, rightDir->Name);
                                         }
                                         else
                                         {
                                             TRACE_E("not implemented");
-                                            rightSubDir[0] = 0;
+                                            rightSubDir.clear();
                                         }
                                     }
 
@@ -1590,8 +1555,8 @@ void CMainWindow::CompareDirectories(DWORD flags)
                                     CQuadWord subTotal(0, 0);
                                     int foundDSTShiftsInSubDir = 0;
                                     BOOL ret = CompareDirsAux(progressDlg.HWindow, &progressDlg,
-                                                              LeftPanel, leftSubDir, leftFAT,
-                                                              RightPanel, rightSubDir, rightFAT,
+                                                              LeftPanel, leftSubDir.c_str(), leftFAT,
+                                                              RightPanel, rightSubDir.c_str(), rightFAT,
                                                               flags, &different, &canceled,
                                                               getTotal, &subTotal, &foundDSTShiftsInSubDir);
                                     if (ret)
@@ -1761,27 +1726,28 @@ void CMainWindow::CompareDirectories(DWORD flags)
     if (!canceled && foundDSTShifts > 0 &&
         (Configuration.IgnoreDSTShifts ? Configuration.CnfrmDSTShiftsIgnored : Configuration.CnfrmDSTShiftsOccured))
     {
-        char buf[550];
-        char buf2[400];
         CQuadWord qwShifts[2];
         qwShifts[0].Set(foundDSTShifts, 0);
         qwShifts[1].Set(foundDSTShifts, 0);
-        ExpandPluralString(buf2, 400,
-                           LoadStr(Configuration.IgnoreDSTShifts ? (!canceled && identical ? IDS_CMPDIRS_IGNDSTDIFFSEXACT : IDS_CMPDIRS_IGNDSTDIFFS) : IDS_CMPDIRS_FOUNDDSTDIFFS),
-                           2, qwShifts);
-        buf[0] = 0;
+        const int detailResource = Configuration.IgnoreDSTShifts ?
+                                       (!canceled && identical ? IDS_CMPDIRS_IGNDSTDIFFSEXACT : IDS_CMPDIRS_IGNDSTDIFFS) :
+                                       IDS_CMPDIRS_FOUNDDSTDIFFS;
+        const std::wstring detailFormat = ExpandPluralStringOwnedW(
+            LoadStrOwned(detailResource).c_str(), 2, qwShifts);
+        std::wstring message;
         if (!canceled && identical)
         {
             resultAlreadyShown = TRUE;
             int messageID = (flags & COMPARE_DIRECTORIES_BYCONTENT) ? IDS_COMPAREDIR_ARE_IDENTICAL : IDS_COMPAREDIR_SEEMS_IDENTICAL;
-            _snprintf_s(buf, _TRUNCATE, "%s\n\n%s ", LoadStr(messageID), LoadStr(IDS_CMPDIRS_NOTE));
+            message = FormatStrW(L"%s\n\n%s ", LoadStrOwned(messageID).c_str(),
+                                 LoadStrOwned(IDS_CMPDIRS_NOTE).c_str());
         }
-        _snprintf_s(buf + strlen(buf), _countof(buf) - strlen(buf), _TRUNCATE, buf2, foundDSTShifts);
+        message += FormatStrW(detailFormat.c_str(), foundDSTShifts);
 
         bool dontShow = Configuration.IgnoreDSTShifts ? !Configuration.CnfrmDSTShiftsIgnored : !Configuration.CnfrmDSTShiftsOccured;
         gPrompter->ShowInfoWithCheckbox(
             LoadStrW(IDS_COMPAREDIRSTITLE),
-            AnsiToWide(buf).c_str(),
+            message.c_str(),
             LoadStrW(!canceled && identical ? IDS_CMPDIRS_DONTSHOWNOTEAG : IDS_DONTSHOWAGAIN),
             &dontShow);
 
@@ -1816,11 +1782,11 @@ BOOL CMainWindow::GetViewersAssoc(int wantedViewerType, CDynString* strViewerMas
         CViewerMasksItem* item = masks->At(i);
         if (!item->OldType && item->ViewerType == wantedViewerType)
         {
-            const char* masksStr = item->Masks->GetMasksString();
-            int len = (int)strlen(masksStr);
-            if (len > 0 && masksStr[len - 1] == ';')
+            const wchar_t* masksStr = item->Masks->GetMasksString();
+            int len = (int)wcslen(masksStr);
+            if (len > 0 && masksStr[len - 1] == L';')
                 len--;
-            if (strchr(masksStr, '|') != NULL)
+            if (wcschr(masksStr, L'|') != NULL)
             {
                 TRACE_E("CMainWindow::GetViewersAssoc(): unexpected situation: masks contains forbidden char '|'!");
                 len = 0;
@@ -1828,7 +1794,7 @@ BOOL CMainWindow::GetViewersAssoc(int wantedViewerType, CDynString* strViewerMas
             if (len > 0)
             {
                 if (!first)
-                    ok &= strViewerMasks->Append(";", 1);
+                    ok &= strViewerMasks->Append(L";", 1);
                 else
                     first = FALSE;
                 ok &= strViewerMasks->Append(masksStr, len);
@@ -1844,14 +1810,14 @@ BOOL CMainWindow::GetViewersAssoc(int wantedViewerType, CDynString* strViewerMas
 // CDynString
 //
 
-BOOL CDynString::Append(const char* str, int len)
+BOOL CDynString::Append(const wchar_t* str, int len)
 {
     if (len == -1)
-        len = (int)strlen(str);
+        len = (int)wcslen(str);
     if (Length + len >= Allocated)
     {
         int size = Length + len + 1 + 256; // +256 characters as reserve so we don't allocate so often
-        char* newBuf = (char*)realloc(Buffer, size);
+        wchar_t* newBuf = (wchar_t*)realloc(Buffer, size * sizeof(wchar_t));
         if (newBuf != NULL)
         {
             Buffer = newBuf;
@@ -1863,7 +1829,7 @@ BOOL CDynString::Append(const char* str, int len)
             return FALSE;
         }
     }
-    memmove(Buffer + Length, str, len);
+    memmove(Buffer + Length, str, len * sizeof(wchar_t));
     Length += len;
     Buffer[Length] = 0;
     return TRUE;

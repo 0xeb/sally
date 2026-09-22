@@ -15,7 +15,6 @@ enum class NameColumnViewMode
 
 struct NameWidthMeasurementPlan
 {
-    bool UseWide = false;
     int NameLength = 0;
     int ExtensionLength = 0;
 };
@@ -62,35 +61,35 @@ inline const wchar_t* GetWideExtensionStart(const wchar_t* nameW)
     return dot + 1;
 }
 
-inline NameWidthMeasurementPlan BuildNameWidthMeasurementPlan(const char* nameA,
-                                                              int nameLenA,
-                                                              const char* extA,
-                                                              const wchar_t* nameW,
+// This took a fifth argument 'const wchar_t* nameW' and set
+// plan.UseWide = (nameW != NULL) to choose between two branches. That predicate died with
+// CFileData::NameW (see spl_com.h: "two wide names cannot disagree usefully"), so it was
+// always false and every caller silently took the branch below. Both branches were measured
+// and computed the SAME quantities: the wide one found the last dot with wcsrchr and took
+// wcslen past it, this one derives the same split from Ext and NameLen. They agree because
+// Ext points into Name just after that same last dot and NameLen == wcslen(Name).
+//
+// 'name'/'nameLen'/'ext' are CFileData's Name/NameLen/Ext, all wide since P1.3 - they were
+// called nameA/nameLenA/extA while the wide mirror still existed to distinguish them from it.
+inline NameWidthMeasurementPlan BuildNameWidthMeasurementPlan(const wchar_t* name,
+                                                              int nameLen,
+                                                              const wchar_t* ext,
                                                               bool isDir,
                                                               bool sortDirsByExt,
                                                               bool extensionInSeparateColumn,
                                                               NameColumnViewMode viewMode = NameColumnViewMode::Detailed)
 {
     NameWidthMeasurementPlan plan;
-    plan.UseWide = (nameW != NULL);
+    if (name == NULL)
+        return plan;
+
     const bool splitExtension = ShouldUseSeparateExtensionColumn(isDir, sortDirsByExt, extensionInSeparateColumn, viewMode);
 
-    if (plan.UseWide)
+    plan.NameLength = nameLen;
+    if (splitExtension && ext != NULL && ext[0] != 0 && ext > name + 1)
     {
-        plan.NameLength = GetWideNameLengthForNameColumn(nameW, isDir, sortDirsByExt, extensionInSeparateColumn, viewMode);
-        const wchar_t* extPosW = splitExtension ? GetWideExtensionStart(nameW) : NULL;
-        plan.ExtensionLength = extPosW != NULL ? (int)wcslen(extPosW) : 0;
-        return plan;
-    }
-
-    if (nameA == NULL)
-        return plan;
-
-    plan.NameLength = nameLenA;
-    if (splitExtension && extA != NULL && extA[0] != 0 && extA > nameA + 1)
-    {
-        plan.NameLength = (int)(extA - nameA - 1);
-        plan.ExtensionLength = nameLenA - (int)(extA - nameA);
+        plan.NameLength = (int)(ext - name - 1);
+        plan.ExtensionLength = nameLen - (int)(ext - name);
     }
     return plan;
 }

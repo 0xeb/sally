@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -18,20 +18,44 @@ BOOL UsePalette = FALSE; // TRUE when we only have 256 colors available
 
 CBandParams BandsParams[2];
 
-const char* MAINWINDOW_CLASSNAME = "SFC Window Class";
+LPCWSTR MAINWINDOW_CLASSNAME = L"SFC Window Class";
 
-CMainWindow::CMainWindow(const char* path1, const char* path2, CCompareOptions* options, UINT showCmd,
-                         const wchar_t* path1W, const wchar_t* path2W)
+// Wide. Its two callers had a wide path in scope the whole time (Path1WStr, and
+// SpawnWorker's own path1W parameter) and were reaching past it for the narrow copy.
+static const wchar_t* FindFileNameForMainWindow(const wchar_t* path)
+{
+    if (path == NULL)
+        return L"";
+
+    const wchar_t* name = path;
+    for (const wchar_t* cursor = path; *cursor != 0; ++cursor)
+    {
+        if (*cursor == L'\\' || *cursor == L'/')
+            name = cursor + 1;
+    }
+    return name;
+}
+
+static bool GetDroppedFilePath(HDROP drop, UINT index, std::wstring& path)
+{
+    path.clear();
+    const UINT length = DragQueryFileW(drop, index, NULL, 0);
+    if (length == 0)
+        return false;
+    std::vector<wchar_t> buffer(static_cast<size_t>(length) + 1, L'\0');
+    if (DragQueryFileW(drop, index, buffer.data(),
+                       static_cast<UINT>(buffer.size())) != length)
+        return false;
+    path.assign(buffer.data(), length);
+    return true;
+}
+
+CMainWindow::CMainWindow(const wchar_t* path1, const wchar_t* path2,
+                         CCompareOptions* options, UINT showCmd)
 {
     CALL_STACK_MESSAGE1("CMainWindow::CMainWindow(, , )");
-    // Store owned copies of paths
-    Path1Str = path1 ? path1 : "";
-    Path2Str = path2 ? path2 : "";
-    Path1WStr = path1W ? path1W : L"";
-    Path2WStr = path2W ? path2W : L"";
-    // Set convenience pointers
-    Path1 = Path1Str.c_str();
-    Path2 = Path2Str.c_str();
+    Path1WStr = path1 ? path1 : L"";
+    Path2WStr = path2 ? path2 : L"";
     FileView[fviLeft] = NULL;
     FileView[fviRight] = NULL;
     Active = 0;
@@ -132,8 +156,8 @@ BOOL CMainWindow::Init()
     if (!ComboBox)
         return Error(HWND(NULL), IDS_LOWMEM);
     if (!ComboBox->CreateEx(0,
-                            "ComboBox",
-                            "",
+                            L"ComboBox",
+                            L"",
                             WS_CHILD | WS_VSCROLL | WS_CLIPSIBLINGS | WS_VISIBLE |
                                 CBS_DROPDOWN | CBS_AUTOHSCROLL,
                             //CBS_DROPDOWNLIST,
@@ -161,7 +185,7 @@ BOOL CMainWindow::Init()
         return Error(HWND(NULL), IDS_LOWMEM);
     if (!Rebar->CreateEx(WS_EX_TOOLWINDOW,
                          REBARCLASSNAME,
-                         "",
+                         L"",
                          WS_VISIBLE | WS_BORDER | WS_CHILD |
                              WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
                              RBS_VARHEIGHT | CCS_NODIVIDER |
@@ -173,7 +197,7 @@ BOOL CMainWindow::Init()
                          DLLInstance,
                          Rebar))
     {
-        TRACE_E("CreateWindowEx on " << REBARCLASSNAME);
+        TRACE_EW(L"CreateWindowEx on " << REBARCLASSNAME);
         return FALSE;
     }
 
@@ -213,7 +237,8 @@ BOOL CMainWindow::Init()
 
     rbbi.fMask = RBBIM_STYLE | RBBIM_CHILD | RBBIM_CHILDSIZE |
                  RBBIM_SIZE | RBBIM_ID | RBBIM_TEXT;
-    rbbi.lpText = LoadStr(IDS_DIFFERENCES);
+    std::wstring differencesW = LangStr(IDS_DIFFERENCES).c_str();
+    rbbi.lpText = const_cast<LPWSTR>(differencesW.c_str());
     rbbi.hwndChild = ComboBox->HWindow;
     rbbi.wID = IDC_DIFFLIST;
     rbbi.cxMinChild = LOWORD(GetDialogBaseUnits()) * 4;
@@ -228,12 +253,12 @@ BOOL CMainWindow::Init()
     RebarHeight = LONG(SendMessage(Rebar->HWindow, RB_GETBARHEIGHT, 0, 0)) + 4 + REBAR_BORDER;
 
     // create the window caption
-    LeftHeader = new CFileHeaderWindow("");
+    LeftHeader = new CFileHeaderWindow(L"");
     if (!LeftHeader)
         return Error(HWND(NULL), IDS_LOWMEM);
     if (!LeftHeader->CreateEx(WS_EX_STATICEDGE,
                               CWINDOW_CLASSNAME,
-                              "",
+                              L"",
                               WS_VISIBLE | WS_CHILD,
                               0, 0, 0, 0,
                               HWindow, // parent
@@ -245,12 +270,12 @@ BOOL CMainWindow::Init()
         return FALSE;
     }
 
-    RightHeader = new CFileHeaderWindow("");
+    RightHeader = new CFileHeaderWindow(L"");
     if (!RightHeader)
         return Error(HWND(NULL), IDS_LOWMEM);
     if (!RightHeader->CreateEx(WS_EX_STATICEDGE,
                                CWINDOW_CLASSNAME,
-                               "",
+                               L"",
                                WS_VISIBLE | WS_CHILD,
                                0, 0, 0, 0,
                                HWindow, // parent
@@ -265,7 +290,7 @@ BOOL CMainWindow::Init()
     // create the file view windows
     LeftFileViewHWnd = CreateWindowEx(WS_EX_STATICEDGE,
                                       FILEVIEWWINDOW_CLASSNAME,
-                                      "",
+                                      L"",
                                       WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL,
                                       0, 0, 0, 0,
                                       HWindow,                 // parent
@@ -280,7 +305,7 @@ BOOL CMainWindow::Init()
 
     RightFileViewHWnd = CreateWindowEx(WS_EX_STATICEDGE,
                                        FILEVIEWWINDOW_CLASSNAME,
-                                       "",
+                                       L"",
                                        WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL,
                                        0, 0, 0, 0,
                                        HWindow,                  // parent
@@ -302,7 +327,7 @@ BOOL CMainWindow::Init()
     if (!SplitBar)
         return Error(HWND(NULL), IDS_LOWMEM);
     if (!SplitBar->Create(SPLITBARWINDOW_CLASSNAME,
-                          "",
+                          L"",
                           WS_VISIBLE | WS_CHILD,
                           0, 0, 0, 0,
                           HWindow, // parent
@@ -454,13 +479,18 @@ void CMainWindow::SelectDifference(int i, int cmd, BOOL setSel, BOOL center)
             if (SelectedDifference == -1)
             {
                 OutOfRange = TRUE;
-                char buf1[32];
-                char buf2[32];
-                char report[200], fmt[128];
-                SG->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BINREPORT2), 1, &CQuadWord().SetUI64(length));
-                sprintf(report, fmt, _ui64toa(length, buf1, 10),
-                        QWord2Ascii(offset, buf2, FileView[fviLeft]->GetLineNumDigits()));
-                SendMessage(ComboBox->HWindow, WM_SETTEXT, 0, (WPARAM)report);
+                wchar_t countText[32];
+                wchar_t offsetText[32];
+                const std::wstring fmt = SPLExpandPluralStringOwned(
+                    SG, SPLLoadStrOwned(SG, HLanguage, IDS_BINREPORT2).c_str(), 1,
+                    &CQuadWord().SetUI64(length));
+                _ui64tow_s(length, countText, _countof(countText), 10);
+                _snwprintf_s(offsetText, _countof(offsetText), _TRUNCATE, L"%0*I64X",
+                             FileView[fviLeft]->GetLineNumDigits(), offset);
+                const std::wstring report = SPLFormatStringOwned(
+                    fmt.c_str(), countText, offsetText);
+                SendMessageW(ComboBox->HWindow, WM_SETTEXT, 0,
+                             (LPARAM)report.c_str());
                 SendMessage(GetWindow(ComboBox->HWindow, GW_CHILD), EM_SETSEL, 0, -1);
             }
             else
@@ -588,8 +618,8 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
             CheckMenuItem(menu, CM_VIEW_HORIZONTAL, bHorizontalView ? (MF_BYCOMMAND | MF_CHECKED) : (MF_BYCOMMAND | MF_UNCHECKED));
             if (bHorizontalView)
             {
-                ModifyMenu(menu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(IDS_MAXTOPVIEW));
-                ModifyMenu(menu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(IDS_MAXBOTTOMVIEW));
+                ModifyMenuW(menu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LangStr(IDS_MAXTOPVIEW).c_str());
+                ModifyMenuW(menu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LangStr(IDS_MAXBOTTOMVIEW).c_str());
             }
             EnableMenuItem(menu, CM_RECOMPARE, MF_BYCOMMAND | MF_ENABLED);
             EnableToolbarButton(CM_RECOMPARE, TRUE);
@@ -719,8 +749,8 @@ BOOL CMainWindow::RebuildFileViewScripts(BOOL& cancel)
     // something went wrong
     FileView[fviLeft]->InvalidateData(); // ensure the windows are repainted
     FileView[fviRight]->InvalidateData();
-    LeftHeader->SetText("");
-    RightHeader->SetText("");
+    LeftHeader->SetText(L"");
+    RightHeader->SetText(L"");
     return FALSE;
 }
 
@@ -740,46 +770,47 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
             size_t inserted = TextChanges[i].Inserted; // # lines of file 1 changed here.
             size_t line0 = TextChanges[i].DeletePos;   // Line number of 1st deleted line.
             size_t line1 = TextChanges[i].InsertPos;   // Line number of 1st inserted line.
-            const char* path0 = SG->SalPathFindFileName(Path1);
-            const char* path1 = SG->SalPathFindFileName(Path2);
-            CPathBuffer buf; // Heap-allocated for long path support
-
+            const wchar_t* path0 = FindFileNameForMainWindow(Path1WStr.c_str());
+            const wchar_t* path1 = FindFileNameForMainWindow(Path2WStr.c_str());
             ++i;
+
+            std::wstring text;
 
             if (deleted)
             {
                 if (inserted)
                 {
                     // change
-                    CPathBuffer buf2; // Heap-allocated for long path support
+                    std::wstring prefix;
                     if (deleted > 1)
-                        sprintf((char*)buf2, LoadStr(IDS_CHANGEFROM2), i, line0 + 1, line0 + deleted, path0);
+                        prefix = SPLFormatStringOwned(LangStr(IDS_CHANGEFROM2).c_str(), i, line0 + 1, line0 + deleted, path0);
                     else
-                        sprintf((char*)buf2, LoadStr(IDS_CHANGEFROM1), i, line0 + 1, path0);
+                        prefix = SPLFormatStringOwned(LangStr(IDS_CHANGEFROM1).c_str(), i, line0 + 1, path0);
                     if (inserted > 1)
-                        sprintf((char*)buf, LoadStr(IDS_CHANGETO2), buf2.Get(), line1 + 1, line1 + inserted, path1);
+                        text = SPLFormatStringOwned(LangStr(IDS_CHANGETO2).c_str(), prefix.c_str(), line1 + 1, line1 + inserted, path1);
                     else
-                        sprintf((char*)buf, LoadStr(IDS_CHANGETO1), buf2.Get(), line1 + 1, path1);
+                        text = SPLFormatStringOwned(LangStr(IDS_CHANGETO1).c_str(), prefix.c_str(), line1 + 1, path1);
                 }
                 else
                 {
                     // delete
                     if (deleted > 1)
-                        sprintf((char*)buf, LoadStr(IDS_DELETE2), i, line0 + 1, line0 + deleted, path0);
+                        text = SPLFormatStringOwned(LangStr(IDS_DELETE2).c_str(), i, line0 + 1, line0 + deleted, path0);
                     else
-                        sprintf((char*)buf, LoadStr(IDS_DELETE1), i, line0 + 1, path0);
+                        text = SPLFormatStringOwned(LangStr(IDS_DELETE1).c_str(), i, line0 + 1, path0);
                 }
             }
             else
             {
                 // insert
                 if (inserted > 1)
-                    sprintf((char*)buf, LoadStr(IDS_ADD2), i, line1 + 1, line1 + inserted, path0, line0, path1);
+                    text = SPLFormatStringOwned(LangStr(IDS_ADD2).c_str(), i, line1 + 1, line1 + inserted, path0, line0, path1);
                 else
-                    sprintf((char*)buf, LoadStr(IDS_ADD1), i, line1 + 1, path0, line0, path1);
+                    text = SPLFormatStringOwned(LangStr(IDS_ADD1).c_str(), i, line1 + 1, path0, line0, path1);
             }
 
-            LRESULT ret = SendMessage(ComboBox->HWindow, CB_ADDSTRING, 0, (LPARAM)buf.Get());
+            LRESULT ret = SendMessageW(ComboBox->HWindow, CB_ADDSTRING, 0,
+                                      (LPARAM)text.c_str());
             if (ret == CB_ERR || ret == CB_ERRSPACE)
             {
                 TRACE_E("CB_ADDSTRING has failed, i = " << DWORD(i));
@@ -789,7 +820,7 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
             if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == HWindow)
             {
                 MSG msg; // discard the queued ESC
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
                 if (cancel)
                 {
@@ -847,11 +878,10 @@ void CMainWindow::RestoreRebarLayout()
     Rebar->SetBandParams(IDC_DIFFLIST, BandsParams + BI_DIFFLIST);
 }
 
-void CMainWindow::SpawnWorker(const char* path1, const char* path2,
-                              BOOL recompare, const CCompareOptions& options,
-                              const wchar_t* path1W, const wchar_t* path2W)
+void CMainWindow::SpawnWorker(const wchar_t* path1, const wchar_t* path2,
+                              BOOL recompare, const CCompareOptions& options)
 {
-    CALL_STACK_MESSAGE3("CMainWindow::SpawnWorker(%s, %s, )", path1, path2);
+    CALL_STACK_MESSAGE1("CMainWindow::SpawnWorker(, , )");
 
     Recompare = recompare;
 
@@ -864,12 +894,12 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
             break;
         TRACE_I("HaveMessage");
         MSG msg;
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (!TranslateAccelerator(HWindow, HAccels, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
     }
@@ -879,8 +909,8 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
     CancelWorker = CW_CONTINUE;
     CCompareOptions opt = options;
     opt.DetailedDifferences = DetailedDifferences ? 1 : 0;
-    CFilecompWorker* worker = new CFilecompWorker(HWindow, HWindow, path1,
-                                                  path2, opt, CancelWorker, WorkerEvent, path1W, path2W);
+    CFilecompWorker* worker = new CFilecompWorker(
+        HWindow, HWindow, path1, path2, opt, CancelWorker, WorkerEvent);
     if (!worker)
         Error(HWindow, IDS_LOWMEM);
     else
@@ -895,10 +925,11 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
         else
         {
             EnableInput(FALSE);
-            CPathBuffer buf; // Heap-allocated for long path support
-            sprintf((char*)buf, LoadStr(IDS_MAINWNDHEADERCOMPUTING), SG->SalPathFindFileName(path1),
-                    SG->SalPathFindFileName(path2));
-            SetWindowText(HWindow, buf);
+            const std::wstring caption = SPLFormatStringOwned(
+                LangStr(IDS_MAINWNDHEADERCOMPUTING).c_str(),
+                FindFileNameForMainWindow(path1),
+                FindFileNameForMainWindow(path2));
+            SetWindowTextW(HWindow, caption.c_str());
             SetWait(TRUE);
         }
     }
@@ -922,7 +953,7 @@ void CMainWindow::SetWait(BOOL wait)
 }
 
 template <class CChar>
-bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message, UINT& type, const char* (&encoding)[2])
+bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, std::wstring& message, UINT& type, const wchar_t* (&encoding)[2])
 {
     DataValid = FALSE;
 
@@ -943,7 +974,7 @@ bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message
     FileView[fviLeft] = new TTextFileViewWindow<CChar>(fviLeft, ShowWhiteSpace, this);
     if (!FileView[fviLeft])
     {
-        strcpy(message, LoadStr(IDS_LOWMEM));
+        message = SPLLoadStrOwned(SG, HLanguage, IDS_LOWMEM).c_str();
         return FALSE; // do not deallocate buffers provided by CTextCompareResults
     }
     FileView[fviLeft]->AttachToWindow(LeftFileViewHWnd);
@@ -958,7 +989,7 @@ bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message
     FileView[fviRight] = new TTextFileViewWindow<CChar>(fviRight, ShowWhiteSpace, this);
     if (!FileView[fviRight])
     {
-        strcpy(message, LoadStr(IDS_LOWMEM));
+        message = SPLLoadStrOwned(SG, HLanguage, IDS_LOWMEM).c_str();
         return FALSE; // do not deallocate buffers provided by CTextCompareResults
     }
     FileView[fviRight]->AttachToWindow(RightFileViewHWnd);
@@ -985,12 +1016,10 @@ bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message
     {
         DifferencesCount = int(ChangesToLines[ViewMode].size());
 
-        Path1Str = res->Files[0].Name;
-        Path2Str = res->Files[1].Name;
-        Path1 = Path1Str.c_str();
-        Path2 = Path2Str.c_str();
-        LeftHeader->SetText(Path1);
-        RightHeader->SetText(Path2);
+        Path1WStr = res->Files[0].Name;
+        Path2WStr = res->Files[1].Name;
+        LeftHeader->SetText(Path1WStr.c_str());
+        RightHeader->SetText(Path2WStr.c_str());
 
         ResetComboBox(&cancel);
         if (!cancel)
@@ -1005,23 +1034,41 @@ bool CMainWindow::TextFilesDiffer(CTextCompareResults<CChar>* res, char* message
 
     if (cancel)
     {
-        strcpy(message, LoadStr(IDS_CANCELED));
+        message = SPLLoadStrOwned(SG, HLanguage, IDS_CANCELED).c_str();
         type = MB_ICONEXCLAMATION;
     }
     if (!success)
     {
         SendMessage(ComboBox->HWindow, CB_RESETCONTENT, 0, 0);
         DataValid = FALSE;
-        LeftHeader->SetText("");
-        RightHeader->SetText("");
+        LeftHeader->SetText(L"");
+        RightHeader->SetText(L"");
         leftFileView->InvalidateData(); // ensure the windows are repainted
         rightFileView->InvalidateData();
     }
 
-    encoding[0] = res->Files[0].Encoding;
-    encoding[1] = res->Files[1].Encoding;
+    encoding[0] = res->Files[0].Encoding.c_str();
+    encoding[1] = res->Files[1].Encoding.c_str();
 
     return TRUE;
+}
+
+// LPNMTTDISPINFO::lpszText is LPWSTR and non-const, and LangStr hands back a
+// pointer into the SDK's shared cyclic buffer - so this copies rather than casting. The
+// conversion it used to do on the way in is gone; only the copy remains, and only because the
+// field's ownership is not ours.
+static LPWSTR HoldTooltipText(const wchar_t* text) noexcept
+{
+    static thread_local std::wstring storage;
+    try
+    {
+        storage = text != nullptr ? text : L"";
+        return storage.data();
+    }
+    catch (...)
+    {
+        return const_cast<wchar_t*>(L"");
+    }
 }
 
 LRESULT
@@ -1126,8 +1173,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             SplitBar->SetType(bHoriz ? sbHorizontal : sbVertical);
             CheckMenuItem(hMenu, CM_VIEW_HORIZONTAL, MF_BYCOMMAND | (bHoriz ? MF_CHECKED : MF_UNCHECKED));
-            ModifyMenu(hMenu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(bHoriz ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW));
-            ModifyMenu(hMenu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(bHoriz ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW));
+            ModifyMenuW(hMenu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LangStr(bHoriz ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW).c_str());
+            ModifyMenuW(hMenu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LangStr(bHoriz ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW).c_str());
             LayoutChilds();
             return 0;
         }
@@ -1228,24 +1275,18 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_COMPARE:
         {
-            CPathBuffer path1; // Heap-allocated for long path support
-            CPathBuffer path2;
-            if (DataValid)
-            {
-                strcpy(path1, Path1);
-                strcpy(path2, Path2);
-            }
-            else
-            {
-                *path1 = 0;
-                *path2 = 0;
-            }
+            std::wstring path1 = DataValid ? Path1WStr : std::wstring();
+            std::wstring path2 = DataValid ? Path2WStr : std::wstring();
             BOOL succes = FALSE;
             CCompareOptions options = DefCompareOptions;
             CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options);
             dlg.Execute();
             if (succes)
-                SpawnWorker(path1, path2, FALSE, options);
+            {
+                Path1WStr = path1;
+                Path2WStr = path2;
+                SpawnWorker(path1.c_str(), path2.c_str(), FALSE, options);
+            }
             return 0;
         }
 
@@ -1256,7 +1297,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (OptionsChanged)
                 {
                     // ask whether the user wants to apply the new options
-                    int ret = SG->SalMessageBox(HWindow, LoadStr(IDS_OPTIONSCHANGED), LoadStr(IDS_PLUGINNAME),
+                    int ret = SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_OPTIONSCHANGED).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(),
                                                 MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2);
                     switch (ret)
                     {
@@ -1275,7 +1316,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
 
                 // start the worker
-                SpawnWorker(Path1, Path2, TRUE, Options, Path1WStr.c_str(), Path2WStr.c_str());
+                SpawnWorker(Path1WStr.c_str(), Path2WStr.c_str(), TRUE, Options);
             }
             return 0;
         }
@@ -1298,10 +1339,10 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (cancel)
                     {
-                        SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELED), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+                        SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_CANCELED).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
                     }
                     SendMessage(ComboBox->HWindow, CB_RESETCONTENT, 0, 0);
-                    SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+                    SetWindowTextW(HWindow, LangStr(IDS_PLUGINNAME).c_str());
                 }
                 SetWait(FALSE);
             }
@@ -1436,16 +1477,16 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ChangesLengths.clear();
             TextChanges.clear();
 
-            LeftHeader->SetText("");
-            RightHeader->SetText("");
+            LeftHeader->SetText(L"");
+            RightHeader->SetText(L"");
 
             ResetComboBox();
 
-            SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+            SetWindowTextW(HWindow, LangStr(IDS_PLUGINNAME).c_str());
 
             UpdateToolbarButtons(UTB_ALL);
 
-            if (SG->SalMessageBox(HWindow, LoadStr(IDS_CLOSEDIFF), LoadStr(IDS_PLUGINNAME),
+            if (SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_CLOSEDIFF).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(),
                                   MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES)
             {
                 PostMessage(HWindow, WM_COMMAND, CM_EXIT, 0);
@@ -1572,7 +1613,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             POINT pt;
             int count, view = -1;
-            CPathBuffer path1, path2; // Heap-allocated for long path support
+            std::wstring path1, path2;
             CCompareOptions options = DefCompareOptions;
 
             if (DragQueryPoint(drop, &pt))
@@ -1585,24 +1626,26 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // how many files were dropped on us
-            count = DragQueryFile(drop, 0xFFFFFFFF, NULL, 0);
+            count = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0);
             if (count < 1)
                 goto LDROPERROR;
             if (count >= 1)
             {
-                DragQueryFile(drop, 0, path1, path1.Size());
-                if (SG->SalGetFileAttributes(path1) & FILE_ATTRIBUTE_DIRECTORY)
+                if (!GetDroppedFilePath(drop, 0, path1))
+                    goto LDROPERROR;
+                if (SG->SalGetFileAttributes(path1.c_str()) & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    Error(HWindow, IDS_NOTVALIDFILE, path1.Get());
+                    Error(HWindow, IDS_NOTVALIDFILE, path1.c_str());
                     goto LDROPERROR;
                 }
             }
             if (count >= 2)
             {
-                DragQueryFile(drop, 1, path2, path2.Size());
-                if (SG->SalGetFileAttributes(path1) & FILE_ATTRIBUTE_DIRECTORY)
+                if (!GetDroppedFilePath(drop, 1, path2))
+                    goto LDROPERROR;
+                if (SG->SalGetFileAttributes(path2.c_str()) & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    Error(HWindow, IDS_NOTVALIDFILE, path2.Get());
+                    Error(HWindow, IDS_NOTVALIDFILE, path2.c_str());
                     goto LDROPERROR;
                 }
             }
@@ -1611,11 +1654,13 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (DataValid && view >= 0)
                 {
                     if (view == 0)
-                        strcpy(path2, Path2);
+                    {
+                        path2 = Path2WStr;
+                    }
                     else
                     {
-                        strcpy(path2, path1);
-                        strcpy(path1, Path1);
+                        path2 = path1;
+                        path1 = Path1WStr;
                     }
                     // the operation resembles a recompare, so reuse the current settings
                     // unless the user changed the defaults in the configuration in the meantime;
@@ -1624,11 +1669,13 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         options = Options;
                 }
                 else
-                    *path2 = 0;
+                {
+                    path2.clear();
+                }
             }
 
             BOOL succes = FALSE;
-            if (count > 2 || *path2 == 0)
+            if (count > 2 || path2.empty())
             {
                 // let the user confirm it
                 CCompareFilesDialog dlg(HWindow, path1, path2, succes, &options);
@@ -1638,7 +1685,11 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 succes = TRUE;
 
             if (succes)
-                SpawnWorker(path1, path2, FALSE, options);
+            {
+                Path1WStr = path1;
+                Path2WStr = path2;
+                SpawnWorker(path1.c_str(), path2.c_str(), FALSE, options);
+            }
         }
 
     LDROPERROR:
@@ -1691,22 +1742,22 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 switch (wParam)
                 {
                 case CM_COPY:
-                    lpnmtdi->lpszText = LoadStr(IDS_COPYCLIP);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_COPYCLIP).c_str());
                     break;
                 case CM_RECOMPARE:
-                    lpnmtdi->lpszText = LoadStr(IDS_RECOMPARE);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_RECOMPARE).c_str());
                     break;
                 case CM_FIRSTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_FIRSTDIFF);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_FIRSTDIFF).c_str());
                     break;
                 case CM_PREVDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_PREVDIFF);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_PREVDIFF).c_str());
                     break;
                 case CM_NEXTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_NEXTDIFF);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_NEXTDIFF).c_str());
                     break;
                 case CM_LASTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_LASTDIFF);
+                    lpnmtdi->lpszText = HoldTooltipText(LangStr(IDS_LASTDIFF).c_str());
                     break;
                 }
 
@@ -1827,14 +1878,13 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_WORKERNOTIFIES:
     {
         BOOL ret = TRUE;
-        TCHAR message[1024];
-        *message = 0;
+        std::wstring message;
         UINT type = MB_ICONERROR;
-        LPCTSTR encoding[2] = {_T(""), _T("")};
+        const wchar_t* encoding[2] = {L"", L""};
         switch (wParam)
         {
         case WN_ERROR:
-            _tcscpy(message, (LPCTSTR)lParam);
+            message = (const wchar_t*)lParam;
             break;
 
         case WN_WORKER_CANCELED:
@@ -1860,19 +1910,19 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if ((FirstCompare || !Recompare) && CalculatingDetailedDifferences)
                 {
-                    if (SG->SalMessageBox(HWindow, LoadStr(IDS_DETAILCANCEL),
-                                          LoadStr(IDS_PLUGINNAME), MB_YESNOCANCEL) == IDYES)
+                    if (SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_DETAILCANCEL).c_str(),
+                                          SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(), MB_YESNOCANCEL) == IDYES)
                     {
                         // turn off DetailedDifferences
                         DetailedDifferences = FALSE;
                         CheckMenuItem(GetMenu(HWindow), CM_DETAILDIFF, MF_BYCOMMAND | (DetailedDifferences ? MF_CHECKED : MF_UNCHECKED));
                         // and compare again
-                        SpawnWorker(Path1, Path2, FALSE, Options, Path1WStr.c_str(), Path2WStr.c_str());
+                        SpawnWorker(Path1WStr.c_str(), Path2WStr.c_str(), FALSE, Options);
                         return 0;
                     }
                 }
 
-                _tcscpy(message, LoadStr(IDS_CANCELED));
+                message = SPLLoadStrOwned(SG, HLanguage, IDS_CANCELED).c_str();
                 type = MB_ICONEXCLAMATION;
             }
             }
@@ -1881,13 +1931,13 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WN_NO_DIFFERENCE:
             // NOTE: previously sent WN_TEXT_FILES_DIFFER did provide encoding...
-            _tcscpy(message, LoadStr(IDS_NODIFFERRENCE));
+            message = SPLLoadStrOwned(SG, HLanguage, IDS_NODIFFERRENCE).c_str();
             type = MB_ICONINFORMATION;
             break;
 
         case WN_NO_ALL_DIFFS_IGNORED:
             // NOTE: previously sent WN_TEXT_FILES_DIFFER did provide encoding...
-            _tcscpy(message, LoadStr(IDS_ALLDIFFSIGNORED));
+            message = SPLLoadStrOwned(SG, HLanguage, IDS_ALLDIFFSIGNORED).c_str();
             type = MB_ICONINFORMATION;
             break;
 
@@ -1923,7 +1973,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!FileView[fviLeft])
                 {
                     ret = FALSE; // do not deallocate buffers provided by CDiffResults
-                    _tcscpy(message, LoadStr(IDS_LOWMEM));
+                    message = SPLLoadStrOwned(SG, HLanguage, IDS_LOWMEM).c_str();
                     break;
                 }
                 FileView[fviLeft]->AttachToWindow(LeftFileViewHWnd);
@@ -1943,7 +1993,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!FileView[fviRight])
                 {
                     ret = FALSE; // do not deallocate buffers provided by CDiffResults
-                    _tcscpy(message, LoadStr(IDS_LOWMEM));
+                    message = SPLLoadStrOwned(SG, HLanguage, IDS_LOWMEM).c_str();
                     break;
                 }
                 FileView[fviRight]->AttachToWindow(RightFileViewHWnd);
@@ -1957,16 +2007,14 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DifferencesCount = 0;
 
             if (
-                ((CHexFileViewWindow*)FileView[fviLeft])->SetData(res->FirstChange, res->Files[0].Name, res->Files[1].Size) &&
-                ((CHexFileViewWindow*)FileView[fviRight])->SetData(res->FirstChange, res->Files[1].Name, res->Files[0].Size))
+                ((CHexFileViewWindow*)FileView[fviLeft])->SetData(res->FirstChange, Path1WStr.c_str(), res->Files[1].Size) &&
+                ((CHexFileViewWindow*)FileView[fviRight])->SetData(res->FirstChange, Path2WStr.c_str(), res->Files[0].Size))
             {
                 Options = res->Options;
-                Path1Str = res->Files[0].Name;
-                Path2Str = res->Files[1].Name;
-                Path1 = Path1Str.c_str();
-                Path2 = Path2Str.c_str();
-                LeftHeader->SetText(Path1);
-                RightHeader->SetText(Path2);
+                Path1WStr = res->Files[0].Name;
+                Path2WStr = res->Files[1].Name;
+                LeftHeader->SetText(Path1WStr.c_str());
+                RightHeader->SetText(Path2WStr.c_str());
 
                 ResetComboBox();
 
@@ -1988,8 +2036,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                LeftHeader->SetText("");
-                RightHeader->SetText("");
+                LeftHeader->SetText(L"");
+                RightHeader->SetText(L"");
                 FileView[fviLeft]->InvalidateData(); // ensure the windows are repainted
                 FileView[fviRight]->InvalidateData();
                 ret = FALSE; // we will not search for the difference
@@ -2030,20 +2078,27 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case WN_SET_PROGRESS:
         {
-            CPathBuffer buf; // Heap-allocated for long path support
-            TCHAR fmt[128];
+            std::wstring fmt;
             if (HIWORD(lParam))
             {
                 CQuadWord qLPARAM(LOWORD(lParam), 0);
-                SG->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND), 1, &qLPARAM);
+                fmt = SPLExpandPluralStringOwned(
+                    SG, SPLLoadStrOwned(SG, HLanguage, IDS_MAINWNDHEADERCOMPUTING_PROGRESS_FOUND).c_str(),
+                    1, &qLPARAM);
             }
             else
             {
-                _tcscpy(fmt, LoadStr(IDS_MAINWNDHEADERCOMPUTING_PROGRESS));
+                fmt = SPLLoadStrOwned(SG, HLanguage, IDS_MAINWNDHEADERCOMPUTING_PROGRESS).c_str();
             }
-            _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Path1), SG->SalPathFindFileName(Path2),
-                      LOWORD(lParam), HIWORD(lParam));
-            SetWindowText(HWindow, buf);
+            const wchar_t* path1Name = SG->SalPathFindFileName(Path1WStr.c_str());
+            const wchar_t* path2Name = SG->SalPathFindFileName(Path2WStr.c_str());
+            const std::wstring caption = SPLFormatStringOwned(
+                fmt.c_str(), path1Name, path2Name, LOWORD(lParam), HIWORD(lParam));
+            // MAINWINDOW_CLASSNAME is registered wide (dlg_com.cpp), so this window
+            // has always been a Unicode window. Building the caption wide and then projecting it
+            // through CP_ACP to reach the narrow SetWindowText entry point was loss with nothing on the
+            // other side of it.
+            SetWindowTextW(HWindow, caption.c_str());
             return 0;
         }
 
@@ -2096,43 +2151,39 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         }
 
-        if (*message)
+        if (!message.empty())
         {
             if (FirstCompare)
             {
                 type |= MB_YESNO | MSGBOXEX_ESCAPEENABLED;
-                _tcscat(message, _T("\n"));
-                _tcscat(message, LoadStr(IDS_CLOSEDIFF));
+                message += L"\n";
+                message += SPLLoadStrOwned(SG, HLanguage, IDS_CLOSEDIFF).c_str();
             }
-            if (SG->SalMessageBox(HWindow, message, LoadStr(IDS_PLUGINNAME), type) == IDYES)
+            if (SG->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(), type) == IDYES)
                 PostMessage(HWindow, WM_COMMAND, CM_EXIT, 0);
         }
 
-        CPathBuffer buf; // Heap-allocated for long path support
+        std::wstring captionW;
         if (DataValid)
         {
-            //        if (DifferencesCount || (WN_NO_DIFFERENCE == wParam))
-            //        { // if it is 0, set the caption later once we find all binary differences
-            TCHAR fmt[128];
+            std::wstring fmt;
             if (DifferencesCount)
             {
                 CQuadWord qDC(DifferencesCount, 0);
-                SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_MAINWNDHEADER), 1, &qDC);
+                fmt = SPLExpandPluralStringOwned(
+                    SG, SPLLoadStrOwned(SG, HLanguage, IDS_MAINWNDHEADER).c_str(), 1, &qDC);
             }
             else
-                _tcscpy(fmt, LoadStr((WN_NO_DIFFERENCE == wParam) ? IDS_MAINWNDHEADER_NODIF : IDS_MAINWNDHEADERCOMPUTING2));
-            _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Path1), encoding[0], SG->SalPathFindFileName(Path2), encoding[1], DifferencesCount);
-            //        }
-            //        else
-            //        {
-            //          _stprintf(buf, LoadStr(IDS_MAINWNDHEADERCOMPUTING2),
-            //            SG->SalPathFindFileName(Path1), SG->SalPathFindFileName(Path2));
-            //        }
+                fmt = SPLLoadStrOwned(SG, HLanguage, (WN_NO_DIFFERENCE == wParam) ? IDS_MAINWNDHEADER_NODIF : IDS_MAINWNDHEADERCOMPUTING2).c_str();
+            const wchar_t* path1Name = SG->SalPathFindFileName(Path1WStr.c_str());
+            const wchar_t* path2Name = SG->SalPathFindFileName(Path2WStr.c_str());
+            captionW = SPLFormatStringOwned(fmt.c_str(), path1Name, encoding[0],
+                                            path2Name, encoding[1], DifferencesCount);
         }
         else
-            _tcscpy(buf, LoadStr(IDS_PLUGINNAME));
+            captionW = SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str();
 
-        SetWindowText(HWindow, buf);
+        SetWindowTextW(HWindow, captionW.c_str());
 
         if ((wParam != WN_TEXT_FILES_DIFFER) && (wParam != WN_UNICODE_FILES_DIFFER) && (wParam != WN_BINARY_FILES_DIFFER))
         {
@@ -2179,7 +2230,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     return 0;
 
                 bOptionsChangedBeingHandled = TRUE;
-                int ret = SG->SalMessageBox(HWindow, LoadStr(IDS_OPTIONSCHANGED), LoadStr(IDS_PLUGINNAME),
+                int ret = SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_OPTIONSCHANGED).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(),
                                             MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION);
                 bOptionsChangedBeingHandled = FALSE;
                 if (ret == IDYES)
@@ -2211,10 +2262,10 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         {
                             if (cancel)
                             {
-                                SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELED), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+                                SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_CANCELED).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
                             }
                             SendMessage(ComboBox->HWindow, CB_RESETCONTENT, 0, 0);
-                            SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+                            SetWindowTextW(HWindow, LangStr(IDS_PLUGINNAME).c_str());
                         }
                         SetWait(FALSE);
                     }
@@ -2289,12 +2340,12 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 break;
             TRACE_I("HaveMessage");
             MSG msg;
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 if (!TranslateAccelerator(HWindow, HAccels, &msg))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
         }

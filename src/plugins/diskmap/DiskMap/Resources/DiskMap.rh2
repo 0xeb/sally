@@ -117,7 +117,13 @@
 #define IDS_DISKMAP_FORMAT_BYTE1        78 //for "1 byte"
 #define IDS_DISKMAP_FORMAT_BYTEN        79 //for "n bytes"
 
-#define IDS_DISKMAP_LAST                79
+//Empty map info
+#define IDS_DISKMAP_EMPTY_TITLE         80
+#define IDS_DISKMAP_EMPTY_FOOTER        81
+
+// CZLocalizer preloads the contiguous range [FIRST, LAST] into one buffer, so an ID past LAST
+// resolves to "WRONG STRING ID". Always extend this when adding a string above.
+#define IDS_DISKMAP_LAST                81
 
 
 #define IDR_CUSHIONDATA_LEGACY          1

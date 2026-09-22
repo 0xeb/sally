@@ -30,7 +30,7 @@ public:
 
     ~CMMIO() { Close(); }
 
-    BOOL Open(char* fname);
+    BOOL Open(const wchar_t* fname);
     void Close(void);
 
     BOOL IsOpened(void) const { return m_hmmio != NULL; }
@@ -60,7 +60,7 @@ private:
 public:
     CParserWAV() {}
 
-    virtual CParserResultEnum OpenFile(const char* fileName);
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName);
     virtual CParserResultEnum CloseFile();
     virtual CParserResultEnum GetFileInfo(COutputInterface* output);
 };

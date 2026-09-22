@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <algorithm>
+#include <new>
 #include <wininet.h>
 
 #include "checkver.h"
@@ -10,87 +12,37 @@
 #include "checkver.rh2"
 #include "lang\lang.rh"
 
-const char* GITHUB_RELEASES_API_URL = "https://api.github.com/repos/0xeb/sally/releases/latest";
-const char* GITHUB_API_HEADERS =
-    "Accept: application/vnd.github+json\r\n"
-    "X-GitHub-Api-Version: 2022-11-28\r\n";
+const wchar_t* GITHUB_RELEASES_API_URL = L"https://api.github.com/repos/0xeb/sally/releases/latest";
+const wchar_t* GITHUB_API_HEADERS =
+    L"Accept: application/vnd.github+json\r\n"
+    L"X-GitHub-Api-Version: 2022-11-28\r\n";
 
-const char* AGENT_NAME = "Sally CheckVer Plugin";
+const wchar_t* AGENT_NAME = L"Sally CheckVer Plugin";
 
-// limitation - may be called from only one thread; otherwise buffer overwrites are not handled
-const char* GetInetErrorText(DWORD dError)
+std::wstring GetInetErrorText(DWORD error)
 {
-    static char tempErrorText[1024];
-    tempErrorText[0] = 0;
+    wchar_t* allocated = NULL;
+    const DWORD count = FormatMessageW(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_IGNORE_INSERTS,
+        GetModuleHandleW(L"wininet.dll"), error, 0,
+        reinterpret_cast<wchar_t*>(&allocated), 0, NULL);
+    if (count == 0 || allocated == NULL)
+        return L"Unable to get error message";
 
-    DWORD count = FormatMessage(FORMAT_MESSAGE_FROM_HMODULE, GetModuleHandle("wininet.dll"), dError, 0,
-                                tempErrorText, 1024, NULL);
-
-    if (count > 0)
+    std::wstring text;
+    try
     {
-        // trim garbage on the right
-        char* p = tempErrorText + count - 1;
-        while (p > tempErrorText && (*p == '\n' || *p == '\r' || *p == ' '))
-        {
-            *p = 0;
-            p--;
-        }
+        text.assign(allocated, count);
     }
-    else
-        lstrcpy(tempErrorText, "Unable to get error message");
-    return tempErrorText;
-    /*
-  // hopefully we will not need this (considering the trivial internet usage)
-  sprintf(szTemp, "%s error code: %d\nMessage: %s\n", szCallFunc, dError, strName);
-  int response;
-
-  if (dError == ERROR_INTERNET_EXTENDED_ERROR)
-  {
-    InternetGetLastResponseInfo(&dwIntError, NULL, &dwLength);
-    if (dwLength)
+    catch (const std::bad_alloc&)
     {
-      if (!(szBuffer = (char *) LocalAlloc(LPTR, dwLength)))
-      {
-        lstrcat(szTemp, "Unable to allocate memory to display Internet error code. Error code: ");
-        lstrcat(szTemp, _itoa(GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-
-        response = MessageBox(hErr, (LPSTR)szTemp,"Error", MB_OK);
-        return FALSE;
-      }
-
-      if (!InternetGetLastResponseInfo (&dwIntError, (LPTSTR) szBuffer, &dwLength))
-      {
-        lstrcat(szTemp, "Unable to get Internet error. Error code: ");
-        lstrcat(szTemp, _itoa(GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-        response = MessageBox(hErr, (LPSTR)szTemp, "Error", MB_OK);
-        return FALSE;
-      }
-
-      if (!(szBufferFinal = (char *) LocalAlloc(LPTR, (strlen(szBuffer) + strlen(szTemp) + 1))))
-      {
-        lstrcat(szTemp, "Unable to allocate memory. Error code: ");
-        lstrcat(szTemp, _itoa (GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-        response = MessageBox(hErr, (LPSTR)szTemp, "Error", MB_OK);
-        return FALSE;
-      }
-
-      lstrcpy(szBufferFinal, szTemp);
-      lstrcat(szBufferFinal, szBuffer);
-      LocalFree(szBuffer);
-      response = MessageBox(hErr, (LPSTR)szBufferFinal, "Error", MB_OK);
-      LocalFree(szBufferFinal);
+        LocalFree(allocated);
+        return L"Unable to allocate error message";
     }
-  }
-  else
-  {
-    response = MessageBox(hErr, (LPSTR)szTemp,"Error",MB_OK);
-  }
-
-  return response;
-*/
+    LocalFree(allocated);
+    while (!text.empty() && (text.back() == L'\n' || text.back() == L'\r' || text.back() == L' '))
+        text.pop_back();
+    return text;
 }
 
 void IncMainDialogID()
@@ -129,9 +81,10 @@ DWORD WINAPI ThreadDownload(void* param)
     data = NULL;
 
     // lock the DLL to prevent it from being unloaded while this function runs
-    CPathBuffer buff; // Heap-allocated for long path support
-    GetModuleFileName(DLLInstance, buff, buff.Size());
-    HINSTANCE hLock = LoadLibrary(buff);
+    std::wstring modulePath;
+    HINSTANCE hLock = SPLGetModuleFileNameOwned(DLLInstance, modulePath)
+                          ? LoadLibraryW(modulePath.c_str())
+                          : NULL;
 
     BOOL exit = FALSE;
 
@@ -144,17 +97,17 @@ DWORD WINAPI ThreadDownload(void* param)
     // is the main dialog still present and is it the one that opened us?
     if (dialogID == GetMainDialogID() && !exit)
     {
-        AddLogLine(LoadStr(IDS_INET_PROTOCOL), FALSE);
-        AddLogLine(LoadStr(IDS_INET_INIT), FALSE);
+        AddLogLine(LangStr(IDS_INET_PROTOCOL).c_str(), FALSE);
+        AddLogLine(LangStr(IDS_INET_INIT).c_str(), FALSE);
         errorCode = InternetAttemptConnect(0);
         if (errorCode != ERROR_SUCCESS)
         {
             EnterCriticalSection(&MainDialogIDSection);
             if (dialogID == MainDialogID)
             {
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), GetInetErrorText(errorCode));
-                AddLogLine(buff2, TRUE);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_INET_INIT_FAILED).c_str(), GetInetErrorText(errorCode).c_str());
+                AddLogLine(message.c_str(), TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
             exit = TRUE;
@@ -163,16 +116,16 @@ DWORD WINAPI ThreadDownload(void* param)
 
     if (dialogID == GetMainDialogID() && !exit)
     {
-        hSession = InternetOpen(AGENT_NAME, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+        hSession = InternetOpenW(AGENT_NAME, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
         if (hSession == NULL)
         {
             EnterCriticalSection(&MainDialogIDSection);
             if (dialogID == MainDialogID)
             {
                 DWORD err = GetLastError();
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), GetInetErrorText(err));
-                AddLogLine(buff2, TRUE);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_INET_INIT_FAILED).c_str(), GetInetErrorText(err).c_str());
+                AddLogLine(message.c_str(), TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
             exit = TRUE;
@@ -181,9 +134,9 @@ DWORD WINAPI ThreadDownload(void* param)
 
     if (dialogID == GetMainDialogID() && !exit)
     {
-        AddLogLine(LoadStr(IDS_INET_CONNECT), FALSE);
+        AddLogLine(LangStr(IDS_INET_CONNECT).c_str(), FALSE);
         (void)firstLoadAfterInstall;
-        hUrl = InternetOpenUrl(hSession, GITHUB_RELEASES_API_URL, GITHUB_API_HEADERS, -1,
+        hUrl = InternetOpenUrlW(hSession, GITHUB_RELEASES_API_URL, GITHUB_API_HEADERS, -1,
                                INTERNET_FLAG_DONT_CACHE | INTERNET_FLAG_RELOAD |
                                    INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_PRAGMA_NOCACHE |
                                    INTERNET_FLAG_SECURE,
@@ -195,9 +148,9 @@ DWORD WINAPI ThreadDownload(void* param)
             if (dialogID == MainDialogID)
             {
                 DWORD err = GetLastError();
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_CONNECT_FAILED), GetInetErrorText(err));
-                AddLogLine(buff2, TRUE);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_INET_CONNECT_FAILED).c_str(), GetInetErrorText(err).c_str());
+                AddLogLine(message.c_str(), TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
             exit = TRUE;
@@ -215,11 +168,10 @@ DWORD WINAPI ThreadDownload(void* param)
             EnterCriticalSection(&MainDialogIDSection);
             if (dialogID == MainDialogID)
             {
-                char statusText[128];
-                _snprintf_s(statusText, _TRUNCATE, "HTTP %lu", statusCode);
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_CONNECT_FAILED), statusText);
-                AddLogLine(buff2, TRUE);
+                const std::wstring statusText = SPLFormatStringOwned(L"HTTP %lu", statusCode);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_INET_CONNECT_FAILED).c_str(), statusText.c_str());
+                AddLogLine(message.c_str(), TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
             exit = TRUE;
@@ -228,55 +180,72 @@ DWORD WINAPI ThreadDownload(void* param)
 
     if (dialogID == GetMainDialogID() && !exit)
     {
-        AddLogLine(LoadStr(IDS_INET_READ), FALSE);
-        LoadedScriptSize = 0;
+        AddLogLine(LangStr(IDS_INET_READ).c_str(), FALSE);
+        LoadedScript.clear();
+        std::array<BYTE, 16 * 1024> chunk;
         while (true)
         {
-            DWORD bytesToRead = LOADED_SCRIPT_MAX - LoadedScriptSize;
-            if (bytesToRead == 0)
-            {
-                EnterCriticalSection(&MainDialogIDSection);
-                if (dialogID == MainDialogID)
-                {
-                    char buff2[1024];
-                    sprintf(buff2, LoadStr(IDS_INET_READ_FAILED), "Response too large");
-                    AddLogLine(buff2, TRUE);
-                }
-                LeaveCriticalSection(&MainDialogIDSection);
-                exit = TRUE;
-                break;
-            }
-
             dwBytesRead = 0;
-            bResult = InternetReadFile(hUrl, LoadedScript + LoadedScriptSize, bytesToRead, &dwBytesRead);
+            const size_t remaining = CHECKVER_MAX_RELEASE_RESPONSE_BYTES - LoadedScript.size();
+            const DWORD bytesToRead = static_cast<DWORD>((std::min)(chunk.size(), remaining + 1));
+            bResult = InternetReadFile(hUrl, chunk.data(), bytesToRead, &dwBytesRead);
             if (!bResult)
             {
                 EnterCriticalSection(&MainDialogIDSection);
                 if (dialogID == MainDialogID)
                 {
                     DWORD err = GetLastError();
-                    char buff2[1024];
-                    sprintf(buff2, LoadStr(IDS_INET_READ_FAILED), GetInetErrorText(err));
-                    AddLogLine(buff2, TRUE);
+                    const std::wstring message = SPLFormatStringOwned(
+                        LangStr(IDS_INET_READ_FAILED).c_str(), GetInetErrorText(err).c_str());
+                    AddLogLine(message.c_str(), TRUE);
                 }
                 LeaveCriticalSection(&MainDialogIDSection);
                 exit = TRUE;
                 break;
             }
 
-            LoadedScriptSize += dwBytesRead;
             if (dwBytesRead == 0)
                 break;
+            if (dwBytesRead > remaining)
+            {
+                EnterCriticalSection(&MainDialogIDSection);
+                if (dialogID == MainDialogID)
+                {
+                    const std::wstring message = SPLFormatStringOwned(
+                        LangStr(IDS_INET_READ_FAILED).c_str(), L"Response too large");
+                    AddLogLine(message.c_str(), TRUE);
+                }
+                LeaveCriticalSection(&MainDialogIDSection);
+                exit = TRUE;
+                break;
+            }
+            try
+            {
+                LoadedScript.insert(LoadedScript.end(), chunk.begin(), chunk.begin() + dwBytesRead);
+            }
+            catch (const std::bad_alloc&)
+            {
+                EnterCriticalSection(&MainDialogIDSection);
+                if (dialogID == MainDialogID)
+                {
+                    const std::wstring message = SPLFormatStringOwned(
+                        LangStr(IDS_INET_READ_FAILED).c_str(), L"Unable to allocate response buffer");
+                    AddLogLine(message.c_str(), TRUE);
+                }
+                LeaveCriticalSection(&MainDialogIDSection);
+                exit = TRUE;
+                break;
+            }
         }
 
-        if (!exit && LoadedScriptSize == 0)
+        if (!exit && LoadedScript.empty())
         {
             EnterCriticalSection(&MainDialogIDSection);
             if (dialogID == MainDialogID)
             {
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_READ_FAILED), "GitHub returned an empty response");
-                AddLogLine(buff2, TRUE);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_INET_READ_FAILED).c_str(), L"GitHub returned an empty response");
+                AddLogLine(message.c_str(), TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
             exit = TRUE;
@@ -293,9 +262,9 @@ DWORD WINAPI ThreadDownload(void* param)
     if (dialogID == GetMainDialogID())
     {
         if (!exit)
-            AddLogLine(LoadStr(IDS_INET_SUCCESS), FALSE);
+            AddLogLine(LangStr(IDS_INET_SUCCESS).c_str(), FALSE);
         else
-            LoadedScriptSize = 0;
+            LoadedScript.clear();
         PostMessage(HMainDialog, WM_USER_DOWNLOADTHREAD_EXIT, !exit, 0); // thread ends; data are loaded
         FreeLibrary(hLock);                                              // release the lock
         LeaveCriticalSection(&MainDialogIDSection);

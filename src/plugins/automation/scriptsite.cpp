@@ -89,7 +89,7 @@ STDMETHODIMP CScriptSite::QueryInterface(REFIID iid, __out void** ppvObject)
     {
         OLECHAR szIID[64];
         StringFromGUID2(iid, szIID, _countof(szIID));
-        TRACE_I("CScriptSite::QueryInterface: unknown interface " << OLE2A(szIID));
+        TRACE_IW(L"CScriptSite::QueryInterface: unknown interface " << szIID);
     }
 #endif
 
@@ -468,7 +468,7 @@ HRESULT STDMETHODCALLTYPE CScriptSite::GetPathName(
     /* [out] */ __RPC__out BOOL* pfIsOriginalFile)
 {
     TRACE_I("IDebugDocumentHost::GetPathName");
-    *pbstrLongName = SysAllocString(A2OLE(m_pChief->GetFileName()));
+    *pbstrLongName = SysAllocString(m_pChief->GetFileName());
     *pfIsOriginalFile = TRUE;
     return S_OK;
 }
@@ -477,7 +477,7 @@ HRESULT STDMETHODCALLTYPE CScriptSite::GetFileName(
     /* [out] */ __RPC__deref_out_opt BSTR* pbstrShortName)
 {
     TRACE_I("IDebugDocumentHost::GetFileName");
-    *pbstrShortName = SysAllocString(A2OLE(PathFindFileName(m_pChief->GetFileName())));
+    *pbstrShortName = SysAllocString(PathFindFileNameW(m_pChief->GetFileName()));
     return S_OK;
 }
 

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -100,7 +100,7 @@ BOOL InitViewer()
 {
     if (!InitializeWinLib(PluginNameEN, DLLInstance))
         return FALSE;
-    SetWinLibStrings(LoadStr(IDS_INVALID_NUM), LoadStr(IDS_PLUGINNAME));
+    SetWinLibStrings(LoadStr(IDS_INVALID_NUM).c_str(), LoadStr(IDS_PLUGINNAME).c_str());
     SetupWinLibHelp(HTMLHelpCallback);
     ViewerAccels = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELERATORS));
     return TRUE;
@@ -116,7 +116,7 @@ void ReleaseViewer()
 class CViewerThread : public CThread
 {
 protected:
-    CPathBuffer Name; // Heap-allocated for long path support
+    std::wstring Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL AlwaysOnTop;
@@ -131,13 +131,13 @@ protected:
     int EnumFilesCurrentIndex; // index of the first viewer file within the source
 
 public:
-    CViewerThread(const char* name, int left, int top, int width, int height,
+    CViewerThread(const wchar_t* name, int left, int top, int width, int height,
                   UINT showCmd, BOOL alwaysOnTop, BOOL returnLock,
                   HANDLE* lock, BOOL* lockOwner, HANDLE contEvent,
                   BOOL* success, int enumFilesSourceUID,
-                  int enumFilesCurrentIndex) : CThread("DMV Viewer")
+                  int enumFilesCurrentIndex) : CThread(L"DMV Viewer")
     {
-        lstrcpyn(Name, name, Name.Size());
+        Name.assign(name != NULL ? name : L"");
         Left = left;
         Top = top;
         Width = width;
@@ -195,7 +195,7 @@ CViewerThread::Body()
 
             if (window->CreateEx(AlwaysOnTop ? WS_EX_TOPMOST : 0,
                                  CWINDOW_CLASSNAME2,
-                                 "DMV Viewer",
+                                 L"DMV Viewer",
                                  WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                  Left,
                                  Top,
@@ -232,7 +232,7 @@ CViewerThread::Body()
     if (openFile)
     {
         CALL_STACK_MESSAGE1("ViewerThreadBody::OpenFile");
-        window->OpenFile(Name, FALSE);
+        window->OpenFile(Name.c_str(), FALSE);
 
         CALL_STACK_MESSAGE1("ViewerThreadBody::message-loop");
         // message loop
@@ -255,7 +255,7 @@ CViewerThread::Body()
 }
 
 BOOL WINAPI
-CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, int width, int height,
+CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                     UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                     BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                     int enumFilesSourceUID, int enumFilesCurrentIndex)
@@ -328,7 +328,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             SetBkColor(hDC, (COLORREF)GetSysColor(COLOR_WINDOW));
             SetTextColor(hDC, (COLORREF)GetSysColor(COLOR_WINDOWTEXT));
-            TextOut(hDC, 10, 10, Viewer->Name, (int)strlen(Viewer->Name));
+            TextOutW(hDC, 10, 10, Viewer->Name.c_str(), static_cast<int>(Viewer->Name.size()));
         }
         HANDLES(EndPaint(HWindow, &ps));
         return 0;
@@ -359,7 +359,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CViewerWindow::CViewerWindow(int enumFilesSourceUID, int enumFilesCurrentIndex) : CWindow(ooStatic)
 {
     Lock = NULL;
-    Name[0] = 0;
+    Name.clear();
     Renderer.Viewer = this;
     HRebar = NULL;
     MainMenu = NULL;
@@ -509,12 +509,12 @@ void FillMenuFilter(CGUIMenuPopupAbstract* popup, int cmdFirst, int filterCount)
     mi.Type = MENU_TYPE_STRING;
     mi.State = 0;
 
-    CPathBuffer buff; // Heap-allocated for long path support
-    mi.String = buff;
     int index = 0;
     while (index < filterCount)
     {
-        wsprintf(buff, "&%d %s %d", index < 9 ? index + 1 : 0, LoadStr(IDS_FILTER), index + 1);
+        std::wstring buff = SPLFormatStringOwned(L"&%d %ls %d", index < 9 ? index + 1 : 0,
+                                                  LoadStr(IDS_FILTER).c_str(), index + 1);
+        mi.String = buff.data();
         mi.ID = cmdFirst + index;
         popup->InsertItem(-1, TRUE, &mi);
         index++;
@@ -624,13 +624,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES: // allow opening files via drag and drop
     {
         UINT drag;
-        CPathBuffer path; // Heap-allocated for long path support
-
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // determine how many files were dropped onto the window
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, path.Size());
-            OpenFile(path);
+            const UINT length = DragQueryFileW((HDROP)wParam, 0, NULL, 0);
+            std::wstring path(length, L'\0');
+            if (DragQueryFileW((HDROP)wParam, 0, path.data(), length + 1) == length)
+                OpenFile(path.c_str());
         }
         DragFinish((HDROP)wParam);
         break;
@@ -728,25 +728,24 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL ok = FALSE;
                 BOOL srcBusy = FALSE;
                 BOOL noMoreFiles = FALSE;
-                CPathBuffer fileName; // Heap-allocated for long path support
+                std::wstring fileNameW;
                 if (shiftPressed) // legacy hot-key: use Backspace (keys + commands in the menu see PictView, menu File/Other Files)
                 {
-                    ok = SalamanderGeneral->GetPreviousFileNameForViewer(EnumFilesSourceUID,
-                                                                         &EnumFilesCurrentIndex,
-                                                                         Name, FALSE, TRUE,
-                                                                         fileName, &noMoreFiles,
-                                                                         &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalamanderGeneral, TRUE, EnumFilesSourceUID,
+                        &EnumFilesCurrentIndex, Name.c_str(), FALSE,
+                        TRUE, fileNameW, &noMoreFiles, &srcBusy);
                 }
                 else
                 {
-                    ok = SalamanderGeneral->GetNextFileNameForViewer(EnumFilesSourceUID,
-                                                                     &EnumFilesCurrentIndex,
-                                                                     Name, FALSE, TRUE, fileName,
-                                                                     &noMoreFiles, &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalamanderGeneral, FALSE, EnumFilesSourceUID,
+                        &EnumFilesCurrentIndex, Name.c_str(), FALSE,
+                        TRUE, fileNameW, &noMoreFiles, &srcBusy);
                 }
 
                 if (ok)
-                    OpenFile(fileName); // we have a new name
+                    OpenFile(fileNameW.c_str()); // we have a new name
                 else
                 {
                     if (noMoreFiles)
@@ -842,9 +841,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (LOWORD(wParam) >= CM_FILTER_FIRST && LOWORD(wParam) <= CM_FILTER_LAST)
         {
-            char buff[100];
-            wsprintf(buff, "%s %d", LoadStr(IDS_FILTER), LOWORD(wParam) - CM_FILTER_FIRST + 1);
-            SalamanderGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+            const std::wstring text = SPLFormatStringOwned(L"%ls %d", LoadStr(IDS_FILTER).c_str(),
+                                                            LOWORD(wParam) - CM_FILTER_FIRST + 1);
+            SalamanderGeneral->SalMessageBox(HWindow, text.c_str(), LoadStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             return 0;
         }
 
@@ -852,38 +851,30 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case CM_VIEWER_OPEN:
         {
-            CPathBuffer file; // Heap-allocated for long path support
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
+            OPENFILENAMEW ofn;
+            memset(&ofn, 0, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
             ofn.hwndOwner = HWindow;
-            char filterBuf[100];
-            lstrcpyn(filterBuf, LoadStr(IDS_DMV_FILES_FILTER), 100);
-            char* s = filterBuf;
-            ofn.lpstrFilter = s;
-            while (*s != 0) // create a double-null-terminated list
-            {
-                if (*s == '|')
-                    *s = 0;
-                s++;
-            }
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = file.Size();
+            std::wstring filter = LoadStr(IDS_DMV_FILES_FILTER);
+            std::replace(filter.begin(), filter.end(), L'|', L'\0');
+            filter.push_back(L'\0');
+            ofn.lpstrFilter = filter.c_str();
             ofn.nFilterIndex = 1;
-            CPathBuffer curDir; // Heap-allocated for long path support
-            lstrcpyn(curDir, Name, curDir.Size());
-            SalamanderGeneral->CutDirectory(curDir);
-            ofn.lpstrInitialDir = curDir[0] != 0 ? curDir : NULL;
+            std::wstring curDir = Name;
+            SPLCutDirectoryOwned(SalamanderGeneral, curDir);
+            ofn.lpstrInitialDir = !curDir.empty() ? curDir.c_str() : NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-            if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
-                OpenFile(file);
+            std::vector<std::wstring> selectedFiles;
+            if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn, selectedFiles) &&
+                selectedFiles.size() == 1)
+                OpenFile(selectedFiles[0].c_str());
             break;
         }
 
         case CM_VIEWER_CUT:
         {
-            SalamanderGeneral->SalMessageBox(HWindow, "TODO: Cut", LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+            SalamanderGeneral->SalMessageBox(HWindow, L"TODO: Cut", LoadStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             Enablers[vwePaste] = TRUE;
             UpdateEnablers();
             break;
@@ -891,7 +882,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_VIEWER_COPY:
         {
-            SalamanderGeneral->SalMessageBox(HWindow, "TODO: Copy", LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+            SalamanderGeneral->SalMessageBox(HWindow, L"TODO: Copy", LoadStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             Enablers[vwePaste] = TRUE;
             UpdateEnablers();
             break;
@@ -899,7 +890,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_VIEWER_PASTE:
         {
-            SalamanderGeneral->SalMessageBox(HWindow, "TODO: Paste", LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+            SalamanderGeneral->SalMessageBox(HWindow, L"TODO: Paste", LoadStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
             Enablers[vwePaste] = FALSE; // it's OK only if it was Cut (Copy should not change it)
             UpdateEnablers();
             break;
@@ -932,8 +923,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ToolBar != NULL && hToolBar == ToolBar->GetHWND())
         {
             TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-            lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
-            SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
+            lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID).c_str());
+            SPLPrepareToolTipTextForAbiBuffer(SalamanderGUI, tt->Buffer,
+                                              TOOLTIP_TEXT_MAX, FALSE);
         }
         return 0;
     }
@@ -949,14 +941,14 @@ CViewerWindow::GetLock()
     return Lock;
 }
 
-void CViewerWindow::OpenFile(const char* name, BOOL setLock)
+void CViewerWindow::OpenFile(const wchar_t* name, BOOL setLock)
 {
     if (setLock && Lock != NULL)
     {
         SetEvent(Lock);
         Lock = NULL; // from now on it's up to the disk cache
     }
-    lstrcpyn(Name, name, Name.Size());
+    Name.assign(name != NULL ? name : L"");
     InvalidateRect(HWindow, NULL, TRUE);
     InvalidateRect(Renderer.HWindow, NULL, TRUE);
 }

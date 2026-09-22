@@ -17,7 +17,7 @@
 #include "guicomponent.h"
 #include "aututils.h"
 
-const TCHAR CSalamanderGuiComponentBase::s_szInstancePropName[] = _T("AutomationComponent");
+const wchar_t CSalamanderGuiComponentBase::s_szInstancePropName[] = L"AutomationComponent";
 
 CSalamanderGuiComponentBase::CSalamanderGuiComponentBase(__in_opt VARIANT* text)
 {
@@ -297,7 +297,7 @@ LRESULT STDMETHODCALLTYPE CSalamanderGuiComponentBase::OnMessage(
 {
     LRESULT lres;
 
-    lres = CallWindowProc(m_pfnPrevWndProc, m_hWnd, uMsg, wParam, lParam);
+    lres = CallWindowProcW(m_pfnPrevWndProc, m_hWnd, uMsg, wParam, lParam);
 
     if (uMsg == WM_DESTROY)
     {

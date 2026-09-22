@@ -29,3 +29,4 @@
 #include "array2.h"
 
 #include "config.h"
+#include "zip_text.h"

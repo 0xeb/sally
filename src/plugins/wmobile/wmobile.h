@@ -5,7 +5,6 @@
 #pragma once
 
 // global data
-extern char Str[MAX_PATH];
 extern DWORD DWord;
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
@@ -20,7 +19,7 @@ BOOL InitFS();
 void ReleaseFS();
 
 // FS name assigned by Salamander after the plugin loads
-extern char AssignedFSName[MAX_PATH];
+extern std::wstring AssignedFSName;
 
 // pointers to lower/upper case mapping tables
 extern unsigned char* LowerCase;
@@ -37,7 +36,6 @@ extern CPluginDataInterfaceAbstract** TransferPluginDataIface;
 extern DWORD* TransferActCustomData;
 
 // global data
-extern char Str[MAX_PATH];
 extern int Number;
 extern int Selection; // "second" in configuration dialog
 extern BOOL CheckBox;
@@ -47,11 +45,11 @@ extern WINDOWPLACEMENT CfgWindowPlacement; // invalid when CfgSavePosition != TR
 
 extern DWORD LastCfgPage; // start page (sheet) in the configuration dialog
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
-extern char TitleWMobile[];
-extern char TitleWMobileError[];
-extern char TitleWMobileQuestion[];
+extern const wchar_t* TitleWMobile;
+extern const wchar_t* TitleWMobileError;
+extern const wchar_t* TitleWMobileQuestion;
 
 //
 // ****************************************************************************
@@ -67,27 +65,27 @@ public:
     CPluginInterfaceForFS() { ActiveFSCount = 0; }
     int GetActiveFSCount() { return ActiveFSCount; }
 
-    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const char* fsName, int fsNameIndex);
+    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const wchar_t* fsName, int fsNameIndex);
     virtual void WINAPI CloseFS(CPluginFSInterfaceAbstract* fs);
 
     virtual void WINAPI ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex,
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex,
                                     CFileData& file, int isDir);
     virtual BOOL WINAPI DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                      CPluginFSInterfaceAbstract* pluginFS,
-                                     const char* pluginFSName, int pluginFSNameIndex);
+                                     const wchar_t* pluginFSName, int pluginFSNameIndex);
 
-    virtual void WINAPI ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
-    virtual void WINAPI ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
+    virtual BOOL WINAPI ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) { return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart); }
+    virtual BOOL WINAPI ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) { return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart); }
 
-    virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server, const char* share) {}
+    virtual void WINAPI EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share) {}
 
     virtual void WINAPI ExecuteChangeDriveMenuItem(int panel);
     virtual BOOL WINAPI ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                        CPluginFSInterfaceAbstract* pluginFS,
-                                                       const char* pluginFSName, int pluginFSNameIndex,
+                                                       const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                        BOOL isDetachedFS, BOOL& refreshMenu,
                                                        BOOL& closeMenu, int& postCmd, void*& postCmdParam);
     virtual void WINAPI ExecuteChangeDrivePostCommand(int panel, int postCmd, void* postCmdParam);
@@ -116,7 +114,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -133,25 +131,23 @@ public:
 // top-index memory for the panel list box - used by CPluginFSInterface to keep
 // ExecuteOnFS behavior consistent (preserves the top index when entering and leaving a subdirectory)
 
+#include "wmobile_topindex_core.h"
+
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indexes (levels), at least 1
 
+// The logic lives in wmobile_topindex_core.cpp so it can be exercised without a
+// device - see gtest_wmobile_topindex_core. This is the same object, not a copy: the plugin
+// runs the tested code. Salamander's own case-folding is preserved by injecting StrNICmp.
 class CTopIndexMem
 {
 protected:
-    // path for the last remembered top index
-    char Path[MAX_PATH];
-    int TopIndexes[TOP_INDEX_MEM_SIZE]; // stored top indexes
-    int TopIndexesCount;                // number of stored top indexes
+    wmobile::TopIndexMemory Memory;
 
 public:
-    CTopIndexMem() { Clear(); }
-    void Clear()
-    {
-        Path[0] = 0;
-        TopIndexesCount = 0;
-    } // clear the memory
-    void Push(const char* path, int topIndex);        // store the top index for the given path
-    BOOL FindAndPop(const char* path, int& topIndex); // find the top index for the given path, FALSE -> not found
+    CTopIndexMem();
+    void Clear() { Memory.Clear(); }                  // clear the memory
+    void Push(const wchar_t* path, int topIndex);        // store the top index for the given path
+    BOOL FindAndPop(const wchar_t* path, int& topIndex); // find the top index for the given path, FALSE -> not found
 };
 
 //
@@ -163,7 +159,7 @@ public:
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 public:
-    char Path[MAX_PATH];      // current path
+    std::wstring Path;        // current device path
     BOOL PathError;           // TRUE if ListCurrentPath failed (path error); triggers ChangePath
     BOOL FatalError;          // TRUE if ListCurrentPath failed (fatal error); triggers ChangePath
     CTopIndexMem TopIndexMem; // stored top indexes for ExecuteOnFS()
@@ -172,16 +168,16 @@ public:
     CPluginFSInterface();
     ~CPluginFSInterface() {}
 
-    virtual BOOL WINAPI GetCurrentPath(char* userPart);
-    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir, char* buf, int bufSize);
-    virtual BOOL WINAPI GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success);
-    virtual BOOL WINAPI GetRootPath(char* userPart);
-
-    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
-    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
-
-    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                                   const char* userPart, char* cutFileName, BOOL* pathWasCut,
+    virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* userPart);
+    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir, CSalamanderStringBuffer* fullName);
+    virtual BOOL WINAPI GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                      CSalamanderStringBuffer* path, BOOL& success);
+    virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart);
+    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart);
+    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart);
+    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                                   int fsNameIndex, const wchar_t* userPart,
+                                   CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut,
                                    BOOL forceRefresh, int mode);
     virtual BOOL WINAPI ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                         CPluginDataInterfaceAbstract*& pluginData,
@@ -195,47 +191,64 @@ public:
 
     virtual DWORD WINAPI GetSupportedServices();
 
-    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const char* fsName, char*& title, HICON& icon, BOOL& destroyIcon) { return FALSE; }
+    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title, HICON& icon, BOOL& destroyIcon) override { return FALSE; }
     virtual HICON WINAPI GetFSIcon(BOOL& destroyIcon);
-    virtual void WINAPI GetDropEffect(const char* srcFSPath, const char* tgtFSPath,
+    virtual void WINAPI GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                                       DWORD allowedEffects, DWORD keyState,
-                                      DWORD* dropEffect) {}
+                                      DWORD* dropEffect) override {}
     virtual void WINAPI GetFSFreeSpace(CQuadWord* retValue);
-    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset);
-    virtual void WINAPI CompleteDirectoryLineHotPath(char* path, int pathBufSize) {}
-    virtual BOOL WINAPI GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize) { return FALSE; }
-    virtual void WINAPI ShowInfoDialog(const char* fsName, HWND parent);
-    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo);
-    virtual BOOL WINAPI QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                                    char* newName, BOOL& cancel);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs);
-    virtual BOOL WINAPI CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel);
-    virtual void WINAPI ViewFile(const char* fsName, HWND parent,
+    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset) override;
+    virtual BOOL WINAPI CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path) override { return TRUE; }
+    virtual BOOL WINAPI GetPathForMainWindowTitle(const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf) override { return FALSE; }
+    virtual void WINAPI ShowInfoDialog(const wchar_t* fsName, HWND parent) override;
+    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo) override;
+    BOOL ExecuteCommandLineOwned(HWND parent, std::wstring& command, int& selFrom, int& selTo);
+    virtual BOOL WINAPI QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
+                                    CSalamanderStringBuffer* newName, BOOL& cancel) override;
+    BOOL QuickRenameOwned(const wchar_t* fsName, int mode, HWND parent, CFileData& file,
+                          BOOL isDir, std::wstring& newName, BOOL& cancel);
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs) override;
+    virtual BOOL WINAPI CreateDir(const wchar_t* fsName, int mode, HWND parent, CSalamanderStringBuffer* newName, BOOL& cancel) override;
+    BOOL CreateDirOwned(const wchar_t* fsName, int mode, HWND parent,
+                        std::wstring& newName, BOOL& cancel);
+    virtual void WINAPI ViewFile(const wchar_t* fsName, HWND parent,
                                  CSalamanderForViewFileOnFSAbstract* salamander,
-                                 CFileData& file);
-    virtual BOOL WINAPI Delete(const char* fsName, int mode, HWND parent, int panel,
-                               int selectedFiles, int selectedDirs, BOOL& cancelOrError);
-    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+                                 CFileData& file) override;
+    virtual BOOL WINAPI Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
+                               int selectedFiles, int selectedDirs, BOOL& cancelOrError) override;
+    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                          int panel, int selectedFiles, int selectedDirs,
-                                         char* targetPath, BOOL& operationMask,
-                                         BOOL& cancelOrHandlePath, HWND dropTarget);
-    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                               const char* sourcePath, SalEnumSelection2 next,
+                                         CSalamanderStringBuffer* targetPath, BOOL& operationMask,
+                                         BOOL& cancelOrHandlePath, HWND dropTarget) override;
+    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                               const wchar_t* sourcePath, SalEnumSelection2 next,
                                                void* nextParam, int sourceFiles, int sourceDirs,
-                                               char* targetPath, BOOL* invalidPathOrCancel);
-    virtual BOOL WINAPI ChangeAttributes(const char* fsName, HWND parent, int panel,
-                                         int selectedFiles, int selectedDirs);
-    virtual void WINAPI ShowProperties(const char* fsName, HWND parent, int panel,
-                                       int selectedFiles, int selectedDirs);
-    virtual void WINAPI ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
-                                    int panel, int selectedFiles, int selectedDirs);
-    virtual BOOL WINAPI OpenFindDialog(const char* fsName, int panel) { return FALSE; }
-    virtual void WINAPI OpenActiveFolder(const char* fsName, HWND parent) {}
-    virtual void WINAPI GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects) {}
+                                               CSalamanderStringBuffer* targetPath, BOOL* invalidPathOrCancel) override;
+    virtual BOOL WINAPI ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
+                                         int selectedFiles, int selectedDirs) override;
+    virtual void WINAPI ShowProperties(const wchar_t* fsName, HWND parent, int panel,
+                                       int selectedFiles, int selectedDirs) override;
+    virtual void WINAPI ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
+                                    int panel, int selectedFiles, int selectedDirs) override;
+    virtual BOOL WINAPI OpenFindDialog(const wchar_t* fsName, int panel) override { return FALSE; }
+    virtual void WINAPI OpenActiveFolder(const wchar_t* fsName, HWND parent) override {}
+    virtual void WINAPI GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects) override {}
     virtual BOOL WINAPI HandleMenuMsg(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT* plResult) { return FALSE; }
-    virtual BOOL WINAPI GetNoItemsInPanelText(char* textBuf, int textBufSize) { return FALSE; }
+    virtual BOOL WINAPI GetNoItemsInPanelText(CSalamanderStringBuffer* textBuf) override { return FALSE; }
     virtual void WINAPI ShowSecurityInfo(HWND parent) {}
 
+private:
+    BOOL WINAPI CopyOrMoveFromFSOwned(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                      int panel, int selectedFiles, int selectedDirs,
+                                      std::wstring& targetPath, const std::wstring& suppliedMask,
+                                      BOOL& operationMask, BOOL& cancelOrHandlePath,
+                                      HWND dropTarget);
+    BOOL WINAPI CopyOrMoveFromDiskToFSOwned(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                            const wchar_t* sourcePath, SalEnumSelection2 next,
+                                            void* nextParam, int sourceFiles, int sourceDirs,
+                                            std::wstring& targetPath, BOOL* invalidPathOrCancel);
+
+public:
     static void EmptyCache();
 };
 
@@ -251,15 +264,28 @@ void OnAbout(HWND hParent);
 /////////////////////////////////////////////////////////////////////////////
 // helper functions for RAPI
 
+// CFileInfo is stored in TDirectArray, whose elements are relocated with memmove. Keep the record
+// trivially relocatable, but give the semantic relative path dynamic UTF-16 storage through an
+// owned pointer. CFileInfoArray releases those pointers before the raw array storage is destroyed.
 struct CFileInfo
 {
-    char cFileName[MAX_PATH];
+    wchar_t* cFileName;
     DWORD dwFileAttributes;
     DWORD size;
     int block;
 };
 
-typedef TDirectArray<CFileInfo> CFileInfoArray;
+class CFileInfoArray : public TDirectArray<CFileInfo>
+{
+public:
+    CFileInfoArray(int base, int delta)
+        : TDirectArray<CFileInfo>(base, delta)
+    {
+    }
+    ~CFileInfoArray() override;
+
+    BOOL AddOwned(const wchar_t* fileName, DWORD attributes, DWORD size, int block);
+};
 
 class CRAPI
 {
@@ -269,22 +295,21 @@ public:
     static void UnInit();
 
     //RAPI
-    static BOOL FindAllFiles(LPCTSTR szPath, DWORD dwFlags, LPDWORD lpdwFoundCount,
-                             RapiNS::LPCE_FIND_DATA* ppFindDataArray, BOOL tryReinit = FALSE);
-    static HANDLE FindFirstFile(LPCTSTR lpFileName, RapiNS::LPCE_FIND_DATA lpFindFileData, BOOL tryReinit = FALSE);
+    static BOOL FindAllFilesWide(const wchar_t* path, DWORD flags, LPDWORD foundCount,
+                                 RapiNS::LPCE_FIND_DATA* findData, BOOL tryReinit = FALSE);
+    static HANDLE FindFirstFileWide(const wchar_t* lpFileName, RapiNS::LPCE_FIND_DATA lpFindFileData, BOOL tryReinit = FALSE);
     static BOOL FindNextFile(HANDLE hFindFile, RapiNS::LPCE_FIND_DATA lpFindFileData);
     static BOOL FindClose(HANDLE hFindFile);
 
-    static DWORD GetFileAttributes(LPCTSTR lpFileName, BOOL tryReinit = FALSE);
-    static BOOL SetFileAttributes(LPCTSTR lpFileName, DWORD dwFileAttributes);
+    static DWORD GetFileAttributesWide(const wchar_t* lpFileName, BOOL tryReinit = FALSE);
     static BOOL GetFileTime(HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime);
     static BOOL SetFileTime(HANDLE hFile, FILETIME* lpCreationTime, FILETIME* lpLastAccessTime, FILETIME* lpLastWriteTime);
     static DWORD GetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh);
     static BOOL GetStoreInformation(RapiNS::LPSTORE_INFORMATION lpsi);
 
-    static HANDLE CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
-                             LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
-                             DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
+    static HANDLE CreateFileWide(const wchar_t* lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+                                 LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+                                 DWORD dwFlagsAndAttributes, HANDLE hTemplateFile);
 
     static BOOL CloseHandle(HANDLE hObject);
 
@@ -293,36 +318,52 @@ public:
     static BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite,
                           LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped);
 
-    static BOOL CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists);
-    static BOOL MoveFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName);
-    static BOOL DeleteFile(LPCTSTR lpFileName);
+    static BOOL CreateDirectoryWide(const wchar_t* lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes);
+    static BOOL DeleteFileWide(const wchar_t* lpFileName);
+    static BOOL RemoveDirectoryWide(const wchar_t* lpPathName);
+    static BOOL SetFileAttributesWide(const wchar_t* lpFileName, DWORD dwFileAttributes);
+    static BOOL MoveFileWide(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName);
 
-    static BOOL CreateDirectory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes);
-    static BOOL RemoveDirectory(LPCTSTR lpPathName);
+    static BOOL CreateProcessWide(const wchar_t* lpApplicationName, const wchar_t* lpCommandLine);
 
-    static BOOL CreateProcess(LPCTSTR lpApplicationName, LPCTSTR lpCommandLine);
-
-    static BOOL SHGetShortcutTarget(LPCTSTR lpszShortcut, LPTSTR lpszTarget, int cbMax);
+    static BOOL SHGetShortcutTargetWide(const wchar_t* shortcut, std::wstring& target);
 
     static HRESULT FreeBuffer(LPVOID Buffer);
 
     static DWORD GetLastError(void);
     static HRESULT RapiGetError(void);
 
-    //Helpers
-    static BOOL PathAppend(char* path, const char* name, int pathSize);
-    static BOOL FindAllFilesInTree(const char* rootPath, const char* fileName, CFileInfoArray& array, int block, BOOL dirFirst);
+    // Helpers
+    static BOOL FindAllFilesInTreeWide(const wchar_t* rootPath, const wchar_t* fileName,
+                                       CFileInfoArray& array, int block, BOOL dirFirst);
 
-    static DWORD CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName);
-    static DWORD CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName);
-    static DWORD CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName);
+    // Wide. Each straddles the phone and the PC; which parameter names which
+    // machine is documented at the definitions in rapi.cpp, and it is not symmetric:
+    //   CopyFileToPC  existing = device, new = PC
+    //   CopyFileToCE  existing = PC,     new = device
+    //   CopyFile      both = device
+    // 'errorFileName' receives whichever of the two arguments failed, so it aliases a caller
+    // string and must not outlive it.
+    static DWORD CopyFileToPC(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName);
+    static DWORD CopyFileToCE(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName);
+    // Named CopyFileWide, not CopyFile: CopyFile is a Win32 macro and under UNICODE this
+    // declaration silently became CRAPI::CopyFileW. Same trap as DeleteFile/RemoveDirectory
+    // on the delete path, and it cost a build there too.
+    static DWORD CopyFileWide(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName);
 
-    static DWORD SetFileTime(LPCTSTR lpFileName, const SYSTEMTIME* lpCreationTime,
-                             const SYSTEMTIME* lpLastAccessTime, const SYSTEMTIME* lpLastWriteTime);
+    static DWORD SetFileTimeWide(const wchar_t* fileName, const SYSTEMTIME* creationTime,
+                                 const SYSTEMTIME* lastAccessTime, const SYSTEMTIME* lastWriteTime);
 
-    static BOOL CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, char* errBuf, int errBufSize, char* newDir);
+    // Wide. 'errBuf'/'errBufSize' were already being written as wchar_t by the
+    // LangStr widening while the parameter still said char* - every caller passes NULL/0 so
+    // nothing overran, but the type and the body disagreed. errBufSize counts CHARACTERS.
+    static BOOL CheckAndCreateDirectory(const wchar_t* dir, HWND parent, BOOL quiet);
 
-    static void GetFileData(const char* name, char (&buf)[100]);
+    // Wide. The output is a display string - size, date, time - and the date
+    // and time come from GetDateFormat/GetTimeFormat under LOCALE_USER_DEFAULT, so the old
+    // "ascii-by-construction" note on its CP_ACP conversion was wrong: under a Japanese or
+    // Greek user locale those are not ASCII at all.
+    static std::wstring GetFileDataWide(const wchar_t* name);
 
     static BOOL CheckConnection();
 
@@ -330,8 +371,6 @@ public:
 private:
     static DWORD WaitAndDispatch(DWORD nCount, HANDLE* phWait, DWORD dwTimeout, BOOL bOnlySendMessage);
     static HRESULT InitRapi(HANDLE hExit, DWORD dwTimeout);
-
-    static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR fileName, CFileInfoArray& array, int block, BOOL dirFirst);
 
     static BOOL initialized;
 };

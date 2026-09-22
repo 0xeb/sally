@@ -4,6 +4,7 @@
 
 #pragma once
 
+
 //#define PD_NO_SELFEXT   0x1
 //#define PD_NO_MULTIVOL  0x2
 #define PD_REMOVALBE 0x4
@@ -45,19 +46,19 @@ class CPackDialog : public CDlgRoot
     char DecimalSeparator[5];
     int DecimalSeparatorLen;
     //unsigned            Units;
-    const char* ZipFile;
+    std::wstring ZipFile;
     unsigned Flags;
     HWND CBEditCtrl;
 
 public:
     CPackDialog(HWND parent, CZipPack* packObject, CConfiguration* config,
-                CExtendedOptions* packOptions, const char* zipFile, unsigned flags) : CDlgRoot(parent)
+                CExtendedOptions* packOptions, const wchar_t* zipFile, unsigned flags) : CDlgRoot(parent)
     {
         PackObject = packObject;
         Config = config;
         PackOptions = packOptions;
         Flags = flags;
-        ZipFile = zipFile;
+        ZipFile = zipFile != NULL ? zipFile : L"";
         CBEditCtrl = NULL;
         DecimalSeparator[0] = '.';
         DecimalSeparator[1] = 0;
@@ -82,7 +83,7 @@ public:
 };
 
 INT_PTR PackDialog(HWND parent, CZipPack* packObject, CConfiguration* config,
-                   CExtendedOptions* packOptions, const char* zipFile, unsigned flags);
+                   CExtendedOptions* packOptions, const wchar_t* zipFile, unsigned flags);
 
 class CConfigDialog : public CDlgRoot
 {
@@ -104,11 +105,11 @@ public:
 class CPasswordDialog : public CDlgRoot
 {
     HICON Lock;
-    const char* File;
+    const wchar_t* File;
     char* Password;
 
 public:
-    CPasswordDialog(HWND parent, const char* file, char* password) : CDlgRoot(parent)
+    CPasswordDialog(HWND parent, const wchar_t* file, char* password) : CDlgRoot(parent)
     {
         File = file;
         Password = password;
@@ -121,18 +122,20 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR PasswordDialog(HWND parent, const char* file, char* password);
+INT_PTR PasswordDialog(HWND parent, const wchar_t* file, char* password);
 
 class CLowDiskSpaceDialog : public CDlgRoot
 {
-    const char* Text;
-    const char* Path;
+    const wchar_t* Text;
+    const wchar_t* Path;
     __INT64 FreeSpace;
     __INT64 VolumeSize;
     int Flags;
 
 public:
-    CLowDiskSpaceDialog(HWND parent, const char* text, const char* path,
+    // W - these reach the controls via SendDlgItemMessage(WM_SETTEXT), which
+    // resolves to the W form under UNICODE, so narrow buffers were being read as UTF-16.
+    CLowDiskSpaceDialog(HWND parent, const wchar_t* text, const wchar_t* path,
                         __INT64 freeSpace, __INT64 volumeSize, int flags) : CDlgRoot(parent)
     {
         Text = text;
@@ -148,15 +151,15 @@ public:
     BOOL OnInit(WPARAM wParam, LPARAM lParam);
 };
 
-INT_PTR LowDiskSpaceDialog(HWND parent, const char* text, const char* path,
+INT_PTR LowDiskSpaceDialog(HWND parent, const wchar_t* text, const wchar_t* path,
                            __INT64 freeSpace, __INT64 volumeSize, int flags);
 
 class CChangeDiskDialog : public CDlgRoot
 {
-    const char* Text;
+    const wchar_t* Text;
 
 public:
-    CChangeDiskDialog(HWND parent, const char* text) : CDlgRoot(parent)
+    CChangeDiskDialog(HWND parent, const wchar_t* text) : CDlgRoot(parent)
     {
         Text = text;
     }
@@ -167,21 +170,19 @@ public:
     BOOL OnInit(WPARAM wParam, LPARAM lParam);
 };
 
-INT_PTR ChangeDiskDialog(HWND parent, const char* text);
+INT_PTR ChangeDiskDialog(HWND parent, const wchar_t* text);
 
 class CChangeDiskDialog2 : public CDlgRoot
 {
     //int     VolumeNumber;
-    char* FileName;
-    CPathBuffer CurrentPath;
+    std::wstring& FileName;
+    std::wstring CurrentPath;
 
 public:
-    CChangeDiskDialog2(HWND parent, /*int volNum,*/ char* fileName) : CDlgRoot(parent)
+    CChangeDiskDialog2(HWND parent, std::wstring& fileName) : CDlgRoot(parent), FileName(fileName)
     {
-        //VolumeNumber = volNumber;
-        FileName = fileName;
-        lstrcpyn(CurrentPath, FileName, CurrentPath.Size());
-        SalamanderGeneral->CutDirectory(CurrentPath);
+        CurrentPath = FileName;
+        SPLCutDirectoryOwned(SalamanderGeneral, CurrentPath);
     }
 
     INT_PTR Proceed();
@@ -192,26 +193,25 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR ChangeDiskDialog2(HWND parent, /*int volNum,*/ char* fileName);
+INT_PTR ChangeDiskDialog2(HWND parent, std::wstring& fileName);
 
 class CChangeDiskDialog3 : public CDlgRoot
 {
     int VolumeNumber;
     bool Last;
-    char* OldName;
+    std::wstring& OldName;
     unsigned* Flags;
-    CPathBuffer CurrentPath;
+    std::wstring CurrentPath;
 
 public:
     CChangeDiskDialog3(HWND parent, int volNum, bool last,
-                       char* fileName, unsigned* flags) : CDlgRoot(parent)
+                       std::wstring& fileName, unsigned* flags) : CDlgRoot(parent), OldName(fileName)
     {
         VolumeNumber = volNum;
         Last = last;
-        OldName = fileName;
         Flags = flags;
-        lstrcpyn(CurrentPath, OldName, CurrentPath.Size());
-        SalamanderGeneral->CutDirectory(CurrentPath);
+        CurrentPath = OldName;
+        SPLCutDirectoryOwned(SalamanderGeneral, CurrentPath);
     }
 
     INT_PTR Proceed();
@@ -225,15 +225,15 @@ public:
 };
 
 INT_PTR ChangeDiskDialog3(HWND parent, int volNum, bool last,
-                          char* fileName, unsigned* flags);
+                          std::wstring& fileName, unsigned* flags);
 
 class COverwriteDialog : public CDlgRoot
 {
-    const char* File;
-    const char* Attr;
+    const wchar_t* File;
+    const wchar_t* Attr;
 
 public:
-    COverwriteDialog(HWND parent, const char* file, const char* attr) : CDlgRoot(parent)
+    COverwriteDialog(HWND parent, const wchar_t* file, const wchar_t* attr) : CDlgRoot(parent)
     {
         File = file;
         Attr = attr;
@@ -245,15 +245,15 @@ public:
     BOOL OnInit(WPARAM wParam, LPARAM lParam);
 };
 
-INT_PTR OverwriteDialog(HWND parent, const char* file, const char* attr);
+INT_PTR OverwriteDialog(HWND parent, const wchar_t* file, const wchar_t* attr);
 
 class COverwriteDialog2 : public CDlgRoot
 {
-    const char* File;
-    const char* Attr;
+    const wchar_t* File;
+    const wchar_t* Attr;
 
 public:
-    COverwriteDialog2(HWND parent, const char* file, const char* attr) : CDlgRoot(parent)
+    COverwriteDialog2(HWND parent, const wchar_t* file, const wchar_t* attr) : CDlgRoot(parent)
     {
         File = file;
         Attr = attr;
@@ -265,7 +265,7 @@ public:
     BOOL OnInit(WPARAM wParam, LPARAM lParam);
 };
 
-INT_PTR OverwriteDialog2(HWND parent, const char* file, const char* attr);
+INT_PTR OverwriteDialog2(HWND parent, const wchar_t* file, const wchar_t* attr);
 
 class CAdvancedSEDialog : public CDlgRoot
 {
@@ -402,15 +402,13 @@ class CCreateSFXDialog : public CDlgRoot
 {
     CZipPack* PackObject; //used in adcanced self-extr settings dialog
     CExtendedOptions* PackOptions;
-    char* ZipName;
-    char* ExeName;
+    std::wstring& ZipName;
+    std::wstring& ExeName;
 
 public:
-    CCreateSFXDialog(HWND parent, char* zipName, char* exeName,
-                     CExtendedOptions* options, CZipPack* packObject) : CDlgRoot(parent)
+    CCreateSFXDialog(HWND parent, std::wstring& zipName, std::wstring& exeName,
+                     CExtendedOptions* options, CZipPack* packObject) : CDlgRoot(parent), ZipName(zipName), ExeName(exeName)
     {
-        ZipName = zipName;
-        ExeName = exeName;
         PackOptions = options;
         PackObject = packObject;
     }
@@ -447,12 +445,16 @@ public:
 
 class CWaitForDialog : public CDlgRoot
 {
-    char* WaitFor;
+    char* EncodedOutput;
+    size_t EncodedCapacity;
+    std::wstring WaitFor;
 
 public:
-    CWaitForDialog(HWND parent, char* waitFor) : CDlgRoot(parent)
+    CWaitForDialog(HWND parent, char* waitFor, size_t waitForCapacity) : CDlgRoot(parent)
     {
-        WaitFor = waitFor;
+        EncodedOutput = waitFor;
+        EncodedCapacity = waitForCapacity;
+        WaitFor = ZipTextToWide(waitFor);
     }
 
     INT_PTR Proceed();
@@ -463,7 +465,7 @@ public:
 };
 
 INT_PTR
-WaitForDialog(HWND parent, char* waitFor);
+WaitForDialog(HWND parent, char* waitFor, size_t waitForCapacity);
 
 class CChangeTextsDialog : public CDlgRoot
 {
@@ -490,6 +492,6 @@ extern CFavoriteSfx LastUsedSfxSet;
 
 int CompareMenuItems(char* name1, char* name2);
 
-BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig);
+BOOL LoadSfxLangs(HWND dlg, const wchar_t* selectedSfxFile, bool isConfig);
 BOOL LoadLangChache(HWND parent);
-int FormatNumber(__UINT64 number, char* buffer, const char* text);
+int FormatNumber(__UINT64 number, wchar_t* buffer, const wchar_t* text);

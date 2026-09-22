@@ -45,3 +45,35 @@ int LoadShellOverlayIcons(const char* iconFile, int iconIndex, const int* sizes,
     }
     return loaded;
 }
+
+// wide: same contract as LoadShellOverlayIcons above (see shiconov_icons.h) - a
+// genuine parallel implementation, not a template, since production calls it with a wide COM
+// result (IShellIconOverlayIdentifier::GetOverlayInfo) that must never be narrowed first.
+int LoadShellOverlayIconsW(const wchar_t* iconFile, int iconIndex, const int* sizes, int sizeCount,
+                           HICON* icons, ShellIconExtractFnW extract)
+{
+    if (icons == NULL || sizes == NULL || sizeCount <= 0)
+        return 0;
+
+    for (int i = 0; i < sizeCount; i++)
+        icons[i] = NULL;
+
+    if (iconFile == NULL || iconFile[0] == 0)
+        return 0;
+
+    if (extract == NULL)
+        extract = &SHDefExtractIconW;
+
+    int loaded = 0;
+    for (int i = 0; i < sizeCount; i++)
+    {
+        HICON hIcon = NULL;
+        if (extract(iconFile, iconIndex, 0, &hIcon, NULL, (UINT)sizes[i]) == S_OK &&
+            hIcon != NULL)
+        {
+            icons[i] = hIcon;
+            loaded++;
+        }
+    }
+    return loaded;
+}

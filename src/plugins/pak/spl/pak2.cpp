@@ -12,32 +12,32 @@
 #include "pak.rh2"
 #include "lang\lang.rh"
 #include "pak.h"
+#include "pak_text.h"
 
-DWORD ComputeDirDepth(const char* fileName)
+DWORD ComputeDirDepth(const wchar_t* fileName)
 {
     CALL_STACK_MESSAGE_NONE
     DWORD ret = 0;
     while (*fileName)
     {
-        if (*fileName++ == '\\')
+        if (*fileName++ == L'\\')
             ret++;
     }
     return ret;
 }
 
-BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& files, BOOL* del, const char* archiveRoot, const char* sourcePath,
+BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& files, BOOL* del, std::string_view archiveRoot, const wchar_t* sourcePath,
                                                 SalEnumSelection2 next, void* nextParam)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::MakeFileList3(, , %s, %s, , )",
-                        archiveRoot, sourcePath);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::MakeFileList3(, , , %ls, , )", sourcePath);
     BOOL isDir;
     CQuadWord nextSize;
-    const char* nextName;
-    char pakName[PAK_MAXPATH];
+    const wchar_t* nextName;
+    std::string pakName;
     DWORD pakSize;
-    CPathBuffer sourName; // Heap-allocated for long path support
+    std::wstring sourName;
     BOOL skip;
-    int errorOccured;
+    int errorOccured = 0;
 
     ProgressTotal = CQuadWord(0, 0);
     *del = FALSE;
@@ -48,13 +48,13 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         skip = FALSE;
         if (isDir)
             continue;
-        lstrcpyn(sourName, sourcePath, sourName.Size());
-        SalamanderGeneral->SalPathAppend(sourName, nextName, sourName.Size());
-        if (lstrlen(archiveRoot) + lstrlen(nextName) + 2 >= PAK_MAXPATH)
+        sourName = sourcePath;
+        SPLSalPathAppendOwned(sourName, nextName);
+        if (JoinPakEntryName(archiveRoot, nextName, pakName) != PakTextStatus::Success)
         {
             if (Silent & SF_LONGNAMES)
                 continue;
-            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, sourName, LoadStr(IDS_TOOLONGNAME2), NULL))
+            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, sourName.c_str(), LangStr(IDS_TOOLONGNAME2).c_str(), NULL))
             {
             case DIALOG_SKIPALL:
                 Silent |= SF_LONGNAMES;
@@ -65,9 +65,7 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
             }
             continue;
         }
-        lstrcpy(pakName, archiveRoot);
-        SalamanderGeneral->SalPathAppend(pakName, nextName, PAK_MAXPATH);
-        if (!PakIFace->FindFile(pakName, &pakSize))
+        if (!PakIFace->FindFile(pakName.c_str(), &pakSize))
             return FALSE;
         if (pakSize != -1 && (Silent & SF_SKIPALL))
             continue;
@@ -75,21 +73,21 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         {
             if (!(Silent & SF_OVEWRITEALL))
             {
-                CPathBuffer name1; // Heap-allocated for long path support
-                char data1[100];
-                char data2[100];
+                std::wstring name1(PakFileName);
+                std::wstring pakNameW;
+                if (DecodePakText(pakName, pakNameW) != PakTextStatus::Success)
+                    return FALSE;
                 FILETIME ft;
 
-                lstrcpy(name1, PakFileName);
-                SalamanderGeneral->SalPathAppend(name1, pakName, name1.Size());
+                SPLSalPathAppendOwned(name1, pakNameW.c_str());
                 PakIFace->GetPakTime(&ft);
-                GetInfo(data1, &ft, pakSize);
+                const std::wstring data1 = GetInfo(&ft, pakSize);
                 HANDLE file;
                 file = INVALID_HANDLE_VALUE;
                 while (file == INVALID_HANDLE_VALUE && !skip)
                 {
-                    file = CreateFile(sourName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                    file = CreateFileW(sourName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (file != INVALID_HANDLE_VALUE)
                         break;
                     if (Silent & SF_IOERRORS)
@@ -97,11 +95,9 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                         skip = TRUE;
                         break;
                     }
-                    char buf[1024];
-                    lstrcpy(buf, LoadStr(IDS_ERROPEN));
-                    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                                  GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
-                    switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, sourName, buf, NULL))
+                    const std::wstring error = LangStr(IDS_ERROPEN) +
+                                               SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
+                    switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, sourName.c_str(), error.c_str(), NULL))
                     {
                     case DIALOG_SKIPALL:
                         Silent |= SF_IOERRORS;
@@ -117,9 +113,9 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                     continue;
                 GetFileTime(file, NULL, NULL, &ft);
                 CloseHandle(file);
-                GetInfo(data2, &ft, (unsigned)nextSize.Value);
+                const std::wstring data2 = GetInfo(&ft, (unsigned)nextSize.Value);
                 // CONFIRM FILE OVERWRITE: filename1+filedata1+filename2+filedata2, buttons yes/all/skip/skip all/cancel
-                switch (SalamanderGeneral->DialogOverwrite(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_YESALLSKIPCANCEL, name1, data1, sourName, data2))
+                switch (SalamanderGeneral->DialogOverwrite(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_YESALLSKIPCANCEL, name1.c_str(), data1.c_str(), sourName.c_str(), data2.c_str()))
                 {
                 case DIALOG_ALL:
                     Silent |= SF_OVEWRITEALL;
@@ -145,7 +141,7 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         {
             if (Silent & SF_LARGE)
                 continue;
-            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, sourName, LoadStr(IDS_TOOLARGE), NULL))
+            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, sourName.c_str(), LangStr(IDS_TOOLARGE).c_str(), NULL))
             {
             case DIALOG_SKIPALL:
                 Silent |= SF_LARGE;
@@ -159,19 +155,17 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         }
         if (skip)
             continue;
-        CFileInfo* f;
-        f = new CFileInfo(sourName, 0, ComputeDirDepth(sourName), (DWORD)nextSize.Value);
-        if (!f || !f->Name)
+        const DWORD dirDepth = ComputeDirDepth(sourName.c_str());
+        CFileInfo* f = NewFileInfo(std::move(sourName), 0, dirDepth, (DWORD)nextSize.Value);
+        if (!f)
         {
-            if (f)
-                delete f;
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
             return FALSE;
         }
         if (!files.Add(f))
         {
             delete f;
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
             return FALSE;
         }
         ProgressTotal += nextSize;
@@ -182,7 +176,7 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
 BOOL CPluginInterfaceForArchiver::DelFilesToBeOverwritten(unsigned* deleted)
 {
     CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::DelFilesToBeOverwritten()");
-    Salamander->ProgressDialogAddText(LoadStr(IDS_DELFILES), TRUE);
+    Salamander->ProgressDialogAddText(LangStr(IDS_DELFILES).c_str(), TRUE);
     unsigned total;
     if (!PakIFace->GetDelProgressTotal(&total))
         return FALSE;
@@ -191,20 +185,18 @@ BOOL CPluginInterfaceForArchiver::DelFilesToBeOverwritten(unsigned* deleted)
     if (!PakIFace->DeleteFiles(&opt))
     {
         if (opt)
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_NEEDOPT), LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_NEEDOPT).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         return FALSE;
     }
     *deleted = total;
     return TRUE;
 }
 
-BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, unsigned deleted, const char* sourPath, const char* archiveRoot)
+BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, unsigned deleted, const wchar_t* sourPath, std::string_view archiveRoot)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::AddFiles(, 0x%X, %s, %s)", deleted,
-                        sourPath, archiveRoot);
+    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::AddFiles(, 0x%X, %ls, )", deleted, sourPath);
     Abort = TRUE;
     CFileInfo* f;
-    CPathBuffer message; // Heap-allocated for long path support
     BOOL skip;
     CQuadWord currentProgress = CQuadWord(deleted, 0);
     int i;
@@ -212,14 +204,13 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
     {
         skip = FALSE;
         f = files[i];
-        lstrcpy(message, LoadStr(IDS_PACKING));
-        lstrcat(message, f->Name);
-        Salamander->ProgressDialogAddText(message, TRUE);
+        const std::wstring message = LangStr(IDS_PACKING) + f->Name;
+        Salamander->ProgressDialogAddText(message.c_str(), TRUE);
         IOFile = INVALID_HANDLE_VALUE;
         while (IOFile == INVALID_HANDLE_VALUE)
         {
-            IOFile = CreateFile(f->Name /* + sourPathLen*/, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+            IOFile = CreateFileW(f->Name.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
             if (IOFile != INVALID_HANDLE_VALUE)
                 break;
             if (Silent & SF_IOERRORS)
@@ -227,11 +218,9 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
                 skip = TRUE;
                 goto l_next;
             }
-            char buf[1024];
-            lstrcpy(buf, LoadStr(IDS_ERROPEN));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                          GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
-            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, f->Name, buf, NULL))
+            const std::wstring error = LangStr(IDS_ERROPEN) +
+                                       SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
+            switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, f->Name.c_str(), error.c_str(), NULL))
             {
             case DIALOG_SKIPALL:
                 Silent |= SF_IOERRORS;
@@ -243,19 +232,28 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
                 return FALSE;
             }
         }
-        IOFileName = f->Name;
+        IOFileName = f->Name.c_str();
         if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
             return FALSE;
         Salamander->ProgressSetTotalSize(CQuadWord(f->Size, 0), ProgressTotal);
         BOOL ret;
-        char pakName[PAK_MAXPATH];
-        lstrcpy(pakName, archiveRoot);
-        char* root;
-        root = f->Name + lstrlen(sourPath);
-        if (*root == '\\')
-            root++;
-        SalamanderGeneral->SalPathAppend(pakName, root, PAK_MAXPATH);
-        ret = PakIFace->AddFile(pakName, f->Size);
+        {
+            std::string pakName;
+            if (f->Name.compare(0, wcslen(sourPath), sourPath) != 0)
+            {
+                CloseHandle(IOFile);
+                return FALSE;
+            }
+            std::wstring rootW = f->Name.substr(wcslen(sourPath));
+            if (!rootW.empty() && rootW[0] == L'\\')
+                rootW.erase(0, 1);
+            if (JoinPakEntryName(archiveRoot, rootW, pakName) != PakTextStatus::Success)
+            {
+                CloseHandle(IOFile);
+                return FALSE;
+            }
+            ret = PakIFace->AddFile(pakName.c_str(), f->Size);
+        }
         CloseHandle(IOFile);
         if (!ret && Abort)
             return FALSE;
@@ -297,13 +295,13 @@ void SortByDirDepth(int left, int right, TIndirectArray2<CFileInfo>& files)
         SortByDirDepth(i, right, files);
 }
 
-void CPluginInterfaceForArchiver::DeleteSourceFiles(TIndirectArray2<CFileInfo>& files, const char* sourcePath)
+void CPluginInterfaceForArchiver::DeleteSourceFiles(TIndirectArray2<CFileInfo>& files, const wchar_t* sourcePath)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::DeleteSourceFiles(, %s)", sourcePath);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::DeleteSourceFiles(, %ls)", sourcePath);
     if (files.Count == 0)
         return;
     CFileInfo* f;
-    CPathBuffer path; // Heap-allocated for long path support
+    std::wstring path;
     SortByDirDepth(0, files.Count - 1, files);
     DWORD sourceDepth = ComputeDirDepth(sourcePath);
 
@@ -313,30 +311,30 @@ void CPluginInterfaceForArchiver::DeleteSourceFiles(TIndirectArray2<CFileInfo>& 
         f = files[i];
         if (f->Status == STATUS_OK)
         {
-            SalamanderGeneral->ClearReadOnlyAttr(f->Name);
-            DeleteFile(f->Name);
-            lstrcpyn(path, f->Name, path.Size());
-            while (ComputeDirDepth(path) > sourceDepth + 1)
+            SalamanderGeneral->ClearReadOnlyAttr(f->Name.c_str());
+            DeleteFileW(f->Name.c_str());
+            path = f->Name;
+            while (ComputeDirDepth(path.c_str()) > sourceDepth + 1)
             {
-                SalamanderGeneral->CutDirectory(path);
-                if (!RemoveDirectory(path))
+                SPLCutDirectoryOwned(SalamanderGeneral, path);
+                if (!RemoveDirectoryW(path.c_str()))
                     break;
             }
         }
     }
 }
 
-BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                                const char* archiveRoot, BOOL move, const char* sourcePath,
+BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                                const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                                                 SalEnumSelection2 next, void* nextParam)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::PackToArchive(, %s, %s, %d, %s, ,)", fileName,
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::PackToArchive(, %ls, %ls, %d, %ls, ,)", fileName,
                         archiveRoot, move, sourcePath);
 
     PakIFace = PAKGetIFace();
     if (!PakIFace)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
 
@@ -347,10 +345,10 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
     CPakCallbacks pakCalls(this);
     PakIFace->Init(&pakCalls);
-    char title[1024];
-    sprintf(title, LoadStr(IDS_ADDPROGTITLE), SalamanderGeneral->SalPathFindFileName(PakFileName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LangStr(IDS_ADDPROGTITLE).c_str(), SalamanderGeneral->SalPathFindFileName(PakFileName));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LangStr(IDS_PREPAREDATA).c_str(), FALSE);
 
     if (!PakIFace->OpenPak(fileName, OP_WRITE_MODE))
         ret = FALSE;
@@ -358,23 +356,32 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
     {
         TIndirectArray2<CFileInfo> files(256);
         BOOL del;
-        const char* arcRoot = archiveRoot ? archiveRoot : "";
-        if (*arcRoot == '\\')
-            arcRoot++;
-        if (!MakeFileList3(files, &del, arcRoot, sourcePath, next, nextParam))
+        std::string arcRootStr;
+        if (EncodePakEntryName(archiveRoot, arcRootStr) != PakTextStatus::Success)
+        {
+            SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_OK,
+                                           archiveRoot, LangStr(IDS_TOOLONGNAME2).c_str(), NULL);
             ret = FALSE;
+        }
         else
         {
-            unsigned deleted;
-            if (del && !DelFilesToBeOverwritten(&deleted))
+            std::string_view arcRoot(arcRootStr);
+            if (!arcRoot.empty() && arcRoot.front() == '\\')
+                arcRoot.remove_prefix(1);
+            if (!MakeFileList3(files, &del, arcRoot, sourcePath, next, nextParam))
+            {
                 ret = FALSE;
-            else
+            }
+            unsigned deleted = 0;
+            if (ret && del && !DelFilesToBeOverwritten(&deleted))
+                ret = FALSE;
+            else if (ret)
             {
                 if (!PakIFace->StartAdding(files.Count))
                     ret = FALSE;
                 else
                 {
-                    Salamander->ProgressDialogAddText(LoadStr(IDS_ADDFILES), TRUE);
+                    Salamander->ProgressDialogAddText(LangStr(IDS_ADDFILES).c_str(), TRUE);
                     if (!AddFiles(files, deleted, sourcePath, arcRoot))
                         ret = FALSE;
                     ret = PakIFace->FinalizeAdding() && ret;
@@ -392,31 +399,30 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
     return ret;
 }
 
-BOOL CPluginInterfaceForArchiver::DeleteFiles(const char* archiveRoot, SalEnumSelection next, void* nextParam)
+BOOL CPluginInterfaceForArchiver::DeleteFiles(std::string_view archiveRoot, SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::DeleteFiles(%s, , )", archiveRoot);
-    const char* nextName;
-    char nextFull[PAK_MAXPATH];
-    int len;
+    CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::DeleteFiles(, , )");
+    const wchar_t* nextName;
+    std::string nextFull;
     BOOL isDir;
-    char file[PAK_MAXPATH];
+    std::string file;
     DWORD size;
     unsigned total;
 
-    const char* arcRoot = archiveRoot ? archiveRoot : "";
-    if (*arcRoot == '\\')
-        arcRoot++;
+    if (!archiveRoot.empty() && archiveRoot.front() == '\\')
+        archiveRoot.remove_prefix(1);
 
     while ((nextName = next(NULL, 0, &isDir, NULL, NULL, nextParam, NULL)) != NULL)
     {
-        lstrcpy(nextFull, arcRoot);
-        SalamanderGeneral->SalPathAppend(nextFull, nextName, PAK_MAXPATH);
-        len = lstrlen(nextFull);
-        if (!PakIFace->GetFirstFile(file, &size))
+        if (JoinPakEntryName(archiveRoot, nextName, nextFull) != PakTextStatus::Success)
             return FALSE;
-        while (*file)
+        const int len = static_cast<int>(nextFull.size());
+        if (!ReadFirstPakEntry(PakIFace, file, size))
+            return FALSE;
+        while (!file.empty())
         {
-            if (CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, nextFull, len, file, len) == CSTR_EQUAL &&
+            if (file.size() >= nextFull.size() &&
+                CompareStringA(LOCALE_USER_DEFAULT, NORM_IGNORECASE, nextFull.c_str(), len, file.c_str(), len) == CSTR_EQUAL &&
                 (file[len] == 0 || file[len] == '\\'))
             {
                 if (!PakIFace->MarkForDelete())
@@ -424,11 +430,11 @@ BOOL CPluginInterfaceForArchiver::DeleteFiles(const char* archiveRoot, SalEnumSe
                 if (!isDir)
                     break;
             }
-            if (!PakIFace->GetNextFile(file, &size))
+            if (!ReadNextPakEntry(PakIFace, file, size))
                 return FALSE;
         }
     }
-    Salamander->ProgressDialogAddText(LoadStr(IDS_DELFILES), TRUE);
+    Salamander->ProgressDialogAddText(LangStr(IDS_DELFILES).c_str(), TRUE);
     if (!PakIFace->GetDelProgressTotal(&total))
         return FALSE;
     ProgressTotal = CQuadWord(total, 0);
@@ -436,22 +442,22 @@ BOOL CPluginInterfaceForArchiver::DeleteFiles(const char* archiveRoot, SalEnumSe
     if (!PakIFace->DeleteFiles(&opt))
     {
         if (opt)
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_NEEDOPT), LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_NEEDOPT).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         return FALSE;
     }
     return TRUE;
 }
 
-BOOL CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                                    CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+BOOL CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                                    CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                                     SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteFromArchive(, %s, , %s, ,)", fileName, archiveRoot);
+    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteFromArchive(, %ls, , %ls, ,)", fileName, archiveRoot);
 
     PakIFace = PAKGetIFace();
     if (!PakIFace)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
 
@@ -461,17 +467,19 @@ BOOL CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbst
 
     CPakCallbacks pakCalls(this);
     PakIFace->Init(&pakCalls);
-    char title[1024];
-    sprintf(title, LoadStr(IDS_DELPROGTITLE), SalamanderGeneral->SalPathFindFileName(PakFileName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LangStr(IDS_DELPROGTITLE).c_str(), SalamanderGeneral->SalPathFindFileName(PakFileName));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LangStr(IDS_PREPAREDATA).c_str(), FALSE);
 
     if (!PakIFace->OpenPak(fileName, OP_WRITE_MODE))
         ret = FALSE;
     else
     {
-        Salamander->ProgressDialogAddText(LoadStr(IDS_EXTRACTFILES), FALSE);
-        if (!DeleteFiles(archiveRoot, next, nextParam))
+        Salamander->ProgressDialogAddText(LangStr(IDS_EXTRACTFILES).c_str(), FALSE);
+        std::string arcRootStr;
+        if (EncodePakEntryName(archiveRoot, arcRootStr) != PakTextStatus::Success ||
+            !DeleteFiles(arcRootStr, next, nextParam))
             ret = FALSE;
         PakIFace->ClosePak();
     }
@@ -486,41 +494,50 @@ BOOL CPakCallbacks::DelNotify(const char* fileName, unsigned fileProgressTotal)
 {
     CALL_STACK_MESSAGE3("CPakCallbacks::DelNotify(%s, 0x%X)", fileName,
                         fileProgressTotal);
-    char message[PAK_MAXPATH + 32];
-    lstrcpy(message, LoadStr(IDS_DELETING));
-    lstrcat(message, fileName);
-    Plugin->Salamander->ProgressDialogAddText(message, TRUE);
-    if (!Plugin->Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
+    try
     {
-        Plugin->Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING), FALSE);
-        Plugin->Salamander->ProgressEnableCancel(FALSE);
+        std::wstring decoded;
+        if (fileName == nullptr ||
+            DecodePakText(fileName, decoded) != PakTextStatus::Success)
+            return FALSE;
+        const std::wstring message = LangStr(IDS_DELETING) + decoded;
+        Plugin->Salamander->ProgressDialogAddText(message.c_str(), TRUE);
+        if (!Plugin->Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
+        {
+            Plugin->Salamander->ProgressDialogAddText(LangStr(IDS_CANCELING).c_str(), FALSE);
+            Plugin->Salamander->ProgressEnableCancel(FALSE);
+            return FALSE;
+        }
+        Plugin->Salamander->ProgressSetTotalSize(CQuadWord(fileProgressTotal, 0), Plugin->ProgressTotal);
+        return TRUE;
+    }
+    catch (...)
+    {
         return FALSE;
     }
-    Plugin->Salamander->ProgressSetTotalSize(CQuadWord(fileProgressTotal, 0), Plugin->ProgressTotal);
-    return TRUE;
 }
 
 BOOL CPakCallbacks::Read(void* buffer, DWORD size)
 {
     CALL_STACK_MESSAGE2("CPakCallbacks::Read(, 0x%X)", size);
+    try
+    {
     if (size == 0)
         return TRUE;
-    char buf[1024];
     DWORD pos;
     while (1)
     {
         pos = SetFilePointer(Plugin->IOFile, 0, NULL, FILE_CURRENT);
         if (pos != 0xFFFFFFFF)
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+        const std::wstring message = LangStr(IDS_UNABLEGETFIELPOS) +
+                                     SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
             return FALSE;
         }
-        switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, Plugin->IOFileName, buf, NULL))
+        switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, Plugin->IOFileName, message.c_str(), NULL))
         {
         case DIALOG_SKIPALL:
             Plugin->Silent |= SF_IOERRORS;
@@ -537,15 +554,14 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
     {
         if (ReadFile(Plugin->IOFile, buffer, size, &read, NULL) && size == read)
             return TRUE;
-        lstrcpy(buf, LoadStr(IDS_UNABLEREAD));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+        const std::wstring message = LangStr(IDS_UNABLEREAD) +
+                                     SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
             return FALSE;
         }
-        switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, Plugin->IOFileName, buf, NULL))
+        switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, Plugin->IOFileName, message.c_str(), NULL))
         {
         case DIALOG_SKIPALL:
             Plugin->Silent |= SF_IOERRORS;
@@ -559,7 +575,12 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
         if (!SafeSeek(pos))
             return FALSE;
     }
-    return TRUE;
+    }
+    catch (...)
+    {
+        Plugin->Abort = FALSE;
+        return FALSE;
+    }
 }
 
 DWORD
@@ -588,27 +609,27 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_SOURCE); // we treat this command as working with the path (it appears in Alt+F12)
 
-    CPathBuffer pakFile; // Heap-allocated for long path support
-    char* fileName;
-    char* arch;
+    std::wstring pakFile;
+    size_t archiveOffset = std::wstring::npos;
     BOOL selFiles = FALSE;
     int index = 0;
 
     InterfaceForArchiver.Salamander = salamander;
-    if (!SalamanderGeneral->GetPanelPath(PANEL_SOURCE, pakFile, pakFile.Size(), NULL, &arch))
+    if (!SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, pakFile, NULL, &archiveOffset))
         return FALSE;
 
-    if (!arch)
+    const BOOL panelShowsArchive = archiveOffset != std::wstring::npos;
+    std::wstring diskDirectory;
+    if (!panelShowsArchive)
     {
-        SalamanderGeneral->SalPathAddBackslash(pakFile, pakFile.Size());
-        fileName = pakFile.Get() + lstrlen(pakFile);
+        diskDirectory = pakFile;
         selFiles = eventMask & MENU_EVENT_FILES_SELECTED;
     }
 
     InterfaceForArchiver.PakIFace = PAKGetIFace();
     if (!InterfaceForArchiver.PakIFace)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     CPakCallbacks pakCalls(&InterfaceForArchiver);
@@ -617,9 +638,9 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     BOOL changesReported = FALSE; // helper variable - TRUE if path changes have already been reported
     do
     {
-        if (arch)
+        if (panelShowsArchive)
         {
-            *arch = NULL;
+            pakFile.resize(archiveOffset);
         }
         else
         {
@@ -630,15 +651,16 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 fileData = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
             if (!fileData)
                 break; // end of enumeration, or an error (in the case of GetFocusedItem)
-            lstrcpy(fileName, fileData->Name);
-            DWORD attr = SalamanderGeneral->SalGetFileAttributes(pakFile);
+            pakFile = diskDirectory;
+            SPLSalPathAppendOwned(pakFile, fileData->Name);
+            DWORD attr = SalamanderGeneral->SalGetFileAttributes(pakFile.c_str());
             if (attr != 0xFFFFFFFF && attr & FILE_ATTRIBUTE_DIRECTORY)
                 continue;
         }
 
-        InterfaceForArchiver.PakFileName = pakFile;
+        InterfaceForArchiver.PakFileName = pakFile.c_str();
 
-        if (InterfaceForArchiver.PakIFace->OpenPak(pakFile, OP_WRITE_MODE))
+        if (InterfaceForArchiver.PakIFace->OpenPak(pakFile.c_str(), OP_WRITE_MODE))
         {
             COptDlgData dlgData;
             InterfaceForArchiver.PakIFace->GetOptimizedState(&dlgData.PakSize, &dlgData.ValData);
@@ -648,10 +670,11 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 unsigned progress;
                 if (InterfaceForArchiver.PakIFace->InitOptimalization(&progress))
                 {
-                    char title[1024];
-                    sprintf(title, LoadStr(IDS_OPTPROGTITLE), SalamanderGeneral->SalPathFindFileName(pakFile));
-                    InterfaceForArchiver.Salamander->OpenProgressDialog(title, FALSE, NULL, FALSE);
-                    InterfaceForArchiver.Salamander->ProgressDialogAddText(LoadStr(IDS_OPTIMIZING), FALSE);
+                    const std::wstring title = SPLFormatStringOwned(
+                        LangStr(IDS_OPTPROGTITLE).c_str(),
+                        SalamanderGeneral->SalPathFindFileName(pakFile.c_str()));
+                    InterfaceForArchiver.Salamander->OpenProgressDialog(title.c_str(), FALSE, NULL, FALSE);
+                    InterfaceForArchiver.Salamander->ProgressDialogAddText(LangStr(IDS_OPTIMIZING).c_str(), FALSE);
                     InterfaceForArchiver.Salamander->ProgressSetTotalSize(CQuadWord(progress, 0), CQuadWord(-1, -1));
                     InterfaceForArchiver.PakIFace->OptimizePak();
                     InterfaceForArchiver.Salamander->CloseProgressDialog();
@@ -662,10 +685,9 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                     changesReported = TRUE;
                     // announce the change on the path where the modified PAK files reside (the notification happens after leaving
                     // the plugin code - after returning from this method)
-                    CPathBuffer pakFileDir; // Heap-allocated for long path support
-                    lstrcpyn(pakFileDir, pakFile, pakFileDir.Size());
-                    SalamanderGeneral->CutDirectory(pakFileDir); // must work, because it is an existing file
-                    SalamanderGeneral->PostChangeOnPathNotification(pakFileDir, FALSE);
+                    std::wstring pakFileDir = pakFile;
+                    SPLCutDirectoryOwned(SalamanderGeneral, pakFileDir); // must work, because it is an existing file
+                    SalamanderGeneral->PostChangeOnPathNotification(pakFileDir.c_str(), FALSE);
                 }
             }
             InterfaceForArchiver.PakIFace->ClosePak();
@@ -693,20 +715,18 @@ CPluginInterfaceForMenuExt::HelpForMenuItem(HWND parent, int id)
     return helpID != 0;
 }
 
-char* PrintDiskSize(char* buf, CQuadWord size)
+std::wstring PrintDiskSizeOwned(CQuadWord size)
 {
     CALL_STACK_MESSAGE2("PrintDiskSize(, %g)", size.GetDouble());
-    buf[0] = 0;
-
-    char num[50];
-    sprintf(buf, "%s bytes", SalamanderGeneral->NumberToStr(num, size));
-    char* s = NULL;
+    std::wstring result = SPLNumberToStrOwned(SalamanderGeneral, size);
+    result += L" bytes";
     if (size.GetDouble() >= 1023.5)
     {
-        char num2[100];
-        sprintf(buf + lstrlen(buf), " (%s)", SalamanderGeneral->PrintDiskSize(num2, size, 0));
+        result += L" (";
+        result += SPLPrintDiskSizeOwned(SalamanderGeneral, size, 0);
+        result += L')';
     }
-    return buf;
+    return result;
 }
 
 INT_PTR WINAPI OptimizeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -723,10 +743,21 @@ INT_PTR WINAPI OptimizeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
             EnableWindow(GetDlgItem(hDlg, IDOK), FALSE);
             SendMessage(hDlg, DM_SETDEFID, IDCANCEL, 0);
         }
-        char buf[100];
-        SetDlgItemText(hDlg, IDC_VALIDSIZE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->ValData, 0)));
-        SetDlgItemText(hDlg, IDC_TOTALSIZE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->PakSize, 0)));
-        SetDlgItemText(hDlg, IDC_WASTEDSPACE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->PakSize - ((COptDlgData*)lParam)->ValData, 0)));
+        try
+        {
+            const COptDlgData* data = reinterpret_cast<const COptDlgData*>(lParam);
+            const std::wstring validSize = PrintDiskSizeOwned(CQuadWord(data->ValData, 0));
+            const std::wstring totalSize = PrintDiskSizeOwned(CQuadWord(data->PakSize, 0));
+            const std::wstring wastedSpace = PrintDiskSizeOwned(CQuadWord(data->PakSize - data->ValData, 0));
+            SetDlgItemTextW(hDlg, IDC_VALIDSIZE, validSize.c_str());
+            SetDlgItemTextW(hDlg, IDC_TOTALSIZE, totalSize.c_str());
+            SetDlgItemTextW(hDlg, IDC_WASTEDSPACE, wastedSpace.c_str());
+        }
+        catch (...)
+        {
+            EndDialog(hDlg, IDCANCEL);
+            return FALSE;
+        }
 
         HWND hParent = GetParent(hDlg);
         if (hParent != NULL)

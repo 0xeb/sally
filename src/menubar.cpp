@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -196,7 +196,7 @@ void CMenuBar::DrawItem(HDC hDC, int index, int x)
     r.bottom = Height - 1;
 
     // output the text
-    const char* string = item->String;
+    const wchar_t* string = item->String;
     int stringLen = item->ColumnL1Len;
 
     // fill the stripe above and below (for Windows Vista rebar)
@@ -222,7 +222,7 @@ void CMenuBar::DrawItem(HDC hDC, int index, int x)
     DWORD dtFlags = DT_LEFT | DT_SINGLELINE | DT_NOCLIP;
     if ((UIState & UISF_HIDEACCEL) && !ForceAccelVisible)
         dtFlags |= DT_HIDEPREFIX;
-    DrawText(hDC, string, stringLen, &r, dtFlags);
+    DrawTextW(hDC, string, stringLen, &r, dtFlags);
 
     //  TRACE_I("DrawText "<<string<<" selected:"<< (HotIndex == index && !Closing));
 }
@@ -285,8 +285,8 @@ void CMenuBar::RefreshMinWidths()
         r.top = 0;
         r.right = 0;
         r.bottom = 0;
-        DrawText(hDC, item->String, item->ColumnL1Len,
-                 &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
+        DrawTextW(hDC, item->String, item->ColumnL1Len,
+                  &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         item->MinWidth = r.right;
     }
     SelectObject(hDC, hOldFont);
@@ -386,7 +386,12 @@ void CMenuBar::EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse)
             leaveLoop = TRUE;
             continue;
         }
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) != 0)
+        // Deliberately still the A form, unlike the popup's pump. This loop only runs
+        // while no popup is open - TrackHotIndex() above blocks inside
+        // CMenuPopup::TrackInternal, which pumps with PeekMessageW for the duration -
+        // so the WM_CHAR seen here is aimed at the menu bar itself, whose text is
+        // Sally's own localized resource text and is exact in CP_ACP by construction.
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE) != 0)
         {
             //      TRACE_I("MenuLoop msg=0x"<<hex<<msg.message<<" wParam=0x"<<msg.wParam<<" lParam=0x"<<msg.lParam);
             switch (msg.message)
@@ -401,7 +406,7 @@ void CMenuBar::EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse)
             {
                 if (!HotIndexIsTracked)
                 {
-                    BOOL found = HotKeyIndexLookup((char)msg.wParam, index);
+                    BOOL found = HotKeyIndexLookup((wchar_t)msg.wParam, index);
                     if (found)
                     {
                         if (index != HotIndex)
@@ -550,7 +555,7 @@ void CMenuBar::EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse)
             }
 
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
         else
         {
@@ -688,14 +693,14 @@ void CMenuBar::TrackHotIndex()
     //  TRACE_I("CMenuBar::TrackHotIndex end");
 }
 
-BOOL CMenuBar::HotKeyIndexLookup(char hotKey, int& itemIndex)
+BOOL CMenuBar::HotKeyIndexLookup(wchar_t hotKey, int& itemIndex)
 {
     CALL_STACK_MESSAGE3("CMenuBar::HotKeyIndexLookup(%u, %d)", hotKey, itemIndex);
     int i;
     for (i = 0; i < Menu->Items.Count; i++)
     {
-        const char* found = NULL;
-        const char* s = Menu->Items[i]->String;
+        const wchar_t* found = NULL;
+        const wchar_t* s = Menu->Items[i]->String;
         while (*s != 0)
         {
             if (*s == '&')
@@ -800,7 +805,7 @@ BOOL CMenuBar::IsMenuBarMessage(CONST MSG* lpMsg)
     case WM_SYSCHAR:
     {
         int index;
-        BOOL found = HotKeyIndexLookup((char)lpMsg->wParam, index);
+        BOOL found = HotKeyIndexLookup((wchar_t)lpMsg->wParam, index);
         if (found)
         {
             if ((UIState & UISF_HIDEACCEL) && !ForceAccelVisible)

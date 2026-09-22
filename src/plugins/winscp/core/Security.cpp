@@ -9,6 +9,7 @@
 //---------------------------------------------------------------------------
 #define PWALG_SIMPLE_INTERNAL 0x00
 #define PWALG_SIMPLE_EXTERNAL 0x01
+#define PWALG_SIMPLE_EXTERNAL_V108 0x02
 //---------------------------------------------------------------------------
 AnsiString SimpleEncryptChar(unsigned char Ch)
 {
@@ -77,23 +78,30 @@ AnsiString DecryptPassword(AnsiString Password, AnsiString Key, Integer /* Algor
   return Result;
 }
 //---------------------------------------------------------------------------
-AnsiString SetExternalEncryptedPassword(AnsiString Password)
+AnsiString SetExternalEncryptedPassword(AnsiString Password, bool HasPasswordManagerSignature)
 {
   AnsiString Result;
   Result += SimpleEncryptChar((Char)PWALG_SIMPLE_FLAG);
-  Result += SimpleEncryptChar((Char)PWALG_SIMPLE_EXTERNAL);
+  Result += SimpleEncryptChar((Char)(HasPasswordManagerSignature ?
+    PWALG_SIMPLE_EXTERNAL_V108 : PWALG_SIMPLE_EXTERNAL));
   Result += StrToHex(Password);
   return Result;
 }
 //---------------------------------------------------------------------------
-bool GetExternalEncryptedPassword(AnsiString Encrypted, AnsiString & Password)
+bool GetExternalEncryptedPassword(AnsiString Encrypted, AnsiString & Password,
+  bool * HasPasswordManagerSignature)
 {
-  bool Result =
-    (SimpleDecryptNextChar(Encrypted) == PWALG_SIMPLE_FLAG) &&
-    (SimpleDecryptNextChar(Encrypted) == PWALG_SIMPLE_EXTERNAL);
+  if (HasPasswordManagerSignature != NULL)
+    *HasPasswordManagerSignature = false;
+  bool Result = (SimpleDecryptNextChar(Encrypted) == PWALG_SIMPLE_FLAG);
+  Char Kind = Result ? SimpleDecryptNextChar(Encrypted) : 0;
+  Result = Result && (Kind == PWALG_SIMPLE_EXTERNAL ||
+                      Kind == PWALG_SIMPLE_EXTERNAL_V108);
   if (Result)
   {
     Password = HexToStr(Encrypted);
+    if (HasPasswordManagerSignature != NULL)
+      *HasPasswordManagerSignature = (Kind == PWALG_SIMPLE_EXTERNAL_V108);
   }
   return Result;
 }

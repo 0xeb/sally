@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "ftp_command_builder.h"
+
 // ***************************************************************************
 // functions:
 
@@ -11,6 +13,9 @@
 // 'buf'+'bufSize' is the output buffer; 'txt'+'size' is the input string
 // returns 'buf'
 char* CopyStr(char* buf, int bufSize, const char* txt, int size);
+// Copies a bounded FTP reply and normalizes bare LF to CRLF. On failure the
+// destination is empty; partial or stale reply text is never published.
+BOOL CopyStr(std::string& output, const char* text, int size) noexcept;
 
 // helper function for decomposing a string with initial FTP commands (separated by ';')
 // into individual commands; returns TRUE if another command is available (the
@@ -18,45 +23,14 @@ char* CopyStr(char* buf, int bufSize, const char* txt, int size);
 // the start of the string and leave it unchanged between calls to GetToken
 BOOL GetToken(char** s, char** next);
 
-// command codes for PrepareFTPCommand (parameters in [] are passed through the ellipsis)
-enum CFtpCmdCode
-{
-    ftpcmdQuit,              // [] - logout from FTP server
-    ftpcmdSystem,            // [] - determine the operating system on the server (may be just a simulation)
-    ftpcmdAbort,             // [] - abort the command currently being executed
-    ftpcmdPrintWorkingPath,  // [] - get the working (current) directory on the FTP server
-    ftpcmdChangeWorkingPath, // [char *path] - change the working directory on the FTP server
-    ftpcmdSetTransferMode,   // [BOOL ascii] - set the transfer mode (ASCII/BINARY(IMAGE))
-    ftpcmdPassive,           // [] - request the server to use "listen" for the data connection (the client establishes the data connection)
-    ftpcmdSetPort,           // [DWORD IP, unsigned short port] - set the IP and port for the data connection on the server
-    ftpcmdNoOperation,       // [] - keep-alive command "no operation"
-    ftpcmdDeleteFile,        // [char *filename] - delete the file 'filename'
-    ftpcmdDeleteDir,         // [char *dirname] - delete the directory 'dirname'
-    ftpcmdChangeAttrs,       // [int newAttr, char *name] - change the attributes (mode) of the file/directory 'name' to 'newAttr'
-    ftpcmdChangeAttrsQuoted, // [int newAttr, char *nameToQuotes (insert '\\' before every '"' character in the name)] - change the attributes (mode) of the file/directory 'name' to 'newAttr' - the file/directory name is in quotation marks (Linux FTP requires this for names with spaces)
-    ftpcmdRestartTransfer,   // [char *number] - REST command (resume / restart transfer)
-    ftpcmdRetrieveFile,      // [char *filename] - download the file 'filename'
-    ftpcmdCreateDir,         // [char *path] - create the directory 'path'
-    ftpcmdRenameFrom,        // [char *fromName] - start renaming ("rename from")
-    ftpcmdRenameTo,          // [char *newName] - finish renaming ("rename to")
-    ftpcmdStoreFile,         // [char *filename] - upload the file 'filename'
-    ftpcmdGetSize,           // [char *filename] - get the size of the file (may also be a link to a file)
-    ftpcmdAppendFile,        // [char *filename] - upload: append the file 'filename'
-};
-
-// prepares the text of a command for the FTP server (including CRLF at the end), returns TRUE
-// if the command fits into the buffer 'buf' (with the size 'bufSize'); 'ftpCmd'
-// is the command code (see CFtpCmdCode); if 'cmdLen' is not NULL, it returns the length
-// of the prepared command text (it is always null-terminated at the end);
-// 'logBuf' with the length 'logBufSize' will contain a version of the command suitable for
-// the log file (passwords replaced with asterisks, etc.) - this is a null-terminated string
-BOOL PrepareFTPCommand(char* buf, int bufSize, char* logBuf, int logBufSize,
-                       CFtpCmdCode ftpCmd, int* cmdLen, ...);
-
-// helper function for preparing error texts
-const char* GetFatalErrorTxt(int fatalErrorTextID, char* errBuf);
-// helper function for preparing error texts
-const char* GetOperationFatalErrorTxt(int opFatalError, char* errBuf);
+// Helpers for preparing dynamically owned encoded error text.
+BOOL GetFatalErrorText(int fatalErrorTextID, const std::string& directErrorText,
+                       std::string& errorText) noexcept;
+BOOL GetOperationFatalErrorText(int opFatalError, const std::string& directErrorText,
+                                std::string& errorText) noexcept;
+void TrimLineEnds(std::string& text) noexcept;
+BOOL GetLocaleDateTimePart(const SYSTEMTIME& time, BOOL date,
+                           std::string& text) noexcept;
 
 // ****************************************************************************
 // macros:
@@ -143,6 +117,32 @@ struct CDynString
     const char* GetString() const { return Buffer; }
 };
 
+struct CDynStringW
+{
+    wchar_t* Buffer;
+    int Length;
+    int Allocated;
+
+    CDynStringW() : Buffer(NULL), Length(0), Allocated(0) {}
+
+    ~CDynStringW()
+    {
+        if (Buffer != NULL)
+            free(Buffer);
+    }
+
+    void Clear()
+    {
+        Length = 0;
+        if (Buffer != NULL)
+            Buffer[0] = 0;
+    }
+
+    BOOL Append(const wchar_t* str, int len);
+    void TrimToUtf8Size(DWORD maxBytes, int* skippedChars, int* skippedLines);
+    const wchar_t* GetString() const { return Buffer != NULL ? Buffer : L""; }
+};
+
 //
 // ****************************************************************************
 // CLogs
@@ -160,9 +160,10 @@ protected:
 
     // log identification:
     int UID;             // unique log number (value -1 is reserved for "invalid UID")
-    char* Host;          // server address
+    std::wstring Host;   // semantic server address
     unsigned short Port; // port used on the server
-    char* User;          // user name
+    std::wstring User;   // semantic user name
+    BOOL Valid;          // dynamic identity conversion/allocation succeeded
 
     BOOL CtrlConOrWorker; // TRUE/FALSE = logging the "control connection" from the panel / from a worker
     BOOL WorkerIsAlive;   // TRUE/FALSE = the worker exists / no longer exists
@@ -172,19 +173,19 @@ protected:
     BOOL Connected;    // TRUE/FALSE == active/inactive "control connection" (panel and worker)
     int DisconnectNum; // if (CtrlCon==NULL && !WorkerIsAlive), holds the number describing how old the dead log is (so that we always delete starting from the longest dead log)
 
-    CDynString Text;  // the actual log text
+    CDynStringW Text; // the actual log text, UTF-16; byte limits are measured as exported UTF-8
     int SkippedChars; // number of skipped characters since the last output to the edit window in Logs
     int SkippedLines; // number of skipped lines since the last output to the edit window in Logs
 
 protected:
-    CLogData(const char* host, unsigned short port, const char* user,
-             CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker);
+    CLogData(const wchar_t* host, unsigned short port, const wchar_t* user,
+             CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker) noexcept;
     ~CLogData();
 
-    BOOL IsGood() { return Host != NULL && User != NULL; }
+    BOOL IsGood() { return Valid; }
 
-    // change user; returns TRUE on success (on failure leaves an empty string in User)
-    BOOL ChangeUser(const char* user);
+    // change user transactionally; allocation failure preserves the prior identity
+    BOOL ChangeUser(const wchar_t* user) noexcept;
 
     friend class CLogs;
     friend TIndirectArray<CLogData>;
@@ -218,7 +219,7 @@ public:
 
     // creates a new log; returns TRUE on success and writes the new log's UID into 'uid' (must not be NULL);
     // WARNING: does not take Config.EnableLogging into account
-    BOOL CreateLog(int* uid, const char* host, unsigned short port, const char* user,
+    BOOL CreateLog(int* uid, const wchar_t* host, unsigned short port, const wchar_t* user,
                    CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker);
 
     // sets CLogData::Connected to 'isConnected' in the log with UID=='uid'
@@ -229,13 +230,14 @@ public:
     BOOL ClosingConnection(int uid);
 
     // changes the user name (this can happen during connection); returns TRUE on success
-    BOOL ChangeUser(int uid, const char* user);
+    BOOL ChangeUser(int uid, const wchar_t* user);
 
-    // adds the text 'str' (length 'len') to the log with UID=='uid'; if 'uid' is -1 ("invalid UID")
-    // nothing is logged; if 'len' is -1, it uses "len=strlen(str)"; if 'addTimeToLog' is TRUE, the
-    // current time is placed before the message; returns TRUE when the text is added to the log or
-    // when 'uid' is -1
+    // UTF-16 is the log's authoritative text. The narrow overload is a temporary ingress adapter
+    // for callers that still own protocol/local byte buffers.
+    BOOL LogMessage(int uid, const wchar_t* str, int len, BOOL addTimeToLog = FALSE);
     BOOL LogMessage(int uid, const char* str, int len, BOOL addTimeToLog = FALSE);
+    BOOL LogServerMessage(int uid, const char* str, int len, const CFtpSessionTextPolicy& policy,
+                          BOOL addTimeToLog = FALSE);
 
     // returns TRUE if the log with UID=='uid' is in the log array (therefore the log can be viewed
     // in the Logs dialog)
@@ -277,16 +279,16 @@ public:
 
     // saves the log to a file (letting the user choose); 'itemName' is the log name; 'uid' is the
     // log UID
-    void SaveLog(HWND parent, const char* itemName, int uid);
+    void SaveLog(HWND parent, const wchar_t* itemName, int uid);
 
     // copies the log to the clipboard; 'itemName' is the log name; 'uid' is the log UID
-    void CopyLog(HWND parent, const char* itemName, int uid);
+    void CopyLog(HWND parent, const wchar_t* itemName, int uid);
 
     // clears the log text; 'itemName' is the log name; 'uid' is the log UID
-    void ClearLog(HWND parent, const char* itemName, int uid);
+    void ClearLog(HWND parent, const wchar_t* itemName, int uid);
 
     // removes the log; 'itemName' is the log name; 'uid' is the log UID
-    void RemoveLog(HWND parent, const char* itemName, int uid);
+    void RemoveLog(HWND parent, const wchar_t* itemName, int uid);
 
     // saves all logs to a file (letting the user choose)
     void SaveAllLogs(HWND parent);
@@ -320,30 +322,40 @@ struct CListingCacheItem
 {
 public:
     // connection parameters for the server:
-    char* Host;          // host address (must not be NULL)
+    std::wstring Host;   // semantic host address
     unsigned short Port; // port on which the FTP server runs
-    char* User;          // user name, NULL == anonymous
-    int UserLength;      // optimization-only variable: length of 'User' if it contains "forbidden" characters (if 'User==NULL',
-                         // this is zero)
+    std::wstring User;   // semantic user name
+    BOOL Anonymous;      // TRUE when the omitted user denotes an anonymous connection
+    int UserLength;      // optimization-only WCHAR length when User contains path-significant characters
+    BOOL Valid;
 
-    char* Path;                  // cached path (local on the server)
+    std::string Path;            // cached path in encoded server-session bytes
+    std::wstring PathText;       // decoded semantic path used by W notifications
+    BOOL PathTextValid;          // FALSE if the server bytes cannot be decoded exactly
     CFTPServerPathType PathType; // type of the cached path
 
-    char* ListCmd; // command that retrieved the listing (a different command may produce a different listing)
+    std::string ListCmd; // encoded FTP command bytes that retrieved the listing
     BOOL IsFTPS;   // TRUE = FTPS, FALSE = FTP
 
-    char* CachedListing;          // listing of the cached path
-    int CachedListingLen;         // length of the listing of the cached path
+    std::string CachedListing;    // explicitly encoded listing bytes for the cached path
     CFTPDate CachedListingDate;   // date when the listing was created (needed to evaluate "year_or_time" correctly)
     DWORD CachedListingStartTime; // IncListingCounter() value at the moment the "LIST" command was sent to obtain this listing
 
-    CListingCacheItem(const char* host, unsigned short port, const char* user, const char* path,
-                      const char* listCmd, BOOL isFTPS, const char* cachedListing, int cachedListingLen,
+    CListingCacheItem(const wchar_t* host, unsigned short port, const wchar_t* user, const char* path,
+                      const CFtpTextCodec& textCodec, const char* listCmd, BOOL isFTPS,
+                      std::string_view cachedListing,
                       const CFTPDate& cachedListingDate, DWORD cachedListingStartTime,
                       CFTPServerPathType pathType);
     ~CListingCacheItem();
 
-    BOOL IsGood() { return Host != NULL; }
+    BOOL IsGood() { return Valid; }
+};
+
+enum class CListingCacheLookupStatus
+{
+    NotFound,
+    Found,
+    LowMemory,
 };
 
 class CListingCache
@@ -357,30 +369,25 @@ public:
     CListingCache();
     ~CListingCache();
 
-    // returns TRUE if a usable listing of the path 'path' (of type 'pathType') is available on the
-    // server 'host', where user 'user' is connected on port 'port'; the listing is returned in the
-    // allocated string 'cachedListing' (must not be NULL; returning NULL means an allocation error),
-    // the string length is returned in 'cachedListingLen' (must not be NULL); the caller is
-    // responsible for deallocation; the date when the listing was captured is returned in
-    // 'cachedListingDate' (must not be NULL); 'path' returns the exact text of the cached path (as
-    // provided by the server when it was inserted into the cache); 'path' is a buffer of size
-    // 'pathBufSize' bytes
+    // Looks up a cached listing. On Found, transactionally publishes the exact cached path bytes,
+    // listing bytes, date, and start time. On NotFound or LowMemory, none of the outputs changes.
     // can be called from any thread
-    BOOL GetPathListing(const char* host, unsigned short port, const char* user,
-                        CFTPServerPathType pathType, char* path, int pathBufSize,
-                        const char* listCmd, BOOL isFTPS, char** cachedListing,
-                        int* cachedListingLen, CFTPDate* cachedListingDate,
-                        DWORD* cachedListingStartTime);
+    CListingCacheLookupStatus GetPathListing(const wchar_t* host, unsigned short port,
+                                             const wchar_t* user, CFTPServerPathType pathType,
+                                             std::string& path, const char* listCmd, BOOL isFTPS,
+                                             std::string& cachedListing,
+                                             CFTPDate* cachedListingDate,
+                                             DWORD* cachedListingStartTime) noexcept;
 
     // adds or refreshes (overwrites) the listing of the path 'path' (type 'pathType') on the server
     // 'host', where user 'user' is connected on port 'port'; the listing is in the string
-    // 'cachedListing' (must not be NULL), the string length is in 'cachedListingLen'; the date when
+    // 'cachedListing'; the date when
     // the listing was captured is in 'cachedListingDate' (must not be NULL);
     // can be called from any thread
-    void AddOrUpdatePathListing(const char* host, unsigned short port, const char* user,
+    void AddOrUpdatePathListing(const wchar_t* host, unsigned short port, const wchar_t* user,
                                 CFTPServerPathType pathType, const char* path,
-                                const char* listCmd, BOOL isFTPS,
-                                const char* cachedListing, int cachedListingLen,
+                                const CFtpTextCodec& textCodec, const char* listCmd, BOOL isFTPS,
+                                std::string_view cachedListing,
                                 const CFTPDate* cachedListingDate,
                                 DWORD cachedListingStartTime);
 
@@ -390,19 +397,19 @@ public:
     // 'ignorePath' is TRUE, listings of all paths from server 'host', where user 'user' is connected
     // on port 'port', are removed from the cache
     // can be called from any thread
-    void RefreshOnPath(const char* host, unsigned short port, const char* user,
+    void RefreshOnPath(const wchar_t* host, unsigned short port, const wchar_t* user,
                        CFTPServerPathType pathType, const char* path, BOOL ignorePath = FALSE);
 
     // reports to the cache that a change occurred on the path 'userPart' (FS user-part path
     // format); if 'includingSubdirs' is TRUE, changes in subdirectories of 'userPart' are included;
     // the changed paths are removed from the cache (so they will be loaded from the server next time)
-    void AcceptChangeOnPathNotification(const char* userPart, BOOL includingSubdirs);
+    void AcceptChangeOnPathNotification(const wchar_t* userPart, BOOL includingSubdirs);
 
 protected:
     // searches for an item in the cache; if found, returns TRUE and its index in 'index'
     // (must not be NULL); returns FALSE if the item does not exist in the cache;
     // WARNING: call only from the CacheCritSect critical section
-    BOOL Find(const char* host, unsigned short port, const char* user,
+    BOOL Find(const wchar_t* host, unsigned short port, const wchar_t* user,
               CFTPServerPathType pathType, const char* path, const char* listCmd,
               BOOL isFTPS, int* index);
 };
@@ -473,13 +480,15 @@ enum CCurrentTransferMode
 class CSendCmdUserIfaceAbstract
 {
 public:
-    virtual void Init(HWND parent, const char* logCmd, const char* waitWndText) = 0;
+    virtual void Init(HWND parent, const char* logCmd, const wchar_t* waitWndText,
+                      const CFtpTextCodec& textCodec) = 0;
     virtual void BeforeAborting() = 0;
     virtual void AfterWrite(BOOL aborting, DWORD showTime) = 0;
     virtual BOOL GetWindowClosePressed() = 0;
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort) = 0;
     virtual void SendingFinished() = 0;
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) = 0;
+    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID,
+                           std::string& errorText) = 0;
     virtual void MaybeSuccessReplyReceived(const char* reply, int replySize) = 0; // FTP reply code: 1xx
     virtual void CancelDataCon() = 0;
 
@@ -537,15 +546,17 @@ public:
                   int* sslErrorOccured, BOOL* decomprErrorOccured);
     BOOL GetDatConCancelled() { return DatConCancelled; }
 
-    void InitWnd(const char* fileName, const char* host, const char* path,
-                 CFTPServerPathType pathType);
-    virtual void Init(HWND parent, const char* logCmd, const char* waitWndText) {}
-    virtual void BeforeAborting() { WaitWnd.SetText(LoadStr(IDS_ABORTINGCOMMAND)); }
+    void InitWnd(const char* fileName, const wchar_t* host, const char* path,
+                 CFTPServerPathType pathType, const CFtpTextCodec& textCodec);
+    virtual void Init(HWND parent, const char* logCmd, const wchar_t* waitWndText,
+                      const CFtpTextCodec& textCodec) {}
+    virtual void BeforeAborting() { WaitWnd.SetText(LangStr(IDS_ABORTINGCOMMAND).c_str()); }
     virtual void AfterWrite(BOOL aborting, DWORD showTime);
     virtual BOOL GetWindowClosePressed() { return WaitWnd.GetWindowClosePressed(); }
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort);
     virtual void SendingFinished();
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize);
+    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID,
+                           std::string& errorText);
     virtual void MaybeSuccessReplyReceived(const char* reply, int replySize);
     virtual void CancelDataCon();
 
@@ -608,11 +619,11 @@ protected:
 
     // connection parameters for the FTP server
     CFTPProxyServer* ProxyServer; // NULL = "not used (direct connection)"
-    char Host[HOST_MAX_SIZE];
+    std::wstring Host;
     unsigned short Port;
-    char User[USER_MAX_SIZE];
-    char Password[PASSWORD_MAX_SIZE];
-    char Account[ACCOUNT_MAX_SIZE];
+    std::wstring User;
+    std::wstring Password;
+    std::wstring Account;
     int UseListingsCache;
     std::string InitFTPCommands;
     BOOL UsePassiveMode;
@@ -624,8 +635,9 @@ protected:
     std::string ServerSystem;                 // server system (reply to SYST command) - may also be empty
     std::string ServerFirstReply;             // first server reply (often contains the FTP server version) - may also be empty
     BOOL HaveWorkingPath;                     // TRUE if WorkingPath is valid
-    CPathBuffer WorkingPath;           // current working directory on the FTP server
+    std::string WorkingPath;                   // current working directory on the FTP server (encoded session bytes)
     CCurrentTransferMode CurrentTransferMode; // current transfer mode on the FTP server (memory of the last FTP "TYPE" command)
+    CFtpSessionTextPolicy TextPolicy;          // byte/text boundary selected for this FTP session
 
     BOOL EventConnectSent; // TRUE only if the ccsevConnected event was already sent (handles FD_READ arriving before FD_CONNECT)
 
@@ -685,14 +697,14 @@ public:
     // sets the connection parameters for the FTP server; strings must not be NULL (except for
     // 'initFTPCommands' and 'listCommand' - they may be NULL)
     // can be called from any thread
-    void SetConnectionParameters(const char* host, unsigned short port, const char* user,
-                                 const char* password, BOOL useListingsCache,
+    BOOL SetConnectionParameters(const wchar_t* host, unsigned short port, const wchar_t* user,
+                                 const wchar_t* password, BOOL useListingsCache,
                                  const char* initFTPCommands, BOOL usePassiveMode,
                                  const char* listCommand, BOOL keepAliveEnabled,
                                  int keepAliveSendEvery, int keepAliveStopAfter,
                                  int keepAliveCommand, int proxyServerUID,
                                  int encryptControlConnection, int encryptDataConnection,
-                                 int compressData);
+                                 int compressData) noexcept;
 
     // methods for tracking the duration of an operation with the socket:
     // WARNING: not synchronized - use from one thread or apply other synchronization
@@ -707,6 +719,9 @@ public:
     int GetEncryptControlConnection() { return EncryptControlConnection; }
     int GetEncryptDataConnection() { return EncryptDataConnection; }
     int GetCompressData() { return CompressData; }
+    CFtpTextCodec GetTextCodec();
+    BOOL EncodeText(const wchar_t* text, std::string& bytes);
+    BOOL DecodeText(const char* bytes, size_t length, std::wstring& text);
 
     // opens the "control connection" to the FTP server (configured by the preceding
     // SetConnectionParameters call); expects SetStartTime() to be set - shows a wait window using
@@ -715,21 +730,20 @@ public:
     // main thread this is SalamanderGeneral->GetMsgBoxParent() or a dialog opened by the plugin);
     // 'parent' is also the parent of any error message boxes; 'reconnect' is TRUE when reconnecting
     // a closed "control connection"; if 'workDir' is not NULL, the current working directory on the
-    // server is determined (right after the connection) and stored in 'workDir' (buffer of size
-    // 'workDirBufSize'); if 'totalAttemptNum' is not NULL, it is an in/out variable containing the
-    // total number of connection attempts (initialize to 1 before the first call); if 'retryMsg' is
-    // not NULL, the message 'retryMsg' (text for the retry wait window) is displayed before the next
+    // server is determined (right after the connection) and stored as dynamically owned encoded
+    // session bytes; if 'totalAttemptNum' is not NULL, it is an in/out variable containing the
+    // total number of connection attempts (initialize to 1 before the first call); if 'retryMessage' is
+    // not NULL, the message it owns (text for the retry wait window) is displayed before the next
     // connection attempt (provided not all attempts are exhausted) - this allows simulating a state
     // where the disconnect occurred inside this method; if 'reconnectErrResID' is not -1, it is used
     // as the text for the reconnect wait window (if it is -1, IDS_SENDCOMMANDERROR is used); if
     // 'useFastReconnect' is TRUE, reconnect is performed without waiting;
     // returns TRUE if the connection succeeded; the user name may change during connection (it does
-    // not depend on the method's success) - the current name is returned in 'user' (maximum
-    // 'userSize' bytes);
+    // not depend on the method's success) - the current semantic name is returned in 'user';
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL StartControlConnection(HWND parent, char* user, int userSize, BOOL reconnect,
-                                char* workDir, int workDirBufSize, int* totalAttemptNum,
-                                const char* retryMsg, BOOL canShowWelcomeDlg,
+    BOOL StartControlConnection(HWND parent, std::wstring& user, BOOL reconnect,
+                                std::string* workDir, int* totalAttemptNum,
+                                const std::string* retryMessage, BOOL canShowWelcomeDlg,
                                 int reconnectErrResID, BOOL useFastReconnect);
 
     // changes the working directory in the "control connection"; expects SetStartTime() to be set -
@@ -750,27 +764,27 @@ public:
     // shortened before use (by one directory); if the path is shortened because it leads to a file
     // (a mere suspicion that it might be a file path is enough - after listing the path it checks
     // whether the file exists, otherwise an error is shown) and 'cutFileName' is not NULL (possible
-    // only in 'mode' 3 and with 'cutDirectory' FALSE), the buffer 'cutFileName' (size MAX_PATH
-    // characters) receives that file name (without path), otherwise 'cutFileName' receives an empty
+    // only in 'mode' 3 and with 'cutDirectory' FALSE), the dynamically owned encoded-byte
+    // 'cutFileName' receives that file name (without path), otherwise it receives an empty
     // string; if 'pathWasCut' is not NULL, it returns TRUE if the path was shortened; Salamander uses
     // 'cutFileName' and 'pathWasCut' in the Change Directory command (Shift+F7) when a file name is
     // entered - the file gains focus; 'rescuePath' contains the last accessible and listable path on
     // the server that should be used when everything else fails (better than disconnecting) - it is
-    // an in/out string (maximum size FTP_MAX_PATH characters);
+    // an in/out encoded-byte string;
     // if 'showChangeInLog' is TRUE, the log should contain the message "Changing path to...";
-    // if the listing is cached (no need to retrieve it from the server), it is returned in
-    // 'cachedListing' (must not be NULL) as an allocated string, the string length is returned in
-    // 'cachedListingLen' (must not be NULL), the caller is responsible for deallocation; the date the
+    // if the listing is cached (no need to retrieve it from the server), it is returned in the
+    // dynamically owned encoded-byte 'cachedListing'; disengaged means the listing was not cached,
+    // while an engaged empty string is a valid empty cached listing; the date the
     // listing was captured is returned in 'cachedListingDate' (must not be NULL);
     // 'totalAttemptNum' + 'skipFirstReconnectIfNeeded' are parameters for SendChangeWorkingPath();
     // returns FALSE if the path change failed (says nothing about the "control connection" - it may
     // remain open or closed)
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel, HWND parent, char* path,
-                           int pathBufSize, char* userBuf, int userBufSize, BOOL parsedPath,
+    BOOL ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel, HWND parent, std::string& path,
+                           std::wstring& user, BOOL parsedPath,
                            BOOL forceRefresh, int mode, BOOL cutDirectory,
-                           char* cutFileName, BOOL* pathWasCut, char* rescuePath,
-                           BOOL showChangeInLog, char** cachedListing, int* cachedListingLen,
+                           std::string* cutFileName, BOOL* pathWasCut, std::string& rescuePath,
+                           BOOL showChangeInLog, std::optional<std::string>& cachedListing,
                            CFTPDate* cachedListingDate, DWORD* cachedListingStartTime,
                            int* totalAttemptNum, BOOL skipFirstReconnectIfNeeded);
 
@@ -782,10 +796,9 @@ public:
     // SalamanderGeneral->GetMsgBoxParent() or a dialog opened by the plugin); 'parent' is also the
     // parent of any error message boxes; 'path' is the working directory; 'userBuf' + 'userBufSize'
     // is an in/out buffer for the user name on the FTP server (it may change during reconnect);
-    // returns TRUE if at least part of the listing was obtained (empty string in the worst case); the
-    // listing is returned in the allocated string 'allocatedListing' (must not be NULL; returning NULL
-    // means an allocation error), the string length is returned in 'allocatedListingLen' (must not be
-    // NULL), the caller is responsible for deallocation; 'listingDate' (must not be NULL) returns the
+    // returns TRUE if at least part of the listing was obtained (an engaged empty string in the worst
+    // case); the listing is returned as dynamically owned, explicitly encoded bytes in 'listing';
+    // 'listingDate' (must not be NULL) returns the
     // date when the listing was captured; 'pathListingIsIncomplete' (must not be NULL) returns TRUE if
     // the listing is incomplete (was interrupted) or FALSE if it is complete; 'pathListingIsBroken'
     // (must not be NULL) returns TRUE if the listing command returned an error (3xx, 4xx, or 5xx);
@@ -797,8 +810,8 @@ public:
     // ListingCache.RefreshOnPath() should not be called to clear the cache for the current path (it is
     // cleared elsewhere);
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL ListWorkingPath(HWND parent, const char* path, char* userBuf, int userBufSize,
-                         char** allocatedListing, int* allocatedListingLen,
+    BOOL ListWorkingPath(HWND parent, const char* path, std::wstring& user,
+                         std::optional<std::string>& listing,
                          CFTPDate* listingDate, BOOL* pathListingIsIncomplete,
                          BOOL* pathListingIsBroken, BOOL* pathListingMayBeOutdated,
                          DWORD* listingStartTime, BOOL forceRefresh, int* totalAttemptNum,
@@ -814,12 +827,12 @@ public:
     // may be used when retrieving the path (it must be fetched directly from the server);
     // returns FALSE if getting the path failed (e.g. invalid reply format from the server), the
     // connection was interrupted (on timeout it automatically closes the connection hard - sending
-    // "QUIT" makes no sense); if 'canRetry' is not NULL, the error text may be returned in 'retryMsg'
-    // (buffer of size 'retryMsgBufSize') - 'canRetry' returns TRUE; otherwise the error is shown in a
+    // "QUIT" makes no sense); if 'canRetry' and 'retryMessage' are not NULL, the complete error text
+    // may be returned in the dynamic byte owner and 'canRetry' returns TRUE; otherwise the error is shown in a
     // message box ('canRetry' is either NULL or FALSE is returned there);
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL GetCurrentWorkingPath(HWND parent, char* path, int pathBufSize, BOOL forceRefresh,
-                               BOOL* canRetry, char* retryMsg, int retryMsgBufSize);
+    BOOL GetCurrentWorkingPath(HWND parent, std::string& path, BOOL forceRefresh,
+                               BOOL* canRetry, std::string* retryMessage);
 
     // if needed, sets the transfer mode (ASCII/BINARY(IMAGE) - TRUE/FALSE in 'asciiMode') in the
     // "control connection"; expects SetStartTime() to be set - shows a wait window using
@@ -827,19 +840,18 @@ public:
     // detect whether ESC was pressed in this window and not, for example, in another application; in
     // the main thread this is SalamanderGeneral->GetMsgBoxParent() or a dialog opened by the plugin);
     // 'parent' is also the parent of any error message boxes; if 'success' is not NULL, it returns
-    // TRUE when the server reports success; if the server reports failure, the server reply text is in
-    // the buffer 'ftpReplyBuf' (maximum size 'ftpReplyBufSize'), null-terminated - if it is longer
-    // than the buffer it is simply truncated; if 'forceRefresh' is TRUE, no cached data may be used
+    // TRUE when the server reports success; if the server reports failure and 'ftpReply' is not NULL,
+    // the complete server reply text is returned there in negotiated server bytes; if 'forceRefresh'
+    // is TRUE, no cached data may be used
     // when setting the transfer mode (the mode is set even if theoretically unnecessary because it is
     // already set); returns FALSE if setting the transfer mode failed, the connection was interrupted
     // (on timeout it automatically closes the connection hard - sending "QUIT" makes no sense); if
-    // 'canRetry' is not NULL, the error text may be returned in 'retryMsg' (buffer of size
-    // 'retryMsgBufSize') - 'canRetry' returns TRUE; otherwise the error is displayed in a message box
+    // 'canRetry' and 'retryMessage' are not NULL, the complete error text may be returned in the
+    // dynamic byte owner and 'canRetry' returns TRUE; otherwise the error is displayed in a message box
     // ('canRetry' is either NULL or FALSE is returned there);
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL SetCurrentTransferMode(HWND parent, BOOL asciiMode, BOOL* success, char* ftpReplyBuf,
-                                int ftpReplyBufSize, BOOL forceRefresh, BOOL* canRetry,
-                                char* retryMsg, int retryMsgBufSize);
+    BOOL SetCurrentTransferMode(HWND parent, BOOL asciiMode, BOOL* success, std::string* ftpReply,
+                                BOOL forceRefresh, BOOL* canRetry, std::string* retryMessage);
 
     // clears the cache for the current working directory: synchronized HaveWorkingPath=FALSE,
     void ResetWorkingPathCache();
@@ -854,10 +866,9 @@ public:
     // this is SalamanderGeneral->GetMsgBoxParent() or a dialog opened by the plugin); 'parent' is also
     // the parent of any error message boxes; 'success' (must not be NULL) returns TRUE when the
     // operation succeeds;
-    // 'notInPanel' + 'leftPanel' + 'userBuf' + 'userBufSize' + 'totalAttemptNum' + 'retryMsg' are
-    // parameters for ReconnectIfNeeded(); the server reply text is in the buffer 'ftpReplyBuf'
-    // (maximum size 'ftpReplyBufSize'), null-terminated - if it is longer than the buffer it is simply
-    // truncated; if 'startPath' is not NULL and the connection is restored, a command to change the
+    // 'notInPanel' + 'leftPanel' + 'userBuf' + 'userBufSize' + 'totalAttemptNum' + 'retryMessage' are
+    // parameters for ReconnectIfNeeded(); 'ftpReply' receives the complete reply in negotiated
+    // server bytes; if 'startPath' is not NULL and the connection is restored, a command to change the
     // working directory to 'startPath' is sent first and then to 'path' (handles relative path
     // changes); if 'startPath' is not NULL and reconnect is unnecessary, GetCurrentWorkingPath (with
     // 'forceRefresh'=FALSE) verifies whether the working directory on the server is exactly
@@ -869,9 +880,9 @@ public:
     // closes the connection hard - sending "QUIT" makes no sense)
     // can be called only from the main thread (uses wait windows, etc.)
     BOOL SendChangeWorkingPath(BOOL notInPanel, BOOL leftPanel, HWND parent, const char* path,
-                               char* userBuf, int userBufSize, BOOL* success, char* ftpReplyBuf,
-                               int ftpReplyBufSize, const char* startPath, int* totalAttemptNum,
-                               const char* retryMsg, BOOL skipFirstReconnectIfNeeded,
+                               std::wstring& user, BOOL* success, std::string& ftpReply,
+                               const char* startPath, int* totalAttemptNum,
+                               const std::string* retryMessage, BOOL skipFirstReconnectIfNeeded,
                                BOOL* userRejectsReconnect);
 
     // determines the path type on the FTP server (calls ::GetFTPServerPathType() inside the critical
@@ -893,13 +904,13 @@ public:
     // for a new user name on the FTP server (it may change during reconnect); 'reconnected' (if not
     // NULL) returns TRUE when the connection was restored (the "control connection" was reopened); if
     // 'setStartTimeIfConnected' is FALSE and reconnecting is unnecessary, SetStartTime() is not set;
-    // 'totalAttemptNum' + 'retryMsg' + 'reconnectErrResID' + 'useFastReconnect' are parameters for
+    // 'totalAttemptNum' + 'retryMessage' + 'reconnectErrResID' + 'useFastReconnect' are parameters for
     // StartControlConnection(); 'userRejectsReconnect' (if not NULL) returns TRUE if the user refuses
     // to perform a reconnect
     // can be called only from the main thread (uses wait windows, etc.)
-    BOOL ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel, HWND parent, char* userBuf,
-                           int userBufSize, BOOL* reconnected, BOOL setStartTimeIfConnected,
-                           int* totalAttemptNum, const char* retryMsg,
+    BOOL ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel, HWND parent, std::wstring& user,
+                           BOOL* reconnected, BOOL setStartTimeIfConnected,
+                           int* totalAttemptNum, const std::string* retryMessage,
                            BOOL* userRejectsReconnect, int reconnectErrResID,
                            BOOL useFastReconnect);
 
@@ -921,14 +932,13 @@ public:
     // TRUE if sending the command or aborting it and receiving the reply succeeded; 'cmdAborted'
     // (if not NULL) returns TRUE when the command was successfully aborted; the reply code is returned
     // in 'ftpReplyCode' (must not be NULL) - it is valid (!=-1) even when 'cmdAborted' == TRUE; the
-    // reply text is stored in the buffer 'ftpReplyBuf' (maximum size 'ftpReplyBufSize'),
-    // null-terminated - if it is longer than the buffer, it is simply truncated; if
+    // complete reply text is stored in 'ftpReply' in negotiated server bytes when it is not NULL; if
     // 'specialUserInterface' is NULL, the standard wait window is used for the user interface,
     // otherwise the object provided via 'specialUserInterface' should be used (for example when
     // listing the current path);
     // returns FALSE if the connection was interrupted (on timeout it automatically closes the
-    // connection hard - sending "QUIT" makes no sense); if 'canRetry' is not NULL, the error text can
-    // be returned in 'retryMsg' (buffer of size 'retryMsgBufSize') - 'canRetry' returns TRUE; otherwise
+    // connection hard - sending "QUIT" makes no sense); if 'canRetry' and 'retryMessage' are not NULL,
+    // the complete error text can be returned in the dynamic byte owner and 'canRetry' returns TRUE; otherwise
     // the error is shown in a message box ('canRetry' is either NULL or FALSE is returned there);
     // can be called only from the main thread (uses wait windows, etc.)
     //
@@ -938,11 +948,18 @@ public:
     //          occurred) - this is handled by trying to receive everything the server sends in one
     //          packet (it probably sends both replies together); any additional replies are ignored as
     //          "unexpected" before the next FTP command sent by this method
-    BOOL SendFTPCommand(HWND parent, const char* ftpCmd, const char* logCmd, const char* waitWndText,
-                        int waitWndTime, BOOL* cmdAborted, int* ftpReplyCode, char* ftpReplyBuf,
-                        int ftpReplyBufSize, BOOL allowCmdAbort, BOOL resetWorkingPathCache,
-                        BOOL resetCurrentTransferModeCache, BOOL* canRetry, char* retryMsg,
-                        int retryMsgBufSize, CSendCmdUserIfaceAbstract* specialUserInterface);
+    BOOL SendFTPCommand(HWND parent, const char* ftpCmd, const char* logCmd, const wchar_t* waitWndText,
+                        int waitWndTime, BOOL* cmdAborted, int* ftpReplyCode, std::string* ftpReply,
+                        BOOL allowCmdAbort, BOOL resetWorkingPathCache,
+                        BOOL resetCurrentTransferModeCache, BOOL* canRetry,
+                        std::string* retryMessage, CSendCmdUserIfaceAbstract* specialUserInterface);
+
+    BOOL SendFTPCommandInternal(HWND parent, const char* ftpCmd, const char* logCmd, const wchar_t* waitWndText,
+                                int waitWndTime, BOOL* cmdAborted, int* ftpReplyCode, std::string* ftpReply,
+                                BOOL allowCmdAbort,
+                                BOOL resetWorkingPathCache, BOOL resetCurrentTransferModeCache,
+                                BOOL* canRetry, std::string* retryMessage,
+                                CSendCmdUserIfaceAbstract* specialUserInterface);
 
     // closes the "control connection" to the FTP server (or performs a hard socket close after a
     // timeout); 'parent' is the thread's foreground window (after ESC is pressed it is used to detect
@@ -969,6 +986,7 @@ public:
     // uses "len=strlen(str)"; if 'addTimeToLog' is TRUE, the current time is placed before the
     // message; returns TRUE when the log is updated successfully or if the log does not exist at all
     BOOL LogMessage(const char* str, int len, BOOL addTimeToLog = FALSE);
+    BOOL LogMessage(const wchar_t* str, int len, BOOL addTimeToLog = FALSE);
 
     // if the welcome-message window is open and the main Salamander window becomes active, activates
     // the welcome-message window (e.g. after closing an error message box the main window would become
@@ -1031,34 +1049,31 @@ public:
     // file size on disk; 'totalAttemptNum', 'panel', 'notInPanel', 'userBuf', and 'userBufSize' are
     // parameters for ReconnectIfNeeded()
     void DownloadOneFile(HWND parent, const char* fileName, CQuadWord const& fileSizeInBytes,
-                         BOOL asciiMode, const char* workPath, const char* tgtFileName,
+                         BOOL asciiMode, const char* workPath, const wchar_t* tgtFileName,
                          BOOL* newFileCreated, BOOL* newFileIncomplete, CQuadWord* newFileSize,
-                         int* totalAttemptNum, int panel, BOOL notInPanel, char* userBuf,
-                         int userBufSize);
+                         int* totalAttemptNum, int panel, BOOL notInPanel, std::wstring& user);
 
     // creates the directory 'newName' (any string from the user - treated as an absolute or relative
     // path on the server - Salamander path syntax is ignored); 'parent' is the parent of any message
-    // boxes; 'newName' is the name of the directory being created; on success, 'newName' (buffer
-    // 2 * MAX_PATH characters) returns the directory name to focus in the panel on the next refresh;
+    // boxes; 'newName' is the name of the directory being created; on success, its dynamically
+    // owned encoded bytes return the directory name to focus in the panel on the next refresh;
     // returns success (on failure it is assumed the user has already seen an error window); 'workPath'
     // is the working directory; 'totalAttemptNum', 'panel', 'notInPanel', 'userBuf', and 'userBufSize'
-    // are parameters for ReconnectIfNeeded(); 'changedPath' (at least FTP_MAX_PATH characters)
-    // returns the server path that needs to be refreshed (if 'changedPath' is empty, no refresh is
-    // required)
-    BOOL CreateDir(char* changedPath, HWND parent, char* newName, const char* workPath,
-                   int* totalAttemptNum, int panel, BOOL notInPanel, char* userBuf,
-                   int userBufSize);
+    // are parameters for ReconnectIfNeeded(); 'changedPath' returns the complete encoded server
+    // path that needs to be refreshed (empty means no refresh is required)
+    BOOL CreateDir(std::string& changedPath, HWND parent, std::string& newName, const char* workPath,
+                   int* totalAttemptNum, int panel, BOOL notInPanel, std::wstring& user);
 
     // renames the file/directory 'fromName' to 'newName'; 'parent' is the parent of any message
-    // boxes; on success, 'newName' (buffer 2 * MAX_PATH characters) returns the file/directory name
+    // boxes; on success, dynamically owned 'newName' returns the encoded file/directory name
     // to focus in the panel during the next refresh; returns success (on failure it is assumed the user
     // has already seen an error window); 'workPath' is the working directory; 'totalAttemptNum',
     // 'panel', 'notInPanel', 'userBuf', and 'userBufSize' are parameters for ReconnectIfNeeded();
-    // 'changedPath' (at least FTP_MAX_PATH characters) returns the server path that needs to be
-    // refreshed (if 'changedPath' is empty, no refresh is required)
-    BOOL QuickRename(char* changedPath, HWND parent, const char* fromName, char* newName,
-                     const char* workPath, int* totalAttemptNum, int panel, BOOL notInPanel,
-                     char* userBuf, int userBufSize, BOOL isVMS, BOOL isDir);
+    // 'changedPath' returns the complete encoded server path that needs to be refreshed (empty
+    // means no refresh is required)
+    BOOL QuickRename(std::string& changedPath, HWND parent, const char* fromName, std::string& newName,
+                      const char* workPath, int* totalAttemptNum, int panel, BOOL notInPanel,
+                      std::wstring& user, BOOL isVMS, BOOL isDir);
 
     // sends a request to open a "listen" port (either on the local machine or on the proxy server) for
     // the data connection 'dataConnection'; inputs 'listenOnIP' + 'listenOnPort' specify the IP+port
@@ -1070,16 +1085,13 @@ public:
     // returns TRUE on success - 'listenOnIP' + 'listenOnPort' then contain the IP+port where we wait
     // for the FTP server to connect; returns FALSE if an interruption or error occurred; if retrying is
     // meaningful, the connection is forcibly closed (we could send "QUIT", but for now we simplify
-    // our lives) and the error text is returned in 'retryMsg' (buffer of size 'retryMsgBufSize', must
-    // not be 0) and 'canRetry' (must not be NULL) returns TRUE; if retrying makes no sense, the error
+    // our lives) and the complete error text is returned in 'retryMessage' (must not be NULL) and
+    // 'canRetry' (must not be NULL) returns TRUE; if retrying makes no sense, the error
     // is shown in a message box and 'canRetry' returns FALSE (the connection is not interrupted);
-    // 'errBuf' is a helper buffer of size 'errBufSize' (must not be 0) - used for texts displayed in
-    // message boxes;
     // can be called only from the main thread (uses wait windows, etc.)
     BOOL OpenForListeningAndWaitForRes(HWND parent, CDataConnectionSocket* dataConnection,
                                        DWORD* listenOnIP, unsigned short* listenOnPort,
-                                       BOOL* canRetry, char* retryMsg, int retryMsgBufSize,
-                                       int waitWndTime, char* errBuf, int errBufSize);
+                                       BOOL* canRetry, std::string* retryMessage, int waitWndTime);
 
     // returns TRUE if the "LIST -a" command is used for listing
     BOOL IsListCommandLIST_a();

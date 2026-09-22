@@ -63,15 +63,15 @@ public:
     // The BeginUpdateResource initilalize CResEdit class and begin resource update in
     // an executable file.
     BOOL BeginUpdateResource(
-        LPCSTR pFileName,             // executable file name
+        LPCWSTR pFileName,            // executable file name
         BOOL bDeleteExistingResources // deletion option
     );
 
     // The UpdateResource function adds, deletes, or replaces a resource in
     // an executable file.
     BOOL UpdateResource(
-        LPCSTR lpType,  // resource type
-        LPCSTR lpName,  // resource name
+        LPCWSTR lpType, // resource type
+        LPCWSTR lpName, // resource name
         WORD wLanguage, // language identifier
         LPVOID lpData,  // resource data
         DWORD cbData    // length of resource data
@@ -189,7 +189,7 @@ public:
     virtual BOOL Load(int level, DWORD offset, COffsets* offsets) = 0;
     virtual DWORD Save(CSaveRes* save) = 0;
     virtual void AddSize(CSaveRes* save) = 0;
-    virtual BOOL AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, DWORD size) = 0;
+    virtual BOOL AddResource(LPCWSTR type, LPCWSTR name, WORD language, void* data, DWORD size) = 0;
 };
 
 class CDirEntry
@@ -258,7 +258,7 @@ public:
 
     virtual void AddSize(CSaveRes* save);
 
-    virtual BOOL AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, DWORD size);
+    virtual BOOL AddResource(LPCWSTR type, LPCWSTR name, WORD language, void* data, DWORD size);
 };
 
 class CResTreeLeaf : public CResTreeNode
@@ -297,5 +297,5 @@ public:
 
     virtual void AddSize(CSaveRes* save);
 
-    virtual BOOL AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, DWORD size);
+    virtual BOOL AddResource(LPCWSTR type, LPCWSTR name, WORD language, void* data, DWORD size);
 };

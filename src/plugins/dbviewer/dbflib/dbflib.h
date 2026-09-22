@@ -194,7 +194,7 @@ private:
     BOOL updated;
 
 public:
-    cDBF(const char* filename, BOOL readOnly = TRUE);
+    cDBF(const wchar_t* filename, BOOL readOnly = TRUE);
     ~cDBF(void);
 
     /* GetStatus should be called after constructing the object to verify success */

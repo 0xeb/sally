@@ -9,16 +9,16 @@
 // CPluginInterfaceForMenuExt
 //
 
-BOOL CPluginInterfaceForMenuExt::PostFocusCommand(const char* path,
-                                                  const char* name)
+BOOL CPluginInterfaceForMenuExt::PostFocusCommand(const wchar_t* path,
+                                                  const wchar_t* name)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForMenuExt::PostFocusCommand(%s, %s)",
+    CALL_STACK_MESSAGE3("CPluginInterfaceForMenuExt::PostFocusCommand(%ls, %ls)",
                         path, name);
     if (!SG->SalamanderIsNotBusy(NULL))
         return FALSE;
 
-    strcpy(Path, path);
-    strcpy(Name, name);
+    Path = path != NULL ? path : L"";
+    Name = name != NULL ? name : L"";
 
     SG->PostMenuExtCommand(MID_FOCUS, TRUE);
 
@@ -28,8 +28,8 @@ BOOL CPluginInterfaceForMenuExt::PostFocusCommand(const char* path,
 
     // after 0.5 seconds we are no longer interested in the focus (handles
     // the case when we hit the start of Salamander's BUSY mode)
-    Path[0] = 0;
-    Name[0] = 0;
+    Path.clear();
+    Name.clear();
 
     return TRUE;
 }
@@ -56,15 +56,9 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
         SG->GetConfigParameter(SALCFG_ALWAYSONTOP, &AlwaysOnTop, sizeof(AlwaysOnTop), NULL);
 
         CPluginFSInterface* fs = (CPluginFSInterface*)SG->GetPanelPluginFS(PANEL_SOURCE);
-        WCHAR path[MAX_FULL_KEYNAME];
-        int len = StrToWStr(path, MAX_FULL_KEYNAME, AssignedFSName);
-        path[len - 1] = L':';
-        if (!fs ||
-            !fs->GetCurrentPathW(path + len, MAX_FULL_KEYNAME))
-        {
-            wcscpy(path + len, L"\\");
-        }
-        CFindDialogThread* t = new CFindDialogThread(path);
+        std::wstring path = AssignedFSName + L":";
+        path += fs != NULL ? fs->GetCurrentPathOwned() : L"\\";
+        CFindDialogThread* t = new CFindDialogThread(path.c_str());
         if (t)
         {
             if (!t->Create(ThreadQueue))
@@ -92,35 +86,32 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     case MID_EXPORT:
     {
         CPluginFSInterface* fs = (CPluginFSInterface*)SG->GetPanelPluginFS(PANEL_SOURCE);
-        WCHAR path[MAX_FULL_KEYNAME];
-        int len = StrToWStr(path, MAX_FULL_KEYNAME, AssignedFSName);
-        path[len - 1] = L':';
-        if (fs && fs->GetCurrentPathW(path + len, MAX_FULL_KEYNAME))
+        std::wstring path = AssignedFSName + L":";
+        if (fs != NULL)
         {
+            path += fs->GetCurrentPathOwned();
             BOOL isDir;
             const CFileData* fd = SG->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-            CPluginData* pd = (CPluginData*)fd->PluginData;
+            CPluginData* pd = fd != NULL ? (CPluginData*)fd->PluginData : NULL;
             if (isDir && pd && pd->Name && wcscmp(pd->Name, L"..") != 0)
-            {
-                PathAppend(path, pd->Name, MAX_FULL_KEYNAME);
-            }
+                SPLSalPathAppendOwned(path, pd->Name);
         }
         else
-            wcscpy(path + len, L"\\");
-        ExportKey(path);
+            path += L"\\";
+        ExportKey(path.data());
         break;
     }
 
     case MID_FOCUS:
     {
         // only if we were lucky enough not to hit the start of Salamander's BUSY mode
-        if (Path[0] != 0)
+        if (!Path.empty())
         {
             SetForegroundWindow(SG->GetMainWindowHWND());
-            SG->ChangePanelPathToPluginFS(PANEL_SOURCE, AssignedFSName, Path, NULL,
-                                          -1, Name);
-            Path[0] = 0;
-            Name[0] = 0;
+            SG->ChangePanelPathToPluginFS(PANEL_SOURCE, AssignedFSName.c_str(), Path.c_str(), NULL,
+                                          -1, Name.c_str());
+            Path.clear();
+            Name.clear();
         }
         break;
     }

@@ -22,6 +22,9 @@
 #include "unmime.rh"
 #include "unmime.rh2"
 #include "lang\lang.rh"
+#include "unmime_text.h"
+
+#include <vector>
 
 #define XX 127
 #define EE 126
@@ -98,7 +101,7 @@ static void BuildBinHexTable(BYTE* pTable)
 //  CDecoder - base class for the other decoders
 //
 
-BOOL CDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CDecoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CDecoder::Start(, %d)", bJustCalcSize);
     bCalcSize = bJustCalcSize;
@@ -107,7 +110,7 @@ BOOL CDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
     {
         HFile = hFile;
         if (fileName != NULL)
-            strcpy(FileName, fileName);
+            FileName = fileName;
         PBuffer = new char[BUFSIZE];
         if (PBuffer == NULL)
         {
@@ -143,7 +146,7 @@ BOOL CDecoder::BufferedWrite(const void* pData, int nBytes)
         if (n > 0)
             memcpy(PBuffer + iBufPos, pData, n);
         DWORD numw;
-        if (!SafeWriteFile(HFile, PBuffer, BUFSIZE, &numw, FileName))
+        if (!SafeWriteFile(HFile, PBuffer, BUFSIZE, &numw, FileName.c_str()))
         {
             iErrorStr = -1;
             iBufPos = 0; // so that CDecoder::End() does not report an error as well...
@@ -163,7 +166,7 @@ BOOL CDecoder::End()
         if (iBufPos)
         {
             DWORD numw;
-            if (!SafeWriteFile(HFile, PBuffer, iBufPos, &numw, FileName))
+            if (!SafeWriteFile(HFile, PBuffer, iBufPos, &numw, FileName.c_str()))
             {
                 iErrorStr = -1;
                 ret = FALSE;
@@ -191,7 +194,7 @@ void CDecoder::RestoreState()
 //  CTextDecoder - decoder for Plain Text or None
 //
 
-BOOL CTextDecoder::DecodeLine(LPTSTR pszLine, BOOL bLastLine)
+BOOL CTextDecoder::DecodeLine(LPSTR pszLine, BOOL bLastLine)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE1("CTextDecoder::DecodeLine()");
@@ -207,14 +210,14 @@ BOOL CTextDecoder::DecodeLine(LPTSTR pszLine, BOOL bLastLine)
 //  CQPDecoder - Quoted Printable Decoder
 //
 
-BOOL CQPDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CQPDecoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CQPDecoder::Start(, %d)", bJustCalcSize);
     BuildQPTable(table);
     return CDecoder::Start(hFile, fileName, bJustCalcSize);
 }
 
-BOOL CQPDecoder::DecodeLine(LPTSTR pszLine, BOOL bLastLine)
+BOOL CQPDecoder::DecodeLine(LPSTR pszLine, BOOL bLastLine)
 {
     // CALLSTACK is disabled because it slowed things down...
     // trim whitespace from the end of the line, as required by the RFC (MPACK does not do this...)
@@ -252,7 +255,7 @@ BOOL CQPDecoder::DecodeLine(LPTSTR pszLine, BOOL bLastLine)
 //  CBase64Decoder
 //
 
-BOOL CBase64Decoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CBase64Decoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CBase64Decoder::Start(, %d)", bJustCalcSize);
     n = 0;
@@ -301,7 +304,7 @@ BOOL CBase64Decoder::DecodeChar(char newchar)
     return TRUE;
 }
 
-BOOL CBase64Decoder::DecodeLine(LPTSTR pszLine, BOOL)
+BOOL CBase64Decoder::DecodeLine(LPSTR pszLine, BOOL)
 {
     // CALLSTACK is disabled because it slowed things down...
     while (*pszLine)
@@ -329,7 +332,7 @@ void CBase64Decoder::RestoreState()
 //  CUUXXDecoder
 //
 
-BOOL CUUXXDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CUUXXDecoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CUUXXDecoder::Start(, %d)", bJustCalcSize);
     if (bXX)
@@ -339,13 +342,13 @@ BOOL CUUXXDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
     return CDecoder::Start(hFile, fileName, bJustCalcSize);
 }
 
-BOOL CUUXXDecoder::DecodeLine(LPTSTR pszLine, BOOL)
+BOOL CUUXXDecoder::DecodeLine(LPSTR pszLine, BOOL)
 {
     const char* line = pszLine;
     char text[8];
     SkipWSP(line);
     GetWord(line, text, 8, " \t");
-    if (!lstrcmpi(text, "begin") || !lstrcmpi(text, "end"))
+    if (!lstrcmpiA(text, "begin") || !lstrcmpiA(text, "end"))
         return TRUE;
 
     int c, len;
@@ -378,7 +381,7 @@ BOOL CUUXXDecoder::DecodeLine(LPTSTR pszLine, BOOL)
 //  CBinHexDecoder
 //
 
-BOOL CBinHexDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CBinHexDecoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CBinHexDecoder::Start(, %d)", bJustCalcSize);
     eCharState = CS_START;
@@ -398,7 +401,7 @@ BOOL CBinHexDecoder::End()
     return CDecoder::End();
 }
 
-BOOL CBinHexDecoder::DecodeLine(LPTSTR pszLine, BOOL)
+BOOL CBinHexDecoder::DecodeLine(LPSTR pszLine, BOOL)
 {
     while (*pszLine)
         if (!DecodeChar(*pszLine++))
@@ -587,7 +590,7 @@ void CBinHexDecoder::DecodeBinary(BYTE b)
 //  CYEncDecoder
 //
 
-BOOL CYEncDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
+BOOL CYEncDecoder::Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize)
 {
     CALL_STACK_MESSAGE2("CUUXXDecoder::Start(, %d)", bJustCalcSize);
     bError = FALSE;
@@ -596,7 +599,7 @@ BOOL CYEncDecoder::Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize)
     return CDecoder::Start(hFile, fileName, bJustCalcSize);
 }
 
-BOOL CYEncDecoder::DecodeLine(LPTSTR pszLine, BOOL)
+BOOL CYEncDecoder::DecodeLine(LPSTR pszLine, BOOL)
 {
     if (!memcmp(pszLine, "=ybegin", 7) || !memcmp(pszLine, "=yend", 5) || !memcmp(pszLine, "=ypart", 6))
         return TRUE;
@@ -633,29 +636,45 @@ static CInputFile InputFile;
 static char* pszLine;
 static CParserOutput* pOutput;
 static int iNextMarker;
-static LPCTSTR pszDir;
+static const wchar_t* pszDir;
 static FILETIME* pFileTime;
-static LPCTSTR pszArcName;
+static const wchar_t* pszArcName;
 static DWORD iSilent;
 static BOOL bFileExtracted;
-static char* pszText2;
-static char* pszBuf;
 static BOOL bLastLine;
 
-static void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
+static std::wstring GetInfo(FILETIME* lastWrite, unsigned size)
 {
-    CALL_STACK_MESSAGE2("GetInfo(, , 0x%X)", size);
+    CALL_STACK_MESSAGE2("GetInfo(, 0x%X)", size);
     SYSTEMTIME st;
     FILETIME ft;
     FileTimeToLocalFileTime(lastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
+    std::wstring time;
+    const int timeChars = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
+    if (timeChars > 0)
+    {
+        std::vector<wchar_t> buffer(timeChars, L'\0');
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, buffer.data(), timeChars) != 0)
+            time.assign(buffer.data());
+    }
+    if (time.empty())
+        time = SPLFormatStringOwned(L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+
+    std::wstring date;
+    const int dateChars = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, NULL, 0);
+    if (dateChars > 0)
+    {
+        std::vector<wchar_t> buffer(dateChars, L'\0');
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buffer.data(), dateChars) != 0)
+            date.assign(buffer.data());
+    }
+    if (date.empty())
+        date = SPLFormatStringOwned(L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, CQuadWord(size, 0));
+    return SPLFormatStringOwned(L"%ls, %ls, %ls", number.c_str(), date.c_str(), time.c_str());
 }
 
 static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
@@ -667,13 +686,14 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
         if (InputFile.iCurrentLine >= pNextMarker->iLine)
         {
             iNextMarker++;
-            CPathBuffer text;
+            std::wstring text;
             if (pNextMarker->iMarkerType == MARKER_START)
             {
                 CStartMarker* pStartMarker = (CStartMarker*)pNextMarker;
                 CDecoder* pDecoder;
                 HANDLE hFile = INVALID_HANDLE_VALUE;
                 BOOL bNull = FALSE;
+                std::wstring decodedName;
 
                 if (pStartMarker->bEmpty || !pStartMarker->bSelected)
                 {
@@ -682,22 +702,22 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
                 }
                 else
                 {
-                    strncpy_s((char*)text, text.Size(), pszDir, _TRUNCATE);
-                    if (!SalamanderGeneral->SalPathAppend(text, pStartMarker->cFileName, text.Size()))
-                    { // too long name - reported in SalamanderSafeFile->SafeFileCreate
-                        char* end = text + strlen(text);
-                        if (end > text && *(end - 1) != '\\')
-                            *end++ = '\\';
-                        strncpy_s(end, text.Size() - (end - (char*)text), pStartMarker->cFileName, _TRUNCATE);
+                    if (!DecodeUnmimeNameBytes(pStartMarker->cFileName, decodedName))
+                    { // the decode degrades rather than refuses, so the only way here is a failed
+                        // allocation - say so, instead of leaving whatever the last stage reported
+                        iErrorStr = IDS_LOWMEM;
+                        return FALSE;
                     }
-                    strcpy_s(pszText2, MAX_PATH, pszArcName);
-                    SalamanderGeneral->SalPathAppend(pszText2, pStartMarker->cFileName, MAX_PATH);
-                    GetInfo(pszBuf, pFileTime, pStartMarker->iSize);
+                    text = pszDir;
+                    SPLSalPathAppendOwned(text, decodedName.c_str());
+                    std::wstring archiveName = pszArcName;
+                    SPLSalPathAppendOwned(archiveName, decodedName.c_str());
+                    const std::wstring info = GetInfo(pFileTime, pStartMarker->iSize);
                     BOOL bSkip;
-                    hFile = SalamanderSafeFile->SafeFileCreate(text, GENERIC_WRITE, FILE_SHARE_READ,
+                    hFile = SalamanderSafeFile->SafeFileCreate(text.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                                                                FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
                                                                FALSE, SalamanderGeneral->GetMsgBoxParent(),
-                                                               pszText2, pszBuf, &iSilent, TRUE, &bSkip, NULL, 0, NULL, NULL);
+                                                               archiveName.c_str(), info.c_str(), &iSilent, TRUE, &bSkip, NULL, 0, NULL, NULL);
                     if (hFile == INVALID_HANDLE_VALUE)
                     {
                         pDecoder = new CNullDecoder;
@@ -737,15 +757,14 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
 
                 if (!bNull && Salamander != NULL)
                 {
-                    strcpy_s(pszText2, MAX_PATH, LoadStr(IDS_UNPACKING));
-                    strcat_s(pszText2, MAX_PATH, pStartMarker->cFileName);
-                    Salamander->ProgressDialogAddText(pszText2, TRUE);
+                    const std::wstring progressText = LangStr(IDS_UNPACKING) + decodedName;
+                    Salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
                     Salamander->ProgressSetTotalSize(CQuadWord(pStartMarker->iSize, 0), CQuadWord(-1, -1));
                     if (!Salamander->ProgressSetSize(CQuadWord(0, 0), currentProgress, TRUE))
                         bAbort = TRUE;
                 }
 
-                BOOL err = !pDecoder->Start(hFile, text) || !Decode(pDecoder, bOnlyOneFile);
+                BOOL err = !pDecoder->Start(hFile, text.c_str()) || !Decode(pDecoder, bOnlyOneFile);
                 err = !pDecoder->End() || err;
 
                 if (!bNull && Salamander != NULL)
@@ -767,7 +786,7 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
                     else
                     {
                         CloseHandle(hFile);
-                        DeleteFile(text);
+                        DeleteFileW(text.c_str());
                     }
 
                 if (err || bAbort)
@@ -789,11 +808,11 @@ static BOOL Decode(CDecoder* pDec, BOOL bOnlyOneFile)
     }
 }
 
-BOOL DecodeSelectedBlocks(LPCTSTR pszFileName, CParserOutput* output, LPCTSTR dir, FILETIME* pft,
+BOOL DecodeSelectedBlocks(const wchar_t* pszFileName, CParserOutput* output, const wchar_t* dir, FILETIME* pft,
                           CSalamanderForOperationsAbstract* sal, const CQuadWord& totalSize,
                           BOOL* pAborted, BOOL bOnlyOneFile)
 {
-    CALL_STACK_MESSAGE3("DecodeSelectedBlocks(%s, , %s)", pszFileName, dir);
+    CALL_STACK_MESSAGE3("DecodeSelectedBlocks(%ls, , %ls)", pszFileName, dir);
     if (output->Markers.Count == 0)
         return TRUE;
     if (!InputFile.Open(pszFileName))
@@ -810,8 +829,6 @@ BOOL DecodeSelectedBlocks(LPCTSTR pszFileName, CParserOutput* output, LPCTSTR di
     Salamander = sal;
     currentProgress = CQuadWord(0, 0);
     bAbort = FALSE;
-    pszText2 = new char[MAX_PATH];
-    pszBuf = new char[100];
     bLastLine = FALSE;
 
     if (Salamander != NULL)
@@ -822,8 +839,6 @@ BOOL DecodeSelectedBlocks(LPCTSTR pszFileName, CParserOutput* output, LPCTSTR di
     BOOL ret = Decode(pDecoder, bOnlyOneFile);
 
     delete pDecoder;
-    delete[] pszBuf;
-    delete[] pszText2;
     delete[] pszLine;
     InputFile.Close();
 

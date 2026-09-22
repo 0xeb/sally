@@ -22,6 +22,9 @@
 #include "nethood.rh2"
 #include "lang\lang.rh"
 
+#define NETHOOD_WIDEN_IMPL(value) L##value
+#define NETHOOD_WIDEN(value) NETHOOD_WIDEN_IMPL(value)
+
 unsigned int _winmajor;
 unsigned int _winminor;
 unsigned int _osplatform;
@@ -117,7 +120,6 @@ SalamanderPluginEntry(
     __in CSalamanderPluginEntryAbstract* salamander)
 {
     HINSTANCE hLangInst;
-    TCHAR szDescription[128];
 
     SalamanderDebug = salamander->GetSalamanderDebug();
     SalamanderVersion = salamander->GetVersion();
@@ -129,10 +131,14 @@ SalamanderPluginEntry(
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     {
         // Reject older versions.
-        MessageBox(
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-231). PluginNameEN is a fixed "Network" TCHAR[] consumed narrow elsewhere
+        // (InitializeWinLib, ~line 158) - inlined the known wide literal here rather than
+        // widening the shared global.
+        MessageBoxW(
             salamander->GetParentWindow(),
-            REQUIRE_LAST_VERSION_OF_SALAMANDER,
-            PluginNameEN,
+            NETHOOD_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+            L"Network",
             MB_OK | MB_ICONERROR);
         return NULL;
     }
@@ -142,7 +148,7 @@ SalamanderPluginEntry(
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // setup help file name
-    SalamanderGeneral->SetHelpFileName("nethood.chm");
+    SalamanderGeneral->SetHelpFileName(L"nethood.chm");
 
 #if 0
 	// DBG: Fake OS version
@@ -167,17 +173,18 @@ SalamanderPluginEntry(
     }
     SetupWinLibHelp(HTMLHelpCallback);
 
-    LoadString(hLangInst, IDS_DESCRIPTION, szDescription, COUNTOF(szDescription));
+    const std::wstring description =
+        SPLLoadStrOwned(SalamanderGeneral, hLangInst, IDS_DESCRIPTION);
 
     // Setup basic plugin information.
     salamander->SetBasicPluginData(
-        SalamanderGeneral->LoadStr(GetLangInstance(), IDS_PLUGIN_NAME),
+        SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_PLUGIN_NAME).c_str(),
         FUNCTION_CONFIGURATION |
             FUNCTION_LOADSAVECONFIGURATION |
             FUNCTION_FILESYSTEM,
-        VERSINFO_VERSION_NO_PLATFORM,
-        VERSINFO_COPYRIGHT,
-        szDescription,
+        NETHOOD_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+        NETHOOD_WIDEN(VERSINFO_COPYRIGHT),
+        description.c_str(),
         SuggestedConfigKey,
         NULL,
         SuggestedFSName);
@@ -187,8 +194,8 @@ SalamanderPluginEntry(
 
     // Retrieve the file system name assigned to plugin by Salamander
     // (may be different from suggested name).
-    SalamanderGeneral->GetPluginFSName(g_szAssignedFSName, 0);
-    g_cchAssignedFSName = _tcslen(g_szAssignedFSName);
+    g_assignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
+    g_cchAssignedFSName = g_assignedFSName.size();
 
     // Setup plugin home page.
     salamander->SetPluginHomePageURL(HomePageUrl);

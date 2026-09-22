@@ -13,16 +13,23 @@ typedef QWORD* LPQWORD;
 #endif
 
 void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
-                 char* buffer, int bufferSize,
                  CSalamanderRegistryAbstract* registry);
 void SaveHistory(HKEY regKey, const char* keyPattern, char** history,
                  CSalamanderRegistryAbstract* registry);
 
-BOOL FileError(HWND parent, const char* fileName, int error,
+// Bridges a narrow (char*) config field through the shared
+// registry facade's wide-only REG_SZ contract (see reg_sz_narrow_bridge.h /
+// ftp.cpp's SetValueSZ/GetValueSZ for the original of this pattern). The
+// field itself stays narrow by design (feeds a still-narrow dialog control).
+BOOL SetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const char* narrowValue);
+BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, char* narrowBuf, int narrowBufSize);
+BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, std::string& value);
+
+BOOL FileError(HWND parent, const wchar_t* fileName, int error,
                BOOL retry, BOOL* skip, BOOL* skipAll, int title);
 
-BOOL FileOverwrite(HWND parent, const char* fileName1, const char* fileData1,
-                   const char* fileName2, const char* fileData2, DWORD attr,
+BOOL FileOverwrite(HWND parent, const wchar_t* fileName1, const wchar_t* fileData1,
+                   const wchar_t* fileName2, const wchar_t* fileData2, DWORD attr,
                    int shquestion, int shtitle, BOOL* skip, DWORD* silent);
 
 // ****************************************************************************
@@ -82,16 +89,16 @@ const char* StrQChr(const char* start, const char* end, char q, char c);
 BOOL IsValidInt(const char* begin, const char* end, BOOL isSigned);
 BOOL IsValidFloat(const char* begin, const char* end);
 int GetRegExpErrorID(CRegExpErrors err);
-char* StripRoot(char* path, int rootLen);
+wchar_t* StripRoot(wchar_t* path, size_t rootLen);
 enum CRenameSpec;
-BOOL ValidateFileName(const char* name, int len, CRenameSpec spec,
+BOOL ValidateFileName(const wchar_t* name, int len, CRenameSpec spec,
                       BOOL* skip, BOOL* skipAll);
-int CutTrailingDots(char* name, int len, CRenameSpec spec);
-inline const char* GetNextPathComponent(const char* name)
+int CutTrailingDots(wchar_t* name, int len, CRenameSpec spec);
+inline const wchar_t* GetNextPathComponent(const wchar_t* name)
 {
-    while (*name != '\\' && *name != 0)
+    while (*name != L'\\' && *name != 0)
         name++;
     return name;
 }
-BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
-                     char* buffer, int bufferSize, BOOL save = FALSE);
+BOOL ShowOpenFileDialog(HWND parent, const wchar_t* title, const wchar_t* filter,
+                        std::wstring& fileName);

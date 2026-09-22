@@ -21,46 +21,7 @@
 #pragma option -a4
 #endif // __BORLANDC__
 
-#include <string>
-
-// RAII string conversion helpers - use for local temporaries
-inline std::string WideToLocal(const wchar_t* src, int srcLen = -1)
-{
-    if (!src || (srcLen == 0))
-        return std::string();
-    int len = WideCharToMultiByte(CP_ACP, 0, src, srcLen, nullptr, 0, nullptr, nullptr);
-    if (len <= 0)
-        return std::string();
-    std::string result(len, '\0');
-    WideCharToMultiByte(CP_ACP, 0, src, srcLen, &result[0], len, nullptr, nullptr);
-    if (srcLen == -1 && !result.empty() && result.back() == '\0')
-        result.pop_back(); // remove null terminator counted by -1
-    return result;
-}
-
-inline std::string WideToLocal(const std::wstring& src)
-{
-    return WideToLocal(src.c_str(), static_cast<int>(src.size()));
-}
-
-inline std::wstring LocalToWide(const char* src, int srcLen = -1)
-{
-    if (!src || (srcLen == 0))
-        return std::wstring();
-    int len = MultiByteToWideChar(CP_ACP, 0, src, srcLen, nullptr, 0);
-    if (len <= 0)
-        return std::wstring();
-    std::wstring result(len, L'\0');
-    MultiByteToWideChar(CP_ACP, 0, src, srcLen, &result[0], len);
-    if (srcLen == -1 && !result.empty() && result.back() == L'\0')
-        result.pop_back(); // remove null terminator counted by -1
-    return result;
-}
-
-inline std::wstring LocalToWide(const std::string& src)
-{
-    return LocalToWide(src.c_str(), static_cast<int>(src.size()));
-}
+#include "spl_buffer.h"
 
 // in the plugin you need to define variable SalamanderVersion (int) and initialize it
 // in SalamanderPluginEntry:
@@ -107,12 +68,6 @@ struct CQuadWord
         LoDWord = lo;
         HiDWord = hi;
     }
-    CQuadWord(const CQuadWord& qw)
-    {
-        LoDWord = qw.LoDWord;
-        HiDWord = qw.HiDWord;
-    }
-
     CQuadWord& Set(DWORD lo, DWORD hi)
     {
         LoDWord = lo;
@@ -244,9 +199,9 @@ struct CQuadWord
 // record of each file and directory in Salamander (basic data about file/directory)
 struct CFileData // destructor must not be added here!
 {
-    char* Name;                    // allocated file name (without path), must be allocated on Salamander's
+    wchar_t* Name;                    // allocated file name (without path), must be allocated on Salamander's
                                    // heap (see CSalamanderGeneralAbstract::Alloc/Realloc/Free)
-    char* Ext;                     // pointer into Name after the first dot from the right (including dot at the beginning of name,
+    wchar_t* Ext;                     // pointer into Name after the first dot from the right (including dot at the beginning of name,
                                    // on Windows it is considered as extension, unlike on UNIX) or to the end of
                                    // Name if extension does not exist; if FALSE is set in configuration
                                    // for SALCFG_SORTBYEXTDIRSASFILES, Ext for directories points to the end of
@@ -254,14 +209,18 @@ struct CFileData // destructor must not be added here!
     CQuadWord Size;                // file size in bytes
     DWORD Attr;                    // file attributes - ORed constants FILE_ATTRIBUTE_XXX
     FILETIME LastWrite;            // last write time to file (UTC-based time)
-    char* DosName;                 // allocated DOS 8.3 file name, NULL if not needed, must be
+    wchar_t* DosName;                 // allocated DOS 8.3 file name, NULL if not needed, must be
                                    // allocated on Salamander's heap (see CSalamanderGeneralAbstract::Alloc/Realloc/Free)
-    WCHAR* NameW = nullptr;        // allocated wide (Unicode) file name, NULL if Name can represent the filename
-                                   // correctly (all chars fit in current ANSI codepage);
-                                   // use NameW when available for display and file operations;
-                                   // NOTE: must NOT be std::wstring — CFileData is stored in TDirectArray (memmove)
+    // NameW is GONE. It existed only because Name was narrow and could
+    // not represent every filename, so a second wide field carried the truth "iff
+    // needed". Name is WCHAR* now, so that field, the iff-needed dance around it and
+    // UseWideName() are all incoherent rather than merely redundant - two wide names
+    // cannot disagree usefully. The one-allocator rule is unchanged: Name and DosName
+    // are still allocated on Salamander's heap via Alloc/Realloc/Free, and CFileData is
+    // still memmove'd inside TDirectArray, so no field here may become std::wstring.
     DWORD_PTR PluginData;          // used by plugin through CPluginDataInterfaceAbstract, Salamander ignores it
-    unsigned NameLen : 9;          // length of Name string (strlen(Name)) - WARNING: maximum name length is (MAX_PATH - 5)
+    DWORD NameLen;                  // length of Name in WCHARs (wcslen(Name)); full-width so virtual/archive
+                                    // namespaces are not forced through the old Windows component-name ceiling
     unsigned Hidden : 1;           // is hidden? (if 1, icon is 50% more transparent - ghosted)
     unsigned IsLink : 1;           // is link? (if 1, icon has link overlay) - standard filling see CSalamanderGeneralAbstract::IsFileLink(CFileData::Ext), takes precedence over IsOffline when displayed, but IconOverlayIndex takes precedence
     unsigned IsOffline : 1;        // is offline? (if 1, icon has offline overlay - black clock), both IsLink and IconOverlayIndex take precedence when displayed
@@ -277,9 +236,6 @@ struct CFileData // destructor must not be added here!
     unsigned CutToClip : 1;       // is CUT to clipboard? (if 1, icon is 50% more transparent - ghosted)
     unsigned IconOverlayDone : 1; // only for icon-reader-thread needs: are we getting or have we already gotten icon-overlay? (0 - no, 1 - yes)
 
-    // Returns true if this file requires wide string APIs for correct display/operations
-    // (i.e., the filename contains characters that can't be represented in the current ANSI codepage)
-    bool UseWideName() const { return NameW != NULL; }
 };
 
 // constants determining validity of data that is directly stored in CFileData (size, extension, etc.)
@@ -357,7 +313,7 @@ public:
     // if 'pluginData' is not NULL, it is used when creating new directories (if
     // 'path' does not exist), see CPluginDataInterfaceAbstract::GetFileDataForNewDir;
     // uniqueness check for file name on 'path' is not performed
-    virtual BOOL WINAPI AddFile(const char* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData) = 0;
+    virtual BOOL WINAPI AddFile(const wchar_t* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData) = 0;
 
     // adds a directory to the specified path (relative to this "salamander-directory"), returns success
     // string path is used only inside the function, content of file structure is used outside the function
@@ -373,7 +329,7 @@ public:
     // special case for FS (or object allocated via CSalamanderGeneralAbstract::AllocSalamanderDirectory
     // with 'isForFS'==TRUE): if dir.Name is "..", directory is added as up-dir (there can be only one,
     // always displayed at the beginning of listing with special icon)
-    virtual BOOL WINAPI AddDir(const char* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData) = 0;
+    virtual BOOL WINAPI AddDir(const wchar_t* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData) = 0;
 
     // returns the number of files in the object
     virtual int WINAPI GetFilesCount() const = 0;
@@ -432,7 +388,7 @@ public:
 // SALENUM_CANCEL if user decided to cancel operation on error (cancel), at the same time
 // enumerator returns NULL (ends); 'errorOccured' (if not NULL) returns SALENUM_SUCCESS if
 // no error occurred
-typedef const char*(WINAPI* SalEnumSelection)(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
+typedef const wchar_t*(WINAPI* SalEnumSelection)(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
                                               const CFileData** fileData, void* param, int* errorOccured);
 
 // enumerator, returns file names, ends by returning NULL;
@@ -458,7 +414,7 @@ typedef const char*(WINAPI* SalEnumSelection)(HWND parent, int enumFiles, BOOL* 
 // returned name, that one is OK; 'errorOccured' (if not NULL) returns SALENUM_CANCEL if
 // user decided to cancel operation on error (cancel), at the same time enumerator returns NULL (ends);
 // 'errorOccured' (if not NULL) returns SALENUM_SUCCESS if no error occurred
-typedef const char*(WINAPI* SalEnumSelection2)(HWND parent, int enumFiles, const char** dosName,
+typedef const wchar_t*(WINAPI* SalEnumSelection2)(HWND parent, int enumFiles, const wchar_t** dosName,
                                                BOOL* isDir, CQuadWord* size, DWORD* attr,
                                                FILETIME* lastWrite, void* param, int* errorOccured);
 
@@ -518,7 +474,7 @@ typedef int(WINAPI* FGetPluginIconIndex)();
 
 struct CColumn
 {
-    char Name[COLUMN_NAME_MAX]; // "Name", "Ext", "Size", ... column name under
+    wchar_t Name[COLUMN_NAME_MAX]; // "Name", "Ext", "Size", ... column name under
                                 // which the column appears in view and in menu
                                 // Must not contain empty string.
                                 // WARNING: May contain (after first null-terminator)
@@ -527,7 +483,7 @@ struct CColumn
                                 // is set in panel data (see CSalamanderDirectoryAbstract::SetValidData()).
                                 // For joining two strings use CSalamanderGeneralAbstract::AddStrToStr().
 
-    char Description[COLUMN_DESCRIPTION_MAX]; // Tooltip in header line
+    wchar_t Description[COLUMN_DESCRIPTION_MAX]; // Tooltip in header line
                                               // Must not contain empty string.
                                               // WARNING: May contain (after first null-terminator)
                                               // also description of "Ext" column - this happens when
@@ -632,7 +588,7 @@ public:
     //                                    callback is called)
     virtual void WINAPI GetTransferVariables(const CFileData**& transferFileData,
                                              int*& transferIsDir,
-                                             char*& transferBuffer,
+                                             wchar_t*& transferBuffer,
                                              int*& transferLen,
                                              DWORD*& transferRowData,
                                              CPluginDataInterfaceAbstract**& transferPluginDataIface,
@@ -671,10 +627,12 @@ public:
     // WARNING: Name and description of "Name" column may contain (always after first
     // null-terminator) also name and description of "Ext" column - this happens when
     // separate "Ext" column doesn't exist and VALID_DATA_EXTENSION is set in panel data
-    // (see CSalamanderDirectoryAbstract::SetValidData()).
-    // In this case double strings (with two null-terminators) need to be set -
-    // see CSalamanderGeneralAbstract::AddStrToStr().
-    virtual BOOL WINAPI SetColumnName(int index, const char* name, const char* description) = 0;
+    // (see CSalamanderDirectoryAbstract::SetValidData()). In that case pass the extension
+    // strings explicitly; the host owns publication into its fixed ABI column record.
+    virtual BOOL WINAPI SetColumnName(int index, const wchar_t* name,
+                                      const wchar_t* description,
+                                      const wchar_t* extensionName = NULL,
+                                      const wchar_t* extensionDescription = NULL) = 0;
 
     // Removes column at position 'index'. Both columns added by plugin and standard
     // Salamander columns can be removed. 'Name' column, which is always at index 0,
@@ -682,6 +640,10 @@ public:
     // in plugin data (see CSalamanderDirectoryAbstract::SetValidData()),
     // name+description of 'Ext' column must appear at 'Name' column.
     virtual BOOL WINAPI DeleteColumn(int index) = 0;
+
+    // Returns TRUE when the Name column also owns the Ext column strings.
+    // Kept at the end of the interface to preserve all existing vtable slots.
+    virtual BOOL WINAPI IsNameColumnExtensionMerged() = 0;
 };
 
 //
@@ -726,7 +688,7 @@ public:
     // can be performed at next GetFileDataForUpDir call or when releasing
     // the entire interface (in its destructor - called from
     // CPluginInterfaceAbstract::ReleasePluginDataInterface)
-    virtual void WINAPI GetFileDataForUpDir(const char* archivePath, CFileData& upDir) = 0;
+    virtual void WINAPI GetFileDataForUpDir(const wchar_t* archivePath, CFileData& upDir) = 0;
 
     // only for archive data (FS uses only root path in CSalamanderDirectoryAbstract):
     // when adding file/directory to CSalamanderDirectoryAbstract it may happen that
@@ -742,7 +704,7 @@ public:
     // its creation if the same directory is added via
     // CSalamanderDirectoryAbstract::AddDir (overwriting automatic creation with later
     // normal addition); if returns FALSE, only Salamander part will be released from 'dir'
-    virtual BOOL WINAPI GetFileDataForNewDir(const char* dirName, CFileData& dir) = 0;
+    virtual BOOL WINAPI GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir) = 0;
 
     // only for FS with custom icons (pitFromPlugin):
     // returns image-list with simple icons, during drawing items in panel
@@ -801,7 +763,7 @@ public:
     // restriction: from CSalamanderGeneralAbstract only methods that can be called
     //              from any thread can be used (methods independent of panel state)
     virtual void WINAPI SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
-                                  const char* archivePath, const CFileData* upperDir) = 0;
+                                  const wchar_t* archivePath, const CFileData* upperDir) = 0;
 
     // setting new value of "column->FixedWidth" - user used context menu
     // on plugin-added column in header-line > "Automatic Column Width"; plugin
@@ -831,16 +793,14 @@ public:
     // 'selectedFiles' and 'selectedDirs' are 0); if 'displaySize' is TRUE, size of
     // all selected directories is known (see CFileData::SizeValid; if nothing is selected, this is
     // TRUE); 'selectedSize' contains sum of CFileData::Size numbers of selected files and directories
-    // (if nothing is selected, this is zero); 'buffer' is buffer for returned text (size
-    // 1000 bytes); 'hotTexts' is array (size 100 DWORDs), in which hot-text position information
-    // is returned, lower WORD always contains hot-text position in 'buffer', upper WORD contains
-    // hot-text length; 'hotTextsCount' contains size of 'hotTexts' array (100) and returns number of
-    // written hot-texts in 'hotTexts' array; returns TRUE if 'buffer' + 'hotTexts' +
-    // 'hotTextsCount' is set, returns FALSE if Information Line should be filled in standard
+    // (if nothing is selected, this is zero); 'buffer' and 'hotTexts' are caller-owned,
+    // dynamically growable output records. Hot-text offsets and lengths count UTF-16 code units;
+    // returns TRUE if both outputs are set, returns FALSE if Information Line should be filled in standard
     // way (as on disk)
     virtual BOOL WINAPI GetInfoLineContent(int panel, const CFileData* file, BOOL isDir, int selectedFiles,
                                            int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
-                                           char* buffer, DWORD* hotTexts, int& hotTextsCount) = 0;
+                                           CSalamanderStringBuffer* buffer,
+                                           CSalamanderTextRangeBuffer* hotTexts) = 0;
 
     // only for archives: user saved files/directories from archive to clipboard, now closing
     // archive in panel: if method returns TRUE, this object remains open (optimization
@@ -898,10 +858,10 @@ public:
     // messages (timer); if such an operation is likely to take a long time, we should
     // "refresh" the dialog during this time by calling ProgressAddSize(CQuadWord(0, 0), TRUE)
     // and, based on its return value, possibly terminate the action early
-    virtual void WINAPI OpenProgressDialog(const char* title, BOOL twoProgressBars,
+    virtual void WINAPI OpenProgressDialog(const wchar_t* title, BOOL twoProgressBars,
                                            HWND parent, BOOL fileProgress) = 0;
     // writes text 'txt' (even multiple lines - it is split into lines) to the progress dialog
-    virtual void WINAPI ProgressDialogAddText(const char* txt, BOOL delayedPaint) = 0;
+    virtual void WINAPI ProgressDialogAddText(const wchar_t* txt, BOOL delayedPaint) = 0;
     // if 'totalSize1' is not CQuadWord(-1, -1), sets 'totalSize1' as 100 percent of the first progress bar,
     // if 'totalSize2' is not CQuadWord(-1, -1), sets 'totalSize2' as 100 percent of the second progress bar
     // (for a progress dialog with one progress bar, 'totalSize2' must be CQuadWord(-1, -1))
@@ -924,8 +884,8 @@ public:
     // moves all files from the 'source' directory to the 'target' directory,
     // additionally remaps prefixes of displayed names ('remapNameFrom' -> 'remapNameTo')
     // returns success of the operation
-    virtual BOOL WINAPI MoveFiles(const char* source, const char* target, const char* remapNameFrom,
-                                  const char* remapNameTo) = 0;
+    virtual BOOL WINAPI MoveFiles(const wchar_t* source, const wchar_t* target, const wchar_t* remapNameFrom,
+                                  const wchar_t* remapNameTo) = 0;
 };
 
 #ifdef _MSC_VER

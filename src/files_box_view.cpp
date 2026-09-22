@@ -16,7 +16,7 @@
 #include "darkmode.h"
 #include "common/unicode/NameRenderPolicy.h"
 
-const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
+const wchar_t* CFILESBOX_CLASSNAME = L"SalamanderItemsBox";
 
 //****************************************************************************
 //
@@ -24,6 +24,10 @@ const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
 //
 
 CFilesBox::CFilesBox(CFilesWindow* parent)
+    // Created through CWindow's wide-only CreateEx adapter (files_window_windowproc.cpp).
+    // This used to need an explicit UnicodeWnd flag to match the duplicate wide proc, or WM_CREATE's
+    // CWindowProcInt fired TRACE_C("Incompatible windows procedure.") - the exact mismatch
+    // that bug class is made of. There is one window proc now and no flag to disagree with it.
     : CWindow(ooStatic)
 {
     BottomBar.RelayWindow = this;
@@ -401,13 +405,14 @@ void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
     // highlight the fact that the panel is empty
     if (ItemsCount == 0 && (drawFlags & DRAWFLAG_ICON_ONLY) == 0)
     {
-        char textBuf[300];
-        textBuf[0] = 0;
+        // self-painted (no SetWindowText/WM_SETTEXT anywhere in this file, text
+        // is drawn straight from a private buffer via DrawText/DrawTextW), so this control's
+        // own window class is irrelevant to what it can paint - same shape as CTPHCaptionWindow
+        // (190) and CExecuteWindow (191).
+        std::wstring text;
         if (!Parent->Is(ptPluginFS) || !Parent->GetPluginFS()->NotEmpty() ||
-            !Parent->GetPluginFS()->GetNoItemsInPanelText(textBuf, 300))
-        {
-            lstrcpyn(textBuf, LoadStr(IDS_NOITEMSINPANEL), 300);
-        }
+            !Parent->GetPluginFS()->GetNoItemsInPanelText(text))
+            text = LoadStrW(IDS_NOITEMSINPANEL);
         RECT textR = FilesRect;
         textR.bottom = textR.top + FontCharHeight + 4;
         BOOL focused = (Parent->FocusVisible || Parent->Parent->EditMode && Parent->Parent->GetActivePanel() == Parent);
@@ -426,8 +431,8 @@ void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
         int oldTextColor = SetTextColor(HPrivateDC, newColor);
         HFONT hOldFont = (HFONT)SelectObject(HPrivateDC, Font);
         // if it flickers we can measure the text and use ExtTextOut
-        DrawText(HPrivateDC, textBuf, -1,
-                 &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(HPrivateDC, text.c_str(), -1,
+                  &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         SelectObject(HPrivateDC, hOldFont);
         SetTextColor(HPrivateDC, oldTextColor);
         SetBkMode(HPrivateDC, oldBkMode);
@@ -1916,7 +1921,6 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
         {
             if (ViewMode == vmDetailed)
                 x += XOffset;
-            CPathBuffer formatedFileName;  // Heap-allocated for long path support
             CFileData* f;
             BOOL isDir = itemIndex < Parent->Dirs->Count;
             if (isDir)
@@ -1927,6 +1931,9 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             int width = IconSizes[ICONSIZE_16] + 2;
 
             SIZE sz;
+            // Declared before the 'goto SKIP_MES' below, as the buffer it replaced was:
+            // jumping over an initialization is C2362.
+            std::wstring formatedFileName;
             sally::unicode::NameColumnViewMode nameColumnMode =
                 ViewMode == vmBrief ? sally::unicode::NameColumnViewMode::Brief : sally::unicode::NameColumnViewMode::Detailed;
             sally::unicode::NameWidthMeasurementPlan widthPlan =
@@ -1934,7 +1941,6 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
                     f->Name,
                     f->NameLen,
                     f->Ext,
-                    f->NameW,
                     isDir != FALSE,
                     Configuration.SortDirsByExt != FALSE,
                     Parent->IsExtensionInSeparateColumn() != FALSE,
@@ -1955,13 +1961,13 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             dc = HANDLES(GetDC(HWindow));
             hOldFont = (HFONT)SelectObject(dc, Font);
 
-            if (widthPlan.UseWide)
-                GetTextExtentPoint32W(dc, f->NameW, widthPlan.NameLength, &sz);
-            else
-            {
-                AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-                GetTextExtentPoint32(dc, formatedFileName, widthPlan.NameLength, &sz);
-            }
+            // One arm now - and it is the NARROW arm's computation, not the
+            // wide one's. The wide arm measured f->NameW unformatted while the narrow arm ran
+            // AlterFileName first. Case mapping preserves the character count but NOT the pixel
+            // width ("WWW" is wider than "www"), so collapsing to the wide arm as written would
+            // have quietly dropped the user's FileNameFormat from this column measurement.
+            formatedFileName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir != FALSE);
+            GetTextExtentPoint32W(dc, formatedFileName.c_str(), widthPlan.NameLength, &sz);
             width += 2 + sz.cx + 3;
 
             if (ViewMode == vmDetailed && width > (int)Parent->Columns[0].Width)
@@ -2005,7 +2011,6 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             BOOL hitIcon = PtInRect(&rect, pt);
 
             // detect a click on the text below the icon
-            CPathBuffer formatedFileName;  // Heap-allocated for long path support
             CFileData* f;
             BOOL isItemUpDir = FALSE;
             if (itemIndex < Parent->Dirs->Count)
@@ -2017,21 +2022,22 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             else
                 f = &Parent->Files->At(itemIndex - Parent->Dirs->Count);
 
-            AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0,
-                          itemIndex < Parent->Dirs->Count);
+            const std::wstring formatedFileName =
+                AlterFileNameW(f->Name, Configuration.FileNameFormat, 0,
+                               itemIndex < Parent->Dirs->Count);
 
             // NOTE: keep in sync with CFilesWindow::SetQuickSearchCaretPos
-            char buff[1024];                  // destination buffer for strings
+            wchar_t buff[1024];                  // destination buffer for strings
             int maxWidth = ItemWidth - 4 - 1; // -1 so they don't touch
-            char* out1 = buff;
+            wchar_t* out1 = buff;
             int out1Len = 512;
             int out1Width;
-            char* out2 = buff + 512;
+            wchar_t* out2 = buff + 512;
             int out2Len = 512;
             int out2Width;
             HDC hDC = ItemBitmap.HMemDC;
             HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
-            SplitText(hDC, formatedFileName, f->NameLen, &maxWidth,
+            SplitTextW(hDC, formatedFileName.c_str(), static_cast<int>(formatedFileName.length()), &maxWidth,
                       out1, &out1Len, &out1Width,
                       out2, &out2Len, &out2Width);
             SelectObject(hDC, hOldFont);
@@ -2087,7 +2093,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             if (itemIndex < Parent->Dirs->Count)
             {
                 f = &Parent->Dirs->At(itemIndex);
-                isDir = itemIndex != 0 || strcmp(f->Name, "..") != 0 ? 1 : 2 /* UP-DIR */;
+                isDir = itemIndex != 0 || wcscmp(f->Name, L"..") != 0 ? 1 : 2 /* UP-DIR */;
             }
             else
                 f = &Parent->Files->At(itemIndex - Parent->Dirs->Count);
@@ -2096,12 +2102,12 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             int maxTextWidth = ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
-            char buff[3 * 512]; // destination buffer for strings
-            char* out0 = buff;
+            wchar_t buff[3 * 512]; // destination buffer for strings
+            wchar_t* out0 = buff;
             int out0Len;
-            char* out1 = buff + 512;
+            wchar_t* out1 = buff + 512;
             int out1Len;
-            char* out2 = buff + 1024;
+            wchar_t* out2 = buff + 1024;
             int out2Len;
             HDC hDC = ItemBitmap.HMemDC;
             HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
@@ -2189,13 +2195,13 @@ BOOL CFilesBox::ShowHideChilds()
     // if we are in detailed or brief mode we need the horizontal scrollbar
     if ((ViewMode == vmDetailed || ViewMode == vmBrief) && HHScrollBar == NULL)
     {
-        BottomBar.Create(CWINDOW_CLASSNAME2, "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+        BottomBar.Create(CWINDOW_CLASSNAME2, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                          0, 0, 0, 0,
                          HWindow,
                          NULL, //HMenu
                          HInstance,
                          &BottomBar);
-        HHScrollBar = CreateWindow("scrollbar", "", WS_CHILD | SBS_HORZ | WS_VISIBLE | WS_CLIPSIBLINGS | SBS_HORZ,
+        HHScrollBar = CreateWindowW(L"scrollbar", L"", WS_CHILD | SBS_HORZ | WS_VISIBLE | WS_CLIPSIBLINGS | SBS_HORZ,
                                    0, 0, 0, 0,
                                    BottomBar.HWindow,
                                    NULL, //HMenu
@@ -2213,7 +2219,7 @@ BOOL CFilesBox::ShowHideChilds()
     {
         if (HVScrollBar == NULL)
         {
-            HVScrollBar = CreateWindow("scrollbar", "", WS_CHILD | SBS_VERT | WS_VISIBLE | WS_CLIPSIBLINGS | SBS_VERT,
+            HVScrollBar = CreateWindowW(L"scrollbar", L"", WS_CHILD | SBS_VERT | WS_VISIBLE | WS_CLIPSIBLINGS | SBS_VERT,
                                        0, 0, 0, 0,
                                        HWindow,
                                        NULL, //HMenu
@@ -2243,7 +2249,7 @@ BOOL CFilesBox::ShowHideChilds()
     // in detailed mode, if a header line is requested, create it
     if (ViewMode == vmDetailed && HeaderLineVisible && HeaderLine.HWindow == NULL)
     {
-        HeaderLine.Create(CWINDOW_CLASSNAME2, "", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+        HeaderLine.Create(CWINDOW_CLASSNAME2, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
                           0, 0, 0, 0,
                           HWindow,
                           NULL, //HMenu

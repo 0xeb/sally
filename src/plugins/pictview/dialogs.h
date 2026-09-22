@@ -33,11 +33,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}
@@ -87,9 +87,9 @@ protected:
 struct CExifItem
 {
     DWORD Tag;
-    char* TagTitle;
-    char* TagDescription;
-    char* Value;
+    wchar_t* TagTitle;
+    wchar_t* TagDescription;
+    wchar_t* Value;
 };
 
 class CExifDialog : public CCommonDialog
@@ -295,12 +295,11 @@ protected:
 class CRenameDialog : public CCommonDialog
 {
 protected:
-    LPTSTR Path;
-    int PathBufSize;
+    std::wstring& Path;
     BOOL bFirstShow;
 
 public:
-    CRenameDialog(HWND hParent, LPTSTR path, int pathBufSize);
+    CRenameDialog(HWND hParent, std::wstring& path);
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -336,14 +335,13 @@ protected:
 class CCopyToDlg : public CCommonDialog
 {
 protected:
-    LPCTSTR SrcName;
-    LPTSTR DstName;
+    const wchar_t* SrcName;
+    std::wstring& DstName;
 
 public:
-    // dstName must point to a buffer of at least MAX_PATH in size
-    // if Execute() returns IDOK, this buffer contains the full path to the file
-    // we should write to (the user also confirmed overwriting if it already exists)
-    CCopyToDlg(HWND parent, LPCTSTR srcName, LPTSTR dstName);
+    // If Execute() returns IDOK, dstName contains the full path to the file
+    // we should write to (the user also confirmed overwriting if it already exists).
+    CCopyToDlg(HWND parent, const wchar_t* srcName, std::wstring& dstName);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);

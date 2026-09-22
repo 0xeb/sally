@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -14,6 +14,7 @@
 #include "dialogs.h"
 #include "buffer.h"
 #include "parser.h"
+#include "unicode/helpers.h"
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -44,15 +45,13 @@ int FontHeight = -1;
 CWindowQueue ViewerWindowQueue("MMViewer Viewers"); // list of all viewer windows
 CThreadQueue ThreadQueue("MMViewer Viewers");       // list of all window threads
 
-const char* CONFIG_VERSION = "Version";
-const char* CONFIG_LOGFONT = "LogFont";
-const char* CONFIG_SAVEPOS = "SavePosition";
-const char* CONFIG_WNDPLACEMENT = "WindowPlacement";
-const char* CONFIG_AUTOSELECT = "Auto Select";
-const char* CONFIG_DEFAULT_CODING = "Default Coding";
-const char* CONFIG_FINDHISTORY = "Find History";
+const wchar_t* CONFIG_VERSION = L"Version";
+const wchar_t* CONFIG_LOGFONT = L"LogFont";
+const wchar_t* CONFIG_SAVEPOS = L"SavePosition";
+const wchar_t* CONFIG_WNDPLACEMENT = L"WindowPlacement";
+const wchar_t* CONFIG_AUTOSELECT = L"Auto Select";
 
-const char* PLUGIN_NAME = "MMVIEWER"; // plugin name required for WinLib
+const wchar_t* PLUGIN_NAME = L"MMVIEWER"; // plugin name required for WinLib
 
 // Configuration variables
 
@@ -177,12 +176,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 //
 // ****************************************************************************
-// LoadStr
+// LangStr
 //
 
-char* LoadStr(int resID)
+// Wide - SalGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SalGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalGeneral, HLanguage, resID);
 }
 
 BOOL GDIInit()
@@ -234,7 +234,7 @@ BOOL InitViewer()
 
     if (!InitializeWinLib(PLUGIN_NAME, DLLInstance))
         return FALSE;
-    SetWinLibStrings("Invalid number!", PLUGIN_NAME);
+    SetWinLibStrings(L"Invalid number!", PLUGIN_NAME);
     return TRUE;
 }
 
@@ -273,14 +273,22 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Multimedia Viewer" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // (spl_vers.h) used by ~35 plugins - widen only at this call site via the same
+        // two-macro token-paste idiom already used for __WFILE__ in common/trace.h, rather
+        // than touching the shared macro itself.
+#define MMVIEWER_WIDEN2(x) L##x
+#define MMVIEWER_WIDEN(x) MMVIEWER_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    MMVIEWER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Multimedia Viewer" /* do not translate! */, MB_OK | MB_ICONERROR);
+#undef MMVIEWER_WIDEN
+#undef MMVIEWER_WIDEN2
         return NULL;
     }
 
     // let it load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Multimedia Viewer" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Multimedia Viewer" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -291,21 +299,21 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set the help file name
-    SalGeneral->SetHelpFileName("mmviewer.chm");
+    SalGeneral->SetHelpFileName(L"mmviewer.chm");
 
     if (!InitViewer())
         return NULL; // error
 
     // set the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGIN_NAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION | FUNCTION_VIEWER /*|FUNCTION_CONFIGURATION*/,
-                                   VERSINFO_VERSION_NO_PLATFORM,
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
                                    // warning, long string so it doesn't overflow in the Plugins Manager window
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "MMVIEWER");
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"MMVIEWER");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -329,8 +337,8 @@ void CPluginInterface::About(HWND parent)
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
 {
     BOOL ret = ViewerWindowQueue.Empty();
-    if (!ret && (force || SalGeneral->SalMessageBox(parent, LoadStr(IDS_OPENED_WINDOWS),
-                                                    LoadStr(IDS_PLUGIN_NAME),
+    if (!ret && (force || SalGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_OPENED_WINDOWS).c_str(),
+                                                    SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(),
                                                     MB_YESNO | MB_ICONQUESTION) == IDYES))
     {
         ret = ViewerWindowQueue.CloseAllWindows(force) || force;
@@ -347,7 +355,6 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 
 void CPluginInterface::ClearHistory(HWND parent)
 {
-    ViewerWindowQueue.BroadcastMessage(WM_USER_CLEARHISTORY, 0, 0);
 }
 
 void CPluginInterface::Event(int event, DWORD param)
@@ -358,73 +365,6 @@ void CPluginInterface::Event(int event, DWORD param)
         ViewerWindowQueue.BroadcastMessage(WM_USER_SETTINGCHANGE, 0, 0);
         break;
     }
-}
-
-// ****************************************************************************
-
-BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
-{
-    HKEY historyKey;
-    int i;
-    for (i = 0; i < maxCount; i++)
-        if (history[i] != NULL)
-        {
-            free(history[i]);
-            history[i] = NULL;
-        }
-    if (registry->OpenKey(hKey, name, historyKey))
-    {
-        char buf[10];
-        for (i = 0; i < maxCount; i++)
-        {
-            _itoa(i + 1, buf, 10);
-            DWORD bufferSize;
-            if (registry->GetSize(historyKey, buf, REG_SZ, bufferSize))
-            {
-                history[i] = (char*)malloc(bufferSize);
-                if (history[i] == NULL)
-                {
-                    TRACE_E("Low memory");
-                    break;
-                }
-                if (!registry->GetValue(historyKey, buf, REG_SZ, history[i], bufferSize))
-                    break;
-            }
-        }
-        registry->CloseKey(historyKey);
-    }
-    return TRUE;
-}
-
-// ****************************************************************************
-
-BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
-{
-    HKEY historyKey;
-    if (registry->CreateKey(hKey, name, historyKey))
-    {
-        registry->ClearKey(historyKey);
-
-        BOOL saveHistory = FALSE;
-        SalGeneral->GetConfigParameter(SALCFG_SAVEHISTORY, &saveHistory, sizeof(BOOL), NULL);
-        if (saveHistory)
-        {
-            char buf[10];
-            int i;
-            for (i = 0; i < maxCount; i++)
-            {
-                if (history[i] != NULL)
-                {
-                    _itoa(i + 1, buf, 10);
-                    registry->SetValue(historyKey, buf, REG_SZ, history[i], (DWORD)strlen(history[i]) + 1);
-                }
-                else
-                    break;
-            }
-        }
-        registry->CloseKey(historyKey);
-    }
-    return TRUE;
 }
 
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
@@ -461,7 +401,7 @@ void OnConfiguration(HWND hParent)
     if (InConfiguration)
     {
         SalGeneral->SalMessageBox(hParent,
-                                  LoadStr(IDS_CFG_CONFLICT), LoadStr(IDS_PLUGIN_NAME),
+                                  SPLLoadStrOwned(SalGeneral, HLanguage, IDS_CFG_CONFLICT).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(),
                                   MB_ICONINFORMATION | MB_OK);
         return;
     }
@@ -489,34 +429,34 @@ CPluginInterface::GetInterfaceForMenuExt()
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
-    salamander->AddViewer(""
+    salamander->AddViewer(L""
 
 #ifdef _MP4_SUPPORT_
-                          "*.aac;*.mp4;*.m4a;*.m4b"
+                          L"*.aac;*.mp4;*.m4a;*.m4b"
 #endif
 
 #ifdef _MPG_SUPPORT_
-                          "*.mp3;*.mp2"
+                          L"*.mp3;*.mp2"
 #endif
 
 #ifdef _WAV_SUPPORT_
-                          ";*.wav;*.wave"
+                          L";*.wav;*.wave"
 #endif
 
 #ifdef _WMA_SUPPORT_
-                          ";*.wma"
+                          L";*.wma"
 #endif
 
 #ifdef _VQF_SUPPORT_
-                          ";*.vqf"
+                          L";*.vqf"
 #endif
 
 #ifdef _OGG_SUPPORT_
-                          ";*.ogg"
+                          L";*.ogg"
 #endif
 
 #ifdef _MOD_SUPPORT_
-                          ";*.it;*.s3m;*.stm;*.xm;*.mod;*.mtm;*.669"
+                          L";*.it;*.s3m;*.stm;*.xm;*.mod;*.mtm;*.669"
 #endif
 
                           ,
@@ -524,7 +464,7 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
 
     if (ConfigVersion < 1) // extensions added after 2.5b6
     {
-        salamander->AddViewer("*.wav;*.wave;*.wma;*.ogg", TRUE);
+        salamander->AddViewer(L"*.wav;*.wave;*.wma;*.ogg", TRUE);
     }
 
     /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
@@ -536,7 +476,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
   {MNTT_PE, 0
 };
 */
-    salamander->AddMenuItem(-1, LoadStr(IDS_EXPORTHTML), 0, MENUCMD_HTMLEXPORT, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_EXPORTHTML).c_str(), 0, MENUCMD_HTMLEXPORT, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
 
     HBITMAP hBmp = (HBITMAP)HANDLES(LoadImage(DLLInstance, MAKEINTRESOURCE(IDB_TOOLBARMAIN), IMAGE_BITMAP, 16, 16, LR_DEFAULTCOLOR));
     salamander->SetBitmapWithIcons(hBmp);
@@ -559,7 +499,7 @@ CPluginInterface::GetInterfaceForViewer()
 struct CTVData
 {
     BOOL AlwaysOnTop;
-    const char* Name;
+    const wchar_t* Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL ReturnLock;
@@ -574,12 +514,14 @@ struct CTVData
 unsigned WINAPI ViewerThreadBody(void* param)
 {
     CALL_STACK_MESSAGE1("ViewerThreadBody()");
-    SetThreadNameInVCAndTrace(LoadStr(IDS_PLUGIN_NAME));
+    // SetThreadNameInVCAndTrace is a byte-only diagnostic API.
+    SetThreadNameInVCAndTrace(LangStr(IDS_PLUGIN_NAME).c_str());
     TRACE_I("Begin");
 
     CTVData* data = (CTVData*)param;
 
-    CViewerWindow* window = new CViewerWindow(data->EnumFilesSourceUID, data->EnumFilesCurrentIndex);
+    const std::wstring name = data->Name != NULL ? data->Name : L"";
+    CViewerWindow* window = data->Name != NULL ? new CViewerWindow(data->EnumFilesSourceUID, data->EnumFilesCurrentIndex) : NULL;
     if (window != NULL)
     {
         if (data->ReturnLock)
@@ -610,7 +552,7 @@ unsigned WINAPI ViewerThreadBody(void* param)
             }
             if (window->CreateEx(data->AlwaysOnTop ? WS_EX_TOPMOST : 0,
                                  CWINDOW_CLASSNAME2,
-                                 LoadStr(IDS_PLUGIN_NAME),
+                                 LangStr(IDS_PLUGIN_NAME).c_str(),
                                  WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                  data->Left,
                                  data->Top,
@@ -623,9 +565,9 @@ unsigned WINAPI ViewerThreadBody(void* param)
             {
                 CALL_STACK_MESSAGE1("ViewerThreadBody::ShowWindow");
                 // WARNING! icons obtained here must be destroyed in WM_DESTROY
-                SendMessage(window->HWindow, WM_SETICON, ICON_BIG,
+                SendMessageW(window->HWindow, WM_SETICON, ICON_BIG,
                             (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_MAIN)));
-                SendMessage(window->HWindow, WM_SETICON, ICON_SMALL,
+                SendMessageW(window->HWindow, WM_SETICON, ICON_SMALL,
                             (LPARAM)LoadImage(DLLInstance, MAKEINTRESOURCE(IDI_MAIN),
                                               IMAGE_ICON, 16, 16, SalGeneral->GetIconLRFlags()));
                 ShowWindow(window->HWindow, data->ShowCmd);
@@ -642,8 +584,6 @@ unsigned WINAPI ViewerThreadBody(void* param)
     }
 
     CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
-    CPathBuffer name; // Heap-allocated for long path support
-    lstrcpyn(name, data->Name, name.Size());
     BOOL openFile = data->Success;
     SetEvent(data->Continue); // let the main thread continue, data are invalid from this point (=NULL)
     data = NULL;
@@ -652,18 +592,18 @@ unsigned WINAPI ViewerThreadBody(void* param)
     if (openFile)
     {
         CALL_STACK_MESSAGE1("ViewerThreadBody::OpenFile");
-        window->Renderer.OpenFile(name);
+        window->Renderer.OpenFile(name.c_str());
 
         CALL_STACK_MESSAGE1("ViewerThreadBody::message-loop");
         // message loop
         MSG msg;
-        while (GetMessage(&msg, NULL, 0, 0))
+        while (GetMessageW(&msg, NULL, 0, 0))
         {
             if ((!window->IsMenuBarMessage(&msg)) &&
                 (!TranslateAccelerator(window->HWindow, HAccel, &msg)))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
     }
@@ -674,7 +614,7 @@ unsigned WINAPI ViewerThreadBody(void* param)
     return 0;
 }
 
-BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, int width, int height,
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                          UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                          BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
@@ -814,7 +754,7 @@ BOOL CViewerWindow::InsertMenuBand()
     rbbi.fStyle = RBBS_NOGRIPPER;
     rbbi.hwndChild = MenuBar->GetHWND();
     rbbi.wID = BANDID_MENU;
-    SendMessage(HRebar, RB_INSERTBAND, (WPARAM)0, (LPARAM)&rbbi);
+    SendMessageW(HRebar, RB_INSERTBAND, (WPARAM)0, (LPARAM)&rbbi);
     return TRUE;
 }
 
@@ -831,7 +771,7 @@ BOOL CViewerWindow::InsertToolBarBand()
     rbbi.fStyle = RBBS_NOGRIPPER;
     rbbi.hwndChild = ToolBar->GetHWND();
     rbbi.wID = BANDID_TOOLBAR;
-    SendMessage(HRebar, RB_INSERTBAND, (WPARAM)1, (LPARAM)&rbbi);
+    SendMessageW(HRebar, RB_INSERTBAND, (WPARAM)1, (LPARAM)&rbbi);
     return TRUE;
 }
 
@@ -839,7 +779,7 @@ void CViewerWindow::LayoutWindows()
 {
     RECT r;
     GetClientRect(HWindow, &r);
-    SendMessage(HWindow, WM_SIZE, SIZE_RESTORED,
+    SendMessageW(HWindow, WM_SIZE, SIZE_RESTORED,
                 MAKELONG(r.right - r.left, r.bottom - r.top));
 }
 
@@ -853,7 +793,7 @@ CViewerWindow::GetLock()
 
 void CViewerWindow::UpdateEnablers()
 {
-    Enablers[vweFileOpened] = Renderer.FileName[0] != 0;
+    Enablers[vweFileOpened] = !Renderer.FileName.empty();
     if (ToolBar != NULL)
         ToolBar->UpdateItemsState();
 }
@@ -879,7 +819,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         RECT r;
         GetClientRect(HWindow, &r);
-        HRebar = CreateWindowEx(WS_EX_TOOLWINDOW, REBARCLASSNAME, "",
+        HRebar = CreateWindowEx(WS_EX_TOOLWINDOW, REBARCLASSNAME, L"",
                                 WS_VISIBLE | /*WS_BORDER |  */ WS_CHILD |
                                     WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
                                     RBS_VARHEIGHT | CCS_NODIVIDER |
@@ -893,7 +833,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         Renderer.CreateEx(WS_EX_CLIENTEDGE,
                           CWINDOW_CLASSNAME2,
-                          "",
+                          L"",
                           WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                           0,
                           0,
@@ -929,7 +869,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // WM_CONTEXTMENU arrives here when Shift+F10 is pressed instead of being captured
             // in the Renderer window. That would activate the system menu of this window.
             if (Renderer.HWindow != NULL)
-                SendMessage(Renderer.HWindow, uMsg, wParam, lParam);
+                SendMessageW(Renderer.HWindow, uMsg, wParam, lParam);
             break;
         }
 
@@ -1007,15 +947,6 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return 0;
     }
 
-    case WM_USER_CLEARHISTORY:
-    {
-        /*
-      if (FindDialog.HWindow != NULL)
-        PostMessage(FindDialog.HWindow, uMsg, wParam, lParam);
-      */
-        return 0;
-    }
-
     case WM_ACTIVATE:
     {
         if (!LOWORD(wParam))
@@ -1070,10 +1001,10 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // icons obtained without the LR_SHARED flag must be destroyed (ICON_SMALL)
         // and destroying shared ones (ICON_BIG) does no harm (nothing happens)
-        HICON hIcon = (HICON)SendMessage(HWindow, WM_SETICON, ICON_BIG, NULL);
+        HICON hIcon = (HICON)SendMessageW(HWindow, WM_SETICON, ICON_BIG, NULL);
         if (hIcon != NULL)
             DestroyIcon(hIcon);
-        hIcon = (HICON)SendMessage(HWindow, WM_SETICON, ICON_SMALL, NULL);
+        hIcon = (HICON)SendMessageW(HWindow, WM_SETICON, ICON_SMALL, NULL);
         if (hIcon != NULL)
             DestroyIcon(hIcon);
 
@@ -1084,8 +1015,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
-        SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
+        lstrcpynW(tt->Buffer, SPLLoadStrOwned(SalGeneral, HLanguage, ToolBarButtons[tt->Index].ToolTipResID).c_str(), TOOLTIP_TEXT_MAX);
+        SPLPrepareToolTipTextForAbiBuffer(SalamanderGUI, tt->Buffer,
+                                          TOOLTIP_TEXT_MAX, FALSE);
         return TRUE;
     }
     }
@@ -1117,15 +1049,15 @@ struct SMMVOperationFromDiskData
     int TotalFiles, ProcessedFiles;
 };
 
-void WINAPI MMVOperationFromDisk(const char* sourcePath, SalEnumSelection2 next, void* nextParam, void* param)
+void WINAPI MMVOperationFromDisk(const wchar_t* sourcePath, SalEnumSelection2 next, void* nextParam, void* param)
 {
     SMMVOperationFromDiskData* data = (SMMVOperationFromDiskData*)param;
 
     data->Success = TRUE; // for now we report the operation as successful
 
     BOOL isDir;
-    const char* name;
-    const char* dosName;
+    const wchar_t* name;
+    const wchar_t* dosName;
     CQuadWord size;
     DWORD attr;
     FILETIME lastWrite;
@@ -1144,11 +1076,11 @@ void WINAPI MMVOperationFromDisk(const char* sourcePath, SalEnumSelection2 next,
         {
             data->TotalFiles++;
 
+            std::wstring pathname = sourcePath;
+            SPLSalPathAppendOwned(pathname, name);
+
             CParserInterface* parser;
-            char pathname[1024];
-            strcpy(pathname, sourcePath);
-            SalGeneral->SalPathAppend(pathname, name, sizeof(pathname));
-            CParserResultEnum result = CreateAppropriateParser(pathname, &parser);
+            CParserResultEnum result = CreateAppropriateParser(pathname.c_str(), &parser);
             if (result == preOK)
             {
                 data->Output->AddHeader(name, TRUE);
@@ -1182,10 +1114,9 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     int ret = FALSE;
 
     COutput output;
-    CPathBuffer fname; // Heap-allocated for long path support
-    fname[0] = '\0';
-    char* s = LoadStr(IDS_HTMLEXPFILTER);
-    if (GetOpenFileName(parent, NULL, s, fname, LoadStr(IDS_HTMLEXT), TRUE))
+    std::wstring fname;
+    if (ShowOpenFileDialog(parent, NULL, LangStr(IDS_HTMLEXPFILTER).c_str(), fname,
+                           LangStr(IDS_HTMLEXT).c_str(), TRUE))
     {
         CQuadWord size = CQuadWord(-1, -1); // error
         SMMVOperationFromDiskData data;
@@ -1196,13 +1127,13 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
         data.TotalFiles = 0;
         data.ProcessedFiles = 0;
 
-        SalGeneral->CreateSafeWaitWindow(LoadStr(IDS_PROCESSINGFILES), LoadStr(IDS_PLUGIN_NAME), 500, NULL, NULL);
+        SalGeneral->CreateSafeWaitWindow(SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PROCESSINGFILES).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), 500, NULL, NULL);
 
         SalGeneral->CallPluginOperationFromDisk(PANEL_SOURCE, MMVOperationFromDisk, &data);
 
         if (data.Success)
         {
-            int r = ExportToHTML(fname, output);
+            int r = ExportToHTML(fname.c_str(), output);
 
             SalGeneral->DestroySafeWaitWindow();
 
@@ -1210,11 +1141,15 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
             {
                 ret = TRUE;
 
-                SalGeneral->SalMessageBox(parent, FStr(LoadStr(IDS_FILESPROCESSED), data.ProcessedFiles, data.TotalFiles),
-                                          LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONINFORMATION);
+                // Composed wide, so neither FStr's narrow formatter nor the
+                // conversion after it is in the path any more.
+                const std::wstring processed = SPLFormatStringOwned(
+                    LangStr(IDS_FILESPROCESSED).c_str(), data.ProcessedFiles, data.TotalFiles);
+                SalGeneral->SalMessageBox(parent, processed.c_str(),
+                                          SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONINFORMATION);
 
-                if (SalGeneral->SalMessageBox(parent, LoadStr(IDS_EXPORTOPEN), LoadStr(IDS_PLUGIN_NAME), MB_YESNO | MB_ICONQUESTION) == DIALOG_YES)
-                    ExecuteFile(fname);
+                if (SalGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_EXPORTOPEN).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_YESNO | MB_ICONQUESTION) == DIALOG_YES)
+                    ExecuteFile(fname.c_str());
             }
             else
             {
@@ -1223,7 +1158,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 case -1:
                 case -2:
                 default: // for now treat all errors as write errors
-                    SalGeneral->SalMessageBox(parent, LoadStr(IDS_MMV_WRITE_ERROR), LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+                    SalGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_MMV_WRITE_ERROR).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
                     break;
                 }
             }
@@ -1231,8 +1166,10 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
         else
         {
             SalGeneral->DestroySafeWaitWindow();
-            SalGeneral->SalMessageBox(parent, FStr(LoadStr(IDS_FILESPROCESSED), data.ProcessedFiles, data.TotalFiles),
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONSTOP);
+            const std::wstring processed = SPLFormatStringOwned(
+                LangStr(IDS_FILESPROCESSED).c_str(), data.ProcessedFiles, data.TotalFiles);
+            SalGeneral->SalMessageBox(parent, processed.c_str(),
+                                      SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONSTOP);
         }
     }
 
@@ -1254,66 +1191,47 @@ CPluginInterfaceForMenuExt::HelpForMenuItem(HWND parent, int id)
     return helpID != 0;
 }
 
-static char msgbuf[1024];
-char* FStr(const char* format, ...)
+std::wstring FStrW(const wchar_t* format, ...)
 {
-    va_list arglist;
-
-    va_start(arglist, format);
-    vsprintf(msgbuf, format, arglist);
-    va_end(arglist);
-    return (msgbuf);
+    va_list args;
+    va_start(args, format);
+    std::wstring result = SPLFormatStringOwnedV(format, args);
+    va_end(args);
+    return result;
 }
 
-char* my_strrev(char* string)
+char* FormatDiagnostic(const char* format, ...)
 {
-    char* start = string;
-    char* left = string;
-    char ch;
+    static thread_local std::string buffer;
+    static char empty[] = "";
+    if (format == NULL)
+        return empty;
 
-    while (*string++) /* find end of string */
-        ;
-    string -= 2;
-
-    while (left < string)
+    va_list args;
+    va_start(args, format);
+    va_list lengthArgs;
+    va_copy(lengthArgs, args);
+    const int length = _vscprintf(format, lengthArgs);
+    va_end(lengthArgs);
+    if (length < 0)
     {
-        ch = *left;
-        *left++ = *string;
-        *string-- = ch;
+        va_end(args);
+        return empty;
     }
 
-    return (start);
-}
-
-void FormatSize2(__int64 size, char* str_size, BOOL nozero = FALSE)
-{
-    if (!size && nozero)
+    try
     {
-        if (str_size)
-            str_size[0] = '\0';
-        return;
+        buffer.resize(static_cast<size_t>(length) + 1);
+        vsnprintf_s(buffer.data(), buffer.size(), _TRUNCATE, format, args);
+        buffer.resize(static_cast<size_t>(length));
+        va_end(args);
+        return buffer.data();
     }
-
-    char s[128];
-
-    _i64toa(size, s, 10);
-
-    int j = 0;
-    int len = (int)strlen(s) - 1;
-    int i = len;
-    int n = 0;
-    while (i > -1)
+    catch (...)
     {
-        n++;
-
-        str_size[j++] = s[i];
-        if ((n % 3 == 0) && (i != len) && (i != 0))
-            str_size[j++] = ' ';
-
-        i--;
+        va_end(args);
+        return empty;
     }
-    str_size[j] = '\0';
-    my_strrev(str_size);
 }
 
 bool IsUTF8Text(const char* s)
@@ -1388,197 +1306,72 @@ bool IsUTF8Text(const char* s)
     return false;
 }
 
-// intelligent dynamic converter - prevents unnecessary reallocation
-char* AnsiToUTF8(const char* chars, int len)
+void ExecuteFile(const wchar_t* fname)
 {
-    static TBuffer<char> tmpbuf;
-    static TBuffer<wchar_t> tmpbufw;
-
-    if (len == 0)
-    {
-        static char emptyBuff[] = "";
-        return emptyBuff;
-    }
-
-    tmpbufw.Reserve(len + 1);
-
-    wchar_t* wc = tmpbufw.Get();
-    wc[MultiByteToWideChar(CP_ACP, 0, chars, len, wc, len)] = 0;
-    int wcl = (int)wcslen(wc);
-
-    tmpbuf.Reserve((wcl + 1) * 4);
-
-    char* c = tmpbuf.Get();
-
-    if (((wcl = WideCharToMultiByte(CP_UTF8, 0, wc, wcl, c, wcl * 3, 0, NULL)) == 0))
-    {
-        tmpbuf.Reserve(len + 1);
-        strcpy(tmpbuf.Get(), chars);
-    }
-    else
-        c[wcl] = 0;
-
-    return tmpbuf.Get();
-}
-
-// intelligent dynamic converter - prevents unnecessary reallocation
-char* UTF8ToAnsi(const char* chars, int len)
-{
-    static TBuffer<char> tmpbuf;
-    static TBuffer<wchar_t> tmpbufw;
-
-    if (len == 0)
-    {
-        static char emptyBuff[] = "";
-        return emptyBuff;
-    }
-
-    tmpbufw.Reserve(len + 1);
-
-    wchar_t* wc = tmpbufw.Get();
-    wc[MultiByteToWideChar(CP_UTF8, 0, chars, len, wc, len)] = 0;
-    int wcl = (int)wcslen(wc);
-
-    tmpbuf.Reserve((wcl + 1) * 4);
-
-    char* c = tmpbuf.Get();
-
-    if (((wcl = WideCharToMultiByte(CP_ACP, 0, wc, wcl, c, wcl * 3, 0, NULL)) == 0))
-    {
-        tmpbuf.Reserve(len + 1);
-        strcpy(tmpbuf.Get(), chars);
-    }
-    else
-        c[wcl] = 0;
-
-    return tmpbuf.Get();
-}
-
-// intelligent dynamic converter - prevents unnecessary reallocation
-// Actually called only from 1 place in wmaparser.cpp
-char* WideToAnsi(const wchar_t* chars, int len)
-{
-    static TBuffer<char> tmpbuf;
-
-    if (len == 0)
-    {
-        static char emptyBuff[] = "";
-        return emptyBuff;
-    }
-
-    int outlen = WideCharToMultiByte(CP_UTF8, 0, chars, len, NULL, 0, 0, NULL);
-    tmpbuf.Reserve(outlen + 1);
-
-    char* c = tmpbuf.Get();
-
-    c[WideCharToMultiByte(CP_UTF8, 0, chars, len, c, outlen, 0, NULL)] = 0;
-
-    return c;
-}
-
-// intelligent dynamic converter - prevents unnecessary reallocation
-wchar_t* AnsiToWide(const char* chars, int len)
-{
-    static TBuffer<wchar_t> tmpbufw;
-
-    if (len == 0)
-    {
-        static wchar_t emptyBuff[] = L"";
-        return emptyBuff;
-    }
-
-    tmpbufw.Reserve(len + 1);
-
-    wchar_t* wc = tmpbufw.Get();
-
-    // NOTE: Must stay CP_ACP, used for file name conversion
-    wc[MultiByteToWideChar(CP_ACP, 0, chars, len, wc, len)] = 0;
-
-    return wc;
-}
-
-// intelligent dynamic converter - prevents unnecessary reallocation
-wchar_t* UTF8ToWide(const char* chars, int len)
-{
-    static TBuffer<wchar_t> tmpbufw;
-
-    if (len == 0)
-    {
-        static wchar_t emptyBuff[] = L"";
-        return emptyBuff;
-    }
-
-    tmpbufw.Reserve(len + 1);
-
-    wchar_t* wc = tmpbufw.Get();
-
-    wc[MultiByteToWideChar(CP_UTF8, 0, chars, len, wc, len)] = 0;
-
-    return wc;
-}
-
-void ExecuteFile(LPCTSTR fname)
-{
-    if (int((INT_PTR)ShellExecute(::GetDesktopWindow(), _T("open"), fname, _T(""), _T("."), SW_SHOW)) <= 32)
+    if (int((INT_PTR)ShellExecuteW(::GetDesktopWindow(), L"open", fname, L"", L".", SW_SHOW)) <= 32)
     {
         // let the user choose what to associate it with
-        ShellExecute(NULL,
-                     _T("open"),
-                     _T("rundll32.exe"),
-                     FStr("shell32.dll, OpenAs_RunDLL %s", fname),
-                     NULL,
-                     SW_SHOW);
+        const std::wstring parameters = std::wstring(L"shell32.dll, OpenAs_RunDLL \"") + fname + L"\"";
+        ShellExecuteW(NULL,
+                      L"open",
+                      L"rundll32.exe",
+                      parameters.c_str(),
+                      NULL,
+                      SW_SHOW);
     }
 }
 
-BOOL GetOpenFileName(HWND parent, const char* title, char* filter, char* buffer, const char* ext, BOOL save)
+BOOL ShowOpenFileDialog(HWND parent, const wchar_t* title, const wchar_t* filter,
+                        std::wstring& fileName, const wchar_t* ext, BOOL save)
 {
-    CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
-    OPENFILENAME ofn;
-
-    CPathBuffer fileName; // Heap-allocated for long path support
-
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    CALL_STACK_MESSAGE4("ShowOpenFileDialog(, %ls, %ls, , %d)", title, filter, save);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = parent;
-    ofn.lpstrFilter = filter;
-    while (*filter != 0) // create a double-null terminated list
-    {
-        if (*filter == '|')
-            *filter = 0;
-        filter++;
-    }
-
-    DWORD attr = SalGeneral->SalGetFileAttributes(buffer);
-    if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
-    {
-        fileName[0] = 0;
-        ofn.lpstrInitialDir = buffer;
-    }
-    else
-        strcpy(fileName, buffer);
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrTitle = title;
-    ofn.lpstrDefExt = ext + 1;
-    //ofn.lpfnHook = OFNHookProc;
     ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
     ofn.nFilterIndex = 1;
 
-    BOOL ret;
+    // Build the double-NUL-terminated wide filter directly from the '|'-separated source,
+    // rather than mutating 'filter' in place (narrow) and re-widening the result.
+    std::wstring filterW;
+    {
+        const wchar_t* segStart = filter;
+        for (const wchar_t* s = filter;; s++)
+        {
+            if (*s == L'|' || *s == 0)
+            {
+                filterW.append(segStart, s - segStart);
+                filterW.push_back(L'\0');
+                if (*s == 0)
+                    break;
+                segStart = s + 1;
+            }
+        }
+    }
+    filterW.push_back(L'\0');
+    DWORD attr = SalGeneral->SalGetFileAttributes(fileName.c_str());
+    std::wstring initialDirectory;
+    if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
+    {
+        initialDirectory = fileName;
+        fileName.clear();
+        ofn.lpstrInitialDir = initialDirectory.c_str();
+    }
+    ofn.lpstrFilter = filterW.c_str();
+    ofn.lpstrTitle = title;
+    ofn.lpstrDefExt = ext != NULL && *ext == L'.' ? ext + 1 : ext;
+
     if (save)
     {
         ofn.Flags |= OFN_OVERWRITEPROMPT;
-        ret = SalGeneral->SafeGetSaveFileName(&ofn);
-    }
-    else
-    {
-        ofn.Flags |= OFN_FILEMUSTEXIST;
-        ret = SalGeneral->SafeGetOpenFileName(&ofn);
+        return SPLSafeGetSaveFileNameOwned(SalGeneral, &ofn, fileName);
     }
 
-    if (ret)
-        strcpy(buffer, fileName);
-
-    return ret;
+    ofn.Flags |= OFN_FILEMUSTEXIST;
+    std::vector<std::wstring> files{fileName};
+    if (!SPLSafeGetOpenFileNamesOwned(SalGeneral, &ofn, files))
+        return FALSE;
+    fileName = files[0];
+    return TRUE;
 }

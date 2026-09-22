@@ -6,7 +6,6 @@
 
 #include "common/widepath.h"
 #include "common/find/FindDialogSeed.h"
-#include "ui/UnicodeNameInputController.h"
 
 // structure for adding messages to the Find Log; sent as the message parameter
 // of WM_USER_ADDLOG; parameters will be copied into the log data (can be deallocated after returning)
@@ -16,8 +15,8 @@
 struct FIND_LOG_ITEM
 {
     DWORD Flags;      // FLI_xxx
-    const char* Text; // message text, must not be NULL
-    const char* Path; // path to a file or directory, may be NULL
+    const wchar_t* Text; // message text, must not be NULL
+    const wchar_t* Path; // path to a file or directory, may be NULL
 };
 
 #define WM_USER_ADDLOG WM_APP + 210     // add an item to the log [FIND_LOG_ITEM* item, 0]
@@ -28,10 +27,6 @@ struct FIND_LOG_ITEM
 
 extern BOOL IsNotAlpha[256];
 
-#define ITEMNAME_TEXT_LEN MAX_PATH + MAX_PATH + 10
-#define NAMED_TEXT_LEN MAX_PATH  // maximum text length in the combobox
-#define LOOKIN_TEXT_LEN MAX_PATH // maximum text length in the combobox
-#define GREP_TEXT_LEN 201        // maximum text length in the combobox; NOTE: should match FIND_TEXT_LEN
 #define GREP_LINE_LEN 10000      // maximum line length for regular expressions (viewer uses a different macro)
 
 // Length of the mapped view; must be greater than the length of a line for regexp + EOL +
@@ -40,15 +35,15 @@ extern BOOL IsNotAlpha[256];
 
 // history for the Named combobox
 #define FIND_NAMED_HISTORY_SIZE 30 // number of remembered strings
-extern char* FindNamedHistory[FIND_NAMED_HISTORY_SIZE];
+extern wchar_t* FindNamedHistory[FIND_NAMED_HISTORY_SIZE];
 
 // history for the LookIn combobox
 #define FIND_LOOKIN_HISTORY_SIZE 30 // number of remembered strings
-extern char* FindLookInHistory[FIND_LOOKIN_HISTORY_SIZE];
+extern wchar_t* FindLookInHistory[FIND_LOOKIN_HISTORY_SIZE];
 
 // history for the Containing combobox
 #define FIND_GREP_HISTORY_SIZE 30 // number of remembered strings
-extern char* FindGrepHistory[FIND_GREP_HISTORY_SIZE];
+extern wchar_t* FindGrepHistory[FIND_GREP_HISTORY_SIZE];
 
 extern BOOL FindManageInUse; // is the Manage dialog open?
 extern BOOL FindIgnoreInUse; // is the Ignore dialog open?
@@ -75,33 +70,30 @@ class CMenuBar;
 
 struct CSearchForData
 {
-    CPathBuffer Dir;
+    // DirW replaced a (dir, dirW) pair whose narrow half was derived with
+    // WideToAnsi() - substituting the literal path "?" when the wide path had no
+    // CP_ACP form. Two of the three constructors and two of the three Set
+    // overloads had no caller at all.
     std::wstring DirW;
     CMaskGroup MasksGroup;
     BOOL IncludeSubDirs;
 
-    CSearchForData(const char* dir, const char* masksGroup, BOOL includeSubDirs)
+    CSearchForData(const wchar_t* dirW, const wchar_t* masksGroupW, BOOL includeSubDirs)
     {
-        Set(dir, masksGroup, includeSubDirs);
+        Set(dirW, masksGroupW, includeSubDirs);
     }
 
-    CSearchForData(const char* dir, const wchar_t* dirW, const char* masksGroup, BOOL includeSubDirs)
-    {
-        Set(dir, dirW, masksGroup, includeSubDirs);
-    }
-
-    void Set(const char* dir, const char* masksGroup, BOOL includeSubDirs);
-    void Set(const char* dir, const wchar_t* dirW, const char* masksGroup, BOOL includeSubDirs);
-    const char* GetText(int i)
+    void Set(const wchar_t* dirW, const wchar_t* masksGroupW, BOOL includeSubDirs);
+    const wchar_t* GetText(int i)
     {
         switch (i)
         {
         case 0:
             return MasksGroup.GetMasksString();
         case 1:
-            return Dir;
+            return DirW.c_str();
         default:
-            return IncludeSubDirs ? LoadStr(IDS_INCLUDESUBDIRSYES) : LoadStr(IDS_INCLUDESUBDIRSNO);
+            return IncludeSubDirs ? LoadStrW(IDS_INCLUDESUBDIRSYES) : LoadStrW(IDS_INCLUDESUBDIRSNO);
         }
     }
 };
@@ -124,15 +116,14 @@ public:
     CSearchingString();
     ~CSearchingString();
 
+    // each of these was declared twice: a sweep widened both halves of an A/W
+    // pair into identical signatures, leaving the narrow definitions with nothing to match.
     // sets the base to which additional text is appended via Set, and sets dirty to FALSE
-    void SetBase(const char* buf);
     void SetBase(const wchar_t* buf);
     // appending to the base value set via SetBase
-    void Set(const char* buf);
     void Set(const wchar_t* buf);
     // returns the complete string
-    void Get(char* buf, int bufSize);
-    void GetW(wchar_t* buf, int bufSize);
+    void Get(wchar_t* buf, int bufSize);
     std::wstring GetWString();
 
     // sets the dirty flag (is a redraw already pending?)
@@ -167,7 +158,29 @@ struct CGrepData
     //       EOL_NULL;              // unsupported by the regular expression parser :(
 
     CSearchData SearchData;
+    // Wide literal needle used by the encoding-aware content search. Hex and
+    // regular-expression byte renderings remain explicit in their own engines.
+    std::wstring GrepText;
+    // Case sensitivity for the wide path. SearchData carries it as an sf* flag for
+    // the byte engine; this mirrors it in the form ContentSearcher takes.
+    BOOL GrepCaseSensitive;
     CRegularExpression RegExp;
+    // The SAME pattern compiled from its UTF-8 rendering, used when
+    // the file's content is UTF-8.
+    //
+    // `RegExp` is compiled only when the wide pattern has an exact process-ACP
+    // representation. It remains invalid for an unrepresentable pattern so legacy
+    // byte content cannot produce substitution-driven false matches.
+    //
+    // UTF-8 needs no other machinery, which is why it is worth a member of its own:
+    // the encoding is ASCII-transparent, so CR/LF bytes never occur inside a
+    // multi-byte sequence and the existing line splitter and byte engine are
+    // already correct over UTF-8 bytes. Only the PATTERN was in the wrong encoding.
+    //
+    // UTF-16 content must be re-encoded before this byte engine can run over it.
+    // TestUtf16RegexContent (find.cpp) does that via common/text/Utf16RegexBridge,
+    // in its own __try-free function so its decode buffers can be plain locals.
+    CRegularExpression RegExpUtf8;
     // advanced search
     DWORD AttributesMask;  // mask first
     DWORD AttributesValue; // then compare
@@ -204,7 +217,7 @@ class CFindOptionsItem
 {
 public:
     // Internal
-    CPathBuffer ItemName;
+    std::wstring ItemName;
 
     CFilterCriteria Criteria;
 
@@ -218,14 +231,9 @@ public:
 
     BOOL AutoLoad;
 
-    CPathBuffer NamedText;
-    CPathBuffer LookInText;
-    // Wide twin of LookInText. Non-empty only when the saved "Look in" path
-    // does not round-trip CP_ACP exactly (kb/unicode P0-a); LookInText then
-    // holds the lossy ANSI mirror for legacy readers. Persisted as
-    // "Look In (Unicode)" REG_SZ next to the ANSI value.
-    std::wstring LookInTextW;
-    char GrepText[GREP_TEXT_LEN];
+    std::wstring NamedText;
+    std::wstring LookInText;
+    std::wstring GrepText;
 
 public:
     CFindOptionsItem();
@@ -286,7 +294,7 @@ class CFindIgnoreItem
 {
 public:
     BOOL Enabled;
-    std::string Path;
+    std::wstring Path; // wide, with the REG_SZ that persists it
 
     // the following data are not saved; they are initialized in Prepare()
     CFindIgnoreItemType Type;
@@ -322,10 +330,10 @@ public:
     // only items with 'Enabled' == TRUE are evaluated
     // returns FALSE if no such item is found
     // Note: the method must receive the full path with a trailing slash
-    BOOL Contains(const char* path, int startPathLen);
+    BOOL Contains(const wchar_t* path, int startPathLen);
 
     // adds the path only if it does not already exist in the list
-    BOOL AddUnique(BOOL enabled, const char* path);
+    BOOL AddUnique(BOOL enabled, const wchar_t* path);
 
 protected:
     void DeleteAll();
@@ -334,8 +342,8 @@ protected:
     BOOL Load(CFindIgnore* source);
 
     int GetCount() { return Items.Count; }
-    BOOL Add(BOOL enabled, const char* path);
-    BOOL Set(int index, BOOL enabled, const char* path);
+    BOOL Add(BOOL enabled, const wchar_t* path);
+    BOOL Set(int index, BOOL enabled, const wchar_t* path);
     CFindIgnoreItem* At(int i) { return Items[i]; }
     void Delete(int i) { Items.Delete(i); }
     BOOL Move(int srcIndex, int dstIndex);
@@ -456,8 +464,8 @@ protected:
 struct CFindLogItem
 {
     DWORD Flags;
-    char* Text;
-    char* Path;
+    wchar_t* Text;
+    wchar_t* Path;
 };
 
 class CFindLog
@@ -474,7 +482,7 @@ public:
 
     void Clean(); // releases all held items
 
-    BOOL Add(DWORD flags, const char* text, const char* path);
+    BOOL Add(DWORD flags, const wchar_t* text, const wchar_t* path);
     int GetCount() { return Items.Count; }
     int GetSkippedCount() { return SkippedErrors; }
     const CFindLogItem* Get(int index);
@@ -524,8 +532,8 @@ struct CMD5Digest
 
 struct CFoundFilesData
 {
-    std::string Name;
-    std::string Path;
+    // the narrow Name/Path halves are gone; these two are the only
+    // representation. Their W suffix is now redundant and comes off in the P1.5 rename pass.
     std::wstring NameW;
     std::wstring PathW;
     CQuadWord Size;
@@ -556,15 +564,9 @@ struct CFoundFilesData
         Different = 0;
     }
     ~CFoundFilesData() = default;
-    BOOL Set(const char* path, const char* name, const CQuadWord& size, DWORD attr,
+    BOOL Set(const wchar_t* path, const wchar_t* name, const CQuadWord& size, DWORD attr,
              const FILETIME* lastWrite, BOOL isDir);
-    BOOL Set(const char* path, const char* name, const wchar_t* pathW, const wchar_t* nameW,
-             const CQuadWord& size, DWORD attr, const FILETIME* lastWrite, BOOL isDir);
-    // if 'i' refers to Name or Path, returns a pointer to the corresponding variable
-    // otherwise fills the buffer 'text' (must be at least 50 characters long) with the appropriate value
-    // and returns a pointer to 'text'
     // 'fileNameFormat' determines formatting of names of found items
-    char* GetText(int i, char* text, int fileNameFormat);
     std::wstring GetTextW(int i, int fileNameFormat) const;
     std::wstring GetNameTextW(int fileNameFormat) const;
     std::wstring GetFullNameW() const;
@@ -618,13 +620,7 @@ public:
     int GetDataForRefineCount();
     CFoundFilesData* GetDataForRefine(int index);
 
-    DWORD GetSelectedListSize();                        // returns how many WCHARs are needed to store all selected
-                                                        // items as L"c:\\bla\\bla.txt\0c:\\bla\\bla2.txt\0\0"
-                                                        // if no item is selected, returns 2 (two terminators)
-    BOOL GetSelectedList(wchar_t* list, DWORD maxSize); // fills the list according to GetSelectedListSize
-                                                        // without exceeding maxSize (in WCHARs); built from the
-                                                        // wide names so lossy ANSI mirrors ('?' is a wildcard to
-                                                        // SHFileOperation!) never reach shell operations
+    void GetSelectedPaths(std::vector<std::wstring>& paths);
 
     // scans all selected files and directories and removes those that no longer exist
     // if 'forceRemove' variable is TRUE, selected items are removed without needing checks
@@ -646,7 +642,12 @@ protected:
     CToolBar* ToolBar;
     CToolBar* LogToolBar;
     HWND HNotifyWindow; // window to which commands are sent
-    char Text[200];
+    // The owning CFindDialog and its IDC_FIND_FOUND_FILES child are Unicode windows, so
+    // template caption ("Fo&und Items: (%d)") is delivered as genuine wide text to this attached
+    // control - narrow GetWindowText would round-trip a translated caption through CP_ACP for
+    // no reason. This control is self-painted (WM_ERASEBKGND draws Text directly via DrawTextW,
+    // no WM_SETTEXT marshalling), so it's free to hold/paint wide regardless of its own class.
+    WCHAR Text[200];
     int FoundCount;
     int ErrorsCount;
     int InfosCount;
@@ -704,29 +705,17 @@ enum CStateOfFindCloseQueryEnum
     sofcqCannotClose, // the Find window cannot be closed
 };
 
-class CComboboxEdit;
 class CButton;
 
 class CFindDialog : public CCommonDialog
 {
 protected:
-    // Wide cache for the "Look in" edit field. Authoritative ONLY while
-    // LookInUnicodeInput.IsEnabled() is TRUE. While the Unicode edit control
-    // is active, every write to the wide control mirrors into this cache (see
-    // Transfer ttDataFromWindow, Validate, browse, insert-drives). While the
-    // Unicode control is disabled, the cache must stay empty so downstream
-    // readers fall through to AnsiToWide(Data.LookInText) — the live ANSI
-    // combo is the source of truth in that mode. See InitialLookInSeed for
-    // the constructor-time bootstrap that decides which mode the dialog runs
-    // in, and sally::find::ShouldOverrideEditWithWide for the decision.
-    std::wstring LookInTextW;
-    // Seed captured at construction time from the opening panel's
-    // (GetPath(), GetPathW()) pair. Consumed once by the deferred
-    // WM_USER_FIND_LOOKIN_W_OVERRIDE handler to decide whether to enable the
-    // Unicode edit control and, if so, to plant the initial wide text into
-    // both the control and LookInTextW. Not consulted elsewhere.
+    // Seed captured at construction time from the opening panel and applied after
+    // the framework's initial transfer so the active panel wins over saved history.
     sally::find::LookInSeed InitialLookInSeed;
-    CUnicodeNameInputController LookInUnicodeInput;
+    // DEFAULT_CHARSET clone of the dialog font, made only when the Look-in text needs
+    // glyphs the dialog font's charset cannot supply. Owned; freed on WM_DESTROY.
+    HFONT LookInUnicodeFont;
 
     // data needed for laying out the dialog
     BOOL FirstWMSize;
@@ -768,7 +757,6 @@ protected:
     BOOL TwoParts;     // does the status bar have two texts?
                        //    CFindAdvancedDialog FindAdvanced;
     CFoundFilesListView* FoundFilesListView;
-    CPathBuffer FoundFilesDataTextBuffer; // for obtaining text from CFoundFilesData::GetText
     std::wstring FoundFilesDataTextBufferW; // for obtaining text from CFoundFilesData::GetTextW
     CFindTBHeader* TBHeader;
     BOOL SearchInProgress;
@@ -777,7 +765,6 @@ protected:
     CGrepData GrepData;
     CSearchingString SearchingText;
     CSearchingString SearchingText2;
-    CComboboxEdit* EditLine;
     BOOL UpdateStatusBar;
     IContextMenu2* ContextMenu;
     CFindDialog** ZeroOnDestroy; // the pointer will be zeroed on destruction
@@ -799,32 +786,26 @@ protected:
 
     BOOL FlashIconsOnActivation; // flash the status icons when we get activated
 
-    char FindNowText[100];
+    std::wstring FindNowText;
 
 public:
     CStateOfFindCloseQueryEnum StateOfFindCloseQuery; // main thread asks the Find thread whether the window can close; unsynchronized, used only during shutdown, more than enough...
 
 public:
-    CFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_t* initPathW = nullptr);
+    CFindDialog(HWND hCenterAgainst, const wchar_t* initPath);
     ~CFindDialog();
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
 
-    BOOL IsGood() { return EditLine != NULL; }
+    BOOL IsGood() { return TRUE; }
 
     void SetZeroOnDestroy(CFindDialog** zeroOnDestroy) { ZeroOnDestroy = zeroOnDestroy; }
 
-    BOOL GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex /* can be NULL */);
-    const char* GetName(int index);
-    const char* GetPath(int index);
+    BOOL GetFocusedFile(std::wstring& fullName, int* viewedIndex /* can be NULL */);
+    const wchar_t* GetName(int index);
+    const wchar_t* GetPath(int index);
     void UpdateInternalViewerData();
-
-    // Guard for commands that still consume the row's lossy ANSI mirrors
-    // (focus/open/view/edit): refuses rows whose wide names do not round-trip
-    // CP_ACP (sally::find::RowActionableViaAnsi) and tells the user why.
-    // Remove together with the P0-b wide routing of these commands.
-    BOOL EnsureRowActionableViaAnsi(const CFoundFilesData* data);
 
     BOOL IsSearchInProgress() { return SearchInProgress; }
 
@@ -891,7 +872,7 @@ protected:
 
     // creates a context menu for the selected items and calls ContextMenuInvoke for the specified lpVerb
     // returns TRUE if Invoke was called, otherwise returns FALSE if something fails
-    BOOL InvokeContextMenu(const char* lpVerb);
+    BOOL InvokeContextMenu(const wchar_t* lpVerb);
 
     void OnCutOrCopy(BOOL cut);
     void OnDrag(BOOL rightMouseButton);
@@ -904,10 +885,11 @@ protected:
 
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    // iterates over selected list view items and tries to find a common parent directory
-    // if it founds it, it copies it to the buffer and returns TRUE
-    // if it does not found it or the buffer is too small, it returns FALSE
-    BOOL GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPrefixChars);
+    // Iterates over selected list-view items and returns their common parent prefix.
+    BOOL GetCommonPrefixPath(std::wstring& prefix, int& commonPrefixChars);
+
+    // Returns the common prefix and each selected item's UTF-16 path relative to that prefix.
+    BOOL GetCommonPrefixPathW(std::wstring& prefix, std::vector<std::wstring>& namesW);
 
     BOOL InitializeOle();
     void UninitializeOle();
@@ -924,7 +906,9 @@ protected:
 class CFindDialogQueue : public CWindowQueue
 {
 public:
-    CFindDialogQueue(const char* queueName) : CWindowQueue(queueName) {}
+    // wchar_t, matching CWindowQueue's own base-class parameter - was hardcoded
+    // const char*, which no longer converts once wchar_t resolves to wchar_t under _UNICODE.
+    CFindDialogQueue(const wchar_t* queueName) : CWindowQueue(queueName) {}
 
     void AddToArray(TDirectArray<HWND>& arr);
 };
@@ -934,11 +918,8 @@ public:
 // externs
 //
 
-// Open the Find dialog seeded with the panel's path. `initPathW` carries
-// the wide source-of-truth; pass nullptr when only the ANSI mirror is
-// available. The wide pointer lets the dialog render Unicode-only roots
-// (e.g. zz中文) without CP_ACP loss in the visible "Look in" edit field.
-BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_t* initPathW = nullptr);
+// Open the Find dialog seeded with the panel's UTF-16 path.
+BOOL OpenFindDialog(HWND hCenterAgainst, const wchar_t* initPath);
 
 extern CFindOptions FindOptions;
 extern CFindIgnore FindIgnore;

@@ -7,6 +7,7 @@ sal_add_plugin(NAME unmime
     "${SAL_PLUGINS}/unmime/parser.cpp"
     "${SAL_PLUGINS}/unmime/precomp.cpp"
     "${SAL_PLUGINS}/unmime/unmime.cpp"
+    "${SAL_PLUGINS}/unmime/unmime_text.cpp"
   RC "${SAL_PLUGINS}/unmime/unmime.rc"
   DEF "${SAL_PLUGINS}/unmime/unmime.def"
 )

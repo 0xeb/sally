@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderSafeFileAbstract* SalamanderSafeFile;
 extern CSalamanderGUIAbstract* SalamanderGUI;
@@ -31,7 +33,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -54,14 +56,17 @@ extern BOOL configSplitToSubdir;
 
 extern HINSTANCE DLLInstance; // handle to SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to SLG - language-dependent resources
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 void CenterWindow(HWND hWnd);
-void GetInfo(char* buffer, CQuadWord& size);
-void StripExtension(LPTSTR fileName);
+std::wstring GetInfo(CQuadWord& size);
+void StripExtension(wchar_t* fileName);
+void StripExtension(std::wstring& fileName);
 BOOL Error(int title, int error, ...);
 BOOL Error2(HWND hParent, int title, int error, ...);
-void GetTargetDir(LPTSTR targetDir, LPTSTR subdirName, BOOL bSplit);
-BOOL MakePathAbsolute(char* path, BOOL pathIsDir, char* absRoot, BOOL activePreferred, int errorTitle);
+BOOL GetTargetDir(std::wstring& targetDir, const wchar_t* subdirName, BOOL bSplit);
+BOOL MakePathAbsolute(std::wstring& path, BOOL pathIsDir,
+                      const std::wstring& absRoot, BOOL activePreferred,
+                      int errorTitle);
 
 #define GETPARENT SalamanderGeneral->GetMsgBoxParent()
 

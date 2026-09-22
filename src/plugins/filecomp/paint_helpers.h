@@ -9,5 +9,5 @@ inline BOOL FileCompFillRect(HDC hdc, const RECT* rect)
 {
     // FileComp uses empty ExtTextOut calls as background fills. Keep that
     // behavior, but route through the shared clipped text policy.
-    return sally::ui::DrawPanelTextA(hdc, 0, 0, ETO_OPAQUE, rect, NULL, 0, NULL);
+    return sally::ui::DrawPanelTextW(hdc, 0, 0, ETO_OPAQUE, rect, L"", 0, NULL);
 }

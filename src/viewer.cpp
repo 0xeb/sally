@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/unicode/LegacyByteCellMap.h"
 
 #include <cstdint>
 
@@ -16,14 +17,10 @@
 #include "execute.h"
 #include "gui.h"
 #include "darkmode.h"
-#include "common/unicode/helpers.h"
 
-const char* CVIEWERWINDOW_CLASSNAME = "Salamander's Viewer Window";
-#ifndef _UNICODE
-const wchar_t* CVIEWERWINDOW_CLASSNAMEW = L"Salamander's Viewer Window";
-#endif // _UNICODE
+const wchar_t* CVIEWERWINDOW_CLASSNAME = L"Salamander's Viewer Window";
 
-char* ViewerHistory[VIEWER_HISTORY_SIZE];
+wchar_t* ViewerHistory[VIEWER_HISTORY_SIZE];
 
 HACCEL ViewerTable = NULL;
 BOOL UseCustomViewerFont = FALSE;
@@ -34,8 +31,7 @@ int CharWidth = 1,  // character width (in points); we divide by this value, so 
 
 CRITICAL_SECTION ViewerFontMeasureCS;
 BOOL ViewerFontMeasured = FALSE;
-BOOL ViewerFontNeedsMapping = FALSE;
-char ViewerFontMapping[256];
+wchar_t ViewerFontMapping[256];
 
 void GetDefaultViewerLogFont(LOGFONT* lf)
 {
@@ -48,14 +44,14 @@ void GetDefaultViewerLogFont(LOGFONT* lf)
     lf->lfClipPrecision = CLIP_DEFAULT_PRECIS;
     lf->lfQuality = DEFAULT_QUALITY;
     lf->lfPitchAndFamily = FIXED_PITCH | FF_DONTCARE;
-    strcpy(lf->lfFaceName, "Consolas");
+    wcscpy_s(lf->lfFaceName, L"Consolas");
 }
 
 //
 //*****************************************************************************
 
-void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
-                     int textLen, BOOL hexMode, int historySize, char* history[],
+void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, wchar_t* Text,
+                     int textLen, BOOL hexMode, int historySize, wchar_t* history[],
                      BOOL changeOnlyHistory)
 {
     CALL_STACK_MESSAGE6("HistoryComboBox(, , %d, , %d, %d, %d, , %d)",
@@ -82,9 +78,9 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
             // hex mode handling
             if (hexMode)
             {
-                char* s = Text;
+                wchar_t* s = Text;
                 BOOL openedQuotes = FALSE;
-                char* lastQuotes = NULL;
+                wchar_t* lastQuotes = NULL;
                 while (*s != 0 && (openedQuotes || *s == ' ' || *s >= '0' && *s <= '9' ||
                                    LowerCase[*s] >= 'a' && LowerCase[*s] <= 'f' ||
                                    *s == '"'))
@@ -120,12 +116,12 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
                     {
                         if (history[i] != NULL)
                         {
-                            if (strcmp(history[i], Text) == 0) // already in the history
+                            if (wcscmp(history[i], Text) == 0) // already in the history
                             {                                  // move it to position 0
                                 if (i > 0)
                                 {
-                                    char* swap = history[i];
-                                    memmove(history + 1, history, i * sizeof(char*));
+                                    wchar_t* swap = history[i];
+                                    memmove(history + 1, history, i * sizeof(wchar_t*));
                                     history[0] = swap;
                                 }
                                 insert = FALSE;
@@ -138,13 +134,13 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
 
                     if (insert)
                     {
-                        char* newText = _strdup(Text);
+                        wchar_t* newText = _wcsdup(Text);
                         if (newText != NULL)
                         {
                             if (history[historySize - 1] != NULL)
                                 free(history[historySize - 1]);
                             memmove(history + 1, history,
-                                    (historySize - 1) * sizeof(char*));
+                                    (historySize - 1) * sizeof(wchar_t*));
                             history[0] = newText;
                         }
                         else
@@ -166,177 +162,129 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
     }
 }
 
+void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, std::wstring& text,
+                     BOOL hexMode, int historySize, wchar_t* history[],
+                     BOOL changeOnlyHistory)
+{
+    CALL_STACK_MESSAGE5("HistoryComboBox(, , %d, <dynamic>, %d, %d, , %d)",
+                        ctrlID, hexMode, historySize, changeOnlyHistory);
+    HWND hwnd = NULL;
+    if (changeOnlyHistory || ti.GetControl(hwnd, ctrlID))
+    {
+        if (!changeOnlyHistory && ti.Type == ttDataToWindow)
+        {
+            SendMessageW(hwnd, CB_RESETCONTENT, 0, 0);
+            SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)text.c_str());
+        }
+        else
+        {
+            if (!changeOnlyHistory)
+            {
+                text = GetWindowTextStringW(hwnd);
+                SendMessageW(hwnd, CB_RESETCONTENT, 0, 0);
+                SendMessageW(hwnd, WM_SETTEXT, 0, (LPARAM)text.c_str());
+            }
+
+            if (hexMode)
+            {
+                size_t pos = 0;
+                BOOL openedQuotes = FALSE;
+                size_t lastQuotes = std::wstring::npos;
+                while (pos < text.length() &&
+                       (openedQuotes || text[pos] == L' ' ||
+                        text[pos] >= L'0' && text[pos] <= L'9' ||
+                        text[pos] >= L'a' && text[pos] <= L'f' ||
+                        text[pos] >= L'A' && text[pos] <= L'F' ||
+                        text[pos] == L'"'))
+                {
+                    if (text[pos] == L'"')
+                    {
+                        openedQuotes = !openedQuotes;
+                        lastQuotes = pos;
+                    }
+                    pos++;
+                }
+                if (openedQuotes)
+                    pos = lastQuotes;
+                if (pos < text.length())
+                {
+                    if (!changeOnlyHistory)
+                    {
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_STRINGISNOTHEX));
+                        SetFocus(hwnd);
+                        SendMessageW(hwnd, CB_SETEDITSEL, 0, MAKELPARAM(pos, pos + 1));
+                    }
+                    ti.ErrorOn(ctrlID);
+                }
+            }
+
+            if (ti.IsGood() && !text.empty())
+            {
+                BOOL insert = TRUE;
+                int i;
+                for (i = 0; i < historySize; i++)
+                {
+                    if (history[i] == NULL)
+                        break;
+                    if (wcscmp(history[i], text.c_str()) == 0)
+                    {
+                        if (i > 0)
+                        {
+                            wchar_t* swap = history[i];
+                            memmove(history + 1, history, i * sizeof(wchar_t*));
+                            history[0] = swap;
+                        }
+                        insert = FALSE;
+                        break;
+                    }
+                }
+                if (insert)
+                {
+                    wchar_t* newText = _wcsdup(text.c_str());
+                    if (newText != NULL)
+                    {
+                        if (history[historySize - 1] != NULL)
+                            free(history[historySize - 1]);
+                        memmove(history + 1, history,
+                                (historySize - 1) * sizeof(wchar_t*));
+                        history[0] = newText;
+                    }
+                    else
+                        TRACE_E(LOW_MEMORY);
+                }
+            }
+        }
+
+        if (!changeOnlyHistory)
+        {
+            for (int i = 0; i < historySize && history[i] != NULL; i++)
+                SendMessageW(hwnd, CB_ADDSTRING, 0, (LPARAM)history[i]);
+        }
+    }
+}
+
 //
 //*****************************************************************************
 
-void DoHexValidation(HWND edit, const int textLen)
+void DoHexValidation(HWND edit)
 {
-    CALL_STACK_MESSAGE2("DoHexValidation(, %d)", textLen);
+    CALL_STACK_MESSAGE1("DoHexValidation()");
     int start, end;
     SendMessage(edit, CB_GETEDITSEL, (WPARAM)&start, (LPARAM)&end);
-    std::unique_ptr<char[]> textBuffer = std::make_unique<char[]>(textLen); // RAII: auto-deleted
-    char* text = textBuffer.get(); // use raw pointer for arithmetic
-    SendMessage(edit, WM_GETTEXT, textLen, (LPARAM)text);
-    char* s = text;
-    while (*s != 0 && *s == ' ')
-        s++;
-    if (s != text)
-    {
-        start -= (int)(s - text);
-        end -= (int)(s - text);
-        if (start < 0)
-            start = 0;
-        if (end < 0)
-            end = 0;
-        memmove(text, s, strlen(s) + 1);
-    }
-    s = text;
-    BOOL openedQuotes = FALSE;
-    char *st = s, *strEnd = text + strlen(text);
-    while (*s != 0)
-    {
-        if (*s == '"')
-        {
-            if (!openedQuotes && s > text && *(s - 1) != ' ' && strEnd - text < textLen - 1)
-            {
-                if (start > s - text)
-                    start++;
-                if (end > s - text)
-                    end++;
-                memmove(s + 1, s, (strEnd - s) + 1);
-                *s++ = ' ';
-                strEnd++;
-            }
-            else
-            {
-                if (openedQuotes && s + 1 < strEnd && *(s + 1) != ' ' &&
-                    strEnd - text < textLen - 1)
-                {
-                    if (start >= (s - text) + 1)
-                        start++;
-                    if (end >= (s - text) + 1)
-                        end++;
-                    memmove(s + 2, s + 1, strEnd - s);
-                    *(s + 1) = ' ';
-                    strEnd++;
-                }
-                if (openedQuotes && s + 1 < strEnd)
-                    s++;
-                st = s + 1;
-            }
-            openedQuotes = !openedQuotes;
-        }
-        else
-        {
-            if (!openedQuotes)
-            {
-                if (*s == ' ')
-                {
-                    if (st == s) // '  ' -> ' '
-                    {
-                        s--;
-                        if (start >= st - text)
-                            start--;
-                        if (end >= st - text)
-                            end--;
-                        memmove(s, st, (strEnd - st) + 1);
-                        strEnd--;
-                    }
-                    else
-                        st = s + 1;
-                }
-                else
-                {
-                    if ((s - st) == 2) // 'ABC' -> 'AB C'
-                    {
-                        if (strEnd - text < textLen - 1)
-                        {
-                            if (start >= s - text)
-                                start++;
-                            if (end >= s - text)
-                                end++;
-                            memmove(s + 1, s, (strEnd - s) + 1);
-                            *s = ' ';
-                            st = s + 1;
-                            strEnd++;
-                        }
-                    }
-                }
-            }
-        }
-        s++;
-    }
-    SendMessage(edit, WM_SETTEXT, 0, (LPARAM)text);
+    std::wstring text = GetWindowTextStringW(edit);
+    Sally::Unicode::NormalizeHexPatternInput(text, start, end);
+    SendMessageW(edit, WM_SETTEXT, 0, (LPARAM)text.c_str());
     SendMessage(edit, CB_SETEDITSEL, 0, MAKELPARAM(start, end));
-    // RAII: textBuffer auto-deleted when scope exits
 }
 
 //
 //*****************************************************************************
-
-void ConvertHexToString(char* text, char* hex, int& len)
-{
-    CALL_STACK_MESSAGE2("ConvertHexToString(%s, ,)", text);
-    len = 0;
-    char *s = text, *st = text;
-    BYTE value = 0;
-    BOOL openedQuotes = FALSE;
-    while (1)
-    {
-        if (*s == '"')
-        {
-            s++;
-            openedQuotes = !openedQuotes;
-            continue;
-        }
-        if (openedQuotes)
-        {
-            if (*s == 0)
-                break;
-            else
-                hex[len++] = *s++;
-        }
-        else
-        {
-            if (*s != ' ')
-            {
-                if (*s == 0)
-                    break; // end of string
-                else
-                {
-                    if (*s >= '0' && *s <= '9')
-                        value = (BYTE)(*s - '0'); // first digit
-                    else
-                        value = (BYTE)(10 + (LowerCase[*s] - 'a'));
-                    s++;
-                    if (*s != ' ' && *s != 0 && *s != '"') // second digit
-                    {
-                        value <<= 4;
-                        if (*s >= '0' && *s <= '9')
-                            value |= (BYTE)(*s - '0');
-                        else
-                            value |= (BYTE)(10 + (LowerCase[*s] - 'a'));
-                        s++;
-                    }
-                    hex[len++] = value;
-                }
-            }
-            else
-                s++; // skip the space
-        }
-    }
-}
-
-//
-//*****************************************************************************
-// CFindSetDialog
-//
 
 void CFindSetDialog::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_FINDHEX, HexMode);
     ti.CheckBox(IDC_VIEWREGEXP, Regular);
-    HistoryComboBox(HWindow, ti, IDC_FINDTEXT, Text, FIND_TEXT_LEN, !Regular && HexMode,
+    HistoryComboBox(HWindow, ti, IDC_FINDTEXT, Text, !Regular && HexMode,
                     VIEWER_HISTORY_SIZE, ViewerHistory);
     if (ti.Type == ttDataToWindow)
     { // initialize the search text based on the selection in the viewer (the parent of this dialog)
@@ -344,23 +292,31 @@ void CFindSetDialog::Transfer(CTransferInfo& ti)
         if (win != NULL && win->Is(otViewerWindow)) // just to be sure, check that it is a viewer window
         {
             CViewerWindow* view = (CViewerWindow*)win;
-            char buf[FIND_TEXT_LEN];
-            char hexBuf[FIND_TEXT_LEN];
-            int len;
-            if (view->GetFindText(buf, len))
+            if (HexMode)
             {
-                if (HexMode)
+                std::string bytes;
+                if (view->GetFindBytes(bytes))
                 {
-                    if (len * 3 > FIND_TEXT_LEN)
-                        len = (FIND_TEXT_LEN - 1) / 3;
-                    int i;
-                    for (i = 0; i < len; i++)
-                    {
-                        sprintf(hexBuf + i * 3, i == len - 1 ? "%02X" : "%02X ", (unsigned)buf[i]);
-                    }
-                    strcpy(buf, hexBuf);
+                    std::wstring hexText;
+                    if (Sally::Unicode::FormatHexPattern(
+                            reinterpret_cast<const std::uint8_t*>(bytes.data()),
+                            bytes.size(), hexText))
+                        SetDlgItemTextW(HWindow, IDC_FINDTEXT, hexText.c_str());
                 }
-                SendMessage(GetDlgItem(HWindow, IDC_FINDTEXT), WM_SETTEXT, 0, (LPARAM)buf);
+            }
+            else
+            {
+                std::wstring seedW;
+                if (!view->GetFindTextW(seedW) || seedW.empty())
+                {
+                    std::string bytes;
+                    if (!view->GetFindBytes(bytes) ||
+                        !sally::legacy_search::DecodeAcp(
+                            bytes.data(), bytes.size(), seedW))
+                        seedW.clear();
+                }
+                if (!seedW.empty())
+                    SetDlgItemTextW(HWindow, IDC_FINDTEXT, seedW.c_str());
             }
         }
     }
@@ -460,7 +416,7 @@ CFindSetDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (!Regular && HexMode && HIWORD(wParam) == CBN_EDITUPDATE)
             {
-                DoHexValidation((HWND)lParam, FIND_TEXT_LEN);
+                DoHexValidation((HWND)lParam);
                 return TRUE;
             }
             break;
@@ -522,14 +478,10 @@ CViewerGoToOffsetDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CViewerWindow
 //
 
-CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* caption,
+CViewerWindow::CViewerWindow(const wchar_t* fileName, CViewType type, const wchar_t* caption,
                              BOOL wholeCaption, CObjectOrigin origin,
                              int enumFileNamesSourceUID, int enumFileNamesLastFileIndex)
-#ifdef _UNICODE
     : CWindow(origin), LineOffset(300, 100),
-#else  // _UNICODE
-    : CWindow(origin, TRUE), LineOffset(300, 100),
-#endif // _UNICODE
       FindDialog(HLanguage, IDD_FINDSET, IDD_FINDSET)
 {
     // GDI variables
@@ -555,7 +507,6 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
     LastSeekY = 0;
     LastOriginX = 0;
     RepeatCmdAfterRefresh = -1;
-    CurrentDir[0] = 0;
     ExitTextMode = FALSE;
     ForceTextMode = FALSE;
     CodeType = 0;
@@ -568,12 +519,10 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
         ClearViewedFile(); // error
     else
     {
-        CPathBuffer name; // Heap-allocated for long path support
-        lstrcpyn(name, fileName, name.Size());
-        if (SalGetFullName(name, NULL, NULL, NULL, NULL, name.Size()))
+        std::wstring name = fileName;
+        if (SalGetFullNameW(name))
         {
-            FileName = (const char*)name;
-            FileNameW = AnsiToWide(name);
+            FileNameW = name;
         }
         else
             ClearViewedFile();
@@ -607,7 +556,7 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
     Lock = NULL;
     WrapText = Configuration.WrapText;
     CodePageAutoSelect = Configuration.CodePageAutoSelect;
-    strcpy(DefaultConvert, Configuration.DefaultConvert);
+    DefaultConvert = Configuration.DefaultConvert;
     LastFindSeekY = -1;
     LastFindOffset = -1;
 
@@ -743,39 +692,31 @@ void PrintHexOffset(char* s, unsigned __int64 offset, int mode)
     TRACE_E("Unexpected situation in PrintHexOffset().");
 }
 
-void MyTextOut(HDC hdc, int nXStart, int nYStart, LPCTSTR lpString, int cbString)
+void DrawLegacyByteCells(HDC hdc, int nXStart, int nYStart,
+                         const char* bytes, int byteCount) noexcept
 {
 #ifdef _DEBUG
     if (!ViewerFontMeasured)
-        TRACE_E("MyTextOut(): ViewerFontMeasured is FALSE!");
+        TRACE_E("DrawLegacyByteCells(): ViewerFontMeasured is FALSE!");
 #endif // _DEBUG
-    if (ViewerFontNeedsMapping)
-    {
-        const char* s = lpString;
-        if (cbString >= 2001)
-        {
-            cbString = 2000;
-            TRACE_E("MyTextOut(): too long string! Truncating to 2000 characters!");
-        }
-        const char* end = s + cbString;
-        char buf[2001];
-        char* d = buf;
-        while (s < end)
-            *d++ = ViewerFontMapping[(unsigned char)*s++];
-        *d = 0;
-        TextOut(hdc, nXStart, nYStart, buf, cbString);
-    }
+    if (bytes == nullptr || byteCount <= 0)
+        return;
+    std::wstring text;
+    if (sally::unicode::TryMapLegacyByteCells(
+            bytes, static_cast<size_t>(byteCount), ViewerFontMapping, text))
+        TextOutW(hdc, nXStart, nYStart, text.c_str(), byteCount);
     else
-        TextOut(hdc, nXStart, nYStart, lpString, cbString);
+        TRACE_E("DrawLegacyByteCells(): insufficient memory for display text");
 }
 
-void MyTextOutW(HDC hdc, int nXStart, int nYStart, const wchar_t* lpString, int cchString)
+void DrawUnicodeCells(HDC hdc, int nXStart, int nYStart,
+                      const wchar_t* text, int characterCount)
 {
 #ifdef _DEBUG
     if (!ViewerFontMeasured)
-        TRACE_E("MyTextOutW(): ViewerFontMeasured is FALSE!");
+        TRACE_E("DrawUnicodeCells(): ViewerFontMeasured is FALSE!");
 #endif // _DEBUG
-    TextOutW(hdc, nXStart, nYStart, lpString, cchString);
+    TextOutW(hdc, nXStart, nYStart, text, characterCount);
 }
 
 namespace
@@ -859,7 +800,7 @@ void DrawDecodedCells(HDC dc, const Sally::Unicode::DecodedRun& visual, std::siz
     std::size_t textStart = visual.TextIndexForCellEnd(cellStart);
     std::size_t textEnd = visual.TextIndexForCellEnd(cellEnd);
     if (textEnd > textStart)
-        MyTextOutW(dc, xCell * CharWidth, 0, visual.Text.c_str() + textStart, (int)(textEnd - textStart));
+        DrawUnicodeCells(dc, xCell * CharWidth, 0, visual.Text.c_str() + textStart, (int)(textEnd - textStart));
 }
 
 } // namespace
@@ -1277,10 +1218,23 @@ void CViewerWindow::Paint(HDC dc)
     GetClientRect(HWindow, &clientRect);
     FillRect(dc, &clientRect, BkgndBrush);
 
-    if (EnablePaint && !ExitTextMode && !FileName.empty() && Width > 0 && Height > 0)
+    if (EnablePaint && !ExitTextMode && !FileNameW.empty() && Width > 0 && Height > 0)
     {
         //    HCURSOR oldCursor = GetCursor();
         //    SetCursor(LoadCursor(NULL, IDC_WAIT));
+        const int columns = (Width - BORDER_WIDTH) / CharWidth;
+        const size_t visibleLineCapacity = static_cast<size_t>(max(columns, 0)) + 1;
+        const size_t hexLineCapacity = static_cast<size_t>(max(HexOffsetLength, 0)) + 2 + 16 * 4 + 16 + 1;
+        std::vector<char> lineStorage;
+        try
+        {
+            lineStorage.resize(max(visibleLineCapacity, hexLineCapacity), '\0');
+        }
+        catch (...)
+        {
+            TRACE_E("CViewerWindow::Paint(): insufficient memory for the visible byte line");
+            return;
+        }
         //---
         HFONT oldFont = (HFONT)SelectObject(dc, ViewerFont);
         SetTextColor(dc, GetCOLORREF(ViewerColors[VIEWER_FG_NORMAL]));
@@ -1309,12 +1263,9 @@ void CViewerWindow::Paint(HDC dc)
         r.right = Width;
         ViewSize = 0;
         int lines = Height / CharHeight + 1;
-        int columns = (Width - BORDER_WIDTH) / CharWidth;
-        char line[2001]; // holds at most 2000 fully visible characters per line plus 1 partially visible character
+        char* line = lineStorage.data(); // explicit byte owner for legacy/hex parsing only
         char* s;
         BOOL fatalErr = FALSE;
-        if (columns <= 2000) // only when this maximum is not exceeded
-        {
             // determine which rows need to be repainted
             RECT clipRect;
             int clipRet = GetClipBox(dc, &clipRect);
@@ -1449,8 +1400,8 @@ void CViewerWindow::Paint(HDC dc)
                                 // u2, lineLen - OriginX norm
                                 if (u2 < lineLen - OriginX)
                                 {
-                                    MyTextOut(Bitmap.HMemDC, u2 * CharWidth, 0, text + u2,
-                                              (int)(lineLen - OriginX - u2));
+                                    DrawLegacyByteCells(Bitmap.HMemDC, u2 * CharWidth, 0, text + u2,
+                                                        (int)(lineLen - OriginX - u2));
                                 }
                                 // u1, u2 sel
                                 if (u1 < u2)
@@ -1458,7 +1409,7 @@ void CViewerWindow::Paint(HDC dc)
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_SELECTED]));
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_SELECTED]));
                                     SetBkMode(Bitmap.HMemDC, OPAQUE);
-                                    MyTextOut(Bitmap.HMemDC, u1 * CharWidth, 0, text + u1, u2 - u1);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, u1 * CharWidth, 0, text + u1, u2 - u1);
                                     SetBkMode(Bitmap.HMemDC, TRANSPARENT);
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_NORMAL]));
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_NORMAL]));
@@ -1466,7 +1417,7 @@ void CViewerWindow::Paint(HDC dc)
                                 // t2, u1 norm
                                 if (t2 < u1)
                                 {
-                                    MyTextOut(Bitmap.HMemDC, t2 * CharWidth, 0, text + t2, u1 - t2);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, t2 * CharWidth, 0, text + t2, u1 - t2);
                                 }
                                 // t1, t2 select
                                 if (t1 < t2)
@@ -1474,14 +1425,14 @@ void CViewerWindow::Paint(HDC dc)
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_SELECTED]));
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_SELECTED]));
                                     SetBkMode(Bitmap.HMemDC, OPAQUE);
-                                    MyTextOut(Bitmap.HMemDC, t1 * CharWidth, 0, text + t1, t2 - t1);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, t1 * CharWidth, 0, text + t1, t2 - t1);
                                     SetBkMode(Bitmap.HMemDC, TRANSPARENT);
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_NORMAL]));
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_NORMAL]));
                                 }
                                 // 0, t1 norm
                                 if (t1 > 0)
-                                    MyTextOut(Bitmap.HMemDC, 0, 0, text, t1);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, 0, 0, text, t1);
                             }
 
                             // bitblt the entire row to the screen
@@ -1889,19 +1840,19 @@ void CViewerWindow::Paint(HDC dc)
                             if (lineLen > OriginX)
                             { // output text to Bitmap.HMemDC
                                 if (u3 > 0)
-                                    MyTextOut(Bitmap.HMemDC, (int)((u1 + u2) * CharWidth), 0, line + u1 + u2, (int)u3);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, (int)((u1 + u2) * CharWidth), 0, line + u1 + u2, (int)u3);
                                 if (u2 > 0)
                                 {
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_SELECTED]));
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_SELECTED]));
                                     SetBkMode(Bitmap.HMemDC, OPAQUE);
-                                    MyTextOut(Bitmap.HMemDC, (int)(u1 * CharWidth), 0, line + u1, (int)u2);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, (int)(u1 * CharWidth), 0, line + u1, (int)u2);
                                     SetBkMode(Bitmap.HMemDC, TRANSPARENT);
                                     SetTextColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_FG_NORMAL]));
                                     SetBkColor(Bitmap.HMemDC, GetCOLORREF(ViewerColors[VIEWER_BK_NORMAL]));
                                 }
                                 if (u1 > 0)
-                                    MyTextOut(Bitmap.HMemDC, 0, 0, line, (int)u1);
+                                    DrawLegacyByteCells(Bitmap.HMemDC, 0, 0, line, (int)u1);
                             }
 
                             // bitblt the entire row to the screen
@@ -1944,7 +1895,6 @@ void CViewerWindow::Paint(HDC dc)
                 if (!FindDialog.Forward)
                     FindOffset += ViewSize;
             }
-        }
         EnablePaint = TRUE;
         ScrollToSelection = FALSE;
         SetBkMode(Bitmap.HMemDC, oldMode);
@@ -2017,51 +1967,39 @@ BOOL InitializeViewer()
     HANDLES(InitializeCriticalSection(&ViewerFontMeasureCS));
 
     UpdateViewerColors(ViewerColors);
-    ViewerMenu = LoadMenu(HLanguage, MAKEINTRESOURCE(IDM_VIEWERMENU));
+    ViewerMenu = LoadMenuW(HLanguage, MAKEINTRESOURCEW(IDM_VIEWERMENU));
     if (ViewerMenu == NULL)
     {
         TRACE_E("Unable to load menu for viewer.");
         return FALSE;
     }
-    MENUITEMINFO mi;
+    MENUITEMINFOW mi;
     memset(&mi, 0, sizeof(mi));
     mi.cbSize = sizeof(mi);
     mi.fMask = MIIM_TYPE | MIIM_SUBMENU;
     mi.fType = MFT_STRING;
     mi.hSubMenu = CreatePopupMenu();
-    mi.dwTypeData = LoadStr(IDS_VIEWERCODINGMENU);
-    InsertMenuItem(ViewerMenu, CODING_MENU_INDEX, TRUE, &mi);
+    std::wstring codingMenuText = LoadStrOwned(IDS_VIEWERCODINGMENU);
+    mi.dwTypeData = codingMenuText.data();
+    InsertMenuItemW(ViewerMenu, CODING_MENU_INDEX, TRUE, &mi);
 
-    ViewerTable = HANDLES(LoadAccelerators(HInstance, MAKEINTRESOURCE(IDA_VIEWERACCELS)));
+    ViewerTable = HANDLES(LoadAcceleratorsW(HInstance, MAKEINTRESOURCEW(IDA_VIEWERACCELS)));
     if (ViewerTable == NULL)
     {
         TRACE_E("Unable to load accelerators for viewer.");
         return FALSE;
     }
 
-#ifdef _UNICODE
     if (!CViewerWindow::RegisterUniversalClass(CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
                                                0,
                                                0,
-                                               HANDLES(LoadIcon(HInstance,
-                                                                MAKEINTRESOURCE(IDI_VIEWER))),
-                                               LoadCursor(NULL, IDC_ARROW),
+                                               HANDLES(LoadIconW(HInstance,
+                                                                 MAKEINTRESOURCEW(IDI_VIEWER))),
+                                               LoadCursorW(NULL, IDC_ARROW),
                                                (HBRUSH)(COLOR_WINDOW + 1),
                                                NULL,
                                                CVIEWERWINDOW_CLASSNAME,
                                                NULL))
-#else  // _UNICODE
-    if (!CViewerWindow::RegisterUniversalClassW(CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW,
-                                                0,
-                                                0,
-                                                HANDLES(LoadIcon(HInstance,
-                                                                 MAKEINTRESOURCE(IDI_VIEWER))),
-                                                LoadCursor(NULL, IDC_ARROW),
-                                                (HBRUSH)(COLOR_WINDOW + 1),
-                                                NULL,
-                                                CVIEWERWINDOW_CLASSNAMEW,
-                                                NULL))
-#endif // _UNICODE
     {
         TRACE_E("Unable to register window class for viewer.");
         return FALSE;
@@ -2159,33 +2097,27 @@ void CViewerWindow::SetViewerFont()
 
         HANDLES(EnterCriticalSection(&ViewerFontMeasureCS));
 
-        // Vista: the fixedsys font contains characters that do not have the expected width (even though it is a fixed-width font), therefore
-        // we measure individual characters and map those with an incorrect width to a replacement character with the correct width
-        if (!WindowsXP64AndLater && !ViewerFontMeasured) // before XP64 and Vista we did not run into this mess, so we will not even test it (on XP, W2K, NT4, etc.)
-        {
-            ViewerFontMeasured = TRUE;
-            ViewerFontNeedsMapping = FALSE;
-        }
+        // The legacy/hex view still has one visual cell per source byte. Build
+        // its byte-to-UTF-16 table once, measuring every resulting glyph so the
+        // old fixed-font substitution behavior remains intact without GDI A.
         if (!ViewerFontMeasured)
         {
             HFONT oldFont = (HFONT)SelectObject(Bitmap.HMemDC, ViewerFont);
             int oldMode = SetBkMode(Bitmap.HMemDC, TRANSPARENT);
 
-            ViewerFontNeedsMapping = FALSE;
-            char ch[2];
-            ch[1] = 0;
             RECT rect;
-            char substChar = (char)0xB7 /* middle dot */;
+            wchar_t substChar = L'\xB7'; // middle dot
             int x;
             for (x = 0; x < 256; x++)
             {
-                ViewerFontMapping[x] = x;
-                ch[0] = x;
+                wchar_t character = sally::legacy_search::DecodeDisplayCellAcp(
+                    static_cast<std::uint8_t>(x));
+                ViewerFontMapping[x] = character;
                 rect.left = 0;
                 rect.right = Width;
                 rect.top = 0;
                 rect.bottom = CharHeight;
-                if (DrawTextEx(Bitmap.HMemDC, ch, 1, &rect, DT_LEFT | DT_TOP | DT_CALCRECT | DT_NOPREFIX | DT_SINGLELINE, NULL))
+                if (DrawTextExW(Bitmap.HMemDC, &character, 1, &rect, DT_LEFT | DT_TOP | DT_CALCRECT | DT_NOPREFIX | DT_SINGLELINE, NULL))
                 {
                     if (rect.right - rect.left != CharWidth)
                     {
@@ -2194,11 +2126,10 @@ void CViewerWindow::SetViewerFont()
                             substChar = ' ';
                             int z;
                             for (z = 0; z < x; z++)
-                                if (ViewerFontMapping[z] == (char)0xB7 /* middle dot */)
+                                if (ViewerFontMapping[z] == L'\xB7' /* middle dot */)
                                     ViewerFontMapping[z] = substChar;
                         }
                         ViewerFontMapping[x] = substChar;
-                        ViewerFontNeedsMapping = TRUE;
                     }
                 }
                 else

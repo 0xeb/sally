@@ -3,21 +3,21 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 #include "checkver.h"
 #include "checkver.rh"
 #include "checkver.rh2"
+#include "checkver_text.h"
 #include "release_check.h"
 #include "lang\lang.rh"
 
 #include <string>
+#include <new>
 
 SYSTEMTIME LastCheckTime;       // when the check was last performed
 SYSTEMTIME NextOpenOrCheckTime; // the earliest time the plugin window should open automatically and optionally perform a check
 int ErrorsSinceLastCheck = 0;   // how many times we have already failed to perform the automatic check
 
-BYTE LoadedScript[LOADED_SCRIPT_MAX];
-DWORD LoadedScriptSize = 0;
+std::vector<BYTE> LoadedScript;
 
 namespace
 {
@@ -53,8 +53,8 @@ bool BuildReleaseState()
 {
     std::string error;
     if (!checkver::BuildReleaseCheckResult(
-            reinterpret_cast<const char*>(LoadedScript), LoadedScriptSize,
-            SalamanderTextVersion.Get(), GetCurrentPlatform(), ReleaseState, error))
+            reinterpret_cast<const char*>(LoadedScript.data()), LoadedScript.size(),
+            SalamanderTextVersion.c_str(), GetCurrentPlatform(), ReleaseState, error))
     {
         TRACE_E("Unable to build GitHub release state: " << error.c_str());
         return false;
@@ -64,29 +64,32 @@ bool BuildReleaseState()
 
 void AddVersionLine(int stringId, const std::string& version)
 {
-    char buffer[1024];
-    _snprintf_s(buffer, _TRUNCATE, LoadStr(stringId), version.c_str());
-    AddLogLine(buffer, FALSE);
+    const std::wstring versionText = checkver::Utf8ToWideOrEmpty(version);
+    const std::wstring line = SPLFormatStringOwned(LangStr(stringId).c_str(), versionText.c_str());
+    AddLogLine(line.c_str(), FALSE);
 }
 
 void AddPrimaryLinkLine()
 {
-    char buffer[1024];
+    const std::wstring latestVersion = checkver::Utf8ToWideOrEmpty(ReleaseState.LatestVersion);
+    std::wstring label;
     if (ReleaseState.UsedDirectAssetLink)
     {
-        _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_DOWNLOAD_RELEASE),
-                    ReleaseState.LatestVersion.c_str(),
-                    checkver::GetPlatformLabel(GetCurrentPlatform()));
+        const std::wstring platform = checkver::Utf8ToWideOrEmpty(
+            checkver::GetPlatformLabel(GetCurrentPlatform()));
+        label = SPLFormatStringOwned(LangStr(IDS_DOWNLOAD_RELEASE).c_str(),
+                                     latestVersion.c_str(), platform.c_str());
     }
     else
     {
-        _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_OPEN_RELEASE_PAGE),
-                    ReleaseState.LatestVersion.c_str());
+        label = SPLFormatStringOwned(LangStr(IDS_OPEN_RELEASE_PAGE).c_str(),
+                                     latestVersion.c_str());
     }
 
-    char line[1600];
-    _snprintf_s(line, _TRUNCATE, "   \tu%s\tl%s\tn", buffer, ReleaseState.PrimaryUrl.c_str());
-    AddLogLine(line, FALSE);
+    // The \tu ... \tl ... \tn markup is FlexWriteText's, not a user string - see logwnd.cpp.
+    const std::wstring url = checkver::Utf8ToWideOrEmpty(ReleaseState.PrimaryUrl);
+    const std::wstring line = L"   \tu" + label + L"\tl" + url + L"\tn";
+    AddLogLine(line.c_str(), FALSE);
 }
 
 void AddReleasePageLine()
@@ -94,38 +97,37 @@ void AddReleasePageLine()
     if (ReleaseState.ReleasePageUrl.empty() || ReleaseState.ReleasePageUrl == ReleaseState.PrimaryUrl)
         return;
 
-    char line[1600];
-    _snprintf_s(line, _TRUNCATE, "   \tu%s\tl%s\tn",
-                LoadStr(IDS_RELEASE_PAGE_LINK), ReleaseState.ReleasePageUrl.c_str());
-    AddLogLine(line, FALSE);
+    const std::wstring url = checkver::Utf8ToWideOrEmpty(ReleaseState.ReleasePageUrl);
+    const std::wstring line = L"   \tu" + LangStr(IDS_RELEASE_PAGE_LINK) + L"\tl" + url + L"\tn";
+    AddLogLine(line.c_str(), FALSE);
 }
 
 void FillReleaseLog()
 {
     if (!ReleaseState.HasCorrectData)
     {
-        AddLogLine(LoadStr(IDS_INFO_CORRUPTED), TRUE);
+        AddLogLine(LangStr(IDS_INFO_CORRUPTED).c_str(), TRUE);
         return;
     }
 
     if (ReleaseState.UpdateAvailable)
     {
-        AddLogLine(LoadStr(IDS_NEWREL_MODULES), FALSE);
+        AddLogLine(LangStr(IDS_NEWREL_MODULES).c_str(), FALSE);
         AddVersionLine(IDS_CURRENT_VERSION, ReleaseState.InstalledVersion);
         AddVersionLine(IDS_LATEST_VERSION, ReleaseState.LatestVersion);
         AddPrimaryLinkLine();
         AddReleasePageLine();
-        AddLogLine("", FALSE);
-        AddLogLine(LoadStr(IDS_LOGWNDHELP1), FALSE);
-        AddLogLine(LoadStr(IDS_LOGWNDHELP2), FALSE);
+        AddLogLine(L"", FALSE);
+        AddLogLine(LangStr(IDS_LOGWNDHELP1).c_str(), FALSE);
+        AddLogLine(LangStr(IDS_LOGWNDHELP2).c_str(), FALSE);
     }
     else
     {
-        AddLogLine(LoadStr(IDS_NONEW_MODULES), FALSE);
+        AddLogLine(LangStr(IDS_NONEW_MODULES).c_str(), FALSE);
         AddVersionLine(IDS_CURRENT_VERSION, ReleaseState.InstalledVersion);
         AddVersionLine(IDS_LATEST_VERSION, ReleaseState.LatestVersion);
     }
-    AddLogLine("", FALSE);
+    AddLogLine(L"", FALSE);
 }
 
 } // namespace
@@ -140,69 +142,23 @@ CDataDefaults DataDefaults[inetCount] =
 CInternetConnection InternetConnection = inetLAN;
 CInternetProtocol InternetProtocol = inetpHTTP;
 CDataDefaults Data = DataDefaults[inetLAN];
-TDirectArray<char*> Filters(1, 1);
-
-const char* CONFIG_AUTOCHECKMODE = "AutoCheckMode";
-const char* CONFIG_AUTOCONNECT = "AutoConnect";
-const char* CONFIG_AUTOCLOSE = "AutoClose";
-const char* CONFIG_CHECKBETA = "CheckBetaVersions";
-const char* CONFIG_CHECKPB = "CheckPBVersions";
-const char* CONFIG_CHECKRELEASE = "CheckReleaseVersions";
-const char* CONFIG_CONNECTION = "IneternetConnection";
-const char* CONFIG_PROTOCOL = "InternetProtocol";
-const char* CONFIG_TIMESTAMP_KEY = "TimeStamp.hidden";
-const char* CONFIG_LASTCHECK = "LastOpen";
-const char* CONFIG_NEXTOPEN = "NextOpen";
-const char* CONFIG_NUMOFERRORS = "NumOfErrors";
+const wchar_t* CONFIG_AUTOCHECKMODE = L"AutoCheckMode";
+const wchar_t* CONFIG_AUTOCONNECT = L"AutoConnect";
+const wchar_t* CONFIG_AUTOCLOSE = L"AutoClose";
+const wchar_t* CONFIG_CHECKBETA = L"CheckBetaVersions";
+const wchar_t* CONFIG_CHECKPB = L"CheckPBVersions";
+const wchar_t* CONFIG_CHECKRELEASE = L"CheckReleaseVersions";
+const wchar_t* CONFIG_CONNECTION = L"IneternetConnection";
+const wchar_t* CONFIG_PROTOCOL = L"InternetProtocol";
+const wchar_t* CONFIG_TIMESTAMP_KEY = L"TimeStamp.hidden";
+const wchar_t* CONFIG_LASTCHECK = L"LastOpen";
+const wchar_t* CONFIG_NEXTOPEN = L"NextOpen";
+const wchar_t* CONFIG_NUMOFERRORS = L"NumOfErrors";
 
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 5
 #define LOAD_ONLY_CONFIG_VERSION 5
-const char* CONFIG_VERSION = "Version";
-
-void DestroyFilters()
-{
-    for (int i = 0; i < Filters.Count; i++)
-        free(Filters[i]);
-    Filters.DestroyMembers();
-}
-
-BOOL AddUniqueFilter(const char* itemName)
-{
-    if (itemName == NULL || *itemName == 0)
-        return TRUE;
-
-    for (int i = 0; i < Filters.Count; i++)
-    {
-        if (SalGeneral->StrICmp(Filters[i], itemName) == 0)
-            return TRUE;
-    }
-
-    char* newItem = SalGeneral->DupStr(itemName);
-    if (newItem == NULL)
-        return FALSE;
-
-    Filters.Add(newItem);
-    if (!Filters.IsGood())
-    {
-        Filters.ResetState();
-        free(newItem);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-void FiltersFillListBox(HWND hListBox)
-{
-    if (hListBox != NULL)
-        SendMessage(hListBox, LB_RESETCONTENT, 0, 0);
-}
-
-void FiltersLoadFromListBox(HWND hListBox)
-{
-    (void)hListBox;
-    DestroyFilters();
-}
+const wchar_t* CONFIG_VERSION = L"Version";
 
 unsigned __int64
 GetDaysCount(const SYSTEMTIME* time)
@@ -286,8 +242,6 @@ void LoadConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
     InternetProtocol = inetpHTTP;
     Data = DataDefaults[InternetConnection];
     ApplyFixedReleaseSettings(Data);
-    DestroyFilters();
-
     if (regKey != NULL && ConfigVersion >= LOAD_ONLY_CONFIG_VERSION)
     {
         registry->GetValue(regKey, CONFIG_AUTOCHECKMODE, REG_DWORD, &Data.AutoCheckMode, sizeof(DWORD));
@@ -365,43 +319,54 @@ void SaveConfig(HKEY regKey, CSalamanderRegistryAbstract* registry)
     SalGeneral->SetFlagLoadOnSalamanderStart(Data.AutoCheckMode != achmNever);
 }
 
-BOOL LoadScripDataFromFile(const char* fileName)
+BOOL LoadScripDataFromFile(const wchar_t* fileName)
 {
-    HANDLE hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+    HANDLE hFile = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        char buffer[1024];
-        _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_FILE_OPENERROR), fileName);
-        AddLogLine(buffer, TRUE);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_FILE_OPENERROR).c_str(), fileName);
+        AddLogLine(message.c_str(), TRUE);
         return FALSE;
     }
 
-    DWORD fileSize = GetFileSize(hFile, NULL);
-    if (fileSize == INVALID_FILE_SIZE || fileSize >= LOADED_SCRIPT_MAX)
+    LARGE_INTEGER fileSize = {};
+    if (!GetFileSizeEx(hFile, &fileSize) || fileSize.QuadPart < 0 ||
+        static_cast<ULONGLONG>(fileSize.QuadPart) > CHECKVER_MAX_RELEASE_RESPONSE_BYTES)
     {
         CloseHandle(hFile);
-        char buffer[1024];
-        _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_FILE_READERROR), fileName);
-        AddLogLine(buffer, TRUE);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_FILE_READERROR).c_str(), fileName);
+        AddLogLine(message.c_str(), TRUE);
+        return FALSE;
+    }
+
+    std::vector<BYTE> loaded;
+    try
+    {
+        loaded.resize(static_cast<size_t>(fileSize.QuadPart));
+    }
+    catch (const std::bad_alloc&)
+    {
+        CloseHandle(hFile);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_FILE_READERROR).c_str(), fileName);
+        AddLogLine(message.c_str(), TRUE);
         return FALSE;
     }
 
     DWORD bytesRead = 0;
-    BOOL ok = ReadFile(hFile, LoadedScript, fileSize, &bytesRead, NULL);
+    const DWORD requested = static_cast<DWORD>(loaded.size());
+    BOOL ok = requested == 0 || ReadFile(hFile, loaded.data(), requested, &bytesRead, NULL);
     CloseHandle(hFile);
-    if (!ok || bytesRead != fileSize)
+    if (!ok || bytesRead != requested)
     {
-        char buffer[1024];
-        _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_FILE_READERROR), fileName);
-        AddLogLine(buffer, TRUE);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_FILE_READERROR).c_str(), fileName);
+        AddLogLine(message.c_str(), TRUE);
         return FALSE;
     }
 
-    LoadedScriptSize = bytesRead;
-    char buffer[1024];
-    _snprintf_s(buffer, _TRUNCATE, LoadStr(IDS_FILE_OPENED), fileName);
-    AddLogLine(buffer, FALSE);
+    LoadedScript.swap(loaded);
+    const std::wstring message = SPLFormatStringOwned(LangStr(IDS_FILE_OPENED).c_str(), fileName);
+    AddLogLine(message.c_str(), FALSE);
     return TRUE;
 }
 
@@ -414,7 +379,7 @@ void ModulesCreateLog(BOOL* moduleWasFound, BOOL rereadModules)
     {
         if (!BuildReleaseState())
         {
-            AddLogLine(LoadStr(IDS_INFO_CORRUPTED), TRUE);
+            AddLogLine(LangStr(IDS_INFO_CORRUPTED).c_str(), TRUE);
             return;
         }
     }

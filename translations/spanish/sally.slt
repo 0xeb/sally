@@ -1,7 +1,7 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\spanish\sally.atp"
-TEXTVERSION,"1.0 (x64)"
-VERSION,"1,0,0,188"
+TEXTVERSION,"1.0.27 (x64)"
+VERSION,"1,0,27,188"
 
 [TRANSLATION]
 LANGID,3082
@@ -317,12 +317,11 @@ SLGINCOMPLETE,""
 313,184,68,28,12,1,""
 1151,216,70,6,8,1,"segundos"
 316,1,81,256,12,1,"C&omparar directorios: ignorar diferencias de hora de justo una o dos horas"
-597,1,94,238,12,1,"&Abrir ficheros mediante salopen.exe (sortea errores de extensiones shell)"
-603,1,107,243,12,1,"S&eleccionar también extensión de fichero en Cambio rápido de nombre y Comprimir"
-623,1,120,202,12,1,"Seleccionar también extensión de &fichero en comando Editar nuevo fichero"
-622,1,133,156,12,1,"Usar &traslado rápido de directorio en Novell Netware"
-624,1,146,282,12,1,"Copiar ficheros: usar algoritmo así&ncrono más rápido en red (Windows 7 y posterior)"
-625,1,159,193,12,1,"Mantener las &variables de entorno actualizadas a los valores del sistema"
+603,1,94,243,12,1,"S&eleccionar también extensión de fichero en Cambio rápido de nombre y Comprimir"
+623,1,107,202,12,1,"Seleccionar también extensión de &fichero en comando Editar nuevo fichero"
+622,1,120,156,12,1,"Usar &traslado rápido de directorio en Novell Netware"
+624,1,133,282,12,1,"Copiar ficheros: usar algoritmo así&ncrono más rápido en red (Windows 7 y posterior)"
+625,1,146,193,12,1,"Mantener las &variables de entorno actualizadas a los valores del sistema"
 
 [DIALOG 320]
 299,231,1,"Vistas"
@@ -3495,3 +3494,6 @@ SLGINCOMPLETE,""
 14224,1,"Shell de comandos del sistema (%COMSPEC%)"
 14225,1,"Perfil por defecto de Windows Terminal"
 14226,1,"La shell preferida ya no está disponible. Elija otra shell por defecto."
+14227,1,"El nombre "%s" no se puede representar en la página de códigos del sistema y este volumen no ofrece ninguna alternativa corta (8.3).\n\nEl desempaquetador seleccionado solo acepta ese tipo de nombres, por lo que se canceló la operación. Continuar podría haber desempaquetado un archivo distinto."
+14228,0,"The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password."
+14229,0,"The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes."

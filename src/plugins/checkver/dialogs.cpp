@@ -3,11 +3,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 #include "checkver.h"
 #include "checkver.rh"
 #include "checkver.rh2"
+#include "checkver_text.h"
 #include "lang\lang.rh"
+#include "checkver_path.h"
 
 void CenterWindow(HWND hWindow, HWND hParent)
 {
@@ -65,7 +66,7 @@ INT_PTR CALLBACK InternetProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lPa
         if (!DoNotUseFTPShown)
         {
             DoNotUseFTPShown = TRUE;
-            if (SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_DONOTUSEFTP), LoadStr(IDS_PLUGINNAME),
+            if (SalGeneral->SalMessageBox(hWindow, LangStr(IDS_DONOTUSEFTP).c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                           MB_ICONQUESTION | MB_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT) == IDYES)
             {
                 CheckDlgButton(hWindow, IDC_INET_FTP, BST_UNCHECKED);
@@ -152,7 +153,7 @@ void OnConfiguration(HWND hParent)
     if (HConfigurationDialog != NULL)
     {
         SalGeneral->SalMessageBox(hParent,
-                                  LoadStr(IDS_CFG_CONFLICT1), LoadStr(IDS_PLUGINNAME),
+                                  LangStr(IDS_CFG_CONFLICT1).c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                   MB_ICONINFORMATION | MB_OK);
         return;
     }
@@ -161,8 +162,8 @@ void OnConfiguration(HWND hParent)
     if (HDownloadThread != NULL)
     {
         ShowMinNA_IfNotShownYet(HMainDialog, TRUE, FALSE); // flash the window so the user notices it
-        SalGeneral->SalMessageBox(hParent, LoadStr(IDS_CFG_CONFLICT3),
-                                  LoadStr(IDS_PLUGINNAME),
+        SalGeneral->SalMessageBox(hParent, LangStr(IDS_CFG_CONFLICT3).c_str(),
+                                  LangStr(IDS_PLUGINNAME).c_str(),
                                   MB_ICONINFORMATION | MB_OK);
         return;
     }
@@ -329,12 +330,12 @@ void MainEnableControls(BOOL downloading)
     if (downloading)
     {
         // set the button text
-        SetDlgItemText(HMainDialog, IDC_MAIN_CHECK, LoadStr(IDS_BTN_STOP));
+        SetDlgItemTextW(HMainDialog, IDC_MAIN_CHECK, LangStr(IDS_BTN_STOP).c_str());
     }
     else
     {
         // set the button text
-        SetDlgItemText(HMainDialog, IDC_MAIN_CHECK, LoadStr(IDS_BTN_CHECK));
+        SetDlgItemTextW(HMainDialog, IDC_MAIN_CHECK, LangStr(IDS_BTN_CHECK).c_str());
     }
     HWND hCfgButton = GetDlgItem(HMainDialog, IDC_MAIN_CFG);
     HWND hCheckButton = GetDlgItem(HMainDialog, IDC_MAIN_CHECK);
@@ -406,9 +407,9 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
 	{MNTT_PE, 0
 };
 */
-            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, CM_OPENFILE, LoadStr(IDS_MENU_OPENFILE));
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, CM_ABOUT, LoadStr(IDS_MENU_ABOUT));
+            AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuW(hMenu, MF_STRING | MF_ENABLED, CM_OPENFILE, LangStr(IDS_MENU_OPENFILE).c_str());
+            AppendMenuW(hMenu, MF_STRING | MF_ENABLED, CM_ABOUT, LangStr(IDS_MENU_ABOUT).c_str());
 
             EnableMenuItem(hMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
             EnableMenuItem(hMenu, SC_RESTORE, MF_BYCOMMAND | MF_GRAYED);
@@ -427,30 +428,45 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         SetWindowLong(hLogWnd, GWL_EXSTYLE, exStyle);
         SetWindowPos(hLogWnd, 0, 0, 0, 100, 100, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
-        char buff[500];
-        sprintf(buff, LoadStr(IDS_COPYRIGHT1), VERSINFO_VERSION);
-        AddLogLine(buff, FALSE);
-        AddLogLine(LoadStr(IDS_COPYRIGHT2), FALSE);
+        const std::wstring version = checkver::Utf8ToWideOrEmpty(VERSINFO_VERSION);
+        std::wstring line = SPLFormatStringOwned(LangStr(IDS_COPYRIGHT1).c_str(), version.c_str());
+        AddLogLine(line.c_str(), FALSE);
+        AddLogLine(LangStr(IDS_COPYRIGHT2).c_str(), FALSE);
 
         if (LastCheckTime.wYear != 0)
         {
-            char date[50];
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &LastCheckTime, NULL, date, 50) == 0)
-                sprintf(date, "%u.%u.%u", LastCheckTime.wDay, LastCheckTime.wMonth, LastCheckTime.wYear);
-            sprintf(buff, LoadStr(IDS_LAST_CHECK), date);
-            AddLogLine(buff, FALSE);
+            // W date. The long-date form takes month and day names from the
+            // user locale, which need not be representable in the ANSI codepage - so this
+            // was mojibake for anyone outside it, independently of the %s width below.
+            std::wstring date;
+            const int required = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE,
+                                                &LastCheckTime, NULL, NULL, 0);
+            if (required > 0)
+            {
+                date.resize(static_cast<size_t>(required));
+                if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &LastCheckTime,
+                                   NULL, date.data(), required) > 0)
+                    date.pop_back();
+                else
+                    date.clear();
+            }
+            if (date.empty())
+                date = SPLFormatStringOwned(L"%u.%u.%u", LastCheckTime.wDay,
+                                            LastCheckTime.wMonth, LastCheckTime.wYear);
+            line = SPLFormatStringOwned(LangStr(IDS_LAST_CHECK).c_str(), date.c_str());
+            AddLogLine(line.c_str(), FALSE);
         }
 
         MainDlgAutoOpen2 = tvData->AutoOpen;
         if (MainDlgAutoOpen2)
-            AddLogLine(LoadStr(IDS_SKIP_CHECK), FALSE);
+            AddLogLine(LangStr(IDS_SKIP_CHECK).c_str(), FALSE);
 
         // assign the window icon
         SendMessage(hWindow, WM_SETICON, ICON_BIG,
                     (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_CHECKVER)));
 
         // set the button text
-        SetDlgItemText(hWindow, IDC_MAIN_CHECK, LoadStr(IDS_BTN_CHECK));
+        SetDlgItemTextW(hWindow, IDC_MAIN_CHECK, LangStr(IDS_BTN_CHECK).c_str());
 
         MainDlgAutoOpen = tvData->AutoOpen;
         if (MainDlgAutoOpen)
@@ -518,34 +534,29 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
     {
         if (LOWORD(wParam) == CM_OPENFILE)
         {
-            CPathBuffer file; // Heap-allocated for long path support
-            lstrcpyn(file, "salupdate_en.txt", file.Size());
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
+            std::vector<std::wstring> files{L"salupdate_en.txt"};
+            OPENFILENAMEW ofn;
+            memset(&ofn, 0, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
             ofn.hwndOwner = hWindow;
-            ofn.lpstrFilter = "*.txt\0*.txt\0*.*\0*.*\0";
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
-            //  ofn.lpstrFileTitle = file;
-            //  ofn.nMaxFileTitle = MAX_PATH;
             ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_LONGNAMES | OFN_EXPLORER;
 
-            CPathBuffer buf; // Heap-allocated for long path support
-            GetModuleFileName(DLLInstance, buf, buf.Size());
-            char* s = strrchr(buf.Get(), '\\');
-            if (s != NULL)
-            {
-                *s = 0;
-                ofn.lpstrInitialDir = buf;
-            }
+            std::wstring moduleDirectory;
+            std::wstring modulePath;
+            if (SPLGetModuleFileNameOwned(DLLInstance, modulePath))
+                moduleDirectory = checkver::ModuleDirectory(modulePath);
 
-            if (SalGeneral->SafeGetOpenFileName(&ofn))
+            static const wchar_t filterW[] = L"*.txt\0*.txt\0*.*\0*.*\0";
+            ofn.lpstrFilter = filterW;
+            if (!moduleDirectory.empty())
+                ofn.lpstrInitialDir = moduleDirectory.c_str();
+
+            if (SPLSafeGetOpenFileNamesOwned(SalGeneral, &ofn, files))
             {
                 ModulesCleanup();
                 ClearLogWindow();
-                if (LoadScripDataFromFile(file))
+                if (LoadScripDataFromFile(files[0].c_str()))
                     ModulesCreateLog(NULL, TRUE);
             }
             return 0;
@@ -574,8 +585,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             if (PluginIsReleased)
             {
                 // currently handling plugin shutdown - do not let ourselves get dragged into anything else
-                SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_PLUGIN_BUSY),
-                                          LoadStr(IDS_PLUGINNAME),
+                SalGeneral->SalMessageBox(hWindow, LangStr(IDS_PLUGIN_BUSY).c_str(),
+                                          LangStr(IDS_PLUGINNAME).c_str(),
                                           MB_ICONINFORMATION | MB_OK);
                 return 0;
             }
@@ -595,8 +606,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             if (HConfigurationDialog != NULL)
             {
                 ShowMinNA_IfNotShownYet(hWindow, FALSE, TRUE);
-                SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_CFG_CONFLICT2),
-                                          LoadStr(IDS_PLUGINNAME),
+                SalGeneral->SalMessageBox(hWindow, LangStr(IDS_CFG_CONFLICT2).c_str(),
+                                          LangStr(IDS_PLUGINNAME).c_str(),
                                           MB_ICONINFORMATION | MB_OK);
                 return 0;
             }
@@ -605,8 +616,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             {
                 // currently handling plugin shutdown - do not let ourselves get dragged into anything else
                 ShowMinNA_IfNotShownYet(hWindow, FALSE, TRUE);
-                SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_PLUGIN_BUSY),
-                                          LoadStr(IDS_PLUGINNAME),
+                SalGeneral->SalMessageBox(hWindow, LangStr(IDS_PLUGIN_BUSY).c_str(),
+                                          LangStr(IDS_PLUGINNAME).c_str(),
                                           MB_ICONINFORMATION | MB_OK);
                 return 0;
             }
@@ -615,8 +626,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             {
                 // the download thread is running right now - should we let it finish on its own?
                 ShowMinNA_IfNotShownYet(hWindow, FALSE, TRUE);
-                DWORD ret = SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_ABORT_DOWNLOAD),
-                                                      LoadStr(IDS_PLUGINNAME),
+                DWORD ret = SalGeneral->SalMessageBox(hWindow, LangStr(IDS_ABORT_DOWNLOAD).c_str(),
+                                                      LangStr(IDS_PLUGINNAME).c_str(),
                                                       MB_ICONQUESTION | MB_YESNO);
                 if (ret != IDNO && HDownloadThread != NULL)
                 {
@@ -628,7 +639,7 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                     ModulesCleanup();
                     MainEnableControls(FALSE);
                     ClearLogWindow();
-                    AddLogLine(LoadStr(IDS_INET_ABORTED), TRUE);
+                    AddLogLine(LangStr(IDS_INET_ABORTED).c_str(), TRUE);
                 }
                 return 0;
             }
@@ -653,8 +664,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
             {
                 // the download thread is running right now - should we let it finish on its own?
                 ShowMinNA_IfNotShownYet(hWindow, FALSE, TRUE);
-                DWORD ret = SalGeneral->SalMessageBox(hWindow, LoadStr(IDS_ABORT_DOWNLOAD),
-                                                      LoadStr(IDS_PLUGINNAME),
+                DWORD ret = SalGeneral->SalMessageBox(hWindow, LangStr(IDS_ABORT_DOWNLOAD).c_str(),
+                                                      LangStr(IDS_PLUGINNAME).c_str(),
                                                       MB_ICONQUESTION | MB_YESNO);
                 if (ret == IDNO)
                     return 0;
@@ -668,7 +679,7 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                     ModulesCleanup();
                     MainEnableControls(FALSE);
                     ClearLogWindow();
-                    AddLogLine(LoadStr(IDS_INET_ABORTED), TRUE);
+                    AddLogLine(LangStr(IDS_INET_ABORTED).c_str(), TRUE);
                 }
             }
 

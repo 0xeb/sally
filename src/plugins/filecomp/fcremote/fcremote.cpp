@@ -30,8 +30,8 @@ Concatenate(const char* string1, const char* string2)
     static char buffer[5120];
     static int iterator = 0;
 
-    int len1 = lstrlen(string1);
-    int len2 = lstrlen(string2);
+    int len1 = lstrlenA(string1);
+    int len2 = lstrlenA(string2);
 
     if (len1 + len2 >= 5120)
         return "STRING TOO LONG";
@@ -48,41 +48,41 @@ Concatenate(const char* string1, const char* string2)
     return ret;
 }
 
-const char*
-LoadStr(int resID)
+const wchar_t*
+LangStr(int resID)
 {
-    const char* ret;
+    const wchar_t* ret;
     switch (resID)
     {
     case IDS_SPLERROR:
-        ret = "File Comparator - Error";
+        ret = L"File Comparator - Error";
         break;
     case IDS_INVALIDARGS:
-        ret = "Invalid arguments. Usage:\n\tfcremote.exe [options] first second\nOptions are:\n\t-w\tWait until File Comparator closes.\n\t--wait\tWait until File Comparator closes.";
+        ret = L"Invalid arguments. Usage:\n\tfcremote.exe [options] first second\nOptions are:\n\t-w\tWait until File Comparator closes.\n\t--wait\tWait until File Comparator closes.";
         break;
     case IDS_MSGERR:
-        ret = "Cannot send message to File Comparator plugin.";
+        ret = L"Cannot send message to File Comparator plugin.";
         break;
     case IDS_LAUNCHSAL:
-        ret = "Unable to launch Open Salamander.";
+        ret = L"Unable to launch Open Salamander.";
         break;
     case IDS_MSGERR2:
-        ret = "Cannot send message to File Comparator plugin. Ensure 'Load plugin on Open Salamander start' option is set in File Comparator configuration.";
+        ret = L"Cannot send message to File Comparator plugin. Ensure 'Load plugin on Open Salamander start' option is set in File Comparator configuration.";
         break;
     default:
-        ret = "ERROR LOADING STRING";
+        ret = L"ERROR LOADING STRING";
     }
     return ret;
 }
 
-inline int IsSpace(char c) { return c == ' ' || c == '\t'; }
+inline int IsSpace(wchar_t c) { return c == L' ' || c == L'\t'; }
 
-int RemoveQuotes(char* dest, const char* source, int len)
+int RemoveQuotes(wchar_t* dest, const wchar_t* source, int len)
 {
     int d = 0, s = 0;
     while (s < len)
     {
-        if (source[s] == '"')
+        if (source[s] == L'"')
             s++;
         else
             dest[d++] = source[s++];
@@ -90,11 +90,11 @@ int RemoveQuotes(char* dest, const char* source, int len)
     return d;
 }
 
-BOOL MakeArgv(const char* commandLine, char argv[2][MAX_PATH], int& argc,
+BOOL MakeArgv(const wchar_t* commandLine, wchar_t argv[4][REMOTE_PATH_CAPACITY], int& argc,
               int maxlen, int maxarg)
 {
     argc = 0;
-    const char* start = commandLine;
+    const wchar_t* start = commandLine;
     while (*start)
     {
         // trim the whitespace at the beginning
@@ -102,18 +102,18 @@ BOOL MakeArgv(const char* commandLine, char argv[2][MAX_PATH], int& argc,
             start++;
         if (!*start || argc >= maxarg)
             break;
-        const char* end = start;
+        const wchar_t* end = start;
         // find the end of the token
         while (*end && !IsSpace(*end))
         {
-            if (*end++ == '"')
+            if (*end++ == L'"')
             {
-                while (*end && *end != '"')
+                while (*end && *end != L'"')
                     end++;
                 if (end)
                     end++;
                 else
-                    end = start + lstrlen(start);
+                    end = start + lstrlenW(start);
             }
         }
         // add the token to the array
@@ -124,7 +124,7 @@ BOOL MakeArgv(const char* commandLine, char argv[2][MAX_PATH], int& argc,
     return *start == 0;
 }
 
-BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
+BOOL PathAppend(wchar_t* pPath, int pathCapacity, const wchar_t* pMore)
 {
     if (pPath == NULL || pMore == NULL)
     {
@@ -136,31 +136,34 @@ BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
         TRACE_E("pMore[0] == 0");
         return TRUE;
     }
-    int len = lstrlen(pPath);
+    int len = lstrlenW(pPath);
+    const int moreLength = lstrlenW(pMore);
+    if (len + moreLength + 2 > pathCapacity)
+        return FALSE;
     // trim the trailing backslash before appending
-    if (len > 1 && pPath[len - 1] != '\\' && pMore[0] != '\\')
+    if (len > 1 && pPath[len - 1] != L'\\' && pMore[0] != L'\\')
     {
-        pPath[len] = '\\';
+        pPath[len] = L'\\';
         len++;
     }
-    lstrcpy(pPath + len, pMore);
+    lstrcpyW(pPath + len, pMore);
     return TRUE;
 }
 
-BOOL PathRemoveFileSpec(LPTSTR pszPath)
+BOOL PathRemoveFileSpec(wchar_t* pszPath)
 {
     if (pszPath == NULL)
     {
         TRACE_E("pszPath == NULL");
         return FALSE;
     }
-    int len = lstrlen(pszPath);
-    char* iterator = pszPath + len - 1;
+    int len = lstrlenW(pszPath);
+    wchar_t* iterator = pszPath + len - 1;
     while (iterator >= pszPath)
     {
-        if (*iterator == '\\')
+        if (*iterator == L'\\')
         {
-            if (iterator - 1 < pszPath || *(iterator - 1) == ':')
+            if (iterator - 1 < pszPath || *(iterator - 1) == L':')
                 iterator++;
             *iterator = 0;
             break;
@@ -174,22 +177,23 @@ BOOL PathRemoveFileSpec(LPTSTR pszPath)
 #define ASFW_ANY ((DWORD) - 1)
 #endif
 
-int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
+int RemoteCompareFiles(HINSTANCE hInstance, const wchar_t* commandLine)
 {
     /*
   char spl[MAX_PATH];
-  GetModuleFileName(hInstance, spl, MAX_PATH);
+  GetModuleFileNameA(hInstance, spl, MAX_PATH);
   PathRemoveFileSpec(spl); // remove fcremote.exe
   PathAppend(spl, "filecomp.spl");
   DLLInstance = LoadLibraryEx(spl, NULL, LOAD_LIBRARY_AS_DATAFILE);
 */
-    char argv[4][MAX_PATH];
+    typedef wchar_t TRemoteArg[REMOTE_PATH_CAPACITY];
+    TRemoteArg* argv = new TRemoteArg[4];
     int argc;
     int first, second;
     BOOL wait = FALSE;
 
     // prepare argv
-    BOOL argOK = MakeArgv(lpCmdLine, argv, argc, MAX_PATH, 4) &&
+    BOOL argOK = MakeArgv(commandLine, argv, argc, REMOTE_PATH_CAPACITY, 4) &&
                  3 <= argc && argc <= 4;
     if (argOK)
     {
@@ -200,7 +204,7 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
         }
         else
         {
-            if (lstrcmp(argv[1], "-w") == 0 || lstrcmp(argv[1], "--wait") == 0)
+            if (lstrcmpW(argv[1], L"-w") == 0 || lstrcmpW(argv[1], L"--wait") == 0)
                 wait = TRUE;
             else
                 argOK = FALSE;
@@ -211,9 +215,10 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
 
     if (!argOK)
     {
-        MessageBox(NULL, LoadStr(IDS_INVALIDARGS), LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
+        MessageBoxW(NULL, LangStr(IDS_INVALIDARGS), LangStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
         if (DLLInstance)
             FreeLibrary(DLLInstance);
+        delete[] argv;
         return -1;
     }
 
@@ -228,29 +233,41 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
             if (firstTry)
             {
                 // try to launch Salamander
-                char sal[MAX_PATH];
-                GetModuleFileName(hInstance, sal, MAX_PATH);
+                wchar_t* sal = new wchar_t[REMOTE_PATH_CAPACITY];
+                if (GetModuleFileNameW(hInstance, sal, REMOTE_PATH_CAPACITY) == 0)
+                {
+                    delete[] sal;
+                    break;
+                }
                 PathRemoveFileSpec(sal); // fcremote.exe
                 PathRemoveFileSpec(sal); // filecomp
                 PathRemoveFileSpec(sal); // plugins
-                PathAppend(sal, "sally.exe");
+                if (!PathAppend(sal, REMOTE_PATH_CAPACITY, L"sally.exe"))
+                {
+                    delete[] sal;
+                    break;
+                }
 
-                STARTUPINFO si;
+                STARTUPINFOW si;
                 PROCESS_INFORMATION pi;
                 my_zeromem(&si, sizeof(STARTUPINFO));
                 si.cb = sizeof(STARTUPINFO);
                 si.lpTitle = NULL;
                 si.dwFlags = STARTF_USESHOWWINDOW;
                 si.wShowWindow = SW_SHOWNORMAL;
-                if (!CreateProcess(sal, NULL, NULL, NULL, FALSE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi))
+                const BOOL launched = CreateProcessW(sal, NULL, NULL, NULL, FALSE,
+                                                     CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
+                                                     NULL, NULL, &si, &pi);
+                delete[] sal;
+                if (!launched)
                 {
-                    MessageBox(NULL, LoadStr(IDS_LAUNCHSAL), LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
+                    MessageBoxW(NULL, LangStr(IDS_LAUNCHSAL), LangStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
                     break;
                 }
                 char startedEventName[128];
                 sally::filecomp::BuildFileCompStartedEventNameForCurrentProcess(startedEventName, (int)sizeof(startedEventName));
                 HANDLE started =
-                    CreateEvent(NULL, TRUE, FALSE, startedEventName);
+                    CreateEventA(NULL, TRUE, FALSE, startedEventName);
                 WaitForSingleObject(started, 5000);
                 CloseHandle(started);
                 CloseHandle(pi.hProcess);
@@ -258,33 +275,35 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
                 firstTry = FALSE;
                 continue; // try again with Salamander already running
             }
-            MessageBox(NULL, LoadStr(IDS_MSGERR2), LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
+            MessageBoxW(NULL, LangStr(IDS_MSGERR2), LangStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
             break;
         }
 
-        CRCMessage msg;
-        msg.Size = sizeof(msg);
-        lstrcpyn(msg.Path1, argv[first], MAX_PATH);
-        lstrcpyn(msg.Path2, argv[second], MAX_PATH);
-        msg.Path1[MAX_PATH - 1];
-        msg.Path2[MAX_PATH - 1];
-        GetCurrentDirectory(MAX_PATH, msg.CurrentDirectory);
+        CRCMessage* msg = new CRCMessage;
+        msg->Size = sizeof(*msg);
+        lstrcpynW(msg->Path1, argv[first], REMOTE_PATH_CAPACITY);
+        lstrcpynW(msg->Path2, argv[second], REMOTE_PATH_CAPACITY);
+        msg->Path1[REMOTE_PATH_CAPACITY - 1] = L'\0';
+        msg->Path2[REMOTE_PATH_CAPACITY - 1] = L'\0';
+        GetCurrentDirectoryW(REMOTE_PATH_CAPACITY, msg->CurrentDirectory);
 
         if (wait)
         {
             sally::filecomp::BuildFileCompReleaseEventNameForCurrentProcess(
-                msg.ReleaseEvent, (int)sizeof(msg.ReleaseEvent), GetCurrentProcessId());
-            releaseEvent = CreateEvent(NULL, TRUE, FALSE, msg.ReleaseEvent);
+                msg->ReleaseEvent, (int)sizeof(msg->ReleaseEvent), GetCurrentProcessId());
+            releaseEvent = CreateEventA(NULL, TRUE, FALSE, msg->ReleaseEvent);
         }
         else
-            *msg.ReleaseEvent = 0;
+            *msg->ReleaseEvent = 0;
 
         AllowSetForegroundWindow(ASFW_ANY);
-        if (!mc.SendMessage(&msg, 5000))
+        if (!mc.SendMessage(msg, 5000))
         {
-            MessageBox(NULL, LoadStr(IDS_MSGERR), LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
+            delete msg;
+            MessageBoxW(NULL, LangStr(IDS_MSGERR), LangStr(IDS_SPLERROR), MB_OK | MB_ICONERROR);
             break;
         }
+        delete msg;
         ret = 0;
         break;
     }
@@ -295,6 +314,7 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
         WaitForSingleObject(releaseEvent, INFINITE);
         CloseHandle(releaseEvent);
     }
+    delete[] argv;
     return ret;
 }
 
@@ -313,7 +333,7 @@ void EnableExceptionsOn64()
     typedef BOOL(WINAPI * FIsWow64Process)(HANDLE, PBOOL);
 #define PROCESS_CALLBACK_FILTER_ENABLED 0x1
 
-    HINSTANCE hDLL = LoadLibrary("KERNEL32.DLL");
+    HINSTANCE hDLL = LoadLibraryW(L"KERNEL32.DLL");
     if (hDLL != NULL)
     {
         FIsWow64Process isWow64 = (FIsWow64Process)GetProcAddress(hDLL, "IsWow64Process");                                                      // Min: XP SP2
@@ -344,6 +364,11 @@ void __cdecl operator delete(void* ptr)
     HeapFree(GetProcessHeap(), 0, ptr);
 }
 
+void __cdecl operator delete(void* ptr, size_t)
+{
+    HeapFree(GetProcessHeap(), 0, ptr);
+}
+
 // requires VC2015
 void* __cdecl operator new[](size_t size)
 {
@@ -355,12 +380,17 @@ void __cdecl operator delete[](void* ptr)
     HeapFree(GetProcessHeap(), 0, ptr);
 }
 
+void __cdecl operator delete[](void* ptr, size_t)
+{
+    HeapFree(GetProcessHeap(), 0, ptr);
+}
+
 void WinMainCRTStartup()
 {
     EnableExceptionsOn64();
     // avoid critical errors such as "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
 
-    int ret = RemoteCompareFiles(GetModuleHandle(NULL), GetCommandLine());
+    int ret = RemoteCompareFiles(GetModuleHandle(NULL), GetCommandLineW());
     ExitProcess(ret);
 }

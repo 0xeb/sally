@@ -17,7 +17,7 @@
 #include "undelete.h"
 
 // FS-name assigned by Salamanderem after plugin is loaded
-CPathBuffer AssignedFSName;
+std::wstring AssignedFSName;
 
 // image-list for simple FS icons
 HIMAGELIST DFSImageList = NULL;
@@ -27,7 +27,7 @@ BOOL WantReconnect;
 // global variables where we will store pointers to global variables in Salamander
 const CFileData** TransferFileData = NULL;
 int* TransferIsDir = NULL;
-char* TransferBuffer = NULL;
+wchar_t* TransferBuffer = NULL;
 int* TransferLen = NULL;
 DWORD* TransferRowData = NULL;
 CPluginDataInterfaceAbstract** TransferPluginDataIface = NULL;
@@ -55,9 +55,9 @@ void ReleaseFS()
 //   CPluginInterfaceForFS
 //
 
-CPluginFSInterfaceAbstract* WINAPI CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginFSInterfaceAbstract* WINAPI CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForFS::OpenFS(%s, %d)", fsName, fsNameIndex);
+    CALL_STACK_MESSAGE3("CPluginInterfaceForFS::OpenFS(%ls, %d)", fsName, fsNameIndex);
     ActiveFSCount++;
     return new CPluginFSInterface;
 }
@@ -69,11 +69,9 @@ void WINAPI CPluginInterfaceForFS::CloseFS(CPluginFSInterfaceAbstract* fs)
     ActiveFSCount--;
     if (!ActiveFSCount)
     {
-        CPathBuffer root; // Heap-allocated for long path support
-        strcpy(root, AssignedFSName);
-        strcat(root, ":");
-        SalamanderGeneral->ToLowerCase(root);
-        SalamanderGeneral->RemoveFilesFromCache(root);
+        std::wstring root = AssignedFSName + L":";
+        SPLToLowerCaseOwned(SalamanderGeneral, root);
+        SalamanderGeneral->RemoveFilesFromCache(root.c_str());
     }
     if (dfsFS != NULL)
         delete dfsFS;
@@ -90,54 +88,52 @@ void WINAPI CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
         return;
 
     WantReconnect = TRUE;
-    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName, dlg.Volume);
+    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName.c_str(), dlg.Volume.c_str());
     WantReconnect = FALSE;
 }
 
 void WINAPI
 CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                   const char* pluginFSName, int pluginFSNameIndex,
+                                   const wchar_t* pluginFSName, int pluginFSNameIndex,
                                    CFileData& file, int isDir)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::ExecuteOnFS(%d, , %s, %d, , %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::ExecuteOnFS(%d, , %ls, %d, , %d)",
                         panel, pluginFSName, pluginFSNameIndex, isDir);
 
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // sub-dir or up-dir
     {
-        CPathBuffer newPath; // Heap-allocated for long path support
-        strcpy(newPath, fs->Path);
+        std::wstring newPath(fs->Path);
         if (isDir == 2) // up-dir
         {
-            char* cutDir = NULL;
-            if (SalamanderGeneral->CutDirectory(newPath, &cutDir)) // cut last component from the path
+            const size_t separator = newPath.find_last_of(L'\\');
+            if (separator != std::wstring::npos)
             {
+                const std::wstring cutDir = newPath.substr(separator + 1);
+                newPath.erase(separator);
                 int topIndex; // next top-index, -1 -> invalid
-                if (!fs->TopIndexMem.FindAndPop(newPath, topIndex))
+                if (!fs->TopIndexMem.FindAndPop(newPath.c_str(), topIndex))
                     topIndex = -1;
                 // change path in panel
                 fs = NULL; // after ChangePanelPathToXXX the pointer could be invalid
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath, NULL,
-                                                             topIndex, cutDir);
+                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str(), NULL,
+                                                             topIndex, cutDir.c_str());
             }
         }
         else // sub-dir
         {
             // store data for TopIndexMem (backupPath + topIndex)
-            CPathBuffer backupPath; // Heap-allocated for long path support
-            strcpy(backupPath, newPath);
+            const std::wstring backupPath(newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, newPath.Size())) // set path
+            SPLSalPathAppendOwned(newPath, file.Name); // set path
+            // change path in panel
+            fs = NULL; // after ChangePanelPathToXXX the pointer could be invalid
+            if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str()))
             {
-                // change path in panel
-                fs = NULL; // after ChangePanelPathToXXX the pointer could be invalid
-                if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath))
-                {
-                    fs = (CPluginFSInterface*)SalamanderGeneral->GetPanelPluginFS(panel); // we need to get current object (in case FS changes)
-                    if (fs != NULL && fs == pluginFS)                                     // if it is original FS
-                        fs->TopIndexMem.Push(backupPath, topIndex);                       // store top-index for return
-                }
+                fs = (CPluginFSInterface*)SalamanderGeneral->GetPanelPluginFS(panel); // we need to get current object (in case FS changes)
+                if (fs != NULL && fs == pluginFS)                                     // if it is original FS
+                    fs->TopIndexMem.Push(backupPath.c_str(), topIndex);                // store top-index for return
             }
         }
     }
@@ -146,9 +142,9 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex);
     BOOL ret = FALSE;
     if (isInPanel)
@@ -181,7 +177,7 @@ void WINAPI GetSzText()
     {
         if (((CPluginFSDataInterface*)(*TransferPluginDataIface))->IsSnapshotValid())
         {
-            DIR_ITEM_I<char>* di = (DIR_ITEM_I<char>*)(*TransferFileData)->PluginData;
+            DIR_ITEM_I<wchar_t>* di = (DIR_ITEM_I<wchar_t>*)(*TransferFileData)->PluginData;
             int resID = IDS_CONDITION_UNKNOWN;
             switch (di->Record->Flags & FR_FLAGS_CONDITION_MASK)
             {
@@ -199,7 +195,7 @@ void WINAPI GetSzText()
                 break;
             }
             if (di->Record->Flags & FR_FLAGS_DELETED)
-                *TransferLen = sprintf(TransferBuffer, String<char>::LoadStr(resID));
+                *TransferLen = swprintf(TransferBuffer, String<wchar_t>::LangStr(resID).c_str());
             else
                 *TransferLen = 0; // don't display "Good" for existing files
         }
@@ -209,7 +205,7 @@ void WINAPI GetSzText()
 }
 
 void WINAPI
-CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                   const CFileData* upperDir)
 {
     view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen, TransferRowData,
@@ -221,8 +217,8 @@ CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
         int sizeIndex = view->GetColumnsCount();
 
         CColumn column;
-        lstrcpy(column.Name, String<char>::LoadStr(IDS_CONDITION));
-        lstrcpy(column.Description, String<char>::LoadStr(IDS_CONDITIONDESC));
+        lstrcpyW(column.Name, String<wchar_t>::LangStr(IDS_CONDITION).c_str());
+        lstrcpyW(column.Description, String<wchar_t>::LangStr(IDS_CONDITIONDESC).c_str());
         column.GetText = GetSzText;
         column.SupportSorting = 0;
         column.LeftAlignment = 1;

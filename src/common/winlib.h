@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 // macro __DEBUG_WINLIB enables several tests for tricky WinLib errors
 
 // constants for WinLib strings (internal use only in WinLib)
@@ -16,17 +18,13 @@ enum CWLS
 };
 
 // set custom text to WinLib
-void SetWinLibStrings(const TCHAR* invalidNumber, // "not a number" (for number transfer buffer)
-                      const TCHAR* error);        // title "error" (for number transfer buffer)
+void SetWinLibStrings(const wchar_t* invalidNumber, // "not a number" (for number transfer buffer)
+                      const wchar_t* error);        // title "error" (for number transfer buffer)
 
 extern HINSTANCE HInstance;
-extern const TCHAR* CWINDOW_CLASSNAME;  // name of universal window class
-extern const TCHAR* CWINDOW_CLASSNAME2; // name of universal window class - does not have CS_VREDRAW | CS_HREDRAW
+extern const wchar_t* CWINDOW_CLASSNAME;  // name of universal window class
+extern const wchar_t* CWINDOW_CLASSNAME2; // name of universal window class - does not have CS_VREDRAW | CS_HREDRAW
 
-#ifndef _UNICODE
-extern const WCHAR* CWINDOW_CLASSNAMEW;  // name of Unicode universal window class
-extern const WCHAR* CWINDOW_CLASSNAME2W; // name of Unicode universal window class - does not have CS_VREDRAW | CS_HREDRAW
-#endif                                   // _UNICODE
 
 class CWinLibHelp;
 
@@ -73,33 +71,22 @@ public:
     HWND HWindow;
     UINT HelpID; // -1 = empty value (do not use help)
 
-    CWindowsObject(CObjectOrigin origin
-#ifndef _UNICODE
-                   ,
-                   BOOL unicodeWnd
-#endif // _UNICODE
-    )
+    // The unicodeWnd opt-in is GONE. Every window is a Unicode window: the
+    // define is unconditional (CMakeLists.txt), so a per-window flag could only ever have
+    // held TRUE. It survived the flip only so that the remaining work could land
+    // separately - the flag kept ~166 call sites compiling while the define moved. Both
+    // halves are done now, so the parameter, the member and the call sites go together.
+    CWindowsObject(CObjectOrigin origin)
     {
         HWindow = NULL;
         ObjectOrigin = origin;
-#ifndef _UNICODE
-        UnicodeWnd = unicodeWnd;
-#endif // _UNICODE
         HelpID = -1;
     }
 
-    CWindowsObject(UINT helpID, CObjectOrigin origin
-#ifndef _UNICODE
-                   ,
-                   BOOL unicodeWnd
-#endif // _UNICODE
-    )
+    CWindowsObject(UINT helpID, CObjectOrigin origin)
     {
         HWindow = NULL;
         ObjectOrigin = origin;
-#ifndef _UNICODE
-        UnicodeWnd = unicodeWnd;
-#endif // _UNICODE
         SetHelpID(helpID);
     }
 
@@ -114,18 +101,13 @@ public:
     void SetHelpID(UINT helpID)
     {
         if (helpID == -1)
-            TRACE_ET(_T("CWindowsObject::SetHelpID(): helpID==-1, -1 is 'empty value', you should use another helpID! If you want to set HelpID to -1, use ClearHelpID()."));
+            TRACE_ET(L"CWindowsObject::SetHelpID(): helpID==-1, -1 is 'empty value', you should use another helpID! If you want to set HelpID to -1, use ClearHelpID().");
         HelpID = helpID;
     }
     void ClearHelpID() { HelpID = -1; }
 
 protected:
     CObjectOrigin ObjectOrigin;
-#ifndef _UNICODE
-    // windows: create: TRUE = window is Unicode, else ANSI; attach: TRUE = our window procedure
-    // is Unicode, else ANSI; dialogs: TRUE = dialog is Unicode, else ANSI
-    BOOL UnicodeWnd;
-#endif // _UNICODE
 };
 
 // ****************************************************************************
@@ -133,34 +115,19 @@ protected:
 class CWindow : public CWindowsObject
 {
 public:
-#ifdef _UNICODE
     CWindow(CObjectOrigin origin = ooAllocated) : CWindowsObject(origin)
-#else  // _UNICODE
-    CWindow(CObjectOrigin origin = ooAllocated,
-            BOOL unicodeWnd = FALSE) : CWindowsObject(origin, unicodeWnd)
-#endif // _UNICODE
     {
         DefWndProc = GetDefWindowProc();
     }
 
-#ifdef _UNICODE
     CWindow(HWND hDlg, int ctrlID, CObjectOrigin origin = ooAllocated) : CWindowsObject(origin)
-#else  // _UNICODE
-    CWindow(HWND hDlg, int ctrlID, CObjectOrigin origin = ooAllocated,
-            BOOL unicodeWnd = FALSE) : CWindowsObject(origin, unicodeWnd)
-#endif // _UNICODE
     {
         DefWndProc = GetDefWindowProc();
         AttachToControl(hDlg, ctrlID);
     }
 
-#ifdef _UNICODE
-    CWindow(HWND hDlg, int ctrlID, UINT helpID,
-            CObjectOrigin origin = ooAllocated) : CWindowsObject(helpID, origin)
-#else  // _UNICODE
-    CWindow(HWND hDlg, int ctrlID, UINT helpID, CObjectOrigin origin = ooAllocated,
-            BOOL unicodeWnd = FALSE) : CWindowsObject(helpID, origin, unicodeWnd)
-#endif // _UNICODE
+    CWindow(HWND hDlg, int ctrlID, UINT helpID, CObjectOrigin origin = ooAllocated)
+        : CWindowsObject(helpID, origin)
     {
         DefWndProc = GetDefWindowProc();
         AttachToControl(hDlg, ctrlID);
@@ -176,24 +143,12 @@ public:
                                        HICON hIcon,
                                        HCURSOR hCursor,
                                        HBRUSH hbrBackground,
-                                       LPCTSTR lpszMenuName,
-                                       LPCTSTR lpszClassName,
+                                       LPCWSTR lpszMenuName,
+                                       LPCWSTR lpszClassName,
                                        HICON hIconSm);
 
-#ifndef _UNICODE
-    static BOOL RegisterUniversalClassW(UINT style,
-                                        int cbClsExtra,
-                                        int cbWndExtra,
-                                        HICON hIcon,
-                                        HCURSOR hCursor,
-                                        HBRUSH hbrBackground,
-                                        LPCWSTR lpszMenuName,
-                                        LPCWSTR lpszClassName,
-                                        HICON hIconSm);
-#endif // _UNICODE
-
-    HWND Create(LPCTSTR lpszClassName,  // address of registered class name
-                LPCTSTR lpszWindowName, // address of window name
+    HWND Create(LPCWSTR lpszClassName,  // address of registered class name
+                LPCWSTR lpszWindowName, // address of window name
                 DWORD dwStyle,          // window style
                 int x,                  // horizontal position of window
                 int y,                  // vertical position of window
@@ -205,8 +160,8 @@ public:
                 LPVOID lpvParam);       // pointer to created window object
 
     HWND CreateEx(DWORD dwExStyle,        // extended window style
-                  LPCTSTR lpszClassName,  // address of registered class name
-                  LPCTSTR lpszWindowName, // address of window name
+                  LPCWSTR lpszClassName,  // address of registered class name
+                  LPCWSTR lpszWindowName, // address of window name
                   DWORD dwStyle,          // window style
                   int x,                  // horizontal position of window
                   int y,                  // vertical position of window
@@ -217,59 +172,18 @@ public:
                   HINSTANCE hinst,        // handle of application instance
                   LPVOID lpvParam);       // pointer to created window object
 
-#ifndef _UNICODE
-    HWND CreateW(LPCWSTR lpszClassName,  // address of registered class name
-                 LPCWSTR lpszWindowName, // address of window name
-                 DWORD dwStyle,          // window style
-                 int x,                  // horizontal position of window
-                 int y,                  // vertical position of window
-                 int nWidth,             // window width
-                 int nHeight,            // window height
-                 HWND hwndParent,        // handle of parent or owner window
-                 HMENU hmenu,            // handle of menu or child-window identifier
-                 HINSTANCE hinst,        // handle of application instance
-                 LPVOID lpvParam);       // pointer to created window object
-
-    HWND CreateExW(DWORD dwExStyle,        // extended window style
-                   LPCWSTR lpszClassName,  // address of registered class name
-                   LPCWSTR lpszWindowName, // address of window name
-                   DWORD dwStyle,          // window style
-                   int x,                  // horizontal position of window
-                   int y,                  // vertical position of window
-                   int nWidth,             // window width
-                   int nHeight,            // window height
-                   HWND hwndParent,        // handle of parent or owner window
-                   HMENU hmenu,            // handle of menu or child-window identifier
-                   HINSTANCE hinst,        // handle of application instance
-                   LPVOID lpvParam);       // pointer to created window object
-#endif                                     // _UNICODE
-
     void AttachToWindow(HWND hWnd);
     void AttachToControl(HWND dlg, int ctrlID);
     void DetachWindow();
 
     static LRESULT CALLBACK CWindowProc(HWND hwnd, UINT uMsg,
                                         WPARAM wParam, LPARAM lParam);
-#ifndef _UNICODE
-    static LRESULT CALLBACK CWindowProcW(HWND hwnd, UINT uMsg,
-                                         WPARAM wParam, LPARAM lParam);
-#endif // _UNICODE
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-#ifndef _UNICODE
-    static LRESULT CALLBACK CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL unicode);
-#endif // _UNICODE
 
-    WNDPROC GetDefWindowProc()
-    {
-#ifndef _UNICODE
-        if (UnicodeWnd)
-            return DefWindowProcW;
-#endif // _UNICODE
-        return DefWindowProc;
-    }
+    WNDPROC GetDefWindowProc() { return DefWindowProcW; }
 
     WNDPROC DefWndProc;
 };
@@ -302,8 +216,8 @@ public:
     BOOL GetControl(HWND& ctrlHWnd, int ctrlID, BOOL ignoreIsGood = FALSE);
     void EnsureControlIsFocused(int ctrlID);
 
-    void EditLine(int ctrlID, TCHAR* buffer, DWORD bufferSizeInChars, BOOL select = TRUE);
-    void EditLine(int ctrlID, double& value, TCHAR* format, BOOL select = TRUE); // format e.g. _T("%.2lf")
+    void EditLine(int ctrlID, wchar_t* buffer, DWORD bufferSizeInChars, BOOL select = TRUE);
+    void EditLine(int ctrlID, double& value, wchar_t* format, BOOL select = TRUE); // format e.g. L"%.2lf"
     void EditLine(int ctrlID, int& value, BOOL select = TRUE);
     void EditLine(int ctrlID, __int64& value, BOOL select = TRUE, BOOL unsignedNum = FALSE /* signed number */,
                   BOOL hexMode = FALSE /* decimal mode */, BOOL ignoreOverflow = FALSE, BOOL quiet = FALSE);
@@ -311,9 +225,15 @@ public:
     void CheckBox(int ctrlID, int& value); // 0-unchecked, 1-checked, 2-grayed
     void TrackBar(int ctrlID, int& value);
 
-#ifndef _UNICODE
+    // Unconditional in both builds - EditLineW is a distinct name from EditLine,
+    // so there is no A/W signature collision to guard against here (unlike the doubled-ctor
+    // case). Under _UNICODE its body is functionally redundant with EditLine(wchar_t*, ...)
+    // (both resolve to SendMessageW), which is fine: keeping it means the ~30 existing
+    // .EditLineW(...) call sites across dialogs still compile under the canary without each
+    // needing its own #ifdef, matching the winlib constructor-unification precedent (accept
+    // in both builds now, so the redundancy can be retired later).
     void EditLineW(int ctrlID, WCHAR* buffer, DWORD bufferSizeInChars, BOOL select = TRUE);
-#endif // _UNICODE
+    void EditLineW(int ctrlID, std::wstring& value, BOOL select = TRUE);
 
 protected:
     HWND HDialog; // dialog handle for which transfer is performed
@@ -327,12 +247,13 @@ public:
     using CWindowsObject::HWindow;         // for CPropSheetPage compilability
     using CWindowsObject::SetObjectOrigin; // for CPropSheetPage compilability
 
-#ifdef _UNICODE
-    CDialog(HINSTANCE modul, int resID, HWND parent, CObjectOrigin origin = ooStandard) : CWindowsObject(origin)
-#else  // _UNICODE
-    CDialog(HINSTANCE modul, int resID, HWND parent, CObjectOrigin origin = ooStandard,
-            BOOL unicodeWnd = FALSE) : CWindowsObject(origin, unicodeWnd)
-#endif // _UNICODE
+    // The unicodeWnd opt-in that used to sit here is gone; see CWindowsObject.
+    // Its history, worth one line: the default was FALSE, dialogs opted in one at a
+    // time, P0.4 flipped the default to TRUE, and P4.2's unconditional define made the flag
+    // unobservable - Execute()/Create() reach DialogBoxParamW/CreateDialogParamW either way.
+    // Every dialog is a Unicode window and a wide caption is never re-narrowed by USER32.
+    CDialog(HINSTANCE modul, int resID, HWND parent, CObjectOrigin origin = ooStandard)
+        : CWindowsObject(origin)
     {
         Modal = 0;
         Modul = modul;
@@ -340,13 +261,8 @@ public:
         Parent = parent;
     }
 
-#ifdef _UNICODE
-    CDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent,
-            CObjectOrigin origin = ooStandard) : CWindowsObject(helpID, origin)
-#else  // _UNICODE
-    CDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent, CObjectOrigin origin = ooStandard,
-            BOOL unicodeWnd = FALSE) : CWindowsObject(helpID, origin, unicodeWnd)
-#endif // _UNICODE
+    CDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent, CObjectOrigin origin = ooStandard)
+        : CWindowsObject(helpID, origin)
     {
         Modal = 0;
         Modul = modul;
@@ -503,13 +419,13 @@ struct CWindowQueueItem
 class CWindowQueue
 {
 protected:
-    const TCHAR* QueueName; // queue name (debug purposes only)
+    const wchar_t* QueueName; // queue name (debug purposes only)
     CWindowQueueItem* Head;
     int Count;
     CWinLibCS CS; // access from multiple threads -> synchronization required
 
 public:
-    CWindowQueue(const TCHAR* queueName /* e.g. "Find Dialogs" */)
+    CWindowQueue(const wchar_t* queueName /* e.g. "Find Dialogs" */)
     {
         QueueName = queueName;
         Head = NULL;

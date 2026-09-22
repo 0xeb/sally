@@ -13,7 +13,7 @@
 #pragma once
 
 // global data
-extern const char* PluginNameEN; // untranslated plugin name, used before loading the language module and for debugging
+extern const wchar_t* PluginNameEN; // untranslated plugin name, used before loading the language module and for debugging
 extern HINSTANCE DLLInstance;    // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;      // handle to the SLG - language-dependent resources
 
@@ -39,7 +39,7 @@ extern DWORD LastCfgPage; // start page (sheet) in configuration dialog
 // [0, 0] - for open viewer windows: Salamander regenerated fonts, call SetFont() on the lists
 #define WM_USER_SETTINGCHANGE WM_APP + 3248
 
-char* LoadStr(int resID);
+std::wstring LoadStr(int resID);
 
 // plugin menu commands
 #define MENUCMD_VIEWBMPFROMCLIP 1
@@ -52,11 +52,11 @@ char* LoadStr(int resID);
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
-    virtual BOOL WINAPI ViewFile(const char* name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                  BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex);
-    virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name) { return TRUE; }
 };
 
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
@@ -72,7 +72,7 @@ public:
 class CPluginInterfaceForThumbLoader : public CPluginInterfaceForThumbLoaderAbstract
 {
 public:
-    virtual BOOL WINAPI LoadThumbnail(const char* filename, int thumbWidth, int thumbHeight,
+    virtual BOOL WINAPI LoadThumbnail(const wchar_t* filename, int thumbWidth, int thumbHeight,
                                       CSalamanderThumbnailMakerAbstract* thumbMaker,
                                       BOOL fastThumbnail);
 };
@@ -100,7 +100,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -142,7 +142,7 @@ class CViewerWindow : public CWindow
 {
 public:
     HANDLE Lock;                      // 'lock' object or NULL (set to the signaled state once we close the file)
-    CPathBuffer Name; // Heap-allocated for long path support (file name or "")
+    std::wstring Name;                  // dynamically owned UTF-16 file name
     CRendererWindow Renderer;         // viewer inner window
     HIMAGELIST HGrayToolBarImageList; // toolbar and menu in the gray variant (computed from the colored one)
     HIMAGELIST HHotToolBarImageList;  // toolbar and menu in the colored variant
@@ -163,7 +163,7 @@ public:
     HANDLE GetLock();
 
     // if 'setLock' is TRUE, set 'Lock' to the signaled state (needed after closing the file)
-    void OpenFile(const char* name, BOOL setLock = TRUE);
+    void OpenFile(const wchar_t* name, BOOL setLock = TRUE);
 
     BOOL IsMenuBarMessage(CONST MSG* lpMsg);
 

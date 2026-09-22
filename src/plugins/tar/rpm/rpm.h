@@ -292,7 +292,7 @@ private:
     CZippedFile* Stream;
 
 public:
-    CRPM(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read, FILE* fContents = NULL);
+    CRPM(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read, FILE* fContents = NULL);
     ~CRPM(void);
 
     BOOL RPMDumpLead(FILE* fContents, short& SignatureType);

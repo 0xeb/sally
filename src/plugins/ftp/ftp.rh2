@@ -1816,6 +1816,9 @@
 #define IDS_PRXSCRERR_3XXONFIRSTLINE  11226
 // Proxy script must contain at least one command.
 #define IDS_PRXSCRERR_NONECMDS        11227
+// A proxy-script credential cannot be represented by the selected connection encoding.
+#define IDS_PRXSCRERR_CANNOTENCODE    11228
+#define IDS_PRXHOST_CANNOTENCODE      11229
 
 // Edit Proxy Server dialog title: Edit Proxy Server
 #define IDS_EDITPROXYSRVTITLE         11230
@@ -2012,5 +2015,25 @@
 #define IDS_SHOWPASSWORD_CONFIRMATION   11400
 // The password is: 
 #define IDS_PASSWORDIS                  11401
+
+// A server-type name cannot be represented by the persisted local-text format.
+#define IDS_SRVTYPENAME_CANNOTENCODE    11402
+
+// A custom proxy script cannot be represented by the persisted local-text format.
+#define IDS_PRXSCRIPT_CANNOTENCODE      11403
+
+// The user-entered FTP command cannot be represented by the negotiated connection encoding.
+#define IDS_FTPCOMMAND_CANNOTENCODE     11404
+
+// The replacement name typed into the Solve Error dialog cannot be represented by the negotiated
+// connection encoding, so it cannot name a file on the server.
+#define IDS_NEWNAME_CANNOTENCODE        11405
+
+// The directory name entered in the Create Directory dialog cannot be represented by the
+// negotiated connection encoding.
+#define IDS_DIRNAME_CANNOTENCODE        11406
+
+// The new name entered in Quick Rename cannot be represented by the negotiated connection encoding.
+#define IDS_RENAMENAME_CANNOTENCODE     11407
 
 #endif // __FTP_RH2

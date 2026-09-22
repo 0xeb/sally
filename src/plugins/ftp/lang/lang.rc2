@@ -814,6 +814,8 @@ STRINGTABLE
  IDS_PRXSCRERR_INVPORT, "You can set port only as number or as $(ProxyPort) or $(Port) variable."
  IDS_PRXSCRERR_3XXONFIRSTLINE, "You cannot use ""3xx:"" condition for the first command, some preceeding command (typically ""USER"") is neccessary."
  IDS_PRXSCRERR_NONECMDS, "Proxy script must contain at least one command."
+ IDS_PRXSCRERR_CANNOTENCODE, "A user name, password, or account contains characters that cannot be represented by this connection's text encoding."
+ IDS_PRXHOST_CANNOTENCODE, "The proxy server address cannot be represented by the current system encoding or is too long."
 
  IDS_EDITPROXYSRVTITLE, "Edit Proxy Server"
  IDS_PORTISUSHORT, "Port number must be in range 1 to 65535."
@@ -922,4 +924,10 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Are you sure you wish to clear this password?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Are you sure you wish to show this password?"
  IDS_PASSWORDIS, "The password is: %s\n\nDo you want to copy the password to clipboard?"
+ IDS_SRVTYPENAME_CANNOTENCODE, "The server type name contains characters that cannot be represented by the current configuration encoding."
+ IDS_PRXSCRIPT_CANNOTENCODE, "The proxy script contains characters that cannot be represented by the current configuration encoding."
+ IDS_FTPCOMMAND_CANNOTENCODE, "The FTP command contains characters that cannot be represented by this connection's text encoding."
+ IDS_NEWNAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so it cannot be used to name a file on the server.\n\nThe item has been left in its error state."
+ IDS_DIRNAME_CANNOTENCODE, "The directory name contains characters that cannot be represented by this connection's text encoding, so the directory cannot be created on the server."
+ IDS_RENAMENAME_CANNOTENCODE, "The new name contains characters that cannot be represented by this connection's text encoding, so the item cannot be renamed on the server."
 }

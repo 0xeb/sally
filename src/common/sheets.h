@@ -50,15 +50,15 @@ public:
     using CDialog::SetObjectOrigin; // access to allowed methods of parent
     using CDialog::Transfer;
 
-    CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID,
+    CPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
                    CObjectOrigin origin = ooStatic);
-    CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
                    CObjectOrigin origin = ooStatic);
     ~CPropSheetPage();
 
-    void Init(const TCHAR* title, HINSTANCE modul, int resID,
+    void Init(const wchar_t* title, HINSTANCE modul, int resID,
               HICON icon, DWORD flags, CObjectOrigin origin);
 
     virtual BOOL ValidateData();
@@ -77,7 +77,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
     BOOL ElasticVerticalLayout(int count, ...);
 
-    TCHAR* Title;
+    wchar_t* Title;
     DWORD Flags;
     HICON Icon;
 
@@ -101,7 +101,7 @@ protected:
 class CPropertyDialog : public TIndirectArray<CPropSheetPage>
 {
 public:
-    CPropertyDialog(HWND parent, HINSTANCE modul, const TCHAR* caption,
+    CPropertyDialog(HWND parent, HINSTANCE modul, const wchar_t* caption,
                     int startPage, DWORD flags, HICON icon = NULL,
                     DWORD* lastPage = NULL, PFNPROPSHEETCALLBACK callback = NULL)
         : TIndirectArray<CPropSheetPage>(10, 5, dtNoDelete)
@@ -126,7 +126,7 @@ protected:
     HWND HWindow;
     HINSTANCE Modul;
     HICON Icon;
-    const TCHAR* Caption;
+    const wchar_t* Caption;
     int StartPage;
     DWORD Flags;
     PFNPROPSHEETCALLBACK Callback;
@@ -145,14 +145,16 @@ class CTreePropDialog;
 class CTPHCaptionWindow : protected CWindow
 {
 protected:
-    TCHAR* Text;
+    WCHAR* Text;
     int Allocated;
 
 public:
     CTPHCaptionWindow(HWND hDlg, int ctrlID);
     ~CTPHCaptionWindow();
 
-    void SetText(const TCHAR* text);
+    // wide: this control is entirely self-painted (WM_PAINT draws Text directly
+    // via DrawTextW), so its own window's ANSI/Unicode class is irrelevant to what it can paint.
+    void SetText(const WCHAR* text);
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -213,27 +215,38 @@ class CTreePropDialog : public CPropertyDialog
 {
 protected:
     CTreePropHolderDlg Dialog;
+    // CTreePropDialog's own Execute() never reaches CPropertyDialog::Execute()'s
+    // psh.pszCaption = Caption (that 0-arg overload isn't reachable via the 3-arg Execute this
+    // class exposes - the base Caption field is unused dead weight for this subclass), so the
+    // window title can be stored wide here instead of round-tripping through the base's narrow
+    // Caption.
+    const WCHAR* CaptionW;
 
 public:
-    CTreePropDialog(HWND hParent, HINSTANCE hInstance, TCHAR* caption,
+    CTreePropDialog(HWND hParent, HINSTANCE hInstance, const WCHAR* caption,
                     int startPage, DWORD flags, DWORD* lastPage,
                     DWORD* windowHeight)
-        : CPropertyDialog(hParent, hInstance, caption, startPage, flags, NULL, lastPage),
+        : CPropertyDialog(hParent, hInstance, NULL, startPage, flags, NULL, lastPage),
           Dialog(hParent, windowHeight)
     {
+        CaptionW = caption;
         Dialog.TPD = this;
     }
 
-    virtual int Execute(const TCHAR* buttonOK,
-                        const TCHAR* buttonCancel,
-                        const TCHAR* buttonHelp);
+    // buttonOK/Cancel/Help are wide - the DLGTEMPLATE control-text fields they
+    // feed (via AddItemEx/WinLibCopyText) are always UTF-16 regardless of ANSI/Unicode entry
+    // point, so a narrow (LoadStr-sourced) caption would be a lossy CP_ACP round trip for no
+    // reason.
+    virtual int Execute(const WCHAR* buttonOK,
+                        const WCHAR* buttonCancel,
+                        const WCHAR* buttonHelp);
     virtual int GetCurSel();
     int Add(CPropSheetPage* page, CPropSheetPage* parent = NULL, BOOL* expanded = NULL);
 
 protected:
     WORD* lpdwAlign(WORD* lpIn);
-    int AddItemEx(LPWORD& lpw, const TCHAR* className, WORD id, int x, int y, int cx, int cy,
-                  UINT style, UINT exStyle, const TCHAR* text);
+    int AddItemEx(LPWORD& lpw, const wchar_t* className, WORD id, int x, int y, int cx, int cy,
+                  UINT style, UINT exStyle, const WCHAR* text);
 
     //    DLGTEMPLATE *DoLockDlgRes(int page);
     friend class CTreePropHolderDlg;

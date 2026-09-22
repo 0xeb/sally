@@ -902,7 +902,7 @@ int huft_build(CDecompressionObject* decompress,
 
     /* Generate counts for each bit length */
     el = n > 256 ? b[256] : BMAX; /* set length of EOB code, if any */
-    memset((char*)c, 0, sizeof(c));
+    memset(c, 0, sizeof(c));
     p = (unsigned*)b;
     i = n;
     do
@@ -955,7 +955,7 @@ int huft_build(CDecompressionObject* decompress,
     }
 
     /* Make a table of values in order of bit lengths */
-    memset((char*)v, 0, sizeof(v));
+    memset(v, 0, sizeof(v));
     p = (unsigned*)b;
     i = 0;
     do

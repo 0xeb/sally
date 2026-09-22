@@ -10,26 +10,22 @@
 //
 
 #define MAX_HISTORY_ENTRIES 20
-extern char CBHistory[MAX_HISTORY_ENTRIES][MAX_PATH];
-extern int CBHistoryEntries;
+extern std::vector<std::wstring> CBHistory;
 
-void AddToHistory(const char* path);
+void AddToHistory(const wchar_t* path);
 
 class CCompareFilesDialog : public CCommonDialog
 {
 protected:
-    char *Path1,
-        *Path2;
-    wchar_t *Path1W,  // Wide paths for Unicode display and output
-        *Path2W;
-    int PathWSize;    // Size of wide path buffers
+    std::wstring& Path1;
+    std::wstring& Path2;
     BOOL& Succes;
     CCompareOptions* Options;
     WNDPROC OldEditProc1, OldEditProc2;
 
 public:
-    CCompareFilesDialog(HWND parent, char* path1, char* path2, BOOL& succes, CCompareOptions* options,
-                        wchar_t* path1W = NULL, wchar_t* path2W = NULL, int pathWSize = 0);
+    CCompareFilesDialog(HWND parent, std::wstring& path1, std::wstring& path2,
+                        BOOL& succes, CCompareOptions* options);
     virtual ~CCompareFilesDialog() { MainWindowQueue.Remove(HWindow); }
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -48,11 +44,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}

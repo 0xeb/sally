@@ -42,7 +42,9 @@ void Initialize__Messages()
 #pragma init_seg(".i_msg$m")
 
 #include <ostream>
+#include <new>
 #include <stdio.h>
+#include <string>
 #ifdef _DEBUG
 #include <sstream>
 #endif // _DEBUG
@@ -61,20 +63,11 @@ void Initialize__Messages()
 
 #include "trace.h"
 #include "messages.h"
-
-char __ResourceStringBuffer[__RESOURCE_STRING_BUFFER_SIZE] = "";
-WCHAR __ResourceStringBufferW[__RESOURCE_STRING_BUFFER_SIZE] = L"";
-char __SPrintFBuffer[__SPRINTF_BUFFER_SIZE] = "";
-WCHAR __SPrintFBufferW[__SPRINTF_BUFFER_SIZE] = L"";
-char __ErrorBuffer[__ERROR_BUFFER_SIZE] = "";
-WCHAR __ErrorBufferW[__ERROR_BUFFER_SIZE] = L"";
+#include "DiagnosticTextEncoding.h"
 
 const char* __MessagesTitle = "Message";
 const WCHAR* __MessagesTitleW = L"Message";
 HWND __MessagesParent = NULL;
-
-char __MessagesTitleBuf[200];
-WCHAR __MessagesTitleBufW[200];
 
 #ifdef MULTITHREADED_MESSAGES_ENABLE
 
@@ -167,6 +160,141 @@ C__Messages::~C__Messages()
 #endif // MULTITHREADED_MESSAGES_ENABLE
 }
 
+// The ONE choke point for every message box this module raises.
+//
+// In the shipping app all windows are raised through ::MessageBoxW. Narrow
+// diagnostic streams are decoded by __MessagesShowA immediately before this boundary.
+//
+// Under AUTOMATION they must NOT block: nothing is watching to click OK, so the
+// run hangs FOREVER - no crash, no timeout, no output, just a process that never
+// exits. That is not hypothetical; it cost two full diagnosis cycles on
+// CFindDialog (a failed LoadIcon in WM_INITDIALOG, and the
+// HANDLES() atexit leak report), each found only by attaching cdb to the stuck
+// process. Any future test touching a HANDLES()-wrapped call could hit it again.
+//
+// Suppressed means printed to stderr - the diagnostic is still SEEN, which is the
+// whole point of these boxes - and answered with the least-escalating option, i.e.
+// the one that declines whatever extra action was offered. For the leak report's
+// "list opened handles to Trace Server?" (MB_YESNO) that is IDNO.
+//
+// TWO triggers, because there are two kinds of automated process:
+//
+//  1. COMPILE-TIME (SALLY_NO_INTERACTIVE_DIALOGS, set tree-wide by
+//     tests/CMakeLists.txt; or SALLY_E2E_HOST). Covers every test binary.
+//
+// Scope note: this whole file is inside `#ifndef MESSAGES_DISABLE`, and Release
+// defines MESSAGES_DISABLE while HANDLES_ENABLE is Debug-only (cmake/sal_common.cmake).
+// So a Release sally.exe raises none of these boxes in the first place - everything
+// below concerns DEBUG binaries, which is exactly where the automation runs.
+//
+//  2. RUNTIME (the SALLY_NONINTERACTIVE env var). Covers what the define cannot:
+//     a real sally.exe SPAWNED BY a test. That child is the shipping binary and
+//     must keep its dialogs when a human runs it, so the define is wrong there -
+//     but when an e2e test launches it, its exit-time leak box has no one to
+//     dismiss it and blocks the parent. The env var is inherited by children, so
+//     setting it once for a ctest run covers the whole process tree.
+//
+// Checked once and cached: this can be called from a static destructor, after
+// other statics are gone, so it must not depend on any non-trivial global.
+bool __MessagesIsNonInteractive()
+{
+#if defined(SALLY_E2E_HOST) || defined(SALLY_NO_INTERACTIVE_DIALOGS)
+    return true;
+#else
+    static const bool suppressed = (::GetEnvironmentVariableA("SALLY_NONINTERACTIVE", NULL, 0) != 0);
+    return suppressed;
+#endif
+}
+
+#if defined(SALLY_E2E_HOST) || defined(SALLY_NO_INTERACTIVE_DIALOGS)
+// A test binary propagates its own non-interactivity to every process it starts.
+// Several tests CreateProcess() a real sally.exe (gtest_issue75_f2_escape_ui_e2e,
+// gtest_external_tool_runner, ...); that child is the SHIPPING binary, so it has
+// neither define and would raise a real modal box that nothing dismisses - the
+// parent then waits on a child that is waiting on a human. Setting the env var
+// here means children inherit the suppression automatically, with no per-test
+// wiring to remember. Shipping sally.exe never runs this code.
+static const struct __MessagesPropagateNonInteractive
+{
+    __MessagesPropagateNonInteractive()
+    {
+        ::SetEnvironmentVariableA("SALLY_NONINTERACTIVE", "1");
+    }
+} __messagesPropagateNonInteractive;
+#endif
+
+static int __MessagesNonInteractiveAnswer(UINT uType)
+{
+    switch (uType & MB_TYPEMASK)
+    {
+    case MB_OKCANCEL:
+    case MB_YESNOCANCEL:
+    case MB_RETRYCANCEL:
+        return IDCANCEL;
+    case MB_ABORTRETRYIGNORE:
+        return IDIGNORE;
+    case MB_YESNO:
+        return IDNO;
+    case MB_CANCELTRYCONTINUE:
+        return IDCONTINUE;
+    default: // MB_OK
+        return IDOK;
+    }
+}
+
+int __MessagesShowW(HWND hWnd, const WCHAR* text, const WCHAR* caption, UINT uType)
+{
+    if (!__MessagesIsNonInteractive())
+        return ::MessageBoxW(hWnd, text, caption, uType);
+
+    fwprintf(stderr, L"\n[sally messagebox suppressed - non-interactive] %s: %s\n",
+             caption != NULL ? caption : L"(no caption)", text != NULL ? text : L"(no text)");
+    fflush(stderr);
+    return __MessagesNonInteractiveAnswer(uType);
+}
+
+static bool DecodeLegacyDiagnosticText(const char* bytes,
+                                       std::wstring& text) noexcept
+{
+    if (bytes == NULL)
+    {
+        text.clear();
+        return true;
+    }
+    return sally::diagnostic::DecodeAcp(bytes, text);
+}
+
+static bool EncodeLegacyDiagnosticText(const std::wstring& text,
+                                       std::string& bytes) noexcept
+{
+    return sally::diagnostic::EncodeAcpExact(text, bytes);
+}
+
+// Compatibility adapter for narrow diagnostic streams. The UI boundary itself
+// is UTF-16; legacy debug bytes are decoded once here and never become window
+// ownership. If allocation fails, preserve the diagnostic path with static text.
+int __MessagesShowA(HWND hWnd, const char* text, const char* caption, UINT uType)
+{
+    try
+    {
+        std::wstring textW;
+        std::wstring captionW;
+        const bool textDecoded = DecodeLegacyDiagnosticText(text, textW);
+        const bool captionDecoded = DecodeLegacyDiagnosticText(caption, captionW);
+        return __MessagesShowW(hWnd,
+                               text == NULL ? NULL :
+                                   (textDecoded ? textW.c_str() : L"Invalid legacy diagnostic text."),
+                               caption == NULL ? NULL :
+                                   (captionDecoded ? captionW.c_str() : L"Sally"),
+                               uType);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return __MessagesShowW(hWnd, L"Insufficient memory while preparing a diagnostic.",
+                               L"Sally", uType);
+    }
+}
+
 struct C__MessageBoxData
 {
     const char* Text;
@@ -178,7 +306,7 @@ struct C__MessageBoxData
 int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
 { // must not wait for a response from the calling thread because it will not respond
     // therefore parent==NULL -> no window disabling etc.
-    data->Return = MessageBoxA(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
+    data->Return = __MessagesShowA(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
     return 0;
 }
 
@@ -195,15 +323,16 @@ int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
     data.Text = MessagesStringBuf.c_str();
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
-    int len = (int)MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, len); // text backup
-    if (message != NULL)
+    std::string message;
+    try
     {
-        memcpy((char*)message, MessagesStringBuf.c_str(), len); // it is FIXED -> HANDLE==PTR
-        data.Text = (char*)message;
+        message = MessagesStringBuf.c_str();
+        data.Text = message.c_str();
     }
-    else
+    catch (const std::bad_alloc&)
+    {
         data.Text = __MessagesLowMemory;
+    }
     MessagesStringBuf.erase(); // preparation for next message
     LeaveMessagesModul();      // now other threads + message loops can start malfunctioning
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
@@ -219,11 +348,6 @@ int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
     else
         TRACE_E("Unable to show MessageBox: " << data.Caption << ": " << data.Text);
 
-#ifdef MULTITHREADED_MESSAGES_ENABLE
-    if (message != NULL)
-        GlobalFree(message);
-#endif // MULTITHREADED_MESSAGES_ENABLE
-
     return data.Return;
 }
 
@@ -235,26 +359,26 @@ int C__Messages::MessageBox(HWND hWnd, const char* lpCaption, UINT uType)
 #ifndef MULTITHREADED_MESSAGES_ENABLE
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxA(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
+    ret = __MessagesShowA(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
-    size_t len = MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, len); // text backup
-    char* txt;
-    txt = (char*)message; // it is FIXED -> HANDLE==PTR
-    if (txt != NULL)
-        memcpy(txt, MessagesStringBuf.c_str(), len);
-    else
-        txt = (char*)__MessagesLowMemory;
+    std::string message;
+    const char* txt = __MessagesLowMemory;
+    try
+    {
+        message = MessagesStringBuf.c_str();
+        txt = message.c_str();
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
     MessagesStringBuf.erase(); // preparation for next message
     LeaveMessagesModul();      // now other threads + message loops can start malfunctioning
 
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxA(hWnd, txt, lpCaption, uType);
+    ret = __MessagesShowA(hWnd, txt, lpCaption, uType);
 
-    if (message != NULL)
-        GlobalFree(message);
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
     return ret;
@@ -298,7 +422,7 @@ struct C__MessageBoxDataW
 int CALLBACK __MessagesWMessageBoxThreadF(C__MessageBoxDataW* data)
 { // must not wait for a response from the calling thread because it will not respond
     // therefore parent==NULL -> no window disabling etc.
-    data->Return = MessageBoxW(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
+    data->Return = __MessagesShowW(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
     return 0;
 }
 
@@ -315,15 +439,16 @@ int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
     data.Text = MessagesStringBuf.c_str();
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
-    int len = (int)MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * len); // text backup
-    if (message != NULL)
+    std::wstring message;
+    try
     {
-        memcpy((WCHAR*)message, MessagesStringBuf.c_str(), sizeof(WCHAR) * len); // it is FIXED -> HANDLE==PTR
-        data.Text = (WCHAR*)message;
+        message = MessagesStringBuf.c_str();
+        data.Text = message.c_str();
     }
-    else
+    catch (const std::bad_alloc&)
+    {
         data.Text = __MessagesLowMemoryW;
+    }
     MessagesStringBuf.erase(); // preparation for next message
     LeaveMessagesModul();      // now other threads + message loops can start malfunctioning
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
@@ -339,11 +464,6 @@ int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
     else
         TRACE_EW(L"Unable to show MessageBox: " << data.Caption << L": " << data.Text);
 
-#ifdef MULTITHREADED_MESSAGES_ENABLE
-    if (message != NULL)
-        GlobalFree(message);
-#endif // MULTITHREADED_MESSAGES_ENABLE
-
     return data.Return;
 }
 
@@ -355,26 +475,26 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
 #ifndef MULTITHREADED_MESSAGES_ENABLE
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxW(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
+    ret = __MessagesShowW(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
-    size_t len = MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * len); // text backup
-    WCHAR* txt;
-    txt = (WCHAR*)message; // it is FIXED -> HANDLE==PTR
-    if (txt != NULL)
-        memcpy(txt, MessagesStringBuf.c_str(), sizeof(WCHAR) * len);
-    else
-        txt = (WCHAR*)__MessagesLowMemoryW;
+    std::wstring message;
+    const WCHAR* txt = __MessagesLowMemoryW;
+    try
+    {
+        message = MessagesStringBuf.c_str();
+        txt = message.c_str();
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
     MessagesStringBuf.erase(); // preparation for next message
     LeaveMessagesModul();      // now other threads + message loops can start malfunctioning
 
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxW(hWnd, txt, lpCaption, uType);
+    ret = __MessagesShowW(hWnd, txt, lpCaption, uType);
 
-    if (message != NULL)
-        GlobalFree(message);
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
     return ret;
@@ -385,6 +505,182 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
 // rsc
 //
 
+namespace
+{
+// The diagnostic layer is used from late static destructors. Keep its dynamic
+// scratch owners alive for the process lifetime so destruction order across
+// translation units cannot invalidate them before a final handle/trace report.
+std::string& ResourceStringBufferA()
+{
+    static std::string* value = new std::string;
+    return *value;
+}
+
+std::wstring& ResourceStringBufferW()
+{
+    static std::wstring* value = new std::wstring;
+    return *value;
+}
+
+std::string& PrintfBufferA()
+{
+    static std::string* value = new std::string;
+    return *value;
+}
+
+std::wstring& PrintfBufferW()
+{
+    static std::wstring* value = new std::wstring;
+    return *value;
+}
+
+std::string& ErrorBufferA()
+{
+    static std::string* value = new std::string;
+    return *value;
+}
+
+std::wstring& ErrorBufferW()
+{
+    static std::wstring* value = new std::wstring;
+    return *value;
+}
+
+bool LoadResourceStringOwned(int resID, std::wstring& value)
+{
+    const WCHAR* resource = NULL;
+    const int length = LoadStringW(HInstance, resID,
+                                   reinterpret_cast<LPWSTR>(&resource), 0);
+    if (length <= 0 || resource == NULL)
+    {
+        value.clear();
+        return false;
+    }
+    value.assign(resource, static_cast<size_t>(length));
+    return true;
+}
+
+bool VFormatOwned(const char* format, va_list params, std::string& value)
+{
+    if (format == NULL)
+    {
+        value.clear();
+        return false;
+    }
+    try
+    {
+        va_list countParams;
+        va_copy(countParams, params);
+        const int length = _vscprintf(format, countParams);
+        va_end(countParams);
+        if (length < 0)
+        {
+            value.clear();
+            return false;
+        }
+        std::string staged(static_cast<size_t>(length) + 1, '\0');
+        if (vsprintf_s(staged.data(), staged.size(), format, params) < 0)
+        {
+            value.clear();
+            return false;
+        }
+        staged.resize(static_cast<size_t>(length));
+        value.swap(staged);
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        value.clear();
+        return false;
+    }
+}
+
+bool VFormatOwned(const WCHAR* format, va_list params, std::wstring& value)
+{
+    if (format == NULL)
+    {
+        value.clear();
+        return false;
+    }
+    try
+    {
+        va_list countParams;
+        va_copy(countParams, params);
+        const int length = _vscwprintf(format, countParams);
+        va_end(countParams);
+        if (length < 0)
+        {
+            value.clear();
+            return false;
+        }
+        std::wstring staged(static_cast<size_t>(length) + 1, L'\0');
+        if (vswprintf_s(staged.data(), staged.size(), format, params) < 0)
+        {
+            value.clear();
+            return false;
+        }
+        staged.resize(static_cast<size_t>(length));
+        value.swap(staged);
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        value.clear();
+        return false;
+    }
+}
+
+bool FormatSystemErrorOwned(DWORD error, std::wstring& value)
+{
+    std::wstring staged = L"(" + std::to_wstring(error) + L") ";
+    WCHAR* systemText = NULL;
+    const DWORD length = FormatMessageW(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+        NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<LPWSTR>(&systemText), 0, NULL);
+
+    try
+    {
+        if (length != 0 && systemText != NULL)
+            staged.append(systemText, static_cast<size_t>(length));
+    }
+    catch (...)
+    {
+        if (systemText != NULL)
+            LocalFree(systemText);
+        throw;
+    }
+    if (systemText != NULL)
+        LocalFree(systemText);
+    value.swap(staged);
+    return length != 0;
+}
+
+std::string& MessagesTitleStorageA()
+{
+    static std::string* value = new std::string;
+    return *value;
+}
+
+std::wstring& MessagesTitleStorageW()
+{
+    static std::wstring* value = new std::wstring;
+    return *value;
+}
+} // namespace
+
+void PreallocateMessagesDiagnosticStorage()
+{
+    ResourceStringBufferA();
+    ResourceStringBufferW();
+    PrintfBufferA();
+    PrintfBufferW();
+    ErrorBufferA();
+    ErrorBufferW();
+    MessagesTitleStorageA();
+    MessagesTitleStorageW();
+}
+
 const char* rsc(int resID)
 {
 #ifdef MULTITHREADED_MESSAGES_ENABLE
@@ -392,13 +688,23 @@ const char* rsc(int resID)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        if (LoadStringA(HInstance, resID, __ResourceStringBuffer,
-                        __RESOURCE_STRING_BUFFER_SIZE) == 0)
+        try
         {
-            TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
-            __ResourceStringBuffer[0] = 0;
+            std::wstring resource;
+            if (!LoadResourceStringOwned(resID, resource))
+            {
+                TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
+                ResourceStringBufferA().clear();
+            }
+            else if (!EncodeLegacyDiagnosticText(resource, ResourceStringBufferA()))
+                ResourceStringBufferA() =
+                    "Unicode resource is unavailable through the legacy diagnostic API.";
+            return ResourceStringBufferA().c_str();
         }
-        return __ResourceStringBuffer;
+        catch (const std::bad_alloc&)
+        {
+            return "Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -418,13 +724,19 @@ const WCHAR* rscW(int resID)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        if (LoadStringW(HInstance, resID, __ResourceStringBufferW,
-                        __RESOURCE_STRING_BUFFER_SIZE) == 0)
+        try
         {
-            TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
-            __ResourceStringBufferW[0] = 0;
+            if (!LoadResourceStringOwned(resID, ResourceStringBufferW()))
+            {
+                TRACE_E("Unable to load string from resource (resource ID is " << resID << ")");
+                ResourceStringBufferW().clear();
+            }
+            return ResourceStringBufferW().c_str();
         }
-        return __ResourceStringBufferW;
+        catch (const std::bad_alloc&)
+        {
+            return L"Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -449,11 +761,19 @@ const char* spf(const char* formatString, ...)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        va_list params;
-        va_start(params, formatString);
-        _vsnprintf_s(__SPrintFBuffer, _TRUNCATE, formatString, params);
-        va_end(params);
-        return __SPrintFBuffer;
+        try
+        {
+            std::string& buffer = PrintfBufferA();
+            va_list params;
+            va_start(params, formatString);
+            VFormatOwned(formatString, params, buffer);
+            va_end(params);
+            return buffer.c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return "Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -473,11 +793,19 @@ const WCHAR* spfW(const WCHAR* formatString, ...)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        va_list params;
-        va_start(params, formatString);
-        _vsnwprintf_s(__SPrintFBufferW, _TRUNCATE, formatString, params);
-        va_end(params);
-        return __SPrintFBufferW;
+        try
+        {
+            std::wstring& buffer = PrintfBufferW();
+            va_list params;
+            va_start(params, formatString);
+            VFormatOwned(formatString, params, buffer);
+            va_end(params);
+            return buffer.c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return L"Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -502,11 +830,20 @@ const char* spf(int formatStringResID, ...)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        va_list params;
-        va_start(params, formatStringResID);
-        _vsnprintf_s(__SPrintFBuffer, _TRUNCATE, rsc(formatStringResID), params);
-        va_end(params);
-        return __SPrintFBuffer;
+        try
+        {
+            const char* format = rsc(formatStringResID);
+            std::string& buffer = PrintfBufferA();
+            va_list params;
+            va_start(params, formatStringResID);
+            VFormatOwned(format, params, buffer);
+            va_end(params);
+            return buffer.c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return "Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -526,11 +863,20 @@ const WCHAR* spfW(int formatStringResID, ...)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        va_list params;
-        va_start(params, formatStringResID);
-        _vsnwprintf_s(__SPrintFBufferW, _TRUNCATE, rscW(formatStringResID), params);
-        va_end(params);
-        return __SPrintFBufferW;
+        try
+        {
+            const WCHAR* format = rscW(formatStringResID);
+            std::wstring& buffer = PrintfBufferW();
+            va_list params;
+            va_start(params, formatStringResID);
+            VFormatOwned(format, params, buffer);
+            va_end(params);
+            return buffer.c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return L"Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -555,16 +901,19 @@ const char* err(DWORD error)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        wsprintfA(__ErrorBuffer, "(%d) ", error);
-        int len = (int)strlen(__ErrorBuffer);
-        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
-                       NULL,
-                       error,
-                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                       __ErrorBuffer + len,
-                       __ERROR_BUFFER_SIZE - len,
-                       NULL);
-        return __ErrorBuffer;
+        try
+        {
+            std::wstring errorW;
+            FormatSystemErrorOwned(error, errorW);
+            if (!EncodeLegacyDiagnosticText(errorW, ErrorBufferA()))
+                ErrorBufferA() =
+                    "Unicode system error is unavailable through the legacy diagnostic API.";
+            return ErrorBufferA().c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return "Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -584,16 +933,15 @@ const WCHAR* errW(DWORD error)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        wsprintfW(__ErrorBufferW, L"(%d) ", error);
-        int len = (int)wcslen(__ErrorBufferW);
-        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
-                       NULL,
-                       error,
-                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                       __ErrorBufferW + len,
-                       __ERROR_BUFFER_SIZE - len,
-                       NULL);
-        return __ErrorBufferW;
+        try
+        {
+            FormatSystemErrorOwned(error, ErrorBufferW());
+            return ErrorBufferW().c_str();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return L"Insufficient memory.";
+        }
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
     else
@@ -608,27 +956,29 @@ const WCHAR* errW(DWORD error)
 
 //*****************************************************************************
 //
-// SetMessagesTitle
+// SetMessagesTitleW
 //
-
-void SetMessagesTitle(const char* title)
-{
-    lstrcpynA(__MessagesTitleBuf, title, _countof(__MessagesTitleBuf));
-    __MessagesTitle = __MessagesTitleBuf;
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, __MessagesTitleBuf, -1,
-                        __MessagesTitleBufW, _countof(__MessagesTitleBufW));
-    __MessagesTitleBufW[_countof(__MessagesTitleBufW) - 1] = 0;
-    __MessagesTitleW = __MessagesTitleBufW;
-}
 
 void SetMessagesTitleW(const WCHAR* title)
 {
-    lstrcpynW(__MessagesTitleBufW, title, _countof(__MessagesTitleBufW));
-    __MessagesTitleW = __MessagesTitleBufW;
-    WideCharToMultiByte(CP_ACP, 0, __MessagesTitleBufW, -1,
-                        __MessagesTitleBuf, _countof(__MessagesTitleBuf), NULL, NULL);
-    __MessagesTitleBuf[_countof(__MessagesTitleBuf) - 1] = 0;
-    __MessagesTitle = __MessagesTitleBuf;
+    try
+    {
+        std::wstring wide = title != NULL ? title : L"";
+        std::string narrow;
+        if (!EncodeLegacyDiagnosticText(wide, narrow))
+            narrow = "Sally";
+        std::wstring& wideStorage = MessagesTitleStorageW();
+        std::string& narrowStorage = MessagesTitleStorageA();
+        wideStorage.swap(wide);
+        narrowStorage.swap(narrow);
+        __MessagesTitleW = wideStorage.c_str();
+        __MessagesTitle = narrowStorage.c_str();
+    }
+    catch (const std::bad_alloc&)
+    {
+        // Keep the previous process-lifetime title. Diagnostics must remain usable
+        // when the title itself cannot be allocated.
+    }
 }
 
 //*****************************************************************************

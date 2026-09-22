@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 #define IOBUFSIZE (16 * 1024)
 #define PAK_UPDIR "__$UPDIR" //alias to ".."
 
@@ -29,16 +31,16 @@ struct CPackEntry
 
 struct CDelRegion
 {
-    char* Description;
+    std::string Description;
     DWORD Offset;
     DWORD Size;
-    char* FileName;
+    std::string FileName;
+    bool HasFileName;
 
     CDelRegion(const char* descript, DWORD offset, DWORD size, const char* fileName);
-    ~CDelRegion();
 };
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 void FreeRegion(void* region);
 
 class CPakIface : public CPakIfaceAbstract
@@ -69,7 +71,7 @@ public:
 
     //opens a PAK file for further processing
     //returns TRUE on success
-    virtual BOOL OpenPak(const char* fileName, DWORD mode);
+    virtual BOOL OpenPak(const wchar_t* fileName, DWORD mode);
 
     //closes the PAK file
     virtual BOOL ClosePak();
@@ -122,13 +124,10 @@ public:
     //optimizes the PAK
     virtual BOOL OptimizePak();
 
-    //creates a message from the parameters passed to 'HandleError()'
-    virtual char* FormatMessage(char* buffer, int errorID, va_list arglist);
-
 protected:
     BOOL HandleError(DWORD flags, int errorID, ...);
 
-    char* LastErrorString(int lastError, char* buffer);
+    std::wstring LastErrorString(DWORD lastError) noexcept;
 
     BOOL SafeSeek(HANDLE file, DWORD position);
 
@@ -136,7 +135,7 @@ protected:
 
     BOOL SafeWrite(HANDLE file, void* buffer, DWORD size);
 
-    BOOL GetName(const char* nameInPak, char* outName);
+    BOOL GetName(const char* nameInPak, std::string& outName);
 
     void UpdateDir(CDelRegion* region, DWORD topOffset, DWORD delta);
 

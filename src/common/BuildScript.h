@@ -30,8 +30,7 @@ BOOL BuildScriptFromSnapshot(
 // Legacy ADS probe adapter used by production CBuildConfig callers. It lives
 // outside BuildScript.cpp so headless/private test targets can link the script
 // builder without dragging in worker.cpp.
-BOOL BuildScriptLegacyADSProbe(const char* sourceNameA,
-                               const wchar_t* sourceNameW,
+BOOL BuildScriptLegacyADSProbe(const wchar_t* sourceName,
                                BOOL isDir,
                                DWORD bytesPerCluster,
                                CBuildADSProbeResult* result,

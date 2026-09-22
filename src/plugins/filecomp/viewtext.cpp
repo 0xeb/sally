@@ -290,42 +290,30 @@ BOOL TTextFileViewWindow<CChar>::CopySelection()
     int len = int((Lines[l2] + charEnd) - (Lines[l1] + charBegin));
     if (len)
     {
-        // replace LF with CRLF
-        const CChar* sour = Lines[l1] + charBegin;
-        int s = 0, d = 0, i;
-        int size = (int)(1.1 * len);
-        CChar* buffer = (CChar*)malloc(size * sizeof(CChar));
-        if (!buffer)
-            return FALSE;
-
-        while (s < len)
+        const CChar* source = Lines[l1] + charBegin;
+        std::basic_string<CChar> clipboardText;
+        try
         {
-            CChar* ptr = (CChar*)MemChr(sour + s, '\n', len - s);
-            i = ptr ? int(ptr - (sour + s)) : len - s;
-            if (size < d + i + 2)
+            size_t lineFeeds = 0;
+            for (int i = 0; i < len; ++i)
             {
-                size = max(2 * size, size + d + i + 2);
-                ptr = (CChar*)realloc(buffer, size * sizeof(CChar));
-                if (!ptr)
-                {
-                    free(buffer);
-                    return FALSE;
-                }
-                buffer = ptr;
+                if (source[i] == '\n')
+                    ++lineFeeds;
             }
-            memcpy(buffer + d, sour + s, i * sizeof(CChar));
-            d += i;
-            s += i + 1; // skip the LF
-            if (s <= len)
+            clipboardText.reserve(static_cast<size_t>(len) + lineFeeds);
+            for (int i = 0; i < len; ++i)
             {
-                buffer[d++] = '\r';
-                buffer[d++] = '\n';
+                if (source[i] == '\n')
+                    clipboardText.push_back('\r');
+                clipboardText.push_back(source[i]);
             }
         }
-
-        BOOL ret = CopyTextToClipboard(buffer, d, FALSE, NULL);
-        free(buffer);
-        return ret;
+        catch (...)
+        {
+            return FALSE;
+        }
+        return CopyFileCompSelectionToClipboard(
+            clipboardText.data(), clipboardText.size(), FALSE, NULL);
     }
     else
         return FALSE;
@@ -516,8 +504,14 @@ void TTextFileViewWindow<CChar>::PolytextLengthFixup(typename std::vector<POLYTE
             begin->lpstr += offset;
             begin->n -= offset;
         }
-        // TODO on 4K displays 1024 characters may no longer be enough!!
-        begin->n = min(begin->n, UINT(1024));
+        if (FontWidth <= 0 || begin->x >= begin->rcl.right)
+            begin->n = 0;
+        else
+        {
+            const UINT visibleCells = static_cast<UINT>(
+                (begin->rcl.right - begin->x + FontWidth - 1) / FontWidth);
+            begin->n = min(begin->n, visibleCells);
+        }
     }
 }
 
@@ -680,11 +674,12 @@ void TTextFileViewWindow<CChar>::Paint()
 
             // draw the line number together with its background
             int l = Script[ViewMode][line].GetLine();
-            char num[numeric_limits<size_t>::digits10 + 1];
-            sprintf(num, "%*d", LineNumDigits, l + 1);
+            wchar_t num[numeric_limits<int>::digits10 + 3];
+            _snwprintf_s(num, _countof(num), _TRUNCATE, L"%*d", LineNumDigits, l + 1);
             SetTextColor(dc, LineColors[colorScheme].LineNumFgColor);
             SetBkColor(dc, LineColors[colorScheme].LineNumBkColor);
-            MappedASCII8TextOut.DoTextOut(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1, num, LineNumDigits, NULL);
+            DrawFileCompText(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1,
+                             num, LineNumDigits, NULL);
 
             // draw the text line together with its background
             int len = FormatLine(dc, LineBuffer, Lines[l], Lines[l + 1] - 1);
@@ -786,10 +781,12 @@ void TTextFileViewWindow<CChar>::Paint()
                  LineBuffer[FirstVisibleChar + offset2-2], LineBuffer[FirstVisibleChar + offset2-1]);
               OutputDebugString(ss);*/
 
-                        // Windows XP seems to fail on len ~ 200 000. 1024 should be enough for everybody
-                        // TODO on 4K displays 1024 characters may no longer be enough!!
-                        ExtTextOutX(dc, r3.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r3,
-                                    LineBuffer + FirstVisibleChar + offset1, min(1024, offset2 - offset1), NULL);
+                        const UINT visibleCells = FontWidth > 0 && r3.right > r3.left
+                                                      ? static_cast<UINT>((r3.right - r3.left + FontWidth - 1) / FontWidth)
+                                                      : 0;
+                        DrawFileCompText(dc, r3.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r3,
+                                         LineBuffer + FirstVisibleChar + offset1,
+                                         min(static_cast<UINT>(offset2 - offset1), visibleCells), NULL);
 
                         ExcludeClipRect(dc, r3.left, r3.top, r3.right, r3.bottom);
                     }
@@ -978,28 +975,30 @@ void TTextFileViewWindow<CChar>::Paint()
                 if (d > 0)
                 {
                     PolytextLengthFixup(PTChange.begin(), PTChange.begin() + d);
-                    PolyTextOutX(dc, &PTChange.front(), d);
+                    DrawFileCompTextRuns(dc, &PTChange.front(), d);
                 }
 
                 SetTextColor(dc, LineColors[colorScheme].FgCommon);
                 if (z > 0)
-                    PolyTextOutX(dc, &PTZeroChange.front(), z);
+                    DrawFileCompTextRuns(dc, &PTZeroChange.front(), z);
 
                 SetBkColor(dc, LineColors[colorScheme].BkCommon);
                 PolytextLengthFixup(PTCommon.begin(), PTCommon.begin() + c);
-                PolyTextOutX(dc, &PTCommon.front(), c);
+                DrawFileCompTextRuns(dc, &PTCommon.front(), c);
             }
             else
             {
             LNORMAL_PAINT:
                 if (FirstVisibleChar > len)
                     len = FirstVisibleChar; // only clear the background
-                // Windows XP seems to fail on len ~ 200 000. 1024 should be enough for everybody
                 len -= FirstVisibleChar;
 
-                // TODO on 4K displays 1024 characters may no longer be enough!!
-                ExtTextOutX(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2,
-                            LineBuffer + FirstVisibleChar, min(1024, len), NULL);
+                const UINT visibleCells = FontWidth > 0 && r2.right > r2.left
+                                              ? static_cast<UINT>((r2.right - r2.left + FontWidth - 1) / FontWidth)
+                                              : 0;
+                DrawFileCompText(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2,
+                                 LineBuffer + FirstVisibleChar,
+                                 min(static_cast<UINT>(len), visibleCells), NULL);
             }
             break;
         }

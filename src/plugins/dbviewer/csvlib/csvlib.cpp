@@ -12,6 +12,8 @@
 #include <limits.h>
 #include <new.h>
 
+#include "../display_text.h"
+
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
 #endif
@@ -164,7 +166,7 @@ static void SwapWords(char* s, size_t len)
 }
 
 template <class CChar>
-CCSVParser<CChar>::CCSVParser(const char* filename,
+CCSVParser<CChar>::CCSVParser(const wchar_t* filename,
                               BOOL autoSeparator, CChar separator,
                               BOOL autoQualifier, CCSVParserTextQualifier textQualifier,
                               BOOL autoFirstRowAsName, BOOL firstRowAsColumnNames)
@@ -173,7 +175,7 @@ CCSVParser<CChar>::CCSVParser(const char* filename,
 
     Buffer = NULL;
 
-    File = fopen(filename, "rb");
+    File = _wfopen(filename, L"rb");
     if (File == NULL)
     {
         Status = (CCSVParserStatus)(GetLastError() | CSVE_SYSTEM_ERROR);
@@ -839,20 +841,16 @@ CCSVParserBase::~CCSVParserBase()
 // CCSVParserUTF8 - internally uses CCSVParser<char>
 //
 
-CCSVParserUTF8::CCSVParserUTF8(const char* filename,
+CCSVParserUTF8::CCSVParserUTF8(const wchar_t* filename,
                                BOOL autoSeparator, char separator,
                                BOOL autoQualifier, CCSVParserTextQualifier textQualifier,
                                BOOL autoFirstRowAsName, BOOL firstRowAsColumnNames) : parser(filename, autoSeparator, separator, autoQualifier, textQualifier,
                                                                                              autoFirstRowAsName, firstRowAsColumnNames)
 {
-    Buffer = (wchar_t*)malloc(10);
-    BufferSize = 5;
 }
 
 CCSVParserUTF8::~CCSVParserUTF8()
 {
-    if (Buffer)
-        free(Buffer);
 }
 
 const char* CCSVParserUTF8::GetColumnName(DWORD index)
@@ -862,48 +860,26 @@ const char* CCSVParserUTF8::GetColumnName(DWORD index)
     if (!name)
         return NULL;
 
-    int nameLen = (int)strlen(name) + 1;
-    int len = MultiByteToWideChar(CP_UTF8, 0, name, nameLen, Buffer, BufferSize);
-    if (len <= 0)
-    {
-        len = MultiByteToWideChar(CP_UTF8, 0, name, nameLen, NULL, 0);
-        if (len > 0)
-        {
-            free(Buffer);
-            Buffer = (wchar_t*)malloc(len * sizeof(wchar_t));
-            if (Buffer)
-            {
-                BufferSize = len;
-                len = MultiByteToWideChar(CP_UTF8, 0, name, nameLen, Buffer, BufferSize);
-            }
-        }
-    }
-    return (const char*)Buffer;
+    if (!sally::dbviewer::DecodeUtf8DisplayText(name, strlen(name), Buffer))
+        return NULL;
+    return reinterpret_cast<const char*>(Buffer.c_str());
 }
 
 void* CCSVParserUTF8::GetCellText(DWORD index, size_t* textLen)
 {
+    if (textLen == NULL)
+        return NULL;
     LPCSTR text = (LPCSTR)parser.GetCellText(index, textLen);
     if (!text)
         return NULL;
 
-    int len = MultiByteToWideChar(CP_UTF8, 0, text, (int)*textLen, Buffer, BufferSize);
-    if (len <= 0)
+    if (!sally::dbviewer::DecodeUtf8DisplayText(text, *textLen, Buffer))
     {
-        len = MultiByteToWideChar(CP_UTF8, 0, text, (int)*textLen, NULL, 0);
-        if (len > 0)
-        {
-            free(Buffer);
-            Buffer = (wchar_t*)malloc(len * sizeof(wchar_t));
-            if (Buffer)
-            {
-                BufferSize = len;
-                len = MultiByteToWideChar(CP_UTF8, 0, text, (int)*textLen, Buffer, BufferSize);
-            }
-        }
+        *textLen = 0;
+        return NULL;
     }
-    *textLen = len;
-    return (char*)Buffer;
+    *textLen = Buffer.size();
+    return Buffer.data();
 }
 
 //template class CCSVParser<char>;

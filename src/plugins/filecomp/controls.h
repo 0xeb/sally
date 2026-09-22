@@ -16,15 +16,15 @@ extern HBRUSH HDitheredBrush;
 class CFileHeaderWindow : public CWindow
 {
 protected:
-    CPathBuffer Text; // Heap-allocated for long path support
+    std::wstring Text;
     int TextLen;
     COLORREF BkColor;
     HBRUSH BkgndBrush;
 
 public:
-    CFileHeaderWindow(const char* text);
+    CFileHeaderWindow(const wchar_t* text);
     virtual ~CFileHeaderWindow();
-    void SetText(const char* text);
+    void SetText(const wchar_t* text);
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -43,7 +43,7 @@ enum CSplitBarType
 #define SBP_RIGHT 1
 #define SBP_BOTTOM SB_RIGHT
 
-extern const char* SPLITBARWINDOW_CLASSNAME;
+extern LPCWSTR SPLITBARWINDOW_CLASSNAME;
 
 class CToolTipWindow;
 
@@ -72,13 +72,12 @@ protected:
 class CToolTipWindow : public CWindow
 {
 protected:
-    char Text[10];
+    std::wstring Text;
     int TextLen;
 
 public:
     CToolTipWindow()
     {
-        *Text = 0;
         TextLen = 0;
     }
 

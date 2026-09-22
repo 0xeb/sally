@@ -3,6 +3,8 @@
 
 #include "common/ViewerEditorLauncher.h"
 
+#include <new>
+
 CViewerEditorLauncher::CViewerEditorLauncher(IExternalToolRunner* runner, IShell* shell)
     : Runner(runner)
     , Shell(shell)
@@ -20,6 +22,7 @@ IShell* CViewerEditorLauncher::ResolveShell() const
 }
 
 ExternalToolResult CViewerEditorLauncher::LaunchProcess(const ViewerEditorProcessLaunchRequest& request)
+try
 {
     IExternalToolRunner* runner = ResolveRunner();
     if (runner == nullptr)
@@ -39,6 +42,10 @@ ExternalToolResult CViewerEditorLauncher::LaunchProcess(const ViewerEditorProces
     toolRequest.height = request.height;
 
     return runner->Launch(toolRequest);
+}
+catch (const std::bad_alloc&)
+{
+    return ExternalToolResult::Error(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 ShellExecResult CViewerEditorLauncher::OpenFileWithShell(HWND hwnd, const wchar_t* path, int showCommand)

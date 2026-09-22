@@ -3,88 +3,53 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/unicode/helpers.h"
+#include <limits>
+#include <stdexcept>
+
+using sally::unicode::FoldCharW;
 
 //
 //*****************************************************************************
 // Functions for wildcard operations
 //
 
-void PrepareMask(char* mask, const char* src)
+void PrepareMask(wchar_t* mask, const wchar_t* src)
 {
-    SLOW_CALL_STACK_MESSAGE2("PrepareMask(, %s)", src);
-    char* begMask = mask;
-    char lastChar = 0;
+    SLOW_CALL_STACK_MESSAGE2("PrepareMask(, %S)", src);
+    wchar_t* begMask = mask;
+    wchar_t lastChar = 0;
     // remove spaces at the beginning of the mask
-    while (*src == ' ')
+    while (*src == L' ')
         src++;
     while (*src != 0)
     {
-        if (*src == '*' && lastChar == '*')
+        if (*src == L'*' && lastChar == L'*')
             src++;                               // "**" -> "*"
-        else if (*src == '?' && lastChar == '*') // "*?" -> "?*"
+        else if (*src == L'?' && lastChar == L'*') // "*?" -> "?*"
         {
-            *(mask - 1) = '?';
-            *mask++ = '*';
+            *(mask - 1) = L'?';
+            *mask++ = L'*';
             src++;
         }
         else
             *mask++ = (lastChar = *src++);
     }
     // trim spaces at the end of the mask
-    while (mask > begMask && *(mask - 1) == ' ')
+    while (mask > begMask && *(mask - 1) == L' ')
         mask--;
     *mask = 0;
 }
 
-BOOL AgreeMask(const char* filename, const char* mask, BOOL hasExtension, BOOL extendedMode)
-{
-    CALL_STACK_MESSAGE_NONE;
-    //  CALL_STACK_MESSAGE4("AgreeMask(%s, %s, %d)", filename, mask, hasExtension);  // slows things down massively (called recursively)
-    while (*filename != 0)
-    {
-        if (*mask == 0)
-            return FALSE; // mask is too short
-        BOOL agree;
-        if (extendedMode)
-            agree = (LowerCase[*filename] == LowerCase[*mask] || *mask == '?' || // match or '?' represents any character or '#' represents any digit
-                     (*mask == '#' && *filename >= '0' && *filename <= '9'));
-        else
-            agree = (LowerCase[*filename] == LowerCase[*mask] || *mask == '?'); // match or '?' represents any character
-        if (agree)
-        {
-            filename++;
-            mask++;
-        }
-        else if (*mask == '*') // '*' represents a sequence of characters (possibly empty)
-        {
-            mask++;
-            while (*filename != 0)
-            {
-                if (AgreeMask(filename, mask, hasExtension, extendedMode))
-                    return TRUE; // the rest of the mask matches
-                filename++;
-            }
-            break; // end of filename...
-        }
-        else
-            return FALSE;
-    }
-    if (*mask == '*')
-        mask++;                        // asterisk '*' afterwards -> represents "" -> everything is ok
-    if (!hasExtension && *mask == '.') // without extension mask "*.*" must still match...
-        return *(mask + 1) == 0 || (*(mask + 1) == '*' && *(mask + 2) == 0);
-    else
-        return *mask == 0;
-}
 
-char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
+wchar_t* MaskName(wchar_t* buffer, int bufSize, const wchar_t* name, const wchar_t* mask)
 {
     SLOW_CALL_STACK_MESSAGE1("MaskName()");
     if (buffer == NULL || bufSize <= 0 || name == NULL)
         return NULL;
     if (mask == NULL)
     {
-        lstrcpyn(buffer, name, bufSize);
+        lstrcpynW(buffer, name, bufSize);
         return buffer;
     }
 
@@ -93,11 +58,11 @@ char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
     // "d" + "*.old" = "d.old" -> the result is the combination "a.b.c.d.old")
 
     int ignPoints = 0; // how many dots the name contains (this section corresponds to the text of the mask from the start to the first dot); the rest matches the extension (after the fisrt dot)
-    const char* n = name;
+    const wchar_t* n = name;
     while (*n != 0)
         if (*n++ == '.')
             ignPoints++;
-    const char* s = mask;
+    const wchar_t* s = mask;
     while (*s != 0)
         if (*s++ == '.')
         {
@@ -110,8 +75,8 @@ char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
     //  if (ignPoints == 0 && *name == '.') ignPoints++;   // dot at the start of the name should be ignored (not an extension); fix: ".cvspass" is an extension in Windows...
 
     n = name;
-    char* d = buffer;
-    char* endBuf = buffer + bufSize - 1;
+    wchar_t* d = buffer;
+    wchar_t* endBuf = buffer + bufSize - 1;
     s = mask;
     while (*s != 0 && d < endBuf)
     {
@@ -199,6 +164,27 @@ char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
     return buffer;
 }
 
+std::wstring MaskNameOwnedW(const wchar_t* name, const wchar_t* mask)
+{
+    if (name == NULL)
+        return {};
+    if (mask == NULL)
+        return name;
+
+    // MaskName emits no more than every input-name character plus every mask
+    // character. Give the legacy algorithm that exact dynamic upper bound.
+    const size_t nameLength = wcslen(name);
+    const size_t maskLength = wcslen(mask);
+    const size_t maxCapacity = static_cast<size_t>((std::numeric_limits<int>::max)());
+    if (nameLength >= maxCapacity || maskLength >= maxCapacity - nameLength)
+        throw std::length_error("masked name exceeds the supported string size");
+    const size_t capacity = nameLength + maskLength + 1;
+    std::wstring result(capacity, L'\0');
+    MaskName(result.data(), static_cast<int>(result.size()), name, mask);
+    result.resize(wcslen(result.c_str()));
+    return result;
+}
+
 //
 //*****************************************************************************
 // Functions for quick-search
@@ -208,16 +194,17 @@ char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
 // it must be a character not allowed in file names
 // and at the same time, it should be easy to type (see the '<' on the German keyboard;
 // for the backslash on the German keyboard you must press AltGr+\)
-BOOL IsQSWildChar(char ch)
+BOOL IsQSWildChar(wchar_t ch)
 {
     return (ch == '/' || ch == '\\' || ch == '<');
 }
 
-void PrepareQSMask(char* mask, const char* src)
+std::wstring PrepareQSMask(const wchar_t* src)
 {
-    CALL_STACK_MESSAGE2("PrepareQSMask(, %s)", src);
-    char* begMask = mask;
-    char lastChar = 0;
+    CALL_STACK_MESSAGE2("PrepareQSMask(%S)", src);
+    std::wstring mask;
+    mask.reserve(wcslen(src));
+    wchar_t lastChar = 0;
     while (*src != 0)
     {
         if (IsQSWildChar(*src))
@@ -228,22 +215,31 @@ void PrepareQSMask(char* mask, const char* src)
             {
                 // convert other wild characters to '/'
                 src++;
-                *mask++ = (lastChar = '/');
+                mask.push_back(lastChar = L'/');
             }
         }
         else
-            *mask++ = (lastChar = *src++);
+        {
+            lastChar = *src++;
+            mask.push_back(lastChar);
+        }
     }
     // trim '/' at the end of the mask (it has no meaning here)
-    if (mask > begMask && *(mask - 1) == '/')
-        mask--;
-    *mask = 0;
+    if (!mask.empty() && mask.back() == L'/')
+        mask.pop_back();
+    return mask;
 }
 
-BOOL AgreeQSMaskAux(const char* filename, BOOL hasExtension, const char* filenameBase, const char* mask, BOOL wholeString, int& offset)
+// masks.h declares AgreeQSMask wide (quick-search is a
+// panel-name feature, not file content), but the definition stayed narrow, folding through the
+// CP_ACP LowerCase[] table -- the same link-time-masked defect P1.6i already fixed for
+// PrepareMask/AgreeMask above, just never applied here. Folds with FoldCharW per character, the
+// same choice AgreeMask already made and for the same reason (a character-by-character matcher,
+// not a whole-string compare).
+BOOL AgreeQSMaskAux(const wchar_t* filename, BOOL hasExtension, const wchar_t* filenameBase, const wchar_t* mask, BOOL wholeString, int& offset)
 {
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE6("AgreeQSMaskAux(%s, %d, %s, %s, %d,)", filename, hasExtension, filenameBase, mask, wholeString);
+    //  CALL_STACK_MESSAGE6("AgreeQSMaskAux(%S, %d, %S, %S, %d,)", filename, hasExtension, filenameBase, mask, wholeString);
     while (*filename != 0)
     {
         if (!wholeString && *mask == 0)
@@ -251,12 +247,12 @@ BOOL AgreeQSMaskAux(const char* filename, BOOL hasExtension, const char* filenam
             offset = (int)(filename - filenameBase);
             return TRUE; // end of mask, 'offset' = how far it reaches into the file name
         }
-        if (LowerCase[*filename] == LowerCase[*mask])
+        if (FoldCharW(*filename) == FoldCharW(*mask))
         {
             filename++;
             mask++;
         }
-        else if (*mask == '/') // '/' stands for a sequence of characters (can be empty)
+        else if (*mask == L'/') // '/' stands for a sequence of characters (can be empty)
         {
             mask++;
             while (*filename != 0)
@@ -271,7 +267,7 @@ BOOL AgreeQSMaskAux(const char* filename, BOOL hasExtension, const char* filenam
             return FALSE;
     }
     if (*mask == 0 ||
-        !hasExtension && *mask == '.' && *(mask + 1) == 0) // a dot at the end of the mask is tolerated for names without an extension ('/' at the end is trimmed, not handled)
+        !hasExtension && *mask == L'.' && *(mask + 1) == 0) // a dot at the end of the mask is tolerated for names without an extension ('/' at the end is trimmed, not handled)
     {
         offset = (int)(filename - filenameBase);
         return TRUE; // mask matched the entire name -> 'offset' = length of the file name
@@ -280,9 +276,9 @@ BOOL AgreeQSMaskAux(const char* filename, BOOL hasExtension, const char* filenam
         return FALSE;
 }
 
-BOOL AgreeQSMask(const char* filename, BOOL hasExtension, const char* mask, BOOL wholeString, int& offset)
+BOOL AgreeQSMask(const wchar_t* filename, BOOL hasExtension, const wchar_t* mask, BOOL wholeString, int& offset)
 {
-    SLOW_CALL_STACK_MESSAGE5("AgreeQSMask(%s, %d, %s, %d,)", filename, hasExtension, mask, wholeString);
+    SLOW_CALL_STACK_MESSAGE5("AgreeQSMask(%S, %d, %S, %d,)", filename, hasExtension, mask, wholeString);
     offset = 0;
     return AgreeQSMaskAux(filename, hasExtension, filename, mask, wholeString, offset);
 }
@@ -295,14 +291,14 @@ BOOL AgreeQSMask(const char* filename, BOOL hasExtension, const char* mask, BOOL
 CMaskGroup::CMaskGroup()
     : PreparedMasks(10, 10)
 {
-    MasksString[0] = 0;
+    MasksString.clear();
     NeedPrepare = FALSE;
     ExtendedMode = FALSE;
     MasksHashArray = NULL;
     MasksHashArraySize = 0;
 }
 
-CMaskGroup::CMaskGroup(const char* masks, BOOL extendedMode)
+CMaskGroup::CMaskGroup(const wchar_t* masks, BOOL extendedMode)
     : PreparedMasks(10, 10)
 {
     MasksHashArray = NULL;
@@ -335,7 +331,9 @@ CMaskGroup::operator=(const CMaskGroup& s)
 {
     Release();
 
-    lstrcpy(MasksString, s.MasksString);
+    // Still re-PREPARES rather than copying prepared state. A
+    // memcpy here would share heap pointers between two groups and double-free.
+    MasksString = s.MasksString;
     ExtendedMode = s.ExtendedMode;
 
     NeedPrepare = TRUE;
@@ -375,34 +373,23 @@ void CMaskGroup::ReleaseMasksHashArray()
     }
 }
 
-void CMaskGroup::SetMasksString(const char* masks, BOOL extendedMode)
+void CMaskGroup::SetMasksString(const wchar_t* masks, BOOL extendedMode)
 {
-    int l = (int)strlen(masks);
-    if (l > MAX_GROUPMASK - 1)
-    {
-        l = MAX_GROUPMASK - 1;
-        TRACE_E("Group mask string is longer than MAX_GROUPMASK, using only first MAX_GROUPMASK-1 characters...");
-    }
-    // originally memcpy was used, but in some calls, the masks pointer referenced
-    // MasksString itself, causing overlap
-    memmove(MasksString, masks, l);
-
-    MasksString[l] = 0;
+    std::wstring newMasks = masks != NULL ? masks : L"";
+    MasksString = std::move(newMasks);
 
     NeedPrepare = TRUE;
     ExtendedMode = extendedMode;
 }
 
-const char*
+// The lossy CP_ACP rendering is gone. masks.h has declared this
+// returning const wchar_t*, so no caller could ever have received
+// the narrow buffer -- the definition differed only by return type (C2556) and had no
+// matching declaration. Returning the storage directly also retires MasksStringNarrow.
+const wchar_t*
 CMaskGroup::GetMasksString()
 {
-    return MasksString;
-}
-
-char* CMaskGroup::GetWritableMasksString()
-{
-    NeedPrepare = TRUE; // unfortunately also used as a write buffer, so we have to allow another PrepareMasks
-    return MasksString;
+    return MasksString.c_str();
 }
 
 BOOL CMaskGroup::GetExtendedMode()
@@ -410,23 +397,13 @@ BOOL CMaskGroup::GetExtendedMode()
     return ExtendedMode;
 }
 
-#define COMPUTEMASKGROUPHASH(hash, exten) \
-    { \
-        const unsigned char* __CMGH_ext = (exten); \
-        if (*__CMGH_ext != 0) \
-        { \
-            hash = (LowerCase[*__CMGH_ext] - 'a'); \
-            if (*++__CMGH_ext != 0) \
-            { \
-                hash += 3 * (LowerCase[*__CMGH_ext] - 'a'); \
-                if (*++__CMGH_ext != 0) \
-                    hash += 7 * (LowerCase[*__CMGH_ext] - 'a'); \
-            } \
-        } \
-        hash = hash % MasksHashArraySize; \
-    }
+// Wide hash. MUST produce the same bucket for the same extension
+// as the linear scan expects, or the hash array and the scan disagree and
+// matches vanish silently. Folds with FoldCharW for the same reason AgreeMask
+// does - the narrow form used LowerCase[], the CP_ACP table.
+#define COMPUTEMASKGROUPHASH(hash, exten)     {         const wchar_t* __CMGH_ext = (exten);         if (*__CMGH_ext != 0)         {             hash = (DWORD)(sally::unicode::FoldCharW(*__CMGH_ext) - L'a');             if (*++__CMGH_ext != 0)             {                 hash += 3 * (DWORD)(sally::unicode::FoldCharW(*__CMGH_ext) - L'a');                 if (*++__CMGH_ext != 0)                     hash += 7 * (DWORD)(sally::unicode::FoldCharW(*__CMGH_ext) - L'a');             }         }         hash = hash % MasksHashArraySize;     }
 
-BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
+BOOL CMaskGroup::PrepareMasks(int& errorPos, const wchar_t* masksString)
 {
     CALL_STACK_MESSAGE1("CMaskGroup::PrepareMasks(,)");
     if (masksString == NULL && !NeedPrepare)
@@ -439,29 +416,32 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
     PreparedMasks.DestroyMembers();
     ReleaseMasksHashArray();
 
-    const char* useMasksString = masksString == NULL ? MasksString : masksString;
-    const char* s = useMasksString;
-    CPathBuffer buf;      // Heap-allocated for long path support
-    CPathBuffer maskBuf;  // Heap-allocated for long path support
+    const wchar_t* useMasksString = masksString == NULL ? MasksString.c_str() : masksString;
+    const wchar_t* s = useMasksString;
+    const size_t scratchSize = std::wcslen(s) + 1;
+    std::wstring bufStore(scratchSize, L'\0');
+    std::wstring maskStore(scratchSize, L'\0');
+    wchar_t* buf = &bufStore[0];
+    wchar_t* maskBuf = &maskStore[0];
     int excludePos = -1;   // if not -1, all following masks are exclude type
                            // and will be inserted at the beginning of the array
     int hashableMasks = 0; // number of masks that can be hashed (MASK_OPTIMIZE_EXTENSION + CMaskItemFlags::Exclude==0)
 
     // to avoid unnecessary reallocations for longer arrays, set a reasonable delta
-    int masksLen = (int)strlen(s);
+    int masksLen = (int)wcslen(s);
     PreparedMasks.SetDelta(max(10, (masksLen / 6) / 2)); // "*.xxx;" is 6 characters, use half the extensions
 
     while (1)
     {
-        char* mask = maskBuf;
-        while (*s != 0 && *s > 31 && *s != '\\' && *s != '/' &&
-               *s != '<' && *s != '>' && *s != ':' && *s != '"')
+        wchar_t* mask = maskBuf;
+        while (*s != 0 && *s > 31 && *s != '\\' && *s != L'/' &&
+               *s != L'<' && *s != L'>' && *s != L':' && *s != L'"')
         {
-            if (*s == '|')
+            if (*s == L'|')
                 break;
-            if (*s == ';')
+            if (*s == L';')
             {
-                if (*(s + 1) == ';')
+                if (*(s + 1) == L';')
                     s++;
                 else
                     break;
@@ -469,17 +449,17 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
             *mask++ = *s++;
         }
         *mask = 0;
-        if (*s != 0 && *s != ';' && (*s != '|' || excludePos != -1)) // the exclude character '|' may appear only once in the mask
+        if (*s != 0 && *s != L';' && (*s != L'|' || excludePos != -1)) // the exclude character L'|' may appear only once in the mask
         {
             errorPos = (int)(s - useMasksString);
             return FALSE;
         }
 
-        while (--mask >= maskBuf && *mask <= ' ')
+        while (--mask >= maskBuf && *mask <= L' ')
             ;
         *(mask + 1) = 0;
         mask = maskBuf;
-        while (*mask != 0 && *mask <= ' ')
+        while (*mask != 0 && *mask <= L' ')
             mask++;
 
         if (*mask != 0)
@@ -487,41 +467,40 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
             PrepareMask(buf, mask); // call PrepareMask for extendedMode as well
             if (buf[0] != 0)
             {
-                int l = (int)strlen(buf) + 1;
-                char* newMask = (char*)malloc(1 + l);
+                int l = (int)wcslen(buf) + 1;
+                wchar_t* newMask = (wchar_t*)malloc((1 + l) * sizeof(wchar_t));
                 if (newMask != NULL)
                 {
-                    CMaskItemFlags* flags = (CMaskItemFlags*)newMask;
-                    flags->Optimize = MASK_OPTIMIZE_NONE;
+                    unsigned optimize = MASK_OPTIMIZE_NONE;
                     // determine whether one of the optimizations can be used
-                    if (lstrcmp(buf, "*") == 0 || lstrcmp(buf, "*.*") == 0)
-                        flags->Optimize = MASK_OPTIMIZE_ALL; // *.* or *
+                    if (wcscmp(buf, L"*") == 0 || wcscmp(buf, L"*.*") == 0)
+                        optimize = MASK_OPTIMIZE_ALL; // *.* or *
                     else
                     {
-                        if (l > 3 && buf[0] == '*' && buf[1] == '.') // *.xxxx
+                        if (l > 3 && buf[0] == L'*' && buf[1] == L'.') // *.xxxx
                         {
-                            const char* iter = buf + 2;
+                            const wchar_t* iter = buf + 2;
                             if (ExtendedMode)
                             {
-                                while (*iter != 0 && *iter != '*' && *iter != '?' && *iter != '#' && *iter != '.')
+                                while (*iter != 0 && *iter != L'*' && *iter != L'?' && *iter != L'#' && *iter != L'.')
                                     iter++;
                             }
                             else
                             {
-                                while (*iter != 0 && *iter != '*' && *iter != '?' && *iter != '.')
+                                while (*iter != 0 && *iter != L'*' && *iter != L'?' && *iter != L'.')
                                     iter++;
                             }
                             if (*iter == 0)
                             {
-                                flags->Optimize = MASK_OPTIMIZE_EXTENSION;
+                                optimize = MASK_OPTIMIZE_EXTENSION;
                                 if (excludePos == -1)
                                     hashableMasks++;
                             }
                         }
                     }
-                    flags->Exclude = excludePos != -1 ? 1 : 0;
+                    SetMaskItemFlags(newMask, optimize, excludePos != -1 ? 1 : 0);
 
-                    memmove(newMask + 1, buf, l);
+                    memmove(newMask + 1, buf, l * sizeof(wchar_t));
                     if (excludePos != -1)
                         PreparedMasks.Insert(0, newMask); // insert exclude masks at the beginning
                     else
@@ -546,26 +525,24 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
         if (*s == 0)
         {
             if (excludePos != -1 && (PreparedMasks.Count == 0 ||
-                                     ((CMaskItemFlags*)PreparedMasks[0])->Exclude == 0))
+                                     MaskItemExclude(PreparedMasks[0]) == 0))
             {
-                // if the '|' character is not followed by another mask, the syntax is invalid
+                // if the L'|' character is not followed by another mask, the syntax is invalid
                 errorPos = excludePos;
                 return FALSE;
             }
             break;
         }
-        if (*s == '|')
+        if (*s == L'|')
         {
             if (PreparedMasks.Count == 0)
             {
-                // the user specified a sequence starting with '|', we must append an implicit * at the end
-                char* newMask = (char*)malloc(1 + 2);
+                // the user specified a sequence starting with L'|', we must append an implicit * at the end
+                wchar_t* newMask = (wchar_t*)malloc((1 + 2) * sizeof(wchar_t));
                 if (newMask != NULL)
                 {
-                    CMaskItemFlags* flags = (CMaskItemFlags*)newMask;
-                    flags->Optimize = MASK_OPTIMIZE_ALL;
-                    flags->Exclude = 0;
-                    newMask[1] = '*';
+                    SetMaskItemFlags(newMask, MASK_OPTIMIZE_ALL, 0);
+                    newMask[1] = L'*';
                     newMask[2] = 0;
                     PreparedMasks.Add(newMask);
                     if (!PreparedMasks.IsGood())
@@ -598,12 +575,12 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
             int i2;
             for (i2 = PreparedMasks.Count - 1; i2 >= 0; i2--)
             {
-                CMaskItemFlags* mask = (CMaskItemFlags*)PreparedMasks[i2];
-                if (mask->Optimize == MASK_OPTIMIZE_EXTENSION &&
-                    mask->Exclude == 0)
+                wchar_t* mask = PreparedMasks[i2];
+                if (MaskItemOptimize(mask) == MASK_OPTIMIZE_EXTENSION &&
+                    MaskItemExclude(mask) == 0)
                 { // this mask can be hashed; add it to the hash array
                     DWORD hash = 0;
-                    COMPUTEMASKGROUPHASH(hash, (unsigned char*)mask + 3);
+                    COMPUTEMASKGROUPHASH(hash, mask + 3);
                     if (MasksHashArray[hash].Mask == NULL)
                     {
                         MasksHashArray[hash].Mask = mask;
@@ -668,43 +645,42 @@ BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
     return TRUE;
 }
 
-BOOL CMaskGroup::AgreeMasks(const char* fileName, const char* fileExt)
+BOOL CMaskGroup::AgreeMasks(const wchar_t* fileName, const wchar_t* fileExt)
 {
     if (NeedPrepare)
         TRACE_E("CMaskGroup::AgreeMasks: PrepareMasks must be called before AgreeMasks!");
 
-    SLOW_CALL_STACK_MESSAGE3("CMaskGroup::AgreeMasks(%s, %s)", fileName, fileExt);
+    SLOW_CALL_STACK_MESSAGE3("CMaskGroup::AgreeMasks(%S, %S)", fileName, fileExt);
     if (fileExt == NULL)
     {
-        int tmpLen = lstrlen(fileName);
+        int tmpLen = (int)wcslen(fileName);
         fileExt = fileName + tmpLen;
-        while (--fileExt >= fileName && *fileExt != '.')
+        while (--fileExt >= fileName && *fileExt != L'.')
             ;
         if (fileExt < fileName)
             fileExt = fileName + tmpLen; // ".cvspass" in Windows is an extension ...
         else
             fileExt++;
     }
-    const char* ext = fileExt;
-    if (*ext == 0 && *fileName == '.' && *(ext - 1) != '.') // may be the ".cvspass" case; ".." has no extension
+    const wchar_t* ext = fileExt;
+    if (*ext == 0 && *fileName == L'.' && *(ext - 1) != L'.') // may be the ".cvspass" case; ".." has no extension
     {
-        TRACE_E("CMaskGroup::AgreeMasks: Unexpected situation: fileName starts with '.' but fileExt points to end of name: " << fileName);
+        TRACE_E("CMaskGroup::AgreeMasks: fileName starts with a dot but fileExt points to the end of the name");
         ext = fileName + 1;
     }
     int i;
     for (i = 0; i < PreparedMasks.Count; i++)
     {
-        char* mask = PreparedMasks[i];
+        wchar_t* mask = PreparedMasks[i];
         if (mask != NULL)
         {
-            CMaskItemFlags* flags = (CMaskItemFlags*)mask;
-            if (flags->Exclude == 1)
+            if (MaskItemExclude(mask) == 1)
             {
-                if (flags->Optimize == MASK_OPTIMIZE_ALL) // *.*; *
+                if (MaskItemOptimize(mask) == MASK_OPTIMIZE_ALL) // *.*; *
                     return FALSE;
-                if (flags->Optimize == MASK_OPTIMIZE_EXTENSION) // *.xxxx
+                if (MaskItemOptimize(mask) == MASK_OPTIMIZE_EXTENSION) // *.xxxx
                 {
-                    if (StrICmp(ext, mask + 3) == 0)
+                    if (StrICmpW(ext, mask + 3) == 0)
                         return FALSE;
                     else
                         continue;
@@ -715,11 +691,11 @@ BOOL CMaskGroup::AgreeMasks(const char* fileName, const char* fileExt)
             }
             else
             {
-                if (flags->Optimize == MASK_OPTIMIZE_ALL) // *.*; *
+                if (MaskItemOptimize(mask) == MASK_OPTIMIZE_ALL) // *.*; *
                     return TRUE;
-                if (flags->Optimize == MASK_OPTIMIZE_EXTENSION) // *.xxxx
+                if (MaskItemOptimize(mask) == MASK_OPTIMIZE_EXTENSION) // *.xxxx
                 {
-                    if (StrICmp(ext, mask + 3) == 0)
+                    if (StrICmpW(ext, mask + 3) == 0)
                         return TRUE;
                     else
                         continue;
@@ -733,17 +709,73 @@ BOOL CMaskGroup::AgreeMasks(const char* fileName, const char* fileExt)
     if (MasksHashArray != NULL) // there are still some masks in the hash array
     {
         DWORD hash = 0;
-        COMPUTEMASKGROUPHASH(hash, (unsigned char*)ext);
+        COMPUTEMASKGROUPHASH(hash, ext);
         CMasksHashEntry* item = &MasksHashArray[hash];
         if (item->Mask != NULL)
         {
             do
             {
-                if (StrICmp(ext, ((char*)item->Mask) + 3) == 0)
+                if (StrICmpW(item->Mask + 3, ext) == 0)
                     return TRUE;
                 item = item->Next;
             } while (item != NULL);
         }
     }
     return FALSE;
+}
+
+// ****************************************************************************
+// Wide mask matching.
+//
+// The narrow AgreeMask above folds with `LowerCase[]`, a 256-entry table built
+// from CharLower under the active code page. Two characters that differ only
+// outside CP_ACP therefore fold to the same entry, so a mask matches files it
+// should not - and, more visibly, a mask containing non-ANSI characters matches
+// nothing at all once the filename has been narrowed to '?'.
+//
+// FOLDING CHOICE. This is a character-by-character matcher, so
+// sally::text::CompareFolded (which folds whole strings) does not fit, and
+// towlower() is wrong: under MSVC's default C locale it folds ASCII only, which
+// would silently reproduce the very limitation being removed. CharLowerW's
+// single-character form is the exact wide analogue of how LowerCase[] itself was
+// built, so the semantics carry over rather than being re-invented (the FoldCharW `using` itself
+// is declared once, at the top of this file, since AgreeQSMaskAux above needs it too).
+BOOL AgreeMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension, BOOL extendedMode)
+{
+    CALL_STACK_MESSAGE_NONE;
+    while (*filename != 0)
+    {
+        if (*mask == 0)
+            return FALSE; // mask is too short
+        BOOL agree;
+        if (extendedMode)
+            agree = (FoldCharW(*filename) == FoldCharW(*mask) || *mask == L'?' ||
+                     (*mask == L'#' && *filename >= L'0' && *filename <= L'9'));
+        else
+            agree = (FoldCharW(*filename) == FoldCharW(*mask) || *mask == L'?');
+        if (agree)
+        {
+            filename++;
+            mask++;
+        }
+        else if (*mask == L'*') // '*' represents a sequence of characters (possibly empty)
+        {
+            mask++;
+            while (*filename != 0)
+            {
+                if (AgreeMask(filename, mask, hasExtension, extendedMode))
+                    return TRUE; // the rest of the mask matches
+                filename++;
+            }
+            break; // end of filename...
+        }
+        else
+            return FALSE;
+    }
+    if (*mask == L'*')
+        mask++;                         // asterisk '*' afterwards -> represents "" -> everything is ok
+    if (!hasExtension && *mask == L'.') // without extension mask "*.*" must still match...
+        return *(mask + 1) == 0 || (*(mask + 1) == L'*' && *(mask + 2) == 0);
+    else
+        return *mask == 0;
 }

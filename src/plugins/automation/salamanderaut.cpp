@@ -313,7 +313,7 @@ HRESULT CSalamanderAutomation::TraceWorker(
     __in BSTR message)
 {
     _bstr_t messageT = message;
-    A2OLE sFileW(m_pScriptInfo->GetFileName());
+    PCWSTR sFileW = m_pScriptInfo->GetFileName();
     int line = 0;
 
     // TraceConnectToServer should not be called here!
@@ -321,11 +321,11 @@ HRESULT CSalamanderAutomation::TraceWorker(
 
     if (level == TraceInfo)
     {
-        SalamanderDebug->TraceIW(sFileW, line, messageT);
+        SalamanderDebug->TraceI(sFileW, line, messageT);
     }
     else
     {
-        SalamanderDebug->TraceEW(sFileW, line, messageT);
+        SalamanderDebug->TraceE(sFileW, line, messageT);
     }
 
     return S_OK;
@@ -413,11 +413,7 @@ void CSalamanderAutomation::OnEndExecution()
 {
     HRESULT hr = S_OK;
     int err;
-    _bstr_t fileT(file);
-    CSalamanderPluginInternalViewerData viewerData;
-    TCHAR caption[512];
     int cacheMode;
-    CPathBuffer szTempFile;
     HCURSOR hOldCursor;
 
     if (IsArgumentPresent(temp))
@@ -448,12 +444,16 @@ void CSalamanderAutomation::OnEndExecution()
         return E_INVALIDARG;
     }
 
+    const std::wstring sourceFileW(file != NULL ? file : L"");
+    std::wstring viewerFileW = sourceFileW;
+    CSalamanderPluginInternalViewerData viewerData;
+    std::wstring caption = sourceFileW;
+    caption += L" - ";
+    caption += SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME);
     viewerData.Size = sizeof(viewerData);
-    viewerData.FileName = fileT;
+    viewerData.FileName = viewerFileW.c_str();
     viewerData.Mode = 0; // text mode
-    StringCchPrintf(caption, _countof(caption), _T("%s - %s"), (PCTSTR)fileT,
-                    SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME));
-    viewerData.Caption = caption;
+    viewerData.Caption = caption.c_str();
     viewerData.WholeCaption = TRUE;
 
     hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -462,17 +462,26 @@ void CSalamanderAutomation::OnEndExecution()
     {
         DWORD dwDosErr = NO_ERROR;
 
-        if (SalamanderGeneral->SalGetTempFileName(NULL, _T("AUT"), szTempFile, TRUE, &dwDosErr))
+        std::wstring tempFileW;
+        const BOOL tempCreated = SPLSalGetTempFileNameOwned(
+            SalamanderGeneral, NULL, L"AUT", tempFileW, TRUE, &dwDosErr);
+        if (tempCreated)
         {
-            if (CopyFile(fileT, szTempFile, FALSE))
+            if (CopyFileW(sourceFileW.c_str(), tempFileW.c_str(), FALSE))
             {
-                viewerData.FileName = szTempFile;
+                viewerFileW = tempFileW;
+                viewerData.FileName = viewerFileW.c_str();
             }
             else
             {
                 dwDosErr = GetLastError();
             }
+
+            if (dwDosErr != NO_ERROR)
+                DeleteFileW(tempFileW.c_str());
         }
+        if (!tempCreated && dwDosErr == NO_ERROR)
+            dwDosErr = ERROR_CANNOT_MAKE;
 
         if (dwDosErr != NO_ERROR)
         {
@@ -487,7 +496,7 @@ void CSalamanderAutomation::OnEndExecution()
             &viewerData,
             cacheMode > 0,
             NULL,
-            PathFindFileName(fileT),
+            PathFindFileNameW(sourceFileW.c_str()),
             err))
     {
         hr = E_FAIL;
@@ -527,8 +536,6 @@ void CSalamanderAutomation::OnEndExecution()
 {
     HRESULT hr = S_OK;
     CSalamanderMaskGroup* pMaskGroup;
-    _bstr_t fileT(file);
-    _bstr_t maskT(mask);
     int err;
 
     pMaskGroup = SalamanderGeneral->AllocSalamanderMaskGroup();
@@ -537,10 +544,16 @@ void CSalamanderAutomation::OnEndExecution()
         return E_OUTOFMEMORY;
     }
 
-    pMaskGroup->SetMasksString(maskT, TRUE);
+    pMaskGroup->SetMasksString(mask != NULL ? mask : L"", TRUE);
     if (pMaskGroup->PrepareMasks(err))
     {
-        *match = pMaskGroup->AgreeMasks(fileT, NULL) ? VARIANT_TRUE : VARIANT_FALSE;
+        // fileExt must be NULL, not L"". Its contract (spl_gen.h) is that it
+        // points either at the extension WITHIN fileName or at fileName's end,
+        // and that NULL means "find the extension using standard rules". An
+        // empty string satisfies neither: it points outside fileName entirely,
+        // so the engine sees an empty extension and every extension-bearing
+        // mask stopped matching.
+        *match = pMaskGroup->AgreeMasks(file != NULL ? file : L"", NULL) ? VARIANT_TRUE : VARIANT_FALSE;
     }
     else
     {
@@ -577,9 +590,9 @@ struct ABORTABLE_DLG_ERROR_OR_QUESTION_PARAMS
 {
     HWND hwndOwner;
     DWORD dwFlags;
-    LPCTSTR pszFileName;
-    LPCTSTR pszErrorOrQuestion;
-    LPCTSTR pszTitle;
+    LPCWSTR pszFileName;
+    LPCWSTR pszErrorOrQuestion;
+    LPCWSTR pszTitle;
     int nDlgResult;
 };
 
@@ -604,6 +617,9 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
         msgbox->dwFlags,
         msgbox->pszFileName,
         msgbox->pszErrorOrQuestion,
+        // NULL is MEANINGFUL for 'title' - it selects the standard
+        // "Question" caption. pszTitle is wide now, so a NULL script argument
+        // reaches here as a real NULL, not an empty string.
         msgbox->pszTitle);
 }
 
@@ -618,10 +634,10 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
     ABORTABLE_DLG_ERROR_OR_QUESTION_PARAMS msgbox = {
         0,
     };
-    PCTSTR errorT;
+    PCWSTR errorT;
     _bstr_t errorHolder;
     _bstr_t titleT;
-    TCHAR errorBuffer[256];
+    wchar_t errorBuffer[256];
 
     if (buttons != BUTTONS_OK &&
         buttons != BUTTONS_RETRYCANCEL &&
@@ -669,7 +685,7 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
         try
         {
             errorHolder = error;
-            errorT = errorHolder;
+            errorT = (LPCWSTR)errorHolder;
         }
         catch (_com_error& e)
         {
@@ -684,7 +700,7 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
     if (IsArgumentPresent(title))
     {
         titleT = title;
-        msgbox.pszTitle = (PCTSTR)titleT;
+        msgbox.pszTitle = (LPCWSTR)titleT;
     }
 
     hr = AbortableModalDialogWrapper(m_pScriptInfo, msgbox.hwndOwner, ShowErrorDialogProc, &msgbox);
@@ -719,7 +735,6 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
         0,
     };
     _bstr_t titleT;
-    OLE2A questionT(question);
 
     if (buttons != BUTTONS_YESALLSKIPCANCEL &&
         buttons != BUTTONS_YESNOCANCEL &&
@@ -738,11 +753,11 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
     msgbox.hwndOwner = SalamanderGeneral->GetMsgBoxParent();
     msgbox.dwFlags = buttons;
     msgbox.pszFileName = oInfo.Path();
-    msgbox.pszErrorOrQuestion = questionT;
+    msgbox.pszErrorOrQuestion = question;
     if (IsArgumentPresent(title))
     {
         titleT = title;
-        msgbox.pszTitle = (PCTSTR)titleT;
+        msgbox.pszTitle = (LPCWSTR)titleT;
     }
 
     hr = AbortableModalDialogWrapper(m_pScriptInfo, msgbox.hwndOwner, ShowQuestionDialogProc, &msgbox);
@@ -869,15 +884,9 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
 {
     HRESULT hr = S_OK;
     ISalamanderPanel* pPanel = NULL;
-    const char* currentT = NULL;
-    _bstr_t pathT(path);
-    CPathBuffer szPath;
-
-    // validate input
-    if (lstrlen(pathT) >= MAX_PATH)
-    {
-        return E_INVALIDARG;
-    }
+    const wchar_t* currentPath = NULL;
+    const wchar_t* pathW = path != NULL ? path : L"";
+    std::wstring panelPath;
 
     if (IsArgumentPresent(panel))
     {
@@ -908,33 +917,29 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
                               (iPanel == SalamanderGeneral->GetSourcePanel());
         SalamanderGeneral->SalUpdateDefaultDir(useSourcePanel);
 
-        if (!SalamanderGeneral->GetPanelPath(
-                useSourcePanel ? PANEL_SOURCE : PANEL_TARGET,
-                szPath,
-                szPath.Size(),
-                NULL,
-                NULL))
+        if (!SPLGetPanelPathOwned(SalamanderGeneral,
+                                  useSourcePanel ? PANEL_SOURCE : PANEL_TARGET,
+                                  panelPath))
         {
             _ASSERTE(0);
             return E_FAIL;
         }
-        currentT = szPath;
+        currentPath = panelPath.c_str();
     }
 
-    CPathBuffer szName;
-    StringCchCopy(szName, szName.Size(), pathT);
+    std::wstring fullName = pathW;
     int errTextID;
-    BOOL ret = SalamanderGeneral->SalGetFullName(szName, &errTextID, currentT, NULL);
+    BOOL ret = SPLSalGetFullNameOwned(SalamanderGeneral, fullName, &errTextID, currentPath);
     if (!ret)
     {
-        char errText[200];
-        SalamanderGeneral->GetGFNErrorText(errTextID, errText, 200);
-        RaiseError(A2OLE(errText));
+        std::wstring errText;
+        SPLGetGFNErrorTextOwned(SalamanderGeneral, errTextID, errText);
+        RaiseError(errText.c_str());
         hr = SALAUT_E_INVALIDPATH;
     }
     else
     {
-        *result = SysAllocString(A2OLE(szName));
+        *result = SysAllocString(fullName.c_str());
     }
 
     return hr;

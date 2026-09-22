@@ -16,12 +16,13 @@
 
 #include "dispimpl.h"
 
+#include <string>
+
 class CSalamanderPanelItemAutomation : public CDispatchImpl<CSalamanderPanelItemAutomation, ISalamanderPanelItem>
 {
 private:
-    WCHAR* m_pszFullPath;
-    size_t m_cchFullPath;
-    WCHAR* m_pszName;
+    std::wstring m_fullPath;
+    size_t m_nameOffset;
     LARGE_INTEGER m_size;
     DATE m_dateLastModified;
     DWORD m_dwAttributes;
@@ -32,11 +33,11 @@ public:
     DECLARE_DISPOBJ_NAME(L"Salamander.Item")
 
     CSalamanderPanelItemAutomation();
-    CSalamanderPanelItemAutomation(const CFileData* pData, PCTSTR pszPath);
+    CSalamanderPanelItemAutomation(const CFileData* pData, PCWSTR pszPath);
     CSalamanderPanelItemAutomation(const CFileData* pData, int nPanel);
-    ~CSalamanderPanelItemAutomation();
+    ~CSalamanderPanelItemAutomation() = default;
 
-    void Set(const CFileData* pData, PCTSTR pszPath);
+    void Set(const CFileData* pData, PCWSTR pszPath);
     void Set(const CFileData* pData, int nPanel);
 
     // ISalamanderPanelItem

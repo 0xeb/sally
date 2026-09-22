@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 // error codes
 #define AE_SUCCESS 0
 #define AE_OPEN 1
@@ -30,21 +32,20 @@
 #define EF_RETRY 0x01
 
 // callbacks from the DLL
-typedef BOOL(WINAPI* FARJChangeVolProc)(char* volName, char* prevName, int mode);
+typedef BOOL(WINAPI* FARJChangeVolProc)(std::wstring& volName, const wchar_t* prevName, int mode);
 typedef BOOL(WINAPI* FARJProcessDataProc)(const void* buffer, DWORD size);
 typedef BOOL(WINAPI* FARJErrorProc)(int error, BOOL flags);
+typedef void(WINAPI* FARJArchiveVolumeProc)(const wchar_t* volumeName);
 
 struct CARJOpenData
 {
     //input fields
-    const char* ArcName;
+    const wchar_t* ArcName;
     FARJChangeVolProc ARJChangeVolProc;
     FARJProcessDataProc ARJProcessDataProc;
     FARJErrorProc ARJErrorProc;
-    CDynamicString* AchiveVolumes;
+    FARJArchiveVolumeProc ARJArchiveVolumeProc;
 };
-
-#define ARJ_MAX_PATH 512
 
 // flags
 #define FF_ENCRYPTED 0x01 // =garbled
@@ -71,7 +72,7 @@ struct CARJHeaderData
     DWORD Size;
     DWORD CompSize;
     DWORD Attr;
-    char FileName[ARJ_MAX_PATH];
+    std::wstring FileName;
 };
 
 BOOL WINAPI ARJOpenArchive(CARJOpenData* openData);

@@ -18,7 +18,7 @@ std::string NarrowForObjectName(const std::wstring& value)
     std::string result;
     result.reserve(value.length());
     for (wchar_t ch : value)
-        result.push_back(ch >= 0 && ch <= 0x7f ? static_cast<char>(ch) : '_');
+        result.push_back(ch >= 0 && ch <= 0x7f ? static_cast<wchar_t>(ch) : '_');
     return result;
 }
 
@@ -69,6 +69,27 @@ std::string BuildSharedObjectName(const char* baseName, const std::string& insta
 std::string BuildSharedObjectNameForCurrentInstance(const char* baseName)
 {
     return BuildSharedObjectName(baseName, GetInstanceIdFromEnvironment());
+}
+
+bool WidenSharedObjectName(const std::string& name, std::wstring& wideName) noexcept
+{
+    try
+    {
+        std::wstring candidate;
+        candidate.reserve(name.size());
+        for (unsigned char ch : name)
+        {
+            if (ch > 0x7f)
+                return false;
+            candidate.push_back(static_cast<wchar_t>(ch));
+        }
+        wideName.swap(candidate);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
 bool IsInstanceIsolationEnabled(IEnvironment* environment)

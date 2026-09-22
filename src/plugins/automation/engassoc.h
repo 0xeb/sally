@@ -19,7 +19,7 @@
 struct SCRIPT_ENGINE_ASSOCIATION
 {
     /// File name extension.
-    TCHAR szExt[8];
+    wchar_t szExt[8];
 
     /// Class ID of the script engine.
     CLSID clsidEngine;
@@ -28,17 +28,17 @@ struct SCRIPT_ENGINE_ASSOCIATION
 class CScriptEngineAssociations : private TDirectArray<SCRIPT_ENGINE_ASSOCIATION>
 {
 protected:
-    SCRIPT_ENGINE_ASSOCIATION* FindAssoc(PCTSTR pszExt);
+    SCRIPT_ENGINE_ASSOCIATION* FindAssoc(PCWSTR pszExt);
 
 private:
-    static HRESULT QueryHardcodedScriptEngineAssociation(PCTSTR pszExt, __out CLSID* clsidEngine);
+    static HRESULT QueryHardcodedScriptEngineAssociation(PCWSTR pszExt, __out CLSID* clsidEngine);
 
 public:
     CScriptEngineAssociations() : TDirectArray<SCRIPT_ENGINE_ASSOCIATION>(2, 2)
     {
     }
 
-    bool FindEngineByExt(PCTSTR pszExt, __out_opt CLSID* clsidEngine = NULL);
+    bool FindEngineByExt(PCWSTR pszExt, __out_opt CLSID* clsidEngine = NULL);
 };
 
 extern CScriptEngineAssociations g_oScriptAssociations;

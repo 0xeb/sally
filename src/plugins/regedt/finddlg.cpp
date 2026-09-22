@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_window_text.h"
+#include "regedt_find_pattern.h"
+#include "regedt_registry_enum.h"
 
-LPWSTR PatternHistory[MAX_HISTORY_ENTRIES];
-LPWSTR LookInHistory[MAX_HISTORY_ENTRIES];
+std::vector<std::wstring> PatternHistory;
+std::vector<std::wstring> LookInHistory;
 
 #ifdef _DEBUG
 // statistics of value type frequency
@@ -21,7 +24,6 @@ CStatusBar::CStatusBar()
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE1("CStatusBar::CStatusBar()");
-    *Text = L'\0';
     BaseLen = 0;
     Dirty = 0;
     Width = 0;
@@ -82,9 +84,18 @@ void CStatusBar::SetBase(LPCWSTR text, BOOL updateInIdle)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CStatusBar::SetBase(, %d)", updateInIdle);
+    std::wstring staged;
+    try
+    {
+        staged = text ? text : L"";
+    }
+    catch (...)
+    {
+        return;
+    }
     Section.Enter();
-    lstrcpynW(Text, text, MAX_FULL_KEYNAME + 50);
-    BaseLen = (int)wcslen(Text);
+    Text.swap(staged);
+    BaseLen = Text.size();
     // do not wait for a repaint
     if (!Dirty)
     {
@@ -107,7 +118,17 @@ void CStatusBar::Set(LPCWSTR text, BOOL updateInIdle)
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CStatusBar::Set(, %d)", updateInIdle);
     Section.Enter();
-    lstrcpynW(Text + BaseLen, text, MAX_FULL_KEYNAME + 49 - BaseLen);
+    try
+    {
+        Text.resize(BaseLen);
+        if (text)
+            Text.append(text);
+    }
+    catch (...)
+    {
+        Section.Leave();
+        return;
+    }
     // do not wait for a repaint
     if (!Dirty)
     {
@@ -210,7 +231,7 @@ CStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 Section.Enter();
                 RECT r;
                 SetRect(&r, 1, 1, TextWidth, Height - 1);
-                ExtTextOutW(dc, 2, (r.top + r.bottom - EnvFontHeight) / 2, ETO_OPAQUE | ETO_CLIPPED, &r, Text, (UINT)wcslen(Text), NULL);
+                ExtTextOutW(dc, 2, (r.top + r.bottom - EnvFontHeight) / 2, ETO_OPAQUE | ETO_CLIPPED, &r, Text.c_str(), static_cast<UINT>(Text.size()), NULL);
                 Dirty = FALSE;
                 Section.Leave();
 
@@ -265,10 +286,14 @@ CFoundFilesData::CFoundFilesData(LPWSTR name, int root, LPWSTR key, DWORD type,
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE5("CFoundFilesData::CFoundFilesData(, %d, , 0x%X, 0x%X, , , "
     //                      "%d)", root, type, size, isDir);
-    Name = DupStr(*name == L'\0' ? LoadStrW(IDS_DEFAULTVALUE) : name);
-    WCHAR path[MAX_KEYNAME];
-    PathAppend(wcscpy(path, PredefinedHKeys[root].KeyName), key, MAX_KEYNAME);
-    Path = DupStr(path);
+    Name = *name == L'\0' ? LoadStrW(IDS_DEFAULTVALUE) : name;
+    Path = PredefinedHKeys[root].KeyName;
+    if (key && *key)
+    {
+        if (!Path.empty() && Path.back() != L'\\')
+            Path.push_back(L'\\');
+        Path.append(key);
+    }
     Type = type;
     Size = size;
     Data = NULL;
@@ -348,69 +373,33 @@ CFoundFilesData::CFoundFilesData(LPWSTR name, int root, LPWSTR key, DWORD type,
     }
 }
 
-/*
-CFoundFilesData::CFoundFilesData(CFoundFilesData & orig)
-{
-  Name = orig.Name;
-  Path = orig.Path;
-  Type = orig.Type;
-  Size = orig.Size;
-  Data = orig.Data;
-  Allocated = orig.Allocated;
-  Time = orig.Time;
-  IsDir = orig.IsDir;
-  orig.Name = NULL;
-  orig.Path = NULL;
-  orig.Data = 0;
-  orig.Data = NULL;
-}
-*/
-
-/*
-BOOL 
-|CFoundFilesData::Set(const char * name, const char * volume, const char * path,
-                     QWORD size, FILETIME time, DWORD attributes, BOOL isDir)
-{
-  if ((Name = SG->DupStr(name)) == NULL) return FALSE;
-  if ((Volume = SG->DupStr(volume)) == NULL) return FALSE;
-  if ((Path = SG->DupStr(path)) == NULL) return FALSE;
-  Size = size;
-  Time = time;
-  Attributes = attributes;
-  IsDir = isDir;
-  return TRUE;
-}
-*/
-
-LPWSTR
-CFoundFilesData::GetText(int i, LPWSTR buffer)
+LPCWSTR
+CFoundFilesData::GetText(int i, std::wstring& buffer)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CFoundFilesData::GetText(%d, )", i);
-    char buf[100];
     static wchar_t emptyBuffer[] = L"";
-    LPWSTR ret = emptyBuffer; //"?";
+    LPCWSTR ret = emptyBuffer; //"?";
     switch (i)
     {
     case CI_NAME:
-        ret = Name;
+        ret = Name.c_str();
         break;
     case CI_PATH:
-        ret = Path;
+        ret = Path.c_str();
         break;
 
     case CI_SIZE:
     {
         if (IsDir)
         {
-            StrToWStr(buffer, 100, KeyText);
-            ret = buffer;
+            buffer = KeyText;
+            ret = buffer.c_str();
         }
         else
         {
-            SG->NumberToStr(buf, CQuadWord().Set(Size, 0));
-            StrToWStr(buffer, 100, buf);
-            ret = buffer;
+            buffer = SPLNumberToStrOwned(SG, CQuadWord().Set(Size, 0));
+            ret = buffer.c_str();
         }
         break;
     }
@@ -419,8 +408,8 @@ CFoundFilesData::GetText(int i, LPWSTR buffer)
     {
         SYSTEMTIME st;
         FileTimeToSystemTime(&Time, &st);
-        SalPrintfW(buffer, 100, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        ret = buffer;
+        buffer = SPLFormatStringOwned(L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        ret = buffer.c_str();
         break;
     }
 
@@ -428,8 +417,8 @@ CFoundFilesData::GetText(int i, LPWSTR buffer)
     {
         SYSTEMTIME st;
         FileTimeToSystemTime(&Time, &st);
-        SalPrintfW(buffer, 100, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        ret = buffer;
+        buffer = SPLFormatStringOwned(L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        ret = buffer.c_str();
         break;
     }
 
@@ -441,46 +430,46 @@ CFoundFilesData::GetText(int i, LPWSTR buffer)
             switch (Type)
             {
             case REG_BINARY:
-                StrToWStr(buffer, 100, Str_REG_BINARY);
+                buffer = Str_REG_BINARY;
                 break;
             case REG_DWORD:
-                StrToWStr(buffer, 100, Str_REG_DWORD);
+                buffer = Str_REG_DWORD;
                 break;
             case REG_DWORD_BIG_ENDIAN:
-                StrToWStr(buffer, 100, Str_REG_DWORD_BIG_ENDIAN);
+                buffer = Str_REG_DWORD_BIG_ENDIAN;
                 break;
             case REG_QWORD:
-                StrToWStr(buffer, 100, Str_REG_QWORD);
+                buffer = Str_REG_QWORD;
                 break;
             case REG_EXPAND_SZ:
-                StrToWStr(buffer, 100, Str_REG_EXPAND_SZ);
+                buffer = Str_REG_EXPAND_SZ;
                 break;
             case REG_LINK:
-                StrToWStr(buffer, 100, Str_REG_LINK);
+                buffer = Str_REG_LINK;
                 break;
             case REG_MULTI_SZ:
-                StrToWStr(buffer, 100, Str_REG_MULTI_SZ);
+                buffer = Str_REG_MULTI_SZ;
                 break;
             case REG_NONE:
-                StrToWStr(buffer, 100, Str_REG_NONE);
+                buffer = Str_REG_NONE;
                 break;
             case REG_RESOURCE_LIST:
-                StrToWStr(buffer, 100, Str_REG_RESOURCE_LIST);
+                buffer = Str_REG_RESOURCE_LIST;
                 break;
             case REG_SZ:
-                StrToWStr(buffer, 100, Str_REG_SZ);
+                buffer = Str_REG_SZ;
                 break;
             case REG_FULL_RESOURCE_DESCRIPTOR:
-                StrToWStr(buffer, 100, Str_REG_FULL_RESOURCE_DESCRIPTOR);
+                buffer = Str_REG_FULL_RESOURCE_DESCRIPTOR;
                 break;
             case REG_RESOURCE_REQUIREMENTS_LIST:
-                StrToWStr(buffer, 100, Str_REG_RESOURCE_REQUIREMENTS_LIST);
+                buffer = Str_REG_RESOURCE_REQUIREMENTS_LIST;
                 break;
             default:
                 TRACE_E("unknown value type");
-                wcscpy(buffer, L"?");
+                buffer = L"?";
             }
-            ret = buffer;
+            ret = buffer.c_str();
         }
         break;
     }
@@ -504,16 +493,16 @@ CFoundFilesData::GetText(int i, LPWSTR buffer)
                 case REG_DWORD:
                     if (Size == 4)
                     {
-                        SalPrintfW(buffer, 100, L"0x%08x (%u)", Data, Data);
-                        ret = buffer;
+                        buffer = SPLFormatStringOwned(L"0x%08x (%u)", Data, Data);
+                        ret = buffer.c_str();
                     }
                     break;
 
                 case REG_QWORD:
                     if (Size == 8)
                     {
-                        SalPrintfW(buffer, 100, L"0x%016I64x (%I64u)", *(LPQWORD)Data, *(LPQWORD)Data);
-                        ret = buffer;
+                        buffer = SPLFormatStringOwned(L"0x%016I64x (%I64u)", *(LPQWORD)Data, *(LPQWORD)Data);
+                        ret = buffer.c_str();
                     }
                     break;
 
@@ -606,9 +595,9 @@ int CFoundFilesListView::CompareFunc(CFoundFilesData* f1, CFoundFilesData* f2, i
         {
             if (f1->IsDir == f2->IsDir)
             {
-                res = CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, f1->Name, -1, f2->Name, -1) - 2;
+                res = CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, f1->Name.c_str(), -1, f2->Name.c_str(), -1) - 2;
                 if (res == 0)
-                    res = CompareStringW(LOCALE_USER_DEFAULT, 0, f1->Name, -1, f2->Name, -1) - 2;
+                    res = CompareStringW(LOCALE_USER_DEFAULT, 0, f1->Name.c_str(), -1, f2->Name.c_str(), -1) - 2;
             }
             else
                 res = f1->IsDir ? -1 : 1;
@@ -617,9 +606,9 @@ int CFoundFilesListView::CompareFunc(CFoundFilesData* f1, CFoundFilesData* f2, i
 
         case CI_PATH:
         {
-            res = CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, f1->Path, -1, f2->Path, -1) - 2;
+            res = CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, f1->Path.c_str(), -1, f2->Path.c_str(), -1) - 2;
             if (res == 0)
-                res = CompareStringW(LOCALE_USER_DEFAULT, 0, f1->Path, -1, f2->Path, -1) - 2;
+                res = CompareStringW(LOCALE_USER_DEFAULT, 0, f1->Path.c_str(), -1, f2->Path.c_str(), -1) - 2;
             break;
         }
 
@@ -859,7 +848,8 @@ BOOL CFoundFilesListView::InitColumns()
     int i;
     for (i = 0; i < 7; i++) // create the columns
     {
-        lvc.pszText = (LPSTR)LoadStr(header[i]);
+        // LangStr is wide, so the fork and its conversion are both gone.
+        lvc.pszText = const_cast<LPWSTR>(LangStr(header[i]).c_str());
         lvc.iSubItem = i;
         if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
             return FALSE;
@@ -953,10 +943,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         BOOL nextIsButton;
         if (next != NULL)
         {
-            char className[30];
+            std::wstring className;
             WORD wl = LOWORD(GetWindowLong(next, GWL_STYLE)); // jen BS_...
-            nextIsButton = (GetClassName(next, className, 30) != 0 &&
-                            SG->StrICmp(className, "BUTTON") == 0 &&
+            nextIsButton = (ReadWindowClassOwnedW(next, className) &&
+                            SG->StrICmp(className.c_str(), L"BUTTON") == 0 &&
                             (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON));
         }
         else
@@ -1107,13 +1097,13 @@ BOOL CFindThread::Test(char* text, int len, BOOL name, DWORD type)
 
             if (len > 0)
             {
-                if (!AsciiBuffer.Reserve(len))
+                std::wstring_view source(reinterpret_cast<wchar_t*>(text), static_cast<size_t>(len));
+                if (!EncodeRegedtSearchSubject(source, AsciiBuffer))
                 {
-                    TRACE_E("LOW_MEMORY");
                     return FALSE;
                 }
-                WStrToStr(AsciiBuffer.Get(), AsciiBuffer.GetSize(), (LPWSTR)text, len);
-                text = AsciiBuffer.Get();
+                text = AsciiBuffer.data();
+                len = static_cast<int>(AsciiBuffer.size());
             }
         }
 
@@ -1203,20 +1193,34 @@ BOOL CFindThread::Test(char* text, int len, BOOL name, DWORD type)
 
             case REG_DWORD_BIG_ENDIAN:
                 // compare numbers with their numeric value
-                if (UseNumber)
-                    return (DWORD)(text[3] | (text[2] << 8) | (text[1] << 16) | (text[0] << 24)) == Number;
+                if (UseNumber && len >= static_cast<int>(sizeof(DWORD)))
+                {
+                    const auto* bytes = reinterpret_cast<const unsigned char*>(text);
+                    return (static_cast<DWORD>(bytes[3]) |
+                            static_cast<DWORD>(bytes[2]) << 8 |
+                            static_cast<DWORD>(bytes[1]) << 16 |
+                            static_cast<DWORD>(bytes[0]) << 24) == Number;
+                }
                 break;
 
             case REG_DWORD:
                 // compare numbers with their numeric value
-                if (UseNumber)
-                    return *(LPDWORD)text == Number;
+                if (UseNumber && len >= static_cast<int>(sizeof(DWORD)))
+                {
+                    DWORD value = 0;
+                    memcpy(&value, text, sizeof(value));
+                    return value == Number;
+                }
                 break;
 
             case REG_QWORD:
                 // compare numbers with their numeric value
-                if (UseNumber)
-                    return *(LPQWORD)text == Number;
+                if (UseNumber && len >= static_cast<int>(sizeof(QWORD)))
+                {
+                    QWORD value = 0;
+                    memcpy(&value, text, sizeof(value));
+                    return value == Number;
+                }
                 break;
 
             default:
@@ -1237,9 +1241,10 @@ BOOL CFindThread::Test(char* text, int len, BOOL name, DWORD type)
                         break;
                 } while (pos <= len - PatternWLen);
 
-                if (BMForPatternA != BMForPatternW)
+                if (BMForPatternA && BMForPatternA != BMForPatternW)
                 {
                     // also try the ASCII pattern
+                    pos = 0;
                     do
                     {
                         if ((pos = BMForPatternA->SearchForward(text, len, pos)) != -1)
@@ -1262,16 +1267,19 @@ BOOL CFindThread::Test(char* text, int len, BOOL name, DWORD type)
     return FALSE;
 }
 
-BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErrors,
-                             LPWSTR nameBuffer, TIndirectArray<WCHAR>& stack)
+BOOL CFindThread::ScanKeyAux(int root, std::wstring& key, BOOL& skip, BOOL& skipAllErrors,
+                             std::vector<std::wstring>& stack)
 {
+    HKEY hKey = NULL;
+    try
+    {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE4("CFindThread::ScanKeyAux(%d, , %d, %d, , )", root, skip,
     //                           skipAllErrors);
     // status text
     if ((int)(GetTickCount() - NextStatusUpdate) > 0)
     {
-        FindDialog->StatusBar->Set(key);
+        FindDialog->StatusBar->Set(key.c_str());
         NextStatusUpdate = GetTickCount() + 1;
     }
 
@@ -1279,55 +1287,62 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
     if (WaitForSingleObject(CancelEvent, 0) == WAIT_OBJECT_0)
         return skip = FALSE;
 
-    HKEY hKey; // currently searched key
-
     // open the key being searched
-    if (!SafeOpenKey(root, key, KEY_READ, hKey, IDS_SEARCHERROR, &skip, &skipAllErrors))
+    if (!SafeOpenKey(root, key.data(), KEY_READ, hKey, IDS_SEARCHERROR, &skip, &skipAllErrors))
         return FALSE;
 
     // test the values
     FILETIME time, localFileTime;
-    DWORD maxData;
-    void* data = NULL;
+    DWORD maxData = 0;
 
     // load the maximum data size and time of the key
-    if (!SafeQueryInfoKey(hKey, root, key, NULL, &maxData, &time, IDS_SEARCHERROR, skip, skipAllErrors))
+    if (!SafeQueryInfoKey(hKey, root, key.data(), NULL, &maxData, &time, IDS_SEARCHERROR, skip, skipAllErrors))
     {
         RegCloseKey(hKey);
         return FALSE;
     }
     FileTimeToLocalFileTime(&time, &localFileTime);
 
-    if (LookAtData)
-    {
-        // MS sometimes returns half the size (observed on MULTI_SZ in
-        // the key HKEY_LOCAL_MACHINE\SYSTEM\ControlSet002\Services\NetBT\Linkage
-        maxData *= 2;
-        data = malloc(maxData);
-        if (!data)
-        {
-            skip = FALSE;
-            RegCloseKey(hKey);
-            return Error(IDS_LOWMEM);
-        }
-    }
-
     DWORD index = 0;
-    LPWSTR name = nameBuffer;
+    std::wstring name;
+    std::vector<BYTE> data;
     DWORD type, size;
     BOOL noMore = TRUE;
-    BOOL someFileSkipped = FALSE;
 
     if ((LookAtValues || LookAtData) && TestTime(localFileTime))
     {
-        while (SafeEnumValue(hKey, root, key, index, name, type, data, size = maxData,
-                             IDS_SEARCHERROR, skip, skipAllErrors, noMore) ||
-               skip)
+        while (true)
         {
+            const LONG result = RegedtEnumerateValueOwned(hKey, index, 64, maxData, name, type, data, size, LookAtData != FALSE);
+            if (result == ERROR_NO_MORE_ITEMS)
+            {
+                noMore = TRUE;
+                skip = FALSE;
+                break;
+            }
+            if (result != ERROR_SUCCESS)
+            {
+                const BOOL retry = RegOperationError(result, IDS_ACCESS2, IDS_SEARCHERROR, root, key.data(), &skip, &skipAllErrors);
+                if (!retry)
+                {
+                    ++index;
+                    noMore = FALSE;
+                }
+                if (skip)
+                {
+                    skip = FALSE;
+                    continue;
+                }
+                if (!retry)
+                    break;
+                continue;
+            }
+            ++index;
+            noMore = FALSE;
             if (!skip)
             {
-                if ((LookAtValues && Test((LPSTR)name, (int)wcslen(name) * 2, TRUE, 0) ||
-                     LookAtData && Test((LPSTR)data, size, FALSE, type)))
+                if ((LookAtValues && Test(reinterpret_cast<char*>(name.data()), static_cast<int>(name.size() * sizeof(wchar_t)), TRUE, 0) ||
+                     LookAtData && Test(reinterpret_cast<char*>(data.data()), static_cast<int>(size), FALSE, type)))
                 {
 #ifdef _DEBUG
                     // statistics of value type frequency
@@ -1338,15 +1353,14 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
                     // add the item to the list view
 
                     CFoundFilesData* fd =
-                        new CFoundFilesData(name,
-                                            root, key, type, size, (unsigned char*)data,
+                        new CFoundFilesData(name.data(),
+                                            root, key.data(), type, size,
+                                            LookAtData && !data.empty() ? data.data() : nullptr,
                                             localFileTime, FALSE);
                     if (!fd || FindDialog->List->Add(fd) == ULONG_MAX)
                     {
                         if (fd)
                             delete fd;
-                        if (data)
-                            free(data);
                         skip = FALSE;
                         RegCloseKey(hKey);
                         return Error(IDS_LOWMEM);
@@ -1356,22 +1370,14 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
                         PostMessage(FindDialog->HWindow, WM_USER_ADDFILE, 0, 0);
                 }
             }
-            else
-                skip = FALSE;
-
             // check for cancellation by the user
             if (WaitForSingleObject(CancelEvent, 0) == WAIT_OBJECT_0)
             {
-                if (data)
-                    free(data);
                 RegCloseKey(hKey);
                 return skip = FALSE;
             }
         }
     }
-
-    if (data)
-        free(data);
 
     if (!noMore)
     {
@@ -1382,49 +1388,45 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
     // recursively search the subkeys as well
 
     // first enumerate all keys onto the stack
-    int len = (int)wcslen(key);
-    int maxSubkey = MAX_KEYNAME - len - 2;
+    const size_t len = key.size();
     index = 0;
-    int top = stack.Count; // remember the pointer to the top of the stack
-    while (SafeEnumKey(hKey, root, key, index, name, &time,
-                       IDS_SEARCHERROR, skip, skipAllErrors, noMore) ||
-           skip)
+    const size_t top = stack.size();
+    while (true)
     {
+        const LONG result = RegedtEnumerateSubKeyOwned(hKey, index, 64, name, time);
+        if (result == ERROR_NO_MORE_ITEMS)
+        {
+            noMore = TRUE;
+            skip = FALSE;
+            break;
+        }
+        if (result != ERROR_SUCCESS)
+        {
+            const BOOL retry = RegOperationError(result, IDS_ACCESS2, IDS_SEARCHERROR, root, key.data(), &skip, &skipAllErrors);
+            if (!retry)
+            {
+                ++index;
+                noMore = FALSE;
+            }
+            if (skip)
+            {
+                skip = FALSE;
+                continue;
+            }
+            if (!retry)
+                break;
+            continue;
+        }
+        ++index;
+        noMore = FALSE;
         if (!skip)
         {
-            int nameLen = (int)wcslen(name);
-            if (nameLen > maxSubkey)
-            {
-                if (skipAllErrors)
-                {
-                    someFileSkipped = TRUE;
-                    continue;
-                }
-
-                char nameA[MAX_KEYNAME];
-                WStrToStr(nameA, MAX_KEYNAME, name);
-
-                int res = SG->DialogError(GetParent(), BUTTONS_SKIPCANCEL, nameA, LoadStr(IDS_LONGNAME), LoadStr(IDS_SEARCHERROR));
-                switch (res)
-                {
-                case DIALOG_SKIPALL:
-                    skipAllErrors = TRUE;
-                case DIALOG_SKIP:
-                    continue;
-
-                default:
-                    skip = FALSE;
-                    RegCloseKey(hKey);
-                    return FALSE; // DIALOG_CANCEL
-                }
-            }
-
             FileTimeToLocalFileTime(&time, &localFileTime);
-            if (LookAtKeys && TestTime(localFileTime) && Test((LPSTR)name, (int)wcslen(name) * 2, TRUE, 0))
+            if (LookAtKeys && TestTime(localFileTime) && Test(reinterpret_cast<char*>(name.data()), static_cast<int>(name.size() * sizeof(wchar_t)), TRUE, 0))
             {
                 // add the key to the result
                 CFoundFilesData* fd =
-                    new CFoundFilesData(name, root, key, 0, 0, NULL, localFileTime, TRUE);
+                    new CFoundFilesData(name.data(), root, key.data(), 0, 0, NULL, localFileTime, TRUE);
                 if (!fd || FindDialog->List->Add(fd) == ULONG_MAX)
                 {
                     if (fd)
@@ -1439,18 +1441,7 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
             }
 
             if (IncludeSubkeys)
-            {
-                LPWSTR ptr = new WCHAR[nameLen + 1];
-                if (!ptr || stack.Add(ptr) == ULONG_MAX)
-                {
-                    if (ptr)
-                        delete[] ptr;
-                    skip = FALSE;
-                    RegCloseKey(hKey);
-                    return Error(IDS_LOWMEM);
-                }
-                wcscpy(ptr, name);
-            }
+                stack.push_back(name);
         }
         else
             skip = FALSE;
@@ -1469,17 +1460,15 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
         return FALSE;
     }
 
-    LPWSTR subkey = key + len;
-    if (len > 0)
-        *subkey++ = L'\\';
-
     // search the keys stored on the stack
-    int i;
-    for (i = stack.Count - 1; i >= top; i--)
+    for (size_t i = stack.size(); i-- > top;)
     {
-        wcscpy(subkey, stack[i]);
+        key.resize(len);
+        if (!key.empty())
+            key.push_back(L'\\');
+        key.append(stack[i]);
 
-        if (!ScanKeyAux(root, key, skip, skipAllErrors, nameBuffer, stack))
+        if (!ScanKeyAux(root, key, skip, skipAllErrors, stack))
         {
             if (!skip)
             {
@@ -1487,44 +1476,48 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
                 return FALSE;
             }
         }
-        stack.Delete(i);
+        stack.erase(stack.begin() + i);
     }
-
-    if (len > 0)
-        *--subkey = L'\0';
+    key.resize(len);
 
     RegCloseKey(hKey);
 
     return TRUE;
+    }
+    catch (...)
+    {
+        if (hKey)
+            RegCloseKey(hKey);
+        skip = FALSE;
+        return Error(IDS_LOWMEM);
+    }
 }
 
-BOOL CFindThread::ScanKey(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErrors,
-                          LPWSTR nameBuffer, TIndirectArray<WCHAR>& stack)
+BOOL CFindThread::ScanKey(int root, std::wstring& key, BOOL& skip, BOOL& skipAllErrors,
+                          std::vector<std::wstring>& stack)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE4("CFindThread::ScanKey(%d, , %d, %d, , )", root, skip,
     //                      skipAllErrors);
-    WCHAR base[50 + MAX_PREDEF_KEYNAME];
-    SalPrintfW(base, 50, LoadStrW(IDS_SEARCHING), PredefinedHKeys[root].KeyName);
-    FindDialog->StatusBar->SetBase(base);
-    return ScanKeyAux(root, key, skip, skipAllErrors, nameBuffer, stack);
+    const std::wstring base = SPLFormatStringOwned(LoadStrW(IDS_SEARCHING).c_str(), PredefinedHKeys[root].KeyName);
+    FindDialog->StatusBar->SetBase(base.c_str());
+    return ScanKeyAux(root, key, skip, skipAllErrors, stack);
 }
 
 BOOL CFindThread::ScanRegistry(BOOL& skipAllErrors)
 {
     CALL_STACK_MESSAGE2("CFindThread::ScanRegistry(%d)", skipAllErrors);
     BOOL skip = FALSE;
-    WCHAR keyBuffer[MAX_KEYNAME];
-    WCHAR nameBuffer[MAX_KEYNAME];
-    TIndirectArray<WCHAR> stack(100, 100);
+    std::wstring key;
+    std::vector<std::wstring> stack;
     int i = 0;
     while (PredefinedHKeys[i].HKey != NULL)
     {
         if (RegQueryInfoKeyW(PredefinedHKeys[i].HKey, NULL, NULL, NULL, NULL, NULL, NULL,
                              NULL, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
         {
-            *keyBuffer = L'\0';
-            if (!ScanKey(i, keyBuffer, skip, skipAllErrors, nameBuffer, stack) && !skip)
+            key.clear();
+            if (!ScanKey(i, key, skip, skipAllErrors, stack) && !skip)
                 return FALSE;
         }
         i++;
@@ -1545,33 +1538,44 @@ BOOL CFindThread::Init()
             if (!SalRegExp)
                 return Error(IDS_LOWMEM);
 
-            if (!SalRegExp->Set(PatternA, flags))
+            if (!SalRegExp->Set(PatternA.c_str(), flags))
             {
                 const char* err = SalRegExp->GetLastErrorText();
                 if (err)
-                    Error(GetParent(), err);
+                {
+                    std::wstring errorText;
+                    if (DecodeRegedtRegexError(err, errorText))
+                        Error(GetParent(), L"%s", errorText.c_str());
+                    else
+                        Error(IDS_REGEXPERR, L"Invalid encoded error text");
+                }
                 return FALSE;
             }
         }
         else
         {
-            BMForPatternA = SG->AllocSalamanderBMSearchData();
-            if (!BMForPatternA)
-                return Error(IDS_LOWMEM);
+            if (PatternALen != 0)
+            {
+                BMForPatternA = SG->AllocSalamanderBMSearchData();
+                if (!BMForPatternA)
+                    return Error(IDS_LOWMEM);
 
-            BMForPatternA->Set(PatternA, PatternALen, flags);
-            if (!BMForPatternA->IsGood())
-                return Error(IDS_LOWMEM);
+                BMForPatternA->Set(PatternA.data(), PatternALen, flags);
+                if (!BMForPatternA->IsGood())
+                    return Error(IDS_LOWMEM);
+            }
 
-            if (PatternALen == PatternWLen)
+            const bool patternsEqual = PatternALen == PatternWLen && PatternALen != 0 &&
+                                       memcmp(PatternA.data(), PatternW.data(), static_cast<size_t>(PatternALen)) == 0;
+            if (patternsEqual)
                 BMForPatternW = BMForPatternA;
-            else
+            else if (PatternWLen != 0)
             {
                 BMForPatternW = SG->AllocSalamanderBMSearchData();
                 if (!BMForPatternW)
                     return Error(IDS_LOWMEM);
 
-                BMForPatternW->Set(PatternW, PatternWLen, flags);
+                BMForPatternW->Set(PatternW.data(), PatternWLen, flags);
                 if (!BMForPatternW->IsGood())
                     return Error(IDS_LOWMEM);
             }
@@ -1583,6 +1587,21 @@ BOOL CFindThread::Init()
 
 unsigned
 CFindThread::Body()
+{
+    try
+    {
+        return BodyCore();
+    }
+    catch (...)
+    {
+        Error(IDS_LOWMEM);
+        PostMessage(FindDialog->HWindow, WM_USER_SEARCH_FINISHED, 0, 0);
+        return FALSE;
+    }
+}
+
+unsigned
+CFindThread::BodyCore()
 {
     CALL_STACK_MESSAGE1("CFindThread::Body()");
     Sleep(50); // until Petr removes the bug in auxtools
@@ -1599,19 +1618,20 @@ CFindThread::Body()
 
     if (Init())
     {
-        TIndirectArray<WCHAR> stack(100, 100);
+        std::vector<std::wstring> stack;
         BOOL skipAllErrors = FALSE;
         int root;
         LPWSTR key;
         int j;
-        for (j = 0; j < LookIn.Count; j++)
+        for (j = 0; j < static_cast<int>(LookIn.size()); j++)
         {
-            if (!RemoveFSNameFromPath(LookIn[j]))
+            std::wstring location = LookIn[j];
+            if (!RemoveFSNameFromPath(location))
             {
                 Error(IDS_NOTREGEDTPATH);
                 continue;
             }
-            if (!ParseFullPath(LookIn[j], key, root))
+            if (!ParseFullPath(location.data(), key, root))
             {
                 Error(IDS_BADPATH);
                 continue;
@@ -1627,10 +1647,8 @@ CFindThread::Body()
             {
                 // search the selected key
                 BOOL skip = FALSE;
-                WCHAR keyBuffer[MAX_KEYNAME];
-                WCHAR nameBuffer[MAX_KEYNAME];
-                wcscpy(keyBuffer, key);
-                if (!ScanKey(root, keyBuffer, skip, skipAllErrors, nameBuffer, stack) && !skip)
+                std::wstring keyBuffer = key;
+                if (!ScanKey(root, keyBuffer, skip, skipAllErrors, stack) && !skip)
                     break;
             }
         }

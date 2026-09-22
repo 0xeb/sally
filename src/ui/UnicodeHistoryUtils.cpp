@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
-#include <vector>
 
 namespace
 {
@@ -24,21 +23,6 @@ wchar_t* DupWideStr(const wchar_t* value)
     return text;
 }
 
-std::wstring AnsiToWideLocal(const char* text)
-{
-    if (text == NULL || text[0] == 0)
-        return std::wstring();
-
-    int needed = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
-    if (needed <= 0)
-        return std::wstring();
-
-    std::vector<wchar_t> wide((size_t)needed);
-    if (MultiByteToWideChar(CP_ACP, 0, text, -1, wide.data(), needed) <= 0)
-        return std::wstring();
-
-    return std::wstring(wide.data());
-}
 } // namespace
 
 BOOL IsWideHistoryEmpty(wchar_t* history[], int count)
@@ -49,20 +33,6 @@ BOOL IsWideHistoryEmpty(wchar_t* history[], int count)
             return FALSE;
     }
     return TRUE;
-}
-
-void SeedWideHistoryFromAnsi(wchar_t* historyW[], int historyWCount, char* historyA[], int historyACount)
-{
-    int count = historyWCount < historyACount ? historyWCount : historyACount;
-    for (int i = 0; i < count; i++)
-    {
-        if (historyW[i] == NULL && historyA[i] != NULL && historyA[i][0] != 0)
-        {
-            std::wstring wide = AnsiToWideLocal(historyA[i]);
-            if (!wide.empty())
-                historyW[i] = DupWideStr(wide.c_str());
-        }
-    }
 }
 
 void AddValueToWideHistory(wchar_t** historyArr, int historyItemsCount,
@@ -97,4 +67,42 @@ void AddValueToWideHistory(wchar_t** historyArr, int historyItemsCount,
             historyArr[0] = text;
         }
     }
+}
+
+BOOL ShouldUseWidePair(BOOL gotWideName, BOOL gotWidePath)
+{
+    // EITHER half is enough - see the header for why requiring both would demote
+    // a legitimately half-filled entry to its lossy ANSI mirror.
+    return (gotWideName || gotWidePath) ? TRUE : FALSE;
+}
+
+void EscapeHotPathDollars(std::wstring& text)
+{
+    size_t pos = 0;
+    while ((pos = text.find(L'$', pos)) != std::wstring::npos)
+    {
+        text.insert(pos, 1, L'$');
+        pos += 2;
+    }
+}
+
+BOOL AppendUserMenuArgument(std::wstring& list, const wchar_t* name, size_t nameLength,
+                            size_t maxLength)
+{
+    if (name == NULL)
+        return FALSE;
+
+    const bool quote = wmemchr(name, L' ', nameLength) != NULL;
+    const size_t required = (list.empty() ? 0 : 1) + (quote ? 2 : 0) + nameLength;
+    if (required > maxLength || list.size() > maxLength - required)
+        return FALSE;
+
+    if (!list.empty())
+        list.push_back(L' ');
+    if (quote)
+        list.push_back(L'"');
+    list.append(name, nameLength);
+    if (quote)
+        list.push_back(L'"');
+    return TRUE;
 }

@@ -433,9 +433,9 @@ BOOL InitDialogs()
     HArrowCursor = LoadCursor(NULL, IDC_ARROW);
     HWaitCursor = LoadCursor(NULL, IDC_WAIT);
 
-    if (!InitializeWinLib("FILECOMP", DLLInstance))
+    if (!InitializeWinLib(L"FILECOMP", DLLInstance))
         return FALSE;
-    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), LoadStr(IDS_PLUGINNAME));
+    SetWinLibStrings(LangStr(IDS_INVALIDNUMBER).c_str(), LangStr(IDS_PLUGINNAME).c_str());
     SetupWinLibHelp(HTMLHelpCallback);
     if (!CWindow::RegisterUniversalClass(
             CS_DBLCLKS, 0, 0, DLLInstance,
@@ -455,10 +455,10 @@ BOOL InitDialogs()
         return FALSE;
     }
 
-    WNDCLASSEX windowClass;
-    windowClass.cbSize = sizeof(WNDCLASSEX);
+    WNDCLASSEXW windowClass;
+    windowClass.cbSize = sizeof(windowClass);
     windowClass.style = CS_DBLCLKS;
-    windowClass.lpfnWndProc = DefWindowProc;
+    windowClass.lpfnWndProc = DefWindowProcW;
     windowClass.cbClsExtra = 0;
     windowClass.cbWndExtra = 0;
     windowClass.hInstance = DLLInstance;
@@ -468,12 +468,12 @@ BOOL InitDialogs()
     windowClass.lpszMenuName = NULL;
     windowClass.lpszClassName = FILEVIEWWINDOW_CLASSNAME;
     windowClass.hIconSm = NULL;
-    if (!RegisterClassEx(&windowClass))
+    if (!RegisterClassExW(&windowClass))
     {
         ReleaseWinLib(DLLInstance);
-        if (!UnregisterClass(MAINWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(MAINWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(MAINWINDOW_CLASSNAME) has failed");
-        if (!UnregisterClass(SPLITBARWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(SPLITBARWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(SPLITBARWINDOW_CLASSNAME) has failed");
         return FALSE;
     }
@@ -481,18 +481,18 @@ BOOL InitDialogs()
     if (!CreateEnvFont())
     {
         ReleaseWinLib(DLLInstance);
-        if (!UnregisterClass(MAINWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(MAINWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(MAINWINDOW_CLASSNAME) has failed");
-        if (!UnregisterClass(FILEVIEWWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(FILEVIEWWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(FILEVIEWWINDOW_CLASSNAME) has failed");
-        if (!UnregisterClass(SPLITBARWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(SPLITBARWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(SPLITBARWINDOW_CLASSNAME) has failed");
         return FALSE;
     }
 
     HDitheredBrush = CreateDitheredBrush();
 
-    HAccels = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELS));
+    HAccels = LoadAcceleratorsW(DLLInstance, MAKEINTRESOURCEW(IDA_ACCELS));
 
     CaretWidth = GetSystemMetrics(SM_CXBORDER) * 2;
 
@@ -503,11 +503,11 @@ void ReleaseDialogs()
 {
     CALL_STACK_MESSAGE1("ReleaseDialogs()");
     ReleaseWinLib(DLLInstance);
-    if (!UnregisterClass(MAINWINDOW_CLASSNAME, DLLInstance))
+    if (!UnregisterClassW(MAINWINDOW_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(MAINWINDOW_CLASSNAME) has failed");
-    if (!UnregisterClass(FILEVIEWWINDOW_CLASSNAME, DLLInstance))
+    if (!UnregisterClassW(FILEVIEWWINDOW_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(FILEVIEWWINDOW_CLASSNAME) has failed");
-    if (!UnregisterClass(SPLITBARWINDOW_CLASSNAME, DLLInstance))
+    if (!UnregisterClassW(SPLITBARWINDOW_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(SPLITBARWINDOW_CLASSNAME) has failed");
     if (EnvFont)
         DeleteObject(EnvFont);

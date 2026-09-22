@@ -36,10 +36,16 @@ public:
                                      CPluginFSInterfaceAbstract* PluginFS, const char* PluginFSName,
                                      int PluginFSNameIndex);
 
-    virtual void WINAPI ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
-    virtual void WINAPI ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
+    virtual BOOL WINAPI ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart)
+    {
+        return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
+    }
+    virtual BOOL WINAPI ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart)
+    {
+        return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
+    }
 
     virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server,
                                                   const char* share) {}

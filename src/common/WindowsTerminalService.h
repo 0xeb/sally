@@ -46,7 +46,7 @@ struct WindowsTerminalCatalog
 
 struct WindowsTerminalLaunchRequest
 {
-    const wchar_t* workingDirectory = nullptr;
+    std::wstring workingDirectory;
     bool usePosition = false;
     int x = 0;
     int y = 0;

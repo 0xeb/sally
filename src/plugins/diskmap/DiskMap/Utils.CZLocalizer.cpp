@@ -14,11 +14,20 @@ CZLocalizer::CZLocalizer(HINSTANCE HModule)
     //_tcscpy(_buffer, szStrLoadError);
     //load all strings - we cannot delay it because thread synchronization would be required
     this->_freepos = this->_buffer;
-    this->_bufferend = this->_buffer + sizeof(_buffer);
+    // ARRAYSIZE, not sizeof: this is wchar_t* arithmetic, so a byte count would put _bufferend
+    // twice as far out as the buffer reaches and LoadStringW would be told it has double the real
+    // capacity - writing past _buffer into _start[]/_length[]/_freepos once the strings outgrow it.
+    this->_bufferend = this->_buffer + ARRAYSIZE(this->_buffer);
     for (int i = IDS_DISKMAP_FIRST; i <= IDS_DISKMAP_LAST; i++)
     {
-        int size = LoadString(HModule, i, this->_freepos, (int)(this->_bufferend - this->_freepos));
-        if (size == 0) //not found
+        // Room for at least one character plus its terminator. LoadStringW treats cchBufferMax == 0
+        // as a request for a read-only pointer and writes an LPWSTR through lpBuffer, so a full
+        // buffer must take the fallback rather than call with 0.
+        const ptrdiff_t remaining = this->_bufferend - this->_freepos;
+        int size = (remaining >= 2)
+                       ? LoadStringW(HModule, i, this->_freepos, (int)remaining)
+                       : 0;
+        if (size == 0) //not found, or no room left
         {
             this->_start[i - IDS_DISKMAP_FIRST] = szStrLoadError;
             this->_length[i - IDS_DISKMAP_FIRST] = ARRAYSIZE(szStrLoadError);

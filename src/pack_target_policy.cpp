@@ -8,7 +8,7 @@
 #endif
 
 #include "pack_target_policy.h"
-#include "common/unicode/helpers.h" // TryWideToAnsiRoundTripExact
+#include "common/Win32TextCodec.h"
 
 bool ShouldRerouteCopyTargetToArchive(bool isCopyOrMove,
                                       bool targetHadTrailingBackslash,
@@ -65,7 +65,7 @@ bool BuildArchiveProbeNameFromWidePath(const wchar_t* fullWidePath, std::string&
     for (std::wstring::size_type start = 0; start < component.size(); ++start)
     {
         std::string ansi;
-        if (sally::unicode::TryWideToAnsiRoundTripExact(component.substr(start), ansi))
+        if (Win32EncodeAcpExact(component.substr(start), ansi))
         {
             if (ansi.empty())
                 return false;

@@ -12,14 +12,17 @@
 
 #include "precomp.h"
 
+#define DEMOMENU_WIDEN_IMPL(value) L##value
+#define DEMOMENU_WIDEN(value) DEMOMENU_WIDEN_IMPL(value)
+
 // Plugin interface object whose methods are called by Salamander
 CPluginInterface PluginInterface;
 // Additional interfaces exposed by CPluginInterface
 CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
 // Global data
-const char* PluginNameEN = "DemoMenu";    // Non-translated plugin name, used before loading the language module + for debugging
-const char* PluginNameShort = "DEMOMENU"; // Plugin name (short, without spaces)
+const wchar_t* PluginNameEN = L"DemoMenu";    // Non-translated plugin name, used before loading the language module + for debugging
+const wchar_t* PluginNameShort = L"DEMOMENU"; // Plugin name (short, without spaces)
 
 HINSTANCE DLLInstance = NULL; // Handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // Handle to SLG - language-dependent resources
@@ -47,7 +50,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_BAR_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            MessageBox(NULL, "InitCommonControlsEx failed!", "Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
     }
@@ -57,20 +60,20 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 // ****************************************************************************
 
-char* LoadStr(int resID)
+// Wide. SalamanderGeneral->LoadStr has returned WCHAR* since the v108
+// ABI break; this went through LoadStrNarrow and was widened again at every call site.
+std::wstring LoadStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 void OnAbout(HWND hParent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%s %s\n\n%s\n\n%s", LoadStr(IDS_PLUGINNAME).c_str(),
+        DEMOMENU_WIDEN(VERSINFO_VERSION), DEMOMENU_WIDEN(VERSINFO_COPYRIGHT),
+        LoadStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(hParent, text.c_str(), LoadStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 //
@@ -108,8 +111,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // Verify Salamander is at the minimum supported version before continuing
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // Reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
+        MessageBoxW(salamander->GetParentWindow(),
+                   DEMOMENU_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
                    PluginNameEN, MB_OK | MB_ICONERROR);
         return NULL;
     }
@@ -125,15 +128,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     //  SalamanderGUI = salamander->GetSalamanderGUI();
 
     // Register the name of the help file
-    SalamanderGeneral->SetHelpFileName("demomenu.chm");
+    SalamanderGeneral->SetHelpFileName(L"demomenu.chm");
 
     // Provide the basic plugin metadata
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME), 0, VERSINFO_VERSION_NO_PLATFORM, VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION), PluginNameShort,
+    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME).c_str(), 0,
+                                   DEMOMENU_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+                                   DEMOMENU_WIDEN(VERSINFO_COPYRIGHT),
+                                   LoadStr(IDS_PLUGIN_DESCRIPTION).c_str(), PluginNameShort,
                                    NULL, NULL);
 
     // Register the plugin home page URL
-    salamander->SetPluginHomePageURL(LoadStr(IDS_PLUGIN_HOME));
+    salamander->SetPluginHomePageURL(LoadStr(IDS_PLUGIN_HOME).c_str());
 
     return &PluginInterface;
 }
@@ -155,7 +160,7 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
     // Register the basic menu item:
-    salamander->AddMenuItem(-1, LoadStr(IDS_TESTCMD), SALHOTKEY('M', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
+    salamander->AddMenuItem(-1, LoadStr(IDS_TESTCMD).c_str(), SALHOTKEY('M', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
                             MENUCMD_TESTCMD, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
     /*

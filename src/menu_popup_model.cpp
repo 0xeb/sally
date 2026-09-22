@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "menu_item_text.h"
 #include "darkmode.h"
 
 #define UPDOWN_TIMER_ID 1  // timer id
@@ -164,16 +165,20 @@ void CMenuPopup::AssignHotKeys()
         if (!(item->Type & MENU_TYPE_STRING) || (item->Type & MENU_TYPE_OWNERDRAW))
             continue;
 
-        const char* p = item->String;
-        if (*p == NULL)
+        const wchar_t* p = item->String;
+        if (p == NULL || *p == 0)
             continue;
 
         BOOL hasHotKey = FALSE;
         while (*p != 0)
         {
-            if (*p == '&' && *(p + 1) != '&' && *(p + 1) != 0)
+            if (*p == L'&' && *(p + 1) != L'&' && *(p + 1) != 0)
             {
-                assigned[UpperCase[*(p + 1)]] = TRUE;
+                // Only an ASCII letter can be typed as an accelerator here; the
+                // 'assigned' table is indexed by byte and anything above it is not a
+                // candidate in the first place.
+                if ((unsigned)*(p + 1) < 256)
+                    assigned[UpperCase[(unsigned char)*(p + 1)]] = TRUE;
                 hasHotKey = TRUE;
                 break;
             }
@@ -184,7 +189,6 @@ void CMenuPopup::AssignHotKeys()
     }
 
     // for items without a hotkey, we try to assign one
-    char buff[1000];
     for (i = 0; i < Items.Count; i++)
     {
         CMenuItem* item = Items[i];
@@ -195,11 +199,21 @@ void CMenuPopup::AssignHotKeys()
         int i2;
         for (i2 = 0; !keyAssigned && i2 < 2; i2++)
         {
-            const char* p = item->String;
-            if (*p == NULL)
+            const wchar_t* p = item->String;
+            if (p == NULL || *p == 0)
                 continue;
             while (*p != 0)
             {
+                // Characters the accelerator table cannot index are not candidates. This
+                // is not a new restriction - the byte-indexed table always had it - but
+                // it is now the only place the wide text is narrowed, and it narrows a
+                // decision rather than the text itself.
+                if ((unsigned)*p >= 256)
+                {
+                    p++;
+                    continue;
+                }
+
                 // During the first round, we try to avoid characters with diacritics so the user
                 // does not have to switch from an English keyboard
                 // see https://forum.altap.cz/viewtopic.php?f=23&t=4025
@@ -208,27 +222,22 @@ void CMenuPopup::AssignHotKeys()
 
                 if (i2 == 0)
                 {
-                    char buffa[2];
-                    buffa[0] = *p;
-                    buffa[1] = 0;
-                    MultiByteToWideChar(CP_ACP, MB_COMPOSITE, buffa, -1, buffw, 10); // "á" -> "a´"
+                    WCHAR one[2];
+                    one[0] = *p;
+                    one[1] = 0;
+                    // "á" -> "a´"; a character that decomposes is one we skip this round
+                    if (FoldStringW(MAP_COMPOSITE, one, -1, buffw, 10) == 0)
+                        buffw[1] = 0;
                 }
 
-                char upper = UpperCase[*p];
+                char upper = UpperCase[(unsigned char)*p];
                 if (buffw[1] == 0 && !assigned[upper])
                 {
-                    int len = (int)strlen(item->String);
-                    if (len < 1000 - 1) // we must fit into the buffer
-                    {
-                        int pos = (int)(p - item->String);
-                        if (pos > 0)
-                            memcpy(buff, item->String, len);
-                        buff[pos] = '&';
-                        memcpy(buff + pos + 1, item->String + pos, len - pos);
-                        // if the hot key was successfully inserted, we mark the assigned array
-                        if (item->SetText(buff, len + 1))
-                            assigned[upper] = TRUE;
-                    }
+                    std::wstring text = item->String;
+                    text.insert((size_t)(p - item->String), 1, L'&');
+                    // if the hot key was successfully inserted, we mark the assigned array
+                    if (item->SetText(text.c_str(), (int)text.size()))
+                        assigned[upper] = TRUE;
                     keyAssigned = TRUE;
                     break;
                 }
@@ -613,11 +622,11 @@ BOOL CMenuPopup::SetItemInfo(DWORD position, BOOL byPosition, const MENU_ITEM_IN
     if (mii->Mask & MENU_MASK_STRING)
     {
         // the string type has an allocated string that we will free
-        const char* p = mii->String;
+        const wchar_t* p = mii->String;
         if (p == NULL)
         {
             TRACE_E("CMenuPopup::SetItemInfo menu item with id=" << position << " obtained mii->String == NULL.");
-            p = "";
+            p = L"";
         }
         if (!item->SetText(p))
         {
@@ -629,7 +638,7 @@ BOOL CMenuPopup::SetItemInfo(DWORD position, BOOL byPosition, const MENU_ITEM_IN
     // guard against inconsistent data
     if (item->Type & MENU_TYPE_STRING && item->String == NULL)
     {
-        if (!item->SetText(""))
+        if (!item->SetText(L""))
         {
             TRACE_E(LOW_MEMORY);
             return FALSE;
@@ -642,6 +651,38 @@ BOOL CMenuPopup::SetItemInfo(DWORD position, BOOL byPosition, const MENU_ITEM_IN
     if (mii->Mask & MENU_MASK_FLAGS)
         item->Flags = mii->Flags;
 
+    return TRUE;
+}
+
+BOOL CMenuPopup::SetItemTextW(DWORD position, BOOL byPosition, const wchar_t* text)
+{
+    CALL_STACK_MESSAGE3("CMenuPopup::SetItemTextW(0x%X, %d, )", position, byPosition);
+    int newPos;
+    if (byPosition)
+    {
+        newPos = position;
+        if (newPos < 0 || newPos >= Items.Count)
+        {
+            TRACE_E("CMenuPopup::SetItemTextW menu item with position=" << position << " is not available");
+            return FALSE;
+        }
+    }
+    else
+    {
+        newPos = FindItemPosition(position);
+        if (newPos == -1)
+        {
+            TRACE_E("CMenuPopup::SetItemTextW menu item with id=" << position << " was not found");
+            return FALSE;
+        }
+    }
+
+    CMenuItem* item = Items[newPos];
+    if (!item->SetText(text != NULL ? text : L""))
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -711,9 +752,9 @@ BOOL CMenuPopup::GetItemInfo(DWORD position, BOOL byPosition, MENU_ITEM_INFO* mi
     if (mii->Mask & MENU_MASK_STRING)
     {
         if (mii->String == NULL && item->String != NULL)
-            mii->StringLen = lstrlen(item->String);
+            mii->StringLen = lstrlenW(item->String);
         else
-            lstrcpyn(mii->String, item->String, mii->StringLen);
+            lstrcpynW(mii->String, item->String, mii->StringLen);
     }
 
     if (mii->Mask & MENU_MASK_BITMAP)
@@ -1041,7 +1082,9 @@ BOOL CMenuPopup::GetItemRect(int index, RECT* rect)
 BOOL CMenuPopup::FillMenuHandle(HMENU hMenu)
 {
     CALL_STACK_MESSAGE1("CMenuPopup::FillMenuHandle()");
-    MENUITEMINFO mii;
+    // Wide out for the same reason as wide in: this hands Sally's items to a real
+    // HMENU that Windows then owns and draws.
+    MENUITEMINFOW mii;
     ZeroMemory(&mii, sizeof(mii));
     mii.cbSize = sizeof(mii);
     mii.fMask = MIIM_ID | MIIM_TYPE;
@@ -1052,7 +1095,7 @@ BOOL CMenuPopup::FillMenuHandle(HMENU hMenu)
         mii.fType = MFT_STRING;
         mii.wID = item->ID;
         mii.dwTypeData = item->String;
-        if (!InsertMenuItem(hMenu, i, TRUE, &mii))
+        if (!InsertMenuItemW(hMenu, i, TRUE, &mii))
         {
             TRACE_E("InsertMenuItem failed");
             return FALSE;
@@ -1105,10 +1148,10 @@ typedef struct
     HBITMAP hbmpChecked;   // used if MIIM_CHECKMARKS
     HBITMAP hbmpUnchecked; // used if MIIM_CHECKMARKS
     ULONG_PTR dwItemData;  // used if MIIM_DATA
-    LPSTR dwTypeData;      // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+    LPWSTR dwTypeData;     // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
     UINT cch;              // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
     HBITMAP hbmpItem;      // used if MIIM_BITMAP
-} MENUITEMINFOA_NEW, FAR* LPMENUITEMINFOA_NEW;
+} MENUITEMINFOW_NEW, FAR* LPMENUITEMINFOW_NEW;
 
 #define MIIM_STRING 0x00000040
 #define MIIM_BITMAP 0x00000080
@@ -1117,20 +1160,25 @@ typedef struct
 BOOL CMenuPopup::LoadFromHandle()
 {
     CALL_STACK_MESSAGE1("CMenuPopup::LoadFromHandle()");
-    char buff[2048];
-    MENUITEMINFOA_NEW mii;
+    // This is where a menu somebody else built - the shell's context menu, the shell's
+    // New menu, the drive bar - becomes ours. Read it wide: the ANSI form of this call
+    // narrowed every entry to CP_ACP on the way in, which is why an Extract-to verb
+    // naming a Unicode folder arrived already spelled with question marks and no later
+    // stage could put it back. The text is fetched separately by ReadMenuItemTextW so
+    // that the readback is a plain function a test can drive against a real HMENU.
+    MENUITEMINFOW_NEW mii;
     mii.cbSize = sizeof(mii);
-    mii.fMask = MIIM_CHECKMARKS | MIIM_DATA | MIIM_ID | MIIM_STATE | MIIM_SUBMENU | MIIM_FTYPE | MIIM_BITMAP | MIIM_STRING;
+    mii.fMask = MIIM_CHECKMARKS | MIIM_DATA | MIIM_ID | MIIM_STATE | MIIM_SUBMENU | MIIM_FTYPE | MIIM_BITMAP;
     // convert all menu items to our data structures
     int count = GetMenuItemCount(HWindowsMenu);
     Items.DestroyMembers();
     int i;
     for (i = 0; i < count; i++)
     {
-        mii.dwTypeData = buff;
-        mii.cch = 2048;
+        mii.dwTypeData = NULL;
+        mii.cch = 0;
         // retrieve all available information about the item from the menu
-        if (!GetMenuItemInfo(HWindowsMenu, i, TRUE, (MENUITEMINFO*)&mii))
+        if (!GetMenuItemInfoW(HWindowsMenu, i, TRUE, (MENUITEMINFOW*)&mii))
         {
             TRACE_E("GetMenuItemInfo failed");
             return FALSE;
@@ -1190,14 +1238,10 @@ BOOL CMenuPopup::LoadFromHandle()
         // in the case of a string, copy the string
         if (item->Type & MENU_TYPE_STRING)
         {
-            const char* p = mii.dwTypeData;
-            int len = mii.cch;
-            if (p == NULL)
-            {
-                p = "";
-                len = 0;
-            }
-            if (!item->SetText(p, len))
+            std::wstring text;
+            // A string item with no text is ordinary; only refuse to fabricate one.
+            ReadMenuItemTextW(HWindowsMenu, i, text);
+            if (!item->SetText(text.c_str(), (int)text.length()))
             {
                 TRACE_E(LOW_MEMORY);
                 Items.Detach(index);
@@ -1206,7 +1250,22 @@ BOOL CMenuPopup::LoadFromHandle()
             }
         }
         else if (item->Type & MENU_TYPE_BITMAP)
-            item->HBmpItem = (HBITMAP)mii.dwTypeData;
+        {
+            // A legacy MFT_BITMAP item keeps its handle in dwTypeData, which only means
+            // that under MIIM_TYPE - so it needs its own query. The old code read
+            // dwTypeData from a call that had asked for MIIM_STRING instead, where the
+            // field still holds the caller's own text buffer; for an MFT_BITMAP item it
+            // was therefore assigning a pointer to a stack array as the bitmap handle.
+            // Harmless in practice only because item->HBmpItem had already been set from
+            // MIIM_BITMAP just above and nothing Sally builds uses MFT_BITMAP.
+            MENUITEMINFOW_NEW bmp;
+            bmp.cbSize = sizeof(bmp);
+            bmp.fMask = MIIM_TYPE;
+            bmp.dwTypeData = NULL;
+            bmp.cch = 0;
+            if (GetMenuItemInfoW(HWindowsMenu, i, TRUE, (MENUITEMINFOW*)&bmp))
+                item->HBmpItem = (HBITMAP)bmp.dwTypeData;
+        }
 
         if (mii.hSubMenu != NULL)
         {
@@ -1243,10 +1302,8 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
     SetImageList(hImageList);
     SetHotImageList(hHotImageList);
 
-    char stringBuff[1000];
     MENU_ITEM_INFO mii;
     ZeroMemory(&mii, sizeof(mii));
-    mii.String = stringBuff;
 
     const MENU_TEMPLATE_ITEM* row = menuTemplate;
     if (addedRows == 0)
@@ -1270,7 +1327,7 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            lstrcpy(stringBuff, LoadStr(row->TextResID, hInstance));
+            mii.String = const_cast<wchar_t*>(LoadStrW(row->TextResID, hInstance));
             mii.ImageIndex = row->ImageIndex;
             mii.State = row->State;
             mii.SkillLevel = row->SkillLevel;
@@ -1319,7 +1376,7 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_ENABLER | MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            lstrcpy(stringBuff, LoadStr(row->TextResID, hInstance));
+            mii.String = const_cast<wchar_t*>(LoadStrW(row->TextResID, hInstance));
             mii.ImageIndex = row->ImageIndex;
             mii.SubMenu = subMenu;
             mii.State = row->State;
@@ -1569,10 +1626,10 @@ void CMenuPopup::OnKeyReturn(BOOL* leaveMenu, DWORD* retValue)
         SharedRes->MenuBar->ExitMenuLoop = TRUE; // so we exit it
 }
 
-int CMenuPopup::FindNextItemIndex(int firstIndex, char key)
+int CMenuPopup::FindNextItemIndex(int firstIndex, wchar_t key)
 {
     CALL_STACK_MESSAGE3("CMenuPopup::FindNextItemIndex(%d, %u)", firstIndex, key);
-    key = UpperCase[key];
+    // Case folding now happens inside MatchMenuItemKeyW, which does it for both sides.
     if (firstIndex == -1)
         firstIndex = 0;
     else
@@ -1592,38 +1649,9 @@ int CMenuPopup::FindNextItemIndex(int firstIndex, char key)
             continue;
         if (item->Type & MENU_TYPE_STRING && !(item->State & MENU_STATE_GRAYED) && !(item->Type & MENU_TYPE_OWNERDRAW))
         {
-            const char* p = item->String;
-            BOOL firstCharFound = FALSE;
-            BOOL prefixFound = FALSE;
-            BOOL anotherPrefixFound = FALSE;
-            if (*p != NULL)
-            {
-                while (*p != 0)
-                {
-                    if (*p == '&')
-                    {
-                        if (*(p + 1) != 0 && UpperCase[*(p + 1)] == key)
-                        {
-                            prefixFound = TRUE;
-                            break;
-                        }
-                        else if (*(p + 1) != 0 && *(p + 1) != '&')
-                        {
-                            anotherPrefixFound = TRUE;
-                            break;
-                        }
-                        p++;
-                    }
-                    p++;
-                }
-                // if we did not find the correct prefix or any prefix, try the first letter
-                if (!prefixFound && !anotherPrefixFound)
-                {
-                    p = item->String;
-                    if (UpperCase[*p] == key)
-                        firstCharFound = TRUE;
-                }
-            }
+            CMenuItemKeyMatch match = MatchMenuItemKeyW(item->String, key);
+            BOOL prefixFound = (match == mikmPrefix);
+            BOOL firstCharFound = (match == mikmFirstChar);
             if (prefixFound)
             {
                 if (prefixIndexFirst == -1)
@@ -1659,7 +1687,7 @@ int CMenuPopup::FindNextItemIndex(int firstIndex, char key)
     return -1;
 }
 
-void CMenuPopup::OnChar(char key, BOOL* leaveMenu, DWORD* retValue)
+void CMenuPopup::OnChar(wchar_t key, BOOL* leaveMenu, DWORD* retValue)
 {
     CALL_STACK_MESSAGE2("CMenuPopup::OnChar(%u, , )", key);
     int firstIndex = FindNextItemIndex(SelectedItemIndex, key);
@@ -2080,7 +2108,9 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
     case WM_SYSCHAR: // j.r.: so that Alt+LETTER works inside the menu as well
     {
         CMenuPopup* popup = FindActivePopup();
-        popup->OnChar((char)msg->wParam, leaveMenu, retValue);
+        // The popup window is registered wide, and this loop pumps with PeekMessageW,
+        // so wParam is a whole wide character rather than a CP_ACP byte.
+        popup->OnChar((wchar_t)msg->wParam, leaveMenu, retValue);
         return;
     }
 
@@ -2538,7 +2568,7 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
         //      return;
     }
     TranslateMessage(msg);
-    DispatchMessage(msg);
+    DispatchMessageW(msg);
 }
 
 BOOL CMenuPopup::CreatePopupWindow(CMenuPopup* firstPopup, int x, int y, int submenuItemPos, const RECT* exclude)
@@ -2689,7 +2719,7 @@ BOOL CMenuPopup::CreatePopupWindow(CMenuPopup* firstPopup, int x, int y, int sub
 
     if (CreateEx(WS_EX_TOPMOST | WS_EX_DLGMODALFRAME,
                  WC_POPUPMENU,
-                 "",
+                 L"",
                  WS_CLIPSIBLINGS | WS_POPUP | WS_BORDER,
                  newX,
                  newY,
@@ -3119,7 +3149,11 @@ CMenuPopup::TrackInternal(DWORD trackFlags, int x, int y, HWND hwnd, const RECT*
             else
             {
                 //        TRACE_I("MENU: entering message queue");
-                if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) != 0)
+                // PeekMessageW, not the A form: TranslateMessage produces a WM_CHAR in
+                // whichever width the message was retrieved in, so peeking narrow would
+                // put the keystroke back through CP_ACP no matter how the window class
+                // is registered.
+                if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE) != 0)
                 {
                     if (!leaveMenu)
                     {

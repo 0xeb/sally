@@ -1,23 +1,38 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
+#include <vector>
+
+static char* DupUploadDirectoryText(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
+
+// Temporary projection for the still-narrow operation dialog. Local filesystem work uses the
+// UTF-16 owner stored beside it and never consumes this value.
 //
 // ****************************************************************************
 // CFTPWorker
 //
 
 void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                            BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                            BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                             int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
-                                            int replyCode, CPathBuffer& ftpPath, CPathBuffer& errText,
+                                            int replyCode, std::string& ftpPath, std::string& errText,
                                             BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                             BOOL& handleShouldStop, BOOL& quitCmdWasSent)
 {
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuf[USER_MAX_SIZE];
+    const wchar_t* hostBuf = NULL;
+    const wchar_t* userBuf = NULL;
     unsigned short portBuf;
     CFTPQueueItemCopyMoveUploadExplore* curItem = (CFTPQueueItemCopyMoveUploadExplore*)CurItem;
     CUploadListingItem* existingItem = NULL; // for passing listing item data between different SubStates
@@ -34,7 +49,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             {
                 if (curItem->TgtDirState == UPLOADTGTDIRSTATE_UNKNOWN)
                 {
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     CFTPServerPathType pathType = Oper->GetFTPServerPathType(curItem->TgtPath);
                     BOOL notAccessible, getListing, listingInProgress;
                     if (existingItem != NULL)
@@ -42,7 +57,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     if (UploadListingCache.GetListing(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                       pathType, Msg, UID, &listingInProgress,
                                                       &notAccessible, &getListing, curItem->TgtName,
-                                                      &existingItem, NULL))
+                                                      &existingItem, NULL, TextPolicy.GetCodec()))
                     {
                         if (listingInProgress) // the listing is currently running or is about to start
                         {
@@ -118,17 +133,28 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadResolveLink: // upload copy/move file: determine what the link is (file/directory) whose name collides with the target directory on the server
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, ftpPath.Size());
-            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-            if (FTPPathAppend(type, ftpPath, ftpPath.Size(), curItem->TgtName, TRUE))
+            if (!FTPFormatString(ftpPath, "%s", curItem->TgtPath))
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                lookForNewWork = TRUE;
+                break;
+            }
+            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath.c_str());
+            if (FTPPathAppend(type, ftpPath, curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
-                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath.Get());
-                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                if (FTPFormatString(errText, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath.c_str()))
+                    Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
-                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                  ftpcmdChangeWorkingPath, &cmdLen, ftpPath.Get()); // cannot report an error
-                sendCmd = TRUE;
-                SubState = fwssWorkUploadResLnkWaitForCWDRes;
+                if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, ftpPath.c_str()))
+                {
+                    sendCmd = TRUE;
+                    SubState = fwssWorkUploadResLnkWaitForCWDRes;
+                }
+                else
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                    lookForNewWork = TRUE;
+                }
 
                 HaveWorkingPath = FALSE; // change the current working directory on the server
             }
@@ -164,9 +190,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETORESOLVELNK, NO_ERROR,
-                                           SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     lookForNewWork = TRUE;
                 }
@@ -184,10 +210,16 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadCreateDir: // upload copy/move file: create the target directory on the server - start by setting the target path
         {
-            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                              ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath); // cannot report an error
-            sendCmd = TRUE;
-            SubState = fwssWorkUploadCrDirWaitForCWDRes;
+            if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath))
+            {
+                sendCmd = TRUE;
+                SubState = fwssWorkUploadCrDirWaitForCWDRes;
+            }
+            else
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                lookForNewWork = TRUE;
+            }
 
             HaveWorkingPath = FALSE; // change the current working directory on the server
             break;
@@ -206,20 +238,26 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         handleShouldStop = TRUE; // check whether the worker should stop
                     else
                     {
-                        _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), curItem->TgtName);
-                        Logs.LogMessage(LogUID, errText, -1, TRUE);
+                        if (FTPFormatString(errText, LoadStr(IDS_LOGMSGCREATEDIR), curItem->TgtName))
+                            Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
-                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                          ftpcmdCreateDir, &cmdLen, curItem->TgtName); // cannot report an error
-                        sendCmd = TRUE;
-                        SubState = fwssWorkUploadCrDirWaitForMKDRes;
+                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdCreateDir, &cmdLen, curItem->TgtName))
+                        {
+                            sendCmd = TRUE;
+                            SubState = fwssWorkUploadCrDirWaitForMKDRes;
+                        }
+                        else
+                        {
+                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                            lookForNewWork = TRUE;
+                        }
                     }
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
-                                           SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     lookForNewWork = TRUE;
                 }
@@ -247,7 +285,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     Queue->UpdateUploadTgtDirState(curItem, UPLOADTGTDIRSTATE_READY);
 
                     // if the target directory was created, update the listing cache
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     UploadListingCache.ReportCreateDirs(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                         Oper->GetFTPServerPathType(curItem->TgtPath),
                                                         curItem->TgtName, FALSE);
@@ -262,7 +300,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     CFTPServerPathType pathType = Oper->GetFTPServerPathType(curItem->TgtPath);
                     if (UploadListingCache.IsListingFromPanel(userBuf, hostBuf, portBuf, curItem->TgtPath, pathType))
                     {
@@ -273,7 +311,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else
                     {
-                        CopyStr(errText, errText.Size(), reply, replySize);
+                        CopyStr(errText, reply, replySize);
                         if (CurItem->ForceAction == fqiaUseAutorename) // forced autorename
                         {
                             if (ShouldStop)
@@ -291,7 +329,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                             case CANNOTCREATENAME_USERPROMPT:
                             {
                                 Queue->UpdateItemState(CurItem, sqisUserInputNeeded, ITEMPR_UPLOADCANNOTCREATETGTDIR, NO_ERROR,
-                                                       SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                                       DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                                        Oper);
                                 lookForNewWork = TRUE;
                                 break;
@@ -300,7 +338,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                             case CANNOTCREATENAME_SKIP:
                             {
                                 Queue->UpdateItemState(CurItem, sqisSkipped, ITEMPR_UPLOADCANNOTCREATETGTDIR, NO_ERROR,
-                                                       SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                                       DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                                        Oper);
                                 lookForNewWork = TRUE;
                                 break;
@@ -327,7 +365,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             case fweCmdConClosed: // the connection was closed/timed out (see ErrorDescr) -> try to restore it
             {
                 // if we do not know whether the directory creation succeeded, invalidate the listing cache
-                Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                 UploadListingCache.ReportCreateDirs(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                     Oper->GetFTPServerPathType(curItem->TgtPath),
                                                     curItem->TgtName, TRUE);
@@ -439,10 +477,16 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadAutorenameDir: // upload copy/move file: handle the target directory creation error - autorename - start by setting the target path
         {
-            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                              ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath); // cannot report an error
-            sendCmd = TRUE;
-            SubState = fwssWorkUploadAutorenDirWaitForCWDRes;
+            if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, curItem->TgtPath))
+            {
+                sendCmd = TRUE;
+                SubState = fwssWorkUploadAutorenDirWaitForCWDRes;
+            }
+            else
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                lookForNewWork = TRUE;
+            }
 
             HaveWorkingPath = FALSE; // change the current working directory on the server
             break;
@@ -462,16 +506,16 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     else
                     {
                         UploadAutorenamePhase = 0; // start of name generation
-                        UploadAutorenameNewName[0] = 0;
+                        UploadAutorenameNewName.clear();
                         SubState = fwssWorkUploadAutorenDirSendMKD;
                         nextLoop = TRUE;
                     }
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
-                                           SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     lookForNewWork = TRUE;
                 }
@@ -489,20 +533,26 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadAutorenDirSendMKD: // upload copy/move file: autorename - try to generate another new name for the target directory and attempt to create it
         {
-            Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+            Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
             CFTPServerPathType pathType = Oper->GetFTPServerPathType(curItem->TgtPath);
             BOOL notAccessible, getListing, listingInProgress, nameExists;
             int index = 0;
             int usedUploadAutorenamePhase = UploadAutorenamePhase; // in case of a name collision - the phase in which we should try generating another name
             while (1)
             {
-                FTPGenerateNewName(&UploadAutorenamePhase, UploadAutorenameNewName, &index,
-                                   curItem->TgtName, pathType, TRUE, FALSE);
+                if (!FTPGenerateNewName(TextPolicy.GetCodec(), &UploadAutorenamePhase, UploadAutorenameNewName, &index,
+                                        curItem->TgtName, pathType, TRUE, FALSE))
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, 0, NULL, Oper);
+                    lookForNewWork = TRUE;
+                    break;
+                }
                 // we have a new name; verify that it does not collide with any name from the target path listing
                 if (UploadListingCache.GetListing(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                   pathType, Msg, UID, &listingInProgress,
                                                   &notAccessible, &getListing,
-                                                  UploadAutorenameNewName, NULL, &nameExists))
+                                                  UploadAutorenameNewName.c_str(), NULL, &nameExists,
+                                                  TextPolicy.GetCodec()))
                 {
                     if (listingInProgress) // the listing is currently running or is about to start
                     {
@@ -531,13 +581,19 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         {
                             if (!nameExists) // no collision -> try to create the target directory
                             {
-                                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGCREATEDIR), UploadAutorenameNewName.Get());
-                                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                                if (FTPFormatString(errText, LoadStr(IDS_LOGMSGCREATEDIR), UploadAutorenameNewName.c_str()))
+                                    Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
-                                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                  ftpcmdCreateDir, &cmdLen, UploadAutorenameNewName.Get()); // cannot report an error
-                                sendCmd = TRUE;
-                                SubState = fwssWorkUploadAutorenDirWaitForMKDRes;
+                                if (PrepareFTPCommand(buf, &errBuf, ftpcmdCreateDir, &cmdLen, UploadAutorenameNewName.c_str()))
+                                {
+                                    sendCmd = TRUE;
+                                    SubState = fwssWorkUploadAutorenDirWaitForMKDRes;
+                                }
+                                else
+                                {
+                                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                    lookForNewWork = TRUE;
+                                }
                                 break;
                             }
                             else // name collision (with a file/link/directory) - try another name in the same autorename phase
@@ -565,12 +621,12 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS) // the target directory was created (should be 257)
                 {
                     // if the target directory was created, update the listing cache
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     UploadListingCache.ReportCreateDirs(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                         Oper->GetFTPServerPathType(curItem->TgtPath),
-                                                        UploadAutorenameNewName, FALSE);
+                                                        UploadAutorenameNewName.c_str(), FALSE);
 
-                    char* newName = SalamanderGeneral->DupStr(UploadAutorenameNewName);
+                    char* newName = DupUploadDirectoryText(UploadAutorenameNewName.c_str());
                     if (newName != NULL)
                     {
                         if (CurItem->ForceAction != fqiaNone) // the forced action no longer applies
@@ -609,9 +665,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else // no other name can be generated, so report an error
                     {
-                        CopyStr(errText, errText.Size(), reply, replySize);
+                        CopyStr(errText, reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UPLOADCRDIRAUTORENFAILED, NO_ERROR,
-                                               SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                               DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                                Oper);
                         lookForNewWork = TRUE;
                     }
@@ -622,10 +678,10 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             case fweCmdConClosed: // the connection was closed/timed out (see ErrorDescr) -> try to restore it
             {
                 // if we do not know whether the directory creation succeeded, invalidate the listing cache
-                Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                 UploadListingCache.ReportCreateDirs(userBuf, hostBuf, portBuf, curItem->TgtPath,
                                                     Oper->GetFTPServerPathType(curItem->TgtPath),
-                                                    UploadAutorenameNewName, TRUE);
+                                                    UploadAutorenameNewName.c_str(), TRUE);
                 conClosedRetryItem = TRUE;
                 break;
             }
@@ -635,14 +691,25 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadGetTgtPath: // upload copy/move file: determine the path to the target directory on the server - start by changing into it
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, ftpPath.Size());
-            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-            if (FTPPathAppend(type, ftpPath, ftpPath.Size(), curItem->TgtName, TRUE))
+            if (!FTPFormatString(ftpPath, "%s", curItem->TgtPath))
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                lookForNewWork = TRUE;
+                break;
+            }
+            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath.c_str());
+            if (FTPPathAppend(type, ftpPath, curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
-                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                  ftpcmdChangeWorkingPath, &cmdLen, ftpPath.Get()); // cannot report an error
-                sendCmd = TRUE;
-                SubState = fwssWorkUploadGetTgtPathWaitForCWDRes;
+                if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, ftpPath.c_str()))
+                {
+                    sendCmd = TRUE;
+                    SubState = fwssWorkUploadGetTgtPathWaitForCWDRes;
+                }
+                else
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                    lookForNewWork = TRUE;
+                }
 
                 HaveWorkingPath = FALSE; // change the current working directory on the server
             }
@@ -674,7 +741,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     CFTPServerPathType pathType = Oper->GetFTPServerPathType(curItem->TgtPath);
                     if (UploadListingCache.IsListingFromPanel(userBuf, hostBuf, portBuf, curItem->TgtPath, pathType))
                     {
@@ -684,9 +751,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else
                     {
-                        CopyStr(errText, errText.Size(), reply, replySize);
+                        CopyStr(errText, reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWD, NO_ERROR,
-                                               SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                               DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                                Oper);
                     }
                     lookForNewWork = TRUE;
@@ -705,10 +772,16 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadGetTgtPathSendPWD: // upload copy/move file: send "PWD" (determine the path to the target directory)
         {
-            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                              ftpcmdPrintWorkingPath, &cmdLen); // cannot report an error
-            sendCmd = TRUE;
-            SubState = fwssWorkUploadGetTgtPathWaitForPWDRes;
+            if (PrepareFTPCommand(buf, &errBuf, ftpcmdPrintWorkingPath, &cmdLen))
+            {
+                sendCmd = TRUE;
+                SubState = fwssWorkUploadGetTgtPathWaitForPWDRes;
+            }
+            else
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                lookForNewWork = TRUE;
+            }
             break;
         }
 
@@ -720,9 +793,8 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             case fweCmdReplyReceived:
             {
                 if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS &&
-                    FTPGetDirectoryFromReply(reply, replySize, ftpPath, ftpPath.Size()))
+                    FTPGetDirectoryFromReply(reply, replySize, WorkingPath))
                 { // success, we have the working path
-                    lstrcpyn(WorkingPath, ftpPath, WorkingPath.Size());
                     HaveWorkingPath = TRUE;
 
                     if (ShouldStop)
@@ -735,9 +807,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // an error occurred; show it to the user and move on to the next queue item
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOPWD, NO_ERROR,
-                                           SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           DupUploadDirectoryText(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     lookForNewWork = TRUE;
                 }
@@ -758,9 +830,9 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             // try to list the source directory on disk
             if (DiskWorkIsUsed)
                 TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState4(): DiskWorkIsUsed may not be TRUE here!");
-            InitDiskWork(WORKER_DISKWORKLISTFINISHED, fdwtListDir, CurItem->Path, CurItem->Name,
-                         fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
-            if (FTPDiskThread->AddWork(&DiskWork))
+            const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKLISTFINISHED, fdwtListDir, CurItem->LocalPath, CurItem->LocalName,
+                                                    fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
+            if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
             {
                 DiskWorkIsUsed = TRUE;
                 SubState = fwssWorkUploadListDiskWaitForDisk; // wait for the result
@@ -805,42 +877,43 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         int transferMode = Oper->GetTransferMode();
                         BOOL copy = CurItem->Type == fqitUploadCopyExploreDir;
                         CQuadWord totalSize(0, 0); // total size (in bytes)
-                        CPathBuffer sourcePath; // Heap-allocated for long path support
-                        lstrcpyn(sourcePath, CurItem->Path, sourcePath.Size());
+                        std::wstring sourcePathPrefixW = CurItem->LocalPath;
+                        std::wstring sourceNameW = CurItem->LocalName;
+                        std::wstring sourcePathW = sourcePathPrefixW;
 
-                        BOOL err = ftpQueueItems == NULL || !HaveWorkingPath || DiskWork.DiskListing == NULL ||
-                                   !SalamanderGeneral->SalPathAppend(sourcePath, CurItem->Name, sourcePath.Size()) /* always true - an error would already have been reported by DoListDirectory() */;
+                        BOOL err = ftpQueueItems == NULL || !HaveWorkingPath || DiskWork.DiskListing == NULL;
+                        SPLSalPathAppendOwned(sourcePathW, sourceNameW.c_str());
                         if (!err) // add queue items for files/directories from the listing
                         {
                             BOOL ok = TRUE;
-                            CFTPServerPathType workingPathType = Oper->GetFTPServerPathType(WorkingPath);
+                            CFTPServerPathType workingPathType = Oper->GetFTPServerPathType(WorkingPath.c_str());
                             BOOL is_AS_400_QSYS_LIB_Path = workingPathType == ftpsptAS400 &&
-                                                           FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", WorkingPath);
+                                                           FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", WorkingPath.c_str());
                             int i;
                             for (i = 0; i < DiskWork.DiskListing->Count; i++)
                             {
                                 CDiskListingItem* lstItem = DiskWork.DiskListing->At(i);
 
-                                CPathBuffer mbrName;
-                                char* tgtName = lstItem->Name;
-                                if (is_AS_400_QSYS_LIB_Path)
+                                std::string listedNameBytes;
+                                if (!TextPolicy.GetCodec().EncodeUploadName(lstItem->Name, wcslen(lstItem->Name), listedNameBytes))
                                 {
-                                    lstrcpyn(mbrName, tgtName, mbrName.Size());
-                                    FTPAS400AddFileNamePart(mbrName);
-                                    tgtName = mbrName;
+                                    ok = FALSE;
+                                    break;
                                 }
+                                if (is_AS_400_QSYS_LIB_Path)
+                                    FTPAS400AddFileNamePart(listedNameBytes);
 
                                 CFTPQueueItemType type;
                                 CFTPQueueItem* item = CreateItemForCopyOrMoveUploadOperation(lstItem->Name, lstItem->IsDir,
                                                                                              &lstItem->Size, &type,
                                                                                              transferMode, Oper, copy,
-                                                                                             WorkingPath, tgtName, // we are in a subdirectory; names are no longer generated from the operation mask here
+                                                                                             WorkingPath.c_str(), listedNameBytes.c_str(), // we are in a subdirectory; names are no longer generated from the operation mask here
                                                                                              &totalSize, workingPathType == ftpsptOpenVMS);
                                 if (item != NULL)
                                 {
                                     if (ok)
                                     {
-                                        item->SetItem(-1, type, sqisWaiting, ITEMPR_OK, sourcePath, lstItem->Name);
+                                        item->SetLocalItem(-1, type, sqisWaiting, ITEMPR_OK, sourcePathW.data(), lstItem->Name);
                                         ftpQueueItems->Add(item); // add the operation to the queue
                                         if (!ftpQueueItems->IsGood())
                                         {
@@ -871,8 +944,8 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                             CFTPQueueItem* item = new CFTPQueueItemDir;
                             if (item != NULL && ((CFTPQueueItemDir*)item)->SetItemDir(0, 0, 0, 0))
                             {
-                                item->SetItem(CurItem->ParentUID, fqitUploadMoveDeleteDir, sqisWaiting,
-                                              ITEMPR_OK, CurItem->Path, CurItem->Name);
+                                item->SetLocalItem(CurItem->ParentUID, fqitUploadMoveDeleteDir, sqisWaiting,
+                                                   ITEMPR_OK, CurItem->LocalPath, CurItem->LocalName);
                                 ftpQueueItems->Add(item); // add the operation to the queue
                                 if (!ftpQueueItems->IsGood())
                                 {
@@ -986,8 +1059,5 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
             break;
     }
     if (existingItem != NULL)
-    {
-        free(existingItem->Name);
         delete existingItem;
-    }
 }

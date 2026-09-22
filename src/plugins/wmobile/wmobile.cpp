@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#define WMOBILE_WIDEN2(x) L##x
+#define WMOBILE_WIDEN(x) WMOBILE_WIDEN2(x)
+
 // plugin interface object; Salamander calls its methods
 CPluginInterface PluginInterface;
 // additional parts of the CPluginInterface interface
@@ -14,7 +17,7 @@ CPluginInterfaceForFS InterfaceForFS;
 
 int ConfigVersion = 0;           // version of the configuration loaded from the registry (see description above)
 #define CURRENT_CONFIG_VERSION 1 // current configuration version (stored in the registry when the plugin unloads)
-const char* CONFIG_VERSION = "Version";
+const wchar_t* CONFIG_VERSION = L"Version";
 
 // global data
 
@@ -37,15 +40,50 @@ int SalamanderVersion = 0;
 // interface providing customized Windows controls used in Salamander
 CSalamanderGUIAbstract* SalamanderGUI = NULL;
 
-char TitleWMobile[100] = "Windows Mobile Plugin";                  // replaced with IDS_WMPLUGINTITLE in the entry point
-char TitleWMobileError[100] = "Windows Mobile Plugin Error";       // replaced with IDS_WMPLUGINTITLE_ERROR in the entry point
-char TitleWMobileQuestion[100] = "Windows Mobile Plugin Question"; // replaced with IDS_WMPLUGINTITLE_QUESTION in the entry point
+CFileInfoArray::~CFileInfoArray()
+{
+    if (SalamanderGeneral != NULL)
+    {
+        for (int i = 0; i < Count; ++i)
+            SalamanderGeneral->Free(At(i).cFileName);
+    }
+}
+
+BOOL CFileInfoArray::AddOwned(const wchar_t* fileName, DWORD attributes, DWORD fileSize, int block)
+{
+    if (fileName == NULL || SalamanderGeneral == NULL)
+        return FALSE;
+
+    CFileInfo entry = {};
+    entry.cFileName = SalamanderGeneral->DupStr(fileName);
+    if (entry.cFileName == NULL)
+        return FALSE;
+    entry.dwFileAttributes = attributes;
+    entry.size = fileSize;
+    entry.block = block;
+
+    Add(entry);
+    if (State != etNone)
+    {
+        SalamanderGeneral->Free(entry.cFileName);
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static std::wstring TitleWMobileStorage;
+static std::wstring TitleWMobileErrorStorage;
+static std::wstring TitleWMobileQuestionStorage;
+const wchar_t* TitleWMobile = L"Windows Mobile Plugin";
+const wchar_t* TitleWMobileError = L"Windows Mobile Plugin Error";
+const wchar_t* TitleWMobileQuestion = L"Windows Mobile Plugin Question";
 
 // ****************************************************************************
 
-char* LoadStr(int resID)
+// Wide - SalamanderGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
@@ -59,7 +97,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_BAR_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            MessageBox(NULL, "InitCommonControlsEx failed!", "Error", MB_OK | MB_ICONERROR);
+            // wide: English-only diagnostic, no LangStr involved (language
+            // module isn't loaded yet at DllMain time) - same shape as undelete.cpp/demoplug.cpp
+            // (208, 217).
+            MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
     }
@@ -69,13 +110,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 void OnAbout(HWND hParent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls " WMOBILE_WIDEN(VERSINFO_VERSION) L"\n\n" WMOBILE_WIDEN(VERSINFO_COPYRIGHT) L"\n\n%ls",
+        LangStr(IDS_PLUGINNAME).c_str(), LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(hParent, text.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 //
@@ -118,14 +156,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Windows Mobile Plugin" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-228).
+        MessageBoxW(salamander->GetParentWindow(),
+                    WMOBILE_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Windows Mobile Plugin" /* do not translate! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Windows Mobile Plugin" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Windows Mobile Plugin" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -133,17 +173,20 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGeneral = salamander->GetSalamanderGeneral();
     SalamanderGeneral->GetLowerAndUpperCase(&LowerCase, &UpperCase);
 
-    strncpy_s(TitleWMobile, LoadStr(IDS_WMPLUGINTITLE), _TRUNCATE);
-    strncpy_s(TitleWMobileError, LoadStr(IDS_WMPLUGINTITLE_ERROR), _TRUNCATE);
-    strncpy_s(TitleWMobileQuestion, LoadStr(IDS_WMPLUGINTITLE_QUESTION), _TRUNCATE);
+    TitleWMobileStorage = LangStr(IDS_WMPLUGINTITLE).c_str();
+    TitleWMobileErrorStorage = LangStr(IDS_WMPLUGINTITLE_ERROR).c_str();
+    TitleWMobileQuestionStorage = LangStr(IDS_WMPLUGINTITLE_QUESTION).c_str();
+    TitleWMobile = TitleWMobileStorage.c_str();
+    TitleWMobileError = TitleWMobileErrorStorage.c_str();
+    TitleWMobileQuestion = TitleWMobileQuestionStorage.c_str();
 
     // obtain the interface that provides customized Windows controls used in Salamander
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set the help file name
-    SalamanderGeneral->SetHelpFileName("wmobile.chm");
+    SalamanderGeneral->SetHelpFileName(L"wmobile.chm");
 
-    if (!InitializeWinLib("WMOBILE" /* do not translate! */, DLLInstance))
+    if (!InitializeWinLib(L"WMOBILE" /* do not translate! */, DLLInstance))
         return FALSE;
     SetupWinLibHelp(HTMLHelpCallback);
 
@@ -151,17 +194,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL; // error
 
     // configure the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_FILESYSTEM | FUNCTION_LOADSAVECONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "WMOBILE" /* do not translate! */, NULL, "CE");
+                                   WMOBILE_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+                                   WMOBILE_WIDEN(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"WMOBILE" /* do not translate! */, NULL, L"CE");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // obtain our FS name (it may not be "cefs"; Salamander can adjust it)
-    SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);
+    AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
 
     return &PluginInterface;
 }
@@ -190,13 +233,11 @@ CPluginInterface::Release(HWND parent, BOOL force)
         ReleaseWinLib(DLLInstance);
 
         // remove all copies of FS files from the disk cache (theoretically redundant, every FS should delete its own copies)
-        CPathBuffer uniqueFileName; // Heap-allocated for long path support
-        strcpy(uniqueFileName, AssignedFSName);
-        strcat(uniqueFileName, ":");
+        std::wstring uniqueFileNameW = AssignedFSName + L":";
         // disk names are case-insensitive while the disk cache is case-sensitive; converting
         // to lowercase makes the disk cache behave case-insensitively as well
-        SalamanderGeneral->ToLowerCase(uniqueFileName);
-        SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
+        SPLToLowerCaseOwned(SalamanderGeneral, uniqueFileNameW);
+        SalamanderGeneral->RemoveFilesFromCache(uniqueFileNameW.c_str());
     }
     if (ret && InterfaceForFS.GetActiveFSCount() != 0)
     {
@@ -243,14 +284,14 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     iconList->ReplaceIcon(0, hIcon);
     DestroyIcon(hIcon);
     salamander->SetIconListForGUI(iconList); // Salamander takes care of destroying the icon list
-    salamander->SetChangeDriveMenuItem("\tMobile Device", 0);
+    salamander->SetChangeDriveMenuItem(L"\tMobile Device", 0);
     salamander->SetPluginIcon(0);
     salamander->SetPluginMenuAndToolbarIcon(0);
 
     if (ConfigVersion < 1) // do this only during plugin installation or upgrade from 2.5 beta 7 or older (to keep the user's settings)
     {
         // if rapi is not installed, hide the icon so it does not get in the way
-        HINSTANCE hLib = LoadLibrary("rapi.dll");
+        HINSTANCE hLib = LoadLibraryW(L"rapi.dll");
         if (hLib != NULL)
             FreeLibrary(hLib);
         else

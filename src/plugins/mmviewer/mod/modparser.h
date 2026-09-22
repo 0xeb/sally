@@ -32,7 +32,7 @@ public:
     CParserMOD() : f(NULL) {}
     ~CParserMOD() { CloseFile(); }
 
-    virtual CParserResultEnum OpenFile(const char* fileName);
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName);
     virtual CParserResultEnum CloseFile();
     virtual CParserResultEnum GetFileInfo(COutputInterface* output);
 };

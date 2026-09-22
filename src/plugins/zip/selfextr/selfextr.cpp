@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -799,7 +799,7 @@ int MyWinMain()
                     {
                         MSG msg;
                         TRACE1("WAIT_OBJECT_0 + 1")
-                        PeekMessage(&msg, (HWND)NULL, 0, 0, PM_REMOVE);
+                        PeekMessageW(&msg, (HWND)NULL, 0, 0, PM_REMOVE);
                         /*BOOL b = FALSE; for debugging purposes
 	      if (b) MainWindowWndProc(NULL, WM_USER + 1, TRUE, 0);*/
                         break;

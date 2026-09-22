@@ -56,9 +56,9 @@ struct CCS
 // ****************************************************************************
 
 //char * ErrorStr(char * buf, int error, ...);
-BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglist);
+BOOL ErrorHelper(HWND parent, const wchar_t* message, int lastError, va_list arglist);
 BOOL Error(HWND parent, int error, ...);
-BOOL Error(HWND parent, const char* error, ...);
+BOOL Error(HWND parent, const wchar_t* error, ...);
 BOOL Error(int error, ...);
 // BOOL ErrorL(int lastError, HWND parent, int error, ...);
 BOOL ErrorL(int lastError, int error, ...);
@@ -94,7 +94,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) { ; }
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) { ; }
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -116,4 +116,4 @@ public:
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);

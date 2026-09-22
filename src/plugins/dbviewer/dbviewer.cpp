@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -12,9 +12,15 @@
 #include "dialogs.h"
 #include "dbviewer.h"
 #include "auxtools.h"
+#include "widefind.h"
+#include "common/Win32TextCodec.h"
+#include "common/LegacyLogFontImport.h"
+
+#define DBVIEWER_WIDEN2(x) L##x
+#define DBVIEWER_WIDEN(x) DBVIEWER_WIDEN2(x)
 
 // untranslated plugin name (used before the language module is loaded + for debug cases where translation would be harmful)
-const char* READABLE_EN_PLUGIN_NAME = "Database Viewer";
+const wchar_t* READABLE_EN_PLUGIN_NAME = L"Database Viewer";
 
 /*
 TODO: enabler sketch; Salamander needs to implement the offset method (enablersOffset)
@@ -46,31 +52,36 @@ CSalamanderGUIAbstract* SalamanderGUI = NULL;
 CWindowQueue ViewerWindowQueue("DBViewer Viewers"); // list of all viewer windows
 CThreadQueue ThreadQueue("DBViewer Viewers");       // list of all window threads
 
-#define CURRENT_CONFIG_VERSION 0
-const char* CONFIG_VERSION = "Version";
-const char* CONFIG_USECUSTOMFONT = "Use Custom Font";
-const char* CONFIG_LOGFONT = "LogFont";
-const char* CONFIG_SAVEPOS = "SavePosition";
-const char* CONFIG_WNDPLACEMENT = "WindowPlacement";
-const char* CONFIG_AUTOSELECT = "Auto Select";
-const char* CONFIG_DEFAULT_CODING = "Default Coding";
-const char* CONFIG_CSV_TEXTQUALIFIER = "CSV Text Qualifier";
-const char* CONFIG_CSV_VALUESEPARATOR = "CSV Value Separator";
-const char* CONFIG_CSV_VALUESEPARATORCHAR = "CSV Value Separator Char";
-const char* CONFIG_CSV_FIRSTROW = "CSV First Row As Name";
-const char* CONFIG_FINDHISTORY = "Find History";
+// Version 1 marks CONFIG_LOGFONT as holding a LOGFONTW. Version 0 (and anything written before
+// the value existed) holds the 60-byte LOGFONTA every narrow release persisted; the two layouts
+// differ in size and in the domain of lfFaceName, and the registry reader accepts the shorter
+// value silently, so the version is the only thing that tells them apart.
+#define CURRENT_CONFIG_VERSION 1
+#define CONFIG_VERSION_NARROWLOGFONT 0
+const wchar_t* CONFIG_VERSION = L"Version";
+const wchar_t* CONFIG_USECUSTOMFONT = L"Use Custom Font";
+const wchar_t* CONFIG_LOGFONT = L"LogFont";
+const wchar_t* CONFIG_SAVEPOS = L"SavePosition";
+const wchar_t* CONFIG_WNDPLACEMENT = L"WindowPlacement";
+const wchar_t* CONFIG_AUTOSELECT = L"Auto Select";
+const wchar_t* CONFIG_DEFAULT_CODING = L"Default Coding";
+const wchar_t* CONFIG_CSV_TEXTQUALIFIER = L"CSV Text Qualifier";
+const wchar_t* CONFIG_CSV_VALUESEPARATOR = L"CSV Value Separator";
+const wchar_t* CONFIG_CSV_VALUESEPARATORCHAR = L"CSV Value Separator Char";
+const wchar_t* CONFIG_CSV_FIRSTROW = L"CSV First Row As Name";
+const wchar_t* CONFIG_FINDHISTORY = L"Find History";
 
-const char* PLUGIN_NAME = "DBVIEWER"; // plugin name required by WinLib
+const wchar_t* PLUGIN_NAME = L"DBVIEWER"; // plugin name required by WinLib
 
 // Configuration variables
 
-int ConfigVersion = 0;         // ConfigVersion: 0 - default,
+int ConfigVersion = 0;         // ConfigVersion: 0 - narrow CfgLogFont (LOGFONTA), 1 - wide CfgLogFont
 BOOL CfgUseCustomFont = FALSE; // TRUE - use the font defined by CfgLogFont, FALSE - default font
 LOGFONT CfgLogFont;
 BOOL CfgSavePosition = FALSE;
 WINDOWPLACEMENT CfgWindowPlacement;
 BOOL CfgAutoSelect = TRUE;
-char CfgDefaultCoding[210];
+std::wstring CfgDefaultCoding;
 CCSVConfig CfgDefaultCSV;
 
 #define IDX_TB_ROWNUMBER -3
@@ -241,12 +252,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 //
 // ****************************************************************************
-// LoadStr
+// LangStr
 //
 
-char* LoadStr(int resID)
+// Wide - SalGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SalGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalGeneral, HLanguage, resID);
 }
 
 void WINAPI HTMLHelpCallback(HWND hWindow, UINT helpID)
@@ -275,16 +287,12 @@ BOOL InitViewer()
 
     CfgSavePosition = FALSE;
     CfgWindowPlacement.length = 0;
-    CfgDefaultCoding[0] = 0;
+    CfgDefaultCoding.clear();
 
     CfgDefaultCSV.TextQualifier = 0;  // Auto-Select
     CfgDefaultCSV.ValueSeparator = 0; // Auto-Select
     CfgDefaultCSV.ValueSeparatorChar = 0;
     CfgDefaultCSV.FirstRowAsName = 0; // Auto-Select
-
-    int i;
-    for (i = 0; i < FIND_HISTORY_SIZE; i++)
-        FindHistory[i] = NULL;
 
     int j;
     for (j = 0; j < 256; j++)
@@ -295,18 +303,13 @@ BOOL InitViewer()
 
     if (!InitializeWinLib(PLUGIN_NAME, DLLInstance))
         return FALSE;
-    SetWinLibStrings("Invalid number!", PLUGIN_NAME);
+    SetWinLibStrings(L"Invalid number!", PLUGIN_NAME);
     SetupWinLibHelp(HTMLHelpCallback);
     return TRUE;
 }
 
 void ReleaseViewer()
 {
-    int i;
-    for (i = 0; i < FIND_HISTORY_SIZE; i++)
-        if (FindHistory[i] != NULL)
-            free(FindHistory[i]);
-
     ReleaseWinLib(DLLInstance);
 }
 
@@ -337,9 +340,9 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin targets the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   READABLE_EN_PLUGIN_NAME, MB_OK | MB_ICONERROR);
+        MessageBoxW(salamander->GetParentWindow(),
+                    DBVIEWER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    READABLE_EN_PLUGIN_NAME, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
@@ -352,7 +355,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalGeneral = salamander->GetSalamanderGeneral();
 
     // set the help file name
-    SalGeneral->SetHelpFileName("dbviewer.chm");
+    SalGeneral->SetHelpFileName(L"dbviewer.chm");
 
     // obtain the interface that provides customized Windows controls used in Salamander
     SalamanderGUI = salamander->GetSalamanderGUI();
@@ -361,15 +364,15 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL; // error
 
     // set the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION | FUNCTION_VIEWER |
                                        FUNCTION_CONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "DBVIEWER");
+                                   DBVIEWER_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+                                   DBVIEWER_WIDEN(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"DBVIEWER");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -381,13 +384,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void DBFViewAbout(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls " DBVIEWER_WIDEN(VERSINFO_VERSION) L"\n\n" DBVIEWER_WIDEN(VERSINFO_COPYRIGHT) L"\n\n%ls",
+        SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
+        SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str());
+    SalGeneral->SalMessageBox(parent, text.c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void CPluginInterface::About(HWND parent)
@@ -398,7 +399,7 @@ void CPluginInterface::About(HWND parent)
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
 {
     BOOL ret = ViewerWindowQueue.Empty();
-    if (!ret && (force || MessageBox(parent, LoadStr(IDS_OPENED_WINDOWS), LoadStr(IDS_PLUGINNAME),
+    if (!ret && (force || SalGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_OPENED_WINDOWS).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                      MB_YESNO | MB_ICONQUESTION) == IDYES))
     {
         ret = ViewerWindowQueue.CloseAllWindows(force) || force;
@@ -416,15 +417,8 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 void CPluginInterface::ClearHistory(HWND parent)
 {
     ViewerWindowQueue.BroadcastMessage(WM_USER_CLEARHISTORY, 0, 0);
-    int i;
-    for (i = 0; i < FIND_HISTORY_SIZE; i++)
-    {
-        if (FindHistory[i] != NULL)
-        {
-            free(FindHistory[i]);
-            FindHistory[i] = NULL;
-        }
-    }
+    for (std::wstring& entry : FindHistory)
+        entry.clear();
 }
 
 void CPluginInterface::Event(int event, DWORD param)
@@ -439,35 +433,20 @@ void CPluginInterface::Event(int event, DWORD param)
 
 // ****************************************************************************
 
-BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
+BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const wchar_t* name,
+                 sally::dbviewer::FindHistoryEntries& history)
 {
     HKEY historyKey;
-    int i;
-    for (i = 0; i < maxCount; i++)
-        if (history[i] != NULL)
-        {
-            free(history[i]);
-            history[i] = NULL;
-        }
+    for (std::wstring& entry : history)
+        entry.clear();
     if (registry->OpenKey(hKey, name, historyKey))
     {
-        char buf[10];
-        int j;
-        for (j = 0; j < maxCount; j++)
+        wchar_t buf[10];
+        for (size_t i = 0; i < history.size(); ++i)
         {
-            _itoa(j + 1, buf, 10);
-            DWORD bufferSize;
-            if (registry->GetSize(historyKey, buf, REG_SZ, bufferSize))
-            {
-                history[j] = (char*)malloc(bufferSize);
-                if (history[j] == NULL)
-                {
-                    TRACE_E("Low memory");
-                    break;
-                }
-                if (!registry->GetValue(historyKey, buf, REG_SZ, history[j], bufferSize))
-                    break;
-            }
+            _itow_s(static_cast<int>(i + 1), buf, _countof(buf), 10);
+            if (!SPLRegistryGetStringOwned(registry, historyKey, buf, history[i]))
+                break;
         }
         registry->CloseKey(historyKey);
     }
@@ -476,7 +455,8 @@ BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* n
 
 // ****************************************************************************
 
-BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
+BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const wchar_t* name,
+                 const sally::dbviewer::FindHistoryEntries& history)
 {
     HKEY historyKey;
     if (registry->CreateKey(hKey, name, historyKey))
@@ -487,14 +467,13 @@ BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* n
         SalGeneral->GetConfigParameter(SALCFG_SAVEHISTORY, &saveHistory, sizeof(BOOL), NULL);
         if (saveHistory)
         {
-            char buf[10];
-            int i;
-            for (i = 0; i < maxCount; i++)
+            wchar_t buf[10];
+            for (size_t i = 0; i < history.size(); ++i)
             {
-                if (history[i] != NULL)
+                if (!history[i].empty())
                 {
-                    _itoa(i + 1, buf, 10);
-                    registry->SetValue(historyKey, buf, REG_SZ, history[i], (DWORD)strlen(history[i]) + 1);
+                    _itow_s(static_cast<int>(i + 1), buf, _countof(buf), 10);
+                    SPLRegistrySetString(registry, historyKey, buf, history[i]);
                 }
                 else
                     break;
@@ -512,25 +491,35 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     {
         if (!registry->GetValue(regKey, CONFIG_VERSION, REG_DWORD, &ConfigVersion, sizeof(DWORD)))
         {
-            ConfigVersion = CURRENT_CONFIG_VERSION; // probably some rascal... ;-)
+            // No version at all. Assume the older layout: mis-reading a wide font as narrow only
+            // costs the custom font, while mis-reading a narrow one as wide installs mojibake.
+            ConfigVersion = CONFIG_VERSION_NARROWLOGFONT;
         }
         registry->GetValue(regKey, CONFIG_USECUSTOMFONT, REG_DWORD, &CfgUseCustomFont, sizeof(DWORD));
-        registry->GetValue(regKey, CONFIG_LOGFONT, REG_BINARY, &CfgLogFont, sizeof(LOGFONT));
+        if (ConfigVersion <= CONFIG_VERSION_NARROWLOGFONT)
+        { // written by a narrow release - convert instead of reinterpreting the bytes
+            LOGFONTA legacyLogFont;
+            memset(&legacyLogFont, 0, sizeof(legacyLogFont));
+            if (registry->GetValue(regKey, CONFIG_LOGFONT, REG_BINARY, &legacyLogFont, sizeof(legacyLogFont)))
+                ImportLegacyLogFont(legacyLogFont, CfgLogFont); // keeps the default font on failure
+        }
+        else
+            registry->GetValue(regKey, CONFIG_LOGFONT, REG_BINARY, &CfgLogFont, sizeof(LOGFONT));
         registry->GetValue(regKey, CONFIG_SAVEPOS, REG_DWORD, &CfgSavePosition, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_WNDPLACEMENT, REG_BINARY, &CfgWindowPlacement, sizeof(WINDOWPLACEMENT));
         registry->GetValue(regKey, CONFIG_AUTOSELECT, REG_DWORD, &CfgAutoSelect, sizeof(DWORD));
-        registry->GetValue(regKey, CONFIG_DEFAULT_CODING, REG_SZ, &CfgDefaultCoding, 210);
+        SPLRegistryGetStringOwned(registry, regKey, CONFIG_DEFAULT_CODING, CfgDefaultCoding);
 
         registry->GetValue(regKey, CONFIG_CSV_TEXTQUALIFIER, REG_DWORD, &CfgDefaultCSV.TextQualifier, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_CSV_VALUESEPARATOR, REG_DWORD, &CfgDefaultCSV.ValueSeparator, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_CSV_VALUESEPARATORCHAR, REG_DWORD, &CfgDefaultCSV.ValueSeparatorChar, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_CSV_FIRSTROW, REG_DWORD, &CfgDefaultCSV.FirstRowAsName, sizeof(DWORD));
 
-        LoadHistory(registry, regKey, CONFIG_FINDHISTORY, FindHistory, FIND_HISTORY_SIZE);
+        LoadHistory(registry, regKey, CONFIG_FINDHISTORY, FindHistory);
     }
     else // default configuration
     {
-        ConfigVersion = 0;
+        ConfigVersion = CURRENT_CONFIG_VERSION; // the defaults are already in the current layout
     }
 }
 
@@ -543,14 +532,14 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_SAVEPOS, REG_DWORD, &CfgSavePosition, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_WNDPLACEMENT, REG_BINARY, &CfgWindowPlacement, sizeof(WINDOWPLACEMENT));
     registry->SetValue(regKey, CONFIG_AUTOSELECT, REG_DWORD, &CfgAutoSelect, sizeof(DWORD));
-    registry->SetValue(regKey, CONFIG_DEFAULT_CODING, REG_SZ, &CfgDefaultCoding, -1);
+    SPLRegistrySetString(registry, regKey, CONFIG_DEFAULT_CODING, CfgDefaultCoding);
 
     registry->SetValue(regKey, CONFIG_CSV_TEXTQUALIFIER, REG_DWORD, &CfgDefaultCSV.TextQualifier, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_CSV_VALUESEPARATOR, REG_DWORD, &CfgDefaultCSV.ValueSeparator, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_CSV_VALUESEPARATORCHAR, REG_DWORD, &CfgDefaultCSV.ValueSeparatorChar, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_CSV_FIRSTROW, REG_DWORD, &CfgDefaultCSV.FirstRowAsName, sizeof(DWORD));
 
-    SaveHistory(registry, regKey, CONFIG_FINDHISTORY, FindHistory, FIND_HISTORY_SIZE);
+    SaveHistory(registry, regKey, CONFIG_FINDHISTORY, FindHistory);
 }
 
 void OnConfiguration(HWND hParent, BOOL bFromSalamander)
@@ -559,7 +548,7 @@ void OnConfiguration(HWND hParent, BOOL bFromSalamander)
     if (InConfiguration)
     {
         SalGeneral->SalMessageBox(hParent,
-                                  LoadStr(IDS_CFG_CONFLICT), LoadStr(IDS_PLUGINNAME),
+                                  SPLLoadStrOwned(SalGeneral, HLanguage, IDS_CFG_CONFLICT).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                   MB_ICONINFORMATION | MB_OK);
         return;
     }
@@ -579,7 +568,7 @@ void CPluginInterface::Configuration(HWND parent)
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
-    salamander->AddViewer("*.csv;*.dbf", FALSE); // default (plugin installation), otherwise Salamander ignores it
+    salamander->AddViewer(L"*.csv;*.dbf", FALSE); // default (plugin installation), otherwise Salamander ignores it
 }
 
 CPluginInterfaceForViewerAbstract*
@@ -596,7 +585,7 @@ CPluginInterface::GetInterfaceForViewer()
 struct CTVData
 {
     BOOL AlwaysOnTop;
-    const char* Name;
+    const wchar_t* Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL ReturnLock;
@@ -611,12 +600,14 @@ struct CTVData
 unsigned WINAPI ViewerThreadBody(void* param)
 {
     CALL_STACK_MESSAGE1("ViewerThreadBody()");
-    SetThreadNameInVCAndTrace(READABLE_EN_PLUGIN_NAME);
+    SetThreadNameInVCAndTrace(L"Database Viewer");
     TRACE_I("Begin");
 
     CTVData* data = (CTVData*)param;
 
-    CViewerWindow* window = new CViewerWindow(data->EnumFilesSourceUID, data->EnumFilesCurrentIndex);
+    const std::wstring name = data->Name != NULL ? data->Name : L"";
+
+    CViewerWindow* window = data->Name != NULL ? new CViewerWindow(data->EnumFilesSourceUID, data->EnumFilesCurrentIndex) : NULL;
     if (window != NULL)
     {
         if (data->ReturnLock)
@@ -646,7 +637,7 @@ unsigned WINAPI ViewerThreadBody(void* param)
             }
             if (window->CreateEx(data->AlwaysOnTop ? WS_EX_TOPMOST : 0,
                                  CWINDOW_CLASSNAME2,
-                                 LoadStr(IDS_PLUGINNAME),
+                                 SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                  WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                  data->Left,
                                  data->Top,
@@ -678,8 +669,6 @@ unsigned WINAPI ViewerThreadBody(void* param)
     }
 
     CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
-    CPathBuffer name; // Heap-allocated for long path support
-    lstrcpyn(name, data->Name, name.Size());
     BOOL openFile = data->Success;
     SetEvent(data->Continue); // let the main thread continue; data is invalid from this point (=NULL)
     data = NULL;
@@ -688,18 +677,18 @@ unsigned WINAPI ViewerThreadBody(void* param)
     if (openFile)
     {
         CALL_STACK_MESSAGE1("ViewerThreadBody::OpenFile");
-        window->Renderer.OpenFile(name, TRUE);
+        window->Renderer.OpenFile(name.c_str(), TRUE);
 
         CALL_STACK_MESSAGE1("ViewerThreadBody::message-loop");
         // message loop
         MSG msg;
-        while (GetMessage(&msg, NULL, 0, 0))
+        while (GetMessageW(&msg, NULL, 0, 0))
         {
             if ((!window->IsMenuBarMessage(&msg)) &&
                 (!TranslateAccelerator(window->HWindow, HAccel, &msg)))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
     }
@@ -710,7 +699,7 @@ unsigned WINAPI ViewerThreadBody(void* param)
     return 0;
 }
 
-BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, int width, int height,
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                          UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                          BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
@@ -809,7 +798,7 @@ BOOL CViewerWindow::ReleaseGraphics()
 
 BOOL CViewerWindow::FillToolBar()
 {
-    char emptyBuff[] = "";
+    wchar_t emptyBuff[] = L"";
     TLBI_ITEM_INFO2 tii;
     tii.Mask = TLBI_MASK_IMAGEINDEX | TLBI_MASK_ID | TLBI_MASK_ENABLER | TLBI_MASK_STYLE;
 
@@ -895,9 +884,8 @@ BOOL CViewerWindow::InitCodingSubmenu()
 
     int index = 0;
     int menuIndex = 1;
-    const char *name, *table;
-    char buff[1000];
-    mi.String = buff;
+    const wchar_t* name;
+    const char* table;
     mi.Enabler = &Enablers[vweUncertainEncoding];
     while (SalGeneral->EnumConversionTables(HWindow, &index, &name, &table))
     {
@@ -905,13 +893,13 @@ BOOL CViewerWindow::InitCodingSubmenu()
         {
             mi.ID = 0;
             mi.Type = MENU_TYPE_SEPARATOR;
-            buff[0] = 0;
+            mi.String = const_cast<wchar_t*>(L"");
         }
         else
         {
             mi.ID = CM_CODING_FIRST + menuIndex;
             mi.Type = MENU_TYPE_STRING;
-            lstrcpyn(buff, name, 1000);
+            mi.String = const_cast<wchar_t*>(name);
             menuIndex++;
         }
         popup->InsertItem(2 + index, TRUE, &mi);
@@ -920,16 +908,16 @@ BOOL CViewerWindow::InitCodingSubmenu()
     return TRUE;
 }
 
-int CViewerWindow::GetCodingMenuIndex(const char* coding)
+int CViewerWindow::GetCodingMenuIndex(const std::wstring& coding)
 {
     int index = 0;
-    const char* name;
+    const wchar_t* name;
     int menuIndex = 1;
     while (SalGeneral->EnumConversionTables(HWindow, &index, &name, NULL))
     {
         if (name != NULL)
         {
-            if (lstrcmpi(name, coding) == 0)
+            if (lstrcmpiW(name, coding.c_str()) == 0)
                 return menuIndex;
             menuIndex++;
         }
@@ -937,7 +925,7 @@ int CViewerWindow::GetCodingMenuIndex(const char* coding)
     return 0; // none
 }
 
-int CViewerWindow::GetNextCodingMenuIndex(const char* coding, BOOL next)
+int CViewerWindow::GetNextCodingMenuIndex(const std::wstring& coding, BOOL next)
 {
     int menuIndex = GetCodingMenuIndex(coding);
     if (next)
@@ -953,10 +941,35 @@ int CViewerWindow::GetNextCodingMenuIndex(const char* coding, BOOL next)
     return menuIndex;
 }
 
+BOOL GetConversionMenuText(CGUIMenuPopupAbstract* popup, int command, std::wstring& conversion)
+{
+    MENU_ITEM_INFO mii = {};
+    mii.Mask = MENU_MASK_STRING;
+    mii.String = NULL;
+    mii.StringLen = 0;
+    if (!popup->GetItemInfo(command, FALSE, &mii))
+        return FALSE;
+    try
+    {
+        std::wstring buffer(static_cast<size_t>(mii.StringLen) + 1, L'\0');
+        mii.String = buffer.data();
+        mii.StringLen++;
+        if (!popup->GetItemInfo(command, FALSE, &mii))
+            return FALSE;
+        buffer.resize(wcslen(buffer.c_str()));
+        conversion.swap(buffer);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
 void CViewerWindow::OnFind(WORD command)
 {
-    if (command == CM_FIND || FindDialog.Text[0] == 0)
-        if (FindDialog.Execute() != IDOK || FindDialog.Text[0] == 0)
+    if (command == CM_FIND || FindDialog.Text.empty())
+        if (FindDialog.Execute() != IDOK || FindDialog.Text.empty())
             return;
 
     BOOL forward = (command != CM_FIND_PREV) ^ (!FindDialog.Forward);
@@ -964,31 +977,72 @@ void CViewerWindow::OnFind(WORD command)
     if (FindDialog.CaseSensitive)
         flags |= SASF_CASESENSITIVE;
 
+    // A Unicode database is searched as UTF-8, because ANSI cannot represent every cell
+    // (and the whole cell would then be unsearchable). The rule itself lives in widefind
+    // so it is stated once and can be tested without the plugin host.
+    const bool utf8Regexp =
+        sally::dbviewer::ChooseFindTextDomain(FindDialog.Regular != FALSE,
+                                              Renderer.Database.GetIsUnicode() != FALSE) ==
+        sally::dbviewer::FindTextDomain::Utf8Bytes;
+    const UINT patternCodePage = utf8Regexp ? CP_UTF8 : CP_ACP;
+
+    std::string encodedPattern;
+    if (FindDialog.Regular || !Renderer.Database.GetIsUnicode())
+    {
+        const Win32TextConversionResult conversion =
+            Win32EncodeText(patternCodePage, FindDialog.Text, encodedPattern);
+        if (!conversion)
+        {
+            const std::wstring errorText = SPLGetErrorTextOwned(SalGeneral, conversion.Win32Error);
+            SalGeneral->SalMessageBox(HWindow, errorText.c_str(),
+                                      SPLLoadStrOwned(SalGeneral, HLanguage, IDS_FIND).c_str(),
+                                      MB_ICONEXCLAMATION);
+            return;
+        }
+    }
+
     if (FindDialog.Regular)
     {
         CSalamanderREGEXPSearchData* regexp = SalGeneral->AllocSalamanderREGEXPSearchData();
         if (regexp != NULL)
         {
-            if (regexp->Set(FindDialog.Text, flags))
+            if (regexp->Set(encodedPattern.c_str(), utf8Regexp ? (flags | SASF_UTF8) : flags))
             {
-                Renderer.Find(forward, FindDialog.WholeWords, NULL, regexp);
+                Renderer.Find(forward, FindDialog.WholeWords, FindDialog.CaseSensitive,
+                              utf8Regexp ? CRendererWindow::FindMode::Utf8RegularExpression
+                                         : CRendererWindow::FindMode::EncodedRegularExpression,
+                              FindDialog.Text, NULL, regexp);
             }
             else // error - invalid regular expression (mismatched parentheses, etc.) or out of memory
             {
-                SalGeneral->SalMessageBox(HWindow, regexp->GetLastErrorText(),
-                                          LoadStr(IDS_REGEXP_ERROR), MB_ICONEXCLAMATION);
+                const char* error = regexp->GetLastErrorText();
+                std::wstring errorText;
+                if (error == NULL || !Win32DecodeText(CP_ACP, error, strlen(error), errorText))
+                    errorText = SPLGetErrorTextOwned(SalGeneral, ERROR_NO_UNICODE_TRANSLATION);
+                SalGeneral->SalMessageBox(HWindow, errorText.c_str(),
+                                          SPLLoadStrOwned(SalGeneral, HLanguage, IDS_REGEXP_ERROR).c_str(), MB_ICONEXCLAMATION);
             }
             SalGeneral->FreeSalamanderREGEXPSearchData(regexp);
         }
     }
     else
     {
+        if (Renderer.Database.GetIsUnicode())
+        {
+            Renderer.Find(forward, FindDialog.WholeWords, FindDialog.CaseSensitive,
+                          CRendererWindow::FindMode::WideLiteral, FindDialog.Text,
+                          NULL, NULL);
+            return;
+        }
+
         CSalamanderBMSearchData* bm = SalGeneral->AllocSalamanderBMSearchData();
         if (bm != NULL)
         {
-            bm->Set(FindDialog.Text, flags);
+            bm->Set(encodedPattern.c_str(), flags);
             if (bm->IsGood())
-                Renderer.Find(forward, FindDialog.WholeWords, bm, NULL);
+                Renderer.Find(forward, FindDialog.WholeWords, FindDialog.CaseSensitive,
+                              CRendererWindow::FindMode::EncodedLiteral,
+                              FindDialog.Text, bm, NULL);
             SalGeneral->FreeSalamanderBMSearchData(bm);
         }
     }
@@ -1017,20 +1071,20 @@ void CViewerWindow::UpdateEnablers()
     Enablers[vweMoreBookmarks] = Enablers[vweDBOpened] && Renderer.GetBookmarkCount() > 0;
     Enablers[vweUncertainEncoding] = !Renderer.Database.GetIsUnicode();
 
-    LPCTSTR FileName = Renderer.Database.GetFileName();
+    const wchar_t* openedFileName = Renderer.Database.GetFileName();
+    if (openedFileName == NULL)
+        openedFileName = L"";
 
     if (IsWindowVisible(HWindow))
     {
         BOOL srcBusy, noMoreFiles;
-        TCHAR fileName[MAX_PATH] = _T("");
-        LPCTSTR openedFileName = FileName;
+        std::wstring fileName;
         int enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
 
-        BOOL ok = SalGeneral->GetPreviousFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                           &enumFilesCurrentIndex,
-                                                           openedFileName, FALSE,
-                                                           TRUE, fileName, &noMoreFiles,
-                                                           &srcBusy);
+        BOOL ok = SPLGetAdjacentFileNameForViewerOwned(
+            SalGeneral, TRUE, Renderer.EnumFilesSourceUID,
+            &enumFilesCurrentIndex, openedFileName, FALSE, TRUE, fileName,
+            &noMoreFiles, &srcBusy);
         Enablers[vwePrevFile] = ok || srcBusy;                 // only if there is a previous file (or Salamander is busy, so the user must try later)
         Enablers[vweFirstFile] = ok || srcBusy || noMoreFiles; // jumping to the first or last file works only if the source connection persists (or Salamander is busy, so the user must try later)
 
@@ -1038,23 +1092,22 @@ void CViewerWindow::UpdateEnablers()
         { // if the source connection is missing, there is no point in asking for more details
             // check whether a previous selected file exists
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
-            ok = SalGeneral->GetPreviousFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                          &enumFilesCurrentIndex,
-                                                          openedFileName,
-                                                          TRUE /* prefer selected */, TRUE,
-                                                          fileName, &noMoreFiles,
-                                                          &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalGeneral, TRUE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileName,
+                TRUE /* prefer selected */, TRUE, fileName, &noMoreFiles,
+                &srcBusy);
             BOOL isSrcFileSel = FALSE;
             if (ok)
             {
                 ok = SalGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                              enumFilesCurrentIndex,
-                                                             fileName, &isSrcFileSel,
+                                                             fileName.c_str(), &isSrcFileSel,
                                                              &srcBusy);
             }
             Enablers[vwePrevSelFile] = ok && isSrcFileSel || srcBusy; // only if the previous file is actually selected (or Salamander is busy, so the user must try later)
 
-            if (FileName && (*FileName != '<'))
+            if (openedFileName && (*openedFileName != L'<'))
             {
                 //           ok = SalGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                 //                                                            Renderer.EnumFilesCurrentIndex,
@@ -1068,29 +1121,27 @@ void CViewerWindow::UpdateEnablers()
                 IsSrcFileSelected = FALSE;
             }
 
-            fileName[0] = 0;
+            fileName.clear();
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
-            ok = SalGeneral->GetNextFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                      &enumFilesCurrentIndex,
-                                                      openedFileName, FALSE,
-                                                      TRUE, fileName, &noMoreFiles,
-                                                      &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalGeneral, FALSE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileName, FALSE, TRUE, fileName,
+                &noMoreFiles, &srcBusy);
             Enablers[vweNextFile] = ok || srcBusy; // only if there is another file (or Salamander is busy, so the user must try later)
 
             // check whether the next file is selected or no selected files remain
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
-            ok = SalGeneral->GetNextFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                      &enumFilesCurrentIndex,
-                                                      openedFileName,
-                                                      TRUE /* prefer selected */, TRUE,
-                                                      fileName, &noMoreFiles,
-                                                      &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalGeneral, FALSE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileName,
+                TRUE /* prefer selected */, TRUE, fileName, &noMoreFiles,
+                &srcBusy);
             isSrcFileSel = FALSE;
             if (ok)
             {
                 ok = SalGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                              enumFilesCurrentIndex,
-                                                             fileName, &isSrcFileSel,
+                                                             fileName.c_str(), &isSrcFileSel,
                                                              &srcBusy);
             }
             Enablers[vweNextSelFile] = ok && isSrcFileSel || srcBusy; // only if the next file is actually selected (or Salamander is busy, so the user must try later)
@@ -1122,9 +1173,9 @@ void CViewerWindow::UpdateEnablers()
 void CViewerWindow::UpdateRowNumberOnToolBar(int cur /*zero-based*/, int tot)
 {
     TLBI_ITEM_INFO2 tii;
-    TCHAR buf[50];
+    wchar_t buf[50];
 
-    _stprintf(buf, _T("%d/%d"), cur + 1, tot);
+    _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%d/%d", cur + 1, tot);
 
     tii.Mask = TLBI_MASK_TEXT;
     tii.Text = buf;
@@ -1152,7 +1203,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         RECT r;
         GetClientRect(HWindow, &r);
-        HRebar = CreateWindowEx(WS_EX_TOOLWINDOW, REBARCLASSNAME, "",
+        HRebar = CreateWindowEx(WS_EX_TOOLWINDOW, REBARCLASSNAME, L"",
                                 WS_VISIBLE | /*WS_BORDER |  */ WS_CHILD |
                                     WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
                                     RBS_VARHEIGHT | CCS_NODIVIDER |
@@ -1166,7 +1217,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         Renderer.CreateEx(WS_EX_CLIENTEDGE,
                           CWINDOW_CLASSNAME2,
-                          "",
+                          L"",
                           WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_CLIPSIBLINGS,
                           0,
                           0,
@@ -1293,7 +1344,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             GetWindowPlacement(HWindow, &CfgWindowPlacement);
         }
         CfgAutoSelect = Renderer.AutoSelect;
-        strcpy(CfgDefaultCoding, Renderer.DefaultCoding);
+        CfgDefaultCoding = Renderer.DefaultCoding;
 
         if (MenuBar != NULL)
         {
@@ -1343,7 +1394,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         BOOL dbOpened = Renderer.Database.IsOpened();
         EnableMenuItem(hMenu, CM_FIELDS, MF_BYCOMMAND | (dbOpened ? MF_ENABLED : MF_GRAYED));
         EnableMenuItem(hMenu, CM_PROPERTIES, MF_BYCOMMAND | (dbOpened ? MF_ENABLED : MF_GRAYED));
-        BOOL csvOpened = lstrcmpi(Renderer.Database.GetParserName(), "csv") == 0;
+        BOOL csvOpened = lstrcmpiA(Renderer.Database.GetParserName(), "csv") == 0;
         EnableMenuItem(hMenu, CM_CSV_OPTIONS, MF_BYCOMMAND | (csvOpened ? MF_ENABLED : MF_GRAYED));
         EnableMenuItem(hMenu, CM_COPY, MF_BYCOMMAND | (dbOpened ? MF_ENABLED : MF_GRAYED));
         EnableMenuItem(hMenu, CM_SELECT_ALL, MF_BYCOMMAND | (dbOpened ? MF_ENABLED : MF_GRAYED));
@@ -1391,8 +1442,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
-        SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
+        lstrcpynW(tt->Buffer, SPLLoadStrOwned(SalGeneral, HLanguage, ToolBarButtons[tt->Index].ToolTipResID).c_str(), TOOLTIP_TEXT_MAX);
+        SPLPrepareToolTipTextForAbiBuffer(SalamanderGUI, tt->Buffer,
+                                          TOOLTIP_TEXT_MAX, FALSE);
         return TRUE;
     }
 
@@ -1413,13 +1465,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CGUIMenuPopupAbstract* popup = MainMenu->GetSubMenu(CML_CONVERT, FALSE);
             if (popup != NULL)
             {
-                char conversion[220];
-                MENU_ITEM_INFO mii;
-                mii.Mask = MENU_MASK_STRING;
-                mii.String = conversion;
-                mii.StringLen = 220;
-                if (popup->GetItemInfo(command, FALSE, &mii))
-                    Renderer.SelectConversion(command == CM_CODING_FIRST ? NULL : conversion);
+                std::wstring conversion;
+                if (GetConversionMenuText(popup, command, conversion))
+                    Renderer.SelectConversion(command == CM_CODING_FIRST ? NULL : conversion.c_str());
             }
             return 0;
         }
@@ -1445,15 +1493,16 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CM_FILE_NEXTSELFILE:
         case CM_FILE_LAST:
         {
-            LPCTSTR FileName = Renderer.Database.GetFileName();
+            const wchar_t* openedFileName = Renderer.Database.GetFileName();
+            if (openedFileName == NULL)
+                openedFileName = L"";
 
-            if (!FileName || !*FileName || (*FileName != '<') /* || !strcmp(FileName, LoadStr(IDS_DELETED_TITLE))*/)
+            if (!openedFileName || !*openedFileName || (*openedFileName != L'<') /* || !wcscmp(openedFileName, LangStr(IDS_DELETED_TITLE).c_str())*/)
             {
                 BOOL ok = FALSE;
                 BOOL srcBusy = FALSE;
                 BOOL noMoreFiles = FALSE;
-                TCHAR fileName[MAX_PATH] = _T("");
-                LPCTSTR openedFileName = FileName;
+                std::wstring fileName;
                 int enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
 
                 if ((command == CM_FILE_PREV) || (command == CM_FILE_LAST) || (command == CM_FILE_PREVSELFILE))
@@ -1462,19 +1511,18 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         enumFilesCurrentIndex = -1;
                     }
-                    ok = SalGeneral->GetPreviousFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                                  &enumFilesCurrentIndex,
-                                                                  openedFileName,
-                                                                  command == CM_FILE_PREVSELFILE,
-                                                                  TRUE, fileName,
-                                                                  &noMoreFiles, &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalGeneral, TRUE, Renderer.EnumFilesSourceUID,
+                        &enumFilesCurrentIndex, openedFileName,
+                        command == CM_FILE_PREVSELFILE, TRUE, fileName,
+                        &noMoreFiles, &srcBusy);
                     if (ok && (command == CM_FILE_PREVSELFILE))
                     { // take only selected files
                         BOOL isSrcFileSel = FALSE;
 
                         ok = SalGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                                      enumFilesCurrentIndex,
-                                                                     fileName, &isSrcFileSel,
+                                                                     fileName.c_str(), &isSrcFileSel,
                                                                      &srcBusy);
                         if (ok && !isSrcFileSel)
                             ok = FALSE;
@@ -1486,19 +1534,18 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         enumFilesCurrentIndex = -1;
                     }
-                    ok = SalGeneral->GetNextFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                              &enumFilesCurrentIndex,
-                                                              openedFileName,
-                                                              command == CM_FILE_NEXTSELFILE,
-                                                              TRUE, fileName,
-                                                              &noMoreFiles, &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalGeneral, FALSE, Renderer.EnumFilesSourceUID,
+                        &enumFilesCurrentIndex, openedFileName,
+                        command == CM_FILE_NEXTSELFILE, TRUE, fileName,
+                        &noMoreFiles, &srcBusy);
                     if (ok && (command == CM_FILE_NEXTSELFILE))
                     { // take only selected files
                         BOOL isSrcFileSel = FALSE;
 
                         ok = SalGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                                      enumFilesCurrentIndex,
-                                                                     fileName, &isSrcFileSel,
+                                                                     fileName.c_str(), &isSrcFileSel,
                                                                      &srcBusy);
                         if (ok && !isSrcFileSel)
                             ok = FALSE;
@@ -1507,15 +1554,14 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (ok)
                 { // we've got a new name
-                    if (!openedFileName || !*openedFileName || _stricmp(fileName, openedFileName))
+                    if (!openedFileName || !*openedFileName || _wcsicmp(fileName.c_str(), openedFileName))
                     {
-
                         if (Lock != NULL)
                         {
                             SetEvent(Lock);
                             Lock = NULL; // from now on it's up to the disk cache
                         }
-                        Renderer.OpenFile(fileName, TRUE);
+                        Renderer.OpenFile(fileName.c_str(), TRUE);
                     }
                     // update the index even on failure so the user can move to the next/previous item
                     Renderer.EnumFilesCurrentIndex = enumFilesCurrentIndex;
@@ -1548,7 +1594,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_CSV_OPTIONS:
         {
-            if (lstrcmpi(Renderer.Database.GetParserName(), "csv") != 0)
+            if (lstrcmpiA(Renderer.Database.GetParserName(), "csv") != 0)
                 return 0;
             CCSVConfig oldCfg = CfgCSV;
             if (CCSVOptionsDialog(Renderer.HWindow, &CfgCSV, &CfgDefaultCSV).Execute() == IDOK)
@@ -1644,7 +1690,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             Renderer.AutoSelect = !Renderer.AutoSelect;
             if (Renderer.AutoSelect)
-                Renderer.DefaultCoding[0] = 0;
+                Renderer.DefaultCoding.clear();
             return 0;
         }
 
@@ -1655,13 +1701,9 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if ((popup != NULL) && !Renderer.Database.GetIsUnicode())
             {
                 int nextIndex = GetNextCodingMenuIndex(Renderer.Coding, command == CM_CODING_NEXT);
-                char conversion[220];
-                MENU_ITEM_INFO mii;
-                mii.Mask = MENU_MASK_STRING;
-                mii.String = conversion;
-                mii.StringLen = 220;
-                if (popup->GetItemInfo(CM_CODING_FIRST + nextIndex, FALSE, &mii))
-                    Renderer.SelectConversion(nextIndex == NULL ? NULL : conversion);
+                std::wstring conversion;
+                if (GetConversionMenuText(popup, CM_CODING_FIRST + nextIndex, conversion))
+                    Renderer.SelectConversion(nextIndex == 0 ? NULL : conversion.c_str());
             }
             return 0;
         }
@@ -1672,14 +1714,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (popup != NULL)
             {
                 int index = GetCodingMenuIndex(Renderer.Coding);
-                char conversion[220];
-                MENU_ITEM_INFO mii;
-                mii.Mask = MENU_MASK_STRING;
-                mii.String = conversion;
-                mii.StringLen = 220;
-                if (popup->GetItemInfo(CM_CODING_FIRST + index, FALSE, &mii))
+                std::wstring conversion;
+                if (GetConversionMenuText(popup, CM_CODING_FIRST + index, conversion))
                 {
-                    strcpy(Renderer.DefaultCoding, index == 0 ? "" : conversion);
+                    if (index == 0)
+                        Renderer.DefaultCoding.clear();
+                    else
+                        Renderer.DefaultCoding = std::move(conversion);
                     Renderer.AutoSelect = FALSE;
                 }
             }

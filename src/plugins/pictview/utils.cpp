@@ -148,8 +148,17 @@ BOOL SalGetFullName(LPTSTR name, int* errTextID, LPCTSTR curDir)
 
     if (err == 0) // remove '.' and '..' from the path
     {
-        if (!SalamanderGeneral->SalRemovePointsFromPath(s))
+        std::wstring normalized = ToWideArg(s);
+        if (!SPLSalRemovePointsFromPathOwned(SalamanderGeneral, normalized, 0))
             err = GFN_PATHISINVALID;
+        else
+        {
+            std::string projected;
+            if (!WideToLegacyTextExact(normalized.c_str(), projected))
+                err = GFN_PATHISINVALID;
+            else
+                memcpy(s, projected.c_str(), projected.size() + 1);
+        }
     }
 
     if (err == 0) // remove any undesired trailing backslash from the end of the string

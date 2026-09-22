@@ -178,7 +178,7 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
     int dmy;
     char method[METHOD_TYPE_STRAGE];
 
-    ZeroMemory(lpHeader, sizeof(LHA_HEADER));
+    *lpHeader = LHA_HEADER{};
 
     if (((header_size = fgetc(fp)) == EOF) || (header_size == 0))
     {
@@ -233,9 +233,9 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
             return GH_ERROR;
         }
         name_length = get_byte();
+        lpHeader->name.resize(static_cast<size_t>(name_length));
         for (i = 0; i < name_length; i++)
             lpHeader->name[i] = (char)get_byte();
-        lpHeader->name[name_length] = '\0';
     }
     else
     {
@@ -353,7 +353,7 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
         ptr = get_ptr;
         while ((header_size = get_word()) != 0)
         {
-            if (header_size > 500 ||
+            if (header_size < 3 || header_size > 500 ||
                 (lpHeader->header_level != 2 &&
                  ((data + LZHEADER_STRAGE - get_ptr < header_size) ||
                   (int)fread(get_ptr, sizeof(char), header_size, fp) < header_size)))
@@ -368,10 +368,10 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
                 /*
            * filename
            */
-                for (i = 0; i < header_size - 3; i++)
-                    lpHeader->name[i] = (char)get_byte();
-                lpHeader->name[header_size - 3] = '\0';
                 name_length = header_size - 3;
+                lpHeader->name.resize(static_cast<size_t>(name_length));
+                for (i = 0; i < name_length; i++)
+                    lpHeader->name[i] = (char)get_byte();
                 break;
             case 2:
                 /*
@@ -432,22 +432,21 @@ int LHAGetHeader(FILE* fp, LHA_HEADER* lpHeader)
     case EXTEND_UNIX:
         break;
     case EXTEND_MACOS:
-        macos_to_unix_filename(lpHeader->name, name_length);
+        macos_to_unix_filename(lpHeader->name.data(), name_length);
         /* macos_to_unix_filename(dirname, dir_length); */ // ????
         break;
     default:
-        generic_to_unix_filename(lpHeader->name, name_length);
+        generic_to_unix_filename(lpHeader->name.data(), name_length);
         generic_to_unix_filename(dirname, dir_length);
     }
 
     if (dir_length)
     {
-        strcat(dirname, lpHeader->name);
-        strcpy(lpHeader->name, dirname);
-        name_length += dir_length;
+        std::string fullName(dirname, static_cast<size_t>(dir_length));
+        fullName.append(lpHeader->name);
+        lpHeader->name.swap(fullName);
+        name_length = static_cast<int>(lpHeader->name.size());
     }
-
-    OemToChar(lpHeader->name, lpHeader->name); // Czech characters ... :-)
 
     for (i = 0;; i++)
         if (lha_methods[i] == NULL)
@@ -479,18 +478,16 @@ static int iProgress;
 ////////////////////////////////////////////////////////////////////////////////////////
 // BUFFERED OUTPUT /////////////////////////////////////////////////////////////////////
 
-static char* outputFileName;
+static const wchar_t* outputFileName;
 
 BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten)
 {
     while (!WriteFile(hFile, lpBuffer, nBytesToWrite, pnBytesWritten, NULL))
     {
         int lastErr = GetLastError();
-        char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
-        if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, outputFileName, error,
-                                           LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
+        const std::wstring error = SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
+        if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, outputFileName, error.c_str(),
+                                           LangStr(IDS_WRITEERROR).c_str()) != DIALOG_RETRY)
             return FALSE;
     }
     return TRUE;
@@ -1729,7 +1726,7 @@ static int copyfile(FILE* infile2, HANDLE outfile2, int size)
 ////////////////////////////////////////////////////////////////////////////////////////
 // EXTRACT.C ///////////////////////////////////////////////////////////////////////////
 
-BOOL LHAUnpackFile(FILE* infile, HANDLE outfile, LHA_HEADER* lpHeader, int* CRC, char* fileName)
+BOOL LHAUnpackFile(FILE* infile, HANDLE outfile, LHA_HEADER* lpHeader, int* CRC, const wchar_t* fileName)
 {
     CALL_STACK_MESSAGE1("LHAUnpackFile( , , , )");
 
@@ -1807,11 +1804,11 @@ void LHAInit()
 
 #define MAXSFXCODE 1024 * 64
 
-int LHAOpenArchive(FILE*& f, LPCTSTR lpName)
+int LHAOpenArchive(FILE*& f, const wchar_t* lpName)
 {
-    CALL_STACK_MESSAGE2("LHAOpenArchive( , %s)", lpName);
+    CALL_STACK_MESSAGE2("LHAOpenArchive( , %ls)", lpName);
 
-    if ((f = fopen(lpName, "rb")) == NULL)
+    if ((f = _wfopen(lpName, L"rb")) == NULL)
     {
         iLHAErrorStrId = IDS_OPENERROR;
         return FALSE;
@@ -1873,7 +1870,6 @@ int LHAOpenArchive(FILE*& f, LPCTSTR lpName)
 // everything is fine :-)
 //
 // Call it like this:
-// char path[MAX_PATH] = "c:";
 // TestLHAOpenArchive(path);
 
 /*void TestLHAOpenArchive(char* path)

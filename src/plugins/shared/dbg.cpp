@@ -11,6 +11,8 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "plugin_narrow_compat.h"
+#include <new>
 //#include <windows.h>
 //#include <commctrl.h>
 #ifdef _MSC_VER
@@ -131,11 +133,30 @@ BOOL __CallStk_T = TRUE;
 
 #include "spl_base.h"
 #include "dbg.h"
+#include "plugin_text_encoding.h"
 
 #pragma warning(disable : 4074)
 #pragma init_seg(compiler)
 
-C__Trace __Trace;
+// See the comment on GetTrace()'s declaration in dbg.h. Function-local static, not
+// a plain global - safer than relying on #pragma init_seg(compiler) above (which only orders
+// this TU's own "compiler" segment against other segments, not against every other global
+// object's constructor everywhere), and construction-on-first-use makes ordering moot entirely.
+C__Trace& GetTrace()
+{
+    static C__Trace trace;
+    return trace;
+}
+
+// See IsTraceAlive()'s declaration in dbg.h. Must flip before Disconnect-
+// equivalent teardown (there isn't one here, just DeleteCriticalSection) so a caller checking
+// IsTraceAlive() from another singleton's destructor never observes a half-torn-down object.
+static bool s_TraceAlive = true;
+
+bool IsTraceAlive()
+{
+    return s_TraceAlive;
+}
 
 // ****************************************************************************
 //
@@ -145,33 +166,12 @@ C__Trace __Trace;
 CWStr::CWStr(const char* s)
 {
     IsOK = TRUE;
+    OwnsStr = FALSE;
     Str = NULL;
-    if (s == NULL)
-        AllocBuf = NULL;
-    else
+    if (s != NULL)
     {
-        IsOK = FALSE;
-        int len = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
-        if (len == 0)
-            AllocBuf = NULL; // MultiByteToWideChar failed
-        else
-        {
-            AllocBuf = (WCHAR*)malloc(len * sizeof(WCHAR));
-            if (AllocBuf != NULL)
-            {
-                int res = MultiByteToWideChar(CP_ACP, 0, s, -1, AllocBuf, len);
-                if (res > 0 && res <= len)
-                {
-                    AllocBuf[res - 1] = 0; // success, ensure zero terminated string
-                    IsOK = TRUE;
-                }
-                else // MultiByteToWideChar failed
-                {
-                    free(AllocBuf);
-                    AllocBuf = NULL;
-                }
-            }
-        }
+        OwnsStr = TRUE;
+        IsOK = sally::plugin_text::DecodeAcp(s, OwnedStr) ? TRUE : FALSE;
     }
 }
 
@@ -187,6 +187,7 @@ C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceSt
 
 C__Trace::~C__Trace()
 {
+    s_TraceAlive = false;
     DeleteCriticalSection(&CriticalSection);
 }
 
@@ -210,7 +211,7 @@ C__Trace::SetInfoW(const WCHAR* file, int line)
 
 struct C__TraceMsgBoxThreadData
 {
-    char* Msg;        // allocated message text
+    const char* Msg;  // owned by SendMessageToServer until the thread joins
     const char* File; // just a reference to a static string
     int Line;
 };
@@ -222,25 +223,32 @@ struct C__TraceMsgBoxThreadData
 DWORD WINAPI __TraceMsgBoxThread(void* param)
 {
     C__TraceMsgBoxThreadData* data = (C__TraceMsgBoxThreadData*)param;
-    char msg[1000];
-    wsprintf(msg, "TRACE_C message received!\n\n"
-                  "File: %s\n"
-                  "Line: %d\n\n"
-                  "Message: ",
-             data->File, data->Line);
-    const char* appendix = "\n\nTRACE_C message means that fatal error has occured. "
-                           "Application will be crashed by \"access violation\" exception after "
-                           "clicking OK. Please send us bug report to help us fix this problem. "
-                           "If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpyn(msg + (int)strlen(msg), data->Msg, _countof(msg) - (int)strlen(msg) - (int)strlen(appendix));
-    lstrcpyn(msg + (int)strlen(msg), appendix, _countof(msg) - (int)strlen(msg));
-    MessageBox(NULL, msg, "Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    try
+    {
+        std::wstring msg = L"TRACE_C message received!\n\nFile: ";
+        msg += ToWideArg(data->File);
+        msg += L"\nLine: ";
+        msg += std::to_wstring(data->Line);
+        msg += L"\n\nMessage: ";
+        msg += ToWideArg(data->Msg);
+        msg += L"\n\nTRACE_C message means that fatal error has occured. "
+               L"Application will be crashed by \"access violation\" exception after "
+               L"clicking OK. Please send us bug report to help us fix this problem. "
+               L"If you want to copy this message to clipboard, use Ctrl+C key.";
+        MessageBoxW(NULL, msg.c_str(), L"Debug Message",
+                    MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
+    catch (...)
+    {
+        MessageBoxW(NULL, L"Unable to allocate the fatal trace diagnostic.",
+                    L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
     return 0;
 }
 
 struct C__TraceMsgBoxThreadDataW
 {
-    WCHAR* Msg;        // allocated message text
+    const WCHAR* Msg;  // owned by SendMessageToServer until the thread joins
     const WCHAR* File; // just a reference to a static string
     int Line;
 };
@@ -248,19 +256,27 @@ struct C__TraceMsgBoxThreadDataW
 DWORD WINAPI __TraceMsgBoxThreadW(void* param)
 {
     C__TraceMsgBoxThreadDataW* data = (C__TraceMsgBoxThreadDataW*)param;
-    WCHAR msg[1000];
-    wsprintfW(msg, L"TRACE_C message received!\n\n"
-                   L"File: %s\n"
-                   L"Line: %d\n\n"
-                   L"Message: ",
-              data->File, data->Line);
-    const WCHAR* appendix = L"\n\nTRACE_C message means that fatal error has occured. "
-                            L"Application will be crashed by \"access violation\" exception after "
-                            L"clicking OK. Please send us bug report to help us fix this problem. "
-                            L"If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpynW(msg + (int)wcslen(msg), data->Msg, _countof(msg) - (int)wcslen(msg) - (int)wcslen(appendix));
-    lstrcpynW(msg + (int)wcslen(msg), appendix, _countof(msg) - (int)wcslen(msg));
-    MessageBoxW(NULL, msg, L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    try
+    {
+        std::wstring msg = L"TRACE_C message received!\n\nFile: ";
+        msg += data->File != NULL ? data->File : L"";
+        msg += L"\nLine: ";
+        msg += std::to_wstring(data->Line);
+        msg += L"\n\nMessage: ";
+        if (data->Msg != NULL)
+            msg += data->Msg;
+        msg += L"\n\nTRACE_C message means that fatal error has occured. "
+               L"Application will be crashed by \"access violation\" exception after "
+               L"clicking OK. Please send us bug report to help us fix this problem. "
+               L"If you want to copy this message to clipboard, use Ctrl+C key.";
+        MessageBoxW(NULL, msg.c_str(), L"Debug Message",
+                    MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
+    catch (...)
+    {
+        MessageBoxW(NULL, L"Unable to allocate the fatal trace diagnostic.",
+                    L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
     return 0;
 }
 
@@ -276,16 +292,20 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         if (unicode)
         {
             if (information)
-                SalamanderDebug->TraceIW(FileW, Line, TraceStringBufW.c_str());
+                SalamanderDebug->TraceI(FileW, Line, TraceStringBufW.c_str());
             else
-                SalamanderDebug->TraceEW(FileW, Line, TraceStringBufW.c_str());
+                SalamanderDebug->TraceE(FileW, Line, TraceStringBufW.c_str());
         }
         else
         {
+            const std::wstring fileW = ToWideArg(File);
+            const std::wstring textW = ToWideArg(TraceStringBuf.c_str());
             if (information)
-                SalamanderDebug->TraceI(File, Line, TraceStringBuf.c_str());
+                SalamanderDebug->TraceI(File != NULL ? fileW.c_str() : NULL,
+                                        Line, textW.c_str());
             else
-                SalamanderDebug->TraceE(File, Line, TraceStringBuf.c_str());
+                SalamanderDebug->TraceE(File != NULL ? fileW.c_str() : NULL,
+                                        Line, textW.c_str());
         }
     }
     // only if crash==TRUE:
@@ -304,6 +324,8 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
     static BOOL msgBoxOpened = FALSE;
     C__TraceMsgBoxThreadData threadData;
     C__TraceMsgBoxThreadDataW threadDataW;
+    std::string threadMessage;
+    std::wstring threadMessageW;
     if (unicode)
         memset(&threadDataW, 0, sizeof(threadDataW));
     else
@@ -314,24 +336,32 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         {
             if (unicode)
             {
-                threadDataW.Msg = (WCHAR*)GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
-                if (threadDataW.Msg != NULL)
+                try
                 {
-                    lstrcpynW(threadDataW.Msg, TraceStringBufW.c_str(), (int)(TraceStringBufW.length() + 1));
+                    threadMessageW = TraceStringBufW.c_str();
+                    threadDataW.Msg = threadMessageW.c_str();
                     threadDataW.File = FileW;
                     threadDataW.Line = Line;
                     msgBoxOpened = TRUE;
                 }
+                catch (const std::bad_alloc&)
+                {
+                    threadDataW.Msg = NULL;
+                }
             }
             else
             {
-                threadData.Msg = (char*)GlobalAlloc(GMEM_FIXED, TraceStringBuf.length() + 1);
-                if (threadData.Msg != NULL)
+                try
                 {
-                    lstrcpyn(threadData.Msg, TraceStringBuf.c_str(), (int)TraceStringBuf.length() + 1);
+                    threadMessage = TraceStringBuf.c_str();
+                    threadData.Msg = threadMessage.c_str();
                     threadData.File = File;
                     threadData.Line = Line;
                     msgBoxOpened = TRUE;
+                }
+                catch (const std::bad_alloc&)
+                {
+                    threadData.Msg = NULL;
                 }
             }
         }
@@ -363,7 +393,6 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
                 CloseHandle(msgBoxThread);
             }
             msgBoxOpened = FALSE;
-            GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
             // software crash is triggered directly in the code where TRACE_C/TRACE_MC is placed, so
             // it's visible in the bug report exactly where the macros are located; the crash therefore
             // follows after this method completes

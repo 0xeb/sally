@@ -36,10 +36,10 @@ HWND CSalamanderGuiTextBox::CreateHwnd(HWND hWndParent)
 
     m_pParent->BoundsToPixels(&pxbounds);
 
-    hWnd = CreateWindowEx(
+    hWnd = CreateWindowExW(
         WS_EX_NOPARENTNOTIFY | WS_EX_CLIENTEDGE,
-        _T("edit"),
-        OLE2T(m_strText),
+        L"edit",
+        m_strText,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL | ES_LEFT,
         pxbounds.x,
         pxbounds.y,

@@ -1,8 +1,47 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static BOOL FormatOperationLogDateTime(const SYSTEMTIME& value, BOOL date,
+                                       std::wstring& output) noexcept
+{
+    try
+    {
+        const int needed = date
+                               ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                                                &value, NULL, NULL, 0)
+                               : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value,
+                                                NULL, NULL, 0);
+        if (needed > 0)
+        {
+            std::wstring staged(static_cast<size_t>(needed), L'\0');
+            const int written = date
+                                    ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                                                     &value, NULL, staged.data(), needed)
+                                    : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value,
+                                                     NULL, staged.data(), needed);
+            if (written == needed)
+            {
+                staged.resize(static_cast<size_t>(needed - 1));
+                output.swap(staged);
+                return TRUE;
+            }
+        }
+
+        std::wstring fallback =
+            date ? SPLFormatStringOwned(L"%u.%u.%u", value.wDay, value.wMonth, value.wYear)
+                 : SPLFormatStringOwned(L"%u:%02u:%02u", value.wHour, value.wMinute,
+                                        value.wSecond);
+        output.swap(fallback);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
 
 //
 // ****************************************************************************
@@ -17,7 +56,7 @@ protected:
     HWND DropTargetWnd;
 
 public:
-    COperationDlgThread(COperationDlg* operDlg, HWND dropTargetWnd) : CThread("Operation Dialog")
+    COperationDlgThread(COperationDlg* operDlg, HWND dropTargetWnd) : CThread(L"Operation Dialog")
     {
         OperDlg = operDlg;
         AlwaysOnTop = FALSE;
@@ -55,12 +94,12 @@ public:
 
             // message loop - wait until the modeless dialog is closed
             MSG msg;
-            while (GetMessage(&msg, NULL, 0, 0))
+            while (GetMessageW(&msg, NULL, 0, 0))
             {
                 if (!IsDialogMessage(dlg, &msg))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
                 if (sendWMClose)
                 {
@@ -79,57 +118,91 @@ public:
 // CFTPOperation
 //
 
-BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const char* host, unsigned short port,
-                                  const char* user, const char* password, const char* account,
+static char* DupOperationText(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
+
+static wchar_t* DupOperationWideText(const wchar_t* text)
+{
+    if (text == NULL)
+        return NULL;
+    const size_t length = wcslen(text) + 1;
+    if (length > INT_MAX / sizeof(wchar_t))
+        return NULL;
+    wchar_t* copy = (wchar_t*)SalamanderGeneral->Alloc((int)(length * sizeof(wchar_t)));
+    if (copy != NULL)
+        memcpy(copy, text, length * sizeof(wchar_t));
+    return copy;
+}
+
+BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const wchar_t* host, unsigned short port,
+                                  const CFtpTextCodec& identityCodec,
+                                  const wchar_t* user, const wchar_t* password, const wchar_t* account,
                                   const char* initFTPCommands, BOOL usePassiveMode,
                                   const char* listCommand, DWORD serverIP,
                                   const char* serverSystem, const char* serverFirstReply,
-                                  BOOL useListingsCache, DWORD hostIP)
+                                  BOOL useListingsCache, DWORD hostIP) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetConnection()");
 
-    BOOL err = (host == NULL || *host == 0);
-    Host = SalamanderGeneral->DupStr(host);
-    Port = port;
-    User = SalamanderGeneral->DupStr((user != NULL && *user == 0) ? NULL : user); // remains NULL if it is NULL
-    Password = SalamanderGeneral->DupStr((password != NULL && *password == 0) ? NULL : password);
-    Account = SalamanderGeneral->DupStr((account != NULL && *account == 0) ? NULL : account);
-    InitFTPCommands = (initFTPCommands != NULL && *initFTPCommands != 0) ? initFTPCommands : "";
-    UsePassiveMode = usePassiveMode;
-    SizeCmdIsSupported = TRUE;
-    ListCommand = listCommand != NULL ? listCommand : "";
-    ServerSystem = serverSystem != NULL ? serverSystem : "";
-    ServerFirstReply = serverFirstReply != NULL ? serverFirstReply : "";
-    ServerIP = serverIP;
-    UseListingsCache = useListingsCache;
-    HostIP = hostIP;
+    if (host == NULL || *host == 0)
+        return FALSE;
+    std::wstring stagedHost;
+    if (!FtpStoreWideText(host, stagedHost))
+        return FALSE;
+    std::wstring stagedUser;
+    std::wstring stagedPassword;
+    std::wstring stagedAccount;
+    std::string stagedInitFTPCommands;
+    std::string stagedListCommand;
+    std::string stagedServerSystem;
+    std::string stagedServerFirstReply;
+    std::string stagedProxyScriptText;
+    CFTPProxyServer* stagedProxyServer = proxyServer != NULL ? proxyServer->MakeCopy() : NULL;
+    BOOL err = proxyServer != NULL && stagedProxyServer == NULL;
+    err = err || !FtpStoreWideText(user != NULL ? user : L"", stagedUser) ||
+          !FtpStoreWideText(password != NULL ? password : L"", stagedPassword) ||
+          !FtpStoreWideText(account != NULL ? account : L"", stagedAccount) ||
+          !FtpStoreProtocolBytes((initFTPCommands != NULL && *initFTPCommands != 0) ? initFTPCommands : "", stagedInitFTPCommands) ||
+          !FtpStoreProtocolBytes(listCommand != NULL ? listCommand : "", stagedListCommand) ||
+          !FtpStoreProtocolBytes(serverSystem != NULL ? serverSystem : "", stagedServerSystem) ||
+          !FtpStoreProtocolBytes(serverFirstReply != NULL ? serverFirstReply : "", stagedServerFirstReply);
 
-    if (proxyServer != NULL)
-    {
-        ProxyServer = proxyServer->MakeCopy();
-        if (ProxyServer == NULL)
-            err = TRUE;
-    }
     CFTPProxyServerType proxyType = fpstNotUsed;
-    if (ProxyServer != NULL)
-        proxyType = ProxyServer->ProxyType;
+    if (stagedProxyServer != NULL)
+        proxyType = stagedProxyServer->ProxyType;
+    const char* selectedProxyScript;
     if (proxyType == fpstOwnScript)
-        ProxyScriptText = ProxyServer->ProxyScript;
+        selectedProxyScript = stagedProxyServer->ProxyScript.c_str();
     else
     {
-        ProxyScriptText = GetProxyScriptText(proxyType, FALSE);
-        if (ProxyScriptText[0] == 0)
-            ProxyScriptText = GetProxyScriptText(fpstNotUsed, FALSE); // undefined script = "not used (direct connection)" script - SOCKS 4/4A/5, HTTP 1.1
+        selectedProxyScript = GetProxyScriptText(proxyType, FALSE);
+        if (selectedProxyScript[0] == 0)
+            selectedProxyScript = GetProxyScriptText(fpstNotUsed, FALSE); // undefined script = "not used (direct connection)" script - SOCKS 4/4A/5, HTTP 1.1
     }
+    if (!FtpStoreProtocolBytes(selectedProxyScript, stagedProxyScriptText))
+        err = TRUE;
+    std::wstring stagedConnectToHost;
+    unsigned short stagedConnectToPort = 21;
+    size_t proxyScriptStartOffset = 0;
     if (!err)
     {
-        CProxyScriptParams proxyScriptParams(ProxyServer, Host, Port, User, Password, Account,
-                                             Password == NULL || Password[0] == 0);
-        char connectToHost[HOST_MAX_SIZE];
-        char errBuf[300];
-        if (ProcessProxyScript(ProxyScriptText, &ProxyScriptStartExecPoint, -1,
-                               &proxyScriptParams, connectToHost, &ConnectToPort,
-                               NULL, NULL, errBuf, NULL))
+        CProxyScriptParams proxyScriptParams(stagedProxyServer, stagedHost.c_str(), port, stagedUser.c_str(), stagedPassword.c_str(), stagedAccount.c_str(),
+                                             stagedPassword.empty());
+        std::string errorDescription;
+        BOOL lowMemory = !proxyScriptParams.IsGood();
+        const char* stagedExecPoint = NULL;
+        if (proxyScriptParams.IsGood() &&
+            ProcessProxyScript(FtpLocalTextCodec(), stagedProxyScriptText.c_str(), &stagedExecPoint, -1,
+                               &proxyScriptParams, &stagedConnectToHost, &stagedConnectToPort,
+                               NULL, NULL, &errorDescription, NULL, &lowMemory))
         {
             if (proxyScriptParams.NeedUserInput()) // theoretically should not happen (already verified by running it in the panel)
             {
@@ -137,47 +210,103 @@ BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const char* host
                 TRACE_E("CFTPOperation::SetConnection(): unexpected situation: proxy script needs user input!");
             }
             else
-                ConnectToHost = SalamanderGeneral->DupStr(connectToHost);
+            {
+                proxyScriptStartOffset = static_cast<size_t>(stagedExecPoint - stagedProxyScriptText.c_str());
+            }
         }
         else // theoretically should never happen (stored scripts are validated and already verified by running them in the panel)
         {
             err = TRUE;
-            TRACE_E("CFTPOperation::SetConnection(): proxy script error: " << errBuf);
+            if (lowMemory)
+                TRACE_E(LOW_MEMORY);
+            else
+                TRACE_E("CFTPOperation::SetConnection(): proxy script error: " << errorDescription.c_str());
         }
     }
-    return !err;
+    if (err)
+    {
+        delete stagedProxyServer;
+        FTPSecureWipe(stagedPassword);
+        FTPSecureWipe(stagedAccount);
+        return FALSE;
+    }
+
+    Host.swap(stagedHost);
+    Port = port;
+    IdentityCodec = identityCodec;
+    User.swap(stagedUser);
+    Password.swap(stagedPassword);
+    Account.swap(stagedAccount);
+    InitFTPCommands.swap(stagedInitFTPCommands);
+    UsePassiveMode = usePassiveMode;
+    SizeCmdIsSupported = TRUE;
+    ListCommand.swap(stagedListCommand);
+    ServerSystem.swap(stagedServerSystem);
+    ServerFirstReply.swap(stagedServerFirstReply);
+    ServerIP = serverIP;
+    UseListingsCache = useListingsCache;
+    HostIP = hostIP;
+    ProxyServer = stagedProxyServer;
+    ProxyScriptText.swap(stagedProxyScriptText);
+    ProxyScriptStartExecPoint = ProxyScriptText.c_str() + proxyScriptStartOffset;
+    ConnectToHost.swap(stagedConnectToHost);
+    ConnectToPort = stagedConnectToPort;
+    FTPSecureWipe(stagedPassword);
+    FTPSecureWipe(stagedAccount);
+    return TRUE;
 }
 
-void CFTPOperation::SetBasicData(char* operationSubject, const char* listingServerType)
+BOOL CFTPOperation::SetBasicData(const wchar_t* operationSubject, const char* listingServerType)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetBasicData()");
 
-    OperationSubject = SalamanderGeneral->DupStr(operationSubject);
-    ListingServerType = SalamanderGeneral->DupStr(listingServerType); // remains NULL if it is NULL
+    std::wstring stagedOperationSubject;
+    std::string stagedListingServerType;
+    if (!FtpStoreWideText(operationSubject != NULL ? operationSubject : L"",
+                          stagedOperationSubject) ||
+        (listingServerType != NULL &&
+         !FtpStoreLocalTextBytes(listingServerType, stagedListingServerType)))
+        return FALSE;
+    OperationSubject.swap(stagedOperationSubject);
+    ListingServerType.swap(stagedListingServerType);
+    return TRUE;
 }
 
-void CFTPOperation::SetOperationDelete(const char* sourcePath, char srcPathSeparator,
+BOOL CFTPOperation::SetOperationDelete(const char* remoteSourcePath, const wchar_t* sourcePath, char srcPathSeparator,
                                        BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
                                        int confirmDelOnNonEmptyDir, int confirmDelOnHiddenFile,
                                        int confirmDelOnHiddenDir)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetOperationDelete()");
 
+    char* stagedRemoteSourcePath = DupOperationText(remoteSourcePath);
+    wchar_t* stagedSourcePath = DupOperationWideText(sourcePath);
+    if (stagedRemoteSourcePath == NULL || stagedSourcePath == NULL)
+    {
+        if (stagedRemoteSourcePath != NULL)
+            SalamanderGeneral->Free(stagedRemoteSourcePath);
+        if (stagedSourcePath != NULL)
+            SalamanderGeneral->Free(stagedSourcePath);
+        return FALSE;
+    }
     Type = fotDelete;
-    SourcePath = SalamanderGeneral->DupStr(sourcePath);
+    RemoteSourcePath = stagedRemoteSourcePath;
+    SourcePath = stagedSourcePath;
     SrcPathSeparator = srcPathSeparator;
     SrcPathCanChange = srcPathCanChange;
     SrcPathCanChangeInclSubdirs = srcPathCanChangeInclSubdirs;
     ConfirmDelOnNonEmptyDir = confirmDelOnNonEmptyDir;
     ConfirmDelOnHiddenFile = confirmDelOnHiddenFile;
     ConfirmDelOnHiddenDir = confirmDelOnHiddenDir;
+    return TRUE;
 }
 
-BOOL CFTPOperation::SetOperationCopyMoveDownload(BOOL isCopy, const char* sourcePath,
-                                                 char srcPathSeparator, BOOL srcPathCanChange,
-                                                 BOOL srcPathCanChangeInclSubdirs, const char* targetPath,
+BOOL CFTPOperation::SetOperationCopyMoveDownload(BOOL isCopy, const char* remoteSourcePath,
+                                                 const wchar_t* sourcePath, char srcPathSeparator,
+                                                 BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
+                                                 const wchar_t* targetPath,
                                                  char tgtPathSeparator, BOOL tgtPathCanChange,
-                                                 BOOL tgtPathCanChangeInclSubdirs, const char* asciiFileMasks,
+                                                 BOOL tgtPathCanChangeInclSubdirs, const wchar_t* asciiFileMasks,
                                                  int autodetectTrMode, int useAsciiTransferMode,
                                                  int cannotCreateFile, int cannotCreateDir,
                                                  int fileAlreadyExists, int dirAlreadyExists, int retryOnCreatedFile,
@@ -187,11 +316,13 @@ BOOL CFTPOperation::SetOperationCopyMoveDownload(BOOL isCopy, const char* source
 
     Type = isCopy ? fotCopyDownload : fotMoveDownload;
     BOOL err = FALSE;
-    SourcePath = SalamanderGeneral->DupStr(sourcePath);
+    RemoteSourcePath = DupOperationText(remoteSourcePath);
+    SourcePath = DupOperationWideText(sourcePath);
     SrcPathSeparator = srcPathSeparator;
     SrcPathCanChange = srcPathCanChange;
     SrcPathCanChangeInclSubdirs = srcPathCanChangeInclSubdirs;
-    TargetPath = SalamanderGeneral->DupStr(targetPath);
+    TargetPath = DupOperationWideText(targetPath);
+    err = RemoteSourcePath == NULL || SourcePath == NULL || TargetPath == NULL;
     TgtPathSeparator = tgtPathSeparator;
     TgtPathCanChange = tgtPathCanChange;
     TgtPathCanChangeInclSubdirs = tgtPathCanChangeInclSubdirs;
@@ -220,11 +351,11 @@ BOOL CFTPOperation::SetOperationCopyMoveDownload(BOOL isCopy, const char* source
     return !err;
 }
 
-BOOL CFTPOperation::SetOperationCopyMoveUpload(BOOL isCopy, const char* sourcePath, char srcPathSeparator,
+BOOL CFTPOperation::SetOperationCopyMoveUpload(BOOL isCopy, const wchar_t* sourcePath, char srcPathSeparator,
                                                BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
-                                               const char* targetPath, char tgtPathSeparator,
+                                               const char* remoteTargetPath, const wchar_t* targetPath, char tgtPathSeparator,
                                                BOOL tgtPathCanChange, BOOL tgtPathCanChangeInclSubdirs,
-                                               const char* asciiFileMasks, int autodetectTrMode,
+                                               const wchar_t* asciiFileMasks, int autodetectTrMode,
                                                int useAsciiTransferMode, int uploadCannotCreateFile,
                                                int uploadCannotCreateDir, int uploadFileAlreadyExists,
                                                int uploadDirAlreadyExists, int uploadRetryOnCreatedFile,
@@ -234,11 +365,13 @@ BOOL CFTPOperation::SetOperationCopyMoveUpload(BOOL isCopy, const char* sourcePa
 
     Type = isCopy ? fotCopyUpload : fotMoveUpload;
     BOOL err = FALSE;
-    SourcePath = SalamanderGeneral->DupStr(sourcePath);
+    SourcePath = DupOperationWideText(sourcePath);
     SrcPathSeparator = srcPathSeparator;
     SrcPathCanChange = srcPathCanChange;
     SrcPathCanChangeInclSubdirs = srcPathCanChangeInclSubdirs;
-    TargetPath = SalamanderGeneral->DupStr(targetPath);
+    RemoteTargetPath = DupOperationText(remoteTargetPath);
+    TargetPath = DupOperationWideText(targetPath);
+    err = SourcePath == NULL || RemoteTargetPath == NULL || TargetPath == NULL;
     TgtPathSeparator = tgtPathSeparator;
     TgtPathCanChange = tgtPathCanChange;
     TgtPathCanChangeInclSubdirs = tgtPathCanChangeInclSubdirs;
@@ -267,15 +400,26 @@ BOOL CFTPOperation::SetOperationCopyMoveUpload(BOOL isCopy, const char* sourcePa
     return !err;
 }
 
-void CFTPOperation::SetOperationChAttr(const char* sourcePath, char srcPathSeparator,
+BOOL CFTPOperation::SetOperationChAttr(const char* remoteSourcePath, const wchar_t* sourcePath, char srcPathSeparator,
                                        BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
                                        WORD attrAnd, WORD attrOr, int chAttrOfFiles, int chAttrOfDirs,
                                        int unknownAttrs)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetOperationChAttr()");
 
+    char* stagedRemoteSourcePath = DupOperationText(remoteSourcePath);
+    wchar_t* stagedSourcePath = DupOperationWideText(sourcePath);
+    if (stagedRemoteSourcePath == NULL || stagedSourcePath == NULL)
+    {
+        if (stagedRemoteSourcePath != NULL)
+            SalamanderGeneral->Free(stagedRemoteSourcePath);
+        if (stagedSourcePath != NULL)
+            SalamanderGeneral->Free(stagedSourcePath);
+        return FALSE;
+    }
     Type = fotChangeAttrs;
-    SourcePath = SalamanderGeneral->DupStr(sourcePath);
+    RemoteSourcePath = stagedRemoteSourcePath;
+    SourcePath = stagedSourcePath;
     SrcPathSeparator = srcPathSeparator;
     SrcPathCanChange = srcPathCanChange;
     SrcPathCanChangeInclSubdirs = srcPathCanChangeInclSubdirs;
@@ -284,6 +428,7 @@ void CFTPOperation::SetOperationChAttr(const char* sourcePath, char srcPathSepar
     ChAttrOfFiles = chAttrOfFiles;
     ChAttrOfDirs = chAttrOfDirs;
     UnknownAttrs = unknownAttrs;
+    return TRUE;
 }
 
 void CFTPOperation::SetQueue(CFTPQueue* queue)
@@ -320,7 +465,7 @@ CFTPOperation::AllocNewWorker()
     CALL_STACK_MESSAGE1("CFTPOperation::AllocNewWorker()");
 
     HANDLES(EnterCriticalSection(&OperCritSect));
-    CFTPWorker* ret = new CFTPWorker(this, Queue, Host, Port, User);
+    CFTPWorker* ret = new CFTPWorker(this, Queue, Host.c_str(), Port, User.c_str());
     if (ret == NULL)
         TRACE_E(LOW_MEMORY);
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -332,8 +477,6 @@ void CFTPOperation::SendHeaderToLog(int logUID)
     CALL_STACK_MESSAGE2("CFTPOperation::SendHeaderToLog(%d)", logUID);
 
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char buf[500];
-    char timeBuf[100];
     BOOL ok = TRUE;
     // building the window title
     int titleResID = 0;
@@ -364,19 +507,36 @@ void CFTPOperation::SendHeaderToLog(int logUID)
     }
     if (ok)
     {
-        _snprintf_s(buf, 498, _TRUNCATE, LoadStr(titleResID), OperationSubject, Host);
-        strcat(buf, "\r\n");
-        Logs.LogMessage(logUID, buf, -1);
+        try
+        {
+            std::wstring title = SPLFormatStringOwned(
+                LangStr(titleResID).c_str(), OperationSubject.c_str(), Host.c_str());
+            title.append(L"\r\n");
+            Logs.LogMessage(logUID, title.c_str(), -1);
 
-        SYSTEMTIME st;
-        GetLocalTime(&st);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, timeBuf, 50) == 0)
-            sprintf(timeBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        strcat(timeBuf, " - ");
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, timeBuf + strlen(timeBuf), 50) == 0)
-            sprintf(timeBuf + strlen(timeBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        sprintf(buf, LoadStr(IDS_WORKERLOGHEADER), Host, Port, logUID, timeBuf);
-        Logs.LogMessage(logUID, buf, -1);
+            SYSTEMTIME st;
+            GetLocalTime(&st);
+            std::wstring dateText;
+            std::wstring timeText;
+            if (!FormatOperationLogDateTime(st, TRUE, dateText) ||
+                !FormatOperationLogDateTime(st, FALSE, timeText))
+            {
+                ok = FALSE;
+            }
+            else
+            {
+                dateText.append(L" - ");
+                dateText.append(timeText);
+                const std::wstring header = SPLFormatStringOwned(
+                    LangStr(IDS_WORKERLOGHEADER).c_str(), Host.c_str(), Port, logUID,
+                    dateText.c_str());
+                Logs.LogMessage(logUID, header.c_str(), -1);
+            }
+        }
+        catch (...)
+        {
+            ok = FALSE;
+        }
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
@@ -431,7 +591,7 @@ void CFTPOperation::AddToNotDoneSkippedFailed(int notDone, int skipped, int fail
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
-BOOL CFTPOperation::IsASCIIFile(const char* name, const char* ext)
+BOOL CFTPOperation::IsASCIIFile(const wchar_t* name, const wchar_t* ext)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -676,11 +836,16 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
     }
     if (ok)
     {
-        char title[500];
-        _snprintf_s(title, _TRUNCATE, LoadStr(titleResID), OperationSubject, Host);
-        dlg->TitleText = SalamanderGeneral->DupStr(title);
-        if (dlg->TitleText == NULL)
+        try
+        {
+            std::wstring title = SPLFormatStringOwned(
+                LangStr(titleResID).c_str(), OperationSubject.c_str(), Host.c_str());
+            dlg->TitleText.swap(title);
+        }
+        catch (...)
+        {
             ok = FALSE;
+        }
     }
 
     // set the source and target paths
@@ -690,8 +855,8 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
         if (Type == fotCopyDownload || Type == fotMoveDownload ||
             Type == fotCopyUpload || Type == fotMoveUpload)
         {
-            SetDlgItemText(dlg->HWindow, IDT_OPSOURCETITLE, LoadStr(IDS_OPERDLGSRCPATH));
-            SetDlgItemText(dlg->HWindow, IDT_OPTARGETTITLE, LoadStr(IDS_OPERDLGTGTPATH));
+            SetDlgItemTextW(dlg->HWindow, IDT_OPSOURCETITLE, LangStr(IDS_OPERDLGSRCPATH).c_str());
+            SetDlgItemTextW(dlg->HWindow, IDT_OPTARGETTITLE, LangStr(IDS_OPERDLGTGTPATH).c_str());
             dlg->Target->SetPathSeparator(TgtPathSeparator);
             if (!dlg->Source->SetText(SourcePath) ||
                 !dlg->Target->SetText(TargetPath))
@@ -699,7 +864,7 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
         }
         else // move + ch-attrs
         {
-            SetDlgItemText(dlg->HWindow, IDT_OPSOURCETITLE, LoadStr(IDS_OPERDLGPATH));
+            SetDlgItemTextW(dlg->HWindow, IDT_OPSOURCETITLE, LangStr(IDS_OPERDLGPATH).c_str());
             if (!dlg->Source->SetText(SourcePath))
                 ok = FALSE;
         }
@@ -709,15 +874,19 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
     return ok;
 }
 
-BOOL CFTPOperation::GetServerAddress(DWORD* serverIP, char* host, int hostBufSize)
+BOOL CFTPOperation::GetServerAddress(DWORD* serverIP, std::wstring& host, BOOL* hostReady) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetServerAddress(, ,)");
     HANDLES(EnterCriticalSection(&OperCritSect));
     BOOL ret = TRUE;
+    *hostReady = TRUE;
     *serverIP = ServerIP;
     if (ServerIP == INADDR_NONE) // IP address is unknown, return the host name
     {
-        lstrcpyn(host, ConnectToHost, hostBufSize);
+        if (!FtpStoreWideText(ConnectToHost.c_str(), host))
+        {
+            *hostReady = FALSE;
+        }
         ret = FALSE;
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -734,125 +903,162 @@ void CFTPOperation::SetServerIP(DWORD serverIP)
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
-void CFTPOperation::GetConnectInfo(DWORD* serverIP, unsigned short* port, char* host,
+BOOL CFTPOperation::GetConnectInfo(DWORD* serverIP, unsigned short* port, std::wstring& host,
                                    CFTPProxyServerType* proxyType, DWORD* hostIP, unsigned short* hostPort,
-                                   char* proxyUser, char* proxyPassword)
+                                   std::wstring& proxyUser, std::wstring& proxyPassword) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetConnectInfo(, , ,)");
+    std::wstring proxyUserW;
+    std::wstring proxyPasswordW;
+    DWORD stagedServerIP;
+    unsigned short stagedPort;
+    std::wstring stagedHost;
+    DWORD stagedHostIP;
+    unsigned short stagedHostPort;
+    CFTPProxyServerType stagedProxyType = fpstNotUsed;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    *serverIP = ServerIP;
-    *port = ConnectToPort;
-    lstrcpyn(host, HandleNULLStr(Host), HOST_MAX_SIZE);
-    *hostIP = HostIP;
-    *hostPort = Port;
-    *proxyType = fpstNotUsed;
+    stagedServerIP = ServerIP;
+    stagedPort = ConnectToPort;
+    BOOL stored = FtpStoreWideText(Host.c_str(), stagedHost);
+    stagedHostIP = HostIP;
+    stagedHostPort = Port;
     if (ProxyServer != NULL)
     {
-        *proxyType = ProxyServer->ProxyType;
-        lstrcpyn(proxyUser, HandleNULLStr(ProxyServer->ProxyUser), USER_MAX_SIZE);
-        lstrcpyn(proxyPassword, HandleNULLStr(ProxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE);
-    }
-    else
-    {
-        proxyUser[0] = 0;
-        proxyPassword[0] = 0;
+        stagedProxyType = ProxyServer->ProxyType;
+        stored = FtpStoreWideText(ProxyServer->ProxyUser, proxyUserW) &&
+                 FtpStoreWideText(ProxyServer->ProxyPlainPassword, proxyPasswordW);
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    if (!stored)
+    {
+        FTPSecureWipe(proxyPasswordW);
+        return FALSE;
+    }
+    *serverIP = stagedServerIP;
+    *port = stagedPort;
+    host.swap(stagedHost);
+    *hostIP = stagedHostIP;
+    *hostPort = stagedHostPort;
+    *proxyType = stagedProxyType;
+    proxyUser.swap(proxyUserW);
+    proxyPassword.swap(proxyPasswordW);
+    FTPSecureWipe(proxyPasswordW);
+    return TRUE;
 }
 
-void CFTPOperation::GetConnectLogMsg(BOOL isReconnect, char* buf, int bufSize, int attemptNumber, const char* dateTime)
+BOOL CFTPOperation::GetConnectLogMsg(BOOL isReconnect, std::string& text, int attemptNumber, const char* dateTime)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::GetConnectLogMsg(%d, , , ,)", isReconnect);
     HANDLES(EnterCriticalSection(&OperCritSect));
     in_addr srvAddr;
     srvAddr.s_addr = ServerIP;
-    if (bufSize > 0)
+    std::string userBytes;
+    std::string proxyUserBytes;
+    std::string hostBytes;
+    std::string connectToHostBytes;
+    std::string proxyHostBytes;
+    BOOL result = FtpEncodeLocalText(User.c_str(), userBytes) &&
+                  FtpEncodeNetworkHost(Host.c_str(), hostBytes) &&
+                  FtpEncodeNetworkHost(ConnectToHost.c_str(), connectToHostBytes) &&
+                  (ProxyServer == NULL ||
+                   (FtpEncodeLocalText(ProxyServer->ProxyUser.c_str(), proxyUserBytes) &&
+                    FtpEncodeNetworkHost(ProxyServer->ProxyHost.c_str(), proxyHostBytes)));
+    if (isReconnect)
     {
-        if (isReconnect)
+        if (ProxyServer != NULL)
         {
-            if (ProxyServer != NULL)
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_PRXSRVRECONLOGHEADER), Host, Port, HandleNULLStr(User),
-                            ProxyServer->ProxyName, GetProxyTypeName(ProxyServer->ProxyType),
-                            HandleNULLStr(ProxyServer->ProxyHost), ProxyServer->ProxyPort,
-                            HandleNULLStr(ProxyServer->ProxyUser), ConnectToHost, inet_ntoa(srvAddr),
-                            ConnectToPort, attemptNumber, dateTime);
-            }
-            else
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_RECONLOGHEADER), ConnectToHost, inet_ntoa(srvAddr), ConnectToPort,
-                            attemptNumber, dateTime);
-            }
+            std::string proxyNameForLog;
+            std::string proxyTypeName;
+            result = result &&
+                     FtpEncodeLocalTextForByteLog(ProxyServer->ProxyName.c_str(),
+                                                  "<Unicode proxy profile>", proxyNameForLog) &&
+                     GetProxyTypeName(ProxyServer->ProxyType, proxyTypeName) &&
+                     FTPFormatString(text, LoadStr(IDS_PRXSRVRECONLOGHEADER), hostBytes.c_str(), Port, userBytes.c_str(),
+                                      proxyNameForLog.c_str(), proxyTypeName.c_str(),
+                                      proxyHostBytes.c_str(), ProxyServer->ProxyPort,
+                                     proxyUserBytes.c_str(), connectToHostBytes.c_str(), inet_ntoa(srvAddr),
+                                     ConnectToPort, attemptNumber, dateTime);
         }
         else
         {
-            if (ProxyServer != NULL)
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_PRXSRVWORKERCONLOGHDR), Host, Port, HandleNULLStr(User),
-                            ProxyServer->ProxyName, GetProxyTypeName(ProxyServer->ProxyType),
-                            HandleNULLStr(ProxyServer->ProxyHost), ProxyServer->ProxyPort,
-                            HandleNULLStr(ProxyServer->ProxyUser), ConnectToHost, inet_ntoa(srvAddr), ConnectToPort);
-            }
-            else
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_WORKERCONLOGHDR), ConnectToHost, inet_ntoa(srvAddr), ConnectToPort);
-            }
+            result = result && FTPFormatString(text, LoadStr(IDS_RECONLOGHEADER), connectToHostBytes.c_str(), inet_ntoa(srvAddr), ConnectToPort,
+                                     attemptNumber, dateTime);
         }
     }
+    else if (ProxyServer != NULL)
+    {
+        std::string proxyNameForLog;
+        std::string proxyTypeName;
+        result = result &&
+                 FtpEncodeLocalTextForByteLog(ProxyServer->ProxyName.c_str(),
+                                              "<Unicode proxy profile>", proxyNameForLog) &&
+                 GetProxyTypeName(ProxyServer->ProxyType, proxyTypeName) &&
+                 FTPFormatString(text, LoadStr(IDS_PRXSRVWORKERCONLOGHDR), hostBytes.c_str(), Port, userBytes.c_str(),
+                                  proxyNameForLog.c_str(), proxyTypeName.c_str(),
+                                  proxyHostBytes.c_str(), ProxyServer->ProxyPort,
+                                 proxyUserBytes.c_str(), connectToHostBytes.c_str(), inet_ntoa(srvAddr), ConnectToPort);
+    }
+    else
+        result = result && FTPFormatString(text, LoadStr(IDS_WORKERCONLOGHDR), connectToHostBytes.c_str(), inet_ntoa(srvAddr), ConnectToPort);
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    return result;
 }
 
-void CFTPOperation::SetServerSystem(const char* reply, int replySize)
+BOOL CFTPOperation::SetServerSystem(const char* reply, int replySize) noexcept
 {
     CALL_STACK_MESSAGE2("CFTPOperation::SetServerSystem(, %d)", replySize);
     HANDLES(EnterCriticalSection(&OperCritSect));
+    BOOL result = TRUE;
     if (ServerSystem.empty())
     {
-        char buf[700];
-        CopyStr(buf, 700, reply, replySize); // store the first server reply (source of information about the server version)
-        ServerSystem = buf;
+        std::string staged;
+        result = CopyStr(staged, reply, replySize);
+        if (result)
+            ServerSystem.swap(staged);
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    return result;
 }
 
-void CFTPOperation::SetServerFirstReply(const char* reply, int replySize)
+BOOL CFTPOperation::SetServerFirstReply(const char* reply, int replySize) noexcept
 {
     CALL_STACK_MESSAGE2("CFTPOperation::SetServerFirstReply(, %d)", replySize);
     HANDLES(EnterCriticalSection(&OperCritSect));
+    BOOL result = TRUE;
     if (ServerFirstReply.empty())
     {
-        char buf[700];
-        CopyStr(buf, 700, reply, replySize); // store the first server reply (source of information about the server version)
-        ServerFirstReply = buf;
+        std::string staged;
+        result = CopyStr(staged, reply, replySize);
+        if (result)
+            ServerFirstReply.swap(staged);
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    return result;
 }
 
-BOOL CFTPOperation::PrepareNextScriptCmd(char* buf, int bufSize, char* logBuf, int logBufSize, int* cmdLen,
+BOOL CFTPOperation::PrepareNextScriptCmd(std::string& command, std::string& logCommand, int* cmdLen,
                                          const char** proxyScriptExecPoint, int proxyScriptLastCmdReply,
-                                         char* errDescrBuf, BOOL* needUserInput)
+                                         std::string& errorDescription, BOOL* needUserInput)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::PrepareNextScriptCmd()");
     HANDLES(EnterCriticalSection(&OperCritSect));
 
-    if (bufSize > 0)
-        buf[0] = 0;
-    if (logBufSize > 0)
-        logBuf[0] = 0;
     *cmdLen = 0;
-    errDescrBuf[0] = 0;
+    errorDescription.clear();
     *needUserInput = FALSE;
 
-    CProxyScriptParams proxyScriptParams(ProxyServer, Host, Port, User, Password, Account,
-                                         Password == NULL || Password[0] == 0);
-    char proxySendCmdBuf[FTPCOMMAND_MAX_SIZE];
-    char proxyLogCmdBuf[FTPCOMMAND_MAX_SIZE];
+    CProxyScriptParams proxyScriptParams(ProxyServer, Host.c_str(), Port, User.c_str(), Password.c_str(), Account.c_str(),
+                                         Password.empty());
+    std::string proxySendCmdBuf;
+    CFTPSecureByteStringGuard proxySendCmdGuard(proxySendCmdBuf);
+    std::string proxyLogCmdBuf;
     BOOL ret = TRUE;
     if (*proxyScriptExecPoint == NULL)
         *proxyScriptExecPoint = ProxyScriptStartExecPoint; // we should prepare the first script command
-    if (ProcessProxyScript(ProxyScriptText, proxyScriptExecPoint, proxyScriptLastCmdReply,
-                           &proxyScriptParams, NULL, NULL, proxySendCmdBuf,
-                           proxyLogCmdBuf, errDescrBuf, NULL))
+    BOOL lowMemory = FALSE;
+    if (ProcessProxyScript(FtpLocalTextCodec(), ProxyScriptText.c_str(), proxyScriptExecPoint, proxyScriptLastCmdReply,
+                           &proxyScriptParams, NULL, NULL, &proxySendCmdBuf,
+                           &proxyLogCmdBuf, &errorDescription, NULL, &lowMemory))
     {
         if (proxyScriptParams.NeedUserInput()) // some details need to be entered (user, password, etc.)
         {
@@ -872,23 +1078,17 @@ BOOL CFTPOperation::PrepareNextScriptCmd(char* buf, int bufSize, char* logBuf, i
             if (proxyScriptParams.NeedAccount)
                 resID = IDS_WORKERUNKNOWNACCOUNT;
             if (resID != 0)
-                lstrcpyn(errDescrBuf, LoadStr(resID), 300);
+                ret = FtpStoreProtocolBytes(LoadStr(resID), errorDescription);
         }
-        else
-        {
-            if (proxySendCmdBuf[0] != 0) // we have a command to send to the server
-            {
-                lstrcpyn(buf, proxySendCmdBuf, bufSize);
-                if (bufSize > 0)
-                    *cmdLen = (int)strlen(buf);
-                lstrcpyn(logBuf, proxyLogCmdBuf, logBufSize);
-            }
-            // else ; // end of the login script
-        }
+        command.swap(proxySendCmdBuf);
+        logCommand.swap(proxyLogCmdBuf);
+        *cmdLen = static_cast<int>(command.size());
     }
-    else // theoretically should never happen (stored scripts are validated)
+    else // stored scripts are validated; FALSE without a description is allocation failure
     {
         ret = FALSE;
+        if (lowMemory && errorDescription.empty())
+            FtpStoreProtocolBytes(LoadStr(IDS_OPERDOPPR_LOWMEM), errorDescription);
     }
 
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -899,7 +1099,7 @@ BOOL CFTPOperation::AllocProxyForDataCon(CFTPProxyForDataCon** newDataConProxySe
 {
     CALL_STACK_MESSAGE1("CFTPOperation::AllocProxyForDataCon()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    *newDataConProxyServer = ProxyServer == NULL ? NULL : ProxyServer->AllocProxyForDataCon(ServerIP, Host, HostIP, Port);
+    *newDataConProxyServer = ProxyServer == NULL ? NULL : ProxyServer->AllocProxyForDataCon(ServerIP, Host.c_str(), HostIP, Port);
     BOOL ret = ProxyServer == NULL || *newDataConProxyServer != NULL;
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
@@ -914,56 +1114,69 @@ BOOL CFTPOperation::GetRetryLoginWithoutAsking()
     return ret;
 }
 
-void CFTPOperation::GetInitFTPCommands(char* buf, int bufSize)
+BOOL CFTPOperation::GetInitFTPCommands(std::string& commands)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetInitFTPCommands(,)");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, InitFTPCommands.c_str(), bufSize);
+    BOOL result = FTPFormatString(commands, "%s", InitFTPCommands.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    return result;
 }
 
-void CFTPOperation::GetLoginErrorDlgInfo(char* user, int userBufSize, char* password, int passwordBufSize,
-                                         char* account, int accountBufSize, BOOL* retryLoginWithoutAsking,
-                                         BOOL* proxyUsed, char* proxyUser, int proxyUserBufSize,
-                                         char* proxyPassword, int proxyPasswordBufSize)
+BOOL CFTPOperation::GetLoginErrorDlgInfo(std::wstring& user, std::wstring& password,
+                                         std::wstring& account, BOOL* retryLoginWithoutAsking,
+                                         BOOL* proxyUsed, std::wstring& proxyUser,
+                                         std::wstring& proxyPassword) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetLoginErrorDlgInfo()");
-    char anonymousPasswd[PASSWORD_MAX_SIZE];
-    Config.GetAnonymousPasswd(anonymousPasswd, PASSWORD_MAX_SIZE);
+    std::wstring anonymousPasswordW;
+    if (!Config.GetAnonymousPasswd(anonymousPasswordW))
+        return FALSE;
+    std::wstring stagedUser;
+    std::wstring stagedPassword;
+    std::wstring stagedAccount;
+    std::wstring stagedProxyUser;
+    std::wstring stagedProxyPassword;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(user, User != NULL ? User : FTP_ANONYMOUS, userBufSize);
-    lstrcpyn(password, Password != NULL ? Password : (User == NULL ? anonymousPasswd : ""), passwordBufSize);
-    lstrcpyn(account, Account != NULL ? Account : "", accountBufSize);
+    BOOL result = FtpStoreWideText(User.empty() ? L"anonymous" : User, stagedUser) &&
+                  FtpStoreWideText(Password.empty() && User.empty() ? anonymousPasswordW : Password, stagedPassword) &&
+                  FtpStoreWideText(Account, stagedAccount);
     *proxyUsed = ProxyServer != NULL;
     if (ProxyServer != NULL)
-    {
-        lstrcpyn(proxyUser, HandleNULLStr(ProxyServer->ProxyUser), proxyUserBufSize);
-        lstrcpyn(proxyPassword, HandleNULLStr(ProxyServer->ProxyPlainPassword), proxyPasswordBufSize);
-    }
-    else
-    {
-        if (proxyUserBufSize > 0)
-            proxyUser[0] = 0;
-        if (proxyPasswordBufSize > 0)
-            proxyPassword[0] = 0;
-    }
+        result = result && FtpStoreWideText(ProxyServer->ProxyUser, stagedProxyUser) &&
+                 FtpStoreWideText(ProxyServer->ProxyPlainPassword, stagedProxyPassword);
     *retryLoginWithoutAsking = RetryLoginWithoutAsking;
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    FTPSecureWipe(anonymousPasswordW);
+    if (!result)
+    {
+        FTPSecureWipe(stagedPassword);
+        FTPSecureWipe(stagedProxyPassword);
+        return FALSE;
+    }
+    user.swap(stagedUser);
+    password.swap(stagedPassword);
+    account.swap(stagedAccount);
+    proxyUser.swap(stagedProxyUser);
+    proxyPassword.swap(stagedProxyPassword);
+    FTPSecureWipe(stagedPassword);
+    FTPSecureWipe(stagedProxyPassword);
+    return TRUE;
 }
 
-void CFTPOperation::SetLoginErrorDlgInfo(const char* password, const char* account, BOOL retryLoginWithoutAsking,
-                                         BOOL proxyUsed, const char* proxyUser, const char* proxyPassword)
+BOOL CFTPOperation::SetLoginErrorDlgInfo(const wchar_t* password, const wchar_t* account,
+                                         BOOL retryLoginWithoutAsking, BOOL proxyUsed,
+                                         const wchar_t* proxyUser, const wchar_t* proxyPassword) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetLoginErrorDlgInfo()");
-    char* n1 = SalamanderGeneral->DupStr((password != NULL && *password == 0) ? NULL : password);
-    char* n2 = SalamanderGeneral->DupStr((account != NULL && *account == 0) ? NULL : account);
+    std::wstring stagedPassword;
+    std::wstring stagedAccount;
+    if (!FtpStoreWideText(password != NULL ? password : L"", stagedPassword) ||
+        !FtpStoreWideText(account != NULL ? account : L"", stagedAccount))
+        return FALSE;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    if (Password != NULL)
-        SalamanderGeneral->Free(Password);
-    Password = n1;
-    if (Account != NULL)
-        SalamanderGeneral->Free(Account);
-    Account = n2;
+    Password.swap(stagedPassword);
+    Account.swap(stagedAccount);
     RetryLoginWithoutAsking = retryLoginWithoutAsking;
     if (proxyUsed && ProxyServer != NULL)
     {
@@ -971,6 +1184,9 @@ void CFTPOperation::SetLoginErrorDlgInfo(const char* password, const char* accou
         ProxyServer->SetProxyPassword(proxyPassword);
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    FTPSecureWipe(stagedPassword);
+    FTPSecureWipe(stagedAccount);
+    return TRUE;
 }
 
 void CFTPOperation::ReportWorkerChange(int workerID, BOOL reportProgressChange)
@@ -1142,16 +1358,14 @@ void CFTPOperation::PostChangeOnPathNotifications(BOOL softRefresh)
     HANDLES(EnterCriticalSection(&OperCritSect));
     if (SrcPathCanChange)
     {
-        TRACE_I("PostChangeOnPathNotification: soft: " << softRefresh << ", src: " << SourcePath << ": " << SrcPathCanChangeInclSubdirs);
-        BOOL isDiskPath = SourcePath[0] == '\\' && SourcePath[1] == '\\' ||
-                          SourcePath[0] != 0 && SourcePath[1] == ':';
+        TRACE_I("PostChangeOnPathNotification: soft: " << softRefresh << ", source subdirs: " << SrcPathCanChangeInclSubdirs);
+        BOOL isDiskPath = RemoteSourcePath == NULL;
         SalamanderGeneral->PostChangeOnPathNotification(SourcePath, SrcPathCanChangeInclSubdirs | (isDiskPath ? 0 : (softRefresh ? 0x02 /* soft refresh */ : 0)));
     }
     if (TgtPathCanChange)
     {
-        TRACE_I("PostChangeOnPathNotification: soft: " << softRefresh << ", tgt: " << TargetPath << ": " << TgtPathCanChangeInclSubdirs);
-        BOOL isDiskPath = TargetPath[0] == '\\' && TargetPath[1] == '\\' ||
-                          TargetPath[0] != 0 && TargetPath[1] == ':';
+        TRACE_I("PostChangeOnPathNotification: soft: " << softRefresh << ", target subdirs: " << TgtPathCanChangeInclSubdirs);
+        BOOL isDiskPath = RemoteTargetPath == NULL;
         SalamanderGeneral->PostChangeOnPathNotification(TargetPath, TgtPathCanChangeInclSubdirs | (isDiskPath ? 0 : (softRefresh ? 0x02 /* soft refresh */ : 0)));
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -1302,13 +1516,25 @@ BOOL CFTPOperation::GetDataActivityInLastPeriod()
     return (GetTickCount() - GlobalLastActivityTime.Get()) <= WORKER_STATUSUPDATETIMEOUT;
 }
 
-void CFTPOperation::GetTargetPath(char* buf, int bufSize)
+BOOL CFTPOperation::GetTargetPath(std::wstring& path) noexcept
 {
-    CALL_STACK_MESSAGE1("CFTPOperation::GetDiskOperDefaults()");
+    CALL_STACK_MESSAGE1("CFTPOperation::GetTargetPath()");
 
+    std::wstring staged;
+    BOOL ok = FALSE;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, TargetPath != NULL ? TargetPath : "", bufSize);
+    try
+    {
+        staged = TargetPath != NULL ? TargetPath : L"";
+        ok = TRUE;
+    }
+    catch (...)
+    {
+    }
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    if (ok)
+        path.swap(staged);
+    return ok;
 }
 
 void CFTPOperation::GetDiskOperDefaults(CFTPDiskWork* diskWork)
@@ -1699,16 +1925,23 @@ CFTPOperation::GetFTPServerPathType(const char* path)
     return type;
 }
 
+CFtpTextCodec CFTPOperation::GetPathTextCodec()
+{
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    const CFtpTextCodec codec = IdentityCodec;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+    return codec;
+}
+
 BOOL CFTPOperation::IsServerSystem(const char* systemName)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::IsServerSystem()");
 
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char sysName[201];
-    FTPGetServerSystem(ServerSystem.c_str(), sysName);
+    const std::string_view sysName = FTPGetServerSystem(ServerSystem.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
 
-    return _stricmp(sysName, systemName) == 0;
+    return systemName != NULL && FtpEqualAsciiTokenNoCase(sysName, systemName);
 }
 
 BOOL CFTPOperation::IsAlreadyExploredPath(const char* path)
@@ -1763,14 +1996,13 @@ void CFTPOperation::SetSizeCmdIsSupported(BOOL sizeCmdIsSupported)
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
-void CFTPOperation::GetListCommand(char* buf, int bufSize)
+BOOL CFTPOperation::GetListCommand(std::string& command)
 {
-    CALL_STACK_MESSAGE2("CFTPOperation::GetListCommand(, %d)", bufSize);
+    CALL_STACK_MESSAGE1("CFTPOperation::GetListCommand()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, (!ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT), bufSize);
-    if (bufSize > 2 && bufSize > (int)strlen(buf) + 2)
-        strcat(buf, "\r\n");
+    BOOL result = FTPFormatString(command, "%s\r\n", !ListCommand.empty() ? ListCommand.c_str() : LIST_CMD_TEXT);
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    return result;
 }
 
 BOOL CFTPOperation::GetUseListingsCache()
@@ -1782,19 +2014,11 @@ BOOL CFTPOperation::GetUseListingsCache()
     return ret;
 }
 
-void CFTPOperation::GetUser(char* buf, int bufSize)
-{
-    CALL_STACK_MESSAGE2("CFTPOperation::GetUser(, %d)", bufSize);
-    HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, User != NULL ? User : FTP_ANONYMOUS, bufSize);
-    HANDLES(LeaveCriticalSection(&OperCritSect));
-}
-
 char* CFTPOperation::AllocServerSystemReply()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::AllocServerSystemReply()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char* ret = SalamanderGeneral->DupStr(ServerSystem.c_str());
+    char* ret = DupOperationText(ServerSystem.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
@@ -1803,21 +2027,20 @@ char* CFTPOperation::AllocServerFirstReply()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::AllocServerFirstReply()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    char* ret = SalamanderGeneral->DupStr(ServerFirstReply.c_str());
+    char* ret = DupOperationText(ServerFirstReply.c_str());
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
 
-BOOL CFTPOperation::GetListingServerType(char* buf)
+BOOL CFTPOperation::GetListingServerType(std::string& type) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetListingServerType()");
+    std::string staged;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    BOOL ret = ListingServerType != NULL;
-    if (ret)
-        lstrcpyn(buf, ListingServerType, SERVERTYPE_MAX_SIZE);
-    else
-        buf[0] = 0;
+    const BOOL ret = FtpStoreLocalTextBytes(ListingServerType, staged);
     HANDLES(LeaveCriticalSection(&OperCritSect));
+    if (ret)
+        type.swap(staged);
     return ret;
 }
 
@@ -1929,131 +2152,56 @@ BOOL CFTPOperation::SearchWorkerWithNewError(int* index)
     return WorkersList.SearchWorkerWithNewError(index, lastErrorOccurenceTime);
 }
 
-BOOL CFTPOperation::CanMakeChangesOnPath(const char* user, const char* host, unsigned short port,
-                                         const char* path, CFTPServerPathType pathType,
-                                         int userLength)
+BOOL CFTPOperation::CanMakeChangesOnPath(const wchar_t* user, const wchar_t* host, unsigned short port,
+                                         const char* path, CFTPServerPathType pathType)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::CanMakeChangesOnPath()");
-    char buf[FTP_USERPART_SIZE];
     BOOL ret = FALSE;
     HANDLES(EnterCriticalSection(&OperCritSect));
-    if (SrcPathCanChange)
+    const wchar_t* normalizedUser = user != NULL && *user != 0 ? user : L"anonymous";
+    const BOOL identityMatches = host != NULL && !Host.empty() && Port == port &&
+                                  User == normalizedUser &&
+                                  CompareStringOrdinal(Host.c_str(), -1, host, -1, TRUE) == CSTR_EQUAL;
+    if (identityMatches && SrcPathCanChange && RemoteSourcePath != NULL)
     {
-        BOOL isFTP = SalamanderGeneral->StrNICmp(SourcePath, AssignedFSName, AssignedFSNameLen) == 0 &&          // this is our fs-name (FTP)
-                     SourcePath[AssignedFSNameLen] == ':';                                                       // our fs-name is not just a prefix
-        BOOL isFTPS = SalamanderGeneral->StrNICmp(SourcePath, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 && // this is our fs-name (FTPS)
-                      SourcePath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
-        if (isFTP || isFTPS)
-        {
-            lstrcpyn(buf, SourcePath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
-            char *user2, *host2, *portStr2, *pathStr2;
-            FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, &pathStr2, NULL, userLength);
-            const char* pathPart2 = NULL;
-            if (pathStr2 != NULL && pathStr2 > buf)
-                pathPart2 = SourcePath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1 + (pathStr2 - buf) - 1;
-            int port2 = portStr2 != NULL ? atoi(portStr2) : IPPORT_FTP;
-            if (user2 != NULL && strcmp(user2, FTP_ANONYMOUS) == 0)
-                user2 = NULL;
-            if (host2 != NULL && host != NULL && pathPart2 != NULL &&
-                SalamanderGeneral->StrICmp(host2, host) == 0 &&
-                (user2 == NULL && user == NULL ||
-                 user != NULL && user2 != NULL && strcmp(user2, user) == 0) &&
-                port2 == port &&
-                FTPIsPrefixOfServerPath(pathType, FTPGetLocalPath(pathPart2, pathType),
-                                        path, !SrcPathCanChangeInclSubdirs))
-            {
-                ret = TRUE;
-            }
-        }
+        ret = FTPIsPrefixOfServerPath(pathType,
+                                      RemoteSourcePath,
+                                      path, !SrcPathCanChangeInclSubdirs);
     }
-    if (!ret && TgtPathCanChange)
+    if (!ret && identityMatches && TgtPathCanChange && RemoteTargetPath != NULL)
     {
-        BOOL isFTP = SalamanderGeneral->StrNICmp(TargetPath, AssignedFSName, AssignedFSNameLen) == 0 &&          // this is our fs-name (FTP)
-                     TargetPath[AssignedFSNameLen] == ':';                                                       // our fs-name is not just a prefix
-        BOOL isFTPS = SalamanderGeneral->StrNICmp(TargetPath, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 && // this is our fs-name (FTPS)
-                      TargetPath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
-        if (isFTP || isFTPS)
-        {
-            lstrcpyn(buf, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
-            char *user2, *host2, *portStr2, *pathStr2;
-            FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, &pathStr2, NULL, userLength);
-            const char* pathPart2 = NULL;
-            if (pathStr2 != NULL && pathStr2 > buf)
-                pathPart2 = TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1 + (pathStr2 - buf) - 1;
-            int port2 = portStr2 != NULL ? atoi(portStr2) : IPPORT_FTP;
-            if (user2 != NULL && strcmp(user2, FTP_ANONYMOUS) == 0)
-                user2 = NULL;
-            if (host2 != NULL && host != NULL && pathPart2 != NULL &&
-                SalamanderGeneral->StrICmp(host2, host) == 0 &&
-                (user2 == NULL && user == NULL ||
-                 user != NULL && user2 != NULL && strcmp(user2, user) == 0) &&
-                port2 == port &&
-                FTPIsPrefixOfServerPath(pathType, FTPGetLocalPath(pathPart2, pathType),
-                                        path, !TgtPathCanChangeInclSubdirs))
-            {
-                ret = TRUE;
-            }
-        }
+        ret = FTPIsPrefixOfServerPath(pathType,
+                                      RemoteTargetPath,
+                                      path, !TgtPathCanChangeInclSubdirs);
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
 
-BOOL CFTPOperation::IsUploadingToServer(const char* user, const char* host, unsigned short port,
-                                        int userLength)
+BOOL CFTPOperation::IsUploadingToServer(const wchar_t* user, const wchar_t* host, unsigned short port)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::IsUploadingToServer()");
-    char buf[FTP_USERPART_SIZE];
     BOOL ret = FALSE;
     HANDLES(EnterCriticalSection(&OperCritSect));
+    const wchar_t* normalizedUser = user != NULL && *user != 0 ? user : L"anonymous";
+    const BOOL identityMatches = host != NULL && !Host.empty() && Port == port &&
+                                  User == normalizedUser &&
+                                  CompareStringOrdinal(Host.c_str(), -1, host, -1, TRUE) == CSTR_EQUAL;
 
-    if (Type == fotCopyUpload || Type == fotMoveUpload) // this is an upload
-    {
-        BOOL isFTP = SalamanderGeneral->StrNICmp(TargetPath, AssignedFSName, AssignedFSNameLen) == 0 &&          // this is our fs-name (FTP)
-                     TargetPath[AssignedFSNameLen] == ':';                                                       // our fs-name is not just a prefix
-        BOOL isFTPS = SalamanderGeneral->StrNICmp(TargetPath, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 && // this is our fs-name (FTPS)
-                      TargetPath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
-        if (isFTP || isFTPS)
-        {
-            lstrcpyn(buf, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
-            char *user2, *host2, *portStr2;
-            FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, NULL, NULL, userLength);
-            int port2 = portStr2 != NULL ? atoi(portStr2) : IPPORT_FTP;
-            if (user2 != NULL && strcmp(user2, FTP_ANONYMOUS) == 0)
-                user2 = NULL;
-            if (host2 != NULL && host != NULL &&
-                SalamanderGeneral->StrICmp(host2, host) == 0 &&
-                (user2 == NULL && user == NULL ||
-                 user != NULL && user2 != NULL && strcmp(user2, user) == 0) &&
-                port2 == port)
-            {
-                ret = TRUE;
-            }
-        }
-    }
+    if (identityMatches && (Type == fotCopyUpload || Type == fotMoveUpload) && RemoteTargetPath != NULL)
+        ret = TRUE;
 
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
 
-void CFTPOperation::GetUserHostPort(char* user, char* host, unsigned short* port)
+void CFTPOperation::GetUserHostPort(const wchar_t** user, const wchar_t*& host, unsigned short* port) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetUserHostPort()");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    if (host != NULL)
-    {
-        if (Host != NULL)
-            lstrcpyn(host, Host, HOST_MAX_SIZE);
-        else
-            host[0] = 0;
-    }
+    host = Host.c_str();
     if (user != NULL)
-    {
-        if (User != NULL)
-            lstrcpyn(user, User, USER_MAX_SIZE);
-        else
-            user[0] = 0;
-    }
+        *user = User.empty() ? L"anonymous" : User.c_str();
     if (port != NULL)
         *port = Port;
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -2082,6 +2230,8 @@ CFTPQueueItem::CFTPQueueItem()
 
     Path = NULL;
     Name = NULL;
+    LocalPath = NULL;
+    LocalName = NULL;
 }
 
 CFTPQueueItem::~CFTPQueueItem()
@@ -2090,6 +2240,10 @@ CFTPQueueItem::~CFTPQueueItem()
         SalamanderGeneral->Free(Path);
     if (Name != NULL)
         SalamanderGeneral->Free(Name);
+    if (LocalPath != NULL)
+        SalamanderGeneral->Free(LocalPath);
+    if (LocalName != NULL)
+        SalamanderGeneral->Free(LocalName);
     if (ErrAllocDescr != NULL)
         SalamanderGeneral->Free(ErrAllocDescr);
 }
@@ -2101,8 +2255,19 @@ void CFTPQueueItem::SetItem(int parentUID, CFTPQueueItemType type, CFTPQueueItem
     Type = type;
     SetStateInternal(state);
     ProblemID = problemID;
-    Path = SalamanderGeneral->DupStr(path);
-    Name = SalamanderGeneral->DupStr(name);
+    Path = DupOperationText(path);
+    Name = DupOperationText(name);
+}
+
+void CFTPQueueItem::SetLocalItem(int parentUID, CFTPQueueItemType type, CFTPQueueItemState state,
+                                 DWORD problemID, const wchar_t* path, const wchar_t* name)
+{
+    ParentUID = parentUID;
+    Type = type;
+    SetStateInternal(state);
+    ProblemID = problemID;
+    LocalPath = DupOperationWideText(path);
+    LocalName = DupOperationWideText(name);
 }
 
 BOOL CFTPQueueItem::HasErrorToSolve(BOOL* canSkip, BOOL* canRetry)
@@ -2132,339 +2297,261 @@ BOOL CFTPQueueItem::HasErrorToSolve(BOOL* canSkip, BOOL* canRetry)
     }
 }
 
-void CFTPQueueItem::GetProblemDescr(char* buf, int bufSize)
+BOOL CFTPQueueItem::GetProblemDescr(const CFtpTextCodec& codec, std::wstring& description) noexcept
 {
-    char errBuf[300];
+    std::string message;
+    std::string errorText;
     BOOL addErrAllocDescr = FALSE; // TRUE = if we have some server reply in ErrAllocDescr, append its first line to the message
-    if (bufSize > 0)
+    BOOL success = TRUE;
+    switch (ProblemID)
     {
+    case ITEMPR_OK:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_OK));
+        break;
+    case ITEMPR_LOWMEM:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_LOWMEM));
+        break;
+
+    case ITEMPR_CANNOTCREATETGTFILE:
+    case ITEMPR_CANNOTCREATETGTDIR:
+    case ITEMPR_TGTFILEREADERROR:
+    case ITEMPR_SRCFILEREADERROR:
+    case ITEMPR_TGTFILEWRITEERROR:
+    case ITEMPR_UPLOADCANNOTLISTSRCPATH:
+    case ITEMPR_UNABLETODELETEDISKDIR:
+    case ITEMPR_UNABLETODELETEDISKFILE:
+    case ITEMPR_UPLOADCANNOTOPENSRCFILE:
+    {
+        if (WinError != NO_ERROR)
+            success = FTPGetErrorText(WinError, errorText);
+        else
+            success = FtpStoreProtocolBytes(LoadStr(IDS_UNKNOWNERROR), errorText);
+        while (!errorText.empty() && (errorText.back() == '\r' || errorText.back() == '\n' || errorText.back() == '.'))
+            errorText.pop_back();
+        int resID = 0;
         switch (ProblemID)
         {
-        case ITEMPR_OK:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_OK));
-            break;
-        case ITEMPR_LOWMEM:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_LOWMEM));
-            break;
-
-        case ITEMPR_CANNOTCREATETGTFILE:
-        case ITEMPR_CANNOTCREATETGTDIR:
-        case ITEMPR_TGTFILEREADERROR:
-        case ITEMPR_SRCFILEREADERROR:
-        case ITEMPR_TGTFILEWRITEERROR:
-        case ITEMPR_UPLOADCANNOTLISTSRCPATH:
-        case ITEMPR_UNABLETODELETEDISKDIR:
-        case ITEMPR_UNABLETODELETEDISKFILE:
-        case ITEMPR_UPLOADCANNOTOPENSRCFILE:
-        {
-            if (WinError != NO_ERROR)
-                FTPGetErrorText(WinError, errBuf, 300);
-            else
-                lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
-            char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
-            while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))
-                ;
-            *(s + 1) = 0;
-            int resID = 0;
-            switch (ProblemID)
-            {
-            case ITEMPR_CANNOTCREATETGTFILE:
-                resID = IDS_OPERDOPPR_CANTCRTGTFILE;
-                break;
-            case ITEMPR_CANNOTCREATETGTDIR:
-                resID = IDS_OPERDOPPR_CANTCRTGTDIR;
-                break;
-            case ITEMPR_TGTFILEREADERROR:
-                resID = IDS_OPERDOPPR_TGTFILEREADERROR;
-                break;
-            case ITEMPR_SRCFILEREADERROR:
-                resID = IDS_OPERDOPPR_SRCFILEREADERROR;
-                break;
-            case ITEMPR_TGTFILEWRITEERROR:
-                resID = IDS_OPERDOPPR_TGTFILEWRITEERROR;
-                break;
-            case ITEMPR_UPLOADCANNOTLISTSRCPATH:
-                resID = IDS_OPERDOPPR_UPLCANTLISTSRCPATH;
-                break;
-            case ITEMPR_UNABLETODELETEDISKDIR:
-                resID = IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR;
-                break;
-            case ITEMPR_UPLOADCANNOTOPENSRCFILE:
-                resID = IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE;
-                break;
-            case ITEMPR_UNABLETODELETEDISKFILE:
-                resID = IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE;
-                break;
-            }
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(resID), errBuf);
-            break;
+        case ITEMPR_CANNOTCREATETGTFILE: resID = IDS_OPERDOPPR_CANTCRTGTFILE; break;
+        case ITEMPR_CANNOTCREATETGTDIR: resID = IDS_OPERDOPPR_CANTCRTGTDIR; break;
+        case ITEMPR_TGTFILEREADERROR: resID = IDS_OPERDOPPR_TGTFILEREADERROR; break;
+        case ITEMPR_SRCFILEREADERROR: resID = IDS_OPERDOPPR_SRCFILEREADERROR; break;
+        case ITEMPR_TGTFILEWRITEERROR: resID = IDS_OPERDOPPR_TGTFILEWRITEERROR; break;
+        case ITEMPR_UPLOADCANNOTLISTSRCPATH: resID = IDS_OPERDOPPR_UPLCANTLISTSRCPATH; break;
+        case ITEMPR_UNABLETODELETEDISKDIR: resID = IDS_OPERDOPPR_UPLCANTDELSRCDISKDIR; break;
+        case ITEMPR_UPLOADCANNOTOPENSRCFILE: resID = IDS_OPERDOPPR_UPLCANNOTOPENSRCFILE; break;
+        case ITEMPR_UNABLETODELETEDISKFILE: resID = IDS_OPERDOPPR_UPLCANTDELSRCDISKFILE; break;
         }
+        success = success && FTPFormatString(message, LoadStr(resID), errorText.c_str());
+        break;
+    }
 
-        case ITEMPR_TGTFILEALREADYEXISTS:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_TGTFILEEXISTS));
-            break;
-        case ITEMPR_TGTDIRALREADYEXISTS:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_TGTDIREXISTS));
-            break;
+    case ITEMPR_TGTFILEALREADYEXISTS:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_TGTFILEEXISTS));
+        break;
+    case ITEMPR_TGTDIRALREADYEXISTS:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_TGTDIREXISTS));
+        break;
 
-        case ITEMPR_RETRYONCREATFILE:
-        case ITEMPR_RETRYONRESUMFILE:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_TRANSFERFAILED));
-            break;
+    case ITEMPR_RETRYONCREATFILE:
+    case ITEMPR_RETRYONRESUMFILE:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_TRANSFERFAILED));
+        break;
 
-        case ITEMPR_ASCIITRFORBINFILE:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_ASCIITRBINFILE));
-            break;
+    case ITEMPR_ASCIITRFORBINFILE:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_ASCIITRBINFILE));
+        break;
 
-        case ITEMPR_UNKNOWNATTRS:
+    case ITEMPR_UNKNOWNATTRS:
+    {
+        const char* attrs;
+        switch (Type)
         {
-            const char* attrs;
-            switch (Type)
-            {
-            case fqitChAttrsFile:
-                attrs = ((CFTPQueueItemChAttr*)this)->OrigRights;
-                break;
-            case fqitChAttrsDir:
-                attrs = ((CFTPQueueItemChAttrDir*)this)->OrigRights;
-                break;
-            case fqitChAttrsExploreDir:
-                attrs = ((CFTPQueueItemChAttrExplore*)this)->OrigRights;
-                break;
-
-            default:
-            {
-                TRACE_E("Unexpected situation in CFTPQueueItem::GetProblemDescr(): ITEMPR_UNKNOWNATTRS with unknown original attributes!");
-                attrs = "???";
-                break;
-            }
-            }
-            if (attrs == NULL)
-                attrs = LoadStr(IDS_OPERDOPPR_UNKEXISTATTR);
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNKNOWNATTRS), attrs); // attrs might even be NULL (on error); sprintf can cope with that
-            break;
-        }
-
-        case ITEMPR_INVALIDPATHTODIR:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_INVALIDPATHTODIR));
-            break;
-
-        case ITEMPR_INVALIDPATHTOLINK:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_INVALIDPATHTOLINK));
-            break;
-
-        case ITEMPR_UNABLETOCWD:
-        case ITEMPR_UNABLETOCWDONLYPATH:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETOCWD));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UNABLETOPWD:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETOPWD));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_DIREXPLENDLESSLOOP:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_DIREXPLENDLESSLOOP));
-            break;
-
-        case ITEMPR_LISTENFAILURE:
-        {
-            if (WinError != NO_ERROR)
-                FTPGetErrorText(WinError, errBuf, 300);
-            else
-                lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
-            char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
-            while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))
-                ;
-            *(s + 1) = 0;
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_LISTENFAILURE), errBuf);
-            break;
-        }
-
-        case ITEMPR_UPLOADCANNOTLISTTGTPATH:
-        case ITEMPR_INCOMPLETELISTING:
-        case ITEMPR_INCOMPLETEDOWNLOAD:
-        case ITEMPR_INCOMPLETEUPLOAD:
-        {
-            if (ErrAllocDescr != NULL)
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE,
-                            LoadStr(ProblemID == ITEMPR_INCOMPLETELISTING ? IDS_OPERDOPPR_INCOMPLLISTING2 : ProblemID == ITEMPR_INCOMPLETEDOWNLOAD ? IDS_OPERDOPPR_INCOMPLDOWNLOAD2
-                                                                                                        : ProblemID == ITEMPR_INCOMPLETEUPLOAD     ? IDS_OPERDOPPR_INCOMPLUPLOAD2
-                                                                                                                                                   : IDS_OPERDOPPR_UPLCANTLISTTGTPATH2));
-                addErrAllocDescr = TRUE;
-            }
-            else
-            {
-                if (WinError != NO_ERROR)
-                    FTPGetErrorText(WinError, errBuf, 300);
-                else
-                {
-                    if (ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
-                        errBuf[0] = 0;
-                    else
-                        lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
-                }
-                char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
-                while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))
-                    ;
-                *(s + 1) = 0;
-                _snprintf_s(buf, bufSize, _TRUNCATE,
-                            LoadStr(ProblemID == ITEMPR_INCOMPLETELISTING ? IDS_OPERDOPPR_INCOMPLLISTING1 : ProblemID == ITEMPR_INCOMPLETEDOWNLOAD ? IDS_OPERDOPPR_INCOMPLDOWNLOAD1
-                                                                                                        : ProblemID == ITEMPR_INCOMPLETEUPLOAD     ? IDS_OPERDOPPR_INCOMPLUPLOAD1
-                                                                                                        : errBuf[0] == 0                           ? IDS_OPERDOPPR_UPLCANTLISTTGTPATH
-                                                                                                                                                   : IDS_OPERDOPPR_UPLCANTLISTTGTPATH3),
-                            errBuf);
-            }
-            break;
-        }
-
-        case ITEMPR_UNABLETOPARSELISTING:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETOPARSELISTING));
-            break;
-
-        case ITEMPR_DIRISHIDDEN:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_DIRISHIDDEN));
-            break;
-        case ITEMPR_DIRISNOTEMPTY:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_DIRISNOTEMPTY));
-            break;
-        case ITEMPR_FILEISHIDDEN:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_FILEISHIDDEN));
-            break;
-
-        case ITEMPR_UNABLETORESOLVELNK:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETORESOLVELNK));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UNABLETODELETEFILE:
-        case ITEMPR_UNABLETODELSRCFILE:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE,
-                        LoadStr(ProblemID == ITEMPR_UNABLETODELETEFILE ? IDS_OPERDOPPR_UNABLETODELFILE : IDS_OPERDOPPR_UNABLETODELSRCFILE));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UNABLETODELETEDIR:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETODELDIR));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UNABLETOCHATTRS:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETOCHATTRS));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UNABLETORESUME:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UNABLETORESUME));
-            break;
-        case ITEMPR_RESUMETESTFAILED:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_RESUMETESTFAILED));
-            break;
-
-        case ITEMPR_UPLOADCANNOTCREATETGTDIR:
-        {
-            if (ErrAllocDescr == NULL)
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE,
-                            LoadStr(WinError == ERROR_ALREADY_EXISTS ? IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX : IDS_OPERDOPPR_UPLCANTCRTGTDIRINV));
-            }
-            else
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLCANTCRTGTDIR));
-                addErrAllocDescr = TRUE;
-            }
-            break;
-        }
-
-        case ITEMPR_UPLOADTGTDIRALREADYEXISTS:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLTGTDIREXISTS));
-            break;
-
-        case ITEMPR_UPLOADCRDIRAUTORENFAILED:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UPLOADFILEAUTORENFAILED:
-        {
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLFILEAUTORENFAILED));
-            addErrAllocDescr = TRUE;
-            break;
-        }
-
-        case ITEMPR_UPLOADCANNOTCREATETGTFILE:
-        {
-            if (ErrAllocDescr == NULL)
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE,
-                            LoadStr(WinError == ERROR_ALREADY_EXISTS ? IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX : IDS_OPERDOPPR_UPLCANTCRTGTFILEINV));
-            }
-            else
-            {
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLCANTCRTGTFILE));
-                addErrAllocDescr = TRUE;
-            }
-            break;
-        }
-
-        case ITEMPR_UPLOADTGTFILEALREADYEXISTS:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLTGTFILEEXISTS));
-            break;
-        case ITEMPR_SRCFILEINUSE:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_SRCFILEINUSE));
-            break;
-        case ITEMPR_TGTFILEINUSE:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_TGTFILEINUSE));
-            break;
-        case ITEMPR_UPLOADASCIIRESUMENOTSUP:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLASCIIRESNOTSUP));
-            break;
-        case ITEMPR_UPLOADUNABLETORESUMEUNKSIZ:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ));
-            break;
-        case ITEMPR_UPLOADUNABLETORESUMEBIGTGT:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPUNABLERESBIGTGT));
-            break;
-        case ITEMPR_SKIPPEDBYUSER:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_SKIPPEDBYUSER));
-            break;
-        case ITEMPR_UPLOADTESTIFFINISHEDNOTSUP:
-            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPPR_UPLTESTIFFINNOTSUP));
-            break;
-
+        case fqitChAttrsFile: attrs = ((CFTPQueueItemChAttr*)this)->OrigRights; break;
+        case fqitChAttrsDir: attrs = ((CFTPQueueItemChAttrDir*)this)->OrigRights; break;
+        case fqitChAttrsExploreDir: attrs = ((CFTPQueueItemChAttrExplore*)this)->OrigRights; break;
         default:
+            TRACE_E("Unexpected situation in CFTPQueueItem::GetProblemDescr(): ITEMPR_UNKNOWNATTRS with unknown original attributes!");
+            attrs = "???";
+            break;
+        }
+        if (attrs == NULL)
+            attrs = LoadStr(IDS_OPERDOPPR_UNKEXISTATTR);
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNKNOWNATTRS), attrs);
+        break;
+    }
+
+    case ITEMPR_INVALIDPATHTODIR:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_INVALIDPATHTODIR));
+        break;
+    case ITEMPR_INVALIDPATHTOLINK:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_INVALIDPATHTOLINK));
+        break;
+
+    case ITEMPR_UNABLETOCWD:
+    case ITEMPR_UNABLETOCWDONLYPATH:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETOCWD));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UNABLETOPWD:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETOPWD));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_DIREXPLENDLESSLOOP:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_DIREXPLENDLESSLOOP));
+        break;
+
+    case ITEMPR_LISTENFAILURE:
+        if (WinError != NO_ERROR)
+            success = FTPGetErrorText(WinError, errorText);
+        else
+            success = FtpStoreProtocolBytes(LoadStr(IDS_UNKNOWNERROR), errorText);
+        while (!errorText.empty() && (errorText.back() == '\r' || errorText.back() == '\n' || errorText.back() == '.'))
+            errorText.pop_back();
+        success = success && FTPFormatString(message, LoadStr(IDS_OPERDOPPR_LISTENFAILURE), errorText.c_str());
+        break;
+
+    case ITEMPR_UPLOADCANNOTLISTTGTPATH:
+    case ITEMPR_INCOMPLETELISTING:
+    case ITEMPR_INCOMPLETEDOWNLOAD:
+    case ITEMPR_INCOMPLETEUPLOAD:
+        if (ErrAllocDescr != NULL)
         {
-            TRACE_E("Unexpected situation in CFTPQueueItem::GetProblemDescr(): unknown ProblemID!");
-            buf[0] = 0;
+            success = FTPFormatString(message,
+                                      LoadStr(ProblemID == ITEMPR_INCOMPLETELISTING ? IDS_OPERDOPPR_INCOMPLLISTING2 : ProblemID == ITEMPR_INCOMPLETEDOWNLOAD ? IDS_OPERDOPPR_INCOMPLDOWNLOAD2
+                                                                                                                  : ProblemID == ITEMPR_INCOMPLETEUPLOAD     ? IDS_OPERDOPPR_INCOMPLUPLOAD2
+                                                                                                                                                             : IDS_OPERDOPPR_UPLCANTLISTTGTPATH2));
+            addErrAllocDescr = TRUE;
         }
+        else
+        {
+            if (WinError != NO_ERROR)
+                success = FTPGetErrorText(WinError, errorText);
+            else
+            {
+                if (ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
+                    errorText.clear();
+                else
+                    success = FtpStoreProtocolBytes(LoadStr(IDS_UNKNOWNERROR), errorText);
+            }
+            while (!errorText.empty() && (errorText.back() == '\r' || errorText.back() == '\n' || errorText.back() == '.'))
+                errorText.pop_back();
+            success = success && FTPFormatString(message,
+                                                 LoadStr(ProblemID == ITEMPR_INCOMPLETELISTING ? IDS_OPERDOPPR_INCOMPLLISTING1 : ProblemID == ITEMPR_INCOMPLETEDOWNLOAD ? IDS_OPERDOPPR_INCOMPLDOWNLOAD1
+                                                                                                                             : ProblemID == ITEMPR_INCOMPLETEUPLOAD     ? IDS_OPERDOPPR_INCOMPLUPLOAD1
+                                                                                                                              : errorText.empty()                        ? IDS_OPERDOPPR_UPLCANTLISTTGTPATH
+                                                                                                                                                                         : IDS_OPERDOPPR_UPLCANTLISTTGTPATH3),
+                                                 errorText.c_str());
+        }
+        break;
+
+    case ITEMPR_UNABLETOPARSELISTING:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETOPARSELISTING));
+        break;
+
+    case ITEMPR_DIRISHIDDEN: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_DIRISHIDDEN)); break;
+    case ITEMPR_DIRISNOTEMPTY: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_DIRISNOTEMPTY)); break;
+    case ITEMPR_FILEISHIDDEN: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_FILEISHIDDEN)); break;
+
+    case ITEMPR_UNABLETORESOLVELNK:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETORESOLVELNK));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UNABLETODELETEFILE:
+    case ITEMPR_UNABLETODELSRCFILE:
+        success = FTPFormatString(message, LoadStr(ProblemID == ITEMPR_UNABLETODELETEFILE ? IDS_OPERDOPPR_UNABLETODELFILE : IDS_OPERDOPPR_UNABLETODELSRCFILE));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UNABLETODELETEDIR:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETODELDIR));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UNABLETOCHATTRS:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETOCHATTRS));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UNABLETORESUME: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UNABLETORESUME)); break;
+    case ITEMPR_RESUMETESTFAILED: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_RESUMETESTFAILED)); break;
+
+    case ITEMPR_UPLOADCANNOTCREATETGTDIR:
+        if (ErrAllocDescr == NULL)
+        {
+            success = FTPFormatString(message, LoadStr(WinError == ERROR_ALREADY_EXISTS ? IDS_OPERDOPPR_UPLCANTCRTGTDIRFILEEX : IDS_OPERDOPPR_UPLCANTCRTGTDIRINV));
+        }
+        else
+        {
+            success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLCANTCRTGTDIR));
+            addErrAllocDescr = TRUE;
+        }
+        break;
+
+    case ITEMPR_UPLOADTGTDIRALREADYEXISTS: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLTGTDIREXISTS)); break;
+    case ITEMPR_UPLOADCRDIRAUTORENFAILED:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLCRDIRAUTORENFAILED));
+        addErrAllocDescr = TRUE;
+        break;
+    case ITEMPR_UPLOADFILEAUTORENFAILED:
+        success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLFILEAUTORENFAILED));
+        addErrAllocDescr = TRUE;
+        break;
+
+    case ITEMPR_UPLOADCANNOTCREATETGTFILE:
+        if (ErrAllocDescr == NULL)
+        {
+            success = FTPFormatString(message, LoadStr(WinError == ERROR_ALREADY_EXISTS ? IDS_OPERDOPPR_UPLCANTCRTGTFILEDIREX : IDS_OPERDOPPR_UPLCANTCRTGTFILEINV));
+        }
+        else
+        {
+            success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLCANTCRTGTFILE));
+            addErrAllocDescr = TRUE;
+        }
+        break;
+
+    case ITEMPR_UPLOADTGTFILEALREADYEXISTS: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLTGTFILEEXISTS)); break;
+    case ITEMPR_SRCFILEINUSE: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_SRCFILEINUSE)); break;
+    case ITEMPR_TGTFILEINUSE: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_TGTFILEINUSE)); break;
+    case ITEMPR_UPLOADASCIIRESUMENOTSUP: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLASCIIRESNOTSUP)); break;
+    case ITEMPR_UPLOADUNABLETORESUMEUNKSIZ: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ)); break;
+    case ITEMPR_UPLOADUNABLETORESUMEBIGTGT: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPUNABLERESBIGTGT)); break;
+    case ITEMPR_SKIPPEDBYUSER: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_SKIPPEDBYUSER)); break;
+    case ITEMPR_UPLOADTESTIFFINISHEDNOTSUP: success = FTPFormatString(message, LoadStr(IDS_OPERDOPPR_UPLTESTIFFINNOTSUP)); break;
+
+    default:
+        TRACE_E("Unexpected situation in CFTPQueueItem::GetProblemDescr(): unknown ProblemID!");
+        message.clear();
+        break;
+    }
+
+    std::wstring staged;
+    if (!success || !FtpDecodeLocalText(message, staged))
+        return FALSE;
+    if (addErrAllocDescr && ErrAllocDescr != NULL)
+    {
+        size_t detailLength = 0;
+        while (ErrAllocDescr[detailLength] >= ' ')
+            ++detailLength;
+        std::wstring detail;
+        if (!FtpDecodeServerTextForPresentation(codec,
+                                                std::string_view(ErrAllocDescr, detailLength),
+                                                detail))
+            return FALSE;
+        try
+        {
+            staged.push_back(L' ');
+            staged.append(detail);
+        }
+        catch (...)
+        {
+            return FALSE;
         }
     }
-    if (addErrAllocDescr && ErrAllocDescr != NULL && bufSize > 0)
-    { // if we have some server reply, append its first line to the message
-        char* end = buf + bufSize - 1;
-        char* s = buf + strlen(buf);
-        char* src = ErrAllocDescr;
-        if (s < end)
-            *s++ = ' ';
-        while (s < end && *src >= ' ')
-            *s++ = *src++;
-        *s = 0;
-    }
+    description.swap(staged);
+    return TRUE;
 }
 
 //
@@ -2658,8 +2745,8 @@ BOOL CFTPQueueItemDelExplore::SetItemDelExplore(int isTopLevelDir, int isHiddenD
 
 CFTPQueueItemCopyOrMove::CFTPQueueItemCopyOrMove()
 {
-    TgtPath = NULL;
-    TgtName = NULL;
+    LocalTgtPath = NULL;
+    LocalTgtName = NULL;
     Size.SetUI64(0);
     AsciiTransferMode = 0;
     IgnoreAsciiTrModeForBinFile = 0;
@@ -2672,18 +2759,19 @@ CFTPQueueItemCopyOrMove::CFTPQueueItemCopyOrMove()
 
 CFTPQueueItemCopyOrMove::~CFTPQueueItemCopyOrMove()
 {
-    if (TgtPath != NULL)
-        SalamanderGeneral->Free(TgtPath);
-    if (TgtName != NULL)
-        SalamanderGeneral->Free(TgtName);
+    if (LocalTgtPath != NULL)
+        SalamanderGeneral->Free(LocalTgtPath);
+    if (LocalTgtName != NULL)
+        SalamanderGeneral->Free(LocalTgtName);
 }
 
-void CFTPQueueItemCopyOrMove::SetItemCopyOrMove(const char* tgtPath, const char* tgtName, const CQuadWord& size,
+void CFTPQueueItemCopyOrMove::SetItemCopyOrMove(const wchar_t* localTgtPath, const wchar_t* localTgtName,
+                                                const CQuadWord& size,
                                                 int asciiTransferMode, int sizeInBytes, int tgtFileState,
                                                 BOOL dateAndTimeValid, const CFTPDate& date, const CFTPTime& time)
 {
-    TgtPath = SalamanderGeneral->DupStr(tgtPath);
-    TgtName = SalamanderGeneral->DupStr(tgtName);
+    LocalTgtPath = DupOperationWideText(localTgtPath);
+    LocalTgtName = DupOperationWideText(localTgtName);
     Size = size;
     AsciiTransferMode = asciiTransferMode;
     SizeInBytes = sizeInBytes;
@@ -2729,8 +2817,8 @@ void CFTPQueueItemCopyOrMoveUpload::SetItemCopyOrMoveUpload(const char* tgtPath,
                                                             const CQuadWord& size, int asciiTransferMode,
                                                             int tgtFileState)
 {
-    TgtPath = SalamanderGeneral->DupStr(tgtPath);
-    TgtName = SalamanderGeneral->DupStr(tgtName);
+    TgtPath = DupOperationText(tgtPath);
+    TgtName = DupOperationText(tgtName);
     Size = size;
     AsciiTransferMode = asciiTransferMode;
     TgtFileState = tgtFileState;
@@ -2743,24 +2831,24 @@ void CFTPQueueItemCopyOrMoveUpload::SetItemCopyOrMoveUpload(const char* tgtPath,
 
 CFTPQueueItemCopyMoveExplore::CFTPQueueItemCopyMoveExplore()
 {
-    TgtPath = NULL;
-    TgtName = NULL;
+    LocalTgtPath = NULL;
+    LocalTgtName = NULL;
     TgtDirState = 0;
 }
 
 CFTPQueueItemCopyMoveExplore::~CFTPQueueItemCopyMoveExplore()
 {
-    if (TgtPath != NULL)
-        SalamanderGeneral->Free(TgtPath);
-    if (TgtName != NULL)
-        SalamanderGeneral->Free(TgtName);
+    if (LocalTgtPath != NULL)
+        SalamanderGeneral->Free(LocalTgtPath);
+    if (LocalTgtName != NULL)
+        SalamanderGeneral->Free(LocalTgtName);
 }
 
-void CFTPQueueItemCopyMoveExplore::SetItemCopyMoveExplore(const char* tgtPath, const char* tgtName,
+void CFTPQueueItemCopyMoveExplore::SetItemCopyMoveExplore(const wchar_t* localTgtPath, const wchar_t* localTgtName,
                                                           int tgtDirState)
 {
-    TgtPath = SalamanderGeneral->DupStr(tgtPath);
-    TgtName = SalamanderGeneral->DupStr(tgtName);
+    LocalTgtPath = DupOperationWideText(localTgtPath);
+    LocalTgtName = DupOperationWideText(localTgtName);
     TgtDirState = tgtDirState;
 }
 
@@ -2788,8 +2876,8 @@ void CFTPQueueItemCopyMoveUploadExplore::SetItemCopyMoveUploadExplore(const char
                                                                       const char* tgtName,
                                                                       int tgtDirState)
 {
-    TgtPath = SalamanderGeneral->DupStr(tgtPath);
-    TgtName = SalamanderGeneral->DupStr(tgtName);
+    TgtPath = DupOperationText(tgtPath);
+    TgtName = DupOperationText(tgtName);
     TgtDirState = tgtDirState;
 }
 
@@ -2797,6 +2885,11 @@ void CFTPQueueItemCopyMoveUploadExplore::SetItemCopyMoveUploadExplore(const char
 // ****************************************************************************
 // CFTPQueueItemChAttr
 //
+
+static char* DupQueueRights(const char* text)
+{
+    return text != NULL ? _strdup(text) : NULL;
+}
 
 CFTPQueueItemChAttr::CFTPQueueItemChAttr()
 {
@@ -2815,7 +2908,7 @@ void CFTPQueueItemChAttr::SetItemChAttr(WORD attr, const char* origRights, BYTE 
 {
     Attr = attr;
     AttrErr = attrErr;
-    OrigRights = SalamanderGeneral->DupStr(origRights);
+    OrigRights = DupQueueRights(origRights);
 }
 
 //
@@ -2840,7 +2933,7 @@ void CFTPQueueItemChAttrDir::SetItemChAttrDir(WORD attr, const char* origRights,
 {
     Attr = attr;
     AttrErr = attrErr;
-    OrigRights = SalamanderGeneral->DupStr(origRights);
+    OrigRights = DupQueueRights(origRights);
 }
 
 //
@@ -2861,7 +2954,7 @@ CFTPQueueItemChAttrExplore::~CFTPQueueItemChAttrExplore()
 
 void CFTPQueueItemChAttrExplore::SetItemChAttrExplore(const char* origRights)
 {
-    OrigRights = SalamanderGeneral->DupStr(origRights);
+    OrigRights = DupQueueRights(origRights);
 }
 
 //

@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "ftp_text_codec.h"
 
 const char* LogsSeparator = "\r\n=================\r\n\r\n";
+const wchar_t* LogsSeparatorW = L"\r\n=================\r\n\r\n";
 
 // ****************************************************************************
 
@@ -39,139 +41,22 @@ char* CopyStr(char* buf, int bufSize, const char* txt, int size)
     return buf;
 }
 
-// ****************************************************************************
-
-BOOL PrepareFTPCommand(char* buf, int bufSize, char* logBuf, int logBufSize,
-                       CFtpCmdCode ftpCmd, int* cmdLen, ...)
+BOOL CopyStr(std::string& output, const char* text, int size) noexcept
 {
-    va_list args;
-    va_start(args, cmdLen);
-
-    BOOL ret = TRUE;
-    int len = 0;
-    if (logBufSize > 0)
-        logBuf[0] = 0;
-    if (bufSize > 0)
+    if (text == NULL || size < 0)
     {
-        switch (ftpCmd)
-        {
-        case ftpcmdQuit:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "QUIT");
-            break;
-        case ftpcmdSystem:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "SYST");
-            break;
-        case ftpcmdAbort:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "ABOR");
-            break;
-        case ftpcmdPrintWorkingPath:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "PWD");
-            break;
-        case ftpcmdNoOperation:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "NOOP");
-            break;
-        case ftpcmdChangeWorkingPath:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "CWD %s", args);
-            break;
-
-        case ftpcmdSetTransferMode:
-        {
-            BOOL ascii = va_arg(args, BOOL);
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "TYPE %c", ascii ? 'A' : 'I');
-            break;
-        }
-
-        case ftpcmdPassive:
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "PASV");
-            break;
-
-        case ftpcmdSetPort:
-        {
-            DWORD ip = va_arg(args, DWORD);
-            unsigned short port = va_arg(args, unsigned short);
-            len = _snprintf_s(buf, bufSize, _TRUNCATE, "PORT %u,%u,%u,%u,%d,%d",
-                              (ip & 0xff),
-                              ((ip >> 8) & 0xff),
-                              ((ip >> 16) & 0xff),
-                              ((ip >> 24) & 0xff),
-                              ((port >> 8) & 0xff),
-                              (port & 0xff));
-            break;
-        }
-
-        case ftpcmdDeleteFile:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "DELE %s", args);
-            break;
-        case ftpcmdDeleteDir:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "RMD %s", args);
-            break;
-        case ftpcmdChangeAttrs:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "SITE CHMOD %03o %s", args);
-            break;
-        case ftpcmdChangeAttrsQuoted:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "SITE CHMOD %03o \"%s\"", args);
-            break;
-        case ftpcmdRestartTransfer:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "REST %s", args);
-            break;
-        case ftpcmdRetrieveFile:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "RETR %s", args);
-            break;
-        case ftpcmdStoreFile:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "STOR %s", args);
-            break;
-        case ftpcmdAppendFile:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "APPE %s", args);
-            break;
-        case ftpcmdCreateDir:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "MKD %s", args);
-            break;
-        case ftpcmdRenameFrom:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "RNFR %s", args);
-            break;
-        case ftpcmdRenameTo:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "RNTO %s", args);
-            break;
-        case ftpcmdGetSize:
-            len = _vsnprintf_s(buf, bufSize, _TRUNCATE, "SIZE %s", args);
-            break;
-
-        default:
-        {
-            TRACE_E("Unknown command code in PrepareFTPCommand(): " << ftpCmd);
-            ret = FALSE;
-            break;
-        }
-        }
+        output.clear();
+        return FALSE;
     }
-    else
-        len = -1; // should not happen, just prevention
-    // a combined check of the _vsnprintf_s result + add CRLF to the end
-    if (len < 0 || len + 2 >= bufSize)
+    if (!FtpStoreReplyTextBytes(std::string_view(text, static_cast<size_t>(size)), output))
     {
-        TRACE_E("PrepareFTPCommand(): Insufficient buffer size: " << bufSize);
-        len = 0;
-        ret = FALSE;
+        output.clear();
+        return FALSE;
     }
-    else
-    {
-        buf[len++] = '\r';
-        buf[len++] = '\n';
-        buf[len] = 0;
-    }
-
-    va_end(args);
-    if (cmdLen != NULL)
-        *cmdLen = len;
-    if (logBufSize > 0 && logBuf[0] == 0)
-    {
-        if (len >= logBufSize)
-            len = logBufSize - 1;
-        memmove(logBuf, buf, len);
-        logBuf[len] = 0;
-    }
-    return ret;
+    return TRUE;
 }
+
+// ****************************************************************************
 
 //
 // ****************************************************************************
@@ -242,6 +127,41 @@ void CDynString::SkipBeginning(DWORD len, int* skippedChars, int* skippedLines)
     }
 }
 
+BOOL CDynStringW::Append(const wchar_t* str, int len)
+{
+    if (len == -1)
+        len = (int)wcslen(str);
+    if (Length + len >= Allocated)
+    {
+        int size = Length + len + 1 + 256;
+        wchar_t* newBuf = (wchar_t*)realloc(Buffer, size * sizeof(wchar_t));
+        if (newBuf == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            return FALSE;
+        }
+        Buffer = newBuf;
+        Allocated = size;
+    }
+    memmove(Buffer + Length, str, len * sizeof(wchar_t));
+    Length += len;
+    Buffer[Length] = 0;
+    return TRUE;
+}
+
+void CDynStringW::TrimToUtf8Size(DWORD maxBytes, int* skippedChars, int* skippedLines)
+{
+    size_t lines = 0;
+    const size_t trim = FtpFindLogTrimPrefix(Buffer, Length, maxBytes, &lines);
+    if (trim == 0)
+        return;
+    *skippedLines += (int)lines;
+    *skippedChars += (int)trim;
+    Length -= (int)trim;
+    memmove(Buffer, Buffer + trim, Length * sizeof(wchar_t));
+    Buffer[Length] = 0;
+}
+
 //
 // ****************************************************************************
 // CControlConnectionSocket
@@ -283,34 +203,42 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
     int logUID = LogUID;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-    Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGDISCONNECT), -1, TRUE);
+    Logs.LogMessage(logUID, LangStr(IDS_LOGMSGDISCONNECT).c_str(), -1, TRUE);
 
     BOOL socketClosed = FALSE;
     int cmdLen;
-    char buf[500];
-    char errBuf[300];
-    if (PrepareFTPCommand(buf, 500, errBuf, 300, ftpcmdQuit, &cmdLen))
+    std::string command;
+    std::string logCommand;
+    std::wstring hostForDisplay;
+    if (PrepareFTPCommand(command, &logCommand, ftpcmdQuit, &cmdLen))
     {
         DWORD error;
         BOOL allBytesWritten;
-        if (Write(buf, cmdLen, &error, &allBytesWritten))
+        if (Write(command.c_str(), cmdLen, &error, &allBytesWritten))
         {
             // Compose the wait-window message text
             HANDLES(EnterCriticalSection(&SocketCritSect));
-            Logs.LogMessage(logUID, errBuf, -1);
-            int l = (int)strlen(Host);
-            if (l > 22) // shorten the text (keep up to 22 characters, otherwise 20 + "...")
-            {
-                memcpy(errBuf, Host, 20);
-                strcpy(errBuf + 20, "...");
-            }
-            else
-                memcpy(errBuf, Host, l + 1);
+            Logs.LogMessage(logUID, logCommand.c_str(), -1);
+            const BOOL hostReady = FtpStoreWideText(Host.c_str(), hostForDisplay);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-            sprintf(buf, LoadStr(IDS_CLOSINGCONNECTION), errBuf);
-
-            waitWnd.SetText(buf);
+            try
+            {
+                if (!hostReady)
+                    throw std::bad_alloc();
+                if (hostForDisplay.size() > 22)
+                {
+                    hostForDisplay.resize(20);
+                    hostForDisplay.append(L"...");
+                }
+                const std::wstring waitText = SPLFormatStringOwned(
+                    LangStr(IDS_CLOSINGCONNECTION).c_str(), hostForDisplay.c_str());
+                waitWnd.SetText(waitText.c_str());
+            }
+            catch (...)
+            {
+                waitWnd.SetText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str());
+            }
             waitWnd.Create(GetWaitTime(showWaitWndTime));
 
             DWORD start = GetTickCount();
@@ -331,13 +259,13 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
                 case ccsevESC:
                 {
                     waitWnd.Show(FALSE);
-                    if (SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_CLOSECONESC),
-                                                         LoadStr(IDS_FTPPLUGINTITLE),
+                    if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CLOSECONESC).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                          MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                              MB_ICONQUESTION) == IDYES)
                     { // the user wants to force the connection to terminate
                         run = FALSE;
-                        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGACTIONCANCELED), -1, TRUE); // record that ESC (Cancel) was pressed
+                        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGACTIONCANCELED).c_str(), -1, TRUE); // record that ESC (Cancel) was pressed
                     }
                     else
                     {
@@ -349,7 +277,7 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
 
                 case ccsevTimeout:
                 {
-                    Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGDISCONTIMEOUT), -1, TRUE); // record the disconnection timeout in the log
+                    Logs.LogMessage(logUID, LangStr(IDS_LOGMSGDISCONTIMEOUT).c_str(), -1, TRUE); // record the disconnection timeout in the log
                     run = FALSE;
                     break;
                 }
@@ -364,7 +292,7 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
                     HANDLES(EnterCriticalSection(&SocketCritSect));
                     while (ReadFTPReply(&reply, &replySize)) // process responses from the server as long as we have any
                     {
-                        Logs.LogMessage(logUID, reply, replySize);
+                        Logs.LogServerMessage(logUID, reply, replySize, TextPolicy);
 
                         if (!shutdownCalled) // a reply arrived (success or error), so shut down the socket
                         {
@@ -447,9 +375,7 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
     if (found ||                           // the ccsevClosed event is waiting for us�the user still does not know that the connection is closed
         !auxConnectionLostMsg.empty()) // we cached the message captured when the connection closed (at that moment it only went into the log)
     {
-        char errBuf[300];
-        errBuf[0] = 0;
-        char buf[500];
+        std::string errorText;
 
         if (found)
         {
@@ -461,54 +387,55 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
             HANDLES(EnterCriticalSection(&SocketCritSect));
             while (ReadFTPReply(&reply, &replySize, &replyCode)) // process responses from the server as long as we have any
             {
-                Logs.LogMessage(logUID, reply, replySize, TRUE);
+                Logs.LogServerMessage(logUID, reply, replySize, TextPolicy, TRUE);
 
                 if (replyCode != -1 &&
                     (FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR ||
                      FTP_DIGIT_1(replyCode) == FTP_D1_ERROR))
                 {
-                    CopyStr(errBuf, 300, reply, replySize); // error message (take the last one in the sequence)
+                    CopyStr(errorText, reply, replySize); // error message (take the last one in the sequence)
                     haveErr = TRUE;
                 }
                 if (!haveErr)
-                    CopyStr(errBuf, 300, reply, replySize); // if there is no error yet, take every message (the last one in the sequence)
+                    CopyStr(errorText, reply, replySize); // if there is no error yet, take every message (the last one in the sequence)
                 SkipFTPReply(replySize);
             }
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-            if (errBuf[0] == 0)
+            if (errorText.empty())
             {
                 if (!auxConnectionLostMsg.empty()) // we cached the message captured when the connection closed (at that moment it only went into the log)
                 {                                  // show it again in a message box
                     HANDLES(EnterCriticalSection(&SocketCritSect));
                     if (!ConnectionLostMsg.empty())
-                        lstrcpyn(errBuf, ConnectionLostMsg.c_str(), 300);
+                        FtpStoreProtocolBytes(ConnectionLostMsg, errorText);
                     else
-                        errBuf[0] = 0;
+                        errorText.clear();
                     ConnectionLostMsg.clear(); // it is no longer needed
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                 }
                 else
                 {
                     if (error == NO_ERROR)
-                        strcpy(errBuf, LoadStr(IDS_NONEREPLY));
+                        FtpStoreProtocolBytes(LoadStr(IDS_NONEREPLY), errorText);
                     else
-                        FTPGetErrorText(error, errBuf, 300);
+                        FTPGetErrorText(error, errorText);
                 }
             }
             if (error != NO_ERROR)
             {
-                FTPGetErrorTextForLog(error, buf, 500);
-                Logs.LogMessage(logUID, buf, -1, TRUE);
+                std::string logText;
+                if (FTPGetErrorTextForLog(error, logText))
+                    Logs.LogMessage(logUID, logText.c_str(), -1, TRUE);
             }
         }
         else // we cached the message captured when the connection closed (at that moment it only went into the log)
         {    // show it again in a message box
             HANDLES(EnterCriticalSection(&SocketCritSect));
             if (!ConnectionLostMsg.empty())
-                lstrcpyn(errBuf, ConnectionLostMsg.c_str(), 300);
+                FtpStoreProtocolBytes(ConnectionLostMsg, errorText);
             else
-                errBuf[0] = 0;
+                errorText.clear();
             ConnectionLostMsg.clear(); // it is no longer needed
             HANDLES(LeaveCriticalSection(&SocketCritSect));
         }
@@ -516,7 +443,7 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
         if (quiet)
         {
             HANDLES(EnterCriticalSection(&SocketCritSect));
-            ConnectionLostMsg = errBuf;
+            FtpStoreProtocolBytes(errorText, ConnectionLostMsg);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
         }
         else
@@ -524,14 +451,21 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
             if (Config.WarnWhenConLost)
             {
                 BOOL actWelcomeMsg = (OurWelcomeMsgDlg != NULL && GetForegroundWindow() == OurWelcomeMsgDlg);
-                sprintf(buf, LoadStr(notInPanel ? IDS_DCONLOSTFORMATERROR : (leftPanel ? IDS_LCONLOSTFORMATERROR : IDS_RCONLOSTFORMATERROR)), errBuf);
+                std::wstring errorTextW;
+                if (!FtpDecodeLocalText(errorText, errorTextW))
+                    errorTextW = L"<invalid local error text>";
+                const std::wstring connectionLostText = SPLFormatStringOwned(
+                    LangStr(notInPanel ? IDS_DCONLOSTFORMATERROR : (leftPanel ? IDS_LCONLOSTFORMATERROR : IDS_RCONLOSTFORMATERROR)).c_str(),
+                    errorTextW.c_str());
                 MSGBOXEX_PARAMS params;
+                const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
+                const std::wstring checkBoxText = LangStr(IDS_WARNWHENCONLOST);
                 memset(&params, 0, sizeof(params));
                 params.HParent = parent;
                 params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_HINT;
-                params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                params.Text = buf;
-                params.CheckBoxText = LoadStr(IDS_WARNWHENCONLOST);
+                params.Caption = caption.c_str();
+                params.Text = connectionLostText.c_str();
+                params.CheckBoxText = checkBoxText.c_str();
                 int doNotWarnWhenConLost = !Config.WarnWhenConLost;
                 params.CheckBoxValue = &doNotWarnWhenConLost;
                 SalamanderGeneral->SalMessageBoxEx(&params);
@@ -557,6 +491,15 @@ int CControlConnectionSocket::GetLogUID()
 BOOL CControlConnectionSocket::LogMessage(const char* str, int len, BOOL addTimeToLog)
 {
     CALL_STACK_MESSAGE4("CControlConnectionSocket::LogMessage(%s, %d, %d)", str, len, addTimeToLog);
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    int logUID = LogUID;
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+    return Logs.LogMessage(logUID, str, len, addTimeToLog);
+}
+
+BOOL CControlConnectionSocket::LogMessage(const wchar_t* str, int len, BOOL addTimeToLog)
+{
+    CALL_STACK_MESSAGE4("CControlConnectionSocket::LogMessage(%ls, %d, %d)", str, len, addTimeToLog);
     HANDLES(EnterCriticalSection(&SocketCritSect));
     int logUID = LogUID;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -767,8 +710,6 @@ void CControlConnectionSocket::ReceiveHostByAddress(DWORD ip, int hostUID, int e
 
 BOOL CControlConnectionSocket::SendKeepAliveCmd(int logUID, const char* ftpCmd)
 {
-    char errBuf[300];
-    char buf[500];
     DWORD error;
     BOOL allBytesWritten;
     if (Write(ftpCmd, -1, &error, &allBytesWritten))
@@ -785,13 +726,10 @@ BOOL CControlConnectionSocket::SendKeepAliveCmd(int logUID, const char* ftpCmd)
     else // Write error (low memory, disconnected, non-blocking "send" failure)
     {
         // Add the error to the log; ClosedCtrlConChecker will alert the user about the lost connection
-        const char* e = GetOperationFatalErrorTxt(error, errBuf);
-        lstrcpyn(buf, e, 500);
-        char* s = buf + strlen(buf);
-        while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-            s--;
-        strcpy(s, "\r\n");                      // CRLF at the end of the last error text
-        Logs.LogMessage(logUID, buf, -1, TRUE); // add the last error text to the log
+        std::string errorText;
+        if (!FTPGetErrorTextForLog(error, errorText))
+            FTPFormatString(errorText, "%s\r\n", LoadStr(IDS_UNKNOWNERROR));
+        Logs.LogMessage(logUID, errorText.c_str(), -1, TRUE);
 
         ReleaseKeepAlive(); // nothing was sent (connection error, no point in continuing keep-alive), cancel keep-alive
         return FALSE;
@@ -923,7 +861,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
             int replyCode;
             while (ReadFTPReply(&reply, &replySize, &replyCode)) // process responses from the server as long as we have any
             {
-                Logs.LogMessage(LogUID, reply, replySize);
+                Logs.LogServerMessage(LogUID, reply, replySize, TextPolicy);
                 BOOL run = TRUE;
                 BOOL leave = TRUE;
                 BOOL setupNextKA = TRUE;
@@ -957,7 +895,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                         HANDLES(LeaveCriticalSection(&SocketCritSect));
                         leave = FALSE;
 
-                        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGKAPASVNOTSUPPORTED), -1, TRUE);
+                        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGKAPASVNOTSUPPORTED).c_str(), -1, TRUE);
                         ReleaseKeepAlive();
                         run = FALSE; // abort...
                     }
@@ -1015,10 +953,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
 
                 if (sendList) // send the "list" command ('listCmd' ('KeepAliveCommand') must be 2 or 3 to reach this point)
                 {
-                    char ftpCmd[200];
-                    const char* s = (listCmd == 3 ? LIST_CMD_TEXT : NLST_CMD_TEXT);
-                    sprintf(ftpCmd, "%s\r\n", s);
-
+                    const char* ftpCmd = listCmd == 3 ? "LIST\r\n" : "NLST\r\n";
                     if (SendKeepAliveCmd(logUID, ftpCmd))
                         kaDataConnection->ActivateConnection();
                     else
@@ -1036,7 +971,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     HANDLES(EnterCriticalSection(&SocketCritSect));
                     while (ReadFTPReply(&reply, &replySize, &replyCode)) // process responses from the server as long as we have any
                     {
-                        Logs.LogMessage(LogUID, reply, replySize);
+                        Logs.LogServerMessage(LogUID, reply, replySize, TextPolicy);
                         SkipFTPReply(replySize);
                     }
                     break; // abort...
@@ -1300,15 +1235,15 @@ void CClosedCtrlConChecker::Check(HWND parent)
 // CLogData
 //
 
-CLogData::CLogData(const char* host, unsigned short port, const char* user,
-                   CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker)
+CLogData::CLogData(const wchar_t* host, unsigned short port, const wchar_t* user,
+                   CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker) noexcept
 {
     UID = NextLogUID++;
     if (UID == -1)
         UID = NextLogUID++; // -1 is reserved
-    Host = SalamanderGeneral->DupStr(host);
     Port = port;
-    User = SalamanderGeneral->DupStr(user);
+    Valid = FtpStoreWideText(host != NULL ? host : L"", Host) &&
+            FtpStoreWideText(user != NULL ? user : L"", User);
     CtrlConOrWorker = !isWorker;
     WorkerIsAlive = isWorker;
     CtrlCon = ctrlCon;
@@ -1320,27 +1255,11 @@ CLogData::CLogData(const char* host, unsigned short port, const char* user,
 
 CLogData::~CLogData()
 {
-    if (Host != NULL)
-        SalamanderGeneral->Free(Host);
-    if (User != NULL)
-        SalamanderGeneral->Free(User);
 }
 
-BOOL CLogData::ChangeUser(const char* user)
+BOOL CLogData::ChangeUser(const wchar_t* user) noexcept
 {
-    char* u = SalamanderGeneral->DupStr(user);
-    if (u != NULL)
-    {
-        if (User != NULL)
-            SalamanderGeneral->Free(User);
-        User = u;
-    }
-    else
-    {
-        if (User != NULL)
-            User[0] = 0;
-    }
-    return u != NULL;
+    return FtpStoreWideText(user != NULL ? user : L"", User);
 }
 
 //
@@ -1355,7 +1274,7 @@ protected:
     BOOL AlwaysOnTop;
 
 public:
-    CLogsDlgThread(CLogsDlg* logsDlg) : CThread("Logs Dialog")
+    CLogsDlgThread(CLogsDlg* logsDlg) : CThread(L"Logs Dialog")
     {
         LogsDlg = logsDlg;
         AlwaysOnTop = FALSE;
@@ -1389,10 +1308,10 @@ public:
 
             // Message loop � wait until the modeless dialog ends
             MSG msg;
-            while (GetMessage(&msg, NULL, 0, 0))
+            while (GetMessageW(&msg, NULL, 0, 0))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
                 if (sendWMClose)
                 {
                     sendWMClose = FALSE;
@@ -1421,17 +1340,12 @@ void CLogs::AddLogsToCombo(HWND combo, int prevItemUID, int* focusIndex, BOOL* e
     if (!*empty)
     {
         HANDLES(EnterCriticalSection(&PanelCtrlConSect));
-        char buf[300];
         int i;
         for (i = 0; i < Data.Count; i++)
         {
             CLogData* d = Data[i];
-            sprintf(buf, "%d: ", d->UID);
-            if (d->User != NULL && d->User[0] != 0 && strcmp(d->User, FTP_ANONYMOUS) != 0)
-                sprintf(buf + strlen(buf), "%s@", d->User);
-            sprintf(buf + strlen(buf), "%s", d->Host);
-            if (d->Port != IPPORT_FTP)
-                sprintf(buf + strlen(buf), ":%u", d->Port);
+            std::wstring display;
+            BOOL displayReady = FALSE;
 
             int fsPosID = 0;
             if (d->CtrlConOrWorker) // connection in panel
@@ -1459,15 +1373,39 @@ void CLogs::AddLogsToCombo(HWND combo, int prevItemUID, int* focusIndex, BOOL* e
                     fsPosID = IDS_OPERSTOPPED; // stopped worker
             }
 
-            if ((d->CtrlCon != NULL || d->WorkerIsAlive) && !d->Connected)
+            try
             {
-                sprintf(buf + strlen(buf), " (%s, %s)", LoadStr(fsPosID), LoadStr(IDS_FTPINACTIVE));
+                display = std::to_wstring(d->UID);
+                display += L": ";
+                if (!d->User.empty() && d->User != L"anonymous")
+                {
+                    display += d->User;
+                    display += L'@';
+                }
+                display += d->Host;
+                if (d->Port != IPPORT_FTP)
+                {
+                    display += L':';
+                    display += std::to_wstring(d->Port);
+                }
+                display += L" (";
+                display += LangStr(fsPosID);
+                if ((d->CtrlCon != NULL || d->WorkerIsAlive) && !d->Connected)
+                {
+                    display += L", ";
+                    display += LangStr(IDS_FTPINACTIVE);
+                }
+                display += L')';
+                displayReady = TRUE;
             }
-            else
-                sprintf(buf + strlen(buf), " (%s)", LoadStr(fsPosID));
+            catch (...)
+            {
+                TRACE_E(LOW_MEMORY);
+            }
 
             // add the assembled name + log UID
-            if (i == SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)buf))
+            if (i == SendMessageW(combo, CB_ADDSTRING, 0,
+                                  (LPARAM)(displayReady ? display.c_str() : L"<out of memory>")))
                 SendMessage(combo, CB_SETITEMDATA, i, d->UID);
             if (d->UID == prevItemUID)
                 *focusIndex = i;
@@ -1476,7 +1414,7 @@ void CLogs::AddLogsToCombo(HWND combo, int prevItemUID, int* focusIndex, BOOL* e
     }
     else
     {
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_NOLOGS));
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_NOLOGS).c_str());
         SendMessage(combo, CB_SETITEMDATA, 0, -1);
     }
     HANDLES(LeaveCriticalSection(&LogCritSect));
@@ -1518,7 +1456,7 @@ void CLogs::SetLogToEdit(HWND edit, int logUID, BOOL update)
         {
             if (lockUpdate)
                 LockWindowUpdate(edit);
-            SetWindowText(edit, d->Text.GetString());
+            SetWindowTextW(edit, d->Text.GetString());
             SendMessage(edit, EM_SETSEL, d->Text.Length, d->Text.Length);
             SendMessage(edit, EM_SCROLLCARET, 0, 0);
             if (lockUpdate)
@@ -1553,7 +1491,7 @@ void CLogs::SetLogToEdit(HWND edit, int logUID, BOOL update)
             if (scrollCaret && GetScrollInfo(edit, SB_VERT, &si) != 0)
                 scrollCaret = (si.nMax == (int)si.nPage + si.nPos - 1);
 
-            SetWindowText(edit, d->Text.GetString());
+            SetWindowTextW(edit, d->Text.GetString());
             SendMessage(edit, EM_SETSEL, pos, pos);
             if (scrollCaret)
                 SendMessage(edit, EM_SCROLLCARET, 0, 0);
@@ -1567,7 +1505,7 @@ void CLogs::SetLogToEdit(HWND edit, int logUID, BOOL update)
         }
     }
     else
-        SetWindowText(edit, ""); // unknown log -> clear the edit
+        SetWindowTextW(edit, L""); // unknown log -> clear the edit
     HANDLES(LeaveCriticalSection(&LogCritSect));
 }
 
@@ -1611,25 +1549,32 @@ void CLogs::ConfigChanged()
             for (i = 0; i < Data.Count; i++)
             {
                 CLogData* d = Data[i];
-                if ((DWORD)(d->Text.Length) > size) // the log is too large
-                {
-                    d->Text.SkipBeginning((DWORD)(d->Text.Length) - size, &(d->SkippedChars), &(d->SkippedLines));
+                const int oldLength = d->Text.Length;
+                d->Text.TrimToUtf8Size(size, &(d->SkippedChars), &(d->SkippedLines));
+                if (d->Text.Length != oldLength)
                     if (LogsDlg != NULL && LogsDlg->HWindow != NULL)
                         PostMessage(LogsDlg->HWindow, WM_APP_UPDATELOG, d->UID, 0);
-                }
             }
         }
     }
     HANDLES(LeaveCriticalSection(&LogCritSect));
 }
 
-BOOL CLogs::CreateLog(int* uid, const char* host, unsigned short port, const char* user,
+BOOL CLogs::CreateLog(int* uid, const wchar_t* host, unsigned short port, const wchar_t* user,
                       CControlConnectionSocket* ctrlCon, BOOL connected, BOOL isWorker)
 {
     HANDLES(EnterCriticalSection(&LogCritSect));
     BOOL ok = FALSE;
     *uid = -1;
-    CLogData* d = new CLogData(host, port, user, ctrlCon, connected, isWorker);
+    CLogData* d = NULL;
+    try
+    {
+        d = new CLogData(host, port, user, ctrlCon, connected, isWorker);
+    }
+    catch (...)
+    {
+        TRACE_E(LOW_MEMORY);
+    }
     if (d != NULL && d->IsGood())
     {
         Data.Add(d);
@@ -1650,7 +1595,7 @@ BOOL CLogs::CreateLog(int* uid, const char* host, unsigned short port, const cha
     return ok;
 }
 
-BOOL CLogs::ChangeUser(int uid, const char* user)
+BOOL CLogs::ChangeUser(int uid, const wchar_t* user)
 {
     HANDLES(EnterCriticalSection(&LogCritSect));
     BOOL ret = FALSE;
@@ -1738,6 +1683,27 @@ BOOL CLogs::ClosingConnection(int uid)
 
 BOOL CLogs::LogMessage(int uid, const char* str, int len, BOOL addTimeToLog)
 {
+    if (len == -1)
+        len = (int)strlen(str);
+    std::wstring text;
+    if (!FtpLocalTextCodec().Decode(str, len, text))
+        return FALSE;
+    return LogMessage(uid, text.c_str(), (int)text.size(), addTimeToLog);
+}
+
+BOOL CLogs::LogServerMessage(int uid, const char* str, int len, const CFtpSessionTextPolicy& policy,
+                             BOOL addTimeToLog)
+{
+    if (len == -1)
+        len = (int)strlen(str);
+    std::wstring text;
+    if (!policy.GetCodec().Decode(str, len, text))
+        return FALSE;
+    return LogMessage(uid, text.c_str(), (int)text.size(), addTimeToLog);
+}
+
+BOOL CLogs::LogMessage(int uid, const wchar_t* str, int len, BOOL addTimeToLog)
+{
     if (uid == -1)
         return TRUE; // "invalid UID" means there is nothing to log
 
@@ -1746,39 +1712,41 @@ BOOL CLogs::LogMessage(int uid, const char* str, int len, BOOL addTimeToLog)
     int index;
     if (GetLogIndex(uid, &index))
     {
-        char timeBuf[20];
-        int timeLen = 0;
+        std::wstring timeText;
         if (addTimeToLog)
         {
             SYSTEMTIME st;
             GetLocalTime(&st); // use the standard time format to avoid slowing things down with GetTimeFormat
-            timeLen = sprintf(timeBuf, "(%u:%02u:%02u): ", st.wHour, st.wMinute, st.wSecond);
-        }
-
-        if (len == -1)
-            len = (int)strlen(str);
-        CLogData* d = Data[index];
-        if (Config.UseLogMaxSize) // there is a limit for the log size
-        {
-            DWORD size = Config.LogMaxSize * 1024; // overflow is handled when the value is entered
-            if ((DWORD)(d->Text.Length + len + timeLen) > size)
+            try
             {
-                d->Text.SkipBeginning((DWORD)(d->Text.Length + len + timeLen) - size, &(d->SkippedChars), &(d->SkippedLines));
+                timeText = SPLFormatStringOwned(L"(%u:%02u:%02u): ", st.wHour, st.wMinute, st.wSecond);
+            }
+            catch (...)
+            {
+                HANDLES(LeaveCriticalSection(&LogCritSect));
+                return FALSE;
             }
         }
 
+        if (len == -1)
+            len = (int)wcslen(str);
+        CLogData* d = Data[index];
+
         // Write the message to the log (in the most complex case write CR+LF before the text,
         // then the current time, and finally the rest of the text after the inserted CR+LF)
-        const char* s = str;
-        if (timeLen > 0)
+        const wchar_t* s = str;
+        if (!timeText.empty())
         {
-            const char* end = str + len;
-            while (s < end && (*s == '\r' || *s == '\n'))
+            const wchar_t* end = str + len;
+            while (s < end && (*s == L'\r' || *s == L'\n'))
                 s++;
         }
         if (s == str || (ret = d->Text.Append(str, (int)(s - str))) != 0)
-            if (timeLen == 0 || (ret = d->Text.Append(timeBuf, timeLen)) != 0)
+            if (timeText.empty() || (ret = d->Text.Append(timeText.c_str(), static_cast<int>(timeText.size()))) != 0)
                 ret = d->Text.Append(s, (int)(len - (s - str)));
+
+        if (ret && Config.UseLogMaxSize)
+            d->Text.TrimToUtf8Size(Config.LogMaxSize * 1024, &(d->SkippedChars), &(d->SkippedLines));
 
         if (LogsDlg != NULL && LogsDlg->HWindow != NULL)
             PostMessage(LogsDlg->HWindow, WM_APP_UPDATELOG, d->UID, 0);
@@ -1905,50 +1873,40 @@ void CLogs::RefreshListOfLogsInLogsDlg()
     HANDLES(LeaveCriticalSection(&LogCritSect));
 }
 
-void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
+void CLogs::SaveLog(HWND parent, const wchar_t* itemName, int uid)
 { // itemName == NULL - "save all as..."
-    static CPathBuffer initDir;
-    if (*initDir == 0)
-        GetMyDocumentsPath(initDir);
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(fileName, "ftp.log", fileName.Size());
+    static std::wstring initDir;
+    if (initDir.empty())
+        GetMyDocumentsPathW(initDir);
+    std::wstring fileName = L"ftp.log";
 
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = parent;
-    char* s = LoadStr(IDS_SAVELOGFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create a double-null-terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrInitialDir = initDir;
-    ofn.lpstrDefExt = "log";
+    std::wstring filter = LangStr(IDS_SAVELOGFILTER).c_str();
+    for (wchar_t& ch : filter)
+        if (ch == L'|')
+            ch = 0;
+    filter.push_back(0);
+    ofn.lpstrFilter = filter.c_str();
+    ofn.lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
+    ofn.lpstrDefExt = L"log";
+    const std::wstring dialogTitle =
+        LangStr(itemName == NULL ? IDS_SAVEALLASTITLE : IDS_SAVEASTITLE);
+    ofn.lpstrTitle = dialogTitle.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = LoadStr(itemName == NULL ? IDS_SAVEALLASTITLE : IDS_SAVEASTITLE);
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    CPathBuffer buf;
-    if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
+    if (SPLSafeGetSaveFileNameOwned(SalamanderGeneral, &ofn, fileName))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        FtpRememberSelectedDirectory(fileName, initDir);
 
-        s = strrchr(fileName.Get(), '\\');
-        if (s != NULL)
-        {
-            memcpy(initDir, fileName.Get(), s - fileName.Get());
-            initDir[s - fileName.Get()] = 0;
-        }
-
-        if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so that a read-only file can be overwritten
-            SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE,
+        if (SalamanderGeneral->SalGetFileAttributes(fileName.c_str()) != 0xFFFFFFFF) // so that a read-only file can be overwritten
+            SetFileAttributesW(fileName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+        HANDLE file = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
                                            CREATE_ALWAYS,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -1968,8 +1926,15 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
                     // write the log
                     ULONG written;
                     BOOL success;
-                    if ((success = WriteFile(file, d->Text.GetString(), d->Text.Length, &written, NULL)) == 0 ||
-                        written != (DWORD)d->Text.Length)
+                    std::string utf8;
+                    const CFtpTextCodec utf8Codec = FtpUtf8TextCodec();
+                    if (!utf8Codec.Encode(d->Text.GetString(), d->Text.Length, utf8))
+                    {
+                        err = ERROR_NO_UNICODE_TRANSLATION;
+                        break;
+                    }
+                    if ((success = WriteFile(file, utf8.data(), (DWORD)utf8.size(), &written, NULL)) == 0 ||
+                        written != (DWORD)utf8.size())
                     {
                         if (!success)
                             err = GetLastError();
@@ -2001,28 +1966,25 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
             SetCursor(oldCur);
             if (err != NO_ERROR) // report the error
             {
-                sprintf(buf, LoadStr(IDS_SAVELOGERROR), SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                 MB_OK | MB_ICONEXCLAMATION);
-                DeleteFile(fileName); // delete the file when an error occurs
+                FTPShowSystemError(parent, IDS_SAVELOGERROR, err);
+                DeleteFileW(fileName.c_str()); // delete the file when an error occurs
             }
 
             // announce a change on the path (our file may have appeared)
-            SalamanderGeneral->CutDirectory(fileName);
-            SalamanderGeneral->PostChangeOnPathNotification(fileName, FALSE);
+            std::wstring notificationPath = fileName;
+            SPLCutDirectoryOwned(SalamanderGeneral, notificationPath);
+            SalamanderGeneral->PostChangeOnPathNotification(notificationPath.c_str(), FALSE);
         }
         else
         {
             DWORD err = GetLastError();
             SetCursor(oldCur);
-            sprintf(buf, LoadStr(IDS_SAVELOGERROR), SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_FTPERRORTITLE),
-                                             MB_OK | MB_ICONEXCLAMATION);
+            FTPShowSystemError(parent, IDS_SAVELOGERROR, err);
         }
     }
 }
 
-void CLogs::CopyLog(HWND parent, const char* itemName, int uid)
+void CLogs::CopyLog(HWND parent, const wchar_t* itemName, int uid)
 {
     HANDLES(EnterCriticalSection(&LogCritSect));
     BOOL err = FALSE, found = FALSE;
@@ -2042,29 +2004,30 @@ void CLogs::CopyLog(HWND parent, const char* itemName, int uid)
     {
         if (!err)
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_TEXTCOPIEDTOCLIPBOARD),
-                                             LoadStr(IDS_FTPPLUGINTITLE),
+            SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_TEXTCOPIEDTOCLIPBOARD).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                              MB_OK | MB_ICONINFORMATION);
         }
         else
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_COPYTOCLIPBOARDERROR),
-                                             LoadStr(IDS_FTPERRORTITLE),
+            SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_COPYTOCLIPBOARDERROR).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
         }
     }
 }
 
-void CLogs::ClearLog(HWND parent, const char* itemName, int uid)
+void CLogs::ClearLog(HWND parent, const wchar_t* itemName, int uid)
 {
-    char buf[500];
-    sprintf(buf, LoadStr(IDS_CLEARLOGQUESTION), itemName);
+    const std::wstring text = SPLFormatStringOwned(LangStr(IDS_CLEARLOGQUESTION).c_str(),
+                                                   itemName != NULL ? itemName : L"");
     MSGBOXEX_PARAMS params;
+    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
     memset(&params, 0, sizeof(params));
     params.HParent = parent;
     params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-    params.Text = buf;
+    params.Caption = caption.c_str();
+    params.Text = text.c_str();
     if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
     {
         HANDLES(EnterCriticalSection(&LogCritSect));
@@ -2084,16 +2047,17 @@ void CLogs::ClearLog(HWND parent, const char* itemName, int uid)
     }
 }
 
-void CLogs::RemoveLog(HWND parent, const char* itemName, int uid)
+void CLogs::RemoveLog(HWND parent, const wchar_t* itemName, int uid)
 {
-    char buf[500];
-    sprintf(buf, LoadStr(IDS_REMOVELOGQUESTION), itemName);
+    const std::wstring text = SPLFormatStringOwned(LangStr(IDS_REMOVELOGQUESTION).c_str(),
+                                                   itemName != NULL ? itemName : L"");
     MSGBOXEX_PARAMS params;
+    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
     memset(&params, 0, sizeof(params));
     params.HParent = parent;
     params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-    params.Text = buf;
+    params.Caption = caption.c_str();
+    params.Text = text.c_str();
     if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
     {
         HANDLES(EnterCriticalSection(&LogCritSect));
@@ -2122,7 +2086,7 @@ void CLogs::SaveAllLogs(HWND parent)
 
 void CLogs::CopyAllLogs(HWND parent)
 {
-    int sepLen = (int)strlen(LogsSeparator);
+    int sepLen = (int)wcslen(LogsSeparatorW);
 
     HANDLES(EnterCriticalSection(&LogCritSect));
     int len = 0, i;
@@ -2134,18 +2098,18 @@ void CLogs::CopyAllLogs(HWND parent)
     if (Data.Count > 1)
         len += (Data.Count - 1) * sepLen;
     BOOL err = TRUE;
-    char* txt = (char*)malloc(len + 1);
+    wchar_t* txt = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
     if (txt != NULL)
     {
-        char* s = txt;
+        wchar_t* s = txt;
         for (i = 0; i < Data.Count; i++)
         {
             CLogData* d = Data[i];
-            memcpy(s, d->Text.GetString(), d->Text.Length);
+            memcpy(s, d->Text.GetString(), d->Text.Length * sizeof(wchar_t));
             s += d->Text.Length;
             if (i + 1 < Data.Count)
             {
-                memcpy(s, LogsSeparator, sepLen);
+                memcpy(s, LogsSeparatorW, sepLen * sizeof(wchar_t));
                 s += sepLen;
             }
         }
@@ -2159,14 +2123,14 @@ void CLogs::CopyAllLogs(HWND parent)
 
     if (!err)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_TEXTCOPIEDTOCLIPBOARD),
-                                         LoadStr(IDS_FTPPLUGINTITLE),
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_TEXTCOPIEDTOCLIPBOARD).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                          MB_OK | MB_ICONINFORMATION);
     }
     else
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_COPYTOCLIPBOARDERROR),
-                                         LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_COPYTOCLIPBOARDERROR).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
     }
 }
@@ -2174,11 +2138,13 @@ void CLogs::CopyAllLogs(HWND parent)
 void CLogs::RemoveAllLogs(HWND parent)
 {
     MSGBOXEX_PARAMS params;
+    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
+    const std::wstring text = LangStr(IDS_REMOVEALLLOGSQUESTION).c_str();
     memset(&params, 0, sizeof(params));
     params.HParent = parent;
     params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-    params.Text = LoadStr(IDS_REMOVEALLLOGSQUESTION);
+    params.Caption = caption.c_str();
+    params.Text = text.c_str();
     if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
     {
         HANDLES(EnterCriticalSection(&LogCritSect));

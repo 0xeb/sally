@@ -1,8 +1,56 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static BOOL GetComboItemText(HWND combo, int index, std::wstring& text) noexcept
+{
+    const LRESULT length = SendMessageW(combo, CB_GETLBTEXTLEN, index, 0);
+    if (length == CB_ERR)
+        return FALSE;
+    try
+    {
+        std::wstring staged(static_cast<size_t>(length) + 1, L'\0');
+        const LRESULT copied = SendMessageW(combo, CB_GETLBTEXT, index,
+                                            reinterpret_cast<LPARAM>(staged.data()));
+        if (copied == CB_ERR || copied > length)
+            return FALSE;
+        staged.resize(static_cast<size_t>(copied));
+        text.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+static void PrintDiskSizeNarrow(char* out, int outSize, const CQuadWord& value)
+{
+    if (outSize <= 0)
+        return;
+    const std::wstring wide = SPLPrintDiskSizeOwned(SalamanderGeneral, value, 0);
+    std::string encoded;
+    if (!FtpEncodeLocalText(wide.c_str(), encoded) ||
+        encoded.size() >= static_cast<size_t>(outSize))
+        out[0] = 0;
+    else
+        memcpy(out, encoded.c_str(), encoded.size() + 1);
+}
+
+static void PrintTimeLeftNarrow(char* out, int outSize, const CQuadWord& value)
+{
+    if (outSize <= 0)
+        return;
+    const std::wstring wide = SPLPrintTimeLeftOwned(SalamanderGeneral, value);
+    std::string encoded;
+    if (!FtpEncodeLocalText(wide.c_str(), encoded) ||
+        encoded.size() >= static_cast<size_t>(outSize))
+        out[0] = 0;
+    else
+        memcpy(out, encoded.c_str(), encoded.size() + 1);
+}
 
 //
 // ****************************************************************************
@@ -47,16 +95,19 @@ CSimpleDlgControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CWelcomeMsgDlg
 //
 
-CWelcomeMsgDlg::CWelcomeMsgDlg(HWND parent, const char* text, BOOL serverReply,
-                               const char* sentCommand, BOOL rawListing, int textSize)
+CWelcomeMsgDlg::CWelcomeMsgDlg(HWND parent, const wchar_t* text, BOOL serverReply,
+                               const wchar_t* sentCommand, BOOL rawListing,
+                               const char* rawText, int rawTextSize)
     : CCenteredDialog(HLanguage, IDD_WELCOMEMSGDLG, parent)
 {
-    Text = text;
-    TextSize = textSize;
+    Text = text != NULL ? text : L"";
     SizeBox = NULL;
     ServerReply = serverReply;
     RawListing = rawListing;
-    SentCommand = ServerReply ? sentCommand : NULL;
+    if (ServerReply && sentCommand != NULL)
+        SentCommand = sentCommand;
+    if (RawListing && rawText != NULL)
+        RawText.assign(rawText, rawTextSize == -1 ? strlen(rawText) : rawTextSize);
 
     MinDlgHeight = 0;
     MinDlgWidth = 0;
@@ -80,32 +131,27 @@ CWelcomeMsgDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (ServerReply)
         {
-            if (SentCommand == NULL)
+            if (SentCommand.empty())
                 TRACE_E("Unexpected situation in CWelcomeMsgDlg::DialogProc().");
-            char buf[300];
-            _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_SERVERREPLYTITLE), (SentCommand == NULL ? "" : SentCommand));
-            SetWindowText(HWindow, buf);
+            try
+            {
+                const std::wstring title = SPLFormatStringOwned(
+                    LangStr(IDS_SERVERREPLYTITLE).c_str(), SentCommand.c_str());
+                SetWindowTextW(HWindow, title.c_str());
+            }
+            catch (...)
+            {
+                SetWindowTextW(HWindow, L"FTP");
+            }
         }
         if (RawListing)
-            SetWindowText(HWindow, LoadStr(IDS_RAWLISTINGTITLE));
+            SetWindowTextW(HWindow, LangStr(IDS_RAWLISTINGTITLE).c_str());
         else
             ShowWindow(GetDlgItem(HWindow, IDB_SAVEMSGAS), SW_HIDE);
 
         if (FixedFont != NULL)
             SendDlgItemMessage(HWindow, IDE_WELCOMEMSG, WM_SETFONT, (WPARAM)FixedFont, TRUE);
-        if (TextSize == -1)
-            SetDlgItemText(HWindow, IDE_WELCOMEMSG, Text);
-        else
-        {
-            char* t = (char*)malloc(TextSize + 1); // nothing we can do, we have to allocate it including the trailing null
-            if (t != NULL)
-            {
-                memcpy(t, Text, TextSize);
-                t[TextSize] = 0;
-                SetDlgItemText(HWindow, IDE_WELCOMEMSG, t);
-                free(t);
-            }
-        }
+        SetDlgItemTextW(HWindow, IDE_WELCOMEMSG, Text.c_str());
 
         // keep it even for ServerReply and RawListing -> suppresses selection in the edit box
         CSimpleDlgControlWindow* wnd = new CSimpleDlgControlWindow(HWindow, IDE_WELCOMEMSG,
@@ -149,9 +195,9 @@ CWelcomeMsgDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         EditBorderHeight = r1.bottom - (r2.bottom - r2.top);
 
         // put a resize grip into the bottom-right corner of the window
-        SizeBox = CreateWindowEx(0,
-                                 "scrollbar",
-                                 "",
+        SizeBox = CreateWindowExW(0,
+                                 L"scrollbar",
+                                 L"",
                                  WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE |
                                      WS_GROUP | SBS_SIZEBOX | SBS_SIZEGRIP | SBS_SIZEBOXBOTTOMRIGHTALIGN,
                                  0, 0, r1.right, r1.bottom,
@@ -256,48 +302,38 @@ CWelcomeMsgDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void CWelcomeMsgDlg::OnSaveTextAs()
 {
-    static CPathBuffer initDir;
-    if (*initDir == 0)
-        GetMyDocumentsPath(initDir);
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(fileName, "listing.txt", fileName.Size());
+    static std::wstring initDir;
+    if (initDir.empty())
+        GetMyDocumentsPathW(initDir);
+    std::wstring fileName = L"listing.txt";
 
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(OPENFILENAMEW));
     ofn.hwndOwner = HWindow;
-    char* s = LoadStr(IDS_RAWLISTINGFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create the double-null-terminated list
+    std::wstring filter = LangStr(IDS_RAWLISTINGFILTER).c_str();
+    for (wchar_t& ch : filter)
     {
-        if (*s == '|')
-            *s = 0;
-        s++;
+        if (ch == L'|')
+            ch = L'\0';
     }
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrInitialDir = initDir;
-    ofn.lpstrDefExt = "txt";
+    filter.push_back(L'\0');
+    ofn.lpstrFilter = filter.c_str();
+    ofn.lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
+    ofn.lpstrDefExt = L"txt";
+    const std::wstring dialogTitle = LangStr(IDS_RAWLISTSAVEASTITLE);
+    ofn.lpstrTitle = dialogTitle.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = LoadStr(IDS_RAWLISTSAVEASTITLE);
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    CPathBuffer buf;
-    if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
+    if (SPLSafeGetSaveFileNameOwned(SalamanderGeneral, &ofn, fileName))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        FtpRememberSelectedDirectory(fileName, initDir);
 
-        s = strrchr(fileName.Get(), '\\');
-        if (s != NULL)
-        {
-            memcpy(initDir, fileName.Get(), s - fileName.Get());
-            initDir[s - fileName.Get()] = 0;
-        }
-
-        if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // allow overwriting even a read-only file
-            SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE,
+        if (SalamanderGeneral->SalGetFileAttributes(fileName.c_str()) != 0xFFFFFFFF) // allow overwriting even a read-only file
+            SetFileAttributesW(fileName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+        HANDLE file = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
                                            CREATE_ALWAYS,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -308,8 +344,8 @@ void CWelcomeMsgDlg::OnSaveTextAs()
             ULONG written;
             BOOL success;
             DWORD err = NO_ERROR;
-            DWORD size = TextSize != -1 ? TextSize : (DWORD)strlen(Text);
-            if ((success = WriteFile(file, Text, size, &written, NULL)) == 0 || written != size)
+            DWORD size = (DWORD)RawText.size();
+            if ((success = WriteFile(file, RawText.data(), size, &written, NULL)) == 0 || written != size)
             {
                 if (!success)
                     err = GetLastError();
@@ -321,24 +357,21 @@ void CWelcomeMsgDlg::OnSaveTextAs()
             SetCursor(oldCur);
             if (err != NO_ERROR) // show the error
             {
-                sprintf(buf, LoadStr(IDS_RAWLISTSAVEERROR), SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                 MB_OK | MB_ICONEXCLAMATION);
-                DeleteFile(fileName); // delete the file if an error occurred
+                FTPShowSystemError(HWindow, IDS_RAWLISTSAVEERROR, err);
+                DeleteFileW(fileName.c_str()); // delete the file if an error occurred
             }
         }
         else
         {
             DWORD err = GetLastError();
             SetCursor(oldCur);
-            sprintf(buf, LoadStr(IDS_RAWLISTSAVEERROR), SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                             MB_OK | MB_ICONEXCLAMATION);
+            FTPShowSystemError(HWindow, IDS_RAWLISTSAVEERROR, err);
         }
 
         // announce the change on the path (our file may have been added)
-        SalamanderGeneral->CutDirectory(fileName);
-        SalamanderGeneral->PostChangeOnPathNotification(fileName, FALSE);
+        std::wstring notificationPath(fileName);
+        SPLCutDirectoryOwned(SalamanderGeneral, notificationPath);
+        SalamanderGeneral->PostChangeOnPathNotification(notificationPath.c_str(), FALSE);
     }
 }
 
@@ -380,7 +413,7 @@ void CLogsDlg::LoadListOfLogs(BOOL update)
         prevUID = LastLogUID; // use the last log in the edit (cannot take the current selection from the combo, mouse focus misbehaves when dropped down)
 
     MSG msg; // remove other messages requesting the list update (only one will run)
-    while (PeekMessage(&msg, NULL, WM_APP_UPDATELISTOFLOGS, WM_APP_UPDATELISTOFLOGS, PM_REMOVE))
+    while (PeekMessageW(&msg, NULL, WM_APP_UPDATELISTOFLOGS, WM_APP_UPDATELISTOFLOGS, PM_REMOVE))
         ;
 
     int index;
@@ -413,7 +446,7 @@ void CLogsDlg::LoadLog(int updateUID)
     {
         BOOL found = (actLogUID == updateUID); // TRUE = the combo has the updated log with UID 'actLogUID' selected
         MSG msg;                               // remove other messages requesting a log update (update the current log)
-        while (PeekMessage(&msg, NULL, WM_APP_UPDATELOG, WM_APP_UPDATELOG, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, WM_APP_UPDATELOG, WM_APP_UPDATELOG, PM_REMOVE))
         {
             if (!found) // if it is not yet clear that the update should run
                 found = (actLogUID == (int)msg.wParam);
@@ -426,7 +459,7 @@ void CLogsDlg::LoadLog(int updateUID)
         if (actLogUID != -1)
             Logs.SetLogToEdit(edit, actLogUID, FALSE);
         else
-            SetWindowText(edit, "");
+            SetWindowTextW(edit, L"");
     }
 }
 
@@ -468,9 +501,9 @@ CLogsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         LineHeight = r2.bottom - r2.top;
 
         // put a resize grip into the bottom-right corner of the window
-        SizeBox = CreateWindowEx(0,
-                                 "scrollbar",
-                                 "",
+        SizeBox = CreateWindowExW(0,
+                                 L"scrollbar",
+                                 L"",
                                  WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE |
                                      WS_GROUP | SBS_SIZEBOX | SBS_SIZEGRIP | SBS_SIZEBOXBOTTOMRIGHTALIGN,
                                  0, 0, r1.right, r1.bottom,
@@ -646,27 +679,25 @@ CLogsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CM_CLEARLOG:
         case CM_REMOVELOG:
         {
-            char buf[300];
-            buf[0] = 0;
             HWND combo = GetDlgItem(HWindow, IDC_LISTOFLOGS);
             int i = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
-            if (i != CB_ERR && SendMessage(combo, CB_GETLBTEXTLEN, i, 0) < 300)
+            std::wstring itemName;
+            if (i != CB_ERR && GetComboItemText(combo, i, itemName))
             {
-                SendMessage(combo, CB_GETLBTEXT, i, (LPARAM)buf);
                 int uid = (int)SendMessage(combo, CB_GETITEMDATA, i, 0); // x64 - log UID is an index, not a pointer
                 switch (LOWORD(wParam))
                 {
                 case CM_SAVELOG:
-                    Logs.SaveLog(HWindow, buf, uid);
+                    Logs.SaveLog(HWindow, itemName.c_str(), uid);
                     break;
                 case CM_COPYLOG:
-                    Logs.CopyLog(HWindow, buf, uid);
+                    Logs.CopyLog(HWindow, itemName.c_str(), uid);
                     break;
                 case CM_CLEARLOG:
-                    Logs.ClearLog(HWindow, buf, uid);
+                    Logs.ClearLog(HWindow, itemName.c_str(), uid);
                     break;
                 case CM_REMOVELOG:
-                    Logs.RemoveLog(HWindow, buf, uid);
+                    Logs.RemoveLog(HWindow, itemName.c_str(), uid);
                     break;
                 }
             }
@@ -779,13 +810,13 @@ void CSetWaitCursorWindow::AttachToWindow(HWND hWnd)
     if (DefWndProc == NULL)
     {
         TRACE_E("Spatny handle okna. hWnd = " << hWnd);
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         return;
     }
-    if (!SetProp(hWnd, (LPCTSTR)AtomObject2, (HANDLE)this))
+    if (!SetPropW(hWnd, (LPCWSTR)AtomObject2, (HANDLE)this))
     {
         TRACE_E("Chyba pri pripojovani objektu na okno.");
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         return;
     }
     HWindow = hWnd;
@@ -794,7 +825,7 @@ void CSetWaitCursorWindow::AttachToWindow(HWND hWnd)
     if (DefWndProc == CSetWaitCursorWindow::CWindowProc) // that would be recursion
     {
         TRACE_E("Tak tohle by se vubec nemelo stat.");
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
     }
 }
 
@@ -802,7 +833,7 @@ void CSetWaitCursorWindow::DetachWindow()
 {
     if (HWindow != NULL)
     {
-        RemoveProp(HWindow, (LPCTSTR)AtomObject2);
+        RemovePropW(HWindow, (LPCWSTR)AtomObject2);
         SetWindowLongPtr(HWindow, GWLP_WNDPROC, (LONG_PTR)DefWndProc);
 
         POINT p;
@@ -820,12 +851,12 @@ LRESULT CALLBACK
 CSetWaitCursorWindow::CWindowProc(HWND hwnd, UINT uMsg,
                                   WPARAM wParam, LPARAM lParam)
 {
-    CSetWaitCursorWindow* wnd = (CSetWaitCursorWindow*)GetProp(hwnd, (LPCTSTR)AtomObject2);
+    CSetWaitCursorWindow* wnd = (CSetWaitCursorWindow*)GetPropW(hwnd, (LPCWSTR)AtomObject2);
     if (uMsg == WM_DESTROY && wnd != NULL) // last message - detach the object from the window
     {
-        LRESULT res = CallWindowProc((WNDPROC)wnd->DefWndProc, hwnd, uMsg, wParam, lParam);
+        LRESULT res = CallWindowProcW((WNDPROC)wnd->DefWndProc, hwnd, uMsg, wParam, lParam);
         // back to the original procedure now (because of subclassing)
-        RemoveProp(hwnd, (LPCTSTR)AtomObject2);
+        RemovePropW(hwnd, (LPCWSTR)AtomObject2);
         SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)wnd->DefWndProc);
         if (res == 0)
             return 0; // the application handled it
@@ -850,10 +881,10 @@ CSetWaitCursorWindow::CWindowProc(HWND hwnd, UINT uMsg,
                 return TRUE;
             }
         }
-        return CallWindowProc((WNDPROC)wnd->DefWndProc, hwnd, uMsg, wParam, lParam);
+        return CallWindowProcW((WNDPROC)wnd->DefWndProc, hwnd, uMsg, wParam, lParam);
     }
     else
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 //****************************************************************************
@@ -895,9 +926,9 @@ CWaitWindow::~CWaitWindow()
 {
 }
 
-void CWaitWindow::SetText(const char* text)
+void CWaitWindow::SetText(const wchar_t* text)
 {
-    Text = text != NULL ? text : "";
+    Text = text != NULL ? text : L"";
     if (HWindow != NULL && IsWindowVisible(HWindow))
     {
         InvalidateRect(HWindow, NULL, TRUE);
@@ -905,9 +936,9 @@ void CWaitWindow::SetText(const char* text)
     }
 }
 
-void CWaitWindow::SetCaption(const char* text)
+void CWaitWindow::SetCaption(const wchar_t* text)
 {
-    Caption = text != NULL ? text : "";
+    Caption = text != NULL ? text : L"";
 }
 
 #define WAITWINDOW_HMARGIN 25
@@ -962,12 +993,12 @@ HWND CWaitWindow::Create(DWORD showTime)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        DrawTextW(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN > parW)
         {
             tR.right = parW - 2 * WAITWINDOW_HMARGIN;
             tR.bottom = 1;
-            DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawTextW(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -981,9 +1012,10 @@ HWND CWaitWindow::Create(DWORD showTime)
     int height = TextSize.cy + 2 * WAITWINDOW_VMARGIN;
     height += GetSystemMetrics(SM_CYSMCAPTION);
 
+    const std::wstring captionT = Caption.empty() ? LangStr(IDS_FTPPLUGINTITLE) : Caption;
     CreateEx(WS_EX_DLGMODALFRAME /*| WS_EX_TOOLWINDOW*/,
              SAVEBITS_CLASSNAME,
-             Caption.empty() ? LoadStr(IDS_FTPPLUGINTITLE) : Caption.c_str(),
+             captionT.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,
@@ -1029,7 +1061,7 @@ void CWaitWindow::Show(BOOL show)
             KillTimer(HWindow, WAITWND_SHOWTIMER);
             // clear the message queue of any WM_TIMER messages
             MSG msg;
-            while (PeekMessage(&msg, HWindow, WM_TIMER, WM_TIMER, PM_REMOVE))
+            while (PeekMessageW(&msg, HWindow, WM_TIMER, WM_TIMER, PM_REMOVE))
                 ;
             HasTimer = FALSE;
         }
@@ -1141,7 +1173,7 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
             // do not clip so we survive a slight text extension that
             // may occur while calling SetText
-            DrawText(dc, Text.c_str(), (int)Text.size(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+            DrawTextW(dc, Text.c_str(), (int)Text.size(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
             SetBkMode(dc, prevBkMode);
             if (hOldFont != NULL)
                 SelectObject(dc, hOldFont);
@@ -1210,9 +1242,9 @@ CListWaitWindow::CListWaitWindow(HWND hParent, CDataConnectionSocket* dataConnec
 
     PathType = ftpsptEmpty;
 
-    Status[0] = 0;
-    TimeLeft[0] = 0;
-    TimeElapsed[0] = 0;
+    Status.clear();
+    TimeLeft.clear();
+    TimeElapsed.clear();
     HasRefreshStatusTimer = FALSE;
     HasDelayedUpdateTimer = FALSE;
     NeedDelayedUpdate = FALSE;
@@ -1226,16 +1258,16 @@ CListWaitWindow::~CListWaitWindow()
 {
 }
 
-void CListWaitWindow::SetText(const char* text)
+void CListWaitWindow::SetText(const wchar_t* text)
 {
-    Text = text != NULL ? text : "";
+    Text = text != NULL ? text : L"";
     if (HWindow != NULL && !Text.empty())
-        SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
+        SendDlgItemMessageW(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
 }
 
-void CListWaitWindow::SetPath(const char* path, CFTPServerPathType pathType)
+void CListWaitWindow::SetPath(const wchar_t* path, CFTPServerPathType pathType)
 {
-    Path = path != NULL ? path : "";
+    Path = path != NULL ? path : L"";
     PathType = pathType;
     if (PathOnFTPText != NULL && !Path.empty())
     {
@@ -1308,17 +1340,18 @@ HWND CListWaitWindow::Create(DWORD showTime)
 
     WindowClosePressed = FALSE;
     HasTimer = FALSE;
-    Status[0] = 0;
-    TimeLeft[0] = 0;
-    TimeElapsed[0] = 0;
+    Status.clear();
+    TimeLeft.clear();
+    TimeElapsed.clear();
     HasRefreshStatusTimer = FALSE;
 
     ElapsedTime = 0;
     LastTickCountForElapsedTime = GetTickCount();
 
+    const std::wstring captionT = Caption.empty() ? LangStr(IDS_FTPPLUGINTITLE) : Caption;
     CreateEx(WS_EX_DLGMODALFRAME /*| WS_EX_TOOLWINDOW*/,
              SAVEBITS_CLASSNAME,
-             Caption.empty() ? LoadStr(IDS_FTPPLUGINTITLE) : Caption.c_str(),
+             captionT.c_str(),
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, 0, 0,
              HParent,
@@ -1362,7 +1395,7 @@ HWND CListWaitWindow::Create(DWORD showTime)
         }
 
         if (!Text.empty())
-            SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
+            SendDlgItemMessageW(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text.c_str());
         if (PathOnFTPText != NULL && !Path.empty())
         {
             PathOnFTPText->SetPathSeparator(FTPGetPathDelimiter(PathType));
@@ -1450,11 +1483,11 @@ void CListWaitWindow::RefreshTimeAndStatusAndProgress(BOOL fromTimer)
             DataConnection->SetAsciiTrModeForBinFileHowToSolve(asciiTrForBinFileHowToSolve);
             if (asciiTrForBinFileHowToSolve != 3)
             { // use the binary mode or cancel viewing, forcibly abort the download (if that fails, the user must press ESC to interrupt the control connection; we no longer handle that automatically, it should almost never be necessary)
-                SetText(LoadStr(IDS_LISTWNDDOWNLFILEABORTING));
+                SetText(LangStr(IDS_LISTWNDDOWNLFILEABORTING).c_str());
                 if (DataConnection->IsTransfering(NULL) || DataConnection->IsFlushingDataToDisk())
                 {
                     DataConnection->CancelConnectionAndFlushing(); // close the "data connection", the system will attempt a "graceful" shutdown (we will not know the result)
-                    Logs.LogMessage(DataConnection->GetLogUID(), LoadStr(IDS_LOGMSGDATACONTERMINATED), -1, TRUE);
+                    Logs.LogMessage(DataConnection->GetLogUID(), LangStr(IDS_LOGMSGDATACONTERMINATED).c_str(), -1, TRUE);
                 }
                 *Aborted = TRUE;
             }
@@ -1479,87 +1512,100 @@ void CListWaitWindow::RefreshTimeAndStatusAndProgress(BOOL fromTimer)
             HasRefreshStatusTimer = FALSE;
     }
 
-    char num1[100];
-    char num2[100];
-    char num3[100];
-    if (connectionIdleTime <= 30)
+    try
     {
-        SalamanderGeneral->PrintDiskSize(num1, CQuadWord(speed, 0), 0);
-        _snprintf_s(num3, _TRUNCATE, LoadStr(IDS_LISTWNDDOWNLOADSPEED), num1);
-    }
-    else
-    {
-        SalamanderGeneral->PrintTimeLeft(num1, CQuadWord(connectionIdleTime, 0));
-        _snprintf_s(num3, _TRUNCATE, LoadStr(IDS_LISTWNDCONNECTIONIDLE), num1);
-    }
-    SalamanderGeneral->PrintDiskSize(num1, CQuadWord(downloaded, 0), 0); // note: num1 is reused when building num3
-    char buf[100];
-    if (total != -1)
-    {
-        SalamanderGeneral->PrintDiskSize(num2, CQuadWord(total, 0), 0);
-        _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LISTWNDSTATUS1), num1, num2, num3);
-    }
-    else
-        _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LISTWNDSTATUS2), num1, num3);
-
-    if (OperStatusText != NULL && strcmp(Status, buf) != 0)
-    {
-        strcpy(Status, buf);
-        OperStatusText->SetText(Status);
-    }
-
-    DWORD ti = GetTickCount();
-    if (ti - LastTickCountForElapsedTime >= 1000)
-    {
-        ti = (ti - LastTickCountForElapsedTime) / 1000;
-        ElapsedTime += ti;
-        LastTickCountForElapsedTime += ti * 1000;
-    }
-    SalamanderGeneral->PrintTimeLeft(buf, CQuadWord(ElapsedTime, 0));
-    if (ElapsedTimeText != NULL && strcmp(TimeElapsed, buf) != 0)
-    {
-        strcpy(TimeElapsed, buf);
-        ElapsedTimeText->SetText(TimeElapsed);
-    }
-
-    if (downloaded <= total && total != -1 && speed > 0)
-    {
-        DWORD secs = (total - downloaded) / speed; // estimate of the remaining seconds
-        secs++;                                    // add one more second so we finish the operation with "time left: 1 sec" (instead of 0 sec)
-        if (LastTimeEstimation != -1)
-            secs = (2 * secs + LastTimeEstimation) / 3;
-        // compute rounding (roughly 10% error + we round to nice numbers 1,2,5,10,20,40)
-        int dif = (secs + 5) / 10;
-        int expon = 0;
-        while (dif >= 50)
+        const std::wstring activityText =
+            connectionIdleTime <= 30
+                ? SPLFormatStringOwned(
+                      LangStr(IDS_LISTWNDDOWNLOADSPEED).c_str(),
+                      SPLPrintDiskSizeOwned(SalamanderGeneral, CQuadWord(speed, 0), 0).c_str())
+                : SPLFormatStringOwned(
+                      LangStr(IDS_LISTWNDCONNECTIONIDLE).c_str(),
+                      SPLPrintTimeLeftOwned(SalamanderGeneral, CQuadWord(connectionIdleTime, 0)).c_str());
+        const std::wstring downloadedText =
+            SPLPrintDiskSizeOwned(SalamanderGeneral, CQuadWord(downloaded, 0), 0);
+        std::wstring statusText;
+        if (total != -1)
         {
-            dif /= 60;
-            expon++;
+            const std::wstring totalText =
+                SPLPrintDiskSizeOwned(SalamanderGeneral, CQuadWord(total, 0), 0);
+            statusText = SPLFormatStringOwned(LangStr(IDS_LISTWNDSTATUS1).c_str(),
+                                              downloadedText.c_str(), totalText.c_str(),
+                                              activityText.c_str());
         }
-        if (dif <= 1)
-            dif = 1;
-        else if (dif <= 3)
-            dif = 2;
-        else if (dif <= 7)
-            dif = 5;
-        else if (dif < 15)
-            dif = 10;
-        else if (dif < 30)
-            dif = 20;
         else
-            dif = 40;
-        while (expon--)
-            dif *= 60;
-        secs = ((secs + dif / 2) / dif) * dif; // round 'secs' to 'dif' seconds
-        SalamanderGeneral->PrintTimeLeft(buf, CQuadWord(secs, 0));
-        LastTimeEstimation = secs;
+        {
+            statusText = SPLFormatStringOwned(LangStr(IDS_LISTWNDSTATUS2).c_str(),
+                                              downloadedText.c_str(), activityText.c_str());
+        }
+
+        if (OperStatusText != NULL && Status != statusText)
+        {
+            Status.swap(statusText);
+            OperStatusText->SetText(Status.c_str());
+        }
+
+        DWORD ti = GetTickCount();
+        if (ti - LastTickCountForElapsedTime >= 1000)
+        {
+            ti = (ti - LastTickCountForElapsedTime) / 1000;
+            ElapsedTime += ti;
+            LastTickCountForElapsedTime += ti * 1000;
+        }
+        std::wstring elapsedText =
+            SPLPrintTimeLeftOwned(SalamanderGeneral, CQuadWord(ElapsedTime, 0));
+        if (ElapsedTimeText != NULL && TimeElapsed != elapsedText)
+        {
+            TimeElapsed.swap(elapsedText);
+            ElapsedTimeText->SetText(TimeElapsed.c_str());
+        }
+
+        std::wstring estimateText;
+        if (downloaded <= total && total != -1 && speed > 0)
+        {
+            DWORD secs = (total - downloaded) / speed; // estimate of the remaining seconds
+            secs++;                                    // add one more second so we finish the operation with "time left: 1 sec" (instead of 0 sec)
+            if (LastTimeEstimation != -1)
+                secs = (2 * secs + LastTimeEstimation) / 3;
+            // compute rounding (roughly 10% error + we round to nice numbers 1,2,5,10,20,40)
+            int dif = (secs + 5) / 10;
+            int expon = 0;
+            while (dif >= 50)
+            {
+                dif /= 60;
+                expon++;
+            }
+            if (dif <= 1)
+                dif = 1;
+            else if (dif <= 3)
+                dif = 2;
+            else if (dif <= 7)
+                dif = 5;
+            else if (dif < 15)
+                dif = 10;
+            else if (dif < 30)
+                dif = 20;
+            else
+                dif = 40;
+            while (expon--)
+                dif *= 60;
+            secs = ((secs + dif / 2) / dif) * dif; // round 'secs' to 'dif' seconds
+            estimateText = SPLPrintTimeLeftOwned(SalamanderGeneral, CQuadWord(secs, 0));
+            LastTimeEstimation = secs;
+        }
+        else
+        {
+            estimateText = LangStr(IDS_LISTWNDESTIMTIMEUNKNOWN);
+        }
+        if (EstimatedTimeText != NULL && TimeLeft != estimateText)
+        {
+            TimeLeft.swap(estimateText);
+            EstimatedTimeText->SetText(TimeLeft.c_str());
+        }
     }
-    else
-        lstrcpyn(buf, LoadStr(IDS_LISTWNDESTIMTIMEUNKNOWN), 20);
-    if (EstimatedTimeText != NULL && strcmp(TimeLeft, buf) != 0)
+    catch (...)
     {
-        strcpy(TimeLeft, buf);
-        EstimatedTimeText->SetText(TimeLeft);
+        return; // retain the last complete status rather than publishing truncated text
     }
 
     if (OperProgressBar != NULL)

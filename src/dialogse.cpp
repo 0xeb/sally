@@ -69,7 +69,7 @@ CCfgPageShellExt::Validate(CTransferInfo &ti)
   ti.CheckBox(IDC_SE_SUBMENU, submenu);
   if (submenu)
   {
-    char buff[SEC_SUBMENUNAME_MAX];
+    wchar_t buff[SEC_SUBMENUNAME_MAX];
     ti.EditLine(IDC_SE_SUBMENUNAME, buff, SEC_SUBMENUNAME_MAX);
     if (strlen(buff) == 0)
     {
@@ -250,7 +250,7 @@ CCfgPageShellExt::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
               EDTLB_DISPINFO *dispInfo = (EDTLB_DISPINFO *)lParam;
               if (dispInfo->ToDo == edtlbGetData)
               {
-                strcpy(dispInfo->Buffer, SECGetName(dispInfo->ItemID));
+                *dispInfo->Text = SECGetName(dispInfo->ItemID);
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                 return TRUE;
               }
@@ -264,13 +264,13 @@ CCfgPageShellExt::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
                     return TRUE;
                   }
-                  SECSetName(index, dispInfo->Buffer);
+                  SECSetName(index, dispInfo->Text->c_str());
                   EditLB->SetItemData();
                 }
                 else 
                 {
                   int index = dispInfo->ItemID;
-                  SECSetName(index, dispInfo->Buffer);
+                  SECSetName(index, dispInfo->Text->c_str());
                 }
 
                 LoadControls();

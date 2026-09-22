@@ -11,15 +11,28 @@ class TCharSpecific
 {
 };
 
+template <class CChar>
+struct TFileCompTextRun
+{
+    int x;
+    int y;
+    UINT n;
+    const CChar* lpstr;
+    UINT uiFlags;
+    RECT rcl;
+    INT* pdx;
+};
+
 template <>
 class TCharSpecific<char>
 {
 public:
-    typedef POLYTEXTA POLYTEXT;
+    typedef TFileCompTextRun<char> POLYTEXT;
     typedef unsigned char Unsigned;
 
     static char* LowerCase;
     static unsigned short* CType;
+    static wchar_t Display[256];
 
     static const bool IsUnicode() { return false; }
     static char ConvertANSI8Char(char c) { return c; }
@@ -32,7 +45,7 @@ template <>
 class TCharSpecific<wchar_t>
 {
 public:
-    typedef POLYTEXTW POLYTEXT;
+    typedef TFileCompTextRun<wchar_t> POLYTEXT;
     typedef unsigned short Unsigned;
 
     static wchar_t LowerCase[256 * 256];
@@ -79,54 +92,71 @@ inline int IsWordX(CChar c)
     return (TCharSpecific<CChar>::CType[TCharSpecific<CChar>::Unsigned(c)] & (C1_ALPHA | C1_DIGIT)) || c == '_';
 }
 
-inline BOOL
-ExtTextOutX(HDC hdc, int X, int Y, UINT fuOptions, CONST RECT* lprc, LPCSTR lpString, UINT cbCount, CONST INT* lpDx)
-{
-    return ExtTextOutA(hdc, X, Y, fuOptions, lprc, lpString, cbCount, lpDx);
-}
+// Byte-mode comparisons deliberately preserve one visual cell per source byte.
+// Their GDI adapter maps those cells to UTF-16 dynamically; byte counts and
+// narrow Win32 render-record ownership never reach the UI boundary.
+BOOL DrawFileCompText(HDC hdc, int X, int Y, UINT fuOptions, CONST RECT* lprc,
+                      LPCSTR lpString, UINT cbCount, CONST INT* lpDx) noexcept;
 
-inline BOOL
-ExtTextOutX(HDC hdc, int X, int Y, UINT fuOptions, CONST RECT* lprc, LPCWSTR lpString, UINT cbCount, CONST INT* lpDx)
+inline BOOL DrawFileCompText(HDC hdc, int X, int Y, UINT fuOptions, CONST RECT* lprc,
+                             LPCWSTR lpString, UINT cbCount, CONST INT* lpDx) noexcept
 {
     return ExtTextOutW(hdc, X, Y, fuOptions, lprc, lpString, cbCount, lpDx);
 }
 
-inline int
-DrawTextExX(HDC hdc, LPSTR lpchText, int cchText, LPRECT lprc, UINT dwDTFormat,
-            LPDRAWTEXTPARAMS lpDTParams)
+int MeasureFileCompText(HDC hdc, LPCSTR text, int textLength, LPRECT bounds,
+                        UINT format, LPDRAWTEXTPARAMS parameters) noexcept;
+
+inline int MeasureFileCompText(HDC hdc, LPWSTR text, int textLength, LPRECT bounds,
+                               UINT format, LPDRAWTEXTPARAMS parameters) noexcept
 {
-    return DrawTextExA(hdc, lpchText, cchText, lprc, dwDTFormat, lpDTParams);
+    return DrawTextExW(hdc, text, textLength, bounds, format, parameters);
 }
 
-inline int
-DrawTextExX(HDC hdc, LPWSTR lpchText, int cchText, LPRECT lprc, UINT dwDTFormat,
-            LPDRAWTEXTPARAMS lpDTParams)
+BOOL DrawFileCompTextRuns(HDC hdc, const TFileCompTextRun<char>* runs,
+                          int runCount) noexcept;
+
+inline BOOL DrawFileCompTextRuns(HDC hdc, const TFileCompTextRun<wchar_t>* runs,
+                                 int runCount) noexcept
 {
-    return DrawTextExW(hdc, lpchText, cchText, lprc, dwDTFormat, lpDTParams);
+    if (runCount < 0 || (runs == nullptr && runCount != 0))
+        return FALSE;
+
+    try
+    {
+        std::vector<POLYTEXTW> nativeRuns(static_cast<size_t>(runCount));
+        for (int i = 0; i < runCount; ++i)
+        {
+            nativeRuns[i].x = runs[i].x;
+            nativeRuns[i].y = runs[i].y;
+            nativeRuns[i].n = runs[i].n;
+            nativeRuns[i].lpstr = runs[i].lpstr;
+            nativeRuns[i].uiFlags = runs[i].uiFlags;
+            nativeRuns[i].rcl = runs[i].rcl;
+            nativeRuns[i].pdx = runs[i].pdx;
+        }
+        return PolyTextOutW(hdc, nativeRuns.data(), runCount);
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
-inline BOOL
-PolyTextOutX(HDC hdc, CONST POLYTEXTA* pptxt, int cStrings)
-{
-    return PolyTextOutA(hdc, pptxt, cStrings);
-}
+// Byte-mode selections are decoded as an explicit ACP text span. The resulting
+// UTF-16 count, never the source byte count, reaches the wide SDK clipboard.
+BOOL CopyFileCompSelectionToClipboard(const char* text, size_t byteCount,
+                                      BOOL showEcho, HWND echoParent) noexcept;
+BOOL CopyFileCompSelectionToClipboard(const wchar_t* text, size_t characterCount,
+                                      BOOL showEcho, HWND echoParent) noexcept;
+BOOL CopyFileCompByteCellsToClipboard(const char* bytes, size_t byteCount,
+                                      BOOL showEcho, HWND echoParent) noexcept;
 
-inline BOOL
-PolyTextOutX(HDC hdc, CONST POLYTEXTW* pptxt, int cStrings)
-{
-    return PolyTextOutW(hdc, pptxt, cStrings);
-}
-
-inline BOOL
-CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND echoParent)
-{
-    return SG->CopyTextToClipboard(text, textLen, showEcho, echoParent);
-}
-
-inline BOOL
-CopyTextToClipboard(wchar_t* text, int textLen, BOOL showEcho, HWND echoParent)
-{
-    return SG->CopyTextToClipboardW(text, textLen, showEcho, echoParent);
-}
+// FileComp's legacy configuration names and byte-mode text are encoded in the
+// active Windows code page. Keep that byte boundary named and centralized.
+bool DecodeFileCompLegacyText(const char* bytes, size_t byteCount,
+                              std::wstring& text) noexcept;
+bool EncodeFileCompLegacyText(const wchar_t* text, size_t characterCount,
+                              std::string& bytes) noexcept;
 
 void InitXUnicode();

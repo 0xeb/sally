@@ -17,13 +17,14 @@ enum
 extern const char* const StringTable[];
 
 // exports from zip2sfx.cpp
-extern const char* ZipName; // archive
+extern std::wstring ZipName; // archive path
 extern HANDLE ZipFile;
 extern DWORD ArcSize;
 extern DWORD EOCentrDirOffs;
 extern BOOL Encrypt;
 
-extern CPathBuffer ExeName;
+extern std::wstring ExeName;
+extern std::wstring SfxPackageName;
 extern HANDLE ExeFile;
 
 extern HANDLE SfxPackage; // sfx package
@@ -39,10 +40,12 @@ extern __UINT32* CrcTab;
 extern BOOL InflatingTexts;
 
 BOOL Error(int error, ...);
+BOOL ErrorPath(int error, const wchar_t* path);
+void PrintWideText(const std::wstring& text);
 BOOL Read(HANDLE file, void* buffer, DWORD size);
 BOOL Write(HANDLE file, const void* buffer, DWORD size);
 
 // exports from zip2sfx2.cpp
 BOOL WriteSfxExecutable();
 BOOL AppendArchive();
-DWORD SalGetFileAttributes(const char* fileName);
+DWORD SalGetFileAttributes(const wchar_t* fileName);

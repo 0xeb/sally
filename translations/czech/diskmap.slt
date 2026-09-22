@@ -76,3 +76,7 @@ COMMENT,"Česká verze"
 78,1,"bajt"
 79,1,"bajtů"
 
+[STRINGTABLE 3]
+80,1,"Nic k zobrazení..."
+81,1,"...tato složka neobsahuje žádné soubory k zmapování"
+

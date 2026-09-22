@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "common/unicode/helpers.h"
+#include "common/Win32TextCodec.h"
 
 #include <string>
 
@@ -12,6 +12,6 @@ namespace sally::unicode
 inline bool WideStringRequiresWidePath(const std::wstring& value)
 {
     std::string ansi;
-    return !TryWideToAnsiRoundTripExact(value, ansi);
+    return !Win32EncodeAcpExact(value, ansi);
 }
 } // namespace sally::unicode

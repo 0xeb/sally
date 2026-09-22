@@ -70,10 +70,11 @@ protected:
     //      pszFile  - Full path to the file.
     //  RETURN VALUE:
     //      Returns a fully qualified ITEMIDLIST, or NULL if an error occurs.
-    LPITEMIDLIST PIDL_GetFromPath(LPWSTR pszPath)
+    LPITEMIDLIST PIDL_GetFromPath(LPCWSTR pszPath)
     {
         LPITEMIDLIST res = NULL;
-        if (FAILED(this->_pDesktop->ParseDisplayName(this->_hWnd, NULL, pszPath, NULL, &res, NULL)))
+        std::wstring mutablePath(pszPath != NULL ? pszPath : L"");
+        if (FAILED(this->_pDesktop->ParseDisplayName(this->_hWnd, NULL, mutablePath.data(), NULL, &res, NULL)))
         {
             return NULL;
         }
@@ -203,7 +204,7 @@ protected:
         return psf->GetUIObjectOf(this->_hWnd, 1, &pidl, riid, NULL, ppv);
     }
 
-    HRESULT GetUIObjectOfFile(LPWSTR pszPath, REFIID riid, void** ppv)
+    HRESULT GetUIObjectOfFile(LPCWSTR pszPath, REFIID riid, void** ppv)
     {
         IShellFolder* ShellFolder = NULL;
         LPITEMIDLIST DirPIDL = NULL;
@@ -283,18 +284,13 @@ public:
         return FALSE;
     }
 
-    BOOL InvokeDefaultCommand(TCHAR* filename)
+    BOOL InvokeDefaultCommand(const wchar_t* filename)
     {
         //if (this->_pcm != NULL) return FALSE; //the menu is open
 
-#ifdef UNICODE
-        WCHAR* wFileName = filename;
-#else
-        WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
-        if (wl == 0)
-            return FALSE;
-#endif
+        // filename is wide now - the dormant #ifdef UNICODE branch here was
+        // already correct, just never activated since UNICODE stays undefined.
+        LPCWSTR wFileName = filename;
         BOOL res = FALSE;
         IContextMenu* pcm;
         if (SUCCEEDED(GetUIObjectOfFile(wFileName, IID_IContextMenu, (void**)&pcm)))
@@ -325,9 +321,9 @@ public:
     }
 
 #ifdef SALAMANDER
-    int ShowFileMenu(TCHAR* filename, int xPos, int yPos, BOOL canFocus, BOOL canZoomIn, BOOL canZoomOut)
+    int ShowFileMenu(const wchar_t* filename, int xPos, int yPos, BOOL canFocus, BOOL canZoomIn, BOOL canZoomOut)
 #else
-    int ShowFileMenu(TCHAR* filename, int xPos, int yPos, BOOL canZoomIn, BOOL canZoomOut)
+    int ShowFileMenu(const wchar_t* filename, int xPos, int yPos, BOOL canZoomIn, BOOL canZoomOut)
 #endif
     {
         if (this->_pcm != NULL)
@@ -339,14 +335,9 @@ public:
 			ClientToScreen(this->_hWnd, &pt);
 		}*/
         int res = 0;
-#ifdef UNICODE
-        WCHAR* wFileName = filename;
-#else
-        WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
-        if (wl == 0)
-            return FALSE;
-#endif
+        // filename is wide now - the dormant #ifdef UNICODE branch here was
+        // already correct, just never activated since UNICODE stays undefined.
+        LPCWSTR wFileName = filename;
         if (SUCCEEDED(GetUIObjectOfFile(wFileName, IID_IContextMenu, (void**)&this->_pcm)))
         {
             HMENU hmenu = CreatePopupMenu();
@@ -362,7 +353,7 @@ public:
                 if (
 #ifdef SALAMANDER
                     /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
-   keep in sync with the InsertMenu() calls below...
+   keep in sync with the InsertMenuW() calls below...
 MENU_TEMPLATE_ITEM FileMenu[] =
 {
         {MNTT_PB, 0
@@ -372,11 +363,11 @@ MENU_TEMPLATE_ITEM FileMenu[] =
         {MNTT_PE, 0
 };
 */
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | (canFocus ? MF_ENABLED : MF_GRAYED), IDM_FOCUS, CZResourceString::GetString(IDS_DISKMAP_SHELL_FOCUS)) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | (canFocus ? MF_ENABLED : MF_GRAYED), IDM_FOCUS, CZResourceString::GetString(IDS_DISKMAP_SHELL_FOCUS)) &&
 #endif
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | (canZoomIn ? MF_ENABLED : MF_GRAYED), IDM_ZOOMIN, CZResourceString::GetString(IDS_DISKMAP_SHELL_ZOOMIN)) &&
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | (canZoomOut ? MF_ENABLED : MF_GRAYED), IDM_ZOOMOUT, CZResourceString::GetString(IDS_DISKMAP_SHELL_ZOOMOUT)) &&
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | MF_SEPARATOR, NULL, NULL) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | (canZoomIn ? MF_ENABLED : MF_GRAYED), IDM_ZOOMIN, CZResourceString::GetString(IDS_DISKMAP_SHELL_ZOOMIN)) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | (canZoomOut ? MF_ENABLED : MF_GRAYED), IDM_ZOOMOUT, CZResourceString::GetString(IDS_DISKMAP_SHELL_ZOOMOUT)) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | MF_SEPARATOR, NULL, NULL) &&
                     SUCCEEDED(this->_pcm->QueryContextMenu(hmenu, mPos, SCRATCH_QCM_FIRST, SCRATCH_QCM_LAST, qcmFlags)))
                 {
 #ifdef SALAMANDER
@@ -461,9 +452,9 @@ MENU_TEMPLATE_ITEM FileMenu[] =
         return res;
     }
 #ifdef SALAMANDER
-    int ShowDirMenu(TCHAR* filename, int xPos, int yPos, BOOL canOpen, BOOL canGoto)
+    int ShowDirMenu(const wchar_t* filename, int xPos, int yPos, BOOL canOpen, BOOL canGoto)
 #else
-    int ShowDirMenu(TCHAR* filename, int xPos, int yPos, BOOL canGoto)
+    int ShowDirMenu(const wchar_t* filename, int xPos, int yPos, BOOL canGoto)
 #endif
     {
         if (this->_pcm != NULL)
@@ -475,14 +466,9 @@ MENU_TEMPLATE_ITEM FileMenu[] =
 		ClientToScreen(this->_hWnd, &pt);
 		}*/
         int res = 0;
-#ifdef UNICODE
-        WCHAR* wFileName = filename;
-#else
-        WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
-        if (wl == 0)
-            return FALSE;
-#endif
+        // filename is wide now - the dormant #ifdef UNICODE branch here was
+        // already correct, just never activated since UNICODE stays undefined.
+        LPCWSTR wFileName = filename;
         if (SUCCEEDED(GetUIObjectOfFile(wFileName, IID_IContextMenu, (void**)&this->_pcm)))
         {
             HMENU hmenu = CreatePopupMenu();
@@ -498,7 +484,7 @@ MENU_TEMPLATE_ITEM FileMenu[] =
                 if (
 #ifdef SALAMANDER
                     /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
-   keep in sync with the InsertMenu() calls below...
+   keep in sync with the InsertMenuW() calls below...
 MENU_TEMPLATE_ITEM DirMenu[] =
 {
   {MNTT_PB, 0
@@ -507,10 +493,10 @@ MENU_TEMPLATE_ITEM DirMenu[] =
   {MNTT_PE, 0
 };
 */
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | (canOpen ? MF_ENABLED : MF_GRAYED), IDM_OPEN, CZResourceString::GetString(IDS_DISKMAP_SHELL_DIROPEN)) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | (canOpen ? MF_ENABLED : MF_GRAYED), IDM_OPEN, CZResourceString::GetString(IDS_DISKMAP_SHELL_DIROPEN)) &&
 #endif
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | (canGoto ? MF_ENABLED : MF_GRAYED), IDM_GOTO, CZResourceString::GetString(IDS_DISKMAP_SHELL_DIRCHANGE)) &&
-                    InsertMenu(hmenu, mPos++, MF_BYPOSITION | MF_SEPARATOR, NULL, NULL) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | (canGoto ? MF_ENABLED : MF_GRAYED), IDM_GOTO, CZResourceString::GetString(IDS_DISKMAP_SHELL_DIRCHANGE)) &&
+                    InsertMenuW(hmenu, mPos++, MF_BYPOSITION | MF_SEPARATOR, NULL, NULL) &&
                     SUCCEEDED(this->_pcm->QueryContextMenu(hmenu, mPos, SCRATCH_QCM_FIRST, SCRATCH_QCM_LAST, qcmFlags)))
                 {
 #ifdef SALAMANDER

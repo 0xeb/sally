@@ -32,7 +32,7 @@ struct CFieldInfo
     BOOL LeftAlign; // where the text should be aligned when displayed
     int TextMax;    // maximum number of characters shown in this column; -1 if unknown to the parser
     int FieldLen;   // # of bytes in the file used by this field
-    char* Type;     // must point to a char[100] buffer where the column type will be written
+    std::wstring* Type; // optional dynamically owned UTF-16 column type
     int Decimals;   // number of digits after the decimal point; -1 if unknown
 };
 
@@ -50,7 +50,7 @@ public:
     virtual const char* GetParserName() = 0;
 
     // called to open the requested file
-    virtual CParserStatusEnum OpenFile(const char* fileName) = 0;
+    virtual CParserStatusEnum OpenFile(const wchar_t* fileName) = 0;
 
     // called to close the currently opened file; pairs with OpenFile
     // after CloseFile is called, the interface is considered invalid
@@ -78,6 +78,7 @@ public:
     // called after FetchRecord and returns the text and its length from the corresponding column
     virtual const char* GetCellText(DWORD index, size_t* textLen) = 0;
     virtual const wchar_t* GetCellTextW(DWORD index, size_t* textLen) = 0;
+    virtual bool TryGetLocalizedCellText(DWORD index, std::wstring& text) = 0;
 
     // called after FetchRecord and returns TRUE if the row is marked as deleted
     virtual BOOL IsRecordDeleted() = 0;
@@ -108,7 +109,7 @@ private:
     _dbf_header* DbfHdr;     // data extracted from the opened database
     _dbf_field* DbfFields;   // pointer to the list of columns
     char* Record;            // buffer used for retrieving records from the database
-    char FileName[MAX_PATH]; // path to the opened file
+    std::wstring FileName; // path to the opened file
 
 public:
     // constructor
@@ -117,7 +118,7 @@ public:
     // implementation of virtual-pure methods
     virtual const char* GetParserName() { return "dbf"; }
 
-    virtual CParserStatusEnum OpenFile(const char* fileName);
+    virtual CParserStatusEnum OpenFile(const wchar_t* fileName);
     virtual void CloseFile();
 
     virtual BOOL GetFileInfo(HWND hEdit);
@@ -127,6 +128,7 @@ public:
     virtual CParserStatusEnum FetchRecord(DWORD index);
     virtual const char* GetCellText(DWORD index, size_t* textLen);
     virtual const wchar_t* GetCellTextW(DWORD index, size_t* textLen);
+    virtual bool TryGetLocalizedCellText(DWORD index, std::wstring& text);
     virtual BOOL IsRecordDeleted();
 
 private:
@@ -146,7 +148,7 @@ class CParserInterfaceCSV : public CParserInterfaceAbstract
 {
 private:
     CCSVParserBase* Csv;     // interface to the CSV library
-    char FileName[MAX_PATH]; // path to the opened file
+    std::wstring FileName; // path to the opened file
     const CCSVConfig* Config;
     BOOL IsUnicode;
     BOOL IsUTF8;
@@ -158,7 +160,7 @@ public:
     // implementation of virtual-pure methods
     virtual const char* GetParserName() { return "csv"; }
 
-    virtual CParserStatusEnum OpenFile(const char* fileName);
+    virtual CParserStatusEnum OpenFile(const wchar_t* fileName);
     virtual void CloseFile();
 
     virtual BOOL GetFileInfo(HWND hEdit);
@@ -170,6 +172,7 @@ public:
     virtual CParserStatusEnum FetchRecord(DWORD index);
     virtual const char* GetCellText(DWORD index, size_t* textLen);
     virtual const wchar_t* GetCellTextW(DWORD index, size_t* textLen);
+    virtual bool TryGetLocalizedCellText(DWORD, std::wstring&) { return false; }
     virtual BOOL IsRecordDeleted();
 
 private:

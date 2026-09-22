@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <string>
+
 /// Network neighborhood plugin data interface.
 class CNethoodPluginDataInterface : public CPluginDataInterfaceAbstract
 {
@@ -22,7 +24,7 @@ protected:
         ColumnDataComment = 1,
     };
 
-    TCHAR m_szRedirectPath[MAX_PATH];
+    std::wstring m_redirectPath;
 
     void SetupColumns(__in CSalamanderViewAbstract* pView);
     void AddDescriptionColumn(__in CSalamanderViewAbstract* pView);
@@ -35,7 +37,7 @@ protected:
 
     static void RedirectUncPathToSalamander(
         __in int iPanel,
-        __in PCTSTR pszUncPath);
+        __in PCWSTR pszUncPath);
 
 public:
     /// Constructor.
@@ -44,9 +46,9 @@ public:
     /// Destructor.
     ~CNethoodPluginDataInterface();
 
-    void SetRedirectPath(__in PCTSTR pszUncPath)
+    void SetRedirectPath(const std::wstring& uncPath)
     {
-        StringCchCopy(m_szRedirectPath, COUNTOF(m_szRedirectPath), pszUncPath);
+        m_redirectPath = uncPath;
     }
 
     //----------------------------------------------------------------------
@@ -81,7 +83,7 @@ public:
     // the entire interface (in its destructor - called from
     // CPluginInterfaceAbstract::ReleasePluginDataInterface)
     virtual void WINAPI GetFileDataForUpDir(
-        __in const char* archivePath,
+        __in const wchar_t* archivePath,
         __inout CFileData& upDir);
 
     // archives only (the FS uses only the root path in CSalamanderDirectoryAbstract):
@@ -99,7 +101,7 @@ public:
     // CSalamanderDirectoryAbstract::AddDir (overwriting the automatic creation with a later
     // normal addition); if it returns FALSE, only the Salamander part will be released from 'dir'
     virtual BOOL WINAPI GetFileDataForNewDir(
-        __in const char* dirName,
+        __in const wchar_t* dirName,
         __inout CFileData& dir);
 
     // FS with custom icons only (pitFromPlugin):
@@ -168,7 +170,7 @@ public:
     virtual void WINAPI SetupView(
         __in BOOL leftPanel,
         __in CSalamanderViewAbstract* view,
-        __in const char* archivePath,
+        __in const wchar_t* archivePath,
         __in const CFileData* upperDir);
 
     // sets a new value for "column->FixedWidth" - the user used the context menu
@@ -202,12 +204,10 @@ public:
     // if 'displaySize' is TRUE, the size of all selected directories is known (see
     // CFileData::SizeValid; if nothing is selected, this is TRUE); 'selectedSize' holds
     // the sum of CFileData::Size values of selected files and directories (if nothing is selected,
-    // it is zero); 'buffer' is the buffer for the returned text (size 1000 bytes); 'hotTexts'
-    // is an array (size 100 DWORDs) that returns information about hot-text positions; the lower WORD
-    // always contains the position of the hot-text in 'buffer', the upper WORD contains the hot-text length;
-    // 'hotTextsCount' returns the number of hot-text entries written to 'hotTexts'; returns TRUE
-    // if 'buffer' + 'hotTexts' + 'hotTextsCount' are set, returns FALSE if the Information Line should be
-    // filled in the standard way (as on disks)
+    // it is zero); 'buffer' and 'hotTexts' are caller-owned growable output records.
+    // Hot-text offsets and lengths are UTF-16 code-unit counts. Returns TRUE when both
+    // outputs are published, or FALSE if the Information Line should be filled in the
+    // standard way (as on disks).
     virtual BOOL WINAPI GetInfoLineContent(
         __in int panel,
         __in const CFileData* file,
@@ -216,9 +216,8 @@ public:
         __in int selectedDirs,
         __in BOOL displaySize,
         __in const CQuadWord& selectedSize,
-        __out_bcount(1000) char* buffer,
-        __out_ecount(100) DWORD* hotTexts,
-        __out int& hotTextsCount);
+        CSalamanderStringBuffer* buffer,
+        CSalamanderTextRangeBuffer* hotTexts);
 
     // archives only: the user saved files/directories from the archive to the clipboard and is now closing
     // the archive in the panel; if the method returns TRUE, this object remains open (optimization

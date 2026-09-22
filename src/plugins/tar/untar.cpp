@@ -7,6 +7,7 @@
 #include <string>
 
 #include "dlldefs.h"
+#include "archive_name.h"
 #include "fileio.h"
 #include "tar.h"
 #include "deb/deb.h"
@@ -41,7 +42,7 @@ int TxtToShort(const unsigned char* txt, unsigned long& result)
         }
         else
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -66,7 +67,7 @@ int TxtToLong(const unsigned char* txt, unsigned long& result)
         }
         else
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -91,7 +92,7 @@ int TxtToQuad(const unsigned char* txt, CQuadWord& result)
         }
         else
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -129,8 +130,6 @@ BOOL FromOctalQ(const unsigned char* ptr, const int length, CQuadWord& result)
 //
 SCommonHeader::SCommonHeader()
 {
-    Path = NULL;
-    ;
     Name = NULL;
     FileInfo.Name = NULL;
     Initialize();
@@ -143,9 +142,8 @@ SCommonHeader::~SCommonHeader()
 
 void SCommonHeader::Initialize()
 {
-    if (Path != NULL)
-        free(Path);
-    Path = NULL;
+    FullName.clear();
+    Path.clear();
     if (Name != NULL)
         free(Name);
     Name = NULL;
@@ -170,9 +168,9 @@ void SCommonHeader::Initialize()
 // ****************************************************************************
 //
 
-CArchive::CArchive(const char* fileName, CSalamanderForOperationsAbstract* salamander, DWORD offset, CQuadWord inputSize)
+CArchive::CArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander, DWORD offset, CQuadWord inputSize)
 {
-    CALL_STACK_MESSAGE2("CArchive::CArchive(%s, )", fileName);
+    CALL_STACK_MESSAGE2("CArchive::CArchive(%ls, )", fileName);
 
     // initialization
     Offset.Set(0, 0);
@@ -203,7 +201,7 @@ CArchive::~CArchive()
         delete Stream;
 }
 
-BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir)
+BOOL CArchive::ListArchive(const wchar_t* prefix, CSalamanderDirectoryAbstract* dir)
 {
     CALL_STACK_MESSAGE1("CArchive::ListArchive( )");
 
@@ -222,7 +220,7 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
             return ListStream(dir);
         else
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_UNKNOWN), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_UNKNOWN).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return FALSE;
         }
 
@@ -231,7 +229,7 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
 
     if (header.Finished)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_NOTFOUND), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_NOTFOUND).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
 
@@ -241,22 +239,22 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
         // ignore entries we cannot interpret
         if (!header.Ignored)
         {
-            CPathBuffer path; // Heap-allocated for long path support
-
-            if (prefix)
+            std::wstring path;
+            if (prefix != NULL)
             {
-                strcpy(path, prefix);
-                if (header.Path)
-                    strcat(path, header.Path);
+                path = prefix;
+                path += header.Path;
             }
             // add either a new file or a directory
+            const wchar_t* itemPath = prefix != NULL ? path.c_str() :
+                                      (header.Path.empty() ? NULL : header.Path.c_str());
             if (!header.IsDir)
             {
                 // TODO: also add user data with the file position inside the archive to separate identically named files
                 // this is a file, add the file
-                if (!dir->AddFile(prefix ? path : header.Path, header.FileInfo, NULL))
+                if (!dir->AddFile(itemPath, header.FileInfo, NULL))
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_FDATA), LoadStr(IDS_TARERR_TITLE),
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_FDATA).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                                       MSGBOX_ERROR);
                     return FALSE;
                 }
@@ -265,9 +263,9 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
             {
                 // TODO: also add user data with the file position inside the archive to separate identically named files
                 // this is a directory, add the directory
-                if (!dir->AddDir(prefix ? path : header.Path, header.FileInfo, NULL))
+                if (!dir->AddDir(itemPath, header.FileInfo, NULL))
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_FDATA), LoadStr(IDS_TARERR_TITLE),
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_FDATA).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                                       MSGBOX_ERROR);
                     return FALSE;
                 }
@@ -296,10 +294,10 @@ BOOL CArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir
     }
 }
 
-BOOL CArchive::UnpackOneFile(const char* nameInArchive, const CFileData* fileData,
-                             const char* targetPath, const char* newFileName)
+BOOL CArchive::UnpackOneFile(const wchar_t* nameInArchive, const CFileData* fileData,
+                             const wchar_t* targetPath, const wchar_t* newFileName)
 {
-    CALL_STACK_MESSAGE4("CArchive::UnpackOneFile(%s, , %s, %s)", nameInArchive, targetPath, newFileName);
+    CALL_STACK_MESSAGE4("CArchive::UnpackOneFile(%ls, , %ls, %ls)", nameInArchive, targetPath, newFileName);
 
     if (!IsOk())
         return FALSE;
@@ -316,14 +314,14 @@ BOOL CArchive::UnpackOneFile(const char* nameInArchive, const CFileData* fileDat
         return FALSE;
     if (header.Finished)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_NOTFOUND), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_NOTFOUND).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     BOOL found = FALSE;
     // we have an archive, so proceed - decode all files from the archive
     for (;;)
     {
-        found = !strcmp(header.Name, nameInArchive);
+        found = header.FullName == nameInArchive;
         // if we cannot interpret what we found, skip it; otherwise extract the file
         // What we don't support (everything except files & dirs) has zero size and Ignored set.
         // This new condition unlike the old one also extracts empty files.
@@ -336,8 +334,7 @@ BOOL CArchive::UnpackOneFile(const char* nameInArchive, const CFileData* fileDat
                 if (found)
                     return TRUE;
 
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             }
             return FALSE;
         }
@@ -354,66 +351,67 @@ BOOL CArchive::UnpackOneFile(const char* nameInArchive, const CFileData* fileDat
 }
 
 // extraction of selected files
-BOOL CArchive::UnpackArchive(const char* targetPath, const char* archiveRoot,
+BOOL CArchive::UnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot,
                              SalEnumSelection next, void* param)
 {
-    CALL_STACK_MESSAGE3("CArchive::UnpackArchive(%s, %s, , )", targetPath, archiveRoot);
+    CALL_STACK_MESSAGE3("CArchive::UnpackArchive(%ls, %ls, , )", targetPath, archiveRoot);
 
     if (!IsOk())
         return FALSE;
 
-    // initialize the names to extract
-    const char* curName;
+    // Initialize the UTF-16 names selected in the panel.
+    const wchar_t* curNameW;
     BOOL isDir;
     CQuadWord size;
     CQuadWord totalSize(0, 0);
     CNames names;
-    while ((curName = next(NULL, 0, &isDir, &size, NULL, param, NULL)) != NULL)
+    while ((curNameW = next(NULL, 0, &isDir, &size, NULL, param, NULL)) != NULL)
     {
-        if (archiveRoot != NULL && *archiveRoot != '\0')
+        std::wstring curName = curNameW;
+        if (archiveRoot != NULL && *archiveRoot != L'\0')
         {
-            std::string tmpName = archiveRoot;
-            if (tmpName.back() != '\\')
-                tmpName += '\\';
+            std::wstring tmpName = archiveRoot;
+            if (tmpName.back() != L'\\')
+                tmpName += L'\\';
             tmpName += curName;
             names.AddName(tmpName.c_str(), isDir, NULL, NULL);
         }
         else
-            names.AddName(curName, isDir, NULL, NULL);
+            names.AddName(curName.c_str(), isDir, NULL, NULL);
         totalSize = totalSize + size;
     }
     // check free space; assume TestFreeSpace displays an appropriate message
     if (!SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                          targetPath, totalSize, LoadStr(IDS_TARERR_HEADER)))
+                                          targetPath, totalSize, LangStr(IDS_TARERR_HEADER).c_str()))
         return FALSE;
 
     // perform the actual extraction by the collected names
     return DoUnpackArchive(targetPath, archiveRoot, names);
 }
 
-BOOL CArchive::UnpackWholeArchive(const char* mask, const char* targetPath)
+BOOL CArchive::UnpackWholeArchive(const wchar_t* mask, const wchar_t* targetPath)
 {
-    CALL_STACK_MESSAGE3("CArchive::UnpackWholeArchive(%s, %s)", mask, targetPath);
+    CALL_STACK_MESSAGE3("CArchive::UnpackWholeArchive(%ls, %ls)", mask, targetPath);
 
     if (!IsOk())
         return FALSE;
 
     // initialize the list of names to extract according to the provided mask list
     CNames names;
-    std::string tmp = mask;
-    char* ptr = &tmp[0] + tmp.size() - 1;
+    std::wstring tmp = mask;
+    wchar_t* ptr = &tmp[0] + tmp.size() - 1;
     for (;;)
     {
-        while (ptr > &tmp[0] && *ptr != ';')
+        while (ptr > &tmp[0] && *ptr != L';')
             ptr--;
-        if (*ptr == ';')
+        if (*ptr == L';')
         {
-            if (strlen(ptr + 1) > 0)
+            if (wcslen(ptr + 1) > 0)
                 names.AddName(ptr + 1, FALSE, NULL, NULL);
-            *ptr = '\0';
+            *ptr = L'\0';
             ptr--;
         }
-        else if (strlen(ptr) > 0)
+        else if (wcslen(ptr) > 0)
             names.AddName(ptr, FALSE, NULL, NULL);
         if (ptr <= &tmp[0])
             break;
@@ -431,9 +429,9 @@ BOOL CArchive::UnpackWholeArchive(const char* mask, const char* targetPath)
 // ****************************************************************************
 //
 
-BOOL CArchive::DoUnpackArchive(const char* targetPath, const char* archiveRoot, CNames& names)
+BOOL CArchive::DoUnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot, CNames& names)
 {
-    CALL_STACK_MESSAGE3("CArchive::DoUnpackArchive(%s, %s, )", targetPath, archiveRoot);
+    CALL_STACK_MESSAGE3("CArchive::DoUnpackArchive(%ls, %ls, )", targetPath, archiveRoot);
 
     if (!IsOk())
         return FALSE;
@@ -452,11 +450,11 @@ BOOL CArchive::DoUnpackArchive(const char* targetPath, const char* archiveRoot, 
         return FALSE;
     if (header.Finished)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_NOTFOUND), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_NOTFOUND).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // open the progress dialog
-    SalamanderIf->OpenProgressDialog(LoadStr(IDS_UNPACKPROGRESS_TITLE), FALSE, NULL, FALSE);
+    SalamanderIf->OpenProgressDialog(LangStr(IDS_UNPACKPROGRESS_TITLE).c_str(), FALSE, NULL, FALSE);
     SalamanderIf->ProgressSetTotalSize(Stream->GetStreamSize(), CQuadWord(-1, -1));
     // update the progress after reading the header
     sizeDelta = filePos;
@@ -472,11 +470,11 @@ BOOL CArchive::DoUnpackArchive(const char* targetPath, const char* archiveRoot, 
     for (;;)
     {
         // determine whether this is "our" file
-        BOOL found = names.IsNamePresent(header.Name);
+        BOOL found = names.IsNamePresent(header.FullName.c_str());
         // what should be the name of the created file? (relative path)
-        char* ptr = header.Name;
+        const wchar_t* ptr = header.FullName.c_str();
         if (found && !header.Ignored && archiveRoot != NULL)
-            ptr += strlen(archiveRoot);
+            ptr += wcslen(archiveRoot);
 
         // if we cannot interpret what we found, skip it; otherwise extract the file
         // What we don't support (everything except files & dirs) has zero size and Ignored set.
@@ -515,15 +513,36 @@ BOOL CArchive::DoUnpackArchive(const char* targetPath, const char* archiveRoot, 
     }
 }
 
-void CArchive::MakeFileInfo(const SCommonHeader& header, char* arcfiledata, char* arcfilename)
+static std::wstring FormatLocalDateOrTime(const SYSTEMTIME& time, bool date)
+{
+    const int required = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, NULL, 0)
+                              : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL, NULL, 0);
+    if (required > 1)
+    {
+        std::wstring result(static_cast<size_t>(required), L'\0');
+        const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, result.data(), required)
+                                 : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL, result.data(), required);
+        if (written == required)
+        {
+            result.resize(static_cast<size_t>(written - 1));
+            return result;
+        }
+    }
+    if (date)
+        return std::to_wstring(time.wDay) + L"." + std::to_wstring(time.wMonth) + L"." + std::to_wstring(time.wYear);
+    return std::to_wstring(time.wHour) + L":" + (time.wMinute < 10 ? L"0" : L"") + std::to_wstring(time.wMinute) +
+           L":" + (time.wSecond < 10 ? L"0" : L"") + std::to_wstring(time.wSecond);
+}
+
+void CArchive::MakeFileInfo(const SCommonHeader& header, std::wstring& arcfiledata, std::wstring& arcfilename)
 {
     CALL_STACK_MESSAGE1("CArchive::MakeFileInfo( , , )");
 
     if (header.IsDir)
     {
         // this does not matter for directories
-        arcfiledata[0] = '\0';
-        arcfilename[0] = '\0';
+        arcfiledata.clear();
+        arcfilename.clear();
     }
     else
     {
@@ -532,42 +551,41 @@ void CArchive::MakeFileInfo(const SCommonHeader& header, char* arcfiledata, char
         FileTimeToLocalFileTime(&header.FileInfo.LastWrite, &ft);
         SYSTEMTIME st;
         FileTimeToSystemTime(&ft, &st);
-        char date[50], time[50], number[50];
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-            sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-            sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        sprintf(arcfiledata, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, header.FileInfo.Size), date, time);
+        const std::wstring date = FormatLocalDateOrTime(st, true);
+        const std::wstring time = FormatLocalDateOrTime(st, false);
+        const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, header.FileInfo.Size);
+        arcfiledata = number + L", " + date + L", " + time;
         // filename
-        sprintf(arcfilename, "%s\\%s", Stream->GetArchiveName(), header.Name);
+        arcfilename = Stream->GetArchiveName();
+        SPLSalPathAppendOwned(arcfilename, header.FullName.c_str());
     }
 }
 
-int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
-                           const char* targetName, BOOL simulate, BOOL doProgress)
+int CArchive::WriteOutData(const SCommonHeader& header, const wchar_t* targetPath,
+                           const wchar_t* targetName, BOOL simulate, BOOL doProgress)
 {
-    SLOW_CALL_STACK_MESSAGE5("CArchive::WriteOutData( , %s, %s, %d, %d)",
+    SLOW_CALL_STACK_MESSAGE5("CArchive::WriteOutData( , %ls, %ls, %d, %d)",
                              targetPath, targetName, simulate, doProgress);
 
     BOOL toSkip = TRUE;
-    std::string extractedName;
+    std::wstring extractedName;
     HANDLE file;
     if (!simulate || doProgress)
     {
         // construct the name of the extracted item
         extractedName = targetPath;
-        if (extractedName.back() != '\\')
-            extractedName += '\\';
-        extractedName += (targetName[0] == '\\' ? 1 : 0) + targetName;
+        if (extractedName.back() != L'\\')
+            extractedName += L'\\';
+        extractedName += (targetName[0] == L'\\' ? 1 : 0) + targetName;
         // create the new file
-        char arcfiledata[500];
-        char arcfilename[500];
+        std::wstring arcfiledata;
+        std::wstring arcfilename;
         MakeFileInfo(header, arcfiledata, arcfilename);
         if (!simulate)
         {
             file = SalamanderSafeFile->SafeFileCreate(extractedName.c_str(), GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL,
                                                       header.IsDir, SalamanderGeneral->GetMainWindowHWND(),
-                                                      arcfilename, arcfiledata, &Silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
+                                                      arcfilename.c_str(), arcfiledata.c_str(), &Silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
             // abort on any problem
             if (file == INVALID_HANDLE_VALUE)
             {
@@ -582,13 +600,9 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
         // update the file name in the progress dialog
         if (doProgress)
         {
-            char progresstxt[1000];
-            if (!toSkip)
-                strcpy(progresstxt, LoadStr(IDS_UNPACKPROGRESS_TEXT));
-            else
-                strcpy(progresstxt, LoadStr(IDS_SKIPPROGRESS_TEXT));
-            strcat(progresstxt, header.Name);
-            SalamanderIf->ProgressDialogAddText(progresstxt, TRUE);
+            std::wstring progresstxt = !toSkip ? LangStr(IDS_UNPACKPROGRESS_TEXT).c_str() : LangStr(IDS_SKIPPROGRESS_TEXT).c_str();
+            progresstxt += header.FullName;
+            SalamanderIf->ProgressDialogAddText(progresstxt.c_str(), TRUE);
         }
     }
     unsigned long checksum = 0;
@@ -609,12 +623,11 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             tarHeader = (const TTarBlock*)Stream->GetBlock(BLOCKSIZE);
             if (tarHeader == NULL)
             {
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName.c_str());
+                    DeleteFileW(extractedName.c_str());
                 }
                 return TAR_ERROR;
             }
@@ -622,34 +635,17 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             BOOL finished;
             if (!IsTarHeader(tarHeader->RawBlock, finished, format))
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName.c_str());
+                    DeleteFileW(extractedName.c_str());
                 }
                 return TAR_ERROR;
             }
             if (!simulate)
             {
                 // TODO: process extended headers according to their specific type here
-                /*
-        DWORD written;
-        if (!WriteFile(file, buffer, toRead, &written, NULL) || written != toRead)
-        {
-          char message[1000];
-          DWORD err = GetLastError();
-          strcpy(message, LoadStr(IDS_TARERR_FWRITE));
-          if (written != toRead)
-            strcat(message, LoadStr(IDS_TARERR_WRSIZE));
-          else
-            strcat(message, SalamanderGeneral->GetErrorText(err));
-          SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
-          CloseHandle(file);
-          DeleteFile(extractedName.c_str());
-          return TAR_ERROR;
-        }
-        */
             }
             // update the progress if necessary
             if (doProgress)
@@ -664,7 +660,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                     if (!simulate)
                     {
                         CloseHandle(file);
-                        DeleteFile(extractedName.c_str());
+                        DeleteFileW(extractedName.c_str());
                     }
                     return TAR_ERROR;
                 }
@@ -683,14 +679,13 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
         if (buffer == NULL)
         {
             if (!Stream->IsOk())
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             else
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_EOF), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_EOF).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             if (!simulate)
             {
                 CloseHandle(file);
-                DeleteFile(extractedName.c_str());
+                DeleteFileW(extractedName.c_str());
             }
             return TAR_ERROR;
         }
@@ -699,15 +694,14 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             DWORD written;
             if (!WriteFile(file, buffer, toRead, &written, NULL) || written != toRead)
             {
-                char message[1000];
-                strcpy(message, LoadStr(IDS_TARERR_FWRITE));
+                std::wstring message = LangStr(IDS_TARERR_FWRITE).c_str();
                 if (written != toRead)
-                    strcat(message, LoadStr(IDS_TARERR_WRSIZE));
+                    message += LangStr(IDS_TARERR_WRSIZE).c_str();
                 else
-                    strcat(message, SalamanderGeneral->GetErrorText(GetLastError()));
-                SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                    message += SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
+                SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 CloseHandle(file);
-                DeleteFile(extractedName.c_str());
+                DeleteFileW(extractedName.c_str());
                 return TAR_ERROR;
             }
         }
@@ -724,7 +718,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName.c_str());
+                    DeleteFileW(extractedName.c_str());
                 }
                 return TAR_ERROR;
             }
@@ -743,11 +737,11 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
     if (header.Format == e_CRCASCII && !header.Ignored &&
         CQuadWord(checksum, 0) != header.Checksum)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_CHECKSUM), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_CHECKSUM).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         if (!simulate)
         {
             CloseHandle(file);
-            DeleteFile(extractedName.c_str());
+            DeleteFileW(extractedName.c_str());
         }
         return TAR_ERROR;
     }
@@ -759,16 +753,15 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             SetFileTime(file, &header.FileInfo.LastWrite, &header.FileInfo.LastWrite, &header.FileInfo.LastWrite);
             if (!CloseHandle(file))
             {
-                char buffer[1000];
                 DWORD err = GetLastError();
-                strcpy(buffer, LoadStr(IDS_TARERR_FWRITE));
-                strcat(buffer, SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->ShowMessageBox(buffer, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
-                DeleteFile(extractedName.c_str());
+                std::wstring buffer = LangStr(IDS_TARERR_FWRITE).c_str();
+                buffer += SPLGetErrorTextOwned(SalamanderGeneral, err);
+                SalamanderGeneral->ShowMessageBox(buffer.c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                DeleteFileW(extractedName.c_str());
                 return TAR_ERROR;
             }
         }
-        SetFileAttributes(extractedName.c_str(), header.FileInfo.Attr);
+        SetFileAttributesW(extractedName.c_str(), header.FileInfo.Attr);
     }
 
     // align the input to whole blocks
@@ -796,8 +789,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
         else if (ret == TAR_PREMATURE_END)
         {
             // all other errors reported inside SkipBlockPadding()
-            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                              LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -893,11 +885,9 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
         if (buffer == NULL)
         {
             if (!Stream->IsOk())
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             else
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_EOF),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_EOF).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -917,13 +907,12 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
         Stream->Rewind(preRead);
         if (!Stream->IsOk())
         {
-            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                              LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
         // and exit
         if (!probe)
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_UNKNOWN), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_UNKNOWN).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_NOTAR;
     }
     // if the tar archive has ended, stop processing
@@ -956,7 +945,7 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
         ret = ReadTarHeader(buffer, header);
         break;
     default:
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_FORMAT), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_FORMAT).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         ret = TAR_ERROR;
     }
     // abort when an error occurs
@@ -968,8 +957,7 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
     {
         if ((ret == TAR_PREMATURE_END) || (ret == TAR_EOF))
         {
-            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                              LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
         return ret;
@@ -1052,57 +1040,54 @@ int CArchive::ReadArchiveHeader(SCommonHeader& header, BOOL probe)
     header.Name = _strdup(tmpName);
     if (header.Name == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
         return TAR_ERROR;
     }
-    // now analyze the name
-    const char* ptr = header.Name + strlen(header.Name) - 1;
-    // find the next separator - split name and path
-    while (ptr > header.Name && *ptr != '\\')
-        ptr--;
-    if (ptr == header.Name)
+    const bool isTar = header.Format == e_TarPosix || header.Format == e_TarOldGnu ||
+                       header.Format == e_TarV7;
+    // Lenient, because the alternative here is dropping the member.
+    //
+    // The strict decoder answers false for a name that is valid in neither UTF-8 nor this
+    // machine's ACP - a tarball written on a KOI8-R or ISO-8859-2 system, say - and this arm
+    // then marked it Ignored: no panel entry, no message, nothing to select and extract.
+    // Pre-unicode did not decode at all and always listed the member. The lenient form keeps
+    // the strict identity whenever one exists and falls back to a byte-for-byte ISO-8859-1
+    // projection otherwise, so the entry is visible and extractable even when its encoding is
+    // unknowable. It only fails for a null pointer, which header.Name cannot be here.
+    if (!DecodeArchiveMemberNameLenient(header.Name, isTar, header.FullName))
     {
-        // nothing found, we only have the name
-        header.Path = NULL;
-        header.FileInfo.NameLen = strlen(header.Name);
-        header.FileInfo.Name = SalamanderGeneral->DupStr(header.Name);
-        if (header.FileInfo.Name == NULL)
-        {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
-                                              MSGBOX_ERROR);
-            return TAR_ERROR;
-        }
+        header.Ignored = TRUE;
+        return TAR_OK;
     }
+
+    // Split the decoded name only after the byte grammar has normalized separators and removed
+    // traversal components. The decoded UTF-16 identity is authoritative from this point on.
+    const size_t separator = header.FullName.find_last_of(L'\\');
+    const wchar_t* leaf = header.FullName.c_str();
+    if (separator == std::wstring::npos)
+        header.Path.clear();
     else
     {
-        // separator found; copy both the name and the path
-        header.Path = (char*)malloc(ptr - header.Name + 1);
-        if (header.Path == NULL)
-        {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
-                                              MSGBOX_ERROR);
-            return TAR_ERROR;
-        }
-        strncpy_s(header.Path, ptr - header.Name + 1, header.Name, _TRUNCATE);
-        ptr++;
-        header.FileInfo.NameLen = strlen(ptr);
-        header.FileInfo.Name = SalamanderGeneral->DupStr(ptr);
-        if (header.FileInfo.Name == NULL)
-        {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
-                                              MSGBOX_ERROR);
-            return TAR_ERROR;
-        }
+        header.Path.assign(header.FullName, 0, separator);
+        leaf += separator + 1;
     }
+    header.FileInfo.Name = SalamanderGeneral->DupStr(leaf);
+    if (header.FileInfo.Name == NULL)
+    {
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
+                                          MSGBOX_ERROR);
+        return TAR_ERROR;
+    }
+    header.FileInfo.NameLen = (unsigned)wcslen(header.FileInfo.Name);
     // determine the extension
     int sortByExtDirsAsFiles;
     SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &sortByExtDirsAsFiles,
                                           sizeof(sortByExtDirsAsFiles), NULL);
     if (sortByExtDirsAsFiles || !header.IsDir)
     {
-        char* s = header.FileInfo.Name + header.FileInfo.NameLen - 1;
-        while (s >= header.FileInfo.Name && *s != '.')
+        wchar_t* s = header.FileInfo.Name + header.FileInfo.NameLen - 1;
+        while (s >= header.FileInfo.Name && *s != L'.')
             s--;
         //    if (s > header.FileInfo.Name)   // ".cvspass" in Windows counts as an extension...
         if (s >= header.FileInfo.Name)
@@ -1177,28 +1162,27 @@ int CArchive::ReadCpioName(unsigned long namesize, SCommonHeader& header)
     // sanity-check the name length
     if (namesize > 10000)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     // allocate space for the name
     header.Name = (char*)malloc(namesize);
     if (header.Name == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     // read the name
     const unsigned char* buffer = Stream->GetBlock((unsigned short)namesize);
     if (buffer == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                          LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     // ensure the length matches
     if (buffer[namesize - 1] != '\0')
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     // update the offset for alignment
@@ -1217,8 +1201,7 @@ int CArchive::ReadNewASCIIHeader(SCommonHeader& header)
     const unsigned char* buffer = Stream->GetBlock(13 * 8);
     if (buffer == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                          LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
 
@@ -1249,8 +1232,7 @@ int CArchive::ReadOldASCIIHeader(SCommonHeader& header)
     const unsigned char* buffer = Stream->GetBlock(70);
     if (buffer == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                          LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
 
@@ -1260,7 +1242,7 @@ int CArchive::ReadOldASCIIHeader(SCommonHeader& header)
     CQuadWord qnamesize;
     if (!FromOctalQ(buffer + 6 * 7 + 11, 6, qnamesize))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     unsigned long namesize;
@@ -1268,17 +1250,17 @@ int CArchive::ReadOldASCIIHeader(SCommonHeader& header)
     // and extract the file details we care about
     if (!FromOctalQ(buffer + 6 * 2, 6, header.Mode))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     if (!FromOctalQ(buffer + 6 * 7, 11, header.MTime))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     if (!FromOctalQ(buffer + 6 * 8 + 11, 11, header.FileInfo.Size))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
     header.Checksum.Set(0, 0);
@@ -1294,8 +1276,7 @@ int CArchive::ReadBinaryHeader(SCommonHeader& header)
     const unsigned char* buffer = Stream->GetBlock(20);
     if (buffer == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                          LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         return TAR_ERROR;
     }
 
@@ -1315,25 +1296,25 @@ int CArchive::ReadBinaryHeader(SCommonHeader& header)
         // extract the name length
         if (!TxtToShort(buffer + 2 * 7, namesize))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
         // and extract the file details we care about
         unsigned long mode;
         if (!TxtToShort(buffer + 2 * 0, mode))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
         header.Mode.Set(mode, 0);
         if (!TxtToQuad(buffer + 2 * 5, header.MTime))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
         if (!TxtToQuad(buffer + 2 * 8, header.FileInfo.Size))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CPIOERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_CPIOERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             return TAR_ERROR;
         }
     }
@@ -1401,6 +1382,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
     // the first header block is already read and validated
     const TTarBlock* tarHeader = (const TTarBlock*)buffer;
     Offset += CQuadWord(BLOCKSIZE, 0);
+    std::string paxPath;
 
     for (;;)
     {
@@ -1412,9 +1394,50 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             header.FileInfo.Size.Set(0, 0);
         else if (!FromOctalQ((const unsigned char*)tarHeader->Header.size, 1 + 12, header.FileInfo.Size))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
             return TAR_ERROR;
+        }
+
+        // POSIX PAX extended headers apply to the next real member. Keep their payload as bytes
+        // until the path record is isolated, then let the common strict UTF-8 decoder own it.
+        if (tarHeader->Header.typeflag == XHDTYPE)
+        {
+            if (header.FileInfo.Size > CQuadWord(1024 * 1024, 0))
+            {
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                return TAR_ERROR;
+            }
+            std::string payload(header.FileInfo.Size.LoDWord, '\0');
+            DWORD remaining = header.FileInfo.Size.LoDWord;
+            DWORD copied = 0;
+            while (remaining > 0)
+            {
+                const unsigned char* block = Stream->GetBlock(BLOCKSIZE);
+                if (block == NULL)
+                {
+                    SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                    return TAR_ERROR;
+                }
+                Offset += CQuadWord(BLOCKSIZE, 0);
+                const DWORD part = remaining < BLOCKSIZE ? remaining : BLOCKSIZE;
+                memcpy(payload.data() + copied, block, part);
+                copied += part;
+                remaining -= part;
+            }
+            if (!ParsePaxPath(payload.data(), payload.size(), paxPath))
+            {
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                return TAR_ERROR;
+            }
+            tarHeader = (const TTarBlock*)Stream->GetBlock(BLOCKSIZE);
+            if (tarHeader == NULL || !IsTarHeader(tarHeader->RawBlock, header.Finished, header.Format))
+            {
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                return TAR_ERROR;
+            }
+            Offset += CQuadWord(BLOCKSIZE, 0);
+            continue;
         }
 
         // handle long GNU names
@@ -1424,7 +1447,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             // sanity checking
             if (header.FileInfo.Size > CQuadWord(10000, 0))
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 return TAR_ERROR;
             }
             // ignore link entries and keep only actual file names
@@ -1435,7 +1458,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
                 header.Name = (char*)malloc(header.FileInfo.Size.LoDWord + 1);
                 if (header.Name == NULL)
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                                       MSGBOX_ERROR);
                     return TAR_ERROR;
                 }
@@ -1449,8 +1472,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
                 const unsigned char* ptr = Stream->GetBlock(BLOCKSIZE);
                 if (ptr == NULL)
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                      LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
                     return TAR_ERROR;
                 }
                 Offset += CQuadWord(BLOCKSIZE, 0);
@@ -1468,14 +1490,13 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             tarHeader = (const TTarBlock*)Stream->GetBlock(BLOCKSIZE);
             if (tarHeader == NULL)
             {
-                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                                  LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 return TAR_ERROR;
             }
             Offset += CQuadWord(BLOCKSIZE, 0);
             if (!IsTarHeader(tarHeader->RawBlock, header.Finished, header.Format))
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
                 return TAR_ERROR;
             }
             // and loop again
@@ -1499,7 +1520,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             header.Name = (char*)malloc(len + 1);
             if (header.Name == NULL)
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_MEMORY), LoadStr(IDS_TARERR_TITLE),
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                                   MSGBOX_ERROR);
                 return TAR_ERROR;
             }
@@ -1511,6 +1532,16 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             else
                 header.Name[0] = '\0';
             strcat(header.Name, tmpName);
+        }
+        if (!paxPath.empty())
+        {
+            free(header.Name);
+            header.Name = _strdup(paxPath.c_str());
+            if (header.Name == NULL)
+            {
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_MEMORY).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+                return TAR_ERROR;
+            }
         }
         // assume a regular file
         header.IsDir = FALSE;
@@ -1556,7 +1587,7 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
             break;
         default:
             // error
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_BADSIG), LoadStr(IDS_TARERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_BADSIG).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
             header.Ignored = TRUE;
             break;
@@ -1564,13 +1595,13 @@ int CArchive::ReadTarHeader(const unsigned char* buffer, SCommonHeader& header)
         // load the file information
         if (!FromOctalQ((const unsigned char*)tarHeader->Header.mtime, sizeof(tarHeader->Header.mtime) + 1, header.MTime))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
             return TAR_ERROR;
         }
         if (!FromOctalQ((const unsigned char*)tarHeader->Header.mode, sizeof(tarHeader->Header.mode), header.Mode))
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_HEADER), LoadStr(IDS_TARERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_HEADER).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
             return TAR_ERROR;
         }
@@ -1588,19 +1619,20 @@ BOOL CArchive::GetStreamHeader(SCommonHeader& header)
     CALL_STACK_MESSAGE1("CArchive::GetStreamHeader( )");
 
     // create a "fake" stream header
-    header.FileInfo.NameLen = strlen(Stream->GetOldName());
-    header.FileInfo.Name = SalamanderGeneral->DupStr(Stream->GetOldName());
-    header.Name = (char*)malloc(header.FileInfo.NameLen + 1);
+    const std::wstring oldNameW = Stream->GetOldNameW();
+    header.FullName = oldNameW;
+    header.FileInfo.Name = SalamanderGeneral->DupStr(oldNameW.c_str());
+    header.Name = (char*)malloc(strlen(Stream->GetOldName()) + 1);
     if (header.FileInfo.Name == NULL || header.Name == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
-    strcpy(header.FileInfo.Name, Stream->GetOldName());
     strcpy(header.Name, Stream->GetOldName());
+    header.FileInfo.NameLen = (unsigned)wcslen(header.FileInfo.Name);
     // determine the extension
-    char* s = header.FileInfo.Name + header.FileInfo.NameLen - 1;
-    while (s >= header.FileInfo.Name && *s != '.')
+    wchar_t* s = header.FileInfo.Name + header.FileInfo.NameLen - 1;
+    while (s >= header.FileInfo.Name && *s != L'.')
         s--;
     //  if (s > header.FileInfo.Name)   // ".cvspass" is considered an extension in Windows...
     if (s >= header.FileInfo.Name)
@@ -1612,8 +1644,7 @@ BOOL CArchive::GetStreamHeader(SCommonHeader& header)
                         header.FileInfo.Attr);
     if (!Stream->IsOk())
     {
-        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                          LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // and the remaining attributes
@@ -1635,7 +1666,7 @@ BOOL CArchive::ListStream(CSalamanderDirectoryAbstract* dir)
     // an unpacked raw stream is always a file, so add it as one
     if (!dir->AddFile(NULL, header.FileInfo, NULL))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_FDATA), LoadStr(IDS_TARERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_FDATA).c_str(), LangStr(IDS_TARERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
         return FALSE;
     }
@@ -1644,17 +1675,17 @@ BOOL CArchive::ListStream(CSalamanderDirectoryAbstract* dir)
     return TRUE;
 }
 
-BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
-                            const char* nameInArchive, CNames* names, const char* newName)
+BOOL CArchive::UnpackStream(const wchar_t* targetPath, BOOL doProgress,
+                            const wchar_t* nameInArchive, CNames* names, const wchar_t* newName)
 {
-    CALL_STACK_MESSAGE3("CArchive::UnpackStream(%s, %d)", targetPath, doProgress);
+    CALL_STACK_MESSAGE3("CArchive::UnpackStream(%ls, %d)", targetPath, doProgress);
 
     CQuadWord filePos, sizeDelta;
     if (doProgress)
     {
         filePos = Stream->GetStreamPos();
         // open the progress dialog
-        SalamanderIf->OpenProgressDialog(LoadStr(IDS_UNPACKPROGRESS_TITLE), FALSE, NULL, FALSE);
+        SalamanderIf->OpenProgressDialog(LangStr(IDS_UNPACKPROGRESS_TITLE).c_str(), FALSE, NULL, FALSE);
         SalamanderIf->ProgressSetTotalSize(Stream->GetStreamSize(), CQuadWord(-1, -1));
     }
     SCommonHeader header;
@@ -1663,31 +1694,30 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
         SalamanderIf->CloseProgressDialog();
         return FALSE;
     }
-    if (!(nameInArchive != NULL && !strcmp(header.Name, nameInArchive)) &&
-        !(names != NULL && names->IsNamePresent(header.Name)))
+    if (!(nameInArchive != NULL && header.FullName == nameInArchive) &&
+        !(names != NULL && names->IsNamePresent(header.FullName.c_str())))
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TARERR_NOTFOUND), LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_TARERR_NOTFOUND).c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
         SalamanderIf->CloseProgressDialog();
         return FALSE;
     }
     BOOL toSkip = TRUE;
-    std::string extractedName;
+    std::wstring extractedName;
     HANDLE file;
 
     // construct the target name
-    if (!newName)
-        newName = header.Name;
+    std::wstring newNameW = newName ? newName : header.FullName;
     extractedName = targetPath;
-    if (extractedName.back() != '\\')
-        extractedName += '\\';
-    extractedName += (newName[0] == '\\' ? 1 : 0) + newName;
+    if (extractedName.back() != L'\\')
+        extractedName += L'\\';
+    extractedName += newNameW.c_str() + (newNameW[0] == L'\\' ? 1 : 0);
     // create the new file
-    char arcfiledata[500];
-    char arcfilename[500];
+    std::wstring arcfiledata;
+    std::wstring arcfilename;
     MakeFileInfo(header, arcfiledata, arcfilename);
     file = SalamanderSafeFile->SafeFileCreate(extractedName.c_str(), GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL,
                                               header.IsDir, SalamanderGeneral->GetMainWindowHWND(),
-                                              arcfilename, arcfiledata, &Silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
+                                              arcfilename.c_str(), arcfiledata.c_str(), &Silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
     // abort on any problem
     if (file == INVALID_HANDLE_VALUE)
     {
@@ -1700,10 +1730,9 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
     // update the file name in the progress dialog
     if (doProgress)
     {
-        char progresstxt[1000];
-        strcpy(progresstxt, LoadStr(IDS_UNPACKPROGRESS_TEXT));
-        strcat(progresstxt, header.Name);
-        SalamanderIf->ProgressDialogAddText(progresstxt, TRUE);
+        std::wstring progresstxt = LangStr(IDS_UNPACKPROGRESS_TEXT).c_str();
+        progresstxt += header.FullName;
+        SalamanderIf->ProgressDialogAddText(progresstxt.c_str(), TRUE);
     }
     // the size field in the header may not be reliable; keep unpacking while data remains
     for (;;)
@@ -1716,10 +1745,9 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
             buffer = Stream->GetBlock(read);
         if (!Stream->IsOk())
         {
-            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
-                                              LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             CloseHandle(file);
-            DeleteFile(extractedName.c_str());
+            DeleteFileW(extractedName.c_str());
             SalamanderIf->CloseProgressDialog();
             return FALSE;
         }
@@ -1730,16 +1758,15 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
         DWORD written;
         if (!WriteFile(file, buffer, read, &written, NULL) || written != read)
         {
-            char message[1000];
             DWORD err = GetLastError();
-            strcpy(message, LoadStr(IDS_TARERR_FWRITE));
+            std::wstring message = LangStr(IDS_TARERR_FWRITE).c_str();
             if (written != read)
-                strcat(message, LoadStr(IDS_TARERR_WRSIZE));
+                message += LangStr(IDS_TARERR_WRSIZE).c_str();
             else
-                strcat(message, SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
+                message += SPLGetErrorTextOwned(SalamanderGeneral, err);
+            SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
             CloseHandle(file);
-            DeleteFile(extractedName.c_str());
+            DeleteFileW(extractedName.c_str());
             SalamanderIf->CloseProgressDialog();
             return FALSE;
         }
@@ -1754,7 +1781,7 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
             {
                 // handle cancellation
                 CloseHandle(file);
-                DeleteFile(extractedName.c_str());
+                DeleteFileW(extractedName.c_str());
                 SalamanderIf->CloseProgressDialog();
                 return FALSE;
             }
@@ -1764,21 +1791,20 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
     SetFileTime(file, &header.FileInfo.LastWrite, &header.FileInfo.LastWrite, &header.FileInfo.LastWrite);
     if (!CloseHandle(file))
     {
-        char buffer[1000];
         DWORD err = GetLastError();
-        strcpy(buffer, LoadStr(IDS_TARERR_FWRITE));
-        strcat(buffer, SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(buffer, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
-        DeleteFile(extractedName.c_str());
+        std::wstring buffer = LangStr(IDS_TARERR_FWRITE).c_str();
+        buffer += SPLGetErrorTextOwned(SalamanderGeneral, err);
+        SalamanderGeneral->ShowMessageBox(buffer.c_str(), LangStr(IDS_TARERR_TITLE).c_str(), MSGBOX_ERROR);
+        DeleteFileW(extractedName.c_str());
         SalamanderIf->CloseProgressDialog();
         return FALSE;
     }
-    SetFileAttributes(extractedName.c_str(), header.FileInfo.Attr);
+    SetFileAttributesW(extractedName.c_str(), header.FileInfo.Attr);
     SalamanderIf->CloseProgressDialog();
     return TRUE;
 }
 
-CArchiveAbstract* CreateArchive(LPCTSTR fileName, CSalamanderForOperationsAbstract* salamander)
+CArchiveAbstract* CreateArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander)
 {
     CArchiveAbstract* archive = new CDEBArchive(fileName, salamander);
 

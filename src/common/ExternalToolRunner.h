@@ -4,50 +4,33 @@
 
 #include "IProcess.h"
 
+#include <string>
+#include <vector>
 #include <windows.h>
 
 struct ExternalToolRequest
 {
-    const wchar_t* commandLine;
-    const wchar_t* workingDirectory;
-    bool inheritHandles;
-    bool createNewConsole;
-    bool hideWindow;
-    DWORD creationFlags;
-    const wchar_t* windowTitle;
-    bool useShowWindow;
-    WORD showWindow;
-    bool usePosition;
-    DWORD x;
-    DWORD y;
-    bool useSize;
-    DWORD width;
-    DWORD height;
-    HANDLE hStdInput;
-    HANDLE hStdOutput;
-    HANDLE hStdError;
-
-    ExternalToolRequest()
-        : commandLine(nullptr)
-        , workingDirectory(nullptr)
-        , inheritHandles(false)
-        , createNewConsole(false)
-        , hideWindow(false)
-        , creationFlags(CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS)
-        , windowTitle(nullptr)
-        , useShowWindow(false)
-        , showWindow(SW_SHOWNORMAL)
-        , usePosition(false)
-        , x(0)
-        , y(0)
-        , useSize(false)
-        , width(0)
-        , height(0)
-        , hStdInput(nullptr)
-        , hStdOutput(nullptr)
-        , hStdError(nullptr)
-    {
-    }
+    std::wstring applicationName;
+    std::wstring commandLine;
+    std::wstring workingDirectory;
+    std::wstring windowTitle;
+    std::vector<wchar_t> environmentBlock;
+    bool useEnvironment = false;
+    bool inheritHandles = false;
+    bool createNewConsole = false;
+    bool hideWindow = false;
+    DWORD creationFlags = CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS;
+    bool useShowWindow = false;
+    WORD showWindow = SW_SHOWNORMAL;
+    bool usePosition = false;
+    DWORD x = 0;
+    DWORD y = 0;
+    bool useSize = false;
+    DWORD width = 0;
+    DWORD height = 0;
+    HANDLE hStdInput = nullptr;
+    HANDLE hStdOutput = nullptr;
+    HANDLE hStdError = nullptr;
 };
 
 struct ExternalToolResult

@@ -24,11 +24,11 @@ inline void AppendBounded(char* dest, int destSize, const char* src)
     if (dest == NULL || src == NULL || destSize <= 0)
         return;
 
-    int used = lstrlen(dest);
+    int used = lstrlenA(dest);
     if (used >= destSize - 1)
         return;
 
-    lstrcpyn(dest + used, src, destSize - used);
+    lstrcpynA(dest + used, src, destSize - used);
 }
 
 inline void SanitizeMessageCenterInstanceId(char* dest, int destSize, const char* instanceId)
@@ -59,7 +59,7 @@ inline void GetMessageCenterInstanceIdForCurrentProcess(char* dest, int destSize
     if (len == 0)
     {
 #ifdef _DEBUG
-        lstrcpyn(dest, "Debug", destSize);
+        lstrcpynA(dest, "Debug", destSize);
 #endif
         return;
     }
@@ -73,7 +73,7 @@ inline void BuildMessageCenterObjectName(char* dest, int destSize, const char* b
     if (dest == NULL || destSize <= 0)
         return;
 
-    lstrcpyn(dest, baseName != NULL ? baseName : "", destSize);
+    lstrcpynA(dest, baseName != NULL ? baseName : "", destSize);
 
     char sanitized[128];
     SanitizeMessageCenterInstanceId(sanitized, (int)sizeof(sanitized), instanceId);

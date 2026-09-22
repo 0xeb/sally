@@ -9,8 +9,8 @@
 
 void CZDirectory::TEST_ENUM(FILE* fileHandle)
 {
-    TCHAR name[512];
-    TCHAR str[512];
+    wchar_t name[512];
+    wchar_t str[512];
     size_t strSize;
     int cnt = this->_files->GetCount();
     for (int i = 0; i < cnt; i++)
@@ -18,27 +18,27 @@ void CZDirectory::TEST_ENUM(FILE* fileHandle)
 
         CZFile* f = this->_files->At(i);
 
-        TCHAR const* sn = f->GetName();
-        TCHAR* dn = name;
-        //_tcscpy_s(name, sizeof(name)/sizeof(wchar_t), f->GetName());
-        while (*sn != TEXT('\0'))
+        wchar_t const* sn = f->GetName();
+        wchar_t* dn = name;
+        //wcscpy_s(name, sizeof(name)/sizeof(wchar_t), f->GetName());
+        while (*sn != L'\0')
         {
             switch (*sn)
             {
             case '&':
-                *dn++ = TEXT('&');
-                *dn++ = TEXT('a');
-                *dn++ = TEXT('m');
-                *dn++ = TEXT('p');
-                *dn++ = TEXT(';');
+                *dn++ = L'&';
+                *dn++ = L'a';
+                *dn++ = L'm';
+                *dn++ = L'p';
+                *dn++ = L';';
                 break;
             case '"':
-                *dn++ = TEXT('&');
-                *dn++ = TEXT('q');
-                *dn++ = TEXT('u');
-                *dn++ = TEXT('o');
-                *dn++ = TEXT('t');
-                *dn++ = TEXT(';');
+                *dn++ = L'&';
+                *dn++ = L'q';
+                *dn++ = L'u';
+                *dn++ = L'o';
+                *dn++ = L't';
+                *dn++ = L';';
                 break;
             default:
                 *dn++ = *sn;
@@ -46,32 +46,32 @@ void CZDirectory::TEST_ENUM(FILE* fileHandle)
             }
             sn++;
         }
-        *dn++ = TEXT('\0');
+        *dn++ = L'\0';
 
         if (f->IsDirectory())
         {
-            //strSize = _stprintf_s(str, sizeof(str)/sizeof(TCHAR), TEXT("<folder name=\"%s\" size=\"%I64d\">\n"), name, f->GetSize());
-            strSize = _stprintf(str, TEXT("<folder name=\"%s\" datasize=\"%I64d\" realsize=\"%I64d\" disksize=\"%I64d\">\n"), name, f->GetSizeEx(FILESIZE_DATA), f->GetSizeEx(FILESIZE_REAL), f->GetSizeEx(FILESIZE_DISK));
+            //strSize = _snwprintf_s(str, sizeof(str)/sizeof(wchar_t), L"<folder name=\"%s\" size=\"%I64d\">\n", name, f->GetSize());
+            strSize = swprintf(str, 512, L"<folder name=\"%s\" datasize=\"%I64d\" realsize=\"%I64d\" disksize=\"%I64d\">\n", name, f->GetSizeEx(FILESIZE_DATA), f->GetSizeEx(FILESIZE_REAL), f->GetSizeEx(FILESIZE_DISK));
             if (fwrite(str, sizeof(wchar_t), strSize, fileHandle) != strSize)
             {
-                _tprintf(TEXT("fwrite failed!\n"));
+                wprintf(L"fwrite failed!\n");
             }
 
             ((CZDirectory*)f)->TEST_ENUM(fileHandle);
-            //strSize = _stprintf_s(str, sizeof(str)/sizeof(TCHAR), TEXT("</folder>\n"));
-            strSize = _stprintf(str, TEXT("</folder>\n"));
+            //strSize = _snwprintf_s(str, sizeof(str)/sizeof(wchar_t), L"</folder>\n");
+            strSize = swprintf(str, 512, L"</folder>\n");
             if (fwrite(str, sizeof(wchar_t), strSize, fileHandle) != strSize)
             {
-                _tprintf(TEXT("fwrite failed!\n"));
+                wprintf(L"fwrite failed!\n");
             }
         }
         else
         {
-            //strSize = _stprintf_s(str, sizeof(str)/sizeof(TCHAR), TEXT("<file name=\"%s\" size=\"%I64d\" />\n"), name, f->GetSize());
-            strSize = _stprintf(str, TEXT("<file name=\"%s\" datasize=\"%I64d\" realsize=\"%I64d\" disksize=\"%I64d\" />\n"), name, f->GetSizeEx(FILESIZE_DATA), f->GetSizeEx(FILESIZE_REAL), f->GetSizeEx(FILESIZE_DISK));
+            //strSize = _snwprintf_s(str, sizeof(str)/sizeof(wchar_t), L"<file name=\"%s\" size=\"%I64d\" />\n", name, f->GetSize());
+            strSize = swprintf(str, 512, L"<file name=\"%s\" datasize=\"%I64d\" realsize=\"%I64d\" disksize=\"%I64d\" />\n", name, f->GetSizeEx(FILESIZE_DATA), f->GetSizeEx(FILESIZE_REAL), f->GetSizeEx(FILESIZE_DISK));
             if (fwrite(str, sizeof(wchar_t), strSize, fileHandle) != strSize)
             {
-                _tprintf(TEXT("fwrite failed!\n"));
+                wprintf(L"fwrite failed!\n");
             }
         }
     }
@@ -79,54 +79,52 @@ void CZDirectory::TEST_ENUM(FILE* fileHandle)
 
 void CZDirectory::TEST()
 {
-    TCHAR str[512];
+    wchar_t str[512];
     size_t strSize;
     FILE* fileHandle;
 
     // Create an the xml file in text and Unicode encoding mode.
-    if ((fileHandle = _tfopen(TEXT("_test.xml"), TEXT("wt+,ccs=UTF-8"))) == NULL) // C4996
-                                                                                  // Note: _wfopen is deprecated; consider using _wfopen_s instead
+    if ((fileHandle = _wfopen(L"_test.xml", L"wt+,ccs=UTF-8")) == NULL) // C4996
+                                                                        // Note: _wfopen is deprecated; consider using _wfopen_s instead
     {
-        _tprintf(TEXT("fopen failed!\n"));
+        wprintf(L"fopen failed!\n");
         return;
     }
 
     // Write a string into the file.
     //wcscpy_s(str, sizeof(str)/sizeof(wchar_t), L"<root>\n");
-    //strSize = _stprintf_s(str, sizeof(str)/sizeof(TCHAR), TEXT("<root path=\"%s\">\n"), this->_name);
-    strSize = _stprintf(str, TEXT("<root path=\"%s\">\n"), this->_name);
+    //strSize = _snwprintf_s(str, sizeof(str)/sizeof(wchar_t), L"<root path=\"%s\">\n", this->_name);
+    strSize = swprintf(str, 512, L"<root path=\"%s\">\n", this->_name);
     //strSize = wcslen(str);
     if (fwrite(str, sizeof(wchar_t), strSize, fileHandle) != strSize)
     {
-        _tprintf(TEXT("fwrite failed!\n"));
+        wprintf(L"fwrite failed!\n");
     }
 
     TEST_ENUM(fileHandle);
 
     // Write a string into the file.
-    //_tcscpy_s(str, sizeof(str)/sizeof(TCHAR), TEXT("</root>"));
-    _tcscpy(str, TEXT("</root>"));
-    strSize = _tcslen(str);
-    if (fwrite(str, sizeof(TCHAR), strSize, fileHandle) != strSize)
+    //wcscpy_s(str, sizeof(str)/sizeof(wchar_t), L"</root>");
+    wcscpy(str, L"</root>");
+    strSize = wcslen(str);
+    if (fwrite(str, sizeof(wchar_t), strSize, fileHandle) != strSize)
     {
-        _tprintf(TEXT("fwrite failed!\n"));
+        wprintf(L"fwrite failed!\n");
     }
 
     // Close the file.
     if (fclose(fileHandle))
     {
-        _tprintf(TEXT("fclose failed!\n"));
+        wprintf(L"fclose failed!\n");
     }
 }
 
-INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, size_t pathsize)
+INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, std::wstring path)
 {
     if (this->_root == NULL)
         Beep(1000, 100);
-    if (pathsize < 2 * MAX_PATH)
-        Beep(1000, 100);
 
-    WIN32_FIND_DATA FindFileData;
+    WIN32_FIND_DATAW FindFileData;
     HANDLE hFind = INVALID_HANDLE_VALUE;
     DWORD dwError;
 
@@ -136,32 +134,13 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
 
     int sortorder = this->_root->GetSortOrder();
 
-    //append the current name
-    if ((pos + this->_namelen + 1) < pathsize)
-    {
-        if (pos && path[pos - 1] != TEXT('\\'))
-        {
-            path[pos] = TEXT('\\');
-            pos++;
-        }
-        _tcscpy(path + pos, this->_name);
-        pos += (int)this->_namelen;
-    }
-    if (!pos || path[pos - 1] != TEXT('\\'))
-        path[pos++] = TEXT('\\');
+    if (!path.empty() && path.back() != L'\\')
+        path.push_back(L'\\');
+    path.append(this->_name, this->_namelen);
+    if (path.empty() || path.back() != L'\\')
+        path.push_back(L'\\');
 
-    //check the length
-    if (pos >= MAX_PATH)
-    {
-        //ERROR
-        this->_root->Log(LOG_ERROR, TEXT("Path is too long."), this);
-        return -1;
-    }
-
-    TCHAR* filepart = &path[pos]; //pointer to the start of the area for appending the file name
-
-    path[pos] = TEXT('*');
-    path[pos + 1] = TEXT('\0');
+    const std::wstring searchPath = path + L'*';
     /*
 	int radixHistorgram[2048 * 6];
 	radixHistorgram[0] = 0;
@@ -171,7 +150,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
 	}
 	path[MAX_PATH] = (char)radixHistorgram[2048];
 */
-    hFind = FindFirstFile(path, &FindFileData);
+    hFind = FindFirstFileW(searchPath.c_str(), &FindFileData);
     if (hFind == INVALID_HANDLE_VALUE)
     {
         //ERROR
@@ -195,7 +174,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 if ((FindFileData.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
                 {
                     f = new CZDirectory(this, FindFileData.cFileName, &FindFileData.ftCreationTime, &FindFileData.ftLastWriteTime);
-                    datasize = ((CZDirectory*)f)->PopulateDir(mythread, path, pos, pathsize);
+                    datasize = ((CZDirectory*)f)->PopulateDir(mythread, path);
                     if (datasize < 0) //error!
                     {
                         //this->_root->Log(LOG_ERROR, TEXT("Negative size of directory contents."), f);
@@ -232,7 +211,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 else
                 {
                     f = new CZDirectory(this, FindFileData.cFileName, &FindFileData.ftCreationTime, &FindFileData.ftLastWriteTime);
-                    this->_root->Log(LOG_WARNING, TEXT("Ignoring Reparse Point."), f);
+                    this->_root->Log(LOG_WARNING, L"Ignoring Reparse Point.", f);
                     delete f;
                     f = NULL;
                 }
@@ -243,8 +222,8 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 if ((FindFileData.dwFileAttributes & (FILE_ATTRIBUTE_SPARSE_FILE | FILE_ATTRIBUTE_COMPRESSED)) != 0)
                 {
                     DWORD lo, hi;
-                    _tcscpy(filepart, FindFileData.cFileName);
-                    lo = GetCompressedFileSize(path, &hi);
+                    const std::wstring filePath = path + FindFileData.cFileName;
+                    lo = GetCompressedFileSizeW(filePath.c_str(), &hi);
                     if (lo == INVALID_FILE_SIZE)
                     {
                         //ErrorExit(FindFileData.cFileName);
@@ -312,7 +291,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 filecount = 0;
                 tsize = 0;
             }
-        } while ((FindNextFile(hFind, &FindFileData) != 0) && (mythread == NULL || !mythread->Aborting()));
+        } while ((FindNextFileW(hFind, &FindFileData) != 0) && (mythread == NULL || !mythread->Aborting()));
 
         this->_root->IncStats(filecount, dircount, tsize);
 

@@ -67,11 +67,14 @@ struct CCS
 BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginName);
 void ReleaseLCUtils();
 
-char* LoadStr(int resID);
+// LangStr, wide. The name follows the convention the other 21 plugins adopted:
+// a wide resource-string wrapper is spelled LangStr so the plugin_loadstr ratchet, which is a
+// bare identifier match and cannot see types, keeps counting only genuinely narrow ones.
+std::wstring LangStr(int resID);
 
-BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglist);
+BOOL ErrorHelper(HWND parent, const wchar_t* message, int lastError, va_list arglist);
 BOOL Error(HWND parent, int error, ...);
-BOOL Error(HWND parent, const char* error, ...);
+BOOL Error(HWND parent, const wchar_t* error, ...);
 BOOL Error(int error, ...);
 BOOL ErrorL(int lastError, HWND parent, int error, ...);
 BOOL ErrorL(int lastError, int error, ...);
@@ -144,19 +147,10 @@ protected:
 void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
                      int historySize, char** history);
 
-void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
-                 char* buffer, int bufferSize, CSalamanderRegistryAbstract* registry);
-
-void SaveHistory(HKEY regKey, const char* keyPattern, char** history,
-                 CSalamanderRegistryAbstract* registry);
-
 // ****************************************************************************
 //
 // utilaux1.cpp
 //
-
-BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
-                     char* buffer, BOOL save = FALSE);
 
 BOOL FileErrorL(int lastError, HWND parent, const char* fileName, int error,
                 BOOL retry, BOOL* skip = NULL, BOOL* skipAll = NULL,
@@ -212,7 +206,6 @@ protected:
 
 char* DupStr(const char* begin, const char* end);
 int RemoveCharacters(char* dest, const char* source, const char* charSet);
-BOOL SalGetFullName(char* name, int* errTextID, const char* curDir);
 
 // ****************************************************************************
 //

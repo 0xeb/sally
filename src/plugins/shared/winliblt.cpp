@@ -16,6 +16,7 @@
 #include <crtdbg.h>
 #endif // _MSC_VER
 #include <limits.h>
+#include <new>
 #include <stdio.h>
 //#include <commctrl.h>  // need HIMAGELIST
 #include <ostream>
@@ -30,6 +31,7 @@
 #include "spl_base.h"
 #include "dbg.h"
 #include "plugindarkmode.h"
+#include "plugin_narrow_compat.h"
 
 #ifdef ENABLE_PROPERTYDIALOG
 #include "arraylt.h"
@@ -43,25 +45,49 @@
 #endif // itoa
 #endif // _MSC_VER
 
-char CWINDOW_CLASSNAME[100] = "";
-char CWINDOW_CLASSNAME2[100] = ""; // does not have CS_VREDRAW | CS_HREDRAW
+namespace
+{
+std::wstring WindowClassName;
+std::wstring WindowClassName2;
+std::wstring WinLibStrings[WLS_COUNT] = {
+    L"Invalid number!",
+    L"Error",
+    L"This text cannot be stored: it is too long, or it contains characters the "
+    L"system code page cannot represent."};
+}
+
+const wchar_t* CWINDOW_CLASSNAME = L"";
+const wchar_t* CWINDOW_CLASSNAME2 = L""; // does not have CS_VREDRAW | CS_HREDRAW
 
 ATOM AtomObject = 0; // window "property" with a pointer to the object (used in WindowsManager)
 CWindowsManager WindowsManager;
-
-char WinLibStrings[WLS_COUNT][101] = {
-    "Invalid number!",
-    "Error"};
 
 FWinLibLTHelpCallback WinLibLTHelpCallback = NULL; // callback for connecting to HTML help
 
 //
 // ****************************************************************************
 
-void SetWinLibStrings(const char* invalidNumber, const char* error)
+void SetWinLibStrings(LPCWSTR invalidNumber, LPCWSTR error, LPCWSTR textNotStorable)
 {
-    lstrcpyn(WinLibStrings[WLS_INVALID_NUMBER], invalidNumber, 100);
-    lstrcpyn(WinLibStrings[WLS_ERROR], error, 100);
+    try
+    {
+        std::wstring invalidNumberText = invalidNumber != NULL ? invalidNumber : L"";
+        std::wstring errorText = error != NULL ? error : L"";
+        WinLibStrings[WLS_INVALID_NUMBER].swap(invalidNumberText);
+        WinLibStrings[WLS_ERROR].swap(errorText);
+        // NULL means "keep the built-in English text" - a plugin that has not yet
+        // added the string to its resources still gets a message rather than a
+        // blank box.
+        if (textNotStorable != NULL)
+        {
+            std::wstring notStorableText = textNotStorable;
+            WinLibStrings[WLS_TEXT_NOT_STORABLE].swap(notStorableText);
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E("Unable to allocate WinLib diagnostic strings.");
+    }
 }
 
 void SetupWinLibHelp(FWinLibLTHelpCallback helpCallback)
@@ -69,16 +95,28 @@ void SetupWinLibHelp(FWinLibLTHelpCallback helpCallback)
     WinLibLTHelpCallback = helpCallback;
 }
 
-BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance)
+BOOL InitializeWinLib(LPCWSTR pluginName, HINSTANCE dllInstance)
 {
     PluginDarkMode_Initialize();
 
-    lstrcpyn(CWINDOW_CLASSNAME, pluginName, 50);
-    strcat(CWINDOW_CLASSNAME, " - WinLib Universal Window");
-    lstrcpyn(CWINDOW_CLASSNAME2, pluginName, 50);
-    strcat(CWINDOW_CLASSNAME2, " - WinLib Universal Window2");
+    try
+    {
+        std::wstring className = pluginName != NULL ? pluginName : L"";
+        std::wstring className2 = className;
+        className += L" - WinLib Universal Window";
+        className2 += L" - WinLib Universal Window2";
+        WindowClassName.swap(className);
+        WindowClassName2.swap(className2);
+        CWINDOW_CLASSNAME = WindowClassName.c_str();
+        CWINDOW_CLASSNAME2 = WindowClassName2.c_str();
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E("Unable to allocate WinLib window class names.");
+        return FALSE;
+    }
 
-    AtomObject = GlobalAddAtom("object handle"); // all plugins will use the same atom, no collision
+    AtomObject = GlobalAddAtomW(L"object handle"); // all plugins will use the same atom, no collision
     if (AtomObject == 0)
     {
         TRACE_E("GlobalAddAtom has failed");
@@ -117,9 +155,9 @@ void ReleaseWinLib(HINSTANCE dllInstance)
     // unregister classes so they can be registered again on the next plugin load
     if (CWINDOW_CLASSNAME2[0] != 0 && CWINDOW_CLASSNAME[0] != 0)
     {
-        if (!UnregisterClass(CWINDOW_CLASSNAME2, dllInstance))
+        if (!UnregisterClassW(CWINDOW_CLASSNAME2, dllInstance))
             TRACE_E("UnregisterClass(CWINDOW_CLASSNAME2) failed!");
-        if (!UnregisterClass(CWINDOW_CLASSNAME, dllInstance))
+        if (!UnregisterClassW(CWINDOW_CLASSNAME, dllInstance))
             TRACE_E("UnregisterClass(CWINDOW_CLASSNAME) failed!");
     }
 
@@ -135,8 +173,8 @@ void ReleaseWinLib(HINSTANCE dllInstance)
 //            (it is in the window class), it must contain the address of the created window object
 
 HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
-                       LPCTSTR lpszClassName,  // address of registered class name
-                       LPCTSTR lpszWindowName, // address of window name
+                       LPCWSTR lpszClassName,  // address of registered class name
+                       LPCWSTR lpszWindowName, // address of window name
                        DWORD dwStyle,          // window style
                        int x,                  // horizontal position of window
                        int y,                  // vertical position of window
@@ -147,7 +185,7 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                        HINSTANCE hinst,        // handle of application instance
                        LPVOID lpvParam)        // pointer to the created window object
 {
-    HWND hWnd = CreateWindowEx(dwExStyle,
+    HWND hWnd = CreateWindowExW(dwExStyle,
                                lpszClassName,
                                lpszWindowName,
                                dwStyle,
@@ -167,8 +205,8 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
     return hWnd;
 }
 
-HWND CWindow::Create(LPCTSTR lpszClassName,  // address of registered class name
-                     LPCTSTR lpszWindowName, // address of window name
+HWND CWindow::Create(LPCWSTR lpszClassName,  // address of registered class name
+                     LPCWSTR lpszWindowName, // address of window name
                      DWORD dwStyle,          // window style
                      int x,                  // horizontal position of window
                      int y,                  // vertical position of window
@@ -199,13 +237,13 @@ void CWindow::AttachToWindow(HWND hWnd)
     if (DefWndProc == NULL)
     {
         TRACE_E("Bad window handle. hWnd = " << hWnd);
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         return;
     }
     if (!WindowsManager.AddWindow(hWnd, this))
     {
         TRACE_E("Error during attaching object to window.");
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
         return;
     }
     HWindow = hWnd;
@@ -214,7 +252,7 @@ void CWindow::AttachToWindow(HWND hWnd)
     if (DefWndProc == CWindow::CWindowProc) // to by byla rekurze
     {
         TRACE_C("This should never happen.");
-        DefWndProc = DefWindowProc;
+        DefWndProc = DefWindowProcW;
     }
 }
 
@@ -260,7 +298,7 @@ CWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return TRUE; // if it is not a child, finish handling F1
     }
     }
-    return CallWindowProc((WNDPROC)DefWndProc, HWindow, uMsg, wParam, lParam);
+    return CallWindowProcW((WNDPROC)DefWndProc, HWindow, uMsg, wParam, lParam);
 }
 
 LRESULT CALLBACK
@@ -352,13 +390,13 @@ CWindow::CWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     if (wnd != NULL)
         return wnd->WindowProc(uMsg, wParam, lParam);
     else
-        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        return DefWindowProcW(hwnd, uMsg, wParam, lParam);
     // error or the message arrived before WM_CREATE
 }
 
 BOOL CWindow::RegisterUniversalClass(HINSTANCE dllInstance)
 {
-    WNDCLASS CWindowClass;
+    WNDCLASSW CWindowClass;
     CWindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
     CWindowClass.lpfnWndProc = CWindow::CWindowProc;
     CWindowClass.cbClsExtra = 0;
@@ -370,12 +408,12 @@ BOOL CWindow::RegisterUniversalClass(HINSTANCE dllInstance)
     CWindowClass.lpszMenuName = NULL;
     CWindowClass.lpszClassName = CWINDOW_CLASSNAME;
 
-    BOOL ret = RegisterClass(&CWindowClass) != 0;
+    BOOL ret = RegisterClassW(&CWindowClass) != 0;
     if (ret)
     {
         CWindowClass.style = CS_DBLCLKS;
         CWindowClass.lpszClassName = CWINDOW_CLASSNAME2;
-        ret = RegisterClass(&CWindowClass) != 0;
+        ret = RegisterClassW(&CWindowClass) != 0;
     }
 
     return ret;
@@ -383,11 +421,11 @@ BOOL CWindow::RegisterUniversalClass(HINSTANCE dllInstance)
 
 BOOL CWindow::RegisterUniversalClass(UINT style, int cbClsExtra, int cbWndExtra, HINSTANCE dllInstance,
                                      HICON hIcon, HCURSOR hCursor, HBRUSH hbrBackground,
-                                     LPCTSTR lpszMenuName, LPCTSTR lpszClassName,
+                                     LPCWSTR lpszMenuName, LPCWSTR lpszClassName,
                                      HICON hIconSm)
 {
-    WNDCLASSEX windowClass;
-    windowClass.cbSize = sizeof(WNDCLASSEX);
+    WNDCLASSEXW windowClass;
+    windowClass.cbSize = sizeof(WNDCLASSEXW);
     windowClass.style = style;
     windowClass.lpfnWndProc = CWindow::CWindowProc;
     windowClass.cbClsExtra = cbClsExtra;
@@ -400,7 +438,7 @@ BOOL CWindow::RegisterUniversalClass(UINT style, int cbClsExtra, int cbWndExtra,
     windowClass.lpszClassName = lpszClassName;
     windowClass.hIconSm = hIconSm;
 
-    return RegisterClassEx(&windowClass) != 0;
+    return RegisterClassExW(&windowClass) != 0;
 }
 
 //
@@ -439,14 +477,14 @@ INT_PTR
 CDialog::Execute()
 {
     Modal = TRUE;
-    return DialogBoxParam(Modul, MAKEINTRESOURCE(ResID), Parent,
+    return DialogBoxParamW(Modul, MAKEINTRESOURCEW(ResID), Parent,
                           (DLGPROC)CDialog::CDialogProc, (LPARAM)this);
 }
 
 HWND CDialog::Create()
 {
     Modal = FALSE;
-    return CreateDialogParam(Modul, MAKEINTRESOURCE(ResID), Parent,
+    return CreateDialogParamW(Modul, MAKEINTRESOURCEW(ResID), Parent,
                              (DLGPROC)CDialog::CDialogProc, (LPARAM)this);
 }
 
@@ -619,32 +657,32 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 #ifdef ENABLE_PROPERTYDIALOG
 
-CPropSheetPage::CPropSheetPage(char* title, HINSTANCE modul, int resID,
+CPropSheetPage::CPropSheetPage(LPCWSTR title, HINSTANCE modul, int resID,
                                DWORD flags, HICON icon, CObjectOrigin origin)
     : CDialog(modul, resID, NULL, origin)
 {
     Init(title, modul, resID, icon, flags, origin);
 }
 
-CPropSheetPage::CPropSheetPage(char* title, HINSTANCE modul, int resID, int helpID,
+CPropSheetPage::CPropSheetPage(LPCWSTR title, HINSTANCE modul, int resID, int helpID,
                                DWORD flags, HICON icon, CObjectOrigin origin)
     : CDialog(modul, resID, helpID, NULL, origin)
 {
     Init(title, modul, resID, icon, flags, origin);
 }
 
-void CPropSheetPage::Init(char* title, HINSTANCE modul, int resID,
+void CPropSheetPage::Init(LPCWSTR title, HINSTANCE modul, int resID,
                           HICON icon, DWORD flags, CObjectOrigin origin)
 {
-    Title = NULL;
-    if (title != NULL)
+    Title.reset();
+    try
     {
-        int len = (int)strlen(title);
-        Title = new char[len + 1];
-        if (Title != NULL)
-            strcpy(Title, title);
-        else
-            TRACE_E("Low memory!");
+        if (title != NULL)
+            Title.emplace(title);
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E("Low memory!");
     }
     Flags = flags;
     Icon = icon;
@@ -652,11 +690,7 @@ void CPropSheetPage::Init(char* title, HINSTANCE modul, int resID,
     ParentDialog = NULL; // nastavuje se z CPropertyDialog::Execute()
 }
 
-CPropSheetPage::~CPropSheetPage()
-{
-    if (Title != NULL)
-        delete[] Title;
-}
+CPropSheetPage::~CPropSheetPage() = default;
 
 BOOL CPropSheetPage::ValidateData()
 {
@@ -694,18 +728,18 @@ BOOL CPropSheetPage::TransferData(CTransferType type)
 HPROPSHEETPAGE
 CPropSheetPage::CreatePropSheetPage()
 {
-    PROPSHEETPAGE psp;
-    psp.dwSize = sizeof(PROPSHEETPAGE);
+    PROPSHEETPAGEW psp;
+    psp.dwSize = sizeof(PROPSHEETPAGEW);
     psp.dwFlags = Flags;
     psp.hInstance = Modul;
-    psp.pszTemplate = MAKEINTRESOURCE(ResID);
+    psp.pszTemplate = MAKEINTRESOURCEW(ResID);
     psp.hIcon = Icon;
-    psp.pszTitle = Title;
+    psp.pszTitle = Title.has_value() ? Title->c_str() : NULL;
     psp.pfnDlgProc = CPropSheetPage::CPropSheetPageProc;
     psp.lParam = (LPARAM)this;
     psp.pfnCallback = NULL;
     psp.pcRefParent = NULL;
-    return CreatePropertySheetPage(&psp);
+    return CreatePropertySheetPageW(&psp);
 }
 
 INT_PTR
@@ -837,7 +871,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
     {
     case WM_INITDIALOG: // first message - attach the object to the dialog
     {
-        dlg = (CPropSheetPage*)((PROPSHEETPAGE*)lParam)->lParam;
+        dlg = (CPropSheetPage*)((PROPSHEETPAGEW*)lParam)->lParam;
         if (dlg == NULL)
         {
             TRACE_E("Error during creating of dialog.");
@@ -915,13 +949,13 @@ CPropertyDialog::Execute()
 {
     if (Count > 0)
     {
-        PROPSHEETHEADER psh;
-        psh.dwSize = sizeof(PROPSHEETHEADER);
+        PROPSHEETHEADERW psh;
+        psh.dwSize = sizeof(PROPSHEETHEADERW);
         psh.dwFlags = Flags;
         psh.hwndParent = Parent;
         psh.hInstance = Modul;
         psh.hIcon = Icon;
-        psh.pszCaption = Caption;
+        psh.pszCaption = Caption.c_str();
         psh.nPages = Count;
         if (StartPage < 0 || StartPage >= Count)
             StartPage = 0;
@@ -939,7 +973,7 @@ CPropertyDialog::Execute()
             At(i)->ParentDialog = this;
         }
         psh.pfnCallback = Callback;
-        INT_PTR ret = PropertySheet(&psh);
+        INT_PTR ret = PropertySheetW(&psh);
         delete pages;
         return ret;
     }
@@ -970,7 +1004,7 @@ BOOL CWindowsManager::AddWindow(HWND hWnd, CWindowsObject* wnd)
         TRACE_E("Uninitialized AtomObject - you should call InitializeWinLib() before first use of WinLib.");
         return FALSE;
     }
-    if (!SetProp(hWnd, (LPCTSTR)AtomObject, (HANDLE)wnd))
+    if (!SetPropW(hWnd, reinterpret_cast<LPCWSTR>(static_cast<ULONG_PTR>(AtomObject)), (HANDLE)wnd))
     {
         DWORD err = GetLastError();
         TRACE_E("SetProp has failed (err=" << err << ")");
@@ -982,7 +1016,7 @@ BOOL CWindowsManager::AddWindow(HWND hWnd, CWindowsObject* wnd)
 
 void CWindowsManager::DetachWindow(HWND hWnd)
 {
-    if (RemoveProp(hWnd, (LPCTSTR)AtomObject))
+    if (RemovePropW(hWnd, reinterpret_cast<LPCWSTR>(static_cast<ULONG_PTR>(AtomObject))))
     {
         WindowsCount--;
     }
@@ -995,7 +1029,7 @@ void CWindowsManager::DetachWindow(HWND hWnd)
 CWindowsObject*
 CWindowsManager::GetWindowPtr(HWND hWnd)
 {
-    return (CWindowsObject*)GetProp(hWnd, (LPCTSTR)AtomObject);
+    return (CWindowsObject*)GetPropW(hWnd, reinterpret_cast<LPCWSTR>(static_cast<ULONG_PTR>(AtomObject)));
 }
 
 //
@@ -1134,14 +1168,153 @@ void CTransferInfo::EnsureControlIsFocused(int ctrlID)
             wnd = ::GetParent(wnd);
         if (wnd == NULL) // focus only if ctrl is not an ancestor of GetFocus
         {                // e.g. edit line in a combo box
-            SendMessage(HDialog, WM_NEXTDLGCTL, (WPARAM)ctrl, TRUE);
+            SendMessageW(HDialog, WM_NEXTDLGCTL, (WPARAM)ctrl, TRUE);
         }
     }
     else
         TRACE_E("Control with ctrlID = " << ctrlID << " is not in dialog.");
 }
 
+// A narrow transfer buffer refused the text. The refusal is deliberate - exact ACP
+// projection never substitutes characters - but ErrorOn() alone only moves focus
+// back to the control, so the OK button appears to do nothing at all. Say why.
+void CTransferInfo::ReportTextNotStorable(int ctrlID)
+{
+    MessageBoxW(HDialog, WinLibStrings[WLS_TEXT_NOT_STORABLE].c_str(),
+                WinLibStrings[WLS_ERROR].c_str(), MB_OK | MB_ICONEXCLAMATION);
+    ErrorOn(ctrlID);
+}
+
 void CTransferInfo::EditLine(int ctrlID, char* buffer, DWORD bufferSize, BOOL select)
+{
+    HWND HWindow;
+    if (buffer == NULL || bufferSize == 0)
+    {
+        ErrorOn(ctrlID);
+        return;
+    }
+    if (GetControl(HWindow, ctrlID))
+    {
+        try
+        {
+            switch (Type)
+            {
+            case ttDataToWindow:
+            {
+                std::wstring wide;
+                if (!LegacyTextToWide(buffer, wide))
+                {
+                    ErrorOn(ctrlID);
+                    break;
+                }
+                // The buffer is the caller's fixed char[bufferSize] and stays that
+                // size, so the control has to stay inside it. This cap is not one of
+                // the self-imposed path ceilings the widening removed - without it
+                // the user can type more than the buffer can ever hold and the only
+                // symptom is an OK button that stops responding.
+                SendMessageW(HWindow, EM_LIMITTEXT, bufferSize - 1, 0);
+                SendMessageW(HWindow, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(wide.c_str()));
+                if (select)
+                    SendMessageW(HWindow, EM_SETSEL, 0, -1);
+                break;
+            }
+
+            case ttDataFromWindow:
+            {
+                std::wstring wide;
+                if (!ReadWindowTextOwnedW(HWindow, wide))
+                    ErrorOn(ctrlID);
+                else if (!CopyWideToLegacyTextExact(wide.c_str(), buffer, bufferSize))
+                    ReportTextNotStorable(ctrlID);
+                break;
+            }
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            ErrorOn(ctrlID);
+        }
+    }
+}
+
+void CTransferInfo::EditLine(int ctrlID, std::string& value, BOOL select)
+{
+    HWND HWindow;
+    if (GetControl(HWindow, ctrlID))
+    {
+        try
+        {
+            switch (Type)
+            {
+            case ttDataToWindow:
+            {
+                std::wstring wide;
+                if (!LegacyTextToWide(value.c_str(), wide))
+                {
+                    ErrorOn(ctrlID);
+                    break;
+                }
+                SendMessageW(HWindow, EM_LIMITTEXT, 0, 0);
+                SendMessageW(HWindow, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(wide.c_str()));
+                if (select)
+                    SendMessageW(HWindow, EM_SETSEL, 0, -1);
+                break;
+            }
+
+            case ttDataFromWindow:
+            {
+                std::string staged;
+                if (!ReadWindowLegacyTextExact(HWindow, staged))
+                    ReportTextNotStorable(ctrlID); // no length cap here - the owner
+                                                   // grows; only the code page refuses
+                else
+                    value.swap(staged);
+                break;
+            }
+            }
+        }
+        catch (...)
+        {
+            ErrorOn(ctrlID);
+        }
+    }
+}
+
+void CTransferInfo::EditLine(int ctrlID, std::wstring& value, BOOL select)
+{
+    HWND HWindow;
+    if (GetControl(HWindow, ctrlID))
+    {
+        try
+        {
+            switch (Type)
+            {
+            case ttDataToWindow:
+                SendMessageW(HWindow, EM_LIMITTEXT, 0, 0);
+                SendMessageW(HWindow, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(value.c_str()));
+                if (select)
+                    SendMessageW(HWindow, EM_SETSEL, 0, -1);
+                break;
+
+            case ttDataFromWindow:
+            {
+                std::wstring staged;
+                if (!ReadWindowTextOwnedW(HWindow, staged))
+                    ErrorOn(ctrlID);
+                else
+                    value.swap(staged);
+                break;
+            }
+            }
+        }
+        catch (...)
+        {
+            ErrorOn(ctrlID);
+        }
+    }
+}
+
+void CTransferInfo::EditLine(int ctrlID, wchar_t* buffer, DWORD bufferSize, BOOL select)
 {
     HWND HWindow;
     if (GetControl(HWindow, ctrlID))
@@ -1150,82 +1323,103 @@ void CTransferInfo::EditLine(int ctrlID, char* buffer, DWORD bufferSize, BOOL se
         {
         case ttDataToWindow:
         {
-            SendMessage(HWindow, EM_LIMITTEXT, bufferSize - 1, 0);
-            SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)buffer);
+            SendMessageW(HWindow, EM_LIMITTEXT, bufferSize - 1, 0);
+            SendMessageW(HWindow, WM_SETTEXT, 0, (LPARAM)buffer);
             if (select)
-                SendMessage(HWindow, EM_SETSEL, 0, -1);
+                SendMessageW(HWindow, EM_SETSEL, 0, -1);
             break;
         }
 
         case ttDataFromWindow:
         {
-            SendMessage(HWindow, WM_GETTEXT, bufferSize, (LPARAM)buffer);
+            SendMessageW(HWindow, WM_GETTEXT, bufferSize, (LPARAM)buffer);
             break;
         }
         }
     }
 }
 
-void CTransferInfo::EditLine(int ctrlID, double& value, char* format, BOOL select)
+void CTransferInfo::EditLine(int ctrlID, double& value, const wchar_t* format, BOOL select)
 {
     HWND HWindow;
-    char buff[31];
     if (GetControl(HWindow, ctrlID))
     {
-        switch (Type)
+        try
         {
-        case ttDataToWindow:
-        {
-            SendMessage(HWindow, EM_LIMITTEXT, 30, 0);
-            sprintf(buff, format, value);
-            SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)buff);
-            if (select)
-                SendMessage(HWindow, EM_SETSEL, 0, -1);
-            break;
-        }
-
-        case ttDataFromWindow:
-        {
-            SendMessage(HWindow, WM_GETTEXT, 31, (LPARAM)buff);
-            char* s = buff;
-            BOOL decPoints = FALSE;
-            BOOL expPart = FALSE;
-            if (*s == '-' || *s == '+')
-                s++;        // preskok znamenka
-            while (*s != 0) // prevod carky na tecku
+            switch (Type)
             {
-                if (!expPart && !decPoints && (*s == ',' || *s == '.'))
+            case ttDataToWindow:
+            {
+                const int length = format != NULL ? _scwprintf(format, value) : -1;
+                if (length < 0)
                 {
-                    decPoints = TRUE;
-                    *s = '.';
+                    ErrorOn(ctrlID);
+                    break;
                 }
-                else
+                std::wstring text(static_cast<size_t>(length) + 1, L'\0');
+                if (swprintf_s(text.data(), text.size(), format, value) != length)
                 {
-                    if (!expPart && (*s == 'e' || *s == 'E'))
+                    ErrorOn(ctrlID);
+                    break;
+                }
+                text.resize(static_cast<size_t>(length));
+                SendMessageW(HWindow, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
+                if (select)
+                    SendMessageW(HWindow, EM_SETSEL, 0, -1);
+                break;
+            }
+
+            case ttDataFromWindow:
+            {
+                std::wstring text;
+                if (!ReadWindowTextOwnedW(HWindow, text))
+                {
+                    ErrorOn(ctrlID);
+                    value = 0;
+                    break;
+                }
+                wchar_t* s = text.data();
+                BOOL decPoints = FALSE;
+                BOOL expPart = FALSE;
+                if (*s == L'-' || *s == L'+')
+                    s++;        // skip sign
+                while (*s != 0) // convert comma to dot
+                {
+                    if (!expPart && !decPoints && (*s == L',' || *s == L'.'))
                     {
-                        expPart = TRUE;
-                        if (*(s + 1) == '+' || *(s + 1) == '-')
-                            s++; // skip +/- after E
+                        decPoints = TRUE;
+                        *s = L'.';
                     }
                     else
                     {
-                        if (*s < '0' || *s > '9')
+                        if (!expPart && (*s == L'e' || *s == L'E'))
                         {
-                            MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
-                                       MB_OK | MB_ICONEXCLAMATION);
+                            expPart = TRUE;
+                            if (*(s + 1) == L'+' || *(s + 1) == L'-')
+                                s++; // skip +/- after E
+                        }
+                        else if (*s < L'0' || *s > L'9')
+                        {
+                            MessageBoxW(HWindow, WinLibStrings[WLS_INVALID_NUMBER].c_str(),
+                                        WinLibStrings[WLS_ERROR].c_str(), MB_OK | MB_ICONEXCLAMATION);
                             ErrorOn(ctrlID);
                             break;
                         }
                     }
+                    s++;
                 }
-                s++;
+                if (*s == 0)
+                    value = wcstod(text.c_str(), NULL); // only if it is a number
+                else
+                    value = 0; // on error, set to zero
+                break;
             }
-            if (*s == 0)
-                value = atof(buff); // only if it is a number
-            else
-                value = 0; // on error, set to zero
-            break;
+            }
         }
+        catch (const std::bad_alloc&)
+        {
+            ErrorOn(ctrlID);
+            value = 0;
         }
     }
 }
@@ -1233,43 +1427,54 @@ void CTransferInfo::EditLine(int ctrlID, double& value, char* format, BOOL selec
 void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
 {
     HWND HWindow;
-    char buff[16];
     if (GetControl(HWindow, ctrlID))
     {
-        switch (Type)
+        try
         {
-        case ttDataToWindow:
-        {
-            SendMessage(HWindow, EM_LIMITTEXT, 15, 0);
-            SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)itoa(value, buff, 10));
-            if (select)
-                SendMessage(HWindow, EM_SETSEL, 0, -1);
-            break;
-        }
-
-        case ttDataFromWindow:
-        {
-            SendMessage(HWindow, WM_GETTEXT, 16, (LPARAM)buff);
-
-            char* s = buff;
-            if (*s == '-' || *s == '+')
-                s++;        // preskok znamenka
-            while (*s != 0) // kontrola cisla
+            switch (Type)
             {
-                if (*s < '0' || *s > '9')
+            case ttDataToWindow:
+            {
+                const std::wstring text = std::to_wstring(value);
+                SendMessageW(HWindow, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
+                if (select)
+                    SendMessageW(HWindow, EM_SETSEL, 0, -1);
+                break;
+            }
+
+            case ttDataFromWindow:
+            {
+                std::wstring text;
+                if (!ReadWindowTextOwnedW(HWindow, text))
                 {
-                    MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
-                               MB_OK | MB_ICONEXCLAMATION);
                     ErrorOn(ctrlID);
                     break;
                 }
-                s++;
-            }
 
-            char* endptr;
-            value = strtoul(buff, &endptr, 10); // replacement for atoi / _ttoi, which return 2147483647 instead of 4000000000 (because it is a signed int)
-            break;
+                const wchar_t* s = text.c_str();
+                if (*s == L'-' || *s == L'+')
+                    s++;        // skip sign
+                while (*s != 0) // validate number
+                {
+                    if (*s < L'0' || *s > L'9')
+                    {
+                        MessageBoxW(HWindow, WinLibStrings[WLS_INVALID_NUMBER].c_str(),
+                                    WinLibStrings[WLS_ERROR].c_str(), MB_OK | MB_ICONEXCLAMATION);
+                        ErrorOn(ctrlID);
+                        break;
+                    }
+                    s++;
+                }
+
+                wchar_t* endptr;
+                value = wcstoul(text.c_str(), &endptr, 10); // replacement for atoi / _ttoi, which return 2147483647 instead of 4000000000 (because it is a signed int)
+                break;
+            }
+            }
         }
+        catch (const std::bad_alloc&)
+        {
+            ErrorOn(ctrlID);
         }
     }
 }
@@ -1283,13 +1488,13 @@ void CTransferInfo::RadioButton(int ctrlID, int ctrlValue, int& value)
         {
         case ttDataToWindow:
         {
-            SendMessage(HWindow, BM_SETCHECK, ctrlValue == value, 0);
+            SendMessageW(HWindow, BM_SETCHECK, ctrlValue == value, 0);
             break;
         }
 
         case ttDataFromWindow:
         {
-            if (SendMessage(HWindow, BM_GETCHECK, 0, 0) == 1)
+            if (SendMessageW(HWindow, BM_GETCHECK, 0, 0) == 1)
                 value = ctrlValue;
             break;
         }
@@ -1306,13 +1511,13 @@ void CTransferInfo::CheckBox(int ctrlID, int& value)
         {
         case ttDataToWindow:
         {
-            SendMessage(HWindow, BM_SETCHECK, value, 0);
+            SendMessageW(HWindow, BM_SETCHECK, value, 0);
             break;
         }
 
         case ttDataFromWindow:
         {
-            value = (int)SendMessage(HWindow, BM_GETCHECK, 0, 0);
+            value = (int)SendMessageW(HWindow, BM_GETCHECK, 0, 0);
             break;
         }
         }

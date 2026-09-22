@@ -4,20 +4,26 @@
 
 #pragma once
 
+#include <string>
+
 // functions used by the quick-search feature
-BOOL IsQSWildChar(char ch);
-void PrepareQSMask(char* mask, const char* src);
-BOOL AgreeQSMask(const char* filename, BOOL hasExtension, const char* mask, BOOL wholeString, int& offset);
+BOOL IsQSWildChar(wchar_t ch);
+std::wstring PrepareQSMask(const wchar_t* src);
+BOOL AgreeQSMask(const wchar_t* filename, BOOL hasExtension, const wchar_t* mask, BOOL wholeString, int& offset);
 
 // wildcards '*' (any string) + '?' (any character) <+ '#' (a digit) if extendedMode==TRUE>
-void PrepareMask(char* mask, const char* src);                                                // converts the mask into the chosen format
-BOOL AgreeMask(const char* filename, const char* mask, BOOL hasExtension, BOOL extendedMode); // does it match the mask ??
+void PrepareMask(wchar_t* mask, const wchar_t* src);                                                // converts the mask into the chosen format
+BOOL AgreeMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension, BOOL extendedMode); // does it match the mask ??
+// Wide form. Folds with CharLowerW per character instead of the
+// CP_ACP LowerCase[] table, so a mask containing non-ANSI characters matches,
+// and characters differing only outside the code page stop colliding.
 
 // adjusts the name according to the mask and stores the result in buffer 'buffer' of size 'bufSize'
 // 'name' is the name to adjust; 'mask' is the mask (unmodified - do not call PrepareMask on it)
 // returns 'buffer' on success (even if the name was truncated because the buffer was too small),
 // otherwise NULL; NOTE: behaves like the "copy" command in Win2K
-char* MaskName(char* buffer, int bufSize, const char* name, const char* mask);
+wchar_t* MaskName(wchar_t* buffer, int bufSize, const wchar_t* name, const wchar_t* mask);
+std::wstring MaskNameOwnedW(const wchar_t* name, const wchar_t* mask);
 
 //*****************************************************************************
 //
@@ -68,37 +74,60 @@ struct CMaskItemFlags
 
 struct CMasksHashEntry
 {
-    CMaskItemFlags* Mask;  // internal mask representation, see CMaskItemFlags for the format
+    wchar_t* Mask;         // packed wide mask; see the format note below
     CMasksHashEntry* Next; // next entry with the same hash
 };
+
+// A PREPARED MASK IS A PACKED BUFFER, not a string.
+//
+//   element 0   : flags (Optimize in the low 7 bits, Exclude in bit 7)
+//   element 1.. : the mask text
+//
+// and the code reaches past it by raw offset - `mask + 3` is "flags, '*', '.'",
+// i.e. the extension of a MASK_OPTIMIZE_EXTENSION mask. That arithmetic carries
+// over unchanged now the element is wchar_t.
+//
+// WHAT DID NOT CARRY OVER is the old `(CMaskItemFlags*)buffer` cast. Over a
+// wchar_t* it would alias only the low byte of the first code unit on
+// little-endian, leaving the high byte uninitialised - something that works in
+// testing and corrupts on a different build. So the flags are now a plain value
+// behind these accessors and nothing aliases the buffer.
+inline unsigned MaskItemOptimize(const wchar_t* mask) { return (unsigned)(mask[0] & 0x7F); }
+inline unsigned MaskItemExclude(const wchar_t* mask) { return (unsigned)((mask[0] >> 7) & 1); }
+inline void SetMaskItemFlags(wchar_t* mask, unsigned optimize, unsigned exclude)
+{
+    mask[0] = (wchar_t)((optimize & 0x7F) | ((exclude & 1) << 7));
+}
 
 class CMaskGroup
 {
 protected:
-    char MasksString[MAX_GROUPMASK];   // mask group passed in the constructor or in PrepareMasks
-    TDirectArray<char*> PreparedMasks; // internal mask representation; for the format see CMaskItemFlags - may not contain all masks, some may be in MasksHashArray
-    BOOL NeedPrepare;                  // is it necessary to call the PrepareMasks method before using 'PreparedMasks'?
+    // Dynamically owned UTF-16 is the sole storage. The unsuffixed methods below
+    // remain source-compatible aliases; they neither convert nor own a mirror.
+    std::wstring MasksString;              // mask group passed in the constructor or in PrepareMasks
+    TDirectArray<wchar_t*> PreparedMasks;  // packed masks; see the note above for the format
+    BOOL NeedPrepare;                      // is it necessary to call the PrepareMasks method before using 'PreparedMasks'?
     BOOL ExtendedMode;
 
-    CMasksHashEntry* MasksHashArray; // if not NULL, it is a hash array containing all masks with MASK_OPTIMIZE_EXTENSION format (only those with CMaskItemFlags::Exclude==0)
+    // MasksStringNarrow is gone. It was described as a "narrow rendering
+    // so GetMasksString() can keep returning a stable const char*", but it had been
+    // declared wchar_t[] and GetMasksString had been declared wide, so it rendered a lossy
+    // CP_ACP copy that no declaration allowed anyone to receive.
+
+    CMasksHashEntry* MasksHashArray; // if not NULL, it is a hash array containing all masks with MASK_OPTIMIZE_EXTENSION format (only those with Exclude==0)
     int MasksHashArraySize;          // size of MasksHashArray (twice the number of stored masks)
 
 public:
     CMaskGroup();
-    CMaskGroup(const char* masks, BOOL extendedMode = FALSE);
+    CMaskGroup(const wchar_t* masks, BOOL extendedMode = FALSE);
     ~CMaskGroup();
     void Release();
 
     CMaskGroup& operator=(const CMaskGroup& s);
 
-    // sets the mask string 'masks'; (maximum length including the terminating null is MAX_GROUPMASK)
-    void SetMasksString(const char* masks, BOOL extendedMode = FALSE);
-
-    // returns the string of masks; 'buffer' is a buffer that is at least MAX_GROUPMASK long
-    const char* GetMasksString();
-
-    // returns the mask string released for writing; 'buffer' is a buffer that is at least MAX_GROUPMASK long
-    char* GetWritableMasksString();
+    // WIDE PRIMARY.
+    void SetMasksString(const wchar_t* masks, BOOL extendedMode = FALSE);
+    const wchar_t* GetMasksString();
 
     BOOL GetExtendedMode();
 
@@ -111,13 +140,15 @@ public:
     // If masksString == NULL, CMaskGroup::MasksString is used; otherwise the
     // provided 'masksString' is used (in that case, AgreeMasks can be called —
     // CMaskGroup::MasksString is ignored).
-    BOOL PrepareMasks(int& errorPos, const char* masksString = NULL);
+    BOOL PrepareMasks(int& errorPos, const wchar_t* masksString = NULL);
+    // wide primary
 
     // Determines whether 'fileName' matches the mask group.
     // NOTE: 'fileName' must not be a full path, only in the form name.ext
     // fileExt must point either to the terminator of fileName or to the extension (if it exists)
     // if fileExt == NULL, the extension will be searched for - this is slower
-    BOOL AgreeMasks(const char* fileName, const char* fileExt);
+    BOOL AgreeMasks(const wchar_t* fileName, const wchar_t* fileExt);
+    // wide primary
 
 protected:
     // releases the hash array MasksHashArray

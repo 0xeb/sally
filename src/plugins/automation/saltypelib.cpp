@@ -61,7 +61,7 @@ HRESULT CSalamanderTypeLib::Get(ITypeLib** ppTypeLib)
 
 void CSalamanderTypeLib::Load()
 {
-    WCHAR szModule[MAX_PATH];
+    std::wstring modulePath;
     extern HINSTANCE g_hInstance;
 
     _ASSERTE(m_pTypeLib == NULL);
@@ -73,15 +73,22 @@ void CSalamanderTypeLib::Load()
     {
 #endif
 
-        GetModuleFileNameW(g_hInstance, szModule, _countof(szModule));
-        m_hrLoad = LoadTypeLib(szModule, &m_pTypeLib);
+        if (!SPLGetModuleFileNameOwned(g_hInstance, modulePath))
+        {
+            const DWORD error = GetLastError();
+            m_hrLoad = HRESULT_FROM_WIN32(error != ERROR_SUCCESS
+                                             ? error
+                                             : ERROR_INSUFFICIENT_BUFFER);
+            return;
+        }
+        m_hrLoad = LoadTypeLib(modulePath.c_str(), &m_pTypeLib);
         _ASSERTE(SUCCEEDED(m_hrLoad));
 
 #if REGISTER_TYPELIB
         if (SUCCEEDED(m_hrLoad))
         {
             HRESULT hrRegister;
-            hrRegister = RegisterTypeLib(m_pTypeLib, szModule, NULL);
+            hrRegister = RegisterTypeLib(m_pTypeLib, modulePath.c_str(), NULL);
             _ASSERTE(SUCCEEDED(hrRegister));
         }
     }

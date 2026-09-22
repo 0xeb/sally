@@ -7,6 +7,7 @@
 #include "versinfo.rh2"
 #include "jumplist.h"
 #include "mainwnd.h"
+#include "common/IPathService.h"
 //#include "propvarutil.h"
 
 //#pragma comment(lib,"Shlwapi.lib")
@@ -21,157 +22,41 @@ http://msdn.microsoft.com/en-us/library/dd378460%28v=VS.85%29.aspx#custom_jump_l
 DEFINE_PROPERTYKEY(PKEY_Title, 0xF29F85E0, 0x4FF9, 0x1068, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3, 0xD9, 2);
 DEFINE_PROPERTYKEY(PKEY_AppUserModel_IsDestListSeparator, 0x9F4C2855, 0x9F79, 0x4B39, 0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3, 6);
 
-// We want to link the unique process ID with the configuration
-// (two different versions of Salamander may, for example, have different hot paths)
-//const char *SALAMANDER_APP_ID = "OPENSAL.OpenSalamanderAppID." VERSINFO_xstr(VERSINFO_BUILDNUMBER);
-
-//typedef WINSHELLAPI HRESULT (WINAPI *FT_SetCurrentProcessExplicitAppUserModelID)(PCWSTR appID);
-//typedef WINSHELLAPI HRESULT (WINAPI *FT_SHCreateItemFromIDList)(PCIDLIST_ABSOLUTE pidl, REFIID riid, void **ppv);
-//FT_SetCurrentProcessExplicitAppUserModelID SetCurrentProcessExplicitAppUserModelID = NULL;
-//FT_SHCreateItemFromIDList SHCreateItemFromIDList = NULL;
-
-//{
-//  BOOL ret = FALSE;
-//  if (Windows7AndLater)
-//  {
-//    HMODULE hShell32 = LoadLibrary("shell32.dll");
-//    if (hShell32 != NULL)
-//    {
-//      FT_SetCurrentProcessExplicitAppUserModelID SetCurrentProcessExplicitAppUserModelID = NULL;
-//      SetCurrentProcessExplicitAppUserModelID = (FT_SetCurrentProcessExplicitAppUserModelID)GetProcAddress(hShell32, "SetCurrentProcessExplicitAppUserModelID");
-//      SHCreateItemFromIDList = (FT_SHCreateItemFromIDList)GetProcAddress(hShell32, "SHCreateItemFromIDList");
-//      if (SetCurrentProcessExplicitAppUserModelID != NULL && SHCreateItemFromIDList != NULL)
-//      {
-//        wchar_t appID[500];
-//        ConvertA2U(SALAMANDER_APP_ID, -1, appID, _countof(appID));
-////        HRESULT hres = SetCurrentProcessExplicitAppUserModelID(appID);
-//        HRESULT hres = S_OK;
-//        if (hres == S_OK)
-//        {
-//          ret = TRUE;
-//        }
-//        else
-//        {
-//          TRACE_E("SetCurrentProcessExplicitAppUserModelID() failed! hres="<<hres);
-//        }
-//      }
-//      //FreeLibrary(hShell32); // FIXME - find a cleaner solution
-//    }
-//  }
-//  return ret;
-//}
-
-// Creates a CLSID_ShellLink to insert into the Tasks section of the Jump List.  This type of Jump
-// List item allows the specification of an explicit command line to execute the task.
-//
-//HRESULT CreateShellLink(PCWSTR pszArguments, PCWSTR pszTitle, IShellLink **ppsl)
-//{
-//    IShellLink *psl;
-//    HRESULT hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&psl));
-//    if (SUCCEEDED(hr))
-//    {
-//        // Determine our executable's file path so the task will execute this application
-//        char szAppPath[MAX_PATH];
-//        if (GetModuleFileName(NULL, szAppPath, ARRAYSIZE(szAppPath)))
-//        {
-//            hr = psl->SetPath(szAppPath);
-//            if (SUCCEEDED(hr))
-//            {
-//
-//              char buff[2000];
-//              ConvertU2A(pszArguments, -1, buff, sizeof(buff));
-//                hr = psl->SetArguments(buff);
-//                if (SUCCEEDED(hr))
-//                {
-//                    // The title property is required on Jump List items provided as an IShellLink
-//                    // instance.  This value is used as the display name in the Jump List.
-//                    IPropertyStore *pps;
-//                    hr = psl->QueryInterface(IID_PPV_ARGS(&pps));
-//                    if (SUCCEEDED(hr))
-//                    {
-//                        PROPVARIANT propvar;
-//                        hr = InitPropVariantFromString(pszTitle, &propvar);
-//                        if (SUCCEEDED(hr))
-//                        {
-//                            hr = pps->SetValue(PKEY_Title, propvar);
-//                            if (SUCCEEDED(hr))
-//                            {
-//                                hr = pps->Commit();
-//                                if (SUCCEEDED(hr))
-//                                {
-//                                    hr = psl->QueryInterface(IID_PPV_ARGS(ppsl));
-//                                }
-//                            }
-//                            PropVariantClear(&propvar);
-//                        }
-//                        pps->Release();
-//                    }
-//                }
-//            }
-//        }
-//        else
-//        {
-//            hr = HRESULT_FROM_WIN32(GetLastError());
-//        }
-//        psl->Release();
-//    }
-//    return hr;
-//}
-
-// The Tasks category of Jump Lists supports separator items.  These are simply IShellLink instances
-// that have the PKEY_AppUserModel_IsDestListSeparator property set to TRUE.  All other values are
-// ignored when this property is set.
-//HRESULT CreateSeparatorLink(IShellLink **ppsl)
-//{
-//    IPropertyStore *pps;
-//    HRESULT hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pps));
-//    if (SUCCEEDED(hr))
-//    {
-//        PROPVARIANT propvar;
-//        hr = InitPropVariantFromBoolean(TRUE, &propvar);
-//        if (SUCCEEDED(hr))
-//        {
-//            hr = pps->SetValue(PKEY_AppUserModel_IsDestListSeparator, propvar);
-//            if (SUCCEEDED(hr))
-//            {
-//                hr = pps->Commit();
-//                if (SUCCEEDED(hr))
-//                {
-//                    hr = pps->QueryInterface(IID_PPV_ARGS(ppsl));
-//                }
-//            }
-//            PropVariantClear(&propvar);
-//        }
-//        pps->Release();
-//    }
-//    return hr;
-//}
-
-HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
+// wide: path/name are now the genuine wide hot-path values (see AddTasksToList
+// below); this whole function switched to IShellLinkW (unqualified IShellLink/IID_PPV_ARGS(&ret)
+// resolved to the ANSI interface, since core code never defines UNICODE - same defect class as
+// the shellsup.cpp shortcut-resolution fix) and GetModuleFileNameW (no wide value was
+// ever captured before, the same shape as the SVG icon-path fix) so a non-ASCII hot-path
+// name/path, or a Sally install path with
+// non-ASCII characters, no longer silently mangles the jump-list entry.
+HRESULT CreateShellLink(const wchar_t* path, const wchar_t* name, IShellLinkW** psl)
 {
-    char params[HOTPATHITEM_MAXPATH + 100];
-    sprintf(params, "-AJ \"%s\"", path);
-    if (strlen(params) < INFOTIPSIZE) // length limit for W2K+ when using SetArguments
+    const std::wstring params = std::wstring(L"-AJ \"") + path + L"\"";
+    if (params.length() < INFOTIPSIZE) // length limit for W2K+ when using SetArguments
     {
         HRESULT hres;
-        IShellLink* ret;
+        IShellLinkW* ret = NULL;
         hres = CoCreateInstance(CLSID_ShellLink, NULL,
                                 CLSCTX_INPROC_SERVER,
-                                IID_PPV_ARGS(&ret));
+                                IID_IShellLinkW, (LPVOID*)&ret);
         if (SUCCEEDED(hres))
         {
-            CPathBuffer pathName; // Heap-allocated for long path support
-            GetModuleFileName(NULL, pathName, pathName.Size() - 1);
+            std::wstring pathName;
+            if (gPathService == NULL || !gPathService->GetModuleFileName(NULL, pathName).success)
+            {
+                ret->Release();
+                return E_FAIL;
+            }
 
             // Set path, parameters, icon and description.
-            ret->SetPath(pathName);
-            ret->SetArguments(params);
-            char desc[MAX_PATH]; // kept as char[] - SetDescription API limits to MAX_PATH+1
-            lstrcpyn(desc, path, _countof(desc));
-            if (strlen(path) >= _countof(desc))
-                strcpy(desc + _countof(desc) - 4, "..."); // indicates the path has been truncated
-            ret->SetDescription(desc);                    // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
-            ret->SetIconLocation("shell32.dll", -319);    // this icon exists from Windows XP onwards
+            ret->SetPath(pathName.c_str());
+            ret->SetArguments(params.c_str());
+            wchar_t desc[MAX_PATH]; // kept as wchar_t[] - SetDescription API limits to MAX_PATH+1
+            lstrcpynW(desc, path, _countof(desc));
+            if (wcslen(path) >= _countof(desc))
+                wcscpy(desc + _countof(desc) - 4, L"..."); // indicates the path has been truncated
+            ret->SetDescription(desc);                     // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
+            ret->SetIconLocation(L"shell32.dll", -319);    // this icon exists from Windows XP onwards
 
             // To set the link title, we require the property store of the link.
             IPropertyStore* pPS;
@@ -180,8 +65,8 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
             {
                 PROPVARIANT pv;
                 PropVariantInit(&pv);
-                pv.vt = VT_LPSTR;
-                pv.pszVal = (LPSTR)name;
+                pv.vt = VT_LPWSTR;
+                pv.pwszVal = (LPWSTR)name;
                 pPS->SetValue(PKEY_Title, pv);
                 pPS->Commit();
                 pPS->Release();
@@ -211,22 +96,21 @@ HRESULT AddTasksToList(ICustomDestinationList* pcdl)
     HRESULT hr = CoCreateInstance(CLSID_EnumerableObjectCollection, NULL, CLSCTX_INPROC, IID_PPV_ARGS(&poc));
     if (SUCCEEDED(hr))
     {
-        IShellLink* psl;
+        IShellLinkW* psl;
 
         int count = 0;
         for (int i = 0; i < HOT_PATHS_COUNT; i++)
         {
             if (MainWindow->HotPaths.GetVisible(i))
             {
-                CPathBuffer name; // Heap-allocated for long path support
-                char path[HOTPATHITEM_MAXPATH];
-                name[0] = 0;
-                path[0] = 0;
-                MainWindow->HotPaths.GetName(i, name, name.Size());
-                MainWindow->HotPaths.GetPath(i, path, HOTPATHITEM_MAXPATH);
-                if (name[0] != 0 && path[0] != 0)
+                // wide: GetNameW/GetPathW return the stored truth directly - the
+                // narrow GetName/GetPath pair is documented LOSSY BY CONSTRUCTION for a Unicode
+                // hot path (mainwnd.h) and this was the last un-migrated caller.
+                const std::wstring& name = MainWindow->HotPaths.GetNameW(i);
+                const std::wstring& path = MainWindow->HotPaths.GetPathW(i);
+                if (!name.empty() && !path.empty())
                 {
-                    hr = CreateShellLink(path, name, &psl);
+                    hr = CreateShellLink(path.c_str(), name.c_str(), &psl);
                     if (SUCCEEDED(hr))
                     {
                         hr = poc->AddObject(psl);
@@ -284,11 +168,7 @@ void CreateJumpList()
         IID_PPV_ARGS(&pcdl));
     if (SUCCEEDED(hr))
     {
-        //important to setup App Id for the Jump List
-        //wchar_t appID[500];
-        //ConvertA2U(SALAMANDER_APP_ID, -1, appID, _countof(appID));
-        //hr = pcdl->SetAppID(appID);
-        //    if (SUCCEEDED(hr))
+        // Use the process-default application ID for this Jump List.
         {
             UINT uMaxSlots;
             IObjectArray* poaRemoved;

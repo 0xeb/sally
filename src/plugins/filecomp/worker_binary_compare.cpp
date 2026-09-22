@@ -4,6 +4,19 @@
 
 #include "precomp.h"
 
+static std::wstring FormatBinaryChangeReport(size_t index, QWORD length,
+                                             QWORD offset, int digits)
+{
+    wchar_t countText[32];
+    wchar_t offsetText[32];
+    const std::wstring fmt = SPLExpandPluralStringOwned(
+        SG, SPLLoadStrOwned(SG, HLanguage, IDS_BINREPORT1).c_str(), 1,
+        &CQuadWord().SetUI64(length));
+    _ui64tow_s(length, countText, _countof(countText), 10);
+    _snwprintf_s(offsetText, _countof(offsetText), _TRUNCATE, L"%0*I64X", digits, offset);
+    return SPLFormatStringOwned(fmt.c_str(), int(index), countText, offsetText);
+}
+
 void CFilecompWorker::CompareBinaryFiles()
 {
     CCachedFile cf[2];
@@ -14,10 +27,10 @@ void CFilecompWorker::CompareBinaryFiles()
         switch (cf[i].SetFile(Files[i].File))
         {
         case 1:
-            CException::Raise(IDS_ACCESFILE, GetLastError(), Files[i].Name);
+            CException::Raise(IDS_ACCESFILE, GetLastError(), Files[i].Name.c_str());
             break;
         case 2:
-            CException(LoadStr(IDS_LOWMEM));
+            CException(LangStr(IDS_LOWMEM).c_str());
             break;
         }
     }
@@ -30,7 +43,7 @@ void CFilecompWorker::CompareBinaryFiles()
     {
         if (ret + 2 < 0)
             throw CAbortByUserException(); // cancel
-        CException::Raise(IDS_ACCESFILE, GetLastError(), Files[ret + 2].Name);
+        CException::Raise(IDS_ACCESFILE, GetLastError(), Files[ret + 2].Name.c_str());
     }
 
     CBinaryCompareResults results(Options);
@@ -66,12 +79,10 @@ void CFilecompWorker::CompareBinaryFiles()
                 size_t j;
                 for (j = 0; j < changes.size(); j++)
                 {
-                    TCHAR buf1[32], buf2[32], report[200], fmt[128];
-                    SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_BINREPORT1), 1, &CQuadWord().SetUI64(changes[j].Length));
-                    _stprintf(report, fmt, j + 1,
-                              _ui64toa(changes[j].Length, buf1, 10),
-                              QWord2Ascii(changes[j].Offset, buf2, digits));
-                    LRESULT ret2 = SendMessage(comboHWnd, CB_ADDSTRING, 0, (LPARAM)report);
+                    const std::wstring report = FormatBinaryChangeReport(
+                        j + 1, changes[j].Length, changes[j].Offset, digits);
+                    LRESULT ret2 = SendMessageW(comboHWnd, CB_ADDSTRING, 0,
+                                                (LPARAM)report.c_str());
                     if (ret2 == CB_ERR || ret2 == CB_ERRSPACE)
                     {
                         TRACE_E("CB_ADDSTRING has failed, j = " << j);
@@ -84,21 +95,26 @@ void CFilecompWorker::CompareBinaryFiles()
                 InvalidateRect(comboHWnd, NULL, TRUE);
                 UpdateWindow(comboHWnd);
 
-                CPathBuffer buf; // Heap-allocated for long path support
+                const wchar_t* path0Name = SG->SalPathFindFileName(Files[0].Name.c_str());
+                const wchar_t* path1Name = SG->SalPathFindFileName(Files[1].Name.c_str());
+                std::wstring caption;
                 if (changes.size() < MaxBinChanges)
                 {
-                    TCHAR fmt[128];
                     CQuadWord qSize((DWORD)changes.size(), 0);
-                    SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_MAINWNDHEADER), 1, &qSize);
-                    _stprintf(buf.Get(), fmt, SG->SalPathFindFileName(Files[0].Name.c_str()), "",
-                              SG->SalPathFindFileName(Files[1].Name.c_str()), "", changes.size());
+                    const std::wstring fmt = SPLExpandPluralStringOwned(
+                        SG, SPLLoadStrOwned(SG, HLanguage, IDS_MAINWNDHEADER).c_str(), 1, &qSize);
+                    caption = SPLFormatStringOwned(fmt.c_str(), path0Name, L"",
+                                                   path1Name, L"", int(changes.size()));
                 }
                 else
                 {
-                    _stprintf(buf.Get(), LoadStr(IDS_MAINWNDHEADERTOOMANY),
-                              SG->SalPathFindFileName(Files[0].Name.c_str()), SG->SalPathFindFileName(Files[1].Name.c_str()));
+                    caption = SPLFormatStringOwned(
+                        SPLLoadStrOwned(SG, HLanguage, IDS_MAINWNDHEADERTOOMANY).c_str(),
+                        path0Name, path1Name);
                 }
-                SetWindowText(MainWindow, buf);
+                // Same as CMainWindow's own captions: the target is a Unicode
+                // window, so the CP_ACP projection was pure loss.
+                SetWindowTextW(MainWindow, caption.c_str());
                 PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_CBINIT_FINISHED, 0);
             }
         }
@@ -108,9 +124,9 @@ void CFilecompWorker::CompareBinaryFiles()
             {
             case 1:
             case 2:
-                CException::Raise(IDS_ACCESFILE, GetLastError(), Files[ret - 1].Name);
+                CException::Raise(IDS_ACCESFILE, GetLastError(), Files[ret - 1].Name.c_str());
             case 3:
-                throw CException(LoadStr(IDS_LOWMEM));
+                throw CException(LangStr(IDS_LOWMEM).c_str());
             case 4:
                 throw CAbortByUserException(); // cancel
             }
@@ -288,15 +304,13 @@ int CFilecompWorker::FindDifferencesBody(CCachedFile (&cf)[2], QWORD changeOffs,
             HWND hComboWnd = (HWND)SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_GET_CHANGESCOMBO, NULL);
             if (hComboWnd)
             {
-                TCHAR report[200], buf1[32], buf2[32], fmt[128];
                 int digits = ComputeAddressCharWidth(Files[0].Size, Files[1].Size);
-                SG->ExpandPluralString(fmt, SizeOf(fmt), LoadStr(IDS_BINREPORT1), 1, &CQuadWord().SetUI64(lenghtSave));
-                _stprintf(report, fmt, changes.size(),
-                          _ui64toa(lenghtSave, buf1, 10),
-                          QWord2Ascii(offsetSave, buf2, digits));
+                const std::wstring report = FormatBinaryChangeReport(
+                    changes.size(), lenghtSave, offsetSave, digits);
                 if (changes.size() == 1)
                     SendMessage(hComboWnd, CB_RESETCONTENT, 0, 0); // Hack
-                LRESULT ret = SendMessage(hComboWnd, CB_ADDSTRING, 0, (LPARAM)report);
+                LRESULT ret = SendMessageW(hComboWnd, CB_ADDSTRING, 0,
+                                           (LPARAM)report.c_str());
                 if (changes.size() == 1)
                     SendMessage(hComboWnd, CB_SETCURSEL, 0, 0); // Hack
                 if (ret == CB_ERR || ret == CB_ERRSPACE)

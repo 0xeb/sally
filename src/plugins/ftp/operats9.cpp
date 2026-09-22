@@ -1,8 +1,83 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <utility>
+
+
+template <typename TObject, typename... TArgs>
+static TObject* NewUploadCacheObject(TArgs&&... args) noexcept
+{
+    try
+    {
+        return new TObject(std::forward<TArgs>(args)...);
+    }
+    catch (...)
+    {
+        TRACE_E(LOW_MEMORY);
+        return NULL;
+    }
+}
+
+static BOOL StoreUploadListingItemName(CUploadListingItem& item,
+                                       const CFtpTextCodec& codec,
+                                       const char* name) noexcept
+{
+    if (name == NULL || !FtpStoreProtocolBytes(name, item.Name))
+        return FALSE;
+    switch (codec.DecodeForComparison(item.Name.data(), item.Name.size(), item.NameText))
+    {
+    case CFtpTextDecodeStatus::Success:
+        item.NameTextValid = TRUE;
+        return TRUE;
+
+    case CFtpTextDecodeStatus::InvalidInput:
+        item.NameText.clear();
+        item.NameTextValid = FALSE;
+        return TRUE;
+
+    default:
+        return FALSE;
+    }
+}
+
+static int CompareUploadListingByteNames(std::string_view first,
+                                         std::string_view second) noexcept
+{
+    const size_t commonLength = first.size() < second.size() ? first.size() : second.size();
+    const int prefix = commonLength == 0 ? 0 : memcmp(first.data(), second.data(), commonLength);
+    if (prefix != 0)
+        return prefix;
+    return first.size() < second.size() ? -1 : first.size() > second.size() ? 1 : 0;
+}
+
+static int CompareUploadListingNamesNoCase(const CUploadListingItem& first,
+                                           const CUploadListingItem& second) noexcept
+{
+    if (first.NameTextValid != second.NameTextValid)
+        return first.NameTextValid ? -1 : 1;
+    if (!first.NameTextValid)
+        return CompareUploadListingByteNames(first.Name, second.Name);
+    const int result = CompareStringOrdinal(first.NameText.c_str(), -1,
+                                            second.NameText.c_str(), -1, TRUE);
+    return result == CSTR_LESS_THAN ? -1 : result == CSTR_GREATER_THAN ? 1 : 0;
+}
+
+static int CompareUploadListingNameNoCase(const CUploadListingItem& item,
+                                          std::string_view name,
+                                          const std::wstring& nameText,
+                                          BOOL nameTextValid) noexcept
+{
+    if (item.NameTextValid != nameTextValid)
+        return item.NameTextValid ? -1 : 1;
+    if (!item.NameTextValid)
+        return CompareUploadListingByteNames(item.Name, name);
+    const int result = CompareStringOrdinal(item.NameText.c_str(), -1,
+                                            nameText.c_str(), -1, TRUE);
+    return result == CSTR_LESS_THAN ? -1 : result == CSTR_GREATER_THAN ? 1 : 0;
+}
 
 #ifdef _DEBUG
 int CUploadListingsOnServer::FoundPathIndexesInCache = 0; // how many searched paths the cache has caught
@@ -24,12 +99,13 @@ CUploadListingCache::~CUploadListingCache()
     HANDLES(DeleteCriticalSection(&UploadLstCacheCritSect));
 }
 
-BOOL CUploadListingCache::AddOrUpdateListing(const char* user, const char* host, unsigned short port,
+BOOL CUploadListingCache::AddOrUpdateListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                                              const char* path, CFTPServerPathType pathType,
                                              const char* pathListing, int pathListingLen,
                                              const CFTPDate& pathListingDate, DWORD listingStartTime,
                                              BOOL onlyUpdate, const char* welcomeReply,
-                                             const char* systReply, const char* suggestedListingServerType)
+                                             const char* systReply, const char* suggestedListingServerType,
+                                             const CFtpTextCodec& textCodec)
 {
     if (host == NULL)
     {
@@ -37,13 +113,13 @@ BOOL CUploadListingCache::AddOrUpdateListing(const char* user, const char* host,
         return FALSE;
     }
     BOOL ret = TRUE;
-    if (user != NULL && strcmp(user, FTP_ANONYMOUS) == 0)
+    if (user != NULL && wcscmp(user, L"anonymous") == 0)
         user = NULL;
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
     CUploadListingsOnServer* foundServer = FindServer(user, host, port, NULL);
     if (foundServer == NULL && !onlyUpdate) // the cache does not contain any path from this server yet; create an entry for the server
     {
-        foundServer = new CUploadListingsOnServer(user, host, port);
+        foundServer = NewUploadCacheObject<CUploadListingsOnServer>(user, host, port);
         if (foundServer != NULL && foundServer->IsGood())
         {
             ListingsOnServer.Add(foundServer);
@@ -72,13 +148,14 @@ BOOL CUploadListingCache::AddOrUpdateListing(const char* user, const char* host,
     {
         ret = foundServer->AddOrUpdateListing(path, pathType, pathListing, pathListingLen,
                                               pathListingDate, listingStartTime, onlyUpdate,
-                                              welcomeReply, systReply, suggestedListingServerType);
+                                              welcomeReply, systReply, suggestedListingServerType,
+                                              textCodec);
     }
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
     return ret;
 }
 
-void CUploadListingCache::RemoveServer(const char* user, const char* host, unsigned short port)
+void CUploadListingCache::RemoveServer(const wchar_t* user, const wchar_t* host, unsigned short port)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
     int index;
@@ -87,7 +164,7 @@ void CUploadListingCache::RemoveServer(const char* user, const char* host, unsig
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::RemoveNotAccessibleListings(const char* user, const char* host, unsigned short port)
+void CUploadListingCache::RemoveNotAccessibleListings(const wchar_t* user, const wchar_t* host, unsigned short port)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
     CUploadListingsOnServer* foundServer = FindServer(user, host, port, NULL);
@@ -97,7 +174,7 @@ void CUploadListingCache::RemoveNotAccessibleListings(const char* user, const ch
 }
 
 CUploadListingsOnServer*
-CUploadListingCache::FindServer(const char* user, const char* host, unsigned short port, int* index)
+CUploadListingCache::FindServer(const wchar_t* user, const wchar_t* host, unsigned short port, int* index)
 {
     if (index != NULL)
         *index = -1;
@@ -106,15 +183,15 @@ CUploadListingCache::FindServer(const char* user, const char* host, unsigned sho
         TRACE_E("Unexpected situation in CUploadListingCache::FindServer()!");
         return FALSE;
     }
-    if (user != NULL && strcmp(user, FTP_ANONYMOUS) == 0)
+    if (user != NULL && wcscmp(user, L"anonymous") == 0)
         user = NULL;
     int i;
     for (i = 0; i < ListingsOnServer.Count; i++)
     {
         CUploadListingsOnServer* server = ListingsOnServer[i];
-        if (SalamanderGeneral->StrICmp(server->Host, host) == 0 &&
-            (server->User == NULL && user == NULL ||
-             user != NULL && server->User != NULL && strcmp(server->User, user) == 0) &&
+        if (CompareStringOrdinal(server->Host.c_str(), -1, host, -1, TRUE) == CSTR_EQUAL &&
+            (server->Anonymous && user == NULL ||
+             user != NULL && !server->Anonymous && server->User == user) &&
             server->Port == port) // server found
         {
             if (index != NULL)
@@ -125,7 +202,7 @@ CUploadListingCache::FindServer(const char* user, const char* host, unsigned sho
     return NULL;
 }
 
-void CUploadListingCache::ReportCreateDirs(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportCreateDirs(const wchar_t* user, const wchar_t* host, unsigned short port,
                                            const char* workPath, CFTPServerPathType pathType, const char* newDirs,
                                            BOOL unknownResult)
 {
@@ -136,7 +213,7 @@ void CUploadListingCache::ReportCreateDirs(const char* user, const char* host, u
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::ReportRename(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportRename(const wchar_t* user, const wchar_t* host, unsigned short port,
                                        const char* workPath, CFTPServerPathType pathType,
                                        const char* fromName, const char* newName, BOOL unknownResult)
 {
@@ -147,7 +224,7 @@ void CUploadListingCache::ReportRename(const char* user, const char* host, unsig
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::ReportDelete(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportDelete(const wchar_t* user, const wchar_t* host, unsigned short port,
                                        const char* workPath, CFTPServerPathType pathType, const char* name,
                                        BOOL unknownResult)
 {
@@ -158,7 +235,7 @@ void CUploadListingCache::ReportDelete(const char* user, const char* host, unsig
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::ReportStoreFile(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportStoreFile(const wchar_t* user, const wchar_t* host, unsigned short port,
                                           const char* workPath, CFTPServerPathType pathType, const char* name)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
@@ -168,7 +245,7 @@ void CUploadListingCache::ReportStoreFile(const char* user, const char* host, un
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::ReportFileUploaded(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportFileUploaded(const wchar_t* user, const wchar_t* host, unsigned short port,
                                              const char* workPath, CFTPServerPathType pathType, const char* name,
                                              const CQuadWord& fileSize, BOOL unknownResult)
 {
@@ -179,7 +256,7 @@ void CUploadListingCache::ReportFileUploaded(const char* user, const char* host,
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::ReportUnknownChange(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ReportUnknownChange(const wchar_t* user, const wchar_t* host, unsigned short port,
                                               const char* workPath, CFTPServerPathType pathType)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
@@ -189,7 +266,7 @@ void CUploadListingCache::ReportUnknownChange(const char* user, const char* host
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-void CUploadListingCache::InvalidatePathListing(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::InvalidatePathListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                                                 const char* path, CFTPServerPathType pathType)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
@@ -199,7 +276,7 @@ void CUploadListingCache::InvalidatePathListing(const char* user, const char* ho
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-BOOL CUploadListingCache::IsListingFromPanel(const char* user, const char* host, unsigned short port,
+BOOL CUploadListingCache::IsListingFromPanel(const wchar_t* user, const wchar_t* host, unsigned short port,
                                              const char* path, CFTPServerPathType pathType)
 {
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
@@ -211,11 +288,11 @@ BOOL CUploadListingCache::IsListingFromPanel(const char* user, const char* host,
     return ret;
 }
 
-BOOL CUploadListingCache::GetListing(const char* user, const char* host, unsigned short port,
+BOOL CUploadListingCache::GetListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                                      const char* path, CFTPServerPathType pathType, int workerMsg,
                                      int workerUID, BOOL* listingInProgress, BOOL* notAccessible,
                                      BOOL* getListing, const char* name, CUploadListingItem** existingItem,
-                                     BOOL* nameExists)
+                                     BOOL* nameExists, const CFtpTextCodec& textCodec)
 {
     BOOL ret = TRUE;
     *listingInProgress = FALSE;
@@ -229,7 +306,7 @@ BOOL CUploadListingCache::GetListing(const char* user, const char* host, unsigne
     CUploadListingsOnServer* server = FindServer(user, host, port, NULL);
     if (server == NULL) // the cache does not contain any path from this server yet; create an entry for the server
     {
-        server = new CUploadListingsOnServer(user, host, port);
+        server = NewUploadCacheObject<CUploadListingsOnServer>(user, host, port);
         if (server != NULL && server->IsGood())
         {
             ListingsOnServer.Add(server);
@@ -256,13 +333,14 @@ BOOL CUploadListingCache::GetListing(const char* user, const char* host, unsigne
     if (server != NULL)
     {
         ret = server->GetListing(path, pathType, workerMsg, workerUID, listingInProgress,
-                                 notAccessible, getListing, name, existingItem, nameExists);
+                                 notAccessible, getListing, name, existingItem, nameExists,
+                                 textCodec);
     }
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
     return ret;
 }
 
-void CUploadListingCache::ListingFailed(const char* user, const char* host, unsigned short port,
+void CUploadListingCache::ListingFailed(const wchar_t* user, const wchar_t* host, unsigned short port,
                                         const char* path, CFTPServerPathType pathType,
                                         BOOL listingIsNotAccessible,
                                         CUploadWaitingWorker** uploadFirstWaitingWorker,
@@ -282,11 +360,12 @@ void CUploadListingCache::ListingFailed(const char* user, const char* host, unsi
     HANDLES(LeaveCriticalSection(&UploadLstCacheCritSect));
 }
 
-BOOL CUploadListingCache::ListingFinished(const char* user, const char* host, unsigned short port,
+BOOL CUploadListingCache::ListingFinished(const wchar_t* user, const wchar_t* host, unsigned short port,
                                           const char* path, CFTPServerPathType pathType,
                                           const char* pathListing, int pathListingLen,
                                           const CFTPDate& pathListingDate, const char* welcomeReply,
-                                          const char* systReply, const char* suggestedListingServerType)
+                                          const char* systReply, const char* suggestedListingServerType,
+                                          const CFtpTextCodec& textCodec)
 {
     BOOL ret = TRUE;
     HANDLES(EnterCriticalSection(&UploadLstCacheCritSect));
@@ -295,7 +374,7 @@ BOOL CUploadListingCache::ListingFinished(const char* user, const char* host, un
     {
         ret = server->ListingFinished(path, pathType, pathListing, pathListingLen,
                                       pathListingDate, welcomeReply, systReply,
-                                      suggestedListingServerType);
+                                      suggestedListingServerType, textCodec);
     }
     else
         TRACE_E("CUploadListingCache::ListingFinished(): server not found!");
@@ -308,25 +387,15 @@ BOOL CUploadListingCache::ListingFinished(const char* user, const char* host, un
 // CUploadListingsOnServer
 //
 
-CUploadListingsOnServer::CUploadListingsOnServer(const char* user, const char* host,
+CUploadListingsOnServer::CUploadListingsOnServer(const wchar_t* user, const wchar_t* host,
                                                  unsigned short port) : Listing(50, 100)
 {
-    BOOL err = host == NULL;
-    Host = SalamanderGeneral->DupStr(host);
-    if (user != NULL && strcmp(user, FTP_ANONYMOUS) == 0)
+    if (user != NULL && wcscmp(user, L"anonymous") == 0)
         user = NULL;
-    User = SalamanderGeneral->DupStr(user); // if it is NULL, it remains NULL
+    Anonymous = user == NULL;
+    Valid = host != NULL && FtpStoreWideText(host, Host) &&
+            (Anonymous || FtpStoreWideText(user, User));
     Port = port;
-
-    // if there is an error, release and null the data
-    if (err)
-    {
-        if (User != NULL)
-            free(User);
-        if (Host != NULL)
-            free(Host);
-        User = Host = NULL;
-    }
     memset(FoundPathIndexes, -1, sizeof(FoundPathIndexes));
 }
 
@@ -339,10 +408,6 @@ CUploadListingsOnServer::~CUploadListingsOnServer()
         if (state != ulsReady && state != ulsNotAccessible)
             TRACE_E("CUploadListingsOnServer::~CUploadListingsOnServer(): listing in forbidden state (in progress): " << state);
     }
-    if (User != NULL)
-        SalamanderGeneral->Free(User);
-    if (Host != NULL)
-        SalamanderGeneral->Free(Host);
 }
 
 BOOL CUploadListingsOnServer::AddOrUpdateListing(const char* path, CFTPServerPathType pathType,
@@ -350,7 +415,8 @@ BOOL CUploadListingsOnServer::AddOrUpdateListing(const char* path, CFTPServerPat
                                                  const CFTPDate& pathListingDate,
                                                  DWORD listingStartTime, BOOL onlyUpdate,
                                                  const char* welcomeReply, const char* systReply,
-                                                 const char* suggestedListingServerType)
+                                                 const char* suggestedListingServerType,
+                                                 const CFtpTextCodec& textCodec)
 {
     BOOL ret = TRUE;
     int index;
@@ -366,7 +432,8 @@ BOOL CUploadListingsOnServer::AddOrUpdateListing(const char* path, CFTPServerPat
         {
             listing->ClearListingItems();
             if (listing->ParseListing(pathListing, pathListingLen, pathListingDate, pathType,
-                                      welcomeReply, systReply, suggestedListingServerType, NULL))
+                                      welcomeReply, systReply, suggestedListingServerType, NULL,
+                                      textCodec))
             {
                 if (listing->ListingState == ulsInProgress)
                 {
@@ -425,11 +492,12 @@ BOOL CUploadListingsOnServer::AddOrUpdateListing(const char* path, CFTPServerPat
     {
         if (!onlyUpdate) // if it is possible to add the listing, add it
         {
-            CUploadPathListing* listing = new CUploadPathListing(path, pathType, ulsReady, listingStartTime, TRUE /* listing being added = listing from the panel */);
+            CUploadPathListing* listing = NewUploadCacheObject<CUploadPathListing>(textCodec, path, pathType, ulsReady, listingStartTime, TRUE /* listing being added = listing from the panel */);
             if (listing != NULL && listing->IsGood())
             {
                 if (listing->ParseListing(pathListing, pathListingLen, pathListingDate, pathType,
-                                          welcomeReply, systReply, suggestedListingServerType, NULL))
+                                          welcomeReply, systReply, suggestedListingServerType, NULL,
+                                          textCodec))
                 {
                     Listing.Add(listing);
                     if (!Listing.IsGood())
@@ -475,17 +543,19 @@ void CUploadListingsOnServer::RemoveNotAccessibleListings()
 
 CUploadPathListing*
 CUploadListingsOnServer::AddEmptyListing(const char* path, const char* dirName, CFTPServerPathType pathType,
-                                         CUploadListingState listingState, BOOL doNotCheckIfPathIsKnown)
+                                         CUploadListingState listingState, BOOL doNotCheckIfPathIsKnown,
+                                         const CFtpTextCodec& textCodec)
 {
     CUploadPathListing* ret = NULL;
-    CPathBuffer dir;
-    lstrcpyn(dir, path, dir.Size());
-    if (dirName == NULL || FTPPathAppend(pathType, dir, dir.Size(), dirName, TRUE))
+    std::string dir;
+    if (!FtpStoreProtocolBytes(path != NULL ? path : "", dir))
+        return NULL;
+    if (dirName == NULL || FTPPathAppend(pathType, dir, dirName, TRUE))
     {
         int index;
-        if (doNotCheckIfPathIsKnown || !FindPath(dir, pathType, index)) // the path is not in the cache yet
+        if (doNotCheckIfPathIsKnown || !FindPath(dir.c_str(), pathType, index)) // the path is not in the cache yet
         {
-            CUploadPathListing* listing = new CUploadPathListing(dir, pathType, listingState, IncListingCounter(), FALSE);
+            CUploadPathListing* listing = NewUploadCacheObject<CUploadPathListing>(textCodec, dir.c_str(), pathType, listingState, IncListingCounter(), FALSE);
             if (listing != NULL && listing->IsGood())
             {
                 Listing.Add(listing);
@@ -525,7 +595,7 @@ BOOL CUploadListingsOnServer::FindPath(const char* path, CFTPServerPathType path
     {
         int ind = FoundPathIndexes[i];
         if (ind >= 0 && ind < Listing.Count &&
-            FTPIsTheSameServerPath(pathType, Listing[ind]->Path, path))
+            FTPIsTheSameServerPath(pathType, Listing[ind]->Path.c_str(), path))
         {
             index = ind;
             if (i > 0) // bubble the found index up to the first position in the lookup cache (giving it the longest lifetime)
@@ -541,7 +611,7 @@ BOOL CUploadListingsOnServer::FindPath(const char* path, CFTPServerPathType path
     }
     for (i = 0; i < Listing.Count; i++) // the cache did not help, search the entire array sequentially
     {
-        if (FTPIsTheSameServerPath(pathType, Listing[i]->Path, path))
+        if (FTPIsTheSameServerPath(pathType, Listing[i]->Path.c_str(), path))
         {
             // put the found index into the lookup cache at the first position and shift the others down
             memmove(FoundPathIndexes + 1, FoundPathIndexes, sizeof(int) * (FOUND_PATH_IND_CACHE_SIZE - 1));
@@ -557,62 +627,66 @@ BOOL CUploadListingsOnServer::FindPath(const char* path, CFTPServerPathType path
 void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerPathType pathType,
                                                const char* newDirs, BOOL unknownResult)
 {
-    CPathBuffer cutDir;
-    CPathBuffer path;
+    std::string cutDir;
+    std::string path;
     if (FTPIsPathRelative(pathType, newDirs))
     { // call ReportCreateDir sequentially for all directories being created
-        CPathBuffer relPath;
-        lstrcpyn(relPath, newDirs, relPath.Size());
-        lstrcpyn(path, workPath, path.Size());
-        while (FTPCutFirstDirFromRelativePath(pathType, relPath, cutDir, cutDir.Size()))
+        std::string relPath;
+        if (!FtpStoreProtocolBytes(newDirs != NULL ? newDirs : "", relPath) ||
+            !FtpStoreProtocolBytes(workPath != NULL ? workPath : "", path))
+            return;
+        while (FTPCutFirstDirFromRelativePath(pathType, relPath, cutDir))
         {
-            if (strcmp(cutDir, ".") != 0) // assumption: "." is the current directory or is meaningless
+            if (cutDir != ".") // assumption: "." is the current directory or is meaningless
             {
-                if (strcmp(cutDir, "..") == 0)
-                    FTPCutDirectory(pathType, path, path.Size(), NULL, 0, NULL); // assumption: ".." is the parent directory or is meaningless
+                if (cutDir == "..")
+                    FTPCutDirectory(pathType, path, NULL, NULL); // assumption: ".." is the parent directory or is meaningless
                 else
                 {
                     int index;
-                    if (FindPath(path, pathType, index)) // find the path in the cache
+                    if (FindPath(path.c_str(), pathType, index)) // find the path in the cache
                     {
                         if (unknownResult)
                             InvalidateListing(index);
                         else
                         {
                             BOOL dirCreated, lowMem;
-                            Listing[index]->ReportCreateDir(cutDir, &dirCreated, &lowMem);
+                            Listing[index]->ReportCreateDir(cutDir.c_str(), &dirCreated, &lowMem);
                             if (lowMem)
                                 InvalidateListing(index);
                             if (dirCreated)
-                                AddEmptyListing(path, cutDir, pathType, ulsReady, FALSE); // add an empty listing to the listing cache for the newly created directory
+                                AddEmptyListing(path.c_str(), cutDir.c_str(), pathType, ulsReady, FALSE,
+                                                Listing[index]->TextCodec); // add an empty listing to the listing cache for the newly created directory
                         }
                     }
-                    if (!FTPPathAppend(pathType, path, path.Size(), cutDir, TRUE))
-                        break; // ignore paths that are too long
+                    if (!FTPPathAppend(pathType, path, cutDir.c_str(), TRUE))
+                        break;
                 }
             }
         }
     }
     else // newDirs is an absolute path, so trim it up to the root and call ReportCreateDir for all subdirectories (we do not know how many subdirectories were created)
     {
-        lstrcpyn(path, newDirs, path.Size());
-        FTPCompleteAbsolutePath(pathType, path, path.Size(), workPath); // convert the path to a full absolute path if necessary
-        FTPRemovePointsFromPath(path, pathType);                         // assumption: "." is the current directory or is meaningless, ".." is the parent directory or is meaningless
-        while (FTPCutDirectory(pathType, path, path.Size(), cutDir, cutDir.Size(), NULL))
+        if (!FtpStoreProtocolBytes(newDirs != NULL ? newDirs : "", path) ||
+            !FTPCompleteAbsolutePath(pathType, path, workPath != NULL ? workPath : "") ||
+            !FTPRemovePointsFromPath(path, pathType))
+            return;
+        while (FTPCutDirectory(pathType, path, &cutDir, NULL))
         {
             int index;
-            if (FindPath(path, pathType, index)) // find the path in the cache
+            if (FindPath(path.c_str(), pathType, index)) // find the path in the cache
             {
                 if (unknownResult)
                     InvalidateListing(index);
                 else
                 {
                     BOOL dirCreated, lowMem;
-                    Listing[index]->ReportCreateDir(cutDir, &dirCreated, &lowMem);
+                    Listing[index]->ReportCreateDir(cutDir.c_str(), &dirCreated, &lowMem);
                     if (lowMem)
                         InvalidateListing(index);
                     if (dirCreated)
-                        AddEmptyListing(path, cutDir, pathType, ulsReady, FALSE); // add an empty listing to the listing cache for the newly created directory
+                        AddEmptyListing(path.c_str(), cutDir.c_str(), pathType, ulsReady, FALSE,
+                                        Listing[index]->TextCodec); // add an empty listing to the listing cache for the newly created directory
                 }
             }
         }
@@ -655,11 +729,11 @@ void CUploadListingsOnServer::ReportDelete(const char* workPath, CFTPServerPathT
     {
         // just in case 'name' is a directory or a link to a directory, invalidate
         // the listing of the path to that directory
-        CPathBuffer path;
-        lstrcpyn(path, workPath, path.Size());
-        if (FTPPathAppend(pathType, path, path.Size(), name, TRUE))
+        std::string path;
+        if (FtpStoreProtocolBytes(workPath != NULL ? workPath : "", path) &&
+            FTPPathAppend(pathType, path, name, TRUE))
         {
-            if (FindPath(path, pathType, index)) // find the path in the cache (if it was a file, the path cannot be found)
+            if (FindPath(path.c_str(), pathType, index)) // find the path in the cache (if it was a file, the path cannot be found)
                 InvalidateListing(index);
         }
     }
@@ -744,7 +818,7 @@ void CUploadListingsOnServer::InvalidateListing(int index)
 BOOL CUploadListingsOnServer::GetListing(const char* path, CFTPServerPathType pathType, int workerMsg,
                                          int workerUID, BOOL* listingInProgress, BOOL* notAccessible,
                                          BOOL* getListing, const char* name, CUploadListingItem** existingItem,
-                                         BOOL* nameExists)
+                                         BOOL* nameExists, const CFtpTextCodec& textCodec)
 {
     BOOL ret = TRUE;
     int index;
@@ -767,19 +841,21 @@ BOOL CUploadListingsOnServer::GetListing(const char* path, CFTPServerPathType pa
                 if (listing->ListingState == ulsReady) // the listing is ready
                 {
                     int index2;
-                    if (listing->FindItem(name, index2)) // item 'name' found; copy its data into 'existingItem' and set 'nameExists' to TRUE
+                    BOOL lowMemory = FALSE;
+                    if (listing->FindItem(name, index2, &lowMemory)) // item 'name' found; copy its data into 'existingItem' and set 'nameExists' to TRUE
                     {
                         if (nameExists != NULL)
                             *nameExists = TRUE;
                         if (existingItem != NULL)
                         {
                             CUploadListingItem* item = listing->ListingItem[index2];
-                            *existingItem = new CUploadListingItem;
+                            *existingItem = NewUploadCacheObject<CUploadListingItem>();
                             if (*existingItem != NULL)
                             {
-                                (*existingItem)->Name = SalamanderGeneral->DupStr(item->Name);
-                                if ((*existingItem)->Name != NULL)
+                                if (FtpStoreProtocolBytes(item->Name, (*existingItem)->Name) &&
+                                    (!item->NameTextValid || FtpStoreWideText(item->NameText, (*existingItem)->NameText)))
                                 {
+                                    (*existingItem)->NameTextValid = item->NameTextValid;
                                     (*existingItem)->ItemType = item->ItemType;
                                     (*existingItem)->ByteSize = item->ByteSize;
                                 }
@@ -796,6 +872,11 @@ BOOL CUploadListingsOnServer::GetListing(const char* path, CFTPServerPathType pa
                                 TRACE_E(LOW_MEMORY);
                         }
                     }
+                    else if (lowMemory)
+                    {
+                        TRACE_E(LOW_MEMORY);
+                        ret = FALSE;
+                    }
                 }
                 else
                     TRACE_E("CUploadListingsOnServer::GetListing(): Unexpected state of listing: " << listing->ListingState);
@@ -804,7 +885,8 @@ BOOL CUploadListingsOnServer::GetListing(const char* path, CFTPServerPathType pa
     }
     else // the path is not in the cache yet
     {
-        CUploadPathListing* listing = AddEmptyListing(path, NULL, pathType, ulsInProgress, TRUE);
+        CUploadPathListing* listing = AddEmptyListing(path, NULL, pathType, ulsInProgress, TRUE,
+                                                      textCodec);
         if (listing != NULL)
         {
             *getListing = TRUE;
@@ -864,7 +946,8 @@ void CUploadListingsOnServer::ListingFailed(const char* path, CFTPServerPathType
 BOOL CUploadListingsOnServer::ListingFinished(const char* path, CFTPServerPathType pathType,
                                               const char* pathListing, int pathListingLen,
                                               const CFTPDate& pathListingDate, const char* welcomeReply,
-                                              const char* systReply, const char* suggestedListingServerType)
+                                              const char* systReply, const char* suggestedListingServerType,
+                                              const CFtpTextCodec& textCodec)
 {
     BOOL ret = TRUE;
     int index;
@@ -891,7 +974,8 @@ BOOL CUploadListingsOnServer::ListingFinished(const char* path, CFTPServerPathTy
                     listing->ClearListingItems(); // probably unnecessary, just to be safe
                     BOOL lowMem;
                     if (listing->ParseListing(pathListing, pathListingLen, pathListingDate, pathType,
-                                              welcomeReply, systReply, suggestedListingServerType, &lowMem))
+                                              welcomeReply, systReply, suggestedListingServerType, &lowMem,
+                                              textCodec))
                     {
                         CUploadListingChange* change = listing->FirstChange;
                         while (change != NULL)
@@ -948,13 +1032,12 @@ BOOL CUploadListingsOnServer::ListingFinished(const char* path, CFTPServerPathTy
 // CUploadPathListing
 //
 
-CUploadPathListing::CUploadPathListing(const char* path, CFTPServerPathType pathType,
+CUploadPathListing::CUploadPathListing(const CFtpTextCodec& textCodec, const char* path, CFTPServerPathType pathType,
                                        CUploadListingState listingState, DWORD listingStartTime,
                                        BOOL fromPanel)
-    : ListingItem(50, 200, dtNoDelete)
+    : TextCodec(textCodec), ListingItem(50, 200, dtNoDelete)
 {
-    BOOL err = path == NULL;
-    Path = SalamanderGeneral->DupStr(path);
+    Valid = path != NULL && FtpStoreProtocolBytes(path, Path);
     PathType = pathType;
 
     ListingState = listingState;
@@ -965,13 +1048,6 @@ CUploadPathListing::CUploadPathListing(const char* path, CFTPServerPathType path
     FirstWaitingWorker = NULL;
     FromPanel = fromPanel;
 
-    // if there is an error, release and null the data
-    if (err)
-    {
-        if (Path != NULL)
-            SalamanderGeneral->Free(Path);
-        Path = NULL;
-    }
 }
 
 CUploadPathListing::~CUploadPathListing()
@@ -979,8 +1055,6 @@ CUploadPathListing::~CUploadPathListing()
     if (FirstWaitingWorker != NULL)
         TRACE_E("CUploadPathListing::~CUploadPathListing(): FirstWaitingWorker is not NULL!");
     ClearListingItems();
-    if (Path != NULL)
-        SalamanderGeneral->Free(Path);
     ClearListingChanges();
 }
 
@@ -990,7 +1064,6 @@ void CUploadPathListing::ClearListingItems()
     for (i = 0; i < ListingItem.Count; i++)
     {
         CUploadListingItem* item = ListingItem[i];
-        SalamanderGeneral->Free(item->Name);
         delete item;
     }
     ListingItem.DetachMembers();
@@ -1014,11 +1087,10 @@ BOOL CUploadPathListing::AddItemDoNotSort(CUploadListingItemType itemType, const
         TRACE_E("Unexpected situation in CUploadPathListing::AddItemDoNotSort()!");
     else
     {
-        CUploadListingItem* item = new CUploadListingItem;
+        CUploadListingItem* item = NewUploadCacheObject<CUploadListingItem>();
         if (item != NULL)
         {
-            item->Name = SalamanderGeneral->DupStr(name);
-            if (item->Name != NULL)
+            if (StoreUploadListingItemName(*item, TextCodec, name))
             {
                 item->ItemType = itemType;
                 item->ByteSize = byteSize;
@@ -1028,7 +1100,6 @@ BOOL CUploadPathListing::AddItemDoNotSort(CUploadListingItemType itemType, const
                     return TRUE;
                 else
                     ListingItem.ResetState();
-                SalamanderGeneral->Free(item->Name);
             }
             delete item;
         }
@@ -1045,11 +1116,10 @@ BOOL CUploadPathListing::InsertNewItem(int index, CUploadListingItemType itemTyp
         TRACE_E("Unexpected situation in CUploadPathListing::InsertNewItem()!");
     else
     {
-        CUploadListingItem* item = new CUploadListingItem;
+        CUploadListingItem* item = NewUploadCacheObject<CUploadListingItem>();
         if (item != NULL)
         {
-            item->Name = SalamanderGeneral->DupStr(name);
-            if (item->Name != NULL)
+            if (StoreUploadListingItemName(*item, TextCodec, name))
             {
                 item->ItemType = itemType;
                 item->ByteSize = byteSize;
@@ -1059,7 +1129,6 @@ BOOL CUploadPathListing::InsertNewItem(int index, CUploadListingItemType itemTyp
                     return TRUE;
                 else
                     ListingItem.ResetState();
-                SalamanderGeneral->Free(item->Name);
             }
             delete item;
         }
@@ -1075,13 +1144,13 @@ void UploadListingSortItemsAux(TIndirectArray<CUploadListingItem>* listingItem, 
 LABEL_UploadListingSortItemsAux:
 
     int i = left, j = right;
-    const char* pivot = listingItem->At((i + j) / 2)->Name;
+    const char* pivot = listingItem->At((i + j) / 2)->Name.c_str();
 
     do
     {
-        while (strcmp(listingItem->At(i)->Name, pivot) < 0 && i < right)
+        while (strcmp(listingItem->At(i)->Name.c_str(), pivot) < 0 && i < right)
             i++;
-        while (strcmp(pivot, listingItem->At(j)->Name) < 0 && j > left)
+        while (strcmp(pivot, listingItem->At(j)->Name.c_str()) < 0 && j > left)
             j--;
 
         if (i <= j)
@@ -1137,13 +1206,13 @@ void UploadListingSortItemsCaseInsensitiveAux(TIndirectArray<CUploadListingItem>
 LABEL_UploadListingSortItemsCaseInsensitiveAux:
 
     int i = left, j = right;
-    const char* pivot = listingItem->At((i + j) / 2)->Name;
+    const CUploadListingItem* pivot = listingItem->At((i + j) / 2);
 
     do
     {
-        while (SalamanderGeneral->StrICmp(listingItem->At(i)->Name, pivot) < 0 && i < right)
+        while (CompareUploadListingNamesNoCase(*listingItem->At(i), *pivot) < 0 && i < right)
             i++;
-        while (SalamanderGeneral->StrICmp(pivot, listingItem->At(j)->Name) < 0 && j > left)
+        while (CompareUploadListingNamesNoCase(*pivot, *listingItem->At(j)) < 0 && j > left)
             j--;
 
         if (i <= j)
@@ -1204,8 +1273,15 @@ void CUploadPathListing::SortItems()
     }
 }
 
-BOOL CUploadPathListing::FindItem(const char* name, int& index)
+BOOL CUploadPathListing::FindItem(const char* name, int& index, BOOL* lowMemory) noexcept
 {
+    if (lowMemory != NULL)
+        *lowMemory = FALSE;
+    if (name == NULL)
+    {
+        index = 0;
+        return FALSE;
+    }
     if (ListingItem.Count == 0)
     {
         index = 0;
@@ -1213,15 +1289,37 @@ BOOL CUploadPathListing::FindItem(const char* name, int& index)
     }
 
     BOOL caseSensitive = FTPIsCaseSensitive(PathType);
+    const std::string_view nameBytes(name, strlen(name));
+    std::wstring nameText;
+    BOOL nameTextValid = FALSE;
+    if (!caseSensitive)
+    {
+        switch (TextCodec.DecodeForComparison(nameBytes.data(), nameBytes.size(), nameText))
+        {
+        case CFtpTextDecodeStatus::Success:
+            nameTextValid = TRUE;
+            break;
+
+        case CFtpTextDecodeStatus::InvalidInput:
+            break;
+
+        default:
+            index = 0;
+            if (lowMemory != NULL)
+                *lowMemory = TRUE;
+            return FALSE;
+        }
+    }
     int l = 0, r = ListingItem.Count - 1, m;
     while (1)
     {
         m = (l + r) / 2;
         int res;
         if (caseSensitive)
-            res = strcmp(ListingItem[m]->Name, name);
+            res = CompareUploadListingByteNames(ListingItem[m]->Name, nameBytes);
         else
-            res = SalamanderGeneral->StrICmp(ListingItem[m]->Name, name);
+            res = CompareUploadListingNameNoCase(*ListingItem[m], nameBytes, nameText,
+                                                 nameTextValid);
         if (res == 0) // found
         {
             index = m;
@@ -1250,7 +1348,8 @@ BOOL CUploadPathListing::FindItem(const char* name, int& index)
 
 BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLen, const CFTPDate& pathListingDate,
                                       CFTPServerPathType pathType, const char* welcomeReply, const char* systReply,
-                                      const char* suggestedListingServerType, BOOL* lowMemory)
+                                      const char* suggestedListingServerType, BOOL* lowMemory,
+                                      const CFtpTextCodec& textCodec)
 {
     CALL_STACK_MESSAGE2("CUploadPathListing::ParseListing(, %d,)", pathListingLen);
 
@@ -1261,14 +1360,18 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
         TRACE_E("CUploadPathListing::ParseListing(): pathListing == NULL or welcomeReply == NULL or systReply == NULL!");
         return FALSE;
     }
+    TextCodec = textCodec;
 
     BOOL isVMS = pathType == ftpsptOpenVMS;
     BOOL needSimpleListing = TRUE;
-    char listingServerType[SERVERTYPE_MAX_SIZE];
-    if (suggestedListingServerType == NULL)
-        listingServerType[0] = 0;
-    else
-        lstrcpyn(listingServerType, suggestedListingServerType, SERVERTYPE_MAX_SIZE);
+    std::string listingServerType;
+    if (suggestedListingServerType != NULL &&
+        !FtpStoreLocalTextBytes(suggestedListingServerType, listingServerType))
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
 
     // reset the helper variable used to determine which server type has already been tested (unsuccessfully)
     CServerTypeList* serverTypeList = Config.LockServerTypeList();
@@ -1279,7 +1382,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
 
     BOOL err = FALSE;
     CServerType* serverType = NULL;
-    if (listingServerType[0] != 0) // this is not autodetection; find listingServerType
+    if (!listingServerType.empty()) // this is not autodetection; find listingServerType
     {
         int i;
         for (i = 0; i < serverTypeListCount; i++)
@@ -1288,11 +1391,19 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
             const char* s = serverType->TypeName;
             if (*s == '*')
                 s++;
-            if (SalamanderGeneral->StrICmp(listingServerType, s) == 0)
+            const CFtpTextCompareStatus comparison = FtpCompareLocalTextNoCase(listingServerType, s);
+            if (comparison == CFtpTextCompareStatus::Failure)
+            {
+                err = TRUE;
+                if (lowMemory != NULL)
+                    *lowMemory = TRUE;
+                break;
+            }
+            if (comparison == CFtpTextCompareStatus::Equal)
             {
                 // serverType has been selected; try its parser on the listing
                 serverType->ParserAlreadyTested = TRUE;
-                if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS))
+                if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS, textCodec))
                     needSimpleListing = FALSE; // successfully parsed the listing
                 if (err && lowMemory != NULL)
                     *lowMemory = TRUE;
@@ -1300,11 +1411,11 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
             }
         }
         if (i == serverTypeListCount)
-            listingServerType[0] = 0; // listingServerType does not exist -> perform autodetection
+            listingServerType.clear(); // listingServerType does not exist -> perform autodetection
     }
 
     // autodetection - select the server type whose autodetection condition is satisfied
-    if (!err && needSimpleListing && listingServerType[0] == 0)
+    if (!err && needSimpleListing && listingServerType.empty())
     {
         int welcomeReplyLen = (int)strlen(welcomeReply);
         int systReplyLen = (int)strlen(systReply);
@@ -1317,7 +1428,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                 if (serverType->CompiledAutodetCond == NULL)
                 {
                     serverType->CompiledAutodetCond = CompileAutodetectCond(HandleNULLStr(serverType->AutodetectCond),
-                                                                            NULL, NULL, NULL, NULL, 0);
+                                                                            NULL, NULL, NULL, NULL);
                     if (serverType->CompiledAutodetCond == NULL) // can only be a memory shortage error
                     {
                         err = TRUE;
@@ -1331,7 +1442,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                 {
                     // serverType has been selected; try its parser on the listing
                     serverType->ParserAlreadyTested = TRUE;
-                    if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS) || err)
+                    if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS, textCodec) || err)
                     {
                         if (err && lowMemory != NULL)
                             *lowMemory = TRUE;
@@ -1340,7 +1451,12 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                             const char* s = serverType->TypeName;
                             if (*s == '*')
                                 s++;
-                            lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                            if (!FtpStoreLocalTextBytes(s, listingServerType))
+                            {
+                                err = TRUE;
+                                if (lowMemory != NULL)
+                                    *lowMemory = TRUE;
+                            }
                         }
                         needSimpleListing = err; // either successfully parsed the listing or ran into a memory shortage error, finish
                         break;
@@ -1360,7 +1476,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                 {
                     // serverType has been selected; try its parser on the listing
                     // serverType->ParserAlreadyTested = TRUE;  // unnecessary, not used later
-                    if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS) || err)
+                    if (ParseListingToArray(pathListing, pathListingLen, pathListingDate, serverType, &err, isVMS, textCodec) || err)
                     {
                         if (err && lowMemory != NULL)
                             *lowMemory = TRUE;
@@ -1369,7 +1485,12 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                             const char* s = serverType->TypeName;
                             if (*s == '*')
                                 s++;
-                            lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                            if (!FtpStoreLocalTextBytes(s, listingServerType))
+                            {
+                                err = TRUE;
+                                if (lowMemory != NULL)
+                                    *lowMemory = TRUE;
+                            }
                         }
                         needSimpleListing = err; // either successfully parsed the listing or ran into a memory shortage error, finish
                         break;
@@ -1384,7 +1505,8 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
 
 BOOL CUploadPathListing::ParseListingToArray(const char* pathListing, int pathListingLen,
                                              const CFTPDate& pathListingDate,
-                                             CServerType* serverType, BOOL* lowMem, BOOL isVMS)
+                                             CServerType* serverType, BOOL* lowMem, BOOL isVMS,
+                                             const CFtpTextCodec& textCodec)
 {
     BOOL ret = FALSE;
     *lowMem = FALSE;
@@ -1417,7 +1539,8 @@ BOOL CUploadPathListing::ParseListingToArray(const char* pathListing, int pathLi
 
     BOOL err = FALSE;
     CFTPListingPluginDataInterface* dataIface = new CFTPListingPluginDataInterface(&(serverType->Columns), FALSE,
-                                                                                   validDataMask, isVMS);
+                                                                                   validDataMask, isVMS,
+                                                                                   textCodec);
     if (dataIface != NULL)
     {
         DWORD* emptyCol = new DWORD[serverType->Columns.Count]; // helper preallocated array for GetNextItemFromListing
@@ -1443,7 +1566,7 @@ BOOL CUploadPathListing::ParseListingToArray(const char* pathListing, int pathLi
                 parser->BeforeParsing(listing, listingEnd, pathListingDate.Year, pathListingDate.Month,
                                       pathListingDate.Day, FALSE); // initialize the parser
                 while (parser->GetNextItemFromListing(&file, &isDir, dataIface, &(serverType->Columns), &listing,
-                                                      listingEnd, NULL, &err, emptyCol))
+                                                      listingEnd, NULL, &err, emptyCol, textCodec))
                 {
                     if (!isDir || file.NameLen > 2 ||
                         file.Name[0] != '.' || (file.Name[1] != 0 && file.Name[1] != '.')) // not the directories "." and ".."
@@ -1459,7 +1582,9 @@ BOOL CUploadPathListing::ParseListingToArray(const char* pathListing, int pathLi
                         if (itemType != ulitFile || !dataIface->GetSize(file, size, sizeInBytes) || !sizeInBytes)
                             size = UPLOADSIZE_UNKNOWN; // the size of the file in bytes is unknown
 
-                        err = !AddItemDoNotSort(itemType, file.Name, size);
+                        std::string itemName;
+                        err = !dataIface->GetWireName(file, textCodec, itemName) ||
+                              !AddItemDoNotSort(itemType, itemName.c_str(), size);
                     }
                     // release the data for the file or directory
                     dataIface->ReleasePluginData(file, isDir);
@@ -1507,8 +1632,10 @@ void CUploadPathListing::ReportCreateDir(const char* newDir, BOOL* dirCreated, B
     case ulsReady:
     case ulsInProgressButObsolete:
     {
-        if (!FindItem(newDir, index)) // the name is free; it is possible to create the directory
+        if (!FindItem(newDir, index, lowMem)) // the name is free; it is possible to create the directory
         {
+            if (*lowMem)
+                break;
             if (InsertNewItem(index, ulitDirectory, newDir, UPLOADSIZE_UNKNOWN))
                 *dirCreated = TRUE;
             else
@@ -1519,7 +1646,7 @@ void CUploadPathListing::ReportCreateDir(const char* newDir, BOOL* dirCreated, B
 
     case ulsInProgress:
     {
-        CUploadListingChange* ch = new CUploadListingChange(LatestChangeTime, ulctCreateDir, newDir);
+        CUploadListingChange* ch = NewUploadCacheObject<CUploadListingChange>(LatestChangeTime, ulctCreateDir, newDir);
         if (ch != NULL && ch->IsGood())
             AddChange(ch);
         else
@@ -1549,25 +1676,24 @@ void CUploadPathListing::ReportDelete(const char* name, BOOL* invalidateNameDir,
     case ulsReady:
     case ulsInProgressButObsolete:
     {
-        if (FindItem(name, index))
+        if (FindItem(name, index, lowMem))
         {
             CUploadListingItem* item = ListingItem[index];
             if (item->ItemType == ulitFile)
                 *invalidateNameDir = FALSE; // file = no need to invalidate the directory listing
-            SalamanderGeneral->Free(item->Name);
             delete item;
             ListingItem.Detach(index);
             if (!ListingItem.IsGood())
                 ListingItem.ResetState();
         }
-        else
+        else if (!*lowMem)
             TRACE_E("CUploadPathListing::ReportDelete(): delete for unknown name reported: " << name); // warning only
         break;
     }
 
     case ulsInProgress:
     {
-        CUploadListingChange* ch = new CUploadListingChange(LatestChangeTime, ulctDelete, name);
+        CUploadListingChange* ch = NewUploadCacheObject<CUploadListingChange>(LatestChangeTime, ulctDelete, name);
         if (ch != NULL && ch->IsGood())
             AddChange(ch);
         else
@@ -1596,8 +1722,10 @@ void CUploadPathListing::ReportStoreFile(const char* name, BOOL* lowMem)
     case ulsReady:
     case ulsInProgressButObsolete:
     {
-        if (!FindItem(name, index)) // the name is free; create the file
+        if (!FindItem(name, index, lowMem)) // the name is free; create the file
         {
+            if (*lowMem)
+                break;
             if (!InsertNewItem(index, ulitFile, name, UPLOADSIZE_NEEDUPDATE))
                 *lowMem = TRUE;
         }
@@ -1612,7 +1740,7 @@ void CUploadPathListing::ReportStoreFile(const char* name, BOOL* lowMem)
 
     case ulsInProgress:
     {
-        CUploadListingChange* ch = new CUploadListingChange(LatestChangeTime, ulctStoreFile, name);
+        CUploadListingChange* ch = NewUploadCacheObject<CUploadListingChange>(LatestChangeTime, ulctStoreFile, name);
         if (ch != NULL && ch->IsGood())
             AddChange(ch);
         else
@@ -1641,7 +1769,7 @@ void CUploadPathListing::ReportFileUploaded(const char* name, const CQuadWord& f
     case ulsReady:
     case ulsInProgressButObsolete:
     {
-        if (FindItem(name, index)) // if it is a file, set its new size
+        if (FindItem(name, index, lowMem)) // if it is a file, set its new size
         {
             CUploadListingItem* item = ListingItem[index];
             if (item->ItemType == ulitFile)
@@ -1652,7 +1780,7 @@ void CUploadPathListing::ReportFileUploaded(const char* name, const CQuadWord& f
 
     case ulsInProgress:
     {
-        CUploadListingChange* ch = new CUploadListingChange(LatestChangeTime, ulctFileUploaded, name, &fileSize);
+        CUploadListingChange* ch = NewUploadCacheObject<CUploadListingChange>(LatestChangeTime, ulctFileUploaded, name, &fileSize);
         if (ch != NULL && ch->IsGood())
             AddChange(ch);
         else
@@ -1674,19 +1802,21 @@ void CUploadPathListing::ReportFileUploaded(const char* name, const CQuadWord& f
 BOOL CUploadPathListing::CommitChange(CUploadListingChange* change)
 {
     int index;
+    BOOL lowMemory;
     switch (change->Type)
     {
     case ulctDelete:
     {
-        if (FindItem(change->Name, index))
+        if (FindItem(change->Name.c_str(), index, &lowMemory))
         {
             CUploadListingItem* item = ListingItem[index];
-            SalamanderGeneral->Free(item->Name);
             delete item;
             ListingItem.Detach(index);
             if (!ListingItem.IsGood())
                 ListingItem.ResetState();
         }
+        else if (lowMemory)
+            return FALSE;
         else
             TRACE_I("CUploadPathListing::CommitChange(): delete for unknown name reported: " << change->Name); // warning only
         return TRUE;
@@ -1694,16 +1824,22 @@ BOOL CUploadPathListing::CommitChange(CUploadListingChange* change)
 
     case ulctCreateDir:
     {
-        if (!FindItem(change->Name, index)) // the name is free; it is possible to create the directory
-            return InsertNewItem(index, ulitDirectory, change->Name, UPLOADSIZE_UNKNOWN);
+        if (!FindItem(change->Name.c_str(), index, &lowMemory)) // the name is free; it is possible to create the directory
+        {
+            if (lowMemory)
+                return FALSE;
+            return InsertNewItem(index, ulitDirectory, change->Name.c_str(), UPLOADSIZE_UNKNOWN);
+        }
         return TRUE;
     }
 
     case ulctStoreFile:
     {
-        if (!FindItem(change->Name, index)) // the name is free; create the file
+        if (!FindItem(change->Name.c_str(), index, &lowMemory)) // the name is free; create the file
         {
-            return InsertNewItem(index, ulitFile, change->Name, UPLOADSIZE_NEEDUPDATE);
+            if (lowMemory)
+                return FALSE;
+            return InsertNewItem(index, ulitFile, change->Name.c_str(), UPLOADSIZE_NEEDUPDATE);
         }
         else // the name already exists; if it is a file, invalidate its size (a link has no size)
         {
@@ -1716,12 +1852,14 @@ BOOL CUploadPathListing::CommitChange(CUploadListingChange* change)
 
     case ulctFileUploaded:
     {
-        if (FindItem(change->Name, index)) // if it is a file, set its new size
+        if (FindItem(change->Name.c_str(), index, &lowMemory)) // if it is a file, set its new size
         {
             CUploadListingItem* item = ListingItem[index];
             if (item->ItemType == ulitFile)
                 item->ByteSize = change->FileSize;
         }
+        else if (lowMemory)
+            return FALSE;
         return TRUE;
     }
 
@@ -1798,8 +1936,7 @@ void CUploadPathListing::InformWaitingWorkers(CUploadWaitingWorker** uploadFirst
 CUploadListingChange::CUploadListingChange(DWORD changeTime, CUploadListingChangeType type,
                                            const char* name, const CQuadWord* fileSize)
 {
-    BOOL err = name == NULL;
-    Name = SalamanderGeneral->DupStr(name);
+    Valid = name != NULL && FtpStoreProtocolBytes(name, Name);
     if (fileSize != NULL)
         FileSize = *fileSize;
     else
@@ -1807,20 +1944,6 @@ CUploadListingChange::CUploadListingChange(DWORD changeTime, CUploadListingChang
     Type = type;
     ChangeTime = changeTime;
     NextChange = NULL;
-
-    // if there is an error, release and null the data
-    if (err)
-    {
-        if (Name != NULL)
-            SalamanderGeneral->Free(Name);
-        Name = NULL;
-    }
-}
-
-CUploadListingChange::~CUploadListingChange() // release the data, but WARNING: must not free NextChange
-{
-    if (Name != NULL)
-        SalamanderGeneral->Free(Name);
 }
 
 //
@@ -1828,33 +1951,69 @@ CUploadListingChange::~CUploadListingChange() // release the data, but WARNING: 
 // CFTPOpenedFiles
 //
 
-CFTPOpenedFile::CFTPOpenedFile(int myUID, const char* user, const char* host, unsigned short port,
-                               const char* path, CFTPServerPathType pathType, const char* name,
-                               CFTPFileAccessType accessType)
+BOOL CFTPOpenedFile::Set(const CFtpTextCodec& codec, int myUID, const wchar_t* user, const wchar_t* host,
+                         unsigned short port, const char* path, CFTPServerPathType pathType,
+                         const char* name, CFTPFileAccessType accessType) noexcept
 {
-    Set(myUID, user, host, port, path, pathType, name, accessType);
+    try
+    {
+        std::wstring stagedUser;
+        std::wstring stagedHost;
+        std::wstring stagedPath;
+        std::wstring stagedName;
+        const char* pathBytes = path != NULL ? path : "";
+        const char* nameBytes = name != NULL ? name : "";
+        if (!FtpStoreWideText(user != NULL ? user : L"", stagedUser) ||
+            !FtpStoreWideText(host != NULL ? host : L"", stagedHost) ||
+            !codec.Decode(pathBytes, strlen(pathBytes), stagedPath) ||
+            !codec.Decode(nameBytes, strlen(nameBytes), stagedName))
+            return FALSE;
+
+        User.swap(stagedUser);
+        Host.swap(stagedHost);
+        Path.swap(stagedPath);
+        Name.swap(stagedName);
+        UID = myUID;
+        AccessType = accessType;
+        Port = port;
+        PathType = pathType;
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
-void CFTPOpenedFile::Set(int myUID, const char* user, const char* host, unsigned short port,
-                         const char* path, CFTPServerPathType pathType, const char* name,
-                         CFTPFileAccessType accessType)
+BOOL CFTPOpenedFile::IsSameFile(const CFtpTextCodec& codec, const wchar_t* user, const wchar_t* host,
+                                unsigned short port, const char* path,
+                                CFTPServerPathType pathType, const char* name) noexcept
 {
-    UID = myUID;
-    AccessType = accessType;
-    lstrcpyn(User, user, USER_MAX_SIZE);
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
-    Port = port;
-    lstrcpyn(Path, path, FTP_MAX_PATH);
-    PathType = pathType;
-    lstrcpyn(Name, name);
-}
+    try
+    {
+        std::wstring otherUser;
+        std::wstring otherHost;
+        std::wstring otherPath;
+        std::wstring otherName;
+        const char* pathBytes = path != NULL ? path : "";
+        const char* nameBytes = name != NULL ? name : "";
+        if (!FtpStoreWideText(user != NULL ? user : L"", otherUser) ||
+            !FtpStoreWideText(host != NULL ? host : L"", otherHost) ||
+            !codec.Decode(pathBytes, strlen(pathBytes), otherPath) ||
+            !codec.Decode(nameBytes, strlen(nameBytes), otherName))
+            return FALSE;
 
-BOOL CFTPOpenedFile::IsSameFile(const char* user, const char* host, unsigned short port,
-                                const char* path, CFTPServerPathType pathType, const char* name)
-{
-    return strcmp(User, user) == 0 && SalamanderGeneral->StrICmp(Host, host) == 0 &&
-           Port == port && FTPIsTheSameServerPath(pathType, Path, path) &&
-           (FTPIsCaseSensitive(pathType) ? strcmp(Name, name) == 0 : SalamanderGeneral->StrICmp(Name, name) == 0);
+        return User == otherUser &&
+               CompareStringOrdinal(Host.c_str(), -1, otherHost.c_str(), -1, TRUE) == CSTR_EQUAL &&
+               Port == port &&
+               FTPIsPrefixOfServerPathW(pathType, Path.c_str(), otherPath.c_str(), TRUE) &&
+               (FTPIsCaseSensitive(pathType) ? Name == otherName :
+                                                CompareStringOrdinal(Name.c_str(), -1, otherName.c_str(), -1, TRUE) == CSTR_EQUAL);
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL CFTPOpenedFile::IsInConflictWith(CFTPFileAccessType accessType)
@@ -1879,7 +2038,7 @@ CFTPOpenedFiles::~CFTPOpenedFiles()
         TRACE_E("CFTPOpenedFiles::~CFTPOpenedFiles(): unexpected situation: OpenedFiles.Count > 0!");
 }
 
-BOOL CFTPOpenedFiles::OpenFile(const char* user, const char* host, unsigned short port,
+BOOL CFTPOpenedFiles::OpenFile(const CFtpTextCodec& codec, const wchar_t* user, const wchar_t* host, unsigned short port,
                                const char* path, CFTPServerPathType pathType,
                                const char* name, int* newUID, CFTPFileAccessType accessType)
 {
@@ -1889,7 +2048,7 @@ BOOL CFTPOpenedFiles::OpenFile(const char* user, const char* host, unsigned shor
     for (i = 0; i < OpenedFiles.Count; i++)
     {
         CFTPOpenedFile* file = OpenedFiles[i];
-        if (file->IsSameFile(user, host, port, path, pathType, name) &&
+        if (file->IsSameFile(codec, user, host, port, path, pathType, name) &&
             file->IsInConflictWith(accessType))
         {
             ret = FALSE;
@@ -1898,23 +2057,44 @@ BOOL CFTPOpenedFiles::OpenFile(const char* user, const char* host, unsigned shor
     }
     if (ret)
     {
-        int uid = NextOpenedFileUID++;
+        int uid = NextOpenedFileUID;
         CFTPOpenedFile* n;
         if (AllocatedObjects.Count > 0) // if we have something preallocated, reuse it
         {
             n = AllocatedObjects[AllocatedObjects.Count - 1];
-            AllocatedObjects.Detach(AllocatedObjects.Count - 1);
-            if (!AllocatedObjects.IsGood())
-                AllocatedObjects.ResetState(); // detaching cannot fail
-            n->Set(uid, user, host, port, path, pathType, name, accessType);
+            if (n->Set(codec, uid, user, host, port, path, pathType, name, accessType))
+            {
+                AllocatedObjects.Detach(AllocatedObjects.Count - 1);
+                if (!AllocatedObjects.IsGood())
+                    AllocatedObjects.ResetState(); // detaching cannot fail
+            }
+            else
+                n = NULL;
         }
         else
-            n = new CFTPOpenedFile(uid, user, host, port, path, pathType, name, accessType);
+        {
+            try
+            {
+                n = new CFTPOpenedFile;
+            }
+            catch (...)
+            {
+                n = NULL;
+            }
+            if (n != NULL && !n->Set(codec, uid, user, host, port, path, pathType, name, accessType))
+            {
+                delete n;
+                n = NULL;
+            }
+        }
         if (n != NULL)
         {
             OpenedFiles.Add(n);
             if (OpenedFiles.IsGood())
+            {
                 *newUID = uid;
+                NextOpenedFileUID++;
+            }
             else
             {
                 OpenedFiles.ResetState();

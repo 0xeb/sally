@@ -38,4 +38,3 @@ inline bool ArePathsEquivalentForCopy(const char* sourceA, const char* targetA,
     return _stricmp(sourceA, targetA) == 0;
 }
 } // namespace sally::unicode
-

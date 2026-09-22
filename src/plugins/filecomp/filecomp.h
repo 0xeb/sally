@@ -9,7 +9,11 @@
 
 #define CURRENT_CONFIG_VERSION_PRESEPARATEOPTIONS 6
 #define CURRENT_CONFIG_VERSION_NORECOMPAREBUTTON 7
-#define CURRENT_CONFIG_VERSION 8
+// Version 8 and below store CRegBLOBConfigurationNarrow, whose LOGFONTA makes the blob 32 bytes
+// shorter and puts every switch after the font at a different offset. Version 9 stores
+// CRegBLOBConfiguration.
+#define CURRENT_CONFIG_VERSION_NARROWLOGFONT 8
+#define CURRENT_CONFIG_VERSION 9
 
 // plugin interface object whose methods are invoked by Salamander
 class CPluginInterface;
@@ -45,7 +49,7 @@ public:
     virtual CPluginInterfaceForThumbLoaderAbstract* WINAPI GetInterfaceForThumbLoader() { return NULL; }
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
@@ -73,45 +77,25 @@ public:
 
 // ****************************************************************************
 //
-// AnsiToWidePath - Convert ANSI path to wide string, with optional provided wide path
-// If widePathProvided is non-null, returns it directly; otherwise converts ansiPath
-//
-inline std::wstring AnsiToWidePath(const char* ansiPath, const wchar_t* widePathProvided = NULL)
-{
-    if (widePathProvided)
-        return widePathProvided;
-    if (!ansiPath || !*ansiPath)
-        return L"";
-    wchar_t buf[32767];
-    MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, buf, 32767);
-    return buf;
-}
-
-// ****************************************************************************
-//
 // CFileCompThread
 //
 
 class CFilecompThread : public CThread
 {
 public:
-    std::string Path1;
-    std::string Path2;
-    std::wstring Path1W; // Wide path for Unicode/long path filenames
-    std::wstring Path2W; // Wide path for Unicode/long path filenames
+    std::wstring Path1;
+    std::wstring Path2;
     BOOL DontConfirmSelection;
-    char ReleaseEvent[20];
+    std::string ReleaseEvent;
 
-    CFilecompThread(const char* file1, const char* file2, BOOL dontConfirmSelection,
-                    const char* releaseEvent,
-                    const wchar_t* file1W = NULL, const wchar_t* file2W = NULL) : CThread("Filecomp Thread")
+    CFilecompThread(const wchar_t* file1, const wchar_t* file2,
+                    BOOL dontConfirmSelection, const char* releaseEvent)
+        : CThread(L"Filecomp Thread")
     {
-        Path1 = file1 ? file1 : "";
-        Path2 = file2 ? file2 : "";
-        Path1W = AnsiToWidePath(file1, file1W);
-        Path2W = AnsiToWidePath(file2, file2W);
+        Path1 = file1 ? file1 : L"";
+        Path2 = file2 ? file2 : L"";
         DontConfirmSelection = dontConfirmSelection;
-        strcpy(ReleaseEvent, releaseEvent);
+        ReleaseEvent = releaseEvent ? releaseEvent : "";
     }
 
     virtual unsigned Body();

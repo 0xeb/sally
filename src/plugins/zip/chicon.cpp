@@ -19,26 +19,26 @@
 #include "selfextr\\comdefs.h"
 
 CIcon* LoadIconsFromDirectory(HINSTANCE module, LPICONDIR directory, BOOL isIco);
-LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName);
+LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPWSTR lpszName);
 LPICONDIR LoadIconDirectoryFromEXE(HINSTANCE module, DWORD index);
 LPVOID LoadIconDataFromEXE(HINSTANCE module, DWORD id);
 LPICONDIR LoadIconDirectoryFromICO(HANDLE icoFile);
 LPVOID LoadIconDataFromICO(HANDLE icoFile, DWORD offset, DWORD size);
-void LoadIDsList(HINSTANCE module, TIndirectArray2<TCHAR>& IDsArray);
-WORD FindNextUnusedID(WORD IDVal, TIndirectArray2<TCHAR>& IDsArray);
+void LoadIDsList(HINSTANCE module, TIndirectArray2<wchar_t>& IDsArray);
+WORD FindNextUnusedID(WORD IDVal, TIndirectArray2<wchar_t>& IDsArray);
 
 BOOL Read(HANDLE file, void* buffer, DWORD size);
 
-BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCount, LPVOID manifest, DWORD manifestSize)
+BOOL ChangeSfxIconAndAddManifest(const wchar_t* sfxFile, CIcon* icons, int iconsCount, LPVOID manifest, DWORD manifestSize)
 {
-    CALL_STACK_MESSAGE3("ChangeSfxIcon(%s, , %d)", sfxFile, iconsCount);
+    CALL_STACK_MESSAGE3("ChangeSfxIcon(%ls, , %d)", sfxFile, iconsCount);
     if (!icons)
         return FALSE;
 
-    TIndirectArray2<TCHAR> IDsArray(16, FALSE);
+    TIndirectArray2<wchar_t> IDsArray(16, FALSE);
     BOOL ret = FALSE;
 
-    HINSTANCE module = LoadLibraryEx(sfxFile, NULL, LOAD_LIBRARY_AS_DATAFILE);
+    HINSTANCE module = LoadLibraryExW(sfxFile, NULL, LOAD_LIBRARY_AS_DATAFILE);
     if (module)
     {
         LoadIDsList(module, IDsArray);
@@ -66,15 +66,15 @@ BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCou
                     dir->idEntries[i].wBitCount = icons[i].wBitCount;
                     dir->idEntries[i].dwBytesInRes = icons[i].dwBytesInRes;
                     dir->idEntries[i].nID = id = FindNextUnusedID(id, IDsArray);
-                    if (!re.UpdateResource(RT_ICON, MAKEINTRESOURCE(id), MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL),
+                    if (!re.UpdateResource((LPCWSTR)(ULONG_PTR)RT_ICON, MAKEINTRESOURCEW(id), MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL),
                                            icons[i].lpData, icons[i].dwBytesInRes))
                         break;
                 }
                 if (i == iconsCount &&
-                    re.UpdateResource(RT_GROUP_ICON, MAKEINTRESOURCE(SE_IDI_ICON),
+                    re.UpdateResource((LPCWSTR)(ULONG_PTR)RT_GROUP_ICON, MAKEINTRESOURCEW(SE_IDI_ICON),
                                       MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), dir, size) &&
-                    re.UpdateResource(RT_MANIFEST,
-                                      CREATEPROCESS_MANIFEST_RESOURCE_ID,
+                    re.UpdateResource((LPCWSTR)(ULONG_PTR)RT_MANIFEST,
+                                      (LPCWSTR)(ULONG_PTR)CREATEPROCESS_MANIFEST_RESOURCE_ID,
                                       MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), manifest, manifestSize))
                 {
                     if (re.EndUpdateResource(FALSE))
@@ -90,13 +90,13 @@ BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCou
     return ret;
 }
 
-BOOL HasExtension(const char* filename, const char* extension)
+BOOL HasExtension(const wchar_t* filename, const wchar_t* extension)
 {
     CALL_STACK_MESSAGE_NONE
-    const char* dot = strrchr(filename, '.');
+    const wchar_t* dot = wcsrchr(filename, L'.');
     if (dot != NULL) // ".cvspass" is extension in Windows
     {
-        if (lstrcmpi(++dot, extension) == 0)
+        if (lstrcmpiW(++dot, extension) == 0)
             return TRUE;
     }
     return FALSE;
@@ -111,17 +111,17 @@ BOOL HasExtension(const char* filename, const char* extension)
 //   3  unable to load module containing icon data
 //   4  unable to load icon from file
 
-int LoadIcons(const char* iconFile, DWORD index, CIcon** icons, int* count)
+int LoadIcons(const wchar_t* iconFile, DWORD index, CIcon** icons, int* count)
 {
-    CALL_STACK_MESSAGE3("LoadIcons(%s, 0x%X, , )", iconFile, index);
+    CALL_STACK_MESSAGE3("LoadIcons(%ls, 0x%X, , )", iconFile, index);
     HINSTANCE module;
     LPICONDIR directory;
-    BOOL isIco = HasExtension(iconFile, "ico");
+    BOOL isIco = HasExtension(iconFile, L"ico");
 
     if (isIco)
     {
-        module = (HINSTANCE)CreateFile(iconFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                                       FILE_ATTRIBUTE_NORMAL, NULL);
+        module = (HINSTANCE)CreateFileW(iconFile, GENERIC_READ, FILE_SHARE_READ,
+                                       NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (module == INVALID_HANDLE_VALUE)
             return 1;
 
@@ -129,7 +129,7 @@ int LoadIcons(const char* iconFile, DWORD index, CIcon** icons, int* count)
     }
     else
     {
-        module = (HINSTANCE)LoadLibraryEx(iconFile, NULL, LOAD_LIBRARY_AS_DATAFILE);
+        module = LoadLibraryExW(iconFile, NULL, LOAD_LIBRARY_AS_DATAFILE);
         if (!module)
         {
             int err = GetLastError();
@@ -207,7 +207,7 @@ CIcon* LoadIconsFromDirectory(HINSTANCE module, LPICONDIR directory, BOOL isIco)
     return icons;
 }
 
-LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName)
+LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPWSTR lpszName)
 {
     CALL_STACK_MESSAGE1("LoadIconDirectoryByResName(, )");
     LPMEMICONDIR memDir = NULL;
@@ -253,7 +253,7 @@ typedef struct
     LPICONDIR Directory;
 } CEnumIconDirsData;
 
-BOOL CALLBACK EnumIconDirectories(HINSTANCE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam)
+BOOL CALLBACK EnumIconDirectories(HINSTANCE hModule, LPCWSTR lpszType, LPWSTR lpszName, LONG_PTR lParam)
 {
     CALL_STACK_MESSAGE_NONE
     CEnumIconDirsData* data = (CEnumIconDirsData*)lParam;
@@ -360,10 +360,10 @@ LPVOID LoadIconDataFromICO(HANDLE icoFile, DWORD offset, DWORD size)
     return data;
 }
 
-BOOL CALLBACK EnumResNames(HINSTANCE hModule, LPCTSTR lpszType, LPTSTR lpszName, LONG_PTR lParam)
+BOOL CALLBACK EnumResNames(HINSTANCE hModule, LPCWSTR lpszType, LPWSTR lpszName, LONG_PTR lParam)
 {
     CALL_STACK_MESSAGE_NONE
-    TIndirectArray2<TCHAR>* IDsArray = (TIndirectArray2<TCHAR>*)lParam;
+    TIndirectArray2<wchar_t>* IDsArray = (TIndirectArray2<wchar_t>*)lParam;
     if (((DWORD_PTR)lpszName & ~(DWORD_PTR)0xFFFF) == 0)
     {
         IDsArray->Add(lpszName);
@@ -371,14 +371,14 @@ BOOL CALLBACK EnumResNames(HINSTANCE hModule, LPCTSTR lpszType, LPTSTR lpszName,
     return TRUE;
 }
 
-BOOL CALLBACK EnumResTypes(HINSTANCE hModule, LPTSTR lpszType, LONG_PTR lParam)
+BOOL CALLBACK EnumResTypes(HINSTANCE hModule, LPWSTR lpszType, LONG_PTR lParam)
 {
     CALL_STACK_MESSAGE2("EnumResTypes(, , 0x%IX)", lParam);
     EnumResourceNames(hModule, lpszType, EnumResNames, lParam);
     return TRUE;
 }
 
-void QuickSortIDsArray(int left, int right, TIndirectArray2<TCHAR>& IDsArray)
+void QuickSortIDsArray(int left, int right, TIndirectArray2<wchar_t>& IDsArray)
 {
     CALL_STACK_MESSAGE_NONE
     int i = left, j = right;
@@ -391,7 +391,7 @@ void QuickSortIDsArray(int left, int right, TIndirectArray2<TCHAR>& IDsArray)
             j--;
         if (i <= j)
         {
-            LPTSTR tmp = IDsArray[i];
+            LPWSTR tmp = IDsArray[i];
             IDsArray[i] = IDsArray[j];
             IDsArray[j] = tmp;
             i++;
@@ -404,7 +404,7 @@ void QuickSortIDsArray(int left, int right, TIndirectArray2<TCHAR>& IDsArray)
         QuickSortIDsArray(i, right, IDsArray);
 }
 
-void LoadIDsList(HINSTANCE module, TIndirectArray2<TCHAR>& IDsArray)
+void LoadIDsList(HINSTANCE module, TIndirectArray2<wchar_t>& IDsArray)
 {
     CALL_STACK_MESSAGE1("LoadIDsList(, )");
     EnumResourceTypes(module, EnumResTypes, (LONG_PTR)&IDsArray);
@@ -414,7 +414,7 @@ void LoadIDsList(HINSTANCE module, TIndirectArray2<TCHAR>& IDsArray)
     }
 }
 
-WORD FindNextUnusedID(WORD IDVal, TIndirectArray2<TCHAR>& IDsArray)
+WORD FindNextUnusedID(WORD IDVal, TIndirectArray2<wchar_t>& IDsArray)
 {
     CALL_STACK_MESSAGE2("FindNextUnusedID(0x%X, )", IDVal);
     IDVal++;

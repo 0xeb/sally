@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 class CCRCMD5Thread;
 class CCalculateThread;
 class CVerifyThread;
@@ -17,33 +19,19 @@ public:
     FILELISTITEM()
     {
         IconIndex = 0;
-        Name = NULL;
         Size = CQuadWord(0, 0);
         FileExist = FALSE;
-        for (int i = 0; i < HT_COUNT; i++)
-            Hashes[i] = NULL;
-    }
-
-    ~FILELISTITEM()
-    {
-        if (Name != NULL)
-            free(Name);
-        for (int i = 0; i < HT_COUNT; i++)
-        {
-            if (Hashes[i] != NULL)
-                free(Hashes[i]);
-        }
     }
 
 public:
     int IconIndex;  // no synchronization needed, see CSFVMD5Dialog::SetItemTextAndIcon()
-    char* Name;     // unchanged after adding to the array = no synchronized access needed
+    std::wstring Name; // unchanged after adding to the array = no synchronized access needed
     CQuadWord Size; // unchanged after adding to the array = no synchronized access needed
     BOOL FileExist; // unchanged after adding to the array = no synchronized access needed
 
     // the order in this array matches the listview columns (depends on configuration)
     // no synchronization needed, see CSFVMD5Dialog::SetItemTextAndIcon()
-    char* Hashes[HT_COUNT];
+    std::wstring Hashes[HT_COUNT];
 };
 
 class CSFVMD5Dialog : public CDialog
@@ -60,12 +48,12 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
     void ConvertPath(char* str, char from, char to);
     virtual void OnThreadEnd();
-    void SetItemTextAndIcon(int row, int col, const char* text = NULL, int icon = -1);
-    void GetItemText(int row, int col, char* text, int textMax);
+    void SetItemTextAndIcon(int row, int col, const wchar_t* text = NULL, int icon = -1);
+    std::wstring GetItemTextOwnedW(int row, int col);
     void IncreaseProgress(const CQuadWord& delta);
     virtual void DeleteItem(int index);
     void ScrollToItem(int i);
-    void AddFileListItem(const char* name, CQuadWord size, BOOL fileExist);
+    void AddFileListItem(const wchar_t* name, CQuadWord size, BOOL fileExist);
     void SetRowsDirty(int firstRow, int lastRow);
 
     void EnterDataCS() { HANDLES(EnterCriticalSection(&DataCS)); }
@@ -121,7 +109,7 @@ protected:
 class CCRCMD5Thread : public CThread
 {
 public:
-    CCRCMD5Thread(BOOL* terminate) : CThread("Hash Worker Thread")
+    CCRCMD5Thread(BOOL* terminate) : CThread(L"Hash Worker Thread")
     {
         Terminate = terminate;
     };
@@ -134,7 +122,7 @@ typedef struct _SEEDFILEINFO
     CQuadWord Size;
     bool bDir;
     DWORD Attr;
-    char Name[1];
+    wchar_t Name[1];
 } SEEDFILEINFO;
 
 typedef TIndirectArray<SEEDFILEINFO> TSeedFileList;
@@ -142,22 +130,22 @@ typedef TIndirectArray<SEEDFILEINFO> TSeedFileList;
 class CCalculateDialog : public CSFVMD5Dialog
 {
 public:
-    CCalculateDialog(HWND parent, BOOL alwaysOnTop, TSeedFileList* pFileList, const char* sourcePath);
+    CCalculateDialog(HWND parent, BOOL alwaysOnTop, TSeedFileList* pFileList, const wchar_t* sourcePath);
 
 protected:
-    BOOL AddDir(CPathBuffer& path, size_t root, BOOL* ignoreAll);
+    BOOL AddDir(const std::wstring& path, size_t root, BOOL* ignoreAll);
     BOOL GetFileList();
     virtual void OnThreadEnd();
     void EnableButtons(BOOL bEnable);
     virtual void DeleteItem(int index);
-    BOOL GetSaveFileName(LPTSTR buffer, LPCTSTR title = NULL);
+    BOOL GetSaveFileName(std::wstring& fileName);
     void SaveHashes();
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
     void OnContextMenu(int x, int y, eHASH_TYPE forceCopyHash = HT_COUNT);
     void RefreshUI();
 
     TSeedFileList* pSeedFileList;
-    const char* SourcePath;
+    std::wstring SourcePath;
     SHashInfo HashInfo[HT_COUNT];
     DWORD RefreshCounter;
 
@@ -170,7 +158,7 @@ protected:
 struct FILEINFO
 {
     // nothing in this structure changes after it is added to the array = no synchronized access needed
-    CPathBuffer fileName; // Heap-allocated for long path support
+    std::wstring fileName;
     char digest[DIGEST_MAX_SIZE];
     CQuadWord size;
     BOOL bFileExist;
@@ -179,20 +167,20 @@ struct FILEINFO
 class CVerifyDialog : public CSFVMD5Dialog
 {
 public:
-    CVerifyDialog(HWND parent, BOOL alwaysOnTop, char* path, char* file);
+    CVerifyDialog(HWND parent, BOOL alwaysOnTop, const wchar_t* path, const wchar_t* file);
 
 protected:
     void LTrimStr(char* str);
     //char* GetLine(FILE* f, char* buffer, int max);
-    char* LoadFile(char* name);
+    char* LoadFile(const wchar_t* name);
     BOOL AnalyzeSourceFile();
     BOOL LoadSourceFile();
     virtual void OnThreadEnd();
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     TIndirectArray<FILEINFO> fileList;
-    char* sourcePath;
-    char* sourceFile;
+    std::wstring sourcePath;
+    std::wstring sourceFile;
     SHashInfo* pHashInfo;
     BOOL bCanceled;
     int nCorrupt, nMissing, nSkipped;

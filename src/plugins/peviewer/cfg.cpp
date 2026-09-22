@@ -21,45 +21,45 @@
 
 const CFG_DUMPER g_cfgDumpers[AVAILABLE_PE_DUMPERS] =
     {
-        {_T("FileType"),
+        {L"FileType",
          IDS_DUMPER_FILETYPE,
          &CFileTypeDumper::Create},
-        {_T("Version"),
+        {L"Version",
          IDS_DUMPER_FILEVERSIONRESOURCE,
          &CFileVersionResourceDumper::Create},
-        {_T("FileHeader"),
+        {L"FileHeader",
          IDS_DUMPER_FILEHEADER,
          &CFileHeaderDumper::Create},
-        {_T("OptionalFileHeader"),
+        {L"OptionalFileHeader",
          IDS_DUMPER_OPTIONALFILEHEADER,
          &COptionalFileHeaderDumper::Create},
-        {_T("ExportTable"),
+        {L"ExportTable",
          IDS_DUMPER_EXPORTTABLE,
          &CExportTableDumper::Create},
-        {_T("ImportTable"),
+        {L"ImportTable",
          IDS_DUMPER_IMPORTTABLE,
          &CImportTableDumper::Create},
-        {_T("SectionTable"),
+        {L"SectionTable",
          IDS_DUMPER_SECTIONTABLE,
          &CSectionTableDumper::Create},
-        {_T("LoadConfig"),
+        {L"LoadConfig",
          IDS_DUMPER_LOADCONFIG,
          &CLoadConfigDumper::Create},
-        {_T("DebugDirectory"),
+        {L"DebugDirectory",
          IDS_DUMPER_DEBUGDIRECTORY,
          &CDebugDirectoryDumper::Create},
-        {_T("Manifest"),
+        {L"Manifest",
          IDS_DUMPER_MANIFEST,
          &CManifestResourceDumper::Create},
-        {_T("CorHeader"),
+        {L"CorHeader",
          IDS_DUMPER_CORHEADER,
          &CCorHeaderDumper::Create},
 #if WITH_COR_METADATA_DUMPER
-        {_T("CorMetadata"),
+        {L"CorMetadata",
          IDS_DUMPER_CORMETADATA,
          &CCorMetadataDumper::Create},
 #endif
-        {_T("ResourceDirectory"),
+        {L"ResourceDirectory",
          IDS_DUMPER_RESOURCEDIRECTORY,
          &CResourceDirectoryDumper::Create},
 };
@@ -68,39 +68,39 @@ CFG_CHAIN_ENTRY g_cfgChain[AVAILABLE_PE_DUMPERS];
 CFG_CHAIN_ENTRY g_cfgChainDefault[AVAILABLE_PE_DUMPERS];
 unsigned g_cfgChainLength;
 
-PCTSTR GetDumperTitleStr(int nTitleId)
+PCWSTR GetDumperTitleStr(int nTitleId)
 {
     switch (nTitleId)
     {
     case IDS_DUMPER_FILETYPE:
-        return _T("File type");
+        return L"File type";
     case IDS_DUMPER_FILEVERSIONRESOURCE:
-        return _T("Version");
+        return L"Version";
     case IDS_DUMPER_FILEHEADER:
-        return _T("File header");
+        return L"File header";
     case IDS_DUMPER_OPTIONALFILEHEADER:
-        return _T("Optional file header");
+        return L"Optional file header";
     case IDS_DUMPER_EXPORTTABLE:
-        return _T("Export table");
+        return L"Export table";
     case IDS_DUMPER_IMPORTTABLE:
-        return _T("Import table");
+        return L"Import table";
     case IDS_DUMPER_SECTIONTABLE:
-        return _T("Section table");
+        return L"Section table";
     case IDS_DUMPER_DEBUGDIRECTORY:
-        return _T("Debug directory");
+        return L"Debug directory";
     case IDS_DUMPER_RESOURCEDIRECTORY:
-        return _T("Resource directory");
+        return L"Resource directory";
     case IDS_DUMPER_LOADCONFIG:
-        return _T("Load configuration");
+        return L"Load configuration";
     case IDS_DUMPER_MANIFEST:
-        return _T("Manifest");
+        return L"Manifest";
     case IDS_DUMPER_CORHEADER:
-        return _T("CLR header");
+        return L"CLR header";
     case IDS_DUMPER_CORMETADATA:
-        return _T("CLR metadata");
+        return L"CLR metadata";
     }
     TRACE_C("GetDumperTitleStr(): unknown nTitleId (" << nTitleId << ")");
-    return _T("");
+    return L"";
 }
 
 int FindDumperInChain(const CFG_DUMPER* pDumperCfg)

@@ -85,7 +85,27 @@ void ISODateTimeStrToSystemTime(BYTE isodt[], SYSTEMTIME* st)
 #undef CpyN
 }
 
-void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
+static std::wstring FormatUnisoLocalDateOrTime(const SYSTEMTIME& value, bool date)
+{
+    const int required = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &value, NULL, NULL, 0)
+                              : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value, NULL, NULL, 0);
+    if (required > 1)
+    {
+        std::wstring text(static_cast<size_t>(required), L'\0');
+        const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &value, NULL, text.data(), required)
+                                 : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value, NULL, text.data(), required);
+        if (written == required)
+        {
+            text.resize(static_cast<size_t>(written - 1));
+            return text;
+        }
+    }
+    if (date)
+        return SPLFormatStringOwned(L"%u.%u.%u", value.wDay, value.wMonth, value.wYear);
+    return SPLFormatStringOwned(L"%u:%02u:%02u", value.wHour, value.wMinute, value.wSecond);
+}
+
+std::wstring GetInfo(FILETIME* lastWrite, CQuadWord size)
 {
     CALL_STACK_MESSAGE2("GetInfo(, , 0x%I64X)", size.Value);
 
@@ -94,22 +114,20 @@ void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
     FileTimeToLocalFileTime(lastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
+    const std::wstring date = FormatUnisoLocalDateOrTime(st, true);
+    const std::wstring time = FormatUnisoLocalDateOrTime(st, false);
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, size);
+    return SPLFormatStringOwned(L"%s, %s, %s", number.c_str(), date.c_str(), time.c_str());
 }
 
-void SetFileAttrs(const char* name, DWORD attrs, BOOL quiet)
+void SetFileAttrs(const wchar_t* name, DWORD attrs, BOOL quiet)
 {
     if (Options.ClearReadOnly)
         attrs &= ~FILE_ATTRIBUTE_READONLY;
-    if (!SetFileAttributes(name, attrs))
+    if (!SetFileAttributesW(name, attrs))
     { // set attributes - always clear Archive attribute, clearing of Read-Only attribute depends on settings
         DWORD err = GetLastError();
-        Error(LoadStr(IDS_CANT_SET_ATTRS), err, quiet);
+        Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), err, quiet);
     }
 }
 
@@ -146,13 +164,14 @@ CISOImage::Track::~Track()
     delete FileSystem;
 }
 
-const char* CISOImage::Track::GetLabel()
+const wchar_t* CISOImage::Track::GetLabel()
 {
-    return "";
+    return L"";
 }
 
-void CISOImage::Track::SetLabel(const char*)
+bool CISOImage::Track::SetLabel(std::wstring_view) noexcept
 {
+    return true;
 }
 
 CISOImage::CISOImage() : Session(10, 5),
@@ -173,13 +192,11 @@ CISOImage::CISOImage() : Session(10, 5),
     SectorRawSize = 2048;
     SectorUserSize = 2048;
 
-    Label = NULL;
 }
 
 CISOImage::~CISOImage()
 {
     delete[] FileName;
-    delete[] Label;
     delete File;
 }
 
@@ -193,18 +210,23 @@ void CISOImage::AddSessionTracks(int tracks)
     Session.Add(tracks);
 }
 
-void CISOImage::SetLabel(const char* label)
+bool CISOImage::SetLabel(std::wstring_view label) noexcept
 {
-    delete[] Label;
-    Label = new char[strlen(label) + 1];
-    if (Label)
-        strcpy(Label, label);
+    try
+    {
+        std::wstring staged(label);
+        Label.swap(staged);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
 }
 
-const char*
-CISOImage::GetLabel()
+const wchar_t* CISOImage::GetLabel() const
 {
-    return Label ? Label : "";
+    return Label.c_str();
 }
 
 DWORD
@@ -717,24 +739,26 @@ BOOL CISOImage::ReadSessionInfo(BOOL quiet /* = FALSE*/)
 
     BOOL ret = FALSE;
 
-    char* fn = SalamanderGeneral->DupStr(FileName);
+    // fn is a scratch copy of the now-wide FileName, used to build the sibling
+    // session-info filename in place (e.g. "x.img" -> "x.ccd").
+    wchar_t* fn = _wcsdup(FileName);
     if (fn != NULL)
     {
-        char* ext = strrchr(fn, '.');
+        wchar_t* ext = wcsrchr(fn, L'.');
         if (ext != NULL) // ".cvspass" is extension in Windows
         {
             ext++;
-            if (SalamanderGeneral->StrICmp(ext, "nrg") == 0)
+            if (SalamanderGeneral->StrICmp(ext, L"nrg") == 0)
                 ret = ReadSessionNRG(quiet);
-            else if (SalamanderGeneral->StrICmp(ext, "img") == 0)
+            else if (SalamanderGeneral->StrICmp(ext, L"img") == 0)
             {
-                strcpy(ext, "ccd");
+                wcscpy(ext, L"ccd");
                 ret = ReadSessionCCD(fn, quiet);
             }
-            //      else if (SalamanderGeneral->StrICmp(ext, "ccd") == 0)
+            //      else if (SalamanderGeneral->StrICmp(ext, L"ccd") == 0)
             //        ret = ReadSessionCCD(fn, quiet);
         }
-        SalamanderGeneral->Free(fn);
+        free(fn);
     }
     return ret;
 }
@@ -814,26 +838,27 @@ void CISOImage::SetTrackParams(int trackno)
     SectorHeaderSize = track->SectorHeaderSize;
 }
 
-BOOL CISOImage::Open(const char* fileName, BOOL quiet /* = FALSE*/)
+BOOL CISOImage::Open(const wchar_t* fileName, BOOL quiet /* = FALSE*/)
 {
-    CALL_STACK_MESSAGE3("CISOImage::Open(%s, %d)", fileName, quiet);
+    CALL_STACK_MESSAGE3("CISOImage::Open(%ls, %d)", fileName, quiet);
 
     if (!fileName)
         return FALSE;
 
     // remember the name of the file being opened
-    if ((FileName = new char[strlen(fileName) + 1]) == NULL)
+    if ((FileName = new wchar_t[wcslen(fileName) + 1]) == NULL)
         return Error(IDS_INSUFFICIENT_MEMORY, quiet);
 
-    strcpy(FileName, fileName);
+    wcscpy(FileName, fileName);
 
-    HANDLE hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
-        CPathBuffer errStr; // Heap-allocated for long path support
-
-        sprintf(errStr.Get(), LoadStr(IDS_CANT_OPEN_FILE), fileName);
-        return Error(errStr, GetLastError(), quiet);
+        std::wstring errStr(LangStr(IDS_CANT_OPEN_FILE).c_str());
+        const size_t placeholder = errStr.find(L"%s");
+        if (placeholder != std::wstring::npos)
+            errStr.replace(placeholder, 2, fileName);
+        return Error(errStr.c_str(), GetLastError(), quiet);
     }
     DWORD l = 0;
     DWORD dwBytesRead;
@@ -1345,7 +1370,7 @@ BYTE CISOImage::GetTrackFromExtent(DWORD extent)
     return Tracks.Count - 1;
 }
 
-BOOL CISOImage::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
+BOOL CISOImage::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     BOOL ret = FALSE;
     if (OpenedTrack >= 0 && OpenedTrack < Tracks.Count)
@@ -1358,8 +1383,7 @@ BOOL CISOImage::ListImage(CSalamanderDirectoryAbstract* dir, CPluginDataInterfac
 {
     CALL_STACK_MESSAGE1("CISOImage::ListImage(, )");
 
-    CPathBuffer path;
-    ZeroMemory(path.Get(), path.Size());
+    std::wstring path;
 
     if (Options.SessionAsDirectory && Session.Count > 1)
     {
@@ -1369,7 +1393,10 @@ BOOL CISOImage::ListImage(CSalamanderDirectoryAbstract* dir, CPluginDataInterfac
         int session;
         for (session = 0; session < Session.Count; session++)
         {
-            sprintf(path, "\\Session %02d", session + 1);
+            std::wstring sessionNumber = std::to_wstring(session + 1);
+            if (sessionNumber.size() < 2)
+                sessionNumber.insert(sessionNumber.begin(), L'0');
+            path = L"\\Session " + sessionNumber;
 
             int trackCount = Session[session];
             int lastSessionTrack = firstSessionTrack + trackCount;
@@ -1428,10 +1455,10 @@ BOOL CISOImage::ListImage(CSalamanderDirectoryAbstract* dir, CPluginDataInterfac
 }
 
 //
-int CISOImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                          const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CISOImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& archivePath,
+                          const std::wstring& targetPath, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE6("CISOImage::UnpackFile(, %s, %s, %p, %u, %d)", srcPath, path, fileData, silent, toSkip);
+    CALL_STACK_MESSAGE6("CISOImage::UnpackFile(, %ls, %ls, %p, %u, %d)", archivePath.c_str(), targetPath.c_str(), fileData, silent, toSkip);
 
     if (fileData == NULL)
         return UNPACK_ERROR;
@@ -1455,21 +1482,21 @@ int CISOImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const ch
         return UNPACK_ERROR;
     }
 
-    CPathBuffer nameInArc;
-    strcpy(nameInArc, FileName);
-    SalamanderGeneral->SalPathAppend(nameInArc, srcPath, nameInArc.Size());
-    SalamanderGeneral->SalPathAppend(nameInArc, fileData->Name, nameInArc.Size());
+    std::wstring nameInArc(FileName);
+    if (!archivePath.empty())
+        SPLSalPathAppendOwned(nameInArc, archivePath.c_str());
+    SPLSalPathAppendOwned(nameInArc, fileData->Name);
 
     CUnISOFSAbstract* fileSystem = Tracks[track]->FileSystem;
     if (fileSystem != NULL)
-        return fileSystem->UnpackFile(salamander, srcPath, path, nameInArc, fileData, silent, toSkip);
+        return fileSystem->UnpackFile(salamander, targetPath, nameInArc, fileData, silent, toSkip);
     else
         return Error(IDS_INTERNAL_PLUGIN_ERROR);
 }
 
-BOOL CISOImage::UnpackDir(const char* dirName, const CFileData* fileData)
+BOOL CISOImage::UnpackDir(const wchar_t* dirName, const CFileData* fileData)
 {
-    CALL_STACK_MESSAGE3("CISOImage::UnpackDir(%s, %p)", dirName, fileData);
+    CALL_STACK_MESSAGE3("CISOImage::UnpackDir(%ls, %p)", dirName, fileData);
 
     if (!SalamanderGeneral->CheckAndCreateDirectory(dirName))
         return UNPACK_ERROR;
@@ -1480,20 +1507,20 @@ BOOL CISOImage::UnpackDir(const char* dirName, const CFileData* fileData)
     if (Options.ClearReadOnly) // clear ReadOnly Attribute if needed
         attrs &= ~FILE_ATTRIBUTE_READONLY;
 
-    if (!SetFileAttributes(dirName, attrs))
+    if (!SetFileAttributesW(dirName, attrs))
     {
         DWORD err = GetLastError();
-        Error(LoadStr(IDS_CANT_SET_ATTRS), err);
+        Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), err);
     }
 
     return UNPACK_OK;
 }
 
-int CISOImage::ExtractAllItems(CSalamanderForOperationsAbstract* salamander, char* srcPath,
-                               CSalamanderDirectoryAbstract const* dir, const char* mask,
-                               char* path, int pathBufSize, DWORD& silent, BOOL& toSkip)
+int CISOImage::ExtractAllItems(CSalamanderForOperationsAbstract* salamander, const std::wstring& archivePath,
+                               CSalamanderDirectoryAbstract const* dir, const wchar_t* mask,
+                               const std::wstring& targetPath, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CISOImage::ExtractAllItems(, %s, , %s, %s, %d, %u, %d)", srcPath, mask, path, pathBufSize, silent, toSkip);
+    CALL_STACK_MESSAGE6("CISOImage::ExtractAllItems(, %ls, , %ls, %ls, %u, %d)", archivePath.c_str(), mask, targetPath.c_str(), silent, toSkip);
 
     int count = dir->GetFilesCount();
     int i;
@@ -1509,35 +1536,28 @@ int CISOImage::ExtractAllItems(CSalamanderForOperationsAbstract* salamander, cha
         if (SalamanderGeneral->AgreeMask(file->Name, mask, file->Ext[0] != 0))
         {
             //      SalamanderGeneral->CheckAndCreateDirectory(path);
-            if (UnpackFile(salamander, srcPath, path, file, silent, toSkip) == UNPACK_CANCEL ||
+            if (UnpackFile(salamander, archivePath, targetPath, file, silent, toSkip) == UNPACK_CANCEL ||
                 !salamander->ProgressAddSize(1, TRUE))
                 return UNPACK_CANCEL;
         }
     } // for
 
     count = dir->GetDirsCount();
-    int pathLen = (int)strlen(path);
-    int srcPathLen = (int)strlen(srcPath);
     int j;
     for (j = 0; j < count; j++)
     {
         CFileData const* file = dir->GetDir(j);
         //    TRACE_I("EnumAllItems(): directory: " << path << (path[0] != 0 ? "\\" : "") << file->Name);
-        if (!SalamanderGeneral->SalPathAppend(path, file->Name, pathBufSize))
-        {
-            Error(IDS_ERR_TOO_LONG_NAME);
-            return UNPACK_CANCEL;
-        }
-        if (UnpackDir(path, file) == UNPACK_CANCEL)
+        std::wstring childTargetPath(targetPath);
+        SPLSalPathAppendOwned(childTargetPath, file->Name);
+        if (UnpackDir(childTargetPath.c_str(), file) == UNPACK_CANCEL)
             return UNPACK_CANCEL;
 
         CSalamanderDirectoryAbstract const* subDir = dir->GetSalDir(j);
-        SalamanderGeneral->SalPathAppend(srcPath, file->Name, ISO_MAX_PATH_LEN);
-        if (ExtractAllItems(salamander, srcPath, subDir, mask, path, pathBufSize, silent, toSkip) == UNPACK_CANCEL)
+        std::wstring childArchivePath(archivePath);
+        SPLSalPathAppendOwned(childArchivePath, file->Name);
+        if (ExtractAllItems(salamander, childArchivePath, subDir, mask, childTargetPath, silent, toSkip) == UNPACK_CANCEL)
             return UNPACK_CANCEL;
-
-        srcPath[srcPathLen] = '\0';
-        path[pathLen] = '\0';
     }
 
     return UNPACK_OK;

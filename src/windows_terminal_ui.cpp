@@ -29,11 +29,15 @@ namespace
     void SaveConfiguredTarget(const ShellTarget& target)
     {
         Configuration.CommandShellTargetKind = static_cast<int>(target.kind);
-        wcsncpy_s(Configuration.CommandShellProfileGuid, target.profileGuid.c_str(), _TRUNCATE);
-        wcsncpy_s(Configuration.CommandShellProfileName, target.profileName.c_str(), _TRUNCATE);
+        Configuration.CommandShellProfileGuid = target.profileGuid;
+        Configuration.CommandShellProfileName = target.profileName;
     }
 
-    std::string ProfileMenuLabel(const std::wstring& name)
+    // WT profile names are user-editable (WSL distro names, custom shells) and
+    // routinely contain characters outside CP_ACP, so the sanitized name stays wide end to end.
+    // It used to be narrowed for the menu and then repaired with
+    // SetItemTextW; AddStringItem takes const wchar_t* now, so both steps are gone.
+    std::wstring SanitizeProfileName(const std::wstring& name)
     {
         std::wstring sanitized;
         sanitized.reserve(name.size() + 4);
@@ -45,15 +49,15 @@ namespace
                 sanitized.push_back(L'&');
             sanitized.push_back(ch);
         }
-        return WideToAnsi(sanitized);
+        return sanitized;
     }
 
-    void AddStringItem(CMenuPopup* popup, DWORD id, const char* text, DWORD state = 0)
+    void AddStringItem(CMenuPopup* popup, DWORD id, const wchar_t* text, DWORD state = 0)
     {
         MENU_ITEM_INFO item{};
         item.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_STATE;
         item.Type = MENU_TYPE_STRING;
-        item.String = const_cast<char*>(text);
+        item.String = const_cast<wchar_t*>(text);
         item.ID = id;
         item.State = state;
         popup->InsertItem(0xFFFFFFFF, TRUE, &item);
@@ -75,7 +79,7 @@ namespace
 
     bool CheckRunPolicy(const ShellTarget& target)
     {
-        std::string executableName;
+        std::wstring executableName;
         if (target.kind == ShellTargetKind::ComSpec)
         {
             CommandShellRequest request;
@@ -87,7 +91,7 @@ namespace
         }
         else
         {
-            executableName = "wt.exe";
+            executableName = L"wt.exe";
         }
 
         return !SystemPolicies.GetNoRun() &&
@@ -106,7 +110,8 @@ namespace
         if (target.kind == ShellTargetKind::ComSpec)
         {
             CommandShellRequest request;
-            request.workingDirectory = workingDirectory;
+            if (workingDirectory != nullptr)
+                request.workingDirectory = workingDirectory;
             request.windowTitle = LoadStrW(IDS_COMMANDSHELL);
             request.useShowWindow = true;
             request.showWindow = SW_SHOWNORMAL;
@@ -119,7 +124,8 @@ namespace
         }
 
         WindowsTerminalLaunchRequest request;
-        request.workingDirectory = workingDirectory;
+        if (workingDirectory != nullptr)
+            request.workingDirectory = workingDirectory;
         request.usePosition = usePosition;
         request.x = position.x;
         request.y = position.y;
@@ -152,7 +158,7 @@ namespace
         mainWindow->SetDefaultDirectories();
         CommandShellResult result = LaunchTarget(mainWindow, activePanel, target);
         if (!result.success)
-            gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT), GetErrorTextW(result.errorCode));
+            gPrompter->ShowError(LoadStrW(IDS_ERROREXECPROMPT), GetErrorTextOwned(result.errorCode).c_str());
         else
             result.CloseProcess();
     }
@@ -174,23 +180,24 @@ void UpdateWindowsTerminalCommandsMenu(CMenuPopup* popup)
     if (terminalMenu == nullptr)
         return;
 
-    AddStringItem(terminalMenu, CM_WT_DEFAULT_PROFILE, LoadStr(IDS_MENU_CMD_WT_DEFAULT));
+    AddStringItem(terminalMenu, CM_WT_DEFAULT_PROFILE, LoadStrW(IDS_MENU_CMD_WT_DEFAULT));
     const size_t profileCount = std::min<size_t>(catalog.profiles.size(),
                                                  CM_WT_PROFILE_MAX - CM_WT_PROFILE_MIN + 1);
     for (size_t index = 0; index < profileCount; index++)
     {
-        std::string label = ProfileMenuLabel(catalog.profiles[index].name);
-        AddStringItem(terminalMenu, CM_WT_PROFILE_MIN + static_cast<DWORD>(index), label.c_str());
+        std::wstring sanitizedW = SanitizeProfileName(catalog.profiles[index].name);
+        DWORD id = CM_WT_PROFILE_MIN + static_cast<DWORD>(index);
+        AddStringItem(terminalMenu, id, sanitizedW.c_str());
     }
     if (!catalog.settingsAvailable)
-        AddStringItem(terminalMenu, 0, LoadStr(IDS_MENU_CMD_WT_UNAVAILABLE), MENU_STATE_GRAYED);
+        AddStringItem(terminalMenu, 0, LoadStrW(IDS_MENU_CMD_WT_UNAVAILABLE), MENU_STATE_GRAYED);
     AddSeparator(terminalMenu);
-    AddStringItem(terminalMenu, CM_WT_REFRESH_PROFILES, LoadStr(IDS_MENU_CMD_WT_REFRESH));
+    AddStringItem(terminalMenu, CM_WT_REFRESH_PROFILES, LoadStrW(IDS_MENU_CMD_WT_REFRESH));
 
     MENU_ITEM_INFO item{};
     item.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_SUBMENU;
     item.Type = MENU_TYPE_STRING;
-    item.String = LoadStr(IDS_MENU_CMD_WINDOWS_TERMINAL);
+    item.String = LoadStrW(IDS_MENU_CMD_WINDOWS_TERMINAL);
     item.ID = CM_WT_MENU_ROOT;
     item.SubMenu = terminalMenu;
     int position = popup->FindItemPosition(CM_DEFAULT_SHELL);

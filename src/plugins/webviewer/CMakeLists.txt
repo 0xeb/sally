@@ -45,6 +45,7 @@ sal_add_plugin(NAME webviewer
     "${SAL_PLUGINS}/webviewer/webviewer.cpp"
     "${SAL_PLUGINS}/webviewer/markdown.cpp"
     "${SAL_PLUGINS}/webviewer/markdown_document.cpp"
+    "${SAL_PLUGINS}/webviewer/webviewer_text.cpp"
     "${SAL_PLUGINS}/webviewer/precomp.cpp"
   RC "${SAL_PLUGINS}/webviewer/webviewer.rc"
   DEF "${SAL_PLUGINS}/webviewer/webviewer.def"

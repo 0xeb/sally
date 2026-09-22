@@ -1,10 +1,13 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
 #include "svg.h"
+#include "common/IFileSystem.h"
+#include "common/IPathService.h"
+#include "common/ModuleRelativePath.h"
 #include "common/unicode/helpers.h"
 
 #define NANOSVG_IMPLEMENTATION
@@ -48,54 +51,88 @@ DWORD GetSVGSysColor(int index)
 // RenderSVGImage
 //
 
-char* ReadSVGFile(const char* fileName)
+// wide: fileName is now the genuine wide path built in RenderSVGImage below - no
+// more narrow round-trip through AnsiToWide, which could not have recovered characters the
+// caller's own module-path narrowing had already lost.
+char* ReadSVGFile(const wchar_t* fileName)
 {
     char* buff = NULL;
-    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ,
-                                        FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING,
-                                        FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL));
+    HANDLE hFile = gFileSystem->CreateFile(fileName, GENERIC_READ,
+                                           FILE_SHARE_READ, NULL,
+                                           OPEN_EXISTING,
+                                           FILE_FLAG_SEQUENTIAL_SCAN,
+                                           NULL);
+    HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile, GetLastError(), TRUE);
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        DWORD size = GetFileSize(hFile, NULL);
-        if (size != INVALID_FILE_SIZE)
+        uint64_t size64 = 0;
+        const FileResult sizeResult = gFileSystem->GetHandleFileSize(hFile, &size64);
+        if (sizeResult.success && size64 <= MAXDWORD)
         {
+            const DWORD size = (DWORD)size64;
             buff = (char*)malloc(size + 1);
             DWORD read;
-            if (ReadFile(hFile, buff, size, &read, NULL) && read == size)
+            const FileResult readResult = gFileSystem->ReadFromHandle(hFile, buff, size, &read);
+            if (readResult.success && read == size)
             {
                 buff[size] = 0;
             }
             else
             {
-                TRACE_E("ReadSVGFile(): ReadFile() failed on " << fileName);
+                TRACE_EW(L"ReadSVGFile(): ReadFile() failed on " << fileName);
                 free(buff);
                 buff = NULL;
             }
         }
         else
         {
-            TRACE_E("ReadSVGFile(): GetFileSize() failed on " << fileName);
+            TRACE_EW(L"ReadSVGFile(): GetFileSize() failed on " << fileName);
         }
-        HANDLES(CloseHandle(hFile));
+        HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(hFile);
     }
     else
     {
-        TRACE_I("ReadSVGFile(): cannot open SVG file " << fileName);
+        TRACE_IW(L"ReadSVGFile(): cannot open SVG file " << fileName);
     }
     return buff;
 }
 
 // render icons for which we have SVG representation
-void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
+void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const wchar_t* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
 {
-    CPathBuffer svgFile;
-    GetModuleFileName(NULL, svgFile, svgFile.Size());
-    char* s = strrchr(svgFile, '\\');
-    if (s != NULL)
-        sprintf(s + 1, "toolbars\\%s.svg", svgName);
-    char* svg = ReadSVGFile(svgFile);
+    // wide: GetModuleFileName (ANSI) narrowed Sally's own EXE path via CP_ACP right
+    // at the source, with no wide value ever captured - a non-ASCII install path (Unicode
+    // user-profile name, non-English portable install) made toolbar SVG icons silently fail to
+    // load, since ReadSVGFile's own AnsiToWide round-trip could not recover what was already
+    // lost. Same shape as the jump-list and shell-link icon-path fixes.
+    if (gPathService == NULL || svgName == NULL)
+        return;
+
+    std::wstring modulePath;
+    if (!gPathService->GetModuleFileName(NULL, modulePath).success)
+        return;
+
+    std::wstring relativePath;
+    std::wstring svgFile;
+    try
+    {
+        relativePath.assign(L"toolbars\\");
+        relativePath.append(svgName);
+        relativePath.append(L".svg");
+    }
+    catch (const std::bad_alloc&)
+    {
+        return;
+    }
+    catch (const std::length_error&)
+    {
+        return;
+    }
+    if (!sally::path::BuildModuleRelativePath(modulePath.c_str(), relativePath.c_str(), svgFile))
+        return;
+
+    char* svg = ReadSVGFile(svgFile.c_str());
     if (svg != NULL)
     {
         HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
@@ -119,7 +156,7 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
         r.right = x + iconSize;
         r.bottom = y + iconSize;
         SetBkColor(hDC, bkColor);
-        ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+        ExtTextOutW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
 
         float sysDPIScale = (float)GetScaleForSystemDPI();
         NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);

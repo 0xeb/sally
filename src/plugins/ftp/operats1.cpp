@@ -1,8 +1,34 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static wchar_t* DupQueueWideText(const wchar_t* text)
+{
+    if (text == NULL)
+        return NULL;
+    const size_t length = wcslen(text) + 1;
+    if (length > INT_MAX / sizeof(wchar_t))
+        return NULL;
+    wchar_t* copy = (wchar_t*)SalamanderGeneral->Alloc((int)(length * sizeof(wchar_t)));
+    if (copy != NULL)
+        memcpy(copy, text, length * sizeof(wchar_t));
+    return copy;
+}
+
+static char* DupQueueByteText(const char* text, size_t length)
+{
+    if (text == NULL || length >= INT_MAX)
+        return NULL;
+    char* copy = (char*)SalamanderGeneral->Alloc((int)length + 1);
+    if (copy != NULL)
+    {
+        memcpy(copy, text, length);
+        copy[length] = 0;
+    }
+    return copy;
+}
 
 CFTPOperationsList FTPOperationsList; // all FTP operations
 
@@ -107,8 +133,10 @@ void CFTPOperationsList::DeleteOperation(int uid, BOOL doNotPostChangeOnPathNoti
                         doNotPostChangeOnPathNotifications);
 
     BOOL uploadOperDeleted = FALSE;
-    char uploadUser[USER_MAX_SIZE];
-    char uploadHost[HOST_MAX_SIZE];
+    std::wstring uploadUser;
+    std::wstring uploadHost;
+    const wchar_t* uploadUserView = NULL;
+    const wchar_t* uploadHostView = NULL;
     unsigned short uploadPort;
 
     HANDLES(EnterCriticalSection(&OpListCritSect));
@@ -119,7 +147,9 @@ void CFTPOperationsList::DeleteOperation(int uid, BOOL doNotPostChangeOnPathNoti
         if (operType == fotCopyUpload || operType == fotMoveUpload)
         { // if this is an upload operation, after discarding it try to clean up the upload listing cache
             uploadOperDeleted = TRUE;
-            oper->GetUserHostPort(uploadUser, uploadHost, &uploadPort);
+            oper->GetUserHostPort(&uploadUserView, uploadHostView, &uploadPort);
+            uploadOperDeleted = FtpStoreWideText(uploadUserView, uploadUser) &&
+                                FtpStoreWideText(uploadHostView, uploadHost);
         }
         if (!doNotPostChangeOnPathNotifications)
         {
@@ -152,8 +182,8 @@ void CFTPOperationsList::DeleteOperation(int uid, BOOL doNotPostChangeOnPathNoti
     // if an upload operation was canceled and no other upload operation is working with
     // the server used by the canceled operation, we can release this server from the upload
     // listing cache
-    if (uploadOperDeleted && !IsUploadingToServer(uploadUser, uploadHost, uploadPort))
-        UploadListingCache.RemoveServer(uploadUser, uploadHost, uploadPort);
+    if (uploadOperDeleted && !IsUploadingToServer(uploadUser.c_str(), uploadHost.c_str(), uploadPort))
+        UploadListingCache.RemoveServer(uploadUser.c_str(), uploadHost.c_str(), uploadPort);
 }
 
 void CFTPOperationsList::CloseAllOperationDlgs()
@@ -217,7 +247,7 @@ void CFTPOperationsList::WaitForFinishOrESC(HWND parent, int milliseconds, CWait
              waitWnd != NULL && waitWnd->GetWindowClosePressed()))                        // close button in the wait window
         {
             MSG msg; // discard the buffered ESC
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                 ;
             reason = wwsrEsc;
             break; // report ESC
@@ -227,7 +257,7 @@ void CFTPOperationsList::WaitForFinishOrESC(HWND parent, int milliseconds, CWait
             if (waitRes == WAIT_OBJECT_0 + 1) // process Windows messages
             {
                 MSG msg;
-                while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                 {
                     if (msg.message == WM_CLOSE) // we cannot deliver WM_CLOSE; post it only after enabling the parent
                     {
@@ -237,7 +267,7 @@ void CFTPOperationsList::WaitForFinishOrESC(HWND parent, int milliseconds, CWait
                     else
                     {
                         TranslateMessage(&msg);
-                        DispatchMessage(&msg);
+                        DispatchMessageW(&msg);
                     }
                 }
             }
@@ -353,7 +383,7 @@ void CFTPOperationsList::StopWorkers(HWND parent, int operUID, int workerInd)
     BOOL postWM_CLOSE = FALSE;
     int lastWorkerMayBeClosedState = -1;
     CWaitWindow waitWnd(parent, TRUE);
-    waitWnd.SetText(LoadStr(closConResID));
+    waitWnd.SetText(LangStr(closConResID).c_str());
     waitWnd.Create(WAITWND_CLWORKCON);
     int serverTimeout = Config.GetServerRepliesTimeout() * 1000;
     if (serverTimeout < 1000)
@@ -376,8 +406,8 @@ void CFTPOperationsList::StopWorkers(HWND parent, int operUID, int workerInd)
         case wwsrEsc:
         {
             waitWnd.Show(FALSE);
-            if (SalamanderGeneral->SalMessageBox(parent, LoadStr(termConResID),
-                                                 LoadStr(IDS_FTPPLUGINTITLE),
+            if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, termConResID).c_str(),
+                                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                  MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                      MB_ICONQUESTION) == IDYES)
             { // cancel
@@ -652,17 +682,11 @@ BOOL CFTPOperationsList::CloseOperationDlg(int operUID, HANDLE* dlgThread)
     return EndCall();
 }
 
-BOOL CFTPOperationsList::CanMakeChangesOnPath(const char* user, const char* host, unsigned short port,
+BOOL CFTPOperationsList::CanMakeChangesOnPath(const wchar_t* user, const wchar_t* host, unsigned short port,
                                               const char* path, CFTPServerPathType pathType,
                                               int ignoreOperUID)
 {
-    CALL_STACK_MESSAGE7("CFTPOperationsList::CanMakeChangesOnPath(%s, %s, %u, %s, %d, %d)",
-                        user, host, port, path, pathType, ignoreOperUID);
-    int userLength = 0;
-    if (user != NULL && strcmp(user, FTP_ANONYMOUS) == 0)
-        user = NULL;
-    if (user != NULL)
-        userLength = FTPGetUserLength(user);
+    CALL_STACK_MESSAGE1("CFTPOperationsList::CanMakeChangesOnPath()");
 
     HANDLES(EnterCriticalSection(&OpListCritSect));
     BOOL ret = FALSE;
@@ -671,7 +695,7 @@ BOOL CFTPOperationsList::CanMakeChangesOnPath(const char* user, const char* host
     {
         CFTPOperation* oper = Operations[i];
         if (oper != NULL && oper->GetUID() != ignoreOperUID &&
-            oper->CanMakeChangesOnPath(user, host, port, path, pathType, userLength))
+            oper->CanMakeChangesOnPath(user, host, port, path, pathType))
         {
             ret = TRUE;
             break;
@@ -681,15 +705,9 @@ BOOL CFTPOperationsList::CanMakeChangesOnPath(const char* user, const char* host
     return ret;
 }
 
-BOOL CFTPOperationsList::IsUploadingToServer(const char* user, const char* host, unsigned short port)
+BOOL CFTPOperationsList::IsUploadingToServer(const wchar_t* user, const wchar_t* host, unsigned short port)
 {
-    CALL_STACK_MESSAGE4("CFTPOperationsList::IsUploadingToServer(%s, %s, %u)",
-                        user, host, port);
-    int userLength = 0;
-    if (user != NULL && strcmp(user, FTP_ANONYMOUS) == 0)
-        user = NULL;
-    if (user != NULL)
-        userLength = FTPGetUserLength(user);
+    CALL_STACK_MESSAGE1("CFTPOperationsList::IsUploadingToServer()");
 
     HANDLES(EnterCriticalSection(&OpListCritSect));
     BOOL ret = FALSE;
@@ -697,7 +715,7 @@ BOOL CFTPOperationsList::IsUploadingToServer(const char* user, const char* host,
     for (i = 0; i < Operations.Count; i++)
     {
         CFTPOperation* oper = Operations[i];
-        if (oper != NULL && oper->IsUploadingToServer(user, host, port, userLength))
+        if (oper != NULL && oper->IsUploadingToServer(user, host, port))
         {
             ret = TRUE;
             break;
@@ -712,7 +730,7 @@ BOOL CFTPOperationsList::IsUploadingToServer(const char* user, const char* host,
 // CFTPQueue
 //
 
-CFTPQueue::CFTPQueue() : Items(100, 500)
+CFTPQueue::CFTPQueue(const CFtpTextCodec& textCodec) : Items(100, 500), TextCodec(textCodec)
 {
     HANDLES(InitializeCriticalSection(&QueueCritSect));
     LastFoundUID = -1;
@@ -1105,302 +1123,221 @@ int CFTPQueue::GetItemIndex(int itemUID)
     return index;
 }
 
-void CFTPQueue::GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* buf, int bufSize)
+void CFTPQueue::GetListViewDataForW(int index, NMLVDISPINFO* lvdi, std::wstring& text) noexcept
 {
-    CALL_STACK_MESSAGE1("CFTPQueue::GetListViewDataFor()");
-
+    LVITEM* itemData = &lvdi->item;
     HANDLES(EnterCriticalSection(&QueueCritSect));
-    LVITEM* itemData = &(lvdi->item);
-    if (index >= 0 && index < Items.Count) // index is valid
+    try
     {
-        CFTPQueueItem* item = Items[index];
-        if (itemData->mask & LVIF_IMAGE)
+        text.clear();
+        if (index < 0 || index >= Items.Count)
         {
-            switch (item->Type)
-            {
-            case fqitDeleteLink:
-            case fqitDeleteFile:
-            case fqitCopyResolveLink:
-            case fqitMoveResolveLink:
-            case fqitCopyFileOrFileLink:
-            case fqitMoveFileOrFileLink:
-            case fqitChAttrsFile:
-            case fqitChAttrsResolveLink:
-            case fqitUploadCopyFile:
-            case fqitUploadMoveFile:
+            if (itemData->mask & LVIF_IMAGE)
                 itemData->iImage = 1;
-                break; // file icon
-
-                /*      case fqitDeleteDir:
-        case fqitDeleteExploreDir:
-        case fqitMoveDeleteDir:
-        case fqitMoveDeleteDirLink:
-        case fqitCopyExploreDir:
-        case fqitMoveExploreDir:
-        case fqitMoveExploreDirLink:
-        case fqitChAttrsDir:
-        case fqitChAttrsExploreDir:
-        case fqitChAttrsExploreDirLink:
-        case fqitUploadCopyExploreDir:
-        case fqitUploadMoveExploreDir:
-        case fqitUploadMoveDeleteDir: */
-            default:
-                itemData->iImage = 0;
-                break; // directory icon
-            }
         }
-        if ((itemData->mask & LVIF_TEXT) && bufSize > 0)
+        else
         {
-            char unixRights[20];
-            char size[110];
-            switch (itemData->iSubItem)
-            {
-            case 0: // description
+            CFTPQueueItem* item = Items[index];
+            if (itemData->mask & LVIF_IMAGE)
             {
                 switch (item->Type)
                 {
                 case fqitDeleteLink:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_DELLINK), item->Name, item->Path);
-                    break;
-                }
-
                 case fqitDeleteFile:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_DELFILE), item->Name, item->Path);
-                    break;
-                }
-
-                case fqitDeleteDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_DELDIR), item->Name, item->Path);
-                    break;
-                }
-
-                case fqitDeleteExploreDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_DELEXPLDIR), item->Name, item->Path);
-                    break;
-                }
-
-                case fqitChAttrsExploreDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_CHATTREXPLDIR), item->Name, item->Path);
-                    break;
-                }
-
                 case fqitCopyResolveLink:
                 case fqitMoveResolveLink:
-                case fqitChAttrsResolveLink:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_RESLINK), item->Name, item->Path);
-                    break;
-                }
-
                 case fqitCopyFileOrFileLink:
                 case fqitMoveFileOrFileLink:
-                {
-                    if (((CFTPQueueItemCopyOrMove*)item)->Size != CQuadWord(-1, -1))
-                    { // if the size is known
-                        strcpy(size, " (");
-                        if (((CFTPQueueItemCopyOrMove*)item)->SizeInBytes) // size in bytes
-                            SalamanderGeneral->PrintDiskSize(size + 2, ((CFTPQueueItemCopyOrMove*)item)->Size, 0);
-                        else // size in blocks
-                        {
-                            SalamanderGeneral->NumberToStr(size + 2, ((CFTPQueueItemCopyOrMove*)item)->Size);
-                            strcat(size, " ");
-                            strcat(size, LoadStr(IDS_OPERDOPDS_SIZEINBLOCKS));
-                        }
-                        strcat(size, ")");
-                    }
-                    else
-                        size[0] = 0;
-                    if (strcmp(((CFTPQueueItemCopyOrMove*)item)->TgtName, item->Name) == 0)
-                    { // same target file name
-                        _snprintf_s(buf, bufSize, _TRUNCATE,
-                                    LoadStr(item->Type == fqitCopyFileOrFileLink ? IDS_OPERDOPDS_COPY1 : IDS_OPERDOPDS_MOVE1), item->Name, size,
-                                    item->Path, ((CFTPQueueItemCopyOrMove*)item)->TgtPath,
-                                    LoadStr(((CFTPQueueItemCopyOrMove*)item)->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE));
-                    }
-                    else // different target file name
-                    {
-                        _snprintf_s(buf, bufSize, _TRUNCATE,
-                                    LoadStr(item->Type == fqitCopyFileOrFileLink ? IDS_OPERDOPDS_COPY2 : IDS_OPERDOPDS_MOVE2), item->Name, size,
-                                    item->Path, ((CFTPQueueItemCopyOrMove*)item)->TgtPath,
-                                    ((CFTPQueueItemCopyOrMove*)item)->TgtName,
-                                    LoadStr(((CFTPQueueItemCopyOrMove*)item)->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE));
-                    }
-                    break;
-                }
-
+                case fqitChAttrsFile:
+                case fqitChAttrsResolveLink:
                 case fqitUploadCopyFile:
                 case fqitUploadMoveFile:
-                {
-                    strcpy(size, " (");
-                    SalamanderGeneral->PrintDiskSize(size + 2, ((CFTPQueueItemCopyOrMoveUpload*)item)->Size, 0);
-                    strcat(size, ")");
-
-                    CFTPQueueItemCopyOrMoveUpload* uploadItem = (CFTPQueueItemCopyOrMoveUpload*)item;
-                    char* name = uploadItem->RenamedName != NULL ? uploadItem->RenamedName : uploadItem->TgtName;
-                    if (strcmp(name, item->Name) == 0)
-                    { // same target file name
-                        _snprintf_s(buf, bufSize, _TRUNCATE,
-                                    LoadStr(item->Type == fqitUploadCopyFile ? IDS_OPERDOPDS_COPY1 : IDS_OPERDOPDS_MOVE1),
-                                    item->Name, size, item->Path, uploadItem->TgtPath,
-                                    LoadStr(uploadItem->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE));
-                    }
-                    else // different target file name
-                    {
-                        _snprintf_s(buf, bufSize, _TRUNCATE,
-                                    LoadStr(item->Type == fqitUploadCopyFile ? IDS_OPERDOPDS_COPY2 : IDS_OPERDOPDS_MOVE2),
-                                    item->Name, size, item->Path, uploadItem->TgtPath, name,
-                                    LoadStr(uploadItem->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE));
-                    }
+                    itemData->iImage = 1;
                     break;
-                }
-
-                case fqitMoveDeleteDir:
-                case fqitUploadMoveDeleteDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_MOVEDELDIR), item->Name, item->Path);
-                    break;
-                }
-
-                case fqitMoveDeleteDirLink:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_MOVEDELDIRLNK), item->Name, item->Path);
-                    break;
-                }
-
-                case fqitCopyExploreDir:
-                case fqitUploadCopyExploreDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_COPYEXPLDIR), item->Name, item->Path,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtPath,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtName);
-                    break;
-                }
-
-                case fqitMoveExploreDir:
-                case fqitUploadMoveExploreDir:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_MOVEEXPLDIR), item->Name, item->Path,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtPath,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtName);
-                    break;
-                }
-
-                case fqitMoveExploreDirLink:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_MOVEEXPLDIRLNK), item->Name, item->Path,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtPath,
-                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtName);
-                    break;
-                }
-
-                case fqitChAttrsFile:
-                {
-                    sprintf(unixRights, "%03o (", ((CFTPQueueItemChAttr*)item)->Attr);
-                    GetUNIXRightsStr(unixRights + strlen(unixRights), 20, ((CFTPQueueItemChAttr*)item)->Attr);
-                    strcat(unixRights, ")");
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_CHATTRFILE), item->Name, item->Path, unixRights);
-                    break;
-                }
-
-                case fqitChAttrsDir:
-                {
-                    sprintf(unixRights, "%03o (", ((CFTPQueueItemChAttrDir*)item)->Attr);
-                    GetUNIXRightsStr(unixRights + strlen(unixRights), 20, ((CFTPQueueItemChAttrDir*)item)->Attr);
-                    strcat(unixRights, ")");
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_CHATTRDIR), item->Name, item->Path, unixRights);
-                    break;
-                }
-
-                case fqitChAttrsExploreDirLink:
-                {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDOPDS_CHATTREXPLDIRLNK), item->Name, item->Path);
-                    break;
-                }
-
                 default:
-                {
-                    TRACE_E("Unexpected situation in CFTPQueue::GetListViewDataFor(): unknown operation item type!");
-                    buf[0] = 0;
+                    itemData->iImage = 0;
                     break;
                 }
-                }
-                break;
             }
 
-            case 1: // status
+            if (itemData->mask & LVIF_TEXT)
             {
-                char reason[500];
-                switch (item->GetItemState())
+                if (itemData->iSubItem == 1)
                 {
-                case sqisDone:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_FINISHED));
-                    break;
-
-                case sqisSkipped:
+                    std::wstring reason;
+                    switch (item->GetItemState())
+                    {
+                    case sqisDone:
+                        text = LangStr(IDS_OPERDLGOPSTS_FINISHED);
+                        break;
+                    case sqisSkipped:
+                        if (!item->GetProblemDescr(TextCodec, reason))
+                            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), reason);
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDLGOPSTS_SKIPPED).c_str(), reason.c_str());
+                        break;
+                    case sqisFailed:
+                        if (!item->GetProblemDescr(TextCodec, reason))
+                            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), reason);
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDLGOPSTS_FAILED).c_str(), reason.c_str());
+                        break;
+                    case sqisForcedToFail:
+                        text = LangStr(IDS_OPERDLGOPSTS_FORCEDTOFAIL);
+                        break;
+                    case sqisUserInputNeeded:
+                        if (!item->GetProblemDescr(TextCodec, reason))
+                            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), reason);
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDLGOPSTS_WAITUSER).c_str(), reason.c_str());
+                        break;
+                    case sqisWaiting:
+                        text = LangStr(IDS_OPERDLGOPSTS_WAITING);
+                        break;
+                    case sqisProcessing:
+                        text = LangStr(IDS_OPERDLGOPSTS_PROCESSING);
+                        break;
+                    case sqisDelayed:
+                        text = LangStr(IDS_OPERDLGOPSTS_DELAYED);
+                        break;
+                    default:
+                        TRACE_E("Unexpected situation in CFTPQueue::GetListViewDataForW(): unknown status!");
+                        break;
+                    }
+                }
+                else if (itemData->iSubItem == 0)
                 {
-                    item->GetProblemDescr(reason, 500);
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_SKIPPED), reason);
-                    break;
-                }
+                    const std::wstring sourcePath = item->LocalPath != NULL ? item->LocalPath : DecodeRemoteText(item->Path);
+                    const std::wstring sourceName = item->LocalName != NULL ? item->LocalName : DecodeRemoteText(item->Name);
+                    auto formatSize = [](const CQuadWord& value, BOOL inBytes) {
+                        const std::wstring number = inBytes
+                                                        ? SPLPrintDiskSizeOwned(SalamanderGeneral, value, 0)
+                                                        : SPLNumberToStrOwned(SalamanderGeneral, value);
+                        std::wstring size = L" (";
+                        size += number;
+                        if (!inBytes)
+                        {
+                            size += L' ';
+                            size += LangStr(IDS_OPERDOPDS_SIZEINBLOCKS);
+                        }
+                        size += L')';
+                        return size;
+                    };
 
-                case sqisFailed:
-                {
-                    item->GetProblemDescr(reason, 500);
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_FAILED), reason);
-                    break;
+                    switch (item->Type)
+                    {
+                    case fqitDeleteLink:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_DELLINK).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitDeleteFile:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_DELFILE).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitDeleteDir:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_DELDIR).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitDeleteExploreDir:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_DELEXPLDIR).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitChAttrsExploreDir:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_CHATTREXPLDIR).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitCopyResolveLink:
+                    case fqitMoveResolveLink:
+                    case fqitChAttrsResolveLink:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_RESLINK).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitCopyFileOrFileLink:
+                    case fqitMoveFileOrFileLink:
+                    {
+                        CFTPQueueItemCopyOrMove* download = (CFTPQueueItemCopyOrMove*)item;
+                        const std::wstring targetPath = download->LocalTgtPath;
+                        const std::wstring targetName = download->LocalTgtName;
+                        const std::wstring size = download->Size == CQuadWord(-1, -1) ? L"" : formatSize(download->Size, download->SizeInBytes);
+                        const std::wstring mode = LangStr(
+                            download->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE);
+                        if (targetName == sourceName)
+                            text = SPLFormatStringOwned(LangStr(item->Type == fqitCopyFileOrFileLink ? IDS_OPERDOPDS_COPY1 : IDS_OPERDOPDS_MOVE1).c_str(), sourceName.c_str(), size.c_str(), sourcePath.c_str(), targetPath.c_str(), mode.c_str());
+                        else
+                            text = SPLFormatStringOwned(LangStr(item->Type == fqitCopyFileOrFileLink ? IDS_OPERDOPDS_COPY2 : IDS_OPERDOPDS_MOVE2).c_str(), sourceName.c_str(), size.c_str(), sourcePath.c_str(), targetPath.c_str(), targetName.c_str(), mode.c_str());
+                        break;
+                    }
+                    case fqitUploadCopyFile:
+                    case fqitUploadMoveFile:
+                    {
+                        CFTPQueueItemCopyOrMoveUpload* upload = (CFTPQueueItemCopyOrMoveUpload*)item;
+                        const std::wstring targetPath = DecodeRemoteText(upload->TgtPath);
+                        const std::wstring targetName = DecodeRemoteText(upload->RenamedName != NULL ? upload->RenamedName : upload->TgtName);
+                        const std::wstring size = formatSize(upload->Size, TRUE);
+                        const std::wstring mode = LangStr(
+                            upload->AsciiTransferMode ? IDS_OPERDOPDS_ASCIITRMODE : IDS_OPERDOPDS_BINARYTRMODE);
+                        if (targetName == sourceName)
+                            text = SPLFormatStringOwned(LangStr(item->Type == fqitUploadCopyFile ? IDS_OPERDOPDS_COPY1 : IDS_OPERDOPDS_MOVE1).c_str(), sourceName.c_str(), size.c_str(), sourcePath.c_str(), targetPath.c_str(), mode.c_str());
+                        else
+                            text = SPLFormatStringOwned(LangStr(item->Type == fqitUploadCopyFile ? IDS_OPERDOPDS_COPY2 : IDS_OPERDOPDS_MOVE2).c_str(), sourceName.c_str(), size.c_str(), sourcePath.c_str(), targetPath.c_str(), targetName.c_str(), mode.c_str());
+                        break;
+                    }
+                    case fqitMoveDeleteDir:
+                    case fqitUploadMoveDeleteDir:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_MOVEDELDIR).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitMoveDeleteDirLink:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_MOVEDELDIRLNK).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    case fqitCopyExploreDir:
+                    case fqitMoveExploreDir:
+                    case fqitMoveExploreDirLink:
+                    {
+                        CFTPQueueItemCopyMoveExplore* download = (CFTPQueueItemCopyMoveExplore*)item;
+                        const int textID = item->Type == fqitCopyExploreDir ? IDS_OPERDOPDS_COPYEXPLDIR :
+                                           item->Type == fqitMoveExploreDir ? IDS_OPERDOPDS_MOVEEXPLDIR : IDS_OPERDOPDS_MOVEEXPLDIRLNK;
+                        text = SPLFormatStringOwned(LangStr(textID).c_str(), sourceName.c_str(), sourcePath.c_str(), download->LocalTgtPath, download->LocalTgtName);
+                        break;
+                    }
+                    case fqitUploadCopyExploreDir:
+                    case fqitUploadMoveExploreDir:
+                    {
+                        CFTPQueueItemCopyMoveUploadExplore* upload = (CFTPQueueItemCopyMoveUploadExplore*)item;
+                        const std::wstring targetPath = DecodeRemoteText(upload->TgtPath);
+                        const std::wstring targetName = DecodeRemoteText(upload->TgtName);
+                        text = SPLFormatStringOwned(LangStr(item->Type == fqitUploadCopyExploreDir ? IDS_OPERDOPDS_COPYEXPLDIR : IDS_OPERDOPDS_MOVEEXPLDIR).c_str(), sourceName.c_str(), sourcePath.c_str(), targetPath.c_str(), targetName.c_str());
+                        break;
+                    }
+                    case fqitChAttrsFile:
+                    case fqitChAttrsDir:
+                    {
+                        const WORD attr = item->Type == fqitChAttrsFile ? ((CFTPQueueItemChAttr*)item)->Attr : ((CFTPQueueItemChAttrDir*)item)->Attr;
+                        std::string rights;
+                        std::wstring rightsText;
+                        if (!FTPFormatUNIXRights(rights, attr) ||
+                            !FtpDecodeLocalText(rights, rightsText))
+                            break;
+                        text = SPLFormatStringOwned(LangStr(item->Type == fqitChAttrsFile ? IDS_OPERDOPDS_CHATTRFILE : IDS_OPERDOPDS_CHATTRDIR).c_str(), sourceName.c_str(), sourcePath.c_str(), rightsText.c_str());
+                        break;
+                    }
+                    case fqitChAttrsExploreDirLink:
+                        text = SPLFormatStringOwned(LangStr(IDS_OPERDOPDS_CHATTREXPLDIRLNK).c_str(), sourceName.c_str(), sourcePath.c_str());
+                        break;
+                    }
                 }
-
-                case sqisForcedToFail:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_FORCEDTOFAIL));
-                    break;
-
-                case sqisUserInputNeeded:
-                {
-                    item->GetProblemDescr(reason, 500);
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_WAITUSER), reason);
-                    break;
-                }
-
-                case sqisWaiting:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_WAITING));
-                    break;
-                case sqisProcessing:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_PROCESSING));
-                    break;
-                case sqisDelayed:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGOPSTS_DELAYED));
-                    break;
-
-                default:
-                {
-                    TRACE_E("Unexpected situation in CFTPQueue::GetListViewDataFor(): unknown status!");
-                    buf[0] = 0;
-                    break;
-                }
-                }
-                break;
             }
-            }
-            itemData->pszText = buf;
         }
-    }
-    else // for an invalid index (the list view has not refreshed yet) we must return at least an empty item
-    {
-        if (itemData->mask & LVIF_IMAGE)
-            itemData->iImage = 1 /* the file icon is less pronounced */;
+
         if (itemData->mask & LVIF_TEXT)
-        {
-            if (bufSize > 0)
-                buf[0] = 0;
-            itemData->pszText = buf;
-        }
+            itemData->pszText = const_cast<LPWSTR>(text.c_str());
+    }
+    catch (...)
+    {
+        text.clear();
+        if (itemData->mask & LVIF_TEXT)
+            itemData->pszText = const_cast<LPWSTR>(text.c_str());
     }
     HANDLES(LeaveCriticalSection(&QueueCritSect));
+}
+
+std::wstring CFTPQueue::DecodeRemoteText(const char* bytes) const
+{
+    std::wstring text;
+    const char* value = bytes != NULL ? bytes : "";
+    FtpDecodeServerTextForPresentation(TextCodec,
+                                       std::string_view(value, strlen(value)), text);
+    return text;
 }
 
 BOOL CFTPQueue::IsItemWithErrorToSolve(int index, BOOL* canSkip, BOOL* canRetry)
@@ -1508,10 +1445,10 @@ int CFTPQueue::RetryItem(int UID, CFTPOperation* oper)
             if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir ||
                 found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
             {
-                char hostBuf[HOST_MAX_SIZE];
-                char userBuf[USER_MAX_SIZE];
+                const wchar_t* hostBuf = NULL;
+                const wchar_t* userBuf = NULL;
                 unsigned short portBuf;
-                oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                 UploadListingCache.RemoveNotAccessibleListings(userBuf, hostBuf, portBuf);
             }
             CFTPQueueItemState newState = sqisWaiting;
@@ -1551,51 +1488,84 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
     CALL_STACK_MESSAGE1("CFTPQueue::SolveErrorOnItem()");
 
     int openDlgWithID = 0;
-    CPathBuffer ftpPath;
-    ftpPath[0] = 0;
-    CPathBuffer ftpName;
-    ftpName[0] = 0;
-    CPathBuffer diskPath, diskName; // Heap-allocated for long path support
-    diskPath[0] = 0;
-    diskName[0] = 0;
+    std::string ftpPath;
+    std::string ftpName;
+    std::wstring diskPathW;
+    std::wstring diskNameW;
     char* newName = NULL;
-    char origRightsBuf[100];
-    origRightsBuf[0] = 0;
-    char* origRights = NULL;
+    wchar_t* newNameW = NULL;
+    wchar_t* localNewName = NULL;
+    std::string origRightsStorage;
+    const char* origRights = NULL;
     WORD newAttr = 0;
     DWORD winError = NO_ERROR;
     BOOL applyToAll = FALSE;
-    char errDescrBuf[500];
-    errDescrBuf[0] = 0;
+    std::wstring errorDescription;
+    auto storeLocalError = [&](std::string_view bytes)
+    {
+        if (!FtpDecodeLocalText(bytes, errorDescription))
+            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), errorDescription);
+    };
+    auto storeServerError = [&](std::string_view bytes)
+    {
+        if (!FtpDecodeServerTextForPresentation(TextCodec, bytes, errorDescription))
+            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), errorDescription);
+    };
+    auto storeWinError = [&](DWORD error)
+    {
+        std::string bytes;
+        if (!FTPGetErrorText(error, bytes) || !FtpDecodeLocalText(bytes, errorDescription))
+            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), errorDescription);
+    };
     BOOL isUploadItem = FALSE;
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuf[USER_MAX_SIZE];
+    const wchar_t* hostBuf = NULL;
+    const wchar_t* userBuf = NULL;
     unsigned short portBuf;
 
     HANDLES(EnterCriticalSection(&QueueCritSect));
     CFTPQueueItem* found = FindItemWithUID(UID);
     if (found != NULL)
     {
+        if (found->LocalPath != NULL)
+            FtpStoreWideText(found->LocalPath, diskPathW);
+        if (found->LocalName != NULL)
+            FtpStoreWideText(found->LocalName, diskNameW);
+        if (found->Type == fqitCopyResolveLink || found->Type == fqitMoveResolveLink ||
+            found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
+        {
+            CFTPQueueItemCopyOrMove* download = (CFTPQueueItemCopyOrMove*)found;
+            FtpStoreWideText(download->LocalTgtPath != NULL ? download->LocalTgtPath : L"", diskPathW);
+            FtpStoreWideText(download->LocalTgtName != NULL ? download->LocalTgtName : L"", diskNameW);
+        }
+        else if (found->Type == fqitCopyExploreDir || found->Type == fqitMoveExploreDir ||
+                 found->Type == fqitMoveExploreDirLink)
+        {
+            CFTPQueueItemCopyMoveExplore* download = (CFTPQueueItemCopyMoveExplore*)found;
+            FtpStoreWideText(download->LocalTgtPath != NULL ? download->LocalTgtPath : L"", diskPathW);
+            FtpStoreWideText(download->LocalTgtName != NULL ? download->LocalTgtName : L"", diskNameW);
+        }
         if (found->HasErrorToSolve(NULL, NULL))
         {
             if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
             {
                 isUploadItem = TRUE;
-                lstrcpyn(ftpPath, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtPath, ftpPath.Size());
-                lstrcpyn(ftpName, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtName, ftpName.Size());
+                const CFTPQueueItemCopyMoveUploadExplore* upload = (CFTPQueueItemCopyMoveUploadExplore*)found;
+                FtpStoreProtocolBytes(upload->TgtPath != NULL ? upload->TgtPath : "", ftpPath);
+                FtpStoreProtocolBytes(upload->TgtName != NULL ? upload->TgtName : "", ftpName);
             }
             else
             {
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
                     isUploadItem = TRUE;
-                    lstrcpyn(ftpPath, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtPath, ftpPath.Size());
-                    lstrcpyn(ftpName, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtName, ftpName.Size());
+                    const CFTPQueueItemCopyOrMoveUpload* upload = (CFTPQueueItemCopyOrMoveUpload*)found;
+                    FtpStoreProtocolBytes(upload->TgtPath != NULL ? upload->TgtPath : "", ftpPath);
+                    FtpStoreProtocolBytes(upload->TgtName != NULL ? upload->TgtName : "", ftpName);
                 }
                 else
                 {
-                    lstrcpyn(ftpPath, found->Path, ftpPath.Size());
-                    lstrcpyn(ftpName, found->Name, ftpName.Size());
+                    FtpStoreProtocolBytes(found->Path != NULL ? found->Path : "", ftpPath);
+                    FtpStoreProtocolBytes(found->Name != NULL ? found->Name : "", ftpName);
                 }
             }
             switch (found->ProblemID)
@@ -1604,8 +1574,6 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (isUploadItem)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
                 }
                 openDlgWithID = 1;
                 break;
@@ -1628,7 +1596,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 if (found->ProblemID == ITEMPR_UNABLETOCWDONLYPATH ||
                     found->ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
                 {
-                    ftpName[0] = 0;
+                    ftpName.clear();
                 }
                 if (found->ProblemID == ITEMPR_UPLOADCANNOTLISTSRCPATH ||
                     found->ProblemID == ITEMPR_UNABLETODELETEDISKDIR ||
@@ -1636,10 +1604,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                     found->ProblemID == ITEMPR_SRCFILEREADERROR ||
                     found->ProblemID == ITEMPR_UNABLETODELETEDISKFILE)
                 {
-                    ftpPath[0] = 0;
-                    ftpName[0] = 0;
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    ftpPath.clear();
+                    ftpName.clear();
                 }
                 openDlgWithID = found->ProblemID == ITEMPR_UNABLETOPWD ? 13 : found->ProblemID == ITEMPR_UNABLETOCWD || found->ProblemID == ITEMPR_UNABLETOCWDONLYPATH ? 12
                                                                           : found->ProblemID == ITEMPR_UNABLETORESOLVELNK                                              ? 17
@@ -1653,17 +1619,17 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                                                           : found->ProblemID == ITEMPR_SRCFILEREADERROR                                                ? 39
                                                                                                                                                                        : 41;
                 if (found->ErrAllocDescr != NULL)
-                    lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                    storeServerError(found->ErrAllocDescr);
                 else
                 {
                     if (found->WinError != NO_ERROR)
-                        FTPGetErrorText(found->WinError, errDescrBuf, 500);
+                        storeWinError(found->WinError);
                     else
                     {
                         if (found->ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_OPERDOPPR_UPLCANTLISTTGTPATH), 500);
+                            storeLocalError(LoadStr(IDS_OPERDOPPR_UPLCANTLISTTGTPATH));
                         else
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                            storeLocalError(LoadStr(IDS_UNKNOWNERROR));
                     }
                 }
                 break;
@@ -1673,13 +1639,13 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 openDlgWithID = 14;
                 if (found->ErrAllocDescr != NULL)
-                    lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                    storeServerError(found->ErrAllocDescr);
                 else
                 {
                     if (found->WinError != NO_ERROR)
-                        FTPGetErrorText(found->WinError, errDescrBuf, 500);
+                        storeWinError(found->WinError);
                     else
-                        lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                        storeLocalError(LoadStr(IDS_UNKNOWNERROR));
                 }
                 break;
             }
@@ -1690,15 +1656,13 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                     found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
                 {
                     openDlgWithID = 49;
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
                 }
                 else
                     openDlgWithID = 15;
                 if (found->WinError != NO_ERROR)
-                    FTPGetErrorText(found->WinError, errDescrBuf, 500);
+                    storeWinError(found->WinError);
                 else
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                    storeLocalError(LoadStr(IDS_UNKNOWNERROR));
                 break;
             }
 
@@ -1717,15 +1681,11 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
                 }
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
                 }
-                lstrcpyn(errDescrBuf, LoadStr(found->ProblemID == ITEMPR_UNABLETORESUME ? IDS_SSCD2_UNABLETORESUME : IDS_SSCD2_RESUMETESTFAILED), 500);
+                storeLocalError(LoadStr(found->ProblemID == ITEMPR_UNABLETORESUME ? IDS_SSCD2_UNABLETORESUME : IDS_SSCD2_RESUMETESTFAILED));
                 openDlgWithID = found->ProblemID == ITEMPR_UNABLETORESUME ? (found->Type == fqitUploadCopyFile ||
                                                                                      found->Type == fqitUploadMoveFile
                                                                                  ? 45
@@ -1739,13 +1699,11 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
                 }
                 if (found->WinError != NO_ERROR)
-                    FTPGetErrorText(found->WinError, errDescrBuf, 500);
+                    storeWinError(found->WinError);
                 else
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                    storeLocalError(LoadStr(IDS_UNKNOWNERROR));
                 openDlgWithID = found->ProblemID == ITEMPR_TGTFILEREADERROR ? 23 : 24;
                 break;
             }
@@ -1760,39 +1718,35 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
                 }
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
                 }
                 switch (found->ProblemID)
                 {
                 case ITEMPR_UPLOADASCIIRESUMENOTSUP:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLCANTRESUMINASC), 500);
+                    storeLocalError(LoadStr(IDS_UPLERR_UPLCANTRESUMINASC));
                     break;
                 case ITEMPR_UPLOADUNABLETORESUMEUNKSIZ:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ), 500);
+                    storeLocalError(LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ));
                     break;
                 case ITEMPR_UPLOADUNABLETORESUMEBIGTGT:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLCANTRESUMBIGTGT), 500);
+                    storeLocalError(LoadStr(IDS_UPLERR_UPLCANTRESUMBIGTGT));
                     break;
                 case ITEMPR_UPLOADTESTIFFINISHEDNOTSUP:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLTESTIFFINNOTSUP), 500);
+                    storeLocalError(LoadStr(IDS_UPLERR_UPLTESTIFFINNOTSUP));
                     break;
 
                 default:
                 {
                     if (found->ErrAllocDescr != NULL)
-                        lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                        storeServerError(found->ErrAllocDescr);
                     else
                     {
                         if (found->WinError != NO_ERROR)
-                            FTPGetErrorText(found->WinError, errDescrBuf, 500);
+                            storeWinError(found->WinError);
                         else
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                            storeLocalError(LoadStr(IDS_UNKNOWNERROR));
                     }
                     break;
                 }
@@ -1846,8 +1800,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (((CFTPQueueItemChAttr*)found)->OrigRights != NULL)
                             {
-                                lstrcpyn(origRightsBuf, ((CFTPQueueItemChAttr*)found)->OrigRights, 100);
-                                origRights = origRightsBuf;
+                                if (FtpStoreProtocolBytes(((CFTPQueueItemChAttr*)found)->OrigRights, origRightsStorage))
+                                    origRights = origRightsStorage.c_str();
                             }
                             newAttr = ((CFTPQueueItemChAttr*)found)->Attr;
                         }
@@ -1855,8 +1809,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (((CFTPQueueItemChAttrDir*)found)->OrigRights != NULL)
                             {
-                                lstrcpyn(origRightsBuf, ((CFTPQueueItemChAttrDir*)found)->OrigRights, 100);
-                                origRights = origRightsBuf;
+                                if (FtpStoreProtocolBytes(((CFTPQueueItemChAttrDir*)found)->OrigRights, origRightsStorage))
+                                    origRights = origRightsStorage.c_str();
                             }
                             newAttr = ((CFTPQueueItemChAttrDir*)found)->Attr;
                         }
@@ -1871,8 +1825,6 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyMoveExplore*)found)->TgtDirState == TGTDIRSTATE_UNKNOWN)
                     {
-                        lstrcpyn(diskPath, ((CFTPQueueItemCopyMoveExplore*)found)->TgtPath, MAX_PATH);
-                        lstrcpyn(diskName, ((CFTPQueueItemCopyMoveExplore*)found)->TgtName, MAX_PATH);
                         winError = found->WinError;
 
                         switch (found->ProblemID)
@@ -1893,21 +1845,19 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtDirState == UPLOADTGTDIRSTATE_UNKNOWN)
                     {
-                        lstrcpyn(diskPath, found->Path, MAX_PATH);
-                        lstrcpyn(diskName, found->Name, MAX_PATH);
 
                         switch (found->ProblemID)
                         {
                         case ITEMPR_UPLOADCANNOTCREATETGTDIR:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                storeServerError(found->ErrAllocDescr);
                             else
                             {
                                 if (found->WinError == ERROR_ALREADY_EXISTS)
-                                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_CANTCRTGTDIRFILEEX), 500);
+                                    storeLocalError(LoadStr(IDS_UPLERR_CANTCRTGTDIRFILEEX));
                                 else
-                                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_CANTCRTGTDIRINV), 500);
+                                    storeLocalError(LoadStr(IDS_UPLERR_CANTCRTGTDIRINV));
                             }
                             openDlgWithID = 28;
                             break;
@@ -1920,7 +1870,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         case ITEMPR_UPLOADCRDIRAUTORENFAILED:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                storeServerError(found->ErrAllocDescr);
                             openDlgWithID = 32;
                             break;
                         }
@@ -1934,8 +1884,6 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyOrMove*)found)->TgtFileState != TGTFILESTATE_TRANSFERRED)
                     {
-                        lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                        lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
                         winError = found->WinError;
 
                         switch (found->ProblemID)
@@ -1965,8 +1913,6 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyOrMoveUpload*)found)->TgtFileState != UPLOADTGTFILESTATE_TRANSFERRED)
                     {
-                        lstrcpyn(diskPath, found->Path, MAX_PATH);
-                        lstrcpyn(diskName, found->Name, MAX_PATH);
 
                         switch (found->ProblemID)
                         {
@@ -1974,10 +1920,10 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (found->ErrAllocDescr == NULL)
                             {
-                                lstrcpyn(errDescrBuf, LoadStr(found->WinError == ERROR_ALREADY_EXISTS ? IDS_UPLERR_CANTCRTGTFILEDIREX : IDS_UPLERR_CANTCRTGTFILEINV), 500);
+                                storeLocalError(LoadStr(found->WinError == ERROR_ALREADY_EXISTS ? IDS_UPLERR_CANTCRTGTFILEDIREX : IDS_UPLERR_CANTCRTGTFILEINV));
                             }
                             else
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                storeServerError(found->ErrAllocDescr);
                             openDlgWithID = 34;
                             break;
                         }
@@ -1998,7 +1944,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         case ITEMPR_UPLOADFILEAUTORENFAILED:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                storeServerError(found->ErrAllocDescr);
                             openDlgWithID = 48;
                             break;
                         }
@@ -2024,6 +1970,10 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
     }
     HANDLES(LeaveCriticalSection(&QueueCritSect));
 
+    std::wstring ftpPathW;
+    std::wstring ftpNameW;
+    FtpDecodeServerTextForPresentation(TextCodec, ftpPath, ftpPathW);
+    FtpDecodeServerTextForPresentation(TextCodec, ftpName, ftpNameW);
     int ret = -2; // no change
     if (openDlgWithID > 0)
     {
@@ -2033,39 +1983,39 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         {
         case 1: // insufficient memory
         {
-            CSolveLowMemoryErr dlg(parent, isUploadItem ? diskPath : ftpPath, isUploadItem ? diskName : ftpName, &applyToAll);
+            CSolveLowMemoryErr dlg(parent, isUploadItem ? diskPathW.c_str() : ftpPathW.c_str(), isUploadItem ? diskNameW.c_str() : ftpNameW.c_str(), &applyToAll);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 2: // error creating the target directory
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtCannotCreateTgtDir);
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtCannotCreateTgtDir);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 3: // target directory already exists
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtTgtDirAlreadyExists);
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtTgtDirAlreadyExists);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 4: // error creating the target file
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtCannotCreateTgtFile);
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtCannotCreateTgtFile);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 5: // target file already exists
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtTgtFileAlreadyExists);
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtTgtFileAlreadyExists);
             dlgResult = dlg.Execute();
             break;
         }
@@ -2073,8 +2023,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         case 6:  // file transfer error, the file was created or overwritten or resumed with overwrite allowed
         case 42: // upload: file transfer error, the file was created or overwritten or resumed with overwrite allowed
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName,
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW,
                                    openDlgWithID == 6 ? sidtTransferFailedOnCreatedFile : sidtUploadTransferFailedOnCreatedFile);
             dlgResult = dlg.Execute();
             break;
@@ -2083,8 +2033,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         case 7:  // file transfer error, the file was resumed without the option to overwrite
         case 43: // upload: file transfer error, the file was resumed without the option to overwrite
         {
-            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName,
+            CSolveItemErrorDlg dlg(parent, oper, winError, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW,
                                    openDlgWithID == 7 ? sidtTransferFailedOnResumedFile : sidtUploadTransferFailedOnResumedFile);
             dlgResult = dlg.Execute();
             break;
@@ -2092,12 +2042,12 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 8: // error: the file/directory has unknown attributes we cannot preserve (permissions other than 'r'+'w'+'x')
         {
-            CSolveItemErrUnkAttrDlg dlg(parent, oper, ftpPath, ftpName, origRights, newAttr, &applyToAll);
+            CSolveItemErrUnkAttrDlg dlg(parent, oper, ftpPathW.c_str(), ftpNameW.c_str(), origRights, newAttr, &applyToAll);
             dlgResult = dlg.Execute();
             if (dlgResult == CM_SIEA_SETNEWATTRS)
             {
                 applyToAll = FALSE; // normally attributes are set only for one file/directory (not one set of attributes for all items)
-                CSolveItemSetNewAttrDlg dlg2(parent, oper, ftpPath, ftpName, origRights, &newAttr, &applyToAll);
+                CSolveItemSetNewAttrDlg dlg2(parent, oper, ftpPathW.c_str(), ftpNameW.c_str(), origRights, &newAttr, &applyToAll);
                 if (dlg2.Execute() == IDCANCEL)
                     dlgResult = IDCANCEL;
             }
@@ -2106,7 +2056,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 9: // delete directory error: the directory is hidden (more a confirmation than an error)
         {
-            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPath, ftpName,
+            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPathW.c_str(), ftpNameW.c_str(),
                                          &applyToAll, sisdtDelHiddenDir);
             dlgResult = dlg.Execute();
             break;
@@ -2114,7 +2064,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 10: // delete file or link error: the file is hidden (more a confirmation than an error)
         {
-            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPath, ftpName,
+            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPathW.c_str(), ftpNameW.c_str(),
                                          &applyToAll, sisdtDelHiddenFile);
             dlgResult = dlg.Execute();
             break;
@@ -2122,7 +2072,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 11: // delete directory error: the directory is not empty (more a confirmation than an error)
         {
-            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPath, ftpName,
+            CSolveItemErrorSimpleDlg dlg(parent, oper, ftpPathW.c_str(), ftpNameW.c_str(),
                                          &applyToAll, sisdtDelNonEmptyDir);
             dlgResult = dlg.Execute();
             break;
@@ -2160,9 +2110,9 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                                                        : openDlgWithID == 39                        ? IDS_SSCD_TITLE12
                                                                        : openDlgWithID == 41                        ? IDS_SSCD2_TITLE5
                                                                                                                     : IDS_SSCD_TITLE6 /* openDlgWithID == 20 */,
-                                   useDiskPathAndName ? diskPath : ftpPath,
-                                   useDiskPathAndName ? diskName : ftpName,
-                                   errDescrBuf, &applyToAll,
+                                   useDiskPathAndName ? diskPathW.c_str() : ftpPathW.c_str(),
+                                   useDiskPathAndName ? diskNameW.c_str() : ftpNameW.c_str(),
+                                   errorDescription.c_str(), &applyToAll,
                                    openDlgWithID == 18 ? siscdtDeleteFile : openDlgWithID == 19 ? siscdtDeleteDir
                                                                                                 : siscdtSimple);
             dlgResult = dlg.Execute();
@@ -2173,7 +2123,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         case 37: // target file or link is locked by another operation
         case 50: // source file or link is locked by another operation
         {
-            CSolveLowMemoryErr dlg(parent, ftpPath, ftpName, &applyToAll, openDlgWithID == 16 ? IDS_SCRD_TITLE1 : openDlgWithID == 37 ? IDS_SCRD_TITLE2
+            CSolveLowMemoryErr dlg(parent, ftpPathW.c_str(), ftpNameW.c_str(), &applyToAll, openDlgWithID == 16 ? IDS_SCRD_TITLE1 : openDlgWithID == 37 ? IDS_SCRD_TITLE2
                                                                                                                                       : IDS_SCRD_TITLE3);
             dlgResult = dlg.Execute();
             break;
@@ -2200,8 +2150,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                     : openDlgWithID == 25 ? IDS_SSCD2_TITLE4
                                     : openDlgWithID == 26 ? IDS_SSCD2_TITLE5
                                                           : IDS_SSCD2_TITLE7,
-                                    ftpPath, ftpName, diskPath,
-                                    diskName, errDescrBuf, &applyToAll,
+                                    ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                    diskNameW.c_str(), errorDescription.c_str(), &applyToAll,
                                     openDlgWithID == 22 ? siscdt2ResumeTestFailed : openDlgWithID == 26                                                                    ? siscdt2Simple
                                                                                 : openDlgWithID == 44 || openDlgWithID == 45 || openDlgWithID == 46 || openDlgWithID == 47 ? siscdt2UploadUnableToStore
                                                                                 : openDlgWithID == 51                                                                      ? siscdt2UploadTestIfFinished
@@ -2213,8 +2163,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         case 27: // ASCII transfer mode for a binary file
         case 38: // upload: ASCII transfer mode for a binary file
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, NULL,
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, NULL,
                                    openDlgWithID == 27 ? sidtASCIITrModeForBinFile : sidtUploadASCIITrModeForBinFile);
             dlgResult = dlg.Execute();
             break;
@@ -2222,16 +2172,16 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 28: // upload: error creating the target directory
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errDescrBuf, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtUploadCannotCreateTgtDir);
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errorDescription.c_str(), ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtUploadCannotCreateTgtDir);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 29: // upload: target directory already exists
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtUploadTgtDirAlreadyExists);
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtUploadTgtDirAlreadyExists);
             dlgResult = dlg.Execute();
             break;
         }
@@ -2240,8 +2190,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
         case 48: // upload: error creating the target file with auto-rename (under a different name)
         case 40: // upload: unable to store file to server
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errDescrBuf, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName,
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errorDescription.c_str(), ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW,
                                    openDlgWithID == 32 ? sidtUploadCrDirAutoRenFailed : openDlgWithID == 48 ? sidtUploadFileAutoRenFailed
                                                                                                             : sidtUploadStoreFileFailed);
             dlgResult = dlg.Execute();
@@ -2250,19 +2200,55 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
 
         case 34: // upload: error creating the target file
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errDescrBuf, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtUploadCannotCreateTgtFile);
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, errorDescription.c_str(), ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtUploadCannotCreateTgtFile);
             dlgResult = dlg.Execute();
             break;
         }
 
         case 36: // upload: target file already exists
         {
-            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPath, ftpName, diskPath,
-                                   diskName, &applyToAll, &newName, sidtUploadTgtFileAlreadyExists);
+            CSolveItemErrorDlg dlg(parent, oper, NO_ERROR, NULL, ftpPathW.c_str(), ftpNameW.c_str(), diskPathW.c_str(),
+                                   diskNameW.c_str(), &applyToAll, &newNameW, sidtUploadTgtFileAlreadyExists);
             dlgResult = dlg.Execute();
             break;
         }
+        }
+
+        if (dlgResult != IDCANCEL && newNameW != NULL)
+        {
+            std::string encodedName;
+            if (isUploadItem)
+            {
+                if (!TextCodec.Encode(newNameW, wcslen(newNameW), encodedName))
+                {
+                    // The name NAMES a file on the server, so exact-or-refuse is right - a
+                    // best-fit substitution would create a DIFFERENT file than the user asked for.
+                    // What was missing is any way to find that out. Turning OK into IDCANCEL on its
+                    // own made the dialog close exactly as if the user had pressed Cancel: the
+                    // rename discarded, the item still in its error state, and nothing said. The
+                    // edit control is Unicode now, so typing an unencodable character is ordinary
+                    // rather than impossible, and this is the one arm where the refusal is the
+                    // user's own input being rejected.
+                    SalamanderGeneral->SalMessageBox(parent,
+                                                     LangStr(IDS_NEWNAME_CANNOTENCODE).c_str(),
+                                                     LangStr(IDS_FTPERRORTITLE).c_str(),
+                                                     MB_OK | MB_ICONEXCLAMATION);
+                    dlgResult = IDCANCEL;
+                }
+                else
+                {
+                    newName = DupQueueByteText(encodedName.data(), encodedName.size());
+                    if (newName == NULL)
+                        dlgResult = IDCANCEL;
+                }
+            }
+            else
+            {
+                localNewName = DupQueueWideText(newNameW);
+                if (localNewName == NULL)
+                    dlgResult = IDCANCEL;
+            }
         }
 
         if (dlgResult != IDCANCEL) // store the values entered by the user in the item
@@ -2287,7 +2273,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                              item->Type == fqitUploadCopyFile || item->Type == fqitUploadMoveFile))
                         {
                             notAccessibleListingsRemoved = TRUE;
-                            oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                            oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                             UploadListingCache.RemoveNotAccessibleListings(userBuf, hostBuf, portBuf);
                         }
 
@@ -2350,7 +2336,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                 { // invalidate the target path listing (if an outdated listing containing the target directory is used, CWD into this directory reports "path not found" - with an up-to-date listing the directory is created via MKD)
                                     CFTPQueueItemCopyMoveUploadExplore* curItem = (CFTPQueueItemCopyMoveUploadExplore*)item;
                                     UpdateUploadTgtDirState(curItem, UPLOADTGTDIRSTATE_UNKNOWN);
-                                    oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                                    oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                                     CFTPServerPathType pathType = oper->GetFTPServerPathType(curItem->TgtPath);
                                     UploadListingCache.InvalidatePathListing(userBuf, hostBuf, portBuf, curItem->TgtPath, pathType);
                                 }
@@ -2589,7 +2575,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                     case CM_SCRD_USEALTNAME:     // autorename
                                     case CM_SDEX_USEEXISTINGDIR: // use existing directory
                                     {
-                                        if (newName != NULL)
+                                        if (newName != NULL || localNewName != NULL)
                                         {
                                             if (item->Type == fqitUploadCopyExploreDir || item->Type == fqitUploadMoveExploreDir)
                                             {
@@ -2599,11 +2585,21 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                             }
                                             else
                                             {
-                                                if (((CFTPQueueItemCopyMoveExplore*)item)->TgtName != NULL)
-                                                    SalamanderGeneral->Free(((CFTPQueueItemCopyMoveExplore*)item)->TgtName);
-                                                ((CFTPQueueItemCopyMoveExplore*)item)->TgtName = newName;
+                                                CFTPQueueItemCopyMoveExplore* download = (CFTPQueueItemCopyMoveExplore*)item;
+                                                if (localNewName != NULL)
+                                                {
+                                                    if (download->LocalTgtName != NULL)
+                                                        SalamanderGeneral->Free(download->LocalTgtName);
+                                                    download->LocalTgtName = localNewName;
+                                                    localNewName = NULL;
+                                                }
                                             }
                                             newName = NULL;
+                                            if (newNameW != NULL)
+                                            {
+                                                SalamanderGeneral->Free(newNameW);
+                                                newNameW = NULL;
+                                            }
                                         }
 
                                         HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
@@ -2617,7 +2613,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                         { // invalidate the target path listing (if an outdated listing lacking the target directory is used, MKD for this directory reports "already exists" - with an up-to-date listing the change goes directly into this directory via CWD)
                                             CFTPQueueItemCopyMoveUploadExplore* curItem = (CFTPQueueItemCopyMoveUploadExplore*)item;
                                             UpdateUploadTgtDirState(curItem, UPLOADTGTDIRSTATE_UNKNOWN);
-                                            oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                                            oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                                             CFTPServerPathType pathType = oper->GetFTPServerPathType(curItem->TgtPath);
                                             UploadListingCache.InvalidatePathListing(userBuf, hostBuf, portBuf, curItem->TgtPath, pathType);
                                         }
@@ -2687,13 +2683,10 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                     case CM_SIED_OVERWRITE:   // overwrite
                                         // case CM_SIED_OVERWRITEALL: // overwrite-all translates to overwrite + applyToAll==TRUE
                                         {
-                                            if (newName != NULL)
+                                            if (newName != NULL || localNewName != NULL)
                                             {
                                                 if (item->Type == fqitCopyFileOrFileLink || item->Type == fqitMoveFileOrFileLink)
                                                 {
-                                                    if (((CFTPQueueItemCopyOrMove*)item)->TgtName != NULL)
-                                                        SalamanderGeneral->Free(((CFTPQueueItemCopyOrMove*)item)->TgtName);
-                                                    ((CFTPQueueItemCopyOrMove*)item)->TgtName = newName;
                                                 }
                                                 else
                                                 {
@@ -2701,7 +2694,23 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                                         SalamanderGeneral->Free(((CFTPQueueItemCopyOrMoveUpload*)item)->TgtName);
                                                     ((CFTPQueueItemCopyOrMoveUpload*)item)->TgtName = newName;
                                                 }
+                                                if (item->Type == fqitCopyFileOrFileLink || item->Type == fqitMoveFileOrFileLink)
+                                                {
+                                                    CFTPQueueItemCopyOrMove* download = (CFTPQueueItemCopyOrMove*)item;
+                                                    if (localNewName != NULL)
+                                                    {
+                                                        if (download->LocalTgtName != NULL)
+                                                            SalamanderGeneral->Free(download->LocalTgtName);
+                                                        download->LocalTgtName = localNewName;
+                                                        localNewName = NULL;
+                                                    }
+                                                }
                                                 newName = NULL;
+                                                if (newNameW != NULL)
+                                                {
+                                                    SalamanderGeneral->Free(newNameW);
+                                                    newNameW = NULL;
+                                                }
                                             }
 
                                             HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
@@ -2765,8 +2774,18 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (newName != NULL)
                             {
-                                free(newName);
+                                SalamanderGeneral->Free(newName);
                                 newName = NULL;
+                            }
+                            if (newNameW != NULL)
+                            {
+                                SalamanderGeneral->Free(newNameW);
+                                newNameW = NULL;
+                            }
+                            if (localNewName != NULL)
+                            {
+                                SalamanderGeneral->Free(localNewName);
+                                localNewName = NULL;
                             }
                             // try to find another item with the same error
                             BOOL nextItemFound = FALSE;
@@ -2797,7 +2816,11 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             TRACE_E("CFTPQueue::SolveErrorOnItem(): unknown type of error!");
     }
     if (newName != NULL)
-        free(newName);
+        SalamanderGeneral->Free(newName);
+    if (newNameW != NULL)
+        SalamanderGeneral->Free(newNameW);
+    if (localNewName != NULL)
+        SalamanderGeneral->Free(localNewName);
     return ret;
 }
 
@@ -2863,15 +2886,17 @@ void CFTPQueue::ChangeTgtNameToRenamedName(CFTPQueueItemCopyOrMoveUpload* item)
     HANDLES(LeaveCriticalSection(&QueueCritSect));
 }
 
-void CFTPQueue::UpdateTgtName(CFTPQueueItemCopyMoveExplore* item, char* tgtName)
+BOOL CFTPQueue::UpdateLocalTgtName(CFTPQueueItemCopyMoveExplore* item, const wchar_t* tgtName)
 {
-    CALL_STACK_MESSAGE1("CFTPQueue::UpdateTgtName1()");
-
+    wchar_t* copy = DupQueueWideText(tgtName);
+    if (copy == NULL)
+        return FALSE;
     HANDLES(EnterCriticalSection(&QueueCritSect));
-    if (item->TgtName != NULL)
-        SalamanderGeneral->Free(item->TgtName);
-    item->TgtName = tgtName;
+    if (item->LocalTgtName != NULL)
+        SalamanderGeneral->Free(item->LocalTgtName);
+    item->LocalTgtName = copy;
     HANDLES(LeaveCriticalSection(&QueueCritSect));
+    return TRUE;
 }
 
 void CFTPQueue::UpdateTgtName(CFTPQueueItemCopyMoveUploadExplore* item, char* tgtName)
@@ -2885,15 +2910,17 @@ void CFTPQueue::UpdateTgtName(CFTPQueueItemCopyMoveUploadExplore* item, char* tg
     HANDLES(LeaveCriticalSection(&QueueCritSect));
 }
 
-void CFTPQueue::UpdateTgtName(CFTPQueueItemCopyOrMove* item, char* tgtName)
+BOOL CFTPQueue::UpdateLocalTgtName(CFTPQueueItemCopyOrMove* item, const wchar_t* tgtName)
 {
-    CALL_STACK_MESSAGE1("CFTPQueue::UpdateTgtName3()");
-
+    wchar_t* copy = DupQueueWideText(tgtName);
+    if (copy == NULL)
+        return FALSE;
     HANDLES(EnterCriticalSection(&QueueCritSect));
-    if (item->TgtName != NULL)
-        SalamanderGeneral->Free(item->TgtName);
-    item->TgtName = tgtName;
+    if (item->LocalTgtName != NULL)
+        SalamanderGeneral->Free(item->LocalTgtName);
+    item->LocalTgtName = copy;
     HANDLES(LeaveCriticalSection(&QueueCritSect));
+    return TRUE;
 }
 
 void CFTPQueue::UpdateTgtDirState(CFTPQueueItemCopyMoveExplore* item, unsigned tgtDirState)
@@ -3540,7 +3567,7 @@ void CFTPQueue::ReturnToWaitingItems(CFTPQueueItem* item, CFTPOperation* oper)
 // CFTPOperation
 //
 
-CFTPOperation::CFTPOperation()
+CFTPOperation::CFTPOperation() : IdentityCodec(FtpLocalTextCodec())
 {
     HANDLES(InitializeCriticalSection(&OperCritSect));
     UID = -1;
@@ -3552,16 +3579,16 @@ CFTPOperation::CFTPOperation()
     OperationDlgThread = NULL;
 
     ProxyServer = NULL;
-    ProxyScriptText = NULL;
+    ProxyScriptText.clear();
     ProxyScriptStartExecPoint = NULL;
-    ConnectToHost = NULL;
+    ConnectToHost.clear();
     ConnectToPort = -1;
     HostIP = INADDR_NONE;
-    Host = NULL;
+    Host.clear();
     Port = -1;
-    User = NULL;
-    Password = NULL;
-    Account = NULL;
+    User.clear();
+    Password.clear();
+    Account.clear();
     RetryLoginWithoutAsking = FALSE;
     InitFTPCommands.clear();
     UsePassiveMode = FALSE;
@@ -3571,7 +3598,7 @@ CFTPOperation::CFTPOperation()
     ServerSystem.clear();
     ServerFirstReply.clear();
     UseListingsCache = FALSE;
-    ListingServerType = NULL;
+    ListingServerType.clear();
 
     ReportChangeInWorkerID = -2;
     ReportProgressChange = FALSE;
@@ -3581,13 +3608,14 @@ CFTPOperation::CFTPOperation()
     LastReportedOperState = opstNone;
 
     Type = fotNone;
-    OperationSubject = NULL;
+    OperationSubject.clear();
 
     ChildItemsNotDone = 0;
     ChildItemsSkipped = 0;
     ChildItemsFailed = 0;
     ChildItemsUINeeded = 0;
 
+    RemoteSourcePath = NULL;
     SourcePath = NULL;
     SrcPathSeparator = '/';
     SrcPathCanChange = FALSE;
@@ -3598,6 +3626,7 @@ CFTPOperation::CFTPOperation()
     AttrAnd = -1;
     AttrOr = 0;
 
+    RemoteTargetPath = NULL;
     TargetPath = NULL;
     TgtPathSeparator = '\\';
     TgtPathCanChange = FALSE;
@@ -3654,28 +3683,21 @@ CFTPOperation::~CFTPOperation()
         TRACE_E("Unexpected situation in CFTPOperation::~CFTPOperation(): operation is destructed, but its dialog still exists!");
     if (Queue != NULL)
         delete Queue;
-    if (OperationSubject != NULL)
-        SalamanderGeneral->Free(OperationSubject);
     if (ProxyServer != NULL)
         delete ProxyServer;
-    if (ConnectToHost != NULL)
-        SalamanderGeneral->Free(ConnectToHost);
-    if (Host != NULL)
-        SalamanderGeneral->Free(Host);
-    if (User != NULL)
-        SalamanderGeneral->Free(User);
-    if (Password != NULL)
-        SalamanderGeneral->Free(Password);
-    if (Account != NULL)
-        SalamanderGeneral->Free(Account);
-    // std::string members (InitFTPCommands, ListCommand, ServerSystem, ServerFirstReply)
+    FTPSecureWipe(Password);
+    FTPSecureWipe(Account);
+    // std::string members (InitFTPCommands, ListCommand, ServerSystem, ServerFirstReply,
+    // ListingServerType)
     // are automatically freed
-    if (ListingServerType != NULL)
-        SalamanderGeneral->Free(ListingServerType);
     if (SourcePath != NULL)
         SalamanderGeneral->Free(SourcePath);
+    if (RemoteSourcePath != NULL)
+        SalamanderGeneral->Free(RemoteSourcePath);
     if (TargetPath != NULL)
         SalamanderGeneral->Free(TargetPath);
+    if (RemoteTargetPath != NULL)
+        SalamanderGeneral->Free(RemoteTargetPath);
     if (ASCIIFileMasks != NULL)
         SalamanderGeneral->FreeSalamanderMaskGroup(ASCIIFileMasks);
     if (pCertificate != NULL)

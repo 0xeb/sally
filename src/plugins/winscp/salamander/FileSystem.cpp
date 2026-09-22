@@ -5,6 +5,7 @@
 //---------------------------------------------------------------------------
 #define NO_WIN32_LEAN_AND_MEAN
 #include <vcl.h>
+#include "plugin_narrow_compat.h"
 #pragma hdrstop
 
 #include <Consts.hpp>
@@ -28,6 +29,38 @@
 #include <VCLCommon.h>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
+//---------------------------------------------------------------------------
+namespace
+{
+bool WideToWinScpBytes(const wchar_t* Value, AnsiString& Result)
+{
+    Result = "";
+    if (Value == NULL)
+        return true;
+
+    BOOL UsedDefault = FALSE;
+    const int Required = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS,
+                                              Value, -1, NULL, 0, NULL, &UsedDefault);
+    if (Required <= 0 || UsedDefault)
+        return false;
+
+    std::string Storage(static_cast<size_t>(Required), '\0');
+    UsedDefault = FALSE;
+    if (WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, Value, -1,
+                            &Storage[0], Required, NULL, &UsedDefault) == 0 ||
+        UsedDefault)
+        return false;
+
+    Result = Storage.c_str();
+    return true;
+}
+
+bool WriteWinScpBytes(CSalamanderStringBuffer* Buffer, const AnsiString& Value)
+{
+    return Buffer != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*Buffer, ToWideArg(Value.c_str()));
+}
+}
 //---------------------------------------------------------------------------
 CPluginFSInterface::CPluginFSInterface(CPluginInterface* APlugin) : CPluginFSInterfaceAbstract(), CSalamanderGeneralLocal(APlugin)
 {
@@ -169,8 +202,8 @@ void __fastcall CPluginFSInterface::Connect(int FSNameIndex, const AnsiString Us
 
             if (!Path.IsEmpty())
             {
-                ChangePath(FSNameIndex, NULL, FSNameIndex,
-                           Path.c_str(), NULL, NULL, false, 3);
+                ChangePathBytes(FSNameIndex, NULL, FSNameIndex,
+                                Path.c_str(), NULL, false, 3);
             }
         }
         __finally
@@ -309,21 +342,26 @@ void __fastcall CPluginFSInterface::CreateFileList(int Panel,
 }
 //---------------------------------------------------------------------------
 void __fastcall CPluginFSInterface::CreateFileList(
-    AnsiString SourcePath, SalEnumSelection2 Next, void* NextParam)
+    const std::wstring& SourcePath, SalEnumSelection2 Next, void* NextParam)
 {
-    CALL_STACK_MESSAGE5("CPluginFSInterface::CreateFileList(%p, %p, %p, %s)",
-                        this, FTerminal, FFileList, SourcePath.c_str());
+    CALL_STACK_MESSAGE4("CPluginFSInterface::CreateFileList(%p, %p, %p)",
+                        this, FTerminal, FFileList);
 
     assert(!FFileList);
     FFileList = new TStringList();
     try
     {
-        const char* FileName;
-        SourcePath = IncludeTrailingBackslash(SourcePath);
+        std::wstring SourceBase(SourcePath);
+        SPLSalPathAddBackslashOwned(SourceBase);
 
+        const wchar_t* FileName;
         while ((FileName = Next(NULL, 0, NULL, NULL, NULL, NULL, NULL, NextParam, NULL)) != NULL)
         {
-            FFileList->Add(SourcePath + FileName);
+            AnsiString FilePath;
+            const std::wstring WideFilePath = SourceBase + FileName;
+            if (!WideToWinScpBytes(WideFilePath.c_str(), FilePath))
+                throw Exception("A selected local path cannot be represented by this WinSCP compatibility build.");
+            FFileList->Add(FilePath);
         }
     }
     catch (...)
@@ -787,7 +825,7 @@ void __fastcall CPluginFSInterface::PathChanged(const AnsiString Path,
             FPreloaded = true;
         }
         SalamanderGeneral()->PostChangeOnPathNotification(
-            Path.c_str(), IncludingSubDirs);
+            ToWideArg(Path.c_str()).c_str(), IncludingSubDirs);
     }
     else
     {
@@ -915,18 +953,26 @@ void __fastcall CPluginFSInterface::SynchronizeDirectories(
     int Panel;
     if (GetPanel(Panel, true))
     {
-        CPathBuffer Buf;
+        std::wstring PanelPath;
         int PathType;
-        if (SalamanderGeneral()->GetPanelPath(Panel, Buf, Buf.Size(), &PathType, NULL))
+        if (SPLGetPanelPathOwned(SalamanderGeneral(), Panel, PanelPath,
+                                 &PathType))
         {
+            AnsiString PanelPathBytes;
+            const bool PathRepresentable =
+                WideToWinScpBytes(PanelPath.c_str(), PanelPathBytes);
             if (PathType != PATH_TYPE_WINDOWS)
             {
-                SimpleErrorDialog(FMTLOAD(SAL_PATH_NOT_SUPPORTED, (Buf)));
+                SimpleErrorDialog(FMTLOAD(SAL_PATH_NOT_SUPPORTED,
+                                          (PathRepresentable ? PanelPathBytes :
+                                                               AnsiString("<Unicode path>"))));
+            }
+            else if (!PathRepresentable)
+            {
+                SimpleErrorDialog(SalLoadStr(SAL_PATH_NOT_SUPPORTED));
             }
             else
-            {
-                LocalDirectory = Buf;
-            }
+                LocalDirectory = PanelPathBytes;
         }
     }
 }
@@ -1267,14 +1313,15 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
     int ItemIndex = 0;
     for (int Index = 0; Index < LENOF(SalamCommands); Index++)
     {
-        char Name[200];
+        std::wstring Name;
         BOOL Enabled;
         int Type;
 
-        if (SalamanderGeneral()->GetSalamanderCommand(SalamCommands[Index],
-                                                      Name, sizeof(Name), &Enabled, &Type))
+        if (SPLGetSalamanderCommandOwned(
+                SalamanderGeneral(), SalamCommands[Index], Name, &Enabled,
+                &Type))
         {
-            MENUITEMINFO MI;
+            MENUITEMINFOW MI;
 
             if ((ItemIndex > 0) && (Type != LastType))
             {
@@ -1282,7 +1329,7 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
                 MI.cbSize = sizeof(MI);
                 MI.fMask = MIIM_TYPE;
                 MI.fType = MFT_SEPARATOR;
-                InsertMenuItem(Menu, ItemIndex, TRUE, &MI);
+                InsertMenuItemW(Menu, ItemIndex, TRUE, &MI);
                 ItemIndex++;
             }
             LastType = Type;
@@ -1292,10 +1339,10 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
             MI.fMask = MIIM_TYPE | MIIM_ID | MIIM_STATE;
             MI.fType = MFT_STRING;
             MI.wID = SalamCommands[Index] + 1;
-            MI.dwTypeData = Name;
-            MI.cch = strlen(Name);
+            MI.dwTypeData = Name.data();
+            MI.cch = static_cast<UINT>(Name.size());
             MI.fState = Enabled ? MFS_ENABLED : MFS_DISABLED;
-            InsertMenuItem(Menu, ItemIndex, TRUE, &MI);
+            InsertMenuItemW(Menu, ItemIndex, TRUE, &MI);
             ItemIndex++;
 
             if ((SalamCommands[Index] == SALCMD_COPY) ||
@@ -1314,10 +1361,11 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
                     MI.wID = fmMoveTo;
                     Enabled = FTerminal->IsCapable[fcRemoteMove];
                 }
-                MI.dwTypeData = Caption.c_str();
-                MI.cch = Caption.Length();
+                const std::wstring CaptionW = ToWideArg(Caption.c_str());
+                MI.dwTypeData = const_cast<wchar_t*>(CaptionW.c_str());
+                MI.cch = static_cast<UINT>(CaptionW.size());
                 MI.fState = Enabled ? MFS_ENABLED : MFS_DISABLED;
-                InsertMenuItem(Menu, ItemIndex, TRUE, &MI);
+                InsertMenuItemW(Menu, ItemIndex, TRUE, &MI);
                 ItemIndex++;
             }
         }
@@ -1422,7 +1470,7 @@ void __fastcall CPluginFSInterface::FileSystemInfo()
                            OnGetSpaceAvailable);
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::GetCurrentPath(char* UserPart)
+BOOL WINAPI CPluginFSInterface::GetCurrentPath(CSalamanderStringBuffer* UserPart)
 {
     CALL_STACK_MESSAGE5("CPluginFSInterface::GetCurrentPath(%p, %p, %d, %p)",
                         this, FTerminal, FClosing, UserPart);
@@ -1432,16 +1480,14 @@ BOOL WINAPI CPluginFSInterface::GetCurrentPath(char* UserPart)
         return FALSE;
     }
 
-    strcpy(UserPart, CurrentFullPath().c_str());
-
-    return TRUE;
+    return WriteWinScpBytes(UserPart, CurrentFullPath());
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::GetFullName(CFileData& File, int /*IsDir*/,
-                                            char* Buf, int BufSize)
+                                            CSalamanderStringBuffer* FullNameBuffer)
 {
-    CALL_STACK_MESSAGE6("CPluginFSInterface::GetFullName(%p, %p, %d, %p, %d)",
-                        this, FTerminal, FClosing, Buf, BufSize);
+    CALL_STACK_MESSAGE5("CPluginFSInterface::GetFullName(%p, %p, %d, %p)",
+                        this, FTerminal, FClosing, FullNameBuffer);
 
     if (FClosing)
     {
@@ -1451,19 +1497,14 @@ BOOL WINAPI CPluginFSInterface::GetFullName(CFileData& File, int /*IsDir*/,
     TRemoteFile* RemoteFile = reinterpret_cast<TRemoteFile*>(File.PluginData);
     assert(RemoteFile);
     AnsiString FullName = FullPath(RemoteFile->FullFileName);
-    BOOL Result = (FullName.Length() < BufSize);
-    if (Result)
-    {
-        strcpy(Buf, FullName.c_str());
-    }
-    return Result;
+    return WriteWinScpBytes(FullNameBuffer, FullName);
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::GetFullFSPath(HWND Parent,
-                                              const char* /*FSName*/, char* Path, int PathSize, BOOL& Success)
+                                              const wchar_t* /*FSName*/, CSalamanderStringBuffer* PathBuffer, BOOL& Success)
 {
-    CALL_STACK_MESSAGE7("CPluginFSInterface::GetFullFSPath(%p, %p, %d, %x, %s, %d)",
-                        this, FTerminal, FClosing, Parent, Path, PathSize);
+    CALL_STACK_MESSAGE5("CPluginFSInterface::GetFullFSPath(%p, %p, %d, %x)",
+                        this, FTerminal, FClosing, Parent);
 
     if (FClosing)
     {
@@ -1477,11 +1518,17 @@ BOOL WINAPI CPluginFSInterface::GetFullFSPath(HWND Parent,
     {
         SetParentWindow(Parent);
 
-        AnsiString APath = FullFSPath(FullPath(FTerminal->AbsolutePath(Path, false)));
-        strncpy(Path, APath.c_str(), PathSize);
-        Path[PathSize - 1] = '\0';
-
-        Success = TRUE;
+        std::wstring Path;
+        AnsiString PathBytes;
+        Success = PathBuffer != NULL &&
+                  sally::plugin_abi::ReadStringBuffer(*PathBuffer, Path) &&
+                  WideToWinScpBytes(Path.c_str(), PathBytes);
+        if (Success)
+        {
+            AnsiString FullPathValue =
+                FullFSPath(FullPath(FTerminal->AbsolutePath(PathBytes, false)));
+            Success = WriteWinScpBytes(PathBuffer, FullPathValue);
+        }
     }
     catch (Exception& E)
     {
@@ -1492,35 +1539,36 @@ BOOL WINAPI CPluginFSInterface::GetFullFSPath(HWND Parent,
     return TRUE;
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::GetRootPath(char* UserPart)
+BOOL WINAPI CPluginFSInterface::GetRootPath(CSalamanderStringBuffer* UserPart)
 {
     CALL_STACK_MESSAGE4("CPluginFSInterface::GetRootPath(%p, %p, %p)",
                         this, FTerminal, UserPart);
 
-    strcpy(UserPart, "/");
-    return TRUE;
+    return WriteWinScpBytes(UserPart, "/");
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::IsCurrentPath(int CurrentFSNameIndex,
-                                              int FSNameIndex, const char* UserPart)
+                                              int FSNameIndex, const wchar_t* UserPart)
 {
-    CALL_STACK_MESSAGE6("CPluginFSInterface::IsCurrentPath(%p, %p, %d, %d, %s)",
-                        this, FTerminal, CurrentFSNameIndex, FSNameIndex, UserPart);
+    CALL_STACK_MESSAGE5("CPluginFSInterface::IsCurrentPath(%p, %p, %d, %d)",
+                        this, FTerminal, CurrentFSNameIndex, FSNameIndex);
 
     if (FClosing)
     {
         return FALSE;
     }
 
+    AnsiString UserPartBytes;
     return (CurrentFSNameIndex == FSNameIndex) &&
-           UnixComparePaths(UserPart, CurrentFullPath());
+           WideToWinScpBytes(UserPart, UserPartBytes) &&
+           UnixComparePaths(UserPartBytes, CurrentFullPath());
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::IsOurPath(int CurrentFSNameIndex,
-                                          int FSNameIndex, const char* UserPart)
+                                          int FSNameIndex, const wchar_t* UserPart)
 {
-    CALL_STACK_MESSAGE6("CPluginFSInterface::IsOurPath(%p, %p, %d, %d, %s)",
-                        this, FTerminal, CurrentFSNameIndex, FSNameIndex, UserPart);
+    CALL_STACK_MESSAGE5("CPluginFSInterface::IsOurPath(%p, %p, %d, %d)",
+                        this, FTerminal, CurrentFSNameIndex, FSNameIndex);
 
     if (FClosing)
     {
@@ -1531,17 +1579,22 @@ BOOL WINAPI CPluginFSInterface::IsOurPath(int CurrentFSNameIndex,
 
     if (Result)
     {
-        Result = IsOurUserPart(UserPart);
+        AnsiString UserPartBytes;
+        Result = WideToWinScpBytes(UserPart, UserPartBytes) &&
+                 IsOurUserPart(UserPartBytes);
     }
     return Result;
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::ChangePath(int CurrentFSNameIndex,
-                                           char* FSName, int FSNameIndex, const char* UserPart,
-                                           char* /*CutFileName*/, BOOL* /*PathWasCut*/, BOOL /*ForceRefresh*/, int /*Mode*/)
+BOOL __fastcall CPluginFSInterface::ChangePathBytes(int CurrentFSNameIndex,
+                                                    AnsiString* FSName, int FSNameIndex,
+                                                    const char* UserPart, BOOL* /*PathWasCut*/,
+                                                    BOOL /*ForceRefresh*/, int /*Mode*/)
 {
     CALL_STACK_MESSAGE7("CPluginFSInterface::ChangePath(%p, %p, %d, %s, %d, %s)",
-                        this, FTerminal, CurrentFSNameIndex, FSName, FSNameIndex, UserPart);
+                        this, FTerminal, CurrentFSNameIndex,
+                        FSName != NULL ? FSName->c_str() : NULL,
+                        FSNameIndex, UserPart);
 
     USEDPARAM(CurrentFSNameIndex);
 
@@ -1563,7 +1616,7 @@ BOOL WINAPI CPluginFSInterface::ChangePath(int CurrentFSNameIndex,
             assert(FTerminal);
             assert(FTerminal->Active);
 
-            assert(IsOurPath(CurrentFSNameIndex, FSNameIndex, UserPart));
+            assert(CurrentFSNameIndex == FSNameIndex && IsOurUserPart(UserPart));
 
             AnsiString ConnectInfo;
             Result = (strlen(UserPart) == 0);
@@ -1598,7 +1651,7 @@ BOOL WINAPI CPluginFSInterface::ChangePath(int CurrentFSNameIndex,
 
         if (FSName != NULL)
         {
-            strcpy(FSName, this->FSName().c_str());
+            *FSName = this->FSName();
         }
     }
     catch (Exception& E)
@@ -1608,6 +1661,30 @@ BOOL WINAPI CPluginFSInterface::ChangePath(int CurrentFSNameIndex,
     }
 
     return Result;
+}
+//---------------------------------------------------------------------------
+BOOL WINAPI CPluginFSInterface::ChangePath(int CurrentFSNameIndex,
+                                           CSalamanderStringBuffer* FSNameBuffer,
+                                           int FSNameIndex, const wchar_t* UserPart,
+                                           CSalamanderStringBuffer* CutFileName,
+                                           BOOL* PathWasCut, BOOL ForceRefresh, int Mode)
+{
+    AnsiString UserPartBytes;
+    if (!WideToWinScpBytes(UserPart, UserPartBytes))
+        return FALSE;
+
+    if (PathWasCut != NULL)
+        *PathWasCut = FALSE;
+    if (CutFileName != NULL &&
+        !sally::plugin_abi::WriteStringBuffer(*CutFileName, std::wstring()))
+        return FALSE;
+
+    AnsiString FSNameBytes;
+    const BOOL Result = ChangePathBytes(CurrentFSNameIndex,
+                                        FSNameBuffer != NULL ? &FSNameBytes : NULL,
+                                        FSNameIndex, UserPartBytes.c_str(), PathWasCut,
+                                        ForceRefresh, Mode);
+    return Result && (FSNameBuffer == NULL || WriteWinScpBytes(FSNameBuffer, FSNameBytes));
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* Dir,
@@ -1866,7 +1943,7 @@ void WINAPI CPluginFSInterface::Event(int Event, DWORD /*Param*/)
                     {
                         AnsiString ToolTip =
                             FMTLOAD(SAL_SECURE, (SessionInfo.SecurityProtocolName));
-                        SalamanderGeneral()->ShowSecurityIcon(Panel, true, true, ToolTip.c_str());
+                        SalamanderGeneral()->ShowSecurityIcon(Panel, true, true, ToWideArg(ToolTip.c_str()).c_str());
                     }
                 }
             }
@@ -1939,8 +2016,12 @@ BOOL WINAPI CPluginFSInterface::GetChangeDriveOrDisconnectItem(const char* /*FSN
     AnsiString Caption;
     Caption = FORMAT("\t%s://%s\t",
                      (FSName(), FTerminal->SessionData->SessionName));
-    Caption.SetLength(Caption.Length() * 2);
-    SalamanderGeneral()->DuplicateAmpersands(Caption.c_str(), Caption.Length());
+    std::string escapedCaption(Caption.c_str());
+    for (size_t at = 0;
+         (at = escapedCaption.find('&', at)) != std::string::npos;
+         at += 2)
+        escapedCaption.insert(at, 1, '&');
+    Caption = escapedCaption.c_str();
     Title = SalamanderGeneral()->DupStr(Caption.c_str());
 
     BOOL Result = (Title != NULL);
@@ -2085,10 +2166,18 @@ void WINAPI CPluginFSInterface::AcceptChangeOnPathNotification(
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::ExecuteCommandLine(HWND Parent,
-                                                   char* Command, int& /*SelFrom*/, int& /*SelTo*/)
+                                                   CSalamanderStringBuffer* Command,
+                                                   int& /*SelFrom*/, int& /*SelTo*/)
 {
+    std::wstring CommandW;
+    AnsiString CommandBytes;
+    if (Command == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*Command, CommandW) ||
+        !WideToWinScpBytes(CommandW.c_str(), CommandBytes))
+        return FALSE;
     CALL_STACK_MESSAGE5("CPluginFSInterface::ExecuteCommandLine(%p, %p, %x, %s)",
-                        this, FTerminal, Parent, lstrlen(Command) > 350 ? "(too long command)" : Command);
+                        this, FTerminal, Parent,
+                        CommandBytes.Length() > 350 ? "(too long command)" : CommandBytes.c_str());
 
     if (FClosing)
     {
@@ -2102,7 +2191,7 @@ BOOL WINAPI CPluginFSInterface::ExecuteCommandLine(HWND Parent,
 
     try
     {
-        Result = FTerminal->AllowedAnyCommand(Command) &&
+        Result = FTerminal->AllowedAnyCommand(CommandBytes) &&
                  EnsureCommandSessionFallback(fcAnyCommand);
 
         if (Result)
@@ -2111,7 +2200,7 @@ BOOL WINAPI CPluginFSInterface::ExecuteCommandLine(HWND Parent,
             {
                 SetParentWindow(Parent);
 
-                DoConsoleDialog(FTerminal, Command);
+                DoConsoleDialog(FTerminal, CommandBytes);
             }
             __finally
             {
@@ -2126,17 +2215,25 @@ BOOL WINAPI CPluginFSInterface::ExecuteCommandLine(HWND Parent,
 
     if (Result)
     {
-        Command[0] = '\0';
+        CommandW.clear();
+        if (!sally::plugin_abi::WriteStringBuffer(*Command, CommandW))
+            return FALSE;
     }
 
     return Result;
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::QuickRename(const char* /*FSName*/, int Mode,
-                                            HWND Parent, CFileData& File, BOOL IsDir, char* NewName, BOOL& Cancel)
+BOOL WINAPI CPluginFSInterface::QuickRename(const wchar_t* /*FSName*/, int Mode,
+                                            HWND Parent, CFileData& File, BOOL IsDir,
+                                            CSalamanderStringBuffer* NewName, BOOL& Cancel)
 {
+    std::wstring NewNameW;
+    if (NewName == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*NewName, NewNameW))
+        return FALSE;
     CALL_STACK_MESSAGE7("CPluginFSInterface::QuickRename(%p, %p, %d, %x, %d, %s)",
-                        this, FTerminal, Mode, Parent, IsDir, NewName);
+                        this, FTerminal, Mode, Parent, IsDir,
+                        NewNameW.size() > 350 ? "(too long name)" : "(wide name)");
 
     if (FClosing)
     {
@@ -2158,19 +2255,24 @@ BOOL WINAPI CPluginFSInterface::QuickRename(const char* /*FSName*/, int Mode,
         TRemoteFile* RemoteFile = reinterpret_cast<TRemoteFile*>(File.PluginData);
         assert(RemoteFile);
 
-        char RenameTo[2 * MAX_PATH + 1];
-        SalamanderGeneral()->MaskName(RenameTo, 2 * MAX_PATH + 1, File.Name, NewName);
-        if (strcmp(File.Name, RenameTo) == 0)
+        std::wstring renameTo;
+        if (!SPLMaskNameOwned(SalamanderGeneral(), File.Name,
+                              NewNameW.c_str(), renameTo))
+            return FALSE;
+        NewNameW = std::move(renameTo);
+        if (wcscmp(File.Name, NewNameW.c_str()) == 0)
         {
             Cancel = TRUE;
         }
         else
         {
-            lstrcpyn(NewName, RenameTo, MAX_PATH);
+            AnsiString RenameBytes;
+            if (!WideToWinScpBytes(NewNameW.c_str(), RenameBytes))
+                return FALSE;
 
             try
             {
-                FTerminal->RenameFile(RemoteFile, NewName, true);
+                FTerminal->RenameFile(RemoteFile, RenameBytes, true);
             }
             __finally
             {
@@ -2183,14 +2285,22 @@ BOOL WINAPI CPluginFSInterface::QuickRename(const char* /*FSName*/, int Mode,
         HandleException(&E);
         Cancel = TRUE;
     }
-    return TRUE;
+    return sally::plugin_abi::WriteStringBuffer(*NewName, NewNameW) ? TRUE : FALSE;
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::CreateDir(const char* /*FSName*/, int Mode,
-                                          HWND Parent, char* NewName, BOOL& Cancel)
+BOOL WINAPI CPluginFSInterface::CreateDir(const wchar_t* /*FSName*/, int Mode,
+                                          HWND Parent,
+                                          CSalamanderStringBuffer* NewName,
+                                          BOOL& Cancel)
 {
+    std::wstring NewNameW;
+    AnsiString NewNameBytes;
+    if (NewName == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*NewName, NewNameW) ||
+        !WideToWinScpBytes(NewNameW.c_str(), NewNameBytes))
+        return FALSE;
     CALL_STACK_MESSAGE6("CPluginFSInterface::CreateDir(%p, %p, %d, %x, %s)",
-                        this, FTerminal, Mode, Parent, NewName);
+                        this, FTerminal, Mode, Parent, NewNameBytes.c_str());
 
     if (FClosing)
     {
@@ -2211,7 +2321,7 @@ BOOL WINAPI CPluginFSInterface::CreateDir(const char* /*FSName*/, int Mode,
 
         try
         {
-            FTerminal->CreateDirectory(NewName);
+            FTerminal->CreateDirectory(NewNameBytes);
         }
         __finally
         {
@@ -2223,7 +2333,7 @@ BOOL WINAPI CPluginFSInterface::CreateDir(const char* /*FSName*/, int Mode,
         HandleException(&E);
         Cancel = TRUE;
     }
-    return TRUE;
+    return sally::plugin_abi::WriteStringBuffer(*NewName, NewNameW) ? TRUE : FALSE;
 }
 //---------------------------------------------------------------------------
 void WINAPI CPluginFSInterface::ViewFile(const char* /*FSName*/, HWND Parent,
@@ -2358,12 +2468,29 @@ BOOL WINAPI CPluginFSInterface::Delete(const char* /*FSName*/, int Mode,
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
-                                                 const char* /*FSName*/, HWND Parent, int Panel, int SelectedFiles,
-                                                 int SelectedDirs, char* TargetPath, BOOL& OperationMask,
+                                                 const wchar_t* /*FSName*/, HWND Parent, int Panel, int SelectedFiles,
+                                                 int SelectedDirs, CSalamanderStringBuffer* TargetPath, BOOL& OperationMask,
                                                  BOOL& CancelOrHandlePath, HWND /*DropTarget*/)
 {
+    std::wstring TargetPathW;
+    AnsiString TargetPathBytes;
+    if (TargetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*TargetPath, TargetPathW) ||
+        !WideToWinScpBytes(TargetPathW.c_str(), TargetPathBytes))
+        return FALSE;
+    const BOOL Result = CopyOrMoveFromFSBytes(
+        Copy, Mode, Parent, Panel, SelectedFiles, SelectedDirs,
+        TargetPathBytes, OperationMask, CancelOrHandlePath);
+    return WriteWinScpBytes(TargetPath, TargetPathBytes) ? Result : FALSE;
+}
+
+BOOL CPluginFSInterface::CopyOrMoveFromFSBytes(
+    BOOL Copy, int Mode, HWND Parent, int Panel, int SelectedFiles,
+    int SelectedDirs, AnsiString& TargetPath, BOOL& OperationMask,
+    BOOL& CancelOrHandlePath)
+{
     CALL_STACK_MESSAGE10("CPluginFSInterface::CopyOrMoveFromFS(%p, %p, %d, %d, %x, %d, %d, %d, %s)",
-                         this, FTerminal, Copy, Mode, Parent, Panel, SelectedFiles, SelectedDirs, TargetPath);
+                         this, FTerminal, Copy, Mode, Parent, Panel, SelectedFiles, SelectedDirs, TargetPath.c_str());
 
     assert(Mode == 1 || Mode == 2 || Mode == 5);
 
@@ -2392,11 +2519,10 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
                 int Panel;
                 if (GetPanel(Panel, true))
                 {
-                    CPathBuffer Buf;
-                    if (SalamanderGeneral()->GetPanelPath(Panel, Buf, Buf.Size(), &PathType, NULL))
-                    {
-                        TargetDirectory = Buf;
-                    }
+                    std::wstring PanelPath;
+                    if (SPLGetPanelPathOwned(SalamanderGeneral(), Panel, PanelPath,
+                                             &PathType, NULL))
+                        WideToWinScpBytes(PanelPath.c_str(), TargetDirectory);
                 }
             }
         }
@@ -2418,7 +2544,7 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
                 {
                     if (Mode == 1)
                     {
-                        strcpy(TargetPath, TargetDirectory.SubString(1, 2 * MAX_PATH - 1).c_str());
+                        TargetPath = TargetDirectory;
                         Result = FALSE;
                     }
                     else
@@ -2495,7 +2621,7 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
                             }
                             else
                             {
-                                strncpy(TargetPath, TargetDirectory.c_str(), MAX_PATH);
+                                TargetPath = TargetDirectory;
 
                                 try
                                 {
@@ -2529,14 +2655,47 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
 }
 //---------------------------------------------------------------------------
 BOOL WINAPI CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
-                                                       const char* FSName, HWND Parent, const char* SourcePath,
+                                                       const wchar_t* FSName, HWND Parent, const wchar_t* SourcePath,
                                                        SalEnumSelection2 Next, void* NextParam, int /*SourceFiles*/,
-                                                       int SourceDirs, char* TargetPath, BOOL* InvalidPathOrCancel)
+                                                       int SourceDirs, CSalamanderStringBuffer* TargetPath, BOOL* InvalidPathOrCancel)
+{
+    std::wstring TargetPathW;
+    AnsiString FSNameBytes;
+    AnsiString TargetPathBytes;
+    if (TargetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*TargetPath, TargetPathW) ||
+        !WideToWinScpBytes(FSName, FSNameBytes) ||
+        !WideToWinScpBytes(TargetPathW.c_str(), TargetPathBytes))
+    {
+        if (InvalidPathOrCancel != NULL)
+            *InvalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    const BOOL Result = CopyOrMoveFromDiskToFSBytes(
+        Copy, Mode, FSNameBytes, Parent,
+        SourcePath != NULL ? std::wstring(SourcePath) : std::wstring(),
+        Next, NextParam, SourceDirs, TargetPathBytes, InvalidPathOrCancel);
+    return WriteWinScpBytes(TargetPath, TargetPathBytes) ? Result : FALSE;
+}
+
+BOOL CPluginFSInterface::CopyOrMoveFromDiskToFSBytes(
+    BOOL Copy, int Mode, const AnsiString& FSName, HWND Parent,
+    const std::wstring& SourcePath, SalEnumSelection2 Next, void* NextParam,
+    int SourceDirs, AnsiString& TargetPath, BOOL* InvalidPathOrCancel)
 {
     CALL_STACK_MESSAGE10("CPluginFSInterface::CopyOrMoveFromDiskToFS(%p, %p, %d, %d, %s, %x, %s, %d, %s)",
-                         this, FTerminal, Copy, Mode, FSName, Parent, SourcePath, SourceDirs, TargetPath);
+                         this, FTerminal, Copy, Mode, FSName.c_str(), Parent,
+                         "<wide source>", SourceDirs, TargetPath.c_str());
 
     assert(Mode == 1 || Mode == 2 || Mode == 3);
+
+    AnsiString SourcePathBytes;
+    if (!WideToWinScpBytes(SourcePath.c_str(), SourcePathBytes))
+    {
+        if (InvalidPathOrCancel != NULL)
+            *InvalidPathOrCancel = TRUE;
+        return FALSE;
+    }
 
     if (FClosing)
     {
@@ -2551,9 +2710,7 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
     bool Result;
     if (Mode == 1)
     {
-        AnsiString ATargetPath = UnixIncludeTrailingBackslash(TargetPath) + "*.*";
-        ATargetPath.SetLength(2 * MAX_PATH - 1);
-        strcpy(TargetPath, ATargetPath.c_str());
+        TargetPath = UnixIncludeTrailingBackslash(TargetPath) + "*.*";
         Result = TRUE;
     }
     else
@@ -2566,7 +2723,7 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
             AnsiString UserPart(TargetPath);
             StripFS(UserPart, FPendingConnect);
 
-            int FSNameIndex = FPlugin->GetFSNameIndex(FSName);
+            int FSNameIndex = FPlugin->GetFSNameIndex(FSName.c_str());
 
             if (FPendingConnect)
             {
@@ -2661,7 +2818,7 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
                                     }
                                     if (!Copy)
                                     {
-                                        PathChanged(SourcePath, (SourceDirs > 0));
+                                        PathChanged(SourcePathBytes, (SourceDirs > 0));
                                     }
                                 }
                             }
@@ -2919,8 +3076,8 @@ void WINAPI CPluginFSInterface::GetAllowedDropEffects(int Mode,
     }
 }
 //---------------------------------------------------------------------------
-BOOL WINAPI CPluginFSInterface::GetNoItemsInPanelText(char* /*TextBuf*/,
-                                                      int /*TextBufSize*/)
+BOOL WINAPI CPluginFSInterface::GetNoItemsInPanelText(
+    CSalamanderStringBuffer* /*TextBuf*/)
 {
     return FALSE;
 }

@@ -150,7 +150,7 @@ bool CPersistentValueStorage::Save(
             break;
 
         case ENTRY_DELETED:
-            registry->DeleteValue(hKey, OLE2T(entry.name));
+            registry->DeleteValue(hKey, entry.name);
             break;
 
         default:
@@ -361,7 +361,7 @@ bool CPersistentValueStorage::SaveEntry(
             return false;
         }
 
-        return !!registry->SetValue(hKey, OLE2T(pwzName), REG_DWORD,
+        return !!registry->SetValue(hKey, pwzName, REG_DWORD,
                                     &dwVal, sizeof(dwVal));
     }
 

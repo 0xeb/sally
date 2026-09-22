@@ -357,7 +357,7 @@ int inflate_codes(struct huft* tl, //literal/length
                 {
                     if (!Write(ExeFile, SlideWin, WSIZE))
                     {
-                        Error(STR_ERRWRITE, ExeName);
+                        ErrorPath(STR_ERRWRITE, ExeName.c_str());
                         return 5;
                     }
                 }
@@ -426,7 +426,7 @@ int inflate_codes(struct huft* tl, //literal/length
                     {
                         if (!Write(ExeFile, SlideWin, WSIZE))
                         {
-                            Error(STR_ERRWRITE, ExeName);
+                            ErrorPath(STR_ERRWRITE, ExeName.c_str());
                             return 5;
                         }
                     }
@@ -495,7 +495,7 @@ int inflate_stored()
             {
                 if (!Write(ExeFile, SlideWin, WSIZE))
                 {
-                    Error(STR_ERRWRITE, ExeName);
+                    ErrorPath(STR_ERRWRITE, ExeName.c_str());
                     return 5;
                 }
             }
@@ -865,7 +865,7 @@ int Inflate()
     {
         if (!Write(ExeFile, SlideWin, WinPos))
         {
-            Error(STR_ERRWRITE, ExeName);
+            ErrorPath(STR_ERRWRITE, ExeName.c_str());
             return 5;
         }
     }

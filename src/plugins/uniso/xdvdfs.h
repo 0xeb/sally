@@ -49,16 +49,16 @@ public:
 
     virtual BOOL Open(BOOL quiet);
     virtual BOOL DumpInfo(FILE* outStream);
-    virtual BOOL ListDirectory(char* path, int session,
+    virtual BOOL ListDirectory(const std::wstring& path, int session,
                                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
-    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                           const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
+    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                           const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
 protected:
     BOOL ReadBlockPhys(Uint32 lbNum, size_t blocks, unsigned char* data);
 
-    BOOL AddFileDir(const char* path, char* fileName, CDirectoryEntry* de,
+    BOOL AddFileDir(const wchar_t* path, const wchar_t* fileName, CDirectoryEntry* de,
                     CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
-    int ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
+    int ScanDir(DWORD sector, DWORD size, const std::wstring& path, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 };

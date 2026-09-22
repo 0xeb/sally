@@ -43,16 +43,20 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
-        CPathBuffer srcName;
-        MainWindow->HotPaths.GetName(i, srcName, srcName.Size());
-        if (srcName[0] != 0)
+        const std::wstring& srcName = MainWindow->HotPaths.GetNameW(i);
+        if (!srcName.empty())
         {
             tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_TEXT | TLBI_MASK_ICON | TLBI_MASK_ID;
             tii.Style = TLBI_STYLE_SHOWTEXT;
-            char buff[200];
-            lstrcpyn(buff, srcName, 200);
-            DuplicateAmpersands(buff, 200);
-            tii.Text = buff;
+            std::wstring escapedName;
+            escapedName.reserve(srcName.size());
+            for (wchar_t ch : srcName)
+            {
+                escapedName.push_back(ch);
+                if (ch == L'&')
+                    escapedName.push_back(ch);
+            }
+            tii.Text = &escapedName[0];
             tii.HIcon = HFavoritIcon;
             tii.ID = CM_ACTIVEHOTPATH_MIN + i;
             InsertItem2(0xFFFFFFFF, TRUE, &tii);
@@ -86,7 +90,7 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
           tii.Style = TLBI_STYLE_SHOWTEXT | TLBI_STYLE_NOPREFIX;
           if (item->Type == umitSubmenuBegin)
             tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
-          char buff[80];
+          wchar_t buff[80];
           lstrcpyn(buff, item->ItemName.c_str(), 80);
           RemoveAmpersands(buff);
           tii.Text = buff;
@@ -133,7 +137,7 @@ void CHotPathsBar::OnGetToolTip(LPARAM lParam)
     {
         if (MainWindow->HotPaths.GetNameLen(index) > 0)
         {
-            MainWindow->HotPaths.GetPath(index, tt->Buffer, TOOLTIP_TEXT_MAX);
+            lstrcpynW(tt->Buffer, MainWindow->HotPaths.GetPathW(index).c_str(), TOOLTIP_TEXT_MAX);
         }
     }
 }

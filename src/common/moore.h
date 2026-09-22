@@ -14,6 +14,18 @@
 
 // ****************************************************************************
 
+// THIS ENGINE IS BYTE-DOMAIN BY ALGORITHM, NOT BY CONVENIENCE.
+// A sweep widened these DECLARATIONS on top of a consistently narrow
+// implementation, and the "FLOOR" label on the .cpp meant nobody re-read the
+// header. Four independent authorities say narrow is correct:
+//   1. THE ALGORITHM - Boyer-Moore's bad-character tables (LowerCase, Fail1)
+//      have 256 entries. A wchar_t index above U+00FF read off the end of both.
+//   2. THE PLUGIN ABI - zip.cpp:3603-3607/3641/3642 and the FROZEN v107
+//      compat/sdk107/spl_gen.h:576/612/616 both declare const char*.
+//   3. EVERY CALLER - find.cpp and viewer_interaction_scrolling.cpp pass
+//      memory-mapped file bytes, with explicit (char*) casts.
+//   4. UPSTREAM - Open Salamander's regedt/utils.cpp declares
+//      ConvertHexToString(LPWSTR, char* hex, int&); its caller names it patternA.
 class CSearchData
 {
 public:
@@ -28,18 +40,7 @@ public:
 
     ~CSearchData()
     {
-        if (Fail1 != NULL)
-            delete[] (Fail1);
-        if (Fail2 != NULL)
-            delete[] (Fail2);
-        if (Pattern != NULL)
-            free(Pattern);
-        if (OriginalPattern != NULL)
-            free(OriginalPattern);
-        Pattern = NULL;
-        Fail1 = Fail2 = NULL;
-        OriginalPattern = NULL;
-        Length = 0;
+        Clear();
     }
 
     int GetLength() const { return Length; }
@@ -48,6 +49,7 @@ public:
     BOOL IsGood() const { return OriginalPattern != NULL &&
                                  Pattern != NULL &&
                                  Fail1 != NULL && Fail2 != NULL; }
+    void Clear() noexcept;
     void SetFlags(WORD flags);
     void Set(const char* pattern, WORD flags);
     // for patterns containing '\0'

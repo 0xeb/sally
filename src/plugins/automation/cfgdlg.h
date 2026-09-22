@@ -19,7 +19,7 @@ class CAutomationConfigDialog : public CDialog
 protected:
     HWND m_hwndSubclassedEdit;
     WNDPROC m_pfnSubclassedEdit;
-    static const _TCHAR SublassPropName[];
+    static const char SublassPropName[];
     RECT m_rcBrowseBtn;
     int m_nBrowseBtnState;
     CGUIToolbarHeaderAbstract* m_pHeader;
@@ -36,8 +36,8 @@ protected:
 
     BOOL OnDirListNotify(NMHDR* pnmhdr);
     BOOL OnDirListKeyDown(NMLVKEYDOWN* pnmkey);
-    BOOL OnDirListBeginLabelEdit(NMLVDISPINFO* nmlv);
-    BOOL OnDirListEndLabelEdit(NMLVDISPINFO* nmlv);
+    BOOL OnDirListBeginLabelEdit(NMLVDISPINFOW* nmlv);
+    BOOL OnDirListEndLabelEdit(NMLVDISPINFOW* nmlv);
     BOOL OnDirListItemChanged(NMLISTVIEW* nmlv);
 
     void OnInitDialog();
@@ -60,7 +60,7 @@ protected:
 
     void DrawBrowseBtn();
     void OnBrowseBtnClicked();
-    void InsertVariable(PCTSTR pszVar, int nCaretPos = -1);
+    void InsertVariable(PCWSTR pszVar, int nCaretPos = -1);
 
     bool ScreenPointInButtonRect(POINTS pt)
     {

@@ -15,31 +15,32 @@
 #include "pack.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
+#include "common/IFileSystem.h"
 #include "fileswnd.h"
 #include "edtlbwnd.h"
 
 // item type in the packer extensions table
 struct SPackAssocItem
 {
-    const char* Ext; // packer extension
+    const wchar_t* Ext; // packer extension
     int nextIndex;   // index of another packer for the same archive, -1 if none exists
 };
 
 // table of packer extension associations
 // first item is the string of masks, second is the index of the next packer of the same type
 SPackAssocItem PackACExtensions[] = {
-    {"j", 5},           // 0
-    {"rar;r##", 6},     // 1
-    {"arj;a##", 10},    // 2
-    {"lzh", -1},        // 3
-    {"uc2", -1},        // 4
-    {"j", 0},           // 5
-    {"rar;r##", 1},     // 6
-    {"zip;pk3;jar", 8}, // 7
-    {"zip;pk3;jar", 7}, // 8, 9
-    {"arj;a##", 2},     // 10
-    {"ace;c##", 12},    // 11
-    {"ace;c##", 11},    // 12
+    {L"j", 5},           // 0
+    {L"rar;r##", 6},     // 1
+    {L"arj;a##", 10},    // 2
+    {L"lzh", -1},        // 3
+    {L"uc2", -1},        // 4
+    {L"j", 0},           // 5
+    {L"rar;r##", 1},     // 6
+    {L"zip;pk3;jar", 8}, // 7
+    {L"zip;pk3;jar", 7}, // 8, 9
+    {L"arj;a##", 2},     // 10
+    {L"ace;c##", 12},    // 11
+    {L"ace;c##", 11},    // 12
 };
 
 //
@@ -67,7 +68,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // subclass listview
         ListView->AttachToControl(HWindow, IDC_ACLIST);
         // create status bar
-        HStatusBar = CreateWindowEx(0, STATUSCLASSNAME, (LPCTSTR)NULL,
+        HStatusBar = CreateWindowExW(0, STATUSCLASSNAMEW, (LPCWSTR)NULL,
                                     SBARS_SIZEGRIP | WS_CHILD | CCS_BOTTOM | WS_VISIBLE | WS_GROUP,
                                     0, 0, 0, 0, HWindow, (HMENU)IDC_ACSTATUS,
                                     HInstance, NULL);
@@ -78,7 +79,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         // the Stop/Restart button becomes the Start button
-        SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
+        SetDlgItemTextW(HWindow, IDB_ACSTOP, LoadStrW(IDS_ACBUTTON_RESCAN));
         // disable OK and enable Drives
         EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), TRUE);
         EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
@@ -111,7 +112,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 // Restart button
                 // the Stop/Restart button becomes the Stop button again
-                SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_STOP));
+                SetDlgItemTextW(HWindow, IDB_ACSTOP, LoadStrW(IDS_ACBUTTON_STOP));
                 // disable OK and Drives
                 EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), FALSE);
                 EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
@@ -183,8 +184,11 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int index;
                 CPackACPacker* packer = ListView->GetPacker(info->item.iItem, &index);
                 // if text was requested, provide it
+                // GetText() has always returned const wchar_t* (even in the narrow
+                // build - this listview apparently already receives it as wide text at runtime);
+                // the cast just needs to track pszText's own per-build width now.
                 if (info->item.mask & LVIF_TEXT)
-                    info->item.pszText = (char*)packer->GetText(index, info->item.iSubItem);
+                    info->item.pszText = (wchar_t*)packer->GetText(index, info->item.iSubItem);
                 // if the checkbox icon was requested, provide it too
                 if ((info->item.mask & LVIF_STATE) &&
                     (info->item.stateMask & LVIS_STATEIMAGEMASK))
@@ -224,16 +228,20 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (IsIconic(HWindow))
             ShowWindow(HWindow, SW_RESTORE);
         // and display the error
-        MessageBox(HWindow, (char*)wParam, LoadStr(IDS_ERRORFINDINGFILE), MB_OK | MB_ICONEXCLAMATION);
+        // wide: the WPARAM text comes straight from LoadStrW's ring buffer at the
+        // SendMessage producer sites below - both sides of this round trip widened together.
+        MessageBoxW(HWindow, (WCHAR*)wParam, LoadStrW(IDS_ERRORFINDINGFILE), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;
     }
     case WM_USER_ACSEARCHING:
     {
         // the searching thread sent us a new path it is working on, so we trim the trailing slash
-        if (((char*)wParam)[lstrlen((char*)wParam) - 1] == '\\')
-            ((char*)wParam)[lstrlen((char*)wParam) - 1] = '\0';
+        // the producer (DirectorySearch) now GlobalAllocs a wchar_t buffer; a
+        // WPARAM carries no type, so both ends of this round trip had to widen in one change.
+        if (((wchar_t*)wParam)[lstrlenW((wchar_t*)wParam) - 1] == L'\\')
+            ((wchar_t*)wParam)[lstrlenW((wchar_t*)wParam) - 1] = L'\0';
         // display it
-        SetDlgItemText(HWindow, IDC_ACSTATUS, (char*)wParam);
+        SetDlgItemTextW(HWindow, IDC_ACSTATUS, (wchar_t*)wParam);
         // and free the memory
         HANDLES(GlobalFree((HGLOBAL)wParam));
         return TRUE;
@@ -259,8 +267,8 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
         {
             // restore everything back to normal
-            SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
-            SetDlgItemText(HWindow, IDC_ACSTATUS, LoadStr(IDS_ACSTATUSDONE));
+            SetDlgItemTextW(HWindow, IDB_ACSTOP, LoadStrW(IDS_ACBUTTON_RESCAN));
+            SetDlgItemTextW(HWindow, IDC_ACSTATUS, LoadStrW(IDS_ACSTATUSDONE));
             EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), TRUE);
             EnableWindow(GetDlgItem(HWindow, IDOK), TRUE);
             // fix the default push button
@@ -405,21 +413,32 @@ void CPackACDialog::LayoutControls()
     ListView->SetColumnWidth();
 }
 
-BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
+BOOL CPackACDialog::MyGetBinaryType(LPCWSTR filename, LPDWORD lpBinaryType)
 {
-    CALL_STACK_MESSAGE2("CPackACDialog::MyGetBinaryType(%s, )", filename);
+    // CALL_STACK_MESSAGE formats stay narrow (bug-report floor); %ls takes the wide argument.
+    CALL_STACK_MESSAGE2("CPackACDialog::MyGetBinaryType(%ls)", filename);
 
     BOOL ret = FALSE;
     // open the file for reading
-    HANDLE hfile = HANDLES_Q(CreateFileW(AnsiToWide(filename).c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hfile = gFileSystem->CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                           OPEN_EXISTING, 0, NULL);
+    const DWORD openError = GetLastError();
+    HANDLES_ADD_EX(__otQuiet, hfile != INVALID_HANDLE_VALUE, __htFile,
+                   __hoCreateFile, hfile, openError, TRUE);
     if (hfile != INVALID_HANDLE_VALUE)
     {
+        auto seek = [hfile](int64_t offset)
+        {
+            return gFileSystem->SeekHandle(hfile, offset, FILE_BEGIN, NULL).success;
+        };
+        auto readExact = [hfile](void* buffer, DWORD size)
+        {
+            DWORD read = 0;
+            return gFileSystem->ReadFromHandle(hfile, buffer, size, &read).success && read == size;
+        };
         IMAGE_DOS_HEADER mz_header;
-        DWORD len;
         // Seek to the start of the file and read the DOS header information.
-        if (SetFilePointer(hfile, 0, NULL, FILE_BEGIN) != -1 &&
-            ReadFile(hfile, &mz_header, sizeof(mz_header), &len, NULL) &&
-            len == sizeof(mz_header))
+        if (seek(0) && readExact(&mz_header, sizeof(mz_header)))
         {
             // Now that we have the header check the e_magic field to see if this is a dos image.
             if (mz_header.e_magic == IMAGE_DOS_SIGNATURE)
@@ -435,9 +454,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                     if ((mz_header.e_crlc == 0) ||
                         (mz_header.e_lfarlc >= sizeof(IMAGE_DOS_HEADER)))
                         if (mz_header.e_lfanew >= sizeof(IMAGE_DOS_HEADER) &&
-                            SetFilePointer(hfile, mz_header.e_lfanew, NULL, FILE_BEGIN) != -1 &&
-                            ReadFile(hfile, magic, sizeof(magic), &len, NULL) &&
-                            len == sizeof(magic))
+                            seek(mz_header.e_lfanew) && readExact(magic, sizeof(magic)))
                             lfanewValid = TRUE;
 
                 if (!lfanewValid)
@@ -461,9 +478,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                         // header."  This can mean either a 16-bit OS/2 or a 16-bit Windows or even a DOS program
                         // (running under a DOS extender).  To decide which, we'll have to read the NE header.
                         IMAGE_OS2_HEADER ne;
-                        if (SetFilePointer(hfile, mz_header.e_lfanew, NULL, FILE_BEGIN) != -1 &&
-                            ReadFile(hfile, &ne, sizeof(ne), &len, NULL) &&
-                            len == sizeof(ne))
+                        if (seek(mz_header.e_lfanew) && readExact(&ne, sizeof(ne)))
                         {
                             switch (ne.ne_exetyp)
                             {
@@ -485,18 +500,16 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                                 LPSTR nametab = NULL;
 
                                 // read modref table
-                                if ((SetFilePointer(hfile, mz_header.e_lfanew + ne.ne_modtab, NULL, FILE_BEGIN) == -1) ||
+                                if (!seek(mz_header.e_lfanew + ne.ne_modtab) ||
                                     ((modtab = (LPWORD)HANDLES(GlobalAlloc(GMEM_FIXED, ne.ne_cmod * sizeof(WORD)))) == NULL) ||
-                                    (!(ReadFile(hfile, modtab, ne.ne_cmod * sizeof(WORD), &len, NULL))) ||
-                                    (len != ne.ne_cmod * sizeof(WORD)))
+                                    !readExact(modtab, ne.ne_cmod * sizeof(WORD)))
                                     ret = FALSE;
                                 else
                                 {
                                     // read imported names table
-                                    if ((SetFilePointer(hfile, mz_header.e_lfanew + ne.ne_imptab, NULL, FILE_BEGIN) == -1) ||
+                                    if (!seek(mz_header.e_lfanew + ne.ne_imptab) ||
                                         ((nametab = (LPSTR)HANDLES(GlobalAlloc(GMEM_FIXED, ne.ne_enttab - ne.ne_imptab))) == NULL) ||
-                                        (!(ReadFile(hfile, nametab, ne.ne_enttab - ne.ne_imptab, &len, NULL))) ||
-                                        (len != (WORD)(ne.ne_enttab - ne.ne_imptab)))
+                                        !readExact(nametab, ne.ne_enttab - ne.ne_imptab))
                                         ret = FALSE;
                                     else
                                     {
@@ -537,18 +550,18 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
             else
             {
                 // If we get here, we don't even have a correct MZ header. Try to check the file extension for known types ...
-                const char* ptr;
-                ptr = strrchr(filename, '.');
+                const wchar_t* ptr;
+                ptr = wcsrchr(filename, L'.');
                 if (ptr &&
-                    !strchr(ptr, '\\') &&
-                    !strchr(ptr, '/'))
+                    !wcschr(ptr, L'\\') &&
+                    !wcschr(ptr, L'/'))
                 {
-                    if (!stricmp(ptr, ".COM"))
+                    if (!_wcsicmp(ptr, L".COM"))
                     {
                         *lpBinaryType = SCS_DOS_BINARY;
                         ret = TRUE;
                     }
-                    else if (!stricmp(ptr, ".PIF"))
+                    else if (!_wcsicmp(ptr, L".PIF"))
                     {
                         *lpBinaryType = SCS_PIF_BINARY;
                         ret = TRUE;
@@ -559,77 +572,78 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
             }
         }
         // Close the file.
-        HANDLES(CloseHandle(hfile));
+        HANDLES_REMOVE(hfile, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(hfile);
     }
     return ret;
 }
 
 // the actual (and recursive :-) ) function for disk searching
-BOOL CPackACDialog::DirectorySearch(char* path)
+BOOL CPackACDialog::DirectorySearch(const std::wstring& path)
 {
-    CALL_STACK_MESSAGE2("CPackACDialog::DirectorySearch(%s)", path);
+    // CALL_STACK_MESSAGE formats stay narrow (bug-report floor); %ls takes the wide argument.
+    CALL_STACK_MESSAGE2("CPackACDialog::DirectorySearch(%ls)", path.c_str());
 
     // report to the boss what we are working on
-    DWORD pathLen = (DWORD)strlen(path);
-    char* workName = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 1));
+    // WM_USER_ACSEARCHING transfers ownership to the dialog thread, which frees the allocation.
+    const size_t pathLen = path.length();
+    if (pathLen > (std::numeric_limits<DWORD>::max)() / sizeof(wchar_t) - 1)
+    {
+        SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStrW(IDS_PACKERR_NOMEM), NULL);
+        return TRUE;
+    }
+    const DWORD workNameBytes = static_cast<DWORD>((pathLen + 1) * sizeof(wchar_t));
+    wchar_t* workName = (wchar_t*)HANDLES(GlobalAlloc(GMEM_FIXED, workNameBytes));
     if (workName == NULL)
     {
-        SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
+        SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStrW(IDS_PACKERR_NOMEM), NULL);
         TRACE_E(LOW_MEMORY);
         return TRUE;
     }
-    strcpy(workName, path);
+    std::wmemcpy(workName, path.c_str(), pathLen + 1);
     // send the name; the receiver will free the memory
+    // WM_USER_ACSEARCHING carries this buffer as a WPARAM, which erases its type -
+    // the handler in DialogProc casts it back and was widened in the same change.
     if (!PostMessage(HWindow, WM_USER_ACSEARCHING, (WPARAM)workName, 0))
         // if it failed, never mind...
         HANDLES(GlobalFree((HGLOBAL)workName));
 
-    // allocate the buffer for the search mask
-    char* fileName = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 3 + 1));
-    if (fileName == NULL)
-    {
-        SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
-        TRACE_E(LOW_MEMORY);
-        return TRUE;
-    }
-    // prepare the mask for searching
-    strcpy(fileName, path);
-    strcat(fileName, "*");
+    const std::wstring searchMask = path + L"*";
 
     // set up some variables
     BOOL mustStop = FALSE;
     WIN32_FIND_DATAW findData;
     // try to find the first file
-    HANDLE fileFind = SalFindFirstFileHW(fileName, &findData);
+    HANDLE fileFind = SalFindFirstFileHW(searchMask.c_str(), &findData);
     if (fileFind != INVALID_HANDLE_VALUE)
     {
         do
         {
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, findData.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-            unsigned int nameLen = (unsigned int)strlen(cFileNameA);
+            // findData.cFileName is the truth; the WideCharToMultiByte copy that
+            // used to stand here narrowed it through CP_ACP only to feed narrow parameters that
+            // are all wide now.
+            const wchar_t* cFileName = findData.cFileName;
+            unsigned int nameLen = (unsigned int)wcslen(cFileName);
             if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 // it is a file; now check if it is an exe
-                if (nameLen > 4 && pathLen + nameLen < SAL_MAX_LONG_PATH &&
-                    (cFileNameA[nameLen - 1] == 'e' || cFileNameA[nameLen - 1] == 'E') &&
-                    (cFileNameA[nameLen - 2] == 'x' || cFileNameA[nameLen - 2] == 'X') &&
-                    (cFileNameA[nameLen - 3] == 'e' || cFileNameA[nameLen - 3] == 'E') &&
-                    cFileNameA[nameLen - 4] == '.')
+                if (nameLen > 4 &&
+                    (cFileName[nameLen - 1] == L'e' || cFileName[nameLen - 1] == L'E') &&
+                    (cFileName[nameLen - 2] == L'x' || cFileName[nameLen - 2] == L'X') &&
+                    (cFileName[nameLen - 3] == L'e' || cFileName[nameLen - 3] == L'E') &&
+                    cFileName[nameLen - 4] == L'.')
                 {
                     // determine the program type
-                    CPathBuffer fullName; // Heap-allocated for long path support
                     DWORD type;
-                    strcpy(fullName, path);
-                    strcat(fullName, cFileNameA);
+                    const std::wstring fullName = path + cFileName;
 
-                    if (!MyGetBinaryType(fullName, &type))
+                    if (!MyGetBinaryType(fullName.c_str(), &type))
                     {
-                        TRACE_I("Invalid executable or error getting type: " << fullName.Get());
+                        TRACE_IW(L"Invalid executable or error getting type: " << fullName.c_str());
                         continue;
                     }
                     // and see whether we are interested in it
-                    mustStop |= ListView->ConsiderItem(path, cFileNameA,
+                    mustStop |= ListView->ConsiderItem(path.c_str(), cFileName,
                                                        findData.ftLastWriteTime,
                                                        CQuadWord(findData.nFileSizeLow,
                                                                  findData.nFileSizeHigh),
@@ -639,29 +653,13 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             else
             {
                 // we have a directory - exclude '.' and '..'
-                if (cFileNameA[0] != 0 &&
-                    (cFileNameA[0] != '.' ||
-                     (cFileNameA[1] != '\0' &&
-                      (cFileNameA[1] != '.' || cFileNameA[2] != '\0'))) &&
-                    pathLen + 1 + nameLen < SAL_MAX_LONG_PATH)
+                if (cFileName[0] != 0 &&
+                    (cFileName[0] != L'.' ||
+                     (cFileName[1] != L'\0' &&
+                      (cFileName[1] != L'.' || cFileName[2] != L'\0'))))
                 {
-                    // create the directory name to search
-                    char* newPath = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 1 + nameLen + 1));
-                    if (newPath == NULL)
-                    {
-                        SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
-                        mustStop = TRUE;
-                        TRACE_E(LOW_MEMORY);
-                    }
-                    else
-                    {
-                        strcpy(newPath, path);
-                        strcat(newPath, cFileNameA);
-                        strcat(newPath, "\\");
-                        // and search it recursively
-                        DirectorySearch(newPath);
-                        HANDLES(GlobalFree((HGLOBAL)newPath));
-                    }
+                    const std::wstring newPath = path + cFileName + L"\\";
+                    mustStop |= DirectorySearch(newPath);
                 }
             }
             // check whether an interruption has been signaled
@@ -669,9 +667,8 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             if (ret != WAIT_TIMEOUT)
                 mustStop = TRUE;
         } while (SalLPFindNextFile(fileFind, &findData) && !mustStop);
-        HANDLES(FindClose(fileFind));
+        SalLPFindClose(fileFind);
     }
-    HANDLES(GlobalFree((HGLOBAL)fileName));
     // and done
     return mustStop;
 }
@@ -682,24 +679,24 @@ CPackACDialog::DiskSearch()
 {
     CALL_STACK_MESSAGE1("CPackACDialog::DiskSearch()");
     // initialize tracing for the new thread
-    SetThreadNameInVCAndTrace("AutoConfig");
+    SetThreadNameInVCAndTrace(L"AutoConfig");
     TRACE_I("Begin");
 
     // sanity checking
-    if (DrivesList == NULL || *DrivesList == NULL || **DrivesList == '\0')
+    if (DrivesList == NULL || *DrivesList == NULL || **DrivesList == L'\0')
         TRACE_I("The list of drives is empty...");
     else
     {
-        char* drive = *DrivesList;
+        wchar_t* drive = *DrivesList;
         // go through all drives we have
         BOOL mustStop = FALSE;
-        while (*drive != '\0' && !mustStop)
+        while (*drive != L'\0' && !mustStop)
         {
             // and off we go...
-            TRACE_I("Searching drive " << drive);
-            mustStop = DirectorySearch(drive);
+            TRACE_IW(L"Searching drive " << drive);
+            mustStop = DirectorySearch(std::wstring(drive));
             // move to the next one in the list
-            while (*drive != '\0')
+            while (*drive != L'\0')
                 drive++;
             // skip the terminating null
             drive++;
@@ -751,25 +748,25 @@ void CPackACDialog::AddToExtensions(int foundIndex, int packerIndex, CPackACPack
     // add the extension and possibly a custom packer if it does not exist
     // the packer is added if there is no file mask corresponding to the found packer
     // if one exists and refers to something other than a plugin or 32-bit version, redirect to the found one
-    char buffer[10];
-    const char* ptr = PackACExtensions[packerIndex].Ext;
+    wchar_t buffer[10];
+    const wchar_t* ptr = PackACExtensions[packerIndex].Ext;
     int found;
     do
     {
         // look for who is using us
-        buffer[0] = '.';
+        buffer[0] = L'.';
         int j = 1;
-        while (*ptr != ';' && *ptr != '\0')
+        while (*ptr != L';' && *ptr != L'\0')
         {
-            if (*ptr == '#')
-                buffer[j++] = '1';
+            if (*ptr == L'#')
+                buffer[j++] = L'1';
             else
                 buffer[j++] = *ptr;
             ptr++;
         }
-        if (*ptr == ';')
+        if (*ptr == L';')
             ptr++;
-        buffer[j] = '\0';
+        buffer[j] = L'\0';
         // we built the "archive name", now check whether we have it in extensions...
         found = PackerFormatConfig.PackIsArchive(buffer);
         if (found != 0)
@@ -801,7 +798,7 @@ void CPackACDialog::AddToExtensions(int foundIndex, int packerIndex, CPackACPack
                     (pos >= 0 && pos != packerIndex &&
                      (p == NULL || p->GetSelectedFullName() == NULL || foundPacker->GetExeType() == EXE_32BIT)))
                 {
-                    TRACE_I("Setting packer for extension " << PackACExtensions[packerIndex].Ext << " to the new one.");
+                    TRACE_IW(L"Setting packer for extension " << PackACExtensions[packerIndex].Ext << L" to the new one.");
                     PackerFormatConfig.SetPackerIndex(found - 1, packerIndex);
                     PackerFormatConfig.SetUsePacker(found - 1, TRUE);
                     // rebuild the table
@@ -825,21 +822,21 @@ void CPackACDialog::AddToExtensions(int foundIndex, int packerIndex, CPackACPack
                 if (pos >= 0 && pos != packerIndex &&
                     (p == NULL || p->GetSelectedFullName() == NULL || foundPacker->GetExeType() == EXE_32BIT))
                 {
-                    TRACE_I("Changing unpacker for extension " << PackACExtensions[packerIndex].Ext << " to the new one.");
+                    TRACE_IW(L"Changing unpacker for extension " << PackACExtensions[packerIndex].Ext << L" to the new one.");
                     PackerFormatConfig.SetUnpackerIndex(found - 1, packerIndex);
                     // rebuild the table
                     PackerFormatConfig.BuildArray();
                 }
             }
         }
-    } while (*ptr != '\0');
+    } while (*ptr != L'\0');
     // we searched all extensions and if none were found we must add one
     if (found == 0)
     {
         // if we only have a packer, we must also have an unpacker (we would have found the plugin already)
         if (foundPacker->GetPackerType() != Packer_Packer || ListView->GetPacker(foundIndex + 1)->GetSelectedFullName() != NULL)
         {
-            TRACE_I("Adding extensions " << PackACExtensions[packerIndex].Ext);
+            TRACE_IW(L"Adding extensions " << PackACExtensions[packerIndex].Ext);
             int idx = PackerFormatConfig.AddFormat();
             if (idx >= 0)
             {
@@ -849,7 +846,7 @@ void CPackACDialog::AddToExtensions(int foundIndex, int packerIndex, CPackACPack
             }
         }
         else
-            TRACE_I("Skipping packer for which I have no unpacker: " << foundPacker->GetSelectedFullName());
+            TRACE_IW(L"Skipping packer for which I have no unpacker: " << foundPacker->GetSelectedFullName());
     }
 }
 
@@ -878,14 +875,14 @@ void CPackACDialog::RemoveFromExtensions(int foundIndex, int packerIndex, CPackA
             if (p == NULL || p->GetSelectedFullName() == NULL)
             {
                 // if there is no alternative, remove it
-                TRACE_I("Removing extensions " << PackerFormatConfig.GetExt(i));
+                TRACE_IW(L"Removing extensions " << PackerFormatConfig.GetExt(i));
                 PackerFormatConfig.DeleteFormat(i);
                 PackerFormatConfig.BuildArray();
             }
             else
             {
                 // we found an alternative, switch to it
-                TRACE_I("Changing viewer for extensions " << PackerFormatConfig.GetExt(i) << " to another.");
+                TRACE_IW(L"Changing viewer for extensions " << PackerFormatConfig.GetExt(i) << L" to another.");
                 PackerFormatConfig.SetUnpackerIndex(i, p->GetArchiverIndex());
                 PackerFormatConfig.BuildArray();
             }
@@ -901,7 +898,7 @@ void CPackACDialog::RemoveFromExtensions(int foundIndex, int packerIndex, CPackA
                 if (p == NULL || p->GetSelectedFullName() == NULL)
                 {
                     // the alternative does not exist
-                    TRACE_I("Setting packer to --not supported-- for extension " << PackerFormatConfig.GetExt(i));
+                    TRACE_IW(L"Setting packer to --not supported-- for extension " << PackerFormatConfig.GetExt(i));
                     // another unpacker is present, set the packer to --not supported--
                     PackerFormatConfig.SetUsePacker(i, FALSE);
                     PackerFormatConfig.BuildArray();
@@ -909,7 +906,7 @@ void CPackACDialog::RemoveFromExtensions(int foundIndex, int packerIndex, CPackA
                 else
                 {
                     // we have an alternative that we found, switch to it
-                    TRACE_I("Changing editor for extensions " << PackerFormatConfig.GetExt(i) << " to another.");
+                    TRACE_IW(L"Changing editor for extensions " << PackerFormatConfig.GetExt(i) << L" to another.");
                     PackerFormatConfig.SetPackerIndex(i, p->GetArchiverIndex());
                     PackerFormatConfig.BuildArray();
                 }
@@ -923,37 +920,37 @@ void CPackACDialog::AddToCustom(int foundIndex, int packerIndex, CPackACPacker* 
     CALL_STACK_MESSAGE3("CPackACDialog::AddToCustom(%d, %d, )", foundIndex, packerIndex);
 
     // add custom packers for the newly found packer
-    char variable[50];
+    wchar_t variable[50];
     int i;
     BOOL found1 = FALSE, found2 = FALSE;
-    sprintf(variable, "$(%s)", ArchiverConfig->GetPackerVariable(packerIndex));
+    swprintf_s(variable, L"$(%s)", ArchiverConfig->GetPackerVariable(packerIndex));
     // search custom packers to see if it is already present
     for (i = 0; i < PackerConfig.GetPackersCount(); i++)
     {
         // consider only external ones
         if (PackerConfig.GetPackerType(i) >= 0)
         {
-            const char* cmd = PackerConfig.GetPackerCmdExecCopy(i);
-            const char* args = PackerConfig.GetPackerCmdArgsCopy(i);
-            if (!strcmp(cmd, variable) && !strcmp(args, CustomPackers[packerIndex].CopyArgs[0]))
+            const wchar_t* cmd = PackerConfig.GetPackerCmdExecCopy(i);
+            const wchar_t* args = PackerConfig.GetPackerCmdArgsCopy(i);
+            if (!wcscmp(cmd, variable) && !wcscmp(args, CustomPackers[packerIndex].CopyArgs[0]))
                 found1 = TRUE;
-            else if (CustomPackers[packerIndex].CopyArgs[1] != NULL && !strcmp(cmd, variable) && !strcmp(args, CustomPackers[packerIndex].CopyArgs[1]))
+            else if (CustomPackers[packerIndex].CopyArgs[1] != NULL && !wcscmp(cmd, variable) && !wcscmp(args, CustomPackers[packerIndex].CopyArgs[1]))
                 found2 = TRUE;
         }
     }
     if (!found1 && foundPacker->GetPackerType() != Packer_Unpacker)
     {
-        TRACE_I("Adding custom packer " << LoadStr(CustomPackers[packerIndex].Title[0]));
+        TRACE_IW(L"Adding custom packer " << LoadStrW(CustomPackers[packerIndex].Title[0]));
         int idx = PackerConfig.AddPacker();
-        PackerConfig.SetPacker(idx, 0, LoadStr(CustomPackers[packerIndex].Title[0]), CustomPackers[packerIndex].Ext,
+        PackerConfig.SetPacker(idx, 0, LoadStrW(CustomPackers[packerIndex].Title[0]), CustomPackers[packerIndex].Ext,
                                FALSE, CustomPackers[packerIndex].SupLN, TRUE, variable, CustomPackers[packerIndex].CopyArgs[0],
                                variable, CustomPackers[packerIndex].MoveArgs[0], CustomPackers[packerIndex].Ansi);
     }
     if (CustomPackers[packerIndex].CopyArgs[1] != NULL && !found2 && foundPacker->GetPackerType() != Packer_Unpacker)
     {
-        TRACE_I("Adding custom packer " << LoadStr(CustomPackers[packerIndex].Title[1]));
+        TRACE_IW(L"Adding custom packer " << LoadStrW(CustomPackers[packerIndex].Title[1]));
         int idx = PackerConfig.AddPacker();
-        PackerConfig.SetPacker(idx, 0, LoadStr(CustomPackers[packerIndex].Title[1]), CustomPackers[packerIndex].Ext,
+        PackerConfig.SetPacker(idx, 0, LoadStrW(CustomPackers[packerIndex].Title[1]), CustomPackers[packerIndex].Ext,
                                FALSE, CustomPackers[packerIndex].SupLN, TRUE, variable,
                                CustomPackers[packerIndex].CopyArgs[1], variable, CustomPackers[packerIndex].MoveArgs[1],
                                CustomPackers[packerIndex].Ansi);
@@ -961,7 +958,7 @@ void CPackACDialog::AddToCustom(int foundIndex, int packerIndex, CPackACPacker* 
 
     // add custom unpackers for the newly found packer
     if (!ArchiverConfig->ArchiverExesAreSame(packerIndex))
-        sprintf(variable, "$(%s)", ArchiverConfig->GetUnpackerVariable(packerIndex));
+        swprintf_s(variable, L"$(%s)", ArchiverConfig->GetUnpackerVariable(packerIndex));
     found1 = FALSE;
     // search custom packers to see if it is already present
     for (i = 0; i < UnpackerConfig.GetUnpackersCount(); i++)
@@ -969,17 +966,17 @@ void CPackACDialog::AddToCustom(int foundIndex, int packerIndex, CPackACPacker* 
         // consider only external ones
         if (UnpackerConfig.GetUnpackerType(i) >= 0)
         {
-            const char* cmd = UnpackerConfig.GetUnpackerCmdExecExtract(i);
-            const char* args = UnpackerConfig.GetUnpackerCmdArgsExtract(i);
-            if (!strcmp(cmd, variable) && !strcmp(args, CustomUnpackers[packerIndex].Args))
+            const wchar_t* cmd = UnpackerConfig.GetUnpackerCmdExecExtract(i);
+            const wchar_t* args = UnpackerConfig.GetUnpackerCmdArgsExtract(i);
+            if (!wcscmp(cmd, variable) && !wcscmp(args, CustomUnpackers[packerIndex].Args))
                 found1 = TRUE;
         }
     }
     if (!found1 && foundPacker->GetPackerType() != Packer_Packer)
     {
-        TRACE_I("Adding custom unpacker " << LoadStr(CustomUnpackers[packerIndex].Title));
+        TRACE_IW(L"Adding custom unpacker " << LoadStrW(CustomUnpackers[packerIndex].Title));
         int idx = UnpackerConfig.AddUnpacker();
-        UnpackerConfig.SetUnpacker(idx, 0, LoadStr(CustomUnpackers[packerIndex].Title), CustomUnpackers[packerIndex].Ext,
+        UnpackerConfig.SetUnpacker(idx, 0, LoadStrW(CustomUnpackers[packerIndex].Title), CustomUnpackers[packerIndex].Ext,
                                    FALSE, CustomUnpackers[packerIndex].SupLN, variable, CustomUnpackers[packerIndex].Args,
                                    CustomUnpackers[packerIndex].Ansi);
     }
@@ -994,45 +991,45 @@ void CPackACDialog::RemoveFromCustom(int foundIndex, int packerIndex)
     //   2) the invoked program is a variable corresponding to this packer
 
     CPackACPacker* p = NULL;
-    char variable[50];
-    sprintf(variable, "$(%s)", ArchiverConfig->GetPackerVariable(packerIndex));
+    wchar_t variable[50];
+    swprintf_s(variable, L"$(%s)", ArchiverConfig->GetPackerVariable(packerIndex));
     int i;
     // search custom packers (backwards so we can remove entries)
     for (i = PackerConfig.GetPackersCount() - 1; i >= 0; i--)
         // consider only external ones
         if (PackerConfig.GetPackerType(i) >= 0)
         {
-            const char* cmd = PackerConfig.GetPackerCmdExecCopy(i);
-            if (!strcmp(cmd, variable))
+            const wchar_t* cmd = PackerConfig.GetPackerCmdExecCopy(i);
+            if (!wcscmp(cmd, variable))
             {
                 // this packer calls a program we did not find - remove it
-                TRACE_I("Removing custom packer which uses not found packer: " << variable);
+                TRACE_IW(L"Removing custom packer which uses not found packer: " << variable);
                 PackerConfig.DeletePacker(i);
                 // no need to check move cmd, the packer no longer exists
             }
             else if (PackerConfig.GetPackerSupMove(i))
             {
                 cmd = PackerConfig.GetPackerCmdExecMove(i);
-                if (!strcmp(cmd, variable))
+                if (!wcscmp(cmd, variable))
                 {
                     // calls the move cmd program that does not exist - disable it
-                    TRACE_I("Disabling Move command for custom packer which uses not found packer: " << variable);
+                    TRACE_IW(L"Disabling Move command for custom packer which uses not found packer: " << variable);
                     PackerConfig.SetPackerSupMove(i, FALSE);
                 }
             }
         }
     if (!ArchiverConfig->ArchiverExesAreSame(packerIndex))
-        sprintf(variable, "$(%s)", ArchiverConfig->GetUnpackerVariable(packerIndex));
+        swprintf_s(variable, L"$(%s)", ArchiverConfig->GetUnpackerVariable(packerIndex));
     // search custom unpackers
     for (i = UnpackerConfig.GetUnpackersCount() - 1; i >= 0; i--)
         // consider only external ones
         if (UnpackerConfig.GetUnpackerType(i) >= 0)
         {
-            const char* cmd = UnpackerConfig.GetUnpackerCmdExecExtract(i);
-            if (!strcmp(cmd, variable))
+            const wchar_t* cmd = UnpackerConfig.GetUnpackerCmdExecExtract(i);
+            if (!wcscmp(cmd, variable))
             {
                 // this unpacker calls a program we did not find - remove it
-                TRACE_I("Removing custom unpacker which uses not found packer: " << variable);
+                TRACE_IW(L"Removing custom unpacker which uses not found packer: " << variable);
                 UnpackerConfig.DeleteUnpacker(i);
             }
         }
@@ -1086,7 +1083,7 @@ void CPackACDialog::Transfer(CTransferInfo& ti)
             // ask for the packer
             CPackACPacker* packer = ListView->GetPacker(i);
             int index = packer->GetArchiverIndex();
-            const char* fullName = packer->GetSelectedFullName();
+            const wchar_t* fullName = packer->GetSelectedFullName();
             // if we didn't find it leave the original value
             if (fullName != NULL)
             {
@@ -1109,7 +1106,7 @@ void CPackACDialog::Transfer(CTransferInfo& ti)
             // ask for the packer
             CPackACPacker* packer = ListView->GetPacker(i);
             int index = packer->GetArchiverIndex();
-            const char* fullName = packer->GetSelectedFullName();
+            const wchar_t* fullName = packer->GetSelectedFullName();
             // if we didn't find it, leave the original value
             if (fullName != NULL)
             {
@@ -1164,11 +1161,11 @@ void CPackACPacker::InvertSelect(int index)
 }
 
 // return the text that belongs in the given column
-const char*
+const wchar_t*
 CPackACPacker::GetText(int index, int column)
 {
     CALL_STACK_MESSAGE3("CPackACPacker::GetText(%d, %d)", index, column);
-    const char* ret;
+    const wchar_t* ret;
     if (index >= 0)
     {
         HANDLES(EnterCriticalSection(&FoundDataCriticalSection));
@@ -1180,7 +1177,7 @@ CPackACPacker::GetText(int index, int column)
         if (column == 0)
             ret = Title;
         else
-            ret = "";
+            ret = L"";
     }
     return ret;
 }
@@ -1209,31 +1206,31 @@ int CPackACPacker::GetSelectState(int index)
 }
 
 // check whether we want the given program and if so, add it
-int CPackACPacker::CheckAndInsert(const char* path, const char* fileName, FILETIME lastWriteTime,
+int CPackACPacker::CheckAndInsert(const wchar_t* path, const wchar_t* fileName, FILETIME lastWriteTime,
                                   const CQuadWord& size, EPackExeType exeType)
 {
-    CALL_STACK_MESSAGE3("CPackACPacker::CheckAndInsert(%s, %s, , , )", path, fileName);
-    const char* ref = Name;
-    const char* act = fileName;
+    CALL_STACK_MESSAGE3("CPackACPacker::CheckAndInsert(%ls, %ls, , , )", path, fileName);
+    const wchar_t* ref = Name;
+    const wchar_t* act = fileName;
     // does the name match?
-    while (*ref != '\0' && *act != '\0' && tolower(*ref) == tolower(*act))
+    while (*ref != L'\0' && *act != L'\0' && towlower(*ref) == towlower(*act))
     {
         ref++;
         act++;
     }
     // the extension has been checked already; now verify if we are at the end of the string
     // and whether other requirements are met (currently only the type, we will see in the future...)
-    if (*ref == '\0' && act == &fileName[lstrlen(fileName) - 4] &&
+    if (*ref == L'\0' && act == &fileName[lstrlenW(fileName) - 4] &&
         exeType == Type)
     {
-        std::string fullName = std::string(path) + fileName;
+        std::wstring fullName = std::wstring(path) + fileName;
         // we found a new item, check whether it is new for us
         int i;
         for (i = 0; i < Found.Count; i++)
         {
-            const char* n2 = Found.At(i)->FullName.c_str();
+            const wchar_t* n2 = Found.At(i)->FullName.c_str();
             // if we already have it, return
-            if (!strcmp(fullName.c_str(), n2))
+            if (!wcscmp(fullName.c_str(), n2))
             {
                 return 0;
             }
@@ -1317,7 +1314,7 @@ void CPackACArray::InvertSelect(int index)
 }
 
 // return the FullName of the selected item
-const char*
+const wchar_t*
 CPackACArray::GetSelectedFullName()
 {
     CALL_STACK_MESSAGE1("CPackACArray::GetSelectedFullName()");
@@ -1442,7 +1439,7 @@ void CPackACListView::Initialize(APackACPackersTable* table)
 BOOL CPackACListView::InitColumns()
 {
     CALL_STACK_MESSAGE1("CPackACListView::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     // header table
     int header[4] = {IDS_ACCOLUMN1, IDS_ACCOLUMN2, IDS_ACCOLUMN3, IDS_ACCOLUMN4};
 
@@ -1457,18 +1454,19 @@ BOOL CPackACListView::InitColumns()
         else
             lvc.fmt = LVCFMT_RIGHT;
         // header
-        lvc.pszText = LoadStr(header[i]);
+        std::wstring headerText = LoadStrOwned(header[i]);
+        lvc.pszText = headerText.data();
         // column number
         lvc.iSubItem = i;
         // and create the column
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        if (SendMessageW(HWindow, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc) == -1)
             return FALSE;
     }
 
     // set initial widths of the size, date and time columns
-    ListView_SetColumnWidth(HWindow, 3, ListView_GetStringWidth(HWindow, "00:00:00") + 20);
-    ListView_SetColumnWidth(HWindow, 2, ListView_GetStringWidth(HWindow, "00.00.0000") + 20);
-    ListView_SetColumnWidth(HWindow, 1, ListView_GetStringWidth(HWindow, "000 000") + 20);
+    ListView_SetColumnWidth(HWindow, 3, (int)SendMessageW(HWindow, LVM_GETSTRINGWIDTHW, 0, (LPARAM)L"00:00:00") + 20);
+    ListView_SetColumnWidth(HWindow, 2, (int)SendMessageW(HWindow, LVM_GETSTRINGWIDTHW, 0, (LPARAM)L"00.00.0000") + 20);
+    ListView_SetColumnWidth(HWindow, 1, (int)SendMessageW(HWindow, LVM_GETSTRINGWIDTHW, 0, (LPARAM)L"000 000") + 20);
     // calculate the width of the fullname column
     SetColumnWidth();
 
@@ -1501,10 +1499,10 @@ void CPackACListView::SetColumnWidth()
 }
 
 // check the found file and if it is an archiver we want, add it to the Found array
-BOOL CPackACListView::ConsiderItem(const char* path, const char* fileName, FILETIME lastWriteTime,
+BOOL CPackACListView::ConsiderItem(const wchar_t* path, const wchar_t* fileName, FILETIME lastWriteTime,
                                    const CQuadWord& size, EPackExeType type)
 {
-    CALL_STACK_MESSAGE4("CPackACListView::ConsiderItem(%s, %s, , , %d)", path, fileName, type);
+    CALL_STACK_MESSAGE4("CPackACListView::ConsiderItem(%ls, %ls, , , %d)", path, fileName, type);
 
     // consistency check
     if (PackersTable == NULL)
@@ -1523,13 +1521,13 @@ BOOL CPackACListView::ConsiderItem(const char* path, const char* fileName, FILET
         if (ret < 0)
         {
             // some problem with the array
-            SendMessage(ACDialog->HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_CANTSHOWRESULTS), NULL);
+            SendMessage(ACDialog->HWindow, WM_USER_ACERROR, (WPARAM)LoadStrW(IDS_CANTSHOWRESULTS), NULL);
             TRACE_E("Problems with array detected.");
             stop = TRUE;
         }
         else if (ret > 0)
         {
-            TRACE_I("Packer " << fileName << " in location " << path << " found and added");
+            TRACE_IW(L"Packer " << fileName << L" in location " << path << L" found and added");
             // we added an item, redraw from the start of the category onward (without the heading)
             SendMessage(ACDialog->HWindow, WM_USER_ACADDFILE, (WPARAM)(totalCount + 1), 0);
             // we won't search further
@@ -1585,10 +1583,11 @@ CPackACListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //
 
 // returns the text that belongs to the given column
-const char* CPackACFound::GetText(int column)
+const wchar_t* CPackACFound::GetText(int column)
 {
     CALL_STACK_MESSAGE2("CPackACFound::GetText(%d)", column);
-    static char text[100];
+    static wchar_t text[100];
+    static std::wstring numberText;
     switch (column)
     {
     // Name
@@ -1597,8 +1596,8 @@ const char* CPackACFound::GetText(int column)
     // Size
     case 1:
     {
-        NumberToStr(text, Size);
-        return text;
+        numberText = NumberToStr(Size);
+        return numberText.c_str();
     }
     // Date
     case 2:
@@ -1608,11 +1607,11 @@ const char* CPackACFound::GetText(int column)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 100) == 0)
-                sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+            if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 100) == 0)
+                swprintf(text, 100, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         }
         else
-            strcpy(text, LoadStr(IDS_INVALID_DATEORTIME));
+            wcscpy(text, LoadStrW(IDS_INVALID_DATEORTIME));
         return text;
     }
     // Time
@@ -1623,20 +1622,20 @@ const char* CPackACFound::GetText(int column)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 100) == 0)
-                sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 100) == 0)
+                swprintf(text, 100, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         }
         else
-            strcpy(text, LoadStr(IDS_INVALID_DATEORTIME));
+            wcscpy(text, LoadStrW(IDS_INVALID_DATEORTIME));
         return text;
     }
     }
 }
 
 // set the item to the desired values
-BOOL CPackACFound::Set(const char* fullName, const CQuadWord& size, FILETIME lastWrite)
+BOOL CPackACFound::Set(const wchar_t* fullName, const CQuadWord& size, FILETIME lastWrite)
 {
-    CALL_STACK_MESSAGE2("CPackACFound::Set(%s, , )", fullName);
+    CALL_STACK_MESSAGE2("CPackACFound::Set(%ls, , )", fullName);
     FullName = fullName;
     Size = size;
     LastWrite = lastWrite;
@@ -1692,7 +1691,7 @@ CPackACDrives::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 INT_PTR itemID;
                 EditLB->GetItemID(i, itemID);
-                free((char*)itemID);
+                free((wchar_t*)itemID);
             }
             EditLB->DeleteAllItems();
             break;
@@ -1714,35 +1713,36 @@ CPackACDrives::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    strncpy_s(dispInfo->Buffer, dispInfo->BufferLen, (char*)dispInfo->ItemID, _TRUNCATE);
+                    *dispInfo->Text = (wchar_t*)dispInfo->ItemID;
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                 }
                 else
                 {
                     Dirty = TRUE;
-                    char* txt = dispInfo->Buffer;
+                    const wchar_t* txt = dispInfo->Text->c_str();
                     // cut off leading spaces
-                    while (*txt == ' ' || *txt == '\t')
+                    while (*txt == L' ' || *txt == L'\t')
                         txt++;
                     // determine the length without trailing spaces
-                    int len = (int)strlen(txt) - 1; // if txt is an empty string, len == -1
-                    while (len > 0 && (*(txt + len) == ' ' || *(txt + len) == '\t'))
+                    int len = (int)wcslen(txt) - 1; // if txt is an empty string, len == -1
+                    while (len > 0 && (*(txt + len) == L' ' || *(txt + len) == L'\t'))
                         len--;
                     len++;
-                    char* newPath = (char*)malloc(len + 1);
+                    // 'len' counts wchar_t; malloc and memcpy take BYTES.
+                    wchar_t* newPath = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
                     if (newPath == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
                         SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
                         return TRUE;
                     }
-                    memcpy(newPath, txt, len);
-                    *(newPath + len) = '\0';
+                    memcpy(newPath, txt, len * sizeof(wchar_t));
+                    *(newPath + len) = L'\0';
                     if (dispInfo->ItemID == -1)
                         EditLB->SetItemData((INT_PTR)newPath);
                     else
                     {
-                        free((char*)dispInfo->ItemID);
+                        free((wchar_t*)dispInfo->ItemID);
                         EditLB->SetItemID(dispInfo->Index, (INT_PTR)newPath);
                     }
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
@@ -1802,7 +1802,7 @@ CPackACDrives::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             case EDTLBN_DELETEITEM:
             {
                 Dirty = TRUE;
-                free((char*)dispInfo->ItemID);
+                free((wchar_t*)dispInfo->ItemID);
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow deletion
                 return TRUE;
             }
@@ -1837,13 +1837,13 @@ void CPackACDrives::Validate(CTransferInfo& ti)
         {
             INT_PTR itemID;
             EditLB->GetItemID(i, itemID);
-            DWORD attr = GetFileAttributesW(AnsiToWide((char*)itemID).c_str());
+            DWORD attr = gFileSystem->GetFileAttributes((wchar_t*)itemID);
             if (attr == -1 || (attr & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
                 EditLB->SetCurSel(i);
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ACBADDRIVE));
                 ti.ErrorOn(IDC_ACDRVLIST);
-                PostMessage(HWindow, WM_USER_EDIT, 0, strlen((char*)itemID));
+                PostMessage(HWindow, WM_USER_EDIT, 0, wcslen((wchar_t*)itemID));
                 return;
             }
         }
@@ -1857,17 +1857,18 @@ void CPackACDrives::Transfer(CTransferInfo& ti)
     {
         Dirty = FALSE;
         // pour the list of drives into the control
-        char* path = *DrivesList;
-        while (*path != '\0')
+        wchar_t* path = *DrivesList;
+        while (*path != L'\0')
         {
-            unsigned int len = (unsigned int)strlen(path) + 1;
-            char* newPath = (char*)malloc(len);
+            // 'len' is a wchar_t count: malloc scales, 'path += len' does not.
+            unsigned int len = (unsigned int)wcslen(path) + 1;
+            wchar_t* newPath = (wchar_t*)malloc(len * sizeof(wchar_t));
             if (newPath == NULL)
             {
                 TRACE_E(LOW_MEMORY);
                 return;
             }
-            strcpy(newPath, path);
+            wcscpy(newPath, path);
             EditLB->AddItem((INT_PTR)newPath);
             path += len;
         }
@@ -1884,36 +1885,37 @@ void CPackACDrives::Transfer(CTransferInfo& ti)
             {
                 INT_PTR itemID;
                 EditLB->GetItemID(i, itemID);
-                unsigned long pathlen = (unsigned long)strlen((char*)itemID);
+                unsigned long pathlen = (unsigned long)wcslen((wchar_t*)itemID);
                 len += pathlen + 1;
                 // if the path does not end with a backslash, we need to account for it
-                if (*((char*)itemID + pathlen - 1) != '\\')
+                if (*((wchar_t*)itemID + pathlen - 1) != L'\\')
                     len++;
             }
             HANDLES(GlobalFree((HGLOBAL)*DrivesList));
-            *DrivesList = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, len + 1));
+            // 'len' accumulated wchar_t counts above; GlobalAlloc takes BYTES.
+            *DrivesList = (wchar_t*)HANDLES(GlobalAlloc(GMEM_FIXED, (len + 1) * sizeof(wchar_t)));
             if (*DrivesList == NULL)
                 TRACE_E(LOW_MEMORY);
             else
             {
-                char* path = *DrivesList;
+                wchar_t* path = *DrivesList;
                 // and extract the list
                 for (i = 0; i < EditLB->GetCount(); i++)
                 {
                     INT_PTR itemID;
                     EditLB->GetItemID(i, itemID);
-                    unsigned long pathlen = (unsigned long)strlen((char*)itemID);
-                    memcpy(path, (char*)itemID, pathlen + 1);
-                    if (*(path + pathlen - 1) != '\\')
+                    unsigned long pathlen = (unsigned long)wcslen((wchar_t*)itemID);
+                    memcpy(path, (wchar_t*)itemID, (pathlen + 1) * sizeof(wchar_t));
+                    if (*(path + pathlen - 1) != L'\\')
                     {
-                        *(path++ + pathlen) = '\\';
-                        *(path + pathlen) = '\0';
+                        *(path++ + pathlen) = L'\\';
+                        *(path + pathlen) = L'\0';
                     }
                     path += pathlen + 1;
-                    free((char*)itemID);
+                    free((wchar_t*)itemID);
                 }
                 EditLB->DeleteAllItems();
-                *path = '\0';
+                *path = L'\0';
             }
         }
     }
@@ -1932,9 +1934,10 @@ void PackAutoconfig(HWND parent)
     // stop refreshes in the main window
     BeginStopRefresh();
     // determine the buffer needed for drives to search
-    DWORD size = GetLogicalDriveStrings(0, NULL);
-    char* sysDrives = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, size));
-    char* drives = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, size));
+    // GetLogicalDriveStringsW reports a wchar_t count, so both buffers scale.
+    DWORD size = GetLogicalDriveStringsW(0, NULL);
+    wchar_t* sysDrives = (wchar_t*)HANDLES(GlobalAlloc(GMEM_FIXED, size * sizeof(wchar_t)));
+    wchar_t* drives = (wchar_t*)HANDLES(GlobalAlloc(GMEM_FIXED, size * sizeof(wchar_t)));
     if (sysDrives == NULL || drives == NULL)
     {
         TRACE_E(LOW_MEMORY);
@@ -1945,27 +1948,27 @@ void PackAutoconfig(HWND parent)
     }
     else
     {
-        DWORD newSize = GetLogicalDriveStrings(size, sysDrives);
+        DWORD newSize = GetLogicalDriveStringsW(size, sysDrives);
         if (newSize > size)
             TRACE_E("The drives buffer size requested by system is too small...");
         else
         {
-            char* dstDrive = drives;
+            wchar_t* dstDrive = drives;
             // skip non-fixed drives...
-            char* srcDrive = sysDrives;
-            while (*srcDrive != '\0')
+            wchar_t* srcDrive = sysDrives;
+            while (*srcDrive != L'\0')
             {
                 // what kind is it? is it worth our time?
-                if (GetDriveType(srcDrive) == DRIVE_FIXED)
+                if (GetDriveTypeW(srcDrive) == DRIVE_FIXED)
                 {
-                    strcpy(dstDrive, srcDrive);
-                    dstDrive += strlen(dstDrive) + 1;
+                    wcscpy(dstDrive, srcDrive);
+                    dstDrive += wcslen(dstDrive) + 1;
                 }
                 else
-                    TRACE_I("Skipping drive " << srcDrive << ", not fixed.");
-                srcDrive += strlen(srcDrive) + 1;
+                    TRACE_IW(L"Skipping drive " << srcDrive << L", not fixed.");
+                srcDrive += wcslen(srcDrive) + 1;
             }
-            *dstDrive = '\0';
+            *dstDrive = L'\0';
             HANDLES(GlobalFree((HGLOBAL)sysDrives));
             // open the search dialog
             CPackACDialog(HLanguage, IDD_AUTOCONF, IDD_AUTOCONF, parent, &ArchiverConfig, &drives).Execute();

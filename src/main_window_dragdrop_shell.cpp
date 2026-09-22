@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -6,7 +6,9 @@
 
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
+#include "common/Win32TextCodec.h"
 #include "common/unicode/helpers.h"
+#include "common/fsutil.h" // GetShortPathW
 #include "stswnd.h"
 #include "editwnd.h"
 #include "plugins.h"
@@ -52,18 +54,15 @@ void CMainWindow::ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs)
     DirHistory->ClearPluginFSFromHistory(fs);
 }
 
-void CMainWindow::DirHistoryAddPathUnique(int type, const char* pathOrArchiveOrFSName,
-                                          const char* archivePathOrFSUserPart, HICON hIcon,
+void CMainWindow::DirHistoryAddPathUnique(int type, const wchar_t* pathOrArchiveOrFSName,
+                                          const wchar_t* archivePathOrFSUserPart, HICON hIcon,
                                           CPluginFSInterfaceAbstract* pluginFS,
-                                          CPluginFSInterfaceEncapsulation* curPluginFS,
-                                          const wchar_t* pathOrArchiveOrFSNameW,
-                                          const wchar_t* archivePathOrFSUserPartW)
+                                          CPluginFSInterfaceEncapsulation* curPluginFS)
 {
     if (CanAddToDirHistory)
     {
         DirHistory->AddPathUnique(type, pathOrArchiveOrFSName, archivePathOrFSUserPart, hIcon,
-                                  pluginFS, curPluginFS,
-                                  pathOrArchiveOrFSNameW, archivePathOrFSUserPartW);
+                                  pluginFS, curPluginFS);
         if (LeftPanel != NULL)
             LeftPanel->DirectoryLine->SetHistory(DirHistory->HasPaths());
         if (RightPanel != NULL)
@@ -80,24 +79,22 @@ void CMainWindow::DirHistoryRemoveActualPath(CFilesWindow* panel)
 {
     if (panel->Is(ptZIPArchive))
     {
-        DirHistory->RemoveActualPath(1, panel->GetZIPArchive(), panel->GetZIPPath(), NULL, NULL,
-                                     panel->GetZIPArchiveW(), panel->GetZIPPathW());
+        DirHistory->RemoveActualPath(1, panel->GetZIPArchive(), panel->GetZIPPath(), NULL, NULL);
     }
     else
     {
         if (panel->Is(ptDisk))
         {
-            DirHistory->RemoveActualPath(0, panel->GetPath(), NULL, NULL, NULL,
-                                         panel->GetPathW(), nullptr);
+            DirHistory->RemoveActualPath(0, panel->GetPathW(), NULL, NULL, NULL);
         }
         else
         {
             if (panel->Is(ptPluginFS))
             {
-                CPathBuffer curPath; // Heap-allocated for long path support
-                if (panel->GetPluginFS()->NotEmpty() && panel->GetPluginFS()->GetCurrentPath(curPath))
+                std::wstring curPath;
+                if (panel->GetPluginFS()->NotEmpty() && panel->GetPluginFS()->GetCurrentPathW(curPath))
                 {
-                    DirHistory->RemoveActualPath(2, panel->GetPluginFS()->GetPluginFSName(), curPath,
+                    DirHistory->RemoveActualPath(2, panel->GetPluginFS()->GetPluginFSName(), curPath.c_str(),
                                                  panel->GetPluginFS()->GetInterface(), panel->GetPluginFS());
                 }
             }
@@ -141,14 +138,13 @@ BOOL CMainWindow::CloseDetachedFS(HWND parent, CPluginFSInterfaceEncapsulation* 
     if (!detachedFS->TryCloseOrDetach(CriticalShutdown, FALSE, dummy, FSTRYCLOSE_UNLOADCLOSEDETACHEDFS) &&
         !CriticalShutdown) // test close; forceClose==TRUE only during a "critical shutdown"
     {                      // ask the user whether to close it even against the FS wishes
-        CPathBuffer path; // Heap-allocated for long path support
-        strcpy(path, detachedFS->GetPluginFSName());
-        strcat(path, ":");
-        char* s = path + strlen(path);
-        if (!detachedFS->NotEmpty() || !detachedFS->GetCurrentPath(s))
-            *s = 0; // cannot obtain the user portion
+        std::wstring path = detachedFS->GetPluginFSName();
+        path += L':';
+        std::wstring userPart;
+        if (detachedFS->NotEmpty() && detachedFS->GetCurrentPathW(userPart))
+            path += userPart;
 
-        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
+        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), path.c_str());
         if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "close"
         {
             detachedFS->TryCloseOrDetach(TRUE, FALSE, dummy, FSTRYCLOSE_UNLOADCLOSEDETACHEDFS);
@@ -214,7 +210,7 @@ void CMainWindow::MakeFileList()
 
     CFilesWindow* panel = GetActivePanel();
 
-    upDir = (panel->Dirs->Count != 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0);
+    upDir = (panel->Dirs->Count != 0 && wcscmp(panel->Dirs->At(0).Name, L"..") == 0);
     int caret = panel->GetCaretIndex();
     if (caret >= 0)
     {
@@ -248,31 +244,39 @@ void CMainWindow::MakeFileList()
     CFileListDialog dlg(HWindow);
     if (dlg.Execute() == IDOK)
     {
-        CPathBuffer fileName; // Heap-allocated for long path support
+        std::wstring fileNameW;
 
         switch (Configuration.FileListDestination)
         {
         case 0: // clipboard
         case 1: // viewer
         {
-            if (!SalGetTempFileName(NULL, "MFL", fileName, TRUE))
+            fileNameW = SalGetTempFileNameW(NULL, L"MFL", true);
+            if (fileNameW.empty())
             {
                 DWORD err = GetLastError();
-                std::wstring msg = FormatStrW(L"%s\n\n%s", LoadStrW(IDS_ERRORCREATINGTMPFILE), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(L"%s\n\n%s", LoadStrW(IDS_ERRORCREATINGTMPFILE), GetErrorTextOwned(err).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                fileName[0] = 0;
             }
             break;
         }
 
         case 2: // file
         {
-            strcpy(fileName, Configuration.FileListName);
+            // Configuration.FileListName has since become a genuine wide
+            // config value (std::wstring, cfgdlg.h) - this comment's "narrow-only"
+            // premise is stale, use it directly instead of a needless AnsiToWide re-widen.
+            // The current directory and next-focus target also have genuine wide sources:
+            // GetPathW() (the removed ANSI mirror can name a different path or none), and
+            // NextFocusNameW is consumed directly by the panel's refresh logic.
+            fileNameW = Configuration.FileListName;
             int errTextID;
-            if (!SalGetFullName(fileName, &errTextID, GetActivePanel()->Is(ptDisk) ? GetActivePanel()->GetPath() : NULL, panel->NextFocusName, NULL, fileName.Size()))
+            if (!SalGetFullNameW(fileNameW, &errTextID,
+                                 GetActivePanel()->Is(ptDisk) ? GetActivePanel()->GetPathW() : NULL,
+                                 &panel->NextFocusNameW))
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
-                fileName[0] = 0;
+                fileNameW.clear();
             }
             break;
         }
@@ -280,22 +284,26 @@ void CMainWindow::MakeFileList()
         default:
         {
             TRACE_E("Unknown destination!");
-            fileName[0] = 0;
+            fileNameW.clear();
         }
         }
 
-        if (fileName[0] != 0)
+        if (!fileNameW.empty())
         {
             BOOL append = (Configuration.FileListDestination == 2 && Configuration.FileListAppend);
-            HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_WRITE | GENERIC_READ,
-                                                FILE_SHARE_READ, NULL,
-                                                append ? OPEN_ALWAYS : CREATE_ALWAYS,
-                                                FILE_FLAG_RANDOM_ACCESS,
-                                                NULL));
+            // genuine wide path from above, not a re-widened narrow mirror.
+            HANDLE hFile = gFileSystem->CreateFile(fileNameW.c_str(), GENERIC_WRITE | GENERIC_READ,
+                                                   FILE_SHARE_READ, NULL,
+                                                   append ? OPEN_ALWAYS : CREATE_ALWAYS,
+                                                   FILE_FLAG_RANDOM_ACCESS,
+                                                   NULL);
+            DWORD openError = GetLastError();
+            HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile,
+                           __hoCreateFile, hFile, openError, TRUE);
             if (hFile != INVALID_HANDLE_VALUE)
             {
                 // position the file pointer
-                SetFilePointer(hFile, 0, NULL, append ? FILE_END : FILE_BEGIN);
+                gFileSystem->SeekHandle(hFile, 0, append ? FILE_END : FILE_BEGIN, NULL);
 
                 // fill the file with data -- insert one entry for each file or directory
                 BOOL deleteFile = TRUE;
@@ -308,34 +316,33 @@ void CMainWindow::MakeFileList()
 
                 if (!deleteFile && Configuration.FileListDestination == 0) // clipboard
                 {
-                    DWORD fileSize = GetFileSize(hFile, NULL);
-                    if (fileSize != INVALID_FILE_SIZE && fileSize > 0)
+                    uint64_t fileSize = 0;
+                    if (gFileSystem->GetHandleFileSize(hFile, &fileSize).success &&
+                        fileSize > 0 && fileSize <= MAXDWORD)
                     {
-                        SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
-                        char* buff = (char*)malloc(fileSize);
+                        gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, NULL);
+                        char* buff = (char*)malloc((size_t)fileSize);
                         if (buff != NULL)
                         {
-                            DWORD read;
-                            if (ReadFile(hFile, buff, fileSize, &read, NULL))
+                            DWORD read = 0;
+                            FileResult readResult = gFileSystem->ReadFromHandle(
+                                hFile, buff, (DWORD)fileSize, &read);
+                            if (readResult.success)
                             {
                                 if (read >= 3 &&
                                     (BYTE)buff[0] == 0xEF && (BYTE)buff[1] == 0xBB && (BYTE)buff[2] == 0xBF)
                                 {
-                                    int wideLen = MultiByteToWideChar(CP_UTF8, 0, buff + 3, read - 3, NULL, 0);
-                                    if (wideLen > 0)
-                                    {
-                                        std::wstring wideText(wideLen, L'\0');
-                                        MultiByteToWideChar(CP_UTF8, 0, buff + 3, read - 3, wideText.data(), wideLen);
+                                    std::wstring wideText;
+                                    if (Win32DecodeText(CP_UTF8, buff + 3, read - 3, wideText).Succeeded())
                                         CopyTextToClipboardW(wideText.c_str(), (int)wideText.length(), FALSE, NULL);
-                                    }
                                 }
                                 else
-                                    CopyTextToClipboard(buff, read, FALSE, NULL);
+                                    CopyAcpTextToClipboard(buff, read, FALSE, NULL);
                             }
                             else
                             {
-                                DWORD err = GetLastError();
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                                     GetErrorTextOwned(readResult.errorCode).c_str());
                             }
                             free(buff);
                         }
@@ -343,11 +350,12 @@ void CMainWindow::MakeFileList()
                             TRACE_E(LOW_MEMORY);
                     }
                 }
-                HANDLES(CloseHandle(hFile));
+                HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+                gFileSystem->CloseFileHandle(hFile);
 
                 // if the destination was the clipboard, delete the temporary file
                 if (deleteFile || Configuration.FileListDestination == 0) // clipboard
-                    gFileSystem->DeleteFile(AnsiToWide(fileName).c_str());
+                    gFileSystem->DeleteFile(fileNameW.c_str());           // genuine wide path
                 else
                 {
                     if (Configuration.FileListDestination == 1) // viewer
@@ -355,14 +363,14 @@ void CMainWindow::MakeFileList()
                         // show the file in the internal viewer, which will delete it afterwards
                         CSalamanderPluginInternalViewerData viewerData;
                         viewerData.Size = sizeof(viewerData);
-                        viewerData.FileName = fileName;
+                        viewerData.FileName = fileNameW.c_str();
                         viewerData.Mode = 0; // text mode
-                        char title[200];
-                        lstrcpyn(title, LoadStr(IDS_MAKEFILELIST_OUTPUT), 200);
-                        viewerData.Caption = title;
+                        const std::wstring caption = LoadStrOwned(IDS_MAKEFILELIST_OUTPUT);
+                        viewerData.Caption = caption.c_str();
                         viewerData.WholeCaption = TRUE;
                         int error;
-                        if (!ViewFileInPluginViewer(NULL, &viewerData, TRUE, NULL, "mfl.txt", error))
+                        if (!ViewFileInPluginViewerW(fileNameW.c_str(), NULL, &viewerData, TRUE,
+                                                     NULL, L"mfl.txt", error))
                         {
                             // delete the file even when opening fails
                         }
@@ -372,15 +380,17 @@ void CMainWindow::MakeFileList()
                 if (Configuration.FileListDestination == 2) // file
                 {
                     //---  refresh manually refreshed directories
-                    // change in the directory where the file list was created
-                    CutDirectory(fileName);
-                    MainWindow->PostChangeOnPathNotification(fileName, FALSE);
+                    // change in the directory where the file list was created.
+                    // CutDirectory and the notification queue both retain the genuine wide path.
+                    CutDirectory(&fileNameW[0]);
+                    fileNameW.resize(wcslen(fileNameW.c_str()));
+                    MainWindow->PostChangeOnPathNotificationW(fileNameW.c_str(), FALSE);
                 }
             }
             else
             {
                 DWORD err = GetLastError();
-                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), fileNameW.c_str(), GetErrorTextOwned(err).c_str()); // genuine wide path
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             }
         }
@@ -389,14 +399,14 @@ void CMainWindow::MakeFileList()
 }
 
 // see description in mainwnd.h
-BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param)
+BOOL GetNextFileFromPanel(int index, std::wstring& path, std::wstring& name, void* param)
 {
     CALL_STACK_MESSAGE2("GetNextFileFromPanel(%d, , ,)", index);
     CUMDataFromPanel* data = (CUMDataFromPanel*)param;
     if (data->Count == -1) // retrieving data
     {
         BOOL upDir = (data->Window->Dirs->Count != 0 &&
-                      strcmp(data->Window->Dirs->At(0).Name, "..") == 0);
+                      wcscmp(data->Window->Dirs->At(0).Name, L"..") == 0);
         data->Count = data->Window->GetSelCount();
         if (data->Count < 0)
             data->Count = 0;
@@ -404,16 +414,16 @@ BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param)
         {
             index = data->Window->GetCaretIndex();
             data->Index = NULL;
-            strcpy(path, data->Window->GetPath());
+            path = data->Window->GetPathW();
             if (index < 0 || index >= data->Window->Dirs->Count + data->Window->Files->Count ||
                 index == 0 && upDir)
             {
-                name[0] = 0; // for up-dir or for the first item of an empty panel the name will be empty...
+                name.clear(); // for up-dir or for the first item of an empty panel the name will be empty...
             }
             else // copy the name for others
             {
                 CFileData* f = &((index < data->Window->Dirs->Count) ? data->Window->Dirs->At(index) : data->Window->Files->At(index - data->Window->Dirs->Count));
-                strcpy(name, f->Name);
+                name = f->Name;
             }
             return TRUE;
         }
@@ -425,8 +435,8 @@ BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param)
     if (index >= 0 && index < data->Count)
     {
         CFileData* f = &((data->Index[index] < data->Window->Dirs->Count) ? data->Window->Dirs->At(data->Index[index]) : data->Window->Files->At(data->Index[index] - data->Window->Dirs->Count));
-        strcpy(path, data->Window->GetPath());
-        strcpy(name, f->Name);
+        path = data->Window->GetPathW();
+        name = f->Name;
         return TRUE;
     }
     else
@@ -442,7 +452,7 @@ BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param)
     }
 }
 
-BOOL CheckIfCanBeExecuted(BOOL buildBat, int commandLen, int argumentsLen)
+BOOL CheckIfCanBeExecuted(BOOL buildBat, size_t commandLen, size_t argumentsLen)
 {
     /*  MEASURED LIMITS:
   Batch file:
@@ -460,7 +470,7 @@ BOOL CheckIfCanBeExecuted(BOOL buildBat, int commandLen, int argumentsLen)
     // parameters are passed to the .exe. (I wouldn't solve this issue; it would require parsing
     // .bat files etc., which is just nonsense.)
 
-    int cmdLineLen = commandLen + argumentsLen + 1; // +1 for the space between command and arguments
+    size_t cmdLineLen = commandLen + argumentsLen + 1; // +1 for the space between command and arguments
     if (buildBat)                                   // launching via a .bat file
     {
         if (WindowsVistaAndLater)
@@ -497,96 +507,74 @@ BOOL CheckIfCanBeExecuted(BOOL buildBat, int commandLen, int argumentsLen)
 // returns success of the operation
 
 BOOL ExpandCommand2(HWND parent,
-                    char* cmd, int cmdSize,
-                    char* args, int argsSize, BOOL buildBat,
-                    char* initDir, int initDirSize,
+                    std::wstring& cmd,
+                    std::wstring& args, BOOL buildBat,
+                    std::wstring& initDir,
                     CUserMenuItem* item,
-                    const char* path,
-                    const char* longName,
+                    const std::wstring& path,
+                    const std::wstring& longName,
                     BOOL* fileNameUsed,
                     CUserMenuAdvancedData* userMenuAdvancedData,
                     BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CALL_STACK_MESSAGE5("ExpandCommand2(, , %d, , %d, , %s, %s, )",
-                        cmdSize, initDirSize, path, longName);
+    CALL_STACK_MESSAGE3("ExpandCommand2(, , , , , %ls, %ls, )", path.c_str(), longName.c_str());
 
     *fileNameUsed = FALSE;
-    CPathBuffer command; // Heap-allocated for long path support
-    if (ExpandCommand(parent, item->UMCommand.c_str(), command, command.Size(), ignoreEnvVarNotFoundOrTooLong))
+    std::wstring command;
+    if (ExpandCommand(parent, item->UMCommand.c_str(), command, ignoreEnvVarNotFoundOrTooLong))
     {
-        CPathBuffer fileName; // Heap-allocated for long path support
-        if (path[0] != 0)
+        if (!path.empty())
         {
-            int l = (int)strlen(path);
-            if (path[l - 1] == '\\')
-                l--;
-            memcpy(fileName, path, l);
+            std::wstring fileName = path;
+            if (!fileName.empty() && fileName.back() == L'\\')
+                fileName.pop_back();
 
-            CPathBuffer dosName; // Heap-allocated for long path support
-            if (longName[0] != 0)
+            std::wstring dosName;
+            if (!longName.empty())
             {
-                if (l + 1 + lstrlen(longName) > fileName.Size() - 1)
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
-                    goto EXIT;
-                }
-                fileName[l++] = '\\';
-                strcpy(fileName + l, longName);
-                if (GetShortPathName(fileName, dosName, dosName.Size()) == 0)
+                SalPathAppendW(fileName, longName.c_str());
+                dosName = GetShortPathW(fileName.c_str());
+                if (dosName.empty())
                 {
                     TRACE_E("GetShortPathName() failed");
-                    dosName[0] = 0;
                 }
             }
             else
             {
-                if (l == 2 && fileName[1] == ':') // we must append '\\' after a standard root path
-                {
-                    fileName[l++] = '\\';
-                }
-                fileName[l] = 0;
-                if (GetShortPathName(fileName, dosName, dosName.Size()) == 0)
+                if (fileName.length() == 2 && fileName[1] == L':') // append '\\' after a standard root path
+                    fileName.push_back(L'\\');
+                dosName = GetShortPathW(fileName.c_str());
+                if (dosName.empty())
                 {
                     TRACE_E("GetShortPathName() failed");
-                    dosName[0] = 0;
                 }
                 else
-                {
-                    SalPathAddBackslash(dosName, dosName.Size());
-                }
-                SalPathAddBackslash(fileName, fileName.Size());
+                    SalPathAddBackslashW(dosName);
+                SalPathAddBackslashW(fileName);
             }
 
-            char expArguments[USRMNUARGS_MAXLEN];
-            if (ExpandUserMenuArguments(parent, fileName, dosName, item->Arguments.c_str(), expArguments,
-                                        USRMNUARGS_MAXLEN, fileNameUsed, userMenuAdvancedData,
+            std::wstring expArguments;
+            if (ExpandUserMenuArguments(parent, fileName.c_str(), dosName.c_str(), item->Arguments.c_str(), expArguments,
+                                        fileNameUsed, userMenuAdvancedData,
                                         ignoreEnvVarNotFoundOrTooLong) &&
-                ExpandInitDir(parent, fileName, dosName, item->InitDir.c_str(), initDir, initDirSize,
+                ExpandInitDir(parent, fileName.c_str(), dosName.c_str(), item->InitDir.c_str(), initDir,
                               ignoreEnvVarNotFoundOrTooLong))
             {
-                int len = (int)strlen(command);
-                int lArgs = (int)strlen(expArguments);
-                if (CheckIfCanBeExecuted(buildBat, len, lArgs))
+                if (CheckIfCanBeExecuted(buildBat, command.length(), expArguments.length()))
                 {
                     if (!buildBat) // launching via ShellExecuteEx: pass arguments separately
                     {
-                        if (len + 1 <= cmdSize && lArgs + 1 <= argsSize)
-                        {
-                            memcpy(cmd, command, len + 1);
-                            memcpy(args, expArguments, lArgs + 1);
-                            return TRUE;
-                        }
+                        cmd = std::move(command);
+                        args = std::move(expArguments);
+                        return TRUE;
                     }
                     else // launching via .bat: append arguments after the command
                     {
-                        if (len + lArgs + 2 <= cmdSize)
-                        {
-                            memcpy(cmd, command, len);
-                            cmd[len] = ' ';
-                            memcpy(cmd + len + 1, expArguments, lArgs + 1);
-                            args[0] = 0;
-                            return TRUE;
-                        }
+                        cmd = std::move(command);
+                        cmd.push_back(L' ');
+                        cmd.append(expArguments);
+                        args.clear();
+                        return TRUE;
                     }
                 }
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_USRMNUTOOLONGCMDORARGS));
@@ -594,12 +582,11 @@ BOOL ExpandCommand2(HWND parent,
         }
         else
         {
-            int len = (int)strlen(command);
-            if (len + 1 < cmdSize)
+            if (CheckIfCanBeExecuted(buildBat, command.length(), 0))
             {
-                memcpy(cmd, command, len + 1);
-                args[0] = 0;
-                initDir[0] = 0;
+                cmd = std::move(command);
+                args.clear();
+                initDir.clear();
                 return TRUE;
             }
             else
@@ -608,10 +595,9 @@ BOOL ExpandCommand2(HWND parent,
             }
         }
     }
-EXIT:
-    cmd[0] = 0;
-    args[0] = 0;
-    initDir[0] = 0;
+    cmd.clear();
+    args.clear();
+    initDir.clear();
     return FALSE;
 }
 
@@ -659,27 +645,28 @@ void CMainWindow::UserMenu(HWND parent, int itemIndex, UM_GetNextFileName getNex
         if (ValidateUserMenuArguments(parent, UserMenuItems->At(itemIndex)->Arguments.c_str(), errorPos1, errorPos2,
                                       &userMenuValidationData))
         {
-            if (userMenuValidationData.UsesListOfSelNames && userMenuAdvancedData->ListOfSelNames[0] == 0)
+            if (userMenuValidationData.UsesListOfSelNames && userMenuAdvancedData->ListOfSelNames.empty())
             {
                 gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(userMenuAdvancedData->ListOfSelNamesIsEmpty ? IDS_EMPTYLISTOFSELNAMES : IDS_TOOLONGLISTOFSELNAMES));
                 ok = FALSE;
             }
-            if (ok && userMenuValidationData.UsesListOfSelFullNames && userMenuAdvancedData->ListOfSelFullNames[0] == 0)
+            if (ok && userMenuValidationData.UsesListOfSelFullNames && userMenuAdvancedData->ListOfSelFullNames.empty())
             {
                 gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(userMenuAdvancedData->ListOfSelFullNamesIsEmpty ? IDS_EMPTYLISTOFSELFULLNAMES : IDS_TOOLONGLISTOFSELFULLNAMES));
                 ok = FALSE;
             }
-            if (ok && userMenuValidationData.UsesFullPathLeft && userMenuAdvancedData->FullPathLeft[0] == 0)
+            if (ok && userMenuValidationData.UsesFullPathLeft && userMenuAdvancedData->FullPathLeft.empty())
             {
                 gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHLEFT));
                 ok = FALSE;
             }
-            if (ok && userMenuValidationData.UsesFullPathRight && userMenuAdvancedData->FullPathRight[0] == 0)
+            if (ok && userMenuValidationData.UsesFullPathRight && userMenuAdvancedData->FullPathRight.empty())
             {
                 gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHRIGHT));
                 ok = FALSE;
             }
-            if (ok && userMenuValidationData.UsesFullPathInactive && userMenuAdvancedData->FullPathInactive[0] == 0)
+            if (ok && userMenuValidationData.UsesFullPathInactive &&
+                (userMenuAdvancedData->FullPathInactive == nullptr || userMenuAdvancedData->FullPathInactive->empty()))
             {
                 gPrompter->ShowError(LoadStrW(IDS_USERMENUERROR), LoadStrW(IDS_NOTDEFFULLPATHINACTIVE));
                 ok = FALSE;
@@ -688,16 +675,15 @@ void CMainWindow::UserMenu(HWND parent, int itemIndex, UM_GetNextFileName getNex
             {
                 if ((userMenuValidationData.UsedCompareType == 6 /* file-or-dir-left-right */ ||
                      userMenuValidationData.UsedCompareType == 7 /* file-or-dir-active-inactive */) &&
-                    userMenuAdvancedData->CompareName1[0] == 0 &&
-                    userMenuAdvancedData->CompareName2[0] == 0)
+                    userMenuAdvancedData->CompareName1.empty() &&
+                    userMenuAdvancedData->CompareName2.empty())
                 { // we don't know if files or directories should be compared, ask the user (the name selection dialog differs for files/directories)
                     MSGBOXEX_PARAMS params;
                     memset(&params, 0, sizeof(params));
                     params.HParent = parent;
                     params.Flags = MB_YESNO | MB_ICONQUESTION | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_QUESTION);
-                    params.Text = LoadStr(IDS_COMPAREFILESORDIRS);
-                    char aliasBtnNames[200];
+                    params.Caption = LoadStrW(IDS_QUESTION);
+                    params.Text = LoadStrW(IDS_COMPAREFILESORDIRS);
                     /* used by the export_mnu.py script that generates salmenu.mnu for the Translator
    we let the message box buttons resolve hotkey collisions by pretending it's a menu
 MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
@@ -708,10 +694,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                            DIALOG_YES, LoadStr(IDS_MSGBOXBTN_FILES),
-                            DIALOG_NO, LoadStr(IDS_MSGBOXBTN_DIRS));
-                    params.AliasBtnNames = aliasBtnNames;
+                    const std::wstring aliasBtnNames = FormatStrW(L"%d\t%ls\t%d\t%ls",
+                                                                 DIALOG_YES, LoadStrW(IDS_MSGBOXBTN_FILES),
+                                                                 DIALOG_NO, LoadStrW(IDS_MSGBOXBTN_DIRS));
+                    params.AliasBtnNames = aliasBtnNames.c_str();
                     userMenuAdvancedData->CompareNamesAreDirs = (SalMessageBoxEx(&params) == DIALOG_NO);
                 }
 
@@ -770,22 +756,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 }
                 if (clearNames)
                 {
-                    userMenuAdvancedData->CompareName1[0] = 0;
-                    userMenuAdvancedData->CompareName2[0] = 0;
+                    userMenuAdvancedData->CompareName1.clear();
+                    userMenuAdvancedData->CompareName2.clear();
                 }
                 else
                 {
                     if (swapNames)
-                    {
-                        CPathBuffer swap; // Heap-allocated for long path support
-                        lstrcpyn(swap, userMenuAdvancedData->CompareName1, swap.Size());
-                        lstrcpyn(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2, userMenuAdvancedData->CompareName1.Size());
-                        lstrcpyn(userMenuAdvancedData->CompareName2, swap, userMenuAdvancedData->CompareName2.Size());
-                    }
+                        std::swap(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2);
                 }
                 if (Configuration.CnfrmShowNamesToCompare ||
-                    userMenuAdvancedData->CompareName1[0] == 0 ||
-                    userMenuAdvancedData->CompareName2[0] == 0)
+                    userMenuAdvancedData->CompareName1.empty() ||
+                    userMenuAdvancedData->CompareName2.empty())
                 {
                     CCompareArgsDlg dlg(parent, comparingFiles, userMenuAdvancedData->CompareName1,
                                         userMenuAdvancedData->CompareName2, &Configuration.CnfrmShowNamesToCompare);
@@ -800,17 +781,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             BOOL buildBat = UserMenuItems->At(itemIndex)->ThroughShell;
             BOOL batNotEmpty = FALSE;
-            char* batName;
+            const wchar_t* batName;
             HANDLE file;
-            char batUniqueName[50]; // we need a unique name for the batch file in the cache
+            wchar_t batUniqueName[50]; // we need a unique name for the batch file in the cache
             DWORD lastErr;
 
             // Try to get a unique name for the batch file (retry loop replaces goto _TRY_AGAIN)
             while (buildBat)
             {
-                sprintf(batUniqueName, "Usermenu %X", GetTickCount());
+                wsprintfW(batUniqueName, L"Usermenu %X", GetTickCount());
                 BOOL exists;
-                batName = (char*)DiskCache.GetName(batUniqueName, "usermenu.bat", &exists, TRUE, NULL, FALSE, NULL, NULL);
+                batName = DiskCache.GetName(batUniqueName, L"usermenu.bat", &exists, TRUE, NULL, FALSE, NULL, NULL);
                 if (batName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")
                 {
                     if (!exists) // file exists -> almost impossible, handle anyway
@@ -828,12 +809,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
             if (buildBat)
             {
-                file = HANDLES_Q(CreateFileW(AnsiToWide(batName).c_str(), GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                            FILE_ATTRIBUTE_TEMPORARY, NULL));
+                file = gFileSystem->CreateFile(batName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                               FILE_ATTRIBUTE_TEMPORARY, NULL);
+                lastErr = GetLastError();
+                HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile,
+                               __hoCreateFile, file, lastErr, TRUE);
                 if (file == INVALID_HANDLE_VALUE)
                 {
-                    lastErr = GetLastError();
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastErr));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(lastErr).c_str());
                     UpdateWindow(parent);
                     return; // cacheGuard destructor will call ReleaseName
                 }
@@ -842,28 +825,34 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             // build the .bat file
             int index;
             index = 0;
-            char cmdLine[USRMNUCMDLINE_MAXLEN];
-            char arguments[USRMNUARGS_MAXLEN];
-            CPathBuffer initDir;     // Heap-allocated for long path support (now possible without goto)
-            CPathBuffer prevInitDir; // Heap-allocated for long path support
-            *initDir = 0;
-            arguments[0] = 0;
-            CPathBuffer path, name;  // Heap-allocated for long path support
+            std::wstring cmdLine;
+            std::wstring arguments;
+            std::wstring initDir;
+            std::wstring prevInitDir;
+            std::wstring path;
+            std::wstring name;
             BOOL error;
             error = FALSE;
             BOOL skipErrorMessage;
             skipErrorMessage = FALSE;
             DWORD written;
+            auto writeExact = [&written, &file](const void* bytes, DWORD size)
+            {
+                FileResult result = gFileSystem->WriteToHandle(file, bytes, size, &written);
+                if (!result.success)
+                    SetLastError(result.errorCode);
+                return result.success && written == size;
+            };
             BOOL fileNameUsed;
             BOOL firstRound;
             firstRound = TRUE;
             while (getNextFile(index, path, name, data))
             {
-                strcpy(prevInitDir, initDir);
+                prevInitDir = initDir;
                 BOOL expandOK = ExpandCommand2(parent,
-                                               cmdLine, USRMNUCMDLINE_MAXLEN,
-                                               arguments, USRMNUARGS_MAXLEN, buildBat, // if we are running via a batch file, allow
-                                               initDir, initDir.Size(),                      // arguments will be inserted into cmdLine
+                                               cmdLine,
+                                               arguments, buildBat, // if we are running via a batch file, allow
+                                               initDir,             // arguments will be inserted into cmdLine
                                                UserMenuItems->At(itemIndex),
                                                path, name, &fileNameUsed,
                                                userMenuAdvancedData,
@@ -874,27 +863,35 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     skipErrorMessage = TRUE;
                     break;
                 }
-                if (expandOK && (firstRound || fileNameUsed || strcmp(initDir, prevInitDir) != 0)) // block running the same command for all items (a user mistake that happens often)
+                if (expandOK && (firstRound || fileNameUsed || initDir != prevInitDir)) // block running the same command for all items (a user mistake that happens often)
                 {
                     if (buildBat) // building a .bat file
                     {
-                        CPathBuffer initDirOEM; // Heap-allocated for long path support
-                        char cmdLineOEM[USRMNUCMDLINE_MAXLEN];
-                        CharToOem(initDir, initDirOEM);
-                        CharToOem(cmdLine, cmdLineOEM);
+                        // A cmd.exe batch file is an OEM-encoded byte protocol. Keep that encoding
+                        // explicit and reject unrepresentable Unicode instead of silently targeting
+                        // a best-fit-mapped file.
+                        std::string initDirOEM;
+                        std::string cmdLineOEM;
+                        const Win32TextConversionResult initConversion = Win32EncodeText(CP_OEMCP, initDir, initDirOEM);
+                        const Win32TextConversionResult commandConversion = Win32EncodeText(CP_OEMCP, cmdLine, cmdLineOEM);
+                        if (!initConversion || !commandConversion)
+                        {
+                            SetLastError(!initConversion ? initConversion.Win32Error : commandConversion.Win32Error);
+                            error = TRUE;
+                            break;
+                        }
                         batNotEmpty = TRUE;
-                        if ((initDirOEM[0] != 0 &&
-                                 (initDirOEM[1] == ':' && // "@C:"
-                                  (!WriteFile(file, "@", 1, &written, NULL) ||
-                                   !WriteFile(file, initDirOEM, 2, &written, NULL) ||
-                                   !WriteFile(file, "\r\n", 2, &written, NULL))) ||
-                             (initDirOEM[1] == ':' && // "@cd C:\\path"
-                              (!WriteFile(file, "@cd \"", 5, &written, NULL) ||
-                               !WriteFile(file, initDirOEM, (DWORD)strlen(initDirOEM), &written, NULL) ||
-                               !WriteFile(file, "\"\r\n", 3, &written, NULL)))) ||
-                            !WriteFile(file, "call ", 5, &written, NULL) ||
-                            !WriteFile(file, cmdLineOEM, (DWORD)strlen(cmdLineOEM), &written, NULL) ||
-                            !WriteFile(file, "\r\n", 2, &written, NULL))
+                        const bool driveDirectory = initDirOEM.length() >= 2 && initDirOEM[1] == ':';
+                        if ((driveDirectory && // "@C:" followed by "@cd C:\\path"
+                             (!writeExact("@", 1) ||
+                              !writeExact(initDirOEM.data(), 2) ||
+                              !writeExact("\r\n", 2) ||
+                              !writeExact("@cd \"", 5) ||
+                              !writeExact(initDirOEM.data(), (DWORD)initDirOEM.length()) ||
+                              !writeExact("\"\r\n", 3))) ||
+                            !writeExact("call ", 5) ||
+                            !writeExact(cmdLineOEM.data(), (DWORD)cmdLineOEM.length()) ||
+                            !writeExact("\r\n", 2))
                         {
                             error = TRUE;
                             break;
@@ -909,34 +906,34 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         // additionally, launch restrictions will be handled
 
                         // set correct default directories for individual drives
-                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir.Get() : NULL);
+                        MainWindow->SetDefaultDirectories(initDir.empty() ? NULL : initDir.c_str());
 
                         // to work with old configurations, remove the " character from the start and end of cmdLine
-                        int cmdLen = (int)strlen(cmdLine);
-                        if (cmdLen > 1 && cmdLine[0] == '\"' && cmdLine[cmdLen - 1] == '\"')
+                        if (cmdLine.length() > 1 && cmdLine.front() == L'\"' && cmdLine.back() == L'\"')
                         {
-                            memmove(cmdLine, cmdLine + 1, cmdLen - 2);
-                            cmdLine[cmdLen - 2] = 0;
+                            cmdLine.erase(cmdLine.begin());
+                            cmdLine.pop_back();
                         }
                         // better not swallow backslashes so that we don't destroy some OLE paths
                         //RemoveRedundantBackslahes(cmdLine); // ShellExecuteEx dislikes multiple backslashes, "$(SalDir)\sally.exe"
 
                         CShellExecuteWnd shellExecuteWnd;
-                        SHELLEXECUTEINFO sei;
-                        memset(&sei, 0, sizeof(SHELLEXECUTEINFO));
-                        sei.cbSize = sizeof(SHELLEXECUTEINFO);
-                        sei.hwnd = shellExecuteWnd.Create(parent, "SEW: CMainWindow::UserMenu"); // handle to any message boxes that the system might produce while executing
-                        sei.lpFile = cmdLine;
-                        sei.lpParameters = arguments;
-                        sei.lpDirectory = (initDir[0] != 0) ? initDir.Get() : NULL;
+                        SHELLEXECUTEINFOW sei;
+                        memset(&sei, 0, sizeof(SHELLEXECUTEINFOW));
+                        sei.cbSize = sizeof(SHELLEXECUTEINFOW);
+                        sei.hwnd = shellExecuteWnd.Create(parent, L"SEW: CMainWindow::UserMenu"); // handle to any message boxes that the system might produce while executing
+                        sei.lpFile = cmdLine.c_str();
+                        sei.lpParameters = arguments.c_str();
+                        sei.lpDirectory = initDir.empty() ? NULL : initDir.c_str();
                         sei.nShow = SW_SHOWNORMAL;
 
-                        if (!ShellExecuteEx(&sei))
+                        if (!ShellExecuteExW(&sei))
                         {
                             DWORD err = GetLastError();
-                            if (strlen(cmdLine) > 2 * MAX_PATH) // "always false" (arguments are in 'arguments'): shorten overly long command lines for error display
-                                strcpy(cmdLine + 2 * MAX_PATH - 4, "...");
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), AnsiToWide(cmdLine).c_str(), GetErrorTextW(err));
+                            std::wstring displayCommand = cmdLine;
+                            if (displayCommand.length() > 516)
+                                displayCommand.replace(513, std::wstring::npos, L"...");
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), displayCommand.c_str(), GetErrorTextOwned(err).c_str());
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                             break;
                         }
@@ -951,26 +948,28 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             if (buildBat)
             {
                 lastErr = GetLastError();
-                DWORD size;
-                size = GetFileSize(file, NULL);
-                HANDLES(CloseHandle(file));
+                uint64_t size = 0;
+                gFileSystem->GetHandleFileSize(file, &size);
+                HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+                gFileSystem->CloseFileHandle(file);
 
-                DiskCache.NamePrepared(batUniqueName, CQuadWord(size, 0));
+                DiskCache.NamePrepared(batUniqueName,
+                                       CQuadWord((DWORD)size, (DWORD)(size >> 32)));
 
                 if (!error) // run the .bat
                 {
                     if (batNotEmpty)
                     {
-                        MainWindow->SetDefaultDirectories((initDir[0] != 0) ? initDir.Get() : NULL);
+                        MainWindow->SetDefaultDirectories(initDir.empty() ? NULL : initDir.c_str());
 
                         CommandShellRequest request;
-                        std::wstring batNameW = AnsiToWide(batName);
+                        std::wstring batNameW = batName;
                         std::wstring initDirW;
-                        if (initDir[0] != 0)
-                            initDirW = AnsiToWide(initDir);
+                        if (!initDir.empty())
+                            initDirW = initDir;
 
-                        request.command = batNameW.c_str();
-                        request.workingDirectory = initDirW.empty() ? NULL : initDirW.c_str();
+                        request.command = batNameW;
+                        request.workingDirectory = initDirW;
                         request.windowTitle = LoadStrW(IDS_COMMANDSHELL);
                         request.keepOpen = UserMenuItems->At(itemIndex)->UseWindow &&
                                            !UserMenuItems->At(itemIndex)->CloseShell;
@@ -994,7 +993,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                         : CommandShellResult::Error(ERROR_INVALID_PARAMETER);
                         if (!result.success)
                         {
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), batNameW.c_str(), GetErrorTextW(result.errorCode));
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), batNameW.c_str(), GetErrorTextOwned(result.errorCode).c_str());
                             cacheGuard.ReleaseNow();
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
@@ -1006,7 +1005,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 DWORD err = GetLastError();
                                 result.CloseProcess();
                                 cacheGuard.ReleaseNow();
-                                std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), batNameW.c_str(), GetErrorTextW(err));
+                                std::wstring msg = FormatStrW(LoadStrW(IDS_EXECERROR), batNameW.c_str(), GetErrorTextOwned(err).c_str());
                                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                             }
                             else
@@ -1027,7 +1026,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     cacheGuard.ReleaseNow();
                     if (!skipErrorMessage)
                     {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastErr));
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(lastErr).c_str());
                     }
                 }
             }
@@ -1036,31 +1035,31 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     UpdateWindow(parent);
 }
 
-void CMainWindow::SetDefaultDirectories(const char* curPath)
+void CMainWindow::SetDefaultDirectories(const wchar_t* curPath)
 {
-    CALL_STACK_MESSAGE2("CMainWindow::SetDefaultDirectories(%s)", curPath);
+    CALL_STACK_MESSAGE2("CMainWindow::SetDefaultDirectories(%ls)", curPath);
     //---  restore DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);
     //---  set environment variables
-    char name[4] = "= :";
-    const char* dir;
-    char d;
-    for (d = 'a'; d <= 'z'; d++)
+    wchar_t name[4] = L"= :";
+    const wchar_t* dir;
+    wchar_t d;
+    for (d = L'a'; d <= L'z'; d++)
     {
         name[1] = d;
-        if (curPath != NULL && d == LowerCase[curPath[0]]) // UNC paths are ignored
+        if (curPath != NULL && d == towlower(curPath[0])) // UNC paths are ignored
             dir = curPath;
         else
-            dir = DefaultDir[d - 'a'];
+            dir = DefaultDir[d - L'a'].c_str();
 
-        if (dir[1] == ':' && dir[2] == '\\' && dir[3] == 0)
-            SetEnvironmentVariable(name, NULL);
+        if (dir[1] == L':' && dir[2] == L'\\' && dir[3] == 0)
+            SetEnvironmentVariableW(name, NULL);
         else
-            SetEnvironmentVariable(name, dir);
+            SetEnvironmentVariableW(name, dir);
     }
 }
 
-BOOL CMainWindow::HandleCtrlLetter(char c)
+BOOL CMainWindow::HandleCtrlLetter(wchar_t c)
 {
     CALL_STACK_MESSAGE2("CMainWindow::HandleCtrlLetter(%u)", c);
     if ((GetKeyState(VK_SHIFT) & 0x8000) != 0)
@@ -1085,7 +1084,7 @@ BOOL CMainWindow::HandleCtrlLetter(char c)
                 if (GetActivePanel()->GetCaretIndex() == 0)
                 {
                     if (0 == GetActivePanel()->Dirs->Count ||
-                        strcmp(GetActivePanel()->Dirs->At(0).Name, "..") != 0)
+                        wcscmp(GetActivePanel()->Dirs->At(0).Name, L"..") != 0)
                     {
                         files = GetActivePanel()->Dirs->Count + GetActivePanel()->Files->Count > 0;
                     }
@@ -1662,7 +1661,7 @@ void CMainWindow::OnContextHelp()
 
     // don't enter help mode with pending WM_USER_EXITHELPMODE message
     MSG msg;
-    if (PeekMessage(&msg, HWindow, WM_USER_EXITHELPMODE, WM_USER_EXITHELPMODE, PM_REMOVE | PM_NOYIELD))
+    if (PeekMessageW(&msg, HWindow, WM_USER_EXITHELPMODE, WM_USER_EXITHELPMODE, PM_REMOVE | PM_NOYIELD))
         return;
 
     BOOL bHelpMode = HelpMode;
@@ -1709,7 +1708,7 @@ void CMainWindow::OnContextHelp()
     HWND hDirtyWindow = NULL;
     while (HelpMode)
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_NOREMOVE))
         {
             if (!ProcessHelpMsg(msg, &dwContext, &hDirtyWindow))
                 break;
@@ -1816,7 +1815,7 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
     if (msg.message == WM_USER_EXITHELPMODE ||
         (msg.message == WM_KEYDOWN && msg.wParam == VK_ESCAPE))
     {
-        PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+        PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
         return FALSE;
     }
 
@@ -1828,7 +1827,7 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
         HWND hWndHit = SetHelpCapture(msg.pt, &bDescendant);
         if (hWndHit == NULL)
         {
-            PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE); // eat the message
+            PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE); // eat the message
             return TRUE;
         }
 
@@ -1837,7 +1836,7 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
             if (msg.message != WM_LBUTTONDOWN)
             {
                 // Hit one of our owned windows -- eat the message.
-                PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+                PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
 
                 // notify windows that wish to highlight items during Shift+F1 mode
                 if (msg.message == WM_MOUSEMOVE)
@@ -1864,8 +1863,8 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
                 ReleaseCapture();
                 // the message we peeked changes into a non-client because
                 // of the release capture.
-                GetMessage(&msg, NULL, WM_NCLBUTTONDOWN, WM_NCLBUTTONDOWN);
-                DispatchMessage(&msg);
+                GetMessageW(&msg, NULL, WM_NCLBUTTONDOWN, WM_NCLBUTTONDOWN);
+                DispatchMessageW(&msg);
                 GetCursorPos(&point);
                 SetHelpCapture(point, NULL);
             }
@@ -1873,40 +1872,40 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
             {
                 if (hWndHit == MenuBar->HWindow)
                 {
-                    PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+                    PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
                     ReleaseCapture();
                     POINT p = msg.pt;
                     ScreenToClient(hWndHit, &p);
                     msg.lParam = MAKELPARAM(p.x, p.y);
                     msg.hwnd = hWndHit;
                     msg.message = WM_MOUSEMOVE;
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                     msg.message = WM_LBUTTONDOWN;
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                     GetCursorPos(&point);
                     SetHelpCapture(point, NULL);
                 }
                 else
                 {
                     *pContext = MapClientArea(msg.pt);
-                    PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+                    PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
                     return FALSE;
                 }
             }
             else
             {
                 *pContext = MapNonClientArea(iHit);
-                PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+                PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
                 return FALSE;
             }
         }
         else
         {
             // Hit one of our apps windows (or desktop) -- dispatch the message.
-            PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE);
+            PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE);
 
             // Dispatch mouse messages that hit the desktop!
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
     else if (msg.message == WM_SYSCOMMAND ||
@@ -1916,12 +1915,12 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
         {
             ReleaseCapture();
             MSG msg2;
-            while (PeekMessage(&msg2, NULL, WM_MOUSEFIRST, WM_MOUSELAST, PM_REMOVE | PM_NOYIELD))
+            while (PeekMessageW(&msg2, NULL, WM_MOUSEFIRST, WM_MOUSELAST, PM_REMOVE | PM_NOYIELD))
                 ;
         }
-        if (PeekMessage(&msg, NULL, msg.message, msg.message, PM_NOREMOVE))
+        if (PeekMessageW(&msg, NULL, msg.message, msg.message, PM_NOREMOVE))
         {
-            GetMessage(&msg, NULL, msg.message, msg.message);
+            GetMessageW(&msg, NULL, msg.message, msg.message);
 
             // ensure sending messages to our menu (avoiding the need for a keyboard hook)
             // this supports entering the menu via Alt/F10/Alt+letter during help mode
@@ -1933,7 +1932,7 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
                      msg.message <= WM_SYSKEYLAST))
                 {
                     // only dispatch system keys and system commands
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
         }
@@ -1943,8 +1942,8 @@ BOOL CMainWindow::ProcessHelpMsg(MSG& msg, DWORD* pContext, HWND* hDirtyWindow)
     else
     {
         // allow all other messages to go through (capture still set)
-        if (PeekMessage(&msg, NULL, msg.message, msg.message, PM_REMOVE))
-            DispatchMessage(&msg);
+        if (PeekMessageW(&msg, NULL, msg.message, msg.message, PM_REMOVE))
+            DispatchMessageW(&msg);
     }
 
     return TRUE;
@@ -1960,7 +1959,7 @@ void CMainWindow::ExitHelpMode()
     // only post new WM_EXITHELPMODE message if one doesn't already exist
     //  in the queue.
     MSG msg;
-    if (!PeekMessage(&msg, HWindow, WM_USER_EXITHELPMODE, WM_USER_EXITHELPMODE, PM_REMOVE | PM_NOYIELD))
+    if (!PeekMessageW(&msg, HWindow, WM_USER_EXITHELPMODE, WM_USER_EXITHELPMODE, PM_REMOVE | PM_NOYIELD))
         PostMessage(HWindow, WM_USER_EXITHELPMODE, 0, 0);
 
     // release capture if this window has it
@@ -2016,7 +2015,7 @@ BOOL CMainWindow::DoQuickRename()
 // LockUI
 //
 
-void CMainWindow::LockUI(BOOL lock, HWND hToolWnd, const char* lockReason)
+void CMainWindow::LockUI(BOOL lock, HWND hToolWnd, const wchar_t* lockReason)
 {
     if (LockedUI && lock)
     {
@@ -2076,19 +2075,5 @@ CMainWindow::GetPanel(int panel)
     default:
         TRACE_E("Invalid panel (PANEL_XXX) constant: " << panel);
         return NULL;
-    }
-}
-
-void CMainWindow::PostFocusNameInPanel(int panel, const char* path, const char* name)
-{
-    CALL_STACK_MESSAGE4("CMainWindow::FocusNameInPanel(%d, %s, %s)", panel, path, name);
-    CFilesWindow* p = GetPanel(panel);
-    if (p != NULL)
-    {
-        static CPathBuffer pathBackup; // Heap-allocated for long path support
-        static CPathBuffer nameBackup; // Heap-allocated for long path support
-        lstrcpyn(pathBackup, path, pathBackup.Size());
-        lstrcpyn(nameBackup, name, nameBackup.Size());
-        PostMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup.Get(), (LPARAM)pathBackup.Get());
     }
 }

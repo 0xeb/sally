@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "spl_buffer.h"
+
 #ifdef _MSC_VER
 #pragma pack(push, enter_include_spl_fs) // so that structures are independent of the set alignment
 #pragma pack(4)
@@ -54,17 +56,17 @@ public:
     // WARNING: if it did not return NULL (no system error occurred), FreeFileNameInCache must be called later
     //          (for the same 'uniqueFileName')
     // NOTE: if the FS uses disk-cache, it should at least call
-    //       CSalamanderGeneralAbstract::RemoveFilesFromCache("fs-name:") when unloading the plugin, otherwise
+    //       CSalamanderGeneralAbstract::RemoveFilesFromCache(L"fs-name:") when unloading the plugin, otherwise
     //       its file copies will unnecessarily clutter the disk-cache
-    virtual const char* WINAPI AllocFileNameInCache(HWND parent, const char* uniqueFileName, const char* nameInCache,
-                                                    const char* rootTmpPath, BOOL& fileExists) = 0;
+    virtual const wchar_t* WINAPI AllocFileNameInCache(HWND parent, const wchar_t* uniqueFileName, const wchar_t* nameInCache,
+                                                    const wchar_t* rootTmpPath, BOOL& fileExists) = 0;
 
     // opens file 'fileName' from a Windows path in the user-requested viewer (either
     // via viewer association or through the View With command); 'parent' is the parent of the error
     // messagebox; if 'fileLock' and 'fileLockOwner' are not NULL, the binding to
     // the opened viewer is returned in them (used as a parameter of the FreeFileNameInCache method); returns TRUE
     // if the viewer was opened
-    virtual BOOL WINAPI OpenViewer(HWND parent, const char* fileName, HANDLE* fileLock,
+    virtual BOOL WINAPI OpenViewer(HWND parent, const wchar_t* fileName, HANDLE* fileLock,
                                    BOOL* fileLockOwner) = 0;
 
     // must pair with AllocFileNameInCache, called after opening the viewer (or after an error when
@@ -86,7 +88,7 @@ public:
     // will not be stored longer than necessary (after closing the viewer it will be deleted immediately; if
     // the viewer was not opened at all ('fileLock' is NULL), the file will not be inserted into disk-cache,
     // but deleted)
-    virtual void WINAPI FreeFileNameInCache(const char* uniqueFileName, BOOL fileExists, BOOL newFileOK,
+    virtual void WINAPI FreeFileNameInCache(const wchar_t* uniqueFileName, BOOL fileExists, BOOL newFileOK,
                                             const CQuadWord& newFileSize, HANDLE fileLock,
                                             BOOL fileLockOwner, BOOL removeAsSoonAsPossible) = 0;
 };
@@ -231,55 +233,6 @@ public:
 
 #define SALCMDLINE_MAXLEN 8192 // maximum length of command from Salamander command line
 
-inline BOOL SPLFSWideToAnsiExact(const wchar_t* src, char* dst, int dstSize)
-{
-    if (dst == NULL || dstSize <= 0)
-        return FALSE;
-    dst[0] = 0;
-    if (src == NULL)
-        return TRUE;
-
-    if (GetACP() == CP_UTF8)
-    {
-        int converted = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, src, -1, dst, dstSize, NULL, NULL);
-        if (converted == 0)
-        {
-            dst[0] = 0;
-            return FALSE;
-        }
-        dst[dstSize - 1] = 0;
-        return TRUE;
-    }
-
-    BOOL usedDefaultChar = FALSE;
-    int converted = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, src, -1, dst, dstSize, NULL, &usedDefaultChar);
-    if (converted == 0 || usedDefaultChar)
-    {
-        dst[0] = 0;
-        return FALSE;
-    }
-    dst[dstSize - 1] = 0;
-    return TRUE;
-}
-
-inline BOOL SPLFSAnsiToWide(const char* src, wchar_t* dst, int dstSize)
-{
-    if (dst == NULL || dstSize <= 0)
-        return FALSE;
-    dst[0] = 0;
-    if (src == NULL)
-        return TRUE;
-
-    int converted = MultiByteToWideChar(CP_ACP, 0, src, -1, dst, dstSize);
-    if (converted == 0)
-    {
-        dst[0] = 0;
-        return FALSE;
-    }
-    dst[dstSize - 1] = 0;
-    return TRUE;
-}
-
 class CPluginFSInterfaceAbstract
 {
 #ifdef INSIDE_SALAMANDER
@@ -289,35 +242,36 @@ private: // protection against incorrect direct method calls (see CPluginFSInter
 public:
 #endif // INSIDE_SALAMANDER
 
-    // returns user-part of the current path in this FS, 'userPart' is a buffer of MAX_PATH size
-    // for the path, returns success
-    virtual BOOL WINAPI GetCurrentPath(char* userPart) = 0;
+    // returns the user-part of the current path in this FS. The caller owns the
+    // call-scoped UTF-16 buffer and the plugin grows it through Reserve as needed.
+    virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* userPart) = 0;
 
     // returns user-part of the full name of file/directory/up-dir 'file' ('isDir' is 0/1/2) on the current
     // path in this FS; for up-dir directory (first in the directory list and named ".."),
-    // 'isDir'==2 and the method should return the current path shortened by the last component; 'buf'
-    // is a buffer of 'bufSize' for the resulting full name, returns success
-    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir, char* buf, int bufSize) = 0;
+    // 'isDir'==2 and the method should return the current path shortened by the last component;
+    // 'fullName' is an independent caller-owned UTF-16 output buffer, returns success
+    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir,
+                                    CSalamanderStringBuffer* fullName) = 0;
 
     // returns absolute path (including fs-name) corresponding to relative path 'path' on this FS;
     // returns FALSE if this method is not implemented (other return values are then ignored);
-    // 'parent' is the parent of any messageboxes; 'fsName' is the current FS name; 'path' is a buffer
-    // of 'pathSize' characters, on input it contains the relative path on FS, on output it contains
+    // 'parent' is the parent of any messageboxes; 'fsName' is the current FS name; 'path' is a
+    // caller-owned UTF-16 string buffer, on input it contains the relative path on FS, on output it contains
     // the corresponding absolute path on FS; in 'success' returns TRUE if the path was successfully translated
     // (the string in 'path' should be used - otherwise it is ignored) - path change follows (if it is
     // a path on this FS, ChangePath() is called); if it returns FALSE in 'success', it is assumed
     // that the user has already seen the error message
-    virtual BOOL WINAPI GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize,
-                                      BOOL& success) = 0;
+    virtual BOOL WINAPI GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                      CSalamanderStringBuffer* path, BOOL& success) = 0;
 
-    // returns user-part of the root of the current path in this FS, 'userPart' is a buffer of MAX_PATH size
-    // for the path (used in "goto root" function), returns success
-    virtual BOOL WINAPI GetRootPath(char* userPart) = 0;
+    // returns the user-part of the root of the current path in this FS (used in "goto root")
+    virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart) = 0;
 
     // compares the current path in this FS and the path specified via 'fsNameIndex' and 'userPart'
     // (the FS name in the path is from this plugin and is given by index 'fsNameIndex'), returns TRUE
     // if the paths are identical; 'currentFSNameIndex' is the index of the current FS name
-    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart) = 0;
+    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                      const wchar_t* userPart) = 0;
 
     // returns TRUE if the path is from this FS (which means Salamander can pass the path
     // to ChangePath of this FS); the path is always to one of the FS of this plugin (e.g. Windows
@@ -325,16 +279,17 @@ public:
     // in the path (index is zero for fs-name specified in CSalamanderPluginEntryAbstract::SetBasicPluginData,
     // for other fs-names the index is returned by CSalamanderPluginEntryAbstract::AddFSName); user-part
     // of the path is 'userPart'; 'currentFSNameIndex' is the index of the current FS name
-    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart) = 0;
+    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                                  const wchar_t* userPart) = 0;
 
     // changes the current path in this FS to the path specified via 'fsName' and 'userPart' (exactly
     // or to the nearest accessible subpath of 'userPart' - see 'mode' value); in case
     // the path is shortened because it is a path to a file (a guess that it might be
     // a path to a file is sufficient - after listing the path it is verified if the file exists, or
     // an error is shown to the user) and 'cutFileName' is not NULL (possible only in 'mode' 3), returns
-    // in the buffer 'cutFileName' (of MAX_PATH characters size) the name of this file (without path),
+    // in the optional caller-owned UTF-16 buffer 'cutFileName' the name of this file (without path),
     // otherwise returns an empty string in the buffer 'cutFileName'; 'currentFSNameIndex' is the index
-    // of the current FS name; 'fsName' is a buffer of MAX_PATH size, on input it contains the FS name
+    // of the current FS name; 'fsName' is a caller-owned UTF-16 string buffer, on input it contains the FS name
     // in the path, which is from this plugin (but does not have to match the current FS name
     // in this object, it is sufficient if IsOurPath() returns TRUE for it), on output 'fsName' contains
     // the current FS name in this object (must be from this plugin); 'fsNameIndex' is the index
@@ -359,8 +314,9 @@ public:
     // in case opening the FS is time-consuming (e.g. connecting to FTP server) and 'mode'
     // is 3, it is possible to adjust behavior like for archives - shorten the path if needed and return FALSE
     // only if no path on FS is accessible, error reporting does not change
-    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                                   const char* userPart, char* cutFileName, BOOL* pathWasCut,
+    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                                   int fsNameIndex, const wchar_t* userPart,
+                                   CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut,
                                    BOOL forceRefresh, int mode) = 0;
 
     // loads files and directories from the current path, stores them in the 'dir' object (for path NULL or
@@ -418,7 +374,7 @@ public:
     // up to three columns separated by '\t' (see Alt+F1/F2 menu), in Disconnect dialog
     // only the second column is used; if the return value is FALSE, the return values
     // 'title', 'icon' and 'destroyIcon' are ignored (no item is added)
-    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const char* fsName, char*& title,
+    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title,
                                                        HICON& icon, BOOL& destroyIcon) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_GETFSICON:
@@ -446,7 +402,7 @@ public:
     // the chosen drop-effect is returned in it (DROPEFFECT_COPY, DROPEFFECT_MOVE or DROPEFFECT_NONE);
     // if the method does not change 'dropEffect' and it contains multiple effects, Copy operation
     // is preferentially selected
-    virtual void WINAPI GetDropEffect(const char* srcFSPath, const char* tgtFSPath,
+    virtual void WINAPI GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                                       DWORD allowedEffects, DWORD keyState,
                                       DWORD* dropEffect) = 0;
 
@@ -462,14 +418,15 @@ public:
     // (the rest is filter); 'offset' is the character offset from which to search for delimiter point; returns TRUE
     // if the next delimiter point exists, its position is returned in 'offset'; returns FALSE if no next
     // delimiter point exists (end of text is not considered a delimiter point)
-    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset) = 0;
+    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_GETNEXTDIRLINEHOTPATH:
     // adjustment of the shortened path text to be displayed in the panel (Directory Line - path
     // shortening via mouse - hot-tracking); used when the hot-text from Directory Line does not match
     // the path exactly (e.g. missing closing bracket - VMS paths on FTP - "[DIR1.DIR2.DIR3]");
-    // 'path' is in/out buffer with the path (buffer size is 'pathBufSize')
-    virtual void WINAPI CompleteDirectoryLineHotPath(char* path, int pathBufSize) = 0;
+    // 'path' is a caller-owned growable UTF-16 in/out buffer.
+    virtual BOOL WINAPI CompleteDirectoryLineHotPath(
+        CSalamanderStringBuffer* path) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_GETPATHFORMAINWNDTITLE:
     // obtains the text to be displayed in the main window title if displaying
@@ -478,19 +435,20 @@ public:
     // "Directory Name Only" mode (only the current directory name should be displayed - the last
     // path component); if 'mode' is 2, it is the "Shortened Path" mode (the shortened
     // form of path should be displayed - root (including path separator) + "..." + path
-    // separator + last path component); 'buf' is a buffer of 'bufSize' for
-    // the resulting text; returns TRUE if it returns the requested text; returns FALSE if
+    // separator + last path component); 'buf' is a caller-owned growable UTF-16
+    // output buffer; returns TRUE if it returns the requested text; returns FALSE if
     // the text should be created based on delimiter point data obtained via the
     // GetNextDirectoryLineHotPath() method
     // NOTE: if GetSupportedServices() does not also return FS_SERVICE_GETPATHFORMAINWNDTITLE,
     //       the full FS path is displayed in the main window title in all title
     //       display modes (including "Directory Name Only" and "Shortened Path")
-    virtual BOOL WINAPI GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize) = 0;
+    virtual BOOL WINAPI GetPathForMainWindowTitle(
+        const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_SHOWINFO:
     // displays a dialog with information about the FS (free space, capacity, name, options, etc.);
     // 'fsName' is the current FS name; 'parent' is the suggested parent of the displayed dialog
-    virtual void WINAPI ShowInfoDialog(const char* fsName, HWND parent) = 0;
+    virtual void WINAPI ShowInfoDialog(const wchar_t* fsName, HWND parent) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_COMMANDLINE:
     // executes a command for the FS in the active panel from the command line below the panels; returns FALSE on error
@@ -505,7 +463,8 @@ public:
     // only the cursor is positioned; if the output is an empty line, these values are ignored)
     // WARNING: this method should not directly change the path in the panel - there is a risk of FS closing on path error
     //          (the this pointer would cease to exist for the method)
-    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo) = 0;
+    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command,
+                                           int& selFrom, int& selTo) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_QUICKRENAME:
     // quick rename of a file or directory ('isDir' is FALSE/TRUE) 'file' on FS;
@@ -525,8 +484,9 @@ public:
     // quick rename should be opened, if it returns FALSE when 'mode'==2, it is an operation error (the erroneous
     // new name is returned in 'newName' - the standard dialog is reopened and the user can
     // correct the erroneous name there)
-    virtual BOOL WINAPI QuickRename(const char* fsName, int mode, HWND parent, CFileData& file,
-                                    BOOL isDir, char* newName, BOOL& cancel) = 0;
+    virtual BOOL WINAPI QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file,
+                                    BOOL isDir, CSalamanderStringBuffer* newName,
+                                    BOOL& cancel) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_ACCEPTSCHANGENOTIF:
     // receives information about a change on path 'path' (if 'includingSubdirs' is TRUE,
@@ -536,7 +496,7 @@ public:
     // detached FS; 'fsName' is the current FS name
     // NOTE: for the plugin as a whole, there is the method
     //       CPluginInterfaceAbstract::AcceptChangeOnPathNotification()
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* fsName, const char* path,
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path,
                                                        BOOL includingSubdirs) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_CREATEDIR:
@@ -556,15 +516,16 @@ public:
     // a directory should be opened, if it returns FALSE when 'mode'==2, it is an operation error (the erroneous
     // directory name is returned in 'newName' - the standard dialog is reopened and the user can
     // correct the erroneous name there)
-    virtual BOOL WINAPI CreateDir(const char* fsName, int mode, HWND parent,
-                                  char* newName, BOOL& cancel) = 0;
+    virtual BOOL WINAPI CreateDir(const wchar_t* fsName, int mode, HWND parent,
+                                  CSalamanderStringBuffer* newName,
+                                  BOOL& cancel) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_VIEWFILE:
     // viewing a file (directories cannot be viewed via the View function) 'file' on the current path
     // on FS; 'fsName' is the current FS name; 'parent' is the parent of any error
     // messageboxes; 'salamander' is a set of methods from Salamander needed for implementing
     // viewing with caching
-    virtual void WINAPI ViewFile(const char* fsName, HWND parent,
+    virtual void WINAPI ViewFile(const wchar_t* fsName, HWND parent,
                                  CSalamanderForViewFileOnFSAbstract* salamander,
                                  CFileData& file) = 0;
 
@@ -586,7 +547,7 @@ public:
     // the operation or an error occurs, 'cancelOrError' returns TRUE and no deselection
     // of files/directories occurs; if it returns FALSE when 'mode'==1 and 'cancelOrError' is FALSE,
     // the standard delete confirmation should be opened
-    virtual BOOL WINAPI Delete(const char* fsName, int mode, HWND parent, int panel,
+    virtual BOOL WINAPI Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                                int selectedFiles, int selectedDirs, BOOL& cancelOrError) = 0;
 
     // copy/move from FS (parameter 'copy' is TRUE/FALSE), in the following text only
@@ -634,11 +595,11 @@ public:
     // target path string entered by the user in the standard dialog, when 'mode'==3 contains the target
     // path and mask (separated by null), when 'mode'==4 contains the erroneous target path, when 'mode'==5
     // contains the target path (Windows, FS or archive) terminated with two nulls; if
-    // the method returns FALSE, 'targetPath' on output (buffer of 2 * MAX_PATH characters) when
+    // the method returns FALSE, 'targetPath' on output when
     // 'cancelOrHandlePath'==FALSE contains the suggested target path for the standard dialog and when
     // 'cancelOrHandlePath'==TRUE contains the target path string to be processed; if the method returns TRUE and
     // 'cancelOrHandlePath' is FALSE, 'targetPath' contains the name of the item to focus
-    // in the source panel (buffer of 2 * MAX_PATH characters; not a full name, just the item name in panel;
+    // in the source panel (not a full name, just the item name in panel;
     // if empty string, focus remains unchanged); 'dropTarget' is not NULL only when
     // the path is specified via drag&drop (see description above)
     //
@@ -652,9 +613,9 @@ public:
     //       CSalamanderGeneralAbstract::SetUserWorkedOnPanelPath should be called for the target
     //       panel, otherwise the path in that panel will not be inserted into the list of working
     //       directories - List of Working Directories (Alt+F12)
-    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                          int panel, int selectedFiles, int selectedDirs,
-                                         char* targetPath, BOOL& operationMask,
+                                         CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                          BOOL& cancelOrHandlePath, HWND dropTarget) = 0;
 
     // copy/move from a Windows path to FS (parameter 'copy' is TRUE/FALSE), in the following text
@@ -678,7 +639,7 @@ public:
     // are addressed relative to it), when 'mode'==1 it is NULL; selected files and directories
     // are specified by the enumeration function 'next' whose parameter is 'nextParam', when 'mode'==1
     // they are NULL; 'sourceFiles' + 'sourceDirs' - number of selected files and directories (the sum
-    // is always non-zero); 'targetPath' is an in/out buffer of at least 2 * MAX_PATH characters for the target
+    // is always non-zero); 'targetPath' is a dynamically owned UTF-16 in/out record for the target
     // path; when 'mode'==1 'targetPath' on input is the current path on this FS and on output the target
     // path for the standard copy dialog; when 'mode'==2 'targetPath' on input is the user-entered
     // target path (unmodified, including mask, etc.) and on output is ignored except when
@@ -703,10 +664,11 @@ public:
     //          - this FS is detached
     //          - this FS was just created (by calling OpenFS) and will be immediately destroyed after
     //            the method ends (by calling CloseFS) - no other method was called on it (not even ChangePath)
-    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                               const char* sourcePath, SalEnumSelection2 next,
+    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                               const wchar_t* sourcePath, SalEnumSelection2 next,
                                                void* nextParam, int sourceFiles, int sourceDirs,
-                                               char* targetPath, BOOL* invalidPathOrCancel) = 0;
+                                               CSalamanderStringBuffer* targetPath,
+                                               BOOL* invalidPathOrCancel) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_CHANGEATTRS:
     // changing attributes of files and directories selected in the panel; each plugin has
@@ -721,7 +683,7 @@ public:
     // are needed); if it returns TRUE, the operation completed correctly and the selected files/directories
     // should be deselected; if the user wants to cancel the operation or an error occurs, the method
     // returns FALSE and no deselection of files/directories occurs
-    virtual BOOL WINAPI ChangeAttributes(const char* fsName, HWND parent, int panel,
+    virtual BOOL WINAPI ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                                          int selectedFiles, int selectedDirs) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_SHOWPROPERTIES:
@@ -736,7 +698,7 @@ public:
     // under the cursor (focus) is used, before calling the ShowProperties method either
     // files and directories are selected or there is at least focus on a file/directory, so there is always
     // something to work with (no additional tests are needed)
-    virtual void WINAPI ShowProperties(const char* fsName, HWND parent, int panel,
+    virtual void WINAPI ShowProperties(const wchar_t* fsName, HWND parent, int panel,
                                        int selectedFiles, int selectedDirs) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_CONTEXTMENU:
@@ -757,7 +719,7 @@ public:
     // file/directory (not on up-dir), so there is always something to work with (no additional tests
     // are needed); if 'type'!=fscmItemsInPanel, 'selectedFiles' + 'selectedDirs'
     // are always set to zero (ignored)
-    virtual void WINAPI ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+    virtual void WINAPI ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                     int panel, int selectedFiles, int selectedDirs) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_CONTEXTMENU:
@@ -772,12 +734,12 @@ public:
     // the panel (PANEL_LEFT or PANEL_RIGHT) for which the Find dialog should be opened (from this panel
     // the search path is usually obtained); returns TRUE on successful opening of the Find dialog;
     // if it returns FALSE, Salamander opens the standard Find Files and Directories dialog
-    virtual BOOL WINAPI OpenFindDialog(const char* fsName, int panel) = 0;
+    virtual BOOL WINAPI OpenFindDialog(const wchar_t* fsName, int panel) = 0;
 
     // only if GetSupportedServices() also returns FS_SERVICE_OPENACTIVEFOLDER:
     // opens an Explorer window for the current path in the panel
     // 'fsName' is the current FS name; 'parent' is the suggested parent of the displayed dialog
-    virtual void WINAPI OpenActiveFolder(const char* fsName, HWND parent) = 0;
+    virtual void WINAPI OpenActiveFolder(const wchar_t* fsName, HWND parent) = 0;
 
     // only if GetSupportedServices() returns FS_SERVICE_MOVEFROMFS or FS_SERVICE_COPYFROMFS:
     // allows influencing the allowed drop-effects during drag&drop from this FS; if 'allowedEffects' is not
@@ -789,103 +751,20 @@ public:
     // panel); when 'mode' is 1, 'tgtFSPath' contains the target path that will be used if a drop occurs,
     // otherwise 'tgtFSPath' is NULL; 'mode' is 2 when called immediately after the drag&drop
     // operation completes (both successful and unsuccessful)
-    virtual void WINAPI GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects) = 0;
+    virtual void WINAPI GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects) = 0;
 
     // allows the plugin to change the standard message "There are no items in this panel." displayed
     // when there are no items (file/directory/up-dir) in the panel; returns FALSE if
     // the standard message should be used (the return value 'textBuf' is then ignored); returns TRUE
-    // if the plugin returns its alternative message in 'textBuf' (buffer of 'textBufSize' characters)
-    virtual BOOL WINAPI GetNoItemsInPanelText(char* textBuf, int textBufSize) = 0;
+    // if the plugin returns its alternative message in the caller-owned growable
+    // UTF-16 output buffer 'textBuf'
+    virtual BOOL WINAPI GetNoItemsInPanelText(
+        CSalamanderStringBuffer* textBuf) = 0;
 
     // only if GetSupportedServices() returns FS_SERVICE_SHOWSECURITYINFO:
     // the user clicked on the security icon (see CSalamanderGeneralAbstract::ShowSecurityIcon;
     // e.g. FTPS displays a dialog with the server certificate); 'parent' is the suggested parent of the dialog
     virtual void WINAPI ShowSecurityInfo(HWND parent) = 0;
-
-    // Optional wide path ABI. Plugins built for SALLY_PLUGIN_WIDE_FS_VERSION or newer may
-    // override these methods to preserve exact UTF-16 paths. The default implementations
-    // bridge to the legacy ANSI methods only when the conversion is exact.
-    virtual BOOL WINAPI GetCurrentPathW(wchar_t* userPart, int userPartSize)
-    {
-        char userPartA[MAX_PATH];
-        if (!GetCurrentPath(userPartA))
-            return FALSE;
-        return SPLFSAnsiToWide(userPartA, userPart, userPartSize);
-    }
-
-    virtual BOOL WINAPI GetFullNameW(CFileData& file, int isDir, wchar_t* buf, int bufSize)
-    {
-        char bufA[MAX_PATH];
-        if (!GetFullName(file, isDir, bufA, MAX_PATH))
-            return FALSE;
-        return SPLFSAnsiToWide(bufA, buf, bufSize);
-    }
-
-    virtual BOOL WINAPI GetFullFSPathW(HWND parent, const wchar_t* fsName, wchar_t* path, int pathSize,
-                                       BOOL& success)
-    {
-        char fsNameA[MAX_PATH];
-        char pathA[MAX_PATH];
-        if (!SPLFSWideToAnsiExact(fsName, fsNameA, MAX_PATH) ||
-            !SPLFSWideToAnsiExact(path, pathA, MAX_PATH))
-        {
-            success = FALSE;
-            return FALSE;
-        }
-        BOOL ret = GetFullFSPath(parent, fsNameA, pathA, MAX_PATH, success);
-        if (ret && success)
-            return SPLFSAnsiToWide(pathA, path, pathSize);
-        return ret;
-    }
-
-    virtual BOOL WINAPI GetRootPathW(wchar_t* userPart, int userPartSize)
-    {
-        char userPartA[MAX_PATH];
-        if (!GetRootPath(userPartA))
-            return FALSE;
-        return SPLFSAnsiToWide(userPartA, userPart, userPartSize);
-    }
-
-    virtual BOOL WINAPI IsCurrentPathW(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
-    {
-        char userPartA[MAX_PATH];
-        return SPLFSWideToAnsiExact(userPart, userPartA, MAX_PATH) &&
-               IsCurrentPath(currentFSNameIndex, fsNameIndex, userPartA);
-    }
-
-    virtual BOOL WINAPI IsOurPathW(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
-    {
-        char userPartA[MAX_PATH];
-        return SPLFSWideToAnsiExact(userPart, userPartA, MAX_PATH) &&
-               IsOurPath(currentFSNameIndex, fsNameIndex, userPartA);
-    }
-
-    virtual BOOL WINAPI ChangePathW(int currentFSNameIndex, wchar_t* fsName, int fsNameIndex,
-                                    const wchar_t* userPart, wchar_t* cutFileName, int cutFileNameSize,
-                                    BOOL* pathWasCut, BOOL forceRefresh, int mode)
-    {
-        char fsNameA[MAX_PATH];
-        char userPartA[MAX_PATH];
-        char cutFileNameA[MAX_PATH];
-        if (!SPLFSWideToAnsiExact(fsName, fsNameA, MAX_PATH) ||
-            !SPLFSWideToAnsiExact(userPart, userPartA, MAX_PATH))
-        {
-            if (cutFileName != NULL && cutFileNameSize > 0)
-                cutFileName[0] = 0;
-            return FALSE;
-        }
-        cutFileNameA[0] = 0;
-        BOOL ret = ChangePath(currentFSNameIndex, fsNameA, fsNameIndex, userPartA,
-                              cutFileName != NULL ? cutFileNameA : NULL,
-                              pathWasCut, forceRefresh, mode);
-        if (ret)
-        {
-            SPLFSAnsiToWide(fsNameA, fsName, MAX_PATH);
-            if (cutFileName != NULL)
-                SPLFSAnsiToWide(cutFileNameA, cutFileName, cutFileNameSize);
-        }
-        return ret;
-    }
 
     /* remaining to be completed:
 // calculate occupied space on FS (Alt+F10 + Ctrl+Shift+F10 + calc. needed space + spacebar key in panel)
@@ -917,7 +796,7 @@ public:
     // for other fs-names the index is returned by CSalamanderPluginEntryAbstract::AddFSName);
     // returns a pointer to the interface of the opened FS CPluginFSInterfaceAbstract or
     // NULL on error
-    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const char* fsName, int fsNameIndex) = 0;
+    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const wchar_t* fsName, int fsNameIndex) = 0;
 
     // function for "file system", called to close an FS, 'fs' is a pointer to
     // the interface of the opened FS, after this call the interface 'fs' is considered
@@ -957,7 +836,7 @@ public:
     // also work with the inactive panel)
     virtual BOOL WINAPI ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                        CPluginFSInterfaceAbstract* pluginFS,
-                                                       const char* pluginFSName, int pluginFSNameIndex,
+                                                       const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                        BOOL isDetachedFS, BOOL& refreshMenu,
                                                        BOOL& closeMenu, int& postCmd, void*& postCmdParam) = 0;
 
@@ -988,7 +867,7 @@ public:
     //       'panel' panel, otherwise the path in this panel will not be inserted into the list of working
     //       directories - List of Working Directories (Alt+F12)
     virtual void WINAPI ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex,
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex,
                                     CFileData& file, int isDir) = 0;
 
     // performs disconnect of the FS requested by the user in the Disconnect dialog; 'parent' is
@@ -1002,18 +881,19 @@ public:
     // is refreshed to reflect any previous successful disconnects)
     virtual BOOL WINAPI DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                      CPluginFSInterfaceAbstract* pluginFS,
-                                     const char* pluginFSName, int pluginFSNameIndex) = 0;
+                                     const wchar_t* pluginFSName, int pluginFSNameIndex) = 0;
 
-    // converts the user-part of the path in buffer 'fsUserPart' (size MAX_PATH characters) from external
+    // converts the user-part in caller-owned growable UTF-16 storage from external
     // to internal format (e.g. for FTP: internal format = paths as the server works with them,
-    // external format = URL format = paths contain hex-escape-sequences (e.g. "%20" = " "))
-    virtual void WINAPI ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) = 0;
+    // external format = URL format = paths contain hex-escape-sequences (e.g. "%20" = " "));
+    // returns FALSE without publishing a partial value if conversion or growth fails
+    virtual BOOL WINAPI ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) = 0;
 
-    // converts the user-part of the path in buffer 'fsUserPart' (size MAX_PATH characters) from internal
-    // to external format
-    virtual void WINAPI ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) = 0;
+    // converts the user-part in caller-owned growable UTF-16 storage from internal
+    // to external format with the same transactional failure contract
+    virtual BOOL WINAPI ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) = 0;
 
     // this method is called only for plugins that serve as a replacement for the Network item
     // in the Change Drive menu and in Drive bars (see CSalamanderGeneralAbstract::SetPluginIsNethood()):
@@ -1022,7 +902,7 @@ public:
     // user-part "\\server" in the panel 'panel' (PANEL_LEFT or PANEL_RIGHT); purpose of this method:
     // the plugin should without waiting list at least this one share on this path, so that
     // it can be focused in the panel (which is the normal behavior when changing paths via up-dir)
-    virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server, const char* share) = 0;
+    virtual void WINAPI EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share) = 0;
 };
 
 #ifdef _MSC_VER

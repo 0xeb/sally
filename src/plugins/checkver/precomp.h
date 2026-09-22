@@ -12,6 +12,7 @@
 #include <crtdbg.h>
 #include <process.h>
 #include <commctrl.h>
+#include <array>
 #include <ostream>
 #include <limits.h>
 #include <stdio.h>

@@ -12,8 +12,8 @@
 struct CRenameScriptEntry
 {
     CSourceFile* Source;
-    char* NewName;
-    char* NewPart;
+    wchar_t* NewName;
+    wchar_t* NewPart;
     int Blocks : 28;            // script construction: index of an item depending on this one
                                 // script processing: the following item depends on this entry
     unsigned int Overwrite : 1; // the user confirmed overwriting the existing file
@@ -46,7 +46,7 @@ struct CRenameScriptEntry
     }
     static int __cdecl CompareOldName(const void* key, const void* elem2)
     {
-        return SG->StrICmp((const char*)key, ((CRenameScriptEntry*)elem2)->Source->FullName);
+        return SG->StrICmp((const wchar_t*)key, ((CRenameScriptEntry*)elem2)->Source->FullName);
     }
     static int __cdecl CompareNewNames(const void* elem1, const void* elem2)
     {
@@ -72,13 +72,13 @@ struct CRenameScriptEntry
 // CUndoStackEntry
 //
 
-CUndoStackEntry::CUndoStackEntry(char* source, char* target, CSourceFile* renamedFile,
+CUndoStackEntry::CUndoStackEntry(const wchar_t* source, const wchar_t* target, CSourceFile* renamedFile,
                                  BOOL isDir, BOOL blocks)
 {
     CALL_STACK_MESSAGE_NONE
-    Source = SG->DupStr(source);
+    Source = _wcsdup(source);
     if (target)
-        Target = SG->DupStr(target);
+        Target = _wcsdup(target);
     else
         Target = NULL;
     RenamedFile = renamedFile;
@@ -120,14 +120,14 @@ void CRenamerDialog::Rename(BOOL validate)
             }
             if (validate)
             {
-                SG->SalMessageBox(HWindow, LoadStr(IDS_VALIDATEOK),
-                                  LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+                SG->SalMessageBox(HWindow, LangStr(IDS_VALIDATEOK).c_str(),
+                                  LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
             }
             else
             {
                 delete[] script;
-                SG->SalMessageBox(HWindow, LoadStr(IDS_NOTTODO),
-                                  LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+                SG->SalMessageBox(HWindow, LangStr(IDS_NOTTODO).c_str(),
+                                  LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
             }
             return;
         }
@@ -147,8 +147,8 @@ void CRenamerDialog::Rename(BOOL validate)
         NotRenamedFiles.DestroyMembers();
         if (Errors || count < SourceFiles.Count)
         {
-            SG->SalMessageBox(HWindow, LoadStr(IDS_SOMEERRORS),
-                              LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+            SG->SalMessageBox(HWindow, LangStr(IDS_SOMEERRORS).c_str(),
+                              LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
             int i;
             for (i = 0; i < SourceFiles.Count; i++)
                 if (SourceFiles[i]->State == 0)
@@ -167,8 +167,7 @@ void CRenamerDialog::Rename(BOOL validate)
 
         if (RenamerOptions.Spec == rsFullPath)
         {
-            Root[0] = 0;
-            RootLen = 0;
+            Root.clear();
         }
 
         ReloadSourceFiles();
@@ -192,8 +191,8 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     BOOL ret = FALSE;
     CRenameScriptEntry* tmpScript = NULL;
     script = NULL;
-    CPathBuffer newName; // Heap-allocated for long path support
-    char* newPart;
+    std::wstring newName;
+    size_t newPartOffset = 0;
     BOOL skip;
     BOOL skipAllLongNames = FALSE,
          skipAllBadNames = FALSE,
@@ -207,7 +206,7 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     BOOL usrBreak = FALSE;
 
     // set the options
-    CRenamer renamer(Root, RootLen);
+    CRenamer renamer(Root);
     if (!ManualMode && !renamer.SetOptions(&RenamerOptions))
     {
         int error, errorPos1, errorPos2;
@@ -252,7 +251,7 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     Progress = new CProgressDialog(HWindow);
     Progress->Create();
     EnableWindow(HWindow, FALSE);
-    Progress->SetText(LoadStr(IDS_PREPARING));
+    Progress->SetText(LangStr(IDS_PREPARING).c_str());
     Progress->EmptyMessageLoop();
 
     // create the helper script
@@ -261,8 +260,9 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
     {
         tmpScript[i].Source = SourceFiles[i];
         // create a new name
-        int l = ManualMode ? GetManualModeNewName(SourceFiles[i], i, newName, newName.Size(), newPart) : renamer.Rename(SourceFiles[i], i, newName, &newPart);
-        if (l < 0)
+        const BOOL generated = ManualMode ? GetManualModeNewName(SourceFiles[i], i, newName, newPartOffset)
+                                          : renamer.RenameOwned(SourceFiles[i], i, newName, &newPartOffset);
+        if (!generated)
         {
             FileError(HWindow, SourceFiles[i]->FullName, IDS_EXP_SMALLBUFFER,
                       FALSE, &skip, &skipAllLongNames, IDS_ERROR);
@@ -272,17 +272,19 @@ BOOL CRenamerDialog::BuildScript(CRenameScriptEntry*& script, int& count,
             continue;
         }
         // verify the correctness of the name
-        if (!ValidateFileName(newPart, l, RenamerOptions.Spec, &skip, &skipAllBadNames))
+        int partLength = static_cast<int>(newName.size() - newPartOffset);
+        if (!ValidateFileName(newName.c_str() + newPartOffset, partLength, RenamerOptions.Spec, &skip, &skipAllBadNames))
         {
             if (!skip)
                 goto LBUILD_SCRIPT_ERROR;
             tmpScript[i].Skip = 1;
             continue;
         }
-        CutTrailingDots(newPart, l, RenamerOptions.Spec);
-        tmpScript[i].NewName = SG->DupStr(newName);
-        tmpScript[i].NewPart = tmpScript[i].NewName + (newPart - newName);
-        somethingToDo = somethingToDo || strcmp(SourceFiles[i]->FullName, newName);
+        partLength = CutTrailingDots(newName.data() + newPartOffset, partLength, RenamerOptions.Spec);
+        newName.resize(newPartOffset + static_cast<size_t>(partLength));
+        tmpScript[i].NewName = _wcsdup(newName.c_str());
+        tmpScript[i].NewPart = tmpScript[i].NewName + newPartOffset;
+        somethingToDo = somethingToDo || wcscmp(SourceFiles[i]->FullName, newName.c_str());
     }
 
     // remove duplicate names
@@ -486,52 +488,40 @@ LBUILD_SCRIPT_ERROR:
     return ret;
 }
 
-int CRenamerDialog::GetManualModeNewName(CSourceFile* file, int index, char* newName, int newNameSize, char*& newPart)
+BOOL CRenamerDialog::GetManualModeNewName(CSourceFile* file, int index,
+                                          std::wstring& newName, size_t& newPartOffset)
 {
     CALL_STACK_MESSAGE_NONE
-    int pathLen = 0;
+    newName.clear();
     switch (RenamerOptions.Spec)
     {
     case rsFileName:
-    {
-        pathLen = (int)(file->Name - file->FullName);
-        memcpy(newName, file->FullName, pathLen);
+        newName.assign(file->FullName, file->Name);
         break;
-    }
     case rsRelativePath:
-    {
-        pathLen = RootLen;
-        memcpy(newName, Root, pathLen);
-        if (newName[pathLen - 1] != '\\')
-            newName[pathLen++] = '\\';
+        newName = Root;
+        if (!newName.empty() && newName.back() != L'\\')
+            newName.push_back(L'\\');
         break;
-    }
     case rsFullPath:
         break;
     }
-    newName += pathLen;
-    newPart = newName;
+    newPartOffset = newName.size();
 
     int charIndex = (int)SendMessage(ManualEdit->HWindow, EM_LINEINDEX, index, 0);
     if (charIndex < 0) // this should not happen -- CRenamerDialog::Validate would fail
     {
-        *newName = 0;
-        return 0;
+        return TRUE;
     }
     else
     {
-        int l = (int)SendMessage(ManualEdit->HWindow, EM_LINELENGTH, charIndex, 0);
-        if (l >= newNameSize - pathLen)
-        {
-            return -1;
-        }
-        else
-        {
-            *LPWORD(newName) = (WORD)(newNameSize - pathLen);
-            int l2 = (int)SendMessage(ManualEdit->HWindow, EM_GETLINE, index, (LPARAM)newName);
-            newName[l2] = 0; // just to be sure
-        }
-        return l;
+        std::string line;
+        std::wstring suffix;
+        if (GetRenamerEditLine(ManualEdit->HWindow, index, line) < 0 ||
+            !TryRenamerTextToWide(line.c_str(), suffix, static_cast<int>(line.size())))
+            return FALSE;
+        newName.append(suffix);
+        return TRUE;
     }
 }
 
@@ -543,7 +533,7 @@ void CRenamerDialog::ExecuteScript(CRenameScriptEntry* script, int count)
         SkipAllBadRead = SkipAllOpenOut = SkipAllOpenIn =
             SkipAllDirChangeCase = SkipAllCreateDir = FALSE;
 
-    Progress->SetText(LoadStr(IDS_RENAMING));
+    Progress->SetText(LangStr(IDS_RENAMING).c_str());
 
     // perform the rename
     BOOL blocked = FALSE;
@@ -565,13 +555,12 @@ void CRenamerDialog::ExecuteScript(CRenameScriptEntry* script, int count)
         {
             if (RemoveSourcePath)
             {
-                CPathBuffer dir; // Heap-allocated for long path support
-                lstrcpyn(dir, script[i].Source->FullName, dir.Size());
+                std::wstring dir = script[i].Source->FullName;
                 do
                 {
-                    SG->CutDirectory(dir);
-                    SG->ClearReadOnlyAttr(dir); // so it can be deleted
-                } while (RemoveDirectory(dir));
+                    CutRenamerPath(dir);
+                    SG->ClearReadOnlyAttr(dir.c_str()); // so it can be deleted
+                } while (RemoveDirectoryW(dir.c_str()));
             }
             script[i].Source->State = 1;
             CSourceFile* f = new CSourceFile(script[i].Source, script[i].NewName);
@@ -607,7 +596,7 @@ void CRenamerDialog::Undo()
     Progress = new CProgressDialog(HWindow);
     Progress->Create();
     EnableWindow(HWindow, FALSE);
-    Progress->SetText(LoadStr(IDS_UNDOING));
+    Progress->SetText(LangStr(IDS_UNDOING).c_str());
     Progress->EmptyMessageLoop();
 
     int total = UndoStack.Count;
@@ -697,7 +686,7 @@ void CRenamerDialog::Undo()
                     // undo create directory
                     while (1)
                     {
-                        pathSuccess = RemoveDirectory(entry->Source);
+                        pathSuccess = RemoveDirectoryW(entry->Source);
                         if (pathSuccess)
                         {
                             UndoStack.Delete(i);

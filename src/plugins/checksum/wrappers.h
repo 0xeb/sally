@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 class CHashAlgo
 {
 public:
@@ -15,7 +17,7 @@ public:
     virtual bool Update(const char* buf, DWORD size) = 0;
     virtual bool Finalize() = 0;
     virtual int GetDigest(char* buf, DWORD bufsize) = 0; // Returns # of copied binary bytes
-    virtual bool ParseDigest(char* buf, char* fileName, int fileNameLen, char* digest) = 0;
+    virtual bool ParseDigest(char* buf, std::string& fileName, char* digest) = 0;
 };
 
 typedef CHashAlgo* (*THashFactory)();

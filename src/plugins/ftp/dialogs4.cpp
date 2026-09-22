@@ -1,8 +1,41 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static BOOL FormatServerTypeDateTime(const SYSTEMTIME& value, BOOL date, std::wstring& output) noexcept
+{
+    try
+    {
+        const int needed = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &value, NULL, NULL, 0)
+                                : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value, NULL, NULL, 0);
+        if (needed > 0)
+        {
+            std::wstring staged(needed, L'\0');
+            const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &value, NULL, staged.data(), needed)
+                                     : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value, NULL, staged.data(), needed);
+            if (written == needed)
+            {
+                staged.resize(needed - 1);
+                output.swap(staged);
+                return TRUE;
+            }
+        }
+
+        if (date)
+            output = std::to_wstring(value.wDay) + L"." + std::to_wstring(value.wMonth) + L"." + std::to_wstring(value.wYear);
+        else
+            output = std::to_wstring(value.wHour) + L":" + (value.wMinute < 10 ? L"0" : L"") + std::to_wstring(value.wMinute) +
+                     L":" + (value.wSecond < 10 ? L"0" : L"") + std::to_wstring(value.wSecond);
+        return TRUE;
+    }
+    catch (...)
+    {
+        output.clear();
+        return FALSE;
+    }
+}
 
 //
 // ****************************************************************************
@@ -50,17 +83,22 @@ BOOL IsValidIdentifier(const char* s, int* errResID)
 void CEditSrvTypeColumnDlg::Validate(CTransferInfo& ti)
 {
     // check syntax, avoid reserved IDs (is_dir+is_hidden+is_link), ensure uniqueness and non-empty ID
-    char id[STC_ID_MAX_SIZE];
+    std::string id;
     BOOL ok = TRUE;
-    ti.EditLine(IDE_COL_ID, id, STC_ID_MAX_SIZE);
+    ti.EditLine(IDE_COL_ID, id);
     int errResID = 0;
-    if (IsValidIdentifier(id, &errResID))
+    if (!ti.IsGood())
+    {
+        ti.ErrorOn(IDE_COL_ID);
+        return;
+    }
+    if (IsValidIdentifier(id.c_str(), &errResID))
     {
         int j;
         for (j = 0; j < ColumnsData->Count; j++)
         {
             if ((!Edit || *EditedColumn != j) &&
-                SalamanderGeneral->StrICmp(id, ColumnsData->At(j)->ID) == 0)
+                _stricmp(id.c_str(), HandleNULLStr(ColumnsData->At(j)->ID)) == 0)
             {
                 ok = FALSE;
                 errResID = IDS_STC_ERR_IDNOTUNIQUE;
@@ -72,7 +110,7 @@ void CEditSrvTypeColumnDlg::Validate(CTransferInfo& ti)
         ok = FALSE;
     if (!ok)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(errResID), LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, errResID).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_COL_ID);
         return;
@@ -89,12 +127,12 @@ void CEditSrvTypeColumnDlg::Validate(CTransferInfo& ti)
         if (t > stctNone && t < stctLastItem)
             type = (CSrvTypeColumnTypes)t;
     }
-    char emptyVal[STC_EMPTYVAL_MAX_SIZE];
-    ti.EditLine(IDE_COL_EMPTY, emptyVal, STC_EMPTYVAL_MAX_SIZE);
-    if (!GetColumnEmptyValue(emptyVal[0] != 0 ? emptyVal : NULL, type, NULL, NULL, NULL, FALSE))
+    std::string emptyVal;
+    ti.EditLine(IDE_COL_EMPTY, emptyVal);
+    if (!ti.IsGood() || !GetColumnEmptyValue(emptyVal.empty() ? NULL : emptyVal.c_str(), type, NULL, NULL, NULL, FALSE))
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_STC_ERR_INVALEMPTY),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_STC_ERR_INVALEMPTY).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_COL_EMPTY);
         return;
     }
@@ -104,8 +142,8 @@ void CEditSrvTypeColumnDlg::Validate(CTransferInfo& ti)
     BOOL errOnDescr = LastUsedIndexForDescr == -1 && GetWindowTextLength(GetDlgItem(HWindow, IDC_COL_DESCR)) == 0;
     if (errOnName || errOnDescr)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(errOnName ? IDS_STC_ERR_EMPTYNAME : IDS_STC_ERR_EMPTYDESCR),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, errOnName ? IDS_STC_ERR_EMPTYNAME : IDS_STC_ERR_EMPTYDESCR).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(errOnName ? IDC_COL_NAME : IDC_COL_DESCR);
         return;
     }
@@ -113,27 +151,26 @@ void CEditSrvTypeColumnDlg::Validate(CTransferInfo& ti)
 
 void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
 {
-    char id[STC_ID_MAX_SIZE];
-    id[0] = 0;
-    char emptyVal[STC_EMPTYVAL_MAX_SIZE];
-    emptyVal[0] = 0;
+    std::string id;
+    std::string emptyVal;
     if (ti.Type == ttDataToWindow)
     {
-        char emptyBuff[] = "";
-        ti.EditLine(IDE_COL_ID, Edit ? ColumnsData->At(*EditedColumn)->ID : emptyBuff, STC_ID_MAX_SIZE); // ID cannot be NULL
-        ti.EditLine(IDE_COL_EMPTY, Edit ? HandleNULLStr(ColumnsData->At(*EditedColumn)->EmptyValue) : emptyBuff,
-                    STC_EMPTYVAL_MAX_SIZE);
+        if (Edit)
+        {
+            id = HandleNULLStr(ColumnsData->At(*EditedColumn)->ID);
+            emptyVal = HandleNULLStr(ColumnsData->At(*EditedColumn)->EmptyValue);
+        }
+        ti.EditLine(IDE_COL_ID, id);
+        ti.EditLine(IDE_COL_EMPTY, emptyVal);
     }
     else
     {
-        ti.EditLine(IDE_COL_ID, id, STC_ID_MAX_SIZE);
-        ti.EditLine(IDE_COL_EMPTY, emptyVal, STC_EMPTYVAL_MAX_SIZE);
+        ti.EditLine(IDE_COL_ID, id);
+        ti.EditLine(IDE_COL_EMPTY, emptyVal);
     }
 
-    char bufName[STC_NAME_MAX_SIZE];
-    bufName[0] = 0;
-    char bufDescr[STC_DESCR_MAX_SIZE];
-    bufDescr[0] = 0;
+    std::string bufName;
+    std::string bufDescr;
     HWND comboName, comboDescr;
     if (ti.GetControl(comboName, IDC_COL_NAME) && ti.GetControl(comboDescr, IDC_COL_DESCR))
     {
@@ -145,36 +182,35 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             int i;
             for (i = 0; i < STC_STD_NAMES_COUNT; i++)
             {
-                LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, i);
-                LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, i);
-                SendMessage(comboName, CB_ADDSTRING, 0, (LPARAM)bufName);
-                SendMessage(comboDescr, CB_ADDSTRING, 0, (LPARAM)bufDescr);
+                std::wstring nameText;
+                std::wstring descrText;
+                LoadStdColumnStrName(i, nameText);
+                LoadStdColumnStrDescr(i, descrText);
+                SendMessageW(comboName, CB_ADDSTRING, 0, (LPARAM)nameText.c_str());
+                SendMessageW(comboDescr, CB_ADDSTRING, 0, (LPARAM)descrText.c_str());
             }
-            // set text limits
-            SendMessage(comboName, CB_LIMITTEXT, STC_NAME_MAX_SIZE - 1, 0);
-            SendMessage(comboDescr, CB_LIMITTEXT, STC_DESCR_MAX_SIZE - 1, 0);
             // if editing, insert the current texts into the edit line
             if (Edit)
             {
                 CSrvTypeColumn* col = ColumnsData->At(*EditedColumn);
+                std::wstring nameText;
+                std::wstring descrText;
                 if (col->NameID != -1)
                 {
-                    if (!LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, col->NameID))
-                        bufName[0] = 0;
+                    LoadStdColumnStrName(col->NameID, nameText);
                     LastUsedIndexForName = col->NameID;
                 }
                 else
-                    lstrcpyn(bufName, HandleNULLStr(col->NameStr), STC_NAME_MAX_SIZE);
+                    FtpDecodeLocalText(HandleNULLStr(col->NameStr), nameText);
                 if (col->DescrID != -1)
                 {
-                    if (!LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, col->DescrID))
-                        bufDescr[0] = 0;
+                    LoadStdColumnStrDescr(col->DescrID, descrText);
                     LastUsedIndexForDescr = col->DescrID;
                 }
                 else
-                    lstrcpyn(bufDescr, HandleNULLStr(col->DescrStr), STC_DESCR_MAX_SIZE);
-                SetWindowText(comboName, bufName);
-                SetWindowText(comboDescr, bufDescr);
+                    FtpDecodeLocalText(HandleNULLStr(col->DescrStr), descrText);
+                SetWindowTextW(comboName, nameText.c_str());
+                SetWindowTextW(comboDescr, descrText.c_str());
             }
         }
         else
@@ -182,9 +218,15 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             // if the user has custom text, pull it out, otherwise use indexes from the last selection
             // in the combo (finding the index by looking up the string in the list is impossible, duplicate strings may occur)
             if (LastUsedIndexForName == -1)
-                GetWindowText(comboName, bufName, STC_NAME_MAX_SIZE);
+            {
+                if (!ReadWindowLocalText(comboName, bufName))
+                    ti.ErrorOn(IDC_COL_NAME);
+            }
             if (LastUsedIndexForDescr == -1)
-                GetWindowText(comboDescr, bufDescr, STC_DESCR_MAX_SIZE);
+            {
+                if (!ReadWindowLocalText(comboDescr, bufDescr))
+                    ti.ErrorOn(IDC_COL_DESCR);
+            }
         }
     }
 
@@ -194,7 +236,7 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
     {
         if (ti.Type == ttDataToWindow)
         {
-            char buf[100];
+            std::wstring typeName;
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
             int count = 0;
             int focus = 0;
@@ -217,9 +259,9 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
                         }
                     }
                 }
-                if (add && GetColumnTypeName(buf, 100, (CSrvTypeColumnTypes)i))
+                if (add && GetColumnTypeName((CSrvTypeColumnTypes)i, typeName))
                 {
-                    SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)buf); // add the string and
+                    SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)typeName.c_str()); // add the string and
                     SendMessage(combo, CB_SETITEMDATA, count++, i);   // associate which column type it is
                     if (Edit && (int)(ColumnsData->At(*EditedColumn)->Type) == i)
                     {
@@ -254,8 +296,8 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SRVTYPECOL_ALIGNLEFT));  // add the string "left"
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SRVTYPECOL_ALIGNRIGHT)); // add the string "right"
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_SRVTYPECOL_ALIGNLEFT).c_str());  // add the string "left"
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_SRVTYPECOL_ALIGNRIGHT).c_str()); // add the string "right"
             SendMessage(combo, CB_SETCURSEL, ColumnsData->At(*EditedColumn)->Type >= stctFirstGeneral ? (ColumnsData->At(*EditedColumn)->LeftAlignment ? 0 : 1) : -1, 0);
         }
         else
@@ -268,20 +310,22 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
 
     // process the acquired data (id, emptyVal, LastUsedIndexForName, bufName, LastUsedIndexForDescr,
     // bufDescr, colType, leftAlignment)
+    if (!ti.IsGood())
+        return;
     if (ti.Type == ttDataFromWindow)
     {
         // for types Name, Ext, and Type empty values make no sense, clear them
         if (colType == stctName || colType == stctExt || colType == stctType)
-            emptyVal[0] = 0;
+            emptyVal.clear();
 
         if (Edit) // editing a column
         {
             CSrvTypeColumn* col = ColumnsData->At(*EditedColumn);
-            UpdateStr(col->ID, id); // in case of an error we keep the original ID
+            UpdateStr(col->ID, id.c_str()); // in case of an error we keep the original ID
             if (LastUsedIndexForName == -1)
             {
                 BOOL err = FALSE;
-                UpdateStr(col->NameStr, bufName, &err);
+                UpdateStr(col->NameStr, bufName.c_str(), &err);
                 if (!err)
                     col->NameID = -1; // in case of an error we leave the original column name
             }
@@ -297,7 +341,7 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             if (LastUsedIndexForDescr == -1)
             {
                 BOOL err = FALSE;
-                UpdateStr(col->DescrStr, bufDescr, &err);
+                UpdateStr(col->DescrStr, bufDescr.c_str(), &err);
                 if (!err)
                     col->DescrID = -1; // in case of an error we leave the original column description
             }
@@ -316,7 +360,7 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             col->Type = colType;
             col->LeftAlignment = leftAlignment;
             BOOL err = FALSE;
-            UpdateStr(col->EmptyValue, emptyVal[0] == 0 ? NULL : emptyVal, &err);
+            UpdateStr(col->EmptyValue, emptyVal.empty() ? NULL : emptyVal.c_str(), &err);
             if (err && col->EmptyValue != NULL)
             {
                 free(col->EmptyValue);
@@ -328,9 +372,9 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             CSrvTypeColumn* col = new CSrvTypeColumn;
             if (col != NULL && col->IsGood())
             {
-                col->Set(TRUE, id, LastUsedIndexForName, bufName[0] == 0 ? NULL : bufName,
-                         LastUsedIndexForDescr, bufDescr[0] == 0 ? NULL : bufDescr, colType,
-                         emptyVal[0] == 0 ? NULL : emptyVal, leftAlignment, 0, 0);
+                col->Set(TRUE, id.c_str(), LastUsedIndexForName, bufName.empty() ? NULL : bufName.c_str(),
+                         LastUsedIndexForDescr, bufDescr.empty() ? NULL : bufDescr.c_str(), colType,
+                         emptyVal.empty() ? NULL : emptyVal.c_str(), leftAlignment, 0, 0);
                 // adding type stctExt must insert it after "Name" (that is, at index 1 in the array)
                 if (colType == stctExt)
                 {
@@ -362,7 +406,7 @@ CEditSrvTypeColumnDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (!Edit)
-            SetWindowText(HWindow, LoadStr(IDS_SRVTYPECOL_NEWTITLE));
+            SetWindowTextW(HWindow, LangStr(IDS_SRVTYPECOL_NEWTITLE).c_str());
         break;
     }
 
@@ -429,7 +473,7 @@ CEditSrvTypeColumnDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             leftAlignment = FALSE;
                             break;
                         }
-                        SetDlgItemText(HWindow, IDT_COL_FORMHELP, LoadStr(resID));
+                        SetDlgItemTextW(HWindow, IDT_COL_FORMHELP, LangStr(resID).c_str());
 
                         // enable the Empty Value edit line
                         BOOL enable = (type != stctName && type != stctExt && type != stctType);
@@ -487,11 +531,11 @@ CSrvTypeTestParserDlg::CSrvTypeTestParserDlg(HWND parent, CFTPParser* parser,
 
         HINSTANCE iconsDLL;
         if (WindowsVistaAndLater)
-            iconsDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+            iconsDLL = HANDLES(LoadLibraryExA("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
         else
         {
             const char* Shell32DLLName = "shell32.dll";
-            iconsDLL = HANDLES(LoadLibraryEx(Shell32DLLName, NULL, LOAD_LIBRARY_AS_DATAFILE));
+            iconsDLL = HANDLES(LoadLibraryExA(Shell32DLLName, NULL, LOAD_LIBRARY_AS_DATAFILE));
         }
 
         BOOL err = FALSE;
@@ -557,6 +601,25 @@ CSrvTypeTestParserDlg::~CSrvTypeTestParserDlg()
         ImageList_Destroy(SymbolsImageList);
 }
 
+bool CSrvTypeTestParserDlg::PublishRawListing(const std::string& listing, size_t headroom)
+{
+    if (headroom > static_cast<size_t>(INT_MAX) - 1 ||
+        listing.size() > static_cast<size_t>(INT_MAX) - headroom - 1)
+        return false;
+    const size_t required = listing.size() + 1;
+    const size_t requested = required + headroom;
+    if (static_cast<size_t>(AllocatedSizeOfRawListing) < required)
+    {
+        char* resized = static_cast<char*>(realloc(*RawListing, requested));
+        if (resized == NULL)
+            return false;
+        *RawListing = resized;
+        AllocatedSizeOfRawListing = static_cast<int>(requested);
+    }
+    memcpy(*RawListing, listing.c_str(), required);
+    return true;
+}
+
 void CSrvTypeTestParserDlg::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_PARSER_LISTINCOMPL, *RawListIncomplete);
@@ -564,38 +627,22 @@ void CSrvTypeTestParserDlg::Transfer(CTransferInfo& ti)
     {
         SendDlgItemMessage(HWindow, IDE_PARSER_RAWLIST, EM_LIMITTEXT, 0, 0);
         if (*RawListing != NULL)
-            SetDlgItemText(HWindow, IDE_PARSER_RAWLIST, *RawListing);
+            SetWindowLocalText(GetDlgItem(HWindow, IDE_PARSER_RAWLIST), *RawListing);
     }
     else
     {
         HWND edit = GetDlgItem(HWindow, IDE_PARSER_RAWLIST);
-        int len = GetWindowTextLength(edit);
-        if (len >= 0)
+        std::string listing;
+        if (ReadWindowLocalText(edit, listing))
         {
-            if (AllocatedSizeOfRawListing != len + 1) // reallocate the buffer to the exact size of the text
+            if (!PublishRawListing(listing))
             {
-                AllocatedSizeOfRawListing = len + 1;
-                char* n = (char*)realloc(*RawListing, AllocatedSizeOfRawListing);
-                if (n == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    AllocatedSizeOfRawListing = 0;
-                    if (*RawListing != NULL)
-                        free(*RawListing);
-                }
-                *RawListing = n;
+                TRACE_E(LOW_MEMORY);
+                ti.ErrorOn(IDE_PARSER_RAWLIST);
             }
-            if (*RawListing != NULL)
-                GetWindowText(edit, *RawListing, len + 1);
         }
         else
-        {
-            if (*RawListing != NULL)
-            {
-                free(*RawListing);
-                *RawListing = NULL;
-            }
-        }
+            ti.ErrorOn(IDE_PARSER_RAWLIST);
 
         // release the image list from the list view, we want to free the image list ourselves
         ListView_SetImageList(HListView, NULL, LVSIL_SMALL);
@@ -610,21 +657,19 @@ void CSrvTypeTestParserDlg::Transfer(CTransferInfo& ti)
 
 void CSrvTypeTestParserDlg::InitColumns()
 {
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
     lvc.fmt = LVCFMT_LEFT;
     int i;
     for (i = 0; i < Columns->Count; i++) // create columns
     {
         CSrvTypeColumn* col = Columns->At(i);
-        char bufName[STC_NAME_MAX_SIZE];
+        std::wstring bufNameW;
         if (col->NameID != -1)
-        {
-            LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, col->NameID);
-            lvc.pszText = bufName;
-        }
+            LoadStdColumnStrName(col->NameID, bufNameW);
         else
-            lvc.pszText = HandleNULLStr(col->NameStr);
+            FtpDecodeLocalText(HandleNULLStr(col->NameStr), bufNameW);
+        lvc.pszText = const_cast<LPWSTR>(bufNameW.c_str());
         lvc.iSubItem = i;
         ListView_InsertColumn(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER); // widths will be set later in SetColumnWidths()
@@ -665,14 +710,14 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
     Offsets.DestroyMembers();
     LastSelectedOffset = -1;
 
-    char strOnlyInPanel[100];
-    lstrcpyn(strOnlyInPanel, LoadStr(IDS_SRVTYPE_ONLYINPANEL), 100);
-    char strDIR[100];
-    lstrcpyn(strDIR, LoadStr(IDS_SRVTYPE_SIZEISDIR), 100);
+    const std::wstring strOnlyInPanel = LangStr(IDS_SRVTYPE_ONLYINPANEL).c_str();
+    const std::wstring strDIR = LangStr(IDS_SRVTYPE_SIZEISDIR).c_str();
 
     CFileData file;
-    CFTPListingPluginDataInterface dataIface(Columns, FALSE, 0 /* not used here */, FALSE /* not used here */);
-    char buf[100];
+    const CFtpTextCodec textCodec = FtpLocalTextCodec();
+    CFTPListingPluginDataInterface dataIface(Columns, FALSE, 0 /* not used here */,
+                                              FALSE /* not used here */, textCodec);
+    std::wstring formattedNumber;
     CQuadWord qwVal(0, 0);
     __int64 int64Val = 0;
     SYSTEMTIME stDateVal;
@@ -700,13 +745,13 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
         Parser->BeforeParsing(listingStart, listingEnd, stDateVal.wYear, stDateVal.wMonth,
                               stDateVal.wDay, *RawListIncomplete); // initialize the parser
         while (Parser->GetNextItemFromListing(&file, &isDir, &dataIface, Columns, &listing,
-                                              listingEnd, &itemStart, &lowMem, emptyCol))
+                                              listingEnd, &itemStart, &lowMem, emptyCol, textCodec))
         {
             Offsets.Add((DWORD)(itemStart - listingStart));
             Offsets.Add((DWORD)(listing - listingStart));
 
             // the first column is always Name
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_STATE | LVIF_TEXT | (SymbolsImageList != NULL ? LVIF_IMAGE : 0);
             lvi.iImage = (isDir ? 0 : 1);
             lvi.iItem = i;
@@ -719,14 +764,13 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
             int j;
             for (j = 1; j < Columns->Count; j++)
             {
-                static char emptyBuff[] = "";
-                char* value = emptyBuff;
+                std::wstring value;
                 CSrvTypeColumn* col = Columns->At(j);
                 switch (col->Type)
                 {
                 // case stctName:   // Name can only be in the first column
                 case stctGeneralText:
-                    value = HandleNULLStr(dataIface.GetStringFromColumn(file, j));
+                    FtpDecodeLocalText(HandleNULLStr(dataIface.GetStringFromColumn(file, j)), value);
                     break;
 
                 case stctExt:
@@ -738,8 +782,8 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                 {
                     if (!isDir)
                     {
-                        SalamanderGeneral->NumberToStr(buf, file.Size);
-                        value = buf;
+                        formattedNumber = SPLNumberToStrOwned(SalamanderGeneral, file.Size);
+                        value = formattedNumber;
                     }
                     else
                         value = strDIR;
@@ -751,16 +795,16 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                     int64Val = dataIface.GetNumberFromColumn(file, j);
                     if (int64Val >= 0)
                     {
-                        SalamanderGeneral->NumberToStr(buf, qwVal.SetUI64((unsigned __int64)int64Val));
-                        value = buf;
+                        formattedNumber = SPLNumberToStrOwned(SalamanderGeneral, qwVal.SetUI64((unsigned __int64)int64Val));
+                        value = formattedNumber;
                     }
                     else
                     {
                         if (int64Val != INT64_EMPTYNUMBER) // should not display ""
                         {
-                            buf[0] = '-';
-                            SalamanderGeneral->NumberToStr(buf + 1, qwVal.SetUI64((unsigned __int64)(-int64Val)));
-                            value = buf;
+                            formattedNumber = SPLNumberToStrOwned(SalamanderGeneral, qwVal.SetUI64((unsigned __int64)(-int64Val)));
+                            formattedNumber.insert(0, 1, L'-');
+                            value = formattedNumber;
                         }
                     }
                     break;
@@ -770,9 +814,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                 {
                     FileTimeToLocalFileTime(&file.LastWrite, &ft);
                     FileTimeToSystemTime(&ft, &st);
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 100) == 0)
-                        sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                    value = buf;
+                    FormatServerTypeDateTime(st, TRUE, value);
                     break;
                 }
 
@@ -781,9 +823,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                     dataIface.GetDateFromColumn(file, j, &stDateVal);
                     if (stDateVal.wDay != 0) // should not display ""
                     {
-                        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &stDateVal, NULL, buf, 100) == 0)
-                            sprintf(buf, "%u.%u.%u", stDateVal.wDay, stDateVal.wMonth, stDateVal.wYear);
-                        value = buf;
+                        FormatServerTypeDateTime(stDateVal, TRUE, value);
                     }
                     break;
                 }
@@ -792,9 +832,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                 {
                     FileTimeToLocalFileTime(&file.LastWrite, &ft);
                     FileTimeToSystemTime(&ft, &st);
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, buf, 100) == 0)
-                        sprintf(buf, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-                    value = buf;
+                    FormatServerTypeDateTime(st, FALSE, value);
                     break;
                 }
 
@@ -803,14 +841,12 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                     dataIface.GetTimeFromColumn(file, j, &stTimeVal);
                     if (stTimeVal.wHour != 24) // should not display ""
                     {
-                        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &stTimeVal, NULL, buf, 100) == 0)
-                            sprintf(buf, "%u:%02u:%02u", stTimeVal.wHour, stTimeVal.wMinute, stTimeVal.wSecond);
-                        value = buf;
+                        FormatServerTypeDateTime(stTimeVal, FALSE, value);
                     }
                     break;
                 }
                 }
-                ListView_SetItemText(HListView, i, j, value);
+                ListView_SetItemText(HListView, i, j, const_cast<LPWSTR>(value.c_str()));
             }
             i++;
             // release data of the file or directory
@@ -857,8 +893,8 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
     // if the entire listing was not parsed successfully, report an error
     if (!lowMem && listing < listingEnd) // we do not report lack of memory (fatal error)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_SRVTYPE_PARSEERROR),
-                                         LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SRVTYPE_PARSEERROR).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         // highlight the error location in the parsing rules text
         DWORD errorPos = (DWORD)(listing - listingStart);
@@ -871,42 +907,31 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
 
 void CSrvTypeTestParserDlg::LoadTextFromFile()
 {
-    static CPathBuffer initDir;
-    if (*initDir == 0)
-        GetMyDocumentsPath(initDir);
-    CPathBuffer fileName; // Heap-allocated for long path support
-    fileName[0] = 0;
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    static std::wstring initDir;
+    if (initDir.empty())
+        GetMyDocumentsPathW(initDir);
+    std::vector<std::wstring> selectedFiles;
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = HWindow;
-    char* s = LoadStr(IDS_RAWLISTINGFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // creating a double-null-terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
+    std::wstring filter = LangStr(IDS_RAWLISTINGFILTER).c_str();
+    for (wchar_t& ch : filter)
+        if (ch == L'|')
+            ch = 0;
+    filter.push_back(0);
+    ofn.lpstrFilter = filter.c_str();
+    ofn.lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrInitialDir = initDir;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-    CPathBuffer buf;
-    if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+    if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn, selectedFiles) && selectedFiles.size() == 1)
     {
+        const std::wstring& fileName = selectedFiles[0];
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        FtpRememberSelectedDirectory(fileName, initDir);
 
-        s = strrchr(fileName.Get(), '\\');
-        if (s != NULL)
-        {
-            memcpy(initDir, fileName.Get(), s - fileName.Get());
-            initDir[s - fileName.Get()] = 0;
-        }
-
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+        HANDLE file = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_READ,
                                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                            OPEN_EXISTING,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -919,49 +944,47 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
             int len;
             if (size > CQuadWord(1024 * 1024, 0))
             {
-                SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_SRVTYPE_READRAWLISTLIMIT),
-                                                 LoadStr(IDS_FTPPLUGINTITLE),
+                SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SRVTYPE_READRAWLISTLIMIT).c_str(),
+                                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                  MB_OK | MB_ICONWARNING);
                 len = 1024 * 1024;
             }
             else
                 len = (DWORD)size.Value;
 
-            if (AllocatedSizeOfRawListing < len + 1)
+            try
             {
-                AllocatedSizeOfRawListing = len + 1;
-                char* n = (char*)realloc(*RawListing, AllocatedSizeOfRawListing);
-                if (n == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    AllocatedSizeOfRawListing = 0;
-                    if (*RawListing != NULL)
-                        free(*RawListing);
-                }
-                *RawListing = n;
-            }
-            if (*RawListing != NULL)
-            {
+                std::string fileBytes(static_cast<size_t>(len), '\0');
                 DWORD read;
-                if (ReadFile(file, *RawListing, len, &read, NULL) && read == (DWORD)len)
+                if (ReadFile(file, fileBytes.data(), len, &read, NULL) && read == (DWORD)len)
                 {
-                    (*RawListing)[len] = 0;
-                    SetDlgItemText(HWindow, IDE_PARSER_RAWLIST, *RawListing);
+                    if (PublishRawListing(fileBytes))
+                        SetWindowLocalText(GetDlgItem(HWindow, IDE_PARSER_RAWLIST), *RawListing);
+                    else
+                        err = ERROR_NOT_ENOUGH_MEMORY;
                 }
                 else
-                {
                     err = GetLastError();
-                    (*RawListing)[0] = 0;
-                }
+            }
+            catch (const std::bad_alloc&)
+            {
+                err = ERROR_NOT_ENOUGH_MEMORY;
             }
 
             HANDLES(CloseHandle(file));
             SetCursor(oldCur);
             if (err != NO_ERROR) // print the error
             {
-                sprintf(buf, LoadStr(IDS_SRVTYPE_READRAWLISTERR), SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                 MB_OK | MB_ICONEXCLAMATION);
+                try
+                {
+                    const std::wstring errorText = SPLFormatStringOwned(LangStr(IDS_SRVTYPE_READRAWLISTERR).c_str(), SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+                    SalamanderGeneral->SalMessageBox(HWindow, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                     MB_OK | MB_ICONEXCLAMATION);
+                }
+                catch (const std::bad_alloc&)
+                {
+                    SalamanderGeneral->SalMessageBox(HWindow, L"Not enough memory.", L"FTP", MB_OK | MB_ICONEXCLAMATION);
+                }
             }
         }
         else
@@ -971,9 +994,16 @@ void CSrvTypeTestParserDlg::LoadTextFromFile()
             if (file != INVALID_HANDLE_VALUE)
                 HANDLES(CloseHandle(file));
             SetCursor(oldCur);
-            sprintf(buf, LoadStr(IDS_SRVTYPE_READRAWLISTERR), SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                             MB_OK | MB_ICONEXCLAMATION);
+            try
+            {
+                const std::wstring errorText = SPLFormatStringOwned(LangStr(IDS_SRVTYPE_READRAWLISTERR).c_str(), SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+                SalamanderGeneral->SalMessageBox(HWindow, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                 MB_OK | MB_ICONEXCLAMATION);
+            }
+            catch (const std::bad_alloc&)
+            {
+                SalamanderGeneral->SalMessageBox(HWindow, L"Not enough memory.", L"FTP", MB_OK | MB_ICONEXCLAMATION);
+            }
         }
     }
 }
@@ -1080,9 +1110,9 @@ CSrvTypeTestParserDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ResultsSpacingY = r8.bottom - (r10.bottom - r10.top);
 
         // insert a resize grip into the bottom right corner
-        SizeBox = CreateWindowEx(0,
-                                 "scrollbar",
-                                 "",
+        SizeBox = CreateWindowExW(0,
+                                 L"scrollbar",
+                                 L"",
                                  WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE |
                                      WS_GROUP | SBS_SIZEBOX | SBS_SIZEGRIP | SBS_SIZEBOXBOTTOMRIGHTALIGN,
                                  0, 0, r8.right, r8.bottom,
@@ -1166,29 +1196,16 @@ CSrvTypeTestParserDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             *RawListIncomplete = IsDlgButtonChecked(HWindow, IDC_PARSER_LISTINCOMPL) == BST_CHECKED;
             HWND edit = GetDlgItem(HWindow, IDE_PARSER_RAWLIST);
-            int len = GetWindowTextLength(edit);
-            if (len >= 0)
+            std::string listing;
+            if (ReadWindowLocalText(edit, listing))
             {
-                if (AllocatedSizeOfRawListing < len + 1)
+                if (PublishRawListing(listing, 49))
                 {
-                    AllocatedSizeOfRawListing = len + 50;
-                    char* n = (char*)realloc(*RawListing, AllocatedSizeOfRawListing); // make a bit of headroom
-                    if (n == NULL)
-                    {
-                        TRACE_E(LOW_MEMORY);
-                        AllocatedSizeOfRawListing = 0;
-                        if (*RawListing != NULL)
-                            free(*RawListing);
-                    }
-                    *RawListing = n;
-                }
-                if (*RawListing != NULL)
-                {
-                    // read new listing text from the edit box
-                    GetWindowText(edit, *RawListing, len + 1);
                     // start parsing, results go directly into the list view
                     ParseListingToListView();
                 }
+                else
+                    TRACE_E(LOW_MEMORY);
             }
             return TRUE; // do not continue further
         }
@@ -1261,14 +1278,13 @@ CSrvTypeTestParserDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CCopyMoveDlg
 //
 
-CCopyMoveDlg::CCopyMoveDlg(HWND parent, char* path, int pathBufSize, const char* title,
-                           const char* subject, char* history[], int historyCount, int helpID)
-    : CCenteredDialog(HLanguage, IDD_COPYMOVEDLG, helpID, parent)
+CCopyMoveDlg::CCopyMoveDlg(HWND parent, std::wstring& path, const wchar_t* title,
+                           const wchar_t* subject, wchar_t* history[], int historyCount, int helpID)
+    : CCenteredDialog(HLanguage, IDD_COPYMOVEDLG, helpID, parent),
+      Path(path)
 {
     Title = title;
     Subject = subject;
-    Path = path;
-    PathBufSize = pathBufSize;
     History = history;
     HistoryCount = historyCount;
 }
@@ -1284,13 +1300,16 @@ void CCopyMoveDlg::Transfer(CTransferInfo& ti)
             if (ti.Type == ttDataToWindow)
             {
                 SalamanderGeneral->LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
-                SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+                SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Path.c_str());
             }
             else
             {
-                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
-                SalamanderGeneral->AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
+                const int length = GetWindowTextLengthW(hWnd);
+                std::vector<wchar_t> value(static_cast<size_t>(length) + 1, L'\0');
+                GetWindowTextW(hWnd, value.data(), length + 1);
+                Path.assign(value.data());
+                SalamanderGeneral->AddValueToStdHistoryValues(History, HistoryCount,
+                                                               Path.c_str(), FALSE);
             }
         }
     }
@@ -1306,8 +1325,8 @@ CCopyMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDC_TGTPATH)); // install WordBreakProc into the combo box
-        SetWindowText(HWindow, Title);
-        SetDlgItemText(HWindow, IDT_TGTPATHSUBJECT, Subject);
+        SetWindowTextW(HWindow, Title);
+        SetDlgItemTextW(HWindow, IDT_TGTPATHSUBJECT, Subject);
         break;
     }
     }
@@ -1319,7 +1338,7 @@ CCopyMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CConfirmDeleteDlg
 //
 
-CConfirmDeleteDlg::CConfirmDeleteDlg(HWND parent, const char* subject, HICON icon)
+CConfirmDeleteDlg::CConfirmDeleteDlg(HWND parent, const wchar_t* subject, HICON icon)
     : CCenteredDialog(HLanguage, IDD_CONFIRMDELETEDLG, parent)
 {
     Subject = subject;
@@ -1339,7 +1358,7 @@ CConfirmDeleteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_DELSUBJECT, Subject);
+        SetDlgItemTextW(HWindow, IDT_DELSUBJECT, Subject);
         SendDlgItemMessage(HWindow, IDC_DELICON, STM_SETICON,
                            (WPARAM)(Icon == NULL ? HANDLES(LoadIcon(NULL, IDI_QUESTION)) : Icon), 0);
         break;
@@ -1353,7 +1372,7 @@ CConfirmDeleteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CChangeAttrsDlg
 //
 
-CChangeAttrsDlg::CChangeAttrsDlg(HWND parent, const char* subject, DWORD attr, DWORD attrDiff,
+CChangeAttrsDlg::CChangeAttrsDlg(HWND parent, const wchar_t* subject, DWORD attr, DWORD attrDiff,
                                  BOOL selDirs)
     : CCenteredDialog(HLanguage, IDD_CHANGEATTRSDLG, IDD_CHANGEATTRSDLG, parent)
 {
@@ -1380,26 +1399,25 @@ void CChangeAttrsDlg::RefreshNumValue()
     UINT groupExec = IsDlgButtonChecked(HWindow, IDC_EXECUTEGROUP);
     UINT othersExec = IsDlgButtonChecked(HWindow, IDC_EXECUTEOTHERS);
 
-    char text[4];
-    text[3] = 0;
+    std::wstring text(3, L'-');
     if (userRead == 2 || userWrite == 2 || userExec == 2)
-        text[0] = '-';
+        text[0] = L'-';
     else
-        text[0] = '0' + (userRead << 2) + (userWrite << 1) + userExec;
+        text[0] = L'0' + (userRead << 2) + (userWrite << 1) + userExec;
     if (groupRead == 2 || groupWrite == 2 || groupExec == 2)
-        text[1] = '-';
+        text[1] = L'-';
     else
-        text[1] = '0' + (groupRead << 2) + (groupWrite << 1) + groupExec;
+        text[1] = L'0' + (groupRead << 2) + (groupWrite << 1) + groupExec;
     if (othersRead == 2 || othersWrite == 2 || othersExec == 2)
-        text[2] = '-';
+        text[2] = L'-';
     else
-        text[2] = '0' + (othersRead << 2) + (othersWrite << 1) + othersExec;
+        text[2] = L'0' + (othersRead << 2) + (othersWrite << 1) + othersExec;
     EnableNotification = FALSE;
     HWND edit = GetDlgItem(HWindow, IDE_NUMATTRVALUE);
     DWORD start = 0;
     DWORD end = 0;
     SendMessage(edit, EM_GETSEL, (WPARAM)(&start), (LPARAM)(&end));
-    SetWindowText(edit, text);
+    SetWindowTextW(edit, text.c_str());
     SendMessage(edit, EM_SETSEL, start, end);
     EnableNotification = TRUE;
 }
@@ -1416,7 +1434,7 @@ void CChangeAttrsDlg::Validate(CTransferInfo& ti)
         IsDlgButtonChecked(HWindow, IDC_EXECUTEGROUP) == 2 &&
         IsDlgButtonChecked(HWindow, IDC_EXECUTEOTHERS) == 2)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CHATTRNOTHINGTODO2), LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CHATTRNOTHINGTODO2).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_READOWNER);
         return;
@@ -1427,15 +1445,15 @@ void CChangeAttrsDlg::Validate(CTransferInfo& ti)
     ti.CheckBox(IDC_CHATTRSETDIRS, dirs);
     if (!files && !dirs)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CHATTRNOTHINGTODO), LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CHATTRNOTHINGTODO).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_CHATTRSETFILES);
         return;
     }
-    char text[5];
-    if (GetDlgItemText(HWindow, IDE_NUMATTRVALUE, text, 5) != 3)
+    const std::wstring text = SPLGetDlgItemTextOwned(HWindow, IDE_NUMATTRVALUE);
+    if (text.size() != 3)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CHATTRNUMVAL3DIGITS), LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CHATTRNUMVAL3DIGITS).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_NUMATTRVALUE);
         return;
@@ -1528,7 +1546,7 @@ CChangeAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_CHATTRSUBJECT, Subject);
+        SetDlgItemTextW(HWindow, IDT_CHATTRSUBJECT, Subject);
         EnableWindow(GetDlgItem(HWindow, IDC_INCLUDESUBDIRS), SelDirs);
         EnableWindow(GetDlgItem(HWindow, IDC_CHATTRSETFILES), SelDirs);
         EnableWindow(GetDlgItem(HWindow, IDC_CHATTRSETDIRS), SelDirs);
@@ -1557,21 +1575,21 @@ CChangeAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == EN_CHANGE)
                 {
-                    char text[5];
-                    if (GetDlgItemText(HWindow, IDE_NUMATTRVALUE, text, 5) == 3)
+                    const std::wstring text = SPLGetDlgItemTextOwned(HWindow, IDE_NUMATTRVALUE);
+                    if (text.size() == 3)
                     {
                         DWORD attr = 0;
                         DWORD attrDiff = 0;
-                        if (text[0] >= '0' && text[0] <= '7')
-                            attr |= (text[0] - '0') << 6;
+                        if (text[0] >= L'0' && text[0] <= L'7')
+                            attr |= (text[0] - L'0') << 6;
                         else
                             attrDiff |= 0700;
-                        if (text[1] >= '0' && text[1] <= '7')
-                            attr |= (text[1] - '0') << 3;
+                        if (text[1] >= L'0' && text[1] <= L'7')
+                            attr |= (text[1] - L'0') << 3;
                         else
                             attrDiff |= 0070;
-                        if (text[2] >= '0' && text[2] <= '7')
-                            attr |= text[2] - '0';
+                        if (text[2] >= L'0' && text[2] <= L'7')
+                            attr |= text[2] - L'0';
                         else
                             attrDiff |= 0007;
 

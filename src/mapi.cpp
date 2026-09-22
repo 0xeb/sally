@@ -6,6 +6,7 @@
 
 #include "mapi.h"
 #include "ui/IPrompter.h"
+#include "common/Win32TextCodec.h"
 #include "common/unicode/helpers.h"
 
 CSimpleMAPI::CSimpleMAPI()
@@ -27,13 +28,13 @@ BOOL CSimpleMAPI::Init(HWND hParent)
     CALL_STACK_MESSAGE_NONE
     if (HLibrary == NULL)
     {
-        HLibrary = HANDLES_Q(LoadLibrary("mapi32.dll"));
+        HLibrary = HANDLES_Q(LoadLibraryW(L"mapi32.dll"));
         if (HLibrary == NULL)
         {
             // under NT4.0 US + IE 4.01 US, mapi32.dll is not installed
             // but I found msoemapi.dll there which has the necessary export and more importantly, it works,
             // so why not try it...
-            HLibrary = HANDLES_Q(LoadLibrary("msoemapi.dll"));
+            HLibrary = HANDLES_Q(LoadLibraryW(L"msoemapi.dll"));
             if (HLibrary == NULL)
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EMAILFILES_MAPIERROR));
@@ -72,12 +73,12 @@ void CSimpleMAPI::Release()
     TotalSize.Set(0, 0);
 }
 
-BOOL CSimpleMAPI::AddFile(const char* fileName, const CQuadWord* size)
+BOOL CSimpleMAPI::AddFile(const wchar_t* fileName, const CQuadWord* size)
 {
     CALL_STACK_MESSAGE_NONE
-    int len = (int)strlen(fileName);
+    size_t len = wcslen(fileName);
 
-    char* text = (char*)malloc(len + 1);
+    wchar_t* text = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
     if (text == NULL)
     {
         TRACE_E(LOW_MEMORY);
@@ -87,12 +88,13 @@ BOOL CSimpleMAPI::AddFile(const char* fileName, const CQuadWord* size)
     FileNames.Add(text);
     if (!FileNames.IsGood())
     {
-        delete text;
+        free(text); // was `delete` on a malloc'd block - UB. Release() at
+                    // :62 frees these with free(), which is what the allocator requires.
         FileNames.ResetState();
         return FALSE;
     }
 
-    memcpy(text, fileName, len + 1);
+    memcpy(text, fileName, (len + 1) * sizeof(wchar_t));
     TotalSize += *size;
 
     return TRUE;
@@ -121,17 +123,50 @@ BOOL CSimpleMAPI::SendMail()
 
     ZeroMemory(fileDesc, FileNames.Count * sizeof(MapiFileDesc));
 
+    // mapi32.dll's ANSI MAPISendMail export requires
+    // narrow (LPSTR) strings in MapiFileDesc - an external ABI Sally does not own (see mapi.h).
+    // FileNames is stored wide (AddFile's callers are wide); convert to ANSI here at the
+    // boundary, exact-or-refuse rather than best-fit - a silently substituted attachment path
+    // could point MAPISendMail at a different file than the one the user selected. These ANSI
+    // copies must outlive the MAPISendMail call below, so they are freed alongside
+    // fileDesc/subject after it returns, not before.
+    char** fileNamesA = (char**)malloc(FileNames.Count * sizeof(char*));
+    if (fileNamesA == NULL)
+    {
+        TRACE_E(LOW_MEMORY);
+        free(fileDesc);
+        return FALSE;
+    }
+    ZeroMemory(fileNamesA, FileNames.Count * sizeof(char*));
+
     MapiFileDesc* iterator = fileDesc;
     int subjectSize = 0;
     int i;
+    BOOL ok = TRUE;
     for (i = 0; i < FileNames.Count; i++)
     {
-        char* fileName = FileNames[i];
-        iterator->nPosition = (ULONG)-1;   // position not specified
-        iterator->lpszPathName = fileName; // pathname
-        char* p = strrchr(fileName, '\\');
+        std::string fileNameA;
+        if (!Win32EncodeAcpExact(FileNames[i], fileNameA))
+        {
+            TRACE_E("CSimpleMAPI::SendMail(): an attachment path cannot be represented in the system code page");
+            ok = FALSE;
+            break;
+        }
+
+        fileNamesA[i] = (char*)malloc(fileNameA.size() + 1);
+        if (fileNamesA[i] == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            ok = FALSE;
+            break;
+        }
+        memcpy(fileNamesA[i], fileNameA.c_str(), fileNameA.size() + 1); // includes the NUL
+
+        iterator->nPosition = (ULONG)-1;        // position not specified
+        iterator->lpszPathName = fileNamesA[i]; // pathname
+        char* p = strrchr(fileNamesA[i], '\\');
         if (p == NULL)
-            p = fileName;
+            p = fileNamesA[i];
         else
             p++;
         iterator->lpszFileName = p;        // filename visible for user
@@ -139,41 +174,55 @@ BOOL CSimpleMAPI::SendMail()
         iterator++;
     }
 
+    if (!ok)
+    {
+        for (int j = 0; j < FileNames.Count; j++)
+            free(fileNamesA[j]);
+        free(fileNamesA);
+        free(fileDesc);
+        return FALSE;
+    }
+
     MapiMessage message;
     ZeroMemory(&message, sizeof(message));
     message.nFileCount = FileNames.Count;
     message.lpFiles = fileDesc;
 
-    char* subject = (char*)malloc(subjectSize + strlen(LoadStr(IDS_EMAILFILES_SUBJECT)) + 2); // space for "emailing" and the terminating NULL
-    if (subject == NULL)
+    // Simple MAPI is an ANSI ABI. The attachment PATHS above are identity and must be exact or
+    // refused; the subject and note body are text the mail client merely displays, so they take the
+    // best-effort projection instead. Refusing them abandoned the whole Email Files command - with
+    // no dialog, because SendMail() runs on a worker thread whose return value nobody reads -
+    // whenever the language pack's strings were outside the active ACP, which is an ordinary
+    // configuration (the Russian pack on an ACP-1252 machine; Select Language permits it). The
+    // narrow build these strings came from substituted '?' and sent the mail, attachments intact.
+    std::string subjectPrefix;
+    std::string body;
+    if (!Win32EncodeAcpLossy(LoadStrOwned(IDS_EMAILFILES_SUBJECT), subjectPrefix) ||
+        !Win32EncodeAcpLossy(LoadStrOwned(IDS_EMAILFILES_BODY), body))
     {
-        TRACE_E(LOW_MEMORY);
+        // Only a genuine conversion failure (out of memory, absurd length) reaches here now.
+        TRACE_E("CSimpleMAPI::SendMail(): localized message text could not be converted");
+        for (i = 0; i < FileNames.Count; i++)
+            free(fileNamesA[i]);
+        free(fileNamesA);
         free(fileDesc);
         return FALSE;
     }
 
-    char* p = subject;
-    p += sprintf(p, "%s ", LoadStr(IDS_EMAILFILES_SUBJECT));
+    std::string subject;
+    subject.reserve(subjectPrefix.size() + static_cast<size_t>(subjectSize) + 1);
+    subject = subjectPrefix;
+    subject.push_back(' ');
     iterator = fileDesc;
     for (i = 0; i < FileNames.Count; i++)
     {
-        int len = (int)strlen(iterator->lpszFileName);
-        memcpy(p, iterator->lpszFileName, len);
-        p += len;
+        subject += iterator->lpszFileName;
         if (i < FileNames.Count - 1)
-        {
-            memcpy(p, ", ", len);
-            p += 2;
-        }
-        else
-            *p = 0;
+            subject += ", ";
         iterator++;
     }
-    message.lpszSubject = subject;
-
-    char body[1000];
-    strcpy(body, LoadStr(IDS_EMAILFILES_BODY));
-    message.lpszNoteText = body;
+    message.lpszSubject = const_cast<char*>(subject.c_str());
+    message.lpszNoteText = const_cast<char*>(body.c_str());
 
     ULONG ret = MAPISendMail(0,
                              /*(ULONG)hParent*/ 0, // we will be non-modal
@@ -181,7 +230,9 @@ BOOL CSimpleMAPI::SendMail()
                              MAPI_LOGON_UI | MAPI_DIALOG,
                              0L);
 
-    free(subject);
+    for (i = 0; i < FileNames.Count; i++)
+        free(fileNamesA[i]);
+    free(fileNamesA);
     free(fileDesc);
     // report nothing because various clients return different values
     // for example Outlook 6 on XP returned 1 when cancelling a message or 3
@@ -200,7 +251,7 @@ BOOL CSimpleMAPI::SendMail()
 unsigned SimpleMAPISendMailThreadBody(void* param)
 {
     CALL_STACK_MESSAGE1("SimpleMAPISendMailThreadBody()");
-    SetThreadNameInVCAndTrace("MapiSendMail");
+    SetThreadNameInVCAndTrace(L"MapiSendMail");
     TRACE_I("Begin");
     // lower the thread priority to "normal" so the operation does not burden the machine too much
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);

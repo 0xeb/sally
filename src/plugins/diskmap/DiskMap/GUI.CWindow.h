@@ -21,9 +21,9 @@ protected:
     HWND _hWnd;
     HWND _hWndParent;
 
-    HWND MyCreateWindow(DWORD dwExStyle, LPCTSTR lpClassName, LPCTSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HMENU hMenu)
+    HWND MyCreateWindow(DWORD dwExStyle, LPCWSTR lpClassName, LPCWSTR lpWindowName, DWORD dwStyle, int x, int y, int nWidth, int nHeight, HMENU hMenu)
     {
-        return CreateWindowEx(
+        return CreateWindowExW(
             dwExStyle,
             lpClassName,
             lpWindowName,
@@ -50,7 +50,7 @@ protected:
         {
             pWindow = (CWindow*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
         }
-        LRESULT res = pWindow ? pWindow->MyWndProc(hwnd, uMsg, wParam, lParam) : DefWindowProc(hwnd, uMsg, wParam, lParam);
+        LRESULT res = pWindow ? pWindow->MyWndProc(hwnd, uMsg, wParam, lParam) : DefWindowProcW(hwnd, uMsg, wParam, lParam);
 
         if (pWindow != NULL &&
             (uMsg == WM_CREATE ||

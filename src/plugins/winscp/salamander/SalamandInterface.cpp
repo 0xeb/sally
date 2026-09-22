@@ -169,7 +169,7 @@ static unsigned int __stdcall SalamThreadProc(void* AParam)
     CALL_STACK_MESSAGE2("SalamThreadProc(%p)", AParam);
 
     SalamanderDebug->TraceAttachThread(GetCurrentThread(), GetCurrentThreadId());
-    SetThreadNameInVCAndTrace("WinSCP background");
+    SetThreadNameInVCAndTrace(L"WinSCP background");
 
     TThreadParam* Param = reinterpret_cast<TThreadParam*>(AParam);
     unsigned int Result = Param->ThreadFunc(Param->Parameter);

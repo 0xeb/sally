@@ -116,18 +116,16 @@ BEGIN
     LTEXT           "s",IDC_STATIC_2,216,70,6,8,NOT WS_GROUP
     CONTROL         "Com&pare Directories: ignore time differences of exactly one or two hours",IDC_IGNOREDSTSHIFTS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,81,256,12
-    CONTROL         "&Open files through salopen.exe (it bypasses shell extensions errors)",IDC_USESALOPEN,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,238,12
     CONTROL         "S&elect also filename extension in Quick Rename and Pack commands",IDC_QUICKRENAME_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,243,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,94,243,12
     CONTROL         "Select also f&ilename extension in Edit New File command",IDC_EDITNEW_SELALL,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,202,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,107,202,12
     CONTROL         "Use &fast directory move on Novell NetWare",IDC_NETWAREFASTDIRMOVE,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,156,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,120,156,12
     CONTROL         "Copy files: use faster asy&nchronous algorithm on network (Windows 7 and later)",IDC_ASYNCCOPYALG,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,282,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,133,282,12
     CONTROL         "&Keep environment variables updated to system values",IDC_RELOADENVVARS,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,159,193,12
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,146,193,12
 END
 
 IDD_CFGPAGE_REGIONAL DIALOGEX 65, 18, 299, 231
@@ -2104,7 +2102,7 @@ BEGIN
     RTEXT           "Details:",IDC_STATIC_4,3,23,31,8
     EDITTEXT        IDS_DETAILS,35,23,312,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
     LTEXT           "Do you want to follow the link and copy files and directories from link target?",IDC_STATIC_1,37,43,310,8,SS_NOPREFIX
-    LTEXT           "Click Skip button to ignore link target and to create only empty directory.",IDC_STATIC_2,37,51,310,8,SS_NOPREFIX
+    LTEXT           "Click Skip button to copy the link itself instead of its target.",IDC_STATIC_2,37,51,310,8,SS_NOPREFIX
 END
 
 IDD_VIEWERGOTOOFFSET DIALOGEX 75, 140, 205, 81

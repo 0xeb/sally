@@ -126,7 +126,7 @@ void CPropPageColors::ItemChanged(int i)
             continue;
         }
         ShowWindow(GetDlgItem(HWindow, DescriptionIDs[j]), SW_SHOW);
-        SetWindowText(GetDlgItem(HWindow, DescriptionIDs[j]), LoadStr(ColorItems[i].Buttons[j].TextID));
+        SetWindowTextW(GetDlgItem(HWindow, DescriptionIDs[j]), LangStr(ColorItems[i].Buttons[j].TextID).c_str());
 
         if (ColorItems[i].Buttons[j].ColorLineNumBK == -1)
             ShowWindow(GetDlgItem(HWindow, LineNumIDs[j]), SW_HIDE);
@@ -288,7 +288,7 @@ CPropPageColors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int j;
         for (j = 0; j < CD_NUMBER_OF_ITEMS; j++)
         {
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(ColorItems[j].TextID));
+            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(ColorItems[j].TextID).c_str());
         }
         SendMessage(combo, CB_SETCURSEL, 0, 0);
         ItemChanged(0);
@@ -597,17 +597,19 @@ CPreviewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             // draw the line number
-            char num[2 + 1];
-            sprintf(num, "%*d", 2, lineNum);
+            std::wstring num = std::to_wstring(lineNum);
+            if (num.size() < 2)
+                num.insert(num.begin(), L' ');
             SetTextColor(dc, GetPALETTERGB(Colors[PreviewScript[i].LineNumFGColor + side]));
             SetBkColor(dc, GetPALETTERGB(Colors[PreviewScript[i].LineNumBKColor + side]));
-            ExtTextOut(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1, num, 2, NULL);
+            ExtTextOutW(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1,
+                        num.c_str(), static_cast<UINT>(num.size()), NULL);
 
             // draw the text
             SetTextColor(dc, GetPALETTERGB(Colors[PreviewScript[i].TextColor + side]));
             SetBkColor(dc, GetPALETTERGB(Colors[PreviewScript[i].BkgndColor + side]));
-            char* text = LoadStr(PreviewScript[i].TextID);
-            ExtTextOut(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2, text, UINT(strlen(text)), NULL);
+            const std::wstring text = LangStr(PreviewScript[i].TextID);
+            ExtTextOutW(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2, text.c_str(), UINT(text.size()), NULL);
         }
 
         if (r1.bottom < cr.bottom)
@@ -615,7 +617,7 @@ CPreviewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             r1.top = r2.top = r1.bottom;
             r1.bottom = r2.bottom = cr.bottom;
             SetBkColor(dc, GetPALETTERGB(Colors[LINENUM_BK_NORMAL]));
-            ExtTextOut(dc, 0, 0, ETO_OPAQUE | ETO_CLIPPED, &r1, NULL, 0, NULL);
+            ExtTextOutW(dc, 0, 0, ETO_OPAQUE | ETO_CLIPPED, &r1, L"", 0, NULL);
             SetBkColor(dc, GetPALETTERGB(Colors[TEXT_BK_NORMAL]));
             ExtTextOut(dc, 0, 0, ETO_OPAQUE | ETO_CLIPPED, &r2, NULL, 0, NULL);
         }

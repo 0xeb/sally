@@ -81,7 +81,7 @@ public:
         __in HWND parent);
 
     virtual void WINAPI AcceptChangeOnPathNotification(
-        __in const char* path,
+        __in const wchar_t* path,
         __in BOOL includingSubdirs);
 
     virtual void WINAPI PasswordManagerEvent(

@@ -1,6 +1,8 @@
 #ifndef _RAR_DEFS_
 #define _RAR_DEFS_
 
+#include "../unrar_callback_contract.h"
+
 #define  Min(x,y) (((x)<(y)) ? (x):(y))
 #define  Max(x,y) (((x)>(y)) ? (x):(y))
 
@@ -19,7 +21,7 @@
 
 // Set some arbitrary sensible limit to maximum path length to prevent
 // the excessive memory allocation for dynamically allocated strings.
-#define  MAXPATHSIZE       0x10000
+#define  MAXPATHSIZE       UNRAR_CHANGE_VOLUME_BUFFER_CHARS
 
 #define  MAXSFXSIZE        0x400000
 

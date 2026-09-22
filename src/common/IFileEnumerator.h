@@ -71,6 +71,9 @@ public:
     // ADS support / none present" and callers should treat that as an empty set.
     // The default implementation returns INVALID_HENUM (no ADS) so mocks that
     // don't care about streams need not override it.
+    // Failure notes: ERROR_HANDLE_EOF means "no streams"; treat
+    // ERROR_INVALID_FUNCTION and ERROR_NOT_SUPPORTED (FAT/exFAT - no ADS
+    // support) as "no streams" too, not as errors.
     virtual HENUM StartStreamEnum(const wchar_t* path)
     {
         (void)path;
@@ -89,26 +92,6 @@ public:
     // Close a stream-enumeration handle.
     virtual void EndStreamEnum(HENUM handle) { (void)handle; }
 
-    // Convenience: Check if the final path component contains a wildcard
-    // pattern. Only the part after the last backslash counts — a directory
-    // component can never legally hold a wildcard, and scanning the whole
-    // string would misread the '?' in a \\?\ long-path prefix as a pattern.
-    static bool HasPattern(const wchar_t* path)
-    {
-        if (!path) return false;
-        const wchar_t* component = path;
-        for (const wchar_t* p = path; *p; p++)
-        {
-            if (*p == L'\\' || *p == L'/')
-                component = p + 1;
-        }
-        for (const wchar_t* p = component; *p; p++)
-        {
-            if (*p == L'*' || *p == L'?')
-                return true;
-        }
-        return false;
-    }
 };
 
 // Global file enumerator instance - default is Win32 implementation
@@ -116,23 +99,3 @@ extern IFileEnumerator* gFileEnumerator;
 
 // Returns the default Win32 implementation
 IFileEnumerator* GetWin32FileEnumerator();
-
-// ANSI helper: Convert ANSI path and start enumeration
-inline std::wstring AnsiEnumPathToWide(const char* path)
-{
-    if (!path || !*path) return L"";
-    int len = MultiByteToWideChar(CP_ACP, 0, path, -1, nullptr, 0);
-    if (len == 0) return L"";
-    std::wstring wide;
-    wide.resize(len);
-    MultiByteToWideChar(CP_ACP, 0, path, -1, &wide[0], len);
-    wide.resize(len - 1);
-    return wide;
-}
-
-inline HENUM StartEnumA(IFileEnumerator* enumerator, const char* path, const char* pattern = nullptr)
-{
-    std::wstring widePath = AnsiEnumPathToWide(path);
-    std::wstring widePattern = pattern ? AnsiEnumPathToWide(pattern) : L"";
-    return enumerator->StartEnum(widePath.c_str(), widePattern.empty() ? nullptr : widePattern.c_str());
-}

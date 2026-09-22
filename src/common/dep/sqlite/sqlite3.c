@@ -32171,8 +32171,8 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
     /*  38 */ "IdxGT"            OpHelp("key=r[P3@P4]"),
     /*  39 */ "IdxLT"            OpHelp("key=r[P3@P4]"),
     /*  40 */ "IdxGE"            OpHelp("key=r[P3@P4]"),
-    /*  41 */ "RowSetRead"       OpHelp("r[P3]=rowset(P1)"),
-    /*  42 */ "RowSetTest"       OpHelp("if r[P3] in rowset(P1) goto P2"),
+    /*  41 */ "RowSetRead"       OpHelp("r[P3]=rowset"),
+    /*  42 */ "RowSetTest"       OpHelp("if r[P3] in rowset goto P2"),
     /*  43 */ "Or"               OpHelp("r[P3]=(r[P1] || r[P2])"),
     /*  44 */ "And"              OpHelp("r[P3]=(r[P1] && r[P2])"),
     /*  45 */ "Program"          OpHelp(""),
@@ -32219,7 +32219,7 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
     /*  86 */ "Permutation"      OpHelp(""),
     /*  87 */ "Compare"          OpHelp("r[P1@P3] <-> r[P2@P3]"),
     /*  88 */ "IsTrue"           OpHelp("r[P2] = coalesce(r[P1]==TRUE,P3) ^ P4"),
-    /*  89 */ "Offset"           OpHelp("r[P3] = sqlite_offset(P1)"),
+    /*  89 */ "Offset"           OpHelp("r[P3] = sqlite_offset"),
     /*  90 */ "Column"           OpHelp("r[P3]=PX"),
     /*  91 */ "Affinity"         OpHelp("affinity(r[P1@P2])"),
     /*  92 */ "MakeRecord"       OpHelp("r[P3]=mkrec(r[P1@P2])"),
@@ -32255,7 +32255,7 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
     /* 122 */ "Insert"           OpHelp("intkey=r[P3] data=r[P2]"),
     /* 123 */ "Delete"           OpHelp(""),
     /* 124 */ "ResetCount"       OpHelp(""),
-    /* 125 */ "SorterCompare"    OpHelp("if key(P1)!=trim(r[P3],P4) goto P2"),
+    /* 125 */ "SorterCompare"    OpHelp("if key!=trim(r[P3],P4) goto P2"),
     /* 126 */ "SorterData"       OpHelp("r[P2]=data"),
     /* 127 */ "RowData"          OpHelp("r[P2]=data"),
     /* 128 */ "Rowid"            OpHelp("r[P2]=rowid"),
@@ -32278,7 +32278,7 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
     /* 145 */ "Real"             OpHelp("r[P2]=P4"),
     /* 146 */ "DropTrigger"      OpHelp(""),
     /* 147 */ "IntegrityCk"      OpHelp(""),
-    /* 148 */ "RowSetAdd"        OpHelp("rowset(P1)=r[P2]"),
+    /* 148 */ "RowSetAdd"        OpHelp("rowset=r[P2]"),
     /* 149 */ "Param"            OpHelp(""),
     /* 150 */ "FkCounter"        OpHelp("fkctr[P1]+=P2"),
     /* 151 */ "MemMax"           OpHelp("r[P1]=max(r[P1],r[P2])"),
@@ -32294,7 +32294,7 @@ SQLITE_PRIVATE const char *sqlite3OpcodeName(int i){
     /* 161 */ "VCreate"          OpHelp(""),
     /* 162 */ "VDestroy"         OpHelp(""),
     /* 163 */ "VOpen"            OpHelp(""),
-    /* 164 */ "VColumn"          OpHelp("r[P3]=vcolumn(P2)"),
+    /* 164 */ "VColumn"          OpHelp("r[P3]=vcolumn"),
     /* 165 */ "VRename"          OpHelp(""),
     /* 166 */ "Pagecount"        OpHelp(""),
     /* 167 */ "MaxPgcnt"         OpHelp(""),
@@ -57240,7 +57240,7 @@ SQLITE_PRIVATE int sqlite3PagerCommitPhaseTwo(Pager *pPager){
 **   2) It finalizes the journal file, so that it is not used for hot
 **      rollback at any point in the future.
 **
-** Finalization of the journal file (task 2) is only performed if the 
+** Finalization of the journal file is only performed if the
 ** rollback is successful.
 **
 ** In WAL mode, all cache-entries containing data modified within the
@@ -84954,7 +84954,7 @@ case OP_IntCopy: {            /* out2 */
 ** The registers P1 through P1+P2-1 contain a single row of
 ** results. This opcode causes the sqlite3_step() call to terminate
 ** with an SQLITE_ROW return code and it sets up the sqlite3_stmt
-** structure to provide access to the r(P1)..r(P1+P2-1) values as
+** structure to provide access to the r..r(P1+P2-1) values as
 ** the result row.
 */
 case OP_ResultRow: {
@@ -85399,7 +85399,7 @@ case OP_Cast: {                  /* in1 */
 /* Opcode: Eq P1 P2 P3 P4 P5
 ** Synopsis: IF r[P3]==r[P1]
 **
-** Compare the values in register P1 and P3.  If reg(P3)==reg(P1) then
+** Compare the values in register P1 and P3.  If reg==reg then
 ** jump to address P2.  Or if the SQLITE_STOREP2 flag is set in P5, then
 ** store the result of comparison in register P2.
 **
@@ -85445,12 +85445,12 @@ case OP_Cast: {                  /* in1 */
 /* Opcode: Lt P1 P2 P3 P4 P5
 ** Synopsis: IF r[P3]<r[P1]
 **
-** Compare the values in register P1 and P3.  If reg(P3)<reg(P1) then
+** Compare the values in register P1 and P3.  If reg<reg then
 ** jump to address P2.  Or if the SQLITE_STOREP2 flag is set in P5 store
 ** the result of comparison (0 or 1 or NULL) into register P2.
 **
-** If the SQLITE_JUMPIFNULL bit of P5 is set and either reg(P1) or
-** reg(P3) is NULL then the take the jump.  If the SQLITE_JUMPIFNULL 
+** If the SQLITE_JUMPIFNULL bit of P5 is set and either reg or
+** reg is NULL then the take the jump.  If the SQLITE_JUMPIFNULL
 ** bit is clear then fall through if either operand is NULL.
 **
 ** The SQLITE_AFF_MASK portion of P5 must be an affinity character -
@@ -85689,8 +85689,8 @@ case OP_Permutation: {
 /* Opcode: Compare P1 P2 P3 P4 P5
 ** Synopsis: r[P1@P3] <-> r[P2@P3]
 **
-** Compare two vectors of registers in reg(P1)..reg(P1+P3-1) (call this
-** vector "A") and in reg(P2)..reg(P2+P3-1) ("B").  Save the result of
+** Compare two vectors of registers in reg..reg(P1+P3-1) (call this
+** vector "A") and in reg..reg(P2+P3-1) ("B").  Save the result of
 ** the comparison for use by the next OP_Jump instruct.
 **
 ** If P5 has the OPFLAG_PERMUTE bit set, then the order of comparison is
@@ -86001,7 +86001,7 @@ case OP_IfNullRow: {         /* jump */
 
 #ifdef SQLITE_ENABLE_OFFSET_SQL_FUNC
 /* Opcode: Offset P1 P2 P3 * *
-** Synopsis: r[P3] = sqlite_offset(P1)
+** Synopsis: r[P3] = sqlite_offset
 **
 ** Store in register r[P3] the byte offset into the database file that is the
 ** start of the payload for the record at which that cursor P1 is currently
@@ -88390,7 +88390,7 @@ case OP_ResetCount: {
 }
 
 /* Opcode: SorterCompare P1 P2 P3 P4
-** Synopsis: if key(P1)!=trim(r[P3],P4) goto P2
+** Synopsis: if key!=trim(r[P3],P4) goto P2
 **
 ** P1 is a sorter cursor. This instruction compares a prefix of the
 ** record blob in register P3 against a prefix of the entry that 
@@ -88869,7 +88869,7 @@ next_tail:
 ** into the index P1.  Data for the entry is nil.
 **
 ** If P4 is not zero, then it is the number of values in the unpacked
-** key of reg(P2).  In that case, P3 is the index of the first register
+** key of reg.  In that case, P3 is the index of the first register
 ** for the unpacked key.  The availability of the unpacked key can sometimes
 ** be an optimization.
 **
@@ -89457,9 +89457,9 @@ case OP_DropTrigger: {
 ** If no problems are found, store a NULL in register P1.
 **
 ** The register P3 contains one less than the maximum number of allowed errors.
-** At most reg(P3) errors will be reported.
-** In other words, the analysis stops as soon as reg(P1) errors are 
-** seen.  Reg(P1) is updated with the number of errors remaining.
+** At most reg errors will be reported.
+** In other words, the analysis stops as soon as reg errors are
+** seen.  Reg is updated with the number of errors remaining.
 **
 ** The root page numbers of all tables in the database are integers
 ** stored in P4_INTARRAY argument.
@@ -89506,7 +89506,7 @@ case OP_IntegrityCk: {
 #endif /* SQLITE_OMIT_INTEGRITY_CHECK */
 
 /* Opcode: RowSetAdd P1 P2 * * *
-** Synopsis: rowset(P1)=r[P2]
+** Synopsis: rowset=r[P2]
 **
 ** Insert the integer value held by register P2 into a RowSet object
 ** held in register P1.
@@ -89526,7 +89526,7 @@ case OP_RowSetAdd: {       /* in1, in2 */
 }
 
 /* Opcode: RowSetRead P1 P2 P3 * *
-** Synopsis: r[P3]=rowset(P1)
+** Synopsis: r[P3]=rowset
 **
 ** Extract the smallest value from the RowSet object in P1
 ** and put that value into register P3.
@@ -89554,7 +89554,7 @@ case OP_RowSetRead: {       /* jump, in1, out3 */
 }
 
 /* Opcode: RowSetTest P1 P2 P3 P4
-** Synopsis: if r[P3] in rowset(P1) goto P2
+** Synopsis: if r[P3] in rowset goto P2
 **
 ** Register P3 is assumed to hold a 64-bit integer value. If register P1
 ** contains a RowSet object and that RowSet object contains
@@ -90569,7 +90569,7 @@ case OP_VFilter: {   /* jump */
 
 #ifndef SQLITE_OMIT_VIRTUALTABLE
 /* Opcode: VColumn P1 P2 P3 * P5
-** Synopsis: r[P3]=vcolumn(P2)
+** Synopsis: r[P3]=vcolumn
 **
 ** Store in register P3 the value of the P2-th column of
 ** the current row of the virtual-table of cursor P1.

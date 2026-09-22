@@ -58,7 +58,7 @@ protected:
     /// SALGUI_STYLE enumeration.
     UINT m_uStyle;
 
-    static const TCHAR s_szInstancePropName[];
+    static const wchar_t s_szInstancePropName[];
 
     virtual HWND CreateHwnd(HWND hWndParent)
     {

@@ -23,6 +23,10 @@
 #include "versinfo.rh2"
 #include "persistence.h"
 #include "abortmodal.h"
+#include "unicode/helpers.h"
+
+#define AUTOMATION_WIDEN_IMPL(value) L##value
+#define AUTOMATION_WIDEN(value) AUTOMATION_WIDEN_IMPL(value)
 
 #pragma comment(lib, "uxtheme.lib")
 
@@ -34,12 +38,12 @@ extern HINSTANCE g_hLangInst;
 extern CAutomationPluginInterface g_oAutomationPlugin;
 CWindowQueue AbortPaletteWindowQueue("Automation Abort Palette Window");
 
-static const TCHAR CONFIG_VERSION[] = TEXT("Version");
+static const wchar_t CONFIG_VERSION[] = L"Version";
 static const UINT CURRENT_CONFIG_VERSION = 1;
-static const TCHAR CONFIG_ENABLEDEBUGGER[] = TEXT("EnableDebugger");
-static const TCHAR CONFIG_DIRECTORIES[] = TEXT("Directories");
-static const TCHAR CONFIG_SCRIPTS[] = TEXT("Scripts");
-static const TCHAR CONFIG_PERSISTENCE[] = TEXT("Persistent");
+static const wchar_t CONFIG_ENABLEDEBUGGER[] = L"EnableDebugger";
+static const wchar_t CONFIG_DIRECTORIES[] = L"Directories";
+static const wchar_t CONFIG_SCRIPTS[] = L"Scripts";
+static const wchar_t CONFIG_PERSISTENCE[] = L"Persistent";
 
 CScriptLookup g_oScriptLookup;
 CPersistentValueStorage g_oPersistentStorage;
@@ -64,14 +68,17 @@ BOOL WINAPI CAutomationMenuExtInterface::ExecuteMenuItem(
 
     if (id == CmdRunFocusedScript)
     {
-        CPathBuffer szFullName;
+        std::wstring fullName;
         const CFileData* pFocusedFile;
 
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, szFullName, szFullName.Size(), NULL, NULL);
         pFocusedFile = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
-        SalamanderGeneral->SalPathAppend(szFullName, pFocusedFile->Name, szFullName.Size());
+        if (!SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, fullName) || pFocusedFile == NULL)
+            return FALSE;
+        if (!fullName.empty() && fullName.back() != L'\\')
+            fullName += L'\\';
+        fullName += pFocusedFile->Name;
 
-        CScriptInfo scriptInfo(szFullName, NULL);
+        CScriptInfo scriptInfo(fullName.c_str(), NULL);
         bExecuted = scriptInfo.Execute(info);
     }
     else if (id == CmdScriptPopupMenu)
@@ -132,8 +139,6 @@ int CAutomationMenuExtInterface::ExecuteScriptMenu()
     int nCmd;
     CGUIMenuPopupAbstract* pMenu;
     MENU_ITEM_INFO mii;
-    TCHAR szText[100];
-    TCHAR szHotKeyText[64];
 
     pMenu = SalamanderGUI->CreateMenuPopup();
 
@@ -154,13 +159,14 @@ MENU_TEMPLATE_ITEM ExecuteScriptMenu[] =
     mii.Type = MENU_TYPE_STRING;
     mii.ID = CmdRunFocusedScript;
     mii.State = CanExecuteFocusedItem() ? 0 : MENU_STATE_GRAYED;
-    LoadString(g_hLangInst, IDS_RUNFOCUSED, szText, _countof(szText));
-    if (SalamanderGeneral->GetMenuItemHotKey(mii.ID, NULL, szHotKeyText, _countof(szHotKeyText)))
+    std::wstring menuText = SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_RUNFOCUSED).c_str();
+    std::wstring hotKeyText;
+    if (SPLGetMenuItemHotKeyOwned(SalamanderGeneral, mii.ID, NULL, hotKeyText))
     {
-        StringCchCat(szText, _countof(szText), TEXT("\t"));
-        StringCchCat(szText, _countof(szText), szHotKeyText);
+        menuText += L'\t';
+        menuText += hotKeyText;
     }
-    mii.String = szText;
+    mii.String = menuText.data();
     mii.ImageIndex = PluginIconRun;
     pMenu->InsertItem(0, TRUE, &mii);
 
@@ -201,7 +207,7 @@ void CAutomationMenuExtInterface::AddScriptContainerToPopup(
     };
     int i = 0;
     CGUIMenuPopupAbstract* pSubMenu = NULL;
-    TCHAR szDisplayName[256];
+    std::wstring displayName;
 
     const CScriptContainer* pSubContainer;
     const CScriptInfo* pScript;
@@ -215,9 +221,9 @@ void CAutomationMenuExtInterface::AddScriptContainerToPopup(
         mii.ID = 0;
         mii.SubMenu = pSubMenu;
 
-        StringCchCopy(szDisplayName, _countof(szDisplayName), pContainer->GetName());
-        SalamanderGeneral->DuplicateAmpersands(szDisplayName, _countof(szDisplayName));
-        mii.String = szDisplayName;
+        displayName = pContainer->GetName();
+        SPLDuplicateAmpersandsOwned(SalamanderGeneral, displayName);
+        mii.String = displayName.data();
 
         pMenu->InsertItem(INT_MAX, TRUE, &mii);
     }
@@ -236,15 +242,16 @@ void CAutomationMenuExtInterface::AddScriptContainerToPopup(
     {
         mii.ID = pScript->GetId();
 
-        StringCchCopy(szDisplayName, _countof(szDisplayName), pScript->GetDisplayName());
-        SalamanderGeneral->DuplicateAmpersands(szDisplayName, _countof(szDisplayName));
-        TCHAR szHotKeyText[100];
-        if (SalamanderGeneral->GetMenuItemHotKey(pScript->GetId(), NULL, szHotKeyText, 100))
+        displayName = pScript->GetDisplayName();
+        SPLDuplicateAmpersandsOwned(SalamanderGeneral, displayName);
+        std::wstring hotKeyText;
+        if (SPLGetMenuItemHotKeyOwned(SalamanderGeneral, pScript->GetId(), NULL,
+                                      hotKeyText))
         {
-            StringCchCat(szDisplayName, _countof(szDisplayName), "\t");
-            StringCchCat(szDisplayName, _countof(szDisplayName), szHotKeyText);
+            displayName += L'\t';
+            displayName += hotKeyText;
         }
-        mii.String = szDisplayName;
+        mii.String = displayName.data();
 
         if (pSubMenu != NULL)
         {
@@ -278,7 +285,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
     // run focused script menu item
     salamander->AddMenuItem(
         PluginIconRun,
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_RUNFOCUSED),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_RUNFOCUSED).c_str(),
         0,
         CAutomationMenuExtInterface::CmdRunFocusedScript,
         TRUE, // callGetState
@@ -289,7 +296,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
     // open script menu
     salamander->AddMenuItem(
         -1,
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_SCRIPTPOPUPMENU),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_SCRIPTPOPUPMENU).c_str(),
         SALHOTKEY('A', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
         CAutomationMenuExtInterface::CmdScriptPopupMenu,
         TRUE,
@@ -354,16 +361,16 @@ void CAutomationMenuExtInterface::AddScriptContainerToMenu(
 {
     const CScriptContainer* pSubContainer;
     const CScriptInfo* pScript;
-    TCHAR szDisplayName[256];
+    std::wstring displayName;
 
     if (nLevel > 1)
     {
-        StringCchCopy(szDisplayName, _countof(szDisplayName), pContainer->GetName());
-        SalamanderGeneral->DuplicateAmpersands(szDisplayName, _countof(szDisplayName));
+        displayName = pContainer->GetName();
+        SPLDuplicateAmpersandsOwned(SalamanderGeneral, displayName);
 
         pMenuBuilder->AddSubmenuStart(
             -1, // iconIndex
-            szDisplayName,
+            displayName.c_str(),
             0,
             FALSE,
             MENU_EVENT_TRUE,
@@ -381,12 +388,12 @@ void CAutomationMenuExtInterface::AddScriptContainerToMenu(
     pScript = pContainer->FirstScript();
     while (pScript)
     {
-        StringCchCopy(szDisplayName, _countof(szDisplayName), pScript->GetDisplayName());
-        SalamanderGeneral->DuplicateAmpersands(szDisplayName, _countof(szDisplayName));
+        displayName = pScript->GetDisplayName();
+        SPLDuplicateAmpersandsOwned(SalamanderGeneral, displayName);
 
         pMenuBuilder->AddMenuItem(
             PluginIconScript, // icon index
-            szDisplayName,
+            displayName.c_str(),
             0,                // hotkey
             pScript->GetId(), // id
             TRUE,             // callGetState
@@ -408,7 +415,7 @@ bool CAutomationMenuExtInterface::CanExecuteFocusedItem()
     // check if we have script engine for the file extension
     const CFileData* pFocusedFile = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
     // _ASSERTE(pFocusedFile);  // Petr: if the panel is empty (e.g. when we are in the root of an empty disk)
-    if (pFocusedFile == NULL || pFocusedFile->Ext == NULL || *pFocusedFile->Ext == _T('\0'))
+    if (pFocusedFile == NULL || pFocusedFile->Ext == NULL || *pFocusedFile->Ext == L'\0')
     {
         return false;
     }
@@ -431,12 +438,16 @@ CAutomationPluginInterface::CAutomationPluginInterface() : m_aDirectories(4, 1)
     m_himlCold = NULL;
     m_bEnableDebugger = false;
 
-    GetModuleFileName(NULL, m_szSalDir, m_szSalDir.Size());
-    PTSTR pszNamePart = PathFindFileName(m_szSalDir);
-    if (pszNamePart)
+    if (SPLGetModuleFileNameOwned(NULL, m_szSalDir))
     {
-        *pszNamePart = _T('\0');
+        const std::wstring::size_type separator = m_szSalDir.find_last_of(L"\\/");
+        if (separator == std::wstring::npos)
+            m_szSalDir.clear();
+        else
+            m_szSalDir.resize(separator + 1);
     }
+    else
+        m_szSalDir.clear();
 }
 
 CAutomationPluginInterface::~CAutomationPluginInterface()
@@ -453,7 +464,7 @@ void CAutomationPluginInterface::Connect(
     pIcons = SalamanderGUI->CreateIconList();
     _ASSERTE(pIcons);
 
-    bLoaded = pIcons->CreateFromPNG(g_hInstance, MAKEINTRESOURCE(IDB_ICONSTRIP), 16);
+    bLoaded = pIcons->CreateFromPNG(g_hInstance, MAKEINTRESOURCEW(IDB_ICONSTRIP), 16);
     _ASSERTE(bLoaded);
     if (bLoaded)
     {
@@ -494,19 +505,17 @@ void CAutomationPluginInterface::Connect(
 
 void CAutomationPluginInterface::About(HWND parent)
 {
-    TCHAR szMessage[256];
-
-    StringCchPrintf(szMessage, _countof(szMessage),
-                    TEXT("%s ") TEXT(VERSINFO_VERSION) TEXT("\n\n")
-                        TEXT(VERSINFO_COPYRIGHT) TEXT("\n\n")
-                            TEXT("%s"),
-                    SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME),
-                    SalamanderGeneral->LoadStr(g_hLangInst, IDS_DESCRIPTION));
+    const std::wstring message = SPLFormatStringOwned(
+        L"%ls %ls\n\n%ls\n\n%ls",
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME).c_str(),
+        AUTOMATION_WIDEN(VERSINFO_VERSION),
+        AUTOMATION_WIDEN(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_DESCRIPTION).c_str());
 
     SalamanderGeneral->SalMessageBox(
         parent,
-        szMessage,
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABOUT),
+        message.c_str(),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ABOUT).c_str(),
         MB_OK | MB_ICONINFORMATION);
 }
 
@@ -534,8 +543,6 @@ void WINAPI CAutomationPluginInterface::LoadConfiguration(
 {
     DWORD dwVersion;
     DWORD dwArbitrary;
-    DIRECTORY_INFO dir;
-
     CALL_STACK_MESSAGE1("CAutomationPluginInterface::LoadConfiguration(, ,)");
 
     if (!hKey)
@@ -564,20 +571,21 @@ void WINAPI CAutomationPluginInterface::LoadConfiguration(
 
         if (registry->OpenKey(hKey, CONFIG_DIRECTORIES, hkDirs))
         {
-            TCHAR szValName[16];
+            wchar_t szValName[16];
             int iVal;
 
             bLoadDefaultDirs = false;
 
             for (iVal = 1;; iVal++)
             {
-                _itot_s(iVal, szValName, _countof(szValName), 10);
-                if (!registry->GetValue(hkDirs, szValName, REG_SZ, dir.szDirectory, _countof(dir.szDirectory)))
+                _itow_s(iVal, szValName, _countof(szValName), 10);
+                std::wstring directory;
+                if (!SPLRegistryGetStringOwned(registry, hkDirs, szValName, directory))
                 {
                     break;
                 }
 
-                m_aDirectories.Add(dir);
+                AddScriptDirectory(directory.c_str());
             }
 
             registry->CloseKey(hkDirs);
@@ -586,14 +594,9 @@ void WINAPI CAutomationPluginInterface::LoadConfiguration(
 
     if (bLoadDefaultDirs)
     {
-        dir.Set(_T("$[AppData]\\Sally\\Automation\\scripts"));
-        m_aDirectories.Add(dir);
-
-        dir.Set(_T("$[AllUsersProfile]\\Sally\\Automation\\scripts"));
-        m_aDirectories.Add(dir);
-
-        dir.Set(_T("$(SalDir)\\plugins\\automation\\scripts"));
-        m_aDirectories.Add(dir);
+        AddScriptDirectory(L"$[AppData]\\Sally\\Automation\\scripts");
+        AddScriptDirectory(L"$[AllUsersProfile]\\Sally\\Automation\\scripts");
+        AddScriptDirectory(L"$(SalDir)\\plugins\\automation\\scripts");
     }
 
     bool bLookupLoaded = false;
@@ -645,16 +648,16 @@ void WINAPI CAutomationPluginInterface::SaveConfiguration(
         HKEY hkDirs;
         if (registry->CreateKey(hKey, CONFIG_DIRECTORIES, hkDirs))
         {
-            TCHAR szValName[16];
+            wchar_t szValName[16];
             int iVal;
 
             registry->ClearKey(hkDirs);
 
             for (iVal = 0; iVal < m_aDirectories.Count; iVal++)
             {
-                _itot_s(iVal + 1, szValName, _countof(szValName), 10);
-                if (!registry->SetValue(hkDirs, szValName, REG_SZ,
-                                        m_aDirectories.At(iVal).szDirectory, -1))
+                _itow_s(iVal + 1, szValName, _countof(szValName), 10);
+                if (!SPLRegistrySetString(registry, hkDirs, szValName,
+                                          m_aDirectories.At(iVal)->Directory))
                 {
                     break;
                 }
@@ -695,40 +698,37 @@ void WINAPI CAutomationPluginInterface::Configuration(HWND hwndParent)
 }
 
 bool CAutomationPluginInterface::ExpandPath(
-    __in PCTSTR pszPath,
-    __out_ecount(cchMax) PTSTR pszExpanded,
-    __in int cchMax)
+    __in PCWSTR pszPath,
+    std::wstring& expanded)
 {
     static const CSalamanderVarStrEntry variables[] =
         {
-            _T("SalDir"),
-            ExpandSalDir,
-            NULL,
-            NULL,
+            {L"SalDir", ExpandSalDir},
+            {NULL, NULL},
         };
 
+    CSalamanderStringBufferOwner output;
     if (!SalamanderGeneral->ExpandVarString(
             NULL, // hwndParent
             pszPath,
-            pszExpanded,
-            cchMax,
+            output.Buffer(),
             variables,
             this))
     {
         return false;
     }
 
-    return true;
+    return output.GetValue(expanded);
 }
 
-/*static*/ PCTSTR CALLBACK CAutomationPluginInterface::ExpandSalDir(
+/*static*/ const wchar_t* CALLBACK CAutomationPluginInterface::ExpandSalDir(
     HWND hwndParent,
     void* pContext)
 {
     CAutomationPluginInterface* that = reinterpret_cast<CAutomationPluginInterface*>(pContext);
     _ASSERTE(that);
 
-    return that->m_szSalDir;
+    return that->m_szSalDir.empty() ? NULL : that->m_szSalDir.c_str();
 }
 
 void CAutomationPluginInterface::Event(int event, DWORD param)

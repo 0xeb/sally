@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "number_text.h"
+
 /*
 MP3, MP2 - MPEG 1 or MPEG 2 audio files, layer I, II or III
 OGG - OGG Vorbis Audio (competition to MP3) - Ogg Vorbis is a fully open, non-proprietary, patent-and-royalty-free, general-purpose compressed audio format for mid to high quality (8kHz-48.0kHz, 16+ bit, polyphonic) audio and music at fixed and variable bitrates from 16 to 128 kbps/channel. This places Vorbis in the same competitive class as audio representations such as MPEG-4 (AAC), and similar to, but higher performance than MPEG-1/2 audio layer 3, MPEG-4 audio (TwinVQ), WMA and PAC.
@@ -24,7 +26,6 @@ XM - Extended Module - Fast Tracker II
 // [0, 0] - for open viewer windows: the plugin configuration has changed
 #define WM_USER_VIEWERCFGCHNG WM_APP + 3246
 // [0, 0] - for open viewer windows: the history needs to be pruned
-#define WM_USER_CLEARHISTORY WM_APP + 3247
 // [0, 0] - for open viewer windows: Salamander regenerated fonts, we have to call SetFont() on the lists
 #define WM_USER_SETTINGCHANGE WM_APP + 3248
 
@@ -36,19 +37,17 @@ enum
 
 #define KEY_DOWN(k) (GetAsyncKeyState(k) & 0x8000)
 
-char* FStr(const char* format, ...);
-char* LoadStr(int resID);
-bool IsUTF8Text(const char* s);
-char* AnsiToUTF8(const char* chars, int len);
-char* UTF8ToAnsi(const char* chars, int len);
-char* WideToAnsi(const wchar_t* chars, int len);
-wchar_t* AnsiToWide(const char* chars, int len);
-wchar_t* UTF8ToWide(const char* chars, int len);
-void ExecuteFile(const char* fname);
-BOOL GetOpenFileName(HWND parent, const char* title, char* filter, char* buffer, const char* ext, BOOL save);
+char* FormatDiagnostic(const char* format, ...);
+std::wstring FStrW(const wchar_t* format, ...);
 
-int ExportToHTML(const char* fname, COutput& Output);
-int ExportToXML(const char* fname, COutput& Output);
+std::wstring LangStr(int resID);
+bool IsUTF8Text(const char* s);
+void ExecuteFile(const wchar_t* fname);
+BOOL ShowOpenFileDialog(HWND parent, const wchar_t* title, const wchar_t* filter,
+                        std::wstring& fileName, const wchar_t* ext, BOOL save);
+
+int ExportToHTML(const wchar_t* fname, COutput& Output);
+int ExportToXML(const wchar_t* fname, COutput& Output);
 
 // general Salamander interface - valid from startup until the plugin shuts down
 extern CSalamanderGeneralAbstract* SalGeneral;
@@ -83,11 +82,11 @@ void MMViewerAbout(HWND parent);
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
-    virtual BOOL WINAPI ViewFile(const char* name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                  BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex);
-    virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name) { return TRUE; }
 };
 
 class CPluginInterface : public CPluginInterfaceAbstract
@@ -113,7 +112,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };

@@ -4,8 +4,11 @@
 
 #pragma once
 
-extern LPWSTR PatternHistory[MAX_HISTORY_ENTRIES];
-extern LPWSTR LookInHistory[MAX_HISTORY_ENTRIES];
+#include <string>
+#include <vector>
+
+extern std::vector<std::wstring> PatternHistory;
+extern std::vector<std::wstring> LookInHistory;
 
 //*********************************************************************************
 //
@@ -15,8 +18,8 @@ extern LPWSTR LookInHistory[MAX_HISTORY_ENTRIES];
 class CStatusBar : public CWindow
 {
 protected:
-    WCHAR Text[MAX_FULL_KEYNAME + 50];
-    int BaseLen;
+    std::wstring Text;
+    size_t BaseLen;
     BOOL Dirty;
     BOOL UpdateInIdle;
     CCS Section; // critical section for accessing the text buffer
@@ -34,9 +37,6 @@ public:
     void SetBase(LPCWSTR text, BOOL updateInIdle = FALSE);
     // append to the base set via SetBase
     void Set(LPCWSTR text, BOOL updateInIdle = FALSE);
-    // returns the complete string
-    //void Get(char *buf, int bufSize);
-
     void OnEnterIdle();
 
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -60,8 +60,8 @@ public:
 
 struct CFoundFilesData
 {
-    LPWSTR Name;
-    LPWSTR Path;
+    std::wstring Name;
+    std::wstring Path;
     DWORD Type;
     DWORD Size;
     DWORD_PTR Data;
@@ -73,7 +73,6 @@ struct CFoundFilesData
 
     CFoundFilesData()
     {
-        Path = Name = NULL;
         Data = NULL;
         Allocated = 0;
         IsDir = FALSE;
@@ -81,22 +80,12 @@ struct CFoundFilesData
     CFoundFilesData(LPWSTR name, int root, LPWSTR key, DWORD type,
                     DWORD size, unsigned char* data,
                     FILETIME time, BOOL isDir);
-    //CFoundFilesData(CFoundFilesData & orig);
     ~CFoundFilesData()
     {
-        if (Name)
-            free(Name);
-        if (Path)
-            free(Path);
         if (Allocated && Data)
             free((void*)Data);
     }
-    /*
-  BOOL Set(const char * name, const char * volume, const char * path,
-           QWORD size, FILETIME time, DWORD attributes, BOOL isDir);
-  */
-    LPWSTR GetText(int i, LPWSTR buffer);
-    //char *GetFullPath(char *buffer, int size, BOOL skipName = FALSE);
+    LPCWSTR GetText(int i, std::wstring& buffer);
 };
 
 #define SYMBOL_CX 16 // bitmap dimensions
@@ -175,7 +164,7 @@ class CComboboxEdit: public CWindow
 class CFindDialog : public CDialogEx
 {
 protected:
-    LPWSTR LookInInit;
+    std::wstring LookInInit;
 
     // layout parameters
     int MinDlgW;
@@ -200,8 +189,8 @@ protected:
     //CComboboxEdit * LookIn;
 
     // query parameters
-    WCHAR Pattern[MAX_KEYNAME];
-    TIndirectArray<WCHAR> LookInList;
+    std::wstring Pattern;
+    std::vector<std::wstring> LookInList;
     BOOL IncludeSubkeys;
     BOOL LookAtKeys;
     BOOL LookAtValues;
@@ -218,12 +207,12 @@ protected:
     int FoundVisibleCount;
     DWORD NextUpdate;
     BOOL CloseWhenSearchFinishes;
-    WCHAR LVItemTextBuffer[100];
+    std::wstring LVItemTextBuffer;
     BOOL Stopped;
     BOOL ShowOptions;
 
 public:
-    CFindDialog(LPWSTR lookInInit);
+    explicit CFindDialog(const wchar_t* lookInInit);
     virtual ~CFindDialog() { ; }
     void SetZeroOnDestroy(CFindDialog** zeroOnDestroy) { ZeroOnDestroy = zeroOnDestroy; }
 
@@ -249,11 +238,11 @@ protected:
 
 class CFindDialogThread : public CThread
 {
-    WCHAR LookIn[MAX_FULL_KEYNAME];
+    std::wstring LookIn;
 
 public:
-    CFindDialogThread(LPWSTR lookIn)
-        : CThread("CFindDialogThread") { wcscpy(LookIn, lookIn); }
+    explicit CFindDialogThread(const wchar_t* lookIn)
+        : CThread(L"CFindDialogThread"), LookIn(lookIn != NULL ? lookIn : L"") {}
     virtual unsigned Body();
 };
 
@@ -264,9 +253,9 @@ public:
 
 class CFindThread : public CThread
 {
-    TIndirectArray<WCHAR>& LookIn;
-    char PatternA[MAX_KEYNAME];
-    char PatternW[MAX_KEYNAME * 2];
+    std::vector<std::wstring> LookIn;
+    std::string PatternA;
+    std::vector<char> PatternW;
     int PatternALen, PatternWLen;
     BOOL IncludeSubkeys;
     BOOL LookAtKeys;
@@ -283,7 +272,7 @@ class CFindThread : public CThread
     HANDLE CancelEvent;
 
     // used to translate a Unicode string when searching with a regexp
-    TBuffer<char> AsciiBuffer;
+    std::string AsciiBuffer;
 
     CSalamanderBMSearchData* BMForPatternA;
     CSalamanderBMSearchData* BMForPatternW;
@@ -292,21 +281,21 @@ class CFindThread : public CThread
     DWORD NextStatusUpdate;
 
 public:
-    CFindThread(TIndirectArray<WCHAR>& lookIn,
-                char* patternA, int patternALen,
-                char* patternW, int patternWLen,
+    CFindThread(const std::vector<std::wstring>& lookIn,
+                const std::string& patternA,
+                const std::vector<char>& patternW,
                 BOOL includeSubkeys, BOOL lookAtKeys, BOOL lookAtValues,
                 BOOL lookAtData, BOOL caseSensitive, BOOL wholeWords,
                 BOOL regExp, QWORD number, BOOL useNumber,
                 BOOL useMinTime, BOOL useMaxTime,
                 SYSTEMTIME& minTime, SYSTEMTIME& maxTime,
                 CFindDialog* findDlg, HANDLE cancelEvent)
-        : CThread("CFindThread"), LookIn(lookIn)
+        : CThread(L"CFindThread"), LookIn(lookIn)
     {
-        memcpy(PatternA, patternA, patternALen);
-        memcpy(PatternW, patternW, patternWLen);
-        PatternALen = patternALen;
-        PatternWLen = patternWLen;
+        PatternA = patternA;
+        PatternW = patternW;
+        PatternALen = static_cast<int>(PatternA.size());
+        PatternWLen = static_cast<int>(PatternW.size());
         IncludeSubkeys = includeSubkeys;
         LookAtKeys = lookAtKeys;
         LookAtValues = lookAtValues;
@@ -339,11 +328,12 @@ public:
 
     BOOL TestTime(FILETIME& ft);
     BOOL Test(char* text, int len, BOOL name, DWORD type);
-    BOOL ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErrors,
-                    LPWSTR nameBuffer, TIndirectArray<WCHAR>& stack);
-    BOOL ScanKey(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErrors,
-                 LPWSTR nameBuffer, TIndirectArray<WCHAR>& stack);
+    BOOL ScanKeyAux(int root, std::wstring& key, BOOL& skip, BOOL& skipAllErrors,
+                    std::vector<std::wstring>& stack);
+    BOOL ScanKey(int root, std::wstring& key, BOOL& skip, BOOL& skipAllErrors,
+                 std::vector<std::wstring>& stack);
     BOOL ScanRegistry(BOOL& skipAllErrors);
     BOOL Init();
+    unsigned BodyCore();
     virtual unsigned Body();
 };

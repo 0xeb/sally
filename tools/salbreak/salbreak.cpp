@@ -4,12 +4,12 @@
 #include <windows.h>
 #include <Sddl.h>
 
+#include <string>
+
 #include "resource.h"
 #include "salbreak.h"
 #include "tasklist.h"
 #include "md5.h"
-
-#define MAX_LOADSTRING 100
 
 #define NOHANDLES(function) function // obrana proti zanaseni maker HANDLES do zdrojaku pomoci CheckHnd
 
@@ -19,9 +19,10 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_E(str) __TraceEmptyFunction()
 
 // Global Variables:
-HINSTANCE hInst;                     // current instance
-TCHAR szTitle[MAX_LOADSTRING];       // The title bar text
-TCHAR szWindowClass[MAX_LOADSTRING]; // The title bar text
+HINSTANCE hInst; // current instance
+std::wstring Title;
+std::wstring WindowClass;
+std::wstring HelloText;
 
 // Foward declarations of functions included in this code module:
 ATOM MyRegisterClass(HINSTANCE hInstance);
@@ -30,6 +31,14 @@ LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK About(HWND, UINT, WPARAM, LPARAM);
 
 HWND HMainWindow = NULL;
+
+static std::wstring LoadStringOwned(HINSTANCE instance, UINT id)
+{
+    const wchar_t* resourceText = NULL;
+    const int length = LoadStringW(instance, id,
+                                   reinterpret_cast<wchar_t*>(&resourceText), 0);
+    return length > 0 ? std::wstring(resourceText, static_cast<size_t>(length)) : std::wstring();
+}
 
 void BreakAllSalamanders()
 {
@@ -57,8 +66,9 @@ int WINAPI WinMain(HINSTANCE hInstance,
     HACCEL hAccelTable;
 
     // Initialize global strings
-    LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadString(hInstance, IDC_SALBREAK, szWindowClass, MAX_LOADSTRING);
+    Title = LoadStringOwned(hInstance, IDS_APP_TITLE);
+    WindowClass = LoadStringOwned(hInstance, IDC_SALBREAK);
+    HelloText = LoadStringOwned(hInstance, IDS_HELLO);
     MyRegisterClass(hInstance);
 
     // Perform application initialization:
@@ -69,10 +79,10 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
     RegisterHotKey(HMainWindow, 0x0001, MOD_ALT | MOD_CONTROL | MOD_SHIFT, VK_F12);
 
-    hAccelTable = LoadAccelerators(hInstance, (LPCTSTR)IDC_SALBREAK);
+    hAccelTable = LoadAcceleratorsW(hInstance, MAKEINTRESOURCEW(IDC_SALBREAK));
 
     // Main message loop:
-    while (GetMessage(&msg, NULL, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         if (msg.message == WM_HOTKEY && msg.wParam == 0x0001)
         {
@@ -82,13 +92,13 @@ int WINAPI WinMain(HINSTANCE hInstance,
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
     UnregisterHotKey(HMainWindow, 0x0001);
 
-    return msg.wParam;
+    return static_cast<int>(msg.wParam);
 }
 
 //
@@ -98,7 +108,7 @@ int WINAPI WinMain(HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
-    WNDCLASSEX wcex;
+    WNDCLASSEXW wcex;
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
@@ -107,14 +117,14 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbClsExtra = 0;
     wcex.cbWndExtra = 0;
     wcex.hInstance = hInstance;
-    wcex.hIcon = LoadIcon(hInstance, (LPCTSTR)IDI_SALBREAK);
-    wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wcex.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SALBREAK));
+    wcex.hCursor = LoadCursorW(NULL, IDC_ARROW);
     wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wcex.lpszMenuName = (LPCSTR)IDC_SALBREAK;
-    wcex.lpszClassName = szWindowClass;
-    wcex.hIconSm = LoadIcon(wcex.hInstance, (LPCTSTR)IDI_SMALL);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_SALBREAK);
+    wcex.lpszClassName = WindowClass.c_str();
+    wcex.hIconSm = LoadIconW(wcex.hInstance, MAKEINTRESOURCEW(IDI_SMALL));
 
-    return RegisterClassEx(&wcex);
+    return RegisterClassExW(&wcex);
 }
 
 //
@@ -133,8 +143,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
     hInst = hInstance; // Store instance handle in our global variable
 
-    hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-                        CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+    hWnd = CreateWindowW(WindowClass.c_str(), Title.c_str(), WS_OVERLAPPEDWINDOW,
+                         CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
     if (!hWnd)
     {
@@ -164,9 +174,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     int wmId, wmEvent;
     PAINTSTRUCT ps;
     HDC hdc;
-    TCHAR szHello[MAX_LOADSTRING];
-    LoadString(hInst, IDS_HELLO, szHello, MAX_LOADSTRING);
-
     switch (message)
     {
     case WM_COMMAND:
@@ -176,13 +183,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         switch (wmId)
         {
         case IDM_ABOUT:
-            DialogBox(hInst, (LPCTSTR)IDD_ABOUTBOX, hWnd, (DLGPROC)About);
+            DialogBoxW(hInst, MAKEINTRESOURCEW(IDD_ABOUTBOX), hWnd, (DLGPROC)About);
             break;
         case IDM_EXIT:
             DestroyWindow(hWnd);
             break;
         default:
-            return DefWindowProc(hWnd, message, wParam, lParam);
+            return DefWindowProcW(hWnd, message, wParam, lParam);
         }
         break;
     case WM_PAINT:
@@ -190,14 +197,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         // TODO: Add any drawing code here...
         RECT rt;
         GetClientRect(hWnd, &rt);
-        DrawText(hdc, szHello, lstrlen(szHello), &rt, DT_CENTER);
+        DrawTextW(hdc, HelloText.c_str(), static_cast<int>(HelloText.size()), &rt, DT_CENTER);
         EndPaint(hWnd, &ps);
         break;
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
     default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProcW(hWnd, message, wParam, lParam);
     }
     return 0;
 }

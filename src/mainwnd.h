@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "common/unicode/helpers.h" // AnsiToWide/WideToAnsi for the narrow hot-path accessors
+
 #define HOT_PATHS_COUNT 30
 
 #define TASKBAR_ICON_ID 0x0000
@@ -11,10 +13,10 @@
 extern const int SPLIT_LINE_WIDTH;
 extern const int MIN_WIN_WIDTH;
 
-struct CCommandLineParams;
+#include "common/CommandLineParser.h"
 
 // if the user disallows multiple instances, just activate the previous one
-BOOL CheckOnlyOneInstance(const CCommandLineParams* cmdLineParams);
+BOOL CheckOnlyOneInstance(const sally::cmdline::CommandLineRequest* request);
 
 // sends the WM_USER_CFGCHANGED message to open internal viewer and find windows
 void BroadcastConfigChanged();
@@ -43,8 +45,6 @@ class CMenuBar;
 class CMenuNew;
 class CToolTip;
 class CAnimate;
-class CPathBuffer;
-
 //****************************************************************************
 //
 // CToolTipWindow
@@ -68,18 +68,20 @@ protected:
 // CHotPathItem
 //
 
-// used in the configuration dialog and specifies the maximum allowed length of CHotPathItem::Path
-// we keep some margin because the path may contain long variables that will "shrink" to just a few characters after expansion,
-// for example $[SystemDrive] -> C:
-#define HOTPATHITEM_MAXPATH (4 * MAX_PATH)
-
 struct CHotPathItem
 {
-    // Name and Path use std::string to support unlimited length
-    // moreover, in the case of Path, MAX_PATH would be too small (escaping + variables)
-    std::string Name; // name under which the path appears in the menu
-    std::string Path; // path escaped (double '$' characters) for variables like $(SalDir), etc.
-    BOOL Visible;     // is the path present in the ChangeDrive menu
+    // WIDE-PRIMARY. Name and Path are the truth; the narrow
+    // accessors below convert on the way out.
+    //
+    // Why it matters: a hot path pointing at a Unicode directory used to be
+    // stored, persisted and re-opened through CP_ACP, so it either failed to open
+    // or opened a DIFFERENT directory whose name narrowed the same way. std::wstring
+    // also keeps the unlimited length the original std::string was chosen for -
+    // MAX_PATH is far too small here because the path carries escaping and
+    // variables like $(SalDir).
+    std::wstring Name; // name under which the path appears in the menu
+    std::wstring Path; // path escaped (double '$' characters) for variables like $(SalDir), etc.
+    BOOL Visible;      // is the path present in the ChangeDrive menu
 
     CHotPathItem()
     {
@@ -125,55 +127,48 @@ public:
             Items[i].Empty();
     }
 
-    // sets the attributes
-    void Set(DWORD index, const char* name, const char* path)
+    // Wide setters are the real ones.
+    void SetW(DWORD index, const wchar_t* name, const wchar_t* path)
     {
-        Items[index].Name = name ? name : "";
-        Items[index].Path = path ? path : "";
+        Items[index].Name = name ? name : L"";
+        Items[index].Path = path ? path : L"";
     }
 
-    void Set(DWORD index, const char* name, const char* path, BOOL visible)
+    void SetW(DWORD index, const wchar_t* name, const wchar_t* path, BOOL visible)
     {
-        Set(index, name, path);
+        SetW(index, name, path);
         Items[index].Visible = visible;
     }
 
-    void SetPath(DWORD index, const char* path)
+    void SetPathW(DWORD index, const wchar_t* path)
     {
-        Items[index].Path = path ? path : "";
+        Items[index].Path = path ? path : L"";
     }
+
+    // The narrow setters are gone. Legacy configuration is imported by Load(), while Save()
+    // writes only the authoritative UTF-16 values.
 
     void SetVisible(DWORD index, BOOL visible)
     {
         Items[index].Visible = visible;
     }
 
-    void GetName(int index, char* buffer, int bufferSize)
+    // Wide getters return the stored truth directly - no buffer, no
+    // truncation, no conversion.
+    const std::wstring& GetNameW(int index) const
     {
-        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Name.empty())
-        {
-            if (bufferSize > 0)
-                *buffer = 0;
-        }
-        else
-        {
-            if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Name.c_str(), bufferSize);
-        }
+        static const std::wstring empty;
+        if (index < 0 || index >= HOT_PATHS_COUNT)
+            return empty;
+        return Items[index].Name;
     }
 
-    void GetPath(int index, char* buffer, int bufferSize)
+    const std::wstring& GetPathW(int index) const
     {
-        if (index < 0 || index >= HOT_PATHS_COUNT || Items[index].Path.empty())
-        {
-            if (bufferSize > 0)
-                *buffer = 0;
-        }
-        else
-        {
-            if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Path.c_str(), bufferSize);
-        }
+        static const std::wstring empty;
+        if (index < 0 || index >= HOT_PATHS_COUNT)
+            return empty;
+        return Items[index].Path;
     }
 
     int GetNameLen(int index)
@@ -196,7 +191,7 @@ public:
     int GetUnassignedHotPathIndex();
 
     BOOL GetVisible(int index) { return Items[index].Visible; }
-    BOOL CleanName(char* name); // trims spaces and returns TRUE if the name is valid
+    BOOL CleanName(std::wstring& name); // trims spaces and returns TRUE if the name is valid
 
     BOOL SwapItems(int index1, int index2); // swaps two items in the array
 
@@ -225,13 +220,13 @@ public:
 // UM_GetNextFileName - function type that gradually returns file names for U.M.
 //
 // index - order of the next name (starting from zero and increasing by one)
-// path  - buffer for the path [MAX_PATH]
-// name  - buffer for the file name [MAX_PATH]
+// path  - receives the exact path
+// name  - receives the exact file name
 // param - helper pointer for user data
 //
 // returns success - continue retrieving more names? (returns FALSE - ends the enumeration)
 
-typedef BOOL (*UM_GetNextFileName)(int index, char* path, char* name, void* param);
+typedef BOOL (*UM_GetNextFileName)(int index, std::wstring& path, std::wstring& name, void* param);
 
 struct CUMDataFromPanel
 {
@@ -252,7 +247,7 @@ struct CUMDataFromPanel
     }
 };
 
-BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param);
+BOOL GetNextFileFromPanel(int index, std::wstring& path, std::wstring& name, void* param);
 
 struct CUserMenuAdvancedData;
 struct IContextMenu2;
@@ -307,7 +302,6 @@ enum CMainWindowsHitTestEnum
 
 struct CChangeNotifData
 {
-    char Path[MAX_PATH];
     wchar_t* PathW;
     BOOL IncludingSubdirs;
 };
@@ -322,7 +316,7 @@ typedef TDirectArray<CChangeNotifData> CChangeNotifArray;
 
 struct CDynString
 {
-    char* Buffer;
+    wchar_t* Buffer;
     int Length;
     int Allocated;
 
@@ -339,9 +333,9 @@ struct CDynString
             free(Buffer);
     }
 
-    BOOL Append(const char* str, int len); // returns TRUE on success; if 'len' is -1 the length is calculated using "len = strlen(str)"
+    BOOL Append(const wchar_t* str, int len); // returns TRUE on success; if 'len' is -1 the length is calculated using "len = wcslen(str)"
 
-    const char* GetString() const { return Buffer; }
+    const wchar_t* GetString() const { return Buffer; }
 };
 
 // flags for CompareDirectories methods
@@ -403,7 +397,7 @@ public:
     CMenuNew* ContextMenuNew;          // handles commands from the New menu
     IContextMenu2* ContextMenuChngDrv; // handles commands from the Change Drive Menu
 
-    CPathBuffer SelectionMask; // mask for select/deselect
+    std::wstring SelectionMask; // mask for select/deselect
 
     BOOL CanClose;                    // can the main window be closed? (has the application fully started?)
     BOOL CanCloseButInEndSuspendMode; // TRUE if CanClose was TRUE but is temporarily FALSE because a message loop is running while processing WM_USER_END_SUSPMODE
@@ -443,7 +437,7 @@ public:
 
     BOOL LockedUI;
     HWND LockedUIToolWnd;
-    std::string LockedUIReason;
+    std::wstring LockedUIReason;
 
     CITaskBarList3 TaskBarList3; // controls progress on the taskbar since Windows 7
 
@@ -484,7 +478,6 @@ public:
     // changes may occur in subdirectories as well); the information is distributed to panels
     // and to all opened FS from plugins (both panels and FS can respond by refreshing their content);
     // can be called from any thread
-    void PostChangeOnPathNotification(const char* path, BOOL includingSubdirs);
     void PostChangeOnPathNotificationW(const wchar_t* path, BOOL includingSubdirs);
 
     // these functions have no effect if CFilesWindow::CanBeFocused is not satisfied
@@ -496,15 +489,10 @@ public:
     void CompareDirectories(DWORD flags); // flags are a combination of COMPARE_DIRECTORIES_xxx
 
     // ensures DirHistory->AddPathUnique is called and correctly updates the panel's SetHistory
-    // pathOrArchiveOrFSNameW / archivePathOrFSUserPartW carry the wide source-of-truth so the
-    // history can replay through ChangePathToDiskW / ChangePathToArchiveW; pass nullptr when
-    // only the ANSI byte stream is available (plugin FS today).
-    void DirHistoryAddPathUnique(int type, const char* pathOrArchiveOrFSName,
-                                 const char* archivePathOrFSUserPart, HICON hIcon,
+    void DirHistoryAddPathUnique(int type, const wchar_t* pathOrArchiveOrFSName,
+                                 const wchar_t* archivePathOrFSUserPart, HICON hIcon,
                                  CPluginFSInterfaceAbstract* pluginFS,
-                                 CPluginFSInterfaceEncapsulation* curPluginFS,
-                                 const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                                 const wchar_t* archivePathOrFSUserPartW = nullptr);
+                                 CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // ensures DirHistory->RemoveActualPath is called and correctly updates the panel's SetHistory
     void DirHistoryRemoveActualPath(CFilesWindow* panel);
@@ -521,22 +509,23 @@ public:
     void ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs);
 
     void SaveConfig(HWND parent = NULL); // parent: NULL = MainWindow->HWindow
-    BOOL LoadConfig(BOOL importingOldConfig, const CCommandLineParams* cmdLineParams);
-    void SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const char* reg);
-    void LoadPanelConfig(CPathBuffer& panelPath, std::wstring& panelPathW, CFilesWindow* panel, HKEY hSalamander, const char* reg);
+    BOOL LoadConfig(BOOL importingOldConfig, const sally::cmdline::CommandLineRequest* request);
+    // wide subkey name: this region is on the wide registry facades
+    void SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg);
+    void LoadPanelConfig(std::wstring& panelPath, CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg);
     void DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoImportConfig,
-                                 const char* autoImportConfigFromKey, BOOL doNotDeleteImportedCfg);
+                                 const wchar_t* autoImportConfigFromKey, BOOL doNotDeleteImportedCfg);
 
     void UserMenu(HWND parent, int itemIndex, UM_GetNextFileName getNextFile, void* data,
                   CUserMenuAdvancedData* userMenuAdvancedData);
 
     // sets the hot path 'path' with index 'index'; receives a valid path without doubled '$' or variables
-    void SetUnescapedHotPath(int index, const char* path);
+    void SetUnescapedHotPath(int index, const wchar_t* path);
 
     // expands the hot path with index 'index' into 'buffer' of size 'bufferSize'
     // 'hParent' -- errors during path expansion will be shown for this window; if NULL, errors are suppressed
     // returns TRUE if the path was successfully obtained, otherwise FALSE
-    BOOL GetExpandedHotPath(HWND hParent, int index, char* buffer, int bufferSize);
+    BOOL GetExpandedHotPath(HWND hParent, int index, std::wstring& path);
 
     // returns the index of an unassigned hot path or -1 if all are assigned
     int GetUnassignedHotPathIndex();
@@ -551,7 +540,7 @@ public:
     // active panel path is preferred (and later written to DefaultDir), otherwise
     // the non-active panel path has priority
     void UpdateDefaultDir(BOOL activePrefered);
-    void SetDefaultDirectories(const char* curPath = NULL);
+    void SetDefaultDirectories(const wchar_t* curPath = NULL);
 
     HWND GetActivePanelHWND();
     int GetDirectoryLineHeight();
@@ -566,7 +555,7 @@ public:
     HWND GetEditLineHWND(BOOL disableSkip = FALSE);
 
     // returns TRUE if the key was handled
-    BOOL HandleCtrlLetter(char c); // Ctrl+letter hotkeys
+    BOOL HandleCtrlLetter(wchar_t c); // Ctrl+letter hotkeys
 
     void LayoutWindows();
     BOOL ToggleTopToolBar(BOOL storePos = TRUE);
@@ -595,7 +584,6 @@ public:
 
     void AddTrayIcon(BOOL updateIcon = FALSE);
     void RemoveTrayIcon();
-    void SetTrayIconText(const char* text);
     void SetTrayIconTextW(const wchar_t* text);
 
     // fills the menu with UserMenuItems items
@@ -613,10 +601,10 @@ public:
     void MakeFileList();
 
     // helper method for SetTitle; 'text' must be at least 2 * MAX_PATH characters long
-    void GetFormatedPathForTitle(char* text);
+    std::wstring GetFormatedPathForTitle();
 
     // if 'text' == NULL the default content will be set
-    void SetWindowTitle(const char* text = NULL);
+    void SetWindowTitle(const wchar_t* text = NULL);
 
     // sets the main window icon according to MainWindowIconIndex
     void SetWindowIcon();
@@ -717,14 +705,14 @@ public:
 
     void SafeHandleMenuChngDrvMsg2(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT* plResult);
 
-    void ApplyCommandLineParams(const CCommandLineParams* params, BOOL setActivePanelAndPanelPaths = TRUE);
+    void ApplyCommandLineParams(const sally::cmdline::CommandLineRequest* request,
+                                BOOL setActivePanelAndPanelPaths = TRUE);
 
-    void LockUI(BOOL lock, HWND hToolWnd, const char* lockReason);
+    void LockUI(BOOL lock, HWND hToolWnd, const wchar_t* lockReason);
     BOOL HasLockedUI() { return LockedUI; }
     void BringLockedUIToolWnd();
 
     CFilesWindow* GetPanel(int panel);
-    void PostFocusNameInPanel(int panel, const char* path, const char* name);
 
     friend void CMainWindow_RefreshCommandStates(CMainWindow* obj);
 };

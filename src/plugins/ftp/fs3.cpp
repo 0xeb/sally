@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -29,14 +29,16 @@ BOOL CPluginFSInterface::TryCloseOrDetach(BOOL forceClose, BOOL canDetach, BOOL&
                 if (!Config.AlwaysNotCloseCon)
                 {
                     MSGBOXEX_PARAMS params;
+                    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
+                    const std::wstring text = LangStr(IDS_CLOSECONINPANEL);
+                    const std::wstring checkBoxText = LangStr(IDS_ALWAYSNOTCLOSE);
                     memset(&params, 0, sizeof(params));
                     params.HParent = SalamanderGeneral->GetMsgBoxParent();
                     params.Flags = MSGBOXEX_YESNOCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                    params.Text = LoadStr(IDS_CLOSECONINPANEL);
-                    params.CheckBoxText = LoadStr(IDS_ALWAYSNOTCLOSE);
+                    params.Caption = caption.c_str();
+                    params.Text = text.c_str();
+                    params.CheckBoxText = checkBoxText.c_str();
                     params.CheckBoxValue = &Config.AlwaysNotCloseCon;
-                    char buffer[100];
                     /* used by the export_mnu.py script that generates salmenu.mnu for the Translator
    we let the message box buttons handle hotkey collisions by simulating that this is a menu
 MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
@@ -47,9 +49,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-                    sprintf(buffer, "%d\t%s\t%d\t%s", DIALOG_YES, LoadStr(IDS_DISCONNECTBUTTON),
-                            DIALOG_NO, LoadStr(IDS_KEEPCONBUTTON));
-                    params.AliasBtnNames = buffer;
+                    const std::wstring aliasBtnNames = SPLFormatStringOwned(
+                        L"%d\t%s\t%d\t%s", DIALOG_YES, LangStr(IDS_DISCONNECTBUTTON).c_str(),
+                        DIALOG_NO, LangStr(IDS_KEEPCONBUTTON).c_str());
+                    params.AliasBtnNames = aliasBtnNames.c_str();
                     res = SalamanderGeneral->SalMessageBoxEx(&params);
                     // redraw the main window (so the user does not stare at the rest of the dialog during the entire disconnect)
                     UpdateWindow(SalamanderGeneral->GetMainWindowHWND());
@@ -67,13 +70,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (Config.DisconnectCommandUsed && !Config.AlwaysDisconnect && !IsDetached)
                 {
                     MSGBOXEX_PARAMS params;
+                    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
+                    const std::wstring text = LangStr(IDS_WANTDISCONNECT);
+                    const std::wstring checkBoxText = LangStr(IDS_ALWAYSCLOSE);
                     memset(&params, 0, sizeof(params));
                     params.HParent = SalamanderGeneral->GetMsgBoxParent();
                     params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED |
                                    MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-                    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                    params.Text = LoadStr(IDS_WANTDISCONNECT);
-                    params.CheckBoxText = LoadStr(IDS_ALWAYSCLOSE);
+                    params.Caption = caption.c_str();
+                    params.Text = text.c_str();
+                    params.CheckBoxText = checkBoxText.c_str();
                     params.CheckBoxValue = &Config.AlwaysDisconnect;
                     res = SalamanderGeneral->SalMessageBoxEx(&params);
                     // redraw the main window (so the user does not stare at the rest of the dialog during the entire disconnect)
@@ -117,7 +123,7 @@ void CPluginFSInterface::Event(int event, DWORD param)
     case FSE_DETACHED:
     {
         if (ControlConnection != NULL)
-            ControlConnection->LogMessage(LoadStr(IDS_LOGMSGDETACHED), -1, TRUE);
+            ControlConnection->LogMessage(LangStr(IDS_LOGMSGDETACHED).c_str(), -1, TRUE);
         Logs.RefreshListOfLogsInLogsDlg();
         IsDetached = TRUE;
         break;
@@ -143,7 +149,7 @@ void CPluginFSInterface::Event(int event, DWORD param)
 
     case FSE_ATTACHED:
         if (ControlConnection != NULL)
-            ControlConnection->LogMessage(LoadStr(IDS_LOGMSGATTACHED), -1, TRUE);
+            ControlConnection->LogMessage(LangStr(IDS_LOGMSGATTACHED).c_str(), -1, TRUE);
         // break;  // should not be here
     case FSE_OPENED:
     {
@@ -192,7 +198,8 @@ void CPluginFSInterface::Event(int event, DWORD param)
 
     case FSE_PATHCHANGED:
     {
-        LPCTSTR pToolTip = NULL;
+        const wchar_t* pToolTip = NULL;
+        std::wstring toolTip;
         BOOL bLocked = FALSE, bShow = FALSE;
 
         if (ControlConnection)
@@ -202,7 +209,11 @@ void CPluginFSInterface::Event(int event, DWORD param)
             {
                 bShow = TRUE;
                 bLocked = cert->IsVerified();
-                pToolTip = LoadStr(bLocked ? IDS_SSL_SECURITY_OK : IDS_SSL_SECURITY_UNVERIFIED);
+                // LoadStr(...)+ToWideArg was a double round trip -
+                // SalamanderGeneral->LoadStr is the real wide source LoadStr narrows.
+                toolTip = SPLLoadStrOwned(SalamanderGeneral, HLanguage,
+                                          bLocked ? IDS_SSL_SECURITY_OK : IDS_SSL_SECURITY_UNVERIFIED);
+                pToolTip = toolTip.c_str();
                 cert->Release();
             }
         }
@@ -266,26 +277,32 @@ CPluginFSInterface::GetSupportedServices()
            FS_SERVICE_SHOWSECURITYINFO;
 }
 
-BOOL CPluginFSInterface::GetChangeDriveOrDisconnectItem(const char* fsName, char*& title, HICON& icon, BOOL& destroyIcon)
+BOOL CPluginFSInterface::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title, HICON& icon, BOOL& destroyIcon) try
 {
-    char txt[FTP_USERPART_SIZE + 50]; // user part + space for the fs-name + space for doubling a few ampersands
-    // the text will be the path to the FS (in the Salamander format)
-    txt[0] = '\t';
-    sprintf(txt + 1, "%s:", fsName);
-    static char emptyBuff[] = "";
-    MakeUserPart(txt + strlen(txt), FTP_USERPART_SIZE, emptyBuff);
-    int l = (int)strlen(txt);
-    if (l > 0 && txt[l - 1] == '/')
-        txt[l - 1] = 0; // trim '/' from the end of the path (it must be "relative")
-    // double any '&' so that the path prints correctly
-    SalamanderGeneral->DuplicateAmpersands(txt, FTP_USERPART_SIZE + 50);
-    title = SalamanderGeneral->DupStr(txt);
+    std::wstring userPartText;
+    if (!BuildUserPartText(userPartText, ""))
+        return FALSE;
+
+    std::wstring text = L"\t";
+    text.append(fsName != NULL ? fsName : L"");
+    text.push_back(L':');
+    text.append(userPartText);
+    if (!text.empty() && text.back() == L'/')
+        text.pop_back(); // trim '/' from the end of the path (it must be "relative")
+    for (size_t at = 0; (at = text.find(L'&', at)) != std::wstring::npos; at += 2)
+        text.insert(at, 1, L'&');
+    title = SalamanderGeneral->DupStr(text.c_str());
     if (title == NULL)
         return FALSE; // low memory, no item will be added
 
     icon = FTPIcon;
     destroyIcon = FALSE;
     return TRUE;
+}
+catch (...)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return FALSE;
 }
 
 HICON
@@ -295,35 +312,35 @@ CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
     return FTPIcon;
 }
 
-BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
 {
     if (DirLineHotPathType == ftpsptEmpty && ControlConnection != NULL)
     { // based on the current path in the FS determine the path type in the Directory Line
-        DirLineHotPathType = ControlConnection->GetFTPServerPathType(Path);
-        DirLineHotPathUserLength = FTPGetUserLength(User);
+        DirLineHotPathType = ControlConnection->GetFTPServerPathType(Path.c_str());
+        DirLineHotPathUserLength = FTPGetUserLengthW(User.c_str());
     }
 
-    const char* end = text + pathLen;
-    const char* root = text; // pointer past the root path
-    while (*root != 0 && *root != ':')
+    const wchar_t* end = text + pathLen;
+    const wchar_t* root = text; // pointer past the root path
+    while (*root != 0 && *root != L':')
         root++; // skip the fs-name
-    if (*root == ':')
+    if (*root == L':')
     {
-        root = FTPFindPath(root + 1, DirLineHotPathUserLength);
-        if (*root == '/' || *root == '\\')
+        root = FTPFindPathW(root + 1, DirLineHotPathUserLength);
+        if (*root == L'/' || *root == L'\\')
             root++;                          // skip the first '/' or '\\' from the path
         if (DirLineHotPathType == ftpsptOS2) // for OS/2 paths skip the disk root ("C:/") as well
         {
-            while (root < end && *root != '/' && *root != '\\')
+            while (root < end && *root != L'/' && *root != L'\\')
                 root++;
-            if (*root == '/' || *root == '\\')
+            if (*root == L'/' || *root == L'\\')
                 root++; // skip '/' or '\\' from the disk root path
         }
         if (DirLineHotPathType == ftpsptTandem) // for Tandem paths skip the "system" ("\\SYSTEM"), a shorter path makes no sense
-            while (root < end && *root != '.')
+            while (root < end && *root != L'.')
                 root++;
     }
-    const char* s = text + offset;
+    const wchar_t* s = text + offset;
     if (s >= end)
     {
         DirLineHotPathType = ftpsptEmpty; // end of hot-text detection
@@ -338,12 +355,12 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
         {
         case ftpsptOpenVMS: // "PUB$DEVICE:[PUB.VMS.DIR2]"
         {                   // the separator is a dot, "^." is an escape sequence for '.'
-            if (*s == '.')
+            if (*s == L'.')
                 s++;
             BOOL vmsEsc = FALSE;
             while (s < end)
             {
-                if (*s == '^')
+                if (*s == L'^')
                     vmsEsc = !vmsEsc;
                 else
                 {
@@ -351,13 +368,13 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
                         vmsEsc = FALSE;
                     else
                     {
-                        if (*s == '.')
+                        if (*s == L'.')
                             break;
                     }
                 }
                 s++;
             }
-            if (*s == '.' && *(s + 1) == ']')
+            if (*s == L'.' && *(s + 1) == L']')
                 s = end;
             break;
         }
@@ -366,20 +383,20 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
         case ftpsptMVS:     // "'VEA0016.MAIN.CLIST'"
         case ftpsptTandem:  // \SYSTEM.$VVVVV.SUBVOLUM.FILENAME
         {                   // the separator is a dot
-            if (*s == '.')
+            if (*s == L'.')
                 s++;
-            while (s < end && *s != '.')
+            while (s < end && *s != L'.')
                 s++;
-            if (*s == '.')
+            if (*s == L'.')
             {
-                if (DirLineHotPathType == ftpsptMVS && *(s + 1) == '\'')
+                if (DirLineHotPathType == ftpsptMVS && *(s + 1) == L'\'')
                     s = end;
                 else
                 {
                     if (DirLineHotPathType == ftpsptIBMz_VM)
                     {
-                        const char* z_VMRootDir = root; // position of the first dot (root) in IBM_z/VM paths
-                        while (z_VMRootDir < end && *z_VMRootDir != '.')
+                        const wchar_t* z_VMRootDir = root; // position of the first dot (root) in IBM_z/VM paths
+                        while (z_VMRootDir < end && *z_VMRootDir != L'.')
                             z_VMRootDir++;
                         if (s == z_VMRootDir)
                             s++; // the root must end with a dot, other paths probably do not
@@ -393,18 +410,18 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
         case ftpsptWindows: // "/pub/altap/sally" or "\pub\altap\sally"
         case ftpsptOS2:     // e.g. C:/DIR1/DIR2 or C:\DIR1\DIR2
         {                   // the separators are '/' and '\\'
-            if (*s == '/' || *s == '\\')
+            if (*s == L'/' || *s == L'\\')
                 s++;
-            while (s < end && *s != '/' && *s != '\\')
+            while (s < end && *s != L'/' && *s != L'\\')
                 s++;
             break;
         }
 
         default: // Unix and others: "/pub/altap/sally" (but also "/\dir-with-backslash")
         {        // the separator is '/'
-            if (*s == '/')
+            if (*s == L'/')
                 s++;
-            while (s < end && *s != '/')
+            while (s < end && *s != L'/')
                 s++;
             break;
         }
@@ -419,33 +436,38 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
     return TRUE;
 }
 
-void CPluginFSInterface::CompleteDirectoryLineHotPath(char* path, int pathBufSize)
+BOOL CPluginFSInterface::CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path)
 {
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
     if (ControlConnection != NULL)
     { // based on the current path in the FS determine the path type in the Directory Line
-        CFTPServerPathType type = ControlConnection->GetFTPServerPathType(Path);
+        CFTPServerPathType type = ControlConnection->GetFTPServerPathType(Path.c_str());
         if (type == ftpsptOpenVMS || type == ftpsptMVS) // only OpenVMS and MVS need to add the "bracket"
         {
             // obtain a pointer past the root path
-            const char* root = path;
-            while (*root != 0 && *root != ':')
+            const wchar_t* root = pathText.c_str();
+            while (*root != 0 && *root != L':')
                 root++; // skip the fs-name
-            if (*root == ':')
+            if (*root == L':')
             {
-                root = FTPFindPath(root + 1, FTPGetUserLength(User));
-                if (*root == '/' || *root == '\\')
+                root = FTPFindPathW(root + 1, FTPGetUserLengthW(User.c_str()));
+                if (*root == L'/' || *root == L'\\')
                     root++; // skip the first '/' or '\\' from the path
             }
-            int pathLen = (int)strlen(path);
+            const size_t pathLen = pathText.size();
 
             // check the "bracket" and add it if missing
             if (type == ftpsptOpenVMS) // OpenVMS - the bracket is ']'
             {
-                const char* s = root;
+                const wchar_t* s = root;
                 BOOL vmsEsc = FALSE;
                 while (*s != 0)
                 {
-                    if (*s == '^')
+                    if (*s == L'^')
                         vmsEsc = !vmsEsc;
                     else
                     {
@@ -453,50 +475,68 @@ void CPluginFSInterface::CompleteDirectoryLineHotPath(char* path, int pathBufSiz
                             vmsEsc = FALSE;
                         else
                         {
-                            if (*s == '[')
+                            if (*s == L'[')
                                 break;
                         }
                     }
                     s++;
                 }
-                if (*s == '[')
+                if (*s == L'[')
                 {
-                    if (path[pathLen - 1] != ']' || FTPIsVMSEscapeSequence(path, path + (pathLen - 1)))
+                    if (pathLen == 0 || pathText[pathLen - 1] != L']' ||
+                        FTPIsVMSEscapeSequenceW(pathText.c_str(), pathText.c_str() + (pathLen - 1)))
                     {
-                        if (pathLen + 1 < pathBufSize)
-                        {
-                            path[pathLen++] = ']';
-                            path[pathLen] = 0;
-                        }
+                        pathText.push_back(L']');
                     }
                 }
             }
             else // MVS - the bracket is '\''
             {
-                if (strchr(root, '\'') != NULL && path[pathLen - 1] != '\'' && pathLen + 1 < pathBufSize)
-                {
-                    path[pathLen++] = '\'';
-                    path[pathLen] = 0;
-                }
+                if (wcschr(root, L'\'') != NULL &&
+                    (pathLen == 0 || pathText[pathLen - 1] != L'\''))
+                    pathText.push_back(L'\'');
             }
         }
     }
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText) ? TRUE : FALSE;
 }
 
-BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize)
+BOOL CPluginFSInterface::GetPathForMainWindowTitle(const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf) try
 {
-    CFTPServerPathType pathType = ControlConnection != NULL ? ControlConnection->GetFTPServerPathType(Path) : ftpsptUnknown;
+    if (fsName == NULL || buf == NULL ||
+        !sally::plugin_abi::IsValidStringBuffer(*buf))
+        return FALSE;
+    CFTPServerPathType pathType = ControlConnection != NULL ? ControlConnection->GetFTPServerPathType(Path.c_str()) : ftpsptUnknown;
     BOOL needFullPath = FALSE;
-    CPathBuffer root;
-    CPathBuffer path;
+    const size_t sourceLength = Path.size();
+    if (sourceLength > (std::numeric_limits<int>::max)() - 8)
+        return FALSE;
+    std::vector<char> path(sourceLength + 8, '\0');
+    std::vector<char> result(sourceLength + 1, '\0');
+    memcpy(path.data(), Path.c_str(), sourceLength + 1);
+    auto publishByteText = [&](const std::string& bytes, BOOL includeFSName) -> BOOL
+    {
+        std::wstring title;
+        if (includeFSName)
+        {
+            if (!BuildFullPathText(fsName, bytes.c_str(), title))
+                return FALSE;
+        }
+        else if (!DecodeSessionBytes(bytes, title))
+            return FALSE;
+        return sally::plugin_abi::WriteStringBuffer(*buf, title)
+                   ? TRUE
+                   : FALSE;
+    };
     if (mode == 1) // "Directory Name Only" mode
     {
-        lstrcpyn(path, Path, path.Size());
+        memcpy(path.data(), Path.c_str(), sourceLength + 1);
         if (pathType == ftpsptUnknown)
             pathType = ftpsptUnix;
-        if (FTPCutDirectory(pathType, path, path.Size(), buf, bufSize, NULL)) // trimming succeeded
+        if (FTPCutDirectory(pathType, path.data(), static_cast<int>(path.size()),
+                            result.data(), static_cast<int>(result.size()), NULL)) // trimming succeeded
         {
-            return TRUE;
+            return publishByteText(std::string(result.data()), FALSE);
         }
         else // it is the root or some other error occurred (unknown path type)
         {
@@ -509,16 +549,17 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
         {
             char* trimStart = NULL;
             char* trimEnd = NULL;
-            lstrcpyn(path, Path, path.Size());
+            memcpy(path.data(), Path.c_str(), sourceLength + 1);
+            char* const pathData = path.data();
             switch (pathType)
             {
             case ftpsptIBMz_VM: // "ACADEM:ANONYMOU.PICS" (+the root must end with a dot: "ACADEM:ANONYMOU.")
             {                   // the separator is a dot
-                trimStart = strchr(path, '.');
-                char* s = path + strlen(path) - 1; // ignore the last character (if it is a dot we skip it anyway)
-                while (--s > path && *s != '.')
+                trimStart = strchr(pathData, '.');
+                char* s = pathData + strlen(pathData) - 1; // ignore the last character (if it is a dot we skip it anyway)
+                while (--s > pathData && *s != '.')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s + 1;
                 if (trimStart + 1 == trimEnd)
                     trimEnd = NULL; // only one dot in the path -> do not trim
@@ -527,7 +568,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
 
             case ftpsptOpenVMS: // "PUB$DEVICE:[PUB.VMS.DIR2]"
             {                   // the separator is a dot, "^." is an escape sequence for '.'
-                char* s = path;
+                char* s = pathData;
                 BOOL vmsEsc = FALSE;
                 while (*s != 0)
                 {
@@ -548,12 +589,12 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
                 if (*s == '[')
                     trimStart = s + 1;
 
-                s = path + strlen(path) - 1;
-                if (s > path && *(s - 1) == '.')
+                s = pathData + strlen(pathData) - 1;
+                if (s > pathData && *(s - 1) == '.')
                     s--; // the last character must be ']', we do not test it and skip the last '.'
-                while (--s > path && (*s != '.' || FTPIsVMSEscapeSequence(path, s)))
+                while (--s > pathData && (*s != '.' || FTPIsVMSEscapeSequence(pathData, s)))
                     ; // non-escaped '.'
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s + 1;
                 if (trimStart + 1 == trimEnd)
                     trimEnd = NULL; // e.g. "[.pub]" -> do not trim
@@ -562,15 +603,15 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
 
             case ftpsptMVS: // "'VEA0016.MAIN.CLIST'"
             {               // the separator is a dot
-                trimStart = strchr(path, '\'');
+                trimStart = strchr(pathData, '\'');
                 if (trimStart != NULL)
                     trimStart++;
-                char* s = path + strlen(path) - 1;
-                if (s > path && *(s - 1) == '.')
+                char* s = pathData + strlen(pathData) - 1;
+                if (s > pathData && *(s - 1) == '.')
                     s--; // the last character must be '\'', we do not test it and skip the last '.'
-                while (--s > path && *s != '.')
+                while (--s > pathData && *s != '.')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s + 1;
                 if (trimStart + 1 == trimEnd)
                     trimEnd = NULL; // e.g. "'.pub'" -> do not trim
@@ -581,13 +622,13 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
             case ftpsptWindows: // "/pub/altap/sally" or "\pub\altap\sally"
             {                   // the separators are '/' and '\\'
                 if (path[0] == '/' || path[0] == '\\')
-                    trimStart = path + 1;
+                    trimStart = pathData + 1;
                 else
-                    trimStart = path;
-                char* s = path + strlen(path) - 1; // do not consider '/' or '\\' at the end of the string
-                while (--s > path && *s != '/' && *s != '\\')
+                    trimStart = pathData;
+                char* s = pathData + strlen(pathData) - 1; // do not consider '/' or '\\' at the end of the string
+                while (--s > pathData && *s != '/' && *s != '\\')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s;
                 break;
             }
@@ -596,16 +637,16 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
             {
                 if (path[0] != 0 && path[1] == ':')
                 {
-                    trimStart = path + 2;
+                    trimStart = pathData + 2;
                     if (*trimStart == '/' || *trimStart == '\\')
                         trimStart++;
                 }
                 else
-                    trimStart = path;
-                char* s = path + strlen(path) - 1; // do not consider '/' or '\\' at the end of the string
-                while (--s > path && *s != '/' && *s != '\\')
+                    trimStart = pathData;
+                char* s = pathData + strlen(pathData) - 1; // do not consider '/' or '\\' at the end of the string
+                while (--s > pathData && *s != '/' && *s != '\\')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s;
                 break;
             }
@@ -613,13 +654,13 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
             case ftpsptTandem: // \SYSTEM.$VVVVV.SUBVOLUM.FILENAME
             {
                 if (path[0] == '/' || path[0] == '\\')
-                    trimStart = path + 1;
+                    trimStart = pathData + 1;
                 else
-                    trimStart = path;
-                char* s = path + strlen(path) - 1; // do not consider '.' at the end of the string
-                while (--s > path && *s != '.')
+                    trimStart = pathData;
+                char* s = pathData + strlen(pathData) - 1; // do not consider '.' at the end of the string
+                while (--s > pathData && *s != '.')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s + 1;
                 break;
             }
@@ -627,13 +668,13 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
             default: // Unix and others: "/pub/altap/sally" (but also "/\dir-with-backslash")
             {        // the separator is '/'
                 if (path[0] == '/')
-                    trimStart = path + 1;
+                    trimStart = pathData + 1;
                 else
-                    trimStart = path;
-                char* s = path + strlen(path) - 1; // do not consider '/' at the end of the string
-                while (--s > path && *s != '/')
+                    trimStart = pathData;
+                char* s = pathData + strlen(pathData) - 1; // do not consider '/' at the end of the string
+                while (--s > pathData && *s != '/')
                     ;
-                if (s > path)
+                if (s > pathData)
                     trimEnd = s;
                 break;
             }
@@ -643,13 +684,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
             {
                 memmove(trimStart + 3, trimEnd, strlen(trimEnd) + 1);
                 memcpy(trimStart, "...", 3);
-                sprintf(root, "%s:", fsName);
-                int len = (int)strlen(root);
-                if (MakeUserPart(root + len, root.Size() - len, path))
-                {
-                    lstrcpyn(buf, root, bufSize);
-                    return TRUE;
-                }
+                return publishByteText(std::string(path.data()), TRUE);
             }
             else
                 needFullPath = TRUE;
@@ -657,40 +692,44 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
     }
     if (needFullPath)
     {
-        sprintf(root, "%s:", fsName);
-        int len = (int)strlen(root);
-        if (MakeUserPart(root + len, root.Size() - len, Path))
-        {
-            lstrcpyn(buf, root, bufSize);
-            return TRUE;
-        }
+        return publishByteText(Path, TRUE);
     }
+    SetLastError(ERROR_SUCCESS);
     return FALSE; // the path can be created by the standard algorithm
 }
+catch (...)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return FALSE;
+}
 
-void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs)
+void CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs) try
 {
     // WARNING: in 'includingSubdirs' for FTP paths 0x02 is ORed in when it is a "soft refresh"
 
-    BOOL isFTP = SalamanderGeneral->StrNICmp(path, AssignedFSName, AssignedFSNameLen) == 0 &&          // this is our fs-name for FTP
-                 path[AssignedFSNameLen] == ':';                                                       // our fs-name is not just a prefix
-    BOOL isFTPS = SalamanderGeneral->StrNICmp(path, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 && // this is our fs-name for FTPS
-                  path[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
+    const size_t pathLength = wcslen(path);
+    BOOL isFTP = pathLength > AssignedFSName.size() &&
+                 SalamanderGeneral->StrNICmp(path, AssignedFSName.c_str(), (int)AssignedFSName.size()) == 0 && // this is our fs-name for FTP
+                 path[AssignedFSName.size()] == L':';                                                           // our fs-name is not just a prefix
+    BOOL isFTPS = pathLength > AssignedFSNameFTPS.size() &&
+                  SalamanderGeneral->StrNICmp(path, AssignedFSNameFTPS.c_str(), (int)AssignedFSNameFTPS.size()) == 0 && // this is our fs-name for FTPS
+                  path[AssignedFSNameFTPS.size()] == L':';                                                             // our fs-name is not just a prefix
 
     if (isFTP || isFTPS)
     {
         // test whether the user-part paths match or at least share the same prefix
-        char path1[FTP_USERPART_SIZE];
-        char path2[FTP_USERPART_SIZE];
-        lstrcpyn(path1, path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
-        MakeUserPart(path2, FTP_USERPART_SIZE);
-        int userLength = FTPGetUserLength(User);
-        if (FTPHasTheSameRootPath(path1, path2, userLength)) // same root (connection)
+        const size_t assignedFSNameLength = isFTP ? AssignedFSName.size() : AssignedFSNameFTPS.size();
+        const std::wstring path1(path + assignedFSNameLength + 1);
+        std::wstring path2W;
+        if (!BuildUserPartText(path2W))
+            return;
+        int userLength = FTPGetUserLengthW(User.c_str());
+        if (FTPHasTheSameRootPathW(path1.c_str(), path2W.c_str(), userLength)) // same root (connection)
         {
-            char* p1 = (char*)FTPFindPath(path1, userLength);
-            char* p2 = (char*)FTPFindPath(path2, userLength);
-            CFTPServerPathType type = GetFTPServerPathType(Path);
-            if (FTPIsPrefixOfServerPath(type, p1, p2, !(includingSubdirs & 0x01))) // prefix matches or it is an exact match
+            const wchar_t* p1 = FTPFindPathW(path1.c_str(), userLength);
+            const wchar_t* p2 = FTPFindPathW(path2W.c_str(), userLength);
+            CFTPServerPathType type = GetFTPServerPathType(Path.c_str());
+            if (FTPIsPrefixOfServerPathW(type, p1, p2, !(includingSubdirs & 0x01))) // prefix matches or it is an exact match
             {
                 NextRefreshWontClearCache = TRUE;
                 if (includingSubdirs & 0x02 /* soft refresh */) // perform the refresh once the panel activates
@@ -708,19 +747,25 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
         }
     }
 }
+catch (...)
+{
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+}
 
 void CPluginFSInterface::AddBookmark(HWND parent)
 {
-    char name[BOOKMARKNAME_MAX_SIZE];
-    lstrcpyn(name, Host, BOOKMARKNAME_MAX_SIZE);
+    std::wstring name = Host;
+    std::wstring pathText;
+    if (!DecodeSessionBytes(Path, pathText))
+        return;
     if (CRenameDlg(parent, name, FALSE, TRUE).Execute() == IDOK)
     {
-        BOOL anonymous = strcmp(User, FTP_ANONYMOUS) == 0;
-        if (Config.FTPServerList.AddServer(name,
-                                           Host,
-                                           Path,
+        BOOL anonymous = User == L"anonymous";
+        if (Config.FTPServerList.AddServer(name.c_str(),
+                                           Host.c_str(),
+                                           pathText.c_str(),
                                            anonymous,
-                                           anonymous ? NULL : User,
+                                           anonymous ? NULL : User.c_str(),
                                            NULL,
                                            0,
                                            FALSE,
@@ -745,49 +790,101 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
         dlg.Execute() == IDOK)
     {
         // store the path for which we will report a change after the command is executed
-        CPathBuffer changedPath;
-        const char* fsName = ControlConnection->GetEncryptControlConnection() == 1 ? AssignedFSNameFTPS : AssignedFSName;
-        sprintf(changedPath, "%s:", fsName);
-        int len = (int)strlen(changedPath);
-        MakeUserPart(changedPath + len, changedPath.Size() - len);
+        const std::wstring& fsName = ControlConnection->GetEncryptControlConnection() == 1 ? AssignedFSNameFTPS : AssignedFSName;
+        std::wstring changedPath;
+        if (!BuildFullPathText(fsName.c_str(), Path.c_str(), changedPath))
+            return;
 
-        char cmdBuf[FTPCOMMAND_MAX_SIZE + 2];
-        char logBuf[FTPCOMMAND_MAX_SIZE + 2];
-        char txtBuf[200 + FTPCOMMAND_MAX_SIZE];
-        lstrcpyn(cmdBuf, dlg.Command, FTPCOMMAND_MAX_SIZE);
-        strcpy(logBuf, Config.SendSecretCommand ? LoadStr(IDS_SECRETFTPCOMMAND) : cmdBuf);
-        _snprintf_s(txtBuf, _TRUNCATE, LoadStr(IDS_LOGMSGSENDINGUSRCMD), logBuf);
-        ControlConnection->LogMessage(txtBuf, -1, TRUE);
-        strcat(cmdBuf, "\r\n");
-        strcat(logBuf, "\r\n");
+        const CFtpTextCodec commandCodec = ControlConnection->GetTextCodec();
+        std::string commandBytes;
+        CFTPSecureByteStringGuard commandBytesGuard(commandBytes);
+        const CFtpTextEncodeStatus commandStatus = commandCodec.EncodeWithStatus(
+            dlg.Command.data(), dlg.Command.size(), commandBytes);
+        if (commandStatus == CFtpTextEncodeStatus::InvalidInput)
+        {
+            SalamanderGeneral->SalMessageBox(parent,
+                                             LangStr(IDS_FTPCOMMAND_CANNOTENCODE).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(),
+                                             MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
+
+        std::wstring commandForLog;
+        CFTPSecureWideStringGuard commandForLogGuard(commandForLog);
+        BOOL commandForLogReady = FALSE;
+        try
+        {
+            if (Config.SendSecretCommand)
+            {
+                const std::wstring secretCommandText = LangStr(IDS_SECRETFTPCOMMAND);
+                commandForLogReady = FtpStoreWideText(secretCommandText, commandForLog);
+            }
+            else
+                commandForLogReady = FtpStoreWideText(dlg.Command, commandForLog);
+        }
+        catch (...)
+        {
+        }
+        if (!commandForLogReady)
+        {
+            SalamanderGeneral->SalMessageBox(parent,
+                                             LangStr(IDS_OPERDOPPR_LOWMEM).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(),
+                                             MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
+        std::string commandForLogBytes;
+        CFTPSecureByteStringGuard commandForLogBytesGuard(commandForLogBytes);
+        std::string cmdBuf;
+        CFTPSecureByteStringGuard cmdBufGuard(cmdBuf);
+        std::string logBuf;
+        CFTPSecureByteStringGuard logBufGuard(logBuf);
+        std::wstring logMessage;
+        const BOOL logCommandReady = Config.SendSecretCommand
+                                         ? (commandCodec.Encode(commandForLog.data(), commandForLog.size(), commandForLogBytes) ||
+                                            FtpStoreProtocolBytes("<secret command>", commandForLogBytes))
+                                         : FtpStoreProtocolBytes(commandBytes, commandForLogBytes);
+        if (commandStatus != CFtpTextEncodeStatus::Success || !logCommandReady ||
+            !FTPBuildUserCommandBytes(commandBytes, commandForLogBytes, cmdBuf, logBuf) ||
+            !FtpFormatWideText(LangStr(IDS_LOGMSGSENDINGUSRCMD).c_str(),
+                               commandForLog, logMessage))
+        {
+            SalamanderGeneral->SalMessageBox(parent,
+                                             LangStr(IDS_OPERDOPPR_LOWMEM).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(),
+                                             MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
+        ControlConnection->LogMessage(logMessage.c_str(), static_cast<int>(logMessage.size()), TRUE);
 
         TotalConnectAttemptNum = 1; // user-initiated action -> if reconnection is needed, this is the first reconnect attempt
-        const char* retryMsgAux = NULL;
+        const std::string* retryMessageToUse = NULL;
         BOOL canRetry = FALSE;
-        char retryMsgBuf[300];
+        std::string nextRetryMessage;
 
         BOOL commandSent = FALSE;
         BOOL reconnected = FALSE;
         int ftpReplyCode;
-        char ftpReplyBuf[20480]; // take only the first 20 KB from the reply message (hopefully oversized enough)
+        std::string ftpReply;
+        std::string changePathReply;
         while (ReconnectIfNeeded(parent, &reconnected, TRUE,
-                                 &TotalConnectAttemptNum, retryMsgAux)) // reconnect if necessary
+                                 &TotalConnectAttemptNum, retryMessageToUse)) // reconnect if necessary
         {
             BOOL run = FALSE;
             BOOL ok = TRUE;
-            CPathBuffer newPath;
+            std::string newPath;
             BOOL needChangeDir = reconnected; // after reconnect try to set the working directory again
             if (!reconnected)                 // already connected for a longer time, verify that the working directory matches 'Path'
             {
                 // use the cache, under normal circumstances the path should be there
-                ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE,
-                                                              &canRetry, retryMsgBuf, 300);
+                ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, FALSE,
+                                                              &canRetry, &nextRetryMessage);
                 if (!ok && canRetry) // "retry" is allowed
                 {
                     run = TRUE;
-                    retryMsgAux = retryMsgBuf;
+                    retryMessageToUse = &nextRetryMessage;
                 }
-                if (ok && strcmp(newPath, Path) != 0) // working directory on the server differs - change required
+                if (ok && newPath != Path) // working directory on the server differs - change required
                     needChangeDir = TRUE;             // (assumption: the server returns the same working path string)
             }
             if (ok && needChangeDir) // working directory needs to be changed
@@ -798,15 +895,20 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
                 // SendChangeWorkingPath() calls ReconnectIfNeeded() on connection failure, luckily that
                 // does not matter because the code preceding this call runs only when reconnect did not
                 // occur - "if (!reconnected)" - if reconnect happens, both code paths are the same
-                ok = ControlConnection->SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, Path,
-                                                              User, USER_MAX_SIZE, &success,
-                                                              ftpReplyBuf, 700, NULL,
+                ok = ControlConnection->SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, Path.c_str(),
+                                                              User, &success,
+                                                              changePathReply, NULL,
                                                               &TotalConnectAttemptNum, NULL, TRUE, NULL);
-                if (ok && !success && Path[0] != 0) // send succeeded, but the server reports an error (+ignore the error for an empty path) -> user command cannot
+                if (ok && !success && !Path.empty()) // send succeeded, but the server reports an error (+ignore the error for an empty path) -> user command cannot
                 {                                   // be sent (it may be tied to the current path in the panel)
-                    CPathBuffer errBuf;
-                    _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CHANGEWORKPATHERROR), Path.Get(), ftpReplyBuf);
-                    SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                    std::wstring errText;
+                    if (!FtpFormatServerReplyMessage(ControlConnection->GetTextCodec(),
+                                                     LangStr(IDS_CHANGEWORKPATHERROR).c_str(),
+                                                     std::string_view(Path.data(), Path.size()),
+                                                     changePathReply, errText))
+                        errText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                    SalamanderGeneral->SalMessageBox(parent, errText.c_str(),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                      MB_OK | MB_ICONEXCLAMATION);
                     ok = FALSE;
                 }
@@ -814,55 +916,64 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
             if (ok)
             {
                 commandSent = TRUE;
-                if (ControlConnection->SendFTPCommand(parent, cmdBuf, logBuf, NULL,
+                if (ControlConnection->SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL,
                                                       ControlConnection->GetWaitTime(WAITWND_COMOPER), NULL,
-                                                      &ftpReplyCode, ftpReplyBuf, 20480, FALSE,
-                                                      TRUE, TRUE, &canRetry, retryMsgBuf,
-                                                      300, NULL)) // no fatal error occurred
+                                                      &ftpReplyCode, &ftpReply, FALSE,
+                                                      TRUE, TRUE, &canRetry, &nextRetryMessage,
+                                                      NULL)) // no fatal error occurred
                 {
                     if (dlg.RefreshWorkingPath) // the Path probably changed, invalidate the Path listing cache
-                        UploadListingCache.ReportUnknownChange(User, Host, Port, Path, GetFTPServerPathType(Path));
+                        UploadListingCache.ReportUnknownChange(User.c_str(), Host.c_str(), Port, Path.c_str(), GetFTPServerPathType(Path.c_str()));
 
                     if (dlg.ChangePathInPanel)
                     {
                         int panel;
                         BOOL notInPanel = !SalamanderGeneral->GetPanelWithPluginFS(this, panel);
-                        ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, newPath.Size(), TRUE,
-                                                                      &canRetry, retryMsgBuf, 300);
+                        ok = ControlConnection->GetCurrentWorkingPath(parent, newPath, TRUE,
+                                                                      &canRetry, &nextRetryMessage);
                         if (!ok && canRetry) // "retry" is allowed
                         {
                             run = TRUE;
-                            retryMsgAux = retryMsgBuf;
+                            retryMessageToUse = &nextRetryMessage;
                         }
-                        if (ok && !notInPanel && strcmp(newPath, Path) != 0)
+                        if (ok && !notInPanel && newPath != Path)
                         { // the path changed (+otherwise everything is ok and we are in the panel ("always true")) -> change
                             // the path in the panel (assumption: the server returns the same working path string)
-                            char newUserPart[FTP_USERPART_SIZE];
-                            MakeUserPart(newUserPart, FTP_USERPART_SIZE, newPath);
-                            ChangePathOnlyGetCurPathTime = GetTickCount(); // optimize ChangePath() called right after obtaining the working path
-                            SalamanderGeneral->ChangePanelPathToPluginFS(panel, fsName, newUserPart);
+                            std::wstring newUserPartText;
+                            if (BuildUserPartText(newUserPartText, newPath.c_str()))
+                            {
+                                ChangePathOnlyGetCurPathTime = GetTickCount(); // optimize ChangePath() called right after obtaining the working path
+                                SalamanderGeneral->ChangePanelPathToPluginFS(
+                                    panel, fsName.c_str(),
+                                    newUserPartText.c_str());
+                            }
                         }
                     }
 
                     if (ok) // everything went well, report the command result to the user
                     {
-                        char* s = logBuf + strlen(logBuf);
-                        while (s > logBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                            s--;
-                        *s = 0;                                                      // trim CRLF from the end of the command text for the log
-                        CWelcomeMsgDlg(parent, ftpReplyBuf, TRUE, logBuf).Execute(); // show the response, nothing more...
+                        while (!logBuf.empty() && (logBuf.back() == '\n' || logBuf.back() == '\r'))
+                            logBuf.pop_back(); // trim CRLF from the end of the command text for the log
+                        const CFtpTextCodec textCodec = ControlConnection->GetTextCodec();
+                        std::wstring replyText;
+                        std::wstring commandText;
+                        if (!textCodec.Decode(ftpReply.data(), ftpReply.size(), replyText))
+                            replyText = L"";
+                        if (!textCodec.Decode(logBuf.data(), logBuf.size(), commandText))
+                            commandText = L"";
+                        CWelcomeMsgDlg(parent, replyText.c_str(), TRUE, commandText.c_str()).Execute(); // show the response, nothing more...
                         SalamanderGeneral->WaitForESCRelease();
                     }
                 }
                 else
                 {
                     if (dlg.RefreshWorkingPath) // the Path may have changed, invalidate the Path listing cache
-                        UploadListingCache.ReportUnknownChange(User, Host, Port, Path, GetFTPServerPathType(Path));
+                        UploadListingCache.ReportUnknownChange(User.c_str(), Host.c_str(), Port, Path.c_str(), GetFTPServerPathType(Path.c_str()));
 
                     if (canRetry) // "retry" is allowed
                     {
                         run = TRUE;
-                        retryMsgAux = retryMsgBuf;
+                        retryMessageToUse = &nextRetryMessage;
                     }
                 }
             }
@@ -871,13 +982,21 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
         }
 
         if (dlg.RefreshWorkingPath && commandSent)
-            SalamanderGeneral->PostChangeOnPathNotification(changedPath, TRUE | 0x02 /* soft refresh */);
+            SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), TRUE | 0x02 /* soft refresh */);
     }
 }
 
 void CPluginFSInterface::ShowRawListing(HWND parent)
 {
-    CWelcomeMsgDlg(parent, PathListing, FALSE, NULL, TRUE, PathListingLen).Execute();
+    const CFtpTextCodec textCodec = ControlConnection->GetTextCodec();
+    const std::string_view listing = PathListing.has_value()
+                                         ? std::string_view(*PathListing)
+                                         : std::string_view("", 0);
+    std::wstring listingText;
+    if (!textCodec.Decode(listing.data(), listing.size(), listingText))
+        listingText = L"";
+    CWelcomeMsgDlg(parent, listingText.c_str(), FALSE, NULL, TRUE, listing.data(),
+                   static_cast<int>(listing.size())).Execute();
 }
 
 int CPluginFSInterface::GetLogUID()
@@ -885,13 +1004,13 @@ int CPluginFSInterface::GetLogUID()
     return (ControlConnection != NULL ? ControlConnection->GetLogUID() : -1);
 }
 
-void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+void CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                      int panel, int selectedFiles, int selectedDirs)
 {
     if (type == fscmPathInPanel || type == fscmPanel || // menus for the current path and for the panel are identical
         type == fscmItemsInPanel)                       // the item menu will contain commands for items
     {
-        HMENU main = LoadMenu(HLanguage, MAKEINTRESOURCE(IDM_ACTPATHCONTEXTMENU));
+        HMENU main = LoadMenuW(HLanguage, MAKEINTRESOURCEW(IDM_ACTPATHCONTEXTMENU));
         if (main != NULL)
         {
             HMENU subMenu;
@@ -913,8 +1032,8 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                 }
                 else
                 {
-                    MENUITEMINFO mi;
-                    char nameBuf[200];
+                    MENUITEMINFOW mi;
+                    std::wstring nameBuf;
 
                     BOOL isfocusedDir = FALSE;
                     SalamanderGeneral->GetPanelFocusedItem(panel, &isfocusedDir);
@@ -925,7 +1044,9 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                     int salCmd;
                     BOOL enabled;
                     int type2, lastType = sctyUnknown;
-                    while (SalamanderGeneral->EnumSalamanderCommands(&index, &salCmd, nameBuf, 200, &enabled, &type2))
+                    while (SPLEnumSalamanderCommandsOwned(
+                        SalamanderGeneral, &index, &salCmd, nameBuf, &enabled,
+                        &type2))
                     {
                         if (!enabled || salCmd == SALCMD_OPEN || // we cannot "open" files yet, so do not add it (we can do it only for directories and there it is uninteresting)
                             type2 == sctyForFocusedFile && isfocusedDir ||
@@ -941,7 +1062,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                             mi.cbSize = sizeof(mi);
                             mi.fMask = MIIM_TYPE;
                             mi.fType = MFT_SEPARATOR;
-                            InsertMenuItem(subMenu, i++, TRUE, &mi);
+                            InsertMenuItemW(subMenu, i++, TRUE, &mi);
                         }
                         lastType = type2;
 
@@ -951,10 +1072,10 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                         mi.fMask = MIIM_TYPE | MIIM_ID | MIIM_STATE;
                         mi.fType = MFT_STRING;
                         mi.wID = salCmd + 5000; // shift all Salamander commands by 5000 so they can be distinguished from FTP commands
-                        mi.dwTypeData = nameBuf;
-                        mi.cch = (UINT)strlen(nameBuf);
+                        mi.dwTypeData = nameBuf.data();
+                        mi.cch = (UINT)nameBuf.size();
                         mi.fState = MFS_ENABLED;
-                        InsertMenuItem(subMenu, i++, TRUE, &mi);
+                        InsertMenuItemW(subMenu, i++, TRUE, &mi);
                     }
                 }
 
@@ -1009,8 +1130,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                         GlobalShowLogUID = GetLogUID();
                         if (GlobalShowLogUID == -1 || !Logs.HasLogWithUID(GlobalShowLogUID))
                         {
-                            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_FSHAVENOLOG),
-                                                              LoadStr(IDS_FTPERRORTITLE), MSGBOX_ERROR);
+                            SalamanderGeneral->ShowMessageBox(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FSHAVENOLOG).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MSGBOX_ERROR);
                         }
                         else                                                              // open the Logs window with the selected log GlobalShowLogUID
                             SalamanderGeneral->PostMenuExtCommand(FTPCMD_SHOWLOGS, TRUE); // runs later in "sal-idle"
@@ -1127,12 +1247,15 @@ void CPluginFSInterface::ToggleListHiddenFiles(HWND parent)
     if (Config.HintListHiddenFiles)
     {
         MSGBOXEX_PARAMS params;
+        const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
+        const std::wstring text = LangStr(IDS_HINTLISTHIDDENFILES).c_str();
+        const std::wstring checkBoxText = LangStr(IDS_DONOTSHOWHINTLISTHF).c_str();
         memset(&params, 0, sizeof(params));
         params.HParent = parent;
         params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_HINT;
-        params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-        params.Text = LoadStr(IDS_HINTLISTHIDDENFILES);
-        params.CheckBoxText = LoadStr(IDS_DONOTSHOWHINTLISTHF);
+        params.Caption = caption.c_str();
+        params.Text = text.c_str();
+        params.CheckBoxText = checkBoxText.c_str();
         int doNotShowHint = !Config.HintListHiddenFiles;
         params.CheckBoxValue = &doNotShowHint;
         SalamanderGeneral->SalMessageBoxEx(&params);
@@ -1156,19 +1279,23 @@ BOOL CPluginFSInterface::IsListCommandLIST_a()
 
 void CSimpleListPluginDataInterface::ReleasePluginData(CFileData& file, BOOL isDir)
 {
-    char* s = (char*)file.PluginData;
-    if (s != NULL)
-        free(s);
+    wchar_t* text = (wchar_t*)file.PluginData;
+    if (text != NULL)
+        free(text);
 }
+
+static wchar_t* SimpleTransferBuffer = NULL;
 
 // callback invoked from Salamander to obtain text
 void WINAPI GetRowText()
 {
-    char* s = (char*)((*TransferFileData)->PluginData);
-    if (s != NULL)
+    const wchar_t* text = (const wchar_t*)((*TransferFileData)->PluginData);
+    if (text != NULL)
     {
-        *TransferLen = (int)strlen(s);
-        memcpy(TransferBuffer, s, *TransferLen);
+        *TransferLen = static_cast<int>(wcslen(text));
+        if (*TransferLen > TRANSFER_BUFFER_MAX)
+            *TransferLen = TRANSFER_BUFFER_MAX;
+        wmemcpy(SimpleTransferBuffer, text, *TransferLen);
     }
     else
     {
@@ -1177,18 +1304,19 @@ void WINAPI GetRowText()
 }
 
 void CSimpleListPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
-                                               const char* archivePath, const CFileData* upperDir)
+                                               const wchar_t* archivePath, const CFileData* upperDir)
 {
     view->SetViewMode(VIEW_MODE_DETAILED, VALID_DATA_NONE); // switch to Detailed mode + remove other columns, keep only the Name column
-    view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen, TransferRowData,
+    view->GetTransferVariables(TransferFileData, TransferIsDir, SimpleTransferBuffer, TransferLen, TransferRowData,
                                TransferPluginDataIface, TransferActCustomData);
 
     // rename the standard Name column to Line
-    view->SetColumnName(0, LoadStr(IDS_LINENUMCOLUMN), LoadStr(IDS_LINENUMCOLUMNDESC));
+    view->SetColumnName(0, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_LINENUMCOLUMN).c_str(),
+                        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_LINENUMCOLUMNDESC).c_str());
 
     CColumn column;
-    lstrcpyn(column.Name, LoadStr(IDS_RAWLISTCOLUMN), COLUMN_NAME_MAX);
-    lstrcpyn(column.Description, LoadStr(IDS_RAWLISTCOLUMNDESC), COLUMN_DESCRIPTION_MAX);
+    lstrcpynW(column.Name, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_RAWLISTCOLUMN).c_str(), COLUMN_NAME_MAX);
+    lstrcpynW(column.Description, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_RAWLISTCOLUMNDESC).c_str(), COLUMN_DESCRIPTION_MAX);
     column.GetText = GetRowText;
     column.SupportSorting = 0;
     column.LeftAlignment = 1;
@@ -1219,23 +1347,37 @@ void CSimpleListPluginDataInterface::ColumnWidthWasChanged(BOOL leftPanel, const
 BOOL CSimpleListPluginDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOOL isDir,
                                                         int selectedFiles, int selectedDirs,
                                                         BOOL displaySize, const CQuadWord& selectedSize,
-                                                        char* buffer, DWORD* hotTexts, int& hotTextsCount)
+                                                        CSalamanderStringBuffer* buffer,
+                                                        CSalamanderTextRangeBuffer* hotTexts)
 {
+    if (buffer == NULL || hotTexts == NULL)
+        return FALSE;
     if (file != NULL)
     {
-        const char* s = (char*)(file->PluginData);
-        if (s == NULL)
-            s = "";
-        _snprintf_s(buffer, 1000, _TRUNCATE, "%s: %s", file->Name, s);
-        if (*s != 0)
+        try
         {
-            int off = (int)strlen(file->Name) + 2;
-            hotTexts[0] = MAKELONG(off, strlen(buffer) - off);
-            hotTextsCount = 1;
+            const wchar_t* text = (const wchar_t*)(file->PluginData);
+            const std::wstring output =
+                SPLFormatStringOwned(L"%ls: %ls", file->Name, text != NULL ? text : L"");
+            std::vector<CSalamanderTextRange> ranges;
+            if (text != NULL && text[0] != L'\0')
+            {
+                const size_t offset = wcslen(file->Name) + 2;
+                if (offset > (std::numeric_limits<DWORD>::max)() ||
+                    output.size() - offset > (std::numeric_limits<DWORD>::max)())
+                    return FALSE;
+                ranges.push_back({static_cast<DWORD>(offset),
+                                  static_cast<DWORD>(output.size() - offset)});
+            }
+            return sally::plugin_abi::WriteTextAndRanges(
+                       *buffer, *hotTexts, output, ranges)
+                       ? TRUE
+                       : FALSE;
         }
-        else
-            hotTextsCount = 0;
-        return TRUE;
+        catch (...)
+        {
+            return FALSE;
+        }
     }
     else
         return FALSE; // let Salamander display the item counts and empty panel information
@@ -1248,11 +1390,13 @@ BOOL CSimpleListPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
 
 CFTPListingPluginDataInterface::CFTPListingPluginDataInterface(TIndirectArray<CSrvTypeColumn>* columns,
                                                                BOOL deleteColumns, DWORD validDataMask,
-                                                               BOOL isVMS)
+                                                               BOOL isVMS, const CFtpTextCodec& textCodec)
+    : TextCodec(textCodec)
 {
     Columns = columns;
     DeleteColumns = deleteColumns;
-    ItemDataSize = 0;
+    RawNameOffset = 0;
+    ItemDataSize = sizeof(char*);
     BlocksColumnOffset = -1;
     BytesColumnOffset = -1;
     DateColumnOffset = -1;
@@ -1392,6 +1536,49 @@ void CFTPListingPluginDataInterface::StoreStringToColumn(CFileData& file, int co
     if (*data != NULL)
         free(*data);
     *data = str;
+}
+
+BOOL CFTPListingPluginDataInterface::StoreRawName(CFileData& file, const char* name, size_t length)
+{
+    if (file.PluginData == 0 || name == NULL)
+        return FALSE;
+
+    char* copy = (char*)SalamanderGeneral->Alloc((int)length + 1);
+    if (copy == NULL)
+        return FALSE;
+    memcpy(copy, name, length);
+    copy[length] = 0;
+
+    char** data = (char**)(((char*)file.PluginData) + RawNameOffset);
+    if (*data != NULL)
+        SalamanderGeneral->Free(*data);
+    *data = copy;
+    return TRUE;
+}
+
+const char* CFTPListingPluginDataInterface::GetRawName(const CFileData& file) const
+{
+    if (file.PluginData == 0)
+        return NULL;
+    return *(char**)(((char*)file.PluginData) + RawNameOffset);
+}
+
+BOOL CFTPListingPluginDataInterface::GetWireName(const CFileData& file, const CFtpTextCodec& codec,
+                                                  std::string& name) const
+{
+    const char* rawName = GetRawName(file);
+    if (rawName != NULL)
+    {
+        name.assign(rawName);
+        return TRUE;
+    }
+    return codec.Encode(file.Name, file.NameLen, name);
+}
+
+BOOL CFTPListingPluginDataInterface::DecodeTextForPresentation(
+    std::string_view bytes, std::wstring& text) const noexcept
+{
+    return FtpDecodeServerTextForPresentation(TextCodec, bytes, text);
 }
 
 void CFTPListingPluginDataInterface::StoreDayToColumn(CFileData& file, int column, BYTE day)
@@ -1642,6 +1829,9 @@ void CFTPListingPluginDataInterface::ClearPluginData(CFileData& file)
     if (file.PluginData != 0)
     {
         char* base = (char*)file.PluginData;
+        char* rawName = *(char**)(base + RawNameOffset);
+        if (rawName != NULL)
+            SalamanderGeneral->Free(rawName);
         int i;
         for (i = 0; i < Columns->Count; i++)
         {
@@ -1662,6 +1852,9 @@ void CFTPListingPluginDataInterface::ReleasePluginData(CFileData& file, BOOL isD
     if (file.PluginData != 0)
     {
         char* base = (char*)file.PluginData;
+        char* rawName = *(char**)(base + RawNameOffset);
+        if (rawName != NULL)
+            SalamanderGeneral->Free(rawName);
         int i;
         for (i = 0; i < Columns->Count; i++)
         {
@@ -1723,28 +1916,37 @@ BOOL CFTPListingPluginDataInterface::GetSize(const CFileData& file, CQuadWord& s
     }
 }
 
-void CFTPListingPluginDataInterface::GetBasicName(const CFileData& file, char** name,
-                                                  char** ext, char* buffer)
+BOOL CFTPListingPluginDataInterface::GetBasicName(const CFileData& file, const wchar_t** name,
+                                                  const wchar_t** ext, std::wstring& storage) noexcept
 {
     if (IsVMS)
     {
-        memcpy(buffer, file.Name, file.NameLen + 1);
-        if (FTPVMSCutFileVersion(buffer, file.NameLen))
+        try
         {
-            *name = buffer;
+            storage.assign(file.Name, file.NameLen);
+        }
+        catch (...)
+        {
+            return FALSE;
+        }
+        if (FTPVMSCutFileVersion(storage.data(), file.NameLen))
+        {
+            storage.resize(wcslen(storage.c_str()));
+            *name = storage.c_str();
             if (file.NameLen > (DWORD)(file.Ext - file.Name))
-                *ext = buffer + (file.Ext - file.Name);
+                *ext = storage.c_str() + (file.Ext - file.Name);
             else
-                *ext = buffer + strlen(buffer); // in case the name has no extension (otherwise ';' is always after the extension)
-            return;                             // success, we're done
+                *ext = storage.c_str() + storage.size(); // in case the name has no extension (otherwise ';' is always after the extension)
+            return TRUE;
         }
         else
-            TRACE_E("Unexpected situation in CFTPListingPluginDataInterface::GetBasicName(): not "
-                    "a VMS name? ("
-                    << file.Name << ")");
+            TRACE_EW(L"Unexpected situation in CFTPListingPluginDataInterface::GetBasicName(): not "
+                     L"a VMS name? ("
+                     << file.Name << L")");
     }
     *name = file.Name;
     *ext = file.Ext;
+    return TRUE;
 }
 
 void CFTPListingPluginDataInterface::GetLastWriteDateAndTime(const CFileData& file, BOOL* dateAndTimeValid,

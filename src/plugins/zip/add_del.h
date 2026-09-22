@@ -14,7 +14,8 @@
 
 struct CAddInfo
 {
-    char* Name;
+    char* Name; // UTF-8 staging used only to derive the ZIP member record
+    std::wstring LocalPath;
     int NameLen;
     bool IsDir;
     CQuadWord Size;
@@ -85,12 +86,13 @@ public:
     char* NewCentrDir;
     DWORD ZipAttr;
     CFile* TempFile;
-    CPathBuffer TempName;
+    std::wstring TempName;
     //bool                Backup;
     CQuadWord AddTotalSize;
     int SizeToAdd;
-    const char* SourcePath;
-    int SourceLen;
+    std::wstring SourcePath;
+    std::string ArchiveSourcePrefix;
+    int SourceLen; // byte length of ArchiveSourcePrefix for the byte ZIP-name engine
     TIndirectArray2<CAddInfo> AddFiles;
     bool SkipAllIOErrors;
     CFile* SourFile;
@@ -116,7 +118,7 @@ public:
 
     //delete from archive
 
-    CZipPack(const char* zipName, const char* zipRoot,
+    CZipPack(const wchar_t* zipName, const char* zipRoot,
              CSalamanderForOperationsAbstract* salamander) : CZipCommon(zipName, zipRoot, salamander, NULL), DelFiles(256),
                                                              AddFiles(256)
     {
@@ -136,7 +138,7 @@ public:
     }
 
     int DeleteFromArchive(SalEnumSelection next, void* param);
-    int PackToArchive(BOOL move, const char* sourcePath,
+    int PackToArchive(BOOL move, const wchar_t* sourcePath,
                       SalEnumSelection2 next, void* param);
     int PackNormal(SalEnumSelection2 next, void* param);
     int PackMultiVol(SalEnumSelection2 next, void* param);
@@ -161,9 +163,9 @@ public:
     int BackupZip();
     int PackFiles();
     int FinishPack(int reason = FPR_NORMAL);
-    int GetDirInfo(const char* name, DWORD* attr, FILETIME* lastWrite);
-    int IsDirectoryEmpty(const char* name);
-    int InsertDir(char* dir, TIndirectArray2<TIndirectArray2_char_>& table);
+    int GetDirInfo(const wchar_t* name, DWORD* attr, FILETIME* lastWrite);
+    int IsDirectoryEmpty(const wchar_t* name);
+    int InsertDir(const std::wstring& dir, std::vector<std::vector<std::wstring>>& table);
     int CleanUpSource();
     int LoadExPackOptions(unsigned flags);
     void Recover();
@@ -171,11 +173,10 @@ public:
     int CreateNextFile(bool firstSfxDisk = false);
     int NextDisk();
     int MatchAll();
-    int WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BOOL preview, int progressMode);
+    int WriteSfxExecutable(const wchar_t* sfxFile, const char* sfxPackage, BOOL preview, int progressMode);
     BOOL WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD archSize);
     /*
     bool ChangeSfxIcon(const char * sfxFile);
-    int LoadIcons(const char * iconFile, DWORD index, CIcon **icons, int * count);
     void DestroyIcons(CIcon * icons, int count);
     CIcon * LoadIconsFromDirectory(HINSTANCE module, LPICONDIR directory, bool isIco);
     LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName);

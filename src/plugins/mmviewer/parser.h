@@ -31,7 +31,7 @@ class CParserInterface
 {
 public:
     // called to open the requested file
-    virtual CParserResultEnum OpenFile(const char* fileName) = 0;
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName) = 0;
 
     // called to close the currently opened file; pairs with OpenFile
     // after CloseFile is called the interface is considered invalid
@@ -51,4 +51,4 @@ public:
 // to provide information about the file.
 //
 
-CParserResultEnum CreateAppropriateParser(const char* fileName, CParserInterface** parser);
+CParserResultEnum CreateAppropriateParser(const wchar_t* fileName, CParserInterface** parser);

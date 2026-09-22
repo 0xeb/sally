@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include "uncab_text.h"
+
+#include <vector>
+
 /* winnt.h
 #define FILE_ATTRIBUTE_READONLY             0x00000001
 #define FILE_ATTRIBUTE_HIDDEN               0x00000002
@@ -26,7 +30,7 @@
 struct CFile
 {
     HANDLE Handle;
-    CPathBuffer FileName;
+    std::wstring FileName;
     DWORD Flags;
     DWORD cabOffset; // for sfx archives
 };
@@ -41,12 +45,15 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 #define CA_UNPACK_WHOLE_ARCHIVE 3
 
 //cab cache items
+// The cabinet NAME comes out of the CAB byte stream and stays bytes; the
+// directory it was found in is Sally's own path and stays UTF-16, so a volume
+// sitting in a folder FDI's ANSI interface could not spell is still reachable.
 struct CCABCacheEntry
 {
-    char CABName[CB_MAX_CABINET_NAME];
-    char CABPath[CB_MAX_CAB_PATH];
+    std::string CABName;
+    std::wstring CABPath;
 
-    CCABCacheEntry(char* name, char* path);
+    CCABCacheEntry(const char* name, const std::wstring& path);
 };
 
 // ****************************************************************************
@@ -66,7 +73,7 @@ protected:
     BOOL FirstCAB;
     BOOL FirstCABINET_INFO;
     char CurrentCAB[CB_MAX_CABINET_NAME];
-    char CurrentCABPath[CB_MAX_CAB_PATH];
+    std::wstring CurrentCABPathW; // directory holding the current/next volume
     char NextCAB[CB_MAX_CABINET_NAME];
     char NextDISK[CB_MAX_DISK_NAME];
     int NextCABIndex;
@@ -75,60 +82,44 @@ protected:
     CSalamanderDirectoryAbstract* Dir; //used by ListFile
     DWORD Count;
     CQuadWord ProgressTotal;
-    const char* ArcRoot;
-    DWORD RootLen;
-    TIndirectArray2<char> Files;
-    const char* TargetDir;
-    TIndirectArray2<char> Masks;
+    std::wstring ArcRoot;
+    size_t RootLen;
+    std::vector<std::wstring> Files;
+    const wchar_t* TargetDir;
+    std::wstring InitialCabinetPath;
+    std::vector<std::wstring> Masks;
     TIndirectArray2<CCABCacheEntry> CABCache;
     BOOL AllocateWholeFile;
     BOOL TestAllocateWholeFile;
 
-    const char* NameInArchive; //unpack one file
+    std::wstring NameInArchive; // unpack one file
     BOOL OneFileSuccess;
-    /*
-    char ArcFileName[MAX_PATH];
-    HANDLE ArcHandle;
-    BOOL List;
-    unsigned int Silent;
-    BOOL Abort;
-    CQuadWord ProgressTotal;
-    const char * ArcRoot;
-    DWORD RootLen;
-    char TargetName[MAX_PATH];
-    HANDLE TargetFile;
-    BOOL Success;
-    BOOL UnPackWholeArchive;
-    char Password[MAX_PASSWORD];
-    BOOL FirstFile;
-    BOOL NotWholeArchListed;*/
-
 public:
-    CPluginInterfaceForArchiver() : Files(256), Masks(16), CABCache(16) { ; }
+    CPluginInterfaceForArchiver() : CABCache(16) { ; }
 
-    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData);
-    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                      const char* archiveRoot, SalEnumSelection next, void* nextParam);
-    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                                      const CFileData* fileData, const char* targetDir,
-                                      const char* newFileName, BOOL* renamingNotSupported);
-    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      const char* archiveRoot, BOOL move, const char* sourcePath,
+    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                      const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam);
+    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                                      const CFileData* fileData, const wchar_t* targetDir,
+                                      const wchar_t* newFileName, BOOL* renamingNotSupported);
+    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                                       SalEnumSelection2 next, void* nextParam) { return FALSE; }
-    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                          CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                          CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                           SalEnumSelection next, void* nextParam) { return FALSE; }
-    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                           const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                           const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                            CDynamicString* archiveVolumes);
-    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                         BOOL force, int panel) { return TRUE; }
-    virtual BOOL WINAPI GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
-    virtual void WINAPI DeleteTmpCopy(const char* fileName, BOOL firstFile) {}
+    virtual BOOL WINAPI GetCacheInfo(CSalamanderStringBuffer* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
+    virtual void WINAPI DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile) {}
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 
     BOOL Error(int error, ...);
@@ -143,17 +134,20 @@ public:
     //int ChangeVolProc(char *arcName, int mode);
     //int ProcessDataProc(unsigned char *addr, int size);
     //void SwitchToFirstVol(const char * arcName);
-    //BOOL MakeFilesList(TIndirectArray2<char> &files, SalEnumSelection next, void *nextParam, const char * targetDir);
-    //BOOL DoThisFile(CFileHeader * header, const char * arcName, const char * targetDir);
-    BOOL ConstructMaskArray(TIndirectArray2<char>& maskArray, const char* masks);
-    BOOL UpdateCABCache(char* name, char* path);
-    BOOL GetCachedCABPath(char* name, char* path);
+    BOOL ConstructMaskArray(std::vector<std::wstring>& maskArray, const wchar_t* masks);
+    BOOL UpdateCABCache(const char* name, const std::wstring& path);
+    BOOL GetCachedCABPath(const char* name, std::wstring& path);
+    // Full wide path of the volume being read right now - InitialCabinetPath while
+    // the initial-cabinet token is current, CurrentCABPathW + CurrentCAB after.
+    BOOL CurrentCabinetFullPathW(std::wstring& fullPath) const;
     BOOL ListFile(char* fileName, DWORD size, WORD date, WORD time, DWORD attributes);
-    BOOL DoThisFile(char* fileName);
+    BOOL DoThisFile(const std::wstring& fileName);
     INT_PTR UnpackFile(char* fileName, DWORD size, WORD date, WORD time, DWORD attributes);
-    BOOL MakeFilesList(TIndirectArray2<char>& files, SalEnumSelection next, void* nextParam, const char* targetDir);
-    //BOOL DoThisFile(CFileHeader * header, const char * arcName, const char * targetDir);
+    BOOL MakeFilesList(std::vector<std::wstring>& files, SalEnumSelection next, void* nextParam, const wchar_t* targetDir);
     INT_PTR Open(char* pszFile, int oflag, int pmode);
+    // Open() resolves its byte argument to this; the retry loops call it directly
+    // so a probed volume never round-trips back through the CAB byte domain.
+    INT_PTR OpenWide(const std::wstring& openPath, int oflag);
     UINT Read(INT_PTR hf, void* pv, UINT cb);
     UINT Write(INT_PTR hf, void* pv, UINT cb);
     int Close(INT_PTR hf);
@@ -185,7 +179,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -199,8 +193,7 @@ extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resource
 
 extern DWORD Options; // configuration
 
-char* LoadStr(int resID);
-void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size);
+std::wstring GetInfo(const FILETIME* lastWrite, unsigned size);
 
 #define DUMP_MEM_OBJECTS
 

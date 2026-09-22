@@ -43,8 +43,7 @@ protected:
     static DWORD_PTR WINAPI PopulateThreadProc(CWorkerThread* mythread, LPVOID lpParam)
     {
         CZRoot* self = (CZRoot*)lpParam;
-        CPathBuffer path;
-        self->PopulateDir(mythread, path, 0, path.Size());
+        self->PopulateDir(mythread, std::wstring());
         if (mythread->Aborting() && mythread->IsSelfDelete())
         {
             delete self;
@@ -52,7 +51,7 @@ protected:
         }
         return TRUE;
     }
-    void Log(int level, const TCHAR* text, CZFile* file /*CString *path*/)
+    void Log(int level, const wchar_t* text, CZFile* file /*CString *path*/)
     {
         CLogItemBase* lgi;
         lgi = CLogger::CreateLogItem(level, text, new CZString(file));
@@ -64,8 +63,8 @@ protected:
     }
     void LogError(CZFile* file, DWORD dwError)
     {
-        TCHAR szBuf[120];
-        FormatMessage(
+        wchar_t szBuf[120];
+        FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM,
             NULL,
             dwError,
@@ -87,7 +86,7 @@ protected:
     }
 
 public:
-    CZRoot(TCHAR const* name, CLogger* logger, int sortorder = FILESIZE_DISK) : CZDirectory(NULL, name, NULL, NULL)
+    CZRoot(wchar_t const* name, CLogger* logger, int sortorder = FILESIZE_DISK) : CZDirectory(NULL, name, NULL, NULL)
     {
         this->_clustersize = 0;
         this->_minimalfilesize = 0; //TODO: pro NTFS = 512
@@ -121,18 +120,17 @@ public:
             return 0;
         if (!this->_clustersize)
         {
-            CPathBuffer path;
-            size_t pos = this->GetFullName(path, path.Size() - 3);
-            if (path[pos - 1] != TEXT('\\'))
-                path[pos++] = TEXT('\\');
-            path[pos++] = TEXT('\0');
+            std::wstring path;
+            this->GetFullName(path);
+            if (path.empty() || path.back() != L'\\')
+                path.push_back(L'\\');
             DWORD SectorsPerCluster = 0;
             DWORD BytesPerSector = 0;
             DWORD NumberOfFreeClusters = 0;
             DWORD TotalNumberOfClusters = 0;
-            if (!GetDiskFreeSpace(path, &SectorsPerCluster, &BytesPerSector, &NumberOfFreeClusters, &TotalNumberOfClusters))
+            if (!GetDiskFreeSpaceW(path.c_str(), &SectorsPerCluster, &BytesPerSector, &NumberOfFreeClusters, &TotalNumberOfClusters))
             {
-                this->_logger->Log(new CBasicLogItem(LOG_ERROR, TEXT("Problem with GetDiskFreeSpace() API."), NULL));
+                this->_logger->Log(new CBasicLogItem(LOG_ERROR, L"Problem with GetDiskFreeSpace() API.", NULL));
             }
             else
             {
@@ -157,8 +155,7 @@ public:
 
     INT64 SyncPopulate()
     {
-        CPathBuffer path;
-        return this->PopulateDir(NULL, path, 0, path.Size());
+        return this->PopulateDir(NULL, std::wstring());
     }
 
     CWorkerThread* BeginAsyncPopulate(HWND owner, UINT msg)

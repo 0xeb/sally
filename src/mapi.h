@@ -12,6 +12,14 @@ typedef unsigned long LHANDLE, FAR *LPLHANDLE;
 
 //#define MAPI_MESSAGEID_LENGTH   64
 
+// These four structs are Sally's hand-rolled mirror of
+// mapi32.dll's Simple MAPI contract ("no header available", see the GetProcAddress call in
+// mapi.cpp) - an external DLL ABI this project does not own and cannot widen. MAPISendMail is
+// loaded by its ANSI export name, whose lpsz* fields are LPSTR; a P1.5 mechanical sweep had
+// widened them to LPWSTR here, which would hand mapi32.dll's ANSI entry point a wchar_t*
+// pointer it reads as char* - an ASCII attachment path would appear to truncate at its first
+// NUL byte. Reverted to the correct (narrow) contract; the wide-to-ANSI boundary conversion now
+// lives in CSimpleMAPI::SendMail, exact-or-refuse rather than best-fit.
 typedef struct
 {
     ULONG ulReserved;            // Reserved for future use (must be 0)
@@ -44,11 +52,11 @@ typedef struct
 typedef struct
 {
     ULONG ulReserved;             // Reserved for future use (M.B. 0)
-    LPSTR lpszSubject;            // Message Subject
-    LPSTR lpszNoteText;           // Message Text
-    LPSTR lpszMessageType;        // Message Class
-    LPSTR lpszDateReceived;       // in YYYY/MM/DD HH:MM format
-    LPSTR lpszConversationID;     // conversation thread ID
+    LPSTR lpszSubject;             // Message Subject
+    LPSTR lpszNoteText;            // Message Text
+    LPSTR lpszMessageType;         // Message Class
+    LPSTR lpszDateReceived;        // in YYYY/MM/DD HH:MM format
+    LPSTR lpszConversationID;      // conversation thread ID
     FLAGS flFlags;                // unread,return receipt
     lpMapiRecipDesc lpOriginator; // Originator descriptor
     ULONG nRecipCount;            // Number of recipients
@@ -112,7 +120,7 @@ protected:
     HINSTANCE HLibrary;           // MAPI32.DLL library
     PFNMAPISENDMAIL MAPISendMail; // function extracted from it
 
-    TDirectArray<char*> FileNames; // array of pointers to the names of files being sent
+    TDirectArray<wchar_t*> FileNames; // array of pointers to the names of files being sent
     CQuadWord TotalSize;           // total size of the files (from FileNames)
 
 public:
@@ -131,7 +139,7 @@ public:
     // increases TotalSize by the file size and creates its own copy of the name
     // returns TRUE on success, otherwise returns FALSE
     // the array is cleared when Release method is called
-    BOOL AddFile(const char* fileName, const CQuadWord* size);
+    BOOL AddFile(const wchar_t* fileName, const CQuadWord* size);
 
     int GetFilesCount() { return FileNames.Count; }
     void GetTotalSize(CQuadWord* size) { *size = TotalSize; }

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
+// SPDX-FileCopyrightText: 2025-2026 Elias Bachaalany
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #ifdef SALLY_WORKER_CORE_STANDALONE
@@ -33,7 +33,7 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath)
     }
 
     std::wstring pathToUse;
-    PathResult pathRes = gPathService->ToLongPath(fullPath, pathToUse);
+    PathResult pathRes = gPathService->PrepareForIo(fullPath, pathToUse);
     if (!pathRes.success)
     {
         info.LastError = pathRes.errorCode;
@@ -63,7 +63,7 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath)
         info.FileName = findData.cFileName;
         if (findData.cAlternateFileName[0] != L'\0')
             info.AlternateName = findData.cAlternateFileName;
-        HANDLES(FindClose(hFind));
+        SalLPFindClose(hFind);
     }
     else
     {
@@ -88,35 +88,6 @@ std::wstring BuildPathW(const wchar_t* directory, const wchar_t* fileName)
 
     result += fileName;
     return result;
-}
-
-std::wstring BuildPathW(const char* directory, const char* fileName)
-{
-    std::wstring dirW, nameW;
-
-    // Convert directory to wide
-    if (directory != NULL && directory[0] != '\0')
-    {
-        int dirLen = MultiByteToWideChar(CP_ACP, 0, directory, -1, NULL, 0);
-        if (dirLen > 0)
-        {
-            dirW.resize(dirLen - 1);
-            MultiByteToWideChar(CP_ACP, 0, directory, -1, dirW.data(), dirLen);
-        }
-    }
-
-    // Convert filename to wide
-    if (fileName != NULL && fileName[0] != '\0')
-    {
-        int nameLen = MultiByteToWideChar(CP_ACP, 0, fileName, -1, NULL, 0);
-        if (nameLen > 0)
-        {
-            nameW.resize(nameLen - 1);
-            MultiByteToWideChar(CP_ACP, 0, fileName, -1, nameW.data(), nameLen);
-        }
-    }
-
-    return BuildPathW(dirW.c_str(), nameW.c_str());
 }
 
 BOOL PathExistsW(const wchar_t* path)
@@ -255,7 +226,7 @@ void RemoveDoubleBackslashesW(std::wstring& path)
     path.resize(writePos);
 }
 
-std::wstring GetRootPathW(const wchar_t* path)
+std::wstring GetRootPath(const wchar_t* path)
 {
     if (path == NULL || path[0] == L'\0')
         return std::wstring();
@@ -286,6 +257,28 @@ std::wstring GetRootPathW(const wchar_t* path)
         root += L'\\';
         return root;
     }
+}
+
+const wchar_t* SkipRootW(const wchar_t* path)
+{
+    if (path == NULL)
+        return NULL;
+
+    if (path[0] == L'\\' && path[1] == L'\\') // UNC
+    {
+        const wchar_t* s = path + 2;
+        while (*s != L'\0' && *s != L'\\')
+            s++; // server
+        if (*s != L'\0')
+            s++; // the backslash between server and share
+        while (*s != L'\0' && *s != L'\\')
+            s++; // share
+        return s;
+    }
+    // Local path: the root is exactly the drive letter and its colon. Matches
+    // the narrow SkipRoot, which does not validate the letter either — callers
+    // reach here only with a path they already know is drive-rooted.
+    return (path[0] != L'\0' && path[1] != L'\0') ? path + 2 : path + wcslen(path);
 }
 
 BOOL IsUNCRootPathW(const wchar_t* path)
@@ -486,7 +479,7 @@ std::wstring GetParentPathW(const wchar_t* path)
     return p.substr(0, lastSlash);
 }
 
-BOOL IsTheSamePathW(const wchar_t* path1, const wchar_t* path2)
+BOOL IsTheSamePath(const wchar_t* path1, const wchar_t* path2)
 {
     if (path1 == NULL || path2 == NULL)
         return (path1 == path2);

@@ -35,15 +35,14 @@ protected:
 
     int* ErrorResID; // if not NULL, stores the id of the string in resources that describes the error
     BOOL* LowMem;    // if not NULL, stores TRUE for an error caused by lack of memory
-    char* ErrBuf;    // buffer of size ErrBufSize for the textual description of the error (higher priority than ErrorResID)
-    int ErrBufSize;  // size of the ErrBuf buffer (0 = NULL buffer)
+    std::string* ErrorText; // dynamically owned local/configuration-byte diagnostic (higher priority than ErrorResID)
 
     CFTPAutodetCondFunction ActFunction; // function data (only if the current symbol is lexFunction)
     void* ActFuncAlgorithm;              // either (CSalamanderBMSearchData*) or (CSalamanderREGEXPSearchData*)
 
 public:
     CFTPAutodetCondLexAn(const char* cond, const char* condEnd, int* errorResID, BOOL* lowMem,
-                         char* errBuf, int errBufSize);
+                         std::string* errorText);
     ~CFTPAutodetCondLexAn() { ReleaseActFuncAlgorithm(); }
 
     // release ActFuncAlgorithm and set it to NULL
@@ -66,7 +65,7 @@ public:
     void SetErrorResID(int errorResID)
     {
         if (ErrorResID != NULL && *ErrorResID == -1 &&
-            (ErrBufSize <= 0 || ErrBuf[0] == 0))
+            (ErrorText == NULL || ErrorText->empty()))
             *ErrorResID = errorResID;
     }
 
@@ -78,8 +77,8 @@ public:
 };
 
 CFTPAutodetCondLexAn::CFTPAutodetCondLexAn(const char* cond, const char* condEnd,
-                                           int* errorResID, BOOL* lowMem, char* errBuf,
-                                           int errBufSize)
+                                           int* errorResID, BOOL* lowMem,
+                                           std::string* errorText)
 {
     CondBeg = cond;
     CondEnd = condEnd;
@@ -90,8 +89,7 @@ CFTPAutodetCondLexAn::CFTPAutodetCondLexAn(const char* cond, const char* condEnd
     LowMem = lowMem;
     ActFunction = acfNone;
     ActFuncAlgorithm = NULL;
-    ErrBuf = errBuf;
-    ErrBufSize = errBufSize;
+    ErrorText = errorText;
 }
 
 void CFTPAutodetCondLexAn::ReleaseActFuncAlgorithm()
@@ -145,22 +143,21 @@ CFTPAutodetCondLexAn::GetActualElement()
                 const char* beg = s;
                 if (SkipIdentifier(s, end, NULL, 0))
                 {
-                    char id[100];
-                    int idLen = (int)(s - beg);
-                    lstrcpyn(id, beg, min(100, idLen + 1));
+                    const std::string_view id(beg, static_cast<size_t>(s - beg));
+                    const size_t idLen = id.size();
 
                     ActElem = lexUnknown;
-                    if (idLen == 2 && _stricmp(id, "or") == 0)
+                    if (idLen == 2 && FtpEqualAsciiTokenNoCase(id, "or"))
                         ActElem = lexLogOr;
                     else
                     {
                         if (idLen == 3)
                         {
-                            if (_stricmp(id, "and") == 0)
+                            if (FtpEqualAsciiTokenNoCase(id, "and"))
                                 ActElem = lexLogAnd;
                             else
                             {
-                                if (_stricmp(id, "not") == 0)
+                                if (FtpEqualAsciiTokenNoCase(id, "not"))
                                     ActElem = lexLogNegation;
                             }
                         }
@@ -190,7 +187,7 @@ CFTPAutodetCondLexAn::GetActualElement()
                     int i;
                     for (i = 0; i < count; i++)
                     {
-                        if (_stricmp(functionNames[i], id) == 0)
+                        if (FtpEqualAsciiTokenNoCase(functionNames[i], id))
                         {
                             funcType = functionCodes[i];
                             break;
@@ -319,12 +316,18 @@ CFTPAutodetCondLexAn::GetActualElement()
                                                     {
                                                         Cond = orgStrBeg;
                                                         const char* err = ((CSalamanderREGEXPSearchData*)ActFuncAlgorithm)->GetLastErrorText();
-                                                        if (ErrBufSize > 0)
+                                                        if (ErrorText != NULL)
                                                         {
+                                                            std::string stagedError;
+                                                            BOOL errorStored;
                                                             if (err != NULL)
-                                                                _snprintf_s(ErrBuf, ErrBufSize, _TRUNCATE, LoadStr(IDS_STPAR_ERR_INVALREGEXP), err);
+                                                                errorStored = FTPFormatString(stagedError, LoadStr(IDS_STPAR_ERR_INVALREGEXP), err);
                                                             else
-                                                                _snprintf_s(ErrBuf, ErrBufSize, _TRUNCATE, LoadStr(IDS_STPAR_ERR_INVALREGEXP2));
+                                                                errorStored = FtpStoreLocalTextBytes(LoadStr(IDS_STPAR_ERR_INVALREGEXP2), stagedError);
+                                                            if (errorStored)
+                                                                ErrorText->swap(stagedError);
+                                                            else
+                                                                SetLowMem();
                                                         }
                                                         SalamanderGeneral->FreeSalamanderREGEXPSearchData((CSalamanderREGEXPSearchData*)ActFuncAlgorithm);
                                                         ActFuncAlgorithm = NULL;
@@ -445,7 +448,7 @@ CFTPAutodetCondNode* FTP_AC_Term(CFTPAutodetCondLexAn& lexAn);
 //
 
 CFTPAutodetCondNode* CompileAutodetectCond(const char* cond, int* errorPos, int* errorResID,
-                                           BOOL* lowMem, char* errBuf, int errBufSize)
+                                           BOOL* lowMem, std::string* errorText)
 {
     CALL_STACK_MESSAGE1("CompileAutodetectCond()");
     if (errorPos != NULL)
@@ -454,10 +457,10 @@ CFTPAutodetCondNode* CompileAutodetectCond(const char* cond, int* errorPos, int*
         *errorResID = -1;
     if (lowMem != NULL)
         *lowMem = FALSE;
-    if (errBufSize > 0)
-        errBuf[0] = 0;
+    if (errorText != NULL)
+        errorText->clear();
 
-    CFTPAutodetCondLexAn lexAn(cond, cond + strlen(cond), errorResID, lowMem, errBuf, errBufSize);
+    CFTPAutodetCondLexAn lexAn(cond, cond + strlen(cond), errorResID, lowMem, errorText);
     if (lexAn.GetActualElement() != lexEOS) // non-empty condition -> start parsing
     {
         CFTPAutodetCondNode* node = FTP_AC_ExpOr(lexAn);

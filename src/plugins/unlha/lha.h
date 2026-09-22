@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //**************************************************************************
 //
 //  Structure of an LHA archive:
@@ -46,7 +48,7 @@ struct LHA_HEADER
     FILETIME last_modified_filetime; // last_modified_stamp converted to FILETIME
     unsigned char attribute;
     unsigned char header_level;
-    char name[MAX_PATH];
+    std::string name; // archive-format bytes; decode once at the host boundary
     unsigned short crc;
     BOOL has_crc;
     unsigned char extend_type;
@@ -86,7 +88,7 @@ void LHAInit();
 //                   Returns TRUE if everything is fine, otherwise FALSE.
 //
 
-BOOL LHAOpenArchive(FILE*& f, LPCTSTR lpName);
+BOOL LHAOpenArchive(FILE*& f, const wchar_t* lpName);
 
 //**************************************************************************
 //
@@ -112,7 +114,7 @@ int LHAGetHeader(FILE* hFile, LHA_HEADER* lpHeader);
 //
 
 BOOL LHAUnpackFile(FILE* infile, HANDLE outfile, LHA_HEADER* lpHeader, int* CRC,
-                   char* fileName /* output file name for SafeWriteFile */);
+                   const wchar_t* fileName /* output file name, display-only (error dialogs); never used for I/O */);
 
 /*
     Note: Why does 'infile' use CRT I/O functions and 'outfile' use API functions?

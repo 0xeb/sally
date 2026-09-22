@@ -21,6 +21,9 @@
 #include "../../IPassword.h"
 #include "../../MyVersion.h"
 
+#include <string>
+#include <vector>
+
 #ifdef _WIN32
 HINSTANCE g_hInstance = 0;
 #endif
@@ -32,7 +35,7 @@ DEFINE_GUID(CLSID_CFormat7z,
 
 using namespace NWindows;
 
-#define kDllName "7za.dll"
+#define kDllName L"7za.dll"
 
 typedef UINT32 (WINAPI * CreateObjectFunc)(
     const GUID *clsID,
@@ -40,32 +43,21 @@ typedef UINT32 (WINAPI * CreateObjectFunc)(
     void **outObject);
 
 
-static AString FStringToConsoleString(const FString &s)
-{
-  return GetOemString(fs2us(s));
-}
-
-static FString CmdStringToFString(const char *s)
-{
-  return us2fs(GetUnicodeString(s));
-}
-
-char *OutputBuffer = NULL;
-int OutputBufferSize = 0;
+thread_local std::wstring OutputText;
 
 static void PrintString(const UString &s)
 {
-  _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "%s", (LPCSTR)GetOemString(s));
+  OutputText += s.Ptr();
 }
 
 static void PrintString(const AString &s)
 {
-  _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "%s", (LPCSTR)s);
+  OutputText += GetUnicodeString(s).Ptr();
 }
 
 static void PrintNewLine()
 {
-  _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "\n");
+  OutputText += L'\n';
 }
 
 static void PrintStringLn(const AString &s)
@@ -76,9 +68,10 @@ static void PrintStringLn(const AString &s)
 
 static void PrintError(const char *message, const FString &name)
 {
-  _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "Error: %s", (LPCSTR)message);
+  OutputText += L"Error: ";
+  OutputText += GetUnicodeString(AString(message)).Ptr();
   PrintNewLine();
-  PrintString(FStringToConsoleString(name));
+  PrintString(name);
   PrintNewLine();
 }
 
@@ -655,46 +648,79 @@ STDMETHODIMP CArchiveUpdateCallback::CryptoGetTextPassword2(Int32 *passwordIsDef
 }
 
 
-/*
-HINSTANCE GetHInstance()
-{    
-    MEMORY_BASIC_INFORMATION mbi;
-    TCHAR szModule[MAX_PATH];
-
-    SetLastError(ERROR_SUCCESS);
-    if (VirtualQuery(GetHInstance,&mbi,sizeof(mbi)))
-    {
-        if (GetModuleFileName((HINSTANCE)mbi.AllocationBase,szModule,sizeof(szModule)))
-        {
-            return (HINSTANCE)mbi.AllocationBase;
-        }        
-    }
-    return NULL;
-}
-*/
-
 HINSTANCE HModule = NULL;
 
 // see http://msdn.microsoft.com/en-us/library/bb687850.aspx
 #define EXPORT comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
 
-BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, const char* filter, char *errorMessage, int errorMessageSize)
+class CErrorOutputPublisher
+{
+  wchar_t **Output;
+
+public:
+  explicit CErrorOutputPublisher(wchar_t **output): Output(output)
+  {
+    *Output = NULL;
+    OutputText.clear();
+  }
+
+  ~CErrorOutputPublisher()
+  {
+    if (OutputText.empty())
+      return;
+    const size_t bytes = (OutputText.size() + 1) * sizeof(wchar_t);
+    wchar_t *published = static_cast<wchar_t *>(CoTaskMemAlloc(bytes));
+    if (published != NULL)
+    {
+      memcpy(published, OutputText.c_str(), bytes);
+      *Output = published;
+    }
+  }
+};
+
+static bool GetWrapperModulePath(std::wstring &path)
+{
+  std::vector<wchar_t> buffer(256);
+  for (;;)
+  {
+    SetLastError(ERROR_SUCCESS);
+    const DWORD length = GetModuleFileNameW(HModule, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0)
+      return false;
+    if (length < buffer.size() && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+    {
+      path.assign(buffer.data(), length);
+      return true;
+    }
+    if (buffer.size() > MAXDWORD / 2)
+      return false;
+    buffer.resize(buffer.size() * 2);
+  }
+}
+
+BOOL WINAPI CompressFilesW(const wchar_t* archiveName7z, const wchar_t* sourceDir, const wchar_t* filter, wchar_t **errorMessage)
 {
   #pragma EXPORT
 
-  OutputBuffer = errorMessage;
-  OutputBuffer[0] = 0;
-  OutputBufferSize = errorMessageSize;
+  CErrorOutputPublisher publishError(errorMessage);
+  try
+  {
 
-  HMODULE hmod = HModule;
-  char dllPath[MAX_PATH] = {0};
-  GetModuleFileNameA(hmod, dllPath, MAX_PATH);
-  *strrchr(dllPath, '\\') = 0;
-  lstrcatA(dllPath, "\\");
-  lstrcatA(dllPath, kDllName);
+  std::wstring dllPath;
+  if (!GetWrapperModulePath(dllPath))
+  {
+    PrintError("Can not locate 7-zip wrapper library");
+    return FALSE;
+  }
+  const size_t separator = dllPath.rfind(L'\\');
+  if (separator != std::wstring::npos)
+    dllPath.resize(separator + 1);
+  else
+    dllPath.clear();
+  dllPath += kDllName;
 
   NDLL::CLibrary lib;
-  if (!lib.Load((CFSTR)dllPath))
+  if (!lib.Load((CFSTR)dllPath.c_str()))
   {
     PrintError("Can not load 7-zip library");
     return FALSE;
@@ -706,25 +732,29 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
     return FALSE;
   }
 
-  FString archiveName = CmdStringToFString(archiveName7z);
+  FString archiveName = archiveName7z;
   CObjectVector<CDirItem> dirItems;
 
-//  SetCurrentDirectoryA(sourceDir);
-  WIN32_FIND_DATAA find;
-  HANDLE hFind = FindFirstFileA(filter, &find);
+  WIN32_FIND_DATAW find;
+  HANDLE hFind = FindFirstFileW(filter, &find);
   if (hFind != INVALID_HANDLE_VALUE)
   {
     do
     {
-      if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
+      if (find.cFileName[0] != 0 && wcscmp(find.cFileName, L".") != 0 && wcscmp(find.cFileName, L"..") != 0)
       {
         CDirItem di;
-        FString name = CmdStringToFString(find.cFileName);
+        FString name = find.cFileName;
+        FString fullPath = sourceDir;
+        if (!fullPath.IsEmpty() && fullPath.Back() != L'\\')
+          fullPath += L'\\';
+        fullPath += find.cFileName;
         
         NFile::NFind::CFileInfo fi;
-        if (!fi.Find(name))
+        if (!fi.Find(fullPath))
         {
           PrintError("Can't find file", name);
+          FindClose(hFind);
           return FALSE;
         }
 
@@ -734,10 +764,10 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
         di.ATime = fi.ATime;
         di.MTime = fi.MTime;
         di.Name = fs2us(name);
-        di.FullPath = name;
+        di.FullPath = fullPath;
         dirItems.Add(di);
       }
-    } while (FindNextFileA(hFind, &find));
+    } while (FindNextFileW(hFind, &find));
     FindClose(hFind);
   }
 
@@ -800,44 +830,17 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
     return FALSE;
 
   return TRUE;
-
-
-
-  /*
-  errorMessage[0] = 0;
-  try
-	{
-	  SevenZip::SevenZipLibrary lib;
-
-    HINSTANCE hInstance = GetHInstance();
-    wchar_t dllPath[MAX_PATH];
-    GetModuleFileName(hInstance, dllPath, MAX_PATH);
-    lstrcpy(StrRChr(dllPath, NULL, L'\\'), L"\\7za.dll");
-	  lib.Load(dllPath);
-
-    wchar_t archiveNameW[MAX_PATH];
-    wchar_t sourceDirW[MAX_PATH];
-    wchar_t filterW[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, archiveName, -1, archiveNameW, MAX_PATH);
-    archiveNameW[MAX_PATH - 1] = 0;
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, sourceDir, -1, sourceDirW, MAX_PATH);
-    sourceDirW[MAX_PATH - 1] = 0;
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filter, -1, filterW, MAX_PATH);
-    filterW[MAX_PATH - 1] = 0;
-
-	  SevenZip::SevenZipCompressor compressor(lib, archiveNameW);
-    compressor.SetCompressionLevel(SevenZip::CompressionLevel::Ultra);
-    compressor.CompressFiles(sourceDirW, filterW, FALSE);
-	  return TRUE;
   }
-  catch (SevenZip::SevenZipException& ex)
-	{
-    const wchar_t *msg = ex.GetMessage().GetString();
-    WideCharToMultiByte(CP_ACP, 0, (wchar_t *)msg, -1, errorMessage, errorMessageSize, NULL, NULL);
-    errorMessage[errorMessageSize - 1] = 0;
-	  return FALSE;
-	}
-  */
+  catch (const std::bad_alloc &)
+  {
+    return FALSE;
+  }
+  catch (...)
+  {
+    try { PrintError("Unexpected failure while creating archive"); }
+    catch (...) {}
+    return FALSE;
+  }
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,

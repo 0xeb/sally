@@ -145,14 +145,16 @@ CWorkerFileData::DetachHFile()
 // CFilecompWorker
 //
 
-CFilecompWorker::CFilecompWorker(HWND parent, HWND mainWindow, const char* name0, const char* name1, const CCompareOptions& options, const int& cancelFlag, HANDLE event, const wchar_t* name0W, const wchar_t* name1W) : CancelFlag(cancelFlag)
+CFilecompWorker::CFilecompWorker(HWND parent, HWND mainWindow,
+                                 const wchar_t* name0, const wchar_t* name1,
+                                 const CCompareOptions& options,
+                                 const int& cancelFlag, HANDLE event)
+    : CancelFlag(cancelFlag)
 {
     Parent = parent;
     MainWindow = mainWindow;
-    Files[0].Name = name0 ? name0 : "";
-    Files[1].Name = name1 ? name1 : "";
-    Files[0].NameW = AnsiToWidePath(name0, name0W);
-    Files[1].NameW = AnsiToWidePath(name1, name1W);
+    Files[0].Name = name0 ? name0 : L"";
+    Files[1].Name = name1 ? name1 : L"";
     Options = options;
     Event = event;
 }
@@ -162,17 +164,24 @@ void CFilecompWorker::CException::Raise(int error, int lastError, ...)
     CALL_STACK_MESSAGE3("CFilecompWorker::CWorkerException::Raise(%d, %d, )", error, lastError);
     va_list arglist;
     va_start(arglist, lastError);
-    char buf[1024]; //temp variable
-    *buf = 0;
-    vsprintf(buf, LoadStr(error), arglist);
+    std::wstring message;
+    try
+    {
+        message = SPLFormatStringOwnedV(LangStr(error).c_str(), arglist);
+    }
+    catch (...)
+    {
+        va_end(arglist);
+        throw;
+    }
     va_end(arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        std::wstring systemError;
+        if (SPLGetErrorTextOwned(SG, lastError, systemError))
+            message += systemError;
     }
-    throw CException(buf);
+    throw CException(message.c_str());
 }
 
 unsigned
@@ -183,30 +192,36 @@ CFilecompWorker::Body()
     {
         GuardedBody();
     }
-    catch (CException e)
+    catch (const CException& e)
     {
-        TRACE_I("Error in worker. " << e.what());
-        SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_ERROR, (LPARAM)e.what());
+        TRACE_IW(L"Error in worker. " << e.WhatW());
+        SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_ERROR, (LPARAM)e.WhatW());
     }
-    catch (diff_exception e)
-    {
-        TRACE_I("Operation canceled. CancelFlag = " << CancelFlag);
-        PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_WORKER_CANCELED, 0);
-    }
-    catch (CAbortByUserException e)
+    catch (const diff_exception&)
     {
         TRACE_I("Operation canceled. CancelFlag = " << CancelFlag);
         PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_WORKER_CANCELED, 0);
     }
-    catch (CFilesDontDifferException e)
+    catch (const CAbortByUserException&)
+    {
+        TRACE_I("Operation canceled. CancelFlag = " << CancelFlag);
+        PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_WORKER_CANCELED, 0);
+    }
+    catch (const CFilesDontDifferException& e)
     {
         TRACE_I("Files don't differ. " << e.what());
         PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_NO_DIFFERENCE, 0);
     }
-    catch (CAllDiffsIgnoredException e)
+    catch (const CAllDiffsIgnoredException& e)
     {
         TRACE_I("All differences were ignored. " << e.what());
         PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_NO_ALL_DIFFS_IGNORED, 0);
+    }
+    catch (const std::bad_alloc&)
+    {
+        static const wchar_t OutOfMemory[] = L"Out of memory.";
+        SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_ERROR,
+                    reinterpret_cast<LPARAM>(OutOfMemory));
     }
     SetEvent(Event);
     _CrtCheckMemory();
@@ -224,7 +239,7 @@ void CFilecompWorker::GuardedBody()
         // See https://forum.altap.cz/viewtopic.php?t=2675
         // See also CHexFileViewWindow::SetData()
         // Use CreateFileW with wide path to support Unicode/long path filenames
-        Files[i].File = CreateFileW(Files[i].NameW.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        Files[i].File = CreateFileW(Files[i].Name.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                     NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (Files[i].File == INVALID_HANDLE_VALUE)
             CException::Raise(IDS_OPEN, GetLastError(), Files[i].Name.c_str());
@@ -297,7 +312,7 @@ void CFilecompWorker::GuardedBody()
                     // compare as UCS-4/UTF-32 text
                     // TODO maybe support this in the future; currently we handle only BMP
                     // this code path never runs, HasSurrogates always returns false
-                    throw CFilecompWorker::CException("Only BMP character set is supported.");
+                    throw CFilecompWorker::CException(L"Only BMP character set is supported.");
                     //CompareTextFiles<DWORD>(files);
                 }
                 else

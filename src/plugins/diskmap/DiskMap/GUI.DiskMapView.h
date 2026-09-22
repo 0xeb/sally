@@ -10,7 +10,7 @@
 #include "GUI.LoadAnimation.h"
 #include "GUI.ViewConnectorBase.h"
 
-const TCHAR szDiskMapViewClass[] = TEXT("Zar.DM.DMView.WC");
+const wchar_t szDiskMapViewClass[] = L"Zar.DM.DMView.WC";
 
 #define IDT_ANIMTIMER 1
 #define ANIMTIMER_TIME 10
@@ -53,17 +53,70 @@ protected:
         return MyCreateWindow(
             0,
             szDiskMapViewClass,
-            TEXT("DiskMap"),
+            L"DiskMap",
             WS_CHILD | WS_VISIBLE,
             left, top,     //X, Y
             width, height, // WIDTH, HEIGHT
             NULL);
     }
+    // Centred two-line notice on a black field, in the same layout the load animation uses so the
+    // view does not jump when it is replaced. Shared by every "there is no treemap to show" state.
+    void DrawCenteredNotice(HDC hdc, const RECT& rect, UINT titleID, UINT footerID)
+    {
+        //HACK: this was put together quickly to have something for version 1.0; fortunately it should not happen too often
+        //TODO: rework properly
+        BitBlt(hdc, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, NULL, 0, 0, BLACKNESS);
+
+        NONCLIENTMETRICS ncm;
+        ncm.cbSize = sizeof(ncm);
+        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+        HFONT hfnormal = CreateFontIndirect(&ncm.lfStatusFont);
+
+        HFONT ofont = SelectFont(hdc, hfnormal);
+
+        CZResourceString info1(titleID);
+        CZResourceString info2(footerID);
+        SIZE sz1;
+        SIZE sz2;
+        GetTextExtentPoint32W(hdc, info1.GetString(), (int)info1.GetLength(), &sz1);
+        GetTextExtentPoint32W(hdc, info2.GetString(), (int)info2.GetLength(), &sz2);
+
+        int w = (8 + 1) * 24 + 3; // from LoadAnimation
+        int x = (rect.left + rect.right - w) / 2;
+        int y = (rect.bottom - 8 - 4) / 2 + 8 + 4 + 6; //matches the title from LoadAnimation
+
+        SetTextColor(hdc, RGB(255, 255, 255));
+        SetBkColor(hdc, RGB(0, 0, 0));
+
+        ExtTextOutW(hdc, x, y, 0, NULL, info1.GetString(), (UINT)info1.GetLength(), NULL);
+
+        y += sz1.cy + 2;
+
+        HPEN pn_rct = CreatePen(PS_SOLID, 1, RGB(192, 192, 192));
+
+        HPEN open = SelectPen(hdc, pn_rct);
+        //Dividing line
+        MoveToEx(hdc, x, y, NULL);
+        LineTo(hdc, x + w, y);
+
+        SelectPen(hdc, open);
+        DeletePen(pn_rct);
+
+        y += 6;
+
+        ExtTextOutW(hdc, x + w - sz2.cx, y, 0, NULL, info2.GetString(), (UINT)info2.GetLength(), NULL);
+
+        SelectFont(hdc, ofont);
+        DeleteFont(hfnormal);
+    }
     void DoPaint(PAINTSTRUCT* pps)
     {
         HDC hdc = pps->hdc;
 
-#ifdef _DEBUG
+        // Paint timing is opt-in via TIMINGTEST (DiskMapPlugin/precomp.h), not #ifdef _DEBUG. It
+        // draws over the map itself, and every other timing overlay in this plug-in already uses
+        // that switch - see the TIMINGTEST blocks in TreeMap.CDiskMap.h.
+#ifdef TIMINGTEST
         LARGE_INTEGER lt1, lt2, lf;
         QueryPerformanceCounter(&lt1);
 #endif
@@ -75,69 +128,30 @@ protected:
         {
             this->_anim->Paint(hdc, rect);
         }
+        else if (this->_diskmap && this->_diskmap->IsViewEmpty())
+        {
+            // The map is ready and correct, it just has nothing in it - an empty directory, or one
+            // whose every child was unreadable. Painting the (now cleared) pixmap would leave a
+            // featureless rectangle with no way to tell that apart from a failure.
+            this->DrawCenteredNotice(hdc, rect, IDS_DISKMAP_EMPTY_TITLE, IDS_DISKMAP_EMPTY_FOOTER);
+        }
         else if (this->_diskmap && this->_diskmap->Paint(hdc, rect))
         {
             //OK... no body - everything drawn in DiskMap::Paint()
         }
         else
         {
-            //TODO: Display something!
-            BitBlt(hdc, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, NULL, 0, 0, BLACKNESS);
-
-            //HACK: this was put together quickly to have something for version 1.0; fortunately it should not happen too often
-            //TODO: rework properly
-            NONCLIENTMETRICS ncm;
-            ncm.cbSize = sizeof(ncm);
-            SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
-            HFONT hfnormal = CreateFontIndirect(&ncm.lfStatusFont);
-
-            HFONT ofont = SelectFont(hdc, hfnormal);
-
-            CZResourceString info1(IDS_DISKMAP_ABORT_TITLE);
-            CZResourceString info2(IDS_DISKMAP_ABORT_FOOTER);
-            SIZE sz1;
-            SIZE sz2;
-            GetTextExtentPoint32(hdc, info1.GetString(), (int)info1.GetLength(), &sz1);
-            GetTextExtentPoint32(hdc, info2.GetString(), (int)info2.GetLength(), &sz2);
-
-            int w = (8 + 1) * 24 + 3; // from LoadAnimation
-            int x = (rect.left + rect.right - w) / 2;
-            int y = (rect.bottom - 8 - 4) / 2 + 8 + 4 + 6; //matches the title from LoadAnimation
-
-            SetTextColor(hdc, RGB(255, 255, 255));
-            SetBkColor(hdc, RGB(0, 0, 0));
-
-            ExtTextOut(hdc, x, y, 0, NULL, info1.GetString(), (UINT)info1.GetLength(), NULL);
-
-            y += sz1.cy + 2;
-
-            HPEN pn_rct = CreatePen(PS_SOLID, 1, RGB(192, 192, 192));
-
-            HPEN open = SelectPen(hdc, pn_rct);
-            //Dividing line
-            MoveToEx(hdc, x, y, NULL);
-            LineTo(hdc, x + w, y);
-
-            SelectPen(hdc, open);
-            DeletePen(pn_rct);
-
-            y += 6;
-
-            ExtTextOut(hdc, x + w - sz2.cx, y, 0, NULL, info2.GetString(), (UINT)info2.GetLength(), NULL);
-
-            SelectFont(hdc, ofont);
-            DeleteFont(hfnormal);
+            this->DrawCenteredNotice(hdc, rect, IDS_DISKMAP_ABORT_TITLE, IDS_DISKMAP_ABORT_FOOTER);
         }
 
-#ifdef _DEBUG
+#ifdef TIMINGTEST
         QueryPerformanceCounter(&lt2);
         QueryPerformanceFrequency(&lf);
 
-        static TCHAR sbuff[260];
-        static int slen = 0;
+        wchar_t sbuff[260];
         double tf = (double)(lt2.QuadPart - lt1.QuadPart) / lf.QuadPart;
-        slen = _stprintf(sbuff, TEXT("WM_PAINT - 1: t1=%1.8lg   t2=%1.8f   f=%I64d"), tf, tf, lf.QuadPart);
-        TextOut(hdc, 0, 60, sbuff, slen);
+        int slen = swprintf(sbuff, 260, L"WM_PAINT - 1: t1=%1.8lg   t2=%1.8f   f=%I64d", tf, tf, lf.QuadPart);
+        TextOutW(hdc, 0, 60, sbuff, slen);
 #endif
     }
 
@@ -199,20 +213,20 @@ protected:
             CZFile* f = cs->GetFile();
             if (f != NULL)
             {
-                CPathBuffer buff;
-                f->GetFullName(buff, buff.Size());
+                std::wstring buff;
+                f->GetFullName(buff);
                 int icmd = 0;
 #ifdef SALAMANDER
                 if (this->_connector->GetSalamander() != NULL)
                 {
-                    icmd = this->_shellmenu->ShowFileMenu(buff, xPos, yPos, this->_connector->GetSalamander()->CanFocusFile(), this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
+                    icmd = this->_shellmenu->ShowFileMenu(buff.c_str(), xPos, yPos, this->_connector->GetSalamander()->CanFocusFile(), this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
                 }
                 else
                 {
-                    icmd = this->_shellmenu->ShowFileMenu(buff, xPos, yPos, FALSE, this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
+                    icmd = this->_shellmenu->ShowFileMenu(buff.c_str(), xPos, yPos, FALSE, this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
                 }
 #else
-                icmd = this->_shellmenu->ShowFileMenu(buff, xPos, yPos, this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
+                icmd = this->_shellmenu->ShowFileMenu(buff.c_str(), xPos, yPos, this->_diskmap->CanZoomIn(), this->_diskmap->CanZoomOut());
 #endif
                 if (icmd == IDM_ZOOMIN)
                 {
@@ -232,7 +246,7 @@ protected:
                 else if (icmd == IDM_FOCUS)
                 {
                     if (this->_connector->GetSalamander())
-                        this->_connector->GetSalamander()->FocusFile(buff);
+                        this->_connector->GetSalamander()->FocusFile(buff.c_str());
                 }
 #endif
             }
@@ -360,9 +374,9 @@ protected:
         //this->_diskmap->GetParentDir()
         this->_tooltip->SetDirInfo(this->_diskmap->GetRootDir(), this->_diskmap->GetViewDir());
 
-        CPathBuffer buff;
-        this->_diskmap->GetSubDirName(buff, buff.Size());
-        CZString s(buff);
+        std::wstring buff;
+        this->_diskmap->GetSubDirName(buff);
+        CZString s(buff.c_str());
         this->_connector->DL_SetSubPath(&s);
 
         INT64 size = this->_diskmap->GetDirSize();
@@ -523,10 +537,10 @@ public:
 
     BOOL SetCushionDesign(DWORD resourceID)
     {
-        //this->_diskmap->LoadGraphicsFromResource(CWindow::s_hInstance, MAKEINTRESOURCE(IDR_CUSHIONDATA_GLASS));
+        //this->_diskmap->LoadGraphicsFromResource(CWindow::s_hInstance, MAKEINTRESOURCEW(IDR_CUSHIONDATA_GLASS));
         if (this->_cushionDesign != resourceID)
         {
-            if (this->_diskmap->LoadGraphicsFromResource(CWindow::s_hInstance, MAKEINTRESOURCE(resourceID)))
+            if (this->_diskmap->LoadGraphicsFromResource(CWindow::s_hInstance, MAKEINTRESOURCEW(resourceID)))
             {
                 this->_cushionDesign = resourceID;
             }
@@ -567,9 +581,9 @@ public:
                 CZFile* f = csel->GetFile();
                 if (f != NULL)
                 {
-                    CPathBuffer buff;
-                    f->GetFullName(buff, buff.Size());
-                    return this->_shellmenu->InvokeDefaultCommand(buff);
+                    std::wstring buff;
+                    f->GetFullName(buff);
+                    return this->_shellmenu->InvokeDefaultCommand(buff.c_str());
                 }
             }
         }
@@ -642,7 +656,7 @@ public:
 
         return FALSE;
     }
-    BOOL GetSelectedFileName(TCHAR* buff, size_t bufflen)
+    BOOL GetSelectedFileName(std::wstring& path)
     {
         CCushion* cs = this->_diskmap->GetSelectedCushion();
         if (cs != NULL)
@@ -650,7 +664,7 @@ public:
             CZFile* f = cs->GetFile();
             if (f != NULL)
             {
-                size_t s = f->GetFullName(buff, bufflen);
+                size_t s = f->GetFullName(path);
                 return (s > 0);
             }
         }
@@ -745,7 +759,7 @@ public:
     {
         this->_connector = connector;
     }
-    BOOL SetPath(TCHAR const* path, BOOL fStartEnum = TRUE)
+    BOOL SetPath(wchar_t const* path, BOOL fStartEnum = TRUE)
     {
         if (this->_path)
             delete this->_path;
@@ -795,7 +809,7 @@ public:
         case WM_DESTROY:
             return this->OnDestroy(), 0;
         }
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProcW(hWnd, message, wParam, lParam);
     }
 
     static BOOL RegisterClass()
@@ -803,9 +817,9 @@ public:
         static ATOM a = NULL;
         if (!a)
         {
-            WNDCLASSEX wcex;
+            WNDCLASSEXW wcex;
 
-            wcex.cbSize = sizeof(WNDCLASSEX);
+            wcex.cbSize = sizeof(WNDCLASSEXW);
 
             wcex.style = CS_DBLCLKS;
             wcex.lpfnWndProc = CDiskMapView::s_WndProc;
@@ -819,14 +833,14 @@ public:
             wcex.hIcon = NULL;
             wcex.hIconSm = NULL;
 
-            a = ::RegisterClassEx(&wcex);
+            a = ::RegisterClassExW(&wcex);
         }
         BOOL ret = (a != NULL);
         return ret;
     }
     static BOOL UnregisterClass()
     {
-        BOOL ret = ::UnregisterClass(szDiskMapViewClass, CWindow::s_hInstance);
+        BOOL ret = ::UnregisterClassW(szDiskMapViewClass, CWindow::s_hInstance);
         if (!ret)
             TRACE_E("UnregisterClass(szDiskMapViewClass) has failed");
         return ret;

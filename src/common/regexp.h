@@ -19,6 +19,12 @@
  * not the System V one.
  */
 #define NSUBEXP 10
+// The Spencer core is byte-domain: regexp.cpp defines
+// regerror(const char*) :94, regcomp(char*, const char*&) :655 and
+// regexec(regexp*, char*, int) :1181. These declarations had been widened
+// over them - and because a FREE function with a mismatched parameter type
+// becomes an OVERLOAD rather than a redefinition, it raised no C2511 and
+// never showed up in the orphan column that found the class members.
 typedef struct regexp
 {
     char* startp[NSUBEXP];
@@ -72,10 +78,40 @@ const char* RegExpErrorText(CRegExpErrors err);
 // CRegularExpression
 //
 
+// THIS ENGINE IS BYTE-DOMAIN BY ALGORITHM, NOT BY CONVENIENCE.
+// A sweep widened these DECLARATIONS on top of a consistently narrow
+// implementation, and the "FLOOR" label on the .cpp meant nobody re-read the
+// header. Four independent authorities say narrow is correct:
+//   1. THE ALGORITHM - Boyer-Moore's bad-character tables (LowerCase, Fail1)
+//      have 256 entries. A wchar_t index above U+00FF read off the end of both.
+//   2. THE PLUGIN ABI - zip.cpp:3603-3607/3641/3642 and the FROZEN v107
+//      compat/sdk107/spl_gen.h:576/612/616 both declare const char*.
+//   3. EVERY CALLER - find.cpp and viewer_interaction_scrolling.cpp pass
+//      memory-mapped file bytes, with explicit (char*) casts.
+//   4. UPSTREAM - Open Salamander's regedt/utils.cpp declares
+//      ConvertHexToString(LPWSTR, char* hex, int&); its caller names it patternA.
 class CRegularExpression
 {
 public:
     static const char* LastError; // Text of last error
+
+    // How the engine should fold case when sfCaseSensitive is clear.
+    //
+    // Case insensitivity here is implemented by lowercasing BOTH the pattern and the
+    // subject line and then matching exactly, so the fold has to agree with the encoding
+    // of the bytes it is handed.
+    enum class FoldEncoding
+    {
+        // Fold every byte through LowerCase[], the CP_ACP table. Correct when one byte is
+        // one character: the viewer searching raw file bytes, zip's masks, and Find's
+        // legacy-bytes arm. This is the default, so every pre-existing caller is unchanged.
+        Acp,
+        // The subject and pattern are UTF-8. Folding UTF-8 through the ACP table corrupts
+        // lead bytes (CP-1252 maps 0xC3 to 0xE3), which both loses real matches and
+        // invents false ones in unrelated scripts, so non-ASCII is folded by code point
+        // instead - see common/text/Utf8CaseFold.h.
+        Utf8,
+    };
 
 protected:
     const char* LastErrorText;
@@ -87,6 +123,7 @@ protected:
     const char* OrigLineStart; // Pointer to the beginning of original text (passed to SetLine() as 'start')
     int Allocated;             // How many bytes are allocated
     int LineLength;            // Current length of line
+    FoldEncoding Folding;      // Encoding the case fold assumes; see FoldEncoding
 
 public:
     CRegularExpression()
@@ -99,6 +136,7 @@ public:
         Allocated = 0;
         LineLength = 0;
         LastErrorText = NULL;
+        Folding = FoldEncoding::Acp;
     }
 
     ~CRegularExpression()
@@ -114,7 +152,14 @@ public:
     BOOL IsGood() const { return OriginalPattern != NULL && Expression != NULL; }
     const char* GetPattern() const { return OriginalPattern; }
 
+    // Must be called BEFORE Set()/SetFlags(): the fold is applied when the pattern is
+    // compiled, so changing it afterwards would leave the pattern and the subject folded
+    // by different rules.
+    void SetFoldEncoding(FoldEncoding folding) { Folding = folding; }
+    FoldEncoding GetFoldEncoding() const { return Folding; }
+
     const char* GetLastErrorText() const { return LastErrorText; }
+    void Clear() noexcept;
     BOOL Set(const char* pattern, WORD flags); // Returns FALSE on error (call GetLastErrorText method)
     BOOL SetFlags(WORD flags);                 // Returns FALSE on error (call GetLastErrorText method)
 

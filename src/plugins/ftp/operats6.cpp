@@ -1,8 +1,10 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <vector>
 
 //
 // ****************************************************************************
@@ -47,13 +49,13 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                         // try to create the target directory on disk (also see whether it already exists)
                         if (DiskWorkIsUsed)
                             TRACE_E("Unexpected situation in CFTPWorker::HandleEventInPreparingState(): DiskWorkIsUsed may not be TRUE here!");
-                        InitDiskWork(WORKER_DISKWORKFINISHED, fdwtCreateDir,
-                                     ((CFTPQueueItemCopyMoveExplore*)CurItem)->TgtPath,
-                                     ((CFTPQueueItemCopyMoveExplore*)CurItem)->TgtName,
-                                     CurItem->ForceAction, FALSE, NULL, NULL, NULL, 0, NULL);
+                        const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKFINISHED, fdwtCreateDir,
+                                                               ((CFTPQueueItemCopyMoveExplore*)CurItem)->LocalTgtPath,
+                                                               ((CFTPQueueItemCopyMoveExplore*)CurItem)->LocalTgtName,
+                                                               CurItem->ForceAction, FALSE, NULL, NULL, NULL, 0, NULL);
                         if (CurItem->ForceAction != fqiaNone) // the forced action stops being valid here
                             Queue->UpdateForceAction(CurItem, fqiaNone);
-                        if (FTPDiskThread->AddWork(&DiskWork))
+                        if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
                         {
                             DiskWorkIsUsed = TRUE;
                             SubState = fwssPrepWaitForDisk; // wait for the result
@@ -84,9 +86,17 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                         BOOL itemChange = FALSE;
                         if (DiskWork.NewTgtName != NULL)
                         {
-                            Queue->UpdateTgtName((CFTPQueueItemCopyMoveExplore*)CurItem, DiskWork.NewTgtName);
+                            BOOL nameUpdated = Queue->UpdateLocalTgtName((CFTPQueueItemCopyMoveExplore*)CurItem, DiskWork.NewTgtName);
+                            free(DiskWork.NewTgtName);
                             DiskWork.NewTgtName = NULL;
-                            itemChange = TRUE;
+                            if (nameUpdated)
+                                itemChange = TRUE;
+                            else
+                            {
+                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                itemChange = TRUE;
+                                fail = TRUE;
+                            }
                         }
                         if (DiskWork.State == sqisNone)
                         { // the directory was created (including autorename) or it already existed and we can use it
@@ -236,15 +246,38 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                             type = fdwtRetryResumedFile;
                             break;
                         }
-                        InitDiskWork(WORKER_DISKWORKFINISHED, type,
-                                     ((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath,
-                                     ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName,
-                                     CurItem->ForceAction,
-                                     strcmp(CurItem->Name, ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName) != 0,
-                                     NULL, NULL, NULL, 0, NULL);
+                        // "Is the target name ALREADY a renamed name?" - pre-unicode computed it as
+                        // strcmp(CurItem->Name, TgtName) != 0, and widening replaced it with a
+                        // hardcoded TRUE. This is the one call site of the seven that passed a
+                        // computed value, and the flag drives StripAutorenameSuffix: a constant TRUE
+                        // strips a trailing " (N)" from the FIRST attempt too, so downloading a
+                        // server file genuinely named "Report (2).pdf" over a local file of the same
+                        // name produced "Report (3).pdf" - which reads as the next revision of an
+                        // unrelated "Report.pdf" family - instead of "Report (2) (2).pdf".
+                        //
+                        // The two names now live in different domains (Name is remote bytes,
+                        // LocalTgtName is local UTF-16), so the source name is decoded with the
+                        // session codec before the comparison. If either name is missing or will not
+                        // decode, fall back to FALSE - the value the other six call sites pass, and
+                        // the one that treats this as a first rename.
+                        BOOL alreadyRenamedName = FALSE;
+                        const wchar_t* localTgtName = ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName;
+                        if (CurItem->Name != NULL && localTgtName != NULL)
+                        {
+                            std::wstring sourceNameW;
+                            const CFtpTextCodec textCodec = TextPolicy.GetCodec();
+                            if (textCodec.Decode(CurItem->Name, strlen(CurItem->Name), sourceNameW))
+                                alreadyRenamedName = sourceNameW != localTgtName;
+                        }
+                        const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKFINISHED, type,
+                                                               ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtPath,
+                                                               ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName,
+                                                               CurItem->ForceAction,
+                                                               alreadyRenamedName,
+                                                               NULL, NULL, NULL, 0, NULL);
                         if (CurItem->ForceAction != fqiaNone) // the forced action stops being valid here
                             Queue->UpdateForceAction(CurItem, fqiaNone);
-                        if (FTPDiskThread->AddWork(&DiskWork))
+                        if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
                         {
                             DiskWorkIsUsed = TRUE;
                             SubState = fwssPrepWaitForDisk; // wait for the result
@@ -275,9 +308,17 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                         BOOL itemChange = FALSE;
                         if (DiskWork.NewTgtName != NULL)
                         {
-                            Queue->UpdateTgtName((CFTPQueueItemCopyOrMove*)CurItem, DiskWork.NewTgtName);
+                            BOOL nameUpdated = Queue->UpdateLocalTgtName((CFTPQueueItemCopyOrMove*)CurItem, DiskWork.NewTgtName);
+                            free(DiskWork.NewTgtName);
                             DiskWork.NewTgtName = NULL;
-                            itemChange = TRUE;
+                            if (nameUpdated)
+                                itemChange = TRUE;
+                            else
+                            {
+                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                itemChange = TRUE;
+                                fail = TRUE;
+                            }
                         }
                         if (DiskWork.State == sqisNone)
                         { // the file was created or opened successfully
@@ -351,9 +392,9 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                     { // open the source file on disk for reading
                         if (DiskWorkIsUsed)
                             TRACE_E("Unexpected situation 4 in CFTPWorker::HandleEventInPreparingState(): DiskWorkIsUsed may not be TRUE here!");
-                        InitDiskWork(WORKER_DISKWORKFINISHED, fdwtOpenFileForReading, CurItem->Path, CurItem->Name,
-                                     fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
-                        if (FTPDiskThread->AddWork(&DiskWork))
+                        const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKFINISHED, fdwtOpenFileForReading, CurItem->LocalPath, CurItem->LocalName,
+                                                               fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
+                        if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
                         {
                             DiskWorkIsUsed = TRUE;
                             SubState = fwssPrepWaitForDisk; // wait for the result
@@ -418,9 +459,9 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                     // try to delete an empty source directory from disk
                     if (DiskWorkIsUsed)
                         TRACE_E("Unexpected situation 3 in CFTPWorker::HandleEventInPreparingState(): DiskWorkIsUsed may not be TRUE here!");
-                    InitDiskWork(WORKER_DISKWORKFINISHED, fdwtDeleteDir, CurItem->Path, CurItem->Name,
-                                 fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
-                    if (FTPDiskThread->AddWork(&DiskWork))
+                    const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKFINISHED, fdwtDeleteDir, CurItem->LocalPath, CurItem->LocalName,
+                                                           fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
+                    if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
                     {
                         DiskWorkIsUsed = TRUE;
                         SubState = fwssPrepWaitForDisk; // wait for the result
@@ -568,7 +609,7 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
 }
 
 void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                              BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                              BOOL& reportWorkerChange, std::string& buf, std::string& errBuf, std::wstring& host,
                                               int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
                                               int replyCode, BOOL& operStatusMaybeChanged)
 {
@@ -577,6 +618,18 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
     {
         run = FALSE;              // when changed to TRUE, the loop runs again immediately
         BOOL closeSocket = FALSE; // TRUE = the worker's socket should be closed
+        auto failCommandAllocation = [&]()
+        {
+            SetLocalErrorDescr(LoadStr(IDS_OPERDOPPR_LOWMEM));
+            CorrectErrorDescr();
+            closeSocket = TRUE;
+            State = fwsConnectionError;
+            operStatusMaybeChanged = TRUE;
+            ErrorOccurenceTime = Oper->GiveLastErrorOccurenceTime();
+            SubState = fwssNone;
+            postActivate = TRUE;
+            reportWorkerChange = TRUE;
+        };
         if (ShouldStop)           // we should terminate the worker (everything inside the loop due to 'closeSocket')
         {
             switch (SubState)
@@ -608,6 +661,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
             case fwssConWaitForPrompt:       // close the connection and delete the WORKER_TIMEOUTTIMERID timer
             case fwssConWaitForScriptCmdRes: // close the connection and delete the WORKER_TIMEOUTTIMERID timer (it might no longer exist, but that does not matter)
+            case fwssConWaitForOptsUtf8Res:  // close the connection and delete the WORKER_TIMEOUTTIMERID timer
             case fwssConWaitForInitCmdRes:   // close the connection and delete the WORKER_TIMEOUTTIMERID timer (it might no longer exist, but that does not matter)
             case fwssConWaitForSystRes:      // close the connection and delete the WORKER_TIMEOUTTIMERID timer (it might no longer exist, but that does not matter)
             {
@@ -655,21 +709,27 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 CurrentTransferMode = ctrmUnknown;
 
                 DWORD serverIP;
-                if (Oper->GetServerAddress(&serverIP, host, HOST_MAX_SIZE)) // we have the IP
+                BOOL hostReady;
+                if (Oper->GetServerAddress(&serverIP, host, &hostReady)) // we have the IP
                 {
                     SubState = fwssConConnect;
                     run = TRUE;
                 }
                 else // we only have a host name
                 {
+                    if (!hostReady)
+                    {
+                        failCommandAllocation();
+                        break;
+                    }
                     // because we are already inside CSocketsThread::CritSect, this call is also possible
                     // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                    BOOL getHostByAddressRes = GetHostByAddress(host, ++IPRequestUID);
+                    BOOL getHostByAddressRes = GetHostByAddress(host.c_str(), ++IPRequestUID);
                     RefreshCopiesOfUIDAndMsg(); // refresh the UID+Msg copies (they changed)
                     if (!getHostByAddressRes)
                     { // no chance of success -> report an error
-                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_WORKERGETIPERROR),
-                                    GetWorkerErrorTxt(NO_ERROR, errBuf, 50 + FTP_MAX_PATH));
+                        SetFormattedLocalErrorDescr(IDS_WORKERGETIPERROR,
+                                                    GetWorkerErrorTxt(NO_ERROR, errBuf));
                         CorrectErrorDescr();
                         SubState = fwssConReconnect;
                         run = TRUE;
@@ -718,7 +778,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
                 case fweConTimeout:
                 {
-                    lstrcpyn(ErrorDescr, LoadStr(IDS_GETIPTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                    SetLocalErrorDescr(LoadStr(IDS_GETIPTIMEOUT));
                     CorrectErrorDescr();
                     SubState = fwssConReconnect;
                     run = TRUE;
@@ -730,39 +790,52 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
             case fwssConConnect: // perform Connect()
             {
-                DWORD serverIP;
-                unsigned short port;
-                CFTPProxyServerType proxyType;
-                DWORD hostIP;
-                unsigned short hostPort;
-                char proxyUser[USER_MAX_SIZE];
-                char proxyPassword[PASSWORD_MAX_SIZE];
-                Oper->GetConnectInfo(&serverIP, &port, host, &proxyType, &hostIP, &hostPort, proxyUser, proxyPassword);
                 if (ConnectAttemptNumber == 1) // connect
                 {
-                    Oper->GetConnectLogMsg(FALSE, buf, 700 + FTP_MAX_PATH, 0, NULL);
-                    Logs.LogMessage(LogUID, buf, -1, TRUE);
+                    if (Oper->GetConnectLogMsg(FALSE, buf, 0, NULL))
+                        Logs.LogMessage(LogUID, buf.c_str(), -1, TRUE);
                 }
                 else // reconnect
                 {
                     SYSTEMTIME st;
                     GetLocalTime(&st);
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, errBuf, 50) == 0)
-                        sprintf(errBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                    strcat(errBuf, " - ");
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, errBuf + strlen(errBuf), 50) == 0)
-                        sprintf(errBuf + strlen(errBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-                    Oper->GetConnectLogMsg(TRUE, buf, 700 + FTP_MAX_PATH, ConnectAttemptNumber, errBuf);
-                    Logs.LogMessage(LogUID, buf, -1);
+                    std::string dateText;
+                    std::string timeText;
+                    std::string timestamp;
+                    if (!GetLocaleDateTimePart(st, TRUE, dateText) ||
+                        !GetLocaleDateTimePart(st, FALSE, timeText) ||
+                        !FTPFormatString(timestamp, "%s - %s", dateText.c_str(), timeText.c_str()))
+                    {
+                        failCommandAllocation();
+                        break;
+                    }
+                    if (Oper->GetConnectLogMsg(TRUE, buf, ConnectAttemptNumber, timestamp.c_str()))
+                        Logs.LogMessage(LogUID, buf.c_str(), -1);
                 }
 
                 ResetBuffersAndEvents(); // clear the buffers (discard old data) and initialize variables related to the connection
+                TextPolicy.ResetForConnection();
 
+                DWORD serverIP;
+                unsigned short port;
+                CFTPProxyServerType proxyType;
+                DWORD hostIP;
+                unsigned short hostPort;
+                std::wstring proxyUser;
+                std::wstring proxyPassword;
+                if (!Oper->GetConnectInfo(&serverIP, &port, host, &proxyType, &hostIP, &hostPort,
+                                          proxyUser, proxyPassword))
+                {
+                    SetLocalErrorDescr(LoadStr(IDS_PRXSCRERR_CANNOTENCODE));
+                    SubState = fwssConReconnect;
+                    break;
+                }
                 DWORD error;
                 // because we are already inside CSocketsThread::CritSect, this call is also possible
                 // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                BOOL conRes = ConnectWithProxy(serverIP, port, proxyType, &error, host, hostPort,
-                                               proxyUser, proxyPassword, hostIP);
+                BOOL conRes = ConnectWithProxy(serverIP, port, proxyType, &error, host.c_str(), hostPort,
+                                               proxyUser.c_str(), proxyPassword.c_str(), hostIP);
+                FTPSecureWipe(proxyPassword);
                 RefreshCopiesOfUIDAndMsg(); // refresh the UID+Msg copies (they changed)
                 Logs.SetIsConnected(LogUID, IsConnected());
                 Logs.RefreshListOfLogsInLogsDlg();
@@ -784,8 +857,8 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 }
                 else
                 {
-                    _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_WORKEROPENCONERR),
-                                GetWorkerErrorTxt(error, errBuf, 50 + FTP_MAX_PATH));
+                    SetFormattedLocalErrorDescr(IDS_WORKEROPENCONERR,
+                                                GetWorkerErrorTxt(error, errBuf));
                     CorrectErrorDescr();
                     SubState = fwssConReconnect;
                     run = TRUE;
@@ -834,8 +907,10 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 {
                     // because we are already inside CSocket::SocketCritSect, this call is also possible
                     // from within CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                    if (!GetProxyTimeoutDescr(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE))
-                        lstrcpyn(ErrorDescr, LoadStr(IDS_OPENCONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                    if (GetProxyTimeoutDescr(errBuf))
+                        SetLocalErrorDescr(errBuf);
+                    else
+                        SetLocalErrorDescr(LoadStr(IDS_OPENCONTIMEOUT));
                     CorrectErrorDescr();
                     SubState = fwssConReconnect;
                     run = TRUE;
@@ -858,7 +933,11 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS &&
                             FTP_DIGIT_2(replyCode) == FTP_D2_CONNECTION) // e.g. 220 - Service ready for new user
                         {
-                            Oper->SetServerFirstReply(reply, replySize); // store the server's first reply (source of information about the server version)
+                            if (!Oper->SetServerFirstReply(reply, replySize))
+                            {
+                                failCommandAllocation();
+                                break;
+                            }
 
                             ProxyScriptExecPoint = NULL; // start sending from the first login script command again
                             ProxyScriptLastCmdReply = -1;
@@ -870,8 +949,8 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             if (FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR ||
                                 FTP_DIGIT_1(replyCode) == FTP_D1_ERROR) // e.g. 421 Service not available, closing control connection
                             {
-                                lstrcpyn(ErrorDescr, CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize),
-                                         FTPWORKER_ERRDESCR_BUFSIZE);
+                                CopyStr(errBuf, reply, replySize);
+                                SetServerErrorDescr(errBuf);
                                 CorrectErrorDescr();
                                 closeSocket = TRUE; // close the connection (no point in continuing)
 
@@ -880,14 +959,15 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             }
                             else // unexpected response, ignore it
                             {
-                                TRACE_E("Unexpected reply: " << CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                                CopyStr(errBuf, reply, replySize);
+                                TRACE_E("Unexpected reply: " << errBuf.c_str());
                             }
                         }
                     }
                     else // not an FTP server
                     {
-                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_NOTFTPSERVERERROR),
-                                    CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                        CopyStr(errBuf, reply, replySize);
+                        SetFormattedServerErrorDescr(IDS_NOTFTPSERVERERROR, errBuf);
                         CorrectErrorDescr();
                         closeSocket = TRUE; // close the connection (no point in continuing)
 
@@ -912,55 +992,75 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
             }
 
             case fwssConSendAUTH: // Initiate TLS
-                strcpy(buf, "AUTH TLS\r\n");
-                cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // For logging purposes
-                sendCmd = TRUE;
-                if (pCertificate)
-                    pCertificate->Release();
-                pCertificate = Oper->GetCertificate();
-                SubState = fwssConWaitForAUTHCmdRes;
+            {
+                if (FTPFormatString(buf, "AUTH TLS\r\n") && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    sendCmd = TRUE;
+                    cmdLen = static_cast<int>(buf.size());
+                    if (pCertificate)
+                        pCertificate->Release();
+                    pCertificate = Oper->GetCertificate();
+                    SubState = fwssConWaitForAUTHCmdRes;
+                }
+                else
+                    failCommandAllocation();
                 break;
+            }
 
             case fwssConSendPBSZ: // After AUTH TLS, but only if encrypting also data
-                strcpy(buf, "PBSZ 0\r\n");
-                cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // For logging purposes
-                sendCmd = TRUE;
-                SubState = fwssConWaitForPBSZCmdRes;
+            {
+                if (FTPFormatString(buf, "PBSZ 0\r\n") && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    sendCmd = TRUE;
+                    cmdLen = static_cast<int>(buf.size());
+                    SubState = fwssConWaitForPBSZCmdRes;
+                }
+                else
+                    failCommandAllocation();
                 break;
+            }
 
             case fwssConSendPROT: // After PBSZ
-                strcpy(buf, "PROT P\r\n");
-                cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // For logging purposes
-                sendCmd = TRUE;
-                SubState = fwssConWaitForPROTCmdRes;
+            {
+                if (FTPFormatString(buf, "PROT P\r\n") && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    sendCmd = TRUE;
+                    cmdLen = static_cast<int>(buf.size());
+                    SubState = fwssConWaitForPROTCmdRes;
+                }
+                else
+                    failCommandAllocation();
                 break;
+            }
 
             case fwssConSendMODEZ: // Init compression
-                strcpy(buf, "MODE Z\r\n");
-                cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // For logging purposes
-                sendCmd = TRUE;
-                SubState = fwssConWaitForMODEZCmdRes;
+            {
+                if (FTPFormatString(buf, "MODE Z\r\n") && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    sendCmd = TRUE;
+                    cmdLen = static_cast<int>(buf.size());
+                    SubState = fwssConWaitForMODEZCmdRes;
+                }
+                else
+                    failCommandAllocation();
                 break;
+            }
 
             case fwssConSendNextScriptCmd: // send the next login script command
             {
                 BOOL fail = FALSE;
-                char errDescrBuf[300];
+                std::string errorDescription;
                 BOOL needUserInput;
-                if (Oper->PrepareNextScriptCmd(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH, &cmdLen,
+                if (Oper->PrepareNextScriptCmd(buf, errBuf, &cmdLen,
                                                &ProxyScriptExecPoint, ProxyScriptLastCmdReply,
-                                               errDescrBuf, &needUserInput) &&
+                                               errorDescription, &needUserInput) &&
                     !needUserInput)
                 {
-                    if (buf[0] == 0) // end of the script
+                    if (buf.empty()) // end of the script
                     {
                         if (ProxyScriptLastCmdReply == -1) // the script does not contain any command that would be sent to the server - e.g. commands were skipped because they contain optional variables
                         {
-                            lstrcpyn(ErrorDescr, LoadStr(IDS_INCOMPLETEPRXSCR2), FTPWORKER_ERRDESCR_BUFSIZE);
+                            SetLocalErrorDescr(LoadStr(IDS_INCOMPLETEPRXSCR2));
                             CorrectErrorDescr();
                             fail = TRUE;
                         }
@@ -968,15 +1068,15 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         {
                             if (FTP_DIGIT_1(ProxyScriptLastCmdReply) == FTP_D1_SUCCESS) // e.g. 230 User logged in, proceed
                             {
-                                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGLOGINSUCCESS), -1, TRUE);
-                                NextInitCmd = 0;                                                             // send the first init-ftp command
-                                SubState = Oper->GetCompressData() ? fwssConSendMODEZ : fwssConSendInitCmds; // we are logged in, now send the init-ftp commands
+                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGLOGINSUCCESS).c_str(), -1, TRUE);
+                                NextInitCmd = 0; // send the first init-ftp command
+                                SubState = fwssConSendOptsUtf8;
                                 run = TRUE;
                             }
                             else // FTP_DIGIT_1(ProxyScriptLastCmdReply) == FTP_D1_PARTIALSUCCESS  // e.g. 331 User name okay, need password
                             {    // assumes we got here from fwssConWaitForScriptCmdRes and reply+replySize is still valid
-                                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_INCOMPLETEPRXSCR3),
-                                            CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                                CopyStr(errBuf, reply, replySize);
+                                SetFormattedServerErrorDescr(IDS_INCOMPLETEPRXSCR3, errBuf);
                                 CorrectErrorDescr();
                                 fail = TRUE;
                             }
@@ -992,9 +1092,9 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 else // script error or missing variable value
                 {
                     if (needUserInput)
-                        lstrcpyn(ErrorDescr, errDescrBuf, FTPWORKER_ERRDESCR_BUFSIZE);
+                        SetLocalErrorDescr(errorDescription);
                     else
-                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_ERRINPROXYSCRIPT), errDescrBuf);
+                        SetFormattedLocalErrorDescr(IDS_ERRINPROXYSCRIPT, errorDescription);
                     CorrectErrorDescr();
                     fail = TRUE;
                 }
@@ -1032,10 +1132,10 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             if (InitSSL(LogUID, &errID))
                             {
                                 int err;
+                                std::string sslError;
                                 HANDLES(LeaveCriticalSection(&WorkerCritSect));
                                 CCertificate* unverifiedCert;
-                                BOOL ret = EncryptSocket(LogUID, &err, &unverifiedCert, &errID, errBuf,
-                                                         50 + FTP_MAX_PATH,
+                                BOOL ret = EncryptSocket(LogUID, &err, &unverifiedCert, &errID, &sslError,
                                                          NULL /* for the control connection this is always NULL */);
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
                                 if (ret)
@@ -1045,7 +1145,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                         if (UnverifiedCertificate != NULL)
                                             UnverifiedCertificate->Release();
                                         UnverifiedCertificate = unverifiedCert;
-                                        lstrcpyn(ErrorDescr, LoadStr(IDS_SSLNEWUNVERIFIEDCERT), FTPWORKER_ERRDESCR_BUFSIZE);
+                                        SetLocalErrorDescr(LoadStr(IDS_SSLNEWUNVERIFIEDCERT));
                                         failed = TRUE;
                                     }
                                     else
@@ -1057,17 +1157,17 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                 }
                                 else
                                 {
-                                    if (errBuf[0] == 0)
-                                        lstrcpyn(ErrorDescr, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE);
+                                    if (sslError.empty())
+                                        SetLocalErrorDescr(LoadStr(errID));
                                     else
-                                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(errID), errBuf.Get());
+                                        SetFormattedLocalErrorDescr(errID, sslError);
                                     failed = TRUE;
                                     retryLoginWithoutAsking = err == SSLCONERR_CANRETRY;
                                 }
                             }
                             else
                             {
-                                lstrcpyn(ErrorDescr, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE);
+                                SetLocalErrorDescr(LoadStr(errID));
                                 failed = TRUE;
                             }
                             break;
@@ -1086,7 +1186,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     }
                     else
                     {
-                        lstrcpyn(ErrorDescr, LoadStr(SubState == fwssConWaitForAUTHCmdRes ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP), FTPWORKER_ERRDESCR_BUFSIZE);
+                        SetLocalErrorDescr(LoadStr(SubState == fwssConWaitForAUTHCmdRes ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP));
                         failed = TRUE;
                     }
                     if (failed)
@@ -1122,6 +1222,37 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 break;
             }
 
+            case fwssConSendOptsUtf8:
+            {
+                if (FTPFormatString(buf, "OPTS UTF8 ON\r\n") && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    sendCmd = TRUE;
+                    cmdLen = static_cast<int>(buf.size());
+                    SubState = fwssConWaitForOptsUtf8Res;
+                }
+                else
+                    failCommandAllocation();
+                break;
+            }
+
+            case fwssConWaitForOptsUtf8Res:
+            {
+                switch (event)
+                {
+                case fweCmdReplyReceived:
+                    TextPolicy.ApplyUtf8OptionsReply(replyCode);
+                    SubState = Oper->GetCompressData() ? fwssConSendMODEZ : fwssConSendInitCmds;
+                    run = TRUE;
+                    break;
+
+                case fweCmdConClosed:
+                    SubState = fwssConReconnect;
+                    run = TRUE;
+                    break;
+                }
+                break;
+            }
+
             case fwssConWaitForMODEZCmdRes:
             {
                 switch (event)
@@ -1140,7 +1271,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         // NOTE: Probably cannot happen because CompresData was set to FALSE in main connection
                         replyCode = 200; // Emulate Full success
                         Oper->SetCompressData(FALSE);
-                        Logs.LogMessage(LogUID, LoadStr(IDS_MODEZ_LOG_UNSUPBYSERVER), -1);
+                        Logs.LogMessage(LogUID, LangStr(IDS_MODEZ_LOG_UNSUPBYSERVER).c_str(), -1);
                     }
                     break;
                 }
@@ -1184,8 +1315,8 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                 else
                                     retryLoginWithoutAsking = Oper->GetRetryLoginWithoutAsking();
 
-                                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_WORKERLOGINERR),
-                                            CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                                CopyStr(errBuf, reply, replySize);
+                                SetFormattedServerErrorDescr(IDS_WORKERLOGINERR, errBuf);
                                 CorrectErrorDescr();
                                 closeSocket = TRUE; // close the connection (no point in continuing)
 
@@ -1206,14 +1337,15 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             }
                             else // unexpected response, ignore it
                             {
-                                TRACE_E("Unexpected reply: " << CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                                CopyStr(errBuf, reply, replySize);
+                                TRACE_E("Unexpected reply: " << errBuf.c_str());
                             }
                         }
                     }
                     else // not an FTP server
                     {
-                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_NOTFTPSERVERERROR),
-                                    CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize));
+                        CopyStr(errBuf, reply, replySize);
+                        SetFormattedServerErrorDescr(IDS_NOTFTPSERVERERROR, errBuf);
                         CorrectErrorDescr();
                         closeSocket = TRUE; // close the connection (no point in continuing)
 
@@ -1239,12 +1371,17 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
             case fwssConSendInitCmds: // send initialization commands (user-defined, see CFTPOperation::InitFTPCommands)
             {
-                Oper->GetInitFTPCommands(buf, 200 + FTP_MAX_PATH);
-                if (buf[0] != 0)
+                if (!Oper->GetInitFTPCommands(buf))
                 {
-                    char* next = buf;
+                    failCommandAllocation();
+                    break;
+                }
+                if (!buf.empty())
+                {
+                    char* next = buf.data();
                     char* s;
                     int i = 0;
+                    BOOL selectedCommand = FALSE;
                     while (GetToken(&s, &next))
                     {
                         if (*s != 0 && *s <= ' ')
@@ -1253,15 +1390,20 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         {
                             if (i++ == NextInitCmd)
                             {
+                                selectedCommand = TRUE;
                                 NextInitCmd++; // take the next command next time (very inefficient, but only a few commands are expected here)
-                                _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, "%s\r\n", s);
-                                strcpy(buf, errBuf);
-                                cmdLen = (int)strlen(buf);
-                                sendCmd = TRUE;
+                                sendCmd = FTPFormatString(buf, "%s\r\n", s) &&
+                                          FTPFormatString(errBuf, "%s", buf.c_str());
+                                if (sendCmd)
+                                    cmdLen = static_cast<int>(buf.size());
+                                else
+                                    failCommandAllocation();
                                 break;
                             }
                         }
                     }
+                    if (selectedCommand && !sendCmd)
+                        break;
                 }
                 if (sendCmd) // sending another init-ftp command
                 {
@@ -1300,9 +1442,13 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
             case fwssConSendSyst: // determine the server system (send the "SYST" command)
             {
-                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH, ftpcmdSystem, &cmdLen); // cannot report an error
-                sendCmd = TRUE;
-                SubState = fwssConWaitForSystRes;
+                if (PrepareFTPCommand(buf, &errBuf, ftpcmdSystem, &cmdLen))
+                {
+                    sendCmd = TRUE;
+                    SubState = fwssConWaitForSystRes;
+                }
+                else
+                    failCommandAllocation();
                 // run = TRUE; // pointless (no event has occurred yet)
                 break;
             }
@@ -1314,7 +1460,11 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 // case fweCmdInfoReceived:  // ignore "1xx" replies (they are only written to the Log)
                 case fweCmdReplyReceived:
                 {
-                    Oper->SetServerSystem(reply, replySize); // store the server system (source of information about the server version)
+                    if (!Oper->SetServerSystem(reply, replySize))
+                    {
+                        failCommandAllocation();
+                        break;
+                    }
 
                     // the connection is established, start working
                     State = fwsWorking; // no need to call Oper->OperationStatusMaybeChanged(), the operation state does not change (it is not paused and will not be after this change)
@@ -1324,7 +1474,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     StatusType = wstNone;
                     postActivate = TRUE;      // post an activation for the next worker state
                     ConnectAttemptNumber = 1; // the connection is established, reset to one so the next reconnect attempt is ready again
-                    ErrorDescr[0] = 0;        // start collecting error messages again
+                    ErrorDescr.clear();       // start collecting error messages again
                     reportWorkerChange = TRUE;
                     break;
                 }
@@ -1437,8 +1587,10 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
     }
 
     BOOL err = FALSE;
+    const CFtpTextCodec textCodec = TextPolicy.GetCodec();
     CFTPListingPluginDataInterface* dataIface = new CFTPListingPluginDataInterface(&(serverType->Columns), FALSE,
-                                                                                   validDataMask, isVMS);
+                                                                                   validDataMask, isVMS,
+                                                                                   textCodec);
     if (dataIface != NULL)
     {
         DWORD* emptyCol = new DWORD[serverType->Columns.Count]; // helper preallocated array for GetNextItemFromListing
@@ -1465,25 +1617,36 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
 
                 // variables for Copy and Move operations
                 CQuadWord size(-1, -1); // variable for the current file size
-                CPathBuffer targetPath; // Heap-allocated for long path support
+                std::wstring localTargetPath;
                 if (CurItem->Type == fqitCopyExploreDir ||
                     CurItem->Type == fqitMoveExploreDir ||
                     CurItem->Type == fqitMoveExploreDirLink)
                 {
                     CFTPQueueItemCopyMoveExplore* cmItem = (CFTPQueueItemCopyMoveExplore*)CurItem;
-                    lstrcpyn(targetPath, cmItem->TgtPath, targetPath.Size());
-                    SalamanderGeneral->SalPathAppend(targetPath, cmItem->TgtName, targetPath.Size()); // must succeed, the directory already exists on disk and its full name is at most PATH_MAX_PATH-1 characters
+                    localTargetPath = cmItem->LocalTgtPath;
+                    SPLSalPathAppendOwned(localTargetPath,
+                                          cmItem->LocalTgtName);
                 }
-                else
-                    targetPath[0] = 0;
-                BOOL is_AS_400_QSYS_LIB_Path = isAS400 && FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", WorkingPath);
+                BOOL is_AS_400_QSYS_LIB_Path = isAS400 && FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", WorkingPath.c_str());
                 parser->BeforeParsing(listing, listingEnd, StartTimeOfListing.wYear, StartTimeOfListing.wMonth,
                                       StartTimeOfListing.wDay, FALSE); // parser initialization
-                while (parser->GetNextItemFromListing(&file, &isDir, dataIface, &(serverType->Columns), &listing,
-                                                      listingEnd, NULL, &err, emptyCol))
+                while (!err && parser->GetNextItemFromListing(&file, &isDir, dataIface, &(serverType->Columns), &listing,
+                                                               listingEnd, NULL, &err, emptyCol, textCodec))
                 {
-                    if (!isDir || file.NameLen > 2 ||
-                        file.Name[0] != '.' || (file.Name[1] != 0 && file.Name[1] != '.')) // ignore the "." and ".." directories
+                    std::wstring memberNameW;
+                    const wchar_t* targetNameW = file.Name;
+                    if (is_AS_400_QSYS_LIB_Path)
+                    {
+                        memberNameW = FTPAS400CutFileNamePartW(file.Name);
+                        targetNameW = memberNameW.c_str();
+                    }
+                    std::string itemNameBytes;
+                    if (!dataIface->GetWireName(file, textCodec, itemNameBytes))
+                    {
+                        err = TRUE;
+                    }
+                    if (!err && (!isDir || file.NameLen > 2 ||
+                                 file.Name[0] != L'.' || (file.Name[1] != 0 && file.Name[1] != L'.'))) // ignore the "." and ".." directories
                     {
                         // add an item for the parsed file/directory to ftpQueueItems
                         CFTPQueueItem* item = NULL;
@@ -1508,17 +1671,10 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
                         case fqitMoveExploreDir:     // explore a directory for moving (deletes the directory after completion) (object of class CFTPQueueItemCopyMoveExplore)
                         case fqitMoveExploreDirLink: // explore a link to a directory for moving (deletes the directory link after completion) (object of class CFTPQueueItemCopyMoveExplore)
                         {
-                            CPathBuffer mbrName; // Heap-allocated for long path support
-                            char* tgtName = file.Name;
-                            if (is_AS_400_QSYS_LIB_Path)
-                            {
-                                FTPAS400CutFileNamePart(mbrName, tgtName);
-                                tgtName = mbrName;
-                            }
                             item = CreateItemForCopyOrMoveOperation(&file, isDir, rightsCol, dataIface,
                                                                     &type, transferMode, Oper,
                                                                     CurItem->Type == fqitCopyExploreDir,
-                                                                    targetPath, tgtName, // we are in a subdirectory, names are no longer generated from the operation mask here
+                                                                    localTargetPath.c_str(), targetNameW,
                                                                     &size, sizeInBytes, totalSize);
                             break;
                         }
@@ -1540,7 +1696,7 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
                         {
                             if (ok)
                             {
-                                item->SetItem(-1, type, state, problemID, WorkingPath, file.Name);
+                                item->SetItem(-1, type, state, problemID, WorkingPath.c_str(), itemNameBytes.c_str());
                                 ftpQueueItems->Add(item); // add the operation to the queue
                                 if (!ftpQueueItems->IsGood())
                                 {

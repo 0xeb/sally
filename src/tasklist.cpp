@@ -8,11 +8,16 @@
 #include "tasklist.h"
 #include "plugins.h"
 #include "common/InstanceNamespace.h"
+#include "common/unicode/helpers.h"
 extern "C"
 {
 #include "shexreg.h"
 }
 #include "salshlib.h"
+
+#include <new>
+#include <utility>
+#include <vector>
 
 #pragma warning(disable : 4074)
 #pragma init_seg(compiler) // perform initialization as early as possible
@@ -29,20 +34,72 @@ BOOL FirstInstance_3_or_later = FALSE;
 
 // WARNING: when changing, you need to update salbreak.exe, just send me the info please ... thanks, Petr
 
-const char* AS_PROCESSLIST_NAME = "Sally1ProcessList";                               // shared memory CProcessList
-const char* AS_PROCESSLIST_MUTEX_NAME = "Sally1ProcessListMutex";                    // synchronization for access to shared memory
-const char* AS_PROCESSLIST_EVENT_NAME = "Sally1ProcessListEvent";                    // event firing (what to do is stored in shared memory)
-const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "Sally1ProcessListEventProcessed"; // fired event was processed
-
 const char* FIRST_SALAMANDER_MUTEX_NAME = "SallyFirstInstance";     // introduced since AS 2.52 beta 1
-const char* LOADSAVE_REGISTRY_MUTEX_NAME = SAL_REG_MUTEX_LOADSAVE_A; // introduced since AS 2.52 beta 1
+const wchar_t* LOADSAVE_REGISTRY_MUTEX_NAME = SAL_REG_MUTEX_LOADSAVE_W; // introduced since AS 2.52 beta 1
 
-// path where we save bug report and minidump; later Salmon packs it into 7z and uploads to server
-CPathBuffer BugReportPath; // Heap-allocated for long path support
+static CRITICAL_SECTION CommandLineParamsCS;
+static sally::cmdline::CommandLineRequest* PendingCommandLineRequest = NULL;
+static HANDLE CommandLineParamsProcessed;
 
-CRITICAL_SECTION CommandLineParamsCS;
-CCommandLineParams CommandLineParams;
-HANDLE CommandLineParamsProcessed;
+static BOOL ReadActivationRequest(const CActivationRequestRef& ref,
+                                  sally::cmdline::CommandLineRequest& request,
+                                  HANDLE* processedEvent)
+{
+    if (processedEvent == NULL)
+        return FALSE;
+    *processedEvent = NULL;
+    if (ref.StructSize != sizeof(ref) ||
+        ref.ProtocolVersion != SALLY_ACTIVATION_PROTOCOL_VERSION ||
+        ref.RequestUID == 0 || ref.SenderPID == 0 || ref.Generation == 0 ||
+        ref.PayloadBytes < sizeof(CActivationPayloadHeader) || ref.Reserved != 0)
+    {
+        return FALSE;
+    }
+
+    try
+    {
+        const std::string base =
+            sally::instance::BuildSharedObjectNameForCurrentInstance(
+                SALLY_ACTIVATION_PAYLOAD_BASE_NAME);
+        const std::string name = BuildActivationPayloadName(
+            base, ref.SenderPID, ref.RequestUID, ref.Generation);
+        const std::string processedBase =
+            sally::instance::BuildSharedObjectNameForCurrentInstance(
+                SALLY_ACTIVATION_PROCESSED_EVENT_BASE_NAME);
+        const std::string processedName = BuildActivationPayloadName(
+            processedBase, ref.SenderPID, ref.RequestUID, ref.Generation);
+        HANDLE mapping =
+            NOHANDLES(OpenFileMappingA(FILE_MAP_READ, FALSE, name.c_str()));
+        if (mapping == NULL)
+            return FALSE;
+        const void* view = NOHANDLES(MapViewOfFile(
+            mapping, FILE_MAP_READ, 0, 0, ref.PayloadBytes));
+        BOOL ok = FALSE;
+        if (view != NULL)
+        {
+            ok = ParseActivationPayload(view, ref.PayloadBytes, ref.RequestUID,
+                                        ref.Generation, ref.SenderPID, request)
+                     ? TRUE
+                     : FALSE;
+            NOHANDLES(UnmapViewOfFile(view));
+        }
+        NOHANDLES(CloseHandle(mapping));
+        if (ok)
+        {
+            *processedEvent = NOHANDLES(OpenEventA(
+                EVENT_MODIFY_STATE, FALSE, processedName.c_str()));
+            if (*processedEvent == NULL)
+                return FALSE;
+            request.requestTimestamp = ref.RequestTimestamp;
+        }
+        return ok;
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+}
 
 // handle of the main window (it's not good to access MainWindow from control thread, which can be set to NULL under our hands)
 HWND HSafeMainWindow = NULL;
@@ -68,7 +125,7 @@ DWORD WINAPI FControlThread(void* param)
 
     CTaskList* tasklist = (CTaskList*)param;
 
-    SetThreadNameInVC("ControlThread");
+    SetThreadNameInVC(L"ControlThread");
 
     HANDLE arr[3];
     arr[0] = tasklist->TerminateEvent;
@@ -101,7 +158,7 @@ DWORD WINAPI FControlThread(void* param)
                 break;
 
             // protection against cycling after command execution
-            if (tasklist->ProcessList->TodoUID <= lastTodoUID)
+            if (tasklist->ProcessList->TodoUID == lastTodoUID)
             {
                 // release ProcessList
                 ReleaseMutex(tasklist->FMOMutex);
@@ -178,14 +235,29 @@ DWORD WINAPI FControlThread(void* param)
 
             case TASKLIST_TODO_ACTIVATE:
             {
-                // copy ProcessList to global variable CommandLineParams,
-                // which is monitored by main thread at entry from idle;
-                NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
-                memcpy(&CommandLineParams, &processList.CommandLineParams, sizeof(CCommandLineParams));
-                ResetEvent(CommandLineParamsProcessed);
-                NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
+                sally::cmdline::CommandLineRequest request;
+                HANDLE activationProcessed = NULL;
+                if (!ReadActivationRequest(processList.ActivationRequest, request,
+                                           &activationProcessed))
+                    break;
 
-                // in case the main thread is in IDLE, we poke it and force it to check CommandLineParams::RequestUID
+                BOOL published = FALSE;
+                NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
+                if (PendingCommandLineRequest != NULL)
+                {
+                    using std::swap;
+                    swap(*PendingCommandLineRequest, request);
+                    ResetEvent(CommandLineParamsProcessed);
+                    published = TRUE;
+                }
+                NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
+                if (!published)
+                {
+                    NOHANDLES(CloseHandle(activationProcessed));
+                    break;
+                }
+
+                // If the main thread is idle, poke it so it takes the dynamic request.
                 // if it's not in IDLE, it's solving something right now and will handle the message at the moment it enters IDLE (if we wait for it)
                 if (HSafeMainWindow != NULL)
                     PostMessage(HSafeMainWindow, WM_USER_WAKEUP_FROM_IDLE, 0, 0);
@@ -195,11 +267,15 @@ DWORD WINAPI FControlThread(void* param)
 
                 // now we can enter the critical section
                 NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
-                CommandLineParams.RequestUID = 0;                             // disable any further actions by the main thread
+                if (PendingCommandLineRequest != NULL &&
+                    PendingCommandLineRequest->requestUID ==
+                        processList.ActivationRequest.RequestUID)
+                    PendingCommandLineRequest->requestUID = 0;                // disable any further actions by the main thread
                 waitRet = WaitForSingleObject(CommandLineParamsProcessed, 0); // ask what's the current state of the event
                 if (waitRet == WAIT_OBJECT_0)
-                    SetEvent(tasklist->EventProcessed); // message for requester process: we're done
+                    SetEvent(activationProcessed); // this exact request was accepted
                 NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
+                NOHANDLES(CloseHandle(activationProcessed));
                 break;
             }
 
@@ -252,6 +328,7 @@ CTaskList::CTaskList()
     FMOMutex = NULL;
     Event = NULL;
     EventProcessed = NULL;
+    ActivationDispatchMutex = NULL;
     TerminateEvent = NULL;
     ControlThread = NULL;
     // internal synchronization between ControlThread and main thread
@@ -263,10 +340,25 @@ BOOL CTaskList::Init()
 {
     OK = FALSE;
 
-    std::string processListName = sally::instance::BuildSharedObjectNameForCurrentInstance(AS_PROCESSLIST_NAME);
-    std::string processListMutexName = sally::instance::BuildSharedObjectNameForCurrentInstance(AS_PROCESSLIST_MUTEX_NAME);
-    std::string processListEventName = sally::instance::BuildSharedObjectNameForCurrentInstance(AS_PROCESSLIST_EVENT_NAME);
-    std::string processListEventProcessedName = sally::instance::BuildSharedObjectNameForCurrentInstance(AS_PROCESSLIST_EVENT_PROCESSED_NAME);
+    if (PendingCommandLineRequest == NULL)
+    {
+        try
+        {
+            PendingCommandLineRequest =
+                new sally::cmdline::CommandLineRequest;
+        }
+        catch (const std::bad_alloc&)
+        {
+            TRACE_E(LOW_MEMORY);
+            return FALSE;
+        }
+    }
+
+    std::string processListName = sally::instance::BuildSharedObjectNameForCurrentInstance(SALLY_PROCESS_LIST_MAPPING_NAME);
+    std::string processListMutexName = sally::instance::BuildSharedObjectNameForCurrentInstance(SALLY_PROCESS_LIST_MUTEX_NAME);
+    std::string processListEventName = sally::instance::BuildSharedObjectNameForCurrentInstance(SALLY_PROCESS_LIST_EVENT_NAME);
+    std::string processListEventProcessedName = sally::instance::BuildSharedObjectNameForCurrentInstance(SALLY_PROCESS_LIST_PROCESSED_EVENT_NAME);
+    std::string activationDispatchMutexName = sally::instance::BuildSharedObjectNameForCurrentInstance(SALLY_ACTIVATION_DISPATCH_MUTEX_NAME);
     std::string firstInstanceMutexBaseName = sally::instance::BuildSharedObjectNameForCurrentInstance(FIRST_SALAMANDER_MUTEX_NAME);
 
     PSID psidEveryone;
@@ -278,40 +370,48 @@ BOOL CTaskList::Init()
     //---  first a side note: under Vista+ we create an event for communication with copy-hook (it's waited for in control-thread)
     if (WindowsVistaAndLater)
     {
-        char doPasteEventName[256];
-        const char* shellExtDoPasteEventName = SALSHEXT_GetDoPasteEventName(doPasteEventName, _countof(doPasteEventName));
-        SalShExtDoPasteEvent = NOHANDLES(CreateEvent(saPtr, TRUE, FALSE, shellExtDoPasteEventName));
+        wchar_t doPasteEventName[256];
+        // wide, matching shexreg_ipc_names.h. CreateEventW/OpenEventW rather
+        // than the TCHAR macros: this build does not define UNICODE, so the unsuffixed names
+        // would resolve to the A forms and take a wchar_t* as if it were char*.
+        const wchar_t* shellExtDoPasteEventName = SALSHEXT_GetDoPasteEventName(doPasteEventName, _countof(doPasteEventName));
+        SalShExtDoPasteEvent = NOHANDLES(CreateEventW(saPtr, TRUE, FALSE, shellExtDoPasteEventName));
         if (SalShExtDoPasteEvent == NULL)
-            SalShExtDoPasteEvent = NOHANDLES(OpenEvent(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, shellExtDoPasteEventName));
+            SalShExtDoPasteEvent = NOHANDLES(OpenEventW(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, shellExtDoPasteEventName));
         if (SalShExtDoPasteEvent == NULL)
             TRACE_E("CTaskList::Init(): unable to create event object for communicating with copy-hook shell extension!");
     }
 
     //---  try to attach to FMO-mutex - at the same time test if some Salamander is already running
-    FMOMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, processListMutexName.c_str()));
+    // processList*Name are std::string (narrow) - explicit A forms rather than the TCHAR macros:
+    // this build does not define UNICODE, so the unsuffixed names would resolve to the A forms
+    // anyway, but under the msvc-unicode-canary probe they'd resolve to W forms taking wchar_t*.
+    FMOMutex = NOHANDLES(OpenMutexA(SYNCHRONIZE, FALSE, processListMutexName.c_str()));
     if (FMOMutex == NULL) // we're the first Salamander 3.0 or newer in the local session
     {
         //---  creation of system objects for communication, acquire FMO
-        FMOMutex = NOHANDLES(CreateMutex(saPtr, TRUE, processListMutexName.c_str())); // task list is valid only for the given session, mutex belongs to local namespace
+        FMOMutex = NOHANDLES(CreateMutexA(saPtr, TRUE, processListMutexName.c_str())); // task list is valid only for the given session, mutex belongs to local namespace
         if (FMOMutex == NULL)
             return FALSE; // fail
-        FMO = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE | SEC_COMMIT,
-                                          0, sizeof(CProcessList), processListName.c_str()));
+        FMO = NOHANDLES(CreateFileMappingA(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE | SEC_COMMIT,
+                                           0, sizeof(CProcessList), processListName.c_str()));
         if (FMO == NULL)
             return FALSE; // fail
         ProcessList = (CProcessList*)NOHANDLES(MapViewOfFile(FMO, FILE_MAP_WRITE, 0, 0, 0));
         if (ProcessList == NULL)
             return FALSE; // fail
-        Event = NOHANDLES(CreateEvent(saPtr, TRUE, FALSE, processListEventName.c_str()));
+        Event = NOHANDLES(CreateEventA(saPtr, TRUE, FALSE, processListEventName.c_str()));
         if (Event == NULL)
             return FALSE; // fail
-        EventProcessed = NOHANDLES(CreateEvent(saPtr, TRUE, FALSE, processListEventProcessedName.c_str()));
+        EventProcessed = NOHANDLES(CreateEventA(saPtr, TRUE, FALSE, processListEventProcessedName.c_str()));
         if (EventProcessed == NULL)
             return FALSE; // fail
 
         //---  initialization of shared memory
         ZeroMemory(ProcessList, sizeof(CProcessList));
-        ProcessList->Version = 1; // 3.0 beta 4
+        ProcessList->Magic = SALLY_PROCESS_LIST_PROTOCOL_MAGIC;
+        ProcessList->Version = SALLY_PROCESS_LIST_PROTOCOL_VERSION;
+        ProcessList->StructSize = sizeof(CProcessList);
 
         ProcessList->ItemsCount = 1;
         ProcessList->ItemsStateUID++;
@@ -328,19 +428,39 @@ BOOL CTaskList::Init()
             return FALSE; // fail
 
         //---  attach to other system objects for communication
-        FMO = NOHANDLES(OpenFileMapping(FILE_MAP_WRITE, FALSE, processListName.c_str()));
+        FMO = NOHANDLES(OpenFileMappingA(FILE_MAP_WRITE, FALSE, processListName.c_str()));
         if (FMO == NULL)
+        {
+            ReleaseMutex(FMOMutex);
             return FALSE; // fail
+        }
         ProcessList = (CProcessList*)NOHANDLES(MapViewOfFile(FMO, FILE_MAP_WRITE, 0, 0, 0));
         if (ProcessList == NULL)
+        {
+            ReleaseMutex(FMOMutex);
             return FALSE; // fail
+        }
+        if (ProcessList->Magic != SALLY_PROCESS_LIST_PROTOCOL_MAGIC ||
+            ProcessList->Version != SALLY_PROCESS_LIST_PROTOCOL_VERSION ||
+            ProcessList->StructSize != sizeof(CProcessList) ||
+            ProcessList->ItemsCount > MAX_TL_ITEMS)
+        {
+            ReleaseMutex(FMOMutex);
+            return FALSE; // fail closed; this process continues as a separate instance
+        }
         // to be able to call SetEvent() on event, it must have EVENT_MODIFY_STATE set, for Wait* it needs SYNCHRONIZE
-        Event = NOHANDLES(OpenEvent(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, processListEventName.c_str()));
+        Event = NOHANDLES(OpenEventA(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, processListEventName.c_str()));
         if (Event == NULL)
+        {
+            ReleaseMutex(FMOMutex);
             return FALSE; // fail
-        EventProcessed = NOHANDLES(OpenEvent(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, processListEventProcessedName.c_str()));
+        }
+        EventProcessed = NOHANDLES(OpenEventA(SYNCHRONIZE | EVENT_MODIFY_STATE, FALSE, processListEventProcessedName.c_str()));
         if (EventProcessed == NULL)
+        {
+            ReleaseMutex(FMOMutex);
             return FALSE; // fail
+        }
 
         //---  add entry to shared memory
         BOOL attempt = 0;
@@ -368,21 +488,43 @@ BOOL CTaskList::Init()
     }
 
     // detection of other Salamander instances
-    LPTSTR sid = NULL;
+    LPWSTR sid = NULL;
     if (!GetStringSid(&sid))
         sid = NULL;
-    char mutexName[1000];
-    if (sid == NULL)
+    std::wstring firstInstanceMutexBaseNameW;
+    if (!sally::instance::WidenSharedObjectName(firstInstanceMutexBaseName,
+                                                 firstInstanceMutexBaseNameW))
     {
-        // error getting SID -- local name space, without attached SID
-        _snprintf_s(mutexName, _TRUNCATE, "%s", firstInstanceMutexBaseName.c_str());
+        if (sid != NULL)
+            LocalFree(sid);
+        return FALSE;
     }
-    else
+    std::wstring mutexName;
+    try
     {
-        _snprintf_s(mutexName, _TRUNCATE, "Global\\%s_%s", firstInstanceMutexBaseName.c_str(), sid);
-        LocalFree(sid);
+        if (sid == NULL)
+        {
+            // error getting SID -- local name space, without attached SID
+            mutexName = firstInstanceMutexBaseNameW;
+        }
+        else
+        {
+            mutexName = L"Global\\";
+            mutexName += firstInstanceMutexBaseNameW;
+            mutexName += L'_';
+            mutexName += sid;
+            LocalFree(sid);
+            sid = NULL;
+        }
     }
-    HANDLE hMutex = NOHANDLES(CreateMutex(saPtr, FALSE, mutexName));
+    catch (const std::bad_alloc&)
+    {
+        if (sid != NULL)
+            LocalFree(sid);
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+    HANDLE hMutex = NOHANDLES(CreateMutexW(saPtr, FALSE, mutexName.c_str()));
     DWORD lastError = GetLastError();
     if (hMutex != NULL)
     {
@@ -390,10 +532,21 @@ BOOL CTaskList::Init()
     }
     else
     {
-        hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, mutexName));
+        hMutex = NOHANDLES(OpenMutexW(SYNCHRONIZE, FALSE, mutexName.c_str()));
         lastError = GetLastError();
         if (hMutex != NULL)
             FirstInstance_3_or_later = FALSE;
+    }
+
+    ActivationDispatchMutex = NOHANDLES(CreateMutexA(
+        saPtr, FALSE, activationDispatchMutexName.c_str()));
+    if (ActivationDispatchMutex == NULL)
+    {
+        if (psidEveryone != NULL)
+            FreeSid(psidEveryone);
+        if (paclNewDacl != NULL)
+            LocalFree(paclNewDacl);
+        return FALSE;
     }
 
     if (psidEveryone != NULL)
@@ -473,8 +626,12 @@ CTaskList::~CTaskList()
         NOHANDLES(CloseHandle(Event));
     if (EventProcessed != NULL)
         NOHANDLES(CloseHandle(EventProcessed));
+    if (ActivationDispatchMutex != NULL)
+        NOHANDLES(CloseHandle(ActivationDispatchMutex));
     if (CommandLineParamsProcessed != NULL)
         NOHANDLES(CloseHandle(CommandLineParamsProcessed));
+    delete PendingCommandLineRequest;
+    PendingCommandLineRequest = NULL;
     NOHANDLES(DeleteCriticalSection(&CommandLineParamsCS));
 
     if (SalShExtDoPasteEvent != NULL)
@@ -619,13 +776,28 @@ BOOL CTaskList::FireEvent(DWORD todo, DWORD pid, BOOL* timeouted)
     return FALSE;
 }
 
-BOOL CTaskList::ActivateRunningInstance(const CCommandLineParams* cmdLineParams, BOOL* timeouted)
+BOOL CTaskList::ActivateRunningInstance(
+    const sally::cmdline::CommandLineRequest* request, BOOL* timeouted)
 {
     if (timeouted != NULL)
         *timeouted = FALSE;
 
     if (!OK)
         return FALSE;
+
+    DWORD dispatchWait = WaitForSingleObject(ActivationDispatchMutex,
+                                             TASKLIST_TODO_TIMEOUT);
+    if (dispatchWait == WAIT_TIMEOUT || dispatchWait == WAIT_FAILED)
+    {
+        if (timeouted != NULL)
+            *timeouted = dispatchWait == WAIT_TIMEOUT;
+        return FALSE;
+    }
+    struct CReleaseActivationMutex
+    {
+        HANDLE Mutex;
+        ~CReleaseActivationMutex() { ReleaseMutex(Mutex); }
+    } releaseActivationMutex{ActivationDispatchMutex};
 
     CProcessListItem ourProcessInfo;
 
@@ -678,32 +850,104 @@ BOOL CTaskList::ActivateRunningInstance(const CCommandLineParams* cmdLineParams,
 
     CProcessListItem* item = &ProcessList->Items[firstRunnig];
 
-    // set Todo, PID and parameters
+    DWORD requestUID = ProcessList->TodoUID + 1;
+    if (requestUID == 0)
+        requestUID = 1;
+    DWORD generation = requestUID ^ GetCurrentProcessId() ^ GetTickCount();
+    if (generation == 0)
+        generation = 1;
+    std::vector<BYTE> payload;
+    if (request == NULL ||
+        !BuildActivationPayload(*request, requestUID, generation,
+                                GetCurrentProcessId(), payload))
+    {
+        ReleaseMutex(FMOMutex);
+        return FALSE;
+    }
+    std::string payloadName;
+    std::string processedName;
+    try
+    {
+        const std::string payloadBase =
+            sally::instance::BuildSharedObjectNameForCurrentInstance(
+                SALLY_ACTIVATION_PAYLOAD_BASE_NAME);
+        payloadName = BuildActivationPayloadName(
+            payloadBase, GetCurrentProcessId(), requestUID, generation);
+        const std::string processedBase =
+            sally::instance::BuildSharedObjectNameForCurrentInstance(
+                SALLY_ACTIVATION_PROCESSED_EVENT_BASE_NAME);
+        processedName = BuildActivationPayloadName(
+            processedBase, GetCurrentProcessId(), requestUID, generation);
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E(LOW_MEMORY);
+        ReleaseMutex(FMOMutex);
+        return FALSE;
+    }
+    HANDLE activationProcessed = NOHANDLES(CreateEventA(
+        NULL, TRUE, FALSE, processedName.c_str()));
+    if (activationProcessed == NULL || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        if (activationProcessed != NULL)
+            NOHANDLES(CloseHandle(activationProcessed));
+        ReleaseMutex(FMOMutex);
+        return FALSE;
+    }
+    HANDLE payloadMapping = NOHANDLES(CreateFileMappingA(
+        INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE | SEC_COMMIT, 0,
+        static_cast<DWORD>(payload.size()), payloadName.c_str()));
+    if (payloadMapping == NULL || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        if (payloadMapping != NULL)
+            NOHANDLES(CloseHandle(payloadMapping));
+        NOHANDLES(CloseHandle(activationProcessed));
+        ReleaseMutex(FMOMutex);
+        return FALSE;
+    }
+    void* payloadView = NOHANDLES(MapViewOfFile(
+        payloadMapping, FILE_MAP_WRITE, 0, 0, payload.size()));
+    if (payloadView == NULL)
+    {
+        NOHANDLES(CloseHandle(payloadMapping));
+        NOHANDLES(CloseHandle(activationProcessed));
+        ReleaseMutex(FMOMutex);
+        return FALSE;
+    }
+    memcpy(payloadView, payload.data(), payload.size());
+    NOHANDLES(UnmapViewOfFile(payloadView));
+
+    // Set fixed control metadata only. The producer keeps the payload mapping
+    // alive until acknowledgement or timeout.
     ProcessList->Todo = TASKLIST_TODO_ACTIVATE;
-    ProcessList->TodoUID++; // tell processes that new command will be processed
+    ProcessList->TodoUID = requestUID; // tell processes that new command will be processed
     ProcessList->TodoTimestamp = GetTickCount();
     ProcessList->PID = item->PID;
-
-    // take parameters from command-line
-    memcpy(&ProcessList->CommandLineParams, cmdLineParams, sizeof(CCommandLineParams));
-    // and set our internal variables
-    ProcessList->CommandLineParams.Version = 1;
-    ProcessList->CommandLineParams.RequestUID = ProcessList->TodoUID;
-    ProcessList->CommandLineParams.RequestTimestamp = ProcessList->TodoTimestamp;
+    CActivationRequestRef& ref = ProcessList->ActivationRequest;
+    ZeroMemory(&ref, sizeof(ref));
+    ref.StructSize = sizeof(ref);
+    ref.ProtocolVersion = SALLY_ACTIVATION_PROTOCOL_VERSION;
+    ref.RequestUID = requestUID;
+    ref.RequestTimestamp = ProcessList->TodoTimestamp;
+    ref.SenderPID = GetCurrentProcessId();
+    ref.Generation = generation;
+    ref.PayloadBytes = static_cast<DWORD>(payload.size());
 
     // allow activated process to call SetForegroundWindow, otherwise it won't be able to pull itself up
     AllowSetForegroundWindow(item->PID);
 
-    // start check in all Salamanders
-    // release shared memory
+    // Start the check in all Sally processes and release shared memory.
     ReleaseMutex(FMOMutex);
 
-    ResetEvent(EventProcessed);
     SetEvent(Event);
 
     // give a moment to react (during this time someone should "catch" it and fulfill the task)
     // 500ms is our reserve, to safely cover subordinate threads
-    BOOL ret = (WaitForSingleObject(EventProcessed, TASKLIST_TODO_TIMEOUT + 500) == WAIT_OBJECT_0);
+    BOOL ret = (WaitForSingleObject(activationProcessed,
+                                    TASKLIST_TODO_TIMEOUT + 500) == WAIT_OBJECT_0);
+
+    NOHANDLES(CloseHandle(payloadMapping));
+    NOHANDLES(CloseHandle(activationProcessed));
 
     // tell all Salamanders to prepare for next command (also reset in control thread, if some process is doing todo)
     ResetEvent(Event);
@@ -713,6 +957,47 @@ BOOL CTaskList::ActivateRunningInstance(const CCommandLineParams* cmdLineParams,
     // ProcessList->PID = 0;
 
     return ret;
+}
+
+void CTaskList::ReleasePendingRequest()
+{
+    // The control thread may still be running and publishing into this owner, so take the same
+    // lock it does. Every reader already re-checks the pointer inside the section, so dropping it
+    // here only makes further activation requests decline to publish - which is correct once the
+    // main thread has stopped consuming them.
+    NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
+    sally::cmdline::CommandLineRequest* released = PendingCommandLineRequest;
+    PendingCommandLineRequest = NULL;
+    NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
+    delete released;
+}
+
+BOOL CTaskList::TakePendingActivationRequest(
+    DWORD lastRequestUID, sally::cmdline::CommandLineRequest& request)
+{
+    BOOL accepted = FALSE;
+    NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
+    if (PendingCommandLineRequest != NULL &&
+        PendingCommandLineRequest->requestUID != lastRequestUID &&
+        PendingCommandLineRequest->requestUID != 0 &&
+        GetTickCount() - PendingCommandLineRequest->requestTimestamp <
+            TASKLIST_TODO_TIMEOUT)
+    {
+        try
+        {
+            sally::cmdline::CommandLineRequest copied =
+                *PendingCommandLineRequest;
+            request = std::move(copied);
+            accepted = TRUE;
+            SetEvent(CommandLineParamsProcessed);
+        }
+        catch (const std::bad_alloc&)
+        {
+            TRACE_E(LOW_MEMORY);
+        }
+    }
+    NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
+    return accepted;
 }
 
 BOOL CTaskList::RemoveKilledItems(BOOL* changed)

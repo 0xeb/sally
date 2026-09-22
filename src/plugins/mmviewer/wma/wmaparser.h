@@ -24,7 +24,8 @@ private:
     HMODULE module;
 
 protected:
-    HRESULT GetHeaderAttribute(IWMHeaderInfo* pHdrInfo, LPCWSTR pwszName, BOOL* pbIsPresent, char** output);
+    HRESULT GetHeaderAttribute(IWMHeaderInfo* pHdrInfo, LPCWSTR pwszName,
+                               BOOL* pbIsPresent, std::wstring& output);
 
 public:
     CParserWMA();
@@ -35,7 +36,7 @@ public:
             FreeLibrary(module);
     }
 
-    virtual CParserResultEnum OpenFile(LPCTSTR fileName);
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName);
     virtual CParserResultEnum CloseFile();
     virtual CParserResultEnum GetFileInfo(COutputInterface* output);
 };

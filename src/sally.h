@@ -70,11 +70,12 @@ public:
         if (!DeleteData)
             TRACE_E("Unexpected situation in CFilesArray::CallDestructor()");
 #endif // _DEBUG
+        // Name is wide now and NameW is gone (P1.3): there is no second
+        // wide name to free. The allocator is unchanged - these still come from
+        // Salamander's heap via the one-allocator rule CFileData documents.
         free(member.Name);
         if (member.DosName != NULL)
             free(member.DosName);
-        if (member.NameW != NULL)
-            free(member.NameW);
     }
 };
 
@@ -89,8 +90,8 @@ public:
 class CNames
 {
 protected:
-    TDirectArray<char*> Dirs;
-    TDirectArray<char*> Files;
+    TDirectArray<wchar_t*> Dirs;
+    TDirectArray<wchar_t*> Files;
     BOOL CaseSensitive;
     BOOL NeedSort; // guard for proper class usage
 
@@ -108,14 +109,14 @@ public:
     // copies the content of 'name' into its own buffer
     // adds it to the list (to Dirs if 'nameIsDir' is TRUE, otherwise to Files)
     // returns TRUE on success, otherwise FALSE
-    BOOL Add(BOOL nameIsDir, const char* name);
+    BOOL Add(BOOL nameIsDir, const wchar_t* name);
 
     // sorts the Dirs and Files lists so that Contains() can be called;
     void Sort();
 
     // returns TRUE if the name specified through 'nameIsDir' and 'name' is present in one
     // of the arrays; if 'foundOnIndex' is not NULL, it returns the index where the item was found
-    BOOL Contains(BOOL nameIsDir, const char* name, int* foundOnIndex = NULL);
+    BOOL Contains(BOOL nameIsDir, const wchar_t* name, int* foundOnIndex = NULL);
 
     // returns the total number of stored names
     int GetCount() { return Dirs.Count + Files.Count; }
@@ -136,32 +137,27 @@ class CPathHistoryItem
 {
 protected:
     int Type;                             // type: 0 is a disk, 1 is an archive, 2 is FS
-    std::string PathOrArchiveOrFSName;    // disk path or archive name or FS name (legacy ANSI mirror)
-    std::string ArchivePathOrFSUserPart;  // path in an archive or the user part of an FS path
-    // Wide source-of-truth twins. Populated for Type==0 (disk) and Type==1 (archive)
-    // when the recorder has the panel's PathW / ZIPArchiveW / ZIPPathW available.
-    // Empty for Type==2 (plugin FS) until plugin FS user-parts gain wide support.
-    // Empty also when populated from an old code path that only had ANSI bytes.
-    std::wstring PathOrArchiveOrFSNameW;
-    std::wstring ArchivePathOrFSUserPartW;
+    // One value each. These were ANSI mirrors with wide twins beside
+    // them; both halves of every pair were already wide, so the twins were duplicates
+    // and the constructor was normalizing the same path twice.
+    std::wstring PathOrArchiveOrFSName;   // disk path or archive name or FS name
+    std::wstring ArchivePathOrFSUserPart; // path in an archive or the user part of an FS path
     HICON HIcon;                          // icon corresponding to the path (may be NULL); the icon will be destroyed in the destructor
     CPluginFSInterfaceAbstract* PluginFS; // only for Type==2: the last used interface for the FS path
 
     int TopIndex;      // top index at the time the panel state was saved
-    std::string FocusedName; // focused item at the time the panel state was saved
+    std::wstring FocusedName; // focused item at the time the panel state was saved
 
 public:
-    CPathHistoryItem(int type, const char* pathOrArchiveOrFSName,
-                     const char* archivePathOrFSUserPart, HICON hIcon,
-                     CPluginFSInterfaceAbstract* pluginFS,
-                     const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                     const wchar_t* archivePathOrFSUserPartW = nullptr);
+    CPathHistoryItem(int type, const wchar_t* pathOrArchiveOrFSName,
+                     const wchar_t* archivePathOrFSUserPart, HICON hIcon,
+                     CPluginFSInterfaceAbstract* pluginFS);
     ~CPathHistoryItem();
 
     // change of top index and focused name (repeated addition of one path to the history)
-    void ChangeData(int topIndex, const char* focusedName);
+    void ChangeData(int topIndex, const wchar_t* focusedName);
 
-    void GetPath(char* buffer, int bufferSize);
+    std::wstring GetPath() const;
     HICON GetIcon();
     BOOL Execute(CFilesWindow* panel); // returns TRUE if the change succeeded (FALSE - stays in place)
 
@@ -188,42 +184,31 @@ public:
     // clears all history entries
     void ClearHistory();
 
-    // adds a path to the history.
-    // pathOrArchiveOrFSNameW / archivePathOrFSUserPartW carry the wide source-of-truth
-    // when available (disk: panel->GetPathW(); archive: panel->GetZIPArchiveW() and
-    // panel->GetZIPPathW()); pass nullptr for plugin FS or when only ANSI bytes are
-    // available. The wide twins are what Execute() replays through ChangePathToDiskW /
-    // ChangePathToArchiveW so that Unicode-only roots survive round-tripping.
-    void AddPath(int type, const char* pathOrArchiveOrFSName, const char* archivePathOrFSUserPart,
-                 CPluginFSInterfaceAbstract* pluginFS, CPluginFSInterfaceEncapsulation* curPluginFS,
-                 const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                 const wchar_t* archivePathOrFSUserPartW = nullptr);
+    // adds a path to the history. The wide-twin arguments that used to
+    // ride alongside these are gone: the item holds one wide value, and Execute() replays
+    // it through ChangePathToDisk / ChangePathToArchive unconditionally.
+    void AddPath(int type, const wchar_t* pathOrArchiveOrFSName, const wchar_t* archivePathOrFSUserPart,
+                 CPluginFSInterfaceAbstract* pluginFS, CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // adds a path to the history only if the path is not already present (see Alt+F12; for FS it overwrites pluginFS with the newest one)
-    void AddPathUnique(int type, const char* pathOrArchiveOrFSName, const char* archivePathOrFSUserPart,
+    void AddPathUnique(int type, const wchar_t* pathOrArchiveOrFSName, const wchar_t* archivePathOrFSUserPart,
                        HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
-                       CPluginFSInterfaceEncapsulation* curPluginFS,
-                       const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                       const wchar_t* archivePathOrFSUserPartW = nullptr);
+                       CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // changes the data (top index and focused name) of the current path only if the given path
     // matches the current path in the history
-    void ChangeActualPathData(int type, const char* pathOrArchiveOrFSName,
-                              const char* archivePathOrFSUserPart,
+    void ChangeActualPathData(int type, const wchar_t* pathOrArchiveOrFSName,
+                              const wchar_t* archivePathOrFSUserPart,
                               CPluginFSInterfaceAbstract* pluginFS,
                               CPluginFSInterfaceEncapsulation* curPluginFS,
-                              int topIndex, const char* focusedName,
-                              const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                              const wchar_t* archivePathOrFSUserPartW = nullptr);
+                              int topIndex, const wchar_t* focusedName);
 
     // deletes the current path from the history only if the given path matches the current
     // path in the history
-    void RemoveActualPath(int type, const char* pathOrArchiveOrFSName,
-                          const char* archivePathOrFSUserPart,
+    void RemoveActualPath(int type, const wchar_t* pathOrArchiveOrFSName,
+                          const wchar_t* archivePathOrFSUserPart,
                           CPluginFSInterfaceAbstract* pluginFS,
-                          CPluginFSInterfaceEncapsulation* curPluginFS,
-                          const wchar_t* pathOrArchiveOrFSNameW = nullptr,
-                          const wchar_t* archivePathOrFSUserPartW = nullptr);
+                          CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // populates the menu with items
     // IDs will start from one and correspond to the index parameter when calling the Execute() method
@@ -250,8 +235,8 @@ public:
     }
     BOOL HasPaths() { return Paths.Count > 0; }
 
-    void SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear);
-    void LoadFromRegistry(HKEY hKey, const char* name);
+    void SaveToRegistry(HKEY hKey, const wchar_t* name, BOOL onlyClear);
+    void LoadFromRegistry(HKEY hKey, const wchar_t* name);
 };
 
 //*****************************************************************************
@@ -274,16 +259,21 @@ protected:
     CFileHistoryItemTypeEnum Type; // how the file was accessed
     DWORD HandlerID;               // viewer/editor ID for repeating the action
     HICON HIcon;                   // icon associated with the file
-    std::string FileName;          // file name
+    // One name. The wide twin that used to sit here only confirmed the
+    // dedup check in Equal(), and Execute() still replayed through the narrow half - that
+    // deferred improvement lands with the collapse rather than after it.
+    std::wstring FileName; // file name
 
 public:
-    CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
+    CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerID, const wchar_t* fileName);
     ~CFileHistoryItem();
 
     BOOL IsGood() { return !FileName.empty(); }
 
-    // returns TRUE if the object was constructed from the specified data
-    BOOL Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
+    // returns TRUE if the object was constructed from the specified data. The compare is
+    // exact now: the CP_ACP mirror collision it used to need a wide confirmation for cannot
+    // happen when the stored name is wide.
+    BOOL Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const wchar_t* fileName);
 
     BOOL Execute();
 
@@ -303,7 +293,7 @@ public:
 
     // searches the history and, if it does not find the item being added, inserts it at the top
     // if the item already exists, it will be pulled to the top position
-    BOOL AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
+    BOOL AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const wchar_t* fileName);
 
     // populates the menu with items
     // IDs will start from one and correspond to the index parameter when calling the Execute() method
@@ -327,7 +317,7 @@ class CPluginDataInterfaceAbstract;
 // the plugin receives pointers to these pointers
 extern const CFileData* TransferFileData;                     // pointer to the data used to draw the column
 extern int TransferIsDir;                                     // 0 (file), 1 (directory), 2 (up-dir)
-extern char TransferBuffer[TRANSFER_BUFFER_MAX];              // pointer to an array with TRANSFER_BUFFER_MAX characters that serves as the return value
+extern wchar_t TransferBuffer[TRANSFER_BUFFER_MAX]; // wide: the panel column transfer buffer              // pointer to an array with TRANSFER_BUFFER_MAX characters that serves as the return value
 extern int TransferLen;                                       // number of returned characters
 extern DWORD TransferRowData;                                 // user data, bits 0x00000001 to 0x00000080 are reserved for Salamander
 extern CPluginDataInterfaceAbstract* TransferPluginDataIface; // plugin data interface of the panel in which the item is drawn (belongs to TransferFileData->PluginData)
@@ -357,7 +347,6 @@ int WINAPI InternalGetPluginIconIndex();
 
 #define STANDARD_COLUMNS_COUNT 9 // number of standard columns for the view
 #define VIEW_TEMPLATES_COUNT 10
-#define VIEW_NAME_MAX 30
 // column Name is always visible and if the flag VIEW_SHOW_EXTENSION is not set, it also contains the extension
 #define VIEW_SHOW_EXTENSION 0x00000001
 #define VIEW_SHOW_DOSNAME 0x00000002
@@ -403,8 +392,8 @@ struct CColumnConfig
 struct CViewTemplate
 {
     DWORD Mode;               // view display mode (tree/brief/detailed)
-    char Name[VIEW_NAME_MAX]; // name under which the view will appear in the configuration/menu;
-                              // if it is an empty string, the view is not defined
+    std::wstring Name;        // name under which the view will appear in the configuration/menu;
+                              // empty means the view is not defined
     DWORD Flags;              // visibility of Salamander`s standard columns
                               // VIEW_SHOW_xxxx
 
@@ -425,21 +414,21 @@ public:
     CViewTemplates();
 
     // sets the attributes
-    void Set(DWORD index, DWORD viewMode, const char* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);
-    void Set(DWORD index, const char* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);
+    void Set(DWORD index, DWORD viewMode, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);
+    void Set(DWORD index, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode);
 
     BOOL SwapItems(int index1, int index2); // swaps two items in the array
-    BOOL CleanName(char* name);             // trims spaces and returns TRUE if name is ok
+    BOOL CleanName(std::wstring& name); // trims spaces and returns TRUE if name is ok
 
-    int SaveColumns(CColumnConfig* columns, char* buffer);  // convert the array to a string
-    void LoadColumns(CColumnConfig* columns, char* buffer); // and back again
+    std::wstring SaveColumns(const CColumnConfig* columns);             // convert the array to a string
+    void LoadColumns(CColumnConfig* columns, const std::wstring& value); // and back again
 
     BOOL Save(HKEY hKey); // saves the entire array
     BOOL Load(HKEY hKey); // loads the entire array
 
     void Load(CViewTemplates& source)
     {
-        memcpy(Items, source.Items, sizeof(Items));
+        std::copy(std::begin(source.Items), std::end(source.Items), std::begin(Items));
     }
 };
 
@@ -452,7 +441,7 @@ public:
 class CDynamicStringImp : public CDynamicString
 {
 public:
-    char* Text;
+    wchar_t* Text;
     int Allocated;
     int Length;
 
@@ -475,7 +464,7 @@ public:
     // returns TRUE if the string 'str' of length 'len' was successfully appended; if 'len' is -1,
     // 'len' is determined as "strlen(str)" (addition without the trailing zero); if 'len' is -2,
     // 'len' is determined as "strlen(str)+1" (addition including the trailing zero)
-    virtual BOOL WINAPI Add(const char* str, int len = -1);
+    virtual BOOL WINAPI Add(const wchar_t* str, int len = -1);
 };
 
 //****************************************************************************
@@ -489,15 +478,16 @@ public:
 class CTruncatedString
 {
 protected:
-    std::string Text;      // complete text
-    std::wstring TextW;    // complete text when Unicode rendering is required
+    // One representation. `std::string Text` and `std::string TruncatedText`
+    // sat beside these as a CP_ACP mirror, discriminated by a UseWideText flag that the only
+    // setter (SetW) always set TRUE - so the narrow half was written, never read, and the
+    // narrow arm of TruncateText had not run since the mirror was introduced.
+    std::wstring TextW; // complete text
     int SubStrIndex; // index of the first character of the truncatable substring; -1 if it does not exist
     int SubStrLen;   // number of characters in the substring
 
-    std::string TruncatedText; // truncated form of the text (if truncation was needed)
-    std::wstring TruncatedTextW;
-    BOOL HasTruncated;         // TRUE if TruncatedText contains valid data
-    BOOL UseWideText;
+    std::wstring TruncatedTextW; // truncated form of the text (if truncation was needed)
+    BOOL HasTruncated;           // TRUE if TruncatedTextW contains valid data
 
 public:
     CTruncatedString();
@@ -509,7 +499,10 @@ public:
     // the contents of the variable str will be copied into the allocated Text buffer
     // if subStr is not NULL, its contents will be inserted into str via sprintf
     // it is assumed that str contains the %s format string
-    BOOL Set(const char* str, const char* subStr);
+    // The narrow Set() is gone. Its declaration had already been widened
+    // into an exact twin of SetW, and every string it produced was invisible: CMessageBox
+    // reads Text.GetW() unconditionally (no IsWide() fallback), which Set() left empty --
+    // three blank dialog bodies were fixed one at a time before the cause was removed.
     BOOL SetW(const wchar_t* str, const wchar_t* subStr);
 
     // the string will be truncated according to the size of the window specified by ctrlID
@@ -518,9 +511,10 @@ public:
     BOOL TruncateText(HWND hWindow, BOOL forMessageBox = FALSE);
 
     // returns the truncated version of the text (if truncation was needed)
-    const char* Get();
+    const wchar_t* Get();
     const wchar_t* GetW();
-    BOOL IsWide() const { return UseWideText; }
+    // IsWide() is gone - it could only ever answer TRUE. Its callers each had
+    // an if/else whose two arms did the same thing; see dialogs_file_transforms.cpp.
 
     // returns TRUE if the string can be truncated
     BOOL NeedTruncate() { return SubStrIndex != -1; }
@@ -532,21 +526,36 @@ public:
 //
 // list of shared directories
 
+// Wide is the STORAGE here, not a sibling bolted on.
+//
+// `NetShareEnum` is a Unicode-only API - SHARE_INFO_502's netname/path/remark are
+// LPWSTR and always have been. This data therefore arrives from the OS already wide,
+// and CShares::Refresh() was narrowing it on ingestion through a bare
+// WideCharToMultiByte(CP_ACP, 0, ...): best-fit ON, no lossy check, no failure path.
+// So the long-standing note that "CShares is ANSI-only" had it backwards - nothing
+// about this data was ever narrow; Sally was throwing the wide form away at the door.
+//
+// The second copy is GONE. It was described here as "the ANSI mirrors,
+// kept only while the consumers migrate" - but a later sweep widened its members to
+// wchar_t* without touching its construction, so it was being built by narrowing to
+// CP_ACP and back. Its only reader was CShares::GetItem, which had no callers left.
 struct CSharesItem
 {
-    char* LocalPath;  // allocated local path for the shared resource
-    char* LocalName;  // points into LocalPath and marks the name of the shared directory
-                      // for a root path it is equal to LocalPath
-    char* RemoteName; // name of the shared resource
-    char* Comment;    // optional description of the shared resource
+    std::wstring LocalPathW;  // local path of the shared resource
+    std::wstring RemoteNameW; // name of the shared resource
+    std::wstring CommentW;    // optional description of the shared resource
+    size_t LocalNameOffsetW;  // offset into LocalPathW of the share directory's own name;
+                              // 0 for a root path, where the name IS the whole path
 
-    CSharesItem(const char* localPath, const char* remoteName, const char* comment);
+    CSharesItem(const wchar_t* localPath, const wchar_t* remoteName, const wchar_t* comment);
     ~CSharesItem();
 
-    void Cleanup(); // initializes pointers and variables
-    void Destroy(); // destroys allocated data
+    void Cleanup(); // resets the item to empty
 
-    BOOL IsGood() { return LocalPath != NULL; } // if the LocalPath is allocated, the rest will be as well
+    const wchar_t* GetLocalNameW() const { return LocalPathW.c_str() + LocalNameOffsetW; }
+
+    // the constructor leaves LocalPathW empty on every rejected/failed path
+    BOOL IsGood() { return !LocalPathW.empty(); }
 };
 
 class CShares
@@ -564,28 +573,33 @@ public:
 
     void Refresh(); // reload shares from the system
 
-    // prepares for use by Search(); 'path' is the path where we care about shares ("" = this_computer)
-    void PrepareSearch(const char* path);
+    // The ANSI overloads are GONE. The note that used to stand here
+    // justified them as re-widening their argument before calling the W form - but the
+    // type sweep had already left them declared IDENTICALLY to their twins, so they were
+    // duplicates, not conversions. Every caller now passes wide data it already had.
 
-    // returns TRUE if 'path' from PrepareSearch has a shared subdirectory (or root) named 'name'
-    BOOL Search(const char* name);
+    // prepares for use by SearchW(); 'path' is the path where we care about shares ("" = this_computer)
+    void PrepareSearchW(const wchar_t* path);
+
+    // returns TRUE if 'path' from PrepareSearchW has a shared subdirectory (or root) named 'name'
+    BOOL SearchW(const wchar_t* name);
 
     // returns TRUE if 'path' is the shared directory or its subdirectory
     // if no such share was found, returns FALSE
-    // call without PrepareSearch; scans all shares linearly
-    // WARNING! not optimized for speed like PrepareSearch/Search
-    BOOL GetUNCPath(const char* path, char* uncPath, int uncPathMax);
+    // call without PrepareSearchW; scans all shares linearly
+    // WARNING! not optimized for speed like PrepareSearchW/SearchW
+    BOOL GetUNCPathW(const wchar_t* path, std::wstring& uncPath);
 
     // returns the number of shared directories
     int GetCount() { return Data.Count; }
 
     // returns information about a specific item; localPath, remoteName or comment
     // may contain NULL and will then not be returned
-    BOOL GetItem(int index, const char** localPath, const char** remoteName, const char** comment);
+    BOOL GetItemW(int index, const wchar_t** localPath, const wchar_t** remoteName, const wchar_t** comment);
 
 protected:
     // returns TRUE if it finds 'name' in Wanted + its 'index', otherwise FALSE + the 'index' where to insert
-    BOOL GetWantedIndex(const char* name, int& index);
+    BOOL GetWantedIndexW(const wchar_t* name, int& index);
 };
 
 class CSalamanderHelp : public CWinLibHelp
@@ -607,26 +621,26 @@ class CLanguage
 {
 public:
     // SLG file name (only name.spl)
-    char* FileName; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
+    wchar_t* FileName; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
 
     // data retrieved from the SLG file
     WORD LanguageID;
     WCHAR* AuthorW;
-    char* Web;
+    wchar_t* Web;
     WCHAR* CommentW;
-    char* HelpDir;
+    wchar_t* HelpDir;
 
 public:
     CLanguage();
 
-    BOOL Init(const char* fileName, WORD languageID, const WCHAR* authorW,
-              const char* web, const WCHAR* commentW, const char* helpdir);
-    BOOL Init(const char* fileName, HINSTANCE modul);
+    BOOL Init(const wchar_t* fileName, WORD languageID, const WCHAR* authorW,
+              const wchar_t* web, const WCHAR* commentW, const wchar_t* helpdir);
+    BOOL Init(const wchar_t* fileName, HINSTANCE modul);
     void Free();
-    BOOL GetLanguageName(char* buffer, int bufferSize);
+    BOOL GetLanguageName(wchar_t* buffer, int bufferSize);
 };
 
-BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* isIncomplete);
+BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, wchar_t* isIncomplete);
 
 //*****************************************************************************
 //
@@ -651,8 +665,8 @@ private:
     DWORD RestrictRun;
     DWORD DisallowRun;
     DWORD NoDotBreakInLogicalCompare;
-    TDirectArray<char*> RestrictRunList;
-    TDirectArray<char*> DisallowRunList;
+    TDirectArray<wchar_t*> RestrictRunList;
+    TDirectArray<wchar_t*> DisallowRunList;
 
 public:
     CSystemPolicies();
@@ -753,9 +767,9 @@ public:
     // are there restrictions imposed on launching applications?
     BOOL GetMyRunRestricted() { return RestrictRun != 0 || DisallowRun != 0; }
     // is the file 'fileName' restricted (it can also be a full path)
-    BOOL GetMyCanRun(const char* fileName);
+    BOOL GetMyCanRun(const wchar_t* fileName);
 
-    // 1 = our StrCmpLogicalEx and the system StrCmpLogicalW under Vista do not treat the dot as
+    // 1 = our StrCmpLogicalExW and the system StrCmpLogicalW under Vista do not treat the dot as
     // a separator in names ("File.txt" is greater than "File (4).txt")
     DWORD GetNoDotBreakInLogicalCompare() { return NoDotBreakInLogicalCompare; }
 
@@ -764,9 +778,9 @@ private:
     void EnableAll();
     // loads all keys and adds them to the list
     // returns FALSE if there was not enough memory to allocate the list
-    BOOL LoadList(TDirectArray<char*>* list, HKEY hRootKey, const char* keyName);
+    BOOL LoadList(TDirectArray<wchar_t*>* list, HKEY hRootKey, const wchar_t* keyName);
     // returns TRUE if 'name' is in the list
-    BOOL FindNameInList(TDirectArray<char*>* list, const char* name);
+    BOOL FindNameInList(TDirectArray<wchar_t*>* list, const wchar_t* name);
 };
 
 extern CSystemPolicies SystemPolicies;
@@ -798,6 +812,9 @@ public:
         HOldPluginMsgBoxParent = NULL;
         CallEndStopRefresh = FALSE;
     }
+    // A second overload used to sit here whose ONLY reason to exist was carrying
+    // the Unicode opt-in - same parameters otherwise. With the flag gone it was an exact
+    // duplicate of the one above, so it is deleted rather than kept as a synonym.
     CCommonDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent,
                   CObjectOrigin origin = ooStandard, HWND hCenterAgains = NULL)
         : CDialog(modul, resID, helpID, parent, origin)
@@ -828,11 +845,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}
@@ -934,7 +951,7 @@ public:
     // 'index': for value 0 it will be the oldest item, value Count
     // it will be the last added waypoint
     // if the index is out of the array, it inserts the text "error"
-    void Print(char* buffer, int buffMax, int index);
+    void Print(wchar_t* buffer, int buffMax, int index);
 };
 
 //******************************************************************************
@@ -1032,16 +1049,15 @@ public:
     // 'format' is a format string for sprintf; string pointers may be NULL, they will be translated to "(null)"
     // on success returns the handle of the created window
     // WARNING: on failure returns hParent
-    HWND Create(HWND hParent, const char* format, ...);
+    HWND Create(HWND hParent, const wchar_t* format, ...);
 
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 // for window 'hParent' enumerates all children and searches for CShellExecuteWnd windows
-// retrieves their names and stores them into the 'text' buffer, separated by line endings "\r\n"
-// does not exceed the size of the 'textMax' buffer and terminates the end with the character 0
+// appends their names to 'text', separated by line endings "\r\n"
 // returns the number of windows found
-int EnumCShellExecuteWnd(HWND hParent, char* text, int textMax);
+int EnumCShellExecuteWnd(HWND hParent, std::wstring& text);
 
 //
 // ****************************************************************************
@@ -1050,7 +1066,7 @@ class CSalamanderSafeFile : public CSalamanderSafeFileAbstract
 {
 public:
     virtual BOOL WINAPI SafeFileOpen(SAFE_FILE* file,
-                                     const char* fileName,
+                                     const wchar_t* fileName,
                                      DWORD dwDesiredAccess,
                                      DWORD dwShareMode,
                                      DWORD dwCreationDisposition,
@@ -1062,7 +1078,7 @@ public:
 
     BOOL SafeFileOpenW(SAFE_FILE* file,
                        const wchar_t* fileName,
-                       const char* displayFileName,
+                       const wchar_t* displayFileName,
                        DWORD dwDesiredAccess,
                        DWORD dwShareMode,
                        DWORD dwCreationDisposition,
@@ -1072,35 +1088,35 @@ public:
                        DWORD* pressedButton,
                        DWORD* silentMask);
 
-    virtual HANDLE WINAPI SafeFileCreate(const char* fileName,
+    virtual HANDLE WINAPI SafeFileCreate(const wchar_t* fileName,
                                          DWORD dwDesiredAccess,
                                          DWORD dwShareMode,
                                          DWORD dwFlagsAndAttributes,
                                          BOOL isDir,
                                          HWND hParent,
-                                         const char* srcFileName,
-                                         const char* srcFileInfo,
+                                         const wchar_t* srcFileName,
+                                         const wchar_t* srcFileInfo,
                                          DWORD* silentMask,
                                          BOOL allowSkip,
                                          BOOL* skipped,
-                                         char* skipPath,
+                                         wchar_t* skipPath,
                                          int skipPathMax,
                                          CQuadWord* allocateWholeFile,
                                          SAFE_FILE* file);
 
     HANDLE SafeFileCreateW(const wchar_t* fileName,
-                           const char* displayFileName,
+                           const wchar_t* displayFileName,
                            DWORD dwDesiredAccess,
                            DWORD dwShareMode,
                            DWORD dwFlagsAndAttributes,
                            BOOL isDir,
                            HWND hParent,
-                           const char* srcFileName,
-                           const char* srcFileInfo,
+                           const wchar_t* srcFileName,
+                           const wchar_t* srcFileInfo,
                            DWORD* silentMask,
                            BOOL allowSkip,
                            BOOL* skipped,
-                           char* skipPath,
+                           wchar_t* skipPath,
                            int skipPathMax,
                            CQuadWord* allocateWholeFile,
                            SAFE_FILE* file);
@@ -1154,17 +1170,19 @@ UINT GetMouseWheelScrollChars(); // for horizontal scrolling
 BOOL InitializeMenuWheelHook();
 BOOL ReleaseMenuWheelHook();
 
-#define BUG_REPORT_REASON_MAX 1000
-extern char BugReportReasonBreak[BUG_REPORT_REASON_MAX]; // text shown when Salamander breaks into the bug report (as the reason)
+// The producer transfers the reason before firing TASKLIST_TODO_BREAK and then freezes.
+// The report thread receives a stable non-owning view of that process-lifetime UTF-16 text.
+void SetBugReportReasonBreak(std::wstring reason);
+const wchar_t* GetBugReportReasonBreak();
 
 extern CShares Shares; // the loaded shared directories are stored here
 
 extern CSalamanderSafeFile SalSafeFile; // interface for comfortable work with files
 
-extern const char* SalamanderConfigurationRoots[];                                                           // description in main_window_config_persistence.cpp
-BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize); // description in main_window_config_persistence.cpp
-BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration);                    // description in main_window_config_persistence.cpp
-BOOL FindLanguageFromPrevVerOfSal(char* slgName);                                                            // description in main_window_config_persistence.cpp
+extern const wchar_t* SalamanderConfigurationRoots[];                                                           // description in main_window_config_persistence.cpp
+BOOL GetUpgradeInfo(BOOL* autoImportConfig, std::wstring& autoImportConfigFromKey); // description in main_window_config_persistence.cpp
+BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const wchar_t*& loadConfiguration);                    // description in main_window_config_persistence.cpp
+BOOL FindLanguageFromPrevVerOfSal(std::wstring& slgName);                                                       // description in main_window_config_persistence.cpp
 
 // creates and attaches a special class to the edit line/combobox 'ctrlID' that enables
 // capturing keys and sending the WM_USER_KEYDOWN message to the dialog 'hDialog'
@@ -1172,11 +1190,11 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName);                               
 BOOL CreateKeyForwarder(HWND hDialog, int ctrlID);
 // call after receiving the WM_USER_KEYDOWN message; returns TRUE if the key was processed
 DWORD OnDirectoryKeyDown(DWORD keyCode, HWND hDialog, int editID, int editBufSize, int buttonID);
-DWORD OnDirectoryKeyDownW(DWORD keyCode, HWND hDialog, int editID, int editBufSize, int buttonID, HWND hUnicodeCtrl);
+DWORD OnDirectoryKeyDownW(DWORD keyCode, HWND hDialog, int editID, int buttonID, HWND hUnicodeCtrl);
 // call after receiving the WM_USER_BUTTON message; ensures the menu behind the 'buttonID' button is opened
 // and subsequently fills the 'editID' edit line
 void OnDirectoryButton(HWND hDialog, int editID, int editBufSize, int buttonID, WPARAM wParam, LPARAM lParam);
-void OnDirectoryButtonW(HWND hDialog, int editID, int editBufSize, int buttonID, WPARAM wParam, LPARAM lParam, HWND hUnicodeCtrl);
+void OnDirectoryButtonW(HWND hDialog, int editID, int buttonID, WPARAM wParam, LPARAM lParam, HWND hUnicodeCtrl);
 
 // call after receiving the WM_USER_BUTTON message; ensures Ctrl+A works on systems up to Windows Vista,
 // where the shortcut is already supported system-wide
@@ -1185,15 +1203,16 @@ DWORD OnKeyDownHandleSelectAll(DWORD keyCode, HWND hDialog, int editID);
 // returns TRUE if the hot key belongs to Salamander
 BOOL IsSalHotKey(WORD hotKey);
 
-void GetNetworkDrives(DWORD& netDrives, char (*netRemotePath)[MAX_PATH]);
-void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], char* buffer); // or internal use in bug reports only
+void GetNetworkDrives(DWORD& netDrives, std::wstring* netRemotePaths = NULL);
+void GetNetworkDrivesBody(DWORD& netDrives, std::wstring* netRemotePaths,
+                          BYTE* buffer, DWORD bufferSize); // direct scratch buffer is for bug-report use
 
 // returns the SID (as a string) for our process
 // the returned SID must be freed using a call to LocalFree
-//   LPTSTR sid;
+//   LPWSTR sid;
 //   if (GetStringSid(&sid))
 //     LocalFree(sid);
-BOOL GetStringSid(LPTSTR* stringSid);
+BOOL GetStringSid(LPWSTR* stringSid);
 
 // returns the MD5 hash computed from the SID, giving us a 16-byte array from a variable-length SID
 // 'sidMD5' must point to an array of 16 bytes
@@ -1223,4 +1242,6 @@ void InitEnvironmentVariablesDifferences();
 void RegenEnvironmentVariables();
 
 // attempt to detect SSD; see CSalamanderGeneralAbstract::IsPathOnSSD() for details
-BOOL IsPathOnSSD(const char* path);
+// Wide-only — the narrow form's sole caller was the SDK
+// forwarder, which is wide now.
+BOOL IsPathOnSSDW(const wchar_t* path);

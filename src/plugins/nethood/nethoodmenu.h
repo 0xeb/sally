@@ -28,7 +28,7 @@ protected:
     ///         is true. Otherwise the return value is false.
     bool FocusItemInPanel(
         __in int iPanel,
-        __in PCTSTR pszItemName);
+        __in const wchar_t* pszItemName);
 
 public:
     /// Returns state of the menu item.

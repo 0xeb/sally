@@ -7,6 +7,10 @@
 #include <windows.h>
 #include <crtdbg.h>
 #include <tchar.h>
+#include <limits>
+#include <string>
+
+#include "DiagnosticTextEncoding.h"
 
 #if defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
@@ -30,23 +34,84 @@ __declspec(allocate(".i_trc$a")) const _PVFV i_trace = (_PVFV)1; // at the begin
 #pragma section(".i_trc$z", read)
 __declspec(allocate(".i_trc$z")) const _PVFV i_trace_end = (_PVFV)1; // and at the end of section .i_trc we place variable i_trace_end
 
-static TCHAR __TraceFileMappingName[64];
-static TCHAR __TraceOpenConnectionMutexName[64];
-static TCHAR __TraceConnectDataReadyEventName[64];
-static TCHAR __TraceConnectDataAcceptedEventName[64];
+static wchar_t __TraceFileMappingName[64];
+static wchar_t __TraceOpenConnectionMutexName[64];
+static wchar_t __TraceConnectDataReadyEventName[64];
+static wchar_t __TraceConnectDataAcceptedEventName[64];
+
+static bool GetTraceModulePath(std::wstring& path) noexcept
+{
+    try
+    {
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer(static_cast<size_t>(capacity), L'\0');
+            SetLastError(ERROR_SUCCESS);
+            const DWORD len = GetModuleFileNameW(NULL, buffer.data(), capacity);
+            if (len == 0)
+                return false;
+
+            const DWORD error = GetLastError();
+            if (len < capacity && !(len == capacity - 1 && error == ERROR_INSUFFICIENT_BUFFER))
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return true;
+            }
+            if (capacity > (std::numeric_limits<DWORD>::max)() / 2)
+                return false;
+            capacity *= 2;
+        }
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+static bool GetTraceTempPath(std::wstring& path) noexcept
+{
+    try
+    {
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer(static_cast<size_t>(capacity), L'\0');
+            const DWORD len = GetTempPathW(capacity, buffer.data());
+            if (len == 0)
+                return false;
+            if (len < capacity)
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return true;
+            }
+
+            const DWORD required = len == (std::numeric_limits<DWORD>::max)() ? len : len + 1;
+            if (required <= capacity)
+                return false;
+            capacity = required;
+        }
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 
 static DWORD GetTraceNamespaceHash()
 {
-    WCHAR modulePath[MAX_PATH];
-    DWORD len = GetModuleFileNameW(NULL, modulePath, _countof(modulePath));
-    if (len == 0 || len >= _countof(modulePath))
+    std::wstring modulePath;
+    if (!GetTraceModulePath(modulePath))
         return 0;
 
+    size_t len = modulePath.length();
     while (len > 0 && modulePath[len - 1] != L'\\' && modulePath[len - 1] != L'/')
         len--;
 
     DWORD hash = 2166136261U; // FNV-1a
-    for (DWORD i = 0; i < len; i++)
+    for (size_t i = 0; i < len; i++)
     {
         WCHAR ch = modulePath[i];
         if (ch == L'/')
@@ -65,10 +130,10 @@ static void InitializeTraceObjectNames()
 {
     DWORD namespaceHash = GetTraceNamespaceHash();
 
-    _stprintf_s(__TraceFileMappingName, _T("TraceServerMappingName.%08X"), namespaceHash);
-    _stprintf_s(__TraceOpenConnectionMutexName, _T("TraceServerOpenConnectionMutex.%08X"), namespaceHash);
-    _stprintf_s(__TraceConnectDataReadyEventName, _T("TraceServerConnectDataReadyEvent.%08X"), namespaceHash);
-    _stprintf_s(__TraceConnectDataAcceptedEventName, _T("TraceServerConnectDataAcceptedEvent.%08X"), namespaceHash);
+    _stprintf_s(__TraceFileMappingName, L"TraceServerMappingName.%08X", namespaceHash);
+    _stprintf_s(__TraceOpenConnectionMutexName, L"TraceServerOpenConnectionMutex.%08X", namespaceHash);
+    _stprintf_s(__TraceConnectDataReadyEventName, L"TraceServerConnectDataReadyEvent.%08X", namespaceHash);
+    _stprintf_s(__TraceConnectDataAcceptedEventName, L"TraceServerConnectDataAcceptedEvent.%08X", namespaceHash);
 }
 
 void Initialize__Trace()
@@ -83,10 +148,10 @@ void Initialize__Trace()
 
 #pragma init_seg(".i_trc$m")
 
-const TCHAR* __FILE_MAPPING_NAME = __TraceFileMappingName;
-const TCHAR* __OPEN_CONNECTION_MUTEX = __TraceOpenConnectionMutexName;
-const TCHAR* __CONNECT_DATA_READY_EVENT_NAME = __TraceConnectDataReadyEventName;
-const TCHAR* __CONNECT_DATA_ACCEPTED_EVENT_NAME = __TraceConnectDataAcceptedEventName;
+const wchar_t* __FILE_MAPPING_NAME = __TraceFileMappingName;
+const wchar_t* __OPEN_CONNECTION_MUTEX = __TraceOpenConnectionMutexName;
+const wchar_t* __CONNECT_DATA_READY_EVENT_NAME = __TraceConnectDataReadyEventName;
+const wchar_t* __CONNECT_DATA_ACCEPTED_EVENT_NAME = __TraceConnectDataAcceptedEventName;
 
 #endif // defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
@@ -118,7 +183,33 @@ const TCHAR* __CONNECT_DATA_ACCEPTED_EVENT_NAME = __TraceConnectDataAcceptedEven
 
 #endif // MULTITHREADED_TRACE_ENABLE
 
-C__Trace __Trace;
+// See the comment on GetTrace()'s declaration in trace.h.
+C__Trace& GetTrace()
+{
+    static C__Trace trace;
+    return trace;
+}
+
+// Self-referencing counterparts of TRACE_I/TRACE_E for use ONLY inside C__Trace's
+// own methods (Connect/Disconnect/CloseTraceFile), which run during GetTrace()'s own construction
+// (C__Trace::C__Trace calls Connect(FALSE)). Calling the public TRACE_I/TRACE_E macros there would
+// call GetTrace() again on the same thread while the Meyer's singleton is still being built -
+// MSVC's magic-statics guard blocks that reentrant call waiting for a completion that can never
+// happen, since it's the same thread doing the constructing. These operate on the already-existing
+// *this instead, so they never touch the construction guard.
+#define TRACE_I_SELF(str)                                                    \
+    (::EnterCriticalSection(&CriticalSection), StoreLastError(),             \
+     OStream() << str, *this)                                                \
+        .SetInfo(__FILE__, __LINE__)                                         \
+        .SendMessageToServer(__mtInformation)                                \
+        .RestoreLastError()
+
+#define TRACE_E_SELF(str)                                                    \
+    (::EnterCriticalSection(&CriticalSection), StoreLastError(),             \
+     OStream() << str, *this)                                                \
+        .SetInfo(__FILE__, __LINE__)                                         \
+        .SendMessageToServer(__mtError)                                      \
+        .RestoreLastError()
 
 #ifdef MULTITHREADED_TRACE_ENABLE
 
@@ -322,10 +413,10 @@ HANDLE __TRACECreateThread(LPSECURITY_ATTRIBUTES lpThreadAttributes,
         if (DuplicateHandle(GetCurrentProcess(), ret, GetCurrentProcess(),
                             &handle, 0, FALSE, DUPLICATE_SAME_ACCESS))
         {
-            EnterCriticalSection(&__Trace.CriticalSection);
-            if (!__Trace.ThreadCache.Add(handle, tid))
+            EnterCriticalSection(&GetTrace().CriticalSection);
+            if (!GetTrace().ThreadCache.Add(handle, tid))
                 CloseHandle(handle);
-            LeaveCriticalSection(&__Trace.CriticalSection);
+            LeaveCriticalSection(&GetTrace().CriticalSection);
         }
         if ((dwCreationFlags & CREATE_SUSPENDED) == 0)
             ResumeThread(ret);
@@ -354,10 +445,10 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
         if (DuplicateHandle(GetCurrentProcess(), (HANDLE)ret, GetCurrentProcess(),
                             &handle, 0, FALSE, DUPLICATE_SAME_ACCESS))
         {
-            EnterCriticalSection(&__Trace.CriticalSection);
-            if (!__Trace.ThreadCache.Add(handle, tid))
+            EnterCriticalSection(&GetTrace().CriticalSection);
+            if (!GetTrace().ThreadCache.Add(handle, tid))
                 CloseHandle(handle);
-            LeaveCriticalSection(&__Trace.CriticalSection);
+            LeaveCriticalSection(&GetTrace().CriticalSection);
             if ((initflag & CREATE_SUSPENDED) == 0)
                 ResumeThread((HANDLE)ret);
         }
@@ -374,37 +465,10 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 // CWStr
 //
 
-CWStr::CWStr(const char* s)
+CWStr::CWStr(const char* s) : IsOK(TRUE), OwnsStr(s != NULL), Str(NULL)
 {
-    IsOK = TRUE;
-    Str = NULL;
-    if (s == NULL)
-        AllocBuf = NULL;
-    else
-    {
-        IsOK = FALSE;
-        int len = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
-        if (len == 0)
-            AllocBuf = NULL; // MultiByteToWideChar failed
-        else
-        {
-            AllocBuf = (WCHAR*)malloc(len * sizeof(WCHAR));
-            if (AllocBuf != NULL)
-            {
-                int res = MultiByteToWideChar(CP_ACP, 0, s, -1, AllocBuf, len);
-                if (res > 0 && res <= len)
-                {
-                    AllocBuf[res - 1] = 0; // success, ensure zero terminated string
-                    IsOK = TRUE;
-                }
-                else // MultiByteToWideChar failed
-                {
-                    free(AllocBuf);
-                    AllocBuf = NULL;
-                }
-            }
-        }
-    }
+    if (s != NULL)
+        IsOK = sally::diagnostic::DecodeAcp(s, OwnedStr);
 }
 
 //*****************************************************************************
@@ -442,7 +506,7 @@ C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceSt
 #ifdef TRACE_TO_FILE
     HTraceFile = NULL;
 #ifdef __TRACESERVER
-    TraceFileName[0] = 0;
+    TraceFileName.clear();
 #endif // __TRACESERVER
 #endif // TRACE_TO_FILE
     ::QueryPerformanceFrequency(&PerformanceFrequency);
@@ -466,8 +530,19 @@ C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceSt
     Connect(FALSE);
 }
 
+// See IsTraceAlive()'s declaration in trace.h - this is the only place that
+// flips it, and it must happen before Disconnect()/DeleteCriticalSection() touch anything, so a
+// concurrent or later caller checking IsTraceAlive() never observes a half-torn-down object.
+static bool s_TraceAlive = true;
+
+bool IsTraceAlive()
+{
+    return s_TraceAlive;
+}
+
 C__Trace::~C__Trace()
 {
+    s_TraceAlive = false;
     Disconnect();
     DeleteCriticalSection(&CriticalSection);
 }
@@ -480,33 +555,33 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
 #ifdef TRACE_TO_FILE
     if (HTraceFile == NULL)
     {
-        WCHAR tmpDir[MAX_PATH + 10];
-        WCHAR* end = tmpDir + MAX_PATH + 10;
-        if (GetTempPathW(MAX_PATH, tmpDir))
+        try
         {
-            WCHAR* s = tmpDir + wcslen(tmpDir);
-            if (s > tmpDir && *(s - 1) != L'\\')
-                *s++ = L'\\';
-            lstrcpynW(s, L"altap_traces", int(end - s));
-            s += wcslen(s);
-
-            if ((s - tmpDir) + 15 < MAX_PATH) // enough space to append "_2000000000.log"
+            std::wstring tmpDir;
+            if (GetTraceTempPath(tmpDir))
             {
-                int num = 1;
+                if (!tmpDir.empty() && tmpDir.back() != L'\\')
+                    tmpDir += L'\\';
+                const std::wstring stem = tmpDir + L"altap_traces";
+
+                unsigned long long num = 1;
                 while (1)
                 {
-                    swprintf_s(s, _countof(tmpDir) - (s - tmpDir), L"_%d.log", num++);
-                    HTraceFile = CreateFileW(tmpDir, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+                    const std::wstring candidate = stem + L"_" + std::to_wstring(num) + L".log";
+                    HTraceFile = CreateFileW(candidate.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                                             CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (HTraceFile != INVALID_HANDLE_VALUE)
                     {
 #ifdef __TRACESERVER
-                        lstrcpynW(TraceFileName, tmpDir, _countof(TraceFileName));
+                        TraceFileName = candidate;
 #endif // __TRACESERVER
                         break;
                     }
                     DWORD err = GetLastError();
-                    if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
+                    if ((err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS) ||
+                        num == (std::numeric_limits<unsigned long long>::max)())
                         break; // unexpected error (and nowhere to output it)
+                    ++num;
                 }
                 if (HTraceFile == INVALID_HANDLE_VALUE)
                     HTraceFile = NULL;
@@ -519,15 +594,24 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
 #endif // MULTITHREADED_TRACE_ENABLE
                                               L"Date\tTime\tCounter [ms]\tModule\tLine\tMessage\r\n";
                     WriteFile(HTraceFile, fileHeader, (int)(sizeof(WCHAR) * wcslen(fileHeader)), &wr, NULL);
-                    TRACE_I("Opening log file" << (onUserRequest ? " on user's request." : "."));
+                    TRACE_I_SELF("Opening log file" << (onUserRequest ? " on user's request." : "."));
                 }
             }
+        }
+        catch (...)
+        {
+            if (HTraceFile != NULL && HTraceFile != INVALID_HANDLE_VALUE)
+                CloseHandle(HTraceFile);
+            HTraceFile = NULL;
+#ifdef __TRACESERVER
+            TraceFileName.clear();
+#endif // __TRACESERVER
         }
     }
 #endif // TRACE_TO_FILE
 
     if (HWritePipe != NULL) // test server connection, if down, HWritePipe will close and we will try to reconnect
-        TRACE_I("Connect request received when already connected to Trace Server.");
+        TRACE_I_SELF("Connect request received when already connected to Trace Server.");
 
     BOOL ret = FALSE;
     if (HWritePipe != NULL)
@@ -619,7 +703,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
 #endif                                                                               // TRACE_IGNORE_AUTOCLEAR
                                                 }
                                                 else
-                                                    TRACE_E(oldTraceServerA);
+                                                    TRACE_E_SELF(oldTraceServerA);
                                             }
                                             else // failed: try to create pipe on server side
                                             {
@@ -680,7 +764,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
 #endif                                                                                       // TRACE_IGNORE_AUTOCLEAR
                                                         }
                                                         else
-                                                            TRACE_E(oldTraceServerA);
+                                                            TRACE_E_SELF(oldTraceServerA);
                                                     }
                                                     else
                                                     {
@@ -732,10 +816,10 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
         }
         if (ret)
         {
-            TRACE_I("Connected" << (onUserRequest ? " on user's request." : "."));
+            TRACE_I_SELF("Connected" << (onUserRequest ? " on user's request." : "."));
 #ifdef TRACE_TO_FILE
             if (HTraceFile != NULL)
-                TRACE_I("TRACE MESSAGES ARE ALSO WRITTEN TO FILE IN TEMP DIRECTORY.");
+                TRACE_I_SELF("TRACE MESSAGES ARE ALSO WRITTEN TO FILE IN TEMP DIRECTORY.");
 #endif // TRACE_TO_FILE
         }
     }
@@ -750,17 +834,17 @@ void C__Trace::Disconnect()
     DWORD storedLastError = GetLastError();
     if (HWritePipe != NULL)
     {
-        TRACE_I("Disconnected.");
+        TRACE_I_SELF("Disconnected.");
         CloseWritePipeAndSemaphore();
     }
 #ifdef TRACE_TO_FILE
     if (HTraceFile != NULL)
     {
-        TRACE_I("Closing log file.");
+        TRACE_I_SELF("Closing log file.");
         CloseHandle(HTraceFile);
         HTraceFile = NULL;
 #ifdef __TRACESERVER
-        TraceFileName[0] = 0;
+        TraceFileName.clear();
 #endif // __TRACESERVER
     }
 #endif // TRACE_TO_FILE
@@ -775,11 +859,11 @@ void C__Trace::CloseTraceFile()
     DWORD storedLastError = GetLastError();
     if (HTraceFile != NULL)
     {
-        TRACE_I("Closing log file on user's request.");
+        TRACE_I_SELF("Closing log file on user's request.");
         CloseHandle(HTraceFile);
         HTraceFile = NULL;
 #ifdef __TRACESERVER
-        TraceFileName[0] = 0;
+        TraceFileName.clear();
 #endif // __TRACESERVER
     }
     SetLastError(storedLastError);
@@ -926,7 +1010,7 @@ C__Trace::SetInfoW(const WCHAR* file, int line)
 
 struct C__TraceMsgBoxThreadData
 {
-    char* Msg;        // allocated message text
+    const char* Msg;  // owned by SendMessageToServer until the thread joins
     const char* File; // just a reference to static string
     int Line;
 };
@@ -934,25 +1018,36 @@ struct C__TraceMsgBoxThreadData
 DWORD WINAPI __TraceMsgBoxThread(void* param)
 {
     C__TraceMsgBoxThreadData* data = (C__TraceMsgBoxThreadData*)param;
-    char msg[1000];
-    sprintf_s(msg, "TRACE_C message received!\n\n"
-                   "File: %s\n"
-                   "Line: %d\n\n"
-                   "Message: ",
-              data->File, data->Line);
-    const char* appendix = "\n\nTRACE_C message means that fatal error has occured. "
-                           "Application will be crashed by \"access violation\" exception after "
-                           "clicking OK. Please send us bug report to help us fix this problem. "
-                           "If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpynA(msg + (int)strlen(msg), data->Msg, _countof(msg) - (int)strlen(msg) - (int)strlen(appendix));
-    lstrcpynA(msg + (int)strlen(msg), appendix, _countof(msg) - (int)strlen(msg));
-    MessageBoxA(NULL, msg, "Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    try
+    {
+        std::string msg = "TRACE_C message received!\n\nFile: ";
+        msg += data->File != NULL ? data->File : "";
+        msg += "\nLine: ";
+        msg += std::to_string(data->Line);
+        msg += "\n\nMessage: ";
+        if (data->Msg != NULL)
+            msg += data->Msg;
+        msg += "\n\nTRACE_C message means that fatal error has occured. "
+               "Application will be crashed by \"access violation\" exception after "
+               "clicking OK. Please send us bug report to help us fix this problem. "
+               "If you want to copy this message to clipboard, use Ctrl+C key.";
+        // The narrow trace stream is decoded by the single diagnostic adapter;
+        // no ANSI window is created.
+        extern int __MessagesShowA(HWND, const char*, const char*, UINT);
+        __MessagesShowA(NULL, msg.c_str(), "Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
+    catch (...)
+    {
+        extern int __MessagesShowW(HWND, const WCHAR*, const WCHAR*, UINT);
+        __MessagesShowW(NULL, L"Unable to allocate the fatal trace diagnostic.",
+                        L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
     return 0;
 }
 
 struct C__TraceMsgBoxThreadDataW
 {
-    WCHAR* Msg;        // allocated message text
+    const WCHAR* Msg;  // owned by SendMessageToServer until the thread joins
     const WCHAR* File; // just a reference to static string
     int Line;
 };
@@ -960,19 +1055,28 @@ struct C__TraceMsgBoxThreadDataW
 DWORD WINAPI __TraceMsgBoxThreadW(void* param)
 {
     C__TraceMsgBoxThreadDataW* data = (C__TraceMsgBoxThreadDataW*)param;
-    WCHAR msg[1000];
-    swprintf_s(msg, L"TRACE_C message received!\n\n"
-                    L"File: %s\n"
-                    L"Line: %d\n\n"
-                    L"Message: ",
-               data->File, data->Line);
-    const WCHAR* appendix = L"\n\nTRACE_C message means that fatal error has occured. "
-                            L"Application will be crashed by \"access violation\" exception after "
-                            L"clicking OK. Please send us bug report to help us fix this problem. "
-                            L"If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpynW(msg + (int)wcslen(msg), data->Msg, _countof(msg) - (int)wcslen(msg) - (int)wcslen(appendix));
-    lstrcpynW(msg + (int)wcslen(msg), appendix, _countof(msg) - (int)wcslen(msg));
-    MessageBoxW(NULL, msg, L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    try
+    {
+        std::wstring msg = L"TRACE_C message received!\n\nFile: ";
+        msg += data->File != NULL ? data->File : L"";
+        msg += L"\nLine: ";
+        msg += std::to_wstring(data->Line);
+        msg += L"\n\nMessage: ";
+        if (data->Msg != NULL)
+            msg += data->Msg;
+        msg += L"\n\nTRACE_C message means that fatal error has occured. "
+               L"Application will be crashed by \"access violation\" exception after "
+               L"clicking OK. Please send us bug report to help us fix this problem. "
+               L"If you want to copy this message to clipboard, use Ctrl+C key.";
+        extern int __MessagesShowW(HWND, const WCHAR*, const WCHAR*, UINT);
+        __MessagesShowW(NULL, msg.c_str(), L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
+    catch (...)
+    {
+        extern int __MessagesShowW(HWND, const WCHAR*, const WCHAR*, UINT);
+        __MessagesShowW(NULL, L"Unable to allocate the fatal trace diagnostic.",
+                        L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    }
     return 0;
 }
 
@@ -980,7 +1084,9 @@ DWORD WINAPI __TraceMsgBoxThreadW(void* param)
 
 DWORD WINAPI __TraceMsgBoxThreadErrInTS(void* param)
 {
-    MessageBoxW(NULL, (WCHAR*)param, L"Trace Server", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
+    // choke point, not ::MessageBoxW.
+    extern int __MessagesShowW(HWND, const WCHAR*, const WCHAR*, UINT);
+    __MessagesShowW(NULL, (WCHAR*)param, L"Trace Server", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return 0;
 }
 
@@ -1055,11 +1161,13 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         {
             if (TraceStringBuf.length() > 0)
             {
-                // Convert the ANSI string to UNICODE
-                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, TraceStringBuf.c_str(),
-                                    (int)TraceStringBuf.length() + 1, bufW, _countof(bufW));
-                bufW[_countof(bufW) - 1] = 0;
-                WriteFile(HTraceFile, bufW, sizeof(WCHAR) * (int)wcslen(bufW), &wr, NULL);
+                std::wstring traceText;
+                if (sally::diagnostic::DecodeAcpLossy(TraceStringBuf.c_str(),
+                                                      TraceStringBuf.length(), traceText))
+                {
+                    WriteFile(HTraceFile, traceText.data(),
+                              static_cast<DWORD>(sizeof(WCHAR) * traceText.length()), &wr, NULL);
+                }
             }
         }
         WriteFile(HTraceFile, L"\r\n", sizeof(WCHAR) * 2, &wr, NULL);
@@ -1069,11 +1177,14 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         // for Trace Server debugging: TRACE messages go only to file, when TRACE_E arrives, notify with msgbox
         if (!crash && (type == __mtError || type == __mtErrorW))
         {
-            swprintf_s(bufW, L"Error message from Trace Server has been written to file with traces:\n%s", TraceFileName);
+            const std::wstring message =
+                L"Error message from Trace Server has been written to file with traces:\n" +
+                TraceFileName;
 
             // print message in another thread to avoid pumping current thread messages
             DWORD id;
-            HANDLE msgBoxThread = CreateThread(NULL, 0, __TraceMsgBoxThreadErrInTS, bufW, 0, &id);
+            HANDLE msgBoxThread = CreateThread(NULL, 0, __TraceMsgBoxThreadErrInTS,
+                                               const_cast<wchar_t*>(message.c_str()), 0, &id);
             if (msgBoxThread != NULL)
             {
                 WaitForSingleObject(msgBoxThread, INFINITE);
@@ -1129,30 +1240,40 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
     static BOOL msgBoxOpened = FALSE;
     C__TraceMsgBoxThreadData threadData;
     C__TraceMsgBoxThreadDataW threadDataW;
+    std::string threadMessage;
+    std::wstring threadMessageW;
     if (crash) // break/crash after printing TRACE error message (TRACE_C and TRACE_MC)
     {
         if (!msgBoxOpened)
         {
             if (unicode)
             {
-                threadDataW.Msg = (WCHAR*)GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
-                if (threadDataW.Msg != NULL)
+                try
                 {
-                    lstrcpynW(threadDataW.Msg, TraceStringBufW.c_str(), (int)(TraceStringBufW.length() + 1));
+                    threadMessageW = TraceStringBufW.c_str();
+                    threadDataW.Msg = threadMessageW.c_str();
                     threadDataW.File = FileW;
                     threadDataW.Line = Line;
                     msgBoxOpened = TRUE;
                 }
+                catch (const std::bad_alloc&)
+                {
+                    threadDataW.Msg = NULL;
+                }
             }
             else
             {
-                threadData.Msg = (char*)GlobalAlloc(GMEM_FIXED, TraceStringBuf.length() + 1);
-                if (threadData.Msg != NULL)
+                try
                 {
-                    lstrcpynA(threadData.Msg, TraceStringBuf.c_str(), (int)(TraceStringBuf.length() + 1));
+                    threadMessage = TraceStringBuf.c_str();
+                    threadData.Msg = threadMessage.c_str();
                     threadData.File = File;
                     threadData.Line = Line;
                     msgBoxOpened = TRUE;
+                }
+                catch (const std::bad_alloc&)
+                {
+                    threadData.Msg = NULL;
                 }
             }
         }
@@ -1184,7 +1305,6 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
                 CloseHandle(msgBoxThread);
             }
             msgBoxOpened = FALSE;
-            GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
             // we trigger the crash directly in the code where TRACE_C/TRACE_MC is placed, so
             // it is visible in bug report exactly where macros are; crash thus follows
             // after this method completes

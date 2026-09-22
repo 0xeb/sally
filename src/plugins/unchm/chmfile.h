@@ -4,7 +4,7 @@
 
 #pragma once
 
-typedef struct chmFile* (*CHM_OPEN_PROC)(const char* filename);
+typedef struct chmFile* (*CHM_OPEN_PROC)(const wchar_t* filename);
 typedef void (*CHM_CLOSE_PROC)(struct chmFile* h);
 typedef int (*CHM_ITERATE_PROC)(struct chmFile* h, int pg, int what, struct chmUnitInfo* unitInfo);
 typedef int (*CHM_ENUMERATE_PROC)(struct chmFile* h, int what, CHM_ENUMERATOR e, void* context);
@@ -24,25 +24,25 @@ public:
     CCHMFile();
     virtual ~CCHMFile();
 
-    BOOL Open(const char* fileName, BOOL quiet = FALSE);
+    BOOL Open(const wchar_t* fileName, BOOL quiet = FALSE);
     BOOL Close();
 
     BOOL EnumObjects(CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
-    BOOL ExtractObject(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
+    BOOL ExtractObject(CSalamanderForOperationsAbstract* salamander, const wchar_t* srcPath, const wchar_t* path,
                        const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
-    int ExtractAllObjects(CSalamanderForOperationsAbstract* salamander, char* srcPath,
-                          CSalamanderDirectoryAbstract const* dir, const char* mask,
-                          char* path, int pathBufSize, DWORD& silent, BOOL& toSkip);
-    BOOL UnpackDir(const char* dirName, const CFileData* fileData);
+    int ExtractAllObjects(CSalamanderForOperationsAbstract* salamander, std::wstring& srcPath,
+                          CSalamanderDirectoryAbstract const* dir, const wchar_t* mask,
+                          std::wstring& path, DWORD& silent, BOOL& toSkip);
+    BOOL UnpackDir(const wchar_t* dirName, const CFileData* fileData);
 
 public:
     DWORD ButtonFlags;
 
 protected:
     chmFile* CHM;
-    char* FileName;
+    std::wstring FileName;
     FILETIME FileTime;
 
     CHM_OPEN_PROC ChmOpen;

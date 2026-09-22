@@ -1,26 +1,46 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 #include "paint_helpers.h"
 
+static bool BuildFileAccessErrorText(DWORD error, std::wstring& text) noexcept
+{
+    try
+    {
+        std::wstring staged = SPLLoadStrOwned(SG, HLanguage, IDS_ACCESFILE2);
+        if (error != ERROR_SUCCESS)
+        {
+            std::wstring systemError;
+            if (SPLGetErrorTextOwned(SG, static_cast<int>(error), systemError))
+                staged += systemError;
+        }
+        text.swap(staged);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
 // ****************************************************************************
 //
 // CHexFileViewWindow
 //
 
-const char* Bin2ASCII = "0123456789ABCDEF";
+const wchar_t* HexDigits = L"0123456789ABCDEF";
 
-char* QWord2Ascii(QWORD qw, char* buffer, int digits)
+wchar_t* QWordToHexText(QWORD value, wchar_t* buffer, int digits)
 {
     CALL_STACK_MESSAGE_NONE
-    // CALL_STACK_MESSAGE2("QWord2Ascii(, , %d)", digits);
+    // CALL_STACK_MESSAGE2("QWordToHexText(, , %d)", digits);
     int i = digits;
     int shift = 0;
     while (i)
     {
-        buffer[--i] = Bin2ASCII[(qw >> (shift)) & 0x0F];
+        buffer[--i] = HexDigits[(value >> shift) & 0x0F];
         shift += 4;
     }
     buffer[digits] = 0;
@@ -155,14 +175,14 @@ void CHexFileViewWindow::UpdateScrollBars(BOOL repaint)
         UpdateWindow(HWindow);
 }
 
-BOOL CHexFileViewWindow::SetData(QWORD firstDiff, const char* path, QWORD siblinkSize)
+BOOL CHexFileViewWindow::SetData(QWORD firstDiff, const wchar_t* path, QWORD siblinkSize)
 {
-    CALL_STACK_MESSAGE2("CHexFileViewWindow::SetData(, %s, )", path);
+    CALL_STACK_MESSAGE2("CHexFileViewWindow::SetData(, %ls, )", path);
     DestroyData();
 
     // FILE_SHARE_WRITE : See also CFilecompWorker::GuardedBody()
-    HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
-    strcpy(Path, path); // Path may be needed in Retry dialog upon WM_USER_HANDLEFILEERROR
+    HANDLE hFile = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    Path = path ? path : L""; // Path may be needed in Retry dialog upon WM_USER_HANDLEFILEERROR
     if (hFile == INVALID_HANDLE_VALUE)
         return Error(GetParent(HWindow), IDS_OPEN, path);
 
@@ -247,7 +267,7 @@ void CHexFileViewWindow::Paint()
         data = (char*)Mapping.MapViewOfFile(ViewOffset + clipFirstRow * BytesPerLine, size);
         if (!data)
         {
-            HandleFileError(Path, GetLastError());
+            HandleFileError(Path.c_str(), GetLastError());
             goto LERASE_WINDOW;
         }
 
@@ -294,11 +314,12 @@ void CHexFileViewWindow::Paint()
             colorScheme = LC_NORMAL;
 
             // draw the line number together with its background
-            char num[32];
-            QWord2Ascii(ViewOffset + i * BytesPerLine, num, LineNumDigits);
+            wchar_t num[std::numeric_limits<QWORD>::digits / 4 + 1];
+            QWordToHexText(ViewOffset + i * BytesPerLine, num, LineNumDigits);
             SetTextColor(dc, LineColors[colorScheme].LineNumFgColor);
             SetBkColor(dc, LineColors[colorScheme].LineNumBkColor);
-            MappedASCII8TextOut.DoTextOut(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1, num, LineNumDigits, NULL);
+            DrawFileCompText(dc, BORDER_WIDTH, text_y, ETO_OPAQUE | ETO_CLIPPED, &r1,
+                             num, LineNumDigits, NULL);
 
             r2.left = LineNumWidth - HScrollOffs * FontWidth;
             r3.left = LineNumWidth + (BytesPerLine / 4 * 13) * FontWidth - HScrollOffs * FontWidth;
@@ -340,15 +361,15 @@ void CHexFileViewWindow::Paint()
                 // draw the ASCII section
                 if (r3.left >= LineNumWidth)
                 {
-                    MappedASCII8TextOut.DoTextOut(dc, r3.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r3, data + j, 1, NULL);
+                    MappedByteCellTextOut.DoTextOut(dc, r3.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r3, data + j, 1, NULL);
                 }
 
                 // draw the hex section
                 if (r2.right > LineNumWidth)
                 {
-                    char buf[2];
-                    buf[0] = Bin2ASCII[(unsigned char)data[j] >> 4];
-                    buf[1] = Bin2ASCII[data[j] & 0x0F];
+                    wchar_t buf[2];
+                    buf[0] = HexDigits[(unsigned char)data[j] >> 4];
+                    buf[1] = HexDigits[data[j] & 0x0F];
 
                     int k = j + 1;
                     if (colorScheme == LC_NORMAL ||
@@ -358,7 +379,7 @@ void CHexFileViewWindow::Paint()
                         r = r2;
                         if (r.left < LineNumWidth)
                             r.left = LineNumWidth;
-                        MappedASCII8TextOut.DoTextOut(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r, buf, 2, NULL);
+                        DrawFileCompText(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r, buf, 2, NULL);
                     }
                     else
                     {
@@ -369,7 +390,7 @@ void CHexFileViewWindow::Paint()
                         {
                             if (r.left < LineNumWidth)
                                 r.left = LineNumWidth;
-                            MappedASCII8TextOut.DoTextOut(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r, buf, 2, NULL);
+                            DrawFileCompText(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r, buf, 2, NULL);
                         }
                         // draw the separating space
                         if (r.right < r2.right)
@@ -467,7 +488,7 @@ int CHexFileViewWindow::HandleFileException(EXCEPTION_POINTERS* e)
     CALL_STACK_MESSAGE1("CHexFileViewWindow::HandleFileException()");
     if (Mapping.IsFileIOException(e))
     {
-        HandleFileError(Path, ERROR_SUCCESS);
+        HandleFileError(Path.c_str(), ERROR_SUCCESS);
         return EXCEPTION_EXECUTE_HANDLER; // start the __except block
     }
     if (((CHexFileViewWindow*)Siblink)->Mapping.IsFileIOException(e))
@@ -478,9 +499,9 @@ int CHexFileViewWindow::HandleFileException(EXCEPTION_POINTERS* e)
     return EXCEPTION_CONTINUE_SEARCH; // propagate the exception further up the call stack
 }
 
-void CHexFileViewWindow::HandleFileError(const char* path, int error)
+void CHexFileViewWindow::HandleFileError(const wchar_t* path, int error)
 {
-    CALL_STACK_MESSAGE3("CHexFileViewWindow::HandleFileError(%s, %d)", path, error);
+    CALL_STACK_MESSAGE3("CHexFileViewWindow::HandleFileError(%ls, %d)", path, error);
     PostMessage(HWindow, WM_USER_HANDLEFILEERROR, (WPARAM)path, error);
     DisablePaint();
     ((CHexFileViewWindow*)Siblink)->DisablePaint();
@@ -524,7 +545,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                     ptr0 = (char*)Mapping.MapViewOfFile(offset, size);
                     if (!ptr0)
                     {
-                        HandleFileError(Path, GetLastError());
+                        HandleFileError(Path.c_str(), GetLastError());
                         return 0;
                     }
 
@@ -557,7 +578,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                     if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
                     {
                         MSG msg; // discard the buffered ESC key
-                        while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                        while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                             ;
                         return 0;
                     }
@@ -587,7 +608,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                 ptr0 = (char*)Mapping.MapViewOfFile(offset, size);
                 if (!ptr0)
                 {
-                    HandleFileError(Path, GetLastError());
+                    HandleFileError(Path.c_str(), GetLastError());
                     return 0;
                 }
 
@@ -613,7 +634,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                 if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
                 {
                     MSG msg; // discard the buffered ESC key
-                    while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                    while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                         ;
                     return 0;
                 }
@@ -652,7 +673,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                     ptr0 = (char*)Mapping.MapViewOfFile(offset - size + 1, size);
                     if (!ptr0)
                     {
-                        HandleFileError(Path, GetLastError());
+                        HandleFileError(Path.c_str(), GetLastError());
                         return 0;
                     }
                     ptr0 += size - 1;
@@ -691,7 +712,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                     if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
                     {
                         MSG msg; // discard the buffered ESC key
-                        while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                        while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                             ;
                         return 0;
                     }
@@ -717,7 +738,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                 ptr0 = (char*)Mapping.MapViewOfFile(offset - size + 1, size);
                 if (!ptr0)
                 {
-                    HandleFileError(Path, GetLastError());
+                    HandleFileError(Path.c_str(), GetLastError());
                     return 0;
                 }
                 ptr0 += size - 1;
@@ -745,7 +766,7 @@ CHexFileViewWindow::FindDifference(int cmd, QWORD* pOffset)
                 if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
                 {
                     MSG msg; // discard the buffered ESC key
-                    while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                    while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                         ;
                     return 0;
                 }
@@ -853,19 +874,20 @@ BOOL CHexFileViewWindow::CopySelection()
 
             if (data)
             {
-                if (!CopyTextToClipboard(data, (DWORD)SelectedLength, FALSE, NULL))
+                if (!CopyFileCompByteCellsToClipboard(
+                        data, static_cast<size_t>(SelectedLength), FALSE, NULL))
                 {
-                    SG->SalMessageBox(HWindow, LoadStr(IDS_ERROR_COPY_FAILED), LoadStr(IDS_ERROR), MB_ICONERROR);
+                    SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_ERROR_COPY_FAILED).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
                 }
             }
             else
             {
-                SG->SalMessageBox(HWindow, LoadStr(IDS_ERROR_COPY_OOM), LoadStr(IDS_ERROR), MB_ICONERROR);
+                SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_ERROR_COPY_OOM).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
             }
         }
         else
         {
-            SG->SalMessageBox(HWindow, LoadStr(IDS_ERROR_COPY_LARGE_SELECTION), LoadStr(IDS_ERROR), MB_ICONERROR);
+            SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_ERROR_COPY_LARGE_SELECTION).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
         }
     }
     return FALSE;
@@ -1180,15 +1202,11 @@ CHexFileViewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_HANDLEFILEERROR:
     {
-        char buf[1024];
-        strcpy(buf, LoadStr(IDS_ACCESFILE2));
-        if (lParam != ERROR_SUCCESS)
-        {
-            int l = lstrlen(buf);
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, DWORD(lParam),
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
-        }
-        if (SG->DialogError(GetParent(HWindow), BUTTONS_RETRYCANCEL, (char*)wParam, buf, LoadStr(IDS_ERROR)) != DIALOG_RETRY)
+        std::wstring errorText;
+        BuildFileAccessErrorText(static_cast<DWORD>(lParam), errorText);
+        if (SG->DialogError(GetParent(HWindow), BUTTONS_RETRYCANCEL,
+                            (const wchar_t*)wParam, errorText.c_str(),
+                            SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str()) != DIALOG_RETRY)
         {
             PostMessage(GetParent(HWindow), WM_COMMAND, CM_CLOSEFILES, 0);
             return 0;

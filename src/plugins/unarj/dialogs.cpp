@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <cderr.h>
+#include <commdlg.h>
+#include <shlobj.h>
 
 #include "array2.h"
 
@@ -26,8 +29,6 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         RECT r;
         PAINTSTRUCT ps;
-        CPathBuffer txt; // Heap-allocated for long path support
-
         GetClientRect(hWnd, &r);
         BeginPaint(hWnd, &ps);
         HBRUSH DialogBrush = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
@@ -36,19 +37,19 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
             FillRect(ps.hdc, &r, DialogBrush);
             DeleteObject(DialogBrush);
         }
-        HFONT hCurrentFont = (HFONT)SendMessage(hWnd, WM_GETFONT, 0, 0);
+        HFONT hCurrentFont = (HFONT)SendMessageW(hWnd, WM_GETFONT, 0, 0);
         HFONT hOldFont = (HFONT)SelectObject(ps.hdc, hCurrentFont);
         SetTextColor(ps.hdc, GetSysColor(COLOR_BTNTEXT));
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
-        int len = GetWindowText(hWnd, txt, txt.Size());
-        DrawText(ps.hdc, txt, lstrlen(txt), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
+        const std::wstring txt = SPLGetWindowTextOwned(hWnd);
+        DrawTextW(ps.hdc, txt.c_str(), static_cast<int>(txt.size()), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
         EndPaint(hWnd, &ps);
         return 0;
     }
     }
-    return CallWindowProc(OrigTextControlProc, hWnd, uMsg, wParam, lParam);
+    return CallWindowProcW(OrigTextControlProc, hWnd, uMsg, wParam, lParam);
 }
 
 // ****************************************************************************
@@ -78,6 +79,15 @@ void CDlgRoot::SubClassStatic(DWORD wID, BOOL subclass)
 // CNextVolumeDialog
 //
 
+CNextVolumeDialog::CNextVolumeDialog(HWND parent, std::wstring& volumeName, const wchar_t* prevName)
+    : CDlgRoot(parent), OutputVolumeName(volumeName)
+{
+    VolumeNameW = volumeName;
+    PrevNameW = prevName != NULL ? prevName : L"";
+    CurrentPath = VolumeNameW;
+    SPLCutDirectoryOwned(SalamanderGeneral, CurrentPath);
+}
+
 INT_PTR WINAPI NextVolumeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("NextVolumeDlgProc(, 0x%X, 0x%IX, 0x%IX)", uMsg, wParam,
@@ -103,8 +113,8 @@ INT_PTR
 CNextVolumeDialog::Proceed()
 {
     CALL_STACK_MESSAGE1("CNextVolumeDialog::Proceed()");
-    return DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_CHANGEDISK),
-                          Parent, NextVolumeDlgProc, (LPARAM)this);
+    return DialogBoxParamW(HLanguage, MAKEINTRESOURCEW(IDD_CHANGEDISK),
+                           Parent, NextVolumeDlgProc, (LPARAM)this);
 }
 
 INT_PTR
@@ -137,9 +147,8 @@ CNextVolumeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CNextVolumeDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
-    SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
-    SendDlgItemMessage(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeName);
-    SendDlgItemMessage(Dlg, IDC_PREVVOL, WM_SETTEXT, 0, (LPARAM)PrevName);
+    SendDlgItemMessageW(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeNameW.c_str());
+    SendDlgItemMessageW(Dlg, IDC_PREVVOL, WM_SETTEXT, 0, (LPARAM)PrevNameW.c_str());
 
     CenterDlgToParent();
     return TRUE;
@@ -149,28 +158,34 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnBrowse(0x%X, 0x%X, )", wNotifyCode,
                         wID);
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(ofn));
-    char buf[128];
+    OPENFILENAMEW ofn = {};
+    std::wstring filter = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ARJARCHIVES).c_str();
+    filter.push_back(L'\0');
+    filter.append(L"*.a*");
+    filter.push_back(L'\0');
+    filter.append(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ALLFILES).c_str());
+    filter.push_back(L'\0');
+    filter.append(L"*.*");
+    filter.push_back(L'\0');
+    filter.push_back(L'\0');
 
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = Dlg;
     ofn.hInstance = 0;
-    sprintf(buf, "%s%c%s%c"
-                 "%s%c%s%c",
-            LoadStr(IDS_ARJARCHIVES), 0, "*.a*", 0,
-            LoadStr(IDS_ALLFILES), 0, "*.*", 0);
-    ofn.lpstrFilter = buf;
+    ofn.lpstrFilter = filter.c_str();
     ofn.lpstrCustomFilter = NULL;
     ofn.nMaxCustFilter = 0;
     ofn.nFilterIndex = 1;
-    GetDlgItemText(Dlg, IDC_FILENAME, VolumeName, MAX_PATH);
-    ofn.lpstrFile = VolumeName;
-    ofn.nMaxFile = MAX_PATH;
+    std::vector<std::wstring> selectedFiles{
+        SPLGetDlgItemTextOwned(Dlg, IDC_FILENAME)};
+    ofn.lpstrFile = NULL;
+    ofn.nMaxFile = 0;
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = NULL;
-    ofn.lpstrTitle = LoadStr(IDS_BROWSEARCHIVETITLE);
+    const std::wstring browseTitle =
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_BROWSEARCHIVETITLE);
+    ofn.lpstrTitle = browseTitle.c_str();
     ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
     ofn.nFileOffset = 0;
     ofn.nFileExtension = 0;
@@ -179,9 +194,11 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     ofn.lpfnHook = NULL;
     ofn.lpTemplateName = NULL;
 
-    if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+    if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn, selectedFiles) &&
+        !selectedFiles.empty())
     {
-        SendDlgItemMessage(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeName);
+        VolumeNameW = std::move(selectedFiles.front());
+        SendDlgItemMessageW(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeNameW.c_str());
     }
     return TRUE;
 }
@@ -189,32 +206,37 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 BOOL CNextVolumeDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
-    SendDlgItemMessage(Dlg, IDC_FILENAME, WM_GETTEXT, MAX_PATH, (LPARAM)VolumeName);
+    VolumeNameW = SPLGetDlgItemTextOwned(Dlg, IDC_FILENAME);
 
     SalamanderGeneral->SalUpdateDefaultDir(TRUE);
     int err;
-    if (!SalamanderGeneral->SalGetFullName(VolumeName, &err, CurrentPath))
+    BOOL gotFullName = SPLSalGetFullNameOwned(SalamanderGeneral, VolumeNameW, &err,
+                                               CurrentPath.c_str());
+    if (!gotFullName)
     {
-        char buffer[100];
-        SalamanderGeneral->SalMessageBox(Dlg, SalamanderGeneral->GetGFNErrorText(err, buffer, 100),
-                                         LoadStr(IDS_ERROR), MB_OK | MB_ICONERROR);
+        std::wstring errorText;
+        SPLGetGFNErrorTextOwned(SalamanderGeneral, err, errorText);
+        SalamanderGeneral->SalMessageBox(Dlg, errorText.c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
         return TRUE;
     }
 
-    DWORD attr = SalamanderGeneral->SalGetFileAttributes(VolumeName);
+    DWORD attr = SalamanderGeneral->SalGetFileAttributes(VolumeNameW.c_str());
     if (attr == 0xFFFFFFFF || (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_NOTFOUND),
-                                         LoadStr(IDS_ERROR), MB_OK | MB_ICONERROR);
-        SendDlgItemMessage(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeName);
+        SalamanderGeneral->SalMessageBox(Dlg, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_NOTFOUND).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(), MB_OK | MB_ICONERROR);
+        SendDlgItemMessageW(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumeNameW.c_str());
         return TRUE;
     }
+
+    OutputVolumeName = VolumeNameW;
 
     EndDialog(Dlg, IDOK);
     return TRUE;
 }
 
-INT_PTR NextVolumeDialog(HWND parent, char* volumeName, char* prevName)
+INT_PTR NextVolumeDialog(HWND parent, std::wstring& volumeName, const wchar_t* prevName)
 {
     CALL_STACK_MESSAGE1("NextVolumeDialog(, )");
     CNextVolumeDialog dlg(parent, volumeName, prevName);
@@ -255,8 +277,8 @@ INT_PTR
 CContinuedFileDialog::Proceed()
 {
     CALL_STACK_MESSAGE1("CContinuedFileDialog::Proceed()");
-    return DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_ERROR),
-                          Parent, ContinuedFileDlgProc, (LPARAM)this);
+    return DialogBoxParamW(HLanguage, MAKEINTRESOURCEW(IDD_ERROR),
+                           Parent, ContinuedFileDlgProc, (LPARAM)this);
 }
 
 INT_PTR
@@ -291,7 +313,7 @@ BOOL CContinuedFileDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CContinuedFileDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
     SubClassStatic(IDS_FILENAME, TRUE);
-    SendDlgItemMessage(Dlg, IDS_FILENAME, WM_SETTEXT, 0, (LPARAM)File);
+    SendDlgItemMessageW(Dlg, IDS_FILENAME, WM_SETTEXT, 0, (LPARAM)File);
 
     CenterDlgToParent();
     return TRUE;
@@ -301,16 +323,16 @@ BOOL CContinuedFileDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CContinuedFileDialog::OnOK(0x%X, 0x%X, )", wNotifyCode,
                         wID);
-    if (SendDlgItemMessage(Dlg, IDC_DONTSHOW, BM_GETCHECK, 0, 0) == BST_CHECKED)
+    if (SendDlgItemMessageW(Dlg, IDC_DONTSHOW, BM_GETCHECK, 0, 0) == BST_CHECKED)
         Options |= OP_SKIPCONTINUED;
 
     EndDialog(Dlg, IDOK);
     return TRUE;
 }
 
-INT_PTR ContinuedFileDialog(HWND parent, const char* file)
+INT_PTR ContinuedFileDialog(HWND parent, const wchar_t* file)
 {
-    CALL_STACK_MESSAGE2("ContinuedFileDialog(, %s)", file);
+    CALL_STACK_MESSAGE2("ContinuedFileDialog(, %ls)", file);
     CContinuedFileDialog dlg(parent, file);
     HWND mainWnd = SalamanderGeneral->GetWndToFlash(parent);
     INT_PTR ret = dlg.Proceed();
@@ -348,8 +370,8 @@ INT_PTR
 CConfigDialog::Proceed()
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Proceed()");
-    return DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_CONFIG),
-                          Parent, ConfigDlgProc, (LPARAM)this);
+    return DialogBoxParamW(HLanguage, MAKEINTRESOURCEW(IDD_CONFIG),
+                           Parent, ConfigDlgProc, (LPARAM)this);
 }
 
 INT_PTR
@@ -379,8 +401,8 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CConfigDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CConfigDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
-    SendDlgItemMessage(Dlg, IDC_SKIPCONTINUED, BM_SETCHECK, Options & OP_SKIPCONTINUED ? BST_CHECKED : BST_UNCHECKED, 0);
-    SendDlgItemMessage(Dlg, IDC_NOVOLATTENTION, BM_SETCHECK, Options & OP_NO_VOL_ATTENTION ? BST_CHECKED : BST_UNCHECKED, 0);
+    SendDlgItemMessageW(Dlg, IDC_SKIPCONTINUED, BM_SETCHECK, Options & OP_SKIPCONTINUED ? BST_CHECKED : BST_UNCHECKED, 0);
+    SendDlgItemMessageW(Dlg, IDC_NOVOLATTENTION, BM_SETCHECK, Options & OP_NO_VOL_ATTENTION ? BST_CHECKED : BST_UNCHECKED, 0);
 
     CenterDlgToParent();
     return TRUE;
@@ -389,11 +411,11 @@ BOOL CConfigDialog::OnInit(WPARAM wParam, LPARAM lParam)
 BOOL CConfigDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CConfigDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
-    if (SendDlgItemMessage(Dlg, IDC_SKIPCONTINUED, BM_GETCHECK, 0, 0) == BST_CHECKED)
+    if (SendDlgItemMessageW(Dlg, IDC_SKIPCONTINUED, BM_GETCHECK, 0, 0) == BST_CHECKED)
         Options |= OP_SKIPCONTINUED;
     else
         Options &= ~OP_SKIPCONTINUED;
-    if (SendDlgItemMessage(Dlg, IDC_NOVOLATTENTION, BM_GETCHECK, 0, 0) == BST_CHECKED)
+    if (SendDlgItemMessageW(Dlg, IDC_NOVOLATTENTION, BM_GETCHECK, 0, 0) == BST_CHECKED)
         Options |= OP_NO_VOL_ATTENTION;
     else
         Options &= ~OP_NO_VOL_ATTENTION;
@@ -439,8 +461,8 @@ INT_PTR
 CAttentionDialog::Proceed()
 {
     CALL_STACK_MESSAGE1("CAttentionDialog::Proceed()");
-    return DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_WARNING),
-                          Parent, AttentionDlgProc, (LPARAM)this);
+    return DialogBoxParamW(HLanguage, MAKEINTRESOURCEW(IDD_WARNING),
+                           Parent, AttentionDlgProc, (LPARAM)this);
 }
 
 INT_PTR
@@ -472,7 +494,7 @@ CAttentionDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CAttentionDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CAttentionDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
-    if (SendDlgItemMessage(Dlg, IDC_DONTSHOW, BM_GETCHECK, 0, 0) == BST_CHECKED)
+    if (SendDlgItemMessageW(Dlg, IDC_DONTSHOW, BM_GETCHECK, 0, 0) == BST_CHECKED)
         Options |= OP_NO_VOL_ATTENTION;
 
     EndDialog(Dlg, IDOK);

@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include <string>
+#include <vector>
+
 const char* VarOriginalName = "OriginalName";
 const char* VarDrive = "Drive";
 const char* VarPath = "Path";
@@ -64,22 +67,22 @@ public:
     {
         if (state == 0)
         {
-            if (SG->StrICmpEx(argStart, (int)(argEnd - argStart), "lower", sizeof("lower") - 1) == 0)
+            if (SG->StrICmpEx(RenamerTextToWide(argStart, (int)(argEnd - argStart)).c_str(), -1, RenamerTextToWide("lower", sizeof("lower") - 1).c_str(), -1) == 0)
             {
                 Case = ccLower;
                 return TRUE;
             }
-            if (SG->StrICmpEx(argStart, (int)(argEnd - argStart), "upper", sizeof("upper") - 1) == 0)
+            if (SG->StrICmpEx(RenamerTextToWide(argStart, (int)(argEnd - argStart)).c_str(), -1, RenamerTextToWide("upper", sizeof("upper") - 1).c_str(), -1) == 0)
             {
                 Case = ccUpper;
                 return TRUE;
             }
-            if (SG->StrICmpEx(argStart, (int)(argEnd - argStart), "mixed", sizeof("mixed") - 1) == 0)
+            if (SG->StrICmpEx(RenamerTextToWide(argStart, (int)(argEnd - argStart)).c_str(), -1, RenamerTextToWide("mixed", sizeof("mixed") - 1).c_str(), -1) == 0)
             {
                 Case = ccMixed;
                 return TRUE;
             }
-            if (SG->StrICmpEx(argStart, (int)(argEnd - argStart), "stripdia", sizeof("stripdia") - 1) == 0)
+            if (SG->StrICmpEx(RenamerTextToWide(argStart, (int)(argEnd - argStart)).c_str(), -1, RenamerTextToWide("stripdia", sizeof("stripdia") - 1).c_str(), -1) == 0)
             {
                 Case = ccStripDia;
                 return TRUE;
@@ -128,12 +131,20 @@ public:
         int l = (int)(e - s);
         if (l > 0)
         {
-            if (end - string < l)
-                return -1;
             if (Case == ccDontChange)
+            {
+                if (end - string < l)
+                    return -1;
                 memcpy(string, s, l);
+            }
             else
-                ChangeCase(Case, string, srcStart, s, e);
+            {
+                const std::string changed = ChangeCase(Case, s, e);
+                if (end - string < (int)changed.size())
+                    return -1;
+                memcpy(string, changed.data(), changed.size());
+                l = (int)changed.size();
+            }
             string += l;
             return l;
         }
@@ -153,16 +164,16 @@ public:
         switch (p->Spec)
         {
         case rsFileName:
-            strStart = p->File->Name;
+            strStart = p->EngineFullName.data() + p->EngineNameOffset;
             break;
         case rsRelativePath:
-            strStart = StripRoot(p->File->FullName, p->RootLen);
+            strStart = p->EngineFullName.data() + p->EngineRootLen;
             break;
         case rsFullPath:
-            strStart = p->File->FullName;
+            strStart = p->EngineFullName.data();
             break;
         }
-        strEnd = p->File->FullName + p->File->NameLen;
+        strEnd = p->EngineFullName.data() + p->EngineFullName.size();
         return DoExpand(string, end, strStart, strEnd);
     }
 };
@@ -180,7 +191,7 @@ public:
             return 0;
 
         char *strStart, *strEnd;
-        strStart = p->File->FullName;
+        strStart = p->EngineFullName.data();
         if (strStart[0] == '\\' && strStart[1] == '\\') // UNC
         {
             strEnd = strStart + 2;
@@ -211,7 +222,7 @@ public:
             return 0;
 
         char *strStart, *strEnd;
-        strStart = p->File->FullName;
+        strStart = p->EngineFullName.data();
         if (strStart[0] == '\\' && strStart[1] == '\\') // UNC
         {
             strStart += 2;
@@ -225,7 +236,7 @@ public:
         else
             strStart += 2;
 
-        strEnd = p->File->Name;
+        strEnd = p->EngineFullName.data() + p->EngineNameOffset;
 
         return DoExpand(string, end, strStart, strEnd);
     }
@@ -244,8 +255,8 @@ public:
             return 0;
 
         char *strStart, *strEnd;
-        strStart = StripRoot(p->File->FullName, p->RootLen);
-        strEnd = p->File->Name;
+        strStart = p->EngineFullName.data() + p->EngineRootLen;
+        strEnd = p->EngineFullName.data() + p->EngineNameOffset;
 
         return DoExpand(string, end, strStart, strEnd);
     }
@@ -261,8 +272,8 @@ public:
         CExecuteNewNameParam* p = (CExecuteNewNameParam*)param;
 
         char *strStart, *strEnd;
-        strStart = p->File->Name;
-        strEnd = p->File->FullName + p->File->NameLen;
+        strStart = p->EngineFullName.data() + p->EngineNameOffset;
+        strEnd = p->EngineFullName.data() + p->EngineFullName.size();
 
         return DoExpand(string, end, strStart, strEnd);
     }
@@ -278,8 +289,8 @@ public:
         CExecuteNewNameParam* p = (CExecuteNewNameParam*)param;
 
         char *strStart, *strEnd;
-        strStart = p->File->Name;
-        strEnd = p->File->Ext;
+        strStart = p->EngineFullName.data() + p->EngineNameOffset;
+        strEnd = p->EngineFullName.data() + p->EngineExtOffset;
         if (*strEnd != 0)
             strEnd--; // ext points past the dot
 
@@ -297,8 +308,8 @@ public:
         CExecuteNewNameParam* p = (CExecuteNewNameParam*)param;
 
         char *strStart, *strEnd;
-        strStart = p->File->Ext;
-        strEnd = p->File->FullName + p->File->NameLen;
+        strStart = p->EngineFullName.data() + p->EngineExtOffset;
+        strEnd = p->EngineFullName.data() + p->EngineFullName.size();
 
         return DoExpand(string, end, strStart, strEnd);
     }
@@ -323,18 +334,62 @@ public:
     }
 };
 
+// $(Date:fmt) and $(Time:fmt), formatted wide and re-encoded as the UTF-8 the engine
+// buffer holds.
+//
+// These two used the TCHAR GetDateFormat/GetTimeFormat, which resolved to the ANSI form
+// while the plugin was built without UNICODE; pinning them to the explicit ...A kept that
+// behaviour once UNICODE went build-wide. But the engine buffer is no longer ACP - it is
+// UTF-8, and TryRenamerTextToWide decodes it as strict UTF-8 with no fallback. So the ACP
+// bytes the ANSI formatter writes for any locale whose date or time names are not plain
+// ASCII - Czech, Russian, Greek, Japanese - failed that decode and the whole rename was
+// refused, where before the same bytes had simply become the ACP file name.
+//
+// The format string travels the same road in reverse: it comes from the user's expression,
+// so it is UTF-8 and has to be widened before the W formatter sees it.
+static bool FormatWideDateTime(bool date, const std::wstring& format, const SYSTEMTIME& st,
+                               std::string& utf8)
+{
+    utf8.clear();
+    const int needed = date ? GetDateFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(), NULL, 0)
+                            : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(), NULL, 0);
+    if (needed <= 0)
+        return false;
+    std::vector<wchar_t> buffer(static_cast<size_t>(needed), L'\0');
+    const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(),
+                                              buffer.data(), needed)
+                             : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, format.c_str(),
+                                              buffer.data(), needed);
+    if (written <= 0)
+        return false;
+    // 'written' counts the terminator.
+    return TryWideToRenamerText(buffer.data(), utf8, written - 1);
+}
+
+// Shared by both Expand overrides: format, then copy into the caller's remaining space.
+// The CVariable contract is "negative means no", and a result that does not fit is one of
+// the things the grow-and-retry loop in CVarString::ExecuteOwned exists to answer.
+static int ExpandWideDateTime(bool date, const std::wstring& format, const FILETIME& when,
+                              char*& string, char* end)
+{
+    SYSTEMTIME st;
+    if (!FileTimeToSystemTime(&when, &st))
+        return -1;
+    std::string utf8;
+    if (!FormatWideDateTime(date, format, st, utf8))
+        return -1;
+    if (utf8.size() >= static_cast<size_t>(end - string))
+        return -1;
+    memcpy(string, utf8.data(), utf8.size());
+    string += utf8.size();
+    return static_cast<int>(utf8.size());
+}
+
 class CVarTime : public CVariableEx
 {
-    char* Format;
+    std::wstring Format;
 
 public:
-    CVarTime() { Format = NULL; }
-    ~CVarTime()
-    {
-        if (Format)
-            delete[] Format;
-    }
-
     static CVarString::CVariable* Alloc() { return new CVarTime(); }
 
     virtual BOOL SetArguments(const char* argStart, const char* argEnd,
@@ -364,54 +419,42 @@ public:
 
         state = 1;
 
-        int l = (int)(argEnd - argStart);
-        char* fmt = new char[l + 1];
-        memcpy(fmt, argStart, l);
-        fmt[l] = 0;
-
-        SYSTEMTIME st;
-        char buf[100];
-        GetSystemTime(&st);
-        if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, fmt, buf, 100))
+        std::wstring fmt;
+        if (!TryRenamerTextToWide(argStart, fmt, static_cast<int>(argEnd - argStart)))
         {
             error = IDS_EXP_INVALIDTIMEFMT;
             errorPos1 = argStart;
             errorPos2 = argEnd;
-            delete[] fmt;
             return FALSE;
         }
 
-        Format = fmt;
+        SYSTEMTIME st;
+        std::string probe;
+        GetSystemTime(&st);
+        if (!FormatWideDateTime(false, fmt, st, probe))
+        {
+            error = IDS_EXP_INVALIDTIMEFMT;
+            errorPos1 = argStart;
+            errorPos2 = argEnd;
+            return FALSE;
+        }
+
+        Format = std::move(fmt);
         return TRUE;
     }
 
     virtual int Expand(char*& string, char* end, LPVOID param)
     {
         CExecuteNewNameParam* p = (CExecuteNewNameParam*)param;
-
-        SYSTEMTIME st;
-        FileTimeToSystemTime(&p->File->LastWrite, &st);
-        int l = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st,
-                              Format, string, (int)(end - string)) -
-                1;
-        if (l > 0)
-            string += l;
-        return l;
+        return ExpandWideDateTime(false, Format, p->File->LastWrite, string, end);
     }
 };
 
 class CVarDate : public CVariableEx
 {
-    char* Format;
+    std::wstring Format;
 
 public:
-    CVarDate() { Format = NULL; }
-    ~CVarDate()
-    {
-        if (Format)
-            delete[] Format;
-    }
-
     static CVarString::CVariable* Alloc() { return new CVarDate(); }
 
     virtual BOOL SetArguments(const char* argStart, const char* argEnd,
@@ -441,39 +484,34 @@ public:
 
         state = 1;
 
-        int l = (int)(argEnd - argStart);
-        char* fmt = new char[l + 1];
-        memcpy(fmt, argStart, l);
-        fmt[l] = 0;
-
-        SYSTEMTIME st;
-        char buf[100];
-        GetSystemTime(&st);
-        if (!GetDateFormat(LOCALE_USER_DEFAULT, 0, &st, fmt, buf, 100))
+        std::wstring fmt;
+        if (!TryRenamerTextToWide(argStart, fmt, static_cast<int>(argEnd - argStart)))
         {
             error = IDS_EXP_INVALIDDATEFMT;
             errorPos1 = argStart;
             errorPos2 = argEnd;
-            delete[] fmt;
             return FALSE;
         }
 
-        Format = fmt;
+        SYSTEMTIME st;
+        std::string probe;
+        GetSystemTime(&st);
+        if (!FormatWideDateTime(true, fmt, st, probe))
+        {
+            error = IDS_EXP_INVALIDDATEFMT;
+            errorPos1 = argStart;
+            errorPos2 = argEnd;
+            return FALSE;
+        }
+
+        Format = std::move(fmt);
         return TRUE;
     }
 
     virtual int Expand(char*& string, char* end, LPVOID param)
     {
         CExecuteNewNameParam* p = (CExecuteNewNameParam*)param;
-
-        SYSTEMTIME st;
-        FileTimeToSystemTime(&p->File->LastWrite, &st);
-        int l = GetDateFormat(LOCALE_USER_DEFAULT, 0, &st,
-                              Format, string, (int)(end - string)) -
-                1;
-        if (l > 0)
-            string += l;
-        return l;
+        return ExpandWideDateTime(true, Format, p->File->LastWrite, string, end);
     }
 };
 

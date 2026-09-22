@@ -31,7 +31,7 @@
 #else
 #define SALMON_SHARED_MEMORY_VERSION_PLATFORM 0x00000000
 #endif
-#define SALMON_SHARED_MEMORY_VERSION (SALMON_SHARED_MEMORY_VERSION_PLATFORM | 4)
+#define SALMON_SHARED_MEMORY_VERSION (SALMON_SHARED_MEMORY_VERSION_PLATFORM | 5)
 
 #pragma pack(push)
 #pragma pack(4)
@@ -45,10 +45,10 @@ struct CSalmonSharedMemory
     HANDLE Done;             // SALMON signals back to AS that it is done
     HANDLE SetSLG;           // AS signals SALMON to load SLG based on SLGName buffer, which it sets before signaling the event
     HANDLE CheckBugs;        // AS signals SALMON to check the bug report directory and if it finds any (from a previous crash), offer upload
-    char SLGName[MAX_PATH];  // meaningful when AS signals SetSLG and says which SLG should be loaded
-    char BugPath[MAX_PATH];  // set by Salamander, path where bug reports will be written (path may not exist, created only on crash)
-    char BugName[MAX_PATH];  // set by Salamander, internal name of the minidump/bug report file
-    char BaseName[MAX_PATH]; // set by Salmon, composed as "UID-BugName-DATE-TIME"; for a minidump it appends ".DMP"
+    wchar_t SLGName[MAX_PATH];  // meaningful when AS signals SetSLG and says which SLG should be loaded
+    wchar_t BugPath[MAX_PATH];  // set by Salamander, path where bug reports will be written (path may not exist, created only on crash)
+    wchar_t BugName[MAX_PATH];  // set by Salamander, internal name of the minidump/bug report file
+    wchar_t BaseName[MAX_PATH]; // set by Salmon, composed as "UID-BugName-DATE-TIME"; for a minidump it appends ".DMP"
     DWORD64 UID;             // unique machine ID, created by XORing GUIDs; stored in registry under Bug Reporter key; set by Salamander, Salmon only reads and inserts into bug report name
 
     // passing EXCEPTION_POINTERS by its parts; set before signaling the Fire event
@@ -61,11 +61,11 @@ struct CSalmonSharedMemory
 #ifdef INSIDE_SALAMANDER
 
 BOOL SalmonInit();
-void SalmonSetSLG(const char* slgName); // sets language in salmon
+void SalmonSetSLG(const wchar_t* slgName); // sets language in salmon
 void SalmonCheckBugs();
 
-// store exception info in shared memory and ask Salmon to create a minidump; then wait for it to finish
-// returns TRUE on success, FALSE if Salmon could not be called for some reason
-BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath);
+// Store exception info in shared memory and ask Salmon to create a minidump; then wait for it to finish.
+// Returns the stable path assembled from the frozen Salmon IPC fields.
+const wchar_t* SalmonFireAndWait(const EXCEPTION_POINTERS* e);
 
 #endif //INSIDE_SALAMANDER

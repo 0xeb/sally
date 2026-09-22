@@ -9,9 +9,10 @@
 
 #include "worker.h"
 #include "common/HeadlessScriptExecutor.h"
+#include "common/IFileSystem.h"
+#include "common/IFileEnumerator.h" // reparse-blob ops
 #include "common/unicode/helpers.h"
 
-#include <aclapi.h>
 #include <winioctl.h>
 
 #include <algorithm>
@@ -20,18 +21,22 @@
 namespace sally::operation_executor
 {
 
+static IFileSystem* ExecutorFs()
+{
+    IFileSystem* fs = gFileSystem;
+    if (fs == NULL)
+        fs = GetWin32FileSystem();
+    return fs;
+}
+
 static std::wstring OperationSourcePathW(const COperation& op)
 {
-    if (op.HasWideSource())
-        return op.SourceNameW;
-    return op.SourceName != NULL ? AnsiToWide(op.SourceName) : std::wstring();
+    return op.SourceNameW; // the wide name IS the name
 }
 
 static std::wstring OperationTargetPathW(const COperation& op)
 {
-    if (op.HasWideTarget())
-        return op.TargetNameW;
-    return op.TargetName != NULL ? AnsiToWide(op.TargetName) : std::wstring();
+    return op.TargetNameW;
 }
 
 static bool ScriptOperationCountsForProgress(COperationCode opcode)
@@ -46,17 +51,19 @@ static CFileOperationResult ExecuteMoveDirectoryW(IWorkerObserver& observer,
 {
     while (true)
     {
-        if (MoveFileExW(sourcePath.c_str(), targetPath.c_str(), MOVEFILE_COPY_ALLOWED))
+        const FileResult moveResult = ExecutorFs()->MoveFileWithFlags(
+            sourcePath.c_str(), targetPath.c_str(), MoveFlags::CopyAllowed);
+        if (moveResult.success)
             return SuccessResult();
 
-        DWORD error = GetLastError();
+        DWORD error = moveResult.errorCode;
         observer.WaitIfSuspended();
         if (observer.IsCancelled())
             return ErrorResult(ERROR_CANCELLED);
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error moving directory", sourcePath, error);
+        int response = AskFileError(observer, L"Error moving directory", sourcePath, error);
         switch (response)
         {
         case IDRETRY:
@@ -80,20 +87,21 @@ static CFileOperationResult ExecuteCopyDirectoryTimeW(IWorkerObserver& observer,
 {
     while (true)
     {
-        HANDLE directory = CreateFileW(targetPath.c_str(), FILE_WRITE_ATTRIBUTES,
+        HANDLE directory = ExecutorFs()->CreateFile(targetPath.c_str(), FILE_WRITE_ATTRIBUTES,
                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                        NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
         if (directory != INVALID_HANDLE_VALUE)
         {
-            const BOOL ok = SetFileTime(directory, NULL, NULL, &lastWrite);
-            const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
-            CloseHandle(directory);
-            if (ok)
+            const FileResult timeResult = ExecutorFs()->SetHandleFileTime(
+                directory, NULL, NULL, &lastWrite);
+            const DWORD error = timeResult.errorCode;
+            ExecutorFs()->CloseFileHandle(directory);
+            if (timeResult.success)
                 return SuccessResult();
 
             if (state.SkipAllErrors)
                 return SuccessResult(true);
-            int response = AskFileError(observer, "Error setting directory time", targetPath, error);
+            int response = AskFileError(observer, L"Error setting directory time", targetPath, error);
             switch (response)
             {
             case IDRETRY:
@@ -119,7 +127,7 @@ static CFileOperationResult ExecuteCopyDirectoryTimeW(IWorkerObserver& observer,
             if (state.SkipAllErrors)
                 return SuccessResult(true);
 
-            int response = AskFileError(observer, "Error opening directory", targetPath, error);
+            int response = AskFileError(observer, L"Error opening directory", targetPath, error);
             switch (response)
             {
             case IDRETRY:
@@ -167,30 +175,37 @@ static bool EnumerateADSStreamsW(const std::wstring& path,
     streamNames.clear();
     error = ERROR_SUCCESS;
 
-    WIN32_FIND_STREAM_DATA data = {};
-    HANDLE find = FindFirstStreamW(ADSBasePathW(path).c_str(), FindStreamInfoStandard, &data, 0);
-    if (find == INVALID_HANDLE_VALUE)
+    // through gFileEnumerator (mockable; long-path decorated).
+    IFileEnumerator* enumerator = gFileEnumerator;
+    HENUM find = enumerator->StartStreamEnum(ADSBasePathW(path).c_str());
+    if (find == INVALID_HENUM)
     {
         error = GetLastError();
         if (error == ERROR_HANDLE_EOF || error == ERROR_INVALID_FUNCTION || error == ERROR_NOT_SUPPORTED)
         {
-            error = ERROR_SUCCESS;
+            error = ERROR_SUCCESS; // no streams / FAT-family: no ADS support
             return true;
         }
         return false;
     }
 
-    do
+    StreamEnumEntry entry;
+    EnumResult r;
+    // Done() is {success=true, noMoreFiles=true} - testing .success alone
+    // loops forever on EOF (and re-appends the last stream each round).
+    while ((r = enumerator->NextStream(find, entry)).success && !r.noMoreFiles)
     {
-        if (wcscmp(data.cStreamName, L"::$DATA") != 0)
-            streamNames.push_back(data.cStreamName);
-    } while (FindNextStreamW(find, &data));
-
-    error = GetLastError();
-    FindClose(find);
-    if (error == ERROR_HANDLE_EOF)
+        if (entry.name != L"::$DATA")
+            streamNames.push_back(entry.name);
+    }
+    error = r.success ? ERROR_SUCCESS : r.errorCode;
+    enumerator->EndStreamEnum(find);
+    if (error == ERROR_HANDLE_EOF || error == ERROR_NO_MORE_FILES || error == ERROR_SUCCESS)
+    {
         error = ERROR_SUCCESS;
-    return error == ERROR_SUCCESS;
+        return true;
+    }
+    return false;
 }
 
 static CFileOperationResult HandleADSReadError(IWorkerObserver& observer,
@@ -204,9 +219,7 @@ static CFileOperationResult HandleADSReadError(IWorkerObserver& observer,
     if (state.IgnoreAllADSReadErrors)
         return SuccessResult();
 
-    std::string sourceA = ObserverPathFallbackA(sourcePath);
-    std::string streamA = ObserverPathFallbackA(streamName);
-    int response = observer.AskADSReadError(sourceA.c_str(), streamA.c_str());
+    int response = observer.AskADSReadError(sourcePath.c_str(), streamName.c_str());
     switch (response)
     {
     case IDB_ALL:
@@ -240,10 +253,9 @@ static CFileOperationResult HandleADSOpenError(IWorkerObserver& observer,
     if (state.SkipAllADSOpenErrors)
         return SuccessResult(true);
 
-    std::string fileA = ObserverPathFallbackA(filePath);
-    std::string streamA = ObserverPathFallbackA(streamName);
-    std::string errorText = ADSErrorTextA(error);
-    int response = observer.AskADSOpenError(fileA.c_str(), streamA.c_str(), errorText.c_str());
+    wchar_t errorText[64] = {};
+    swprintf_s(errorText, L"Error code %lu", error);
+    int response = observer.AskADSOpenError(filePath.c_str(), streamName.c_str(), errorText);
     switch (response)
     {
     case IDRETRY:
@@ -276,7 +288,7 @@ static CFileOperationResult HandleADSWriteError(IWorkerObserver& observer,
     if (state.SkipAllADSCopyErrors)
         return SuccessResult(true);
 
-    int response = AskFileError(observer, "Error writing ADS", targetPath, error);
+    int response = AskFileError(observer, L"Error writing ADS", targetPath, error);
     switch (response)
     {
     case IDRETRY:
@@ -296,7 +308,7 @@ static void CloseADSHandle(HANDLE& handle)
 {
     if (handle != INVALID_HANDLE_VALUE)
     {
-        CloseHandle(handle);
+        ExecutorFs()->CloseFileHandle(handle);
         handle = INVALID_HANDLE_VALUE;
     }
 }
@@ -316,7 +328,7 @@ static CFileOperationResult CopyOneADSStreamW(IWorkerObserver& observer,
 
     while (true)
     {
-        HANDLE input = CreateFileW(sourceStream.c_str(), GENERIC_READ,
+        HANDLE input = ExecutorFs()->CreateFile(sourceStream.c_str(), GENERIC_READ,
                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                    NULL, OPEN_EXISTING, streamFlags, NULL);
         if (input == INVALID_HANDLE_VALUE)
@@ -328,7 +340,7 @@ static CFileOperationResult CopyOneADSStreamW(IWorkerObserver& observer,
             return openResult;
         }
 
-        HANDLE output = CreateFileW(targetStream.c_str(), GENERIC_WRITE, 0, NULL,
+        HANDLE output = ExecutorFs()->CreateFile(targetStream.c_str(), GENERIC_WRITE, 0, NULL,
                                     CREATE_ALWAYS, streamFlags, NULL);
         if (output == INVALID_HANDLE_VALUE)
         {
@@ -346,14 +358,16 @@ static CFileOperationResult CopyOneADSStreamW(IWorkerObserver& observer,
         while (true)
         {
             DWORD read = 0;
-            if (!ReadFile(input, buffer.data(), (DWORD)buffer.size(), &read, NULL))
+            const FileResult readIoResult = ExecutorFs()->ReadFromHandle(
+                input, buffer.data(), (DWORD)buffer.size(), &read);
+            if (!readIoResult.success)
             {
-                DWORD error = GetLastError();
+                DWORD error = readIoResult.errorCode;
                 CloseADSHandle(output);
                 CloseADSHandle(input);
                 CFileOperationResult readResult = HandleADSReadError(observer, sourcePath, streamName, state);
                 if (!readResult.success || readResult.skipped)
-                    DeleteFileW(targetStream.c_str());
+                    ExecutorFs()->DeleteFile(targetStream.c_str());
                 return readResult.success ? readResult : ErrorResult(error);
             }
             if (read == 0)
@@ -364,19 +378,21 @@ static CFileOperationResult CopyOneADSStreamW(IWorkerObserver& observer,
             {
                 CloseADSHandle(output);
                 CloseADSHandle(input);
-                DeleteFileW(targetStream.c_str());
+                ExecutorFs()->DeleteFile(targetStream.c_str());
                 return ErrorResult(ERROR_CANCELLED);
             }
 
             DWORD written = 0;
-            if (!WriteFile(output, buffer.data(), read, &written, NULL) || written != read)
+            const FileResult writeIoResult = ExecutorFs()->WriteToHandle(
+                output, buffer.data(), read, &written);
+            if (!writeIoResult.success || written != read)
             {
-                DWORD error = GetLastError();
+                DWORD error = writeIoResult.errorCode;
                 if (error == ERROR_SUCCESS)
                     error = ERROR_WRITE_FAULT;
                 CloseADSHandle(output);
                 CloseADSHandle(input);
-                DeleteFileW(targetStream.c_str());
+                ExecutorFs()->DeleteFile(targetStream.c_str());
 
                 CFileOperationResult writeResult = HandleADSWriteError(observer, targetPath, error, state);
                 if (!writeResult.success && writeResult.lastError == ERROR_RETRY)
@@ -492,10 +508,11 @@ static bool WriteAllW(HANDLE file, const std::vector<char>& bytes, DWORD& error)
     {
         DWORD chunkSize = (DWORD)std::min<size_t>(bytes.size() - offset, MAXDWORD);
         DWORD written = 0;
-        if (!WriteFile(file, bytes.data() + offset, chunkSize, &written, NULL) ||
-            written == 0)
+        const FileResult writeResult = ExecutorFs()->WriteToHandle(
+            file, bytes.data() + offset, chunkSize, &written);
+        if (!writeResult.success || written == 0)
         {
-            error = GetLastError();
+            error = writeResult.errorCode;
             if (error == ERROR_SUCCESS)
                 error = ERROR_WRITE_FAULT;
             return false;
@@ -527,7 +544,7 @@ static HANDLE CreateConvertTempFileW(const std::wstring& directory,
     {
         tempPath = base + L"cnv-" + std::to_wstring(pid) + L"-" +
                    std::to_wstring(tick) + L"-" + std::to_wstring(attempt) + L".tmp";
-        HANDLE file = CreateFileW(tempPath.c_str(), GENERIC_WRITE, 0, NULL,
+        HANDLE file = ExecutorFs()->CreateFile(tempPath.c_str(), GENERIC_WRITE, 0, NULL,
                                   CREATE_NEW,
                                   FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_SEQUENTIAL_SCAN,
                                   NULL);
@@ -544,7 +561,7 @@ static HANDLE CreateConvertTempFileW(const std::wstring& directory,
 }
 
 static CFileOperationResult AskConvertFileError(IWorkerObserver& observer,
-                                                const char* title,
+                                                const wchar_t* title,
                                                 const std::wstring& path,
                                                 DWORD error,
                                                 CFileOperationExecutionState& state,
@@ -590,11 +607,7 @@ static CFileOperationResult AskConvertMoveError(IWorkerObserver& observer,
     if (state.SkipAllErrors)
         return SuccessResult(true);
 
-    std::string tempA = ObserverPathFallbackA(tempPath);
-    std::string sourceA = ObserverPathFallbackA(sourcePath);
-    int response = observer.AskCannotMoveErrW(tempA.c_str(), tempPath.c_str(),
-                                             sourceA.c_str(), sourcePath.c_str(),
-                                             error, false);
+    int response = observer.AskCannotMoveErr(tempPath.c_str(), sourcePath.c_str(), error, false);
     switch (response)
     {
     case IDRETRY:
@@ -622,20 +635,20 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
     if (HasUnsafeTrailingFileNameCharW(sourcePath))
     {
         bool retry = false;
-        return AskConvertFileError(observer, "Error opening file", sourcePath,
+        return AskConvertFileError(observer, L"Error opening file", sourcePath,
                                    ERROR_INVALID_NAME, state, retry);
     }
 
     while (true)
     {
-        HANDLE source = CreateFileW(sourcePath.c_str(), GENERIC_READ,
+        HANDLE source = ExecutorFs()->CreateFile(sourcePath.c_str(), GENERIC_READ,
                                     FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                     NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (source == INVALID_HANDLE_VALUE)
         {
             bool retry = false;
             CFileOperationResult openResult =
-                AskConvertFileError(observer, "Error opening file", sourcePath, GetLastError(), state, retry);
+                AskConvertFileError(observer, L"Error opening file", sourcePath, GetLastError(), state, retry);
             if (retry)
                 continue;
             return openResult;
@@ -646,10 +659,10 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
         HANDLE target = CreateConvertTempFileW(ParentDirectoryW(sourcePath), tempPath, tempError);
         if (target == INVALID_HANDLE_VALUE)
         {
-            CloseHandle(source);
+            ExecutorFs()->CloseFileHandle(source);
             bool retry = false;
             CFileOperationResult tempResult =
-                AskConvertFileError(observer, "Error creating temp file",
+                AskConvertFileError(observer, L"Error creating temp file",
                                     tempPath.empty() ? sourcePath : tempPath,
                                     tempError, state, retry);
             if (retry)
@@ -664,16 +677,18 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
         while (true)
         {
             DWORD read = 0;
-            if (!ReadFile(source, sourceBuffer.data(), (DWORD)sourceBuffer.size(), &read, NULL))
+            const FileResult readIoResult = ExecutorFs()->ReadFromHandle(
+                source, sourceBuffer.data(), (DWORD)sourceBuffer.size(), &read);
+            if (!readIoResult.success)
             {
-                DWORD error = GetLastError();
-                CloseHandle(target);
-                CloseHandle(source);
-                DeleteFileW(tempPath.c_str());
+                DWORD error = readIoResult.errorCode;
+                ExecutorFs()->CloseFileHandle(target);
+                ExecutorFs()->CloseFileHandle(source);
+                ExecutorFs()->DeleteFile(tempPath.c_str());
 
                 bool retry = false;
                 CFileOperationResult readResult =
-                    AskConvertFileError(observer, "Error reading file", sourcePath, error, state, retry);
+                    AskConvertFileError(observer, L"Error reading file", sourcePath, error, state, retry);
                 if (retry)
                 {
                     restart = true;
@@ -687,9 +702,9 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
             observer.WaitIfSuspended();
             if (observer.IsCancelled())
             {
-                CloseHandle(target);
-                CloseHandle(source);
-                DeleteFileW(tempPath.c_str());
+                ExecutorFs()->CloseFileHandle(target);
+                ExecutorFs()->CloseFileHandle(source);
+                ExecutorFs()->DeleteFile(tempPath.c_str());
                 return ErrorResult(ERROR_CANCELLED);
             }
 
@@ -697,13 +712,13 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
             DWORD writeError = ERROR_SUCCESS;
             if (!WriteAllW(target, targetBuffer, writeError))
             {
-                CloseHandle(target);
-                CloseHandle(source);
-                DeleteFileW(tempPath.c_str());
+                ExecutorFs()->CloseFileHandle(target);
+                ExecutorFs()->CloseFileHandle(source);
+                ExecutorFs()->DeleteFile(tempPath.c_str());
 
                 bool retry = false;
                 CFileOperationResult writeResult =
-                    AskConvertFileError(observer, "Error writing file", tempPath, writeError, state, retry);
+                    AskConvertFileError(observer, L"Error writing file", tempPath, writeError, state, retry);
                 if (retry)
                 {
                     restart = true;
@@ -716,47 +731,50 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
         if (restart)
             continue;
 
-        CloseHandle(source);
-        if (!CloseHandle(target))
+        ExecutorFs()->CloseFileHandle(source);
+        const FileResult closeFileResult = ExecutorFs()->CloseFileHandle(target);
+        if (!closeFileResult.success)
         {
-            DWORD error = GetLastError();
-            DeleteFileW(tempPath.c_str());
+            DWORD error = closeFileResult.errorCode;
+            ExecutorFs()->DeleteFile(tempPath.c_str());
 
             bool retry = false;
-            CFileOperationResult closeResult =
-                AskConvertFileError(observer, "Error writing file", tempPath, error, state, retry);
+            CFileOperationResult closeDecision =
+                AskConvertFileError(observer, L"Error writing file", tempPath, error, state, retry);
             if (retry)
                 continue;
-            return closeResult;
+            return closeDecision;
         }
 
-        const DWORD sourceAttrs = GetFileAttributesW(sourcePath.c_str());
+        const DWORD sourceAttrs = ExecutorFs()->GetFileAttributes(sourcePath.c_str());
         if (sourceAttrs != INVALID_FILE_ATTRIBUTES &&
             (sourceAttrs & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            SetFileAttributesW(sourcePath.c_str(), sourceAttrs & ~FILE_ATTRIBUTE_READONLY);
+            ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs & ~FILE_ATTRIBUTE_READONLY);
         }
 
         while (true)
         {
-            if (MoveFileExW(tempPath.c_str(), sourcePath.c_str(), MOVEFILE_REPLACE_EXISTING))
+            const FileResult moveResult = ExecutorFs()->MoveFileWithFlags(
+                tempPath.c_str(), sourcePath.c_str(), MoveFlags::ReplaceExisting);
+            if (moveResult.success)
             {
                 if (sourceAttrs != INVALID_FILE_ATTRIBUTES)
-                    SetFileAttributesW(sourcePath.c_str(), sourceAttrs);
+                    ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs);
                 return SuccessResult();
             }
 
-            DWORD error = GetLastError();
+            DWORD error = moveResult.errorCode;
             bool retry = false;
-            CFileOperationResult moveResult =
+            CFileOperationResult moveErrorResult =
                 AskConvertMoveError(observer, tempPath, sourcePath, error, state, retry);
             if (retry)
                 continue;
 
-            DeleteFileW(tempPath.c_str());
+            ExecutorFs()->DeleteFile(tempPath.c_str());
             if (sourceAttrs != INVALID_FILE_ATTRIBUTES)
-                SetFileAttributesW(sourcePath.c_str(), sourceAttrs);
-            return moveResult;
+                ExecutorFs()->SetFileAttributes(sourcePath.c_str(), sourceAttrs);
+            return moveErrorResult;
         }
     }
 }
@@ -764,11 +782,6 @@ static CFileOperationResult ExecuteConvertFileW(IWorkerObserver& observer,
 class CSecurityDescriptorHolder
 {
 public:
-    ~CSecurityDescriptorHolder()
-    {
-        Reset();
-    }
-
     CSecurityDescriptorHolder(const CSecurityDescriptorHolder&) = delete;
     CSecurityDescriptorHolder& operator=(const CSecurityDescriptorHolder&) = delete;
 
@@ -778,9 +791,8 @@ public:
     {
         Reset();
         Path = AttributeWritePathW(path);
-        Error = GetNamedSecurityInfoW((LPWSTR)Path.c_str(), SE_FILE_OBJECT,
-                                      DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                      &Owner, &Group, &Dacl, NULL, &Descriptor);
+        const FileResult result = ExecutorFs()->GetPathSecurity(Path.c_str(), Descriptor);
+        Error = result.success ? ERROR_SUCCESS : result.errorCode;
         return Error == ERROR_SUCCESS;
     }
 
@@ -788,57 +800,28 @@ public:
     {
         if (Error != ERROR_SUCCESS)
             return Error;
-        if (Descriptor == NULL)
+        if (Descriptor.empty())
             return ERROR_INVALID_SECURITY_DESCR;
-
-        SECURITY_DESCRIPTOR_CONTROL control = 0;
-        DWORD revision = 0;
-        if (!GetSecurityDescriptorControl(Descriptor, &control, &revision))
-            return GetLastError();
-
-        const bool inheritedDacl = (control & SE_DACL_PROTECTED) == 0;
         const std::wstring target = AttributeWritePathW(targetPath);
-        const DWORD targetAttrs = GetFileAttributesW(target.c_str());
-        const SECURITY_INFORMATION securityInfo =
-            DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
-            (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION);
-
-        DWORD error = SetNamedSecurityInfoW((LPWSTR)target.c_str(), SE_FILE_OBJECT,
-                                            securityInfo, Owner, Group, Dacl, NULL);
-        if (error != ERROR_SUCCESS)
-        {
-            const SECURITY_INFORMATION daclOnlyInfo =
-                DACL_SECURITY_INFORMATION |
-                (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION);
-            DWORD daclError = SetNamedSecurityInfoW((LPWSTR)target.c_str(), SE_FILE_OBJECT,
-                                                    daclOnlyInfo, NULL, NULL, Dacl, NULL);
-            if (daclError == ERROR_SUCCESS)
-                error = ERROR_SUCCESS;
-        }
+        const DWORD targetAttrs = ExecutorFs()->GetFileAttributes(target.c_str());
+        const FileResult result = ExecutorFs()->SetPathSecurity(
+            target.c_str(), Descriptor.data(), Descriptor.size());
 
         if (targetAttrs != INVALID_FILE_ATTRIBUTES)
-            SetFileAttributesW(target.c_str(), targetAttrs);
-        return error;
+            ExecutorFs()->SetFileAttributes(target.c_str(), targetAttrs);
+        return result.success ? ERROR_SUCCESS : result.errorCode;
     }
 
     DWORD LastError() const { return Error; }
 
 private:
     std::wstring Path;
-    PSID Owner = NULL;
-    PSID Group = NULL;
-    PACL Dacl = NULL;
-    PSECURITY_DESCRIPTOR Descriptor = NULL;
+    std::vector<BYTE> Descriptor;
     DWORD Error = ERROR_SUCCESS;
 
     void Reset()
     {
-        if (Descriptor != NULL)
-            LocalFree(Descriptor);
-        Owner = NULL;
-        Group = NULL;
-        Dacl = NULL;
-        Descriptor = NULL;
+        Descriptor.clear();
         Error = ERROR_SUCCESS;
         Path.clear();
     }
@@ -856,13 +839,7 @@ static CFileOperationResult HandleCopySecurityError(IWorkerObserver& observer,
     if (state.IgnoreAllCopySecurityErrors)
         return SuccessResult();
 
-    std::string sourceA = ObserverPathFallbackA(sourcePath);
-    std::string targetA = ObserverPathFallbackA(targetPath);
-    char errorText[64] = {};
-    wsprintfA(errorText, "Error code %lu", error);
-    int response = observer.AskCopyPermErrorW(sourceA.c_str(), sourcePath.c_str(),
-                                             targetA.c_str(), targetPath.c_str(),
-                                             errorText);
+    int response = observer.AskCopyPermError(sourcePath.c_str(), targetPath.c_str(), error);
     switch (response)
     {
     case IDB_IGNOREALL:
@@ -918,31 +895,33 @@ static bool IsEncryptionUnsupportedError(DWORD error)
 
 static DWORD SetCompressionFormatW(const std::wstring& path, USHORT compressionFormat)
 {
-    HANDLE file = CreateFileW(path.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
+    if (compressionFormat != COMPRESSION_FORMAT_NONE &&
+        compressionFormat != COMPRESSION_FORMAT_DEFAULT)
+    {
+        return ERROR_INVALID_PARAMETER;
+    }
+    HANDLE file = ExecutorFs()->CreateFile(path.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                               NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return GetLastError();
 
-    DWORD error = ERROR_SUCCESS;
-    DWORD returned = 0;
-    if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &compressionFormat,
-                         sizeof(compressionFormat), NULL, 0, &returned, NULL))
-    {
-        error = GetLastError();
-    }
-    CloseHandle(file);
-    return error;
+    const FileResult result = ExecutorFs()->SetHandleCompression(
+        file, compressionFormat != COMPRESSION_FORMAT_NONE);
+    ExecutorFs()->CloseFileHandle(file);
+    return result.success ? ERROR_SUCCESS : result.errorCode;
 }
 
 static DWORD EncryptPathW(const wchar_t* path)
 {
-    return EncryptFileW(path) ? ERROR_SUCCESS : GetLastError();
+    const FileResult result = ExecutorFs()->EncryptPath(path);
+    return result.success ? ERROR_SUCCESS : result.errorCode;
 }
 
 static DWORD DecryptPathW(const wchar_t* path)
 {
-    return DecryptFileW(path, 0) ? ERROR_SUCCESS : GetLastError();
+    const FileResult result = ExecutorFs()->DecryptPath(path);
+    return result.success ? ERROR_SUCCESS : result.errorCode;
 }
 
 static DWORD InvokeWithPreservedFileTimeW(const std::wstring& path,
@@ -951,7 +930,7 @@ static DWORD InvokeWithPreservedFileTimeW(const std::wstring& path,
 {
     DWORD flags = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0;
 
-    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ,
+    HANDLE file = ExecutorFs()->CreateFile(path.c_str(), GENERIC_READ,
                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                               NULL, OPEN_EXISTING, flags, NULL);
     if (file == INVALID_HANDLE_VALUE)
@@ -959,18 +938,24 @@ static DWORD InvokeWithPreservedFileTimeW(const std::wstring& path,
 
     FILETIME created = {};
     FILETIME modified = {};
-    GetFileTime(file, &created, NULL, &modified);
-    CloseHandle(file);
+    const FileResult readTimeResult = ExecutorFs()->GetHandleFileTime(
+        file, &created, NULL, &modified);
+    ExecutorFs()->CloseFileHandle(file);
+    if (!readTimeResult.success)
+        return readTimeResult.errorCode;
 
     DWORD result = operationFn(path.c_str());
 
-    file = CreateFileW(path.c_str(), FILE_WRITE_ATTRIBUTES,
+    file = ExecutorFs()->CreateFile(path.c_str(), FILE_WRITE_ATTRIBUTES,
                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                        NULL, OPEN_EXISTING, flags, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
-        SetFileTime(file, &created, NULL, &modified);
-        CloseHandle(file);
+        const FileResult restoreTimeResult = ExecutorFs()->SetHandleFileTime(
+            file, &created, NULL, &modified);
+        ExecutorFs()->CloseFileHandle(file);
+        if (result == ERROR_SUCCESS && !restoreTimeResult.success)
+            result = restoreTimeResult.errorCode;
     }
     return result;
 }
@@ -989,7 +974,7 @@ static CFileOperationResult ExecuteCompressionChangeW(IWorkerObserver& observer,
 
     while (true)
     {
-        DWORD effectiveCurrentAttrs = GetFileAttributesW(attrPath.c_str());
+        DWORD effectiveCurrentAttrs = ExecutorFs()->GetFileAttributes(attrPath.c_str());
         if (effectiveCurrentAttrs == INVALID_FILE_ATTRIBUTES)
             effectiveCurrentAttrs = currentAttrs;
 
@@ -1002,12 +987,12 @@ static CFileOperationResult ExecuteCompressionChangeW(IWorkerObserver& observer,
         const bool clearReadOnly = effectiveCurrentAttrs != INVALID_FILE_ATTRIBUTES &&
                                    (effectiveCurrentAttrs & FILE_ATTRIBUTE_READONLY) != 0;
         if (clearReadOnly)
-            SetFileAttributesW(attrPath.c_str(), effectiveCurrentAttrs & ~FILE_ATTRIBUTE_READONLY);
+            ExecutorFs()->SetFileAttributes(attrPath.c_str(), effectiveCurrentAttrs & ~FILE_ATTRIBUTE_READONLY);
 
         DWORD error = SetCompressionFormatW(attrPath, targetCompressed ? COMPRESSION_FORMAT_DEFAULT : COMPRESSION_FORMAT_NONE);
 
         if (clearReadOnly)
-            SetFileAttributesW(attrPath.c_str(), effectiveCurrentAttrs);
+            ExecutorFs()->SetFileAttributes(attrPath.c_str(), effectiveCurrentAttrs);
 
         if (error == ERROR_SUCCESS)
             return SuccessResult();
@@ -1019,15 +1004,14 @@ static CFileOperationResult ExecuteCompressionChangeW(IWorkerObserver& observer,
         if (IsCompressionUnsupportedError(error))
         {
             state.SkipCompressionChanges = true;
-            std::string pathA = ObserverPathFallbackA(path);
-            observer.NotifyError("Error changing compression", pathA.c_str(), "Compression is not supported");
+            observer.NotifyError(L"Error changing compression", path.c_str(), L"Compression is not supported");
             return SuccessResult();
         }
 
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error changing compression", path, error);
+        int response = AskFileError(observer, L"Error changing compression", path, error);
         switch (response)
         {
         case IDRETRY:
@@ -1058,7 +1042,7 @@ static CFileOperationResult ExecuteEncryptionChangeW(IWorkerObserver& observer,
 
     while (true)
     {
-        DWORD effectiveCurrentAttrs = GetFileAttributesW(attrPath.c_str());
+        DWORD effectiveCurrentAttrs = ExecutorFs()->GetFileAttributes(attrPath.c_str());
         if (effectiveCurrentAttrs == INVALID_FILE_ATTRIBUTES)
             effectiveCurrentAttrs = currentAttrs;
 
@@ -1080,10 +1064,7 @@ static CFileOperationResult ExecuteEncryptionChangeW(IWorkerObserver& observer,
             if (state.SkipAllEncryptSystem)
                 return SuccessResult();
 
-            std::string pathA = ObserverPathFallbackA(path);
-            int response = observer.AskHiddenOrSystem("Confirm system file encryption",
-                                                      pathA.c_str(),
-                                                      "Encrypt system file");
+            int response = observer.AskHiddenOrSystem(L"Confirm system file encryption", path.c_str(), L"Encrypt system file");
             switch (response)
             {
             case IDB_ALL:
@@ -1114,7 +1095,7 @@ static CFileOperationResult ExecuteEncryptionChangeW(IWorkerObserver& observer,
             if (attrsForOperation != effectiveCurrentAttrs)
             {
                 attrsToRestore = effectiveCurrentAttrs;
-                SetFileAttributesW(attrPath.c_str(), attrsForOperation);
+                ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrsForOperation);
             }
         }
 
@@ -1122,7 +1103,7 @@ static CFileOperationResult ExecuteEncryptionChangeW(IWorkerObserver& observer,
                                                    targetEncrypted ? EncryptPathW : DecryptPathW);
 
         if (attrsToRestore != INVALID_FILE_ATTRIBUTES)
-            SetFileAttributesW(attrPath.c_str(), attrsToRestore);
+            ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrsToRestore);
 
         if (error == ERROR_SUCCESS)
             return SuccessResult();
@@ -1134,15 +1115,14 @@ static CFileOperationResult ExecuteEncryptionChangeW(IWorkerObserver& observer,
         if (IsEncryptionUnsupportedError(error))
         {
             state.SkipEncryptionChanges = true;
-            std::string pathA = ObserverPathFallbackA(path);
-            observer.NotifyError("Error changing encryption", pathA.c_str(), "Encryption is not supported");
+            observer.NotifyError(L"Error changing encryption", path.c_str(), L"Encryption is not supported");
             return SuccessResult();
         }
 
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error changing encryption", path, error);
+        int response = AskFileError(observer, L"Error changing encryption", path, error);
         switch (response)
         {
         case IDRETRY:
@@ -1198,7 +1178,8 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
                 return encryption;
         }
 
-        if (SetFileAttributesW(attrPath.c_str(), attrs))
+        const FileResult setAttrsResult = ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs);
+        if (setAttrsResult.success)
         {
             if (attrsData == NULL ||
                 (!attrsData->ChangeTimeModified &&
@@ -1210,10 +1191,10 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
 
             const bool isReadOnly = (attrs & FILE_ATTRIBUTE_READONLY) != 0;
             if (isReadOnly)
-                SetFileAttributesW(attrPath.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+                ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
 
             DWORD flags = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0;
-            HANDLE file = CreateFileW(attrPath.c_str(), FILE_WRITE_ATTRIBUTES,
+            HANDLE file = ExecutorFs()->CreateFile(attrPath.c_str(), FILE_WRITE_ATTRIBUTES,
                                       FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                       NULL, OPEN_EXISTING, flags, NULL);
             if (file != INVALID_HANDLE_VALUE)
@@ -1221,17 +1202,18 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
                 const FILETIME* created = attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL;
                 const FILETIME* accessed = attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL;
                 const FILETIME* modified = attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL;
-                const BOOL ok = SetFileTime(file, created, accessed, modified);
-                const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
-                CloseHandle(file);
+                const FileResult timeResult = ExecutorFs()->SetHandleFileTime(
+                    file, created, accessed, modified);
+                const DWORD error = timeResult.errorCode;
+                ExecutorFs()->CloseFileHandle(file);
                 if (isReadOnly)
-                    SetFileAttributesW(attrPath.c_str(), attrs);
-                if (ok)
+                    ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs);
+                if (timeResult.success)
                     return SuccessResult();
 
                 if (state.SkipAllErrors)
                     return SuccessResult(true);
-                int response = AskFileError(observer, "Error changing attributes", path, error);
+                int response = AskFileError(observer, L"Error changing attributes", path, error);
                 switch (response)
                 {
                 case IDRETRY:
@@ -1250,10 +1232,10 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
             {
                 DWORD error = GetLastError();
                 if (isReadOnly)
-                    SetFileAttributesW(attrPath.c_str(), attrs);
+                    ExecutorFs()->SetFileAttributes(attrPath.c_str(), attrs);
                 if (state.SkipAllErrors)
                     return SuccessResult(true);
-                int response = AskFileError(observer, "Error changing attributes", path, error);
+                int response = AskFileError(observer, L"Error changing attributes", path, error);
                 switch (response)
                 {
                 case IDRETRY:
@@ -1271,14 +1253,14 @@ static CFileOperationResult ExecuteChangeAttributesW(IWorkerObserver& observer,
         }
         else
         {
-            DWORD error = GetLastError();
+            DWORD error = setAttrsResult.errorCode;
             observer.WaitIfSuspended();
             if (observer.IsCancelled())
                 return ErrorResult(ERROR_CANCELLED);
             if (state.SkipAllErrors)
                 return SuccessResult(true);
 
-            int response = AskFileError(observer, "Error changing attributes", path, error);
+            int response = AskFileError(observer, L"Error changing attributes", path, error);
             switch (response)
             {
             case IDRETRY:
@@ -1311,12 +1293,10 @@ static CFileOperationResult ExecuteScriptOperation(IWorkerObserver& observer,
     {
         const std::wstring sourcePath = OperationSourcePathW(op);
         CProgressData progressData = {};
-        std::string sourceA = sourcePath.empty() ? std::string() : ObserverPathFallbackA(sourcePath);
-        progressData.Source = sourceA.c_str();
-        progressData.SourceW = sourcePath.empty() ? NULL : sourcePath.c_str();
+        progressData.Source = sourcePath.empty() ? NULL : sourcePath.c_str();
         observer.SetOperationInfo(&progressData);
 
-        return ExecuteChangeAttributesW(observer, sourcePath, (DWORD)(DWORD_PTR)op.TargetName, op.Attr,
+        return ExecuteChangeAttributesW(observer, sourcePath, op.NewAttrs, op.Attr,
                                         options.AttrsData, state);
     }
 
@@ -1333,9 +1313,7 @@ static CFileOperationResult ExecuteScriptOperation(IWorkerObserver& observer,
 
         const std::wstring sourcePath = OperationSourcePathW(op);
         CProgressData progressData = {};
-        std::string sourceA = sourcePath.empty() ? std::string() : ObserverPathFallbackA(sourcePath);
-        progressData.Source = sourceA.c_str();
-        progressData.SourceW = sourcePath.empty() ? NULL : sourcePath.c_str();
+        progressData.Source = sourcePath.empty() ? NULL : sourcePath.c_str();
         observer.SetOperationInfo(&progressData);
 
         return ExecuteConvertFileW(observer, sourcePath, options.ConvertData, state);
@@ -1345,27 +1323,18 @@ static CFileOperationResult ExecuteScriptOperation(IWorkerObserver& observer,
     {
         const std::wstring targetPath = OperationTargetPathW(op);
         CProgressData progressData = {};
-        std::string targetA = targetPath.empty() ? std::string() : ObserverPathFallbackA(targetPath);
-        progressData.Target = targetA.c_str();
-        progressData.TargetW = targetPath.empty() ? NULL : targetPath.c_str();
+        progressData.Target = targetPath.empty() ? NULL : targetPath.c_str();
         observer.SetOperationInfo(&progressData);
 
-        FILETIME lastWrite = {};
-        lastWrite.dwLowDateTime = (DWORD)(DWORD_PTR)op.SourceName;
-        lastWrite.dwHighDateTime = op.Attr;
-        return ExecuteCopyDirectoryTimeW(observer, targetPath, lastWrite, state);
+        return ExecuteCopyDirectoryTimeW(observer, targetPath, op.DirTime, state);
     }
 
     const std::wstring sourcePath = OperationSourcePathW(op);
     const std::wstring targetPath = OperationTargetPathW(op);
 
     CProgressData progressData = {};
-    std::string sourceA = sourcePath.empty() ? std::string() : ObserverPathFallbackA(sourcePath);
-    std::string targetA = targetPath.empty() ? std::string() : ObserverPathFallbackA(targetPath);
-    progressData.Source = sourceA.c_str();
-    progressData.Target = targetA.c_str();
-    progressData.SourceW = sourcePath.empty() ? NULL : sourcePath.c_str();
-    progressData.TargetW = targetPath.empty() ? NULL : targetPath.c_str();
+    progressData.Source = sourcePath.empty() ? NULL : sourcePath.c_str();
+    progressData.Target = targetPath.empty() ? NULL : targetPath.c_str();
     observer.SetOperationInfo(&progressData);
 
     CSecurityDescriptorHolder moveSecurity;
@@ -1407,6 +1376,21 @@ static CFileOperationResult ExecuteScriptOperation(IWorkerObserver& observer,
     case ocDeleteDir:
     case ocDeleteDirLink:
         return ExecuteRemoveDirectoryW(observer, sourcePath, state);
+    case ocCreateDirLink: // clone the link (never its target)
+    {
+        IFileSystem* linkFs = gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+        std::vector<BYTE> blob;
+        FileResult r = linkFs->GetReparseData(sourcePath.c_str(), blob);
+        if (r.success)
+        {
+            r = linkFs->CreateDirectory(targetPath.c_str());
+            if (r.success || r.errorCode == ERROR_ALREADY_EXISTS)
+                r = linkFs->SetReparseData(targetPath.c_str(), blob.data(), blob.size());
+        }
+        if (!r.success)
+            return ErrorResult(r.errorCode);
+        return SuccessResult();
+    }
     default:
         return ErrorResult(ERROR_NOT_SUPPORTED);
     }

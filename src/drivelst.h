@@ -10,13 +10,13 @@
 
 struct COneDriveBusinessStorage
 {
-    std::string DisplayName;
-    std::string UserFolder;
+    std::wstring DisplayName;
+    std::wstring UserFolder;
 
-    COneDriveBusinessStorage(const char* displayName, const char* userFolder)
+    COneDriveBusinessStorage(const wchar_t* displayName, const wchar_t* userFolder)
     {
-        DisplayName = displayName ? displayName : "";
-        UserFolder = userFolder ? userFolder : "";
+        DisplayName = displayName ? displayName : L"";
+        UserFolder = userFolder ? userFolder : L"";
     }
 
     ~COneDriveBusinessStorage()
@@ -30,11 +30,11 @@ public:
     COneDriveBusinessStorages() : TIndirectArray<COneDriveBusinessStorage>(1, 20) {}
 
     void SortIn(COneDriveBusinessStorage* s);
-    BOOL Find(const char* displayName, const char** userFolder);
+    BOOL Find(const wchar_t* displayName, const std::wstring** userFolder);
 };
 
-extern CPathBuffer DropboxPath;
-extern CPathBuffer OneDrivePath;                        // for personal account only
+extern std::wstring DropboxPath;
+extern std::wstring OneDrivePath;                           // for personal account only
 extern COneDriveBusinessStorages OneDriveBusinessStorages; // for business accounts only
 
 void InitOneDrivePath();
@@ -74,7 +74,11 @@ enum CDriveTypeEnum
 struct CDriveData
 {
     CDriveTypeEnum DriveType; // if it's drvtSeparator, other items are not valid
-    char* DriveText; // NOTE: stored in TDirectArray (memmove) — must NOT be std::string
+    // Packed menu columns separated by tabs. Stored as an allocated pointer because
+    // TDirectArray relocates CDriveData with memmove; it must not become std::wstring.
+    wchar_t* DriveText;
+    // Stable identity for OneDrive Business entries; selection does not parse display text.
+    wchar_t* OneDriveDisplayName;
     DWORD Param;      // at the moment for Hot Paths - its index
     BOOL Accessible;  // for drvtRemote: FALSE - gray symbol
     BOOL Shared;      // is the drive shared?
@@ -87,7 +91,7 @@ struct CDriveData
     // for drvtPluginCmd only: pointer taken from CPluginData (unique identification of the
     //  plugin - DLLName is allocated only once; may be invalid, check it); pointer to
     //  CPluginData is not enough, because it would be invalid when adding/removing plugins (array reallocation - see array.h)
-    const char* DLLName;
+    const wchar_t* DLLName;
 };
 
 class CMenuPopup;
@@ -103,7 +107,7 @@ protected:
     int* PostCmd;              // post-cmd for context menu of a FS plugin
     void** PostCmdParam;       // post-cmd-parameter for context menu of a FS plugin
     BOOL* FromContextMenu;     // set to TRUE if the menu was invoked from a context menu
-    CPathBuffer CurrentPath;
+    std::wstring CurrentPath;
     TDirectArray<CDriveData>* Drives;
     CMenuPopup* MenuPopup;
     int FocusIndex; // what item from the Drives array should be focused
@@ -115,7 +119,7 @@ public:
     // input:
     // driveType = dummy
     // driveTypeParam = letter of the drive to activate (or 0 (PluginFS) or '\\' (UNC))
-    CDrivesList(CFilesWindow* filesWindow, const char* currentPath, CDriveTypeEnum* driveType,
+    CDrivesList(CFilesWindow* filesWindow, const wchar_t* currentPath, CDriveTypeEnum* driveType,
                 DWORD_PTR* driveTypeParam, int* postCmd, void** postCmdParam, BOOL* fromContextMenu);
     ~CDrivesList()
     {
@@ -145,7 +149,7 @@ public:
     // name of the plugin DLL (or SPL); returns TRUE if we should execute the command on which the context
     // menu was popped up (FALSE does nothing); 'itemIndex' says for which item we are popping up the context
     // menu, 'posByMouse' must be TRUE; if 'itemIndex' is -1, the item is taken from the menu
-    BOOL OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const char** pluginFSDLLName);
+    BOOL OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const wchar_t** pluginFSDLLName);
 
     // A new loading of items into the menu is requested here. It is assumed that the menu is displayed
     // and the program is in the Track method.
@@ -161,15 +165,16 @@ public:
     void DestroyDrives(TDirectArray<CDriveData>* drives);
 
     // helper function for adding an item to Drives
-    void AddToDrives(CDriveData& drv, int textResId, char hotkey, CDriveTypeEnum driveType,
-                     BOOL getGrayIcons, HICON icon, BOOL destroyIcon = TRUE, const char* itemText = NULL);
+    void AddToDrives(CDriveData& drv, int textResId, wchar_t hotkey, CDriveTypeEnum driveType,
+                     BOOL getGrayIcons, HICON icon, BOOL destroyIcon = TRUE, const wchar_t* itemText = NULL,
+                     const wchar_t* oneDriveDisplayName = NULL);
 
     // sets *DriveType and *DriveTypeParam according to the index
     // returns FALSE if the index is out of range or the path cannot be revived
     BOOL ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* fromDropDown);
 
     // insert tooltip corresponding to the drive determined by the variable index to text buffer
-    BOOL GetDriveBarToolTip(int index, char* text);
+    BOOL GetDriveBarToolTip(int index, wchar_t* text);
 
     // for Drive bars only: searches data and if it finds an item with path from 'panel' panel, it sets
     // 'index' to its index and returns TRUE, otherwise it returns FALSE
@@ -197,7 +202,7 @@ public:
 protected:
     BOOL LoadMenuFromData();
 
-    CDriveTypeEnum OwnGetDriveType(const char* rootPath); // translates system DriveType to our CDriveTypeEnum
+    CDriveTypeEnum OwnGetDriveType(const wchar_t* rootPath); // translates system DriveType to our CDriveTypeEnum
 
     // helper method; helps to prevent two separators in a row
     BOOL IsLastItemSeparator();

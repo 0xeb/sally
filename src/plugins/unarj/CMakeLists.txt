@@ -8,6 +8,7 @@ sal_add_plugin(NAME unarj
     "${SAL_PLUGINS}/unarj/precomp.cpp"
     "${SAL_PLUGINS}/unarj/unarj.cpp"
     "${SAL_PLUGINS}/unarj/unarjspl.cpp"
+    "${SAL_PLUGINS}/unarj/unarj_text.cpp"
   RC "${SAL_PLUGINS}/unarj/unarj.rc"
   DEF "${SAL_PLUGINS}/unarj/unarj.def"
   INCLUDES "${SAL_SHARED}/plugcore"

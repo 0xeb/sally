@@ -35,7 +35,7 @@ CNethoodPluginInterfaceForFS::~CNethoodPluginInterfaceForFS()
 
 CPluginFSInterfaceAbstract* WINAPI
 CNethoodPluginInterfaceForFS::OpenFS(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int fsNameIndex)
 {
     ++m_cActiveFS;
@@ -68,8 +68,8 @@ CNethoodPluginInterfaceForFS::ExecuteChangeDriveMenuItem(
 
     changeRes = SalamanderGeneral->ChangePanelPathToPluginFS(
         panel,
-        g_szAssignedFSName,
-        TEXT(""),
+        g_assignedFSName.c_str(),
+        L"",
         &failReason);
 }
 
@@ -80,7 +80,7 @@ CNethoodPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(
     __in int x,
     __in int y,
     __in CPluginFSInterfaceAbstract* pluginFS,
-    __in const char* pluginFSName,
+    __in const wchar_t* pluginFSName,
     __in int pluginFSNameIndex,
     __in BOOL isDetachedFS,
     __out BOOL& refreshMenu,
@@ -103,12 +103,16 @@ void WINAPI
 CNethoodPluginInterfaceForFS::ExecuteOnFS(
     __in int panel,
     __in CPluginFSInterfaceAbstract* pluginFS,
-    __in const char* pluginFSName,
+    __in const wchar_t* pluginFSName,
     __in int pluginFSNameIndex,
     __in CFileData& file,
     __in int isDir)
 {
-    CPathBuffer szNewPath;
+    // GetCurrentPathW is CNethoodFSInterface's real implementation now
+    // (that class's wide-FS-interface-ABI conversion); calling it directly here instead of
+    // the narrow GetCurrentPath wrapper removes every narrow-then-rewiden bridge this
+    // function used to need.
+    std::wstring newPath;
     CNethoodFSInterface* pFSInterface;
     CNethoodCache::Node node;
 
@@ -116,30 +120,35 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
     node = pFSInterface->GetNodeFromFileData(file);
     assert(node != NULL || isDir == 2);
 
-    pFSInterface->GetCurrentPath(szNewPath);
+    if (!pFSInterface->GetCurrentPathOwned(newPath))
+        return;
 
     if (isDir == 2)
     {
         // It's the up-dir.
 
-        TCHAR* pszCutDir = NULL;
-
         // Trim off the last path component...
-        if (szNewPath[0] == TEXT('\\') && szNewPath[1] == TEXT('\\'))
+        if (newPath.size() >= 2 && newPath[0] == L'\\' && newPath[1] == L'\\')
         {
             // Is a UNC path - go back to root.
             //pFSInterface->GetRootPath(szNewPath);
             pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
             SalamanderGeneral->ChangePanelPathToPluginFS(
-                panel, pluginFSName, TEXT(""), NULL, -1, szNewPath + 2);
+                panel, pluginFSName, L"", NULL, -1, newPath.c_str() + 2);
         }
-        else if (SalamanderGeneral->CutDirectory(szNewPath, &pszCutDir))
+        else
         {
-            // ...and change the path.
-            pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
-            SalamanderGeneral->ChangePanelPathToPluginFS(
-                panel, pluginFSName, szNewPath, NULL,
-                -1, pszCutDir);
+            const size_t slash = newPath.find_last_of(L'\\');
+            if (slash != std::wstring::npos)
+            {
+                const std::wstring cutDir = newPath.substr(slash + 1);
+                newPath.erase(slash);
+                // ...and change the path.
+                pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
+                SalamanderGeneral->ChangePanelPathToPluginFS(
+                    panel, pluginFSName, newPath.c_str(), NULL,
+                    -1, cutDir.c_str());
+            }
         }
     }
     else
@@ -157,8 +166,7 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
 
             // SalamanderGeneral->SetUserWorkedOnPanelPath(panel);  // Petr Solin: I think this is not the reason to add current path to List Of Working Directories (Alt+F12)
 
-            if (!SalamanderGeneral->ChangePanelPathToDisk(panel,
-                                                          nodeData.GetName()))
+            if (!SalamanderGeneral->ChangePanelPathToDisk(panel, nodeData.GetName()))
             {
                 // May be access denied or so...
                 // Do nothing - stay on the current nethood path.
@@ -168,7 +176,7 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
         {
             // It's a server.
 
-            if (pFSInterface->IsRootPath(szNewPath))
+            if (pFSInterface->IsRootPath(newPath.c_str()))
             {
                 pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
                 SalamanderGeneral->ChangePanelPathToPluginFS(
@@ -177,23 +185,23 @@ CNethoodPluginInterfaceForFS::ExecuteOnFS(
             else
             {
                 // Combine the path...
-                if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, szNewPath.Size()))
-                {
-                    pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
-                    SalamanderGeneral->ChangePanelPathToPluginFS(
-                        panel, pluginFSName, szNewPath);
-                }
+                if (!newPath.empty() && newPath.back() != L'\\')
+                    newPath.push_back(L'\\');
+                newPath.append(file.Name);
+                pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
+                SalamanderGeneral->ChangePanelPathToPluginFS(
+                    panel, pluginFSName, newPath.c_str());
             }
         }
         else
         {
             // Combine the path...
-            if (SalamanderGeneral->SalPathAppend(szNewPath, file.Name, szNewPath.Size()))
-            {
-                pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
-                SalamanderGeneral->ChangePanelPathToPluginFS(
-                    panel, pluginFSName, szNewPath);
-            }
+            if (!newPath.empty() && newPath.back() != L'\\')
+                newPath.push_back(L'\\');
+            newPath.append(file.Name);
+            pFSInterface = NULL; // Pointer may be invalid after ChangePanelPathToXxx
+            SalamanderGeneral->ChangePanelPathToPluginFS(
+                panel, pluginFSName, newPath.c_str());
         }
     }
 }
@@ -204,13 +212,13 @@ CNethoodPluginInterfaceForFS::DisconnectFS(
     __in BOOL isInPanel,
     __in int panel,
     __in CPluginFSInterfaceAbstract* pluginFS,
-    __in const char* pluginFSName,
+    __in const wchar_t* pluginFSName,
     __in int pluginFSNameIndex)
 {
     BOOL ret = FALSE;
 
-    CALL_STACK_MESSAGE5("CNethoodPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
-                        isInPanel, panel, pluginFSName, pluginFSNameIndex);
+    CALL_STACK_MESSAGE4("CNethoodPluginInterfaceForFS::DisconnectFS(, %d, %d, , , %d)",
+                        isInPanel, panel, pluginFSNameIndex);
 
     //((CPluginFSInterface *)pluginFS)->CalledFromDisconnectDialog = TRUE; // suppress unnecessary prompts (the user issued a disconnect command, we just perform it)
 
@@ -232,50 +240,53 @@ CNethoodPluginInterfaceForFS::DisconnectFS(
     return ret;
 }
 
-void WINAPI
+BOOL WINAPI
 CNethoodPluginInterfaceForFS::ConvertPathToInternal(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int fsNameIndex,
-    __inout char* fsUserPart)
+    __inout CSalamanderStringBuffer* fsUserPart)
 {
+    return fsUserPart != NULL &&
+           sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
 }
 
-void WINAPI
+BOOL WINAPI
 CNethoodPluginInterfaceForFS::ConvertPathToExternal(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int fsNameIndex,
-    __inout char* fsUserPart)
+    __inout CSalamanderStringBuffer* fsUserPart)
 {
+    return fsUserPart != NULL &&
+           sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
 }
 
 void WINAPI
 CNethoodPluginInterfaceForFS::EnsureShareExistsOnServer(
     __in int iPanel,
-    __in const char* server,
-    __in const char* share)
+    __in const wchar_t* server,
+    __in const wchar_t* share)
 {
-    CPathBuffer szUncPath;
     UINT uError;
 
     assert(server != NULL);
 
+    // EnsurePathExists is wide now (cache.h widened) - the narrow
+    // ToNarrowDisplay bridge this comment used to describe is obsolete, use server/share
+    // directly.
+    std::wstring uncPath = L"\\\\";
+    uncPath.append(server);
     if (share != NULL)
     {
-        StringCchPrintf(szUncPath, szUncPath.Size(),
-                        TEXT("\\\\%s\\%s"), server, share);
-    }
-    else
-    {
-        StringCchPrintf(szUncPath, szUncPath.Size(),
-                        TEXT("\\\\%s"), server);
+        uncPath.push_back(L'\\');
+        uncPath.append(share);
     }
 
-    uError = g_oNethoodCache.EnsurePathExists(szUncPath);
+    uError = g_oNethoodCache.EnsurePathExists(uncPath.c_str());
     assert(uError == NO_ERROR);
 
     g_iFocusSharePanel = iPanel;
     // Shift iPanel to zero-based value.
     iPanel -= PANEL_LEFT;
-    assert(iPanel >= 0 && iPanel < COUNTOF(g_aszFocusShareName));
-    StringCchCopy(g_aszFocusShareName[iPanel], COUNTOF(g_aszFocusShareName[iPanel]), share);
+    assert(iPanel >= 0 && iPanel < 2);
+    g_focusShareNames[iPanel] = share != NULL ? share : L"";
 }

@@ -12,7 +12,7 @@ namespace sally
     namespace clipboard
     {
         bool CreateCopyMoveData(const ClipboardFileTransfer& transfer,
-                                CCopyMoveData** data)
+                                CCopyMoveData** data) noexcept
         {
             if (data == nullptr)
                 return false;
@@ -20,7 +20,15 @@ namespace sally
             if (transfer.SourcePaths.empty())
                 return false;
 
-            CCopyMoveData* records = new CCopyMoveData(100, 50);
+            CCopyMoveData* records = nullptr;
+            try
+            {
+                records = new CCopyMoveData(100, 50);
+            }
+            catch (const std::bad_alloc&)
+            {
+                return false;
+            }
             if (records == nullptr)
                 return false;
             records->MakeCopyOfName = transfer.MakeCopyOfName ? TRUE : FALSE;
@@ -32,10 +40,19 @@ namespace sally
                     records->ResetState();
                     break;
                 }
-                CCopyMoveRecord* record = new CCopyMoveRecord(path.c_str(),
-                                                              static_cast<const wchar_t*>(nullptr));
-                if (record == nullptr)
+                CCopyMoveRecord* record = nullptr;
+                try
                 {
+                    record = new CCopyMoveRecord(path.c_str(), nullptr);
+                }
+                catch (const std::bad_alloc&)
+                {
+                    records->ResetState();
+                    break;
+                }
+                if (record == nullptr || !record->IsValid())
+                {
+                    delete record;
                     records->ResetState();
                     break;
                 }

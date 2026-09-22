@@ -1,8 +1,21 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+// The owned STRRET normalization helper comes from shlwapi, already linked project-wide.
+#include <shlwapi.h>
+#include <limits>
+#include <new>
+#include <stdexcept>
+// shlwapi.h's PathIsPrefix macro (-> PathIsPrefixA, since this project never
+// defines UNICODE) silently renames plugins.h's CSalamanderGeneral::PathIsPrefix override to
+// PathIsPrefixA if left active across that include - it then fails to satisfy
+// CSalamanderGeneralAbstract::PathIsPrefix's pure virtual, and CSalamanderGeneral becomes
+// non-instantiable. Same guard already used in files_window_clipboard_paths.cpp,
+// main_window_commands_help.cpp, and main_window_config_persistence.cpp for the same reason.
+#undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
 #include "shellib.h"
 #include "drop_effect_policy.h"
@@ -15,8 +28,15 @@ extern "C"
 }
 #include "salshlib.h"
 #include "common/widepath.h"
+#include "common/IFileSystem.h"
+#include "common/IShell.h"
 #include "common/unicode/helpers.h"
 #include "common/fsutil.h"
+#include "common/SalPathWide.h"
+#include "common/FixedUtf16Buffer.h"
+#include "common/clipboard/HDropSelection.h"
+#include "common/clipboard/ClipboardTextPayload.h"
+#include "common/Win32TextCodec.h"
 
 // original location in fileswnd.h (here only because of MakeCopyOfName in CImpDropTarget::ProcessClipboardData)
 extern BOOL OurClipDataObject; // TRUE during "paste" of our IDataObject
@@ -51,93 +71,30 @@ static BOOL CanUseOwnFolderDrop(IDataObject* dataObject, BOOL isFakeDataObject, 
 // CCopyMoveRecord
 //
 
-CCopyMoveRecord::CCopyMoveRecord(const char* fileName, const char* mapName)
+CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName) noexcept
+    : Valid(false)
 {
-    FileName = AllocChars(fileName);
-    MapName = AllocChars(mapName);
-    FileNameW = NULL;  // No wide name needed for ANSI-only input
-}
-
-CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const char* mapName)
-{
-    FileName = AllocChars(fileName);  // Convert to ANSI (may be lossy)
-    MapName = AllocChars(mapName);
-    FileNameW = AllocWideChars(fileName);  // Preserve wide name for Unicode support
-}
-
-CCopyMoveRecord::CCopyMoveRecord(const char* fileName, const wchar_t* mapName)
-{
-    FileName = AllocChars(fileName);
-    MapName = AllocChars(mapName);
-    FileNameW = NULL;  // No wide name needed for ANSI filename
-}
-
-CCopyMoveRecord::CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName)
-{
-    FileName = AllocChars(fileName);  // Convert to ANSI (may be lossy)
-    MapName = AllocChars(mapName);
-    FileNameW = AllocWideChars(fileName);  // Preserve wide name for Unicode support
-}
-
-CCopyMoveRecord::~CCopyMoveRecord()
-{
-    if (FileName != NULL)
-        free(FileName);
-    if (MapName != NULL)
-        free(MapName);
-    if (FileNameW != NULL)
-        free(FileNameW);
-}
-
-char* CCopyMoveRecord::AllocChars(const char* name)
-{
-    if (name == NULL)
-        return NULL;
-
-    int l = (int)strlen(name);
-    char* newName = (char*)malloc(l + 1);
-    if (newName != NULL)
-        memcpy(newName, name, l + 1);
-    else
-        TRACE_E(LOW_MEMORY);
-    return newName;
-}
-
-char* CCopyMoveRecord::AllocChars(const wchar_t* name)
-{
-    if (name == NULL)
-        return NULL;
-
-    // Query required buffer size first (multi-byte codepages may need more bytes than wchars)
-    int requiredSize = WideCharToMultiByte(CP_ACP, 0, name, -1, NULL, 0, NULL, NULL);
-    if (requiredSize <= 0)
+    if (fileName == NULL)
+        return;
+    try
     {
-        TRACE_E("WideCharToMultiByte failed to calculate size");
-        return NULL;
+        std::wstring stagedFileName(fileName);
+        std::optional<std::wstring> stagedMapName;
+        if (mapName != NULL)
+            stagedMapName.emplace(mapName);
+        FileName.swap(stagedFileName);
+        MapName.swap(stagedMapName);
+        Valid = true;
     }
-
-    char* newName = (char*)malloc(requiredSize);
-    if (newName != NULL)
+    catch (const std::bad_alloc&)
     {
-        WideCharToMultiByte(CP_ACP, 0, name, -1, newName, requiredSize, NULL, NULL);
+        // This constructor is used below COM drop callbacks. Keep failure represented by
+        // IsValid() and do not invoke diagnostic machinery from the noexcept boundary.
     }
-    else
-        TRACE_E(LOW_MEMORY);
-    return newName;
-}
-
-wchar_t* CCopyMoveRecord::AllocWideChars(const wchar_t* name)
-{
-    if (name == NULL)
-        return NULL;
-
-    int l = lstrlenW(name);
-    wchar_t* newName = (wchar_t*)malloc((l + 1) * sizeof(wchar_t));
-    if (newName != NULL)
-        memcpy(newName, name, (l + 1) * sizeof(wchar_t));
-    else
-        TRACE_E(LOW_MEMORY);
-    return newName;
+    catch (const std::length_error&)
+    {
+        // See the bad_alloc arm above.
+    }
 }
 
 //*****************************************************************************
@@ -147,9 +104,7 @@ wchar_t* CCopyMoveRecord::AllocWideChars(const wchar_t* name)
 
 void DestroyCopyMoveData(CCopyMoveData* data)
 {
-    // TIndirectArray destructor calls delete on each CCopyMoveRecord,
-    // which properly frees FileName, MapName, and FileNameW.
-    // Do NOT manually free here - that causes double-free!
+    // TIndirectArray destructor calls delete on each CCopyMoveRecord.
     delete data;
 }
 
@@ -158,11 +113,11 @@ void DestroyCopyMoveData(CCopyMoveData* data)
 // CImpDropTarget
 //
 
-void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt,
+void CImpDropTarget::SetDirectory(const wchar_t* path, DWORD grfKeyState, POINTL pt,
                                   DWORD* effect, IDataObject* dataObject, BOOL tgtIsFile,
                                   int tgtType)
 {
-    CALL_STACK_MESSAGE5("CImpDropTarget::SetDirectory(%s, 0x%X, , , , %d, %d)", path,
+    CALL_STACK_MESSAGE5("CImpDropTarget::SetDirectory(%ls, 0x%X, , , , %d, %d)", path,
                         grfKeyState, tgtIsFile, tgtType);
 
     if (path == NULL)
@@ -173,7 +128,7 @@ void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt
             CurDirDropTarget->Release();
         }
         CurDirDropTarget = NULL;
-        CurDir[0] = 0;
+        CurDir.clear();
         TgtType = idtttWindows;
         return;
     }
@@ -181,28 +136,29 @@ void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt
     TgtType = tgtType;
     if (tgtType == idtttWindows)
     {
-        if (strcmp(path, CurDir) != 0 || CurDirDropTarget == NULL)
+        BOOL pathChanged = CurDir != path;
+        if (pathChanged || CurDirDropTarget == NULL)
         {
             if (CurDirDropTarget != NULL)
             {
                 CurDirDropTarget->DragLeave();
                 CurDirDropTarget->Release();
             }
-            if (tgtIsFile && dataObject != NULL && IsFakeDataObject(dataObject, NULL, NULL, 0))
+            if (tgtIsFile && dataObject != NULL && IsFakeDataObject(dataObject, NULL, NULL))
                 CurDirDropTarget = NULL;
-            else
-                CurDirDropTarget = CreateIDropTarget(OwnerWindow, path);
+            else if (*path != 0)
+                CurDirDropTarget = CreateIDropTargetW(OwnerWindow, path);
             if (CurDirDropTarget != NULL && dataObject != NULL && effect != NULL)
             {
                 if (CurDirDropTarget->DragEnter(dataObject, grfKeyState, pt, effect) != S_OK)
                 { // drop-target error -> release it
                     CurDirDropTarget->Release();
                     CurDirDropTarget = NULL;
-                    CurDir[0] = 0;
+                    CurDir.clear();
                     return;
                 }
             }
-            strcpy(CurDir, path);
+            CurDir = path;
         }
     }
     else // archives + FS
@@ -213,100 +169,66 @@ void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt
             CurDirDropTarget->Release();
         }
         CurDirDropTarget = NULL;
-        strcpy(CurDir, path);
+        CurDir = path;
     }
 }
 
-const char* FindNextString(const char* txt)
+BOOL CImpDropTarget::ProcessClipboardData(
+    BOOL copy, const std::vector<std::wstring>& paths,
+    const std::vector<std::wstring>* mappedNames)
 {
-    while (*txt++ != 0)
-        ;
-    return txt;
-}
+    CALL_STACK_MESSAGE2("CImpDropTarget::ProcessClipboardData(%d, ,)", copy);
+    if (paths.empty() || paths.size() > static_cast<size_t>(INT_MAX))
+        return FALSE;
 
-const wchar_t* FindNextString(const wchar_t* txt)
-{
-    while (*txt++ != 0)
-        ;
-    return txt;
-}
-
-BOOL CImpDropTarget::ProcessClipboardData(BOOL copy, const DROPFILES* data,
-                                          const char* mapA, const wchar_t* mapW)
-{
-    CALL_STACK_MESSAGE4("CImpDropTarget::ProcessClipboardData(%d, , %s, %S)", copy, mapA, mapW);
     BOOL ret = FALSE;
-    CCopyMoveData* array = new CCopyMoveData(100, 50);
+    CCopyMoveData* array = NULL;
+    try
+    {
+        array = new CCopyMoveData(100, 50);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return FALSE;
+    }
     if (array != NULL)
     {
         // array->MakeCopyOfName will be TRUE if it's our own copy & paste from clipboard
         // (copying with the condition that if target already exists, "Copy of ..." will be created)
-        //    array->MakeCopyOfName = copy && OurClipDataObject && mapA == NULL && mapW == NULL;  // to work also via drag&drop
-        array->MakeCopyOfName = copy && mapA == NULL && mapW == NULL; // only our data-object gets here
+        array->MakeCopyOfName = copy && mappedNames == NULL; // only our data-object gets here
 
-        if (data->fWide)
+        for (size_t i = 0; i < paths.size(); ++i)
         {
-            const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-            while (1) // double null terminated, doesn't count empty strings (at start)
+            const wchar_t* mapName = NULL;
+            if (mappedNames != NULL)
+                mapName = i < mappedNames->size() ? (*mappedNames)[i].c_str() : L"";
+
+            CCopyMoveRecord* record = NULL;
+            try
             {
-                if (*fileW == 0)
-                {
-                    ret = DoCopyMove(copy, CurDir, array, DoCopyMoveParam);
-                    array = NULL; // released by DoCopyMove
-                    break;
-                }
-                CCopyMoveRecord* cr;
-                if (mapA != NULL)
-                    cr = new CCopyMoveRecord(fileW, mapA);
-                else
-                    cr = new CCopyMoveRecord(fileW, mapW);
-                if (cr != NULL)
-                    array->Add(cr);
-                else
-                    break;
-                if (!array->IsGood())
-                {
-                    array->ResetState();
-                    break;
-                }
-                fileW = FindNextString(fileW);
-                if (mapA != NULL && *mapA != 0)
-                    mapA = FindNextString(mapA);
-                else if (mapW != NULL && *mapW != 0)
-                    mapW = FindNextString(mapW);
+                record = new CCopyMoveRecord(paths[i].c_str(), mapName);
+            }
+            catch (const std::bad_alloc&)
+            {
+                break;
+            }
+            if (record == NULL || !record->IsValid())
+            {
+                delete record;
+                break;
+            }
+            array->Add(record);
+            if (!array->IsGood())
+            {
+                array->ResetState();
+                break;
             }
         }
-        else
+
+        if (array->IsGood() && array->Count == static_cast<int>(paths.size()) && array->Count > 0)
         {
-            const char* fileA = ((char*)data) + data->pFiles;
-            while (1) // double null terminated, doesn't count empty strings (at start)
-            {
-                if (*fileA == 0)
-                {
-                    ret = DoCopyMove(copy, CurDir, array, DoCopyMoveParam);
-                    array = NULL; // released by DoCopyMove
-                    break;
-                }
-                CCopyMoveRecord* cr;
-                if (mapA != NULL)
-                    cr = new CCopyMoveRecord(fileA, mapA);
-                else
-                    cr = new CCopyMoveRecord(fileA, mapW);
-                if (cr != NULL)
-                    array->Add(cr);
-                else
-                    break;
-                if (!array->IsGood())
-                {
-                    array->ResetState();
-                    break;
-                }
-                fileA = FindNextString(fileA);
-                if (mapA != NULL && *mapA != 0)
-                    mapA = FindNextString(mapA);
-                else if (mapW != NULL && *mapW != 0)
-                    mapW = FindNextString(mapW);
-            }
+            ret = DoCopyMove(copy, CurDir.c_str(), array, DoCopyMoveParam);
+            array = NULL; // released by DoCopyMove
         }
         if (array != NULL)
             DestroyCopyMoveData(array);
@@ -339,9 +261,20 @@ BOOL CImpDropTarget::TryCopyOrMove(BOOL copy, IDataObject* pDataObject, UINT CF_
             DROPFILES* data = (DROPFILES*)HANDLES(GlobalLock(stgMedium.hGlobal));
             if (data != NULL)
             {
+                std::vector<std::wstring> paths;
+                const SIZE_T dataSize = GlobalSize(stgMedium.hGlobal);
+                const bool havePaths = sally::clipboard::TryDecodeHDropPaths(
+                    data, dataSize, paths);
                 if (cfFileMapA || cfFileMapW)
                 {
-                    formatEtc.cfFormat = (CLIPFORMAT)(cfFileMapA ? CF_FileMapA : CF_FileMapW);
+                    // ONE discriminator for both the request and the decode. cfFileMapA and
+                    // cfFileMapW are set independently while enumerating the source object's
+                    // formats, so both can be TRUE; asking for CF_FileMapA and then decoding the
+                    // answer as UTF-16 (which is what testing cfFileMapW separately did) read every
+                    // ANSI name two bytes at a time and ended the list at the first name whose
+                    // second byte was zero.
+                    const bool wideMap = cfFileMapA == FALSE;
+                    formatEtc.cfFormat = (CLIPFORMAT)(wideMap ? CF_FileMapW : CF_FileMapA);
                     formatEtc.ptd = NULL;
                     formatEtc.dwAspect = DVASPECT_CONTENT;
                     formatEtc.lindex = -1;
@@ -360,17 +293,22 @@ BOOL CImpDropTarget::TryCopyOrMove(BOOL copy, IDataObject* pDataObject, UINT CF_
 
                             if (map != NULL)
                             {
-                                ret = ProcessClipboardData(copy, data,
-                                                           (char*)(cfFileMapA ? map : NULL),
-                                                           (wchar_t*)(cfFileMapA ? NULL : map));
+                                std::vector<std::wstring> mappedNames;
+                                const SIZE_T mapSize = GlobalSize(stgMediumMap.hGlobal);
+                                if (havePaths &&
+                                    sally::clipboard::TryDecodeClipboardStringList(
+                                        map, mapSize, wideMap, mappedNames))
+                                {
+                                    ret = ProcessClipboardData(copy, paths, &mappedNames);
+                                }
                                 HANDLES(GlobalUnlock(stgMediumMap.hGlobal));
                             }
                         }
                         ReleaseStgMedium(&stgMediumMap);
                     }
                 }
-                else
-                    ret = ProcessClipboardData(copy, data, NULL, NULL);
+                else if (havePaths)
+                    ret = ProcessClipboardData(copy, paths, NULL);
                 HANDLES(GlobalUnlock(stgMedium.hGlobal));
             }
         }
@@ -383,7 +321,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
 {
     CALL_STACK_MESSAGE1("IsSimpleSelection()");
     BOOL ret = FALSE;
-    if (pDataObject != NULL && !IsFakeDataObject(pDataObject, NULL, NULL, 0)) // from archive/FS it's not received this way
+    if (pDataObject != NULL && !IsFakeDataObject(pDataObject, NULL, NULL)) // from archive/FS it's not received this way
     {
         IEnumFORMATETC* enumFormat;
         if (pDataObject->EnumFormatEtc(DATADIR_GET, &enumFormat) == S_OK)
@@ -403,9 +341,10 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
             BOOL cfRemoteDesktop1 = FALSE;
             BOOL cfRemoteDesktop2 = FALSE;
             BOOL cfRemoteDesktop3 = FALSE;
-            UINT CF_RemoteDesktop1 = RegisterClipboardFormat("Preferred DropEf");
-            UINT CF_RemoteDesktop2 = RegisterClipboardFormat("Shell Object Off");
-            UINT CF_RemoteDesktop3 = RegisterClipboardFormat("Shell IDList Arr");
+            // narrow literals - explicit RegisterClipboardFormatA.
+            UINT CF_RemoteDesktop1 = RegisterClipboardFormatA("Preferred DropEf");
+            UINT CF_RemoteDesktop2 = RegisterClipboardFormatA("Shell Object Off");
+            UINT CF_RemoteDesktop3 = RegisterClipboardFormatA("Shell IDList Arr");
 
             FORMATETC formatEtc;
             enumFormat->Reset();
@@ -455,200 +394,29 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                         DROPFILES* data = (DROPFILES*)HANDLES(GlobalLock(stgMedium.hGlobal));
                         if (data != NULL)
                         {
-                            int prefixLen = -1;
-                            CWidePathBuffer prefixBuf;
-                            prefixBuf[0] = 0;
-                            if (data->fWide)
+                            // DROPFILES::fWide is an external format discriminator. Decode
+                            // either arm once at the Win32 boundary; internal ownership is wide.
+                            sally::clipboard::HDropSelection selection;
+                            ret = sally::clipboard::TryParseHDropSelection(data, GlobalSize(stgMedium.hGlobal), selection);
+                            if (ret && namesList != NULL)
                             {
-                                CPathBuffer mulbyteName; // Heap-allocated for long path support
-                                wchar_t* prefix = prefixBuf;
-                                const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                                while (1) // double null terminated, doesn't count empty strings (at start)
+                                namesList->SrcPath = selection.SourcePath;
+                                for (const std::wstring& name : selection.Names)
                                 {
-                                    if (*fileW == 0) // no more names, success!
+                                    wchar_t* add = DupStr(name.c_str());
+                                    if (add == NULL)
                                     {
-                                        if (namesList != NULL) // add common path of all names to namesList
-                                        {
-                                            if (WideCharToMultiByte(CP_ACP, 0, prefix, prefixLen + 1, mulbyteName, mulbyteName.Size(), NULL, NULL) == 0)
-                                            {
-                                                DWORD err = GetLastError();
-                                                TRACE_E("IsSimpleSelection(): WideCharToMultiByte: " << GetErrorText(err));
-                                                mulbyteName[0] = 0;
-                                            }
-                                            strcpy(namesList->SrcPath.Get(), mulbyteName);
-                                            if (prefixLen < 3)
-                                                SalPathAddBackslash(namesList->SrcPath.Get(), SAL_MAX_LONG_PATH);
-                                        }
-                                        ret = TRUE;
+                                        ret = FALSE;
                                         break;
                                     }
-
-                                    // test for common path of all contained names
-                                    const wchar_t* s = fileW;
-                                    const wchar_t* lastBackslash = NULL; // last backslash (except the one at end of string)
-                                    while (*s != 0)
+                                    namesList->Names.Add(add);
+                                    if (!namesList->Names.IsGood())
                                     {
-                                        if (*s == L'\\' && *(s + 1) != 0)
-                                            lastBackslash = s;
-                                        s++;
-                                    }
-                                    if (lastBackslash != NULL)
-                                    {
-                                        if (lastBackslash - fileW == prefixLen)
-                                        {
-                                            if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, fileW,
-                                                               prefixLen, prefix, prefixLen) != CSTR_EQUAL)
-                                            {
-                                                ret = FALSE; // path changed, error
-                                                break;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            if (prefixLen == -1)
-                                            {
-                                                prefixLen = (int)(lastBackslash - fileW);
-                                                if (prefixLen >= prefixBuf.Size())
-                                                    prefixLen = prefixBuf.Size() - 1;
-                                                memmove(prefix, fileW, prefixLen * sizeof(wchar_t));
-                                                prefix[prefixLen] = 0;
-                                            }
-                                            else
-                                            {
-                                                ret = FALSE; // path changed, error
-                                                break;
-                                            }
-                                        }
-
-                                        if (namesList != NULL) // add current file or directory name to namesList
-                                        {
-                                            if (s > fileW && *(s - 1) == L'\\')
-                                                s--; // trim trailing backslash if present
-                                            int len;
-                                            if ((len = WideCharToMultiByte(CP_ACP, 0, lastBackslash + 1,
-                                                                           (int)(s - (lastBackslash + 1)), mulbyteName,
-                                                                           mulbyteName.Size(), NULL, NULL)) == 0)
-                                            {
-                                                DWORD err = GetLastError();
-                                                TRACE_E("IsSimpleSelection(): WideCharToMultiByte: " << GetErrorText(err));
-                                                mulbyteName[0] = 0;
-                                            }
-                                            else
-                                                mulbyteName[min(mulbyteName.Size() - 1, len)] = 0;
-                                            char* add = DupStr(mulbyteName);
-                                            if (add != NULL)
-                                            {
-                                                namesList->Names.Add(add);
-                                                if (!namesList->Names.IsGood())
-                                                {
-                                                    namesList->Names.ResetState();
-                                                    free(add);
-                                                    ret = FALSE; // not enough memory for file/directory names, error
-                                                    break;
-                                                }
-                                            }
-                                            else
-                                            {
-                                                ret = FALSE; // not enough memory for file/directory names, error
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        ret = FALSE; // not a full path, error
+                                        namesList->Names.ResetState();
+                                        free(add);
+                                        ret = FALSE;
                                         break;
                                     }
-
-                                    fileW = FindNextString(fileW);
-                                }
-                            }
-                            else
-                            {
-                                char* prefix = (char*)prefixBuf.Get();
-                                const char* fileA = ((char*)data) + data->pFiles;
-                                while (1) // double null terminated, doesn't count empty strings (at start)
-                                {
-                                    if (*fileA == 0) // no more names, success!
-                                    {
-                                        if (namesList != NULL) // add common path of all names to namesList
-                                        {
-                                            strcpy(namesList->SrcPath.Get(), prefix);
-                                            if (prefixLen < 3)
-                                                SalPathAddBackslash(namesList->SrcPath.Get(), SAL_MAX_LONG_PATH);
-                                        }
-                                        ret = TRUE;
-                                        break;
-                                    }
-
-                                    // test for common path of all contained names
-                                    const char* s = fileA;
-                                    const char* lastBackslash = NULL; // last backslash (except the one at end of string)
-                                    while (*s != 0)
-                                    {
-                                        if (*s == '\\' && *(s + 1) != 0)
-                                            lastBackslash = s;
-                                        s++;
-                                    }
-                                    if (lastBackslash != NULL)
-                                    {
-                                        if (lastBackslash - fileA == prefixLen)
-                                        {
-                                            if (StrICmpEx(fileA, prefixLen, prefix, prefixLen) != 0)
-                                            {
-                                                ret = FALSE; // path changed, error
-                                                break;
-                                            }
-                                        }
-                                        else
-                                        {
-                                            if (prefixLen == -1)
-                                            {
-                                                prefixLen = (int)(lastBackslash - fileA);
-                                                if (prefixLen >= (int)(prefixBuf.Size() * sizeof(wchar_t)))
-                                                    prefixLen = (int)(prefixBuf.Size() * sizeof(wchar_t)) - 1;
-                                                memmove(prefix, fileA, prefixLen);
-                                                prefix[prefixLen] = 0;
-                                            }
-                                            else
-                                            {
-                                                ret = FALSE; // path changed, error
-                                                break;
-                                            }
-                                        }
-
-                                        if (namesList != NULL) // add current file or directory name to namesList
-                                        {
-                                            if (s > fileA && *(s - 1) == '\\')
-                                                s--; // trim trailing backslash if present
-                                            char* add = (char*)malloc(s - (lastBackslash + 1) + 1);
-                                            if (add != NULL)
-                                            {
-                                                memcpy(add, lastBackslash + 1, s - (lastBackslash + 1));
-                                                add[s - (lastBackslash + 1)] = 0;
-                                                namesList->Names.Add(add);
-                                                if (!namesList->Names.IsGood())
-                                                {
-                                                    namesList->Names.ResetState();
-                                                    free(add);
-                                                    ret = FALSE; // not enough memory for file/directory names, error
-                                                    break;
-                                                }
-                                            }
-                                            else
-                                            {
-                                                ret = FALSE; // not enough memory for file/directory names, error
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        ret = FALSE; // not a full path, error
-                                        break;
-                                    }
-
-                                    fileA = FindNextString(fileA);
                                 }
                             }
                             HANDLES(GlobalUnlock(stgMedium.hGlobal));
@@ -693,7 +461,7 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
         OldDataObject->Release();
     OldDataObject = pDataObject;
     OldDataObjectIsFake = IsFakeDataObject(OldDataObject, &OldDataObjectSrcType,
-                                           OldDataObjectSrcFSPath.Get(), SAL_MAX_LONG_PATH);
+                                           &OldDataObjectSrcFSPath);
 
     OldDataObjectIsSimple = -1; // unknown value
     OldDataObject->AddRef();
@@ -705,21 +473,21 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
     {
         BOOL tgtFile;
         int tgtType;
-        const char* tgtPath = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
-                                        grfKeyState, tgtType, OldDataObjectSrcType);
-        SetDirectory(tgtPath, 0, pt, NULL, OldDataObject, tgtFile, tgtType);
+        const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
+                                               grfKeyState, tgtType, OldDataObjectSrcType);
+        SetDirectory(tgtPathWide, 0, pt, NULL, OldDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
         { // if selection is not from one path (risk likely only with Find), we can't copy/move to archive or FS
             OldDataObjectIsSimple = IsSimpleSelection(OldDataObject, NULL);
             if (!OldDataObjectIsSimple)
                 SetDirectory(NULL, 0, pt, NULL, OldDataObject, FALSE, idtttWindows);
         }
-        ownFolderDrop = TgtType == idtttWindows && CurDirDropTarget == NULL && CurDir[0] != 0 && tgtPath != NULL &&
+        ownFolderDrop = TgtType == idtttWindows && CurDirDropTarget == NULL && !CurDir.empty() && tgtPathWide != NULL &&
                         CanUseOwnFolderDrop(OldDataObject, OldDataObjectIsFake, tgtFile, UseOwnRutine);
     }
 
     if (DragDropDiagEnabled())
-        DragDropDiagDataObject(OldDataObject, CurDir);
+        DragDropDiagDataObject(OldDataObject, CurDir.c_str());
 
     if (CurDirDropTarget != NULL) // only idtttWindows
     {
@@ -788,9 +556,9 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
             }
             // determine default drop effect
             if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
-                OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
+                !OldDataObjectSrcFSPath.empty() && GetFSToFSDropEffect != NULL)
             { // FS to FS: get preferred effect from plugin
-                GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, allowedEffects, origKeyState,
+                GetFSToFSDropEffect(OldDataObjectSrcFSPath.c_str(), CurDir.c_str(), allowedEffects, origKeyState,
                                     pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
@@ -841,10 +609,12 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
     {
         BOOL tgtFile;
         int tgtType;
-        const char* tgtPath = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
-                                        grfKeyState, tgtType, OldDataObjectSrcType);
+        const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
+                                               grfKeyState, tgtType, OldDataObjectSrcType);
+        // [merge:main->unicode] main's #101 drag-drop diagnostic, re-inserted onto the wide
+        // GetCurDir/SetDirectory call shape this branch uses.
         diagTgtFile = tgtFile;
-        SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
+        SetDirectory(tgtPathWide, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
         { // if selection is not from one path (risk likely only with Find), we can't copy/move to archive or FS
             if (OldDataObjectIsSimple == -1)
@@ -852,7 +622,7 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
             if (!OldDataObjectIsSimple)
                 SetDirectory(NULL, grfKeyState, pt, pdwEffect, OldDataObject, FALSE, idtttWindows);
         }
-        ownFolderDrop = TgtType == idtttWindows && CurDirDropTarget == NULL && CurDir[0] != 0 && tgtPath != NULL &&
+        ownFolderDrop = TgtType == idtttWindows && CurDirDropTarget == NULL && !CurDir.empty() && tgtPathWide != NULL &&
                         CanUseOwnFolderDrop(OldDataObject, OldDataObjectIsFake, tgtFile, UseOwnRutine);
     }
     if (CurDirDropTarget != NULL) // only idtttWindows
@@ -922,9 +692,9 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
             }
             // determine default drop effect
             if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
-                OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
+                !OldDataObjectSrcFSPath.empty() && GetFSToFSDropEffect != NULL)
             { // FS to FS: get preferred effect from plugin
-                GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, allowedEffects,
+                GetFSToFSDropEffect(OldDataObjectSrcFSPath.c_str(), CurDir.c_str(), allowedEffects,
                                     origKeyState, pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
@@ -974,7 +744,7 @@ STDMETHODIMP CImpDropTarget::DragLeave()
         OldDataObjectIsFake = FALSE;
         OldDataObjectIsSimple = -1; // unknown value
         OldDataObjectSrcType = 0;
-        OldDataObjectSrcFSPath[0] = 0;
+        OldDataObjectSrcFSPath.clear();
     }
 
     HRESULT ret = S_OK;
@@ -1020,9 +790,9 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         {
             BOOL tgtFile;
             int tgtType;
-            const char* tgtPath = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
-                                            grfKeyState, tgtType, OldDataObjectSrcType);
-            SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
+            const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
+                                                   grfKeyState, tgtType, OldDataObjectSrcType);
+            SetDirectory(tgtPathWide, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
             if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
             { // if selection is not from one path (risk likely only with Find), we can't copy/move to archive or FS
                 if (OldDataObjectIsSimple == -1)
@@ -1090,9 +860,9 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                 }
                 // determine default drop effect
                 if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
-                    OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
+                    !OldDataObjectSrcFSPath.empty() && GetFSToFSDropEffect != NULL)
                 { // FS to FS: get preferred effect from plugin
-                    GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, *pdwEffect,
+                    GetFSToFSDropEffect(OldDataObjectSrcFSPath.c_str(), CurDir.c_str(), *pdwEffect,
                                         origKeyState, &defEffect, GetFSToFSDropEffectParam);
                     if (defEffect == DROPEFFECT_NONE)
                         defEffect = 0; // drop-target error
@@ -1137,20 +907,20 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         OldDataObjectIsFake = FALSE;
         OldDataObjectIsSimple = -1; // unknown value
         OldDataObjectSrcType = 0;
-        OldDataObjectSrcFSPath[0] = 0;
+        OldDataObjectSrcFSPath.clear();
     }
 
     int dataObjectSrcType;
-    CPathBuffer dataObjectSrcFSPath;
-    BOOL isFake = IsFakeDataObject(pDataObject, &dataObjectSrcType, dataObjectSrcFSPath, dataObjectSrcFSPath.Size());
+    std::wstring dataObjectSrcFSPath;
+    BOOL isFake = IsFakeDataObject(pDataObject, &dataObjectSrcType, &dataObjectSrcFSPath);
     BOOL tgtFile = TRUE; // is the operation target a file?
     CDragDropOperData* namesList = new CDragDropOperData;
     if (GetCurDir != NULL)
     {
         int tgtType;
-        const char* tgtPath = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
-                                        grfKeyState, tgtType, dataObjectSrcType);
-        SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, pDataObject, tgtFile, tgtType);
+        const wchar_t* tgtPathWide = GetCurDir(pt, GetCurDirParam, pdwEffect, RButton, tgtFile,
+                                               grfKeyState, tgtType, dataObjectSrcType);
+        SetDirectory(tgtPathWide, grfKeyState, pt, pdwEffect, pDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath &&
             !IsSimpleSelection(pDataObject, namesList))
         { // if selection is not from one path (risk likely only with Find), we can't copy/move to archive or FS
@@ -1230,7 +1000,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         }
 
         // if it's a "fake" directory (unpack from archive, copy/move from FS), we handle it here
-        if (!operationDone && isFake && CurDir[0] != 0)
+        if (!operationDone && isFake && !CurDir.empty())
         {
             // determine default drop effect - our data-object (may not be from this process): default is
             // Copy (fake is in TEMP, on the same disk it did Move by default, so we work around it this way)
@@ -1258,11 +1028,11 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                 if (SalShExtSharedMemView != NULL)
                 {
                     WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-                    if (SalShExtSharedMemView->DoDragDropFromSalamander)
+                    if ((SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_DRAG_ACTIVE) != 0 &&
+                        SalShExtPublishLocalResponseLocked(CurDir))
                     {
-                        SalShExtSharedMemView->DropDone = TRUE;
-                        SalShExtSharedMemView->PasteDone = FALSE;
-                        lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, MAX_PATH); // only disk path, MAX_PATH is enough
+                        SalShExtSharedMemView->StateFlags |= SALSHEXT_STATE_DROP_DONE;
+                        SalShExtSharedMemView->StateFlags &= ~SALSHEXT_STATE_PASTE_DONE;
                         SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
                         success = TRUE;
                     }
@@ -1308,9 +1078,9 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             }
             // determine default drop effect
             if (TgtType == idtttFullPluginFSPath && dataObjectSrcType == 2 /* FS */ &&
-                dataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
+                !dataObjectSrcFSPath.empty() && GetFSToFSDropEffect != NULL)
             { // FS to FS: get preferred effect from plugin
-                GetFSToFSDropEffect(dataObjectSrcFSPath, CurDir, allowedEffects,
+                GetFSToFSDropEffect(dataObjectSrcFSPath.c_str(), CurDir.c_str(), allowedEffects,
                                     origKeyState, pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
@@ -1329,21 +1099,26 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
 
             if (*pdwEffect != DROPEFFECT_NONE)
             {
+                BOOL operationAccepted = TRUE;
                 if (TgtType == idtttFullPluginFSPath) // drag&drop z FS na FS
                 {
-                    if (isFake && dataObjectSrcType == 2 /* FS */ && CurDir[0] != 0 &&      // "always true"
-                        (*pdwEffect == DROPEFFECT_COPY || *pdwEffect == DROPEFFECT_MOVE) && // "always true"
-                        SalShExtSharedMemView != NULL)
+                    if (isFake && dataObjectSrcType == 2 /* FS */ && !CurDir.empty() &&    // "always true"
+                        (*pdwEffect == DROPEFFECT_COPY || *pdwEffect == DROPEFFECT_MOVE)) // "always true"
                     {
-                        WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-                        if (SalShExtSharedMemView->DoDragDropFromSalamander)
+                        operationAccepted = FALSE;
+                        if (SalShExtSharedMemView != NULL)
                         {
-                            SalShExtSharedMemView->DropDone = TRUE;
-                            SalShExtSharedMemView->PasteDone = FALSE;
-                            lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, 2 * MAX_PATH); // full FS path, needs 2 * MAX_PATH
-                            SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
+                            WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
+                            if ((SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_DRAG_ACTIVE) != 0 &&
+                                SalShExtPublishLocalResponseLocked(CurDir))
+                            {
+                                SalShExtSharedMemView->StateFlags |= SALSHEXT_STATE_DROP_DONE;
+                                SalShExtSharedMemView->StateFlags &= ~SALSHEXT_STATE_PASTE_DONE;
+                                SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
+                                operationAccepted = TRUE;
+                            }
+                            ReleaseMutex(SalShExtSharedMemMutex);
                         }
-                        ReleaseMutex(SalShExtSharedMemMutex);
                     }
                 }
                 else // TgtType: idtttArchive, idtttArchiveOnWinPath, idtttPluginFS
@@ -1352,12 +1127,15 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         namesList != NULL)
                     {
                         DoDragDropOper(*pdwEffect == DROPEFFECT_COPY, TgtType == idtttArchive || TgtType == idtttArchiveOnWinPath,
-                                       TgtType == idtttArchiveOnWinPath ? CurDir.Get() : (char*)NULL,
-                                       TgtType == idtttArchiveOnWinPath ? (char*)"" : CurDir.Get(), namesList, DoDragDropOperParam);
+                                       TgtType == idtttArchiveOnWinPath ? CurDir.c_str() : (const wchar_t*)NULL,
+                                       TgtType == idtttArchiveOnWinPath ? L"" : CurDir.c_str(), namesList, DoDragDropOperParam);
                         namesList = NULL; // DoDragDropOper will have it deallocated, we won't do it here anymore
                     }
                 }
-                ret = S_OK;
+                if (operationAccepted)
+                    ret = S_OK;
+                else
+                    *pdwEffect = DROPEFFECT_NONE;
             }
         }
     }
@@ -1439,18 +1217,30 @@ void ReleaseShellib()
 // GetItemIdListForFileName
 //
 
-LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName,
-                                      BOOL addUNCPrefix = FALSE, BOOL useEnumForPIDLs = FALSE,
-                                      const char* enumNamePrefix = NULL)
+static BOOL StrRetToStringOwnedW(STRRET* str, LPCITEMIDLIST pidl, std::wstring& value)
 {
-    CALL_STACK_MESSAGE4("GetItemIdListForFileName(, %s, %d, %d,)", fileName, addUNCPrefix, useEnumForPIDLs);
+    value.clear();
+    wchar_t* shellValue = NULL;
+    const HRESULT result = StrRetToStrW(str, pidl, &shellValue);
+    if (FAILED(result) || shellValue == NULL)
+        return FALSE;
+    value = shellValue;
+    CoTaskMemFree(shellValue);
+    return TRUE;
+}
+
+LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const wchar_t* fileName,
+                                      BOOL addUNCPrefix = FALSE, BOOL useEnumForPIDLs = FALSE,
+                                      const wchar_t* enumNamePrefix = NULL)
+{
+    CALL_STACK_MESSAGE4("GetItemIdListForFileName(, %ls, %d, %d,)", fileName, addUNCPrefix, useEnumForPIDLs);
 
     // if we're looking for a name ending with space/dot, we have no choice but to search slowly
     // using enumeration of the entire folder
     if (!useEnumForPIDLs && enumNamePrefix != NULL && !addUNCPrefix)
     {
-        int len = (int)strlen(fileName);
-        if (len > 0 && (fileName[len - 1] <= ' ' || fileName[len - 1] == '.'))
+        int len = (int)wcslen(fileName);
+        if (len > 0 && (fileName[len - 1] <= L' ' || fileName[len - 1] == L'.'))
             useEnumForPIDLs = TRUE;
     }
     if (useEnumForPIDLs) // slower variant, unfortunately necessary for getting PIDL of share on server
@@ -1467,8 +1257,8 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
             IMalloc* alloc;
             if (SUCCEEDED(CoGetMalloc(1, &alloc)))
             {
-                int enumNamePrefixLen = enumNamePrefix == NULL ? 0 : (int)strlen(enumNamePrefix);
-                if (enumNamePrefixLen > 0 && enumNamePrefix[enumNamePrefixLen - 1] == '\\')
+                int enumNamePrefixLen = enumNamePrefix == NULL ? 0 : (int)wcslen(enumNamePrefix);
+                if (enumNamePrefixLen > 0 && enumNamePrefix[enumNamePrefixLen - 1] == L'\\')
                     enumNamePrefixLen--;
                 while (1)
                 {
@@ -1476,36 +1266,15 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
                     {
                         if (folder->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str) == NOERROR)
                         {
-                            CPathBuffer buf; // Heap-allocated for long path support
-                            char* name;
-                            switch (str.uType)
+                            std::wstring name;
+                            if (StrRetToStringOwnedW(&str, idList, name))
                             {
-                            case STRRET_CSTR:
-                                name = str.cStr;
-                                break;
-                            case STRRET_OFFSET:
-                                name = (char*)idList + str.uOffset;
-                                break;
-                            case STRRET_WSTR:
-                            {
-                                WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
-                                buf[buf.Size() - 1] = 0;
-                                name = buf;
-                                if (alloc->DidAlloc(str.pOleStr) == 1)
-                                    alloc->Free(str.pOleStr);
-                                break;
-                            }
-                            default:
-                                name = NULL;
-                            }
-
-                            if (name != NULL)
-                            {
-                                if (*(name + strlen(name) - 1) == '\\')
-                                    *(name + strlen(name) - 1) = 0;
-                                if (enumNamePrefix != NULL && StrNICmp(name, enumNamePrefix, enumNamePrefixLen) == 0 &&
-                                        name[enumNamePrefixLen] == '\\' && StrICmp(name + enumNamePrefixLen + 1, fileName) == 0 ||
-                                    enumNamePrefix == NULL && StrICmp(name, fileName) == 0) // we have the share we're looking for
+                                if (!name.empty() && name.back() == L'\\')
+                                    name.pop_back();
+                                if (enumNamePrefix != NULL && StrNICmpW(name.c_str(), enumNamePrefix, enumNamePrefixLen) == 0 &&
+                                        name.size() > (size_t)enumNamePrefixLen && name[enumNamePrefixLen] == L'\\' &&
+                                        StrICmpW(name.c_str() + enumNamePrefixLen + 1, fileName) == 0 ||
+                                    enumNamePrefix == NULL && StrICmpW(name.c_str(), fileName) == 0) // we have the share we're looking for
                                 {
                                     foundPidl = idList;
                                     break; // pidl found (obtained)
@@ -1528,17 +1297,13 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
             TRACE_E("GetItemIdListForFileName(): unable to find PIDL usign enumeration, trying to get it using ParseDisplayName...");
     }
 
-    CWidePathBuffer olePath;
-    if (addUNCPrefix)
-        olePath[0] = olePath[1] = L'\\';
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
-                        olePath.Size() - (addUNCPrefix ? 2 : 0));
-    olePath[olePath.Size() - 1] = 0;
+    std::wstring olePath = addUNCPrefix ? L"\\\\" : L"";
+    olePath += fileName;
 
     LPITEMIDLIST pidl;
     ULONG chEaten;
     HRESULT ret;
-    if (SUCCEEDED((ret = folder->ParseDisplayName(NULL, NULL, olePath, &chEaten,
+    if (SUCCEEDED((ret = folder->ParseDisplayName(NULL, NULL, &olePath[0], &chEaten,
                                                   &pidl, NULL))))
     {
         return pidl;
@@ -1582,7 +1347,7 @@ void DestroyItemIdList(ITEMIDLIST** list, int itemsInList)
 ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
                               CEnumFileNamesFunction nextFile, void* param,
                               UINT& itemsInList, BOOL addUNCPrefix = FALSE,
-                              BOOL useEnumForPIDLs = FALSE, const char* enumNamePrefix = NULL,
+                              BOOL useEnumForPIDLs = FALSE, const wchar_t* enumNamePrefix = NULL,
                               BOOL namesMustBeValid = FALSE)
 {
     CALL_STACK_MESSAGE5("CreateItemIdList(, %d, , , , %d, %d, , %d)",
@@ -1608,17 +1373,21 @@ ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
     int i;
     for (i = 0; i < files; i++)
     {
-        const char* fileName = nextFile(i, param);
+        const wchar_t* fileNameW = nextFile(i, param);
         // e.g. for getting a functional data-object, it's necessary that contained names are valid,
         // drag&drop of invalid name means operation on name with silently trimmed spaces/dots
         // at the end (instead of "a   " it takes "a"), we definitely don't want that
-        if (namesMustBeValid && FileNameIsInvalid(fileName, FALSE))
+        // FileNameIsInvalid scans raw bytes for ':' and the trailing character;
+        // under a DBCS code page a multi-byte character's trailing byte can coincidentally
+        // equal one of those ASCII values, misjudging a valid name. FileNameIsInvalidW scans
+        // codepoints instead of raw bytes.
+        if (namesMustBeValid && FileNameIsInvalidW(fileNameW, FALSE))
         {
-            TRACE_I("CreateItemIdList: unable to create IdList becuase of invalid name: \"" << fileName << "\"");
+            TRACE_I("CreateItemIdList: unable to create IdList because of invalid name");
             pidl = NULL;
             break;
         }
-        pidl = (ITEMIDLIST*)GetItemIdListForFileName(folder, fileName, addUNCPrefix, useEnumForPIDLs, enumNamePrefix);
+        pidl = (ITEMIDLIST*)GetItemIdListForFileName(folder, fileNameW, addUNCPrefix, useEnumForPIDLs, enumNamePrefix);
         if (pidl != NULL)
             list[i] = pidl;
         else
@@ -1643,9 +1412,9 @@ ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
 // GetShellFolder
 //
 
-BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST& pidlFolder)
+BOOL GetShellFolder(const wchar_t* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST& pidlFolder)
 {
-    CALL_STACK_MESSAGE2("GetShellFolder(%s, ,)", dir);
+    CALL_STACK_MESSAGE2("GetShellFolder(%ls, ,)", dir);
     shellFolderObj = NULL;
     pidlFolder = NULL;
     HRESULT ret;
@@ -1653,12 +1422,12 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     // if path contains components ending with spaces/dots, shell won't return
     // folder for the requested path, but for the path created by trimming these
     // spaces/dots, so we'd better give up on it early...
-    if (PathContainsValidComponents((char*)dir, FALSE))
+    if (PathContainsValidComponents(dir))
     {
         if (SUCCEEDED((ret = SHGetDesktopFolder(&desktop))))
         {
             int rootFolder;
-            if (dir[0] != '\\')
+            if (dir[0] != L'\\')
                 rootFolder = CSIDL_DRIVES; // normal path
             else
                 rootFolder = CSIDL_NETWORK; // UNC - network resources
@@ -1669,21 +1438,16 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                            IID_IShellFolder,
                                                            (LPVOID*)&shellFolderObj))))
                 {
-                    CPathBuffer root;
-                    GetRootPath(root, dir);
-                    if (strlen(root) < strlen(dir)) // it's not a root path
+                    std::wstring dirPart(dir);
+                    std::wstring root = GetRootPath(dir);
+                    if (root.size() < wcslen(dir)) // it's not a root path
                     {
-                        strcpy(root, dir);
-                        char* name = root + strlen(root);
-                        if (*--name == '\\')
-                            *name = 0;
-                        else
-                            name++;
-                        while (*--name != '\\')
-                            ;
-                        char c = *++name;
-                        *name = 0;
-                        LPITEMIDLIST pidlUpperDir = GetItemIdListForFileName(shellFolderObj, root);
+                        std::wstring fullPath(dir);
+                        if (!fullPath.empty() && fullPath.back() == L'\\')
+                            fullPath.pop_back();
+                        const size_t separator = fullPath.find_last_of(L'\\');
+                        const std::wstring upperDir = fullPath.substr(0, separator + 1);
+                        LPITEMIDLIST pidlUpperDir = GetItemIdListForFileName(shellFolderObj, upperDir.c_str());
                         LPSHELLFOLDER folder2;
                         if (pidlUpperDir != NULL &&
                             SUCCEEDED((ret = shellFolderObj->BindToObject(pidlUpperDir, NULL,
@@ -1691,18 +1455,11 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                         {
                             shellFolderObj->Release();
                             shellFolderObj = folder2;
-                            *name = c;
-                            dir = name;
+                            dirPart = fullPath.substr(separator + 1);
                         }
                         else
                             TRACE_E("BindToObject error: 0x" << std::hex << ret << std::dec); // dir stays unchanged
-                        IMalloc* alloc;
-                        if (pidlUpperDir != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-                        {
-                            if (alloc->DidAlloc(pidlUpperDir) == 1)
-                                alloc->Free(pidlUpperDir);
-                            alloc->Release();
-                        }
+                        CoTaskMemFree(pidlUpperDir);
                     }
                     else
                     {
@@ -1727,32 +1484,11 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                             ret = shellFolderObj->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str);
                                             if (ret == NOERROR)
                                             {
-                                                CPathBuffer buf; // Heap-allocated for long path support
-                                                char* name;
-                                                switch (str.uType)
+                                                // Normalize every STRRET arm into owned UTF-16; never mutate shell PIDL bytes.
+                                                std::wstring name;
+                                                if (StrRetToStringOwnedW(&str, idList, name))
                                                 {
-                                                case STRRET_CSTR:
-                                                    name = str.cStr;
-                                                    break;
-                                                case STRRET_OFFSET:
-                                                    name = (char*)idList + str.uOffset;
-                                                    break;
-                                                case STRRET_WSTR:
-                                                {
-                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
-                                                    buf[buf.Size() - 1] = 0;
-                                                    name = buf;
-                                                    if (alloc->DidAlloc(str.pOleStr) == 1)
-                                                        alloc->Free(str.pOleStr);
-                                                    break;
-                                                }
-                                                default:
-                                                    name = NULL;
-                                                }
-
-                                                if (name != NULL)
-                                                {
-                                                    if (strlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
+                                                    if (name.size() <= 3 && StrNICmpW(name.c_str(), root.c_str(), 2) == 0) // name = "c:" or "c:\"
                                                     {
                                                         pidlFolder = idList;
                                                         break; // pidl found (obtained)
@@ -1774,10 +1510,12 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                         {
                             if (rootFolder == CSIDL_NETWORK) // we need to get complex pidl, otherwise mapping doesn't work
                             {
-                                *(root + strlen(root) - 1) = 0;
-                                dir = root;
-                                char* s = root + 2;
-                                if (*s == 0) // network path "\\\\" (root of network)
+                                if (!root.empty() && root.back() == L'\\')
+                                    root.pop_back();
+                                const std::wstring rootW = root;
+                                dirPart = root;
+                                const size_t serverSeparator = root.find(L'\\', 2);
+                                if (root == L"\\\\") // root of network
                                 {
                                     shellFolderObj->Release();
                                     shellFolderObj = desktop;
@@ -1792,11 +1530,9 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                     if (setWait)
                                         oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-                                    while (*s != 0 && *s != '\\')
-                                        s++;
-                                    BOOL dirIsOnlyServer = *s == 0;
-                                    *s = 0;
-                                    LPITEMIDLIST pidl = GetItemIdListForFileName(shellFolderObj, root);
+                                    BOOL dirIsOnlyServer = serverSeparator == std::wstring::npos;
+                                    const std::wstring server = dirIsOnlyServer ? root : root.substr(0, serverSeparator);
+                                    LPITEMIDLIST pidl = GetItemIdListForFileName(shellFolderObj, server.c_str());
                                     if (dirIsOnlyServer) // network path "\\\\server" (server on network)
                                     {
                                         pidlFolder = pidl;
@@ -1804,7 +1540,6 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                     }
                                     else
                                     {
-                                        *s = '\\';
                                         LPSHELLFOLDER folder2;
                                         if (pidl != NULL &&
                                             SUCCEEDED((ret = shellFolderObj->BindToObject(pidl, NULL,
@@ -1829,34 +1564,13 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                             ret = folder2->GetDisplayNameOf(idList, SHGDN_FORPARSING, &str);
                                                             if (ret == NOERROR)
                                                             {
-                                                                CPathBuffer buf; // Heap-allocated for long path support
-                                                                char* name;
-                                                                switch (str.uType)
+                                                                // Normalize every STRRET arm into owned UTF-16; never mutate shell PIDL bytes.
+                                                                std::wstring name;
+                                                                if (StrRetToStringOwnedW(&str, idList, name))
                                                                 {
-                                                                case STRRET_CSTR:
-                                                                    name = str.cStr;
-                                                                    break;
-                                                                case STRRET_OFFSET:
-                                                                    name = (char*)idList + str.uOffset;
-                                                                    break;
-                                                                case STRRET_WSTR:
-                                                                {
-                                                                    WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, buf, buf.Size(), NULL, NULL);
-                                                                    buf[buf.Size() - 1] = 0;
-                                                                    name = buf;
-                                                                    if (alloc->DidAlloc(str.pOleStr) == 1)
-                                                                        alloc->Free(str.pOleStr);
-                                                                    break;
-                                                                }
-                                                                default:
-                                                                    name = NULL;
-                                                                }
-
-                                                                if (name != NULL)
-                                                                {
-                                                                    if (*(name + strlen(name) - 1) == '\\')
-                                                                        *(name + strlen(name) - 1) = 0;
-                                                                    if (StrICmp(name, root) == 0)
+                                                                    if (!name.empty() && name.back() == L'\\')
+                                                                        name.pop_back();
+                                                                    if (StrICmpW(name.c_str(), rootW.c_str()) == 0)
                                                                     {
                                                                         pidlFolder = idList;
                                                                         LPSHELLFOLDER swap = shellFolderObj;
@@ -1893,7 +1607,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                         }
                     }
                     if (pidlFolder == NULL)
-                        pidlFolder = GetItemIdListForFileName(shellFolderObj, dir);
+                        pidlFolder = GetItemIdListForFileName(shellFolderObj, dirPart.c_str());
 
                     // shellFolderObj + pidlFolder  -> together they represent "dir" folder
                 }
@@ -1916,7 +1630,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
             TRACE_E("SHGetDesktopFolder error: 0x" << std::hex << ret << std::dec);
     }
     else
-        TRACE_I("GetShellFolder: unable to get folder for path containing invalid components: \"" << dir << "\"");
+        TRACE_IW(L"GetShellFolder: unable to get folder for path containing invalid components: \"" << dir << L"\"");
     if (shellFolderObj != NULL && pidlFolder != NULL)
         return TRUE;
     else
@@ -1937,84 +1651,27 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     }
 }
 
-//*****************************************************************************
-//
-// CreateIDataObject
-//
-
-IDataObject* CreateIDataObjectAux(HWND hOwnerWindow, const char* rootDir, int files,
-                                  CEnumFileNamesFunction nextFile, void* param)
-{
-    CALL_STACK_MESSAGE3("CreateIDataObjectAux(, %s, %d, ,)", rootDir, files);
-
-    IDataObject* dataObj = NULL;
-    IShellFolder* shellFolderObj;
-    LPITEMIDLIST pidlFolder;
-    if (GetShellFolder(rootDir, shellFolderObj, pidlFolder))
-    {
-        HRESULT ret;
-        LPSHELLFOLDER folder;
-        if (SUCCEEDED((ret = shellFolderObj->BindToObject(pidlFolder, NULL,
-                                                          IID_IShellFolder, (LPVOID*)&folder))))
-        {
-            UINT itemsInList;
-            ITEMIDLIST** list;
-
-            list = CreateItemIdList(folder, files, nextFile, param, itemsInList, FALSE, FALSE, NULL, TRUE);
-            if (list != NULL)
-            {
-                if (!SUCCEEDED((ret = folder->GetUIObjectOf(hOwnerWindow, itemsInList, (LPCITEMIDLIST*)list,
-                                                            IID_IDataObject, NULL,
-                                                            (LPVOID*)&dataObj))))
-                {
-                    TRACE_E("GetUIObjectOf error: 0x" << std::hex << ret << std::dec);
-                }
-                DestroyItemIdList(list, itemsInList);
-            }
-            folder->Release();
-        }
-        else
-            TRACE_E("BindToObject error: 0x" << std::hex << ret << std::dec);
-
-        IMalloc* alloc;
-        if (pidlFolder != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->DidAlloc(pidlFolder) == 1)
-                alloc->Free(pidlFolder);
-            alloc->Release();
-        }
-        shellFolderObj->Release();
-    }
-    return dataObj;
-}
-
-IDataObject* CreateIDataObject(HWND hOwnerWindow, const char* rootDir, int files,
-                               CEnumFileNamesFunction nextFile, void* param)
-{
-    __try
-    {
-        return CreateIDataObjectAux(hOwnerWindow, rootDir, files, nextFile, param);
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        SHLExceptionHasOccured++;
-    }
-    return NULL; // error
-}
+// The narrow CreateIDataObject / CreateIDataObjectAux stood here.
+// CreateIDataObjectW above replaces them, and with their four callers migrated they
+// had no callers left. They were also the LAST dependent of the ANSI shell-namespace
+// walk that had no wide sibling.
 
 //*****************************************************************************
 //
 // CreateIContextMenu2
 //
 
-IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const char* rootDir, int files,
+IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const wchar_t* rootDirW, int files,
                                       CEnumFileNamesFunction nextFile, void* param)
 {
-    CALL_STACK_MESSAGE3("CreateIContextMenu2Aux(, %s, %d, ,)", rootDir, files);
+    CALL_STACK_MESSAGE3("CreateIContextMenu2Aux(, %ls, %d, ,)", rootDirW, files);
+    if (rootDirW == NULL)
+        return NULL;
+
     IContextMenu2* contextMenu2Obj = NULL;
     IShellFolder* shellFolderObj;
     LPITEMIDLIST pidlFolder;
-    if (GetShellFolder(rootDir, shellFolderObj, pidlFolder))
+    if (GetShellFolder(rootDirW, shellFolderObj, pidlFolder))
     {
         HRESULT ret;
         LPSHELLFOLDER folder;
@@ -2025,9 +1682,10 @@ IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const char* rootDir, in
             ITEMIDLIST** list;
 
             list = CreateItemIdList(folder, files, nextFile, param, itemsInList,
-                                    strcmp(rootDir, "\\\\") == 0,                                                                     // is it "\\\\"?
-                                    rootDir[0] == '\\' && rootDir[1] == '\\' && rootDir[2] != 0 && strchr(rootDir + 2, '\\') == NULL, // is it "\\\\server"?
-                                    rootDir);
+                                    wcscmp(rootDirW, L"\\\\") == 0,
+                                    wcslen(rootDirW) > 2 && rootDirW[0] == L'\\' && rootDirW[1] == L'\\' &&
+                                        wcschr(rootDirW + 2, L'\\') == NULL,
+                                    rootDirW);
             if (list != NULL)
             {
                 IContextMenu* contextMenuObj;
@@ -2063,12 +1721,12 @@ IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const char* rootDir, in
     return contextMenu2Obj;
 }
 
-IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* rootDir, int files,
+IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const wchar_t* rootDirW, int files,
                                    CEnumFileNamesFunction nextFile, void* param)
 {
     __try
     {
-        return CreateIContextMenu2Aux(hOwnerWindow, rootDir, files, nextFile, param);
+        return CreateIContextMenu2Aux(hOwnerWindow, rootDirW, files, nextFile, param);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -2077,11 +1735,197 @@ IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* rootDir, int f
     return NULL; // error
 }
 
+// Folder-only form for the two shell-namespace roots that SHParseDisplayName
+// does not bind. Keep its argument wide until this exact legacy boundary.
+IContextMenu2* CreateNetworkRootContextMenuAux(HWND hOwnerWindow, const wchar_t* dirW)
+{
+    if (dirW == NULL || *dirW == L'\0')
+        return NULL;
+    CALL_STACK_MESSAGE2("CreateNetworkRootContextMenuAux(, %ls)", dirW);
+    IContextMenu2* contextMenu2Obj = NULL;
+    IShellFolder* shellFolderObj;
+    LPITEMIDLIST pidlFolder;
+    if (GetShellFolder(dirW, shellFolderObj, pidlFolder))
+    {
+        HRESULT ret;
+        IContextMenu* contextMenuObj;
+        if (SUCCEEDED((ret = shellFolderObj->GetUIObjectOf(
+                hOwnerWindow, 1, (LPCITEMIDLIST*)&pidlFolder, IID_IContextMenu,
+                NULL, (LPVOID*)&contextMenuObj))))
+        {
+            if (!SUCCEEDED((ret = contextMenuObj->QueryInterface(
+                    IID_IContextMenu2, (void**)&contextMenu2Obj))))
+                TRACE_E("QueryInterface error: 0x" << std::hex << ret << std::dec);
+            contextMenuObj->Release();
+        }
+        else
+            TRACE_E("GetUIObjectOf error: 0x" << std::hex << ret << std::dec);
+
+        IMalloc* alloc;
+        if (pidlFolder != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
+        {
+            if (alloc->DidAlloc(pidlFolder) == 1)
+                alloc->Free(pidlFolder);
+            alloc->Release();
+        }
+        shellFolderObj->Release();
+    }
+    return contextMenu2Obj;
+}
+
+IContextMenu2* CreateNetworkRootContextMenu(HWND hOwnerWindow, const wchar_t* dirW)
+{
+    __try
+    {
+        return CreateNetworkRootContextMenuAux(hOwnerWindow, dirW);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        SHLExceptionHasOccured++;
+    }
+    return NULL;
+}
+
 //*****************************************************************************
 //
 // CreateIContextMenu2W - wide, partial-failure-tolerant selection menu (issue #79)
 //
 
+// Binds the IShellFolder for a wide path.
+//
+// The special network-root walker above handles namespace roots that SHParseDisplayName
+// cannot bind. General filesystem paths use this direct wide binding helper.
+//
+// Returns NULL on failure; the caller releases the folder.
+static IShellFolder* BindShellFolderW(const wchar_t* dirW)
+{
+    if (dirW == NULL || *dirW == 0)
+        return NULL;
+
+    // Same early refusal GetShellFolder makes, and for the same reason: if a component ends in a
+    // space or a dot the shell does not fail - it silently binds the TRIMMED path, so a data
+    // object or a context menu built here would act on "a" when the user selected "a   ".
+    // SHParseDisplayName trims exactly the same way, so losing this check did not turn the case
+    // into an error, it turned it into a wrong-target success.
+    if (!PathContainsValidComponents(dirW))
+    {
+        TRACE_IW(L"BindShellFolderW: refusing a path with invalid components: \"" << dirW << L"\"");
+        return NULL;
+    }
+
+    LPITEMIDLIST folderPidl = NULL;
+    if (FAILED(SHParseDisplayName(dirW, NULL, &folderPidl, 0, NULL)) || folderPidl == NULL)
+        return NULL;
+
+    IShellFolder* desktop = NULL;
+    IShellFolder* folder = NULL;
+    if (SUCCEEDED(SHGetDesktopFolder(&desktop)))
+    {
+        if (FAILED(desktop->BindToObject(folderPidl, NULL, IID_IShellFolder, (LPVOID*)&folder)))
+            folder = NULL;
+        desktop->Release();
+    }
+    CoTaskMemFree(folderPidl);
+    return folder;
+}
+
+IDataObject* CreateIDataObjectWAux(HWND hOwnerWindow, const wchar_t* rootDirW, int files,
+                                   CEnumFileNamesFunction nextFile, void* param)
+{
+    CALL_STACK_MESSAGE2("CreateIDataObjectWAux(, , %d, ,)", files);
+
+    if (rootDirW == NULL || *rootDirW == 0 || files <= 0 || nextFile == NULL)
+        return NULL;
+
+    IShellFolder* folder = BindShellFolderW(rootDirW);
+    if (folder == NULL)
+    {
+        TRACE_E("CreateIDataObjectWAux(): could not bind the root path");
+        return NULL;
+    }
+
+    // ALL-OR-NOTHING, deliberately unlike CreateIContextMenu2WAux above.
+    // That one skips a name it cannot resolve, because losing one entry from a context
+    // menu beats losing the menu. A data object is the opposite: it becomes a clipboard
+    // payload or a drag, so dropping one file silently would copy nine of ten and report
+    // success. The narrow CreateItemIdList() it replaces was called with
+    // namesMustBeValid = TRUE, so this also preserves the existing behaviour exactly.
+    std::vector<LPITEMIDLIST> pidls;
+    pidls.reserve(files);
+    BOOL ok = TRUE;
+    for (int i = 0; ok && i < files; i++)
+    {
+        const wchar_t* name = nextFile(i, param);
+        if (name == NULL || *name == 0)
+        {
+            TRACE_E("CreateIDataObjectWAux(): enumeration returned no name");
+            ok = FALSE;
+            break;
+        }
+        // The namesMustBeValid = TRUE arm the comment above claims, actually implemented.
+        // CreateItemIdList still carries it (see its own reasoning at the FileNameIsInvalidW call):
+        // a name ending in spaces or dots is not rejected by ParseDisplayName, it is silently
+        // TRIMMED, so the data object would name "a" where the user selected "a   " - and a data
+        // object is a clipboard payload or a drop, so that wrong target is what gets copied,
+        // moved, or deleted.
+        if (FileNameIsInvalidW(name, FALSE))
+        {
+            TRACE_IW(L"CreateIDataObjectWAux(): invalid name in selection: \"" << name << L"\"");
+            ok = FALSE;
+            break;
+        }
+        LPITEMIDLIST pidl = NULL;
+        ULONG chEaten = 0;
+        // ParseDisplayName takes a non-const buffer in some SDKs, so hand it a copy.
+        std::wstring mutableName(name);
+        if (SUCCEEDED(folder->ParseDisplayName(NULL, NULL, &mutableName[0], &chEaten, &pidl, NULL)) &&
+            pidl != NULL)
+        {
+            pidls.push_back(pidl);
+        }
+        else
+        {
+            TRACE_E("CreateIDataObjectWAux(): could not resolve a selected name");
+            ok = FALSE;
+        }
+    }
+
+    IDataObject* dataObj = NULL;
+    if (ok && !pidls.empty())
+    {
+        HRESULT ret = folder->GetUIObjectOf(hOwnerWindow, (UINT)pidls.size(),
+                                            (LPCITEMIDLIST*)&pidls[0], IID_IDataObject, NULL,
+                                            (LPVOID*)&dataObj);
+        if (!SUCCEEDED(ret))
+        {
+            TRACE_E("GetUIObjectOf error: 0x" << std::hex << ret << std::dec);
+            dataObj = NULL;
+        }
+    }
+
+    for (size_t i = 0; i < pidls.size(); i++)
+        CoTaskMemFree(pidls[i]);
+    folder->Release();
+    return dataObj;
+}
+
+IDataObject* CreateIDataObjectW(HWND hOwnerWindow, const wchar_t* rootDirW, int files,
+                                CEnumFileNamesFunction nextFile, void* param)
+{
+    __try
+    {
+        return CreateIDataObjectWAux(hOwnerWindow, rootDirW, files, nextFile, param);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        SHLExceptionHasOccured++;
+    }
+    return NULL; // error
+}
+
+//
+// CreateIContextMenu2W - wide, partial-failure-tolerant selection menu (issue #79)
+//
 IContextMenu2* CreateIContextMenu2WAux(HWND hOwnerWindow, const wchar_t* rootDirW,
                                        const std::vector<std::wstring>& names,
                                        CShellPidlResolveStats* stats)
@@ -2096,27 +1940,12 @@ IContextMenu2* CreateIContextMenu2WAux(HWND hOwnerWindow, const wchar_t* rootDir
     if (rootDirW == NULL || names.empty())
         return NULL;
 
-    // Bind the folder from its wide path. The ANSI sibling of this function walks the
-    // shell namespace by hand from a CP_ACP string; SHParseDisplayName does the same job
-    // without ever narrowing the path.
-    LPITEMIDLIST folderPidl = NULL;
-    if (FAILED(SHParseDisplayName(rootDirW, NULL, &folderPidl, 0, NULL)) || folderPidl == NULL)
-    {
-        TRACE_E("CreateIContextMenu2WAux(): SHParseDisplayName failed for the panel path");
-        return NULL;
-    }
-
-    IShellFolder* desktop = NULL;
-    IShellFolder* folder = NULL;
-    if (SUCCEEDED(SHGetDesktopFolder(&desktop)))
-    {
-        if (FAILED(desktop->BindToObject(folderPidl, NULL, IID_IShellFolder, (LPVOID*)&folder)))
-            folder = NULL;
-        desktop->Release();
-    }
-    CoTaskMemFree(folderPidl);
+    IShellFolder* folder = BindShellFolderW(rootDirW);
     if (folder == NULL)
+    {
+        TRACE_E("CreateIContextMenu2WAux(): could not bind the panel path");
         return NULL;
+    }
 
     // Resolve each selected name from its wide form. Unlike CreateItemIdList(), a name
     // that cannot be resolved is skipped rather than discarding the whole selection: one
@@ -2179,52 +2008,54 @@ IContextMenu2* CreateIContextMenu2W(HWND hOwnerWindow, const wchar_t* rootDirW,
     return NULL; // error
 }
 
-//*****************************************************************************
-//
-// CreateIContextMenu2
-//
+// The generic narrow folder-only overload stood here. General
+// callers now use CreateIContextMenu2W(hwnd, dirW), which binds through
+// SHParseDisplayName. The only retained namespace-walk case is the explicitly
+// named CreateNetworkRootContextMenu above for "\\\\" and "\\\\server".
 
-IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const char* dir)
+// Wide sibling of the folder-only overload above.
+//
+// Note this is the folder's menu *as an item in its parent* (Open, Cut, Copy, Properties,
+// and whatever extensions add), not the background menu - which is why it binds the parent
+// and asks for the child, exactly as the ANSI version does via GetShellFolder(). The
+// background menu is GetNewOrBackgroundMenuW().
+IContextMenu2* CreateIContextMenu2WAux(HWND hOwnerWindow, const wchar_t* dirW)
 {
-    CALL_STACK_MESSAGE2("CreateIContextMenu2Aux(, %s)", dir);
+    CALL_STACK_MESSAGE1("CreateIContextMenu2WAux(dir)");
+    if (dirW == NULL || *dirW == 0)
+        return NULL;
+
+    LPITEMIDLIST absPidl = NULL;
+    if (FAILED(SHParseDisplayName(dirW, NULL, &absPidl, 0, NULL)) || absPidl == NULL)
+        return NULL;
+
     IContextMenu2* contextMenu2Obj = NULL;
-    IShellFolder* shellFolderObj;
-    LPITEMIDLIST pidlFolder;
-    if (GetShellFolder(dir, shellFolderObj, pidlFolder))
+    IShellFolder* parentFolder = NULL;
+    LPCITEMIDLIST childPidl = NULL;
+    // childPidl points into absPidl, so absPidl must outlive this block.
+    if (SUCCEEDED(SHBindToParent(absPidl, IID_IShellFolder, (void**)&parentFolder, &childPidl)) &&
+        parentFolder != NULL && childPidl != NULL)
     {
-        HRESULT ret;
-        IContextMenu* contextMenuObj;
-        if (SUCCEEDED((ret = shellFolderObj->GetUIObjectOf(hOwnerWindow, 1, (LPCITEMIDLIST*)&pidlFolder,
-                                                           IID_IContextMenu, NULL,
-                                                           (LPVOID*)&contextMenuObj))))
+        IContextMenu* contextMenuObj = NULL;
+        if (SUCCEEDED(parentFolder->GetUIObjectOf(hOwnerWindow, 1, &childPidl, IID_IContextMenu,
+                                                  NULL, (LPVOID*)&contextMenuObj)) &&
+            contextMenuObj != NULL)
         {
-            if (!SUCCEEDED((ret = contextMenuObj->QueryInterface(IID_IContextMenu2,
-                                                                 (void**)&contextMenu2Obj))))
-            {
-                TRACE_E("QueryInterface error: 0x" << std::hex << ret << std::dec);
-            }
+            if (FAILED(contextMenuObj->QueryInterface(IID_IContextMenu2, (void**)&contextMenu2Obj)))
+                contextMenu2Obj = NULL;
             contextMenuObj->Release();
         }
-        else
-            TRACE_E("GetUIObjectOf error: 0x" << std::hex << ret << std::dec);
-
-        IMalloc* alloc;
-        if (pidlFolder != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->DidAlloc(pidlFolder) == 1)
-                alloc->Free(pidlFolder);
-            alloc->Release();
-        }
-        shellFolderObj->Release();
+        parentFolder->Release();
     }
+    CoTaskMemFree(absPidl);
     return contextMenu2Obj;
 }
 
-IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* dir)
+IContextMenu2* CreateIContextMenu2W(HWND hOwnerWindow, const wchar_t* dirW)
 {
     __try
     {
-        return CreateIContextMenu2Aux(hOwnerWindow, dir);
+        return CreateIContextMenu2WAux(hOwnerWindow, dirW);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -2238,9 +2069,13 @@ IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* dir)
 // HasDropTarget
 //
 
-BOOL HasDropTarget(const char* dir)
+// The definition lagged its own (already wide) declaration, so both
+// callers were binding to a promise with no body. Widened here rather than reverting
+// the header because neither caller has anything narrow to offer, and the wide
+// implementation this delegates to already exists.
+BOOL HasDropTarget(const wchar_t* dir)
 {
-    CALL_STACK_MESSAGE2("HasDropTarget(%s)", dir);
+    CALL_STACK_MESSAGE2("HasDropTarget(%ls)", dir);
     /*
   IShellFolder *shellFolderObj;
   LPITEMIDLIST pidlFolder;
@@ -2265,7 +2100,10 @@ BOOL HasDropTarget(const char* dir)
   }
   return (attrs & SFGAO_DROPTARGET) != 0;
 */
-    IDropTarget* drop = CreateIDropTarget(NULL, dir); // unfortunately there's no other way...
+    // The W sibling binds through SHParseDisplayName instead of walking the shell
+    // namespace out of a CP_ACP string, so this no longer answers "no drop target"
+    // for a directory the active code page cannot spell.
+    IDropTarget* drop = CreateIDropTargetW(NULL, dir); // unfortunately there's no other way...
     if (drop != NULL)
     {
         drop->Release();
@@ -2274,45 +2112,41 @@ BOOL HasDropTarget(const char* dir)
     return FALSE;
 }
 
-//*****************************************************************************
-//
-// CreateIDropTarget
-//
-
-IDropTarget* CreateIDropTargetAux(HWND hOwnerWindow, const char* dir)
+// Wide: same "bind through SHParseDisplayName/SHBindToParent" shape as
+// CreateIContextMenu2WAux's directory overload (this file) - reuses the already-built wide
+// binding infrastructure instead of a widened copy of GetShellFolder's component-by-component
+// narrow walk.
+IDropTarget* CreateIDropTargetWAux(HWND hOwnerWindow, const wchar_t* dirW)
 {
-    CALL_STACK_MESSAGE2("CreateIDropTargetAux(, %s)", dir);
-    IDropTarget* dropTargetObj = NULL;
-    IShellFolder* shellFolderObj;
-    LPITEMIDLIST pidlFolder;
-    if (GetShellFolder(dir, shellFolderObj, pidlFolder))
-    {
-        HRESULT ret;
-        if (!SUCCEEDED((ret = shellFolderObj->GetUIObjectOf(hOwnerWindow, 1,
-                                                            (LPCITEMIDLIST*)&pidlFolder,
-                                                            IID_IDropTarget, NULL,
-                                                            (LPVOID*)&dropTargetObj))))
-        {
-            TRACE_I("GetUIObjectOf error: 0x" << std::hex << ret << std::dec);
-        }
+    CALL_STACK_MESSAGE1("CreateIDropTargetWAux(dir)");
+    if (dirW == NULL || *dirW == 0)
+        return NULL;
 
-        IMalloc* alloc;
-        if (pidlFolder != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->DidAlloc(pidlFolder) == 1)
-                alloc->Free(pidlFolder);
-            alloc->Release();
-        }
-        shellFolderObj->Release();
+    LPITEMIDLIST absPidl = NULL;
+    if (FAILED(SHParseDisplayName(dirW, NULL, &absPidl, 0, NULL)) || absPidl == NULL)
+        return NULL;
+
+    IDropTarget* dropTargetObj = NULL;
+    IShellFolder* parentFolder = NULL;
+    LPCITEMIDLIST childPidl = NULL;
+    // childPidl points into absPidl, so absPidl must outlive this block.
+    if (SUCCEEDED(SHBindToParent(absPidl, IID_IShellFolder, (void**)&parentFolder, &childPidl)) &&
+        parentFolder != NULL && childPidl != NULL)
+    {
+        if (FAILED(parentFolder->GetUIObjectOf(hOwnerWindow, 1, &childPidl, IID_IDropTarget,
+                                               NULL, (LPVOID*)&dropTargetObj)))
+            dropTargetObj = NULL;
+        parentFolder->Release();
     }
+    CoTaskMemFree(absPidl);
     return dropTargetObj;
 }
 
-IDropTarget* CreateIDropTarget(HWND hOwnerWindow, const char* dir)
+IDropTarget* CreateIDropTargetW(HWND hOwnerWindow, const wchar_t* dirW)
 {
     __try
     {
-        return CreateIDropTargetAux(hOwnerWindow, dir);
+        return CreateIDropTargetWAux(hOwnerWindow, dirW);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -2333,15 +2167,17 @@ void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
     if (SHGetSpecialFolderLocation(NULL, specFolder, &pidl) == NOERROR && pidl != NULL)
     {
         CShellExecuteWnd shellExecuteWnd;
-        SHELLEXECUTEINFO se;
-        memset(&se, 0, sizeof(SHELLEXECUTEINFO));
-        se.cbSize = sizeof(SHELLEXECUTEINFO);
+        // Explicitly SHELLEXECUTEINFOA/ShellExecuteExA - se.lpVerb is a narrow literal and no
+        // path/argument field is set here, so the whole struct stays narrow.
+        SHELLEXECUTEINFOA se;
+        memset(&se, 0, sizeof(SHELLEXECUTEINFOA));
+        se.cbSize = sizeof(SHELLEXECUTEINFOA);
         se.fMask = SEE_MASK_IDLIST;
         se.lpVerb = "open";
-        se.hwnd = shellExecuteWnd.Create(hOwnerWindow, "SEW: OpenSpecFolder specFolder=%d verb=%s", specFolder, se.lpVerb);
+        se.hwnd = shellExecuteWnd.Create(hOwnerWindow, L"SEW: OpenSpecFolder specFolder=%d verb=%hs", specFolder, se.lpVerb);
         se.nShow = SW_SHOWNORMAL;
         se.lpIDList = pidl;
-        ShellExecuteEx(&se);
+        ShellExecuteExA(&se);
 
         IMalloc* alloc;
         if (SUCCEEDED(CoGetMalloc(1, &alloc)))
@@ -2358,22 +2194,21 @@ void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
 // OpenFolder
 //
 
-void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item)
+void OpenFolderAndFocusItemW(HWND hOwnerWindow, const wchar_t* dir, const wchar_t* item)
 {
-    CALL_STACK_MESSAGE2("OpenFolder(, %s)", dir);
+    CALL_STACK_MESSAGE2("OpenFolder(, %ls)", dir);
     // if path contains components ending with spaces/dots, shell won't return
     // pidl for the requested path, but for the path created by trimming these
     // spaces/dots, so we'd better give up on it early...
-    CPathBuffer mydir;
-    lstrcpyn(mydir, dir, mydir.Size());
+    std::wstring mydir(dir);
     if (item[0] != 0)
-        SalPathAppend(mydir, item, mydir.Size());
-    if (PathContainsValidComponents((char*)mydir, FALSE))
+        SalPathAppendW(mydir, item);
+    if (PathContainsValidComponents(mydir.c_str()))
     {
         BOOL useOldMethod = TRUE; // SHOpenFolderAndSelectItems is supported since XP and we still run on W2K and XP without SPx
         if (item[0] != 0)         // if we don't have an item to select, we don't use SHOpenFolderAndSelectItems, because it would show parent directory, see MSDN
         {
-            HMODULE hShell32 = LoadLibrary("shell32.dll");
+            HMODULE hShell32 = LoadLibraryW(L"shell32.dll");
             if (hShell32 != NULL)
             {
                 typedef HRESULT(WINAPI * F_SHOpenFolderAndSelectItems)(PCIDLIST_ABSOLUTE pidlFolder, UINT cidl, PCUITEMID_CHILD_ARRAY apidl, DWORD dwFlags);
@@ -2381,26 +2216,25 @@ void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item
                 mySHOpenFolderAndSelectItems = (F_SHOpenFolderAndSelectItems)GetProcAddress(hShell32, "SHOpenFolderAndSelectItems"); // Min: XP
                 if (mySHOpenFolderAndSelectItems != NULL)
                 {
-                    LPITEMIDLIST pidl = NULL;
-                    LPSHELLFOLDER desktop;
-                    if (SUCCEEDED(SHGetDesktopFolder(&desktop)))
+                    LPITEMIDLIST folderPidl = NULL;
+                    LPITEMIDLIST childPidl = NULL;
+                    IShellFolder* folder = BindShellFolderW(dir);
+                    std::wstring mutableItem(item);
+                    ULONG eaten = 0;
+                    if (folder != NULL &&
+                        SUCCEEDED(SHParseDisplayName(dir, NULL, &folderPidl, 0, NULL)) &&
+                        SUCCEEDED(folder->ParseDisplayName(NULL, NULL, &mutableItem[0], &eaten,
+                                                           &childPidl, NULL)) &&
+                        folderPidl != NULL && childPidl != NULL)
                     {
-                        pidl = GetItemIdListForFileName(desktop, mydir);
-                        desktop->Release();
+                        PCUITEMID_CHILD children[] = {childPidl};
+                        if (SUCCEEDED(mySHOpenFolderAndSelectItems(folderPidl, 1, children, 0)))
+                            useOldMethod = FALSE;
                     }
-                    else
-                        TRACE_E("SHGetDesktopFolder error");
-
-                    mySHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
-                    useOldMethod = FALSE;
-
-                    IMalloc* alloc;
-                    if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-                    {
-                        if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                            alloc->Free(pidl);
-                        alloc->Release();
-                    }
+                    CoTaskMemFree(childPidl);
+                    CoTaskMemFree(folderPidl);
+                    if (folder != NULL)
+                        folder->Release();
                 }
                 FreeLibrary(hShell32);
             }
@@ -2409,351 +2243,151 @@ void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item
         if (useOldMethod)
         {
             LPITEMIDLIST pidl = NULL;
-            LPSHELLFOLDER desktop;
-            if (SUCCEEDED(SHGetDesktopFolder(&desktop)))
-            {
-                pidl = GetItemIdListForFileName(desktop, dir);
-                desktop->Release();
-            }
-            else
-                TRACE_E("SHGetDesktopFolder error");
+            SHParseDisplayName(dir, NULL, &pidl, 0, NULL);
 
             if (pidl != NULL)
             {
                 CShellExecuteWnd shellExecuteWnd;
-                SHELLEXECUTEINFO se;
-                memset(&se, 0, sizeof(SHELLEXECUTEINFO));
-                se.cbSize = sizeof(SHELLEXECUTEINFO);
+                SHELLEXECUTEINFOW se;
+                memset(&se, 0, sizeof(SHELLEXECUTEINFOW));
+                se.cbSize = sizeof(SHELLEXECUTEINFOW);
                 se.fMask = SEE_MASK_IDLIST;
-                se.lpVerb = "open";
-                se.hwnd = shellExecuteWnd.Create(hOwnerWindow, "SEW: OpenFolderAndFocusItem verb=%s", se.lpVerb);
+                se.lpVerb = L"open";
+                se.hwnd = shellExecuteWnd.Create(hOwnerWindow, L"SEW: OpenFolderAndFocusItem verb=%ls", se.lpVerb);
                 se.nShow = SW_SHOWNORMAL;
                 se.lpIDList = pidl;
-                ShellExecuteEx(&se);
+                ShellExecuteExW(&se);
 
-                IMalloc* alloc;
-                if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-                {
-                    if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                        alloc->Free(pidl);
-                    alloc->Release();
-                }
+                CoTaskMemFree(pidl);
             }
         }
     }
     else
-        TRACE_I("OpenFolderAndFocusItem: unable to open folder for path containing invalid components: \"" << mydir << "\"");
+        TRACE_I("OpenFolderAndFocusItemW: unable to open folder for a path containing invalid components");
 }
 
 //*****************************************************************************
 //
 // GetTargetDirectory
 //
-//  parent  - owner window of dialog
-//  title   - dialog title
-//  comment - text displayed above tree-view
-//  path    - buffer for selected path (length at least MAX_PATH)
+// The narrow picker and the legacy tree-dialog callback are deleted. GetTargetDirectoryW routes
+// the complete UTF-16 options and result through the modern shell adapter.
+
+// Wide-native. The former implementation projected the input to ACP and let a
+// legacy in-place resolver write the resolved shortcut target into storage sized for the input.
+// That was not merely lossy: a folder shortcut's target is routinely LONGER than its shortcut path
+// ("C:\...\NetHood\srv" -> "\\server\some\long\share"). That is a heap write past the end,
+// reachable from the Find results "Change Directory" browse via GetTargetDirectoryW.
 //
-//  returns TRUE if path is a valid new path
-
-struct CBrowseData
+// Written wide throughout instead, so the result is assigned to a std::wstring and cannot
+// overflow by construction, and a NetHood target the code page cannot spell survives.
+void ResolveNetHoodPathW(std::wstring& path)
 {
-    const char* Title;
-    const char* InitDir;
-    HWND HCenterWindow;
-};
-
-struct CBrowseDataW
-{
-    const wchar_t* Title;
-    const wchar_t* InitDir;
-    HWND HCenterWindow;
-};
-
-int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    CALL_STACK_MESSAGE4("DirectoryBrowse(, 0x%X, 0x%IX, 0x%IX)", uMsg, lParam, lpData);
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        MultiMonCenterWindow(hwnd, ((CBrowseData*)lpData)->HCenterWindow, FALSE);
-
-        // set header
-        SetWindowText(hwnd, ((CBrowseData*)lpData)->Title);
-        if (((CBrowseData*)lpData)->InitDir != NULL)
-        {
-            CPathBuffer path; // Heap-allocated for long path support
-            GetRootPath(path, ((CBrowseData*)lpData)->InitDir);
-            if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // it's not root-dir
-            {
-                strcpy(path, ((CBrowseData*)lpData)->InitDir);
-                char& ch = path[strlen(path) - 1];
-                if (ch == '\\')
-                    ch = 0;
-            }
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)path.Get());
-        }
-    }
-    if (uMsg == BFFM_SELCHANGED)
-    {
-        if ((ITEMIDLIST*)lParam != NULL)
-        {
-            CPathBuffer path; // Heap-allocated for long path support
-            BOOL ret = SHGetPathFromIDList((ITEMIDLIST*)lParam, path);
-            SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
-        }
-    }
-    return 0;
-}
-
-int CALLBACK DirectoryBrowseW(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    CALL_STACK_MESSAGE4("DirectoryBrowseW(, 0x%X, 0x%IX, 0x%IX)", uMsg, lParam, lpData);
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        MultiMonCenterWindow(hwnd, ((CBrowseDataW*)lpData)->HCenterWindow, FALSE);
-        SetWindowTextW(hwnd, ((CBrowseDataW*)lpData)->Title);
-        if (((CBrowseDataW*)lpData)->InitDir != NULL)
-        {
-            std::wstring path = GetRootPathW(((CBrowseDataW*)lpData)->InitDir);
-            if (path.length() < wcslen(((CBrowseDataW*)lpData)->InitDir))
-            {
-                path = ((CBrowseDataW*)lpData)->InitDir;
-                if (!path.empty() && path[path.length() - 1] == L'\\')
-                    path.resize(path.length() - 1);
-            }
-            SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, (LPARAM)path.c_str());
-        }
-    }
-    if (uMsg == BFFM_SELCHANGED && (ITEMIDLIST*)lParam != NULL)
-    {
-        CWidePathBuffer path;
-        BOOL ret = SHGetPathFromIDListW((ITEMIDLIST*)lParam, path);
-        SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
-    }
-    return 0;
-}
-
-BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
-                           const char* title, const char* comment,
-                           char* path, BOOL onlyNet, const char* initDir)
-{
-    __try
-    {
-        ITEMIDLIST* pidl; // select root-folder
-        if (onlyNet)
-            SHGetSpecialFolderLocation(parent, CSIDL_NETWORK, &pidl);
-        else
-            pidl = NULL;
-
-        // open dialog
-        char display[MAX_PATH]; // kept as char[] due to SEH __try constraint
-        BROWSEINFO bi;
-        ZeroMemory(&bi, sizeof(bi));
-        bi.hwndOwner = parent;
-        bi.pidlRoot = pidl;
-        bi.pszDisplayName = display;
-        bi.lpszTitle = comment;
-        bi.ulFlags = BIF_RETURNONLYFSDIRS;
-        /* j.r.: under W2K after opening focus goes to OK instead of treeview (as it was before); also ensure_visible doesn't work; simply UGLY, we're reverting to old dialog version; we can rewrite it later
-    if (!onlyNet)  // Petr: Network dialog only works in old version - new one can't ask user for server login (situation when current login isn't enough)
-      bi.ulFlags |= BIF_NEWDIALOGSTYLE; // bigger and resizable dialog
-    */
-        bi.lpfn = DirectoryBrowse;
-        CBrowseData bd;
-        bd.Title = title;
-        bd.InitDir = initDir;
-        bd.HCenterWindow = hCenterWindow;
-        bi.lParam = (LPARAM)&bd;
-        LPITEMIDLIST res = SHBrowseForFolder(&bi);
-        BOOL ret = FALSE; // return value
-        if (res != NULL)
-        {
-            SHGetPathFromIDList(res, path);
-            ret = TRUE;
-        }
-        // release item-id-list
-        IMalloc* alloc;
-        if ((pidl != NULL || res != NULL) && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                alloc->Free(pidl);
-            if (res != NULL && alloc->DidAlloc(res) == 1)
-                alloc->Free(res);
-            alloc->Release();
-        }
-        return ret;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        GTDExceptionHasOccured++;
-        return FALSE; // error
-    }
-}
-
-void ResolveNetHoodPath(char* path)
-{
-    if (path[0] == '\\')
+    if (path.empty() || path[0] == L'\\')
         return; // UNC path -> can't be NetHood
 
-    CPathBuffer name; // Heap-allocated for long path support
-    GetRootPath(name, path);
-    if (GetDriveType(name) != DRIVE_FIXED)
+    const std::wstring root = GetRootPath(path.c_str());
+    if (root.empty() || GetDriveTypeW(root.c_str()) != DRIVE_FIXED)
         return; // not a local fixed path -> can't be NetHood
 
     BOOL tryTarget = FALSE; // if TRUE, it's worth trying to find file "target.lnk"
-    lstrcpyn(name, path, name.Size());
-    if (SalPathAppend(name, "desktop.ini", name.Size()))
+    std::wstring name = path;
+    SalPathAppendW(name, L"desktop.ini");
+    HANDLE hFile = gFileSystem->CreateFile(name.c_str(), GENERIC_READ,
+                                           FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
+                                           OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile, GetLastError(), TRUE);
+    if (hFile != INVALID_HANDLE_VALUE)
     {
-        HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(name).c_str(), GENERIC_READ,
-                                            FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
-                                            OPEN_EXISTING,
-                                            FILE_FLAG_SEQUENTIAL_SCAN,
-                                            NULL));
-        if (hFile != INVALID_HANDLE_VALUE)
+        uint64_t size = 0;
+        if (gFileSystem->GetHandleFileSize(hFile, &size).success && size <= 1000) // so far all had 92 bytes
         {
-            if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
+            // The scan below stays BYTE-domain on purpose: it is looking for an ASCII CLSID
+            // inside desktop.ini, not for text in any code page.
+            char buf[1000];
+            DWORD read;
+            if (gFileSystem->ReadFromHandle(hFile, buf, 1000, &read).success && read != 0)
             {
-                char buf[1000];
-                DWORD read;
-                if (ReadFile(hFile, buf, 1000, &read, NULL) && read != 0) // read file into memory
+                char* s = buf;
+                char* end = buf + read;
+                while (s < end) // search for CLSID "folder shortcut" in file
                 {
-                    char* s = buf;
-                    char* end = buf + read;
-                    while (s < end) // search for CLSID "folder shortcut" in file
+                    if (*s == '{')
                     {
-                        if (*s == '{')
-                        {
+                        s++;
+                        char* beg = s;
+                        while (s < end && *s != '}')
                             s++;
-                            char* beg = s;
-                            while (s < end && *s != '}')
-                                s++;
-                            if (s < end)
+                        if (s < end)
+                        {
+                            const char* folderShortcutCLSID = "0AFACED1-E828-11D1-9187-B532F1E9575D";
+                            if (StrNICmp(beg, folderShortcutCLSID, (int)(s - beg)) == 0)
                             {
-                                const char* folderShortcutCLSID = "0AFACED1-E828-11D1-9187-B532F1E9575D";
-                                if (StrNICmp(beg, folderShortcutCLSID, (int)(s - beg)) == 0)
-                                {
-                                    tryTarget = TRUE;
-                                    break;
-                                }
+                                tryTarget = TRUE;
+                                break;
                             }
                         }
-                        else
-                            s++;
                     }
+                    else
+                        s++;
                 }
             }
-            HANDLES(CloseHandle(hFile));
         }
+        HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(hFile);
     }
 
-    if (tryTarget)
+    if (!tryTarget)
+        return;
+
+    name = path;
+    SalPathAppendW(name, L"target.lnk");
+    WIN32_FIND_DATAW data;
+    HANDLE find = gFileSystem->FindFirstFile(name.c_str(), &data);
+    if (find == INVALID_HANDLE_VALUE)
+        return; // no target.lnk
+    gFileSystem->CloseFind(find);
+
+    HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+    IShellLinkW* link;
+    if (CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW,
+                         (LPVOID*)&link) == S_OK)
     {
-        lstrcpyn(name, path, name.Size());
-        if (SalPathAppend(name, "target.lnk", name.Size()))
+        IPersistFile* fileInt;
+        if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
         {
-            WIN32_FIND_DATAW data;
-            HANDLE find = SalFindFirstFileHW(name, &data);
-            if (find != INVALID_HANDLE_VALUE) // file exists and we have its 'data'
+            if (fileInt->Load(name.c_str(), STGM_READ) == S_OK)
             {
-                HANDLES(FindClose(find));
-
-                HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-                IShellLink* link;
-                if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
-                                     (LPVOID*)&link) == S_OK)
-                {
-                    IPersistFile* fileInt;
-                    if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
-                    {
-                        CWidePathBuffer oleName;
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, oleName.Size());
-                        oleName[oleName.Size() - 1] = 0;
-                        if (fileInt->Load(oleName, STGM_READ) == S_OK)
-                        {
-                            WIN32_FIND_DATAA dataA;
-                            if (link->GetPath(name, name.Size(), &dataA, SLGP_UNCPRIORITY) == NOERROR)
-                            {                       // we don't use Resolve because it's not that critical here and would slow things down considerably
-                                strcpy(path, name); // eureka, finally we know where that link leads
-                            }
-                        }
-                        fileInt->Release();
-                    }
-                    link->Release();
-                }
-                SetCursor(oldCur);
+                // we don't use Resolve because it's not that critical here and would slow
+                // things down considerably
+                std::wstring target;
+                WIN32_FIND_DATAW dataW;
+                if (GetShellLinkPathOwned(link, SLGP_UNCPRIORITY, target, &dataW))
+                    path = std::move(target); // eureka, finally we know where that link leads
             }
+            fileInt->Release();
         }
+        link->Release();
     }
-}
-
-void ResolveNetHoodPathW(std::wstring& path)
-{
-    std::string ansi = WideToAnsi(path);
-    if (!ansi.empty())
-    {
-        ResolveNetHoodPath(ansi.data());
-        path = AnsiToWide(ansi.c_str());
-    }
-}
-
-BOOL GetTargetDirectory(HWND parent, HWND hCenterWindow,
-                        const char* title, const char* comment,
-                        char* path, BOOL onlyNet, const char* initDir)
-{
-    CALL_STACK_MESSAGE5("GetTargetDirectory(, , %s, %s, , %d, %s)", title, comment, onlyNet, initDir);
-    BOOL ret = GetTargetDirectoryAux(parent, hCenterWindow, title, comment, path, onlyNet, initDir);
-    if (ret)
-        ResolveNetHoodPath(path);
-    return ret;
+    SetCursor(oldCur);
 }
 
 BOOL GetTargetDirectoryW(HWND parent, HWND hCenterWindow, const wchar_t* title, const wchar_t* comment,
                          std::wstring& path, BOOL onlyNet, const wchar_t* initDir)
 {
-    ITEMIDLIST* pidl;
-    if (onlyNet)
-        SHGetSpecialFolderLocation(parent, CSIDL_NETWORK, &pidl);
-    else
-        pidl = NULL;
+    (void)hCenterWindow; // IFileDialog is centered by its owner.
+    FolderPickerOptions options;
+    options.owner = parent;
+    options.title = title;
+    options.instruction = comment;
+    options.initialDirectory = initDir;
+    options.networkOnly = onlyNet != FALSE;
 
-    wchar_t display[MAX_PATH];
-    BROWSEINFOW bi;
-    ZeroMemory(&bi, sizeof(bi));
-    bi.hwndOwner = parent;
-    bi.pidlRoot = pidl;
-    bi.pszDisplayName = display;
-    bi.lpszTitle = comment;
-    bi.ulFlags = BIF_RETURNONLYFSDIRS;
-    bi.lpfn = DirectoryBrowseW;
-    CBrowseDataW bd;
-    bd.Title = title;
-    bd.InitDir = initDir;
-    bd.HCenterWindow = hCenterWindow;
-    bi.lParam = (LPARAM)&bd;
-    LPITEMIDLIST res = SHBrowseForFolderW(&bi);
-    BOOL ret = FALSE;
-    if (res != NULL)
-    {
-        CWidePathBuffer out;
-        if (SHGetPathFromIDListW(res, out))
-        {
-            path = out;
-            ret = TRUE;
-        }
-    }
-    IMalloc* alloc;
-    if ((pidl != NULL || res != NULL) && SUCCEEDED(CoGetMalloc(1, &alloc)))
-    {
-        if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-            alloc->Free(pidl);
-        if (res != NULL && alloc->DidAlloc(res) == 1)
-            alloc->Free(res);
-        alloc->Release();
-    }
-    if (ret)
+    IShell* shell = gShell != NULL ? gShell : GetWin32Shell();
+    const ShellResult result = shell->PickFolder(options, path);
+    if (result.success)
         ResolveNetHoodPathW(path);
-    return ret;
+    return result.success;
 }
 
 //*****************************************************************************
@@ -2794,85 +2428,85 @@ void GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, int minCmd, int maxCmd)
     SetThreadPriority(hThread, oldThreadPriority);
 }
 
-void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
-                            int minCmd, int maxCmd, BOOL backgoundMenu)
+// Shared body of both GetNewOrBackgroundMenu overloads: everything from the bound folder
+// onwards is identical, only the way the folder is reached differs (CP_ACP namespace walk
+// vs. SHParseDisplayName). 'folder' stays owned by the caller.
+static void FillNewOrBackgroundMenu(HWND hOwnerWindow, IShellFolder* folder, CMenuNew* menu,
+                                    int minCmd, int maxCmd, BOOL backgoundMenu)
 {
-    CALL_STACK_MESSAGE4("GetNewOrBackgroundMenu(, %s, , %d, %d)", dir, minCmd, maxCmd);
-    menu->Init();
-    IShellFolder* shellFolderObj;
-    LPITEMIDLIST pidlFolder;
-    if (GetShellFolder(dir, shellFolderObj, pidlFolder))
+    HRESULT ret;
+    IContextMenu* contextMenu;
+    if (SUCCEEDED((ret = folder->CreateViewObject(hOwnerWindow, IID_IContextMenu,
+                                                  (void**)&contextMenu))))
     {
-        HRESULT ret;
-        LPSHELLFOLDER folder;
-        if (SUCCEEDED((ret = shellFolderObj->BindToObject(pidlFolder, NULL,
-                                                          IID_IShellFolder, (LPVOID*)&folder))))
+        IContextMenu2* contextMenu2 = NULL;
+        if (SUCCEEDED((ret = contextMenu->QueryInterface(IID_IContextMenu2,
+                                                         (void**)&contextMenu2))))
         {
-            IContextMenu* contextMenu;
-            if (SUCCEEDED((ret = folder->CreateViewObject(hOwnerWindow, IID_IContextMenu,
-                                                          (void**)&contextMenu))))
+            HMENU m = CreatePopupMenu();
+            if (m != NULL)
             {
-                IContextMenu2* contextMenu2 = NULL;
-                if (SUCCEEDED((ret = contextMenu->QueryInterface(IID_IContextMenu2,
-                                                                 (void**)&contextMenu2))))
+                GetMenuNewAux(contextMenu2, m, minCmd, maxCmd);
+                RemoveUselessSeparatorsFromMenu(m);
+
+                if (backgoundMenu) // we take entire background menu
                 {
-                    HMENU m = CreatePopupMenu();
-                    if (m != NULL)
-                    {
-                        GetMenuNewAux(contextMenu2, m, minCmd, maxCmd);
-                        RemoveUselessSeparatorsFromMenu(m);
-
-                        if (backgoundMenu) // we take entire background menu
-                        {
-                            menu->Set(contextMenu2, m);
-                        }
-                        else // we cut out only New menu
-                        {
-                            MENUITEMINFO mi;
-                            int index = 0;
-                            int foundIndex = -1;
-                            HMENU foundSubMenu = NULL;
-                            while (1)
-                            {
-                                mi.cbSize = sizeof(mi);
-                                mi.fMask = MIIM_SUBMENU;
-                                if (GetMenuItemInfo(m, index, TRUE, &mi))
-                                {
-                                    if (mi.hSubMenu != NULL)
-                                    { // looking for last submenu (user items hopefully only appear before Windows items, we'll see over time)
-                                        foundIndex = index;
-                                        foundSubMenu = mi.hSubMenu;
-                                    }
-                                }
-                                else
-                                    break;
-                                index++;
-                            }
-                            if (foundIndex != -1)
-                            {
-                                menu->Set(contextMenu2, foundSubMenu);
-                                RemoveMenu(m, foundIndex, MF_BYPOSITION);
-                            }
-                            DestroyMenu(m);
-                        }
-                    }
-                    if (!menu->MenuIsAssigned())
-                        contextMenu2->Release();
+                    menu->Set(contextMenu2, m);
                 }
-                contextMenu->Release();
+                else // we cut out only New menu
+                {
+                    MENUITEMINFO mi;
+                    int index = 0;
+                    int foundIndex = -1;
+                    HMENU foundSubMenu = NULL;
+                    while (1)
+                    {
+                        mi.cbSize = sizeof(mi);
+                        mi.fMask = MIIM_SUBMENU;
+                        if (GetMenuItemInfo(m, index, TRUE, &mi))
+                        {
+                            if (mi.hSubMenu != NULL)
+                            { // looking for last submenu (user items hopefully only appear before Windows items, we'll see over time)
+                                foundIndex = index;
+                                foundSubMenu = mi.hSubMenu;
+                            }
+                        }
+                        else
+                            break;
+                        index++;
+                    }
+                    if (foundIndex != -1)
+                    {
+                        menu->Set(contextMenu2, foundSubMenu);
+                        RemoveMenu(m, foundIndex, MF_BYPOSITION);
+                    }
+                    DestroyMenu(m);
+                }
             }
-            folder->Release();
+            if (!menu->MenuIsAssigned())
+                contextMenu2->Release();
         }
-
-        IMalloc* alloc;
-        if (pidlFolder != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->DidAlloc(pidlFolder) == 1)
-                alloc->Free(pidlFolder);
-            alloc->Release();
-        }
-        shellFolderObj->Release();
+        contextMenu->Release();
     }
+}
+
+// The narrow GetNewOrBackgroundMenu stood here. Its last three callers
+// moved to GetNewOrBackgroundMenuW at P1.7k, leaving it dead.
+
+// Wide sibling. Without it the New submenu and the background menu are built for the
+// folder the CP_ACP mirror happens to name, so in a folder the code page cannot spell
+// they come back empty - which reads as "this folder has no New menu".
+void GetNewOrBackgroundMenuW(HWND hOwnerWindow, const wchar_t* dirW, CMenuNew* menu,
+                             int minCmd, int maxCmd, BOOL backgoundMenu)
+{
+    CALL_STACK_MESSAGE3("GetNewOrBackgroundMenuW(, , , %d, %d)", minCmd, maxCmd);
+    menu->Init();
+    IShellFolder* folder = BindShellFolderW(dirW);
+    if (folder == NULL)
+        return;
+
+    FillNewOrBackgroundMenu(hOwnerWindow, folder, menu, minCmd, maxCmd, backgoundMenu);
+    folder->Release();
 }
 
 //*****************************************************************************
@@ -2957,18 +2591,27 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
                     const wchar_t* ptr2 = (const wchar_t*)HANDLES(GlobalLock(UnicodeData));
                     if (ptr2 != NULL)
                     {
-                        int len = WideCharToMultiByte(CP_ACP, 0, ptr2, -1, NULL, 0, NULL, NULL);
-                        if (len > 0)
+                        std::wstring wideText;
+                        const SIZE_T sourceSize = GlobalSize(UnicodeData);
+                        if (sally::clipboard::DecodeUnicodeClipboardPayload(
+                                ptr2, sourceSize, wideText) == ERROR_SUCCESS)
                         {
-                            dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, len));
-                            if (dataDup != NULL)
+                            std::string encoded;
+                            if (Win32EncodeTextLossy(GetACP(), wideText.data(), wideText.size(), encoded))
                             {
-                                char* ptr1 = (char*)HANDLES(GlobalLock(dataDup));
-                                if (ptr1 != NULL)
+                                dataDup = NOHANDLES(GlobalAlloc(
+                                    GMEM_MOVEABLE | GMEM_DDESHARE, encoded.size() + 1));
+                                if (dataDup != NULL)
                                 {
-                                    if (WideCharToMultiByte(CP_ACP, 0, ptr2, -1, ptr1, len, NULL, NULL) > 0)
+                                    char* ptr1 = (char*)HANDLES(GlobalLock(dataDup));
+                                    if (ptr1 != NULL)
+                                    {
+                                        if (!encoded.empty())
+                                            memcpy(ptr1, encoded.data(), encoded.size());
+                                        ptr1[encoded.size()] = '\0';
                                         ok = TRUE;
-                                    HANDLES(GlobalUnlock(dataDup));
+                                        HANDLES(GlobalUnlock(dataDup));
+                                    }
                                 }
                             }
                         }
@@ -3002,25 +2645,31 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
                     const char* ptr2 = (const char*)HANDLES(GlobalLock(Data));
                     if (ptr2 != NULL)
                     {
-                        int len = MultiByteToWideChar(CP_ACP, 0, ptr2, -1, NULL, 0);
-                        if (len > 0)
+                        std::wstring decoded;
+                        const SIZE_T sourceSize = GlobalSize(Data);
+                        if (sally::clipboard::DecodeAnsiClipboardPayload(
+                                ptr2, sourceSize, GetACP(), decoded) == ERROR_SUCCESS)
                         {
-                            dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, len * sizeof(WCHAR)));
-                            if (dataDup != NULL)
+                            if (decoded.size() != (std::numeric_limits<size_t>::max)() &&
+                                decoded.size() + 1 <=
+                                    (std::numeric_limits<SIZE_T>::max)() / sizeof(wchar_t))
                             {
-                                WCHAR* ptr1 = (WCHAR*)HANDLES(GlobalLock(dataDup));
-                                if (ptr1 != NULL)
+                                const SIZE_T byteSize =
+                                    (decoded.size() + 1) * sizeof(wchar_t);
+                                dataDup = NOHANDLES(GlobalAlloc(
+                                    GMEM_MOVEABLE | GMEM_DDESHARE, byteSize));
+                                if (dataDup != NULL)
                                 {
-                                    if (ConvertA2U(ptr2, -1, ptr1, len))
+                                    WCHAR* ptr1 = (WCHAR*)HANDLES(GlobalLock(dataDup));
+                                    if (ptr1 != NULL)
+                                    {
+                                        memcpy(ptr1, decoded.c_str(), byteSize);
                                         ok = TRUE;
-                                    else
-                                        TRACE_E("ConvertA2U() failed to make unicode translation for our ANSI text.");
-                                    HANDLES(GlobalUnlock(dataDup));
+                                        HANDLES(GlobalUnlock(dataDup));
+                                    }
                                 }
                             }
                         }
-                        else
-                            TRACE_E("MultiByteToWideChar() failed to return size of unicode translation for our ANSI text.");
                         HANDLES(GlobalUnlock(Data));
                     }
                 }
@@ -3049,84 +2698,12 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
 // GetMyDocumentsOrDesktopPath
 //
 
-BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen)
-{
-    CPathBuffer buff;
-
-    BOOL ret = FALSE;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDList(pidl, buff))
-            ret = TRUE;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
-    if (!ret && SHGetSpecialFolderLocation(NULL, CSIDL_DESKTOP, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDList(pidl, buff))
-            ret = TRUE;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
-
-    if (ret)
-    {
-        if ((int)strlen(buff) >= pathLen)
-            TRACE_E("GetMyDocumentsOrDesktopPath() Buffer too small!");
-
-        lstrcpyn(path, buff, pathLen);
-    }
-
-    return ret;
-}
-
-// Wide version - no MAX_PATH limitation
 BOOL GetMyDocumentsOrDesktopPathW(std::wstring& path)
 {
     path.clear();
-    wchar_t buff[32768]; // Support long paths
-
-    BOOL ret = FALSE;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDListW(pidl, buff))
-        {
-            path = buff;
-            ret = TRUE;
-        }
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
-    if (!ret && SHGetSpecialFolderLocation(NULL, CSIDL_DESKTOP, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDListW(pidl, buff))
-        {
-            path = buff;
-            ret = TRUE;
-        }
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
-
-    return ret;
+    IShell* shell = gShell != NULL ? gShell : GetWin32Shell();
+    return shell->GetKnownFolderPath(FOLDERID_Documents, path).success ||
+           shell->GetKnownFolderPath(FOLDERID_Desktop, path).success;
 }
 
 //
@@ -3134,11 +2711,9 @@ BOOL GetMyDocumentsOrDesktopPathW(std::wstring& path)
 // GetSHObjectName
 //
 
-BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IMalloc* alloc)
+BOOL GetSHObjectNameOwned(ITEMIDLIST* pidl, DWORD flags, std::wstring& name)
 {
     BOOL ret = FALSE;
-    if (nameSize > 0)
-        name[0] = 0;
     if (pidl != NULL && pidl->mkid.cb != 0) // there must be at least one ID in the list, otherwise nothing to determine
     {
         // find the last ID in the list
@@ -3181,41 +2756,27 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
                 STRRET str;
                 if (folder->GetDisplayNameOf(lastID, flags, &str) == S_OK)
                 {
-                    ret = TRUE;
-                    switch (str.uType)
+                    wchar_t* converted = NULL;
+                    const HRESULT conversion = StrRetToStrW(&str, lastID, &converted);
+                    if (SUCCEEDED(conversion) && converted != NULL)
                     {
-                    case STRRET_CSTR:
-                        lstrcpyn(name, str.cStr, nameSize);
-                        break;
-                    case STRRET_OFFSET:
-                        lstrcpyn(name, (char*)lastID + str.uOffset, nameSize);
-                        break;
-
-                    case STRRET_WSTR:
-                    {
-                        if (WideCharToMultiByte(CP_ACP, 0, str.pOleStr, -1, name, nameSize, NULL, NULL) == 0)
+                        try
+                        {
+                            std::wstring staged(converted);
+                            name.swap(staged);
+                            ret = TRUE;
+                        }
+                        catch (const std::bad_alloc&)
                         {
                             ret = FALSE;
-                            if (nameSize > 0)
-                                name[0] = 0;
                         }
-                        else
+                        catch (const std::length_error&)
                         {
-                            if (nameSize > 0)
-                                name[nameSize - 1] = 0;
+                            ret = FALSE;
                         }
-                        if (alloc->DidAlloc(str.pOleStr) == 1)
-                            alloc->Free(str.pOleStr);
-                        break;
                     }
-
-                    default:
-                    {
-                        ret = FALSE;
-                        TRACE_E("GetSHObjectName(): unexpected str.uType");
-                        break;
-                    }
-                    }
+                    if (converted != NULL)
+                        CoTaskMemFree(converted);
                 }
                 else
                     TRACE_E("GetSHObjectName(): GetDisplayNameOf has failed");
@@ -3232,4 +2793,29 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
     else
         TRACE_E("GetSHObjectName(): unable to get name for empty 'pidl'");
     return ret;
+}
+
+BOOL GetShellLinkPathOwned(IShellLinkW* link, DWORD flags, std::wstring& path,
+                           WIN32_FIND_DATAW* findData)
+{
+    path.clear();
+    if (link == NULL)
+        return FALSE;
+
+    std::vector<wchar_t> buffer(256, L'\0');
+    for (;;)
+    {
+        std::fill(buffer.begin(), buffer.end(), L'\0');
+        if (link->GetPath(buffer.data(), static_cast<int>(buffer.size()), findData, flags) != S_OK)
+            return FALSE;
+        const size_t length = wcsnlen_s(buffer.data(), buffer.size());
+        if (length + 1 < buffer.size())
+        {
+            path.assign(buffer.data(), length);
+            return TRUE;
+        }
+        if (buffer.size() > static_cast<size_t>(INT_MAX) / 2)
+            return FALSE;
+        buffer.resize(buffer.size() * 2, L'\0');
+    }
 }

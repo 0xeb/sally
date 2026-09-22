@@ -44,7 +44,7 @@ public:
             free(this->_pix);
     }
 
-    BOOL LoadFromFile(TCHAR const* filename)
+    BOOL LoadFromFile(wchar_t const* filename)
     {
         HANDLE fa;
         DWORD read, lo, hi;
@@ -52,7 +52,7 @@ public:
         BYTE* tbs;
         BOOL val;
 
-        fa = CreateFile(filename, FILE_READ_DATA, FILE_READ_DATA, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        fa = CreateFileW(filename, FILE_READ_DATA, FILE_READ_DATA, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (fa == INVALID_HANDLE_VALUE)
         {
             err = GetLastError();
@@ -85,7 +85,7 @@ public:
         return val;
     }
 
-    BOOL LoadFromResource(HINSTANCE hInst, TCHAR const* name /*, TCHAR *type*/)
+    BOOL LoadFromResource(HINSTANCE hInst, wchar_t const* name /*, TCHAR *type*/)
     {
         HRSRC hRsrc;
         HGLOBAL hresm;
@@ -94,8 +94,8 @@ public:
         BYTE* tbs;
         BOOL val;
 
-        //hRsrc = FindResource(hInst, MAKEINTRESOURCE(IDR_CUSHIONDATA_ALPHA), TEXT("CUSHIONDATA"));
-        hRsrc = FindResource(hInst, name, TEXT("CUSHIONDATA"));
+        //hRsrc = FindResourceW(hInst, MAKEINTRESOURCE(IDR_CUSHIONDATA_ALPHA), L"CUSHIONDATA");
+        hRsrc = FindResourceW(hInst, name, L"CUSHIONDATA");
         if (hRsrc == NULL)
         {
             err = GetLastError();
@@ -470,7 +470,13 @@ public:
         int dy;
         int cy;
 
-#ifdef _DEBUG
+        // Unconditional, not #ifdef _DEBUG. Everything below writes straight into the caller's
+        // buffer at 4*pw*cshy + 4*cshx, and no caller validates: CDiskMap::DrawCushion checks only
+        // for zero size, DrawCCushionDirectory forwards computed coordinates as-is, and
+        // CSelectedCushionOverlay passes its stored rect through. With these compiled out, an
+        // out-of-range cushion returned TRUE and then wrote past the pixmap - an access violation
+        // in the lucky case, silent heap corruption otherwise. The sibling painters in
+        // CDirectoryOverlay have validated unconditionally since 063325a0; this matches them.
         if (cshx < 0)
             return FALSE;
         if (cshy < 0)
@@ -484,7 +490,6 @@ public:
             cshw = pw - cshx;
         if ((unsigned int)(cshy + cshh) > ph)
             cshh = ph - cshy;
-#endif
 
         if (cshw < 1)
             return FALSE;

@@ -17,9 +17,9 @@
 // Argument to WM_7ZIP_CREATEFILE
 struct CCreateFileParams
 {
-    const char* FileInfo;
-    const char* FileName;
-    const char* Name;
+    const wchar_t* FileInfo;
+    const wchar_t* FileName;
+    const wchar_t* Name;
     DWORD* pSilent;
     BOOL* pSkip;
 };
@@ -28,8 +28,8 @@ struct CCreateFileParams
 struct CDialogErrorParams
 {
     DWORD Flags;
-    const char* FileName;
-    const char* Error;
+    const wchar_t* FileName;
+    const wchar_t* Error;
 };
 
 //  Structures to launch 7-zip tasks in a new threads

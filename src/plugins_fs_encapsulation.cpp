@@ -1,11 +1,15 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
+#include "compat/legacy_host_api.h"
+#include "compat/plugin_abi_routing.h"
 #include "ui/IPrompter.h"
+#include "common/IPathService.h"
 #include "common/IRegistry.h"
+#include "common/fsutil.h" // IsUNCPathW / IsUNCRootPathW
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
 #include "plugins/shared/spl_vers.h"
@@ -23,17 +27,33 @@
 
 CPlugins Plugins;
 
-static bool ShouldRejectBrokenWideFSPlugin(CPluginInterfaceEncapsulation& pluginIface,
-                                           int builtForVersion)
-{
-    return builtForVersion == SALLY_PLUGIN_BROKEN_WIDE_FS_VERSION &&
-           pluginIface.NotEmpty() &&
-           pluginIface.GetInterfaceForFS() != NULL;
-}
-
 static IRegistry* GetPluginsRegistry()
 {
     return gRegistry != nullptr ? gRegistry : GetWin32Registry();
+}
+
+static PathResult GetPluginDllPathOwned(const std::wstring& dllName, std::wstring& path)
+{
+    const bool isUNC = dllName.size() >= 2 && dllName[0] == L'\\' && dllName[1] == L'\\';
+    const bool isDrivePath = dllName.size() >= 2 && dllName[1] == L':';
+    if (isUNC || isDrivePath)
+    {
+        path = dllName;
+        return PathResult::Ok();
+    }
+
+    if (gPathService == NULL)
+        return PathResult::Error(ERROR_INVALID_STATE);
+    PathResult result = gPathService->GetModuleFileName(HInstance, path);
+    if (!result.success)
+        return result;
+    const size_t separator = path.find_last_of(L"\\/");
+    if (separator == std::wstring::npos)
+        return PathResult::Error(ERROR_BAD_PATHNAME);
+    path.resize(separator + 1);
+    path.append(L"plugins\\");
+    path.append(dllName);
+    return PathResult::Ok();
 }
 
 // global "time" (counter) for obtaining the FS creation "time"
@@ -107,17 +127,17 @@ void LeavePlugin()
 // CPluginFSInterfaceEncapsulation
 //
 
-BOOL CPluginFSInterfaceEncapsulation::IsFSNameFromSamePluginAsThisFS(const char* fsName, int& fsNameIndex)
+BOOL CPluginFSInterfaceEncapsulation::IsFSNameFromSamePluginAsThisFS(const wchar_t* fsName, int& fsNameIndex)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::IsFSNameFromSamePluginAsThisFS(%s,) (%s v. %s)",
+    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::IsFSNameFromSamePluginAsThisFS(%ls,) (%ls v. %ls)",
                         fsName, DLLName, Version);
 
-    return Plugins.AreFSNamesFromSamePlugin(PluginFSName, fsName, fsNameIndex);
+    return Plugins.AreFSNamesFromSamePlugin(PluginFSName.c_str(), fsName, fsNameIndex);
 }
 
-BOOL CPluginFSInterfaceEncapsulation::IsPathFromThisFS(const char* fsName, const char* fsUserPart)
+BOOL CPluginFSInterfaceEncapsulation::IsPathFromThisFS(const wchar_t* fsName, const wchar_t* fsUserPart)
 {
-    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsPathFromThisFS(%s, %s) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsPathFromThisFS(%ls, %ls) (%ls v. %ls)",
                         fsName, fsUserPart, DLLName, Version);
 
     int fsNameIndex;
@@ -130,137 +150,298 @@ BOOL CPluginFSInterfaceEncapsulation::IsPathFromThisFS(const char* fsName, const
 
 BOOL CPluginFSInterfaceEncapsulation::GetCurrentPathW(std::wstring& userPart)
 {
-    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetCurrentPathW() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetCurrentPathW() (%ls v. %ls)",
                         DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        std::vector<wchar_t> buf(SAL_MAX_LONG_PATH);
-        EnterPlugin();
-        BOOL r = Interface->GetCurrentPathW(buf.data(), (int)buf.size());
-        LeavePlugin();
-        if (r)
-            userPart = buf.data();
-        return r;
-    }
-
-    CPathBuffer userPartA;
-    if (!GetCurrentPath(userPartA))
+    CSalamanderStringBufferOwner owner;
+    if (!owner.IsValid())
         return FALSE;
-    userPart = AnsiToWide(userPartA);
+    EnterPlugin();
+    const BOOL result = Interface->GetCurrentPath(owner.Buffer());
+    LeavePlugin();
+    std::wstring staged;
+    if (!result || !owner.GetValue(staged))
+        return FALSE;
+    userPart.swap(staged);
     return TRUE;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::GetFullNameW(CFileData& file, int isDir, std::wstring& fullName)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::GetFullNameW(, %d, ,) (%s v. %s)",
+    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::GetFullNameW(, %d, ,) (%ls v. %ls)",
                         isDir, DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        std::vector<wchar_t> buf(SAL_MAX_LONG_PATH);
-        EnterPlugin();
-        BOOL r = Interface->GetFullNameW(file, isDir, buf.data(), (int)buf.size());
-        LeavePlugin();
-        if (r)
-            fullName = buf.data();
-        return r;
-    }
-
-    CPathBuffer fullNameA;
-    if (!GetFullName(file, isDir, fullNameA, fullNameA.Size()))
+    CSalamanderStringBufferOwner owner;
+    if (!owner.IsValid())
         return FALSE;
-    fullName = AnsiToWide(fullNameA);
+    EnterPlugin();
+    const BOOL result = Interface->GetFullName(file, isDir, owner.Buffer());
+    LeavePlugin();
+    std::wstring staged;
+    if (!result || !owner.GetValue(staged))
+        return FALSE;
+    fullName.swap(staged);
     return TRUE;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::GetFullFSPathW(HWND parent, const std::wstring& fsName,
                                                      std::wstring& path, BOOL& success)
 {
-    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFullFSPathW() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFullFSPathW() (%ls v. %ls)",
                         DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        std::vector<wchar_t> pathBuf(SAL_MAX_LONG_PATH);
-        lstrcpynW(pathBuf.data(), path.c_str(), (int)pathBuf.size());
-        EnterPlugin();
-        BOOL r = Interface->GetFullFSPathW(parent, fsName.c_str(), pathBuf.data(), (int)pathBuf.size(), success);
-        LeavePlugin();
-        if (r && success)
-            path = pathBuf.data();
-        return r;
-    }
-
-    std::string fsNameA;
-    std::string pathA;
-    if (!sally::unicode::TryExactAnsiFallback(fsName, fsNameA) ||
-        !sally::unicode::TryExactAnsiFallback(path, pathA))
+    CSalamanderStringBufferOwner owner(path);
+    if (!owner.IsValid())
     {
         success = FALSE;
         return FALSE;
     }
-
-    CPathBuffer pathBuf(pathA.c_str());
-    BOOL r = GetFullFSPath(parent, fsNameA.c_str(), pathBuf, pathBuf.Size(), success);
-    if (r && success)
-        path = AnsiToWide(pathBuf);
-    return r;
+    EnterPlugin();
+    const BOOL result = Interface->GetFullFSPath(parent, fsName.c_str(),
+                                                  owner.Buffer(), success);
+    LeavePlugin();
+    if (!result || !success)
+        return result;
+    std::wstring staged;
+    if (!owner.GetValue(staged))
+    {
+        success = FALSE;
+        return FALSE;
+    }
+    path.swap(staged);
+    return TRUE;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::GetRootPathW(std::wstring& userPart)
 {
-    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetRootPathW() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetRootPathW() (%ls v. %ls)",
                         DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
+    CSalamanderStringBufferOwner owner;
+    if (!owner.IsValid())
+        return FALSE;
+    EnterPlugin();
+    const BOOL result = Interface->GetRootPath(owner.Buffer());
+    LeavePlugin();
+    std::wstring staged;
+    if (!result || !owner.GetValue(staged))
+        return FALSE;
+    userPart.swap(staged);
+    return TRUE;
+}
+
+namespace
+{
+bool BuildPluginTargetPathValue(const std::wstring& targetPath,
+                                const std::wstring* targetMask,
+                                std::wstring& value)
+{
+    const size_t maskLength = targetMask != NULL ? targetMask->size() : 0;
+    if (targetPath.size() > SIZE_MAX - maskLength - 2)
+        return false;
+    try
     {
-        std::vector<wchar_t> buf(SAL_MAX_LONG_PATH);
-        EnterPlugin();
-        BOOL r = Interface->GetRootPathW(buf.data(), (int)buf.size());
-        LeavePlugin();
-        if (r)
-            userPart = buf.data();
-        return r;
+        value = targetPath;
+        value.push_back(L'\0');
+        if (targetMask != NULL)
+            value.append(*targetMask);
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    catch (const std::length_error&)
+    {
+        return false;
+    }
+}
+
+bool ReadPluginTargetPathValue(const std::wstring& value, std::wstring& targetPath)
+{
+    // 'value' comes from CSalamanderStringBufferOwner::GetValue(), which
+    // constructs it from exactly Length characters - the plugin-reported
+    // logical length, deliberately excluding the terminator it separately
+    // verified is present. There is never an embedded NUL to find here: every
+    // call, for every well-behaved plugin, made find(L'\0') return npos, so
+    // assign(data, npos) threw length_error unconditionally and both
+    // CopyOrMoveFromFS and CopyOrMoveFromDiskToFS always treated a normal
+    // plugin-provided target path as a cancel.
+    try
+    {
+        targetPath.assign(value.data(), value.size());
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    catch (const std::length_error&)
+    {
+        return false;
+    }
+}
+} // namespace
+
+BOOL CPluginFSInterfaceEncapsulation::CopyOrMoveFromFS(
+    BOOL copy, int mode, const wchar_t* fsName, HWND parent, int panel,
+    int selectedFiles, int selectedDirs, std::wstring& targetPath,
+    const std::wstring* targetMask, BOOL& operationMask,
+    BOOL& cancelOrHandlePath, HWND dropTarget)
+{
+    CALL_STACK_MESSAGE10("CPluginFSInterfaceEncapsulation::CopyOrMoveFromFS(%d, %d, %ls, , %d, %d, %d, %ls, , ,) (%ls v. %ls)",
+                         copy, mode, fsName, panel, selectedFiles, selectedDirs,
+                         targetPath.c_str(), DLLName, Version);
+    if (!(copy && IsServiceSupported(FS_SERVICE_COPYFROMFS) ||
+          !copy && IsServiceSupported(FS_SERVICE_MOVEFROMFS)))
+    {
+        cancelOrHandlePath = TRUE;
+        return TRUE;
     }
 
-    CPathBuffer userPartA;
-    if (!GetRootPath(userPartA))
+    std::wstring pluginValue;
+    if (!BuildPluginTargetPathValue(targetPath, targetMask, pluginValue))
+    {
+        cancelOrHandlePath = TRUE;
         return FALSE;
-    userPart = AnsiToWide(userPartA);
-    return TRUE;
+    }
+
+    CSalamanderStringBufferOwner owner(pluginValue);
+    if (!owner.IsValid())
+    {
+        cancelOrHandlePath = TRUE;
+        return FALSE;
+    }
+    EnterPlugin();
+    const BOOL result = Interface->CopyOrMoveFromFS(
+        copy, mode, fsName, parent, panel, selectedFiles, selectedDirs,
+        owner.Buffer(), operationMask, cancelOrHandlePath, dropTarget);
+    LeavePlugin();
+    std::wstring returnedValue;
+    if (!owner.GetValue(returnedValue) ||
+        !ReadPluginTargetPathValue(returnedValue, targetPath))
+    {
+        cancelOrHandlePath = TRUE;
+        return FALSE;
+    }
+    return result;
+}
+
+BOOL CPluginFSInterfaceEncapsulation::CopyOrMoveFromDiskToFS(
+    BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+    const wchar_t* sourcePath, SalEnumSelection2 next, void* nextParam,
+    int sourceFiles, int sourceDirs, std::wstring& targetPath,
+    BOOL* invalidPathOrCancel)
+{
+    CALL_STACK_MESSAGE9("CPluginFSInterfaceEncapsulation::CopyOrMoveFromDiskToFS(%d, %d, %ls, , %ls, , , %d, %d, ,) (%ls v. %ls)",
+                        copy, mode, fsName, sourcePath, sourceFiles, sourceDirs,
+                        DLLName, Version);
+    if (!(copy && IsServiceSupported(FS_SERVICE_COPYFROMDISKTOFS) ||
+          !copy && IsServiceSupported(FS_SERVICE_MOVEFROMDISKTOFS)))
+    {
+        if (mode == 1)
+            return FALSE;
+        SalMessageBoxW(parent, LoadStrW(IDS_FSCOPYMOVE_TOFS_NOTSUP),
+                       LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+
+    std::wstring pluginValue;
+    if (!BuildPluginTargetPathValue(targetPath, NULL, pluginValue))
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    CSalamanderStringBufferOwner owner(pluginValue);
+    if (!owner.IsValid())
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+
+    EnterPlugin();
+    const BOOL result = Interface->CopyOrMoveFromDiskToFS(
+        copy, mode, fsName, parent, sourcePath, next, nextParam, sourceFiles,
+        sourceDirs, owner.Buffer(), invalidPathOrCancel);
+    LeavePlugin();
+    std::wstring returnedValue;
+    if (!owner.GetValue(returnedValue) ||
+        !ReadPluginTargetPathValue(returnedValue, targetPath))
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    return result;
+}
+
+BOOL CPluginFSInterfaceEncapsulation::CompleteDirectoryLineHotPathW(
+    std::wstring& path)
+{
+    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::CompleteDirectoryLineHotPathW(%ls) (%ls v. %ls)",
+                        path.c_str(), DLLName, Version);
+    if (!IsServiceSupported(FS_SERVICE_GETNEXTDIRLINEHOTPATH))
+        return FALSE;
+
+    CSalamanderStringBufferOwner owner(path);
+    if (!owner.IsValid())
+        return FALSE;
+    EnterPlugin();
+    const BOOL result = Interface->CompleteDirectoryLineHotPath(owner.Buffer());
+    LeavePlugin();
+    if (!result)
+        return FALSE;
+    return owner.GetValue(path) ? TRUE : FALSE;
+}
+
+BOOL CPluginFSInterfaceEncapsulation::GetPathForMainWindowTitleW(
+    const wchar_t* fsName, int mode, std::wstring& path)
+{
+    path.clear();
+    if (!IsServiceSupported(FS_SERVICE_GETPATHFORMAINWNDTITLE))
+        return FALSE;
+
+    CSalamanderStringBufferOwner owner;
+    if (!owner.IsValid())
+        return FALSE;
+    EnterPlugin();
+    const BOOL result = Interface->GetPathForMainWindowTitle(
+        fsName, mode, owner.Buffer());
+    LeavePlugin();
+    return result && owner.GetValue(path) ? TRUE : FALSE;
+}
+
+BOOL CPluginFSInterfaceEncapsulation::GetNoItemsInPanelText(std::wstring& text)
+{
+    CSalamanderStringBufferOwner owner;
+    if (!owner.IsValid())
+        return FALSE;
+    EnterPlugin();
+    const BOOL result = Interface->GetNoItemsInPanelText(owner.Buffer());
+    LeavePlugin();
+    return result && owner.GetValue(text) ? TRUE : FALSE;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::IsCurrentPathW(int currentFSNameIndex, int fsNameIndex,
                                                      const std::wstring& userPart)
 {
-    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsCurrentPathW(%d, %d,) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsCurrentPathW(%d, %d,) (%ls v. %ls)",
                         currentFSNameIndex, fsNameIndex, DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        EnterPlugin();
-        BOOL r = Interface->IsCurrentPathW(currentFSNameIndex, fsNameIndex, userPart.c_str());
-        LeavePlugin();
-        return r;
-    }
-
-    std::string userPartA;
-    return sally::unicode::TryExactAnsiFallback(userPart, userPartA) &&
-           IsCurrentPath(currentFSNameIndex, fsNameIndex, userPartA.c_str());
+    EnterPlugin();
+    BOOL r = Interface->IsCurrentPath(currentFSNameIndex, fsNameIndex, userPart.c_str());
+    LeavePlugin();
+    return r;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::IsOurPathW(int currentFSNameIndex, int fsNameIndex,
                                                  const std::wstring& userPart)
 {
-    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsOurPathW(%d, %d,) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::IsOurPathW(%d, %d,) (%ls v. %ls)",
                         currentFSNameIndex, fsNameIndex, DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        EnterPlugin();
-        BOOL r = Interface->IsOurPathW(currentFSNameIndex, fsNameIndex, userPart.c_str());
-        LeavePlugin();
-        return r;
-    }
-
-    std::string userPartA;
-    return sally::unicode::TryExactAnsiFallback(userPart, userPartA) &&
-           IsOurPath(currentFSNameIndex, fsNameIndex, userPartA.c_str());
+    EnterPlugin();
+    BOOL r = Interface->IsOurPath(currentFSNameIndex, fsNameIndex, userPart.c_str());
+    LeavePlugin();
+    return r;
 }
 
 BOOL CPluginFSInterfaceEncapsulation::ChangePathW(int currentFSNameIndex, std::wstring& fsName,
@@ -268,50 +449,30 @@ BOOL CPluginFSInterfaceEncapsulation::ChangePathW(int currentFSNameIndex, std::w
                                                   std::wstring* cutFileName, BOOL* pathWasCut,
                                                   BOOL forceRefresh, int mode)
 {
-    CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ChangePathW(%d, , %d, , , , %d, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ChangePathW(%d, , %d, , , , %d, %d) (%ls v. %ls)",
                         currentFSNameIndex, fsNameIndex, forceRefresh, mode, DLLName, Version);
-    if (BuiltForVersion >= SALLY_PLUGIN_WIDE_FS_VERSION)
-    {
-        wchar_t fsNameBuf[MAX_PATH];
-        wchar_t cutFileNameBuf[SAL_MAX_LONG_PATH];
-        lstrcpynW(fsNameBuf, fsName.c_str(), MAX_PATH);
-        cutFileNameBuf[0] = 0;
-        EnterPlugin();
-        BOOL r = Interface->ChangePathW(currentFSNameIndex, fsNameBuf, fsNameIndex, userPart.c_str(),
-                                        cutFileName != NULL ? cutFileNameBuf : NULL,
-                                        SAL_MAX_LONG_PATH, pathWasCut, forceRefresh, mode);
-        CALL_STACK_MESSAGE1("CPluginFSInterface::GetSupportedServices()");
-        SupportedServices = Interface->GetSupportedServices();
-        LeavePlugin();
-        if (r)
-        {
-            fsName = fsNameBuf;
-            if (cutFileName != NULL)
-                *cutFileName = cutFileNameBuf;
-        }
-        return r;
-    }
-
-    std::string fsNameA;
-    std::string userPartA;
-    if (!sally::unicode::TryExactAnsiFallback(fsName, fsNameA) ||
-        !sally::unicode::TryExactAnsiFallback(userPart, userPartA))
-    {
-        if (cutFileName != NULL)
-            cutFileName->clear();
+    CSalamanderStringBufferOwner fsNameOwner(fsName);
+    CSalamanderStringBufferOwner cutFileNameOwner;
+    if (!fsNameOwner.IsValid() || (cutFileName != NULL && !cutFileNameOwner.IsValid()))
         return FALSE;
-    }
-
-    CPathBuffer fsNameBuf(fsNameA.c_str());
-    CPathBuffer cutFileNameBuf;
-    BOOL r = ChangePath(currentFSNameIndex, fsNameBuf, fsNameIndex, userPartA.c_str(),
-                        cutFileName != NULL ? cutFileNameBuf.Get() : NULL,
-                        pathWasCut, forceRefresh, mode);
+    EnterPlugin();
+    BOOL r = Interface->ChangePath(currentFSNameIndex, fsNameOwner.Buffer(),
+                                   fsNameIndex, userPart.c_str(),
+                                   cutFileName != NULL ? cutFileNameOwner.Buffer() : NULL,
+                                   pathWasCut, forceRefresh, mode);
+    CALL_STACK_MESSAGE1("CPluginFSInterface::GetSupportedServices()");
+    SupportedServices = Interface->GetSupportedServices();
+    LeavePlugin();
     if (r)
     {
-        fsName = AnsiToWide(fsNameBuf);
+        std::wstring stagedFSName;
+        std::wstring stagedCutFileName;
+        if (!fsNameOwner.GetValue(stagedFSName) ||
+            (cutFileName != NULL && !cutFileNameOwner.GetValue(stagedCutFileName)))
+            return FALSE;
+        fsName.swap(stagedFSName);
         if (cutFileName != NULL)
-            *cutFileName = AnsiToWide(cutFileNameBuf);
+            cutFileName->swap(stagedCutFileName);
     }
     return r;
 }
@@ -320,7 +481,7 @@ BOOL CPluginFSInterfaceEncapsulation::ListCurrentPath(CSalamanderDirectoryAbstra
                                                       CPluginDataInterfaceAbstract*& pluginData,
                                                       int& iconsType, BOOL forceRefresh)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ListCurrentPath(, , , %d) (%s v. %s)",
+    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ListCurrentPath(, , , %d) (%ls v. %ls)",
                         forceRefresh, DLLName, Version);
     EnterPlugin();
     //TRACE_I("list path: begin");
@@ -342,10 +503,10 @@ BOOL CPluginFSInterfaceEncapsulation::ListCurrentPath(CSalamanderDirectoryAbstra
     return r;
 }
 
-BOOL CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(const char* fsName, char*& title,
+BOOL CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title,
                                                                      HICON& icon, BOOL& destroyIcon)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(%s, , ,) (%s v. %s)",
+    CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(%ls, , ,) (%ls v. %ls)",
                         fsName, DLLName, Version);
     if (IsServiceSupported(FS_SERVICE_GETCHANGEDRIVEORDISCONNECTITEM))
     {
@@ -363,7 +524,7 @@ BOOL CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(const char*
 HICON
 CPluginFSInterfaceEncapsulation::GetFSIcon(BOOL& destroyIcon)
 {
-    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFSIcon() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFSIcon() (%ls v. %ls)",
                         DLLName, Version);
     if (IsServiceSupported(FS_SERVICE_GETFSICON))
     {
@@ -397,7 +558,7 @@ void CPluginInterfaceForFSEncapsulation::CloseFS(CPluginFSInterfaceAbstract* fs)
         TRACE_E("OpenedFSCounter is negative number - too much calls to CloseFS()");
     }
 #endif // _DEBUG
-    CALL_STACK_MESSAGE3("CPluginInterfaceForFSEncapsulation::CloseFS() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginInterfaceForFSEncapsulation::CloseFS() (%ls v. %ls)",
                         data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->CloseFS(fs);
@@ -423,7 +584,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteChangeDriveMenuItem(int panel)
 
 BOOL CPluginInterfaceForFSEncapsulation::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                                         CPluginFSInterfaceAbstract* pluginFS,
-                                                                        const char* pluginFSName, int pluginFSNameIndex,
+                                                                        const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                                         BOOL isDetachedFS, BOOL& refreshMenu,
                                                                         BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
@@ -444,7 +605,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(int panel
         TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand()");
         return;
     }
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(%d, %d, ) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(%d, %d, ) (%ls v. %ls)",
                         panel, postCmd, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ExecuteChangeDrivePostCommand(panel, postCmd, postCmdParam);
@@ -452,7 +613,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(int panel
 }
 
 void CPluginInterfaceForFSEncapsulation::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                                     const char* pluginFSName, int pluginFSNameIndex,
+                                                     const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                      CFileData& file, int isDir)
 {
     CPluginData* data = Plugins.GetPluginData(Interface);
@@ -461,7 +622,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteOnFS(int panel, CPluginFSInterfa
         TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ExecuteOnFS()");
         return;
     }
-    CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::ExecuteOnFS(%d, , %s, %d, , %d) (%s v. %s)",
+    CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::ExecuteOnFS(%d, , %ls, %d, , %d) (%ls v. %ls)",
                         panel, pluginFSName, pluginFSNameIndex, isDir, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ExecuteOnFS(panel, pluginFS, pluginFSName, pluginFSNameIndex, file, isDir);
@@ -470,7 +631,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteOnFS(int panel, CPluginFSInterfa
 
 BOOL CPluginInterfaceForFSEncapsulation::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                                       CPluginFSInterfaceAbstract* pluginFS,
-                                                      const char* pluginFSName, int pluginFSNameIndex)
+                                                      const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
     CPluginData* data = Plugins.GetPluginData(Interface);
     if (data == NULL || !data->GetLoaded())
@@ -478,7 +639,7 @@ BOOL CPluginInterfaceForFSEncapsulation::DisconnectFS(HWND parent, BOOL isInPane
         TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::DisconnectFS()");
         return FALSE;
     }
-    CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::DisconnectFS(, %d, %d, , %s, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::DisconnectFS(, %d, %d, , %ls, %d) (%ls v. %ls)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex, data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     BOOL ret = Interface->DisconnectFS(parent, isInPanel, panel, pluginFS, pluginFSName, pluginFSNameIndex);
@@ -486,36 +647,44 @@ BOOL CPluginInterfaceForFSEncapsulation::DisconnectFS(HWND parent, BOOL isInPane
     return ret;
 }
 
-void CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                                               char* fsUserPart)
+BOOL CPluginInterfaceForFSEncapsulation::ConvertPathToInternalW(const wchar_t* fsName, int fsNameIndex,
+                                                                std::wstring& fsUserPart)
 {
     CPluginData* data = Plugins.GetPluginData(Interface);
     if (data == NULL || !data->GetLoaded())
     {
-        TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ConvertPathToInternal()");
-        return;
+        TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ConvertPathToInternalW()");
+        return FALSE;
     }
-    CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(%s, %d, %s) (%s v. %s)",
-                        fsName, fsNameIndex, fsUserPart, data->DLLName.c_str(), data->Version.c_str());
+
+    CSalamanderStringBufferOwner owner(fsUserPart);
+    if (!owner.IsValid())
+        return FALSE;
     EnterPlugin();
-    Interface->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart);
+    const BOOL result = Interface->ConvertPathToInternal(
+        fsName, fsNameIndex, owner.Buffer());
     LeavePlugin();
+    return result && owner.GetValue(fsUserPart) ? TRUE : FALSE;
 }
 
-void CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                                               char* fsUserPart)
+BOOL CPluginInterfaceForFSEncapsulation::ConvertPathToExternalW(const wchar_t* fsName, int fsNameIndex,
+                                                                std::wstring& fsUserPart)
 {
     CPluginData* data = Plugins.GetPluginData(Interface);
     if (data == NULL || !data->GetLoaded())
     {
-        TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ConvertPathToExternal()");
-        return;
+        TRACE_E("Incorrect call to CPluginInterfaceForFSEncapsulation::ConvertPathToExternalW()");
+        return FALSE;
     }
-    CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(%s, %d, %s) (%s v. %s)",
-                        fsName, fsNameIndex, fsUserPart, data->DLLName.c_str(), data->Version.c_str());
+
+    CSalamanderStringBufferOwner owner(fsUserPart);
+    if (!owner.IsValid())
+        return FALSE;
     EnterPlugin();
-    Interface->ConvertPathToExternal(fsName, fsNameIndex, fsUserPart);
+    const BOOL result = Interface->ConvertPathToExternal(
+        fsName, fsNameIndex, owner.Buffer());
     LeavePlugin();
+    return result && owner.GetValue(fsUserPart) ? TRUE : FALSE;
 }
 
 void CPluginInterfaceEncapsulation::ReleasePluginDataInterface(CPluginDataInterfaceAbstract* pluginData)
@@ -532,7 +701,7 @@ void CPluginInterfaceEncapsulation::ReleasePluginDataInterface(CPluginDataInterf
         TRACE_E("OpenedPDCounter is negative number - too much calls to ReleasePluginDataInterface()");
     }
 #endif // _DEBUG
-    CALL_STACK_MESSAGE3("CPluginInterfaceEncapsulation::ReleasePluginDataInterface() (%s v. %s)",
+    CALL_STACK_MESSAGE3("CPluginInterfaceEncapsulation::ReleasePluginDataInterface() (%ls v. %ls)",
                         data->DLLName.c_str(), data->Version.c_str());
     EnterPlugin();
     Interface->ReleasePluginDataInterface(pluginData);
@@ -546,7 +715,7 @@ void CPluginInterfaceEncapsulation::ReleasePluginDataInterface(CPluginDataInterf
 
 void CPluginDataInterfaceEncapsulation::ReleaseFilesOrDirs(CFilesArray* filesOrDirs, BOOL areDirs)
 {
-    SLOW_CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::ReleaseFilesOrDirs(, %d) (%s v. %s)",
+    SLOW_CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::ReleaseFilesOrDirs(, %d) (%ls v. %ls)",
                              areDirs, DLLName, Version);
     EnterPlugin();
     int i;
@@ -569,32 +738,28 @@ void CSalamanderDebug::TraceAttachThread(HANDLE thread, unsigned tid)
     if (NOHANDLES(DuplicateHandle(GetCurrentProcess(), thread, GetCurrentProcess(), // HANDLES cannot be used -> module
                                   &handle, 0, FALSE, DUPLICATE_SAME_ACCESS)))       // TRACE does not use HANDLES
     {
-        HANDLES(EnterCriticalSection(&__Trace.CriticalSection));
-        if (!__Trace.ThreadCache.Add(handle, tid))
+        HANDLES(EnterCriticalSection(&GetTrace().CriticalSection));
+        if (!GetTrace().ThreadCache.Add(handle, tid))
             NOHANDLES(CloseHandle(handle));
-        HANDLES(LeaveCriticalSection(&__Trace.CriticalSection));
+        HANDLES(LeaveCriticalSection(&GetTrace().CriticalSection));
     }
 #endif // defined(MULTITHREADED_TRACE_ENABLE) && defined(TRACE_ENABLE)
 }
 
-void CSalamanderDebug::TraceSetThreadName(const char* name)
-{
-    SetTraceThreadName(name);
-}
-
-void CSalamanderDebug::TraceSetThreadNameW(const WCHAR* name)
+void CSalamanderDebug::TraceSetThreadName(const wchar_t* name)
 {
     SetTraceThreadNameW(name);
 }
 
-void CSalamanderDebug::SetThreadNameInVC(const char* name)
+void CSalamanderDebug::SetThreadNameInVC(const wchar_t* name)
 {
     ::SetThreadNameInVC(name);
 }
 
-void CSalamanderDebug::SetThreadNameInVCAndTrace(const char* name)
+void CSalamanderDebug::SetThreadNameInVCAndTrace(const wchar_t* name)
 {
-    ::SetThreadNameInVCAndTrace(name);
+    SetThreadNameInVC(name);
+    SetTraceThreadNameW(name);
 }
 
 void CSalamanderDebug::TraceConnectToServer()
@@ -602,37 +767,27 @@ void CSalamanderDebug::TraceConnectToServer()
     ConnectToTraceServer();
 }
 
-void CSalamanderDebug::AddModuleWithPossibleMemoryLeaks(const char* fileName)
+void CSalamanderDebug::AddModuleWithPossibleMemoryLeaks(const wchar_t* fileName)
 {
 #ifdef _DEBUG
     ::AddModuleWithPossibleMemoryLeaks(fileName);
 #endif // _DEBUG
 }
 
-void CSalamanderDebug::TraceI(const char* file, int line, const char* str)
-{
-    TRACE_MI(file, line, str);
-}
-
-void CSalamanderDebug::TraceIW(const WCHAR* file, int line, const WCHAR* str)
+void CSalamanderDebug::TraceI(const wchar_t* file, int line, const wchar_t* str)
 {
     TRACE_MIW(file, line, str);
 }
 
-void CSalamanderDebug::TraceE(const char* file, int line, const char* str)
-{
-    TRACE_ME(file, line, str);
-}
-
-void CSalamanderDebug::TraceEW(const WCHAR* file, int line, const WCHAR* str)
+void CSalamanderDebug::TraceE(const wchar_t* file, int line, const wchar_t* str)
 {
     TRACE_MEW(file, line, str);
 }
 
-unsigned CallWithCallStackEHBody(const char* dllName, const char* version,
+unsigned CallWithCallStackEHBody(const wchar_t* dllName, const wchar_t* version,
                                  unsigned(WINAPI* threadBody)(void*), void* param)
 {
-    CALL_STACK_MESSAGE3("Plugin Thread (%s v. %s)", dllName, version);
+    CALL_STACK_MESSAGE3("Plugin Thread (%ls v. %ls)", dllName, version);
     return threadBody(param);
 }
 
@@ -671,7 +826,7 @@ extern "C"
     void* _AddressOfReturnAddress(void);
 }
 
-void CSalamanderDebug::Push(const char* format, va_list args, CCallStackMsgContext* callStackMsgContext,
+void CSalamanderDebug::Push(const wchar_t* format, va_list args, CCallStackMsgContext* callStackMsgContext,
                             BOOL doNotMeasureTimes)
 {
 #ifndef CALLSTK_DISABLE
@@ -718,7 +873,7 @@ void CSalamanderDebug::Push(const char* format, va_list args, CCallStackMsgConte
     }
     else
     {
-        TRACE_E("Invalid use of CALL_STACK_MESSAGE: call-stack object was not defined in this thread. Format=\"" << format << "\"");
+        TRACE_EW(L"Invalid use of CALL_STACK_MESSAGE: call-stack object was not defined in this thread. Format=\"" << format << L"\"");
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
         if (callStackMsgContext != NULL)
         {
@@ -787,9 +942,9 @@ void CSalamanderDebug::Pop(CCallStackMsgContext* callStackMsgContext)
 // CSalamanderConnect
 //
 
-void CSalamanderConnect::AddCustomPacker(const char* title, const char* defaultExtension, BOOL update)
+void CSalamanderConnect::AddCustomPacker(const wchar_t* title, const wchar_t* defaultExtension, BOOL update)
 {
-    CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomPacker(%s, %s, %d)", title, defaultExtension, update);
+    CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomPacker(%ls, %ls, %d)", title, defaultExtension, update);
     if (CustomPack)
     {
         int i = PackerConfig.AddPacker(TRUE);
@@ -813,9 +968,9 @@ void CSalamanderConnect::AddCustomPacker(const char* title, const char* defaultE
     }
 }
 
-void CSalamanderConnect::AddCustomUnpacker(const char* title, const char* masks, BOOL update)
+void CSalamanderConnect::AddCustomUnpacker(const wchar_t* title, const wchar_t* masks, BOOL update)
 {
-    CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomUnpacker(%s, %s, %d)", title, masks, update);
+    CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomUnpacker(%ls, %ls, %d)", title, masks, update);
     if (CustomUnpack)
     {
         int i = UnpackerConfig.AddUnpacker(TRUE);
@@ -839,35 +994,35 @@ void CSalamanderConnect::AddCustomUnpacker(const char* title, const char* masks,
     }
 }
 
-void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
+void CSalamanderConnect::AddViewer(const wchar_t* masks, BOOL force)
 {
-    CALL_STACK_MESSAGE3("CSalamanderConnect::AddViewer(%s, %d)", masks, force);
-    if (strchr(masks, '|') != NULL)
+    CALL_STACK_MESSAGE3("CSalamanderConnect::AddViewer(%ls, %d)", masks, force);
+    if (wcschr(masks, L'|') != NULL)
     {
         TRACE_E("CSalamanderConnect::AddViewer(): you can not use character '|', sorry"); // '|' acts as negation in group masks; merging masks in GetViewersAssoc can't handle it
         return;
     }
     if (Viewer || force)
     {
-        char ext[300];        // copy of masks (replace ';' with '\0')
-        char ext2[300];       // used to split found masks (replace ';' with '\0'); also stores the "force" result
+        wchar_t ext[300];        // copy of masks (replace ';' with '\0')
+        wchar_t ext2[300];       // used to split found masks (replace ';' with '\0'); also stores the "force" result
         if (!Viewer && force) // this is an update, not an installation, so check whether it is already on the list
         {
-            int len = (int)strlen(masks);
+            int len = (int)wcslen(masks);
             if (len > 299)
                 len = 299;
-            memcpy(ext, masks, len);
+            wmemcpy(ext, masks, len);
             ext[len] = 0;
-            TDirectArray<char*> extArray(10, 5); // array of extensions from masks
-            char* s = ext + len;
+            TDirectArray<wchar_t*> extArray(10, 5); // array of extensions from masks
+            wchar_t* s = ext + len;
             while (s > ext)
             {
                 while (--s >= ext)
                 {
-                    if (*s == ';')
+                    if (*s == L';')
                     {
-                        char* p = s;
-                        while (--p >= ext && *p == ';')
+                        wchar_t* p = s;
+                        while (--p >= ext && *p == L';')
                             ;
                         if (((s - p) & 1) == 1)
                             break;
@@ -876,12 +1031,12 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
                 }
                 if (s >= ext)
                     *s = 0;
-                char* ss = s + 1 + strlen(s + 1);
-                while (--ss >= s + 1 && *ss <= ' ')
+                wchar_t* ss = s + 1 + wcslen(s + 1);
+                while (--ss >= s + 1 && *ss <= L' ')
                     ;
                 *(ss + 1) = 0; // trim the spaces at the end of the mask
                 ss = s + 1;
-                while (*ss != 0 && *ss <= ' ')
+                while (*ss != 0 && *ss <= L' ')
                     ss++;     // skip spaces at the beginning of the mask
                 if (*ss != 0) // if the mask is not empty, add it to the array
                 {
@@ -897,21 +1052,21 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
             {
                 if (MainWindow->ViewerMasks->At(i)->ViewerType == -Index - 1) // correct plug-in
                 {
-                    const char* m = MainWindow->ViewerMasks->At(i)->Masks->GetMasksString();
-                    len = (int)strlen(m);
+                    const wchar_t* m = MainWindow->ViewerMasks->At(i)->Masks->GetMasksString();
+                    len = (int)wcslen(m);
                     if (len > 299)
                         len = 299;
-                    memcpy(ext2, m, len);
+                    wmemcpy(ext2, m, len);
                     ext2[len] = 0;
                     s = ext2 + len;
                     while (s > ext2)
                     {
                         while (--s >= ext2)
                         {
-                            if (*s == ';')
+                            if (*s == L';')
                             {
-                                char* p = s;
-                                while (--p >= ext2 && *p == ';')
+                                wchar_t* p = s;
+                                while (--p >= ext2 && *p == L';')
                                     ;
                                 if (((s - p) & 1) == 1)
                                     break;
@@ -920,17 +1075,17 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
                         }
                         if (s >= ext2)
                             *s = 0;
-                        char* ss = s + 1 + strlen(s + 1);
-                        while (--ss >= s + 1 && *ss <= ' ')
+                        wchar_t* ss = s + 1 + wcslen(s + 1);
+                        while (--ss >= s + 1 && *ss <= L' ')
                             ;
                         *(ss + 1) = 0; // trim spaces at the end of the mask
                         ss = s + 1;
-                        while (*ss != 0 && *ss <= ' ')
+                        while (*ss != 0 && *ss <= L' ')
                             ss++; // skip spaces at the beginning of the mask
                         int k;
                         for (k = 0; k < extArray.Count; k++)
                         {
-                            if (StrICmp(ss, extArray[k]) == 0) // we already have this mask, don't add it
+                            if (StrICmpW(ss, extArray[k]) == 0) // we already have this mask, don't add it
                             {
                                 extArray.Delete(k);
                                 if (!extArray.IsGood())
@@ -948,12 +1103,12 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
             int k;
             for (k = 0; k < extArray.Count; k++)
             {
-                if (extArray[k][0] == ';' && s != ext2)
-                    *s++ = ' '; // space is necessary (otherwise the previous ';' wouldn't act as a separator but will merge with this ';')
-                strcpy(s, extArray[k]);
+                if (extArray[k][0] == L';' && s != ext2)
+                    *s++ = L' '; // space is necessary (otherwise the previous ';' wouldn't act as a separator but will merge with this ';')
+                wcscpy(s, extArray[k]);
                 if (k + 1 < extArray.Count)
-                    strcat(s, ";");
-                s += strlen(s);
+                    wcscat(s, L";");
+                s += wcslen(s);
             }
             masks = ext2;
         }
@@ -961,7 +1116,7 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
         if (Viewer && !force || // plug-in installation
             !Viewer && force)   // plug-in update, but not during its installation
         {
-            CViewerMasksItem* item = new CViewerMasksItem(masks, "", "", "", -Index - 1, FALSE);
+            CViewerMasksItem* item = new CViewerMasksItem(masks, L"", L"", L"", -Index - 1, FALSE);
             if (item != NULL && item->IsGood())
             {
                 MainWindow->EnterViewerMasksCS();
@@ -978,54 +1133,59 @@ void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
     }
 }
 
-int StrICmpIgnoreSpacesOnStartAndEnd(const char* s1, const char* s2)
+// Rewritten wide, replacing the CP_ACP-limited 256-entry LowerCase[]
+// table (common/str.h) with towlower - that table indexed by a wide code unit is
+// pattern #14 (a narrow lookup table indexed by a wide character), and would have
+// read out of bounds for anything above U+00FF. Sole definition, sole caller
+// (ForceRemoveViewer below), both local to this file - safe to widen outright.
+int StrICmpIgnoreSpacesOnStartAndEnd(const wchar_t* s1, const wchar_t* s2)
 {
-    while (*s1 != 0 && *s1 <= ' ')
+    while (*s1 != 0 && *s1 <= L' ')
         s1++;
-    while (*s2 != 0 && *s2 <= ' ')
+    while (*s2 != 0 && *s2 <= L' ')
         s2++;
-    while (*s1 != 0 && LowerCase[*s1] == LowerCase[*s2])
+    while (*s1 != 0 && towlower(*s1) == towlower(*s2))
     {
         s1++;
         s2++;
     }
-    while (*s1 != 0 && *s1 <= ' ')
+    while (*s1 != 0 && *s1 <= L' ')
         s1++;
-    while (*s2 != 0 && *s2 <= ' ')
+    while (*s2 != 0 && *s2 <= L' ')
         s2++;
     if (*s1 == 0 && *s2 == 0)
         return 0;
-    if ((unsigned)LowerCase[*s1] < (unsigned)LowerCase[*s2])
+    if ((unsigned)towlower(*s1) < (unsigned)towlower(*s2))
         return -1;
     else
         return 1;
 }
 
-void CSalamanderConnect::ForceRemoveViewer(const char* mask)
+void CSalamanderConnect::ForceRemoveViewer(const wchar_t* mask)
 {
-    CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemoveViewer(%s)", mask);
-    char ext2[300]; // used to split found masks (replace ';' with '\0')
+    CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemoveViewer(%ls)", mask);
+    wchar_t ext2[300]; // used to split found masks (replace ';' with '\0')
     int i;
     for (i = 0; i < MainWindow->ViewerMasks->Count; i++)
     {
         if (MainWindow->ViewerMasks->At(i)->ViewerType == -Index - 1) // correct plug-in
         {
-            const char* m = MainWindow->ViewerMasks->At(i)->Masks->GetMasksString();
-            int len = (int)strlen(m);
+            const wchar_t* m = MainWindow->ViewerMasks->At(i)->Masks->GetMasksString();
+            int len = (int)wcslen(m);
             if (len > 299)
                 len = 299;
-            memcpy(ext2, m, len);
+            wmemcpy(ext2, m, len);
             ext2[len] = 0;
-            char* s = ext2 + len;
+            wchar_t* s = ext2 + len;
             // find and eliminate the extension 'mask', side effect of removing the ';' (replacing it with 0)
             while (s > ext2)
             {
                 while (--s >= ext2)
                 {
-                    if (*s == ';')
+                    if (*s == L';')
                     {
-                        char* p = s;
-                        while (--p >= ext2 && *p == ';')
+                        wchar_t* p = s;
+                        while (--p >= ext2 && *p == L';')
                             ;
                         if (((s - p) & 1) == 1)
                             break;
@@ -1036,8 +1196,8 @@ void CSalamanderConnect::ForceRemoveViewer(const char* mask)
                     *s = 0;
                 if (StrICmpIgnoreSpacesOnStartAndEnd(s + 1, mask) == 0) // we are looking for this mask, we will delete it
                 {
-                    int sLen = (int)strlen(s + 1);
-                    memmove(s + 1, s + 1 + sLen + 1, len - ((s + 1) - ext2) - sLen);
+                    int sLen = (int)wcslen(s + 1);
+                    wmemmove(s + 1, s + 1 + sLen + 1, len - ((s + 1) - ext2) - sLen);
                     if (len > sLen + 1)
                         len -= sLen + 1;
                     else
@@ -1049,13 +1209,13 @@ void CSalamanderConnect::ForceRemoveViewer(const char* mask)
             while (s - ext2 < len)
             {
                 if (*s == 0)
-                    *s = ';';
+                    *s = L';';
                 s++;
             }
             if (ext2[0] != 0) // mask changed
             {
-                if (strcmp(ext2, m) != 0)
-                    MainWindow->ViewerMasks->At(i)->Set(ext2, "", "", "");
+                if (wcscmp(ext2, m) != 0)
+                    MainWindow->ViewerMasks->At(i)->Set(ext2, L"", L"", L"");
             }
             else // entry removed (last mask deleted)
             {
@@ -1070,24 +1230,24 @@ void CSalamanderConnect::ForceRemoveViewer(const char* mask)
     }
 }
 
-void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOOL updateExts)
+void CSalamanderConnect::AddPanelArchiver(const wchar_t* extensions, BOOL edit, BOOL updateExts)
 {
-    CALL_STACK_MESSAGE3("CSalamanderConnect::AddPanelArchiver(%s, %d)", extensions, edit);
+    CALL_STACK_MESSAGE3("CSalamanderConnect::AddPanelArchiver(%ls, %d)", extensions, edit);
 
     if (!PanelView && (!edit || !PanelEdit) && !updateExts)
         return; // nothing to do (neither a plug-in upgrade nor extension update)
 
-    char ext[300]; // copy of extensions (replace ';' with '\0')
-    int len = (int)strlen(extensions);
+    wchar_t ext[300]; // copy of extensions (replace ';' with '\0')
+    int len = (int)wcslen(extensions);
     if (len > 299)
         len = 299;
-    memcpy(ext, extensions, len);
+    wmemcpy(ext, extensions, len);
     ext[len] = 0;
-    TDirectArray<char*> extArray(10, 5); // array of extensions from "extensions"
-    char* s = ext + len;
+    TDirectArray<wchar_t*> extArray(10, 5); // array of extensions from "extensions"
+    wchar_t* s = ext + len;
     while (s > ext)
     {
-        while (--s >= ext && *s != ';')
+        while (--s >= ext && *s != L';')
             ;
         if (s >= ext)
             *s = 0;
@@ -1098,7 +1258,7 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
 
     int index = -1; // index of the desired intersection of extensions or a record where the plugin provides at least
                     // "view" when updating extensions (the plugin extends/modifies an existing record)
-    char ext2[300]; // copy of the extension from PackerFormatConfig (replace ';' with '\0')
+    wchar_t ext2[300]; // copy of the extension from PackerFormatConfig (replace ';' with '\0')
     int i;
     for (i = 0; i < PackerFormatConfig.GetFormatsCount(); i++)
     {
@@ -1113,26 +1273,26 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
                 continue; // this is an extension upgrade; we don't look for intersections
         }
 
-        len = (int)strlen(PackerFormatConfig.GetExt(i));
+        len = (int)wcslen(PackerFormatConfig.GetExt(i));
         if (len > 299)
             len = 299;
-        memcpy(ext2, PackerFormatConfig.GetExt(i), len);
+        wmemcpy(ext2, PackerFormatConfig.GetExt(i), len);
         ext2[len] = 0;
         s = ext2 + len;
         while (s > ext2)
         {
-            while (--s >= ext2 && *s != ';')
+            while (--s >= ext2 && *s != L';')
                 ;
             if (s >= ext2)
                 *s = 0;
             int j;
             for (j = 0; j < extArray.Count; j++)
             {
-                if (found || StrICmp(s + 1, extArray[j]) == 0) // upgrade or extension sets have a non-empty intersection
+                if (found || StrICmpW(s + 1, extArray[j]) == 0) // upgrade or extension sets have a non-empty intersection
                 {
                     index = i;
 
-                    if (!found || StrICmp(s + 1, extArray[j]) == 0) // only if the extensions match
+                    if (!found || StrICmpW(s + 1, extArray[j]) == 0) // only if the extensions match
                     {
                         extArray.Delete(j); // it's already in ext2, so it doesn't need to be in ext
                         if (!extArray.IsGood())
@@ -1144,14 +1304,14 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
                     {
                         if (!firstRound || !found)
                         {
-                            while (--s >= ext2 && *s != ';')
+                            while (--s >= ext2 && *s != L';')
                                 ;
                             if (s >= ext2)
                                 *s = 0;
                         }
                         for (j = 0; j < extArray.Count; j++)
                         {
-                            if (StrICmp(s + 1, extArray[j]) == 0) // another identical extension
+                            if (StrICmpW(s + 1, extArray[j]) == 0) // another identical extension
                             {
                                 extArray.Delete(j); // it's already in ext2, so it doesn't need to be in ext
                                 if (!extArray.IsGood())
@@ -1176,22 +1336,22 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
         ext2[0] = 0;
     }
     else
-        strcpy(ext2, PackerFormatConfig.GetExt(index));
+        wcscpy(ext2, PackerFormatConfig.GetExt(index));
 
     // in ext2, we prepare the union of the old extensions and the new extensions, or only the new extensions (if applicable)
-    len = (int)strlen(ext2);
-    if (len > 0 && ext2[len - 1] == ';')
+    len = (int)wcslen(ext2);
+    if (len > 0 && ext2[len - 1] == L';')
         len--;
     for (i = 0; i < extArray.Count; i++)
     {
-        int len2 = (int)strlen(extArray[i]);
+        int len2 = (int)wcslen(extArray[i]);
         if (len + len2 + 1 <= 300) // add the extension to ext2 if it fits
         {
             if (len != 0)
-                ext2[len] = ';';
+                ext2[len] = L';';
             else
                 len--;
-            strcpy(ext2 + len + 1, extArray[i]);
+            wcscpy(ext2 + len + 1, extArray[i]);
             len += len2 + 1;
         }
     }
@@ -1276,9 +1436,9 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
     }
 }
 
-void CSalamanderConnect::ForceRemovePanelArchiver(const char* extension)
+void CSalamanderConnect::ForceRemovePanelArchiver(const wchar_t* extension)
 {
-    CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemovePanelArchiver(%s)", extension);
+    CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemovePanelArchiver(%ls)", extension);
     BOOL needBuild = FALSE;
 
 NEXT_ROUND:
@@ -1287,29 +1447,29 @@ NEXT_ROUND:
     {
         if (PackerFormatConfig.GetUnpackerIndex(i) == -Index - 1) // if the plug-in is configured at least for "view"
         {
-            char ext[300];
-            lstrcpyn(ext, PackerFormatConfig.GetExt(i), _countof(ext));
-            char* s = ext + strlen(ext);
-            char* extEnd = NULL;
+            wchar_t ext[300];
+            lstrcpynW(ext, PackerFormatConfig.GetExt(i), _countof(ext));
+            wchar_t* s = ext + wcslen(ext);
+            wchar_t* extEnd = NULL;
             while (s > ext)
             {
-                while (--s >= ext && *s != ';')
+                while (--s >= ext && *s != L';')
                     ;
                 if (extEnd != NULL)
                     *extEnd = 0;
-                if (StrICmp(s + 1, extension) == 0) // the searched extension found
+                if (StrICmpW(s + 1, extension) == 0) // the searched extension found
                 {
                     if (s < ext)
                     {
                         if (extEnd != NULL)
-                            memmove(ext, extEnd + 1, strlen(extEnd + 1) + 1);
+                            wmemmove(ext, extEnd + 1, wcslen(extEnd + 1) + 1);
                         else
                             ext[0] = 0;
                     }
                     else
                     {
                         if (extEnd != NULL)
-                            memmove(s + 1, extEnd + 1, strlen(extEnd + 1) + 1);
+                            wmemmove(s + 1, extEnd + 1, wcslen(extEnd + 1) + 1);
                         else
                             *s = 0;
                     }
@@ -1327,7 +1487,7 @@ NEXT_ROUND:
                     goto NEXT_ROUND; // restart the entire search (minor issue = no point in optimizations)
                 }
                 if (extEnd != NULL)
-                    *extEnd = ';';
+                    *extEnd = L';';
                 extEnd = s;
             }
         }
@@ -1336,10 +1496,10 @@ NEXT_ROUND:
         PackerFormatConfig.BuildArray();
 }
 
-void CSalamanderConnect::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+void CSalamanderConnect::AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState,
                                      DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
-    CALL_STACK_MESSAGE9("CSalamanderConnect::AddMenuItem(%d, %s, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
+    CALL_STACK_MESSAGE9("CSalamanderConnect::AddMenuItem(%d, %S, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, hotKey, id, callGetState, state_or, state_and, skillLevel);
     if (iconIndex < -1)
         iconIndex = -1;
@@ -1364,10 +1524,10 @@ void CSalamanderConnect::AddMenuItem(int iconIndex, const char* name, DWORD hotK
     }
 }
 
-void CSalamanderConnect::AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+void CSalamanderConnect::AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState,
                                          DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
-    CALL_STACK_MESSAGE8("CSalamanderConnect::AddSubmenuStart(%d, %s, %d, %d, 0x%X, 0x%X, 0x%X)",
+    CALL_STACK_MESSAGE8("CSalamanderConnect::AddSubmenuStart(%d, %S, %d, %d, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, id, callGetState, state_or, state_and, skillLevel);
     if (name == NULL)
     {
@@ -1427,9 +1587,9 @@ void CSalamanderConnect::AddSubmenuEnd()
         TRACE_E("Incorrect call to CSalamanderConnect::AddSubmenuEnd(): no submenu is opened!");
 }
 
-void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex)
+void CSalamanderConnect::SetChangeDriveMenuItem(const wchar_t* title, int iconIndex)
 {
-    CALL_STACK_MESSAGE3("CSalamanderConnect::SetChangeDriveMenuItem(%s, %d)", title, iconIndex);
+    CALL_STACK_MESSAGE3("CSalamanderConnect::SetChangeDriveMenuItem(%ls, %d)", title, iconIndex);
     CPluginData* p = Plugins.Get(Index);
     if (p != NULL)
     {
@@ -1456,7 +1616,7 @@ void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex
     }
 }
 
-void CSalamanderConnect::SetThumbnailLoader(const char* masks)
+void CSalamanderConnect::SetThumbnailLoader(const wchar_t* masks)
 {
     if (masks == NULL || *masks == 0)
     {
@@ -1474,7 +1634,7 @@ void CSalamanderConnect::SetThumbnailLoader(const char* masks)
             if (!p->ThumbnailMasks.PrepareMasks(err)) // error
             {
                 TRACE_E("Unable to set thumbnail loader masks. Error in group mask (syntactical).");
-                p->ThumbnailMasks.SetMasksString("");
+                p->ThumbnailMasks.SetMasksString(L"");
             }
         }
         else
@@ -1588,10 +1748,10 @@ void CSalamanderConnect::SetIconListForGUI(CGUIIconListAbstract* iconList)
 // CSalamanderBuildMenu
 //
 
-void CSalamanderBuildMenu::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+void CSalamanderBuildMenu::AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState,
                                        DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
-    CALL_STACK_MESSAGE9("CSalamanderBuildMenu::AddMenuItem(%d, %s, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
+    CALL_STACK_MESSAGE9("CSalamanderBuildMenu::AddMenuItem(%d, %S, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, hotKey, id, callGetState, state_or, state_and, skillLevel);
     if (iconIndex < -1)
         iconIndex = -1;
@@ -1611,10 +1771,10 @@ void CSalamanderBuildMenu::AddMenuItem(int iconIndex, const char* name, DWORD ho
     }
 }
 
-void CSalamanderBuildMenu::AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+void CSalamanderBuildMenu::AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState,
                                            DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
-    CALL_STACK_MESSAGE8("CSalamanderBuildMenu::AddSubmenuStart(%d, %s, %d, %d, 0x%X, 0x%X, 0x%X)",
+    CALL_STACK_MESSAGE8("CSalamanderBuildMenu::AddSubmenuStart(%d, %S, %d, %d, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, id, callGetState, state_or, state_and, skillLevel);
     SubmenuLevel++;
     CPluginData* p = Plugins.Get(Index);
@@ -1685,16 +1845,16 @@ BOOL CSalamanderRegistry::ClearKey(HKEY key)
     return ::ClearKey(key);
 }
 
-BOOL CSalamanderRegistry::CreateKey(HKEY key, const char* name, HKEY& createdKey)
+BOOL CSalamanderRegistry::CreateKey(HKEY key, const wchar_t* name, HKEY& createdKey)
 {
     CALL_STACK_MESSAGE1("CSalamanderRegistry::CreateKey()");
-    return ::CreateKey(key, name, createdKey);
+    return ::CreateKeyW(key, name, createdKey);
 }
 
-BOOL CSalamanderRegistry::OpenKey(HKEY key, const char* name, HKEY& openedKey)
+BOOL CSalamanderRegistry::OpenKey(HKEY key, const wchar_t* name, HKEY& openedKey)
 {
     CALL_STACK_MESSAGE1("CSalamanderRegistry::OpenKey()");
-    return ::OpenKey(key, name, openedKey);
+    return ::OpenKeyW(key, name, openedKey);
 }
 
 void CSalamanderRegistry::CloseKey(HKEY key)
@@ -1703,34 +1863,34 @@ void CSalamanderRegistry::CloseKey(HKEY key)
     ::CloseKey(key);
 }
 
-BOOL CSalamanderRegistry::DeleteKey(HKEY key, const char* name)
+BOOL CSalamanderRegistry::DeleteKey(HKEY key, const wchar_t* name)
 {
     CALL_STACK_MESSAGE1("CSalamanderRegistry::DeleteKey()");
-    return ::DeleteKey(key, name);
+    return ::DeleteKeyW(key, name);
 }
 
-BOOL CSalamanderRegistry::GetValue(HKEY key, const char* name, DWORD type, void* buffer, DWORD bufferSize)
+BOOL CSalamanderRegistry::GetValue(HKEY key, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize)
 {
     SLOW_CALL_STACK_MESSAGE1("CSalamanderRegistry::GetValue()");
-    return ::GetValue(key, name, type, buffer, bufferSize);
+    return ::GetValueW(key, name, type, buffer, bufferSize);
 }
 
-BOOL CSalamanderRegistry::SetValue(HKEY key, const char* name, DWORD type, const void* data, DWORD dataSize)
+BOOL CSalamanderRegistry::SetValue(HKEY key, const wchar_t* name, DWORD type, const void* data, DWORD dataSize)
 {
     SLOW_CALL_STACK_MESSAGE1("CSalamanderRegistry::SetValue()");
-    return ::SetValue(key, name, type, data, dataSize);
+    return ::SetValueW(key, name, type, data, dataSize);
 }
 
-BOOL CSalamanderRegistry::DeleteValue(HKEY key, const char* name)
+BOOL CSalamanderRegistry::DeleteValue(HKEY key, const wchar_t* name)
 {
     CALL_STACK_MESSAGE1("CSalamanderRegistry::DeleteValue()");
-    return ::DeleteValue(key, name);
+    return ::DeleteValueW(key, name);
 }
 
-BOOL CSalamanderRegistry::GetSize(HKEY key, const char* name, DWORD type, DWORD& bufferSize)
+BOOL CSalamanderRegistry::GetSize(HKEY key, const wchar_t* name, DWORD type, DWORD& bufferSize)
 {
-    SLOW_CALL_STACK_MESSAGE3("CSalamanderRegistry::GetSize(, %s, 0x%x, )", name, type);
-    return ::GetSize(key, name, type, bufferSize);
+    SLOW_CALL_STACK_MESSAGE3("CSalamanderRegistry::GetSize(, %ls, 0x%x, )", name, type);
+    return ::GetSizeW(key, name, type, bufferSize);
 }
 
 //
@@ -1738,12 +1898,12 @@ BOOL CSalamanderRegistry::GetSize(HKEY key, const char* name, DWORD type, DWORD&
 // CSalamanderPluginEntry
 //
 
-BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD functions,
-                                                const char* version, const char* copyright,
-                                                const char* description, const char* regKeyName,
-                                                const char* extensions, const char* fsName)
+BOOL CSalamanderPluginEntry::SetBasicPluginData(const wchar_t* pluginName, DWORD functions,
+                                                const wchar_t* version, const wchar_t* copyright,
+                                                const wchar_t* description, const wchar_t* regKeyName,
+                                                const wchar_t* extensions, const wchar_t* fsName)
 {
-    CALL_STACK_MESSAGE9("CSalamanderPluginEntry::SetBasicPluginData(%s, 0x%X, %s, %s, %s, %s, %s, %s)",
+    CALL_STACK_MESSAGE9("CSalamanderPluginEntry::SetBasicPluginData(%ls, 0x%X, %ls, %ls, %ls, %ls, %ls, %ls)",
                         pluginName, functions, version, copyright, description, regKeyName, extensions,
                         fsName);
 
@@ -1782,7 +1942,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
         Plugin->SupportViewer && !supportViewer ||
         Plugin->SupportFS && !supportFS)
     { // downgrading capabilities is not possible ...
-        std::wstring msg = FormatStrW(LoadStrW(IDS_REINSTALLPLUGIN), AnsiToWide(Plugin->Name.c_str()).c_str(), AnsiToWide(Plugin->DLLName.c_str()).c_str());
+        std::wstring msg = FormatStrW(LoadStrW(IDS_REINSTALLPLUGIN), Plugin->Name.c_str(), Plugin->DLLName.c_str());
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         Error = TRUE;
         return FALSE;
@@ -1804,15 +1964,13 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
     Plugin->SalamanderDebug.Init(Plugin->DLLName.c_str(), Plugin->Version.c_str());
     Plugin->SalamanderPasswordManager.Init(Plugin->DLLName.c_str());
     Plugin->Copyright = copyright;
-    Plugin->Extensions = (supportPanelView || supportPanelEdit) ? extensions : "";
+    Plugin->Extensions = (supportPanelView || supportPanelEdit) ? extensions : L"";
     Plugin->Description = description;
     if (supportLoadSave)
     {
         if (Plugin->RegKeyName.empty() || Plugin->RegKeyName[0] == 0)
         { // new plugin with load/save - set a new key name in the registry
-            CPathBuffer uniqueKeyName;  // Heap-allocated for long path support
-            Plugins.GetUniqueRegKeyName(uniqueKeyName, regKeyName);
-            Plugin->RegKeyName = uniqueKeyName.Get();
+            Plugin->RegKeyName = Plugins.GetUniqueRegKeyName(regKeyName);
         }
     }
     else // does not support load/save
@@ -1824,9 +1982,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
         OldFSNames = std::move(Plugin->FSNames); // take ownership of old names
         Plugin->FSNames.clear();
 
-        CPathBuffer uniqueFSName;  // Heap-allocated for long path support
-        Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
-        Plugin->FSNames.push_back(uniqueFSName.Get());
+        Plugin->FSNames.push_back(Plugins.GetUniqueFSName(fsName, NULL, &OldFSNames));
     }
     else // does not support FS
     {
@@ -1838,32 +1994,22 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
 }
 
 HINSTANCE
-CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
+CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const wchar_t* pluginName)
 {
     HINSTANCE lang = NULL;
-    CPathBuffer path; // Heap-allocated for long path support
-    CPathBuffer errorText;
-
-    // obtain the path to the plugin's LANG directory
-    const char* dllStr = Plugin->DLLName.c_str();
-    if ((*dllStr != '\\' || *(dllStr + 1) != '\\') && // not UNC
-        (*dllStr == 0 || *(dllStr + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
-    {
-        GetModuleFileName(HInstance, path, path.Size());
-        char* s = strrchr(path, '\\') + 1;
-        strcpy(s, "plugins\\");
-        strcat(s, Plugin->DLLName.c_str());
-    }
-    else
-        lstrcpyn(path, dllStr, path.Size());
-    char* s = strrchr(path, '\\') + 1;
-    lstrcpyn(s, "lang\\", path.Size() - (int)(s - path.Get()));
-    char* slgName = path.Get() + strlen(path);
-    int slgNameBufSize = path.Size() - (int)(slgName - path.Get());
+    std::wstring pluginPath;
+    if (!GetPluginDllPathOwned(Plugin->DLLName, pluginPath).success)
+        return NULL;
+    const size_t separator = pluginPath.find_last_of(L"\\/");
+    if (separator == std::wstring::npos)
+        return NULL;
+    std::wstring langDirectory(pluginPath, 0, separator + 1);
+    langDirectory.append(L"lang\\");
+    std::wstring slgName = Configuration.LoadedSLGName;
+    std::wstring path = langDirectory + slgName;
 
     // first try to load the SLG of the language Salamander is currently running in
-    lstrcpyn(slgName, Configuration.LoadedSLGName, slgNameBufSize);
-    lang = HANDLES_Q(LoadLibrary(path));
+    lang = HANDLES_Q(LoadLibraryW(path.c_str()));
     WORD languageID = 0;
     if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
     { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
@@ -1871,21 +2017,22 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
             HANDLES(FreeLibrary(lang));
         lang = NULL;
         if (Plugin->LastSLGName.empty() ||                       // no .slg chosen during the previous plugin load
-            _stricmp(slgName, Plugin->LastSLGName.c_str()) == 0) // we already tried this .slg
+            _wcsicmp(slgName.c_str(), Plugin->LastSLGName.c_str()) == 0) // we already tried this .slg
         {
             if (!Configuration.DoNotDispCantLoadPluginSLG)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG1), AnsiToWide(path).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG1), path.c_str());
                 bool dontShow = Configuration.DoNotDispCantLoadPluginSLG != FALSE;
-                gPrompter->ShowErrorWithCheckbox(AnsiToWide(pluginName).c_str(), msg.c_str(),
+                gPrompter->ShowErrorWithCheckbox(pluginName, msg.c_str(),
                                                  LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
                 Configuration.DoNotDispCantLoadPluginSLG = dontShow ? TRUE : FALSE;
             }
         }
         else // try to load the .slg chosen during the previous plugin load
         {
-            lstrcpyn(slgName, Plugin->LastSLGName.c_str(), slgNameBufSize);
-            lang = HANDLES_Q(LoadLibrary(path));
+            slgName = Plugin->LastSLGName;
+            path = langDirectory + slgName;
+            lang = HANDLES_Q(LoadLibraryW(path.c_str()));
             if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
             { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
                 if (lang != NULL)
@@ -1893,9 +2040,9 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                 lang = NULL;
                 if (!Configuration.DoNotDispCantLoadPluginSLG2)
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG2), AnsiToWide(path).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CANTLOADPLUGINSLG2), path.c_str());
                     bool dontShow = Configuration.DoNotDispCantLoadPluginSLG2 != FALSE;
-                    gPrompter->ShowErrorWithCheckbox(AnsiToWide(pluginName).c_str(), msg.c_str(),
+                    gPrompter->ShowErrorWithCheckbox(pluginName, msg.c_str(),
                                                      LoadStrW(IDS_DONOTSHOWCANTLOADPLUGINSLG), &dontShow);
                     Configuration.DoNotDispCantLoadPluginSLG2 = dontShow ? TRUE : FALSE;
                 }
@@ -1903,13 +2050,12 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         }
         if (lang == NULL) // find all .slg files on the disk for the plugin and let the user choose (if there's more than one .slg)
         {
-            CPathBuffer selSLGName; // Heap-allocated for long path support
-            selSLGName[0] = 0;
+            std::wstring selSLGName;
             CLanguageSelectorDialog slgDialog(parent, selSLGName, pluginName);
-            lstrcpyn(slgName, "*.slg", slgNameBufSize);
-            slgDialog.Initialize(path, Plugin->GetPluginDLL());
+            const std::wstring searchPath = langDirectory + L"*.slg";
+            slgDialog.Initialize(searchPath.c_str(), Plugin->GetPluginDLL());
             if (slgDialog.GetLanguagesCount() == 0)
-                gPrompter->ShowError(AnsiToWide(pluginName).c_str(), LoadStrW(IDS_PLUGINSLGNOTFOUND));
+                gPrompter->ShowError(pluginName, LoadStrW(IDS_PLUGINSLGNOTFOUND));
             else
             {
                 if (slgDialog.GetLanguagesCount() == 1)
@@ -1917,9 +2063,9 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                 else
                 {
                     if (Configuration.UseAsAltSLGInOtherPlugins &&
-                        slgDialog.SLGNameExists(Configuration.AltPluginSLGName))
+                        slgDialog.SLGNameExists(Configuration.AltPluginSLGName.c_str()))
                     {
-                        lstrcpy(selSLGName, Configuration.AltPluginSLGName);
+                        selSLGName = Configuration.AltPluginSLGName;
                     }
                     else
                     {
@@ -1928,8 +2074,9 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                         slgDialog.Execute();
                     }
                 }
-                lstrcpyn(slgName, selSLGName, slgNameBufSize);
-                lang = HANDLES_Q(LoadLibrary(path));
+                slgName = selSLGName;
+                path = langDirectory + slgName;
+                lang = HANDLES_Q(LoadLibraryW(path.c_str()));
                 if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
                 { // shouldn't theoretically happen (dialog verifies the validity of the .SLG module)
                     if (lang != NULL)
@@ -1943,7 +2090,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
     Plugin->LastSLGName.clear();
     if (lang != NULL)
     {
-        if (_stricmp(slgName, Configuration.LoadedSLGName) != 0)
+        if (_wcsicmp(slgName.c_str(), Configuration.LoadedSLGName.c_str()) != 0)
             Plugin->LastSLGName = slgName;
         if (Plugin->SalamanderGeneral.LanguageModule == NULL)
             Plugin->SalamanderGeneral.LanguageModule = lang;
@@ -1957,15 +2104,15 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
     return lang;
 }
 
-void CSalamanderPluginEntry::SetPluginHomePageURL(const char* url)
+void CSalamanderPluginEntry::SetPluginHomePageURL(const wchar_t* url)
 {
-    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::SetPluginHomePageURL(%s)", url);
-    Plugin->PluginHomePageURL = url ? url : "";
+    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::SetPluginHomePageURL(%ls)", url);
+    Plugin->PluginHomePageURL = url ? url : L"";
 }
 
-BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
+BOOL CSalamanderPluginEntry::AddFSName(const wchar_t* fsName, int* newFSNameIndex)
 {
-    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::AddFSName(%s,)", fsName);
+    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::AddFSName(%ls,)", fsName);
     if (fsName == NULL || newFSNameIndex == NULL)
     {
         TRACE_E("CSalamanderPluginEntry::AddFSName(): invalid parameter (NULL)!");
@@ -1990,9 +2137,7 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
         return FALSE;
     }
 
-    CPathBuffer uniqueFSName;  // Heap-allocated for long path support
-    Plugins.GetUniqueFSName(uniqueFSName, fsName, NULL, &OldFSNames);
-    Plugin->FSNames.push_back(uniqueFSName.Get());
+    Plugin->FSNames.push_back(Plugins.GetUniqueFSName(fsName, NULL, &OldFSNames));
     *newFSNameIndex = (int)Plugin->FSNames.size() - 1;
     return TRUE;
 }
@@ -2002,7 +2147,7 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
 // CPluginMenuItem
 //
 
-CPluginMenuItem::CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, DWORD stateMask,
+CPluginMenuItem::CPluginMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, DWORD stateMask,
                                  int id, DWORD skillLevel, CPluginMenuItemType type)
 {
     Type = type;
@@ -2015,11 +2160,11 @@ CPluginMenuItem::CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, 
     {
         // since version 2.5 beta 7 hot keys are supported
         // the hot key must not be part of the text
-        auto tabPos = Name.find('\t');
-        if (tabPos != std::string::npos)
+        auto tabPos = Name.find(L'\t');
+        if (tabPos != std::wstring::npos)
         {
             if (Configuration.ConfigVersion >= 25) // warn only on newer configurations
-                TRACE_E("Plugin menu item contains hot key (" << name << "). Use the AddMenuItem/'hotKey' parameter instead.");
+                TRACE_EW(L"Plugin menu item contains hot key (" << name << L"). Use the AddMenuItem/'hotKey' parameter instead.");
             Name.resize(tabPos);
         }
     }
@@ -2043,23 +2188,22 @@ CPluginMenuItem::CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, 
 // CPluginData
 //
 
-CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPanelView,
+CPluginData::CPluginData(const wchar_t* name, const wchar_t* dllName, BOOL supportPanelView,
                          BOOL supportPanelEdit, BOOL supportCustomPack, BOOL supportCustomUnpack,
                          BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
-                         BOOL supportFS, BOOL supportDynMenuExt, const char* version, const char* copyright,
-                         const char* description, const char* regKeyName, const char* extensions,
-                         const std::vector<std::string>* fsNames, BOOL loadOnStart, char* lastSLGName,
-                         const char* pluginHomePageURL)
+                         BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version, const wchar_t* copyright,
+                         const wchar_t* description, const wchar_t* regKeyName, const wchar_t* extensions,
+                         const std::vector<std::wstring>* fsNames, BOOL loadOnStart, const wchar_t* lastSLGName,
+                         const wchar_t* pluginHomePageURL)
     : MenuItems(10, 5), Commands(1, 5), PluginIfaceForFS(NULL, 0),
       PluginIfaceForMenuExt(NULL, 0)
 {
-    CALL_STACK_MESSAGE20("CPluginData::CPluginData(%s, %s, %d, %d, %d, %d, %d, %d, %d, %d, %d, %s, %s, %s, %s, %s, , %d, %s, %s)",
+    CALL_STACK_MESSAGE20("CPluginData::CPluginData(%ls, %ls, %d, %d, %d, %d, %d, %d, %d, %d, %d, %ls, %ls, %ls, %ls, %ls, , %d, %ls, %ls)",
                          name, dllName, supportPanelView, supportPanelEdit, supportCustomPack,
                          supportCustomUnpack, supportConfiguration, supportLoadSave, supportViewer,
                          supportFS, supportDynMenuExt, version, copyright, description, regKeyName,
                          extensions, loadOnStart, lastSLGName, pluginHomePageURL);
     ArcCacheHaveInfo = FALSE;
-    ArcCacheTmpPath = NULL;
     ArcCacheOwnDelete = FALSE;
     ArcCacheCacheCopies = TRUE;
     PluginIcons = NULL;
@@ -2074,18 +2218,18 @@ CPluginData::CPluginData(const char* name, const char* dllName, BOOL supportPane
     SubMenu = NULL;
     DLL = NULL;
     BuiltForVersion = 0;
-    Name = name ? name : "";
-    DLLName = dllName ? dllName : "";
-    Version = version ? version : "";
-    Copyright = copyright ? copyright : "";
-    Extensions = extensions ? extensions : "";
-    Description = description ? description : "";
-    RegKeyName = regKeyName ? regKeyName : "";
+    Name = name ? name : L"";
+    DLLName = dllName ? dllName : L"";
+    Version = version ? version : L"";
+    Copyright = copyright ? copyright : L"";
+    Extensions = extensions ? extensions : L"";
+    Description = description ? description : L"";
+    RegKeyName = regKeyName ? regKeyName : L"";
     SupportFS = supportFS;
     if (SupportFS && fsNames != NULL)
         FSNames = *fsNames; // vector copy; throws std::bad_alloc on OOM
-    LastSLGName = (lastSLGName != NULL && lastSLGName[0] != 0) ? lastSLGName : "";
-    PluginHomePageURL = pluginHomePageURL != NULL ? pluginHomePageURL : "";
+    LastSLGName = (lastSLGName != NULL && lastSLGName[0] != 0) ? lastSLGName : L"";
+    PluginHomePageURL = pluginHomePageURL != NULL ? pluginHomePageURL : L"";
     SalamanderDebug.Init(DLLName.c_str(), Version.c_str());
     SalamanderPasswordManager.Init(DLLName.c_str());
     SupportPanelView = supportPanelView;
@@ -2132,17 +2276,17 @@ CPluginData::~CPluginData()
 #endif // _DEBUG
     if (PluginIface.NotEmpty())
         PluginIface.Release(NULL, TRUE);
+    LegacyHost.reset();
     if (DLL != NULL)
     {
         TRACE_E("CPluginData::~CPluginData(): unexpected situation (2)!");
         HANDLES(FreeLibrary(DLL));
     }
     // Name, DLLName, Version, Copyright, Extensions, Description, RegKeyName,
-    // ChDrvMenuFSItemName, LastSLGName, PluginHomePageURL are std::string (auto-destruct)
-    // FSNames is std::vector<std::string> (auto-destruct)
-    // BugReportMessage, BugReportEMail, UnpackDlgUnpackMask are std::string (auto-destruct)
-    if (ArcCacheTmpPath != NULL)
-        free(ArcCacheTmpPath);
+    // ChDrvMenuFSItemName, LastSLGName, PluginHomePageURL are std::wstring (auto-destruct)
+    // FSNames is std::vector<std::wstring> (auto-destruct)
+    // BugReportMessage, BugReportEMail, UnpackDlgUnpackMask, and ArcCacheTmpPath are
+    // std::wstring (auto-destruct).
     if (PluginIcons != NULL)
         delete PluginIcons;
     if (PluginIconsGray != NULL)
@@ -2158,40 +2302,34 @@ CPluginData::~CPluginData()
 
 BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUnsupOnX64, BOOL releaseDynMenuIcons)
 {
-    CALL_STACK_MESSAGE8("CPluginData::InitDLL(0x%p, %d, %d, %d, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE8("CPluginData::InitDLL(0x%p, %d, %d, %d, %d) (%ls v. %ls)",
                         parent, quiet, waitCursor, showUnsupOnX64,
                         releaseDynMenuIcons, DLLName.c_str(), Version.c_str());
-
-    CPathBuffer bufText;
 
     if (DLL == NULL)
     {
         BOOL refreshUNCRootPaths = FALSE;
 
         // obtain the full DLL name
-        CPathBuffer buf; // Heap-allocated for long path support
-        const char* dllStr = DLLName.c_str();
-        char* s;
-        if ((*dllStr != '\\' || *(dllStr + 1) != '\\') && // not UNC
-            (*dllStr == 0 || *(dllStr + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
+        std::wstring pluginPath;
+        const PathResult pluginPathResult = GetPluginDllPathOwned(DLLName, pluginPath);
+        if (!pluginPathResult.success)
         {
-            GetModuleFileName(HInstance, buf, buf.Size());
-            s = strrchr(buf, '\\') + 1;
-            strcpy(s, "plugins\\");
-            strcat(s, DLLName.c_str());
-            s = buf;
+            if (!quiet)
+            {
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), Name.c_str(),
+                                              DLLName.c_str(), GetErrorTextOwned(pluginPathResult.errorCode).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+            }
+            return FALSE;
         }
-        else
-        {
-            lstrcpyn(buf, dllStr, buf.Size());
-            s = buf;
-        }
+        const wchar_t* s = pluginPath.c_str();
 
         // load the DLL
         HCURSOR oldCur;
         if (waitCursor)
             oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-        DLL = HANDLES(LoadLibraryEx(s, NULL, LOAD_WITH_ALTERED_SEARCH_PATH));
+        DLL = HANDLES(LoadLibraryExW(s, NULL, LOAD_WITH_ALTERED_SEARCH_PATH));
         if (waitCursor)
             SetCursor(oldCur);
         if (DLL == NULL) // error
@@ -2199,14 +2337,14 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
             DWORD err = GetLastError();
             if (!quiet)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str(), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOLOADPLUGIN), Name.c_str(), s, GetErrorTextOwned(err).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             }
         }
         else // connect to the DLL
         {
-            FSalamanderPluginEntry entry = (FSalamanderPluginEntry)GetProcAddress(DLL, "SalamanderPluginEntry"); // plug-in entry point
-            if (entry != NULL)
+            FARPROC entryProc = GetProcAddress(DLL, "SalamanderPluginEntry"); // plug-in entry point
+            if (entryProc != NULL)
             {
 #ifdef _DEBUG
                 AddModuleWithPossibleMemoryLeaks(s);
@@ -2232,9 +2370,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
                 // clear the disk-cache settings for the archiver; we must obtain them again
                 ArcCacheHaveInfo = FALSE;
-                if (ArcCacheTmpPath != NULL)
-                    free(ArcCacheTmpPath);
-                ArcCacheTmpPath = NULL;
+                ArcCacheTmpPath.clear();
                 ArcCacheOwnDelete = FALSE;
                 ArcCacheCacheCopies = TRUE;
 
@@ -2252,31 +2388,32 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                             TRACE_E("CPluginData::InitDLL(): nonsense: SalamanderPluginGetSDKVer() returns older version than SalamanderPluginGetReqVer()");
                     }
                 }
-                BOOL oldVer = BuiltForVersion < PLUGIN_REQVER;
                 BOOL suppressOldVerError = FALSE;
-                if (oldVer && BuiltForVersion == PLUGIN_LEGACY_REQVER)
+                sally::compat::RoutingDecision abiRoute =
+                    sally::compat::DecideAbiRoute(
+                        BuiltForVersion, LAST_VERSION_OF_SALAMANDER,
+                        LegacyCompatApproved != FALSE);
+                if (abiRoute.route == sally::compat::AbiRoute::NeedsUserApproval &&
+                    !quiet)
                 {
-                    if (LegacyCompatApproved)
+                    std::wstring msg;
+                    if (Name.empty() || Name[0] == 0)
+                        msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM2), s);
+                    else
+                        msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM), Name.c_str(), s);
+                    if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                     {
-                        oldVer = FALSE;
+                        LegacyCompatApproved = TRUE; // persist in configuration so this path is not prompted again
+                        abiRoute = sally::compat::DecideAbiRoute(
+                            BuiltForVersion, LAST_VERSION_OF_SALAMANDER, true);
                     }
-                    else if (!quiet)
-                    {
-                        std::wstring msg;
-                        if (Name.empty() || Name[0] == 0)
-                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM2), AnsiToWide(s).c_str());
-                        else
-                            msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION_CONFIRM), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
-                        if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
-                        {
-                            LegacyCompatApproved = TRUE; // persist in configuration so this path is not prompted again
-                            oldVer = FALSE;
-                        }
-                        else
-                        {
-                            suppressOldVerError = TRUE; // user already refused in this attempt
-                        }
-                    }
+                    else
+                        suppressOldVerError = TRUE; // user already refused in this attempt
+                }
+                BOOL oldVer = !abiRoute.loadable();
+                if (abiRoute.route == sally::compat::AbiRoute::Refused)
+                {
+                    TRACE_E("CPluginData::InitDLL(): plugin ABI version " << BuiltForVersion << " is refused by the ABI route.");
                 }
                 if (!oldVer)
                 {
@@ -2297,7 +2434,22 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     SalamanderGeneral.Init((CPluginInterfaceAbstract*)-1); // so SetFlagLoadOnSalamanderStart can be used from the entry point
 
                     // !!! CALLING THE PLUGIN ENTRY POINT !!!
-                    CPluginInterfaceAbstract* resIface = entry(&salamander);
+                    CPluginInterfaceAbstract* resIface = NULL;
+                    if (abiRoute.needsAdapter())
+                    {
+                        LegacyHost = sally::compat::CreateLegacyPluginHost(
+                            salamander, SalamanderDebug, SalamanderGeneral,
+                            SalSafeFile, SalamanderGUI, BuiltForVersion);
+                        if (LegacyHost)
+                            resIface = sally::compat::InvokeLegacyPluginEntry(
+                                *LegacyHost, entryProc);
+                    }
+                    else
+                    {
+                        FSalamanderPluginEntry entry =
+                            reinterpret_cast<FSalamanderPluginEntry>(entryProc);
+                        resIface = entry(&salamander);
+                    }
 
                     Plugins.EnterDataCS();
                     PluginIface.Init(resIface, BuiltForVersion);
@@ -2316,25 +2468,6 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         pluginNethoodChanged = PluginIsNethood != oldPluginIsNethood;
                         if (pluginNethoodChanged)
                             refreshUNCRootPaths = TRUE;
-                    }
-
-                    if (!oldVer && ShouldRejectBrokenWideFSPlugin(PluginIface, BuiltForVersion))
-                    {
-                        PluginIsNethood = oldPluginIsNethood;
-                        PluginUsesPasswordManager = oldPluginUsesPasswordManager;
-                        if (pluginNethoodChanged)
-                            refreshUNCRootPaths = FALSE;
-                        oldVer = TRUE;
-                        suppressOldVerError = TRUE;
-                        if (!quiet)
-                        {
-                            std::wstring msg;
-                            if (Name.empty() || Name[0] == 0)
-                                msg = FormatStrW(LoadStrW(IDS_BROKENFSPLUGINVERSION2), AnsiToWide(s).c_str());
-                            else
-                                msg = FormatStrW(LoadStrW(IDS_BROKENFSPLUGINVERSION), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                        }
                     }
                 }
                 else // probably unnecessary, just to be safe
@@ -2359,11 +2492,24 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     {
                         if (!quiet)
                         {
+                            // The quarantined 104 vintage says so by name. That
+                            // message went out with ShouldRejectBrokenWideFSPlugin
+                            // while the routing kept refusing the vintage, so a
+                            // broken transitional FS ABI was reported as a plain
+                            // "plugin too old" — sending the user to look for an
+                            // update that may already be installed. The problem is
+                            // the ABI, not the age.
+                            const bool quarantined =
+                                abiRoute.reason == sally::compat::RefusalReason::Quarantined;
+                            const int withName = quarantined ? IDS_BROKENFSPLUGINVERSION
+                                                             : IDS_OLDPLUGINVERSION;
+                            const int withoutName = quarantined ? IDS_BROKENFSPLUGINVERSION2
+                                                                : IDS_OLDPLUGINVERSION2;
                             std::wstring msg;
                             if (Name.empty() || Name[0] == 0)
-                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION2), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(withoutName), s);
                             else
-                                msg = FormatStrW(LoadStrW(IDS_OLDPLUGINVERSION), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(withName), Name.c_str(), s);
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                     }
@@ -2397,17 +2543,17 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         LoadSaveToRegistryMutex.Enter();
                         HKEY hSal;
                         if (SALAMANDER_ROOT_REG != NULL &&
-                            OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, hSal))
+                            OpenKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, hSal))
                         {
                             HKEY actKey;
-                            if (OpenKey(hSal, SALAMANDER_PLUGINSCONFIG, actKey))
+                            if (OpenKeyW(hSal, SALAMANDER_PLUGINSCONFIG, actKey))
                             {
                                 HKEY regKey;
-                                if (OpenKey(actKey, RegKeyName.c_str(), regKey))
+                                if (OpenKeyW(actKey, RegKeyName.c_str(), regKey))
                                 {
                                     CSalamanderRegistry registry;
                                     {
-                                        CALL_STACK_MESSAGE3("1.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+                                        CALL_STACK_MESSAGE3("1.PluginIface.LoadConfiguration(, ,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
                                         PluginIface.LoadConfiguration(parent, regKey, &registry);
                                     }
                                     loaded = TRUE;
@@ -2424,12 +2570,12 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     {
                         CSalamanderRegistry registry;
                         {
-                            CALL_STACK_MESSAGE3("2.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+                            CALL_STACK_MESSAGE3("2.PluginIface.LoadConfiguration(, ,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
                             PluginIface.LoadConfiguration(parent, NULL, &registry);
                         }
                     }
 
-                    ThumbnailMasks.SetMasksString(""); // remove masks for the thumbnail loader; only the new ones apply
+                    ThumbnailMasks.SetMasksString(L""); // remove masks for the thumbnail loader; only the new ones apply
                     ThumbnailMasksDisabled = FALSE;
                     if (PluginIcons != NULL)
                     {
@@ -2469,7 +2615,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     CSalamanderConnect salConnect(Plugins.GetIndexJustForConnect(this), supportCustomPack, supportCustomUnpack,
                                                   supportPanelView, supportPanelEdit, supportViewer);
                     {
-                        CALL_STACK_MESSAGE3("PluginIface.Connect(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+                        CALL_STACK_MESSAGE3("PluginIface.Connect(,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
                         PluginIface.Connect(parent, &salConnect); // call the plugin's Connect
                         if (!SupportDynMenuExt)
                             HotKeysMerge(&oldMenuItems); // synchronize hot keys
@@ -2502,7 +2648,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                             TRACE_E("The plugin didn't provide interface for file-system (see GetInterfaceForFS).");
                         }
                         {
-                            CALL_STACK_MESSAGE3("PluginIface.Release(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+                            CALL_STACK_MESSAGE3("PluginIface.Release(,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
                             PluginIface.Release(parent, TRUE);
                         }
                         Plugins.EnterDataCS();
@@ -2516,6 +2662,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         SalamanderGeneral.Init(NULL);
                     }
                     SalamanderGeneral.Clear();
+                    LegacyHost.reset();
                     HANDLES(FreeLibrary(DLL));
                     DLL = NULL;
                     BuiltForVersion = 0;
@@ -2529,9 +2676,9 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         {
                             std::wstring msg;
                             if (Name.empty() || Name[0] == 0)
-                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID2), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID2), s);
                             else
-                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID), AnsiToWide(Name.c_str()).c_str(), AnsiToWide(s).c_str());
+                                msg = FormatStrW(LoadStrW(IDS_PLUGININVALID), Name.c_str(), s);
                             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         }
                     }
@@ -2544,7 +2691,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
 
                 if (!quiet)
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOFINDPLUGINENTRY), AnsiToWide(s).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOFINDPLUGINENTRY), s);
                     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 }
             }
@@ -2556,14 +2703,14 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         if (refreshUNCRootPaths && MainWindow != NULL &&
             MainWindow->LeftPanel != NULL && MainWindow->RightPanel != NULL)
         { // the return value of CPlugins::GetFirstNethoodPluginFSName() changed - it affects UNC root paths (whether an up-dir exists or not); refresh needed
-            if (MainWindow->LeftPanel->Is(ptDisk) && IsUNCRootPath(MainWindow->LeftPanel->GetPath()))
+            if (MainWindow->LeftPanel->Is(ptDisk) && IsUNCRootPathW(MainWindow->LeftPanel->GetPathW()))
             {
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
                 int t1 = MyTimeCounter++;
                 HANDLES(LeaveCriticalSection(&TimeCounterSection));
                 PostMessage(MainWindow->LeftPanel->HWindow, WM_USER_REFRESH_DIR, 0, t1);
             }
-            if (MainWindow->RightPanel->Is(ptDisk) && IsUNCRootPath(MainWindow->RightPanel->GetPath()))
+            if (MainWindow->RightPanel->Is(ptDisk) && IsUNCRootPathW(MainWindow->RightPanel->GetPathW()))
             {
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
                 int t1 = MyTimeCounter++;
@@ -2571,13 +2718,13 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 PostMessage(MainWindow->RightPanel->HWindow, WM_USER_REFRESH_DIR, 0, t1);
             }
             if ((MainWindow->LeftPanel->Is(ptDisk) || MainWindow->LeftPanel->Is(ptZIPArchive)) &&
-                IsUNCPath(MainWindow->LeftPanel->GetPath()) &&
+                IsUNCPathW(MainWindow->LeftPanel->GetPathW()) &&
                 MainWindow->LeftPanel->DirectoryLine != NULL)
             {
                 MainWindow->LeftPanel->DirectoryLine->BuildHotTrackItems();
             }
             if ((MainWindow->RightPanel->Is(ptDisk) || MainWindow->RightPanel->Is(ptZIPArchive)) &&
-                IsUNCPath(MainWindow->RightPanel->GetPath()) &&
+                IsUNCPathW(MainWindow->RightPanel->GetPathW()) &&
                 MainWindow->RightPanel->DirectoryLine != NULL)
             {
                 MainWindow->RightPanel->DirectoryLine->BuildHotTrackItems();
@@ -2588,27 +2735,17 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
     return DLL != NULL;
 }
 
-void CPluginData::GetDisplayName(char* buf, int bufSize)
+std::wstring CPluginData::GetDisplayName() const
 {
-    const char* add = LoadStr(IDS_PLUGINSUFFIX);
-    int l = (int)strlen(add);
-    if (l + 1 < bufSize)
-    {
-        lstrcpyn(buf, Name.c_str(), bufSize - l);
-        lstrcpyn(buf + strlen(buf), add, l + 1);
-    }
-    else
-    {
-        if (bufSize > 0)
-            buf[0] = 0;
-    }
+    const wchar_t* add = LoadStrW(IDS_PLUGINSUFFIX);
+    return Name + add;
 }
 
-void CPluginData::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+void CPluginData::AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState,
                               DWORD state_or, DWORD state_and, DWORD skillLevel,
                               CPluginMenuItemType type)
 {
-    CALL_STACK_MESSAGE12("CPluginData::AddMenuItem(%d, %s, %u, %d, %d, 0x%X, 0x%X, 0x%X, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE12("CPluginData::AddMenuItem(%d, %S, %u, %d, %d, 0x%X, 0x%X, 0x%X, %d) (%ls v. %ls)",
                          iconIndex, name, hotKey, id, callGetState, state_or, state_and,
                          skillLevel, (int)type, DLLName.c_str(), Version.c_str());
     DWORD state = 0;
@@ -2646,7 +2783,7 @@ void CPluginData::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int
         delete item;
 }
 
-BOOL CPluginData::GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int hotKeyTextSize)
+BOOL CPluginData::GetMenuItemHotKey(int id, WORD* hotKey, std::wstring* hotKeyText)
 {
     int i;
     for (i = 0; i < MenuItems.Count; i++)
@@ -2657,11 +2794,7 @@ BOOL CPluginData::GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int 
             if (hotKey != NULL)
                 *hotKey = HOTKEY_GET(item->HotKey);
             if (hotKeyText != NULL)
-            {
-                char buff[200];
-                GetHotKeyText(HOTKEY_GET(item->HotKey), buff);
-                lstrcpyn(hotKeyText, buff, hotKeyTextSize);
-            }
+                *hotKeyText = GetHotKeyText(HOTKEY_GET(item->HotKey));
             return TRUE;
         }
     }
@@ -2677,7 +2810,7 @@ void CPluginData::ClearSUID()
 
 BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
 {
-    CALL_STACK_MESSAGE6("CPluginData::Remove(0x%p, %d, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE6("CPluginData::Remove(0x%p, %d, %d) (%ls v. %ls)",
                         parent, index, canDelPluginRegKey, DLLName.c_str(), Version.c_str());
     BOOL unloaded = !GetLoaded();
     if (!unloaded)
@@ -2693,7 +2826,7 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
                 unloaded = TRUE; // will be unloaded and can be removed
             else
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name.c_str()).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), Name.c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     PluginIface.Release(parent, TRUE);
@@ -2704,6 +2837,7 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
             {
                 // unload SPL+SLG and clean up the interfaces
                 SalamanderGeneral.Clear();
+                LegacyHost.reset();
                 if (DLL != NULL)
                     HANDLES(FreeLibrary(DLL));
                 DLL = NULL;
@@ -2878,13 +3012,13 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
             LoadSaveToRegistryMutex.Enter();
             HKEY salamander;
             if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+                OpenKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
             {
                 HKEY actKey;
-                if (OpenKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
+                if (OpenKeyW(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                 {
                     HKEY regKey;
-                    if (OpenKey(actKey, RegKeyName.c_str(), regKey))
+                    if (OpenKeyW(actKey, RegKeyName.c_str(), regKey))
                     {
                         shouldDelete = TRUE;
                         CloseKey(regKey);
@@ -2896,18 +3030,18 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
             if (shouldDelete)
             {
                 if (SALAMANDER_ROOT_REG != NULL &&
-                    CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // ensure write permissions
+                    CreateKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // ensure write permissions
                 {
                     HKEY actKey;
-                    if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
+                    if (CreateKeyW(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                     {
                         HKEY regKey;
-                        if (CreateKey(actKey, RegKeyName.c_str(), regKey))
+                        if (CreateKeyW(actKey, RegKeyName.c_str(), regKey))
                         {
                             ClearKey(regKey);
                             CloseKey(regKey);
                         }
-                        DeleteKey(actKey, RegKeyName.c_str());
+                        DeleteKeyW(actKey, RegKeyName.c_str());
                         CloseKey(actKey);
                     }
                     CloseKey(salamander);
@@ -2923,11 +3057,11 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
 
 void CPluginData::Save(HWND parent, HKEY regKeyConfig)
 {
-    CALL_STACK_MESSAGE5("CPluginData::Save(0x%p, 0x%p) (%s v. %s)", parent, regKeyConfig, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::Save(0x%p, 0x%p) (%ls v. %ls)", parent, regKeyConfig, DLLName.c_str(), Version.c_str());
     if (SupportLoadSave && InitDLL(parent))
     {
         HKEY regKey;
-        if (CreateKey(regKeyConfig, RegKeyName.c_str(), regKey))
+        if (CreateKeyW(regKeyConfig, RegKeyName.c_str(), regKey))
         {
             CSalamanderRegistry registry;
             PluginIface.SaveConfiguration(parent, regKey, &registry);
@@ -2938,7 +3072,7 @@ void CPluginData::Save(HWND parent, HKEY regKeyConfig)
 
 void CPluginData::Configuration(HWND parent)
 {
-    CALL_STACK_MESSAGE4("CPluginData::Configuration(0x%p) (%s v. %s)", parent, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::Configuration(0x%p) (%ls v. %ls)", parent, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.Configuration(parent);
@@ -2947,7 +3081,7 @@ void CPluginData::Configuration(HWND parent)
 
 void CPluginData::Event(int event, DWORD param)
 {
-    CALL_STACK_MESSAGE4("CPluginData::Event(%d,) (%s v. %s)", event, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::Event(%d,) (%ls v. %ls)", event, DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginIface.NotEmpty()) // call only if the plugin is loaded (just a "notification")
     {
         PluginIface.Event(event, param);
@@ -2956,16 +3090,16 @@ void CPluginData::Event(int event, DWORD param)
 
 void CPluginData::ClearHistory(HWND parent)
 {
-    CALL_STACK_MESSAGE3("CPluginData::ClearHistory() (%s v. %s)", DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE3("CPluginData::ClearHistory() (%ls v. %ls)", DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.ClearHistory(parent);
     }
 }
 
-void CPluginData::AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+void CPluginData::AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
 {
-    CALL_STACK_MESSAGE3("CPluginData::AcceptChangeOnPathNotification() (%s v. %s)", DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE3("CPluginData::AcceptChangeOnPathNotification() (%ls v. %ls)", DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginIface.NotEmpty()) // call only if the plugin is loaded (just a "notification")
     {
         PluginIface.AcceptChangeOnPathNotification(path, includingSubdirs);
@@ -2974,14 +3108,14 @@ void CPluginData::AcceptChangeOnPathNotification(const char* path, BOOL includin
 
 void CPluginData::PasswordManagerEvent(HWND parent, int event)
 {
-    CALL_STACK_MESSAGE4("CPluginData::PasswordManagerEvent(, %d) (%s v. %s)", event, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::PasswordManagerEvent(, %d) (%ls v. %ls)", event, DLLName.c_str(), Version.c_str());
     if (GetLoaded() && PluginUsesPasswordManager) // in case the plugin stopped using the Password Manager (did not call SetPluginUsesPasswordManager())
         PluginIface.PasswordManagerEvent(parent, event);
 }
 
 void CPluginData::About(HWND parent)
 {
-    CALL_STACK_MESSAGE4("CPluginData::About(0x%p) (%s v. %s)", parent, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::About(0x%p) (%ls v. %ls)", parent, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent))
     {
         PluginIface.About(parent);
@@ -3001,13 +3135,13 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
             LoadSaveToRegistryMutex.Enter();
             HKEY salamander;
             if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+                OpenKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
             {
                 HKEY actKey;
-                if (OpenKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
+                if (OpenKeyW(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                 {
                     HKEY regKey;
-                    if (OpenKey(actKey, RegKeyName.c_str(), regKey)) // try to open the plugin's private key
+                    if (OpenKeyW(actKey, RegKeyName.c_str(), regKey)) // try to open the plugin's private key
                     {
                         CSalamanderRegistry registry;
                         {
@@ -3042,35 +3176,35 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
             HKEY salamander;
             IRegistry* registry = GetPluginsRegistry();
             if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
+                registry->OpenKeyRead(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
             {
                 registry->CloseKey(salamander);
-                if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+                if (CreateKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
                 {
                     BOOL cfgIsOK = TRUE;
                     BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
                     if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                     {
                         DWORD saveInProgress = 1;
-                        if (GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+                        if (registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
                         {
                             cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
-                            TRACE_E("CPluginData::CallLoadOrSaveConfiguration(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
+                            TRACE_EW(L"CPluginData::CallLoadOrSaveConfiguration(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
                         }
                         else
                         {
                             saveInProgress = 1;
-                            SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
+                            SetValueW(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
                             IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
                         }
                     }
                     if (cfgIsOK)
                     {
                         HKEY actKey;
-                        if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
+                        if (CreateKeyW(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                         {
                             HKEY regKey;
-                            if (CreateKey(actKey, RegKeyName.c_str(), regKey))
+                            if (CreateKeyW(actKey, RegKeyName.c_str(), regKey))
                             {
                                 CSalamanderRegistry registry;
                                 {
@@ -3083,7 +3217,7 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
                         }
                         if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                         {
-                            DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS);
+                            DeleteValueW(salamander, SALAMANDER_SAVE_IN_PROGRESS);
                             IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
                         }
                     }
@@ -3097,17 +3231,16 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
 
 BOOL CPluginData::Unload(HWND parent, BOOL ask)
 {
-    CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%ls v. %ls)", parent, ask, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (DLL != NULL)
     {
         if (MainWindow == NULL || MainWindow->CanUnloadPlugin(parent, PluginIface.GetInterface()))
         { // the plugin is no longer used by Salamander; it can be unloaded
-            CPathBuffer buf;
             BOOL skipUnload = FALSE;
             if (SupportLoadSave && ::Configuration.AutoSave)
             { // ask if the user wants to save configuration when "save on exit" is on
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINSAVECONFIG), AnsiToWide(Name.c_str()).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINSAVECONFIG), Name.c_str());
                 if (!ask || gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     LoadSaveToRegistryMutex.Enter();
@@ -3115,40 +3248,40 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                     HKEY salamander;
                     IRegistry* registry = GetPluginsRegistry();
                     if (SALAMANDER_ROOT_REG != NULL &&
-                        OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
+                        registry->OpenKeyRead(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success) // check whether the Salamander key exists at all (otherwise nothing is saved)
                     {
                         registry->CloseKey(salamander);
-                        if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+                        if (CreateKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
                         {
                             BOOL cfgIsOK = TRUE;
                             BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
                             if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                             {
                                 DWORD saveInProgress = 1;
-                                if (GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+                                if (registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
                                 {
                                     cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
                                     salKeyDoesNotExist = TRUE;
-                                    TRACE_E("CPluginData::Unload(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
+                                    TRACE_EW(L"CPluginData::Unload(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
                                 }
                                 else
                                 {
                                     saveInProgress = 1;
-                                    SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
+                                    SetValueW(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
                                     IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
                                 }
                             }
                             if (cfgIsOK)
                             {
                                 HKEY actKey;
-                                if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
+                                if (CreateKeyW(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
                                 {
                                     Save(parent, actKey);
                                     CloseKey(actKey);
                                 }
                                 if (deleteSALAMANDER_SAVE_IN_PROGRESS)
                                 {
-                                    DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS);
+                                    DeleteValueW(salamander, SALAMANDER_SAVE_IN_PROGRESS);
                                     IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
                                 }
                             }
@@ -3163,7 +3296,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
 
                     if (ask && salKeyDoesNotExist)
                     {
-                        std::wstring failMsg = FormatStrW(LoadStrW(IDS_PLUGINSAVEFAILED), AnsiToWide(Name.c_str()).c_str());
+                        std::wstring failMsg = FormatStrW(LoadStrW(IDS_PLUGINSAVEFAILED), Name.c_str());
                         skipUnload = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), failMsg.c_str()).type == PromptResult::kNo;
                     }
                 }
@@ -3181,7 +3314,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                     ret = TRUE;
                 else
                 {
-                    std::wstring forceMsg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), AnsiToWide(Name.c_str()).c_str());
+                    std::wstring forceMsg = FormatStrW(LoadStrW(IDS_PLUGINFORCEUNLOAD), Name.c_str());
                     if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), forceMsg.c_str()).type == PromptResult::kYes)
                     {
                         PluginIface.Release(parent, TRUE);
@@ -3193,6 +3326,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                 {
                     // unload SPL+SLG and clean up the interfaces
                     SalamanderGeneral.Clear();
+                    LegacyHost.reset();
                     if (DLL != NULL)
                         HANDLES(FreeLibrary(DLL));
                     DLL = NULL;
@@ -3264,7 +3398,6 @@ BOOL CPluginData::GetMenuItemStateType(int pluginIndex, int menuItemIndex, MENU_
 void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, DWORD mask)
 {
     CALL_STACK_MESSAGE4("CPluginData::AddMenuItemsToSubmenuAux(, %d, %d, 0x%X)", i, count, mask);
-    char buff[500];
     for (; i < MenuItems.Count; i++)
     {
         CPluginMenuItem* item = MenuItems[i];
@@ -3275,6 +3408,7 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
         {
             BOOL hidden = FALSE;
             MENU_ITEM_INFO mi;
+            std::wstring menuText;
             if (item->Name.empty()) // separator or failed allocation of start-submenu name
             {
                 if (item->Type == pmitStartSubmenu)
@@ -3302,28 +3436,25 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
                           MENU_MASK_STRING | MENU_MASK_SKILLLEVEL | MENU_MASK_IMAGEINDEX |
                           (item->Type == pmitStartSubmenu ? MENU_MASK_SUBMENU : 0);
                 mi.Type = MENU_TYPE_STRING;
-                lstrcpyn(buff, item->Name.c_str(), 400);
-                mi.String = buff;
+                // MENU_ITEM_INFO::String (plugins/shared/spl_gui.h) is wide in the
+                // live SDK; the frozen sdk107 snapshot alone still has it narrow. item->Name is
+                // already wide, so no WideToAnsi bridge is needed here.
+                menuText = item->Name;
+                mi.String = menuText.data();
 
                 if (HOTKEY_GET(item->HotKey) != 0)
                 {
                     // if we have a hint in the text, remove it
                     if ((item->HotKey & HOTKEY_HINT) != 0)
                     {
-                        char* p = buff;
-                        while (*p != 0)
-                        {
-                            if (*p == '\t')
-                            {
-                                *p = 0;
-                                break;
-                            }
-                            p++;
-                        }
+                        const std::size_t hint = menuText.find(L'\t');
+                        if (hint != std::wstring::npos)
+                            menuText.resize(hint);
                     }
 
-                    strcat(buff, "\t");
-                    GetHotKeyText(LOWORD(item->HotKey), buff + strlen(buff));
+                    menuText += L'\t';
+                    menuText += GetHotKeyText(LOWORD(item->HotKey));
+                    mi.String = menuText.data();
                 }
                 mi.ImageIndex = item->IconIndex;
                 mi.SkillLevel = 0;
@@ -3445,7 +3576,7 @@ CPluginData::GetMaskForMenuItems(int index)
 
 void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
 {
-    CALL_STACK_MESSAGE4("CPluginData::InitMenuItems(, %d, ) (%s v. %s)", index, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::InitMenuItems(, %d, ) (%ls v. %ls)", index, DLLName.c_str(), Version.c_str());
     int count = menu->GetItemCount();
     if (count == 0) // submenu needs to be initialized
     {
@@ -3537,7 +3668,7 @@ void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
 
 BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect)
 {
-    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%ls v. %ls)", index, suid, DLLName.c_str(), Version.c_str());
     unselect = FALSE;
     int id;
     int i;
@@ -3561,7 +3692,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
 
 BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, int id, BOOL& unselect)
 {
-    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%ls v. %ls)", index, id, DLLName.c_str(), Version.c_str());
     unselect = FALSE;
     int i;
     for (i = 0; i < MenuItems.Count; i++)
@@ -3585,7 +3716,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
 
 BOOL CPluginData::HelpForMenuItem(HWND parent, int index, int suid, BOOL& helpDisplayed)
 {
-    CALL_STACK_MESSAGE5("CPluginData::HelpForMenuItem(, %d, %d, ) (%s v. %s)", index, suid, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::HelpForMenuItem(, %d, %d, ) (%ls v. %ls)", index, suid, DLLName.c_str(), Version.c_str());
     helpDisplayed = FALSE;
     int id;
     int i;
@@ -3604,7 +3735,7 @@ BOOL CPluginData::HelpForMenuItem(HWND parent, int index, int suid, BOOL& helpDi
 
 BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
 {
-    CALL_STACK_MESSAGE3("CPluginData::BuildMenu() (%s v. %s)", DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE3("CPluginData::BuildMenu() (%ls v. %ls)", DLLName.c_str(), Version.c_str());
     if (GetLoaded() && SupportDynMenuExt && (!DynMenuWasAlreadyBuild || force))
     {
         DynMenuWasAlreadyBuild = TRUE; // prevent needless rebuilds of the menu, especially when building the menu for Last Command and again when opening a plugin submenu containing command in the Last Command
@@ -3623,7 +3754,7 @@ BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
 
             CSalamanderBuildMenu salBuildMenu(Plugins.GetIndexJustForConnect(this));
             {
-                CALL_STACK_MESSAGE3("PluginIfaceForMenuExt.BuildMenu(,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+                CALL_STACK_MESSAGE3("PluginIfaceForMenuExt.BuildMenu(,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
                 PluginIfaceForMenuExt.BuildMenu(parent, &salBuildMenu); // call the plugin's BuildMenu
                 HotKeysMerge(&oldMenuItems);                            // synchronize hot keys
                 HotKeysEnsureIntegrity();                               // prevent conflicts with Salamander or another plugin
@@ -3637,10 +3768,10 @@ BOOL CPluginData::BuildMenu(HWND parent, BOOL force)
     return GetLoaded() && (!SupportDynMenuExt || PluginIfaceForMenuExt.NotEmpty());
 }
 
-BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
+BOOL CPluginData::ListArchive(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDirectory& dir,
                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE4("CPluginData::ListArchive(, %s, ,) (%s v. %s)", archiveFileName, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::ListArchive(, %ls, ,) (%ls v. %ls)", archiveFileName, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
@@ -3654,12 +3785,12 @@ BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, 
     return ret;
 }
 
-BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
+BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
                                 CPluginDataInterfaceAbstract* pluginData,
-                                const char* targetDir, const char* archiveRoot,
+                                const wchar_t* targetDir, const wchar_t* archiveRoot,
                                 SalEnumSelection nextName, void* param)
 {
-    CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %s, , %s, %s, ,) (%s v. %s)", archiveFileName,
+    CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %ls, , %ls, %ls, ,) (%ls v. %ls)", archiveFileName,
                         targetDir, archiveRoot, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
@@ -3671,18 +3802,18 @@ BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName
     return ret;
 }
 
-BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
-                                CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                                const CFileData* fileData, const char* targetDir,
-                                const char* newFileName, BOOL* renamingNotSupported)
+BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const wchar_t* archiveFileName,
+                                CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                                const CFileData* fileData, const wchar_t* targetDir,
+                                const wchar_t* newFileName, BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE7("CPluginData::UnpackOneFile(, %s, , %s, , %s, %s, ) (%s v. %s)", archiveFileName,
+    CALL_STACK_MESSAGE7("CPluginData::UnpackOneFile(, %ls, , %ls, , %ls, %ls, ) (%ls v. %ls)", archiveFileName,
                         nameInArchive, targetDir, newFileName, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
         CSalamanderForOperations sc(panel);
-        CreateSafeWaitWindow(LoadStr(IDS_UNPACKINGFILEFROMARC), NULL, 2000, FALSE, MainWindow->HWindow);
+        CreateSafeWaitWindow(LoadStrW(IDS_UNPACKINGFILEFROMARC), NULL, 2000, FALSE, MainWindow->HWindow);
         ret = PluginIfaceForArchiver.UnpackOneFile(&sc, archiveFileName, pluginData, nameInArchive,
                                                    fileData, targetDir, newFileName, renamingNotSupported);
         DestroySafeWaitWindow();
@@ -3690,11 +3821,11 @@ BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const char* archiveFileName
     return ret;
 }
 
-BOOL CPluginData::PackToArchive(CFilesWindow* panel, const char* archiveFileName,
-                                const char* archiveRoot, BOOL move, const char* sourceDir,
+BOOL CPluginData::PackToArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
+                                const wchar_t* archiveRoot, BOOL move, const wchar_t* sourceDir,
                                 SalEnumSelection2 nextName, void* param)
 {
-    CALL_STACK_MESSAGE7("CPluginData::PackToArchive(, %s, %s, %d, %s, ,) (%s v. %s)", archiveFileName,
+    CALL_STACK_MESSAGE7("CPluginData::PackToArchive(, %ls, %ls, %d, %ls, ,) (%ls v. %ls)", archiveFileName,
                         archiveRoot, move, sourceDir, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
@@ -3705,11 +3836,11 @@ BOOL CPluginData::PackToArchive(CFilesWindow* panel, const char* archiveFileName
     return ret;
 }
 
-BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const char* archiveFileName,
-                                    CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
+                                    CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                     SalEnumSelection nextName, void* param)
 {
-    CALL_STACK_MESSAGE5("CPluginData::DeleteFromArchive(, %s, , %s, ,) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginData::DeleteFromArchive(, %ls, , %ls, ,) (%ls v. %ls)",
                         archiveFileName, archiveRoot, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
@@ -3720,10 +3851,10 @@ BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const char* archiveFile
     return ret;
 }
 
-BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
-                                     const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
+BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const wchar_t* archiveFileName, const wchar_t* mask,
+                                     const wchar_t* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE7("CPluginData::UnpackWholeArchive(, %s, %s, %s, %d,) (%s v. %s)", archiveFileName,
+    CALL_STACK_MESSAGE7("CPluginData::UnpackWholeArchive(, %ls, %ls, %ls, %d,) (%ls v. %ls)", archiveFileName,
                         mask, targetDir, delArchiveWhenDone, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
@@ -3735,9 +3866,9 @@ BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFil
     return ret;
 }
 
-BOOL CPluginData::CanCloseArchive(CFilesWindow* panel, const char* archiveFileName, BOOL force)
+BOOL CPluginData::CanCloseArchive(CFilesWindow* panel, const wchar_t* archiveFileName, BOOL force)
 {
-    CALL_STACK_MESSAGE5("CPluginData::CanCloseArchive(, %s, %d) (%s v. %s)", archiveFileName,
+    CALL_STACK_MESSAGE5("CPluginData::CanCloseArchive(, %ls, %d) (%ls v. %ls)", archiveFileName,
                         force, DLLName.c_str(), Version.c_str());
     BOOL ret = TRUE;
     if (InitDLL(MainWindow->HWindow))
@@ -3751,9 +3882,9 @@ BOOL CPluginData::CanCloseArchive(CFilesWindow* panel, const char* archiveFileNa
     return ret;
 }
 
-BOOL CPluginData::CanViewFile(const char* name)
+BOOL CPluginData::CanViewFile(const wchar_t* name)
 {
-    CALL_STACK_MESSAGE4("CPluginData::CanViewFile(%s) (%s v. %s)", name, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::CanViewFile(%ls) (%ls v. %ls)", name, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForViewer.NotEmpty()*/) // unnecessary, because downgrade is not possible and InitDLL checks the interfaces
@@ -3763,12 +3894,12 @@ BOOL CPluginData::CanViewFile(const char* name)
     return ret;
 }
 
-BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int height,
+BOOL CPluginData::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                            UINT showCmd, BOOL alwaysOnTop, BOOL returnLock,
                            HANDLE* lock, BOOL* lockOwner, int enumFilesSourceUID,
                            int enumFilesCurrentIndex)
 {
-    CALL_STACK_MESSAGE13("CPluginData::ViewFile(%s, %d, %d, %d, %d, %u, %d, %d, , , %d, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE13("CPluginData::ViewFile(%ls, %d, %d, %d, %d, %u, %d, %d, , , %d, %d) (%ls v. %ls)",
                          name, left, top, width, height, showCmd, alwaysOnTop, returnLock,
                          enumFilesSourceUID, enumFilesCurrentIndex, DLLName.c_str(), Version.c_str());
     BOOL ret = FALSE;
@@ -3787,9 +3918,9 @@ BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int h
 }
 
 CPluginFSInterfaceAbstract*
-CPluginData::OpenFS(const char* fsName, int fsNameIndex)
+CPluginData::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginData::OpenFS(%s, %d) (%s v. %s)", fsName, fsNameIndex, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE5("CPluginData::OpenFS(%ls, %d) (%ls v. %ls)", fsName, fsNameIndex, DLLName.c_str(), Version.c_str());
     CPluginFSInterfaceAbstract* ret = NULL;
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForFS.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
@@ -3805,7 +3936,7 @@ CPluginData::OpenFS(const char* fsName, int fsNameIndex)
 
 void CPluginData::ExecuteChangeDriveMenuItem(int panel)
 {
-    CALL_STACK_MESSAGE4("CPluginData::ExecuteChangeDriveMenuItem(%d) (%s v. %s)", panel, DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE4("CPluginData::ExecuteChangeDriveMenuItem(%d) (%ls v. %ls)", panel, DLLName.c_str(), Version.c_str());
     if (InitDLL(MainWindow->HWindow) &&
         !ChDrvMenuFSItemName.empty()         // in case the plugin removed the item during this load
         /*&& PluginIfaceForFS.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
@@ -3816,11 +3947,11 @@ void CPluginData::ExecuteChangeDriveMenuItem(int panel)
 
 BOOL CPluginData::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                  CPluginFSInterfaceAbstract* pluginFS,
-                                                 const char* pluginFSName, int pluginFSNameIndex,
+                                                 const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                  BOOL isDetachedFS, BOOL& refreshMenu,
                                                  BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
-    CALL_STACK_MESSAGE9("CPluginData::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %s, %d, %d, , , ,) (%s v. %s)",
+    CALL_STACK_MESSAGE9("CPluginData::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %ls, %d, %d, , , ,) (%ls v. %ls)",
                         panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent) &&
         (pluginFS != NULL || !ChDrvMenuFSItemName.empty()) // in case the plugin removed the item during this load
@@ -3834,9 +3965,9 @@ BOOL CPluginData::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, 
     return FALSE; // error, so return "value parameters should be ignored"
 }
 
-void CPluginData::EnsureShareExistsOnServer(HWND parent, int panel, const char* server, const char* share)
+void CPluginData::EnsureShareExistsOnServer(HWND parent, int panel, const wchar_t* server, const wchar_t* share)
 {
-    CALL_STACK_MESSAGE6("CPluginData::EnsureShareExistsOnServer(, %d, %s, %s) (%s v. %s)",
+    CALL_STACK_MESSAGE6("CPluginData::EnsureShareExistsOnServer(, %d, %ls, %ls) (%ls v. %ls)",
                         panel, server, share, DLLName.c_str(), Version.c_str());
     if (InitDLL(parent, TRUE) &&     // we don't want to report possible load errors; EnsureShareExistsOnServer provides only supplementary info (if it isn't called, almost nothing happens)
         PluginIsNethood &&           // in case the plug-in stops replacing Network (i.e., it does not call SetPluginIsNethood()) right during this load
@@ -3846,18 +3977,15 @@ void CPluginData::EnsureShareExistsOnServer(HWND parent, int panel, const char* 
     }
 }
 
-void CPluginData::GetCacheInfo(char* arcCacheTmpPath, BOOL* arcCacheOwnDelete, BOOL* arcCacheCacheCopies)
+void CPluginData::GetCacheInfo(std::wstring& arcCacheTmpPath, BOOL* arcCacheOwnDelete, BOOL* arcCacheCacheCopies)
 {
-    CALL_STACK_MESSAGE3("CPluginData::GetCacheInfo(, ,) (%s v. %s)", DLLName.c_str(), Version.c_str());
+    CALL_STACK_MESSAGE3("CPluginData::GetCacheInfo(, ,) (%ls v. %ls)", DLLName.c_str(), Version.c_str());
     if (InitDLL(MainWindow->HWindow) &&
         PluginIfaceForArchiver.NotEmpty()) // this part of the condition is most likely "always true"
     {
         if (ArcCacheHaveInfo) // the settings are already cached; we do not need to bother the plugin anymore
         {
-            if (ArcCacheTmpPath != NULL)
-                strcpy(arcCacheTmpPath, ArcCacheTmpPath);
-            else
-                arcCacheTmpPath[0] = 0;
+            arcCacheTmpPath = ArcCacheTmpPath;
             *arcCacheOwnDelete = ArcCacheOwnDelete;
             *arcCacheCacheCopies = ArcCacheCacheCopies;
         }
@@ -3866,37 +3994,24 @@ void CPluginData::GetCacheInfo(char* arcCacheTmpPath, BOOL* arcCacheOwnDelete, B
             if (!PluginIfaceForArchiver.GetCacheInfo(arcCacheTmpPath, arcCacheOwnDelete, arcCacheCacheCopies))
             {                            // default values should be used
                 ArcCacheHaveInfo = TRUE; // default values are set by InitDLL()()
-                arcCacheTmpPath[0] = 0;
+                arcCacheTmpPath.clear();
                 *arcCacheOwnDelete = FALSE;
                 *arcCacheCacheCopies = TRUE;
             }
             else
             {
-                int l = (int)strlen(arcCacheTmpPath);
-                char* p = NULL;
-                if (l > 0)
-                {
-                    p = (char*)malloc(l + 1);
-                    if (p != NULL)
-                        strcpy(p, arcCacheTmpPath);
-                    else
-                        TRACE_E(LOW_MEMORY);
-                }
                 ArcCacheOwnDelete = *arcCacheOwnDelete; // is set in every case; reason: method IsArchiverAndHaveOwnDelete()()
-                if (l == 0 || p != NULL)                // with low memory the settings cannot be cached -> the plugin will be queried multiple times
-                {
-                    ArcCacheHaveInfo = TRUE;
-                    ArcCacheTmpPath = p;
-                    ArcCacheCacheCopies = *arcCacheCacheCopies;
-                }
+                ArcCacheHaveInfo = TRUE;
+                ArcCacheTmpPath = arcCacheTmpPath;
+                ArcCacheCacheCopies = *arcCacheCacheCopies;
             }
         }
     }
 }
 
-void CPluginData::DeleteTmpCopy(const char* fileName, BOOL firstFile)
+void CPluginData::DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile)
 {
-    CALL_STACK_MESSAGE5("CPluginData::DeleteTmpCopy(%s, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE5("CPluginData::DeleteTmpCopy(%ls, %d) (%ls v. %ls)",
                         fileName, firstFile, DLLName.c_str(), Version.c_str());
     if (PluginIfaceForArchiver.NotEmpty())
         PluginIfaceForArchiver.DeleteTmpCopy(fileName, firstFile);
@@ -3906,7 +4021,7 @@ void CPluginData::DeleteTmpCopy(const char* fileName, BOOL firstFile)
 
 BOOL CPluginData::PrematureDeleteTmpCopy(HWND parent, int copiesCount)
 {
-    CALL_STACK_MESSAGE4("CPluginData::PrematureDeleteTmpCopy(, %d) (%s v. %s)",
+    CALL_STACK_MESSAGE4("CPluginData::PrematureDeleteTmpCopy(, %d) (%ls v. %ls)",
                         copiesCount, DLLName.c_str(), Version.c_str());
     if (PluginIfaceForArchiver.NotEmpty())
     {
@@ -3995,7 +4110,7 @@ void CPluginData::HotKeysEnsureIntegrity()
         {
             // the hot key must not belong to Salamander
             item->HotKey = 0;
-            TRACE_E("CPluginData::HotKeysEnsureIntegrity() hot key is already assigned to Salamander; item:" << item->Name);
+            TRACE_EW(L"CPluginData::HotKeysEnsureIntegrity() hot key is already assigned to Salamander; item:" << item->Name);
         }
         else
         {

@@ -53,7 +53,7 @@ CSplashScreen::CSplashScreen()
     Height = 0;
 
     // create a font
-    LOGFONT lf;
+    LOGFONTW lf;
     //  GetSystemGUIFont(&lf);
     //  lf.lfWeight = FW_NORMAL;
 
@@ -72,12 +72,12 @@ CSplashScreen::CSplashScreen()
     lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
     lf.lfQuality = DEFAULT_QUALITY;
     lf.lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
-    strcpy(lf.lfFaceName, "MS Shell Dlg 2");
+    wcscpy_s(lf.lfFaceName, L"MS Shell Dlg 2");
 
-    HNormalFont = HANDLES(CreateFontIndirect(&lf));
+    HNormalFont = HANDLES(CreateFontIndirectW(&lf));
     // create the bold variant
     lf.lfWeight = FW_BOLD;
-    HBoldFont = HANDLES(CreateFontIndirect(&lf));
+    HBoldFont = HANDLES(CreateFontIndirectW(&lf));
 }
 
 CSplashScreen::~CSplashScreen()
@@ -90,7 +90,7 @@ CSplashScreen::~CSplashScreen()
         HANDLES(DeleteObject(HBoldFont));
 }
 
-BOOL CSplashScreen::PaintText(const char* text, int x, int y, BOOL bold, COLORREF clr)
+BOOL CSplashScreen::PaintText(const wchar_t* text, int x, int y, BOOL bold, COLORREF clr)
 {
     HDC hDC = NULL;
     if (Bitmap != NULL)
@@ -105,7 +105,7 @@ BOOL CSplashScreen::PaintText(const char* text, int x, int y, BOOL bold, COLORRE
         int oldBkMode = SetBkMode(hDC, TRANSPARENT);
         COLORREF oldTextColor = SetTextColor(hDC, clr);
         HFONT hOldFont = (HFONT)SelectObject(hDC, bold ? HBoldFont : HNormalFont);
-        DrawText(hDC, text, -1, &r, DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
+        DrawTextW(hDC, text, -1, &r, DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
         SelectObject(hDC, hOldFont);
         SetTextColor(hDC, oldTextColor);
         SetBkMode(hDC, oldBkMode);
@@ -145,7 +145,7 @@ BOOL CSplashScreen::PrepareBitmap()
 
     // paint the background white
     SetBkColor(hDC, RGB(255, 255, 255));
-    ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+    ExtTextOutW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
 
     CSVGSprite svgText;
     CSVGSprite svgGrad;
@@ -168,12 +168,12 @@ BOOL CSplashScreen::PrepareBitmap()
     svgHand.AlphaBlend(hDC, Width - handSize.cx, 0, handSize.cx, handSize.cy, SVGSTATE_ORIGINAL);
 
     // fixed texts
-    PaintText(SALAMANDER_TEXT_VERSION,
+    PaintText(SALAMANDER_TEXT_VERSIONW(),
               VersionR.left,
               VersionR.top,
               FALSE, RGB(128, 128, 128));
 
-    PaintText(VERSINFO_COPYRIGHT,
+    PaintText(VERSINFO_COPYRIGHT_W,
               CopyrightR.left,
               CopyrightR.top,
               TRUE, RGB(255, 255, 255));
@@ -184,7 +184,7 @@ BOOL CSplashScreen::PrepareBitmap()
     return TRUE;
 }
 
-void CSplashScreen::SetText(const char* text)
+void CSplashScreen::SetText(const wchar_t* text)
 {
     if (Bitmap != NULL && OriginalBitmap != NULL)
     {
@@ -302,7 +302,7 @@ BOOL ExistSplashScreen()
     return (SplashScreen.HWindow != NULL);
 }
 
-void IfExistSetSplashScreenText(const char* text)
+void IfExistSetSplashScreenText(const wchar_t* text)
 {
     if (SplashScreen.HWindow != NULL)
         SplashScreen.SetText(text);
@@ -371,7 +371,7 @@ AboutAndEvalDlgCreateBkgnd(HWND hWindow)
 
     // paint the background white
     SetBkColor(hDC, RGB(255, 255, 255));
-    ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+    ExtTextOutW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
 
     CSVGSprite svgText;
     CSVGSprite svgGrad;
@@ -414,7 +414,7 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         DarkMode_SetLightSurface(HWindow, TRUE);
 
-        SetDlgItemText(HWindow, IDS_ABOUT_SALAMANDER, SALAMANDER_TEXT_VERSION);
+        SetDlgItemTextW(HWindow, IDS_ABOUT_SALAMANDER, SALAMANDER_TEXT_VERSIONW());
         new CStaticText(HWindow, IDS_ABOUT_SALAMANDER, STF_BOLD);
         //      new CStaticText(HWindow, IDS_ABOUT_FIRM, STF_BOLD);
 
@@ -424,8 +424,8 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         hl = new CHyperLink(HWindow, IDC_ABOUT_WWW);
         if (hl != NULL)
         {
-            const char* url = "https://github.com/0xeb/sally";
-            SetDlgItemText(HWindow, IDC_ABOUT_WWW, url + 8); // skip "https://"
+            const wchar_t* url = L"https://github.com/0xeb/sally";
+            SetDlgItemTextW(HWindow, IDC_ABOUT_WWW, url + 8); // skip "https://"
             hl->SetActionOpen(url);
         }
 

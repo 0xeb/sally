@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 // the download thread sends this message to the plugin main window when it closes
 // if the data were loaded correctly, wParam == TRUE; otherwise it is FALSE
 #define WM_USER_DOWNLOADTHREAD_EXIT WM_APP + 666
@@ -82,7 +85,8 @@ extern SYSTEMTIME LastCheckTime;       // when the check was last performed (zer
 extern SYSTEMTIME NextOpenOrCheckTime; // the earliest time the plugin window should open automatically and optionally perform a check (zeroed out if it should happen at the first load-on-start (ASAP))
 extern int ErrorsSinceLastCheck;       // how many times we have already failed to perform the automatic check
 
-extern CPathBuffer SalamanderTextVersion; // Heap-allocated for long path support; running Salamander version text (for example, "2.52 beta 3 (PB 32)")
+// UTF-8 input to the byte-oriented release metadata parser. This is version text, not a path.
+extern std::string SalamanderTextVersion;
 
 extern DWORD MainDialogID;                   // unique dialog counter
 extern CRITICAL_SECTION MainDialogIDSection; // and its lock
@@ -91,19 +95,16 @@ void IncMainDialogID();
 
 extern HANDLE HModulesEnumDone; // synchronization of Salamander's main thread and the main dialog thread
 
-#define LOADED_SCRIPT_MAX 100000             // hopefully we will never end up with a script that large :-))
-extern BYTE LoadedScript[LOADED_SCRIPT_MAX]; // script is poured in here - either from the internet or from a file in the debug build
-extern DWORD LoadedScriptSize;               // number of occupied (valid) bytes
+// The GitHub response is protocol bytes, not text ownership. Keep its download policy limit
+// explicit while growing storage only for bytes actually received.
+constexpr size_t CHECKVER_MAX_RELEASE_RESPONSE_BYTES = 100000;
+extern std::vector<BYTE> LoadedScript;
 
 // Salamander's general interface - valid from startup until the plugin is terminated
 extern CSalamanderGeneralAbstract* SalGeneral;
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
-BOOL AddUniqueFilter(const char* itemName);
-void FiltersFillListBox(HWND hListBox);
-void FiltersLoadFromListBox(HWND hListBox);
-void DestroyFilters(); // tear down the filter array
 void LoadConfig(HKEY regKey, CSalamanderRegistryAbstract* registry);
 void SaveConfig(HKEY regKey, CSalamanderRegistryAbstract* registry);
 void OnSaveTimeStamp(HKEY regKey, CSalamanderRegistryAbstract* registry);
@@ -117,7 +118,7 @@ BOOL RegisterLogClass();
 void UnregisterLogClass();
 BOOL InitializeLogWindow(HWND hWindow);
 void ReleaseLogWindow(HWND hWindow);
-void AddLogLine(const char* line, BOOL scrollToEnd);
+void AddLogLine(const wchar_t* line, BOOL scrollToEnd);
 void ClearLogWindow();
 
 void MainEnableControls(BOOL downloading);
@@ -132,7 +133,7 @@ void GetFutureTime(SYSTEMTIME* tgtTime, const SYSTEMTIME* time, DWORD days);
 void GetFutureTime(SYSTEMTIME* tgtTime, DWORD days);
 
 // script loading
-BOOL LoadScripDataFromFile(const char* fileName);
+BOOL LoadScripDataFromFile(const wchar_t* fileName);
 HANDLE StartDownloadThread(BOOL firstLoadAfterInstall); // returns the thread handle or NULL
 
 // log output
@@ -181,7 +182,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };

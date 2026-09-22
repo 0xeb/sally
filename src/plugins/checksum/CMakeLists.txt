@@ -5,6 +5,7 @@ sal_add_plugin(NAME checksum
   SOURCES
     "${SAL_PLUGINS}/checksum/checksum.cpp"
     "${SAL_PLUGINS}/checksum/dialogs.cpp"
+    "${SAL_PLUGINS}/checksum/digest_parser.cpp"
     "${SAL_PLUGINS}/checksum/misc.cpp"
     "${SAL_PLUGINS}/checksum/precomp.cpp"
     "${SAL_PLUGINS}/checksum/wrappers.cpp"

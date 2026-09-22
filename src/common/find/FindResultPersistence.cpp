@@ -5,6 +5,7 @@
 
 #include "common/find/FindResultPersistence.h"
 #include "common/IFileSystem.h"
+#include "common/Win32TextCodec.h"
 
 #include <algorithm>
 #include <cwchar>
@@ -367,32 +368,17 @@ bool StatFullPath(const std::wstring& fullPath, FindResultRecord& record)
 
 bool WideToUtf8(const std::wstring& text, std::string& bytes, std::wstring* error)
 {
-    if (text.length() > (size_t)(std::numeric_limits<int>::max)())
+    std::string encoded;
+    const Win32TextConversionResult result = Win32EncodeText(CP_UTF8, text, encoded);
+    if (!result)
     {
-        SetError(error, L"Text is too large to encode as UTF-8.");
+        if (result.Error == Win32TextConversionError::InputTooLarge)
+            SetError(error, L"Text is too large to encode as UTF-8.");
+        else
+            SetLastErrorText(error, L"Cannot encode UTF-8:", result.Win32Error);
         return false;
     }
-
-    int needed = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.c_str(),
-                                     (int)text.length(), nullptr, 0, nullptr, nullptr);
-    if (needed == 0)
-    {
-        if (text.empty())
-        {
-            bytes.clear();
-            return true;
-        }
-        SetLastErrorText(error, L"Cannot encode UTF-8:", GetLastError());
-        return false;
-    }
-
-    bytes.resize((size_t)needed);
-    if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.c_str(), (int)text.length(),
-                            bytes.data(), needed, nullptr, nullptr) == 0)
-    {
-        SetLastErrorText(error, L"Cannot encode UTF-8:", GetLastError());
-        return false;
-    }
+    bytes.swap(encoded);
     return true;
 }
 
@@ -409,29 +395,18 @@ bool Utf8ToWide(const unsigned char* bytes, size_t size, std::wstring& text, std
         text.clear();
         return true;
     }
-    if (size > (size_t)(std::numeric_limits<int>::max)())
+    std::wstring decoded;
+    const Win32TextConversionResult result = Win32DecodeText(
+        CP_UTF8, reinterpret_cast<const char*>(bytes), size, decoded);
+    if (!result)
     {
-        SetError(error, L"File is too large to decode as UTF-8.");
+        if (result.Error == Win32TextConversionError::InputTooLarge)
+            SetError(error, L"File is too large to decode as UTF-8.");
+        else
+            SetLastErrorText(error, L"Cannot decode UTF-8:", result.Win32Error);
         return false;
     }
-
-    int needed = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                                     reinterpret_cast<const char*>(bytes), (int)size,
-                                     nullptr, 0);
-    if (needed <= 0)
-    {
-        SetLastErrorText(error, L"Cannot decode UTF-8:", GetLastError());
-        return false;
-    }
-
-    text.resize((size_t)needed);
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                            reinterpret_cast<const char*>(bytes), (int)size,
-                            text.data(), needed) == 0)
-    {
-        SetLastErrorText(error, L"Cannot decode UTF-8:", GetLastError());
-        return false;
-    }
+    text.swap(decoded);
     return true;
 }
 
@@ -473,7 +448,7 @@ bool ReadWholeFile(const std::wstring& fileName, std::vector<unsigned char>& byt
     if (!sizeResult.success || size > (std::numeric_limits<size_t>::max)())
     {
         DWORD err = sizeResult.success ? ERROR_NOT_ENOUGH_MEMORY : sizeResult.errorCode;
-        fs->CloseHandle(file);
+        fs->CloseFileHandle(file);
         SetLastErrorText(error, L"Cannot get file size:", err);
         return false;
     }
@@ -488,7 +463,7 @@ bool ReadWholeFile(const std::wstring& fileName, std::vector<unsigned char>& byt
         if (!readResult.success)
         {
             DWORD err = readResult.errorCode;
-            fs->CloseHandle(file);
+            fs->CloseFileHandle(file);
             SetLastErrorText(error, L"Cannot read file:", err);
             return false;
         }
@@ -496,7 +471,7 @@ bool ReadWholeFile(const std::wstring& fileName, std::vector<unsigned char>& byt
             break;
         offset += read;
     }
-    fs->CloseHandle(file);
+    fs->CloseFileHandle(file);
     bytes.resize(offset);
     return true;
 }
@@ -520,13 +495,13 @@ bool WriteWholeFile(const std::wstring& fileName, const std::string& bytes, std:
         if (!writeResult.success || written != toWrite)
         {
             DWORD err = writeResult.success ? ERROR_WRITE_FAULT : writeResult.errorCode;
-            fs->CloseHandle(file);
+            fs->CloseFileHandle(file);
             SetLastErrorText(error, L"Cannot write file:", err);
             return false;
         }
         offset += written;
     }
-    fs->CloseHandle(file);
+    fs->CloseFileHandle(file);
     return true;
 }
 
@@ -701,8 +676,13 @@ bool SaveFindResultsFile(const std::wstring& fileName, FindResultsFormat format,
     if (!WideToUtf8(text, utf8, error))
         return false;
 
-    std::string bytes(reinterpret_cast<const char*>(UTF8_BOM),
-                      reinterpret_cast<const char*>(UTF8_BOM) + sizeof(UTF8_BOM));
+    // UTF8_BOM is a 3-byte unsigned char[]. Reinterpreting it as
+    // wchar_t* and iterating [begin, begin + sizeof(UTF8_BOM)) read 3 wchar_t
+    // elements (6 bytes) - 3 bytes past the actual 3-byte array - producing
+    // undefined/garbage BOM bytes on disk (caught by gtest_find_results_persistence
+    // once sally_e2e_core stopped being stale; see 00-master.md's History-cluster
+    // entry for how that was found).
+    std::string bytes(reinterpret_cast<const char*>(UTF8_BOM), sizeof(UTF8_BOM));
     bytes += utf8;
     return WriteWholeFile(fileName, bytes, error);
 }

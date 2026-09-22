@@ -18,7 +18,7 @@ class CRendererWindow : public CWindow
 public:
     COutput Output; // interface for working with the open database
     CViewerWindow* Viewer;
-    CPathBuffer FileName; // Heap-allocated for long path support; name of the currently opened file; 0 if none is open
+    std::wstring FileName; // name of the currently opened file; empty if none is open
 
     BOOL Creating; // the window is being created -- do not erase the background yet
 
@@ -35,7 +35,7 @@ public:
 
     void OnFileOpen();
 
-    BOOL OpenFile(const char* name);
+    BOOL OpenFile(const wchar_t* name);
 
     void Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg = SWP_NOSIZE);
 

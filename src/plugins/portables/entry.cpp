@@ -20,6 +20,8 @@
 
 #define STRINGIZE2(x) #x
 #define STRINGIZE(x) STRINGIZE2(x)
+#define PORTABLES_WIDEN_IMPL(value) L##value
+#define PORTABLES_WIDEN(value) PORTABLES_WIDEN_IMPL(value)
 
 /// Entry point of the SPL module.
 /// \param hModule A handle to the DLL module.
@@ -79,11 +81,10 @@ SalamanderPluginEntry(
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     {
         // Reject older versions.
-        MessageBox(
-            salamander->GetParentWindow(),
-            REQUIRE_LAST_VERSION_OF_SALAMANDER,
+        SalamanderGeneral->ShowMessageBox(
+            PORTABLES_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
             invariantName,
-            MB_OK | MB_ICONERROR);
+            MSGBOX_ERROR);
         return nullptr;
     }
 
@@ -100,7 +101,7 @@ SalamanderPluginEntry(
     g_oPlugin.GetPluginConfigKey(configKey);
     functions = g_oPlugin.GetSupportedFunctions();
 
-    PCTSTR suggestedFSName = nullptr;
+    PCWSTR suggestedFSName = nullptr;
     CFxPluginInterfaceForFS* pluginInterfaceForFS;
     if (functions & FUNCTION_FILESYSTEM)
     {
@@ -110,11 +111,15 @@ SalamanderPluginEntry(
     }
 
     // Setup basic plugin information.
+    // name/description/configKey are CFxString and the version metadata is widened
+    // at compile time; no run-time ANSI owner enters the live plugin interface.
+    // 'suggestedFSName' is NULL exactly when FUNCTION_FILESYSTEM is unset, in
+    // which case SetBasicPluginData ignores it regardless of value.
     if (!salamander->SetBasicPluginData(
             name,
             functions,
-            VERSINFO_VERSION_NO_PLATFORM,
-            VERSINFO_COPYRIGHT,
+            PORTABLES_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+            PORTABLES_WIDEN(VERSINFO_COPYRIGHT),
             description,
             configKey,
             NULL,

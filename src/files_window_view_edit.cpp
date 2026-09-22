@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -26,40 +26,16 @@
 #include "common/ViewerEditorLauncher.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
-#include "common/unicode/AnsiFallbackPolicy.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
-#include "common/unicode/NameFallbackRecovery.h"
 #include "common/unicode/PathIdentityPolicy.h"
 #include "common/unicode/RenameRetryPolicy.h"
+#include "common/text/CaseFolding.h"
 #include <vector>
 
 namespace
 {
-bool WideStringUsesAnsiFallback(const std::wstring& value)
-{
-    return sally::unicode::WideStringRequiresWidePath(value) ? TRUE : FALSE;
-}
-
-bool TryGetAnsiEditorLaunchPath(const std::wstring& pathW, char* pathA, int pathASize)
-{
-    if (pathW.empty() || pathA == NULL || pathASize <= 0)
-        return false;
-
-    if (!WideStringUsesAnsiFallback(pathW))
-    {
-        WideToAnsi(pathW, pathA, pathASize);
-        return pathA[0] != 0;
-    }
-
-    std::wstring shortPathW = GetShortPathW(pathW.c_str());
-    if (shortPathW.empty() || WideStringUsesAnsiFallback(shortPathW))
-        return false;
-
-    WideToAnsi(shortPathW, pathA, pathASize);
-    return pathA[0] != 0;
-}
-
 BOOL FileNameInvalidForManualCreateW(const wchar_t* path)
 {
     const wchar_t* name = wcsrchr(path, L'\\');
@@ -72,35 +48,6 @@ BOOL FileNameInvalidForManualCreateW(const wchar_t* path)
     return FALSE;
 }
 
-void RepairLossyQuickRenameHistoryForCurrentName(wchar_t* historyW[], int historyCount,
-                                                 const char* currentAnsiName, const wchar_t* currentWideName)
-{
-    if (historyW == NULL || historyCount <= 0 || currentAnsiName == NULL || currentWideName == NULL || currentWideName[0] == L'\0')
-        return;
-
-    std::wstring ansiNameW = AnsiToWide(currentAnsiName);
-    if (ansiNameW.empty())
-        return;
-
-    for (int i = 0; i < historyCount; i++)
-    {
-        wchar_t* item = historyW[i];
-        if (item == NULL || item[0] == L'\0' || wcschr(item, L'?') == NULL)
-            continue;
-
-        std::wstring repaired = sally::unicode::RecoverWideCharsFromLossyInput(item, ansiNameW, currentWideName);
-        if (repaired.empty() || wcscmp(item, repaired.c_str()) == 0)
-            continue;
-
-        wchar_t* updated = (wchar_t*)malloc((repaired.length() + 1) * sizeof(wchar_t));
-        if (updated == NULL)
-            continue;
-
-        memcpy(updated, repaired.c_str(), (repaired.length() + 1) * sizeof(wchar_t));
-        free(historyW[i]);
-        historyW[i] = updated;
-    }
-}
 } // namespace
 
 //
@@ -121,7 +68,7 @@ void CFilesWindow::Convert()
 
         BOOL subDir;
         if (Dirs->Count > 0)
-            subDir = (strcmp(Dirs->At(0).Name, "..") == 0);
+            subDir = (wcscmp(Dirs->At(0).Name, L"..") == 0);
         else
             subDir = FALSE;
 
@@ -136,7 +83,7 @@ void CFilesWindow::Convert()
 
                 CCriteriaData filter;
                 filter.UseMasks = TRUE;
-                filter.Masks.SetMasksString(convertDlg.Mask);
+                filter.Masks.SetMasksString(convertDlg.Mask.c_str());
                 int errpos = 0;
                 if (!filter.Masks.PrepareMasks(errpos))
                     break; // invalid mask
@@ -195,17 +142,15 @@ void CFilesWindow::Convert()
                 else
                 {
                     HWND hFocusedWnd = GetFocus();
-                    CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
+                    CreateSafeWaitWindow(LoadStrW(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
                     EnableWindow(MainWindow->HWindow, FALSE);
 
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
                     BOOL res = BuildScriptMain(script, convertDlg.SubDirs ? atRecursiveConvert : atConvert,
                                                NULL, NULL, count, indexes.get(), f, NULL, NULL, FALSE, &filter);
-                    // Repair only auto-widened source roots that still came from the ANSI
-                    // panel cache. Operations with explicit PathW+NameW are left intact.
-                    if (res && Is(ptDisk) && sally::unicode::HasWidePathW(GetPathW()))
-                        script->ReanchorWideSourcePaths(GetPath(), GetPathW());
+                    // ReanchorWideSourcePaths deleted — snapshot-
+                    // built ops carry explicit wide names; nothing to repair.
                     if (script->Count == 0)
                         res = FALSE;
                     // reordered to allow the main window to activate (must not be disabled), otherwise it switches to another app
@@ -225,9 +170,9 @@ void CFilesWindow::Convert()
 
                     // prepare refresh of manually refreshed directories
                     // change in the directory displayed in the panel and also in subdirectories if work was done there as well
-                    script->SetWorkPath1(GetPath(), convertDlg.SubDirs);
+                    script->SetWorkPath1W(GetPathW(), convertDlg.SubDirs);
 
-                if (!res || !StartProgressDialog(script, LoadStr(IDS_CONVERTTITLE), NULL, &dlgData))
+                if (!res || !StartProgressDialog(script, LoadStrW(IDS_CONVERTTITLE), NULL, &dlgData))
                 {
                     if (script->IsGood() && script->Count == 0)
                     {
@@ -272,18 +217,17 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
         else
             GetSelItems(1, &index);
         // focus is on UpDir -- nothing to convert
-        if (Dirs->Count > 0 && index == 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+        if (Dirs->Count > 0 && index == 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
             return;
     }
     BeginStopRefresh(); // snooper takes a break
 
     // if no item is selected, select the one under focus and store its name
-    CPathBuffer temporarySelected; // Heap-allocated for long path support
-    temporarySelected[0] = 0;
+    std::wstring temporarySelected;
     if ((!setCompress || Configuration.CnfrmNTFSPress) &&
         (!setEncryption || Configuration.CnfrmNTFSCrypt))
     {
-        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+        temporarySelected = SelectFocusedItemAndGetName();
     }
 
     if (Is(ptDisk))
@@ -294,7 +238,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
             BOOL subDir;
             if (Dirs->Count > 0)
-                subDir = (strcmp(Dirs->At(0).Name, "..") == 0);
+                subDir = (wcscmp(Dirs->At(0).Name, L"..") == 0);
             else
                 subDir = FALSE;
 
@@ -315,14 +259,21 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     if (index >= 0 && index < Files->Count + Dirs->Count)
                     {
                         CFileData* f = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
-                        if (strcmp(f->Name, "..") != 0)
+                        if (wcscmp(f->Name, L"..") != 0)
                         {
                             BOOL isDir = index < Dirs->Count;
 
                             BOOL timeObtained = FALSE;
 
-                            // retrieve the file times using decoupled helper
-                            std::wstring fullPath = BuildPathW(GetPath(), f->Name);
+                            // BuildPathW(const char*, const char*) narrows the removed ANSI mirror
+                            // and f->Name via MultiByteToWideChar - but both are ALREADY lossy CP_ACP
+                            // mirrors, so that only re-widens strings that never recovered their true
+                            // characters. For a panel path or filename outside CP_ACP this named a
+                            // nonexistent/wrong file, GetFileInfoW silently failed, and the dialog fell
+                            // back to collapsing Created/Accessed/Modified into the cached f->LastWrite -
+                            // wrong data with no visible error. Same wide-native idiom already used for
+                            // ViewFile a few hundred lines below in this file.
+                            std::wstring fullPath = BuildPathW(GetPathW(), f->Name);
                             SalFileInfo fileInfo = GetFileInfoW(fullPath.c_str());
                             if (fileInfo.IsValid)
                             {
@@ -372,7 +323,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     {
                         BOOL isDir = i < Dirs->Count;
                         f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-                        if (i == 0 && isDir && strcmp(Dirs->At(0).Name, "..") == 0)
+                        if (i == 0 && isDir && wcscmp(Dirs->At(0).Name, L"..") == 0)
                             continue;
                         if (f->Selected == 1)
                         {
@@ -419,10 +370,15 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                 if (setCompress && Configuration.CnfrmNTFSPress || // ask whether to compress/decompress
                     setEncryption && Configuration.CnfrmNTFSCrypt) // ask whether to encrypt/decrypt
                 {
-                    CPathBuffer subject;
-                    char expanded[200];
+                    // CMessageBox::DialogProc reads Text.GetW() unconditionally
+                    // (msgbox.cpp) - CTruncatedString::Set() (narrow) always leaves UseWideText
+                    // FALSE, so this NTFS compress/encrypt confirmation showed a completely
+                    // blank body. Same bug class as the earlier 8ac53e4d and the earlier Pack
+                    // fix. Built wide throughout; subject/expanded/path (narrow) had no other
+                    // consumer in this block, so they're replaced rather than duplicated.
+                    std::wstring expandedW;
                     int count = GetSelCount();
-                    CPathBuffer path; // Heap-allocated for long path support
+                    std::wstring pathW;
                     if (count > 1)
                     {
                         int totalCount = Dirs->Count + Files->Count;
@@ -434,7 +390,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                         {
                             BOOL isDir = i < Dirs->Count;
                             f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-                            if (i == 0 && isDir && strcmp(Dirs->At(0).Name, "..") == 0)
+                            if (i == 0 && isDir && wcscmp(Dirs->At(0).Name, L"..") == 0)
                                 continue;
                             if (f->Selected == 1)
                             {
@@ -445,7 +401,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                             }
                         }
 
-                        ExpandPluralFilesDirs(expanded, 200, files, dirs, epfdmNormal, FALSE);
+                        expandedW = ExpandPluralFilesDirsTextW(files, dirs, epfdmNormal, FALSE);
                     }
                     else
                     {
@@ -457,8 +413,9 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
                         BOOL isDir = index < Dirs->Count;
                         CFileData* f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
-                        AlterFileName(path, f->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
-                        lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+                        pathW = AlterFileNameW(f->Name,
+                                               Configuration.FileNameFormat, 0, index < Dirs->Count);
+                        expandedW = LoadStrW(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE);
                     }
                     int resTextID;
                     int resTitleID;
@@ -472,11 +429,11 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                         resTextID = encrypted ? IDS_CONFIRM_NTFSENCRYPT : IDS_CONFIRM_NTFSDECRYPT;
                         resTitleID = encrypted ? IDS_CONFIRM_NTFSENCRYPT_TITLE : IDS_CONFIRM_NTFSDECRYPT_TITLE;
                     }
-                    sprintf(subject, LoadStr(resTextID), expanded);
+                    std::wstring subjectW = FormatStrW(LoadStrW(resTextID), expandedW.c_str());
                     CTruncatedString str;
-                    str.Set(subject, count > 1 ? NULL : path.Get());
+                    str.SetW(subjectW.c_str(), count > 1 ? NULL : pathW.c_str());
                     CMessageBox msgBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT,
-                                       LoadStr(resTitleID), &str, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
+                                       LoadStrW(resTitleID), &str, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
                     if (msgBox.Execute() != IDYES)
                     {
                         // if we selected an item, deselect it again
@@ -560,7 +517,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                 else
                 {
                     HWND hFocusedWnd = GetFocus();
-                    CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
+                    CreateSafeWaitWindow(LoadStrW(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
                     EnableWindow(MainWindow->HWindow, FALSE);
 
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -655,9 +612,9 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
 
                     // prepare refresh of manually refreshed directories
                     // change in the directory displayed in the panel and also in subdirectories if work was done there as well
-                    script->SetWorkPath1(GetPath(), chDlg.RecurseSubDirs);
+                    script->SetWorkPath1W(GetPathW(), chDlg.RecurseSubDirs);
 
-                    if (!res || !StartProgressDialog(script, LoadStr(IDS_CHANGEATTRSTITLE), &dlgData, NULL))
+                    if (!res || !StartProgressDialog(script, LoadStrW(IDS_CHANGEATTRSTITLE), &dlgData, NULL))
                     {
                         UpdateWindow(MainWindow->HWindow);
                         if (!script->IsGood())
@@ -746,18 +703,15 @@ void CFilesWindow::FindFile()
         return;
     }
 
-    OpenFindDialog(MainWindow->HWindow,
-                   Is(ptDisk) ? GetPath() : "",
-                   Is(ptDisk) ? GetPathW() : L"");
+    OpenFindDialog(MainWindow->HWindow, Is(ptDisk) ? GetPathW() : L"");
 }
 
-void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumFileNamesSourceUID,
+void CFilesWindow::ViewFile(const wchar_t* name, BOOL altView, DWORD handlerID, int enumFileNamesSourceUID,
                             int enumFileNamesLastFileIndex)
 {
-    CALL_STACK_MESSAGE6("CFilesWindow::ViewFile(%s, %d, %u, %d, %d)", name, altView, handlerID,
+    CALL_STACK_MESSAGE6("CFilesWindow::ViewFile(%ls, %d, %u, %d, %d)", name, altView, handlerID,
                         enumFileNamesSourceUID, enumFileNamesLastFileIndex);
     // verify that the file is on an accessible path
-    CPathBuffer path;
     if (name == NULL) // file from the panel
     {
         if (Is(ptDisk) || Is(ptZIPArchive))
@@ -766,14 +720,15 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                 return;
         }
     }
-    else // file from a Windows path (Find + Alt+F11)
+    else // file from a Windows path (Find results, Alt+F11)
     {
-        char* backSlash = strrchr(name, '\\');
+        // one branch now: there used to be two, because 'name' could be a
+        // lossy structural mirror and only the nameW twin was safe to check the directory with.
+        const wchar_t* backSlash = wcsrchr(name, L'\\');
         if (backSlash != NULL)
         {
-            memcpy(path, name, backSlash - name);
-            path[backSlash - name] = 0;
-            if (CheckPath(TRUE, path) != ERROR_SUCCESS)
+            std::wstring dirW(name, backSlash - name);
+            if (CheckPath(TRUE, dirW.c_str()) != ERROR_SUCCESS)
                 return;
         }
     }
@@ -782,7 +737,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
     // if viewing/editing from the panel, obtain the full long name
     BOOL useDiskCache = FALSE;          // TRUE only for ZIP - uses disk-cache
     BOOL arcCacheCacheCopies = TRUE;    // cache copies in disk-cache unless the archiver plugin requests otherwise
-    CPathBuffer dcFileName; // ZIP: name for disk-cache
+    std::wstring dcFileName; // ZIP disk-cache key
     std::wstring viewNameW;
     if (name == NULL)
     {
@@ -794,30 +749,18 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
             {
                 if (enumFileNamesLastFileIndex == -1)
                     enumFileNamesLastFileIndex = i - Dirs->Count;
-                viewNameW = sally::unicode::BuildPanelChildPathW(
-                    sally::unicode::EffectivePanelPathW(GetPath(), GetPathW()),
-                    f->Name,
-                    f->NameW);
-                std::string pathA;
-                if (!sally::unicode::TryExactAnsiFallback(viewNameW, pathA))
-                    pathA = WideToAnsi(viewNameW);
-                lstrcpyn(path, pathA.c_str(), path.Size());
-
-                if (f->DosName != NULL && SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES &&
-                    sally::unicode::TryExactAnsiFallback(viewNameW, pathA))
+                viewNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), f->Name);
+                if (f->DosName != NULL && SalLPGetFileAttributes(viewNameW.c_str()) == INVALID_FILE_ATTRIBUTES)
                 {
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
                     {
-                        char* s = path + strlen(path);
-                        while (s > path && *(s - 1) != '\\')
-                            s--;
-                        strcpy(s, f->DosName);
-                        if (SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
-                            lstrcpyn(path, pathA.c_str(), path.Size());
+                        std::wstring dosPathW = sally::unicode::BuildPanelChildPathW(GetPathW(), f->DosName);
+                        if (SalLPGetFileAttributes(dosPathW.c_str()) != INVALID_FILE_ATTRIBUTES)
+                            viewNameW = dosPathW;
                     }
                 }
-                name = path;
+                name = viewNameW.c_str();
                 addToHistory = TRUE;
             }
             else
@@ -825,20 +768,12 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                 if (Is(ptZIPArchive))
                 {
                     useDiskCache = TRUE;
-                    StrICpy(dcFileName, GetZIPArchive()); // the archive file name should be compared case-insensitively (Windows file system), so we always convert it to lowercase
-                    if (GetZIPPath()[0] != 0)
-                    {
-                        if (GetZIPPath()[0] != '\\')
-                            strcat(dcFileName, "\\");
-                        strcat(dcFileName, GetZIPPath());
-                    }
-                    if (dcFileName[strlen(dcFileName) - 1] != '\\')
-                        strcat(dcFileName, "\\");
-                    strcat(dcFileName, f->Name);
+                    dcFileName = sally::text::Fold(GetZIPArchive()); // folded archive path is the cache key
+                    SalPathAppendW(dcFileName, GetZIPPath());
+                    SalPathAppendW(dcFileName, f->Name);
 
                     // setting disk-cache for the plugin (standard values change only for the plugin)
-                    CPathBuffer arcCacheTmpPath; // Heap-allocated for long path support
-                    arcCacheTmpPath[0] = 0;
+                    std::wstring arcCacheTmpPath;
                     BOOL arcCacheOwnDelete = FALSE;
                     CPluginInterfaceAbstract* plugin = NULL; // != NULL if the plugin handles its own deletion
                     int format = PackerFormatConfig.PackIsArchive(GetZIPArchive());
@@ -858,8 +793,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                         }
                     }
 
-                    CPathBuffer nameInArchive;  // Heap-allocated for long path support
-                    strcpy(nameInArchive, dcFileName + strlen(GetZIPArchive()) + 1);
+                    const std::wstring nameInArchive = dcFileName.substr(wcslen(GetZIPArchive()) + 1);
 
                     // besides itself, compare the file with all the others and look for a case-sensitive identical name;
                     // if it exists, these two files must be distinguished in the disk-cache; I chose
@@ -871,9 +805,11 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                         if (i - Dirs->Count != x)
                         {
                             CFileData* f2 = &Files->At(x);
-                            if (strcmp(f2->Name, f->Name) == 0)
+                            if (wcscmp(f2->Name, f->Name) == 0)
                             {
-                                sprintf(dcFileName + strlen(dcFileName), ":0x%p", f->Name);
+                                wchar_t duplicateSuffix[32];
+                                swprintf_s(duplicateSuffix, L":0x%p", (const void*)f->Name);
+                                dcFileName += duplicateSuffix;
                                 break;
                             }
                         }
@@ -881,51 +817,49 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
 
                     BOOL exists;
                     int errorCode;
-                    CPathBuffer validTmpName; // Heap-allocated for long path support
-                    validTmpName[0] = 0;
-                    if (!SalIsValidFileNameComponent(f->Name))
+                    std::wstring validTmpName;
+                    // f->Name is the exact wide name (NameW/UseWideName retired
+                    // at P1.3); validate and sanitize it directly through the wide siblings,
+                    // no ANSI mirror to fall back to.
+                    if (!SalIsValidFileNameComponentW(f->Name))
                     {
-                        lstrcpyn(validTmpName, f->Name, validTmpName.Size());
-                        SalMakeValidFileNameComponent(validTmpName);
+                        validTmpName = SalMakeValidFileNameComponentW(f->Name);
                     }
-                    name = (char*)DiskCache.GetName(dcFileName,
-                                                    validTmpName[0] != 0 ? validTmpName.Get() : f->Name,
+                    name = DiskCache.GetName(dcFileName.c_str(), // returns const wchar_t*; the (char*) cast was silencing that
+                                                    !validTmpName.empty() ? validTmpName.c_str() : f->Name,
                                                     &exists, FALSE,
-                                                    arcCacheTmpPath[0] != 0 ? arcCacheTmpPath.Get() : NULL,
+                                                    !arcCacheTmpPath.empty() ? arcCacheTmpPath.c_str() : NULL,
                                                     plugin != NULL, plugin, &errorCode);
                     if (name == NULL)
                     {
-                        if (errorCode == DCGNE_TOOLONGNAME)
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
                         return;
                     }
 
                     if (!exists) // we must unpack it
                     {
-                        char* backSlash = strrchr(name, '\\');
-                        CPathBuffer tmpPath; // Heap-allocated for long path support
-                        memcpy(tmpPath.Get(), name, backSlash - name);
-                        tmpPath[backSlash - name] = 0;
+                        const wchar_t* backSlash = wcsrchr(name, L'\\');
+                        const std::wstring tmpPath(name, backSlash);
                         BeginStopRefresh(); // snooper takes a break
                         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                         BOOL renamingNotSupported = FALSE;
-                        if (PackUnpackOneFile(this, GetZIPArchive(), PluginData.GetInterface(), nameInArchive, f, tmpPath,
-                                              validTmpName[0] == 0 ? NULL : validTmpName.Get(),
-                                              validTmpName[0] == 0 ? NULL : &renamingNotSupported))
+                        if (PackUnpackOneFile(this, GetZIPArchive(), PluginData.GetInterface(), nameInArchive.c_str(), f, tmpPath.c_str(),
+                                              validTmpName.empty() ? NULL : validTmpName.c_str(),
+                                              validTmpName.empty() ? NULL : &renamingNotSupported))
                         {
                             SetCursor(oldCur);
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                             CQuadWord size(0, 0);
-                            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(name).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                               NULL, OPEN_EXISTING, 0, NULL));
+                            HANDLE file = gFileSystem->CreateFile(name, GENERIC_READ,
+                                                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                                 NULL, OPEN_EXISTING, 0, NULL);
                             if (file != INVALID_HANDLE_VALUE)
                             {
                                 DWORD err;
                                 SalGetFileSize(file, size, err); // ignore errors; file size isn't that important
-                                HANDLES(CloseHandle(file));
+                                gFileSystem->CloseFileHandle(file);
                             }
-                            DiskCache.NamePrepared(dcFileName, size);
+                            DiskCache.NamePrepared(dcFileName.c_str(), size);
                         }
                         else
                         {
@@ -933,7 +867,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                             if (renamingNotSupported) // to avoid repeating the same message for many plugins, display it here for all of them
                                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKINVNAMERENUNSUP));
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-                            DiskCache.ReleaseName(dcFileName, FALSE); // not unpacked, nothing to cache
+                            DiskCache.ReleaseName(dcFileName.c_str(), FALSE); // not unpacked, nothing to cache
                             EndStopRefresh();                         // snooper will start again now
                             return;
                         }
@@ -972,53 +906,57 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
         }
     }
 
+    // The panel branch above builds its own viewNameW from CFileData; an external caller
+    // (Find results) passes the name itself, which is now already the exact wide form.
+    if (viewNameW.empty() && name != NULL && name[0] != 0)
+        viewNameW = name;
+
     HANDLE lock = NULL;
     BOOL lockOwner = FALSE;
-    ViewFileInt(HWindow, name, altView, handlerID, useDiskCache, lock, lockOwner, addToHistory,
-                enumFileNamesSourceUID, enumFileNamesLastFileIndex,
-                !viewNameW.empty() ? viewNameW.c_str() : NULL);
+    ViewFileInt(HWindow, !viewNameW.empty() ? viewNameW.c_str() : name, altView, handlerID,
+                useDiskCache, lock, lockOwner, addToHistory,
+                enumFileNamesSourceUID, enumFileNamesLastFileIndex);
 
     if (useDiskCache)
     {
         if (lock != NULL) // ensure association between the viewer and disk-cache
         {
-            DiskCache.AssignName(dcFileName, lock, lockOwner, arcCacheCacheCopies ? crtCache : crtDirect);
+            DiskCache.AssignName(dcFileName.c_str(), lock, lockOwner, arcCacheCacheCopies ? crtCache : crtDirect);
         }
         else // viewer didn't open or has no "lock" object - try leaving the file in disk-cache
         {
-            DiskCache.ReleaseName(dcFileName, arcCacheCacheCopies);
+            DiskCache.ReleaseName(dcFileName.c_str(), arcCacheCacheCopies);
         }
     }
 }
 
-BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, BOOL returnLock,
+BOOL ViewFileInt(HWND parent, const wchar_t* name, BOOL altView, DWORD handlerID, BOOL returnLock,
                  HANDLE& lock, BOOL& lockOwner, BOOL addToHistory, int enumFileNamesSourceUID,
-                 int enumFileNamesLastFileIndex, const wchar_t* nameW)
+                 int enumFileNamesLastFileIndex)
 {
     BOOL success = FALSE;
     lock = NULL;
     lockOwner = FALSE;
 
     // obtain the full DOS name
-    CPathBuffer dosName; // Heap-allocated for long path support
-    if (GetShortPathName(name, dosName, dosName.Size()) == 0)
+    std::wstring dosName = GetShortPathW(name);
+    if (dosName.empty())
     {
         TRACE_E("GetShortPathName() failed");
-        dosName[0] = 0;
     }
 
     // find the file name and check if it has an extension - needed for masks
-    const char* namePart = strrchr(name, '\\');
+    const wchar_t* namePart = wcsrchr(name, L'\\');
     if (namePart == NULL)
     {
-        TRACE_E("Invalid parameter for ViewFileInt(): " << name);
+        TRACE_E("Invalid parameter for ViewFileInt(): " << sally::diagnostic::EncodeAcpLossy(name));
         return FALSE;
     }
     namePart++;
-    const char* tmpExt = strrchr(namePart, '.');
+    const wchar_t* tmpExt = wcsrchr(namePart, L'.');
     //if (tmpExt == NULL || tmpExt == namePart) tmpExt = namePart + lstrlen(namePart); // ".cvspass" is not an extension...
     if (tmpExt == NULL)
-        tmpExt = namePart + lstrlen(namePart); // ".cvspass" is treated as an extension in Windows...
+        tmpExt = namePart + (int)wcslen(namePart); // ".cvspass" is treated as an extension in Windows...
     else
         tmpExt++;
 
@@ -1068,7 +1006,10 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
             int err;
             if (masks->At(i)->Masks->PrepareMasks(err))
             {
-                if (masks->At(i)->Masks->AgreeMasks(namePart, tmpExt))
+                // one path: namePart is the true wide leaf now, so the
+                // AgreeMasks(char*) fallback that re-widened a lossy CP_ACP leaf is gone.
+                BOOL masksMatch = masks->At(i)->Masks->AgreeMasks(namePart, NULL);
+                if (masksMatch)
                 {
                     viewer = masks->At(i);
 
@@ -1103,87 +1044,26 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
         {
         case VIEWER_EXTERNAL:
         {
-            CPathBuffer expCommand; // Heap-allocated for long path support
-            CPathBuffer expArguments; // Heap-allocated for long path support
-            CPathBuffer expInitDir; // Heap-allocated for long path support
-            if (ExpandCommand(parent, viewer->Command.c_str(), expCommand, expCommand.Size(), FALSE) &&
-                ExpandArguments(parent, name, dosName, viewer->Arguments.c_str(), expArguments, expArguments.Size(), NULL) &&
-                ExpandInitDir(parent, name, dosName, viewer->InitDir.c_str(), expInitDir, expInitDir.Size(), FALSE))
+            std::wstring expCommandW;
+            std::wstring expArgumentsW;
+            std::wstring expInitDirW;
+            if (ExpandCommand(parent, viewer->Command.c_str(), expCommandW, FALSE) &&
+                ExpandArguments(parent, name, dosName.c_str(), viewer->Arguments.c_str(), expArgumentsW, NULL) &&
+                ExpandInitDir(parent, name, dosName.c_str(), viewer->InitDir.c_str(), expInitDirW, FALSE))
             {
                 if (SystemPolicies.GetMyRunRestricted() &&
-                    !SystemPolicies.GetMyCanRun(expCommand))
+                    !SystemPolicies.GetMyCanRun(expCommandW.c_str()))
                 {
                     gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
                                                  LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                     break;
                 }
 
-                // Wide-aware command-line assembly. Same shape as EditFile:
-                // ExpandCommand/Arguments/InitDir run ANSI through CP_ACP, then we
-                // convert to wide and substitute the lossy CP_ACP mirrors of $(FullPath),
-                // $(Name), $(Path) (in both with-trailing-slash and without flavors)
-                // with their wide counterparts derived from the caller-supplied nameW.
-                // Without this CreateProcessA fails with ERROR_DIRECTORY (267) when the
-                // panel root is non-CP_ACP, even though the panel rendered it correctly.
-                std::wstring effectiveNameW;
-                if (nameW != NULL && nameW[0] != L'\0')
-                    effectiveNameW = nameW;
-                else if (name != NULL)
-                    effectiveNameW = AnsiToWide(name);
-
-                std::wstring expCommandW = AnsiToWide(expCommand.Get());
-                std::wstring expArgumentsW = AnsiToWide(expArguments.Get());
-                std::wstring expInitDirW = AnsiToWide(expInitDir.Get());
-
-                if (!effectiveNameW.empty() && name != NULL && name[0] != '\0')
-                {
-                    const std::wstring lossyFullPathW = AnsiToWide(name);
-                    auto replaceAll = [](std::wstring& s, const std::wstring& from, const std::wstring& to) {
-                        if (from.empty() || from == to)
-                            return;
-                        size_t pos = 0;
-                        while ((pos = s.find(from, pos)) != std::wstring::npos)
-                        {
-                            s.replace(pos, from.size(), to);
-                            pos += to.size();
-                        }
-                    };
-                    replaceAll(expArgumentsW, lossyFullPathW, effectiveNameW);
-                    replaceAll(expInitDirW, lossyFullPathW, effectiveNameW);
-
-                    const char* leafA = strrchr(name, '\\');
-                    const size_t lastSlashW = effectiveNameW.find_last_of(L'\\');
-                    if (leafA != NULL && lastSlashW != std::wstring::npos)
-                    {
-                        const std::wstring lossyLeafW = AnsiToWide(leafA + 1);
-                        const std::wstring leafW = effectiveNameW.substr(lastSlashW + 1);
-                        replaceAll(expArgumentsW, lossyLeafW, leafW);
-                        replaceAll(expInitDirW, lossyLeafW, leafW);
-
-                        std::string dirA(name, (size_t)(leafA - name + 1));
-                        std::wstring lossyDirWithSlash = AnsiToWide(dirA.c_str());
-                        std::wstring dirWithSlash = effectiveNameW.substr(0, lastSlashW + 1);
-                        replaceAll(expArgumentsW, lossyDirWithSlash, dirWithSlash);
-                        replaceAll(expInitDirW, lossyDirWithSlash, dirWithSlash);
-                        if (!dirA.empty() && dirA.back() == '\\')
-                            dirA.pop_back();
-                        if (!dirA.empty())
-                        {
-                            std::wstring lossyDirNoSlash = AnsiToWide(dirA.c_str());
-                            std::wstring dirNoSlash = (lastSlashW == 0)
-                                                          ? std::wstring()
-                                                          : effectiveNameW.substr(0, lastSlashW);
-                            replaceAll(expArgumentsW, lossyDirNoSlash, dirNoSlash);
-                            replaceAll(expInitDirW, lossyDirNoSlash, dirNoSlash);
-                        }
-                    }
-                }
-
                 MainWindow->SetDefaultDirectories();
 
                 if (expInitDirW.empty()) // matches the original ANSI "this should never happen" branch
                 {
-                    expInitDirW = effectiveNameW.empty() ? AnsiToWide(name) : effectiveNameW;
+                    expInitDirW = name;
                     size_t lastSlash = expInitDirW.find_last_of(L'\\');
                     if (lastSlash != std::wstring::npos)
                         expInitDirW.resize(lastSlash);
@@ -1202,8 +1082,8 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 cmdLineW.append(expArgumentsW);
 
                 ViewerEditorProcessLaunchRequest request;
-                request.commandLine = cmdLineW.c_str();
-                request.workingDirectory = expInitDirW.empty() ? NULL : expInitDirW.c_str();
+                request.commandLine = cmdLineW;
+                request.workingDirectory = expInitDirW;
                 request.creationFlags = NORMAL_PRIORITY_CLASS;
                 request.usePosition = true;
                 request.x = place.rcNormalPosition.left;
@@ -1221,7 +1101,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 {
                     std::wstring msg = FormatStrW(LoadStrW(IDS_ERROREXECVIEW),
                                                   expCommandW.c_str(),
-                                                  GetErrorTextW(launchResult.errorCode));
+                                                  GetErrorTextOwned(launchResult.errorCode).c_str());
                     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 }
                 else
@@ -1233,7 +1113,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                         launchResult.CloseProcess();
                         std::wstring msg = FormatStrW(LoadStrW(IDS_ERROREXECVIEW),
                                                       expCommandW.c_str(),
-                                                      GetErrorTextW(err));
+                                                      GetErrorTextOwned(err).c_str());
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                     }
                     else
@@ -1271,29 +1151,16 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
 
             HANDLE lockAux = NULL;
             BOOL lockOwnerAux = FALSE;
-            BOOL viewerOpened = FALSE;
-            if (nameW != NULL && nameW[0] != L'\0')
-            {
-                viewerOpened = OpenViewerW(nameW, name, vtText,
-                                           place.rcNormalPosition.left,
-                                           place.rcNormalPosition.top,
-                                           place.rcNormalPosition.right - place.rcNormalPosition.left,
-                                           place.rcNormalPosition.bottom - place.rcNormalPosition.top,
-                                           place.showCmd,
-                                           returnLock, &lockAux, &lockOwnerAux, NULL,
-                                           enumFileNamesSourceUID, enumFileNamesLastFileIndex);
-            }
-            else
-            {
-                viewerOpened = OpenViewer(name, vtText,
-                                          place.rcNormalPosition.left,
-                                          place.rcNormalPosition.top,
-                                          place.rcNormalPosition.right - place.rcNormalPosition.left,
-                                          place.rcNormalPosition.bottom - place.rcNormalPosition.top,
-                                          place.showCmd,
-                                          returnLock, &lockAux, &lockOwnerAux, NULL,
-                                          enumFileNamesSourceUID, enumFileNamesLastFileIndex);
-            }
+            // one call: OpenViewer/OpenViewerW were a pair whose only
+            // difference was which half the CALL_STACK_MESSAGE printed.
+            BOOL viewerOpened = OpenViewer(name, vtText,
+                                            place.rcNormalPosition.left,
+                                            place.rcNormalPosition.top,
+                                            place.rcNormalPosition.right - place.rcNormalPosition.left,
+                                            place.rcNormalPosition.bottom - place.rcNormalPosition.top,
+                                            place.showCmd,
+                                            returnLock, &lockAux, &lockOwnerAux, NULL,
+                                            enumFileNamesSourceUID, enumFileNamesLastFileIndex);
             if (viewerOpened)
             {
                 success = TRUE;
@@ -1338,17 +1205,16 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
     }
     else
     {
-        CPathBuffer buff;
         int textID = altView ? IDS_CANT_VIEW_FILE_ALT : IDS_CANT_VIEW_FILE;
-        sprintf(buff, LoadStr(textID), name);
-        gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
+        std::wstring message = FormatStrW(LoadStrW(textID), name);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
     }
     return success;
 }
 
-void CFilesWindow::EditFile(char* name, DWORD handlerID)
+void CFilesWindow::EditFile(const wchar_t* name, DWORD handlerID)
 {
-    CALL_STACK_MESSAGE3("CFilesWindow::EditFile(%s, %u)", name, handlerID);
+    CALL_STACK_MESSAGE3("CFilesWindow::EditFile(%ls, %u)", name, handlerID);
     if (!Is(ptDisk) && name == NULL)
     {
         TRACE_E("Incorrect call to CFilesWindow::EditFile()");
@@ -1356,20 +1222,21 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
 
     // verify that the file is on an accessible path
-    CPathBuffer path;
+    std::wstring path;
     if (name == NULL)
     {
         if (CheckPath(TRUE) != ERROR_SUCCESS)
             return;
     }
-    else
+    else // file from a Windows path (Find results, Alt+F11, history)
     {
-        char* backSlash = strrchr(name, '\\');
+        // one branch: 'name' can no longer be a lossy structural mirror,
+        // so the wide-twin branch and the narrow fallback have the same job.
+        const wchar_t* backSlash = wcsrchr(name, L'\\');
         if (backSlash != NULL)
         {
-            memcpy(path, name, backSlash - name);
-            path[backSlash - name] = 0;
-            if (CheckPath(TRUE, path) != ERROR_SUCCESS)
+            std::wstring dirW(name, backSlash - name);
+            if (CheckPath(TRUE, dirW.c_str()) != ERROR_SUCCESS)
                 return;
         }
     }
@@ -1380,8 +1247,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     // that Unicode panel paths (e.g. "C:\Temp\SalLongPathTest\zz中文\한글_x.txt")
     // can be passed to CreateProcessW without going through CP_ACP — otherwise
     // the working-directory parameter resolves to "zz??" and CreateProcessA
-    // returns ERROR_DIRECTORY (267).
+    // returns ERROR_DIRECTORY (267). An external caller's exact wide twin
+    // (Find results) is seeded here directly; the panel branch below builds
+    // its own from CFileData when name == NULL.
     std::wstring nameW;
+    if (name != NULL && name[0] != 0)
+        nameW = name;
 
     // if viewing/editing from the panel, obtain the full long name
     if (name == NULL)
@@ -1392,56 +1263,26 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             CFileData* f = &Files->At(i - Dirs->Count);
             if (Is(ptDisk))
             {
-                lstrcpyn(path, GetPath(), path.Size());
-                if (GetPath()[strlen(GetPath()) - 1] != '\\')
-                    strcat(path, "\\");
-                char* s = path + strlen(path);
-                if ((s - path) + f->NameLen >= (int)path.Size())
-                {
-                    if (f->DosName != NULL && strlen(f->DosName) + (s - path) < (int)path.Size())
-                        strcpy(s, f->DosName);
-                    else
-                    {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
-                        return;
-                    }
-                }
-                else
-                    strcpy(s, f->Name);
+                path = sally::unicode::BuildPanelChildPathW(GetPathW(), f->Name);
                 // try whether the file name is valid, otherwise try its DOS name as well
                 // (handles files accessible only through Unicode or DOS names)
-                if (f->DosName != NULL && SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES)
+                if (f->DosName != NULL && SalLPGetFileAttributes(path.c_str()) == INVALID_FILE_ATTRIBUTES)
                 {
                     DWORD err = GetLastError();
                     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
                     {
-                        if (strlen(f->DosName) + (s - path) < (int)path.Size())
-                        {
-                            strcpy(s, f->DosName);
-                            if (SalLPGetFileAttributes(path) == INVALID_FILE_ATTRIBUTES) // still error -> revert to the long name
-                            {
-                                if ((s - path) + f->NameLen < (int)path.Size())
-                                    strcpy(s, f->Name);
-                            }
-                        }
+                        const std::wstring dosPath =
+                            sally::unicode::BuildPanelChildPathW(GetPathW(), f->DosName);
+                        if (SalLPGetFileAttributes(dosPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+                            path = dosPath;
                     }
                 }
-                name = path;
+                name = path.c_str();
                 addToHistory = TRUE;
-                // Build the wide twin while f is still in scope. Prefer
-                // f->NameW (preserved Unicode leaf, populated by directory
-                // read for any non-ASCII filename) over AnsiToWide(f->Name),
-                // which would re-introduce CP_ACP loss for Korean/CJK leaves.
-                if (sally::unicode::HasWidePathW(GetPathW()))
-                {
-                    nameW = GetPathW();
-                    if (!nameW.empty() && nameW.back() != L'\\')
-                        nameW += L'\\';
-                    if (f->NameW != NULL)
-                        nameW += f->NameW;
-                    else if (f->Name != NULL)
-                        nameW += AnsiToWide(f->Name);
-                }
+                // path is wide-native (f->Name is the exact wide name,
+                // NameW/UseWideName retired at P1.3) - path already IS the wide twin,
+                // no separate CP_ACP-lossy reconstruction needed.
+                nameW = path;
             }
         }
         else
@@ -1450,33 +1291,28 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         }
     }
 
-    // Fallback wide twin when name was supplied by an external caller
-    // (Find dialog, history). No preserved CFileData here; the best we can
-    // do is AnsiToWide. The Find dialog's wide propagation is a separate
-    // stream (tracked in kb/unicode/TODO.md item 3).
-    if (nameW.empty() && name != NULL)
-        nameW = AnsiToWide(name);
+    // The narrow fallback is gone: every caller now supplies the exact wide
+    // name, so there is no lossy mirror left to re-derive one from.
 
     // obtain the full DOS name
-    CPathBuffer dosName; // Heap-allocated for long path support
-    if (GetShortPathName(name, dosName, dosName.Size()) == 0)
+    std::wstring dosName = GetShortPathW(name);
+    if (dosName.empty())
     {
         TRACE_I("GetShortPathName() failed.");
-        dosName[0] = 0;
     }
 
     // find the file name and check if it has an extension - needed for masks
-    char* namePart = strrchr(name, '\\');
+    const wchar_t* namePart = wcsrchr(name, L'\\');
     if (namePart == NULL)
     {
-        TRACE_E("Invalid parameter CFilesWindow::EditFile(): " << name);
+        TRACE_E("Invalid parameter CFilesWindow::EditFile(): " << sally::diagnostic::EncodeAcpLossy(name));
         return;
     }
     namePart++;
-    char* tmpExt = strrchr(namePart, '.');
+    const wchar_t* tmpExt = wcsrchr(namePart, L'.');
     //if (tmpExt == NULL || tmpExt == namePart) tmpExt = namePart + lstrlen(namePart); // ".cvspass" is not an extension...
     if (tmpExt == NULL)
-        tmpExt = namePart + lstrlen(namePart); // ".cvspass" is treated as an extension in Windows...
+        tmpExt = namePart + (int)wcslen(namePart); // ".cvspass" is treated as an extension in Windows...
     else
         tmpExt++;
 
@@ -1521,7 +1357,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             int err;
             if (masks->At(i)->Masks->PrepareMasks(err))
             {
-                if (masks->At(i)->Masks->AgreeMasks(namePart, tmpExt))
+                // wide: nameW is always populated by this point from the caller's
+                // exact wide value. Mask-match the true wide leaf instead of re-widening the
+                // already-lossy CP_ACP namePart internally.
+                const wchar_t* namePartW = wcsrchr(nameW.c_str(), L'\\');
+                namePartW = namePartW != NULL ? namePartW + 1 : nameW.c_str();
+                if (masks->At(i)->Masks->AgreeMasks(namePartW, NULL))
                 {
                     editor = masks->At(i);
                     break;
@@ -1537,88 +1378,26 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         if (addToHistory)
             MainWindow->FileHistory->AddFile(fhitEdit, editor->HandlerID, name); // add file to history
 
-        CPathBuffer expCommand; // Heap-allocated for long path support
-        CPathBuffer expArguments; // Heap-allocated for long path support
-        CPathBuffer expInitDir; // Heap-allocated for long path support
-        if (ExpandCommand(HWindow, editor->Command.c_str(), expCommand, expCommand.Size(), FALSE) &&
-            ExpandArguments(HWindow, name, dosName, editor->Arguments.c_str(), expArguments, expArguments.Size(), NULL) &&
-            ExpandInitDir(HWindow, name, dosName, editor->InitDir.c_str(), expInitDir, expInitDir.Size(), FALSE))
+        std::wstring expCommandW;
+        std::wstring expArgumentsW;
+        std::wstring expInitDirW;
+        if (ExpandCommand(HWindow, editor->Command.c_str(), expCommandW, FALSE) &&
+            ExpandArguments(HWindow, name, dosName.c_str(), editor->Arguments.c_str(), expArgumentsW, NULL) &&
+            ExpandInitDir(HWindow, name, dosName.c_str(), editor->InitDir.c_str(), expInitDirW, FALSE))
         {
             if (SystemPolicies.GetMyRunRestricted() &&
-                !SystemPolicies.GetMyCanRun(expCommand))
+                !SystemPolicies.GetMyCanRun(expCommandW.c_str()))
             {
                 gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE),
                                              LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                 return;
             }
 
-            // Wide-aware command-line assembly. The ANSI ExpandCommand/Arguments/InitDir
-            // above expanded the templates through CP_ACP, so any $(FullPath), $(Name) or
-            // $(Path) substitutions that referenced a non-CP_ACP filename came out lossy
-            // (e.g. "zz??\??_Korea_22a_9.txt"). Convert each piece to wide via AnsiToWide
-            // and then substitute the lossy CP_ACP-mirrored substrings with their wide
-            // counterparts derived from nameW. This recovers the common $(FullPath),
-            // $(Name) and $(Path) cases without touching the var-expansion engine.
-            std::wstring expCommandW = AnsiToWide(expCommand.Get());
-            std::wstring expArgumentsW = AnsiToWide(expArguments.Get());
-            std::wstring expInitDirW = AnsiToWide(expInitDir.Get());
-
-            if (!nameW.empty() && name != NULL && name[0] != '\0')
-            {
-                const std::wstring lossyFullPathW = AnsiToWide(name);
-                auto replaceAll = [](std::wstring& s, const std::wstring& from, const std::wstring& to) {
-                    if (from.empty() || from == to)
-                        return;
-                    size_t pos = 0;
-                    while ((pos = s.find(from, pos)) != std::wstring::npos)
-                    {
-                        s.replace(pos, from.size(), to);
-                        pos += to.size();
-                    }
-                };
-                replaceAll(expArgumentsW, lossyFullPathW, nameW);
-                replaceAll(expInitDirW, lossyFullPathW, nameW);
-
-                const char* leafA = strrchr(name, '\\');
-                const size_t lastSlashW = nameW.find_last_of(L'\\');
-                if (leafA != NULL && lastSlashW != std::wstring::npos)
-                {
-                    const std::wstring lossyLeafW = AnsiToWide(leafA + 1);
-                    const std::wstring leafW = nameW.substr(lastSlashW + 1);
-                    replaceAll(expArgumentsW, lossyLeafW, leafW);
-                    replaceAll(expInitDirW, lossyLeafW, leafW);
-
-                    // Path component matched in two flavors: $(Path) expansion
-                    // returns the directory with a trailing backslash, but the
-                    // ANSI ExpandInitDir strips the trailing backslash from its
-                    // result before returning (CreateProcess's lpCurrentDirectory
-                    // convention). Do both replacements; the longer-with-slash
-                    // form is tried first so it doesn't get shadowed by the
-                    // shorter no-slash form's substitution.
-                    std::string dirA(name, (size_t)(leafA - name + 1));
-                    std::wstring lossyDirWithSlash = AnsiToWide(dirA.c_str());
-                    std::wstring dirWithSlash = nameW.substr(0, lastSlashW + 1);
-                    replaceAll(expArgumentsW, lossyDirWithSlash, dirWithSlash);
-                    replaceAll(expInitDirW, lossyDirWithSlash, dirWithSlash);
-                    if (!dirA.empty() && dirA.back() == '\\')
-                        dirA.pop_back();
-                    if (!dirA.empty())
-                    {
-                        std::wstring lossyDirNoSlash = AnsiToWide(dirA.c_str());
-                        std::wstring dirNoSlash = (lastSlashW == 0)
-                                                      ? std::wstring()
-                                                      : nameW.substr(0, lastSlashW);
-                        replaceAll(expArgumentsW, lossyDirNoSlash, dirNoSlash);
-                        replaceAll(expInitDirW, lossyDirNoSlash, dirNoSlash);
-                    }
-                }
-            }
-
             MainWindow->SetDefaultDirectories();
 
             if (expInitDirW.empty()) // belt-and-suspenders fallback (parallel of the original ANSI "this should never happen" branch)
             {
-                expInitDirW = nameW.empty() ? AnsiToWide(name) : nameW;
+                expInitDirW = name;
                 size_t lastSlash = expInitDirW.find_last_of(L'\\');
                 if (lastSlash != std::wstring::npos)
                     expInitDirW.resize(lastSlash);
@@ -1639,8 +1418,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             cmdLineW.append(expArgumentsW);
 
             ViewerEditorProcessLaunchRequest request;
-            request.commandLine = cmdLineW.c_str();
-            request.workingDirectory = expInitDirW.empty() ? NULL : expInitDirW.c_str();
+            request.commandLine = cmdLineW;
+            request.workingDirectory = expInitDirW;
             request.creationFlags = NORMAL_PRIORITY_CLASS;
             request.usePosition = true;
             request.x = place.rcNormalPosition.left;
@@ -1658,7 +1437,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             {
                 std::wstring msg = FormatStrW(LoadStrW(IDS_ERROREXECEDIT),
                                               expCommandW.c_str(),
-                                              GetErrorTextW(launchResult.errorCode));
+                                              GetErrorTextOwned(launchResult.errorCode).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
             }
             else
@@ -1670,7 +1449,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                     launchResult.CloseProcess();
                     std::wstring msg = FormatStrW(LoadStrW(IDS_ERROREXECEDIT),
                                                   expCommandW.c_str(),
-                                                  GetErrorTextW(err));
+                                                  GetErrorTextOwned(err).c_str());
                     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 }
                 else
@@ -1683,9 +1462,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
     else
     {
-        CPathBuffer buff;
-        sprintf(buff, LoadStr(IDS_CANT_EDIT_FILE), name);
-        gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), buff.Get());
+        std::wstring message = FormatStrW(LoadStrW(IDS_CANT_EDIT_FILE), name);
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), message.c_str());
     }
 }
 
@@ -1697,12 +1475,10 @@ void CFilesWindow::EditNewFile()
     // restore DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);
 
-    CPathBuffer path; // Heap-allocated for long path support
     std::wstring pathW;
     if (Configuration.UseEditNewFileDefault)
     {
-        lstrcpyn(path, Configuration.EditNewFileDefault, path.Size());
-        pathW = AnsiToWide(path);
+        pathW = Configuration.EditNewFileDefault;
     }
     else
     {
@@ -1715,56 +1491,52 @@ void CFilesWindow::EditNewFile()
             {
                 // Focused on a file
                 CFileData* f = &Files->At(FocusedIndex - Dirs->Count);
-                std::wstring nameW = f->NameW ? f->NameW : AnsiToWide(f->Name);
-                const wchar_t* dot = wcsrchr(nameW.c_str(), L'.');
+                // f->NameW/f->Name-is-lossy ternary retired - f->Name is
+                // unconditionally the exact wide name now.
+                const wchar_t* nameW = f->Name;
+                const wchar_t* dot = wcsrchr(nameW, L'.');
                 std::wstring suggestion;
-                if (dot != NULL && dot > nameW.c_str())
+                if (dot != NULL && dot > nameW)
                 {
                     // "report.docx" -> "report-new.docx"
-                    suggestion.assign(nameW.c_str(), dot);
+                    suggestion.assign(nameW, dot);
                     suggestion += L"-new";
                     suggestion += dot;
                 }
                 else
                 {
                     // "Makefile" -> "Makefile-new"
-                    suggestion = nameW + L"-new";
+                    suggestion = std::wstring(nameW) + L"-new";
                 }
                 pathW = suggestion;
-                WideToAnsi(pathW, path.Get(), path.Size());
                 usedFocused = TRUE;
             }
             else
             {
                 // Focused on a directory — skip ".."
                 CFileData* d = &Dirs->At(FocusedIndex);
-                if (strcmp(d->Name, "..") != 0)
+                if (wcscmp(d->Name, L"..") != 0)
                 {
                     // "MyFolder" -> "MyFolder-new.txt"
-                    std::wstring nameW = d->NameW ? d->NameW : AnsiToWide(d->Name);
-                    pathW = nameW + L"-new.txt";
-                    WideToAnsi(pathW, path.Get(), path.Size());
+                    pathW = std::wstring(d->Name) + L"-new.txt";
                     usedFocused = TRUE;
                 }
             }
         }
         if (!usedFocused)
         {
-            lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), path.Size());
-            pathW = AnsiToWide(path);
+            pathW = LoadStrW(IDS_EDITNEWFILE_DEFAULTNAME);
         }
     }
     CTruncatedString subject;
-    subject.Set(LoadStr(IDS_NEWFILENAME), NULL);
+    subject.SetW(LoadStrW(IDS_NEWFILENAME), NULL);
 
     BOOL first = TRUE;
 
     while (1)
     {
-        CEditNewFileDialog dlg(HWindow, path, path.Size(), &subject,
-                               Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE,
-                               Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE);
-        dlg.SetUnicodePath(pathW);
+        CEditNewFileDialog dlg(HWindow, pathW, &subject,
+                               Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
 
         // Some users always create .txt and are satisfied with overwriting just the extension; others create various files and want to overwrite the whole name,
         // so we compromised and introduced a dedicated option for Edit New File in the configuration.
@@ -1792,9 +1564,7 @@ void CFilesWindow::EditNewFile()
         {
             UpdateWindow(MainWindow->HWindow);
 
-            std::wstring inputW = dlg.GetUnicodeResult();
-            if (inputW.empty())
-                inputW = AnsiToWide(path);
+            std::wstring inputW = pathW;
             if (!inputW.empty())
             {
                 wchar_t* writable = &inputW[0];
@@ -1802,24 +1572,22 @@ void CFilesWindow::EditNewFile()
                 MakeValidFileNameComponentW(lastCompNameW != NULL ? lastCompNameW + 1 : writable);
             }
             pathW = inputW;
-            WideToAnsi(pathW, path.Get(), path.Size()); // keep ANSI fallback for legacy callers
 
             // clean the name from undesirable characters at the beginning and end
             // we do this only for the last component; the previous ones already exist and it doesn't matter
             // (the system handles it) or they are checked during creation and an error is shown
             // (we don't clean them, we let the user do some work, it's easy enough)
-            char* errText;
+            std::wstring errText;
             int errTextID;
             std::wstring nextFocusW;
-            std::wstring curDirW;
-            if (Is(ptDisk))
-                curDirW = AnsiToWide(GetPath());
-            if (SalGetFullNameW(pathW, &errTextID, Is(ptDisk) ? curDirW.c_str() : NULL, &nextFocusW, NULL, FALSE))
+            // GetPathW() is the panel's authoritative path. The removed ANSI mirror
+            // was CP_ACP-mangled and could not recover the original non-ASCII directory name.
+            if (SalGetFullNameW(pathW, &errTextID, Is(ptDisk) ? GetPathW() : NULL, &nextFocusW, NULL, FALSE))
             {
                 std::wstring checkPathW = pathW;
                 if (!CutDirectoryW(checkPathW))
                 {
-                    errText = LoadStr(IDS_PATHISINVALID);
+                    errText = LoadStrW(IDS_PATHISINVALID);
                 }
                 else if (SalCheckPathW(TRUE, checkPathW.c_str(), ERROR_SUCCESS, TRUE, HWindow) != ERROR_SUCCESS)
                 {
@@ -1853,37 +1621,27 @@ void CFilesWindow::EditNewFile()
                             HANDLES(CloseHandle(hFile));
 
                         if (!nextFocusW.empty())
-                            WideToAnsi(nextFocusW, NextFocusName, NextFocusName.Size());
+                        {
+                            // RefreshDirectory's focus consumer checks NextFocusNameW
+                            // first (exact match); writing only the narrow mirror silently dropped
+                            // auto-focus accuracy for a name CP_ACP can't spell, same shape as 178.
+                            NextFocusNameW = nextFocusW;
+                        }
 
-                        CPathBuffer editorPathA;
-                        if (TryGetAnsiEditorLaunchPath(pathW, editorPathA.Get(), editorPathA.Size()))
-                        {
-                            EditFile(editorPathA);
-                        }
-                        else
-                        {
-                            // Wide-only names without an ANSI/8.3 alias still need a wide shell fallback.
-                            ShellExecResult openResult = gViewerEditorLauncher != NULL
-                                                             ? gViewerEditorLauncher->OpenFileWithShell(HWindow, pathW.c_str(), SW_SHOWNORMAL)
-                                                             : ShellExecResult::Error(ERROR_INVALID_PARAMETER);
-                            if (!openResult.success)
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(openResult.errorCode));
-                        }
+                        EditFile(pathW.c_str());
 
                         // change only in the directory where the file was created
-                        CPathBuffer checkPathA;
-                        WideToAnsi(checkPathW, checkPathA.Get(), checkPathA.Size());
-                        MainWindow->PostChangeOnPathNotification(checkPathA, FALSE);
+                        MainWindow->PostChangeOnPathNotificationW(checkPathW.c_str(), FALSE);
 
                         break;
                     }
                     else
-                        errText = GetErrorText(GetLastError());
+                        errText = GetErrorTextOwned(GetLastError()).c_str();
                 }
             }
             else
-                errText = LoadStr(errTextID);
-            gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), errText);
+                errText = LoadStrW(errTextID);
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), errText.c_str());
         }
         else
             break;
@@ -1905,29 +1663,29 @@ void CFilesWindow::FillViewWithMenu(CMenuPopup* popup)
         return;
 
     MENU_ITEM_INFO mii;
-    char buff[1024];
     int i;
     for (i = 0; i < items.Count; i++)
     {
         CViewerMasksItem* item = items[i];
+        std::wstring menuText;
 
         int imgIndex = -1; // no icon
         if (item->ViewerType < 0)
         {
             int pluginIndex = -item->ViewerType - 1;
             CPluginData* plugin = Plugins.Get(pluginIndex);
-            lstrcpy(buff, plugin->Name.c_str());
+            menuText = plugin->Name;
             if (plugin->PluginIconIndex != -1) // the plugin has an icon
                 imgIndex = pluginIndex;
         }
         if (item->ViewerType == VIEWER_EXTERNAL)
-            sprintf(buff, LoadStr(IDS_VIEWWITH_EXTERNAL), item->Command.c_str());
+            menuText = FormatStrW(LoadStrW(IDS_VIEWWITH_EXTERNAL), item->Command.c_str());
         if (item->ViewerType == VIEWER_INTERNAL)
-            lstrcpy(buff, LoadStr(IDS_VIEWWITH_INTERNAL));
+            menuText = LoadStrW(IDS_VIEWWITH_INTERNAL);
 
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_IMAGEINDEX;
         mii.Type = MENU_TYPE_STRING;
-        mii.String = buff;
+        mii.String = const_cast<wchar_t*>(menuText.c_str());
         mii.ID = CM_VIEWWITH_MIN + i;
         mii.ImageIndex = imgIndex;
         if (mii.ID > CM_VIEWWITH_MAX)
@@ -1942,7 +1700,7 @@ void CFilesWindow::FillViewWithMenu(CMenuPopup* popup)
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_STATE;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(IDS_VIEWWITH_EMPTY);
+        mii.String = LoadStrW(IDS_VIEWWITH_EMPTY);
         popup->InsertItem(-1, TRUE, &mii);
     }
     else
@@ -1975,9 +1733,9 @@ BOOL CFilesWindow::FillViewWithData(TDirectArray<CViewerMasksItem*>* items)
 
                 if (item->ViewerType == VIEWER_EXTERNAL)
                 {
-                    if (stricmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
-                        stricmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
-                        stricmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
+                    if (_wcsicmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
+                        _wcsicmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
+                        _wcsicmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
                     {
                         alreadyAdded = TRUE;
                         break;
@@ -2032,10 +1790,10 @@ void CFilesWindow::OnViewFileWith(int index)
     EndStopRefresh(); // snooper will start again now
 }
 
-void CFilesWindow::ViewFileWith(char* name, HWND hMenuParent, const POINT* menuPoint, DWORD* handlerID,
+void CFilesWindow::ViewFileWith(const wchar_t* name, HWND hMenuParent, const POINT* menuPoint, DWORD* handlerID,
                                 int enumFileNamesSourceUID, int enumFileNamesLastFileIndex)
 {
-    CALL_STACK_MESSAGE5("CFilesWindow::ViewFileWith(%s, , , %s, %d, %d)", name,
+    CALL_STACK_MESSAGE5("CFilesWindow::ViewFileWith(%ls, , , %s, %d, %d)", name,
                         (handlerID == NULL ? "NULL" : "non-NULL"), enumFileNamesSourceUID,
                         enumFileNamesLastFileIndex);
     BeginStopRefresh(); // snooper takes a break
@@ -2077,14 +1835,11 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
     CEditorMasks* masks = MainWindow->EditorMasks;
 
     MENU_ITEM_INFO mii;
-    char buff[1024];
-
     int i;
     for (i = 0; i < masks->Count; i++)
     {
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
         mii.Type = MENU_TYPE_STRING;
-        mii.String = buff;
         mii.ID = CM_EDITWITH_MIN + i;
         if (mii.ID > CM_EDITWITH_MAX)
         {
@@ -2101,9 +1856,9 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
         for (j = 0; j < i; j++)
         {
             CEditorMasksItem* oldItem = masks->At(j);
-            if (stricmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
-                stricmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
-                stricmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
+            if (_wcsicmp(item->Command.c_str(), oldItem->Command.c_str()) == 0 &&
+                _wcsicmp(item->Arguments.c_str(), oldItem->Arguments.c_str()) == 0 &&
+                _wcsicmp(item->InitDir.c_str(), oldItem->InitDir.c_str()) == 0)
             {
                 alreadyAdded = TRUE;
                 break;
@@ -2111,7 +1866,8 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
         }
         if (!alreadyAdded)
         {
-            sprintf(buff, LoadStr(IDS_EDITWITH_EXTERNAL), item->Command.c_str());
+            std::wstring menuText = FormatStrW(LoadStrW(IDS_EDITWITH_EXTERNAL), item->Command.c_str());
+            mii.String = const_cast<wchar_t*>(menuText.c_str());
             popup->InsertItem(-1, TRUE, &mii);
         }
     }
@@ -2120,7 +1876,7 @@ void CFilesWindow::FillEditWithMenu(CMenuPopup* popup)
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_STATE;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(IDS_EDITWITH_EMPTY);
+        mii.String = LoadStrW(IDS_EDITWITH_EMPTY);
         popup->InsertItem(-1, TRUE, &mii);
     }
     else
@@ -2147,9 +1903,9 @@ void CFilesWindow::OnEditFileWith(int index)
     EndStopRefresh(); // snooper will start again now
 }
 
-void CFilesWindow::EditFileWith(char* name, HWND hMenuParent, const POINT* menuPoint, DWORD* handlerID)
+void CFilesWindow::EditFileWith(const wchar_t* name, HWND hMenuParent, const POINT* menuPoint, DWORD* handlerID)
 {
-    CALL_STACK_MESSAGE3("CFilesWindow::EditFileWith(%s, , , %s)", name,
+    CALL_STACK_MESSAGE3("CFilesWindow::EditFileWith(%ls, , , %s)", name,
                         (handlerID == NULL ? "NULL" : "non-NULL"));
     BeginStopRefresh(); // snooper takes a break
     if (handlerID != NULL)
@@ -2175,74 +1931,20 @@ void CFilesWindow::EditFileWith(char* name, HWND hMenuParent, const POINT* menuP
     EndStopRefresh(); // snooper will start again now
 }
 
-BOOL FileNameInvalidForManualCreate(const char* path)
-{
-    const char* name = strrchr(path, '\\');
-    if (name != NULL)
-    {
-        name++;
-        int nameLen = (int)strlen(name);
-        return nameLen > 0 && (*name <= ' ' || name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.');
-    }
-    return FALSE;
-}
-
-BOOL MakeValidFileName(char* path)
-{
-    // trim spaces at the beginning and spaces and dots at the end of the name; Explorer does it
-    // and people wanted the same behavior, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
-    // and https://forum.altap.cz/viewtopic.php?f=2&t=4210
-    BOOL ch = FALSE;
-    char* n = path;
-    while (*n != 0 && *n <= ' ')
-        n++;
-    if (n > path)
-    {
-        memmove(path, n, strlen(n) + 1);
-        ch = TRUE;
-    }
-    n = path + strlen(path);
-    while (n > path && (*(n - 1) <= ' ' || *(n - 1) == '.'))
-        n--;
-    if (*n != 0)
-    {
-        *n = 0;
-        ch = TRUE;
-    }
-    return ch;
-}
-
-BOOL CutSpacesFromBothSides(char* path)
-{
-    // trim spaces at the beginning and end of the name
-    BOOL ch = FALSE;
-    char* n = path;
-    while (*n != 0 && *n <= ' ')
-        n++;
-    if (n > path)
-    {
-        memmove(path, n, strlen(n) + 1);
-        ch = TRUE;
-    }
-    n = path + strlen(path);
-    while (n > path && (*(n - 1) <= ' '))
-        n--;
-    if (*n != 0)
-    {
-        *n = 0;
-        ch = TRUE;
-    }
-    return ch;
-}
+// 2026-08-26: the narrow MakeValidFileName(char*) and CutSpacesFromBothSides(char*)
+// were deleted - confirmed-dead (zero callers anywhere: core, plugins, tests). Their wide
+// siblings, MakeValidFileNameW (this file, 2 real callers) and CutSpacesFromBothSidesW
+// (common/SalPathWide.cpp, 3 real callers), are the ones actually used.
 
 // CutSpacesFromBothSidesW moved to common/SalPathWide.cpp (shared with private tests).
 
-BOOL CutDoubleQuotesFromBothSides(char* path)
+BOOL CutDoubleQuotesFromBothSides(wchar_t* path)
 {
-    int len = (int)strlen(path);
-    if (len >= 2 && path[0] == '"' && path[len - 1] == '"')
+    int len = (int)wcslen(path);
+    if (len >= 2 && path[0] == L'"' && path[len - 1] == L'"')
     {
-        memmove(path, path + 1, len - 2);
+        // len counts CHARACTERS; memmove wants BYTES.
+        memmove(path, path + 1, (size_t)(len - 2) * sizeof(wchar_t));
         path[len - 2] = 0;
         return TRUE;
     }
@@ -2254,9 +1956,6 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     CALL_STACK_MESSAGE1("CFilesWindow::CreateDir()");
     BeginStopRefresh(); // snooper takes a break
 
-    CPathBuffer path, nextFocus;  // Heap-allocated for long path support
-    *path = 0;
-    *nextFocus = 0;
     std::wstring pathW;
 
     // restore DefaultDir
@@ -2265,24 +1964,17 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     if (Is(ptDisk)) // create directory on disk
     {
         CTruncatedString subject;
-        subject.Set(LoadStr(IDS_CREATEDIRECTORY_TEXT), NULL);
-        CCopyMoveDialog dlg(HWindow, path, path.Size(), LoadStr(IDS_CREATEDIRECTORY_TITLE),
+        subject.SetW(LoadStrW(IDS_CREATEDIRECTORY_TEXT), NULL);
+        CCopyMoveDialog dlg(HWindow, pathW, LoadStrW(IDS_CREATEDIRECTORY_TITLE),
                             &subject, IDD_CREATEDIRDIALOG,
                             Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE,
-                            FALSE,
-                            Configuration.CreateDirHistoryW, CREATEDIR_HISTORY_SIZE);
-        dlg.SetUnicodePath(pathW);
+                            FALSE);
 
     CREATE_AGAIN:
 
         if (dlg.Execute() == IDOK)
         {
             UpdateWindow(MainWindow->HWindow);
-            pathW = dlg.GetUnicodeResult();
-            if (pathW.empty())
-                pathW = AnsiToWide(path.Get());
-            dlg.SetUnicodePath(pathW);
-
             sally::filesystem::CreateDirectoryPlan plan;
             sally::filesystem::CreateDirectoryFailure failure;
             if (!sally::filesystem::PrepareCreateDirectoryTargetW(pathW, GetPathW(), plan, &failure))
@@ -2291,7 +1983,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                 goto CREATE_AGAIN;
             }
 
-            std::wstring rootPathW = GetRootPathW(plan.fullPath.c_str());
+            std::wstring rootPathW = GetRootPath(plan.fullPath.c_str());
             if (SalCheckPathW(TRUE, rootPathW.c_str(), ERROR_SUCCESS, TRUE, HWindow) != ERROR_SUCCESS)
                 goto CREATE_AGAIN;
 
@@ -2314,7 +2006,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             std::wstring firstCreatedDirW;
             while (!sally::filesystem::EnsureDirectoryTreeExistsW(plan.parentPath, true, &firstCreatedDirW, &failure))
             {
-                std::wstring errorText = failure.errorTextId != 0 ? LoadStrW(failure.errorTextId) : GetErrorTextW(failure.errorCode);
+                std::wstring errorText = failure.errorTextId != 0 ? LoadStrW(failure.errorTextId) : GetErrorTextOwned(failure.errorCode).c_str();
                 if (gPrompter->AskRetryCancel(LoadStrW(IDS_ERRORCREATINGDIR), errorText.c_str()).type != PromptResult::kRetry)
                     goto CREATE_AGAIN;
             }
@@ -2337,7 +2029,6 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                     SetCursor(oldCur);
 
                     NextFocusNameW = plan.nextFocus;
-                    WideToAnsi(NextFocusNameW, NextFocusName, NextFocusName.Size());
                     MainWindow->PostChangeOnPathNotificationW(plan.parentPath.c_str(), FALSE);
 
                     EndStopRefresh(); // snooper will start again now
@@ -2348,7 +2039,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                     err = ERROR_INVALID_NAME;
                 SetCursor(oldCur);
 
-                if (gPrompter->AskRetryCancel(LoadStrW(IDS_ERRORCREATINGDIR), GetErrorTextW(err)).type != PromptResult::kRetry)
+                if (gPrompter->AskRetryCancel(LoadStrW(IDS_ERRORCREATINGDIR), GetErrorTextOwned(err).c_str()).type != PromptResult::kRetry)
                     goto CREATE_AGAIN;
             }
         }
@@ -2361,8 +2052,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
             // lower the thread priority to "normal" (so operations don't overload the machine)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            CPathBuffer newName;  // Heap-allocated for long path support
-            *newName = 0;
+            std::wstring newName;
             BOOL cancel = FALSE;
             BOOL ret = GetPluginFS()->CreateDir(GetPluginFS()->GetPluginFSName(), 1, HWindow, newName, cancel);
             if (!cancel) // not a cancel of the operation
@@ -2370,8 +2060,8 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                 if (!ret)
                 {
                     CTruncatedString subject;
-                    subject.Set(LoadStr(IDS_CREATEDIRECTORY_TEXT), NULL);
-                    CCopyMoveDialog dlg(HWindow, path, path.Size(), LoadStr(IDS_CREATEDIRECTORY_TITLE),
+                    subject.SetW(LoadStrW(IDS_CREATEDIRECTORY_TEXT), NULL);
+                    CCopyMoveDialog dlg(HWindow, pathW, LoadStrW(IDS_CREATEDIRECTORY_TITLE),
                                         &subject, IDD_CREATEDIRDIALOG,
                                         Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE,
                                         FALSE);
@@ -2380,11 +2070,11 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
                         // open the standard dialog
                         if (dlg.Execute() == IDOK)
                         {
-                            strcpy(newName, path);
+                            newName = pathW;
                             ret = GetPluginFS()->CreateDir(GetPluginFS()->GetPluginFSName(), 2, HWindow, newName, cancel);
                             if (ret || cancel)
                                 break; // not an error (cancel or success)
-                            strcpy(path, newName);
+                            pathW = newName;
                         }
                         else
                         {
@@ -2397,7 +2087,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
 
                 if (ret && !cancel) // operation completed successfully
                 {
-                    lstrcpyn(NextFocusName, newName, NextFocusName.Size()); // ensure focus of the new name after refresh
+                    NextFocusNameW = newName; // ensure focus of the new name after refresh
                 }
             }
 
@@ -2410,50 +2100,31 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     EndStopRefresh(); // snooper will start again now
 }
 
-void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName, BOOL* mayChange, BOOL* tryAgain)
+void CFilesWindow::RenameFileInternal(CFileData* f, const std::wstring& newName, BOOL* mayChange, BOOL* tryAgain)
 {
     *tryAgain = TRUE;
-    const char* s = formatedFileName;
-    while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
-           *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
+    // Do NOT clean the MASK here - only the expanded result below, as pre-unicode did.
+    // MakeValidFileNameW strips a trailing dot, and a trailing dot is what makes the
+    // standard mask "*." mean "drop the extension"; trimming it first turned that mask
+    // into "*", so the rename expanded to the name the file already had and was thrown
+    // away by the same-name check.
+    const wchar_t* formatedFileName = newName.c_str();
+    const wchar_t* s = formatedFileName;
+    while (*s != 0 && *s != L'\\' && *s != L'/' && *s != L':' &&
+           *s >= 32 && *s != L'<' && *s != L'>' && *s != L'|' && *s != L'"')
         s++;
     if (formatedFileName[0] != 0 && *s == 0)
     {
-        CPathBuffer finalName;  // Heap-allocated for long path support
-        MaskName(finalName, finalName.Size(), f->Name, formatedFileName);
+        std::wstring finalName = MaskNameOwnedW(f->Name, formatedFileName);
+        MakeValidFileNameW(finalName);
 
-        // clean the name from undesirable characters at the beginning and end
-        MakeValidFileName(finalName);
-
-        int l = (int)strlen(GetPath());
-        CPathBuffer tgtPath; // Heap-allocated for long path support
-        if (l >= tgtPath.Size() - 1) // guard against buffer overflow
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
-            *tryAgain = FALSE;
-            return;
-        }
-        memmove(tgtPath.Get(), GetPath(), l);
-        if (GetPath()[l - 1] != '\\')
-            tgtPath[l++] = '\\';
-        int tgtPathSize = (int)tgtPath.Size();
-        if ((int)strlen(finalName) + l < tgtPathSize &&
-            ((int)f->NameLen + l < tgtPathSize ||
-             (f->DosName != NULL && (int)strlen(f->DosName) + l < tgtPathSize)))
-        {
-            strcpy(tgtPath + l, finalName);
-            CPathBuffer path; // Heap-allocated for long path support
-            strcpy(path, GetPath());
-            char* end = path + l;
-            if (*(end - 1) != '\\')
-                *--end = '\\';
-            if ((int)f->NameLen + l < (int)path.Size())
-                strcpy(path + l, f->Name);
-            else
-                strcpy(path + l, f->DosName);
-
-            const std::wstring emptyWidePath;
-            if (sally::unicode::ArePathsExactlySame(path, tgtPath, emptyWidePath, emptyWidePath))
+        std::wstring basePath = GetPathW();
+        SalPathAddBackslashW(basePath);
+        std::wstring tgtPathW = basePath;
+        tgtPathW += finalName;
+        std::wstring pathW = basePath;
+        pathW += f->Name;
+            if (sally::unicode::ArePathsExactlySame(NULL, NULL, pathW, tgtPathW))
             {
                 *tryAgain = FALSE;
                 return; // no-op rename (same name)
@@ -2461,41 +2132,41 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
             BOOL ret = FALSE;
 
+            // try renaming from the long name first and if there is a problem then
+            // from the DOS name (handles files/directories accessible only via Unicode or DOS names) -
+            // pathW/tgtPathW are owned UTF-16 paths, with no sizing or encoding bridge.
+
             BOOL handsOFF = FALSE;
             CFilesWindow* otherPanel = MainWindow->GetNonActivePanel();
-            int otherPanelPathLen = (int)strlen(otherPanel->GetPath());
-            int pathLen = (int)strlen(path);
+            // The panel's narrow ANSI mirror was removed (fileswnd.h) - GetPathW() is
+            // unconditionally the authoritative panel path now, so compare it directly.
+            std::wstring otherPathW = otherPanel->GetPathW();
             // are we changing the path of the other panel?
-            if (otherPanelPathLen >= pathLen &&
-                StrNICmp(path, otherPanel->GetPath(), pathLen) == 0 &&
-                (otherPanelPathLen == pathLen ||
-                 otherPanel->GetPath()[pathLen] == '\\'))
+            if (otherPathW.length() >= pathW.length() &&
+                _wcsnicmp(pathW.c_str(), otherPathW.c_str(), pathW.length()) == 0 &&
+                (otherPathW.length() == pathW.length() || otherPathW[pathW.length()] == L'\\'))
             {
                 otherPanel->HandsOff(TRUE);
                 handsOFF = TRUE;
             }
 
             *mayChange = TRUE;
-
-            // try renaming from the long name first and if there is a problem then
-            // from the DOS name (handles files/directories accessible only via Unicode or DOS names)
-            std::wstring pathW = AnsiToWide(path);
-            std::wstring tgtPathW = AnsiToWide(tgtPath);
-            BOOL moveRet = MoveFileW(pathW.c_str(), tgtPathW.c_str());
-            DWORD err = 0;
+            FileResult moveResult = gFileSystem->MoveFile(pathW.c_str(), tgtPathW.c_str());
+            BOOL moveRet = moveResult.success;
+            DWORD err = moveRet ? ERROR_SUCCESS : moveResult.errorCode;
             if (!moveRet)
             {
-                err = GetLastError();
                 if ((err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME) &&
                     f->DosName != NULL)
                 {
-                    strcpy(path + l, f->DosName);
-                    pathW = AnsiToWide(path);
-                    moveRet = MoveFileW(pathW.c_str(), tgtPathW.c_str());
+                    pathW = basePath;
+                    pathW += f->DosName;
+                    moveResult = gFileSystem->MoveFile(pathW.c_str(), tgtPathW.c_str());
+                    moveRet = moveResult.success;
                     if (!moveRet)
-                        err = GetLastError();
-                    strcpy(path + l, f->Name);
-                    pathW = AnsiToWide(path);
+                        err = moveResult.errorCode;
+                    pathW = basePath;
+                    pathW += f->Name;
                 }
             }
 
@@ -2504,27 +2175,36 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
             REN_OPERATION_DONE:
 
-                strcpy(NextFocusName, tgtPath + l);
+                NextFocusNameW = finalName;
                 ret = TRUE;
             }
             else
             {
-                if (StrICmp(path, tgtPath) != 0 && // if it isn't just change-case
+                // wide: pathW/tgtPathW are full paths - a non-ASCII component
+                // anywhere in either could collide on the CP_ACP mirror alone, wrongly treating
+                // a genuine rename as a mere case-change no-op. Two wide-identical names are
+                // always narrow-identical too (the mirror is a deterministic function of the
+                // wide source), but not the reverse - so the wide compare alone is authoritative
+                // here, not an addition to the narrow one. pathW/tgtPathW stay in sync with
+                // the retry path; pathW is restored after the DOS-name retry above.
+                if (_wcsicmp(pathW.c_str(), tgtPathW.c_str()) != 0 && // if it isn't just change-case
                     (err == ERROR_FILE_EXISTS ||   // check whether it's only rewriting the DOS name of the file
                      err == ERROR_ALREADY_EXISTS))
                 {
                     WIN32_FIND_DATAW data;
-                    HANDLE find = SalFindFirstFileHW(tgtPath, &data);
+                    HANDLE find = SalFindFirstFileHW(tgtPathW.c_str(), &data);
                     if (find != INVALID_HANDLE_VALUE)
                     {
-                        HANDLES(FindClose(find));
-                        const char* tgtName = SalPathFindFileName(tgtPath);
-                        char cAltNameA[14];
-                        WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                        char cFileNameA[MAX_PATH];
-                        WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                        if (StrICmp(tgtName, cAltNameA) == 0 && // match only for DOS name
-                            StrICmp(tgtName, cFileNameA) != 0)  // (full name differs)
+                        gFileSystem->CloseFind(find);
+                        // wide: the old cFileNameA mirror could collapse two
+                        // distinct non-ASCII on-disk names to the same '?'-mirror, wrongly
+                        // reporting "full name matches" and skipping the DOS-alias cleanup
+                        // below. data.cFileName/cAlternateFileName are already the genuine wide
+                        // forms (no conversion needed); tgtPathW is unmodified since its
+                        // declaration above.
+                        const wchar_t* tgtNameW = SalPathFindFileNameW(tgtPathW.c_str());
+                        if (_wcsicmp(tgtNameW, data.cAlternateFileName) == 0 && // match only for DOS name
+                            _wcsicmp(tgtNameW, data.cFileName) != 0)           // (full name differs)
                         {
                             // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
                             std::wstring tmpNameW = tgtPathW;
@@ -2542,9 +2222,11 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                                     swprintf(tmpSuffix, _countof(tmpSuffix), L"sal%03X", num++);
                                     tmpNameW.resize(tmpNamePartPos);
                                     tmpNameW += tmpSuffix;
-                                    if (MoveFileW(origFullNameW.c_str(), tmpNameW.c_str()))
+                                    FileResult tempMove = gFileSystem->MoveFile(origFullNameW.c_str(),
+                                                                               tmpNameW.c_str());
+                                    if (tempMove.success)
                                         break;
-                                    DWORD e = GetLastError();
+                                    DWORD e = tempMove.errorCode;
                                     if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                                     {
                                         tmpNameW.clear();
@@ -2553,15 +2235,15 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                                 }
                                 if (!tmpNameW.empty()) // if we successfully "cleaned" the conflicting file, try moving
                                 {                      // the file again, then return the temporary file its original name
-                                    BOOL moveDone = MoveFileW(pathW.c_str(), tgtPathW.c_str());
-                                    if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                                    BOOL moveDone = gFileSystem->MoveFile(pathW.c_str(), tgtPathW.c_str()).success;
+                                    if (!gFileSystem->MoveFile(tmpNameW.c_str(), origFullNameW.c_str()).success)
                                     { // this can apparently happen: Windows creates a file named origFullName instead of 'tgtPath' (DOS name)
                                         TRACE_I("CFilesWindow::RenameFileInternal(): Unexpected situation: unable to rename file from tmp-name to original long file name!");
                                         if (moveDone)
                                         {
-                                            if (MoveFileW(tgtPathW.c_str(), pathW.c_str()))
+                                            if (gFileSystem->MoveFile(tgtPathW.c_str(), pathW.c_str()).success)
                                                 moveDone = FALSE;
-                                            if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                                            if (!gFileSystem->MoveFile(tmpNameW.c_str(), origFullNameW.c_str()).success)
                                                 TRACE_E("CFilesWindow::RenameFileInternal(): Fatal unexpected situation: unable to rename file from tmp-name to original long file name!");
                                         }
                                     }
@@ -2573,31 +2255,36 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                         }
                     }
                 }
+                // wide: same collision risk and same reasoning as the "just
+                // change-case" gate above - the wide compare alone is authoritative.
                 if ((err == ERROR_ALREADY_EXISTS ||
                      err == ERROR_FILE_EXISTS) &&
-                    StrICmp(path, tgtPath) != 0) // overwrite the file?
+                    _wcsicmp(pathW.c_str(), tgtPathW.c_str()) != 0) // overwrite the file?
                 {
-                    DWORD inAttr = GetFileAttributesW(pathW.c_str());
-                    DWORD outAttr = GetFileAttributesW(tgtPathW.c_str());
+                    DWORD inAttr = gFileSystem->GetFileAttributes(pathW.c_str());
+                    DWORD outAttr = gFileSystem->GetFileAttributes(tgtPathW.c_str());
 
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both are files
-                        HANDLE in = CreateFileW(pathW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-                        HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, in, GetLastError(), TRUE);
-                        HANDLE out = CreateFileW(tgtPathW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-                        HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, out, GetLastError(), TRUE);
+                        HANDLE in = gFileSystem->CreateFile(pathW.c_str(), 0,
+                                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        HANDLE out = gFileSystem->CreateFile(tgtPathW.c_str(), 0,
+                                                            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
                         {
-                            char iAttr[101], oAttr[101];
-                            GetFileOverwriteInfo(iAttr, _countof(iAttr), in, path);
-                            GetFileOverwriteInfo(oAttr, _countof(oAttr), out, tgtPath);
-                            HANDLES(CloseHandle(in));
-                            HANDLES(CloseHandle(out));
+                            // The wide info generator already existed and the
+                            // wide paths are right here - this was building the attr strings
+                            // narrow only because the dialog took char*.
+                            wchar_t iAttr[101], oAttr[101];
+                            GetFileOverwriteInfoW(iAttr, _countof(iAttr), in, pathW.c_str());
+                            GetFileOverwriteInfoW(oAttr, _countof(oAttr), out, tgtPathW.c_str());
+                            gFileSystem->CloseFileHandle(in);
+                            gFileSystem->CloseFileHandle(out);
 
-                            COverwriteDlg dlg(HWindow, tgtPath, oAttr, path, iAttr, TRUE);
+                            COverwriteDlg dlg(HWindow, tgtPathW.c_str(), oAttr, pathW.c_str(), iAttr, TRUE);
                             int res = (int)dlg.Execute();
 
                             switch (res)
@@ -2610,14 +2297,19 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
 
                             case IDYES:
                             {
-                                ClearReadOnlyAttrW(tgtPathW.c_str()); // so it can be deleted ...
-                                if (!gFileSystem->DeleteFile(tgtPathW.c_str()).success || !MoveFileW(pathW.c_str(), tgtPathW.c_str()))
-                                    err = GetLastError();
+                                ClearReadOnlyAttr(tgtPathW.c_str()); // so it can be deleted ...
+                                FileResult deleteResult = gFileSystem->DeleteFile(tgtPathW.c_str());
+                                if (!deleteResult.success)
+                                    err = deleteResult.errorCode;
                                 else
                                 {
-                                    err = ERROR_SUCCESS;
+                                    moveResult = gFileSystem->MoveFile(pathW.c_str(), tgtPathW.c_str());
+                                    err = moveResult.success ? ERROR_SUCCESS : moveResult.errorCode;
+                                }
+                                if (err == ERROR_SUCCESS)
+                                {
                                     ret = TRUE;
-                                    strcpy(NextFocusName, tgtPath + l);
+                                    NextFocusNameW = finalName;
                                 }
                                 break;
                             }
@@ -2626,176 +2318,30 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                         else
                         {
                             if (in == INVALID_HANDLE_VALUE)
-                                TRACE_E("Unable to open file " << path);
+                                TRACE_E("Unable to open file " << sally::diagnostic::EncodeAcpLossy(pathW));
                             else
-                                HANDLES(CloseHandle(in));
+                                gFileSystem->CloseFileHandle(in);
                             if (out == INVALID_HANDLE_VALUE)
-                                TRACE_E("Unable to open file " << tgtPath);
+                                TRACE_E("Unable to open file " << sally::diagnostic::EncodeAcpLossy(tgtPathW));
                             else
-                                HANDLES(CloseHandle(out));
+                                gFileSystem->CloseFileHandle(out);
                         }
                     }
                 }
 
                 if (err != ERROR_SUCCESS)
                 {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextOwned(err).c_str());
                 }
             }
             if (handsOFF)
                 otherPanel->HandsOff(FALSE);
             *tryAgain = !ret;
-        }
-        else
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), LoadStrW(IDS_TOOLONGNAME));
-        }
     }
     else
     {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
+        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextOwned(ERROR_INVALID_NAME).c_str());
     }
-}
-
-void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName, BOOL* mayChange, BOOL* tryAgain)
-{
-    *tryAgain = TRUE;
-
-    std::wstring trimmedName = newName;
-    if (!trimmedName.empty())
-    {
-        MakeValidFileNameComponentW(&trimmedName[0]);
-        trimmedName.resize(wcslen(trimmedName.c_str()));
-    }
-
-    // Validate the new filename - check for invalid characters
-    for (wchar_t c : trimmedName)
-    {
-        if (c == L'?' || c == L'*' || c == L'\\' || c == L'/' || c == L':' || c < 32 ||
-            c == L'<' || c == L'>' || c == L'|' || c == L'"')
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
-            return;
-        }
-    }
-
-    if (trimmedName.empty())
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(ERROR_INVALID_NAME));
-        return;
-    }
-
-    std::wstring pathW = sally::unicode::EffectivePanelPathW(GetPath(), GetPathW());
-    std::wstring srcPath = sally::unicode::BuildPanelChildPathW(pathW, f->Name, f->NameW);
-
-    // Build target path
-    std::wstring tgtPath = pathW;
-    if (!tgtPath.empty() && tgtPath.back() != L'\\')
-        tgtPath += L'\\';
-    tgtPath += trimmedName;
-
-    if (sally::unicode::ArePathsExactlySame(NULL, NULL, srcPath, tgtPath))
-    {
-        *tryAgain = FALSE;
-        return; // no-op rename (same name)
-    }
-
-    // Check if other panel needs to be notified
-    BOOL handsOFF = FALSE;
-    CFilesWindow* otherPanel = MainWindow->GetNonActivePanel();
-    std::wstring otherPathW = sally::unicode::EffectivePanelPathW(otherPanel->GetPath(),
-                                                                  otherPanel->GetPathW());
-
-    if (otherPathW.length() >= srcPath.length() &&
-        _wcsnicmp(srcPath.c_str(), otherPathW.c_str(), srcPath.length()) == 0 &&
-        (otherPathW.length() == srcPath.length() || otherPathW[srcPath.length()] == L'\\'))
-    {
-        otherPanel->HandsOff(TRUE);
-        handsOFF = TRUE;
-    }
-
-    *mayChange = TRUE;
-
-    IFileSystem* fileSystem = gFileSystem != NULL ? gFileSystem : GetWin32FileSystem();
-    FileResult moveResult = fileSystem->MoveFile(srcPath.c_str(), tgtPath.c_str());
-
-    BOOL renamed = moveResult.success;
-    BOOL finished = renamed;
-    DWORD err = moveResult.errorCode;
-    if (!moveResult.success &&
-        (err == ERROR_ALREADY_EXISTS || err == ERROR_FILE_EXISTS) &&
-        _wcsicmp(srcPath.c_str(), tgtPath.c_str()) != 0)
-    {
-        DWORD inAttr = fileSystem->GetFileAttributes(srcPath.c_str());
-        DWORD outAttr = fileSystem->GetFileAttributes(tgtPath.c_str());
-        if (inAttr != INVALID_FILE_ATTRIBUTES && outAttr != INVALID_FILE_ATTRIBUTES &&
-            (inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
-            (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
-        {
-            HANDLE in = fileSystem->CreateFile(srcPath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-            HANDLE out = fileSystem->CreateFile(tgtPath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-            if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
-            {
-                std::string srcPathA = WideToAnsi(srcPath);
-                std::string tgtPathA = WideToAnsi(tgtPath);
-                char inInfo[101], outInfo[101];
-                GetFileOverwriteInfo(inInfo, _countof(inInfo), in, srcPathA.c_str());
-                GetFileOverwriteInfo(outInfo, _countof(outInfo), out, tgtPathA.c_str());
-                fileSystem->CloseHandle(in);
-                fileSystem->CloseHandle(out);
-
-                COverwriteDlg dlg(HWindow, tgtPathA.c_str(), outInfo, srcPathA.c_str(), inInfo,
-                                  TRUE, FALSE, tgtPath.c_str(), srcPath.c_str());
-                switch ((int)dlg.Execute())
-                {
-                case IDCANCEL:
-                    finished = TRUE;
-                    // fall through
-                case IDNO:
-                    err = ERROR_SUCCESS;
-                    break;
-
-                case IDYES:
-                {
-                    ClearReadOnlyAttrW(tgtPath.c_str());
-                    FileResult deleteResult = fileSystem->DeleteFile(tgtPath.c_str());
-                    if (deleteResult.success)
-                    {
-                        FileResult retry = fileSystem->MoveFile(srcPath.c_str(), tgtPath.c_str());
-                        err = retry.errorCode;
-                        renamed = retry.success;
-                        finished = renamed;
-                    }
-                    else
-                        err = deleteResult.errorCode;
-                    break;
-                }
-                }
-            }
-            else
-            {
-                if (in != INVALID_HANDLE_VALUE)
-                    fileSystem->CloseHandle(in);
-                if (out != INVALID_HANDLE_VALUE)
-                    fileSystem->CloseHandle(out);
-            }
-        }
-    }
-
-    if (renamed)
-    {
-        NextFocusNameW = trimmedName;
-        WideToAnsi(trimmedName, NextFocusName, NextFocusName.Size());
-    }
-    else if (err != ERROR_SUCCESS)
-        gPrompter->ShowError(LoadStrW(IDS_ERRORRENAMINGFILE), GetErrorTextW(err));
-
-    *tryAgain = !finished;
-
-    if (handsOFF)
-        otherPanel->HandsOff(FALSE);
 }
 
 void CFilesWindow::RenameFile(int specialIndex)
@@ -2812,7 +2358,7 @@ void CFilesWindow::RenameFile(int specialIndex)
 
     BOOL subDir;
     if (Dirs->Count > 0)
-        subDir = (strcmp(Dirs->At(0).Name, "..") == 0);
+        subDir = (wcscmp(Dirs->At(0).Name, L"..") == 0);
     else
         subDir = FALSE;
     if (i == 0 && subDir)
@@ -2822,55 +2368,35 @@ void CFilesWindow::RenameFile(int specialIndex)
     BOOL isDir = i < Dirs->Count;
     f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
 
-    BOOL useUnicode = f->UseWideName() || sally::unicode::WidePathNeedsExactPreservation(GetPathW());
-    CPathBuffer formatedFileName; // Heap-allocated for long path support
-    AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
+    const std::wstring formatedFileName =
+        AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir);
 
-    char buff[200];
-    sprintf(buff, LoadStr(IDS_RENAME_TO), LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
     CTruncatedString subject;
-    // #103: a non-ANSI name used to be replaced by a literal "..." here, because the label
-    // was byte-owned. That is no longer true: CTruncatedString carries wide text (SetW/GetW),
-    // and the dialog constructed below is CCopyMoveDialog, whose DialogProc renders it
-    // (IsWide() -> SetWindowTextW) and which is a Unicode window because SetUnicodePath() is
-    // called a few lines down. Same idiom as the Copy/Delete confirmation subject in
-    // files_window_delete_email.cpp.
-    //
-    // Note useUnicode is also TRUE when only the PATH needs exact preservation, so the old
-    // code hid even plain ASCII names behind "..." in such a directory. The narrow fallback
-    // below shows the real name in that case, and is never worse than "...".
-    const BOOL haveWideName = f->NameW != NULL && f->NameW[0] != 0;
-    if (useUnicode && haveWideName)
     {
-        std::wstring subjectW = FormatStrW(LoadStrW(IDS_RENAME_TO),
-                                           LoadStrW(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
-        std::wstring formatedFileNameW = AlterFileNameW(f->NameW, Configuration.FileNameFormat, 0, isDir != 0);
-        subject.SetW(subjectW.c_str(), formatedFileNameW.c_str());
+        // real fix: the item's name isn't representable in CP_ACP (or the panel
+        // path itself is lossy), so the old narrow formatted name couldn't stand in for it.
+        // Build the subject from the genuine wide name instead of substituting the literal placeholder
+        // "..." for it. Mirrors this file's own NTFS-confirm subject block a few hundred lines
+        // above (AlterFileNameW/EffectiveItemNameW/FormatStrW/SetW).
+        std::wstring buffW = FormatStrW(LoadStrW(IDS_RENAME_TO),
+                                        LoadStrW(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+        subject.SetW(buffW.c_str(), formatedFileName.c_str());
     }
-    else
-        subject.Set(buff, formatedFileName.Get());
-    std::wstring initialRenameNameW = (f->NameW != NULL && f->NameW[0] != L'\0') ? f->NameW : AnsiToWide(formatedFileName.Get());
-    if (useUnicode && f->NameW != NULL && f->NameW[0] != L'\0')
-    {
-        RepairLossyQuickRenameHistoryForCurrentName(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE,
-                                                    f->Name, f->NameW);
-    }
-    CCopyMoveDialog dlg(HWindow, formatedFileName, formatedFileName.Size(), LoadStr(IDS_RENAME_TITLE),
+    std::wstring initialRenameNameW = f->Name;
+    CCopyMoveDialog dlg(HWindow, initialRenameNameW, LoadStrW(IDS_RENAME_TITLE),
                         &subject, IDD_RENAMEDIALOG, Configuration.QuickRenameHistory,
-                        QUICKRENAME_HISTORY_SIZE, FALSE,
-                        Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE);
-    dlg.SetUnicodePath(initialRenameNameW);
+                        QUICKRENAME_HISTORY_SIZE, FALSE);
 
     if (Is(ptDisk)) // rename on disk
     {
 #ifndef _WIN64
         if (Windows64Bit && isDir)
         {
-            CPathBuffer pathBuf(GetPath());
-            SalPathAppend(pathBuf.Get(), f->Name, pathBuf.Size());
-            if (IsWin64RedirectedDir(pathBuf, NULL, FALSE))
+            std::wstring pathBuf = GetPathW();
+            SalPathAppendW(pathBuf, f->Name);
+            if (IsWin64RedirectedDir(pathBuf.c_str(), NULL, FALSE))
             {
-                gPrompter->ShowError(LoadStr(IDS_ERRORTITLE), pathBuf.Get());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), pathBuf.c_str());
                 return;
             }
         }
@@ -2882,8 +2408,7 @@ void CFilesWindow::RenameFile(int specialIndex)
         while (1)
         {
             // if no item is selected, select the one under focus and store its name
-            CPathBuffer temporarySelected; // Heap-allocated for long path support
-            SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+            const std::wstring temporarySelected = SelectFocusedItemAndGetName();
 
             // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
             // the same code appears here four times
@@ -2892,18 +2417,9 @@ void CFilesWindow::RenameFile(int specialIndex)
                 int selectionEnd = -1;
                 if (!isDir)
                 {
-                    if (useUnicode)
-                    {
-                        const wchar_t* dotW = wcsrchr(initialRenameNameW.c_str(), L'.');
-                        if (dotW != NULL && dotW > initialRenameNameW.c_str())
-                            selectionEnd = (int)(dotW - initialRenameNameW.c_str());
-                    }
-                    else
-                    {
-                        const char* dot = strrchr(formatedFileName, '.');
-                        if (dot != NULL && dot > formatedFileName)
-                            selectionEnd = (int)(dot - formatedFileName);
-                    }
+                    const wchar_t* dot = wcsrchr(initialRenameNameW.c_str(), L'.');
+                    if (dot != NULL && dot > initialRenameNameW.c_str())
+                        selectionEnd = (int)(dot - initialRenameNameW.c_str());
                 }
                 dlg.SetSelectionEnd(selectionEnd);
             }
@@ -2918,36 +2434,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                 UpdateWindow(MainWindow->HWindow);
 
                 BOOL tryAgain;
-                // Use Unicode path if: 1) file has Unicode name, or 2) path is too long for ANSI
-                std::wstring renameResultW = dlg.GetUnicodeResult();
-                if (useUnicode && f->NameW != NULL && !renameResultW.empty())
-                {
-                    renameResultW = sally::unicode::RecoverWideCharsFromLossyInput(renameResultW,
-                                                                                   AnsiToWide(f->Name),
-                                                                                   f->NameW);
-                }
-                BOOL pathTooLong = (wcslen(GetPathW()) >= MAX_PATH || strlen(GetPath()) >= MAX_PATH);
-                BOOL unicodeNeedsWidePath = !renameResultW.empty() && WideStringUsesAnsiFallback(renameResultW);
-                BOOL panelPathNeedsWide = sally::unicode::WidePathNeedsExactPreservation(GetPathW());
-                if ((!renameResultW.empty() && (useUnicode || unicodeNeedsWidePath || panelPathNeedsWide)) ||
-                    pathTooLong)
-                {
-                    std::wstring newNameW;
-                    if (!renameResultW.empty())
-                    {
-                        newNameW = renameResultW;
-                    }
-                    else
-                    {
-                        // Convert ANSI filename to Unicode for long path handling
-                        newNameW = AnsiToWide(formatedFileName);
-                    }
-                    RenameFileInternalW(f, newNameW, &mayChange, &tryAgain);
-                }
-                else
-                {
-                    RenameFileInternal(f, formatedFileName, &mayChange, &tryAgain);
-                }
+                RenameFileInternal(f, initialRenameNameW, &mayChange, &tryAgain);
                 if (!tryAgain)
                     break;
             }
@@ -2975,13 +2462,11 @@ void CFilesWindow::RenameFile(int specialIndex)
             // lower the thread priority to "normal" (so operations don't overload the machine)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            CPathBuffer newName; // Heap-allocated for long path support
-            newName[0] = 0;
+            std::wstring newName;
             BOOL cancel = FALSE;
 
             // if no item is selected, select the one under focus and store its name
-            CPathBuffer temporarySelected; // Heap-allocated for long path support
-            SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+            std::wstring temporarySelected = SelectFocusedItemAndGetName();
 
             BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -2996,7 +2481,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                     {
                         // open the standard dialog
                         // if no item is selected, select the one under focus and store its name
-                        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+                        temporarySelected = SelectFocusedItemAndGetName();
 
                         // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
                         // the same code appears here four times
@@ -3005,10 +2490,10 @@ void CFilesWindow::RenameFile(int specialIndex)
                             int selectionEnd = -1;
                             if (!isDir)
                             {
-                                const char* dot = strrchr(formatedFileName, '.');
-                                if (dot != NULL && dot > formatedFileName) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
+                                const wchar_t* dot = wcsrchr(formatedFileName.c_str(), L'.');
+                                if (dot != NULL && dot > formatedFileName.c_str()) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
                                                                            //        if (dot != NULL)
-                                    selectionEnd = (int)(dot - formatedFileName);
+                                    selectionEnd = (int)(dot - formatedFileName.c_str());
                             }
                             dlg.SetSelectionEnd(selectionEnd);
                         }
@@ -3020,11 +2505,11 @@ void CFilesWindow::RenameFile(int specialIndex)
 
                         if (dlgRes == IDOK)
                         {
-                            strcpy(newName, formatedFileName);
+                            newName = initialRenameNameW;
                             ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 2, HWindow, *f, isDir, newName, cancel);
                             if (ret || cancel)
                                 break; // not an error (cancel or success)
-                            strcpy(formatedFileName, newName);
+                            initialRenameNameW = newName;
                         }
                         else
                         {
@@ -3037,7 +2522,7 @@ void CFilesWindow::RenameFile(int specialIndex)
 
                 if (ret && !cancel) // operation completed successfully
                 {
-                    strcpy(NextFocusName, newName); // ensure focus of the new name after refresh
+                    NextFocusNameW = newName; // ensure focus of the new name after refresh
                 }
             }
 
@@ -3062,13 +2547,16 @@ BOOL CFilesWindow::IsQuickRenameActive()
     return QuickRenameWindow.HWindow != NULL;
 }
 
-void CFilesWindow::AdjustQuickRenameRect(const char* text, RECT* r)
+void CFilesWindow::AdjustQuickRenameRectW(const wchar_t* text, RECT* r)
 {
     // measure the length of the text
     HDC hDC = HANDLES(GetDC(ListBox->HWindow));
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;
-    GetTextExtentPoint32(hDC, text, (int)strlen(text), &sz);
+    // Measured on the real text. The CP_ACP mirror can be a different
+    // width entirely - every unspellable character collapses to one '?' byte - so the
+    // edit box was sized for a string the user is not looking at.
+    GetTextExtentPoint32W(hDC, text, (int)wcslen(text), &sz);
     TEXTMETRIC tm;
     GetTextMetrics(hDC, &tm);
     SelectObject(hDC, hOldFont);
@@ -3106,9 +2594,8 @@ void CFilesWindow::AdjustQuickRenameWindow()
     GetWindowRect(QuickRenameWindow.HWindow, &r);
     MapWindowPoints(NULL, HWindow, (POINT*)&r, 2);
 
-    CPathBuffer buff; // Heap-allocated for long path support
-    GetWindowText(QuickRenameWindow.HWindow, buff, buff.Size());
-    AdjustQuickRenameRect(buff, &r);
+    const std::wstring buffW = GetWindowTextStringW(QuickRenameWindow.HWindow);
+    AdjustQuickRenameRectW(buffW.c_str(), &r);
     SetWindowPos(QuickRenameWindow.HWindow, NULL, 0, 0,
                  r.right - r.left, r.bottom - r.top,
                  SWP_NOMOVE | SWP_NOZORDER);
@@ -3155,7 +2642,7 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
 
     BOOL subDir;
     if (Dirs->Count > 0)
-        subDir = (strcmp(Dirs->At(0).Name, "..") == 0);
+        subDir = (wcscmp(Dirs->At(0).Name, L"..") == 0);
     else
         subDir = FALSE;
     if (index == 0 && subDir)
@@ -3165,8 +2652,17 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
     BOOL isDir = index < Dirs->Count;
     f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-    CPathBuffer formatedFileName; // Heap-allocated for long path support
-    AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
+    // The whole in-place rename ran on the CP_ACP mirror: the edit box was
+    // SEEDED with the mangled name and the result was READ BACK narrow. Renaming a file
+    // the code page cannot spell was therefore impossible - confirming the unchanged box
+    // renamed the file to its own '?'-string, or failed. Both ends are wide now.
+    const std::wstring formatedFileNameW =
+        AlterFileNameW(f->Name,
+                       Configuration.FileNameFormat, 0, isDir);
+    // The narrow twin this comment referred to (formatedFileName, fed via the
+    // now-removed AlterFileName) had no remaining reader anywhere in this function - the
+    // plugin-FS branch below only ever used formatedFileNameW/newName. Dead code, deleted
+    // rather than mechanically widened.
 
     // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
     // the same code appears here four times
@@ -3175,10 +2671,9 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
     {
         if (!isDir)
         {
-            const char* dot = strrchr(formatedFileName, '.');
-            if (dot != NULL && dot > formatedFileName.Get()) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
-                                                       //    if (dot != NULL)
-                selectionEnd = (int)(dot - formatedFileName.Get());
+            const size_t dot = formatedFileNameW.find_last_of(L'.');
+            if (dot != std::wstring::npos && dot > 0) // although ".cvspass" is an extension in Windows, Explorer selects the entire name, so we do the same
+                selectionEnd = (int)dot;
         }
     }
 
@@ -3192,13 +2687,11 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
         // lower the thread priority to "normal" (so operations don't overload the machine)
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-        CPathBuffer newName; // Heap-allocated for long path support
-        newName[0] = 0;
+        std::wstring newName;
         BOOL cancel = FALSE;
 
         // if no item is selected, select the one under focus and store its name
-        CPathBuffer temporarySelected; // Heap-allocated for long path support
-        SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+        const std::wstring temporarySelected = SelectFocusedItemAndGetName();
 
         BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -3207,7 +2700,7 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
 
         if (ret && !cancel) // operation completed successfully
         {
-            strcpy(NextFocusName, newName); // ensure focus of the new name after refresh
+            NextFocusNameW = newName; // ensure focus of the new name after refresh
         }
 
         // raise the thread priority again, the operation has finished
@@ -3221,17 +2714,21 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
     }
 
     RECT r = *labelRect;
-    AdjustQuickRenameRect(formatedFileName, &r);
+    AdjustQuickRenameRectW(formatedFileNameW.c_str(), &r);
 
+    // CWindow's wide-only CreateEx adapter, so winlib
+    // subclasses it through SetWindowLongPtrW. Both matter: the W creation puts the real
+    // name in the control, and the W subclass keeps WM_CHAR in UTF-16 so a character the
+    // code page cannot spell survives being TYPED as well as being displayed.
     HWND hWnd = QuickRenameWindow.CreateEx(0,
-                                           "edit",
-                                           formatedFileName,
-                                           WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | ES_AUTOHSCROLL | ES_LEFT,
-                                           r.left, r.top, r.right - r.left, r.bottom - r.top,
-                                           GetListBoxHWND(),
-                                           NULL,
-                                           HInstance,
-                                           &QuickRenameWindow);
+                                            L"edit",
+                                            formatedFileNameW.c_str(),
+                                            WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | ES_AUTOHSCROLL | ES_LEFT,
+                                            r.left, r.top, r.right - r.left, r.bottom - r.top,
+                                            GetListBoxHWND(),
+                                            NULL,
+                                            HInstance,
+                                            &QuickRenameWindow);
     if (hWnd == NULL)
     {
         TRACE_E("Cannot create QuickRenameWindow");
@@ -3293,8 +2790,11 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
     QuickRenameWindow.SetCloseEnabled(FALSE);
 
     HWND hWnd = QuickRenameWindow.HWindow;
-    CPathBuffer newName; // Heap-allocated for long path support
-    GetWindowText(hWnd, newName, newName.Size());
+    // The name the user actually typed. GetWindowText (ANSI) returned its
+    // CP_ACP mirror, so a name outside the code page arrived here as '?'-bytes and the
+    // file was renamed to those bytes - or the rename failed - with no way for the user
+    // to tell why.
+    std::wstring newNameW = GetWindowTextStringW(hWnd);
 
     // lower the thread priority to "normal" (so operations don't overload the machine)
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -3308,25 +2808,30 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
         // and we would display the "Access is denied" error. The user has no mouse option
         // to cancel the operation, so they would have to press Escape.
         // Explorer behaves this way now.
-        if (strcmp(f->Name, newName) != 0)
-            RenameFileInternal(f, newName, &mayChange, &tryAgain);
+        // Compared wide, or a rename that only changes characters the code page cannot
+        // spell reads as "unchanged" and is silently skipped.
+        if (f->Name != newNameW)
+            RenameFileInternal(f, newNameW, &mayChange, &tryAgain);
     }
     else if (Is(ptPluginFS) && GetPluginFS()->NotEmpty() &&
              GetPluginFS()->IsServiceSupported(FS_SERVICE_QUICKRENAME)) // FS is in the panel
     {
+        // CPluginFSInterfaceEncapsulation::QuickRename is wide-native now
+        // (plugins.h) - read the edit control wide directly, so a name the code page
+        // cannot spell round-trips correctly instead of arriving here as '?'-bytes.
         // open the standard dialog
         BOOL cancel;
-        BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 2, HWindow, *f, isDir, newName, cancel);
+        BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 2, HWindow, *f, isDir, newNameW, cancel);
         if (!ret && !cancel)
         {
             tryAgain = TRUE;
-            SetWindowText(hWnd, newName);
+            SetWindowTextW(hWnd, newNameW.c_str());
         }
         else
         {
             if (ret && !cancel) // operation completed successfully
             {
-                strcpy(NextFocusName, newName); // ensure focus of the new name after refresh
+                NextFocusNameW = newNameW; // ensure focus of the new name after refresh
             }
         }
     }
@@ -3338,7 +2843,7 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
     if (mayChange)
     {
         // change in the directory shown in the panel and if a directory was renamed, then also in subdirectories
-        MainWindow->PostChangeOnPathNotification(GetPath(), isDir);
+        MainWindow->PostChangeOnPathNotificationW(GetPathW(), isDir);
     }
 
     QuickRenameWindow.SetCloseEnabled(TRUE);
@@ -3374,7 +2879,7 @@ void CFilesWindow::KillQuickRenameTimer()
 //
 
 CQuickRenameWindow::CQuickRenameWindow()
-    : CWindow(ooStatic)
+    : CWindow(ooStatic) // see QuickRenameBegin
 {
     FilesWindow = NULL;
     CloseEnabled = TRUE;

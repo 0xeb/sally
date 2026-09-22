@@ -153,10 +153,10 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case FTPCMD_CHANGETGTPANELPATH:
     {
-        if (*TargetPanelPath != 0)
+        if (!TargetPanelPath.empty())
         {
-            SalamanderGeneral->ChangePanelPath(TargetPanelPathPanel, TargetPanelPath);
-            *TargetPanelPath = 0;
+            SalamanderGeneral->ChangePanelPath(TargetPanelPathPanel, TargetPanelPath.c_str());
+            TargetPanelPath.clear();
         }
         return FALSE; // do not uncheck
     }

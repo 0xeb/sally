@@ -228,34 +228,35 @@ BOOL WriteSfxExecutable()
     unsigned size;
     DWORD offset;
     CSfxFileHeader sfxHead;
-    char langName[128];
+    wchar_t langName[128];
 
     printf(StringTable[STR_WRITINGEXE]);
-    SfxPackage = CreateFile(Settings.SfxFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    SfxPackage = CreateFileW(SfxPackageName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN,
+                             NULL);
     if (SfxPackage == INVALID_HANDLE_VALUE)
-        return Error(STR_ERROPEN, Settings.SfxFile);
+        return ErrorPath(STR_ERROPEN, SfxPackageName.c_str());
 
     if (!Read(SfxPackage, &sfxHead, sizeof(CSfxFileHeader)))
-        return Error(STR_ERRREAD, Settings.SfxFile);
+        return ErrorPath(STR_ERRREAD, SfxPackageName.c_str());
     if (sfxHead.Signature != SFX_SIGNATURE)
-        return Error(STR_CORRUPTSFX, Settings.SfxFile);
+        return ErrorPath(STR_CORRUPTSFX, SfxPackageName.c_str());
     if (sfxHead.CompatibleVersion != SFX_SUPPORTEDVERSION)
-        return Error(STR_BADSFXVER, Settings.SfxFile);
+        return ErrorPath(STR_BADSFXVER, SfxPackageName.c_str());
     if (sfxHead.HeaderCRC != UpdateCrc((__UINT8*)&sfxHead, sizeof(CSfxFileHeader) - sizeof(DWORD), INIT_CRC, CrcTab))
-        return Error(STR_CORRUPTSFX, Settings.SfxFile);
+        return ErrorPath(STR_CORRUPTSFX, SfxPackageName.c_str());
 
-    if (GetLocaleInfo(
+    if (GetLocaleInfoW(
             MAKELCID(MAKELANGID(sfxHead.LangID, SUBLANG_NEUTRAL), SORT_DEFAULT),
-            LOCALE_SLANGUAGE, langName, 128))
+            LOCALE_SLANGUAGE, langName, _countof(langName)))
     {
-        char* c = strchr(langName, ' ');
+        wchar_t* c = wcschr(langName, L' ');
         if (c)
             *c = 0;
     }
     else
         langName[0] = 0;
-    printf(StringTable[STR_SFXINFO], Settings.SfxFile, langName);
+    PrintWideText(L"Used sfx package: " + SfxPackageName + L"\nLanguage: " + langName + L"\n");
 
     //copy executable
     BOOL bigSfx = Encrypt || Settings.Flags & SE_REMOVEAFTER && Settings.WaitFor;
@@ -275,7 +276,7 @@ BOOL WriteSfxExecutable()
     BOOL success = FALSE;
     LONG dummy = 0;
     if (SetFilePointer(SfxPackage, offset, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
-        Error(STR_ERRACCESS, Settings.SfxFile);
+        ErrorPath(STR_ERRACCESS, SfxPackageName.c_str());
     else
     {
         if (Read(SfxPackage, buffer, size))
@@ -291,13 +292,13 @@ BOOL WriteSfxExecutable()
                 if (Crc == (bigSfx ? sfxHead.BigSfxCRC : sfxHead.SmallSfxCRC))
                     success = TRUE;
                 else
-                    Error(STR_CORRUPTSFX, Settings.SfxFile);
+                    ErrorPath(STR_CORRUPTSFX, SfxPackageName.c_str());
                 break;
             }
             case 4:
             case 1:
             case 2:
-                Error(STR_CORRUPTSFX, Settings.SfxFile);
+                ErrorPath(STR_CORRUPTSFX, SfxPackageName.c_str());
                 break;
             case 3:
                 Error(STR_LOWMEM);
@@ -307,7 +308,7 @@ BOOL WriteSfxExecutable()
             }
         }
         else
-            Error(STR_ERRREAD, Settings.SfxFile);
+            ErrorPath(STR_ERRREAD, SfxPackageName.c_str());
     }
     free(buffer);
     if (!success)
@@ -325,21 +326,21 @@ BOOL WriteSfxExecutable()
         return Error(STR_ERRMANIFEST); // this should never happen
 
     //change icon
-    if (!ChangeSfxIconAndAddManifest(ExeName, Icons, IconsCount, manifest,
+    if (!ChangeSfxIconAndAddManifest(ExeName.c_str(), Icons, IconsCount, manifest,
                                      manifestSize))
         return Error(STR_ERRICON);
 
-    ExeFile = CreateFile(ExeName, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                         FILE_ATTRIBUTE_NORMAL, NULL);
+    ExeFile = CreateFileW(ExeName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                          FILE_ATTRIBUTE_NORMAL, NULL);
     if (ExeFile == INVALID_HANDLE_VALUE)
-        return Error(STR_ERROPEN, ExeName);
+        return ErrorPath(STR_ERROPEN, ExeName.c_str());
 
     dummy = 0;
     if (SetFilePointer(ExeFile, 0, &dummy, FILE_END) == 0xFFFFFFFF)
-        return Error(STR_ERRACCESS, ExeName);
+        return ErrorPath(STR_ERRACCESS, ExeName.c_str());
 
     if (!WriteSFXHeader())
-        return Error(STR_ERRWRITE, ExeName);
+        return ErrorPath(STR_ERRWRITE, ExeName.c_str());
 
     return TRUE;
 }
@@ -348,16 +349,16 @@ BOOL AppendArchive()
 {
     printf(StringTable[STR_WRITINGARC]);
     if (SetFilePointer(ZipFile, 0, NULL, FILE_BEGIN) == 0xFFFFFFFF)
-        return Error(STR_ERRACCESS, ZipName);
+        return ErrorPath(STR_ERRACCESS, ZipName.c_str());
     DWORD left = ArcSize;
     DWORD toRead;
     while (left)
     {
         toRead = left > 0xFFFF ? 0xFFFF : left;
         if (!Read(ZipFile, IOBuffer, toRead))
-            return Error(STR_ERRREAD, ZipName);
+            return ErrorPath(STR_ERRREAD, ZipName.c_str());
         if (!Write(ExeFile, IOBuffer, toRead))
-            return Error(STR_ERRWRITE, ExeName);
+            return ErrorPath(STR_ERRWRITE, ExeName.c_str());
         left -= toRead;
     }
     return TRUE;

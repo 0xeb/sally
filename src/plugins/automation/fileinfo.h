@@ -18,8 +18,8 @@
 class CFileInfo
 {
 private:
-    PTSTR m_pszPath;
-    PTSTR m_pszInfo;
+    std::wstring m_path;
+    std::wstring m_info;
 
     /// Clears the structure and releases resources.
     void Clear();
@@ -31,15 +31,6 @@ private:
     void SetInfo(PCWSTR pszInfo, int len = -1);
     void SetInfo(const CQuadWord& size, DATE date, UINT uValidFields);
 
-    static PTSTR DupWideStr(PCWSTR s, int len = -1);
-
-    static inline PTSTR EmptyStr()
-    {
-        TCHAR* empty = new TCHAR[1];
-        empty[0] = _T('\0');
-        return empty;
-    }
-
 public:
     /// Constructor.
     CFileInfo();
@@ -50,15 +41,13 @@ public:
     /// Retrieves information about a file from the variant.
     HRESULT FromVariant(VARIANT* var);
 
-    PCTSTR Path() const
+    PCWSTR Path() const
     {
-        _ASSERTE(m_pszPath);
-        return m_pszPath;
+        return m_path.c_str();
     }
 
-    PCTSTR Info() const
+    PCWSTR Info() const
     {
-        _ASSERTE(m_pszInfo);
-        return m_pszInfo;
+        return m_info.c_str();
     }
 };

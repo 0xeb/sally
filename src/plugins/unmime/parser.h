@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //// main export //////////////////////////////////////////////////////////////
 
 #include "arraylt.h"
@@ -35,6 +37,8 @@ typedef enum eMarkerType
 class CMarker
 {
 public:
+    virtual ~CMarker() = default;
+
     eMarkerType iMarkerType; // marker type, see MARKER_XXX
     int iLine;               // line number; for StartMarker this line belongs to the block,
 }; // for EndMarker the line no longer belongs to the block
@@ -47,8 +51,8 @@ public:
     char bEmpty;              // flag indicating the block is empty (just whitespace)
     char bSelected;           // flag showing selection for decoding
     char bAttachment;         // 1 if this file is an attachment
-    CPathBuffer cFileName; // file name the block will be decoded into
-    char cCharset[20];        // name of the character set
+    std::string cFileName; // explicitly encoded MIME bytes; projected only at the UI/filesystem boundary
+    std::string cCharset;  // MIME charset identifier bytes
     int iSize;                // size of the decoded file
     int iBadBlock;            // 0 or BADBLOCK_XXX
     int iPart;                // yEnc multipart file number, 0 if not multipart
@@ -60,7 +64,7 @@ class CParserOutput
 {
 public:
     CParserOutput() : Markers(100, 100, dtDelete) {};
-    void SelectBlock(LPCTSTR pszFileName);
+    void SelectBlock(const wchar_t* pszFileName);
     void UnselectAll();
     void StartBlock(int iType, int iLine);
     void EndBlock(int iLine);
@@ -71,7 +75,7 @@ public:
     int iLevel;
 };
 
-BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendCharset);
+BOOL ParseMailFile(const wchar_t* pszFileName, CParserOutput* pOutput, BOOL bAppendCharset);
 
 extern int iErrorStr;
 
@@ -80,9 +84,9 @@ extern int iErrorStr;
 class CInputFile
 {
 public:
-    BOOL Open(LPCTSTR pszName);
+    BOOL Open(const wchar_t* pszName);
     int ReadByte();
-    BOOL ReadLine(LPTSTR pszLine);
+    BOOL ReadLine(LPSTR pszLine);
     void Close();
     void SavePosition();
     void RestorePosition();

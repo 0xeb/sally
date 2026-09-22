@@ -1,10 +1,12 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
+#include "common/SalPathWide.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/ComboSyncPolicy.h"
 #include "common/IEnvironment.h"
@@ -65,7 +67,7 @@ CConvertFilesDlg::CConvertFilesDlg(HWND parent, BOOL selectionContainsDirectory)
     CodeTables.Init(HWindow);
 
     SelectionContainsDirectory = selectionContainsDirectory;
-    strcpy(Mask, "*.*");
+    Mask = L"*.*";
     Change = 0;
     SubDirs = FALSE;
     CodeType = 0;
@@ -80,9 +82,8 @@ void CConvertFilesDlg::Validate(CTransferInfo& ti)
     {
         if (ti.Type == ttDataFromWindow)
         {
-            CPathBuffer buf; // Heap-allocated for long path support
-            SendMessage(hWnd, WM_GETTEXT, buf.Size(), (LPARAM)buf.Get());
-            CMaskGroup mask(buf);
+            const std::wstring text = GetWindowTextStringW(hWnd);
+            CMaskGroup mask(text.c_str());
             int errorPos;
             if (!mask.PrepareMasks(errorPos))
             {
@@ -107,20 +108,19 @@ void CConvertFilesDlg::Validate(CTransferInfo& ti)
 
 void CConvertFilesDlg::Transfer(CTransferInfo& ti)
 {
-    char** history = Configuration.ConvertHistory;
+    wchar_t** history = Configuration.ConvertHistory;
     HWND hWnd;
     if (ti.GetControl(hWnd, IDE_FILEMASK))
     {
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, CONVERT_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, Mask.Size() - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Mask.Get());
+            SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Mask.c_str());
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, Mask.Size(), (LPARAM)Mask.Get());
-            AddValueToStdHistoryValues(history, CONVERT_HISTORY_SIZE, Mask, FALSE);
+            Mask = GetWindowTextStringW(hWnd);
+            AddValueToStdHistoryValues(history, CONVERT_HISTORY_SIZE, Mask.c_str(), FALSE);
         }
     }
 
@@ -137,13 +137,14 @@ void CConvertFilesDlg::Transfer(CTransferInfo& ti)
 
 void CConvertFilesDlg::UpdateCodingText()
 {
-    char buff[1024];
-    CodeTables.GetCodeName(CodeType, buff, 1024);
+    std::wstring name;
+    CodeTables.GetCodeName(CodeType, name);
 
     // remove &
-    RemoveAmpersands(buff);
+    RemoveAmpersands(name.data());
+    name.resize(wcslen(name.c_str()));
 
-    SetDlgItemText(HWindow, IDC_CHC_CODING, buff);
+    SetDlgItemTextW(HWindow, IDC_CHC_CODING, name.c_str());
 }
 /*
 int CEOFTypes[4] =
@@ -157,7 +158,7 @@ int CEOFTypes[4] =
   void
 CConvertFilesDlg::UpdateEOFText()
 {
-  char *p = LoadStr(CEOFTypes[EOFType]);
+  wchar_t *p = LoadStr(CEOFTypes[EOFType]);
   // remove &
   RemoveAmpersands(p);
 
@@ -178,7 +179,7 @@ CConvertFilesDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         break;
     }
@@ -220,7 +221,7 @@ CConvertFilesDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int i;
         for (i = 0; i < 4; i++)
         {
-          char *p = LoadStr(CEOFTypes[i]);
+          wchar_t *p = LoadStr(CEOFTypes[i]);
           mi.fMask = MIIM_TYPE | MIIM_ID | MIIM_STATE;
           mi.fType = MFT_STRING;
           mi.wID = i + 1;                   // +1 because of 'None'
@@ -261,7 +262,7 @@ CConvertFilesDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CFilterDialog
 //
 
-CFilterDialog::CFilterDialog(HWND parent, CMaskGroup* filter, char** filterHistory,
+CFilterDialog::CFilterDialog(HWND parent, CMaskGroup* filter, wchar_t** filterHistory,
                              BOOL* use /*, BOOL *inverse*/)
     : CCommonDialog(HLanguage, IDD_CHANGEFILTER, IDD_CHANGEFILTER, parent)
 {
@@ -279,19 +280,16 @@ void CFilterDialog::Validate(CTransferInfo& ti)
     ti.RadioButton(IDC_USEFILTER, TRUE, useFilter);
     if (useFilter)
     {
-        CPathBuffer buf; // Heap-allocated for long path support
-        lstrcpyn(buf, Filter->GetMasksString(), buf.Size()); // backup
-        // provide a buffer for MasksString, there is a size check, nothing serious
-        ti.EditLine(IDE_FILTER, Filter->GetWritableMasksString(), MAX_PATH);
+        const std::wstring candidate = GetWindowTextStringW(GetDlgItem(HWindow, IDE_FILTER));
+        CMaskGroup candidateMasks(candidate.c_str(), Filter->GetExtendedMode());
         int errorPos;
-        if (!Filter->PrepareMasks(errorPos))
+        if (!candidateMasks.PrepareMasks(errorPos))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDE_FILTER));
             SendMessage(GetDlgItem(HWindow, IDE_FILTER), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDE_FILTER);
         }
-        Filter->SetMasksString(buf); // restoration
     }
 }
 
@@ -305,23 +303,25 @@ void CFilterDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
         EnableControls();
     /*
-  ti.EditLine(IDE_FILTER, Filter->MasksString, MAX_PATH);
+  The filter edit is transferred dynamically by CFilterDialog::Transfer.
   int errorPos;
   Filter->PrepareMasks(errorPos);
   */
-    char** history = FilterHistory;
+    wchar_t** history = FilterHistory;
     HWND hWnd;
     if (ti.GetControl(hWnd, IDE_FILTER))
     {
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, FILTER_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, MAX_PATH - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Filter->GetMasksString());
+            // wide - the ttDataFromWindow branch below already reads this
+            // same control wide; seeding it narrow mangled a non-ASCII mask on open.
+            SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Filter->GetMasksString());
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, MAX_PATH, (LPARAM)Filter->GetWritableMasksString());
+            const std::wstring masks = GetWindowTextStringW(hWnd);
+            Filter->SetMasksString(masks.c_str());
             AddValueToStdHistoryValues(history, FILTER_HISTORY_SIZE, Filter->GetMasksString(), FALSE);
         }
     }
@@ -348,7 +348,7 @@ CFilterDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         if (*UseFilter)
         { // we want our own focus in the editbox filter
@@ -389,49 +389,13 @@ CFilterDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CCopyMoveDialog
 //
 
-// Subclass procedure for the Unicode overlay edit control
-// Handles Alt+Down to show combobox dropdown (like standard combo edit behavior)
-static LRESULT CALLBACK UnicodeEditSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
-                                                 UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
-{
-    HWND hCombo = (HWND)dwRefData;  // Combobox handle stored in dwRefData
-
-    switch (uMsg)
-    {
-    case WM_SYSKEYDOWN:
-        // Alt+Down or Alt+Up toggles dropdown, like native combo edit
-        if (wParam == VK_DOWN || wParam == VK_UP)
-        {
-            BOOL isDropped = (BOOL)SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0);
-            SendMessage(hCombo, CB_SHOWDROPDOWN, !isDropped, 0);
-            return 0;
-        }
-        break;
-
-    case WM_KEYDOWN:
-        // F4 also toggles dropdown
-        if (wParam == VK_F4)
-        {
-            BOOL isDropped = (BOOL)SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0);
-            SendMessage(hCombo, CB_SHOWDROPDOWN, !isDropped, 0);
-            return 0;
-        }
-        break;
-
-    case WM_NCDESTROY:
-        // Remove subclass when window is destroyed
-        RemoveWindowSubclass(hWnd, UnicodeEditSubclassProc, uIdSubclass);
-        break;
-    }
-
-    return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-}
-
-CCopyMoveDialog::CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char* title,
+// The dialog and its native edit/combo controls remain Unicode in every path. Path is the
+// caller's sole dynamic UTF-16 input/output value; no mode switch or mirror exists.
+CCopyMoveDialog::CCopyMoveDialog(HWND parent, std::wstring& path, const wchar_t* title,
                                  CTruncatedString* subject, DWORD helpID,
-                                 char* history[], int historyCount, BOOL directoryHelper,
-                                 wchar_t* historyW[], int historyWCount)
-    : CCommonDialog(HLanguage, history ? IDD_COPYMOVEDIALOG_CB : IDD_COPYMOVEDIALOG, parent)
+                                 wchar_t* history[], int historyCount, BOOL directoryHelper)
+    : CCommonDialog(HLanguage, history ? IDD_COPYMOVEDIALOG_CB : IDD_COPYMOVEDIALOG, parent),
+      Path(path)
 {
     DirectoryHelper = FALSE;
     if (directoryHelper)
@@ -446,13 +410,9 @@ CCopyMoveDialog::CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char*
     }
     Title = title;
     Subject = subject;
-    Path = path;
-    PathBufSize = pathBufSize;
     History = history;
     HistoryCount = historyCount;
-    HistoryW = historyW;
-    HistoryWCount = historyWCount;
-    UseUnicodeInput = FALSE;
+    UnicodeFont = NULL; // created only if the dialog font cannot render the name
     SetHelpID(helpID); // the dialog serves multiple purposes - set the proper helpID
     SelectionEnd = -1; // -1 = select all
 }
@@ -460,16 +420,6 @@ CCopyMoveDialog::CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char*
 void CCopyMoveDialog::SetSelectionEnd(int selectionEnd)
 {
     SelectionEnd = selectionEnd;
-}
-
-void CCopyMoveDialog::SetUnicodePath(const std::wstring& pathW)
-{
-    UseUnicodeInput = TRUE;
-    PathW = pathW;
-    ResultW.clear();
-#ifndef _UNICODE
-    UnicodeWnd = TRUE; // Use DialogBoxParamW for Unicode text integrity
-#endif
 }
 
 void CCopyMoveDialog::Transfer(CTransferInfo& ti)
@@ -483,62 +433,25 @@ void CCopyMoveDialog::Transfer(CTransferInfo& ti)
             if (ti.Type == ttDataToWindow)
             {
                 LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
-                SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                // Set ANSI text on combobox (Unicode will be shown in overlay edit)
-                SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+                SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Path.c_str());
             }
             else
             {
-                // Get result from Unicode controller if it exists, otherwise from combobox
-                if (UnicodeInput.IsEnabled())
-                {
-                    ResultW = UnicodeInput.GetText();
-                    PathW = ResultW; // preserve latest value if this dialog instance is retried
-                    TRACE_I("Transfer OUT: UnicodeInput enabled, ResultW.len=" << ResultW.length()
-                            << " hasNonAscii=" << (ResultW.find_first_not_of(L" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~") != std::wstring::npos ? 1 : 0));
-                    // Also get ANSI version for history (lossy but needed for ANSI history)
-                    if (!ResultW.empty())
-                        WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
-                    else
-                        Path[0] = 0;
-                }
-                else
-                {
-                    SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
-                    int lenW = GetWindowTextLengthW(hWnd);
-                    if (lenW > 0)
-                    {
-                        std::vector<wchar_t> buffer((size_t)lenW + 1);
-                        GetWindowTextW(hWnd, buffer.data(), lenW + 1);
-                        ResultW.assign(buffer.data());
-                    }
-                    else
-                        ResultW.clear();
-                }
-                AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
-                if (HistoryW != NULL && HistoryWCount > 0)
-                {
-                    if (UnicodeInput.IsEnabled())
-                    {
-                        if (!ResultW.empty())
-                            AddValueToStdHistoryValuesW(HistoryW, HistoryWCount, ResultW.c_str(), FALSE);
-                    }
-                    else
-                    {
-                        std::wstring wide = ResultW.empty() ? AnsiToWide(Path) : ResultW;
-                        if (!wide.empty())
-                            AddValueToStdHistoryValuesW(HistoryW, HistoryWCount, wide.c_str(), FALSE);
-                    }
-                }
+                Path = GetWindowTextStringW(hWnd);
+                AddValueToStdHistoryValues(History, HistoryCount, Path.c_str(), FALSE);
             }
         }
     }
     else
     {
-        ti.EditLine(IDE_PATH, Path, PathBufSize);
-        // Get Unicode result from Unicode controller if it exists
-        if (ti.Type == ttDataFromWindow && UnicodeInput.IsEnabled())
-            ResultW = UnicodeInput.GetText();
+        HWND hEdit;
+        if (ti.GetControl(hEdit, IDE_PATH))
+        {
+            if (ti.Type == ttDataToWindow)
+                SetWindowTextW(hEdit, Path.c_str());
+            else
+                Path = GetWindowTextStringW(hEdit);
+        }
     }
 }
 
@@ -558,48 +471,24 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             VerticalAlignChildToChild(HWindow, IDB_BROWSE, IDE_PATH); // place the button precisely after the editline
         }
 
-        SetWindowText(HWindow, Title);
+        SetWindowTextW(HWindow, Title);
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
         {
-            if (Subject->IsWide())
-                SetWindowTextW(hSubject, Subject->GetW());
-            else
-                SetWindowText(hSubject, Subject->Get());
+            SetWindowTextW(hSubject, Subject->GetW());
         }
 
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
 
         HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
 
-        // In Unicode mode replace ANSI combo with a Unicode combo (including dropdown list)
-        TRACE_I("CCopyMoveDialog: UseUnicodeInput=" << UseUnicodeInput << " hCombo=" << (void*)hCombo
-                << " PathW.len=" << PathW.length()
-                << " PathW.hasNonAscii=" << (PathW.find_first_not_of(L" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~") != std::wstring::npos ? 1 : 0)
-                << " Path[0..20]=" << std::string(Path, (std::min)((size_t)20, strlen(Path))));
-        if (UseUnicodeInput && hCombo != NULL)
+        if (hCombo != NULL)
         {
-            if (UnicodeInput.EnableForCombo(HWindow, IDE_PATH, PathW, HistoryW, HistoryWCount, PathBufSize, SelectionEnd))
-            {
-                // NOTE: Do NOT call InstallWordBreakProc or CreateKeyForwarder on the
-                // Unicode combo. Both use SetWindowLongPtr(GWLP_WNDPROC) with ANSI subclass
-                // procs which convert the edit control from Unicode to ANSI, causing
-                // GetWindowTextW to return lossy ANSI text instead of Unicode.
-                // The ANSI combo (hidden) already has both installed (lines 551, 553).
-                // See issue #40.
-                TRACE_I("CCopyMoveDialog: Unicode combo created, GetText().len=" << UnicodeInput.GetText().length());
-            }
-            else
-            {
-                TRACE_E("CCopyMoveDialog: EnableForCombo FAILED!");
-            }
+            // Owned; released on WM_DESTROY. NULL when the dialog font already copes.
+            UnicodeFont = EnsureComboFontCanRenderW(hCombo, Path.c_str());
         }
 
-        // Set selection on combobox (for non-Unicode case)
-        if (!UnicodeInput.IsEnabled())
-        {
-            PostMessage(hCombo, CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
-        }
+        PostMessage(hCombo, CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
 
         return FALSE;
     }
@@ -609,9 +498,9 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         BOOL processed = FALSE;
         if (DirectoryHelper)
         {
-            processed = UnicodeInput.IsEnabled()
-                            ? OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, UnicodeInput.GetControlHandle())
-                            : OnDirectoryKeyDown((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE);
+            // Always wide, NULL handle: InvokeDirectoryMenuCommandW
+            // falls back to GetDlgItem(hDialog, editID) with the W APIs.
+            processed = OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, IDB_BROWSE, NULL);
         }
         if (!processed)
             processed = OnKeyDownHandleSelectAll((DWORD)lParam, HWindow, IDE_PATH);
@@ -621,32 +510,28 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_BUTTON:
     {
-        if (UnicodeInput.IsEnabled())
-            OnDirectoryButtonW(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam, UnicodeInput.GetControlHandle());
-        else
-            OnDirectoryButton(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam);
+        OnDirectoryButtonW(HWindow, IDE_PATH, IDB_BROWSE, wParam, lParam, NULL);
         return 0;
     }
 
     case WM_DESTROY:
     {
-        // Clear any stale HWND references before the dialog object is reused.
-        UnicodeInput.Reset();
+        // The controller is gone from this dialog; the only thing left
+        // to release is the DEFAULT_CHARSET font clone, when one was needed.
+        if (UnicodeFont != NULL)
+        {
+            DeleteObject(UnicodeFont);
+            UnicodeFont = NULL;
+        }
         break;
     }
 
     case WM_COMMAND:
     {
-        if (LOWORD(wParam) == IDE_PATH && UnicodeInput.IsEnabled())
-        {
-            HWND hCombo = (HWND)lParam;
-            if (hCombo == UnicodeInput.GetControlHandle())
-            {
-                BOOL isDropdownOpen = (BOOL)SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0);
-                if (sally::unicode::ShouldSyncUnicodeComboSelection(HIWORD(wParam), isDropdownOpen))
-                    UnicodeInput.SyncSelectionToEdit();
-            }
-        }
+        // The selection-sync block that stood here copied the wide item
+        // the user picked in the drop-down into the replacement combo's edit, because
+        // that replacement was a separate control from the list. A native combo puts its
+        // own selection into its own edit; there is nothing to synchronise.
         // Fall through to base class for all WM_COMMAND messages (IDOK, IDCANCEL, etc.)
     }
     }
@@ -659,10 +544,15 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CEditNewFileDialog
 //
 
-CEditNewFileDialog::CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject,
-                                       char* history[], int historyCount, wchar_t* historyW[], int historyWCount)
-    : CCopyMoveDialog(parent, path, pathBufSize, LoadStr(IDS_EDITNEWFILE), subject, IDD_EDITNEWDIALOG,
-                      history, historyCount, FALSE, historyW, historyWCount)
+CEditNewFileDialog::CEditNewFileDialog(HWND parent, std::wstring& path, CTruncatedString* subject,
+                                       wchar_t* history[], int historyCount)
+    // 'history' is wchar_t* now (dialogs.h), matching the sole real
+    // caller (files_window_view_edit.cpp, Configuration.EditNewHistory - already
+    // wchar_t*[EDITNEW_HISTORY_SIZE]). The trailing LoadStrW(...) 12th argument was
+    // stale drift from before 'title' became wide unconditionally; base
+    // CCopyMoveDialog's constructor takes 11 arguments total.
+    : CCopyMoveDialog(parent, path, LoadStrW(IDS_EDITNEWFILE), subject, IDD_EDITNEWDIALOG,
+                      history, historyCount, FALSE)
 {
     ResID = IDD_COPYMOVEDIALOG_CB_BTSML;
 }
@@ -694,10 +584,12 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_EDITNEWFILE_SAVEASDEFAULT));
-            CPathBuffer buff;
-            wsprintf(buff, LoadStr(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME));
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
+            InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_EDITNEWFILE_SAVEASDEFAULT));
+            // both IDS_EDITNEWFILE_REVERTDEFAULT and IDS_EDITNEWFILE_DEFAULTNAME
+            // are translator-owned strings; narrowing them here mangled item 2 while item 1,
+            // built wide two lines above in the same menu, rendered correctly.
+            std::wstring buffW = FormatStrW(LoadStrW(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStrW(IDS_EDITNEWFILE_DEFAULTNAME));
+            InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buffW.c_str());
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -707,12 +599,12 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
             if (cmd == 1)
             {
                 Configuration.UseEditNewFileDefault = TRUE;
-                SendDlgItemMessage(HWindow, IDE_PATH, WM_GETTEXT, Configuration.EditNewFileDefault.Size(), (LPARAM)Configuration.EditNewFileDefault.Get());
+                Configuration.EditNewFileDefault = GetWindowTextStringW(GetDlgItem(HWindow, IDE_PATH));
             }
             if (cmd == 2)
             {
                 Configuration.UseEditNewFileDefault = FALSE;
-                Configuration.EditNewFileDefault[0] = 0;
+                Configuration.EditNewFileDefault.clear();
             }
             return 0;
         }
@@ -727,24 +619,20 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
 // CCopyMoveMoreDialog
 //
 
-CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSize, char* title,
+CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, std::wstring& path, const wchar_t* title,
                                          CTruncatedString* subject, DWORD helpID,
-                                         char* history[], int historyCount, CCriteriaData* criteriaInOut,
-                                         BOOL havePermissions, BOOL supportsADS,
-                                         wchar_t* historyW[], int historyWCount)
-    : CCommonDialog(HLanguage, IDD_COPYMOVEMOREDIALOG, helpID, parent)
+                                         wchar_t* history[], int historyCount, CCriteriaData* criteriaInOut,
+                                         BOOL havePermissions, BOOL supportsADS)
+    : CCommonDialog(HLanguage, IDD_COPYMOVEMOREDIALOG, helpID, parent),
+      Path(path)
 {
     if (history == NULL)
         TRACE_E("CCopyMoveMoreDialog without history is not supported.");
 
     Title = title;
     Subject = subject;
-    Path = path;
-    PathBufSize = pathBufSize;
     History = history;
     HistoryCount = historyCount;
-    HistoryW = historyW;
-    HistoryWCount = historyWCount;
     CriteriaInOut = criteriaInOut;
     Criteria = new CCriteriaData();
     *Criteria = *CriteriaInOut;
@@ -752,17 +640,7 @@ CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSiz
     HavePermissions = havePermissions;
     SupportsADS = supportsADS;
     MoreButton = NULL;
-    UseUnicodeInput = FALSE;
-}
-
-void CCopyMoveMoreDialog::SetUnicodePath(const std::wstring& pathW)
-{
-    UseUnicodeInput = TRUE;
-    PathW = pathW;
-    ResultW.clear();
-#ifndef _UNICODE
-    UnicodeWnd = TRUE;
-#endif
+    UnicodeFont = NULL; // created only if the dialog font cannot render the name
 }
 
 CCopyMoveMoreDialog::~CCopyMoveMoreDialog()
@@ -785,55 +663,37 @@ void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
             if (ti.Type == ttDataToWindow)
             {
                 LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
-                SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+                SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Path.c_str());
             }
             else
             {
-                if (UnicodeInput.IsEnabled())
-                {
-                    ResultW = UnicodeInput.GetText();
-                    PathW = ResultW;
-                    WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
-                }
-                else
-                {
-                    SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
-                    int lenW = GetWindowTextLengthW(hWnd);
-                    if (lenW > 0)
-                    {
-                        std::vector<wchar_t> buffer((size_t)lenW + 1);
-                        GetWindowTextW(hWnd, buffer.data(), lenW + 1);
-                        ResultW.assign(buffer.data());
-                    }
-                    else
-                        ResultW.clear();
-                }
-                AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
-                if (HistoryW != NULL && HistoryWCount > 0)
-                {
-                    std::wstring wide = ResultW.empty() ? AnsiToWide(Path) : ResultW;
-                    if (!wide.empty())
-                        AddValueToStdHistoryValuesW(HistoryW, HistoryWCount, wide.c_str(), FALSE);
-                }
+                // One read path, from the dialog's own combo - see
+                // CCopyMoveDialog above. The controller branch is gone.
+                Path = GetWindowTextStringW(hWnd);
+                AddValueToStdHistoryValues(History, HistoryCount, Path.c_str(), FALSE);
             }
         }
     }
     else
     {
-        if (ti.Type == ttDataFromWindow && UnicodeInput.IsEnabled())
-            ResultW = UnicodeInput.GetText();
-        ti.EditLine(IDE_PATH, Path, PathBufSize);
+        HWND hEditCtl;
+        if (ti.GetControl(hEditCtl, IDE_PATH))
+        {
+            if (ti.Type == ttDataToWindow)
+                SetWindowTextW(hEditCtl, Path.c_str());
+            else
+                Path = GetWindowTextStringW(hEditCtl);
+        }
     }
     TransferCriteriaControls(ti);
 }
 
-BOOL GetSpeedLimit(int sel, char* speedLimitText, DWORD* returnSpeedLimit)
+BOOL GetSpeedLimit(int sel, wchar_t* speedLimitText, DWORD* returnSpeedLimit)
 {
     if (sel >= 0 && sel <= 3)
     {
         __int64 speedLimit = 0;
-        char* s = speedLimitText;
+        wchar_t* s = speedLimitText;
         while (*s != 0 && *s <= ' ')
             s++;
         while (*s >= '0' && *s <= '9')
@@ -883,27 +743,28 @@ void CCopyMoveMoreDialog::TransferCriteriaControls(CTransferInfo& ti)
     ti.CheckBox(IDC_CM_EMPTY, Criteria->SkipEmptyDirs);
     ti.CheckBox(IDC_CM_NAMED, Criteria->UseMasks);
     ti.CheckBox(IDC_CM_SPEEDLIMIT, Criteria->UseSpeedLimit);
-    CPathBuffer masks; // Heap-allocated for long path support
     if (ti.Type == ttDataToWindow)
-        strcpy(masks, Criteria->Masks.GetMasksString());
-    ti.EditLine(IDC_CM_NAMED_MASK, masks, masks.Size() - 1);
+        SetDlgItemTextW(HWindow, IDC_CM_NAMED_MASK, Criteria->Masks.GetMasksString());
+    else
+    {
+        const std::wstring masks = GetWindowTextStringW(GetDlgItem(HWindow, IDC_CM_NAMED_MASK));
+        Criteria->Masks.SetMasksString(masks.c_str());
+    }
     if (ti.Type == ttDataFromWindow)
     {
-        Criteria->Masks.SetMasksString(masks);
         int errpos = 0;
         // masks must go out in the Prepared state
         if (!Criteria->Masks.PrepareMasks(errpos)) // invalid mask, this shouldn't happen thanks to validation
             Criteria->UseMasks = FALSE;
-        char dummy[200];
-        Criteria->Advanced.GetAdvancedDescription(dummy, 200, Criteria->UseAdvanced);
+        Criteria->Advanced.GetAdvancedDescription(Criteria->UseAdvanced);
         // Advanced must also be prepared
         Criteria->Advanced.PrepareForTest();
 
         if (Criteria->UseSpeedLimit)
         {
             int sel = (int)SendDlgItemMessage(HWindow, IDC_CM_SPEEDLIMITUNITS, CB_GETCURSEL, 0, 0);
-            char speedLimitText[20];
-            GetDlgItemText(HWindow, IDE_CM_SPEEDLIMIT, speedLimitText, 20);
+            wchar_t speedLimitText[20];
+            GetDlgItemTextW(HWindow, IDE_CM_SPEEDLIMIT, speedLimitText, 20);
             if (GetSpeedLimit(sel, speedLimitText, &Criteria->SpeedLimit))
                 Configuration.LastUsedSpeedLimit = Criteria->SpeedLimit;
             else
@@ -938,17 +799,17 @@ void CCopyMoveMoreDialog::TransferCriteriaControls(CTransferInfo& ti)
         }
 
         HWND speedLimitUnits = GetDlgItem(HWindow, IDC_CM_SPEEDLIMITUNITS);
-        SendMessage(speedLimitUnits, CB_RESETCONTENT, 0, 0);
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_B_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_KB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_MB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_GB_per_s));
-        SendMessage(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
+        SendMessageW(speedLimitUnits, CB_RESETCONTENT, 0, 0);
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_SPEED_B_per_s).c_str());
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_SPEED_KB_per_s).c_str());
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_SPEED_MB_per_s).c_str());
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_SPEED_GB_per_s).c_str());
+        SendMessageW(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
 
         HWND speedLimit = GetDlgItem(HWindow, IDE_CM_SPEEDLIMIT);
-        char num[20];
-        sprintf(num, "%u", speedLimNum);
-        SetWindowText(speedLimit, num);
+        wchar_t num[20];
+        swprintf_s(num, _countof(num), L"%u", speedLimNum);
+        SetWindowTextW(speedLimit, num);
         SendMessage(speedLimit, EM_LIMITTEXT, 19, 0);
 
         UpdateAdvancedText();
@@ -958,10 +819,9 @@ void CCopyMoveMoreDialog::TransferCriteriaControls(CTransferInfo& ti)
 
 void CCopyMoveMoreDialog::UpdateAdvancedText()
 {
-    char buff[200];
     BOOL dirty;
-    Criteria->Advanced.GetAdvancedDescription(buff, 200, dirty);
-    SetDlgItemText(HWindow, IDC_CM_ADVANCED_INFO, buff);
+    const std::wstring description = Criteria->Advanced.GetAdvancedDescription(dirty);
+    SetDlgItemTextW(HWindow, IDC_CM_ADVANCED_INFO, description.c_str());
     EnableWindow(GetDlgItem(HWindow, IDC_CM_ADVANCED_INFO), dirty);
 }
 
@@ -974,8 +834,8 @@ void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
     if (useSpeedLimit)
     {
         int sel = (int)SendDlgItemMessage(HWindow, IDC_CM_SPEEDLIMITUNITS, CB_GETCURSEL, 0, 0);
-        char speedLimitText[20];
-        GetDlgItemText(HWindow, IDE_CM_SPEEDLIMIT, speedLimitText, 20);
+        wchar_t speedLimitText[20];
+        GetDlgItemTextW(HWindow, IDE_CM_SPEEDLIMIT, speedLimitText, 20);
         if (!GetSpeedLimit(sel, speedLimitText, NULL))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPEEDLIMITSIZE));
@@ -988,9 +848,9 @@ void CCopyMoveMoreDialog::Validate(CTransferInfo& ti)
     ti.CheckBox(IDC_CM_NAMED, useMasks);
     if (useMasks)
     {
-        CPathBuffer buf; // Heap-allocated for long path support
-        ti.EditLine(IDC_CM_NAMED_MASK, buf, buf.Size() - 1);
-        CMaskGroup masks(buf);
+        const std::wstring buf = GetWindowTextStringW(GetDlgItem(HWindow, IDC_CM_NAMED_MASK));
+        CMaskGroup masks;
+        masks.SetMasksString(buf.c_str());
         int errorPos;
         if (!masks.PrepareMasks(errorPos))
         {
@@ -1112,7 +972,7 @@ CCopyMoveMoreDialog::ManageHiddenShortcuts(const MSG *msg)
                        int i;
         for (i = 0; resID[i] != -1; i++)
         {
-          char key = GetControlHotKey(HWindow, resID[i]);
+          wchar_t key = GetControlHotKey(HWindow, resID[i]);
           if (key != 0 && (WPARAM)key == msg->wParam)
           {
             // expand the options section
@@ -1150,16 +1010,42 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
-        SetWindowText(HWindow, Title);
+        SetWindowTextW(HWindow, Title);
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
         {
-            CPathBuffer buff; // Heap-allocated for long path support
-            lstrcpyn(buff, Subject->Get(), buff.Size() - 1);
-            DuplicateAmpersands(buff, buff.Size() - 1, TRUE);
-            SetWindowText(hSubject, buff);
+            // BUG FIX, found by collapsing the CTruncatedString mirror rather
+            // than by a report. This used to branch on Subject->IsWide(): the wide arm set the
+            // text directly, the narrow arm escaped ampersands first. IsWide() has answered
+            // TRUE for every Subject since the mirror's only setter started forcing it, so the
+            // escaping arm has been DEAD - and it is the one that was right here.
+            //
+            // IDD_COPYMOVEMOREDIALOG is the ONLY subject static in lang.rc declared WITHOUT
+            // SS_NOPREFIX (its four IDD_COPYMOVEDIALOG siblings, IDD_PACK and IDD_UNPACK all
+            // have it). So in THIS dialog a literal '&' in a file name is an accelerator
+            // prefix: "R&D report.txt" rendered as "RD report.txt" with a underlined D.
+            //
+            // The two sibling sites a few hundred lines away in this file collapsed to the
+            // plain call, correctly - their controls carry SS_NOPREFIX and their two arms were
+            // genuinely identical. This one is not a symmetric pair and must not be flattened
+            // the same way.
+            std::wstring buff = Subject->Get();
+            bool firstAmpersand = true;
+            for (size_t i = 0; i < buff.length(); ++i)
+            {
+                if (buff[i] != L'&')
+                    continue;
+                if (firstAmpersand)
+                    firstAmpersand = false;
+                else
+                {
+                    buff.insert(i, 1, L'&');
+                    ++i;
+                }
+            }
+            SetWindowTextW(hSubject, buff.c_str());
         }
 
         // now we are at full size => measure the dialog
@@ -1181,30 +1067,19 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
 
         HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
-        if (UseUnicodeInput && hCombo != NULL)
+        if (hCombo != NULL)
         {
-            TRACE_I("CCopyMoveMoreDialog: UseUnicodeInput=" << UseUnicodeInput << " hCombo=" << (void*)hCombo
-                    << " PathW.len=" << PathW.length()
-                    << " PathW.hasNonAscii=" << (PathW.find_first_not_of(L" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~") != std::wstring::npos ? 1 : 0)
-                    << " Path[0..20]=" << std::string(Path, (std::min)((size_t)20, strlen(Path))));
-            if (UnicodeInput.EnableForCombo(HWindow, IDE_PATH, PathW, HistoryW, HistoryWCount, PathBufSize, -1))
-            {
-                // Leave the hidden ANSI combo subclassed; the Unicode controller owns the visible control.
-                TRACE_I("CCopyMoveMoreDialog: Unicode combo created, GetText().len=" << UnicodeInput.GetText().length());
-            }
-            else
-            {
-                TRACE_E("CCopyMoveMoreDialog: EnableForCombo FAILED!");
-            }
+            // Owned; released on WM_DESTROY. NULL when the dialog font already copes.
+            UnicodeFont = EnsureComboFontCanRenderW(hCombo, Path.c_str());
         }
-        return UnicodeInput.IsEnabled() ? FALSE : ret;
+        return ret;
     }
 
     case WM_USER_KEYDOWN:
     {
-        BOOL processed = UnicodeInput.IsEnabled()
-                             ? OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, UnicodeInput.GetControlHandle())
-                             : OnDirectoryKeyDown((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE);
+        // Always wide, NULL handle - the helper falls back to the
+        // dialog's own control with the W APIs.
+        BOOL processed = OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, IDB_BROWSE, NULL);
         if (!processed)
             processed = OnKeyDownHandleSelectAll((DWORD)lParam, HWindow, IDE_PATH);
         SetWindowLongPtr(HWindow, DWLP_MSGRESULT, processed);
@@ -1213,16 +1088,19 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_BUTTON:
     {
-        if (UnicodeInput.IsEnabled())
-            OnDirectoryButtonW(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam, UnicodeInput.GetControlHandle());
-        else
-            OnDirectoryButton(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam);
+        // Always wide, NULL handle.
+        OnDirectoryButtonW(HWindow, IDE_PATH, IDB_BROWSE, wParam, lParam, NULL);
         return 0;
     }
 
     case WM_DESTROY:
     {
-        UnicodeInput.Reset();
+        // Only the owned font clone is left to release.
+        if (UnicodeFont != NULL)
+        {
+            DeleteObject(UnicodeFont);
+            UnicodeFont = NULL;
+        }
         break;
     }
 
@@ -1252,15 +1130,15 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
                 mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
                 mii.Type = MENU_TYPE_STRING;
 
-                mii.String = LoadStr(IDS_COPYMOVE_RESETHIDE);
+                mii.String = LoadStrW(IDS_COPYMOVE_RESETHIDE);
                 mii.ID = 1;
                 popup->InsertItem(-1, TRUE, &mii);
 
-                mii.String = LoadStr(IDS_COPYMOVE_SAVEASDEF);
+                mii.String = LoadStrW(IDS_COPYMOVE_SAVEASDEF);
                 mii.ID = 2;
                 popup->InsertItem(-1, TRUE, &mii);
 
-                mii.String = LoadStr(IDS_COPYMOVE_RESETDEFS);
+                mii.String = LoadStrW(IDS_COPYMOVE_RESETDEFS);
                 mii.ID = 3;
                 popup->InsertItem(-1, TRUE, &mii);
 
@@ -1308,16 +1186,9 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
 
     case WM_COMMAND:
     {
-        if (LOWORD(wParam) == IDE_PATH && UnicodeInput.IsEnabled())
-        {
-            HWND hCombo2 = (HWND)lParam;
-            if (hCombo2 == UnicodeInput.GetControlHandle())
-            {
-                BOOL isDropdownOpen = (BOOL)SendMessage(hCombo2, CB_GETDROPPEDSTATE, 0, 0);
-                if (sally::unicode::ShouldSyncUnicodeComboSelection(HIWORD(wParam), isDropdownOpen))
-                    UnicodeInput.SyncSelectionToEdit();
-            }
-        }
+        // The selection-sync block that stood here copied the wide item
+        // chosen in the drop-down into the replacement combo's edit. A native combo puts
+        // its own selection into its own edit; there is nothing to synchronise.
 
         if (HIWORD(wParam) == BN_CLICKED)
         {
@@ -1348,7 +1219,7 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
                 if (IsDlgButtonChecked(HWindow, IDC_CM_NAMED))
                     SendMessage(HWindow, WM_NEXTDLGCTL, FALSE, FALSE); // focus to the mask
                 else
-                    SetDlgItemText(HWindow, IDC_CM_NAMED_MASK, "*.*"); // default value for the mask
+                    SetDlgItemTextW(HWindow, IDC_CM_NAMED_MASK, L"*.*"); // default value for the mask
             }
 
             // if the user clicked at the speed-limit checkbox, they probably want to edit it
@@ -1395,51 +1266,29 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
 // CChangeDirDlg
 //
 
-CChangeDirDlg::CChangeDirDlg(HWND parent, char* path, int pathBufSize, BOOL* sendDirectlyToPlugin) : CCommonDialog(HLanguage, IDD_CHANGEDIR, IDD_CHANGEDIR, parent)
+CChangeDirDlg::CChangeDirDlg(HWND parent, std::wstring& path, BOOL* sendDirectlyToPlugin)
+    : CCommonDialog(HLanguage, IDD_CHANGEDIR, IDD_CHANGEDIR, parent),
+      Path(path)
 {
-    Path = path;
-    PathBufSize = pathBufSize;
     SendDirectlyToPlugin = sendDirectlyToPlugin;
-    HUnicodeEdit = NULL;
-}
-
-void CChangeDirDlg::SetUnicodePath(const std::wstring& pathW)
-{
-    PathW = pathW;
-    ResultW.clear();
 }
 
 void CChangeDirDlg::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CChangeDirDlg::Transfer()");
-    char** history = Configuration.ChangeDirHistory;
+    wchar_t** history = Configuration.ChangeDirHistory;
     HWND hWnd;
     if (ti.GetControl(hWnd, IDE_PATH))
     {
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, CHANGEDIR_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+            SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)Path.c_str());
         }
         else
         {
-            if (HUnicodeEdit != NULL)
-            {
-                int len = GetWindowTextLengthW(HUnicodeEdit);
-                if (len > 0)
-                {
-                    std::vector<wchar_t> buffer(len + 1);
-                    GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
-                    ResultW = buffer.data();
-                }
-                WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
-            }
-            else
-            {
-                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
-            }
-            AddValueToStdHistoryValues(history, CHANGEDIR_HISTORY_SIZE, Path, FALSE);
+            Path = GetWindowTextStringW(hWnd);
+            AddValueToStdHistoryValues(history, CHANGEDIR_HISTORY_SIZE, Path.c_str(), FALSE);
         }
     }
     if (SendDirectlyToPlugin != NULL)
@@ -1462,50 +1311,15 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_CHANGEDIR_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_CHANGEDIR_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_CHANGEDIR_HINT));
 
-        // Unicode overlay for long path support
-        if (!PathW.empty())
-        {
-            HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
-            if (hCombo != NULL)
-            {
-                COMBOBOXINFO cbi = {sizeof(COMBOBOXINFO)};
-                if (GetComboBoxInfo(hCombo, &cbi) && cbi.hwndItem)
-                {
-                    RECT editRect;
-                    GetWindowRect(cbi.hwndItem, &editRect);
-                    MapWindowPoints(NULL, HWindow, (LPPOINT)&editRect, 2);
-
-                    HFONT hFont = (HFONT)SendMessage(hCombo, WM_GETFONT, 0, 0);
-
-                    HUnicodeEdit = CreateWindowExW(
-                        0, L"EDIT", PathW.c_str(),
-                        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                        editRect.left, editRect.top,
-                        editRect.right - editRect.left, editRect.bottom - editRect.top,
-                        HWindow, NULL, HInstance, NULL);
-
-                    if (HUnicodeEdit != NULL)
-                    {
-                        ShowWindow(cbi.hwndItem, SW_HIDE);
-                        if (hFont != NULL)
-                            SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-                        SetWindowSubclass(HUnicodeEdit, UnicodeEditSubclassProc, 1, (DWORD_PTR)hCombo);
-                        PostMessage(HUnicodeEdit, EM_SETSEL, 0, -1);
-                        SetFocus(HUnicodeEdit);
-                    }
-                }
-            }
-        }
+        SendDlgItemMessageW(HWindow, IDE_PATH, CB_SETEDITSEL, 0, MAKELPARAM(0, -1));
         break;
     }
 
     case WM_USER_KEYDOWN:
     {
-        BOOL processed = (HUnicodeEdit != NULL)
-                             ? OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, HUnicodeEdit)
-                             : OnDirectoryKeyDown((DWORD)lParam, HWindow, IDE_PATH, PathBufSize, IDB_BROWSE);
+        BOOL processed = OnDirectoryKeyDownW((DWORD)lParam, HWindow, IDE_PATH, IDB_BROWSE, NULL);
         if (!processed)
             processed = OnKeyDownHandleSelectAll((DWORD)lParam, HWindow, IDE_PATH);
         SetWindowLongPtr(HWindow, DWLP_MSGRESULT, processed);
@@ -1514,32 +1328,11 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_BUTTON:
     {
-        if (HUnicodeEdit != NULL)
-            OnDirectoryButtonW(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam, HUnicodeEdit);
-        else
-            OnDirectoryButton(HWindow, IDE_PATH, PathBufSize, IDB_BROWSE, wParam, lParam);
+        OnDirectoryButtonW(HWindow, IDE_PATH, IDB_BROWSE, wParam, lParam, NULL);
         return 0;
     }
+    }
 
-    case WM_COMMAND:
-    {
-        // Handle combobox selection change - update overlay edit if present
-        if (LOWORD(wParam) == IDE_PATH && HIWORD(wParam) == CBN_SELCHANGE && HUnicodeEdit != NULL)
-        {
-            HWND hCombo = (HWND)lParam;
-            CPathBuffer ansiText;
-            int len = (int)SendMessage(hCombo, WM_GETTEXT, ansiText.Size(), (LPARAM)ansiText.Get());
-            if (len > 0)
-            {
-                std::wstring wideText(ansiText.Size(), L'\0');
-                int wideLen = MultiByteToWideChar(CP_ACP, 0, ansiText, -1, &wideText[0], (int)wideText.size());
-                wideText.resize(wideLen > 0 ? wideLen - 1 : 0);
-                SetWindowTextW(HUnicodeEdit, wideText.c_str());
-            }
-        }
-        break;
-    }
-    }
     return CCommonDialog::DialogProc(uMsg, wParam, lParam);
 }
 
@@ -1548,11 +1341,48 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CDriveInfo
 //
 
-CDriveInfo::CDriveInfo(HWND parent, const char* path, CObjectOrigin origin)
-    : CCommonDialog(HLanguage, IDD_DRIVEINFO, IDD_DRIVEINFO, parent, origin)
+static bool GetNetworkConnectionTextW(const std::wstring& localName, std::wstring& remoteName)
 {
-    lstrcpyn(VolumePath, path, VolumePath.Size());
-    OldVolumeName[0] = 0;
+    DWORD capacity = 256;
+    for (;;)
+    {
+        remoteName.assign(capacity, L'\0');
+        DWORD length = capacity;
+        const DWORD result = WNetGetConnectionW(localName.c_str(), remoteName.data(), &length);
+        if (result == NO_ERROR)
+        {
+            remoteName.resize(wcslen(remoteName.c_str()));
+            return true;
+        }
+        if (result != ERROR_MORE_DATA)
+            return false;
+        capacity = length > capacity ? length : capacity * 2;
+    }
+}
+
+static bool GetNetworkUserTextW(const std::wstring& localName, std::wstring& userName)
+{
+    DWORD capacity = 256;
+    for (;;)
+    {
+        userName.assign(capacity, L'\0');
+        DWORD length = capacity;
+        const DWORD result = WNetGetUserW(localName.c_str(), userName.data(), &length);
+        if (result == NO_ERROR)
+        {
+            userName.resize(wcslen(userName.c_str()));
+            return true;
+        }
+        if (result != ERROR_MORE_DATA)
+            return false;
+        capacity = length > capacity ? length : capacity * 2;
+    }
+}
+
+CDriveInfo::CDriveInfo(HWND parent, const wchar_t* path, CObjectOrigin origin)
+    : CCommonDialog(HLanguage, IDD_DRIVEINFO, IDD_DRIVEINFO, parent, origin),
+      VolumePath(path != NULL ? path : L"")
+{
     HDriveIcon = NULL;
 }
 
@@ -1562,16 +1392,14 @@ void CDriveInfo::Validate(CTransferInfo& ti)
     HWND edit;
     if (ti.GetControl(edit, IDE_VOLNAME) && ti.Type == ttDataFromWindow)
     {
-        CPathBuffer newName; // Heap-allocated for long path support
-        SendMessage(edit, WM_GETTEXT, newName.Size(), (LPARAM)newName.Get());
+        const std::wstring newName = GetWindowTextStringW(edit);
 
-        if (strcmp(OldVolumeName, newName) != 0)
+        if (OldVolumeName != newName)
         {
-            CPathBuffer volumePathWithBackslash; // Heap-allocated for long path support
-            lstrcpyn(volumePathWithBackslash, VolumePath, volumePathWithBackslash.Size());
-            SalPathAddBackslash(volumePathWithBackslash, volumePathWithBackslash.Size());
-            BOOL handsOffLeft = SalPathIsPrefix(volumePathWithBackslash, MainWindow->LeftPanel->GetPath());
-            BOOL handsOffRight = SalPathIsPrefix(volumePathWithBackslash, MainWindow->RightPanel->GetPath());
+            std::wstring volumePathWithBackslash = VolumePath;
+            SalPathAddBackslashW(volumePathWithBackslash);
+            BOOL handsOffLeft = SalPathIsPrefix(volumePathWithBackslash.c_str(), MainWindow->LeftPanel->GetPathW());
+            BOOL handsOffRight = SalPathIsPrefix(volumePathWithBackslash.c_str(), MainWindow->RightPanel->GetPathW());
             if (handsOffLeft)
                 MainWindow->LeftPanel->HandsOff(TRUE);
             if (handsOffRight)
@@ -1579,15 +1407,14 @@ void CDriveInfo::Validate(CTransferInfo& ti)
             //      SAD_SetUACParentWindow(HWindow);
             //      BOOL res = SAD_SetVolumeLabel(volumePathWithBackslash, newName);
             //      DWORD err = SAD_GetLastError();
-            BOOL res = SetVolumeLabel(volumePathWithBackslash, newName);
-            DWORD err = GetLastError();
+            const FileResult result = gFileSystem->SetVolumeLabel(volumePathWithBackslash.c_str(), newName.c_str());
             if (handsOffLeft)
                 MainWindow->LeftPanel->HandsOff(FALSE);
             if (handsOffRight)
                 MainWindow->RightPanel->HandsOff(FALSE);
-            if (!res)
+            if (!result.success)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOCHANGEDRIVELABEL), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_UNABLETOCHANGEDRIVELABEL), GetErrorTextOwned(result.errorCode).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                 ti.ErrorOn(IDE_VOLNAME);
             }
@@ -1602,158 +1429,100 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
     {
         BOOL err;
         //---  GetVolumeInformation
-        char volumeName[1000]; // later used as a buffer
-        char buff[300];
-        CPathBuffer volumePathWithBackslash; // Heap-allocated for long path support
+        std::wstring volumeName;
+        std::wstring volumePathWithBackslash;
         DWORD volumeSerialNumber;
         DWORD maximumComponentLength;
         DWORD fileSystemFlags;
-        char fileSystemNameBuffer[100];
-        CPathBuffer junctionOrSymlinkTgt; // Heap-allocated for long path support
+        std::wstring fileSystemName;
+        std::wstring junctionOrSymlinkTgt;
         int linkType;
-        err = (MyGetVolumeInformation(VolumePath, volumePathWithBackslash, junctionOrSymlinkTgt, &linkType,
-                                      volumeName, 200, &volumeSerialNumber, &maximumComponentLength,
-                                      &fileSystemFlags, fileSystemNameBuffer, 100) == 0);
-        lstrcpyn(VolumePath, volumePathWithBackslash, VolumePath.Size());
-        SalPathAddBackslash(volumePathWithBackslash, volumePathWithBackslash.Size());
+        // MyGetVolumeInformationW (consts.h:1044) returns its two path outputs
+        // as std::wstring* rather than caller buffers, so they are received into locals and
+        // copied into dynamically owned UTF-16 values used by every later operation.
+        std::wstring rootReparseW, junctionTgtW;
+        err = (MyGetVolumeInformationW(VolumePath.c_str(), &rootReparseW, &junctionTgtW, &linkType,
+                                       &volumeName, &volumeSerialNumber, &maximumComponentLength,
+                                       &fileSystemFlags, &fileSystemName) == 0);
+        volumePathWithBackslash = std::move(rootReparseW);
+        junctionOrSymlinkTgt = std::move(junctionTgtW);
+        VolumePath = volumePathWithBackslash;
+        SalPathAddBackslashW(volumePathWithBackslash);
         //---  GetVolumeInformation - display
         if (!err)
         {
-            SetWindowText(GetDlgItem(HWindow, IDE_VOLNAME), volumeName);
-            strcpy(OldVolumeName, volumeName);
+            SetWindowTextW(GetDlgItem(HWindow, IDE_VOLNAME), volumeName.c_str());
+            OldVolumeName = volumeName;
 
-            CPathBuffer mountPoint; // Heap-allocated for long path support
-            CPathBuffer guidPath; // Heap-allocated for long path support
-            mountPoint[0] = 0;
-            guidPath[0] = 0;
-            if (GetResolvedPathMountPointAndGUID(VolumePath, mountPoint, guidPath))
+            std::wstring mountPoint;
+            std::wstring guidPath;
+            if (GetResolvedPathMountPointAndGUIDW(VolumePath.c_str(), &mountPoint, &guidPath))
             {
-                SetWindowText(GetDlgItem(HWindow, IDT_MOUNTPOINT), mountPoint);
-                SetWindowText(GetDlgItem(HWindow, IDT_GUIDPATH), guidPath);
+                SetWindowTextW(GetDlgItem(HWindow, IDT_MOUNTPOINT), mountPoint.c_str());
+                SetWindowTextW(GetDlgItem(HWindow, IDT_GUIDPATH), guidPath.c_str());
             }
 
-            strcpy(volumeName, VolumePath);
-            if (volumeName[strlen(volumeName) - 1] == '\\')
-                volumeName[strlen(volumeName) - 1] = 0; // shortened by the last character ('\\')
-            sprintf(buff, "(%s) ", volumeName);
-            GetWindowText(HWindow, buff + strlen(buff), 100);
+            std::wstring titlePath = VolumePath;
+            if (!titlePath.empty() && titlePath.back() == L'\\')
+                titlePath.pop_back();
+            const std::wstring title = L"(" + titlePath + L") " + GetWindowTextStringW(HWindow);
+            SetWindowTextW(HWindow, title.c_str());
 
-            SetWindowText(HWindow, buff);
+            const std::wstring serialNumber = FormatStrW(
+                L"%04X-%04X", HIWORD(volumeSerialNumber), LOWORD(volumeSerialNumber));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_VOLSERNUM), serialNumber.c_str());
 
-            sprintf(volumeName, "%04X-%04X", HIWORD(volumeSerialNumber), LOWORD(volumeSerialNumber));
-            SetWindowText(GetDlgItem(HWindow, IDT_VOLSERNUM), volumeName);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_LONGNAMES),
+                           (maximumComponentLength > 100) ? LoadStrW(IDS_INFODLGYES)
+                                                          : LoadStrW(IDS_INFODLGNO));
 
-            strcpy(volumeName, (maximumComponentLength > 100) ? LoadStr(IDS_INFODLGYES) : LoadStr(IDS_INFODLGNO));
-            SetWindowText(GetDlgItem(HWindow, IDT_LONGNAMES), volumeName);
-
-            volumeName[0] = 0;
-            BOOL first = TRUE;
+            std::wstring flagsText;
+            const auto appendFlag = [&flagsText](const wchar_t* flag) {
+                if (!flagsText.empty())
+                    flagsText.append(L", ");
+                flagsText.append(flag);
+            };
             if (fileSystemFlags & FS_CASE_IS_PRESERVED)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG1));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG1));
             if (fileSystemFlags & FS_CASE_SENSITIVE)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG2));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG2));
             if (fileSystemFlags & FS_UNICODE_STORED_ON_DISK)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG3));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG3));
             if (fileSystemFlags & FS_PERSISTENT_ACLS)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG4));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG4));
             if (fileSystemFlags & FS_FILE_COMPRESSION)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG5));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG5));
             if (fileSystemFlags & FS_VOL_IS_COMPRESSED)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG6));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG6));
             if (fileSystemFlags & FILE_NAMED_STREAMS)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG7));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG7));
             if (fileSystemFlags & FILE_READ_ONLY_VOLUME)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG8));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG8));
             if (fileSystemFlags & FILE_SUPPORTS_ENCRYPTION)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG9));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG9));
             if (fileSystemFlags & FILE_SUPPORTS_OBJECT_IDS)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG10));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG10));
             if (fileSystemFlags & FILE_SUPPORTS_REPARSE_POINTS)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG11));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG11));
             if (fileSystemFlags & FILE_SUPPORTS_SPARSE_FILES)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG12));
-                first = FALSE;
-            }
+                appendFlag(LoadStrW(IDS_INFODLGFLAG12));
             if (fileSystemFlags & FILE_VOLUME_QUOTAS)
-            {
-                if (!first)
-                    strcat(volumeName, ", ");
-                strcat(volumeName, LoadStr(IDS_INFODLGFLAG13));
-                first = FALSE;
-            }
-            SetWindowText(GetDlgItem(HWindow, IDT_FILESYSTEMFLAGS), volumeName);
+                appendFlag(LoadStrW(IDS_INFODLGFLAG13));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FILESYSTEMFLAGS), flagsText.c_str());
 
-            SetWindowText(GetDlgItem(HWindow, IDT_FILESYSTEMNAME), fileSystemNameBuffer);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FILESYSTEMNAME), fileSystemName.c_str());
         }
         //---  GetDiskFreeSpace
         DWORD sectorsPerCluster;
         DWORD bytesPerSector;
         DWORD numberOfFreeClusters;
         DWORD totalNumberOfClusters;
-        err = (MyGetDiskFreeSpace(volumePathWithBackslash, &sectorsPerCluster,
-                                  &bytesPerSector, &numberOfFreeClusters, &totalNumberOfClusters) == 0);
+        err = (MyGetDiskFreeSpaceW(volumePathWithBackslash.c_str(), &sectorsPerCluster,
+                                   &bytesPerSector, &numberOfFreeClusters, &totalNumberOfClusters) == 0);
 
         CQuadWord diskTotalBytes = CQuadWord(-1, -1), diskFreeBytes;
         ULARGE_INTEGER availBytes, totalBytes, freeBytes;
-        if (GetDiskFreeSpaceEx(volumePathWithBackslash, &availBytes, &totalBytes, &freeBytes))
+        if (GetDiskFreeSpaceExW(volumePathWithBackslash.c_str(), &availBytes, &totalBytes, &freeBytes))
         {
             diskTotalBytes.Value = (unsigned __int64)totalBytes.QuadPart;
             diskFreeBytes.Value = (unsigned __int64)availBytes.QuadPart;
@@ -1768,23 +1537,19 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         //---  GetDiskFreeSpace - display
         if (!err)
         {
-            NumberToStr(volumeName, CQuadWord(sectorsPerCluster, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_SPC), volumeName);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_SPC), NumberToStr(CQuadWord(sectorsPerCluster, 0)).c_str());
 
-            NumberToStr(volumeName, CQuadWord(bytesPerSector, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_BPS), volumeName);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_BPS), NumberToStr(CQuadWord(bytesPerSector, 0)).c_str());
 
-            if (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0))
-                NumberToStr(volumeName, diskTotalBytes / (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0)));
-            else
-                volumeName[0] = 0;
-            SetWindowText(GetDlgItem(HWindow, IDT_NOC), volumeName);
+            const std::wstring clusterCount = CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0)
+                                                  ? NumberToStr(diskTotalBytes / (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0)))
+                                                  : std::wstring();
+            SetWindowTextW(GetDlgItem(HWindow, IDT_NOC), clusterCount.c_str());
 
-            if (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0))
-                NumberToStr(volumeName, CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0));
-            else
-                volumeName[0] = 0;
-            SetWindowText(GetDlgItem(HWindow, IDT_BPC), volumeName);
+            const std::wstring bytesPerCluster = CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0)
+                                                     ? NumberToStr(CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0))
+                                                     : std::wstring();
+            SetWindowTextW(GetDlgItem(HWindow, IDT_BPC), bytesPerCluster.c_str());
         }
         if (diskTotalBytes != CQuadWord(-1, -1))
         {
@@ -1798,16 +1563,16 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             GetWindowRect(GetDlgItem(HWindow, IDB_GRAPH), &tmpR2);
             spaceForLongAndShort = tmpR2.left - tmpR1.left;
 
-            SetWindowText(GetDlgItem(HWindow, IDT_CAPACITY), PrintDiskSize(volumeName, diskTotalBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_CAPACITY_SHORT), PrintDiskSize(volumeName, diskTotalBytes, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_FREESPACE), PrintDiskSize(volumeName, diskFreeBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_FREESPACE_SHORT), PrintDiskSize(volumeName, diskFreeBytes, 0));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_CAPACITY), PrintDiskSize(diskTotalBytes, 2).c_str());
+            SetWindowTextW(GetDlgItem(HWindow, IDT_CAPACITY_SHORT), PrintDiskSize(diskTotalBytes, 0).c_str());
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FREESPACE), PrintDiskSize(diskFreeBytes, 2).c_str());
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FREESPACE_SHORT), PrintDiskSize(diskFreeBytes, 0).c_str());
             if (diskTotalBytes >= diskFreeBytes)
                 diskTotalBytes -= diskFreeBytes;
             else
                 diskTotalBytes.SetUI64(0); // rather zero than complete nonsense
-            SetWindowText(GetDlgItem(HWindow, IDT_USEDSPACE), PrintDiskSize(volumeName, diskTotalBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_USEDSPACE_SHORT), PrintDiskSize(volumeName, diskTotalBytes, 0));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_USEDSPACE), PrintDiskSize(diskTotalBytes, 2).c_str());
+            SetWindowTextW(GetDlgItem(HWindow, IDT_USEDSPACE_SHORT), PrintDiskSize(diskTotalBytes, 0).c_str());
             // position the static controls
             int height;
             RECT r;
@@ -1859,95 +1624,95 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         }
         //---  GetDriveType
         UINT driveType;
-        CPathBuffer remoteName; // Heap-allocated for long path support
-        BOOL remoteNameValid = FALSE;
-        char userName[100];
-        BOOL userNameValid = FALSE;
-        driveType = MyGetDriveType(volumePathWithBackslash);
+        std::wstring remoteName;
+        bool remoteNameValid = false;
+        std::wstring userName;
+        bool userNameValid = false;
+        driveType = MyGetDriveTypeW(volumePathWithBackslash.c_str());
         err = (driveType == 0 || driveType == 1);
         if (driveType == DRIVE_REMOTE)
         {
-            // GetRootPath(buff, volumePathWithBackslash);
-            lstrcpyn(buff, volumePathWithBackslash, 300);
-            if (buff[0] != 0 && buff[1] == ':' && strlen(buff) <= 3)
-                buff[2] = 0; // "x:\\" -> "x:"
-            DWORD l = MAX_PATH;
-            remoteNameValid = (WNetGetConnection(buff, remoteName, &l) == NO_ERROR);
-            l = 100;
-            userNameValid = (WNetGetUser(buff, userName, &l) == NO_ERROR);
+            std::wstring localName = volumePathWithBackslash;
+            if (localName.size() <= 3 && localName.size() >= 2 && localName[1] == L':')
+                localName.resize(2); // "x:\\" -> "x:"
+            remoteNameValid = GetNetworkConnectionTextW(localName, remoteName);
+            userNameValid = GetNetworkUserTextW(localName, userName);
         }
         //---  GetDriveType - display
         if (!err)
         {
+            std::wstring driveTypeText;
             switch (driveType)
             {
             case DRIVE_REMOVABLE:
-                strcpy(volumeName, LoadStr(IDS_INFODLGTYPE1));
+                driveTypeText = LoadStrW(IDS_INFODLGTYPE1);
                 break;
             case DRIVE_FIXED:
-                strcpy(volumeName, LoadStr(IDS_INFODLGTYPE2));
+                driveTypeText = LoadStrW(IDS_INFODLGTYPE2);
                 break;
             case DRIVE_REMOTE:
             {
-                strcpy(volumeName, LoadStr(IDS_INFODLGTYPE3));
+                driveTypeText = LoadStrW(IDS_INFODLGTYPE3);
                 if (remoteNameValid || userNameValid)
                 {
-                    strcat(volumeName, " ");
-                    sprintf(volumeName + strlen(volumeName), LoadStr(IDS_INFODLGTYPE8),
-                            remoteNameValid ? remoteName : "",
-                            userNameValid ? userName : "");
+                    driveTypeText += L" ";
+                    driveTypeText += FormatStrW(LoadStrW(IDS_INFODLGTYPE8),
+                                                remoteNameValid ? remoteName.c_str() : L"",
+                                                userNameValid ? userName.c_str() : L"");
                 }
                 break;
             }
             case DRIVE_CDROM:
-                strcpy(volumeName, LoadStr(IDS_INFODLGTYPE4));
+                driveTypeText = LoadStrW(IDS_INFODLGTYPE4);
                 break;
             case DRIVE_RAMDISK:
-                strcpy(volumeName, LoadStr(IDS_INFODLGTYPE5));
+                driveTypeText = LoadStrW(IDS_INFODLGTYPE5);
                 break;
             default:
-                sprintf(volumeName, LoadStr(IDS_INFODLGTYPE6), driveType);
+                driveTypeText = FormatStrW(LoadStrW(IDS_INFODLGTYPE6), driveType);
                 break;
             }
             BOOL substInfo = FALSE;
-            if (volumePathWithBackslash[0] != '\\' && strlen(volumePathWithBackslash) <= 3)
+            if (!volumePathWithBackslash.empty() && volumePathWithBackslash[0] != L'\\' &&
+                volumePathWithBackslash.size() <= 3)
             {
-                char drive = toupper(volumePathWithBackslash[0]);
-                if (GetSubstInformation(drive - 'A', buff, 300))
+                wchar_t drive = towupper(volumePathWithBackslash[0]);
+                std::wstring substTarget;
+                if (GetSubstInformationW(static_cast<BYTE>(drive - L'A'), substTarget))
                 {
                     substInfo = TRUE;
-                    strcat(volumeName, " ");
-                    sprintf(volumeName + strlen(volumeName), LoadStr(IDS_INFODLGTYPE7), buff);
+                    driveTypeText += L" ";
+                    driveTypeText += FormatStrW(LoadStrW(IDS_INFODLGTYPE7), substTarget.c_str());
                 }
             }
-            if (!substInfo && junctionOrSymlinkTgt[0] != 0)
+            if (!substInfo && !junctionOrSymlinkTgt.empty())
             {
-                strcat(volumeName, " ");
-                sprintf(volumeName + strlen(volumeName), LoadStr(linkType == 2 ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
-                        junctionOrSymlinkTgt.Get());
+                driveTypeText += L" ";
+                driveTypeText += FormatStrW(LoadStrW(linkType == 2 ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
+                                            junctionOrSymlinkTgt.c_str());
             }
-            SetWindowText(GetDlgItem(HWindow, IDT_DRIVETYPE), volumeName);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_DRIVETYPE), driveTypeText.c_str());
         }
         //---  GetDriveIcon
-        HDriveIcon = GetDriveIcon(volumePathWithBackslash, driveType, TRUE, TRUE);
+        HDriveIcon = GetDriveIconW(volumePathWithBackslash.c_str(), driveType, TRUE, TRUE);
         SendDlgItemMessage(HWindow, IDI_DI_DRIVE, STM_SETIMAGE, IMAGE_ICON, (LPARAM)HDriveIcon);
     }
 }
 
 void CDriveInfo::GrowWidth(int resID, int& width)
 {
-    char buff[200];
+    wchar_t buff[200];
     int minWidth = 0;
 
     HWND hItem = GetDlgItem(HWindow, resID);
-    GetWindowText(hItem, buff, 200);
-    strcat(buff, "M"); // the editbox has some margins; adding "M" compensates for them
+    GetWindowTextW(hItem, buff, 200);
+    wcscat_s(buff, _countof(buff), L"M"); // the editbox has some margins; adding "M" compensates for them
     HFONT hFont = (HFONT)SendMessage(hItem, WM_GETFONT, 0, 0);
 
     SIZE sz;
     HDC hDC = HANDLES(GetDC(HWindow));
     HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
-    GetTextExtentPoint32(hDC, buff, (int)strlen(buff), &sz);
+    GetTextExtentPoint32W(hDC, buff, (int)wcslen(buff), &sz);
     SelectObject(hDC, hOldFont);
     HANDLES(ReleaseDC(HWindow, hDC));
 
@@ -2019,16 +1784,16 @@ CDriveInfo::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CEnterPasswdDialog
 //
 
-CEnterPasswdDialog::CEnterPasswdDialog(HWND parent, const char* path, const char* user,
+CEnterPasswdDialog::CEnterPasswdDialog(HWND parent, const wchar_t* path, const wchar_t* user,
                                        CObjectOrigin origin)
     : CCommonDialog(HLanguage, IDD_ENTERPASSWD, IDD_ENTERPASSWD, parent, origin)
 {
     Path = path;
     if (user != NULL)
-        lstrcpyn(User, user, USERNAME_MAXLEN);
+        User = user;
     else
-        User[0] = 0;
-    Passwd[0] = 0;
+        User.clear();
+    Passwd.clear();
 }
 
 void CEnterPasswdDialog::Validate(CTransferInfo& ti)
@@ -2040,8 +1805,8 @@ void CEnterPasswdDialog::Validate(CTransferInfo& ti)
   {
     if (SendMessage(edit, WM_GETTEXTLENGTH, 0, 0) == 0)
     {
-      SalMessageBox(HWindow, LoadStr(IDS_EMPTYUSERNAME),
-                    LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+      SalMessageBoxW(HWindow, LoadStrW(IDS_EMPTYUSERNAME),
+                    LoadStrW(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
       ti.ErrorOn(IDE_NETUSER);
     }
   }
@@ -2050,8 +1815,13 @@ void CEnterPasswdDialog::Validate(CTransferInfo& ti)
 
 void CEnterPasswdDialog::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDE_NETPASSWD, Passwd, PASSWORD_MAXLEN);
-    ti.EditLine(IDE_NETUSER, User, USERNAME_MAXLEN);
+    ti.EditLineW(IDE_NETPASSWD, Passwd);
+    ti.EditLineW(IDE_NETUSER, User);
+    if (ti.Type == ttDataToWindow)
+    {
+        SendDlgItemMessageW(HWindow, IDE_NETPASSWD, EM_LIMITTEXT, PASSWORD_MAXLEN - 1, 0);
+        SendDlgItemMessageW(HWindow, IDE_NETUSER, EM_LIMITTEXT, USERNAME_MAXLEN - 1, 0);
+    }
 }
 
 INT_PTR
@@ -2061,7 +1831,7 @@ CEnterPasswdDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(GetDlgItem(HWindow, IDS_NETPATH), Path);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_NETPATH), Path);
         break;
     }
     }
@@ -2074,23 +1844,15 @@ CEnterPasswdDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CPackDialog
 //
 
-CPackDialog::CPackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt,
+CPackDialog::CPackDialog(HWND parent, std::wstring& path, const std::wstring& pathAlt,
                          CTruncatedString* subject, CPackerConfig* config)
-    : CCommonDialog(HLanguage, IDD_PACK, IDD_PACK, parent)
+    : CCommonDialog(HLanguage, IDD_PACK, IDD_PACK, parent, ooStandard, NULL),
+      Path(path),
+      PathAlt(pathAlt)
 {
     Subject = subject;
-    Path = path;
-    PathBufSize = pathBufSize;
-    PathAlt = pathAlt;
     PackerConfig = config;
     SelectionEnd = -1;
-    HUnicodeEdit = NULL;
-}
-
-void CPackDialog::SetUnicodePath(const std::wstring& pathW)
-{
-    PathW = pathW;
-    ResultW.clear();
 }
 
 void CPackDialog::SetSelectionEnd(int selectionEnd)
@@ -2106,16 +1868,16 @@ void CPackDialog::Transfer(CTransferInfo& ti)
     {
         if (ti.Type == ttDataToWindow)
         {
-            SendMessage(combo, CB_RESETCONTENT, 0, 0);
+            SendMessageW(combo, CB_RESETCONTENT, 0, 0);
             int i;
             for (i = 0; i < PackerConfig->GetPackersCount(); i++)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PackerConfig->GetPackerTitle(i));
+                SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)PackerConfig->GetPackerTitle(i));
             }
             // sets the position in the combo, preferedPacker == -1 -> no selection
-            SendMessage(combo, CB_SETCURSEL, (WPARAM)PackerConfig->GetPreferedPacker(), 0);
+            SendMessageW(combo, CB_SETCURSEL, (WPARAM)PackerConfig->GetPreferedPacker(), 0);
 
-            i = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
+            i = (int)SendMessageW(combo, CB_GETCURSEL, 0, 0);
             if (i != CB_ERR)
             {
                 BOOL supMove = TRUE;
@@ -2128,7 +1890,7 @@ void CPackDialog::Transfer(CTransferInfo& ti)
         }
         else // ttDataFromWindow
         {
-            int i = (int)SendMessage(combo, CB_GETCURSEL, (WPARAM)PackerConfig->GetPreferedPacker(), 0);
+            int i = (int)SendMessageW(combo, CB_GETCURSEL, (WPARAM)PackerConfig->GetPreferedPacker(), 0);
             if (i != CB_ERR)
                 PackerConfig->SetPreferedPacker(i);
             else
@@ -2140,29 +1902,28 @@ void CPackDialog::Transfer(CTransferInfo& ti)
     {
         // WARNING: code must stay consistent with CPackDialog::DialogProc/WM_COMMAND
         ti.GetControl(combo, IDE_PATH);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)Path);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)Path.c_str());
         // if the alternative path matches the first one, don't add it (target isn't ptDisk)
-        if (StrICmp(Path, PathAlt) != 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt);
-        SendMessage(combo, CB_SETCURSEL, 0, 0);
+        if (_wcsicmp(Path.c_str(), PathAlt.c_str()) != 0)
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt.c_str());
+        SendMessageW(combo, CB_SETCURSEL, 0, 0);
     }
     else
     {
-        // Get Unicode result if overlay edit exists
-        if (HUnicodeEdit != NULL)
+        // Read the native Unicode combo directly into the caller's
+        // one archive-name owner. There is no ACP copy-back or overlay-mode latch.
+        HWND hEdit;
+        if (ti.GetControl(hEdit, IDE_PATH))
         {
-            int len = GetWindowTextLengthW(HUnicodeEdit);
+            const int len = GetWindowTextLengthW(hEdit);
             if (len > 0)
             {
-                std::vector<wchar_t> buffer(len + 1);
-                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
-                ResultW = buffer.data();
+                std::vector<wchar_t> buffer((size_t)len + 1);
+                GetWindowTextW(hEdit, buffer.data(), len + 1);
+                Path = buffer.data();
             }
-            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
-        }
-        else
-        {
-            ti.EditLine(IDE_PATH, Path, PathBufSize);
+            else
+                Path.clear();
         }
     }
 
@@ -2170,17 +1931,11 @@ void CPackDialog::Transfer(CTransferInfo& ti)
     {
         if (PackerConfig->GetPreferedPacker() != -1) // if we have an extension, otherwise don't change the entered name
         {
-            const char* ext = PackerConfig->GetPackerExt(PackerConfig->GetPreferedPacker());
-            char* s = strrchr(Path, '.');
-            char* s2 = strrchr(Path, '\\');
-            int nameLen = (int)strlen(Path);
-            if ((s == NULL || s2 != NULL && s2 > s) && // '.cvspass' in Windows is considered an extension ...
-                (s2 == NULL || (s2 - Path + 1) < nameLen) &&
-                nameLen > 0 &&
-                nameLen + 1 + 1 + strlen(ext) < (size_t)PathBufSize)
+            if (!Path.empty() && Path.back() != L'\\')
             {
-                strcpy(Path + nameLen, ".");
-                strcpy(Path + nameLen + 1, ext);
+                std::wstring extension = L".";
+                extension += PackerConfig->GetPackerExt(PackerConfig->GetPreferedPacker());
+                SalPathAddExtensionW(Path, extension.c_str());
             }
         }
     }
@@ -2206,32 +1961,14 @@ void CPackDialog::Transfer(CTransferInfo& ti)
     }
 }
 
-BOOL CPackDialog::ChangeExtension(char* name, const char* ext)
+BOOL CPackDialog::ChangeExtension(std::wstring& name, const wchar_t* ext)
 {
-    char* s = strrchr(name, '.');
-    char* s2 = strrchr(name, '\\');
-    if (s != NULL && // '.cvspass' in Windows is considered an extension ...
-                     //if (s != NULL && s > name &&
-        (s2 == NULL || s > s2) &&
-        strlen(ext) + 1 + ((s + 1) - name) < (size_t)PathBufSize)
-    {
-        strcpy(s + 1, ext);
-        return TRUE;
-    }
-    else
-    {
-        int nameLen = (int)strlen(name);
-        if ((s == NULL || s2 != NULL && s2 > s) &&
-            (s2 == NULL || (s2 - name + 1) < nameLen) &&
-            nameLen > 0 &&
-            nameLen + 1 + 1 + strlen(ext) < (size_t)PathBufSize)
-        {
-            strcpy(name + nameLen, ".");
-            strcpy(name + nameLen + 1, ext);
-            return TRUE;
-        }
-    }
-    return FALSE;
+    if (name.empty() || name.back() == L'\\')
+        return FALSE;
+
+    std::wstring extension = L".";
+    extension += ext;
+    return SalPathRenameExtensionW(name, extension.c_str());
 }
 
 INT_PTR
@@ -2246,46 +1983,12 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+            SetWindowTextW(hSubject, Subject->GetW());
 
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
 
-        // Create Unicode overlay edit control if needed
-        if (!PathW.empty())
-        {
-            HWND hCombo = GetDlgItem(HWindow, IDE_PATH);
-            if (hCombo != NULL)
-            {
-                COMBOBOXINFO cbi = {sizeof(COMBOBOXINFO)};
-                if (GetComboBoxInfo(hCombo, &cbi) && cbi.hwndItem != NULL)
-                {
-                    RECT rcEdit;
-                    GetWindowRect(cbi.hwndItem, &rcEdit);
-                    MapWindowPoints(NULL, hCombo, (LPPOINT)&rcEdit, 2);
-
-                    HUnicodeEdit = CreateWindowExW(
-                        0, L"EDIT", PathW.c_str(),
-                        WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
-                        rcEdit.left, rcEdit.top,
-                        rcEdit.right - rcEdit.left, rcEdit.bottom - rcEdit.top,
-                        hCombo, NULL, HInstance, NULL);
-
-                    if (HUnicodeEdit != NULL)
-                    {
-                        HFONT hFont = (HFONT)SendMessage(cbi.hwndItem, WM_GETFONT, 0, 0);
-                        if (hFont != NULL)
-                            SendMessage(HUnicodeEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
-                        PostMessage(HUnicodeEdit, EM_SETSEL, 0, SelectionEnd);
-                        SetFocus(HUnicodeEdit);
-                    }
-                }
-            }
-        }
-        else
-        {
-            // we can select only the name without the dot and extension
-            PostMessage(GetDlgItem(HWindow, IDE_PATH), CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
-        }
+        // we can select only the name without the dot and extension
+        PostMessageW(GetDlgItem(HWindow, IDE_PATH), CB_SETEDITSEL, 0, MAKELPARAM(0, SelectionEnd));
         return FALSE;
     }
 
@@ -2293,43 +1996,52 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (HIWORD(wParam) == CBN_SELCHANGE && LOWORD(wParam) == IDC_PACKER)
         {
-            int i = (int)SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
+            int i = (int)SendMessageW((HWND)lParam, CB_GETCURSEL, 0, 0);
             if (i != CB_ERR)
             {
                 // swap extensions
-                CPathBuffer name; // Heap-allocated for long path support
-                CPathBuffer name2; // Heap-allocated for long path support
+                std::wstring name;
+                std::wstring name2;
 
-                int curSel = (int)SendDlgItemMessage(HWindow, IDE_PATH, CB_GETCURSEL, 0, 0);
+                int curSel = (int)SendDlgItemMessageW(HWindow, IDE_PATH, CB_GETCURSEL, 0, 0);
                 if (curSel == CB_ERR) // we must retrieve the text here because CB_RESETCONTENT would wipe it
-                    GetWindowText(GetDlgItem(HWindow, IDE_PATH), name2, name2.Size());
+                {
+                    HWND pathWindow = GetDlgItem(HWindow, IDE_PATH);
+                    const int len = GetWindowTextLengthW(pathWindow);
+                    if (len > 0)
+                    {
+                        std::vector<wchar_t> buffer((size_t)len + 1);
+                        GetWindowTextW(pathWindow, buffer.data(), len + 1);
+                        name2 = buffer.data();
+                    }
+                }
 
                 // WARNING: code must stay consistent with CPackDialog::Transfer
                 // swap extensions in the combobox
-                SendDlgItemMessage(HWindow, IDE_PATH, CB_RESETCONTENT, 0, 0);
-                strcpy(name, Path);
+                SendDlgItemMessageW(HWindow, IDE_PATH, CB_RESETCONTENT, 0, 0);
+                name = Path;
                 if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.Get());
+                    SendDlgItemMessageW(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.c_str());
                 else
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)Path);
+                    SendDlgItemMessageW(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)Path.c_str());
 
                 // if the alternative path matches the first one, don't add it (target isn't ptDisk)
-                if (StrICmp(Path, PathAlt) != 0)
+                if (_wcsicmp(Path.c_str(), PathAlt.c_str()) != 0)
                 {
-                    strcpy(name, PathAlt);
+                    name = PathAlt;
                     if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.Get());
+                        SendDlgItemMessageW(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name.c_str());
                     else
-                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)PathAlt);
+                        SendDlgItemMessageW(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)PathAlt.c_str());
                 }
 
                 if (curSel != CB_ERR)
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_SETCURSEL, (WPARAM)curSel, 0);
+                    SendDlgItemMessageW(HWindow, IDE_PATH, CB_SETCURSEL, (WPARAM)curSel, 0);
                 else
                 {
                     // if the editline was modified, change the extension there as well
                     if (ChangeExtension(name2, PackerConfig->GetPackerExt(i)))
-                        SetWindowText(GetDlgItem(HWindow, IDE_PATH), name2);
+                        SetWindowTextW(GetDlgItem(HWindow, IDE_PATH), name2.c_str());
                 }
 
                 BOOL supMove = TRUE;
@@ -2352,25 +2064,17 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CUnpackDialog
 //
 
-CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
+CUnpackDialog::CUnpackDialog(HWND parent, std::wstring& path, const std::wstring& pathAlt, std::wstring& mask,
                              CTruncatedString* subject, CUnpackerConfig* config,
                              BOOL* delArchiveWhenDone)
-    : CCommonDialog(HLanguage, IDD_UNPACK, IDD_UNPACK, parent)
+    : CCommonDialog(HLanguage, IDD_UNPACK, IDD_UNPACK, parent),
+      Mask(mask),
+      Path(path),
+      PathAlt(pathAlt)
 {
     Subject = subject;
-    Path = path;
-    PathBufSize = pathBufSize;
-    PathAlt = pathAlt;
-    Mask = mask;
     UnpackerConfig = config;
     DelArchiveWhenDone = delArchiveWhenDone;
-    HUnicodeEdit = NULL;
-}
-
-void CUnpackDialog::SetUnicodePath(const std::wstring& pathW)
-{
-    PathW = pathW;
-    ResultW.clear();
 }
 
 void CUnpackDialog::EnableDelArcCheckbox()
@@ -2410,38 +2114,32 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
     {
         ti.GetControl(combo, IDE_PATH);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)Path);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)Path.c_str());
         // if the alternative path matches the first one, don't add it (target isn't ptDisk)
-        if (StrICmp(Path, PathAlt) != 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt);
-        SendMessage(combo, CB_SETCURSEL, 0, 0);
+        if (_wcsicmp(Path.c_str(), PathAlt.c_str()) != 0)
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt.c_str());
+        SendMessageW(combo, CB_SETCURSEL, 0, 0);
         ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
     }
     else
     {
-        // Get Unicode result if overlay edit exists
-        if (HUnicodeEdit != NULL)
-        {
-            int len = GetWindowTextLengthW(HUnicodeEdit);
-            if (len > 0)
-            {
-                std::vector<wchar_t> buffer(len + 1);
-                GetWindowTextW(HUnicodeEdit, buffer.data(), len + 1);
-                ResultW = buffer.data();
-            }
-            WideCharToMultiByte(CP_ACP, 0, ResultW.c_str(), -1, Path, PathBufSize, "?", NULL);
-        }
-        else
-        {
-            ti.EditLine(IDE_PATH, Path, PathBufSize);
-        }
+        HWND hEdit;
+        if (ti.GetControl(hEdit, IDE_PATH))
+            Path = GetWindowTextStringW(hEdit);
         if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
         else
             *DelArchiveWhenDone = FALSE;
     }
 
-    ti.EditLine(IDE_MASK, Mask, MAX_PATH); // Mask is always MAX_PATH (file masks are short)
+    HWND maskEdit;
+    if (ti.GetControl(maskEdit, IDE_MASK))
+    {
+        if (ti.Type == ttDataToWindow)
+            SetWindowTextW(maskEdit, Mask.c_str());
+        else
+            Mask = GetWindowTextStringW(maskEdit);
+    }
 }
 
 INT_PTR
@@ -2456,11 +2154,16 @@ CUnpackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+        {
+            // wide - mirrors the CCopyMoveDialog/CCopyMoveMoreDialog
+            // precedent; UnpackZIPArchive now seeds Subject wide (SetW with the
+            // audited archiveNameW/fileNameW), so this dialog needs the same check.
+                SetWindowTextW(hSubject, Subject->GetW());
+        }
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         break;
     }
@@ -2505,10 +2208,9 @@ CZIPSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
       r1.left = (r2.right + r2.left - width) / 2;
       MoveWindow(HWindow, r1.left, r1.top, width, r1.bottom - r1.top, FALSE);
       */
-        char buf[50];
-        SetWindowText(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(buf, Size, 1));
-        SetWindowText(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(buf, CQuadWord(Files, 0)));
-        SetWindowText(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(buf, CQuadWord(Dirs, 0)));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(Size, 1).c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(CQuadWord(Files, 0)).c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(CQuadWord(Dirs, 0)).c_str());
         break;
     }
     }
@@ -2521,10 +2223,10 @@ CZIPSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CChangeIconDialog
 //
 
-CChangeIconDialog::CChangeIconDialog(HWND hParent, char* iconFile, int* iconIndex)
+CChangeIconDialog::CChangeIconDialog(HWND hParent, std::wstring& iconFile, int* iconIndex)
     : CCommonDialog(HLanguage, IDD_CHANGEICON, IDD_CHANGEICON, hParent)
 {
-    IconFile = iconFile;
+    IconFile = &iconFile;
     IconIndex = iconIndex;
     Dirty = FALSE;
     Icons = NULL;
@@ -2536,29 +2238,35 @@ CChangeIconDialog::~CChangeIconDialog()
     DestroyIcons();
 }
 
-void CChangeIconDialog::GetShell32(char* fileName, int fileNameSize)
+void CChangeIconDialog::GetShell32(std::wstring& fileName)
 {
-    EnvGetSystemDirectoryA(gEnvironment, fileName, fileNameSize);
-    SalPathAppend(fileName, "SHELL32.DLL", fileNameSize);
-    SetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName);
+    if (!gEnvironment->GetSystemDirectory(fileName).success)
+        fileName.clear();
+    SalPathAppendW(fileName, L"SHELL32.DLL");
+    SetDlgItemTextW(HWindow, IDE_CHI_FILENAME, fileName.c_str());
 }
 
 void CChangeIconDialog::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDE_CHI_FILENAME, IconFile, MAX_PATH);
-
     if (ti.Type == ttDataToWindow)
     {
+        SetDlgItemTextW(HWindow, IDE_CHI_FILENAME, IconFile->c_str());
         LoadIcons();
         Dirty = FALSE;
     }
     else
     {
+        HWND edit = GetDlgItem(HWindow, IDE_CHI_FILENAME);
+        const int length = GetWindowTextLengthW(edit);
+        std::vector<wchar_t> text((size_t)length + 1);
+        GetWindowTextW(edit, text.data(), length + 1);
+        IconFile->assign(text.data());
         int curSel = (int)SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_GETCURSEL, 0, 0);
         if (curSel == LB_ERR || curSel >= (int)IconsCount)
         {
-            CPathBuffer fileName; // Heap-allocated for long path support
-            GetShell32(fileName, fileName.Size());
+            std::wstring fileName;
+            GetShell32(fileName);
+            *IconFile = fileName;
             LoadIcons();
             *IconIndex = 0;
         }
@@ -2571,8 +2279,11 @@ void CChangeIconDialog::Transfer(CTransferInfo& ti)
 
 BOOL CChangeIconDialog::LoadIcons()
 {
-    CPathBuffer fileName; // Heap-allocated for long path support
-    GetDlgItemText(HWindow, IDE_CHI_FILENAME, fileName, fileName.Size());
+    HWND edit = GetDlgItem(HWindow, IDE_CHI_FILENAME);
+    const int length = GetWindowTextLengthW(edit);
+    std::vector<wchar_t> text((size_t)length + 1);
+    GetWindowTextW(edit, text.data(), length + 1);
+    std::wstring fileName(text.data());
     int counter = 0;
 
 AGAIN:
@@ -2580,23 +2291,25 @@ AGAIN:
     DestroyIcons();
     SendDlgItemMessage(HWindow, IDL_CHI_LIST, LB_SETCOUNT, 0, 0);
 
-    if (MainWindow->GetActivePanel()->CheckPath(FALSE, fileName) != ERROR_SUCCESS)
+    if (MainWindow->GetActivePanel()->CheckPath(FALSE, fileName.c_str()) != ERROR_SUCCESS)
     {
-        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNONTFINDFILE), AnsiToWide(fileName).c_str());
+        // fileName is genuinely wide now (GetDlgItemTextW above) -
+        // AnsiToWide on it would misread its bytes as CP_ACP; just use it directly.
+        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNONTFINDFILE), fileName.c_str());
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
-        GetShell32(fileName, fileName.Size());
+        GetShell32(fileName);
     }
 
     // enumeration of icons from *.ICO, *.EXE, *.DLL files, including 16-bit PE
-    int iconsCount = ExtractIconEx(fileName, -1, NULL, NULL, 0);
+    int iconsCount = ExtractIconExW(fileName.c_str(), -1, NULL, NULL, 0);
     if (iconsCount > 0)
     {
         Icons = new HICON[iconsCount];
         if (Icons != NULL)
         {
-            IconsCount = ExtractIconEx(fileName, 0, Icons, NULL, iconsCount);
+            IconsCount = ExtractIconExW(fileName.c_str(), 0, Icons, NULL, iconsCount);
             // add the HIcon handle to HANDLES
             for (DWORD i = 0; i < IconsCount; i++)
                 HANDLES_ADD(__htIcon, __hoLoadImage, Icons[i]);
@@ -2607,11 +2320,11 @@ AGAIN:
 
     if (IconsCount == 0)
     {
-        std::wstring msg = FormatStrW(LoadStrW(IDS_NOICONS), AnsiToWide(fileName).c_str());
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOICONS), fileName.c_str());
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 
         // fall back to default
-        GetShell32(fileName, fileName.Size());
+        GetShell32(fileName);
         if (counter < 2) // safety check
             goto AGAIN;
     }
@@ -2748,8 +2461,8 @@ CWaitWindow::CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObj
     HForegroundWnd = NULL;
     if (textResID != 0)
     {
-        char* t = LoadStr(textResID);
-        Text = t ? t : "";
+        const wchar_t* t = LoadStrW(textResID); // Text is wide
+        Text = t ? t : L"";
     }
     ShowCloseButton = showCloseButton;
     ShowProgressBar = showProgressBar;
@@ -2765,9 +2478,9 @@ CWaitWindow::~CWaitWindow()
         delete (CacheBitmap);
 }
 
-void CWaitWindow::SetText(const char* text)
+void CWaitWindow::SetText(const wchar_t* text)
 {
-    Text = text ? text : "";
+    Text = text ? text : L"";
     if (HWindow != NULL && IsWindowVisible(HWindow))
     {
         HDC hDC = GetDC(HWindow);
@@ -2790,9 +2503,9 @@ void CWaitWindow::SetText(const char* text)
     }
 }
 
-void CWaitWindow::SetCaption(const char* text)
+void CWaitWindow::SetCaption(const wchar_t* text)
 {
-    Caption = text ? text : "";
+    Caption = text ? text : L"";
 }
 
 #define WAITWINDOW_HMARGIN 21
@@ -2835,12 +2548,12 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        DrawTextW(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN >= scrW)
         {
             tR.right = (int)(scrW / 1.8);
             tR.bottom = 1;
-            DrawText(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawTextW(dc, Text.c_str(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -2869,14 +2582,14 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
     }
 
     CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOOLWINDOW,
-             SAVEBITS_CLASSNAME,
-             Caption.empty() ? "Sally" : Caption.c_str(),
-             WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
-             0, 0, width, height,
-             HParent,
-             NULL,
-             HInstance,
-             this);
+              SAFEWAIT_CLASSNAMEW,
+              Caption.empty() ? L"Sally" : Caption.c_str(),
+              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
+              0, 0, width, height,
+              HParent,
+              NULL,
+              HInstance,
+              this);
 
     // hack: adjust window size in real time so it works with both old (5 / XP compatible) and new toolsets
     RECT clientR;
@@ -3008,7 +2721,7 @@ void CWaitWindow::PaintText(HDC hDC)
         SetTextColor(hDestDC, colors.DialogText);
         // we won't clip so that we survive minor text extension
         // that may occur during a SetText call
-        DrawText(hDestDC, Text.c_str(), (int)Text.length(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+        DrawTextW(hDestDC, Text.c_str(), (int)Text.length(), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
         SetBkMode(hDestDC, prevBkMode);
         SelectObject(hDestDC, hOldFont);
 
@@ -3107,11 +2820,23 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CConversionTablesDialog
 //
 
-CConversionTablesDialog::CConversionTablesDialog(HWND parent, char* dirName)
-    : CCommonDialog(HLanguage, IDD_CONVERSION_TABLES, IDD_CONVERSION_TABLES, parent)
+// This build does not define _UNICODE, so ListView_SetItemText
+// resolves to the A form only, which would narrow wide item text through the
+// active code page. Mirrors the identical local macro already used by
+// dialogs_highlight_registry.cpp, dialogs_tip_of_day.cpp and others.
+#define ListView_SetItemTextW(hwndLV, i, iSubItem_, pszText_) \
+    {                                                         \
+        LV_ITEMW _ms_lvi;                                     \
+        _ms_lvi.iSubItem = iSubItem_;                         \
+        _ms_lvi.pszText = pszText_;                           \
+        SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
+    }
+
+CConversionTablesDialog::CConversionTablesDialog(HWND parent, std::wstring& dirName)
+    : CCommonDialog(HLanguage, IDD_CONVERSION_TABLES, IDD_CONVERSION_TABLES, parent),
+      DirName(dirName)
 {
     HListView = NULL;
-    DirName = dirName;
 }
 
 CConversionTablesDialog::~CConversionTablesDialog()
@@ -3132,23 +2857,26 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         DWORD origFlags = ListView_GetExtendedListViewStyle(HListView);
         ListView_SetExtendedListViewStyle(HListView, origFlags | exFlags); // 4.71
 
-        // fill the listview with Name, Mode and HotKey columns
-        LVCOLUMN lvc;
+        // Fill the list view from dynamically owned UTF-16 resource text.
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_SUBITEM | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_CONVERSION_DESCRIPTION);
+        std::wstring columnText = LoadStrOwned(IDS_CONVERSION_DESCRIPTION);
+        lvc.pszText = columnText.data();
         lvc.iSubItem = 0;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
-        lvc.pszText = LoadStr(IDS_CONVERSION_CODEPAGE);
+        columnText = LoadStrOwned(IDS_CONVERSION_CODEPAGE);
+        lvc.pszText = columnText.data();
         lvc.iSubItem = 1;
         lvc.fmt = LVCFMT_RIGHT;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 1, (LPARAM)&lvc);
 
-        lvc.pszText = LoadStr(IDS_CONVERSION_PATH);
+        columnText = LoadStrOwned(IDS_CONVERSION_PATH);
+        lvc.pszText = columnText.data();
         lvc.iSubItem = 2;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 2, (LPARAM)&lvc);
 
         RECT r;
         GetClientRect(HListView, &r);
@@ -3157,20 +2885,21 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         ListView_SetColumnWidth(HListView, 2, LVSCW_AUTOSIZE_USEHEADER);
 
         int index = 0;
-        const char* winCodePage;
+        const wchar_t* winCodePage;
         DWORD winCodePageIdentifier;
-        const char* winCodePageDescription;
-        const char* dirName;
-        CPathBuffer buff;
-
-        CPathBuffer bestDirName; // Heap-allocated for long path support
-        CodeTables.GetBestPreloadedConversion(DirName, bestDirName);
+        const wchar_t* winCodePageDescription;
+        const wchar_t* dirName;
+        const std::wstring bestDirName = CodeTables.GetBestPreloadedConversion(DirName.c_str());
         int bestIndex = -1;
 
         while (CodeTables.EnumPreloadedConversions(&index, &winCodePage, &winCodePageIdentifier,
                                                    &winCodePageDescription, &dirName))
         {
-            if (bestIndex == -1 && stricmp(bestDirName, dirName) == 0)
+            // bestDirName/dirName are both wide now - _wcsicmp, not the
+            // narrow stricmp (which compiled silently against the former path buffer's implicit
+            // wchar_t* conversion but compared the wrong byte width - pattern seen
+            // repeatedly this codebase as a silent, uncaught bug, not just a type error).
+            if (bestIndex == -1 && _wcsicmp(bestDirName.c_str(), dirName) == 0)
                 bestIndex = index - 1;
             LVITEM lvi;
             lvi.mask = 0;
@@ -3178,14 +2907,14 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             ListView_InsertItem(HListView, &lvi);
 
-            ListView_SetItemText(HListView, index - 1, 0, (char*)winCodePageDescription);
-            sprintf(buff, "%u", winCodePageIdentifier);
-            ListView_SetItemText(HListView, index - 1, 1, buff);
-            sprintf(buff, "convert\\%s\\convert.cfg", dirName);
-            ListView_SetItemText(HListView, index - 1, 2, buff);
+            ListView_SetItemTextW(HListView, index - 1, 0, (wchar_t*)winCodePageDescription);
+            const std::wstring codePage = std::to_wstring(winCodePageIdentifier);
+            ListView_SetItemTextW(HListView, index - 1, 1, const_cast<wchar_t*>(codePage.c_str()));
+            const std::wstring path = L"convert\\" + std::wstring(dirName) + L"\\convert.cfg";
+            ListView_SetItemTextW(HListView, index - 1, 2, const_cast<wchar_t*>(path.c_str()));
         }
-        sprintf(buff, "%u", GetACP());
-        SetDlgItemText(HWindow, IDC_CT_CODEPAGE, buff);
+        const std::wstring codePage = std::to_wstring(GetACP());
+        SetDlgItemTextW(HWindow, IDC_CT_CODEPAGE, codePage.c_str());
         if (bestIndex != -1)
         {
             DWORD state = LVIS_SELECTED | LVIS_FOCUSED;
@@ -3198,14 +2927,14 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index != -1)
         {
-            const char* winCodePage;
+            const wchar_t* winCodePage;
             DWORD winCodePageIdentifier;
-            const char* winCodePageDescription;
-            const char* dirName;
+            const wchar_t* winCodePageDescription;
+            const wchar_t* dirName;
             if (CodeTables.EnumPreloadedConversions(&index, &winCodePage, &winCodePageIdentifier,
                                                     &winCodePageDescription, &dirName))
             {
-                strcpy(DirName, dirName);
+                DirName = dirName;
             }
         }
     }

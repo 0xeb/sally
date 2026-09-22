@@ -2,6 +2,16 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+// WIDE-WINDOW: the CViewerWindow this file writes captions into is created wide,
+// so its SetWindowTextW(HWindow, ...) calls reach the screen intact and are NOT
+// re-narrowed by USER32. Evidence, all in the non-_UNICODE branch that this build
+// takes:
+//   viewer.cpp registers CVIEWERWINDOW_CLASSNAMEW through CWindow's wide-only adapter.
+//   viewer_thread_buffering.cpp creates it through the same wide-only adapter.
+//   viewer.cpp:555   CViewerWindow ctor passes CWindow(origin, TRUE)
+// gtest_window_width_probe already proves the chain itself: a window created with
+// CreateWindowExW on a RegisterClassW class reports IsWindowUnicode == TRUE.
+
 #include "precomp.h"
 
 #include "cfgdlg.h"
@@ -25,64 +35,30 @@ BOOL ViewerActive(HWND hwnd)
 
 void CViewerWindow::SetViewerCaption()
 {
-    if (!FileNameW.empty())
-    {
-        std::wstring captionW;
-        if (Caption.empty())
-            captionW = FileNameW;
-        else
-            captionW = AnsiToWide(Caption.c_str());
-        if (Caption.empty() || !WholeCaption)
-        {
-            if (!captionW.empty())
-                captionW += L" - ";
-            captionW += AnsiToWide(LoadStr(IDS_VIEWERTITLE));
-            if (CodeType > 0)
-            {
-                char codeName[200];
-                CodeTables.GetCodeName(CodeType, codeName, 200);
-                RemoveAmpersands(codeName);
-                char* s = codeName + strlen(codeName);
-                while (s > codeName && *(s - 1) == ' ')
-                    s--;
-                *s = 0;
-                captionW += L" - [";
-                captionW += AnsiToWide(codeName);
-                captionW += L"]";
-            }
-        }
-        SetWindowTextW(HWindow, captionW.c_str());
-        return;
-    }
-
-    CPathBuffer caption;
+    std::wstring captionW;
     if (Caption.empty())
-    {
-        if (!FileName.empty())
-            lstrcpyn(caption, FileName.c_str(), caption.Size()); // caption according to the file
-        else
-            caption[0] = 0;
-    }
+        captionW = FileNameW;
     else
-        lstrcpyn(caption, Caption.c_str(), caption.Size()); // caption according to the plug-in request
+        captionW = Caption;
     if (Caption.empty() || !WholeCaption)
     {
-        if (caption[0] != 0)
-            strcat(caption, " - ");
-        strcat(caption, LoadStr(IDS_VIEWERTITLE));
+        if (!captionW.empty())
+            captionW += L" - ";
+        captionW += LoadStrW(IDS_VIEWERTITLE);
         if (CodeType > 0)
         {
-            char codeName[200];
-            CodeTables.GetCodeName(CodeType, codeName, 200);
-            RemoveAmpersands(codeName);
-            char* s = codeName + strlen(codeName);
-            while (s > codeName && *(s - 1) == ' ')
-                s--;
-            *s = 0; // trim extra spaces
-            sprintf(caption + strlen(caption), " - [%s]", codeName);
+            std::wstring codeName;
+            CodeTables.GetCodeName(CodeType, codeName);
+            RemoveAmpersands(codeName.data());
+            codeName.resize(wcslen(codeName.c_str()));
+            while (!codeName.empty() && codeName.back() == L' ')
+                codeName.pop_back();
+            captionW += L" - [";
+            captionW += codeName;
+            captionW += L"]";
         }
     }
-    SetWindowText(HWindow, caption);
+    SetWindowTextW(HWindow, captionW.c_str());
 }
 
 //
@@ -374,7 +350,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             WaitForViewerRefresh = FALSE;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 BOOL fatalErr = FALSE;
                 FileChanged(NULL, FALSE, fatalErr, FALSE);
@@ -421,7 +397,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     //            ScrollToSelection = FALSE;
                     //            LineOffset.DestroyMembers();
                     //            EnableSetScroll = TRUE;
-                    //            SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+                    //            SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
                     //            InvalidateRect(HWindow, NULL, FALSE);
                 }
                 else
@@ -568,24 +544,24 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         FindDialog.SetParent(HWindow);
         EraseBkgnd = TRUE;
-        if (!FileName.empty())
+        if (!FileNameW.empty())
             SetViewerCaption();
 
-        HToolTip = CreateWindowEx(0, TOOLTIPS_CLASS, NULL, TTS_NOPREFIX,
+        HToolTip = CreateWindowExW(0, TOOLTIPS_CLASSW, NULL, TTS_NOPREFIX,
                                   CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
                                   NULL, NULL, HInstance, NULL);
 
         if (HToolTip != NULL)
         {
-            TOOLINFO ti;
+            TOOLINFOW ti;
             ti.cbSize = sizeof(ti);
             ti.uFlags = TTF_SUBCLASS;
             ti.hwnd = HWindow;
             ti.uId = 1;
             ti.hinst = HInstance;
             GetClientRect(HWindow, &ti.rect);
-            ti.lpszText = LPSTR_TEXTCALLBACK;
-            SendMessage(HToolTip, TTM_ADDTOOL, 0, (LPARAM)&ti);
+            ti.lpszText = LPSTR_TEXTCALLBACKW;
+            SendMessageW(HToolTip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
             SendMessage(HToolTip, TTM_SETDELAYTIME, TTDT_INITIAL, 500);
             SendMessage(HToolTip, TTM_SETDELAYTIME, TTDT_AUTOPOP, 10000);
             SetWindowPos(HToolTip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
@@ -597,21 +573,24 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DROPFILES:
     {
-        UINT drag;
-        CPathBuffer path; // Heap-allocated for long path support
-
-        drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped on us
+        const UINT drag = DragQueryFileW((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped on us
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, path.Size());
-            if (SalGetFullName(path, NULL, NULL, NULL, NULL, path.Size()))
+            const UINT pathLength = DragQueryFileW((HDROP)wParam, 0, NULL, 0);
+            std::wstring pathW(pathLength + 1, L'\0');
+            const UINT copied = DragQueryFileW((HDROP)wParam, 0, pathW.data(), pathLength + 1);
+            if (copied > 0)
             {
-                if (Lock != NULL)
+                pathW.resize(copied);
+                if (SalGetFullNameW(pathW))
                 {
-                    SetEvent(Lock);
-                    Lock = NULL; // from now on it relies on the disk cache only
+                    if (Lock != NULL)
+                    {
+                        SetEvent(Lock);
+                        Lock = NULL; // from now on it relies on the disk cache only
+                    }
+                    OpenFile(pathW.c_str(), NULL, FALSE);
                 }
-                OpenFile(path, NULL, FALSE);
             }
         }
         DragFinish((HDROP)wParam);
@@ -689,7 +668,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                if (!FileName.empty())
+                if (!FileNameW.empty())
                 {
                     // limit movement according to the longest visible line
                     __int64 maxOX = GetMaxOriginX();
@@ -739,7 +718,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_VSCROLL:
     {
-        if (!FileName.empty())
+        if (!FileNameW.empty())
         {
             ResetMouseWheelAccumulator();
             switch ((int)LOWORD(wParam))
@@ -763,7 +742,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 VScrollWParam = wParam;
                 KillTimer(HWindow, IDT_THUMBSCROLL);
                 MSG msg; // we do not want any additional timer; clear the queue
-                while (PeekMessage(&msg, HWindow, WM_TIMER, WM_TIMER, PM_REMOVE))
+                while (PeekMessageW(&msg, HWindow, WM_TIMER, WM_TIMER, PM_REMOVE))
                     ;
                 OnVScroll();
                 VScrollWParam = -1;
@@ -794,7 +773,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_HSCROLL:
     {
-        if (!FileName.empty())
+        if (!FileNameW.empty())
         {
             ResetMouseWheelAccumulator();
             switch ((int)LOWORD(wParam))
@@ -878,36 +857,38 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            CPathBuffer file; // Heap-allocated for long path support
-            file[0] = 0;
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
+            // Wide file picker: FileNameW is the exact wide name of the currently
+            // viewed file, so the initial
+            // directory and the picked/typed result no longer round-trip through CP_ACP.
+            std::wstring file;
+            OPENFILENAMEW ofn;
+            memset(&ofn, 0, sizeof(OPENFILENAMEW));
+            ofn.lStructSize = sizeof(OPENFILENAMEW);
             ofn.hwndOwner = HWindow;
-            char* s = LoadStr(IDS_VIEWERFILTER);
+            wchar_t* s = LoadStrW(IDS_VIEWERFILTER);
             ofn.lpstrFilter = s;
             while (*s != 0) // create a double-null-terminated list
             {
-                if (*s == '|')
+                if (*s == L'|')
                     *s = 0;
                 s++;
             }
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = file.Size();
             ofn.nFilterIndex = 1;
-            ofn.lpstrInitialDir = CurrentDir[0] != 0 ? CurrentDir : NULL;
+            const wchar_t* dirEnd = wcsrchr(FileNameW.c_str(), L'\\');
+            std::wstring initialDirW = dirEnd != NULL ? FileNameW.substr(0, dirEnd - FileNameW.c_str() + 1) : std::wstring();
+            ofn.lpstrInitialDir = initialDirW.empty() ? NULL : initialDirW.c_str();
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-            if (SafeGetOpenFileName(&ofn))
+            if (SafeGetOpenFileNameOwnedW(&ofn, file))
             {
-                if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
+                if (SalGetFullNameW(file))
                 {
                     if (Lock != NULL)
                     {
                         SetEvent(Lock);
                         Lock = NULL; // from now on it relies on the disk cache only
                     }
-                    OpenFile(file, NULL, FALSE);
+                    OpenFile(file.c_str(), NULL, FALSE);
                 }
             }
             return 0;
@@ -923,8 +904,10 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             BOOL ok = FALSE;
             BOOL srcBusy = FALSE;
             BOOL noMoreFiles = FALSE;
-            CPathBuffer fileName; // Heap-allocated for long path support
-            fileName[0] = 0;
+            // wide sibling of 'fileName' - the source's search already resolves
+            // the true wide name; use it to open the file instead of the
+            // CP_ACP-narrowed mirror, mirroring CM_OPENFILE's OpenFileW just above.
+            std::wstring fileNameW;
             int enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
             if (LOWORD(wParam) == CM_PREVFILE || LOWORD(wParam) == CM_PREVSELFILE || LOWORD(wParam) == CM_LASTFILE)
             {
@@ -932,14 +915,14 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     enumFileNamesLastFileIndex = -1;
                 ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                   &enumFileNamesLastFileIndex,
-                                                  FileName.c_str(), LOWORD(wParam) == CM_PREVSELFILE, TRUE,
-                                                  fileName, &noMoreFiles,
+                                                  FileNameW.c_str(), LOWORD(wParam) == CM_PREVSELFILE, TRUE,
+                                                  &fileNameW, &noMoreFiles,
                                                   &srcBusy, NULL);
                 if (ok && LOWORD(wParam) == CM_PREVSELFILE) // take only selected files
                 {
                     BOOL isSrcFileSel = FALSE;
                     ok = IsFileNameForViewerSelected(EnumFileNamesSourceUID, enumFileNamesLastFileIndex,
-                                                     fileName, &isSrcFileSel, &srcBusy);
+                                                     fileNameW.c_str(), &isSrcFileSel, &srcBusy);
                     if (ok && !isSrcFileSel)
                         ok = FALSE;
                 }
@@ -950,14 +933,14 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     enumFileNamesLastFileIndex = -1;
                 ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                               &enumFileNamesLastFileIndex,
-                                              FileName.c_str(), LOWORD(wParam) == CM_NEXTSELFILE, TRUE,
-                                              fileName, &noMoreFiles,
+                                              FileNameW.c_str(), LOWORD(wParam) == CM_NEXTSELFILE, TRUE,
+                                              &fileNameW, &noMoreFiles,
                                               &srcBusy, NULL);
                 if (ok && LOWORD(wParam) == CM_NEXTSELFILE) // take only selected files
                 {
                     BOOL isSrcFileSel = FALSE;
                     ok = IsFileNameForViewerSelected(EnumFileNamesSourceUID, enumFileNamesLastFileIndex,
-                                                     fileName, &isSrcFileSel, &srcBusy);
+                                                     fileNameW.c_str(), &isSrcFileSel, &srcBusy);
                     if (ok && !isSrcFileSel)
                         ok = FALSE;
                 }
@@ -970,7 +953,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SetEvent(Lock);
                     Lock = NULL; // from now on it relies on the disk cache only
                 }
-                OpenFile(fileName, NULL, FALSE);
+                OpenFile(fileNameW.c_str(), NULL, FALSE);
 
                 // set the index even if it failed so the user can move to the next/previous file
                 EnumFileNamesLastFileIndex = enumFileNamesLastFileIndex;
@@ -1015,10 +998,10 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 FindOffset = LastFindOffset;
             }
 
-            if (LOWORD(wParam) == CM_FINDSET || FindDialog.Text[0] == 0)
+            if (LOWORD(wParam) == CM_FINDSET || FindDialog.Text.empty())
             {
                 int forw = FindDialog.Forward;
-                if (FindDialog.Execute() != IDOK || FindDialog.Text[0] == 0)
+                if (FindDialog.Execute() != IDOK || FindDialog.Text.empty())
                     return 0;
                 else
                 {
@@ -1052,7 +1035,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (setWait)
                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-            CreateSafeWaitWindow(LoadStr(IDS_SEARCHINGTEXTESC), LoadStr(IDS_VIEWERTITLE), 1000, TRUE, HWindow);
+            CreateSafeWaitWindow(LoadStrW(IDS_SEARCHINGTEXTESC), LoadStrW(IDS_VIEWERTITLE), 1000, TRUE, HWindow);
             GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
 
             // let Prepare() open the file just once and close it ourselves at the end
@@ -1164,7 +1147,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
+                                            const std::wstring error = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
+                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), error.c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1274,7 +1258,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         }
                                         else // error - low memory
                                         {
-                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), AnsiToWide(RegExp.GetLastErrorText()).c_str());
+                                            const std::wstring error = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
+                                            gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), error.c_str());
                                             noNotFound = TRUE;
                                             break;
                                         }
@@ -1302,9 +1287,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     std::wstring msg;
                     if (RegExp.GetPattern() != NULL)
-                        msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), AnsiToWide(RegExp.GetPattern()).c_str(), AnsiToWide(RegExp.GetLastErrorText()).c_str());
+                    {
+                        const std::wstring pattern = sally::legacy_search::DecodeEngineAcp(RegExp.GetPattern());
+                        const std::wstring error = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
+                        msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), pattern.c_str(), error.c_str());
+                    }
                     else
-                        msg = AnsiToWide(RegExp.GetLastErrorText());
+                        msg = sally::legacy_search::DecodeEngineAcp(RegExp.GetLastErrorText());
                     gPrompter->ShowError(HWindow, LoadStrW(IDS_FINDTITLE), msg.c_str());
                     noNotFound = TRUE;
                 }
@@ -1468,7 +1457,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (escPressed)
             {
                 MSG msg; // discard the buffered ESC
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
                 gPrompter->ShowInfo(HWindow, LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FINDTERMINATEDBYUSER));
                 found = -1;
@@ -1481,7 +1470,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 FindOffset = oldFindOffset;
                 if (!noNotFound)
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(FindDialog.Regular ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH), AnsiToWide(FindDialog.Text).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(FindDialog.Regular ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH), FindDialog.Text.c_str());
                     gPrompter->ShowInfo(HWindow, LoadStrW(IDS_FINDTITLE), msg.c_str());
                 }
             }
@@ -1551,7 +1540,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         // if (startSel == -1) startSel = 0; // cannot happen (-1 can only be both at once and we do not get here)
                         __int64 endSel = max(StartSelection, EndSelection);
                         // if (endSel == -1) endSel = 0; // cannot happen (-1 can only be both at once and we do not get here)
-                        if (fatalErr || !CopyHTextToClipboard(h, (int)(endSel - startSel)))
+                        if (fatalErr || !CopyAcpHTextToClipboard(h, (int)(endSel - startSel)))
                             NOHANDLES(GlobalFree(h));
                     }
                 }
@@ -1565,7 +1554,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 __int64 start = min(StartSelection, EndSelection);
                 // if (startSel == -1) startSel = 0; // no need to deal with it; handled a few lines below
@@ -1579,37 +1568,40 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             ENTER_AGAIN:
 
-                CPathBuffer fileName; // Heap-allocated for long path support
-                strcpy(fileName, FileName.c_str());
-                OPENFILENAME ofn;
-                memset(&ofn, 0, sizeof(OPENFILENAME));
-                ofn.lStructSize = sizeof(OPENFILENAME);
+                // Wide save-as file picker: FileNameW is the exact wide name of
+                // the currently viewed file; the destination path (typed/picked by the user)
+                // must round-trip through CreateFileW/IFileSystem::DeleteFile/SalMoveFile - all
+                // already wide-only - without a CP_ACP hop in between. Same reasoning as
+                // CM_OPENFILE (176).
+                std::wstring file = FileNameW;
+                OPENFILENAMEW ofn;
+                memset(&ofn, 0, sizeof(OPENFILENAMEW));
+                ofn.lStructSize = sizeof(OPENFILENAMEW);
                 ofn.hwndOwner = HWindow;
-                char* s = LoadStr(IDS_VIEWERFILTER);
+                wchar_t* s = LoadStrW(IDS_VIEWERFILTER);
                 ofn.lpstrFilter = s;
                 while (*s != 0) // create a double-null-terminated list
                 {
-                    if (*s == '|')
+                    if (*s == L'|')
                         *s = 0;
                     s++;
                 }
-                ofn.lpstrFile = fileName;
-                ofn.nMaxFile = fileName.Size();
                 ofn.nFilterIndex = 1;
-                ofn.lpstrTitle = LoadStr(IDS_VIEWERCOPYTOFILE);
+                ofn.lpstrTitle = LoadStrW(IDS_VIEWERCOPYTOFILE);
                 ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR;
 
-                if (SafeGetSaveFileName(&ofn))
+                if (SafeGetSaveFileNameOwnedW(&ofn, file))
                 {
+                    std::wstring fileW = file;
                     int errTextID;
-                    if (!SalGetFullName(fileName, &errTextID, NULL, NULL, NULL, fileName.Size()))
+                    if (!SalGetFullNameW(fileW, &errTextID))
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                         goto ENTER_AGAIN;
                     }
 
                     DWORD attr;
-                    attr = GetFileAttributesW(AnsiToWide(fileName).c_str());
+                    attr = gFileSystem->GetFileAttributes(fileW.c_str());
 
                     if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
                     {
@@ -1618,7 +1610,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     if (attr != 0xFFFFFFFF)
                     {
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), AnsiToWide(fileName).c_str());
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), fileW.c_str());
                         PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_VIEWERTITLE), msg.c_str());
                         if (res.type == PromptResult::kNo)
                             goto ENTER_AGAIN;
@@ -1628,26 +1620,32 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-                    CPathBuffer tmpFile;
-                    char* endBackSlash = strrchr(fileName, '\\');
-                    CPathBuffer path;
-                    if (endBackSlash != NULL)
+                    std::wstring tmpFileW;
+                    size_t endBackSlashPos = fileW.find_last_of(L'\\');
+                    if (endBackSlashPos != std::wstring::npos)
                     {
+                        BOOL tempOk;
                         if (attr != 0xFFFFFFFF) // file overwrite -> do it via a temp file (because of self-overwrite)
                         {
-                            memcpy(path, fileName, endBackSlash - fileName + 1);
-                            path[endBackSlash - fileName + 1] = 0;
+                            std::wstring pathW = fileW.substr(0, endBackSlashPos + 1);
+                            tmpFileW = SalGetTempFileNameW(pathW.c_str(), L"sal", true);
+                            tempOk = !tmpFileW.empty();
                         }
                         else
-                            strcpy(tmpFile, fileName);
-                        if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
                         {
-                            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(tmpFile).c_str(), GENERIC_WRITE,
-                                                         FILE_SHARE_READ, NULL,
-                                                         CREATE_ALWAYS,
-                                                         FILE_FLAG_SEQUENTIAL_SCAN,
-                                                         NULL));
-                            if (file != INVALID_HANDLE_VALUE)
+                            tmpFileW = fileW;
+                            tempOk = TRUE;
+                        }
+                        if (tempOk)
+                        {
+                            HANDLE file2 = gFileSystem->CreateFile(tmpFileW.c_str(), GENERIC_WRITE,
+                                                                   FILE_SHARE_READ, NULL,
+                                                                   CREATE_ALWAYS,
+                                                                   FILE_FLAG_SEQUENTIAL_SCAN,
+                                                                   NULL);
+                            const DWORD openError = GetLastError();
+                            HANDLES_ADD_EX(__otQuiet, file2 != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file2, openError, TRUE);
+                            if (file2 != INVALID_HANDLE_VALUE)
                             {
                                 __int64 off = start, len;
                                 ULONG written;
@@ -1659,61 +1657,64 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         break;
                                     if (len == 0)
                                         break; // read error
-                                    if (!WriteFile(file, Buffer + (off - Seek), (int)len, &written, NULL) ||
-                                        written != len)
+                                    const FileResult writeResult = gFileSystem->WriteToHandle(
+                                        file2, Buffer + (off - Seek), (DWORD)len, &written);
+                                    if (!writeResult.success || written != len)
                                     {
-                                        DWORD err = GetLastError();
+                                        DWORD err = writeResult.success ? ERROR_WRITE_FAULT : writeResult.errorCode;
                                         SetCursor(oldCur);
-                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                                         break;
                                     }
                                     off += len;
                                 }
-                                HANDLES(CloseHandle(file));
+                                HANDLES_REMOVE(file2, __htFile, "IFileSystem::CloseHandle");
+                                gFileSystem->CloseFileHandle(file2);
                                 if (fatalErr || off != end)
-                                    gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str()); // delete it if an error occurs
+                                    gFileSystem->DeleteFile(tmpFileW.c_str()); // delete it if an error occurs
                                 else
                                 {
                                     if (attr != 0xFFFFFFFF) // overwrite: tmp -> fileName
                                     {
-                                        BOOL setAttr = ClearReadOnlyAttrW(AnsiToWide(fileName).c_str(), attr); // for the case of a read-only file
-                                        if (gFileSystem->DeleteFile(AnsiToWide(fileName).c_str()).success)
+                                        BOOL setAttr = ClearReadOnlyAttr(fileW.c_str(), attr); // for the case of a read-only file
+                                        const FileResult deleteResult = gFileSystem->DeleteFile(fileW.c_str());
+                                        if (deleteResult.success)
                                         {
-                                            if (!SalMoveFile(tmpFile, fileName))
+                                            if (!SalMoveFile(tmpFileW.c_str(), fileW.c_str()))
                                             {
                                                 DWORD err = GetLastError();
                                                 SetCursor(oldCur);
-                                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                                             }
                                         }
                                         else
                                         {
-                                            DWORD err = GetLastError();
+                                            DWORD err = deleteResult.errorCode;
                                             if (setAttr)
-                                                SetFileAttributes(fileName, attr); // restore the original attributes
-                                            gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str());                   // the file cannot be overwritten; delete the temp file (it's useless)
+                                                gFileSystem->SetFileAttributes(fileW.c_str(), attr); // restore the original attributes
+                                            gFileSystem->DeleteFile(tmpFileW.c_str());                   // the file cannot be overwritten; delete the temp file (it's useless)
                                             SetCursor(oldCur);
-                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                                         }
                                     }
                                 }
 
                                 // notify the change on the path (our file has appeared)
-                                lstrcpyn(path, fileName, MAX_PATH);
-                                CutDirectory(path);
+                                std::wstring notifyPathW = fileW;
+                                CutDirectoryW(notifyPathW);
                                 if (MainWindow != NULL)
-                                    MainWindow->PostChangeOnPathNotification(path, FALSE);
+                                    MainWindow->PostChangeOnPathNotificationW(notifyPathW.c_str(), FALSE);
 
                                 if (fatalErr)
                                     FatalFileErrorOccured();
                             }
                             else
                             {
-                                DWORD err = GetLastError();
+                                DWORD err = openError;
                                 if (attr != 0xFFFFFFFF)
-                                    gFileSystem->DeleteFile(AnsiToWide(tmpFile).c_str());
+                                    gFileSystem->DeleteFile(tmpFileW.c_str());
                                 SetCursor(oldCur);
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                             }
                             SetCursor(oldCur);
                         }
@@ -1721,7 +1722,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         {
                             DWORD err = GetLastError();
                             SetCursor(oldCur);
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                         }
                     }
                 }
@@ -1750,7 +1751,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 if (Type != vtHex)
                 {
@@ -1769,7 +1770,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 if (Type != vtText)
                 {
@@ -1809,7 +1810,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (MouseDrag)
                 return 0;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 if (Type == vtText)
                 {
@@ -1823,7 +1824,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case CM_GOTOOFFSET:
         {
-            if (MouseDrag || FileName.empty())
+            if (MouseDrag || FileNameW.empty())
                 return 0;
             __int64 offset = SeekY;
             if (CViewerGoToOffsetDialog(HWindow, &offset).Execute() == IDOK)
@@ -1850,15 +1851,15 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CM_RECOGNIZE_CODEPAGE:
         {
             CodePageAutoSelect = !CodePageAutoSelect;
-            DefaultConvert[0] = 0;
+            DefaultConvert.clear();
             return 0;
         }
 
         case CM_SETDEFAULT_CODING:
         {
             CodePageAutoSelect = FALSE;
-            if (!CodeTables.GetCodeName(CodeType, DefaultConvert, 200))
-                DefaultConvert[0] = 0;
+            if (!CodeTables.GetCodeName(CodeType, DefaultConvert))
+                DefaultConvert.clear();
             return 0;
         }
 
@@ -1878,7 +1879,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return 0;
             ExitTextMode = FALSE;
             ForceTextMode = FALSE;
-            if (!FileName.empty())
+            if (!FileNameW.empty())
             {
                 OriginX = 0;
                 ChangeType(Type);
@@ -1944,7 +1945,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         }
 
-        if (!FileName.empty())
+        if (!FileNameW.empty())
         {
             BOOL extSelCh = FALSE;
             BOOL updateView = TRUE;
@@ -2846,13 +2847,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HMENU subMenu = GetSubMenu(main, 0);
             if (subMenu != NULL)
             {
-                BOOL enable = (!FileName.empty() && StartSelection != EndSelection);
+                BOOL enable = (!FileNameW.empty() && StartSelection != EndSelection);
                 EnableMenuItem(subMenu, CM_COPYTOCLIP, MF_BYCOMMAND | (enable ? MF_ENABLED : MF_GRAYED));
-                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileNameW.empty() ? MF_ENABLED : MF_GRAYED));
                 CheckMenuRadioItem(subMenu, CM_TO_HEX, CM_TO_TEXT,
                                    (Type == vtHex) ? CM_TO_HEX : CM_TO_TEXT, MF_BYCOMMAND);
                 CheckMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | (WrapText ? MF_CHECKED : MF_UNCHECKED));
-                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileNameW.empty() ? MF_ENABLED : MF_GRAYED));
                 EnableMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | ((Type == vtText) ? MF_ENABLED : MF_GRAYED));
 
                 POINT p;
@@ -3066,13 +3067,19 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (ToolTipOffset != -1)
             {
                 LPTOOLTIPTEXT ptr = (LPTOOLTIPTEXT)lParam;
-                char number[100];
+                wchar_t hexOffset[20];
                 int dummy;
-                PrintHexOffset(number, ToolTipOffset, GetHexOffsetMode(FileSize, dummy));
-                strcat_s(number, " (");
-                NumberToStr(number + strlen(number), CQuadWord().SetUI64(ToolTipOffset));
-                strcat_s(number, ")");
-                sprintf(ptr->szText, LoadStr(IDS_VIEWEROFFSETTIP), number);
+                const auto word = [](unsigned __int64 value) { return static_cast<unsigned>(value & 0xffff); };
+                switch (GetHexOffsetMode(FileSize, dummy))
+                {
+                case 1: swprintf_s(hexOffset, L"%04X", word(ToolTipOffset)); break;
+                case 2: swprintf_s(hexOffset, L"%04X %04X", word(ToolTipOffset >> 16), word(ToolTipOffset)); break;
+                case 3: swprintf_s(hexOffset, L"%04X %04X %04X", word(ToolTipOffset >> 32), word(ToolTipOffset >> 16), word(ToolTipOffset)); break;
+                default: swprintf_s(hexOffset, L"%04X %04X %04X %04X", word(ToolTipOffset >> 48), word(ToolTipOffset >> 32), word(ToolTipOffset >> 16), word(ToolTipOffset)); break;
+                }
+                const std::wstring offsetText = std::wstring(hexOffset) + L" (" + NumberToStr(CQuadWord().SetUI64(ToolTipOffset)) + L")";
+                _snwprintf_s(ptr->szText, _countof(ptr->szText), _TRUNCATE,
+                             LoadStrW(IDS_VIEWEROFFSETTIP), offsetText.c_str());
             }
             else
                 ((LPTOOLTIPTEXT)lParam)->szText[0] = 0;
@@ -3103,13 +3110,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     BOOL ok = FALSE;
                     BOOL srcBusy = FALSE;
                     BOOL noMoreFiles = FALSE;
-                    CPathBuffer fileName; // Heap-allocated for long path support
-                    fileName[0] = 0;
+                    std::wstring fileName;
                     int enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                     ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName.c_str(), FALSE, TRUE,
-                                                      fileName, &noMoreFiles,
+                                                      FileNameW.c_str(), FALSE, TRUE,
+                                                      &fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
 
                     prevFile = ok || srcBusy;                     // only if a previous file exists (or Salamander is busy, then the user must try again later)
@@ -3119,36 +3125,36 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetPreviousFileNameForViewer(EnumFileNamesSourceUID,
                                                           &enumFileNamesLastFileIndex,
-                                                          FileName.c_str(), TRUE /* prefer selected */, TRUE,
-                                                          fileName, &noMoreFiles,
+                                                          FileNameW.c_str(), TRUE /* prefer selected */, TRUE,
+                                                          &fileName, &noMoreFiles,
                                                           &srcBusy, NULL);
                         BOOL isSrcFileSel = FALSE;
                         if (ok)
                         {
                             ok = IsFileNameForViewerSelected(EnumFileNamesSourceUID, enumFileNamesLastFileIndex,
-                                                             fileName, &isSrcFileSel, &srcBusy);
+                                                             fileName.c_str(), &isSrcFileSel, &srcBusy);
                             prevSelFile = ok && isSrcFileSel || srcBusy; // only if the previous file is actually selected (or Salamander is busy, then the user must try again later)
                         }
 
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName.c_str(), FALSE, TRUE,
-                                                      fileName, &noMoreFiles,
+                                                      FileNameW.c_str(), FALSE, TRUE,
+                                                      &fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
                         nextFile = ok || srcBusy; // only if another file exists (or Salamander is busy, then the user must try again later)
 
                         enumFileNamesLastFileIndex = EnumFileNamesLastFileIndex;
                         ok = GetNextFileNameForViewer(EnumFileNamesSourceUID,
                                                       &enumFileNamesLastFileIndex,
-                                                      FileName.c_str(), TRUE /* prefer selected */, TRUE,
-                                                      fileName, &noMoreFiles,
+                                                      FileNameW.c_str(), TRUE /* prefer selected */, TRUE,
+                                                      &fileName, &noMoreFiles,
                                                       &srcBusy, NULL);
                         isSrcFileSel = FALSE;
                         if (ok)
                         {
                             ok = IsFileNameForViewerSelected(EnumFileNamesSourceUID, enumFileNamesLastFileIndex,
-                                                             fileName, &isSrcFileSel, &srcBusy);
+                                                             fileName.c_str(), &isSrcFileSel, &srcBusy);
                             nextSelFile = ok && isSrcFileSel || srcBusy; // only if the next file is actually selected (or Salamander is busy, then the user must try again later)
                         }
                     }
@@ -3177,14 +3183,14 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EnableMenuItem(subMenu, CM_WRAPED, MF_BYCOMMAND | ((Type == vtText) ? MF_ENABLED : MF_GRAYED));
                 BOOL zoomed = IsZoomed(HWindow);
                 CheckMenuItem(subMenu, CM_VIEW_FULLSCREEN, MF_BYCOMMAND | (zoomed ? MF_CHECKED : MF_UNCHECKED));
-                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_GOTOOFFSET, MF_BYCOMMAND | (!FileNameW.empty() ? MF_ENABLED : MF_GRAYED));
             }
             subMenu = GetSubMenu(main, VIEWER_EDIT_MENU_INDEX);
             if (subMenu != NULL)
             {
-                BOOL enable = (!FileName.empty() && StartSelection != EndSelection);
+                BOOL enable = (!FileNameW.empty() && StartSelection != EndSelection);
                 EnableMenuItem(subMenu, CM_COPYTOCLIP, MF_BYCOMMAND | (enable ? MF_ENABLED : MF_GRAYED));
-                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileName.empty() ? MF_ENABLED : MF_GRAYED));
+                EnableMenuItem(subMenu, CM_COPYTOFILE, MF_BYCOMMAND | (!FileNameW.empty() ? MF_ENABLED : MF_GRAYED));
             }
             subMenu = GetSubMenu(main, OPTIONS_MENU_INDEX);
             if (subMenu != NULL)
@@ -3210,7 +3216,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     // if auto-select is off, one item must be the default
                     int defCodeType;
-                    CodeTables.GetCodeType(DefaultConvert, defCodeType);
+                    CodeTables.GetCodeType(DefaultConvert.c_str(), defCodeType);
                     SetMenuDefaultItem(subMenu, CM_CODING_MIN + defCodeType, FALSE);
                 }
 
@@ -3219,7 +3225,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     // append our commands
                     int count = GetMenuItemCount(subMenu);
 
-                    MENUITEMINFO mi;
+                    MENUITEMINFOW mi;
                     memset(&mi, 0, sizeof(mi));
                     mi.cbSize = sizeof(mi);
 
@@ -3240,33 +3246,37 @@ MENU_TEMPLATE_ITEM ViewerCodingMenu[] =
                     mi.fMask = MIIM_TYPE | MIIM_ID;
                     mi.fType = MFT_STRING;
                     mi.wID = CM_RECOGNIZE_CODEPAGE;
-                    mi.dwTypeData = LoadStr(IDS_VIEWERAUTOCODING);
-                    InsertMenuItem(subMenu, 0, TRUE, &mi);
+                    std::wstring menuText = LoadStrOwned(IDS_VIEWERAUTOCODING);
+                    mi.dwTypeData = menuText.data();
+                    InsertMenuItemW(subMenu, 0, TRUE, &mi);
                     count++;
 
                     mi.fMask = MIIM_TYPE;
                     mi.fType = MFT_SEPARATOR;
-                    InsertMenuItem(subMenu, 1, TRUE, &mi);
+                    InsertMenuItemW(subMenu, 1, TRUE, &mi);
                     count++;
 
                     // append another separator at the end of the submenu
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    InsertMenuItemW(subMenu, count++, TRUE, &mi);
 
                     // now append the rest of the commands
                     mi.fMask = MIIM_TYPE | MIIM_ID;
                     mi.fType = MFT_STRING;
 
                     mi.wID = CM_SETDEFAULT_CODING;
-                    mi.dwTypeData = LoadStr(IDS_VIEWERSETDEFAULTCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    menuText = LoadStrOwned(IDS_VIEWERSETDEFAULTCODING);
+                    mi.dwTypeData = menuText.data();
+                    InsertMenuItemW(subMenu, count++, TRUE, &mi);
 
                     mi.wID = CM_NEXTCODING;
-                    mi.dwTypeData = LoadStr(IDS_VIEWERNEXTCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    menuText = LoadStrOwned(IDS_VIEWERNEXTCODING);
+                    mi.dwTypeData = menuText.data();
+                    InsertMenuItemW(subMenu, count++, TRUE, &mi);
 
                     mi.wID = CM_PREVCODING;
-                    mi.dwTypeData = LoadStr(IDS_VIEWERPREVIOUSCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    menuText = LoadStrOwned(IDS_VIEWERPREVIOUSCODING);
+                    mi.dwTypeData = menuText.data();
+                    InsertMenuItemW(subMenu, count++, TRUE, &mi);
                 }
 
                 CheckMenuItem(subMenu, CM_RECOGNIZE_CODEPAGE, MF_BYCOMMAND | (CodePageAutoSelect ? MF_CHECKED : MF_UNCHECKED));
@@ -3510,11 +3520,11 @@ MENU_TEMPLATE_ITEM ViewerCodingMenu[] =
         GlobalFindDialog = FindDialog;
         if (Configuration.WrapText != WrapText ||
             Configuration.CodePageAutoSelect != CodePageAutoSelect ||
-            strcmp(Configuration.DefaultConvert, DefaultConvert) != 0)
+            Configuration.DefaultConvert != DefaultConvert)
         {
             Configuration.WrapText = WrapText;
             Configuration.CodePageAutoSelect = CodePageAutoSelect;
-            strcpy(Configuration.DefaultConvert, DefaultConvert);
+            Configuration.DefaultConvert = DefaultConvert;
             if (MainWindow != NULL && MainWindow->HWindow != NULL)
                 PostMessage(MainWindow->HWindow, WM_USER_DISPACHCFGCHANGE, 0, 0);
         }

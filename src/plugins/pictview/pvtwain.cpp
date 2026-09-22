@@ -32,6 +32,7 @@ CTwain::CTwain()
     AppIdentity.Version.Language = TWLG_ENGLISH_USA;
     AppIdentity.Version.Country = TWCY_USA;
 #ifdef _UNICODE
+    // [narrow-ok: ascii-by-construction] VERSINFO_VERSION is an ASCII literal macro
     WideCharToMultiByte(CP_ACP, 0, VERSINFO_VERSION, -1, AppIdentity.Version.Info,
                         sizeof(AppIdentity.Version.Info), NULL, NULL);
     AppIdentity.Version.Info[sizeof(AppIdentity.Version.Info) - 1] = 0;
@@ -69,13 +70,12 @@ BOOL CTwain::InitTwain(CViewerWindow* viewer)
     Viewer = viewer;
     HParent = Viewer->HWindow;
 
-    CPathBuffer buff;
-    GetWindowsDirectory(buff, buff.Size());
-    if (buff[(_tcslen(buff) - 1)] != '\\')
-        _tcscat(buff, _T("\\"));
-    _tcscat(buff, _T("TWAIN_32.DLL"));
+    std::wstring twainPath;
+    if (!SPLGetWindowsDirectoryOwned(twainPath))
+        return FALSE;
+    SPLSalPathAppendOwned(twainPath, L"TWAIN_32.DLL");
 
-    HTwainDLL = LoadLibrary(buff);
+    HTwainDLL = LoadLibraryW(twainPath.c_str());
 
     if (HTwainDLL == NULL)
     {

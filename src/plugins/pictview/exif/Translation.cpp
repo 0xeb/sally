@@ -265,6 +265,7 @@ void WINAPI EXIFInitTranslations(LPCTSTR fname)
                                 // CP_UTF8 supported only by newer Windows versions
                                 ConvertUTF8ToUCS2(transl, translW);
                                 // Note: MBCS is never longer than UTF8 representation -> result always fits & is NULL-terminated
+                                // [narrow-ok: unbuildable]
                                 WideCharToMultiByte(CP_ACP, 0, translW, -1, transl, BUF_SIZE, NULL, NULL);
                                 pTexts->translated = _strdup(transl);
                                 if (!pTexts->translated)

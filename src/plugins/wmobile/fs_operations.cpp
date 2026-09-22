@@ -3,6 +3,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "wmobile_delete_plan_core.h"
+#include "wmobile_fileops_core.h"
+#include "wmobile_path_core.h"
+
+#include <vector>
 
 //
 // ****************************************************************************
@@ -11,9 +16,37 @@
 
 #define FILE_ATTRIBUTES_MASK (FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_SYSTEM)
 
+static BOOL WMobileCutDirectoryOwned(std::wstring& path, std::wstring* cutDirectory = NULL)
+{
+    return SPLCutDirectoryOwned(SalamanderGeneral, path, cutDirectory);
+}
+
+static BOOL WMobileRemovePointsFromPathOwned(std::wstring& path, size_t rootLength)
+{
+    if (rootLength > path.size())
+        return FALSE;
+    return SPLSalRemovePointsFromPathOwned(SalamanderGeneral, path,
+                                           rootLength);
+}
+
+// Wide sibling. The cache key is composed wide by the copy loop; the narrow
+// form below stays for the three call sites that still hold a narrow key.
+static void WMobileRemoveFileFromCacheWide(const wchar_t* uniqueFileName)
+{
+    if (uniqueFileName == NULL)
+        return;
+
+    // Lowercased on a copy, as the narrow form did: the disk cache is case-sensitive and
+    // device names are not, so the key is only ever stored folded.
+    std::wstring key(uniqueFileName);
+    if (!key.empty())
+        SPLToLowerCaseOwned(SalamanderGeneral, key);
+    SalamanderGeneral->RemoveOneFileFromCache(key.c_str());
+}
+
 CPluginFSInterface::CPluginFSInterface()
 {
-    Path[0] = 0;
+    Path.clear();
     PathError = FALSE;
     FatalError = FALSE;
 }
@@ -22,80 +55,91 @@ void WINAPI
 CPluginFSInterface::ReleaseObject(HWND parent)
 {
     // if the FS is initialized, remove our copies of files in the disk cache when closing
-    if (Path[0] != 0)
+    if (!Path.empty())
         EmptyCache();
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetRootPath(char* userPart)
+CPluginFSInterface::GetRootPath(CSalamanderStringBuffer* userPart)
 {
-    userPart[0] = '\\';
-    userPart[1] = 0;
-    return TRUE;
+    return userPart != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*userPart, L"\\");
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetCurrentPath(char* userPart)
+CPluginFSInterface::GetCurrentPath(CSalamanderStringBuffer* userPart)
 {
-    strcpy(userPart, Path);
-    return TRUE;
+    return userPart != NULL && sally::plugin_abi::WriteStringBuffer(*userPart, Path);
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
+CPluginFSInterface::GetFullName(CFileData& file, int isDir,
+                                CSalamanderStringBuffer* fullNameBuffer)
 {
-    lstrcpyn(buf, Path, bufSize); // if the path does not fit, the name certainly will not either (an error will be reported)
+    std::wstring fullName = Path;
     if (isDir == 2)
-        return SalamanderGeneral->CutDirectory(buf, NULL); // up-dir
+    {
+        if (!WMobileCutDirectoryOwned(fullName))
+            return FALSE;
+    }
     else
-        return CRAPI::PathAppend(buf, file.Name, bufSize);
+        wmobile::AppendDeviceComponent(fullName, file.Name);
+    return fullNameBuffer != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*fullNameBuffer, fullName);
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success)
+CPluginFSInterface::GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                  CSalamanderStringBuffer* path, BOOL& success)
 {
-    if (Path[0] == 0)
+    if (Path.empty())
         return FALSE; // translation is not possible, let Salamander report the error itself
 
-    CPathBuffer root("\\"); //JR in Windows Mobile the root is always "\\"
-
-    if (*path != '\\')
-        strcpy(root, Path); // paths such as "path" inherit the current FS path
-
-    success = CRAPI::PathAppend(root, path, root.Size());
-    if (success && (int)strlen(root) < 1) // shorter than the root is impossible (it would become a relative path again)
+    std::wstring pathPart;
+    if (path == NULL || !sally::plugin_abi::ReadStringBuffer(*path, pathPart))
     {
-        success = SalamanderGeneral->SalPathAddBackslash(root, root.Size());
+        success = FALSE;
+        return FALSE;
     }
-    if (success)
-        success = (int)(strlen(root) + strlen(fsName) + 1) < pathSize; // does it fit?
-    if (success)
-        sprintf(path, "%s:%s", fsName, (const char*)root);
-    else
+    std::wstring root = L"\\"; // in Windows Mobile the root is always "\\"
+    if (pathPart.empty() || pathPart.front() != L'\\')
+        root = Path; // paths such as "path" inherit the current FS path
+    wmobile::AppendDeviceComponent(root, pathPart.c_str());
+    if (root.empty())
+        root = L"\\";
+    const std::wstring fullPath = std::wstring(fsName != NULL ? fsName : L"") + L":" + root;
+    success = sally::plugin_abi::WriteStringBuffer(*path, fullPath);
+    if (!success)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_PATHTOOLONG),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_PATHTOOLONG).c_str(),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
     }
     return TRUE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
 {
-    return SalamanderGeneral->IsTheSamePath(Path, userPart);
+    return userPart != NULL && SalamanderGeneral->IsTheSamePath(Path.c_str(), userPart);
 }
 
 BOOL WINAPI
-CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
 {
     return TRUE; //JR REVIEW: Who else would it belong to?
 }
 
 BOOL WINAPI
-CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                               const char* userPart, char* cutFileName, BOOL* pathWasCut,
+CPluginFSInterface::ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                               int fsNameIndex, const wchar_t* userPart,
+                               CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut,
                                BOOL forceRefresh, int mode)
 {
+    std::wstring fsNameValue;
+    if (fsName == NULL || !sally::plugin_abi::ReadStringBuffer(*fsName, fsNameValue) ||
+        (cutFileName != NULL &&
+         !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring())))
+        return FALSE;
     if (mode != 3 && (pathWasCut != NULL || cutFileName != NULL))
     {
         TRACE_E("Incorrect value of 'mode' in CPluginFSInterface::ChangePath().");
@@ -103,8 +147,6 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
     if (pathWasCut != NULL)
         *pathWasCut = FALSE;
-    if (cutFileName != NULL)
-        *cutFileName = 0;
     if (FatalError)
     {
         FatalError = FALSE;
@@ -114,19 +156,15 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     if (forceRefresh)
         EmptyCache();
 
-    CPathBuffer buf; // Heap-allocated for long path support
-    CPathBuffer errBuf; // Heap-allocated for long path support
-    errBuf[0] = 0;
-    CPathBuffer path;
+    std::wstring errBuf;
+    std::wstring path = userPart != NULL ? userPart : L"";
     int err = 0;
-
-    lstrcpyn(path, userPart, path.Size());
 
     BOOL fileNameAlreadyCut = FALSE;
     if (PathError) // error while listing the path (the user already saw the error in ListCurrentPath)
     {              // try to trim the path
         PathError = FALSE;
-        if (!SalamanderGeneral->CutDirectory(path, NULL))
+        if (!WMobileCutDirectoryOwned(path))
             return FALSE; // nowhere to shorten, fatal error
         fileNameAlreadyCut = TRUE;
         if (pathWasCut != NULL)
@@ -134,15 +172,16 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
     while (1)
     {
-        DWORD attr = CRAPI::GetFileAttributes(path, TRUE);
+        DWORD attr = CRAPI::GetFileAttributesWide(path.c_str(), TRUE);
         if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0) // success, use the path as current
         {
-            if (errBuf[0] != 0) // if we have a message, print it here (it arose during trimming)
+            if (!errBuf.empty()) // if we have a message, print it here (it arose during trimming)
             {
-                sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf.Get());
-                SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_PATH_ERROR).c_str(), userPart != NULL ? userPart : L"", errBuf.c_str());
+                SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileError, MSGBOX_ERROR);
             }
-            strcpy(Path, path);
+            Path = path;
             return TRUE;
         }
         else // failure, try to shorten the path
@@ -154,10 +193,10 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             {
                 if (attr != 0xFFFFFFFF)
                 {
-                    sprintf(errBuf, LoadStr(IDS_ERR_FILEINPATH));
+                    errBuf = LangStr(IDS_ERR_FILEINPATH).c_str();
                 }
                 else
-                    SalamanderGeneral->GetErrorText(err, errBuf, errBuf.Size());
+                    errBuf = SPLGetErrorTextOwned(SalamanderGeneral, err);
 
                 // if opening the FS is time-consuming and we want to adjust Change Directory (Shift+F7)
                 // to behave like archives, comment out the following line with "break" for mode 3
@@ -167,10 +206,10 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                     break;
             }
 
-            char* cut;
-            if (!SalamanderGeneral->CutDirectory(path, &cut)) // nowhere to shorten, fatal error
+            std::wstring cut;
+            if (!WMobileCutDirectoryOwned(path, &cut)) // nowhere to shorten, fatal error
             {
-                SalamanderGeneral->GetErrorText(err, errBuf, errBuf.Size());
+                errBuf = SPLGetErrorTextOwned(SalamanderGeneral, err);
                 break;
             }
             else
@@ -180,20 +219,23 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                 if (!fileNameAlreadyCut) // it can be a file name only during the first trim
                 {
                     fileNameAlreadyCut = TRUE;
-                    if (cutFileName != NULL && attr != 0xFFFFFFFF) // it is a file
-                        lstrcpyn(cutFileName, cut, MAX_PATH);
+                    if (cutFileName != NULL && attr != 0xFFFFFFFF &&
+                        !sally::plugin_abi::WriteStringBuffer(*cutFileName, cut))
+                        return FALSE; // it is a file
                 }
                 else
                 {
-                    if (cutFileName != NULL)
-                        *cutFileName = 0; // it can no longer be a file name
+                    if (cutFileName != NULL &&
+                        !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+                        return FALSE; // it can no longer be a file name
                 }
             }
         }
     }
 
-    sprintf(buf, LoadStr(IDS_PATH_ERROR), userPart, errBuf.Get());
-    SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
+    const std::wstring message = SPLFormatStringOwned(
+        LangStr(IDS_PATH_ERROR).c_str(), userPart != NULL ? userPart : L"", errBuf.c_str());
+    SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileError, MSGBOX_ERROR);
     PathError = FALSE;
     return FALSE; // fatal path error
 }
@@ -210,29 +252,27 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
 
     iconsType = pitFromRegistry;
 
-    CPathBuffer buf; // Heap-allocated for long path support
-    CPathBuffer curPath; // Heap-allocated for long path support
-    strcpy(curPath, Path);
-    CRAPI::PathAppend(curPath, "*", curPath.Size());
-    char* name = curPath + strlen(curPath) - 3;
+    std::wstring curPath = Path;
+    wmobile::AppendDeviceComponent(curPath, L"*");
 
     DWORD count;
     RapiNS::LPCE_FIND_DATA pFindDataArray;
-    if (!CRAPI::FindAllFiles(curPath, FAF_NAME | FAF_ATTRIBUTES | FAF_SIZE_LOW | FAF_SIZE_HIGH | FAF_LASTWRITE_TIME,
+    if (!CRAPI::FindAllFilesWide(curPath.c_str(), FAF_NAME | FAF_ATTRIBUTES | FAF_SIZE_LOW | FAF_SIZE_HIGH | FAF_LASTWRITE_TIME,
                              &count, &pFindDataArray, TRUE))
     {
         DWORD err = CRAPI::GetLastError();
-        sprintf(buf, LoadStr(IDS_PATH_ERROR), Path, SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_PATH_ERROR).c_str(), Path.c_str(),
+                                                          SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+        SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileError, MSGBOX_ERROR);
         PathError = TRUE;
         return FALSE;
     }
 
     DWORD i = 0;
 
-    if (strcmp(Path, "\\") != 0) //JR If we are not at the root, add the ".." entry
+    if (Path != L"\\") //JR If we are not at the root, add the ".." entry
     {
-        file.Name = SalamanderGeneral->DupStr("..");
+        file.Name = SalamanderGeneral->DupStr(L"..");
         if (file.Name == NULL)
             goto ONERROR;
         file.NameLen = 2;
@@ -259,25 +299,21 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
         RapiNS::CE_FIND_DATA& data = pFindDataArray[i];
 
         if (data.cFileName[0] != 0 &&
-            (data.cFileName[0] != '.' || //JR Windows Mobile does not return "." or ".." paths, but handle it just in case
-             (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
+            (data.cFileName[0] != L'.' || //JR Windows Mobile does not return "." or ".." paths, but handle it just in case
+             (data.cFileName[1] != 0 && (data.cFileName[1] != L'.' || data.cFileName[2] != 0))))
         {
-            CPathBuffer cFileName;
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, cFileName.Size(), NULL, NULL);
-            cFileName[cFileName.Size() - 1] = 0;
-
-            file.Name = SalamanderGeneral->DupStr(cFileName);
+            file.Name = SalamanderGeneral->DupStr(data.cFileName);
             if (file.Name == NULL)
                 goto ONERROR;
-            file.NameLen = strlen(file.Name);
+            file.NameLen = lstrlenW(file.Name);
             if (!sortByExtDirsAsFiles && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
                 file.Ext = file.Name + file.NameLen; // directories have no extensions
             }
             else
             {
-                char* s;
-                s = strrchr(file.Name, '.');
+                wchar_t* s;
+                s = wcsrchr(file.Name, L'.');
                 if (s != NULL)
                     file.Ext = s + 1; // ".cvspass" is treated as an extension in Windows
                 else
@@ -342,7 +378,7 @@ CPluginFSInterface::Event(int event, DWORD param)
                 if (SalamanderGeneral->GetPanelPluginFS(panel2) != NULL)
                     SalamanderGeneral->PostRefreshPanelPath(panel2);
             }
-            else if (SalamanderGeneral->ShowMessageBox(LoadStr(IDS_YESNO_CONNETCLOSEPLUGIN), TitleWMobileQuestion,
+            else if (SalamanderGeneral->ShowMessageBox(LangStr(IDS_YESNO_CONNETCLOSEPLUGIN).c_str(), TitleWMobileQuestion,
                                                        MSGBOX_QUESTION) == IDYES)
             {
                 SalamanderGeneral->DisconnectFSFromPanel(SalamanderGeneral->GetMainWindowHWND(), panel1);
@@ -386,32 +422,6 @@ CPluginFSInterface::GetSupportedServices()
     //         FS_SERVICE_GETCHANGEDRIVEORDISCONNECTITEM;
 }
 
-/*
-BOOL WINAPI
-CPluginFSInterface::GetChangeDriveOrDisconnectItem(const char *fsName, char *&title, HICON &icon, BOOL &destroyIcon)
-{
-  char txt[2 * MAX_PATH + 102];
-  // the text will be the FS path (Salamander format)
-  txt[0] = '\t';
-  strcpy(txt + 1, fsName);
-  sprintf(txt + strlen(txt), ":%s\t", Path);
-  // duplicate '&' characters so the path prints correctly
-  SalamanderGeneral->DuplicateAmpersands(txt, 2 * MAX_PATH + 102);
-
-  // append the free-space information
-  CQuadWord space;
-  GetFSFreeSpace(&space);
-  if (space != CQuadWord(-1, -1)) SalamanderGeneral->PrintDiskSize(txt + strlen(txt), space, 0);
-
-  title = SalamanderGeneral->DupStr(txt);
-  if (title == NULL) return FALSE;  // low memory: no item will be added
-
-  icon = GetFSIcon(destroyIcon);
-  return TRUE;
-}
-
-*/
-
 HICON WINAPI
 CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
 {
@@ -428,7 +438,7 @@ CPluginFSInterface::GetFSFreeSpace(CQuadWord* retValue)
     retValue->HiDWord = -1;
 
     RapiNS::STORE_INFORMATION si;
-    if (Path[0] != 0 && CRAPI::GetStoreInformation(&si))
+    if (!Path.empty() && CRAPI::GetStoreInformation(&si))
     {
         retValue->LoDWord = si.dwFreeSize;
         retValue->HiDWord = 0;
@@ -436,9 +446,9 @@ CPluginFSInterface::GetFSFreeSpace(CQuadWord* retValue)
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+CPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
 {
-    const char* root = text; // pointer to the position after the root path
+    const wchar_t* root = text; // pointer to the position after the root path
 
     while (*root != 0 && *root != ':')
         root++; //JR Skip 'FSNAME'
@@ -447,8 +457,8 @@ CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, i
     if (*root == '\\')
         root++; //JR Skip '\\'
 
-    const char* s = text + offset;
-    const char* end = text + pathLen;
+    const wchar_t* s = text + offset;
+    const wchar_t* end = text + pathLen;
     if (s >= end)
         return FALSE;
     if (s < root)
@@ -465,159 +475,180 @@ CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, i
 }
 
 void WINAPI
-CPluginFSInterface::ShowInfoDialog(const char* fsName, HWND parent)
+CPluginFSInterface::ShowInfoDialog(const wchar_t* fsName, HWND parent)
 {
 }
 
 BOOL WINAPI
-CPluginFSInterface::ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo)
+CPluginFSInterface::ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command,
+                                       int& selFrom, int& selTo)
 {
-    //JR First try the command in the current path if an absolute path is not provided
-    CPathBuffer commandLine; // CRAPI::CreateProcess cannot handle paths longer than MAX_PATH
+    std::wstring value;
+    if (command == NULL || !sally::plugin_abi::ReadStringBuffer(*command, value))
+        return FALSE;
+    const BOOL result = ExecuteCommandLineOwned(parent, value, selFrom, selTo);
+    return sally::plugin_abi::WriteStringBuffer(*command, value) ? result : FALSE;
+}
 
-    if (*command != '\\')
+BOOL CPluginFSInterface::ExecuteCommandLineOwned(HWND parent, std::wstring& command,
+                                                 int& selFrom, int& selTo)
+{
+    std::wstring commandLine;
+    if (command.empty() || command.front() != L'\\')
     {
-        lstrcpyn(commandLine, Path, commandLine.Size());
-        if (!CRAPI::PathAppend(commandLine, command, commandLine.Size()))
-        {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                             TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-            return FALSE;
-        }
+        commandLine = Path;
+        wmobile::AppendDeviceComponent(commandLine, command.c_str());
     }
 
-    if (*command == '\\' || !CRAPI::CreateProcess(commandLine, NULL))
+    if ((!command.empty() && command.front() == L'\\') ||
+        !CRAPI::CreateProcessWide(commandLine.c_str(), NULL))
     {
         // On failure, retry without the path, using only the user input
-        if (lstrlen(command) >= MAX_PATH)
-        {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                             TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-            return FALSE;
-        }
-        if (!CRAPI::CreateProcess(command, NULL))
+        if (!CRAPI::CreateProcessWide(command.c_str(), NULL))
         {
             DWORD err = CRAPI::GetLastError();
-            SalamanderGeneral->SalMessageBox(parent, SalamanderGeneral->GetErrorText(err),
+            SalamanderGeneral->SalMessageBox(parent, SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(),
                                              TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
 
             return FALSE;
         }
     }
 
-    *command = 0;
+    command.clear();
     return TRUE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                                char* newName, BOOL& cancel)
+CPluginFSInterface::QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file,
+                                BOOL isDir, CSalamanderStringBuffer* newName, BOOL& cancel)
+{
+    std::wstring value;
+    if (newName == NULL || !sally::plugin_abi::ReadStringBuffer(*newName, value))
+        return FALSE;
+    const BOOL result = QuickRenameOwned(fsName, mode, parent, file, isDir, value, cancel);
+    return sally::plugin_abi::WriteStringBuffer(*newName, value) ? result : FALSE;
+}
+
+BOOL CPluginFSInterface::QuickRenameOwned(const wchar_t* fsName, int mode, HWND parent,
+                                          CFileData& file, BOOL isDir,
+                                          std::wstring& newName, BOOL& cancel)
 {
     cancel = FALSE;
     if (mode == 1)
         return FALSE; // request for the standard dialog
 
     // Verify the provided name syntactically
-    char* s = newName;
-    CPathBuffer buf; // Heap-allocated for long path support
-    while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
-           *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
+    const wchar_t* s = newName.c_str();
+    while (*s != 0 && *s != L'\\' && *s != L'/' && *s != L':' &&
+           *s >= 32 && *s != L'<' && *s != L'>' && *s != L'|' && *s != L'"')
         s++;
-    if (newName[0] == 0 || *s != 0)
+    if (newName.empty() || *s != 0)
     {
-        SalamanderGeneral->SalMessageBox(parent, SalamanderGeneral->GetErrorText(ERROR_INVALID_NAME),
+        SalamanderGeneral->SalMessageBox(parent, SPLGetErrorTextOwned(SalamanderGeneral, ERROR_INVALID_NAME).c_str(),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
         return FALSE; // invalid name; let the user correct it
     }
 
     // process the mask in newName
-    SalamanderGeneral->MaskName(buf, buf.Size(), file.Name, newName);
-    lstrcpyn(newName, buf, MAX_PATH);
+    std::wstring maskedNameW;
+    if (!SPLMaskNameOwned(SalamanderGeneral, file.Name, newName.c_str(), maskedNameW))
+        return FALSE;
+    newName = maskedNameW;
 
     // perform the rename operation
-    CPathBuffer nameFrom;
-    CPathBuffer nameTo;
-    strcpy(nameFrom, Path);
-    strcpy(nameTo, Path);
-    if (!CRAPI::PathAppend(nameFrom, file.Name, nameFrom.Size()) ||
-        !CRAPI::PathAppend(nameTo, newName, nameTo.Size()))
-    {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                         TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is already returned after the mask adjustment
-        return FALSE; // error -> show the standard dialog again
-    }
+    // Wide. file.Name has been wide since P1.3, and narrowing it here - with
+    // refuse-on-loss - meant renaming a file whose name is outside the machine's code page
+    // returned FALSE before the device was ever asked. The device path is composed wide now,
+    // through the PathAppend covered by gtest_wmobile_path_core.
+    std::wstring nameFrom = Path;
+    std::wstring nameTo = Path;
+    wmobile::AppendDeviceComponent(nameFrom, file.Name);
+    wmobile::AppendDeviceComponent(nameTo, maskedNameW.c_str());
 
     //JR TODO: ConfirmOverwrite + Delete
 
-    if (!CRAPI::MoveFile(nameFrom, nameTo))
+    if (!CRAPI::MoveFileWide(nameFrom.c_str(), nameTo.c_str()))
     {
         // potential overwrites are not handled here; treat them as errors as well
         DWORD err = CRAPI::GetLastError();
-        SalamanderGeneral->SalMessageBox(parent, SalamanderGeneral->GetErrorText(err),
+        SalamanderGeneral->SalMessageBox(parent, SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
         // 'newName' is already returned after the mask adjustment
         return FALSE; // error -> show the standard dialog again
     }
     else // operation succeeded - report the change on the path (triggers refresh) and return success
     {
-        CPathBuffer cefsFileName; // Heap-allocated for long path support
-        if (SalamanderGeneral->StrICmp(nameFrom, nameTo) != 0)
+        if (SalamanderGeneral->StrICmp(nameFrom.c_str(), nameTo.c_str()) != 0)
         { // if it is more than just a case change (CEFS is case-insensitive)
             // remove the source file from the disk cache (the original name is no longer valid)
-            sprintf(cefsFileName, "%s:%s", fsName, nameFrom.Get());
+            // The disk-cache key stays narrow - that cache is byte-keyed - so the device path
+            // bridges here, at the cache boundary rather than before the device ever sees it.
+            std::wstring cefsFileNameW = std::wstring(fsName) + L":" + nameFrom;
             // disk names are case-insensitive while the disk cache is case-sensitive; converting
             // to lowercase makes the disk cache behave case-insensitively as well
-            SalamanderGeneral->ToLowerCase(cefsFileName);
-            SalamanderGeneral->RemoveOneFileFromCache(cefsFileName);
+            SPLToLowerCaseOwned(SalamanderGeneral, cefsFileNameW);
+            SalamanderGeneral->RemoveOneFileFromCache(cefsFileNameW.c_str());
             // if overwriting is possible, the target should be removed from the disk cache as well ("file changed")
         }
 
         // change notification on Path (without subdirectories when renaming files)
-        sprintf(cefsFileName, "%s:%s", fsName, Path);
-        SalamanderGeneral->PostChangeOnPathNotification(cefsFileName, isDir);
+        const std::wstring changedPath = std::wstring(fsName) + L":" + Path;
+        SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), isDir);
 
         return TRUE;
     }
 }
 
 void WINAPI
-CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs)
+CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs)
 {
-
     // test whether the paths or at least their prefixes match (only paths on our FS have a chance;
     // disk paths and other FS paths in 'path' are excluded automatically because they can never
     // match 'fsName'+':' at the start of 'path2' below)
-    CPathBuffer path1; // Heap-allocated for long path support
-    CPathBuffer path2; // Heap-allocated for long path support
-    lstrcpyn(path1, path, path1.Size());
-    sprintf(path2, "%s:%s", fsName, Path);
-    SalamanderGeneral->SalPathRemoveBackslash(path1);
-    SalamanderGeneral->SalPathRemoveBackslash(path2);
-    int len1 = (int)strlen(path1);
-    BOOL refresh = SalamanderGeneral->StrNICmp(path1, path2, len1) == 0 &&
-                   (path2[len1] == 0 || includingSubdirs && path2[len1] == '\\');
+    std::wstring path1W = path;
+    std::wstring path2W = std::wstring(fsName) + L":" + Path;
+    SPLSalPathRemoveBackslashOwned(SalamanderGeneral, path1W);
+    SPLSalPathRemoveBackslashOwned(SalamanderGeneral, path2W);
+    int len1 = lstrlenW(path1W.c_str());
+    BOOL refresh = SalamanderGeneral->StrNICmp(path1W.c_str(), path2W.c_str(), len1) == 0 &&
+                   (path2W[len1] == 0 || includingSubdirs && path2W[len1] == L'\\');
     if (refresh)
         SalamanderGeneral->PostRefreshPanelFS(this); // refresh the panel if the FS is visible there
 }
 
 BOOL WINAPI
-CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel)
+CPluginFSInterface::CreateDir(const wchar_t* fsName, int mode, HWND parent,
+                              CSalamanderStringBuffer* newName, BOOL& cancel)
 {
+    std::wstring value;
+    if (newName == NULL || !sally::plugin_abi::ReadStringBuffer(*newName, value))
+        return FALSE;
+    const BOOL result = CreateDirOwned(fsName, mode, parent, value, cancel);
+    return sally::plugin_abi::WriteStringBuffer(*newName, value) ? result : FALSE;
+}
+
+BOOL CPluginFSInterface::CreateDirOwned(const wchar_t* fsName, int mode, HWND parent,
+                                        std::wstring& newName, BOOL& cancel)
+{
+    // One wide function. The narrow twin this used to delegate to is gone, and
+    // with it the refusal at the top: the old entry narrowed fsName and newName with
+    // refuse-on-loss, so creating a directory under a path containing a non-ANSI component
+    // failed before anything was attempted. Everything here was already available wide - the
+    // SDK's CreateDir is wide, and the *Narrow helpers were only dressing down wide SDK calls.
     cancel = FALSE;
     if (mode == 1)
         return FALSE; // request for the standard dialog
 
     int type;
     BOOL isDir;
-    char* secondPart;
-    CPathBuffer nextFocus;
-    CPathBuffer path; // Heap-allocated for long path support
+    size_t secondPartOffset = std::wstring::npos;
+    std::wstring parsedName(newName);
+    std::wstring nextFocus;
+    std::wstring path;
     int error;
-    nextFocus[0] = 0;
-    if (!SalamanderGeneral->SalParsePath(parent, newName, type, isDir, secondPart,
-                                         TitleWMobileError, nextFocus,
-                                         FALSE, NULL, NULL, &error, path.Size()))
+    if (!SPLSalParsePathOwned(SalamanderGeneral, parent, parsedName, type, isDir,
+                              secondPartOffset, TitleWMobileError, FALSE, NULL,
+                              &error, &nextFocus))
     {
         if (error == SPP_EMPTYPATHNOTALLOWED) // empty string -> stop without performing the operation
         {
@@ -627,125 +658,119 @@ CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* n
 
         if (error == SPP_INCOMLETEPATH) // relative FS path; build the absolute path manually
         {
+            const size_t slash = newName.find(L'\\');
+            if (slash == std::wstring::npos || slash + 1 == newName.size())
+                nextFocus = slash == std::wstring::npos ? newName : newName.substr(0, slash);
             int errTextID;
-            if (!SalamanderGeneral->SalGetFullName(newName, &errTextID, Path, nextFocus))
+            parsedName = newName;
+            if (!SPLSalGetFullNameOwned(SalamanderGeneral, parsedName, &errTextID,
+                                        Path.c_str()))
             {
-                CPathBuffer errBuf;
-                errBuf[0] = 0;
-                SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, errBuf.Size());
-                SalamanderGeneral->ShowMessageBox(errBuf, TitleWMobileError, MSGBOX_ERROR);
+                std::wstring errorText;
+                SPLGetGFNErrorTextOwned(SalamanderGeneral, errTextID, errorText);
+                SalamanderGeneral->ShowMessageBox(errorText.c_str(), TitleWMobileError, MSGBOX_ERROR);
                 return FALSE;
             }
-
-            strcpy(path, fsName);
-            strcat(path, ":");
-
-            if (strlen(fsName) + strlen(newName) + 1 >= (size_t)path.Size())
-            {
-                SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                                 TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
-                // 'newName' is returned in its original form
-                return FALSE; // error -> show the standard dialog again
-            }
-            else
-                strcat(path, newName);
-
-            strcpy(newName, path);
-            secondPart = newName + strlen(fsName) + 1;
+            secondPartOffset = wcslen(fsName) + 1;
             type = PATH_TYPE_FS;
         }
         else
             return FALSE; // error -> show the standard dialog again
     }
 
+    if (secondPartOffset > parsedName.size())
+        return FALSE;
+    newName = parsedName;
+    std::wstring secondPart = parsedName.substr(secondPartOffset);
+
     if (type != PATH_TYPE_FS)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_SORRY_CREATEDIR1),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_SORRY_CREATEDIR1).c_str(),
                                          TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is already returned after the path expansion
         return FALSE; // error -> show the standard dialog again
     }
 
-    if ((secondPart - newName) - 1 != (int)strlen(fsName) ||
-        SalamanderGeneral->StrNICmp(newName, fsName, (int)(secondPart - newName) - 1) != 0)
+    if (secondPartOffset == 0 || secondPartOffset - 1 != wcslen(fsName) ||
+        SalamanderGeneral->StrNICmp(parsedName.c_str(), fsName,
+                                    static_cast<int>(secondPartOffset - 1)) != 0)
     { // not a CEFS path
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_SORRY_CREATEDIR2),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_SORRY_CREATEDIR2).c_str(),
                                          TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is already returned after the path expansion
         return FALSE; // error -> show the standard dialog again
     }
 
-    if (secondPart[0] != '\\')
+    if (secondPart.empty() || secondPart.front() != L'\\')
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_SORRY_CREATEDIR3),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_SORRY_CREATEDIR3).c_str(),
                                          TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is already returned after the path expansion
         return FALSE; // error -> show the standard dialog again
     }
 
     // remove any "." and ".." segments from the full path to this FS
-    if (!SalamanderGeneral->SalRemovePointsFromPath(secondPart + 1))
+    if (!WMobileRemovePointsFromPathOwned(secondPart, 1))
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_INVALIDPATH),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_INVALIDPATH).c_str(),
                                          TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is returned after expanding the path and possibly adjusting ".." and "."
         return FALSE; // error -> show the standard dialog again
     }
 
     // trim any redundant trailing backslash
-    SalamanderGeneral->SalPathRemoveBackslash(secondPart);
+    while (secondPart.size() > 1 && secondPart.back() == L'\\')
+        secondPart.pop_back();
 
     // finally create the directory
-
-    if (!CRAPI::CreateDirectory(secondPart, NULL))
+    if (!CRAPI::CreateDirectoryWide(secondPart.c_str(), NULL))
     {
         DWORD err = CRAPI::GetLastError();
-        SalamanderGeneral->SalMessageBox(parent, SalamanderGeneral->GetErrorText(err),
+        SalamanderGeneral->SalMessageBox(parent, SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-        // 'newName' is already returned after the path expansion
         return FALSE; // error -> show the standard dialog again
     }
 
     // operation succeeded - report the change on the path (triggers refresh)
-    // notify about the change on the path (without subdirectories)
-    SalamanderGeneral->CutDirectory(secondPart); // must succeed (cannot be the root)
-    sprintf(path, "%s:%s", fsName, secondPart);
-    SalamanderGeneral->PostChangeOnPathNotification(path, FALSE);
-    strcpy(newName, nextFocus); // if only the directory name was provided, focus it in the panel
+    WMobileCutDirectoryOwned(secondPart); // must succeed (cannot be the root)
+    path = std::wstring(fsName) + L":" + secondPart;
+    SalamanderGeneral->PostChangeOnPathNotification(path.c_str(), FALSE);
+    newName = nextFocus;
 
     return TRUE;
 }
 
 void WINAPI
-CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
+CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
                              CSalamanderForViewFileOnFSAbstract* salamander,
                              CFileData& file)
 {
     if (!CRAPI::CheckConnection())
         CRAPI::ReInit();
 
+    // What stood here narrowed file.Name and RETURNED on failure, so viewing a
+    // file whose name is outside the system code page did nothing at all - no viewer, no error,
+    // no trace. The name is used wide throughout now, and the only conversion left is of Path,
+    // which is the panel path and belongs to a separate campaign.
+    std::wstring remoteFileName = Path;
+    wmobile::AppendDeviceComponent(remoteFileName, file.Name);
+
     // build a unique file name for the disk cache (standard Salamander path format)
-    CPathBuffer uniqueFileName; // Heap-allocated for long path support
-    strcpy(uniqueFileName, AssignedFSName);
-    strcat(uniqueFileName, ":");
-    strcat(uniqueFileName, Path);
-    CRAPI::PathAppend(uniqueFileName + strlen(AssignedFSName) + 1, file.Name, uniqueFileName.Size() - (int)strlen(AssignedFSName) - 1);
+    const std::wstring& assignedFSNameW = AssignedFSName;
+    std::wstring uniqueFileName = assignedFSNameW + L":" + remoteFileName;
     // disk names are case-insensitive while the disk cache is case-sensitive; converting
     // to lowercase makes the disk cache behave case-insensitively as well
-    SalamanderGeneral->ToLowerCase(uniqueFileName);
+    SPLToLowerCaseOwned(SalamanderGeneral, uniqueFileName);
 
     // obtain the disk-cache copy name
     BOOL fileExists;
-    const char* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName, file.Name, NULL, fileExists);
+    const wchar_t* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName.c_str(), file.Name, NULL, fileExists);
     if (tmpFileName == NULL)
         return; // fatal error
+
 
     // determine whether a disk-cache copy of the file needs to be prepared (download)
     BOOL newFileOK = FALSE;
     CQuadWord newFileSize(0, 0);
     if (!fileExists) // preparing a copy (download) is necessary
     {
-        const char* name = uniqueFileName + strlen(AssignedFSName) + 1;
+        const wchar_t* name = remoteFileName.c_str();
 
         HWND mainWnd = parent;
         HWND parentWin;
@@ -753,7 +778,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
             mainWnd = parentWin;
         // disable 'mainWnd'
 
-        CProgressDlg dlg(mainWnd, LoadStr(IDS_READ), LoadStr(IDS_READING), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
+        CProgressDlg dlg(mainWnd, LangStr(IDS_READ).c_str(), LangStr(IDS_READING).c_str(), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
 
         dlg.Create();
         EnableWindow(mainWnd, FALSE);
@@ -761,7 +786,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
 
         dlg.Set(name, 0, TRUE);
 
-        LPCTSTR errFileName = "";
+        const wchar_t* errFileName = L"";
         DWORD err = CRAPI::CopyFileToPC(name, tmpFileName, TRUE, &dlg, 0, 0, &errFileName);
 
         EnableWindow(mainWnd, TRUE);
@@ -770,7 +795,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         if (err == 0) // the copy succeeded
         {
             newFileOK = TRUE; // if the size query fails, newFileSize stays zero (not critical)
-            HANDLE hFile = HANDLES_Q(CreateFile(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE hFile = HANDLES_Q(CreateFileW(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                 NULL, OPEN_EXISTING, 0, NULL));
             if (hFile != INVALID_HANDLE_VALUE)
             { // ignore errors; the exact file size is not essential
@@ -781,10 +806,9 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         }
         else if (err != -1)
         {
-            CPathBuffer buf; // Heap-allocated for long path support
-            sprintf(buf, LoadStr(IDS_PATH_ERROR), errFileName, SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
-            return;
+            const std::wstring message = SPLFormatStringOwned(LangStr(IDS_PATH_ERROR).c_str(), errFileName,
+                                                              SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+            SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileError, MSGBOX_ERROR);
         }
     }
 
@@ -799,23 +823,50 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     }
 
     // call FreeFileNameInCache to pair with AllocFileNameInCache (link the viewer and the disk cache)
-    salamander->FreeFileNameInCache(uniqueFileName, fileExists, newFileOK,
+    salamander->FreeFileNameInCache(uniqueFileName.c_str(), fileExists, newFileOK,
                                     newFileSize, fileLock, fileLockOwner, FALSE);
 }
 
+
+// CRAPI behind wmobile_fileops_core's interface, so the destructive step can be
+// driven by a fake device in gtest_wmobile_fileops_core. Nothing here decides anything - the
+// decisions are in the core; this just forwards.
+//
+// The paths stay narrow at this seam because CRAPI's delete/attribute signatures still are; the
+// core is wide, so this is the one conversion left on the destructive path and it is now in a
+// single place instead of two open-coded call sites.
+class CRapiFileOps : public wmobile::DeviceFileOps
+{
+public:
+    // Wide end to end. The narrowing that stood here is gone: these call CRAPI's
+    // wide siblings, which hand the UTF-16 path straight to CE. A device file whose name is
+    // outside the machine's code page used to be REFUSED here - visible in the panel but
+    // impossible to delete. It is deletable now.
+    bool SetAttributesOnDevice(const wchar_t* path, unsigned long attributes) override
+    {
+        return CRAPI::SetFileAttributesWide(path, (DWORD)attributes) != FALSE;
+    }
+
+    bool DeleteFileOnDevice(const wchar_t* path) override
+    {
+        return CRAPI::DeleteFileWide(path) != FALSE;
+    }
+
+    bool RemoveDirectoryOnDevice(const wchar_t* path) override
+    {
+        return CRAPI::RemoveDirectoryWide(path) != FALSE;
+    }
+};
 BOOL WINAPI
-CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
+CPluginFSInterface::Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                            int selectedFiles, int selectedDirs, BOOL& cancelOrError)
 {
     cancelOrError = FALSE;
     if (mode == 1)
         return FALSE; // request for the standard prompt
 
-    CPathBuffer buf; // Heap-allocated for long path support — buffer for error messages
-
-    CPathBuffer rootPath, fileName, dfsFileName;
-
-    strcpy(rootPath, Path);
+    const std::wstring rootPath = Path;
+    std::wstring fileName;
 
     // retrieve the "Confirm on" settings from the configuration
     BOOL ConfirmOnNotEmptyDirDelete, ConfirmOnSystemHiddenFileDelete, ConfirmOnSystemHiddenDirDelete;
@@ -837,7 +888,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
     BOOL focused = (selectedFiles == 0 && selectedDirs == 0);
     int index = 0;
 
-    SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_WAIT_READINGDIRTREE), TitleWMobile,
+    SalamanderGeneral->CreateSafeWaitWindow(LangStr(IDS_WAIT_READINGDIRTREE).c_str(), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
     CFileInfoArray array(10, 10);
 
@@ -854,7 +905,9 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
         //JR call FindAllFilesInTree even for individual files
         //JR this verifies the file still exists and gets its current attributes
         if (f != NULL)
-            success = CRAPI::FindAllFilesInTree(rootPath, f->Name, array, block1, FALSE);
+        {
+            success = CRAPI::FindAllFilesInTreeWide(rootPath.c_str(), f->Name, array, block1, FALSE);
+        }
 
         // decide whether to continue (stop if there is an error or no additional selected item)
         if (!success || focused || f == NULL)
@@ -874,7 +927,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
 
     BOOL showProgressDialog = array.Count > 1;
     BOOL enableMainWnd = TRUE;
-    CProgressDlg delDlg(mainWnd, LoadStr(IDS_DELETE), LoadStr(IDS_DELETING), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
+    CProgressDlg delDlg(mainWnd, LangStr(IDS_DELETE).c_str(), LangStr(IDS_DELETING).c_str(), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
 
     if (showProgressDialog)
     {
@@ -893,19 +946,14 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
         {
             CFileInfo& fi = array[i];
 
-            strcpy(fileName, rootPath);
-            if (!CRAPI::PathAppend(fileName, fi.cFileName, fileName.Size()))
-            {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
-                                                  TitleWMobileError, MSGBOX_ERROR);
-                success = FALSE;
-                break;
-            }
+            // The file-list record owns the device's UTF-16 relative path; compose it directly.
+            fileName = rootPath;
+            wmobile::AppendDeviceComponent(fileName, fi.cFileName);
 
             if (showProgressDialog)
             {
                 float progress = ((float)i / (float)array.Count);
-                delDlg.Set(fileName, (DWORD)(progress * 1000), TRUE); // delayedPaint == TRUE so we don't slow things down
+                delDlg.Set(fileName.c_str(), (DWORD)(progress * 1000), TRUE); // delayedPaint == TRUE so we don't slow things down
             }
 
             if (showProgressDialog && delDlg.GetWantCancel())
@@ -917,17 +965,38 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
             if (ConfirmOnNotEmptyDirDelete && i < array.Count - 1)
             {
                 //JR if a block contains more than one item, it represents a non-empty top-level directory
-                if (fi.block != block && fi.block == array[i + 1].block)
+                // The two index decisions here moved to wmobile_delete_plan_core so
+                // they can be tested - see gtest_wmobile_delete_plan_core. Both are consequential:
+                // miss the first and a directory full of files is deleted with no 'not empty'
+                // prompt at all; miscount the second and declining that prompt still deletes part
+                // of what the user just declined.
+                std::vector<wmobile::DeleteCandidate> candidates;
+                candidates.reserve((size_t)array.Count);
+                for (int c = 0; c < array.Count; c++)
+                {
+                    wmobile::DeleteCandidate cand;
+                    cand.block = array[c].block;
+                    cand.isDirectory = (array[c].dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+                    candidates.push_back(cand);
+                }
+
+                if (wmobile::StartsNonEmptyDirectoryBlock(candidates.data(), candidates.size(),
+                                                          (size_t)i, block))
                 {
                     //JR the last path in the block is the directory itself
-                    int j;
-                    for (j = i + 1; j < array.Count && array[j].block == fi.block; j++)
-                    {
-                    }
-                    j--;
+                    const int j = (int)wmobile::LastIndexOfBlock(candidates.data(),
+                                                                 candidates.size(), (size_t)i);
 
-                    sprintf(buf, LoadStr(IDS_YESNO_DELETENOEMPTYDIR), array[j].cFileName);
-                    int res = SalamanderGeneral->ShowMessageBox(buf, TitleWMobileQuestion, MSGBOX_EX_QUESTION);
+                    // array[j].cFileName is wide now; this confirmation dialog's
+                    // format string stays narrow (a separate, deferred campaign). Bridge here,
+                    // refuse-on-loss - display '?' rather than a %s call silently misreading a
+                    // wide pointer as narrow bytes.
+                    // The prompt names the directory straight from the wide
+                    // entry. The narrowing here could fail, and its fallback was an EMPTY
+                    // string - so a directory whose name is outside the code page produced a
+                    // confirmation prompt naming no directory at all.
+                    const std::wstring message = SPLFormatStringOwned(LangStr(IDS_YESNO_DELETENOEMPTYDIR).c_str(), array[j].cFileName);
+                    int res = SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileQuestion, MSGBOX_EX_QUESTION);
                     if (res == IDNO)
                     {
                         i = j; //JR skip the rest of the block
@@ -951,8 +1020,8 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                 {
                     if (!skipAllSHDD && !yesAllSHDD)
                     {
-                        int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, fileName,
-                                                                    LoadStr(IDS_YESNO_DELETEHIDDENDIR), TitleWMobileQuestion);
+                        int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, fileName.c_str(),
+                                                                    LangStr(IDS_YESNO_DELETEHIDDENDIR).c_str(), TitleWMobileQuestion);
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -983,16 +1052,18 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                     skip = FALSE;
                     while (1)
                     {
-                        if (fi.dwFileAttributes & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY))
-                            CRAPI::SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-
-                        if (!CRAPI::RemoveDirectory(fileName))
+                        // Clear-then-delete now lives in wmobile_fileops_core,
+                        // where it is tested. Doing it in the other order fails on anything
+                        // read-only and reports it as a device error.
+                        CRapiFileOps deviceOps;
+                        if (!wmobile::DeleteOneItem(deviceOps, fileName.c_str(),
+                                                    fi.dwFileAttributes, true))
                         {
                             if (!skipAllErrors)
                             {
                                 DWORD err = CRAPI::GetLastError();
-                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName,
-                                                                         SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName.c_str(),
+                                                                         SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                                 switch (res)
                                 {
                                 case DIALOG_RETRY:
@@ -1014,12 +1085,8 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                         }
                         else
                         {
-                            sprintf(dfsFileName, "%s:%s", fsName, fileName.Get());
-                            // disk names are case-insensitive while the disk cache is case-sensitive; converting
-                            // to lowercase makes the disk cache behave case-insensitively as well
-                            SalamanderGeneral->ToLowerCase(dfsFileName);
-                            // remove the deleted file's cache copy if it exists
-                            SalamanderGeneral->RemoveOneFileFromCache(dfsFileName);
+                            const std::wstring cacheName = std::wstring(fsName) + L":" + fileName;
+                            WMobileRemoveFileFromCacheWide(cacheName.c_str());
                             changeInSubdirs = TRUE; // changes may also have occurred in subdirectories
                             break;                  // successful delete
                         }
@@ -1036,8 +1103,8 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                 {
                     if (!skipAllSHFD && !yesAllSHFD)
                     {
-                        int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, fileName,
-                                                                    LoadStr(IDS_YESNO_DELETEHIDDENFILE), TitleWMobileQuestion);
+                        int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, fileName.c_str(),
+                                                                    LangStr(IDS_YESNO_DELETEHIDDENFILE).c_str(), TitleWMobileQuestion);
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -1068,16 +1135,18 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                     skip = FALSE;
                     while (1)
                     {
-                        if (fi.dwFileAttributes & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY))
-                            CRAPI::SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-
-                        if (!CRAPI::DeleteFile(fileName))
+                        // Same tested step as the directory branch above - the
+                        // two sites had the attribute triple written out separately, so a
+                        // divergence between them would have been invisible.
+                        CRapiFileOps deviceOps;
+                        if (!wmobile::DeleteOneItem(deviceOps, fileName.c_str(),
+                                                    fi.dwFileAttributes, false))
                         {
                             if (!skipAllErrors)
                             {
                                 DWORD err = CRAPI::GetLastError();
-                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName,
-                                                                         SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName.c_str(),
+                                                                         SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                                 switch (res)
                                 {
                                 case DIALOG_RETRY:
@@ -1099,12 +1168,8 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
                         }
                         else
                         {
-                            sprintf(dfsFileName, "%s:%s", fsName, fileName.Get());
-                            // disk names are case-insensitive while the disk cache is case-sensitive; converting
-                            // to lowercase makes the disk cache behave case-insensitively as well
-                            SalamanderGeneral->ToLowerCase(dfsFileName);
-                            // remove the deleted file's cache copy if it exists
-                            SalamanderGeneral->RemoveOneFileFromCache(dfsFileName);
+                            const std::wstring cacheName = std::wstring(fsName) + L":" + fileName;
+                            WMobileRemoveFileFromCacheWide(cacheName.c_str());
                             break; // successful delete
                         }
                         if (!success || skip)
@@ -1131,90 +1196,157 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
     SalamanderGeneral->RestoreFocusInSourcePanel();
 
     // report the change on Path (no subdirectories when only files were deleted)
-    sprintf(dfsFileName, "%s:%s", fsName, Path);
-    SalamanderGeneral->PostChangeOnPathNotification(dfsFileName, changeInSubdirs);
+    const std::wstring changedPath = std::wstring(fsName) + L":" + Path;
+    SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), changeInSubdirs);
 
     return success;
 }
 
-static BOOL WINAPI CEFS_IsTheSamePath(const char* path1, const char* path2)
+// Case-insensitive device-path comparison; one trailing backslash on either side is ignored.
+static BOOL WINAPI WMobileIsTheSamePathWide(const wchar_t* path1, const wchar_t* path2)
 {
-    while (*path1 != 0 && LowerCase[*path1] == LowerCase[*path2])
-    {
-        path1++;
-        path2++;
-    }
-    if (*path1 == '\\')
-        path1++;
-    if (*path2 == '\\')
-        path2++;
-    return *path1 == 0 && *path2 == 0;
+    if (path1 == NULL || path2 == NULL)
+        return FALSE;
+
+    std::wstring a(path1), b(path2);
+    if (!a.empty() && a.back() == L'\\')
+        a.pop_back();
+    if (!b.empty() && b.back() == L'\\')
+        b.pop_back();
+
+    return SalamanderGeneral->StrICmp(a.c_str(), b.c_str()) == 0;
 }
 
-static void GetFileData(const char* name, char (&buf)[100])
+// The copy loop's name for the same predicate - it compares two composed device paths.
+static BOOL CEFS_IsTheSamePathWide(const wchar_t* path1, const wchar_t* path2)
 {
-    buf[0] = '?';
-    buf[1] = 0;
-    char tmp[50];
+    return WMobileIsTheSamePathWide(path1, path2);
+}
 
-    WIN32_FIND_DATA data;
+static BOOL WMobileSplitGeneralPath(HWND parent, const wchar_t* title,
+                                    const wchar_t* errorTitle, int selCount,
+                                    std::wstring& path, size_t afterRootOffset,
+                                    size_t secondPartOffset, BOOL pathIsDir,
+                                    BOOL backslashAtEnd, const wchar_t* dirName,
+                                    const wchar_t* curPath, std::wstring& mask,
+                                    std::wstring* newDirs, BOOL useSamePathCallback)
+{
+    return SPLSalSplitGeneralPathOwned(
+        SalamanderGeneral, parent, title, errorTitle, selCount, path,
+        afterRootOffset, secondPartOffset, pathIsDir, backslashAtEnd,
+        dirName, curPath, mask, newDirs,
+        useSamePathCallback ? WMobileIsTheSamePathWide : NULL);
+}
 
-    HANDLE find = FindFirstFile(name, &data);
+static void WMobileRemoveFilesFromCacheWide(const wchar_t* uniqueFileName)
+{
+    if (uniqueFileName != NULL)
+        SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
+}
+
+static std::wstring GetFileDataWide(const wchar_t* name)
+{
+    WIN32_FIND_DATAW data;
+
+    HANDLE find = FindFirstFileW(name, &data);
     if (find == INVALID_HANDLE_VALUE)
-        return;
+        return L"?";
 
     CQuadWord size(data.nFileSizeLow, data.nFileSizeHigh);
-    SalamanderGeneral->NumberToStr(buf, size);
+    std::wstring result = SPLNumberToStrOwned(SalamanderGeneral, size);
 
     FILETIME time;
     SYSTEMTIME st;
     FileTimeToLocalFileTime(&data.ftLastWriteTime, &time);
     FileTimeToSystemTime(&time, &st);
 
-    if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, tmp, 50))
-        sprintf(tmp, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+    int dateLength = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, NULL, 0);
+    std::wstring date;
+    if (dateLength > 0)
+    {
+        std::vector<wchar_t> value(static_cast<size_t>(dateLength));
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, value.data(), dateLength))
+            date.assign(value.data());
+    }
+    if (date.empty())
+        date = SPLFormatStringOwned(L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
-    strcat(buf, ", ");
-    strcat(buf, tmp);
+    int timeLength = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
+    std::wstring timeText;
+    if (timeLength > 0)
+    {
+        std::vector<wchar_t> value(static_cast<size_t>(timeLength));
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, value.data(), timeLength))
+            timeText.assign(value.data());
+    }
+    if (timeText.empty())
+        timeText = SPLFormatStringOwned(L"%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
 
-    if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, tmp, 50))
-        sprintf(tmp, "%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
-
-    strcat(buf, ", ");
-    strcat(buf, tmp);
+    result += L", " + date + L", " + timeText;
 
     FindClose(find);
+    return result;
 }
 
 BOOL WINAPI
-CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                      int panel, int selectedFiles, int selectedDirs,
-                                     char* targetPath, BOOL& operationMask,
+                                     CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                      BOOL& cancelOrHandlePath, HWND dropTarget)
 {
-    CPathBuffer path; // Heap-allocated for long path support
+    std::wstring payload;
+    wmobile::OperationTarget callbackTarget;
+    if (targetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*targetPath, payload) ||
+        !wmobile::DecodeOperationTarget(payload,
+                                        mode == 3 || mode == 5, callbackTarget))
+    {
+        cancelOrHandlePath = TRUE;
+        return TRUE;
+    }
+
+    const BOOL result = CopyOrMoveFromFSOwned(copy, mode, fsName, parent, panel,
+                                               selectedFiles, selectedDirs, callbackTarget.path,
+                                               callbackTarget.mask, operationMask,
+                                               cancelOrHandlePath, dropTarget);
+    if (!sally::plugin_abi::WriteStringBuffer(*targetPath, callbackTarget.path))
+    {
+        cancelOrHandlePath = TRUE;
+        return TRUE;
+    }
+    return result;
+}
+
+BOOL WINAPI
+CPluginFSInterface::CopyOrMoveFromFSOwned(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                          int panel, int selectedFiles, int selectedDirs,
+                                          std::wstring& targetPath, const std::wstring& suppliedMask,
+                                          BOOL& operationMask, BOOL& cancelOrHandlePath,
+                                          HWND dropTarget)
+{
+    std::wstring path;
     operationMask = FALSE;
     cancelOrHandlePath = FALSE;
     if (mode == 1) // first call to CopyOrMoveFromFS
     {
-        if (*targetPath == 0)
+        if (targetPath.empty())
         {
             int targetPanel = (panel == PANEL_LEFT ? PANEL_RIGHT : PANEL_LEFT);
             int type;
-            char* fs;
-            if (SalamanderGeneral->GetPanelPath(targetPanel, path, path.Size(), &type, &fs))
+            size_t fsOffset = std::wstring::npos;
+            if (SPLGetPanelPathOwned(SalamanderGeneral, targetPanel, path, &type, &fsOffset))
             {
-                if (type == PATH_TYPE_FS && fs - path == (int)strlen(fsName) &&
-                    SalamanderGeneral->StrNICmp(path, fsName, (int)(fs - path)) == 0)
-                {
-                    strcpy(targetPath, path);
-                }
+                const std::wstring panelFSName = fsOffset != std::wstring::npos
+                                                     ? path.substr(0, fsOffset)
+                                                     : std::wstring();
+                if (type == PATH_TYPE_FS && panelFSName == fsName)
+                    targetPath = path;
             }
         }
         // If a path was suggested, append the *.* mask (we will process operation masks)
-        if (*targetPath != 0)
+        if (!targetPath.empty())
         {
-            SalamanderGeneral->SalPathAppend(targetPath, "*.*", 2 * MAX_PATH);
+            SPLSalPathAppendOwned(targetPath, L"*.*");
             SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_TARGET); // default action = work with the path in the target panel
         }
         return FALSE; // request for the standard dialog
@@ -1227,22 +1359,22 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         return FALSE; // request for the standard dialog
     }
 
-    CPathBuffer buf; // Heap-allocated for long path support
-    CPathBuffer nextFocus;
-    nextFocus[0] = 0;
+    std::wstring nextFocus;
+    std::wstring operationMaskValue;
 
     BOOL diskPath = TRUE;  // when 'mode'==3 'targetPath' holds a Windows path (FALSE = path on this FS)
-    char* userPart = NULL; // pointer into 'targetPath' to the user portion of the FS path (when 'diskPath' is FALSE)
+    size_t userPartOffset = std::wstring::npos;
     BOOL rename = FALSE;   // TRUE means renaming/copying a directory into itself
 
     if (mode == 2) // a string arrived from the standard dialog entered by the user
     {
         // Handle relative paths ourselves (Salamander cannot do that)
-        if ((targetPath[0] != '\\' || targetPath[1] != '\\') && // not a UNC path
-            (targetPath[0] == 0 || targetPath[1] != ':'))       // not a normal disk path
+        const BOOL uncPath = targetPath.size() >= 2 && targetPath[0] == L'\\' && targetPath[1] == L'\\';
+        const BOOL drivePath = targetPath.size() >= 2 && targetPath[1] == L':';
+        if (!uncPath && !drivePath)
         {                                                       // neither a Windows path, nor an archive path
-            userPart = strchr(targetPath, ':');
-            if (userPart == NULL) // path does not contain an FS name, so it is relative
+            const size_t colon = targetPath.find(L':');
+            if (colon == std::wstring::npos) // path does not contain an FS name, so it is relative
             {                     // a relative path with ':' is not allowed here (cannot be distinguished from an absolute path to some FS)
 
                 // For disk paths we could use SalGetFullName:
@@ -1250,61 +1382,15 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 // After that it would be enough to prepend the FS name to the obtained path
                 // but instead we demonstrate our own implementation (using SalRemovePointsFromPath and others):
 
-                char* s = strchr(targetPath, '\\');
-                if (s == NULL || *(s + 1) == 0)
-                {
-                    int l;
-                    if (s != NULL)
-                        l = (int)(s - targetPath);
-                    else
-                        l = (int)strlen(targetPath);
-                    if (l > nextFocus.Size() - 1)
-                        l = nextFocus.Size() - 1;
-                    memcpy(nextFocus, targetPath, l);
-                    nextFocus[l] = 0;
-                }
-
-                strcpy(path, fsName);
-                s = path + strlen(path);
-                *s++ = ':';
-                userPart = s;
-                BOOL tooLong = FALSE;
-                int rootLen = 1;
-                *s = '\\';
-                if (targetPath[0] == '\\') // "\\path" -> compose root + newName
-                {
-                    s += rootLen;
-                    int len = (int)strlen(targetPath + 1); // without the leading '\\'
-                    if (len + rootLen >= MAX_PATH)
-                        tooLong = TRUE;
-                    else
-                    {
-                        memcpy(s, targetPath + 1, len);
-                        *(s + len) = 0;
-                    }
-                }
-                else // "path" -> compose Path + newName
-                {
-                    int pathLen = (int)strlen(Path);
-                    if (pathLen < rootLen)
-                        rootLen = pathLen;
-                    strcpy(s + rootLen, Path + rootLen); // root was already copied there
-                    tooLong = !CRAPI::PathAppend(s, targetPath, MAX_PATH);
-                }
-
-                if (tooLong)
-                {
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                                     TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-                    // 'targetPath' is returned unchanged (as entered by the user)
-                    return FALSE; // error -> reopen the standard dialog
-                }
-
-                strcpy(targetPath, path);
-                userPart = targetPath + (userPart - path);
+                std::wstring resolvedTarget;
+                if (!wmobile::ResolveRelativeDeviceTarget(fsName, Path, targetPath,
+                                                           resolvedTarget, userPartOffset,
+                                                           nextFocus))
+                    return FALSE;
+                targetPath.swap(resolvedTarget);
             }
             else
-                userPart++;
+                userPartOffset = colon + 1;
 
             // FS destination path ('targetPath' - full path, 'userPart' - pointer inside the full path to the user part)
             // At this point the plugin can handle FS paths (both its own and foreign ones)
@@ -1312,35 +1398,36 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
             // sequence of operations via TEMP (for example download from FTP to TEMP, then upload
             // from TEMP back to FTP - if it can be done more efficiently, as with FTP, the plugin should handle it here)
 
-            if ((userPart - targetPath) - 1 == (int)strlen(fsName) &&
-                SalamanderGeneral->StrNICmp(targetPath, fsName, (int)(userPart - targetPath) - 1) == 0)
+            const std::wstring targetFSName = targetPath.substr(0, userPartOffset - 1);
+            if (SalamanderGeneral->StrICmp(targetFSName.c_str(), fsName) == 0)
             { // it is CEFS (otherwise let Salamander process it normally)
-                BOOL invPath = (userPart[0] != '\\');
+                BOOL invPath = userPartOffset >= targetPath.size() || targetPath[userPartOffset] != L'\\';
 
-                int rootLen = 0;
+                size_t rootLen = 0;
                 if (!invPath)
-                {
                     rootLen = 1;
-                    int userPartLen = (int)strlen(userPart);
-                    if (userPartLen < rootLen)
-                        rootLen = userPartLen;
-                }
 
                 // The full path to this FS may also contain "." and ".." entered by the user - remove them
-                if (invPath || !SalamanderGeneral->SalRemovePointsFromPath(userPart + rootLen))
+                if (invPath)
                 {
                     // Additionally we could display 'err' (when 'invPath' is TRUE); ignored here for simplicity
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_INVALIDPATH),
+                    SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_INVALIDPATH).c_str(),
                                                      TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
                     // 'targetPath' is returned after the modification (path expansion) + possible adjustment of some ".." and "."
                     return FALSE; // error -> reopen the standard dialog
                 }
+                if (!WMobileRemovePointsFromPathOwned(targetPath, userPartOffset + rootLen))
+                {
+                    SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_INVALIDPATH).c_str(),
+                                                     TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+                    return FALSE;
+                }
 
                 // Trim the unnecessary backslash
-                int l = (int)strlen(userPart);
-                BOOL backslashAtEnd = l > 0 && userPart[l - 1] == '\\';
-                if (l > 1 && userPart[l - 1] == '\\') // path of the form "\path\"
-                    userPart[l - 1] = 0;              // remove the trailing backslash
+                const size_t userPartLength = targetPath.size() - userPartOffset;
+                BOOL backslashAtEnd = userPartLength > 0 && targetPath.back() == L'\\';
+                if (userPartLength > 1 && targetPath.back() == L'\\')
+                    targetPath.pop_back();
 
                 // Analyse the path - locate the existing part, the missing part, and the operation mask
                 //
@@ -1358,43 +1445,33 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 
                 // Determine how far the path exists (split into existing and missing parts)
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-                char* end = targetPath + strlen(targetPath);
-                char* afterRoot = userPart + 1; // JR root = '\\'
-                char lastChar = 0;
+                size_t end = targetPath.size();
+                const size_t afterRoot = userPartOffset + 1; // JR root = '\\'
                 BOOL pathIsDir = TRUE;
                 BOOL pathError = FALSE;
 
                 // If the path contains a mask, cut it off without calling GetFileAttributes
                 if (end > afterRoot) // still more than just the root
                 {
-                    char* end2 = end;
-                    BOOL cut = FALSE;
-                    while (*--end2 != '\\') // there is guaranteed to be at least one '\\' after the root path
-                    {
-                        if (*end2 == '*' || *end2 == '?')
-                            cut = TRUE;
-                    }
-                    if (cut) // the name contains a mask -> trim it
-                    {
-                        end = end2;
-                        lastChar = *end;
-                        *end = 0;
-                    }
+                    const size_t slash = targetPath.rfind(L'\\', end - 1);
+                    if (slash != std::wstring::npos &&
+                        targetPath.find_first_of(L"*?", slash + 1) != std::wstring::npos)
+                        end = slash;
                 }
 
                 while (end > afterRoot) // still more than just the root
                 {
-                    DWORD attrs = CRAPI::GetFileAttributes(userPart);
+                    const std::wstring existingPath = targetPath.substr(userPartOffset, end - userPartOffset);
+                    DWORD attrs = CRAPI::GetFileAttributesWide(existingPath.c_str());
                     if (attrs != 0xFFFFFFFF) // this portion of the path exists
                     {
                         if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it is a file
                         {
                             // An existing path must not include a file name (see SalSplitGeneralPath); trim it...
-                            *end = lastChar;   // restore 'targetPath'
                             pathIsDir = FALSE; // the existing part of the path is a file
-                            while (*--end != '\\')
-                                ;            // there is guaranteed to be at least one '\\' beyond the root path
-                            lastChar = *end; // so the path remains valid
+                            end = targetPath.rfind(L'\\', end - 1);
+                            if (end == std::wstring::npos)
+                                pathError = TRUE;
                             break;
                         }
                         else
@@ -1407,29 +1484,33 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                             err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
                             err != ERROR_DIRECTORY) // unexpected error - just report it
                         {
-                            sprintf(buf, LoadStr(IDS_PATH_ERROR), targetPath, SalamanderGeneral->GetErrorText(err));
-                            SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+                            const std::wstring message = SPLFormatStringOwned(
+                                LangStr(IDS_PATH_ERROR).c_str(), targetPath.c_str(),
+                                SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+                            SalamanderGeneral->SalMessageBox(parent, message.c_str(), TitleWMobileError,
+                                                             MB_OK | MB_ICONEXCLAMATION);
                             pathError = TRUE;
                             break; // report the error
                         }
                     }
 
-                    *end = lastChar; // restore 'targetPath'
-                    while (*--end != '\\')
-                        ; // there is guaranteed to be at least one '\\' after the root path
-                    lastChar = *end;
-                    *end = 0;
+                    end = targetPath.rfind(L'\\', end - 1);
+                    if (end == std::wstring::npos)
+                    {
+                        pathError = TRUE;
+                        break;
+                    }
                 }
-                *end = lastChar; // restore 'targetPath'
                 SetCursor(oldCur);
 
                 if (!pathError) // the split finished without errors
                 {
-                    if (*end == '\\')
+                    if (end < targetPath.size() && targetPath[end] == L'\\')
                         end++;
 
-                    const char* dirName = NULL;
-                    const char* curPath = NULL;
+                    const wchar_t* dirName = NULL;
+                    const wchar_t* curPath = NULL;
+                    std::wstring currentFullPath;
                     if (selectedFiles + selectedDirs <= 1)
                     {
                         const CFileData* f;
@@ -1440,33 +1521,31 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                             int index = 0;
                             f = SalamanderGeneral->GetPanelSelectedItem(panel, &index, NULL);
                         }
-                        dirName = f->Name;
-
-                        sprintf(path, "%s:%s", fsName, Path);
-                        curPath = path;
+                        if (f != NULL)
+                            dirName = f->Name;
+                        currentFullPath = std::wstring(fsName) + L":" + Path;
+                        curPath = currentFullPath.c_str();
                     }
 
-                    CPathBuffer newDirs;
-                    char *mask;
-                    if (SalamanderGeneral->SalSplitGeneralPath(parent, TitleWMobile, TitleWMobileError, selectedFiles + selectedDirs,
-                                                               targetPath, afterRoot, end, pathIsDir,
-                                                               backslashAtEnd, dirName, curPath, mask, newDirs,
-                                                               CEFS_IsTheSamePath))
+                    std::wstring newDirs;
+                    if (WMobileSplitGeneralPath(
+                            parent, TitleWMobile, TitleWMobileError,
+                            selectedFiles + selectedDirs, targetPath, afterRoot, end,
+                            pathIsDir, backslashAtEnd, dirName, curPath,
+                            operationMaskValue, &newDirs, TRUE))
                     {
-                        if (newDirs[0] != 0) // need to create some subdirectories on the target path
+                        if (!newDirs.empty()) // need to create some subdirectories on the target path
                         {
-                            if (!CRAPI::CheckAndCreateDirectory(userPart, parent, true, NULL, 0, NULL))
+                            const std::wstring targetUserPart = targetPath.substr(userPartOffset);
+                            if (!CRAPI::CheckAndCreateDirectory(targetUserPart.c_str(), parent, true))
                             {
-                                char* e = targetPath + strlen(targetPath); // restore 'targetPath' (join 'targetPath' and 'mask')
-                                if (e > targetPath && *(e - 1) != '\\')
-                                    *e++ = '\\';
-                                if (e != mask)
-                                    memmove(e, mask, strlen(mask) + 1); // move the mask if needed
+                                SPLSalPathAppendOwned(targetPath, operationMaskValue.c_str());
                                 pathError = TRUE;
                             }
                         }
-                        else if (dirName != NULL && curPath != NULL && SalamanderGeneral->StrICmp(dirName, mask) == 0 &&
-                                 CEFS_IsTheSamePath(targetPath, curPath))
+                        else if (dirName != NULL && curPath != NULL &&
+                                 SalamanderGeneral->StrICmp(dirName, operationMaskValue.c_str()) == 0 &&
+                                 CEFS_IsTheSamePathWide(targetPath.c_str(), curPath))
                         {
                             // Renaming/copying a directory into itself (differing only by letter case) - "change-case"
                             // cannot be treated as an operation mask (the specified target path exists; splitting it into a mask is
@@ -1497,7 +1576,6 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         }
     }
 
-    const char* opMask = NULL; // operation mask
     if (mode == 5)             // operation target specified via drag&drop
     {
         // If it is a disk path, just set the operation mask and continue (same as with 'mode'==3);
@@ -1506,26 +1584,26 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         // a path to another FS, throw a "not supported" error
 
         BOOL ok = FALSE;
-        opMask = "*.*";
+        operationMaskValue = L"*.*";
         int type;
-        char* secondPart;
+        size_t secondPartOffset = std::wstring::npos;
         BOOL isDir;
-        if (targetPath[0] != 0 && targetPath[1] == ':' ||   // disk path (C:\path)
-            targetPath[0] == '\\' && targetPath[1] == '\\') // UNC path (\\server\share\path)
+        if (targetPath.size() >= 2 &&
+            (targetPath[1] == L':' ||
+             targetPath[0] == L'\\' && targetPath[1] == L'\\'))
         {                                                   // append a trailing backslash so it is always treated as a path (for 'mode'==5 it is always a path)
-            SalamanderGeneral->SalPathAddBackslash(targetPath, MAX_PATH);
+            SPLSalPathAddBackslashOwned(targetPath);
         }
-        if (SalamanderGeneral->SalParsePath(parent, targetPath, type, isDir, secondPart,
-                                            TitleWMobileError, NULL, FALSE,
-                                            NULL, NULL, NULL, 2 * MAX_PATH))
+        if (SPLSalParsePathOwned(SalamanderGeneral, parent, targetPath, type, isDir,
+                                 secondPartOffset, TitleWMobileError, FALSE, NULL))
         {
             switch (type)
             {
             case PATH_TYPE_WINDOWS:
             {
-                if (*secondPart != 0)
+                if (secondPartOffset < targetPath.size())
                 {
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_TARGETPATHNOEXISTS),
+                    SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_TARGETPATHNOEXISTS).c_str(),
                                                      TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
                 }
                 else
@@ -1535,16 +1613,16 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 
             case PATH_TYPE_FS:
             {
-                userPart = secondPart;
-                if ((userPart - targetPath) - 1 == (int)strlen(fsName) &&
-                    SalamanderGeneral->StrNICmp(targetPath, fsName, (int)(userPart - targetPath) - 1) == 0)
+                userPartOffset = secondPartOffset;
+                const std::wstring targetFSName = targetPath.substr(0, userPartOffset - 1);
+                if (SalamanderGeneral->StrICmp(targetFSName.c_str(), fsName) == 0)
                 { // je to CEFS
                     diskPath = FALSE;
                     ok = TRUE;
                 }
                 else // different FS, just report "not supported"
                 {
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_COPYTOOTHERFS), TitleWMobileError,
+                    SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_COPYTOOTHERFS).c_str(), TitleWMobileError,
                                                      MB_OK | MB_ICONEXCLAMATION);
                 }
                 break;
@@ -1553,7 +1631,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
             //case PATH_TYPE_ARCHIVE:
             default: // archive, just report "not supported"
             {
-                SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_COPYTOARCHIVES),
+                SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_COPYTOARCHIVES).c_str(),
                                                  TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
                 break;
             }
@@ -1568,51 +1646,31 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 
     // 'mode' is 2, 3 or 5
 
-    // Determine the operation mask (the target path is in 'targetPath')
-    if (opMask == NULL)
-    {
-        opMask = targetPath;
-        while (*opMask != 0)
-            opMask++;
-        opMask++;
-    }
+    if (mode == 3)
+        operationMaskValue = suppliedMask;
 
-    // Prepare buffers for names
-    CPathBuffer sourceName; // buffer for the full disk name (the source resides on disk for CEFS)
-    strcpy(sourceName, Path);
-    char* endSource = sourceName + strlen(sourceName); // space for names from the panel
-    if (endSource > sourceName && *(endSource - 1) != '\\')
-    {
-        *endSource++ = '\\';
-        *endSource = 0;
-    }
-    int endSourceSize = sourceName.Size() - (int)(endSource - sourceName); // maximum number of characters for a panel name
+    // Prepare buffers for names.
+    //
+    // All three semantic bases and every leaf stay owned UTF-16. Only the named v108 split/output
+    // adapters above project through the live callback's fixed writable storage.
+    wmobile::PathComposer sourceName; // the device path of the item being copied
+    if (!sourceName.SetBase(Path.c_str()))
+        return FALSE;
 
-    CPathBuffer cefsSourceName; // Heap-allocated for long path support — buffer for the full CEFS name (for locating the operation source in the disk cache)
-    sprintf(cefsSourceName, "%s:%s", fsName, sourceName.Get());
-    // Disk names are case-insensitive, the disk cache is case-sensitive; converting
-    // to lowercase makes the disk cache behave case-insensitively as well
-    SalamanderGeneral->ToLowerCase(cefsSourceName);
-    char* endCEFSSource = cefsSourceName + strlen(cefsSourceName);                       // space for names from the panel
-    int endCEFSSourceSize = cefsSourceName.Size() - (int)(endCEFSSource - cefsSourceName.Get()); // maximum number of characters for a panel name
+    // The CEFS name is a disk-cache LOOKUP KEY, not a path: "<fsName>:<device path>", lowercased
+    // because the cache is case-sensitive while device names are not. It is composed from the
+    // same leaf as sourceName, so the two must move width together or the key stops matching
+    // what the cache stored.
+    std::wstring cefsBase = std::wstring(fsName) + L":" + sourceName.Get();
+    SPLToLowerCaseOwned(SalamanderGeneral, cefsBase);
+    wmobile::PathComposer cefsSourceName;
+    if (!cefsSourceName.SetBase(cefsBase.c_str()))
+        return FALSE;
 
-    CPathBuffer targetName; // buffer for the full disk name (if the target resides on disk)
-    targetName[0] = 0;
-    char* endTarget = targetName;
-    int endTargetSize = targetName.Size();
-
-    if (diskPath) // Windows target path
-        strcpy(targetName, targetPath);
-    else
-        strcpy(targetName, userPart);
-
-    endTarget = targetName + strlen(targetName); // space for the destination name
-    if (endTarget > targetName && *(endTarget - 1) != '\\')
-    {
-        *endTarget++ = '\\';
-        *endTarget = 0;
-    }
-    endTargetSize = targetName.Size() - (int)(endTarget - targetName); // maximum number of characters for a panel name
+    wmobile::PathComposer targetName; // PC path when 'diskPath', otherwise another device path
+    const std::wstring targetBase = diskPath ? targetPath : targetPath.substr(userPartOffset);
+    if (!targetName.SetBase(targetBase.c_str()))
+        return FALSE;
 
     const CFileData* f = NULL; // pointer to the file/directory in the panel to process
     BOOL isDir = FALSE;        // TRUE if 'f' is a directory
@@ -1627,14 +1685,14 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     BOOL skipAllOverwrite = FALSE;
     BOOL skipAllOverwriteSystemHidden = FALSE;
 
-    rename = !copy && CEFS_IsTheSamePath(sourceName, targetName);
+    rename = !copy && CEFS_IsTheSamePathWide(sourceName, targetName);
 
     // Retrieve the "Confirm on" values from the configuration
     BOOL ConfirmOnFileOverwrite, ConfirmOnSystemHiddenFileOverwrite;
     SalamanderGeneral->GetConfigParameter(SALCFG_CNFRMFILEOVER, &ConfirmOnFileOverwrite, 4, NULL);
     SalamanderGeneral->GetConfigParameter(SALCFG_CNFRMSHFILEOVER, &ConfirmOnSystemHiddenFileOverwrite, 4, NULL);
 
-    SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_WAIT_READINGDIRTREE), TitleWMobile,
+    SalamanderGeneral->CreateSafeWaitWindow(LangStr(IDS_WAIT_READINGDIRTREE).c_str(), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
     CFileInfoArray array(10, 10);
 
@@ -1651,22 +1709,26 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         {
             if (rename)
             {
-                CFileInfo fi;
-                strcpy(fi.cFileName, f->Name);
-                fi.dwFileAttributes = f->Attr;
-                fi.size = 100; // JR Renaming takes roughly the same time regardless of size
-                fi.block = 0;
-
-                array.Add(fi);
-                if (array.State != etNone)
+                // fi.cFileName is wide now: store f->Name (already the genuine
+                // wide panel-selection name, CFileData::Name) directly - no narrow round trip,
+                // no refusal. The old code refused (aborted the WHOLE batch, since this branch
+                // shared its check with the recursion branch below) the moment one selected
+                // item's name couldn't survive a CP_ACP round trip it never actually needed
+                // for a single-file rename.
+                if (!array.AddOwned(f->Name, f->Attr,
+                                    100, // JR Renaming takes roughly the same time regardless of size
+                                    0))
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORYLOW).c_str(), TitleWMobileError, MSGBOX_ERROR);
                     TRACE_E("Low memory");
                     success = false;
                 }
             }
             else
-                success = CRAPI::FindAllFilesInTree(Path, f->Name, array, 0, TRUE);
+            {
+                // Device enumeration is Unicode-native and keeps the selected name wide.
+                success = CRAPI::FindAllFilesInTreeWide(Path.c_str(), f->Name, array, 0, TRUE);
+            }
         }
 
         // Determine whether it makes sense to continue (when not cancelled and another selected item exists)
@@ -1682,7 +1744,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         mainWnd = parentWin;
     // disablujeme 'mainWnd'
 
-    CProgress2Dlg dlg(mainWnd, LoadStr(copy ? IDS_COPY : IDS_MOVE), LoadStr(copy ? IDS_COPYING : IDS_MOVING), LoadStr(IDS_TO), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
+    CProgress2Dlg dlg(mainWnd, LangStr(copy ? IDS_COPY : IDS_MOVE).c_str(), LangStr(copy ? IDS_COPYING : IDS_MOVING).c_str(), LangStr(IDS_TO).c_str(), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
 
     dlg.Create();
     EnableWindow(mainWnd, FALSE);
@@ -1697,30 +1759,42 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     {
         CFileInfo& fi = array[i];
 
-        char* targetFile = SalamanderGeneral->MaskName(buf, buf.Size(), fi.cFileName, opMask);
+        // fi.cFileName is used as it comes off the device. What stood here was a
+        // narrowing bridge that did `continue` when a name left the system code page - so a copy
+        // of a folder containing such a file quietly produced a folder MISSING that file, with
+        // only a TRACE_E to say so. Nothing downstream needs the name narrow any more.
+        std::wstring maskedName;
+        const wchar_t* targetFile = SPLMaskNameOwned(SalamanderGeneral, fi.cFileName, operationMaskValue.c_str(), maskedName)
+                                        ? maskedName.c_str()
+                                        : NULL;
 
-        if ((int)strlen(fi.cFileName) >= endSourceSize || (int)strlen(targetFile) >= endTargetSize)
+        // The composers replace their owned leaves without a path-sized capacity.
+        if (targetFile == NULL ||
+            !sourceName.SetLeaf(fi.cFileName) ||
+            !cefsSourceName.SetLeaf(fi.cFileName) ||
+            !targetName.SetLeaf(targetFile))
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
+            SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_NAMETOOLONG).c_str(),
                                              TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
             success = FALSE;
             break;
         }
 
-        lstrcpyn(endSource, fi.cFileName, endSourceSize);
-        lstrcpyn(endCEFSSource, fi.cFileName, endCEFSSourceSize);
         // Disk names are case-insensitive, the disk cache is case-sensitive; converting
         // to lowercase makes the disk cache behave case-insensitively as well
-        SalamanderGeneral->ToLowerCase(endCEFSSource);
-
-        // Compose the target name - simplified without the LoadStr(IDS_ERR_NAMETOOLONG) error check
-        lstrcpyn(endTarget, targetFile, endTargetSize);
+        const wchar_t* sourceLeaf = cefsSourceName.Leaf();
+        if (sourceLeaf == NULL)
+            return FALSE;
+        std::wstring foldedLeaf(sourceLeaf);
+        if (!SPLToLowerCaseOwned(SalamanderGeneral, foldedLeaf) ||
+            !cefsSourceName.SetLeaf(foldedLeaf.c_str()))
+            return FALSE;
 
         isDir = (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        if (copy && SalamanderGeneral->StrICmp(sourceName, targetName) == 0)
+        if (copy && SalamanderGeneral->StrICmp(sourceName.Get(), targetName.Get()) == 0)
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(isDir ? IDS_ERR_COPYDIRTOITSELF : IDS_ERR_COPYFILETOITSELF), TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+            SalamanderGeneral->SalMessageBox(parent, LangStr(isDir ? IDS_ERR_COPYDIRTOITSELF : IDS_ERR_COPYFILETOITSELF).c_str(), TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
             success = FALSE;
             break;
         }
@@ -1735,13 +1809,14 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
             {
                 while (1)
                 {
-                    if (!(diskPath ? SalamanderGeneral->CheckAndCreateDirectory(targetName, parent, true, NULL, 0, NULL) : CRAPI::CheckAndCreateDirectory(targetName, parent, true, NULL, 0, NULL)))
+                    // the SDK arm is wide; CRAPI:: is this plugin's own narrow helper
+                    if (!(diskPath ? SalamanderGeneral->CheckAndCreateDirectory(targetName, parent, true) : CRAPI::CheckAndCreateDirectory(targetName, parent, true)))
                     {
                         if (!skipAllErrors)
                         {
                             DWORD err = diskPath ? GetLastError() : CRAPI::GetLastError();
-                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, targetName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, targetName.Get(),
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -1779,7 +1854,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 if (diskPath)
                     attr = SalamanderGeneral->SalGetFileAttributes(targetName);
                 else
-                    attr = CRAPI::GetFileAttributes(targetName);
+                    attr = CRAPI::GetFileAttributesWide(targetName);
             }
 
             if (attr != 0xFFFFFFFF)
@@ -1788,15 +1863,16 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 {
                     if (ConfirmOnFileOverwrite)
                     {
-                        char sourceData[100], targetData[100];
-
-                        CRAPI::GetFileData(sourceName, sourceData);
+                        const std::wstring sourceData = CRAPI::GetFileDataWide(sourceName);
+                        std::wstring targetData;
                         if (diskPath)
-                            GetFileData(targetName, targetData);
+                            targetData = GetFileDataWide(targetName);
                         else
-                            CRAPI::GetFileData(targetName, targetData);
+                            targetData = CRAPI::GetFileDataWide(targetName);
 
-                        int res = SalamanderGeneral->DialogOverwrite(parent, BUTTONS_YESALLSKIPCANCEL, targetName, targetData, sourceName, sourceData);
+                        int res = SalamanderGeneral->DialogOverwrite(parent, BUTTONS_YESALLSKIPCANCEL,
+                                                                    targetName, targetData.c_str(),
+                                                                    sourceName, sourceData.c_str());
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -1824,7 +1900,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                     if (!skipAllOverwriteSystemHidden)
                     {
                         int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, targetName,
-                                                                    LoadStr(IDS_YESNO_OVERWRITEHIDDENFILE), TitleWMobileQuestion);
+                                                                    LangStr(IDS_YESNO_OVERWRITEHIDDENFILE).c_str(), TitleWMobileQuestion);
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -1853,12 +1929,12 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 while (1)
                 {
                     DWORD err = 0;
-                    LPCTSTR errFileName = "";
+                    const wchar_t* errFileName = L"";
                     if (diskPath) // JR Windows destination path
                     {
                         if (attr != 0xFFFFFFFF &&
                             (attr & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY)))
-                            SetFileAttributes(targetName, FILE_ATTRIBUTE_ARCHIVE);
+                            ::SetFileAttributesW(targetName, FILE_ATTRIBUTE_ARCHIVE); // PC
 
                         err = CRAPI::CopyFileToPC(sourceName, targetName, FALSE, &dlg, copied, totalsize, &errFileName);
                     }
@@ -1866,18 +1942,18 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                     {
                         if (attr != 0xFFFFFFFF &&
                             (attr & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY)))
-                            CRAPI::SetFileAttributes(targetName, FILE_ATTRIBUTE_ARCHIVE);
+                            CRAPI::SetFileAttributesWide(targetName, FILE_ATTRIBUTE_ARCHIVE);
 
                         if (copy)
                         {
-                            err = CRAPI::CopyFile(sourceName, targetName, FALSE, &dlg, copied, totalsize, &errFileName);
+                            err = CRAPI::CopyFileWide(sourceName, targetName, FALSE, &dlg, copied, totalsize, &errFileName);
                         }
                         else
                         {
                             if (attr != 0xFFFFFFFF)
-                                CRAPI::DeleteFile(targetName);
+                                CRAPI::DeleteFileWide(targetName);
 
-                            if (!CRAPI::MoveFile(sourceName, targetName))
+                            if (!CRAPI::MoveFileWide(sourceName, targetName))
                                 err = CRAPI::GetLastError();
                             else if (dlg.GetWantCancel())
                                 err = -1;
@@ -1893,7 +1969,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         else if (!skipAllErrors)
                         {
                             int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, errFileName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -1936,15 +2012,15 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                     if (fi.block != -1)
                     {
                         if (fi.dwFileAttributes & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY))
-                            CRAPI::SetFileAttributes(sourceName, FILE_ATTRIBUTE_ARCHIVE);
+                            CRAPI::SetFileAttributesWide(sourceName, FILE_ATTRIBUTE_ARCHIVE);
 
-                        if (!CRAPI::RemoveDirectory(sourceName))
+                        if (!CRAPI::RemoveDirectoryWide(sourceName))
                         {
                             if (!skipAllErrors)
                             {
                                 DWORD err = CRAPI::GetLastError();
-                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, cefsSourceName,
-                                                                         SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, cefsSourceName.Get(),
+                                                                         SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                                 switch (res)
                                 {
                                 case DIALOG_RETRY:
@@ -1967,7 +2043,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         else
                         {
                             // remove the deleted file's copy from the disk cache (if it is cached)
-                            SalamanderGeneral->RemoveFilesFromCache(cefsSourceName);
+                            WMobileRemoveFilesFromCacheWide(cefsSourceName.Get());
 
                             sourcePathChanged = TRUE;
                             subdirsOfSourcePathChanged = TRUE;
@@ -1981,15 +2057,15 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 {
                     // remove the file on CEFS
                     if (fi.dwFileAttributes & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY))
-                        CRAPI::SetFileAttributes(sourceName, FILE_ATTRIBUTE_ARCHIVE);
+                        CRAPI::SetFileAttributesWide(sourceName, FILE_ATTRIBUTE_ARCHIVE);
 
-                    if (!CRAPI::DeleteFile(sourceName))
+                    if (!CRAPI::DeleteFileWide(sourceName))
                     {
                         if (!skipAllErrors)
                         {
                             DWORD err = CRAPI::GetLastError();
-                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, cefsSourceName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, cefsSourceName.Get(),
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2012,7 +2088,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                     else
                     {
                         // remove the deleted file's copy from the disk cache (if it is cached)
-                        SalamanderGeneral->RemoveOneFileFromCache(cefsSourceName);
+                        WMobileRemoveFileFromCacheWide(cefsSourceName.Get());
 
                         sourcePathChanged = TRUE;
                         break; // successful delete
@@ -2040,45 +2116,42 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     // Change on the source path Path (primarily move operations)
     if (sourcePathChanged)
     {
-        sprintf(path, "%s:%s", fsName, Path);
-        SalamanderGeneral->PostChangeOnPathNotification(path, subdirsOfSourcePathChanged);
+        const std::wstring changedPath = std::wstring(fsName) + L":" + Path;
+        SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), subdirsOfSourcePathChanged);
     }
 
     // Change on the target path 'targetPath'
     if (targetPathChanged)
-        SalamanderGeneral->PostChangeOnPathNotification(targetPath, subdirsOfTargetPathChanged);
+        SalamanderGeneral->PostChangeOnPathNotification(targetPath.c_str(), subdirsOfTargetPathChanged);
 
     SalamanderGeneral->RestoreFocusInSourcePanel();
 
     if (success)
-        strcpy(targetPath, nextFocus); // success
+        targetPath = nextFocus;
     else
         cancelOrHandlePath = TRUE; // error/cancel
     return TRUE;                   // success or error/cancel handled
 }
 
-static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR fileName, CFileInfoArray& array, BOOL dirFirst, int block)
+static BOOL FindAllFilesInTree(const wchar_t* rootPath, std::wstring& path, const wchar_t* fileName,
+                               CFileInfoArray& array, BOOL dirFirst, int block)
 {
     HANDLE find = INVALID_HANDLE_VALUE;
 
-    WIN32_FIND_DATA data;
-    CPathBuffer fullPath;
-    strcpy(fullPath, rootPath);
-    if (!SalamanderGeneral->SalPathAppend(fullPath, path, fullPath.Size()) ||
-
-        !SalamanderGeneral->SalPathAppend(fullPath, fileName, fullPath.Size()))
-        goto ONERROR_TOOLONG;
-
-    find = FindFirstFile(fullPath, &data);
+    WIN32_FIND_DATAW data;
+    std::wstring fullPath(rootPath);
+    SPLSalPathAppendOwned(fullPath, path.c_str());
+    SPLSalPathAppendOwned(fullPath, fileName);
+    find = FindFirstFileW(fullPath.c_str(), &data);
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
         if (err == ERROR_NO_MORE_FILES || err == ERROR_FILE_NOT_FOUND)
             return TRUE; // JR empty directory, stop
 
-        CPathBuffer buf; // Heap-allocated for long path support
-        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
+        const std::wstring message = SPLFormatStringOwned(LangStr(IDS_PATH_ERROR).c_str(), fullPath.c_str(),
+                                                           SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+        SalamanderGeneral->ShowMessageBox(message.c_str(), TitleWMobileError, MSGBOX_ERROR);
         return FALSE;
     }
 
@@ -2087,67 +2160,55 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
         // JR TODO: This does not work!
         if (SalamanderGeneral->GetSafeWaitWindowClosePressed())
         {
-            if (SalamanderGeneral->ShowMessageBox(LoadStr(IDS_YESNO_CANCEL), TitleWMobileQuestion,
+            if (SalamanderGeneral->ShowMessageBox(LangStr(IDS_YESNO_CANCEL).c_str(), TitleWMobileQuestion,
                                                   MSGBOX_QUESTION) == IDYES)
                 goto ONERROR;
         }
 
         if (data.cFileName[0] != 0 &&
-            (data.cFileName[0] != '.' || // JR Windows Mobile does not return "." and ".." paths, but handle it just in case
-             (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
+            (data.cFileName[0] != L'.' || // JR Windows Mobile does not return "." and ".." paths, but handle it just in case
+             (data.cFileName[1] != 0 && (data.cFileName[1] != L'.' || data.cFileName[2] != 0))))
         {
-            CFileInfo fi;
-            strcpy(fi.cFileName, path);
-            if (!SalamanderGeneral->SalPathAppend(fi.cFileName, data.cFileName, MAX_PATH))
-                goto ONERROR_TOOLONG;
-
-            fi.dwFileAttributes = data.dwFileAttributes;
-
-            if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            std::wstring relativePath(path);
+            SPLSalPathAppendOwned(relativePath, data.cFileName);
+            const BOOL isDirectory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            if ((!isDirectory || dirFirst) &&
+                !array.AddOwned(relativePath.c_str(), data.dwFileAttributes,
+                                isDirectory ? 0 : data.nFileSizeLow,
+                                isDirectory ? -1 : block))
             {
-                fi.size = 0;
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORYLOW).c_str(), TitleWMobileError, MSGBOX_ERROR);
+                TRACE_E("Low memory");
+                goto ONERROR;
+            }
 
-                if (dirFirst)
+            if (isDirectory)
+            {
+                const size_t oldLength = path.size();
+                SPLSalPathAppendOwned(path, data.cFileName);
+                if (!FindAllFilesInTree(rootPath, path, L"*.*", array, dirFirst, block))
+                    goto ONERROR; // JR The error has already been reported
+                path.resize(oldLength);
+
+                if (!dirFirst)
                 {
-                    fi.block = -1;
-                    array.Add(fi);
-                    if (array.State != etNone)
+                    if (!array.AddOwned(relativePath.c_str(), data.dwFileAttributes, 0, block))
                     {
-                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORYLOW).c_str(), TitleWMobileError, MSGBOX_ERROR);
                         TRACE_E("Low memory");
                         goto ONERROR;
                     }
                 }
-
-                int len = (int)strlen(path);
-                if (!SalamanderGeneral->SalPathAppend(path, data.cFileName, MAX_PATH))
-                    goto ONERROR_TOOLONG;
-
-                if (!FindAllFilesInTree(rootPath, path, "*.*", array, dirFirst, block))
-                    goto ONERROR; // JR The error has already been reported
-
-                path[len] = 0;
-            }
-            else
-                fi.size = data.nFileSizeLow;
-
-            fi.block = block;
-            array.Add(fi);
-            if (array.State != etNone)
-            {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
-                TRACE_E("Low memory");
-                goto ONERROR;
             }
         }
 
-        if (!FindNextFile(find, &data))
+        if (!FindNextFileW(find, &data))
         {
             if (GetLastError() == ERROR_NO_MORE_FILES)
                 break; // JR Everything is fine, stop
 
             DWORD err = GetLastError();
-            SalamanderGeneral->ShowMessageBox(SalamanderGeneral->GetErrorText(err), TitleWMobileError, MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), TitleWMobileError, MSGBOX_ERROR);
             FindClose(find);
             return FALSE;
         }
@@ -2156,28 +2217,52 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
     FindClose(find);
     return TRUE;
 
-ONERROR_TOOLONG:
-    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
-                                      TitleWMobileError, MSGBOX_ERROR);
 ONERROR:
     if (find != INVALID_HANDLE_VALUE)
         FindClose(find);
     return FALSE;
 }
 
-static BOOL FindAllFilesInTree(const char* rootPath, const char* fileName, CFileInfoArray& array, BOOL dirFirst, int block)
+static BOOL FindAllFilesInTree(const wchar_t* rootPath, const wchar_t* fileName,
+                               CFileInfoArray& array, BOOL dirFirst, int block)
 {
-    char path[MAX_PATH]; // NOTE: Cannot use CPathBuffer — callee expects char(&)[MAX_PATH] reference
-    path[0] = 0;
-
+    std::wstring path;
     return FindAllFilesInTree(rootPath, path, fileName, array, dirFirst, block);
 }
 
 BOOL WINAPI
-CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                           const char* sourcePath, SalEnumSelection2 next,
+CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                           const wchar_t* sourcePath, SalEnumSelection2 next,
                                            void* nextParam, int sourceFiles, int sourceDirs,
-                                           char* targetPath, BOOL* invalidPathOrCancel)
+                                           CSalamanderStringBuffer* targetPath, BOOL* invalidPathOrCancel)
+{
+    std::wstring payload;
+    wmobile::OperationTarget callbackTarget;
+    if (targetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*targetPath, payload) ||
+        !wmobile::DecodeOperationTarget(payload, false, callbackTarget))
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    const BOOL result = CopyOrMoveFromDiskToFSOwned(copy, mode, fsName, parent, sourcePath,
+                                                     next, nextParam, sourceFiles, sourceDirs,
+                                                     callbackTarget.path, invalidPathOrCancel);
+    if (!sally::plugin_abi::WriteStringBuffer(*targetPath, callbackTarget.path))
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    return result;
+}
+
+BOOL WINAPI
+CPluginFSInterface::CopyOrMoveFromDiskToFSOwned(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                                const wchar_t* sourcePath, SalEnumSelection2 next,
+                                                void* nextParam, int sourceFiles, int sourceDirs,
+                                                std::wstring& targetPath, BOOL* invalidPathOrCancel)
 {
     if (invalidPathOrCancel != NULL)
         *invalidPathOrCancel = FALSE;
@@ -2185,49 +2270,56 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     if (mode == 1)
     {
         // Add the *.* mask to the target path (we will process operation masks)
-        SalamanderGeneral->SalPathAppend(targetPath, "*.*", 2 * MAX_PATH);
+        SPLSalPathAppendOwned(targetPath, L"*.*");
         return TRUE;
     }
-
-    CPathBuffer cefsFileName; // Heap-allocated for long path support
-    CPathBuffer buf; // Heap-allocated for long path support
 
     if (mode != 2 && mode != 3)
         return FALSE; // unknown 'mode'
 
     // 'targetPath' contains the raw path entered by the user (all we know is that it belongs
     // to this FS, otherwise Salamander would not call this method)
-    char* userPart = strchr(targetPath, ':') + 1; // 'targetPath' must contain the FS name + ':'
+    const size_t colon = targetPath.find(L':');
+    if (colon == std::wstring::npos)
+    {
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
+    const size_t userPartOffset = colon + 1;
 
-    BOOL invPath = (userPart[0] != '\\');
+    BOOL invPath = userPartOffset >= targetPath.size() || targetPath[userPartOffset] != L'\\';
 
     // Check whether the operation can be executed on this FS; the user might also have used
     // "." and ".." in the full path to this FS - remove them
-    int rootLen = 0;
+    size_t rootLen = 0;
     if (!invPath)
-    {
         rootLen = 1;
-        int userPartLen = (int)strlen(userPart);
-        if (userPartLen < rootLen)
-            rootLen = userPartLen;
-    }
 
-    if (invPath || !SalamanderGeneral->SalRemovePointsFromPath(userPart + rootLen))
+    if (invPath)
     {
         // Additionally we could display 'err' (when 'invPath' is TRUE); ignored here for simplicity
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_INVALIDPATH),
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_INVALIDPATH).c_str(),
                                          TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
         // 'targetPath' is returned after possibly adjusting some ".." and "."
         if (invalidPathOrCancel != NULL)
             *invalidPathOrCancel = TRUE;
         return FALSE; // let the user correct the path
     }
+    if (!WMobileRemovePointsFromPathOwned(targetPath, userPartOffset + rootLen))
+    {
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_INVALIDPATH).c_str(),
+                                         TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+        if (invalidPathOrCancel != NULL)
+            *invalidPathOrCancel = TRUE;
+        return FALSE;
+    }
 
     // Trim the unnecessary backslash
-    int l = (int)strlen(userPart);
-    BOOL backslashAtEnd = l > 0 && userPart[l - 1] == '\\';
-    if (l > 1 && userPart[l - 1] == '\\') // path of the form "\path\"
-        userPart[l - 1] = 0;              // remove the trailing backslash
+    const size_t userPartLength = targetPath.size() - userPartOffset;
+    BOOL backslashAtEnd = userPartLength > 0 && targetPath.back() == L'\\';
+    if (userPartLength > 1 && targetPath.back() == L'\\')
+        targetPath.pop_back();
 
     // Analyse the path - locate the existing part, the missing part, and the operation mask
     //
@@ -2242,43 +2334,33 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
 
     // Determine how far the path exists (split into existing and missing parts)
     HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-    char* end = targetPath + strlen(targetPath);
-    char* afterRoot = userPart + rootLen;
-    char lastChar = 0;
+    size_t end = targetPath.size();
+    const size_t afterRoot = userPartOffset + rootLen;
     BOOL pathIsDir = TRUE;
     BOOL pathError = FALSE;
 
     // If the path contains a mask, cut it off without calling GetFileAttributes
     if (end > afterRoot) // still more than just the root
     {
-        char* end2 = end;
-        BOOL cut = FALSE;
-        while (*--end2 != '\\') // there is guaranteed to be at least one '\\' after the root path
-        {
-            if (*end2 == '*' || *end2 == '?')
-                cut = TRUE;
-        }
-        if (cut) // the name contains a mask -> trim it
-        {
-            end = end2;
-            lastChar = *end;
-            *end = 0;
-        }
+        const size_t slash = targetPath.rfind(L'\\', end - 1);
+        if (slash != std::wstring::npos &&
+            targetPath.find_first_of(L"*?", slash + 1) != std::wstring::npos)
+            end = slash;
     }
 
     while (end > afterRoot) // still more than just the root
     {
-        DWORD attrs = CRAPI::GetFileAttributes(userPart);
+        const std::wstring existingPath = targetPath.substr(userPartOffset, end - userPartOffset);
+        DWORD attrs = CRAPI::GetFileAttributesWide(existingPath.c_str());
         if (attrs != 0xFFFFFFFF) // this portion of the path exists
         {
             if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it is a file
             {
                 // An existing path must not include a file name (see SalSplitGeneralPath); trim it...
-                *end = lastChar;   // restore 'targetPath'
                 pathIsDir = FALSE; // the existing part of the path is a file
-                while (*--end != '\\')
-                    ;            // there is guaranteed to be at least one '\\' beyond the root path
-                lastChar = *end; // so the path remains valid
+                end = targetPath.rfind(L'\\', end - 1);
+                if (end == std::wstring::npos)
+                    pathError = TRUE;
                 break;
             }
             else
@@ -2291,43 +2373,43 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
                 err != ERROR_DIRECTORY) // unexpected error - just report it
             {
-                sprintf(buf, LoadStr(IDS_PATH_ERROR), targetPath, SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobile, MB_OK | MB_ICONEXCLAMATION);
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_PATH_ERROR).c_str(), targetPath.c_str(),
+                    SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+                SalamanderGeneral->SalMessageBox(parent, message.c_str(), TitleWMobile,
+                                                 MB_OK | MB_ICONEXCLAMATION);
                 pathError = TRUE;
                 break; // report the error
             }
         }
 
-        *end = lastChar; // restore 'targetPath'
-        while (*--end != '\\')
-            ; // there is guaranteed to be at least one '\\' after the root path
-        lastChar = *end;
-        *end = 0;
+        end = targetPath.rfind(L'\\', end - 1);
+        if (end == std::wstring::npos)
+        {
+            pathError = TRUE;
+            break;
+        }
     }
-    *end = lastChar; // restore 'targetPath'
     SetCursor(oldCur);
 
-    char* opMask = NULL;
+    std::wstring operationMaskValue;
     if (!pathError) // the split finished without errors
     {
-        if (*end == '\\')
+        if (end < targetPath.size() && targetPath[end] == L'\\')
             end++;
 
-        CPathBuffer newDirs;
-        if (SalamanderGeneral->SalSplitGeneralPath(parent, TitleWMobile, TitleWMobileError, sourceFiles + sourceDirs,
-                                                   targetPath, afterRoot, end, pathIsDir,
-                                                   backslashAtEnd, NULL, NULL, opMask, newDirs,
-                                                   NULL /* 'isTheSamePathF' not needed */))
+        std::wstring newDirs;
+        if (WMobileSplitGeneralPath(
+                parent, TitleWMobile, TitleWMobileError, sourceFiles + sourceDirs,
+                targetPath, afterRoot, end, pathIsDir, backslashAtEnd,
+                NULL, NULL, operationMaskValue, &newDirs, FALSE))
         {
-            if (newDirs[0] != 0) // need to create some subdirectories on the target path
+            if (!newDirs.empty()) // need to create some subdirectories on the target path
             {
-                if (!CRAPI::CheckAndCreateDirectory(userPart, parent, true, NULL, 0, NULL))
+                const std::wstring targetUserPart = targetPath.substr(userPartOffset);
+                if (!CRAPI::CheckAndCreateDirectory(targetUserPart.c_str(), parent, true))
                 {
-                    char* e = targetPath + strlen(targetPath); // restore 'targetPath' (join 'targetPath' and 'opMask')
-                    if (e > targetPath && *(e - 1) != '\\')
-                        *e++ = '\\';
-                    if (e != opMask)
-                        memmove(e, opMask, strlen(opMask) + 1); // move the mask if needed
+                    SPLSalPathAppendOwned(targetPath, operationMaskValue.c_str());
                     pathError = TRUE;
                 }
             }
@@ -2344,39 +2426,29 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         return FALSE; // path error - let the user fix it
     }
 
-    // Description of the operation target obtained in the preceding code:
-    // 'targetPath' is a path on this FS ('userPart' points to the user part of the FS path), 'opMask' is the operation mask
+    // targetPath and its user-part offset remain owned UTF-16; operationMaskValue is the mask.
 
-    // Prepare buffers for names
-    CPathBuffer sourceName; // buffer for the full disk name
-    strcpy(sourceName, sourcePath);
-    char* endSource = sourceName + strlen(sourceName); // space for names from the 'next' enumeration
-    if (endSource > sourceName && *(endSource - 1) != '\\')
-    {
-        *endSource++ = '\\';
-        *endSource = 0;
-    }
-    int endSourceSize = sourceName.Size() - (int)(endSource - sourceName); // maximum number of characters for a 'next' name
+    // Prepare buffers for names. Same shape as the other direction's loop, and the same two
+    // domains - here the SOURCE is on the PC and the TARGET is on the phone, which is the reverse
+    // of CopyOrMoveFromFS. See wmobile_path_core's PathComposer.
+    wmobile::PathComposer sourceName; // PC path of the item being copied
+    if (!sourceName.SetBase(sourcePath))
+        return FALSE;
 
-    CPathBuffer targetName; // buffer for the full target disk name (the operation target resides on disk for CEFS)
-    strcpy(targetName, userPart);
-    char* endTarget = targetName + strlen(targetName); // space for the destination name
-    if (endTarget > targetName && *(endTarget - 1) != '\\')
-    {
-        *endTarget++ = '\\';
-        *endTarget = 0;
-    }
-    int endTargetSize = targetName.Size() - (int)(endTarget - targetName); // maximum number of characters for the destination name
+    wmobile::PathComposer targetName; // device path it is being copied to
+    const std::wstring targetBase = targetPath.substr(userPartOffset);
+    if (!targetName.SetBase(targetBase.c_str()))
+        return FALSE;
 
-    SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_WAIT_READINGDIRTREE), TitleWMobile,
+    SalamanderGeneral->CreateSafeWaitWindow(LangStr(IDS_WAIT_READINGDIRTREE).c_str(), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
     CFileInfoArray array(10, 10);
 
     BOOL success = TRUE; // FALSE in case of an error or user cancellation
 
     BOOL isDir;
-    const char* name;
-    const char* dosName; // dummy
+    const wchar_t* name;
+    const wchar_t* dosName; // dummy
     CQuadWord size;
     DWORD attr1;
     FILETIME lastWrite;
@@ -2412,7 +2484,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         mainWnd = parentWin;
     // Disable 'mainWnd'
 
-    CProgress2Dlg dlg(mainWnd, LoadStr(copy ? IDS_COPY : IDS_MOVE), LoadStr(copy ? IDS_COPYING : IDS_MOVING), LoadStr(IDS_TO), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
+    CProgress2Dlg dlg(mainWnd, LangStr(copy ? IDS_COPY : IDS_MOVE).c_str(), LangStr(copy ? IDS_COPYING : IDS_MOVING).c_str(), LangStr(IDS_TO).c_str(), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
 
     dlg.Create();
     EnableWindow(mainWnd, FALSE);
@@ -2427,29 +2499,33 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     {
         CFileInfo& fi = array[i];
 
-        char* targetFile = SalamanderGeneral->MaskName(buf, buf.Size(), fi.cFileName, opMask);
+        // As in the other direction: what stood here narrowed the name and did
+        // `continue` on failure, so a PC file whose name is outside the system code page was
+        // dropped from the copy without the user being told.
+        std::wstring maskedName;
+        const wchar_t* targetFile = SPLMaskNameOwned(SalamanderGeneral, fi.cFileName, operationMaskValue.c_str(), maskedName)
+                                        ? maskedName.c_str()
+                                        : NULL;
 
-        if ((int)strlen(fi.cFileName) >= endSourceSize || (int)strlen(targetFile) >= endTargetSize)
+        // 'name' covers only the root of the source path - no subdirectories - so the mask is
+        // applied to the whole name. SetLeaf carries the length refusal the two explicit checks
+        // used to do.
+        if (targetFile == NULL ||
+            !sourceName.SetLeaf(fi.cFileName) ||
+            !targetName.SetLeaf(targetFile))
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
+            SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_ERR_NAMETOOLONG).c_str(),
                                              TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
             success = FALSE;
             break;
         }
-
-        // Construct the full name; trimming to MAX_PATH is theoretically redundant, but unfortunately needed in practice
-        lstrcpyn(endSource, fi.cFileName, endSourceSize);
-
-        // Compose the target name - simplified without the LoadStr(IDS_ERR_NAMETOOLONG) error check
-        // ('name' covers only the root of the source path - no subdirectories - adjust the entire 'name' with the mask)
-        lstrcpyn(endTarget, targetFile, endTargetSize);
 
         isDir = (fi.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
         if (SalamanderGeneral->StrICmp(sourceName, targetName) == 0)
         {
             SalamanderGeneral->SalMessageBox(parent,
-                                             LoadStr(copy ? (isDir ? IDS_ERR_COPYDIRTOITSELF : IDS_ERR_COPYFILETOITSELF) : (isDir ? IDS_ERR_MOVEDIRTOITSELF : IDS_ERR_MOVEFILETOITSELF)),
+                                             LangStr(copy ? (isDir ? IDS_ERR_COPYDIRTOITSELF : IDS_ERR_COPYFILETOITSELF) : (isDir ? IDS_ERR_MOVEDIRTOITSELF : IDS_ERR_MOVEFILETOITSELF)).c_str(),
                                              TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
             success = FALSE;
             break;
@@ -2464,13 +2540,13 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
             {
                 while (1)
                 {
-                    if (!CRAPI::CheckAndCreateDirectory(targetName, parent, true, NULL, 0, NULL))
+                    if (!CRAPI::CheckAndCreateDirectory(targetName, parent, true))
                     {
                         if (!skipAllErrors)
                         {
                             DWORD err = CRAPI::GetLastError();
                             int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, targetName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2503,7 +2579,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         {
             // copy the file directly to CEFS
 
-            DWORD attr = CRAPI::GetFileAttributes(targetName);
+            DWORD attr = CRAPI::GetFileAttributesWide(targetName);
 
             if (attr != 0xFFFFFFFF)
             {
@@ -2511,12 +2587,12 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 {
                     if (ConfirmOnFileOverwrite)
                     {
-                        char sourceData[100], targetData[100];
+                        const std::wstring sourceData = GetFileDataWide(sourceName);
+                        const std::wstring targetData = CRAPI::GetFileDataWide(targetName);
 
-                        GetFileData(sourceName, sourceData);
-                        CRAPI::GetFileData(targetName, targetData);
-
-                        int res = SalamanderGeneral->DialogOverwrite(parent, BUTTONS_YESALLSKIPCANCEL, targetName, targetData, sourceName, sourceData);
+                        int res = SalamanderGeneral->DialogOverwrite(parent, BUTTONS_YESALLSKIPCANCEL,
+                                                                    targetName, targetData.c_str(),
+                                                                    sourceName, sourceData.c_str());
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -2542,7 +2618,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                     if (!skipAllOverwriteSystemHidden)
                     {
                         int res = SalamanderGeneral->DialogQuestion(parent, BUTTONS_YESALLSKIPCANCEL, targetName,
-                                                                    LoadStr(IDS_YESNO_OVERWRITEHIDDENFILE), TitleWMobileQuestion);
+                                                                    LangStr(IDS_YESNO_OVERWRITEHIDDENFILE).c_str(), TitleWMobileQuestion);
                         switch (res)
                         {
                         case DIALOG_ALL:
@@ -2571,9 +2647,9 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 while (1)
                 {
                     if (attr & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY))
-                        CRAPI::SetFileAttributes(targetName, FILE_ATTRIBUTE_ARCHIVE);
+                        CRAPI::SetFileAttributesWide(targetName, FILE_ATTRIBUTE_ARCHIVE);
 
-                    LPCTSTR errFileName = "";
+                    const wchar_t* errFileName = L"";
                     DWORD err = CRAPI::CopyFileToCE(sourceName, targetName, FALSE, &dlg, copied, totalsize, &errFileName);
                     if (err != 0)
                     {
@@ -2582,7 +2658,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                         else if (!skipAllErrors)
                         {
                             int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, errFileName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2606,9 +2682,8 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                     {
                         targetPathChanged = TRUE;
 
-                        sprintf(cefsFileName, "%s:%s", fsName, targetName.Get());
-                        SalamanderGeneral->ToLowerCase(cefsFileName);
-                        SalamanderGeneral->RemoveOneFileFromCache(cefsFileName);
+                        std::wstring cacheKey = std::wstring(fsName) + L":" + targetName.Get();
+                        WMobileRemoveFileFromCacheWide(cacheKey.c_str());
 
                         break; // copied successfully
                     }
@@ -2630,13 +2705,13 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                     {
                         SalamanderGeneral->ClearReadOnlyAttr(sourceName, fi.dwFileAttributes);
 
-                        if (!RemoveDirectory(sourceName))
+                        if (!::RemoveDirectoryW(sourceName) /* PC */)
                         {
                             if (!skipAllErrors)
                             {
                                 DWORD err = GetLastError();
                                 int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, sourceName,
-                                                                         SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                                                         SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                                 switch (res)
                                 {
                                 case DIALOG_RETRY:
@@ -2670,13 +2745,13 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 {
                     SalamanderGeneral->ClearReadOnlyAttr(sourceName, fi.dwFileAttributes);
 
-                    if (!DeleteFile(sourceName))
+                    if (!::DeleteFileW(sourceName) /* PC */)
                     {
                         if (!skipAllErrors)
                         {
                             DWORD err = GetLastError();
                             int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, sourceName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2725,11 +2800,11 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
     if (sourcePathChanged)
         SalamanderGeneral->PostChangeOnPathNotification(sourcePath, subdirsOfSourcePathChanged);
 
-    // Change on the target path (should be FS - 'targetPath', but for CEFS it is the disk path 'userPart')
+    // Change on the target path.
     if (targetPathChanged)
     {
-        sprintf(cefsFileName, "%s:%s", fsName, userPart);
-        SalamanderGeneral->PostChangeOnPathNotification(cefsFileName, subdirsOfTargetPathChanged);
+        const std::wstring changedPath = std::wstring(fsName) + L":" + targetPath.substr(userPartOffset);
+        SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), subdirsOfTargetPathChanged);
     }
 
     SalamanderGeneral->RestoreFocusInSourcePanel();
@@ -2745,19 +2820,10 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
 }
 
 BOOL WINAPI
-CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
+CPluginFSInterface::ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                                      int selectedFiles, int selectedDirs)
 {
-    // Prepare buffers for names
-    CPathBuffer fileName; // buffer for the full disk name (the source resides on disk for DFS)
-    strcpy(fileName, Path);
-    char* end = fileName + strlen(fileName); // space for names from the panel
-    if (end > fileName && *(end - 1) != '\\')
-    {
-        *end++ = '\\';
-        *end = 0;
-    }
-    int endSize = fileName.Size() - (int)(end - fileName); // maximum number of characters for a panel name
+    std::wstring fileName;
 
     const CFileData* f = NULL; // pointer to the file/directory in the panel to process
     BOOL isDir = FALSE;        // TRUE if 'f' is a directory
@@ -2784,22 +2850,15 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         if (f != NULL)
         {
 
-            if ((int)strlen(f->Name) >= endSize)
-            {
-                SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_ERR_NAMETOOLONG),
-                                                 TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
-                success = FALSE;
-                break;
-            }
-
-            lstrcpyn(end, f->Name, endSize);
+            fileName = Path;
+            wmobile::AppendDeviceComponent(fileName, f->Name);
 
             BOOL skip = FALSE;
             while (1)
             {
                 if (count == 0)
                 {
-                    HANDLE handle = CRAPI::FindFirstFile(fileName, &findData);
+                    HANDLE handle = CRAPI::FindFirstFileWide(fileName.c_str(), &findData);
                     if (handle == INVALID_HANDLE_VALUE)
                     {
                         if (skipAllErrors)
@@ -2809,8 +2868,8 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
                             DWORD err = CRAPI::GetLastError();
                             if (err == ERROR_NO_MORE_FILES)
                                 err = ERROR_FILE_NOT_FOUND;
-                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName.c_str(),
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2853,7 +2912,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
                 }
                 else
                 {
-                    DWORD attrib = CRAPI::GetFileAttributes(fileName);
+                    DWORD attrib = CRAPI::GetFileAttributesWide(fileName.c_str());
                     if (attr == 0xFFFFFFFF)
                     {
                         if (skipAllErrors)
@@ -2862,8 +2921,8 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
                         {
                             DWORD err = CRAPI::GetLastError();
                             //if (err == ERROR_NO_MORE_FILES) err = ERROR_FILE_NOT_FOUND;
-                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName,
-                                                                     SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                            int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName.c_str(),
+                                                                     SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                             switch (res)
                             {
                             case DIALOG_RETRY:
@@ -2904,14 +2963,13 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
             break;
     }
 
-    CPathBuffer path; // Heap-allocated for long path support
     if (!success || count == 0)
     {
         // JR The file/directory was probably deleted already
         if (count == 0)
         {
-            sprintf(path, "%s:%s", fsName, Path);
-            SalamanderGeneral->PostChangeOnPathNotification(path, FALSE);
+            const std::wstring path = std::wstring(fsName) + L":" + Path;
+            SalamanderGeneral->PostChangeOnPathNotification(path.c_str(), FALSE);
         }
         return FALSE;
     }
@@ -2927,7 +2985,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
     if (dlgAttr.Execute() != IDOK)
         return FALSE;
 
-    SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_WAIT_READINGDIRTREE), TitleWMobile,
+    SalamanderGeneral->CreateSafeWaitWindow(LangStr(IDS_WAIT_READINGDIRTREE).c_str(), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
 
     CFileInfoArray array(count, 10);
@@ -2948,22 +3006,17 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         // JR This verifies that they still exist
         if (f != NULL)
         {
-
             if (dlgAttr.RecurseSubDirs)
             {
-                *end = 0; // JR => fileName contains rootPath
-                success = CRAPI::FindAllFilesInTree(fileName, f->Name, array, 0, FALSE);
+                success = CRAPI::FindAllFilesInTreeWide(Path.c_str(), f->Name, array, 0, FALSE);
             }
             else
             {
-                CFileInfo fi;
-                strcpy(fi.cFileName, f->Name);
-                fi.dwFileAttributes = f->Attr;
-
-                array.Add(fi);
-                if (array.State != etNone)
+                // fi.cFileName is wide now: store f->Name (already the genuine
+                // wide panel-selection name) directly - no narrow round trip, no refusal.
+                if (!array.AddOwned(f->Name, f->Attr, 0, 0))
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORYLOW).c_str(), TitleWMobileError, MSGBOX_ERROR);
                     TRACE_E("Low memory");
                     success = false;
                 }
@@ -2982,8 +3035,8 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         // JR The file/directory was probably deleted already
         if (array.Count == 0)
         {
-            sprintf(path, "%s:%s", fsName, Path);
-            SalamanderGeneral->PostChangeOnPathNotification(path, FALSE);
+            const std::wstring path = std::wstring(fsName) + L":" + Path;
+            SalamanderGeneral->PostChangeOnPathNotification(path.c_str(), FALSE);
         }
         return FALSE;
     }
@@ -3002,7 +3055,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
 
     BOOL showProgressDialog = array.Count > 1;
     BOOL enableMainWnd = TRUE;
-    CProgressDlg delDlg(mainWnd, LoadStr(IDS_ATTRIBUTES), LoadStr(IDS_CHANGING), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
+    CProgressDlg delDlg(mainWnd, LangStr(IDS_ATTRIBUTES).c_str(), LangStr(IDS_CHANGING).c_str(), ooStatic); // use 'ooStatic' so the modeless dialog can live on the stack
 
     if (showProgressDialog)
     {
@@ -3021,19 +3074,13 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         {
             CFileInfo& fi = array[i];
 
-            *end = 0;
-            if (!CRAPI::PathAppend(fileName, fi.cFileName, fileName.Size()))
-            {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
-                                                  TitleWMobileError, MSGBOX_ERROR);
-                success = FALSE;
-                break;
-            }
+            fileName = Path;
+            wmobile::AppendDeviceComponent(fileName, fi.cFileName);
 
             if (showProgressDialog)
             {
                 float progress = ((float)i / (float)array.Count);
-                delDlg.Set(fileName, (DWORD)(progress * 1000), TRUE); // delayedPaint == TRUE so we do not slow things down
+                delDlg.Set(fileName.c_str(), (DWORD)(progress * 1000), TRUE); // delayedPaint == TRUE so we do not slow things down
             }
 
             if (showProgressDialog && delDlg.GetWantCancel())
@@ -3067,16 +3114,16 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
 
                 if (fi.dwFileAttributes != attr2)
                 {
-                    if (!CRAPI::SetFileAttributes(fileName, attr2))
+                    if (!CRAPI::SetFileAttributesWide(fileName.c_str(), attr2))
                         err = CRAPI::GetLastError();
                 }
 
                 if (err == 0 && (attr2 & FILE_ATTRIBUTE_DIRECTORY) == 0) // JR Apparently timestamps cannot be changed for directories
                 {
-                    err = CRAPI::SetFileTime(fileName,
-                                             dlgAttr.ChangeTimeCreated ? &dlgAttr.TimeCreated : NULL,
-                                             dlgAttr.ChangeTimeAccessed ? &dlgAttr.TimeAccessed : NULL,
-                                             dlgAttr.ChangeTimeModified ? &dlgAttr.TimeModified : NULL);
+                    err = CRAPI::SetFileTimeWide(fileName.c_str(),
+                                                 dlgAttr.ChangeTimeCreated ? &dlgAttr.TimeCreated : NULL,
+                                                 dlgAttr.ChangeTimeAccessed ? &dlgAttr.TimeAccessed : NULL,
+                                                 dlgAttr.ChangeTimeModified ? &dlgAttr.TimeModified : NULL);
                 }
 
                 if (err == 0)
@@ -3088,8 +3135,8 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
                 {
                     if (!skipAllErrors)
                     {
-                        int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName,
-                                                                 SalamanderGeneral->GetErrorText(err), TitleWMobileError);
+                        int res = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName.c_str(),
+                                                                 SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), (TitleWMobileError != NULL ? TitleWMobileError : (const wchar_t*)NULL));
                         switch (res)
                         {
                         case DIALOG_RETRY:
@@ -3134,21 +3181,21 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
     // Change on the source path Path
     if (pathChanged)
     {
-        sprintf(path, "%s:%s", fsName, Path);
-        SalamanderGeneral->PostChangeOnPathNotification(path, changeInSubdirs);
+        const std::wstring path = std::wstring(fsName) + L":" + Path;
+        SalamanderGeneral->PostChangeOnPathNotification(path.c_str(), changeInSubdirs);
     }
 
     return success;
 }
 
 void WINAPI
-CPluginFSInterface::ShowProperties(const char* fsName, HWND parent, int panel,
+CPluginFSInterface::ShowProperties(const wchar_t* fsName, HWND parent, int panel,
                                    int selectedFiles, int selectedDirs)
 {
 }
 
 void WINAPI
-CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int menutype,
+CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int menutype,
                                 int panel, int selectedFiles, int selectedDirs)
 {
 
@@ -3158,8 +3205,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         TRACE_E("CPluginFSInterface::ContextMenu: Unable to create menu.");
         return;
     }
-    MENUITEMINFO mi;
-    char nameBuf[200];
+    MENUITEMINFOW mi;
+    std::wstring nameBufW;
 
     switch (menutype)
     {
@@ -3173,7 +3220,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         int salCmd;
         BOOL enabled;
         int type, lastType = sctyUnknown;
-        while (SalamanderGeneral->EnumSalamanderCommands(&index, &salCmd, nameBuf, 200, &enabled, &type))
+        while (SPLEnumSalamanderCommandsOwned(
+            SalamanderGeneral, &index, &salCmd, nameBufW, &enabled, &type))
         {
             if ((menutype == fscmItemsInPanel && type != sctyForCurrentPath && type != sctyForConnectedDrivesAndFS ||
                  menutype == fscmPanel && (type == sctyForCurrentPath || type == sctyForConnectedDrivesAndFS)) &&
@@ -3186,7 +3234,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                     mi.cbSize = sizeof(mi);
                     mi.fMask = MIIM_TYPE;
                     mi.fType = MFT_SEPARATOR;
-                    InsertMenuItem(menu, i++, TRUE, &mi);
+                    InsertMenuItemW(menu, i++, TRUE, &mi);
                 }
                 lastType = type;
 
@@ -3196,10 +3244,10 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                 mi.fMask = MIIM_TYPE | MIIM_ID | MIIM_STATE;
                 mi.fType = MFT_STRING;
                 mi.wID = salCmd + 1000;
-                mi.dwTypeData = nameBuf;
-                mi.cch = (UINT)strlen(nameBuf);
+                mi.dwTypeData = nameBufW.data();
+                mi.cch = (UINT)nameBufW.size();
                 mi.fState = enabled ? MFS_ENABLED : MFS_DISABLED;
-                InsertMenuItem(menu, i++, TRUE, &mi);
+                InsertMenuItemW(menu, i++, TRUE, &mi);
             }
         }
         if (i > 0)
@@ -3217,11 +3265,9 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
 void CPluginFSInterface::EmptyCache()
 {
     // Build a unique name for this FS root in the disk cache (touch all cached copies of files from this FS)
-    CPathBuffer uniqueFileName; // Heap-allocated for long path support
-    strcpy(uniqueFileName, AssignedFSName);
-    strcat(uniqueFileName, ":\\");
+    std::wstring uniqueFileName = AssignedFSName + L":\\";
     // Disk names are case-insensitive, the disk cache is case-sensitive; converting
     // to lowercase makes the disk cache behave case-insensitively as well
-    SalamanderGeneral->ToLowerCase(uniqueFileName);
-    SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
+    SPLToLowerCaseOwned(SalamanderGeneral, uniqueFileName);
+    SalamanderGeneral->RemoveFilesFromCache(uniqueFileName.c_str());
 }

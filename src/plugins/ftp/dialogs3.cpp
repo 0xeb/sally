@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_window_text.h"
 
 //
 // ****************************************************************************
@@ -127,9 +128,9 @@ void CConfigPageServers::MoveItem(HWND list, int fromIndex, int toIndex)
             SendMessage(list, WM_SETREDRAW, FALSE, 0);
             int topIndex = (int)SendMessage(list, LB_GETTOPINDEX, 0, 0);
             SendMessage(list, LB_DELETESTRING, fromIndex, 0);
-            char typeBuf[SERVERTYPE_MAX_SIZE + 101];
-            SendMessage(list, LB_INSERTSTRING, toIndex,
-                        (LPARAM)GetTypeNameForUser(s->TypeName, typeBuf, SERVERTYPE_MAX_SIZE + 101));
+            std::wstring displayName;
+            GetTypeNameForUser(s->TypeName, displayName);
+            SendMessageW(list, LB_INSERTSTRING, toIndex, (LPARAM)displayName.c_str());
             SendMessage(list, LB_SETTOPINDEX, topIndex, 0);
             SendMessage(list, LB_SETCURSEL, toIndex, 0);
             SendMessage(list, WM_SETREDRAW, TRUE, 0);
@@ -146,83 +147,70 @@ void CConfigPageServers::MoveItem(HWND list, int fromIndex, int toIndex)
         TmpServerTypeList->ResetState();
 }
 
-CPathBuffer ImpExpInitDir; // Heap-allocated for long path support
+std::wstring ImpExpInitDir;
 
 void CConfigPageServers::OnExportServer(CServerType* serverType)
 {
-    if (*ImpExpInitDir == 0)
-        GetMyDocumentsPath(ImpExpInitDir);
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(fileName, serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName,
-             fileName.Size() - 4);
-    strcat(fileName, ".str");
-    SalamanderGeneral->SalMakeValidFileNameComponent(fileName);
+    if (ImpExpInitDir.empty())
+        GetMyDocumentsPathW(ImpExpInitDir);
 
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = HWindow;
-    char* s = LoadStr(IDS_SRVTYPEFILEFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create a double-null-terminated list
+    std::wstring fileName;
+    if (!FtpDecodeLocalText(serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName,
+                            fileName))
+        return;
+    fileName += L".str";
+    SPLSalMakeValidFileNameComponentOwned(SalamanderGeneral, fileName);
+
+    std::wstring filter = LangStr(IDS_SRVTYPEFILEFILTER).c_str();
+    for (wchar_t& ch : filter)
     {
-        if (*s == '|')
-            *s = 0;
-        s++;
+        if (ch == L'|')
+            ch = L'\0';
     }
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrInitialDir = ImpExpInitDir;
-    ofn.lpstrDefExt = "str";
+    filter.push_back(L'\0');
+
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = HWindow;
+    ofn.lpstrFilter = filter.c_str();
+    ofn.lpstrInitialDir = ImpExpInitDir.empty() ? NULL : ImpExpInitDir.c_str();
+    ofn.lpstrDefExt = L"str";
+    const std::wstring dialogTitle = LangStr(IDS_SRVTYPESAVEASTITLE);
+    ofn.lpstrTitle = dialogTitle.c_str();
     ofn.nFilterIndex = 1;
-    ofn.lpstrTitle = LoadStr(IDS_SRVTYPESAVEASTITLE);
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT |
                 OFN_NOTESTFILECREATE | OFN_HIDEREADONLY;
 
-    CPathBuffer buf;
-    if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
+    if (SPLSafeGetSaveFileNameOwned(SalamanderGeneral, &ofn, fileName))
     {
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        FtpRememberSelectedDirectory(fileName, ImpExpInitDir);
 
-        s = strrchr(fileName.Get(), '\\');
-        if (s != NULL)
-        {
-            memcpy(ImpExpInitDir.Get(), fileName.Get(), s - fileName.Get());
-            ImpExpInitDir.Get()[s - fileName.Get()] = 0;
-        }
-
-        if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so a read-only file can be overwritten
-            SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE,
-                                           FILE_SHARE_READ, NULL,
-                                           CREATE_ALWAYS,
-                                           FILE_FLAG_SEQUENTIAL_SCAN,
-                                           NULL));
+        if (SalamanderGeneral->SalGetFileAttributes(fileName.c_str()) != 0xFFFFFFFF)
+            SetFileAttributesW(fileName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+        HANDLE file = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                                           CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (file != INVALID_HANDLE_VALUE)
         {
             DWORD err = serverType->ExportToFile(file);
-
             HANDLES(CloseHandle(file));
             SetCursor(oldCur);
-            if (err != NO_ERROR) // display the error
+            if (err != NO_ERROR)
             {
-                sprintf(buf, LoadStr(IDS_SRVTYPEEXPORTERROR), SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                 MB_OK | MB_ICONEXCLAMATION);
-                DeleteFile(fileName); // delete the file if there was an error
+                FTPShowSystemError(HWindow, IDS_SRVTYPEEXPORTERROR, err);
+                DeleteFileW(fileName.c_str());
             }
         }
         else
         {
             DWORD err = GetLastError();
             SetCursor(oldCur);
-            sprintf(buf, LoadStr(IDS_SRVTYPEEXPORTERROR), SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                             MB_OK | MB_ICONEXCLAMATION);
+            FTPShowSystemError(HWindow, IDS_SRVTYPEEXPORTERROR, err);
         }
-        // announce the change on the path (our file was added)
-        SalamanderGeneral->CutDirectory(fileName);
-        SalamanderGeneral->PostChangeOnPathNotification(fileName, FALSE);
+
+        std::wstring notificationPath(fileName);
+        SPLCutDirectoryOwned(SalamanderGeneral, notificationPath);
+        SalamanderGeneral->PostChangeOnPathNotification(notificationPath.c_str(), FALSE);
     }
 }
 
@@ -231,42 +219,31 @@ void CConfigPageServers::OnImportServer()
     CServerType* serverType = new CServerType;
     if (TmpServerTypeList != NULL && serverType != NULL)
     {
-        if (*ImpExpInitDir == 0)
-            GetMyDocumentsPath(ImpExpInitDir);
-        CPathBuffer fileName; // Heap-allocated for long path support
-        fileName[0] = 0;
-        OPENFILENAME ofn;
-        memset(&ofn, 0, sizeof(OPENFILENAME));
-        ofn.lStructSize = sizeof(OPENFILENAME);
+        if (ImpExpInitDir.empty())
+            GetMyDocumentsPathW(ImpExpInitDir);
+        std::vector<std::wstring> selectedFiles;
+        OPENFILENAMEW ofn = {};
+        ofn.lStructSize = sizeof(ofn);
         ofn.hwndOwner = HWindow;
-        char* s = LoadStr(IDS_SRVTYPEFILEFILTER);
-        ofn.lpstrFilter = s;
-        while (*s != 0) // create a double-null-terminated list
+        std::wstring filter = LangStr(IDS_SRVTYPEFILEFILTER).c_str();
+        for (wchar_t& ch : filter)
         {
-            if (*s == '|')
-                *s = 0;
-            s++;
+            if (ch == L'|')
+                ch = L'\0';
         }
-        ofn.lpstrFile = fileName;
-        ofn.nMaxFile = fileName.Size();
+        filter.push_back(L'\0');
+        ofn.lpstrFilter = filter.c_str();
+        ofn.lpstrInitialDir = ImpExpInitDir.empty() ? NULL : ImpExpInitDir.c_str();
         ofn.nFilterIndex = 1;
-        ofn.lpstrInitialDir = ImpExpInitDir;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
-        CPathBuffer buf;
-        char typeBuf[SERVERTYPE_MAX_SIZE + 101];
-        if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+        if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn, selectedFiles) && selectedFiles.size() == 1)
         {
+            const std::wstring& fileName = selectedFiles[0];
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+            FtpRememberSelectedDirectory(fileName, ImpExpInitDir);
 
-            s = strrchr(fileName.Get(), '\\');
-            if (s != NULL)
-            {
-                memcpy(ImpExpInitDir.Get(), fileName.Get(), s - fileName.Get());
-                ImpExpInitDir.Get()[s - fileName.Get()] = 0;
-            }
-
-            HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+            HANDLE file = HANDLES_Q(CreateFileW(fileName.c_str(), GENERIC_READ,
                                                FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                OPEN_EXISTING,
                                                FILE_FLAG_SEQUENTIAL_SCAN,
@@ -280,9 +257,11 @@ void CConfigPageServers::OnImportServer()
                     int index;
                     if (TmpServerTypeList->ContainsTypeName(serverType->TypeName, NULL, &index))
                     {
-                        sprintf(buf, LoadStr(IDS_SRVTYPEOVERWRITE),
-                                GetTypeNameForUser(serverType->TypeName, typeBuf, SERVERTYPE_MAX_SIZE + 101));
-                        if (SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPPLUGINTITLE),
+                        std::wstring displayName;
+                        GetTypeNameForUser(serverType->TypeName, displayName);
+                        const std::wstring message = SPLFormatStringOwned(
+                            LangStr(IDS_SRVTYPEOVERWRITE).c_str(), displayName.c_str());
+                        if (SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                              MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                  MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
                         {
@@ -310,22 +289,32 @@ void CConfigPageServers::OnImportServer()
                 if (err != NO_ERROR || errResID != 0) // display the error
                 {
                     if (errResID != 0)
-                        sprintf(buf, LoadStr(IDS_SRVTYPEIMPORTERROR), LoadStr(errResID));
-                    else
                     {
-                        sprintf(buf, LoadStr(IDS_SRVTYPEIMPORTERROR), SalamanderGeneral->GetErrorText(err));
+                        try
+                        {
+                            const std::wstring errorText = SPLFormatStringOwned(
+                                LangStr(IDS_SRVTYPEIMPORTERROR).c_str(),
+                                LangStr(errResID).c_str());
+                            SalamanderGeneral->SalMessageBox(
+                                HWindow, errorText.c_str(),
+                                SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                MB_OK | MB_ICONEXCLAMATION);
+                        }
+                        catch (...)
+                        {
+                            SalamanderGeneral->SalMessageBox(HWindow, L"Not enough memory.", L"FTP",
+                                                             MB_OK | MB_ICONEXCLAMATION);
+                        }
                     }
-                    SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                     MB_OK | MB_ICONEXCLAMATION);
+                    else
+                        FTPShowSystemError(HWindow, IDS_SRVTYPEIMPORTERROR, err);
                 }
             }
             else
             {
                 DWORD err = GetLastError();
                 SetCursor(oldCur);
-                sprintf(buf, LoadStr(IDS_SRVTYPEIMPORTERROR), SalamanderGeneral->GetErrorText(err));
-                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
-                                                 MB_OK | MB_ICONEXCLAMATION);
+                FTPShowSystemError(HWindow, IDS_SRVTYPEIMPORTERROR, err);
             }
         }
     }
@@ -403,8 +392,6 @@ CConfigPageServers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (s == NULL)
                         return TRUE; // fatal, do not continue
                 }
-                char buf[300 + SERVERTYPE_MAX_SIZE];
-                char typeBuf[SERVERTYPE_MAX_SIZE + 101];
                 switch (LOWORD(wParam))
                 {
                 case IDB_MOVESERVERDOWN:
@@ -423,15 +410,19 @@ CConfigPageServers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 case CM_REMOVESERVER:
                 {
-                    sprintf(buf, LoadStr(IDS_SRVTYPEREMOVECONF),
-                            GetTypeNameForUser(s->TypeName, typeBuf, SERVERTYPE_MAX_SIZE + 101));
+                    std::wstring displayName;
+                    GetTypeNameForUser(s->TypeName, displayName);
+                    const std::wstring text = SPLFormatStringOwned(
+                        LangStr(IDS_SRVTYPEREMOVECONF).c_str(),
+                        displayName.c_str());
                     MSGBOXEX_PARAMS params;
+                    const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
                     memset(&params, 0, sizeof(params));
                     params.HParent = HWindow;
                     params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED |
                                    MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                    params.Text = buf;
+                    params.Caption = caption.c_str();
+                    params.Text = text.c_str();
                     if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
                     {
                         TmpServerTypeList->Delete(caret);
@@ -456,29 +447,48 @@ CConfigPageServers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 case CM_COPYSERVERTO:
                 case CM_RENAMESERVER:
                 {
-                    char name[SERVERTYPE_MAX_SIZE];
-                    name[0] = '*';
+                    std::wstring name;
                     if (LOWORD(wParam) == CM_RENAMESERVER || LOWORD(wParam) == CM_COPYSERVERTO)
                     {
-                        lstrcpyn(name + 1, s != NULL ? (s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName) : "",
-                                 SERVERTYPE_MAX_SIZE - 1);
+                        if (s != NULL &&
+                            !FtpDecodeLocalText(s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName,
+                                                name))
+                            return TRUE;
                     }
-                    else
-                        name[1] = 0;
-                    CRenameDlg dlg(HWindow, name + 1,
+                    std::wstring copyFromName;
+                    if (s != NULL)
+                        GetTypeNameForUser(s->TypeName, copyFromName);
+                    CRenameDlg dlg(HWindow, name,
                                    LOWORD(wParam) == IDB_NEWSERVER || LOWORD(wParam) == CM_COPYSERVERTO,
-                                   FALSE, TRUE,
-                                   s != NULL ? GetTypeNameForUser(s->TypeName, typeBuf, SERVERTYPE_MAX_SIZE + 101) : NULL);
+                                   copyFromName.empty() ? NULL : copyFromName.c_str());
                     if (LOWORD(wParam) == CM_COPYSERVERTO)
                         dlg.CopyDataFromFocusedServer = TRUE;
                     while (1)
                     {
                         if (dlg.Execute() == IDOK)
                         {
-                            if (TmpServerTypeList->ContainsTypeName(name, LOWORD(wParam) == CM_RENAMESERVER ? s : NULL))
+                            std::string nameBytes;
+                            if (!FtpEncodeLocalText(name.c_str(), nameBytes))
                             {
-                                sprintf(buf, LoadStr(IDS_SRVTYPENOTUNIQUE), name + 1);
-                                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
+                                SalamanderGeneral->SalMessageBox(
+                                    HWindow, LangStr(IDS_SRVTYPENAME_CANNOTENCODE).c_str(),
+                                    LangStr(IDS_FTPERRORTITLE).c_str(),
+                                    MB_OK | MB_ICONEXCLAMATION);
+                                continue;
+                            }
+                            try
+                            {
+                                nameBytes.insert(nameBytes.begin(), '*');
+                            }
+                            catch (...)
+                            {
+                                return TRUE;
+                            }
+                            if (TmpServerTypeList->ContainsTypeName(nameBytes.c_str(), LOWORD(wParam) == CM_RENAMESERVER ? s : NULL))
+                            {
+                                const std::wstring message = SPLFormatStringOwned(
+                                    LangStr(IDS_SRVTYPENOTUNIQUE).c_str(), name.c_str());
+                                SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                                  MB_OK | MB_ICONEXCLAMATION);
                                 continue; // let the user change the name
                             }
@@ -486,19 +496,20 @@ CConfigPageServers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 if (s != NULL && dlg.CopyDataFromFocusedServer)
                                 {
-                                    TmpServerTypeList->AddServerType(name, s);
+                                    TmpServerTypeList->AddServerType(nameBytes.c_str(), s);
                                 }
                                 else
                                 {
                                     const char* column = "1,name,0,\\0,0,\\0,1,\\0";
-                                    TmpServerTypeList->AddServerType(name, NULL, 1, &column, NULL);
+                                    TmpServerTypeList->AddServerType(nameBytes.c_str(), NULL, 1, &column, NULL);
                                 }
                             }
                             else // rename
                             {
-                                if (strcmp(s->TypeName, s->TypeName[0] != '*' ? name + 1 : name) != 0)
+                                const char* comparisonName = s->TypeName[0] != '*' ? nameBytes.c_str() + 1 : nameBytes.c_str();
+                                if (strcmp(s->TypeName, comparisonName) != 0)
                                 { // prevent switching to user defined just by pressing OK without changing the name
-                                    UpdateStr(s->TypeName, name);
+                                    UpdateStr(s->TypeName, nameBytes.c_str());
                                 }
                             }
                             RefreshList(LOWORD(wParam) == IDB_NEWSERVER || LOWORD(wParam) == CM_COPYSERVERTO);
@@ -614,23 +625,30 @@ CEditServerTypeDlg::~CEditServerTypeDlg()
 void CEditServerTypeDlg::Validate(CTransferInfo& ti)
 {
     // verify the autodetect condition
-    char cond[AUTODETCOND_MAX_SIZE];
-    ti.EditLine(IDE_AUTODETECTCOND, cond, AUTODETCOND_MAX_SIZE);
+    std::string cond;
+    ti.EditLine(IDE_AUTODETECTCOND, cond);
+    if (!ti.IsGood())
+        return;
     int errorPos = -1;
     int errorResID = -1;
     BOOL lowMem = FALSE;
-    char errBuf[200];
-    errBuf[0] = 0;
-    CFTPAutodetCondNode* node = CompileAutodetectCond(cond, &errorPos, &errorResID, &lowMem, errBuf, 200);
+    std::string errorText;
+    CFTPAutodetCondNode* node = CompileAutodetectCond(
+        cond.c_str(), &errorPos, &errorResID, &lowMem, &errorText);
     if (node != NULL)
         delete node; // the condition is OK, delete it again
     else             // display the error and mark the error in the "autodetect condition" edit box
     {
-        if (errBuf[0] != 0 || errorResID != -1) // some "reasonable" error was found, comment on it
+        if (!errorText.empty() || errorResID != -1) // some "reasonable" error was found, comment on it
         {
-            char buf[300];
-            sprintf(buf, LoadStr(IDS_STPAR_UNABLECOMPAUTODCOND), (errBuf[0] == 0 ? LoadStr(errorResID) : errBuf));
-            SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
+            std::wstring detail;
+            if (errorText.empty())
+                detail = LangStr(errorResID).c_str();
+            else
+                FtpDecodeLocalText(errorText, detail);
+            const std::wstring message = SPLFormatStringOwned(
+                LangStr(IDS_STPAR_UNABLECOMPAUTODCOND).c_str(), detail.c_str());
+            SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             // mark the error location in the condition text
             SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_AUTODETECTCOND), TRUE);
@@ -645,29 +663,31 @@ void CEditServerTypeDlg::Validate(CTransferInfo& ti)
         BOOL errResID = 0;
         if (!ValidateSrvTypeColumns(&ColumnsData, &errResID))
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(errResID),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, errResID).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDL_SRVTYPECOLUMNS);
         }
     }
 
     if (ti.IsGood()) // validate the parsing rules
     {
-        char rules[PARSER_MAX_SIZE];
-        ti.EditLine(IDE_PARSINGRULES, rules, PARSER_MAX_SIZE);
+        std::string rules;
+        ti.EditLine(IDE_PARSINGRULES, rules);
+        if (!ti.IsGood())
+            return;
         errorPos = -1;
         errorResID = -1;
         lowMem = FALSE;
-        CFTPParser* parser = CompileParsingRules(rules, &ColumnsData, &errorPos, &errorResID, &lowMem);
+        CFTPParser* parser = CompileParsingRules(rules.c_str(), &ColumnsData, &errorPos, &errorResID, &lowMem);
         if (parser != NULL)
             delete parser; // the parser is OK, delete it again
         else               // display the error and mark the error in the "rules for parsing" edit box
         {
             if (errorResID != -1) // some "reasonable" error was found, comment on it
             {
-                char buf[300];
-                sprintf(buf, LoadStr(IDS_STPAR_UNABLECOMPPARSER), LoadStr(errorResID));
-                SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
+                const std::wstring message = SPLFormatStringOwned(
+                    LangStr(IDS_STPAR_UNABLECOMPPARSER).c_str(), LangStr(errorResID).c_str());
+                SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 // mark the error location in the parsing rules text
                 SendDlgItemMessage(HWindow, IDE_PARSINGRULES, EM_SETSEL, (WPARAM)errorPos,
@@ -684,18 +704,24 @@ void CEditServerTypeDlg::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDE_AUTODETECTCOND, HandleNULLStr(ServerType->AutodetectCond), AUTODETCOND_MAX_SIZE);
-        ti.EditLine(IDE_PARSINGRULES, HandleNULLStr(ServerType->RulesForParsing), PARSER_MAX_SIZE, FALSE);
+        std::string autodetectCond = HandleNULLStr(ServerType->AutodetectCond);
+        std::string rulesForParsing = HandleNULLStr(ServerType->RulesForParsing);
+        ti.EditLine(IDE_AUTODETECTCOND, autodetectCond);
+        ti.EditLine(IDE_PARSINGRULES, rulesForParsing, FALSE);
     }
     else // data from window
     {
         BOOL change = FALSE; // TRUE = the data changed in the dialog (requires renaming to "user defined")
-        char buf[AUTODETCOND_MAX_SIZE];
-        ti.EditLine(IDE_AUTODETECTCOND, buf, AUTODETCOND_MAX_SIZE);
-        if (strcmp(buf, HandleNULLStr(ServerType->AutodetectCond)) != 0)
+        std::string autodetectCond;
+        std::string rulesForParsing;
+        ti.EditLine(IDE_AUTODETECTCOND, autodetectCond);
+        ti.EditLine(IDE_PARSINGRULES, rulesForParsing);
+        if (!ti.IsGood())
+            return;
+        if (autodetectCond != HandleNULLStr(ServerType->AutodetectCond))
         {
             change = TRUE;
-            UpdateStr(ServerType->AutodetectCond, (buf[0] == 0 ? NULL : buf));
+            UpdateStr(ServerType->AutodetectCond, autodetectCond.empty() ? NULL : autodetectCond.c_str());
             if (ServerType->CompiledAutodetCond != NULL)
             {
                 delete ServerType->CompiledAutodetCond;
@@ -703,12 +729,10 @@ void CEditServerTypeDlg::Transfer(CTransferInfo& ti)
             }
         }
 
-        char buf2[PARSER_MAX_SIZE];
-        ti.EditLine(IDE_PARSINGRULES, buf2, PARSER_MAX_SIZE);
-        if (strcmp(buf2, HandleNULLStr(ServerType->RulesForParsing)) != 0)
+        if (rulesForParsing != HandleNULLStr(ServerType->RulesForParsing))
         {
             change = TRUE;
-            UpdateStr(ServerType->RulesForParsing, (buf2[0] == 0 ? NULL : buf2));
+            UpdateStr(ServerType->RulesForParsing, rulesForParsing.empty() ? NULL : rulesForParsing.c_str());
             if (ServerType->CompiledParser != NULL)
             {
                 delete ServerType->CompiledParser;
@@ -720,14 +744,14 @@ void CEditServerTypeDlg::Transfer(CTransferInfo& ti)
         BOOL needUpdate = TRUE;
         if (ServerType->Columns.Count == ColumnsData.Count)
         {
-            char colStr1[STC_MAXCOLUMNSTR];
-            char colStr2[STC_MAXCOLUMNSTR];
+            std::string colStr1;
+            std::string colStr2;
             int i;
             for (i = 0; i < ColumnsData.Count; i++)
             {
-                ColumnsData[i]->SaveToStr(colStr1, STC_MAXCOLUMNSTR);
-                ServerType->Columns[i]->SaveToStr(colStr2, STC_MAXCOLUMNSTR);
-                if (strcmp(colStr1, colStr2) != 0)
+                if (!ColumnsData[i]->SaveToStr(colStr1) ||
+                    !ServerType->Columns[i]->SaveToStr(colStr2) ||
+                    colStr1 != colStr2)
                     break;
             }
             needUpdate = (i < ColumnsData.Count);
@@ -773,11 +797,19 @@ void CEditServerTypeDlg::Transfer(CTransferInfo& ti)
         // if the data changed, we must change the server type to "user defined"
         if (change && ServerType->TypeName[0] != '*')
         {
-            char name[SERVERTYPE_MAX_SIZE];
-            name[0] = '*';
-            lstrcpyn(name + 1, ServerType->TypeName, SERVERTYPE_MAX_SIZE - 1);
+            std::string name;
+            try
+            {
+                name.reserve(strlen(ServerType->TypeName) + 2);
+                name.push_back('*');
+                name.append(ServerType->TypeName);
+            }
+            catch (...)
+            {
+                return;
+            }
             BOOL err = FALSE;
-            UpdateStr(ServerType->TypeName, name, &err);
+            UpdateStr(ServerType->TypeName, name.c_str(), &err);
             if (err && ServerType->TypeName[0] != 0)
                 ServerType->TypeName[0] = '*'; // "user defined" at any cost
         }
@@ -801,7 +833,7 @@ void CEditServerTypeDlg::EnableControls()
 void CEditServerTypeDlg::InitColumns()
 {
     CALL_STACK_MESSAGE1("CEditServerTypeDlg::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[6] = {IDS_SRVTYPECOL_ID, IDS_SRVTYPECOL_NAME, IDS_SRVTYPECOL_TYPE,
                      IDS_SRVTYPECOL_EMPTYVAL, IDS_SRVTYPECOL_DESCR, IDS_SRVTYPECOL_ALIGN};
 
@@ -810,7 +842,8 @@ void CEditServerTypeDlg::InitColumns()
     int i;
     for (i = 0; i < 6; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        const std::wstring headerTextW = std::wstring(LangStr(header[i]).c_str());
+        lvc.pszText = const_cast<LPWSTR>(headerTextW.c_str());
         lvc.iSubItem = i;
         ListView_InsertColumn(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER);  // set the widths later in SetColumnWidths()
@@ -847,15 +880,23 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
         // column ID + insert the item if needed
         if (!onlySet)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT;
             lvi.iItem = i;
             lvi.iSubItem = 0;
-            lvi.pszText = HandleNULLStr(col->ID);
+            std::wstring colIdW;
+            FtpDecodeLocalText(HandleNULLStr(col->ID), colIdW);
+            lvi.pszText = const_cast<LPWSTR>(colIdW.c_str());
             ListView_InsertItem(HListView, &lvi);
         }
         else
-            ListView_SetItemText(HListView, i, 0, HandleNULLStr(col->ID));
+        {
+            // The encoded server-type value is projected once into a named UTF-16 local
+            // that survives the ListView macro's whole SendMessageW expression.
+            std::wstring colIdW;
+            FtpDecodeLocalText(HandleNULLStr(col->ID), colIdW);
+            ListView_SetItemText(HListView, i, 0, const_cast<LPWSTR>(colIdW.c_str()));
+        }
 
         // checkbox visible
         // unfortunately this is not available in the header: ListView_SetCheckState(HListView, i, col->Visible != FALSE);
@@ -864,41 +905,45 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
                               LVIS_STATEIMAGEMASK);
 
         // column name
-        char bufName[STC_NAME_MAX_SIZE + 2];
+        std::wstring bufNameW;
         if (col->NameID != -1)
-            LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, col->NameID);
+            LoadStdColumnStrName(col->NameID, bufNameW);
         else
-            _snprintf_s(bufName, _TRUNCATE, "\"%s\"", HandleNULLStr(col->NameStr));
-        ListView_SetItemText(HListView, i, 1, bufName);
+        {
+            FtpDecodeLocalText(HandleNULLStr(col->NameStr), bufNameW);
+            bufNameW.insert(bufNameW.begin(), L'"');
+            bufNameW.push_back(L'"');
+        }
+        ListView_SetItemText(HListView, i, 1, const_cast<LPWSTR>(bufNameW.c_str()));
 
         // column type
-        char bufType[100];
-        GetColumnTypeName(bufType, 100, col->Type);
-        ListView_SetItemText(HListView, i, 2, bufType);
+        std::wstring bufTypeW;
+        GetColumnTypeName(col->Type, bufTypeW);
+        ListView_SetItemText(HListView, i, 2, const_cast<LPWSTR>(bufTypeW.c_str()));
 
         // column empty value
-        char* emptyVal;
-        char emptyValBuf[100];
+        std::wstring emptyValW;
         if (col->EmptyValue == NULL || *(col->EmptyValue) == 0)
-        {
-            GetColumnEmptyValueForType(emptyValBuf, 100, col->Type);
-            emptyVal = emptyValBuf;
-        }
+            GetColumnEmptyValueForType(col->Type, emptyValW);
         else
-            emptyVal = col->EmptyValue;
-        ListView_SetItemText(HListView, i, 3, emptyVal);
+            FtpDecodeLocalText(col->EmptyValue, emptyValW);
+        ListView_SetItemText(HListView, i, 3, const_cast<LPWSTR>(emptyValW.c_str()));
 
         // column description
-        char bufDescr[STC_DESCR_MAX_SIZE + 2];
+        std::wstring bufDescrW;
         if (col->DescrID != -1)
-            LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, col->DescrID);
+            LoadStdColumnStrDescr(col->DescrID, bufDescrW);
         else
-            _snprintf_s(bufDescr, _TRUNCATE, "\"%s\"", HandleNULLStr(col->DescrStr));
-        ListView_SetItemText(HListView, i, 4, bufDescr);
+        {
+            FtpDecodeLocalText(HandleNULLStr(col->DescrStr), bufDescrW);
+            bufDescrW.insert(bufDescrW.begin(), L'"');
+            bufDescrW.push_back(L'"');
+        }
+        ListView_SetItemText(HListView, i, 4, const_cast<LPWSTR>(bufDescrW.c_str()));
 
         // column alignment
-        char emptyBuff[] = "";
-        ListView_SetItemText(HListView, i, 5, col->Type >= stctFirstGeneral ? LoadStr(col->LeftAlignment ? IDS_SRVTYPECOL_ALIGNLEFT : IDS_SRVTYPECOL_ALIGNRIGHT) : emptyBuff);
+        const std::wstring alignTextW = col->Type >= stctFirstGeneral ? LangStr(col->LeftAlignment ? IDS_SRVTYPECOL_ALIGNLEFT : IDS_SRVTYPECOL_ALIGNRIGHT).c_str() : L"";
+        ListView_SetItemText(HListView, i, 5, const_cast<LPWSTR>(alignTextW.c_str()));
     }
 
     int count = ListView_GetItemCount(HListView);
@@ -1015,7 +1060,7 @@ CEditRulesControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SendMessage(HWindow, WM_PASTE, 0, 0);
                     break;
                 case CM_STRM_DELETE:
-                    SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM) "");
+                    SendMessageW(HWindow, EM_REPLACESEL, TRUE, (LPARAM)L"");
                     break;
                 case CM_STRM_SELECTALL:
                     SendMessage(HWindow, EM_SETSEL, 0, -1);
@@ -1180,69 +1225,69 @@ CEditRulesControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 if (strID >= 0)
                 {
-                    const char* strArr[] = {
-                        "\r\n*",
-                        ";\r\n",
-                        "\r\n# line comment\r\n",
-                        "first_nonempty_line",
-                        "last_nonempty_line",
-                        "next_char",
-                        "next_word",
-                        "rest_of_line",
-                        " == ",
-                        " != ",
-                        " eq ",
-                        " not_eq ",
-                        " in ",
-                        " not_in ",
-                        " end_with ",
-                        " not_end_with ",
-                        "skip_white_spaces()",
-                        "white_spaces()",
-                        "white_spaces(number)",
-                        "white_spaces_and_line_ends()",
-                        "rest_of_line()",
-                        "rest_of_line(<column-id>)",
-                        "word()",
-                        "word(<column-id>)",
-                        "number(<column-id>)",
-                        "number_with_separators(<column-id>, \"separators\")",
-                        "month_3(<column-id>)",
-                        "month(<column-id>)",
-                        "day(<column-id>)",
-                        "year(<column-id>)",
-                        "time(<column-id>)",
-                        "year_or_time(<date-column-id>, <time-column-id>)",
-                        "all(number)",
-                        "all(<column-id>, number)",
-                        "all_to(\"string\")",
-                        "all_to(<column-id>, \"string\")",
-                        "all_up_to(<column-id>, \"string\")",
-                        "unix_link(<is_dir>, <name-column-id>, <link-column-id>)",
-                        "unix_device(<column-id>)",
-                        "if(boolean-expression)",
-                        "assign(<column-id>, expression)",
-                        "cut_white_spaces_end(<column-id>)",
-                        "cut_white_spaces_start(<column-id>)",
-                        "cut_white_spaces(<column-id>)",
-                        "back(number)",
-                        "add_string_to_column(<column-id>, string-expression)",
-                        "month_3(<column-id>, \"jan feb mar apr may jun jul aug sep oct nov dec\")",
-                        "month_txt(<column-id>)",
-                        "month_txt(<column-id>, \"Jan. Feb. M�rz Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
-                        "positive_number(<column-id>)",
-                        "cut_end_of_string(<column-id>, number)",
-                        "skip_to_number()",
+                    const wchar_t* strArr[] = {
+                        L"\r\n*",
+                        L";\r\n",
+                        L"\r\n# line comment\r\n",
+                        L"first_nonempty_line",
+                        L"last_nonempty_line",
+                        L"next_char",
+                        L"next_word",
+                        L"rest_of_line",
+                        L" == ",
+                        L" != ",
+                        L" eq ",
+                        L" not_eq ",
+                        L" in ",
+                        L" not_in ",
+                        L" end_with ",
+                        L" not_end_with ",
+                        L"skip_white_spaces()",
+                        L"white_spaces()",
+                        L"white_spaces(number)",
+                        L"white_spaces_and_line_ends()",
+                        L"rest_of_line()",
+                        L"rest_of_line(<column-id>)",
+                        L"word()",
+                        L"word(<column-id>)",
+                        L"number(<column-id>)",
+                        L"number_with_separators(<column-id>, \"separators\")",
+                        L"month_3(<column-id>)",
+                        L"month(<column-id>)",
+                        L"day(<column-id>)",
+                        L"year(<column-id>)",
+                        L"time(<column-id>)",
+                        L"year_or_time(<date-column-id>, <time-column-id>)",
+                        L"all(number)",
+                        L"all(<column-id>, number)",
+                        L"all_to(\"string\")",
+                        L"all_to(<column-id>, \"string\")",
+                        L"all_up_to(<column-id>, \"string\")",
+                        L"unix_link(<is_dir>, <name-column-id>, <link-column-id>)",
+                        L"unix_device(<column-id>)",
+                        L"if(boolean-expression)",
+                        L"assign(<column-id>, expression)",
+                        L"cut_white_spaces_end(<column-id>)",
+                        L"cut_white_spaces_start(<column-id>)",
+                        L"cut_white_spaces(<column-id>)",
+                        L"back(number)",
+                        L"add_string_to_column(<column-id>, string-expression)",
+                        L"month_3(<column-id>, \"jan feb mar apr may jun jul aug sep oct nov dec\")",
+                        L"month_txt(<column-id>)",
+                        L"month_txt(<column-id>, \"Jan. Feb. M\u00E4rz Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez.\")",
+                        L"positive_number(<column-id>)",
+                        L"cut_end_of_string(<column-id>, number)",
+                        L"skip_to_number()",
                     };
                     int firstFunc = 16; /* index of the first function - UPDATE!!! */
                     if (strID < 52 /* number of strings in strArr - UPDATE!!! */)
                     {
-                        const char* str = strArr[strID];
+                        const wchar_t* str = strArr[strID];
                         if (start == 0 || end == 0) // if we are at the start of the edit line, skip the leading EOL
                         {
-                            if (*str == '\r')
+                            if (*str == L'\r')
                                 str++;
-                            if (*str == '\n')
+                            if (*str == L'\n')
                                 str++;
                         }
                         BOOL commaBefore = FALSE;
@@ -1252,44 +1297,63 @@ CEditRulesControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (strID >= firstFunc)
                         {
                             spaceBefore = TRUE;
-                            char buf2[PARSER_MAX_SIZE];
-                            GetWindowText(HWindow, buf2, PARSER_MAX_SIZE);
-                            DWORD pos = min(start, end);
-                            if (pos <= strlen(buf2))
+                            std::wstring text;
+                            if (ReadWindowTextOwnedW(HWindow, text))
                             {
-                                char* s = buf2 + pos - 1;
-                                while (s >= buf2 && (*s == ' ' || *s == ')'))
+                                DWORD pos = min(start, end);
+                                if (pos > 0 && pos <= text.size())
                                 {
-                                    if (*s == ')')
+                                    size_t index = pos;
+                                    while (index > 0 &&
+                                           (text[index - 1] == L' ' || text[index - 1] == L')'))
                                     {
-                                        commaBefore = TRUE;
-                                        break;
+                                        if (text[index - 1] == L')')
+                                        {
+                                            commaBefore = TRUE;
+                                            break;
+                                        }
+                                        else
+                                            spaceBefore = FALSE; // unnecessary, it's already there
+                                        --index;
                                     }
-                                    else
-                                        spaceBefore = FALSE; // unnecessary, it's already there
-                                    s--;
                                 }
-                            }
-                            pos = max(start, end);
-                            if (pos <= strlen(buf2))
-                            {
-                                char* s = buf2 + pos;
-                                spaceAfter = (*s != 0 && IsCharAlpha(*s));
-                                while (*s != 0 && (*s <= ' ' || IsCharAlpha(*s)))
+                                pos = max(start, end);
+                                if (pos <= text.size())
                                 {
-                                    if (*s > ' ') // alpha
+                                    const wchar_t* s = text.c_str() + pos;
+                                    spaceAfter = (*s != 0 && IsCharAlphaW(*s));
+                                    while (*s != 0 && (*s <= L' ' || IsCharAlphaW(*s)))
                                     {
-                                        commaAfter = TRUE;
-                                        break;
+                                        if (*s > L' ') // alpha
+                                        {
+                                            commaAfter = TRUE;
+                                            break;
+                                        }
+                                        s++;
                                     }
-                                    s++;
                                 }
                             }
                         }
-                        char strBuf[200];
-                        sprintf(strBuf, "%s%s%s%s%s", (commaBefore ? "," : ""), (spaceBefore ? " " : ""),
-                                str, (commaAfter ? "," : ""), (spaceAfter ? " " : ""));
-                        SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM)strBuf);
+                        try
+                        {
+                            std::wstring insertion;
+                            insertion.reserve(wcslen(str) + 4);
+                            if (commaBefore)
+                                insertion += L',';
+                            if (spaceBefore)
+                                insertion += L' ';
+                            insertion += str;
+                            if (commaAfter)
+                                insertion += L',';
+                            if (spaceAfter)
+                                insertion += L' ';
+                            SendMessageW(HWindow, EM_REPLACESEL, TRUE,
+                                         reinterpret_cast<LPARAM>(insertion.c_str()));
+                        }
+                        catch (const std::bad_alloc&)
+                        {
+                            TRACE_E(LOW_MEMORY);
+                        }
                     }
                 }
             }
@@ -1348,30 +1412,32 @@ CEditServerTypeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDCANCEL:
         {
             BOOL change = FALSE; // TRUE = the data in the dialog were changed
-            char buf[AUTODETCOND_MAX_SIZE];
+            std::string autodetectCond;
+            std::string rulesForParsing;
             CTransferInfo ti(HWindow, ttDataFromWindow);
-            ti.EditLine(IDE_AUTODETECTCOND, buf, AUTODETCOND_MAX_SIZE);
-            if (strcmp(buf, HandleNULLStr(ServerType->AutodetectCond)) != 0)
+            ti.EditLine(IDE_AUTODETECTCOND, autodetectCond);
+            ti.EditLine(IDE_PARSINGRULES, rulesForParsing);
+            if (!ti.IsGood())
+                change = TRUE;
+            else if (autodetectCond != HandleNULLStr(ServerType->AutodetectCond))
                 change = TRUE;
             else
             {
-                char buf2[PARSER_MAX_SIZE];
-                ti.EditLine(IDE_PARSINGRULES, buf2, PARSER_MAX_SIZE);
-                if (strcmp(buf2, HandleNULLStr(ServerType->RulesForParsing)) != 0)
+                if (rulesForParsing != HandleNULLStr(ServerType->RulesForParsing))
                     change = TRUE;
                 else
                 {
                     // check for a change in columns
                     if (ServerType->Columns.Count == ColumnsData.Count)
                     {
-                        char colStr1[STC_MAXCOLUMNSTR];
-                        char colStr2[STC_MAXCOLUMNSTR];
+                        std::string colStr1;
+                        std::string colStr2;
                         int i;
                         for (i = 0; i < ColumnsData.Count; i++)
                         {
-                            ColumnsData[i]->SaveToStr(colStr1, STC_MAXCOLUMNSTR);
-                            ServerType->Columns[i]->SaveToStr(colStr2, STC_MAXCOLUMNSTR);
-                            if (strcmp(colStr1, colStr2) != 0)
+                            if (!ColumnsData[i]->SaveToStr(colStr1) ||
+                                !ServerType->Columns[i]->SaveToStr(colStr2) ||
+                                colStr1 != colStr2)
                                 break;
                         }
                         change = (i < ColumnsData.Count);
@@ -1383,8 +1449,8 @@ CEditServerTypeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if (change)
             {
-                if (SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_SRVTYPE_EXITCONF),
-                                                     LoadStr(IDS_FTPPLUGINTITLE),
+                if (SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SRVTYPE_EXITCONF).c_str(),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                      MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                          MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
                 {
@@ -1420,21 +1486,23 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
                                   IDS_ADCSTR_LEFTPAR, IDS_ADCSTR_RIGHTPAR, -1,
                                   IDS_ADCSTR_SYSTCONTAINS, IDS_ADCSTR_WELMSGCONTAINS,
                                   IDS_ADCSTR_SYSTCONTAINSREG, IDS_ADCSTR_WELMSGCONTAINSREG, 0};
-                const char* stringArr[] = {" and", " or", " not", NULL,
-                                           " (", ") ", NULL,
-                                           " syst_contains(\"pattern\")",
-                                           " welcome_contains(\"pattern\")",
-                                           " reg_exp_in_syst(\"pattern\")",
-                                           " reg_exp_in_welcome(\"pattern\")", NULL};
+                // These go into the edit control, so they are UTF-16: EM_REPLACESEL
+                // resolves to the wide message.
+                const wchar_t* stringArr[] = {L" and", L" or", L" not", NULL,
+                                              L" (", L") ", NULL,
+                                              L" syst_contains(\"pattern\")",
+                                              L" welcome_contains(\"pattern\")",
+                                              L" reg_exp_in_syst(\"pattern\")",
+                                              L" reg_exp_in_welcome(\"pattern\")", NULL};
                 int* r = resIDArr;
-                const char** s = stringArr;
+                const wchar_t** s = stringArr;
                 DWORD index = 1;
                 while (*r != 0)
                 {
                     if (*r != -1)
-                        AppendMenu(menu, MF_STRING, (UINT_PTR)index, LoadStr(*r));
+                        AppendMenuA(menu, MF_STRING, (UINT_PTR)index, LoadStr(*r));
                     else
-                        AppendMenu(menu, MF_SEPARATOR, NULL, NULL);
+                        AppendMenuA(menu, MF_SEPARATOR, NULL, NULL);
                     index++;
                     s++;
                     r++;
@@ -1454,9 +1522,9 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
                         if (index == cmd && *r != -1 && *s != NULL) // found, insert the text
                         {
                             DWORD start;
-                            SendDlgItemMessage(HWindow, IDE_AUTODETECTCOND, EM_GETSEL, (WPARAM)&start, NULL);
-                            SendDlgItemMessage(HWindow, IDE_AUTODETECTCOND, EM_REPLACESEL, TRUE,
-                                               (LPARAM)(start == 0 && (*s)[0] == ' ' ? *s + 1 : *s));
+                            SendDlgItemMessageW(HWindow, IDE_AUTODETECTCOND, EM_GETSEL, (WPARAM)&start, NULL);
+                            SendDlgItemMessageW(HWindow, IDE_AUTODETECTCOND, EM_REPLACESEL, TRUE,
+                                                reinterpret_cast<LPARAM>(start == 0 && (*s)[0] == L' ' ? *s + 1 : *s));
                             break;
                         }
                         index++;
@@ -1491,15 +1559,18 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
             int i = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
             if (i > 0 && i < ColumnsData.Count)
             {
-                char buf[200 + STC_ID_MAX_SIZE];
-                sprintf(buf, LoadStr(IDS_SRVTYPECOL_REMOVECONF), HandleNULLStr(ColumnsData[i]->ID));
+                std::wstring columnID;
+                FtpDecodeLocalText(HandleNULLStr(ColumnsData[i]->ID), columnID);
+                const std::wstring text = SPLFormatStringOwned(
+                    LangStr(IDS_SRVTYPECOL_REMOVECONF).c_str(), columnID.c_str());
                 MSGBOXEX_PARAMS params;
+                const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
                 memset(&params, 0, sizeof(params));
                 params.HParent = HWindow;
                 params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED |
                                MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-                params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                params.Text = buf;
+                params.Caption = caption.c_str();
+                params.Text = text.c_str();
                 if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
                 {
                     if (ListView_DeleteItem(HListView, i))
@@ -1574,14 +1645,15 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
 
         case IDB_TESTPARSER:
         {
-            char rules[PARSER_MAX_SIZE];
-            GetDlgItemText(HWindow, IDE_PARSINGRULES, rules, PARSER_MAX_SIZE);
+            std::string rules;
+            if (!ReadWindowLocalText(GetDlgItem(HWindow, IDE_PARSINGRULES), rules))
+                return TRUE;
 
             // compile the parsing rules -> obtain the listing parser
             int errorPos = -1;
             int errorResID = -1;
             BOOL lowMem = FALSE;
-            CFTPParser* parser = CompileParsingRules(rules, &ColumnsData, &errorPos, &errorResID, &lowMem);
+            CFTPParser* parser = CompileParsingRules(rules.c_str(), &ColumnsData, &errorPos, &errorResID, &lowMem);
             if (parser != NULL) // we have the parser, we can open the dialog
             {
                 CSrvTypeTestParserDlg(HWindow, parser, &ColumnsData, &RawListing, &RawListIncomplete).Execute();
@@ -1591,9 +1663,9 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
             {
                 if (errorResID != -1) // some "reasonable" error was found, comment on it
                 {
-                    char buf[300];
-                    sprintf(buf, LoadStr(IDS_STPAR_UNABLECOMPPARSER), LoadStr(errorResID));
-                    SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
+                    const std::wstring message = SPLFormatStringOwned(
+                        LangStr(IDS_STPAR_UNABLECOMPPARSER).c_str(), LangStr(errorResID).c_str());
+                    SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                      MB_OK | MB_ICONEXCLAMATION);
                     // mark the error location in the parsing rules text
                     SendDlgItemMessage(HWindow, IDE_PARSINGRULES, EM_SETSEL, (WPARAM)errorPos,

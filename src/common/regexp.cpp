@@ -34,6 +34,44 @@
 #include <string.h>
 #include <ostream>
 
+#include "common/text/Utf8CaseFold.h"
+
+// Folds 'length' bytes from 'src' into 'dst' (which must have room for 'length' bytes)
+// according to 'folding'. Both encodings are byte-length preserving, which is what lets
+// the engine keep reporting offsets into the caller's original buffer.
+static void FoldSearchBytes(char* dst, const char* src, size_t length,
+                            CRegularExpression::FoldEncoding folding)
+{
+    if (folding == CRegularExpression::FoldEncoding::Acp)
+    {
+        for (size_t i = 0; i < length; i++)
+            dst[i] = LowerCase[(BYTE)src[i]];
+        return;
+    }
+
+    // UTF-8: fold the non-ASCII code points properly, then lowercase ASCII exactly as the
+    // ACP table would. ASCII is deliberately left to this loop rather than to the fold
+    // helper because the pattern shares this path, and lowercasing a pattern's ASCII is
+    // what makes the engine case-insensitive at all.
+    const std::string folded =
+        sally::text::FoldUtf8Preserving(std::string_view(src, length),
+                                        sally::text::FoldScope::NonAsciiOnly);
+    // FoldUtf8Preserving is length-preserving by contract; assert it rather than trust it,
+    // because a shorter result would desynchronise every offset the engine reports.
+    _ASSERTE(folded.size() == length);
+    if (folded.size() != length)
+    {
+        for (size_t i = 0; i < length; i++)
+            dst[i] = LowerCase[(BYTE)src[i]];
+        return;
+    }
+    for (size_t i = 0; i < length; i++)
+    {
+        const char byte = folded[i];
+        dst[i] = (byte >= 'A' && byte <= 'Z') ? (char)(byte - 'A' + 'a') : byte;
+    }
+}
+
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
 #endif
@@ -101,14 +139,23 @@ void regerror(const char* s)
 // CRegularExpression
 //
 
-BOOL CRegularExpression::Set(const char* pattern, WORD flags)
+void CRegularExpression::Clear() noexcept
 {
     if (OriginalPattern != NULL)
         free(OriginalPattern);
+    OriginalPattern = NULL;
+    if (Expression != NULL)
+        free(Expression);
+    Expression = NULL;
+    LastErrorText = NULL;
+}
+
+BOOL CRegularExpression::Set(const char* pattern, WORD flags)
+{
+    Clear();
     if (pattern == NULL)
     {
         LastError = LastErrorText = RegExpErrorText(reeEmpty);
-        OriginalPattern = NULL;
         return FALSE;
     }
     int length = (int)strlen(pattern);
@@ -133,11 +180,9 @@ BOOL CRegularExpression::SetFlags(WORD flags)
         pattern = (char*)malloc(strlen(OriginalPattern) + 1);
         if (pattern != NULL)
         {
-            char* s1 = pattern;
-            char* s2 = OriginalPattern;
-            while (*s2 != 0)
-                *s1++ = LowerCase[*s2++];
-            *s1 = 0;
+            const size_t patternLength = strlen(OriginalPattern);
+            FoldSearchBytes(pattern, OriginalPattern, patternLength, Folding);
+            pattern[patternLength] = 0;
         }
         else
         {
@@ -211,10 +256,8 @@ BOOL CRegularExpression::SetLine(const char* start, const char* end)
         }
         else // insensitive
         {
-            char* l = Line;
-            while (start < end)
-                *l++ = LowerCase[*start++];
-            *l = 0;
+            FoldSearchBytes(Line, start, (size_t)(end - start), Folding);
+            Line[LineLength] = 0;
         }
     }
     else // backward
@@ -228,6 +271,11 @@ BOOL CRegularExpression::SetLine(const char* start, const char* end)
         }
         else // insensitive
         {
+            // Backward search reverses the bytes, which a multi-byte encoding cannot
+            // survive, so UTF-8 callers must search forward (Find, the only UTF-8 caller,
+            // does). This path therefore keeps the ACP table unconditionally: it is the
+            // pre-existing behaviour, and it is correct for every caller that can
+            // legitimately get here.
             char* l = Line;
             while (start < end)
                 *l++ = LowerCase[*--end];

@@ -23,10 +23,9 @@
 //const char *SHEXREG_OPENSALAMANDER = "ServantSalamander25";                              // salexten.dll - 2.5 beta 2 az RC1
 //const char *SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension for Servant Salamander 2.5"; // salexten.dll - 2.5 beta 2 az RC1
 //const char* SHEXREG_OPENSALAMANDER = "AltapSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;  // salexten.dll - do 4.0
-const char* SHEXREG_OPENSALAMANDER = "SallyVer" SALSHEXT_SHAREDNAMESAPPENDIX;
+static const wchar_t SHEXREG_OPENSALAMANDER[] = L"SallyVer" L"S100";
 #ifdef INSIDE_SALAMANDER
 #include "versinfo.rh2"
-const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Sally " VERSINFO_VERSION;
 #endif // INSIDE_SALAMANDER
 
 #ifdef ENABLE_SH_MENU_EXT
@@ -48,9 +47,19 @@ const char *SHELLEXT_CM_AND = "Logical AND";
 
 const char *SHELLEXT_CM_SUBMENU = "Show In Submenu";
 const char *SHELLEXT_CM_SUBMENUNAME = "Submenu Name";
+// Wide sibling for the RegQueryValueExW/RegSetValueExW calls below. Same
+// string: a registry value name is the same value whichever API form addresses it, so this
+// is a spelling for the W calls and not a second setting.
+static const wchar_t *SHELLEXT_CM_SUBMENUNAME_W = L"Submenu Name";
 
 BOOL ShellExtConfigSubmenu = FALSE;
-char ShellExtConfigSubmenuName[] = "&Servant Salamander";
+// wchar_t[SEC_SUBMENUNAME_MAX], matching the declaration in shexreg.h.
+// This was `char ShellExtConfigSubmenuName[] = "..."` - a 20-BYTE object - while the header
+// (widened by an earlier sweep) promised wchar_t[100], i.e. 200 bytes. dialogse.cpp writes
+// through the header's view with ti.EditLine(..., SEC_SUBMENUNAME_MAX), so this was a 10x
+// buffer overflow into whatever globals followed. Nothing diagnosed it: array extents are
+// not checked across translation units.
+wchar_t ShellExtConfigSubmenuName[SEC_SUBMENUNAME_MAX] = L"&Servant Salamander";
 
 CShellExtConfigItem *ShellExtConfigFirst = NULL;
 DWORD ShellExtConfigVersion = 0;
@@ -136,8 +145,11 @@ SECLoadRegistry()
     // nactu jednotlive promenne konfigurace
     bufferSize = sizeof(BOOL);
     SalRegQueryValueEx(hKey, SHELLEXT_CM_SUBMENU, 0, &gettedType, (BYTE *)&ShellExtConfigSubmenu, &bufferSize);
+    // RegQueryValueExW explicitly: the buffer is wide now, and the unsuffixed
+    // form is the A one in this build (no UNICODE), which would fill a wchar_t array with
+    // ANSI bytes. sizeof() is still right - the registry APIs count BYTES either way.
     bufferSize = sizeof(ShellExtConfigSubmenuName);
-    SalRegQueryValueEx(hKey, SHELLEXT_CM_SUBMENUNAME, 0, &gettedType, (BYTE *)ShellExtConfigSubmenuName, &bufferSize);
+    RegQueryValueExW(hKey, SHELLEXT_CM_SUBMENUNAME_W, 0, &gettedType, (BYTE *)ShellExtConfigSubmenuName, &bufferSize);
   }
 
   NOHANDLES(RegCloseKey(hKey));
@@ -182,13 +194,13 @@ SECGetItemIndex(UINT cmd, int *index)
 
 
 // vytahne nazev polozky 
-const char *
+const wchar_t *
 SECGetName(int index)
 {
   CShellExtConfigItem *item = SECGetItem(index);
 
   if (item == NULL)
-    return "";
+    return L"";
 
   return item->Name;
 }
@@ -254,43 +266,43 @@ SECAddItem(CShellExtConfigItem **refItem)
 
 BOOL MyClearKey(HKEY key, REGSAM regView)
 {
-    char name[MAX_PATH];
-    DWORD size = MAX_PATH;
+    wchar_t name[256]; // maximum registry key-name length, including terminator
     HKEY subKey;
 
-    while (RegEnumKey(key, 0, name, MAX_PATH) == ERROR_SUCCESS)
+    while (RegEnumKeyW(key, 0, name, ARRAYSIZE(name)) == ERROR_SUCCESS)
     {
-        if (NOHANDLES(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE | regView, &subKey)) == ERROR_SUCCESS)
+        if (NOHANDLES(RegOpenKeyExW(key, name, 0, KEY_READ | KEY_WRITE | regView, &subKey)) == ERROR_SUCCESS)
         {
             BOOL ret = MyClearKey(subKey, regView);
             NOHANDLES(RegCloseKey(subKey));
-            if (!ret || RegDeleteKey(key, name) != ERROR_SUCCESS)
+            if (!ret || RegDeleteKeyW(key, name) != ERROR_SUCCESS)
                 return FALSE;
         }
         else
             return FALSE;
     }
 
-    while (RegEnumValue(key, 0, name, &size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-        if (RegDeleteValue(key, name) != ERROR_SUCCESS)
+    DWORD size = ARRAYSIZE(name);
+    while (RegEnumValueW(key, 0, name, &size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+        if (RegDeleteValueW(key, name) != ERROR_SUCCESS)
             break;
         else
-            size = MAX_PATH;
+            size = ARRAYSIZE(name);
 
     return TRUE;
 }
 
-BOOL MyDeleteKey(HKEY key, const char* keyName, REGSAM regView)
+BOOL MyDeleteKey(HKEY key, const wchar_t* keyName, REGSAM regView)
 {
     HKEY delKey;
-    if (NOHANDLES(RegOpenKeyEx(key, keyName, 0, KEY_READ | KEY_WRITE | regView, &delKey)) == ERROR_SUCCESS)
+    if (NOHANDLES(RegOpenKeyExW(key, keyName, 0, KEY_READ | KEY_WRITE | regView, &delKey)) == ERROR_SUCCESS)
     {
         MyClearKey(delKey, regView);
         NOHANDLES(RegCloseKey(delKey));
     }
-    if (NOHANDLES(RegOpenKeyEx(key, NULL, 0, KEY_READ | KEY_WRITE | regView, &delKey)) == ERROR_SUCCESS)
+    if (NOHANDLES(RegOpenKeyExW(key, NULL, 0, KEY_READ | KEY_WRITE | regView, &delKey)) == ERROR_SUCCESS)
     {
-        BOOL ret = RegDeleteKey(delKey, keyName) == ERROR_SUCCESS;
+        BOOL ret = RegDeleteKeyW(delKey, keyName) == ERROR_SUCCESS;
         NOHANDLES(RegCloseKey(delKey));
         return ret;
     }
@@ -306,29 +318,19 @@ BOOL MyDeleteKey(HKEY key, const char* keyName, REGSAM regView)
 
 HRESULT DllUnregisterServerBody(REGSAM regView)
 {
-    char key[MAX_PATH];
-    WCHAR buff2[MAX_PATH];
-    char shellExtIID[MAX_PATH];
+    wchar_t key[1024]; // fixed registry paths below are short; avoid CRT stack probes in salext
+    wchar_t shellExtIID[64];
     HKEY hKey;
 
-    StringFromGUID2(&CLSID_ShellExtension, buff2, MAX_PATH);
-    WideCharToMultiByte(CP_ACP,
-                        0,
-                        buff2,
-                        -1,
-                        shellExtIID,
-                        MAX_PATH,
-                        NULL,
-                        NULL);
-    shellExtIID[MAX_PATH - 1] = 0;
+    StringFromGUID2(&CLSID_ShellExtension, shellExtIID, ARRAYSIZE(shellExtIID));
 
-    wsprintf(key, "CLSID\\%s", shellExtIID);
+    wsprintfW(key, L"CLSID\\%s", shellExtIID);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_CLSID_A, shellExtIID);
+    wsprintfW(key, SAL_REG_FMT_SOFTWARE_CLASSES_CLSID_W, shellExtIID);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
-    wsprintf(key, "directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    wsprintfW(key, L"directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, SAL_REG_FMT_SOFTWARE_CLASSES_DIRECTORY_COPY_HOOK_A, SHEXREG_OPENSALAMANDER);
+    wsprintfW(key, SAL_REG_FMT_SOFTWARE_CLASSES_DIRECTORY_COPY_HOOK_W, SHEXREG_OPENSALAMANDER);
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
 
 #ifdef ENABLE_SH_MENU_EXT
@@ -344,10 +346,10 @@ HRESULT DllUnregisterServerBody(REGSAM regView)
 
 #endif // ENABLE_SH_MENU_EXT
 
-    lstrcpy(key, SAL_REG_KEY_SHELL_EXT_APPROVED_A);
-    if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE | regView, &hKey)) == ERROR_SUCCESS)
+    lstrcpyW(key, SAL_REG_KEY_SHELL_EXT_APPROVED_W);
+    if (NOHANDLES(RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE | regView, &hKey)) == ERROR_SUCCESS)
     {
-        RegDeleteValue(hKey, shellExtIID);
+        RegDeleteValueW(hKey, shellExtIID);
         NOHANDLES(RegCloseKey(hKey));
     }
     return S_OK;
@@ -377,14 +379,12 @@ STDAPI DllUnregisterServerOtherPlatform()
 
 #ifdef INSIDE_SALAMANDER
 
-BOOL FileExists(const char* fileName);
-
-BOOL MyCreateKey(HKEY hKey, const char* name, HKEY* createdKey, REGSAM regView)
+BOOL MyCreateKey(HKEY hKey, const wchar_t* name, HKEY* createdKey, REGSAM regView)
 {
     DWORD createType; // info jestli byl klic vytvoren nebo jen otevren
-    LONG res = NOHANDLES(RegCreateKeyEx(hKey, name, 0, NULL, REG_OPTION_NON_VOLATILE,
-                                        KEY_READ | KEY_WRITE | regView, NULL, createdKey,
-                                        &createType));
+    LONG res = NOHANDLES(RegCreateKeyExW(hKey, name, 0, NULL, REG_OPTION_NON_VOLATILE,
+                                         KEY_READ | KEY_WRITE | regView, NULL, createdKey,
+                                         &createType));
     return res == ERROR_SUCCESS;
 }
 
@@ -393,21 +393,103 @@ BOOL MyCreateKey(HKEY hKey, const char* name, HKEY* createdKey, REGSAM regView)
 // POZOR: pri zjistovani potrebne velikosti bufferu vraci o jeden nebo dva (dva
 //        jen u REG_MULTI_SZ) znaky vic pro pripad, ze by string bylo potreba
 //        zakoncit nulou/nulami
+#ifdef ENABLE_SH_MENU_EXT
 LONG SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved,
                         LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
+#endif // ENABLE_SH_MENU_EXT
 
-BOOL MyGetValue(HKEY hKey, const char* name, DWORD type, void* buffer, DWORD bufferSize)
+static BOOL SetJoinedWideText(wchar_t** value, const wchar_t* first,
+                              const wchar_t* second, const wchar_t* third)
 {
-    DWORD gettedType;
-    LONG res = SalRegQueryValueEx(hKey, name, 0, &gettedType, (BYTE*)buffer, &bufferSize);
-    return res == ERROR_SUCCESS && gettedType == type;
+    SIZE_T firstLength = first != NULL ? wcslen(first) : 0;
+    SIZE_T secondLength = second != NULL ? wcslen(second) : 0;
+    SIZE_T thirdLength = third != NULL ? wcslen(third) : 0;
+    SIZE_T maxChars = ((SIZE_T)-1) / sizeof(wchar_t);
+    SIZE_T length;
+    wchar_t* joined;
+    wchar_t* write;
+
+    if (value == NULL || firstLength > maxChars - 1 ||
+        secondLength > maxChars - firstLength - 1 ||
+        thirdLength > maxChars - firstLength - secondLength - 1)
+        return FALSE;
+    length = firstLength + secondLength + thirdLength;
+    joined = (wchar_t*)HeapAlloc(GetProcessHeap(), 0,
+                                 (length + 1) * sizeof(wchar_t));
+    if (joined == NULL)
+        return FALSE;
+
+    write = joined;
+    if (firstLength != 0)
+    {
+        memcpy(write, first, firstLength * sizeof(wchar_t));
+        write += firstLength;
+    }
+    if (secondLength != 0)
+    {
+        memcpy(write, second, secondLength * sizeof(wchar_t));
+        write += secondLength;
+    }
+    if (thirdLength != 0)
+    {
+        memcpy(write, third, thirdLength * sizeof(wchar_t));
+        write += thirdLength;
+    }
+    *write = L'\0';
+
+    if (*value != NULL)
+        HeapFree(GetProcessHeap(), 0, *value);
+    *value = joined;
+    return TRUE;
 }
 
-BOOL CheckVersionOfDLL(const char* name)
+BOOL MyGetStringValueW(HKEY hKey, const wchar_t* name, wchar_t** value)
+{
+    DWORD type = 0;
+    DWORD bytes = 0;
+    LONG res;
+
+    if (value == NULL)
+        return FALSE;
+    res = RegQueryValueExW(hKey, name, 0, &type, NULL, &bytes);
+    if (res != ERROR_SUCCESS || type != REG_SZ)
+        return FALSE;
+
+    while (bytes <= MAXDWORD - sizeof(wchar_t))
+    {
+        wchar_t* buffer = (wchar_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                              bytes + sizeof(wchar_t));
+        DWORD readBytes = bytes;
+        if (buffer == NULL)
+            return FALSE;
+        res = RegQueryValueExW(hKey, name, 0, &type, (BYTE*)buffer, &readBytes);
+        if (res == ERROR_MORE_DATA)
+        {
+            HeapFree(GetProcessHeap(), 0, buffer);
+            bytes = readBytes > bytes ? readBytes : bytes + sizeof(wchar_t);
+            continue;
+        }
+        if (res != ERROR_SUCCESS || type != REG_SZ || readBytes > bytes ||
+            readBytes % sizeof(wchar_t) != 0)
+        {
+            HeapFree(GetProcessHeap(), 0, buffer);
+            return FALSE;
+        }
+
+        buffer[readBytes / sizeof(wchar_t)] = L'\0';
+        if (*value != NULL)
+            HeapFree(GetProcessHeap(), 0, *value);
+        *value = buffer;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+BOOL CheckVersionOfDLL(const wchar_t* name)
 {
     typedef HRESULT(STDAPICALLTYPE * FDllCheckVersion)(REFCLSID rclsid);
     BOOL ok = FALSE;
-    HMODULE dll = LoadLibrary(name);
+    HMODULE dll = LoadLibraryW(name);
     if (dll != NULL)
     {
         FDllCheckVersion DllCheckVersion = (FDllCheckVersion)GetProcAddress(dll, "DllCheckVersion"); // nas export
@@ -431,42 +513,33 @@ BOOL CheckVersionOfDLL(const char* name)
 // - vse co bylo receno o klici HKEY_CLASSES_ROOT je potreba zkusit smazat tez z klice
 //   HKEY_CURRENT_USER\Software\Classes (vyuziva se pokud user nema prava pro zapis do
 //   HKEY_CLASSES_ROOT)
-BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView)
+BOOL SECRegisterToRegistry(const wchar_t* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView)
 {
     HKEY hKey;
-    char key[32768];
-    char shellExtIID[32768];
-    char shellExtPath[32768];
-    char* str;
-    WCHAR buff2[32768];
+    wchar_t shellExtIID[64];
+    wchar_t* key = NULL;
+    wchar_t* shellExtPath = NULL;
+    const wchar_t* str;
     BOOL registered;
-    HKEY classesKey;
+    HKEY classesKey = NULL;
 
     if (!doNotLoadDLL && !CheckVersionOfDLL(shellExtensionPath))
         return FALSE;
 
-    StringFromGUID2(&CLSID_ShellExtension, buff2, 32768);
-    WideCharToMultiByte(CP_ACP,
-                        0,
-                        buff2,
-                        -1,
-                        shellExtIID,
-                        32768,
-                        NULL,
-                        NULL);
-    shellExtIID[32768 - 1] = 0;
+    StringFromGUID2(&CLSID_ShellExtension, shellExtIID, ARRAYSIZE(shellExtIID));
 
     // zjistime jestli uz je nase shell extensiona registrovana, pripadne kde je jeji DLL a jestli je to spravna verze
     registered = FALSE;
-    lstrcpy(key, "CLSID\\");
-    lstrcat(key, shellExtIID);
-    lstrcat(key, "\\InProcServer32");
-    if (NOHANDLES(RegOpenKeyEx(HKEY_CLASSES_ROOT, key, 0, KEY_READ | regView, &hKey)) == ERROR_SUCCESS)
+    if (!SetJoinedWideText(&key, L"CLSID\\", shellExtIID, L"\\InProcServer32"))
+        goto REG_CLEANUP;
+    if (NOHANDLES(RegOpenKeyExW(HKEY_CLASSES_ROOT, key, 0, KEY_READ | regView, &hKey)) == ERROR_SUCCESS)
     {
-        if (MyGetValue(hKey, NULL /* default value */, REG_SZ, shellExtPath, 32768))
+        if (MyGetStringValueW(hKey, NULL /* default value */, &shellExtPath))
         {
-            if (doNotLoadDLL && FileExists(shellExtPath) ||       // kdyz ho nemuzu loadit, aspon overim, ze existuje
-                !doNotLoadDLL && CheckVersionOfDLL(shellExtPath)) // jinak ho naloadim a zjistim od nej jeho verzi
+            DWORD attrs = GetFileAttributesW(shellExtPath);
+            if ((doNotLoadDLL && attrs != INVALID_FILE_ATTRIBUTES &&
+                 (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) || // kdyz ho nemuzu loadit, aspon overim, ze existuje
+                (!doNotLoadDLL && CheckVersionOfDLL(shellExtPath))) // jinak ho naloadim a zjistim od nej jeho verzi
             {
                 registered = TRUE; // DLL je registrovane + je to spravna verze DLL
             }
@@ -482,97 +555,117 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
 
 #ifdef ENABLE_SH_MENU_EXT
 
-        lstrcpy(key, "*\\shellex\\ContextMenuHandlers\\");
-        lstrcat(key, SHEXREG_OPENSALAMANDER);
+        if (!SetJoinedWideText(&key, L"*\\shellex\\ContextMenuHandlers\\",
+                               SHEXREG_OPENSALAMANDER, NULL))
+            goto REG_CLEANUP;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            RegSetValueEx(hKey, NULL, 0, REG_SZ,
-                          (BYTE*)shellExtIID, lstrlen(shellExtIID) + 1);
+            RegSetValueExW(hKey, NULL, 0, REG_SZ, (BYTE*)shellExtIID,
+                           (lstrlenW(shellExtIID) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
         // else;  // chybu otevirani klice pod HKEY_CLASSES_ROOT resime az dale (zde uz by bylo zbytecne)
 
-        lstrcpy(key, "Directory\\shellex\\ContextMenuHandlers\\");
-        lstrcat(key, SHEXREG_OPENSALAMANDER);
+        if (!SetJoinedWideText(&key, L"Directory\\shellex\\ContextMenuHandlers\\",
+                               SHEXREG_OPENSALAMANDER, NULL))
+            goto REG_CLEANUP;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            RegSetValueEx(hKey, NULL, 0, REG_SZ,
-                          (BYTE*)shellExtIID, lstrlen(shellExtIID) + 1);
+            RegSetValueExW(hKey, NULL, 0, REG_SZ, (BYTE*)shellExtIID,
+                           (lstrlenW(shellExtIID) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
 
 #endif // ENABLE_SH_MENU_EXT
 
-        wsprintf(key, "CLSID\\%s", shellExtIID);
+        if (!SetJoinedWideText(&key, L"CLSID\\", shellExtIID, NULL))
+            goto REG_CLEANUP;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            char descrBuf[200];
+            wchar_t descrBuf[200];
 #ifdef _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_32KEY) ? "x86" : "x64");
+            wsprintfW(descrBuf, L"Shell Extension (%s) for Sally %hs", (regView & KEY_WOW64_32KEY) ? L"x86" : L"x64", VERSINFO_VERSION);
 #else  // _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_64KEY) ? "x64" : "x86");
+            wsprintfW(descrBuf, L"Shell Extension (%s) for Sally %hs", (regView & KEY_WOW64_64KEY) ? L"x64" : L"x86", VERSINFO_VERSION);
 #endif // _WIN64
-            RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE*)descrBuf, lstrlen(descrBuf) + 1);
+            RegSetValueExW(hKey, NULL, 0, REG_SZ, (BYTE*)descrBuf, (lstrlenW(descrBuf) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
         else
         {
             if (classesKey == HKEY_CLASSES_ROOT)
             {
-                if (NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_SOFTWARE_CLASSES_A, 0,
-                                           KEY_READ | KEY_WRITE | regView, &classesKey)) == ERROR_SUCCESS)
+                if (NOHANDLES(RegOpenKeyExW(HKEY_CURRENT_USER, SAL_REG_KEY_SOFTWARE_CLASSES_W, 0,
+                                            KEY_READ | KEY_WRITE | regView, &classesKey)) == ERROR_SUCCESS)
                 {
-                    if (MyCreateKey(classesKey, "CLSID", &hKey, regView))
+                    if (MyCreateKey(classesKey, L"CLSID", &hKey, regView))
                         NOHANDLES(RegCloseKey(hKey)); // klic "CLSID" ta tomto miste nemusi existovat, vytvorime si ho
                     goto REG_TRY_AGAIN;
                 }
             }
             if (classesKey != HKEY_CLASSES_ROOT)
+            {
                 NOHANDLES(RegCloseKey(classesKey));
-            return FALSE;
+                classesKey = NULL;
+            }
+            goto REG_CLEANUP;
         }
 
-        wsprintf(key, "CLSID\\%s\\InProcServer32", shellExtIID);
+        if (!SetJoinedWideText(&key, L"CLSID\\", shellExtIID, L"\\InProcServer32"))
+            goto REG_CLEANUP;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            RegSetValueEx(hKey, NULL, 0, REG_SZ,
-                          (BYTE*)shellExtensionPath, lstrlen(shellExtensionPath) + 1);
-            str = "Apartment";
-            RegSetValueEx(hKey, SAL_REG_VALUE_THREADING_MODEL_A, 0, REG_SZ, (BYTE*)str, lstrlen(str) + 1);
+            RegSetValueExW(hKey, NULL, 0, REG_SZ,
+                           (BYTE*)shellExtensionPath, (lstrlenW(shellExtensionPath) + 1) * sizeof(wchar_t));
+            str = L"Apartment";
+            RegSetValueExW(hKey, SAL_REG_VALUE_THREADING_MODEL_W, 0, REG_SZ, (BYTE*)str, (lstrlenW(str) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
 
-        lstrcpy(key, "directory\\shellex\\CopyHookHandlers\\");
-        lstrcat(key, SHEXREG_OPENSALAMANDER);
+        if (!SetJoinedWideText(&key, L"directory\\shellex\\CopyHookHandlers\\",
+                               SHEXREG_OPENSALAMANDER, NULL))
+            goto REG_CLEANUP;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            RegSetValueEx(hKey, NULL, 0, REG_SZ,
-                          (BYTE*)shellExtIID, lstrlen(shellExtIID) + 1);
+            RegSetValueExW(hKey, NULL, 0, REG_SZ,
+                           (BYTE*)shellExtIID, (lstrlenW(shellExtIID) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
 
         // bez "As Admin" je tohle "dead code", aspon pod Vista+
-        wsprintf(key, SAL_REG_KEY_SHELL_EXT_APPROVED_A);
+        if (!SetJoinedWideText(&key, SAL_REG_KEY_SHELL_EXT_APPROVED_W, NULL, NULL))
+            goto REG_CLEANUP;
         if (MyCreateKey(HKEY_LOCAL_MACHINE, key, &hKey, regView))
         {
-            char descrBuf[200];
+            wchar_t descrBuf[200];
 #ifdef _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_32KEY) ? "x86" : "x64");
+            wsprintfW(descrBuf, L"Shell Extension (%s) for Sally %hs", (regView & KEY_WOW64_32KEY) ? L"x86" : L"x64", VERSINFO_VERSION);
 #else  // _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_64KEY) ? "x64" : "x86");
+            wsprintfW(descrBuf, L"Shell Extension (%s) for Sally %hs", (regView & KEY_WOW64_64KEY) ? L"x64" : L"x86", VERSINFO_VERSION);
 #endif // _WIN64
-            RegSetValueEx(hKey, shellExtIID, 0, REG_SZ, (BYTE*)descrBuf, lstrlen(descrBuf) + 1);
+            RegSetValueExW(hKey, shellExtIID, 0, REG_SZ, (BYTE*)descrBuf, (lstrlenW(descrBuf) + 1) * sizeof(wchar_t));
             NOHANDLES(RegCloseKey(hKey));
         }
         if (classesKey != HKEY_CLASSES_ROOT)
+        {
             NOHANDLES(RegCloseKey(classesKey));
+            classesKey = NULL;
+        }
 
         // tohle by melo shell informovat o tom, ze je potreba reloadnout shell extensiony
         // (ovsem pro copy-hook to nefunguje; tak snad bude aspon pro menu)
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
     }
+    registered = TRUE;
 
-    return TRUE;
+REG_CLEANUP:
+    if (classesKey != NULL && classesKey != HKEY_CLASSES_ROOT)
+        NOHANDLES(RegCloseKey(classesKey));
+    if (shellExtPath != NULL)
+        HeapFree(GetProcessHeap(), 0, shellExtPath);
+    if (key != NULL)
+        HeapFree(GetProcessHeap(), 0, key);
+    return registered;
 }
 
 #ifdef ENABLE_SH_MENU_EXT
@@ -580,7 +673,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
 BOOL SECSaveRegistry()
 {
     HKEY hKey;
-    char key[32768];
+    char key[sizeof(SHELLEXT_ROOT_REG) + sizeof(SHELLEXT_CONTEXTMENU) + 16];
     DWORD bufferSize;
     DWORD gettedType;
 
@@ -641,7 +734,11 @@ BOOL SECSaveRegistry()
 
         // ulozim jednotlive promenne konfigurace
         RegSetValueEx(hKey, SHELLEXT_CM_SUBMENU, 0, REG_DWORD, (BYTE*)&ShellExtConfigSubmenu, sizeof(BOOL));
-        RegSetValueEx(hKey, SHELLEXT_CM_SUBMENUNAME, 0, REG_SZ, (BYTE*)ShellExtConfigSubmenuName, strlen(ShellExtConfigSubmenuName) + 1);
+        // W form + a BYTE length computed from wcslen. REG_SZ is stored as
+        // Unicode by Windows either way, so a value previously written through the A form
+        // reads back identically here - no migration needed.
+        RegSetValueExW(hKey, SHELLEXT_CM_SUBMENUNAME_W, 0, REG_SZ, (BYTE*)ShellExtConfigSubmenuName,
+                       (DWORD)((wcslen(ShellExtConfigSubmenuName) + 1) * sizeof(wchar_t)));
 
         NOHANDLES(RegCloseKey(hKey));
         return TRUE;
@@ -711,7 +808,7 @@ BOOL SECSwapItems(int index1, int index2)
 }
 
 // nastavi nazev polozky
-BOOL SECSetName(int index, const char* name)
+BOOL SECSetName(int index, const wchar_t* name)
 {
     CShellExtConfigItem* item = SECGetItem(index);
 

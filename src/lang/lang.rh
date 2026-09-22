@@ -291,7 +291,6 @@
 #define IDD_CFGPAGE_EDITORS             590
 #define IDD_CFGPAGE_APPEARANCE          595
 #define IDC_NOTHIDDENSYSTEM             596
-#define IDC_USESALOPEN                  597
 #define IDC_FULLROWHIGHLIGHT            601
 #define IDC_CHD_SHOWMYDOC               602
 #define IDC_QUICKRENAME_SELALL          603

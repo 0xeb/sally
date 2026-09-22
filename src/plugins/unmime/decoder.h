@@ -4,9 +4,11 @@
 
 #pragma once
 
+#include <string>
+
 /// main export ////////////////////////////////////////////////////////////////
 
-BOOL DecodeSelectedBlocks(LPCTSTR pszFileName, CParserOutput* output, LPCTSTR dir, FILETIME* pft,
+BOOL DecodeSelectedBlocks(const wchar_t* pszFileName, CParserOutput* output, const wchar_t* dir, FILETIME* pft,
                           CSalamanderForOperationsAbstract* Salamander, const CQuadWord& totalSize,
                           BOOL* pAborted = NULL, BOOL bOnlyOneFile = FALSE);
 
@@ -17,8 +19,8 @@ extern int iErrorStr;
 class CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL bLastLine) { return TRUE; };
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL bLastLine) { return TRUE; };
     virtual BOOL End();
     virtual void SaveState();
     virtual void RestoreState();
@@ -30,7 +32,7 @@ protected:
     BOOL bCalcSize;
     char* PBuffer;
     int iBufPos;
-    CPathBuffer FileName;
+    std::wstring FileName;
 
     virtual BOOL BufferedWrite(const void* pData, int nBytes);
 };
@@ -38,21 +40,21 @@ protected:
 class CNullDecoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE, char*, BOOL) { return TRUE; };
+    virtual BOOL Start(HANDLE, const wchar_t*, BOOL) { return TRUE; };
     virtual BOOL End() { return TRUE; };
 };
 
 class CTextDecoder : public CDecoder
 {
 public:
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL bLastLine);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL bLastLine);
 };
 
 class CQPDecoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL bLastLine);
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL bLastLine);
 
 private:
     BYTE table[256];
@@ -61,8 +63,8 @@ private:
 class CBase64Decoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL);
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL);
     virtual void SaveState();
     virtual void RestoreState();
 
@@ -77,8 +79,8 @@ private:
 class CUUXXDecoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL);
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL);
     BOOL bXX;
 
 private:
@@ -88,8 +90,8 @@ private:
 class CBinHexDecoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL);
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL);
     virtual BOOL End();
 
     BOOL bFinished, bCRCFailed;
@@ -139,8 +141,8 @@ private:
 class CYEncDecoder : public CDecoder
 {
 public:
-    virtual BOOL Start(HANDLE hFile, char* fileName, BOOL bJustCalcSize = FALSE);
-    virtual BOOL DecodeLine(LPTSTR pszLine, BOOL);
+    virtual BOOL Start(HANDLE hFile, const wchar_t* fileName, BOOL bJustCalcSize = FALSE);
+    virtual BOOL DecodeLine(LPSTR pszLine, BOOL);
 
     BOOL bError;
     DWORD CRC;

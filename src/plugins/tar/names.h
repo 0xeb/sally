@@ -7,16 +7,16 @@
 struct SEndingFile
 {
     const CFileData* fileData;
-    char* path;
+    wchar_t* path;
     BOOL isDir;
-    char* mask;
+    wchar_t* mask;
 };
 
 class CNameTree;
 
 struct SBranch
 {
-    unsigned char ch;
+    wchar_t ch;
     CNameTree* next;
 };
 
@@ -29,8 +29,8 @@ private:
 public:
     CNameTree() : Branches(1, 1) { EndingNames = NULL; }
     ~CNameTree();
-    void Add(const char* name, const BOOL isDir, const char* path, const CFileData* fileData);
-    BOOL IsNamePresent(const char* name, const BOOL hasExtension);
+    void Add(const wchar_t* name, const BOOL isDir, const wchar_t* path, const CFileData* fileData);
+    BOOL IsNamePresent(const wchar_t* name, const BOOL hasExtension);
 };
 
 class CNames
@@ -41,14 +41,14 @@ private:
 public:
     CNames() {};
     ~CNames() {};
-    void AddName(const char* name, const BOOL isDir, const char* path, const CFileData* fileData)
+    void AddName(const wchar_t* name, const BOOL isDir, const wchar_t* path, const CFileData* fileData)
     {
-        if (name == NULL || *name == '\0')
+        if (name == NULL || *name == L'\0')
             return;
         NameTree.Add(name, isDir, path, fileData);
     }
-    BOOL IsNamePresent(const char* name)
+    BOOL IsNamePresent(const wchar_t* name)
     {
-        return NameTree.IsNamePresent(name, strchr(name, '.') != NULL);
+        return NameTree.IsNamePresent(name, wcschr(name, L'.') != NULL);
     }
 };

@@ -11,6 +11,7 @@
 #include "dbg.h"
 
 #include "markdown.h"
+#include "webviewer_text.h"
 
 #include <shlobj.h>
 #include <stdarg.h>
@@ -30,7 +31,7 @@ HINSTANCE HLanguage = NULL;   // handle to the SLG module - language-dependent r
 
 int ConfigVersion = 0;           // 0 - default, 1 - SS 1.6 beta 3, 2 - SS 1.6 beta 4, 3 - SS 2.5 beta 1, 4 - AS 3.1 beta 1, 5 - Sally (PNG/SVG)
 #define CURRENT_CONFIG_VERSION 5 // Sally: PNG/SVG viewer support
-const char* CONFIG_VERSION = "Version";
+const wchar_t* CONFIG_VERSION = L"Version";
 
 // Salamander general interface - valid from startup until the plugin shuts down
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
@@ -51,16 +52,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     if (fdwReason == DLL_PROCESS_ATTACH)
         DLLInstance = hinstDLL;
     return TRUE; // DLL can be loaded
-}
-
-//
-// ****************************************************************************
-// LoadStr
-//
-
-char* LoadStr(int resID)
-{
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
 }
 
 //
@@ -90,14 +81,20 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Web Viewer" /* neprekladat! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-226).
+#define WEBVIEWER_WIDEN2(x) L##x
+#define WEBVIEWER_WIDEN(x) WEBVIEWER_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    WEBVIEWER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Web Viewer" /* neprekladat! */, MB_OK | MB_ICONERROR);
+#undef WEBVIEWER_WIDEN
+#undef WEBVIEWER_WIDEN2
         return NULL;
     }
 
     // let it load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Web Viewer" /* neprekladat! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Web Viewer" /* neprekladat! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -108,14 +105,14 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
         return NULL; // error
 
     // configure the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION | FUNCTION_VIEWER,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "WEBVIEWER");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"WEBVIEWER");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -127,13 +124,14 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls %ls\n\n%ls\n\n%ls",
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
+        _CRT_WIDE(VERSINFO_VERSION), _CRT_WIDE(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(),
+                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ABOUT).c_str(),
+                                     MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -176,28 +174,29 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_VERSION, REG_DWORD, &v, sizeof(DWORD));
 }
 
-const char* MARKDOWN_EXTENSIONS = "*.md;*.mdown;*.markdown";
-const char* IMAGE_EXTENSIONS = "*.png;*.svg";
+const wchar_t* MARKDOWN_EXTENSIONS = L"*.md;*.mdown;*.markdown";
+const wchar_t* IMAGE_EXTENSIONS = L"*.png;*.svg";
 
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
-    char buff[1000];
-    sprintf_s(buff, "*.htm;*.html;*.xml;*.mht;%s;%s", MARKDOWN_EXTENSIONS, IMAGE_EXTENSIONS);
-
-    salamander->AddViewer(buff, FALSE);
+    std::wstring extensions = L"*.htm;*.html;*.xml;*.mht;";
+    extensions += MARKDOWN_EXTENSIONS;
+    extensions += L';';
+    extensions += IMAGE_EXTENSIONS;
+    salamander->AddViewer(extensions.c_str(), FALSE);
 
     if (ConfigVersion < 2) // before SS 1.6 beta 4
     {
-        salamander->AddViewer("*.xml", TRUE);
-        salamander->ForceRemoveViewer("*.jpg");
-        salamander->ForceRemoveViewer("*.gif");
+        salamander->AddViewer(L"*.xml", TRUE);
+        salamander->ForceRemoveViewer(L"*.jpg");
+        salamander->ForceRemoveViewer(L"*.gif");
     }
 
     if (ConfigVersion < 3) // before SS 2.5 beta 1
     {
-        salamander->AddViewer("*.mht", TRUE);
+        salamander->AddViewer(L"*.mht", TRUE);
     }
 
     if (ConfigVersion < 4) // before AD 3.1 beta 1
@@ -261,12 +260,17 @@ static std::wstring GetWebView2UserDataFolder()
 #ifdef _DEBUG
 static void WebViewerDiagLogImpl(const char* fmt, ...)
 {
-    char path[MAX_PATH];
-    if (GetTempPathA(MAX_PATH, path) == 0)
+    const DWORD required = GetTempPathW(0, NULL);
+    if (required == 0)
         return;
-    lstrcatA(path, "sally-webviewer-dpi.log");
+    std::vector<wchar_t> storage(required, L'\0');
+    const DWORD length = GetTempPathW(required, storage.data());
+    if (length == 0 || length >= required)
+        return;
+    std::wstring path(storage.data(), length);
+    SPLSalPathAppendOwned(path, L"sally-webviewer-dpi.log");
     FILE* f = NULL;
-    if (fopen_s(&f, path, "a") != 0 || f == NULL)
+    if (_wfopen_s(&f, path.c_str(), L"a") != 0 || f == NULL)
         return;
     SYSTEMTIME st;
     GetLocalTime(&st);
@@ -291,9 +295,19 @@ static void WebViewerDiagLogImpl(const char* fmt, ...)
 // shipped on a hypothesis.
 static BOOL WebViewerDpiFixEnabled()
 {
-    char value[8] = {0};
-    return GetEnvironmentVariableA("SALLY_WEBVIEWER_DPI_FIX", value, sizeof(value)) > 0 &&
-           value[0] == '1';
+    DWORD capacity = GetEnvironmentVariableW(L"SALLY_WEBVIEWER_DPI_FIX", nullptr, 0);
+    while (capacity != 0)
+    {
+        std::wstring value(capacity, L'\0');
+        const DWORD length = GetEnvironmentVariableW(L"SALLY_WEBVIEWER_DPI_FIX",
+                                                     value.data(), capacity);
+        if (length == 0)
+            return FALSE;
+        if (length < capacity)
+            return value[0] == L'1';
+        capacity = length + 1;
+    }
+    return FALSE;
 }
 
 bool CWebView2Host::Create(HWND hwndParent)
@@ -363,7 +377,7 @@ bool CWebView2Host::Create(HWND hwndParent)
                                 // GetDpiForWindow is Win10 1607+; resolve dynamically so this
                                 // still builds and runs on older targets.
                                 UINT windowDpi = 0;
-                                HMODULE hUser32 = GetModuleHandleA("user32.dll");
+                                HMODULE hUser32 = GetModuleHandleW(L"user32.dll");
                                 if (hUser32 != NULL)
                                 {
                                     typedef UINT(WINAPI * PFNGETDPIFORWINDOW)(HWND);
@@ -433,10 +447,10 @@ bool CWebView2Host::Create(HWND hwndParent)
         if (dwResult == WAIT_OBJECT_0)
         {
             MSG msg;
-            while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
     }
@@ -464,7 +478,7 @@ bool CWebView2Host::Create(HWND hwndParent)
                 if (key == VK_ESCAPE)
                 {
                     args->put_Handled(TRUE);
-                    PostMessage(m_hwndParent, WM_CLOSE, 0, 0);
+                    PostMessageW(m_hwndParent, WM_CLOSE, 0, 0);
                     return S_OK;
                 }
 
@@ -473,7 +487,7 @@ bool CWebView2Host::Create(HWND hwndParent)
                     args->put_Handled(TRUE);
                     // Post a custom message to the parent to trigger refresh
                     // (avoid doing heavy work inside the callback)
-                    PostMessage(m_hwndParent, WM_APP + 1, 0, 0);
+                    PostMessageW(m_hwndParent, WM_APP + 1, 0, 0);
                     return S_OK;
                 }
 
@@ -521,11 +535,13 @@ void CWebView2Host::NavigateToString(const std::string& htmlContent)
 {
     if (m_webview)
     {
-        // WebView2::NavigateToString expects a wide string
-        int len = MultiByteToWideChar(CP_UTF8, 0, htmlContent.c_str(), (int)htmlContent.size(), nullptr, 0);
-        std::wstring wide(len, L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, htmlContent.c_str(), (int)htmlContent.size(), wide.data(), len);
-        m_webview->NavigateToString(wide.c_str());
+        std::wstring wideHtml;
+        if (!WebViewerDecodeHtmlUtf8(htmlContent, wideHtml))
+        {
+            TRACE_E("Invalid UTF-8 HTML content");
+            return;
+        }
+        m_webview->NavigateToString(wideHtml.c_str());
     }
 }
 
@@ -561,6 +577,7 @@ struct CTVData
 {
     BOOL AlwaysOnTop;
     std::wstring Name;
+    std::wstring NavigationUrl; // Non-empty for files navigated directly by WebView2
     std::string HtmlContent; // Non-empty for Markdown (pre-rendered HTML)
     int Left, Top, Width, Height;
     UINT ShowCmd;
@@ -571,51 +588,19 @@ struct CTVData
     HANDLE Continue;
 };
 
-// Convert ANSI path to wide string
-static std::wstring AnsiToWide(const char* ansi)
-{
-    int len = MultiByteToWideChar(CP_ACP, 0, ansi, -1, nullptr, 0);
-    if (len <= 0)
-        return {};
-    std::wstring wide(len - 1, L'\0');
-    MultiByteToWideChar(CP_ACP, 0, ansi, -1, wide.data(), len);
-    return wide;
-}
-
-// Convert a local file path to a file:// URL
-static std::wstring PathToFileUrl(const std::wstring& path)
-{
-    std::wstring url = L"file:///";
-    for (wchar_t c : path)
-    {
-        if (c == L'\\')
-            url += L'/';
-        else
-            url += c;
-    }
-    return url;
-}
-
 // Build a title string from the file path
-static std::wstring MakeWindowTitle(const std::wstring& filePath, const char* pluginName)
+static std::wstring MakeWindowTitle(const std::wstring& filePath, const wchar_t* pluginName)
 {
     std::wstring title = filePath;
     title += L" - ";
-    // Convert plugin name to wide
-    int len = MultiByteToWideChar(CP_ACP, 0, pluginName, -1, nullptr, 0);
-    if (len > 0)
-    {
-        std::wstring wideName(len - 1, L'\0');
-        MultiByteToWideChar(CP_ACP, 0, pluginName, -1, wideName.data(), len);
-        title += wideName;
-    }
+    title += pluginName;
     return title;
 }
 
 unsigned WINAPI ThreadViewerMessageLoop(void* param)
 {
     CALL_STACK_MESSAGE1("ThreadViewerMessageLoop(Version 2.00)");
-    SetThreadNameInVCAndTrace("WebViewLoop");
+    SetThreadNameInVCAndTrace(L"WebViewLoop");
     TRACE_I("Begin");
 
     CTVData* data = (CTVData*)param;
@@ -632,7 +617,7 @@ unsigned WINAPI ThreadViewerMessageLoop(void* param)
         if ((!data->ReturnLock || *data->Lock != NULL) &&
             CreateWindowExW(data->AlwaysOnTop ? WS_EX_TOPMOST : 0,
                             WINDOW_CLASSNAME,
-                            MakeWindowTitle(data->Name, LoadStr(IDS_PLUGINNAME)).c_str(),
+                            MakeWindowTitle(data->Name, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str()).c_str(),
                             WS_OVERLAPPEDWINDOW,
                             data->Left,
                             data->Top,
@@ -643,10 +628,10 @@ unsigned WINAPI ThreadViewerMessageLoop(void* param)
                             DLLInstance,
                             window) != NULL)
         {
-            SendMessage(window->HWindow, WM_SETICON, ICON_BIG,
-                        (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_WEBVIEWER)));
-            SendMessage(window->HWindow, WM_SETICON, ICON_SMALL,
-                        (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_WEBVIEWER)));
+            SendMessageW(window->HWindow, WM_SETICON, ICON_BIG,
+                         (LPARAM)LoadIconW(DLLInstance, MAKEINTRESOURCEW(IDI_WEBVIEWER)));
+            SendMessageW(window->HWindow, WM_SETICON, ICON_SMALL,
+                         (LPARAM)LoadIconW(DLLInstance, MAKEINTRESOURCEW(IDI_WEBVIEWER)));
             CALL_STACK_MESSAGE1("ThreadViewerMessageLoop::ShowWindow");
             ShowWindow(window->HWindow, data->ShowCmd);
             SetForegroundWindow(window->HWindow);
@@ -671,6 +656,7 @@ unsigned WINAPI ThreadViewerMessageLoop(void* param)
 
     CALL_STACK_MESSAGE1("ThreadViewerMessageLoop::SetEvent");
     std::wstring name = data->Name;
+    std::wstring navigationUrl = std::move(data->NavigationUrl);
     std::string htmlContent = std::move(data->HtmlContent);
     BOOL openFile = data->Success;
     SetEvent(data->Continue); // let the main thread continue; data are invalid from this point
@@ -688,15 +674,15 @@ unsigned WINAPI ThreadViewerMessageLoop(void* param)
         }
         else
         {
-            window->m_viewer.Navigate(PathToFileUrl(name));
+            window->m_viewer.Navigate(navigationUrl);
         }
 
         CALL_STACK_MESSAGE1("ThreadViewerMessageLoop::message-loop");
         MSG msg;
-        while (GetMessage(&msg, NULL, 0, 0))
+        while (GetMessageW(&msg, NULL, 0, 0))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -713,7 +699,7 @@ enum FileFormatEnum
     ffeMarkdown
 };
 
-FileFormatEnum GetFileFormat(const char* name)
+FileFormatEnum GetFileFormat(const wchar_t* name)
 {
     FileFormatEnum ret = ffeHTML;
     CSalamanderMaskGroup* masks = SalamanderGeneral->AllocSalamanderMaskGroup();
@@ -728,25 +714,42 @@ FileFormatEnum GetFileFormat(const char* name)
     return ret;
 }
 
-BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, int width,
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width,
                                          int height, UINT showCmd, BOOL alwaysOnTop,
                                          BOOL returnLock, HANDLE* lock, BOOL* lockOwner,
                                          CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
 {
-    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%s, %d, %d, %d, %d, "
+    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%ls, %d, %d, %d, %d, "
                          "0x%X, %d, %d, , , , %d, %d)",
                          name, left, top, width, height,
                          showCmd, alwaysOnTop, returnLock, enumFilesSourceUID, enumFilesCurrentIndex);
 
     FileFormatEnum fileFormat = GetFileFormat(name);
-    std::wstring wideName = AnsiToWide(name);
 
     CTVData data;
     data.AlwaysOnTop = alwaysOnTop;
-    data.Name = wideName;
+    data.Name = name;
     if (fileFormat == ffeMarkdown)
-        data.HtmlContent = ConvertMarkdownToHTML(wideName);
+    {
+        data.HtmlContent = ConvertMarkdownToHTML(data.Name);
+        if (data.HtmlContent.empty())
+        {
+            SalamanderGeneral->SalMessageBox(NULL,
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNABLETOOPENIE).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERRORTITLE).c_str(),
+                                             MB_ICONEXCLAMATION | MB_OK | MB_SETFOREGROUND);
+            return FALSE;
+        }
+    }
+    else if (!WebViewerBuildFileUrl(data.Name, data.NavigationUrl))
+    {
+        SalamanderGeneral->SalMessageBox(NULL,
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNABLETOOPENIE).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERRORTITLE).c_str(),
+                                         MB_ICONEXCLAMATION | MB_OK | MB_SETFOREGROUND);
+        return FALSE;
+    }
     data.Left = left;
     data.Top = top;
     data.Width = width;
@@ -756,7 +759,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     data.Lock = lock;
     data.LockOwner = lockOwner;
     data.Success = FALSE;
-    data.Continue = CreateEvent(NULL, FALSE, FALSE, NULL);
+    data.Continue = CreateEventW(NULL, FALSE, FALSE, NULL);
     if (data.Continue == NULL)
     {
         TRACE_E("Failed to create the Continue event.");
@@ -774,7 +777,9 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
 
     if (!data.Success)
     {
-        SalamanderGeneral->SalMessageBox(NULL, LoadStr(IDS_UNABLETOOPENIE), LoadStr(IDS_ERRORTITLE),
+        SalamanderGeneral->SalMessageBox(NULL,
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNABLETOOPENIE).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERRORTITLE).c_str(),
                                          MB_ICONEXCLAMATION | MB_OK | MB_SETFOREGROUND);
     }
 
@@ -800,8 +805,8 @@ BOOL InitViewer()
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = CViewerMainWindow::ViewerMainWindowProc;
     wc.hInstance = DLLInstance;
-    wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hIcon = LoadIconW(NULL, IDI_APPLICATION);
+    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = WINDOW_CLASSNAME;
     if (RegisterClassW(&wc) == 0)
@@ -895,7 +900,7 @@ BOOL CViewerWindowQueue::CloseAllWindows(BOOL force, int waitTime, int forceWait
     CViewerWindowQueueItem* item = Head;
     while (item != NULL)
     {
-        PostMessage(item->HWindow, WM_CLOSE, 0, 0);
+        PostMessageW(item->HWindow, WM_CLOSE, 0, 0);
         item = item->Next;
     }
     CS.Leave();
@@ -1010,7 +1015,7 @@ HANDLE
 CViewerMainWindow::GetLock()
 {
     if (Lock == NULL)
-        Lock = CreateEvent(NULL, FALSE, FALSE, NULL);
+        Lock = CreateEventW(NULL, FALSE, FALSE, NULL);
     return Lock;
 }
 

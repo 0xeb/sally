@@ -18,7 +18,7 @@ protected:
 public:
     CEditLine();
 
-    void InsertText(char* s);
+    void InsertTextW(const wchar_t* s); // wide-primary
 
     void RegisterDragDrop();
     void RevokeDragDrop();
@@ -48,8 +48,7 @@ public:
     CInnerText(CEditWindow* editWindow);
     ~CInnerText();
 
-    BOOL SetText(const char* txt); // sets only Message, returns when a redraw is needed
-    BOOL SetTextW(const wchar_t* txt); // sets only Message, returns when a redraw is needed
+    BOOL SetText(const wchar_t* txt); // sets only Message, returns when a redraw is needed
     void UpdateControl();
     int GetNeededWidth();
 
@@ -68,7 +67,10 @@ protected:
     BOOL Enabled;
     BOOL Tracking;
 
-    std::string LastText; // when the window was temporarily hidden, its contents were stored here
+    // Wide: the command line's contents survive being hidden and restored.
+    // Narrow, a command typed outside the code page came back as '?' after any panel
+    // change that hid the window.
+    std::wstring LastText; // when the window was temporarily hidden, its contents were stored here
     // the following two variables are relevant only when LastText is not empty
     int LastSelStart; // selection position
     int LastSelEnd;
@@ -78,7 +80,6 @@ public:
     ~CEditWindow();
 
     BOOL Create(HWND hParent, int childID);
-    void SetDirectory(const char* dir);
     void SetDirectoryW(const wchar_t* dir);
     void ResizeChilds(int cx, int cy, BOOL repaint);
     int GetNeededHeight();

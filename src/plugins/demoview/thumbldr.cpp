@@ -141,7 +141,7 @@ BOOL ConvertDIBToCOLORREF(WORD bitCount, int width, int rows, int srcLineSize,
 }
 
 BOOL WINAPI
-CPluginInterfaceForThumbLoader::LoadThumbnail(const char* filename,
+CPluginInterfaceForThumbLoader::LoadThumbnail(const wchar_t* filename,
                                               int thumbWidth,
                                               int thumbHeight,
                                               CSalamanderThumbnailMakerAbstract* thumbMaker,

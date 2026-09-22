@@ -4,11 +4,14 @@
 #include "precomp.h"
 #include "plugindarkmode.h"
 #include "combo_dark_paint.h"
+#include "plugin_window_text.h"
 
+#include <climits>
+#include <new>
+#include <string>
 #include <vector>
 
 #include <commctrl.h>
-#include <tchar.h>
 
 #include "registry_names.h"
 
@@ -39,12 +42,12 @@ const COLORREF DARK_TOOLTIP_BG = RGB(43, 43, 43);
 const COLORREF DARK_CAPTION_BG = RGB(32, 32, 32);
 const COLORREF DARK_INACTIVE_CAPTION_BG = RGB(48, 48, 48);
 
-const TCHAR* IMMERSIVE_COLOR_SET_PARAM = TEXT("ImmersiveColorSet");
-const TCHAR* WINDOWS_THEME_ELEMENT_PARAM = TEXT("WindowsThemeElement");
-const TCHAR* SCROLLBAR_CLASS_NAME = TEXT("ScrollBar");
-const TCHAR* BUTTON_CLASS_NAME = TEXT("Button");
-const TCHAR* EDIT_CLASS_NAME = TEXT("Edit");
-const TCHAR* COMBOBOX_CLASS_NAME = TEXT("ComboBox");
+const wchar_t* IMMERSIVE_COLOR_SET_PARAM = L"ImmersiveColorSet";
+const wchar_t* WINDOWS_THEME_ELEMENT_PARAM = L"WindowsThemeElement";
+const wchar_t* SCROLLBAR_CLASS_NAME = L"ScrollBar";
+const wchar_t* BUTTON_CLASS_NAME = L"Button";
+const wchar_t* EDIT_CLASS_NAME = L"Edit";
+const wchar_t* COMBOBOX_CLASS_NAME = L"ComboBox";
 const WCHAR* UXTHEME_DARKMODE_EXPLORER = L"DarkMode_Explorer";
 const UINT_PTR PLUGIN_EDIT_FRAME_SUBCLASS_ID = 16;
 
@@ -56,6 +59,32 @@ BOOL TextColorAttrSupported = TRUE;
 HBRUSH DialogDarkBrush = NULL;
 HBRUSH InputDarkBrush = NULL;
 thread_local int ListTreeThemeApplyDepth = 0;
+
+BOOL ReadEnvironmentVariableOwned(const wchar_t* name, std::wstring& output)
+{
+    try
+    {
+        DWORD capacity = GetEnvironmentVariableW(name, NULL, 0);
+        while (capacity > 0)
+        {
+            std::wstring staged(static_cast<size_t>(capacity), L'\0');
+            const DWORD written = GetEnvironmentVariableW(name, staged.data(), capacity);
+            if (written == 0)
+                return FALSE;
+            if (written < capacity)
+            {
+                staged.resize(written);
+                output.swap(staged);
+                return TRUE;
+            }
+            capacity = written + 1;
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
+    return FALSE;
+}
 
 int NormalizeThemeMode(int mode)
 {
@@ -77,20 +106,20 @@ BOOL IsHighContrastEnabled()
 {
     HIGHCONTRAST highContrast = {0};
     highContrast.cbSize = sizeof(highContrast);
-    if (!SystemParametersInfo(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0))
+    if (!SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0))
         return FALSE;
     return (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
 }
 
-BOOL ReadRegistryDword(HKEY rootKey, const char* subKey, const char* valueName, DWORD* value)
+BOOL ReadRegistryDword(HKEY rootKey, const wchar_t* subKey, const wchar_t* valueName, DWORD* value)
 {
     HKEY hKey = NULL;
-    if (RegOpenKeyExA(rootKey, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+    if (RegOpenKeyExW(rootKey, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
         return FALSE;
 
     DWORD type = 0;
     DWORD size = sizeof(*value);
-    LONG result = RegQueryValueExA(hKey, valueName, NULL, &type, (LPBYTE)value, &size);
+    LONG result = RegQueryValueExW(hKey, valueName, NULL, &type, (LPBYTE)value, &size);
     RegCloseKey(hKey);
 
     return result == ERROR_SUCCESS && type == REG_DWORD;
@@ -100,8 +129,8 @@ BOOL ReadSystemPrefersDarkApps()
 {
     DWORD value = 1;
     if (!ReadRegistryDword(HKEY_CURRENT_USER,
-                           SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_A,
-                           SAL_REG_VALUE_APPS_USE_LIGHT_THEME_A,
+                           SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_W,
+                           SAL_REG_VALUE_APPS_USE_LIGHT_THEME_W,
                            &value))
     {
         return FALSE;
@@ -124,16 +153,14 @@ BOOL ReadSystemPrefersDarkApps()
 // for a plugin running outside a Sally that publishes it.
 BOOL ReadConfiguredThemeMode(int* themeMode)
 {
-    char hostRoot[MAX_PATH];
-    DWORD hostRootLen = GetEnvironmentVariableA(SAL_ENV_CONFIG_ROOT_A, hostRoot, (DWORD)sizeof(hostRoot));
-    if (hostRootLen > 0 && hostRootLen < sizeof(hostRoot))
+    try
     {
-        char hostKey[MAX_PATH];
-        if (_snprintf_s(hostKey, sizeof(hostKey), _TRUNCATE, "%s\\%s", hostRoot,
-                        SAL_REG_SUBKEY_CONFIGURATION_A) > 0)
+        std::wstring hostRoot;
+        if (ReadEnvironmentVariableOwned(SAL_ENV_CONFIG_ROOT_W, hostRoot))
         {
+            const std::wstring hostKey = hostRoot + L"\\" SAL_REG_SUBKEY_CONFIGURATION_W;
             DWORD value = PLUGIN_THEME_MODE_LIGHT;
-            if (ReadRegistryDword(HKEY_CURRENT_USER, hostKey, "Theme mode", &value))
+            if (ReadRegistryDword(HKEY_CURRENT_USER, hostKey.c_str(), L"Theme mode", &value))
             {
                 *themeMode = NormalizeThemeMode((int)value);
                 return TRUE;
@@ -143,21 +170,24 @@ BOOL ReadConfiguredThemeMode(int* themeMode)
             *themeMode = PLUGIN_THEME_MODE_LIGHT;
             return TRUE;
         }
-    }
 
-    static const char* configRoots[] = {
-        SAL_REG_ROOT_SALLY_1_0_A "\\" SAL_REG_SUBKEY_CONFIGURATION_A,
-        SAL_REG_ROOT_OPENSAL_5_0_A "\\" SAL_REG_SUBKEY_CONFIGURATION_A,
-    };
+        static const wchar_t* configRoots[] = {
+            SAL_REG_ROOT_SALLY_1_0_W L"\\" SAL_REG_SUBKEY_CONFIGURATION_W,
+            SAL_REG_ROOT_OPENSAL_5_0_W L"\\" SAL_REG_SUBKEY_CONFIGURATION_W,
+        };
 
-    for (int i = 0; i < _countof(configRoots); i++)
-    {
-        DWORD value = PLUGIN_THEME_MODE_LIGHT;
-        if (ReadRegistryDword(HKEY_CURRENT_USER, configRoots[i], "Theme mode", &value))
+        for (int i = 0; i < _countof(configRoots); i++)
         {
-            *themeMode = NormalizeThemeMode((int)value);
-            return TRUE;
+            DWORD value = PLUGIN_THEME_MODE_LIGHT;
+            if (ReadRegistryDword(HKEY_CURRENT_USER, configRoots[i], L"Theme mode", &value))
+            {
+                *themeMode = NormalizeThemeMode((int)value);
+                return TRUE;
+            }
         }
+    }
+    catch (const std::bad_alloc&)
+    {
     }
 
     return FALSE;
@@ -170,15 +200,15 @@ void EnsureInitialized()
 
     Initialized = TRUE;
 
-    HMODULE hDwm = GetModuleHandle(TEXT("dwmapi.dll"));
+    HMODULE hDwm = GetModuleHandleW(L"dwmapi.dll");
     if (hDwm == NULL)
-        hDwm = LoadLibrary(TEXT("dwmapi.dll"));
+        hDwm = LoadLibraryW(L"dwmapi.dll");
     if (hDwm != NULL)
         DwmSetWindowAttributePtr = (PFNDWMSETWINDOWATTRIBUTE)GetProcAddress(hDwm, "DwmSetWindowAttribute");
 
-    HMODULE hUxTheme = GetModuleHandle(TEXT("uxtheme.dll"));
+    HMODULE hUxTheme = GetModuleHandleW(L"uxtheme.dll");
     if (hUxTheme == NULL)
-        hUxTheme = LoadLibrary(TEXT("uxtheme.dll"));
+        hUxTheme = LoadLibraryW(L"uxtheme.dll");
     if (hUxTheme != NULL)
         SetWindowThemePtr = (PFNSETWINDOWTHEME)GetProcAddress(hUxTheme, "SetWindowTheme");
 }
@@ -203,12 +233,12 @@ BOOL IsThemeSettingHint(LPARAM lParam)
     if (lParam == 0)
         return FALSE;
 
-    LPCTSTR valueName = (LPCTSTR)lParam;
+    const wchar_t* valueName = reinterpret_cast<const wchar_t*>(lParam);
     if (valueName == NULL || *valueName == 0)
         return FALSE;
 
-    return _tcsicmp(valueName, IMMERSIVE_COLOR_SET_PARAM) == 0 ||
-           _tcsicmp(valueName, WINDOWS_THEME_ELEMENT_PARAM) == 0;
+    return _wcsicmp(valueName, IMMERSIVE_COLOR_SET_PARAM) == 0 ||
+           _wcsicmp(valueName, WINDOWS_THEME_ELEMENT_PARAM) == 0;
 }
 
 // #98: same white hairline as in the core - the control's NON-CLIENT frame, painted by
@@ -271,10 +301,10 @@ BOOL PluginGetChildRectInParent(HWND hParent, HWND hChild, RECT* rect)
 
 BOOL PluginIsComboBoxControl(HWND hwnd)
 {
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
+    std::wstring className;
+    if (!ReadWindowClassOwnedW(hwnd, className))
         return FALSE;
-    return _tcsicmp(className, COMBOBOX_CLASS_NAME) == 0;
+    return _wcsicmp(className.c_str(), COMBOBOX_CLASS_NAME) == 0;
 }
 
 BOOL PaintPluginDarkComboClient(HWND hwnd, HDC paintDC)
@@ -463,21 +493,21 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     if (hwnd == NULL || !IsWindow(hwnd))
         return;
 
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
+    std::wstring className;
+    if (!ReadWindowClassOwnedW(hwnd, className))
         return;
 
     PluginDarkModeColors colors;
     PluginDarkMode_GetColors(&colors);
 
-    if (_tcsicmp(className, SCROLLBAR_CLASS_NAME) == 0)
+    if (_wcsicmp(className.c_str(), SCROLLBAR_CLASS_NAME) == 0)
     {
         MaybeSetWindowTheme(hwnd, useDark);
         InvalidateRect(hwnd, NULL, TRUE);
         return;
     }
 
-    if (_tcsicmp(className, WC_LISTVIEW) == 0)
+    if (_wcsicmp(className.c_str(), WC_LISTVIEWW) == 0)
     {
         MaybeSetWindowTheme(hwnd, useDark);
         ListView_SetBkColor(hwnd, colors.InputBackground);
@@ -487,7 +517,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, WC_TREEVIEW) == 0)
+    if (_wcsicmp(className.c_str(), WC_TREEVIEWW) == 0)
     {
         MaybeSetWindowTheme(hwnd, useDark);
         TreeView_SetBkColor(hwnd, colors.InputBackground);
@@ -496,7 +526,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, TOOLTIPS_CLASS) == 0)
+    if (_wcsicmp(className.c_str(), TOOLTIPS_CLASSW) == 0)
     {
         PluginDarkMode_ApplyTooltipTheme(hwnd);
         return;
@@ -507,20 +537,20 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     // light frames - bright white borders on every control in dark mode. The core does
     // theme these classes (darkmode.cpp ApplyListTreeThemeToControl); this helper did not,
     // which is why EVERY plugin dialog (not just FTP) looked half-themed.
-    if (_tcsicmp(className, BUTTON_CLASS_NAME) == 0)
+    if (_wcsicmp(className.c_str(), BUTTON_CLASS_NAME) == 0)
     {
         MaybeSetWindowTheme(hwnd, useDark);
         InvalidateRect(hwnd, NULL, TRUE);
         return;
     }
 
-    if (_tcsicmp(className, EDIT_CLASS_NAME) == 0)
+    if (_wcsicmp(className.c_str(), EDIT_CLASS_NAME) == 0)
     {
         ApplyPluginEditLikeTheme(hwnd, useDark); // #98: paints its own frame in dark mode
         return;
     }
 
-    if (_tcsicmp(className, COMBOBOX_CLASS_NAME) == 0)
+    if (_wcsicmp(className.c_str(), COMBOBOX_CLASS_NAME) == 0)
     {
         ApplyPluginEditLikeTheme(hwnd, useDark); // #98
         ApplyComboBoxChildThemes(hwnd, useDark);
@@ -672,8 +702,8 @@ void PluginDarkMode_ApplyTooltipTheme(HWND hwndTooltip)
 
     PluginDarkModeColors colors;
     PluginDarkMode_GetColors(&colors);
-    SendMessage(hwndTooltip, TTM_SETTIPBKCOLOR, colors.ToolTipBackground, 0);
-    SendMessage(hwndTooltip, TTM_SETTIPTEXTCOLOR, colors.ToolTipText, 0);
+    SendMessageW(hwndTooltip, TTM_SETTIPBKCOLOR, colors.ToolTipBackground, 0);
+    SendMessageW(hwndTooltip, TTM_SETTIPTEXTCOLOR, colors.ToolTipText, 0);
     InvalidateRect(hwndTooltip, NULL, TRUE);
 }
 

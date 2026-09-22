@@ -1,9 +1,11 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 #include "plugindarkmode.h"
+#include "regedt_find_pattern.h"
+#include "regedt_number_parse.h"
 
 int DialogWidth;
 int DialogHeight;
@@ -14,12 +16,11 @@ BOOL Maximized;
 // CFindDialog
 //
 
-CFindDialog::CFindDialog(LPWSTR lookInInit)
+CFindDialog::CFindDialog(const wchar_t* lookInInit)
     : CDialogEx(IDD_SEARCH, IDD_SEARCH, NULL, SG->GetMainWindowHWND()),
-      LookInList(4, 4)
+      LookInInit(lookInInit ? lookInInit : L"")
 {
     CALL_STACK_MESSAGE1("CFindDialog::CFindDialog()");
-    LookInInit = lookInInit;
     MinDlgW = 0;
     MinDlgH = 0;
     HMargin = 0;
@@ -38,7 +39,6 @@ CFindDialog::CFindDialog(LPWSTR lookInInit)
 
     ZeroOnDestroy = NULL;
 
-    *Pattern = L'\0';
     IncludeSubkeys = TRUE;
     LookAtKeys = TRUE;
     LookAtValues = TRUE;
@@ -238,25 +238,8 @@ void CFindDialog::UpdateListViewItems()
         }
 
         // write the item count above the list view
-        char buff[50];
-        SalPrintf(buff, 50, LoadStr(IDS_FOUNDITEMS2), count);
-        SetWindowText(GetDlgItem(HWindow, IDC_FOUND_FILES), buff);
-
-        /*
-    // if we are minimized, display the item count in the caption
-    if (IsIconic(HWindow))
-    {
-      char buf[MAX_PATH+100];
-      if (SearchInProgress)
-      {
-        _snprintf_s(buf, _TRUNCATE, MINIMIZED_FINDING_CAPTION, FoundFilesListView->GetCount(),
-                    LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
-      }
-      else
-        lstrcpy(buf, LoadStr(IDS_FF_NAME));
-      SetWindowText(HWindow, buf);
-    }
-    */
+        const std::wstring text = SPLFormatStringOwned(LangStr(IDS_FOUNDITEMS2).c_str(), count);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_FOUND_FILES), text.c_str());
 
         // used by the search thread so it knows when to notify us next
         FoundVisibleCount = count;
@@ -282,7 +265,7 @@ void CFindDialog::UpdateStatusText(BOOL searchFinished)
                 id = IDS_HEXHELP;
         }
 
-        StatusBar->SetBase(LoadStrW(id));
+        StatusBar->SetBase(LoadStrW(id).c_str());
 
         return;
     }
@@ -292,14 +275,14 @@ void CFindDialog::UpdateStatusText(BOOL searchFinished)
     if (index != -1)
     {
         CFoundFilesData* file = List->At(index);
-        WCHAR fullName[MAX_FULL_KEYNAME];
-        PathAppend(lstrcpynW(fullName, file->Path, MAX_FULL_KEYNAME), file->Name, MAX_FULL_KEYNAME);
-        StatusBar->SetBase(fullName, TRUE);
+        std::wstring fullName = file->Path;
+        SPLSalPathAppendOwned(fullName, file->Name.c_str());
+        StatusBar->SetBase(fullName.c_str(), TRUE);
     }
     else
     {
         if (List->GetCount() == 0 && searchFinished)
-            StatusBar->SetBase(LoadStrW(IDS_NOFILESFOUND), TRUE);
+            StatusBar->SetBase(LoadStrW(IDS_NOFILESFOUND).c_str(), TRUE);
         else
             StatusBar->SetBase(L"", TRUE);
     }
@@ -317,51 +300,75 @@ void CFindDialog::StartSearch()
     List->DestroyMembers();
     ListView_SetItemCountEx(List->HWindow, 0, 0);
     UpdateWindow(List->HWindow);
-    SetWindowText(GetDlgItem(HWindow, IDC_FOUND_FILES), LoadStr(IDS_FOUNDITEMS1));
+    SetWindowTextW(GetDlgItem(HWindow, IDC_FOUND_FILES), LangStr(IDS_FOUNDITEMS1).c_str());
     FoundVisibleCount = 0;
     NextUpdate = GetTickCount();
 
     // prepare the pattern for searching
-    char patternA[MAX_KEYNAME];
-    char patternW[MAX_KEYNAME * 2];
-    int patternALen, patternWLen;
-    BOOL useNumber;
-    QWORD number;
+    std::string patternA;
+    std::vector<char> patternW;
+    BOOL useNumber = FALSE;
+    QWORD number = 0;
     if (Hex)
     {
-        ConvertHexToString(Pattern, patternA, patternALen);
-        memcpy(patternW, patternA, patternALen);
-        patternWLen = patternALen;
+        if (!DecodeRegedtHexSearchPattern(Pattern, patternW))
+        {
+            Error(IDS_BADHEXSTRING);
+            return;
+        }
+        patternA.assign(patternW.begin(), patternW.end());
     }
     else
     {
         if (RegExp)
         {
-            patternALen = WStrToStr(patternA, MAX_KEYNAME, Pattern);
-            patternWLen = 0;
+            if (!EncodeRegedtSearchPattern(Pattern, patternA))
+            {
+                Error(GetParent(), IDS_REGEXPERR, L"The pattern contains characters that the legacy regular-expression engine cannot represent.");
+                return;
+            }
         }
         else
         {
-            patternALen = WStrToStr(patternA, MAX_KEYNAME, Pattern) - 1;
-            wcscpy((LPWSTR)patternW, Pattern);
-            patternWLen = (int)wcslen(Pattern) * 2;
-            useNumber = DecStringToNumber(patternA, number) ||
-                        HexStringToNumber(patternA, number);
+            // Registry data remains bytes at the matcher boundary. Search the native UTF-16
+            // representation always, and search ACP bytes only when the text is exactly representable.
+            if (!EncodeRegedtSearchPattern(Pattern, patternA))
+                patternA.clear();
+            if (!MakeRegedtUtf16SearchBytes(Pattern, patternW))
+            {
+                Error(IDS_LOWMEM);
+                return;
+            }
+            if (!patternA.empty())
+                useNumber = ParseRegedtUnsignedDecimal(patternA, number) ||
+                            ParseRegedtUnsignedHex(patternA, number);
         }
     }
 
     CancelEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (!CancelEvent)
+    {
+        Error(IDS_LOWMEM);
+        return;
+    }
 
     BOOL ok = FALSE;
 
-    CFindThread* t = new CFindThread(LookInList,
-                                     patternA, patternALen, patternW, patternWLen,
-                                     IncludeSubkeys, LookAtKeys, LookAtValues,
-                                     LookAtData, CaseSensitive, WholeWords, RegExp,
-                                     number, useNumber,
-                                     UseMinTime, UseMaxTime,
-                                     MinTime, MaxTime,
-                                     this, CancelEvent);
+    CFindThread* t = NULL;
+    try
+    {
+        t = new CFindThread(LookInList,
+                            patternA, patternW,
+                            IncludeSubkeys, LookAtKeys, LookAtValues,
+                            LookAtData, CaseSensitive, WholeWords, RegExp,
+                            number, useNumber,
+                            UseMinTime, UseMaxTime,
+                            MinTime, MaxTime,
+                            this, CancelEvent);
+    }
+    catch (...)
+    {
+    }
     if (t)
     {
         if (!t->Create(ThreadQueue))
@@ -376,7 +383,7 @@ void CFindDialog::StartSearch()
     {
         SearchInProgress = TRUE;
         Stopped = FALSE;
-        SetWindowText(GetDlgItem(HWindow, IDOK), LoadStr(IDS_STOP));
+        SetWindowTextW(GetDlgItem(HWindow, IDOK), LangStr(IDS_STOP).c_str());
         SetTimer(HWindow, IDT_REFRESH_LISTVIEW, 500, NULL);
         //UpdateStatusText();
         EnableControls(FALSE);
@@ -386,7 +393,7 @@ void CFindDialog::StartSearch()
 
     /*
   SearchInProgress = FALSE;
-  SetWindowText( GetDlgItem(HWindow, IDOK), LoadStr(IDS_START));
+  SetWindowText( GetDlgItem(HWindow, IDOK), LangStr(IDS_START).c_str());
   UpdateListViewItems();
   //UpdateStatusText();
   //EnableControls(TRUE);
@@ -407,189 +414,37 @@ void CFindDialog::StopSearch()
     Stopped = TRUE;
 }
 
-BOOL ValidateTimeString(char* time)
-{
-    CALL_STACK_MESSAGE1("ValidateTimeString()");
-    char* s = time + strlen(time);
-
-    // trim spaces from the end
-    while (isspace(s[-1]))
-        s--;
-    *s = 0;
-
-    s = time;
-
-    // read the time
-    if (s[1] == ':' || s[2] == ':')
-    {
-        // hh
-        if (!isdigit(*s++))
-            return FALSE;
-        if (*s != ':' && (!isdigit(*s++) || *s != ':'))
-            return FALSE;
-        s++;
-        // mm
-        if (!isdigit(*s++))
-            return FALSE;
-        if (*s != ':' && (!isdigit(*s++) || *s != ':'))
-            return FALSE;
-        s++;
-        // ss
-        if (!isdigit(*s++))
-            return FALSE;
-        if (!isspace(*s) && (!isdigit(*s++) || *s != ' '))
-            return FALSE;
-        s++;
-    }
-
-    // read the date
-
-    // dd
-    if (!isdigit(*s++))
-        return FALSE;
-    if (*s != '.' && (!isdigit(*s++) || *s != '.'))
-        return FALSE;
-    s++;
-    // mm
-    if (!isdigit(*s++))
-        return FALSE;
-    if (*s != '.' && (!isdigit(*s++) || *s != '.'))
-        return FALSE;
-    s++;
-    // yyyy
-    if (!isdigit(*s++))
-        return FALSE;
-    if (*s != '\0')
-    {
-        if (!isdigit(*s++))
-            return FALSE;
-        if (*s != '\0')
-        {
-            if (!isdigit(*s++))
-                return FALSE;
-            if (*s != '\0')
-            {
-                if (!isdigit(*s++))
-                    return FALSE;
-            }
-        }
-    }
-
-    if (*s != '\0')
-        return FALSE;
-    return TRUE;
-}
-
-BOOL ParseTimeString(const char* timeString, SYSTEMTIME& st, BOOL maxTime)
-{
-    CALL_STACK_MESSAGE3("ParseTimeString(%s, , %d)", timeString, maxTime);
-    const char* s = timeString;
-
-    memset(&st, 0, sizeof(st));
-
-    // read the time
-    if (s[1] == ':' || s[2] == ':')
-    {
-        // hh
-        st.wHour = *s++ - '0';
-        if (*s != ':')
-            st.wHour = st.wHour * 10 + *s++ - '0';
-        s++;
-        // mm
-        st.wMinute = *s++ - '0';
-        if (*s != ':')
-            st.wMinute = st.wMinute * 10 + *s++ - '0';
-        s++;
-        // ss
-        st.wSecond = *s++ - '0';
-        if (!isspace(*s))
-            st.wSecond = st.wSecond * 10 + *s++ - '0';
-        s++;
-    }
-    else
-    {
-        if (maxTime)
-        {
-            st.wHour = 23;
-            st.wMinute = 59;
-            st.wSecond = 59;
-        }
-    }
-
-    // read the date
-
-    // dd
-    st.wDay = st.wDay + *s++ - '0';
-    if (*s != '.')
-        st.wDay = st.wDay * 10 + *s++ - '0';
-    s++;
-    // mm
-    st.wMonth = *s++ - '0';
-    if (*s != '.')
-        st.wMonth = st.wMonth * 10 + *s++ - '0';
-    s++;
-    // yyyy
-    st.wYear = *s++ - '0';
-    if (*s != '\0')
-        st.wYear = st.wYear * 10 + *s++ - '0';
-    if (*s != '\0')
-        st.wYear = st.wYear * 10 + *s++ - '0';
-    if (*s != '\0')
-        st.wYear = st.wYear * 10 + *s++ - '0';
-
-    TRACE_I("ParseTimeString: " << st.wHour << " " << st.wMinute << " " << st.wSecond
-                                << " " << st.wDay << " " << st.wMonth << " " << st.wYear);
-
-    // verify the correctness of the entered time
-    FILETIME ft;
-    if (SystemTimeToFileTime(&st, &ft))
-        return TRUE;
-
-    return FALSE;
-}
-
 void CFindDialog::Validate(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CFindDialog::Validate()");
-    /*
-  WCHAR buffer[MAX_KEYNAME];
-  ti.EditLineW(IDC_PATTERN, buffer, MAX_KEYNAME);
-  
-  if (strlen(buffer) == 0)
-  {
-    SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTY), LoadStr(IDS_ERROR), MB_ICONEXCLAMATION);
-    ti.ErrorOn(IDC_PATTERN);
-  }
-  */
-
     BOOL b;
     ti.CheckBox(IDC_HEX, b);
     if (b)
     {
-        WCHAR buffer[MAX_KEYNAME];
-        ti.EditLineW(IDC_PATTERN, buffer, MAX_KEYNAME);
-        if (!ValidateHexString(buffer))
+        std::wstring buffer = SPLGetDlgItemTextOwned(HWindow, IDC_PATTERN);
+        std::vector<char> decoded;
+        if (!ValidateHexString(buffer.data()) || !DecodeRegedtHexSearchPattern(buffer, decoded))
         {
-            SG->SalMessageBox(GetParent(), LoadStr(IDS_BADHEXSTRING), LoadStr(IDS_ERROR), MB_OK);
+            SG->SalMessageBox(GetParent(), LoadStrW(IDS_BADHEXSTRING).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK);
             ti.ErrorOn(IDC_PATTERN);
             return;
         }
     }
 
     // validujeme casy
-    char buffer[20];
-    ti.EditLine(IDC_MINTIME, buffer, MAX_KEYNAME);
-    if (strlen(buffer) && !ValidateTimeString(buffer))
+    SYSTEMTIME parsed{};
+    std::wstring buffer = SPLGetDlgItemTextOwned(HWindow, IDC_MINTIME);
+    if (!buffer.empty() && !ParseRegedtFindTime(buffer, false, parsed))
     {
-        SG->SalMessageBox(GetParent(), LoadStr(IDS_BADTIMEFORMAT), LoadStr(IDS_ERROR), MB_OK);
+        SG->SalMessageBox(GetParent(), LoadStrW(IDS_BADTIMEFORMAT).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK);
         ti.ErrorOn(IDC_MINTIME);
         return;
     }
 
-    ti.EditLine(IDC_MAXTIME, buffer, MAX_KEYNAME);
-    if (strlen(buffer) && !ValidateTimeString(buffer))
+    buffer = SPLGetDlgItemTextOwned(HWindow, IDC_MAXTIME);
+    if (!buffer.empty() && !ParseRegedtFindTime(buffer, true, parsed))
     {
-        SG->SalMessageBox(GetParent(), LoadStr(IDS_BADTIMEFORMAT), LoadStr(IDS_ERROR), MB_OK);
+        SG->SalMessageBox(GetParent(), LoadStrW(IDS_BADTIMEFORMAT).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK);
         ti.ErrorOn(IDC_MAXTIME);
         return;
     }
@@ -599,10 +454,9 @@ void CFindDialog::Transfer(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CFindDialog::Transfer()");
     ti.CheckBox(IDC_OPTIONS, ShowOptions);
-    WCHAR lookIn[1024];
-    lookIn[0] = 0;
-    HistoryComboBox(ti, IDC_PATTERN, Pattern, MAX_KEYNAME, MAX_HISTORY_ENTRIES, PatternHistory);
-    HistoryComboBox(ti, IDC_LOOKIN, lookIn, 1024, MAX_HISTORY_ENTRIES, LookInHistory);
+    std::wstring lookIn;
+    HistoryComboBox(ti, IDC_PATTERN, Pattern, PatternHistory);
+    HistoryComboBox(ti, IDC_LOOKIN, lookIn, LookInHistory);
     ti.CheckBox(IDC_SUBDIRS, IncludeSubkeys);
     ti.CheckBox(IDC_KEYS, LookAtKeys);
     ti.CheckBox(IDC_VALUES, LookAtValues);
@@ -614,61 +468,61 @@ void CFindDialog::Transfer(CTransferInfoEx& ti)
     if (ti.Type == ttDataToWindow)
     {
         //SendDlgItemMessage(HWindow, IDC_PATH, CB_SETCURSEL, 0, 0);
-        wcscpy(lookIn, LookInInit);
-        if (DuplicateChar(L';', lookIn, 1024))
-            ti.EditLineW(IDC_LOOKIN, lookIn, 1024);
-        else
-            Error(IDS_LONGNAME);
+        lookIn.clear();
+        lookIn.reserve(LookInInit.size() * 2);
+        for (const wchar_t value : LookInInit)
+        {
+            if (value == L';')
+                lookIn.push_back(L';');
+            lookIn.push_back(value);
+        }
+        SetDlgItemTextW(HWindow, IDC_LOOKIN, lookIn.c_str());
     }
     else
     {
         // read individual items from LookIn
-        LookInList.DestroyMembers();
-        BOOL more = TRUE;
-        LPWSTR end = lookIn;
-        LPWSTR start;
-        while (more)
+        std::vector<std::wstring> stagedLookIn;
+        std::wstring item;
+        for (size_t offset = 0; offset <= lookIn.size(); ++offset)
         {
-            start = end;
-            while (*end != L'\0')
+            if (offset < lookIn.size() && lookIn[offset] == L';' &&
+                offset + 1 < lookIn.size() && lookIn[offset + 1] == L';')
             {
-                if (*end == L';')
-                {
-                    if (end[1] == L';')
-                        end++;
-                    else
-                        break;
-                }
-                end++;
+                item.push_back(L';');
+                ++offset;
+                continue;
             }
-            more = *end != '\0';
-            *end = '\0';
-            if (end > start)
-                LookInList.Add(DupStr(UnDuplicateChar(L';', start)));
-            end++;
+            if (offset == lookIn.size() || lookIn[offset] == L';')
+            {
+                if (!item.empty())
+                    stagedLookIn.push_back(item);
+                item.clear();
+            }
+            else
+                item.push_back(lookIn[offset]);
         }
+        LookInList.swap(stagedLookIn);
 
         // read the times
         UseMinTime = UseMaxTime = FALSE; // default values
-        char buffer[20];
-        ti.EditLine(IDC_MINTIME, buffer, MAX_KEYNAME);
-        if (strlen(buffer))
+        std::wstring buffer = SPLGetDlgItemTextOwned(HWindow, IDC_MINTIME);
+        if (!buffer.empty())
         {
-            if (!ValidateTimeString(buffer) || !ParseTimeString(buffer, MinTime, FALSE))
+            if (!ParseRegedtFindTime(buffer, false, MinTime))
             {
-                SG->SalMessageBox(GetParent(), LoadStr(IDS_BADTIMEFORMAT), LoadStr(IDS_ERROR), MB_OK);
+                SG->SalMessageBox(GetParent(), LoadStrW(IDS_BADTIMEFORMAT).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK);
                 ti.ErrorOn(IDC_MINTIME);
                 return;
             }
             UseMinTime = TRUE;
         }
 
-        ti.EditLine(IDC_MAXTIME, buffer, MAX_KEYNAME);
-        if (strlen(buffer))
+        buffer = SPLGetDlgItemTextOwned(HWindow, IDC_MAXTIME);
+        if (!buffer.empty())
         {
-            if (!ValidateTimeString(buffer) || !ParseTimeString(buffer, MaxTime, TRUE))
+            if (!ParseRegedtFindTime(buffer, true, MaxTime))
             {
-                SG->SalMessageBox(GetParent(), LoadStr(IDS_BADTIMEFORMAT), LoadStr(IDS_ERROR), MB_OK);
+                SG->SalMessageBox(GetParent(), LoadStrW(IDS_BADTIMEFORMAT).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK);
                 ti.ErrorOn(IDC_MAXTIME);
                 return;
             }
@@ -680,6 +534,8 @@ void CFindDialog::Transfer(CTransferInfoEx& ti)
 INT_PTR
 CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+    try
+    {
     SLOW_CALL_STACK_MESSAGE4("CFindDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg,
                              wParam, lParam);
     switch (uMsg)
@@ -694,9 +550,9 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HICON findIcon = NULL;
         HINSTANCE iconsDLL = NULL;
         if (WindowsVistaAndLater)
-            iconsDLL = LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
+            iconsDLL = LoadLibraryExW(L"imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
         else
-            iconsDLL = LoadLibraryEx("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
+            iconsDLL = LoadLibraryExW(L"shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
         if (iconsDLL != NULL)
         {
             if (WindowsVistaAndLater)
@@ -732,7 +588,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         StatusBar->CreateEx(0,
                             CWINDOW_CLASSNAME,
-                            (LPCTSTR)NULL,
+                            (LPCWSTR)NULL,
                             WS_CHILD | WS_VISIBLE,
                             0, 0, 0, 0,
                             HWindow,
@@ -860,15 +716,17 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 CFoundFilesData* data = List->At(index);
 
-                // check whether it exists
-                WCHAR pathW[MAX_FULL_KEYNAME + 1] = L"\\";
-                wcscpy(pathW + 1, data->Path);
+                // check whether it exists; the probe needs the found key's own
+                // path, but MID_FOCUS (menu.cpp) wants the folder that CONTAINS
+                // the item plus the item's name, so the two stay separate
+                const std::wstring focusPathW = L"\\" + data->Path;
+                std::wstring pathW = focusPathW;
                 if (data->IsDir)
-                    PathAppend(pathW, data->Name, MAX_FULL_KEYNAME + 1);
+                    SPLSalPathAppendOwned(pathW, data->Name.c_str());
 
                 WCHAR* key;
                 int root;
-                if (ParseFullPath(pathW, key, root))
+                if (ParseFullPath(pathW.data(), key, root))
                 {
                     HKEY hKey;
                     int ret = RegOpenKeyExW(PredefinedHKeys[root].HKey, key,
@@ -877,17 +735,13 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         DWORD existType;
                         ret = RegQueryValueExW(hKey,
-                                               data->Default ? NULL : data->Name, 0, &existType, NULL, 0);
+                                               data->Default ? NULL : data->Name.c_str(), 0, &existType, NULL, 0);
                     }
 
                     if (ret != ERROR_FILE_NOT_FOUND)
                     {
-                        char path[MAX_FULL_KEYNAME + 1] = "\\";
-                        char name[MAX_KEYNAME];
-                        WStrToStr(path + 1, MAX_FULL_KEYNAME, data->Path);
-                        WStrToStr(name, MAX_KEYNAME, data->Name);
-                        if (!InterfaceForMenuExt.PostFocusCommand(path, name))
-                            SG->SalMessageBox(HWindow, LoadStr(IDS_BUSY), LoadStr(IDS_PLUGINNAME),
+                        if (!InterfaceForMenuExt.PostFocusCommand(focusPathW.c_str(), data->Name.c_str()))
+                            SG->SalMessageBox(HWindow, LoadStrW(IDS_BUSY).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(),
                                               MB_ICONINFORMATION);
                     }
                     else
@@ -968,7 +822,8 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
                 if (info->item.mask & LVIF_TEXT)
-                    info->item.pszText = item->GetText(info->item.iSubItem, LVItemTextBuffer);
+                    info->item.pszText = const_cast<LPWSTR>(
+                        item->GetText(info->item.iSubItem, LVItemTextBuffer));
                 break;
             }
 
@@ -1076,7 +931,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         // the search has finished
         SearchInProgress = FALSE;
-        SetWindowText(GetDlgItem(HWindow, IDOK), LoadStr(IDS_START));
+        SetWindowTextW(GetDlgItem(HWindow, IDOK), LangStr(IDS_START).c_str());
         CloseHandle(CancelEvent); // we will not need it anymore
         UpdateListViewItems();
         //UpdateStatusText();
@@ -1091,23 +946,12 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (b && MinBeepWhenDone)
                 MessageBeep(0);
             if (Stopped)
-                StatusBar->SetBase(LoadStrW(IDS_STOPPED));
+                StatusBar->SetBase(LoadStrW(IDS_STOPPED).c_str());
             else
                 UpdateStatusText(TRUE);
         }
         return TRUE;
     }
-
-        /*
-    case WM_USER_CLEARHISTORY:
-    {
-      char buffer[MAX_PATTERN];
-      SendMessage(GetDlgItem(HWindow, IDC_PATTERN), WM_GETTEXT, MAX_PATTERN, (LPARAM)buffer);
-      SendMessage(GetDlgItem(HWindow, IDC_PATTERN), CB_RESETCONTENT, 0, 0);
-      SendMessage(GetDlgItem(HWindow, IDC_PATTERN), WM_SETTEXT, 0, (LPARAM)buffer);
-      break;
-    }
-    */
 
     case WM_CLOSE:
     {
@@ -1152,19 +996,29 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     }
     return CDialogEx::DialogProc(uMsg, wParam, lParam);
+    }
+    catch (...)
+    {
+        Error(IDS_LOWMEM);
+        return FALSE;
+    }
 }
 
 unsigned
 CFindDialogThread::Body()
 {
+    CFindDialog* dlg = NULL;
+    HWND wnd = NULL;
+    try
+    {
     CALL_STACK_MESSAGE1("CFindDialogThread::Body()");
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-    CFindDialog* dlg = new CFindDialog(LookIn);
+    dlg = new CFindDialog(LookIn.c_str());
     if (!dlg)
         return Error(IDS_LOWMEM);
 
-    HWND wnd = dlg->Create();
+    wnd = dlg->Create();
     if (!wnd)
     {
         TRACE_E("Failed to create CFindDialog");
@@ -1184,22 +1038,22 @@ CFindDialogThread::Body()
     }
 
     MSG msg;
-    BOOL haveMSG = FALSE; // FALSE means GetMessage() should be called in the loop condition
-    while (haveMSG || IsWindow(wnd) && GetMessage(&msg, NULL, 0, 0))
+    BOOL haveMSG = FALSE; // FALSE means GetMessageW() should be called in the loop condition
+    while (haveMSG || IsWindow(wnd) && GetMessageW(&msg, NULL, 0, 0))
     {
         haveMSG = FALSE;
 
         if (!IsDialogMessage(wnd, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
 
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (msg.message == WM_QUIT)
-                break;      // equivalent to GetMessage() returning FALSE
-            haveMSG = TRUE; // we have a message; process it without calling GetMessage()
+                break;      // equivalent to GetMessageW() returning FALSE
+            haveMSG = TRUE; // we have a message; process it without calling GetMessageW()
         }
         else // if there is no message in the queue, perform idle processing
         {
@@ -1211,4 +1065,14 @@ CFindDialogThread::Body()
     WindowQueue.Remove(wnd);
 
     return 0;
+    }
+    catch (...)
+    {
+        if (wnd && IsWindow(wnd))
+            DestroyWindow(wnd);
+        else
+            delete dlg;
+        Error(IDS_LOWMEM);
+        return 0;
+    }
 }

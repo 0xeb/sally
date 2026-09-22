@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -17,12 +17,16 @@
 #include "snooper.h"
 #include "zip.h"
 #include "common/IFileSystem.h"
+#include "common/DiagnosticTextEncoding.h"
+#include "common/fsutil.h"
 #include "shiconov.h"
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
+#include "common/unicode/AnsiFallbackPolicy.h"
 #include "common/IEnvironment.h"
+#include "common/text/CaseFolding.h"
 
 //
 // ****************************************************************************
@@ -46,7 +50,7 @@ static IFileSystem* GetPanelFileSystem()
 
 #ifndef _WIN64
 
-BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA* fileData,
+BOOL AddWin64RedirectedDir(const wchar_t* path, CFilesArray* dirs, WIN32_FIND_DATAW* fileData,
                            int* index, BOOL* dirWithSameNameExists); // is further in this module
 
 #endif // _WIN64
@@ -107,8 +111,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     DeleteColumnsWithoutData();                      // removing columns for which we don't have data (empty values would be shown in them)
     GetPluginIconIndex = InternalGetPluginIconIndex; // setting standard callback (just returns zero)
 
-    CPathBuffer fileName;
-
     if (Is(ptDisk))
     {
         // setting icon size for IconCache
@@ -138,10 +140,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         }
         UseThumbnails = readThumbnails;
 
-        EnvSetCurrentDirectoryA(gEnvironment, GetPath()); // so that it works better
+        gEnvironment->SetCurrentDirectory(GetPathW()); // so that it works better
 
 #ifndef _WIN64
-        BOOL isWindows64BitDir = Windows64Bit && *WindowsDirectory != 0 && IsTheSamePath(GetPath(), WindowsDirectory);
+        BOOL isWindows64BitDir = Windows64Bit && !WindowsDirectory.empty() &&
+                                 IsTheSamePath(GetPathW(), WindowsDirectory.c_str());
 #endif // _WIN64
 
         RefreshDiskFreeSpace(FALSE);
@@ -158,20 +161,28 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
 
-        GetRootPath(fileName, GetPath());
-        BOOL isRootPath = (strlen(GetPath()) <= strlen(fileName));
+        const std::wstring rootPathW = GetRootPath(GetPathW());
+        BOOL isRootPath = (wcslen(GetPathW()) <= rootPathW.length());
 
         //--- getting drive type (we will not bother network drives with getting shares)
-        UINT drvType = MyGetDriveType(GetPath());
+        // Same CP_ACP-mirror defect as the PrepareSearchW fix two lines below:
+        // asked of the '?'-mangled mirror, this can return the wrong drive type for a
+        // non-ASCII panel path, misrouting the removable/remote/CD-ROM icon selection.
+        UINT drvType = MyGetDriveTypeW(GetPathW());
         BOOL testShares = drvType != DRIVE_REMOTE;
         if (testShares)
-            Shares.PrepareSearch(GetPath());
+        {
+            // Selects which shares are candidates for this directory. Given the
+            // CP_ACP mirror it selects them for a path that may not exist, and every share
+            // overlay in the panel is then decided against the wrong candidate set.
+            Shares.PrepareSearchW(GetPathW());
+        }
         switch (drvType)
         {
         case DRIVE_REMOVABLE:
         {
             BOOL isDriveFloppy = FALSE; // floppies have their own configuration beside other removable drives
-            int drv = UpperCase[fileName[0]] - 'A' + 1;
+            int drv = towupper(rootPathW.empty() ? L'\0' : rootPathW[0]) - L'A' + 1;
             if (drv >= 1 && drv <= 26) // doing "range-check" for sure
             {
                 DWORD medium = GetDriveFormFactor(drv);
@@ -201,28 +212,20 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         }
         }
 
-        const char* s = GetPath();
-        char* st = fileName;
-        while (*s != 0)
-            *st++ = *s++;
-        if (s == GetPath())
+        if (*GetPathW() == L'\0')
         {
             SetCurrentDirectoryToSystem();
             DirectoryLine->SetHidden(HiddenFilesCount, HiddenDirsCount);
             //      TRACE_I("ReadDirectory: end");
             return FALSE; // empty string on input
         }
-        if (*(st - 1) != '\\')
-            *st++ = '\\';
-        strcpy(st, "*");
-        char* fileNameEnd = st;
-        std::wstring fileNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), NULL, L"*");
+        std::wstring fileNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), L"*");
         //--- preparing for reading icons
         if (UseSystemIcons)
         {
             IconCacheValid = FALSE;
             MSG msg; // we must destroy possible WM_USER_ICONREADING_END which would set IconCacheValid = TRUE
-            while (PeekMessage(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
+            while (PeekMessageW(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
                 ;
 
             int i;
@@ -238,22 +241,22 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
                 IconCacheValid = FALSE;
                 MSG msg; // we must destroy possible WM_USER_ICONREADING_END which would set IconCacheValid = TRUE
-                while (PeekMessage(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
+                while (PeekMessageW(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
                     ;
             }
         }
         //--- reading directory content
         BOOL upDir;
         BOOL UNCRootUpDir = FALSE;
-        if (GetPath()[0] == '\\' && GetPath()[1] == '\\')
+        if (GetPathW()[0] == '\\' && GetPathW()[1] == '\\')
         {
-            if (GetPath()[2] == '.' && GetPath()[3] == '\\' && GetPath()[4] != 0 && GetPath()[5] == ':') // "\\.\C:\" type path
+            if (GetPathW()[2] == '.' && GetPathW()[3] == '\\' && GetPathW()[4] != 0 && GetPathW()[5] == ':') // "\\.\C:\" type path
             {
-                upDir = strlen(GetPath()) > 7;
+                upDir = wcslen(GetPathW()) > 7;
             }
             else // UNC path
             {
-                const char* s2 = GetPath() + 2;
+                const wchar_t* s2 = GetPathW() + 2;
                 while (*s2 != 0 && *s2 != '\\')
                     s2++;
                 if (*s2 != 0)
@@ -269,7 +272,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             }
         }
         else
-            upDir = strlen(GetPath()) > 3;
+            upDir = wcslen(GetPathW()) > 3;
 
         CALL_STACK_MESSAGE1("CFilesWindow::ReadDirectory::disk2");
 
@@ -279,7 +282,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         BOOL addtoIconCache;
         CFileData file;
         // inicialization of structure members which will not be changed later
-        file.NameW = NULL;
+        // the wide-name mirror field was retired at P1.3 - CFileData::Name
+        // is the wide name now, there is no separate narrow/wide pair to initialize here.
         file.PluginData = -1; // -1 just like that, ignored
         file.Selected = 0;
         file.SizeValid = 0;
@@ -296,9 +300,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     _TRY_AGAIN:
 
         // after 2000 ms we will show a window with a cancel prompt
-        CPathBuffer buf;
-        _snprintf_s(buf, buf.Size(), _TRUNCATE, LoadStr(IDS_READINGPATHESC), GetPath());
-        CreateSafeWaitWindow(buf, NULL, 2000, TRUE, MainWindow->HWindow);
+        const std::wstring waitMessage = FormatStrW(LoadStrW(IDS_READINGPATHESC), GetPathW());
+        CreateSafeWaitWindow(waitMessage.c_str(), NULL, 2000, TRUE, MainWindow->HWindow);
 
         DWORD lastEscCheckTime;
         //lastEscCheckTime = GetTickCount() - 200;  // the first ESC will go immediately
@@ -311,11 +314,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         BOOL isUpDir = FALSE;
         WIN32_FIND_DATAW fileDataW;
-        CPathBuffer ansiFileName; // Heap-allocated for long path support; ANSI conversion buffer for cFileName (also used as scratch)
-        BOOL nameConversionLossy = FALSE; // TRUE if wide->ANSI conversion lost characters
+        const wchar_t* s = NULL;
+        wchar_t* st = NULL;
         HANDLE search;
         IFileSystem* fileSystem = GetPanelFileSystem();
-        search = SalFindFirstFileWideH(fileNameW.c_str(), &fileDataW);
+        search = SalFindFirstFileHW(fileNameW.c_str(), &fileDataW);
         if (search == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -324,7 +327,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
                 if (!upDir)
                 {
-                    StatusLine->SetText(LoadStr(IDS_NOFILESFOUND));
+                    StatusLine->SetText(LoadStrW(IDS_NOFILESFOUND)); // wide - see files_window_windowproc.cpp's WM_USER_SELCHANGED fix
                     SetCurrentDirectoryToSystem();
                     DirectoryLine->SetHidden(HiddenFilesCount, HiddenDirsCount);
                     if (UseSystemIcons || UseThumbnails) // even though we don't have any icons, we need to start loading them (just to set IconCacheValid = TRUE)
@@ -344,7 +347,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 DirectoryLine->SetHidden(HiddenFilesCount, HiddenDirsCount);
                 DirectoryLine->InvalidateIfNeeded();
                 IdleRefreshStates = TRUE; // we will force checking of states of variables at the next Idle
-                StatusLine->SetText("");
+                StatusLine->SetText(L"");
                 UpdateWindow(HWindow);
 
                 BOOL showErr = TRUE;
@@ -356,34 +359,39 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
                     {
                         showErr = FALSE;
-                        CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
+                        std::wstring drive;
                         UINT drvType2;
-                        if (GetPath()[0] == '\\' && GetPath()[1] == '\\')
+                        if (GetPathW()[0] == '\\' && GetPathW()[1] == '\\')
                         {
                             drvType2 = DRIVE_REMOTE;
-                            GetRootPath(drive, GetPath());
-                            drive[strlen(drive) - 1] = 0; // we don't want the last '\\'
+                            drive = GetRootPath(GetPathW());
+                            SalPathRemoveBackslashW(drive);
                         }
                         else
                         {
-                            drive[0] = GetPath()[0];
-                            drive[1] = 0;
-                            drvType2 = MyGetDriveType(GetPath());
+                            drive.assign(1, GetPathW()[0]);
+                            // Same shape as line 169's fix in this function -
+                            // asked of the '?'-mangled mirror, MyGetDriveType can misreport the
+                            // drive type for a non-ASCII panel path, sending this reparse-point
+                            // recovery down the wrong branch (DRIVE_REMOTE vs local).
+                            drvType2 = MyGetDriveTypeW(GetPathW());
                         }
                         if (drvType2 != DRIVE_REMOTE)
                         {
-                            GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox);
-                            if (strlen(CheckPathRootWithRetryMsgBox) > 3)
+                            std::wstring currentReparsePoint;
+                            GetCurrentLocalReparsePointW(GetPathW(), currentReparsePoint);
+                            CheckPathRootWithRetryMsgBox = currentReparsePoint;
+                            if (currentReparsePoint.length() > 3)
                             {
-                                lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
-                                SalPathRemoveBackslash(drive);
+                                drive = currentReparsePoint;
+                                SalPathRemoveBackslashW(drive);
                             }
                         }
                         else
-                            GetRootPath(CheckPathRootWithRetryMsgBox, GetPath());
-                        sprintf(buf, LoadStr(IDS_NODISKINDRIVE), drive.Get());
-                        int msgboxRes = (int)CDriveSelectErrDlg(parent, buf, GetPath()).Execute();
-                        *CheckPathRootWithRetryMsgBox = 0;
+                            CheckPathRootWithRetryMsgBox = GetRootPath(GetPathW());
+                        const std::wstring driveError = FormatStrW(LoadStrW(IDS_NODISKINDRIVE), drive.c_str());
+                        int msgboxRes = (int)CDriveSelectErrDlg(parent, driveError.c_str(), GetPathW()).Execute();
+                        CheckPathRootWithRetryMsgBox.clear();
                         UpdateWindow(MainWindow->HWindow);
                         if (msgboxRes == IDRETRY)
                             goto _TRY_AGAIN;
@@ -393,11 +401,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     (err == ERROR_ACCESS_DENIED || err == ERROR_PATH_NOT_FOUND ||
                      err == ERROR_BAD_PATHNAME || err == ERROR_FILE_NOT_FOUND))
                 { // when deleting a path shown in the panel, these errors are shown, which we don't want, we just silently shorten the path to the first existing one (unfortunately it's not caught earlier, because the path exists for some time after its deletion, something in Windows just didn't work out again)
-                    //          TRACE_I("ReadDirectory(): silently ignoring FindFirstFile failure: " << GetErrorText(err));
+                    //          TRACE_IW(L"ReadDirectory(): silently ignoring FindFirstFile failure: " << GetErrorTextOwned(err).c_str());
                     showErr = FALSE;
                 }
                 if (showErr)
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(err));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(err).c_str());
                 //        TRACE_I("ReadDirectory: end");
                 return FALSE;
             }
@@ -416,7 +424,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     if (UserWantsToCancelSafeWaitWindow())
                     {
                         MSG msg; // remove buffered ESC
-                        while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                        while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                             ;
 
                         SetCurrentDirectoryToSystem();
@@ -451,38 +459,15 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     lastEscCheckTime = GetTickCount();
                 }
 
-                // Convert wide filename to ANSI and detect any loss of information.
-                // Note: Using manual conversion instead of SalAnsiName class to avoid
-                // constructor-skip issues with the goto ADD_ITEM statements below.
-                {
-                    BOOL usedDefaultChar = FALSE;
-                    int converted = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, fileDataW.cFileName, -1,
-                                                        ansiFileName, MAX_PATH, NULL, &usedDefaultChar);
-                    nameConversionLossy = (converted == 0) || (usedDefaultChar == TRUE);
-                    if (converted == 0)
-                    {
-                        ansiFileName[0] = 0;
-                    }
-                    else if (!nameConversionLossy)
-                    {
-                        int roundtripLen = MultiByteToWideChar(CP_ACP, 0, ansiFileName, -1, NULL, 0);
-                        if (roundtripLen <= 0)
-                        {
-                            nameConversionLossy = TRUE;
-                        }
-                        else
-                        {
-                            std::wstring roundtrip((size_t)roundtripLen, L'\0');
-                            if (MultiByteToWideChar(CP_ACP, 0, ansiFileName, -1, &roundtrip[0], roundtripLen) <= 0 ||
-                                wcscmp(roundtrip.c_str(), fileDataW.cFileName) != 0)
-                            {
-                                nameConversionLossy = TRUE;
-                            }
-                        }
-                    }
-                }
-                st = ansiFileName;
-                len = (int)strlen(st);
+                // This used to build a lossy CP_ACP projection of the real
+                // wide name (via SalAnsiName, since deleted) to feed the now-retired
+                // CFileData::NameW pair. NameW went away at P1.3 - CFileData::Name is the
+                // wide name now, so there is nothing left to project: read the real name
+                // straight from fileDataW, never through a best-fit narrow round-trip that
+                // could silently misfile a non-ASCII name into the wrong hidden/filter/name
+                // bucket.
+                st = fileDataW.cFileName;
+                len = (int)wcslen(st);
                 BOOL isDir;
                 isDir = (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                 isUpDir = (len == 2 && *st == '.' && *(st + 1) == '.');
@@ -507,16 +492,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     continue;
                 }
                 //--- applying filter to files
+                // wide: matching against ansiFileName (the CP_ACP best-fit mirror,
+                // possibly '?'-mangled) let a filter mask wrongly hide/show non-ASCII names, since
+                // '?' is itself a mask wildcard. AgreeMasks self-computes the extension the same
+                // way when passed NULL, so match the true wide name directly.
                 if (FilterEnabled && !isDir)
                 {
-                    const char* ext = st + len;
-                    while (--ext >= st && *ext != '.')
-                        ;
-                    if (ext < st)
-                        ext = st + len; // ".cvspass" in Windows is an extension ...
-                    else
-                        ext++;
-                    if (!Filter.AgreeMasks(st, ext))
+                    if (!Filter.AgreeMasks(fileDataW.cFileName, NULL))
                     {
                         HiddenFilesCount++;
                         HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
@@ -538,13 +520,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             ADD_ITEM: // to add ".."
 
                 //--- name
-                file.Name = (char*)malloc(len + 1); // allocation
+                file.Name = (wchar_t*)malloc((len + 1) * sizeof(wchar_t)); // allocation
                 if (file.Name == NULL)
                 {
                     if (search != NULL)
                     {
                         DestroySafeWaitWindow();
-                        HANDLES(FindClose(search));
+                        SalLPFindClose(search);
                     }
                     TRACE_E(LOW_MEMORY);
                     SetCurrentDirectoryToSystem();
@@ -556,17 +538,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     //          TRACE_I("ReadDirectory: end");
                     return FALSE;
                 }
-                memmove(file.Name, st, len + 1); // copy of text
+                memmove(file.Name, st, (len + 1) * sizeof(wchar_t)); // copy of text
                 file.NameLen = len;
-
-                //--- wide name (for Unicode filenames not representable in ANSI)
-                // Single authority for the wide-row decision: keep NameW iff the
-                // ANSI conversion was lossy OR the name has any non-ASCII char
-                // (see sally::unicode::PanelNameNeedsWideName for the rationale).
-                if (sally::unicode::PanelNameNeedsWideName(fileDataW.cFileName, nameConversionLossy != FALSE))
-                    file.NameW = DupStr(fileDataW.cFileName);
-                else
-                    file.NameW = NULL;  // Reset from previous iteration
 
                 //--- extension
                 if (!Configuration.SortDirsByExt && (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
@@ -594,25 +567,29 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 file.IsOffline = !isUpDir && (file.Attr & FILE_ATTRIBUTE_OFFLINE) ? 1 : 0;
                 if (testShares && (file.Attr & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
                 {
-                    file.Shared = Shares.Search(file.Name);
+                    // Was a UseWideName()/NameW ternary whose comment
+                    // argued the narrow arm was faithful. Both members were deleted at
+                    // P1.3 ("NameW is GONE", spl_com.h) - Name is the wide name now, so
+                    // there is one arm and no choice to make.
+                    file.Shared = Shares.SearchW(file.Name);
                 }
                 else
                     file.Shared = 0;
 
                 if (fileDataW.cAlternateFileName[0] != 0)
                 {
-                    // Convert wide alternate filename to ANSI
-                    char altNameAnsi[14];
-                    WideCharToMultiByte(CP_ACP, 0, fileDataW.cAlternateFileName, -1, altNameAnsi, sizeof(altNameAnsi), NULL, NULL);
-                    int l = (int)strlen(altNameAnsi) + 1;
-                    file.DosName = (char*)malloc(l);
+                    // The DOS 8.3 alternate name is already a real wide
+                    // string from the OS (and is pure ASCII by DOS 8.3 convention), so
+                    // there is nothing to convert - duplicate it directly.
+                    int l = (int)wcslen(fileDataW.cAlternateFileName) + 1;
+                    file.DosName = (wchar_t*)malloc(l * sizeof(wchar_t));
                     if (file.DosName == NULL)
                     {
                         free(file.Name);
                         if (search != NULL)
                         {
                             DestroySafeWaitWindow();
-                            HANDLES(FindClose(search));
+                            SalLPFindClose(search);
                         }
                         TRACE_E(LOW_MEMORY);
                         SetCurrentDirectoryToSystem();
@@ -624,7 +601,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         //            TRACE_I("ReadDirectory: end");
                         return FALSE;
                     }
-                    memmove(file.DosName, altNameAnsi, l);
+                    memmove(file.DosName, fileDataW.cAlternateFileName, l * sizeof(wchar_t));
                 }
                 else
                     file.DosName = NULL;
@@ -634,7 +611,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     file.Archive = 0;
 #ifndef _WIN64
                     file.IsLink = (isWin64RedirectedDir || (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) || // CAUTION: pseudo-directory must have IsLink set, otherwise ContainsWin64RedirectedDir must be changed
-                                   isWindows64BitDir && file.NameLen == 8 && StrICmp(file.Name, "system32") == 0)
+                                   isWindows64BitDir && file.NameLen == 8 && StrICmpW(file.Name, L"system32") == 0)
                                       ? 1
                                       : 0; // system32 directory in 32-bit Salamander is link to SysWOW64 + win64 redirected-dir + volume mount point or junction point = show directory with link overlay
 #else                                      // _WIN64
@@ -642,7 +619,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 #endif                                     // _WIN64
                     if (len == 2 && *st == '.' && *(st + 1) == '.')
                     { // handling ".."
-                        if (GetPath()[3] != 0)
+                        if (GetPathW()[3] != 0)
                             Dirs->Insert(0, file); // except of root...
                         else
                         {
@@ -668,7 +645,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         if (search != NULL)
                         {
                             DestroySafeWaitWindow();
-                            HANDLES(FindClose(search));
+                            SalLPFindClose(search);
                         }
                         SetCurrentDirectoryToSystem();
                         Files->DestroyMembers();
@@ -684,18 +661,22 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 {
                     if (s >= st) // an extension exists
                     {
-                        while (*++s != 0)
-                            *st++ = LowerCase[*s];
-                        *(DWORD*)st = 0;   // zeroes to the end
-                        st = ansiFileName; // lowercase extension (reset to beginning of scratch buffer)
+                        // sally::text::Fold UPPERCASES - it is a comparison key, not a
+                        // display form - and CAssociations stores its extensions folded
+                        // the same way, so the lookups below are ordinal-correct. The
+                        // literals must be folded too: spelled in lower case they never
+                        // matched, which cost .lnk/.pif/.url their link overlay and cost
+                        // .scr/.pif/.lnk their icon-cache handling.
+                        const std::wstring foldedExtension = sally::text::Fold(s + 1);
+                        const wchar_t* extension = foldedExtension.c_str();
 
                         if (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
                             file.IsLink = 1; // if the file is reparse-point (maybe it's not possible at all) = show it with link overlay
                         else
                         {
-                            file.IsLink = (*(DWORD*)st == *(DWORD*)"lnk" ||
-                                           *(DWORD*)st == *(DWORD*)"pif" ||
-                                           *(DWORD*)st == *(DWORD*)"url")
+                            file.IsLink = (wcscmp(extension, L"LNK") == 0 ||
+                                           wcscmp(extension, L"PIF") == 0 ||
+                                           wcscmp(extension, L"URL") == 0)
                                               ? 1
                                               : 0;
                         }
@@ -708,24 +689,23 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         }
                         else
                         {
-                            file.Association = Associations.IsAssociated(st, addtoIconCache, iconSize);
+                            file.Association = Associations.IsAssociated(extension, addtoIconCache, iconSize);
                             file.Archive = 0;
-                            if (*(DWORD*)st == *(DWORD*)"scr" || // few exceptions
-                                *(DWORD*)st == *(DWORD*)"pif")
+                            if (wcscmp(extension, L"SCR") == 0 || // few exceptions
+                                wcscmp(extension, L"PIF") == 0)
                             {
                                 addtoIconCache = TRUE;
                             }
                             else
                             {
-                                if (*(DWORD*)st == *(DWORD*)"lnk") // icons via link
+                                if (wcscmp(extension, L"LNK") == 0) // icons via link
                                 {
-                                    strcpy(ansiFileName, file.Name);
-                                    char* ext2 = strrchr(ansiFileName, '.');
-                                    if (ext2 != NULL) // ".cvspass" in Windows is an extesion
-                                                      //                  if (ext2 != NULL && ext2 != ansiFileName)
+                                    std::wstring linkTargetName(file.Name);
+                                    const size_t extensionPos = linkTargetName.find_last_of(L'.');
+                                    if (extensionPos != std::wstring::npos) // ".cvspass" in Windows is an extesion
                                     {
-                                        *ext2 = 0;
-                                        if (PackerFormatConfig.PackIsArchive(ansiFileName)) // is it a link to archive which we can process?
+                                        linkTargetName.resize(extensionPos);
+                                        if (PackerFormatConfig.PackIsArchive(linkTargetName.c_str())) // is it a link to archive which we can process?
                                         {
                                             file.Association = 1;
                                             file.Archive = 1;
@@ -752,7 +732,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         if (search != NULL)
                         {
                             DestroySafeWaitWindow();
-                            HANDLES(FindClose(search));
+                            SalLPFindClose(search);
                         }
                         SetCurrentDirectoryToSystem();
                         Files->DestroyMembers();
@@ -775,7 +755,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     for (i = 0; i < thumbLoaderPlugins.Count; i++)
                     {
                         CPluginData* p = thumbLoaderPlugins[i];
-                        if (p->ThumbnailMasks.AgreeMasks(file.Name, file.Ext) &&
+                        // wide: file.Name/Ext are the same lossy CP_ACP mirror
+                        // fixed for FilterEnabled above - match the true wide name instead.
+                        if (p->ThumbnailMasks.AgreeMasks(fileDataW.cFileName, NULL) &&
                             !p->ThumbnailMasksDisabled) // its unload/remove is not in progress
                         {
                             if (!p->GetLoaded()) // plugin needs to be loaded (possible change of mask for "thumbnail loader")
@@ -795,7 +777,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                 if (p->InitDLL(HWindow, FALSE, TRUE, FALSE) &&  // plugin loaded successfully
                                     p->ThumbnailMasks.GetMasksString()[0] != 0) // plugin is still "thumbnail loader"
                                 {
-                                    if (!p->ThumbnailMasks.AgreeMasks(file.Name, file.Ext) || // it can't do thumbnail for this file anymore
+                                    if (!p->ThumbnailMasks.AgreeMasks(fileDataW.cFileName, NULL) || // it can't do thumbnail for this file anymore
                                         p->ThumbnailMasksDisabled)                            // its unload/remove is in progress
                                     {
                                         cont = TRUE;
@@ -803,7 +785,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                 }
                                 else // can't load -> we will remove it from the list of probed plugins (prevent from repeating error messages)
                                 {
-                                    TRACE_I("Unable to use plugin " << p->Name.c_str() << " as thumbnail loader.");
+                                    TRACE_I("Unable to use plugin " << sally::diagnostic::EncodeAcpLossy(p->Name) << " as thumbnail loader.");
                                     thumbLoaderPlugins.Delete(i);
                                     readThumbnails = thumbLoaderPlugins.Count > 0;
                                     if (!thumbLoaderPlugins.IsGood())
@@ -815,7 +797,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
                                 // cleanup message-queue from buffered WM_USER_UPDATEPANEL
                                 MSG msg2;
-                                PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
+                                PeekMessageW(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
 
                                 if (cont)
                                     continue;
@@ -828,21 +810,30 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         if (foundThumbLoaderPlugins.Count > 0)
                         {
-                            int size = len + 4;
+                            // NameAndData is wchar_t*, but 'len' is a WCHAR count
+                            // (wcslen, line ~470) and everything past the name (nameSize onward -
+                            // CQuadWord/FILETIME/void* pointers) is raw packed bytes, not wchar_t-
+                            // granular data. The old char-count math allocated/copied half the name's
+                            // bytes and, worse, used a BYTE offset (nameSize) directly as a wchar_t*
+                            // pointer offset (silently doubling it). Do all sizing/offsetting through
+                            // an explicit BYTE count/pointer so nothing is silently rescaled.
+                            int lenBytes = len * (int)sizeof(wchar_t);
+                            int size = lenBytes + 4;
                             size -= (size & 0x3); // size % 4 (alignment per four bytes)
                             int nameSize = size;
                             size += sizeof(CQuadWord) + sizeof(FILETIME);
                             size += (foundThumbLoaderPlugins.Count + 1) * sizeof(void*); // space for pointers to plugin interfaces + NULL at the end
-                            iconData.NameAndData = (char*)malloc(size);
+                            iconData.NameAndData = (wchar_t*)malloc(size);
                             if (iconData.NameAndData != NULL)
                             {
-                                memcpy(iconData.NameAndData, file.Name, len);
-                                memset(iconData.NameAndData + len, 0, nameSize - len); // end of name is zeroed
+                                BYTE* raw = (BYTE*)iconData.NameAndData;
+                                memcpy(raw, file.Name, lenBytes);
+                                memset(raw + lenBytes, 0, nameSize - lenBytes); // end of name is zeroed
                                 // size is added + time of last write to file
-                                *(CQuadWord*)(iconData.NameAndData + nameSize) = file.Size;
-                                *(FILETIME*)(iconData.NameAndData + nameSize + sizeof(CQuadWord)) = file.LastWrite;
+                                *(CQuadWord*)(raw + nameSize) = file.Size;
+                                *(FILETIME*)(raw + nameSize + sizeof(CQuadWord)) = file.LastWrite;
                                 // add list of pointers to encapsulation of plugin interfaces for getting thumbnails
-                                void** ifaces = (void**)(iconData.NameAndData + nameSize + sizeof(CQuadWord) + sizeof(FILETIME));
+                                void** ifaces = (void**)(raw + nameSize + sizeof(CQuadWord) + sizeof(FILETIME));
                                 int i2;
                                 for (i2 = 0; i2 < foundThumbLoaderPlugins.Count; i2++)
                                 {
@@ -877,13 +868,17 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 // adding directory to IconCache -> we need to load icon
                 if (UseSystemIcons && addtoIconCache)
                 {
-                    int size = len + 4;
+                    // NameAndData is wchar_t*; 'len' is a WCHAR count (wcslen, line
+                    // ~470), so the DWORD-alignment and buffer size must be computed in BYTES - the
+                    // old char-count math allocated/copied half the name's actual bytes.
+                    int lenBytes = len * (int)sizeof(wchar_t);
+                    int size = lenBytes + 4;
                     size -= (size & 0x3); // size % 4 (alignment per four bytes)
-                    iconData.NameAndData = (char*)malloc(size);
+                    iconData.NameAndData = (wchar_t*)malloc(size);
                     if (iconData.NameAndData != NULL)
                     {
-                        memmove(iconData.NameAndData, file.Name, len);
-                        memset(iconData.NameAndData + len, 0, size - len); // end of name is zeroed
+                        memmove(iconData.NameAndData, file.Name, lenBytes);
+                        memset(iconData.NameAndData + len, 0, size - lenBytes); // end of name is zeroed
                         iconData.SetFlag(0);                               // no not-loaded icon yet
                                                                            // need to allocate space for bitmaps, can't be done in thread
                         iconData.SetIndex(IconCache->AllocIcon(NULL, NULL));
@@ -914,7 +909,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             if (search != NULL) // the first pass
             {
                 DestroySafeWaitWindow();
-                HANDLES(FindClose(search));
+                SalLPFindClose(search);
             }
 
             if (testFindNextErr && err != ERROR_NO_MORE_FILES)
@@ -923,17 +918,16 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 RefreshListBox(0, -1, -1, FALSE, FALSE);
 
                 // TODO: Use wide format string when available
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (std::wstring(GetPathW()) + L": " + GetErrorTextW(err)).c_str());
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (std::wstring(GetPathW()) + L": " + GetErrorTextOwned(err).c_str()).c_str());
             }
         }
 
-        if (upDir && (Dirs->Count == 0 || strcmp(Dirs->At(0).Name, "..") != 0))
+        if (upDir && (Dirs->Count == 0 || wcscmp(Dirs->At(0).Name, L"..") != 0))
         {
             upDir = FALSE;
-            *(fileNameEnd - 1) = 0; // it's not logical, but times ".." are from current directory
             std::wstring currentPathW = GetPathW();
             if (!UNCRootUpDir)
-                search = SalFindFirstFileWideH(currentPathW.c_str(), &fileDataW);
+                search = SalFindFirstFileHW(currentPathW.c_str(), &fileDataW);
             else
                 search = INVALID_HANDLE_VALUE;
             if (search == INVALID_HANDLE_VALUE)
@@ -959,16 +953,14 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 fileDataW.dwReserved0 = fileDataW.dwReserved1 = 0;
             }
             else
-                HANDLES(FindClose(search));
+                SalLPFindClose(search);
             search = NULL;                                               // the second/third pass
             fileDataW.dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;      // this is ptDisk
             fileDataW.dwFileAttributes &= ~FILE_ATTRIBUTE_REPARSE_POINT; // need to remove flag FILE_ATTRIBUTE_REPARSE_POINT, otherwise link overlay will be on ".."
             wcscpy(fileDataW.cFileName, L"..");
             fileDataW.cAlternateFileName[0] = 0;
-            strcpy(ansiFileName, "..");
-            st = ansiFileName;
+            st = fileDataW.cFileName;
             len = 2;
-            nameConversionLossy = FALSE; // ".." is pure ASCII
             isUpDir = TRUE;
             goto ADD_ITEM;
         }
@@ -978,14 +970,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     FIND_NEXT_WIN64_REDIRECTEDDIR:
 
         BOOL dirWithSameNameExists;
-        WIN32_FIND_DATA fileDataA; // ANSI structure for AddWin64RedirectedDir (system dirs are ASCII)
         if (foundWin64RedirectedDirs < 10 &&
-            AddWin64RedirectedDir(GetPath(), Dirs, &fileDataA, &foundWin64RedirectedDirs, &dirWithSameNameExists))
+            AddWin64RedirectedDir(GetPathW(), Dirs, &fileDataW, &foundWin64RedirectedDirs, &dirWithSameNameExists))
         {
             foundWin64RedirectedDirs++; // e.g. under system32 there can be 5, I've added some reserve to 10...
 
             if (Configuration.NotHiddenSystemFiles &&
-                (fileDataA.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
+                (fileDataW.dwFileAttributes & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
             { // skip hidden directory
                 if (!dirWithSameNameExists)
                 {
@@ -996,7 +987,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             }
 
             //--- if the name is occupied in the array HiddenNames, we will discard it
-            if (HiddenNames.Contains(TRUE, fileDataA.cFileName))
+            if (HiddenNames.Contains(TRUE, fileDataW.cFileName))
             {
                 if (!dirWithSameNameExists)
                 {
@@ -1006,24 +997,10 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 goto FIND_NEXT_WIN64_REDIRECTEDDIR;
             }
 
-            // Convert ANSI fileDataA to wide fileDataW for ADD_ITEM
-            fileDataW.dwFileAttributes = fileDataA.dwFileAttributes;
-            fileDataW.ftCreationTime = fileDataA.ftCreationTime;
-            fileDataW.ftLastAccessTime = fileDataA.ftLastAccessTime;
-            fileDataW.ftLastWriteTime = fileDataA.ftLastWriteTime;
-            fileDataW.nFileSizeHigh = fileDataA.nFileSizeHigh;
-            fileDataW.nFileSizeLow = fileDataA.nFileSizeLow;
-            fileDataW.dwReserved0 = fileDataA.dwReserved0;
-            fileDataW.dwReserved1 = fileDataA.dwReserved1;
-            MultiByteToWideChar(CP_ACP, 0, fileDataA.cFileName, -1, fileDataW.cFileName, MAX_PATH);
-            MultiByteToWideChar(CP_ACP, 0, fileDataA.cAlternateFileName, -1, fileDataW.cAlternateFileName, 14);
-
             isWin64RedirectedDir = TRUE;
             search = NULL; // the second/third pass...
-            strcpy(ansiFileName, fileDataA.cFileName);
-            st = ansiFileName;
-            len = (int)strlen(st);
-            nameConversionLossy = FALSE; // System directory names are ASCII
+            st = fileDataW.cFileName;
+            len = (int)wcslen(st);
             isUpDir = FALSE;
             goto ADD_ITEM;
         }
@@ -1035,7 +1012,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         SetCurrentDirectoryToSystem();
 
         if (Files->Count + Dirs->Count == 0)
-            StatusLine->SetText(LoadStr(IDS_NOFILESFOUND));
+            StatusLine->SetText(LoadStrW(IDS_NOFILESFOUND)); // wide - see files_window_windowproc.cpp's WM_USER_SELCHANGED fix
 
         // sorting of Files and Dirs according to the current sorting method
         SortDirectory();
@@ -1089,11 +1066,16 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         continue;
                     }
 
-                    if (FilterEnabled && (!Filter.AgreeMasks(f->Name, f->Ext)))
+                    // Name is the exact wide name now (NameW retired at P1.3);
+                    // no re-derivation needed.
+                    if (FilterEnabled)
                     {
-                        HiddenFilesCount++;
-                        HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
-                        continue;
+                        if (!Filter.AgreeMasks(f->Name, NULL))
+                        {
+                            HiddenFilesCount++;
+                            HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
+                            continue;
+                        }
                     }
 
                     //--- if the name is occupied in the array HiddenNames, we will discard it
@@ -1107,14 +1089,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     Files->Add(*f);
                 }
                 CFileData upDir;
-                static char buffUp[] = "..";
+                static wchar_t buffUp[] = L"..";
                 upDir.Name = buffUp; // free() won't be called, we can afford ".."
                 upDir.Ext = upDir.Name + 2;
                 upDir.Size = CQuadWord(0, 0);
                 upDir.Attr = 0;
                 upDir.LastWrite = GetZIPArchiveDate();
                 upDir.DosName = NULL;
-                upDir.NameW = NULL;
                 upDir.PluginData = 0; // 0 just like that, plug-in will overwrite it with its value
                 upDir.NameLen = 2;
                 upDir.Hidden = 0;
@@ -1183,7 +1164,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 // preparing for loading of icons
                 IconCacheValid = FALSE;
                 MSG msg; // need to remove any WM_USER_ICONREADING_END, which would set IconCacheValid = TRUE
-                while (PeekMessage(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
+                while (PeekMessageW(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
                     ;
 
                 int i;
@@ -1196,7 +1177,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 // getting of necessary static icons (we won't unpack them)
                 for (i = 0; i < Files->Count; i++)
                 {
-                    const char* iconLocation = NULL;
+                    // wchar_t*: CAssociationData::ExtensionAndData (returned here by
+                    // IsAssociatedStatic) is a packed [extension][DWORD-aligned zero padding]
+                    // [icon-location text] wchar_t* buffer (CAssociations::InsertData, icncache.cpp) -
+                    // never char* since the P1.5bc icncache widening.
+                    const wchar_t* iconLocation = NULL;
                     CFileData* f = &Files->At(i);
 
                     if (*f->Ext != 0) // an extension exists
@@ -1210,14 +1195,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             else
             {
 */
-                        char* s = f->Ext - 1;
-                        char* st = fileName;
-                        while (*++s != 0)
-                            *st++ = LowerCase[*s];
-                        *(DWORD*)st = 0; // zeroes to the end
-                        st = fileName;   // lowercase extension
-
-                        f->Association = Associations.IsAssociatedStatic(st, iconLocation, iconSize);
+                        const std::wstring extension = sally::text::Fold(f->Ext);
+                        f->Association = Associations.IsAssociatedStatic(extension.c_str(), iconLocation, iconSize);
                         f->Archive = FALSE;
                         /*
             }
@@ -1234,20 +1213,27 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         CIconData iconData;
                         iconData.FSFileData = NULL;
                         iconData.SetReadingDone(0); // just for form
-                        int size = (int)strlen(iconLocation) + 4;
-                        size -= (size & 0x3);                // size % 4  (alignment per four bytes)
-                        const char* s = iconLocation + size; // skip alignment from zeros
-                        int len = (int)strlen(s);
+                        // NameAndData/ExtensionAndData are wchar_t* now, so 'size'/
+                        // 'nameLen' must be BYTE offsets (matching InsertData's own '(size + 3) & ~3'
+                        // alignment) even though wcslen()/NameLen are WCHAR counts - the old char-count
+                        // math allocated/copied half the bytes these strings actually need. Pointer
+                        // arithmetic on the wchar_t* buffers stays in WCHAR units.
+                        int size = (int)((wcslen(iconLocation) + 1) * sizeof(wchar_t));
+                        size = (size + 3) & ~3;                                       // align to four bytes
+                        const wchar_t* s = iconLocation + size / sizeof(wchar_t); // skip alignment from zeros
+                        int len = (int)wcslen(s);
                         if (len > 0) // icon-location is not empty
                         {
-                            int nameLen = f->NameLen + 4;
+                            int nameLenBytes = f->NameLen * (int)sizeof(wchar_t);
+                            int nameLen = nameLenBytes + 4;
                             nameLen -= (nameLen & 0x3); // nameLen % 4  (alignment per four bytes)
-                            iconData.NameAndData = (char*)malloc(nameLen + len + 1);
+                            int iLenBytes = (int)((len + 1) * sizeof(wchar_t));
+                            iconData.NameAndData = (wchar_t*)malloc(nameLen + iLenBytes);
                             if (iconData.NameAndData != NULL)
                             {
-                                memcpy(iconData.NameAndData, f->Name, f->NameLen);                  // name +
-                                memset(iconData.NameAndData + f->NameLen, 0, nameLen - f->NameLen); // zeroes alignment +
-                                memcpy(iconData.NameAndData + nameLen, s, len + 1);                 // icon-location + '\0'
+                                memcpy(iconData.NameAndData, f->Name, nameLenBytes);                  // name +
+                                memset(iconData.NameAndData + f->NameLen, 0, nameLen - nameLenBytes); // zeroes alignment +
+                                memcpy(iconData.NameAndData + nameLen / sizeof(wchar_t), s, iLenBytes); // icon-location + '\0'
 
                                 iconData.SetFlag(3); // not-loaded icon given by icon-location only
                                                      // we need to allocate space for bitmaps, can't be done in thread
@@ -1291,15 +1277,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             else
             {
 */
-                        char* s = f->Ext - 1;
-                        CPathBuffer buf; // Heap-allocated for long path support
-                        char* st = buf;
-                        while (*++s != 0)
-                            *st++ = LowerCase[*s];
-                        *(DWORD*)st = 0; // zeroes to the end
-                        st = buf;        // lowercase extension
-
-                        f->Association = Associations.IsAssociated(st);
+                        const std::wstring extension = sally::text::Fold(f->Ext);
+                        f->Association = Associations.IsAssociated(extension.c_str());
                         f->Archive = FALSE;
                         /*
             }
@@ -1357,11 +1336,16 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             continue;
                         }
 
-                        if (FilterEnabled && !Filter.AgreeMasks(f->Name, f->Ext))
+                        // Name is the exact wide name now (NameW retired at P1.3);
+                        // no re-derivation needed.
+                        if (FilterEnabled)
                         {
-                            HiddenFilesCount++;
-                            HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
-                            continue;
+                            if (!Filter.AgreeMasks(f->Name, NULL))
+                            {
+                                HiddenFilesCount++;
+                                HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
+                                continue;
+                            }
                         }
 
                         //--- if the name is occupied in the array HiddenNames, we will discard it
@@ -1419,19 +1403,18 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 // if the panel is empty, we will set infoline to "No files found"
                 if (Files->Count + Dirs->Count == 0)
                 {
-                    char buff[1000];
-                    DWORD varPlacements[100];
-                    int varPlacementsCount = 100;
+                    std::wstring buff;
+                    std::vector<sally::unicode::WideTextRange> varPlacements;
                     if (PluginData.NotEmpty() &&
                         PluginData.GetInfoLineContent(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
                                                       NULL, FALSE, 0, 0, TRUE, CQuadWord(0, 0), buff,
-                                                      varPlacements, varPlacementsCount))
+                                                      varPlacements))
                     {
-                        if (StatusLine->SetText(buff))
-                            StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
+                        if (StatusLine->SetText(buff.c_str()))
+                            StatusLine->SetSubTexts(varPlacements.data(), varPlacements.size());
                     }
                     else
-                        StatusLine->SetText(LoadStr(IDS_NOFILESFOUND));
+                        StatusLine->SetText(LoadStrW(IDS_NOFILESFOUND)); // wide - see files_window_windowproc.cpp's WM_USER_SELCHANGED fix
                 }
 
                 // sorting of Files and Dirs according to the current sorting method
@@ -1444,7 +1427,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     // preparing for loading of icons
                     IconCacheValid = FALSE;
                     MSG msg; // need to remove any WM_USER_ICONREADING_END, which would set IconCacheValid = TRUE
-                    while (PeekMessage(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
+                    while (PeekMessageW(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
                         ;
 
                     int i;
@@ -1457,7 +1440,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     // getting of necessary static icons (we won't unpack anything)
                     for (i = 0; i < Files->Count; i++)
                     {
-                        const char* iconLocation = NULL;
+                        // wchar_t*: CAssociationData::ExtensionAndData (returned here
+                        // by IsAssociatedStatic) is a packed [extension][DWORD-aligned zero padding]
+                        // [icon-location text] wchar_t* buffer (CAssociations::InsertData,
+                        // icncache.cpp) - never char* since the P1.5bc icncache widening.
+                        const wchar_t* iconLocation = NULL;
                         CFileData* f = &Files->At(i);
 
                         if (*f->Ext != 0) // an extension exists
@@ -1471,14 +1458,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
               else
               {
 */
-                            char* s = f->Ext - 1;
-                            char* st = fileName;
-                            while (*++s != 0)
-                                *st++ = LowerCase[*s];
-                            *(DWORD*)st = 0; // zeroes to the end
-                            st = fileName;   // lowercase extension
-
-                            f->Association = Associations.IsAssociatedStatic(st, iconLocation, iconSize);
+                            const std::wstring extension = sally::text::Fold(f->Ext);
+                            f->Association = Associations.IsAssociatedStatic(extension.c_str(), iconLocation, iconSize);
                             f->Archive = FALSE;
                             /*
               }
@@ -1495,20 +1476,28 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             CIconData iconData;
                             iconData.FSFileData = NULL;
                             iconData.SetReadingDone(0); // just for form
-                            int size = (int)strlen(iconLocation) + 4;
-                            size -= (size & 0x3);                // size % 4  (alignment per four bytes)
-                            const char* s = iconLocation + size; // skip alignment from zeros
-                            int len = (int)strlen(s);
+                            // NameAndData/ExtensionAndData are wchar_t* now, so 'size'/
+                            // 'nameLen' must be BYTE offsets (matching InsertData's own
+                            // '(size + 3) & ~3' alignment) even though wcslen()/NameLen are WCHAR
+                            // counts - the old char-count math allocated/copied half the bytes these
+                            // strings actually need. Pointer arithmetic on the wchar_t* buffers stays
+                            // in WCHAR units.
+                            int size = (int)((wcslen(iconLocation) + 1) * sizeof(wchar_t));
+                            size = (size + 3) & ~3;                                       // align to four bytes
+                            const wchar_t* s = iconLocation + size / sizeof(wchar_t); // skip alignment from zeros
+                            int len = (int)wcslen(s);
                             if (len > 0) // icon-location is not empty
                             {
-                                int nameLen = f->NameLen + 4;
+                                int nameLenBytes = f->NameLen * (int)sizeof(wchar_t);
+                                int nameLen = nameLenBytes + 4;
                                 nameLen -= (nameLen & 0x3); // nameLen % 4  (alignment per four bytes)
-                                iconData.NameAndData = (char*)malloc(nameLen + len + 1);
+                                int iLenBytes = (int)((len + 1) * sizeof(wchar_t));
+                                iconData.NameAndData = (wchar_t*)malloc(nameLen + iLenBytes);
                                 if (iconData.NameAndData != NULL)
                                 {
-                                    memcpy(iconData.NameAndData, f->Name, f->NameLen);                  // name +
-                                    memset(iconData.NameAndData + f->NameLen, 0, nameLen - f->NameLen); // zeroes alignment +
-                                    memcpy(iconData.NameAndData + nameLen, s, len + 1);                 // icon-location + '\0'
+                                    memcpy(iconData.NameAndData, f->Name, nameLenBytes);                  // name +
+                                    memset(iconData.NameAndData + f->NameLen, 0, nameLen - nameLenBytes); // zeroes alignment +
+                                    memcpy(iconData.NameAndData + nameLen / sizeof(wchar_t), s, iLenBytes); // icon-location + '\0'
 
                                     iconData.SetFlag(3); // not-loaded icon given by icon-location only
                                                          // we need to allocate space for bitmaps, can't be done in thread
@@ -1569,15 +1558,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 else
                 {
   */
-                                char* s = f->Ext - 1;
-                                CPathBuffer buf; // Heap-allocated for long path support
-                                char* st = buf;
-                                while (*++s != 0)
-                                    *st++ = LowerCase[*s];
-                                *(DWORD*)st = 0; // zeroes to the end
-                                st = buf;        // lowercase extension
-
-                                f->Association = Associations.IsAssociated(st);
+                                const std::wstring extension = sally::text::Fold(f->Ext);
+                                f->Association = Associations.IsAssociated(extension.c_str());
                                 f->Archive = FALSE;
                                 /*
                 }
@@ -1601,7 +1583,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             // preparing for loading of icons
                             IconCacheValid = FALSE;
                             MSG msg; // need to remove any WM_USER_ICONREADING_END, which would set IconCacheValid = TRUE
-                            while (PeekMessage(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
+                            while (PeekMessageW(&msg, HWindow, WM_USER_ICONREADING_END, WM_USER_ICONREADING_END, PM_REMOVE))
                                 ;
 
                             // file/directories which don't have a simple icon will be addeed to icon-cache
@@ -1626,27 +1608,37 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                     }
                                     if (!isDir)
                                     {
-                                        if (FilterEnabled && !Filter.AgreeMasks(f->Name, f->Ext))
-                                            continue;
+                                        // Name is the exact wide name now (NameW
+                                        // retired at P1.3); no re-derivation needed.
+                                        if (FilterEnabled)
+                                        {
+                                            if (!Filter.AgreeMasks(f->Name, NULL))
+                                                continue;
+                                        }
                                     }
                                     //--- if the name is occupied in the array HiddenNames, we will discard it
                                     if (HiddenNames.Contains(isDir, f->Name))
                                         continue;
                                     debugCount++;
 
-                                    if ((!isDir || i != 0 || strcmp(f->Name, "..") != 0) &&
+                                    if ((!isDir || i != 0 || wcscmp(f->Name, L"..") != 0) &&
                                         !PluginData.HasSimplePluginIcon(*f, isDir)) // add to icon-cache?
                                     {
                                         CIconData iconData;
                                         iconData.FSFileData = f;
                                         iconData.SetReadingDone(0); // just for form
-                                        int nameLen = f->NameLen + 4;
+                                        // NameAndData is wchar_t*; f->NameLen is a
+                                        // WCHAR count (spl_com.h), so the DWORD-alignment and buffer
+                                        // size must be computed in BYTES - the old char-count math
+                                        // allocated/copied half the name's actual bytes.
+                                        int nameLenBytes = f->NameLen * (int)sizeof(wchar_t);
+                                        int nameLen = nameLenBytes + 4;
                                         nameLen -= (nameLen & 0x3); // nameLen % 4  (alignment per four bytes)
-                                        iconData.NameAndData = (char*)malloc(nameLen);
+                                        iconData.NameAndData = (wchar_t*)malloc(nameLen);
                                         if (iconData.NameAndData != NULL)
                                         {
-                                            memcpy(iconData.NameAndData, f->Name, f->NameLen);                  // name +
-                                            memset(iconData.NameAndData + f->NameLen, 0, nameLen - f->NameLen); // zeroes alignment
+                                            memcpy(iconData.NameAndData, f->Name, nameLenBytes);                  // name +
+                                            memset(iconData.NameAndData + f->NameLen, 0, nameLen - nameLenBytes); // zeroes alignment
 
                                             iconData.SetFlag(0); // so far not loaded icon (plugin-icon)
                                                                  // need to allocate space for bitmaps, can't be done in thread
@@ -1697,8 +1689,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     }
     DirectoryLine->SetHidden(HiddenFilesCount, HiddenDirsCount);
 
-    // if the sizes of directories are stored for this path, we will assign them
-    // to DirectorySizesHolder.Restore(this);
+    // The disabled "restore remembered directory sizes for this path"
+    // hook lived here (DirectorySizesHolder.Restore(this)); the holder is deleted - see
+    // the matching note in files_window_delete_email.cpp.
 
     //  TRACE_I("ReadDirectory: end");
     return TRUE;
@@ -1786,34 +1779,36 @@ void CFilesWindow::SortDirectory(CFilesArray* files, CFilesArray* dirs)
 
 #ifndef _WIN64
 
-BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, const char* redirectedDirLastComp,
-                             char* winDir, char* winDirEnd, char** lastSubDir, BOOL failIfDirWithSameNameExists)
+BOOL IsWin64RedirectedDirAux(const wchar_t* subDir, const wchar_t* redirectedDir, const wchar_t* redirectedDirLastComp,
+                             const std::wstring& windowsPrefix, std::wstring* completedPath, BOOL failIfDirWithSameNameExists)
 {
     if (IsTheSamePath(subDir, redirectedDir))
     {
-        strcpy(winDirEnd, redirectedDir);
+        std::wstring probe = windowsPrefix;
+        probe.append(redirectedDir);
 
         WIN32_FIND_DATAW find;
         HANDLE h;
         if (failIfDirWithSameNameExists)
         {
-            h = SalFindFirstFileHW(winDir, &find);
+            h = SalFindFirstFileHW(probe.c_str(), &find);
             if (h != INVALID_HANDLE_VALUE)
             {
-                HANDLES(FindClose(h));
+                SalLPFindClose(h);
                 return FALSE; // this is not just a pseudo-directory, there is a directory with the same name, which means that e.g. context menu will work more or less normally
             }
         }
 
-        strcat(winDirEnd, "\\*");
-        h = SalFindFirstFileHW(winDir, &find);
+        probe.append(L"\\*");
+        h = SalFindFirstFileHW(probe.c_str(), &find);
         if (h != INVALID_HANDLE_VALUE)
         {
-            HANDLES(FindClose(h));
-            if (lastSubDir != NULL)
+            SalLPFindClose(h);
+            if (completedPath != NULL)
             {
-                strcpy(*lastSubDir + 1, redirectedDirLastComp != NULL ? redirectedDirLastComp : redirectedDir);
-                *lastSubDir += strlen(*lastSubDir);
+                const size_t lastSlash = completedPath->find_last_of(L'\\');
+                completedPath->resize(lastSlash == std::wstring::npos ? 0 : lastSlash + 1);
+                completedPath->append(redirectedDirLastComp != NULL ? redirectedDirLastComp : redirectedDir);
             }
             return TRUE;
         }
@@ -1821,25 +1816,24 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
     return FALSE;
 }
 
-BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists)
+BOOL IsWin64RedirectedDir(const wchar_t* path, std::wstring* completedPath, BOOL failIfDirWithSameNameExists)
 {
-    if (Windows64Bit && *WindowsDirectory != 0)
+    if (Windows64Bit && !WindowsDirectory.empty())
     {
-        CPathBuffer winDir; // Heap-allocated for long path support
-        strcpy(winDir, WindowsDirectory);
-        int len = (int)strlen(winDir);
-        if (len > 0 && winDir[len - 1] != '\\')
-            strcpy(winDir + len++, "\\");
-        if (StrNICmp(winDir, path, len) == 0)
+        std::wstring windowsPrefix = WindowsDirectory;
+        if (windowsPrefix.back() != L'\\')
+            windowsPrefix.push_back(L'\\');
+        const size_t len = windowsPrefix.length();
+        if (_wcsnicmp(windowsPrefix.c_str(), path, len) == 0)
         {
-            const char* subDir = path + len;
-            if (IsWin64RedirectedDirAux(subDir, "Sysnative", NULL, winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\catroot", "catroot", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\catroot2", "catroot2", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                Windows7AndLater && IsWin64RedirectedDirAux(subDir, "system32\\DriverStore", "DriverStore", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\drivers\\etc", "etc", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\LogFiles", "LogFiles", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\spool", "spool", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists))
+            const wchar_t* subDir = path + len;
+            if (IsWin64RedirectedDirAux(subDir, L"Sysnative", NULL, windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                IsWin64RedirectedDirAux(subDir, L"system32\\catroot", L"catroot", windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                IsWin64RedirectedDirAux(subDir, L"system32\\catroot2", L"catroot2", windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                Windows7AndLater && IsWin64RedirectedDirAux(subDir, L"system32\\DriverStore", L"DriverStore", windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                IsWin64RedirectedDirAux(subDir, L"system32\\drivers\\etc", L"etc", windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                IsWin64RedirectedDirAux(subDir, L"system32\\LogFiles", L"LogFiles", windowsPrefix, completedPath, failIfDirWithSameNameExists) ||
+                IsWin64RedirectedDirAux(subDir, L"system32\\spool", L"spool", windowsPrefix, completedPath, failIfDirWithSameNameExists))
             {
                 return TRUE;
             }
@@ -1848,13 +1842,12 @@ BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWit
     return FALSE;
 }
 
-BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir, BOOL onlyAdded)
+BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, std::wstring& redirectedDir, BOOL onlyAdded)
 {
-    redirectedDir[0] = 0;
-    if (Windows64Bit && *WindowsDirectory != 0)
+    redirectedDir.clear();
+    if (Windows64Bit && !WindowsDirectory.empty())
     {
-        CPathBuffer path(panel->GetPath());
-        char* pathEnd = path + strlen(path);
+        const std::wstring panelPath = panel->GetPathW();
         int i;
         for (i = 0; i < count; i++)
         {
@@ -1863,11 +1856,11 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
                 CFileData* dir = &panel->Dirs->At(indexes[i]);
                 if (dir->IsLink) // all pseudo-directories have IsLink set
                 {
-                    *pathEnd = 0;
-                    if (SalPathAppend(path, dir->Name, path.Size()) &&
-                        IsWin64RedirectedDir(path, NULL, onlyAdded))
+                    std::wstring path = panelPath;
+                    SalPathAppendW(path, dir->Name);
+                    if (IsWin64RedirectedDir(path.c_str(), NULL, onlyAdded))
                     {
-                        lstrcpyn(redirectedDir, dir->Name, MAX_PATH);
+                        redirectedDir = dir->Name;
                         return TRUE;
                     }
                 }
@@ -1877,16 +1870,16 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
     return FALSE;
 }
 
-BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* redirectedDirPrefix,
-                              const char* redirectedDirLastComp, CFilesArray* dirs,
-                              WIN32_FIND_DATA* fileData, BOOL* dirWithSameNameExists)
+BOOL AddWin64RedirectedDirAux(const wchar_t* path, const wchar_t* subDir, const wchar_t* redirectedDirPrefix,
+                              const wchar_t* redirectedDirLastComp, CFilesArray* dirs,
+                              WIN32_FIND_DATAW* fileData, BOOL* dirWithSameNameExists)
 {
     if (IsTheSamePath(subDir, redirectedDirPrefix))
     {
         int deleteIndex = -1;
         int i;
         for (i = 0; i < dirs->Count; i++)
-            if (StrICmp(dirs->At(i).Name, redirectedDirLastComp) == 0)
+            if (StrICmpW(dirs->At(i).Name, redirectedDirLastComp) == 0)
             {
                 if (dirs->At(i).IsLink)
                     return FALSE; // this redirected-dir is already added
@@ -1894,13 +1887,14 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                 break;
             }
 
-        CPathBuffer findPath(path);
-        if (SalPathAppend(findPath, redirectedDirLastComp, findPath.Size()) &&
-            SalPathAppend(findPath, "*", findPath.Size()))
+        std::wstring findPath(path);
+        SalPathAppendW(findPath, redirectedDirLastComp);
+        SalPathAppendW(findPath, L"*");
+        if (!findPath.empty())
         {
             HANDLE h;
             WIN32_FIND_DATAW fileDataW;
-            h = SalFindFirstFileHW(findPath, &fileDataW); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
+            h = SalFindFirstFileHW(findPath.c_str(), &fileDataW); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
             if (h != INVALID_HANDLE_VALUE)
             {
                 BOOL found = FALSE;
@@ -1909,36 +1903,36 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                     if (wcscmp(fileDataW.cFileName, L"..") == 0 &&
                         (fileDataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // "." directory
                     {
-                        // Copy non-name fields to caller's ANSI struct (name fields are overwritten below)
+                        // Copy non-name fields; name fields are overwritten below.
                         fileData->dwFileAttributes = fileDataW.dwFileAttributes;
                         fileData->ftCreationTime = fileDataW.ftCreationTime;
                         fileData->ftLastAccessTime = fileDataW.ftLastAccessTime;
                         fileData->ftLastWriteTime = fileDataW.ftLastWriteTime;
                         fileData->nFileSizeHigh = fileDataW.nFileSizeHigh;
                         fileData->nFileSizeLow = fileDataW.nFileSizeLow;
+                        fileData->dwReserved0 = fileDataW.dwReserved0;
+                        fileData->dwReserved1 = fileDataW.dwReserved1;
                         found = TRUE;
                         break;
                     }
                 } while (SalLPFindNextFile(h, &fileDataW));
-                HANDLES(FindClose(h));
+                SalLPFindClose(h);
                 if (found)
                 {
                     if (deleteIndex != -1)
                         dirs->Delete(deleteIndex); // there's is a directory here, we will delete it, redirected-dir has priority (redirector ignores this directory)
-                    lstrcpyn(fileData->cFileName, redirectedDirLastComp, MAX_PATH);
+                    lstrcpynW(fileData->cFileName, redirectedDirLastComp, _countof(fileData->cFileName));
                     fileData->cAlternateFileName[0] = 0;
 
-                    if (CutDirectory(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
+                    if (CutDirectoryW(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
                     {
                         WIN32_FIND_DATAW fd;
-                        h = SalFindFirstFileHW(findPath, &fd);
+                        h = SalFindFirstFileHW(findPath.c_str(), &fd);
                         if (h != INVALID_HANDLE_VALUE)
                         {
-                            HANDLES(FindClose(h));
-                            char cFileNameA[MAX_PATH];
-                            WideCharToMultiByte(CP_ACP, 0, fd.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
+                            SalLPFindClose(h);
                             if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
-                                StrICmp(cFileNameA, redirectedDirLastComp) == 0)
+                                StrICmpW(fd.cFileName, redirectedDirLastComp) == 0)
                             {
                                 *dirWithSameNameExists = TRUE;
                             }
@@ -1953,29 +1947,28 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
     return FALSE;
 }
 
-BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA* fileData,
+BOOL AddWin64RedirectedDir(const wchar_t* path, CFilesArray* dirs, WIN32_FIND_DATAW* fileData,
                            int* index, BOOL* dirWithSameNameExists)
 {
     *dirWithSameNameExists = FALSE;
-    if (Windows64Bit && *WindowsDirectory != 0)
+    if (Windows64Bit && !WindowsDirectory.empty())
     {
-        CPathBuffer winDir; // Heap-allocated for long path support
-        strcpy(winDir, WindowsDirectory);
-        int len = (int)strlen(winDir);
-        if (len > 0 && winDir[len - 1] != '\\')
-            strcpy(winDir + len++, "\\");
-        if ((int)strlen(path) + 1 == len)
-            winDir[--len] = 0; // patch due to path == win-dir (discard ending backslash)
-        if (StrNICmp(winDir, path, len) == 0)
+        std::wstring windowsPrefix = WindowsDirectory;
+        if (windowsPrefix.back() != L'\\')
+            windowsPrefix.push_back(L'\\');
+        size_t len = windowsPrefix.length();
+        if (wcslen(path) + 1 == len)
+            windowsPrefix.resize(--len); // patch due to path == win-dir (discard ending backslash)
+        if (_wcsnicmp(windowsPrefix.c_str(), path, len) == 0)
         {
-            const char* subDir = path + len;
-            if (*index == 0 && AddWin64RedirectedDirAux(path, subDir, "", "Sysnative", dirs, fileData, dirWithSameNameExists) ||
-                *index == 0 && AddWin64RedirectedDirAux(path, subDir, "system32\\drivers", "etc", dirs, fileData, dirWithSameNameExists) ||
-                *index == 0 && AddWin64RedirectedDirAux(path, subDir, "system32", "catroot", dirs, fileData, dirWithSameNameExists) ||
-                *index <= 1 && AddWin64RedirectedDirAux(path, subDir, "system32", "catroot2", dirs, fileData, dirWithSameNameExists) && (*index = 1) != 0 ||
-                *index <= 2 && AddWin64RedirectedDirAux(path, subDir, "system32", "LogFiles", dirs, fileData, dirWithSameNameExists) && (*index = 2) != 0 ||
-                *index <= 3 && AddWin64RedirectedDirAux(path, subDir, "system32", "spool", dirs, fileData, dirWithSameNameExists) && (*index = 3) != 0 ||
-                Windows7AndLater && *index <= 4 && AddWin64RedirectedDirAux(path, subDir, "system32", "DriverStore", dirs, fileData, dirWithSameNameExists) && (*index = 4) != 0)
+            const wchar_t* subDir = path + len;
+            if (*index == 0 && AddWin64RedirectedDirAux(path, subDir, L"", L"Sysnative", dirs, fileData, dirWithSameNameExists) ||
+                *index == 0 && AddWin64RedirectedDirAux(path, subDir, L"system32\\drivers", L"etc", dirs, fileData, dirWithSameNameExists) ||
+                *index == 0 && AddWin64RedirectedDirAux(path, subDir, L"system32", L"catroot", dirs, fileData, dirWithSameNameExists) ||
+                *index <= 1 && AddWin64RedirectedDirAux(path, subDir, L"system32", L"catroot2", dirs, fileData, dirWithSameNameExists) && (*index = 1) != 0 ||
+                *index <= 2 && AddWin64RedirectedDirAux(path, subDir, L"system32", L"LogFiles", dirs, fileData, dirWithSameNameExists) && (*index = 2) != 0 ||
+                *index <= 3 && AddWin64RedirectedDirAux(path, subDir, L"system32", L"spool", dirs, fileData, dirWithSameNameExists) && (*index = 3) != 0 ||
+                Windows7AndLater && *index <= 4 && AddWin64RedirectedDirAux(path, subDir, L"system32", L"DriverStore", dirs, fileData, dirWithSameNameExists) && (*index = 4) != 0)
             {
                 return TRUE;
             }
@@ -1986,29 +1979,35 @@ BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA*
 
 #endif // _WIN64
 
-BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const char* suggestedFocusName,
+BOOL CFilesWindow::ChangeDir(const wchar_t* newDir, int suggestedTopIndex, const wchar_t* suggestedFocusName,
                              int mode, int* failReason, BOOL convertFSPathToInternal, BOOL showNewDirPathInErrBoxes)
 {
-    CALL_STACK_MESSAGE7("CFilesWindow::ChangeDir(%s, %d, %s, %d, , %d, %d)", newDir, suggestedTopIndex,
+    CALL_STACK_MESSAGE7("CFilesWindow::ChangeDir(%ls, %d, %ls, %d, , %d, %d)", newDir, suggestedTopIndex,
                         suggestedFocusName, mode, convertFSPathToInternal, showNewDirPathInErrBoxes);
 
-    // backup the string (it could change during execution - e.g. Name from CFileData from panel)
-    CPathBuffer backup; // Heap-allocated for long path support
+    // Back up arguments that may point into panel state changed during this operation.
+    std::wstring newDirOwner;
+    if (newDir != NULL)
+    {
+        newDirOwner = newDir;
+        newDir = newDirOwner.c_str();
+    }
+    std::wstring suggestedFocusNameOwner;
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, backup.Size());
-        suggestedFocusName = backup;
+        suggestedFocusNameOwner = suggestedFocusName;
+        suggestedFocusName = suggestedFocusNameOwner.c_str();
     }
 
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
-    CPathBuffer absFSPath;
-    CPathBuffer path;
-    CPathBuffer errBuf;
-    GetGeneralPath(path, path.Size(), TRUE);
+    std::wstring absFSPath;
+    std::wstring path;
+    std::wstring errBuf;
     BOOL sendDirectlyToPlugin = FALSE;
-    CChangeDirDlg dlg(HWindow, path, path.Size(), MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
-    // Note: don't call SetUnicodePath for normal ANSI paths — it creates an
-    // overlay edit that breaks combobox focus. Only use for true Unicode paths.
+    std::wstring pathW;
+    GetGeneralPath(pathW, TRUE);
+    path = pathW;
+    CChangeDirDlg dlg(HWindow, pathW, MainWindow->GetActivePanel()->Is(ptPluginFS) ? &sendDirectlyToPlugin : NULL);
 
     // refresh DefaultDir
     MainWindow->UpdateDefaultDir(TRUE);
@@ -2025,11 +2024,9 @@ CHANGE_AGAIN:
         {
             convertFSPathToInternal = TRUE; // after input from user, conversion to internal format is necessary
             // postprocessing will be done only for path, which is not to be sent directly to plugin
-            CPathBuffer tempPathBuff;  // Heap-allocated for long path support
-            lstrcpyn(tempPathBuff, path, tempPathBuff.Size());
-            if (!sendDirectlyToPlugin && !PostProcessPathFromUser(HWindow, tempPathBuff))
+            if (!sendDirectlyToPlugin && !PostProcessPathFromUserW(HWindow, pathW))
                 goto CHANGE_AGAIN;
-            lstrcpyn(path, tempPathBuff, path.Size());
+            path = pathW;
         }
         BOOL sendDirectlyToPluginLocal = sendDirectlyToPlugin;
         TopIndexMem.Clear(); // long jump
@@ -2038,41 +2035,29 @@ CHANGE_AGAIN:
 
         UpdateWindow(MainWindow->HWindow);
         if (newDir != NULL)
-            lstrcpyn(path, newDir, path.Size());
+            path = newDir;
         else // focus and top-index setting won't be done for path from dialog
         {
             suggestedTopIndex = -1;
             suggestedFocusName = NULL;
         }
 
-        CPathBuffer fsName;
-        char* fsUserPart;
-        if (!sendDirectlyToPluginLocal && IsPluginFSPath(path, fsName, (const char**)&fsUserPart))
+        std::wstring fsName;
+        const wchar_t* fsUserPart;
+        if (!sendDirectlyToPluginLocal && IsPluginFSPath(path.c_str(), &fsName, &fsUserPart))
         {
-            if (strlen(fsUserPart) >= MAX_PATH) // plugins do not count with longer path
-            {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_TOOLONGPATH));
-                gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
-                if (newDir != NULL)
-                {
-                    if (useStopRefresh)
-                        EndStopRefresh(); // snooper will be started again
-                    if (failReason != NULL)
-                        *failReason = CHPPFR_INVALIDPATH;
-                    return FALSE; // we're finished, it can't be repeated
-                }
-                goto CHANGE_AGAIN;
-            }
+            const size_t fsUserPartOffset = (size_t)(fsUserPart - path.c_str());
+            std::wstring fsUserPartOwner = fsUserPart;
             int index;
             int fsNameIndex;
-            if (Plugins.IsPluginFS(fsName, index, fsNameIndex))
+            if (Plugins.IsPluginFS(fsName.c_str(), index, fsNameIndex))
             {
                 BOOL pluginFailure = FALSE;
                 if (convertFSPathToInternal) // convert path to internal format
                 {
                     CPluginData* plugin = Plugins.Get(index);
                     if (plugin != NULL && plugin->InitDLL(MainWindow->HWindow, FALSE, TRUE, TRUE)) // plugin does not have to be loaded, in which case we let it load
-                        plugin->GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart);
+                        plugin->GetPluginInterfaceForFS()->ConvertPathToInternalW(fsName.c_str(), fsNameIndex, fsUserPartOwner);
                     else
                     {
                         pluginFailure = TRUE;
@@ -2093,18 +2078,18 @@ CHANGE_AGAIN:
                 int fsNameIndexDummy;
                 BOOL convertPathToInternalDummy = FALSE;
                 if (!Is(ptPluginFS) || // FS interface in the panel cannot list the path (ChangePathToPluginFS opens a new FS)
-                    !IsPathFromActiveFS(fsName, fsUserPart, fsNameIndexDummy, convertPathToInternalDummy))
+                    !IsPathFromActiveFS(fsName.c_str(), fsUserPartOwner, fsNameIndexDummy, convertPathToInternalDummy))
                 {
                     CDetachedFSList* list = MainWindow->DetachedFSList;
                     int i;
                     for (i = 0; i < list->Count; i++)
                     {
-                        if (list->At(i)->IsPathFromThisFS(fsName, fsUserPart))
+                        if (list->At(i)->IsPathFromThisFS(fsName.c_str(), fsUserPartOwner.c_str()))
                         {
                             done = TRUE;
                             // trying to change to needed path, at the same time we will connect the detached FS
                             ret = ChangePathToDetachedFS(i, suggestedTopIndex, suggestedFocusName, TRUE,
-                                                         &localFailReason, fsName, fsUserPart, mode, mode == 3);
+                                                         &localFailReason, fsName.c_str(), fsUserPartOwner.c_str(), mode, mode == 3);
 
                             break;
                         }
@@ -2113,7 +2098,7 @@ CHANGE_AGAIN:
 
                 if (!pluginFailure && !done)
                 {
-                    ret = ChangePathToPluginFS(fsName, fsUserPart, suggestedTopIndex, suggestedFocusName,
+                    ret = ChangePathToPluginFS(fsName.c_str(), fsUserPartOwner.c_str(), suggestedTopIndex, suggestedFocusName,
                                                FALSE, mode, NULL, TRUE, &localFailReason, FALSE, mode == 3);
                 }
                 else
@@ -2130,9 +2115,11 @@ CHANGE_AGAIN:
                     // convert path to external format
                     CPluginData* plugin = Plugins.Get(index);
                     if (!pluginFailure && plugin != NULL && plugin->InitDLL(MainWindow->HWindow, FALSE, TRUE, FALSE)) // plugin does not have to be loaded, in which case we let it load
-                        plugin->GetPluginInterfaceForFS()->ConvertPathToExternal(fsName, fsNameIndex, fsUserPart);
+                        plugin->GetPluginInterfaceForFS()->ConvertPathToExternalW(fsName.c_str(), fsNameIndex, fsUserPartOwner);
                     // else TRACE_E("Unexpected situation (2) in CFilesWindow::ChangeDir()");  // if the plugin is blocked by the user (if the registration key is missing)
 
+                    pathW.assign(path, 0, fsUserPartOffset);
+                    pathW += fsUserPartOwner;
                     goto CHANGE_AGAIN; // returning back to the dialog for entering the path
                 }
                 else
@@ -2146,7 +2133,7 @@ CHANGE_AGAIN:
             }
             else
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_NOTPLUGINFS));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), path.c_str(), LoadStrW(IDS_NOTPLUGINFS));
                 gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                 if (newDir != NULL)
                 {
@@ -2156,6 +2143,7 @@ CHANGE_AGAIN:
                         *failReason = CHPPFR_INVALIDPATH;
                     return FALSE; // finished, cannot be repeated
                 }
+                pathW = path;
                 goto CHANGE_AGAIN;
             }
         }
@@ -2167,13 +2155,16 @@ CHANGE_AGAIN:
                  Is(ptDisk) || Is(ptZIPArchive)))                                              // disk+archive of the relative path
             {                                                                                  // this is a disk path (absolute or relative) - turn all '/' to '\\' + remove duplicated '\\'
                 SlashesToBackslashesAndRemoveDups(path);
+                path.resize(wcslen(path.c_str()));
             }
 
             int errTextID;
-            const char* text = NULL;                 // caution: textFailReason must be set
+            // Wide - text's only real consumer is the final error message
+            // below; pathForMsg/path/newDir (the rest of this function's narrow buffers,
+            // out of scope) are untouched.
+            std::wstring text;                       // caution: textFailReason must be set
             int textFailReason = CHPPFR_INVALIDPATH; // if text != NULL, it contains the code of error which occurred
-            CPathBuffer curPath;
-            curPath[0] = 0;
+            std::wstring curPath;
             if (sendDirectlyToPluginLocal)
                 errTextID = IDS_INCOMLETEFILENAME;
             else
@@ -2182,26 +2173,34 @@ CHANGE_AGAIN:
                 //        if (!SalGetFullName(path, &errTextID, (MainWindow->GetActivePanel()->Is(ptDisk) ||
                 //                            MainWindow->GetActivePanel()->Is(ptZIPArchive)) ? curPath : NULL))
                 if (Is(ptDisk) || Is(ptZIPArchive))
-                    GetGeneralPath(curPath, curPath.Size()); // because of FTP plugin - relative path in "target panel path" when connecting
+                    GetGeneralPath(curPath); // because of FTP plugin - relative path in "target panel path" when connecting
             }
             BOOL callNethood = FALSE;
-            if (sendDirectlyToPluginLocal ||
-                !SalGetFullName(path, &errTextID, (Is(ptDisk) || Is(ptZIPArchive)) ? (const char*)curPath : NULL, NULL,
-                                &callNethood, path.Size()))
+            std::wstring resolvedPath = path;
+            // sendDirectlyToPluginLocal short-circuits SalGetFullNameW entirely, same as the
+            // original narrow call - resolvedPath stays an unchanged copy of 'path' in that case.
+            BOOL enterFailureBlock = sendDirectlyToPluginLocal ||
+                                     !SalGetFullNameW(resolvedPath, &errTextID, (Is(ptDisk) || Is(ptZIPArchive)) ? curPath.c_str() : NULL, NULL,
+                                                      &callNethood);
+            path = std::move(resolvedPath); // sync back regardless of outcome, matching SalGetFullName's in-place-mutate contract
+            if (enterFailureBlock)
             {
                 sendDirectlyToPluginLocal = FALSE;
                 if ((errTextID == IDS_SERVERNAMEMISSING || errTextID == IDS_SHARENAMEMISSING) && callNethood)
                 { // incomplete UNC path will be given to the first plugin which supports FS and called SalamanderGeneral->SetPluginIsNethood()
-                    if (Plugins.GetFirstNethoodPluginFSName(absFSPath))
+                    std::wstring nethoodFSName;
+                    if (Plugins.GetFirstNethoodPluginFSName(&nethoodFSName))
                     {
-                        if (strlen(absFSPath) + 1 < (size_t)absFSPath.Size())
-                            strcat(absFSPath, ":");
-                        if (strlen(absFSPath) + strlen(path) < (size_t)absFSPath.Size())
-                            strcat(absFSPath, path);
+                        nethoodFSName += L':';
+                        nethoodFSName += path;
+                        absFSPath = std::move(nethoodFSName);
                         if (newDir != NULL)
-                            newDir = absFSPath; // in case that the path is entered from outside
+                        {
+                            newDirOwner = absFSPath;
+                            newDir = newDirOwner.c_str(); // in case the path is entered from outside
+                        }
                         else
-                            strcpy(path, absFSPath);
+                            path = absFSPath;
                         goto CHANGE_AGAIN_NO_DLG; // try to open the incomplete UNC path in the plugin
                     }
                 }
@@ -2219,25 +2218,22 @@ CHANGE_AGAIN:
                         MainWindow->GetActivePanel()->GetPluginFS()->NotEmpty())
                     {
                         BOOL success = TRUE;
-                        if ((int)strlen(path) < absFSPath.Size())
-                            strcpy(absFSPath, path);
-                        else
-                        {
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_TOOLONGPATH));
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
-                            success = FALSE;
-                        }
-                        if (!success ||
-                            MainWindow->GetActivePanel()->GetPluginFS()->GetFullFSPath(HWindow,
-                                                                                       MainWindow->GetActivePanel()->GetPluginFS()->GetPluginFSName(),
-                                                                                       absFSPath, MAX_PATH, success))
+                        absFSPath = path;
+                        const BOOL haveAbsoluteFSPath =
+                            MainWindow->GetActivePanel()->GetPluginFS()->GetFullFSPathW(
+                                HWindow, MainWindow->GetActivePanel()->GetPluginFS()->GetPluginFSName(),
+                                absFSPath, success);
+                        if (!success || haveAbsoluteFSPath)
                         {
                             if (success) // we have the absolute path
                             {
                                 if (newDir != NULL)
-                                    newDir = absFSPath; // in case that the path is entered from outside
+                                {
+                                    newDirOwner = absFSPath;
+                                    newDir = newDirOwner.c_str(); // in case the path is entered from outside
+                                }
                                 else
-                                    strcpy(path, absFSPath);
+                                    path = absFSPath;
                                 convertFSPathToInternal = FALSE; // the path is already in internal format, so we must not convert it to internal format again
                                 goto CHANGE_AGAIN_NO_DLG;        // let's try the entered absolute path
                             }
@@ -2251,23 +2247,24 @@ CHANGE_AGAIN:
                                         *failReason = CHPPFR_INVALIDPATH;
                                     return FALSE; // finished, cannot be repeated
                                 }
+                                pathW = path;
                                 goto CHANGE_AGAIN; // show the path in dialog again, so that the user can correct it
                             }
                         }
                     }
                 }
-                text = LoadStr(errTextID);
+                text = LoadStrW(errTextID);
                 textFailReason = CHPPFR_INVALIDPATH;
             }
             BOOL showErr = TRUE;
-            if (text == NULL)
+            if (text.empty())
             {
-                if (*path != 0 && path[1] == ':')
-                    path[0] = UpperCase[path[0]]; // "c:" path will be "C:"
-                CPathBuffer copy;
-                int len = GetRootPath(copy, path);
+                if (!path.empty() && path.size() > 1 && path[1] == L':')
+                    path[0] = towupper(path[0]); // "c:" path will be "C:"
+                std::wstring copy = GetRootPath(path.c_str());
+                int len = static_cast<int>(copy.size());
 
-                if (!CheckAndRestorePath(copy))
+                if (!CheckAndRestorePath(copy.c_str()))
                 {
                     if (newDir != NULL)
                     {
@@ -2277,39 +2274,27 @@ CHANGE_AGAIN:
                             *failReason = CHPPFR_INVALIDPATH;
                         return FALSE; // finished, cannot be repeated
                     }
+                    pathW = path;
                     goto CHANGE_AGAIN;
                 }
 
-                if (len < (int)strlen(path)) // not a root path
+                if (len > 0 && len < static_cast<int>(path.size())) // not a root path
                 {
-                    char* s = path + len - 1;     // where to copy from (points to '\\')
-                    char* end = s;                // the end of the copied part
-                    char* st = copy + (s - path); // where to copy to
-                    while (*end != 0)
+                    size_t end = static_cast<size_t>(len - 1); // points to '\\'
+                    copy.resize(end);
+                    size_t writeStart = end;
+                    while (end < path.size())
                     {
-                        while (*++end != 0 && *end != '\\')
-                            ;
-                        memcpy(st, s, end - s);
-                        st[end - s] = 0;
-                        s = end;
+                        writeStart = AppendNextPathComponentW(path, end, copy);
 
                     _TRY_AGAIN:
 
                         BOOL pathEndsWithSpaceOrDot;
                         DWORD copyAttr;
-                        int copyLen;
-                        copyLen = (int)strlen(copy);
-                        if (copyLen >= copy.Size() - 1)
-                        {
-                            if (*end != 0 && !SalPathAppend(copy, end + 1, copy.Size())) // if the so far processed part of the path is enlengthened and the rest of the path does not fit, we will use the original form of the path
-                                strcpy(copy, path);
-                            text = LoadStr(IDS_TOOLONGPATH);
-                            textFailReason = CHPPFR_INVALIDPATH;
-                            break;
-                        }
+                        const int copyLen = static_cast<int>(copy.size());
                         if (copyLen > 0 && (copy[copyLen - 1] <= ' ' || copy[copyLen - 1] == '.'))
                         {
-                            copyAttr = GetFileAttributesW(AnsiToWide(copy).c_str());
+                            copyAttr = gFileSystem->GetFileAttributes(copy.c_str());
                             pathEndsWithSpaceOrDot = copyAttr != INVALID_FILE_ATTRIBUTES;
                         }
                         else
@@ -2320,7 +2305,7 @@ CHANGE_AGAIN:
                         WIN32_FIND_DATAW find;
                         HANDLE h;
                         if (!pathEndsWithSpaceOrDot)
-                            h = SalFindFirstFileHW(copy, &find);
+                            h = SalFindFirstFileHW(copy.c_str(), &find);
                         else
                             h = INVALID_HANDLE_VALUE;
                         DWORD err;
@@ -2331,66 +2316,49 @@ CHANGE_AGAIN:
                                 err != ERROR_BAD_PATHNAME && err != ERROR_INVALID_NAME)
                             { // if there's chance that the path contains a directory to which we don't have access (we will try if there are other components of the path accessible)
                                 DWORD firstErr = err;
-                                char* firstCopyEnd = st + strlen(st);
-                                while (*end != 0)
+                                const size_t firstCopyEnd = copy.size();
+                                while (end < path.size())
                                 {
-                                    st += strlen(st); // the inaccessible component of the path will be only copied (it can remain as dos-name or with different letter size)
-                                    while (*++end != 0 && *end != '\\')
-                                        ;
-                                    memcpy(st, s, end - s);
-                                    st[end - s] = 0;
-                                    s = end;
-                                    if ((int)strlen(copy) >= copy.Size() - 1) // too long path, we're finished...
-                                    {
-                                        h = INVALID_HANDLE_VALUE;
-                                        break;
-                                    }
-                                    else
-                                    {
-                                        h = SalFindFirstFileHW(copy, &find);
-                                        if (h != INVALID_HANDLE_VALUE)
-                                            break; // we've found an accessible component, continuing...
-                                        err = GetLastError();
-                                        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND ||
-                                            err == ERROR_BAD_PATHNAME || err == ERROR_INVALID_NAME)
-                                            break; // an error in the path, we're finished...
-                                    }
+                                    writeStart = AppendNextPathComponentW(path, end, copy); // preserve inaccessible components verbatim
+                                    h = SalFindFirstFileHW(copy.c_str(), &find);
+                                    if (h != INVALID_HANDLE_VALUE)
+                                        break; // we've found an accessible component, continuing...
+                                    err = GetLastError();
+                                    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND ||
+                                        err == ERROR_BAD_PATHNAME || err == ERROR_INVALID_NAME)
+                                        break; // an error in the path, we're finished...
                                 }
-                                if (*end == 0 && h == INVALID_HANDLE_VALUE) // another accessible component not found, we will try if the current path can be listed
+                                if (end == path.size() && h == INVALID_HANDLE_VALUE) // another accessible component not found, try listing the current path
                                 {
-                                    if ((int)strlen(copy) < copy.Size() - 10 && SalPathAppend(copy, "*.*", copy.Size()))
+                                    std::wstring probe = copy;
+                                    SalPathAppendW(probe, L"*.*");
+                                    h = SalFindFirstFileHW(probe.c_str(), &find);
+                                    if (h != INVALID_HANDLE_VALUE) // the path can be listed
                                     {
-                                        h = SalFindFirstFileHW(copy, &find);
-                                        CutDirectory(copy);
-                                        if (h != INVALID_HANDLE_VALUE) // the path can be listed
-                                        {
-                                            HANDLES(FindClose(h));
+                                        SalLPFindClose(h);
 
-                                            // changing the path to absolute windows path
-                                            BOOL ret = ChangePathToDisk(HWindow, copy, suggestedTopIndex, suggestedFocusName,
-                                                                        NULL, TRUE, FALSE, FALSE, failReason);
-                                            if (useStopRefresh)
-                                                EndStopRefresh(); // snooper will be started again
-                                            return ret;
-                                        }
+                                        // changing the path to absolute windows path
+                                        BOOL ret = ChangePathToDisk(HWindow, copy.c_str(), suggestedTopIndex, suggestedFocusName,
+                                                                    NULL, TRUE, FALSE, FALSE, failReason);
+                                        if (useStopRefresh)
+                                            EndStopRefresh(); // snooper will be started again
+                                        return ret;
                                     }
                                 }
                                 if (h == INVALID_HANDLE_VALUE) // accessible part of the path not found, we will report the first found error
                                 {
                                     err = firstErr;
-                                    *firstCopyEnd = 0;
-
-                                    // not used, but we'd better zero them, so that it immediately crashes in case of a new code and it's figured out...
-                                    st = NULL;
-                                    end = NULL;
-                                    s = NULL;
+                                    copy.resize(firstCopyEnd);
                                 }
                             }
 #ifndef _WIN64
                             else
                             {
-                                if (IsWin64RedirectedDir(copy, &st, FALSE))
+                                if (IsWin64RedirectedDir(copy.c_str(), &copy, FALSE))
+                                {
+                                    writeStart = copy.size();
                                     continue;
+                                }
                             }
 #endif // _WIN64
                         }
@@ -2399,67 +2367,57 @@ CHANGE_AGAIN:
                         {
                             if (h != INVALID_HANDLE_VALUE)
                             {
-                                HANDLES(FindClose(h));
-                                char cFileNameA[MAX_PATH];
-                                WideCharToMultiByte(CP_ACP, 0, find.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                                int len2 = (int)strlen(cFileNameA); // must fit (only the size of letters is changed - result of FindFirstFile)
-                                if ((int)strlen(st + 1) != len2)    // it does e.g. for "aaa  " returns "aaa", reproduce: Paste (text without quotes): "   "   %TEMP%\aaa   "   "
+                                SalLPFindClose(h);
+                                // find.cFileName and 'copy'/'st' are both wide now; the
+                                // former ANSI round-trip here was purely vestigial (both sides were
+                                // already the same domain) - compare/copy find.cFileName directly.
+                                int len2 = (int)wcslen(find.cFileName); // must fit (only the size of letters is changed - result of FindFirstFile)
+                                const std::wstring originalComponent = copy.substr(writeStart + 1);
+                                if (static_cast<int>(originalComponent.size()) != len2) // e.g. "aaa  " returns "aaa"
                                 {
                                     TRACE_E("CFilesWindow::ChangeDir(): unexpected situation: FindFirstFile returned name with "
                                             "different length: \""
-                                            << cFileNameA << "\" for \"" << (st + 1) << "\"");
+                                            << sally::diagnostic::EncodeAcpLossy(find.cFileName) << "\" for \""
+                                            << sally::diagnostic::EncodeAcpLossy(originalComponent) << "\"");
                                 }
-                                memcpy(st + 1, cFileNameA, len2);
-                                st += 1 + len2;
-                                *st = 0;
+                                ReplacePathComponentW(copy, writeStart, find.cFileName);
+                                writeStart = copy.size();
                             }
                             else
-                                st += strlen(st);
+                                writeStart = copy.size();
 
                             // copy containts the "translated" path
                             if (!pathEndsWithSpaceOrDot)
                                 copyAttr = find.dwFileAttributes;
                             if ((copyAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                             { // file -> is it an archive?
-                                if (PackerFormatConfig.PackIsArchive(copy))
+                                if (PackerFormatConfig.PackIsArchive(copy.c_str()))
                                 {
-                                    if ((int)strlen(*end != 0 ? end + 1 : end) >= MAX_PATH) // too long path in archive (plugins expect MAX_PATH)
+                                    const size_t archivePathOffset = end < path.size() ? end + 1 : end;
+                                    const wchar_t* archivePath = path.c_str() + archivePathOffset;
+                                    // changing the path to absolute path to archive
+                                    int localFailReason;
+                                    BOOL ret = ChangePathToArchive(copy.c_str(), archivePath, suggestedTopIndex, suggestedFocusName,
+                                                                   FALSE, NULL, TRUE, &localFailReason, FALSE, TRUE);
+                                    if (!ret && localFailReason == CHPPFR_SHORTERPATH)
                                     {
-                                        if (!SalPathAppend(copy, end + 1, copy.Size())) // if the archive name is enlengthened and the rest of the path does not fit, we will use the original form of the path
-                                            strcpy(copy, path);
-                                        text = LoadStr(IDS_TOOLONGPATH);
-                                        textFailReason = CHPPFR_INVALIDPATH;
-                                        break;
+                                        std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), archivePath);
+                                        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                                     }
-                                    else
-                                    {
-                                        if (*end != 0)
-                                            end++;
-                                        // changing the path to absolute path to archive
-                                        int localFailReason;
-                                        BOOL ret = ChangePathToArchive(copy, end, suggestedTopIndex, suggestedFocusName,
-                                                                       FALSE, NULL, TRUE, &localFailReason, FALSE, TRUE);
-                                        if (!ret && localFailReason == CHPPFR_SHORTERPATH)
-                                        {
-                                            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHINARCHIVENOTFOUND), AnsiToWide(end).c_str());
-                                            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
-                                        }
-                                        if (failReason != NULL)
-                                            *failReason = localFailReason;
-                                        if (useStopRefresh)
-                                            EndStopRefresh(); // snooper will be started again
-                                        return ret;
-                                    }
+                                    if (failReason != NULL)
+                                        *failReason = localFailReason;
+                                    if (useStopRefresh)
+                                        EndStopRefresh(); // snooper will be started again
+                                    return ret;
                                 }
                                 else
                                 {
-                                    char* name;
-                                    CPathBuffer shortenedPath((const char*)copy);
-                                    // Note: shortenedPath is initialized from copy in constructor
-                                    if (*end == 0 && CutDirectory(shortenedPath, &name)) // when the path does not end with '\\' (path to file)
+                                    std::wstring shortenedPath = copy;
+                                    std::wstring focusName;
+                                    if (end == path.size() && CutDirectoryW(shortenedPath, &focusName)) // when the path does not end with '\\' (path to file)
                                     {
                                         // change of the path to absolute windows path + focus to the file
-                                        ChangePathToDisk(HWindow, shortenedPath, -1, name, NULL, TRUE, FALSE, FALSE, failReason);
+                                        ChangePathToDisk(HWindow, shortenedPath.c_str(), -1, focusName.c_str(), NULL, TRUE, FALSE, FALSE, failReason);
                                         if (useStopRefresh)
                                             EndStopRefresh(); // snooper will be started again
                                         if (failReason != NULL && *failReason == CHPPFR_SUCCESS)
@@ -2468,7 +2426,7 @@ CHANGE_AGAIN:
                                     }
                                     else
                                     {
-                                        text = LoadStr(IDS_NOTARCHIVEPATH);
+                                        text = LoadStrW(IDS_NOTARCHIVEPATH);
                                         textFailReason = CHPPFR_INVALIDARCHIVE;
                                         break;
                                     }
@@ -2480,17 +2438,16 @@ CHANGE_AGAIN:
                             if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND ||
                                 err == ERROR_BAD_PATHNAME)
                             {
-                                text = LoadStr(IDS_PATHNOTFOUND);
+                                text = LoadStrW(IDS_PATHNOTFOUND);
                             }
                             else
                             {
                                 if (err == ERROR_INVALID_PARAMETER || err == ERROR_NOT_READY)
                                 {
-                                    CPathBuffer drive((const char*)copy);
-                                    // Note: drive is initialized from copy in constructor
-                                    if (CutDirectory(drive))
+                                    std::wstring drive = copy;
+                                    if (CutDirectoryW(drive))
                                     {
-                                        DWORD attrs = GetFileAttributesW(AnsiToWide(drive).c_str());
+                                        DWORD attrs = gFileSystem->GetFileAttributes(drive.c_str());
                                         if (attrs != INVALID_FILE_ATTRIBUTES &&
                                             (attrs & FILE_ATTRIBUTE_DIRECTORY) &&
                                             (attrs & FILE_ATTRIBUTE_REPARSE_POINT))
@@ -2499,29 +2456,31 @@ CHANGE_AGAIN:
                                             if (copy[0] == '\\' && copy[1] == '\\')
                                             {
                                                 drvType = DRIVE_REMOTE;
-                                                GetRootPath(drive, copy);
-                                                drive[strlen(drive) - 1] = 0; // we don't want the last '\\'
+                                                drive = GetRootPath(copy.c_str());
+                                                if (!drive.empty() && drive.back() == L'\\')
+                                                    drive.pop_back();
                                             }
                                             else
                                             {
-                                                drive[0] = copy[0];
-                                                drive[1] = 0;
-                                                drvType = MyGetDriveType(copy);
+                                                drive.assign(1, copy[0]);
+                                                drvType = MyGetDriveTypeW(copy.c_str());
                                             }
                                             if (drvType != DRIVE_REMOTE)
                                             {
-                                                GetCurrentLocalReparsePoint(copy, CheckPathRootWithRetryMsgBox);
-                                                if (strlen(CheckPathRootWithRetryMsgBox) > 3)
+                                                std::wstring currentReparsePoint;
+                                                GetCurrentLocalReparsePointW(copy.c_str(), currentReparsePoint);
+                                                CheckPathRootWithRetryMsgBox = currentReparsePoint;
+                                                if (currentReparsePoint.length() > 3)
                                                 {
-                                                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
-                                                    SalPathRemoveBackslash(drive);
+                                                    drive = currentReparsePoint;
+                                                    SalPathRemoveBackslashW(drive);
                                                 }
                                             }
                                             else
-                                                GetRootPath(CheckPathRootWithRetryMsgBox, copy);
-                                            _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_NODISKINDRIVE), (const char*)drive);
-                                            int msgboxRes = (int)CDriveSelectErrDlg(HWindow, errBuf, copy).Execute();
-                                            *CheckPathRootWithRetryMsgBox = 0;
+                                                CheckPathRootWithRetryMsgBox = GetRootPath(copy.c_str());
+                                            errBuf = FormatStrW(LoadStrW(IDS_NODISKINDRIVE), drive.c_str());
+                                            int msgboxRes = (int)CDriveSelectErrDlg(HWindow, errBuf.c_str(), copy.c_str()).Execute();
+                                            CheckPathRootWithRetryMsgBox.clear();
                                             UpdateWindow(MainWindow->HWindow);
                                             if (msgboxRes == IDRETRY)
                                                 goto _TRY_AGAIN;
@@ -2529,22 +2488,22 @@ CHANGE_AGAIN:
                                         }
                                     }
                                 }
-                                text = GetErrorText(err);
+                                text = GetErrorTextOwned(err).c_str();
                             }
                             textFailReason = CHPPFR_INVALIDPATH;
                             break;
                         }
                     }
-                    strcpy(path, copy); // taking a new path
+                    path = std::move(copy); // taking a new path
                 }
             }
 
-            if (text != NULL)
+            if (!text.empty())
             {
                 if (showErr)
                 {
-                    const char* pathForMsg = showNewDirPathInErrBoxes && newDir != NULL ? newDir : (const char*)path;
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(pathForMsg).c_str(), AnsiToWide(text).c_str());
+                    const wchar_t* pathForMsg = showNewDirPathInErrBoxes && newDir != NULL ? newDir : path.c_str();
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), pathForMsg, text.c_str());
                     gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                 }
                 if (newDir != NULL)
@@ -2555,12 +2514,13 @@ CHANGE_AGAIN:
                         *failReason = textFailReason;
                     return FALSE; // finished, cannot be repeated
                 }
+                pathW = path;
                 goto CHANGE_AGAIN;
             }
             else
             {
                 // changing the path to absolute windows path
-                BOOL ret = ChangePathToDisk(HWindow, path, suggestedTopIndex, suggestedFocusName,
+                BOOL ret = ChangePathToDisk(HWindow, path.c_str(), suggestedTopIndex, suggestedFocusName,
                                             NULL, TRUE, FALSE, FALSE, failReason);
                 if (useStopRefresh)
                     EndStopRefresh(); // snooper will be started again
@@ -2576,7 +2536,7 @@ CHANGE_AGAIN:
     return FALSE;
 }
 
-BOOL CFilesWindow::ChangeDirLite(const char* newDir)
+BOOL CFilesWindow::ChangeDirLite(const wchar_t* newDir)
 {
     int failReason;
     BOOL ret = ChangeDir(newDir, -1, NULL, 3, &failReason, TRUE);
@@ -2584,14 +2544,14 @@ BOOL CFilesWindow::ChangeDirLite(const char* newDir)
            failReason == CHPPFR_SUCCESS /* non-sense, but we are not bothered by it */;
 }
 
-BOOL CFilesWindow::ChangePathToDrvType(HWND parent, int driveType, const char* displayName)
+BOOL CFilesWindow::ChangePathToDrvType(HWND parent, int driveType, const wchar_t* displayName)
 {
-    CPathBuffer path;
-    const char* userFolderOneDrive = NULL;
+    std::wstring path;
+    const std::wstring* userFolderOneDrive = NULL;
     if (driveType == drvtOneDrive || driveType == drvtOneDriveBus)
     {
         InitOneDrivePath();
-        if (driveType == drvtOneDrive && OneDrivePath[0] == 0 ||
+        if (driveType == drvtOneDrive && OneDrivePath.empty() ||
             driveType == drvtOneDriveBus && !OneDriveBusinessStorages.Find(displayName, &userFolderOneDrive))
         { // OneDrive Personal/Business has been disconnected, we will refresh Drive bars, so that its icon disappears or is updated
             if (MainWindow != NULL && MainWindow->HWindow != NULL)
@@ -2599,18 +2559,43 @@ BOOL CFilesWindow::ChangePathToDrvType(HWND parent, int driveType, const char* d
             return FALSE;
         }
     }
-    if (driveType == drvtMyDocuments && GetMyDocumentsOrDesktopPath(path, path.Size()) ||
-        driveType == drvtGoogleDrive && ShellIconOverlays.GetPathForGoogleDrive(path, path.Size()) ||
-        driveType == drvtDropbox && strcpy_s(path, path.Size(), DropboxPath) == 0 ||
-        driveType == drvtOneDrive && strcpy_s(path, path.Size(), OneDrivePath) == 0 ||
-        driveType == drvtOneDriveBus && (int)strlen(userFolderOneDrive) < path.Size() && strcpy_s(path, path.Size(), userFolderOneDrive) == 0)
+    if (driveType == drvtMyDocuments)
     {
-        return ChangePathToDisk(parent, path);
+        // real fix: GetMyDocumentsOrDesktopPathW already exists and is honest for a
+        // Documents/Desktop path the active code page cannot spell (e.g. an accented user name),
+        // unlike SHGetPathFromIDList's ANSI best-fit below.
+        std::wstring pathW;
+        if (GetMyDocumentsOrDesktopPathW(pathW))
+            return ChangePathToDisk(parent, pathW.c_str());
+        return FALSE;
+    }
+    if (driveType == drvtOneDrive)
+    {
+        if (!OneDrivePath.empty())
+            return ChangePathToDisk(parent, OneDrivePath.c_str());
+        return FALSE;
+    }
+    if (driveType == drvtOneDriveBus)
+    {
+        // The business account registry record and its selection identity are UTF-16 end to end.
+        if (userFolderOneDrive != NULL && !userFolderOneDrive->empty())
+            return ChangePathToDisk(parent, userFolderOneDrive->c_str());
+        return FALSE;
+    }
+    if (driveType == drvtDropbox)
+    {
+        if (!DropboxPath.empty())
+            return ChangePathToDisk(parent, DropboxPath.c_str());
+        return FALSE;
+    }
+    if (driveType == drvtGoogleDrive && ShellIconOverlays.GetPathForGoogleDrive(path))
+    {
+        return ChangePathToDisk(parent, path.c_str());
     }
     return FALSE;
 }
 
-void CFilesWindow::ChangeDrive(char drive)
+void CFilesWindow::ChangeDrive(wchar_t drive)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::ChangeDrive(%u)", drive);
     //--- DefaultDire refresh
@@ -2620,11 +2605,11 @@ void CFilesWindow::ChangeDrive(char drive)
     if (drive == 0)
     {
         CDriveTypeEnum driveType = drvtUnknow; // dummy
-        DWORD_PTR driveTypeParam = (Is(ptDisk) || Is(ptZIPArchive)) ? GetPath()[0] : 0;
+        DWORD_PTR driveTypeParam = (Is(ptDisk) || Is(ptZIPArchive)) ? GetPathW()[0] : 0;
         int postCmd;
         void* postCmdParam;
         BOOL fromContextMenu;
-        if (CDrivesList(this, ((Is(ptDisk) || Is(ptZIPArchive)) ? GetPath() : ""),
+        if (CDrivesList(this, ((Is(ptDisk) || Is(ptZIPArchive)) ? GetPathW() : L""),
                         &driveType, &driveTypeParam, &postCmd, &postCmdParam,
                         &fromContextMenu)
                     .Track() == FALSE ||
@@ -2638,7 +2623,6 @@ void CFilesWindow::ChangeDrive(char drive)
 
         UpdateWindow(MainWindow->HWindow);
 
-        CPathBuffer path;
         switch (driveType)
         {
         case drvtMyDocuments:
@@ -2647,9 +2631,9 @@ void CFilesWindow::ChangeDrive(char drive)
         case drvtOneDrive:
         case drvtOneDriveBus:
         {
-            ChangePathToDrvType(HWindow, driveType, driveType == drvtOneDriveBus ? (const char*)driveTypeParam : NULL);
+            ChangePathToDrvType(HWindow, driveType, driveType == drvtOneDriveBus ? (const wchar_t*)driveTypeParam : NULL);
             if (driveType == drvtOneDriveBus)
-                free((char*)driveTypeParam);
+                free((wchar_t*)driveTypeParam);
             return;
         }
 
@@ -2660,11 +2644,18 @@ void CFilesWindow::ChangeDrive(char drive)
         // is it Network?
         case drvtNeighborhood:
         {
-            if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_CHANGEDRIVE),
-                                   LoadStr(IDS_CHANGEDRIVETEXT), path, TRUE))
+            // wide: GetTargetDirectory's browse dialog (SHBrowseForFolder/
+            // SHGetPathFromIDList, unqualified - ANSI since core never defines UNICODE)
+            // best-fit-narrows the chosen server/share name before Sally ever sees it - same
+            // shape and fix as toolbar_drive_bar.cpp's CDriveBar::Execute and
+            // this file's own sibling keyboard-shortcut handler in files_window_navigation.cpp
+            //. 'path' was used only by this case, so it's replaced outright.
+            std::wstring pathW;
+            if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_CHANGEDRIVE),
+                                    LoadStrW(IDS_CHANGEDRIVETEXT), pathW, TRUE))
             {
                 UpdateWindow(MainWindow->HWindow);
-                ChangePathToDisk(HWindow, path);
+                ChangePathToDisk(HWindow, pathW.c_str());
                 return;
             }
             else
@@ -2693,7 +2684,7 @@ void CFilesWindow::ChangeDrive(char drive)
         case drvtCDROM:
         case drvtRAMDisk:
         {
-            drive = (char)LOWORD(driveTypeParam);
+            drive = (wchar_t)LOWORD(driveTypeParam);
 
             UpdateWindow(MainWindow->HWindow);
             break;
@@ -2740,7 +2731,7 @@ void CFilesWindow::ChangeDrive(char drive)
 
         case drvtPluginCmd:
         {
-            const char* dllName = (const char*)driveTypeParam;
+            const wchar_t* dllName = (const wchar_t*)driveTypeParam;
             CPluginData* data = Plugins.GetPluginData(dllName);
             if (data != NULL) // plugin exists, we can execute the command
             {
@@ -2766,7 +2757,7 @@ void CFilesWindow::ChangeDrive(char drive)
     else
         TopIndexMem.Clear(); // long jump
 
-    ChangePathToDisk(HWindow, DefaultDir[LowerCase[drive] - 'a'], -1, NULL,
+    ChangePathToDisk(HWindow, DefaultDir[towlower(drive) - L'a'].c_str(), -1, NULL,
                      NULL, TRUE, FALSE, FALSE, NULL, FALSE);
 }
 
@@ -2785,10 +2776,14 @@ void CFilesWindow::UpdateDriveIcon(BOOL check)
         { // only if the path is accessible
             if (DirectoryLine->HWindow != NULL)
             {
-                UINT type = MyGetDriveType(GetPath());
-                CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-                GetRootPath(root, GetPath());
-                HICON hIcon = GetDriveIcon(root, type, TRUE);
+                // MyGetDriveType(the removed ANSI mirror) calls GetDriveTypeA on an
+                // already-lossy narrow mirror - for a UNC path whose server/share name isn't
+                // representable in CP_ACP, this can misreport the drive type and silently pick
+                // the wrong drive-line icon. MyGetDriveTypeW/GetPathW() already used for the
+                // identical purpose a few lines above in this same file (line ~169).
+                UINT type = MyGetDriveTypeW(GetPathW());
+                const std::wstring root = GetRootPath(GetPathW());
+                HICON hIcon = GetDriveIconW(root.c_str(), type, TRUE);
                 DirectoryLine->SetDriveIcon(hIcon);
                 HANDLES(DestroyIcon(hIcon));
             }

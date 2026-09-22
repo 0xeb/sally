@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <string>
 
 #include "unmime.rh"
 #include "unmime.rh2"
@@ -10,6 +11,7 @@
 #include "parser.h"
 #include "decoder.h"
 #include "unmime.h"
+#include "unmime_text.h"
 
 // ****************************************************************************
 
@@ -35,11 +37,11 @@ CPluginDataInterface PluginDataInterface;
 SGlobals G;
 
 // registry key names
-LPCTSTR KEY_LISTMAILHEADERS = _T("List Mail Headers");
-LPCTSTR KEY_LISTMESSAGEBODIES = _T("List Message Bodies");
-LPCTSTR KEY_APPENDCHARSET = _T("Append Charset");
-LPCTSTR KEY_LISTATTACHMENTS = _T("List Attachments");
-LPCTSTR KEY_DONTSHOWANYMORE = _T("DontShowAnymore");
+const wchar_t* KEY_LISTMAILHEADERS = L"List Mail Headers";
+const wchar_t* KEY_LISTMESSAGEBODIES = L"List Message Bodies";
+const wchar_t* KEY_APPENDCHARSET = L"Append Charset";
+const wchar_t* KEY_LISTATTACHMENTS = L"List Attachments";
+const wchar_t* KEY_DONTSHOWANYMORE = L"DontShowAnymore";
 
 // ConfigVersion: 0 - default (before any configuration is loaded),
 //                1 - version with configuration in the registry (used before, only without a configuration number)
@@ -48,7 +50,7 @@ LPCTSTR KEY_DONTSHOWANYMORE = _T("DontShowAnymore");
 
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 3
-const char* CONFIG_VERSION = "Version";
+const wchar_t* CONFIG_VERSION = L"Version";
 
 // ****************************************************************************
 
@@ -59,9 +61,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide. SalamanderGeneral->LoadStr has returned WCHAR* since the v108
+// ABI break; this went through LoadStrNarrow and was widened again at every call site.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 //****************************************************************************
@@ -83,14 +87,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current version of Salamander and newer - perform a check
     if (salamander->GetVersion() < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "UnMIME" /* neprekladat! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-224).
+        MessageBoxW(salamander->GetParentWindow(),
+                    _CRT_WIDE(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"UnMIME" /* neprekladat! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "UnMIME" /* neprekladat! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"UnMIME" /* neprekladat! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -100,15 +106,15 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set the basic information about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_PANELARCHIVERVIEW | FUNCTION_CUSTOMARCHIVERUNPACK |
                                        FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "UnMIME" /* neprekladat! */, "eml;b64;uue;xxe;hqx;ntx;cnm");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"UnMIME" /* neprekladat! */, L"eml;b64;uue;xxe;hqx;ntx;cnm");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -120,13 +126,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT_TITLE), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls %ls\n\n%ls\n\n%ls", LangStr(IDS_PLUGINNAME).c_str(),
+        _CRT_WIDE(VERSINFO_VERSION), _CRT_WIDE(VERSINFO_COPYRIGHT),
+        LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(), LangStr(IDS_ABOUT_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
@@ -209,18 +213,18 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
     // base section:
-    salamander->AddCustomUnpacker("UnMIME (Plugin)", "*.eml;*.b64;*.uue;*.xxe;*.hqx;*.ntx;*.cnm",
+    salamander->AddCustomUnpacker(L"UnMIME (Plugin)", L"*.eml;*.b64;*.uue;*.xxe;*.hqx;*.ntx;*.cnm",
                                   ConfigVersion < 3);
-    salamander->AddPanelArchiver("eml;b64;uue;xxe;hqx;ntx;cnm", FALSE, FALSE);
+    salamander->AddPanelArchiver(L"eml;b64;uue;xxe;hqx;ntx;cnm", FALSE, FALSE);
 
     // upgrade section:
     if (ConfigVersion < 2) // version after introducing the configuration number + yEnc
     {
-        salamander->AddPanelArchiver("ntx", FALSE, TRUE); // add the "ntx" extension
+        salamander->AddPanelArchiver(L"ntx", FALSE, TRUE); // add the "ntx" extension
     }
     if (ConfigVersion < 3) // cnm: file format used by Mercury & PMail emailing system
     {
-        salamander->AddPanelArchiver("cnm", FALSE, TRUE); // add the "cnm" extension
+        salamander->AddPanelArchiver(L"cnm", FALSE, TRUE); // add the "cnm" extension
     }
 }
 
@@ -240,19 +244,19 @@ static void ShowBadBlockMessage(CStartMarker* m, BOOL bDontShow[][2])
     int e = (m->iEncoding == ENCODING_BINHEX) ? 0 : 1;
     if (!bDontShow[e][m->iBadBlock - 1])
     {
-        char text[200];
-        sprintf(text, LoadStr((m->iBadBlock == BADBLOCK_DAMAGED) ? IDS_BADBLOCK_DAMAGED : IDS_BADBLOCK_CRC),
-                e ? "yEncode" : "BinHex");
-        SalamanderGeneral->ShowMessageBox(text, LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        const std::wstring text = SPLFormatStringOwned(
+            LangStr((m->iBadBlock == BADBLOCK_DAMAGED) ? IDS_BADBLOCK_DAMAGED : IDS_BADBLOCK_CRC).c_str(),
+            e ? L"yEncode" : L"BinHex");
+        SalamanderGeneral->ShowMessageBox(text.c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         bDontShow[e][m->iBadBlock - 1] = TRUE;
     }
 }
 
-BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                               CSalamanderDirectoryAbstract* dir,
                                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %ls, ,)", fileName);
     pluginData = &PluginDataInterface;
 
     // allocate ArchiveData - it will hold data about the contents of the "archive"
@@ -260,7 +264,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     ArchiveData->RefCount = 0;
 
     // get the filetime of the "archive" - files inside will have the same time
-    HANDLE hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         GetFileTime(hFile, NULL, NULL, &ArchiveData->ft);
@@ -272,7 +276,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     {
         delete ArchiveData;
         if (iErrorStr != -1)
-            SalamanderGeneral->ShowMessageBox(LoadStr(iErrorStr), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(iErrorStr).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
 
@@ -302,15 +306,22 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
                     ZeroMemory(&fd, sizeof(fd));
 
                     // must allocate using SalamanderGeneral: see CFileData in spl-com.h
-                    fd.Name = SalamanderGeneral->DupStr(m->cFileName);
-                    if (fd.Name == NULL)
+                    std::wstring decodedName;
+                    if (!DecodeUnmimeNameBytes(m->cFileName, decodedName))
                     {
-                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LIST).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                         ret = FALSE;
                         break;
                     }
-                    fd.NameLen = strlen(fd.Name);
-                    fd.Ext = strrchr(fd.Name, '.');
+                    fd.Name = SalamanderGeneral->DupStr(decodedName.c_str());
+                    if (fd.Name == NULL)
+                    {
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOWMEM).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
+                        ret = FALSE;
+                        break;
+                    }
+                    fd.NameLen = static_cast<int>(wcslen(fd.Name));
+                    fd.Ext = wcsrchr(fd.Name, L'.');
                     if (fd.Ext != NULL)
                         fd.Ext++; // ".cvspass" is an extension in Windows
                     else
@@ -323,10 +334,10 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
                     fd.DosName = NULL;
                     fd.IsLink = SalamanderGeneral->IsFileLink(fd.Ext);
                     fd.IsOffline = 0;
-                    if (!dir->AddFile("", fd, NULL))
+                    if (!dir->AddFile(L"", fd, NULL))
                     {
                         SalamanderGeneral->Free(fd.Name);
-                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LIST), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LIST).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                         ret = FALSE;
                         break;
                     }
@@ -335,7 +346,7 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             }
             else if (!bDontShowAgainUnknown)
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_UNKNOWN), LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_UNKNOWN).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
                 bDontShowAgainUnknown = TRUE;
             }
         }
@@ -347,12 +358,12 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const char* nameInArchive, const CFileData* fileData,
-                                                const char* targetDir, const char* newFileName,
+                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                                const wchar_t* nameInArchive, const CFileData* fileData,
+                                                const wchar_t* targetDir, const wchar_t* newFileName,
                                                 BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, , %s, , %s, ,)", fileName,
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, , %ls, , %ls, ,)", fileName,
                         nameInArchive, targetDir);
 
     if (newFileName != NULL)
@@ -368,19 +379,19 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                               NULL, CQuadWord(0, 0), NULL, TRUE))
     {
         if (iErrorStr != -1)
-            SalamanderGeneral->ShowMessageBox(LoadStr(iErrorStr), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(iErrorStr).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     return TRUE;
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* Salamander, const char* fileName,
-                                                CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                                const char* archiveRoot, SalEnumSelection next, void* nextParam)
+BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* Salamander, const wchar_t* fileName,
+                                                CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                                const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, , %s, %s, ,)", fileName, targetDir, archiveRoot);
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, , %ls, %ls, ,)", fileName, targetDir, archiveRoot);
 
-    LPCTSTR nextName;
+    const wchar_t* nextName;
     BOOL isDir;
     CQuadWord size, totalSize(0, 0);
     const CFileData* fileData;
@@ -397,12 +408,11 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
         totalSize += size;
     }
     // check for free space
-    if (!SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(), targetDir, totalSize, LoadStr(IDS_PLUGINNAME)))
+    if (!SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(), targetDir, totalSize, LangStr(IDS_PLUGINNAME).c_str()))
         return FALSE;
     // openprogressdialog
-    CPathBuffer title;
-    sprintf(title, LoadStr(IDS_EXTRTITLE), SalamanderGeneral->SalPathFindFileName(fileName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
+    const std::wstring title = SPLFormatStringOwned(LangStr(IDS_EXTRTITLE).c_str(), SalamanderGeneral->SalPathFindFileName(fileName));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
     // extraction
     int ret = TRUE;
     BOOL bAborted;
@@ -411,7 +421,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
         !bAborted)
     {
         if (iErrorStr != -1)
-            SalamanderGeneral->ShowMessageBox(LoadStr(iErrorStr), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(iErrorStr).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         ret = FALSE;
     }
     if (bAborted)
@@ -421,30 +431,29 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     return ret;
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* Salamander, LPCTSTR fileName,
-                                                     const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* Salamander, const wchar_t* fileName,
+                                                     const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                                      CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
     CArchiveData ArchiveData;
     // get the filetime of the "archive" - files inside will have the same time
-    HANDLE hFile = CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileW(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         GetFileTime(hFile, NULL, NULL, &ArchiveData.ft);
         CloseHandle(hFile);
     }
     // openprogressdialog
-    CPathBuffer title;
-    sprintf(title, LoadStr(IDS_EXTRTITLE), SalamanderGeneral->SalPathFindFileName(fileName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PARSE), FALSE);
+    const std::wstring title = SPLFormatStringOwned(LangStr(IDS_EXTRTITLE).c_str(), SalamanderGeneral->SalPathFindFileName(fileName));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LangStr(IDS_PARSE).c_str(), FALSE);
     // analyze the file
     if (!ParseMailFile(fileName, &ArchiveData.ParserOutput, G.bAppendCharset))
     {
         if (iErrorStr != -1)
-            SalamanderGeneral->ShowMessageBox(LoadStr(iErrorStr), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(iErrorStr).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         Salamander->CloseProgressDialog();
         return FALSE;
     }
@@ -487,7 +496,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
         !bAborted)
     {
         if (iErrorStr != -1)
-            SalamanderGeneral->ShowMessageBox(LoadStr(iErrorStr), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(iErrorStr).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         ret = FALSE;
     }
     if (bAborted)
@@ -517,20 +526,16 @@ BOOL Error(int error, ...)
 {
     int lastErr = GetLastError();
     CALL_STACK_MESSAGE2("CPluginInterface::Error(%d, )", error);
-    char buf[1024];
-    *buf = 0;
     va_list arglist;
     va_start(arglist, error);
-    vsprintf(buf, LoadStr(error), arglist);
+    std::wstring message = SPLFormatStringOwnedV(LangStr(error).c_str(), arglist);
     va_end(arglist);
     if (lastErr != ERROR_SUCCESS)
     {
-        strcat(buf, " ");
-        int l = (int)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        message.push_back(L' ');
+        message.append(SPLGetErrorTextOwned(SalamanderGeneral, lastErr));
     }
-    SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+    SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
 
     return FALSE;
 }
@@ -538,27 +543,28 @@ BOOL Error(int error, ...)
 void ShowOneTimeMessage(HWND HParent, int msg, BOOL* pChecked)
 {
     MSGBOXEX_PARAMS params;
+    const std::wstring caption = LangStr(IDS_PLUGINNAME);
+    const std::wstring text = LangStr(msg);
+    const std::wstring checkBoxText = LangStr(IDS_DONT_SHOW_AGAIN);
 
     memset(&params, 0, sizeof(params));
     params.HParent = HParent;
     params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT;
-    params.Caption = LoadStr(IDS_PLUGINNAME);
-    params.Text = LoadStr(msg);
-    params.CheckBoxText = LoadStr(IDS_DONT_SHOW_AGAIN);
+    params.Caption = caption.c_str();
+    params.Text = text.c_str();
+    params.CheckBoxText = checkBoxText.c_str();
     params.CheckBoxValue = pChecked;
     SalamanderGeneral->SalMessageBoxEx(&params);
 }
 
-BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName)
+BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName)
 {
     while (!WriteFile(hFile, lpBuffer, nBytesToWrite, pnBytesWritten, NULL))
     {
         int lastErr = GetLastError();
-        char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
-        if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, fileName, error,
-                                           LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
+        const std::wstring error = SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
+        if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, fileName, error.c_str(),
+                                           LangStr(IDS_WRITEERROR).c_str()) != DIALOG_RETRY)
             return FALSE;
     }
     return TRUE;

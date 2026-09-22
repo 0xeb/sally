@@ -4,6 +4,13 @@
 
 #include "precomp.h"
 
+// Wide. This existed to widen a narrow LoadStr at the last moment; LangStr
+// means there is nothing left to widen.
+static int ShowMessage(HWND parent, const wchar_t* text, const wchar_t* caption, UINT type)
+{
+    return SalamanderGeneral->SalMessageBox(parent, text, caption, type);
+}
+
 TIndirectArray<CDialog> ModelessDlgs(2, 2, dtNoDelete); // array of "Welcome Message" dialogs
 
 void MyEnableMenuItem(HMENU subMenu, int cmd, BOOL enable)
@@ -48,6 +55,27 @@ void CCommonPropSheetPage::NotifDlgJustCreated()
     SalamanderGUI->ArrangeHorizontalLines(HWindow);
 }
 
+BOOL SetWindowLocalText(HWND window, const char* bytes) noexcept
+{
+    std::wstring text;
+    if (!FtpDecodeLocalText(bytes, text))
+        return FALSE;
+    return SetWindowTextW(window, text.c_str());
+}
+
+BOOL ReadWindowLocalText(HWND window, std::string& bytes) noexcept
+{
+    try
+    {
+        const std::wstring text = SPLGetWindowTextOwned(window);
+        return FtpEncodeLocalText(text.c_str(), bytes);
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
 //
 // ****************************************************************************
 // CConfigPageGeneral
@@ -56,7 +84,6 @@ void CCommonPropSheetPage::NotifDlgJustCreated()
 CConfigPageGeneral::CConfigPageGeneral() : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGGENERAL, IDD_CFGGENERAL, PSP_HASHELP, NULL)
 {
     LastTotSpeed = -1;
-    TotSpeedBuf[0] = 0;
 }
 
 void CConfigPageGeneral::Validate(CTransferInfo& ti)
@@ -67,12 +94,12 @@ void CConfigPageGeneral::Validate(CTransferInfo& ti)
     double totalSpeedLimit;
     if (enableTotalSpeedLimit)
     {
-        char buff[] = "%g";
+        const wchar_t buff[] = L"%g";
         ti.EditLine(IDE_TOTALSPEEDLIMIT, totalSpeedLimit, buff);
         if (ti.IsGood() && totalSpeedLimit <= 0)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MUSTBEGRTHANZERO),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_TOTALSPEEDLIMIT);
         }
     }
@@ -86,7 +113,7 @@ void CConfigPageGeneral::Transfer(CTransferInfo& ti)
 
     if (ti.Type == ttDataFromWindow && Config.EnableTotalSpeedLimit)
     {
-        char buff[] = "%g";
+        const wchar_t buff[] = L"%g";
         ti.EditLine(IDE_TOTALSPEEDLIMIT, Config.TotalSpeedLimit, buff);
         if (ti.Type == ttDataFromWindow &&
             Config.TotalSpeedLimit < 0.001)
@@ -97,85 +124,85 @@ void CConfigPageGeneral::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_CLOSEOPERDLGIFSUCCESS, Config.CloseOperationDlgIfSuccessfullyFinished);
     ti.CheckBox(IDC_OPENSOLVEERRIFIDLE, Config.OpenSolveErrIfIdle);
 
-    char passwd[PASSWORD_MAX_SIZE];
+    std::wstring passwd;
     if (ti.Type == ttDataFromWindow)
     {
-        ti.EditLine(IDE_ANONYMOUSPASSWD, passwd, PASSWORD_MAX_SIZE);
-        Config.SetAnonymousPasswd(passwd);
+        ti.EditLine(IDE_ANONYMOUSPASSWD, passwd, TRUE);
+        if (ti.IsGood() && !Config.SetAnonymousPasswd(passwd.c_str()))
+            ti.ErrorOn(IDE_ANONYMOUSPASSWD);
     }
     else
     {
-        Config.GetAnonymousPasswd(passwd, PASSWORD_MAX_SIZE);
-        ti.EditLine(IDE_ANONYMOUSPASSWD, passwd, PASSWORD_MAX_SIZE);
+        if (!Config.GetAnonymousPasswd(passwd))
+            passwd.clear();
+        ti.EditLine(IDE_ANONYMOUSPASSWD, passwd, TRUE);
     }
 }
 
-void CheckboxEditLine(BOOL isInt, HWND dlg, int checkboxID, int editID, int* lastCheck, char* valueBuf,
-                      int checkedValInteger, double checkedValDouble, BOOL globValUsed,
-                      int globValInteger, double globValDouble)
+static void CheckboxEditLine(BOOL isInt, HWND dlg, int checkboxID, int editID, int* lastCheck,
+                             std::wstring& valueText, int checkedValInteger,
+                             double checkedValDouble, BOOL globValUsed, int globValInteger,
+                             double globValDouble) noexcept
 {
-    char buf[31];
-    int check = IsDlgButtonChecked(dlg, checkboxID);
-    EnableWindow(GetDlgItem(dlg, editID), check == BST_CHECKED);
-    if (*lastCheck != check)
+    try
     {
-        if (*lastCheck == 1)
-            GetDlgItemText(dlg, editID, valueBuf, 31);
-        switch (check)
+        const int check = IsDlgButtonChecked(dlg, checkboxID);
+        EnableWindow(GetDlgItem(dlg, editID), check == BST_CHECKED);
+        if (*lastCheck != check)
         {
-        case 0:
-            buf[0] = 0;
-            break; // switched off (empty string)
+            if (*lastCheck == BST_CHECKED)
+                valueText = SPLGetDlgItemTextOwned(dlg, editID);
 
-        case 1: // enabled
-        {
-            if (valueBuf[0] == 0)
+            std::wstring displayedText;
+            switch (check)
             {
-                if (isInt)
-                    sprintf(valueBuf, "%d", checkedValInteger);
-                else
-                    sprintf(valueBuf, "%g", checkedValDouble);
-            }
-            strcpy(buf, valueBuf);
-            break;
-        }
+            case BST_UNCHECKED:
+                break; // switched off (empty string)
 
-        default: // third state
-        {
-            if (globValUsed)
-            {
-                if (isInt)
-                    sprintf(buf, "%d", globValInteger);
+            case BST_CHECKED:
+                if (valueText.empty())
+                    valueText = isInt ? SPLFormatStringOwned(L"%d", checkedValInteger)
+                                      : SPLFormatStringOwned(L"%g", checkedValDouble);
+                displayedText = valueText;
+                break;
+
+            default: // third state
+                if (globValUsed)
+                    displayedText = isInt ? SPLFormatStringOwned(L"%d", globValInteger)
+                                          : SPLFormatStringOwned(L"%g", globValDouble);
                 else
-                    sprintf(buf, "%g", globValDouble);
+                    displayedText.clear(); // not used (empty string)
+                break;
             }
-            else
-                buf[0] = 0; // not used (empty string)
-            break;
+            SetDlgItemTextW(dlg, editID, displayedText.c_str());
+            *lastCheck = check;
         }
-        }
-        SetDlgItemText(dlg, editID, buf);
-        *lastCheck = check;
+    }
+    catch (...)
+    {
+        // This helper runs from dialog callbacks; keep the previous value on allocation failure.
     }
 }
 
-void CheckboxEditLineInteger(HWND dlg, int checkboxID, int editID, int* lastCheck, char* valueBuf,
-                             int checkedVal, BOOL globValUsed, int globVal)
+void CheckboxEditLineInteger(HWND dlg, int checkboxID, int editID, int* lastCheck,
+                             std::wstring& valueText, int checkedVal,
+                             BOOL globValUsed, int globVal) noexcept
 {
-    CheckboxEditLine(TRUE, dlg, checkboxID, editID, lastCheck, valueBuf,
+    CheckboxEditLine(TRUE, dlg, checkboxID, editID, lastCheck, valueText,
                      checkedVal, 0, globValUsed, globVal, 0);
 }
 
-void CheckboxEditLineDouble(HWND dlg, int checkboxID, int editID, int* lastCheck, char* valueBuf,
-                            double checkedVal, BOOL globValUsed, double globVal)
+void CheckboxEditLineDouble(HWND dlg, int checkboxID, int editID, int* lastCheck,
+                            std::wstring& valueText, double checkedVal,
+                            BOOL globValUsed, double globVal) noexcept
 {
-    CheckboxEditLine(FALSE, dlg, checkboxID, editID, lastCheck, valueBuf,
+    CheckboxEditLine(FALSE, dlg, checkboxID, editID, lastCheck, valueText,
                      0, checkedVal, globValUsed, 0, globVal);
 }
 
 void CConfigPageGeneral::EnableControls()
 {
-    CheckboxEditLineDouble(HWindow, IDC_ENABLETOTSPEEDLIM, IDE_TOTALSPEEDLIMIT, &LastTotSpeed, TotSpeedBuf,
+    CheckboxEditLineDouble(HWindow, IDC_ENABLETOTSPEEDLIM, IDE_TOTALSPEEDLIMIT, &LastTotSpeed, TotalSpeedText,
                            Config.TotalSpeedLimit, 0, 0);
 }
 
@@ -212,9 +239,7 @@ CConfigPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CConfigPageDefaults::CConfigPageDefaults() : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGDEFAULTS, IDD_CFGDEFAULTS, PSP_HASHELP, NULL)
 {
     LastMaxCon = -1;
-    MaxConBuf[0] = 0;
     LastSrvSpeed = -1;
-    SrvSpeedBuf[0] = 0;
     TmpFTPProxyServerList = NULL;
 }
 
@@ -236,8 +261,8 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
                       TmpFTPProxyServerList);
         if (TmpFTPProxyServerList->GetProxyType(defaultProxySrvUID) == fpstHTTP1_1)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_HTTPNEEDPASSIVETRMODE),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ShowMessage(HWindow, LangStr(IDS_HTTPNEEDPASSIVETRMODE).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDC_PASSIVE);
             return;
         }
@@ -254,8 +279,8 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
             return; // an error has already occurred
         if (ti.IsGood() && maxConcCon <= 0)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MUSTBEGRTHANZERO),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_MAXCONCURRENTCON);
             return;
         }
@@ -267,14 +292,14 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
     double srvSpeedLimit;
     if (enableSrvSpeedLimit)
     {
-        char buff[] = "%g";
+        const wchar_t buff[] = L"%g";
         ti.EditLine(IDE_SRVSPEEDLIMIT, srvSpeedLimit, buff);
         if (!ti.IsGood())
             return; // an error has already occurred
         if (ti.IsGood() && srvSpeedLimit <= 0)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MUSTBEGRTHANZERO),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_SRVSPEEDLIMIT);
             return;
         }
@@ -290,8 +315,8 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
             return; // an error has already occurred
         if (num <= 0)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MUSTBEGRTHANZERO),
-                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ShowMessage(HWindow, LangStr(IDS_MUSTBEGRTHANZERO).c_str(),
+                                             LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(arr[i]);
             return;
         }
@@ -302,22 +327,22 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
     ti.EditLine(IDE_KEEPALIVESTOPAFTER, stop);
     if (every > 10000)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_KAEVERYTOOBIG),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        ShowMessage(HWindow, LangStr(IDS_KAEVERYTOOBIG).c_str(),
+                                         LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_KEEPALIVEEVERY);
         return;
     }
     if (stop > 10000)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_KASTOPTOOBIG),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        ShowMessage(HWindow, LangStr(IDS_KASTOPTOOBIG).c_str(),
+                                         LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_KEEPALIVESTOPAFTER);
         return;
     }
     if (stop * 60 < every)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_KAEVERYGRTHSTOP),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        ShowMessage(HWindow, LangStr(IDS_KAEVERYGRTHSTOP).c_str(),
+                                         LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_KEEPALIVESTOPAFTER);
         return;
     }
@@ -327,18 +352,18 @@ void CConfigPageDefaults::Validate(CTransferInfo& ti)
     ti.RadioButton(IDC_AUTODETECT, trmAutodetect, transferMode);
     if (transferMode == trmAutodetect)
     {
-        char masks[MAX_GROUPMASK];
-        ti.EditLine(IDE_ASCIIMASKS, masks, MAX_GROUPMASK);
+        std::wstring masks;
+        ti.EditLine(IDE_ASCIIMASKS, masks);
 
         CSalamanderMaskGroup* maskGroup = SalamanderGeneral->AllocSalamanderMaskGroup();
         if (maskGroup != NULL)
         {
-            maskGroup->SetMasksString(masks, FALSE);
+            maskGroup->SetMasksString(masks.c_str(), FALSE);
             int err;
             if (!maskGroup->PrepareMasks(err))
             {
-                SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_INCORRECTSYNTAX),
-                                                 LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                ShowMessage(HWindow, LangStr(IDS_INCORRECTSYNTAX).c_str(),
+                                                 LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
                 ti.ErrorOn(IDE_ASCIIMASKS);
                 PostMessage(GetDlgItem(HWindow, IDE_ASCIIMASKS), EM_SETSEL, err, err); // marking the error position
             }
@@ -390,7 +415,7 @@ void CConfigPageDefaults::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_SRVSPEEDLIMIT, Config.UseServerSpeedLimit);
     if (ti.Type == ttDataFromWindow && Config.UseServerSpeedLimit)
     {
-        char buff[] = "%g";
+        const wchar_t buff[] = L"%g";
         ti.EditLine(IDE_SRVSPEEDLIMIT, Config.ServerSpeedLimit, buff);
         if (ti.Type == ttDataFromWindow &&
             Config.ServerSpeedLimit < 0.001)
@@ -437,13 +462,14 @@ void CConfigPageDefaults::Transfer(CTransferInfo& ti)
     {
         if (ti.Type == ttDataToWindow)
         {
-            SendMessage(combo, CB_RESETCONTENT, 0, 0);
+            SendMessageW(combo, CB_RESETCONTENT, 0, 0);
             int strID[] = {IDS_KEEPALIVECMDNOOP, IDS_KEEPALIVECMDPWD, IDS_KEEPALIVECMDNLST,
                            IDS_KEEPALIVECMDLIST, -1};
             int i;
             for (i = 0; strID[i] != -1; i++)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(strID[i]));
+                SendMessageW(combo, CB_ADDSTRING, 0,
+                             reinterpret_cast<LPARAM>(LangStr(strID[i]).c_str()));
             }
             // verify that KeepAliveCommand is within bounds (only direct registry editing could break it)
             if (Config.KeepAliveCommand >= i)
@@ -464,19 +490,14 @@ void CConfigPageDefaults::Transfer(CTransferInfo& ti)
     ti.RadioButton(IDC_ASCIIMODE, trmASCII, Config.TransferMode);
     ti.RadioButton(IDC_AUTODETECT, trmAutodetect, Config.TransferMode);
 
-    char masks[MAX_GROUPMASK];
+    std::wstring masks;
     if (ti.Type == ttDataToWindow)
-    {
-        Config.ASCIIFileMasks->GetMasksString(masks);
-        ti.EditLine(IDE_ASCIIMASKS, masks, MAX_GROUPMASK);
-    }
-    else
+        masks = SPLGetMasksStringOwned(Config.ASCIIFileMasks);
+    ti.EditLine(IDE_ASCIIMASKS, masks);
+    if (ti.Type == ttDataFromWindow)
     {
         if (Config.TransferMode == trmAutodetect)
-        {
-            ti.EditLine(IDE_ASCIIMASKS, masks, MAX_GROUPMASK);
-            Config.ASCIIFileMasks->SetMasksString(masks, FALSE);
-        }
+            Config.ASCIIFileMasks->SetMasksString(masks.c_str(), FALSE);
     }
 }
 
@@ -485,9 +506,9 @@ void CConfigPageDefaults::EnableControls()
     BOOL enable = IsDlgButtonChecked(HWindow, IDC_AUTODETECT) == BST_CHECKED;
     EnableWindow(GetDlgItem(HWindow, IDE_ASCIIMASKS), enable);
 
-    CheckboxEditLineInteger(HWindow, IDC_MAXCONCURRENTCON, IDE_MAXCONCURRENTCON, &LastMaxCon, MaxConBuf,
+    CheckboxEditLineInteger(HWindow, IDC_MAXCONCURRENTCON, IDE_MAXCONCURRENTCON, &LastMaxCon, MaxConnectionsText,
                             Config.MaxConcurrentConnections, 0, 0);
-    CheckboxEditLineDouble(HWindow, IDC_SRVSPEEDLIMIT, IDE_SRVSPEEDLIMIT, &LastSrvSpeed, SrvSpeedBuf,
+    CheckboxEditLineDouble(HWindow, IDC_SRVSPEEDLIMIT, IDE_SRVSPEEDLIMIT, &LastSrvSpeed, ServerSpeedText,
                            Config.ServerSpeedLimit, 0, 0);
 }
 
@@ -515,7 +536,7 @@ CConfigPageDefaults::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CGUIHyperLinkAbstract* hint = SalamanderGUI->AttachHyperLink(HWindow, IDT_ASCIIMASKHINTS, STF_DOTUNDERLINE);
         if (hint != NULL)
-            hint->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hint->SetActionShowHint(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MASKS_HINT).c_str());
         INT_PTR ret = CCommonPropSheetPage::DialogProc(uMsg, wParam, lParam);
         EnableControls();
         return ret;
@@ -702,7 +723,7 @@ int CALLBACK CenterCallback(HWND HWindow, UINT uMsg, LPARAM lParam)
 }
 
 CConfigDlg::CConfigDlg(HWND parent)
-    : CPropertyDialog(parent, HLanguage, LoadStr(IDS_CONFIGTITLE),
+    : CPropertyDialog(parent, HLanguage, LangStr(IDS_CONFIGTITLE).c_str(),
                       Config.LastCfgPage, PSH_HASHELP | PSH_USECALLBACK | PSH_NOAPPLYNOW,
                       NULL, &Config.LastCfgPage, CenterCallback)
 {
@@ -875,7 +896,7 @@ CConnectDlg::CConnectDlg(HWND parent, int addBookmarkMode)
     DragIndex = -1;
     ExtraDragDropItemAdded = FALSE;
     AddBookmarkMode = addBookmarkMode;
-    LastRawHostAddress[0] = 0;
+    LastRawHostAddress.clear();
 }
 
 void CConnectDlg::Validate(CTransferInfo& ti)
@@ -890,8 +911,9 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             SendMessage(list, WM_SETREDRAW, FALSE, 0);
-            SendMessage(list, LB_RESETCONTENT, 0, 0);
-            SendMessage(list, LB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_QUICKCONNECT));
+            SendMessageW(list, LB_RESETCONTENT, 0, 0);
+            SendMessageW(list, LB_ADDSTRING, 0,
+                         reinterpret_cast<LPARAM>(LangStr(IDS_QUICKCONNECT).c_str()));
             TmpFTPServerList.AddNamesToListbox(list);
             if (Config.LastBookmark > TmpFTPServerList.Count)
             {
@@ -924,28 +946,30 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
 
     // restore the non-expanded variant of the Address string (history stores what the user typed, not the split result)
     if (ti.IsGood() && ti.Type == ttDataFromWindow && Config.LastBookmark == 0)
-        SetWindowText(GetDlgItem(HWindow, IDE_HOSTADDRESS), LastRawHostAddress);
-    CPathBuffer buf;
-    buf[0] = 0;
-    HistoryComboBox(HWindow, ti, IDE_HOSTADDRESS, buf, HOST_MAX_SIZE,
+        SetWindowTextW(GetDlgItem(HWindow, IDE_HOSTADDRESS), LastRawHostAddress.c_str());
+    std::wstring hostAddress;
+    HistoryComboBox(HWindow, ti, IDE_HOSTADDRESS, hostAddress,
                     HOSTADDRESS_HISTORY_SIZE, Config.HostAddressHistory,
                     Config.LastBookmark != 0 /* store in history only during Quick Connect*/);
-    buf[0] = 0;
-    HistoryComboBox(HWindow, ti, IDE_INITIALPATH, buf, buf.Size(),
+    std::wstring initialPath;
+    HistoryComboBox(HWindow, ti, IDE_INITIALPATH, initialPath,
                     INITIALPATH_HISTORY_SIZE, Config.InitPathHistory,
                     Config.LastBookmark != 0 /* store in history only during Quick Connect*/);
 }
 
-void AddToAdvancedStr(char* buf, int bufSize, const char* str)
+static BOOL AppendAdvancedText(std::wstring& text, std::wstring_view addition) noexcept
 {
-    int len = (int)strlen(buf);
-    if (len != 0 && len + 2 < bufSize)
+    try
     {
-        strcpy(buf + len, ", ");
-        len += 2;
+        if (!text.empty())
+            text.append(L", ");
+        text.append(addition);
+        return TRUE;
     }
-    if (len + (int)strlen(str) < bufSize)
-        strcpy(buf + len, str);
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 void CConnectDlg::SelChanged()
@@ -956,11 +980,11 @@ void CConnectDlg::SelChanged()
         return; // unexpected situation
 
     BOOL lockedPassword = TRUE;
-    char password[PASSWORD_MAX_SIZE];
-    password[0] = 0;
+    std::wstring password;
     if (s->AnonymousConnection)
     {
-        Config.GetAnonymousPasswd(password, PASSWORD_MAX_SIZE);
+        if (!Config.GetAnonymousPasswd(password))
+            password.clear();
         lockedPassword = FALSE;
     }
     else
@@ -970,12 +994,12 @@ void CConnectDlg::SelChanged()
         {
             if (s->EncryptedPassword != NULL)
             { // scrambled/encrypted -> plain
-                char* plainPassword;
-                if (passwordManager->DecryptPassword(s->EncryptedPassword, s->EncryptedPasswordSize, &plainPassword))
+                std::wstring plainPassword;
+                if (FTPDecryptPasswordW(passwordManager, s->EncryptedPassword,
+                                        s->EncryptedPasswordSize, &plainPassword))
                 {
-                    lstrcpyn(password, plainPassword, PASSWORD_MAX_SIZE);
-                    memset(plainPassword, 0, lstrlen(plainPassword));
-                    SalamanderGeneral->Free(plainPassword);
+                    password.swap(plainPassword);
+                    FTPSecureWipe(plainPassword);
                     lockedPassword = FALSE;
                 }
             }
@@ -987,132 +1011,124 @@ void CConnectDlg::SelChanged()
     ShowHidePasswordControls(lockedPassword, FALSE);
 
     CTransferInfo ti(HWindow, ttDataToWindow);
-    ti.EditLine(IDE_HOSTADDRESS, HandleNULLStr(s->Address), HOST_MAX_SIZE);
-    ti.EditLine(IDE_INITIALPATH, HandleNULLStr(s->InitialPath), FTP_MAX_PATH);
+    ti.EditLine(IDE_HOSTADDRESS, s->Address);
+    ti.EditLine(IDE_INITIALPATH, s->InitialPath);
     ti.CheckBox(IDC_ANONYMOUSLOGIN, s->AnonymousConnection);
-    ti.EditLine(IDE_USERNAME, HandleNULLStr(s->AnonymousConnection ? (char*)FTP_ANONYMOUS : s->UserName), USER_MAX_SIZE);
-    ti.EditLine(IDE_PASSWORD, password, PASSWORD_MAX_SIZE);
+    std::wstring userName = s->AnonymousConnection ? L"anonymous" : s->UserName;
+    ti.EditLine(IDE_USERNAME, userName);
+    ti.EditLine(IDE_PASSWORD, password);
+    FTPSecureWipe(password);
 
     int savePasswd = (s->AnonymousConnection || i == 0) ? FALSE : s->SavePassword;
     ti.CheckBox(IDC_SAVEPASSWORD, savePasswd);
 
-    char buf[300];
-    buf[0] = 0;
-    char num[100];
+    std::wstring advancedInfo;
+    BOOL advancedGood = TRUE;
+    const auto appendResource = [&](int resourceID) {
+        if (!advancedGood)
+            return;
+        try
+        {
+            advancedGood = AppendAdvancedText(advancedInfo, LangStr(resourceID));
+        }
+        catch (...)
+        {
+            advancedGood = FALSE;
+        }
+    };
+    const auto appendFormatted = [&](int resourceID, const auto& value) {
+        if (!advancedGood)
+            return;
+        try
+        {
+            const std::wstring format = LangStr(resourceID);
+            const std::wstring formatted = SPLFormatStringOwned(format.c_str(), value);
+            advancedGood = AppendAdvancedText(advancedInfo, formatted);
+        }
+        catch (...)
+        {
+            advancedGood = FALSE;
+        }
+    };
     if (s->ProxyServerUID != -2)
     {
-        num[36] = 0;
-        char proxyNameBuf[PROXYSRVNAME_MAX_SIZE];
-        if (TmpFTPProxyServerList.GetProxyName(proxyNameBuf, PROXYSRVNAME_MAX_SIZE, s->ProxyServerUID))
-        {
-            _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRPROXYSRV), proxyNameBuf);
-            if (num[36] != 0)
-                strcpy(num + 36, "...");
-            AddToAdvancedStr(buf, 300, num);
-        }
+        std::wstring proxyName;
+        if (TmpFTPProxyServerList.GetProxyName(proxyName, s->ProxyServerUID))
+            appendFormatted(IDS_ADVSTRPROXYSRV, proxyName.c_str());
         else
             TRACE_E("Unexpected situation in CConnectDlg::SelChanged(): invalid ProxyServerUID!");
     }
     if (s->Port != IPPORT_FTP)
-    {
-        _snprintf_s(num, _TRUNCATE, LoadStr(IDS_ADVSTRPORT), s->Port);
-        AddToAdvancedStr(buf, 300, num);
-    }
+        appendFormatted(IDS_ADVSTRPORT, s->Port);
     if (s->TransferMode != 0)
     {
-        char* str;
         switch (s->TransferMode)
         {
         case 1:
-            str = LoadStr(IDS_ADVSTRTRMODBINARY);
+            appendResource(IDS_ADVSTRTRMODBINARY);
             break;
         case 2:
-            str = LoadStr(IDS_ADVSTRTRMODASCII);
+            appendResource(IDS_ADVSTRTRMODASCII);
             break;
         default:
-            str = LoadStr(IDS_ADVSTRTRMODAUTO);
+            appendResource(IDS_ADVSTRTRMODAUTO);
             break;
         }
-        AddToAdvancedStr(buf, 300, str);
     }
     if (s->UsePassiveMode != 2)
-    {
-        AddToAdvancedStr(buf, 300, LoadStr(s->UsePassiveMode == 0 ? IDS_ADVSTRSERVERPASVNO : IDS_ADVSTRSERVERPASVYES));
-    }
+        appendResource(s->UsePassiveMode == 0 ? IDS_ADVSTRSERVERPASVNO : IDS_ADVSTRSERVERPASVYES);
     if (s->KeepConnectionAlive != 2)
-    {
-        AddToAdvancedStr(buf, 300, LoadStr(s->KeepConnectionAlive == 0 ? IDS_ADVSTRKEEPALIVENO : IDS_ADVSTRKEEPALIVEYES));
-    }
+        appendResource(s->KeepConnectionAlive == 0 ? IDS_ADVSTRKEEPALIVENO : IDS_ADVSTRKEEPALIVEYES);
     if (s->UseMaxConcurrentConnections != 2)
     {
         if (s->UseMaxConcurrentConnections == 1)
-        {
-            _snprintf_s(num, _TRUNCATE, LoadStr(IDS_ADVSTRMAXCONCURCON), s->MaxConcurrentConnections);
-            AddToAdvancedStr(buf, 300, num);
-        }
+            appendFormatted(IDS_ADVSTRMAXCONCURCON, s->MaxConcurrentConnections);
         else
-            AddToAdvancedStr(buf, 300, LoadStr(IDS_ADVSTRUNLIMITEDCON));
+            appendResource(IDS_ADVSTRUNLIMITEDCON);
     }
     if (s->UseServerSpeedLimit != 2)
     {
         if (s->UseServerSpeedLimit == 1)
-        {
-            _snprintf_s(num, _TRUNCATE, LoadStr(IDS_ADVSTRSPEEDLIM), s->ServerSpeedLimit);
-            AddToAdvancedStr(buf, 300, num);
-        }
+            appendFormatted(IDS_ADVSTRSPEEDLIM, s->ServerSpeedLimit);
         else
-            AddToAdvancedStr(buf, 300, LoadStr(IDS_ADVSTRUNLIMITEDSPEED));
+            appendResource(IDS_ADVSTRUNLIMITEDSPEED);
     }
-    if (s->ServerType != NULL)
+    if (!s->ServerType.empty())
     {
-        num[36] = 0;
-        char typeBuf[SERVERTYPE_MAX_SIZE + 101];
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRSERVERTYPE),
-                    GetTypeNameForUser(s->ServerType, typeBuf, SERVERTYPE_MAX_SIZE + 101));
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
-    }
-    if (s->TargetPanelPath != NULL && *s->TargetPanelPath != 0)
-    {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRTARGETPATH), s->TargetPanelPath);
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        std::wstring serverType;
+        if (GetTypeNameForUser(s->ServerType.c_str(), serverType))
+            appendFormatted(IDS_ADVSTRSERVERTYPE, serverType.c_str());
+        else
+            advancedGood = FALSE;
     }
     if (s->UseListingsCache != 2)
-    {
-        AddToAdvancedStr(buf, 300, LoadStr(s->UseListingsCache == 0 ? IDS_ADVSTRUSECACHENO : IDS_ADVSTRUSECACHEYES));
-    }
+        appendResource(s->UseListingsCache == 0 ? IDS_ADVSTRUSECACHENO : IDS_ADVSTRUSECACHEYES);
     if (s->EncryptControlConnection == 1)
-    {
-        AddToAdvancedStr(buf, 300, LoadStr(s->EncryptDataConnection == 1 ? IDS_ADVSTRSSLCONTRDATA : IDS_ADVSTRSSLCONTRONLY));
-    }
+        appendResource(s->EncryptDataConnection == 1 ? IDS_ADVSTRSSLCONTRDATA : IDS_ADVSTRSSLCONTRONLY);
     if (s->CompressData != -1)
-    {
-        AddToAdvancedStr(buf, 300, LoadStr(s->CompressData == 0 ? IDS_ADVSTRNOMODEZ : IDS_ADVSTRMODEZ));
-    }
+        appendResource(s->CompressData == 0 ? IDS_ADVSTRNOMODEZ : IDS_ADVSTRMODEZ);
 
     if (!s->ListCommand.empty())
     {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRLISTCOMMAND), s->ListCommand.c_str());
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        std::wstring command;
+        if (FtpDecodeLocalText(s->ListCommand, command))
+            appendFormatted(IDS_ADVSTRLISTCOMMAND, command.c_str());
+        else
+            advancedGood = FALSE;
     }
     if (!s->InitFTPCommands.empty())
     {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRINITFTPCMDS), s->InitFTPCommands.c_str());
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        std::wstring commands;
+        if (FtpDecodeLocalText(s->InitFTPCommands, commands))
+            appendFormatted(IDS_ADVSTRINITFTPCMDS, commands.c_str());
+        else
+            advancedGood = FALSE;
     }
-    if (buf[0] == 0)
-        strcpy(buf, LoadStr(IDS_ADVSTRNONE));
-    ti.EditLine(IDE_ADVANCEDINFO, buf, 300);
+    if (!s->TargetPanelPath.empty())
+        appendFormatted(IDS_ADVSTRTARGETPATH, s->TargetPanelPath.c_str());
+    if (!advancedGood || advancedInfo.empty())
+        advancedInfo = LangStr(IDS_ADVSTRNONE).c_str();
+    SetDlgItemTextW(HWindow, IDE_ADVANCEDINFO, advancedInfo.c_str());
 }
 
 void CConnectDlg::EnableControls()
@@ -1195,8 +1211,9 @@ void CConnectDlg::RefreshList(BOOL focusLast)
     int focus = (int)SendMessage(list, LB_GETCURSEL, 0, 0);
     int topIndex = (int)SendMessage(list, LB_GETTOPINDEX, 0, 0);
     SendMessage(list, WM_SETREDRAW, FALSE, 0);
-    SendMessage(list, LB_RESETCONTENT, 0, 0);
-    SendMessage(list, LB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_QUICKCONNECT));
+    SendMessageW(list, LB_RESETCONTENT, 0, 0);
+    SendMessageW(list, LB_ADDSTRING, 0,
+                 reinterpret_cast<LPARAM>(LangStr(IDS_QUICKCONNECT).c_str()));
     TmpFTPServerList.AddNamesToListbox(list);
     int count = (int)SendMessage(list, LB_GETCOUNT, 0, 0);
     if (focus >= count)
@@ -1228,7 +1245,7 @@ void CConnectDlg::MoveItem(HWND list, int fromIndex, int toIndex, int topIndex)
                 if (topIndex == -1)
                     topIndex = (int)SendMessage(list, LB_GETTOPINDEX, 0, 0);
                 SendMessage(list, LB_DELETESTRING, fromIndex + 1, 0);
-                SendMessage(list, LB_INSERTSTRING, toIndex + 1, (LPARAM)HandleNULLStr(s->ItemName));
+                SendMessageW(list, LB_INSERTSTRING, toIndex + 1, (LPARAM)s->ItemName.c_str());
                 SendMessage(list, LB_SETTOPINDEX, topIndex, 0);
                 SendMessage(list, LB_SETCURSEL, toIndex + 1, 0);
                 SendMessage(list, WM_SETREDRAW, TRUE, 0);
@@ -1281,7 +1298,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDE_INITIALPATH));
         if (AddBookmarkMode != 0)
         {
-            SetWindowText(HWindow, LoadStr(IDS_ORGANIZEBOOKMARKS));
+            SetWindowTextW(HWindow, LangStr(IDS_ORGANIZEBOOKMARKS).c_str());
             HWND ok = GetDlgItem(HWindow, IDOK);
             HWND close = GetDlgItem(HWindow, IDB_CLOSE);
             SendMessage(HWindow, DM_SETDEFID, IDB_CLOSE, 0);
@@ -1306,7 +1323,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
         // if the user uses the password manager, change the "it is not secure" message
         if (passwordManager->IsUsingMasterPassword())
-            SetDlgItemText(HWindow, IDC_SAVEPASSWORD_HINT, LoadStr(IDS_SAVEPASSWORD_PROTECTED));
+            SetDlgItemTextW(HWindow, IDC_SAVEPASSWORD_HINT,
+                            LangStr(IDS_SAVEPASSWORD_PROTECTED).c_str());
 
         // attach to the listbox (because Alt+arrow keys do not reach WM_VKEYTOITEM)
         CBookmarksListbox* list = new CBookmarksListbox(this, IDL_BOOKMARKS);
@@ -1331,32 +1349,40 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_APP_SHOWPASSWORD:
     {
         MSGBOXEX_PARAMS params;
+        const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
+        const std::wstring text = LangStr(IDS_SHOWPASSWORD_CONFIRMATION);
         memset(&params, 0, sizeof(params));
         params.HParent = HWindow;
         params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED |
                        MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-        params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-        params.Text = LoadStr(IDS_SHOWPASSWORD_CONFIRMATION);
+        params.Caption = caption.c_str();
+        params.Text = text.c_str();
         if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
         {
             CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
             // ask for the master password even if we already know it
             if (!passwordManager->IsUsingMasterPassword() || passwordManager->AskForMasterPassword(HWindow))
             {
-                // pull the password directly from the edit line
-                char plainPassword[PASSWORD_MAX_SIZE];
-                GetWindowText((HWND)wParam, plainPassword, PASSWORD_MAX_SIZE);
-                plainPassword[PASSWORD_MAX_SIZE - 1] = 0;
-
-                char buff[1000];
-                _snprintf_s(buff, _TRUNCATE, LoadStr(IDS_PASSWORDIS), plainPassword);
+                // Pull the complete password directly from the native edit control.
+                const int passwordLength = GetWindowTextLengthW((HWND)wParam);
+                std::vector<wchar_t> passwordStorage(static_cast<size_t>(passwordLength) + 1, L'\0');
+                GetWindowTextW((HWND)wParam, passwordStorage.data(),
+                               static_cast<int>(passwordStorage.size()));
+                // The formatted message embeds the plaintext password, so it is a secret in its own
+                // right and must be wiped, not merely destroyed - pre-unicode zeroed both the
+                // password and the formatted buffer (`memset(buff, 0, 1000)`). Widening kept the
+                // wipe on the edit-control copy and lost it on the message, which is the half that
+                // survives longest: a freed std::wstring allocation is handed to the next allocation
+                // as-is, and it can reach a crash dump or the page file.
+                std::wstring revealText = SPLFormatStringOwned(
+                    LangStr(IDS_PASSWORDIS).c_str(), passwordStorage.data());
+                CFTPSecureWideStringGuard revealTextGuard(revealText);
                 params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_DEFBUTTON2 |
                                MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT;
-                params.Text = buff;
+                params.Text = revealText.c_str();
                 if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
-                    SalamanderGeneral->CopyTextToClipboard(plainPassword, -1, FALSE, NULL);
-                memset(plainPassword, 0, lstrlen(plainPassword));
-                memset(buff, 0, 1000);
+                    SalamanderGeneral->CopyTextToClipboard(passwordStorage.data(), -1, FALSE, NULL);
+                SecureZeroMemory(passwordStorage.data(), passwordStorage.size() * sizeof(wchar_t));
             }
         }
         return 0;
@@ -1433,10 +1459,10 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!GetCurSelServer(&s, &i))
                     break; // unexpected situation
 
-                if (s->Address == NULL || *s->Address == 0)
+                if (s->Address.empty())
                 {
-                    SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_HOSTMAYNOTBEEMPTY),
-                                                     LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    ShowMessage(HWindow, LangStr(IDS_HOSTMAYNOTBEEMPTY).c_str(),
+                                                     LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
 
                     HWND ctrl = GetDlgItem(HWindow, IDE_HOSTADDRESS);
                     HWND wnd = GetFocus();
@@ -1457,8 +1483,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         proxyServerUID = Config.DefaultProxySrvUID;
                     if (TmpFTPProxyServerList.GetProxyType(proxyServerUID) == fpstHTTP1_1)
                     {
-                        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_HTTPNEEDPASSIVETRMODE2),
-                                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        ShowMessage(HWindow, LangStr(IDS_HTTPNEEDPASSIVETRMODE2).c_str(),
+                                                         LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
                         return TRUE;
                     }
                 }
@@ -1511,8 +1537,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (!GetCurSelServer(&s, &i))
                 break; // unexpected situation
 
-            int ret = SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CLEARPASSWORD_CONFIRMATION),
-                                                       LoadStr(IDS_FTPPLUGINTITLE), MB_YESNO | MSGBOXEX_ESCAPEENABLED | /*MB_DEFBUTTON2 | */ MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT);
+            int ret = ShowMessage(HWindow, LangStr(IDS_CLEARPASSWORD_CONFIRMATION).c_str(),
+                                                       LangStr(IDS_FTPPLUGINTITLE).c_str(), MB_YESNO | MSGBOXEX_ESCAPEENABLED | /*MB_DEFBUTTON2 | */ MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT);
             if (ret == IDYES)
             {
                 // user requested to delete the password
@@ -1540,10 +1566,12 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 // if the master password is used, verify that this password can be decrypted with it
                 if (!passwordManager->IsUsingMasterPassword() ||
-                    s->EncryptedPassword != NULL && !passwordManager->DecryptPassword(s->EncryptedPassword, s->EncryptedPasswordSize, NULL))
+                    s->EncryptedPassword != NULL &&
+                        !FTPDecryptPasswordW(passwordManager, s->EncryptedPassword,
+                                             s->EncryptedPasswordSize, NULL))
                 {
-                    int ret = SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CANNOT_DECRYPT_PASSWORD_DELETE),
-                                                               LoadStr(IDS_FTPERRORTITLE), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
+                    int ret = ShowMessage(HWindow, LangStr(IDS_CANNOT_DECRYPT_PASSWORD_DELETE).c_str(),
+                                                               LangStr(IDS_FTPERRORTITLE).c_str(), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
                     if (ret == IDNO)
                         break;
                     // user requested to delete the password
@@ -1605,14 +1633,10 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (LOWORD(wParam) == IDB_RENAMEBOOKMARK && i <= 0)
                     return TRUE; // quick connect cannot be renamed
 
-                char name[BOOKMARKNAME_MAX_SIZE];
-                name[0] = 0;
-                if (s->ItemName != NULL)
-                {
-                    lstrcpyn(name, s->ItemName, BOOKMARKNAME_MAX_SIZE);
-                }
+                std::wstring name = s->ItemName;
                 CRenameDlg dlg(HWindow, name,
-                               LOWORD(wParam) == IDB_NEWBOOKMARK || LOWORD(wParam) == CM_COPYSRVTO);
+                               LOWORD(wParam) == IDB_NEWBOOKMARK || LOWORD(wParam) == CM_COPYSRVTO,
+                               FALSE);
                 if (LOWORD(wParam) == CM_COPYSRVTO)
                     dlg.CopyDataFromFocusedServer = TRUE;
                 if (dlg.Execute() == IDOK)
@@ -1621,17 +1645,17 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         if (dlg.CopyDataFromFocusedServer)
                         {
-                            TmpFTPServerList.AddServer(name,
-                                                       s->Address,
-                                                       s->InitialPath,
+                            TmpFTPServerList.AddServer(name.c_str(),
+                                                       s->Address.c_str(),
+                                                       s->InitialPath.c_str(),
                                                        s->AnonymousConnection,
-                                                       s->UserName,
+                                                       s->UserName.c_str(),
                                                        s->EncryptedPassword,
                                                        s->EncryptedPasswordSize,
                                                        s->SavePassword,
                                                        s->ProxyServerUID,
-                                                       s->TargetPanelPath,
-                                                       s->ServerType,
+                                                       s->TargetPanelPath.c_str(),
+                                                       s->ServerType.empty() ? NULL : s->ServerType.c_str(),
                                                        s->TransferMode,
                                                        s->Port,
                                                        s->UsePassiveMode,
@@ -1651,11 +1675,11 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                                        s->CompressData);
                         }
                         else
-                            TmpFTPServerList.AddServer(name);
+                            TmpFTPServerList.AddServer(name.c_str());
                     }
                     else // rename
                     {
-                        UpdateStr(s->ItemName, name);
+                        s->ItemName = name;
                     }
                     RefreshList(LOWORD(wParam) == IDB_NEWBOOKMARK || LOWORD(wParam) == CM_COPYSRVTO);
                     SelChanged();
@@ -1666,18 +1690,20 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case IDB_REMOVEBOOKMARK:
             {
-                char buf[200 + BOOKMARKNAME_MAX_SIZE];
-                sprintf(buf, LoadStr(IDS_REMOVECONFIRM), HandleNULLStr(s->ItemName));
+                std::wstring prompt;
+                try
+                {
+                    prompt = SPLFormatStringOwned(LangStr(IDS_REMOVECONFIRM).c_str(),
+                                                  s->ItemName.c_str());
+                }
+                catch (...)
+                {
+                    return TRUE;
+                }
                 if (i > 0) // quick connect cannot be deleted (should always be false)
                 {
-                    MSGBOXEX_PARAMS params;
-                    memset(&params, 0, sizeof(params));
-                    params.HParent = HWindow;
-                    params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED |
-                                   MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT;
-                    params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                    params.Text = buf;
-                    if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
+                    if (ShowMessage(HWindow, prompt.c_str(), LangStr(IDS_FTPPLUGINTITLE).c_str(),
+                                    MB_YESNO | MB_ICONQUESTION) == IDYES)
                     {
                         TmpFTPServerList.Delete(i - 1);
                         RefreshList();
@@ -1693,112 +1719,148 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == CBN_KILLFOCUS)
                 {
-                    ti.EditLine(IDE_HOSTADDRESS, LastRawHostAddress, HOST_MAX_SIZE);
-                    char buf[HOST_MAX_SIZE];
-                    lstrcpyn(buf, LastRawHostAddress, HOST_MAX_SIZE);
-
-                    char* str = buf;
-                    while (*str != 0 && *str <= ' ')
-                        str++; // skip whitespaces
-                    // skip FS name
-                    int isFTPS = 0; // 0 = nothing, 1 = enable, 2 = disable
-                    if (SalamanderGeneral->StrNICmp(str, AssignedFSName, AssignedFSNameLen) == 0 &&
-                        str[AssignedFSNameLen] == ':')
+                    ti.EditLine(IDE_HOSTADDRESS, LastRawHostAddress);
+                    std::wstring parsedAddress;
+                    if (ti.IsGood() && FtpStoreWideText(LastRawHostAddress, parsedAddress))
                     {
-                        str += AssignedFSNameLen + 1;
-                        isFTPS = 2;
-                    }
-                    else // if it is FTPS, enable SSL encryption
-                    {
-                        if (SalamanderGeneral->StrNICmp(str, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 &&
-                            str[AssignedFSNameLenFTPS] == ':')
+                        try
                         {
-                            str += AssignedFSNameLenFTPS + 1;
+                        size_t start = 0;
+                        while (start < parsedAddress.size() && parsedAddress[start] <= L' ')
+                            start++; // skip whitespace
+
+                        int isFTPS = 0; // 0 = nothing, 1 = enable, 2 = disable
+                        const size_t remaining = parsedAddress.size() - start;
+                        if (remaining > AssignedFSName.size() &&
+                            _wcsnicmp(parsedAddress.c_str() + start, AssignedFSName.c_str(), AssignedFSName.size()) == 0 &&
+                            parsedAddress[start + AssignedFSName.size()] == L':')
+                        {
+                            start += AssignedFSName.size() + 1;
+                            isFTPS = 2;
+                        }
+                        else if (remaining > AssignedFSNameFTPS.size() &&
+                                 _wcsnicmp(parsedAddress.c_str() + start, AssignedFSNameFTPS.c_str(), AssignedFSNameFTPS.size()) == 0 &&
+                                 parsedAddress[start + AssignedFSNameFTPS.size()] == L':')
+                        {
+                            start += AssignedFSNameFTPS.size() + 1;
                             isFTPS = 1;
                         }
-                    }
-                    if (isFTPS != 0)
-                    {
-                        s->EncryptControlConnection = isFTPS == 1 ? 1 : 0;
-                        s->EncryptDataConnection = isFTPS == 1 ? 1 : 0;
-                    }
-                    char *user, *plainPassword, *host, *port, *path;
-                    char firstCharOfPath = '/';
-                    if (Config.ConvertHexEscSeq)
-                        FTPConvertHexEscapeSequences(str);
-                    FTPSplitPath(str, &user, &plainPassword, &host, &port, &path, &firstCharOfPath, 0);
-                    if (user != NULL && *user != 0) // we have a user name, use it
-                    {
-                        if (strcmp(FTP_ANONYMOUS, user) == 0 &&
-                            (plainPassword == NULL || *plainPassword == 0))
+                        parsedAddress.erase(0, start);
+
+                        if (Config.ConvertHexEscSeq &&
+                            !FTPConvertHexEscapeSequencesW(parsedAddress))
+                            ti.ErrorOn(IDE_HOSTADDRESS);
+
+                        if (ti.IsGood())
                         {
-                            s->AnonymousConnection = TRUE;
-                        }
-                        else
-                        {
-                            s->AnonymousConnection = FALSE;
-                            UpdateStr(s->UserName, user);
-                        }
-                    }
-                    if (plainPassword != NULL && *plainPassword != 0) // we have a password, use it
-                    {
-                        // when the password manager is used, we do not know the master password and want to store the password
-                        CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
-                        if (s->SavePassword && passwordManager->IsUsingMasterPassword() && !passwordManager->IsMasterPasswordSet())
-                        {
-                            // ask for the master password
-                            if (!passwordManager->AskForMasterPassword(HWindow))
+                            if (isFTPS != 0)
                             {
-                                s->SavePassword = FALSE;
-                                CheckDlgButton(HWindow, IDC_SAVEPASSWORD, BST_UNCHECKED);
+                                s->EncryptControlConnection = isFTPS == 1 ? 1 : 0;
+                                s->EncryptDataConnection = isFTPS == 1 ? 1 : 0;
+                            }
+
+                            wchar_t *user, *plainPassword, *host, *port, *path;
+                            wchar_t firstCharOfPath = L'/';
+                            FTPSplitPathW(parsedAddress.data(), &user, &plainPassword, &host, &port,
+                                          &path, &firstCharOfPath, 0);
+                            if (user != NULL && *user != 0)
+                            {
+                                if (wcscmp(L"anonymous", user) == 0 &&
+                                    (plainPassword == NULL || *plainPassword == 0))
+                                    s->AnonymousConnection = TRUE;
+                                else
+                                {
+                                    s->AnonymousConnection = FALSE;
+                                    if (!FtpStoreWideText(user, s->UserName))
+                                        ti.ErrorOn(IDE_HOSTADDRESS);
+                                }
+                            }
+
+                            if (ti.IsGood() && plainPassword != NULL && *plainPassword != 0)
+                            {
+                                CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
+                                if (s->SavePassword && passwordManager->IsUsingMasterPassword() &&
+                                    !passwordManager->IsMasterPasswordSet() &&
+                                    !passwordManager->AskForMasterPassword(HWindow))
+                                {
+                                    s->SavePassword = FALSE;
+                                    CheckDlgButton(HWindow, IDC_SAVEPASSWORD, BST_UNCHECKED);
+                                }
+                                s->AnonymousConnection = FALSE;
+
+                                BYTE* encryptedPassword = NULL;
+                                int encryptedPasswordSize = 0;
+                                const BOOL encrypt = s->SavePassword &&
+                                                     passwordManager->IsUsingMasterPassword() &&
+                                                     passwordManager->IsMasterPasswordSet();
+                                if (!FTPEncryptPasswordW(passwordManager, plainPassword,
+                                                         &encryptedPassword,
+                                                         &encryptedPasswordSize, encrypt) ||
+                                    !UpdateEncryptedPassword(&s->EncryptedPassword,
+                                                             &s->EncryptedPasswordSize,
+                                                             encryptedPassword,
+                                                             encryptedPasswordSize))
+                                    ti.ErrorOn(IDE_HOSTADDRESS);
+                                if (encryptedPassword != NULL)
+                                {
+                                    SecureZeroMemory(encryptedPassword, encryptedPasswordSize);
+                                    SalamanderGeneral->Free(encryptedPassword);
+                                }
+                            }
+
+                            if (ti.IsGood() && !FtpStoreWideText(host != NULL ? host : L"", s->Address))
+                                ti.ErrorOn(IDE_HOSTADDRESS);
+
+                            if (ti.IsGood() && port != NULL && *port != 0)
+                            {
+                                unsigned value = 0;
+                                const wchar_t* digit = port;
+                                while (*digit >= L'0' && *digit <= L'9' && value <= 65535)
+                                {
+                                    value = value * 10 + static_cast<unsigned>(*digit - L'0');
+                                    digit++;
+                                }
+                                if (*digit == 0 && value >= 1 && value <= 65535)
+                                    s->Port = static_cast<int>(value);
+                            }
+
+                            if (ti.IsGood() && path != NULL)
+                            {
+                                try
+                                {
+                                    std::wstring initialPath;
+                                    const CFTPServerPathType type = GetFTPServerPathTypeW(NULL, NULL, path);
+                                    if (type == ftpsptOpenVMS || type == ftpsptMVS ||
+                                        type == ftpsptIBMz_VM || type == ftpsptOS2)
+                                        initialPath.assign(path);
+                                    else
+                                    {
+                                        initialPath.push_back(firstCharOfPath);
+                                        initialPath.append(path);
+                                    }
+                                    s->InitialPath.swap(initialPath);
+                                }
+                                catch (...)
+                                {
+                                    ti.ErrorOn(IDE_HOSTADDRESS);
+                                }
                             }
                         }
-                        s->AnonymousConnection = FALSE;
 
-                        // store the password
-                        BYTE* encryptedPassword = NULL; // may be just scrambled
-                        int encryptedPasswordSize = 0;
-                        // only stored passwords make sense to encrypt
-                        BOOL encrypt = s->SavePassword && passwordManager->IsUsingMasterPassword() && passwordManager->IsMasterPasswordSet();
-                        if (passwordManager->EncryptPassword(plainPassword, &encryptedPassword, &encryptedPasswordSize, encrypt))
+                        if (ti.IsGood())
                         {
-                            UpdateEncryptedPassword(&s->EncryptedPassword, &s->EncryptedPasswordSize, encryptedPassword, encryptedPasswordSize);
-                            // free the buffer allocated in EncryptPassword()
-                            memset(encryptedPassword, 0, encryptedPasswordSize);
-                            SalamanderGeneral->Free(encryptedPassword);
+                            SelChanged();
+                            EnableControls();
                         }
-                    }
-                    UpdateStr(s->Address, HandleNULLStr(host));
-                    if (port != NULL && *port != 0) // we have a port, use it
-                    {
-                        char* t = port;
-                        while (*t >= '0' && *t <= '9')
-                            t++; // check whether it is a number
-                        int p = atoi(port);
-                        if (*t == 0 && p >= 1 && p <= 65535) // it is a number and within the allowed range
-                            s->Port = atoi(port);
-                    }
-                    if (path != NULL) // we have a remote path, use it
-                    {
-                        CPathBuffer pathBuf;
-                        CFTPServerPathType type;
-                        type = GetFTPServerPathType(NULL, NULL, path);
-                        if (type == ftpsptOpenVMS || type == ftpsptMVS || type == ftpsptIBMz_VM ||
-                            type == ftpsptOS2) // VMS + MVS + IBM_z/VM + OS/2 (poorly recognizes the Unix path "/C:/path", but it probably will not bother anyone; it is a very unlikely Unix path)
-                        {                      // they do not have '/' or '\\' at the start of the path
-                            lstrcpyn(pathBuf, path, pathBuf.Size());
                         }
-                        else
+                        catch (...)
                         {
-                            pathBuf[0] = firstCharOfPath;
-                            lstrcpyn(pathBuf + 1, path, pathBuf.Size() - 1);
+                            ti.ErrorOn(IDE_HOSTADDRESS);
                         }
-                        UpdateStr(s->InitialPath, pathBuf);
+                        FTPSecureWipe(parsedAddress); // may contain an inline password
                     }
-
-                    SelChanged();
-                    EnableControls();
-                    memset(buf, 0, HOST_MAX_SIZE); // wipe the memory where the password appeared
+                    else
+                        ti.ErrorOn(IDE_HOSTADDRESS);
                 }
                 break;
             }
@@ -1807,11 +1869,13 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == CBN_KILLFOCUS)
                 {
-                    CPathBuffer buf;
-                    ti.EditLine(IDE_INITIALPATH, buf, buf.Size());
-                    unsigned len = (unsigned)strlen(buf);
-                    UpdateStr(s->InitialPath, buf);
-                    if (len != strlen(buf))
+                    std::wstring initialPath;
+                    ti.EditLine(IDE_INITIALPATH, initialPath);
+                    if (!ti.IsGood())
+                        break;
+                    const BOOL changed = initialPath != s->InitialPath;
+                    s->InitialPath.swap(initialPath);
+                    if (changed)
                     {
                         SelChanged();
                         EnableControls();
@@ -1835,9 +1899,10 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == EN_KILLFOCUS && !s->AnonymousConnection)
                 {
-                    char buf[USER_MAX_SIZE];
-                    ti.EditLine(IDE_USERNAME, buf, USER_MAX_SIZE);
-                    UpdateStr(s->UserName, buf);
+                    std::wstring userName;
+                    ti.EditLine(IDE_USERNAME, userName);
+                    if (ti.IsGood())
+                        s->UserName.swap(userName);
                 }
                 break;
             }
@@ -1848,26 +1913,30 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (HIWORD(wParam) == EN_KILLFOCUS && !s->AnonymousConnection &&
                     (!s->SavePassword || !passwordManager->IsUsingMasterPassword() || passwordManager->IsMasterPasswordSet())) // just to be safe: exclude the case when the edit box is disabled (editing via the Unlock button)
                 {
-                    char plainPassword[PASSWORD_MAX_SIZE];
-                    ti.EditLine(IDE_PASSWORD, plainPassword, PASSWORD_MAX_SIZE);
+                    std::wstring plainPassword;
+                    ti.EditLine(IDE_PASSWORD, plainPassword);
 
-                    if (plainPassword[0] != 0)
+                    if (!plainPassword.empty())
                     {
                         BYTE* encryptedPassword = NULL; // may be just scrambled
                         int encryptedPasswordSize = 0;
                         // only stored passwords make sense to encrypt
                         BOOL encrypt = s->SavePassword && passwordManager->IsUsingMasterPassword() && passwordManager->IsMasterPasswordSet();
-                        if (passwordManager->EncryptPassword(plainPassword, &encryptedPassword, &encryptedPasswordSize, encrypt))
+                        if (FTPEncryptPasswordW(passwordManager, plainPassword.c_str(),
+                                                &encryptedPassword,
+                                                &encryptedPasswordSize, encrypt))
                         {
-                            UpdateEncryptedPassword(&s->EncryptedPassword, &s->EncryptedPasswordSize, encryptedPassword, encryptedPasswordSize);
+                            if (!UpdateEncryptedPassword(&s->EncryptedPassword, &s->EncryptedPasswordSize,
+                                                         encryptedPassword, encryptedPasswordSize))
+                                ti.ErrorOn(IDE_PASSWORD);
                             // free the buffer allocated in EncryptPassword()
                             memset(encryptedPassword, 0, encryptedPasswordSize);
                             SalamanderGeneral->Free(encryptedPassword);
                         }
-                        memset(plainPassword, 0, PASSWORD_MAX_SIZE); // wipe the memory where the password appeared
                     }
                     else
                         UpdateEncryptedPassword(&s->EncryptedPassword, &s->EncryptedPasswordSize, NULL, 0);
+                    FTPSecureWipe(plainPassword);
                 }
                 break;
             }
@@ -1930,7 +1999,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (!ExtraDragDropItemAdded)
             {
-                SendMessage(pdli->hWnd, LB_ADDSTRING, 0, (LPARAM) ""); // add an empty string at the end (because of the insertion marker after the items)
+                SendMessageW(pdli->hWnd, LB_ADDSTRING, 0, (LPARAM)L""); // add an empty string at the end (because of the insertion marker after the items)
                 ExtraDragDropItemAdded = TRUE;
             }
 
@@ -2019,9 +2088,7 @@ LRESULT CPasswordEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (IsWindowEnabled(HWindow) && controlPressed && !altPressed && !shiftPressed)
         {
             // verify that the edit line contains something
-            char buff[2];
-            GetWindowText(HWindow, buff, 2);
-            if (buff[0] != 0)
+            if (GetWindowTextLengthW(HWindow) > 0)
             {
                 PostMessage(GetParent(HWindow), WM_APP_SHOWPASSWORD, (WPARAM)HWindow, lParam);
                 return 0;

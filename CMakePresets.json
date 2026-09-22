@@ -1,111 +1,123 @@
 {
-    "version": 6,
-    "cmakeMinimumRequired": {
-        "major": 3,
-        "minor": 21,
-        "patch": 0
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build-${presetName}"
     },
-    "configurePresets": [
-        {
-            "name": "base",
-            "hidden": true,
-            "binaryDir": "${sourceDir}/build-${presetName}"
-        },
-        {
-            "name": "x64",
-            "displayName": "Cross-compile x64 (Clang-CL)",
-            "description": "Cross-compile for Windows x64 using Clang-CL with MSVC ABI",
-            "inherits": "base",
-            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "x64-debug",
-            "displayName": "Cross-compile x64 Debug (Clang-CL)",
-            "description": "Cross-compile for Windows x64 Debug using Clang-CL",
-            "inherits": "base",
-            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "arm64",
-            "displayName": "Cross-compile ARM64 (Clang-CL)",
-            "description": "Cross-compile for Windows ARM64 using Clang-CL with MSVC ABI",
-            "inherits": "base",
-            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "arm64-debug",
-            "displayName": "Cross-compile ARM64 Debug (Clang-CL)",
-            "description": "Cross-compile for Windows ARM64 Debug using Clang-CL",
-            "inherits": "base",
-            "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "msvc",
-            "displayName": "Native MSVC x64 (Windows only)",
-            "description": "Native Windows x64 build with Visual Studio",
-            "inherits": "base",
-            "generator": "Visual Studio 17 2022",
-            "architecture": "x64",
-            "binaryDir": "${sourceDir}/build"
-        },
-        {
-            "name": "msvc-arm64",
-            "displayName": "Native MSVC ARM64 (Windows on ARM)",
-            "description": "Native Windows ARM64 build with Visual Studio",
-            "inherits": "base",
-            "generator": "Visual Studio 17 2022",
-            "architecture": "ARM64",
-            "binaryDir": "${sourceDir}/build"
-        }
-    ],
-    "buildPresets": [
-        {
-            "name": "x64",
-            "configurePreset": "x64"
-        },
-        {
-            "name": "x64-debug",
-            "configurePreset": "x64-debug"
-        },
-        {
-            "name": "arm64",
-            "configurePreset": "arm64"
-        },
-        {
-            "name": "arm64-debug",
-            "configurePreset": "arm64-debug"
-        },
-        {
-            "name": "msvc",
-            "configurePreset": "msvc",
-            "configuration": "Release"
-        },
-        {
-            "name": "msvc-debug",
-            "configurePreset": "msvc",
-            "configuration": "Debug"
-        },
-        {
-            "name": "msvc-arm64",
-            "configurePreset": "msvc-arm64",
-            "configuration": "Release"
-        },
-        {
-            "name": "msvc-arm64-debug",
-            "configurePreset": "msvc-arm64",
-            "configuration": "Debug"
-        }
-    ]
+    {
+      "name": "x64",
+      "displayName": "Cross-compile x64 (Clang-CL)",
+      "description": "Cross-compile for Windows x64 using Clang-CL with MSVC ABI",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-debug",
+      "displayName": "Cross-compile x64 Debug (Clang-CL)",
+      "description": "Cross-compile for Windows x64 Debug using Clang-CL",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-x64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "arm64",
+      "displayName": "Cross-compile ARM64 (Clang-CL)",
+      "description": "Cross-compile for Windows ARM64 using Clang-CL with MSVC ABI",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "arm64-debug",
+      "displayName": "Cross-compile ARM64 Debug (Clang-CL)",
+      "description": "Cross-compile for Windows ARM64 Debug using Clang-CL",
+      "inherits": "base",
+      "toolchainFile": "${sourceDir}/cmake/toolchain-clang-cl-arm64.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "msvc",
+      "displayName": "Native MSVC x64 (Windows only)",
+      "description": "Native Windows x64 build with Visual Studio",
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "msvc-arm64",
+      "displayName": "Native MSVC ARM64 (Windows on ARM)",
+      "description": "Native Windows ARM64 build with Visual Studio",
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "ARM64",
+      "binaryDir": "${sourceDir}/build"
+    },
+    {
+      "name": "msvc-unicode-canary",
+      "displayName": "MSVC x64, UNICODE explicitly ON (endgame:P4.2 - now the default; kept for a separate build dir)",
+      "description": "UNICODE/_UNICODE is the DEFAULT build since endgame:P4.2 - this preset now only differs from `msvc` by using its own binaryDir, which keeps a second set of artifacts available for side-by-side comparison. It is no longer expected to fail: the whole solution builds at 0 errors with the define and the private gate is 188/188. There is no narrow configuration to build: UNICODE/_UNICODE are set unconditionally in CMakeLists.txt and no option disables them.",
+      "inherits": "msvc",
+      "binaryDir": "${sourceDir}/build-unicode-canary"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "x64",
+      "configurePreset": "x64"
+    },
+    {
+      "name": "x64-debug",
+      "configurePreset": "x64-debug"
+    },
+    {
+      "name": "arm64",
+      "configurePreset": "arm64"
+    },
+    {
+      "name": "arm64-debug",
+      "configurePreset": "arm64-debug"
+    },
+    {
+      "name": "msvc",
+      "configurePreset": "msvc",
+      "configuration": "Release"
+    },
+    {
+      "name": "msvc-debug",
+      "configurePreset": "msvc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "msvc-arm64",
+      "configurePreset": "msvc-arm64",
+      "configuration": "Release"
+    },
+    {
+      "name": "msvc-arm64-debug",
+      "configurePreset": "msvc-arm64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "msvc-unicode-canary",
+      "configurePreset": "msvc-unicode-canary",
+      "configuration": "Release"
+    }
+  ]
 }

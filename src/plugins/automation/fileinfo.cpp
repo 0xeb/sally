@@ -18,22 +18,16 @@
 
 CFileInfo::CFileInfo()
 {
-    m_pszPath = NULL;
-    m_pszInfo = NULL;
 }
 
 CFileInfo::~CFileInfo()
 {
-    Clear();
 }
 
 void CFileInfo::Clear()
 {
-    delete[] m_pszPath;
-    m_pszPath = NULL;
-
-    delete[] m_pszInfo;
-    m_pszInfo = NULL;
+    m_path.clear();
+    m_info.clear();
 }
 
 HRESULT CFileInfo::FromVariant(VARIANT* var)
@@ -183,19 +177,10 @@ HRESULT CFileInfo::FromDispatch(IDispatch* pdisp)
 
 void CFileInfo::SetInfo(const CQuadWord& size, DATE date, UINT uValidFields)
 {
-    size_t len = 0;
-    const size_t buffSize = 256;
-
-    _ASSERTE(m_pszInfo == NULL);
-
-    m_pszInfo = new TCHAR[buffSize];
-    m_pszInfo[0] = _T('\0');
+    _ASSERTE(m_info.empty());
 
     if (uValidFields & VALID_DATA_SIZE)
-    {
-        SalamanderGeneral->NumberToStr(m_pszInfo, size);
-        len = _tcslen(m_pszInfo);
-    }
+        m_info = SPLNumberToStrOwned(SalamanderGeneral, size);
 
     if (uValidFields & (VALID_DATA_DATE | VALID_DATA_TIME))
     {
@@ -203,76 +188,37 @@ void CFileInfo::SetInfo(const CQuadWord& size, DATE date, UINT uValidFields)
 
         if (VariantTimeToSystemTime(date, &time))
         {
-            if (len > 0)
-            {
-                StringCchCat(m_pszInfo, buffSize, TEXT(", "));
-                len += 2;
-            }
-
-            len += GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
-                                 NULL, m_pszInfo + len, buffSize - (int)len) -
-                   1;
-
-            StringCchCat(m_pszInfo, buffSize, TEXT(", "));
-            len += 2;
-
-            len += GetTimeFormat(LOCALE_USER_DEFAULT, 0, &time, NULL,
-                                 m_pszInfo + len, buffSize - (int)len) -
-                   1;
+            const int dateLength = GetDateFormatW(
+                LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, NULL, 0);
+            const int timeLength = GetTimeFormatW(
+                LOCALE_USER_DEFAULT, 0, &time, NULL, NULL, 0);
+            std::vector<wchar_t> dateText(dateLength > 0 ? dateLength : 1, L'\0');
+            std::vector<wchar_t> timeText(timeLength > 0 ? timeLength : 1, L'\0');
+            if (dateLength > 0)
+                GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL,
+                               dateText.data(), dateLength);
+            if (timeLength > 0)
+                GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL,
+                               timeText.data(), timeLength);
+            if (!m_info.empty())
+                m_info += L", ";
+            m_info += dateText.data();
+            m_info += L", ";
+            m_info += timeText.data();
         }
     }
 }
 
 void CFileInfo::SetPath(PCWSTR pszPath, int len)
 {
-    _ASSERTE(m_pszPath == NULL);
-    m_pszPath = DupWideStr(pszPath, len);
+    _ASSERTE(m_path.empty());
+    if (pszPath != NULL)
+        m_path.assign(pszPath, len >= 0 ? static_cast<size_t>(len) : wcslen(pszPath));
 }
 
 void CFileInfo::SetInfo(PCWSTR pszInfo, int len)
 {
-    _ASSERTE(m_pszInfo == NULL);
-    m_pszInfo = DupWideStr(pszInfo, len);
+    _ASSERTE(m_info.empty());
+    if (pszInfo != NULL)
+        m_info.assign(pszInfo, len >= 0 ? static_cast<size_t>(len) : wcslen(pszInfo));
 }
-
-#ifndef _UNICODE
-PTSTR CFileInfo::DupWideStr(PCWSTR s, int len)
-{
-    char* dup;
-    int cch;
-
-    if (len == 0 || s == NULL || (len < 0 && *s == L'\0'))
-    {
-        return EmptyStr();
-    }
-
-    cch = WideCharToMultiByte(CP_ACP, 0, s, len, NULL, 0, NULL, NULL);
-    if (cch <= 0)
-    {
-        _ASSERTE(0);
-        return EmptyStr();
-    }
-
-    if (len < 0)
-    {
-        dup = new char[cch];
-        cch = WideCharToMultiByte(CP_ACP, 0, s, len, dup, cch, NULL, NULL);
-    }
-    else
-    {
-        dup = new char[cch + 1];
-        cch = WideCharToMultiByte(CP_ACP, 0, s, len, dup, cch + 1, NULL, NULL);
-        if (cch > 0)
-        {
-            dup[cch] = _T('\0');
-        }
-    }
-
-    if (cch <= 0)
-    {
-        dup[0] = _T('\0');
-    }
-
-    return dup;
-}
-#endif

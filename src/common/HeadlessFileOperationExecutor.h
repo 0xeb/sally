@@ -10,10 +10,10 @@
 
 #pragma once
 
+#include "IFileSystem.h"
 #include "IWorkerObserver.h"
 #include "SnapshotOperationPlanner.h"
 #include "lang/lang.rh"
-#include "unicode/helpers.h"
 
 #include <windows.h>
 
@@ -23,6 +23,15 @@
 
 namespace sally::operation_executor
 {
+
+inline IFileSystem* OpExecFs()
+{
+    IFileSystem* fs = gFileSystem;
+    if (fs == NULL)
+        fs = GetWin32FileSystem();
+    return fs;
+}
+
 
 struct CFileOperationExecutionState
 {
@@ -49,21 +58,12 @@ struct CFileOperationResult
 
 struct CDirectoryEntry
 {
-    std::string NameA;
     std::wstring NameW;
     bool IsDir = false;
     unsigned __int64 Size = 0;
     DWORD Attr = 0;
     FILETIME LastWrite = {};
 };
-
-inline std::string ObserverPathFallbackA(const std::wstring& path)
-{
-    std::string ansi;
-    if (sally::unicode::TryWideToAnsiRoundTripExact(path, ansi))
-        return ansi;
-    return WideToAnsi(path);
-}
 
 inline CFileOperationResult SuccessResult(bool skipped = false)
 {
@@ -95,10 +95,8 @@ inline bool ConfirmOverwrite(IWorkerObserver& observer,
     if (observer.IsCancelled())
         return false;
 
-    std::string sourceA = ObserverPathFallbackA(sourcePath);
-    std::string targetA = ObserverPathFallbackA(targetPath);
-    int response = observer.AskOverwriteW(sourceA.c_str(), sourcePath.c_str(), "",
-                                          targetA.c_str(), targetPath.c_str(), "");
+    int response = observer.AskOverwrite(sourcePath.c_str(), L"",
+                                         targetPath.c_str(), L"");
     switch (response)
     {
     case IDB_ALL:
@@ -118,14 +116,13 @@ inline bool ConfirmOverwrite(IWorkerObserver& observer,
 }
 
 inline int AskFileError(IWorkerObserver& observer,
-                        const char* title,
+                        const wchar_t* title,
                         const std::wstring& path,
                         DWORD error)
 {
-    char errorText[64] = {};
-    wsprintfA(errorText, "Error code %lu", error);
-    std::string pathA = ObserverPathFallbackA(path);
-    return observer.AskFileErrorW(title, pathA.c_str(), path.c_str(), errorText);
+    wchar_t errorText[64] = {};
+    swprintf_s(errorText, L"Error code %lu", error);
+    return observer.AskFileError(title, path.c_str(), errorText);
 }
 
 class CScopedReadonlyAttributeClear
@@ -139,15 +136,15 @@ public:
         if (OriginalAttrs != INVALID_FILE_ATTRIBUTES &&
             (OriginalAttrs & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            Restore = SetFileAttributesW(Path.c_str(),
-                                         OriginalAttrs & ~FILE_ATTRIBUTE_READONLY) != FALSE;
+            Restore = OpExecFs()->SetFileAttributes(
+                Path.c_str(), OriginalAttrs & ~FILE_ATTRIBUTE_READONLY).success;
         }
     }
 
     ~CScopedReadonlyAttributeClear()
     {
         if (Restore)
-            SetFileAttributesW(Path.c_str(), OriginalAttrs);
+            OpExecFs()->SetFileAttributes(Path.c_str(), OriginalAttrs);
     }
 
     void Commit()
@@ -179,7 +176,7 @@ inline bool EnumerateDirectoryEntriesW(const std::wstring& dir,
     search += L"*";
 
     WIN32_FIND_DATAW data = {};
-    HANDLE find = FindFirstFileW(search.c_str(), &data);
+    HANDLE find = OpExecFs()->FindFirstFile(search.c_str(), &data);
     if (find == INVALID_HANDLE_VALUE)
         return false;
 
@@ -190,16 +187,15 @@ inline bool EnumerateDirectoryEntriesW(const std::wstring& dir,
 
         CDirectoryEntry entry;
         entry.NameW = data.cFileName;
-        entry.NameA = WideToAnsi(entry.NameW);
         entry.IsDir = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
         entry.Attr = data.dwFileAttributes;
         entry.LastWrite = data.ftLastWriteTime;
         entry.Size = ((unsigned __int64)data.nFileSizeHigh << 32) | data.nFileSizeLow;
         entries.push_back(entry);
-    } while (FindNextFileW(find, &data));
+    } while (OpExecFs()->FindNextFile(find, &data));
 
     DWORD error = GetLastError();
-    FindClose(find);
+    OpExecFs()->CloseFind(find);
     if (error != ERROR_NO_MORE_FILES)
         return false;
 
@@ -216,13 +212,14 @@ inline CFileOperationResult ExecuteCreateDirectoryW(IWorkerObserver& observer,
 {
     while (true)
     {
-        if (CreateDirectoryW(targetPath.c_str(), NULL))
+        const FileResult createResult = OpExecFs()->CreateDirectory(targetPath.c_str());
+        if (createResult.success)
             return SuccessResult();
 
-        DWORD error = GetLastError();
+        DWORD error = createResult.errorCode;
         if (error == ERROR_ALREADY_EXISTS)
         {
-            DWORD attrs = GetFileAttributesW(targetPath.c_str());
+            DWORD attrs = OpExecFs()->GetFileAttributes(targetPath.c_str());
             if (attrs != INVALID_FILE_ATTRIBUTES &&
                 (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0)
             {
@@ -236,7 +233,7 @@ inline CFileOperationResult ExecuteCreateDirectoryW(IWorkerObserver& observer,
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error creating directory", targetPath, error);
+        int response = AskFileError(observer, L"Error creating directory", targetPath, error);
         switch (response)
         {
         case IDRETRY:
@@ -259,17 +256,18 @@ inline CFileOperationResult ExecuteRemoveDirectoryW(IWorkerObserver& observer,
 {
     while (true)
     {
-        if (RemoveDirectoryW(sourcePath.c_str()))
+        const FileResult removeResult = OpExecFs()->RemoveDirectory(sourcePath.c_str());
+        if (removeResult.success)
             return SuccessResult();
 
-        DWORD error = GetLastError();
+        DWORD error = removeResult.errorCode;
         observer.WaitIfSuspended();
         if (observer.IsCancelled())
             return ErrorResult(error);
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error removing directory", sourcePath, error);
+        int response = AskFileError(observer, L"Error removing directory", sourcePath, error);
         switch (response)
         {
         case IDRETRY:
@@ -291,7 +289,7 @@ inline CFileOperationResult ExecuteCopyFileW(IWorkerObserver& observer,
                                              const std::wstring& targetPath,
                                              CFileOperationExecutionState& state)
 {
-    DWORD targetAttrs = GetFileAttributesW(targetPath.c_str());
+    DWORD targetAttrs = OpExecFs()->GetFileAttributes(targetPath.c_str());
     if (targetAttrs != INVALID_FILE_ATTRIBUTES)
     {
         if (!ConfirmOverwrite(observer, sourcePath, targetPath, state))
@@ -301,20 +299,22 @@ inline CFileOperationResult ExecuteCopyFileW(IWorkerObserver& observer,
 
     while (true)
     {
-        if (CopyFileW(sourcePath.c_str(), targetPath.c_str(), FALSE))
+        const FileResult copyResult = OpExecFs()->CopyFile(
+            sourcePath.c_str(), targetPath.c_str(), false);
+        if (copyResult.success)
         {
             targetReadonly.Commit();
             return SuccessResult();
         }
 
-        DWORD error = GetLastError();
+        DWORD error = copyResult.errorCode;
         observer.WaitIfSuspended();
         if (observer.IsCancelled())
             return ErrorResult(ERROR_CANCELLED);
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error copying file", sourcePath, error);
+        int response = AskFileError(observer, L"Error copying file", sourcePath, error);
         switch (response)
         {
         case IDRETRY:
@@ -336,7 +336,7 @@ inline CFileOperationResult ExecuteMoveFileW(IWorkerObserver& observer,
                                              const std::wstring& targetPath,
                                              CFileOperationExecutionState& state)
 {
-    DWORD targetAttrs = GetFileAttributesW(targetPath.c_str());
+    DWORD targetAttrs = OpExecFs()->GetFileAttributes(targetPath.c_str());
     const bool targetExists = targetAttrs != INVALID_FILE_ATTRIBUTES;
     if (targetExists)
     {
@@ -345,26 +345,28 @@ inline CFileOperationResult ExecuteMoveFileW(IWorkerObserver& observer,
     }
     CScopedReadonlyAttributeClear targetReadonly(targetPath, targetAttrs);
 
-    DWORD flags = MOVEFILE_COPY_ALLOWED;
+    MoveFlags flags = MoveFlags::CopyAllowed;
     if (targetExists)
-        flags |= MOVEFILE_REPLACE_EXISTING;
+        flags = flags | MoveFlags::ReplaceExisting;
 
     while (true)
     {
-        if (MoveFileExW(sourcePath.c_str(), targetPath.c_str(), flags))
+        const FileResult moveResult = OpExecFs()->MoveFileWithFlags(
+            sourcePath.c_str(), targetPath.c_str(), flags);
+        if (moveResult.success)
         {
             targetReadonly.Commit();
             return SuccessResult();
         }
 
-        DWORD error = GetLastError();
+        DWORD error = moveResult.errorCode;
         observer.WaitIfSuspended();
         if (observer.IsCancelled())
             return ErrorResult(ERROR_CANCELLED);
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error moving file", sourcePath, error);
+        int response = AskFileError(observer, L"Error moving file", sourcePath, error);
         switch (response)
         {
         case IDRETRY:
@@ -390,20 +392,21 @@ inline CFileOperationResult ExecuteDeleteFileW(IWorkerObserver& observer,
 
     while (true)
     {
-        if (DeleteFileW(sourcePath.c_str()))
+        const FileResult deleteResult = OpExecFs()->DeleteFile(sourcePath.c_str());
+        if (deleteResult.success)
         {
             sourceReadonly.Commit();
             return SuccessResult();
         }
 
-        DWORD error = GetLastError();
+        DWORD error = deleteResult.errorCode;
         observer.WaitIfSuspended();
         if (observer.IsCancelled())
             return ErrorResult(ERROR_CANCELLED);
         if (state.SkipAllErrors)
             return SuccessResult(true);
 
-        int response = AskFileError(observer, "Error deleting file", sourcePath, error);
+        int response = AskFileError(observer, L"Error deleting file", sourcePath, error);
         switch (response)
         {
         case IDRETRY:
@@ -473,7 +476,7 @@ inline CFileOperationResult ExecutePlannedDirectoryOperation(
             error = ERROR_PATH_NOT_FOUND;
         if (state.SkipAllErrors)
             return SuccessResult(true);
-        int response = AskFileError(observer, "Error listing directory", plan.SourcePathW, error);
+        int response = AskFileError(observer, L"Error listing directory", plan.SourcePathW, error);
         switch (response)
         {
         case IDB_SKIPALL:
@@ -495,11 +498,9 @@ inline CFileOperationResult ExecutePlannedDirectoryOperation(
         sally::operation_planner::CPlannedSnapshotItem child;
         if (!sally::operation_planner::TryPlanChildItem(
                 plan.Action,
-                plan.SourcePathA, plan.SourcePathW,
-                plan.HasTarget() ? plan.TargetPathA : std::string(),
+                plan.SourcePathW,
                 plan.HasTarget() ? plan.TargetPathW : std::wstring(),
-                entry.NameA, entry.NameW,
-                entry.NameA, entry.NameW,
+                entry.NameW, entry.NameW,
                 entry.IsDir, entry.Size, entry.Attr, entry.LastWrite,
                 child))
         {

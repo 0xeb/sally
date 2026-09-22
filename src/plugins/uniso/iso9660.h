@@ -17,8 +17,6 @@
 #define ISO_SEPARATOR1 '.'
 #define ISO_SEPARATOR2 ';'
 
-#define ISO_MAX_PATH_LEN 1024
-
 class CISO9660 : public CUnISOFSAbstract
 {
 protected:
@@ -218,12 +216,6 @@ protected:
         BYTE BootIdentifier[32];
     };
 
-    struct CPathRecord
-    {
-        CPathTableRecord Record;
-        char FilePath[MAX_PATH];
-    };
-
     enum EExt
     {
         extNone,
@@ -236,12 +228,6 @@ protected:
         BYTE Signature[2];
         BYTE Length;
         BYTE Version;
-    };
-
-    struct CRRExtNM
-    {
-        CRRExtHeader Header;
-        char Name[MAX_PATH];
     };
 
     enum EBootRecordType
@@ -281,26 +267,35 @@ public:
     //    virtual DWORD GetRootLocationOfExtent();
     //    virtual DWORD GetRootDataLength();
     //    virtual BOOL ListDirectory(int track, char *data, DWORD size, char *path);
-    virtual BOOL ListDirectory(char* path, int session,
+    virtual BOOL ListDirectory(const std::wstring& path, int session,
                                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
     //    virtual int UnpackFile(CFilePos *fp, CSalamanderForOperationsAbstract *salamander);
     ///    virtual int UnpackFile(CSalamanderForOperationsAbstract *salamander, HANDLE outFile, CQuadWord fileSize, DWORD block, BOOL &whole);
-    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                           const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
+    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                           const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
 protected:
     void FillDirectoryRecord(CDirectoryRecord& root, BYTE bytes[]);
     void FillPathTableRecord(CPathTableRecord& record, BYTE bytes[]);
 
-    int ListDirectoryRe(char* path, CDirectoryRecord* root,
+    int ListDirectoryRe(const std::wstring& path, CDirectoryRecord* root,
                         CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
-    void ConvJolietName(char* dest, const char* src, int nLen);
+    // Joliet names are UTF-16BE per the Joliet spec (unlike RockRidge, whose
+    // encoding is unspecified) - decode straight to wide, no CP_ACP narrowing, so a name outside
+    // the machine's code page is not corrupted before AddFileDir builds the real fd.Name/
+    // extraction-target filename from it. The narrow ConvJolietName sibling that used to precede
+    // this declaration was deleted 2026-08-26 as confirmed-dead (zero callers).
+    std::wstring ConvJolietNameW(const char* src, int nLen);
+    // Strips the trailing ';version' (and, when bare, the dot before it) from an already-decoded
+    // wide Joliet file name - the wide sibling of ExtractFileName's suffix-strip step. Directory
+    // names never carry this suffix, so only the file path needs it.
+    void ExtractJolietFileNameW(std::wstring& fileName);
 
-    void ExtractExtFileName(char* fileName, const char* src, CDirectoryRecord& dr);
-    void ExtractFileName(char* fileName, const char* src, CDirectoryRecord& dr);
+    std::string ExtractExtFileName(const char* src, CDirectoryRecord& dr);
+    std::string ExtractFileName(const char* src, CDirectoryRecord& dr);
 
-    BOOL AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr,
+    BOOL AddFileDir(const wchar_t* path, const wchar_t* fileName, CDirectoryRecord& dr,
                     CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
     BOOL ReadBootRecord(BYTE* data, BOOL quiet);
@@ -310,10 +305,10 @@ protected:
     CBootRecordVolumeDescriptor BR;
 
     // boot extensions
-    char* GetBootRecordTypeStr(EBootRecordType type);
+    const wchar_t* GetBootRecordTypeStr(EBootRecordType type);
     BOOL ReadElTorito(BYTE* catalog, DWORD size, BOOL quiet);
     BOOL FillBootRecordInfoElTorito(CBootRecordInfo* bri, BYTE bootMedia, WORD sectorCount, DWORD loadRBA);
-    BOOL AddBootRecord(char* path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
+    BOOL AddBootRecord(std::wstring& path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
     friend class CUDFISO;
 };

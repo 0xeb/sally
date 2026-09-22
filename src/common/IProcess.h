@@ -3,6 +3,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #include <cstdint>
 #include <windows.h>
 
@@ -19,50 +20,29 @@ struct ProcessResult
 // Options for process creation
 struct ProcessStartInfo
 {
-    const wchar_t* applicationName;  // Optional, can be nullptr
-    const wchar_t* commandLine;      // Command line (required if appName is null)
-    const wchar_t* workingDirectory; // Optional, nullptr = inherit
-    bool inheritHandles;             // Whether to inherit handles
-    bool createNewConsole;           // CREATE_NEW_CONSOLE flag
-    bool hideWindow;                 // SW_HIDE in STARTUPINFO
-    DWORD creationFlags;             // Additional creation flags (0 for default)
-    const wchar_t* windowTitle;       // Optional console/window title
-    bool useShowWindow;               // Whether showWindow should be applied
-    WORD showWindow;                  // STARTUPINFO wShowWindow
-    bool usePosition;                 // Whether x/y should be applied
-    DWORD x;                          // STARTUPINFO dwX
-    DWORD y;                          // STARTUPINFO dwY
-    bool useSize;                     // Whether width/height should be applied
-    DWORD width;                      // STARTUPINFO dwXSize
-    DWORD height;                     // STARTUPINFO dwYSize
+    std::wstring applicationName;  // Empty lets Windows parse the executable from commandLine.
+    std::wstring commandLine;
+    std::wstring workingDirectory; // Empty inherits the parent's current directory.
+    std::wstring windowTitle;
+    std::vector<wchar_t> environmentBlock; // Explicit double-NUL UTF-16 block.
+    bool useEnvironment = false;
+    bool inheritHandles = false;
+    bool createNewConsole = false;
+    bool hideWindow = false;
+    DWORD creationFlags = 0;
+    bool useShowWindow = false;
+    WORD showWindow = SW_SHOWNORMAL;
+    bool usePosition = false;
+    DWORD x = 0;
+    DWORD y = 0;
+    bool useSize = false;
+    DWORD width = 0;
+    DWORD height = 0;
 
     // Standard handles for redirection (optional)
-    HANDLE hStdInput;
-    HANDLE hStdOutput;
-    HANDLE hStdError;
-
-    ProcessStartInfo()
-        : applicationName(nullptr)
-        , commandLine(nullptr)
-        , workingDirectory(nullptr)
-        , inheritHandles(false)
-        , createNewConsole(false)
-        , hideWindow(false)
-        , creationFlags(0)
-        , windowTitle(nullptr)
-        , useShowWindow(false)
-        , showWindow(SW_SHOWNORMAL)
-        , usePosition(false)
-        , x(0)
-        , y(0)
-        , useSize(false)
-        , width(0)
-        , height(0)
-        , hStdInput(nullptr)
-        , hStdOutput(nullptr)
-        , hStdError(nullptr)
-    {
-    }
+    HANDLE hStdInput = nullptr;
+    HANDLE hStdOutput = nullptr;
+    HANDLE hStdError = nullptr;
 };
 
 // Wait result enum
@@ -121,35 +101,3 @@ extern IProcess* gProcess;
 // Returns the default Win32 implementation
 IProcess* GetWin32Process();
 
-// ANSI helpers for migration
-inline std::wstring AnsiCmdToWide(const char* cmd)
-{
-    if (!cmd || !*cmd) return L"";
-    int len = MultiByteToWideChar(CP_ACP, 0, cmd, -1, nullptr, 0);
-    if (len == 0) return L"";
-    std::wstring wide;
-    wide.resize(len);
-    MultiByteToWideChar(CP_ACP, 0, cmd, -1, &wide[0], len);
-    wide.resize(len - 1);
-    return wide;
-}
-
-// ANSI helper: Create process with ANSI strings
-inline HPROCESS CreateProcessA(IProcess* proc, const char* appName, const char* cmdLine,
-                               const char* workDir, bool inheritHandles = false,
-                               bool createNewConsole = false, bool hideWindow = false)
-{
-    ProcessStartInfo info;
-    std::wstring wideApp = appName ? AnsiCmdToWide(appName) : L"";
-    std::wstring wideCmd = cmdLine ? AnsiCmdToWide(cmdLine) : L"";
-    std::wstring wideDir = workDir ? AnsiCmdToWide(workDir) : L"";
-
-    info.applicationName = wideApp.empty() ? nullptr : wideApp.c_str();
-    info.commandLine = wideCmd.empty() ? nullptr : wideCmd.c_str();
-    info.workingDirectory = wideDir.empty() ? nullptr : wideDir.c_str();
-    info.inheritHandles = inheritHandles;
-    info.createNewConsole = createNewConsole;
-    info.hideWindow = hideWindow;
-
-    return proc->CreateProcess(info);
-}

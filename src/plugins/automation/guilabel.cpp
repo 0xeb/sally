@@ -35,10 +35,10 @@ HWND CSalamanderGuiLabel::CreateHwnd(HWND hWndParent)
 
     m_pParent->BoundsToPixels(&pxbounds);
 
-    hWnd = CreateWindowEx(
+    hWnd = CreateWindowExW(
         WS_EX_NOPARENTNOTIFY,
-        _T("static"),
-        OLE2T(m_strText),
+        L"static",
+        m_strText,
         WS_CHILD | WS_VISIBLE,
         pxbounds.x,
         pxbounds.y,

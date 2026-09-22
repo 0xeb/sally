@@ -956,17 +956,17 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR2, dtFlags);
+                        DrawTextW(hDC, item->ColumnL1, item->ColumnL1Len, &textR2, dtFlags);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
+                    DrawTextW(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
                     SetBkMode(hDC, OPAQUE);
                 }
                 else
-                    DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
+                    DrawTextW(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
             }
 
             if (item->ColumnL2 != NULL)
@@ -982,19 +982,19 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                        DrawTextW(hDC, item->ColumnL2, item->ColumnL2Len,
                                  &textR2, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                    DrawTextW(hDC, item->ColumnL2, item->ColumnL2Len,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                     SetBkMode(hDC, OPAQUE);
                 }
                 else
-                    DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                    DrawTextW(hDC, item->ColumnL2, item->ColumnL2Len,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
             }
 
@@ -1011,18 +1011,18 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                        DrawTextW(hDC, item->ColumnR, item->ColumnRLen,
                                  &textR2, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                    DrawTextW(hDC, item->ColumnR, item->ColumnRLen,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 }
                 else
-                    DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                    DrawTextW(hDC, item->ColumnR, item->ColumnRLen,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
             }
             // restore the original values

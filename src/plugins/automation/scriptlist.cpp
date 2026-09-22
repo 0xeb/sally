@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -22,6 +22,7 @@
 #include "shim.h"
 #include "abortpalette.h"
 #include "abortmodal.h"
+#include "automation_text_encoding.h"
 #include "lang\lang.rh"
 
 extern HINSTANCE g_hInstance;
@@ -30,17 +31,16 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CAutomationPluginInterface g_oAutomationPlugin;
 
 CScriptInfo::CScriptInfo(
-    PCTSTR pszFileName,
+    PCWSTR pszFileName,
     CScriptContainer* pContainer)
 {
-    PCTSTR pszNameStart, pszNameEnd;
+    PCWSTR pszNameStart, pszNameEnd;
 
-    int fileNameBufSize = m_szFileName.Size();
-    lstrcpyn(m_szFileName, pszFileName, fileNameBufSize);
+    m_szFileName = pszFileName != NULL ? pszFileName : L"";
 
-    pszNameStart = PathFindFileName(pszFileName);
-    pszNameEnd = PathFindExtension(pszNameStart);
-    StringCchCopyN(m_szDisplayName, _countof(m_szDisplayName), pszNameStart, pszNameEnd - pszNameStart);
+    pszNameStart = PathFindFileNameW(pszFileName);
+    pszNameEnd = PathFindExtensionW(pszNameStart);
+    m_szDisplayName.assign(pszNameStart, pszNameEnd);
 
     m_clsidEngine = CLSID_NULL;
 
@@ -74,9 +74,9 @@ CScriptInfo::~CScriptInfo()
     }
 }
 
-PCTSTR CScriptInfo::GetFileExt() const
+PCWSTR CScriptInfo::GetFileExt() const
 {
-    return PathFindExtension(m_szFileName);
+    return PathFindExtensionW(m_szFileName.c_str());
 }
 
 bool CScriptInfo::Execute(__inout EXECUTION_INFO& info)
@@ -95,7 +95,7 @@ bool CScriptInfo::EnsureEngineAssociation()
     if (IsEqualGUID(m_clsidEngine, GUID_NULL))
     {
         if (!g_oScriptAssociations.FindEngineByExt(
-                PathFindExtension(m_szFileName),
+                PathFindExtensionW(m_szFileName.c_str()),
                 &m_clsidEngine))
         {
             // TODO: report a message
@@ -196,28 +196,25 @@ HRESULT CScriptInfo::LoadScript(IActiveScriptParse* pParse, EXECUTION_INFO* info
     LPOLESTR pszCode;
     EXCEPINFO ei;
     ULONG cch;
-    CPathBuffer szExpanded;
+    std::wstring expanded;
 
-    if (!g_oAutomationPlugin.ExpandPath(m_szFileName, szExpanded,
-                                        szExpanded.Size()))
+    if (!g_oAutomationPlugin.ExpandPath(m_szFileName.c_str(), expanded))
     {
         return HRESULT_FROM_WIN32(ERROR_ENVVAR_NOT_FOUND);
     }
 
-    hr = LoadOleStringFromFile(szExpanded, pszCode, &cch);
+    hr = LoadOleStringFromFile(expanded.c_str(), pszCode, &cch);
     if (FAILED(hr))
     {
-        TCHAR szMessage[256];
-        TCHAR szError[192];
+        wchar_t szMessage[256];
+        wchar_t szError[192];
 
         FormatErrorText(hr, szError, _countof(szError));
-        StringCchPrintf(szMessage, _countof(szMessage),
-                        SalamanderGeneral->LoadStr(g_hLangInst, IDS_LOADERRFMT),
-                        PathFindFileName(m_szFileName), szError);
+        StringCchPrintfW(szMessage, _countof(szMessage),
+                         SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_LOADERRFMT).c_str(),
+                         PathFindFileNameW(m_szFileName.c_str()), szError);
 
-        SalamanderGeneral->ShowMessageBox(
-            szMessage,
-            SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME),
+        SalamanderGeneral->ShowMessageBox(szMessage, SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME).c_str(),
             MSGBOX_ERROR);
 
         return hr;
@@ -255,15 +252,14 @@ HRESULT CScriptInfo::LoadScript(IActiveScriptParse* pParse, EXECUTION_INFO* info
     return hr;
 }
 
-HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s, __out_opt ULONG* cch)
+HRESULT CScriptInfo::LoadOleStringFromFile(PCWSTR pszFileName, __out LPOLESTR& s, __out_opt ULONG* cch)
 {
     HANDLE hFile, hMapping;
     DWORD cbSize;
     char* pszCodeA;
     HRESULT hr;
-    int cchRequired, cchConverted;
 
-    hFile = CreateFile(pszFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    hFile = CreateFileW(pszFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
         return HRESULT_FROM_WIN32(GetLastError());
@@ -299,37 +295,25 @@ HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s
         return hr;
     }
 
-    cchRequired = MultiByteToWideChar(CP_ACP, 0, pszCodeA, cbSize, NULL, 0);
-    if (cchRequired <= 0)
+    std::wstring decoded;
+    if (!sally::automation_text::DecodeScriptSource(pszCodeA, cbSize, decoded))
     {
         hr = HRESULT_FROM_WIN32(GetLastError());
         UnmapViewOfFile(pszCodeA);
         return hr;
     }
-
-    s = (LPOLESTR)malloc((cchRequired + 1) * sizeof(WCHAR));
-    if (s == NULL)
-    {
-        UnmapViewOfFile(pszCodeA);
-        return E_OUTOFMEMORY;
-    }
-
-    cchConverted = MultiByteToWideChar(CP_ACP, 0, pszCodeA, cbSize, s, cchRequired);
-    hr = HRESULT_FROM_WIN32(GetLastError());
     UnmapViewOfFile(pszCodeA);
-    if (cchConverted <= 0)
-    {
-        free(s);
-        return hr;
-    }
+    if (decoded.size() > ULONG_MAX)
+        return HRESULT_FROM_WIN32(ERROR_ARITHMETIC_OVERFLOW);
 
-    // nul terminate
-    s[cchConverted] = L'\0';
+    s = static_cast<LPOLESTR>(malloc((decoded.size() + 1) * sizeof(WCHAR)));
+    if (s == NULL)
+        return E_OUTOFMEMORY;
+    memcpy(s, decoded.data(), decoded.size() * sizeof(WCHAR));
+    s[decoded.size()] = L'\0';
 
     if (cch != NULL)
-    {
-        *cch = cchConverted;
-    }
+        *cch = static_cast<ULONG>(decoded.size());
 
     return S_OK;
 }
@@ -338,7 +322,7 @@ bool CScriptInfo::ExecuteWorker(EXECUTION_INFO* info)
 {
     HRESULT hr = S_OK;
 
-    CALL_STACK_MESSAGE2("CScriptInfo::ExecuteWorker() (file name = \"%s\")", (const char*)m_szFileName);
+    CALL_STACK_MESSAGE2("CScriptInfo::ExecuteWorker() (file name = \"%ls\")", m_szFileName.c_str());
 
     info->bDeselect = false;
 
@@ -357,8 +341,8 @@ bool CScriptInfo::ExecuteWorker(EXECUTION_INFO* info)
         {
             SalamanderGeneral->SalMessageBox(
                 SalamanderGeneral->GetMsgBoxParent(),
-                SalamanderGeneral->LoadStr(g_hLangInst, IDS_ENGINECREATEFAIL),
-                SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME),
+                SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ENGINECREATEFAIL).c_str(),
+                SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME).c_str(),
                 MB_OK | MB_ICONERROR);
         }
 
@@ -462,10 +446,10 @@ DWORD WINAPI CScriptInfo::ExecuteEntryProc(void* arg)
         info->bAsyncResult = that->ExecuteWorker(info);
 
         MSG msg;
-        while (GetMessage(&msg, NULL, 0, 0))
+        while (GetMessageW(&msg, NULL, 0, 0))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
 
         CoUninitialize();
@@ -495,15 +479,46 @@ void CScriptInfo::InitializeDebugger(DEBUG_INFO* dbgInfo)
     if (FAILED(hr))
         return;
 
-    OLECHAR szUrl[2 * MAX_PATH];
-    DWORD cchUrl = _countof(szUrl);
-    A2OLE sFileNameW(m_szFileName);
-    if (FAILED(UrlCreateFromPathW(A2OLE(sFileNameW), szUrl, &cchUrl, 0)))
+    std::wstring url;
+    const std::size_t maxUrlCapacity =
+        static_cast<std::size_t>((std::numeric_limits<DWORD>::max)());
+    if (m_szFileName.size() >= maxUrlCapacity)
+        return;
+    std::vector<wchar_t> urlBuffer(m_szFileName.size() + 1, L'\0');
+    for (;;)
     {
-        StringCchCopyW(szUrl, _countof(szUrl), sFileNameW);
+        DWORD length = static_cast<DWORD>(urlBuffer.size());
+        const HRESULT conversion = UrlCreateFromPathW(
+            m_szFileName.c_str(), urlBuffer.data(), &length, 0);
+        if (SUCCEEDED(conversion))
+        {
+            url.assign(urlBuffer.data());
+            break;
+        }
+        if (conversion != E_POINTER ||
+            urlBuffer.size() >= (std::numeric_limits<DWORD>::max)())
+        {
+            url = m_szFileName;
+            break;
+        }
+        const std::size_t required =
+            length < (std::numeric_limits<DWORD>::max)()
+                ? static_cast<std::size_t>(length) + 1
+                : maxUrlCapacity;
+        const std::size_t doubled =
+            urlBuffer.size() <= maxUrlCapacity / 2
+                ? urlBuffer.size() * 2
+                : maxUrlCapacity;
+        const std::size_t grown = (std::max)(required, doubled);
+        if (grown <= urlBuffer.size())
+        {
+            url = m_szFileName;
+            break;
+        }
+        urlBuffer.resize(grown, L'\0');
     }
     hr = dbgInfo->pDbgDocHelper->Init(dbgInfo->pDbgApp,
-                                      A2OLE(GetDisplayName()), szUrl, TEXT_DOC_ATTR_READONLY);
+                                      GetDisplayName(), url.c_str(), TEXT_DOC_ATTR_READONLY);
     if (FAILED(hr))
         return;
 
@@ -583,7 +598,7 @@ void CScriptInfo::ScriptEnter()
         // checking using WindowBelongsToProcessID() look like better solution for now.
         // For example unpack script is starting several command prompt windows
         // so WS_EX_TOPMOST toolbar is better accessible.
-        SalamanderGeneral->LockMainWindow(TRUE, NULL, SalamanderGeneral->LoadStr(g_hLangInst, IDS_MAINWINDOWLOCKED));
+        SalamanderGeneral->LockMainWindow(TRUE, NULL, SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_MAINWINDOWLOCKED).c_str());
     }
 }
 
@@ -607,13 +622,13 @@ CScriptContainer::CScriptContainer()
     m_pSibling = NULL;
     m_pChild = NULL;
     m_pScripts = NULL;
-    m_szPath[0] = _T('\0');
-    m_pszName = NULL;
+    m_szPath.clear();
+    m_szName.clear();
 }
 
 CScriptContainer::CScriptContainer(
     CScriptContainer* pParent,
-    PCTSTR pszPath,
+    PCWSTR pszPath,
     bool bFullPath)
 {
     m_pParent = pParent;
@@ -621,20 +636,19 @@ CScriptContainer::CScriptContainer(
     m_pChild = NULL;
     m_pScripts = NULL;
 
-    int pathBufSize = m_szPath.Size();
     if (bFullPath)
-    {
-        lstrcpyn(m_szPath, pszPath, pathBufSize);
-    }
+        m_szPath = pszPath != NULL ? pszPath : L"";
     else
     {
         _ASSERTE(pParent);
-        lstrcpyn(m_szPath, pParent->m_szPath, pathBufSize);
-        SalamanderGeneral->SalPathAppend(m_szPath, pszPath, pathBufSize);
+        m_szPath = pParent->m_szPath;
+        SPLSalPathAppendOwned(m_szPath, pszPath);
     }
 
-    SalamanderGeneral->SalPathRemoveBackslash(m_szPath);
-    m_pszName = PathFindFileName(m_szPath);
+    while (m_szPath.size() > 1 &&
+           (m_szPath.back() == L'\\' || m_szPath.back() == L'/'))
+        m_szPath.pop_back();
+    m_szName = PathFindFileNameW(m_szPath.c_str());
 }
 
 CScriptContainer::~CScriptContainer()
@@ -642,11 +656,11 @@ CScriptContainer::~CScriptContainer()
 }
 
 CScriptContainer* CScriptContainer::FirstChild(
-    PCTSTR pszPath,
+    PCWSTR pszPath,
     bool bFullPath)
 {
     CScriptContainer* pIter;
-    CPathBuffer szFullPath;
+    std::wstring fullPath;
 
     if (m_pChild == NULL)
     {
@@ -657,17 +671,17 @@ CScriptContainer* CScriptContainer::FirstChild(
 
     if (bFullPath)
     {
-        StringCchCopy(szFullPath, szFullPath.Size(), pszPath);
+        fullPath = pszPath != NULL ? pszPath : L"";
     }
     else
     {
-        StringCchCopy(szFullPath, szFullPath.Size(), m_szPath);
-        SalamanderGeneral->SalPathAppend(szFullPath, pszPath, szFullPath.Size());
+        fullPath = m_szPath;
+        SPLSalPathAppendOwned(fullPath, pszPath);
     }
 
     while (pIter)
     {
-        if (_tcsicmp(pIter->m_szPath, szFullPath) == 0)
+        if (_wcsicmp(pIter->m_szPath.c_str(), fullPath.c_str()) == 0)
         {
             return pIter;
         }
@@ -730,15 +744,14 @@ bool CScriptLookup::Load(HKEY hKey, CSalamanderRegistryAbstract* registry)
     {
         CScriptContainer* pContainer;
         bool bExisting;
+        PCWSTR pszDirectory = g_oAutomationPlugin.GetScriptDirectoryRaw(iDir);
 
-        pContainer = m_pRootContainer->FirstChild(
-            g_oAutomationPlugin.GetScriptDirectoryRaw(iDir), true);
+        pContainer = m_pRootContainer->FirstChild(pszDirectory, true);
         bExisting = (pContainer != NULL);
 
         if (!bExisting)
         {
-            pContainer = new CScriptContainer(m_pRootContainer,
-                                              g_oAutomationPlugin.GetScriptDirectoryRaw(iDir), true);
+            pContainer = new CScriptContainer(m_pRootContainer, pszDirectory, true);
         }
 
         if (FillContainer(pContainer, hKey, registry) > 0)
@@ -787,7 +800,7 @@ bool CScriptLookup::SaveBin(
     HKEY hKey,
     CSalamanderRegistryAbstract* registry)
 {
-    TCHAR szName[8];
+    wchar_t szName[8];
     HKEY hkSub = NULL;
     UINT nPrevHash = 0;
     UINT nHash;
@@ -804,7 +817,7 @@ bool CScriptLookup::SaveBin(
                 hkSub = NULL;
             }
 
-            StringCchPrintf(szName, _countof(szName), "%06X", nHash);
+            StringCchPrintfW(szName, _countof(szName), L"%06X", nHash);
             if (!registry->CreateKey(hKey, szName, hkSub))
             {
                 return false;
@@ -813,8 +826,9 @@ bool CScriptLookup::SaveBin(
             nPrevHash = nHash;
         }
 
-        StringCchPrintf(szName, _countof(szName), "%02X", UniquierFromId(pIter->m_nId));
-        registry->SetValue(hkSub, szName, REG_SZ, pIter->GetFileName(), -1);
+        StringCchPrintfW(szName, _countof(szName), L"%02X", UniquierFromId(pIter->m_nId));
+        const std::wstring fileName = pIter->GetFileName();
+        SPLRegistrySetString(registry, hkSub, szName, fileName);
     }
 
     if (hkSub != NULL)
@@ -855,14 +869,15 @@ int CScriptLookup::FillContainer(
     CSalamanderRegistryAbstract* registry)
 {
     HANDLE hFind;
-    CPathBuffer szPattern;
-    WIN32_FIND_DATA fd;
+    std::wstring pattern;
+    WIN32_FIND_DATAW fd;
     int cScripts = 0;
 
-    g_oAutomationPlugin.ExpandPath(pContainer->GetPath(), szPattern, szPattern.Size());
-    SalamanderGeneral->SalPathAppend(szPattern, _T("*"), szPattern.Size());
+    if (!g_oAutomationPlugin.ExpandPath(pContainer->GetPath(), pattern))
+        return 0;
+    SPLSalPathAppendOwned(pattern, L"*");
 
-    hFind = FindFirstFile(szPattern, &fd);
+    hFind = FindFirstFileW(pattern.c_str(), &fd);
     if (hFind == INVALID_HANDLE_VALUE)
     {
         return 0;
@@ -877,7 +892,7 @@ int CScriptLookup::FillContainer(
 
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
-            if (fd.cFileName[0] != _T('.')) // exclude . and .. as well as unix style hidden dirs
+            if (fd.cFileName[0] != L'.') // exclude . and .. as well as unix style hidden dirs
             {
                 int cSubScripts = 0;
                 CScriptContainer* pSubContainer;
@@ -907,20 +922,22 @@ int CScriptLookup::FillContainer(
         }
         else
         {
-            PTSTR pszExt = PathFindExtension(fd.cFileName);
-            if (pszExt && *pszExt && g_oScriptAssociations.FindEngineByExt(pszExt))
+            PCWSTR pszExt = PathFindExtensionW(fd.cFileName);
+            if (pszExt && *pszExt)
             {
-                CPathBuffer szFullPath;
-                StringCchCopy(szFullPath, szFullPath.Size(), pContainer->GetPath());
-                SalamanderGeneral->SalPathAppend(szFullPath, fd.cFileName, szFullPath.Size());
-                if (AddScriptFromFile(pContainer, szFullPath, hKey, registry))
+                if (g_oScriptAssociations.FindEngineByExt(pszExt))
                 {
-                    ++cScripts;
-                    ++m_cScriptsTotal;
+                    std::wstring fullPath(pContainer->GetPath());
+                    SPLSalPathAppendOwned(fullPath, fd.cFileName);
+                    if (AddScriptFromFile(pContainer, fullPath.c_str(), hKey, registry))
+                    {
+                        ++cScripts;
+                        ++m_cScriptsTotal;
+                    }
                 }
             }
         }
-    } while (FindNextFile(hFind, &fd));
+    } while (FindNextFileW(hFind, &fd));
 
     FindClose(hFind);
 
@@ -940,7 +957,7 @@ void CScriptLookup::LinkContainer(CScriptContainer* pContainer, CScriptContainer
         CScriptContainer* pIter = pParent->m_pChild;
         CScriptContainer* pPrev = NULL;
 
-        while (pIter && _tcsicmp(pContainer->m_pszName, pIter->m_pszName) >= 0)
+        while (pIter && _wcsicmp(pContainer->GetName(), pIter->GetName()) >= 0)
         {
             pPrev = pIter;
             pIter = pIter->m_pSibling;
@@ -1002,7 +1019,7 @@ void CScriptLookup::LinkScript(
         CScriptInfo* pIter = pParent->m_pScripts;
         CScriptInfo* pPrev = NULL;
 
-        while (pIter && _tcsicmp(pScript->GetDisplayName(), pIter->GetDisplayName()) >= 0)
+        while (pIter && _wcsicmp(pScript->GetDisplayName(), pIter->GetDisplayName()) >= 0)
         {
             pPrev = pIter;
             pIter = pIter->m_pNext;
@@ -1082,7 +1099,7 @@ void CScriptLookup::LinkScriptHash(CScriptInfo* pScript)
 
 CScriptInfo* CScriptLookup::AddScriptFromFile(
     CScriptContainer* pContainer,
-    PCTSTR pszFullPath,
+    PCWSTR pszFullPath,
     HKEY hKey,
     CSalamanderRegistryAbstract* registry)
 {
@@ -1122,7 +1139,7 @@ CScriptInfo* CScriptLookup::AddScriptFromFile(
 
 int CScriptLookup::GetUniquier(
     UINT nHash,
-    __in_z PCTSTR pszPath,
+    __in_z PCWSTR pszPath,
     HKEY hKey,
     CSalamanderRegistryAbstract* registry)
 {
@@ -1134,8 +1151,8 @@ int CScriptLookup::GetUniquier(
     if (hKey != NULL && hKey != INVALID_HANDLE_VALUE)
     {
         HKEY hkSub;
-        TCHAR szName[8];
-        StringCchPrintf(szName, _countof(szName), "%06X", HashFromId(nHash));
+        wchar_t szName[8];
+        StringCchPrintfW(szName, _countof(szName), L"%06X", HashFromId(nHash));
         if (!registry->OpenKey(hKey, szName, hkSub))
         {
             // the hash key does not even exist in the registry,
@@ -1148,23 +1165,24 @@ int CScriptLookup::GetUniquier(
         DWORD dwIndex = 0;
         DWORD cchName;
         DWORD dwType;
-        CPathBuffer szPathRead;
+        std::wstring pathRead;
         DWORD cbData;
 
         for (; res == NO_ERROR; dwIndex++)
         {
             cchName = _countof(szName);
-            cbData = szPathRead.Size() * sizeof(TCHAR);
-            res = RegEnumValue(hkSub, dwIndex, szName, &cchName,
-                               NULL, &dwType, (LPBYTE)(char*)szPathRead, &cbData);
-            if (res == NO_ERROR && dwType == REG_SZ)
+            cbData = 0;
+            res = RegEnumValueW(hkSub, dwIndex, szName, &cchName,
+                                NULL, &dwType, NULL, &cbData);
+            if (res == NO_ERROR && dwType == REG_SZ &&
+                SPLRegistryGetStringOwned(registry, hkSub, szName, pathRead))
             {
-                nUniquier = _tcstol(szName, NULL, 16);
+                nUniquier = wcstol(szName, NULL, 16);
 
                 // mark this uniquier as used in the free bitmap
                 bitmap.MarkBusy(nUniquier);
 
-                if (_tcsicmp(pszPath, szPathRead) == 0)
+                if (_wcsicmp(pszPath, pathRead.c_str()) == 0)
                 {
                     // we found exact uniquier for this script
                     registry->CloseKey(hkSub);
@@ -1215,14 +1233,14 @@ int CScriptLookup::GetUniquier(
     return 0;
 }
 
-UINT CScriptLookup::HashPath(__in_z PCTSTR pszPath)
+UINT CScriptLookup::HashPath(__in_z PCWSTR pszPath)
 {
     UINT nHash;
-    CPathBuffer szCanonicalPath;
-
-    StringCchCopy(szCanonicalPath, szCanonicalPath.Size(), pszPath);
-    CharLower(szCanonicalPath);
-    nHash = HashString(szCanonicalPath);
+    std::wstring canonicalPath(pszPath != NULL ? pszPath : L"");
+    if (canonicalPath.size() > (std::numeric_limits<DWORD>::max)())
+        return ~0u & HASH_MASK;
+    CharLowerBuffW(canonicalPath.data(), static_cast<DWORD>(canonicalPath.size()));
+    nHash = HashString(canonicalPath.c_str());
     if (nHash == 0)
     {
         nHash = ~0u;
@@ -1360,7 +1378,7 @@ void CScriptLookup::RemoveEmptyContainers(CScriptContainer* pContainer)
 
 CScriptInfo* CScriptLookup::LookupScriptByPath(
     UINT nHash,
-    PCTSTR pszFullPath)
+    PCWSTR pszFullPath)
 {
     _ASSERTE(nHash != 0);
 
@@ -1369,7 +1387,7 @@ CScriptInfo* CScriptLookup::LookupScriptByPath(
          pIter != NULL;
          pIter = pIter->m_pNextHash)
     {
-        if (_tcsicmp(pIter->GetFileName(), pszFullPath) == 0)
+        if (_wcsicmp(pIter->GetFileName(), pszFullPath) == 0)
         {
             return pIter;
         }

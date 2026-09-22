@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <string_view>
+
 // Salamander's general interface - valid from startup until the plugin shuts down
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
@@ -11,14 +14,15 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
 struct CFileInfo
 {
-    char* Name;
+    std::wstring Name;
     DWORD Status;
     DWORD DirDepth;
     DWORD Size;
 
-    CFileInfo(const char* name, DWORD status, DWORD dirDepth, DWORD size);
-    ~CFileInfo();
+    CFileInfo(std::wstring name, DWORD status, DWORD dirDepth, DWORD size);
 };
+
+CFileInfo* NewFileInfo(std::wstring name, DWORD status, DWORD dirDepth, DWORD size) noexcept;
 
 struct COptDlgData
 {
@@ -44,37 +48,37 @@ class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 public:
     CSalamanderForOperationsAbstract* Salamander;
     CPakIfaceAbstract* PakIFace;
-    const char* PakFileName;
+    const wchar_t* PakFileName;
     HANDLE IOFile;
-    const char* IOFileName;
+    const wchar_t* IOFileName;
     DWORD Silent;
     BOOL Abort;
     CQuadWord ProgressTotal;
 
 public:
-    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData);
-    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                      const char* archiveRoot, SalEnumSelection next, void* nextParam);
-    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                                      const CFileData* fileData, const char* targetDir,
-                                      const char* newFileName, BOOL* renamingNotSupported);
-    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      const char* archiveRoot, BOOL move, const char* sourcePath,
+    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                      const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam);
+    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                                      const CFileData* fileData, const wchar_t* targetDir,
+                                      const wchar_t* newFileName, BOOL* renamingNotSupported);
+    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                                       SalEnumSelection2 next, void* nextParam);
-    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                          CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                          CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                           SalEnumSelection next, void* nextParam);
-    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                           const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                           const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                            CDynamicString* archiveVolumes);
-    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                         BOOL force, int panel) { return TRUE; }
-    virtual BOOL WINAPI GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
-    virtual void WINAPI DeleteTmpCopy(const char* fileName, BOOL firstFile) {}
+    virtual BOOL WINAPI GetCacheInfo(CSalamanderStringBuffer* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
+    virtual void WINAPI DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile) {}
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 
     /*void InitPlugin(CSalamanderForOperationsAbstract * salamander, CPakIfaceAbstract * pakIFace,
@@ -82,26 +86,28 @@ public:
 
     //    HWND GetParentWindow();
 
-    BOOL MakeFileList(TIndirectArray2<CFileInfo>& files, const char* archiveRoot,
+    // 'archiveRoot' here is PAK's own byte-domain directory text, not the raw wide SDK
+    // parameter. Conversion is owned by pak_text's exact-or-refuse adapter.
+    BOOL MakeFileList(TIndirectArray2<CFileInfo>& files, std::string_view archiveRoot,
                       SalEnumSelection next, void* nextParam);
 
-    BOOL UnpackFiles(TIndirectArray2<CFileInfo>& files, const char* arcFile,
-                     int rootLen, const char* targetDir);
+    BOOL UnpackFiles(TIndirectArray2<CFileInfo>& files, const wchar_t* arcFile,
+                     int rootLen, const wchar_t* targetDir);
 
-    BOOL ConstructMaskArray(TIndirectArray2<char>& maskArray, const char* masks);
+    BOOL ConstructMaskArray(TIndirectArray2<std::wstring>& maskArray, const wchar_t* masks);
 
-    BOOL MakeFileList2(TIndirectArray2<char>& masks, TIndirectArray2<CFileInfo>& files);
+    BOOL MakeFileList2(TIndirectArray2<std::wstring>& masks, TIndirectArray2<CFileInfo>& files);
 
-    BOOL DeleteFiles(const char* archiveRoot, SalEnumSelection next, void* nextParam);
+    BOOL DeleteFiles(std::string_view archiveRoot, SalEnumSelection next, void* nextParam);
 
-    BOOL MakeFileList3(TIndirectArray2<CFileInfo>& files, BOOL* del, const char* archiveRoot, const char* sourcePath,
+    BOOL MakeFileList3(TIndirectArray2<CFileInfo>& files, BOOL* del, std::string_view archiveRoot, const wchar_t* sourcePath,
                        SalEnumSelection2 next, void* nextParam);
 
     BOOL DelFilesToBeOverwritten(unsigned* deleted);
 
-    BOOL AddFiles(TIndirectArray2<CFileInfo>& files, unsigned deleted, const char* sourPath, const char* archiveRoot);
+    BOOL AddFiles(TIndirectArray2<CFileInfo>& files, unsigned deleted, const wchar_t* sourPath, std::string_view archiveRoot);
 
-    void DeleteSourceFiles(TIndirectArray2<CFileInfo>& files, const char* sourcePath);
+    void DeleteSourceFiles(TIndirectArray2<CFileInfo>& files, const wchar_t* sourcePath);
 };
 
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
@@ -137,7 +143,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -186,7 +192,6 @@ extern FPAKReleaseIFace PAKReleaseIFace;
 extern CPluginInterfaceForArchiver InterfaceForArchiver;
 extern CPluginInterfaceForMenuExt InterfaceForMenuExt;
 
-char* LoadStr(int resID);
-void FreeFileInfo(void* file);
-void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size);
+std::wstring LangStr(int resID);
+std::wstring GetInfo(FILETIME* lastWrite, unsigned size);
 INT_PTR WINAPI OptimizeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam);

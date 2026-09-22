@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -21,6 +21,8 @@
 #include "histwnd.h"
 #include "PVEXEWrapper.h"
 #include "PixelAccess.h"
+#include "plugin_narrow_compat.h"
+#include "reg_sz_narrow_bridge.h"
 
 // plugin interface object; its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -29,17 +31,17 @@ CPluginInterfaceForViewer InterfaceForViewer;
 CPluginInterfaceForMenuExt InterfaceForMenuExt;
 CPluginInterfaceForThumbLoader InterfaceForThumbLoader;
 
-LPCTSTR TIP_WINDOW_CLASSNAME = _T("PictViewToolTip Class");
-LPCTSTR CLIPBOARD = _T("<<Clipboard>>");
-LPCTSTR CAPTURE = _T("<<Capture>>");
-LPCTSTR SCAN = _T("<<Scan>>");
+const wchar_t* TIP_WINDOW_CLASSNAME = L"PictViewToolTip Class";
+const wchar_t* CLIPBOARD = L"<<Clipboard>>";
+const wchar_t* CAPTURE = L"<<Capture>>";
+const wchar_t* SCAN = L"<<Scan>>";
 #ifdef ENABLE_TWAIN32
-LPCTSTR SCAN_SOURCE = _T("<<ScanSource>>");
+const wchar_t* SCAN_SOURCE = L"<<ScanSource>>";
 #endif // ENABLE_TWAIN32
-LPCTSTR SCANEXTRA = _T("<<ScanExtra>>");
-LPCTSTR DELETED = _T("<<Deleted>>");
+const wchar_t* SCANEXTRA = L"<<ScanExtra>>";
+const wchar_t* DELETED = L"<<Deleted>>";
 
-LPCTSTR PLUGIN_NAME_EN = _T("PICTVIEW"); // non-translated plugin name, used before loading the language module + for debug stuff
+const wchar_t* PLUGIN_NAME_EN = L"PICTVIEW"; // non-translated plugin name, used before loading the language module + for debug stuff
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
@@ -75,6 +77,7 @@ int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 22
 
 SGlobals G; // initialized in InitViewer
+std::wstring SaveInitialDirectory;
 TDirectArray<DWORD> ExifHighlights(20, 10);
 BOOL ExifGroupHighlights = FALSE;
 
@@ -405,13 +408,16 @@ void InitGlobalGUIParameters(void)
 int ShowOneTimeMessage(HWND HParent, int msg, BOOL* pChecked, int flags, int dontShowMsg)
 {
     MSGBOXEX_PARAMS params;
+    const std::wstring caption = LoadStrW(IDS_PLUGINNAME);
+    const std::wstring text = LoadStrW(msg);
+    const std::wstring checkBoxText = LoadStrW(dontShowMsg);
     memset(&params, 0, sizeof(params));
     params.HParent = HParent;
     // key icon flag if specified or add info icon
     params.Flags = flags | MSGBOXEX_ESCAPEENABLED | ((flags & (MSGBOXEX_ICONHAND | MSGBOXEX_ICONQUESTION | MSGBOXEX_ICONEXCLAMATION)) ? 0 : MSGBOXEX_ICONINFORMATION);
-    params.Caption = LoadStr(IDS_PLUGINNAME);
-    params.Text = LoadStr(msg);
-    params.CheckBoxText = LoadStr(dontShowMsg);
+    params.Caption = caption.c_str();
+    params.Text = text.c_str();
+    params.CheckBoxText = checkBoxText.c_str();
     params.CheckBoxValue = pChecked;
     return SalamanderGeneral->SalMessageBoxEx(&params);
 }
@@ -423,12 +429,12 @@ int ShowOneTimeMessage(HWND HParent, int msg, BOOL* pChecked, int flags, int don
 
 char* LoadStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return LoadStrNarrow(SalamanderGeneral, HLanguage, resID);
 }
 
-WCHAR* LoadStrW(int resID)
+std::wstring LoadStrW(int resID)
 {
-    return SalamanderGeneral->LoadStrW(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID); // LoadStrW folded into the wide primary
 }
 
 const char* WINAPI GetExtText(int msgID)
@@ -497,9 +503,13 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is made for the current Salamander version and higher - perform the check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(hParentWnd,
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
+#define PICTVIEW_WIDEN2(x) L##x
+#define PICTVIEW_WIDEN(x) PICTVIEW_WIDEN2(x)
+        MessageBoxW(hParentWnd,
+                   PICTVIEW_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
                    PLUGIN_NAME_EN, MB_OK | MB_ICONERROR);
+#undef PICTVIEW_WIDEN
+#undef PICTVIEW_WIDEN2
         return NULL;
     }
 
@@ -536,7 +546,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     TCHAR exceptInfo[512];
     lstrcpyn(exceptInfo, LoadStr(IDS_EXCEPT_INFO1), SizeOf(exceptInfo));
     _tcsncat(exceptInfo, LoadStr(IDS_EXCEPT_INFO2), SizeOf(exceptInfo) - _tcslen(exceptInfo));
-    SalamanderGeneral->SetPluginBugReportInfo(exceptInfo, "support@pictview.com");
+    SalamanderGeneral->SetPluginBugReportInfo(ToWideArg(exceptInfo).c_str(), ToWideArg("support@pictview.com").c_str());
     return &PluginInterface;
 }
 
@@ -590,17 +600,19 @@ BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, LPCTSTR name,
         for (j = 0; j < maxCount; j++)
         {
             _itot(j + 1, buf, 10);
-            DWORD bufferSize;
-            if (registry->GetSize(historyKey, buf, REG_SZ, bufferSize))
+            std::wstring wideValue;
+            if (SPLRegistryGetStringOwned(registry, historyKey, buf, wideValue))
             {
-                history[j] = (LPTSTR)malloc(bufferSize);
+                std::string narrowValue;
+                if (!DecodeRegSzToNarrowOwned(wideValue.c_str(), narrowValue))
+                    break;
+                history[j] = (LPTSTR)malloc(narrowValue.size() + 1);
                 if (history[j] == NULL)
                 {
                     TRACE_E("Low memory");
                     break;
                 }
-                if (!registry->GetValue(historyKey, buf, REG_SZ, history[j], bufferSize))
-                    break;
+                memcpy(history[j], narrowValue.c_str(), narrowValue.size() + 1);
             }
         }
         registry->CloseKey(historyKey);
@@ -628,7 +640,10 @@ BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, LPCTSTR name,
                 if (history[i] != NULL)
                 {
                     _itot(i + 1, buf, 10);
-                    registry->SetValue(historyKey, buf, REG_SZ, history[i], -1);
+                    std::wstring wideValue;
+                    if (!EncodeRegSzFromNarrowOwned(history[i], wideValue) ||
+                        !SPLRegistrySetString(registry, historyKey, buf, wideValue))
+                        break;
                 }
                 else
                     break;
@@ -708,10 +723,8 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             {
                 G.Save.RememberPath = TRUE; // compatible with previous version of PictView
             }
-            if (!registry->GetValue(hSaveKey, CONFIG_SAVE_INIT_DIR, REG_SZ, G.Save.InitDir, SizeOf(G.Save.InitDir)))
-            {
-                G.Save.InitDir[0] = 0;
-            }
+            SPLRegistryGetStringOwned(registry, hSaveKey,
+                                      CONFIG_SAVE_INIT_DIR, SaveInitialDirectory);
             if (!registry->GetValue(hSaveKey, CONFIG_SAVE_FILTER_MONO, REG_DWORD, &G.LastSaveAsFilterIndexMono, sizeof(DWORD)))
             {
                 G.LastSaveAsFilterIndexMono = 14; // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
@@ -766,9 +779,12 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         InitGlobalGUIParameters();
 
         registry->GetValue(regKey, CONFIG_EXIFGROUPHIGHLIGHTS, REG_DWORD, &ExifGroupHighlights, sizeof(DWORD));
-        TCHAR buf[5000];
-        registry->GetValue(regKey, CONFIG_EXIFHIGHLIGHTS, REG_SZ, buf, 5000);
-        LPTSTR p = _tcstok(buf, _T(","));
+        std::wstring exifHighlightsW;
+        std::string exifHighlights;
+        if (SPLRegistryGetStringOwned(registry, regKey, CONFIG_EXIFHIGHLIGHTS,
+                                      exifHighlightsW))
+            DecodeRegSzToNarrowOwned(exifHighlightsW.c_str(), exifHighlights);
+        LPTSTR p = _tcstok(exifHighlights.data(), _T(","));
         while (p != NULL)
         {
             int tag = _ttoi(p);
@@ -792,21 +808,17 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             int i;
             for (i = 0; i < COPYTO_LINES; i++)
             {
-                DWORD bufferSize;
-
                 _itot(i + 1, buf2, 10);
-                if (registry->GetSize(hCopyToKey, buf2, REG_SZ, bufferSize))
+                std::wstring wideDestination;
+                if (SPLRegistryGetStringOwned(registry, hCopyToKey, buf2,
+                                              wideDestination))
                 {
-                    // Must do this complicated way because the strings are later
-                    // freed via SalamanderGeneral->Free which may crash when using
-                    // various version of RTL (salrtl9.dll vs. msvcr90d/libcmtd)
-                    LPTSTR buff = (LPTSTR)malloc(bufferSize);
-                    if (buff == NULL)
+                    std::string destination;
+                    if (!DecodeRegSzToNarrowOwned(wideDestination.c_str(),
+                                                  destination))
                         break;
-                    if (!registry->GetValue(hCopyToKey, buf2, REG_SZ, buff, bufferSize))
-                        break;
-                    G.CopyToDestinations[i] = SalamanderGeneral->DupStr(buff);
-                    free(buff);
+                    G.CopyToDestinations[i] =
+                        SalamanderGeneral->DupStr(destination.c_str());
                 }
             }
             registry->CloseKey(hCopyToKey);
@@ -872,7 +884,8 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->SetValue(hSaveKey, CONFIG_SAVE_JPEG_SUBSAMPLING, REG_DWORD, &v, sizeof(DWORD));
         v = G.Save.TIFFStripSize;
         registry->SetValue(hSaveKey, CONFIG_SAVE_TIFF_STRIP_SIZE, REG_DWORD, &v, sizeof(DWORD));
-        registry->SetValue(hSaveKey, CONFIG_SAVE_INIT_DIR, REG_SZ, G.Save.InitDir, -1);
+        SPLRegistrySetString(registry, hSaveKey, CONFIG_SAVE_INIT_DIR,
+                             SaveInitialDirectory);
         v = G.Save.RememberPath;
         registry->SetValue(hSaveKey, CONFIG_SAVE_REMEMBER_PATH, REG_DWORD, &v, sizeof(DWORD));
         registry->SetValue(hSaveKey, CONFIG_SAVE_FILTER_MONO, REG_DWORD, &G.LastSaveAsFilterIndexMono, sizeof(DWORD));
@@ -884,22 +897,18 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_EXIFDLGHEIGHT, REG_DWORD, &G.ExifDlgHeight, sizeof(DWORD));
 
     registry->SetValue(regKey, CONFIG_EXIFGROUPHIGHLIGHTS, REG_DWORD, &ExifGroupHighlights, sizeof(DWORD));
-    char buf[5000];
-    char* p = buf;
+    std::string exifHighlights;
     int i;
     for (i = 0; i < ExifHighlights.Count; i++)
     {
-        p += sprintf(p, "%u", ExifHighlights[i]);
-        if (p - buf > 4950)
-            break;
-        if (i < ExifHighlights.Count - 1)
-        {
-            *p = ',';
-            p++;
-        }
+        if (i != 0)
+            exifHighlights.push_back(',');
+        exifHighlights += std::to_string(ExifHighlights[i]);
     }
-    *p = 0;
-    registry->SetValue(regKey, CONFIG_EXIFHIGHLIGHTS, REG_SZ, buf, -1);
+    std::wstring exifHighlightsW;
+    if (EncodeRegSzFromNarrowOwned(exifHighlights.c_str(), exifHighlightsW))
+        SPLRegistrySetString(registry, regKey, CONFIG_EXIFHIGHLIGHTS,
+                             exifHighlightsW);
 
     SaveHistory(registry, regKey, CONFIG_FILESHISTORY, G.FilesHistory, FILES_HISTORY_SIZE);
     SaveHistory(registry, regKey, CONFIG_DIRSHISTORY, G.DirsHistory, DIRS_HISTORY_SIZE);
@@ -916,7 +925,10 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             if (line != NULL)
             {
                 _itot(j + 1, buf2, 10);
-                registry->SetValue(hCopyToKey, buf2, REG_SZ, line, -1);
+                std::wstring wideLine;
+                if (!EncodeRegSzFromNarrowOwned(line, wideLine) ||
+                    !SPLRegistrySetString(registry, hCopyToKey, buf2, wideLine))
+                    break;
             }
         }
         registry->CloseKey(hCopyToKey);
@@ -1077,22 +1089,22 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
 	{MNTT_PE, 0
 };
 */
-    salamander->AddMenuItem(-1, LoadStr(IDS_VIEW_BMP_IN_CLIPBOARD), SALHOTKEY('B', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
+    salamander->AddMenuItem(-1, ToWideArg(LoadStr(IDS_VIEW_BMP_IN_CLIPBOARD)).c_str(), SALHOTKEY('B', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
                             CMD_PASTE, TRUE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_PLUGINSMENU_SCREEN_CAPTURE), 0, CMD_CAPTURE, FALSE,
+    salamander->AddMenuItem(-1, ToWideArg(LoadStr(IDS_PLUGINSMENU_SCREEN_CAPTURE)).c_str(), 0, CMD_CAPTURE, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
-    salamander->AddMenuItem(-1, LoadStr(IDS_PLUGINSMENU_REGENERATE_THUMBNAIL), 0, CMD_REGENERATE_THUMBNAIL, FALSE,
+    salamander->AddMenuItem(-1, ToWideArg(LoadStr(IDS_PLUGINSMENU_REGENERATE_THUMBNAIL)).c_str(), 0, CMD_REGENERATE_THUMBNAIL, FALSE,
                             MENU_EVENT_FILE_FOCUSED | MENU_EVENT_FILES_SELECTED, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
 #ifdef ENABLE_TWAIN32
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
 #endif                                                                         // ENABLE_TWAIN32
 
-    salamander->AddMenuItem(-1, LoadStr(IDS_PLUGINSMENU_SCAN), 0, CMD_SCAN, FALSE,
+    salamander->AddMenuItem(-1, ToWideArg(LoadStr(IDS_PLUGINSMENU_SCAN)).c_str(), 0, CMD_SCAN, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 #ifdef ENABLE_TWAIN32
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENU_FILE_SCAN_SOURCE), 0, CMD_SCAN_SOURCE, FALSE,
+    salamander->AddMenuItem(-1, ToWideArg(LoadStr(IDS_MENU_FILE_SCAN_SOURCE)).c_str(), 0, CMD_SCAN_SOURCE, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 #endif // ENABLE_TWAIN32
 
@@ -1227,16 +1239,15 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case CMD_INTERNAL_FOCUS:
     {
-        CPathBuffer focusPath;
-        lstrcpyn(focusPath, Focus_Path, focusPath.Size());
-        Focus_Path[0] = 0;
-        if (focusPath[0] != 0) // only if we were lucky (we did not hit the start of Salamander's BUSY mode)
+        std::wstring focusPath = std::move(Focus_Path);
+        Focus_Path.clear();
+        if (!focusPath.empty()) // only if we were lucky (we did not hit the start of Salamander's BUSY mode)
         {
-            LPTSTR fname;
-            if (SalamanderGeneral->CutDirectory(focusPath, &fname))
+            std::wstring fname;
+            if (SPLCutDirectoryOwned(SalamanderGeneral, focusPath, &fname))
             {
                 SalamanderGeneral->SkipOneActivateRefresh(); // the main window will not refresh when switching from the viewer
-                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath, fname);
+                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath.c_str(), fname.c_str());
             }
         }
         return TRUE;
@@ -1244,20 +1255,30 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case CMD_INTERNAL_SAVEAS:
     {
-        CPathBuffer panelPath;
+        // GetLastWindowsPanelPath is wide; 'bufferSize' counts WCHARs. The result
+        // is narrowed here only because WM_USER_SAVEAS_INTERNAL still carries a narrow strdup'd
+        // pointer - that message is this plugin's own contract and widens with the plugin.
+        // NOTE: pictview is not in the 33-plugin build, so this edit is source consistency and
+        // has NOT been compiled.
+        std::wstring panelPathW;
+        std::string panelPath;
         HWND hWindow = ghSaveAsWindow;
 
         ghSaveAsWindow = NULL;
 
-        if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_SOURCE, panelPath, panelPath.Size()))
+        if (!SPLGetLastWindowsPanelPathOwned(SalamanderGeneral, PANEL_SOURCE,
+                                             panelPathW))
         {
-            if (!SalamanderGeneral->GetLastWindowsPanelPath(PANEL_TARGET, panelPath, panelPath.Size()))
+            if (!SPLGetLastWindowsPanelPathOwned(SalamanderGeneral, PANEL_TARGET,
+                                                 panelPathW))
             {
                 // Failure -> use the stored directory
-                panelPath[0] = 0;
+                panelPathW.clear();
             }
         }
-        PostMessage(hWindow, WM_USER_SAVEAS_INTERNAL, 0, panelPath[0] ? (LPARAM)_tcsdup(panelPath) : 0);
+        Win32EncodeAcpExact(panelPathW.c_str(), panelPath);
+        PostMessage(hWindow, WM_USER_SAVEAS_INTERNAL, 0,
+                    !panelPath.empty() ? (LPARAM)_strdup(panelPath.c_str()) : 0);
         return TRUE;
     }
 
@@ -1277,8 +1298,8 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     case CMD_INTERNAL_REREADTHUMBS:
     {
         int leftType, rightType;
-        SalamanderGeneral->GetPanelPath(PANEL_LEFT, NULL, 0, &leftType, NULL);
-        SalamanderGeneral->GetPanelPath(PANEL_RIGHT, NULL, 0, &rightType, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_LEFT, NULL, &leftType, NULL);
+        SalamanderGeneral->GetPanelPath(PANEL_RIGHT, NULL, &rightType, NULL);
         if (leftType == PATH_TYPE_WINDOWS)
             SalamanderGeneral->RefreshPanelPath(PANEL_LEFT, TRUE /* we want to reload thumbnails */);
         if (rightType == PATH_TYPE_WINDOWS)
@@ -1359,17 +1380,16 @@ void WINAPI HTMLHelpCallback(HWND hWindow, UINT helpID)
 
 BOOL LoadPictViewDll(HWND hParentWnd)
 {
-    CPathBuffer path;
-
-    if (!GetModuleFileName(DLLInstance, path, path.Size()))
+    std::wstring path;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, path) ||
+        !SPLCutDirectoryOwned(SalamanderGeneral, path))
     {
         TRACE_E("GetModuleFileName failed");
         return FALSE;
     }
-    _tcsrchr(path, '\\')[0] = 0;
 #ifndef PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    _tcscat(path, _T("\\PVW32Cnv.dll"));
-    PVW32DLL.Handle = LoadLibrary(path); // load PVW32Cnv.dll
+    SPLSalPathAppendOwned(path, L"PVW32Cnv.dll");
+    PVW32DLL.Handle = LoadLibraryW(path.c_str()); // load PVW32Cnv.dll
     if (!PVW32DLL.Handle)
     {
         TRACE_E("LoadLibrary(PVW32Cnv.dll) failed");
@@ -1407,7 +1427,7 @@ BOOL LoadPictViewDll(HWND hParentWnd)
         return FALSE;
     }
 #else  // PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    if (!InitPVEXEWrapper(hParentWnd, path))
+    if (!InitPVEXEWrapper(hParentWnd, path.c_str()))
     {
         return FALSE;
     }
@@ -1443,7 +1463,7 @@ BOOL InitViewer(HWND hParentWnd)
     G.Save.JPEGQuality = 75;
     G.Save.JPEGSubsampling = 1;
     G.Save.TIFFStripSize = 64;
-    G.Save.InitDir[0] = 0;
+    SaveInitialDirectory.clear();
     G.SelectRatioX = G.SelectRatioY = 1;
     G.bSelectWhole = TRUE; // Assume failure of GetConfigParameter ;-)
     SalamanderGeneral->GetConfigParameter(SALCFG_SELECTWHOLENAME, &G.bSelectWhole, sizeof(BOOL), NULL);
@@ -1466,7 +1486,7 @@ BOOL InitViewer(HWND hParentWnd)
 
     G.HAccel = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELERATORS));
 
-    WNDCLASS wc;
+    WNDCLASSW wc;
     wc.style = 0;
     wc.lpfnWndProc = ToolTipWindowProc;
     wc.cbClsExtra = 0;
@@ -1477,7 +1497,7 @@ BOOL InitViewer(HWND hParentWnd)
     wc.hbrBackground = 0; //(HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = TIP_WINDOW_CLASSNAME;
-    if (RegisterClass(&wc) == 0)
+    if (RegisterClassW(&wc) == 0)
     {
         TRACE_E("RegisterClass has failed");
         DeleteCriticalSection(&G.CS);
@@ -1486,12 +1506,12 @@ BOOL InitViewer(HWND hParentWnd)
 
     if (!InitializeWinLib(PLUGIN_NAME_EN, DLLInstance))
     {
-        if (!UnregisterClass(TIP_WINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(TIP_WINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(TIP_WINDOW_CLASSNAME) has failed");
         DeleteCriticalSection(&G.CS);
         return FALSE;
     }
-    SetWinLibStrings(_T("Invalid number!"), LoadStr(IDS_PLUGINNAME));
+    SetWinLibStrings(L"Invalid number!", LoadStr(IDS_PLUGINNAME));
     SetupWinLibHelp(HTMLHelpCallback);
 
     INITCOMMONCONTROLSEX initCtrls;
@@ -1508,34 +1528,37 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
     if (EXIFLibrary != NULL)
         return TRUE;
 
-    CPathBuffer path;
+    std::wstring path;
     EXIFINITTRANSLATIONS initTransl;
 
-    GetModuleFileName(DLLInstance, path, path.Size());
-    _tcscpy((LPTSTR)_tcsrchr(path, '\\') + 1, _T("exif.dll"));
-    EXIFLibrary = LoadLibrary(path); // load EXIF.DLL
+    if (!SPLGetModuleFileNameOwned(DLLInstance, path) ||
+        !SPLCutDirectoryOwned(SalamanderGeneral, path))
+        return FALSE;
+    SPLSalPathAppendOwned(path, L"exif.dll");
+    EXIFLibrary = LoadLibraryW(path.c_str()); // load EXIF.DLL
     if (EXIFLibrary == NULL)
     {
         if (!bSilent)
         {
-            TCHAR errText[32768];
-            _stprintf(errText, LoadStr(IDS_LOADEXIF), (const char*)path);
-            SalamanderGeneral->SalMessageBox(hParent, errText, LoadStr(IDS_PLUGINNAME),
+            const std::wstring errText = SPLFormatStringOwned(
+                ToWideArg(LoadStr(IDS_LOADEXIF)).c_str(), path.c_str());
+            SalamanderGeneral->SalMessageBox(hParent, errText.c_str(),
+                                             ToWideArg(LoadStr(IDS_PLUGINNAME)).c_str(),
                                              MB_ICONEXCLAMATION | MB_OK);
         }
         return FALSE;
     }
-    SalamanderDebug->AddModuleWithPossibleMemoryLeaks(path);
+    SalamanderDebug->AddModuleWithPossibleMemoryLeaks(path.c_str());
     initTransl = (EXIFINITTRANSLATIONS)GetProcAddress(EXIFLibrary, "EXIFInitTranslations");
     if (initTransl)
     {
-        TCHAR name[32];
-
-        lstrcpyn(name, LoadStr(IDS_EXIF_LOCALIZATION_FNAME), SizeOf(name));
-        if (*name && _tcscmp(name, _T("ERROR LOADING STRING")))
+        const std::wstring name = ToWideArg(LoadStr(IDS_EXIF_LOCALIZATION_FNAME));
+        if (!name.empty() && name != L"ERROR LOADING STRING")
         {
-            _stprintf((LPTSTR)_tcsrchr(path, '\\') + 1, _T("lang\\exif\\%s"), name);
-            initTransl(path);
+            SPLCutDirectoryOwned(SalamanderGeneral, path);
+            SPLSalPathAppendOwned(path, L"lang\\exif");
+            SPLSalPathAppendOwned(path, name.c_str());
+            initTransl(path.c_str());
         }
     }
 
@@ -1547,7 +1570,7 @@ void ReleaseViewer()
 #ifdef PICTVIEW_DLL_IN_SEPARATE_PROCESS
     ReleasePVEXEWrapper();
 #endif
-    if (!UnregisterClass(TIP_WINDOW_CLASSNAME, DLLInstance))
+    if (!UnregisterClassW(TIP_WINDOW_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(TIP_WINDOW_CLASSNAME) has failed");
     ReleaseWinLib(DLLInstance);
     int i;
@@ -1595,7 +1618,7 @@ void ReleaseViewer()
 class CViewerThread : public CThread
 {
 protected:
-    TCHAR Name[32768];
+    std::wstring Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     BOOL AlwaysOnTop;
@@ -1610,13 +1633,13 @@ protected:
     int EnumFilesCurrentIndex; // index of the first file in the viewer within the source
 
 public:
-    CViewerThread(LPCTSTR name, int left, int top, int width, int height,
+    CViewerThread(const wchar_t* name, int left, int top, int width, int height,
                   UINT showCmd, BOOL alwaysOnTop, BOOL returnLock,
                   HANDLE* lock, BOOL* lockOwner, HANDLE contEvent,
                   BOOL* success, int enumFilesSourceUID,
-                  int enumFilesCurrentIndex) : CThread(PLUGIN_NAME_EN)
+                  int enumFilesCurrentIndex) : CThread(L"PICTVIEW")
     {
-        lstrcpyn(Name, name, SizeOf(Name));
+        Name.assign(name != NULL ? name : L"");
         Left = left;
         Top = top;
         Width = width;
@@ -1641,7 +1664,7 @@ public:
 unsigned WINAPI ViewerThreadBody(void *param)
 {
   CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.dll %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
-  SetThreadNameInVCAndTrace(PLUGIN_NAME_EN);
+  SetThreadNameInVCAndTrace(L"PICTVIEW");
   TRACE_I("Begin");
   RECT    r;
   CTVData *data = (CTVData *)param;
@@ -1692,7 +1715,7 @@ unsigned WINAPI ViewerThreadBody(void *param)
   }
 
   CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
-  CPathBuffer name; // Heap-allocated for long path support
+  std::wstring name;
   BOOL openFile = data->Success;
   int  ShowCmd = data->ShowCmd;
 
@@ -1760,7 +1783,7 @@ unsigned
 CViewerThread::Body()
 {
     CALL_STACK_MESSAGE3(_T("ViewerThreadBody() PictView.dll %s %hs"), VERSINFO_VERSION, PVW32DLL.Version);
-    SetThreadNameInVCAndTrace(PLUGIN_NAME_EN);
+    SetThreadNameInVCAndTrace(L"PICTVIEW");
     TRACE_I("Begin");
 
     CViewerWindow* window = new CViewerWindow(EnumFilesSourceUID, EnumFilesCurrentIndex, AlwaysOnTop);
@@ -1815,7 +1838,7 @@ CViewerThread::Body()
     CALL_STACK_MESSAGE1("ViewerThreadBody::SetEvent");
     BOOL openFile = *Success;
     // before letting the main thread continue, optionally take over an image from the scanner to open in the viewer
-    HBITMAP scanExtraImg = _tcscmp(Name, SCANEXTRA) == 0 ? ExtraScanImagesToOpen.GiveNextImage() : NULL;
+    HBITMAP scanExtraImg = Name == SCANEXTRA ? ExtraScanImagesToOpen.GiveNextImage() : NULL;
     SetEvent(Continue); // let the main thread continue; from this point the following variables are no longer valid:
     Continue = NULL;    // clearing is unnecessary, just for clarity
     Lock = NULL;        // clearing is unnecessary, just for clarity
@@ -1827,29 +1850,28 @@ CViewerThread::Body()
     {
         CALL_STACK_MESSAGE1("ViewerThreadBody::ShowWindow");
 
-        if (_tcscmp(Name, CLIPBOARD) != 0 && _tcscmp(Name, CAPTURE) != 0 &&
-            _tcscmp(Name, SCAN) != 0 && _tcscmp(Name, SCANEXTRA) != 0
+        if (Name != CLIPBOARD && Name != CAPTURE && Name != SCAN && Name != SCANEXTRA
 #ifdef ENABLE_TWAIN32
-            && _tcscmp(Name, SCAN_SOURCE) != 0
+            && Name != SCAN_SOURCE
 #endif // ENABLE_TWAIN32
         )
         {
-            window->Renderer.OpenFile(Name, ShowCmd, NULL);
+            window->Renderer.OpenFile(Name.c_str(), ShowCmd, NULL);
         }
         else
         {
-            if (_tcscmp(Name, CLIPBOARD) == 0)
+            if (Name == CLIPBOARD)
             {
                 ShowWindow(window->HWindow, ShowCmd);
                 SetForegroundWindow(window->HWindow);
                 UpdateWindow(window->HWindow);
                 PostMessage(window->HWindow, WM_COMMAND, CMD_PASTE, 0);
             }
-            if (_tcscmp(Name, CAPTURE) == 0)
+            if (Name == CAPTURE)
             {
                 PostMessage(window->HWindow, WM_COMMAND, CMD_CAPTURE_INTERNAL, 0);
             }
-            if (_tcscmp(Name, SCAN) == 0)
+            if (Name == SCAN)
             {
                 ShowWindow(window->HWindow, ShowCmd);
                 SetForegroundWindow(window->HWindow);
@@ -1857,7 +1879,7 @@ CViewerThread::Body()
                 PostMessage(window->HWindow, WM_COMMAND, CMD_SCAN, 0);
             }
 #ifdef ENABLE_TWAIN32
-            if (_tcscmp(Name, SCAN_SOURCE) == 0)
+            if (Name == SCAN_SOURCE)
             {
                 ShowWindow(window->HWindow, ShowCmd);
                 SetForegroundWindow(window->HWindow);
@@ -1865,7 +1887,7 @@ CViewerThread::Body()
                 PostMessage(window->HWindow, WM_COMMAND, CMD_SCAN_SOURCE, 0);
             }
 #endif // ENABLE_TWAIN32
-            if (_tcscmp(Name, SCANEXTRA) == 0)
+            if (Name == SCANEXTRA)
             {
                 ShowWindow(window->HWindow, ShowCmd);
                 SetForegroundWindow(window->HWindow);
@@ -1904,7 +1926,7 @@ CViewerThread::Body()
     return 0;
 }
 
-BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int width, int height,
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                          UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                          BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
@@ -1947,11 +1969,11 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
     return success;
 }
 
-BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
+BOOL CPluginInterfaceForViewer::CanViewFile(const wchar_t* name)
 {
     // We do quick check for files with suffixes that we now can collided
     // with other formats supported by other viewers
-    LPCTSTR ext = _tcsrchr(name, '.'); // ".cvspass" is extension in Windows
+    const wchar_t* ext = wcsrchr(name, L'.'); // ".cvspass" is extension in Windows
     BOOL bTest = FALSE;
 
     // JR: what does PVW32DLL.PVOpenImageEx do? Does it load the entire image or just some headers?
@@ -1962,12 +1984,12 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
     // JP: I would rather not; when the primary format is not recognized it goes
     //     through detection for a number of formats. Moreover with TIFF, CDR, CMX it scans the entire
     //     file, with JPEG repeatedly to detect a preview....
-    if (ext && (!_tcsicmp(ext, _T(".SCR")) || !_tcsicmp(ext, _T(".PCT")) || !_tcsicmp(ext, _T(".PIC")) ||
-                !_tcsicmp(ext, _T(".PICT")) || !_tcsicmp(ext, _T(".IMG")) ||
-                !_tcsicmp(ext, _T(".EPS")) || !_tcsicmp(ext, _T(".EPT")) || !_tcsicmp(ext, _T(".AI")) ||
-                !_tcsicmp(ext, _T(".MOV")) || !_tcsicmp(ext, _T(".MSP")) ||
-                !_tcsicmp(ext, _T(".CDR")) || !_tcsicmp(ext, _T(".CDT")) ||
-                !_tcsicmp(ext, _T(".SEP"))))
+    if (ext && (!_wcsicmp(ext, L".SCR") || !_wcsicmp(ext, L".PCT") || !_wcsicmp(ext, L".PIC") ||
+                !_wcsicmp(ext, L".PICT") || !_wcsicmp(ext, L".IMG") ||
+                !_wcsicmp(ext, L".EPS") || !_wcsicmp(ext, L".EPT") || !_wcsicmp(ext, L".AI") ||
+                !_wcsicmp(ext, L".MOV") || !_wcsicmp(ext, L".MSP") ||
+                !_wcsicmp(ext, L".CDR") || !_wcsicmp(ext, L".CDT") ||
+                !_wcsicmp(ext, L".SEP")))
     {
         // SCR: Screen Saver EXE files supported by PEViewer
         // PCT, PIC, PICT: MacIntosh PICT is supported by Eroiica Viewer as well.
@@ -1982,11 +2004,11 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
     }
     if (!bTest)
     {
-        ext = _tcschr(name, '\\');
+        ext = wcschr(name, L'\\');
         if (ext)
         {
-            ext = _tcschr(ext, '.');
-            if (ext && !_tcsnicmp(ext, _T(".PSP"), 4))
+            ext = wcschr(ext, L'.');
+            if (ext && !_wcsnicmp(ext, L".PSP", 4))
             {
                 // We are associated to wild suffix *.PSP*: always perform test if the suffix starts with .PSP
                 bTest = TRUE;
@@ -2003,11 +2025,10 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
         memset(&oiei, 0, sizeof(oiei));
         oiei.cbSize = sizeof(oiei);
 #ifdef _UNICODE
-        CPathBuffer nameA;
-
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, nameA.Size(), NULL, NULL);
-        nameA[nameA.Size() - 1] = 0;
-        oiei.FileName = nameA;
+        std::string nameBytes;
+        if (!WideToLegacyTextExact(name, nameBytes))
+            return FALSE;
+        oiei.FileName = nameBytes.c_str();
 #else
         oiei.FileName = name;
 #endif
@@ -2283,17 +2304,17 @@ void CViewerWindow::UpdateEnablers()
         IsWindowVisible(HWindow) && (Renderer.FileName == NULL || *Renderer.FileName != '<' || _tcscmp(Renderer.FileName, pDeletedTitle) == 0))
     {
         BOOL srcBusy, noMoreFiles;
-        CPathBuffer fileName;
+        std::wstring fileName;
         LPCTSTR openedFileName = Renderer.FileName;
 
         if (Renderer.FileName != NULL && _tcscmp(Renderer.FileName, pDeletedTitle) == 0)
             openedFileName = NULL;
+        const std::wstring openedFileNameW = ToWideArg(openedFileName);
         int enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
-        BOOL ok = SalamanderGeneral->GetPreviousFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                                  &enumFilesCurrentIndex,
-                                                                  openedFileName, FALSE,
-                                                                  TRUE, fileName, &noMoreFiles,
-                                                                  &srcBusy);
+        BOOL ok = SPLGetAdjacentFileNameForViewerOwned(
+            SalamanderGeneral, TRUE, Renderer.EnumFilesSourceUID,
+            &enumFilesCurrentIndex, openedFileNameW.c_str(), FALSE, TRUE,
+            fileName, &noMoreFiles, &srcBusy);
         Enablers[vwePrevFile] = ok || srcBusy;                 // only if there is a previous file (or Salamander is busy, the user has to try later)
         Enablers[vweFirstFile] = ok || srcBusy || noMoreFiles; // jumping to the first or last file works only if the source link is intact (or Salamander is busy, the user has to try later)
 
@@ -2301,18 +2322,17 @@ void CViewerWindow::UpdateEnablers()
         {
             // find out whether a previous selected file exists
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
-            ok = SalamanderGeneral->GetPreviousFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                                 &enumFilesCurrentIndex,
-                                                                 openedFileName,
-                                                                 TRUE /* prefer selected */, TRUE,
-                                                                 fileName, &noMoreFiles,
-                                                                 &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalamanderGeneral, TRUE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileNameW.c_str(),
+                TRUE /* prefer selected */, TRUE, fileName, &noMoreFiles,
+                &srcBusy);
             BOOL isSrcFileSel = FALSE;
             if (ok)
             {
                 ok = SalamanderGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                                     enumFilesCurrentIndex,
-                                                                    fileName, &isSrcFileSel,
+                                                                    fileName.c_str(), &isSrcFileSel,
                                                                     &srcBusy);
             }
             Enablers[vwePrevSelFile] = ok && isSrcFileSel || srcBusy; // only if the previous file is actually selected (or Salamander is busy, the user has to try later)
@@ -2321,7 +2341,7 @@ void CViewerWindow::UpdateEnablers()
             {
                 ok = SalamanderGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                                     Renderer.EnumFilesCurrentIndex,
-                                                                    Renderer.FileName, &IsSrcFileSelected,
+                                                                    ToWideArg(Renderer.FileName).c_str(), &IsSrcFileSelected,
                                                                     &srcBusy);
                 Enablers[vweSelSrcFile] = ok || srcBusy; // only if the source file exists (or Salamander is busy, the user has to try later)
             }
@@ -2332,34 +2352,32 @@ void CViewerWindow::UpdateEnablers()
             }
 
             BOOL deletedFile = Renderer.FileName != NULL && _tcscmp(Renderer.FileName, pDeletedTitle) == 0;
-            fileName[0] = 0;
+            fileName.clear();
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
             if (deletedFile && enumFilesCurrentIndex >= 0)
                 enumFilesCurrentIndex--; // prevent skipping the next file after deleting with Space due to files shifting in the panel
-            ok = SalamanderGeneral->GetNextFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                             &enumFilesCurrentIndex,
-                                                             openedFileName, FALSE,
-                                                             TRUE, fileName, &noMoreFiles,
-                                                             &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalamanderGeneral, FALSE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileNameW.c_str(), FALSE, TRUE,
+                fileName, &noMoreFiles, &srcBusy);
             Enablers[vweNextFile] = ok || srcBusy; // only if there is another file (or Salamander is busy, the user has to try later)
 
             // find out whether the next file is selected or whether no selected file remains
-            fileName[0] = 0;
+            fileName.clear();
             enumFilesCurrentIndex = Renderer.EnumFilesCurrentIndex;
             if (deletedFile && enumFilesCurrentIndex >= 0)
                 enumFilesCurrentIndex--; // prevent skipping the next file after deleting with Space due to files shifting in the panel
-            ok = SalamanderGeneral->GetNextFileNameForViewer(Renderer.EnumFilesSourceUID,
-                                                             &enumFilesCurrentIndex,
-                                                             openedFileName,
-                                                             TRUE /* prefer selected */, TRUE,
-                                                             fileName, &noMoreFiles,
-                                                             &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(
+                SalamanderGeneral, FALSE, Renderer.EnumFilesSourceUID,
+                &enumFilesCurrentIndex, openedFileNameW.c_str(),
+                TRUE /* prefer selected */, TRUE, fileName, &noMoreFiles,
+                &srcBusy);
             isSrcFileSel = FALSE;
             if (ok)
             {
                 ok = SalamanderGeneral->IsFileNameForViewerSelected(Renderer.EnumFilesSourceUID,
                                                                     enumFilesCurrentIndex,
-                                                                    fileName, &isSrcFileSel,
+                                                                    fileName.c_str(), &isSrcFileSel,
                                                                     &srcBusy);
             }
             Enablers[vweNextSelFile] = ok && isSrcFileSel || srcBusy; // only if the next file is actually selected (or Salamander is busy, the user has to try later)
@@ -2420,7 +2438,7 @@ BOOL AddToHistory(BOOL filesHistory, LPCTSTR buff)
     int i;
     for (i = 0; i < historySize; i++)
         if (history[i] != NULL)
-            if (SalamanderGeneral->StrICmp(history[i], buff) == 0)
+            if (SalamanderGeneral->StrICmp(ToWideArg(history[i]).c_str(), ToWideArg(buff).c_str()) == 0)
             {
                 from = i;
                 break;
@@ -2491,12 +2509,12 @@ void FillMenuHistory(CGUIMenuPopupAbstract* popup, int cmdFirst, BOOL filesHisto
     }
     else
     {
-        TCHAR buff[32768 + 3];
-        mi.String = buff;
         int index = 0;
         while (history[index] != NULL && index < historySize)
         {
-            _stprintf(buff, _T("&%d %s"), index < 9 ? index + 1 : 0, history[index]);
+            std::wstring buff = SPLFormatStringOwned(L"&%d %ls", index < 9 ? index + 1 : 0,
+                                                      history[index]);
+            mi.String = buff.data();
             mi.ID = cmdFirst + index;
             popup->InsertItem(-1, TRUE, &mi);
             index++;
@@ -3058,7 +3076,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
         _tcscpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
-        SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
+        SPLPrepareToolTipTextForAbiBuffer(SalamanderGUI, tt->Buffer,
+                                          TOOLTIP_TEXT_MAX, FALSE);
         return TRUE;
     }
 

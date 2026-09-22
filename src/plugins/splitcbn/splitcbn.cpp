@@ -11,6 +11,7 @@
 #include "split.h"
 #include "combine.h"
 #include "dialogs.h"
+#include "splitcbn_text.h"
 
 // ****************************************************************************
 
@@ -36,11 +37,11 @@ BOOL configSplitToOther;
 BOOL configCombineToOther;
 BOOL configSplitToSubdir;
 
-static const char* KEY_INCLUDEFILEEXT = "Include Original Extension";
-static const char* KEY_CREATEBATCHFILE = "Create Batch File";
-static const char* KEY_SPLITTOOTHER = "Split To Other Panel";
-static const char* KEY_COMBINETOOTHER = "Combine To Other Panel";
-static const char* KEY_SPLITTOSUBDIR = "Split To Subdirectory";
+static const wchar_t* KEY_INCLUDEFILEEXT = L"Include Original Extension";
+static const wchar_t* KEY_CREATEBATCHFILE = L"Create Batch File";
+static const wchar_t* KEY_SPLITTOOTHER = L"Split To Other Panel";
+static const wchar_t* KEY_COMBINETOOTHER = L"Combine To Other Panel";
+static const wchar_t* KEY_SPLITTOSUBDIR = L"Split To Subdirectory";
 
 // ****************************************************************************
 
@@ -54,9 +55,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide. SalamanderGeneral->LoadStr has returned WCHAR* since the v108
+// ABI break; this went through LoadStrNarrow and was widened again at every call site.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 //****************************************************************************
@@ -78,14 +81,20 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current version of Salamander and newer - perform a check
     if (salamander->GetVersion() < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Split & Combine" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape as checksum/unlha/undelete/zip
+        // (205-209).
+#define SPLITCBN_WIDEN2(x) L##x
+#define SPLITCBN_WIDEN(x) SPLITCBN_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    SPLITCBN_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Split & Combine" /* do not translate! */, MB_OK | MB_ICONERROR);
+#undef SPLITCBN_WIDEN
+#undef SPLITCBN_WIDEN2
         return NULL;
     }
 
     // ask Salamander to load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Split & Combine" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Split & Combine" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -96,17 +105,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set the help file name
-    SalamanderGeneral->SetHelpFileName("splitcbn.chm");
+    SalamanderGeneral->SetHelpFileName(L"splitcbn.chm");
 
     // set the basic information about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "SplitCombine");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"SplitCombine");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -118,13 +127,21 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUTTITLE), MB_OK | MB_ICONINFORMATION);
+    try
+    {
+        const std::wstring message = SPLFormatStringOwned(
+            L"%s " _CRT_WIDE(VERSINFO_VERSION) L"\n\n" _CRT_WIDE(VERSINFO_COPYRIGHT) L"\n\n%s",
+            LangStr(IDS_PLUGINNAME).c_str(), LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+        SalamanderGeneral->SalMessageBox(parent, message.c_str(),
+                                          LangStr(IDS_ABOUTTITLE).c_str(),
+                                          MB_OK | MB_ICONINFORMATION);
+    }
+    catch (...)
+    {
+        SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_PLUGINNAME).c_str(),
+                                          LangStr(IDS_ABOUTTITLE).c_str(),
+                                          MB_OK | MB_ICONINFORMATION);
+    }
 }
 
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
@@ -177,9 +194,9 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
 };
 */
 
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENU1), 0, 1, FALSE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, LangStr(IDS_MENU1).c_str(), 0, 1, FALSE, MENU_EVENT_TRUE,
                             MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENU2), 0, 2, FALSE, MENU_EVENT_FILES_SELECTED | MENU_EVENT_FILE_FOCUSED, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, LangStr(IDS_MENU2).c_str(), 0, 2, FALSE, MENU_EVENT_FILES_SELECTED | MENU_EVENT_FILE_FOCUSED, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
 
     // set the plugin icon
     HBITMAP hBmp = (HBITMAP)LoadImage(DLLInstance, MAKEINTRESOURCE(IDB_SPLIT),
@@ -253,46 +270,67 @@ void CenterWindow(HWND hWnd)
         SalamanderGeneral->MultiMonCenterWindow(hWnd, hParent, TRUE);
 }
 
-void GetInfo(char* buffer, CQuadWord& size)
+std::wstring GetInfo(CQuadWord& size)
 {
-    CALL_STACK_MESSAGE2("GetInfo(, %I64u)", size.Value);
+    CALL_STACK_MESSAGE2("GetInfo(%I64u)", size.Value);
     SYSTEMTIME st;
     GetLocalTime(&st);
 
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
+    std::wstring date;
+    std::wstring time;
+    if (!FormatSplitLocalDateTime(st, date, time))
+    {
+        date = SPLFormatStringOwned(L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        time = SPLFormatStringOwned(L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+    }
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, size);
+    return SPLFormatStringOwned(L"%s, %s, %s", number.c_str(), date.c_str(), time.c_str());
 }
 
-void StripExtension(LPTSTR fileName)
+void StripExtension(wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("StripExtension(%s)", fileName);
-    LPTSTR dot = _tcsrchr(fileName, '.');
+    CALL_STACK_MESSAGE2("StripExtension(%ls)", fileName);
+    wchar_t* dot = wcsrchr(fileName, L'.');
     if (dot != NULL)
         *dot = 0; // ".cvspass" is treated as an extension in Windows
+}
+
+void StripExtension(std::wstring& fileName)
+{
+    const size_t dot = fileName.find_last_of(L'.');
+    if (dot != std::wstring::npos)
+        fileName.resize(dot); // ".cvspass" is treated as an extension in Windows
 }
 
 BOOL Error(int title, int error, ...)
 {
     int lastErr = GetLastError();
     CALL_STACK_MESSAGE3("Error(%d, %d, ...)", title, error);
-    char buf[1024];
-    *buf = 0;
     va_list arglist;
     va_start(arglist, error);
-    vsprintf(buf, LoadStr(error), arglist);
-    va_end(arglist);
-    if (lastErr != ERROR_SUCCESS)
+    std::wstring message;
+    try
     {
-        strcat(buf, " ");
-        DWORD l = (DWORD)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        message = SPLFormatStringOwnedV(LangStr(error).c_str(), arglist);
     }
-    SalamanderGeneral->ShowMessageBox(buf, LoadStr(title), MSGBOX_ERROR);
+    catch (...)
+    {
+        message = L"Error";
+        lastErr = ERROR_SUCCESS;
+    }
+    va_end(arglist);
+    try
+    {
+        if (lastErr != ERROR_SUCCESS)
+        {
+            message += L" ";
+            message += SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
+        }
+    }
+    catch (...)
+    {
+    }
+    SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(title).c_str(), MSGBOX_ERROR);
 
     return FALSE;
 }
@@ -301,25 +339,37 @@ BOOL Error2(HWND hParent, int title, int error, ...)
 {
     int lastErr = GetLastError();
     CALL_STACK_MESSAGE3("Error2( , %d, %d, ...)", title, error);
-    char buf[1024];
-    *buf = 0;
     va_list arglist;
     va_start(arglist, error);
-    vsprintf(buf, LoadStr(error), arglist);
-    va_end(arglist);
-    if (lastErr != ERROR_SUCCESS)
+    std::wstring message;
+    try
     {
-        strcat(buf, " ");
-        DWORD l = (DWORD)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        message = SPLFormatStringOwnedV(LangStr(error).c_str(), arglist);
     }
-    SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(title), MSGBOXEX_OK | MSGBOXEX_ICONEXCLAMATION);
+    catch (...)
+    {
+        message = L"Error";
+        lastErr = ERROR_SUCCESS;
+    }
+    va_end(arglist);
+    try
+    {
+        if (lastErr != ERROR_SUCCESS)
+        {
+            message += L" ";
+            message += SPLGetErrorTextOwned(SalamanderGeneral, lastErr);
+        }
+    }
+    catch (...)
+    {
+    }
+    SalamanderGeneral->SalMessageBox(hParent, message.c_str(), LangStr(title).c_str(),
+                                      MSGBOXEX_OK | MSGBOXEX_ICONEXCLAMATION);
 
     return FALSE;
 }
 
-void GetTargetDir(LPTSTR targetDir, LPTSTR subdirName, BOOL bSplit)
+BOOL GetTargetDir(std::wstring& targetDir, const wchar_t* subdirName, BOOL bSplit)
 {
     // This function returns the target directory for split or combine, respecting the configuration
     // configSplitToOther/configCombineToOther. If the target path would lead into an archive
@@ -327,29 +377,41 @@ void GetTargetDir(LPTSTR targetDir, LPTSTR subdirName, BOOL bSplit)
     // which is always guaranteed to be PATH_TYPE_WINDOWS (thanks to the menu enablers).
 
     int type;
-    SalamanderGeneral->GetPanelPath(
-        (bSplit ? configSplitToOther : configCombineToOther) ? PANEL_TARGET : PANEL_SOURCE,
-        targetDir, SAL_MAX_LONG_PATH, &type, NULL);
+    if (!SPLGetPanelPathOwned(
+            SalamanderGeneral,
+            (bSplit ? configSplitToOther : configCombineToOther) ? PANEL_TARGET : PANEL_SOURCE,
+            targetDir, &type))
+        return FALSE;
 
     if (type != PATH_TYPE_WINDOWS)
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, targetDir, SAL_MAX_LONG_PATH, NULL, NULL);
+        if (!SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, targetDir))
+            return FALSE;
 
     if (bSplit && configSplitToSubdir && subdirName != NULL)
     {
-        if (SalamanderGeneral->SalPathAppend(targetDir, subdirName, SAL_MAX_LONG_PATH))
-            SalamanderGeneral->SalPathRemoveExtension(targetDir);
+        // StripExtension is the bare-FILENAME helper and scans the whole string, so a dot in a
+        // parent directory ("C:\Builds\v1.2\bigfile") would cut the path there. SalPathRemoveExtension
+        // stops at the backslash, which is what pre-unicode used here.
+        SPLSalPathAppendOwned(targetDir, subdirName);
+        SPLSalPathRemoveExtensionOwned(SalamanderGeneral, targetDir);
     }
+    return TRUE;
 }
 
-BOOL MakePathAbsolute(char* path, BOOL pathIsDir, char* absRoot, BOOL activePreferred, int errorTitle)
+BOOL MakePathAbsolute(std::wstring& path, BOOL pathIsDir,
+                      const std::wstring& absRoot, BOOL activePreferred,
+                      int errorTitle)
 {
     int type;
-    char* secondPart;
+    size_t secondPartOffset;
     BOOL isDir;
 
     SalamanderGeneral->SalUpdateDefaultDir(!configCombineToOther);
-    if (!SalamanderGeneral->SalParsePath(SalamanderGeneral->GetMsgBoxParent(), path, type, isDir, secondPart,
-                                         LoadStr(IDS_PATHERROR), NULL, TRUE, absRoot, NULL, NULL, SAL_MAX_LONG_PATH))
+    if (!SPLSalParsePathOwned(SalamanderGeneral,
+                              SalamanderGeneral->GetMsgBoxParent(), path,
+                              type, isDir, secondPartOffset,
+                              LangStr(IDS_PATHERROR).c_str(), TRUE,
+                              absRoot.c_str()))
         return FALSE;
 
     if (type != PATH_TYPE_WINDOWS) // only Windows paths are supported
@@ -357,13 +419,13 @@ BOOL MakePathAbsolute(char* path, BOOL pathIsDir, char* absRoot, BOOL activePref
 
     if (isDir)
     {
-        char* s = secondPart;
+        const wchar_t* s = path.c_str() + secondPartOffset;
         if (!pathIsDir)
-            while (*s != 0 && *s != '\\')
+            while (*s != 0 && *s != L'\\')
                 s++;
         if (*s != 0) // contains subdirectories, ask whether to create them
             if (SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                 LoadStr(IDS_TARGETPATHEXIST), LoadStr(errorTitle), MB_YESNO | MB_ICONQUESTION) == IDNO)
+                                                 LangStr(IDS_TARGETPATHEXIST).c_str(), LangStr(errorTitle).c_str(), MB_YESNO | MB_ICONQUESTION) == IDNO)
                 return FALSE;
     }
 

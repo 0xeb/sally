@@ -7,9 +7,15 @@
 struct CPreviewInitData
 {
     CSfxSettings* Settings;
-    char* About;
-    char* AboutButton1;
-    char* AboutButton2;
+    // W. Unlike CSfxSettings above - which IS the SFX script's byte format -
+    // these three never leave the process: prevsfx.cpp is this plugin's own preview dialog
+    // proc and hands them straight to SetDlgItemText.
+    // About is the SFX script's own text - char About[SE_MAX_ABOUT], serialized by
+    // iosfxset.cpp - so it stays bytes end to end. The two button labels are ordinary
+    // localized UI, so they are wide.
+    const char* About;
+    const wchar_t* AboutButton1;
+    const wchar_t* AboutButton2;
     HICON LargeIcon;
     HICON SmallIcon;
     HINSTANCE SfxHInstance;

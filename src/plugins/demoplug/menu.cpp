@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -38,15 +38,17 @@ CPluginInterfaceForMenuExt::GetMenuItemState(int id, DWORD eventMask)
         BOOL ret = TRUE;
         int count = 0;
 
-        char mask[10];
-        SalamanderGeneral->PrepareMask(mask, "*.dop");
+        // wide end to end - AgreeMask below is already wide, so the mask never
+        // narrows and the conversion that used to sit at the AgreeMask call is gone.
+        const std::wstring mask =
+            SPLPrepareMaskOwned(SalamanderGeneral, L"*.dop");
 
         int index = 0;
         if (file == NULL)
             file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
         while (file != NULL)
         {
-            if (!isDir && SalamanderGeneral->AgreeMask(file->Name, mask, *file->Ext != 0))
+            if (!isDir && SalamanderGeneral->AgreeMask(file->Name, mask.c_str(), *file->Ext != 0))
                 count++;
             else
             {
@@ -93,7 +95,7 @@ struct CDEMOPLUGOperFromDiskData
     BOOL Success;
 };
 
-void WINAPI DEMOPLUGOperationFromDisk(const char* sourcePath, SalEnumSelection2 next,
+void WINAPI DEMOPLUGOperationFromDisk(const wchar_t* sourcePath, SalEnumSelection2 next,
                                       void* nextParam, void* param)
 {
     CDEMOPLUGOperFromDiskData* data = (CDEMOPLUGOperFromDiskData*)param;
@@ -102,8 +104,8 @@ void WINAPI DEMOPLUGOperationFromDisk(const char* sourcePath, SalEnumSelection2 
     data->Success = TRUE; // report the operation as successful for now
 
     BOOL isDir;
-    const char* name;
-    const char* dosName; // dummy
+    const wchar_t* name;
+    const wchar_t* dosName; // dummy
     CQuadWord size;
     DWORD attr;
     FILETIME lastWrite;
@@ -206,39 +208,46 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       char diskSize[100];
       SalamanderGeneral->PrintDiskSize(diskSize, 123456, 1);
 
-      BOOL b1 = SalamanderGeneral->HasTheSameRootPath("c:\\path1", "c:\\path2");
+      BOOL b1 = SalamanderGeneral->HasTheSameRootPath(ToWideArg("c:\\path1").c_str(), ToWideArg("c:\\path2").c_str());
 
-      BOOL b2 = SalamanderGeneral->IsTheSamePath("c:\\path", "c:\\path\\");
+      BOOL b2 = SalamanderGeneral->IsTheSamePath(ToWideArg("c:\\path").c_str(), ToWideArg("c:\\path\\").c_str());
 
-      CPathBuffer root;
-      int len = SalamanderGeneral->GetRootPath(root, "\\\\server\\share\\test\\path");
+      std::wstring root;
+      // GetRootPath is wide; rootSize counts WCHARs.
+      wchar_t rootPathW[MAX_PATH];
+      int len = SalamanderGeneral->GetRootPath(rootPathW, _countof(rootPathW), ToWideArg("\\\\server\\share\\test\\path").c_str());
+      WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, rootPathW, -1,
+                          root, MAX_PATH, NULL, NULL);
 
-      CPathBuffer path;
+      std::wstring path;
       strcpy(path, "\\\\server\\share\\test\\path");
       char *cutDir;
-      BOOL b3 = SalamanderGeneral->CutDirectory(path, &cutDir);
+      BOOL b3 = SPLCutDirectoryOwned(SalamanderGeneral, path, &cutDir);
       strcpy(path, "\\\\server\\share\\test\\path");
-      SalamanderGeneral->SalPathAppend(path, "new", path.Size());
+      SPLSalPathAppendOwned(path, L"new");
       strcpy(path, "\\\\server\\share\\test\\path");
-      SalamanderGeneral->SalPathAddBackslash(path, path.Size());
+      SPLSalPathAddBackslashOwned(path);
       strcpy(path, "\\\\server\\share\\test\\path\\");
-      SalamanderGeneral->SalPathRemoveBackslash(path);
+      SPLSalPathRemoveBackslashOwned(SalamanderGeneral, path);
       strcpy(path, "\\\\server\\share\\test\\file");
-      SalamanderGeneral->SalPathStripPath(path);
+      SPLSalPathStripPathOwned(SalamanderGeneral, path);
       strcpy(path, "\\\\server\\share\\test\\file.ext");
-      SalamanderGeneral->SalPathAddExtension(path, ".txt", path.Size());
-      SalamanderGeneral->SalPathRemoveExtension(path);
-      SalamanderGeneral->SalPathAddExtension(path, ".txt", path.Size());
+      SPLSalPathAddExtensionOwned(SalamanderGeneral, path, L".txt");
+      SPLSalPathRemoveExtensionOwned(SalamanderGeneral, path);
+      SPLSalPathAddExtensionOwned(SalamanderGeneral, path, L".txt");
       strcpy(path, "\\\\server\\share\\test\\file.ext");
-      SalamanderGeneral->SalPathRenameExtension(path, ".txt", path.Size());
+      SPLSalPathRenameExtensionOwned(SalamanderGeneral, path, L".txt");
       strcpy(path, "\\\\server\\share\\test\\file.ext");
       const char *name = SalamanderGeneral->SalPathFindFileName(path);
 
       strcpy(path, "path\\ignore\\..\\.\\name");
       int errTextID;
-      CPathBuffer nextFocus;
+      std::wstring nextFocus;
       SalamanderGeneral->SalUpdateDefaultDir(TRUE);
-      if (!SalamanderGeneral->SalGetFullName(path, &errTextID, "c:\\junk", nextFocus))
+      wchar_t pathW[MAX_PATH], nextFocusW[MAX_PATH];   // wide; sizes in WCHARs
+      lstrcpynW(pathW, ToWideArg(path).c_str(), _countof(pathW));
+      if (!SalamanderGeneral->SalGetFullName(pathW, &errTextID, L"c:\\junk",
+                                             nextFocusW, _countof(nextFocusW), _countof(pathW)))
       {
         char buf[200];
         SalamanderGeneral->GetGFNErrorText(errTextID, buf, 200);
@@ -250,43 +259,10 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         // test IsPluginInstalled
         //      BOOL installed = SalamanderGeneral->IsPluginInstalled("webviewer\\webviewer.dll");
         /*
-      // test ViewFileInPluginViewer
-//      CSalamanderPluginViewerData viewerData;
-      CSalamanderPluginInternalViewerData viewerData;
-      CPathBuffer fileNameBuf;
-      viewerData.Size = sizeof(viewerData);
-      viewerData.FileName = fileNameBuf;
-      DWORD error;
-      if (SalamanderGeneral->SalGetTempFileName(NULL, "view", fileNameBuf, TRUE, &error))
-      {
-        HANDLE file = HANDLES_Q(CreateFile(viewerData.FileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-        if (file != INVALID_HANDLE_VALUE)
-        {
-          const char *content = "This is a text file\r\nwhich was made for test\r\npurposes only.";
-          DWORD written;
-          WriteFile(file, content, strlen(content), &written, NULL);
-          HANDLES(CloseHandle(file));
-
-          int err;
-//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.dll",
-//                                                              &viewerData, FALSE, NULL, NULL, err);
-//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer("webviewer\\webviewer.dll",
-//                                                              &viewerData, TRUE, NULL, "test.txt", err);
-//          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, FALSE, NULL, NULL, err);
-          viewerData.Mode = 1;  // hex mode
-          viewerData.Caption = "My file test.txt";
-          viewerData.WholeCaption = FALSE; // let Salamander append the standard viewer title
-          BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, TRUE, NULL, "test.txt", err);
-//          DeleteFile(viewerData.FileName);   // if disk cache is not used the file has to be deleted manually
-        }
-      }
-*/
-        /*
-      CPathBuffer path;
-      BOOL havePath = SalamanderGeneral->GetTargetDirectory(parent, parent, "Change Directory",
-                                                            "Select the directory you want to visit.",
-                                                            path, FALSE, "C:\\");
+      std::wstring path;   // owned; no caller buffer, no path ceiling
+      BOOL havePath = SPLGetTargetDirectoryOwned(SalamanderGeneral, parent, parent, L"Change Directory",
+                                                 L"Select the directory you want to visit.",
+                                                 path, FALSE, L"C:\\");
 */
         /*
       int index = 0;
@@ -336,16 +312,16 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       else TRACE_I("Not all files and directories were processed! Processed part of selection has size of " << size.GetDouble() << " bytes.");
 */
         /*
-      CPathBuffer path;
+      std::wstring path;
       lstrcpyn(path, "F:\\DRIVE_D", path.Size());
       CQuadWord total;
       CQuadWord space;
-      SalamanderGeneral->GetDiskFreeSpace(&space, path, &total);
+      SalamanderGeneral->GetDiskFreeSpace(&space, ToWideArg(path).c_str(), &total);
       TRACE_I("Disk free space: " << space.GetDouble() << " from " << total.GetDouble() << " bytes.");
       DWORD a, b, donot_use_1, donot_use_2;
       if (SalamanderGeneral->SalGetDiskFreeSpace(path, &a, &b, &donot_use_1, &donot_use_2))
         TRACE_I("Disk parameters: " << a << ", " << b);
-      CPathBuffer rootOrCurReparsePoint;
+      std::wstring rootOrCurReparsePoint;
       char volumeNameBuffer[200];
       DWORD volumeSerialNumber;
       DWORD maximumComponentLength;
@@ -395,7 +371,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         }
         else   // error - malformed regular expression (mismatched brackets, etc.) or out of memory
         {
-          SalamanderGeneral->ShowMessageBox(regexp->GetLastErrorText(), "Regular Expression Error",
+          SalamanderGeneral->ShowMessageBox(ToWideArg(regexp->GetLastErrorText()).c_str(), ToWideArg("Regular Expression Error").c_str(),
                                             MSGBOX_ERROR);
         }
         SalamanderGeneral->FreeSalamanderREGEXPSearchData(regexp);
@@ -409,7 +385,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         memset(&params, 0, sizeof(params));
         params.HParent = parent;
         params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION | MSGBOXEX_SILENT;
-        params.Caption = LoadStr(IDS_PLUGINNAME);
+        params.Caption = LangStr(IDS_PLUGINNAME).c_str();
         params.Text = "Command Always. Notice silent opening of this box.";
         params.CheckBoxText = "Show this box again?";
         params.CheckBoxValue = &again;
@@ -442,38 +418,38 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       int l2 = strlen(s2);
       int res;
       BOOL numericalyEqual;
-      res = SalamanderGeneral->RegSetStrICmp(s1, s2);
-      res = SalamanderGeneral->RegSetStrICmpEx(s1, l1, s2, l2, &numericalyEqual);
-      res = SalamanderGeneral->RegSetStrCmp(s1, s2);
-      res = SalamanderGeneral->RegSetStrCmpEx(s1, l1, s2, l2, &numericalyEqual);
+      res = SalamanderGeneral->RegSetStrICmp(ToWideArg(s1).c_str(), ToWideArg(s2).c_str());
+      res = SalamanderGeneral->RegSetStrICmpEx(ToWideArg(s1, l1).c_str(), -1, ToWideArg(s2, l2).c_str(), -1, &numericalyEqual);
+      res = SalamanderGeneral->RegSetStrCmp(ToWideArg(s1).c_str(), ToWideArg(s2).c_str());
+      res = SalamanderGeneral->RegSetStrCmpEx(ToWideArg(s1, l1).c_str(), -1, ToWideArg(s2, l2).c_str(), -1, &numericalyEqual);
 */
         /*
-      CPathBuffer fileComp;
+      std::wstring fileComp;
       BOOL ok;
       strcpy(fileComp, "prn");
-      ok = SalamanderGeneral->SalIsValidFileNameComponent(fileComp);
+      ok = SalamanderGeneral->SalIsValidFileNameComponent(ToWideArg(fileComp).c_str());
       SalamanderGeneral->SalMakeValidFileNameComponent(fileComp);
       strcpy(fileComp, "hello:");
-      ok = SalamanderGeneral->SalIsValidFileNameComponent(fileComp);
+      ok = SalamanderGeneral->SalIsValidFileNameComponent(ToWideArg(fileComp).c_str());
       SalamanderGeneral->SalMakeValidFileNameComponent(fileComp);
 */
         /*
-      char masks[MAX_GROUPMASK];
+      wchar_t masks[MAX_GROUPMASK];   // wide; MAX_GROUPMASK counts characters
       if (SalamanderGeneral->GetFilterFromPanel(PANEL_SOURCE, masks, MAX_GROUPMASK))
       {
-        TRACE_I("Filter in source panel: " << masks);
+        TRACE_IW(L"Filter in source panel: " << masks);
       }
 */
         /*
-      CPathBuffer firstCreatedDir;
-      BOOL ok = SalamanderGeneral->CheckAndCreateDirectory("C:\\test\\test_dir\\second_dir",
+      std::wstring firstCreatedDir;
+      BOOL ok = SalamanderGeneral->CheckAndCreateDirectory(L"C:\\test\\test_dir\\second_dir",   // wide
                                                            NULL, FALSE, NULL, 0,
                                                            firstCreatedDir);
 */
         /*
       GetAsyncKeyState(VK_ESCAPE);  // initialize GetAsyncKeyState - see the help
       HWND waitWndParent = SalamanderGeneral->GetMsgBoxParent();
-      SalamanderGeneral->CreateSafeWaitWindow("Waiting for ESC key, press ESC key...", LoadStr(IDS_PLUGINNAME),
+      SalamanderGeneral->CreateSafeWaitWindow(ToWideArg("Waiting for ESC key, press ESC key...").c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                               1000, TRUE, waitWndParent);
       while (1)
       {
@@ -483,12 +459,12 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
             SalamanderGeneral->GetSafeWaitWindowClosePressed())
         {
           MSG msg;   // discard the buffered ESC
-          while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE));
+          while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE));
 
           SalamanderGeneral->ShowSafeWaitWindow(FALSE);
           if (SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
                                                "Do you really want to end this waiting?",
-                                               LoadStr(IDS_PLUGINNAME),
+                                               LangStr(IDS_PLUGINNAME).c_str(),
                                                MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                MB_ICONQUESTION) == IDYES)
           {
@@ -561,7 +537,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       // example of SafeWaitWindow usage including Escape/Close-click handling
       GetAsyncKeyState(VK_ESCAPE);  // init GetAsyncKeyState - see msdn documentation
       HWND waitWndParent = SalamanderGeneral->GetMainWindowHWND();
-      SalamanderGeneral->CreateSafeWaitWindow("aaa", "bbb", 0, TRUE, waitWndParent);
+      SalamanderGeneral->CreateSafeWaitWindow(ToWideArg("aaa").c_str(), "bbb", 0, TRUE, waitWndParent);
       int i;
       for (i = 0; i < 100; i++) // for+Sleep() -- pretend some work; for this example only
       {
@@ -570,7 +546,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == waitWndParent)
         {
           MSG msg;   // remove ESC key from buffer
-          while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE));
+          while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE));
           cancel = TRUE;
         }
         else
@@ -583,7 +559,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
           SalamanderGeneral->ShowSafeWaitWindow(FALSE);
           if (SalamanderGeneral->SalMessageBox(waitWndParent,
                                                "Are you sure?",
-                                               LoadStr(IDS_PLUGINNAME),
+                                               LangStr(IDS_PLUGINNAME).c_str(),
                                                MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                MB_ICONQUESTION) == IDYES)
           {
@@ -598,22 +574,22 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         //      SalamanderGeneral->PostOpenPackDlgForThisPlugin(0);
         //      SalamanderGeneral->PostOpenUnpackDlgForThisPlugin(NULL);
 
-        SalamanderGeneral->ShowMessageBox("Always", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"Always", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_SOURCE); // treat this command as working with the path (it appears in Alt+F12)
         break;
     }
 
     case MENUCMD_DIR:
-        SalamanderGeneral->ShowMessageBox("Directory", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"Directory", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
     case MENUCMD_ARCFILE:
-        SalamanderGeneral->ShowMessageBox("Archive File", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"Archive File", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
     case MENUCMD_FILEONDISK:
-        SalamanderGeneral->ShowMessageBox("File on Disk", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"File on Disk", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
     case MENUCMD_ARCFILEONDISK:
-        SalamanderGeneral->ShowMessageBox("Archive File on Disk", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"Archive File on Disk", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
 
     case MENUCMD_DOPFILES:
@@ -635,7 +611,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
         {
             if (stage == 1) // execution phase
             {
-                salamander->OpenProgressDialog("Command \"*.D&OP File(s)\"", FALSE, NULL, FALSE);
+                salamander->OpenProgressDialog(L"Command \"*.D&OP File(s)\"", FALSE, NULL, FALSE);
                 salamander->ProgressSetTotalSize(CQuadWord(count, 0), CQuadWord(-1, -1));
             }
 
@@ -657,7 +633,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                     Sleep(500); // simulate some work
                     if (!salamander->ProgressAddSize(1, FALSE))
                     {
-                        salamander->ProgressDialogAddText("canceling operation, please wait...", FALSE);
+                        salamander->ProgressDialogAddText(L"canceling operation, please wait...", FALSE);
                         salamander->ProgressEnableCancel(FALSE);
                         Sleep(1000); // simulate the cleanup work
                         ret = FALSE; // Cancel -> keep the items selected
@@ -681,27 +657,27 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     }
 
     case MENUCMD_FILESDIRSINARC:
-        SalamanderGeneral->ShowMessageBox("File(s) and/or Directory(ies) in Archive", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"File(s) and/or Directory(ies) in Archive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
 
     case MENUCMD_ENTERDISKPATH: // example of validating a path entered by the user
     {
         // proposed initial string - here just the Windows path from the target panel (otherwise empty)
-        CPathBuffer path;
+        std::wstring path;
         int type;
-        if (SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, path.Size(), &type, NULL))
+        if (SPLGetPanelPathOwned(SalamanderGeneral, PANEL_TARGET, path, &type))
         {
             if (type != PATH_TYPE_WINDOWS)
-                path[0] = 0; // accept only disk paths
+                path.clear(); // accept only disk paths
         }
 
         // we need the current path to convert relative paths to absolute ones
         BOOL curPathIsDisk = FALSE;
-        CPathBuffer curPath;
-        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, curPath.Size(), &type, NULL))
+        std::wstring curPath;
+        if (SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, curPath, &type))
         {
             if (type != PATH_TYPE_WINDOWS)
-                curPath[0] = 0; // accept only disk paths
+                curPath.clear(); // accept only disk paths
             else
                 curPathIsDisk = TRUE;
         }
@@ -716,17 +692,18 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
             if (dlg.Execute() == IDOK)
             {
                 // interpret the entered path
-                int len = (int)strlen(path);
-                BOOL backslashAtEnd = (len > 0 && path[len - 1] == '\\'); // a trailing backslash implies a directory
-                BOOL mustBePath = (len == 2 && LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                                   path[1] == ':'); // a path such as "c:" must stay a path even after expansion (not a file)
+                const size_t len = path.size();
+                BOOL backslashAtEnd = len > 0 && path[len - 1] == L'\\'; // a trailing backslash implies a directory
+                BOOL mustBePath = len == 2 && towlower(path[0]) >= L'a' && towlower(path[0]) <= L'z' &&
+                                  path[1] == L':'; // a path such as "c:" must stay a path even after expansion (not a file)
                 int pathType;
                 BOOL pathIsDir;
-                char* secondPart;
-                if (SalamanderGeneral->SalParsePath(parent, path, pathType, pathIsDir, secondPart,
-                                                    "Path Error", NULL, curPathIsDisk, curPath,
-                                                    NULL, NULL, path.Size()))
+                size_t secondPartOffset = std::wstring::npos;
+                if (SPLSalParsePathOwned(SalamanderGeneral, parent, path, pathType, pathIsDir,
+                                         secondPartOffset, L"Path Error", curPathIsDisk,
+                                         curPathIsDisk ? curPath.c_str() : NULL))
                 {
+                    const wchar_t* secondPart = path.c_str() + secondPartOffset;
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                     {
                         if (pathIsDir) // the existing portion of the path is a directory
@@ -735,21 +712,21 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                             {
                                 if (filePath) // for a file path, ensure the missing part does not contain additional subdirectories
                                 {
-                                    char* s = secondPart;
-                                    while (*s != 0 && *s != '\\')
+                                    const wchar_t* s = secondPart;
+                                    while (*s != 0 && *s != L'\\')
                                         s++;
-                                    if (*s == '\\') // contains subdirectories which we cannot create, report an error
+                                    if (*s == L'\\') // contains subdirectories which we cannot create, report an error
                                     {
-                                        SalamanderGeneral->SalMessageBox(parent, "Unable to create the file specified, because its path doesn't exist.",
-                                                                         "Path Error", MB_OK | MB_ICONEXCLAMATION);
+                                        SalamanderGeneral->SalMessageBox(parent, L"Unable to create the file specified, because its path doesn't exist.",
+                                                                         L"Path Error", MB_OK | MB_ICONEXCLAMATION);
                                         continue; // ask again
                                     }
                                 }
                                 else
                                 {
                                     // error - the path must already exist
-                                    SalamanderGeneral->SalMessageBox(parent, "The path specified doesn't exist.",
-                                                                     "Path Error", MB_OK | MB_ICONEXCLAMATION);
+                                    SalamanderGeneral->SalMessageBox(parent, L"The path specified doesn't exist.",
+                                                                     L"Path Error", MB_OK | MB_ICONEXCLAMATION);
                                     continue; // ask again
                                 }
                             }
@@ -759,8 +736,8 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                             if (!filePath)
                             {
                                 // error - expected a file path, not a directory
-                                SalamanderGeneral->SalMessageBox(parent, "Unable to create the path specified, name has already been used for a file.",
-                                                                 "Path Error", MB_OK | MB_ICONEXCLAMATION);
+                                SalamanderGeneral->SalMessageBox(parent, L"Unable to create the path specified, name has already been used for a file.",
+                                                                 L"Path Error", MB_OK | MB_ICONEXCLAMATION);
                                 continue; // ask again
                             }
                         }
@@ -771,12 +748,10 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
                     else // FS/archive path
                     {
                         if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath)) // restore the removed backslash
-                        {
-                            SalamanderGeneral->SalPathAddBackslash(path, path.Size());
-                        }
+                            SPLSalPathAddBackslashOwned(path);
                         // error - FS/archive paths are not supported; ask again
-                        SalamanderGeneral->SalMessageBox(parent, "File-system and archive paths are not supported here.",
-                                                         "Path Error", MB_OK | MB_ICONEXCLAMATION);
+                        SalamanderGeneral->SalMessageBox(parent, L"File-system and archive paths are not supported here.",
+                                                         L"Path Error", MB_OK | MB_ICONEXCLAMATION);
                     }
                 }
                 else
@@ -800,8 +775,8 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     case MENUCMD_INTADVUSERS:
     case MENUCMD_ADVUSERS:
     {
-        SalamanderGeneral->SalMessageBox(parent, "Hello there!",
-                                         "User's skill level demonstration", MB_OK | MB_ICONINFORMATION);
+        SalamanderGeneral->SalMessageBox(parent, L"Hello there!",
+                                         L"User's skill level demonstration", MB_OK | MB_ICONINFORMATION);
         break;
     }
 
@@ -840,7 +815,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     }
 
     default:
-        SalamanderGeneral->ShowMessageBox("Unknown command.", LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(L"Unknown command.", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         break;
     }
     return FALSE; // keep the selection in the panel
@@ -865,27 +840,27 @@ void WINAPI
 CPluginInterfaceForMenuExt::BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander)
 {
 #ifdef ENABLE_DYNAMICMENUEXT
-    salamander->AddMenuItem(0, "E&nter Disk Path", SALHOTKEY('Z', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MENUCMD_ENTERDISKPATH, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(0, L"E&nter Disk Path", SALHOTKEY('Z', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MENUCMD_ENTERDISKPATH, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&Disconnect", 0, MENUCMD_DISCONNECT_ACTIVE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_THIS_PLUGIN_FS, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"&Disconnect", 0, MENUCMD_DISCONNECT_ACTIVE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_THIS_PLUGIN_FS, MENU_SKILLLEVEL_ALL);
     static int cycle = 0; // this menu has variant content: when opened for the first time, it has only two items, when opened for the second time it has five items, etc.
     if (cycle % 4 >= 1)
     {
         salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-        salamander->AddMenuItem(-1, "&Always", 0, MENUCMD_ALWAYS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-        salamander->AddMenuItem(-1, "D&irectory", 0, MENUCMD_DIR, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DIR_FOCUSED, MENU_SKILLLEVEL_ALL);
-        salamander->AddMenuItem(-1, "A&rchive File", 0, MENUCMD_ARCFILE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, L"&Always", 0, MENUCMD_ALWAYS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, L"D&irectory", 0, MENUCMD_DIR, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DIR_FOCUSED, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, L"A&rchive File", 0, MENUCMD_ARCFILE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
     }
     if (cycle % 4 >= 2)
     {
         salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-        salamander->AddMenuItem(-1, "&File on Disk", 0, MENUCMD_FILEONDISK, FALSE,
+        salamander->AddMenuItem(-1, L"&File on Disk", 0, MENUCMD_FILEONDISK, FALSE,
                                 MENU_EVENT_TRUE, MENU_EVENT_DISK | MENU_EVENT_FILE_FOCUSED, MENU_SKILLLEVEL_ALL);
-        salamander->AddMenuItem(-1, "Ar&chive File on Disk", 0, MENUCMD_ARCFILEONDISK, FALSE, MENU_EVENT_TRUE,
+        salamander->AddMenuItem(-1, L"Ar&chive File on Disk", 0, MENUCMD_ARCFILEONDISK, FALSE, MENU_EVENT_TRUE,
                                 MENU_EVENT_DISK | MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
         salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-        salamander->AddMenuItem(-1, "*.D&OP File(s)", 0, MENUCMD_DOPFILES, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
-        salamander->AddMenuItem(-1, "Fil&e(s) and/or Directory(ies) in Archive", 0, MENUCMD_FILESDIRSINARC, FALSE,
+        salamander->AddMenuItem(-1, L"*.D&OP File(s)", 0, MENUCMD_DOPFILES, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
+        salamander->AddMenuItem(-1, L"Fil&e(s) and/or Directory(ies) in Archive", 0, MENUCMD_FILESDIRSINARC, FALSE,
                                 MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DIR_FOCUSED |
                                     MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIRS_SELECTED,
                                 MENU_EVENT_THIS_PLUGIN_ARCH, MENU_SKILLLEVEL_ALL);
@@ -893,23 +868,23 @@ CPluginInterfaceForMenuExt::BuildMenu(HWND parent, CSalamanderBuildMenuAbstract*
     if (cycle % 4 >= 3)
     {
         salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-        salamander->AddSubmenuStart(-1, "Skill Level Demo", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddSubmenuStart(-1, L"Skill Level Demo", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                     MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-        salamander->AddMenuItem(-1, "For Beginning, Intermediate, and Advanced Users", 0, MENUCMD_ALLUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddMenuItem(-1, L"For Beginning, Intermediate, and Advanced Users", 0, MENUCMD_ALLUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-        salamander->AddSubmenuStart(0, "Intermediate and Advanced", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddSubmenuStart(0, L"Intermediate and Advanced", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                     MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-        salamander->AddMenuItem(-1, "For Intermediate and Advanced Users", 0, MENUCMD_INTADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddMenuItem(-1, L"For Intermediate and Advanced Users", 0, MENUCMD_INTADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-        salamander->AddMenuItem(0, "For Advanced Users", 0, MENUCMD_ADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddMenuItem(0, L"For Advanced Users", 0, MENUCMD_ADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_ADVANCED);
         salamander->AddSubmenuEnd();
         salamander->AddSubmenuEnd();
         salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-        salamander->AddMenuItem(-1, "&Controls provided by Open Salamander...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+        salamander->AddMenuItem(-1, L"&Controls provided by Open Salamander...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
         salamander->AddMenuItem(-1, NULL, 0, MENUCMD_SEP, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED); // separator
-        salamander->AddMenuItem(-1, "Press Shift key when opening menu to hide this item", 0, MENUCMD_HIDDENITEM, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED);
+        salamander->AddMenuItem(-1, L"Press Shift key when opening menu to hide this item", 0, MENUCMD_HIDDENITEM, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED);
     }
     cycle++;
 

@@ -86,17 +86,17 @@ public:
             m_pPromptText = SalamanderGUI->AttachStaticText(m_hWnd, IDC_PROMPT, dwFlags);
             if (chSep)
             {
-                m_pPromptText->SetPathSeparator((char)chSep);
+                m_pPromptText->SetPathSeparator(chSep);
             }
 
-            m_pPromptText->SetText(OLE2A(m_strPrompt));
+            m_pPromptText->SetText(m_strPrompt);
 
             //SetDlgItemTextW(m_hWnd, IDC_PROMPT, m_strPrompt);
         }
 
         if (m_strDefault && *m_strDefault)
         {
-            SetDlgItemTextW(m_hWnd, IDC_INPUTBOX, m_strDefault);
+            ::SetDlgItemTextW(m_hWnd, IDC_INPUTBOX, m_strDefault); // force the free WinAPI, not CDialogImpl's own member
         }
 
         if (m_strTitle && *m_strTitle)

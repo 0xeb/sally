@@ -59,9 +59,14 @@ int CZipPack::CountFilesInRoot(int* filesInRoot, bool* rootExist)
             Fatal = true;
             break;
         }
-        tempNameLen = ProcessName(centralHeader, tempName);
-        if (CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                          zipRoot, rootLen, tempName, rootLen) == CSTR_EQUAL)
+        // ProcessName returns -1 (a name that can't round-trip the system
+        // codepage) rather than a corrupted name - skip this entry for the root-file count
+        // rather than compare against tempName's now-empty buffer.
+        int tempNameLenSigned = ProcessName(centralHeader, tempName);
+        if (tempNameLenSigned < 0)
+            continue;
+        tempNameLen = (unsigned)tempNameLenSigned;
+        if (CompareZipText(zipRoot, rootLen, tempName, rootLen, NORM_IGNORECASE) == CSTR_EQUAL)
         {
             if (*(tempName + rootLen) == '\\')
                 (*filesInRoot)++;
@@ -95,33 +100,26 @@ int CZipPack::DeleteFiles(int* deletedFiles)
     int errorID = 0;
     int ret;
     //bool              cancel =  false;
-    CPathBuffer progrTextBuf;
-    char* progrText;
-    char* sour;
-    int progrPrefixLen; //"deleting: "
+    std::wstring progressPrefix;
 
     buffer = (char*)malloc(DECOMPRESS_INBUFFER_SIZE);
     if (!buffer)
         return IDS_LOWMEM;
     if (Pack)
-        sour = LoadStr(IDS_REMOVING);
+        progressPrefix = LoadStrW(IDS_REMOVING).c_str();
     else
-        sour = LoadStr(IDS_DELETING);
-    progrText = progrTextBuf;
-    while (*sour)
-        *progrText++ = *sour++;
-    progrPrefixLen = (int)(progrText - progrTextBuf);
+        progressPrefix = LoadStrW(IDS_DELETING).c_str();
     if (Config.BackupZip)
     {
-        Salamander->ProgressDialogAddText(LoadStr(IDS_BACKUPING), TRUE);
+        Salamander->ProgressDialogAddText(LoadStrW(IDS_BACKUPING).c_str(), TRUE);
         Salamander->ProgressSetTotalSize(CQuadWord().SetUI64(DelFiles[0]->LocHeaderOffs),
                                          ProgressTotalSize);
         errorID = MoveData(0, 0, DelFiles[0]->LocHeaderOffs, buffer);
     }
     if (Pack)
-        Salamander->ProgressDialogAddText(LoadStr(IDS_REMOVEFILES), TRUE);
+        Salamander->ProgressDialogAddText(LoadStrW(IDS_REMOVEFILES).c_str(), TRUE);
     else
-        Salamander->ProgressDialogAddText(LoadStr(IDS_DELETEFILES), TRUE);
+        Salamander->ProgressDialogAddText(LoadStrW(IDS_DELETEFILES).c_str(), TRUE);
     if (!errorID && !UserBreak)
     {
         writePos = DelFiles[0]->LocHeaderOffs;
@@ -135,8 +133,9 @@ int CZipPack::DeleteFiles(int* deletedFiles)
               ", isdir: " << curFile->IsDir <<
               ", file attr:" << curFile->FileAttr);
 */
-            lstrcpyn(progrText, curFile->Name + RootLen + (RootLen ? 1 : 0), progrTextBuf.Size() - progrPrefixLen);
-            Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
+            const std::wstring entryNameW = ZipTextToWide(curFile->Name + RootLen + (RootLen ? 1 : 0));
+            const std::wstring progressText = progressPrefix + entryNameW;
+            Salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
             if (i + 1 < DelFiles.Count)
                 nextFile = DelFiles[i + 1];
             else
@@ -189,7 +188,7 @@ int CZipPack::DeleteFiles(int* deletedFiles)
                 if (!Salamander->ProgressAddSize(localHeader.NameLen + localHeader.ExtraLen + descSize, TRUE))
                 {
                     if (!UserBreak)
-                        Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING), FALSE);
+                        Salamander->ProgressDialogAddText(LoadStrW(IDS_CANCELING).c_str(), FALSE);
                     UserBreak = true;
                 }
                 if (UserBreak)
@@ -248,7 +247,7 @@ int CZipPack::MoveData(QWORD writePos, QWORD readPos, QWORD moveSize, char* buff
         if (!Salamander->ProgressAddSize(readSize, TRUE))
         {
             if (!UserBreak)
-                Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING), FALSE);
+                Salamander->ProgressDialogAddText(LoadStrW(IDS_CANCELING).c_str(), FALSE);
             Salamander->ProgressEnableCancel(FALSE);
             UserBreak = true;
             if (Config.BackupZip)

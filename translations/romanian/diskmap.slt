@@ -76,3 +76,7 @@ COMMENT,"Versiunea romana"
 78,1,"byte"
 79,1,"bytes"
 
+[STRINGTABLE 3]
+80,1,"Nimic de afisat..."
+81,1,"...acest director nu contine fisiere de mapat"
+

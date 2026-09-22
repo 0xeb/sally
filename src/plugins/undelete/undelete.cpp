@@ -51,6 +51,9 @@
 #include "undelete.h"
 #include "restore.h"
 
+#define UNDELETE_WIDEN_IMPL(value) L##value
+#define UNDELETE_WIDEN(value) UNDELETE_WIDEN_IMPL(value)
+
 HINSTANCE DLLInstance = NULL; // handle for SPL - language independent resources
 HINSTANCE HLanguage = NULL;   // handle for SLG - language dependent resources
 
@@ -73,28 +76,28 @@ CLUSTER_MAP_I cluster_map;
 //  CTopIndexMem
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+void CTopIndexMem::Push(const wchar_t* path, int topIndex)
 {
-    CALL_STACK_MESSAGE3("CTopIndexMem::Push(%s, %d)", path, topIndex);
+    CALL_STACK_MESSAGE3("CTopIndexMem::Push(%ls, %d)", path, topIndex);
 
     // detect if path continues after Path (path==Path+"\\name")
-    const char* s = path + strlen(path);
-    if (s > path && *(s - 1) == '\\')
+    const wchar_t* s = path + wcslen(path);
+    if (s > path && *(s - 1) == L'\\')
         s--;
     BOOL ok;
     if (s == path)
         ok = FALSE;
     else
     {
-        if (s > path && *s == '\\')
+        if (s > path && *s == L'\\')
             s--;
-        while (s > path && *s != '\\')
+        while (s > path && *s != L'\\')
             s--;
 
-        int l = (int)strlen(Path);
-        if (l > 0 && Path[l - 1] == '\\')
+        int l = (int)Path.size();
+        if (l > 0 && Path[l - 1] == L'\\')
             l--;
-        ok = s - path == l && SalamanderGeneral->StrNICmp(path, Path, l) == 0;
+        ok = s - path == l && SalamanderGeneral->StrNICmp(path, Path.c_str(), l) == 0;
     }
 
     if (ok) // it continues -> store next top-index
@@ -106,40 +109,37 @@ void CTopIndexMem::Push(const char* path, int topIndex)
                 TopIndexes[i] = TopIndexes[i + 1];
             TopIndexesCount--;
         }
-        strcpy(Path, path);
+        Path.assign(path);
         TopIndexes[TopIndexesCount++] = topIndex;
     }
     else // it doesn't continue -> first top-index v raw
     {
-        strcpy(Path, path);
+        Path.assign(path);
         TopIndexesCount = 1;
         TopIndexes[0] = topIndex;
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+BOOL CTopIndexMem::FindAndPop(const wchar_t* path, int& topIndex)
 {
-    CALL_STACK_MESSAGE3("CTopIndexMem::FindAndPop(%s, %d)", path, topIndex);
+    CALL_STACK_MESSAGE3("CTopIndexMem::FindAndPop(%ls, %d)", path, topIndex);
 
     // detect if path match to Path (path==Path)
-    int l1 = (int)strlen(path);
-    if (l1 > 0 && path[l1 - 1] == '\\')
+    int l1 = (int)wcslen(path);
+    if (l1 > 0 && path[l1 - 1] == L'\\')
         l1--;
-    int l2 = (int)strlen(Path);
-    if (l2 > 0 && Path[l2 - 1] == '\\')
+    int l2 = (int)Path.size();
+    if (l2 > 0 && Path[l2 - 1] == L'\\')
         l2--;
-    if (l1 == l2 && SalamanderGeneral->StrNICmp(path, Path, l1) == 0)
+    if (l1 == l2 && SalamanderGeneral->StrNICmp(path, Path.c_str(), l1) == 0)
     {
         if (TopIndexesCount > 0)
         {
-            char* s = Path + strlen(Path);
-            if (s > Path && *(s - 1) == '\\')
-                s--;
-            if (s > Path && *s == '\\')
-                s--;
-            while (s > Path && *s != '\\')
-                s--;
-            *s = 0;
+            size_t end = Path.size();
+            if (end > 0 && Path[end - 1] == L'\\')
+                --end;
+            const size_t separator = end == 0 ? std::wstring::npos : Path.rfind(L'\\', end - 1);
+            Path.erase(separator == std::wstring::npos ? 0 : separator);
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;
         }
@@ -200,7 +200,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_USEREX_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            MessageBox(NULL, "InitCommonControlsEx failed!", "Error", MB_OK | MB_ICONERROR);
+            // wide: English-only diagnostic, no LoadStr involved (language module
+            // isn't even loaded yet at DllMain time).
+            MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
     }
@@ -224,13 +226,14 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // works with current and newer Salamander version - check it out
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // deny old versions
-        MessageBox(salamander->GetParentWindow(), REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Undelete" /* DO NOT TRANSLATE! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape as checksum.cpp/unlha.cpp (205,206).
+        MessageBoxW(salamander->GetParentWindow(), UNDELETE_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Undelete" /* DO NOT TRANSLATE! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // load language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Undelete" /* neprekladat! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Undelete" /* neprekladat! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -240,34 +243,34 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set help file name
-    SalamanderGeneral->SetHelpFileName("undelete.chm");
+    SalamanderGeneral->SetHelpFileName(L"undelete.chm");
 
     // init
-    if (!OS<char>::OS_InitLibraryData())
+    if (!OS<wchar_t>::OS_InitLibraryData())
         return NULL;
     if (!InitFS())
     {
-        OS<char>::OS_ReleaseLibraryData();
+        OS<wchar_t>::OS_ReleaseLibraryData();
         return NULL;
     }
-    InitializeWinLib("Undelete" /* DO NOT TRANSLATE! */, DLLInstance);
+    InitializeWinLib(L"Undelete" /* DO NOT TRANSLATE! */, DLLInstance);
     SetupWinLibHelp(HTMLHelpCallback);
 
     InitIconOverlays();
 
     // set basic information about plugin
-    salamander->SetBasicPluginData(String<char>::LoadStr(IDS_UNDELETE),
+    salamander->SetBasicPluginData(String<wchar_t>::LangStr(IDS_UNDELETE).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION |
                                        FUNCTION_FILESYSTEM,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   String<char>::LoadStr(IDS_DESCRIPTION),
-                                   "UNDELETE" /* DO NOT TRANSLATE! */, NULL, "del");
+                                   UNDELETE_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+                                   UNDELETE_WIDEN(VERSINFO_COPYRIGHT),
+                                   String<wchar_t>::LangStr(IDS_DESCRIPTION).c_str(),
+                                   L"UNDELETE" /* DO NOT TRANSLATE! */, NULL, L"del");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // get our FS-name (it could be different than "del", Salamander could change it)
-    SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);
+    AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
 
     return &PluginInterface;
 }
@@ -284,20 +287,19 @@ int WINAPI SalamanderPluginGetReqVer()
 
 void WINAPI CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                String<char>::LoadStr(IDS_UNDELETE),
-                String<char>::LoadStr(IDS_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, String<char>::LoadStr(IDS_ABOUTTITLE), MB_OK | MB_ICONINFORMATION);
+    const std::wstring message = SPLFormatStringOwned(
+        L"%s %s\n\n%s\n\n%s",
+        String<wchar_t>::LangStr(IDS_UNDELETE).c_str(),
+        UNDELETE_WIDEN(VERSINFO_VERSION), UNDELETE_WIDEN(VERSINFO_COPYRIGHT),
+        String<wchar_t>::LangStr(IDS_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, message.c_str(), String<wchar_t>::LangStr(IDS_ABOUTTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL WINAPI CPluginInterface::Release(HWND parent, BOOL force)
 {
     CALL_STACK_MESSAGE2("CPluginInterface::Release(, %d)", force);
     ReleaseFS();
-    OS<char>::OS_ReleaseLibraryData();
+    OS<wchar_t>::OS_ReleaseLibraryData();
     ReleaseWinLib(DLLInstance);
     /*if (ret && InterfaceForFS.GetActiveFSCount() != 0)
   {
@@ -320,12 +322,12 @@ void WINAPI CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* s
     CGUIIconListAbstract* iconList = SalamanderGUI->CreateIconList();
     iconList->Create(16, 16, 1);
     //  HICON hIcon = (HICON)LoadImage(DLLInstance, MAKEINTRESOURCE(IDI_FS), IMAGE_ICON, 16, 16, SalamanderGeneral->GetIconLRFlags());
-    HICON hIcon = OS<char>::OS_GetEmptyRecycleBinIcon(FALSE);
+    HICON hIcon = OS<wchar_t>::OS_GetEmptyRecycleBinIcon(FALSE);
     iconList->ReplaceIcon(0, hIcon);
     DestroyIcon(hIcon);
     salamander->SetIconListForGUI(iconList); // will be destroyed by Salamander
 
-    salamander->SetChangeDriveMenuItem(String<char>::LoadStr(IDS_UNDELETEINCHDRVMENU), 0);
+    salamander->SetChangeDriveMenuItem(String<wchar_t>::LangStr(IDS_UNDELETEINCHDRVMENU).c_str(), 0);
     salamander->SetPluginIcon(0);
     salamander->SetPluginMenuAndToolbarIcon(0);
 
@@ -341,10 +343,10 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
 */
 
     // for better discoverability put plugin also to Plugins menu
-    salamander->AddMenuItem(-1, String<char>::LoadStr(IDS_UNDELETECMD), SALHOTKEY('U', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
+    salamander->AddMenuItem(-1, String<wchar_t>::LangStr(IDS_UNDELETECMD).c_str(), SALHOTKEY('U', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
                             CMD_UNDELETE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
-    salamander->AddMenuItem(-1, String<char>::LoadStr(IDS_RESTORECMD), 0,
+    salamander->AddMenuItem(-1, String<wchar_t>::LangStr(IDS_RESTORECMD).c_str(), 0,
                             CMD_RESTORE_ENCRYPTED, FALSE, MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DIR_FOCUSED | MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIRS_SELECTED, MENU_EVENT_DISK | MENU_EVENT_TARGET_DISK, MENU_SKILLLEVEL_ALL);
 }
 
@@ -399,7 +401,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
         CRestoreDialog dlg(parent);
         if (dlg.Execute() == IDCANCEL)
             return FALSE;
-        return RestoreEncryptedFiles(dlg.TargetPath, parent);
+        return RestoreEncryptedFiles(dlg.TargetPath.c_str(), parent);
         // SalamanderGeneral->SalMessageBox(parent, "Not implemented yet.", "Restore", MB_OK | MB_ICONINFORMATION);
         // return FALSE;
     }
@@ -441,24 +443,26 @@ BOOL ConfigShowZeroFiles;
 BOOL ConfigShowEmptyDirs;
 BOOL ConfigShowMetafiles;
 BOOL ConfigEstimateDamage;
-CPathBuffer ConfigTempPath; // Heap-allocated for long path support
+std::wstring ConfigTempPath;
 BOOL ConfigDontShowEncryptedWarning;
 BOOL ConfigDontShowSamePartitionWarning;
 int ConditionFixedWidth = 0; // column Condition (FS): LO/HI-WORD: left/right panel: FixedWidth
 int ConditionWidth = 0;      // column Condition (FS): LO/HI-WORD: left/right panel: Width
 
-static const char* KEY_ALWAYSREUSE = "Always Reuse Scan Info";
-static const char* KEY_SCANVACENT = "Scan Vacant Clusters";
-static const char* KEY_SHOWEXISTING = "Show Existing Files";
-static const char* KEY_SHOWZEROFILES = "Show Zero Files";
-static const char* KEY_SHOWEMPTYDIRS = "Show Empty Dirs";
-static const char* KEY_SHOWMETAFILES = "Show Metafiles";
-static const char* KEY_ESTIMATEDAMAGE = "Estimate Damage";
-static const char* KEY_TEMPPATH = "Alternate Temp Path";
-static const char* KEY_DONTSHOWENCRYPTED = "Dont Show Encrypted Warning";
-static const char* KEY_DONTSHOWSAMEPARTITION = "Dont Show Same Partition Warning";
-static const char* KEY_CONDITIONFIXEDWIDTH = "Condition Fixed Width";
-static const char* KEY_CONDITIONWIDTH = "Condition Width";
+// wide: registry key NAMES only (never recovered-file data) - matches
+// CSalamanderRegistryAbstract::GetValue/SetValue's wide-only 'name' parameter.
+static const wchar_t* KEY_ALWAYSREUSE = L"Always Reuse Scan Info";
+static const wchar_t* KEY_SCANVACENT = L"Scan Vacant Clusters";
+static const wchar_t* KEY_SHOWEXISTING = L"Show Existing Files";
+static const wchar_t* KEY_SHOWZEROFILES = L"Show Zero Files";
+static const wchar_t* KEY_SHOWEMPTYDIRS = L"Show Empty Dirs";
+static const wchar_t* KEY_SHOWMETAFILES = L"Show Metafiles";
+static const wchar_t* KEY_ESTIMATEDAMAGE = L"Estimate Damage";
+static const wchar_t* KEY_TEMPPATH = L"Alternate Temp Path";
+static const wchar_t* KEY_DONTSHOWENCRYPTED = L"Dont Show Encrypted Warning";
+static const wchar_t* KEY_DONTSHOWSAMEPARTITION = L"Dont Show Same Partition Warning";
+static const wchar_t* KEY_CONDITIONFIXEDWIDTH = L"Condition Fixed Width";
+static const wchar_t* KEY_CONDITIONWIDTH = L"Condition Width";
 
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
@@ -472,7 +476,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     ConfigShowEmptyDirs = TRUE;
     ConfigShowMetafiles = FALSE;
     ConfigEstimateDamage = TRUE;
-    *ConfigTempPath = 0;
+    ConfigTempPath.clear();
     ConfigDontShowEncryptedWarning = FALSE;
     ConfigDontShowSamePartitionWarning = FALSE;
     ConditionFixedWidth = 0;
@@ -487,9 +491,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->GetValue(regKey, KEY_SHOWEMPTYDIRS, REG_DWORD, &ConfigShowEmptyDirs, sizeof(DWORD));
         registry->GetValue(regKey, KEY_SHOWMETAFILES, REG_DWORD, &ConfigShowMetafiles, sizeof(DWORD));
         registry->GetValue(regKey, KEY_ESTIMATEDAMAGE, REG_DWORD, &ConfigEstimateDamage, sizeof(DWORD));
-        registry->GetValue(regKey, KEY_TEMPPATH, REG_SZ, ConfigTempPath, ConfigTempPath.Size());
-        registry->GetValue(regKey, KEY_DONTSHOWENCRYPTED, REG_DWORD, &ConfigDontShowEncryptedWarning, MAX_PATH);
-        registry->GetValue(regKey, KEY_DONTSHOWSAMEPARTITION, REG_DWORD, &ConfigDontShowSamePartitionWarning, MAX_PATH);
+        SPLRegistryGetStringOwned(registry, regKey, KEY_TEMPPATH, ConfigTempPath);
+        registry->GetValue(regKey, KEY_DONTSHOWENCRYPTED, REG_DWORD, &ConfigDontShowEncryptedWarning, sizeof(DWORD));
+        registry->GetValue(regKey, KEY_DONTSHOWSAMEPARTITION, REG_DWORD, &ConfigDontShowSamePartitionWarning, sizeof(DWORD));
         registry->GetValue(regKey, KEY_CONDITIONFIXEDWIDTH, REG_DWORD, &ConditionFixedWidth, sizeof(DWORD));
         registry->GetValue(regKey, KEY_CONDITIONWIDTH, REG_DWORD, &ConditionWidth, sizeof(DWORD));
     }
@@ -506,7 +510,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, KEY_SHOWEMPTYDIRS, REG_DWORD, &ConfigShowEmptyDirs, sizeof(DWORD));
     registry->SetValue(regKey, KEY_SHOWMETAFILES, REG_DWORD, &ConfigShowMetafiles, sizeof(DWORD));
     registry->SetValue(regKey, KEY_ESTIMATEDAMAGE, REG_DWORD, &ConfigEstimateDamage, sizeof(DWORD));
-    registry->SetValue(regKey, KEY_TEMPPATH, REG_SZ, ConfigTempPath.Get(), -1);
+    SPLRegistrySetString(registry, regKey, KEY_TEMPPATH, ConfigTempPath);
     registry->SetValue(regKey, KEY_DONTSHOWENCRYPTED, REG_DWORD, &ConfigDontShowEncryptedWarning, sizeof(DWORD));
     registry->SetValue(regKey, KEY_DONTSHOWSAMEPARTITION, REG_DWORD, &ConfigDontShowSamePartitionWarning, sizeof(DWORD));
     registry->SetValue(regKey, KEY_CONDITIONFIXEDWIDTH, REG_DWORD, &ConditionFixedWidth, sizeof(DWORD));

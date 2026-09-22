@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -14,6 +14,7 @@
 #include "common/widepath.h"
 #include "ui/IPrompter.h"
 #include "common/IRegistry.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
 #include "common/IFileSystem.h"
@@ -26,14 +27,14 @@ static IRegistry* GetSystemPoliciesRegistry()
     return gRegistry != nullptr ? gRegistry : GetWin32Registry();
 }
 
-static BOOL GetValueDontCheckTypeViaRegistry(IRegistry* registry, HKEY hKey, const char* name, void* buffer, DWORD bufferSize)
+static BOOL GetValueDontCheckTypeViaRegistry(IRegistry* registry, HKEY hKey, const wchar_t* name, void* buffer, DWORD bufferSize)
 {
     if (registry == nullptr || buffer == nullptr || bufferSize == 0)
         return FALSE;
 
     RegValueType type = RegValueType::None;
     std::vector<uint8_t> data;
-    auto result = registry->GetValue(hKey, AnsiToWideReg(name).c_str(), type, data);
+    auto result = registry->GetValue(hKey, name, type, data);
     if (!result.success || data.size() > bufferSize)
         return FALSE;
 
@@ -42,29 +43,10 @@ static BOOL GetValueDontCheckTypeViaRegistry(IRegistry* registry, HKEY hKey, con
     return TRUE;
 }
 
-const int ctsNotRunning = 0x00;   // can be started
-const int ctsActive = 0x01;       // this thread is active/just finishing
-const int ctsCanTerminate = 0x02; // can be terminated - already initialized from global data
-
-HANDLE ThreadCheckPath[NUM_OF_CHECKTHREADS];
-int ThreadCheckState[NUM_OF_CHECKTHREADS]; // state of individual threads
-char ThreadPath[SAL_MAX_LONG_PATH];        // input of active thread
-BOOL ThreadValid;                          // result of active thread
-DWORD ThreadLastError;                     // result of active thread
-
 CRITICAL_SECTION CheckPathCS; // critical section for check-path, necessary due to calls from multiple threads (not just main)
 
-// optimization: first check-path thread does not terminate - used repeatedly
-BOOL CPFirstFree = FALSE;      // is it possible to use first check-path thread?
-BOOL CPFirstTerminate = FALSE; // should the first check-path thread terminate?
-HANDLE CPFirstStart = NULL;    // event for starting the first check-path thread
-HANDLE CPFirstEnd = NULL;      // event for testing completion of first check-path thread
-DWORD CPFirstExit;             // replacement for exit-code of first check-path thread (does not terminate)
-
-CPathBuffer CheckPathRootWithRetryMsgBox; // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-HWND LastDriveSelectErrDlgHWnd = NULL;            // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
-
-DWORD WINAPI ThreadCheckPathF(void* param);
+std::wstring CheckPathRootWithRetryMsgBox;
+HWND LastDriveSelectErrDlgHWnd = NULL; // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
 
 struct CWideCheckPathData
 {
@@ -87,7 +69,7 @@ static void ReleaseWideCheckPathData(CWideCheckPathData* data)
 
 static void CheckWidePathAttributes(const std::wstring& path, BOOL& valid, DWORD& lastError)
 {
-    valid = (GetFileAttributesW(path.c_str()) != INVALID_FILE_ATTRIBUTES);
+    valid = (gFileSystem->GetFileAttributes(path.c_str()) != INVALID_FILE_ATTRIBUTES);
     lastError = valid ? ERROR_SUCCESS : GetLastError();
     if (!valid && lastError == ERROR_INVALID_PARAMETER)
         lastError = ERROR_NOT_READY;
@@ -106,12 +88,12 @@ static void CheckWidePathAttributes(const std::wstring& path, BOOL& valid, DWORD
             probe += L"*";
 
             WIN32_FIND_DATAW data;
-            HANDLE find = FindFirstFileW(probe.c_str(), &data);
+            HANDLE find = gFileSystem->FindFirstFile(probe.c_str(), &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 valid = TRUE;
                 lastError = ERROR_SUCCESS;
-                HANDLES(FindClose(find));
+                gFileSystem->CloseFind(find);
             }
         }
     }
@@ -120,7 +102,7 @@ static void CheckWidePathAttributes(const std::wstring& path, BOOL& valid, DWORD
 static DWORD WINAPI WideCheckPathThreadF(void* param)
 {
     CWideCheckPathData* data = (CWideCheckPathData*)param;
-    SetThreadNameInVCAndTrace("CheckPathW");
+    SetThreadNameInVCAndTrace(L"CheckPathW");
     CheckWidePathAttributes(data->Path, data->Valid, data->LastError);
     ReleaseWideCheckPathData(data);
     return 0;
@@ -157,10 +139,8 @@ static DWORD RunWideCheckPathWorker(const wchar_t* path)
 
     if (exit == STILL_ACTIVE)
     {
-        CPathBuffer waitText;
-        std::string displayPath = WideToAnsi(path != NULL ? path : L"");
-        sprintf(waitText, LoadStr(IDS_CHECKINGPATHESC), displayPath.c_str());
-        CreateSafeWaitWindow(waitText, NULL, 4800 + 200, TRUE, NULL);
+        std::wstring waitText = FormatStrW(LoadStrW(IDS_CHECKINGPATHESC), path != NULL ? path : L"");
+        CreateSafeWaitWindow(waitText.c_str(), NULL, 4800 + 200, TRUE, NULL);
 
         while (exit == STILL_ACTIVE)
         {
@@ -171,7 +151,7 @@ static DWORD RunWideCheckPathWorker(const wchar_t* path)
                 ReleaseWideCheckPathData(data);
 
                 MSG msg;
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
 
                 std::wstring infoMsg = FormatStrW(LoadStrW(IDS_TERMINATEDBYUSER), path != NULL ? path : L"");
@@ -198,7 +178,7 @@ CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 // non-blocking reading of volume-name from CD drive:
 CRITICAL_SECTION ReadCDVolNameCS;        // critical section for data access
 UINT_PTR ReadCDVolNameReqUID = 0;        // UID of request (to recognize if anyone is still waiting for result)
-char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH] = ""; // IN/OUT buffer (root/volume_name)
+std::wstring ReadCDVolNameBuffer; // IN/OUT value (root/volume name), protected by ReadCDVolNameCS
 
 struct CInitOpenHtmlHelpCS
 {
@@ -211,30 +191,6 @@ BOOL InitializeCheckThread()
     CALL_STACK_MESSAGE_NONE
     HANDLES(InitializeCriticalSection(&CheckPathCS));
     HANDLES(InitializeCriticalSection(&ReadCDVolNameCS));
-
-    int i;
-    for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
-    {
-        ThreadCheckPath[i] = NULL;
-        ThreadCheckState[i] = ctsNotRunning;
-    }
-
-    CPFirstStart = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
-    CPFirstEnd = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
-    if (CPFirstStart == NULL || CPFirstEnd == NULL)
-    {
-        TRACE_E("Unable to create events for CheckPath.");
-        return FALSE;
-    }
-
-    // try to start the first check-path thread
-    DWORD ThreadID;
-    ThreadCheckPath[0] = HANDLES(CreateThread(NULL, 0, ThreadCheckPathF, (void*)0, 0, &ThreadID));
-    if (ThreadCheckPath[0] == NULL) // failed, but that's okay ...
-    {
-        TRACE_E("Unable to start the first CheckPath thread.");
-    }
-
     return TRUE;
 }
 
@@ -243,464 +199,11 @@ void ReleaseCheckThreads()
     CALL_STACK_MESSAGE_NONE
     HANDLES(DeleteCriticalSection(&ReadCDVolNameCS));
     HANDLES(DeleteCriticalSection(&CheckPathCS));
-
-    if (CPFirstStart != NULL)
-    {
-        CPFirstTerminate = TRUE; // let's terminate the first check-path thread
-        SetEvent(CPFirstStart);
-        Sleep(100); // give it a chance to react
-    }
-    int i;
-    for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
-    {
-        if (ThreadCheckPath[i] != NULL)
-        {
-            DWORD code;
-            if (GetExitCodeThread(ThreadCheckPath[i], &code) && code == STILL_ACTIVE)
-            { // it has nothing left to run, we terminate it
-                TerminateThread(ThreadCheckPath[i], 666);
-                WaitForSingleObject(ThreadCheckPath[i], INFINITE); // wait until thread actually ends, sometimes it takes quite a while
-            }
-            ThreadCheckState[i] = ctsNotRunning;
-            HANDLES(CloseHandle(ThreadCheckPath[i]));
-            ThreadCheckPath[i] = NULL;
-        }
-    }
-    if (CPFirstStart != NULL)
-    {
-        HANDLES(CloseHandle(CPFirstStart));
-        CPFirstStart = NULL;
-    }
-    if (CPFirstEnd != NULL)
-    {
-        HANDLES(CloseHandle(CPFirstEnd));
-        CPFirstEnd = NULL;
-    }
-}
-
-unsigned ThreadCheckPathFBody(void* param) // test of directory accessibility
-{
-    CALL_STACK_MESSAGE1("ThreadCheckPathFBody()");
-    int i = (int)(INT_PTR)param;
-    CPathBuffer threadPath;
-
-    SetThreadNameInVCAndTrace("CheckPath");
-    //  if (i == 0) TRACE_I("First check-path thread: Begin");
-    //  else TRACE_I("Begin");
-
-CPF_AGAIN:
-
-    if (i == 0) // first check-path thread (optimization: runs continuously)
-    {
-        CPFirstFree = TRUE;                          // for entering the thread, otherwise unnecessary safeguard ;-)
-                                                     //    TRACE_I("First check-path thread: Wait for start");
-        WaitForSingleObject(CPFirstStart, INFINITE); // waiting for start or termination
-                                                     //    TRACE_I("First check-path thread: Wait satisfied");
-        CPFirstFree = FALSE;
-        if (CPFirstTerminate) // termination
-        {
-            //      TRACE_I("First check-path thread: End");
-            return 0;
-        }
-    }
-    //  TRACE_I("Testing path " << ThreadPath);
-
-    strcpy(threadPath, ThreadPath);
-    ThreadCheckState[i] |= ctsCanTerminate; // main thread can now terminate
-
-    // this can freeze here, and that's why we do all this hassle around it
-    BOOL threadValid = (GetFileAttributesW(AnsiToWide(threadPath).c_str()) != 0xFFFFFFFF);
-    DWORD error = GetLastError();
-    if (!threadValid && error == ERROR_INVALID_PARAMETER) // reported on root of removable media (CD/DVD, ZIP)
-        error = ERROR_NOT_READY;                          // a bit dirty, but it's simply a "not ready" problem and not "invalid parameter" ;-)
-
-    // work around error when reading attributes (since W2K it's possible to disable reading attributes in Properties/Security) at least on fixed disks
-    if (!threadValid && error == ERROR_ACCESS_DENIED &&
-        (threadPath[0] >= 'a' && threadPath[0] <= 'z' ||
-         threadPath[0] >= 'A' && threadPath[0] <= 'Z') &&
-        threadPath[1] == ':')
-    {
-        char root[20];
-        root[0] = threadPath[0];
-        strcpy(root + 1, ":\\");
-        if (GetDriveType(root) == DRIVE_FIXED)
-        {
-            SalPathAppend(threadPath, "*", threadPath.Size());
-            WIN32_FIND_DATAW data;
-            HANDLE find = SalFindFirstFileHW(threadPath, &data);
-            if (find != INVALID_HANDLE_VALUE)
-            {
-                // path is probably OK after all (cannot be used without test for fixed disk, unfortunately FindFirstFile
-                // probably runs from cache, because disconnected network disk happily starts listing, so
-                // it's unusable for check-path (it was here before and we had to replace it))
-                threadValid = TRUE;
-                HANDLES(FindClose(find));
-            }
-        }
-    }
-
-    if (i == 0) // first check-path thread (optimization: runs continuously)
-    {
-        CPFirstFree = TRUE; // now everything will run smoothly until WaitForSingleObject(CPFirstStart, INFINITE)
-    }
-
-    if (!threadValid && error != ERROR_SUCCESS)
-    {
-        //    SetThreadNameInVCAndTrace("CheckPath");
-        //    TRACE_I("Error: " << GetErrorText(error));
-    }
-
-    int ret;
-    if (ThreadCheckState[i] & ctsActive) // is main thread interested in results?
-    {
-        ThreadValid = threadValid;
-        if (!ThreadValid)
-            ThreadLastError = error;
-        else
-            ThreadLastError = ERROR_SUCCESS;
-        ret = 0;
-    }
-    else
-        ret = 1;
-
-    if (i == 0) // first check-path thread (optimization: runs continuously)
-    {
-        CPFirstExit = ret;
-        SetEvent(CPFirstEnd); // WARNING, immediately switches to main thread (has higher priority)
-
-        goto CPF_AGAIN; // go wait for next request
-    }
-
-    //  TRACE_I("End");
-    return ret;
-}
-
-unsigned ThreadCheckPathFEH(void* param)
-{
-    CALL_STACK_MESSAGE_NONE
-#ifndef CALLSTK_DISABLE
-    __try
-    {
-#endif // CALLSTK_DISABLE
-        return ThreadCheckPathFBody(param);
-#ifndef CALLSTK_DISABLE
-    }
-    __except (CCallStack::HandleException(GetExceptionInformation()))
-    {
-        TRACE_I("Thread CheckPath: calling ExitProcess(1).");
-        //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
-        return 1;
-    }
-#endif // CALLSTK_DISABLE
-}
-
-DWORD WINAPI ThreadCheckPathF(void* param)
-{
-    CALL_STACK_MESSAGE_NONE
-#ifndef CALLSTK_DISABLE
-    CCallStack stack;
-#endif // CALLSTK_DISABLE
-    return ThreadCheckPathFEH(param);
-}
-
-DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent)
-{
-    CALL_STACK_MESSAGE5("SalCheckPath(%d, %s, 0x%X, %d, )", echo, path, err, postRefresh);
-    // protection against multiple calls from multiple threads
-    HANDLES(EnterCriticalSection(&CheckPathCS));
-
-    // protection against multiple calls from one thread
-    static BOOL called = FALSE;
-    if (called)
-    {
-        // so far we only know of deactivation/activation case after ESC in CheckPath(), are there others?
-        HANDLES(LeaveCriticalSection(&CheckPathCS));
-        TRACE_I("SalCheckPath: recursive call (in one thread) is not allowed!");
-        return 666;
-    }
-    called = TRUE;
-
-    BeginStopRefresh(); // so that refresh is not called - recursion
-
-    BOOL valid;
-    DWORD lastError;
-
-RETRY:
-
-    if (err == ERROR_SUCCESS)
-    {
-        lstrcpyn(ThreadPath, path, SAL_MAX_LONG_PATH);
-
-    TEST_AGAIN:
-
-        BOOL runThread = FALSE;
-        int freeThreadIndex = 0;
-        if (!CPFirstFree)
-        {
-            freeThreadIndex = 1;
-            for (; freeThreadIndex < NUM_OF_CHECKTHREADS; freeThreadIndex++)
-            {
-                if (ThreadCheckState[freeThreadIndex] == ctsNotRunning)
-                {
-                    runThread = TRUE;
-                    break;
-                }
-                else
-                {
-                    if (ThreadCheckState[freeThreadIndex] & ctsActive)
-                        continue;
-                    else if (ThreadCheckPath[freeThreadIndex] != NULL)
-                    {
-                        DWORD exit;
-                        if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit) ||
-                            exit != STILL_ACTIVE) // already finished
-                        {
-                            ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                            HANDLES(CloseHandle(ThreadCheckPath[freeThreadIndex]));
-                            ThreadCheckPath[freeThreadIndex] = NULL;
-                            runThread = TRUE;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        ThreadCheckState[freeThreadIndex] = ctsNotRunning; // error
-                        TRACE_E("This should never happen!");
-                    }
-                }
-            }
-        }
-        else
-            runThread = TRUE;
-
-        if (!runThread)
-        {
-            BOOL runAsMainThread = FALSE;
-            if (path[0] != '\\' && path[1] == ':')
-            {
-                char drive[4] = " :\\";
-                drive[0] = path[0];
-                runAsMainThread = (GetDriveType(drive) != DRIVE_REMOTE);
-            }
-            if (runAsMainThread) // not network -> in main thread
-            {
-                valid = (GetFileAttributesW(AnsiToWide(path).c_str()) != 0xFFFFFFFF); // test directory accessibility
-                if (!valid)
-                    lastError = GetLastError();
-                else
-                    lastError = ERROR_SUCCESS;
-            }
-            else // is network -> in one of the secondary threads
-            {
-                Sleep(100); // so let's rest for a bit and test again
-                goto TEST_AGAIN;
-            }
-        }
-        else
-        {
-            DWORD ThreadID;
-            BOOL success = TRUE;
-            ThreadCheckState[freeThreadIndex] = ctsActive;
-            if (freeThreadIndex == 0) // start first check-path thread
-            {
-                ResetEvent(CPFirstEnd); // cancel any previous completion
-                SetEvent(CPFirstStart); // start thread
-            }
-            else // start others
-            {
-                ThreadCheckPath[freeThreadIndex] = HANDLES(CreateThread(NULL, 0, ThreadCheckPathF,
-                                                                        (void*)(INT_PTR)freeThreadIndex,
-                                                                        0, &ThreadID));
-                if (ThreadCheckPath[freeThreadIndex] == NULL)
-                {
-                    TRACE_E("Unable to start CheckPath thread.");
-                    ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                    valid = (GetFileAttributesW(AnsiToWide(path).c_str()) != 0xFFFFFFFF); // test directory accessibility
-                    if (!valid)
-                        lastError = GetLastError();
-                    else
-                        lastError = ERROR_SUCCESS;
-                    success = FALSE;
-                }
-            }
-
-            if (success)
-            {
-                DWORD exit;
-                GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
-                if (freeThreadIndex == 0)    // first check-path thread, check completion
-                {
-                    if (WaitForSingleObject(CPFirstEnd, 200) != WAIT_TIMEOUT) // 200 ms - grace period
-                    {
-                        exit = CPFirstExit; // replacement for return value
-                    }
-                    else
-                        exit = STILL_ACTIVE; // still running
-                }
-                else
-                {
-                    WaitForSingleObject(ThreadCheckPath[freeThreadIndex], 200); // 200 ms - grace period
-                    if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit))
-                        exit = STILL_ACTIVE;
-                }
-                if (exit == STILL_ACTIVE) // take care of kill via ESC
-                {
-                    // after 3 seconds we show "ESC to cancel" window
-                    CPathBuffer buf;
-                    sprintf(buf, LoadStr(IDS_CHECKINGPATHESC), path);
-                    CreateSafeWaitWindow(buf, NULL, 4800 + 200, TRUE, NULL);
-
-                    while (1)
-                    {
-                        if (ThreadCheckState[freeThreadIndex] & ctsCanTerminate)
-                        {
-                            if (UserWantsToCancelSafeWaitWindow())
-                            {
-                                exit = 1;
-                                ThreadCheckState[freeThreadIndex] &= ~ctsActive;
-                                // thread cannot be terminated immediately, usually system waits for completion
-                                // of last system call - if it's network, it takes even several seconds
-                                // so it's pointless to call TerminateThread at all, thread will finish on its own just as fast
-                                //                TerminateThread(ThreadCheckPath[freeThreadIndex], exit);
-                                //                WaitForSingleObject(ThreadCheckPath[freeThreadIndex], INFINITE);  // wait until thread actually ends, sometimes it takes quite a while
-                                break;
-                            }
-                        }
-
-                        if (freeThreadIndex == 0) // first check-path thread, check completion
-                        {
-                            if (WaitForSingleObject(CPFirstEnd, 200) != WAIT_TIMEOUT) // 200 ms before next test
-                            {
-                                exit = CPFirstExit; // replacement for return value
-                            }
-                            else
-                                exit = STILL_ACTIVE; // still running
-                        }
-                        else
-                        {
-                            WaitForSingleObject(ThreadCheckPath[freeThreadIndex], 200); // 200 ms before next test
-                            if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit))
-                                exit = STILL_ACTIVE;
-                        }
-                        if (exit != STILL_ACTIVE)
-                            break;
-                    }
-                    DestroySafeWaitWindow();
-                }
-                if (exit == 0) // was successfully completed
-                {
-                    valid = ThreadValid;
-                    lastError = ThreadLastError;
-                    ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                    if (freeThreadIndex != 0)
-                    {
-                        HANDLES(CloseHandle(ThreadCheckPath[freeThreadIndex]));
-                        ThreadCheckPath[freeThreadIndex] = NULL;
-                    }
-                }
-                else // was terminated, let it finish
-                {
-                    valid = FALSE;
-                    lastError = ERROR_USER_TERMINATED; // my error
-
-                    MSG msg; // discard buffered ESC
-                    while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
-                        ;
-
-                    std::wstring infoMsg = FormatStrW(LoadStrW(IDS_TERMINATEDBYUSER), AnsiToWide(path).c_str());
-                    gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), infoMsg.c_str());
-                }
-            }
-        }
-    }
-    else
-    {
-        lastError = err;
-        err = ERROR_SUCCESS;
-        valid = FALSE;
-    }
-
-    if ((err == ERROR_USER_TERMINATED || echo) && !valid)
-    {
-        switch (lastError)
-        {
-        case (DWORD)ERROR_USER_TERMINATED:
-            break;
-
-        case ERROR_NOT_READY:
-        {
-            CPathBuffer text;  // Heap-allocated for long path support
-            CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-            UINT drvType;
-            if (path[0] == '\\' && path[1] == '\\')
-            {
-                drvType = DRIVE_REMOTE;
-                GetRootPath(drive, path);
-                drive[strlen(drive) - 1] = 0; // we don't want the last '\\'
-            }
-            else
-            {
-                drive[0] = path[0];
-                drive[1] = 0;
-                drvType = MyGetDriveType(path);
-            }
-            if (drvType != DRIVE_REMOTE)
-            {
-                GetCurrentLocalReparsePoint(path, CheckPathRootWithRetryMsgBox);
-                if (strlen(CheckPathRootWithRetryMsgBox) > 3)
-                {
-                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
-                    SalPathRemoveBackslash(drive);
-                }
-            }
-            else
-                GetRootPath(CheckPathRootWithRetryMsgBox, path);
-            sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive.Get());
-            int msgboxRes = (int)CDriveSelectErrDlg(parent, text, path).Execute();
-            *CheckPathRootWithRetryMsgBox = 0;
-            UpdateWindow(MainWindow->HWindow);
-            if (msgboxRes == IDRETRY)
-                goto RETRY;
-            break;
-        }
-
-        case ERROR_DIRECTORY:
-        case ERROR_FILE_NOT_FOUND:
-        case ERROR_PATH_NOT_FOUND:
-        case ERROR_BAD_PATHNAME:
-        {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_DIRNAMEINVALID), AnsiToWide(path).c_str());
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-            break;
-        }
-
-        default:
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastError));
-            break;
-        }
-        }
-    }
-
-    EndStopRefresh(postRefresh);
-    called = FALSE;
-
-    HANDLES(LeaveCriticalSection(&CheckPathCS));
-    return lastError;
 }
 
 DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh, HWND parent)
 {
-    if (err == ERROR_SUCCESS && path != NULL)
-    {
-        std::string pathA;
-        if (sally::unicode::TryExactAnsiFallback(path, pathA))
-            return SalCheckPath(echo, pathA.c_str(), err, postRefresh, parent);
-    }
-
-    std::string tracePath = WideToAnsi(path);
-    CALL_STACK_MESSAGE5("SalCheckPathW(%d, %s, 0x%X, %d, )", echo, tracePath.c_str(), err, postRefresh);
+    CALL_STACK_MESSAGE5("SalCheckPathW(%d, %ls, 0x%X, %d, )", echo, path, err, postRefresh);
 
     HANDLES(EnterCriticalSection(&CheckPathCS));
 
@@ -717,6 +220,8 @@ DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh,
 
     BOOL valid = FALSE;
     DWORD lastError = ERROR_SUCCESS;
+
+RETRY:
 
     if (err == ERROR_SUCCESS)
     {
@@ -743,6 +248,51 @@ DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh,
         case (DWORD)ERROR_USER_TERMINATED:
             break;
 
+        case ERROR_NOT_READY:
+        {
+            // "There is no disk in drive E:" with Retry/Cancel, and the automatic Retry that fires
+            // when the user inserts media - main_window_commands_help.cpp watches
+            // CheckPathRootWithRetryMsgBox and posts IDRETRY to LastDriveSelectErrDlgHWnd. Without
+            // this case the drive-not-ready error fell through to the OK-only box below, so an
+            // empty CD/DVD or card-reader slot abandoned the operation outright and the two
+            // globals above were never set by anyone. Same shape as the reparse-point recovery in
+            // CFilesWindow::ReadDirectory.
+            const std::wstring checked = path != NULL ? path : L"";
+            std::wstring drive;
+            UINT drvType;
+            if (checked.length() >= 2 && checked[0] == L'\\' && checked[1] == L'\\')
+            {
+                drvType = DRIVE_REMOTE;
+                drive = GetRootPath(checked.c_str());
+                SalPathRemoveBackslashW(drive); // we don't want the last '\'
+            }
+            else
+            {
+                drive.assign(1, checked.empty() ? L' ' : checked[0]);
+                drvType = MyGetDriveTypeW(checked.c_str());
+            }
+            if (drvType != DRIVE_REMOTE)
+            {
+                std::wstring currentReparsePoint;
+                GetCurrentLocalReparsePointW(checked.c_str(), currentReparsePoint);
+                CheckPathRootWithRetryMsgBox = currentReparsePoint;
+                if (currentReparsePoint.length() > 3)
+                {
+                    drive = currentReparsePoint;
+                    SalPathRemoveBackslashW(drive);
+                }
+            }
+            else
+                CheckPathRootWithRetryMsgBox = GetRootPath(checked.c_str());
+            const std::wstring driveError = FormatStrW(LoadStrW(IDS_NODISKINDRIVE), drive.c_str());
+            int msgboxRes = (int)CDriveSelectErrDlg(parent, driveError.c_str(), checked.c_str()).Execute();
+            CheckPathRootWithRetryMsgBox.clear();
+            UpdateWindow(MainWindow->HWindow);
+            if (msgboxRes == IDRETRY)
+                goto RETRY;
+            break;
+        }
+
         case ERROR_DIRECTORY:
         case ERROR_FILE_NOT_FOUND:
         case ERROR_PATH_NOT_FOUND:
@@ -754,7 +304,7 @@ DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh,
         }
 
         default:
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(lastError));
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(lastError).c_str());
             break;
         }
     }
@@ -768,7 +318,7 @@ DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh,
 
 BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet)
 {
-    CALL_STACK_MESSAGE3("SalCheckAndRestorePathW(, %s, %d)", WideToAnsi(path).c_str(), tryNet);
+    CALL_STACK_MESSAGE3("SalCheckAndRestorePathW(, %ls, %d)", path, tryNet);
     DWORD err;
     if ((err = SalCheckPathW(FALSE, path, ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS)
     {
@@ -788,9 +338,7 @@ BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet)
             }
             else
             {
-                std::string pathA;
-                if (sally::unicode::TryExactAnsiFallback(path, pathA) &&
-                    CheckAndConnectUNCNetworkPath(parent, pathA.c_str(), pathInvalid, FALSE))
+                if (CheckAndConnectUNCNetworkPathW(parent, path, pathInvalid, FALSE))
                 {
                     if ((err = SalCheckPathW(FALSE, path, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)
                         ok = TRUE;
@@ -808,132 +356,27 @@ BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet)
         }
     }
 
-    return TRUE;
-}
-
-BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
-{
-    CALL_STACK_MESSAGE3("SalCheckAndRestorePath(, %s, %d)", path, tryNet);
-    DWORD err;
-    if ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS)
+    if (tryNet && path != NULL)
     {
-        BOOL ok = FALSE;
         BOOL pathInvalid = FALSE;
-        if (tryNet && err != ERROR_USER_TERMINATED)
+        if (CheckAndConnectUNCNetworkPathW(parent, path, pathInvalid, FALSE))
         {
-            tryNet = FALSE;
-            if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                path[1] == ':') // normal path (not UNC)
-            {
-                if (CheckAndRestoreNetworkConnection(parent, path[0], pathInvalid))
-                {
-                    if ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)
-                        ok = TRUE;
-                }
-            }
-            else // if user doesn't have an account on the requested machine at all
-            {
-                // perform UNC path accessibility test, let user log in if needed
-                if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, FALSE))
-                {
-                    if ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)
-                        ok = TRUE;
-                }
-            }
-        }
-        if (!ok)
-        {
-            if (pathInvalid ||                                                // interrupted connection restoration or unsuccessful restoration attempt
-                err == ERROR_USER_TERMINATED ||                               // CheckPath interrupted by ESC key
-                SalCheckPath(TRUE, path, err, TRUE, parent) != ERROR_SUCCESS) // print other errors
-            {
-                return FALSE;
-            }
-        }
-    }
-
-    if (tryNet) // if we haven't tried network connection restoration yet
-    {
-        // perform UNC path accessibility test, let user log in if needed
-        BOOL pathInvalid;
-        if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, FALSE))
-        {
-            if (SalCheckPath(TRUE, path, ERROR_SUCCESS, TRUE, parent) != ERROR_SUCCESS)
+            if (SalCheckPathW(TRUE, path, ERROR_SUCCESS, TRUE, parent) != ERROR_SUCCESS)
                 return FALSE;
         }
-        else
+        else if (pathInvalid)
         {
-            if (pathInvalid)
-                return FALSE;
+            return FALSE;
         }
     }
 
     return TRUE;
-}
-
-BOOL SalCheckAndRestorePathWithCut(HWND parent, char* path, BOOL& tryNet, DWORD& err, DWORD& lastErr,
-                                   BOOL& pathInvalid, BOOL& cut, BOOL donotReconnect)
-{
-    CALL_STACK_MESSAGE4("SalCheckAndRestorePathWithCut(, %s, %d, , , , , %d)", path, tryNet,
-                        donotReconnect);
-
-    pathInvalid = FALSE;
-    cut = FALSE;
-    lastErr = ERROR_SUCCESS;
-    BOOL semTimeoutOccured = FALSE;
-
-_CHECK_AGAIN:
-
-    while ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS)
-    {
-        if (err == ERROR_SEM_TIMEOUT && !semTimeoutOccured)
-        { // Vista: when changing physical connection (e.g. Wi-Fi and then LAN) it inexplicably reports this error and second time everything is OK, so we do this hassle for the user
-            semTimeoutOccured = TRUE;
-            Sleep(300);
-            continue;
-        }
-        if (err == ERROR_USER_TERMINATED)
-            break;
-        if (tryNet) // haven't tried it yet
-        {
-            tryNet = FALSE;
-            if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                path[1] == ':') // it's a normal path (not UNC)
-            {
-                if (!donotReconnect && CheckAndRestoreNetworkConnection(parent, path[0], pathInvalid))
-                    continue;
-            }
-            else // if user doesn't have an account on the requested machine at all
-            {
-                // perform UNC path accessibility test, let user log in if needed
-                if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, donotReconnect))
-                    continue;
-            }
-            if (pathInvalid)
-                break; // CutDirectory won't help this ...
-        }
-        lastErr = err;
-        if (!IsDirError(err))
-            break; // CutDirectory won't help this ...
-        if (!CutDirectory(path))
-            break;
-        cut = TRUE;
-    }
-    // perform UNC path accessibility test, let user log in if needed
-    if (tryNet && err != ERROR_USER_TERMINATED)
-    {
-        tryNet = FALSE;
-        if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, donotReconnect))
-            goto _CHECK_AGAIN;
-    }
-
-    return !pathInvalid && err == ERROR_SUCCESS;
 }
 
 BOOL SalCheckAndRestorePathWithCutW(HWND parent, std::wstring& path, BOOL& tryNet, DWORD& err, DWORD& lastErr,
                                     BOOL& pathInvalid, BOOL& cut, BOOL donotReconnect)
 {
-    CALL_STACK_MESSAGE4("SalCheckAndRestorePathWithCutW(, %s, %d, , , , , %d)", WideToAnsi(path).c_str(), tryNet,
+    CALL_STACK_MESSAGE4("SalCheckAndRestorePathWithCutW(, %ls, %d, , , , , %d)", path.c_str(), tryNet,
                         donotReconnect);
 
     pathInvalid = FALSE;
@@ -964,9 +407,8 @@ _CHECK_AGAIN:
             }
             else
             {
-                std::string pathA;
-                if (sally::unicode::TryExactAnsiFallback(path, pathA) &&
-                    CheckAndConnectUNCNetworkPath(parent, pathA.c_str(), pathInvalid, donotReconnect))
+                if (CheckAndConnectUNCNetworkPathW(parent, path.c_str(), pathInvalid,
+                                                    donotReconnect))
                 {
                     continue;
                 }
@@ -985,269 +427,14 @@ _CHECK_AGAIN:
     if (tryNet && err != ERROR_USER_TERMINATED)
     {
         tryNet = FALSE;
-        std::string pathA;
-        if (sally::unicode::TryExactAnsiFallback(path, pathA) &&
-            CheckAndConnectUNCNetworkPath(parent, pathA.c_str(), pathInvalid, donotReconnect))
+        if (CheckAndConnectUNCNetworkPathW(parent, path.c_str(), pathInvalid,
+                                            donotReconnect))
         {
             goto _CHECK_AGAIN;
         }
     }
 
     return !pathInvalid && err == ERROR_SUCCESS;
-}
-
-BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
-                  const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
-                  const char* curPath, const char* curArchivePath, int* error,
-                  int pathBufSize)
-{
-    CALL_STACK_MESSAGE7("SalParsePath(%s, , , , %s, , %d, %s, %s, , %d)", path, errorTitle,
-                        curPathIsDiskOrArchive, curPath, curArchivePath, pathBufSize);
-
-    CPathBuffer errBuf;
-    type = -1;
-    secondPart = NULL;
-    isDir = FALSE;
-    if (nextFocus != NULL)
-        nextFocus[0] = 0;
-    if (error != NULL)
-        *error = 0;
-
-PARSE_AGAIN:
-
-    CPathBuffer fsName;
-    char* fsUserPart;
-    if (IsPluginFSPath(path, fsName, &fsUserPart)) // FS path
-    {
-        int index;
-        int fsNameIndex;
-        if (!Plugins.IsPluginFS(fsName, index, fsNameIndex))
-        {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), LoadStrW(IDS_NOTPLUGINFS));
-            gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
-            if (error != NULL)
-                *error = SPP_NOTPLUGINFS;
-            return FALSE;
-        }
-
-        type = PATH_TYPE_FS;
-        secondPart = fsUserPart;
-        return TRUE;
-    }
-    else // Windows/archive paths
-    {
-        int len = (int)strlen(path);
-        BOOL backslashAtEnd = (len > 0 && path[len - 1] == '\\'); // path ends with backslash -> must be directory/archive (not ordinary filename)
-        BOOL mustBePath = (len == 2 && LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                           path[1] == ':'); // path like "c:" must remain a path even after expansion (not a file)
-
-        if (nextFocus != NULL && !mustBePath) // select next focus - only "name" or "name with backslash at end"
-        {
-            char* s = strchr(path, '\\');
-            if (s == NULL || *(s + 1) == 0)
-            {
-                int l;
-                if (s != NULL)
-                    l = (int)(s - path);
-                else
-                    l = (int)strlen(path);
-                if (l < MAX_PATH)
-                {
-                    memcpy(nextFocus, path, l);
-                    nextFocus[l] = 0;
-                }
-            }
-        }
-
-        int errTextID;
-        const char* text = NULL;
-        if (!SalGetFullName(path, &errTextID, curPathIsDiskOrArchive ? curPath : NULL, NULL, NULL,
-                            pathBufSize, curPathIsDiskOrArchive))
-        {
-            if (errTextID == IDS_EMPTYNAMENOTALLOWED)
-            {
-                if (curPath == NULL) // nothing to replace empty path with (understood as current directory)
-                {
-                    if (error != NULL)
-                        *error = SPP_EMPTYPATHNOTALLOWED;
-                }
-                else
-                {
-                    lstrcpyn(path, curPath, pathBufSize);
-                    goto PARSE_AGAIN;
-                }
-            }
-            else
-            {
-                if (errTextID == IDS_INCOMLETEFILENAME)
-                {
-                    if (error != NULL)
-                        *error = SPP_INCOMLETEPATH;
-                    if (!curPathIsDiskOrArchive)
-                    {
-                        // return FALSE without notifying the user - exception allowing further processing
-                        // of relative paths on FS
-                        return FALSE;
-                    }
-                }
-                else
-                {
-                    if (error != NULL)
-                        *error = SPP_WINDOWSPATHERROR;
-                }
-            }
-            text = LoadStr(errTextID);
-        }
-        if (text == NULL)
-        {
-            if (curArchivePath != NULL && StrICmp(path, curArchivePath) == 0)
-            { // helper for users: operation from archive to archive root -> must end with '\\', otherwise it will only
-                // be overwriting existing file
-                SalPathAddBackslash(path, pathBufSize);
-                backslashAtEnd = TRUE;
-            }
-
-            CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-            GetRootPath(root, path);
-
-            // we won't test network paths if we just accessed them
-            BOOL tryNet = !curPathIsDiskOrArchive || curPath == NULL || !HasTheSameRootPath(root, curPath);
-
-            // check/connect root path, if root path works, the rest of the path should hopefully work too
-            if (!SalCheckAndRestorePath(parent, root, tryNet))
-            {
-                if (backslashAtEnd || mustBePath)
-                    SalPathAddBackslash(path, pathBufSize);
-                if (error != NULL)
-                    *error = SPP_WINDOWSPATHERROR;
-                return FALSE;
-            }
-
-        FIND_AGAIN:
-            char* end = path + strlen(path);
-            char* afterRoot = path + strlen(root) - 1;
-            if (*afterRoot == '\\')
-                afterRoot++;
-            char lastChar = 0;
-
-            // if there's a mask in the path, we cut it off without calling SalGetFileAttributes
-            BOOL hasMask = FALSE;
-            if (end > afterRoot) // not just root yet
-            {
-                char* end2 = end;
-                while (*--end2 != '\\') // it's certain that there's at least one '\\' after root path
-                {
-                    if (*end2 == '*' || *end2 == '?')
-                        hasMask = TRUE;
-                }
-                if (hasMask) // there's a mask in name -> trim
-                {
-                    CutSpacesFromBothSides(end2 + 1); // spaces at beginning and end of mask are 100% to be removed, otherwise only trouble (e.g. "*.* " + "a" = "a. ")
-                    end = end2;
-                    lastChar = *end;
-                    *end = 0;
-                }
-            }
-
-            HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-
-            isDir = TRUE;
-
-            while (end > afterRoot) // not just root yet
-            {
-                int len2 = (int)strlen(path);
-                if (path[len2 - 1] != '\\') // paths ending with backslash behave differently (classic and UNC): UNC returns success, classic ERROR_INVALID_NAME: extracting from archive on UNC path to path "" reported unknown archive (PackerFormatConfig.PackIsArchive received e.g. "...test.zip\\" instead of "...test.zip")
-                {
-                    DWORD attrs = GetFileAttributesW(AnsiToWide(path).c_str());
-                    if (attrs != 0xFFFFFFFF) // this part of path exists
-                    {
-                        if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
-                        {
-                            if (lastChar != 0 || backslashAtEnd || mustBePath) // is there backslash after archive name?
-                            {
-                                if (PackerFormatConfig.PackIsArchive(path)) // it's an archive
-                                {
-                                    *end = lastChar; // fix 'path'
-                                    secondPart = end;
-                                    type = PATH_TYPE_ARCHIVE;
-                                    isDir = FALSE;
-
-                                    SetCursor(oldCur);
-
-                                    return TRUE;
-                                }
-                                else // should have been archive (path in file is given), we'll report error
-                                {
-                                    text = LoadStr(IDS_NOTARCHIVEPATH);
-                                    if (error != NULL)
-                                        *error = SPP_NOTARCHIVEFILE;
-                                    break; // report error
-                                }
-                            }
-                            else // not shortened yet + no '\\' at end -> this is a file overwrite
-                            {
-                                // existing path should not contain filename, truncating...
-                                isDir = FALSE;
-                                while (*--end != '\\')
-                                    ;            // it's certain that there's at least one '\\' after root path
-                                lastChar = *end; // so the path doesn't get destroyed
-                                break;           // ordinary Windows path - but to a file
-                            }
-                        }
-                        else
-                            break; // ordinary Windows path
-                    }
-                    else
-                    {
-                        DWORD err = GetLastError();
-                        if (err != ERROR_FILE_NOT_FOUND && err != ERROR_INVALID_NAME &&
-                            err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
-                            err != ERROR_DIRECTORY) // odd error - just print it
-                        {
-                            text = GetErrorText(err);
-                            if (error != NULL)
-                                *error = SPP_WINDOWSPATHERROR;
-                            break; // report error
-                        }
-                    }
-                }
-                *end = lastChar; // restore 'path'
-                while (*--end != '\\')
-                    ; // it's certain that there's at least one '\\' after root path
-                lastChar = *end;
-                *end = 0;
-            }
-            *end = lastChar; // fix 'path'
-
-            SetCursor(oldCur);
-
-            if (text == NULL)
-            {
-                // Windows path
-                if (*end == '\\')
-                    end++;
-                if (isDir && *end != 0 && !hasMask && strchr(end, '\\') == NULL)
-                { // path ends with non-existent directory (not a mask), clean the name from unwanted characters at beginning and end
-                    BOOL changeNextFocus = nextFocus != NULL && strcmp(nextFocus, end) == 0;
-                    if (MakeValidFileName(end))
-                    {
-                        if (changeNextFocus)
-                            strcpy(nextFocus, end);
-                        goto FIND_AGAIN;
-                    }
-                }
-                secondPart = end;
-                type = PATH_TYPE_WINDOWS;
-                return TRUE;
-            }
-        }
-
-        std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(path).c_str(), AnsiToWide(text).c_str());
-        gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
-        if (backslashAtEnd || mustBePath)
-            SalPathAddBackslash(path, pathBufSize);
-        return FALSE;
-    }
 }
 
 BOOL SalParsePathW(HWND parent, std::wstring& path, int& type, BOOL& isDir, wchar_t*& secondPart,
@@ -1264,10 +451,35 @@ BOOL SalParsePathW(HWND parent, std::wstring& path, int& type, BOOL& isDir, wcha
         *error = 0;
 
 PARSE_AGAIN_W:
+    std::wstring fsName;
+    wchar_t* fsUserPart = NULL;
+    if (IsPluginFSPath(path.data(), &fsName, &fsUserPart))
+    {
+        int index;
+        int fsNameIndex;
+        if (!Plugins.IsPluginFS(fsName.c_str(), index, fsNameIndex))
+        {
+            const std::wstring msg = FormatStrW(
+                LoadStrW(IDS_PATHERRORFORMAT), path.c_str(),
+                LoadStrW(IDS_NOTPLUGINFS));
+            gPrompter->ShowError(errorTitle, msg.c_str());
+            if (error != NULL)
+                *error = SPP_NOTPLUGINFS;
+            return FALSE;
+        }
+
+        type = PATH_TYPE_FS;
+        secondPart = fsUserPart;
+        return TRUE;
+    }
+
     int len = (int)path.length();
     BOOL backslashAtEnd = (len > 0 && path[len - 1] == L'\\');
-    BOOL mustBePath = (len == 2 && LowerCase[(unsigned char)path[0]] >= 'a' && LowerCase[(unsigned char)path[0]] <= 'z' &&
-                       path[1] == L':');
+    BOOL mustBePath =
+        len == 2 &&
+        ((path[0] >= L'a' && path[0] <= L'z') ||
+         (path[0] >= L'A' && path[0] <= L'Z')) &&
+        path[1] == L':';
 
     if (nextFocus != NULL && !mustBePath)
     {
@@ -1275,8 +487,7 @@ PARSE_AGAIN_W:
         if (pos == std::wstring::npos || pos + 1 == path.length())
         {
             size_t focusLen = (pos == std::wstring::npos) ? path.length() : pos;
-            if (focusLen < MAX_PATH)
-                *nextFocus = path.substr(0, focusLen);
+            *nextFocus = path.substr(0, focusLen);
         }
     }
 
@@ -1321,8 +532,8 @@ PARSE_AGAIN_W:
         backslashAtEnd = TRUE;
     }
 
-    std::wstring root = GetRootPathW(path.c_str());
-    BOOL tryNet = !curPathIsDiskOrArchive || curPath == NULL || !HasTheSameRootPathW(root.c_str(), curPath);
+    std::wstring root = GetRootPath(path.c_str());
+    BOOL tryNet = !curPathIsDiskOrArchive || curPath == NULL || !HasTheSameRootPath(root.c_str(), curPath);
     if (!SalCheckAndRestorePathW(parent, root.c_str(), tryNet))
     {
         if (backslashAtEnd || mustBePath)
@@ -1370,15 +581,14 @@ FIND_AGAIN_W:
     {
         if (*(end - 1) != L'\\')
         {
-            DWORD attrs = GetFileAttributesW(path.c_str());
+            DWORD attrs = gFileSystem->GetFileAttributes(path.c_str());
             if (attrs != 0xFFFFFFFF)
             {
                 if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
                 {
                     if (lastChar != 0 || backslashAtEnd || mustBePath)
                     {
-                        std::string ansiPath = WideToAnsi(path);
-                        if (PackerFormatConfig.PackIsArchive(ansiPath.c_str()))
+                        if (PackerFormatConfig.PackIsArchive(path.c_str()))
                         {
                             type = PATH_TYPE_ARCHIVE;
                             isDir = FALSE;
@@ -1404,7 +614,7 @@ FIND_AGAIN_W:
                     err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
                     err != ERROR_DIRECTORY)
                 {
-                    text = GetErrorTextW(err);
+                    text = GetErrorTextOwned(err).c_str();
                     if (error != NULL)
                         *error = SPP_WINDOWSPATHERROR;
                     break;
@@ -1470,112 +680,26 @@ FIND_AGAIN_W:
     return FALSE;
 }
 
-BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                         char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curDiskPath, char*& mask)
+static BOOL SalSplitGeneralPathBufferW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                                      wchar_t* path, size_t pathCapacity, wchar_t* afterRoot, wchar_t* secondPart,
+                                      BOOL pathIsDir, BOOL backslashAtEnd, const wchar_t* dirName,
+                                      const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
+                                      size_t newDirsCapacity, SGP_IsTheSamePathF isTheSamePathF);
+
+static BOOL SalSplitWindowsPathBufferW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                                       wchar_t* path, size_t pathCapacity, wchar_t* secondPart, BOOL pathIsDir,
+                                       BOOL backslashAtEnd, const wchar_t* dirName, const wchar_t* curDiskPath,
+                                       wchar_t*& mask)
 {
-    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-    GetRootPath(root, path);
-    char* afterRoot = path + strlen(root) - 1;
-    if (*afterRoot == '\\')
-        afterRoot++;
-
-    CPathBuffer newDirs;  // Heap-allocated for long path support
-    CPathBuffer textBuf;  // Heap-allocated for error messages with long paths
-
-    if (SalSplitGeneralPath(parent, title, errorTitle, selCount, path, afterRoot, secondPart,
-                            pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, newDirs, NULL))
-    {
-        if (mask - 1 > path && *(mask - 2) == '\\' &&
-            (mask - 1 > afterRoot || *path == '\\'))           // not root or is UNC root
-        {                                                      // need to remove unnecessary backslash from end of string
-            memmove(mask - 2, mask - 1, 1 + strlen(mask) + 1); // '\0' + mask + '\0'
-            mask--;
-        }
-
-        if (newDirs[0] != 0) // create new directories on target path
-        {
-            memmove(newDirs.Get() + (secondPart - path), newDirs.Get(), strlen(newDirs) + 1);
-            memmove(newDirs.Get(), path, secondPart - path);
-            SalPathRemoveBackslash(newDirs);
-
-            BOOL ok = TRUE;
-            char* st = newDirs.Get() + (secondPart - path);
-            while (1)
-            {
-                BOOL invalidPath = *st != 0 && *st <= ' ';
-                char* slash = strchr(st, '\\');
-                if (slash != NULL)
-                {
-                    if (slash > st && (*(slash - 1) <= ' ' || *(slash - 1) == '.'))
-                        invalidPath = TRUE;
-                    *slash = 0;
-                }
-                else
-                {
-                    if (*st != 0)
-                    {
-                        char* end = st + strlen(st) - 1;
-                        if (*end <= ' ' || *end == '.')
-                            invalidPath = TRUE;
-                    }
-                }
-                if (invalidPath || !SalLPCreateDirectory(newDirs, NULL))
-                {
-                    DWORD lastErr = invalidPath ? ERROR_INVALID_NAME : GetLastError();
-                    // ERROR_ALREADY_EXISTS is not a failure - the directory is there, which is what we want
-                    if (lastErr != ERROR_ALREADY_EXISTS)
-                    {
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_CREATEDIRFAILED), AnsiToWide(newDirs.Get()).c_str());
-                        gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), msg.c_str());
-                        ok = FALSE;
-                        break;
-                    }
-                }
-                if (slash != NULL)
-                    *slash = '\\';
-                else
-                    break; // that was the last '\\'
-                st = slash + 1;
-            }
-
-            //---  refresh of non-automatically refreshed directories (happens after ending
-            // stop-refresh, so after the operation completes)
-            CPathBuffer changesRoot;  // Heap-allocated for long path support
-            memmove(changesRoot.Get(), path, secondPart - path);
-            changesRoot[secondPart - path] = 0;
-            // path change - creation of new subdirectories on path (needed even if
-            // new directories failed to be created) - change without subdirectories (only subdirectories were being created)
-            MainWindow->PostChangeOnPathNotification(changesRoot, FALSE);
-
-            if (!ok)
-            {
-                char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
-                if (e > path && *(e - 1) != '\\')
-                    *e++ = '\\';
-                if (e != mask)
-                    memmove(e, mask, strlen(mask) + 1); // if needed, move the mask
-                return FALSE;                           // back to copy/move dialog
-            }
-        }
-        return TRUE;
-    }
-    else
-        return FALSE;
-}
-
-BOOL SalSplitWindowsPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
-                          wchar_t* path, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                          const wchar_t* dirName, const wchar_t* curDiskPath, wchar_t*& mask)
-{
-    std::wstring root = GetRootPathW(path);
+    std::wstring root = GetRootPath(path);
     wchar_t* afterRoot = path + root.length() - 1;
     if (*afterRoot == L'\\')
         afterRoot++;
 
-    std::vector<wchar_t> newDirs(SAL_MAX_LONG_PATH, 0);
-    if (SalSplitGeneralPathW(parent, title, errorTitle, selCount, path, afterRoot, secondPart,
-                             pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, newDirs.data(), NULL))
+    std::vector<wchar_t> newDirs(wcslen(path) + 1, L'\0');
+    if (SalSplitGeneralPathBufferW(parent, title, errorTitle, selCount, path, pathCapacity,
+                                   afterRoot, secondPart, pathIsDir, backslashAtEnd, dirName,
+                                   curDiskPath, mask, newDirs.data(), newDirs.size(), NULL))
     {
         if (mask - 1 > path && *(mask - 2) == L'\\' &&
             (mask - 1 > afterRoot || *path == L'\\'))
@@ -1611,9 +735,11 @@ BOOL SalSplitWindowsPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                         invalidPath = TRUE;
                 }
 
-                if (invalidPath || !CreateDirectoryW(newDirs.data(), NULL))
+                const FileResult createResult = invalidPath ? FileResult::Error(ERROR_INVALID_NAME) :
+                                                              gFileSystem->CreateDirectory(newDirs.data());
+                if (!createResult.success)
                 {
-                    DWORD lastErr = invalidPath ? ERROR_INVALID_NAME : GetLastError();
+                    DWORD lastErr = createResult.errorCode;
                     if (lastErr != ERROR_ALREADY_EXISTS)
                     {
                         std::wstring msg = FormatStrW(LoadStrW(IDS_CREATEDIRFAILED), newDirs.data());
@@ -1647,201 +773,38 @@ BOOL SalSplitWindowsPathW(HWND parent, const wchar_t* title, const wchar_t* erro
     return FALSE;
 }
 
-BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                         char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curPath, char*& mask, char* newDirs,
-                         SGP_IsTheSamePathF isTheSamePathF)
+BOOL SalSplitWindowsPathOwnedW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                               std::wstring& path, size_t secondPartOffset, BOOL pathIsDir,
+                               BOOL backslashAtEnd, const wchar_t* dirName, const wchar_t* curDiskPath,
+                               std::wstring& mask)
 {
-    mask = NULL;
-    CPathBuffer textBuf;   // Heap-allocated for long paths
-    CPathBuffer tmpNewDirs; // Heap-allocated for long paths
-    tmpNewDirs[0] = 0;
-    if (newDirs != NULL)
-        newDirs[0] = 0;
-
-    if (pathIsDir) // existing part of path is a directory
+    if (secondPartOffset > path.size() ||
+        path.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) - 6)
     {
-        if (*secondPart != 0) // there's also non-existent part of path
-        {
-            // analyze non-existent part of path - file/directory + mask?
-            char* s = secondPart;
-            BOOL hasMask = FALSE;
-            char* maskFrom = secondPart;
-            while (1)
-            {
-                while (*s != 0 && *s != '?' && *s != '*' && *s != '\\')
-                    s++;
-                if (*s == '\\')
-                    maskFrom = ++s;
-                else
-                {
-                    hasMask = (*s != 0);
-                    break;
-                }
-            }
-
-            if (maskFrom != secondPart) // there's some path before the mask
-            {
-                memcpy(tmpNewDirs.Get(), secondPart, maskFrom - secondPart);
-                tmpNewDirs[maskFrom - secondPart] = 0;
-            }
-
-            if (hasMask)
-            {
-                // ensure splitting into path (ending with backslash) and mask
-                memmove(maskFrom + 1, maskFrom, strlen(maskFrom) + 1);
-                *maskFrom++ = 0;
-
-                mask = maskFrom;
-            }
-            else
-            {
-                if (!backslashAtEnd) // just name (mask without '*' and '?')
-                {
-                    if (selCount > 1 &&
-                        gPrompter->AskYesNo(AnsiToWide(title).c_str(), LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
-                    {
-                        return FALSE; // back to copy/move dialog
-                    }
-
-                    // ensure splitting into path (ending with backslash) and mask
-                    memmove(maskFrom + 1, maskFrom, strlen(maskFrom) + 1);
-                    *maskFrom++ = 0;
-
-                    mask = maskFrom;
-                }
-                else // name with slash at end -> directory
-                {
-                    SalPathAppend(tmpNewDirs.Get(), maskFrom, tmpNewDirs.Size());
-                    SalPathAddBackslash(path, 2 * MAX_PATH); // path should always end with backslash, ensure it...
-                    mask = path + strlen(path) + 1;
-                    strcpy(mask, "*.*");
-                }
-            }
-            CutSpacesFromBothSides(mask); // spaces at beginning and end of mask are 100% to be removed, otherwise only trouble
-
-            if (tmpNewDirs[0] != 0) // still need to create those new directories
-            {
-                if (newDirs != NULL) // creation is supported
-                {
-                    strcpy(newDirs, tmpNewDirs);
-                    memmove(tmpNewDirs.Get(), path, secondPart - path);
-                    strcpy(tmpNewDirs.Get() + (secondPart - path), newDirs);
-                    SalPathRemoveBackslash(tmpNewDirs);
-
-                    if (Configuration.CnfrmCreatePath) // ask if path should be created
-                    {
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_MOVECOPY_CREATEPATH), AnsiToWide(tmpNewDirs.Get()).c_str());
-                        bool dontShow = false;
-                        PromptResult res = gPrompter->AskYesNoWithCheckbox(AnsiToWide(title).c_str(), msg.c_str(),
-                                                                           LoadStrW(IDS_MOVECOPY_CREATEPATH_CNFRM), &dontShow);
-                        Configuration.CnfrmCreatePath = !dontShow;
-                        if (res.type != PromptResult::kYes)
-                        {
-                            char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
-                            if (e > path && *(e - 1) != '\\')
-                                *e++ = '\\';
-                            if (e != mask)
-                                memmove(e, mask, strlen(mask) + 1); // if needed, move the mask
-                            return FALSE;                           // back to copy/move dialog
-                        }
-                    }
-                }
-                else
-                {
-                    gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), LoadStrW(IDS_TARGETPATHMUSTEXIST));
-                    char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
-                    if (e > path && *(e - 1) != '\\')
-                        *e++ = '\\';
-                    if (e != mask)
-                        memmove(e, mask, strlen(mask) + 1); // if needed, move the mask
-                    return FALSE;                           // back to copy/move dialog
-                }
-            }
-            return TRUE; // exit Copy/Move dialog loop and go perform the operation
-        }
-        else // no non-existent part of path (specified path completely exists)
-        {
-            if (dirName != NULL && curPath != NULL &&
-                !backslashAtEnd && selCount <= 1) // no '\\' at end of path (force directory) + single source
-            {
-                char* name = path + strlen(path);
-                while (name >= afterRoot && *(name - 1) != '\\')
-                    name--;
-                if (name >= afterRoot && *name != 0)
-                {
-                    *(name - 1) = 0;
-                    if (StrICmp(dirName, name) == 0 &&
-                        (isTheSamePathF != NULL && isTheSamePathF(path, curPath) ||
-                         isTheSamePathF == NULL && IsTheSamePath(path, curPath)))
-                    { // renaming directory to same name (except letter case, identity possible)
-                        // ensure splitting into path (ending with backslash) and mask
-                        memmove(name + 1, name, strlen(name) + 1);
-                        *(name - 1) = '\\';
-                        *name++ = 0;
-
-                        mask = name;
-                        // CutSpacesFromBothSides(mask); // cannot do here: directory with this exact name exists, without spaces it would be a different directory (not a problem: "illegal" directory existed before operation, nothing new "illegal" is created)
-                        return TRUE; // exit Copy/Move dialog loop and go perform the operation
-                    }
-                    *(name - 1) = '\\';
-                }
-            }
-
-            // simple path target with universal mask
-            SalPathAddBackslash(path, 2 * MAX_PATH); // path should always end with backslash, ensure it...
-            mask = path + strlen(path) + 1;
-            strcpy(mask, "*.*");
-            return TRUE; // exit Copy/Move dialog loop and go perform the operation
-        }
-    }
-    else // file overwrite - 'secondPart' points to filename in path 'path'
-    {
-        char* nameEnd = secondPart;
-        while (*nameEnd != 0 && *nameEnd != '\\')
-            nameEnd++;
-        if (*nameEnd == 0 && !backslashAtEnd) // renaming/overwriting existing file
-        {
-            if (selCount > 1 &&
-                gPrompter->AskYesNo(AnsiToWide(title).c_str(), LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
-            {
-                return FALSE; // back to copy/move dialog
-            }
-
-            // ensure splitting into path (ending with backslash) and mask
-            memmove(secondPart + 1, secondPart, strlen(secondPart) + 1);
-            *secondPart++ = 0;
-
-            mask = secondPart;
-            // CutSpacesFromBothSides(mask); // cannot do here: file with this exact name exists, without spaces it would be a different file (not a problem: "illegal" file existed before operation, nothing new "illegal" is created)
-            return TRUE; // exit Copy/Move dialog loop and go perform the operation
-        }
-        else // path into archive? not possible here...
-        {
-            gPrompter->ShowError(AnsiToWide(errorTitle).c_str(), LoadStrW(IDS_ARCPATHNOTSUPPORTED));
-            if (backslashAtEnd)
-                SalPathAddBackslash(path, 2 * MAX_PATH); // if '\\' was trimmed, add it back
-            return FALSE;                                // back to copy/move dialog
-        }
-    }
-}
-
-// Wide version of SalSplitGeneralPath: splits target path into existing path + mask + new dirs.
-// All char* parameters replaced with wchar_t*. Uses IsTheSamePathW for path comparison.
-typedef BOOL(WINAPI* SGP_IsTheSamePathWF)(const wchar_t* path1, const wchar_t* path2);
-
-BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
-                           wchar_t* path, wchar_t* afterRoot, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                           const wchar_t* dirName, const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
-                           SGP_IsTheSamePathWF isTheSamePathF)
-{
-    mask = NULL;
-    wchar_t* tmpNewDirs = (wchar_t*)malloc(SAL_MAX_LONG_PATH * sizeof(wchar_t));
-    if (tmpNewDirs == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
+        SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
+    std::vector<wchar_t> buffer(path.length() + 6, L'\0');
+    wmemcpy(buffer.data(), path.c_str(), path.length() + 1);
+    wchar_t* splitMask = NULL;
+    const BOOL result = SalSplitWindowsPathBufferW(parent, title, errorTitle, selCount,
+                                                    buffer.data(), buffer.size(),
+                                                    buffer.data() + secondPartOffset, pathIsDir,
+                                                    backslashAtEnd, dirName, curDiskPath, splitMask);
+    path.assign(buffer.data());
+    mask = splitMask != NULL ? splitMask : L"";
+    return result;
+}
+
+static BOOL SalSplitGeneralPathBufferW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                                      wchar_t* path, size_t pathCapacity, wchar_t* afterRoot, wchar_t* secondPart,
+                                      BOOL pathIsDir, BOOL backslashAtEnd, const wchar_t* dirName,
+                                      const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
+                                      size_t newDirsCapacity, SGP_IsTheSamePathF isTheSamePathF)
+{
+    mask = NULL;
+    std::vector<wchar_t> tmpNewDirsStorage(wcslen(path) + 1, L'\0');
+    wchar_t* tmpNewDirs = tmpNewDirsStorage.data();
     tmpNewDirs[0] = 0;
     if (newDirs != NULL)
         newDirs[0] = 0;
@@ -1890,7 +853,6 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                     if (selCount > 1 &&
                         gPrompter->AskYesNo(title, LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
                     {
-                        free(tmpNewDirs);
                         return FALSE; // back to copy/move dialog
                     }
 
@@ -1902,8 +864,8 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                 }
                 else // name with slash at end -> directory
                 {
-                    SalPathAppendW(tmpNewDirs, maskFrom, SAL_MAX_LONG_PATH);
-                    SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
+                    SalPathAppendW(tmpNewDirs, maskFrom, static_cast<int>(tmpNewDirsStorage.size()));
+                    SalPathAddBackslashW(path, static_cast<int>(pathCapacity));
                     mask = path + wcslen(path) + 1;
                     wcscpy(mask, L"*.*");
                 }
@@ -1914,7 +876,7 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
             {
                 if (newDirs != NULL) // creation is supported
                 {
-                    wcscpy(newDirs, tmpNewDirs);
+                    lstrcpynW(newDirs, tmpNewDirs, static_cast<int>(newDirsCapacity));
                     memmove(tmpNewDirs, path, (secondPart - path) * sizeof(wchar_t));
                     wcscpy(tmpNewDirs + (secondPart - path), newDirs);
                     SalPathRemoveBackslashW(tmpNewDirs);
@@ -1933,7 +895,6 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                                 *e++ = L'\\';
                             if (e != mask)
                                 memmove(e, mask, (wcslen(mask) + 1) * sizeof(wchar_t));
-                            free(tmpNewDirs);
                             return FALSE; // back to copy/move dialog
                         }
                     }
@@ -1946,7 +907,6 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                         *e++ = L'\\';
                     if (e != mask)
                         memmove(e, mask, (wcslen(mask) + 1) * sizeof(wchar_t));
-                    free(tmpNewDirs);
                     return FALSE; // back to copy/move dialog
                 }
             }
@@ -1965,7 +925,7 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                     *(name - 1) = 0;
                     if (_wcsicmp(dirName, name) == 0 &&
                         (isTheSamePathF != NULL && isTheSamePathF(path, curPath) ||
-                         isTheSamePathF == NULL && IsTheSamePathW(path, curPath)))
+                         isTheSamePathF == NULL && IsTheSamePath(path, curPath)))
                     { // renaming directory to same name (except letter case, identity possible)
                         // ensure splitting into path (ending with backslash) and mask
                         memmove(name + 1, name, (wcslen(name) + 1) * sizeof(wchar_t));
@@ -1973,7 +933,6 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
                         *name++ = 0;
 
                         mask = name;
-                        free(tmpNewDirs);
                         return TRUE; // exit Copy/Move dialog loop and go perform the operation
                     }
                     *(name - 1) = L'\\';
@@ -1981,7 +940,7 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
             }
 
             // simple path target with universal mask
-            SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
+            SalPathAddBackslashW(path, static_cast<int>(pathCapacity));
             mask = path + wcslen(path) + 1;
             wcscpy(mask, L"*.*");
             result = TRUE; // exit Copy/Move dialog loop and go perform the operation
@@ -1997,7 +956,6 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
             if (selCount > 1 &&
                 gPrompter->AskYesNo(title, LoadStrW(IDS_MOVECOPY_NONSENSE)).type != PromptResult::kYes)
             {
-                free(tmpNewDirs);
                 return FALSE; // back to copy/move dialog
             }
 
@@ -2012,65 +970,57 @@ BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* erro
         {
             gPrompter->ShowError(errorTitle, LoadStrW(IDS_ARCPATHNOTSUPPORTED));
             if (backslashAtEnd)
-                SalPathAddBackslashW(path, SAL_MAX_LONG_PATH);
-            free(tmpNewDirs);
+                SalPathAddBackslashW(path, static_cast<int>(pathCapacity));
             return FALSE; // back to copy/move dialog
         }
     }
 
-    free(tmpNewDirs);
     return result;
 }
 
-void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_PATH])
+BOOL SalSplitGeneralPathOwnedW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                              std::wstring& path, size_t afterRootOffset, size_t secondPartOffset,
+                              BOOL pathIsDir, BOOL backslashAtEnd, const wchar_t* dirName,
+                              const wchar_t* curPath, std::wstring& mask, std::wstring* newDirs,
+                              SGP_IsTheSamePathF isTheSamePathF)
 {
-    int nameLen = (int)strlen(name);
-    if (nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.') &&
-        nameLen + 1 < _countof(nameCopy))
+    mask.clear();
+    if (newDirs != NULL)
+        newDirs->clear();
+    if (afterRootOffset > path.size() || secondPartOffset > path.size() ||
+        path.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) - 6)
     {
-        memcpy(nameCopy, name, nameLen);
-        nameCopy[nameLen] = '\\';
-        nameCopy[nameLen + 1] = 0;
-        name = nameCopy;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
     }
+
+    std::vector<wchar_t> buffer(path.size() + 6, L'\0');
+    std::wmemcpy(buffer.data(), path.c_str(), path.size() + 1);
+    std::vector<wchar_t> newDirsBuffer;
+    if (newDirs != NULL)
+        newDirsBuffer.assign(path.size() + 1, L'\0');
+
+    wchar_t* splitMask = NULL;
+    const BOOL result = SalSplitGeneralPathBufferW(
+        parent, title, errorTitle, selCount, buffer.data(), buffer.size(),
+        buffer.data() + afterRootOffset, buffer.data() + secondPartOffset,
+        pathIsDir, backslashAtEnd, dirName, curPath, splitMask,
+        newDirs != NULL ? newDirsBuffer.data() : NULL, newDirsBuffer.size(),
+        isTheSamePathF);
+    path.assign(buffer.data());
+    mask.assign(splitMask != NULL ? splitMask : L"");
+    if (newDirs != NULL)
+        newDirs->assign(newDirsBuffer.data());
+    return result;
 }
 
-// CPathBuffer overload - same logic but uses heap buffer with Size() method
-void MakeCopyWithBackslashIfNeeded(const char*& name, CPathBuffer& nameCopy)
-{
-    int nameLen = (int)strlen(name);
-    if (nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.') &&
-        nameLen + 1 < nameCopy.Size())
-    {
-        memcpy(nameCopy.Get(), name, nameLen);
-        nameCopy.Get()[nameLen] = '\\';
-        nameCopy.Get()[nameLen + 1] = 0;
-        name = nameCopy.Get();
-    }
-}
-
-BOOL NameEndsWithBackslash(const char* name)
-{
-    int nameLen = (int)strlen(name);
-    return nameLen > 0 && name[nameLen - 1] == '\\';
-}
+// 2026-08-26: the narrow NameEndsWithBackslash(char*) and FileNameIsInvalid(char*,
+// ...) were deleted - confirmed-dead (zero callers anywhere: core, plugins, tests). Their wide
+// siblings, NameEndsWithBackslashW (common/PathDisplayUtils.cpp) and FileNameIsInvalidW (below),
+// are the ones actually used - FileNameIsInvalidW alone has 6 real callers (shellib.cpp,
+// worker.cpp).
 
 // MakeCopyWithBackslashIfNeededW + NameEndsWithBackslashW moved to common/PathDisplayUtils.cpp (shared with private tests).
-
-BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName)
-{
-    const char* s = name;
-    if (isFullName && (*s >= 'a' && *s <= 'z' || *s >= 'A' && *s <= 'Z') && *(s + 1) == ':')
-        s += 2;
-    while (*s != 0 && *s != ':')
-        s++;
-    if (*s == ':')
-        return TRUE;
-    if (ignInvalidName)
-        return FALSE; // dots and spaces at end don't concern us now (directory with that name may exist on disk)
-    int nameLen = (int)(s - name);
-    return nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.');
-}
 
 BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidName)
 {
@@ -2087,26 +1037,26 @@ BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidNam
     return nameLen > 0 && (name[nameLen - 1] <= L' ' || name[nameLen - 1] == L'.');
 }
 
-BOOL SalMoveFileW(const wchar_t* srcName, const wchar_t* destName)
+BOOL SalMoveFile(const wchar_t* srcName, const wchar_t* destName)
 {
     if (!gFileSystem->MoveFile(srcName, destName).success)
     {
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
         { // could be a Novell problem (MoveFile returns error for files with read-only attribute)
-            DWORD attr = GetFileAttributesW(srcName);
+            DWORD attr = gFileSystem->GetFileAttributes(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SetFileAttributesW(srcName, FILE_ATTRIBUTE_ARCHIVE);
+                gFileSystem->SetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
                 if (gFileSystem->MoveFile(srcName, destName).success)
                 {
-                    SetFileAttributesW(destName, attr);
+                    gFileSystem->SetFileAttributes(destName, attr);
                     return TRUE;
                 }
                 else
                 {
                     err = GetLastError();
-                    SetFileAttributesW(srcName, attr);
+                    gFileSystem->SetFileAttributes(srcName, attr);
                 }
             }
             SetLastError(err);
@@ -2116,13 +1066,8 @@ BOOL SalMoveFileW(const wchar_t* srcName, const wchar_t* destName)
     return TRUE;
 }
 
-BOOL SalMoveFile(const char* srcName, const char* destName)
-{
-    return SalMoveFileW(AnsiToWide(srcName).c_str(), AnsiToWide(destName).c_str());
-}
-
 void RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL forceText,
-                       BOOL* isText, char* codePage)
+                       BOOL* isText, std::wstring* codePage)
 {
     CodeTables.Init(parent);
     CodeTables.RecognizeFileType(pattern, patternLen, forceText, isText, codePage);
@@ -2175,11 +1120,11 @@ void CSystemPolicies::EnableAll()
     DisallowRunList.DetachMembers();
 }
 
-BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const char* keyName)
+BOOL CSystemPolicies::LoadList(TDirectArray<wchar_t*>* list, HKEY hRootKey, const wchar_t* keyName)
 {
     HKEY hKey;
     IRegistry* registry = GetSystemPoliciesRegistry();
-    if (OpenKeyReadA(registry, hRootKey, keyName, hKey).success)
+    if (registry->OpenKeyRead(hRootKey, keyName, hKey).success)
     {
         std::vector<std::wstring> valueNames;
         if (registry->EnumValues(hKey, valueNames).success)
@@ -2189,8 +1134,12 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
                 std::wstring appNameWide;
                 if (registry->GetString(hKey, valueName.c_str(), appNameWide).success)
                 {
-                    std::string appNameAnsi = WideToAnsi(appNameWide);
-                    char* appName = (char*)malloc(appNameAnsi.size() + 1);
+                    // GetString already returns the registry's own wide
+                    // value and the list is TDirectArray<wchar_t*>; the WideToAnsi that
+                    // used to stand here best-fitted a policy entry so that it no longer
+                    // equalled the name being checked. Size in BYTES, length in CHARACTERS.
+                    const size_t bytes = (appNameWide.size() + 1) * sizeof(wchar_t);
+                    wchar_t* appName = (wchar_t*)malloc(bytes);
                     if (appName == NULL)
                     {
                         registry->CloseKey(hKey);
@@ -2204,7 +1153,7 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
                         registry->CloseKey(hKey);
                         return FALSE;
                     }
-                    memcpy(appName, appNameAnsi.c_str(), appNameAnsi.size() + 1);
+                    memcpy(appName, appNameWide.c_str(), bytes);
                 }
             }
         }
@@ -2213,44 +1162,36 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
     return TRUE;
 }
 
-BOOL CSystemPolicies::FindNameInList(TDirectArray<char*>* list, const char* name)
+BOOL CSystemPolicies::FindNameInList(TDirectArray<wchar_t*>* list, const wchar_t* name)
 {
     int i;
     for (i = 0; i < list->Count; i++)
-        if (StrICmp(list->At(i), name) == 0)
+        if (StrICmpW(list->At(i), name) == 0)
             return TRUE;
     return FALSE;
 }
 
-BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
+BOOL CSystemPolicies::GetMyCanRun(const wchar_t* fileName)
 {
-    const char* p = strrchr(fileName, '\\');
+    const wchar_t* p = wcsrchr(fileName, L'\\');
     if (p == NULL)
         p = fileName;
     else
         p++;
     // skip spaces from left
-    while (*p != 0 && *p == ' ')
+    while (*p != 0 && *p == L' ')
         p++;
-    if (strlen(p) >= SAL_MAX_LONG_PATH)
-        return RestrictRun == 0; // deny execution if only selected commands are allowed (this one couldn't be separated from command line)
-    CPathBuffer name;
-    lstrcpyn(name, p, name.Size());
-    // trim spaces from right
-    char* p2 = name + strlen(name) - 1;
-    while (p2 >= name && *p2 == ' ')
-    {
-        *p2 = 0;
-        p2--;
-    }
+    std::wstring name(p);
+    while (!name.empty() && name.back() == L' ')
+        name.pop_back();
     if (DisallowRun != 0)
     {
-        if (FindNameInList(&DisallowRunList, name))
+        if (FindNameInList(&DisallowRunList, name.c_str()))
             return FALSE;
     }
     if (RestrictRun != 0)
     {
-        if (!FindNameInList(&RestrictRunList, name))
+        if (!FindNameInList(&RestrictRunList, name.c_str()))
             return FALSE;
     }
     return TRUE;
@@ -2264,41 +1205,35 @@ void CSystemPolicies::LoadFromRegistry()
     // pull restrictions
     IRegistry* registry = GetSystemPoliciesRegistry();
     HKEY hKey;
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_CURRENT_USER_A, hKey).success)
+    if (registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_CURRENT_USER_W, hKey).success)
     {
         // according to MSDN values can be DWORD and BINARY:
         // It is a REG_DWORD or 4-byte REG_BINARY data value, found under the same key.
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_RUN_A, /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DRIVES_A, /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_RUN_W, /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DRIVES_W, /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));
         //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoViewOnDrive", /*REG_DWORD,*/ &NoViewOnDrive, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_FIND_A, /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_SHELL_SEARCH_BUTTON_A, /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_HOOD_A, /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_FIND_W, /*REG_DWORD,*/ &NoFind, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_SHELL_SEARCH_BUTTON_W, /*REG_DWORD,*/ &NoShellSearchButton, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_HOOD_W, /*REG_DWORD,*/ &NoNetHood, sizeof(DWORD));
         //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoComputersNearMe", /*REG_DWORD,*/ &NoComputersNearMe, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_CONNECT_DISCONNECT_A, /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_RESTRICT_RUN_A, /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
-        if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_RESTRICT_RUN_CURRENT_USER_A))
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_NET_CONNECT_DISCONNECT_W, /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_RESTRICT_RUN_W, /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
+        if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_RESTRICT_RUN_CURRENT_USER_W))
             RestrictRun = 0; // low memory; disable this option
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_DISALLOW_RUN_A, /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
-        if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_DISALLOW_RUN_CURRENT_USER_A))
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_DISALLOW_RUN_W, /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
+        if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_DISALLOW_RUN_CURRENT_USER_W))
             DisallowRun = 0; // low memory; disable this option
         registry->CloseKey(hKey);
     }
 
-    //  if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_NETWORK_CURRENT_USER_A, hKey).success)
-    //  {
-    //GetValueDontCheckTypeViaRegistry(registry, hKey, "NoEntireNetwork", /*REG_DWORD,*/ &NoEntireNetwork, sizeof(DWORD));
-    //    registry->CloseKey(hKey);
-    //  }
-
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_A, hKey).success)
+    if (registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_W, hKey).success)
     {
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_A, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_W, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
         registry->CloseKey(hKey);
     }
-    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_A, hKey).success)
+    if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE, SAL_REG_KEY_POLICIES_EXPLORER_MACHINE_W, hKey).success)
     {
-        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_A, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
+        GetValueDontCheckTypeViaRegistry(registry, hKey, SAL_REG_VALUE_NO_DOT_BREAK_IN_LOGICAL_COMPARE_W, /*REG_DWORD,*/ &NoDotBreakInLogicalCompare, sizeof(DWORD));
         registry->CloseKey(hKey);
     }
 }
@@ -2314,27 +1249,30 @@ BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
         return FALSE;
     }
 
-    BOOL ret = FALSE;
-    size.LoDWord = GetFileSize(file, &size.HiDWord);
-    if ((size.LoDWord != INVALID_FILE_SIZE || (err = GetLastError()) == NO_ERROR))
+    uint64_t value = 0;
+    const FileResult result = gFileSystem->GetHandleFileSize(file, &value);
+    if (result.success)
     {
-        ret = TRUE;
+        size.Set((DWORD)value, (DWORD)(value >> 32));
         err = NO_ERROR;
+        return TRUE;
     }
-    else
-        size.Set(0, 0);
-    return ret;
+    err = result.errorCode;
+    size.Set(0, 0);
+    return FALSE;
 }
 
-BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
+BOOL SalGetFileSize2(const wchar_t* fileName, CQuadWord& size, DWORD* err)
 {
-    HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hFile = gFileSystem->CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                           NULL, OPEN_EXISTING, 0, NULL);
+    HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, hFile, GetLastError(), TRUE);
     if (hFile != INVALID_HANDLE_VALUE)
     {
         DWORD dummyErr;
         BOOL ret = SalGetFileSize(hFile, size, err != NULL ? *err : dummyErr);
-        HANDLES(CloseHandle(hFile));
+        HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(hFile);
         return ret;
     }
     if (err != NULL)
@@ -2343,91 +1281,94 @@ BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
     return FALSE;
 }
 
-DWORD SalGetFileAttributes(const char* fileName)
+// The trailing space/dot workaround below is a PATH-SYNTAX rule, not a
+// text rule - Win32 trims trailing spaces and dots, so appending '\\' is what makes the query hit
+// the file the caller named. It is reproduced here exactly; widening must not quietly change which
+// file gets queried.
+DWORD SalGetFileAttributes(const wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("SalGetFileAttributes(%s)", fileName);
-    // if path ends with space/dot, we must append '\\', otherwise GetFileAttributes
-    // trims spaces/dots and thus works with different path + for files it doesn't work,
-    // but still better than getting attributes of different file/directory (for "c:\\file.txt   "
-    // it works with name "c:\\file.txt")
-    int nameLen = (int)strlen(fileName);
-    if (nameLen > 0 && (fileName[nameLen - 1] <= ' ' || fileName[nameLen - 1] == '.'))
+    CALL_STACK_MESSAGE1("SalGetFileAttributes()");
+    if (fileName == NULL)
+        return INVALID_FILE_ATTRIBUTES;
+
+    size_t nameLen = wcslen(fileName);
+    if (nameLen > 0 && (fileName[nameLen - 1] <= L' ' || fileName[nameLen - 1] == L'.'))
     {
-        CPathBuffer fileNameCopy(fileName);
-        fileNameCopy[nameLen] = '\\';
-        fileNameCopy[nameLen + 1] = 0;
-        return SalLPGetFileAttributes(fileNameCopy);
+        std::wstring fileNameCopy(fileName);
+        fileNameCopy += L'\\';
+        return gFileSystem->GetFileAttributes(fileNameCopy.c_str());
     }
 
-    // Use long path wrapper to support paths > MAX_PATH
-    return SalLPGetFileAttributes(fileName);
+    return gFileSystem->GetFileAttributes(fileName);
 }
 
-BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr)
+BOOL ClearReadOnlyAttr(const wchar_t* name, DWORD attr)
 {
     if (attr == (DWORD)-1)
-        attr = GetFileAttributesW(name);
+        attr = gFileSystem->GetFileAttributes(name);
     if (attr != INVALID_FILE_ATTRIBUTES)
     {
         // only drop RO (for hardlinks it also changes attributes of other hardlinks to the same file, so keep it minimal)
         if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            if (!SetFileAttributesW(name, attr & ~FILE_ATTRIBUTE_READONLY))
-                TRACE_EW(L"ClearReadOnlyAttrW(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << L"): " << name);
+            if (!gFileSystem->SetFileAttributes(name, attr & ~FILE_ATTRIBUTE_READONLY).success)
+                TRACE_EW(L"ClearReadOnlyAttr(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << L"): " << name);
             return TRUE;
         }
     }
     else
     {
-        TRACE_EW(L"ClearReadOnlyAttrW(): error getting attrs: " << name);
-        if (!SetFileAttributesW(name, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least writing (don't care if it's needed)
-            TRACE_EW(L"ClearReadOnlyAttrW(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
+        TRACE_EW(L"ClearReadOnlyAttr(): error getting attrs: " << name);
+        if (!gFileSystem->SetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE).success) // cannot read attributes, try at least writing (don't care if it's needed)
+            TRACE_EW(L"ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
         return TRUE;
     }
     return FALSE;
 }
 
-// ANSI wrapper — delegates to wide version
-BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
-{
-    return ClearReadOnlyAttrW(AnsiToWide(name).c_str(), attr);
-}
-
-BOOL IsNetworkProviderDrive(const char* path, DWORD providerType)
+// Wide throughout. The narrow original matched the caller's path against
+// the ANSI network enumeration - mirror against mirror - so two different servers the code
+// page cannot spell compared EQUAL and the WRONG provider was returned. That answer decides
+// whether fast-directory-move is disabled (Novell) and which write path the worker takes
+// (Lantastic), so the failure is a wrong operation strategy rather than an error.
+//
+// WNetEnumResourceW is not a courtesy sibling here: the enumeration is the authority being
+// compared against, so narrowing it corrupts both sides of the comparison at once.
+BOOL IsNetworkProviderDriveW(const wchar_t* path, DWORD providerType)
 {
     HANDLE hEnumNet;
-    DWORD err = WNetOpenEnum(RESOURCE_CONNECTED, RESOURCETYPE_DISK,
-                             RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
+    DWORD err = WNetOpenEnumW(RESOURCE_CONNECTED, RESOURCETYPE_DISK,
+                              RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
     if (err == NO_ERROR)
     {
-        char* provider = NULL;
+        std::wstring provider;
+        BOOL haveProvider = FALSE;
         DWORD bufSize;
-        char buf[1000];
-        NETRESOURCE* netSource = (NETRESOURCE*)buf;
+        BYTE buf[1000];
+        NETRESOURCEW* netSource = (NETRESOURCEW*)buf;
         while (1)
         {
             DWORD e = 1;
-            bufSize = 1000;
-            err = WNetEnumResource(hEnumNet, &e, netSource, &bufSize);
+            bufSize = sizeof(buf);
+            err = WNetEnumResourceW(hEnumNet, &e, netSource, &bufSize);
             if (err == NO_ERROR && e == 1)
             {
-                if (path[0] == '\\')
+                const BOOL matched =
+                    path[0] == L'\\'
+                        ? (netSource->lpRemoteName != NULL &&
+                           HasTheSameRootPath(path, netSource->lpRemoteName))
+                        : (netSource->lpLocalName != NULL &&
+                           towlower(path[0]) == towlower(netSource->lpLocalName[0]));
+                if (matched)
                 {
-                    if (netSource->lpRemoteName != NULL &&
-                        HasTheSameRootPath(path, netSource->lpRemoteName))
+                    // As before, a match ends the search whether or not it names a
+                    // provider; a NULL lpProvider simply leaves nothing to identify.
+                    if (netSource->lpProvider != NULL)
                     {
                         provider = netSource->lpProvider;
-                        break;
+                        haveProvider = TRUE;
                     }
-                }
-                else
-                {
-                    if (netSource->lpLocalName != NULL &&
-                        LowerCase[path[0]] == LowerCase[netSource->lpLocalName[0]])
-                    {
-                        provider = netSource->lpProvider;
-                        break;
-                    }
+                    break;
                 }
             }
             else
@@ -2435,12 +1376,12 @@ BOOL IsNetworkProviderDrive(const char* path, DWORD providerType)
         }
         WNetCloseEnum(hEnumNet);
 
-        if (provider != NULL)
+        if (haveProvider)
         {
-            NETINFOSTRUCT ni;
+            NETINFOSTRUCT ni; // no string fields, so it has no A/W split
             memset(&ni, 0, sizeof(ni));
             ni.cbStructure = sizeof(ni);
-            if (WNetGetNetworkInformation(provider, &ni) == NO_ERROR)
+            if (WNetGetNetworkInformationW(provider.c_str(), &ni) == NO_ERROR)
             {
                 return ni.wNetType == HIWORD(providerType);
             }
@@ -2449,40 +1390,33 @@ BOOL IsNetworkProviderDrive(const char* path, DWORD providerType)
     return FALSE;
 }
 
-BOOL IsNOVELLDrive(const char* path)
+// No ANSI IsNetworkProviderDrive: its only two callers were IsNOVELLDrive and
+// IsLantasticDrive, and both now go through the wide form. Not wrapped, deleted.
+
+BOOL IsNOVELLDriveW(const wchar_t* path)
 {
-    return IsNetworkProviderDrive(path, WNNC_NET_NETWARE);
+    return IsNetworkProviderDriveW(path, WNNC_NET_NETWARE);
 }
 
-BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& lastIsLantasticPath)
+BOOL IsLantasticDriveW(const wchar_t* path, std::wstring& lastLantasticCheckRoot,
+                       BOOL& lastIsLantasticPath)
 {
-    if (lastLantasticCheckRoot[0] != 0 &&
-        HasTheSameRootPath(lastLantasticCheckRoot, path))
+    if (!lastLantasticCheckRoot.empty() &&
+        HasTheSameRootPath(lastLantasticCheckRoot.c_str(), path))
     {
         return lastIsLantasticPath;
     }
 
-    GetRootPath(lastLantasticCheckRoot, path);
+    lastLantasticCheckRoot = GetRootPath(path);
     lastIsLantasticPath = FALSE;
-    if (path[0] != '\\') // not UNC - may not be a network path (which cannot be LANTASTIC)
+    if (path[0] != L'\\') // not UNC - may not be a network path (which cannot be LANTASTIC)
     {
-        if (GetDriveType(lastLantasticCheckRoot) != DRIVE_REMOTE)
+        if (GetDriveTypeW(lastLantasticCheckRoot.c_str()) != DRIVE_REMOTE)
             return FALSE; // not a network path
     }
 
-    return lastIsLantasticPath = IsNetworkProviderDrive(lastLantasticCheckRoot, WNNC_NET_LANTASTIC);
-}
-
-BOOL IsNetworkPath(const char* path)
-{
-    if (path[0] != '\\' || path[1] != '\\')
-    {
-        CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-        GetRootPath(root, path);
-        return GetDriveType(root) == DRIVE_REMOTE;
-    }
-    else
-        return TRUE; // UNC path is always network
+    return lastIsLantasticPath =
+               IsNetworkProviderDriveW(lastLantasticCheckRoot.c_str(), WNNC_NET_LANTASTIC);
 }
 
 HCURSOR SetHandCursor()
@@ -2533,69 +1467,68 @@ void GetListViewContextMenuPos(HWND hListView, POINT* p)
     ClientToScreen(hListView, p);
 }
 
-BOOL IsDeviceNameAux(const char* s, const char* end)
+// Wide form of the reserved-name test. Device names are pure ASCII, so this compares
+// against ASCII literals directly rather than narrowing a name that may not survive it.
+static BOOL IsDeviceNameAuxW(const wchar_t* s, const wchar_t* end)
 {
-    while (end > s && *(end - 1) <= ' ')
+    while (end > s && *(end - 1) <= L' ')
         end--;
-    // try if it's a reserved name
-    static const char* dev1_arr[] = {"CON", "PRN", "AUX", "NUL", NULL};
+    static const wchar_t* dev1_arr[] = {L"CON", L"PRN", L"AUX", L"NUL", NULL};
     if (end - s == 3)
     {
-        const char** dev1 = dev1_arr;
+        const wchar_t** dev1 = dev1_arr;
         while (*dev1 != NULL)
-            if (strnicmp(s, *dev1++, 3) == 0)
+            if (_wcsnicmp(s, *dev1++, 3) == 0)
                 return TRUE;
     }
-    // try if it's a reserved name followed by digit '1'..'9'
-    static const char* dev2_arr[] = {"COM", "LPT", NULL};
-    if (end - s == 4 && *(end - 1) >= '1' && *(end - 1) <= '9')
+    static const wchar_t* dev2_arr[] = {L"COM", L"LPT", NULL};
+    if (end - s == 4 && *(end - 1) >= L'1' && *(end - 1) <= L'9')
     {
-        const char** dev2 = dev2_arr;
+        const wchar_t** dev2 = dev2_arr;
         while (*dev2 != NULL)
-            if (strnicmp(s, *dev2++, 3) == 0)
+            if (_wcsnicmp(s, *dev2++, 3) == 0)
                 return TRUE;
     }
     return FALSE;
 }
 
-BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
+// Validates the native-wide name directly: no trailing space or dot, no control characters
+// or shell metacharacters, and no reserved device name.
+BOOL SalIsValidFileNameComponentW(const wchar_t* fileNameComponent)
 {
-    const char* start = fileNameComponent;
-    // test for white-spaces at beginning (Petr: commented out because spaces at beginning of file and directory names can simply exist)
-    // if (*start != 0 && *start <= ' ') return FALSE;
-
-    // test for maximum length MAX_PATH-4
-    const char* s = fileNameComponent + strlen(fileNameComponent);
-    if (s - fileNameComponent > MAX_PATH - 4)
+    if (fileNameComponent == NULL)
         return FALSE;
+
+    const wchar_t* start = fileNameComponent;
+    const size_t len = wcslen(fileNameComponent);
     // test white-spaces and '.' at end of name (file-system would trim them)
-    s--;
-    if (s >= start && (*s <= ' ' || *s == '.'))
+    if (len > 0 && (start[len - 1] <= L' ' || start[len - 1] == L'.'))
         return FALSE;
 
     BOOL testSimple = TRUE;
-    BOOL simple = TRUE; // TRUE = risk of "lpt1", "prn" and other critical names, better add '_'
+    BOOL simple = TRUE; // TRUE = risk of "lpt1", "prn" and other critical names
     BOOL wasSpace = FALSE;
+    BOOL allAscii = TRUE;
 
-    while (*fileNameComponent != 0)
+    for (const wchar_t* p = start; *p != 0; p++)
     {
-        if (testSimple && *fileNameComponent > ' ' &&
-            (*fileNameComponent < 'a' || *fileNameComponent > 'z') &&
-            (*fileNameComponent < 'A' || *fileNameComponent > 'Z') &&
-            (*fileNameComponent < '0' || *fileNameComponent > '9'))
+        if (*p > 0x7f)
+            allAscii = FALSE;
+
+        if (testSimple && *p > L' ' &&
+            (*p < L'a' || *p > L'z') &&
+            (*p < L'A' || *p > L'Z') &&
+            (*p < L'0' || *p > L'9'))
         {
             simple = FALSE; // "prn.txt" and "prn  .txt" are reserved names
             testSimple = FALSE;
-            if (*fileNameComponent == '.' && fileNameComponent > start &&
-                IsDeviceNameAux(start, fileNameComponent))
-            {
+            if (*p == L'.' && p > start && IsDeviceNameAuxW(start, p))
                 return FALSE;
-            }
         }
-        if (*fileNameComponent <= ' ')
+        if (*p <= L' ')
         {
             wasSpace = TRUE;
-            if (*fileNameComponent != ' ')
+            if (*p != L' ')
                 return FALSE; // disallowed white-space
         }
         else
@@ -2606,94 +1539,65 @@ BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
                 testSimple = FALSE;
             }
         }
-        switch (*fileNameComponent)
+        switch (*p)
         {
-        case '*':
-        case '?':
-        case '\\':
-        case '/':
-        case '<':
-        case '>':
-        case '|':
-        case '"':
-        case ':':
+        case L'*':
+        case L'?':
+        case L'\\':
+        case L'/':
+        case L'<':
+        case L'>':
+        case L'|':
+        case L'"':
+        case L':':
             return FALSE; // disallowed character
         }
-        fileNameComponent++;
     }
-    if (simple && IsDeviceNameAux(start, fileNameComponent))
+    if (simple && allAscii && IsDeviceNameAuxW(start, start + len))
         return FALSE; // simple name + device
     return TRUE;
 }
 
-void SalMakeValidFileNameComponent(char* fileNameComponent)
+// Returns the valid native-wide form without an ACP mirror or path-sized ceiling.
+std::wstring SalMakeValidFileNameComponentW(const wchar_t* fileNameComponent)
 {
-    char* start = fileNameComponent;
+    std::wstring result = fileNameComponent != NULL ? fileNameComponent : L"";
+
+    // trim white-spaces and '.' at end of name (file-system would do it anyway, at least it's clear immediately)
+    size_t end = result.length();
+    while (end > 0 && (result[end - 1] <= L' ' || result[end - 1] == L'.'))
+        end--;
+    if (end < result.length())
+        result.resize(end);
+    if (result.empty()) // empty string or sequence of '.' and white-spaces -> replace with name "_"
+        result = L"_";
+
     BOOL testSimple = TRUE;
     BOOL simple = TRUE; // TRUE = risk of "lpt1", "prn" and other critical names, better add '_'
     BOOL wasSpace = FALSE;
-    // removal of white-spaces at beginning (Petr: commented out because spaces at beginning of file and directory names can simply exist)
-    /*
-  while (*start != 0 && *start <= ' ') start++;
-  if (start > fileNameComponent)
-  {
-    memmove(fileNameComponent, start, strlen(start) + 1);
-    start = fileNameComponent;
-  }
-*/
-    // trim to maximum length MAX_PATH-4
-    char* s = fileNameComponent + strlen(fileNameComponent);
-    if (s - fileNameComponent > MAX_PATH - 4)
-    {
-        s = fileNameComponent + (MAX_PATH - 4);
-        *s = 0;
-    }
-    // trim white-spaces and '.' at end of name (file-system would do it anyway, at least it's clear immediately)
-    s--;
-    while (s >= start && (*s <= ' ' || *s == '.'))
-        s--;
-    if (s >= start)
-        *(s + 1) = 0;
-    else // empty string or sequence of '.' and white-spaces -> replace with name "_" (system trims all this too)
-    {
-        strcpy(start, "_");
-        simple = FALSE;
-        testSimple = FALSE;
-    }
 
-    while (*fileNameComponent != 0)
+    for (size_t i = 0; i < result.length(); i++)
     {
-        if (testSimple && *fileNameComponent > ' ' &&
-            (*fileNameComponent < 'a' || *fileNameComponent > 'z') &&
-            (*fileNameComponent < 'A' || *fileNameComponent > 'Z') &&
-            (*fileNameComponent < '0' || *fileNameComponent > '9'))
+        if (testSimple && result[i] > L' ' &&
+            (result[i] < L'a' || result[i] > L'z') &&
+            (result[i] < L'A' || result[i] > L'Z') &&
+            (result[i] < L'0' || result[i] > L'9'))
         {
             simple = FALSE; // "prn.txt" and "prn  .txt" are reserved names
             testSimple = FALSE;
-            if (*fileNameComponent == '.' && fileNameComponent > start &&
-                IsDeviceNameAux(start, fileNameComponent))
+            if (result[i] == L'.' && i > 0 && IsDeviceNameAuxW(result.c_str(), result.c_str() + i))
             {
-                *fileNameComponent++ = '_';
-                int len = (int)strlen(fileNameComponent);
-                if ((fileNameComponent - start) + len + 1 > MAX_PATH - 4)
-                    len = (int)(MAX_PATH - 4 - ((fileNameComponent - start) + 1));
-                if (len > 0)
-                {
-                    memmove(fileNameComponent + 1, fileNameComponent, len);
-                    *(fileNameComponent + len + 1) = 0;
-                    *fileNameComponent = '.';
-                }
-                else
-                {
-                    *fileNameComponent = 0; // for names like "prn          .txt" (with multiple spaces)
+                // insert '_' right before this dot, same as the narrow version
+                result.insert(result.begin() + i, L'_');
+                i++; // the dot moved one position to the right - continue from it
+                if (i >= result.length())
                     break;
-                }
             }
         }
-        if (*fileNameComponent <= ' ')
+        if (result[i] <= L' ')
         {
             wasSpace = TRUE;
-            *fileNameComponent = ' '; // replace all white-spaces with ' '
+            result[i] = L' '; // replace all white-spaces with ' '
         }
         else
         {
@@ -2703,27 +1607,25 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
                 testSimple = FALSE;
             }
         }
-        switch (*fileNameComponent)
+        switch (result[i])
         {
-        case '*':
-        case '?':
-        case '\\':
-        case '/':
-        case '<':
-        case '>':
-        case '|':
-        case '"':
-        case ':':
-            *fileNameComponent = '_';
+        case L'*':
+        case L'?':
+        case L'\\':
+        case L'/':
+        case L'<':
+        case L'>':
+        case L'|':
+        case L'"':
+        case L':':
+            result[i] = L'_';
             break;
         }
-        fileNameComponent++;
     }
-    if (simple && IsDeviceNameAux(start, fileNameComponent)) // for simple names add '_'
-    {
-        *fileNameComponent++ = '_';
-        *fileNameComponent = 0;
-    }
+    if (simple && IsDeviceNameAuxW(result.c_str(), result.c_str() + result.length())) // for simple names add '_'
+        result += L'_';
+
+    return result;
 }
 
 typedef struct tagTHREADNAME_INFO
@@ -2734,11 +1636,11 @@ typedef struct tagTHREADNAME_INFO
     DWORD dwFlags;    // reserved for future use, must be zero
 } THREADNAME_INFO;
 
-void SetThreadNameInVC(LPCSTR szThreadName)
+static void RaiseLegacyThreadNameInVC(const char* threadName)
 {
     THREADNAME_INFO info;
     info.dwType = 0x1000;
-    info.szName = szThreadName;
+    info.szName = threadName;
     info.dwThreadID = -1 /* caller thread */;
     info.dwFlags = 0;
 
@@ -2751,47 +1653,49 @@ void SetThreadNameInVC(LPCSTR szThreadName)
     }
 }
 
-void SetThreadNameInVCAndTrace(const char* name)
+static void SetLegacyThreadNameInVC(const wchar_t* threadName) noexcept
 {
-    SetTraceThreadName(name);
+    const std::string legacyThreadName =
+        sally::diagnostic::EncodeAcpLossy(threadName != nullptr ? threadName : L"");
+    RaiseLegacyThreadNameInVC(legacyThreadName.c_str());
+}
+
+void SetThreadNameInVC(const wchar_t* threadName)
+{
+    SetLegacyThreadNameInVC(threadName);
+}
+
+void SetThreadNameInVCAndTrace(const wchar_t* name)
+{
+    SetTraceThreadNameW(name);
     SetThreadNameInVC(name);
 }
 
-BOOL GetOurPathInRoamingAPPDATA(char* buf)
+// SHGetFolderPathW has a fixed MAX_PATH output contract. Keep that storage local to this
+// adapter, then move the semantic path into dynamically-owned UTF-16 before appending.
+BOOL CreateOurPathInRoamingAPPDATAW(std::wstring& path)
 {
-    return SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, buf) == S_OK &&
-           SalPathAppend(buf, "Sally", MAX_PATH);
+    static wchar_t appData[MAX_PATH]; // may run from an exception path with little stack available
+    if (SHGetFolderPathW(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, appData) != S_OK)
+        return FALSE;
+
+    path.assign(appData);
+    SalPathAddBackslashW(path);
+    path += L"Sally";
+    gFileSystem->CreateDirectory(path.c_str()); // if it fails (e.g. already exists), we don't care...
+    return TRUE;
 }
 
-BOOL CreateOurPathInRoamingAPPDATA(char* buf)
+void SlashesToBackslashesAndRemoveDups(std::wstring& path)
 {
-    static char path[SAL_MAX_LONG_PATH]; // called from exception handler, stack may be full
-    if (buf != NULL)
-        buf[0] = 0;
-    if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
+    size_t write = 0;
+    for (wchar_t ch : path)
     {
-        if (SalPathAppend(path, "Sally", SAL_MAX_LONG_PATH))
-        {
-            SalLPCreateDirectory(path, NULL); // if it fails (e.g. already exists), we don't care...
-            if (buf != NULL)
-                lstrcpyn(buf, path, MAX_PATH);
-            return TRUE;
-        }
+        if (ch == L'/')
+            ch = L'\\';
+        if (ch == L'\\' && write > 1 && path[write - 1] == L'\\')
+            continue;
+        path[write++] = ch;
     }
-    return FALSE;
-}
-
-void SlashesToBackslashesAndRemoveDups(char* path)
-{
-    char* s = path - 1; // convert '/' to '\\' and eliminate duplicate backslashes (except at beginning, where they mean UNC path or \\.\C:)
-    while (*++s != 0)
-    {
-        if (*s == '/')
-            *s = '\\';
-        if (*s == '\\' && s > path + 1 && *(s - 1) == '\\')
-        {
-            memmove(s, s + 1, strlen(s + 1) + 1);
-            s--;
-        }
-    }
+    path.resize(write);
 }

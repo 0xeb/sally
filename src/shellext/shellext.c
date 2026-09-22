@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -20,13 +21,60 @@ HINSTANCE g_hmodThisDll = NULL; // Handle to this DLL itself.
 
 HANDLE LogFile = NULL;
 HANDLE LogFileMutex = NULL;
-char ModuleName[MAX_PATH];
+wchar_t* ModuleName = NULL;
 
 #ifdef _WIN64
 const char* ShExtName = "salextx64.dll";
 #else  // _WIN64
 const char* ShExtName = "salextx86.dll";
 #endif // _WIN64
+
+static wchar_t* GetModuleFileNameOwned(HMODULE module)
+{
+    DWORD capacity = 64;
+    for (;;)
+    {
+        wchar_t* buffer = (wchar_t*)GlobalAlloc(GMEM_FIXED, (SIZE_T)capacity * sizeof(wchar_t));
+        DWORD length;
+        if (buffer == NULL)
+            return NULL;
+        length = GetModuleFileNameW(module, buffer, capacity);
+        if (length == 0)
+        {
+            GlobalFree(buffer);
+            return NULL;
+        }
+        if (length < capacity)
+            return buffer;
+        GlobalFree(buffer);
+        if (capacity > MAXDWORD / 2)
+            return NULL;
+        capacity *= 2;
+    }
+}
+
+static void WriteWideUtf8ToLog(const wchar_t* text)
+{
+    SIZE_T charCount;
+    SIZE_T capacity;
+    int byteCount;
+    char* utf8;
+    DWORD written;
+    if (text == NULL)
+        return;
+    charCount = (SIZE_T)lstrlenW(text);
+    if (charCount == 0 || charCount > 0x7ffffffe / 3)
+        return;
+    capacity = charCount * 3 + 1;
+    utf8 = (char*)GlobalAlloc(GMEM_FIXED, capacity);
+    if (utf8 == NULL)
+        return;
+    byteCount = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text, (int)charCount,
+                                    utf8, (int)capacity, NULL, NULL);
+    if (byteCount > 0)
+        WriteFile(LogFile, utf8, (DWORD)byteCount, &written, NULL);
+    GlobalFree(utf8);
+}
 
 void WriteToLog(const char* str)
 {
@@ -41,7 +89,7 @@ void WriteToLog(const char* str)
         wsprintf(buf, "%02d:%02d:%02d:%03d", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
         WriteFile(LogFile, buf, lstrlen(buf), &wr, NULL);
         WriteFile(LogFile, ": ", 2, &wr, NULL);
-        WriteFile(LogFile, ModuleName, lstrlen(ModuleName), &wr, NULL);
+        WriteWideUtf8ToLog(ModuleName);
         WriteFile(LogFile, ": ", 2, &wr, NULL);
         WriteFile(LogFile, str, lstrlen(str), &wr, NULL);
         WriteFile(LogFile, "\r\n", 2, &wr, NULL);
@@ -162,7 +210,7 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
             SECURITY_DESCRIPTOR sd;
             SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, SYNCHRONIZE /*| MUTEX_MODIFY_STATE*/, &psidEveryone, &paclNewDacl);
 
-            GetModuleFileName(g_hmodThisDll, ModuleName, MAX_PATH);
+            ModuleName = GetModuleFileNameOwned(g_hmodThisDll);
             LogFile = CreateFile(SHEXT_LOG_FILENAME, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                  NULL, OPEN_ALWAYS, 0, NULL);
 
@@ -201,6 +249,11 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
             CloseHandle(LogFile);
         if (LogFileMutex != NULL)
             CloseHandle(LogFileMutex);
+        if (ModuleName != NULL)
+        {
+            GlobalFree(ModuleName);
+            ModuleName = NULL;
+        }
 
 #endif // SHEXT_LOG_ENABLED
     }
@@ -561,8 +614,8 @@ STDMETHODIMP SE_QueryInterface(THIS_ REFIID riid, LPVOID* ppvObj)
     }
     else if (MyIsEqualIID(riid, &IID_IShellCopyHookW))
     {
-        WriteToLog("SE_QueryInterface: IShellCopyHookW (mame, ale nedavame)");
-        // *ppvObj = se->m_pCHW;
+        WriteToLog("SE_QueryInterface: IShellCopyHookW");
+        *ppvObj = se->m_pCHW;
     }
 #ifdef SHEXT_LOG_ENABLED
     else

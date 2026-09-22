@@ -23,6 +23,15 @@
 #include "gui.h"
 #include "darkmode.h"
 
+// Keep the message explicit at this local helper boundary.
+#define ListView_SetItemTextW(hwndLV, i, iSubItem_, pszText_) \
+    {                                                         \
+        LV_ITEMW _ms_lvi;                                     \
+        _ms_lvi.iSubItem = iSubItem_;                         \
+        _ms_lvi.pszText = pszText_;                           \
+        SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
+    }
+
 //****************************************************************************
 //
 // CHighlightMasksItem
@@ -44,7 +53,7 @@ CHighlightMasksItem::CHighlightMasksItem()
     FocSelBk = RGBF(0, 0, 0, SCF_DEFAULT);
     HighlightFg = RGBF(0, 0, 0, SCF_DEFAULT);
     HighlightBk = RGBF(0, 0, 0, SCF_DEFAULT);
-    Set("");
+    Set(L"");
 }
 
 CHighlightMasksItem::CHighlightMasksItem(CHighlightMasksItem& item)
@@ -72,7 +81,7 @@ CHighlightMasksItem::~CHighlightMasksItem()
         delete Masks;
 }
 
-BOOL CHighlightMasksItem::Set(const char* masks)
+BOOL CHighlightMasksItem::Set(const wchar_t* masks)
 {
     if (Masks == NULL)
         Masks = new CMaskGroup;
@@ -122,9 +131,9 @@ BOOL CHighlightMasks::Load(CHighlightMasks& source)
 //
 // returns FALSE when the path is empty, otherwise TRUE (the path contains 'something')
 
-BOOL ValidatePathIsNotEmpty(HWND hParent, const char* path)
+BOOL ValidatePathIsNotEmpty(HWND hParent, const wchar_t* path)
 {
-    const char* iterator = path;
+    const wchar_t* iterator = path;
     BOOL empty = TRUE;
     while (*iterator != 0)
     {
@@ -151,9 +160,9 @@ BOOL ValidatePathIsNotEmpty(HWND hParent, const char* path)
     {
       // the file was not found - it might not exist or the path may be unreachable;
       // let the user force it
-      char buff[1000];
+      wchar_t buff[1000];
       sprintf(buff, LoadStr(IDS_THECOMMANDISINVALID), myPath, itemName);
-      int ret = SalMessageBox(hParent, buff, LoadStr(IDS_ERRORTITLE),
+      int ret = SalMessageBoxW(hParent, buff, LoadStrW(IDS_ERRORTITLE),
                               MB_YESNO | MB_ICONQUESTION);
       if (ret == IDYES)
         return FALSE;    // the user wants to modify the item
@@ -183,7 +192,7 @@ CLoadSaveToRegistryMutex::~CLoadSaveToRegistryMutex()
     Mutex = NULL;
 }
 
-extern const char* LOADSAVE_REGISTRY_MUTEX_NAME;
+extern const wchar_t* LOADSAVE_REGISTRY_MUTEX_NAME;
 
 void CLoadSaveToRegistryMutex::Init()
 {
@@ -194,19 +203,19 @@ void CLoadSaveToRegistryMutex::Init()
     // do not collide -- they work with their own Registry trees, no synchronization needed there.
     // We could add the Salamander version into the mutex name as well (every version has its own Registry tree).
     // But new versions can remove obsolete configurations, so we won't do it.
-    LPTSTR sid = NULL;
+    LPWSTR sid = NULL;
     if (!GetStringSid(&sid))
         sid = NULL;
 
-    char buff[1000];
+    wchar_t buff[1000];
     if (sid == NULL)
     {
         // failed to obtain SID -- continue in fallback mode
-        _snprintf_s(buff, _TRUNCATE, "%s", LOADSAVE_REGISTRY_MUTEX_NAME);
+        swprintf_s(buff, _countof(buff), L"%s", LOADSAVE_REGISTRY_MUTEX_NAME);
     }
     else
     {
-        _snprintf_s(buff, _TRUNCATE, "Global\\%s_%s", LOADSAVE_REGISTRY_MUTEX_NAME, sid);
+        swprintf_s(buff, _countof(buff), L"Global\\%s_%s", LOADSAVE_REGISTRY_MUTEX_NAME, sid);
         LocalFree(sid);
     }
 
@@ -216,14 +225,14 @@ void CLoadSaveToRegistryMutex::Init()
     SECURITY_DESCRIPTOR sd;
     SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, SYNCHRONIZE /*| MUTEX_MODIFY_STATE*/, &psidEveryone, &paclNewDacl);
 
-    Mutex = HANDLES_Q(CreateMutex(saPtr, FALSE, buff));
+    Mutex = HANDLES_Q(CreateMutexW(saPtr, FALSE, buff));
     if (Mutex == NULL)
     {
-        Mutex = HANDLES_Q(OpenMutex(SYNCHRONIZE, FALSE, buff));
+        Mutex = HANDLES_Q(OpenMutexW(SYNCHRONIZE, FALSE, buff));
         if (Mutex == NULL)
         {
             DWORD err = GetLastError();
-            TRACE_I("CLoadSaveToRegistryMutex::Init(): Unable to create/open mutex for Load/Save to Registry synchronization! Error: " << GetErrorText(err));
+            TRACE_IW(L"CLoadSaveToRegistryMutex::Init(): Unable to create/open mutex for Load/Save to Registry synchronization! Error: " << GetErrorTextOwned(err).c_str());
         }
     }
 
@@ -264,10 +273,10 @@ void CLoadSaveToRegistryMutex::Leave()
 // CConfiguration
 //
 
-const char* DefTopToolBar = "11,14,15,70,-1,40,56,-1,30,31,32,-1,41,42,18,27,55,33,-1,3,34,35,20,19,-1,43,46,49";
-const char* DefMiddleToolBar = "2,3,17,21,22,23,72,26,24,25,27,55,28,29,30,31,32,33";
-const char* DefLeftToolBar = "36";
-const char* DefRightToolBar = "51";
+const wchar_t* DefTopToolBar = L"11,14,15,70,-1,40,56,-1,30,31,32,-1,41,42,18,27,55,33,-1,3,34,35,20,19,-1,43,46,49";
+const wchar_t* DefMiddleToolBar = L"2,3,17,21,22,23,72,26,24,25,27,55,28,29,30,31,32,33";
+const wchar_t* DefLeftToolBar = L"36";
+const wchar_t* DefRightToolBar = L"51";
 
 CConfiguration::CConfiguration()
 {
@@ -283,7 +292,7 @@ CConfiguration::CConfiguration()
     UseRecycleBin = 1;
     FileNameFormat = 4; // as on the disk
     SizeFormat = SIZE_FORMAT_BYTES;
-    RecycleMasks.SetMasksString("*.txt;*.doc");
+    RecycleMasks.SetMasksString(L"*.txt;*.doc");
     LastFocusedPage = 0;
     ConfigurationHeight = 0; // the dialog logic will not allow a smaller dialog than the largest page it contains
     ViewersAndEditorsExpanded = 0;
@@ -293,8 +302,8 @@ CConfiguration::CConfiguration()
     NotHiddenSystemFiles = FALSE;
     AlwaysOnTop = FALSE;
     CommandShellTargetKind = 0;
-    CommandShellProfileGuid[0] = L'\0';
-    CommandShellProfileName[0] = L'\0';
+    CommandShellProfileGuid.clear();
+    CommandShellProfileName.clear();
     //  FastDirectoryMove = TRUE;
     SortUsesLocale = TRUE;
     SortDetectNumbers = TRUE;
@@ -306,7 +315,6 @@ CConfiguration::CConfiguration()
     EnableCmdLineHistory = TRUE;
     SaveCmdLineHistory = TRUE;
     //  LantasticCheck = FALSE;
-    UseSalOpen = FALSE;
     NetwareFastDirMove = FALSE; // choose the slower but 100% working mode; power users can switch it
     UseAsyncCopyAlg = TRUE;
     ReloadEnvVariables = TRUE;
@@ -343,9 +351,9 @@ CConfiguration::CConfiguration()
     CompareIgnoreFiles = FALSE;
     CompareIgnoreDirs = FALSE;
     int errPos;
-    CompareIgnoreFilesMasks.SetMasksString("");
+    CompareIgnoreFilesMasks.SetMasksString(L"");
     CompareIgnoreFilesMasks.PrepareMasks(errPos);
-    CompareIgnoreDirsMasks.SetMasksString("");
+    CompareIgnoreDirsMasks.SetMasksString(L"");
     CompareIgnoreDirsMasks.PrepareMasks(errPos);
 
     // Confirmation
@@ -387,7 +395,7 @@ CConfiguration::CConfiguration()
     UseIconTincture = TRUE;
     ShowPanelCaption = TRUE;
     ShowPanelZoom = TRUE;
-    strcpy(InfoLineContent, "$(FileName): $(FileSize), $(FileDate), $(FileTime), $(FileAttributes), $(FileDOSName)");
+    InfoLineContent = L"$(FileName): $(FileSize), $(FileDate), $(FileTime), $(FileAttributes), $(FileDOSName)";
 
     HotPathAutoConfig = TRUE;
 
@@ -404,7 +412,7 @@ CConfiguration::CConfiguration()
     DrvSpecCDROMSimple = FALSE;
 
     IfPathIsInaccessibleGoToIsMyDocs = TRUE;
-    IfPathIsInaccessibleGoTo[0] = 0;
+    IfPathIsInaccessibleGoTo.clear();
 
     SpaceSelCalcSpace = TRUE;
 
@@ -415,10 +423,10 @@ CConfiguration::CConfiguration()
     UseDragDropMinTime = TRUE;
     DragDropMinTime = 500;
 
-    strcpy(TopToolBar, DefTopToolBar);
-    strcpy(MiddleToolBar, DefMiddleToolBar);
-    strcpy(LeftToolBar, DefLeftToolBar);
-    strcpy(RightToolBar, DefRightToolBar);
+    TopToolBar = DefTopToolBar;
+    MiddleToolBar = DefMiddleToolBar;
+    LeftToolBar = DefLeftToolBar;
+    RightToolBar = DefRightToolBar;
 
     SkillLevel = SKILL_LEVEL_ADVANCED; // try to present as many options as possible
 
@@ -427,8 +435,6 @@ CConfiguration::CConfiguration()
         SelectHistory[i] = NULL;
     for (i = 0; i < COPY_HISTORY_SIZE; i++)
         CopyHistory[i] = NULL;
-    for (i = 0; i < COPY_HISTORY_SIZE; i++)
-        CopyHistoryW[i] = NULL;
     for (i = 0; i < EDIT_HISTORY_SIZE; i++)
         EditHistory[i] = NULL;
     for (i = 0; i < CHANGEDIR_HISTORY_SIZE; i++)
@@ -441,20 +447,14 @@ CConfiguration::CConfiguration()
         QuickRenameHistory[i] = NULL;
     for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
         EditNewHistory[i] = NULL;
-    for (i = 0; i < CREATEDIR_HISTORY_SIZE; i++)
-        CreateDirHistoryW[i] = NULL;
-    for (i = 0; i < QUICKRENAME_HISTORY_SIZE; i++)
-        QuickRenameHistoryW[i] = NULL;
-    for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
-        EditNewHistoryW[i] = NULL;
     for (i = 0; i < CONVERT_HISTORY_SIZE; i++)
         ConvertHistory[i] = NULL;
     for (i = 0; i < FILTER_HISTORY_SIZE; i++)
         FilterHistory[i] = NULL;
 
-    FileListHistory[0] = DupStr("$(FileName)$(CRLF)"); // default for MakeFileList
+    FileListHistory[0] = DupStr(L"$(FileName)$(CRLF)"); // default for MakeFileList
 
-    FileListName[0] = 0;
+    FileListName.clear();
     FileListAppend = FALSE;
     FileListDestination = 0;
     // Internal Viewer:
@@ -466,14 +466,14 @@ CConfiguration::CConfiguration()
     DefViewMode = 0; // Auto-Select
     TabSize = 8;
     SavePosition = FALSE;
-    TextModeMasks.SetMasksString("*.txt;*.602;*.xml");
+    TextModeMasks.SetMasksString(L"*.txt;*.602;*.xml");
     TextModeMasks.PrepareMasks(errPos);
-    HexModeMasks.SetMasksString("");
+    HexModeMasks.SetMasksString(L"");
     HexModeMasks.PrepareMasks(errPos);
     WindowPlacement.length = 0;
     WrapText = TRUE;
     CodePageAutoSelect = TRUE;
-    DefaultConvert[0] = 0;
+    DefaultConvert.clear();
     AutoCopySelection = FALSE;
     GoToOffsetIsHex = TRUE;
 
@@ -517,7 +517,7 @@ CConfiguration::CConfiguration()
     UseSimpleIconsInArchives = FALSE;
 
     UseEditNewFileDefault = FALSE;
-    EditNewFileDefault[0] = 0;
+    EditNewFileDefault.clear();
 
     // Tip of the Day
     //  ShowTipOfTheDay = TRUE;
@@ -535,22 +535,22 @@ CConfiguration::CConfiguration()
     FindColNameWidth = -1; // let it be set according to the window size
 
     // Language
-    LoadedSLGName[0] = 0;
-    SLGName[0] = 0;
+    LoadedSLGName.clear();
+    SLGName.clear();
     DoNotDispCantLoadPluginSLG = FALSE;
     DoNotDispCantLoadPluginSLG2 = FALSE;
     UseAsAltSLGInOtherPlugins = FALSE;
-    AltPluginSLGName[0] = 0;
+    AltPluginSLGName.clear();
 
     // the ConversionTable variable is not loaded from the configuration
-    strcpy(ConversionTable, "*");
+    ConversionTable = L"*";
 
     TitleBarShowPath = TRUE;
     TitleBarMode = TITLE_BAR_MODE_DIRECTORY; // like Explorer
     UseTitleBarPrefix = FALSE;
-    strcpy(TitleBarPrefix, "ADMIN");
+    TitleBarPrefix = L"ADMIN";
     UseTitleBarPrefixForced = FALSE;
-    TitleBarPrefixForced[0] = 0;
+    TitleBarPrefixForced.clear();
 
     MainWindowIconIndex = 0; // default icon
     MainWindowIconIndexForced = -1;
@@ -587,7 +587,6 @@ void CConfiguration::ClearHistory()
             SelectHistory[i] = NULL;
         }
     }
-
     for (i = 0; i < COPY_HISTORY_SIZE; i++)
     {
         if (CopyHistory[i] != NULL)
@@ -596,15 +595,6 @@ void CConfiguration::ClearHistory()
             CopyHistory[i] = NULL;
         }
     }
-    for (i = 0; i < COPY_HISTORY_SIZE; i++)
-    {
-        if (CopyHistoryW[i] != NULL)
-        {
-            free(CopyHistoryW[i]);
-            CopyHistoryW[i] = NULL;
-        }
-    }
-
     for (i = 0; i < EDIT_HISTORY_SIZE; i++)
     {
         if (EditHistory[i] != NULL)
@@ -613,7 +603,6 @@ void CConfiguration::ClearHistory()
             EditHistory[i] = NULL;
         }
     }
-
     for (i = 0; i < CHANGEDIR_HISTORY_SIZE; i++)
     {
         if (ChangeDirHistory[i] != NULL)
@@ -622,7 +611,6 @@ void CConfiguration::ClearHistory()
             ChangeDirHistory[i] = NULL;
         }
     }
-
     for (i = 0; i < FILELIST_HISTORY_SIZE; i++)
     {
         if (FileListHistory[i] != NULL)
@@ -631,7 +619,6 @@ void CConfiguration::ClearHistory()
             FileListHistory[i] = NULL;
         }
     }
-
     for (i = 0; i < CREATEDIR_HISTORY_SIZE; i++)
     {
         if (CreateDirHistory[i] != NULL)
@@ -659,33 +646,6 @@ void CConfiguration::ClearHistory()
         }
     }
 
-    for (i = 0; i < CREATEDIR_HISTORY_SIZE; i++)
-    {
-        if (CreateDirHistoryW[i] != NULL)
-        {
-            free(CreateDirHistoryW[i]);
-            CreateDirHistoryW[i] = NULL;
-        }
-    }
-
-    for (i = 0; i < QUICKRENAME_HISTORY_SIZE; i++)
-    {
-        if (QuickRenameHistoryW[i] != NULL)
-        {
-            free(QuickRenameHistoryW[i]);
-            QuickRenameHistoryW[i] = NULL;
-        }
-    }
-
-    for (i = 0; i < EDITNEW_HISTORY_SIZE; i++)
-    {
-        if (EditNewHistoryW[i] != NULL)
-        {
-            free(EditNewHistoryW[i]);
-            EditNewHistoryW[i] = NULL;
-        }
-    }
-
     for (i = 0; i < CONVERT_HISTORY_SIZE; i++)
     {
         if (ConvertHistory[i] != NULL)
@@ -694,7 +654,6 @@ void CConfiguration::ClearHistory()
             ConvertHistory[i] = NULL;
         }
     }
-
     for (i = 0; i < FILTER_HISTORY_SIZE; i++)
     {
         if (FilterHistory[i] != NULL)
@@ -710,7 +669,7 @@ BOOL CConfiguration::PrepareRecycleMasks(int& errorPos)
     return RecycleMasks.PrepareMasks(errorPos);
 }
 
-BOOL CConfiguration::AgreeRecycleMasks(const char* fileName, const char* fileExt)
+BOOL CConfiguration::AgreeRecycleMasks(const wchar_t* fileName, const wchar_t* fileExt)
 {
     return RecycleMasks.AgreeMasks(fileName, fileExt);
 }
@@ -731,7 +690,7 @@ int CConfiguration::GetMainWindowIconIndex()
 
 CConfigurationDlg::CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems,
                                      int mode, int param)
-    : CTreePropDialog(parent, HLanguage, LoadStr(IDS_CONFIGURATION),
+    : CTreePropDialog(parent, HLanguage, LoadStrW(IDS_CONFIGURATION),
                       mode == 0 ? Configuration.LastFocusedPage : mode == 1 ? 14
                                                               : mode == 2   ? 13
                                                               : mode == 3   ? 21
@@ -877,7 +836,6 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
     //  ti.CheckBox(IDC_LANTASTICCHECK, Configuration.LantasticCheck);
     ti.CheckBox(IDC_ONLYONEINSTANCE, Configuration.OnlyOneInstance);
     ti.CheckBox(IDC_MINBEEPWHENDONE, Configuration.MinBeepWhenDone);
-    ti.CheckBox(IDC_USESALOPEN, Configuration.UseSalOpen);
     ti.CheckBox(IDC_QUICKRENAME_SELALL, Configuration.QuickRenameSelectAll);
     ti.CheckBox(IDC_EDITNEW_SELALL, Configuration.EditNewSelectAll);
     ti.CheckBox(IDC_NETWAREFASTDIRMOVE, Configuration.NetwareFastDirMove);
@@ -924,18 +882,21 @@ CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CCfgPageRegional::CCfgPageRegional()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_REGIONAL, IDD_CFGPAGE_REGIONAL, PSP_USETITLE, NULL)
 {
-    lstrcpy(SLGName, Configuration.SLGName);
-    lstrcpy(DirName, Configuration.ConversionTable);
+    SLGName = Configuration.SLGName;
+    DirName = Configuration.ConversionTable;
 }
 
 void CCfgPageRegional::LoadControls()
 {
     CLanguage language;
-    if (language.Init(SLGName, NULL))
+    if (language.Init(SLGName.c_str(), NULL))
     {
-        char buff[200];
+        // wide - GetLocaleInfo narrows a language's own native display
+        // name through CP_ACP; this dialog already sets other controls via
+        // SetDlgItemTextW (WM_INITDIALOG above), so it's already wide-capable.
+        wchar_t buff[200];
         language.GetLanguageName(buff, 200);
-        SetDlgItemText(HWindow, IDE_LANGUAGE, buff);
+        SetDlgItemTextW(HWindow, IDE_LANGUAGE, buff);
         language.Free();
     }
 }
@@ -948,16 +909,16 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
     }
     else
     {
-        if (stricmp(Configuration.SLGName, SLGName) != 0)
+        if (StrICmpW(Configuration.SLGName.c_str(), SLGName.c_str()) != 0)
         {
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_LANGUAGE_CHANGE));
-            lstrcpy(Configuration.SLGName, SLGName);
+            Configuration.SLGName = SLGName;
             Configuration.ShowSLGIncomplete = TRUE; // if the language is not complete, show a message at startup (recruit translators)
         }
         // if the table has changed and the old one is already loaded we need to restart Salamander
-        if (stricmp(Configuration.ConversionTable, DirName) != 0)
+        if (StrICmpW(Configuration.ConversionTable.c_str(), DirName.c_str()) != 0)
         {
-            lstrcpy(Configuration.ConversionTable, DirName);
+            Configuration.ConversionTable = DirName;
             if (CodeTables.IsLoaded())
             {
                 gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONVERSION_CHANGE));
@@ -976,9 +937,9 @@ CCfgPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (IsSLGIncomplete[0] != 0)
         {
             new CStaticText(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, STF_BOLD);
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, LoadStr(IDS_SLGINCOMPLETE_TITLE));
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_TEXT, LoadStr(IDS_SLGINCOMPLETE_TEXT));
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_URL, IsSLGIncomplete);
+            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, LoadStrW(IDS_SLGINCOMPLETE_TITLE));
+            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_TEXT, LoadStrW(IDS_SLGINCOMPLETE_TEXT));
+            SetDlgItemTextW(HWindow, IDC_CFGREG_INCOMPLETE_URL, IsSLGIncomplete);
             CHyperLink* hl = new CHyperLink(HWindow, IDC_CFGREG_INCOMPLETE_URL);
             hl->SetActionOpen(IsSLGIncomplete);
         }
@@ -1072,43 +1033,43 @@ void CCfgPageView::Transfer(CTransferInfo& ti)
         Config.Load(MainWindow->ViewTemplates);
 
         DisableNotification = TRUE;
-        char buff[20];
+        wchar_t buff[20];
         int i;
         for (i = 0; i < VIEW_TEMPLATES_COUNT; i++)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
-            lvi.pszText = Config.Items[i].Name;
-            ListView_InsertItem(HListView, &lvi);
+            lvi.pszText = const_cast<wchar_t*>(Config.Items[i].Name.c_str());
+            SendMessageW(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
 
             switch (Config.Items[i].Mode)
             {
             case VIEW_MODE_TREE:
-                lstrcpy(buff, LoadStr(IDS_TREE_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_TREE_VIEW_NAME));
                 break;
             case VIEW_MODE_BRIEF:
-                lstrcpy(buff, LoadStr(IDS_BRIEF_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_BRIEF_VIEW_NAME));
                 break;
             case VIEW_MODE_DETAILED:
-                lstrcpy(buff, LoadStr(IDS_DETAILED_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_DETAILED_VIEW_NAME));
                 break;
             case VIEW_MODE_ICONS:
-                lstrcpy(buff, LoadStr(IDS_ICONS_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_ICONS_VIEW_NAME));
                 break;
             case VIEW_MODE_THUMBNAILS:
-                lstrcpy(buff, LoadStr(IDS_THUMBNAILS_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_THUMBNAILS_VIEW_NAME));
                 break;
             case VIEW_MODE_TILES:
-                lstrcpy(buff, LoadStr(IDS_TILES_VIEW_NAME));
+                lstrcpyW(buff, LoadStrW(IDS_TILES_VIEW_NAME));
                 break;
             }
-            ListView_SetItemText(HListView, i, 1, buff);
+            ListView_SetItemTextW(HListView, i, 1, buff);
 
-            sprintf(buff, "Alt+%d", i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
-            ListView_SetItemText(HListView, i, 2, buff);
+            swprintf(buff, 20, L"Alt+%d", i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
+            ListView_SetItemTextW(HListView, i, 2, buff);
         }
         // set column widths
         ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
@@ -1162,13 +1123,13 @@ void CCfgPageView::LoadControls()
         int i;
         for (i = 0; i < CFGP2ItemsCount; i++)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
-            lvi.pszText = LoadStr(CFGP2ResID[i]);
-            ListView_InsertItem(HListView2, &lvi);
+            lvi.pszText = LoadStrW(CFGP2ResID[i]);
+            SendMessageW(HListView2, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
         }
         ListView_SetItemState(HListView2, 0, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
         ListView_SetColumnWidth(HListView2, 0, LVSCW_AUTOSIZE_USEHEADER);
@@ -1227,7 +1188,7 @@ void CCfgPageView::EnableControls()
 {
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     BOOL enable = TRUE;
-    if (index == -1 || index < 2 || index == 3 || index == 4 || index == 5 || strlen(Config.Items[index].Name) == 0)
+    if (index == -1 || index < 2 || index == 3 || index == 4 || index == 5 || Config.Items[index].Name.empty())
         enable = FALSE;
 
     int index2 = ListView_GetNextItem(HListView2, -1, LVNI_SELECTED);
@@ -1240,9 +1201,9 @@ void CCfgPageView::EnableControls()
     {
         ti.CheckBox(IDC_VIEW_LEFT_FIXED, tmp);
         ti.CheckBox(IDC_VIEW_RIGHT_FIXED, tmp);
-        char buff[] = "";
-        ti.EditLine(IDC_VIEW_LEFT_WIDTH, buff, 1);
-        ti.EditLine(IDC_VIEW_RIGHT_WIDTH, buff, 1);
+        wchar_t buff[] = L"";
+        ti.EditLineW(IDC_VIEW_LEFT_WIDTH, buff, 1);
+        ti.EditLineW(IDC_VIEW_RIGHT_WIDTH, buff, 1);
     }
     if (!enable)
     {
@@ -1275,7 +1236,7 @@ CCfgPageView::GetEnabledFunctions()
         if (index > 6)
         {
             mask |= TLBHDRMASK_MODIFY;
-            if (lstrlen(Config.Items[index].Name) > 0)
+            if (!Config.Items[index].Name.empty())
             {
                 mask |= TLBHDRMASK_DELETE;
                 if (index > 7)
@@ -1311,9 +1272,9 @@ void CCfgPageView::OnDelete()
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     if (index != -1)
     {
-        Config.Items[index].Name[0] = 0;
-        char buff[] = "";
-        ListView_SetItemText(HListView, index, 0, buff);
+        Config.Items[index].Name.clear();
+        wchar_t buff[] = L"";
+        ListView_SetItemTextW(HListView, index, 0, buff);
         LoadControls();
     }
     EnableHeader();
@@ -1338,8 +1299,8 @@ void CCfgPageView::OnMove(BOOL up)
         index2 = index1 + 1;
     if (index2 != index1)
     {
-        ListView_SetItemText(HListView, index1, 0, Config.Items[index2].Name);
-        ListView_SetItemText(HListView, index2, 0, Config.Items[index1].Name);
+        ListView_SetItemTextW(HListView, index1, 0, const_cast<wchar_t*>(Config.Items[index2].Name.c_str()));
+        ListView_SetItemTextW(HListView, index2, 0, const_cast<wchar_t*>(Config.Items[index1].Name.c_str()));
         DWORD state1 = ListView_GetItemState(HListView, index1, LVIS_STATEIMAGEMASK);
         DWORD state2 = ListView_GetItemState(HListView, index2, LVIS_STATEIMAGEMASK);
         ListView_SetItemState(HListView, index1, state2, LVIS_STATEIMAGEMASK);
@@ -1386,33 +1347,33 @@ CCfgPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         GetClientRect(HListView, &r);
 
         // fill the list view with Name, Mode and HotKey columns
-        LVCOLUMN lvc;
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_HOTPATH_NAME);
+        lvc.pszText = LoadStrW(IDS_HOTPATH_NAME);
         lvc.cx = 1; // dummy
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_VIEW_MODE);
+        lvc.pszText = LoadStrW(IDS_VIEW_MODE);
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 1, (LPARAM)&lvc);
         ListView_SetColumnWidth(HListView, 1, LVSCW_AUTOSIZE_USEHEADER);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_HOTPATH_HOTKEY);
+        lvc.pszText = LoadStrW(IDS_HOTPATH_HOTKEY);
         lvc.iSubItem = 2;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 2, (LPARAM)&lvc);
         ListView_SetColumnWidth(HListView, 2, LVSCW_AUTOSIZE_USEHEADER);
 
         // insert the Name column into the list view with columns
         GetClientRect(HListView2, &r);
         lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_COLUMN_NAME);
+        lvc.pszText = LoadStrW(IDS_COLUMN_NAME);
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView2, 0, &lvc);
+        SendMessageW(HListView2, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
         // dialog elements should stretch with the dialog size, set split controls
         ElasticVerticalLayout(2, IDC_VIEW_LIST, IDC_VIEW_LIST2);
@@ -1564,20 +1525,19 @@ CCfgPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case LVN_ENDLABELEDIT:
             {
-                NMLVDISPINFO* nmhd = (NMLVDISPINFO*)nmh;
+                NMLVDISPINFOW* nmhd = (NMLVDISPINFOW*)nmh;
                 LabelEdit = FALSE;
                 EnableHeader();
                 if (nmhd->item.pszText != NULL)
                 {
-                    char name[VIEW_NAME_MAX];
-                    lstrcpyn(name, nmhd->item.pszText, VIEW_NAME_MAX);
+                    std::wstring name = nmhd->item.pszText;
                     Config.CleanName(name);
                     int index = nmhd->item.iItem;
-                    if (lstrlen(Config.Items[index].Name) == 0)
+                    if (Config.Items[index].Name.empty())
                         Config.Items[index].Flags = 0;
-                    lstrcpy(Config.Items[index].Name, name);
+                    Config.Items[index].Name = name;
                     LoadControls();
-                    ListView_SetItemText(HListView, index, 0, name);
+                    ListView_SetItemTextW(HListView, index, 0, const_cast<wchar_t*>(name.c_str()));
                     Dirty = TRUE;
                     break;
                 }
@@ -1706,39 +1666,32 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
         ti.ErrorOn(IDC_TABSIZE);
     }
 
-    CPathBuffer buf; // Heap-allocated for long path support
     if (ti.IsGood())
     {
-        lstrcpyn(buf, Configuration.TextModeMasks.GetMasksString(), buf.Size()); // backup of TextModeMasks
-        // provide MasksString, there is range checking, nothing serious
-        ti.EditLine(IDC_VIEW_INTEXT, Configuration.TextModeMasks.GetWritableMasksString(), MAX_PATH);
+        const std::wstring candidate = GetWindowTextStringW(GetDlgItem(HWindow, IDC_VIEW_INTEXT));
+        CMaskGroup candidateMasks(candidate.c_str(), Configuration.TextModeMasks.GetExtendedMode());
         int errorPos;
-        if (!Configuration.TextModeMasks.PrepareMasks(errorPos))
+        if (!candidateMasks.PrepareMasks(errorPos))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDC_VIEW_INTEXT));
             SendMessage(GetDlgItem(HWindow, IDC_VIEW_INTEXT), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_VIEW_INTEXT);
         }
-        Configuration.TextModeMasks.SetMasksString(buf); // TextModeMasks restoration
-        Configuration.TextModeMasks.PrepareMasks(errorPos);
     }
 
     if (ti.IsGood())
     {
-        lstrcpyn(buf, Configuration.HexModeMasks.GetMasksString(), MAX_PATH); // backup of HexModeMasks
-        // provide MasksString, there is range checking, nothing serious
-        ti.EditLine(IDC_VIEW_INHEX, (char*)Configuration.HexModeMasks.GetWritableMasksString(), MAX_PATH);
+        const std::wstring candidate = GetWindowTextStringW(GetDlgItem(HWindow, IDC_VIEW_INHEX));
+        CMaskGroup candidateMasks(candidate.c_str(), Configuration.HexModeMasks.GetExtendedMode());
         int errorPos;
-        if (!Configuration.HexModeMasks.PrepareMasks(errorPos))
+        if (!candidateMasks.PrepareMasks(errorPos))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDC_VIEW_INHEX));
             SendMessage(GetDlgItem(HWindow, IDC_VIEW_INHEX), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDC_VIEW_INHEX);
         }
-        Configuration.HexModeMasks.SetMasksString(buf); // HexModeMasks restoration
-        Configuration.HexModeMasks.PrepareMasks(errorPos);
     }
 }
 
@@ -1758,10 +1711,18 @@ void CCfgPageViewer::Transfer(CTransferInfo& ti)
     if (Configuration.SavePosition)
         Configuration.WindowPlacement.length = 0;
 
-    // provide MasksString, there is range checking, nothing serious
-    ti.EditLine(IDC_VIEW_INHEX, (char*)Configuration.HexModeMasks.GetWritableMasksString(), MAX_PATH);
-    // provide MasksString, there is range checking, nothing serious
-    ti.EditLine(IDC_VIEW_INTEXT, (char*)Configuration.TextModeMasks.GetWritableMasksString(), MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+    {
+        SetDlgItemTextW(HWindow, IDC_VIEW_INHEX, Configuration.HexModeMasks.GetMasksString());
+        SetDlgItemTextW(HWindow, IDC_VIEW_INTEXT, Configuration.TextModeMasks.GetMasksString());
+    }
+    else
+    {
+        const std::wstring hexMasks = GetWindowTextStringW(GetDlgItem(HWindow, IDC_VIEW_INHEX));
+        const std::wstring textMasks = GetWindowTextStringW(GetDlgItem(HWindow, IDC_VIEW_INTEXT));
+        Configuration.HexModeMasks.SetMasksString(hexMasks.c_str());
+        Configuration.TextModeMasks.SetMasksString(textMasks.c_str());
+    }
     int errPos;
     Configuration.TextModeMasks.PrepareMasks(errPos);
     Configuration.HexModeMasks.PrepareMasks(errPos);
@@ -1822,12 +1783,12 @@ void CCfgPageViewer::LoadControls()
     HFont = HANDLES(CreateFontIndirect(&logFont));
     HDC hDC = HANDLES(GetDC(HWindow));
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
-    char buf[LF_FACESIZE + 200];
-    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
-                MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
-                LocalViewerLogFont.lfFaceName,
-                LoadStr(LocalUseCustomViewerFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
-    SetWindowText(hEdit, buf);
+    wchar_t buf[LF_FACESIZE + 200];
+    swprintf_s(buf, _countof(buf), LoadStrW(IDS_FONTDESCRIPTION),
+               MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+               LocalViewerLogFont.lfFaceName,
+               LoadStrW(LocalUseCustomViewerFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
+    SetWindowTextW(hEdit, buf);
 
     HANDLES(ReleaseDC(HWindow, hDC));
 }
@@ -1847,7 +1808,7 @@ CCfgPageViewer::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         break;
     }
@@ -1872,8 +1833,8 @@ MENU_TEMPLATE_ITEM CfgPageViewerMenu[] =
 */
                 HMENU hMenu = CreatePopupMenu();
                 BOOL cstFont = LocalUseCustomViewerFont;
-                InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
-                InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
+                InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_USEDEFAULTFONT));
+                InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStrW(IDS_USECUSTOMFONT));
 
                 TPMPARAMS tpmPar;
                 tpmPar.cbSize = sizeof(tpmPar);
@@ -1931,11 +1892,11 @@ MENU_TEMPLATE_ITEM CfgPageViewerMenu[] =
                     BOOL normal = button == NormalText;
                     BOOL checkedDefaultFg = GetFValue(TmpColors[normal ? VIEWER_FG_NORMAL : VIEWER_FG_SELECTED]) & SCF_DEFAULT;
                     BOOL checkedDefaultBk = GetFValue(TmpColors[normal ? VIEWER_BK_NORMAL : VIEWER_BK_SELECTED]) & SCF_DEFAULT;
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_SETCOLOR_SYSTEM_FG));
-                    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 4, LoadStr(IDS_SETCOLOR_SYSTEM_BK));
+                    InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_SETCOLOR_CUSTOM_FG));
+                    InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStrW(IDS_SETCOLOR_SYSTEM_FG));
+                    InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
+                    InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStrW(IDS_SETCOLOR_CUSTOM_BK));
+                    InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 4, LoadStrW(IDS_SETCOLOR_SYSTEM_BK));
 
                     //            int i;
                     //            for (i = 0; i < 4; i++)
@@ -2125,12 +2086,12 @@ void EnableDlgWindow(HWND hDialog, int resID, BOOL enable, BOOL clear = FALSE)
     EnableWindow(hChild, enable);
     if (!enable && clear)
     {
-        char className[31];
+        wchar_t className[31];
         className[0] = 0;
-        GetClassName(hChild, className, 30);
-        if (StrICmp(className, "edit") == 0)
-            SetWindowText(hChild, "");
-        else if (StrICmp(className, "button") == 0)
+        GetClassNameW(hChild, className, 30);
+        if (StrICmpW(className, L"edit") == 0)
+            SetWindowTextW(hChild, L"");
+        else if (StrICmpW(className, L"button") == 0)
             SendMessage(hChild, BM_SETCHECK, BST_UNCHECKED, 0);
     }
 }
@@ -2201,17 +2162,15 @@ void CCfgPageUserMenu::LoadControls()
     CheckDlgButton(HWindow, IDC_UM_SUBMENU, (!empty && (item->Type == umitSubmenuBegin)) ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(HWindow, IDC_UM_SEPARATOR, (!empty && (item->Type == umitSeparator)) ? BST_CHECKED : BST_UNCHECKED);
 
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, USRMNUARGS_MAXLEN - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->UMCommand.c_str()));
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments.c_str()));
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so that Browse overwrites the content
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir.c_str()));
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so that Browse overwrites the content
+    SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, USRMNUARGS_MAXLEN - 1, 0);
+    SendMessageW(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->UMCommand.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->Arguments.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so that Browse overwrites the content
+    SendMessageW(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->InitDir.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so that Browse overwrites the content
 
     //  SmallIcon->SetIcon(!empty ? item->HIcon : NULL);
 
@@ -2231,17 +2190,13 @@ void CCfgPageUserMenu::StoreControls()
     {
         CUserMenuItem* item = UserMenuItems->At(index);
 
-        CPathBuffer command; // Heap-allocated for long path support
-        char arguments[USRMNUARGS_MAXLEN];
-        CPathBuffer initdir; // Heap-allocated for long path support
-        SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    command.Size(), (LPARAM)command.Get());
-        SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
-                    USRMNUARGS_MAXLEN, (LPARAM)arguments);
-        SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    initdir.Size(), (LPARAM)initdir.Get());
+        wchar_t arguments[USRMNUARGS_MAXLEN];
+        const std::wstring command = GetWindowTextStringW(GetDlgItem(HWindow, IDE_COMMAND));
+        SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
+                     USRMNUARGS_MAXLEN, (LPARAM)arguments);
+        const std::wstring initdir = GetWindowTextStringW(GetDlgItem(HWindow, IDE_INITDIR));
 
-        item->Set(item->ItemName.c_str(), command, arguments, initdir, item->Icon.c_str());
+        item->Set(item->ItemName.c_str(), command.c_str(), arguments, initdir.c_str(), item->Icon.c_str());
 
         BOOL submenu = (IsDlgButtonChecked(HWindow, IDC_UM_SUBMENU) == BST_CHECKED);
         BOOL separator = (IsDlgButtonChecked(HWindow, IDC_UM_SEPARATOR) == BST_CHECKED);
@@ -2330,8 +2285,8 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (submenu)
                     {
                         // user checked the Submenu checkbox; add a closing item
-                        static char emptyBuffer[] = "";
-                        CUserMenuItem* item = new CUserMenuItem(LoadStr(IDS_ENDUSERSUBMENU), emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer,
+                        static wchar_t emptyBuffer[] = L"";
+                        CUserMenuItem* item = new CUserMenuItem(LoadStrW(IDS_ENDUSERSUBMENU), emptyBuffer, emptyBuffer, emptyBuffer, emptyBuffer,
                                                                 FALSE, FALSE, FALSE, FALSE, umitSubmenuEnd, NULL);
                         if (item == NULL)
                             return 0;
@@ -2404,12 +2359,12 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDB_UM_CHANGEICON:
         {
-            CPathBuffer fileName;
-            fileName[0] = 0;
+            std::wstring fileName;
             int resID = 0;
 
             int index;
             EditLB->GetCurSel(index);
+            BOOL error = FALSE;
             if (index >= 0 && index < EditLB->GetCount())
             {
                 CUserMenuItem* item = UserMenuItems->At(index);
@@ -2417,27 +2372,25 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     // Icon is in the format "file name,resID"
                     // perform decomposition
-                    const char* iconStr = item->Icon.c_str();
-                    const char* iterator = iconStr + item->Icon.length() - 1;
+                    const wchar_t* iconStr = item->Icon.c_str();
+                    const wchar_t* iterator = iconStr + item->Icon.length() - 1;
                     while (iterator > iconStr && *iterator != ',')
                         iterator--;
                     if (iterator > iconStr && *iterator == ',')
                     {
-                        strncpy(fileName, iconStr, iterator - iconStr);
-                        fileName[iterator - iconStr] = 0;
+                        fileName.assign(iconStr, iterator - iconStr);
                         iterator++;
-                        resID = atoi(iterator);
+                        resID = _wtoi(iterator);
                     }
                 }
-                BOOL error = FALSE;
-                if (fileName[0] == 0 && !item->UMCommand.empty())
+                if (!error && fileName.empty() && !item->UMCommand.empty())
                 {
-                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, fileName.Size(), FALSE))
+                    if (!ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, FALSE))
                         error = TRUE;
                     else
                     {
-                        while (strlen(fileName) > 2 && CutDoubleQuotesFromBothSides(fileName))
-                            ;
+                        while (fileName.length() > 2 && fileName.front() == L'"' && fileName.back() == L'"')
+                            fileName = fileName.substr(1, fileName.length() - 2);
                     }
                 }
 
@@ -2446,8 +2399,8 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     CChangeIconDialog dlg(HWindow, fileName, &resID);
                     if (dlg.Execute() == IDOK)
                     {
-                        sprintf(fileName + strlen(fileName), ",%d", resID);
-                        item->Set(item->ItemName.c_str(), item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), fileName);
+                        fileName += L"," + std::to_wstring(resID);
+                        item->Set(item->ItemName.c_str(), item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), fileName.c_str());
                         item->GetIconHandle(NULL, FALSE);
                         EditLB->RedrawFocusedItem();
                     }
@@ -2488,7 +2441,7 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (dispInfo->ToDo == edtlbGetData)
                 {
                     CUserMenuItem* item = (CUserMenuItem*)dispInfo->ItemID;
-                    strcpy(dispInfo->Buffer, item->ItemName.c_str());
+                    *dispInfo->Text = item->ItemName;
                     dispInfo->HIcon = item->UMIcon;
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
@@ -2506,13 +2459,13 @@ CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         UserMenuItems->Add(item);
-                        item->Set(dispInfo->Buffer, item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CUserMenuItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->UMCommand.c_str(), item->Arguments.c_str(), item->InitDir.c_str(), item->Icon.c_str());
                     }
 
                     LoadControls();
@@ -2773,16 +2726,20 @@ void CCfgPageHotPath::Validate(CTransferInfo& ti)
 {
     if (Dirty)
     {
-        HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
+        // IDC_WAIT is already MAKEINTRESOURCE(32514) (this build has no UNICODE
+        // #define, so that resolves through MAKEINTRESOURCEA) - re-wrapping an
+        // already-encoded resource-ID pointer in MAKEINTRESOURCEW truncates that POINTER
+        // through (WORD) again (C4302). Numerically harmless today only because 32514 fits in
+        // 16 bits either way; a plain pointer-type reinterpretation carries the same encoded
+        // value without truncating anything.
+        HCURSOR hOldCur = SetCursor(LoadCursorW(NULL, (LPCWSTR)IDC_WAIT));
         int i;
         for (i = 0; i < HOT_PATHS_COUNT; i++)
         {
             int errorPos1, errorPos2;
             if (Config->GetNameLen(i) > 0)
             {
-                char path[HOTPATHITEM_MAXPATH];
-                Config->GetPath(i, path, HOTPATHITEM_MAXPATH);
-                if (!ValidateHotPath(HWindow, path, errorPos1, errorPos2))
+                if (!ValidateHotPath(HWindow, Config->GetPathW(i).c_str(), errorPos1, errorPos2))
                 {
                     ListView_SetItemState(HListView, i, LVIS_SELECTED, LVIS_SELECTED);
                     ListView_EnsureVisible(HListView, i, FALSE);
@@ -2797,8 +2754,8 @@ void CCfgPageHotPath::Validate(CTransferInfo& ti)
     }
 }
 
-extern CPathBuffer HotPathSetBufferName;
-extern char HotPathSetBufferPath[HOTPATHITEM_MAXPATH];
+extern std::wstring HotPathSetBufferName;
+extern std::wstring HotPathSetBufferPath;
 
 void CCfgPageHotPath::Transfer(CTransferInfo& ti)
 {
@@ -2809,32 +2766,29 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
         Config->Load(MainWindow->HotPaths);
 
         if (EditMode)
-            Config->Set(EditIndex, HotPathSetBufferName, HotPathSetBufferPath);
+            Config->SetW(EditIndex, HotPathSetBufferName.c_str(), HotPathSetBufferPath.c_str());
 
         int index = 0;
         DisableNotification = TRUE;
-        char buff[20];
-        CPathBuffer name; // Heap-allocated for long path support
+        wchar_t buff[20];
         int i;
         for (i = 0; i < HOT_PATHS_COUNT; i++)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
-            name[0] = 0;
-            Config->GetName(i, name, name.Size());
-            lvi.pszText = name;
-            ListView_InsertItem(HListView, &lvi);
+            lvi.pszText = const_cast<wchar_t*>(Config->GetNameW(i).c_str());
+            SendMessageW(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
 
             UINT state = INDEXTOSTATEIMAGEMASK((Config->GetVisible(i) ? 2 : 1));
             ListView_SetItemState(HListView, i, state, LVIS_STATEIMAGEMASK);
 
             if (i < 10)
             {
-                sprintf(buff, "%s+%d", LoadStr(IDS_CTRL), i < 9 ? i + 1 : 0);
-                ListView_SetItemText(HListView, i, 1, buff);
+                swprintf(buff, 20, L"%ls+%d", LoadStrW(IDS_CTRL), i < 9 ? i + 1 : 0);
+                ListView_SetItemTextW(HListView, i, 1, buff);
             }
         }
 
@@ -2863,18 +2817,23 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
 void CCfgPageHotPath::LoadControls()
 {
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
-    char path[HOTPATHITEM_MAXPATH];
-    path[0] = 0;
+    // Wide: Config->GetPathW/SetPathW are the real storage; the
+    // narrow GetPath/SetPath pair is documented lossy-by-construction. The edit control
+    // itself is a plain USER32 EDIT (wide-native regardless of the dialog's own class),
+    // so SetDlgItemTextW/GetDlgItemTextW already work here - only the narrow round trip
+    // through this control was mangling a non-ASCII hot path, both on display and (via
+    // StoreControls firing on every EN_CHANGE) on every keystroke while typing one.
+    std::wstring path;
     BOOL visible = FALSE;
     if (index != -1)
     {
-        Config->GetPath(index, path, HOTPATHITEM_MAXPATH);
+        path = Config->GetPathW(index);
         visible = Config->GetVisible(index);
     }
 
     DisableNotification = TRUE;
-    SendDlgItemMessage(HWindow, IDC_HOTPATH_PATH, EM_LIMITTEXT, HOTPATHITEM_MAXPATH - 1, 0);
-    SetDlgItemText(HWindow, IDC_HOTPATH_PATH, path);
+    SendDlgItemMessage(HWindow, IDC_HOTPATH_PATH, EM_LIMITTEXT, 0x7FFFFFFE, 0);
+    SetDlgItemTextW(HWindow, IDC_HOTPATH_PATH, path.c_str());
 
     DisableNotification = FALSE;
     EnableControls();
@@ -2885,9 +2844,11 @@ void CCfgPageHotPath::StoreControls()
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     if (index != -1)
     {
-        char buff[HOTPATHITEM_MAXPATH];
-        GetDlgItemText(HWindow, IDC_HOTPATH_PATH, buff, HOTPATHITEM_MAXPATH);
-        Config->SetPath(index, buff);
+        HWND edit = GetDlgItem(HWindow, IDC_HOTPATH_PATH);
+        const int length = GetWindowTextLengthW(edit);
+        std::vector<wchar_t> buffer((size_t)length + 1);
+        GetWindowTextW(edit, buffer.data(), length + 1);
+        Config->SetPathW(index, buffer.data());
     }
 }
 
@@ -2928,9 +2889,9 @@ void CCfgPageHotPath::OnDelete()
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     if (index != -1)
     {
-        Config->Set(index, "", "");
-        char buffEmpty[] = "";
-        ListView_SetItemText(HListView, index, 0, buffEmpty);
+        Config->SetW(index, L"", L"");
+        wchar_t buffEmpty[] = L"";
+        ListView_SetItemTextW(HListView, index, 0, buffEmpty);
         LoadControls();
     }
     EnableHeader();
@@ -2950,12 +2911,10 @@ void CCfgPageHotPath::OnMove(BOOL up)
         index2 = index1 + 1;
     if (index2 != index1)
     {
-        CPathBuffer name1; // Heap-allocated for long path support
-        CPathBuffer name2; // Heap-allocated for long path support
-        Config->GetName(index1, name1, name1.Size());
-        Config->GetName(index2, name2, name2.Size());
-        ListView_SetItemText(HListView, index1, 0, name2);
-        ListView_SetItemText(HListView, index2, 0, name1);
+        std::wstring name1 = Config->GetNameW(index1);
+        std::wstring name2 = Config->GetNameW(index2);
+        ListView_SetItemTextW(HListView, index1, 0, name2.data());
+        ListView_SetItemTextW(HListView, index2, 0, name1.data());
         DWORD state1 = ListView_GetItemState(HListView, index1, LVIS_STATEIMAGEMASK);
         DWORD state2 = ListView_GetItemState(HListView, index2, LVIS_STATEIMAGEMASK);
         ListView_SetItemState(HListView, index1, state2, LVIS_STATEIMAGEMASK);
@@ -3012,18 +2971,18 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int nameWidth = r.right - (int)(r.right / 7);
 
         // fill the list view with the Name and HotKey columns
-        LVCOLUMN lvc;
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_HOTPATH_NAME);
+        lvc.pszText = LoadStrW(IDS_HOTPATH_NAME);
         lvc.cx = 1;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_HOTPATH_HOTKEY);
+        lvc.pszText = LoadStrW(IDS_HOTPATH_HOTKEY);
         lvc.cx = 1;
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 1, (LPARAM)&lvc);
 
         ChangeToArrowButton(HWindow, IDC_HOTPATH_BROWSE);
 
@@ -3103,22 +3062,18 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case LVN_ENDLABELEDIT:
             {
-                NMLVDISPINFO* nmhd = (NMLVDISPINFO*)nmh;
+                NMLVDISPINFOW* nmhd = (NMLVDISPINFOW*)nmh;
                 LabelEdit = FALSE;
                 EnableHeader();
                 if (nmhd->item.pszText != NULL)
                 {
-                    CPathBuffer name; // Heap-allocated for long path support
-                    lstrcpyn(name, nmhd->item.pszText, name.Size());
+                    std::wstring name = nmhd->item.pszText;
                     Config->CleanName(name);
                     int index = nmhd->item.iItem;
-                    char path[HOTPATHITEM_MAXPATH];
-                    path[0] = 0;
-                    if (strlen(name) != 0)
-                        Config->GetPath(index, path, HOTPATHITEM_MAXPATH);
-                    Config->Set(index, name, path);
+                    const std::wstring path = !name.empty() ? Config->GetPathW(index) : std::wstring();
+                    Config->SetW(index, name.c_str(), path.c_str());
                     LoadControls();
-                    ListView_SetItemText(HListView, index, 0, name);
+                    ListView_SetItemTextW(HListView, index, 0, const_cast<wchar_t*>(name.c_str()));
                     Dirty = TRUE;
                     break;
                 }
@@ -3193,19 +3148,16 @@ void CCfgPageSystem::Validate(CTransferInfo& ti)
     ti.RadioButton(IDR_RECYCLE3, 2, useRecycle);
     if (useRecycle == 2)
     {
-        CPathBuffer buf; // Heap-allocated for long path support
-        lstrcpyn(buf, Configuration.RecycleMasks.GetMasksString(), buf.Size()); // backup of RecycleBinMasks
-        // provide MasksString, there is range checking, nothing serious
-        ti.EditLine(IDE_RECYCLEMASKS, Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
+        const std::wstring candidate = GetWindowTextStringW(GetDlgItem(HWindow, IDE_RECYCLEMASKS));
+        CMaskGroup candidateMasks(candidate.c_str(), Configuration.RecycleMasks.GetExtendedMode());
         int errorPos;
-        if (!Configuration.RecycleMasks.PrepareMasks(errorPos))
+        if (!candidateMasks.PrepareMasks(errorPos))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(GetDlgItem(HWindow, IDE_RECYCLEMASKS));
             SendMessage(GetDlgItem(HWindow, IDE_RECYCLEMASKS), EM_SETSEL, errorPos, errorPos + 1);
             ti.ErrorOn(IDE_RECYCLEMASKS);
         }
-        Configuration.RecycleMasks.SetMasksString(buf); // RecycleBinMasks restoration
     }
 }
 
@@ -3214,8 +3166,13 @@ void CCfgPageSystem::Transfer(CTransferInfo& ti)
     ti.RadioButton(IDR_RECYCLE1, 0, Configuration.UseRecycleBin);
     ti.RadioButton(IDR_RECYCLE2, 1, Configuration.UseRecycleBin);
     ti.RadioButton(IDR_RECYCLE3, 2, Configuration.UseRecycleBin);
-    // provide MasksString, there is range checking, nothing serious
-    ti.EditLine(IDE_RECYCLEMASKS, Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+        SetDlgItemTextW(HWindow, IDE_RECYCLEMASKS, Configuration.RecycleMasks.GetMasksString());
+    else
+    {
+        const std::wstring masks = GetWindowTextStringW(GetDlgItem(HWindow, IDE_RECYCLEMASKS));
+        Configuration.RecycleMasks.SetMasksString(masks.c_str());
+    }
 
     if (ti.Type == ttDataToWindow)
         EnableControls();
@@ -3234,7 +3191,7 @@ CCfgPageSystem::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
         break;
     }
 
@@ -3370,14 +3327,14 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
 
         int schemes[5] = {IDS_COLORSCHEME_SALAMANDER, IDS_COLORSCHEME_EXPLORER, IDS_COLORSCHEME_NORTON, IDS_COLORSCHEME_NAVIGATOR, IDS_COLORSCHEME_CUSTOM};
         for (i = 0; i < 5; i++)
-            SendMessage(HScheme, CB_ADDSTRING, 0, (LPARAM)LoadStr(schemes[i]));
+            SendMessageW(HScheme, CB_ADDSTRING, 0, (LPARAM)LoadStrW(schemes[i]));
 
         for (i = 0; i < PAGE7DATA_COUNT; i++)
-            SendMessage(HItem, CB_ADDSTRING, 0, (LPARAM)LoadStr(Page7Data[i].ItemLabel));
+            SendMessageW(HItem, CB_ADDSTRING, 0, (LPARAM)LoadStrW(Page7Data[i].ItemLabel));
 
         int labels[CFG_COLORS_BUTTONS] = {IDS_COLORLABEL_NORMAL, IDS_COLORLABEL_FOCUSED, IDS_COLORLABEL_SELECTED, IDS_COLORLABEL_FOCUSEDSELECTED, IDS_COLORLABEL_HIGHLIGHTED};
         for (i = 0; i < CFG_COLORS_BUTTONS; i++)
-            SetDlgItemText(HWindow, CConfigurationPage7Masks[i], LoadStr(labels[i]));
+            SetDlgItemTextW(HWindow, CConfigurationPage7Masks[i], LoadStrW(labels[i]));
 
         int index = 4; // custom
         if (CurrentColors == SalamanderColors)
@@ -3388,8 +3345,8 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
             index = 2;
         else if (CurrentColors == NavigatorColors)
             index = 3;
-        SendMessage(HScheme, CB_SETCURSEL, index, 0);
-        SendMessage(HItem, CB_SETCURSEL, 0, 0);
+        SendMessageW(HScheme, CB_SETCURSEL, index, 0);
+        SendMessageW(HItem, CB_SETCURSEL, 0, 0);
 
         // populate the highlight items list
         for (i = 0; i < HighlightMasks.Count; i++)
@@ -3404,7 +3361,7 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
     }
     else
     {
-        int index = (int)SendMessage(HScheme, CB_GETCURSEL, 0, 0);
+        int index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
         if (index == 0)
             CurrentColors = SalamanderColors;
         else if (index == 1)
@@ -3436,7 +3393,7 @@ void CCfgPageColors::LoadColors()
     CALL_STACK_MESSAGE1("CCfgPageColors::LoadColors()");
 
     COLORREF* tmpColors;
-    int index = (int)SendMessage(HScheme, CB_GETCURSEL, 0, 0);
+    int index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
     if (index == 0)
         tmpColors = SalamanderColors;
     else if (index == 1)
@@ -3451,19 +3408,19 @@ void CCfgPageColors::LoadColors()
     // let default values be retrieved
     UpdateDefaultColors(tmpColors, &HighlightMasks, TRUE, TRUE);
 
-    index = (int)SendMessage(HItem, CB_GETCURSEL, 0, 0);
+    index = (int)SendMessageW(HItem, CB_GETCURSEL, 0, 0);
     CConfigurationPage7Data* data = &Page7Data[index];
 
     int i;
     for (i = 0; i < CFG_COLORS_BUTTONS; i++)
     {
         CConfigurationPage7SubData* subData = &data->Items[i];
-        const char* label;
+        const wchar_t* label;
         if (subData->Label != 0)
-            label = LoadStr(subData->Label);
+            label = LoadStrW(subData->Label);
         else
-            label = "";
-        SetDlgItemText(HWindow, CConfigurationPage7Items[i], label);
+            label = L"";
+        SetDlgItemTextW(HWindow, CConfigurationPage7Items[i], label);
         if (subData->Label != 0)
         {
             // Mirror the panel's render-time dark resolution so the base-color swatches match
@@ -3722,10 +3679,10 @@ CCfgPageColors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SALCOLOR* bkColor = NULL;
             if (item)
             {
-                data = &Page7Data[SendMessage(HItem, CB_GETCURSEL, 0, 0)];
+                data = &Page7Data[SendMessageW(HItem, CB_GETCURSEL, 0, 0)];
                 int index;
 
-                index = (int)SendMessage(HScheme, CB_GETCURSEL, 0, 0);
+                index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
                 if (index == 0)
                     tmpColors = SalamanderColors;
                 else if (index == 1)
@@ -3823,10 +3780,10 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu1[] =
   {MNTT_PE, 0
 };
 */
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM));
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_SETCOLOR_CUSTOM));
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
                                                                                                                        : MF_GRAYED,
-                           2, LoadStr(IDS_SETCOLOR_SYSTEM));
+                           2, LoadStrW(IDS_SETCOLOR_SYSTEM));
                 maxCmd = 2;
             }
             else
@@ -3852,17 +3809,17 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
   {MNTT_PE, 0
 };
 */
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_SETCOLOR_CUSTOM_FG));
                 int textResID = (item || id == IDC_C_MASK5_C) ? IDS_SETCOLOR_SYSTEM_FG : IDS_SETCOLOR_DEFAULT_FG;
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
-                                                                                                                       : MF_GRAYED,
-                           2, LoadStr(textResID));
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
+                                                                                                                        : MF_GRAYED,
+                           2, LoadStrW(textResID));
+                InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStrW(IDS_SETCOLOR_CUSTOM_BK));
                 textResID = (item || id == IDC_C_MASK5_C) ? IDS_SETCOLOR_SYSTEM_BK : IDS_SETCOLOR_DEFAULT_BK;
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledBk ? 0
-                                                                                                                       : MF_GRAYED,
-                           4, LoadStr(textResID));
+                InsertMenuW(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledBk ? 0
+                                                                                                                        : MF_GRAYED,
+                           4, LoadStrW(textResID));
                 maxCmd = 4;
             }
 
@@ -3877,7 +3834,7 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                                          HWindow, &tpmPar);
             if (cmd != 0)
             {
-                int index = (int)SendMessage(HScheme, CB_GETCURSEL, 0, 0);
+                int index = (int)SendMessageW(HScheme, CB_GETCURSEL, 0, 0);
                 if (index != 4)
                 {
                     COLORREF* colors;
@@ -3893,7 +3850,7 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                     int i;
                     for (i = 0; i < NUMBER_OF_COLORS; i++)
                         TmpColors[i] = colors[i];
-                    SendMessage(HScheme, CB_SETCURSEL, 4, 0);
+                    SendMessageW(HScheme, CB_SETCURSEL, 4, 0);
                 }
 
                 if (cmd == 1 || cmd == 3)
@@ -3967,7 +3924,7 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CHighlightMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    *dispInfo->Text = ((CHighlightMasksItem*)dispInfo->ItemID)->Masks->GetMasksString();
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }
@@ -3985,14 +3942,14 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                             return TRUE;
                         }
                         HighlightMasks.Add(item);
-                        item->Set(dispInfo->Buffer);
+                        item->Set(dispInfo->Text->c_str());
                         EditLB->SetItemData((INT_PTR)item);
                         PostMessage(HWindow, WM_COMMAND, MAKELPARAM(IDC_C_LIST, LBN_SELCHANGE), (LPARAM)EditLB->HWindow);
                     }
                     else
                     {
                         item = (CHighlightMasksItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer);
+                        item->Set(dispInfo->Text->c_str());
                     }
 
                     LoadMasks();
@@ -4012,7 +3969,7 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
               int srcIndex = index;
               int dstIndex = index + (dispInfo->Up ? -1 : 1);
 
-              char buf[sizeof(CHighlightMasksItem)];
+              wchar_t buf[sizeof(CHighlightMasksItem)];
               memcpy(buf, HighlightMasks[srcIndex], sizeof(CHighlightMasksItem));
               memcpy(HighlightMasks[srcIndex], HighlightMasks[dstIndex], sizeof(CHighlightMasksItem));
               memcpy(HighlightMasks[dstIndex], buf, sizeof(CHighlightMasksItem));
@@ -4029,7 +3986,7 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                 int srcIndex = index;
                 int dstIndex = dispInfo->NewIndex;
 
-                char buf[sizeof(CHighlightMasksItem)];
+                wchar_t buf[sizeof(CHighlightMasksItem)];
                 memcpy(buf, HighlightMasks[srcIndex], sizeof(CHighlightMasksItem));
                 if (srcIndex < dstIndex)
                 {

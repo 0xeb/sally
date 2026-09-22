@@ -49,19 +49,6 @@ SalFileInfo GetFileInfoW(const wchar_t* fullPath);
 //
 std::wstring BuildPathW(const wchar_t* directory, const wchar_t* fileName);
 
-// Builds a full path from ANSI directory and filename, returning wide string.
-// Converts ANSI to wide, adds backslash separator if needed.
-// Adds \\?\ prefix for long paths automatically.
-//
-// Parameters:
-//   directory - Base directory path (ANSI)
-//   fileName  - File or subdirectory name to append (ANSI)
-//
-// Returns:
-//   Combined wide path with \\?\ prefix if needed
-//
-std::wstring BuildPathW(const char* directory, const char* fileName);
-
 // Checks if a path exists (file or directory).
 //
 // Parameters:
@@ -164,7 +151,15 @@ void RemoveDoubleBackslashesW(std::wstring& path);
 // Returns:
 //   Root path with trailing backslash
 //
-std::wstring GetRootPathW(const wchar_t* path);
+std::wstring GetRootPath(const wchar_t* path);
+
+// Returns a pointer INTO 'path', just past its root.
+//   "C:\dir\file"          -> "\dir\file"   (past "C:")
+//   "\\server\share\dir"   -> "\dir"        (past the share)
+// Companion to GetRootPath, which returns the root itself. Used to walk a path
+// component by component without re-examining the root, which has different
+// rules from every other component.
+const wchar_t* SkipRootW(const wchar_t* path);
 
 // Checks if a path is a UNC root path (\\server\share with no subdirectories).
 //
@@ -275,7 +270,7 @@ std::wstring GetFileNameWithoutExtensionW(const wchar_t* path);
 std::wstring GetParentPathW(const wchar_t* path);
 
 // Compares two paths for equality (case-insensitive, ignores trailing backslash).
-// Example: IsTheSamePathW("C:\\Users", "c:\\users\\") => TRUE
+// Example: IsTheSamePath("C:\\Users", "c:\\users\\") => TRUE
 //
 // Parameters:
 //   path1 - First path
@@ -284,7 +279,7 @@ std::wstring GetParentPathW(const wchar_t* path);
 // Returns:
 //   TRUE if paths are equivalent, FALSE otherwise
 //
-BOOL IsTheSamePathW(const wchar_t* path1, const wchar_t* path2);
+BOOL IsTheSamePath(const wchar_t* path1, const wchar_t* path2);
 
 // Checks if path starts with prefix (case-insensitive).
 // Example: PathStartsWithW("C:\\Users\\Test", "C:\\Users") => TRUE

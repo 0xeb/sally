@@ -39,11 +39,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}
@@ -116,11 +116,11 @@ public:
 class CPathDialog : public CCommonDialog
 {
 public:
-    char* Path;     // pointer to an external path buffer (in/out), at least MAX_PATH characters
+    std::wstring* Path;
     BOOL* FilePath; // pointer to an external BOOL value (in/out) - TRUE/FALSE - path to a file/directory
 
 public:
-    CPathDialog(HWND parent, char* path, BOOL* filePath);
+    CPathDialog(HWND parent, std::wstring& path, BOOL* filePath);
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -146,7 +146,7 @@ protected:
 
 protected:
     BOOL TimerStarted;
-    char StringTemplate[300];
+    std::wstring StringTemplate;
     CGUIStaticTextAbstract* Text;
     CGUIStaticTextAbstract* CachedText;
     CGUIProgressBarAbstract* Progress;

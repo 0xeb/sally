@@ -76,3 +76,7 @@ COMMENT,"Magyar változat"
 78,1,"bájt"
 79,1,"bájt"
 
+[STRINGTABLE 3]
+80,1,"Nincs mit megjeleníteni..."
+81,1,"...ez a mappa nem tartalmaz leképezhető fájlokat"
+

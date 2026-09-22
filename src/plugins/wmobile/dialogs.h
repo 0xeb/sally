@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //****************************************************************************
 //
 // CCommonDialog
@@ -37,19 +39,20 @@ protected:
     // method; the same code has to be called to pump the message queue
     DWORD LastTickCount; // detects when it is time to repaint changed data
 
-    char TextCache[32768];
+    std::wstring TextCache;
     BOOL TextCacheIsDirty;
     DWORD ProgressCache;
     BOOL ProgressCacheIsDirty;
     DWORD ProgressTotalCache;
     BOOL ProgressTotalCacheIsDirty;
 
-    char Title[100], Operation[100];
+    std::wstring Title;
+    std::wstring Operation;
 
 public:
-    CProgressDlg(HWND parent, const char* title, const char* operation, CObjectOrigin origin = ooStandard, int resID = 0);
+    CProgressDlg(HWND parent, const wchar_t* title, const wchar_t* operation, CObjectOrigin origin = ooStandard, int resID = 0);
 
-    void Set(const char* fileName, DWORD progressTotal, BOOL dalayedPaint);
+    void Set(const wchar_t* fileName, DWORD progressTotal, BOOL dalayedPaint);
     void SetProgress(DWORD progressTotal, DWORD progress, BOOL dalayedPaint);
 
     // empties the message queue (call often enough) and allows repainting, pressing Cancel...
@@ -69,15 +72,15 @@ class CProgress2Dlg : public CProgressDlg
 protected:
     CGUIProgressBarAbstract* ProgressBar2;
 
-    char TextCache2[32768];
+    std::wstring TextCache2;
     BOOL TextCache2IsDirty;
 
-    char Operation2[100];
+    std::wstring Operation2;
 
 public:
-    CProgress2Dlg(HWND parent, const char* title, const char* operation, const char* operation2, CObjectOrigin origin = ooStandard, int resID = 0);
+    CProgress2Dlg(HWND parent, const wchar_t* title, const wchar_t* operation, const wchar_t* operation2, CObjectOrigin origin = ooStandard, int resID = 0);
 
-    void Set(const char* fileName, const char* fileName2, BOOL dalayedPaint);
+    void Set(const wchar_t* fileName, const wchar_t* fileName2, BOOL dalayedPaint);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

@@ -4,9 +4,19 @@
 
 #include "precomp.h"
 
+#include <limits>
+
+#include "common/CreateDirectoryFlow.h"
+#include "common/fsutil.h"
+
 #include "ui/IPrompter.h"
-#include "common/unicode/helpers.h"
+#include "common/unicode/AnsiToolPathPolicy.h"
+#include "common/unicode/WideTextRange.h"
+#include "common/LocalPathResolution.h"
+#include "common/SalGetFullName.h"
+#include "common/SalPathWide.h"
 #include "common/IFileSystem.h"
+#include "common/PluginStringBuffer.h"
 #include "menu.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -40,7 +50,7 @@ extern "C"
 CPackerConfig PackerConfig;
 CUnpackerConfig UnpackerConfig;
 
-const char* STR_NONE = "(none)";
+const wchar_t* STR_NONE = L"(none)";
 
 CSalamanderDirectory GlobalEmptySalDir(FALSE); // returned as an empty sal-dir (instead of NULL) - only for archives
 
@@ -76,7 +86,7 @@ void CZIPUnpackProgress::Init()
     TaskBarList3 = NULL;
 }
 
-CZIPUnpackProgress::CZIPUnpackProgress(const char* title, HWND parent, const CQuadWord& totalSize, CITaskBarList3* taskBarList3)
+CZIPUnpackProgress::CZIPUnpackProgress(const wchar_t* title, HWND parent, const CQuadWord& totalSize, CITaskBarList3* taskBarList3)
     : CCommonDialog(HLanguage, IDD_ZIPUNPACKPROG, parent, ooStatic)
 {
     SetTotal(totalSize, CQuadWord(0, 0));
@@ -97,7 +107,7 @@ CZIPUnpackProgress::CZIPUnpackProgress(const char* title, HWND parent, const CQu
     TaskBarList3 = taskBarList3;
 }
 
-void CZIPUnpackProgress::Set(const char* title, HWND parent, const CQuadWord& totalSize, BOOL fileProgress)
+void CZIPUnpackProgress::Set(const wchar_t* title, HWND parent, const CQuadWord& totalSize, BOOL fileProgress)
 {
     ResID = IDD_ZIPUNPACKPROG;
     SetTotal(totalSize, CQuadWord(0, 0));
@@ -108,7 +118,7 @@ void CZIPUnpackProgress::Set(const char* title, HWND parent, const CQuadWord& to
     FileProgress = fileProgress;
 }
 
-void CZIPUnpackProgress::Set(const char* title, HWND parent, const CQuadWord& totalSize1,
+void CZIPUnpackProgress::Set(const wchar_t* title, HWND parent, const CQuadWord& totalSize1,
                              const CQuadWord& totalSize2)
 {
     ResID = IDD_ZIPUNPACKPROG2;
@@ -134,26 +144,26 @@ void CZIPUnpackProgress::SetTotal(const CQuadWord& total1, const CQuadWord& tota
     }
 }
 
-void CZIPUnpackProgress::SetRemapNames(const char* nameFrom, const char* nameTo)
+void CZIPUnpackProgress::SetRemapNames(const wchar_t* nameFrom, const wchar_t* nameTo)
 {
     RemapNameFrom = nameFrom;
     RemapNameTo = nameTo;
 }
 
-void CZIPUnpackProgress::DoRemapNames(char* txt, int bufLen)
+void CZIPUnpackProgress::DoRemapNames(wchar_t* txt, int bufLen)
 {
     if (RemapNameFrom != NULL && RemapNameTo != NULL)
     {
-        char* s = strstr(txt, RemapNameFrom);
+        wchar_t* s = wcsstr(txt, RemapNameFrom);
         if (s != NULL)
         {
-            int len = (int)strlen(txt);
-            int lenFrom = (int)strlen(RemapNameFrom);
-            int lenTo = (int)strlen(RemapNameTo);
+            int len = (int)wcslen(txt);
+            int lenFrom = (int)wcslen(RemapNameFrom);
+            int lenTo = (int)wcslen(RemapNameTo);
             if (len - lenFrom + lenTo < bufLen)
             {
-                memmove(s + lenTo, s + lenFrom, len - ((s + lenFrom) - txt) + 1);
-                memcpy(s, RemapNameTo, lenTo);
+                memmove(s + lenTo, s + lenFrom, (len - ((s + lenFrom) - txt) + 1) * sizeof(wchar_t));
+                memcpy(s, RemapNameTo, lenTo * sizeof(wchar_t));
             }
             else
                 TRACE_E("Remap: too long name.");
@@ -170,12 +180,12 @@ void CZIPUnpackProgress::DispatchMessages()
 {
     // pump the message queue
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
     {
         if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 }
@@ -247,7 +257,7 @@ int CZIPUnpackProgress::AddSize(int size, BOOL delayedPaint)
     return !Cancel;
 }
 
-void CZIPUnpackProgress::NewLine(const char* txt, BOOL delayedPaint)
+void CZIPUnpackProgress::NewLine(const wchar_t* txt, BOOL delayedPaint)
 {
     // time-critical function
     //  CALL_STACK_MESSAGE2("CZIPUnpackProgress::NewLine(%s)", txt);
@@ -256,7 +266,7 @@ void CZIPUnpackProgress::NewLine(const char* txt, BOOL delayedPaint)
 
     while (1) // output even multiple lines into the dialog
     {
-        while (*txt != 0 && (*txt == '\r' || *txt == '\n' || *txt == ' ' || *txt == '\t'))
+        while (*txt != 0 && (*txt == L'\r' || *txt == L'\n' || *txt == L' ' || *txt == L'\t'))
             txt++;
         if (*txt == 0)
             break;
@@ -268,14 +278,14 @@ void CZIPUnpackProgress::NewLine(const char* txt, BOOL delayedPaint)
         if (CacheIndex >= ZIP_UNPACK_NUMLINES)
             CacheIndex = 0;
 
-        char* s = LinesCache[CacheIndex];
-        char* sEnd = s + 300 - 1;
-        while (*txt != 0 && *txt != '\r' && *txt != '\n') // read one line + convert '/' -> '\\'
+        wchar_t* s = LinesCache[CacheIndex];
+        wchar_t* sEnd = s + 300 - 1;
+        while (*txt != 0 && *txt != L'\r' && *txt != L'\n') // read one line + convert '/' -> '\\'
         {
-            if (*txt == '/')
+            if (*txt == L'/')
             {
                 if (s < sEnd)
-                    *s++ = '\\';
+                    *s++ = L'\\';
                 txt++;
             }
             else
@@ -391,9 +401,9 @@ CZIPUnpackProgress::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (ResID == IDD_ZIPUNPACKPROG && FileProgress) // it is necessary to replace the text "Total:" with "File:"
-            SetDlgItemText(HWindow, IDT_PROGTITLE, LoadStr(IDS_UNPACKFILEPROGRESS));
+            SetDlgItemTextW(HWindow, IDT_PROGTITLE, LoadStrW(IDS_UNPACKFILEPROGRESS));
 
-        SetWindowText(HWindow, Title);
+        SetWindowTextW(HWindow, Title);
         // the entire object assumes that the allocations may have failed
         int i;
         for (i = 0; i < ZIP_UNPACK_NUMLINES; i++)
@@ -449,7 +459,7 @@ CSalamanderGeneral::CSalamanderGeneral()
 {
     Plugin = NULL;
     LanguageModule = NULL;
-    HelpFileName[0] = 0;
+    HelpFileName.clear();
 }
 
 CSalamanderGeneral::~CSalamanderGeneral()
@@ -466,10 +476,12 @@ void CSalamanderGeneral::Clear()
     if (LanguageModule != NULL)
         HANDLES(FreeLibrary(LanguageModule));
     LanguageModule = NULL;
-    HelpFileName[0] = 0;
+    HelpFileName.clear();
 }
 
-int CSalamanderGeneral::ShowMessageBox(const char* text, const char* title, int type)
+// wide. Pure dispatch, so widening it is a matter of pointing at
+// SalMessageBoxW - the wide message box - rather than a port.
+int CSalamanderGeneral::ShowMessageBox(const wchar_t* text, const wchar_t* title, int type)
 {
     if (MainThreadID != GetCurrentThreadId()) // Petr: just close; I do not have the energy to track down every wrong call
         TRACE_E("You can call CSalamanderGeneral::ShowMessageBox() only from main thread!");
@@ -478,37 +490,37 @@ int CSalamanderGeneral::ShowMessageBox(const char* text, const char* title, int 
     {
     case MSGBOX_INFO:
     {
-        return SalMessageBox(parent, text, title, MB_OK | MB_ICONINFORMATION);
+        return SalMessageBoxW(parent, text, title, MB_OK | MB_ICONINFORMATION);
     }
 
     case MSGBOX_ERROR:
     {
-        return SalMessageBox(parent, text, title, MB_OK | MB_ICONEXCLAMATION);
+        return SalMessageBoxW(parent, text, title, MB_OK | MB_ICONEXCLAMATION);
     }
 
     case MSGBOX_EX_ERROR:
     {
-        return SalMessageBox(parent, text, title, MB_OKCANCEL | MB_ICONEXCLAMATION);
+        return SalMessageBoxW(parent, text, title, MB_OKCANCEL | MB_ICONEXCLAMATION);
     }
 
     case MSGBOX_QUESTION:
     {
-        return SalMessageBox(parent, text, title, MB_YESNO | MB_ICONQUESTION);
+        return SalMessageBoxW(parent, text, title, MB_YESNO | MB_ICONQUESTION);
     }
 
     case MSGBOX_EX_QUESTION:
     {
-        return SalMessageBox(parent, text, title, MB_YESNOCANCEL | MB_ICONQUESTION);
+        return SalMessageBoxW(parent, text, title, MB_YESNOCANCEL | MB_ICONQUESTION);
     }
 
     case MSGBOX_WARNING:
     {
-        return SalMessageBox(parent, text, title, MB_OK | MB_ICONWARNING);
+        return SalMessageBoxW(parent, text, title, MB_OK | MB_ICONWARNING);
     }
 
     case MSGBOX_EX_WARNING:
     {
-        return SalMessageBox(parent, text, title, MB_YESNOCANCEL | MB_ICONWARNING);
+        return SalMessageBoxW(parent, text, title, MB_YESNOCANCEL | MB_ICONWARNING);
     }
 
     default:
@@ -519,9 +531,9 @@ int CSalamanderGeneral::ShowMessageBox(const char* text, const char* title, int 
     }
 }
 
-int CSalamanderGeneral::SalMessageBox(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
+int CSalamanderGeneral::SalMessageBox(HWND hParent, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType)
 {
-    return ::SalMessageBox(hParent, lpText, lpCaption, uType);
+    return ::SalMessageBoxW(hParent, lpText, lpCaption, uType);
 }
 
 int CSalamanderGeneral::SalMessageBoxEx(const MSGBOXEX_PARAMS* params)
@@ -537,8 +549,8 @@ HWND CSalamanderGeneral::GetMsgBoxParent()
     return PluginProgressDialog != NULL ? PluginProgressDialog : PluginMsgBoxParent;
 }
 
-int DialogError(HWND parent, DWORD flags, const char* fileName,
-                const char* error, const char* title)
+int DialogError(HWND parent, DWORD flags, const wchar_t* fileName,
+                const wchar_t* error, const wchar_t* title)
 {
     HWND mainWnd = GetWndToFlash(parent);
     DWORD resID;
@@ -579,7 +591,9 @@ int DialogError(HWND parent, DWORD flags, const char* fileName,
         return DIALOG_FAIL;
     }
     }
-    int res = (int)CFileErrorDlg(parent, title != NULL ? title : ::LoadStr(IDS_ERRORTITLE),
+    // the name goes in the WIDE slot; the narrow one is unread
+    // whenever fileW is non-NULL, which it always is here.
+    int res = (int)CFileErrorDlg(parent, title != NULL ? title : ::LoadStrW(IDS_ERRORTITLE),
                                  fileName, error, noSkip, resID)
                   .Execute();
     if (mainWnd != NULL)
@@ -601,22 +615,26 @@ int DialogError(HWND parent, DWORD flags, const char* fileName,
     }
 }
 
-int CSalamanderGeneral::DialogError(HWND parent, DWORD flags, const char* fileName,
-                                    const char* error, const char* title)
+int CSalamanderGeneral::DialogError(HWND parent, DWORD flags, const wchar_t* fileName,
+                                    const wchar_t* error, const wchar_t* title)
 {
     if (fileName == NULL || error == NULL)
     {
         TRACE_E("Invalid parametr (fileName == NULL || error == NULL) in CSalamanderGeneral::DialogError!");
         if (fileName == NULL)
-            fileName = "";
+            fileName = L"";
         if (error == NULL)
-            error = "";
+            error = L"";
     }
+    // The old AnsiToWide pair is GONE, not moved: the ABI is wide
+    // now, so nothing narrows on the way in and nothing is widened back. NOTE the
+    // asymmetry that survives on purpose - a NULL 'title' still means "use the
+    // standard Error caption", so it is passed through untouched.
     return ::DialogError(parent, flags, fileName, error, title);
 }
 
-int DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char* fileData1,
-                    const char* fileName2, const char* fileData2)
+int DialogOverwrite(HWND parent, DWORD flags, const wchar_t* fileName1, const wchar_t* fileData1,
+                    const wchar_t* fileName2, const wchar_t* fileData2)
 {
     HWND mainWnd = GetWndToFlash(parent);
     BOOL yesnocancel;
@@ -641,7 +659,13 @@ int DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char*
     }
     }
 
-    int res = (int)COverwriteDlg(parent, fileName1, fileData1, fileName2, fileData2, yesnocancel).Execute();
+    // The old AnsiToWide pair is GONE - the ABI is wide, so the
+    // attr strings arrive wide. Names go to the WIDE slots; the narrow twins are
+    // unread whenever those are non-NULL.
+    int res = (int)COverwriteDlg(parent, fileName1, fileData1 != NULL ? fileData1 : L"",
+                                 fileName2, fileData2 != NULL ? fileData2 : L"",
+                                 yesnocancel, FALSE)
+                  .Execute();
     if (mainWnd != NULL)
         FlashWindow(mainWnd, FALSE);
     switch (res)
@@ -663,26 +687,14 @@ int DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char*
     }
 }
 
-int CSalamanderGeneral::DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char* fileData1,
-                                        const char* fileName2, const char* fileData2)
+int CSalamanderGeneral::DialogOverwrite(HWND parent, DWORD flags, const wchar_t* fileName1, const wchar_t* fileData1,
+                                        const wchar_t* fileName2, const wchar_t* fileData2)
 {
-    if (fileName1 == NULL || fileData1 == NULL || fileName2 == NULL || fileData2 == NULL)
-    {
-        TRACE_E("Invalid parametr (fileName1 == NULL || fileData1 == NULL || fileName2 == NULL || fileData2 == NULL) in CSalamanderGeneral::DialogOverwrite!");
-        if (fileName1 == NULL)
-            fileName1 = "";
-        if (fileData1 == NULL)
-            fileData1 = "";
-        if (fileName2 == NULL)
-            fileName2 = "";
-        if (fileData2 == NULL)
-            fileData2 = "";
-    }
     return ::DialogOverwrite(parent, flags, fileName1, fileData1, fileName2, fileData2);
 }
 
-int DialogQuestion(HWND parent, DWORD flags, const char* fileName,
-                   const char* question, const char* title)
+int DialogQuestion(HWND parent, DWORD flags, const wchar_t* fileName,
+                   const wchar_t* question, const wchar_t* title)
 {
     HWND mainWnd = GetWndToFlash(parent);
     BOOL yesnocancel, yesallcancel;
@@ -715,7 +727,7 @@ int DialogQuestion(HWND parent, DWORD flags, const char* fileName,
         return DIALOG_FAIL;
     }
     }
-    int res = (int)CHiddenOrSystemDlg(parent, title != NULL ? title : ::LoadStr(IDS_QUESTION), fileName,
+    int res = (int)CHiddenOrSystemDlg(parent, title != NULL ? title : ::LoadStrW(IDS_QUESTION), fileName,
                                       question, yesnocancel, yesallcancel)
                   .Execute();
     if (mainWnd != NULL)
@@ -739,17 +751,20 @@ int DialogQuestion(HWND parent, DWORD flags, const char* fileName,
     }
 }
 
-int CSalamanderGeneral::DialogQuestion(HWND parent, DWORD flags, const char* fileName,
-                                       const char* question, const char* title)
+int CSalamanderGeneral::DialogQuestion(HWND parent, DWORD flags, const wchar_t* fileName,
+                                       const wchar_t* question, const wchar_t* title)
 {
     if (fileName == NULL || question == NULL)
     {
         TRACE_E("Invalid parametr (fileName == NULL || question == NULL) in CSalamanderGeneral::DialogQuestion!");
         if (fileName == NULL)
-            fileName = "";
+            fileName = L"";
         if (question == NULL)
-            question = "";
+            question = L"";
     }
+    // The task-12 AnsiToWide pair that stood here is GONE, not moved:
+    // the ABI itself is wide now, so nothing narrows on the way in and nothing
+    // has to be widened back.
     return ::DialogQuestion(parent, flags, fileName, question, title);
 }
 
@@ -781,78 +796,161 @@ void CSalamanderGeneral::RestoreFocusInSourcePanel()
     ::RestoreFocusInSourcePanel();
 }
 
-BOOL CSalamanderGeneral::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet,
-                                                 char* errBuf, int errBufSize, char* firstCreatedDir,
+BOOL CSalamanderGeneral::CheckAndCreateDirectory(const wchar_t* dir, HWND parent, BOOL quiet,
+                                                 CSalamanderStringBuffer* errorText,
+                                                 CSalamanderStringBuffer* firstCreatedDir,
                                                  BOOL manualCrDir)
 {
-    return ::CheckAndCreateDirectory(dir, parent, quiet, errBuf, errBufSize, firstCreatedDir, FALSE, manualCrDir);
+    std::wstring error;
+    std::wstring firstCreated;
+    const BOOL result = ::CheckAndCreateDirectoryOwnedW(
+        dir, parent, quiet, errorText != NULL ? &error : NULL,
+        firstCreatedDir != NULL ? &firstCreated : NULL, FALSE, manualCrDir);
+    if ((errorText != NULL && !sally::plugin_abi::WriteStringBuffer(*errorText, error)) ||
+        (firstCreatedDir != NULL &&
+         !sally::plugin_abi::WriteStringBuffer(*firstCreatedDir, firstCreated)))
+        return FALSE;
+    return result;
 }
 
-BOOL CSalamanderGeneral::TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize,
-                                       const char* messageTitle)
+BOOL CSalamanderGeneral::TestFreeSpace(HWND parent, const wchar_t* path, const CQuadWord& totalSize,
+                                       const wchar_t* messageTitle)
 {
     return ::TestFreeSpace(parent, path, totalSize, messageTitle);
 }
 
-void CSalamanderGeneral::GetDiskFreeSpace(CQuadWord* retValue, const char* path, CQuadWord* total)
+void CSalamanderGeneral::GetDiskFreeSpace(CQuadWord* retValue, const wchar_t* path, CQuadWord* total)
 {
     if (retValue == NULL)
     {
         TRACE_E("Unexpected situation in CSalamanderGeneral::GetDiskFreeSpace(): retValue is NULL!");
         return;
     }
-    *retValue = MyGetDiskFreeSpace(path, total);
+    *retValue = MyGetDiskFreeSpaceW(path, total);
 }
 
-BOOL CSalamanderGeneral::SalGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
+BOOL CSalamanderGeneral::SalGetDiskFreeSpace(const wchar_t* path, LPDWORD lpSectorsPerCluster,
                                              LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
                                              LPDWORD lpTotalNumberOfClusters)
 {
-    return MyGetDiskFreeSpace(path, lpSectorsPerCluster, lpBytesPerSector,
-                              lpNumberOfFreeClusters, lpTotalNumberOfClusters);
+    return MyGetDiskFreeSpaceW(path, lpSectorsPerCluster, lpBytesPerSector,
+                               lpNumberOfFreeClusters, lpTotalNumberOfClusters);
 }
 
-BOOL CSalamanderGeneral::SalGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, LPTSTR lpVolumeNameBuffer,
-                                                 DWORD nVolumeNameSize, LPDWORD lpVolumeSerialNumber,
+BOOL CSalamanderGeneral::SalGetVolumeInformation(const wchar_t* path, CSalamanderStringBuffer* rootOrCurReparsePoint,
+                                                 CSalamanderStringBuffer* volumeName, LPDWORD lpVolumeSerialNumber,
                                                  LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
-                                                 LPTSTR lpFileSystemNameBuffer, DWORD nFileSystemNameSize)
+                                                 CSalamanderStringBuffer* fileSystemName)
 {
-    return MyGetVolumeInformation(path, rootOrCurReparsePoint, NULL, NULL, lpVolumeNameBuffer, nVolumeNameSize,
-                                  lpVolumeSerialNumber, lpMaximumComponentLength, lpFileSystemFlags,
-                                  lpFileSystemNameBuffer, nFileSystemNameSize);
+    if ((rootOrCurReparsePoint != NULL &&
+         !sally::plugin_abi::IsValidStringBuffer(*rootOrCurReparsePoint)) ||
+        (volumeName != NULL &&
+         !sally::plugin_abi::IsValidStringBuffer(*volumeName)) ||
+        (fileSystemName != NULL &&
+         !sally::plugin_abi::IsValidStringBuffer(*fileSystemName)) ||
+        (rootOrCurReparsePoint != NULL && rootOrCurReparsePoint == volumeName) ||
+        (rootOrCurReparsePoint != NULL && rootOrCurReparsePoint == fileSystemName) ||
+        (volumeName != NULL && volumeName == fileSystemName))
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    std::wstring rootText;
+    std::wstring volumeText;
+    std::wstring fileSystemText;
+    DWORD stagedSerial = 0;
+    DWORD stagedMaximumComponentLength = 0;
+    DWORD stagedFlags = 0;
+    if (!MyGetVolumeInformationW(
+            path, rootOrCurReparsePoint != NULL ? &rootText : NULL, NULL, NULL,
+            volumeName != NULL ? &volumeText : NULL,
+            lpVolumeSerialNumber != NULL ? &stagedSerial : NULL,
+            lpMaximumComponentLength != NULL ? &stagedMaximumComponentLength : NULL,
+            lpFileSystemFlags != NULL ? &stagedFlags : NULL,
+            fileSystemName != NULL ? &fileSystemText : NULL))
+        return FALSE;
+
+    const auto reserve = [](CSalamanderStringBuffer* buffer,
+                            const std::wstring& value) -> bool {
+        if (buffer == NULL)
+            return true;
+        if (value.size() >= (std::numeric_limits<DWORD>::max)())
+        {
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            return false;
+        }
+        return sally::plugin_abi::ReserveStringBuffer(
+            *buffer, static_cast<DWORD>(value.size() + 1));
+    };
+    if (!reserve(rootOrCurReparsePoint, rootText) ||
+        !reserve(volumeName, volumeText) ||
+        !reserve(fileSystemName, fileSystemText))
+        return FALSE;
+
+    const auto publish = [](CSalamanderStringBuffer* buffer,
+                            const std::wstring& value) {
+        if (buffer != NULL)
+        {
+            std::wmemmove(buffer->Data, value.c_str(), value.size() + 1);
+            buffer->Length = static_cast<DWORD>(value.size());
+        }
+    };
+    publish(rootOrCurReparsePoint, rootText);
+    publish(volumeName, volumeText);
+    publish(fileSystemName, fileSystemText);
+    if (lpVolumeSerialNumber != NULL)
+        *lpVolumeSerialNumber = stagedSerial;
+    if (lpMaximumComponentLength != NULL)
+        *lpMaximumComponentLength = stagedMaximumComponentLength;
+    if (lpFileSystemFlags != NULL)
+        *lpFileSystemFlags = stagedFlags;
+    return TRUE;
 }
 
-UINT CSalamanderGeneral::SalGetDriveType(const char* path)
+UINT CSalamanderGeneral::SalGetDriveType(const wchar_t* path)
 {
-    return MyGetDriveType(path);
+    return MyGetDriveTypeW(path);
 }
 
-void CSalamanderGeneral::RemoveTemporaryDir(const char* dir)
+void CSalamanderGeneral::RemoveTemporaryDir(const wchar_t* dir)
 {
-    ::RemoveTemporaryDir(dir);
+    ::RemoveTemporaryDirW(dir);
 }
 
-void CSalamanderGeneral::PrepareMask(char* mask, const char* src)
+BOOL CSalamanderGeneral::PrepareMask(const wchar_t* src, CSalamanderStringBuffer* mask)
 {
-    ::PrepareMask(mask, src);
+    if (mask == NULL)
+        return FALSE;
+    std::wstring prepared(src != NULL ? src : L"");
+    prepared.push_back(L'\0');
+    ::PrepareMask(prepared.data(), src != NULL ? src : L"");
+    prepared.resize(wcslen(prepared.c_str()));
+    return sally::plugin_abi::WriteStringBuffer(*mask, prepared);
 }
 
-BOOL CSalamanderGeneral::AgreeMask(const char* filename, const char* mask, BOOL hasExtension)
+// native-wide mask matching.
+BOOL CSalamanderGeneral::AgreeMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension)
 {
     return ::AgreeMask(filename, mask, hasExtension, FALSE);
 }
 
-char* CSalamanderGeneral::MaskName(char* buffer, int bufSize, const char* name, const char* mask)
+BOOL CSalamanderGeneral::MaskName(const wchar_t* name, const wchar_t* mask,
+                                 CSalamanderStringBuffer* maskedName)
 {
-    return ::MaskName(buffer, bufSize, name, mask);
+    if (maskedName == NULL || name == NULL)
+        return FALSE;
+    const std::wstring result = MaskNameOwnedW(name, mask);
+    return sally::plugin_abi::WriteStringBuffer(*maskedName, result);
 }
 
-void CSalamanderGeneral::PrepareExtMask(char* mask, const char* src)
+BOOL CSalamanderGeneral::PrepareExtMask(const wchar_t* src, CSalamanderStringBuffer* mask)
 {
-    ::PrepareMask(mask, src);
+    return PrepareMask(src, mask);
 }
 
-BOOL CSalamanderGeneral::AgreeExtMask(const char* filename, const char* mask, BOOL hasExtension)
+// wide; same wide matcher, extendedMode on.
+BOOL CSalamanderGeneral::AgreeExtMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension)
 {
     return ::AgreeMask(filename, mask, hasExtension, TRUE);
 }
@@ -872,7 +970,7 @@ void CSalamanderGeneral::Free(void* ptr)
     free(ptr);
 }
 
-char* CSalamanderGeneral::DupStr(const char* str)
+wchar_t* CSalamanderGeneral::DupStr(const wchar_t* str)
 {
     return ::DupStr(str);
 }
@@ -886,51 +984,61 @@ void CSalamanderGeneral::GetLowerAndUpperCase(unsigned char** lowerCase, unsigne
         *upperCase = UpperCase;
 }
 
-void CSalamanderGeneral::ToLowerCase(char* str)
+BOOL CSalamanderGeneral::ToLowerCase(CSalamanderStringBuffer* text)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::ToLowerCase()");
-    char* toLow = str;
-    while (*toLow != 0)
-    {
-        *toLow = LowerCase[*toLow];
-        toLow++;
-    }
+    std::wstring value;
+    if (text == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*text, value))
+        return FALSE;
+    sally::unicode::LowerCaseInPlaceW(value.data());
+    return sally::plugin_abi::WriteStringBuffer(*text, value);
 }
 
-void CSalamanderGeneral::ToUpperCase(char* str)
+BOOL CSalamanderGeneral::ToUpperCase(CSalamanderStringBuffer* text)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::ToUpperCase()");
-    char* toUpp = str;
-    while (*toUpp != 0)
-    {
-        *toUpp = UpperCase[*toUpp];
-        toUpp++;
-    }
+    std::wstring value;
+    if (text == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*text, value))
+        return FALSE;
+    sally::unicode::UpperCaseInPlaceW(value.data());
+    return sally::plugin_abi::WriteStringBuffer(*text, value);
 }
 
-int CSalamanderGeneral::StrCmpEx(const char* s1, int l1, const char* s2, int l2)
+// wide; lengths in WCHARs, -1 = wcslen.
+int CSalamanderGeneral::StrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2)
 {
-    return ::StrCmpEx(s1, l1, s2, l2);
+    return ::StrCmpExW(s1, l1, s2, l2);
 }
 
-int CSalamanderGeneral::StrICpy(char* dest, const char* src)
+// wide.
+BOOL CSalamanderGeneral::StrICpy(const wchar_t* src,
+                                CSalamanderStringBuffer* dest)
 {
-    return ::StrICpy(dest, src);
+    if (src == NULL || dest == NULL)
+        return FALSE;
+    std::wstring folded;
+    return ::StrICpyW(folded, src) &&
+           sally::plugin_abi::WriteStringBuffer(*dest, folded);
 }
 
-int CSalamanderGeneral::StrICmp(const char* s1, const char* s2)
+// wide; the folding internal was added in the previous commit.
+int CSalamanderGeneral::StrICmp(const wchar_t* s1, const wchar_t* s2)
 {
-    return ::StrICmp(s1, s2);
+    return ::StrICmpW(s1, s2);
 }
 
-int CSalamanderGeneral::StrICmpEx(const char* s1, int l1, const char* s2, int l2)
+// wide; folds via CompareFolded. Lengths in WCHARs, -1 = wcslen.
+int CSalamanderGeneral::StrICmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2)
 {
-    return ::StrICmpEx(s1, l1, s2, l2);
+    return ::StrICmpExW(s1, l1, s2, l2);
 }
 
-int CSalamanderGeneral::StrNICmp(const char* s1, const char* s2, int n)
+// wide; 'n' counts WCHARs, not bytes.
+int CSalamanderGeneral::StrNICmp(const wchar_t* s1, const wchar_t* s2, int n)
 {
-    return ::StrNICmp(s1, s2, n);
+    return ::StrNICmpW(s1, s2, n);
 }
 
 int CSalamanderGeneral::MemICmp(const void* buf1, const void* buf2, int n)
@@ -938,24 +1046,28 @@ int CSalamanderGeneral::MemICmp(const void* buf1, const void* buf2, int n)
     return ::MemICmp(buf1, buf2, n);
 }
 
-int CSalamanderGeneral::RegSetStrICmp(const char* s1, const char* s2)
+// wide; sort.cpp already defined the wide comparator.
+int CSalamanderGeneral::RegSetStrICmp(const wchar_t* s1, const wchar_t* s2)
 {
-    return ::RegSetStrICmp(s1, s2);
+    return ::RegSetStrICmpW(s1, s2);
 }
 
-int CSalamanderGeneral::RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual)
+// wide; sort.cpp already defined the wide comparator.
+int CSalamanderGeneral::RegSetStrICmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual)
 {
-    return ::RegSetStrICmpEx(s1, l1, s2, l2, numericalyEqual);
+    return ::RegSetStrICmpExW(s1, l1, s2, l2, numericalyEqual);
 }
 
-int CSalamanderGeneral::RegSetStrCmp(const char* s1, const char* s2)
+// wide; sort.cpp already defined the wide comparator.
+int CSalamanderGeneral::RegSetStrCmp(const wchar_t* s1, const wchar_t* s2)
 {
-    return ::RegSetStrCmp(s1, s2);
+    return ::RegSetStrCmpW(s1, s2);
 }
 
-int CSalamanderGeneral::RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual)
+// wide; sort.cpp already defined the wide comparator.
+int CSalamanderGeneral::RegSetStrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual)
 {
-    return ::RegSetStrCmpEx(s1, l1, s2, l2, numericalyEqual);
+    return ::RegSetStrCmpExW(s1, l1, s2, l2, numericalyEqual);
 }
 
 CFilesWindow*
@@ -964,16 +1076,15 @@ CSalamanderGeneral::GetPanel(int panel)
     return MainWindow->GetPanel(panel);
 }
 
-BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, int* type,
-                                      char** archiveOrFS, BOOL convertFSPathToExternal)
+BOOL CSalamanderGeneral::GetPanelPath(int panel, CSalamanderStringBuffer* pathBuffer,
+                                     int* type, DWORD* archiveOrFSOffset,
+                                     BOOL convertFSPathToExternal)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::GetPanelPath(%d, , %d, ,)", panel, bufferSize);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetPanelPath(%d, , ,)", panel);
     if (type != NULL)
         *type = 0; // unknown
-    if (archiveOrFS != NULL)
-        *archiveOrFS = NULL;
-    if (bufferSize > 0)
-        buffer[0] = 0;
+    if (archiveOrFSOffset != NULL)
+        *archiveOrFSOffset = SAL_STRING_BUFFER_NPOS;
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::GetPanelPath() only from main thread!");
@@ -984,19 +1095,19 @@ BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, i
     CFilesWindow* p = GetPanel(panel);
     if (p != NULL)
     {
-        CPathBuffer buf;
-        int offset = -1; // offset into the buffer for computing archiveOrFS (-1 means NULL)
+        std::wstring path;
+        size_t offset = std::wstring::npos;
         if (p->Is(ptZIPArchive))
         {
             if (type != NULL)
                 *type = PATH_TYPE_ARCHIVE;
-            offset = (int)strlen(p->GetZIPArchive());
-            memcpy(buf, p->GetZIPArchive(), offset + 1);
+            offset = wcslen(p->GetZIPArchive());
+            path = p->GetZIPArchive();
             if (p->GetZIPPath()[0] != 0)
             {
                 if (p->GetZIPPath()[0] != '\\')
-                    strcpy(buf + offset, "\\");
-                strcat(buf + offset, p->GetZIPPath());
+                    path += L'\\';
+                path += p->GetZIPPath();
             }
         }
         else
@@ -1005,19 +1116,21 @@ BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, i
             {
                 if (type != NULL)
                     *type = PATH_TYPE_FS;
-                offset = (int)strlen(p->GetPluginFS()->GetPluginFSName());
-                memcpy(buf, p->GetPluginFS()->GetPluginFSName(), offset);
-                buf[offset] = ':';
-                if (!p->GetPluginFS()->NotEmpty() || !p->GetPluginFS()->GetCurrentPath(buf + offset + 1))
+                offset = wcslen(p->GetPluginFS()->GetPluginFSName());
+                std::wstring userPart;
+                if (!p->GetPluginFS()->NotEmpty() || !p->GetPluginFS()->GetCurrentPathW(userPart))
                 {
                     return FALSE; // error
                 }
                 if (convertFSPathToExternal)
                 {
-                    p->GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternal(p->GetPluginFS()->GetPluginFSName(),
-                                                                                       p->GetPluginFS()->GetPluginFSNameIndex(),
-                                                                                       buf + offset + 1);
+                    if (!p->GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternalW(
+                            p->GetPluginFS()->GetPluginFSName(), p->GetPluginFS()->GetPluginFSNameIndex(), userPart))
+                        return FALSE;
                 }
+                path = p->GetPluginFS()->GetPluginFSName();
+                path += L':';
+                path += userPart;
             }
             else
             {
@@ -1025,7 +1138,7 @@ BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, i
                 {
                     if (type != NULL)
                         *type = PATH_TYPE_WINDOWS;
-                    strcpy(buf, p->GetPath());
+                    path = p->GetPathW();
                 }
                 else
                 {
@@ -1035,35 +1148,40 @@ BOOL CSalamanderGeneral::GetPanelPath(int panel, char* buffer, int bufferSize, i
             }
         }
 
-        int l = (int)strlen(buf) + 1;
-        if (l > bufferSize)
-            return bufferSize == 0; // if the user does not want the path back, we do not treat it as an error
-        memcpy(buffer, buf, l);
+        if (pathBuffer != NULL &&
+            !sally::plugin_abi::WriteStringBuffer(*pathBuffer, path))
+            return FALSE;
 
-        if (archiveOrFS != NULL && offset != -1)
-            *archiveOrFS = buffer + offset;
+        if (archiveOrFSOffset != NULL && offset != std::wstring::npos)
+        {
+            if (offset > (std::numeric_limits<DWORD>::max)())
+            {
+                SetLastError(ERROR_FILENAME_EXCED_RANGE);
+                return FALSE;
+            }
+            *archiveOrFSOffset = static_cast<DWORD>(offset);
+        }
 
+        SetLastError(ERROR_SUCCESS);
         return TRUE;
     }
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::GetLastWindowsPanelPath(int panel, char* buffer, int bufferSize)
+BOOL CSalamanderGeneral::GetLastWindowsPanelPath(
+    int panel, CSalamanderStringBuffer* pathBuffer)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::GetLastWindowsPanelPath(%d, , %d)", panel, bufferSize);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetLastWindowsPanelPath(%d, )", panel);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::GetLastWindowsPanelPath() only from main thread!");
         return FALSE;
     }
     CFilesWindow* p = GetPanel(panel);
-    if (p != NULL && buffer != NULL)
+    if (p != NULL && pathBuffer != NULL)
     {
-        int l = (int)strlen(p->GetPath()) + 1;
-        if (l > bufferSize)
-            return FALSE;
-        memcpy(buffer, p->GetPath(), l);
-        return TRUE;
+        return sally::plugin_abi::WriteStringBuffer(*pathBuffer,
+                                                     p->GetPathW());
     }
     return FALSE;
 }
@@ -1197,7 +1315,7 @@ BOOL CSalamanderGeneral::GetPanelSelection(int panel, int* selectedFiles, int* s
         int i = p->GetCaretIndex();
         return p->Dirs->Count + p->Files->Count > 0 && // the panel is not empty
                (i != 0 || count > 0 || p->Dirs->Count == 0 ||
-                strcmp(p->Dirs->At(0).Name, "..") != 0); // the focus is not on the up-dir, or at least one item is selected
+                wcscmp(p->Dirs->At(0).Name, L"..") != 0); // the focus is not on the up-dir, or at least one item is selected
     }
     return FALSE;
 }
@@ -1333,9 +1451,10 @@ void CSalamanderGeneral::SetPanelFocusedItem(int panel, const CFileData* file, B
     }
 }
 
-BOOL CSalamanderGeneral::GetFilterFromPanel(int panel, char* masks, int masksBufSize)
+BOOL CSalamanderGeneral::GetFilterFromPanel(int panel,
+                                            CSalamanderStringBuffer* masks)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::GetFilterFromPanel(%d, , %d)", panel, masksBufSize);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetFilterFromPanel(%d, )", panel);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::GetFilterFromPanel() only from main thread!");
@@ -1343,14 +1462,10 @@ BOOL CSalamanderGeneral::GetFilterFromPanel(int panel, char* masks, int masksBuf
     }
     CFilesWindow* p = GetPanel(panel);
     BOOL ret = FALSE;
-    if (p != NULL && p->FilterEnabled)
+    if (p != NULL && p->FilterEnabled && masks != NULL)
     {
-        int len = (int)strlen(p->Filter.GetMasksString());
-        if (len < masksBufSize)
-        {
-            memcpy(masks, p->Filter.GetMasksString(), len + 1);
-            ret = TRUE;
-        }
+        ret = sally::plugin_abi::WriteStringBuffer(
+            *masks, p->Filter.GetMasksString());
     }
     return ret;
 }
@@ -1387,103 +1502,209 @@ void CSalamanderGeneral::SkipOneActivateRefresh()
     PostMessage(MainWindow->HWindow, WM_USER_SKIPONEREFRESH, 0, 0);
 }
 
-BOOL CSalamanderGeneral::SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file, DWORD* err)
+BOOL CSalamanderGeneral::SalGetTempFileName(const wchar_t* path, const wchar_t* prefix,
+                                            CSalamanderStringBuffer* tmpName, BOOL file, DWORD* err)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalGetTempFileName()");
-    BOOL ret = ::SalGetTempFileName(path, prefix, tmpName, file);
+    if (tmpName == NULL || !sally::plugin_abi::IsValidStringBuffer(*tmpName))
+    {
+        if (err != NULL)
+            *err = ERROR_INVALID_PARAMETER;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    SetLastError(NO_ERROR);
+    const std::wstring result = ::SalGetTempFileNameW(path, prefix, file != FALSE);
+    if (result.empty())
+    {
+        if (err != NULL)
+            *err = GetLastError();
+        return FALSE;
+    }
+
+    if (!sally::plugin_abi::WriteStringBuffer(*tmpName, result))
+    {
+        const DWORD publicationError = GetLastError();
+        if (file)
+            gFileSystem->DeleteFile(result.c_str());
+        else
+            SalLPRemoveDirectory(result.c_str());
+        if (err != NULL)
+            *err = publicationError;
+        return FALSE;
+    }
+
     if (err != NULL)
-        *err = GetLastError();
-    return ret;
+        *err = NO_ERROR;
+    return TRUE;
 }
 
-char* CSalamanderGeneral::NumberToStr(char* buffer, const CQuadWord& number)
+BOOL CSalamanderGeneral::NumberToStr(const CQuadWord& number, CSalamanderStringBuffer* text)
 {
-    return ::NumberToStr(buffer, number);
+    return text != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*text, ::NumberToStr(number));
 }
 
-char* CSalamanderGeneral::PrintDiskSize(char* buf, const CQuadWord& size, int mode)
+BOOL CSalamanderGeneral::PrintDiskSize(const CQuadWord& size, int mode,
+                                      CSalamanderStringBuffer* text)
 {
-    return ::PrintDiskSize(buf, size, mode);
+    return text != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*text, ::PrintDiskSize(size, mode));
 }
 
-char* CSalamanderGeneral::PrintTimeLeft(char* buf, const CQuadWord& secs)
+BOOL CSalamanderGeneral::PrintTimeLeft(const CQuadWord& secs,
+                                      CSalamanderStringBuffer* text)
 {
-    return ::PrintTimeLeft(buf, secs);
+    return text != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*text, ::PrintTimeLeft(secs));
 }
 
-BOOL CSalamanderGeneral::HasTheSameRootPath(const char* path1, const char* path2)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::HasTheSameRootPath(const wchar_t* path1, const wchar_t* path2)
 {
     return ::HasTheSameRootPath(path1, path2);
 }
 
-int CSalamanderGeneral::CommonPrefixLength(const char* path1, const char* path2)
+// wide; the internal was ported in the same commit.
+int CSalamanderGeneral::CommonPrefixLength(const wchar_t* path1, const wchar_t* path2)
 {
     return ::CommonPrefixLength(path1, path2);
 }
 
-BOOL CSalamanderGeneral::PathIsPrefix(const char* prefix, const char* path)
+// wide; builds on CommonPrefixLength.
+BOOL CSalamanderGeneral::PathIsPrefix(const wchar_t* prefix, const wchar_t* path)
 {
     return ::SalPathIsPrefix(prefix, path);
 }
 
-BOOL CSalamanderGeneral::IsTheSamePath(const char* path1, const char* path2)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::IsTheSamePath(const wchar_t* path1, const wchar_t* path2)
 {
     return ::IsTheSamePath(path1, path2);
 }
 
-int CSalamanderGeneral::GetRootPath(char* root, const char* path)
+BOOL CSalamanderGeneral::GetRootPath(const wchar_t* path,
+                                     CSalamanderStringBuffer* root)
 {
-    return ::GetRootPath(root, path);
+    const std::wstring full = ::GetRootPath(path);
+    return root != NULL && !full.empty() &&
+           sally::plugin_abi::WriteStringBuffer(*root, full);
 }
 
-BOOL CSalamanderGeneral::CutDirectory(char* path, char** cutDir)
+BOOL CSalamanderGeneral::CutDirectory(CSalamanderStringBuffer* path,
+                                     CSalamanderStringBuffer* cutDir)
 {
-    return ::CutDirectory(path, cutDir);
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    std::vector<wchar_t> buffer(pathText.begin(), pathText.end());
+    buffer.push_back(L'\0');
+    wchar_t* cut = NULL;
+    if (!::CutDirectory(buffer.data(), cutDir != NULL ? &cut : NULL))
+        return FALSE;
+    pathText.assign(buffer.data());
+    const std::wstring cutText = cut != NULL ? std::wstring(cut) : std::wstring();
+    if ((cutDir != NULL && !sally::plugin_abi::WriteStringBuffer(*cutDir, cutText)) ||
+        !sally::plugin_abi::WriteStringBuffer(*path, pathText))
+        return FALSE;
+    return TRUE;
 }
 
-BOOL CSalamanderGeneral::SalPathAppend(char* path, const char* name, int pathSize)
+BOOL CSalamanderGeneral::SalPathAppend(CSalamanderStringBuffer* path,
+                                      const wchar_t* name)
 {
-    return ::SalPathAppend(path, name, pathSize);
+    if (path == NULL || name == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    SPLSalPathAppendOwned(pathText, name);
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-BOOL CSalamanderGeneral::SalPathAddBackslash(char* path, int pathSize)
+BOOL CSalamanderGeneral::SalPathAddBackslash(CSalamanderStringBuffer* path)
 {
-    return ::SalPathAddBackslash(path, pathSize);
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    SPLSalPathAddBackslashOwned(pathText);
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-void CSalamanderGeneral::SalPathRemoveBackslash(char* path)
+BOOL CSalamanderGeneral::SalPathRemoveBackslash(CSalamanderStringBuffer* path)
 {
-    ::SalPathRemoveBackslash(path);
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    if (!pathText.empty() && pathText.back() == L'\\')
+        pathText.pop_back();
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-void CSalamanderGeneral::SalPathStripPath(char* path)
+BOOL CSalamanderGeneral::SalPathStripPath(CSalamanderStringBuffer* path)
 {
-    ::SalPathStripPath(path);
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    ::SalPathStripPathW(pathText);
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-void CSalamanderGeneral::SalPathRemoveExtension(char* path)
+BOOL CSalamanderGeneral::SalPathRemoveExtension(CSalamanderStringBuffer* path)
 {
-    ::SalPathRemoveExtension(path);
+    if (path == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    ::SalPathRemoveExtensionW(pathText);
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-BOOL CSalamanderGeneral::SalPathAddExtension(char* path, const char* extension, int pathSize)
+BOOL CSalamanderGeneral::SalPathAddExtension(CSalamanderStringBuffer* path,
+                                            const wchar_t* extension)
 {
-    return ::SalPathAddExtension(path, extension, pathSize);
+    if (path == NULL || extension == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    if (!::SalPathAddExtensionW(pathText, extension))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-BOOL CSalamanderGeneral::SalPathRenameExtension(char* path, const char* extension, int pathSize)
+BOOL CSalamanderGeneral::SalPathRenameExtension(CSalamanderStringBuffer* path,
+                                               const wchar_t* extension)
 {
-    return ::SalPathRenameExtension(path, extension, pathSize);
+    if (path == NULL || extension == NULL)
+        return FALSE;
+    std::wstring pathText;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, pathText))
+        return FALSE;
+    if (!::SalPathRenameExtensionW(pathText, extension))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*path, pathText);
 }
 
-const char*
-CSalamanderGeneral::SalPathFindFileName(const char* path)
+const wchar_t*
+CSalamanderGeneral::SalPathFindFileName(const wchar_t* path)
 {
-    return ::SalPathFindFileName(path);
+    return ::SalPathFindFileNameW(path);
 }
 
-BOOL CSalamanderGeneral::SalGetFullName(char* name, int* errTextID, const char* curDir,
-                                        char* nextFocus, int nameBufSize)
+BOOL CSalamanderGeneral::SalGetFullName(CSalamanderStringBuffer* name,
+                                        int* errTextID, const wchar_t* curDir,
+                                        CSalamanderStringBuffer* nextFocus)
 {
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -1492,7 +1713,41 @@ BOOL CSalamanderGeneral::SalGetFullName(char* name, int* errTextID, const char* 
             *errTextID = GFN_PATHISINVALID;
         return FALSE;
     }
-    BOOL ret = ::SalGetFullName(name, errTextID, curDir, nextFocus, NULL, nameBufSize);
+    if (name == NULL)
+        return FALSE;
+
+    std::wstring nameW;
+    if (!sally::plugin_abi::ReadStringBuffer(*name, nameW) ||
+        (nextFocus != NULL && !sally::plugin_abi::IsValidStringBuffer(*nextFocus)))
+        return FALSE;
+    std::wstring focusW;
+    BOOL ret = ::SalGetFullNameW(nameW, errTextID, curDir,
+                                 nextFocus != NULL ? &focusW : NULL, NULL, FALSE);
+    if (ret)
+    {
+        if (nameW.size() >= (std::numeric_limits<DWORD>::max)() ||
+            focusW.size() >= (std::numeric_limits<DWORD>::max)())
+        {
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            ret = FALSE;
+        }
+        else
+        {
+            const bool reserved =
+                sally::plugin_abi::ReserveStringBuffer(
+                    *name, static_cast<DWORD>(nameW.size() + 1)) &&
+                (nextFocus == NULL || sally::plugin_abi::ReserveStringBuffer(
+                                          *nextFocus, static_cast<DWORD>(focusW.size() + 1)));
+            if (!reserved)
+                ret = FALSE;
+            else
+            {
+                if (nextFocus != NULL)
+                    sally::plugin_abi::WriteStringBuffer(*nextFocus, focusW);
+                sally::plugin_abi::WriteStringBuffer(*name, nameW);
+            }
+        }
+    }
     if (errTextID != NULL)
     {
         switch (*errTextID)
@@ -1535,85 +1790,56 @@ void CSalamanderGeneral::SalUpdateDefaultDir(BOOL activePrefered)
         MainWindow->UpdateDefaultDir(activePrefered);
 }
 
-char* CSalamanderGeneral::GetGFNErrorText(int GFN, char* buf, int bufSize)
+BOOL CSalamanderGeneral::GetGFNErrorText(int GFN,
+                                         CSalamanderStringBuffer* text)
 {
-    char* s = NULL;
+    const wchar_t* s = NULL;
     switch (GFN)
     {
     case GFN_SERVERNAMEMISSING:
-        s = ::LoadStr(IDS_SERVERNAMEMISSING);
+        s = ::LoadStrW(IDS_SERVERNAMEMISSING);
         break;
     case GFN_SHARENAMEMISSING:
-        s = ::LoadStr(IDS_SHARENAMEMISSING);
+        s = ::LoadStrW(IDS_SHARENAMEMISSING);
         break;
     case GFN_TOOLONGPATH:
-        s = ::LoadStr(IDS_TOOLONGPATH);
+        s = ::LoadStrW(IDS_TOOLONGPATH);
         break;
     case GFN_INVALIDDRIVE:
-        s = ::LoadStr(IDS_INVALIDDRIVE);
+        s = ::LoadStrW(IDS_INVALIDDRIVE);
         break;
     case GFN_INCOMLETEFILENAME:
-        s = ::LoadStr(IDS_INCOMLETEFILENAME);
+        s = ::LoadStrW(IDS_INCOMLETEFILENAME);
         break;
     case GFN_EMPTYNAMENOTALLOWED:
-        s = ::LoadStr(IDS_EMPTYNAMENOTALLOWED);
+        s = ::LoadStrW(IDS_EMPTYNAMENOTALLOWED);
         break;
     case GFN_PATHISINVALID:
-        s = ::LoadStr(IDS_PATHISINVALID);
+        s = ::LoadStrW(IDS_PATHISINVALID);
         break;
     }
-    if (s != NULL)
-        lstrcpyn(buf, s, bufSize);
-    else
-        buf[0] = 0;
-    return buf;
+    return text != NULL && sally::plugin_abi::WriteStringBuffer(
+                               *text, s != NULL ? std::wstring(s) : std::wstring());
 }
 
-char* CSalamanderGeneral::GetErrorText(int err, char* buf, int bufSize)
+BOOL CSalamanderGeneral::GetErrorText(int err, CSalamanderStringBuffer* text)
 {
-    if (buf == NULL || bufSize == 0)
-        return ::GetErrorText(err);
-
-    int l = 0;
-    if (bufSize > 20)
-        l = sprintf(buf, "(%d) ", err);
-    if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                      NULL,
-                      err,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                      buf + l,
-                      bufSize - l,
-                      NULL) == 0 ||
-        bufSize > l && *(buf + l) == 0)
-    {
-        char txt[100];
-        sprintf(txt, "System error %d, text description is not available.", err);
-        lstrcpyn(buf, txt, bufSize);
-    }
-    return buf;
+    return text != NULL && sally::plugin_abi::WriteStringBuffer(
+                               *text, ::GetErrorTextOwned(err));
 }
 
-char* CSalamanderGeneral::LoadStr(HINSTANCE module, int resID)
+// v108: wide is the primary. The former narrow LoadStr and its
+// LoadStrW sibling collapsed into this one wide entry point.
+BOOL CSalamanderGeneral::LoadStr(HINSTANCE module, int resID,
+                                CSalamanderStringBuffer* text)
 {
-    if (module == NULL)
+    if (module == NULL || text == NULL)
     {
         TRACE_E("CSalamanderGeneral::LoadStr(): module == NULL");
-        static char buffEmpty[] = "ERROR LOADING STRING";
-        return buffEmpty;
+        return FALSE;
     }
-    return ::LoadStr(resID, module);
-}
-
-WCHAR*
-CSalamanderGeneral::LoadStrW(HINSTANCE module, int resID)
-{
-    if (module == NULL)
-    {
-        TRACE_E("CSalamanderGeneral::LoadStrW(): module == NULL");
-        static wchar_t buffEmpty[] = L"ERROR LOADING WIDE STRING";
-        return buffEmpty;
-    }
-    return ::LoadStrW(resID, module);
+    return sally::plugin_abi::WriteStringBuffer(
+        *text, ::LoadStrOwned(resID, module));
 }
 
 COLORREF
@@ -1753,22 +1979,23 @@ CSalamanderGeneral::GetCurrentColor(int color)
     return GetCOLORREF(arr[index]);
 }
 
-void CSalamanderGeneral::GetPluginFSName(char* buf, int fsNameIndex)
+BOOL CSalamanderGeneral::GetPluginFSName(CSalamanderStringBuffer* name,
+                                         int fsNameIndex)
 {
     CALL_STACK_MESSAGE2("CSalamanderGeneral::GetPluginFSName(, %d)", fsNameIndex);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::GetPluginFSName() only from main thread!");
-        buf[0] = 0;
-        return;
+        return FALSE;
     }
     CPluginData* data = Plugins.GetPluginData(Plugin);
     if (data != NULL && data->SupportFS && fsNameIndex >= 0 && fsNameIndex < (int)data->FSNames.size())
-        lstrcpyn(buf, data->FSNames[fsNameIndex].c_str(), MAX_PATH);
+        return name != NULL && sally::plugin_abi::WriteStringBuffer(
+                                   *name, data->FSNames[fsNameIndex]);
     else
     {
         TRACE_E("CSalamanderGeneral::GetPluginFSName(): incorrect call (not supporting FS or 'fsNameIndex' is out of range)!");
-        buf[0] = 0;
+        return FALSE;
     }
 }
 
@@ -1976,9 +2203,10 @@ void CSalamanderGeneral::CallLoadOrSaveConfiguration(BOOL load,
     }
 }
 
-void CSalamanderGeneral::SetPluginBugReportInfo(const char* message, const char* email)
+// wide; the storage in CPluginData widened with it.
+void CSalamanderGeneral::SetPluginBugReportInfo(const wchar_t* message, const wchar_t* email)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::SetPluginBugReportInfo(%s)", message);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::SetPluginBugReportInfo(%S)", message);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::SetPluginBugReportInfo() only from main thread!");
@@ -2008,9 +2236,9 @@ void CSalamanderGeneral::SetPluginBugReportInfo(const char* message, const char*
     }
 }
 
-void CSalamanderGeneral::FocusNameInPanel(int panel, const char* path, const char* name)
+void CSalamanderGeneral::FocusNameInPanel(int panel, const wchar_t* path, const wchar_t* name)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::FocusNameInPanel(%d, %s, %s)", panel, path, name);
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::FocusNameInPanel(%d, %ls, %ls)", panel, path, name);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::FocusNameInPanel() only from main thread!");
@@ -2022,19 +2250,18 @@ void CSalamanderGeneral::FocusNameInPanel(int panel, const char* path, const cha
         return;
     }
     CFilesWindow* p = GetPanel(panel);
-    CPathBuffer pathBackup;
-    CPathBuffer nameBackup;
-    lstrcpyn(pathBackup, path, pathBackup.Size());
-    lstrcpyn(nameBackup, name, nameBackup.Size());
     if (p != NULL)
-        SendMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup.Get(), (LPARAM)pathBackup.Get());
+    {
+        CFocusFileDataW focus = {name, path};
+        SendMessage(p->HWindow, WM_USER_FOCUSFILEW, (WPARAM)&focus, 0);
+    }
 }
 
-BOOL CSalamanderGeneral::ChangePanelPath(int panel, const char* path, int* failReason,
-                                         int suggestedTopIndex, const char* suggestedFocusName,
+BOOL CSalamanderGeneral::ChangePanelPath(int panel, const wchar_t* path, int* failReason,
+                                         int suggestedTopIndex, const wchar_t* suggestedFocusName,
                                          BOOL convertFSPathToInternal)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::ChangePanelPath(%d, %s, , %d, %s, %d)",
+    CALL_STACK_MESSAGE6("CSalamanderGeneral::ChangePanelPath(%d, %ls, , %d, %ls, %d)",
                         panel, path, suggestedTopIndex, suggestedFocusName, convertFSPathToInternal);
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -2054,10 +2281,13 @@ BOOL CSalamanderGeneral::ChangePanelPath(int panel, const char* path, int* failR
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::ChangePanelPathToDisk(int panel, const char* path, int* failReason,
-                                               int suggestedTopIndex, const char* suggestedFocusName)
+// wide. Routes to CFilesWindow::ChangePathToDisk, the native-wide
+// wide implementation (not a narrow-then-widen shim), so both path and
+// suggestedFocusName remain Unicode through the navigation owner.
+BOOL CSalamanderGeneral::ChangePanelPathToDisk(int panel, const wchar_t* path, int* failReason,
+                                               int suggestedTopIndex, const wchar_t* suggestedFocusName)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::ChangePanelPathToDisk(%d, %s, , %d, %s)",
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::ChangePanelPathToDisk(%d, %ls, , %d, %ls)",
                         panel, path, suggestedTopIndex, suggestedFocusName);
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -2070,18 +2300,25 @@ BOOL CSalamanderGeneral::ChangePanelPathToDisk(int panel, const char* path, int*
     if (p != NULL)
     {
         return p->ChangePathToDisk(GetMsgBoxParent(), path, suggestedTopIndex, suggestedFocusName,
-                                   NULL, TRUE, FALSE, FALSE, failReason);
+                                    NULL, TRUE, FALSE, FALSE, failReason);
     }
     if (failReason != NULL)
         *failReason = CHPPFR_INVALIDPATH;
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::ChangePanelPathToArchive(int panel, const char* archive, const char* archivePath,
+// wide signature; DEBT, not a full fix. ChangePathToArchive exists but
+// narrows internally (TryExactAnsiFallback) and REFUSES rather than navigates when
+// 'archive'/'archivePath' cannot round-trip CP_ACP exactly - so a plugin passing a
+// genuinely Unicode-only archive name still gets an error box, not a listing. This
+// widening removes the narrowing step at the SDK boundary; it retires to a real fix
+// only once ChangePathToArchive's own refusal goes (the
+// panel/archive-open chain).
+BOOL CSalamanderGeneral::ChangePanelPathToArchive(int panel, const wchar_t* archive, const wchar_t* archivePath,
                                                   int* failReason, int suggestedTopIndex,
-                                                  const char* suggestedFocusName, BOOL forceUpdate)
+                                                  const wchar_t* suggestedFocusName, BOOL forceUpdate)
 {
-    CALL_STACK_MESSAGE7("CSalamanderGeneral::ChangePanelPathToArchive(%d, %s, %s, , %d, %s, %d)",
+    CALL_STACK_MESSAGE7("CSalamanderGeneral::ChangePanelPathToArchive(%d, %ls, %ls, , %d, %ls, %d)",
                         panel, archive, archivePath, suggestedTopIndex, suggestedFocusName, forceUpdate);
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -2094,19 +2331,19 @@ BOOL CSalamanderGeneral::ChangePanelPathToArchive(int panel, const char* archive
     if (p != NULL)
     {
         return p->ChangePathToArchive(archive, archivePath, suggestedTopIndex, suggestedFocusName,
-                                      forceUpdate, NULL, TRUE, failReason);
+                                       forceUpdate, NULL, TRUE, failReason);
     }
     if (failReason != NULL)
         *failReason = CHPPFR_INVALIDPATH;
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::ChangePanelPathToPluginFS(int panel, const char* fsName, const char* fsUserPart,
+BOOL CSalamanderGeneral::ChangePanelPathToPluginFS(int panel, const wchar_t* fsName, const wchar_t* fsUserPart,
                                                    int* failReason, int suggestedTopIndex,
-                                                   const char* suggestedFocusName, BOOL forceUpdate,
+                                                   const wchar_t* suggestedFocusName, BOOL forceUpdate,
                                                    BOOL convertPathToInternal)
 {
-    CALL_STACK_MESSAGE8("CSalamanderGeneral::ChangePanelPathToPluginFS(%d, %s, %s, , %d, %s, %d, %d)",
+    CALL_STACK_MESSAGE8("CSalamanderGeneral::ChangePanelPathToPluginFS(%d, %ls, %ls, , %d, %ls, %d, %d)",
                         panel, fsName, fsUserPart, suggestedTopIndex, suggestedFocusName, forceUpdate,
                         convertPathToInternal);
     if (MainThreadID != GetCurrentThreadId())
@@ -2120,8 +2357,8 @@ BOOL CSalamanderGeneral::ChangePanelPathToPluginFS(int panel, const char* fsName
     if (p != NULL)
     {
         return p->ChangePathToPluginFS(fsName, fsUserPart, suggestedTopIndex, suggestedFocusName,
-                                       forceUpdate, 2 /*report all errors*/, NULL, TRUE, failReason,
-                                       FALSE, FALSE, convertPathToInternal);
+                                        forceUpdate, 2 /*report all errors*/, NULL, TRUE, failReason,
+                                        FALSE, FALSE, convertPathToInternal);
     }
     if (failReason != NULL)
         *failReason = CHPPFR_INVALIDPATH;
@@ -2130,9 +2367,9 @@ BOOL CSalamanderGeneral::ChangePanelPathToPluginFS(int panel, const char* fsName
 
 BOOL CSalamanderGeneral::ChangePanelPathToDetachedFS(int panel, CPluginFSInterfaceAbstract* detachedFS,
                                                      int* failReason, int suggestedTopIndex,
-                                                     const char* suggestedFocusName)
+                                                     const wchar_t* suggestedFocusName)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::ChangePanelPathToDetachedFS(%d, , , %d, %s)",
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::ChangePanelPathToDetachedFS(%d, , , %d, %ls)",
                         panel, suggestedTopIndex, suggestedFocusName);
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -2327,51 +2564,83 @@ BOOL CSalamanderGeneral::CloseDetachedFS(HWND parent, CPluginFSInterfaceAbstract
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::DuplicateAmpersands(char* buffer, int bufferSize)
+BOOL CSalamanderGeneral::DuplicateAmpersands(CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::DuplicateAmpersands(%s, %d)", buffer, bufferSize);
-    return ::DuplicateAmpersands(buffer, bufferSize);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::DuplicateAmpersands()");
+    if (text == NULL)
+        return FALSE;
+    std::wstring input;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, input))
+        return FALSE;
+    std::wstring result;
+    result.reserve(input.size() * 2);
+    for (wchar_t ch : input)
+    {
+        result.push_back(ch);
+        if (ch == L'&')
+            result.push_back(ch);
+    }
+    return sally::plugin_abi::WriteStringBuffer(*text, result);
 }
 
-void CSalamanderGeneral::RemoveAmpersands(char* text)
+BOOL CSalamanderGeneral::RemoveAmpersands(CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::RemoveAmpersands(%s)", text);
-    ::RemoveAmpersands(text);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::RemoveAmpersands()");
+    if (text == NULL)
+        return FALSE;
+    std::wstring input;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, input))
+        return FALSE;
+    std::wstring result;
+    result.reserve(input.size());
+    for (size_t i = 0; i < input.size(); ++i)
+    {
+        if (input[i] != L'&')
+            result.push_back(input[i]);
+        else if (i + 1 < input.size() && input[i + 1] == L'&')
+        {
+            result.push_back(L'&');
+            ++i;
+        }
+    }
+    return sally::plugin_abi::WriteStringBuffer(*text, result);
 }
 
-BOOL CSalamanderGeneral::ValidateVarString(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
+BOOL CSalamanderGeneral::ValidateVarString(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
                                            const CSalamanderVarStrEntry* variables)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::ValidateVarString(, %s, , ,)", varText);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::ValidateVarString(, %ls, , ,)", varText);
     if (varText == NULL || variables == NULL)
     {
         TRACE_E("CSalamanderGeneral::ValidateVarString(): invalid parameters!");
         return FALSE;
     }
-    return ::ValidateVarString(msgParent, varText, errorPos1, errorPos2, variables);
+    return ::ValidateVarStringW(msgParent, varText, errorPos1, errorPos2, variables);
 }
 
-BOOL CSalamanderGeneral::ExpandVarString(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+BOOL CSalamanderGeneral::ExpandVarString(HWND msgParent, const wchar_t* varText, CSalamanderStringBuffer* buffer,
                                          const CSalamanderVarStrEntry* variables, void* param,
                                          BOOL ignoreEnvVarNotFoundOrTooLong,
-                                         DWORD* varPlacements, int* varPlacementsCount,
+                                         CSalamanderTextRangeBuffer* varPlacements,
                                          BOOL detectMaxVarWidths, int* maxVarWidths,
                                          int maxVarWidthsCount)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::ExpandVarString(, %s, , %d, , , %d, , , %d, , %d)",
-                        varText, bufferLen, ignoreEnvVarNotFoundOrTooLong, detectMaxVarWidths,
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::ExpandVarString(, %ls, , , , %d, , , %d, , %d)",
+                        varText, ignoreEnvVarNotFoundOrTooLong, detectMaxVarWidths,
                         maxVarWidthsCount);
-    if (bufferLen <= 0 || buffer == NULL || varText == NULL || variables == NULL)
+    if (buffer == NULL || varText == NULL || variables == NULL)
     {
         TRACE_E("CSalamanderGeneral::ExpandVarString(): invalid parameters!");
         return FALSE;
     }
-    return ::ExpandVarString(msgParent, varText, buffer, bufferLen, variables, param,
-                             ignoreEnvVarNotFoundOrTooLong, varPlacements, varPlacementsCount,
+    return ::ExpandVarString(msgParent, varText, buffer, variables, param,
+                             ignoreEnvVarNotFoundOrTooLong, varPlacements,
                              detectMaxVarWidths, maxVarWidths, maxVarWidthsCount);
 }
 
-BOOL CSalamanderGeneral::EnumInstalledModules(int* index, char* module, char* version)
+BOOL CSalamanderGeneral::EnumInstalledModules(
+    int* index, CSalamanderStringBuffer* module,
+    CSalamanderStringBuffer* version)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::EnumInstalledModules(, ,)");
     if (MainThreadID != GetCurrentThreadId())
@@ -2379,10 +2648,20 @@ BOOL CSalamanderGeneral::EnumInstalledModules(int* index, char* module, char* ve
         TRACE_E("You can call CSalamanderGeneral::EnumInstalledModules() only from main thread!");
         return FALSE;
     }
-    return Plugins.EnumInstalledModules(index, module, version);
+    if (index == NULL || module == NULL || version == NULL)
+        return FALSE;
+
+    std::wstring moduleValue;
+    std::wstring versionValue;
+    if (!Plugins.EnumInstalledModules(index, moduleValue, versionValue))
+        return FALSE;
+
+    return sally::plugin_abi::WriteStringBuffer(*module, moduleValue) &&
+           sally::plugin_abi::WriteStringBuffer(*version, versionValue);
 }
 
-BOOL CSalamanderGeneral::CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND echoParent)
+// wide primary; the narrow overload and the W suffix are gone.
+BOOL CSalamanderGeneral::CopyTextToClipboard(const wchar_t* text, int textLen, BOOL showEcho, HWND echoParent)
 {
     CALL_STACK_MESSAGE3("CSalamanderGeneral::CopyTextToClipboard(, %d, %d,)", textLen, showEcho);
     // j.r. threw the text parameter, which did not have to be null-terminated
@@ -2391,24 +2670,12 @@ BOOL CSalamanderGeneral::CopyTextToClipboard(const char* text, int textLen, BOOL
         TRACE_E("Unexpected parameter (NULL) in CSalamanderGeneral::CopyTextToClipboard().");
         return FALSE;
     }
-    return ::CopyTextToClipboard(text, textLen, showEcho, echoParent);
-}
-
-BOOL CSalamanderGeneral::CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND echoParent)
-{
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::CopyTextToClipboardW(, %d, %d,)", textLen, showEcho);
-    // j.r. threw the text parameter, which did not have to be null-terminated
-    if (text == NULL)
-    {
-        TRACE_E("Unexpected parameter (NULL) in CSalamanderGeneral::CopyTextToClipboardW().");
-        return FALSE;
-    }
     return ::CopyTextToClipboardW(text, textLen, showEcho, echoParent);
 }
 
-BOOL CSalamanderGeneral::IsPluginInstalled(const char* pluginSPL)
+BOOL CSalamanderGeneral::IsPluginInstalled(const wchar_t* pluginSPL)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::IsPluginInstalled(%s)", pluginSPL);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::IsPluginInstalled(%ls)", pluginSPL);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::IsPluginInstalled() only from main thread!");
@@ -2426,50 +2693,50 @@ BOOL CSalamanderGeneral::IsPluginInstalled(const char* pluginSPL)
     }
 }
 
-BOOL ViewFileInPluginViewer(const char* pluginSPL,
-                            CSalamanderPluginViewerData* pluginData,
-                            BOOL useCache, const char* rootTmpPath,
-                            const char* fileNameInCache, int& error)
+BOOL ViewFileInPluginViewerW(const wchar_t* sourceFileName, const wchar_t* pluginSPL,
+                             CSalamanderPluginViewerData* pluginData,
+                             BOOL useCache, const wchar_t* rootTmpPath,
+                             const wchar_t* fileNameInCache, int& error)
 {
     error = -1; // unknown
     if (pluginData == NULL || pluginData->Size < sizeof(CSalamanderPluginViewerData) ||
-        pluginData->FileName == NULL || pluginData->FileName[0] == 0)
+        sourceFileName == NULL || sourceFileName[0] == 0)
     {
         TRACE_E("Unexpected value of 'pluginData' in CSalamanderGeneral::ViewFileInPluginViewer!");
         return FALSE;
     }
 
-    CALL_STACK_MESSAGE7("CSalamanderGeneral::ViewFileInPluginViewer(%s, %d, %s, %d, %s, %s,)",
-                        pluginSPL, pluginData->Size, pluginData->FileName, useCache,
-                        (useCache ? rootTmpPath : "(ignored)"),
-                        (useCache ? fileNameInCache : "(ignored)"));
+    CALL_STACK_MESSAGE7("CSalamanderGeneral::ViewFileInPluginViewer(%ls, %d, %ls, %d, %ls, %ls,)",
+                        pluginSPL, pluginData->Size, sourceFileName, useCache,
+                        (useCache ? rootTmpPath : L"(ignored)"),
+                        (useCache ? fileNameInCache : L"(ignored)"));
 
-    char viewUniqueName[50]; // we need a unique name for the viewed file in the cache
+    wchar_t viewUniqueName[50]; // we need a unique name for the viewed file in the cache
     viewUniqueName[0] = 0;
-    const char* fileName; // name of the file we will pass to the viewer
+    const wchar_t* fileName; // name of the file we will pass to the viewer
     if (useCache)
     {
         // verify that 'fileNameInCache' is valid (a name without path)
-        const char* s = NULL;
+        const wchar_t* s = NULL;
         if (fileNameInCache != NULL)
         {
             s = fileNameInCache;
-            while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
-                   *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
+            while (*s != 0 && *s != L'\\' && *s != L'/' && *s != L':' &&
+                   *s >= 32 && *s != L'<' && *s != L'>' && *s != L'|' && *s != L'"')
                 s++;
         }
         if (fileNameInCache == NULL || fileNameInCache[0] == 0 || *s != 0)
         {
             TRACE_E("Unexpected value of 'fileNameInCache' in CSalamanderGeneral::ViewFileInPluginViewer!");
             error = 3;
-            DeleteFileA(gFileSystem, pluginData->FileName);
+            gFileSystem->DeleteFile(sourceFileName);
             return FALSE;
         }
 
         // insert the file 'pluginData->FileName' into the disk cache under the name 'fileNameInCache'
         while (1)
         {
-            sprintf(viewUniqueName, "ViewFile %X", GetTickCount());
+            swprintf_s(viewUniqueName, _countof(viewUniqueName), L"ViewFile %X", GetTickCount());
             BOOL exists;
             fileName = DiskCache.GetName(viewUniqueName, fileNameInCache, &exists, TRUE, rootTmpPath, FALSE, NULL, NULL);
             if (fileName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")
@@ -2479,18 +2746,18 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
                 else            // fatal error
                 {
                     error = 3;
-                    DeleteFileA(gFileSystem, pluginData->FileName);
+                    gFileSystem->DeleteFile(sourceFileName);
                     return FALSE; // fatal error
                 }
             }
             else
                 break; // we have the name in the disk cache, all OK
         }
-        if (!::SalMoveFile(pluginData->FileName, fileName))
+        if (!::SalMoveFile(sourceFileName, fileName))
         {
             DWORD err = GetLastError();
-            TRACE_E("Unable to move file to disk cache! (error " << ::GetErrorText(err) << ")");
-            DeleteFileA(gFileSystem, pluginData->FileName);
+            TRACE_EW(L"Unable to move file to disk cache! (error " << ::GetErrorTextOwned(err).c_str() << L")");
+            gFileSystem->DeleteFile(sourceFileName);
             DiskCache.ReleaseName(viewUniqueName, FALSE);
             error = 3;
             return FALSE;
@@ -2498,20 +2765,21 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         else // successfully obtained a temp file; we must call NamePrepared()
         {
             CQuadWord size(0, 0);
-            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(fileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, 0, NULL));
+            HANDLE file = gFileSystem->CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                  NULL, OPEN_EXISTING, 0, NULL);
             if (file != INVALID_HANDLE_VALUE)
             { // ignore the error; the file size is not that important
-                DWORD err;
-                ::SalGetFileSize(file, size, err);
-                HANDLES(CloseHandle(file));
+                uint64_t fileSize = 0;
+                if (gFileSystem->GetHandleFileSize(file, &fileSize).success)
+                    size.SetUI64(fileSize);
+                gFileSystem->CloseFileHandle(file);
             }
 
             DiskCache.NamePrepared(viewUniqueName, size);
         }
     }
     else
-        fileName = pluginData->FileName;
+        fileName = sourceFileName;
 
     // position for viewers
     WINDOWPLACEMENT place;
@@ -2614,15 +2882,15 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
     if (useCache && !diskCacheNameClosed)
     {
         DiskCache.ReleaseName(viewUniqueName, FALSE);
-        //    DeleteFileA(gFileSystem, fileName);   // the cache already removed the file and deallocated fileName
+        // The cache already removed the file and deallocated fileName.
     }
     return error == 0; // returning success?
 }
 
-BOOL CSalamanderGeneral::ViewFileInPluginViewer(const char* pluginSPL,
+BOOL CSalamanderGeneral::ViewFileInPluginViewer(const wchar_t* pluginSPL,
                                                 CSalamanderPluginViewerData* pluginData,
-                                                BOOL useCache, const char* rootTmpPath,
-                                                const char* fileNameInCache, int& error)
+                                                BOOL useCache, const wchar_t* rootTmpPath,
+                                                const wchar_t* fileNameInCache, int& error)
 {
     error = -1; // unknown
 
@@ -2636,20 +2904,25 @@ BOOL CSalamanderGeneral::ViewFileInPluginViewer(const char* pluginSPL,
         return FALSE;
     }
 
-    return ::ViewFileInPluginViewer(pluginSPL, pluginData, useCache,
-                                    rootTmpPath, fileNameInCache, error);
+    if (pluginData == NULL || pluginData->FileName == NULL)
+        return FALSE;
+    const std::wstring sourceFileName = pluginData->FileName;
+    return ::ViewFileInPluginViewerW(sourceFileName.c_str(), pluginSPL, pluginData, useCache,
+                                     rootTmpPath, fileNameInCache, error);
 }
 
-void CSalamanderGeneral::ExecuteAssociation(HWND parent, const char* path, const char* name)
+// wide: forwards to the wide internal that already existed.
+// %S is a wide string in a narrow format string under MSVC.
+void CSalamanderGeneral::ExecuteAssociation(HWND parent, const wchar_t* path, const wchar_t* name)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::ExecuteAssociation(0x%p, %s, %s)", parent, path, name);
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::ExecuteAssociation(0x%p, %S, %S)", parent, path, name);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::ExecuteAssociation() only from main thread!");
         return;
     }
     MainWindow->SetDefaultDirectories(); // so the starting process inherits the correct current directories
-    ::ExecuteAssociation(parent, path, name);
+    ::ExecuteAssociationW(parent, path, name);
 }
 
 int CSalamanderGeneral::GetPanelTopIndex(int panel)
@@ -2722,41 +2995,45 @@ BOOL CSalamanderGeneral::GetPanelWithPluginFS(CPluginFSInterfaceAbstract* plugin
     return FALSE;
 }
 
-void CSalamanderGeneral::PostChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+// wide. MainWindow's wide overload landed earlier, where two
+// core callers were found feeding it a lossily-narrowed panel path and so
+// posting a notification for a directory that did not exist.
+void CSalamanderGeneral::PostChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::PostChangeOnPathNotification(%s, %d)", path, includingSubdirs);
-    MainWindow->PostChangeOnPathNotification(path, includingSubdirs);
+    CALL_STACK_MESSAGE3("CSalamanderGeneral::PostChangeOnPathNotification(%S, %d)", path, includingSubdirs);
+    MainWindow->PostChangeOnPathNotificationW(path, includingSubdirs);
 }
 
 DWORD
-CSalamanderGeneral::SalCheckPath(BOOL echo, const char* path, DWORD err, HWND parent)
+CSalamanderGeneral::SalCheckPath(BOOL echo, const wchar_t* path, DWORD err, HWND parent)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::SalCheckPath(%d, %s, %u,)", echo, path, err);
+    // %S is a WIDE string in a narrow format string under MSVC.
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::SalCheckPath(%d, %S, %u,)", echo, path, err);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::SalCheckPath() only from main thread!");
         return ERROR_SUCCESS;
     }
-    return ::SalCheckPath(echo, path, err, TRUE, parent); // the value of 'postRefresh' does not matter (StopRefresh is surely > 0)
+    return ::SalCheckPathW(echo, path, err, TRUE, parent); // the value of 'postRefresh' does not matter (StopRefresh is surely > 0)
 }
 
-BOOL CSalamanderGeneral::SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
+BOOL CSalamanderGeneral::SalCheckAndRestorePath(HWND parent, const wchar_t* path, BOOL tryNet)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::SalCheckAndRestorePath(, %s, %d)", path, tryNet);
+    CALL_STACK_MESSAGE3("CSalamanderGeneral::SalCheckAndRestorePath(, %S, %d)", path, tryNet);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::SalCheckAndRestorePath() only from main thread!");
         return FALSE;
     }
-    return ::SalCheckAndRestorePath(parent, path, tryNet);
+    return ::SalCheckAndRestorePathW(parent, path, tryNet); // wide internal
 }
 
-BOOL CSalamanderGeneral::SalCheckAndRestorePathWithCut(HWND parent, char* path, BOOL& tryNet, DWORD& err,
+BOOL CSalamanderGeneral::SalCheckAndRestorePathWithCut(HWND parent, std::wstring& path, BOOL& tryNet, DWORD& err,
                                                        DWORD& lastErr, BOOL& pathInvalid, BOOL& cut,
                                                        BOOL donotReconnect)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::SalCheckAndRestorePathWithCut(, %s, %d, , , , , %d)",
-                        path, tryNet, donotReconnect);
+    CALL_STACK_MESSAGE3("CSalamanderGeneral::SalCheckAndRestorePathWithCut(, , %d, , , , , %d)",
+                        tryNet, donotReconnect);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::SalCheckAndRestorePathWithCut() only from main thread!");
@@ -2765,18 +3042,19 @@ BOOL CSalamanderGeneral::SalCheckAndRestorePathWithCut(HWND parent, char* path, 
         cut = FALSE;
         return FALSE;
     }
-    return ::SalCheckAndRestorePathWithCut(parent, path, tryNet, err, lastErr, pathInvalid, cut,
-                                           donotReconnect);
+    return ::SalCheckAndRestorePathWithCutW(parent, path, tryNet, err, lastErr, pathInvalid, cut,
+                                            donotReconnect);
 }
 
-BOOL CSalamanderGeneral::SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
-                                      const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
-                                      const char* curPath, const char* curArchivePath, int* error,
-                                      int pathBufSize)
+BOOL CSalamanderGeneral::SalParsePath(HWND parent, CSalamanderStringBuffer* path, int& type,
+                                      BOOL& isDir, DWORD& secondPartOffset,
+                                      const wchar_t* errorTitle, CSalamanderStringBuffer* nextFocus,
+                                      BOOL curPathIsDiskOrArchive, const wchar_t* curPath,
+                                      const wchar_t* curArchivePath, int* error)
 {
-    CALL_STACK_MESSAGE7("CSalamanderGeneral::SalParsePath(, %s, , , , %s, , %d, %s, %s, , %d)",
-                        path, errorTitle, curPathIsDiskOrArchive, curPath, curArchivePath,
-                        pathBufSize);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::SalParsePath(, , , , , , , %d, , , ,)",
+                        curPathIsDiskOrArchive);
+    secondPartOffset = SAL_STRING_BUFFER_NPOS;
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::SalParsePath() only from main thread!");
@@ -2784,40 +3062,177 @@ BOOL CSalamanderGeneral::SalParsePath(HWND parent, char* path, int& type, BOOL& 
             *error = SPP_WINDOWSPATHERROR;
         return FALSE;
     }
-    return ::SalParsePath(parent, path, type, isDir, secondPart, errorTitle, nextFocus,
-                          curPathIsDiskOrArchive, curPath, curArchivePath, error, pathBufSize);
+
+    const auto refuseBoundary = [&]() {
+        type = -1;
+        isDir = FALSE;
+        secondPartOffset = SAL_STRING_BUFFER_NPOS;
+        if (error != NULL)
+            *error = SPP_WINDOWSPATHERROR;
+        return FALSE;
+    };
+
+    if (path == NULL || path == nextFocus)
+        return refuseBoundary();
+    std::wstring originalPath;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, originalPath))
+        return refuseBoundary();
+
+    // The optional context strings may point inside the mutable path buffer.
+    // Consume the complete input record before calling the wide owner.
+    const std::wstring errorTitleStorage =
+        errorTitle != NULL ? errorTitle : L"";
+    const std::wstring curPathStorage = curPath != NULL ? curPath : L"";
+    const std::wstring curArchivePathStorage =
+        curArchivePath != NULL ? curArchivePath : L"";
+    std::wstring stagedPath = originalPath;
+    std::wstring stagedFocus;
+    int stagedType = -1;
+    BOOL stagedIsDir = FALSE;
+    wchar_t* stagedSecondPart = NULL;
+    int stagedError = 0;
+    const BOOL result = ::SalParsePathW(
+        parent, stagedPath, stagedType, stagedIsDir, stagedSecondPart,
+        errorTitle != NULL ? errorTitleStorage.c_str() : NULL,
+        nextFocus != NULL ? &stagedFocus : NULL, curPathIsDiskOrArchive,
+        curPath != NULL ? curPathStorage.c_str() : NULL,
+        curArchivePath != NULL ? curArchivePathStorage.c_str() : NULL,
+        error != NULL ? &stagedError : NULL);
+
+    if (result != FALSE && stagedSecondPart == NULL)
+        return refuseBoundary();
+
+    size_t stagedSecondPartOffset = std::wstring::npos;
+    if (stagedSecondPart != NULL)
+    {
+        const uintptr_t pathAddress =
+            reinterpret_cast<uintptr_t>(stagedPath.c_str());
+        const uintptr_t pointerAddress =
+            reinterpret_cast<uintptr_t>(stagedSecondPart);
+        if (stagedPath.size() >
+            ((std::numeric_limits<uintptr_t>::max)() - pathAddress) /
+                sizeof(wchar_t))
+            return refuseBoundary();
+        const uintptr_t endAddress =
+            pathAddress + stagedPath.size() * sizeof(wchar_t);
+        if (pointerAddress < pathAddress || pointerAddress > endAddress ||
+            (pointerAddress - pathAddress) % sizeof(wchar_t) != 0)
+            return refuseBoundary();
+        stagedSecondPartOffset =
+            (pointerAddress - pathAddress) / sizeof(wchar_t);
+    }
+
+    if (stagedPath.size() >= (std::numeric_limits<DWORD>::max)() ||
+        stagedFocus.size() >= (std::numeric_limits<DWORD>::max)() ||
+        !sally::plugin_abi::ReserveStringBuffer(
+            *path, static_cast<DWORD>(stagedPath.size() + 1)) ||
+        (nextFocus != NULL && !sally::plugin_abi::ReserveStringBuffer(
+                                  *nextFocus, static_cast<DWORD>(stagedFocus.size() + 1))))
+        return refuseBoundary();
+    if (nextFocus != NULL)
+        sally::plugin_abi::WriteStringBuffer(*nextFocus, stagedFocus);
+    sally::plugin_abi::WriteStringBuffer(*path, stagedPath);
+    type = stagedType;
+    isDir = stagedIsDir;
+    secondPartOffset = stagedSecondPartOffset != std::wstring::npos
+                           ? static_cast<DWORD>(stagedSecondPartOffset)
+                           : SAL_STRING_BUFFER_NPOS;
+    if (error != NULL)
+        *error = stagedError;
+    return result;
 }
 
-BOOL CSalamanderGeneral::SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
-                                             int selCount, char* path, char* secondPart, BOOL pathIsDir,
-                                             BOOL backslashAtEnd, const char* dirName,
-                                             const char* curDiskPath, char*& mask)
+BOOL CSalamanderGeneral::SalSplitWindowsPath(HWND parent, const wchar_t* title,
+                                             const wchar_t* errorTitle, int selCount,
+                                             CSalamanderStringBuffer* path, DWORD secondPartOffset,
+                                             BOOL pathIsDir, BOOL backslashAtEnd,
+                                             const wchar_t* dirName, const wchar_t* curDiskPath,
+                                             CSalamanderStringBuffer* mask)
 {
-    CALL_STACK_MESSAGE10("CSalamanderGeneral::SalSplitWindowsPath(, %s, %s, %d, %s, %s, %d, %d, %s, %s,)",
-                         title, errorTitle, selCount, path, secondPart, pathIsDir, backslashAtEnd,
-                         dirName, curDiskPath);
-    return ::SalSplitWindowsPath(parent, title, errorTitle, selCount, path, secondPart,
-                                 pathIsDir, backslashAtEnd, dirName, curDiskPath, mask);
+    // The %s arguments are gone from the trace: the call-stack formatter is
+    // narrow, and rendering wide paths through it would reintroduce exactly the
+    // CP_ACP round trip this widening removes - in the diagnostic that gets read
+    // when something has already gone wrong.
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::SalSplitWindowsPath(, , , %d, , , %d, %d, , ,)",
+                        selCount, pathIsDir, backslashAtEnd);
+    if (path == NULL || mask == NULL || path == mask)
+        return FALSE;
+    std::wstring ownedPath;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, ownedPath) ||
+        secondPartOffset > ownedPath.size())
+        return FALSE;
+    std::wstring ownedMask;
+    const BOOL result = ::SalSplitWindowsPathOwnedW(
+        parent, title, errorTitle, selCount, ownedPath, secondPartOffset,
+        pathIsDir, backslashAtEnd, dirName, curDiskPath, ownedMask);
+    if (ownedPath.size() >= (std::numeric_limits<DWORD>::max)() ||
+        ownedMask.size() >= (std::numeric_limits<DWORD>::max)() ||
+        !sally::plugin_abi::ReserveStringBuffer(
+            *path, static_cast<DWORD>(ownedPath.size() + 1)) ||
+        !sally::plugin_abi::ReserveStringBuffer(
+            *mask, static_cast<DWORD>(ownedMask.size() + 1)))
+        return FALSE;
+    sally::plugin_abi::WriteStringBuffer(*mask, ownedMask);
+    sally::plugin_abi::WriteStringBuffer(*path, ownedPath);
+    return result;
 }
 
-BOOL CSalamanderGeneral::SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
-                                             int selCount, char* path, char* afterRoot, char* secondPart,
-                                             BOOL pathIsDir, BOOL backslashAtEnd, const char* dirName,
-                                             const char* curPath, char*& mask, char* newDirs,
+BOOL CSalamanderGeneral::SalSplitGeneralPath(HWND parent, const wchar_t* title,
+                                             const wchar_t* errorTitle, int selCount,
+                                             CSalamanderStringBuffer* path, DWORD afterRootOffset,
+                                             DWORD secondPartOffset, BOOL pathIsDir,
+                                             BOOL backslashAtEnd, const wchar_t* dirName,
+                                             const wchar_t* curPath, CSalamanderStringBuffer* mask,
+                                             CSalamanderStringBuffer* newDirs,
                                              SGP_IsTheSamePathF isTheSamePathF)
 {
-    CALL_STACK_MESSAGE11("CSalamanderGeneral::SalSplitGeneralPath(, %s, %s, %d, %s, %s, %s, %d, %d, %s, %s, , ,)",
-                         title, errorTitle, selCount, path, afterRoot, secondPart, pathIsDir, backslashAtEnd,
-                         dirName, curPath);
-    return ::SalSplitGeneralPath(parent, title, errorTitle, selCount, path, afterRoot, secondPart,
-                                 pathIsDir, backslashAtEnd, dirName, curPath, mask, newDirs,
-                                 isTheSamePathF);
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::SalSplitGeneralPath(, , , %d, , , , %d, %d, , , , ,)",
+                        selCount, pathIsDir, backslashAtEnd);
+    if (path == NULL || mask == NULL || path == mask || path == newDirs || mask == newDirs)
+        return FALSE;
+    std::wstring ownedPath;
+    if (!sally::plugin_abi::ReadStringBuffer(*path, ownedPath) ||
+        afterRootOffset > ownedPath.size() || secondPartOffset > ownedPath.size())
+        return FALSE;
+    std::wstring ownedMask;
+    std::wstring ownedNewDirs;
+    const BOOL result = ::SalSplitGeneralPathOwnedW(
+        parent, title, errorTitle, selCount, ownedPath, afterRootOffset,
+        secondPartOffset, pathIsDir, backslashAtEnd, dirName, curPath,
+        ownedMask, newDirs != NULL ? &ownedNewDirs : NULL, isTheSamePathF);
+    if (ownedPath.size() >= (std::numeric_limits<DWORD>::max)() ||
+        ownedMask.size() >= (std::numeric_limits<DWORD>::max)() ||
+        ownedNewDirs.size() >= (std::numeric_limits<DWORD>::max)() ||
+        !sally::plugin_abi::ReserveStringBuffer(
+            *path, static_cast<DWORD>(ownedPath.size() + 1)) ||
+        !sally::plugin_abi::ReserveStringBuffer(
+            *mask, static_cast<DWORD>(ownedMask.size() + 1)) ||
+        (newDirs != NULL && !sally::plugin_abi::ReserveStringBuffer(
+                                *newDirs, static_cast<DWORD>(ownedNewDirs.size() + 1))))
+        return FALSE;
+    if (newDirs != NULL)
+        sally::plugin_abi::WriteStringBuffer(*newDirs, ownedNewDirs);
+    sally::plugin_abi::WriteStringBuffer(*mask, ownedMask);
+    sally::plugin_abi::WriteStringBuffer(*path, ownedPath);
+    return result;
 }
 
-BOOL CSalamanderGeneral::SalRemovePointsFromPath(char* afterRoot)
+BOOL CSalamanderGeneral::SalRemovePointsFromPath(
+    CSalamanderStringBuffer* afterRoot)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::SalRemovePointsFromPath(%s)", afterRoot);
-    return ::SalRemovePointsFromPath(afterRoot);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::SalRemovePointsFromPath()");
+    if (afterRoot == NULL)
+        return FALSE;
+    std::wstring path;
+    if (!sally::plugin_abi::ReadStringBuffer(*afterRoot, path))
+        return FALSE;
+    std::vector<wchar_t> buffer(path.begin(), path.end());
+    buffer.push_back(L'\0');
+    const BOOL result = ::SalRemovePointsFromPath(buffer.data());
+    if (!sally::plugin_abi::WriteStringBuffer(*afterRoot,
+                                               std::wstring(buffer.data())))
+        return FALSE;
+    return result;
 }
 
 BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int bufferSize, int* type)
@@ -2900,33 +3315,11 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
         break;
     }
 
-    case SALCFG_INFOLINECONTENT:
-    {
-        auxType = SALCFGTYPE_STRING;
-        auxDataSize = (int)strlen(Configuration.InfoLineContent) + 1;
-        if (auxDataSize > 200)
-            auxDataSize = 200; // we limited the required buffer to 200 characters
-        memcpy(auxBuf, Configuration.InfoLineContent, auxDataSize);
-        auxBuf[auxDataSize - 1] = 0;
-        break;
-    }
-
     case SALCFG_USERECYCLEBIN:
     {
         auxType = SALCFGTYPE_INT;
         auxDataSize = 4;
         *((DWORD*)auxBuf) = (DWORD)Configuration.UseRecycleBin;
-        break;
-    }
-
-    case SALCFG_RECYCLEBINMASKS:
-    {
-        auxType = SALCFGTYPE_STRING;
-        auxDataSize = (int)strlen(Configuration.RecycleMasks.GetMasksString()) + 1;
-        if (auxDataSize > MAX_PATH)
-            auxDataSize = MAX_PATH; // we limited the required buffer to MAX_PATH characters
-        memcpy(auxBuf, Configuration.RecycleMasks.GetMasksString(), auxDataSize);
-        auxBuf[auxDataSize - 1] = 0;
         break;
     }
 
@@ -2999,19 +3392,6 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
     case SALCFG_DRVSPECCDROMSIMPLE:
         *((DWORD*)auxBuf) = (DWORD)Configuration.DrvSpecCDROMSimple;
         break;
-
-    case SALCFG_IFPATHISINACCESSIBLEGOTO:
-    {
-        auxType = SALCFGTYPE_STRING;
-        CPathBuffer ifPathIsInaccessibleGoTo; // Heap-allocated for long path support
-        GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
-        auxDataSize = (int)strlen(ifPathIsInaccessibleGoTo) + 1;
-        if (auxDataSize > ifPathIsInaccessibleGoTo.Size())
-            auxDataSize = ifPathIsInaccessibleGoTo.Size(); // we limited the required buffer
-        memcpy(auxBuf, ifPathIsInaccessibleGoTo, auxDataSize);
-        auxBuf[auxDataSize - 1] = 0;
-        break;
-    }
 
     case SALCFG_VIEWEREOLCRLF:
         *((DWORD*)auxBuf) = (DWORD)Configuration.EOL_CRLF;
@@ -3092,18 +3472,70 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
     return ret;
 }
 
-void CSalamanderGeneral::AlterFileName(char* tgtName, char* srcName, int format, int changedParts,
-                                       BOOL isDir)
+BOOL CSalamanderGeneral::GetConfigParameterString(int paramID,
+                                                  CSalamanderStringBuffer* value)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::AlterFileName(, %s, %d, %d, %d)",
-                        srcName, format, changedParts, isDir);
-    ::AlterFileName(tgtName, srcName, -1, format, changedParts, isDir);
+    if (value == NULL || MainThreadID != GetCurrentThreadId())
+    {
+        SetLastError(value == NULL ? ERROR_INVALID_PARAMETER : ERROR_INVALID_THREAD_ID);
+        return FALSE;
+    }
+    try
+    {
+        std::wstring result;
+        switch (paramID)
+        {
+        case SALCFG_INFOLINECONTENT:
+            result = Configuration.InfoLineContent;
+            break;
+        case SALCFG_RECYCLEBINMASKS:
+            result = Configuration.RecycleMasks.GetMasksString();
+            break;
+        case SALCFG_IFPATHISINACCESSIBLEGOTO:
+            GetIfPathIsInaccessibleGoToW(result);
+            break;
+        default:
+            SetLastError(ERROR_NOT_FOUND);
+            return FALSE;
+        }
+        return sally::plugin_abi::WriteStringBuffer(*value, result);
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+    }
+    catch (...)
+    {
+        SetLastError(ERROR_GEN_FAILURE);
+    }
+    return FALSE;
 }
 
-void CSalamanderGeneral::CreateSafeWaitWindow(const char* message, const char* caption,
+BOOL CSalamanderGeneral::AlterFileName(const wchar_t* srcName, int format,
+                                      int changedParts, BOOL isDir,
+                                      CSalamanderStringBuffer* targetName)
+{
+    if (targetName == nullptr || srcName == nullptr)
+        return FALSE;
+
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::AlterFileName(, %ls, %d, %d, %d)",
+                        srcName, format, changedParts, isDir);
+    const std::wstring altered = ::AlterFileNameW(
+        srcName, format, changedParts, isDir != FALSE);
+    return sally::plugin_abi::WriteStringBuffer(*targetName, altered);
+}
+
+void CSalamanderGeneral::CreateSafeWaitWindow(const wchar_t* message, const wchar_t* caption,
                                               int delay, BOOL showCloseButton, HWND hForegroundWnd)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::CreateSafeWaitWindow(%s, , %d, %d, 0x%p)", message, delay, showCloseButton, hForegroundWnd);
+    CALL_STACK_MESSAGE6("CSalamanderGeneral::CreateSafeWaitWindow(%ls, %ls, %d, %d, 0x%p)",
+                        message ? message : L"(null)",
+                        caption ? caption : L"(null)",
+                        delay, showCloseButton, hForegroundWnd);
     ::CreateSafeWaitWindow(message, caption, delay, showCloseButton, hForegroundWnd);
 }
 
@@ -3125,16 +3557,21 @@ BOOL CSalamanderGeneral::GetSafeWaitWindowClosePressed()
     return ::GetSafeWaitWindowClosePressed();
 }
 
-void CSalamanderGeneral::SetSafeWaitWindowText(const char* message)
+// The conversion that was left here is now gone - it existed only
+// because the ABI was narrow while the wait window was already wide, and it
+// said so at the time ("dies when the ABI widens"). This is that moment: the
+// internal never had a narrow form, so widening the ABI removed a CP_ACP round
+// trip outright rather than relocating one.
+void CSalamanderGeneral::SetSafeWaitWindowText(const wchar_t* message)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::SetSafeWaitWindowText(%s)", message);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::SetSafeWaitWindowText(%ls)", message ? message : L"(null)");
     ::SetSafeWaitWindowText(message);
 }
 
-BOOL CSalamanderGeneral::GetFileFromCache(const char* uniqueFileName, const char*& tmpName,
+BOOL CSalamanderGeneral::GetFileFromCache(const wchar_t* uniqueFileName, const wchar_t*& tmpName,
                                           HANDLE fileLock)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetFileFromCache(%s, ,)", uniqueFileName);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetFileFromCache(%ls, ,)", uniqueFileName ? uniqueFileName : L"(null)");
     tmpName = NULL;
     if (uniqueFileName == NULL || fileLock == NULL)
     {
@@ -3143,7 +3580,7 @@ BOOL CSalamanderGeneral::GetFileFromCache(const char* uniqueFileName, const char
     }
 
     BOOL fileExists;
-    const char* name = DiskCache.GetName(uniqueFileName, NULL, &fileExists, FALSE, NULL, FALSE, NULL, NULL);
+    const wchar_t* name = DiskCache.GetName(uniqueFileName, NULL, &fileExists, FALSE, NULL, FALSE, NULL, NULL);
     if (name != NULL) // file found
     {
         if (!fileExists) // some helpful soul deleted it straight from the disk
@@ -3153,9 +3590,11 @@ BOOL CSalamanderGeneral::GetFileFromCache(const char* uniqueFileName, const char
         }
         else
         {
-            DiskCache.AssignName(uniqueFileName, fileLock, FALSE, crtCache);
-            tmpName = name;
-            return TRUE;
+            if (DiskCache.AssignName(uniqueFileName, fileLock, FALSE, crtCache))
+            {
+                tmpName = name;
+                return TRUE;
+            }
         }
     }
     return FALSE;
@@ -3170,12 +3609,15 @@ void CSalamanderGeneral::UnlockFileInCache(HANDLE fileLock)
     ResetEvent(fileLock); // finish cleaning up the file
 }
 
-BOOL CSalamanderGeneral::MoveFileToCache(const char* uniqueFileName, const char* nameInCache,
-                                         const char* rootTmpPath, const char* newFileName,
+BOOL CSalamanderGeneral::MoveFileToCache(const wchar_t* uniqueFileName, const wchar_t* nameInCache,
+                                         const wchar_t* rootTmpPath, const wchar_t* newFileName,
                                          const CQuadWord& newFileSize, BOOL* alreadyExists)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::MoveFileToCache(%s, %s, %s, %s, %g, )",
-                        uniqueFileName, nameInCache, rootTmpPath, newFileName, newFileSize.GetDouble());
+    CALL_STACK_MESSAGE6("CSalamanderGeneral::MoveFileToCache(%ls, %ls, %ls, %ls, %g, )",
+                        uniqueFileName ? uniqueFileName : L"(null)",
+                        nameInCache ? nameInCache : L"(null)",
+                        rootTmpPath ? rootTmpPath : L"(null)",
+                        newFileName ? newFileName : L"(null)", newFileSize.GetDouble());
     if (alreadyExists != NULL)
         *alreadyExists = FALSE;
     if (uniqueFileName == NULL || newFileName == NULL || nameInCache == NULL)
@@ -3185,9 +3627,9 @@ BOOL CSalamanderGeneral::MoveFileToCache(const char* uniqueFileName, const char*
     }
 
     // verify that 'nameInCache' is valid (a name without a path)
-    const char* s = nameInCache;
-    while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
-           *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
+    const wchar_t* s = nameInCache;
+    while (*s != 0 && *s != L'\\' && *s != L'/' && *s != L':' &&
+           *s >= 32 && *s != L'<' && *s != L'>' && *s != L'|' && *s != L'"')
         s++;
     if (nameInCache[0] == 0 || *s != 0)
     {
@@ -3197,7 +3639,7 @@ BOOL CSalamanderGeneral::MoveFileToCache(const char* uniqueFileName, const char*
 
     // add the file 'newFileName' to the disk cache under the name 'uniqueFileName'
     BOOL exists;
-    const char* fileName = DiskCache.GetName(uniqueFileName, nameInCache, &exists, TRUE, rootTmpPath, FALSE, NULL, NULL);
+    const wchar_t* fileName = DiskCache.GetName(uniqueFileName, nameInCache, &exists, TRUE, rootTmpPath, FALSE, NULL, NULL);
     if (fileName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")
     {
         if (alreadyExists != NULL)
@@ -3208,7 +3650,7 @@ BOOL CSalamanderGeneral::MoveFileToCache(const char* uniqueFileName, const char*
     if (!::SalMoveFile(newFileName, fileName))
     {
         DWORD err = GetLastError();
-        TRACE_E("Unable to move file to disk cache! (error " << ::GetErrorText(err) << ")");
+        TRACE_EW(L"Unable to move file to disk cache! (error " << ::GetErrorTextOwned(err).c_str() << L")");
         DiskCache.ReleaseName(uniqueFileName, FALSE); // nothing to keep in the cache
         return FALSE;
     }
@@ -3220,9 +3662,10 @@ BOOL CSalamanderGeneral::MoveFileToCache(const char* uniqueFileName, const char*
     }
 }
 
-void CSalamanderGeneral::RemoveOneFileFromCache(const char* uniqueFileName)
+void CSalamanderGeneral::RemoveOneFileFromCache(const wchar_t* uniqueFileName)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::RemoveOneFileFromCache(%s)", uniqueFileName);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::RemoveOneFileFromCache(%ls)",
+                        uniqueFileName ? uniqueFileName : L"(null)");
     if (uniqueFileName == NULL)
     {
         TRACE_E("Invalid parametr (NULL) in CSalamanderGeneral::RemoveOneFileFromCache!");
@@ -3231,9 +3674,10 @@ void CSalamanderGeneral::RemoveOneFileFromCache(const char* uniqueFileName)
     DiskCache.FlushOneFile(uniqueFileName);
 }
 
-void CSalamanderGeneral::RemoveFilesFromCache(const char* fileNamesRoot)
+void CSalamanderGeneral::RemoveFilesFromCache(const wchar_t* fileNamesRoot)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::RemoveFilesFromCache(%s)", fileNamesRoot);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::RemoveFilesFromCache(%ls)",
+                        fileNamesRoot ? fileNamesRoot : L"(null)");
     if (fileNamesRoot == NULL)
     {
         TRACE_E("Invalid parametr (NULL) in CSalamanderGeneral::RemoveFilesFromCache!");
@@ -3242,7 +3686,7 @@ void CSalamanderGeneral::RemoveFilesFromCache(const char* fileNamesRoot)
     DiskCache.FlushCache(fileNamesRoot);
 }
 
-BOOL CSalamanderGeneral::EnumConversionTables(HWND parent, int* index, const char** name, const char** table)
+BOOL CSalamanderGeneral::EnumConversionTables(HWND parent, int* index, const wchar_t** name, const char** table)
 {
     if (index == NULL)
     {
@@ -3254,9 +3698,9 @@ BOOL CSalamanderGeneral::EnumConversionTables(HWND parent, int* index, const cha
     return CodeTables.EnumCodeTables(parent, index, name, table);
 }
 
-BOOL CSalamanderGeneral::GetConversionTable(HWND parent, char* table, const char* conversion)
+BOOL CSalamanderGeneral::GetConversionTable(HWND parent, char* table, const wchar_t* conversion)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetConversionTable(, , %s)", conversion);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetConversionTable(, , %ls)", conversion);
     if (table == NULL)
     {
         TRACE_E("Invalid parametr (table==NULL) in CSalamanderGeneral::GetConversionTable!");
@@ -3272,20 +3716,28 @@ BOOL CSalamanderGeneral::GetConversionTable(HWND parent, char* table, const char
     return ret;
 }
 
-void CSalamanderGeneral::GetWindowsCodePage(HWND parent, char* codePage)
+BOOL CSalamanderGeneral::GetWindowsCodePage(
+    HWND parent, CSalamanderStringBuffer* codePage)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::GetWindowsCodePage(,)");
     parent = (parent == NULL ? MainWindow->HWindow : parent);
     CodeTables.Init(parent);
-    CodeTables.GetWinCodePage(codePage);
+    return codePage != NULL && sally::plugin_abi::WriteStringBuffer(
+                                   *codePage, CodeTables.GetWinCodePage());
 }
 
-void CSalamanderGeneral::RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL forceText,
-                                           BOOL* isText, char* codePage)
+void CSalamanderGeneral::RecognizeFileType(HWND parent, const char* pattern,
+                                           int patternLen, BOOL forceText,
+                                           BOOL* isText,
+                                           CSalamanderStringBuffer* codePage)
 {
     CALL_STACK_MESSAGE3("CSalamanderGeneral::RecognizeFileType(, , %d, %d, ,)", patternLen, forceText);
     parent = (parent == NULL ? MainWindow->HWindow : parent);
-    ::RecognizeFileType(parent, pattern, patternLen, forceText, isText, codePage);
+    std::wstring codePageValue;
+    ::RecognizeFileType(parent, pattern, patternLen, forceText, isText,
+                        codePage != NULL ? &codePageValue : NULL);
+    if (codePage != NULL)
+        sally::plugin_abi::WriteStringBuffer(*codePage, codePageValue);
 }
 
 BOOL CSalamanderGeneral::IsANSIText(const char* text, int textLen)
@@ -3307,9 +3759,10 @@ BOOL CSalamanderGeneral::IsANSIText(const char* text, int textLen)
     return s == end;
 }
 
-BOOL CSalamanderGeneral::SalMoveFile(const char* srcName, const char* destName, DWORD* err)
+// wide. %S is a wide string in a narrow format string under MSVC.
+BOOL CSalamanderGeneral::SalMoveFile(const wchar_t* srcName, const wchar_t* destName, DWORD* err)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::SalMoveFile(%s, %s,)", srcName, destName);
+    CALL_STACK_MESSAGE3("CSalamanderGeneral::SalMoveFile(%S, %S,)", srcName, destName);
     BOOL ret = ::SalMoveFile(srcName, destName);
     if (err != NULL)
         *err = GetLastError();
@@ -3322,13 +3775,24 @@ BOOL CSalamanderGeneral::SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err
     return ::SalGetFileSize(file, size, err);
 }
 
-BOOL CSalamanderGeneral::GetTargetDirectory(HWND parent, HWND hCenterWindow, const char* title,
-                                            const char* comment, char* path, BOOL onlyNet,
-                                            const char* initDir)
+BOOL CSalamanderGeneral::GetTargetDirectory(HWND parent, HWND hCenterWindow, const wchar_t* title,
+                                            const wchar_t* comment, CSalamanderStringBuffer* path,
+                                            BOOL onlyNet, const wchar_t* initDir)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetTargetDirectory(, , %s, %s, , %d, %s)",
-                        title, comment, onlyNet, initDir);
-    return ::GetTargetDirectory(parent, hCenterWindow, title, comment, path, onlyNet, initDir);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetTargetDirectory(, , , , , %d,)", onlyNet);
+    if (path == NULL)
+        return FALSE;
+
+    // Straight to the wide core. Note this bypasses the narrow ::GetTargetDirectory
+    // entirely, which is deliberate: that one takes an unsized char* and reaches
+    // ResolveNetHoodPath, so routing plugins through it is what made the documented MAX_PATH
+    // contract unsafe. 'title'/'initDir' may ALIAS 'path' (ftp does exactly that), so nothing is
+    // written to 'path' until the dialog has closed and both have been consumed.
+    std::wstring result;
+    if (!::GetTargetDirectoryW(parent, hCenterWindow, title, comment, result, onlyNet, initDir))
+        return FALSE;
+
+    return sally::plugin_abi::WriteStringBuffer(*path, result);
 }
 
 void CSalamanderGeneral::CallPluginOperationFromDisk(int panel, SalPluginOperationFromDisk callback,
@@ -3380,7 +3844,7 @@ void CSalamanderGeneral::CallPluginOperationFromDisk(int panel, SalPluginOperati
 
             BOOL subDir;
             if (p->Dirs->Count > 0)
-                subDir = (strcmp(p->Dirs->At(0).Name, "..") == 0);
+                subDir = (wcscmp(p->Dirs->At(0).Name, L"..") == 0);
             else
                 subDir = FALSE;
             if (oneIndex == 0 && subDir)
@@ -3397,11 +3861,11 @@ void CSalamanderGeneral::CallPluginOperationFromDisk(int panel, SalPluginOperati
         data.Dirs = p->Dirs;
         data.Files = p->Files;
         data.ArchiveDir = p->GetArchiveDir();
-        lstrcpyn(data.WorkPath, p->GetPath(), MAX_PATH);
+        data.WorkPathW = p->GetPathW();
         data.EnumLastDir = NULL;
         data.EnumLastIndex = -1;
 
-        callback(p->GetPath(), PanelEnumDiskSelection, &data, param);
+        callback(p->GetPathW(), PanelEnumDiskSelection, &data, param);
 
         if (count > 0)
             delete[] (data.Indexes);
@@ -3453,11 +3917,28 @@ class CSalamanderREGEXPSearchDataImp : public CSalamanderREGEXPSearchData
 protected:
     CRegularExpression REGEXP;
 
+    // Both Set and SetFlags rebuild the folded pattern, so the encoding has to be chosen
+    // before either of them runs - not once at construction, since a plugin may call
+    // SetFlags again with a different encoding on the same object.
+    void ApplyFoldEncoding(WORD flags)
+    {
+        REGEXP.SetFoldEncoding((flags & SASF_UTF8) != 0 ? CRegularExpression::FoldEncoding::Utf8
+                                                        : CRegularExpression::FoldEncoding::Acp);
+    }
+
 public:
     CSalamanderREGEXPSearchDataImp() : REGEXP() {}
 
-    virtual BOOL WINAPI Set(const char* pattern, WORD flags) { return REGEXP.Set(pattern, flags); }
-    virtual BOOL WINAPI SetFlags(WORD flags) { return REGEXP.SetFlags(flags); }
+    virtual BOOL WINAPI Set(const char* pattern, WORD flags)
+    {
+        ApplyFoldEncoding(flags);
+        return REGEXP.Set(pattern, flags);
+    }
+    virtual BOOL WINAPI SetFlags(WORD flags)
+    {
+        ApplyFoldEncoding(flags);
+        return REGEXP.SetFlags(flags);
+    }
     virtual const char* WINAPI GetLastErrorText() const { return REGEXP.GetLastErrorText(); }
     virtual const char* WINAPI GetPattern() const { return REGEXP.GetPattern(); }
     virtual BOOL WINAPI SetLine(const char* start, const char* end)
@@ -3537,10 +4018,10 @@ int GetWMCommandFromSalCmd(int salCmd)
     return -1;
 }
 
-BOOL CSalamanderGeneral::GetSalamanderCommand(int salCmd, char* nameBuf, int nameBufSize, BOOL* enabled,
-                                              int* type)
+BOOL CSalamanderGeneral::GetSalamanderCommand(
+    int salCmd, CSalamanderStringBuffer* name, BOOL* enabled, int* type)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::GetSalamanderCommand(%d, , %d, ,)", salCmd, nameBufSize);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetSalamanderCommand(%d, , ,)", salCmd);
     int index = 0;
     while (SalCommandsArray[index].SalCmd != -1)
     {
@@ -3549,10 +4030,9 @@ BOOL CSalamanderGeneral::GetSalamanderCommand(int salCmd, char* nameBuf, int nam
             // need to compute the command states; SalCommandsArray uses them
             MainWindow->OnEnterIdle();
 
-            if (nameBuf != NULL && nameBufSize > 0)
-            {
-                lstrcpyn(nameBuf, ::LoadStr(SalCommandsArray[index].TextID), nameBufSize);
-            }
+            if (name != NULL && !sally::plugin_abi::WriteStringBuffer(
+                                    *name, ::LoadStrW(SalCommandsArray[index].TextID)))
+                return FALSE;
             if (SalCommandsArray[index].Enabled != NULL)
             {
                 if (enabled != NULL)
@@ -3568,14 +4048,16 @@ BOOL CSalamanderGeneral::GetSalamanderCommand(int salCmd, char* nameBuf, int nam
     return FALSE;
 }
 
-BOOL CSalamanderGeneral::EnumSalamanderCommands(int* index, int* salCmd, char* nameBuf, int nameBufSize,
-                                                BOOL* enabled, int* type)
+BOOL CSalamanderGeneral::EnumSalamanderCommands(
+    int* index, int* salCmd, CSalamanderStringBuffer* name, BOOL* enabled,
+    int* type)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::EnumSalamanderCommands(, , , %d, ,)", nameBufSize);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::EnumSalamanderCommands(, , , ,)");
     if (salCmd != NULL)
         *salCmd = -1;
-    if (nameBuf != NULL && nameBufSize > 0)
-        nameBuf[0] = 0;
+    if (name != NULL &&
+        !sally::plugin_abi::WriteStringBuffer(*name, std::wstring()))
+        return FALSE;
     if (enabled != NULL)
         *enabled = TRUE;
     if (type != NULL)
@@ -3591,10 +4073,9 @@ BOOL CSalamanderGeneral::EnumSalamanderCommands(int* index, int* salCmd, char* n
 
         if (salCmd != NULL)
             *salCmd = SalCommandsArray[*index].SalCmd;
-        if (nameBuf != NULL && nameBufSize > 0)
-        {
-            lstrcpyn(nameBuf, ::LoadStr(SalCommandsArray[*index].TextID), nameBufSize);
-        }
+        if (name != NULL && !sally::plugin_abi::WriteStringBuffer(
+                                *name, ::LoadStrW(SalCommandsArray[*index].TextID)))
+            return FALSE;
         if (SalCommandsArray[*index].Enabled != NULL)
         {
             if (enabled != NULL)
@@ -3688,11 +4169,17 @@ protected:
 public:
     CSalamanderMaskGroupImp() : maskGroup() {}
 
-    virtual void WINAPI SetMasksString(const char* masks, BOOL extendedMode) { maskGroup.SetMasksString(masks, extendedMode); }
-    virtual void WINAPI GetMasksString(char* buffer) { lstrcpyn(buffer, maskGroup.GetMasksString(), MAX_GROUPMASK); }
+    // Straight onto CMaskGroup's wide primaries now that the class
+    // stores masks wide - no conversion at this layer at all.
+    virtual void WINAPI SetMasksString(const wchar_t* masks, BOOL extendedMode) { maskGroup.SetMasksString(masks, extendedMode); }
+    virtual BOOL WINAPI GetMasksString(CSalamanderStringBuffer* masks)
+    {
+        return masks != NULL && sally::plugin_abi::WriteStringBuffer(
+                                    *masks, maskGroup.GetMasksString());
+    }
     virtual BOOL WINAPI GetExtendedMode() { return maskGroup.GetExtendedMode(); }
     virtual BOOL WINAPI PrepareMasks(int& errorPos) { return maskGroup.PrepareMasks(errorPos); }
-    virtual BOOL WINAPI AgreeMasks(const char* fileName, const char* fileExt) { return maskGroup.AgreeMasks(fileName, fileExt); }
+    virtual BOOL WINAPI AgreeMasks(const wchar_t* fileName, const wchar_t* fileExt) { return maskGroup.AgreeMasks(fileName, fileExt); }
 };
 
 CSalamanderMaskGroup*
@@ -3750,10 +4237,43 @@ void CSalamanderGeneral::FreeSalamanderMD5(CSalamanderMD5* md5)
         delete ((CSalamanderMD5Imp*)md5);
 }
 
-BOOL CSalamanderGeneral::LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount)
+BOOL CSalamanderGeneral::LookForSubTexts(CSalamanderStringBuffer* text,
+                                         CSalamanderTextRangeBuffer* varPlacements)
 {
     CALL_STACK_MESSAGE_NONE
-    return ::LookForSubTexts(text, varPlacements, varPlacementsCount);
+    if (text == NULL || varPlacements == NULL)
+        return FALSE;
+    std::wstring parsed;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, parsed))
+        return FALSE;
+    std::vector<sally::unicode::WideTextRange> parsedRanges;
+    if (!::LookForSubTexts(parsed, parsedRanges))
+        return FALSE;
+    try
+    {
+        std::vector<CSalamanderTextRange> publishedRanges;
+        publishedRanges.reserve(parsedRanges.size());
+        for (const sally::unicode::WideTextRange& range : parsedRanges)
+        {
+            if (range.Offset > (std::numeric_limits<DWORD>::max)() ||
+                range.Length > (std::numeric_limits<DWORD>::max)())
+                return FALSE;
+            publishedRanges.push_back(
+                {static_cast<DWORD>(range.Offset), static_cast<DWORD>(range.Length)});
+        }
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *text, *varPlacements, parsed, publishedRanges)
+                   ? TRUE
+                   : FALSE;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        return FALSE;
+    }
 }
 
 void CSalamanderGeneral::WaitForESCRelease()
@@ -3824,62 +4344,69 @@ BOOL CSalamanderGeneral::IsFirstInstance3OrLater()
     return FirstInstance_3_or_later;
 }
 
-int CSalamanderGeneral::ExpandPluralString(char* buffer, int bufferSize, const char* format,
-                                           int parametersCount, const CQuadWord* parametersArray)
+BOOL CSalamanderGeneral::ExpandPluralString(const wchar_t* format,
+                                            int parametersCount,
+                                            const CQuadWord* parametersArray,
+                                            CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::ExpandPluralString(, %d, %s, %d, )",
-                        bufferSize, format, parametersCount);
-    return ::ExpandPluralString(buffer, bufferSize, format, parametersCount, parametersArray);
+    CALL_STACK_MESSAGE3("CSalamanderGeneral::ExpandPluralString(%ls, %d, ,)",
+                        format, parametersCount);
+    return text != NULL && format != NULL &&
+           sally::plugin_abi::WriteStringBuffer(
+               *text, ExpandPluralStringOwnedW(format, parametersCount,
+                                                parametersArray));
 }
 
-int CSalamanderGeneral::ExpandPluralFilesDirs(char* buffer, int bufferSize, int files, int dirs,
-                                              int mode, BOOL forDlgCaption)
+BOOL CSalamanderGeneral::ExpandPluralFilesDirs(int files, int dirs, int mode,
+                                               BOOL forDlgCaption,
+                                               CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::ExpandPluralFilesDirs(, %d, %d, %d, %d, %d)",
-                        bufferSize, files, dirs, (int)mode, forDlgCaption);
-    return ::ExpandPluralFilesDirs(buffer, bufferSize, files, dirs, mode, forDlgCaption);
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::ExpandPluralFilesDirs(%d, %d, %d, %d,)",
+                        files, dirs, mode, forDlgCaption);
+    return text != NULL && sally::plugin_abi::WriteStringBuffer(
+                               *text, ExpandPluralFilesDirsTextW(
+                                          files, dirs, mode, forDlgCaption));
 }
 
-int CSalamanderGeneral::ExpandPluralBytesFilesDirs(char* buffer, int bufferSize,
-                                                   const CQuadWord& selectedBytes, int files, int dirs,
-                                                   BOOL useSubTexts)
+BOOL CSalamanderGeneral::ExpandPluralBytesFilesDirs(
+    const CQuadWord& selectedBytes, int files, int dirs, BOOL useSubTexts,
+    CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::FreeSalamanderMaskGroup(, %d, %g, %d, %d, %d)",
-                        bufferSize, selectedBytes.GetDouble(), files, dirs, useSubTexts);
-    return ::ExpandPluralBytesFilesDirs(buffer, bufferSize, selectedBytes, files, dirs, useSubTexts);
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::ExpandPluralBytesFilesDirs(%g, %d, %d, %d,)",
+                        selectedBytes.GetDouble(), files, dirs, useSubTexts);
+    return text != NULL && sally::plugin_abi::WriteStringBuffer(
+                               *text, ExpandPluralBytesFilesDirsTextW(
+                                          selectedBytes, files, dirs,
+                                          useSubTexts));
 }
 
-void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourceDescrSize,
-                                                    int panel, int selectedFiles, int selectedDirs,
-                                                    const char* fileOrDirName, BOOL isDir,
-                                                    BOOL forDlgCaption)
+BOOL CSalamanderGeneral::GetCommonFSOperSourceDescr(
+    int panel, int selectedFiles, int selectedDirs,
+    const wchar_t* fileOrDirName, BOOL isDir, BOOL forDlgCaption,
+    CSalamanderStringBuffer* sourceDescr)
 {
-    CALL_STACK_MESSAGE8("CSalamanderGeneral::GetCommonFSOperSourceDescr(, %d, %d, %d, %d, %s, %d, %d)",
-                        sourceDescrSize, panel, selectedFiles, selectedDirs, fileOrDirName,
-                        isDir, forDlgCaption);
+    CALL_STACK_MESSAGE6("CSalamanderGeneral::GetCommonFSOperSourceDescr(%d, %d, %d, , %d, %d,)",
+                        panel, selectedFiles, selectedDirs, isDir, forDlgCaption);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::GetCommonFSOperSourceDescr() only from main thread!");
-        return;
+        return FALSE;
     }
-    if (sourceDescrSize <= 0)
-        return;
     if (sourceDescr == NULL)
     {
         TRACE_E("CSalamanderGeneral::GetCommonFSOperSourceDescr(): 'sourceDescr' may not be NULL!");
-        return;
+        return FALSE;
     }
     if (selectedFiles + selectedDirs <= 1 && panel == -1 && fileOrDirName == NULL)
     {
         TRACE_E("CSalamanderGeneral::GetCommonFSOperSourceDescr(): 'fileOrDirName' may not be NULL!");
-        sourceDescr[0] = 0;
-        return;
+        return FALSE;
     }
+    std::wstring description;
     if (selectedFiles + selectedDirs <= 1) // one selected item or the focus
     {
         BOOL nameIsDir;
-        char* name;
-        CPathBuffer nameBuf; // Heap-allocated for long path support
+        std::wstring name;
         if (panel != -1)
         {
             const CFileData* f;
@@ -3891,57 +4418,87 @@ void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourc
                 f = GetPanelSelectedItem(panel, &index, &nameIsDir);
             }
             if (f != NULL && f->Name != NULL)
+            {
+                // CFileData::Name is already the exact wide form; the retired
+                // NameW/UseWideName() split (since removed) no longer applies.
                 name = f->Name;
+            }
             else
             {
                 TRACE_E("Unexpected situation in CSalamanderGeneral::GetCommonFSOperSourceDescr()!");
-                sourceDescr[0] = 0;
-                return;
+                return FALSE;
             }
         }
         else
         {
-            lstrcpyn(nameBuf, fileOrDirName, nameBuf.Size());
-            name = nameBuf;
+            name = (fileOrDirName != NULL) ? fileOrDirName : L"";
             nameIsDir = isDir;
         }
         int fileNameFormat;
         GetConfigParameter(SALCFG_FILENAMEFORMAT, &fileNameFormat,
                            sizeof(fileNameFormat), NULL);
-        CPathBuffer formatedFileName;
-        ::AlterFileName(formatedFileName, name, -1, fileNameFormat, 0, nameIsDir);
-        _snprintf_s(sourceDescr, sourceDescrSize, _TRUNCATE,
-                    ::LoadStr(nameIsDir ? (forDlgCaption ? IDS_DLG_QUESTION_DIRECTORY : IDS_QUESTION_DIRECTORY) : (forDlgCaption ? IDS_DLG_QUESTION_FILE : IDS_QUESTION_FILE)),
-                    formatedFileName.Get());
+        const std::wstring formatedFileName =
+            ::AlterFileNameW(name.c_str(), fileNameFormat, 0, nameIsDir != FALSE);
+        description = FormatStrW(
+            ::LoadStrW(nameIsDir ? (forDlgCaption ? IDS_DLG_QUESTION_DIRECTORY : IDS_QUESTION_DIRECTORY) : (forDlgCaption ? IDS_DLG_QUESTION_FILE : IDS_QUESTION_FILE)),
+            formatedFileName.c_str());
     }
     else // multiple directories and files
     {
-        ExpandPluralFilesDirs(sourceDescr, sourceDescrSize, selectedFiles, selectedDirs,
-                              epfdmNormal, forDlgCaption);
+        description = ExpandPluralFilesDirsTextW(
+            selectedFiles, selectedDirs, epfdmNormal, forDlgCaption);
     }
+    return sally::plugin_abi::WriteStringBuffer(*sourceDescr, description);
 }
 
-void CSalamanderGeneral::AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr)
+BOOL CSalamanderGeneral::AddStrToStr(CSalamanderStringBuffer* dstText,
+                                    const wchar_t* srcStr)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::AddStrToStr(, ,)");
-    if (dstBufSize < 2)
+    if (dstText == NULL || srcStr == NULL)
+        return FALSE;
+    std::wstring text;
+    if (!sally::plugin_abi::ReadStringBuffer(*dstText, text))
+        return FALSE;
+    try
     {
-        TRACE_E("CSalamanderGeneral::AddStrToStr(): dstBufSize must be greater or equal to 2");
-        return;
+        const std::wstring::size_type embeddedNull = text.find(L'\0');
+        if (embeddedNull != std::wstring::npos)
+            text.resize(embeddedNull);
+        text.push_back(L'\0');
+        text.append(srcStr);
     }
-    ::AddStrToStr(dstStr, dstBufSize, srcStr);
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+    return sally::plugin_abi::WriteStringBuffer(*dstText, text);
 }
 
-BOOL CSalamanderGeneral::SalIsValidFileNameComponent(const char* fileNameComponent)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::SalIsValidFileNameComponent(const wchar_t* fileNameComponent)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalIsValidFileNameComponent()");
-    return ::SalIsValidFileNameComponent(fileNameComponent);
+    return ::SalIsValidFileNameComponentW(fileNameComponent);
 }
 
-void CSalamanderGeneral::SalMakeValidFileNameComponent(char* fileNameComponent)
+BOOL CSalamanderGeneral::SalMakeValidFileNameComponent(
+    CSalamanderStringBuffer* fileNameComponent)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalMakeValidFileNameComponent()");
-    ::SalMakeValidFileNameComponent(fileNameComponent);
+    if (fileNameComponent == NULL)
+        return FALSE;
+    std::wstring input;
+    if (!sally::plugin_abi::ReadStringBuffer(*fileNameComponent, input))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(
+        *fileNameComponent, ::SalMakeValidFileNameComponentW(input.c_str()));
 }
 
 BOOL CSalamanderGeneral::IsFileEnumSourcePanel(int srcUID, int* panel)
@@ -3950,12 +4507,15 @@ BOOL CSalamanderGeneral::IsFileEnumSourcePanel(int srcUID, int* panel)
     return ::IsFileEnumSourcePanel(srcUID, panel);
 }
 
-BOOL CSalamanderGeneral::GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
-                                                  BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                                  char* fileName, BOOL* noMoreFiles, BOOL* srcBusy)
+BOOL CSalamanderGeneral::GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                                                   BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                                                   CSalamanderStringBuffer* fileName, BOOL* noMoreFiles, BOOL* srcBusy)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetNextFileNameForViewer(%d, , , %d, %d, %s, ,)",
-                        srcUID, preferSelected, onlyAssociatedExtensions, fileName);
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetNextFileNameForViewer(%d, , , %d, %d, %ls, ,)",
+                        srcUID, preferSelected, onlyAssociatedExtensions,
+                        fileName != NULL && fileName->Data != NULL
+                            ? fileName->Data
+                            : L"");
     if (fileName == NULL || lastFileIndex == NULL)
     {
         if (noMoreFiles != NULL)
@@ -3974,17 +4534,34 @@ BOOL CSalamanderGeneral::GetNextFileNameForViewer(int srcUID, int* lastFileIndex
         TRACE_E("CSalamanderGeneral::GetNextFileNameForViewer(): unexpected call, plugin is not initialized yet!");
         return FALSE;
     }
-    return ::GetNextFileNameForViewer(srcUID, lastFileIndex, lastFileName, preferSelected,
-                                      onlyAssociatedExtensions, fileName,
-                                      noMoreFiles, srcBusy, Plugin);
+    int stagedIndex = *lastFileIndex;
+    BOOL stagedNoMoreFiles = FALSE;
+    BOOL stagedSrcBusy = FALSE;
+    std::wstring stagedFileName;
+    const BOOL result = ::GetNextFileNameForViewer(
+        srcUID, &stagedIndex, lastFileName, preferSelected,
+        onlyAssociatedExtensions, &stagedFileName, &stagedNoMoreFiles,
+        &stagedSrcBusy, Plugin);
+    if (result && !sally::plugin_abi::WriteStringBuffer(*fileName,
+                                                        stagedFileName))
+        return FALSE;
+    *lastFileIndex = stagedIndex;
+    if (noMoreFiles != NULL)
+        *noMoreFiles = stagedNoMoreFiles;
+    if (srcBusy != NULL)
+        *srcBusy = stagedSrcBusy;
+    return result;
 }
 
-BOOL CSalamanderGeneral::GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
-                                                      BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                                      char* fileName, BOOL* noMoreFiles, BOOL* srcBusy)
+BOOL CSalamanderGeneral::GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                                                       BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                                                       CSalamanderStringBuffer* fileName, BOOL* noMoreFiles, BOOL* srcBusy)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetPreviousFileNameForViewer(%d, , , %d, %d, %s, ,)",
-                        srcUID, preferSelected, onlyAssociatedExtensions, fileName);
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetPreviousFileNameForViewer(%d, , , %d, %d, %ls, ,)",
+                        srcUID, preferSelected, onlyAssociatedExtensions,
+                        fileName != NULL && fileName->Data != NULL
+                            ? fileName->Data
+                            : L"");
     if (fileName == NULL || lastFileIndex == NULL)
     {
         if (noMoreFiles != NULL)
@@ -4003,13 +4580,27 @@ BOOL CSalamanderGeneral::GetPreviousFileNameForViewer(int srcUID, int* lastFileI
         TRACE_E("CSalamanderGeneral::GetPreviousFileNameForViewer(): unexpected call, plugin is not initialized yet!");
         return FALSE;
     }
-    return ::GetPreviousFileNameForViewer(srcUID, lastFileIndex, lastFileName, preferSelected,
-                                          onlyAssociatedExtensions, fileName,
-                                          noMoreFiles, srcBusy, Plugin);
+    int stagedIndex = *lastFileIndex;
+    BOOL stagedNoMoreFiles = FALSE;
+    BOOL stagedSrcBusy = FALSE;
+    std::wstring stagedFileName;
+    const BOOL result = ::GetPreviousFileNameForViewer(
+        srcUID, &stagedIndex, lastFileName, preferSelected,
+        onlyAssociatedExtensions, &stagedFileName, &stagedNoMoreFiles,
+        &stagedSrcBusy, Plugin);
+    if (result && !sally::plugin_abi::WriteStringBuffer(*fileName,
+                                                        stagedFileName))
+        return FALSE;
+    *lastFileIndex = stagedIndex;
+    if (noMoreFiles != NULL)
+        *noMoreFiles = stagedNoMoreFiles;
+    if (srcBusy != NULL)
+        *srcBusy = stagedSrcBusy;
+    return result;
 }
 
 BOOL CSalamanderGeneral::IsFileNameForViewerSelected(int srcUID, int lastFileIndex,
-                                                     const char* lastFileName,
+                                                     const wchar_t* lastFileName,
                                                      BOOL* isFileSelected, BOOL* srcBusy)
 {
     CALL_STACK_MESSAGE3("CSalamanderGeneral::IsFileNameForViewerSelected(%d, %d, , , ,)",
@@ -4026,7 +4617,7 @@ BOOL CSalamanderGeneral::IsFileNameForViewerSelected(int srcUID, int lastFileInd
 }
 
 BOOL CSalamanderGeneral::SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex,
-                                                         const char* lastFileName, BOOL select,
+                                                         const wchar_t* lastFileName, BOOL select,
                                                          BOOL* srcBusy)
 {
     CALL_STACK_MESSAGE4("CSalamanderGeneral::SetSelectionOnFileNameForViewer(%d, %d, , %d,)",
@@ -4034,7 +4625,7 @@ BOOL CSalamanderGeneral::SetSelectionOnFileNameForViewer(int srcUID, int lastFil
     return ::SetSelectionOnFileNameForViewer(srcUID, lastFileIndex, lastFileName, select, srcBusy);
 }
 
-BOOL CSalamanderGeneral::GetStdHistoryValues(int historyID, char*** historyArr, int* historyItemsCount)
+BOOL CSalamanderGeneral::GetStdHistoryValues(int historyID, wchar_t*** historyArr, int* historyItemsCount)
 {
     CALL_STACK_MESSAGE2("CSalamanderGeneral::GetStdHistoryValues(%d, ,)", historyID);
     if (MainThreadID != GetCurrentThreadId())
@@ -4104,10 +4695,10 @@ BOOL CSalamanderGeneral::GetStdHistoryValues(int historyID, char*** historyArr, 
     }
 }
 
-void CSalamanderGeneral::AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
-                                                    const char* value, BOOL caseSensitiveValue)
+void CSalamanderGeneral::AddValueToStdHistoryValues(wchar_t** historyArr, int historyItemsCount,
+                                                    const wchar_t* value, BOOL caseSensitiveValue)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::AddValueToStdHistoryValues(, %d, %s, %d)",
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::AddValueToStdHistoryValues(, %d, %ls, %d)",
                         historyItemsCount, value, caseSensitiveValue);
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -4122,7 +4713,7 @@ void CSalamanderGeneral::AddValueToStdHistoryValues(char** historyArr, int histo
     ::AddValueToStdHistoryValues(historyArr, historyItemsCount, value, caseSensitiveValue);
 }
 
-void CSalamanderGeneral::LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount)
+void CSalamanderGeneral::LoadComboFromStdHistoryValues(HWND combo, wchar_t** historyArr, int historyItemsCount)
 {
     CALL_STACK_MESSAGE2("CSalamanderGeneral::LoadComboFromStdHistoryValues(, , %d)",
                         historyItemsCount);
@@ -4131,7 +4722,7 @@ void CSalamanderGeneral::LoadComboFromStdHistoryValues(HWND combo, char** histor
         TRACE_E("You can call CSalamanderGeneral::LoadComboFromStdHistoryValues() only from main thread!");
         return;
     }
-    if (historyArr == NULL)
+    if (historyArr == NULL && historyItemsCount > 0)
     {
         TRACE_E("CSalamanderGeneral::LoadComboFromStdHistoryValues(): 'historyArr' may not be NULL!");
         return;
@@ -4196,9 +4787,9 @@ void CSalamanderGeneral::PostOpenPackDlgForThisPlugin(int delFilesAfterPacking)
     }
 }
 
-void CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin(const char* unpackMask)
+void CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin(const wchar_t* unpackMask)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin(%s)", unpackMask);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin()");
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin() only from main thread!");
@@ -4222,7 +4813,7 @@ void CSalamanderGeneral::PostOpenUnpackDlgForThisPlugin(const char* unpackMask)
 }
 
 HANDLE
-CSalamanderGeneral::SalCreateFileEx(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+CSalamanderGeneral::SalCreateFileEx(const wchar_t* fileName, DWORD desiredAccess, DWORD shareMode,
                                     DWORD flagsAndAttributes, DWORD* err)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalCreateFileEx()");
@@ -4232,10 +4823,11 @@ CSalamanderGeneral::SalCreateFileEx(const char* fileName, DWORD desiredAccess, D
     return ret;
 }
 
-BOOL CSalamanderGeneral::SalCreateDirectoryEx(const char* name, DWORD* err)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::SalCreateDirectoryEx(const wchar_t* name, DWORD* err)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalCreateDirectoryEx()");
-    return ::SalCreateDirectoryEx(name, err);
+    return ::SalCreateDirectoryExW(name, err);
 }
 
 void CSalamanderGeneral::PanelStopMonitoring(int panel, BOOL stopMonitoring)
@@ -4414,11 +5006,8 @@ CSalamanderGeneral::GetSalamanderIcon(int icon, int iconSize)
     return list->GetIcon(iconIndex, FALSE);
 }
 
-BOOL CSalamanderGeneral::GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* hIcon, int iconSize,
-                                     BOOL fallbackToDefIcon, BOOL defIconIsDir)
+static CIconSizeEnum GetPluginIconSize(int iconSize)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetFileIcon(, %d, , %d, %d, %d)",
-                        pathIsPIDL, iconSize, fallbackToDefIcon, defIconIsDir);
     CIconSizeEnum salIconSize;
     switch (iconSize)
     {
@@ -4437,13 +5026,33 @@ BOOL CSalamanderGeneral::GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* h
         salIconSize = ICONSIZE_16;
     }
     }
-    return ::GetFileIcon(path, pathIsPIDL, hIcon, salIconSize, fallbackToDefIcon, defIconIsDir);
+    return salIconSize;
+}
+
+BOOL CSalamanderGeneral::GetFileIcon(const wchar_t* path, HICON* hIcon,
+                                     int iconSize, BOOL fallbackToDefIcon,
+                                     BOOL defIconIsDir)
+{
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetFileIcon(%ls, , %d, %d, %d)",
+                        path, iconSize, fallbackToDefIcon, defIconIsDir);
+    return ::GetFileIcon(path, hIcon, GetPluginIconSize(iconSize),
+                         fallbackToDefIcon, defIconIsDir);
+}
+
+BOOL CSalamanderGeneral::GetFileIconFromPIDL(LPCITEMIDLIST pidl, HICON* hIcon,
+                                             int iconSize, BOOL fallbackToDefIcon,
+                                             BOOL defIconIsDir)
+{
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::GetFileIconFromPIDL(%p, , %d, %d, %d)",
+                        pidl, iconSize, fallbackToDefIcon, defIconIsDir);
+    return ::GetFileIconFromPIDL(pidl, hIcon, GetPluginIconSize(iconSize),
+                                 fallbackToDefIcon, defIconIsDir);
 }
 
 class CSalamanderPNG : public CSalamanderPNGAbstract
 {
 public:
-    virtual HBITMAP WINAPI LoadPNGBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName, DWORD flags, COLORREF unused)
+    virtual HBITMAP WINAPI LoadPNGBitmap(HINSTANCE hInstance, LPCWSTR lpBitmapName, DWORD flags, COLORREF unused)
     {
         HBITMAP hBitmap = ::LoadPNGBitmap(hInstance, lpBitmapName, flags);
         if (hBitmap != NULL) // the handle is handed over to the plug-in; the plug-in is responsible for destroying it, remove it from Salamander HANDLES
@@ -4556,10 +5165,14 @@ CSalamanderGeneral::GetSalamanderCrypt()
     return &SalamanderCrypt;
 }
 
-BOOL CSalamanderGeneral::FileExists(const char* fileName)
+// wide. The wide internal was added in the same commit - this
+// method was deferred in an earlier batch precisely because it did not exist,
+// and widening the signature over a narrowing implementation would have moved
+// the loss inward rather than removing it.
+BOOL CSalamanderGeneral::FileExists(const wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::FileExists(%s)", fileName);
-    return ::FileExists(fileName);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::FileExists(%S)", fileName);
+    return ::FileExistsW(fileName);
 }
 
 void CSalamanderGeneral::DisconnectFSFromPanel(HWND parent, int panel)
@@ -4570,20 +5183,28 @@ void CSalamanderGeneral::DisconnectFSFromPanel(HWND parent, int panel)
         TRACE_E("You can call CSalamanderGeneral::DisconnectFSFromPanel() only from main thread!");
         return;
     }
-    CPathBuffer buf; // Heap-allocated for long path support
+    // The path stays wide ALL the way through now. ChangePanelPathToDisk
+    // used to be the narrow final hop (panel chain at the time), which is
+    // why this used to refuse rather than guess for any path CP_ACP could not spell
+    // exactly - falling through to the rescue path below for a perfectly valid
+    // Unicode-only "last visited path". ChangePanelPathToDisk is wide now (routes to
+    // ChangePathToDisk), so that refusal is gone: it was compensating for a narrow
+    // SDK method, not a fundamental limit.
     BOOL rescueOrFixed = TRUE;
-    if (GetLastWindowsPanelPath(panel, buf, buf.Size()))
+    CFilesWindow* sourcePanel = GetPanel(panel);
+    if (sourcePanel != NULL)
     { // change the path to the last visited Windows path
         BOOL tryNet = FALSE;
         DWORD err;
         DWORD lastErr;
         BOOL pathInvalid;
         BOOL cut;
-        if (::SalCheckAndRestorePathWithCut(parent, buf, tryNet, err, lastErr,
-                                            pathInvalid, cut, TRUE))
+        std::wstring pathW(sourcePanel->GetPathW());
+        if (::SalCheckAndRestorePathWithCutW(parent, pathW, tryNet, err, lastErr,
+                                             pathInvalid, cut, TRUE))
         {
             int failReason;
-            if (ChangePanelPathToDisk(panel, buf, &failReason) ||
+            if (ChangePanelPathToDisk(panel, pathW.c_str(), &failReason) ||
                 failReason != CHPPFR_INVALIDPATH) // except for the "bad path" error (closing the FS was refused, etc.)
             {
                 rescueOrFixed = FALSE;
@@ -4594,9 +5215,9 @@ void CSalamanderGeneral::DisconnectFSFromPanel(HWND parent, int panel)
         ChangePanelPathToRescuePathOrFixedDrive(panel); // "always false"
 }
 
-BOOL CSalamanderGeneral::IsArchiveHandledByThisPlugin(const char* name)
+BOOL CSalamanderGeneral::IsArchiveHandledByThisPlugin(const wchar_t* name)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::IsArchiveHandledByThisPlugin(%s)", name);
+    CALL_STACK_MESSAGE2("CSalamanderGeneral::IsArchiveHandledByThisPlugin(%S)", name);
     if (Plugin == NULL || (INT_PTR)Plugin == -1)
     {
         TRACE_E("CSalamanderGeneral::IsArchiveHandledByThisPlugin() unexpected call, plugin is not initialized yet!");
@@ -4632,7 +5253,7 @@ CSalamanderGeneral::GetIconLRFlags()
     return IconLRFlags;
 }
 
-int CSalamanderGeneral::IsFileLink(const char* fileExtension)
+int CSalamanderGeneral::IsFileLink(const wchar_t* fileExtension)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE1("CSalamanderGeneral::IsFileLink()");
@@ -4648,26 +5269,26 @@ CSalamanderGeneral::GetImageListColorFlags()
     return ::GetImageListColorFlags();
 }
 
-void CSalamanderGeneral::SetHelpFileName(const char* chmName)
+void CSalamanderGeneral::SetHelpFileName(const wchar_t* chmName)
 {
     CALL_STACK_MESSAGE_NONE
     if (chmName == NULL || *chmName == 0)
         TRACE_E("CSalamanderGeneral::SetHelpFileName(): invalid parameter 'chmName'.");
     else
-        lstrcpyn(HelpFileName.Get(), chmName, SAL_MAX_LONG_PATH);
+        HelpFileName = chmName;
 }
 
 BOOL CSalamanderGeneral::OpenHtmlHelp(HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)
 {
     CALL_STACK_MESSAGE4("CSalamanderGeneral::OpenHtmlHelp(, %d, %Iu, %d)", command, dwData, quiet);
-    if (HelpFileName[0] == 0)
+    if (HelpFileName.empty())
     {
         TRACE_E("CSalamanderGeneral::OpenHtmlHelp(): plugin must call CSalamanderGeneral::SetHelpFileName() first!");
         return FALSE;
     }
     else
     {
-        return ::OpenHtmlHelp(HelpFileName, parent, command, dwData, quiet);
+        return ::OpenHtmlHelp(HelpFileName.c_str(), parent, command, dwData, quiet);
     }
 }
 
@@ -4692,11 +5313,11 @@ BOOL CSalamanderGeneral::OpenHtmlHelpForSalamander(HWND parent, CHtmlHelpCommand
     return ::OpenHtmlHelp(NULL, parent, command, newData, quiet);
 }
 
-BOOL CSalamanderGeneral::PathsAreOnTheSameVolume(const char* path1, const char* path2,
+BOOL CSalamanderGeneral::PathsAreOnTheSameVolume(const wchar_t* path1, const wchar_t* path2,
                                                  BOOL* resIsOnlyEstimation)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::PathsAreOnTheSameVolume(, ,)");
-    return ::PathsAreOnTheSameVolume(path1, path2, resIsOnlyEstimation);
+    return ::PathsAreOnTheSameVolumeW(path1, path2, resIsOnlyEstimation);
 }
 
 BOOL CSalamanderGeneral::SafeGetOpenFileName(LPOPENFILENAME lpofn)
@@ -4742,13 +5363,17 @@ void CSalamanderGeneral::SetPluginUsesPasswordManager()
 }
 
 void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL forItems, int menuX,
-                                                int menuY, const char* netPath, char* newlyMappedDrive)
+                                                int menuY, const wchar_t* netPathW, wchar_t* newlyMappedDrive)
 {
-    CALL_STACK_MESSAGE6("CSalamanderGeneral::OpenNetworkContextMenu(, %d, %d, %d, %d, %s,)",
-                        panel, forItems, menuX, menuY, netPath);
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::OpenNetworkContextMenu(, %d, %d, %d, %d, ,)",
+                        panel, forItems, menuX, menuY);
 
     if (newlyMappedDrive != NULL)
         *newlyMappedDrive = 0;
+
+    // Keep the public route wide. The special "\\" and "\server" shell
+    // namespace forms cannot bind through SHParseDisplayName, so the network-root helper owns
+    // the one necessary ACP fallback when it walks that namespace.
 
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -4756,9 +5381,9 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
         return;
     }
 
-    if (netPath == NULL || netPath[0] != '\\' || netPath[1] != '\\' || strchr(netPath + 2, '\\') != NULL)
+    if (netPathW == NULL || netPathW[0] != L'\\' || netPathW[1] != L'\\' || wcschr(netPathW + 2, L'\\') != NULL)
     {
-        TRACE_E("CSalamanderGeneral::OpenNetworkContextMenu(): invalid netPath: " << (netPath != NULL ? netPath : "(null)"));
+        TRACE_E("CSalamanderGeneral::OpenNetworkContextMenu(): invalid netPath");
         return;
     }
 
@@ -4774,7 +5399,7 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
         {
             BOOL subDir;
             if (p->Dirs->Count > 0)
-                subDir = (strcmp(p->Dirs->At(0).Name, "..") == 0);
+                subDir = (wcscmp(p->Dirs->At(0).Name, L"..") == 0);
             else
                 subDir = FALSE;
 
@@ -4808,12 +5433,12 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = p;
-                p->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, netPath, (count == 0) ? 1 : count,
+                p->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, netPathW, (count == 0) ? 1 : count,
                                                      EnumFileNames, &data);
             }
             else
             {
-                p->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, netPath);
+                p->ContextMenu = CreateNetworkRootContextMenu(MainWindow->HWindow, netPathW);
             }
 
             HMENU h = CreatePopupMenu();
@@ -4841,28 +5466,24 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
                 {
                     CALL_STACK_MESSAGE1("CSalamanderGeneral::OpenNetworkContextMenu::exec");
 
-                    char cmdName[2000]; // deliberately 2000 instead of 200; shell extensions sometimes write double (considering: Unicode = 2 * "number of characters"), etc.
-                    if (AuxGetCommandString(p->ContextMenu, cmd, GCS_VERB, NULL, cmdName, 200) != NOERROR)
-                        cmdName[0] = 0;
+                    std::wstring cmdName;
+                    AuxGetCommandString(p->ContextMenu, cmd, GCS_VERBW, NULL, cmdName);
 
                     // the Map Network Drive command is 40 on XP, 43 on W2K, and only under Vista has a defined cmdName
-                    if ((stricmp(cmdName, "connectNetworkDrive") == 0 ||
+                    if ((_wcsicmp(cmdName.c_str(), L"connectNetworkDrive") == 0 ||
                          !WindowsVistaAndLater && cmd == 40) &&
-                        forItems && netPath[2] != 0)
+                        forItems && netPathW[2] != 0)
                     {
-                        CPathBuffer root;  // Heap-allocated for long path support
-                        strcpy(root, netPath);
+                        std::wstring root(netPathW);
                         int focus = p->GetCaretIndex();
-                        if (SalPathAppend(root, (focus < p->Dirs->Count ? p->Dirs->At(focus) : p->Files->At(focus - p->Dirs->Count)).Name, root.Size()))
-                        {
-                            char newDrive = 0;
-                            p->ConnectNet(TRUE, root, FALSE /* called from a plug-in; must not change the panel path, otherwise
+                        SalPathAppendW(root, (focus < p->Dirs->Count ? p->Dirs->At(focus) : p->Files->At(focus - p->Dirs->Count)).Name);
+                        wchar_t newDrive = 0;
+                        p->ConnectNet(TRUE, root.c_str(), FALSE /* called from a plug-in; must not change the panel path, otherwise
                                                 we would return to a deallocated FS object */
-                                          ,
-                                          &newDrive);
-                            if (newlyMappedDrive != NULL)
-                                *newlyMappedDrive = newDrive;
-                        }
+                                      ,
+                                      &newDrive);
+                        if (newlyMappedDrive != NULL)
+                            *newlyMappedDrive = newDrive; // a letter A-Z, ASCII by definition
                     }
                     else
                     {
@@ -4871,11 +5492,11 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
                         ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
                         ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
                         ici.fMask = CMIC_MASK_PTINVOKE;
-                        if (CanUseShellExecuteWndAsParent(cmdName))
-                            ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CSalamanderGeneral::OpenNetworkContextMenu cmd=%d", cmd);
+                        if (CanUseShellExecuteWndAsParent(cmdName.c_str()))
+                            ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, L"SEW: CSalamanderGeneral::OpenNetworkContextMenu cmd=%d", cmd);
                         else
                             ici.hwnd = MainWindow->HWindow;
-                        ici.lpVerb = MAKEINTRESOURCE(cmd);
+                        ici.lpVerb = MAKEINTRESOURCEA(cmd); // CMINVOKECOMMANDINFOEX::lpVerb (inherited from the base struct) stays LPCSTR regardless of the Ex/wide fields - MAKEINTRESOURCEA matches that always, not the TCHAR-generic macro
                         ici.nShow = SW_SHOWNORMAL;
                         ici.ptInvoke.x = menuX;
                         ici.ptInvoke.y = menuY;
@@ -4902,15 +5523,22 @@ void CSalamanderGeneral::OpenNetworkContextMenu(HWND parent, int panel, BOOL for
     }
 }
 
-BOOL CSalamanderGeneral::DuplicateBackslashes(char* buffer, int bufferSize)
+BOOL CSalamanderGeneral::DuplicateBackslashes(CSalamanderStringBuffer* text)
 {
-    CALL_STACK_MESSAGE3("CSalamanderGeneral::DuplicateBackslashes(%s, %d)", buffer, bufferSize);
-    return ::DuplicateBackslashes(buffer, bufferSize);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::DuplicateBackslashes()");
+    if (text == NULL)
+        return FALSE;
+    std::wstring value;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, value))
+        return FALSE;
+    if (!::DuplicateBackslashes(value))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*text, value);
 }
 
-int CSalamanderGeneral::StartThrobber(int panel, const char* tooltip, int delay)
+int CSalamanderGeneral::StartThrobber(int panel, const wchar_t* tooltip, int delay)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::StartThrobber(%d, %s, %d)", panel, tooltip, delay);
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::StartThrobber(%d, %ls, %d)", panel, tooltip, delay);
 
     if (MainThreadID != GetCurrentThreadId())
     {
@@ -4922,7 +5550,7 @@ int CSalamanderGeneral::StartThrobber(int panel, const char* tooltip, int delay)
     if (p != NULL && p->DirectoryLine != NULL)
     {
         p->DirectoryLine->SetThrobber(TRUE, delay);
-        p->DirectoryLine->SetThrobberTooltip(tooltip);
+        p->DirectoryLine->SetThrobberTooltipW(tooltip);
         return p->DirectoryLine->ChangeThrobberID();
     }
     return -1;
@@ -4954,9 +5582,9 @@ BOOL CSalamanderGeneral::StopThrobber(int id)
 }
 
 void CSalamanderGeneral::ShowSecurityIcon(int panel, BOOL showIcon, BOOL isLocked,
-                                          const char* tooltip)
+                                          const wchar_t* tooltip)
 {
-    CALL_STACK_MESSAGE5("CSalamanderGeneral::ShowSecurityIcon(%d, %d, %d, %s)",
+    CALL_STACK_MESSAGE5("CSalamanderGeneral::ShowSecurityIcon(%d, %d, %d, %ls)",
                         panel, showIcon, isLocked, tooltip);
 
     if (MainThreadID != GetCurrentThreadId())
@@ -4969,7 +5597,7 @@ void CSalamanderGeneral::ShowSecurityIcon(int panel, BOOL showIcon, BOOL isLocke
     if (p != NULL && p->DirectoryLine != NULL)
     {
         p->DirectoryLine->SetSecurity(showIcon ? (isLocked ? sisSecured : sisUnsecured) : sisNone);
-        p->DirectoryLine->SetSecurityTooltip(tooltip);
+        p->DirectoryLine->SetSecurityTooltipW(tooltip);
     }
 }
 
@@ -5010,7 +5638,7 @@ CSalamanderGeneral::SalWNetAddConnection2Interactive(LPNETRESOURCE lpNetResource
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalWNetAddConnection2Interactive()");
     DWORD err;
-    RestoreNetworkConnection(NULL, NULL, NULL, &err, lpNetResource);
+    RestoreNetworkConnectionW(NULL, NULL, NULL, &err, lpNetResource);
     return err;
 }
 
@@ -5047,9 +5675,10 @@ void CSalamanderGeneral::GetFocusedItemMenuPos(POINT* pos)
     pos->y = 0;
 }
 
-void CSalamanderGeneral::LockMainWindow(BOOL lock, HWND hToolWnd, const char* lockReason)
+void CSalamanderGeneral::LockMainWindow(BOOL lock, HWND hToolWnd,
+                                        const wchar_t* lockReason)
 {
-    CALL_STACK_MESSAGE4("CSalamanderGeneral::LockMainWindow(%d, 0x%p, %s)", lock, hToolWnd, lockReason);
+    CALL_STACK_MESSAGE4("CSalamanderGeneral::LockMainWindow(%d, 0x%p, %ls)", lock, hToolWnd, lockReason);
     if (MainThreadID != GetCurrentThreadId())
     {
         TRACE_E("You can call CSalamanderGeneral::LockMainWindow() only from main thread!");
@@ -5059,7 +5688,8 @@ void CSalamanderGeneral::LockMainWindow(BOOL lock, HWND hToolWnd, const char* lo
         MainWindow->LockUI(lock, hToolWnd, lockReason);
 }
 
-BOOL CSalamanderGeneral::GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int hotKeyTextSize)
+BOOL CSalamanderGeneral::GetMenuItemHotKey(int id, WORD* hotKey,
+                                           CSalamanderStringBuffer* hotKeyText)
 {
     CALL_STACK_MESSAGE2("CSalamanderGeneral::GetMenuItemHotKey(%d, , , )", id);
     if (MainThreadID != GetCurrentThreadId())
@@ -5070,19 +5700,29 @@ BOOL CSalamanderGeneral::GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyTex
     BOOL ret = FALSE;
     CPluginData* data = Plugins.GetPluginData(Plugin);
     if (data != NULL)
-        ret = data->GetMenuItemHotKey(id, hotKey, hotKeyText, hotKeyTextSize);
+    {
+        if (hotKeyText != NULL &&
+            !sally::plugin_abi::IsValidStringBuffer(*hotKeyText))
+            return FALSE;
+        std::wstring text;
+        ret = data->GetMenuItemHotKey(id, hotKey,
+                                      hotKeyText != NULL ? &text : NULL);
+        if (ret && hotKeyText != NULL &&
+            !sally::plugin_abi::WriteStringBuffer(*hotKeyText, text))
+            return FALSE;
+    }
     else
         TRACE_E("Unexpected situation in CSalamanderGeneral::GetMenuItemHotKey().");
     return ret;
 }
 
-LONG CSalamanderGeneral::SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData)
+LONG CSalamanderGeneral::SalRegQueryValue(HKEY hKey, LPCWSTR lpSubKey, LPWSTR lpData, PLONG lpcbData)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalRegQueryValue(, , ,)");
-    return ::SalRegQueryValue(hKey, lpSubKey, lpData, lpcbData);
+    return ::SalRegQueryValueW(hKey, lpSubKey, lpData, lpcbData);
 }
 
-LONG CSalamanderGeneral::SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved,
+LONG CSalamanderGeneral::SalRegQueryValueEx(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved,
                                             LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalRegQueryValueEx(, , , , ,)");
@@ -5090,50 +5730,102 @@ LONG CSalamanderGeneral::SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWO
 }
 
 DWORD
-CSalamanderGeneral::SalGetFileAttributes(const char* fileName)
+CSalamanderGeneral::SalGetFileAttributes(const wchar_t* fileName)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalGetFileAttributes()");
     return ::SalGetFileAttributes(fileName);
 }
 
-BOOL CSalamanderGeneral::IsPathOnSSD(const char* path)
+BOOL CSalamanderGeneral::IsPathOnSSD(const wchar_t* path)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::IsPathOnSSD()");
-    return ::IsPathOnSSD(path);
+    return ::IsPathOnSSDW(path);
 }
 
-BOOL CSalamanderGeneral::IsUNCPath(const char* path)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::IsUNCPath(const wchar_t* path)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::IsUNCPath()");
-    return ::IsUNCPath(path);
+    return ::IsUNCPathW(path);
 }
 
-BOOL CSalamanderGeneral::ResolveSubsts(char* resPath)
+BOOL CSalamanderGeneral::ResolveSubsts(CSalamanderStringBuffer* resPath)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::ResolveSubsts()");
-    return ::ResolveSubsts(resPath);
+    if (resPath == NULL)
+        return FALSE;
+    std::wstring path;
+    if (!sally::plugin_abi::ReadStringBuffer(*resPath, path) ||
+        !::ResolveSubstsW(path))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*resPath, path);
 }
 
-void CSalamanderGeneral::ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
-                                                           BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
-                                                           char* junctionOrSymlinkTgt, int* linkType, char* netPath)
+BOOL CSalamanderGeneral::ResolveLocalPathWithReparsePoints(
+    const wchar_t* path, CSalamanderStringBuffer* resPath,
+    BOOL* cutResPathIsPossible, BOOL* rootOrCurReparsePointSet,
+    CSalamanderStringBuffer* rootOrCurReparsePoint,
+    CSalamanderStringBuffer* junctionOrSymlinkTgt, int* linkType,
+    CSalamanderStringBuffer* netPath)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::ResolveLocalPathWithReparsePoints()");
-    ::ResolveLocalPathWithReparsePoints(resPath, path, cutResPathIsPossible,
-                                        rootOrCurReparsePointSet, rootOrCurReparsePoint,
-                                        junctionOrSymlinkTgt, linkType, netPath);
+    if (path == NULL || resPath == NULL ||
+        !sally::plugin_abi::IsValidStringBuffer(*resPath) ||
+        (rootOrCurReparsePoint != NULL && !sally::plugin_abi::IsValidStringBuffer(*rootOrCurReparsePoint)) ||
+        (junctionOrSymlinkTgt != NULL && !sally::plugin_abi::IsValidStringBuffer(*junctionOrSymlinkTgt)) ||
+        (netPath != NULL && !sally::plugin_abi::IsValidStringBuffer(*netPath)))
+        return FALSE;
+
+    CLocalPathResolutionW res;
+    ::ResolveLocalPathWithReparsePointsW(path, res);
+
+    if (!sally::plugin_abi::WriteStringBuffer(*resPath, res.ResPath) ||
+        (rootOrCurReparsePoint != NULL && !sally::plugin_abi::WriteStringBuffer(*rootOrCurReparsePoint, res.RootOrCurReparsePoint)) ||
+        (junctionOrSymlinkTgt != NULL && !sally::plugin_abi::WriteStringBuffer(*junctionOrSymlinkTgt, res.JunctionOrSymlinkTgt)) ||
+        (netPath != NULL && !sally::plugin_abi::WriteStringBuffer(*netPath, res.NetPath)))
+        return FALSE;
+    if (cutResPathIsPossible != NULL)
+        *cutResPathIsPossible = res.CutResPathIsPossible;
+    if (rootOrCurReparsePointSet != NULL)
+        *rootOrCurReparsePointSet = res.RootOrCurReparsePointSet;
+    if (linkType != NULL)
+        *linkType = res.LinkType;
+    return TRUE;
 }
 
-BOOL CSalamanderGeneral::GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath)
+BOOL CSalamanderGeneral::GetResolvedPathMountPointAndGUID(const wchar_t* path,
+                                                          CSalamanderStringBuffer* mountPoint,
+                                                          CSalamanderStringBuffer* guidPath)
 {
-    CALL_STACK_MESSAGE2("CSalamanderGeneral::GetResolvedPathMountPointAndGUID(%s, ,)", path);
-    return ::GetResolvedPathMountPointAndGUID(path, mountPoint, guidPath);
+    CALL_STACK_MESSAGE1("CSalamanderGeneral::GetResolvedPathMountPointAndGUID()");
+    if (path == NULL)
+        return FALSE;
+
+    if ((mountPoint != NULL && !sally::plugin_abi::IsValidStringBuffer(*mountPoint)) ||
+        (guidPath != NULL && !sally::plugin_abi::IsValidStringBuffer(*guidPath)))
+        return FALSE;
+    std::wstring mountPointW, guidPathW;
+    if (!::GetResolvedPathMountPointAndGUIDW(path,
+                                             mountPoint != NULL ? &mountPointW : NULL,
+                                             guidPath != NULL ? &guidPathW : NULL))
+    {
+        return FALSE;
+    }
+    return (mountPoint == NULL || sally::plugin_abi::WriteStringBuffer(*mountPoint, mountPointW)) &&
+           (guidPath == NULL || sally::plugin_abi::WriteStringBuffer(*guidPath, guidPathW));
 }
 
-BOOL CSalamanderGeneral::PointToLocalDecimalSeparator(char* buffer, int bufferSize)
+BOOL CSalamanderGeneral::PointToLocalDecimalSeparator(CSalamanderStringBuffer* text)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::PointToLocalDecimalSeparator()");
-    return ::PointToLocalDecimalSeparator(buffer, bufferSize);
+    if (text == NULL)
+        return FALSE;
+    std::wstring value;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, value))
+        return FALSE;
+    if (!::PointToLocalDecimalSeparator(value))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*text, value);
 }
 
 void CSalamanderGeneral::SetPluginIconOverlays(int iconOverlaysCount, HICON* iconOverlays)
@@ -5184,26 +5876,29 @@ void CSalamanderGeneral::SetPluginIconOverlays(int iconOverlaysCount, HICON* ico
         TRACE_E("Unexpected situation in CSalamanderGeneral::SetPluginIconOverlays().");
 }
 
-BOOL CSalamanderGeneral::SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
+// wide; the internal was widened in the same commit.
+BOOL CSalamanderGeneral::SalGetFileSize2(const wchar_t* fileName, CQuadWord& size, DWORD* err)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::SalGetFileSize2()");
     return ::SalGetFileSize2(fileName, size, err);
 }
 
-BOOL CSalamanderGeneral::GetLinkTgtFileSize(HWND parent, const char* fileName, CQuadWord* size,
+BOOL CSalamanderGeneral::GetLinkTgtFileSize(HWND parent, const wchar_t* fileName, CQuadWord* size,
                                             BOOL* cancel, BOOL* ignoreAll)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::GetLinkTgtFileSize()");
     return ::GetLinkTgtFileSize(parent, fileName, NULL, size, cancel, ignoreAll);
 }
 
-BOOL CSalamanderGeneral::DeleteDirLink(const char* name, DWORD* err)
+// wide; the internal was widened in the same commit.
+BOOL CSalamanderGeneral::DeleteDirLink(const wchar_t* name, DWORD* err)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::DeleteDirLink()");
     return ::DeleteDirLink(name, err);
 }
 
-BOOL CSalamanderGeneral::ClearReadOnlyAttr(const char* name, DWORD attr)
+// wide: forwards to the wide internal that already existed.
+BOOL CSalamanderGeneral::ClearReadOnlyAttr(const wchar_t* name, DWORD attr)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::ClearReadOnlyAttr()");
     return ::ClearReadOnlyAttr(name, attr);
@@ -5273,7 +5968,7 @@ CSalamanderForOperations::~CSalamanderForOperations()
     Destroyed = TRUE;
 }
 
-void CSalamanderForOperations::OpenProgressDialog(const char* title, BOOL twoProgressBars, HWND parent,
+void CSalamanderForOperations::OpenProgressDialog(const wchar_t* title, BOOL twoProgressBars, HWND parent,
                                                   BOOL fileProgress)
 {
     if (ThreadID != GetCurrentThreadId())
@@ -5354,7 +6049,7 @@ void CSalamanderForOperations::ProgressSetTotalSize(const CQuadWord& totalSize1,
         UnpackProgress.SetTotal(totalSize1, totalSize2);
 }
 
-void CSalamanderForOperations::ProgressDialogAddText(const char* txt, BOOL delayedPaint)
+void CSalamanderForOperations::ProgressDialogAddText(const wchar_t* txt, BOOL delayedPaint)
 {
     if (ThreadID != GetCurrentThreadId())
     {
@@ -5425,8 +6120,10 @@ void CSalamanderForOperations::ProgressEnableCancel(BOOL enable)
         UnpackProgress.EnableCancel(enable);
 }
 
-BOOL CSalamanderForOperations::MoveFiles(const char* source, const char* target, const char* remapNameFrom,
-                                         const char* remapNameTo)
+// The current operations interface is UTF-16. sdk107 byte callers reach it
+// through CLegacySalamanderForOperations, which widens once before this implementation.
+BOOL CSalamanderForOperations::MoveFiles(const wchar_t* source, const wchar_t* target, const wchar_t* remapNameFrom,
+                                         const wchar_t* remapNameTo)
 {
     if (ThreadID != GetCurrentThreadId())
     {
@@ -5451,11 +6148,11 @@ BOOL CSalamanderForOperations::MoveFiles(const char* source, const char* target,
 // CSalamanderForViewFileOnFS
 //
 
-const char*
-CSalamanderForViewFileOnFS::AllocFileNameInCache(HWND parent, const char* uniqueFileName, const char* nameInCache,
-                                                 const char* rootTmpPath, BOOL& fileExists)
+const wchar_t*
+CSalamanderForViewFileOnFS::AllocFileNameInCache(HWND parent, const wchar_t* uniqueFileName, const wchar_t* nameInCache,
+                                                 const wchar_t* rootTmpPath, BOOL& fileExists)
 {
-    CALL_STACK_MESSAGE4("CSalamanderForViewFileOnFS::AllocFileNameInCache(, %s, %s, %s, )",
+    CALL_STACK_MESSAGE4("CSalamanderForViewFileOnFS::AllocFileNameInCache(, %ls, %ls, %ls, )",
                         uniqueFileName, nameInCache, rootTmpPath);
     if (CallsCounter > 0)
     {
@@ -5463,15 +6160,10 @@ CSalamanderForViewFileOnFS::AllocFileNameInCache(HWND parent, const char* unique
     }
 
     int errorCode;
-    const char* name = DiskCache.GetName(uniqueFileName, nameInCache, &fileExists, FALSE, rootTmpPath, FALSE, NULL, &errorCode);
+    const wchar_t* name = DiskCache.GetName(uniqueFileName, nameInCache, &fileExists, FALSE, rootTmpPath, FALSE, NULL, &errorCode);
     if (name == NULL)
     {
         std::wstring msg = LoadStrW(IDS_VIEWFILEFAILED);
-        if (errorCode == DCGNE_TOOLONGNAME)
-        {
-            msg += L"\n";
-            msg += LoadStrW(IDS_VIEWFILETOOLONGNAME);
-        }
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     else
@@ -5482,10 +6174,10 @@ CSalamanderForViewFileOnFS::AllocFileNameInCache(HWND parent, const char* unique
     return name;
 }
 
-BOOL CSalamanderForViewFileOnFS::OpenViewer(HWND parent, const char* fileName, HANDLE* fileLock,
+BOOL CSalamanderForViewFileOnFS::OpenViewer(HWND parent, const wchar_t* fileName, HANDLE* fileLock,
                                             BOOL* fileLockOwner)
 {
-    CALL_STACK_MESSAGE2("CSalamanderForViewFileOnFS::OpenViewer(, %s, ,)", fileName);
+    CALL_STACK_MESSAGE2("CSalamanderForViewFileOnFS::OpenViewer(, %ls, ,)", fileName);
 
     HANDLE lock = NULL;
     BOOL lockOwner = FALSE;
@@ -5501,11 +6193,11 @@ BOOL CSalamanderForViewFileOnFS::OpenViewer(HWND parent, const char* fileName, H
     return ret;
 }
 
-void CSalamanderForViewFileOnFS::FreeFileNameInCache(const char* uniqueFileName, BOOL fileExists, BOOL newFileOK,
+void CSalamanderForViewFileOnFS::FreeFileNameInCache(const wchar_t* uniqueFileName, BOOL fileExists, BOOL newFileOK,
                                                      const CQuadWord& newFileSize, HANDLE fileLock,
                                                      BOOL fileLockOwner, BOOL removeAsSoonAsPossible)
 {
-    CALL_STACK_MESSAGE8("CSalamanderForViewFileOnFS::FreeFileNameInCache(%s, %d, %d, %g, 0x%p, %d, %d)",
+    CALL_STACK_MESSAGE8("CSalamanderForViewFileOnFS::FreeFileNameInCache(%ls, %d, %d, %g, 0x%p, %d, %d)",
                         uniqueFileName, fileExists, newFileOK, newFileSize.GetDouble(), fileLock,
                         fileLockOwner, removeAsSoonAsPossible);
 
@@ -5566,9 +6258,9 @@ void CSalamanderDirectory::AllocAddCache()
 {
     if (AddCache == NULL)
     {
-        AddCache = (CSalamanderDirectoryAddCache*)malloc(sizeof(CSalamanderDirectoryAddCache));
+        AddCache = new CSalamanderDirectoryAddCache;
         if (AddCache != NULL)
-            ZeroMemory(AddCache, sizeof(CSalamanderDirectoryAddCache));
+            AddCache->Dir = NULL;
         // if allocating the cache fails, it is fine; we are fully functional without it
     }
 }
@@ -5577,25 +6269,25 @@ void CSalamanderDirectory::FreeAddCache()
 {
     if (AddCache != NULL)
     {
-        free(AddCache);
+        delete AddCache;
         AddCache = NULL;
     }
 }
 
-int CSalamanderDirectory::SalDirStrCmp(const char* s1, const char* s2)
+int CSalamanderDirectory::SalDirStrCmp(const wchar_t* s1, const wchar_t* s2)
 {
     if (Flags & SALDIRFLAG_CASESENSITIVE)
-        return strcmp(s1, s2);
+        return wcscmp(s1, s2);
     else
-        return StrICmp(s1, s2);
+        return StrICmpW(s1, s2);
 }
 
-int CSalamanderDirectory::SalDirStrCmpEx(const char* s1, int l1, const char* s2, int l2)
+int CSalamanderDirectory::SalDirStrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2)
 {
     if (Flags & SALDIRFLAG_CASESENSITIVE)
-        return StrCmpEx(s1, l1, s2, l2);
+        return StrCmpExW(s1, l1, s2, l2);
     else
-        return StrICmpEx(s1, l1, s2, l2);
+        return StrICmpExW(s1, l1, s2, l2);
 }
 
 void CSalamanderDirectory::Clear(CPluginDataInterfaceAbstract* pluginData)
@@ -5622,8 +6314,7 @@ void CSalamanderDirectory::Clear(CPluginDataInterfaceAbstract* pluginData)
     Files.DestroyMembers();
     if (AddCache != NULL)
     {
-        AddCache->PathLen = 0;
-        AddCache->Path[0] = 0;
+        AddCache->Path.clear();
         AddCache->Dir = NULL;
     }
     ValidData = VALID_DATA_ALL_FS_ARC;
@@ -5690,13 +6381,13 @@ CSalamanderDirectory::AllocSalamDir(int index)
 // 'pluginData' - input: interface for creating plug-in-specific data for the new directory (if needed)
 // 'archivePath' - input: full path in the archive ('path' and 's' both point into it)
 
-BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, const CFileData& file,
-                                   CPluginDataInterfaceAbstract* pluginData, const char* archivePath)
+BOOL CSalamanderDirectory::FindDir(const wchar_t* path, const wchar_t*& s, int& i, const CFileData& file,
+                                   CPluginDataInterfaceAbstract* pluginData, const wchar_t* archivePath)
 {
     CALL_STACK_MESSAGE_NONE // time-critical method
         //  CALL_STACK_MESSAGE2("CSalamanderDirectory::FindDir(%s, , , ,)", path);
         s = path;
-    while (*s != 0 && *s != '\\')
+    while (*s != 0 && *s != L'\\')
         s++;
 
     for (i = 0; i < Dirs.Count; i++)
@@ -5708,22 +6399,22 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
     {
         CFileData data;
         //--- name
-        data.Name = (char*)malloc((s - path) + 1); // allocation
+        data.Name = (wchar_t*)malloc(((s - path) + 1) * sizeof(wchar_t)); // allocation
         if (data.Name == NULL)
         {
             TRACE_E(LOW_MEMORY);
             return FALSE;
         }
-        memcpy(data.Name, path, s - path); // copy of the text
+        memcpy(data.Name, path, (s - path) * sizeof(wchar_t)); // copy of the text
         data.Name[s - path] = 0;
-        data.NameLen = s - path;
+        data.NameLen = (int)(s - path);
         //--- extension
         if (!Configuration.SortDirsByExt)
             data.Ext = data.Name + data.NameLen; // directories have no extensions
         else
         {
-            const char* ss = s;
-            while (--ss >= path && *ss != '.')
+            const wchar_t* ss = s;
+            while (--ss >= path && *ss != L'.')
                 ;
             if (ss >= path)
                 data.Ext = data.Name + (ss - path + 1); // ".cvspass" is an extension in Windows...
@@ -5736,7 +6427,6 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
         data.Attr = 0;
         data.LastWrite = file.LastWrite; // take the date from the first file in the directory
         data.DosName = NULL;
-        data.NameW = NULL;
         data.PluginData = 0;
         data.Hidden = 0;
         data.IsLink = 0;
@@ -5754,11 +6444,9 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
 
         if (pluginData != NULL) // let the plug-in add its specific data
         {
-            CPathBuffer arcPath; // Heap-allocated for long path support
-            memcpy(arcPath.Get(), archivePath, s - archivePath);
-            arcPath[s - archivePath] = 0;
+            const std::wstring arcPath(archivePath, s - archivePath);
             CPluginDataInterfaceEncapsulation plugin(pluginData, STR_NONE, STR_NONE, NULL, 0);
-            if (!plugin.GetFileDataForNewDir(arcPath, data)) // cannot add the plug-in data
+            if (!plugin.GetFileDataForNewDir(arcPath.c_str(), data)) // cannot add the plug-in data
             {
                 free(data.Name);
                 return FALSE;
@@ -5815,16 +6503,11 @@ BOOL CSalamanderDirectory::FindDir(const char* path, const char*& s, int& i, con
     return TRUE;
 }
 
-BOOL CSalamanderDirectory::AddFile(const char* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData)
+BOOL CSalamanderDirectory::AddFile(const wchar_t* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData)
 {
     CALL_STACK_MESSAGE_NONE // time-critical method
 
-        int pathLen = 0;
-    if (path != NULL && ((pathLen = (int)strlen(path)) > SAL_MAX_LONG_PATH - 5 || file.NameLen > SAL_MAX_LONG_PATH - 5))
-    {
-        TRACE_E("Too long path or file name!");
-        return FALSE;
-    }
+    const size_t pathLen = path != NULL ? wcslen(path) : 0;
 
     //  TRACE_I("AddFile path="<<path<<" file="<<file.Name);
 
@@ -5878,7 +6561,6 @@ BOOL CSalamanderDirectory::AddFile(const char* path, CFileData& file, CPluginDat
     if ((ValidData & VALID_DATA_ICONOVERLAY) == 0)
         file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
 
-    file.NameW = NULL; // plugins don't set this; ensure it's initialized for UseWideName()
     file.Association = 0;
     file.Selected = 0;
     file.Shared = 0;
@@ -5890,7 +6572,7 @@ BOOL CSalamanderDirectory::AddFile(const char* path, CFileData& file, CPluginDat
 
     // if we have the path cached from the previous addition, we can insert the file right into its place
     if (path != NULL && AddCache != NULL && pathLen > 0 &&
-        pathLen == AddCache->PathLen && memcmp(path, AddCache->Path, pathLen) == 0)
+        pathLen == AddCache->Path.size() && wmemcmp(path, AddCache->Path.data(), pathLen) == 0)
     {
         // the cache already held our path, so we can insert the file immediately
         AddCache->Dir->Files.Add(file);
@@ -5907,23 +6589,16 @@ BOOL CSalamanderDirectory::AddFile(const char* path, CFileData& file, CPluginDat
     // if the insertion succeeded and the cache is used, remember the path
     if (ret != NULL && AddCache != NULL && pathLen > 0)
     {
-        AddCache->PathLen = pathLen;
-        memcpy(AddCache->Path, path, pathLen);
+        AddCache->Path.assign(path, pathLen);
         AddCache->Dir = ret;
     }
 
     return ret != NULL;
 }
 
-BOOL CSalamanderDirectory::AddDir(const char* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData)
+BOOL CSalamanderDirectory::AddDir(const wchar_t* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData)
 {
     CALL_STACK_MESSAGE_NONE // time-critical method
-
-        if (path != NULL && (strlen(path) > MAX_PATH - 5 || dir.NameLen > MAX_PATH - 5))
-    {
-        TRACE_E("Too long path or file name!");
-        return FALSE;
-    }
 
     //  TRACE_I("AddDir path="<<path<<" dir="<<dir.Name);
 
@@ -5977,7 +6652,6 @@ BOOL CSalamanderDirectory::AddDir(const char* path, CFileData& dir, CPluginDataI
     if ((ValidData & VALID_DATA_ICONOVERLAY) == 0)
         dir.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
 
-    dir.NameW = NULL; // plugins don't set this; ensure it's initialized for UseWideName()
     dir.Association = 0;
     dir.Selected = 0;
     dir.Shared = 0;
@@ -6033,19 +6707,19 @@ CSalamanderDirectory::GetSalDir(int i) const
 }
 
 CSalamanderDirectory*
-CSalamanderDirectory::AddFileInt(const char* path, CFileData& file,
-                                 CPluginDataInterfaceAbstract* pluginData, const char* archivePath)
+CSalamanderDirectory::AddFileInt(const wchar_t* path, CFileData& file,
+                                 CPluginDataInterfaceAbstract* pluginData, const wchar_t* archivePath)
 {
     CALL_STACK_MESSAGE_NONE // time-critical method; in addition, path may be NULL
                             //  CALL_STACK_MESSAGE3("CSalamanderDirectory::AddFileInt(%s, , , %s)", path, archivePath);
 
         if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // not this directory; find the subdirectory
         {
-            const char* s;
+            const wchar_t* s;
             int i;
             if (!FindDir(path, s, i, file, pluginData, archivePath))
                 return NULL;
@@ -6072,19 +6746,19 @@ CSalamanderDirectory::AddFileInt(const char* path, CFileData& file,
 }
 
 CSalamanderDirectory*
-CSalamanderDirectory::AddDirInt(const char* path, CFileData& dir,
-                                CPluginDataInterfaceAbstract* pluginData, const char* archivePath)
+CSalamanderDirectory::AddDirInt(const wchar_t* path, CFileData& dir,
+                                CPluginDataInterfaceAbstract* pluginData, const wchar_t* archivePath)
 {
     CALL_STACK_MESSAGE_NONE // time-critical method; in addition, path may be NULL
                             //  CALL_STACK_MESSAGE3("CSalamanderDirectory::AddDirInt(%s, , , %s)", path, archivePath);
 
         if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // not this directory; find the subdirectory
         {
-            const char* s;
+            const wchar_t* s;
             int i;
             if (!FindDir(path, s, i, dir, pluginData, archivePath))
                 return NULL;
@@ -6249,17 +6923,17 @@ void CSalamanderDirectory::ReleasePluginData(CPluginDataInterfaceEncapsulation& 
 }
 
 CFilesArray*
-CSalamanderDirectory::GetDirs(const char* path)
+CSalamanderDirectory::GetDirs(const wchar_t* path)
 {
-    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetDirs(%s)", path);
+    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetDirs(%ls)", path);
     if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // some subdirectory
         {
-            const char* s = path;
-            while (*s != 0 && *s != '\\')
+            const wchar_t* s = path;
+            while (*s != 0 && *s != L'\\')
                 s++;
 
             int i;
@@ -6285,17 +6959,17 @@ CSalamanderDirectory::GetDirs(const char* path)
 }
 
 CFilesArray*
-CSalamanderDirectory::GetFiles(const char* path)
+CSalamanderDirectory::GetFiles(const wchar_t* path)
 {
-    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetFiles(%s)", path);
+    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetFiles(%ls)", path);
     if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // some subdirectory
         {
-            const char* s = path;
-            while (*s != 0 && *s != '\\')
+            const wchar_t* s = path;
+            while (*s != 0 && *s != L'\\')
                 s++;
 
             int i;
@@ -6321,17 +6995,17 @@ CSalamanderDirectory::GetFiles(const char* path)
 }
 
 const CFileData*
-CSalamanderDirectory::GetUpperDir(const char* path)
+CSalamanderDirectory::GetUpperDir(const wchar_t* path)
 {
-    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetUpperDir(%s)", path);
+    CALL_STACK_MESSAGE2("CSalamanderDirectory::GetUpperDir(%ls)", path);
     if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // some subdirectory
         {
-            const char* s = path;
-            while (*s != 0 && *s != '\\')
+            const wchar_t* s = path;
+            while (*s != 0 && *s != L'\\')
                 s++;
 
             int i;
@@ -6387,18 +7061,18 @@ CSalamanderDirectory::GetSize(int* dirsCount, int* filesCount, TDirectArray<CQua
 }
 
 CQuadWord
-CSalamanderDirectory::GetDirSize(const char* path, const char* dirName, int* dirsCount,
+CSalamanderDirectory::GetDirSize(const wchar_t* path, const wchar_t* dirName, int* dirsCount,
                                  int* filesCount, TDirectArray<CQuadWord>* sizes)
 {
-    CALL_STACK_MESSAGE3("CSalamanderDirectory::GetDirSize(%s, %s, , ,)", path, dirName);
+    CALL_STACK_MESSAGE3("CSalamanderDirectory::GetDirSize(%ls, %ls, , ,)", path, dirName);
     if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // some subdirectory
         {
-            const char* s = path;
-            while (*s != 0 && *s != '\\')
+            const wchar_t* s = path;
+            while (*s != 0 && *s != L'\\')
                 s++;
 
             int i;
@@ -6436,18 +7110,18 @@ CSalamanderDirectory::GetDirSize(const char* path, const char* dirName, int* dir
 }
 
 CSalamanderDirectory*
-CSalamanderDirectory::GetSalamanderDir(const char* path, BOOL readOnly)
+CSalamanderDirectory::GetSalamanderDir(const wchar_t* path, BOOL readOnly)
 {
     CALL_STACK_MESSAGE_NONE
     // CALL_STACK_MESSAGE3("CSalamanderDirectory::GetSalamanderDir(%s, %d)", path, readOnly);
     if (path != NULL)
     {
-        if (*path == '\\')
+        if (*path == L'\\')
             path++;
         if (*path != 0) // some subdirectory
         {
-            const char* s = path;
-            while (*s != 0 && *s != '\\')
+            const wchar_t* s = path;
+            while (*s != 0 && *s != L'\\')
                 s++;
 
             int i;
@@ -6495,7 +7169,7 @@ CSalamanderDirectory::GetSalamanderDir(int i)
         return NULL;
 }
 
-int CSalamanderDirectory::GetIndex(const char* dir)
+int CSalamanderDirectory::GetIndex(const wchar_t* dir)
 {
     if (dir != NULL)
     {
@@ -6511,17 +7185,15 @@ int CSalamanderDirectory::GetIndex(const char* dir)
 
 // ****************************************************************************
 
-BOOL TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize, const char* messageTitle)
+BOOL TestFreeSpace(HWND parent, const wchar_t* path, const CQuadWord& totalSize, const wchar_t* messageTitle)
 {
-    CQuadWord freeSpace = MyGetDiskFreeSpace(path);
+    CQuadWord freeSpace = MyGetDiskFreeSpaceW(path);
     if (freeSpace != CQuadWord(-1, -1) && freeSpace < totalSize)
     {
-        char buf1[50];
-        char buf2[50];
-        NumberToStr(buf1, totalSize);
-        NumberToStr(buf2, freeSpace);
-        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE), AnsiToWide(buf1).c_str(), AnsiToWide(buf2).c_str());
-        return gPrompter->AskYesNo(AnsiToWide(messageTitle).c_str(), msg.c_str()).type == PromptResult::kYes;
+        const std::wstring totalSizeText = NumberToStr(totalSize);
+        const std::wstring freeSpaceText = NumberToStr(freeSpace);
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE), totalSizeText.c_str(), freeSpaceText.c_str());
+        return gPrompter->AskYesNo(messageTitle, msg.c_str()).type == PromptResult::kYes;
     }
     return TRUE;
 }

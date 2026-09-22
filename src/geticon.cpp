@@ -4,13 +4,44 @@
 
 #include "precomp.h"
 #include "commoncontrols.h"
+#include "common/unicode/helpers.h"
 
-UINT WINAPI ExtractIcons(LPCTSTR szFileName, int nIconIndex, int cxIcon, int cyIcon, HICON* phicon, UINT* piconid, UINT nIcons, UINT flags)
+static UINT ExtractIconsA(LPCSTR szFileName, int nIconIndex, int cxIcon, int cyIcon,
+                          HICON* phicon, UINT nIcons)
 {
     UINT nIconSize = cxIcon;
     HICON hLarge{};
     HICON hSmall{};
-    auto shRet = SHDefExtractIcon(szFileName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
+    auto shRet = SHDefExtractIconA(szFileName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
+    if (shRet == S_OK)
+    {
+        if (phicon)
+        {
+            phicon[0] = hLarge;
+            if (nIcons == 2)
+            {
+                phicon[1] = hSmall;
+            }
+            else
+            {
+                if (hSmall != 0)
+                {
+                    DestroyIcon(hSmall);
+                }
+            }
+        }
+    }
+    return shRet == S_OK ? 1 : 0;
+}
+
+// wide: genuine parallel implementation of ExtractIcons above, calling
+// SHDefExtractIconW directly instead of narrowing the caller's path first.
+UINT WINAPI ExtractIconsW(LPCWSTR szFileName, int nIconIndex, int cxIcon, int cyIcon, HICON* phicon, UINT* piconid, UINT nIcons, UINT flags)
+{
+    UINT nIconSize = cxIcon;
+    HICON hLarge{};
+    HICON hSmall{};
+    auto shRet = SHDefExtractIconW(szFileName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
     if (shRet == S_OK)
     {
         if (phicon)
@@ -37,21 +68,19 @@ STDAPI SHBindToIDListParent(LPCITEMIDLIST pidl, REFIID riid, void** ppv, LPCITEM
     return SHBindToFolderIDListParent(NULL, pidl, riid, ppv, ppidlLast);
 }
 
-BOOL OnExtList(LPCTSTR pszExtList, LPCTSTR pszExt)
+BOOL OnExtListW(LPCWSTR pszExtList, LPCWSTR pszExt)
 {
-    for (; *pszExtList; pszExtList += lstrlen(pszExtList) + 1)
+    for (; *pszExtList; pszExtList += lstrlenW(pszExtList) + 1)
     {
-        if (!lstrcmpi(pszExt, pszExtList))
-        {
+        if (!lstrcmpiW(pszExt, pszExtList))
             return TRUE;
-        }
     }
     return FALSE;
 }
 
-BOOL ExtIsExe(LPCTSTR szExt)
+BOOL ExtIsExeW(LPCWSTR szExt)
 {
-    return OnExtList("cmd\0bat\0pif\0scf\0exe\0com\0scr\0", szExt);
+    return OnExtListW(L"cmd\0bat\0pif\0scf\0exe\0com\0scr\0", szExt);
 }
 
 #define SHIL_LARGE 0      // The image size is normally 32x32 pixels. However, if the Use large icons option is selected from the Effects section of the Appearance tab in Display Properties, the image is 48x48 pixels.
@@ -61,18 +90,21 @@ BOOL ExtIsExe(LPCTSTR szExt)
 #define SHIL_JUMBO 4      // Windows Vista and later. The image is normally 256x256 pixels.
 // regarding icon sizes on Windows Vista: see "Creating a DPI-Aware Application" (http://msdn.microsoft.com/en-us/library/ms701681(VS.85).aspx)
 
-BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl, HICON* hIcon,
+BOOL SalGetIconFromPIDL(IShellFolder* psf, const wchar_t* path, LPCITEMIDLIST pidl, HICON* hIcon,
                         CIconSizeEnum iconSize, BOOL fallbackToDefIcon, BOOL defIconIsDir)
 {
     BOOL ret = FALSE;
 
-    IExtractIconA* pxi = NULL; // if 'isIExtractIconW' is TRUE, this pointer is actually IExtractIconW
+    IExtractIconW* extractIconW = NULL;
+    IExtractIconA* extractIconA = NULL;
     BOOL isIExtractIconW = FALSE;
     HICON hIconSmall = NULL;
     HICON hIconLarge = NULL;
 
-    CPathBuffer iconFile;
-    CWidePathBuffer iconFileW;
+    // IExtractIcon's caller-owned output is a frozen shell contract. Keep its mutable
+    // storage inside this adapter; the rest of the icon path remains native-wide.
+    std::vector<wchar_t> iconFileW(MAX_PATH, L'\0');
+    std::vector<char> iconFileA;
     int iconIndex;
     UINT wFlags = 0; // clear because the DWGIcon.dll shell extension just ORs these bits
 
@@ -80,27 +112,33 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
     if (iconSize == ICONSIZE_48)
         largeIconSize = ICONSIZE_48;
 
-    HRESULT hres = psf->GetUIObjectOf(NULL, 1, &pidl, IID_IExtractIconA, NULL, (void**)&pxi);
+    HRESULT hres = psf->GetUIObjectOf(NULL, 1, &pidl, IID_IExtractIconW, NULL,
+                                     reinterpret_cast<void**>(&extractIconW));
     if (SUCCEEDED(hres))
     {
-        hres = pxi->GetIconLocation(GIL_FORSHELL, iconFile, iconFile.Size(), &iconIndex, &wFlags);
-        //TRACE_I("  SalGetIconFromPIDL() IID_IExtractIconA iconFile="<<iconFile<<" iconIndex="<<iconIndex<<" wFlags="<<wFlags);
+        isIExtractIconW = TRUE;
+        hres = extractIconW->GetIconLocation(GIL_FORSHELL, iconFileW.data(),
+                                             static_cast<UINT>(iconFileW.size()),
+                                             &iconIndex, &wFlags);
+        if (FAILED(hres))
+        {
+            extractIconW->Release();
+            extractIconW = NULL;
+            isIExtractIconW = FALSE;
+        }
     }
-    else
+    if (extractIconW == NULL)
     {
-        // The ANSI version failed, so we try the UNICODE IID_IExtractIcon variant
-        hres = psf->GetUIObjectOf(NULL, 1, &pidl, IID_IExtractIconW, NULL, (void**)&pxi);
+        // Legacy shell extensions may expose only IExtractIconA. Its byte buffer is
+        // isolated here and never becomes core path ownership.
+        iconFileA.assign(MAX_PATH, '\0');
+        hres = psf->GetUIObjectOf(NULL, 1, &pidl, IID_IExtractIconA, NULL,
+                                 reinterpret_cast<void**>(&extractIconA));
         if (SUCCEEDED(hres))
         {
-            isIExtractIconW = TRUE;
-            hres = ((IExtractIconW*)pxi)->GetIconLocation(GIL_FORSHELL, iconFileW, iconFileW.Size(), &iconIndex, &wFlags);
-            if (SUCCEEDED(hres))
-            {
-                // Convert the UNICODE string to ANSI
-                WideCharToMultiByte(CP_ACP, 0, iconFileW, -1, iconFile, iconFile.Size(), NULL, NULL);
-                iconFile[iconFile.Size() - 1] = 0;
-                //TRACE_I("  SalGetIconFromPIDL() IID_IExtractIconW iconFile="<<iconFile<<" iconIndex="<<iconIndex<<" wFlags="<<wFlags);
-            }
+            hres = extractIconA->GetIconLocation(GIL_FORSHELL, iconFileA.data(),
+                                                 static_cast<UINT>(iconFileA.size()),
+                                                 &iconIndex, &wFlags);
         }
     }
     //  TRACE_I("iconFile="<<iconFile<<" iconIndex="<<iconIndex);
@@ -110,7 +148,10 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         // another way to get 48x48 icons is LoadImage, but we would need the file path and icon number
         // a "*" in the file name means iconIndex already refers to a system icon index
         //TRACE_I("  SalGetIconFromPIDL() wFlags="<<wFlags<<" iconFile='"<<iconFile<<"' TryObtainGetImageList="<<TryObtainGetImageList);
-        if ((wFlags & GIL_NOTFILENAME) && iconFile[0] == '*' && iconFile[1] == 0)
+        const BOOL systemImageIndex = isIExtractIconW
+                                          ? iconFileW[0] == L'*' && iconFileW[1] == L'\0'
+                                          : iconFileA[0] == '*' && iconFileA[1] == '\0';
+        if ((wFlags & GIL_NOTFILENAME) && systemImageIndex)
         {
             // multiple attempts helped JIS, but if icon extraction keeps failing
             // we would waste 50 ms on each icon retrieval for no reason
@@ -136,9 +177,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
                 if (path != NULL)
                 {
                     // Try asking the system for the system image list index and use that handle to extract the icon
-                    SHFILEINFO sfi;
+                    SHFILEINFOW sfi;
                     ZeroMemory(&sfi, sizeof(sfi));
-                    HIMAGELIST hSysImageList = (HIMAGELIST)SHGetFileInfo(path, 0, &sfi, sizeof(sfi), SHGFI_SYSICONINDEX | SHGFI_SMALLICON); // returns a persistent handle, no need to release
+                    HIMAGELIST hSysImageList = (HIMAGELIST)SHGetFileInfoW(path, 0, &sfi, sizeof(sfi), SHGFI_SYSICONINDEX | SHGFI_SMALLICON); // returns a persistent handle, no need to release
                     if (hSysImageList != NULL)
                     {
                         hIconSmall = ImageList_GetIcon(hSysImageList, sfi.iIcon, ILD_NORMAL);
@@ -148,7 +189,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
                     {
                         // Try asking directly for the icon
                         ZeroMemory(&sfi, sizeof(sfi));
-                        if (SHGetFileInfo(path, 0, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_SMALLICON) != 0)
+                        if (SHGetFileInfoW(path, 0, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_SMALLICON) != 0)
                             hIconSmall = sfi.hIcon;
                         //TRACE_I("  SalGetIconFromPIDL() SHGetFileInfo for SHGFI_ICON | SHGFI_SMALLICON hIconSmall="<<hIconSmall);
                     }
@@ -185,9 +226,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
                     if (path != NULL)
                     {
                         // Try asking the system for the system image list index and use that handle to extract the icon
-                        SHFILEINFO sfi;
+                        SHFILEINFOW sfi;
                         ZeroMemory(&sfi, sizeof(sfi));
-                        HIMAGELIST hSysImageList = (HIMAGELIST)SHGetFileInfo(path, 0, &sfi, sizeof(sfi), SHGFI_SYSICONINDEX | SHGFI_ICON);
+                        HIMAGELIST hSysImageList = (HIMAGELIST)SHGetFileInfoW(path, 0, &sfi, sizeof(sfi), SHGFI_SYSICONINDEX | SHGFI_ICON);
                         if (hSysImageList != NULL)
                         {
                             hIconLarge = ImageList_GetIcon(hSysImageList, sfi.iIcon, ILD_NORMAL);
@@ -197,7 +238,7 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
                         {
                             // Try asking directly for the icon
                             ZeroMemory(&sfi, sizeof(sfi));
-                            if (SHGetFileInfo(path, 0, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_LARGEICON) != 0)
+                            if (SHGetFileInfoW(path, 0, &sfi, sizeof(sfi), SHGFI_ICON | SHGFI_LARGEICON) != 0)
                                 hIconLarge = sfi.hIcon;
                             //TRACE_I("  SalGetIconFromPIDL() SHGetFileInfo for SHGFI_ICON | SHGFI_LARGEICON hIconLarge="<<hIconLarge);
                         }
@@ -223,9 +264,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
             // Note: if iconFile == '*', Extract sometimes returns valid icons but in some implementations it doesn't,
             // leaving users with default icons; see below
             if (isIExtractIconW)
-                hres = ((IExtractIconW*)pxi)->Extract(iconFileW, iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
+                hres = extractIconW->Extract(iconFileW.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
             else
-                hres = pxi->Extract(iconFile, iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
+                hres = extractIconA->Extract(iconFileA.data(), iconIndex, &hIconLarge, &hIconSmall, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]));
             //TRACE_I("  SalGetIconFromPIDL() pxi->Extract() hIconLarge="<<hIconLarge<<" hIconSmall="<<hIconSmall<<" isIExtractIconW="<<isIExtractIconW);
             // WARNING: for *.ai files iconFile==0 and iconIndex==0 yet Extract() still returns an icon (Adobe Illustrator shell extension)
             // WARNING: D:\Store\Salamand\ICO_SONY\SonyF707_Day_Flash.icc returns hIconLarge==hIconSmall, both 32x32
@@ -234,8 +275,13 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         // if the icon is stored in a file, we can attempt to retrieve it ourselves via ExtractIcons()
         if (hIconSmall == NULL && hIconLarge == NULL && !(wFlags & GIL_NOTFILENAME))
         {
+            // wide: dispatch to ExtractIconsW with the genuine wide path when
+            // isIExtractIconW, same as pxi->Extract() already does above - iconFile is a
+            // CP_ACP-narrowed mirror that can resolve to the wrong file or nothing at all.
             HICON hIcons[2] = {0, 0};
-            UINT u = ExtractIcons(iconFile, iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, NULL, 2, IconLRFlags);
+            UINT u = isIExtractIconW
+                        ? ExtractIconsW(iconFileW.data(), iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, NULL, 2, IconLRFlags)
+                        : ExtractIconsA(iconFileA.data(), iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, 2);
             if (u != -1)
             {
                 hIconLarge = hIcons[0];
@@ -244,13 +290,10 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
             //TRACE_I("  SalGetIconFromPIDL() ExtractIcons hIconLarge="<<hIconLarge<<" hIconSmall="<<hIconSmall);
         }
     }
-    if (pxi != NULL)
-    {
-        if (isIExtractIconW)
-            ((IExtractIconW*)pxi)->Release();
-        else
-            pxi->Release();
-    }
+    if (extractIconW != NULL)
+        extractIconW->Release();
+    if (extractIconA != NULL)
+        extractIconA->Release();
 
     // none of the methods worked, so return the default icon
     if (fallbackToDefIcon && hIconSmall == NULL && hIconLarge == NULL)
@@ -258,11 +301,11 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         BOOL fileIsExecutable = FALSE;
         if (!defIconIsDir && path != NULL)
         {
-            const char* name = strrchr(path, '\\');
-            const char* ext = name != NULL ? strrchr(name + 1, '.') : NULL;
+            const wchar_t* name = wcsrchr(path, L'\\');
+            const wchar_t* ext = name != NULL ? wcsrchr(name + 1, L'.') : NULL;
             //      if (ext > path && *(ext - 1) != '\\')    // ".cvspass" is an extension in Windows ...
             if (ext != NULL)
-                fileIsExecutable = ExtIsExe(ext + 1);
+                fileIsExecutable = ExtIsExeW(ext + 1);
         }
 
         int resID;
@@ -271,9 +314,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         else
             resID = defIconIsDir ? 4 : (fileIsExecutable ? 3 : 1); // symbolsDirectory : symbolsExecutable : symbolsNonAssociated
         HICON hIcons[2] = {0, 0};
-        UINT u = ExtractIcons(WindowsVistaAndLater ? "imageres.dll" : "shell32.dll", -resID,
-                              MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]),
-                              hIcons, NULL, 2, IconLRFlags);
+        UINT u = ExtractIconsW(WindowsVistaAndLater ? L"imageres.dll" : L"shell32.dll", -resID,
+                               MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]),
+                               hIcons, NULL, 2, IconLRFlags);
         if (u != -1)
         {
             hIconLarge = hIcons[0];
@@ -321,48 +364,37 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
     return ret;
 }
 
-LPITEMIDLIST SHILCreateFromPath(LPCSTR pszPath)
+LPITEMIDLIST SHILCreateFromPathW(LPCWSTR path)
 {
+    if (path == NULL)
+        return NULL;
+
     LPITEMIDLIST pidl = NULL;
     IShellFolder* psfDesktop;
     if (SUCCEEDED(SHGetDesktopFolder(&psfDesktop)))
     {
         ULONG cchEaten;
-        CWidePathBuffer wszPath;
-
-        MultiByteToWideChar(CP_ACP, 0, pszPath, -1, wszPath, wszPath.Size());
-        wszPath[wszPath.Size() - 1] = 0;
-
-        psfDesktop->ParseDisplayName(NULL, NULL, wszPath, &cchEaten, &pidl, NULL);
+        std::vector<wchar_t> mutablePath(path, path + wcslen(path) + 1);
+        psfDesktop->ParseDisplayName(NULL, NULL, mutablePath.data(), &cchEaten, &pidl, NULL);
 
         psfDesktop->Release();
     }
     return pidl;
 }
 
-// comment see spl_gen.h/GetFileIcon
-BOOL GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* hIcon, CIconSizeEnum iconSize,
-                 BOOL fallbackToDefIcon, BOOL defIconIsDir)
+static BOOL GetFileIconFromPIDLWithPath(LPCITEMIDLIST pidlFull,
+                                        const wchar_t* path, HICON* hIcon,
+                                        CIconSizeEnum iconSize,
+                                        BOOL fallbackToDefIcon,
+                                        BOOL defIconIsDir)
 {
     BOOL ret = FALSE;
-    LPITEMIDLIST pidlFull;
 
     if (hIcon == NULL)
     {
         TRACE_E("hIcon == NULL");
         return FALSE;
     }
-    /*
-  if (!pathIsPIDL)
-    TRACE_I("GetFileIcon() path="<<path<<" iconSize="<<iconSize);
-  else
-    TRACE_I("GetFileIcon() pathIsPIDL"); // not used by Salamander itself, only by the Folders plugin
-*/
-    if (!pathIsPIDL)
-        pidlFull = SHILCreateFromPath(path);
-    else
-        pidlFull = (LPITEMIDLIST)path;
-
     if (pidlFull != NULL)
     {
         IShellFolder* psf;
@@ -371,15 +403,36 @@ BOOL GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* hIcon, CIconSizeEnum 
         if (SUCCEEDED(hres))
         {
             // if we know the path, pass it to SalGetIconFromPIDL
-            ret = SalGetIconFromPIDL(psf, pathIsPIDL ? NULL : path, pidlLast, hIcon, iconSize,
+            ret = SalGetIconFromPIDL(psf, path, pidlLast, hIcon, iconSize,
                                      fallbackToDefIcon, defIconIsDir);
 
             psf->Release();
         }
-
-        if (!pathIsPIDL)
-            ILFree(pidlFull);
     }
 
     return ret;
+}
+
+BOOL GetFileIcon(const wchar_t* path, HICON* hIcon, CIconSizeEnum iconSize,
+                 BOOL fallbackToDefIcon, BOOL defIconIsDir)
+{
+    if (path == NULL || path[0] == L'\0')
+        return FALSE;
+
+    LPITEMIDLIST pidlFull = SHILCreateFromPathW(path);
+    BOOL ret = GetFileIconFromPIDLWithPath(pidlFull, path, hIcon, iconSize,
+                                           fallbackToDefIcon, defIconIsDir);
+    if (pidlFull != NULL)
+        ILFree(pidlFull);
+    return ret;
+}
+
+BOOL GetFileIconFromPIDL(LPCITEMIDLIST pidl, HICON* hIcon,
+                         CIconSizeEnum iconSize, BOOL fallbackToDefIcon,
+                         BOOL defIconIsDir)
+{
+    if (pidl == NULL)
+        return FALSE;
+    return GetFileIconFromPIDLWithPath(pidl, NULL, hIcon, iconSize,
+                                       fallbackToDefIcon, defIconIsDir);
 }

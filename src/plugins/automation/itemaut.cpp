@@ -24,7 +24,7 @@ CSalamanderPanelItemAutomation::CSalamanderPanelItemAutomation()
     _ctor();
 }
 
-CSalamanderPanelItemAutomation::CSalamanderPanelItemAutomation(const CFileData* pData, PCTSTR pszPath)
+CSalamanderPanelItemAutomation::CSalamanderPanelItemAutomation(const CFileData* pData, PCWSTR pszPath)
 {
     _ctor();
     Set(pData, pszPath);
@@ -36,68 +36,27 @@ CSalamanderPanelItemAutomation::CSalamanderPanelItemAutomation(const CFileData* 
     Set(pData, nPanel);
 }
 
-CSalamanderPanelItemAutomation::~CSalamanderPanelItemAutomation()
-{
-    delete[] m_pszFullPath;
-}
-
 void CSalamanderPanelItemAutomation::_ctor()
 {
-    m_pszFullPath = NULL;
-    m_cchFullPath = 0;
-    m_pszName = NULL;
+    m_fullPath.clear();
+    m_nameOffset = 0;
     m_size.QuadPart = 0;
     m_dwAttributes = INVALID_FILE_ATTRIBUTES;
     m_dateLastModified = 0;
 }
 
-void CSalamanderPanelItemAutomation::Set(const CFileData* pData, PCTSTR pszPath)
+void CSalamanderPanelItemAutomation::Set(const CFileData* pData, PCWSTR pszPath)
 {
-    size_t cchNewLen;
-    bool bHasSlash = false;
-    size_t cchPathLenA;
-    size_t cchNameLenA;
-    size_t cchPathLenW;
-    size_t cchNameLenW;
     FILETIME ftLocal;
     SYSTEMTIME st;
 
     _ASSERTE(pszPath != NULL && *pszPath != 0);
 
-    cchPathLenA = _tcslen(pszPath);
-    if (cchPathLenA > 0)
-    {
-        bHasSlash = pszPath[cchPathLenA - 1] == _T('\\');
-    }
-
-    cchNameLenA = _tcslen(pData->Name);
-
-    cchPathLenW = MultiByteToWideChar(CP_ACP, 0, pszPath, (int)cchPathLenA, NULL, 0);
-    cchNameLenW = MultiByteToWideChar(CP_ACP, 0, pData->Name, (int)cchNameLenA, NULL, 0);
-
-    cchNewLen = cchPathLenW + cchNameLenW + (bHasSlash ? 0 : 1) + 1;
-    if (cchNewLen > m_cchFullPath)
-    {
-        cchNewLen = (cchNewLen + 127) & ~0x7F; // align to multiple of 128 bytes
-
-        delete[] m_pszFullPath;
-        m_pszFullPath = m_pszName = NULL;
-
-        m_pszFullPath = new WCHAR[cchNewLen];
-        m_cchFullPath = cchNewLen;
-    }
-
-    cchPathLenW = MultiByteToWideChar(CP_ACP, 0, pszPath, (int)cchPathLenA, m_pszFullPath, (int)m_cchFullPath);
-    if (!bHasSlash)
-    {
-        m_pszFullPath[cchPathLenW] = L'\\';
-        ++cchPathLenW;
-    }
-
-    cchNameLenW = MultiByteToWideChar(CP_ACP, 0, pData->Name, (int)cchNameLenA, m_pszFullPath + cchPathLenW, (int)(m_cchFullPath - cchPathLenW));
-    m_pszFullPath[cchPathLenW + cchNameLenW] = L'\0';
-
-    m_pszName = PathFindFileNameW(m_pszFullPath);
+    m_fullPath = pszPath;
+    if (!m_fullPath.empty() && m_fullPath.back() != L'\\')
+        m_fullPath += L'\\';
+    m_nameOffset = m_fullPath.size();
+    m_fullPath += pData->Name;
 
     m_dwAttributes = pData->Attr;
     m_size.QuadPart = pData->Size.Value;
@@ -114,24 +73,22 @@ void CSalamanderPanelItemAutomation::Set(const CFileData* pData, PCTSTR pszPath)
 
 void CSalamanderPanelItemAutomation::Set(const CFileData* pData, int nPanel)
 {
-    CPathBuffer szPath;
-
-    SalamanderGeneral->GetPanelPath(nPanel, szPath, szPath.Size(), NULL, NULL);
-
-    Set(pData, szPath);
+    std::wstring path;
+    if (SPLGetPanelPathOwned(SalamanderGeneral, nPanel, path))
+        Set(pData, path.c_str());
 }
 
 /* [propget][id] */ HRESULT STDMETHODCALLTYPE CSalamanderPanelItemAutomation::get_Path(
     /* [retval][out] */ BSTR* path)
 {
-    *path = SysAllocString(m_pszFullPath);
+    *path = SysAllocString(m_fullPath.c_str());
     return S_OK;
 }
 
 /* [propget][id] */ HRESULT STDMETHODCALLTYPE CSalamanderPanelItemAutomation::get_Name(
     /* [retval][out] */ BSTR* name)
 {
-    *name = SysAllocString(m_pszName);
+    *name = SysAllocString(m_fullPath.c_str() + m_nameOffset);
     return S_OK;
 }
 

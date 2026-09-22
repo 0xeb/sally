@@ -7,14 +7,22 @@
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "ui/IPrompter.h"
+#include "ui/UnicodeHistoryUtils.h" // AddValueToWideHistory
+#include "common/unicode/PanelPathPolicy.h" // EffectiveItemNameW
 #include "plugins.h"
 #include "fileswnd.h"
 #include "editwnd.h"
 #include "stswnd.h"
 #include "darkmode.h"
 #include "common/CommandShellService.h"
+#include "common/DiagnosticTextEncoding.h"
+#include "common/clipboard/ClipboardTextPayload.h"
+#include "common/clipboard/HDropSelection.h"
+#include "common/fsutil.h"
+#include "common/PathDisplayUtils.h" // MakeCompactPathBuffer
 #include "common/unicode/helpers.h"
 #include "common/unicode/WideVariableExpansion.h"
+#include "salshlib.h"
 #include <uxtheme.h>
 
 #include <shlwapi.h>
@@ -94,8 +102,19 @@ BOOL IsCharacterDelimiter(char ch)
     return ch == ' ' || ch == '/' || ch == '\\' || ch == ';' || ch == ',' || ch == '.';
 }
 
+// The same delimiter set, which is entirely ASCII - so the wide form is a
+// direct transliteration and cannot disagree with the narrow one about any character.
+BOOL IsCharacterDelimiterW(wchar_t ch)
+{
+    return ch == L' ' || ch == L'/' || ch == L'\\' || ch == L';' || ch == L',' || ch == L'.';
+}
+
+// The narrow-native half of the EM_SETWORDBREAKPROC A/W pair (see EditWordBreakCoreW's
+// comment above EditWordBreakProcUNICODE) - fixed to char*/CharPrevA/CharNextA rather than
+// LPWSTR/CharPrev/CharNext so its width never depends on this project's own UNICODE define;
+// this is the proc installed pre-common-controls-6, which always hands narrow text.
 int CALLBACK
-EditWordBreakProc(LPTSTR text, int current, int textLen, int code)
+EditWordBreakProc(char* text, int current, int textLen, int code)
 {
     CALL_STACK_MESSAGE5("EditWordBreakProc(%s, %d, %d, %d)", text, current, textLen, code);
     if (textLen == 0)
@@ -110,7 +129,7 @@ EditWordBreakProc(LPTSTR text, int current, int textLen, int code)
     {
         do
         {
-            esi = CharPrev(text, esi);
+            esi = CharPrevA(text, esi);
             if (esi == text)
                 break;
             if (!IsCharacterDelimiter(*esi))
@@ -140,7 +159,7 @@ EditWordBreakProc(LPTSTR text, int current, int textLen, int code)
             return (int)(esi - text);
         do
         {
-            esi = CharNext(esi);
+            esi = CharNextA(esi);
             if (esi == ebp_10)
                 return (int)(esi - text);
 
@@ -161,67 +180,78 @@ EditWordBreakProc(LPTSTR text, int current, int textLen, int code)
     return textLen;
 }
 
-int CALLBACK
-EditWordBreakProcUNICODE(LPTSTR text, int current, int textLen, int code)
+// The wide-native core. EM_SETWORDBREAKPROC's signature is fixed by Win32 as
+// int(CALLBACK*)(LPWSTR, int, int, int), so the LPWSTR lives in the shim below and
+// everything real happens here, in wchar_t, with no cast at any call site.
+int EditWordBreakCoreW(const wchar_t* wtext, int current, int textLen, int code)
 {
-    CALL_STACK_MESSAGE5("EditWordBreakProcUNICODE(%s, %d, %d, %d)", text, current, textLen, code);
+    // This is installed on common controls 6+, where USER32 hands the callback
+    // UTF-16 text and expects a UTF-16 CHARACTER index back. It used to immediately do
+    // WideCharToMultiByte(CP_ACP, ...) into a char[10000], walk the mirror, and return an
+    // index into THAT - a narrow index used by the caller as a wide one.
+    //
+    // Be precise about when that actually breaks, because the obvious answer is wrong and
+    // was measured wrong here first: on a SINGLE-BYTE ACP the two index spaces coincide,
+    // including across non-BMP characters - WideCharToMultiByte substitutes the default
+    // character per wchar_t, so a surrogate pair becomes "??" rather than "?" and the
+    // lengths still match. The divergence is real on a DBCS ACP (932/936/949/950), where
+    // one wchar_t narrows to two bytes and every index past the first multi-byte character
+    // is wrong; Ctrl+Backspace then selects and deletes the wrong range. So this was a
+    // LATENT bug on Western installs and a live one on CJK ones.
+    //
+    // Now native: same algorithm, wide throughout, no mirror. The delimiter set is ASCII,
+    // so this cannot disagree with the narrow proc about any character it also sees.
+    CALL_STACK_MESSAGE4("EditWordBreakCoreW(, %d, %d, %d)", current, textLen, code);
     if (textLen == 0)
         return 0;
 
-    char buff[10000];
-    // Convert the String to ANSI
-    WideCharToMultiByte(CP_ACP, 0, (wchar_t*)text, textLen, buff, 10000, NULL, NULL);
-    buff[10000 - 1] = 0;
-    text = buff;
-
     static BOOL gRightBreak = FALSE;
-    BOOL ebp_8 = FALSE;
-    char* ebp_10 = NULL;
-    char* esi = text + current;
+    BOOL sawNonDelimiter = FALSE;
+    const wchar_t* esi = wtext + current;
     switch (code)
     {
     case WB_LEFT:
     {
         do
         {
-            esi = CharPrev(text, esi);
-            if (esi == text)
+            esi = CharPrevW(wtext, esi);
+            if (esi == wtext)
                 break;
-            if (!IsCharacterDelimiter(*esi))
+            if (!IsCharacterDelimiterW(*esi))
             {
                 gRightBreak = FALSE;
-                ebp_8 = TRUE;
+                sawNonDelimiter = TRUE;
                 continue;
             }
             if (gRightBreak)
                 break;
-            if (ebp_8)
+            if (sawNonDelimiter)
                 break;
         } while (1);
-        if (esi - text <= 0)
+        if (esi - wtext <= 0)
             return 0;
-        if (esi - text >= textLen)
-            return (int)(esi - text);
-        return (int)(esi - text + 1);
+        if (esi - wtext >= textLen)
+            return (int)(esi - wtext);
+        return (int)(esi - wtext + 1);
     }
 
     case WB_RIGHT:
     {
         gRightBreak = FALSE;
-        BOOL edi = !IsCharacterDelimiter(*esi);
-        ebp_10 = text + textLen;
-        if (esi == ebp_10)
-            return (int)(esi - text);
+        BOOL inWord = !IsCharacterDelimiterW(*esi);
+        const wchar_t* endPtr = wtext + textLen;
+        if (esi == endPtr)
+            return (int)(esi - wtext);
         do
         {
-            esi = CharNext(esi);
-            if (esi == ebp_10)
-                return (int)(esi - text);
+            esi = CharNextW(esi);
+            if (esi == endPtr)
+                return (int)(esi - wtext);
 
-            if (IsCharacterDelimiter(*esi))
-                edi = FALSE;
-            else if (!edi)
-                return (int)(esi - text);
+            if (IsCharacterDelimiterW(*esi))
+                inWord = FALSE;
+            else if (!inWord)
+                return (int)(esi - wtext);
         } while (1);
         return 0;
     }
@@ -229,19 +259,28 @@ EditWordBreakProcUNICODE(LPTSTR text, int current, int textLen, int code)
     case WB_ISDELIMITER:
     {
         gRightBreak = TRUE;
-        return IsCharacterDelimiter(text[current]);
+        return IsCharacterDelimiterW(wtext[current]);
     }
     }
     return textLen;
 }
 
+int CALLBACK
+EditWordBreakProcUNICODE(LPWSTR text, int current, int textLen, int code)
+{
+    return EditWordBreakCoreW((const wchar_t*)text, current, textLen, code);
+}
+
 const char* BACKSPACE_SUBCLASSPROC = "SALBSSubClass";
-int CALLBACK EditWordBreakProc(LPTSTR text, int current, int textLen, int code);
+int CALLBACK EditWordBreakProc(char* text, int current, int textLen, int code);
 
 LRESULT CALLBACK
 BSHandlerSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    WNDPROC OldWndProc = (WNDPROC)GetProp(hwnd, BACKSPACE_SUBCLASSPROC);
+    // BACKSPACE_SUBCLASSPROC is a fixed internal narrow identifier, not user-facing text -
+    // explicit GetPropA/RemovePropA/SetPropA rather than the wchar_t macros, which would
+    // otherwise resolve to the W forms under the msvc-unicode-canary probe.
+    WNDPROC OldWndProc = (WNDPROC)GetPropA(hwnd, BACKSPACE_SUBCLASSPROC);
     if (OldWndProc == NULL)
     {
         TRACE_E("BSHandlerSubclassProc: OldWndProc == NULL");
@@ -277,16 +316,22 @@ BSHandlerSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 }
                 //          if (iStart == iEnd) // nothing can't be selected
                 //          {
-                char buff[10000];
-                int len = GetWindowTextLength(hwnd);
+                // iStart/iEnd come from EM_GETSEL as CHARACTER indices. This
+                // used to read the text narrow and hand the mirror to the narrow word-break
+                // proc, so the boundary it computed indexed a different string from the one
+                // EM_SETSEL then selects - Ctrl+Backspace deleted the wrong range. Read wide
+                // and use the wide proc, so index space is the same on both sides.
+                wchar_t buffW[10000];
+                int len = GetWindowTextLengthW(hwnd);
                 if (len >= 10000 - 1)
                     break;
-                SendMessage(hwnd, WM_GETTEXT, 10000, (LPARAM)buff);
+                buffW[0] = 0;
+                GetWindowTextW(hwnd, buffW, 10000);
 
                 // delete the word
-                iStart = EditWordBreakProc(buff, iStart, iStart + 1, WB_LEFT);
+                iStart = EditWordBreakCoreW(buffW, iStart, iStart + 1, WB_LEFT);
                 SendMessage(hwnd, EM_SETSEL, iStart, iEnd);
-                SendMessage(hwnd, EM_REPLACESEL, TRUE, (LPARAM) "");
+                SendMessageW(hwnd, EM_REPLACESEL, TRUE, (LPARAM)L"");
                 //          }
                 return 0; // we handled it
             }
@@ -297,24 +342,44 @@ BSHandlerSubclassProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
     {
         // clean up the stored OldWndProc
-        WNDPROC currentWndProc = (WNDPROC)GetWindowLongPtr(hwnd, GWLP_WNDPROC);
-        SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)OldWndProc);
+        // W forms, matching AttachBackspaceHandler's install.
+        WNDPROC currentWndProc = (WNDPROC)GetWindowLongPtrW(hwnd, GWLP_WNDPROC);
+        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)OldWndProc);
 
-        RemoveProp(hwnd, BACKSPACE_SUBCLASSPROC);
+        RemovePropA(hwnd, BACKSPACE_SUBCLASSPROC);
         break;
     }
     }
-    return CallWindowProc(OldWndProc, hwnd, message, wParam, lParam);
+    // CallWindowProcW, not the A form: this proc is installed with
+    // SetWindowLongPtrW, so the message it received is wide. Forwarding it through
+    // the ANSI variant would convert the very text this subclass exists to preserve.
+    return CallWindowProcW(OldWndProc, hwnd, message, wParam, lParam);
 }
 
 // we don't use WinLib's subclass so we don't step on its toes
 // (some windows we need to attach may already be or will be under WinLib)
+// Subclass with the WIDE form.
+//
+// This is the second subclass that lands on a combo's inner EDIT (the first is
+// CKeyForwarder, via CWindow::AttachToWindow). Installing with the ANSI
+// SetWindowLongPtr converts a Unicode control into an ANSI one, and thereafter
+// every SendMessageW / GetWindowTextW on that edit round-trips through CP_ACP -
+// the damage the "Unicode overlay" in dialogs_file_transforms.cpp exists to dodge.
+//
+// The two subclasses CHAIN on the same control, so both must be wide; one narrow
+// link is enough to narrow the text passing through it.
+//
+// Safe unconditionally: BSHandlerSubclassProc's only character test is
+// wParam == 127 (the Ctrl+Backspace DEL), a control code identical under A and W,
+// and its text handling is already wide (GetWindowTextW + SendMessageW
+// EM_REPLACESEL) precisely so the indices it computes match the string EM_SETSEL
+// then acts on.
 BOOL AttachBackspaceHandler(HWND hwndEdit)
 {
-    WNDPROC oldWndProc = (WNDPROC)GetWindowLongPtr(hwndEdit, GWLP_WNDPROC);
-    if (SetProp(hwndEdit, BACKSPACE_SUBCLASSPROC, (HANDLE)oldWndProc))
+    WNDPROC oldWndProc = (WNDPROC)GetWindowLongPtrW(hwndEdit, GWLP_WNDPROC);
+    if (SetPropA(hwndEdit, BACKSPACE_SUBCLASSPROC, (HANDLE)oldWndProc))
     {
-        SetWindowLongPtr(hwndEdit, GWLP_WNDPROC, (LONG_PTR)BSHandlerSubclassProc);
+        SetWindowLongPtrW(hwndEdit, GWLP_WNDPROC, (LONG_PTR)BSHandlerSubclassProc);
         return TRUE;
     }
     return FALSE;
@@ -330,15 +395,15 @@ BOOL InstallWordBreakProc(HWND hWindow)
         return FALSE;
     }
 
-    char className[31];
+    wchar_t className[31];
     className[0] = 0;
-    if (GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
+    if (GetClassNameW(hWindow, className, 30) == 0 || StrICmpW(className, L"edit") != 0)
     {
         // might be a combobox, so try grabbing its internal edit control
         hWindow = GetWindow(hWindow, GW_CHILD);
-        if (hWindow == NULL || GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
+        if (hWindow == NULL || GetClassNameW(hWindow, className, 30) == 0 || StrICmpW(className, L"edit") != 0)
         {
-            TRACE_E("InstallWordBreakProc: edit window was not found ClassName is " << className);
+            TRACE_EW(L"InstallWordBreakProc: edit window was not found ClassName is " << className);
             return FALSE;
         }
     }
@@ -356,11 +421,11 @@ BOOL InstallWordBreakProc(HWND hWindow)
 }
 
 // returns TRUE if this is the "cd *" command
-BOOL IsChangeDirAttempt(const char* text)
+BOOL IsChangeDirAttempt(const wchar_t* text)
 {
-    while (*text == ' ')
+    while (*text == L' ')
         text++;
-    return StrNICmp(text, "cd ", 3) == 0;
+    return _wcsnicmp(text, L"cd ", 3) == 0;
 }
 
 int GetCmdLineLimit()
@@ -395,15 +460,17 @@ int GetCmdLineLimit()
 //
 
 CEditLine::CEditLine()
-    : CWindow(ooStatic)
+    : CWindow(ooStatic) // see CEditWindow::Create
 {
     SkipCharacter = FALSE;
     SelChangeDisabled = FALSE;
 }
 
-void CEditLine::InsertText(char* s)
+// Wide insertion. The command line is a Unicode window with a wide execute
+// path, so text inserted here is the last place a '?' can still enter a command.
+void CEditLine::InsertTextW(const wchar_t* s)
 {
-    SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM)s);
+    SendMessageW(HWindow, EM_REPLACESEL, TRUE, (LPARAM)s);
 }
 
 BOOL SkipNextSysCharacter = FALSE;
@@ -423,7 +490,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (SkipCharacter)
             return 0;
-        switch ((TCHAR)wParam)
+        switch ((wchar_t)wParam)
         {
         case '\t': // change panel
         {
@@ -437,13 +504,15 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 MainWindow->GetActivePanel()->CtrlPageDnOrEnter(VK_RETURN);
             else
             {
-                char cmdLine[SALCMDLINE_MAXLEN + 1];
-                SendMessage(HWindow, WM_GETTEXT, SALCMDLINE_MAXLEN + 1, (LPARAM)cmdLine);
+                const int commandLength = GetWindowTextLengthW(HWindow);
+                std::wstring cmdLineW(static_cast<size_t>(commandLength) + 1, L'\0');
+                const int copiedCommandLength =
+                    GetWindowTextW(HWindow, cmdLineW.data(), commandLength + 1);
+                cmdLineW.resize(static_cast<size_t>((std::max)(copiedCommandLength, 0)));
 
                 MainWindow->SetDefaultDirectories();
 
-                char command[SALCMDLINE_MAXLEN + 1];
-                command[0] = 0;
+                std::wstring command;
                 int selFrom = 0;
                 int selTo = 0;
 
@@ -453,7 +522,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     // users coming from TC and other file managers tend to change the panel path via the command line
                     // we'll try to break this habit
-                    if (IsChangeDirAttempt(cmdLine))
+                    if (IsChangeDirAttempt(cmdLineW.c_str()))
                     {
                         if (Configuration.CnfrmChangeDirTC)
                         {
@@ -469,10 +538,10 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     CommandShellPolicyResult policy = gCommandShellService != NULL
                                                           ? gCommandShellService->GetPolicyInfo(policyRequest)
                                                           : CommandShellPolicyResult::Error(ERROR_INVALID_PARAMETER);
-                    const char* shellPolicyName = policy.success ? policy.info.executableNameForPolicy.c_str() : "";
+                    const wchar_t* shellPolicyName = policy.success ? policy.info.executableNameForPolicy.c_str() : L"";
 
                     if (SystemPolicies.GetMyRunRestricted() &&
-                        (!SystemPolicies.GetMyCanRun(shellPolicyName) || !SystemPolicies.GetMyCanRun(cmdLine)))
+                        (!SystemPolicies.GetMyCanRun(shellPolicyName) || !SystemPolicies.GetMyCanRun(cmdLineW.c_str())))
                     {
                         gPrompter->ShowErrorWithHelp(LoadStrW(IDS_POLICIESRESTRICTION_TITLE), LoadStrW(IDS_POLICIESRESTRICTION), IDH_GROUPPOLICY);
                         return 0;
@@ -501,8 +570,10 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         request.y = p.y;
                     }
 
-                    std::wstring commandW = AnsiToWide(cmdLine);
-                    request.command = commandW.c_str();
+                    // The service has always taken a wide command. The former narrow mirror
+                    // round trip lost characters before launch; workingDirectory above was
+                    // already GetPathW(), so the command was the last narrow link in the chain.
+                    request.command = cmdLineW;
 
                     CommandShellResult result = gCommandShellService != NULL
                                                     ? gCommandShellService->LaunchCommand(request)
@@ -510,7 +581,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (!result.success)
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERROREXECCMDLINE),
-                                             result.errorCode == ERROR_FILENAME_EXCED_RANGE ? LoadStrW(IDS_TOOLONGPATH) : GetErrorTextW(result.errorCode));
+                                             result.errorCode == ERROR_FILENAME_EXCED_RANGE ? LoadStrW(IDS_TOOLONGPATH) : GetErrorTextOwned(result.errorCode).c_str());
                     }
                     else
                     {
@@ -525,7 +596,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (panel->Is(ptPluginFS) && panel->GetPluginFS()->NotEmpty() &&
                         panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_COMMANDLINE))
                     { // executing commands from FS
-                        lstrcpyn(command, cmdLine, SALCMDLINE_MAXLEN + 1);
+                        command = cmdLineW;
 
                         panel->UserWorkedOnThisPath = TRUE;
 
@@ -547,31 +618,13 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (Configuration.EnableCmdLineHistory)
                     {
-                        char** history = Configuration.EditHistory;
-                        int from = EDIT_HISTORY_SIZE - 1;
-                        int i;
-                        for (i = 0; i < EDIT_HISTORY_SIZE; i++)
-                            if (history[i] != NULL)
-                                if (strcmp(history[i], cmdLine) == 0)
-                                {
-                                    from = i;
-                                    break;
-                                }
-                        if (from > 0)
-                        {
-                            char* text = _strdup(cmdLine);
-                            if (text != NULL)
-                            {
-                                free(history[from]);
-                                for (i = from - 1; i >= 0; i--)
-                                    history[i + 1] = history[i];
-                                history[0] = text;
-                            }
-                        }
+                        AddValueToWideHistory(Configuration.EditHistory, EDIT_HISTORY_SIZE,
+                                              cmdLineW.c_str(), TRUE /*caseSensitiveValue*/);
                     }
                     MainWindow->EditWindow->FillHistory();
 
-                    int l = (int)strlen(command);
+                    int l = static_cast<int>((std::min)(
+                        command.size(), static_cast<size_t>((std::numeric_limits<int>::max)())));
                     if (selFrom < 0)
                         selFrom = 0;
                     if (selFrom > l)
@@ -580,7 +633,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         selTo = 0;
                     if (selTo > l)
                         selTo = l;
-                    SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)command);
+                    SendMessageW(HWindow, WM_SETTEXT, 0, (LPARAM)command.c_str());
                     SendMessage(HWindow, EM_SETSEL, selFrom, selTo);
                 }
             }
@@ -882,30 +935,32 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (controlPressed && !altPressed) // filename of the selected file to the command line
             {
                 SkipCharacter = TRUE;
-                CPathBuffer path;
-                const char* s;
-                int l;
+                std::wstring nameW;
                 CFilesWindow* p = MainWindow->GetActivePanel();
                 if (p->FocusedIndex >= 0 &&
                     p->FocusedIndex < p->Files->Count + p->Dirs->Count)
                 {
                     CFileData* file = (p->FocusedIndex < p->Dirs->Count) ? &p->Dirs->At(p->FocusedIndex) : &p->Files->At(p->FocusedIndex - p->Dirs->Count);
+                    // NameW when the name needs it; DosName is 8.3 and ASCII
+                    // by definition, so it is faithful as-is.
                     if (shiftPressed) // DOS name
                     {
-                        s = (file->DosName == NULL) ? file->Name : file->DosName;
+                        // A DOS 8.3 name is ASCII by construction, so widen it byte-for-byte
+                        // rather than through a code-page conversion - there is nothing for
+                        // CP_ACP to decide, and saying so keeps the conversion count honest.
+                        nameW = (file->DosName == NULL)
+                                    ? file->Name
+                                    : std::wstring(file->DosName, file->DosName + wcslen(file->DosName));
                     }
                     else
                     {
-                        s = file->Name;
+                        nameW = file->Name;
                     }
                 }
                 else
                     return 0;
-                l = (int)strlen(s);
-                memmove(path, s, l);
-                path[l++] = ' ';
-                path[l] = 0;
-                InsertText(path);
+                nameW += L' ';
+                InsertTextW(nameW.c_str());
                 return 0;
             }
             else
@@ -966,7 +1021,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (wParam == VK_ESCAPE)
                 {
                     // people want compatibility with WinCmd, NC, FAR -- delete the contents on Escape
-                    SetWindowText(HWindow, "");
+                    SetWindowTextW(HWindow, L"");
                 }
                 SkipCharacter = TRUE;
                 MainWindow->FocusPanel(MainWindow->GetActivePanel());
@@ -982,35 +1037,33 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (controlPressed && !altPressed)
             {
                 SkipCharacter = TRUE;
-                CPathBuffer path; // Heap-allocated for long path support
-                const char* s;
+                // Ctrl+[ / Ctrl+] / Ctrl+Space insert a panel path into the
+                // command line. Taken from the CP_ACP mirror they inserted a path that may
+                // name nothing - and the command line now runs exactly what it holds.
+                const wchar_t* s = NULL;
                 switch (wParam)
                 {
                 case VK_LBRACKET:
-                    s = MainWindow->LeftPanel->Is(ptDisk) ? MainWindow->LeftPanel->GetPath() : NULL;
+                    s = MainWindow->LeftPanel->Is(ptDisk) ? MainWindow->LeftPanel->GetPathW() : NULL;
                     break;
                 case VK_RBRACKET:
-                    s = MainWindow->RightPanel->Is(ptDisk) ? MainWindow->RightPanel->GetPath() : NULL;
+                    s = MainWindow->RightPanel->Is(ptDisk) ? MainWindow->RightPanel->GetPathW() : NULL;
                     break;
                 default:
-                    s = MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL;
+                    s = MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPathW() : NULL;
                     break;
                 }
                 if (s != NULL)
                 {
+                    std::wstring pathW(s);
                     if (shiftPressed) // DOS path
                     {
-                        if (!GetShortPathName(s, path.Get(), path.Size()))
-                        {
-                            strcpy(path, s);
-                        }
+                        std::wstring shortPath = GetShortPathW(s);
+                        if (!shortPath.empty())
+                            pathW = std::move(shortPath);
                     }
-                    else
-                    {
-                        strcpy(path, s);
-                    }
-                    SalPathAddBackslash(path, path.Size());
-                    InsertText(path);
+                    SalPathAddBackslashW(pathW);
+                    InsertTextW(pathW.c_str());
                 }
                 return 0;
             }
@@ -1051,7 +1104,11 @@ private:
     CEditLine* EditLine;              // edit line we operate on
     int EditWidth;
     int EditHeight;
-    std::string TextBuff;
+    // Wide: TextLen is a CHARACTER count used to index the control and to
+    // measure the last glyph. On the CP_ACP mirror both the count and the measured
+    // width belong to a different string, so the drag insert-mark lands in the wrong
+    // place on any command line the code page cannot spell.
+    std::wstring TextBuff;
     int TextLen;
     int OldIsertMarkX;
 
@@ -1136,7 +1193,7 @@ public:
                 HDC hDC = HANDLES(GetDC(EditLine->HWindow));
                 HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
                 SIZE sz;
-                GetTextExtentPoint32(hDC, TextBuff.c_str() + TextLen - 1, 1, &sz);
+                GetTextExtentPoint32W(hDC, TextBuff.c_str() + TextLen - 1, 1, &sz);
                 SelectObject(hDC, hOldFont);
                 HANDLES(ReleaseDC(EditLine->HWindow, hDC));
                 x += (short)sz.cx;
@@ -1148,37 +1205,36 @@ public:
         return FALSE;
     }
 
-    BOOL InsertText(POINTL pt, const char* text)
+    // Wide sibling. The drop data is CF_UNICODETEXT - already wide - and the
+    // narrow path below only exists for the legacy CF_HDROP branch.
+    BOOL InsertTextW(POINTL pt, const wchar_t* text)
     {
         int xPos;
         if (HitTest(pt, FALSE, &xPos))
         {
             SetInsertMark(-1);
-            char buff[10000];
-            lstrcpyn(buff, text, 10000);
-            char* start = buff;
+            std::wstring buff(text != NULL ? text : L"");
+            const wchar_t* start = buff.c_str();
             if ((GetKeyState(VK_MENU) & 0x8000) != 0)
             {
                 // we do not want the whole path - trim it
-                int len = lstrlen(buff);
+                size_t len = buff.length();
                 if (len > 2)
                 {
-                    if (buff[len - 1] == '\\')
+                    if (buff[len - 1] == L'\\')
                     {
-                        buff[len - 1] = 0;
+                        buff.resize(len - 1);
                         len--;
                     }
-                    char* p = buff + len - 1;
-                    while (p >= buff && *p != '\\')
-                        p--;
-                    if (p >= buff && *p == '\\')
-                        start = p + 1;
+                    size_t slash = buff.find_last_of(L'\\');
+                    if (slash != std::wstring::npos)
+                        start = buff.c_str() + slash + 1;
                 }
             }
             if (ImageDragging)
                 ImageDragShow(FALSE);
             SendMessage(EditLine->HWindow, EM_SETSEL, xPos, xPos);
-            SendMessage(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)start);
+            SendMessageW(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)start);
             UpdateWindow(EditLine->HWindow);
             if (ImageDragging)
                 ImageDragShow(TRUE);
@@ -1192,98 +1248,51 @@ public:
         ForbiddenDataObject = forbiddenDataObject;
     }
 
-    // returns a directory or a file (there must be exactly one)
-    BOOL GetNameFromDataObject(IDataObject* pDataObject, char* path, int pathSize)
+    // Returns the exact directory or file from a single-item data object.
+    BOOL GetNameFromDataObject(IDataObject* pDataObject, std::wstring* path = NULL)
     {
-        FORMATETC formatEtc;
-        formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
-        formatEtc.ptd = NULL;
-        formatEtc.dwAspect = DVASPECT_CONTENT;
-        formatEtc.lindex = -1;
-        formatEtc.tymed = TYMED_HGLOBAL;
-
-        STGMEDIUM stgMedium;
-        stgMedium.tymed = TYMED_HGLOBAL;
-        stgMedium.hGlobal = NULL;
-        stgMedium.pUnkForRelease = NULL;
-
-        if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
+        std::wstring exactPath;
+        BOOL fakeFormatPresent = FALSE;
+        if (GetFakeDataObjectRealPath(pDataObject, exactPath, NULL, &fakeFormatPresent))
         {
-            BOOL havePath = FALSE;
             if (path != NULL)
-                path[0] = 0;
-            if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
-            {
-                char* data = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
-                if (data != NULL)
-                {
-                    havePath = data[0] != 0 && data[1] != 0;
-                    if (data[0] != 0 && path != NULL)
-                        lstrcpyn(path, data + 1, pathSize);
-                    HANDLES(GlobalUnlock(stgMedium.hGlobal));
-                }
-            }
-            ReleaseStgMedium(&stgMedium);
-            return havePath;
+                *path = std::move(exactPath);
+            return TRUE;
+        }
+        if (fakeFormatPresent)
+        {
+            // Ours, and deliberately carrying no real path - shellsup.cpp leaves it empty for any
+            // drag of more than one item. Falling through to CF_HDROP here would insert Sally's
+            // internal ...\Temp\DROPFAKE\<id> path into the command line, which names nothing the
+            // user dragged and which they might then run.
+            return FALSE;
         }
 
+        FORMATETC formatEtc = {};
         formatEtc.cfFormat = CF_HDROP;
         formatEtc.ptd = NULL;
         formatEtc.dwAspect = DVASPECT_CONTENT;
         formatEtc.lindex = -1;
         formatEtc.tymed = TYMED_HGLOBAL;
 
-        stgMedium.tymed = TYMED_HGLOBAL;
-        stgMedium.hGlobal = NULL;
-        stgMedium.pUnkForRelease = NULL;
-
+        STGMEDIUM stgMedium = {};
         BOOL ret = FALSE;
         if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
         {
             if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
             {
-                DROPFILES* data = (DROPFILES*)HANDLES(GlobalLock(stgMedium.hGlobal));
+                const SIZE_T dataSize = GlobalSize(stgMedium.hGlobal);
+                const DROPFILES* data = static_cast<const DROPFILES*>(HANDLES(GlobalLock(stgMedium.hGlobal)));
                 if (data != NULL)
                 {
-                    if (data->fWide)
-                    {
-                        const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
-                        if (l < pathSize && *(fileW + l + 1) == 0)
-                        {
-                            if (path != NULL)
-                            {
-                                WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, pathSize, NULL, NULL);
-                                path[pathSize - 1] = 0;
-                            }
-                            ret = TRUE;
-                        }
-                    }
-                    else
-                    {
-                        const char* fileA = ((char*)data) + data->pFiles;
-                        int l = (int)strlen(fileA);
-                        if (l < pathSize && *(fileA + l + 1) == 0)
-                        {
-                            if (path != NULL)
-                                lstrcpyn(path, fileA, pathSize);
-                            ret = TRUE;
-                        }
-                    }
-
+                    ret = sally::clipboard::TryGetSingleHDropPath(data, dataSize, exactPath);
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
             }
             ReleaseStgMedium(&stgMedium);
         }
-        /* removed overly strict check - dropping pagefile.sys failed
-      if (ret && path != NULL)
-      {
-        DWORD attrs = SalGetFileAttributes(path);
-        if (attrs == 0xFFFFFFFF)
-          ret = FALSE;
-      }
-*/
+        if (ret && path != NULL)
+            *path = std::move(exactPath);
         return ret;
     }
 
@@ -1346,9 +1355,9 @@ public:
             TRACE_E("CEditDropTarget::DragEnter: Unexpected situation: TextBuff != NULL");
             TextBuff.clear();
         }
-        TextLen = GetWindowTextLength(EditLine->HWindow);
+        TextLen = GetWindowTextLengthW(EditLine->HWindow);
         TextBuff.resize(TextLen + 1);
-        TextLen = GetWindowText(EditLine->HWindow, TextBuff.data(), TextLen + 1);
+        TextLen = GetWindowTextW(EditLine->HWindow, TextBuff.data(), TextLen + 1);
         TextBuff.resize(TextLen);
 
         // check whether there is text on the clipboard
@@ -1366,7 +1375,7 @@ public:
             UseUnicode = FALSE;
             textRes = pDataObject->QueryGetData(&formatEtc);
         }
-        if (textRes == S_OK || GetNameFromDataObject(DataObject, NULL, 0))
+        if (textRes == S_OK || GetNameFromDataObject(DataObject))
         {
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
@@ -1395,7 +1404,7 @@ public:
             formatEtc.dwAspect = DVASPECT_CONTENT;
             formatEtc.lindex = -1;
             formatEtc.tymed = TYMED_HGLOBAL;
-            if (DataObject->QueryGetData(&formatEtc) == S_OK || GetNameFromDataObject(DataObject, NULL, 0))
+            if (DataObject->QueryGetData(&formatEtc) == S_OK || GetNameFromDataObject(DataObject))
             {
                 int xPosDummy;
                 if (HitTest(pt, TRUE, &xPosDummy))
@@ -1446,42 +1455,41 @@ public:
 
         if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
         {
-            char* path = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
-            if (path != NULL)
+            const SIZE_T byteSize = stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL
+                                        ? GlobalSize(stgMedium.hGlobal)
+                                        : 0;
+            const void* payload = byteSize != 0 ? HANDLES(GlobalLock(stgMedium.hGlobal)) : NULL;
+            if (payload != NULL)
             {
-                // change the path
-                if (UseUnicode)
-                    path = ConvertAllocU2A((const WCHAR*)path, -1);
-                if (path != NULL)
-                {
-                    InsertText(pt, path);
-                    if (UseUnicode)
-                        free(path);
-                }
+                std::wstring text;
+                const DWORD decodeError = UseUnicode
+                                              ? sally::clipboard::DecodeUnicodeClipboardPayload(
+                                                    payload, byteSize, text)
+                                              : sally::clipboard::DecodeAnsiClipboardPayload(
+                                                    payload, byteSize, GetACP(), text);
+                if (decodeError == ERROR_SUCCESS && !text.empty())
+                    InsertTextW(pt, text.c_str());
                 HANDLES(GlobalUnlock(stgMedium.hGlobal));
             }
+            ReleaseStgMedium(&stgMedium);
         }
         else
         {
-            CPathBuffer path;
-            if (GetNameFromDataObject(pDataObject, path, path.Size())) // path buffer supports long paths
+            std::wstring path;
+            if (GetNameFromDataObject(pDataObject, &path))
             {
-                // change the path
-                if (!IsPluginFSPath(path))
+                if (!IsPluginFSPath(path.c_str()))
                 {
-                    int l = (int)strlen(path);
-                    if (l > 0 && path[l - 1] == '\\')
-                        path[--l] = 0;             // trailing '\\' is not welcomed
-                    if (l == 2 && path[0] != '\\') // a non-UNC root path must end with '\\'
-                    {
-                        path[l++] = '\\';
-                        path[l] = 0;
-                    }
+                    if (!path.empty() && path.back() == L'\\')
+                        path.pop_back(); // trailing '\\' is not welcomed
+                    if (path.length() == 2 && path[0] != L'\\')
+                        path.push_back(L'\\'); // a non-UNC root path must end with '\\'
                 }
                 else
-                    PluginFSConvertPathToExternal(path); // here 'path' must have MAX_PATH characters after the fs name (hence it is 2 * MAX_PATH long)
-
-                InsertText(pt, path);
+                {
+                    PluginFSConvertPathToExternal(path);
+                }
+                InsertTextW(pt, path.c_str());
             }
         }
 
@@ -1571,11 +1579,10 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             r.right -= TXEL_SPACE - 1; // bold fonts make the text overflow - hence this correction
 
             // PathCompactPath() works better than combining DT_PATH_ELLIPSIS with DT_END_ELLIPSIS (because the last character misbehaves)
-            CWidePathBuffer buff;
-            wcsncpy_s(buff, buff.Size(), Message.c_str(), _TRUNCATE);
-            PathCompactPathW(dc, buff, r.right - r.left);
+            std::vector<wchar_t> buff = MakeCompactPathBuffer(Message);
+            PathCompactPathW(dc, buff.data(), r.right - r.left);
 
-            DrawTextW(dc, buff, -1, &r,
+            DrawTextW(dc, buff.data(), -1, &r,
                       /*DT_END_ELLIPSIS | DT_PATH_ELLIPSIS | */ DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
             SetBkMode(dc, oldBkMode);
             SetTextColor(dc, oldColor);
@@ -1597,16 +1604,10 @@ void CInnerText::UpdateControl()
         InvalidateRect(HWindow, NULL, FALSE);
 }
 
-BOOL CInnerText::SetText(const char* txt)
-{
-    CALL_STACK_MESSAGE2("CInnerText::SetText(%s)", txt);
-    return SetTextW(AnsiToWide(txt != NULL ? txt : "").c_str());
-}
-
-BOOL CInnerText::SetTextW(const wchar_t* txt)
+BOOL CInnerText::SetText(const wchar_t* txt)
 {
     std::wstring newMessage = sally::unicode::BuildCommandLineDirectoryPrefixW(txt != NULL ? txt : L"");
-    CALL_STACK_MESSAGE2("CInnerText::SetTextW(%s)", WideToAnsi(newMessage).c_str());
+    CALL_STACK_MESSAGE2("CInnerText::SetText(%s)", sally::diagnostic::EncodeAcpLossy(newMessage).c_str());
     if (Message == newMessage)
         return FALSE;
     Message = newMessage;
@@ -1637,7 +1638,7 @@ int CInnerText::GetNeededWidth()
 //
 
 CEditWindow::CEditWindow()
-    : CWindow(ooStatic)
+    : CWindow(ooStatic) // see Create()
 {
     EditLine = new CEditLine();
     Text = new CInnerText(this);
@@ -1657,16 +1658,23 @@ CEditWindow::~CEditWindow()
 BOOL CEditWindow::Create(HWND hParent, int childID)
 {
     CALL_STACK_MESSAGE2("CEditWindow::Create(, %d)", childID);
+    // Created wide, and both CEditWindow and CEditLine are constructed with
+    // unicodeWnd=TRUE so winlib subclasses them through SetWindowLongPtrW. All three parts
+    // are needed together: the W creation makes USER32 treat the combo (and the edit child
+    // CEditLine attaches to) as a Unicode window, and only then does WM_CHAR arrive as
+    // UTF-16 - so a character the code page cannot spell can be TYPED into the command
+    // line, not merely displayed. Reading it back wide (see the '\r' handler) is what
+    // makes it reach the shell intact.
     HWND hWnd = CreateEx(0,
-                         "ComboBox",
-                         "",
-                         WS_CHILD | WS_VSCROLL | WS_CLIPSIBLINGS |
-                             CBS_AUTOHSCROLL | CBS_HASSTRINGS | CBS_DROPDOWN,
-                         0, 0, 0, 0,
-                         hParent,
-                         (HMENU)(UINT_PTR)childID,
-                         HInstance,
-                         this);
+                          L"ComboBox",
+                          L"",
+                          WS_CHILD | WS_VSCROLL | WS_CLIPSIBLINGS |
+                              CBS_AUTOHSCROLL | CBS_HASSTRINGS | CBS_DROPDOWN,
+                          0, 0, 0, 0,
+                          hParent,
+                          (HMENU)(UINT_PTR)childID,
+                          HInstance,
+                          this);
     if (hWnd != NULL)
     {
         if (EditLine != NULL)
@@ -1677,8 +1685,8 @@ BOOL CEditWindow::Create(HWND hParent, int childID)
         }
         if (Text != NULL)
         {
-            if (!Text->Create("STATIC",
-                              "",
+            if (!Text->Create(L"STATIC",
+                              L"",
                               WS_VISIBLE | WS_CHILD | SS_RIGHT | SS_NOPREFIX,
                               0, 0, 0, 0,
                               HWindow,
@@ -1702,10 +1710,14 @@ void CEditWindow::FillHistory()
     SendMessage(HWindow, CB_RESETCONTENT, 0, 0);
     if (Configuration.EnableCmdLineHistory)
     {
+        // The dropdown is filled from the WIDE history. The combo is a Unicode
+        // window (see Create), so SendMessageW hands the strings over verbatim; the ANSI
+        // array would have gone through USER32's A->W conversion and shown '?' for every
+        // command the code page cannot spell - including ones the user can now type.
         int i;
         for (i = 0; i < EDIT_HISTORY_SIZE; i++)
             if (Configuration.EditHistory[i] != NULL)
-                SendMessage(HWindow, CB_ADDSTRING, 0, (LPARAM)Configuration.EditHistory[i]);
+                SendMessageW(HWindow, CB_ADDSTRING, 0, (LPARAM)Configuration.EditHistory[i]);
     }
 }
 
@@ -1729,32 +1741,9 @@ void CEditWindow::SetFont()
     }
 }
 
-void CEditWindow::SetDirectory(const char* dir)
-{
-    BOOL changed = Text == NULL || Text->SetText(dir);
-    if (!changed && !DarkMode_ShouldUseDark())
-        return;
-    if (HWindow != NULL)
-    {
-        RECT r;
-        GetClientRect(HWindow, &r);
-        ResizeChilds(r.right - r.left, r.bottom - r.top, FALSE);
-        if (Text != NULL)
-            Text->UpdateControl();
-        if (DarkMode_ShouldUseDark())
-            RedrawWindow(HWindow, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW);
-        else
-            UpdateWindow(HWindow);
-        if (Text != NULL)
-            RedrawChildWindowNow(Text->HWindow);
-        if (EditLine != NULL)
-            RedrawChildWindowNow(EditLine->HWindow);
-    }
-}
-
 void CEditWindow::SetDirectoryW(const wchar_t* dir)
 {
-    BOOL changed = Text == NULL || Text->SetTextW(dir);
+    BOOL changed = Text == NULL || Text->SetText(dir);
     if (!changed && !DarkMode_ShouldUseDark())
         return;
     if (HWindow != NULL)
@@ -2113,11 +2102,11 @@ void CEditWindow::StoreContent()
     if (HWindow == NULL)
         return;
     ResetStoredContent();
-    int textLen = GetWindowTextLength(EditLine->HWindow);
+    int textLen = GetWindowTextLengthW(EditLine->HWindow);
     if (textLen > 0)
     {
         LastText.resize(textLen + 1);
-        GetWindowText(EditLine->HWindow, LastText.data(), textLen + 1);
+        GetWindowTextW(EditLine->HWindow, LastText.data(), textLen + 1);
         LastText.resize(textLen);
         SendMessage(EditLine->HWindow, EM_GETSEL, (WPARAM)&LastSelStart, (LPARAM)&LastSelEnd);
     }
@@ -2128,7 +2117,7 @@ void CEditWindow::RestoreContent()
     if (Enabled && !LastText.empty())
     {
         // if the old window state (contents and selection) was saved, we restore it
-        SetWindowText(HWindow, LastText.c_str());
+        SetWindowTextW(HWindow, LastText.c_str());
         SendMessage(EditLine->HWindow, EM_SETSEL, (WPARAM)LastSelStart, (LPARAM)LastSelEnd);
     }
 }

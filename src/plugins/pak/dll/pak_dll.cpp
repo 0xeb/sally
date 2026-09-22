@@ -14,26 +14,7 @@
 #ifdef PAK_DLL
 // ****************************************************************************
 
-class C__StrCriticalSection
-{
-public:
-    CRITICAL_SECTION cs;
-
-    C__StrCriticalSection() { InitializeCriticalSection(&cs); }
-    ~C__StrCriticalSection() { DeleteCriticalSection(&cs); }
-};
-
-// ensure timely construction of the critical section
-#pragma warning(disable : 4073)
-#pragma init_seg(lib)
-C__StrCriticalSection __StrCriticalSection;
-
-// ****************************************************************************
-
 HINSTANCE DLLInstance = NULL; //dll instance handle
-
-char* StringBuffer = NULL; // buffer for many strings
-char* StrAct = StringBuffer;
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
@@ -53,78 +34,42 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide. This DLL owns the PAK format and parts of its interface are deliberately
+// byte-domain (archive-internal entry names), but resource strings are not archive data - they
+// are error text that the SPL displays through DialogError, so being narrow here only meant
+// being mojibake-capable there.
+std::wstring LangStr(int resID)
 {
-    EnterCriticalSection(&__StrCriticalSection.cs);
-
-    char* ret;
-    if (!StringBuffer)
-        ret = "ERROR LOADING STRING - INSUFFICIENT MEMORY";
-    else
-    {
-        if (5120 - (StrAct - StringBuffer) < 200)
-            StrAct = StringBuffer;
-
 #ifdef _DEBUG
-        // make sure nobody calls us before the resource handle is initialized
-        if (DLLInstance == NULL)
-            TRACE_E("LoadStr: DLLInstance == NULL");
+    // make sure nobody calls us before the resource handle is initialized
+    if (DLLInstance == NULL)
+        TRACE_E("LangStr: DLLInstance == NULL");
 #endif
-
-    RELOAD:
-        int size = LoadString(DLLInstance, resID, StrAct, 5120 - (StrAct - StringBuffer));
-        // size contains the number of copied characters without the terminator
-        //    DWORD error = GetLastError();
-        if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even when the string does not exist - unusable
-        {
-            if (5120 - (StrAct - StringBuffer) == size + 1 && StrAct > StringBuffer)
-            {
-                // if the string was exactly at the end of the buffer, it could
-                // have been a truncation -- if we can move the window
-                // to the beginning of the buffer, load the string once again
-                StrAct = StringBuffer;
-                goto RELOAD;
-            }
-            else
-            {
-                ret = StrAct;
-                StrAct += size + 1;
-            }
-        }
-        else
-        {
-            TRACE_E("Error in LoadStr(" << resID << ")." /*"): " << GetErrorText(error)*/);
-            ret = "ERROR LOADING STRING";
-        }
-    }
-
-    LeaveCriticalSection(&__StrCriticalSection.cs);
-
-    return ret;
+    const wchar_t* value = NULL;
+    const int size = LoadStringW(DLLInstance, resID,
+                                 reinterpret_cast<LPWSTR>(&value), 0);
+    if (size > 0 && value != NULL)
+        return std::wstring(value, static_cast<size_t>(size));
+    TRACE_E("Error in LangStr(" << resID << ").");
+    return L"ERROR LOADING STRING";
 }
 
 #endif //PAK_DLL
 
 CPakIfaceAbstract* WINAPI PAKGetIFace()
 {
-#ifdef PAK_DLL
-    if (!StringBuffer)
-        StrAct = StringBuffer = (char*)malloc(5120);
-    if (!StringBuffer)
-        return NULL;
-#endif //PAK_DLL
-    return new CPakIface;
+    try
+    {
+        return new CPakIface;
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
 }
 
 void WINAPI PAKReleaseIFace(CPakIfaceAbstract* pakIFace)
 {
-#ifdef PAK_DLL
-    if (StringBuffer)
-    {
-        free(StringBuffer);
-        StringBuffer = NULL;
-    }
-#endif //PAK_DLL
     delete pakIFace;
     return;
 }
@@ -156,28 +101,29 @@ BOOL CPakIface::Init(CPakCallbacksAbstract* callbacks)
     return TRUE;
 }
 
-BOOL CPakIface::OpenPak(const char* fileName, DWORD mode)
+BOOL CPakIface::OpenPak(const wchar_t* fileName, DWORD mode)
 {
-    char buf[1024];
-
     if (PakFile != INVALID_HANDLE_VALUE)
         return HandleError(0, IDS_PAK_ERROPEN2);
 
     while (PakFile == INVALID_HANDLE_VALUE)
     {
-        PakFile = CreateFile(fileName, mode, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
-                             FILE_ATTRIBUTE_NORMAL, NULL);
+        PakFile = CreateFileW(fileName, mode, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, NULL);
         if (PakFile != INVALID_HANDLE_VALUE)
             break;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERROPEN, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERROPEN, error.c_str()))
             return FALSE;
     }
 
     PakSize = GetFileSize(PakFile, NULL);
     if (PakSize == 0xFFFFFFFF)
     {
-        CloseHandle(PakFile);
-        return HandleError(0, IDS_PAK_ERRGETFILESIZE, LastErrorString(GetLastError(), buf));
+        const DWORD errorCode = GetLastError();
+        ClosePak();
+        const std::wstring error = LastErrorString(errorCode);
+        return HandleError(0, IDS_PAK_ERRGETFILESIZE, error.c_str());
     }
 
     DirSize = 0;
@@ -190,20 +136,20 @@ BOOL CPakIface::OpenPak(const char* fileName, DWORD mode)
 
     if (PakSize < sizeof(CPackHeader))
     {
-        CloseHandle(PakFile);
+        ClosePak();
         return HandleError(0, IDS_PAK_INVLAIDDATA);
     }
 
     if (!SafeRead(PakFile, &Header, sizeof(CPackHeader)))
     {
-        CloseHandle(PakFile);
+        ClosePak();
         return FALSE;
     }
 
     if (Header.Pack != 0x4b434150 || Header.DirOffset + Header.DirSize > PakSize ||
         Header.DirSize % sizeof(CPackEntry) != 0)
     {
-        CloseHandle(PakFile);
+        ClosePak();
         return HandleError(0, IDS_PAK_INVLAIDDATA);
     }
 
@@ -217,14 +163,14 @@ BOOL CPakIface::OpenPak(const char* fileName, DWORD mode)
     PakDir = (CPackEntry*)malloc(Header.DirSize);
     if (!PakDir)
     {
-        CloseHandle(PakFile);
+        ClosePak();
         return HandleError(0, IDS_PAK_LOWMEMORY);
     }
 
     if (!SafeSeek(PakFile, Header.DirOffset) ||
         !SafeRead(PakFile, PakDir, Header.DirSize))
     {
-        CloseHandle(PakFile);
+        ClosePak();
         return FALSE;
     }
 
@@ -235,6 +181,8 @@ BOOL CPakIface::ClosePak()
 {
     if (PakDir)
         free(PakDir);
+    PakDir = NULL;
+    DirSize = 0;
     if (PakFile != INVALID_HANDLE_VALUE)
         CloseHandle(PakFile);
     PakFile = INVALID_HANDLE_VALUE;
@@ -248,39 +196,39 @@ BOOL CPakIface::GetPakTime(FILETIME* lastWrite)
     return TRUE;
 }
 
-BOOL CPakIface::GetName(const char* nameInPak, char* outName)
+BOOL CPakIface::GetName(const char* nameInPak, std::string& outName)
 {
-    const char* sour = nameInPak;
-    char* dest = outName;
-    while (*sour)
+    const size_t inputLength = strnlen(nameInPak, sizeof(PakDir[DirPos].FileName));
+    std::string staged;
+    try
     {
-        switch (*sour)
+        staged.reserve(inputLength);
+        for (size_t i = 0; i < inputLength; ++i)
         {
-        case '/':
-            *dest++ = '\\';
-            sour++;
-            break;
-
-        case '.':
-        {
-            if ((sour == PakDir[DirPos].FileName || *(sour - 1) == '/') &&
-                *(sour + 1) == '.' && *(sour + 2) == '/')
+            if (nameInPak[i] == '/')
             {
-                lstrcpy(dest, PAK_UPDIR);
-                dest += lstrlen(PAK_UPDIR);
-                sour += 2;
-                break;
+                staged.push_back('\\');
+                continue;
             }
+            if (nameInPak[i] == '.' &&
+                (i == 0 || nameInPak[i - 1] == '/') && i + 2 < inputLength &&
+                nameInPak[i + 1] == '.' && nameInPak[i + 2] == '/')
+            {
+                staged += PAK_UPDIR;
+                i += 1;
+                continue;
+            }
+            staged.push_back(nameInPak[i]);
         }
-
-        default:
-            *dest++ = *sour++;
-        }
-        if (sour > nameInPak + 0x38)
-            return HandleError(0, IDS_PAK_INVLAIDDATA);
+        if (staged.size() >= PAK_MAXPATH)
+            return HandleError(0, IDS_PAK_TOOLONGNAME);
+        outName.swap(staged);
+        return TRUE;
     }
-    *dest = NULL;
-    return TRUE;
+    catch (...)
+    {
+        return HandleError(0, IDS_PAK_LOWMEMORY);
+    }
 }
 
 BOOL CPakIface::GetFirstFile(char* fileName, DWORD* size)
@@ -291,8 +239,10 @@ BOOL CPakIface::GetFirstFile(char* fileName, DWORD* size)
         fileName[0] = 0;
         return TRUE;
     }
-    if (!GetName(PakDir[DirPos].FileName, fileName))
+    std::string name;
+    if (!GetName(PakDir[DirPos].FileName, name))
         return FALSE;
+    memcpy(fileName, name.c_str(), name.size() + 1);
     *size = PakDir[DirPos].Size;
     return TRUE;
 }
@@ -305,8 +255,10 @@ BOOL CPakIface::GetNextFile(char* fileName, DWORD* size)
         fileName[0] = 0;
         return TRUE;
     }
-    if (!GetName(PakDir[DirPos].FileName, fileName))
+    std::string name;
+    if (!GetName(PakDir[DirPos].FileName, name))
         return FALSE;
+    memcpy(fileName, name.c_str(), name.size() + 1);
     *size = PakDir[DirPos].Size;
     return TRUE;
 }
@@ -314,13 +266,13 @@ BOOL CPakIface::GetNextFile(char* fileName, DWORD* size)
 BOOL CPakIface::FindFile(const char* fileName, DWORD* size)
 {
     DWORD s = -1;
-    char name[PAK_MAXPATH];
+    std::string name;
     unsigned i;
     for (i = 0; i < DirSize; i++)
     {
         if (!GetName(PakDir[(int)i].FileName, name))
             return FALSE;
-        if (CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, fileName, -1, name, -1) == CSTR_EQUAL)
+        if (CompareStringA(LOCALE_USER_DEFAULT, NORM_IGNORECASE, fileName, -1, name.c_str(), -1) == CSTR_EQUAL)
         {
             DirPos = i;
             s = PakDir[DirPos].Size;
@@ -352,13 +304,6 @@ BOOL CPakIface::ExtractFile()
     return TRUE;
 }
 
-char* CPakIface::FormatMessage(char* buffer, int errorID, va_list arglist)
-{
-    *buffer = 0;
-    wvsprintf(buffer, LoadStr(errorID), arglist);
-    return buffer;
-}
-
 BOOL CPakIface::HandleError(DWORD flags, int errorID, ...)
 {
     va_list arglist;
@@ -368,23 +313,36 @@ BOOL CPakIface::HandleError(DWORD flags, int errorID, ...)
     return ret;
 }
 
-char* CPakIface::LastErrorString(int lastError, char* buffer)
+std::wstring CPakIface::LastErrorString(DWORD lastError) noexcept
 {
-    *buffer = 0;
-    ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                    lastError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                    buffer, 1024, NULL);
-    return buffer;
+    wchar_t* buffer = nullptr;
+    const DWORD length = ::FormatMessageW(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, lastError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        reinterpret_cast<wchar_t*>(&buffer), 0, NULL);
+    if (length == 0 || buffer == nullptr)
+        return std::wstring();
+    try
+    {
+        std::wstring result(buffer, static_cast<size_t>(length));
+        LocalFree(buffer);
+        return result;
+    }
+    catch (...)
+    {
+        LocalFree(buffer);
+        return std::wstring();
+    }
 }
 
 BOOL CPakIface::SafeSeek(HANDLE file, DWORD position)
 {
-    char buf[1024];
     while (1)
     {
         if (SetFilePointer(file, position, NULL, FILE_BEGIN) != 0xFFFFFFFF)
             return TRUE;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERRSETFILEPTR, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERRSETFILEPTR, error.c_str()))
             return FALSE;
     }
 }
@@ -393,14 +351,14 @@ BOOL CPakIface::SafeRead(HANDLE file, void* buffer, DWORD size)
 {
     if (size == 0)
         return TRUE;
-    char buf[1024];
     DWORD pos;
     while (1)
     {
         pos = SetFilePointer(file, 0, NULL, FILE_CURRENT);
         if (pos != 0xFFFFFFFF)
             break;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, error.c_str()))
             return FALSE;
     }
     DWORD read;
@@ -408,7 +366,8 @@ BOOL CPakIface::SafeRead(HANDLE file, void* buffer, DWORD size)
     {
         if (ReadFile(file, buffer, size, &read, NULL) && read == size)
             return TRUE;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERRREADFILE, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERRREADFILE, error.c_str()))
             return FALSE;
         if (!SafeSeek(file, pos))
             return FALSE;
@@ -419,14 +378,14 @@ BOOL CPakIface::SafeWrite(HANDLE file, void* buffer, DWORD size)
 {
     if (size == 0)
         return TRUE;
-    char buf[1024];
     DWORD pos;
     while (1)
     {
         pos = SetFilePointer(file, 0, NULL, FILE_CURRENT);
         if (pos != 0xFFFFFFFF)
             break;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, error.c_str()))
             return FALSE;
     }
     DWORD written;
@@ -434,7 +393,8 @@ BOOL CPakIface::SafeWrite(HANDLE file, void* buffer, DWORD size)
     {
         if (WriteFile(file, buffer, size, &written, NULL))
             return TRUE;
-        if (!HandleError(HE_RETRY, IDS_PAK_ERRWRITEFILE, LastErrorString(GetLastError(), buf)))
+        const std::wstring error = LastErrorString(GetLastError());
+        if (!HandleError(HE_RETRY, IDS_PAK_ERRWRITEFILE, error.c_str()))
             return FALSE;
         if (!SafeSeek(file, pos))
             return FALSE;

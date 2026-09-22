@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 typedef enum eRPE_ERROR
 {
     RPE_OK,
@@ -26,20 +28,18 @@ typedef enum eRPE_ERROR
     RPE_INVALID_MBCS,
 } eRPE_ERROR;
 
-#ifdef UNICODE
-#define CSalamanderRegistryExAbstract CSalamanderRegistryExAbstractW
+#ifdef INSIDE_SALAMANDER
+class CSalamanderRegistryExAbstractW : public CSalamanderRegistryAbstract
 #else
-#define CSalamanderRegistryExAbstract CSalamanderRegistryExAbstractA
+class CSalamanderRegistryExAbstractW : public CSalamanderRegistryAbstractW
 #endif
-
-class CSalamanderRegistryExAbstract : public CSalamanderRegistryAbstract
 {
 public: // Methods added by Jan Patera
-    // Returns subKeyIndex-th subkey name in buffer name
-    virtual BOOL WINAPI EnumKey(HKEY key, DWORD subKeyIndex, LPTSTR name, DWORD bufferSize) = 0;
+    // Returns the subKeyIndex-th subkey name with dynamic UTF-16 ownership.
+    virtual BOOL WINAPI EnumKey(HKEY key, DWORD subKeyIndex, std::wstring& name) = 0;
 
-    // Returns valIndex-th value, value name in buffer name and value data in buffer data; valType+data+dataSize are optional
-    virtual BOOL WINAPI EnumValue(HKEY key, DWORD valIndex, LPTSTR name, DWORD nameSize, LPDWORD valType, LPBYTE data, LPDWORD dataSize) = 0;
+    // Returns the valIndex-th value name and optional value metadata/data.
+    virtual BOOL WINAPI EnumValue(HKEY key, DWORD valIndex, std::wstring& name, LPDWORD valType, LPBYTE data, LPDWORD dataSize) = 0;
 
     // Remove keys and values with ".hidden" in name
     virtual void WINAPI RemoveHiddenKeysAndValues() = 0;
@@ -50,23 +50,19 @@ public: // Methods added by Jan Patera
     virtual BOOL WINAPI ClearKeyEx(HKEY key, BOOL doNotDeleteHiddenKeysAndValues, BOOL* keyIsNotEmpty) = 0;
 
     virtual void WINAPI Release() = 0;
-    virtual BOOL WINAPI Dump(LPCTSTR fileName, LPCTSTR clearKeyName) = 0;
+    // Serializes to an already-open byte stream. Filesystem path ownership and
+    // long-path decoration remain with the caller's filesystem adapter.
+    virtual BOOL WINAPI Dump(HANDLE outputFile, const wchar_t* clearKeyName) = 0;
 };
 
-#ifdef UNICODE
-#define REG_SysRegistryFactory REG_SysRegistryFactoryW
-#define REG_MemRegistryFactory REG_MemRegistryFactoryW
-#else
-#define REG_SysRegistryFactory REG_SysRegistryFactoryA
-#define REG_MemRegistryFactory REG_MemRegistryFactoryA
-#endif
+CSalamanderRegistryExAbstractW* REG_SysRegistryFactoryW();
+CSalamanderRegistryExAbstractW* REG_MemRegistryFactoryW();
 
-CSalamanderRegistryExAbstract* REG_SysRegistryFactory();
-CSalamanderRegistryExAbstract* REG_MemRegistryFactory();
+eRPE_ERROR ParseRegistryFileW(wchar_t* buf, CSalamanderRegistryExAbstractW* registry, BOOL doNotDeleteHiddenKeysAndValues);
+eRPE_ERROR CopyRegistryBranchW(const wchar_t* branch, CSalamanderRegistryExAbstractW* inRegistry, CSalamanderRegistryExAbstractW* outRegistry);
 
-eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNotDeleteHiddenKeysAndValues);
-eRPE_ERROR CopyBranch(LPCTSTR branch, CSalamanderRegistryExAbstract* pInRegistry, CSalamanderRegistryExAbstract* pOutRegistry);
-
-DWORD ConvertIfNeeded(LPTSTR* pBuf, DWORD size);
+// Converts the byte-oriented REGEDIT4 input format from the current Windows ANSI
+// code page. Native Registry Editor 5 input is already UTF-16 and is not transcoded.
+eRPE_ERROR ConvertRegistryFileToUtf16(wchar_t** buffer, DWORD byteSize, DWORD& utf16ByteSize);
 
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))

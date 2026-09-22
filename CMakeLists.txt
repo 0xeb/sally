@@ -2,6 +2,29 @@ cmake_minimum_required(VERSION 3.21)
 
 project(Sally LANGUAGES C CXX RC)
 
+
+# [endgame:P4.2] THE FLIP. Sally is a Unicode application: UNICODE/_UNICODE are
+# defined unconditionally, so the TCHAR-generic Win32 macros resolve to their W forms.
+#
+# This was `SALLY_UNICODE_CANARY`, default OFF, and its entire job was to fail
+# informatively - turning "what breaks if we define UNICODE?" into a categorisable
+# error list instead of an estimate. That job is finished: the whole solution
+# (sally.exe, 31 plugins, tools, salext) builds at 0 errors with the define, in
+# both Debug and Release, and the private gate is 188/188.
+#
+# Unconditional, and there is no switch to turn it off. The narrow configuration
+# is not a supported build of Sally any more, so offering an option to produce one
+# would only create a way to ship or test something that is not the product.
+#
+# STILL TRUE, and the reason a green build was never the whole bar: a class/flag
+# mismatch is a runtime TRACE_C that no compiler detects (see the CFilesBox
+# UnicodeWnd bug, sally@ac00cbe9 - registered wide, flagged narrow, compiled
+# perfectly, died on the first message). P4.3's GUI smoke is what covers that.
+#
+# tests/CMakeLists.txt sets the same two definitions and must stay in lockstep:
+# that tree compiles these same production sources without including this file.
+add_compile_definitions(UNICODE _UNICODE)
+
 # Generate git version header
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/git_version.cmake)
 
@@ -91,6 +114,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/targets/sally_sources.cmake)
 add_executable(sally WIN32)
 
 target_include_directories(sally PRIVATE
+  "${SALLY_GENERATED_INCLUDE_DIR}"
   ${SAL_COMMON_INCLUDES}
 )
 
@@ -212,6 +236,7 @@ add_executable(salmon WIN32
   "${SAL_SRC}/salmon/minidump.cpp"
   "${SAL_SRC}/salmon/precomp.cpp"
   "${SAL_SRC}/salmon/salmon.cpp"
+  "${SAL_SRC}/salmon/salmon_unicode.cpp"
   "${SAL_SRC}/salmon/upload.cpp"
   "${SAL_SRC}/salmon/salmon.rc"
   # Common library sources
@@ -263,7 +288,7 @@ set_target_properties(salmon PROPERTIES
 )
 
 # ==============================================================================
-# Helper Utilities: salspawn.exe, salopen.exe (minimal, no CRT)
+# Helper Utilities: salspawn.exe (minimal, no CRT)
 # ==============================================================================
 
 # salspawn - Process spawning helper (console)
@@ -301,40 +326,12 @@ set_target_properties(salspawn PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
 )
 
-# salopen - Open files helper (windows)
-add_executable(salopen
-  "${SAL_SRC}/common/lstrfix.cpp"
-  "${SAL_SRC}/common/rtc_stubs.cpp"
-  "${SAL_SRC}/salopen/salopen.cpp"
-  "${SAL_SRC}/salopen/salopen.rc"
-)
-
-target_include_directories(salopen PRIVATE
-  "${SAL_SRC}/salopen"
-  "${SAL_SRC}/common"
-)
-
-target_compile_definitions(salopen PRIVATE
-  WIN32 _CONSOLE
-  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
-  LSTRFIX_WITHOUT_RTL NDEBUG
-)
-
-if(MSVC)
-  # Disable /GL (whole program optimization) - conflicts with no CRT
-  target_compile_options(salopen PRIVATE /MP /W3 /MT /GS- /GL-)
-  target_link_options(salopen PRIVATE
-    /SUBSYSTEM:WINDOWS
-    /MANIFEST:NO
-    /NODEFAULTLIB
-    /ENTRY:WinMainCRTStartup
-  )
-  target_link_libraries(salopen PRIVATE kernel32 user32 shell32)
-endif()
-
-set_target_properties(salopen PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
-)
+# salopen.exe was retired. It opened an association from a separate short-lived process,
+# reached only through Configuration.UseSalOpen ("Open files through salopen.exe"), which
+# defaulted to off. The Unicode work deleted SalOpenExecute() and every reader of that
+# setting, leaving the executable shipped with no caller. The protection it was there for -
+# never handing a shell extension a window Sally cares about - now lives in
+# ExecuteAssociationW(), which invokes the default verb with a throwaway CShellExecuteWnd.
 
 # ==============================================================================
 # Trace Server: tserver.exe
@@ -349,6 +346,7 @@ add_executable(tserver WIN32
   "${SAL_SRC}/tserver/precomp.cpp"
   "${SAL_SRC}/tserver/registry.cpp"
   "${SAL_SRC}/tserver/tablist.cpp"
+  "${SAL_SRC}/tserver/trace_export.cpp"
   "${SAL_SRC}/tserver/tserver.cpp"
   "${SAL_SRC}/tserver/window.cpp"
   "${SAL_SRC}/tserver/tserver.rc"
@@ -423,104 +421,6 @@ set_target_properties(tserver PROPERTIES
 )
 
 # ==============================================================================
-# Translator: translator.exe
-# ==============================================================================
-
-add_executable(translator WIN32
-  # translator sources
-  "${SAL_SRC}/translator/bitmap.cpp"
-  "${SAL_SRC}/translator/checklst.cpp"
-  "${SAL_SRC}/translator/config.cpp"
-  "${SAL_SRC}/translator/databook.cpp"
-  "${SAL_SRC}/translator/datacnfl.cpp"
-  "${SAL_SRC}/translator/datadlg.cpp"
-  "${SAL_SRC}/translator/datafind.cpp"
-  "${SAL_SRC}/translator/datamenu.cpp"
-  "${SAL_SRC}/translator/datamui.cpp"
-  "${SAL_SRC}/translator/dataprj.cpp"
-  "${SAL_SRC}/translator/datarh.cpp"
-  "${SAL_SRC}/translator/datasel.cpp"
-  "${SAL_SRC}/translator/datastr.cpp"
-  "${SAL_SRC}/translator/dataui.cpp"
-  "${SAL_SRC}/translator/dialogs.cpp"
-  "${SAL_SRC}/translator/dlgdummy.cpp"
-  "${SAL_SRC}/translator/ignorelst.cpp"
-  "${SAL_SRC}/translator/ms_init.cpp"
-  "${SAL_SRC}/translator/precomp.cpp"
-  "${SAL_SRC}/translator/restart.cpp"
-  "${SAL_SRC}/translator/salmenu.cpp"
-  "${SAL_SRC}/translator/transfrm.cpp"
-  "${SAL_SRC}/translator/translator.cpp"
-  "${SAL_SRC}/translator/trldata.cpp"
-  "${SAL_SRC}/translator/trlipc.cpp"
-  "${SAL_SRC}/translator/versinfo.cpp"
-  "${SAL_SRC}/translator/wndframe.cpp"
-  "${SAL_SRC}/translator/wndlayt.cpp"
-  "${SAL_SRC}/translator/wndout.cpp"
-  "${SAL_SRC}/translator/wndprev.cpp"
-  "${SAL_SRC}/translator/wndrh.cpp"
-  "${SAL_SRC}/translator/wndtext.cpp"
-  "${SAL_SRC}/translator/wndtree.cpp"
-  "${SAL_SRC}/translator/translator.rc"
-  # Common library sources
-  "${SAL_SRC}/common/allochan.cpp"
-  "${SAL_SRC}/common/array.cpp"
-  "${SAL_SRC}/common/handles.cpp"
-  "${SAL_SRC}/common/heap.cpp"
-  "${SAL_SRC}/common/lstrfix.cpp"
-  "${SAL_SRC}/common/messages.cpp"
-  "${SAL_SRC}/common/str.cpp"
-  "${SAL_SRC}/common/trace.cpp"
-  "${SAL_SRC}/common/winlib.cpp"
-)
-
-target_include_directories(translator PRIVATE
-  "${SAL_SRC}/translator"
-  "${SAL_SRC}/common"
-  "${SAL_SRC}"
-  "${SAL_SHARED}"
-)
-
-# translator debug defines (matches translator.vcxproj - includes __DEBUG_WINLIB)
-set(TRANSLATOR_DEBUG_DEFINES
-  _DEBUG
-  SAFE_ALLOC
-  __DEBUG_WINLIB
-  TRACE_ENABLE
-  HANDLES_ENABLE
-  MESSAGES_DEBUG
-  MULTITHREADED_TRACE_ENABLE
-  MULTITHREADED_MESSAGES_ENABLE
-  MULTITHREADED_HANDLES_ENABLE
-  _CRTDBG_MAP_ALLOC
-  _ALLOW_RTCc_IN_STL
-)
-
-target_compile_definitions(translator PRIVATE
-  _MT WIN32 _WINDOWS
-  WINVER=0x0601 _WIN32_WINNT=0x0601 _WIN32_IE=0x0800
-  $<$<CONFIG:Debug>:${TRANSLATOR_DEBUG_DEFINES}>
-  $<${SAL_IS_RELEASE}:NDEBUG;SAFE_ALLOC;ARRAY_NODEBUG;MESSAGES_DISABLE>
-)
-
-target_link_libraries(translator PRIVATE msimg32 comctl32)
-
-if(MSVC)
-  target_precompile_headers(translator PRIVATE "${SAL_SRC}/translator/precomp.h")
-  target_link_options(translator PRIVATE /SUBSYSTEM:WINDOWS /MANIFEST:NO)
-elseif(MINGW)
-  target_link_options(translator PRIVATE -Wl,--subsystem,windows)
-endif()
-
-set_source_files_properties("${SAL_SRC}/translator/translator.rc" PROPERTIES
-  COMPILE_DEFINITIONS "WINVER=0x0601;$<$<CONFIG:Debug>:_DEBUG>;$<${SAL_IS_RELEASE}:NDEBUG>;$<$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>:_WIN64>"
-)
-
-set_target_properties(translator PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}/utils"
-)
-
-# ==============================================================================
 # Shell Extension: salext.dll (COM shell extension for Explorer integration)
 # ==============================================================================
 # Builds for the current platform (x64 or x86). For full Explorer integration,
@@ -535,6 +435,7 @@ add_library(salext MODULE
   "${SAL_SRC}/shellext/shexinit.c"
   "${SAL_SRC}/shexreg.c"
   "${SAL_SRC}/shexreg_ipc_names.c"
+  "${SAL_SRC}/shexreg_ipc_protocol.c"
   "${SAL_SRC}/shellext/shellext.rc"
 )
 
@@ -557,7 +458,7 @@ set_source_files_properties("${SAL_SRC}/shellext/shellext.rc" PROPERTIES
 )
 
 if(MSVC)
-  # No CRT — standalone COM DLL (like salopen/salspawn)
+  # No CRT — standalone COM DLL (like salspawn)
   target_compile_options(salext PRIVATE /GS- /GL- /GR-)
   set_target_properties(salext PROPERTIES
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"
@@ -609,7 +510,14 @@ include(GNUInstallDirs)
 sal_install_main(sally)
 
 # Utils go in utils/
-install(TARGETS salmon salspawn salopen tserver translator RUNTIME DESTINATION utils)
+install(TARGETS salmon salspawn tserver RUNTIME DESTINATION utils)
+install(CODE [[
+  file(REMOVE
+    "${CMAKE_INSTALL_PREFIX}/utils/translator.exe"
+    "${CMAKE_INSTALL_PREFIX}/utils/translator.pdb"
+    "${CMAKE_INSTALL_PREFIX}/utils/translator.ilk"
+  )
+]])
 
 # Shell extension goes in utils/ (Salamander looks for utils\salextx64.dll)
 install(TARGETS salext
@@ -642,18 +550,7 @@ sal_generate_plugins_ver()
 sal_create_populate_target()
 
 # Ensure populate depends on main targets
-add_dependencies(populate sally salmon salspawn salopen tserver translator salext sal_lang_english)
-
-# Language pack generation (requires populated build with translator.exe)
-add_custom_target(langpacks
-  COMMAND ${CMAKE_COMMAND} -E env
-    pwsh -File ${CMAKE_SOURCE_DIR}/tools/localization/build_language_packs.ps1
-      -BuildRoot ${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}
-      -SkipValidation
-      -AllowSeedRejections
-  COMMENT "Building language packs for ${SAL_OUTPUT_BASE}/$<CONFIG>_${SAL_PLATFORM}"
-  DEPENDS populate
-)
+add_dependencies(populate sally salmon salspawn tserver salext sal_lang_english)
 
 message(STATUS "")
 message(STATUS "=== Sally CMake Build ===")

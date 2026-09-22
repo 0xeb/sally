@@ -3,7 +3,7 @@
 
 // ADS prompt/probe policy — pure decision functions shared by production
 // (files_window_copy_move.cpp) and the private tests. Promoted from the
-// former SALLY_PRIVATE_TESTS *ForTest forwarders (kb/unicode/TODO.md T4-a).
+// former SALLY_PRIVATE_TESTS *ForTest forwarders.
 
 #pragma once
 
@@ -16,13 +16,13 @@
 // legacy exceptions: \\tsclient\* returns ERROR_INVALID_FUNCTION (no ADS on
 // RDP redirects), and network paths yield false positives with
 // ERROR_INVALID_PARAMETER / ERROR_NO_MORE_ITEMS.
-inline BOOL ShouldReportADSProbeError(const char* sourcePath, DWORD adsWinError, BOOL sourcePathIsNet)
+inline BOOL ShouldReportADSProbeError(const wchar_t* sourcePath, DWORD adsWinError, BOOL sourcePathIsNet)
 {
     if (adsWinError == NO_ERROR)
         return FALSE;
 
     if (adsWinError == ERROR_INVALID_FUNCTION &&
-        sourcePath != NULL && _strnicmp(sourcePath, "\\\\tsclient\\", 11) == 0)
+        sourcePath != NULL && _wcsnicmp(sourcePath, L"\\\\tsclient\\", 11) == 0)
     {
         return FALSE;
     }

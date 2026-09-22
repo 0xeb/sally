@@ -17,9 +17,16 @@
 #include "fxfs.h"
 #include "fx.rh"
 #include "fx_lang.rh"
+#include "unicode/helpers.h" // WideToAnsi
 
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
+
+// Widens a narrow macro-expanded string literal (e.g.
+// VERSINFO_VERSION) so it can be concatenated with L"..." literals - matches the
+// existing WIDETEXT idiom in device.cpp.
+#define _FX_WIDETEXT(s) L##s
+#define FX_WIDETEXT(s) _FX_WIDETEXT(s)
 
 namespace Fx
 {
@@ -82,8 +89,8 @@ namespace Fx
     {
         CFxString name;
         GetName(name);
-        PCTSTR pszName = name;
-        PCTSTR pszExt = PathFindExtension(pszName);
+        PCWSTR pszName = name;
+        PCWSTR pszExt = PathFindExtensionW(pszName);
         return static_cast<unsigned>(pszExt - pszName);
     }
 
@@ -193,9 +200,9 @@ namespace Fx
         GetPluginDescription(description);
         caption.LoadString(IDS_FX_ABOUT);
 
-        message.Format(TEXT("%s ") TEXT(VERSINFO_VERSION) TEXT("\n\n")
-                           TEXT(VERSINFO_COPYRIGHT) TEXT("\n\n")
-                               TEXT("%s"),
+        message.Format(L"%s " FX_WIDETEXT(VERSINFO_VERSION) L"\n\n"
+                           FX_WIDETEXT(VERSINFO_COPYRIGHT) L"\n\n"
+                               L"%s",
                        name,
                        description);
 
@@ -298,7 +305,7 @@ namespace Fx
     {
     }
 
-    void WINAPI CFxPluginInterface::AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+    void WINAPI CFxPluginInterface::AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
     {
     }
 
@@ -326,8 +333,8 @@ namespace Fx
 
         if (NeedsWinLib())
         {
-            // Note that 's' variable still contains invariant name!
-            if (!InitializeWinLib(s, FxGetModuleInstance()))
+            // The invariant plug-in name and WinLib boundary are both UTF-16.
+            if (!InitializeWinLib((LPCWSTR)s, FxGetModuleInstance()))
             {
                 return false;
             }
@@ -349,7 +356,7 @@ namespace Fx
     void WINAPI CFxPluginInterface::SetPluginIcons(CSalamanderConnectAbstract* salamander)
     {
         auto iconList = SalamanderGUI->CreateIconList();
-        iconList->CreateFromPNG(FxGetModuleInstance(), MAKEINTRESOURCE(IDB_FX_PLUGIN_ICONS), 16);
+        iconList->CreateFromPNG(FxGetModuleInstance(), MAKEINTRESOURCEW(IDB_FX_PLUGIN_ICONS), 16);
         m_hicoSmall = iconList->GetIcon(0);
         salamander->SetIconListForGUI(iconList);
         salamander->SetPluginIcon(0);
@@ -360,7 +367,7 @@ namespace Fx
     {
         CFxString itemText;
         GetPluginName(itemText);
-        itemText.Insert(0, TEXT('\t'));
+        itemText.Insert(0, L'\t');
         salamander->SetChangeDriveMenuItem(itemText, 0);
     }
 
@@ -380,24 +387,31 @@ namespace Fx
     {
         // By default the configuration key is equal to the name of the plugin
         // module (without the extension).
-        CPathBuffer fileName;
-        DWORD cch = GetModuleFileName(FxGetModuleInstance(), fileName, fileName.Size());
-        _ASSERTE(cch > 0);
-        PTSTR namePart = PathFindFileName(fileName);
-        PTSTR ext = PathFindExtension(namePart);
-        *ext = TEXT('\0');
-        key = namePart;
+        std::wstring modulePath;
+        const BOOL loaded = SPLGetModuleFileNameOwned(FxGetModuleInstance(), modulePath);
+        _ASSERTE(loaded);
+        if (!loaded)
+        {
+            key.Empty();
+            return;
+        }
+        const wchar_t* namePart = PathFindFileNameW(modulePath.c_str());
+        std::wstring configKey(namePart);
+        const size_t extension = configKey.find_last_of(L'.');
+        if (extension != std::wstring::npos)
+            configKey.resize(extension);
+        key = configKey.c_str();
     }
 
     void WINAPI CFxPluginInterface::GetPluginHelpFileName(CFxString& fileName) const
     {
         GetPluginConfigKey(fileName);
-        fileName.Append(TEXT(".chm"));
+        fileName.Append(L".chm");
     }
 
     void WINAPI CFxPluginInterface::GetPluginHomePageUrl(CFxString& url) const
     {
-        url = TEXT("https://github.com/0xeb/sally");
+        url = L"https://github.com/0xeb/sally";
     }
 
     bool WINAPI CFxPluginInterface::NeedsWinLib() const
@@ -421,7 +435,7 @@ namespace Fx
 
     const CFileData** CFxPluginDataInterface::s_transferFileData;
     int* CFxPluginDataInterface::s_transferIsDir;
-    char* CFxPluginDataInterface::s_transferBuffer;
+    wchar_t* CFxPluginDataInterface::s_transferBuffer;
     int* CFxPluginDataInterface::s_transferLen;
     DWORD* CFxPluginDataInterface::s_transferRowData;
     CPluginDataInterfaceAbstract** CFxPluginDataInterface::s_transferPluginDataInterface;
@@ -456,11 +470,11 @@ namespace Fx
         }
     }
 
-    void WINAPI CFxPluginDataInterface::GetFileDataForUpDir(const char* archivePath, CFileData& upDir)
+    void WINAPI CFxPluginDataInterface::GetFileDataForUpDir(const wchar_t* archivePath, CFileData& upDir)
     {
     }
 
-    BOOL WINAPI CFxPluginDataInterface::GetFileDataForNewDir(const char* dirName, CFileData& dir)
+    BOOL WINAPI CFxPluginDataInterface::GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir)
     {
         return FALSE;
     }
@@ -498,13 +512,13 @@ namespace Fx
 
     int WINAPI CFxPluginDataInterface::CompareFilesFromFS(const CFileData* file1, const CFileData* file2)
     {
-        return _tcscmp(file1->Name, file2->Name);
+        return wcscmp(file1->Name, file2->Name);
     }
 
     void WINAPI CFxPluginDataInterface::SetupView(
         BOOL leftPanel,
         CSalamanderViewAbstract* view,
-        const char* archivePath,
+        const wchar_t* archivePath,
         const CFileData* upperDir)
     {
         view->GetTransferVariables(
@@ -539,9 +553,8 @@ namespace Fx
         int selectedDirs,
         BOOL displaySize,
         const CQuadWord& selectedSize,
-        char* buffer,
-        DWORD* hotTexts,
-        int& hotTextsCount)
+        CSalamanderStringBuffer* buffer,
+        CSalamanderTextRangeBuffer* hotTexts)
     {
         return FALSE;
     }
@@ -627,25 +640,29 @@ namespace Fx
         return (himl != nullptr) ? pitFromPlugin : pitSimple;
     }
 
-    void WINAPI CFxPluginDataInterface::AppendInfoLineContentPart(
-        PCTSTR partText,
-        char* buffer,
-        DWORD* hotTexts,
-        int& hotTextsCount)
+    bool WINAPI CFxPluginDataInterface::AppendInfoLineContentPart(
+        PCWSTR partText,
+        std::wstring& buffer,
+        std::vector<CSalamanderTextRange>& hotTexts)
     {
-        if (*buffer != TEXT('\0'))
-        {
-            StringCchCat(buffer, 1000, TEXT(", "));
-        }
+        if (!buffer.empty())
+            buffer += L", ";
 
-        if (*partText == TEXT('\0'))
+        if (*partText == L'\0')
         {
-            StringCchCat(buffer, 1000, TEXT("-"));
+            buffer += L'-';
+            return true;
         }
         else
         {
-            hotTexts[hotTextsCount++] = MAKELONG(_tcslen(buffer), _tcslen(partText));
-            StringCchCat(buffer, 1000, partText);
+            const size_t length = wcslen(partText);
+            if (buffer.size() > (std::numeric_limits<DWORD>::max)() ||
+                length > (std::numeric_limits<DWORD>::max)())
+                return false;
+            hotTexts.push_back({static_cast<DWORD>(buffer.size()),
+                                static_cast<DWORD>(length)});
+            buffer.append(partText, length);
+            return true;
         }
     }
 
@@ -758,15 +775,15 @@ namespace Fx
 
     bool WINAPI FxGetWin32ErrorDescription(HRESULT hr, CFxString& text)
     {
-        PTSTR szMessage = nullptr;
+        PWSTR szMessage = nullptr;
         DWORD dwLangId = 0U;
 
-        if (FormatMessage(
+        if (FormatMessageW(
                 FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                 nullptr,
                 hr,
                 dwLangId,
-                (PTSTR)&szMessage,
+                (PWSTR)&szMessage,
                 0,
                 nullptr) == 0)
         {
@@ -804,7 +821,7 @@ namespace Fx
 
         if (!found && useDefaultIfNotFound)
         {
-            text.Format("0x%08X", hr);
+            text.Format(L"0x%08X", hr);
         }
 
         return found;

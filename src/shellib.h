@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,21 +15,35 @@ BOOL InitializeShellib();
 void ReleaseShellib();
 
 // safe call to IContextMenu2::GetCommandString() where MS sometimes crashes
-HRESULT AuxGetCommandString(IContextMenu2* menu, UINT_PTR idCmd, UINT uType, UINT* pReserved, LPSTR pszName, UINT cchMax);
+HRESULT AuxGetCommandString(IContextMenu2* menu, UINT_PTR idCmd, UINT uType,
+                            UINT* pReserved, std::wstring& name);
 
 // callback that returns names of selected files for creating the next interface
-typedef const char* (*CEnumFileNamesFunction)(int index, void* param);
+typedef const wchar_t* (*CEnumFileNamesFunction)(int index, void* param);
 
-// creates a data object for drag&drop operations on selected files and directories from rootDir
-IDataObject* CreateIDataObject(HWND hOwnerWindow, const char* rootDir, int files,
-                               CEnumFileNamesFunction nextFile, void* param);
+// Wide sibling, and the last of the five dependents of the ANSI shell
+// namespace walk to get one. It binds through SHParseDisplayName like the other wide
+// siblings rather than walking component by component out of a CP_ACP string - see
+// BindShellFolderW. Unlike CreateIContextMenu2W it is ALL-OR-NOTHING: a data object
+// becomes a clipboard payload or a drag, so a silently dropped file would copy nine of
+// ten and report success.
+IDataObject* CreateIDataObjectW(HWND hOwnerWindow, const wchar_t* rootDirW, int files,
+                                CEnumFileNamesFunction nextFile, void* param);
 
 // creates a context menu interface for selected files and directories from rootDir
-IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* rootDir, int files,
+IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const wchar_t* rootDir, int files,
                                    CEnumFileNamesFunction nextFile, void* param);
 
-// creates a context menu interface for the specified directory
-IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* dir);
+// Special fallback for the "\\" and "\\server" shell-namespace forms, which cannot bind
+// through SHParseDisplayName. The public input stays wide; this helper owns its one ACP
+// namespace-walk conversion.
+IContextMenu2* CreateNetworkRootContextMenu(HWND hOwnerWindow, const wchar_t* dirW);
+
+// Wide sibling of the above: the directory's own menu (its verbs as an item in its
+// parent), bound through SHParseDisplayName so the path is never narrowed to CP_ACP.
+// The ANSI version reaches the folder by walking the shell namespace component by
+// component out of the mirror, which cannot match a name outside the code page.
+IContextMenu2* CreateIContextMenu2W(HWND hOwnerWindow, const wchar_t* dirW);
 
 // How many of the requested selection names actually resolved to a shell PIDL.
 // Reported so the caller can tell "nothing to show" from "some names were skipped" and
@@ -55,42 +70,43 @@ IContextMenu2* CreateIContextMenu2W(HWND hOwnerWindow, const wchar_t* rootDirW,
                                     CShellPidlResolveStats* stats = NULL);
 
 // does the specified directory or file have a drop target?
-BOOL HasDropTarget(const char* dir);
+BOOL HasDropTarget(const wchar_t* dir);
 
-// creates a drop target for drag&drop operations into the specified directory or file
-IDropTarget* CreateIDropTarget(HWND hOwnerWindow, const char* dir);
+// Creates a drop target for a disk directory or file without narrowing its path.
+IDropTarget* CreateIDropTargetW(HWND hOwnerWindow, const wchar_t* dirW);
 
 // opens the special folder window
 void OpenSpecFolder(HWND hOwnerWindow, int specFolder);
 
-// opens the 'dir' folder window and focuses 'item'
-void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item);
+// Opens the 'dir' folder window and focuses 'item'.
+void OpenFolderAndFocusItemW(HWND hOwnerWindow, const wchar_t* dir, const wchar_t* item);
 
 // opens the browse dialog and selects a path (can be limited to a network path)
 // hCenterWindow - window to which the dialog will be centered
-BOOL GetTargetDirectory(HWND parent, HWND hCenterWindow, const char* title, const char* comment,
-                        char* path, BOOL onlyNet = FALSE, const char* initDir = NULL);
+// 2026-08-25: the narrow GetTargetDirectory/GetTargetDirectoryAux and the
+// DirectoryBrowse/CBrowseData they alone used were deleted - confirmed-dead (zero callers; the
+// legacy v107 ABI shim forwards to WideGeneral.GetTargetDirectory).
 BOOL GetTargetDirectoryW(HWND parent, HWND hCenterWindow, const wchar_t* title, const wchar_t* comment,
                          std::wstring& path, BOOL onlyNet = FALSE, const wchar_t* initDir = NULL);
 
 // detects whether it is a NetHood path (directory with target.lnk),
-// optionally resolves target.lnk and returns the path in 'path'; 'path' is an in/out path
-// (min. MAX_PATH characters)
-void ResolveNetHoodPath(char* path);
+// optionally resolves target.lnk and returns the dynamically-owned path in 'path'
+// 2026-08-25: the narrow ResolveNetHoodPath(char*) was deleted - confirmed-dead
+// (its only caller, the narrow GetTargetDirectory, was deleted above).
 void ResolveNetHoodPathW(std::wstring& path);
 
 class CMenuNew;
 
 // returns the New menu - handle of popup-menu and IContextMenu through which commands run
-void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
-                            int minCmd, int maxCmd, BOOL backgoundMenu);
+void GetNewOrBackgroundMenuW(HWND hOwnerWindow, const wchar_t* dirW, CMenuNew* menu,
+                             int minCmd, int maxCmd, BOOL backgoundMenu);
 
 struct CDragDropOperData
 {
-    CPathBuffer SrcPath;        // source path common to all files/dirs from Names ("" == failed conversion from Unicode)
-    TIndirectArray<char> Names; // sorted allocated names of files/dirs (CF_HDROP does not distinguish file vs dir) ("" == failed conversion from Unicode)
+    std::wstring SrcPath;          // source path common to all files/dirs from Names
+    TIndirectArray<wchar_t> Names; // allocated names of files/dirs (CF_HDROP does not distinguish file vs dir)
 
-    CDragDropOperData() : Names(200, 200) { SrcPath[0] = 0; }
+    CDragDropOperData() : Names(200, 200) {}
 };
 
 // determines whether 'pDataObject' contains disk files and dirs from a single path,
@@ -101,7 +117,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList);
 // the folder for the shortened ID-list from desktop, then calls GetDisplayNameOf for the last
 // ID with the specified 'flags'); on success returns TRUE + name in 'name' (buffer size 'nameSize');
 // does not deallocate 'pidl'; 'alloc' is the iface obtained via CoGetMalloc
-BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IMalloc* alloc);
+BOOL GetSHObjectNameOwned(ITEMIDLIST* pidl, DWORD flags, std::wstring& name);
+BOOL GetShellLinkPathOwned(IShellLinkW* link, DWORD flags, std::wstring& path,
+                           WIN32_FIND_DATAW* findData = NULL);
 
 // TRUE = drag&drop effect was calculated in plugin FS, so there is no need to force Copy
 // in CImpIDropSource::GiveFeedback
@@ -211,20 +229,14 @@ public:
 // record used in data for copy and move callback
 struct CCopyMoveRecord
 {
-    char* FileName;     // ANSI filename (may have lossy conversion for Unicode names)
-    char* MapName;
-    wchar_t* FileNameW; // Wide filename (preserved for Unicode support, NULL if not needed)
+    std::wstring FileName;
+    std::optional<std::wstring> MapName;
 
-    CCopyMoveRecord(const char* fileName, const char* mapName);
-    CCopyMoveRecord(const wchar_t* fileName, const char* mapName);
-    CCopyMoveRecord(const char* fileName, const wchar_t* mapName);
-    CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName);
-    ~CCopyMoveRecord();
+    CCopyMoveRecord(const wchar_t* fileName, const wchar_t* mapName) noexcept;
+    bool IsValid() const { return Valid; }
 
-    char* AllocChars(const char* name);
-    char* AllocChars(const wchar_t* name);
-    wchar_t* AllocWideChars(const wchar_t* name);
-    bool HasWideFileName() const { return FileNameW != NULL; }
+private:
+    bool Valid;
 };
 
 // data for copy and move callback
@@ -241,21 +253,21 @@ public:
 };
 
 // callback for copy and move operations, handles destruction of 'data'
-typedef BOOL (*CDoCopyMove)(BOOL copy, char* targetDir, CCopyMoveData* data,
-                            void* param);
+typedef BOOL (*CDoCopyMove)(BOOL copy, const wchar_t* targetDir,
+                            CCopyMoveData* data, void* param);
 
 // callback for drag&drop operations; 'copy' is TRUE/FALSE (copy/move), 'toArchive' is TRUE/FALSE
 // (to archive/FS), 'archiveOrFSName' (may be NULL if the info should be obtained from the panel)
 // is the archive file name or FS-name, 'archivePathOrUserPart' is a path in the archive or FS
 // user-part path, 'data' contains description of source files/dirs, the function handles destruction
 // of the 'data' object, 'param' is the parameter passed to CImpDropTarget constructor
-typedef void (*CDoDragDropOper)(BOOL copy, BOOL toArchive, const char* archiveOrFSName,
-                                const char* archivePathOrUserPart, CDragDropOperData* data,
+typedef void (*CDoDragDropOper)(BOOL copy, BOOL toArchive, const wchar_t* archiveOrFSName,
+                                const wchar_t* archivePathOrUserPart, CDragDropOperData* data,
                                 void* param);
 
-// callback that returns target directory for point 'pt'
-typedef const char* (*CGetCurDir)(POINTL& pt, void* param, DWORD* pdwEffect, BOOL rButton,
-                                  BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
+// callback that returns the UTF-16 target directory for point 'pt'
+typedef const wchar_t* (*CGetCurDir)(POINTL& pt, void* param, DWORD* pdwEffect, BOOL rButton,
+                                     BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
 
 // callback notifying end of drop operation, drop == FALSE on ESC
 typedef void (*CDropEnd)(BOOL drop, BOOL shortcuts, void* param, BOOL ownRutine,
@@ -271,7 +283,7 @@ typedef void (*CEnterLeaveDrop)(BOOL enter, void* param);
 typedef BOOL (*CUseOwnRutine)(IDataObject* pDataObject);
 
 // callback for determining default drop effect when dragging FS to FS
-typedef void (*CGetFSToFSDropEffect)(const char* srcFSPath, const char* tgtFSPath,
+typedef void (*CGetFSToFSDropEffect)(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                                      DWORD allowedEffects, DWORD keyState,
                                      DWORD* dropEffect, void* param);
 
@@ -293,7 +305,7 @@ private:
     BOOL OldDataObjectIsFake;
     int OldDataObjectIsSimple;                 // -1 (unknown value), TRUE/FALSE = is/is not simple (all names on one path)
     int OldDataObjectSrcType;                  // 0 (unknown type), 1/2 = archive/FS
-    CPathBuffer OldDataObjectSrcFSPath; // only for FS type: source FS path
+    std::wstring OldDataObjectSrcFSPath; // only for FS type: source FS path
 
     CDoCopyMove DoCopyMove;
     void* DoCopyMoveParam;
@@ -312,7 +324,7 @@ private:
 
     int TgtType; // values see CIDTTgtType; idtttWindows also for archives and FS without ability to drop current dataobject
     IDropTarget* CurDirDropTarget;
-    CPathBuffer CurDir;
+    std::wstring CurDir;
 
     CEnterLeaveDrop EnterLeaveDrop;
     void* EnterLeaveDropParam;
@@ -345,14 +357,13 @@ public:
         GetCurDirParam = getCurDirParam;
         TgtType = idtttWindows;
         CurDirDropTarget = NULL;
-        CurDir[0] = 0;
         DropEnd = dropEnd;
         DropEndParam = dropEndParam;
         OldDataObject = NULL;
         OldDataObjectIsFake = FALSE;
         OldDataObjectIsSimple = -1; // unknown value
         OldDataObjectSrcType = 0;   // unknown type
-        OldDataObjectSrcFSPath[0] = 0;
+        OldDataObjectSrcFSPath.clear();
         ConfirmDrop = confirmDrop;
         ConfirmDropEnable = confirmDropEnable;
         RButton = FALSE;
@@ -371,12 +382,12 @@ public:
             CurDirDropTarget->Release();
     }
 
-    void SetDirectory(const char* path, DWORD grfKeyState, POINTL pt,
+    void SetDirectory(const wchar_t* path, DWORD grfKeyState, POINTL pt,
                       DWORD* effect, IDataObject* dataObject, BOOL tgtIsFile, int tgtType);
     BOOL TryCopyOrMove(BOOL copy, IDataObject* pDataObject, UINT CF_FileMapA,
                        UINT CF_FileMapW, BOOL cfFileMapA, BOOL cfFileMapW);
-    BOOL ProcessClipboardData(BOOL copy, const DROPFILES* data, const char* mapA,
-                              const wchar_t* mapW);
+    BOOL ProcessClipboardData(BOOL copy, const std::vector<std::wstring>& paths,
+                              const std::vector<std::wstring>* mappedNames);
 
     STDMETHOD(QueryInterface)
     (REFIID, void FAR * FAR*);

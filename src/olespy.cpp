@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "common/DiagnosticTextEncoding.h"
+
 #include "olespy.h"
 
 #ifdef _DEBUG
@@ -151,169 +153,219 @@ BOOL IsGoodPIDL(LPCITEMIDLIST pidl, int cb)
     return IsGoodPIDL(_ILNext(pidl), cb);
 }
 
-const char* DumpPidl(LPCITEMIDLIST pidl)
+const wchar_t* DumpPidl(LPCITEMIDLIST pidl) noexcept
 {
-    static TCHAR szBuf[MAX_PATH];
-    CPathBuffer szTmp;
-    USHORT cb;
-    LPCTSTR pszT;
-
-    szBuf[0] = 0;
-
-    if (NULL == pidl)
+    static std::wstring text;
+    text.clear();
+    try
     {
-        StrNCat(szBuf, "Empty pidl", sizeof(szBuf));
-        return szBuf;
-    }
-
-    while (!ILIsEmpty(pidl))
-    {
-        cb = pidl->mkid.cb;
-        wsprintf(szTmp, "cb:%x id:", cb);
-        StrNCat(szBuf, szTmp, sizeof(szBuf));
-
-        switch (SIL_GetType(pidl) & SHID_TYPEMASK)
+        if (NULL == pidl)
         {
-        case SHID_ROOT:
-            pszT = "SHID_ROOT";
-            break;
-        case SHID_ROOT_REGITEM:
-            pszT = "SHID_ROOT_REGITEM";
-            break;
-        case SHID_COMPUTER:
-            pszT = "SHID_COMPUTER";
-            break;
-        case SHID_COMPUTER_1:
-            pszT = "SHID_COMPUTER_1";
-            break;
-        case SHID_COMPUTER_REMOVABLE:
-            pszT = "SHID_COMPUTER_REMOVABLE";
-            break;
-        case SHID_COMPUTER_FIXED:
-            pszT = "SHID_COMPUTER_FIXED";
-            break;
-        case SHID_COMPUTER_REMOTE:
-            pszT = "SHID_COMPUTER_REMOTE";
-            break;
-        case SHID_COMPUTER_CDROM:
-            pszT = "SHID_COMPUTER_CDROM";
-            break;
-        case SHID_COMPUTER_RAMDISK:
-            pszT = "SHID_COMPUTER_RAMDISK";
-            break;
-        case SHID_COMPUTER_7:
-            pszT = "SHID_COMPUTER_7";
-            break;
-        case SHID_COMPUTER_DRIVE525:
-            pszT = "SHID_COMPUTER_DRIVE525";
-            break;
-        case SHID_COMPUTER_DRIVE35:
-            pszT = "SHID_COMPUTER_DRIVE35";
-            break;
-        case SHID_COMPUTER_NETDRIVE:
-            pszT = "SHID_COMPUTER_NETDRIVE";
-            break;
-        case SHID_COMPUTER_NETUNAVAIL:
-            pszT = "SHID_COMPUTER_NETUNAVAIL";
-            break;
-        case SHID_COMPUTER_C:
-            pszT = "SHID_COMPUTER_C";
-            break;
-        case SHID_COMPUTER_D:
-            pszT = "SHID_COMPUTER_D";
-            break;
-        case SHID_COMPUTER_REGITEM:
-            pszT = "SHID_COMPUTER_REGITEM";
-            break;
-        case SHID_COMPUTER_MISC:
-            pszT = "SHID_COMPUTER_MISC";
-            break;
-        case SHID_FS:
-            pszT = "SHID_FS";
-            break;
-        case SHID_FS_TYPEMASK:
-            pszT = "SHID_FS_TYPEMASK";
-            break;
-        case SHID_FS_DIRECTORY:
-            pszT = "SHID_FS_DIRECTORY";
-            break;
-        case SHID_FS_FILE:
-            pszT = "SHID_FS_FILE";
-            break;
-        case SHID_FS_UNICODE:
-            pszT = "SHID_FS_UNICODE";
-            break;
-        case SHID_FS_DIRUNICODE:
-            pszT = "SHID_FS_DIRUNICODE";
-            break;
-        case SHID_FS_FILEUNICODE:
-            pszT = "SHID_FS_FILEUNICODE";
-            break;
-        case SHID_NET:
-            pszT = "SHID_NET";
-            break;
-        case SHID_NET_DOMAIN:
-            pszT = "SHID_NET_DOMAIN";
-            break;
-        case SHID_NET_SERVER:
-            pszT = "SHID_NET_SERVER";
-            break;
-        case SHID_NET_SHARE:
-            pszT = "SHID_NET_SHARE";
-            break;
-        case SHID_NET_FILE:
-            pszT = "SHID_NET_FILE";
-            break;
-        case SHID_NET_GROUP:
-            pszT = "SHID_NET_GROUP";
-            break;
-        case SHID_NET_NETWORK:
-            pszT = "SHID_NET_NETWORK";
-            break;
-        case SHID_NET_RESTOFNET:
-            pszT = "SHID_NET_RESTOFNET";
-            break;
-        case SHID_NET_SHAREADMIN:
-            pszT = "SHID_NET_SHAREADMIN";
-            break;
-        case SHID_NET_DIRECTORY:
-            pszT = "SHID_NET_DIRECTORY";
-            break;
-        case SHID_NET_TREE:
-            pszT = "SHID_NET_TREE";
-            break;
-        case SHID_NET_REGITEM:
-            pszT = "SHID_NET_REGITEM";
-            break;
-        case SHID_NET_PRINTER:
-            pszT = "SHID_NET_PRINTER";
-            break;
-        default:
-            pszT = "unknown";
-            break;
+            text = L"Empty pidl";
+            return text.c_str();
         }
-        StrNCat(szBuf, pszT, sizeof(szBuf));
 
-        if (SIL_GetType(pidl) & SHID_JUNCTION)
-            StrNCat(szBuf, ", junction", sizeof(szBuf));
+        while (!ILIsEmpty(pidl))
+        {
+            wchar_t fragment[32]; // bounded "cb:%x id:" diagnostic fragment
+            const USHORT cb = pidl->mkid.cb;
+            _snwprintf_s(fragment, _TRUNCATE, L"cb:%x id:", cb);
+            text += fragment;
 
-        pidl = _ILNext(pidl);
+            LPCWSTR typeText;
+            switch (SIL_GetType(pidl) & SHID_TYPEMASK)
+            {
+            case SHID_ROOT: typeText = L"SHID_ROOT"; break;
+            case SHID_ROOT_REGITEM: typeText = L"SHID_ROOT_REGITEM"; break;
+            case SHID_COMPUTER: typeText = L"SHID_COMPUTER"; break;
+            case SHID_COMPUTER_1: typeText = L"SHID_COMPUTER_1"; break;
+            case SHID_COMPUTER_REMOVABLE: typeText = L"SHID_COMPUTER_REMOVABLE"; break;
+            case SHID_COMPUTER_FIXED: typeText = L"SHID_COMPUTER_FIXED"; break;
+            case SHID_COMPUTER_REMOTE: typeText = L"SHID_COMPUTER_REMOTE"; break;
+            case SHID_COMPUTER_CDROM: typeText = L"SHID_COMPUTER_CDROM"; break;
+            case SHID_COMPUTER_RAMDISK: typeText = L"SHID_COMPUTER_RAMDISK"; break;
+            case SHID_COMPUTER_7: typeText = L"SHID_COMPUTER_7"; break;
+            case SHID_COMPUTER_DRIVE525: typeText = L"SHID_COMPUTER_DRIVE525"; break;
+            case SHID_COMPUTER_DRIVE35: typeText = L"SHID_COMPUTER_DRIVE35"; break;
+            case SHID_COMPUTER_NETDRIVE: typeText = L"SHID_COMPUTER_NETDRIVE"; break;
+            case SHID_COMPUTER_NETUNAVAIL: typeText = L"SHID_COMPUTER_NETUNAVAIL"; break;
+            case SHID_COMPUTER_C: typeText = L"SHID_COMPUTER_C"; break;
+            case SHID_COMPUTER_D: typeText = L"SHID_COMPUTER_D"; break;
+            case SHID_COMPUTER_REGITEM: typeText = L"SHID_COMPUTER_REGITEM"; break;
+            case SHID_COMPUTER_MISC: typeText = L"SHID_COMPUTER_MISC"; break;
+            case SHID_FS: typeText = L"SHID_FS"; break;
+            case SHID_FS_TYPEMASK: typeText = L"SHID_FS_TYPEMASK"; break;
+            case SHID_FS_DIRECTORY: typeText = L"SHID_FS_DIRECTORY"; break;
+            case SHID_FS_FILE: typeText = L"SHID_FS_FILE"; break;
+            case SHID_FS_UNICODE: typeText = L"SHID_FS_UNICODE"; break;
+            case SHID_FS_DIRUNICODE: typeText = L"SHID_FS_DIRUNICODE"; break;
+            case SHID_FS_FILEUNICODE: typeText = L"SHID_FS_FILEUNICODE"; break;
+            case SHID_NET: typeText = L"SHID_NET"; break;
+            case SHID_NET_DOMAIN: typeText = L"SHID_NET_DOMAIN"; break;
+            case SHID_NET_SERVER: typeText = L"SHID_NET_SERVER"; break;
+            case SHID_NET_SHARE: typeText = L"SHID_NET_SHARE"; break;
+            case SHID_NET_FILE: typeText = L"SHID_NET_FILE"; break;
+            case SHID_NET_GROUP: typeText = L"SHID_NET_GROUP"; break;
+            case SHID_NET_NETWORK: typeText = L"SHID_NET_NETWORK"; break;
+            case SHID_NET_RESTOFNET: typeText = L"SHID_NET_RESTOFNET"; break;
+            case SHID_NET_SHAREADMIN: typeText = L"SHID_NET_SHAREADMIN"; break;
+            case SHID_NET_DIRECTORY: typeText = L"SHID_NET_DIRECTORY"; break;
+            case SHID_NET_TREE: typeText = L"SHID_NET_TREE"; break;
+            case SHID_NET_REGITEM: typeText = L"SHID_NET_REGITEM"; break;
+            case SHID_NET_PRINTER: typeText = L"SHID_NET_PRINTER"; break;
+            default: typeText = L"unknown"; break;
+            }
+            text += typeText;
 
-        if (!ILIsEmpty(pidl))
-            StrNCat(szBuf, "; ", sizeof(szBuf));
+            if (SIL_GetType(pidl) & SHID_JUNCTION)
+                text += L", junction";
+
+            pidl = _ILNext(pidl);
+
+            if (!ILIsEmpty(pidl))
+                text += L"; ";
+        }
+        return text.c_str();
     }
-
-    return szBuf;
+    catch (...)
+    {
+        text.clear();
+        return L"<pidl dump unavailable>";
+    }
 }
 
 //-------------------------------------------------------------------------
 
-void _OutputDebugString(BOOL useTServer, const char* text)
+void _OutputDebugString(BOOL useTServer, const wchar_t* text)
 {
     if (useTServer)
-        TRACE_I(text);
-    OutputDebugString(text);
-    OutputDebugString("\n");
+        TRACE_IW(text);
+    OutputDebugStringW(text);
+    OutputDebugStringW(L"\n");
+}
+
+// Narrow overload so callers building ANSI diagnostic text (e.g. DumpLeaks'
+// sprintf-based buffers) don't need to convert at the call site themselves -
+// DumpLeaks uses __try/__except, and MSVC rejects a std::wstring temporary
+// (or any object needing unwinding) anywhere in a function that does (C2712).
+// Converting here, in a plain function, keeps that temporary out of DumpLeaks.
+void _OutputDebugString(BOOL useTServer, const char* text) noexcept
+{
+    try
+    {
+        std::wstring wide;
+        if (!sally::diagnostic::DecodeAcp(text, wide))
+        {
+            _OutputDebugString(useTServer, L"<OLE byte diagnostic unavailable>");
+            return;
+        }
+        _OutputDebugString(useTServer, wide.c_str());
+    }
+    catch (...)
+    {
+        _OutputDebugString(useTServer, L"<OLE byte diagnostic unavailable>");
+    }
+}
+
+static void OutputOleSpyWideValue(BOOL useTServer, const wchar_t* prefix,
+                                  const wchar_t* value,
+                                  const wchar_t* suffix = L"") noexcept
+{
+    try
+    {
+        std::wstring text = prefix != NULL ? prefix : L"";
+        if (value != NULL)
+            text += value;
+        if (suffix != NULL)
+            text += suffix;
+        _OutputDebugString(useTServer, text.c_str());
+    }
+    catch (...)
+    {
+        _OutputDebugString(useTServer, L"<OLE diagnostic text unavailable>");
+    }
+}
+
+static void OutputOleSpyNarrowValue(BOOL useTServer, const char* prefix,
+                                    const char* value, size_t valueCapacity,
+                                    const char* suffix = "") noexcept
+{
+    try
+    {
+        std::string text = prefix != NULL ? prefix : "";
+        if (value != NULL)
+        {
+            const size_t length = strnlen(value, valueCapacity);
+            text.append(value, length);
+        }
+        if (suffix != NULL)
+            text += suffix;
+        _OutputDebugString(useTServer, text.c_str());
+    }
+    catch (...)
+    {
+        _OutputDebugString(useTServer, L"<OLE byte diagnostic unavailable>");
+    }
+}
+
+static const wchar_t* GetPidlFileSystemPath(LPCITEMIDLIST pidl) noexcept
+{
+    static std::wstring path;
+    path.clear();
+    PWSTR allocatedPath = NULL;
+    const HRESULT result = SHGetNameFromIDList(pidl, SIGDN_FILESYSPATH, &allocatedPath);
+    if (FAILED(result) || allocatedPath == NULL)
+        return NULL;
+    try
+    {
+        path = allocatedPath;
+    }
+    catch (...)
+    {
+        path.clear();
+    }
+    CoTaskMemFree(allocatedPath);
+    return path.empty() ? NULL : path.c_str();
+}
+
+static const wchar_t* GetPidlDisplayName(LPCITEMIDLIST pidl) noexcept
+{
+    static std::wstring name;
+    name.clear();
+    IShellFolder* desktopFolder = NULL;
+    if (FAILED(SHGetDesktopFolder(&desktopFolder)) || desktopFolder == NULL)
+        return NULL;
+
+    STRRET str = {};
+    const HRESULT displayResult = desktopFolder->GetDisplayNameOf(
+        const_cast<LPITEMIDLIST>(pidl), SHGDN_NORMAL, &str);
+    desktopFolder->Release();
+    if (FAILED(displayResult))
+        return NULL;
+
+    PWSTR allocatedName = str.uType == STRRET_WSTR ? str.pOleStr : NULL;
+    try
+    {
+        if (allocatedName != NULL)
+            name = allocatedName;
+        else
+        {
+            const char* legacyName = str.uType == STRRET_CSTR
+                                         ? str.cStr
+                                         : (str.uType == STRRET_OFFSET && pidl != NULL
+                                                ? reinterpret_cast<const char*>(pidl) + str.uOffset
+                                                : NULL);
+            if (legacyName != NULL)
+                sally::diagnostic::DecodeAcp(legacyName, name);
+        }
+    }
+    catch (...)
+    {
+        name.clear();
+    }
+    if (allocatedName != NULL)
+        CoTaskMemFree(allocatedName);
+    return name.empty() ? NULL : name.c_str();
 }
 
 //-------------------------------------------------------------------------
@@ -335,8 +387,8 @@ struct SPYBLK
     DWORD cRealloc;                    // how many times the item was reallocated
     DWORD cOrder;                      // overall allocation count (used for breakpoints)
     DWORD dwThreadId;                  // which thread leaked?
-    char szStackHead[SPYBLK_STACKLEN]; // the first line from the call stack
-    char szStackTail[SPYBLK_STACKLEN]; // the last line from the call stack
+    wchar_t szStackHead[SPYBLK_STACKLEN]; // the first line from the call stack
+    wchar_t szStackTail[SPYBLK_STACKLEN]; // the last line from the call stack
 };
 
 class CMallocSpy : public IMallocSpy
@@ -733,7 +785,7 @@ CMallocSpy::SpyPreFree(void* pvRequest)
     pvRequest = (void*)(((BYTE*)pvRequest) - sizeof(SPYBLK));
     SPYBLK* psb = (SPYBLK*)pvRequest;
     if (psb->dwSig != SPYSIG)
-        _OutputDebugString(FALSE, "psb->dwSig != SPYSIG");
+        _OutputDebugString(FALSE, L"psb->dwSig != SPYSIG");
     SpyDequeue(psb);
 
     return (psb);
@@ -782,14 +834,16 @@ void CMallocSpy::SpyStoreStack(SPYBLK* psb)
     if (stack != NULL)
     {
         stack->Reset();
-        lstrcpyn(psb->szStackHead, stack->GetNextLine(), SPYBLK_STACKLEN);
+        sally::diagnostic::CopyDecodedAcp(stack->GetNextLine(), psb->szStackHead,
+                                         SPYBLK_STACKLEN);
         const char* sOld = NULL;
         const char* sNew;
         do
         {
             sNew = stack->GetNextLine();
             if (sNew == NULL && sOld != NULL)
-                lstrcpyn(psb->szStackTail, sOld, SPYBLK_STACKLEN);
+                sally::diagnostic::CopyDecodedAcp(sOld, psb->szStackTail,
+                                                 SPYBLK_STACKLEN);
             sOld = sNew;
         } while (sNew != NULL);
     }
@@ -818,86 +872,21 @@ BOOL IsAsciiString(LPSTR pv, int cb)
     return (!cb && bRet && !*pv); // we've only had ascii characters, and we're null terminated
 }
 
-STDAPI _StrRetToBuf(STRRET* psr, LPCITEMIDLIST pidl, LPSTR pszBuf, UINT cchBuf)
-{
-    HRESULT hres = E_FAIL;
-
-    if (cchBuf == 0)
-    {
-        TRACE_E("_StrRetToBuf cchBuf=0"); // we are not built for this
-        return hres;
-    }
-
-    switch (psr->uType)
-    {
-    case STRRET_WSTR:
-    {
-        LPWSTR pszStr = psr->pOleStr;
-        if (pszStr != NULL)
-        {
-            int chars = WideCharToMultiByte(CP_ACP, 0, pszStr,
-                                            -1, pszBuf, cchBuf, NULL, NULL);
-            if (chars == 0)
-            {
-                DWORD err = GetLastError();
-                if (err == ERROR_INSUFFICIENT_BUFFER)
-                {
-                    TRACE_E("_StrRetToBuf: buffer is short cchBuf=" << cchBuf);
-                    pszBuf[cchBuf - 1] = 0;
-                    hres = S_OK;
-                }
-                else
-                {
-                    TRACE_E("_StrRetToBuf: WideCharToMultiByte failed, error=" << err);
-                    pszBuf[0] = 0;
-                }
-            }
-            else
-                hres = S_OK;
-            CoTaskMemFree(pszStr); // SHFree function is deprecated.
-        }
-        break;
-    }
-
-    case STRRET_CSTR:
-    {
-        const char* str = (const char*)psr->cStr;
-        if (strlen(str) + 1 > cchBuf)
-            TRACE_E("_StrRetToBuf: buffer is short cchBuf=" << cchBuf);
-        lstrcpyn(pszBuf, str, cchBuf);
-        hres = S_OK;
-        break;
-    }
-
-    case STRRET_OFFSET:
-    {
-        if (pidl != NULL)
-        {
-            const char* str = (const char*)pidl + psr->uOffset;
-            if (strlen(str) + 1 > cchBuf)
-                TRACE_E("_StrRetToBuf: buffer is short cchBuf=" << cchBuf);
-            lstrcpyn(pszBuf, str, cchBuf);
-            hres = S_OK;
-        }
-        break;
-    }
-    }
-
-    if (FAILED(hres) && cchBuf != 0)
-        *pszBuf = 0;
-
-    return hres;
-}
-
 BOOL CMallocSpy::DumpLeaks()
 {
     EnterCS();
 
-    char buff[MAX_PATH + 200]; // kept as char[] due to SEH __try constraint
-    _OutputDebugString(TRUE, "~~~~~~~~~~~~ CMallocSpy Report Begin ~~~~~~~~~~~~");
-    sprintf(buff, "Memory Stats: %d allocations, %Iu bytes allocated", _iTotalAllocs, _iTotalBytes);
+    // Bounded final byte sink for numeric and byte-native leak diagnostics. Semantic
+    // wide values bypass it through OutputOleSpyWideValue.
+    char buff[1024]; // raw storage avoids a C++ destructor near the __try below
+    _OutputDebugString(TRUE, L"~~~~~~~~~~~~ CMallocSpy Report Begin ~~~~~~~~~~~~");
+    _snprintf_s(buff, _countof(buff), _TRUNCATE,
+                "Memory Stats: %d allocations, %Iu bytes allocated", _iTotalAllocs,
+                _iTotalBytes);
     _OutputDebugString(TRUE, buff);
-    sprintf(buff, "Memory Peaks: %Iu allocations; %Iu bytes allocated", _iPeakAllocs, _iPeakBytes);
+    _snprintf_s(buff, _countof(buff), _TRUNCATE,
+                "Memory Peaks: %Iu allocations; %Iu bytes allocated", _iPeakAllocs,
+                _iPeakBytes);
     _OutputDebugString(TRUE, buff);
 
     SIZE_T leakedBytes = 0;
@@ -913,24 +902,26 @@ BOOL CMallocSpy::DumpLeaks()
     {
         // FIXME_X64 psbWalk->cbRequest is of type size_t, yet we print it as %d which is likely wrong
         // check the rest of the code where the bug might appear; it probably should be (%Id) - http://msdn.microsoft.com/en-us/library/tcxf1dw6.aspx
-        sprintf(buff, "[%u] Leaked %Iu bytes at 0x%p, from thread 0x%X",
-                psbWalk->cOrder, psbWalk->cbRequest,
-                (BYTE*)psbWalk + sizeof(SPYBLK), psbWalk->dwThreadId);
+        _snprintf_s(buff, _countof(buff), _TRUNCATE,
+                    "[%u] Leaked %Iu bytes at 0x%p, from thread 0x%X",
+                    psbWalk->cOrder, psbWalk->cbRequest,
+                    (BYTE*)psbWalk + sizeof(SPYBLK), psbWalk->dwThreadId);
         _OutputDebugString(TRUE, buff);
         if (psbWalk->cRealloc)
         {
-            sprintf(buff, "  Data was re-alloced %u times", psbWalk->cRealloc);
+            _snprintf_s(buff, _countof(buff), _TRUNCATE,
+                        "  Data was re-alloced %u times", psbWalk->cRealloc);
             _OutputDebugString(TRUE, buff);
         }
         if (psbWalk->szStackHead[0] != 0)
         {
-            sprintf(buff, "  Call Stack Head: '%s'", psbWalk->szStackHead);
-            _OutputDebugString(TRUE, buff);
+            OutputOleSpyWideValue(TRUE, L"  Call Stack Head: '",
+                                  psbWalk->szStackHead, L"'");
         }
         if (psbWalk->szStackTail[0] != 0)
         {
-            sprintf(buff, "  Call Stack Tail: '%s'", psbWalk->szStackTail);
-            _OutputDebugString(TRUE, buff);
+            OutputOleSpyWideValue(TRUE, L"  Call Stack Tail: '",
+                                  psbWalk->szStackTail, L"'");
         }
         __try
         {
@@ -942,49 +933,36 @@ BOOL CMallocSpy::DumpLeaks()
                 IsGoodPIDL((LPCITEMIDLIST)pvRequest, (int)psbWalk->cbRequest))
             {
                 // some PIDL
-                sprintf(buff, "  Data is pidl %s", DumpPidl((LPITEMIDLIST)pvRequest));
-                _OutputDebugString(TRUE, buff);
+                OutputOleSpyWideValue(TRUE, L"  Data is pidl ",
+                                      DumpPidl((LPITEMIDLIST)pvRequest));
 
                 if (FS_IsValidID((LPITEMIDLIST)pvRequest))
                 {
-                    char szTemp[MAX_PATH]; // kept as char[] due to SEH __try constraint
-                    SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp);
-                    if (szTemp[0])
+                    const wchar_t* path = GetPidlFileSystemPath((LPCITEMIDLIST)pvRequest);
+                    if (path != NULL && path[0] != 0)
                     {
-                        sprintf(buff, "  Pidl for '%s'", szTemp);
-                        _OutputDebugString(TRUE, buff);
+                        OutputOleSpyWideValue(TRUE, L"  Pidl for '", path, L"'");
                     }
                     else if (psbWalk->cbRequest > 16 && SIL_GetType((LPITEMIDLIST)pvRequest) == SHID_FS_FILE) // SHID_FS_FILE == 0x32
                     {
-                        sprintf(buff, "  May be a relative pidl for '%s'", ((LPBYTE)pvRequest) + 14);
-                        _OutputDebugString(TRUE, buff);
+                        OutputOleSpyNarrowValue(
+                            TRUE, "  May be a relative pidl for '",
+                            reinterpret_cast<const char*>((LPBYTE)pvRequest + 14),
+                            psbWalk->cbRequest - 14, "'");
                     }
                 }
                 else if (ROOT_IsValidID((LPITEMIDLIST)pvRequest))
                 {
-                    IShellFolder* desktopFolder;
-                    if (SUCCEEDED(SHGetDesktopFolder(&desktopFolder)))
+                    const wchar_t* path = GetPidlFileSystemPath((LPCITEMIDLIST)pvRequest);
+                    if (path != NULL && path[0] != 0)
                     {
-                        char szTemp[MAX_PATH]; // kept as char[] due to SEH __try constraint
-                        if (SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp) && szTemp[0] != 0)
-                        {
-                            sprintf(buff, "  Pidl for '%s'", szTemp);
-                            _OutputDebugString(TRUE, buff);
-                        }
-                        else
-                        {
-                            STRRET str;
-                            if (SUCCEEDED(desktopFolder->GetDisplayNameOf((LPITEMIDLIST)pvRequest, SHGDN_NORMAL, &str)))
-                            {
-                                char name[MAX_PATH]; // kept as char[] due to SEH __try constraint
-                                if (SUCCEEDED(_StrRetToBuf(&str, (LPITEMIDLIST)pvRequest, name, MAX_PATH)))
-                                {
-                                    sprintf(buff, "  Pidl for '%s'", name);
-                                    _OutputDebugString(TRUE, buff);
-                                }
-                            }
-                            desktopFolder->Release();
-                        }
+                        OutputOleSpyWideValue(TRUE, L"  Pidl for '", path, L"'");
+                    }
+                    else
+                    {
+                        const wchar_t* name = GetPidlDisplayName((LPCITEMIDLIST)pvRequest);
+                        if (name != NULL && name[0] != 0)
+                            OutputOleSpyWideValue(TRUE, L"  Pidl for '", name, L"'");
                     }
                 }
             }
@@ -992,43 +970,45 @@ BOOL CMallocSpy::DumpLeaks()
                      *((DWORD*)pvRequest) != 0 && // the first 4 bytes are 0 -> so this is certainly not a UNICODE string
                      IsTextUnicode((LPWSTR)pvRequest, (int)psbWalk->cbRequest - 2, &iUniFlags))
             {
-                sprintf(buff, "  Data is UNICODE string '%ls'", (LPWSTR)pvRequest);
-                _OutputDebugString(TRUE, buff);
+                OutputOleSpyWideValue(TRUE, L"  Data is UNICODE string '",
+                                      (LPWSTR)pvRequest, L"'");
             }
             else if (psbWalk->cbRequest > 8 && *((DWORD*)pvRequest) <= psbWalk->cbRequest - 4 && IsTextUnicode((LPWSTR)((BYTE*)pvRequest + 4), *((DWORD*)pvRequest), &iUniFlags2))
             {
-                sprintf(buff, "  Data is BSTR string '%ls'", (LPWSTR)((BYTE*)pvRequest + 4));
-                _OutputDebugString(TRUE, buff);
+                OutputOleSpyWideValue(TRUE, L"  Data is BSTR string '",
+                                      (LPWSTR)((BYTE*)pvRequest + 4), L"'");
             }
             else if (IsAsciiString((LPSTR)pvRequest, (int)psbWalk->cbRequest))
             {
-                sprintf(buff, "  Data is ASCII string '%s'", (LPSTR)pvRequest);
-                _OutputDebugString(TRUE, buff);
+                OutputOleSpyNarrowValue(TRUE, "  Data is ASCII string '",
+                                        (LPSTR)pvRequest, psbWalk->cbRequest, "'");
             }
         }
         __except (EXCEPTION_EXECUTE_HANDLER)
         {
-            _OutputDebugString(TRUE, "Exception during memory analyzing");
+            _OutputDebugString(TRUE, L"Exception during memory analyzing");
         }
 
         leakedBytes += psbWalk->cbRequest;
         leakedAllocs++;
         psbWalk = psbWalk->psbPrev;
         if (psbWalk != NULL)
-            _OutputDebugString(TRUE, "");
+            _OutputDebugString(TRUE, L"");
     }
     if (leakedAllocs != 0)
     {
-        _OutputDebugString(TRUE, "-------------------------------------------------");
-        sprintf(buff, "Memory Leaks Summary: %d allocations, %Iu bytes leaked", leakedAllocs, leakedBytes);
+        _OutputDebugString(TRUE, L"-------------------------------------------------");
+        _snprintf_s(buff, _countof(buff), _TRUNCATE,
+                    "Memory Leaks Summary: %d allocations, %Iu bytes leaked",
+                    leakedAllocs, leakedBytes);
         _OutputDebugString(TRUE, buff);
-        _OutputDebugString(TRUE, "Hint: to break on [n] allocation call OleSpySetBreak(n).");
+        _OutputDebugString(TRUE, L"Hint: to break on [n] allocation call OleSpySetBreak(n).");
     }
     else
     {
-        _OutputDebugString(TRUE, "All allocations were deallocated.");
+        _OutputDebugString(TRUE, L"All allocations were deallocated.");
     }
-    _OutputDebugString(TRUE, "~~~~~~~~~~~~~~~~~~ Report End ~~~~~~~~~~~~~~~~~~~");
+    _OutputDebugString(TRUE, L"~~~~~~~~~~~~~~~~~~ Report End ~~~~~~~~~~~~~~~~~~~");
     LeaveCS();
     return TRUE;
 }
@@ -1117,7 +1097,7 @@ void OleSpyDump()
 unsigned OleSpyStressTest(void *param)
 {
   CALL_STACK_MESSAGE1("OleSpyStressTest()");
-  SetThreadNameInVCAndTrace("OleSpyStressTest");
+  SetThreadNameInVCAndTrace(L"OleSpyStressTest");
   TRACE_I("Begin");
 
   IMalloc *alloc;

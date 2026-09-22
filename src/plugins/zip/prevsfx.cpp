@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <vector>
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h>
@@ -41,7 +42,7 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     {
         RECT r;
         PAINTSTRUCT ps;
-        CPathBuffer txt; // Heap-allocated for long path support
+        std::vector<wchar_t> txt(4096);
         DWORD c;
         UINT format = DT_SINGLELINE | DT_BOTTOM | DT_NOPREFIX;
 
@@ -64,8 +65,8 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         HFONT hOldFont = (HFONT)SelectObject(ps.hdc, hFont);
         SetTextColor(ps.hdc, c);
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
-        int len = GetWindowText(hWnd, txt, txt.Size());
-        DrawText(ps.hdc, txt, len, &r, format);
+        int len = GetWindowTextW(hWnd, txt.data(), (int)txt.size());
+        DrawTextW(ps.hdc, txt.data(), len, &r, format);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
         DeleteObject(hFont);
@@ -79,9 +80,9 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
     case WM_LBUTTONDOWN:
     {
-        CPathBuffer link; // Heap-allocated for long path support
-        GetWindowText(hWnd, link, link.Size());
-        ShellExecute(hWnd, "open", link, NULL, NULL, SW_SHOWNORMAL);
+        wchar_t link[2048];
+        GetWindowTextW(hWnd, link, _countof(link));
+        ShellExecuteW(hWnd, L"open", link, NULL, NULL, SW_SHOWNORMAL);
         break;
     }
 
@@ -91,7 +92,7 @@ LRESULT CALLBACK LinkControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         return TRUE;
     }
     }
-    return CallWindowProc(OrigLinkControlProc, hWnd, uMsg, wParam, lParam);
+    return CallWindowProcW(OrigLinkControlProc, hWnd, uMsg, wParam, lParam);
 }
 
 INT_PTR WINAPI SfxPreviewDlgProc(HWND dlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -118,25 +119,27 @@ INT_PTR WINAPI SfxPreviewDlgProc(HWND dlg, UINT uMsg, WPARAM wParam, LPARAM lPar
             SendMessage(dlg, WM_SETICON, ICON_BIG, (LPARAM)data->SmallIcon);
         if (data->LargeIcon)
             SendMessage(GetDlgItem(dlg, IDC_ANIMATION), STM_SETICON, (WPARAM)data->LargeIcon, 0);
-        SetWindowText(dlg, data->Settings->Title);
-        CPathBuffer path; // Heap-allocated for long path support
-        GetCurrentDirectory(path.Size(), path);
-        SetDlgItemText(dlg, IDC_PATH, path);
-        SetDlgItemText(dlg, IDOK, data->Settings->ExtractBtnText);
-        SetDlgItemText(dlg, IDC_ABOUT, data->AboutButton1);
-        SetDlgItemText(dlg, IDC_VENDOR, data->Settings->Vendor);
-        SetDlgItemText(dlg, IDC_WEBLINK, data->Settings->WWW);
+        SetWindowTextW(dlg, ZipTextToWide(data->Settings->Title).c_str());
+        DWORD needed = GetCurrentDirectoryW(0, NULL);
+        std::vector<wchar_t> path(needed ? (size_t)needed : 1);
+        if (needed)
+            GetCurrentDirectoryW(needed, path.data());
+        SetDlgItemTextW(dlg, IDC_PATH, path.data());
+        SetDlgItemTextW(dlg, IDOK, ZipTextToWide(data->Settings->ExtractBtnText).c_str());
+        SetDlgItemTextW(dlg, IDC_ABOUT, data->AboutButton1);
+        SetDlgItemTextW(dlg, IDC_VENDOR, ZipTextToWide(data->Settings->Vendor).c_str());
+        SetDlgItemTextW(dlg, IDC_WEBLINK, ZipTextToWide(data->Settings->WWW).c_str());
         ShowWindow(GetDlgItem(dlg, IDC_FILE), SW_HIDE);
         ShowWindow(GetDlgItem(dlg, IDC_PROGRESS), SW_HIDE);
         ShowWindow(GetDlgItem(dlg, IDC_FILENAME), SW_HIDE);
-        SetDlgItemText(dlg, IDC_TEXT, data->Settings->Text);
+        SetDlgItemTextW(dlg, IDC_TEXT, ZipTextToWide(data->Settings->Text).c_str());
         LONG style = GetWindowLong(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE);
         if (style)
         {
             style = style | SS_NOTIFY;
             SetWindowLong(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE, style);
         }
-        SetDlgItemText(dlg, IDC_ABOUTTEXT, data->About);
+        SetDlgItemTextW(dlg, IDC_ABOUTTEXT, ZipTextToWide(data->About).c_str());
         SalamanderGeneral->MultiMonCenterWindow(dlg, NULL, FALSE); // center it relative to the desktop
         SetFocus(GetDlgItem(dlg, IDOK));
 
@@ -177,13 +180,13 @@ INT_PTR WINAPI SfxPreviewDlgProc(HWND dlg, UINT uMsg, WPARAM wParam, LPARAM lPar
                 if (aboutShowed)
                 {
                     SetWindowPos(dlg, 0, 0, 0, dlgWinWidth, dlgWinHeigth, SWP_NOMOVE | SWP_NOZORDER);
-                    SetDlgItemText(dlg, IDC_ABOUT, data->AboutButton1);
+                    SetDlgItemTextW(dlg, IDC_ABOUT, data->AboutButton1);
                     aboutShowed = false;
                 }
                 else
                 {
                     SetWindowPos(dlg, 0, 0, 0, dlgWinWidth, dlgWinAboutHeigth, SWP_NOMOVE | SWP_NOZORDER);
-                    SetDlgItemText(dlg, IDC_ABOUT, data->AboutButton2);
+                    SetDlgItemTextW(dlg, IDC_ABOUT, data->AboutButton2);
                     aboutShowed = true;
                 }
                 processingCommand = false;

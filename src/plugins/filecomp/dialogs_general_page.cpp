@@ -6,6 +6,22 @@
 
 DWORD LastCfgPage;
 
+// CPropertyDialog aliases this pointer until Execute() consumes it, so retain a
+// dedicated dynamically owned title rather than borrowing LangStr's cyclic buffer.
+static LPCWSTR HoldPropertyDialogTitle(int resID) noexcept
+{
+    static thread_local std::wstring title;
+    try
+    {
+        title = LangStr(resID);
+        return title.c_str();
+    }
+    catch (...)
+    {
+        return L"";
+    }
+}
+
 // ****************************************************************************
 //
 // CPropPageGeneral
@@ -36,14 +52,14 @@ void CPropPageGeneral::Validate(CTransferInfo& ti)
     ti.EditLine(IDE_CONTEXT, i);
     if (i < 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_POSITIVEVALUE), LoadStr(IDS_ERROR), MB_ICONERROR);
+        SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_POSITIVEVALUE).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
         ti.ErrorOn(IDE_CONTEXT);
         return;
     }
     ti.EditLine(IDE_TABSIZE, i);
     if (i <= 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_POSITIVEVALUE), LoadStr(IDS_ERROR), MB_ICONERROR);
+        SG->SalMessageBox(HWindow, SPLLoadStrOwned(SG, HLanguage, IDS_POSITIVEVALUE).c_str(), SPLLoadStrOwned(SG, HLanguage, IDS_ERROR).c_str(), MB_ICONERROR);
         ti.ErrorOn(IDE_TABSIZE);
         return;
     }
@@ -99,10 +115,23 @@ void CPropPageGeneral::LoadControls(BOOL initCombo)
     HDC hDC = GetDC(HWindow);
 
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
-    sprintf(logFont.lfFaceName, LoadStr(IDS_FONTDESCRIPTION),
-            MulDiv(-LogFont.lfHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
-            LogFont.lfFaceName);
-    SetWindowText(hEdit, logFont.lfFaceName);
+    // logFont.lfFaceName is LOGFONT's own WCHAR[32] under _UNICODE - this call only ever wants a
+    // narrow scratch buffer for the composed description text, so use a dedicated one rather than
+    // borrowing the (possibly wide) struct field.
+    // NOTE (pre-existing, out of scope for this pass): IDS_FONTDESCRIPTION's own %s still receives
+    // LogFont.lfFaceName directly - under _UNICODE that argument is WCHAR[32], not narrow, so
+    // sprintf's %s would read it as bytes rather than text. sprintf's varargs are unchecked by the
+    // compiler, so this compiles either way; matches the same class of latent bug flagged (not
+    // fixed) at pefile.cpp's GetExceptionMessage+fprintf earlier this codebase.
+    // BUG FIX, not just a widening. lfFaceName is WCHAR[32] under UNICODE, and the
+    // comment above already said so: sprintf's %s read it as BYTES, printing one character and
+    // then stopping at the first zero high byte. varargs are unchecked, so it compiled and
+    // shipped. Wide format, wide printf, wide field - all three agree now.
+    wchar_t faceNameBuf[LF_FACESIZE * 4];
+    _snwprintf_s(faceNameBuf, _countof(faceNameBuf), _TRUNCATE, LangStr(IDS_FONTDESCRIPTION).c_str(),
+                 MulDiv(-LogFont.lfHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+                 LogFont.lfFaceName);
+    SetWindowTextW(hEdit, faceNameBuf);
 
     // initialize the combo boxes for character selection
     HWND whiteSpace = GetDlgItem(HWindow, IDC_WHITESPACE);
@@ -111,12 +140,13 @@ void CPropPageGeneral::LoadControls(BOOL initCombo)
     {
         SendMessage(whiteSpace, WM_SETREDRAW, FALSE, 0);
         SendMessage(whiteSpace, CB_RESETCONTENT, 0, 0);
-        char buf[20];
+        wchar_t buf[20];
         int i;
         for (i = 1; i < 256; i++)
         {
-            sprintf(buf, "%-3d - %c", i, (char)i);
-            SendMessage(whiteSpace, CB_ADDSTRING, 0, (LPARAM)buf);
+            _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%-3d - %lc", i,
+                         TCharSpecific<char>::Display[i]);
+            SendMessageW(whiteSpace, CB_ADDSTRING, 0, (LPARAM)buf);
         }
         SendMessage(whiteSpace, WM_SETREDRAW, TRUE, 0);
     }
@@ -279,7 +309,7 @@ int CALLBACK CenterCallback(HWND HWindow, UINT uMsg, LPARAM lParam)
 
 CConfigurationDialog::CConfigurationDialog(HWND parent, CConfiguration* configuration,
                                            SALCOLOR* colors, CCompareOptions* options, DWORD* changeFlag)
-    : CPropertyDialog(parent, HLanguage, LoadStr(IDS_CONFIGURATIONTITLE),
+    : CPropertyDialog(parent, HLanguage, HoldPropertyDialogTitle(IDS_CONFIGURATIONTITLE),
                       LastCfgPage, PSH_HASHELP | PSH_NOAPPLYNOW | PSH_USECALLBACK, NULL, &LastCfgPage,
                       CenterCallback),
       Page1(configuration, changeFlag),

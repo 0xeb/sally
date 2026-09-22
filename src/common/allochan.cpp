@@ -73,46 +73,46 @@ private:
     int OldNewMode;
 } __AllocHandlerInit;
 
-TCHAR __AllocHandlerMessage[500] = _T("Insufficient memory to allocate %Iu bytes. Try to release some memory (e.g. ")
-                                   _T("close some running application) and click Retry. If it does not help, you can ")
-                                   _T("click Ignore to pass memory allocation error to this application or click Abort ")
-                                   _T("to terminate this application.");
-TCHAR __AllocHandlerTitle[200] = _T("Error");
-TCHAR __AllocHandlerWarningIgnore[500] = _T("Do you really want to pass memory allocation error to this application?\n\n")
-                                         _T("WARNING: Application may crash and then all unsaved data will be lost!\n")
-                                         _T("HINT: We recommend to risk this action only if the application is trying to ")
-                                         _T("allocate extra large block of memory (i.e. more than 500 MB).");
-TCHAR __AllocHandlerWarningAbort[200] = _T("Do you really want to terminate this application?\n\nWARNING: All unsaved data will be lost!");
+wchar_t __AllocHandlerMessage[500] = L"Insufficient memory to allocate %Iu bytes. Try to release some memory (e.g. "
+                                   L"close some running application) and click Retry. If it does not help, you can "
+                                   L"click Ignore to pass memory allocation error to this application or click Abort "
+                                   L"to terminate this application.";
+wchar_t __AllocHandlerTitle[200] = L"Error";
+wchar_t __AllocHandlerWarningIgnore[500] = L"Do you really want to pass memory allocation error to this application?\n\n"
+                                         L"WARNING: Application may crash and then all unsaved data will be lost!\n"
+                                         L"HINT: We recommend to risk this action only if the application is trying to "
+                                         L"allocate extra large block of memory (i.e. more than 500 MB).";
+wchar_t __AllocHandlerWarningAbort[200] = L"Do you really want to terminate this application?\n\nWARNING: All unsaved data will be lost!";
 
-void SetAllocHandlerMessage(const TCHAR* message, const TCHAR* title, const TCHAR* warningIgnore, const TCHAR* warningAbort)
+void SetAllocHandlerMessage(const wchar_t* message, const wchar_t* title, const wchar_t* warningIgnore, const wchar_t* warningAbort)
 {
     if (message != NULL)
-        lstrcpyn(__AllocHandlerMessage, message, 500);
+        lstrcpynW(__AllocHandlerMessage, message, 500);
     if (title != NULL)
-        lstrcpyn(__AllocHandlerTitle, title, 200);
+        lstrcpynW(__AllocHandlerTitle, title, 200);
     if (warningIgnore != NULL)
-        lstrcpyn(__AllocHandlerWarningIgnore, warningIgnore, 500);
+        lstrcpynW(__AllocHandlerWarningIgnore, warningIgnore, 500);
     if (warningAbort != NULL)
-        lstrcpyn(__AllocHandlerWarningAbort, warningAbort, 200);
+        lstrcpynW(__AllocHandlerWarningAbort, warningAbort, 200);
 }
 
 int C__AllocHandlerInit::AltapNewHandler(size_t size)
 {
-    TRACE_ET(_T("AltapNewHandler: not enough memory to allocate ") << size << _T(" bytes!"));
+    TRACE_ET(L"AltapNewHandler: not enough memory to allocate " << size << L" bytes!");
     int ret = 1;
     int ti = GetTickCount();
     EnterCriticalSection(&__AllocHandlerInit.CriticalSection);
     if (GetTickCount() - ti <= 500) // show message-box only if we haven't just forced the user to solve the same problem in another thread
     {
-        TCHAR buf[550];
-        _sntprintf_s(buf, _countof(buf) - 1, __AllocHandlerMessage, size);
+        wchar_t buf[550];
+        _snwprintf_s(buf, _countof(buf) - 1, __AllocHandlerMessage, size);
         int res;
         do
         {
             res = MessageBox(NULL, buf, __AllocHandlerTitle, MB_ICONERROR | MB_TASKMODAL | MB_ABORTRETRYIGNORE | MB_DEFBUTTON2);
             if (res == 0)
             {
-                TRACE_ET(_T("AltapNewHandler: unable to open message-box!"));
+                TRACE_ET(L"AltapNewHandler: unable to open message-box!");
                 Sleep(1000); // let the machine rest and try to show msgbox again
             }
         } while (res == 0);
@@ -123,7 +123,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                 res = MessageBox(NULL, __AllocHandlerWarningAbort, __AllocHandlerTitle, MB_ICONQUESTION | MB_TASKMODAL | MB_YESNO | MB_DEFBUTTON2);
                 if (res == 0)
                 {
-                    TRACE_ET(_T("AltapNewHandler: unable to open message-box with abort-warning!"));
+                    TRACE_ET(L"AltapNewHandler: unable to open message-box with abort-warning!");
                     Sleep(1000); // let the machine rest and try to show msgbox again
                 }
             } while (res == 0);
@@ -139,7 +139,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                     res = MessageBox(NULL, __AllocHandlerWarningIgnore, __AllocHandlerTitle, MB_ICONQUESTION | MB_TASKMODAL | MB_YESNO | MB_DEFBUTTON2);
                     if (res == 0)
                     {
-                        TRACE_ET(_T("AltapNewHandler: unable to open message-box with ignore-warning!"));
+                        TRACE_ET(L"AltapNewHandler: unable to open message-box with ignore-warning!");
                         Sleep(1000); // let the machine rest and try to show msgbox again
                     }
                 } while (res == 0);

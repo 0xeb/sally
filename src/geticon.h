@@ -34,9 +34,15 @@
 //      can be called by outside people with custom large/small icon
 //      sizes that are not what the shell uses internaly.
 //
-UINT WINAPI ExtractIcons(LPCTSTR szFileName, int nIconIndex, int cxIcon, int cyIcon,
-                         HICON* phicon, UINT* piconid, UINT nIcons, UINT flags);
+// Native-wide icon extraction. The file-local ANSI sibling exists only for an
+// IExtractIconA-only legacy shell extension.
+UINT WINAPI ExtractIconsW(LPCWSTR szFileName, int nIconIndex, int cxIcon, int cyIcon,
+                          HICON* phicon, UINT* piconid, UINT nIcons, UINT flags);
 
-// see comment spl_gen.h/GetFileIcon
-BOOL GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* hIcon, CIconSizeEnum iconSize,
+// Native typed entry points. Text paths and opaque shell item lists never share
+// a pointer slot in the live code or SDK.
+BOOL GetFileIcon(const wchar_t* path, HICON* hIcon, CIconSizeEnum iconSize,
                  BOOL fallbackToDefIcon, BOOL defIconIsDir);
+BOOL GetFileIconFromPIDL(LPCITEMIDLIST pidl, HICON* hIcon,
+                         CIconSizeEnum iconSize, BOOL fallbackToDefIcon,
+                         BOOL defIconIsDir);

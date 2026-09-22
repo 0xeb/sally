@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -28,32 +28,36 @@ void CFilesWindow::EndQuickSearch()
 {
     CALL_STACK_MESSAGE_NONE
     QuickSearchMode = FALSE;
-    QuickSearch[0] = 0;
-    QuickSearchMask[0] = 0;
+    QuickSearch.clear();
+    QuickSearchMask.clear();
+    QuickSearchAssembler.Reset();
     SearchIndex = INT_MAX;
     HideCaret(ListBox->HWindow);
     DestroyCaret();
 }
 
 // Finds the next/previous item. If skip = TRUE, it skips the current item.
-BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, char newChar, int& index)
+BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, wchar_t newChar, int& index)
 {
-    CALL_STACK_MESSAGE6("CFilesWindow::QSFindNext(%d, %d, %d, %d, %u)", currentIndex, next, skip, wholeString, newChar);
-    int len = (int)strlen(QuickSearchMask);
-    if (newChar != 0)
+    return QSFindNext(currentIndex, next, skip, wholeString,
+                      newChar != 0 ? std::wstring(1, newChar) : std::wstring(), index);
+}
+
+BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString,
+                              const std::wstring& newText, int& index)
+{
+    CALL_STACK_MESSAGE5("CFilesWindow::QSFindNext(%d, %d, %d, %d)", currentIndex, next, skip, wholeString);
+    int len = (int)QuickSearchMask.size();
+    if (!newText.empty())
     {
-        if (len >= QuickSearchMask.Size() - 1)
-            return FALSE;
-        QuickSearchMask[len] = newChar;
-        len++;
-        QuickSearchMask[len] = 0;
+        QuickSearchMask.append(newText);
+        len = (int)QuickSearchMask.size();
     }
 
     int delta = skip ? 1 : 0;
 
     int offset = 0;
-    CPathBuffer mask; // Heap-allocated for long path support
-    PrepareQSMask(mask, QuickSearchMask);
+    const std::wstring mask = PrepareQSMask(QuickSearchMask.c_str());
 
     int count = Dirs->Count + Files->Count;
     int dirCount = Dirs->Count;
@@ -62,23 +66,23 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
         int i;
         for (i = currentIndex + delta; i < count; i++)
         {
-            char* name = i < dirCount ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
-            BOOL hasExtension = i < dirCount ? strchr(name, '.') != NULL : // The extension for a directory might not be set.
+            wchar_t* name = i < dirCount ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
+            BOOL hasExtension = i < dirCount ? wcschr(name, L'.') != NULL : // The extension for a directory might not be set.
                                     *Files->At(i - dirCount).Ext != 0;
-            if (i == 0 && i < dirCount && strcmp(name, "..") == 0)
+            if (i == 0 && i < dirCount && wcscmp(name, L"..") == 0)
             {
                 if (len == 0)
                 {
-                    QuickSearch[0] = 0;
+                    QuickSearch.clear();
                     index = i;
                     return TRUE;
                 }
             }
             else
             {
-                if (AgreeQSMask(name, hasExtension, mask, wholeString, offset))
+                if (AgreeQSMask(name, hasExtension, mask.c_str(), wholeString, offset))
                 {
-                    lstrcpyn(QuickSearch, name, offset + 1);
+                    QuickSearch.assign(name, offset);
                     index = i;
                     return TRUE;
                 }
@@ -90,23 +94,23 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
         int i;
         for (i = currentIndex - delta; i >= 0; i--)
         {
-            char* name = i < dirCount ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
-            BOOL hasExtension = i < dirCount ? strchr(name, '.') != NULL : // The extension for a directory might not be set.
+            wchar_t* name = i < dirCount ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
+            BOOL hasExtension = i < dirCount ? wcschr(name, L'.') != NULL : // The extension for a directory might not be set.
                                     *Files->At(i - dirCount).Ext != 0;
-            if (i == 0 && i < dirCount && strcmp(name, "..") == 0)
+            if (i == 0 && i < dirCount && wcscmp(name, L"..") == 0)
             {
                 if (len == 0)
                 {
-                    QuickSearch[0] = 0;
+                    QuickSearch.clear();
                     index = i;
                     return TRUE;
                 }
             }
             else
             {
-                if (AgreeQSMask(name, hasExtension, mask, wholeString, offset))
+                if (AgreeQSMask(name, hasExtension, mask.c_str(), wholeString, offset))
                 {
-                    lstrcpyn(QuickSearch, name, offset + 1);
+                    QuickSearch.assign(name, offset);
                     index = i;
                     return TRUE;
                 }
@@ -114,10 +118,10 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
         }
     }
 
-    if (newChar != 0)
+    if (!newText.empty())
     {
-        len--;
-        QuickSearchMask[len] = 0;
+        // Roll back the whole character, both halves of a surrogate pair included.
+        QuickSearchMask.erase(QuickSearchMask.size() - newText.size());
     }
     return FALSE;
 }
@@ -136,7 +140,7 @@ BOOL CFilesWindow::SelectFindNext(int currentIndex, BOOL next, BOOL skip, int& i
         int i;
         for (i = currentIndex + delta; i < count; i++)
         {
-            char* name = (i < dirCount) ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
+            wchar_t* name = (i < dirCount) ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
             BOOL sel = GetSel(i);
             if (sel)
             {
@@ -150,7 +154,7 @@ BOOL CFilesWindow::SelectFindNext(int currentIndex, BOOL next, BOOL skip, int& i
         int i;
         for (i = currentIndex - delta; i >= 0; i--)
         {
-            char* name = (i < dirCount) ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
+            wchar_t* name = (i < dirCount) ? Dirs->At(i).Name : Files->At(i - dirCount).Name;
             BOOL sel = GetSel(i);
             if (sel)
             {
@@ -199,7 +203,7 @@ void CFilesWindow::CtrlPageUpOrBackspace()
     CALL_STACK_MESSAGE1("CFilesWindow::CtrlPageUpOrBackspace()");
     if (Dirs->Count + Files->Count == 0)
         RefreshDirectory();
-    else if (Dirs->Count > 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+    else if (Dirs->Count > 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
     {
         Execute(0); // ".."
     }
@@ -214,16 +218,13 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     BOOL isDir = index < Dirs->Count;
     CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-    CPathBuffer shortName; // Heap-allocated for long path support
-    strcpy(shortName, file->Name);
+    // Captured here, before the reparse-point/shortcut resolution below -
+    // file becomes unsafe to dereference once link->Resolve() may pump messages and the
+    // panel refreshes.
+    std::wstring shortNameW = file->Name;
 
-    CPathBuffer fullName;  // Heap-allocated for long path support
-    strcpy(fullName, GetPath());
-    if (!SalPathAppend(fullName, file->Name, fullName.Size()))
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_TOOLONGNAME));
-        return;
-    }
+    std::wstring fullName = GetPathW();
+    SalPathAppendW(fullName, file->Name);
 
     //!!! ATTENTION, Resolve may display a dialog and messages will start to be dispatched
     // the panel can be refreshed, so from this moment on it is not possible to access
@@ -233,15 +234,14 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     BOOL wrongPath = FALSE;
     BOOL mountPoint = FALSE;
     int repPointType;
-    CPathBuffer junctionOrSymlinkTgt;  // Heap-allocated for long path support
-    strcpy(junctionOrSymlinkTgt, fullName);
-    if (GetReparsePointDestination(junctionOrSymlinkTgt, junctionOrSymlinkTgt, junctionOrSymlinkTgt.Size(), &repPointType, FALSE))
+    std::wstring junctionOrSymlinkTgt;
+    if (GetReparsePointDestinationOwnedW(fullName.c_str(), &junctionOrSymlinkTgt, &repPointType, FALSE))
     {
         // MOUNT POINT: I can't get this path in the panel (e.g., \??\Volume{98c0ba30-71ff-11e1-9099-005056c00008}\)
         if (repPointType == 1 /* MOUNT POINT */)
             mountPoint = TRUE;
         else
-            panel->ChangeDir(junctionOrSymlinkTgt, -1, NULL, 3, NULL, TRUE, TRUE /* show full path in errors */);
+            panel->ChangeDir(junctionOrSymlinkTgt.c_str(), -1, NULL, 3, NULL, TRUE, TRUE /* show full path in errors */);
     }
     else
     {
@@ -249,17 +249,14 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
             wrongPath = TRUE;
         else
         {
-            IShellLink* link;
-            if (CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&link) == S_OK)
+            IShellLinkW* link;
+            if (CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID*)&link) == S_OK)
             {
                 IPersistFile* fileInt;
                 if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                 {
                     HRESULT res = 2;
-                    CWidePathBuffer oleName;
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, oleName.Size());
-                    oleName[oleName.Size() - 1] = 0;
-                    if (fileInt->Load(oleName, STGM_READ) == S_OK)
+                    if (fileInt->Load(fullName.c_str(), STGM_READ) == S_OK)
                     {
                         res = link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE);
                         // if it finds the object, it returns NOERROR (0)
@@ -267,55 +264,50 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                         // if loading the link fails, it returns other errors (0x80004005)
                         if (res == NOERROR)
                         {
-                            WIN32_FIND_DATA dummyData;
-                            if (link->GetPath(fullName, fullName.Size(), &dummyData, SLGP_UNCPRIORITY) == NOERROR &&
-                                fullName[0] != 0 && CheckPath(FALSE, fullName) == ERROR_SUCCESS)
+                            WIN32_FIND_DATAW dummyData;
+                            if (GetShellLinkPathOwned(link, SLGP_UNCPRIORITY, fullName, &dummyData) &&
+                                !fullName.empty() && CheckPath(FALSE, fullName.c_str()) == ERROR_SUCCESS)
                             {
-                                panel->ChangeDir(fullName);
+                                panel->ChangeDir(fullName.c_str());
                             }
                             else
                             {                           // we can try to open direct links to servers in the Network plugin (Nethood)
                                 BOOL linkIsNet = FALSE; // TRUE -> shortcut to network -> ChangePathToPluginFS
-                                CPathBuffer netFSName;
-                                if (Plugins.GetFirstNethoodPluginFSName(netFSName))
+                                std::wstring netFSName;
+                                if (Plugins.GetFirstNethoodPluginFSName(&netFSName))
                                 {
-                                    if (link->GetPath(fullName, fullName.Size(), NULL, SLGP_RAWPATH) != NOERROR)
+                                    if (!GetShellLinkPathOwned(link, SLGP_RAWPATH, fullName))
                                     { // the path is not stored in the link as text, but only as an ID-list
-                                        fullName[0] = 0;
+                                        fullName.clear();
                                         ITEMIDLIST* pidl;
                                         if (link->GetIDList(&pidl) == S_OK && pidl != NULL)
                                         { // we get the ID-list and ask for the name of the last ID in the list, we expect "\\\\server"
                                             IMalloc* alloc;
                                             if (SUCCEEDED(CoGetMalloc(1, &alloc)))
                                             {
-                                                if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, fullName.Size(), alloc))
-                                                    fullName[0] = 0;
+                                                if (!GetSHObjectNameOwned(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName))
+                                                    fullName.clear();
                                                 if (alloc->DidAlloc(pidl) == 1)
                                                     alloc->Free(pidl);
                                                 alloc->Release();
                                             }
                                         }
                                     }
-                                    if (fullName[0] == '\\' && fullName[1] == '\\' && fullName[2] != '\\')
+                                    if (fullName.size() >= 2 && fullName[0] == '\\' && fullName[1] == '\\' &&
+                                        (fullName.size() == 2 || fullName[2] != '\\'))
                                     { // we'll check if it's a link to a server (contains the path "\\\\server")
-                                        char* backslash = fullName + 2;
-                                        while (*backslash != 0 && *backslash != '\\')
-                                            backslash++;
-                                        if (*backslash == '\\')
-                                            backslash++;
-                                        if (*backslash == 0 && // we only take paths "\\\\", "\\\\server", "\\\\server\\"
-                                            strlen(netFSName) + 1 + strlen(fullName) < fullName.Size())
+                                        const size_t backslash = fullName.find(L'\\', 2);
+                                        if (backslash == std::wstring::npos || backslash + 1 == fullName.size()) // only "\\\\", "\\\\server", "\\\\server\\"
                                         {
                                             linkIsNet = TRUE; // o.k. we'll try change-path-to-FS
-                                            memmove(fullName + strlen(netFSName) + 1, fullName, strlen(fullName) + 1);
-                                            memcpy(fullName, netFSName, strlen(netFSName));
-                                            fullName[strlen(netFSName)] = ':';
+                                            netFSName += L':';
+                                            netFSName += fullName;
                                         }
                                     }
                                 }
 
                                 if (linkIsNet)
-                                    panel->ChangeDir(fullName);
+                                    panel->ChangeDir(netFSName.c_str());
                                 else
                                     wrongPath = TRUE; // the path cannot be obtained or is not available
                             }
@@ -331,8 +323,10 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
     }
     if (mountPoint || invalid)
     {
-        // TODO: Use wide format string when available
-        std::wstring pathW = AnsiToWide(mountPoint ? junctionOrSymlinkTgt : shortName);
+        // junctionOrSymlinkTgt is now populated via GetReparsePointDestinationW
+        // and is already wide. shortNameW is the true wide filename captured above, closing
+        // this function's own TODO for the invalid-shortcut message.
+        std::wstring pathW = mountPoint ? junctionOrSymlinkTgt : shortNameW;
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
             (pathW + L" - " + LoadStrW(mountPoint ? IDS_DIRLINK_MOUNT_POINT : IDS_SHORTCUT_INVALID)).c_str());
     }
@@ -561,7 +555,7 @@ void CFilesWindow::SetSel(BOOL select, int index, BOOL repaintDirtyItems)
         int firstIndex = 0;
         if (Dirs->Count > 0)
         {
-            const char* name = Dirs->At(0).Name;
+            const wchar_t* name = Dirs->At(0).Name;
             if (*name == '.' && *(name + 1) == '.' && *(name + 2) == 0)
                 firstIndex = 1; // we skip ".."
         }
@@ -584,7 +578,7 @@ void CFilesWindow::SetSel(BOOL select, int index, BOOL repaintDirtyItems)
         {
             if (index == 0)
             {
-                const char* name = Dirs->At(0).Name;
+                const wchar_t* name = Dirs->At(0).Name;
                 if (*name == '.' && *(name + 1) == '.' && *(name + 2) == 0)
                     return; // we skip ".."
             }
@@ -685,7 +679,7 @@ BOOL CFilesWindow::SelectionContainsDirectory()
     {
         int index = GetCaretIndex();
         if (index < Dirs->Count &&
-            (index > 0 || strcmp(Dirs->At(0).Name, "..") != 0))
+            (index > 0 || wcscmp(Dirs->At(0).Name, L"..") != 0))
         {
             return TRUE;
         }
@@ -693,7 +687,7 @@ BOOL CFilesWindow::SelectionContainsDirectory()
     else
     {
         int start = 0;
-        if (Dirs->Count > 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+        if (Dirs->Count > 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
             start = 1;
         int i;
         for (i = start; i < Dirs->Count; i++)
@@ -730,9 +724,8 @@ BOOL CFilesWindow::SelectionContainsFile()
     return FALSE;
 }
 
-void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
+std::wstring CFilesWindow::SelectFocusedItemAndGetName()
 {
-    name[0] = 0;
     if (GetSelCount() == 0)
     {
         int deselectIndex = GetCaretIndex();
@@ -741,38 +734,32 @@ void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
             BOOL isDir = deselectIndex < Dirs->Count;
             CFileData* f = isDir ? &Dirs->At(deselectIndex) : &Files->At(deselectIndex - Dirs->Count);
 
-            int len = (int)strlen(f->Name);
-            if (len >= nameSize)
-            {
-                TRACE_E("len > nameMax");
-                len = nameSize - 1;
-            }
-
-            memcpy(name, f->Name, len);
-            name[len] = 0;
+            std::wstring name = f->Name;
 
             SetSel(TRUE, deselectIndex);
             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
             RepaintListBox(DRAWFLAG_DIRTY_ONLY | DRAWFLAG_SKIP_VISTEST);
+            return name;
         }
     }
+    return std::wstring();
 }
 
-void CFilesWindow::UnselectItemWithName(const char* name)
+void CFilesWindow::UnselectItemWithName(const std::wstring& name)
 {
-    if (name[0] != 0)
+    if (!name.empty())
     {
         int count = Dirs->Count + Files->Count;
-        int l = (int)strlen(name);
+        int l = (int)name.length();
         int foundIndex = -1;
         int i;
         for (i = 0; i < count; i++)
         {
             CFileData* f = (i < Dirs->Count) ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
             if (f->NameLen == (unsigned)l &&
-                RegSetStrICmpEx(f->Name, f->NameLen, name, l, NULL) == 0)
+                RegSetStrICmpExW(f->Name, f->NameLen, name.c_str(), l, NULL) == 0)
             {
-                if (RegSetStrCmpEx(f->Name, f->NameLen, name, l, NULL) == 0)
+                if (RegSetStrCmpExW(f->Name, f->NameLen, name.c_str(), l, NULL) == 0)
                 {
                     SetSel(FALSE, i);
                     break;
@@ -812,7 +799,7 @@ BOOL CFilesWindow::SetSelRange(BOOL select, int firstIndex, int lastIndex)
     }
     if (firstIndex == 0 && Dirs->Count > 0)
     {
-        const char* name = Dirs->At(0).Name;
+        const wchar_t* name = Dirs->At(0).Name;
         if (*name == '.' && *(name + 1) == '.' && *(name + 2) == 0)
             firstIndex = 1; // I skip ".."
     }
@@ -888,9 +875,14 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
 
     // if we are in QuickSearchEnterAlt mode, we must set the focus to
     // the command line and buffer the letter there
+    // Same widening as the quick-search gate below: wParam is a UTF-16 code unit, so a "< 256"
+    // test dropped every non-Latin-1 character instead of forwarding it to the command line.
+    // Surrogate halves are forwarded in order and reassembled by the edit control.
     if (!controlPressed && !altPressed &&
         !QuickSearchMode &&
-        wParam > 32 && wParam < 256 &&
+        wParam != L' ' &&
+        (sally::input::SurrogateAssembler::IsUsableInput((wchar_t)wParam) ||
+         IS_HIGH_SURROGATE((wchar_t)wParam) || IS_LOW_SURROGATE((wchar_t)wParam)) &&
         Configuration.QuickSearchEnterAlt)
     {
         if (MainWindow->EditWindow->IsEnabled())
@@ -904,7 +896,17 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
         return FALSE;
     }
 
-    if (wParam > 31 && wParam < 256 &&  // only normal characters
+    // The panel is a wide window (CFILESBOX_CLASSNAME is registered with RegisterClassExW), so
+    // wParam is a UTF-16 code unit, not a code-page byte. The old "< 256" gate was correct only
+    // while this was an ANSI window; keeping it silently discarded every keystroke a Cyrillic,
+    // Greek or CJK user could type. SurrogateAssembler restores that and also joins the two
+    // WM_CHAR messages a non-BMP character arrives as.
+    std::wstring typedChar;
+    const sally::input::FeedResult feed = QuickSearchAssembler.Feed((wchar_t)wParam);
+    if (feed == sally::input::FeedResult::Character)
+        typedChar = QuickSearchAssembler.TakeCharacter();
+
+    if (!typedChar.empty() &&
         Dirs->Count + Files->Count > 0) // at least 1 item
     {
         int index = FocusedIndex;
@@ -926,8 +928,8 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
         //}
         //else
         //{
-        if (!QSFindNext(GetCaretIndex(), TRUE, FALSE, FALSE, (char)wParam, index))
-            QSFindNext(GetCaretIndex(), FALSE, TRUE, FALSE, (char)wParam, index);
+        if (!QSFindNext(GetCaretIndex(), TRUE, FALSE, FALSE, typedChar, index))
+            QSFindNext(GetCaretIndex(), FALSE, TRUE, FALSE, typedChar, index);
         //}
 
         if (!QuickSearchMode) // initialization of search
@@ -1023,12 +1025,17 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         BYTE ks[256];
         GetKeyboardState(ks);
         ks[VK_CONTROL] = 0;
-        WORD ch;
-        int ret = ToAscii((UINT)wParam, 0, ks, &ch, 0);
-        if (ret == 1)
+        // ToUnicode, not ToAscii: ListBox is a wide window, so LOBYTE of an ANSI translation
+        // arrived there as a UTF-16 code unit and searched for the wrong letter (CP1250 'r' with
+        // caron, 0xF8, became U+00F8 'o' with stroke). Two units may come back for a non-BMP
+        // character; OnChar's assembler rejoins them.
+        WCHAR ch[8];
+        int ret = ToUnicode((UINT)wParam, 0, ks, ch, (int)(sizeof(ch) / sizeof(ch[0])), 0);
+        if (ret >= 1)
         {
             SkipSysCharacter = TRUE;
-            SendMessage(ListBox->HWindow, WM_CHAR, LOBYTE(ch), 0);
+            for (int i = 0; i < ret; i++)
+                SendMessage(ListBox->HWindow, WM_CHAR, ch[i], 0);
             return TRUE;
         }
     }
@@ -1212,7 +1219,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         if (wParam >= 'A' && wParam <= 'Z')
         {
             SkipCharacter = TRUE;
-            if (MainWindow->HandleCtrlLetter((char)wParam))
+            if (MainWindow->HandleCtrlLetter((wchar_t)wParam))
                 return TRUE;
         }
     }
@@ -1241,7 +1248,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         if (shiftPressed && controlPressed && !altPressed)
         {
             SkipCharacter = TRUE;
-            MainWindow->GetActivePanel()->SetUnescapedHotPath((char)wParam == '0' ? 9 : (char)wParam - '1');
+            MainWindow->GetActivePanel()->SetUnescapedHotPath((wchar_t)wParam == '0' ? 9 : (wchar_t)wParam - '1');
             if (!Configuration.HotPathAutoConfig)
                 MainWindow->GetActivePanel()->DirectoryLine->FlashText();
             exit = TRUE;
@@ -1252,9 +1259,9 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         {
             SkipCharacter = TRUE;
             if (altPressed)
-                MainWindow->GetNonActivePanel()->GotoHotPath((char)wParam == '0' ? 9 : (char)wParam - '1');
+                MainWindow->GetNonActivePanel()->GotoHotPath((wchar_t)wParam == '0' ? 9 : (wchar_t)wParam - '1');
             else
-                MainWindow->GetActivePanel()->GotoHotPath((char)wParam == '0' ? 9 : (char)wParam - '1');
+                MainWindow->GetActivePanel()->GotoHotPath((wchar_t)wParam == '0' ? 9 : (wchar_t)wParam - '1');
             exit = TRUE;
         }
         if (exit)
@@ -1305,11 +1312,11 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         }
         if (networkNeighborhood)
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            if (Plugins.GetFirstNethoodPluginFSName(path))
+            std::wstring path;
+            if (Plugins.GetFirstNethoodPluginFSName(&path))
             {
                 TopIndexMem.Clear(); // long jump
-                ChangePathToPluginFS(path, "");
+                ChangePathToPluginFS(path.c_str(), L"");
             }
             else
             {
@@ -1320,21 +1327,30 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                     return TRUE;
                 }
 
-                if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_CHANGEDRIVE),
-                                       LoadStr(IDS_CHANGEDRIVETEXT), path, TRUE))
+                // wide: GetTargetDirectory's browse dialog (SHBrowseForFolder/
+                // SHGetPathFromIDList, unqualified - ANSI since core never defines UNICODE)
+                // best-fit-narrows the chosen server/share name before Sally ever sees it -
+                // same shape and fix as toolbar_drive_bar.cpp's CDriveBar::Execute
+                //. 'path' above is only the narrow plugin-FS-name buffer for the
+                // if-branch (GetFirstNethoodPluginFSName has no wide form; plugin FS names are
+                // short ASCII identifiers, not user-facing paths), untouched here.
+                std::wstring pathW;
+                if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_CHANGEDRIVE),
+                                        LoadStrW(IDS_CHANGEDRIVETEXT), pathW, TRUE))
                 {
                     TopIndexMem.Clear(); // long jump
                     UpdateWindow(MainWindow->HWindow);
-                    ChangePathToDisk(HWindow, path);
+                    ChangePathToDisk(HWindow, pathW.c_str());
                 }
             }
             return TRUE;
         }
         if (myDocuments)
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            if (GetMyDocumentsOrDesktopPath(path, path.Size()))
-                ChangePathToDisk(HWindow, path);
+            // real fix: see ChangePathToDrvType's identical note
+            std::wstring pathW;
+            if (GetMyDocumentsOrDesktopPathW(pathW))
+                ChangePathToDisk(HWindow, pathW.c_str());
             return TRUE;
         }
     }
@@ -1374,13 +1390,12 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
 
         case VK_BACK: // backspace - we delete a character in the quicksearch mask
         {
-            if (QuickSearchMask[0] != 0)
+            if (!QuickSearchMask.empty())
             {
-                int len = (int)strlen(QuickSearchMask) - 1; // we remove a character
-                QuickSearchMask[len] = 0;
+                QuickSearchMask.pop_back();
 
                 int index;
-                QSFindNext(GetCaretIndex(), FALSE, FALSE, FALSE, (char)0, index);
+                QSFindNext(GetCaretIndex(), FALSE, FALSE, FALSE, (wchar_t)0, index);
                 SetQuickSearchCaretPos();
             }
             return TRUE;
@@ -1388,19 +1403,18 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
 
         case VK_LEFT: // left arrow - we convert the mask to a string and remove a character
         {
-            if (QuickSearch[0] != 0)
+            if (!QuickSearch.empty())
             {
-                int len = (int)strlen(QuickSearch) - 1; // we remove a character
-                QuickSearch[len] = 0;
-                int len2 = (int)strlen(QuickSearchMask);
+                QuickSearch.pop_back();
+                int len2 = (int)QuickSearchMask.size();
                 if (len2 > 1 && !IsQSWildChar(QuickSearchMask[len2 - 1]) && !IsQSWildChar(QuickSearchMask[len2 - 2]))
                 {
-                    QuickSearchMask[len2 - 1] = 0;
+                    QuickSearchMask.pop_back();
                 }
                 else
                 {
                     // in this case, we discard the "wild" characters and switch to normal search, because
-                    strcpy(QuickSearchMask, QuickSearch);
+                    QuickSearchMask = QuickSearch;
                 }
                 SetQuickSearchCaretPos();
             }
@@ -1411,18 +1425,15 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         {
             if (FocusedIndex >= 0 && FocusedIndex < Dirs->Count + Files->Count)
             {
-                char* name = (FocusedIndex < Dirs->Count) ? Dirs->At(FocusedIndex).Name : Files->At(FocusedIndex - Dirs->Count).Name;
-                int len = (int)strlen(QuickSearch); // we add a character
+                wchar_t* name = (FocusedIndex < Dirs->Count) ? Dirs->At(FocusedIndex).Name : Files->At(FocusedIndex - Dirs->Count).Name;
+                int len = (int)QuickSearch.size(); // we add a character
                 if ((FocusedIndex > Dirs->Count || FocusedIndex != 0 ||
-                     strcmp(name, "..") != 0) &&
+                     wcscmp(name, L"..") != 0) &&
                     name[len] != 0)
                 {
                     // if there is still another one
-                    QuickSearch[len] = name[len];
-                    QuickSearch[len + 1] = 0;
-                    int len2 = (int)strlen(QuickSearchMask);
-                    QuickSearchMask[len2] = name[len];
-                    QuickSearchMask[len2 + 1] = 0;
+                    QuickSearch.push_back(name[len]);
+                    QuickSearchMask.push_back(name[len]);
                     SetQuickSearchCaretPos();
                 }
             }
@@ -1443,7 +1454,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
             BOOL found;
             do
             {
-                found = QSFindNext(lastIndex, FALSE, TRUE, FALSE, (char)0, index);
+                found = QSFindNext(lastIndex, FALSE, TRUE, FALSE, (wchar_t)0, index);
                 if (found)
                 {
                     lastIndex = index;
@@ -1470,7 +1481,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
             BOOL found;
             do
             {
-                found = QSFindNext(lastIndex, TRUE, TRUE, FALSE, (char)0, index);
+                found = QSFindNext(lastIndex, TRUE, TRUE, FALSE, (wchar_t)0, index);
                 if (found)
                 {
                     lastIndex = index;
@@ -1496,7 +1507,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                     SetSel(SelectItems, newIndex, TRUE);
                     PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
                 }
-                found = QSFindNext(newIndex, FALSE, TRUE, FALSE, (char)0, index);
+                found = QSFindNext(newIndex, FALSE, TRUE, FALSE, (wchar_t)0, index);
                 if (found)
                     newIndex = index;
                 if (newIndex < limit)
@@ -1518,7 +1529,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                     SetSel(SelectItems, newIndex, TRUE);
                     PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
                 }
-                found = QSFindNext(newIndex, TRUE, TRUE, FALSE, (char)0, index);
+                found = QSFindNext(newIndex, TRUE, TRUE, FALSE, (wchar_t)0, index);
                 if (found)
                     newIndex = index;
                 if (newIndex > limit)
@@ -1537,7 +1548,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                 do
                 {
                     SetSel(SelectItems, newIndex, TRUE);
-                    found = QSFindNext(newIndex, FALSE, TRUE, FALSE, (char)0, index);
+                    found = QSFindNext(newIndex, FALSE, TRUE, FALSE, (wchar_t)0, index);
                     if (found)
                         newIndex = index;
                 } while (found);
@@ -1551,7 +1562,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                 BOOL skip = FALSE;
                 do
                 {
-                    found = QSFindNext(index, TRUE, skip, FALSE, (char)0, index);
+                    found = QSFindNext(index, TRUE, skip, FALSE, (wchar_t)0, index);
                     skip = TRUE;
                     if (found && GetSel(index))
                         break;
@@ -1574,7 +1585,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                 do
                 {
                     SetSel(SelectItems, newIndex, TRUE);
-                    found = QSFindNext(newIndex, TRUE, TRUE, FALSE, (char)0, index);
+                    found = QSFindNext(newIndex, TRUE, TRUE, FALSE, (wchar_t)0, index);
                     if (found)
                         newIndex = index;
                 } while (found);
@@ -1588,7 +1599,7 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
                 BOOL skip = FALSE;
                 do
                 {
-                    found = QSFindNext(index, FALSE, skip, FALSE, (char)0, index);
+                    found = QSFindNext(index, FALSE, skip, FALSE, (wchar_t)0, index);
                     skip = TRUE;
                     if (found && GetSel(index))
                         break;
@@ -2164,10 +2175,14 @@ BOOL AreTheSameDirs(DWORD validFileData, CPluginDataInterfaceEncapsulation* plug
 {
     // For the data being compared in the condition, it is not necessary to check validity via 'validFileData',
     // because the data is "zeroed" if it is invalid.
-    if (strcmp(f1->Name, f2->Name) == 0 &&
+    // wide: AND a wide confirmation onto the narrow equality check - two different
+    // non-ASCII names outside the code page can share one '?'-mirror, and a false "same dir" here
+    // would carry the wrong row's icon/thumbnail cache onto the new listing (same idiom already
+    // used elsewhere in this file).
+    if (wcscmp(f1->Name, f2->Name) == 0 &&
         f1->Attr == f2->Attr &&
         (f1->DosName == f2->DosName || f1->DosName != NULL && f2->DosName != NULL &&
-                                           strcmp(f1->DosName, f2->DosName) == 0) &&
+                                           wcscmp(f1->DosName, f2->DosName) == 0) &&
         f1->Hidden == f2->Hidden &&
         f1->IsLink == f2->IsLink &&
         f1->IsOffline == f2->IsOffline)
@@ -2201,10 +2216,11 @@ BOOL AreTheSameFiles(DWORD validFileData, CPluginDataInterfaceEncapsulation* plu
 {
     // For the data being compared in the condition, it is not necessary to check validity via 'validFileData',
     // because the data is "zeroed" if it is invalid.
-    if (strcmp(f1->Name, f2->Name) == 0 &&
+    // wide: same AND-confirmation as AreTheSameDirs above, for the identical reason.
+    if (wcscmp(f1->Name, f2->Name) == 0 &&
         f1->Attr == f2->Attr &&
         (f1->DosName == f2->DosName || f1->DosName != NULL && f2->DosName != NULL &&
-                                           strcmp(f1->DosName, f2->DosName) == 0) &&
+                                           wcscmp(f1->DosName, f2->DosName) == 0) &&
         f1->Hidden == f2->Hidden &&
         f1->IsLink == f2->IsLink &&
         f1->IsOffline == f2->IsOffline)
@@ -2247,9 +2263,9 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     //  if (QuickSearchMode) EndQuickSearch();   // We will try to make the quick search mode survive a refresh.
 
 #ifdef _DEBUG
-    CPathBuffer t_path;  // Heap-allocated for long path support
-    GetGeneralPath(t_path, t_path.Size());
-    TRACE_I("RefreshDirectory: " << (MainWindow->LeftPanel == this ? "left" : "right") << ": " << t_path);
+    std::wstring t_path;
+    GetGeneralPath(t_path);
+    TRACE_IW(L"RefreshDirectory: " << (MainWindow->LeftPanel == this ? L"left" : L"right") << L": " << t_path.c_str());
 #endif // _DEBUG
 
     // show wait cursor
@@ -2285,7 +2301,6 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     else
     {
         focusData.Name = NULL; // there won't be a focus ...
-        focusData.NameW = NULL;
     }
 
     // if it's an FS, we need to prepare objects for the new listing separately (they'll be attached later)
@@ -2515,22 +2530,22 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     // refresh of the path (change to the same one with forceUpdate TRUE)
     BOOL noChange;
     BOOL result;
-    CPathBuffer buf1; // Heap-allocated for long path support
+    std::wstring buf1;
     switch (GetPanelType())
     {
     case ptDisk:
     {
         if (sally::unicode::HasWidePathW(GetPathW()))
-            result = ChangePathToDiskW(HWindow, GetPathW(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
+            result = ChangePathToDisk(HWindow, GetPathW(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
         else
-            result = ChangePathToDisk(HWindow, GetPath(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
+            result = ChangePathToDisk(HWindow, GetPathW(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
         break;
     }
 
     case ptZIPArchive:
     {
-        if (sally::unicode::HasWidePathW(GetZIPArchiveW()))
-            result = ChangePathToArchiveW(GetZIPArchiveW(), GetZIPPathW(), -1, NULL, TRUE, &noChange,
+        if (sally::unicode::HasWidePathW(GetZIPArchive()))
+            result = ChangePathToArchive(GetZIPArchive(), GetZIPPath(), -1, NULL, TRUE, &noChange,
                                           FALSE, NULL, TRUE);
         else
             result = ChangePathToArchive(GetZIPArchive(), GetZIPPath(), -1, NULL, TRUE, &noChange,
@@ -2561,9 +2576,9 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
 
     case ptPluginFS:
     {
-        if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPath(buf1))
+        if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPathW(buf1))
         {
-            result = ChangePathToPluginFS(GetPluginFS()->GetPluginFSName(), buf1, -1, NULL, TRUE,
+            result = ChangePathToPluginFS(GetPluginFS()->GetPluginFSName(), buf1.c_str(), -1, NULL, TRUE,
                                           1 /*refresh*/, &noChange, FALSE, NULL, TRUE);
         }
         else // should not happen if the plug-in is written intelligently
@@ -2590,7 +2605,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     {
         // we'll clear the message queue of buffered WM_USER_UPDATEPANEL
         MSG msg2;
-        PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
+        PeekMessageW(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
     }
 
     if (!result || noChange) // refresh failed or is useless
@@ -2780,7 +2795,10 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                                     {
                                         if (focusFirstNewItem) // found a new item
                                         {
-                                            strcpy(NextFocusName, newData->Name);
+                                            // NextFocusNameW is consumed wide-first a few lines below
+                                            // (exact match, no CP_ACP collisions); Name is already the exact wide
+                                            // form, not just a narrow fallback.
+                                            NextFocusNameW = newData->Name;
                                             firstNewItemIsDir = 1 /* is directory */;
                                             focusFirstNewItem = FALSE;
                                         }
@@ -2812,7 +2830,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                 {
                     if (focusFirstNewItem) // found a new item
                     {
-                        strcpy(NextFocusName, newData->Name);
+                        NextFocusNameW = newData->Name;
                         firstNewItemIsDir = 1 /* is directory */;
                         focusFirstNewItem = FALSE;
                     }
@@ -2825,7 +2843,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     }
     if (focusFirstNewItem && i == Dirs->Count - 1) // found a new item
     {
-        strcpy(NextFocusName, Dirs->At(i).Name);
+        NextFocusNameW = Dirs->At(i).Name;
         firstNewItemIsDir = 1 /* is directory */;
         focusFirstNewItem = FALSE;
     }
@@ -2863,7 +2881,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                                         {
                                             if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
                                             {
-                                                strcpy(NextFocusName, newData->Name);
+                                                NextFocusNameW = newData->Name;
                                                 firstNewItemIsDir = 0 /* is file */;
                                             }
                                             focusFirstNewItem = FALSE;
@@ -2895,7 +2913,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
                     {
                         if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
                         {
-                            strcpy(NextFocusName, newData->Name);
+                            NextFocusNameW = newData->Name;
                             firstNewItemIsDir = 0 /* is file */;
                         }
                         focusFirstNewItem = FALSE;
@@ -2911,7 +2929,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     {
         if (!Is(ptDisk) || (Files->At(i).Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) //  on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
         {
-            strcpy(NextFocusName, Files->At(i).Name);
+            NextFocusNameW = Files->At(i).Name;
             firstNewItemIsDir = 0 /* is file */;
         }
         focusFirstNewItem = FALSE;
@@ -2960,13 +2978,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
         for (i = 0; i < count; i++)
         {
             CFileData* f = (i < Dirs->Count) ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-            std::wstring fallbackNameW;
-            const wchar_t* itemNameW = f->NameW;
-            if (itemNameW == NULL)
-            {
-                fallbackNameW = AnsiToWide(f->Name);
-                itemNameW = fallbackNameW.c_str();
-            }
+            const wchar_t* itemNameW = f->Name;
             if ((int)wcslen(itemNameW) == (int)nextFocusName.size() &&
                 _wcsicmp(itemNameW, nextFocusName.c_str()) == 0 &&
                 (firstNewItemIsDir == -1 /* we don't know what it is */ ||
@@ -2988,48 +3000,6 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
         if (i == count && found != -1)
             focusIndex = found;
         NextFocusNameW.clear();
-        NextFocusName[0] = 0;
-    }
-    else if (NextFocusName[0] != 0)
-    {
-        MainWindow->CancelPanelsUI();       // cancel QuickSearch and QuickEdit
-        int l = (int)strlen(NextFocusName); // trim trailing spaces
-        while (l > 0 && NextFocusName[l - 1] <= ' ')
-            l--;
-        NextFocusName[l] = 0;
-        int off = 0; // trim leading spaces
-        while (off < l && NextFocusName[off] <= ' ')
-            off++;
-        if (off != 0)
-            memmove(NextFocusName, NextFocusName + off, l - off + 1);
-        l -= off;
-
-        int found = -1;
-        for (i = 0; i < count; i++)
-        {
-            CFileData* f = (i < Dirs->Count) ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-            if (f->NameLen == (unsigned)l &&
-                StrICmpEx(f->Name, f->NameLen, NextFocusName, l) == 0 &&
-                (firstNewItemIsDir == -1 /* we don't know what it is */ ||
-                 firstNewItemIsDir == 0 /* is file */ && i >= Dirs->Count ||
-                 firstNewItemIsDir == 1 /* is directory */ && i < Dirs->Count))
-            {
-                foundFocus = TRUE;
-                ensureFocusIndexVisible = TRUE;
-                wholeItemVisible = TRUE;                                  // we want complete visibility of the new item
-                if (StrCmpEx(f->Name, f->NameLen, NextFocusName, l) == 0) // found: exact
-                {
-                    focusIndex = i;
-                    break;
-                }
-                if (found == -1)
-                    found = i;
-            }
-        }
-        if (i == count && found != -1)
-            focusIndex = found; // found: ignore-case
-        NextFocusName[0] = 0;
-        NextFocusNameW.clear();
     }
 
     // first, we search for the old focus in the new listing (according to the case-sensitivity of the current listing)
@@ -3041,8 +3011,12 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
             for (i = 0; i < count; i++)
             {
                 CFileData* d2 = &Dirs->At(i);
-                if (StrICmpEx(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0 &&
-                    (!caseSensitive || StrCmpEx(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0))
+                // wide: ANSI compare first (cheap), wide compare to confirm - two
+                // different names outside the code page share one '?'-mirror, so the mirror
+                // alone could re-focus the wrong item after a refresh (same idiom as
+                // files_window_copy_move.cpp/main_window_commands_help.cpp).
+                if (StrICmpExW(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0 &&
+                    (!caseSensitive || StrCmpExW(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0))
                 {
                     focusIndex = i;
                     foundFocus = TRUE;
@@ -3056,8 +3030,8 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
             for (i = 0; i < count; i++)
             {
                 CFileData* d2 = &Files->At(i);
-                if (StrICmpEx(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0 &&
-                    (!caseSensitive || StrCmpEx(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0))
+                if (StrICmpExW(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0 &&
+                    (!caseSensitive || StrCmpExW(d2->Name, d2->NameLen, focusData.Name, focusData.NameLen) == 0))
                 {
                     focusIndex = Dirs->Count + i;
                     foundFocus = TRUE;
@@ -3105,7 +3079,7 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
             {
                 i = 0;
                 count = Dirs->Count;
-                if (count > 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+                if (count > 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
                     i = 1; // we must skip "..", it's not sorted
                 for (; i < count; i++)
                 {
@@ -3190,32 +3164,30 @@ void CFilesWindow::SetQuickSearchCaretPos()
     if (FocusedIndex < Dirs->Count)
     {
         file = &Dirs->At(FocusedIndex);
-        isDir = FocusedIndex != 0 || strcmp(file->Name, "..") != 0 ? 1 : 2 /* UP-DIR */;
+        isDir = FocusedIndex != 0 || wcscmp(file->Name, L"..") != 0 ? 1 : 2 /* UP-DIR */;
     }
     else
         file = &Files->At(FocusedIndex - Dirs->Count);
-    CPathBuffer formatedFileName; // Heap-allocated for long path support
-    AlterFileName(formatedFileName, file->Name, -1,
-                  Configuration.FileNameFormat, 0,
-                  FocusedIndex < Dirs->Count);
+    const std::wstring formattedFileName = AlterFileNameW(file->Name, Configuration.FileNameFormat, 0,
+                                                           FocusedIndex < Dirs->Count);
 
-    int qsLen = (int)strlen(QuickSearch);
+    int qsLen = (int)QuickSearch.size();
     int preLen = isDir && !Configuration.SortDirsByExt ? file->NameLen : (int)(file->Ext - file->Name);
-    char* ss;
+    const wchar_t* ss;
     BOOL ext = FALSE;
     int offset = 0;
     if ((!isDir || Configuration.SortDirsByExt) && GetViewMode() == vmDetailed &&
         IsExtensionInSeparateColumn() && file->Ext[0] != 0 && file->Ext > file->Name + 1 && // exception for names like ".htaccess", they are shown in the Name column even though they are extensions
         qsLen >= preLen)
     {
-        ss = formatedFileName + preLen;
+        ss = formattedFileName.c_str() + preLen;
         qsLen -= preLen;
         offset = Columns[0].Width + 4 - (3 + IconSizes[ICONSIZE_16]);
         ext = TRUE;
     }
     else
     {
-        ss = formatedFileName;
+        ss = formattedFileName.c_str();
     }
 
     HDC hDC = ListBox->HPrivateDC;
@@ -3225,7 +3197,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
     else
         hOldFont = (HFONT)SelectObject(hDC, Font);
 
-    GetTextExtentPoint32(hDC, ss, qsLen, &s);
+    GetTextExtentPoint32W(hDC, ss, qsLen, &s);
 
     RECT r;
     if (ListBox->GetItemRect(FocusedIndex, &r))
@@ -3259,15 +3231,15 @@ void CFilesWindow::SetQuickSearchCaretPos()
             iconH += 3 + 2 - 1;
 
             // ATTENTION: keep in sync with CFilesBox::GetIndex
-            char buff[1024];                           // target buffer for strings
+            wchar_t buff[1024];                           // target buffer for strings
             int maxWidth = ListBox->ItemWidth - 4 - 1; // -1, so they don't touch
-            char* out1 = buff;
+            wchar_t* out1 = buff;
             int out1Len = 512;
             int out1Width;
-            char* out2 = buff + 512;
+            wchar_t* out2 = buff + 512;
             int out2Len = 512;
             int out2Width;
-            SplitText(hDC, formatedFileName, file->NameLen, &maxWidth,
+            SplitTextW(hDC, formattedFileName.c_str(), file->NameLen, &maxWidth,
                       out1, &out1Len, &out1Width,
                       out2, &out2Len, &out2Width);
             //maxWidth += 4;
@@ -3286,12 +3258,12 @@ void CFilesWindow::SetQuickSearchCaretPos()
             int maxTextWidth = ListBox->ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;
 
-            char buff[3 * 512]; // target buffer for strings
-            char* out0 = buff;
+            wchar_t buff[3 * 512]; // target buffer for strings
+            wchar_t* out0 = buff;
             int out0Len;
-            char* out1 = buff + 512;
+            wchar_t* out1 = buff + 512;
             int out1Len;
-            char* out2 = buff + 1024;
+            wchar_t* out2 = buff + 1024;
             int out2Len;
             HDC hDC2 = ItemBitmap.HMemDC;
             HFONT hOldFont2 = (HFONT)SelectObject(hDC2, Font);

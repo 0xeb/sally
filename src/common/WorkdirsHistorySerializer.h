@@ -45,15 +45,11 @@ struct Entry
 std::wstring SerializeEntry(const Entry& entry);
 
 // Plugin-FS detector callback. The serializer is decoupled from the rest
-// of the sally object graph so headless tests can link against a tiny
-// dependency surface; the production CPathHistory adapter wires
-// IsPluginFSPath through this hook. When the callback returns true, it
-// must populate outFsName and outUserPart with ANSI-narrow strings (plugin
-// FS names and user-parts are ANSI today). Tests that don't care about
-// plugin FS pass nullptr and the parser rejects non-disk shapes.
-using PluginFSPathDetectorA = bool (*)(const char* path,
-                                       std::string& outFsName,
-                                       std::string& outUserPart);
+// of the Sally object graph so headless tests can link against a tiny
+// dependency surface; production wires the wide IsPluginFSPath through it.
+using PluginFSPathDetector = bool (*)(const wchar_t* path,
+                                     std::wstring& outFsName,
+                                     std::wstring& outUserPart);
 
 // Parse a wide REG_SZ payload back into an Entry.
 //
@@ -68,7 +64,7 @@ using PluginFSPathDetectorA = bool (*)(const char* path,
 // the plugin FS shape is encountered with no detector; the
 // CPathHistory::LoadFromRegistry caller logs and skips such entries.
 bool ParseEntry(const std::wstring& payloadW, Entry& outEntry,
-                PluginFSPathDetectorA detector = nullptr);
+                PluginFSPathDetector detector = nullptr);
 
 // Round-trip helpers used by CPathHistory::SaveToRegistry / LoadFromRegistry.
 //
@@ -85,5 +81,5 @@ bool ParseEntry(const std::wstring& payloadW, Entry& outEntry,
 // mock if it wants; the production path uses the global gRegistry.
 void WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& entries);
 void ReadEntries(IRegistry* reg, HKEY historyKey, std::vector<Entry>& outEntries,
-                 PluginFSPathDetectorA detector = nullptr);
+                 PluginFSPathDetector detector = nullptr);
 } // namespace sally::path::history

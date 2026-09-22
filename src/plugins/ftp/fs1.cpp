@@ -1,17 +1,15 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
 // FS-name assigned by Salamander after loading the plug-in
-CPathBuffer AssignedFSName;
-int AssignedFSNameLen = 0;
+std::wstring AssignedFSName;
 
 // FS-name for FTP over SSL (FTPS) assigned by Salamander after loading the plugin
-CPathBuffer AssignedFSNameFTPS;
+std::wstring AssignedFSNameFTPS;
 int AssignedFSNameIndexFTPS = -1;
-int AssignedFSNameLenFTPS = 0;
 
 HICON FTPIcon = NULL;        // icon (16x16) of FTP
 HICON FTPLogIcon = NULL;     // icon (16x16) of the FTP Logs dialog
@@ -23,7 +21,7 @@ HFONT FixedFont = NULL;      // font for the Welcome Message dialog (fixed so th
 HFONT SystemFont = NULL;     // environment font (dialogs, wait window, etc.)
 HICON WarningIcon = NULL;    // small (16x16) "warning" icon for the operations dialog
 
-const char* SAVEBITS_CLASSNAME = "SalamanderFTPClientSaveBits"; // class for CWaitWindow
+LPCWSTR SAVEBITS_CLASSNAME = L"SalamanderFTPClientSaveBits"; // class for CWaitWindow
 
 ATOM AtomObject2 = 0; // atom for CSetWaitCursorWindow
 
@@ -56,12 +54,14 @@ BOOL InitFS()
     }
     HANDLES(InitializeCriticalSection(&WorkerMayBeClosedStateCS));
 
-    if (!InitializeWinLib("FTP_Client", DLLInstance))
+    if (!InitializeWinLib(L"FTP_Client" /* do not translate! */, DLLInstance))
         return FALSE;
     SetupWinLibHelp(HTMLHelpCallback);
-    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), LoadStr(IDS_FTPPLUGINTITLE));
+    const std::wstring invalidNumberW = std::wstring(LangStr(IDS_INVALIDNUMBER).c_str());
+    const std::wstring pluginTitleW = std::wstring(LangStr(IDS_FTPPLUGINTITLE).c_str());
+    SetWinLibStrings(invalidNumberW.c_str(), pluginTitleW.c_str());
 
-    AtomObject2 = GlobalAddAtom("object handle2"); // atom for CSetWaitCursorWindow
+    AtomObject2 = GlobalAddAtom(L"object handle2"); // atom for CSetWaitCursorWindow
     if (AtomObject2 == 0)
     {
         TRACE_E("GlobalAddAtom has failed");
@@ -101,7 +101,7 @@ BOOL InitFS()
     lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
     lf.lfQuality = DEFAULT_QUALITY;
     lf.lfPitchAndFamily = FIXED_PITCH | FF_MODERN;
-    strcpy(lf.lfFaceName, "Consolas");
+    lstrcpy(lf.lfFaceName, L"Consolas");
     FixedFont = HANDLES(CreateFontIndirect(&lf));
 
     if (!CWaitWindow::RegisterUniversalClass(CS_DBLCLKS | CS_SAVEBITS,
@@ -157,7 +157,7 @@ void ReleaseFS()
                                   -1 /* all operations */,
                                   -1 /* all workers */);
 
-    if (!UnregisterClass(SAVEBITS_CLASSNAME, DLLInstance))
+    if (!UnregisterClassW(SAVEBITS_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(SAVEBITS_CLASSNAME) has failed");
 
     // close all modeless dialogs (Welcome Message)
@@ -186,7 +186,7 @@ void ReleaseFS()
         FTPDiskThread->Terminate();
         GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
         HWND waitWndParent = SalamanderGeneral->GetMsgBoxParent();
-        SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_CLOSINGDISKTHREAD), LoadStr(IDS_FTPPLUGINTITLE),
+        SalamanderGeneral->CreateSafeWaitWindow(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CLOSINGDISKTHREAD).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                 2000, TRUE, waitWndParent);
         while (1)
         {
@@ -196,13 +196,13 @@ void ReleaseFS()
                 SalamanderGeneral->GetSafeWaitWindowClosePressed())
             {
                 MSG msg; // discard the buffered ESC
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
 
                 SalamanderGeneral->ShowSafeWaitWindow(FALSE);
                 if (SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                     LoadStr(IDS_CANCELDISKTHREAD),
-                                                     LoadStr(IDS_FTPPLUGINTITLE),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANCELDISKTHREAD).c_str(),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                      MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                          MB_ICONQUESTION) == IDYES)
                 {
@@ -267,7 +267,7 @@ DWORD IncListingCounter()
 //
 
 CPluginFSInterfaceAbstract*
-CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
     CPluginFSInterface* fs = new CPluginFSInterface;
     if (fs != NULL)
@@ -345,8 +345,8 @@ void ConnectFTPServer(HWND parent, int panel) // called in Alt+F1/F2 and in Driv
                 Config.UseConnectionDataFromConfig = TRUE; // the next path change will use data from the configuration
                 Config.ChangingPathInInactivePanel = panel != PANEL_SOURCE && SalamanderGeneral->GetSourcePanel() != panel;
                 int failReason;
-                if (!SalamanderGeneral->ChangePanelPathToPluginFS(panel, isFTPS ? AssignedFSNameFTPS : AssignedFSName,
-                                                                  "", &failReason))
+                if (!SalamanderGeneral->ChangePanelPathToPluginFS(panel, (isFTPS ? AssignedFSNameFTPS : AssignedFSName).c_str(),
+                                                                  L"", &failReason))
                 { // on success it returns failReason == CHPPFR_SHORTERPATH (user part of the path is not "")
                     Config.UseConnectionDataFromConfig = FALSE;
                     if (failReason == CHPPFR_INVALIDPATH ||   // inaccessible path (cannot log in or list anything)
@@ -376,11 +376,11 @@ void OrganizeBookmarks(HWND parent) // called in Alt+F1/F2 and in Drive bars and
 
 BOOL CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                            CPluginFSInterfaceAbstract* pluginFS,
-                                                           const char* pluginFSName, int pluginFSNameIndex,
+                                                           const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                            BOOL isDetachedFS, BOOL& refreshMenu,
                                                            BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
-    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %s, %d, %d, , , ,)",
+    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %ls, %d, %d, , , ,)",
                         panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS);
 
     refreshMenu = FALSE;
@@ -605,8 +605,7 @@ void CPluginInterfaceForFS::ExecuteChangeDrivePostCommand(int panel, int postCmd
             GlobalShowLogUID = fs->GetLogUID();
             if (GlobalShowLogUID == -1 || !Logs.HasLogWithUID(GlobalShowLogUID))
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_FSHAVENOLOG),
-                                                  LoadStr(IDS_FTPERRORTITLE), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FSHAVENOLOG).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MSGBOX_ERROR);
             }
             else                                                              // open the Logs window with the selected log GlobalShowLogUID
                 SalamanderGeneral->PostMenuExtCommand(FTPCMD_SHOWLOGS, TRUE); // will run later in "sal-idle"
@@ -655,45 +654,69 @@ void CPluginInterfaceForFS::ExecuteChangeDrivePostCommand(int panel, int postCmd
 }
 
 void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                        const char* pluginFSName, int pluginFSNameIndex,
+                                        const wchar_t* pluginFSName, int pluginFSNameIndex,
                                         CFileData& file, int isDir)
 {
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir || file.IsLink) // subdirectory or up-dir or link (it can target a file or directory - we currently prefer this test to see if it is a directory)
     {
-        char newUserPart[FTP_USERPART_SIZE];
-        CPathBuffer newPath;
-        CPathBuffer cutDir;
-        lstrcpyn(newPath, fs->Path, newPath.Size());
-        CFTPServerPathType type = fs->GetFTPServerPathType(newPath);
+        try
+        {
+        std::string newPath = fs->Path;
+        std::string cutDir;
+        CFTPServerPathType type = fs->GetFTPServerPathType(newPath.c_str());
         if (isDir == 2) // up-dir
         {
-            if (FTPCutDirectory(type, newPath, newPath.Size(), cutDir, cutDir.Size(), NULL)) // shorten the path by the last component
+            if (FTPCutDirectory(type, newPath, &cutDir, NULL)) // shorten the path by the last component
             {
                 int topIndex; // next top-index, -1 -> invalid
-                if (!fs->TopIndexMem.FindAndPop(type, newPath, topIndex))
+                if (!fs->TopIndexMem.FindAndPop(type, newPath.c_str(), topIndex))
                     topIndex = -1;
                 // change the path in the panel
-                fs->MakeUserPart(newUserPart, FTP_USERPART_SIZE, newPath);
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newUserPart, NULL,
-                                                             topIndex, cutDir);
+                std::wstring newUserPartText;
+                std::wstring cutDirText;
+                if (fs->BuildUserPartText(newUserPartText, newPath.c_str()) &&
+                    fs->DecodeSessionBytes(cutDir, cutDirText))
+                    SalamanderGeneral->ChangePanelPathToPluginFS(
+                        panel, pluginFSName, newUserPartText.c_str(), NULL,
+                        topIndex, cutDirText.c_str());
             }
         }
         else // subdirectory
         {
             // backup of data for TopIndexMem (backupPath + topIndex)
-            CPathBuffer backupPath;
-            strcpy(backupPath, newPath);
+            const std::string backupPath = newPath;
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
-            if (FTPPathAppend(type, newPath, newPath.Size(), file.Name, TRUE)) // set the path
+            std::string itemNameBytes;
+            CControlConnectionSocket* controlConnection = fs->GetControlConnection();
+            CFTPListingPluginDataInterface* dataIface =
+                (CFTPListingPluginDataInterface*)SalamanderGeneral->GetPanelPluginData(panel);
+            if (dataIface != NULL && (void*)dataIface == (void*)&SimpleListPluginDataInterface)
+                dataIface = NULL;
+            const BOOL haveWireName = controlConnection != NULL &&
+                                      (dataIface != NULL ? dataIface->GetWireName(file, controlConnection->GetTextCodec(), itemNameBytes)
+                                                         : controlConnection->EncodeText(file.Name, itemNameBytes));
+            if (haveWireName &&
+                FTPPathAppend(type, newPath, itemNameBytes.c_str(), TRUE)) // set the path
             {
                 // change the path in the panel
-                fs->MakeUserPart(newUserPart, FTP_USERPART_SIZE, newPath);
-                if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newUserPart))
+                std::wstring newUserPartText;
+                if (fs->BuildUserPartText(newUserPartText, newPath.c_str()) &&
+                    SalamanderGeneral->ChangePanelPathToPluginFS(
+                        panel, pluginFSName, newUserPartText.c_str()))
                 {
-                    fs->TopIndexMem.Push(type, backupPath, topIndex); // remember the top-index for the return
+                    fs->TopIndexMem.Push(type, backupPath.c_str(), topIndex); // remember the top-index for the return
                 }
             }
+        }
+        }
+        catch (const std::bad_alloc&)
+        {
+            TRACE_E(LOW_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            TRACE_E(LOW_MEMORY);
         }
     }
     else // file
@@ -704,9 +727,9 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex);
     ((CPluginFSInterface*)pluginFS)->CalledFromDisconnectDialog = TRUE; // suppress unnecessary prompts (the user issued the disconnect command, we just perform it)
     BOOL ret = FALSE;
@@ -724,20 +747,49 @@ CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
     return ret;
 }
 
-void CPluginInterfaceForFS::ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                                  char* fsUserPart)
+BOOL CPluginInterfaceForFS::ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
+                                                  CSalamanderStringBuffer* fsUserPart)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToInternal(%s, %d, %s)",
-                        fsName, fsNameIndex, fsUserPart);
-    FTPConvertHexEscapeSequences(fsUserPart);
+    std::wstring value;
+    if (fsUserPart == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*fsUserPart, value))
+        return FALSE;
+    CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToInternal(%ls, %d, %ls)",
+                        fsName, fsNameIndex, value.c_str());
+    // The hex-escape mechanism is byte-oriented (percent-encoding always encodes bytes, not
+    // code points), but only the ESCAPED runs are bytes - the literal text around them is
+    // semantic UTF-16 and has no business being narrowed. FTPConvertHexEscapeSequencesW
+    // makes exactly that split: it collects each run of %XX into bytes, decodes the run
+    // through the explicit local-text boundary, and copies everything else through as wide.
+    //
+    // What stood here instead narrowed the WHOLE user part to the ACP first, exactly, and
+    // answered FALSE for any path the code page could not spell. Since the session decodes
+    // server bytes as UTF-8 whenever OPTS UTF8 ON succeeded, that is ordinary traffic on a
+    // modern server, and both callers of the FALSE - GetGeneralPath and
+    // CopyCurrentPathToClipboard - return it without a message, so Ctrl+C on a directory
+    // named in Chinese simply appeared to do nothing. The frozen v107 slot for this
+    // operation returns void (sdk107/spl_fs.h:1010); it never had a way to say no.
+    if (!FTPConvertHexEscapeSequencesW(value))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*fsUserPart, value) ? TRUE : FALSE;
 }
 
-void CPluginInterfaceForFS::ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                                  char* fsUserPart)
+BOOL CPluginInterfaceForFS::ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
+                                                  CSalamanderStringBuffer* fsUserPart)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToExternal(%s, %d, %s)",
-                        fsName, fsNameIndex, fsUserPart);
-    FTPAddHexEscapeSequences(fsUserPart, MAX_PATH);
+    std::wstring value;
+    if (fsUserPart == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*fsUserPart, value))
+        return FALSE;
+    CALL_STACK_MESSAGE4("CPluginInterfaceForFS::ConvertPathToExternal(%ls, %d, %ls)",
+                        fsName, fsNameIndex, value.c_str());
+    // Outbound needs no bytes at all. FTPAddHexEscapeSequences protects exactly one
+    // character, '%', by doubling it into "%25" - the whole escaping alphabet is ASCII.
+    // Narrowing the path to the ACP to perform an ASCII substitution is what made this
+    // refuse Unicode paths outright, and a refusal here is silent at both callers.
+    if (!FTPAddHexEscapeSequencesW(value))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*fsUserPart, value) ? TRUE : FALSE;
 }
 
 //****************************************************************************
@@ -747,44 +799,51 @@ void CPluginInterfaceForFS::ConvertPathToExternal(const char* fsName, int fsName
 
 void CTopIndexMem::Push(CFTPServerPathType type, const char* path, int topIndex)
 {
-    // determine whether path follows Path (path == Path+"/name")
-    CPathBuffer testPath;
-    lstrcpyn(testPath, path, testPath.Size());
-    BOOL ok = FALSE;
-    if (FTPCutDirectory(type, testPath, testPath.Size(), NULL, 0, NULL))
+    try
     {
-        ok = FTPIsTheSameServerPath(type, testPath, Path);
-    }
+        // determine whether path follows Path (path == Path+"/name")
+        std::string testPath(path);
+        const BOOL ok = FTPCutDirectory(type, testPath, NULL, NULL) &&
+                        FTPIsTheSameServerPath(type, testPath.c_str(), Path.c_str());
 
-    if (ok) // it follows -> remember the next top-index
-    {
-        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // we need to discard the first top-index from memory
+        if (ok) // it follows -> remember the next top-index
         {
-            int i;
-            for (i = 0; i < TOP_INDEX_MEM_SIZE - 1; i++)
-                TopIndexes[i] = TopIndexes[i + 1];
-            TopIndexesCount--;
+            if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // we need to discard the first top-index from memory
+            {
+                int i;
+                for (i = 0; i < TOP_INDEX_MEM_SIZE - 1; i++)
+                    TopIndexes[i] = TopIndexes[i + 1];
+                TopIndexesCount--;
+            }
+            Path.assign(path);
+            TopIndexes[TopIndexesCount++] = topIndex;
         }
-        strcpy(Path, path);
-        TopIndexes[TopIndexesCount++] = topIndex;
+        else // it does not follow -> first top-index in sequence
+        {
+            Path.assign(path);
+            TopIndexesCount = 1;
+            TopIndexes[0] = topIndex;
+        }
     }
-    else // it does not follow -> first top-index in sequence
+    catch (const std::bad_alloc&)
     {
-        strcpy(Path, path);
-        TopIndexesCount = 1;
-        TopIndexes[0] = topIndex;
+        Clear();
+    }
+    catch (const std::length_error&)
+    {
+        Clear();
     }
 }
 
 BOOL CTopIndexMem::FindAndPop(CFTPServerPathType type, const char* path, int& topIndex)
 {
     // determine whether path matches Path (path == Path)
-    if (FTPIsTheSameServerPath(type, path, Path))
+    if (FTPIsTheSameServerPath(type, path, Path.c_str()))
     {
         if (TopIndexesCount > 0)
         {
-            if (!FTPCutDirectory(type, Path, Path.Size(), NULL, 0, NULL))
-                Path[0] = 0;
+            if (!FTPCutDirectory(type, Path, NULL, NULL))
+                Path.clear();
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;
         }

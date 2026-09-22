@@ -9,10 +9,10 @@
 #include "..\tar.rh2"
 #include "..\lang\lang.rh"
 
-CBZip::CBZip(const char *filename, HANDLE file, unsigned char *buffer, unsigned long start, unsigned long read, CQuadWord inputSize):
+CBZip::CBZip(const wchar_t *filename, HANDLE file, unsigned char *buffer, unsigned long start, unsigned long read, CQuadWord inputSize):
   CZippedFile(filename, file, buffer, start, read, inputSize), BZStream(NULL), EndReached(FALSE)
 {
-  CALL_STACK_MESSAGE2("CBZip::CBZip(%s, , , )", filename);
+  CALL_STACK_MESSAGE2("CBZip::CBZip(%ls, , , )", filename);
   
   // if the parent constructor failed, bail out immediately
   if (!Ok)
@@ -76,7 +76,7 @@ CBZip::~CBZip()
   {
     int ret = BZ2_bzDecompressEnd(BZStream);
     if (ret != BZ_OK)
-      SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_INTERNAL), LoadStr(IDS_GZERR_TITLE),
+      SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_INTERNAL).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                         MSGBOX_ERROR);
     free(BZStream);
   }
@@ -142,6 +142,6 @@ void bz_internal_error(int errcode);
 
 void bz_internal_error(int errcode)
 {
-  SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_INTERNAL), LoadStr(IDS_GZERR_TITLE),
+  SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_INTERNAL).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                     MSGBOX_ERROR);
 }

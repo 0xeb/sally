@@ -4,19 +4,18 @@
 
 #pragma once
 
+#include <string>
+
 //*****************************************************************************
 //
 // CConfiguration
 //
 
-#define DESCRIPTION_SIZE 5000
-#define EMAIL_SIZE 100
-
 class CConfiguration
 {
 public:
-    char Description[DESCRIPTION_SIZE];
-    char Email[EMAIL_SIZE];
+    std::wstring Description;
+    std::wstring Email;
     BOOL Restart; // not stored
 
 public:

@@ -10,7 +10,10 @@
 #include "Utils.CZColors.h"
 #include "GUI.ViewConnectorBase.h"
 
-const TCHAR szDirectoryLineClass[] = TEXT("Zar.DM.DirLine.WC");
+#include <string>
+#include <vector>
+
+const wchar_t szDirectoryLineClass[] = L"Zar.DM.DirLine.WC";
 
 #define MAX_LONGSIZELEN 64
 #define MAX_SHORTSIZELEN 32
@@ -19,13 +22,12 @@ const TCHAR szDirectoryLineClass[] = TEXT("Zar.DM.DirLine.WC");
 #define NODEID_NOXY -2
 #define NODEID_NONE -1
 #define NODEID_ROOT 0
-#define NODEID_MAXP 0x7f
-#define NODEID_SIZE 0x80
+#define NODEID_SIZE (INT_MAX - 1)
 //#define NODEID_ICON 0x81 !! TODO !!
 
 /*
  * /-------------------------------------------NODEID_NOXY---------------------------\
- * | NODEID_ICON | NODEID_ROOT\1\2\...\NODEID_MAXP      NODEID_NONE      NODEID_SIZE |
+ * | NODEID_ICON | NODEID_ROOT\1\2\...                    NODEID_NONE      NODEID_SIZE |
  * \---------------------------------------------------------------------------------/
  */
 
@@ -49,13 +51,13 @@ protected:
     BOOL _isActive;
 
     // Data
-    CZStringBuffer* _path;
+    std::wstring _path;
     int _rootLen;
     INT64 _disksize;
 
     // Cached values - size
     BOOL _sizeCached;
-    TCHAR const* _pathstr; // Points to this->_path (whole path) or this->_pathtemp (ellipsis)
+    wchar_t const* _pathstr; // Points to this->_path (whole path) or this->_pathtemp (ellipsis)
     int _pathlen;
 
     int _rootX;
@@ -65,12 +67,12 @@ protected:
     CZStringBuffer* _sizestrlong;  //long version "1 234 567 bytes (1,23MB)"
     CZStringBuffer* _sizestrshort; //short version "1,23MB"
 
-    TDIRNODE _nodes[MAX_PATH / 2];
+    std::vector<TDIRNODE> _nodes;
     int _nodeCount;
     int _mouseNode;
 
     // string for storing a copy of the path with an ellipsis
-    TCHAR _pathtemp[MAX_PATH + 3];
+    std::wstring _pathtemp;
 
     // Cached values - colors: active/inactive
     COLORREF _backColor;
@@ -98,7 +100,7 @@ protected:
         return MyCreateWindow(
             0,
             szDirectoryLineClass,
-            TEXT("Directory Line"),
+            L"Directory Line",
             WS_CHILD | WS_VISIBLE,
             left, top,     //X, Y
             width, height, // WIDTH, HEIGHT
@@ -112,26 +114,29 @@ protected:
             this->_sFormatter->FormatShortFileSize(this->_sizestrshort, this->_disksize);
         }
 
-        TCHAR const* str = this->_path->GetString();
-        int strlen = (int)this->_path->GetLength();
+        wchar_t const* str = this->_path.c_str();
+        int strlen = static_cast<int>(this->_path.length());
 
         int nodeid = 0;
 
         int p = this->_rootLen;
 
-        this->_nodes[nodeid++].strpos = p;
+        this->_nodes.clear();
+        this->_nodes.push_back({p, 0});
+        ++nodeid;
 
         p++;
         while (p < strlen)
         {
-            while (p < strlen && str[p] != TEXT('\\'))
+            while (p < strlen && str[p] != L'\\')
                 p++;
-            this->_nodes[nodeid++].strpos = p;
+            this->_nodes.push_back({p, 0});
+            ++nodeid;
             p++;
         }
 
         this->_nodeCount = nodeid;
-        this->_nodes[this->_nodeCount].xright = LAST_NODEX;
+        this->_nodes.push_back({0, LAST_NODEX});
 
         this->_sizeCached = FALSE;
         this->Repaint();
@@ -194,12 +199,12 @@ protected:
         SIZE sz;
         int sizewidth = 0;
         int pathwidth = 0;
-        int dx[MAX_PATH + 3];
-        GetTextExtentExPoint(hdc, this->_path->GetString(), (int)this->_path->GetLength(), 0, NULL, dx, &sz);
+        std::vector<int> dx(this->_path.length() + 1);
+        GetTextExtentExPointW(hdc, this->_path.c_str(), static_cast<int>(this->_path.length()), 0, NULL, dx.data(), &sz);
         pathwidth = sz.cx;
         if (this->_disksize >= 0)
         {
-            GetTextExtentPoint32(hdc, this->_sizestrlong->GetString(), (int)this->_sizestrlong->GetLength(), &sz);
+            GetTextExtentPoint32W(hdc, this->_sizestrlong->GetString(), (int)this->_sizestrlong->GetLength(), &sz);
             sizewidth = sz.cx + 2;
 
             this->_sizestr = this->_sizestrlong;
@@ -210,7 +215,7 @@ protected:
 			}
 			else
 			{
-				GetTextExtentPoint32(hdc, this->_sizestrshort->GetString(), this->_sizestrshort->GetLength(), &sz);
+				GetTextExtentPoint32W(hdc, this->_sizestrshort->GetString(), this->_sizestrshort->GetLength(), &sz);
 				sizewidth = sz.cx + 4;
 				this->_sizestr = this->_sizestrshort;
 			}*/
@@ -231,48 +236,43 @@ protected:
 
         if (pathwidth <= width)
         {
-            this->_pathstr = this->_path->GetString();
-            this->_pathlen = (int)this->_path->GetLength();
+            this->_pathstr = this->_path.c_str();
+            this->_pathlen = static_cast<int>(this->_path.length());
 
-            this->_rootX = dx[this->_rootLen - 1] + rct.left;
+            this->_rootX = this->_rootLen > 0 ? dx[static_cast<size_t>(this->_rootLen - 1)] + rct.left : -1;
 
             for (int i = 0; i < this->_nodeCount; i++)
             {
                 int ppos = this->_nodes[i].strpos;
-                this->_nodes[i].xright = dx[ppos - 1] + rct.left;
+                this->_nodes[i].xright = ppos > 0 ? dx[static_cast<size_t>(ppos - 1)] + rct.left : rct.left;
             }
         }
         else
         {
-            TCHAR* ostr = this->_pathtemp;
-            int ostrlen = 0;
+            std::wstring shortenedPath;
             if (width > this->_dotsWidth)
             {
-                TCHAR const* str = this->_path->GetString();
-                int strlen = (int)this->_path->GetLength();
+                wchar_t const* str = this->_path.c_str();
+                int strlen = static_cast<int>(this->_path.length());
 
                 int remwidth = width - this->_dotsWidth;
 
                 int p = 0;
-                while (p < strlen && dx[p] <= remwidth && str[p] != TEXT('\\'))
+                while (p < strlen && dx[p] <= remwidth && str[p] != L'\\')
                 {
-                    ostr[p] = str[p];
+                    shortenedPath += str[p];
                     p++;
-                    ostrlen++;
                 }
-                BOOL found = (str[p] == TEXT('\\'));
+                BOOL found = (str[p] == L'\\');
 
-                while (p < strlen && dx[p] <= remwidth && str[p] == TEXT('\\'))
+                while (p < strlen && dx[p] <= remwidth && str[p] == L'\\')
                 {
-                    ostr[p] = str[p];
+                    shortenedPath += str[p];
                     p++;
-                    ostrlen++;
                 }
-                BOOL whole = (str[p] != TEXT('\\'));
+                BOOL whole = (str[p] != L'\\');
 
-                ostr[ostrlen++] = TEXT('.');
-                ostr[ostrlen++] = TEXT('.');
-                ostr[ostrlen++] = TEXT('.');
+                shortenedPath += L"...";
 
                 if (found && whole)
                 {
@@ -286,7 +286,7 @@ protected:
                     int i;
                     for (i = rp + 1; i < strlen; i++)
                     {
-                        ostr[ostrlen++] = str[i];
+                        shortenedPath += str[i];
                     }
                     if (this->_rootLen > rp)
                     {
@@ -323,12 +323,12 @@ protected:
                 //TODO: node clean - nothing!
                 this->_nodes[0].xright = LAST_NODEX;
             }
-            ostr[ostrlen] = TEXT('\0');
-            this->_pathstr = ostr;
-            this->_pathlen = ostrlen;
+            this->_pathtemp.swap(shortenedPath);
+            this->_pathstr = this->_pathtemp.c_str();
+            this->_pathlen = static_cast<int>(this->_pathtemp.length());
         }
 
-        if ((size_t)this->_rootLen == this->_path->GetLength())
+        if ((size_t)this->_rootLen == this->_path.length())
         {
             this->_rootX = -1;
         }
@@ -411,25 +411,25 @@ protected:
         trct.bottom = rct.top + 1 + 2;
         trct.left = rct.left;
         trct.right = rct.right;
-        ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
+        ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
 
         // left section (behind the icon) - TODO: draw in segments to remove all flicker
         trct.top = rct.top + 3;
         trct.bottom = rct.bottom - 3;
         trct.right = rct.left + this->_cxSmIcon + 7 + 1;
-        ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
+        ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
 
         //right part
         trct.left = rct.right - 1;
         trct.right = rct.right;
-        ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
+        ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
 
         //bottom part
         trct.top = rct.bottom - 3;
         trct.bottom = rct.bottom - 1;
         trct.left = rct.left;
         trct.right = rct.right;
-        ExtTextOut(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
+        ExtTextOutW(hdc, 0, 0, ETO_OPAQUE, &trct, NULL, 0, NULL);
 
         if (this->_hicon)
         {
@@ -474,12 +474,12 @@ protected:
             {
                 SetTextColor(hdc, this->_textColorHot);
             }
-            ExtTextOut(hdc, xrc.left + 2, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &xrc, this->_sizestr->GetString(), (UINT)this->_sizestr->GetLength(), NULL);
+            ExtTextOutW(hdc, xrc.left + 2, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &xrc, this->_sizestr->GetString(), (UINT)this->_sizestr->GetLength(), NULL);
             rct.right = this->_sizeX;
         }
 
         //root string color:
-        if ((this->_mouseNode >= NODEID_ROOT) && (this->_mouseNode <= NODEID_MAXP))
+        if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode < this->_nodeCount)
         {
             SetTextColor(hdc, this->_rootColorHot);
         }
@@ -496,14 +496,14 @@ protected:
             {
                 //root string
                 trct.right = this->_rootX;
-                ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
                 trct.right = rct.right;
             }
             trct.left = this->_rootX;
             BOOL isLastNodeHighlighted = (this->_mouseNode == this->_nodeCount - 1);
 
             //path string
-            if ((this->_mouseNode > NODEID_ROOT) && (this->_mouseNode <= NODEID_MAXP))
+            if (this->_mouseNode > NODEID_ROOT && this->_mouseNode < this->_nodeCount)
             {
                 //highlighted part
                 SetTextColor(hdc, this->_textColorHot);
@@ -513,27 +513,27 @@ protected:
                     int oR = trct.right;
                     int nr = this->_nodes[this->_mouseNode].xright;
                     trct.right = nr;
-                    ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                    ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
                     trct.left = nr;
                     trct.right = oR;
                 }
                 else
                 {
                     //whole string highlighted
-                    ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                    ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
                 }
             }
             if (!isLastNodeHighlighted)
             {
                 //normal - remaining part
                 SetTextColor(hdc, this->_textColor);
-                ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
             }
         }
         else
         {
             //root string only
-            ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &rct, this->_pathstr, this->_pathlen, NULL);
+            ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &rct, this->_pathstr, this->_pathlen, NULL);
         }
 
         SelectFont(hdc, hfold);
@@ -541,7 +541,7 @@ protected:
 
     void OnLButtonDown(/*BOOL fDoubleClick, */ int x, int y, UINT keyFlags)
     {
-        if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode <= NODEID_MAXP)
+        if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode < this->_nodeCount)
         {
             int gotolevel = this->_nodeCount - this->_mouseNode - 1;
             if (gotolevel > 0)
@@ -553,11 +553,12 @@ protected:
 
     void OnContextMenu(HWND hwndContext, int xPos, int yPos)
     {
-        if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode <= NODEID_MAXP)
+        if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode < this->_nodeCount)
         {
-            CPathBuffer buff;
+            std::wstring buff;
             size_t plen = this->_nodes[this->_mouseNode].strpos;
-            size_t l = this->_path->GetSubString(0, plen, buff, buff.Size());
+            buff = this->_path.substr(0, plen);
+            size_t l = buff.length();
             if (l > 0)
             {
                 int icmd = 0;
@@ -565,14 +566,14 @@ protected:
 #ifdef SALAMANDER
                 if (this->_connector->GetSalamander() != NULL)
                 {
-                    icmd = this->_shellmenu->ShowDirMenu(buff, xPos, yPos, this->_connector->GetSalamander()->CanOpenFolder(), gotolevel > 0);
+                    icmd = this->_shellmenu->ShowDirMenu(buff.c_str(), xPos, yPos, this->_connector->GetSalamander()->CanOpenFolder(), gotolevel > 0);
                 }
                 else
                 {
-                    icmd = this->_shellmenu->ShowDirMenu(buff, xPos, yPos, FALSE, gotolevel > 0);
+                    icmd = this->_shellmenu->ShowDirMenu(buff.c_str(), xPos, yPos, FALSE, gotolevel > 0);
                 }
 #else
-                icmd = this->_shellmenu->ShowDirMenu(buff, xPos, yPos, gotolevel > 0);
+                icmd = this->_shellmenu->ShowDirMenu(buff.c_str(), xPos, yPos, gotolevel > 0);
 #endif
                 if (icmd == IDM_GOTO)
                 {
@@ -582,7 +583,7 @@ protected:
                 else if (icmd == IDM_OPEN)
                 {
                     if (this->_connector->GetSalamander())
-                        this->_connector->GetSalamander()->OpenFolder(buff);
+                        this->_connector->GetSalamander()->OpenFolder(buff.c_str());
                 }
 #endif
             }
@@ -616,7 +617,6 @@ public:
 
         this->_sFormatter = NULL;
 
-        this->_path = new CZStringBuffer(MAX_PATH + 4);
         this->_rootLen = 0;
         this->_disksize = -1;
         //this->_disksize = 12345678;
@@ -645,9 +645,6 @@ public:
     }
     ~CDirectoryLine()
     {
-        if (this->_path)
-            delete this->_path;
-        this->_path = NULL;
         if (this->_sFormatter)
             delete this->_sFormatter;
         this->_sFormatter = NULL;
@@ -688,8 +685,8 @@ public:
 
         CZIconLoader::BeginAsyncLoadIcon(path, SHGFI_SMALLICON | SHGFI_ADDOVERLAYS, this->_hWnd, WM_APP_ICONLOADED, (void*)this->_id)->SetSelfDelete(TRUE);
 
-        this->_path->AppendAt(path, 0);
-        this->_rootLen = (int)this->_path->GetLength();
+        this->_path.assign(path->GetString(), path->GetLength());
+        this->_rootLen = static_cast<int>(this->_path.length());
 
         this->UpdateValues();
         return TRUE;
@@ -698,20 +695,22 @@ public:
     {
         if (subpath->GetLength() == 0)
         {
-            this->_path->Left(this->_rootLen);
+            this->_path.resize(static_cast<size_t>(this->_rootLen));
         }
         else
         {
             //if the root "C:\" already ends with a trailing backslash
-            if (this->_path->IsCharAt(TEXT('\\'), this->_rootLen - 1)) //if _rootLen happened to be 0, it would overflow to MAX_INT and return FALSE
+            if (this->_rootLen > 0 && this->_path[static_cast<size_t>(this->_rootLen - 1)] == L'\\')
             {
-                this->_path->AppendAt(subpath, this->_rootLen);
+                this->_path.resize(static_cast<size_t>(this->_rootLen));
+                this->_path.append(subpath->GetString(), subpath->GetLength());
             }
             else
             {
                 //normal paths do not end with a backslash, so append one
-                this->_path->AppendAt(TEXT('\\'), this->_rootLen);
-                this->_path->AppendAt(subpath, this->_rootLen + 1);
+                this->_path.resize(static_cast<size_t>(this->_rootLen));
+                this->_path += L'\\';
+                this->_path.append(subpath->GetString(), subpath->GetLength());
             }
         }
 
@@ -762,7 +761,7 @@ public:
         HFONT hfold = SelectFont(hdc, this->_hfont);
 
         SIZE sz;
-        GetTextExtentPoint32(hdc, TEXT("..."), 3, &sz); //obtain the width of "..." and character height
+        GetTextExtentPoint32W(hdc, L"...", 3, &sz); //obtain the width of "..." and character height
         this->_dotsWidth = sz.cx;
         this->_height = max(sz.cy, this->_cySmIcon) + 8;
 
@@ -797,7 +796,7 @@ public:
                 }
                 this->Repaint();
             }
-            if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode <= NODEID_MAXP)
+            if (this->_mouseNode >= NODEID_ROOT && this->_mouseNode < this->_nodeCount)
             {
                 int parentlevel = this->_nodeCount - this->_mouseNode - 1;
                 dir = this->_connector->DM_GetViewDirectory(parentlevel);
@@ -904,7 +903,7 @@ public:
         case WM_DESTROY:
             return this->OnDestroy(), 0;
         }
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProcW(hWnd, message, wParam, lParam);
     }
 
     static BOOL RegisterClass()
@@ -912,9 +911,9 @@ public:
         static ATOM a = NULL;
         if (!a)
         {
-            WNDCLASSEX wcex;
+            WNDCLASSEXW wcex;
 
-            wcex.cbSize = sizeof(WNDCLASSEX);
+            wcex.cbSize = sizeof(WNDCLASSEXW);
 
             wcex.style = 0;
             wcex.lpfnWndProc = CDirectoryLine::s_WndProc;
@@ -929,14 +928,14 @@ public:
             wcex.hIcon = NULL;
             wcex.hIconSm = NULL;
 
-            a = ::RegisterClassEx(&wcex);
+            a = ::RegisterClassExW(&wcex);
         }
         BOOL ret = (a != NULL);
         return ret;
     }
     static BOOL UnregisterClass()
     {
-        BOOL ret = ::UnregisterClass(szDirectoryLineClass, CWindow::s_hInstance);
+        BOOL ret = ::UnregisterClassW(szDirectoryLineClass, CWindow::s_hInstance);
         if (!ret)
             TRACE_E("UnregisterClass(szDirectoryLineClass) has failed");
         return ret;

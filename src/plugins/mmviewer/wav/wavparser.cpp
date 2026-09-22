@@ -14,9 +14,7 @@
 #include "..\lang\lang.rh"
 #include "..\output.h"
 
-char* LoadStr(int resID);
-char* FStr(const char* format, ...);
-void FormatSize2(__int64 size, char* str_size, BOOL nozero = FALSE);
+std::wstring LangStr(int resID);
 
 #define SAFE_DELETE(x) \
     { \
@@ -69,11 +67,11 @@ void CMMIO::Close(void)
     }
 }
 
-BOOL CMMIO::Open(char* fname)
+BOOL CMMIO::Open(const wchar_t* fname)
 {
     Close();
 
-    m_hmmio = mmioOpen(fname, NULL, MMIO_ALLOCBUF | MMIO_READ);
+    m_hmmio = mmioOpenW(const_cast<wchar_t*>(fname), NULL, MMIO_ALLOCBUF | MMIO_READ);
 
     return IsOpened();
 }
@@ -220,13 +218,9 @@ HRESULT CMMIO::ResetFile()
 }
 
 CParserResultEnum
-CParserWAV::OpenFile(const char* fileName)
+CParserWAV::OpenFile(const wchar_t* fileName)
 {
-    // mmioOpen wants a non-const char ;-0
-    CPathBuffer fnamecpy; // Heap-allocated for long path support
-    lstrcpyn(fnamecpy, fileName, fnamecpy.Size());
-
-    if (!mmio.Open(fnamecpy))
+    if (!mmio.Open(fileName))
         return preOpenError;
 
     return preOK;
@@ -256,9 +250,7 @@ CParserWAV::GetFileInfo(COutputInterface* output)
         DWORD bps;
         DWORD hz;
         DWORD chn;
-        char size[64], time[64];
-        char mode[256];
-        char compression[256];
+        std::wstring compression;
         WAVEFORMATEX* m_pwfx = mmio.m_pwfx;
 
         if (m_pwfx->wFormatTag == WAVE_FORMAT_PCM)
@@ -266,7 +258,7 @@ CParserWAV::GetFileInfo(COutputInterface* output)
             bps = m_pwfx->wBitsPerSample;
             hz = m_pwfx->nSamplesPerSec;
             chn = m_pwfx->nChannels;
-            lstrcpy(compression, "PCM");
+            compression = L"PCM";
         }
         else //for non-pcm formats
         {
@@ -274,39 +266,33 @@ CParserWAV::GetFileInfo(COutputInterface* output)
             hz = m_pwfx->nSamplesPerSec;
             chn = m_pwfx->nChannels;
 
-            ACMFORMATTAGDETAILS aftd;
-            memset(&aftd, 0, sizeof(ACMFORMATTAGDETAILS));
-            aftd.cbStruct = sizeof(ACMFORMATTAGDETAILS);
+            ACMFORMATTAGDETAILSW aftd;
+            memset(&aftd, 0, sizeof(aftd));
+            aftd.cbStruct = sizeof(aftd);
             aftd.dwFormatTag = m_pwfx->wFormatTag;
-            MMRESULT mmr = acmFormatTagDetails(NULL, &aftd, ACM_FORMATTAGDETAILSF_FORMATTAG);
+            MMRESULT mmr = acmFormatTagDetailsW(NULL, &aftd, ACM_FORMATTAGDETAILSF_FORMATTAG);
             if (mmr == 0)
-                lstrcpy(compression, aftd.szFormatTag);
+                compression = aftd.szFormatTag;
             else
-                lstrcpy(compression, "?");
+                compression = L"?";
         }
 
         double div = double(bps / 8 * hz * chn);
         if (div > 0.0f)
             s = (int)(double(filesize) / div);
 
-        if (s / 3600)
-            lstrcpy(time, FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60));
-        else
-            lstrcpy(time, FStr("%02lu:%02lu", s / 60 % 60, s % 60));
+        const std::wstring duration = s / 3600
+                                          ? FStrW(L"%02lu:%02lu:%02lu", s / 3600,
+                                                  s / 60 % 60, s % 60)
+                                          : FStrW(L"%02lu:%02lu", s / 60 % 60, s % 60);
+        const std::wstring mode = LangStr(chn >= 2 ? IDS_WAV_STEREO : IDS_WAV_MONO);
 
-        if (chn >= 2)
-            lstrcpy(mode, LoadStr(IDS_WAV_STEREO));
-        else
-            lstrcpy(mode, LoadStr(IDS_WAV_MONO));
-
-        output->AddHeader(LoadStr(IDS_WAV_INFO));
-        output->AddItem(LoadStr(IDS_OGG_LENGTH), time);
-        output->AddItem(LoadStr(IDS_WAV_COMPRESSION), compression);
-        FormatSize2(bps, size);
-        output->AddItem(LoadStr(IDS_WAV_BITRATE), size);
-        FormatSize2(hz, size);
-        output->AddItem(LoadStr(IDS_WAV_FREQUENCY), size);
-        output->AddItem(LoadStr(IDS_WAV_MODE), mode);
+        output->AddHeader(LangStr(IDS_WAV_INFO).c_str());
+        output->AddItem(LangStr(IDS_OGG_LENGTH).c_str(), duration.c_str());
+        output->AddItem(LangStr(IDS_WAV_COMPRESSION).c_str(), compression.c_str());
+        output->AddItem(LangStr(IDS_WAV_BITRATE).c_str(), FormatSize2W(bps).c_str());
+        output->AddItem(LangStr(IDS_WAV_FREQUENCY).c_str(), FormatSize2W(hz).c_str());
+        output->AddItem(LangStr(IDS_WAV_MODE).c_str(), mode.c_str());
 
         return preOK;
     }

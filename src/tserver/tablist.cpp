@@ -81,7 +81,7 @@ void CListView::Attach(HWND hListView)
 {
     AttachToWindow(hListView);
 
-    HToolTip = CreateWindow(TOOLTIPS_CLASS, NULL, TTS_ALWAYSTIP,
+    HToolTip = CreateWindowW(TOOLTIPS_CLASSW, NULL, TTS_ALWAYSTIP,
                             CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
                             HWindow, NULL, HInstance, NULL);
     SetWindowPos(HToolTip, HWND_TOPMOST, 0, 0, 0, 0,
@@ -237,13 +237,10 @@ LRESULT CListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if (ListView_SubItemHitTest(HWindow, &hti) != -1 && (hti.iItem != LastItem || hti.iSubItem != LastSubItem))
             {
-                WCHAR buff[1000];
-                buff[0] = 0;
-
                 int index = TabList->ColumnIndex[hti.iSubItem];
-                TabList->GetText(hti.iItem, index, buff, _countof(buff), TRUE);
+                ToolTipText = TabList->GetTextOwned(hti.iItem, index);
 
-                LastWidth = ListView_GetStringWidth(HWindow, buff);
+                LastWidth = ListView_GetStringWidth(HWindow, ToolTipText.c_str());
 
                 LastItem = hti.iItem;
                 LastSubItem = hti.iSubItem;
@@ -267,11 +264,12 @@ LRESULT CListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (LastWidth > rect.right - rect.left - 12)
                 {
-                    RemoveEOLs(buff);
-                    ti.lpszText = buff;
+                    RemoveEOLs(ToolTipText.data());
+                    ti.lpszText = ToolTipText.data();
                 }
                 else
                 {
+                    ToolTipText.clear();
                     ti.lpszText = (LPWSTR)L"";
                     LastItem = -1;
                 }
@@ -508,12 +506,9 @@ void CTabList::CopyLineToClipboard(HWND hOwner)
 
     for (int col = 0; col < visibleCount; col++)
     {
-        WCHAR buff[1000];
-        buff[0] = 0;
-        GetText(sel, ColumnIndex[col], buff, _countof(buff));
         if (col > 0)
             line += L'\t';
-        line += buff;
+        line += GetTextOwned(sel, ColumnIndex[col]);
     }
 
     if (OpenClipboard(hOwner))
@@ -534,102 +529,81 @@ void CTabList::CopyLineToClipboard(HWND hOwner)
 
 void CTabList::GetText(int iItem, int index, WCHAR* buff, int buffMax, BOOL preferEndOfText)
 {
+    if (buff == NULL || buffMax <= 0)
+        return;
+
+    const std::wstring text = GetTextOwned(iItem, index);
+    const wchar_t* source = text.c_str();
+    if (preferEndOfText && text.size() + 1 > static_cast<size_t>(buffMax))
+    {
+        source += text.size() - (static_cast<size_t>(buffMax) - 1);
+        if (IS_LOW_SURROGATE(*source))
+            source++;
+    }
+    wcsncpy_s(buff, static_cast<size_t>(buffMax), source, _TRUNCATE);
+}
+
+std::wstring CTabList::GetTextOwned(int iItem, int index, BOOL applyDelta)
+{
     switch (index)
     {
-    case 1:
-    {
-        swprintf_s(buff, buffMax, L"%d", Data.Messages[iItem].ProcessID);
-        break;
-    }
-
-    case 2:
-    {
-        swprintf_s(buff, buffMax, L"%d", Data.Messages[iItem].UniqueProcessID);
-        break;
-    }
-
-    case 3:
-    {
-        Data.GetProcessName(Data.Messages[iItem].UniqueProcessID, buff, buffMax);
-        break;
-    }
-
-    case 4:
-    {
-        swprintf_s(buff, buffMax, L"%d", Data.Messages[iItem].ThreadID);
-        break;
-    }
-
-    case 5:
-    {
-        swprintf_s(buff, buffMax, L"%d", Data.Messages[iItem].UniqueThreadID);
-        break;
-    }
-
+    case 1: return std::to_wstring(Data.Messages[iItem].ProcessID);
+    case 2: return std::to_wstring(Data.Messages[iItem].UniqueProcessID);
+    case 3: return Data.GetProcessNameOwned(Data.Messages[iItem].UniqueProcessID);
+    case 4: return std::to_wstring(Data.Messages[iItem].ThreadID);
+    case 5: return std::to_wstring(Data.Messages[iItem].UniqueThreadID);
     case 6:
-    {
-        Data.GetThreadName(Data.Messages[iItem].UniqueProcessID,
-                           Data.Messages[iItem].UniqueThreadID,
-                           buff, buffMax);
-        break;
-    }
+        return Data.GetThreadNameOwned(Data.Messages[iItem].UniqueProcessID,
+                                       Data.Messages[iItem].UniqueThreadID);
 
     case 7:
     {
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                      &Data.Messages[iItem].Time, NULL, buff,
-                      buffMax);
-        break;
+        const int required = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                                            &Data.Messages[iItem].Time, NULL, NULL, 0);
+        if (required <= 0)
+            return {};
+        std::wstring text(static_cast<size_t>(required), L'\0');
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                           &Data.Messages[iItem].Time, NULL, text.data(), required) == 0)
+            return {};
+        text.resize(static_cast<size_t>(required) - 1);
+        return text;
     }
 
     case 8:
     {
-        GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                      &Data.Messages[iItem].Time,
-                      L"hh':'mm':'ss", buff, buffMax);
-        SWPrintFToEnd_s(buff, buffMax, L".%03d", Data.Messages[iItem].Time.wMilliseconds);
-        break;
+        const int required = GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
+                                            &Data.Messages[iItem].Time,
+                                            L"hh':'mm':'ss", NULL, 0);
+        if (required <= 0)
+            return {};
+        std::wstring text(static_cast<size_t>(required), L'\0');
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
+                           &Data.Messages[iItem].Time, L"hh':'mm':'ss",
+                           text.data(), required) == 0)
+            return {};
+        text.resize(static_cast<size_t>(required) - 1);
+        wchar_t milliseconds[5];
+        swprintf_s(milliseconds, L".%03d", Data.Messages[iItem].Time.wMilliseconds);
+        text += milliseconds;
+        return text;
     }
 
     case 9:
     {
         double d = Data.Messages[iItem].Counter;
-        if (DeltaMode)
+        if (DeltaMode && applyDelta)
             d -= CounterAnchor;
 
-        swprintf_s(buff, buffMax, L"%.3lf", d);
-        break;
+        wchar_t number[64];
+        swprintf_s(number, L"%.3lf", d);
+        return number;
     }
-
-    case 10:
-    {
-        wcscpy_s(buff, buffMax, Data.Messages[iItem].File);
-        break;
+    case 10: return Data.Messages[iItem].File;
+    case 11: return std::to_wstring(Data.Messages[iItem].Line);
+    case 12: return Data.Messages[iItem].Message; // beware: the DBLCLK handling is tied to constant 12!
     }
-
-    case 11:
-    {
-        swprintf_s(buff, buffMax, L"%d", Data.Messages[iItem].Line);
-        break;
-    }
-
-    case 12: // beware: the DBLCLK handling is tied to constant 12!
-    {
-        const WCHAR* s = Data.Messages[iItem].Message;
-        if (preferEndOfText) // we want to return the end of the text (e.g., for a tooltip)
-        {
-            size_t len = wcslen(s);
-            if (len + 1 > (size_t)buffMax)
-            {
-                s += len - ((size_t)buffMax - 1);
-                if (IS_LOW_SURROGATE(*s))
-                    s++; // UTF-16 can contain surrogate pairs; skip the second code unit so the text does not start in the middle of a character
-            }
-        }
-        lstrcpyn(buff, s, buffMax);
-        break;
-    }
-    }
+    return {};
 }
 
 #ifndef LVS_EX_DOUBLEBUFFER
@@ -646,7 +620,7 @@ CTabList::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         RECT r;
         GetClientRect(HWindow, &r);
 
-        HListView = CreateWindowEx(WS_EX_CLIENTEDGE,
+        HListView = CreateWindowExW(WS_EX_CLIENTEDGE,
                                    L"SysListView32",
                                    L"",
                                    WS_VISIBLE | WS_CHILD | WS_VSCROLL | WS_HSCROLL | WS_CLIPSIBLINGS |
@@ -799,11 +773,6 @@ CTabList::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     info->item.mask |= LVIF_IMAGE;
                 else
                     info->item.mask |= LVIF_TEXT;
-
-                //            WCHAR buff[1000];
-                //            buff[0] = 0;
-                //            info->item.pszText = buff;
-                //            info->item.pszText[0] = 0;
 
                 if (index == 0)
                 {

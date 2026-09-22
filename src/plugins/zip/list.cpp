@@ -7,6 +7,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <tchar.h>
+#include <vector>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -32,7 +33,7 @@ int CZipList::ListArchive(CSalamanderDirectoryAbstract* dir, BOOL& haveFiles)
     int ret;
 
     haveFiles = FALSE;
-    ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                       true, true); // set 'useReadCache' to TRUE -> optimized central directory reading
     if (ret)
@@ -55,14 +56,18 @@ int CZipList::List(CSalamanderDirectoryAbstract* dir, BOOL& haveFiles)
     int errorID = 0;
     QWORD readOffset;
     //  char *              pathBuf;
-    LPCTSTR path;
-    LPTSTR name;
+    const char* path;
+    char* name;
 
     if (ZeroZip)
         return 0;
     centralHeader = (CFileHeader*)malloc(MAX_HEADER_SIZE);
-    fileInfo.Name = (LPTSTR)malloc(sizeof(TCHAR) * MAX_HEADER_SIZE);
+    fileInfo.Name = (char*)malloc(sizeof(char) * MAX_HEADER_SIZE);
     //  pathBuf = (char *) malloc( MAX_HEADER_SIZE);
+    // Wide scratch buffer for ProcessNameW - see its own comment in common.cpp. Kept
+    // alongside the narrow fileInfo.Name (still used for diagnostics/length checks below,
+    // unchanged) rather than replacing it, to avoid touching that existing narrow logic.
+    std::vector<wchar_t> wideNameBuf(MAX_HEADER_SIZE);
     if (!centralHeader || !fileInfo.Name /* || !pathBuf*/)
     {
         if (centralHeader)
@@ -109,14 +114,14 @@ START_LIST:
                 dir->SetFlags(SALDIRFLAG_CASESENSITIVE);
                 goto START_LIST;
             }
-            int fileInfoNameLen = ProcessName(centralHeader, fileInfo.Name);
+            ProcessName(centralHeader, fileInfo.Name);
             ProcessHeader(centralHeader, &fileInfo);
             //      path = pathBuf;
             //      SplitPath(&path, &name, fileInfo.Name);
             // j.r. optimization instead of SplitPath
             path = fileInfo.Name;
-            // _tcsrchr works correctly on MBCS file names
-            name = _tcsrchr(fileInfo.Name, '\\');
+            // strrchr works correctly on MBCS file names
+            name = strrchr(fileInfo.Name, '\\');
             /*      name = fileInfo.Name + fileInfoNameLen;
       while (name > fileInfo.Name && *name != '\\')
         name--;*/
@@ -128,18 +133,32 @@ START_LIST:
             else
             {
                 name = fileInfo.Name;
-                path = _T("");
+                path = "";
             }
-            int nameLen = (int)(fileInfo.Name + fileInfoNameLen - name);
+            // ProcessNameW shares ProcessName's archive decoder and supplies UTF-16 directly
+            // to the host directory model. The byte path/name fields above are normalized UTF-8.
+            ProcessNameW(centralHeader, wideNameBuf.data());
+            wchar_t* wideName = wideNameBuf.data();
+            wchar_t* wideSlash = wcsrchr(wideName, L'\\');
+            std::wstring pathW, nameW;
+            if (wideSlash)
+            {
+                pathW.assign(wideName, wideSlash);
+                nameW.assign(wideSlash + 1);
+            }
+            else
+            {
+                nameW.assign(wideName);
+            }
 
-            file.NameLen = nameLen;
-            file.Name = (LPTSTR)SalamanderGeneral->Alloc(sizeof(TCHAR) * (file.NameLen + 1));
+            file.NameLen = (int)nameW.size();
+            file.Name = (wchar_t*)SalamanderGeneral->Alloc(sizeof(wchar_t) * (file.NameLen + 1));
             if (!file.Name)
             {
                 errorID = IDS_LOWMEM;
                 break;
             }
-            memcpy(file.Name, name, sizeof(TCHAR) * (file.NameLen + 1));
+            memcpy(file.Name, nameW.c_str(), sizeof(wchar_t) * (file.NameLen + 1));
             //initialize remaining members of CFileData
             file.Size = CQuadWord().SetUI64(fileInfo.Size);
             file.Attr = fileInfo.FileAttr & FILE_ATTTRIBUTE_MASK;
@@ -162,9 +181,9 @@ START_LIST:
             }
             else
             {
-                char* dot = file.Name + file.NameLen - 1;
+                wchar_t* dot = file.Name + file.NameLen - 1;
                 //search backward for last dot
-                for (; dot >= file.Name && *dot != '.'; dot--)
+                for (; dot >= file.Name && *dot != L'.'; dot--)
                     ; // ".cvspass" is extension in Windows
                 //dot found?
                 if (dot >= file.Name)
@@ -176,41 +195,31 @@ START_LIST:
             if (fileInfo.IsDir)
             {
                 file.IsLink = 0;
-                if (!dir->AddDir(path, file, NULL))
+                if (!dir->AddDir(pathW.c_str(), file, NULL))
                 {
                     delete (CZIPFileData*)file.PluginData;
-                    TRACE_E("Error adding directory " << path << "\\" << file.Name << " in the list");
+                    // file.Name is wide (ProcessNameW, see the comment above); pathW is its
+                    // matching wide counterpart already in scope, so this trace uses TRACE_EW
+                    // instead of mixing a wide pointer into the narrow TRACE_E ostream.
+                    TRACE_EW(pathW.c_str() << L"\\" << file.Name << L" in the list");
                     SalamanderGeneral->Free(file.Name);
-                    if (_tcslen(path) >= _MAX_PATH)
-                    {
-                        errorID = IDS_ERRADDDIR_TOOLONG;
-                        // NOTE: no break! We continue parsing the archive
-                    }
-                    else
-                    {
-                        errorID = IDS_ERRADDDIR;
-                        break;
-                    }
+                    errorID = IDS_ERRADDDIR;
+                    break;
                 }
             }
             else
             {
                 file.IsLink = SalamanderGeneral->IsFileLink(file.Ext);
-                if (!dir->AddFile(path, file, NULL))
+                if (!dir->AddFile(pathW.c_str(), file, NULL))
                 {
                     delete (CZIPFileData*)file.PluginData;
-                    TRACE_E("Error adding file " << path << "\\" << file.Name << " to the list");
+                    // file.Name is wide (ProcessNameW, see the comment above); pathW is its
+                    // matching wide counterpart already in scope, so this trace uses TRACE_EW
+                    // instead of mixing a wide pointer into the narrow TRACE_E ostream.
+                    TRACE_EW(pathW.c_str() << L"\\" << file.Name << L" to the list");
                     SalamanderGeneral->Free(file.Name);
-                    if (_tcslen(path) >= _MAX_PATH)
-                    {
-                        errorID = IDS_ERRADDFILE_TOOLONG;
-                        // NOTE: no break! We continue parsing the archive
-                    }
-                    else
-                    {
-                        errorID = IDS_ERRADDFILE;
-                        break;
-                    }
+                    errorID = IDS_ERRADDFILE;
+                    break;
                 }
             }
 

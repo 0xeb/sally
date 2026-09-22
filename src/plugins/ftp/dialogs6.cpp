@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -14,8 +14,7 @@ BOOL CALLBACK CorrectDisabledButtons(HWND hwnd, LPARAM lParam)
     BOOL cont = TRUE;
     if (hwnd != NULL && !IsWindowEnabled(hwnd))
     {
-        char className[31];
-        if (GetClassName(hwnd, className, 31) && _stricmp(className, "button") == 0)
+        if (FTPWindowHasClass(hwnd, L"button"))
         {
             LONG style = GetWindowLong(hwnd, GWL_STYLE);
             if ((style & BS_CHECKBOX) == 0 && (style & BS_DEFPUSHBUTTON) != 0)
@@ -38,16 +37,33 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         BOOL preventSystemFromSettingFocus = FALSE;
-        GetDlgItemText(HWindow, IDB_PAUSERESUME, PauseButtonPauseText, 50);
-        GetDlgItemText(HWindow, IDB_OPCONSPAUSERESUME, ConPauseButtonPauseText, 50);
+        try
+        {
+            PauseButtonPauseText = SPLGetDlgItemTextOwned(HWindow, IDB_PAUSERESUME);
+            ConPauseButtonPauseText = SPLGetDlgItemTextOwned(HWindow, IDB_OPCONSPAUSERESUME);
+        }
+        catch (...)
+        {
+            DestroyWindow(HWindow);
+            return FALSE;
+        }
         LastFocusedControl = GetDlgItem(HWindow, IDB_SHOWDETAILS);
         CFTPOperationType operType = Oper->GetOperationType();
         if (operType == fotCopyDownload || operType == fotMoveDownload)
         {
             // start a thread to fetch the free disk space
-            CPathBuffer pathBuf; // Heap-allocated for long path support
-            Oper->GetTargetPath(pathBuf, pathBuf.Size());
-            GetDiskFreeSpaceThread = new CGetDiskFreeSpaceThread(pathBuf, HWindow);
+            std::wstring path;
+            GetDiskFreeSpaceThread = NULL;
+            if (Oper->GetTargetPath(path))
+            {
+                try
+                {
+                    GetDiskFreeSpaceThread = new CGetDiskFreeSpaceThread(path, HWindow);
+                }
+                catch (...)
+                {
+                }
+            }
             if (GetDiskFreeSpaceThread != NULL && GetDiskFreeSpaceThread->IsGood())
             {
                 if (GetDiskFreeSpaceThread->Create(AuxThreadQueue) == NULL)
@@ -88,10 +104,13 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         LowDiskSpaceHint = SalamanderGUI->AttachHyperLink(HWindow, IDT_ERRORMSG, STF_DOTUNDERLINE);
         SendDlgItemMessage(HWindow, IDI_ERRORICON, STM_SETICON, (WPARAM)WarningIcon, 0);
 
-        char buf[100];
-        if (GetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf, 100))
+        try
         {
-            OperationsTextOrig = buf;
+            OperationsTextOrig = SPLGetDlgItemTextOwned(HWindow, IDT_OPERATIONSTEXT);
+        }
+        catch (...)
+        {
+            OperationsTextOrig.clear();
         }
 
         if (Source == NULL || Target == NULL || TimeLeft == NULL || Status == NULL ||
@@ -251,9 +270,9 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ShowOnlyErrYOffset = p.y;
 
         // insert a marker for resizing the window in the bottom-right corner
-        SizeBox = CreateWindowEx(0,
-                                 "scrollbar",
-                                 "",
+        SizeBox = CreateWindowExW(0,
+                                 L"scrollbar",
+                                 L"",
                                  WS_CHILDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_VISIBLE |
                                      WS_GROUP | SBS_SIZEBOX | SBS_SIZEGRIP | SBS_SIZEBOXBOTTOMRIGHTALIGN,
                                  0, 0, r1.right, r1.bottom,
@@ -364,17 +383,27 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 LastNeededDiskSpace != CQuadWord(-1, -1) && // if we know the required space on the disk
                 LastNeededDiskSpace > freeSpace)
             {
-                char num1[100];
-                char num2[100];
-                char num3[100];
                 showLowDiskWarning = TRUE;
-                SalamanderGeneral->PrintDiskSize(num1, LastNeededDiskSpace, 1);
-                SalamanderGeneral->PrintDiskSize(num2, freeSpace, 1);
-                SalamanderGeneral->PrintDiskSize(num3, LastNeededDiskSpace - freeSpace, 1);
-                char buf[300];
-                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOWDISKSPACEONTGTPATH), num1, num2, num3);
-                if (LowDiskSpaceHint != NULL)
-                    LowDiskSpaceHint->SetActionShowHint(buf);
+                try
+                {
+                    const std::wstring neededText =
+                        SPLPrintDiskSizeOwned(SalamanderGeneral, LastNeededDiskSpace, 1);
+                    const std::wstring freeText =
+                        SPLPrintDiskSizeOwned(SalamanderGeneral, freeSpace, 1);
+                    const std::wstring shortfallText = SPLPrintDiskSizeOwned(
+                        SalamanderGeneral, LastNeededDiskSpace - freeSpace, 1);
+                    const std::wstring message = SPLFormatStringOwned(
+                        SPLLoadStrOwned(SalamanderGeneral, HLanguage,
+                                        IDS_LOWDISKSPACEONTGTPATH)
+                            .c_str(),
+                        neededText.c_str(), freeText.c_str(), shortfallText.c_str());
+                    if (LowDiskSpaceHint != NULL)
+                        LowDiskSpaceHint->SetActionShowHint(message.c_str());
+                }
+                catch (...)
+                {
+                    showLowDiskWarning = FALSE;
+                }
             }
             if (showLowDiskWarning != ShowLowDiskWarning)
             {
@@ -498,7 +527,6 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (IsWindowEnabled(HWindow))
         {
-            char buf[200];
             if (uMsg == WM_COMMAND)
                 SetUserWasActive();
             HWND lastFocus = GetFocus();
@@ -570,8 +598,8 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     HWND focus = GetForegroundWindow() == HWindow ? GetFocus() : NULL;
                     DlgWillCloseIfOpFinWithSkips = FALSE;
-                    int res = SalamanderGeneral->SalMessageBox(HWindow, LoadStr(state == opstInProgress ? IDS_OPERDLGCONFIRMCANCEL : IDS_OPERDLGCONFIRMCLOSE),
-                                                               TitleText != NULL ? TitleText : "",
+                    int res = SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, state == opstInProgress ? IDS_OPERDLGCONFIRMCANCEL : IDS_OPERDLGCONFIRMCLOSE).c_str(),
+                                                               TitleText.c_str(),
                                                                MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                    MB_ICONQUESTION);
                     DlgWillCloseIfOpFinWithSkips = (IsDlgButtonChecked(HWindow, IDC_OPCLOSEWINWHENDONE) == BST_CHECKED);
@@ -705,11 +733,21 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int index = ListView_GetNextItem(ConsListView, -1, LVIS_FOCUSED);
                     if (index >= 0)
                     {
-                        sprintf(buf, LoadStr(IDS_WANTTOSTOPCON), WorkersList->GetWorkerID(index));
+                        std::wstring question;
+                        try
+                        {
+                            question = SPLFormatStringOwned(
+                                LangStr(IDS_WANTTOSTOPCON).c_str(),
+                                WorkersList->GetWorkerID(index));
+                        }
+                        catch (...)
+                        {
+                            return TRUE;
+                        }
                         HWND focus = GetForegroundWindow() == HWindow ? GetFocus() : NULL;
                         DlgWillCloseIfOpFinWithSkips = FALSE;
-                        int res = SalamanderGeneral->SalMessageBox(HWindow, buf,
-                                                                   TitleText != NULL ? TitleText : "",
+                        int res = SalamanderGeneral->SalMessageBox(HWindow, question.c_str(),
+                                                                   TitleText.c_str(),
                                                                    MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                        MSGBOXEX_SILENT | MB_ICONQUESTION);
                         CorrectLookOfPrevFocusedDisabledButton(focus);
@@ -771,7 +809,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int index = ((NMLVDISPINFO*)lParam)->item.iItem;
                 if (ShowOnlyErrors && index >= 0 && index < ErrorsIndexes.Count)
                     index = ErrorsIndexes[index];
-                Queue->GetListViewDataFor(index, (NMLVDISPINFO*)lParam, ItemsTextBuf[ItemsActTextBuf], OPERDLG_ITEMSTEXTBUFSIZE);
+                Queue->GetListViewDataForW(index, (NMLVDISPINFO*)lParam, ItemsTextBuf[ItemsActTextBuf]);
                 if (++ItemsActTextBuf > 2)
                     ItemsActTextBuf = 0;
                 return FALSE; // continue processing
@@ -821,7 +859,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 case LVN_GETDISPINFO:
                 {
                     WorkersList->GetListViewDataFor(((NMLVDISPINFO*)lParam)->item.iItem, (NMLVDISPINFO*)lParam,
-                                                    ConsTextBuf[ConsActTextBuf], OPERDLG_CONSTEXTBUFSIZE);
+                                                    ConsTextBuf[ConsActTextBuf]);
                     if (++ConsActTextBuf > 2)
                         ConsActTextBuf = 0;
                     return FALSE; // continue processing
@@ -905,8 +943,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HWND focus = GetForegroundWindow() == HWindow ? GetFocus() : NULL;
             if (focus != NULL)
             {
-                char className[31];
-                if (GetClassName(focus, className, 31) && _stricmp(className, "button") == 0)
+                if (FTPWindowHasClass(focus, L"button"))
                 {
                     SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)focus, TRUE);
                     EnumChildWindows(HWindow, CorrectDisabledButtons, NULL);
@@ -1267,7 +1304,7 @@ void COperationDlg::SetupCloseButton(BOOL flashTitle)
     switch (state)
     {
     case opstInProgress:
-        SetDlgItemText(HWindow, IDCANCEL, LoadStr(IDS_OPERDLGCLOSEBUTTON2));
+        SetDlgItemTextW(HWindow, IDCANCEL, LangStr(IDS_OPERDLGCLOSEBUTTON2).c_str());
         break;
 
     case opstFinishedWithSkips:
@@ -1303,7 +1340,7 @@ void COperationDlg::SetupCloseButton(BOOL flashTitle)
         // break is intentionally omitted here;
     case opstFinishedWithErrors:
     {
-        SetDlgItemText(HWindow, IDCANCEL, LoadStr(IDS_OPERDLGCLOSEBUTTON1));
+        SetDlgItemTextW(HWindow, IDCANCEL, LangStr(IDS_OPERDLGCLOSEBUTTON1).c_str());
         if (flashTitle)
         {
             HWND wnd = GetForegroundWindow();

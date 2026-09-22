@@ -24,13 +24,13 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
     {
     case MENUCMD_VIEWBMPFROMCLIP:
     {
-        SalamanderGeneral->ShowMessageBox("TODO: Implement View Bitmap from Clipboard.", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SalamanderGeneral->ShowMessageBox(L"TODO: Implement View Bitmap from Clipboard.", LoadStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         //      SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_SOURCE);  // we consider this command as working with the path (appears in Alt+F12)
         break;
     }
 
     default:
-        SalamanderGeneral->ShowMessageBox("Unknown command.", LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(L"Unknown command.", LoadStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         break;
     }
     return FALSE; // do not unselect items in the panel

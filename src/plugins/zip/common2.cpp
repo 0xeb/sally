@@ -29,117 +29,6 @@
 #include "dialogs.h"
 #include "sfxmake\\sfxmake.h"
 
-int RenumberName(int number, const char* oldName, char* newName,
-                 bool lastFile, BOOL winzip)
-{
-    CALL_STACK_MESSAGE4("RenumberName(%d, %s, , %d)", number, oldName, lastFile);
-
-    const char* arcName = strrchr(oldName, '\\');
-    if (arcName != NULL)
-        arcName++;
-    else
-        arcName = oldName;
-    const char* ext = strrchr(arcName, '.');
-    const char* ptr = arcName + strlen(arcName);
-    const char *numberEnd = NULL, *numberStart = arcName;
-    bool haveNumber = false;
-
-    while (--ptr > arcName)
-    {
-        if (!numberEnd && isdigit(*ptr))
-            numberEnd = ptr + 1;
-        if (numberEnd && !isdigit(*ptr))
-        {
-            numberStart = ptr + 1;
-            break;
-        }
-    }
-
-    CPathBuffer buf;
-    if (numberEnd && !winzip)
-    {
-        if (lastFile && ext && ext < numberStart) // in Windows ".cvspass" is treated as an extension
-        {
-            // probably the last file according to the WinZip format
-            int i = (int)(ext - oldName);
-            memmove(buf, oldName, i);
-            strcpy(buf + i, ".zip");
-        }
-        else
-        {
-            int i = (int)(numberStart - oldName);
-            memcpy(buf, oldName, i);
-            i += sprintf(buf + i, "%0*d", (int)(numberEnd - numberStart), number);
-            strcpy(buf + i, numberEnd);
-        }
-    }
-    else
-    {
-        if (ext) // in Windows ".cvspass" is treated as an extension
-        {
-            // probably a WinZip format
-            int i = (int)(ext - oldName);
-            memmove(buf, oldName, i);
-            sprintf(buf + i, lastFile ? ".zip" : ".z%02d", number);
-        }
-        else
-        {
-            strcpy(buf, oldName);
-            sprintf(buf + strlen(buf), "%02d", number);
-        }
-    }
-
-    if (strlen(buf) > MAX_PATH)
-    {
-        TRACE_I("archive name is too long to add file numbers:" << buf);
-        strcpy(newName, oldName);
-    }
-    else
-        strcpy(newName, buf);
-    return (int)strlen(newName);
-}
-
-void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext)
-{
-    CALL_STACK_MESSAGE2("SplitPath2(%s, , , )", pathToSplit);
-    const char* sour = pathToSplit;
-    const char* lastSlash = NULL;
-    const char* lastDot = NULL;
-
-    while (*sour)
-    {
-        if (*sour == '\\')
-            lastSlash = sour;
-        sour++;
-    }
-    if (lastSlash)
-    {
-        lstrcpyn(path, pathToSplit, (int)(lastSlash - pathToSplit) + 2);
-        sour = ++lastSlash;
-    }
-    else
-    {
-        *path = 0;
-        lastSlash = sour = pathToSplit;
-    }
-    while (*sour)
-    {
-        if (*sour == '.')
-            lastDot = sour;
-        sour++;
-    }
-    if (lastDot)
-    {
-        lstrcpyn(name, lastSlash, (int)(lastDot - lastSlash) + 1);
-        lstrcpy(ext, lastDot);
-    }
-    else
-    {
-        lstrcpy(name, lastSlash);
-        *ext = 0;
-    }
-}
-
 int CZipCommon::ChangeDisk()
 {
     CALL_STACK_MESSAGE1("CZipCommon::ChangeDisk()");
@@ -149,16 +38,18 @@ int CZipCommon::ChangeDisk()
     // small test to detect WinZip names
     if (CHDiskFlags & (CHD_FIRST | CHD_SEQNAMES))
     {
-        CPathBuffer buf; // Heap-allocated for long path support
-        RenumberName(DiskNum + 1, ZipName, buf,
-                     DiskNum == EOCentrDir.DiskNum, CHDiskFlags & CHD_WINZIP);
-        if (SalamanderGeneral->SalGetFileAttributes(buf) == 0xFFFFFFFF)
+        std::wstring candidate = RenumberZipVolumeName(DiskNum + 1, ZipName.c_str(),
+                                                       DiskNum == EOCentrDir.DiskNum,
+                                                       (CHDiskFlags & CHD_WINZIP) != 0);
+        if (SalamanderGeneral->SalGetFileAttributes(candidate.c_str()) == 0xFFFFFFFF)
         {
             // the file with the next number is not on the disk; try whether it might appear there
             // s invertovanym winzip flagem
-            RenumberName(DiskNum + 1, ZipName, buf,
-                         DiskNum == EOCentrDir.DiskNum, !(CHDiskFlags & CHD_WINZIP));
-            if (SalamanderGeneral->SalGetFileAttributes(buf) != 0xFFFFFFFF && lstrcmpi(ZipName, buf))
+            candidate = RenumberZipVolumeName(DiskNum + 1, ZipName.c_str(),
+                                              DiskNum == EOCentrDir.DiskNum,
+                                              (CHDiskFlags & CHD_WINZIP) == 0);
+            if (SalamanderGeneral->SalGetFileAttributes(candidate.c_str()) != 0xFFFFFFFF &&
+                CompareStringOrdinal(ZipName.c_str(), -1, candidate.c_str(), -1, TRUE) != CSTR_EQUAL)
                 CHDiskFlags ^= CHD_WINZIP;
         }
     }
@@ -177,8 +68,9 @@ int CZipCommon::ChangeDisk()
         {
             if (CHDiskFlags & CHD_SEQNAMES)
             {
-                RenumberName(DiskNum + 1, ZipName, ZipName,
-                             DiskNum == EOCentrDir.DiskNum, CHDiskFlags & CHD_WINZIP);
+                ZipName = RenumberZipVolumeName(DiskNum + 1, ZipName.c_str(),
+                                                DiskNum == EOCentrDir.DiskNum,
+                                                (CHDiskFlags & CHD_WINZIP) != 0);
             }
         }
         else
@@ -194,7 +86,7 @@ int CZipCommon::ChangeDisk()
         if (ZipFile)
             CloseCFile(ZipFile);
         ZipFile = NULL;
-        ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+        ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           bigFile, useReadCache);
         if (ret)
@@ -208,78 +100,58 @@ int CZipCommon::ChangeDisk()
     CHDiskFlags &= ~CHD_FIRST;
     //if (*OriginalCurrentDir)  SetCurrentDirToZipPath();
     if (ArchiveVolumes != NULL)
-        ArchiveVolumes->Add(_strdup(ZipName));
+        ArchiveVolumes->push_back(ZipName);
     return 0;
 }
 
-void CZipCommon::FindLastFile(char* lastFile)
+std::wstring CZipCommon::FindLastFile()
 {
     CALL_STACK_MESSAGE1("CZipCommon::FindLastFile()");
-    CPathBuffer path; // Heap-allocated for long path support
-    CPathBuffer name; // Heap-allocated for long path support
-    CPathBuffer ext; // Heap-allocated for long path support
-    char* sour;
-    int i, j;
-    CPathBuffer mask; // Heap-allocated for long path support
-    WIN32_FIND_DATA data;
-    HANDLE search;
-    int biggest = 0;
-    CPathBuffer buf; // Heap-allocated for long path support
-    int pathLen;
+    const size_t slash = ZipName.find_last_of(L'\\');
+    const size_t nameStart = slash == std::wstring::npos ? 0 : slash + 1;
+    const std::wstring directory = ZipName.substr(0, nameStart);
+    const size_t dot = ZipName.find_last_of(L'.');
+    const size_t extensionStart = dot != std::wstring::npos && dot >= nameStart ? dot : ZipName.size();
+    const std::wstring name = ZipName.substr(nameStart, extensionStart - nameStart);
+    const std::wstring extension = ZipName.substr(extensionStart);
+    if (name.empty())
+        return {};
 
-    *lastFile = NULL;
-    SplitPath2(ZipName, path, name, ext);
-    if (!*name)
-        return;
-    /*{
-    lstrcpy(name, ext);
-    *ext = 0;
-  }*/
-    i = lstrlen(name) - 1;
-    sour = name.Get() + i;
-    while (sour >= name.Get())
-    {
-        if (!isdigit(*sour))
-            break;
-        sour--;
-    }
-    if (sour < name.Get() || sour == name.Get() + i)
-        return;
-    *(++sour) = 0;
-    sprintf(mask.Get(), "%s%s*%s", path.Get(), name.Get(), ext.Get());
-    search = FindFirstFile(mask, &data);
+    size_t digitStart = name.size();
+    while (digitStart > 0 && name[digitStart - 1] >= L'0' && name[digitStart - 1] <= L'9')
+        --digitStart;
+    if (digitStart == 0 || digitStart == name.size())
+        return {};
+
+    const std::wstring mask = directory + name.substr(0, digitStart) + L"*" + extension;
+    WIN32_FIND_DATAW data;
+    HANDLE search = FindFirstFileW(mask.c_str(), &data);
     if (search == INVALID_HANDLE_VALUE)
-        return;
-    lstrcpy(buf, path);
-    pathLen = lstrlen(buf);
+        return {};
+
+    int biggest = 0;
+    std::wstring result;
     do
     {
-        SplitPath2(data.cFileName, path, name, ext);
-        /*if (!*name)
-    {
-      lstrcpy(name, ext);
-      *ext = 0;
-    }*/
-        i = lstrlen(name) - 1;
-        sour = name.Get() + i;
-        while (sour >= name.Get())
+        const std::wstring foundName = data.cFileName;
+        const size_t foundDot = foundName.find_last_of(L'.');
+        const size_t foundNameEnd = foundDot != std::wstring::npos ? foundDot : foundName.size();
+        size_t foundDigitStart = foundNameEnd;
+        while (foundDigitStart > 0 && foundName[foundDigitStart - 1] >= L'0' &&
+               foundName[foundDigitStart - 1] <= L'9')
+            --foundDigitStart;
+        if (foundDigitStart > 0 && foundDigitStart < foundNameEnd)
         {
-            if (!isdigit(*sour))
-                break;
-            sour--;
-        }
-        if (sour >= name.Get() && sour != name.Get() + i)
-        {
-            j = atoi(++sour);
-            if (j > biggest && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            const int number = _wtoi(foundName.c_str() + foundDigitStart);
+            if (number > biggest && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             {
-                biggest = j;
-                lstrcpy(buf.Get() + pathLen, data.cFileName);
+                biggest = number;
+                result = directory + foundName;
             }
         }
-    } while (FindNextFile(search, &data));
-    if (GetLastError() == ERROR_NO_MORE_FILES && biggest)
-        lstrcpy(lastFile, buf);
+    } while (FindNextFileW(search, &data));
+    if (GetLastError() != ERROR_NO_MORE_FILES)
+        result.clear();
     FindClose(search);
-    return;
+    return result;
 }

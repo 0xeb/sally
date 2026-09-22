@@ -12,7 +12,6 @@
 #endif
 
 #include "worker.h"
-#include "common/widepath.h"
 #include "common/unicode/PathIdentityPolicy.h"
 #include "common/unicode/PanelPathPolicy.h"
 #include "common/unicode/helpers.h"
@@ -58,31 +57,6 @@ void CProgressSpeedMeter::Clear()
     MaxPacketSize = 0;
 }
 
-void COperation::PopulateWidePathsFromAnsi()
-{
-    // Widen SourceName if owned and not already set
-    if (OwnsSourceName && SourceName != NULL && SourceNameW.empty())
-    {
-        wchar_t* wide = SalAllocWidePath(SourceName);
-        if (wide != NULL)
-        {
-            SourceNameW = wide;
-            SalFreeWidePath(wide);
-        }
-    }
-
-    // Widen TargetName if owned and not already set
-    if (OwnsTargetName && TargetName != NULL && TargetNameW.empty())
-    {
-        wchar_t* wide = SalAllocWidePath(TargetName);
-        if (wide != NULL)
-        {
-            TargetNameW = wide;
-            SalFreeWidePath(wide);
-        }
-    }
-}
-
 static std::wstring BuildOperationNameW(std::wstring widePath, const std::wstring& wideFileName)
 {
     if (!wideFileName.empty())
@@ -92,85 +66,30 @@ static std::wstring BuildOperationNameW(std::wstring widePath, const std::wstrin
         widePath += wideFileName;
     }
 
-    // \\?\ decoration unified in common/unicode/helpers.h (Phase 0-c).
-    return sally::unicode::MakeLongPathSafeW(widePath);
-}
-
-void COperations::ReanchorWideSourcePaths(const char* anchorAnsi, const wchar_t* anchorWide)
-{
-    for (size_t i = 0; i < m_ops.size(); ++i)
-    {
-        COperation& op = m_ops[i];
-        if (!op.OwnsSourceName || op.SourceName == NULL || op.SourceNameWExplicit)
-            continue;
-
-        std::wstring rebound = sally::unicode::RebindAnsiPathToWideAnchor(
-            op.SourceName, anchorAnsi, anchorWide);
-        if (rebound.empty())
-            continue;
-
-        op.SourceNameW = BuildOperationNameW(std::move(rebound), std::wstring());
-        op.SourceNameWExplicit = true;
-    }
-}
-
-void COperation::SetSourceNameW(const char* ansiPath, const std::wstring& wideFileName)
-{
-    if (ansiPath == NULL)
-        return;
-
-    // Convert directory path to wide
-    int pathLen = MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, NULL, 0);
-    if (pathLen == 0)
-        return;
-
-    std::wstring widePath;
-    widePath.resize(pathLen);
-    MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, &widePath[0], pathLen);
-    widePath.resize(pathLen - 1);  // Remove null terminator from size
-
-    SetSourceNameW(widePath, wideFileName);
-}
-
-void COperation::SetTargetNameW(const char* ansiPath, const std::wstring& wideFileName)
-{
-    if (ansiPath == NULL)
-        return;
-
-    // Convert directory path to wide
-    int pathLen = MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, NULL, 0);
-    if (pathLen == 0)
-        return;
-
-    std::wstring widePath;
-    widePath.resize(pathLen);
-    MultiByteToWideChar(CP_ACP, 0, ansiPath, -1, &widePath[0], pathLen);
-    widePath.resize(pathLen - 1);  // Remove null terminator from size
-
-    SetTargetNameW(widePath, wideFileName);
+    // Operation state owns logical paths. Win32FileSystem prepares the literal
+    // kernel form at the I/O boundary.
+    return widePath;
 }
 
 void COperation::SetSourceNameW(const std::wstring& widePath, const std::wstring& wideFileName)
 {
     SourceNameW = BuildOperationNameW(widePath, wideFileName);
-    SourceNameWExplicit = true;
 }
 
 void COperation::SetTargetNameW(const std::wstring& widePath, const std::wstring& wideFileName)
 {
     TargetNameW = BuildOperationNameW(widePath, wideFileName);
-    TargetNameWExplicit = true;
 }
 
 BOOL COperation::AreSourceAndTargetExactlySamePath() const
 {
-    return sally::unicode::ArePathsExactlySame(SourceName, TargetName, SourceNameW, TargetNameW);
+    return SourceNameW == TargetNameW && !SourceNameW.empty();
 }
 
 // Case-insensitive comparison of source and target paths - uses wide paths if both available
 BOOL COperation::AreSourceAndTargetSamePath() const
 {
-    return sally::unicode::ArePathsEquivalentForCopy(SourceName, TargetName, SourceNameW, TargetNameW);
+    return _wcsicmp(SourceNameW.c_str(), TargetNameW.c_str()) == 0 && !SourceNameW.empty();
 }
 
 #ifdef SALLY_WORKER_CORE_STANDALONE
@@ -205,16 +124,12 @@ static std::wstring StandaloneRootPathW(std::wstring path)
 BOOL COperation::HasSameRootPath() const
 {
 #ifdef SALLY_WORKER_CORE_STANDALONE
-    std::wstring source = HasWideSource() ? SourceNameW : AnsiToWide(SourceName);
-    std::wstring target = HasWideTarget() ? TargetNameW : AnsiToWide(TargetName);
-    if (source.empty() || target.empty())
+    if (SourceNameW.empty() || TargetNameW.empty())
         return FALSE;
-    return _wcsicmp(StandaloneRootPathW(source).c_str(),
-                    StandaloneRootPathW(target).c_str()) == 0;
+    return _wcsicmp(StandaloneRootPathW(SourceNameW).c_str(),
+                    StandaloneRootPathW(TargetNameW).c_str()) == 0;
 #else
-    if (HasWideSource() && HasWideTarget())
-        return HasTheSameRootPathW(SourceNameW.c_str(), TargetNameW.c_str());
-    return HasTheSameRootPath(SourceName, TargetName);
+    return HasTheSameRootPath(SourceNameW.c_str(), TargetNameW.c_str());
 #endif
 }
 
@@ -223,8 +138,8 @@ BOOL COperation::HasSameRootPath() const
 // COperations
 //
 
-COperations::COperations(int base, int delta, const char* waitInQueueSubject, const char* waitInQueueFrom,
-                         const char* waitInQueueTo) : Sizes(1, 400), Count(0)
+COperations::COperations(int base, int delta, const wchar_t* waitInQueueSubject,
+                         const wchar_t* waitInQueueFrom, const wchar_t* waitInQueueTo) : Sizes(1, 400), Count(0)
 {
     TotalSize = CQuadWord(0, 0);
     CompressedSize = CQuadWord(0, 0);
@@ -258,13 +173,11 @@ COperations::COperations(int base, int delta, const char* waitInQueueSubject, co
     RemovableTgtDisk = FALSE;
     RemovableSrcDisk = FALSE;
     SkipAllCountSizeErrors = FALSE;
-    WorkPath1[0] = 0;
     WorkPath1InclSubDirs = FALSE;
-    WorkPath2[0] = 0;
     WorkPath2InclSubDirs = FALSE;
-    WaitInQueueSubject = waitInQueueSubject ? waitInQueueSubject : "";
-    WaitInQueueFrom = waitInQueueFrom ? waitInQueueFrom : "";
-    WaitInQueueTo = waitInQueueTo ? waitInQueueTo : "";
+    WaitInQueueSubject = waitInQueueSubject ? waitInQueueSubject : L"";
+    WaitInQueueFrom = waitInQueueFrom ? waitInQueueFrom : L"";
+    WaitInQueueTo = waitInQueueTo ? waitInQueueTo : L"";
     HANDLES(InitializeCriticalSection(&StatusCS));
     TransferredFileSize = CQuadWord(0, 0);
     ProgressSize = CQuadWord(0, 0);
@@ -290,7 +203,7 @@ void COperations::SetSpeedLimit(BOOL useSpeedLimit, DWORD speedLimit)
 }
 
 BOOL ShouldWarnNotEnoughSpaceForCopyMove(const COperations* script,
-                                         const char* targetPath,
+                                         const wchar_t* targetPath,
                                          CQuadWord* requiredSpace)
 {
     if (requiredSpace != NULL)
@@ -301,7 +214,7 @@ BOOL ShouldWarnNotEnoughSpaceForCopyMove(const COperations* script,
 #ifdef SALLY_WORKER_CORE_STANDALONE
     const BOOL targetIsSamba = FALSE;
 #else
-    const BOOL targetIsSamba = targetPath != NULL && IsSambaDrivePath(targetPath);
+    const BOOL targetIsSamba = targetPath != NULL && IsSambaDrivePathW(targetPath);
 #endif
 
     const BOOL occupiedSpTooBig =

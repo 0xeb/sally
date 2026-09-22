@@ -1,8 +1,13 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IFileEnumerator.h"
+#include "common/IFileSystem.h"
+#include "common/IPathService.h"
+#include "common/text/EncodingDetector.h" // UTF-8 pre-check
+#include "common/CodeTableTextEncoding.h"
 
 #include "codetbl.h"
 #include "ui/IPrompter.h"
@@ -17,76 +22,135 @@ CCodeTables CodeTables;
 // CCodeTable
 //
 
-char* ReadTable(const char* fileName, char* table)
-{ // reads the 'fileName' file, converts it using 'table'; returns an error message on failure, otherwise NULL
-    CALL_STACK_MESSAGE2("ReadTable(%s,)", fileName);
-    char* text = NULL;
-    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
-                                  FILE_SHARE_READ, NULL,
-                                  OPEN_EXISTING,
-                                  FILE_FLAG_SEQUENTIAL_SCAN,
-                                  NULL);
+enum class EReadTableError
+{
+    None,
+    BadFileSize,
+    System
+};
+
+EReadTableError ReadTable(const wchar_t* fileName, char* table, DWORD* systemError)
+{ // reads the 'fileName' file and reports a POD error across InitAux's SEH boundary
+    CALL_STACK_MESSAGE2("ReadTable(%ls,)", fileName);
+    *systemError = ERROR_SUCCESS;
+    IFileSystem* fileSystem =
+        gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+    HANDLE hFile = fileSystem->OpenFileForRead(fileName, FILE_SHARE_READ);
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        if (GetFileSize(hFile, NULL) == 256)
+        uint64_t fileSize = 0;
+        const FileResult sizeResult =
+            fileSystem->GetHandleFileSize(hFile, &fileSize);
+        if (sizeResult.success && fileSize == 256)
         {
             char buf[256];
-            DWORD read;
-            if (ReadFile(hFile, buf, 256, &read, NULL) && read == 256)
+            DWORD read = 0;
+            const FileResult readResult =
+                fileSystem->ReadFromHandle(hFile, buf, 256, &read);
+            if (readResult.success && read == 256)
             {
                 int i;
                 for (i = 0; i < 256; i++)
-                    table[i] = buf[table[i]];
+                    table[i] = buf[static_cast<BYTE>(table[i])];
             }
             else
             {
-                text = GetErrorText(GetLastError());
+                *systemError = readResult.success ? ERROR_READ_FAULT : readResult.errorCode;
+                fileSystem->CloseFileHandle(hFile);
+                return EReadTableError::System;
             }
         }
+        else if (!sizeResult.success)
+        {
+            *systemError = sizeResult.errorCode;
+            fileSystem->CloseFileHandle(hFile);
+            return EReadTableError::System;
+        }
         else
-            text = LoadStr(IDS_VIEWERBADFILESIZE);
-        HANDLES(CloseHandle(hFile));
+        {
+            fileSystem->CloseFileHandle(hFile);
+            return EReadTableError::BadFileSize;
+        }
+        fileSystem->CloseFileHandle(hFile);
     }
     else
     {
-        text = GetErrorText(GetLastError());
+        *systemError = GetLastError();
+        return EReadTableError::System;
     }
-    return text;
+    return EReadTableError::None;
 }
 
-// Helper functions to avoid std::wstring in SEH blocks
-static void ShowCodeTableError(const char* text)
+static bool CopyCodeTableTextW(const char* text, int textLen,
+                               wchar_t* output, int outputSize)
 {
-    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
+    if (text == nullptr || textLen < 0 || output == nullptr || outputSize <= 0)
+        return false;
+
+    std::wstring decoded;
+    if (!sally::code_table::DecodeLegacyText(
+            text, static_cast<size_t>(textLen), decoded) ||
+        decoded.size() >= static_cast<size_t>(outputSize))
+        return false;
+
+    std::wmemcpy(output, decoded.c_str(), decoded.size() + 1);
+    return true;
 }
 
-static void ShowFileReadError(const char* fileName)
+static wchar_t* DuplicateCodeTableTextW(const char* text)
 {
-    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), AnsiToWide(fileName).c_str());
+    return sally::code_table::DuplicateLegacyText(text);
+}
+
+// Keep C++ objects outside InitAux's SEH scope. The parser reports only a
+// resource ID plus stable pointers; formatting and prompting happen here.
+static void ShowCodeTableError(int textId, const wchar_t* fileName,
+                               EReadTableError detailKind, DWORD detailError)
+{
+    std::wstring detail;
+    if (detailKind == EReadTableError::BadFileSize)
+        detail = LoadStrW(IDS_VIEWERBADFILESIZE);
+    else if (detailKind == EReadTableError::System)
+        detail = GetErrorTextOwned(detailError).c_str();
+    const std::wstring msg = !detail.empty()
+                                 ? FormatStrW(LoadStrW(textId), fileName, detail.c_str())
+                                 : FormatStrW(LoadStrW(textId), fileName);
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+}
+
+static void ShowFileReadError(const wchar_t* fileName)
+{
+    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), fileName);
     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 }
 
 void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
-             char* fileMem, DWORD fileSize, char* fileName, char* fileNameEnd, char* textBuf,
-             char* winCodePage, DWORD* identifier, char* description)
+             char* fileMem, DWORD fileSize, wchar_t* fileName,
+             wchar_t* fileNameEnd, int fileNameCapacity,
+             wchar_t* absoluteFileName, int absoluteFileNameCapacity,
+             const wchar_t* convertCfgFileName,
+             wchar_t* winCodePage, DWORD* identifier, wchar_t* description)
 {
+    (void)hWindow;
     char* txt = fileMem;
     char nameBuf[200];
     char* name;
     char table[256];
 
-    char convertCfgFileName[MAX_PATH]; // for error messages; kept as char[] due to SEH __try constraint
-    strcpy(convertCfgFileName, fileName);
-
     BOOL comment;
-    char* text; // != NULL - means an error message
+    int textId; // != 0 means an error message
+    EReadTableError detailKind;
+    DWORD detailError;
     char* endTxt = txt + fileSize;
     __try
     {
         while (txt < endTxt)
         {
             comment = FALSE;
-            text = NULL;
+            textId = 0;
+            detailKind = EReadTableError::None;
+            detailError = ERROR_SUCCESS;
+            const wchar_t* errorFileName = convertCfgFileName;
             name = nameBuf;
 
             if (endTxt - txt >= 18 && StrNICmp(txt, "WINDOWS_CODE_PAGE=", 18) == 0)
@@ -101,10 +165,9 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                 while (txt < endTxt && *txt != '\r' && *txt != '\n')
                     txt++;
                 int l = (int)min(txt - beg, 100);
-                memcpy(winCodePage, beg, l);
-                while (l > 0 && (winCodePage[l - 1] == ' ' || winCodePage[l - 1] == '\t'))
+                while (l > 0 && (beg[l - 1] == ' ' || beg[l - 1] == '\t'))
                     l--; // trim trailing white spaces
-                winCodePage[l] = 0;
+                CopyCodeTableTextW(beg, l, winCodePage, 101);
             }
             else if (endTxt - txt >= 29 && StrNICmp(txt, "WINDOWS_CODE_PAGE_IDENTIFIER=", 29) == 0)
             {
@@ -120,7 +183,7 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                 int l = (int)min(txt - beg, 100);
                 char buff[101];
                 memcpy(buff, beg, l);
-                while (l > 0 && (identifier[l - 1] == ' ' || identifier[l - 1] == '\t'))
+                while (l > 0 && (buff[l - 1] == ' ' || buff[l - 1] == '\t'))
                     l--; // trim trailing white spaces
                 buff[l] = 0;
                 *identifier = atoi(buff);
@@ -137,10 +200,9 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                 while (txt < endTxt && *txt != '\r' && *txt != '\n')
                     txt++;
                 int l = (int)min(txt - beg, 100);
-                memcpy(description, beg, l);
-                while (l > 0 && (description[l - 1] == ' ' || description[l - 1] == '\t'))
+                while (l > 0 && (beg[l - 1] == ' ' || beg[l - 1] == '\t'))
                     l--; // trim trailing white spaces
-                description[l] = 0;
+                CopyCodeTableTextW(beg, l, description, 101);
             }
             else
             {
@@ -170,7 +232,10 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                             memcpy(name, beg, l);
                             name[l] = 0;
 
-                            int maxFileNameLen = (int)(MAX_PATH - (fileNameEnd - fileName) - 1);
+                            int maxFileNameLen =
+                                fileNameCapacity - (int)(fileNameEnd - fileName) - 1;
+                            if (maxFileNameLen < 0)
+                                maxFileNameLen = 0;
                             int i;
                             for (i = 0; i < 256; i++)
                                 table[i] = i;
@@ -184,16 +249,19 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                                 {
                                     if (*beg == '\\' || beg + 1 < txt && *(beg + 1) == ':') // full-name (UNC, normal)
                                     {
-                                        char fullName[MAX_PATH]; // kept as char[] due to SEH __try constraint
-                                        l = (int)min(txt - beg, MAX_PATH - 1);
-                                        memcpy(fullName, beg, l);
-                                        fullName[l] = 0;
-
-                                        text = ReadTable(fullName, table);
-                                        if (text != NULL)
+                                        l = (int)(txt - beg);
+                                        if (!CopyCodeTableTextW(
+                                                beg, l, absoluteFileName,
+                                                absoluteFileNameCapacity))
                                         {
-                                            sprintf(textBuf, LoadStr(IDS_VIEWERERROPENFILE), fullName, text);
-                                            text = textBuf;
+                                            textId = IDS_VIEWERINVALIDLINE;
+                                        }
+                                        else
+                                        {
+                                            errorFileName = absoluteFileName;
+                                            detailKind = ReadTable(absoluteFileName, table, &detailError);
+                                            if (detailKind != EReadTableError::None)
+                                                textId = IDS_VIEWERERROPENFILE;
                                         }
                                     }
                                     else
@@ -206,44 +274,46 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                                             buf[l] = 0;
                                             if (StrICmp(buf, "ansi->oem") == 0)
                                             {
-                                                CharToOemBuff(table, table, 256);
+                                                CharToOemBuffA(table, table, 256); // table is a byte-to-byte encoding table (codetbl.h), not text
                                             }
                                             else
                                             {
                                                 if (StrICmp(buf, "oem->ansi") == 0)
                                                 {
-                                                    OemToCharBuff(table, table, 256);
+                                                    OemToCharBuffA(table, table, 256); // table is a byte-to-byte encoding table (codetbl.h), not text
                                                 }
                                                 else
                                                 {
-                                                    sprintf(textBuf, LoadStr(IDS_VIEWERBADINTCODING), convertCfgFileName);
-                                                    text = textBuf;
+                                                    textId = IDS_VIEWERBADINTCODING;
                                                 }
                                             }
                                         }
                                         else // relative file name
                                         {
                                             l = (int)min(txt - beg, maxFileNameLen);
-                                            memcpy(fileNameEnd, beg, l);
-                                            fileNameEnd[l] = 0;
-
-                                            text = ReadTable(fileName, table);
-                                            if (text != NULL)
+                                            if (!CopyCodeTableTextW(
+                                                    beg, l, fileNameEnd,
+                                                    maxFileNameLen + 1))
                                             {
-                                                sprintf(textBuf, LoadStr(IDS_VIEWERERROPENFILE), fileName, text);
-                                                text = textBuf;
+                                                textId = IDS_VIEWERINVALIDLINE;
+                                            }
+                                            else
+                                            {
+                                                errorFileName = fileName;
+                                                detailKind = ReadTable(fileName, table, &detailError);
+                                                if (detailKind != EReadTableError::None)
+                                                    textId = IDS_VIEWERERROPENFILE;
                                             }
                                         }
                                     }
                                 }
-                            } while (text == NULL && txt < endTxt && *txt != '\r' && *txt != '\n');
+                            } while (textId == 0 && txt < endTxt && *txt != '\r' && *txt != '\n');
                         }
                         else // missing '=' or it's at the start of the line (and not doubled)
                         {
                             if (!white || txt < endTxt && *txt == '=')
                             {
-                                sprintf(textBuf, LoadStr(IDS_VIEWERINVALIDLINE), convertCfgFileName);
-                                text = textBuf;
+                                textId = IDS_VIEWERINVALIDLINE;
                             }
                             else
                                 comment = TRUE;
@@ -252,14 +322,14 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                 }
             }
 
-            if (text == NULL && !comment) // add code to the code table
+            if (textId == 0 && !comment) // add code to the code table
             {
                 CCodeTablesData* code = new CCodeTablesData;
                 if (code != NULL)
                 {
                     if (name != NULL) // regular entry
                     {
-                        code->Name = DupStr(name);
+                        code->Name = DuplicateCodeTableTextW(name);
                     }
                     else // separator
                     {
@@ -300,87 +370,128 @@ void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
                     txt++; // '\n'
             }
 
-            if (text != NULL)
+            if (textId != 0)
             {
-                ShowCodeTableError(text);
+                ShowCodeTableError(textId, errorFileName, detailKind, detailError);
             }
         }
         if (winCodePage[0] == 0)
-            TRACE_E("File " << fileName << " does not contain assignment to WINDOWS_CODE_PAGE!");
+            TRACE_EW(L"File " << convertCfgFileName << L" does not contain assignment to WINDOWS_CODE_PAGE!");
         if (*identifier == 0xffffffff)
-            TRACE_E("File " << fileName << " does not contain assignment to WINDOWS_CODE_PAGE_IDENTIFIER!");
+            TRACE_EW(L"File " << convertCfgFileName << L" does not contain assignment to WINDOWS_CODE_PAGE_IDENTIFIER!");
         if (description[0] == 0)
-            TRACE_E("File " << fileName << " does not contain assignment to WINDOWS_CODE_PAGE_DESCRIPTION!");
+            TRACE_EW(L"File " << convertCfgFileName << L" does not contain assignment to WINDOWS_CODE_PAGE_DESCRIPTION!");
     }
     __except (HandleFileException(GetExceptionInformation(), fileMem, fileSize))
     {
         // file error
-        ShowFileReadError(fileName);
+        ShowFileReadError(convertCfgFileName);
     }
 }
 
-CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
+CCodeTable::CCodeTable(HWND hWindow, const wchar_t* dirName)
     : Data(10, 5)
 {
     WinCodePage[0] = 0;
     WinCodePageIdentifier = 0xffffffff; // 0 is unsuitable because GetACP returns 0 for UNICODE-only encodings
     WinCodePageDescription[0] = 0;
-    strcpy(DirectoryName, dirName);
+    DirectoryName = dirName != NULL ? dirName : L"";
     State = ctsDefaultValues;
 
-    CPathBuffer fileName; // Heap-allocated for long path support
-    GetModuleFileName(HInstance, fileName, fileName.Size());
-    char* fileNameEnd = strrchr(fileName, '\\') + 1;
-    sprintf(fileNameEnd, "convert\\%s\\", dirName);
-    fileNameEnd += strlen(fileNameEnd);
-    strcpy(fileNameEnd, "convert.cfg");
+    std::wstring modulePath;
+    const bool moduleReady = gPathService != NULL &&
+                             gPathService->GetModuleFileName(HInstance, modulePath).success &&
+                             CutDirectoryW(modulePath);
+    std::wstring conversionDirectory;
+    bool pathReady = moduleReady;
+    if (pathReady)
+    {
+        conversionDirectory = modulePath;
+        SalPathAppendW(conversionDirectory, L"convert");
+        SalPathAppendW(conversionDirectory, dirName);
+        SalPathAddBackslashW(conversionDirectory);
+    }
 
-    HANDLE hFile = SalCreateFileH(fileName, GENERIC_READ,
-                                  FILE_SHARE_READ, NULL,
-                                  OPEN_EXISTING,
-                                  FILE_FLAG_SEQUENTIAL_SCAN,
-                                  NULL);
+    std::wstring convertCfgFileName;
+    if (pathReady)
+    {
+        convertCfgFileName = conversionDirectory;
+        SalPathAppendW(convertCfgFileName, L"convert.cfg");
+    }
+
+    IFileSystem* fileSystem =
+        gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+    HANDLE hFile = pathReady
+                       ? fileSystem->OpenFileForRead(convertCfgFileName.c_str(), FILE_SHARE_READ)
+                       : INVALID_HANDLE_VALUE;
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        CPathBuffer textBuf;
         DWORD err = NO_ERROR;
-        DWORD fileSize = GetFileSize(hFile, NULL);
-        if (fileSize != 0xFFFFFFFF)
+        uint64_t fileSize = 0;
+        const FileResult sizeResult =
+            fileSystem->GetHandleFileSize(hFile, &fileSize);
+        if (sizeResult.success && fileSize > 0 && fileSize <= INT_MAX &&
+            conversionDirectory.length() <= static_cast<size_t>(INT_MAX) - static_cast<size_t>(fileSize) - 1)
         {
-            HANDLE mFile = HANDLES(CreateFileMapping(hFile, NULL, PAGE_READONLY,
-                                                     0, 0, NULL));
-            if (mFile != NULL)
+            const int fileNameCapacity = static_cast<int>(conversionDirectory.length() + fileSize + 1);
+            const int absoluteFileNameCapacity = static_cast<int>(fileSize + 1);
+            char* fileMem = static_cast<char*>(malloc((size_t)fileSize));
+            wchar_t* fileName = static_cast<wchar_t*>(malloc(static_cast<size_t>(fileNameCapacity) * sizeof(wchar_t)));
+            wchar_t* absoluteFileName = static_cast<wchar_t*>(malloc(static_cast<size_t>(absoluteFileNameCapacity) * sizeof(wchar_t)));
+            if (fileMem != NULL && fileName != NULL && absoluteFileName != NULL)
             {
-                char* fileMem = (char*)HANDLES(MapViewOfFile(mFile, FILE_MAP_READ,
-                                                             0, 0, 0));
-                if (fileMem != NULL)
+                memcpy(fileName, conversionDirectory.c_str(),
+                       (conversionDirectory.length() + 1) * sizeof(wchar_t));
+                wchar_t* fileNameEnd = fileName + conversionDirectory.length();
+                DWORD offset = 0;
+                while (offset < (DWORD)fileSize && err == NO_ERROR)
                 {
-                    InitAux(hWindow, Data, fileMem, fileSize, fileName, fileNameEnd,
-                            textBuf, WinCodePage, &WinCodePageIdentifier, WinCodePageDescription);
-                    State = ctsSuccessfullyLoaded;
-
-                    HANDLES(UnmapViewOfFile(fileMem));
+                    DWORD read = 0;
+                    const FileResult readResult = fileSystem->ReadFromHandle(
+                        hFile, fileMem + offset, (DWORD)fileSize - offset, &read);
+                    if (!readResult.success || read == 0)
+                        err = readResult.success ? ERROR_HANDLE_EOF
+                                                 : readResult.errorCode;
+                    else
+                        offset += read;
                 }
-                else
-                    err = GetLastError();
-                HANDLES(CloseHandle(mFile));
+                if (err == NO_ERROR)
+                {
+                    InitAux(hWindow, Data, fileMem, (DWORD)fileSize, fileName,
+                            fileNameEnd, fileNameCapacity, absoluteFileName,
+                            absoluteFileNameCapacity, convertCfgFileName.c_str(),
+                            WinCodePage, &WinCodePageIdentifier,
+                            WinCodePageDescription);
+                    State = ctsSuccessfullyLoaded;
+                }
             }
             else
-                err = GetLastError();
+                err = ERROR_NOT_ENOUGH_MEMORY;
+            free(absoluteFileName);
+            free(fileName);
+            free(fileMem);
         }
+        else if (!sizeResult.success)
+            err = sizeResult.errorCode;
+        else if (fileSize > INT_MAX ||
+                 (fileSize > 0 && conversionDirectory.length() >
+                                      static_cast<size_t>(INT_MAX) - static_cast<size_t>(fileSize) - 1))
+            err = ERROR_FILE_TOO_LARGE;
         else
-            err = GetLastError();
-        HANDLES(CloseHandle(hFile));
+            err = ERROR_FILE_INVALID;
+        fileSystem->CloseFileHandle(hFile);
 
         if (err != NO_ERROR)
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_VIEWERERROPENCODES), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
+            std::wstring msg = FormatStrW(LoadStrW(IDS_VIEWERERROPENCODES),
+                                          convertCfgFileName.c_str(),
+                                          GetErrorTextOwned(err).c_str());
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         }
     }
     else // if convert\\xxx\\convert.cfg is missing, "load" the default configuration
     {
-        lstrcpyn(WinCodePage, LoadStr(IDS_VIEWERANSICODEPAGE), 101); // "ANSI" code page
+        lstrcpynW(WinCodePage, LoadStrW(IDS_VIEWERANSICODEPAGE), 101); // "ANSI" code page
         int i;
         for (i = 0; i < 2; i++)
         {
@@ -394,15 +505,15 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
                 {
                 case 0:
                 {
-                    code->Name = DupStr(LoadStr(IDS_VIEWEROEM2ANSICODING));
-                    OemToCharBuff(code->Table, code->Table, 256);
+                    code->Name = DupStr(LoadStrW(IDS_VIEWEROEM2ANSICODING));
+                    OemToCharBuffA(code->Table, code->Table, 256); // Table is a byte-to-byte encoding table (codetbl.h), not text
                     break;
                 }
 
                 case 1:
                 {
-                    code->Name = DupStr(LoadStr(IDS_VIEWERANSI2OEMCODING));
-                    CharToOemBuff(code->Table, code->Table, 256);
+                    code->Name = DupStr(LoadStrW(IDS_VIEWERANSI2OEMCODING));
+                    CharToOemBuffA(code->Table, code->Table, 256); // Table is a byte-to-byte encoding table (codetbl.h), not text
                     break;
                 }
                 }
@@ -464,24 +575,32 @@ void CCodeTables::PreloadAllConversions()
     HANDLES(EnterCriticalSection(&PreloadCS));
     Preloaded.DestroyMembers();
 
-    CPathBuffer path; // Heap-allocated for long path support
-    GetModuleFileName(NULL, path, path.Size());
-    lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
-
-    WIN32_FIND_DATAW find;
-    HANDLE hFind = SalFindFirstFileHW(path, &find);
-    if (hFind != INVALID_HANDLE_VALUE)
+    std::wstring path;
+    if (gPathService != NULL && gPathService->GetModuleFileName(NULL, path).success &&
+        CutDirectoryW(path))
     {
-        do
+        SalPathAppendW(path, L"convert");
+        IFileEnumerator* enumerator =
+            gFileEnumerator != nullptr ? gFileEnumerator
+                                       : GetWin32FileEnumerator();
+        HENUM enumeration = enumerator != nullptr
+                                ? enumerator->StartEnum(path.c_str(), nullptr)
+                                : INVALID_HENUM;
+        if (enumeration != INVALID_HENUM)
         {
-            if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            FileEnumEntry entry;
+            for (;;)
             {
-                char cFileNameA[MAX_PATH];
-                WideCharToMultiByte(CP_ACP, 0, find.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                if (cFileNameA[0] != 0 && strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0)
+                const EnumResult result =
+                    enumerator->NextFile(enumeration, entry);
+                if (result.noMoreFiles || !result.success)
+                    break;
+                if (entry.IsDirectory() && !entry.name.empty() &&
+                    entry.name != L"." && entry.name != L"..")
                 {
                     // try to open the internal convert.cfg file
-                    CCodeTable* table = new CCodeTable(NULL, cFileNameA);
+                    CCodeTable* table =
+                        new CCodeTable(NULL, entry.name.c_str());
                     if (table == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
@@ -501,8 +620,8 @@ void CCodeTables::PreloadAllConversions()
                         delete table; //  we are not interested in the default table -- discard it
                 }
             }
-        } while (SalLPFindNextFile(hFind, &find));
-        HANDLES(FindClose(hFind));
+            enumerator->EndEnum(enumeration);
+        }
     }
 }
 
@@ -512,10 +631,10 @@ void CCodeTables::FreePreloadedConversions()
     HANDLES(LeaveCriticalSection(&PreloadCS));
 }
 
-BOOL CCodeTables::EnumPreloadedConversions(int* index, const char** winCodePage,
+BOOL CCodeTables::EnumPreloadedConversions(int* index, const wchar_t** winCodePage,
                                            DWORD* winCodePageIdentifier,
-                                           const char** winCodePageDescription,
-                                           const char** dirName)
+                                           const wchar_t** winCodePageDescription,
+                                           const wchar_t** dirName)
 {
     if (*index < 0 || *index >= Preloaded.Count)
         return FALSE;
@@ -523,18 +642,18 @@ BOOL CCodeTables::EnumPreloadedConversions(int* index, const char** winCodePage,
     *winCodePage = table->WinCodePage;
     *winCodePageIdentifier = table->WinCodePageIdentifier;
     *winCodePageDescription = table->WinCodePageDescription;
-    *dirName = table->DirectoryName;
+    *dirName = table->DirectoryName.c_str();
     (*index)++;
     return TRUE;
 }
 
-BOOL CCodeTables::GetPreloadedIndex(const char* dirName, int* index)
+BOOL CCodeTables::GetPreloadedIndex(const wchar_t* dirName, int* index)
 {
     int i;
     for (i = 0; i < Preloaded.Count; i++)
     {
         CCodeTable* table = Preloaded[i];
-        if (stricmp(dirName, table->DirectoryName) == 0)
+        if (_wcsicmp(dirName, table->DirectoryName.c_str()) == 0)
         {
             *index = i;
             return TRUE;
@@ -543,15 +662,14 @@ BOOL CCodeTables::GetPreloadedIndex(const char* dirName, int* index)
     return FALSE;
 }
 
-void CCodeTables::GetBestPreloadedConversion(const char* cfgDirName, char* dirName)
+std::wstring CCodeTables::GetBestPreloadedConversion(const wchar_t* cfgDirName)
 {
     //  criterion (1): cfgDirName
     int dummy;
-    if (cfgDirName[0] != '*' &&
+    if (cfgDirName[0] != L'*' &&
         GetPreloadedIndex(cfgDirName, &dummy))
     {
-        strcpy(dirName, cfgDirName);
-        return;
+        return cfgDirName;
     }
 
     //  criterion (2): item matching the OS code page
@@ -562,29 +680,25 @@ void CCodeTables::GetBestPreloadedConversion(const char* cfgDirName, char* dirNa
         CCodeTable* table = Preloaded[i];
         if (table->WinCodePageIdentifier == cp)
         {
-            strcpy(dirName, table->DirectoryName);
-            return;
+            return table->DirectoryName;
         }
     }
 
     //  criterion (3): westeuro
-    if (GetPreloadedIndex("westeuro", &dummy))
+    if (GetPreloadedIndex(L"westeuro", &dummy))
     {
-        strcpy(dirName, "westeuro");
-        return;
+        return L"westeuro";
     }
 
     if (Preloaded.Count > 0)
     {
         //  criterion (4): first in the list
-        strcpy(dirName, Preloaded[0]->DirectoryName);
-        return;
+        return Preloaded[0]->DirectoryName;
     }
     else
     {
         //  criterion (5): if there is no item in the list, return an empty string
-        dirName[0] = 0;
-        return;
+        return {};
     }
 }
 
@@ -596,10 +710,10 @@ BOOL CCodeTables::Init(HWND hWindow)
     if (!Loaded)
     {
         BOOL findBest = FALSE;
-        if (Configuration.ConversionTable[0] != '*')
+        if (Configuration.ConversionTable[0] != L'*')
         {
             // if the path to convert.cfg is initialized, try to load it
-            Table = new CCodeTable(hWindow, Configuration.ConversionTable);
+            Table = new CCodeTable(hWindow, Configuration.ConversionTable.c_str());
             if (Table != NULL && Table->GetState() != ctsSuccessfullyLoaded)
             {
                 // if the load did not succeed perfectly, give other tables a chance
@@ -617,11 +731,10 @@ BOOL CCodeTables::Init(HWND hWindow)
                 Table = NULL;
             }
             PreloadAllConversions();
-            CPathBuffer dirName; // Heap-allocated for long path support
-            GetBestPreloadedConversion(Configuration.ConversionTable, dirName);
+            std::wstring dirName = GetBestPreloadedConversion(Configuration.ConversionTable.c_str());
             FreePreloadedConversions();
-            strcpy(Configuration.ConversionTable, dirName);
-            Table = new CCodeTable(hWindow, Configuration.ConversionTable);
+            Configuration.ConversionTable = dirName;
+            Table = new CCodeTable(hWindow, Configuration.ConversionTable.c_str());
             // do not check Table->State anymore -- accept anything
         }
         if (Table == NULL)
@@ -641,7 +754,7 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
         TRACE_E("CCodeTables::InitMenu: Table is not loaded");
         return;
     }
-    MENUITEMINFO mi;
+    MENUITEMINFOW mi;
     if (GetMenuItemCount(menu) == 0) // empty menu, needs to be filled
     {
         int count = 0;
@@ -650,8 +763,8 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
         mi.fMask = MIIM_TYPE | MIIM_ID;
         mi.fType = MFT_STRING;
         mi.wID = CM_CODING_MIN;
-        mi.dwTypeData = LoadStr(IDS_VIEWERNONECODING);
-        InsertMenuItem(menu, count++, TRUE, &mi);
+        mi.dwTypeData = LoadStrW(IDS_VIEWERNONECODING);
+        InsertMenuItemW(menu, count++, TRUE, &mi);
 
         int i;
         for (i = 0; i < Table->Data.Count; i++)
@@ -666,7 +779,7 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
                 mi.cbSize = sizeof(mi);
                 mi.fMask = MIIM_TYPE;
                 mi.fType = MFT_SEPARATOR;
-                InsertMenuItem(menu, count++, TRUE, &mi);
+                InsertMenuItemW(menu, count++, TRUE, &mi);
             }
             else
             {
@@ -681,7 +794,7 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
                     break;
                 }
                 mi.dwTypeData = Table->Data[i]->Name;
-                InsertMenuItem(menu, count++, TRUE, &mi);
+                InsertMenuItemW(menu, count++, TRUE, &mi);
             }
         }
     }
@@ -737,7 +850,7 @@ void CCodeTables::Previous(int& codeType)
     codeType = 0;
 }
 
-BOOL CCodeTables::EnumCodeTables(HWND parent, int* index, const char** name, const char** table)
+BOOL CCodeTables::EnumCodeTables(HWND parent, int* index, const wchar_t** name, const char** table)
 {
     CALL_STACK_MESSAGE1("CCodeTables::EnumCodeTables(, , ,)");
     if (name != NULL)
@@ -755,7 +868,7 @@ BOOL CCodeTables::EnumCodeTables(HWND parent, int* index, const char** name, con
     }
     if (*index < Table->Data.Count)
     {
-        char* n = Table->Data[*index]->Name;
+        wchar_t* n = Table->Data[*index]->Name;
         if (n != NULL)
         {
             if (name != NULL)
@@ -781,13 +894,15 @@ BOOL CCodeTables::GetCode(char* table, int& codeType)
         codeType = 0;
     if (codeType == 0)
         return FALSE; // 'none'
+    // The shipped .tab files and both consumers define a 256-byte substitution
+    // map: one input byte selects one output byte.
     memcpy(table, Table->Data[codeType - 1]->Table, 256);
     return TRUE;
 }
 
-BOOL CCodeTables::GetCodeType(const char* coding, int& codeType)
+BOOL CCodeTables::GetCodeType(const wchar_t* coding, int& codeType)
 {
-    CALL_STACK_MESSAGE2("CCodeTables::GetCode(%s, )", coding);
+    CALL_STACK_MESSAGE2("CCodeTables::GetCode(%ls, )", coding);
     if (!Loaded)
     {
         TRACE_E("CCodeTables::GetCodeType: Table is not loaded");
@@ -796,17 +911,20 @@ BOOL CCodeTables::GetCodeType(const char* coding, int& codeType)
     int i;
     for (i = 0; i < Table->Data.Count; i++)
     {
-        const char* n = Table->Data[i]->Name;
+        const wchar_t* n = Table->Data[i]->Name;
         if (n != NULL) // not a separator
         {
-            const char* c = coding;
+            const wchar_t* c = coding;
             while (1)
             {
-                while (*n != 0 && (*n <= ' ' || *n == '-' || *n == '&'))
+                while (*n != 0 && (*n <= L' ' || *n == L'-' || *n == L'&'))
                     n++;
-                while (*c != 0 && (*c <= ' ' || *c == '-') || *c == '&')
+                while (*c != 0 && (*c <= L' ' || *c == L'-') || *c == L'&')
                     c++;
-                if (LowerCase[*n] != LowerCase[*c] || *n == 0)
+                // LowerCase is a BYTE[256] fold table: indexing it with a
+                // wchar_t is an out-of-bounds read above U+00FF, and silently the wrong
+                // answer below it. towlower() is the fold that matches this data.
+                if (towlower(*n) != towlower(*c) || *n == 0)
                     break;
                 n++;
                 c++;
@@ -834,54 +952,44 @@ BOOL CCodeTables::Valid(int codeType)
            (codeType == 0 || Table->Data[codeType - 1]->Name != NULL);
 }
 
-BOOL CCodeTables::GetCodeName(int codeType, char* buffer, int bufferLen)
+BOOL CCodeTables::GetCodeName(int codeType, std::wstring& name)
 {
-    CALL_STACK_MESSAGE3("CCodeTables::GetCodeName(%d, , %d)", codeType, bufferLen);
+    CALL_STACK_MESSAGE2("CCodeTables::GetCodeName(%d)", codeType);
+    name.clear();
     if (!Loaded)
     {
         TRACE_E("CCodeTables::GetCodeName: Table is not loaded");
         return FALSE;
     }
-    char buff[1024];
-    if (bufferLen > 0)
-        buffer[0] = 0;
     if (!Valid(codeType))
         return FALSE;
     if (codeType == 0)
-        strcpy(buff, LoadStr(IDS_VIEWERNONECODING));
+        name = LoadStrW(IDS_VIEWERNONECODING);
     else
-        strcpy(buff, Table->Data[codeType - 1]->Name);
-    int len = (int)strlen(buff);
-    if (len > bufferLen)
-        len = bufferLen - 1;
-    strncpy(buffer, buff, len);
-    buffer[len] = 0;
-    if ((int)strlen(buff) > bufferLen)
-        return FALSE;
+        name = Table->Data[codeType - 1]->Name;
     return TRUE;
 }
 
-void CCodeTables::GetWinCodePage(char* buf)
+std::wstring CCodeTables::GetWinCodePage()
 {
     CALL_STACK_MESSAGE1("CCodeTables::GetWinCodePage()");
     if (!Loaded)
     {
         TRACE_E("CCodeTables::GetWinCodePage: Table is not loaded");
-        buf[0] = 0;
-        return;
+        return {};
     }
-    strcpy(buf, Table->WinCodePage);
+    return Table->WinCodePage;
 }
 
 void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL forceText, BOOL* isText,
-                                    char* codePage)
+                                    std::wstring* codePage)
 {
     CALL_STACK_MESSAGE3("CCodeTables::RecognizeFileType(, %d, %d, ,)", patternLen, forceText);
     if (!Loaded)
     {
         TRACE_E("CCodeTables::RecognizeFileType: Table is not loaded");
         if (codePage != NULL)
-            codePage[0] = 0;
+            codePage->clear();
         if (isText != NULL)
             *isText = FALSE;
         return;
@@ -890,7 +998,7 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
     if (isText != NULL)
         *isText = FALSE;
     if (codePage != NULL)
-        codePage[0] = 0;
+        codePage->clear();
     if (patternLen == 0)
     {
         if (isText != NULL)
@@ -898,49 +1006,66 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
         return; // nothing to do
     }
 
+    // UTF-8 pre-check: this recogniser scores LEGACY code-page
+    // tables against each other, so a BOM-less UTF-8 file was always attributed
+    // to whichever single-byte table penalised its bytes least - the auto-detect
+    // blind spot. Valid UTF-8 with real multi-byte sequences is text, and it is
+    // not any of those code pages, so answer that before scoring begins and
+    // leave the code page EMPTY (meaning "no legacy conversion applies").
+    {
+        bool sawMultiByte = false;
+        if (sally::text::ValidateUtf8((const std::uint8_t*)pattern, (std::size_t)patternLen,
+                                     /*allowTruncatedTail=*/true, &sawMultiByte) &&
+            sawMultiByte)
+        {
+            if (isText != NULL)
+                *isText = TRUE;
+            if (codePage != NULL)
+                codePage->clear();
+            return;
+        }
+    }
+
     char* buf = (char*)malloc(patternLen);
     const char* testBuf;
-    char lastCodePage[101];
-    lastCodePage[0] = 0;
-    int winCodePageLen = (int)strlen(Table->WinCodePage);
+    std::wstring lastCodePage;
+    int winCodePageLen = (int)wcslen(Table->WinCodePage);
     DWORD bestPenalty = 0xFFFFFFFF;
     if (buf != NULL)
     {
         int i;
         for (i = -1; i < Table->Data.Count; i++)
         {
-            const char* n = (i == -1 ? NULL : Table->Data[i]->Name);
+            const wchar_t* n = (i == -1 ? NULL : Table->Data[i]->Name);
             testBuf = NULL;
             if (i == -1) // without changing encoding (text in WinCodePage)
             {
                 testBuf = pattern;
-                strcpy(lastCodePage, Table->WinCodePage);
+                lastCodePage = Table->WinCodePage;
             }
             else
             {
                 if (n != NULL && winCodePageLen > 0) // not a separator and WinCodePage is loaded
                 {
                     // remove '&' characters, they would interfere with comparison
-                    char buf3[200];
-                    lstrcpyn(buf3, n, 200);
-                    RemoveAmpersands(buf3);
-                    n = buf3;
+                    std::wstring displayName(n);
+                    RemoveAmpersands(displayName.data());
+                    displayName.resize(wcslen(displayName.c_str()));
+                    n = displayName.c_str();
 
-                    int nameLen = (int)strlen(n); // check if the "target" conversion is WinCodePage
-                    if (nameLen > winCodePageLen && StrICmp(n + nameLen - winCodePageLen, Table->WinCodePage) == 0)
+                    int nameLen = (int)wcslen(n); // check if the "target" conversion is WinCodePage
+                    if (nameLen > winCodePageLen && StrICmpW(n + nameLen - winCodePageLen, Table->WinCodePage) == 0)
                     {
-                        const char* s = n + nameLen - winCodePageLen;
-                        while (s > n && (*(s - 1) <= ' ' || *(s - 1) == '-'))
+                        const wchar_t* s = n + nameLen - winCodePageLen;
+                        while (s > n && (*(s - 1) <= L' ' || *(s - 1) == L'-'))
                             s--;
-                        int l = (int)min(100, s - n);
-                        memcpy(lastCodePage, n, l);
-                        lastCodePage[l] = 0;
+                        lastCodePage.assign(n, static_cast<size_t>(s - n));
 
                         testBuf = buf;
                         const char* src = pattern;
                         const char* end = pattern + patternLen;
                         char* dst = buf;
-                        char* table = Table->Data[i]->Table;
+                        const char* table = Table->Data[i]->Table;
                         while (src < end)
                             *dst++ = table[(unsigned char)*src++];
                     }
@@ -1094,7 +1219,7 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
                     {
                         bestPenalty = penalty;
                         if (codePage != NULL)
-                            strcpy(codePage, lastCodePage);
+                            *codePage = lastCodePage;
 
                         if (i == -1 && nonAscii * 200 < patternLen)
                             break; // under 0.5% non-ASCII characters -> ASCII, stop searching
@@ -1108,9 +1233,9 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
         TRACE_E(LOW_MEMORY);
 }
 
-int CCodeTables::GetConversionToWinCodePage(const char* codePage)
+int CCodeTables::GetConversionToWinCodePage(const wchar_t* codePage)
 {
-    CALL_STACK_MESSAGE2("CCodeTables::GetConversionToWinCodePage(%s)", codePage);
+    CALL_STACK_MESSAGE2("CCodeTables::GetConversionToWinCodePage(%ls)", codePage);
 
     if (!Loaded)
     {
@@ -1119,36 +1244,36 @@ int CCodeTables::GetConversionToWinCodePage(const char* codePage)
     }
 
     // remove '&' characters; they would interfere with comparison
-    char buf2[200];
-    lstrcpyn(buf2, codePage, 200);
+    wchar_t buf2[200];
+    lstrcpynW(buf2, codePage, 200);
     RemoveAmpersands(buf2);
     codePage = buf2;
 
-    if (StrICmp(codePage, Table->WinCodePage) == 0)
+    if (StrICmpW(codePage, Table->WinCodePage) == 0)
         return 0; // return "none"
-    int winCodePageLen = (int)strlen(Table->WinCodePage);
+    int winCodePageLen = (int)wcslen(Table->WinCodePage);
     if (winCodePageLen > 0) // only if WinCodePage is loaded
     {
         int i;
         for (i = 0; i < Table->Data.Count; i++)
         {
-            const char* n = Table->Data[i]->Name;
+            const wchar_t* n = Table->Data[i]->Name;
             if (n != NULL) // not a separator
             {
                 // remove '&' characters; they would interfere with comparison
-                char buf3[200];
-                lstrcpyn(buf3, n, 200);
+                wchar_t buf3[200];
+                lstrcpynW(buf3, n, 200);
                 RemoveAmpersands(buf3);
                 n = buf3;
 
-                int nameLen = (int)strlen(n); // check whether the "target" conversion is WinCodePage
-                if (nameLen > winCodePageLen && StrICmp(n + nameLen - winCodePageLen, Table->WinCodePage) == 0)
+                int nameLen = (int)wcslen(n); // check whether the "target" conversion is WinCodePage
+                if (nameLen > winCodePageLen && StrICmpW(n + nameLen - winCodePageLen, Table->WinCodePage) == 0)
                 {
-                    const char* s = n + nameLen - winCodePageLen;
-                    while (s > n && (*(s - 1) <= ' ' || *(s - 1) == '-'))
+                    const wchar_t* s = n + nameLen - winCodePageLen;
+                    while (s > n && (*(s - 1) <= L' ' || *(s - 1) == L'-'))
                         s--;
                     int l = (int)min(100, s - n);
-                    if (StrNICmp(n, codePage, l) == 0)
+                    if (StrNICmpW(n, codePage, l) == 0)
                         return i + 1; // found
                 }
             }

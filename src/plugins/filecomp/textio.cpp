@@ -3,6 +3,37 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/Win32TextCodec.h"
+
+static bool GetASCII8ConversionTable(char (&table)[256],
+                                     const char* encodedName) noexcept
+{
+    std::wstring name;
+    if (!DecodeFileCompLegacyText(encodedName, strlen(encodedName), name))
+        return false;
+    try
+    {
+        return SG->GetConversionTable(NULL, table, name.c_str()) != FALSE;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+static bool ProjectWideCodePageNameForLegacyState(const wchar_t* text, char (&legacyName)[101])
+{
+    if (text == NULL)
+        return false;
+
+    std::string staged;
+    if (!EncodeFileCompLegacyText(text, wcslen(text), staged) ||
+        staged.size() >= _countof(legacyName))
+        return false;
+    memcpy(legacyName, staged.data(), staged.size());
+    legacyName[staged.size()] = 0;
+    return true;
+}
 
 using namespace std;
 
@@ -11,7 +42,7 @@ using namespace std;
 // CTextFileReader::CByteReader
 //
 
-CTextFileReader::CByteReader::CByteReader(const char* name, HANDLE file,
+CTextFileReader::CByteReader::CByteReader(const wchar_t* name, HANDLE file,
                                           size_t size, char* buffer, int bufferSize, int bufferedCharacters, const int& cancel, CSalamanderMD5* md5) : Name(name), File(file), UnreadCharacters(size - size_t(bufferedCharacters)),
                                                                                                                                                        Buffer(buffer), BufferSize(bufferSize), BufferedCharacters(bufferedCharacters),
                                                                                                                                                        InPtr(0), Cancel(cancel), MD5(md5)
@@ -73,9 +104,9 @@ CTextFileReader::~CTextFileReader()
     Reset();
 }
 
-void CTextFileReader::Set(const char* name, HANDLE file, size_t size, int eolConversions, eEncoding encoding, eEndian endians, int performASCII8InputEnc, const char* parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5)
+void CTextFileReader::Set(const wchar_t* name, HANDLE file, size_t size, int eolConversions, eEncoding encoding, eEndian endians, int performASCII8InputEnc, const char* parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5)
 {
-    Name = name;
+    Name = name ? name : L"";
     File = file;
     Size = size;
     EolConversions = eolConversions;
@@ -120,13 +151,13 @@ void CTextFileReader::FetchFilePrefix()
             CFilecompWorker::CException::Raise(IDS_LOWMEM, 0);
 
         if (SetFilePointer(File, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-            CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+            CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name.c_str());
 
         DWORD toRead = DWORD(min(size_t(BufferSize), Size));
         DWORD read;
         if (!ReadFile(File, Buffer, toRead, &read, NULL) ||
             toRead != read)
-            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name);
+            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name.c_str());
         if (MD5)
             MD5->Update(Buffer, toRead);
         BufferedCharacters = toRead;
@@ -275,7 +306,7 @@ bool CTextFileReader::IsUTF16Text()
         bc += sqrt(double(histOdd[i]) * double(histEven[i]));
     bc *= norm;
 
-    TRACE_I("Bhattacharyya coefficient of " << Name << " is " << bc);
+    TRACE_IW(L"Bhattacharyya coefficient of " << Name.c_str() << L" is " << bc);
 
     // This filters out 99% of 130K files on my computer and 99% of 180K files on
     // our school terminal server. The remaining 1% are either UTF-16 files or
@@ -308,8 +339,8 @@ bool CTextFileReader::IsUTF16Text()
             p = (histEven[i] + 1. / 256.) * norm;
             ee -= p * log(p);
         }
-        TRACE_I("Even bytes entropy of " << Name << " is " << ee);
-        TRACE_I("Odd  bytes entropy of " << Name << " is " << oe);
+        TRACE_IW(L"Even bytes entropy of " << Name.c_str() << L" is " << ee);
+        TRACE_IW(L"Odd  bytes entropy of " << Name.c_str() << L" is " << oe);
         Type = ftText;
         Encoding = encUTF16;
         Endian = ee > oe ? endianLittle : endianBig;
@@ -446,9 +477,10 @@ void CTextFileReader::EstimateFileType()
          ASCII8InputEncTableName[0] == 0))
     {
         FetchFilePrefix(); // ensure we have file prefix in the buffer
-        char cp[101];
+        std::wstring codePage;
         BOOL isText;
-        SG->RecognizeFileType(NULL, Buffer, BufferedCharacters, Type == ftText, &isText, cp);
+        SPLRecognizeFileTypeOwned(SG, NULL, Buffer, BufferedCharacters,
+                                  Type == ftText, &isText, &codePage);
         if (Type == ftText || isText)
         {
             Type = ftText;
@@ -456,14 +488,13 @@ void CTextFileReader::EstimateFileType()
             {
                 Encoding = encASCII8;
                 // estimated conversion
-                char wincp[101];
-                SG->GetWindowsCodePage(NULL, wincp);
-                if (wincp[0] && cp[0] && strlen(cp) + strlen(wincp) + 4 <= 101 && SG->StrICmp(cp, wincp) != 0)
+                std::wstring windowsCodePage;
+                SPLGetWindowsCodePageOwned(SG, NULL, windowsCodePage);
+                if (!windowsCodePage.empty() && !codePage.empty() &&
+                    SG->StrICmp(codePage.c_str(), windowsCodePage.c_str()) != 0)
                 {
-                    strcpy(ASCII8InputEncTableName, cp);
-                    strcat(ASCII8InputEncTableName, " - ");
-                    strcat(ASCII8InputEncTableName, wincp);
-                    PerformASCII8InputEnc = 1;
+                    const std::wstring conversionName = codePage + L" - " + windowsCodePage;
+                    PerformASCII8InputEnc = ProjectWideCodePageNameForLegacyState(conversionName.c_str(), ASCII8InputEncTableName) ? 1 : 0;
                 }
                 else
                     PerformASCII8InputEnc = 0;
@@ -493,31 +524,46 @@ int CTextFileReader::GetEncoding()
     return Encoding;
 }
 
-void CTextFileReader::GetEncodingName(char* encoding)
+void CTextFileReader::GetEncodingName(std::wstring& encoding) noexcept
 {
-    encoding[0] = 0;
-    if (Encoding == encASCII8)
+    std::wstring staged;
+    try
     {
-        if (PerformASCII8InputEnc && *ASCII8InputEncTableName)
-            _snprintf_s(encoding, 100, _TRUNCATE, "[%s] ", ASCII8InputEncTableName);
-    }
-    else
-    {
-        switch (Encoding)
+        if (Encoding == encASCII8)
         {
-        case encUTF8:
-            strcpy(encoding, "[UTF-8");
-            break;
-        case encUTF16:
-            strcpy(encoding, "[UTF-16");
-            break;
-        case encUTF32:
-            strcpy(encoding, "[UTF-32");
-            break;
+            if (PerformASCII8InputEnc && *ASCII8InputEncTableName)
+            {
+                std::wstring tableName;
+                if (DecodeFileCompLegacyText(ASCII8InputEncTableName,
+                                             strlen(ASCII8InputEncTableName), tableName))
+                    staged = L"[" + tableName + L"] ";
+            }
         }
-        if (Endian == endianBig)
-            strcat(encoding, "BE");
-        strcat(encoding, "] ");
+        else
+        {
+            switch (Encoding)
+            {
+            case encUTF8:
+                staged = L"[UTF-8";
+                break;
+            case encUTF16:
+                staged = L"[UTF-16";
+                break;
+            case encUTF32:
+                staged = L"[UTF-32";
+                break;
+            }
+            if (!staged.empty())
+            {
+                if (Endian == endianBig)
+                    staged += L"BE";
+                staged += L"] ";
+            }
+        }
+        encoding.swap(staged);
+    }
+    catch (...)
+    {
     }
 }
 
@@ -535,7 +581,7 @@ void CTextFileReader::Get(char*& buffer, size_t& size, const int& cancel)
     }
 
     if (SetFilePointer(File, BufferedCharacters, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name.c_str());
 
     // read rest of the file
     size_t bytesLeft = Size - BufferedCharacters;
@@ -546,7 +592,7 @@ void CTextFileReader::Get(char*& buffer, size_t& size, const int& cancel)
         DWORD read;
         if (!ReadFile(File, writePtr, toRead, &read, NULL) ||
             toRead != read)
-            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name);
+            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name.c_str());
         if (MD5)
             MD5->Update(writePtr, toRead);
         bytesLeft -= toRead;
@@ -558,7 +604,7 @@ void CTextFileReader::Get(char*& buffer, size_t& size, const int& cancel)
     if (PerformASCII8InputEnc)
     {
         char conv[256];
-        if (SG->GetConversionTable(NULL, conv, ASCII8InputEncTableName))
+        if (GetASCII8ConversionTable(conv, ASCII8InputEncTableName))
         {
             size_t i;
             for (i = 0; i < Size; ++i)
@@ -583,7 +629,7 @@ void CTextFileReader::Get(wchar_t*& buffer, size_t& size, const int& cancel)
         EstimateFileType();
 
     if (SetFilePointer(File, BufferedCharacters, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name.c_str());
 
     buffer = NULL;
     try
@@ -606,7 +652,7 @@ void CTextFileReader::Get(wchar_t*& buffer, size_t& size, const int& cancel)
         default:
             TRACE_E("This should never happen. Unknown input encoding.");
             throw CFilecompWorker::CException(
-                "This should never happened. Unknown input encoding.");
+                L"This should never happened. Unknown input encoding.");
         }
 
         size = ConvertEols(buffer, size);
@@ -714,7 +760,7 @@ void CTextFileReader::ReadASCII8(wchar_t*& buffer, size_t& size, const int& canc
         DWORD read;
         if (!ReadFile(File, writePtr, toRead, &read, NULL) ||
             toRead != read)
-            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name);
+            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name.c_str());
         if (MD5)
             MD5->Update(writePtr, toRead);
         bytesLeft -= toRead;
@@ -727,7 +773,7 @@ void CTextFileReader::ReadASCII8(wchar_t*& buffer, size_t& size, const int& canc
     if (PerformASCII8InputEnc)
     {
         char conv[256];
-        if (SG->GetConversionTable(NULL, conv, ASCII8InputEncTableName))
+        if (GetASCII8ConversionTable(conv, ASCII8InputEncTableName))
         {
             size_t i;
             for (i = 0; i < Size; ++i)
@@ -735,34 +781,22 @@ void CTextFileReader::ReadASCII8(wchar_t*& buffer, size_t& size, const int& canc
         }
     }
 
-    // TODO what if the file has zero length? MultiByteToWideChar fails?
-
-    int ret = 0;
-    if (Size > 0)
-    {
-        // estimage length
-        ret = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, Buffer, int(Size), NULL, 0);
-        if (ret == 0)
-            CFilecompWorker::CException::Raise(IDS_ERRORUNICODE, GetLastError(), Name);
-    }
+    std::wstring decoded;
+    if (!DecodeFileCompLegacyText(Buffer, Size, decoded))
+        CFilecompWorker::CException::Raise(IDS_ERRORUNICODE, GetLastError(), Name.c_str());
 
     // test
     if (cancel)
         throw CFilecompWorker::CAbortByUserException();
 
     // reserve 1 char more at the end, for possible new-line insertion
-    size = ret;
+    size = decoded.size();
     buffer = (wchar_t*)malloc((size + 1) * sizeof(wchar_t));
     if (!buffer)
         CFilecompWorker::CException::Raise(IDS_LOWMEM, 0);
 
     if (size > 0)
-    {
-        // do the conversion
-        ret = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, Buffer, int(Size), buffer, int(size));
-        if (ret == 0)
-            CFilecompWorker::CException::Raise(IDS_ERRORUNICODE, GetLastError(), Name);
-    }
+        memcpy(buffer, decoded.data(), size * sizeof(wchar_t));
 
     // release further needless memory
     free(Buffer);
@@ -772,7 +806,7 @@ void CTextFileReader::ReadASCII8(wchar_t*& buffer, size_t& size, const int& canc
 
 void CTextFileReader::ReadUTF8(wchar_t*& buffer, size_t& size, const int& cancel)
 {
-    CByteReader input(Name, File, Size, Buffer, BufferSize, BufferedCharacters, cancel, MD5);
+    CByteReader input(Name.c_str(), File, Size, Buffer, BufferSize, BufferedCharacters, cancel, MD5);
 
     Buffer = NULL; // input takes care of freeing it
     BufferedCharacters = 0;
@@ -934,7 +968,7 @@ void CTextFileReader::ReadUTF16(wchar_t*& buffer, size_t& size, const int& cance
         DWORD read;
         if (!ReadFile(File, writePtr, toRead, &read, NULL) ||
             toRead != read)
-            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name);
+            CFilecompWorker::CException::Raise(IDS_READFILE, GetLastError(), Name.c_str());
         if (MD5)
             MD5->Update(writePtr, toRead);
         bytesLeft -= toRead;
@@ -959,7 +993,7 @@ void CTextFileReader::ReadUTF16(wchar_t*& buffer, size_t& size, const int& cance
 
 void CTextFileReader::ReadUTF32(wchar_t*& buffer, size_t& size, const int& cancel)
 {
-    CByteReader input(Name, File, Size, Buffer, BufferSize, BufferedCharacters, cancel, MD5);
+    CByteReader input(Name.c_str(), File, Size, Buffer, BufferSize, BufferedCharacters, cancel, MD5);
 
     Buffer = NULL; // input takes care of freeing it
     BufferedCharacters = 0;

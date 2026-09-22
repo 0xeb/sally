@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "ui/UnicodeHistoryUtils.h" // ShouldUseWidePair
+#include "common/IRegistry.h" // wide hot-path persistence
 
 #include "tooltip.h"
 #include "stswnd.h"
@@ -24,6 +26,7 @@
 #include "jumplist.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/PanelPathPolicy.h"
+#include "common/TitlePathPolicy.h"
 #include "common/fsutil.h"
 
 #include "versinfo.rh2"
@@ -38,6 +41,15 @@ const char* SALAMANDER_TEXT_VERSION = "Sally " GIT_VERSION " (" SAL_VER_PLATFORM
 #else
 const char* SALAMANDER_TEXT_VERSION = "Sally " VERSINFO_VERSION;
 #endif
+
+const wchar_t* SALAMANDER_TEXT_VERSIONW()
+{
+#if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION_W)
+    return L"Sally " GIT_VERSION_W L" (" SAL_VER_PLATFORM_W L")";
+#else
+    return L"Sally " VERSINFO_VERSION_W;
+#endif
+}
 
 //****************************************************************************
 //
@@ -67,9 +79,19 @@ void RefreshToolTip()
 // CHotPathItems
 //
 
-const char* SALAMANDER_HOTPATHS_NAME = "Name";
-const char* SALAMANDER_HOTPATHS_PATH = "Path";
-const char* SALAMANDER_HOTPATHS_VISIBLE = "Visible";
+// Wide value names. The hot path store is wide-primary now, and a
+// path pointing at a Unicode directory has to survive a save/load round trip -
+// through the ANSI values it came back narrowed, so it either failed to open or
+// opened a DIFFERENT directory whose name narrowed the same way.
+const wchar_t* SALAMANDER_HOTPATHS_NAME_W = L"Name W";
+const wchar_t* SALAMANDER_HOTPATHS_PATH_W = L"Path W";
+// Registry VALUE NAMES are form-agnostic -- the wide API addresses the same
+// values. These three still hold the LOSSY downgrade mirror (see Save); only the API used to
+// read and write them is wide now, which is byte-identical because REG_SZ is UTF-16 in the
+// registry either way.
+const wchar_t* SALAMANDER_HOTPATHS_NAME = L"Name";
+const wchar_t* SALAMANDER_HOTPATHS_PATH = L"Path";
+const wchar_t* SALAMANDER_HOTPATHS_VISIBLE = L"Visible";
 
 BOOL CHotPathItems::SwapItems(int index1, int index2)
 {
@@ -84,14 +106,12 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
                                      BOOL customize, BOOL topSeparator, BOOL forAssign)
 {
     CALL_STACK_MESSAGE1("CHotPathItems::FillMenu()");
-    CPathBuffer root;
     BOOL menuIsEmpty = TRUE;
     int firstIndex = menu->GetItemCount();
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STATE | MENU_MASK_STRING | MENU_MASK_ICON;
     mii.Type = MENU_TYPE_STRING;
     mii.State = 0;
-    CPathBuffer name; // Heap-allocated for long path support
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
@@ -104,20 +124,28 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
         if (emptyItems || assigned)
         {
             menuIsEmpty = FALSE;
-            GetName(i, name, name.Size());
-            DuplicateAmpersands(name, name.Size());
+            std::wstring sanitized;
+            const std::wstring& name = GetNameW(i);
+            sanitized.reserve(name.size() + 4);
+            for (wchar_t ch : name)
+            {
+                if (ch == L'&')
+                    sanitized.push_back(L'&');
+                sanitized.push_back(ch);
+            }
+
+            std::wstring label;
             if (i < 10)
             {
                 int key = (i == 9 ? 0 : i + 1);
-                if (emptyItems)
-                    sprintf(root, "%s\t%s+%s+%d", name.Get(), LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), key);
-                else
-                    sprintf(root, "%s\t%s+%d", name.Get(), LoadStr(IDS_CTRL), key);
+                label = emptyItems
+                            ? FormatStrW(L"%s\t%s+%s+%d", sanitized.c_str(), LoadStrW(IDS_CTRL), LoadStrW(IDS_SHIFT), key)
+                            : FormatStrW(L"%s\t%s+%d", sanitized.c_str(), LoadStrW(IDS_CTRL), key);
             }
             else
-                sprintf(root, "%s", name.Get());
+                label = sanitized;
             mii.ID = minCommand + i;
-            mii.String = root;
+            mii.String = label.data();
             mii.HIcon = assigned ? HFavoritIcon : NULL;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
         }
@@ -126,7 +154,7 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
     if (forAssign && unassignedIndex != -1)
     {
         mii.ID = minCommand + unassignedIndex;
-        mii.String = LoadStr(IDS_NEWHOTPATH);
+        mii.String = LoadStrW(IDS_NEWHOTPATH);
         mii.HIcon = NULL;
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
@@ -143,7 +171,7 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STATE | MENU_MASK_STRING;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(IDS_EMPTYHOTPATHS);
+        mii.String = LoadStrW(IDS_EMPTYHOTPATHS);
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
 
@@ -159,7 +187,7 @@ void CHotPathItems::FillHotPathsMenu(CMenuPopup* menu, int minCommand, BOOL empt
         mii.Type = MENU_TYPE_STRING;
         mii.State = 0;
         mii.ID = CM_CUSTOMIZE_HOTPATHS;
-        mii.String = LoadStr(IDS_CUSTOMIZE_HOTPATHS);
+        mii.String = LoadStrW(IDS_CUSTOMIZE_HOTPATHS);
         mii.HIcon = NULL;
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
@@ -176,52 +204,56 @@ int CHotPathItems::GetUnassignedHotPathIndex()
     return -1;
 }
 
-BOOL CHotPathItems::CleanName(char* name)
+BOOL CHotPathItems::CleanName(std::wstring& name)
 {
-    char* start = name;
-    char* end = name + strlen(name) - 1;
-    while (*start != 0 && *start == ' ')
-        start++;
-    while (end >= name && *end == ' ')
-        end--;
-    end++;
-    *end = 0;
-    if (start > name && start < end)
-        memmove(name, start, end - start + 1);
-    return strlen(name) > 0;
+    const size_t first = name.find_first_not_of(L' ');
+    if (first == std::wstring::npos)
+    {
+        name.clear();
+        return FALSE;
+    }
+    const size_t last = name.find_last_not_of(L' ');
+    name = name.substr(first, last - first + 1);
+    return TRUE;
 }
 
 BOOL CHotPathItems::Save(HKEY hKey)
 {
-    char keyName[5];
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
-        itoa(i + 1, keyName, 10);
+        const std::wstring keyName = std::to_wstring(i + 1);
         HKEY actKey;
-        if (CreateKey(hKey, keyName, actKey))
+        if (CreateKeyW(hKey, keyName.c_str(), actKey))
         {
-            const char* name = "";
-            if (GetNameLen(i) > 0)
-                name = Items[i].Name.c_str();
-            const char* path = "";
-            if (GetPathLen(i) > 0)
-                path = Items[i].Path.c_str();
+            const std::wstring& nameW = GetNameW(i);
+            const std::wstring& pathW = GetPathW(i);
             DWORD visible = Items[i].Visible;
 
-            if (*name == 0 && *path == 0 && visible == TRUE)
+            // emptiness is decided on the WIDE truth. It used to be decided
+            // on the lossy WideToAnsi() copies, so an entry whose name and path both vanish
+            // under the active code page would have had its registry key DELETED.
+            if (nameW.empty() && pathW.empty() && visible == TRUE)
             {
                 // optimization: don't clutter the registry unless needed
                 // not ready for configuration merging, but neither is the rest of our configuration
                 ClearKey(actKey);
                 CloseKey(actKey);
-                DeleteKey(hKey, keyName);
+                DeleteKeyW(hKey, keyName.c_str());
             }
             else
             {
-                SetValue(actKey, SALAMANDER_HOTPATHS_NAME, REG_SZ, name, -1);
-                SetValue(actKey, SALAMANDER_HOTPATHS_PATH, REG_SZ, path, -1);
-                SetValue(actKey, SALAMANDER_HOTPATHS_VISIBLE, REG_DWORD, &visible, sizeof(DWORD));
+                // Wide-single-write: the *_W values carry the truth.
+                if (gRegistry != NULL)
+                {
+                    gRegistry->SetString(actKey, SALAMANDER_HOTPATHS_NAME_W, nameW.c_str());
+                    gRegistry->SetString(actKey, SALAMANDER_HOTPATHS_PATH_W, pathW.c_str());
+                }
+                // Legacy values are import-only. Remove stale mirrors after the wide write so
+                // an older build cannot silently act on a different best-fit path.
+                DeleteValueW(actKey, SALAMANDER_HOTPATHS_NAME);
+                DeleteValueW(actKey, SALAMANDER_HOTPATHS_PATH);
+                SetValueW(actKey, SALAMANDER_HOTPATHS_VISIBLE, REG_DWORD, &visible, sizeof(DWORD));
                 CloseKey(actKey);
             }
         }
@@ -231,32 +263,57 @@ BOOL CHotPathItems::Save(HKEY hKey)
 
 BOOL CHotPathItems::Load(HKEY hKey)
 {
-    char keyName[5];
     int i;
     for (i = 0; i <= HOT_PATHS_COUNT; i++)
     {
-        itoa(i, keyName, 10);
+        const std::wstring keyName = std::to_wstring(i);
         HKEY actKey;
-        if (OpenKey(hKey, keyName, actKey))
+        if (OpenKeyW(hKey, keyName.c_str(), actKey))
         {
             // when there were only 10 hot paths, the tenth entry was stored under key '0', so we attempt to load it here
             int index = (i == 0) ? 9 : i - 1;
-            CPathBuffer name; // Heap-allocated for long path support
-            char path[HOTPATHITEM_MAXPATH];
+            std::wstring name;
+            std::wstring path;
             DWORD visible;
-            name[0] = 0;
-            path[0] = 0;
             visible = TRUE;
-            GetValue(actKey, SALAMANDER_HOTPATHS_NAME, REG_SZ, name, name.Size());
-            CleanName(name);
-            if (GetValue(actKey, SALAMANDER_HOTPATHS_PATH, REG_SZ, path, HOTPATHITEM_MAXPATH))
+            if (gRegistry != NULL)
             {
-                if (Configuration.ConfigVersion < 47)            // the old path limit was MAX_PATH, so it fits with expansion
-                    DuplicateDollars(path, HOTPATHITEM_MAXPATH); // if the path is long and contains '$', the end might be truncated; we ignore it
+                gRegistry->GetString(actKey, SALAMANDER_HOTPATHS_NAME, name);
+                gRegistry->GetString(actKey, SALAMANDER_HOTPATHS_PATH, path);
             }
-            GetValue(actKey, SALAMANDER_HOTPATHS_VISIBLE, REG_DWORD, &visible, sizeof(DWORD));
+            CleanName(name);
+            if (!path.empty() && Configuration.ConfigVersion < 47)
+                EscapeHotPathDollars(path);
+            GetValueW(actKey, SALAMANDER_HOTPATHS_VISIBLE, REG_DWORD, &visible, sizeof(DWORD));
 
-            Set(index, name, path, visible);
+            // DUAL-READ, same contract as the ten histories: the wide
+            // values are authoritative, and the ANSI ones above are used only to
+            // seed an entry the wide read did not supply. That is what lets an
+            // existing profile keep working while a Unicode hot path, once saved,
+            // comes back intact.
+            std::wstring nameW, pathW;
+            BOOL haveWide = FALSE;
+            if (gRegistry != NULL)
+            {
+                const BOOL gotName = gRegistry->GetString(actKey, SALAMANDER_HOTPATHS_NAME_W, nameW).success;
+                const BOOL gotPath = gRegistry->GetString(actKey, SALAMANDER_HOTPATHS_PATH_W, pathW).success;
+                // the precedence rule lives in a tested helper - this
+                // decision can silently corrupt a user's saved hot paths.
+                haveWide = ShouldUseWidePair(gotName, gotPath);
+            }
+            if (haveWide)
+            {
+                SetW(index, nameW.c_str(), pathW.c_str(), visible);
+            }
+            else
+            {
+                // Legacy profile: seed from the downgrade-mirror values. A name that was
+                // already lossy stays exactly as stored - it is not "healed" into something
+                // it never was. These buffers were widened by an earlier
+                // tranche, so reading them through the narrow API and then AnsiToWide-ing
+                // them in Set() was narrowing text that was no longer narrow.
+                SetW(index, name.c_str(), path.c_str(), visible);
+            }
             CloseKey(actKey);
         }
     }
@@ -266,25 +323,22 @@ BOOL CHotPathItems::Load(HKEY hKey)
 BOOL CHotPathItems::Load1_52(HKEY hKey)
 {
     // convert configuration from version 1.52 to 1.6
-    char keyName[5];
     int i;
     for (i = 0; i < HOT_PATHS_COUNT; i++)
     {
-        CPathBuffer name; // Heap-allocated for long path support
-        CPathBuffer path; // Heap-allocated for long path support
+        std::wstring name;
+        std::wstring path;
         DWORD visible;
-        name[0] = 0;
-        path[0] = 0;
         visible = FALSE; // do not display converted paths because they are long
 
-        itoa(i, keyName, 10);
-        if (GetValue(hKey, keyName, REG_SZ, path, path.Size()))
+        const std::wstring keyName = std::to_wstring(i);
+        if (gRegistry != NULL && gRegistry->GetString(hKey, keyName.c_str(), path).success)
         {
-            DuplicateDollars(path, path.Size()); // if the path is long and contains '$', the end might be truncated; ignore it
-            strcpy(name, path);
+            EscapeHotPathDollars(path);
+            name = path;
         }
 
-        Set(i == 0 ? 9 : i - 1, name, path, visible);
+        SetW(i == 0 ? 9 : i - 1, name.c_str(), path.c_str(), visible);
     }
     return TRUE;
 }
@@ -296,10 +350,6 @@ BOOL CHotPathItems::Load1_52(HKEY hKey)
 
 CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
 {
-#ifndef _UNICODE
-    UnicodeWnd = TRUE;            // main window is registered with RegisterClassExW so the caption preserves Unicode
-    DefWndProc = GetDefWindowProc(); // re-derive after flipping UnicodeWnd so unhandled messages reach DefWindowProcW
-#endif
     HANDLES(InitializeCriticalSection(&DispachChangeNotifCS));
     LastDispachChangeNotifTime = 0;
     NeedToResentDispachChangeNotif = FALSE;
@@ -347,7 +397,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     SaveCfgInEndSession = FALSE;
     WaitInEndSession = FALSE;
     DisableIdleProcessing = FALSE;
-    lstrcpyn(SelectionMask, "*.*", SelectionMask.Size());
+    SelectionMask = L"*.*";
     Created = FALSE;
     //  DrivesControlHWnd = NULL;
     HDisabledKeyboard = NULL;
@@ -369,7 +419,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     if (ViewerMasks != NULL && item != NULL)
     {
         ViewerMasks->Add(item); // no critical section needed, we're in the constructor
-        item->Set("*.htm;*.html;*.xml;*.mht", "", "", "");
+        item->Set(L"*.htm;*.html;*.xml;*.mht", L"", L"", L"");
         item->ViewerType = -4; // IE viewer (4th plugin in the default configuration)
     }
 
@@ -377,7 +427,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     if (ViewerMasks != NULL && item != NULL)
     {
         ViewerMasks->Add(item); // no critical section needed, we're in the constructor
-        item->Set("*.rpm", "", "", "");
+        item->Set(L"*.rpm", L"", L"", L"");
         item->ViewerType = -2; // TAR (2nd plugin in the default configuration)
     }
 
@@ -385,7 +435,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     if (ViewerMasks != NULL && item != NULL)
     {
         ViewerMasks->Add(item); // no critical section needed, we're in the constructor
-        item->Set("*.*", "", "", "");
+        item->Set(L"*.*", L"", L"", L"");
         item->ViewerType = VIEWER_INTERNAL; // internal viewer
     }
 
@@ -393,7 +443,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     if (AltViewerMasks != NULL && item != NULL)
     {
         AltViewerMasks->Add(item);
-        item->Set("*.*", "", "", "");
+        item->Set(L"*.*", L"", L"", L"");
         item->ViewerType = VIEWER_INTERNAL; // internal viewer
     }
 
@@ -402,7 +452,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     if (EditorMasks != NULL && eItem != NULL)
     {
         EditorMasks->Add(eItem);
-        eItem->Set("*.*", "notepad.exe", "\"$(Name)\"", "$(FullPath)");
+        eItem->Set(L"*.*", L"notepad.exe", L"\"$(Name)\"", L"$(FullPath)");
     }
 
     if (HighlightMasks != NULL)
@@ -411,7 +461,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
         if (hItem != NULL)
         {
             HighlightMasks->Add(hItem);
-            hItem->Set("*.*");
+            hItem->Set(L"*.*");
             int errPos;
             hItem->Masks->PrepareMasks(errPos);
             hItem->NormalFg = RGBF(0, 0, 255, 0);
@@ -424,7 +474,7 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
         if (hItem != NULL)
         {
             HighlightMasks->Add(hItem);
-            hItem->Set("*.*");
+            hItem->Set(L"*.*");
             int errPos;
             hItem->Masks->PrepareMasks(errPos);
             hItem->NormalFg = RGBF(19, 143, 13, 0); // color taken from Windows XP
@@ -501,15 +551,23 @@ void CMainWindow::UpdateDefaultDir(BOOL activePrefered)
         active = GetActivePanel();
         nonactive = GetNonActivePanel();
     }
-    const char* pathActive = active->GetPath();
-    if (!active->Is(ptPluginFS) && pathActive[0] != '\\')
+    const wchar_t* pathActive = active->GetPathW();
+    if (!active->Is(ptPluginFS) && pathActive[0] != L'\\')
     {
-        strcpy(DefaultDir[LowerCase[pathActive[0]] - 'a'], pathActive);
+        // LowerCase is a 256-entry narrow table; indexing it with a wide character
+        // read out of bounds, and an out-of-range result then indexed DefaultDir.
+        wchar_t drive = (wchar_t)towlower(pathActive[0]);
+        if (drive >= L'a' && drive <= L'z')
+            DefaultDir[drive - L'a'] = pathActive;
     }
-    const char* pathPasive = nonactive->GetPath();
-    if (!nonactive->Is(ptPluginFS) && pathPasive[0] != '\\')
+    const wchar_t* pathPasive = nonactive->GetPathW();
+    if (!nonactive->Is(ptPluginFS) && pathPasive[0] != L'\\')
     {
-        strcpy(DefaultDir[LowerCase[pathPasive[0]] - 'a'], pathPasive);
+        // LowerCase is a 256-entry narrow table; indexing it with a wide character
+        // read out of bounds, and an out-of-range result then indexed DefaultDir.
+        wchar_t drive = (wchar_t)towlower(pathPasive[0]);
+        if (drive >= L'a' && drive <= L'z')
+            DefaultDir[drive - L'a'] = pathPasive;
     }
 }
 
@@ -537,7 +595,7 @@ BOOL CMainWindow::ToggleTopToolBar(BOOL storePos)
     {
         if (!TopToolBar->CreateWnd(HTopRebar))
             return FALSE;
-        TopToolBar->Load(Configuration.TopToolBar);
+        TopToolBar->Load(Configuration.TopToolBar.c_str());
         IdleForceRefresh = TRUE;  // force an update
         IdleRefreshStates = TRUE; // on next Idle, enforce a check on status variables
         InsertTopToolbarBand();
@@ -606,7 +664,7 @@ BOOL CMainWindow::ToggleMiddleToolBar()
     {
         if (!MiddleToolBar->CreateWnd(HWindow))
             return FALSE;
-        MiddleToolBar->Load(Configuration.MiddleToolBar);
+        MiddleToolBar->Load(Configuration.MiddleToolBar.c_str());
         IdleForceRefresh = TRUE;  // force an update
         IdleRefreshStates = TRUE; // on next Idle, enforce a check on status variables
         ShowWindow(MiddleToolBar->HWindow, SW_SHOW);
@@ -1195,14 +1253,8 @@ void CMainWindow::EditWindowSetDirectory()
     {
         std::wstring dirW;
         EditWindow->Enable(TRUE); // cached in EditWindow
-        if (panel->GetGeneralPathW(dirW))
-            EditWindow->SetDirectoryW(dirW.c_str());
-        else
-        {
-            CPathBuffer dir; // Heap-allocated for long path support
-            panel->GetGeneralPath(dir, dir.Size());
-            EditWindow->SetDirectory(dir);
-        }
+        panel->GetGeneralPath(dirW);
+        EditWindow->SetDirectoryW(dirW.c_str());
     }
     else // disable/hide edit-line
     {
@@ -1248,39 +1300,36 @@ void CMainWindow::RefreshDiskFreeSpace()
 void CMainWindow::RefreshDirs()
 {
     if (sally::unicode::HasWidePathW(LeftPanel->GetPathW()))
-        LeftPanel->ChangePathToDiskW(LeftPanel->HWindow, LeftPanel->GetPathW());
+        LeftPanel->ChangePathToDisk(LeftPanel->HWindow, LeftPanel->GetPathW());
     else
-        LeftPanel->ChangePathToDisk(LeftPanel->HWindow, LeftPanel->GetPath());
+        LeftPanel->ChangePathToDisk(LeftPanel->HWindow, LeftPanel->GetPathW());
     if (sally::unicode::HasWidePathW(RightPanel->GetPathW()))
-        RightPanel->ChangePathToDiskW(RightPanel->HWindow, RightPanel->GetPathW());
+        RightPanel->ChangePathToDisk(RightPanel->HWindow, RightPanel->GetPathW());
     else
-        RightPanel->ChangePathToDisk(RightPanel->HWindow, RightPanel->GetPath());
+        RightPanel->ChangePathToDisk(RightPanel->HWindow, RightPanel->GetPathW());
 }
 
 // for passing the path to the configuration dialog
-CPathBuffer HotPathSetBufferName; // Heap-allocated for long path support
-char HotPathSetBufferPath[HOTPATHITEM_MAXPATH];
+std::wstring HotPathSetBufferName;
+std::wstring HotPathSetBufferPath;
 
-void CMainWindow::SetUnescapedHotPath(int index, const char* path)
+void CMainWindow::SetUnescapedHotPath(int index, const wchar_t* path)
 {
     if (Configuration.HotPathAutoConfig)
     {
         // switch to the buffer so that Cancel works
-        lstrcpyn(HotPathSetBufferName, path, HotPathSetBufferName.Size());
-        lstrcpyn(HotPathSetBufferPath, path, HOTPATHITEM_MAXPATH);
-        DuplicateDollars(HotPathSetBufferPath, HOTPATHITEM_MAXPATH);
+        HotPathSetBufferName = path;
+        HotPathSetBufferPath = path;
+        EscapeHotPathDollars(HotPathSetBufferPath);
         // open the HotPaths page and edit item index
         PostMessage(HWindow, WM_USER_CONFIGURATION, 1, index);
     }
     else
     {
         // push the value directly
-        char buff[HOTPATHITEM_MAXPATH];
-        lstrcpyn(buff, path, HOTPATHITEM_MAXPATH);
-        CPathBuffer nameBuff; // Heap-allocated for long path support
-        lstrcpyn(nameBuff, path, nameBuff.Size());
-        DuplicateDollars(buff, HOTPATHITEM_MAXPATH);
-        HotPaths.Set(index, nameBuff, buff);
+        std::wstring escapedPath = path;
+        EscapeHotPathDollars(escapedPath);
+        HotPaths.SetW(index, path, escapedPath.c_str());
         // a change occurred, rebuild the Hot Path Bar
         if (HPToolBar != NULL && HPToolBar->HWindow != NULL)
             HPToolBar->CreateButtons();
@@ -1289,7 +1338,7 @@ void CMainWindow::SetUnescapedHotPath(int index, const char* path)
     }
 }
 
-BOOL CMainWindow::GetExpandedHotPath(HWND hParent, int index, char* buffer, int bufferSize)
+BOOL CMainWindow::GetExpandedHotPath(HWND hParent, int index, std::wstring& expanded)
 {
     // if the path is not defined, we can exit immediately
     int pathLen = HotPaths.GetPathLen(index);
@@ -1297,21 +1346,18 @@ BOOL CMainWindow::GetExpandedHotPath(HWND hParent, int index, char* buffer, int 
         return FALSE;
 
     // extract the path for us
-    char* path = (char*)malloc(pathLen + 1);
-    HotPaths.GetPath(index, path, pathLen + 1);
+    // this used to malloc(pathLen + 1) BYTES for a wchar_t buffer -- half the
+    // space needed -- and fill it through the lossy narrow GetPath(). The wide getter owns
+    // the storage, so both problems go away with the buffer.
+    const std::wstring& path = HotPaths.GetPathW(index);
 
     // perform validation
     int errorPos1, errorPos2;
-    if (!ValidateHotPath(hParent, path, errorPos1, errorPos2))
-    {
-        free(path);
+    if (!ValidateHotPath(hParent, path.c_str(), errorPos1, errorPos2))
         return FALSE;
-    }
 
     // finally perform the expansion
-    BOOL ret = ExpandHotPath(hParent, path, buffer, bufferSize, FALSE);
-    free(path);
-    return ret;
+    return ExpandHotPath(hParent, path.c_str(), expanded, FALSE);
 }
 
 int CMainWindow::GetUnassignedHotPathIndex()
@@ -1383,7 +1429,7 @@ BOOL CreatePanelFont()
     GetTextMetrics(dc, &tm);
     FontCharHeight = tm.tmHeight;
     SIZE sz;
-    GetTextExtentPoint32(dc, "...", 3, &sz);
+    GetTextExtentPoint32W(dc, L"...", 3, &sz);
     TextEllipsisWidth = sz.cx;
     SelectObject(dc, oldFont);
     HANDLES(ReleaseDC(NULL, dc));
@@ -1434,7 +1480,7 @@ BOOL CreateEnvFonts()
     GetTextMetrics(dc, &tm);
     EnvFontCharHeight = tm.tmHeight;
     SIZE sz;
-    GetTextExtentPoint32(dc, "...", 3, &sz);
+    GetTextExtentPoint32W(dc, L"...", 3, &sz);
     TextEllipsisWidthEnv = sz.cx;
     SelectObject(dc, oldFont);
     HANDLES(ReleaseDC(NULL, dc));
@@ -1595,7 +1641,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
             mii.State = 0;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = CM_USERMENU_MIN + *iterator;
-            mii.String = const_cast<char*>(UserMenuItems->At(*iterator)->ItemName.c_str());
+            mii.String = const_cast<wchar_t*>(UserMenuItems->At(*iterator)->ItemName.c_str());
             mii.HIcon = UserMenuItems->At(*iterator)->UMIcon;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             added++;
@@ -1613,7 +1659,7 @@ void CMainWindow::FillUserMenu2(CMenuPopup* menu, int* iterator, int max)
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ICON | MENU_MASK_SUBMENU;
             mii.Type = MENU_TYPE_STRING;
             mii.SubMenu = popup;
-            mii.String = const_cast<char*>(UserMenuItems->At(*iterator)->ItemName.c_str());
+            mii.String = const_cast<wchar_t*>(UserMenuItems->At(*iterator)->ItemName.c_str());
             mii.HIcon = UserMenuItems->At(*iterator)->UMIcon;
             menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
             // recursion
@@ -1635,7 +1681,7 @@ ESCAPE:
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STATE | MENU_MASK_STRING;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(IDS_EMPTYUSERMENU);
+        mii.String = LoadStrW(IDS_EMPTYUSERMENU);
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
 }
@@ -1658,7 +1704,7 @@ void CMainWindow::FillUserMenu(CMenuPopup* menu, BOOL customize)
         mii.Type = MENU_TYPE_STRING;
         mii.State = 0;
         mii.ID = CM_CUSTOMIZE_USERMENU;
-        mii.String = LoadStr(IDS_CUSTOMIZE_HOTPATHS);
+        mii.String = LoadStrW(IDS_CUSTOMIZE_HOTPATHS);
         mii.HIcon = NULL;
         menu->InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
@@ -1701,7 +1747,7 @@ void CMainWindow::AddTrayIcon(BOOL updateIcon)
     tnid.uCallbackMessage = WM_USER_ICON_NOTIFY;
     int resID = MainWindowIcons[Configuration.GetMainWindowIconIndex()].IconResID;
     tnid.hIcon = SalLoadIcon(HInstance, resID, IconSizes[ICONSIZE_16]);
-    std::wstring tipW = AnsiToWide(MAINWINDOW_NAME);
+    std::wstring tipW = MAINWINDOW_NAME;
     lstrcpynW(tnid.szTip, tipW.c_str(), sizeof(tnid.szTip) / sizeof(tnid.szTip[0]));
     Shell_NotifyIconW(updateIcon ? NIM_MODIFY : NIM_ADD, &tnid);
     HANDLES(DestroyIcon(tnid.hIcon));
@@ -1717,11 +1763,6 @@ void CMainWindow::RemoveTrayIcon()
     tnid.uID = TASKBAR_ICON_ID;
     tnid.uFlags = 0;
     Shell_NotifyIconW(NIM_DELETE, &tnid);
-}
-
-void CMainWindow::SetTrayIconText(const char* text)
-{
-    SetTrayIconTextW(AnsiToWide(text != NULL ? text : "").c_str());
 }
 
 void CMainWindow::SetTrayIconTextW(const wchar_t* text)
@@ -1742,65 +1783,51 @@ void CMainWindow::SetTrayIconTextW(const wchar_t* text)
     Shell_NotifyIconW(NIM_MODIFY, &tnid);
 }
 
-void CMainWindow::GetFormatedPathForTitle(char* path)
+std::wstring CMainWindow::GetFormatedPathForTitle()
 {
-    path[0] = 0;
     int titleBarMode = Configuration.TitleBarMode;
     // a plugin FS without support for retrieving the path for the window title can only display the Full Path
     CFilesWindow* panel = GetActivePanel();
     if (panel == NULL)
-    {
-        path[0] = 0;
-        return;
-    }
+        return L"";
     if (panel->Is(ptPluginFS) &&
         !panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_GETPATHFORMAINWNDTITLE))
     {
         titleBarMode = TITLE_BAR_MODE_FULLPATH;
     }
+    std::wstring path;
     switch (titleBarMode)
     {
     case TITLE_BAR_MODE_COMPOSITE:
     {
         if (!panel->Is(ptPluginFS) ||
-            !panel->GetPluginFS()->GetPathForMainWindowTitle(panel->GetPluginFS()->GetPluginFSName(),
-                                                             2, path, 2 * MAX_PATH))
+            !panel->GetPluginFS()->GetPathForMainWindowTitleW(panel->GetPluginFS()->GetPluginFSName(), 2, path))
         {
             // we should display "root\...\current directory"
-            panel->GetGeneralPath(path, 2 * MAX_PATH);
-            if (path[0] != 0)
+            panel->GetGeneralPath(path);
+            if (!path.empty())
             {
-                char* trimStart = NULL; // place where I insert "...", after which I append 'trimEnd'
-                char* trimEnd = NULL;
+                size_t trimStart = std::wstring::npos;
+                size_t trimEnd = std::wstring::npos;
                 if (panel->Is(ptDisk) || panel->Is(ptZIPArchive))
                 {
-                    CPathBuffer rootPath;  // Heap-allocated for long path support
-                    GetRootPath(rootPath, path);
-                    int chars = (int)strlen(rootPath);
-                    // we isolated the root
-                    trimStart = path + chars;
-                    while (path[chars] != 0)
-                    {
-                        // we are looking for the last component we want to keep
-                        if (path[chars] == '\\' && path[chars + 1] != 0)
-                            trimEnd = path + chars;
-                        chars++;
-                    }
+                    path = sally::unicode::MakeCompositePathTitle(
+                        path, GetRootPath(path.c_str()).length());
                 }
                 else
                 {
                     if (panel->Is(ptPluginFS))
                     {
                         int chars = 0;
-                        int pathLen = (int)strlen(path);
+                        int pathLen = static_cast<int>(path.size());
                         // if FS does not support FS_SERVICE_GETNEXTDIRLINEHOTPATH, we get FALSE and show the full path
-                        if (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path, pathLen, chars) &&
+                        if (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path.c_str(), pathLen, chars) &&
                             chars < pathLen) // end of path isn't a point of division; bug in GetNextDirectoryLineHotPath implementation
                         {
                             // we isolated the root
-                            trimStart = path + chars;
+                            trimStart = static_cast<size_t>(chars);
                             int lastChars = chars;
-                            while (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path, pathLen, chars))
+                            while (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path.c_str(), pathLen, chars))
                             {
                                 // we are looking for the last component we want to keep
                                 if (chars < pathLen)
@@ -1808,16 +1835,14 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
                                 else
                                     break; // end of path isn't a point of division;bug in GetNextDirectoryLineHotPath implementation
                             }
-                            trimEnd = path + lastChars;
+                            trimEnd = static_cast<size_t>(lastChars);
                         }
                     }
                 }
                 // trim the path
-                if (trimStart != NULL && trimEnd != NULL && trimEnd > trimStart)
-                {
-                    memmove(trimStart + 3, trimEnd, strlen(trimEnd) + 1);
-                    memcpy(trimStart, "...", 3);
-                }
+                if (!panel->Is(ptDisk) && !panel->Is(ptZIPArchive) &&
+                    trimStart != std::wstring::npos && trimEnd != std::wstring::npos && trimEnd > trimStart)
+                    path.replace(trimStart, trimEnd - trimStart, L"...");
             }
         }
         break;
@@ -1826,35 +1851,26 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
     case TITLE_BAR_MODE_DIRECTORY:
     {
         if (!panel->Is(ptPluginFS) ||
-            !panel->GetPluginFS()->GetPathForMainWindowTitle(panel->GetPluginFS()->GetPluginFSName(),
-                                                             1, path, MAX_PATH))
+            !panel->GetPluginFS()->GetPathForMainWindowTitleW(panel->GetPluginFS()->GetPluginFSName(), 1, path))
         {
             // we should display only the current directory
-            panel->GetGeneralPath(path, 2 * MAX_PATH);
-            if (path[0] != 0)
+            panel->GetGeneralPath(path);
+            if (!path.empty())
             {
                 if (panel->Is(ptDisk) || panel->Is(ptZIPArchive))
                 {
-                    CPathBuffer rootPath;  // Heap-allocated for long path support
-                    GetRootPath(rootPath, path);
-                    int chars = (int)strlen(rootPath);
-                    char* p = path + strlen(path);
-                    if (*p == '\\')
-                        p--;
-                    while (p > path && *p != '\\')
-                        p--;
-                    if (*(p + 1) != 0 && p + 1 >= path + chars)
-                        memmove(path, p + 1, strlen(p + 1) + 1);
+                    path = sally::unicode::MakeDirectoryPathTitle(
+                        path, GetRootPath(path.c_str()).length());
                 }
                 else
                 {
                     if (panel->Is(ptPluginFS))
                     {
                         int chars = 0;
-                        int pathLen = (int)strlen(path);
+                        int pathLen = static_cast<int>(path.size());
                         int lastChars = 0;
                         // if FS does not support FS_SERVICE_GETNEXTDIRLINEHOTPATH, we get FALSE and show the full path
-                        while (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path, pathLen, chars))
+                        while (panel->GetPluginFS()->GetNextDirectoryLineHotPath(path.c_str(), pathLen, chars))
                         {
                             if (chars < pathLen)
                                 lastChars = chars;
@@ -1863,10 +1879,10 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
                         }
                         if (lastChars > 0)
                         {
-                            char* p = path + lastChars;
-                            if (*p == '/' || *p == '\\')
-                                p++;
-                            memmove(path, p, strlen(p) + 1);
+                            size_t start = static_cast<size_t>(lastChars);
+                            if (path[start] == L'/' || path[start] == L'\\')
+                                ++start;
+                            path.erase(0, start);
                         }
                     }
                 }
@@ -1878,7 +1894,7 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
     case TITLE_BAR_MODE_FULLPATH:
     {
         // return the full path
-        panel->GetGeneralPath(path, 2 * MAX_PATH);
+        panel->GetGeneralPath(path);
         break;
     }
 
@@ -1887,149 +1903,39 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
         TRACE_E("Configuration.TitleBarMode = " << Configuration.TitleBarMode);
     }
     }
+    return path;
 }
 
 static std::wstring GetFormatedPathForTitleW(CMainWindow* mainWindow)
 {
-    CFilesWindow* panel = mainWindow->GetActivePanel();
-    if (panel == NULL)
-        return L"";
-
-    if (!panel->Is(ptDisk) && !panel->Is(ptZIPArchive))
-    {
-        CPathBuffer pathA;
-        mainWindow->GetFormatedPathForTitle(pathA);
-        return AnsiToWide(pathA);
-    }
-
-    std::wstring pathW = panel->Is(ptDisk) ? panel->GetPathW() : panel->GetZIPArchiveW();
-    if (panel->Is(ptZIPArchive) && panel->GetZIPPathW()[0] != 0)
-    {
-        if (panel->GetZIPPathW()[0] != L'\\')
-            pathW += L"\\";
-        pathW += panel->GetZIPPathW();
-    }
-
-    switch (Configuration.TitleBarMode)
-    {
-    case TITLE_BAR_MODE_COMPOSITE:
-    {
-        std::wstring trimStart;
-        std::wstring trimEnd;
-        std::wstring rootPathW = GetRootPathW(pathW.c_str());
-        size_t chars = rootPathW.size();
-        size_t lastSlash = std::wstring::npos;
-        while (chars < pathW.size())
-        {
-            if (pathW[chars] == L'\\' && chars + 1 < pathW.size())
-                lastSlash = chars;
-            chars++;
-        }
-        if (!rootPathW.empty() && lastSlash != std::wstring::npos && lastSlash > rootPathW.size())
-            pathW = pathW.substr(0, rootPathW.size()) + L"..." + pathW.substr(lastSlash);
-        break;
-    }
-
-    case TITLE_BAR_MODE_DIRECTORY:
-    {
-        std::wstring rootPathW = GetRootPathW(pathW.c_str());
-        size_t chars = rootPathW.size();
-        size_t pos = pathW.find_last_of(L'\\');
-        if (pos != std::wstring::npos && pos + 1 < pathW.size() && pos + 1 >= chars)
-            pathW = pathW.substr(pos + 1);
-        break;
-    }
-
-    case TITLE_BAR_MODE_FULLPATH:
-    default:
-        break;
-    }
-    return pathW;
+    return mainWindow->GetFormatedPathForTitle();
 }
 
-void CMainWindow::SetWindowTitle(const char* text)
+void CMainWindow::SetWindowTitle(const wchar_t* text)
 {
-    CALL_STACK_MESSAGE2("CMainWindow::SetWindowTitle(%s)", text);
+    CALL_STACK_MESSAGE2("CMainWindow::SetWindowTitle(%ls)", text);
     const BOOL useDefaultTitle = (text == NULL);
-    char buff[1000];
-    ::GetWindowText(HWindow, buff, 1000);
-    buff[999] = 0;
-    wchar_t buffW[1000];
-    ::GetWindowTextW(HWindow, buffW, 1000);
-    buffW[999] = 0;
+    const std::wstring currentTitle = GetWindowTextStringW(HWindow);
 
-    CPathBuffer stdWndName;
-    if (useDefaultTitle)
-    {
-        // provide default content
-        stdWndName[0] = 0;
-
-        // prefix
-        if (Configuration.UseTitleBarPrefixForced)
-        {
-            strcpy(stdWndName, Configuration.TitleBarPrefixForced);
-            if (stdWndName[0] != 0)
-                strcat(stdWndName, " - ");
-        }
-        else
-        {
-            if (Configuration.UseTitleBarPrefix)
-            {
-                strcpy(stdWndName, Configuration.TitleBarPrefix);
-                if (stdWndName[0] != 0)
-                    strcat(stdWndName, " - ");
-            }
-        }
-
-        // path
-        if (Configuration.TitleBarShowPath)
-        {
-            GetFormatedPathForTitle(stdWndName + strlen(stdWndName));
-            if (stdWndName[0] != 0)
-                strcat(stdWndName, " - ");
-        }
-
-        // Open Salamander name + ver
-        lstrcat(stdWndName, MAINWINDOW_NAME);
-#if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION)
-        // Use git version: x.y.z-hash (platform)
-        sprintf(stdWndName + lstrlen(stdWndName), " %s (%s)", GIT_VERSION, SAL_VER_PLATFORM);
-#else
-        lstrcat(stdWndName, " " VERSINFO_VERSION);
-#endif
-
-        if (RunningAsAdmin)
-            sprintf(stdWndName + lstrlen(stdWndName), " (%s)", LoadStr(IDS_AS_ADMIN_TITLE));
-
-#ifdef X64_STRESS_TEST
-        lstrcat(stdWndName, " ST");
-#endif //X64_STRESS_TEST
-
-#ifdef USE_BETA_EXPIRATION_DATE
-        // beta version Expires on
-        lstrcat(stdWndName, " - Expires on ");
-        char expire[100];
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expire, 100) == 0)
-            sprintf(expire, "%u.%u.%u", BETA_EXPIRATION_DATE.wDay, BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
-        lstrcat(stdWndName, expire);
-#endif // USE_BETA_EXPIRATION_DATE
-
-        text = stdWndName;
-    }
+    // The narrow 'stdWndName' title builder that used to live here was a
+    // laundered mirror of the wide builder below: it wrote into a fixed buffer with
+    // strcpy/strcat/sprintf, then assigned the result to 'text' -- which the tail of this
+    // function never reads when useDefaultTitle is TRUE. Only its USE_BETA_EXPIRATION_DATE
+    // suffix had no wide counterpart, so that one is carried over below.
 
     std::wstring textW;
     if (useDefaultTitle)
     {
         std::wstring pathW = GetFormatedPathForTitleW(this);
 
-        if (Configuration.UseTitleBarPrefixForced && Configuration.TitleBarPrefixForced[0] != 0)
+        if (Configuration.UseTitleBarPrefixForced && !Configuration.TitleBarPrefixForced.empty())
         {
-            textW += AnsiToWide(Configuration.TitleBarPrefixForced);
+            textW += Configuration.TitleBarPrefixForced;
             textW += L" - ";
         }
-        else if (Configuration.UseTitleBarPrefix && Configuration.TitleBarPrefix[0] != 0)
+        else if (Configuration.UseTitleBarPrefix && !Configuration.TitleBarPrefix.empty())
         {
-            textW += AnsiToWide(Configuration.TitleBarPrefix);
+            textW += Configuration.TitleBarPrefix;
             textW += L" - ";
         }
 
@@ -2039,16 +1945,16 @@ void CMainWindow::SetWindowTitle(const char* text)
             textW += L" - ";
         }
 
-        textW += AnsiToWide(MAINWINDOW_NAME);
+        textW += MAINWINDOW_NAME;
 #if defined(GIT_VERSION_AVAILABLE) && defined(GIT_VERSION)
         textW += L" ";
-        textW += AnsiToWide(GIT_VERSION);
+        textW += GIT_VERSION_W;
         textW += L" (";
-        textW += AnsiToWide(SAL_VER_PLATFORM);
+        textW += SAL_VER_PLATFORM_W;
         textW += L")";
 #else
         textW += L" ";
-        textW += AnsiToWide(VERSINFO_VERSION);
+        textW += VERSINFO_VERSION_W;
 #endif
         if (RunningAsAdmin)
         {
@@ -2059,6 +1965,27 @@ void CMainWindow::SetWindowTitle(const char* text)
 #ifdef X64_STRESS_TEST
         textW += L" ST";
 #endif
+
+#ifdef USE_BETA_EXPIRATION_DATE
+        // beta version Expires on
+        textW += L" - Expires on ";
+        std::wstring expire;
+        const int required = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE,
+                                            &BETA_EXPIRATION_DATE, NULL, NULL, 0);
+        if (required > 0)
+        {
+            expire.resize(required, L'\0');
+            if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE,
+                               NULL, expire.data(), required) != 0)
+                expire.resize(required - 1);
+            else
+                expire.clear();
+        }
+        if (expire.empty())
+            expire = FormatStrW(L"%u.%u.%u", BETA_EXPIRATION_DATE.wDay,
+                                BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
+        textW += expire;
+#endif // USE_BETA_EXPIRATION_DATE
     }
 
     if (useDefaultTitle)
@@ -2067,11 +1994,11 @@ void CMainWindow::SetWindowTitle(const char* text)
         if (Configuration.StatusArea)
             SetTrayIconTextW(textW.c_str());
     }
-    else if (strcmp(text, buff) != 0)
+    else if (currentTitle != text)
     {
-        ::SetWindowText(HWindow, text);
+        ::SetWindowTextW(HWindow, text);
         if (Configuration.StatusArea)
-            SetTrayIconText(text);
+            SetTrayIconTextW(text);
     }
 }
 
@@ -2297,14 +2224,13 @@ void CMainWindow::OnWmContextMenu(HWND hWnd, int xPos, int yPos)
     // fill it
     if (hit == mwhteSplitLine)
     {
-        char buff[20];
         int i;
         for (i = 2; i < 9; i++)
         {
-            sprintf(buff, "&%d0 / %d0", i, 10 - i);
+            std::wstring text = FormatStrW(L"&%d0 / %d0", i, 10 - i);
             mii.ID = i;
             mii.State = i == 5 ? MENU_STATE_DEFAULT : 0;
-            mii.String = buff;
+            mii.String = text.data();
             menu.InsertItem(0xffffffff, TRUE, &mii);
         }
     }
@@ -2332,59 +2258,59 @@ MENU_TEMPLATE_ITEM ToolbarsCtxMenu[] =
 };
 */
 
-        mii.String = LoadStr(IDS_TOPTOOLBAR);
+        mii.String = LoadStrW(IDS_TOPTOOLBAR);
         mii.ID = 1;
         mii.State = TopToolBar->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_PLUGINSBAR);
+        mii.String = LoadStrW(IDS_PLUGINSBAR);
         mii.ID = 12;
         mii.State = PluginsBar->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_UMTOOLBAR);
+        mii.String = LoadStrW(IDS_UMTOOLBAR);
         mii.ID = 2;
         mii.State = UMToolBar->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_HPTOOLBAR);
+        mii.String = LoadStrW(IDS_HPTOOLBAR);
         mii.ID = 11;
         mii.State = HPToolBar->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_DRIVEBAR);
+        mii.String = LoadStrW(IDS_DRIVEBAR);
         mii.ID = 3;
         mii.State = (DriveBar->HWindow != NULL && DriveBar2->HWindow == NULL) ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_DRIVEBAR2);
+        mii.String = LoadStrW(IDS_DRIVEBAR2);
         mii.ID = 4;
         mii.State = (DriveBar->HWindow != NULL && DriveBar2->HWindow != NULL) ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_MIDDLETOOLBAR);
+        mii.String = LoadStrW(IDS_MIDDLETOOLBAR);
         mii.ID = 10;
         mii.State = (MiddleToolBar->HWindow != NULL) ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_COMMANDLINE);
+        mii.String = LoadStrW(IDS_COMMANDLINE);
         mii.ID = 5;
         mii.State = EditPermanentVisible ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_BOTTOMTOOLBAR);
+        mii.String = LoadStrW(IDS_BOTTOMTOOLBAR);
         mii.ID = 6;
         mii.State = ((CWindow*)BottomToolBar)->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
         menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
-        mii.String = LoadStr(IDS_GRIPSINTOOLBAR);
+        mii.String = LoadStrW(IDS_GRIPSINTOOLBAR);
         mii.ID = 9;
         mii.State = Configuration.GripsVisible ? 0 : MENU_STATE_CHECKED;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_SHOWLABELS);
+        mii.String = LoadStrW(IDS_SHOWLABELS);
         mii.ID = 8;
         mii.State = Configuration.UserMenuToolbarLabels ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2394,14 +2320,14 @@ MENU_TEMPLATE_ITEM ToolbarsCtxMenu[] =
         {
             menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
-            mii.String = LoadStr(IDS_CUSTOMIZE);
+            mii.String = LoadStrW(IDS_CUSTOMIZE);
             mii.ID = 7;
             mii.State = 0;
             menu.InsertItem(0xffffffff, TRUE, &mii);
         }
     }
 
-    CPathBuffer HotText; // Heap-allocated for long path support
+    std::wstring HotText;
     int HeaderLineItem = -1; // will be filled with the item index if the user clicked on one
 
     if (panelClass)
@@ -2464,14 +2390,14 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
                     HeaderLineItem = index;
                     CColumn* column = &panel->Columns[index];
 
-                    mii.String = LoadStr(IDS_HDR_ELASTIC);
+                    mii.String = LoadStrW(IDS_HDR_ELASTIC);
                     mii.ID = 1;
                     mii.State = column->FixedWidth ? 0 : MENU_STATE_CHECKED;
                     menu.InsertItem(0xffffffff, TRUE, &mii);
 
                     if (index == 0 /* Name column */)
                     {
-                        mii.String = LoadStr(IDS_HDR_SMARTMODE);
+                        mii.String = LoadStrW(IDS_HDR_SMARTMODE);
                         mii.ID = 17;
                         mii.State = GetSmartColumnMode(panel) ? MENU_STATE_CHECKED : 0;
                         menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2479,7 +2405,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
                 }
             }
 
-            mii.String = LoadStr(IDS_MENU_LEFT_VIEW);
+            mii.String = LoadStrW(IDS_MENU_LEFT_VIEW);
             mii.ID = 2;
             mii.State = 0;
             menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2487,7 +2413,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
             menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
             /*
-      char modiBuff[200];
+      wchar_t modiBuff[200];
       strcpy(modiBuff, LoadStr(IDS_HDR_ELASTIC));
       mii.String = modiBuff;
       mii.ID = 1;
@@ -2498,21 +2424,21 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
       InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowExtension ? MF_CHECKED : 0),
                  2, modiBuff);
-      InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
+      InsertMenuW(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowDosName ? MF_CHECKED : 0),
-                 3, LoadStr(IDS_HDR_DOS));
-      InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
+                 3, LoadStrW(IDS_HDR_DOS));
+      InsertMenuW(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowSize ? MF_CHECKED : 0),
-                 4, LoadStr(IDS_HDR_SIZE));
-      InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
+                 4, LoadStrW(IDS_HDR_SIZE));
+      InsertMenuW(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowDate ? MF_CHECKED : 0),
-                 5, LoadStr(IDS_HDR_DATE));
-      InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
+                 5, LoadStrW(IDS_HDR_DATE));
+      InsertMenuW(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowTime ? MF_CHECKED : 0),
-                 6, LoadStr(IDS_HDR_TIME));
-      InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
+                 6, LoadStrW(IDS_HDR_TIME));
+      InsertMenuW(hMenu, 0xffffffff, MF_BYPOSITION | MF_STRING | 
                  (Configuration.ShowAttr ? MF_CHECKED : 0),
-                 7, LoadStr(IDS_HDR_ATTR));
+                 7, LoadStrW(IDS_HDR_ATTR));
       InsertMenu(hMenu, 0xffffffff, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 */
         }
@@ -2520,7 +2446,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
         // handle the hot path
         if (hit == mwhteLeftDirLine || hit == mwhteRightDirLine)
         {
-            mii.String = LoadStr(IDS_CHANGEDIRECTORY);
+            mii.String = LoadStrW(IDS_CHANGEDIRECTORY);
             mii.ID = 16;
             mii.State = 0;
             mii.ImageIndex = IDX_TB_CHANGE_DIR;
@@ -2529,21 +2455,21 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
 
             menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
-            panel->DirectoryLine->GetHotText(HotText, HotText.Size());
-            if (strlen(HotText) > 0)
+            panel->DirectoryLine->GetHotTextW(HotText);
+            if (!HotText.empty())
             {
                 CMenuPopup* popup = new CMenuPopup();
                 if (popup != NULL)
                 {
                     HotPaths.FillHotPathsMenu(popup, 20, TRUE, FALSE, FALSE, FALSE, TRUE);
                     mii.SubMenu = popup;
-                    mii.String = LoadStr(IDS_SETHOTPATH);
+                    mii.String = LoadStrW(IDS_SETHOTPATH);
                     mii.ID = 0;
                     mii.State = 0;
                     menu.InsertItem(0xffffffff, TRUE, &mii);
                     mii.SubMenu = NULL;
 
-                    mii.String = LoadStr(IDS_COPYTOCLIPBOARD);
+                    mii.String = LoadStrW(IDS_COPYTOCLIPBOARD);
                     mii.ID = 8;
                     mii.State = 0;
                     menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2556,10 +2482,10 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
         // handle hot text in the info line
         if (hit == mwhteLeftStatusLine || hit == mwhteRightStatusLine)
         {
-            panel->StatusLine->GetHotText(HotText, HotText.Size());
-            if (strlen(HotText) > 0)
+            panel->StatusLine->GetHotTextW(HotText);
+            if (!HotText.empty())
             {
-                mii.String = LoadStr(IDS_COPYTOCLIPBOARD);
+                mii.String = LoadStrW(IDS_COPYTOCLIPBOARD);
                 mii.ID = 9;
                 mii.State = 0;
                 menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2568,25 +2494,25 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
             }
         }
 
-        mii.String = LoadStr(IDS_DIRECTORYLINE);
+        mii.String = LoadStrW(IDS_DIRECTORYLINE);
         mii.ID = 11;
         mii.State = panel->DirectoryLine->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_HEADERLINE);
+        mii.String = LoadStrW(IDS_HEADERLINE);
         mii.ID = 12;
         mii.State = (panel->GetViewMode() == vmDetailed ? 0 : (MENU_STATE_GRAYED)) |
                     (panel->GetViewMode() == vmDetailed && panel->HeaderLineVisible ? MENU_STATE_CHECKED : 0);
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
-        mii.String = LoadStr(IDS_INFORMATIONLINE);
+        mii.String = LoadStrW(IDS_INFORMATIONLINE);
         mii.ID = 13;
         mii.State = panel->StatusLine->HWindow != NULL ? MENU_STATE_CHECKED : 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
 
         menu.InsertItem(0xffffffff, TRUE, &miiSep);
 
-        mii.String = LoadStr(IDS_CUSTOMIZEPANEL);
+        mii.String = LoadStrW(IDS_CUSTOMIZEPANEL);
         mii.ID = 15;
         mii.State = 0;
         menu.InsertItem(0xffffffff, TRUE, &mii);
@@ -2761,13 +2687,18 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
 */
         case 8:
         {
-            CopyTextToClipboard(HotText);
+            // Read the exact UTF-16 hot text directly from the directory-line owner.
+            std::wstring hotTextW;
+            panel->DirectoryLine->GetHotTextW(hotTextW);
+            CopyTextToClipboardW(hotTextW.c_str());
             panel->DirectoryLine->FlashText(TRUE);
         }
         break;
         case 9:
         {
-            CopyTextToClipboard(HotText);
+            std::wstring hotTextW;
+            panel->StatusLine->GetHotTextW(hotTextW);
+            CopyTextToClipboardW(hotTextW.c_str());
             panel->StatusLine->FlashText(TRUE);
         }
         break;
@@ -2794,7 +2725,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
         // catch hot paths
         if (cmd >= 20 && cmd < 50)
         {
-            SetUnescapedHotPath(cmd - 20, HotText);
+            SetUnescapedHotPath(cmd - 20, HotText.c_str());
             if (!Configuration.HotPathAutoConfig)
                 panel->DirectoryLine->FlashText(TRUE);
         }
@@ -2910,19 +2841,19 @@ void CMainWindow_RefreshCommandStates(CMainWindow* obj)
         }
 
         upDir = (activePanel->Dirs->Count != 0 &&
-                 strcmp(activePanel->Dirs->At(0).Name, "..") == 0);
+                 wcscmp(activePanel->Dirs->At(0).Name, L"..") == 0);
         leftUpDir = (obj->LeftPanel->Dirs->Count != 0 &&
-                     strcmp(obj->LeftPanel->Dirs->At(0).Name, "..") == 0);
+                     wcscmp(obj->LeftPanel->Dirs->At(0).Name, L"..") == 0);
         rightUpDir = (obj->RightPanel->Dirs->Count != 0 &&
-                      strcmp(obj->RightPanel->Dirs->At(0).Name, "..") == 0);
+                      wcscmp(obj->RightPanel->Dirs->At(0).Name, L"..") == 0);
         if (!leftUpDir)
             leftRootDir = FALSE; // we are already at root (no up-dir exists)
         else
-            leftRootDir = TRUE; //!obj->LeftPanel->Is(ptDisk) || !IsUNCRootPath(obj->LeftPanel->GetPath());
+            leftRootDir = TRUE; //!obj->LeftPanel->Is(ptDisk) || !IsUNCRootPath(obj->LeftPanel->GetPathW());
         if (!rightUpDir)
             rightRootDir = FALSE; // we are already at root (no up-dir exists)
         else
-            rightRootDir = TRUE; //!obj->RightPanel->Is(ptDisk) || !IsUNCRootPath(obj->RightPanel->GetPath());
+            rightRootDir = TRUE; //!obj->RightPanel->Is(ptDisk) || !IsUNCRootPath(obj->RightPanel->GetPathW());
         rootDir = activePanel == obj->LeftPanel ? leftRootDir : rightRootDir;
 
         unselCount = activePanel->Dirs->Count + activePanel->Files->Count - selCount;

@@ -7,9 +7,9 @@
 
 struct CFTPDiskWork;
 
-void FTPPrepareCreateAndWriteFileDiskWork(CFTPDiskWork& work, int socketMsg, int socketUID,
-                                          DWORD msgID, const char* targetFileName,
+BOOL FTPPrepareCreateAndWriteFileDiskWork(CFTPDiskWork& work, int socketMsg, int socketUID,
+                                          DWORD msgID, const wchar_t* targetFileName,
                                           HANDLE workFile, char* flushDataBuffer,
-                                          int validBytesInFlushDataBuffer);
+                                          int validBytesInFlushDataBuffer) noexcept;
 void FTPExecuteCreateAndWriteFileDiskWork(CFTPDiskWork& localWork, BOOL& needCopyBack,
                                           BOOL& workDone);

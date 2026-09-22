@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -18,22 +18,29 @@
 #include "filesbox.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/AnsiToolPathPolicy.h"
+#include "common/IFileEnumerator.h" // loss detector
 #include "common/unicode/CopyNamePolicy.h"
 #include "common/unicode/PanelPathPolicy.h"
 #include "common/unicode/WideVariableExpansion.h"
+#include "common/FileListTextEncoding.h"
+#include "common/text/CaseFolding.h"
+#include "common/SalPathWide.h"
 #include "common/IEnvironment.h"
+#include "common/IFileSystem.h"
+#include "common/fsutil.h"
 #include "common/widepath.h"
 
 #include "common/AdsPolicy.h"
 #include "common/BuildScript.h"
 #include "common/CBuildScriptState.h"
 #include "common/CSelectionSnapshot.h"
+#include <limits>
 
 CSelectionSnapshot CFilesWindow::TakeSnapshot(CActionType type, int selCount,
                                               int* selection, CFileData* oneFile)
 {
     CSelectionSnapshot snap;
-    snap.SourcePath = GetPath();
     snap.SourcePathW = GetPathW();
 
     // Map CActionType to EActionType
@@ -85,11 +92,7 @@ CSelectionSnapshot CFilesWindow::TakeSnapshot(CActionType type, int selCount,
             i++;
 
             CSnapshotItem item = {};
-            item.Name = file->Name;
-            if (file->NameW != NULL)
-                item.NameW = file->NameW;
-            if (file->DosName != NULL)
-                item.DosName = file->DosName;
+            item.NameW = file->Name;
             item.IsDir = (file->Attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
             item.Size = file->Size.Value;
             item.Attr = file->Attr;
@@ -104,21 +107,17 @@ CSelectionSnapshot CFilesWindow::TakeSnapshot(CActionType type, int selCount,
 
 namespace
 {
-BOOL IsSnapshotBuilderDefaultMask(const char* mask)
+BOOL IsSnapshotBuilderDefaultMask(const wchar_t* mask)
 {
-    return mask == NULL || strcmp(mask, "*.*") == 0;
+    return mask == NULL || wcscmp(mask, L"*.*") == 0;
 }
 
-// \\?\ decoration unified in common/unicode/helpers.h (Phase 0-c).
-using sally::unicode::HasLongPathPrefixW;
-using sally::unicode::MakeLongPathSafeW;
-
-std::wstring MaskNameW(const std::wstring& name, const char* mask)
+std::wstring MaskNameW(const std::wstring& name, const wchar_t* mask)
 {
     if (mask == NULL)
         return name;
 
-    const std::wstring maskW = AnsiToWide(mask);
+    const std::wstring maskW = mask;
     int ignPoints = 0;
     for (wchar_t ch : name)
         if (ch == L'.')
@@ -209,33 +208,44 @@ std::wstring MaskNameW(const std::wstring& name, const char* mask)
     return out;
 }
 
-BOOL PopulateSnapshotTargetNames(CSelectionSnapshot& snapshot, const char* mask)
+BOOL PopulateSnapshotTargetNames(CSelectionSnapshot& snapshot, const wchar_t* mask)
 {
     if (IsSnapshotBuilderDefaultMask(mask))
         return TRUE;
 
     for (CSnapshotItem& item : snapshot.Items)
     {
-        const std::wstring sourceNameW = !item.NameW.empty() ? item.NameW : AnsiToWide(item.Name.c_str());
-        if (sourceNameW.empty() || item.Name.empty())
+        const std::wstring& sourceNameW = item.NameW;
+        if (sourceNameW.empty())
             return FALSE;
-
-        CPathBuffer targetNameA;
-        if (MaskName(targetNameA, targetNameA.Size(), item.Name.c_str(), mask) == NULL ||
-            targetNameA[0] == 0)
-        {
-            return FALSE;
-        }
 
         std::wstring targetNameW = MaskNameW(sourceNameW, mask);
         if (targetNameW.empty())
             return FALSE;
 
-        item.TargetName = targetNameA.Get();
         item.TargetNameW = targetNameW;
         item.HasTargetName = true;
     }
     return TRUE;
+}
+
+// Masked DELETE rides the generic filter seam: files are matched
+// against the mask at every level (legacy semantics); directories always
+// traverse and delete only when emptied (movedAll gating already does that).
+BOOL SnapshotDeleteMaskPredicate(const CBuildFilterEntry& entry, void* context)
+{
+    const wchar_t* mask = static_cast<const wchar_t*>(context);
+    if (mask == NULL || entry.IsDir)
+        return TRUE;
+    // AgreeMask is wide now; match natively against NameW
+    // instead of the old ANSI mirror + narrowing-loss refusal, which used to
+    // reject any name outside CP_ACP even though it could match validly.
+    const wchar_t* name = entry.NameW;
+    if (name == NULL || name[0] == 0)
+        return FALSE;
+    const wchar_t* dot = wcsrchr(name, L'.');
+    const BOOL hasExtension = dot != NULL && dot[1] != 0;
+    return AgreeMask(name, mask, hasExtension, FALSE);
 }
 
 BOOL SnapshotFilterPredicate(const CBuildFilterEntry& entry, void* context)
@@ -249,12 +259,9 @@ BOOL SnapshotFilterPredicate(const CBuildFilterEntry& entry, void* context)
     data.nFileSizeLow = (DWORD)(entry.Size & 0xFFFFFFFF);
     data.nFileSizeHigh = (DWORD)(entry.Size >> 32);
     data.ftLastWriteTime = entry.LastWrite;
-    if (entry.NameW != NULL && entry.NameW[0] != L'\0')
-        lstrcpynW(data.cFileName, entry.NameW, MAX_PATH);
-    else if (entry.NameA != NULL)
-        lstrcpynW(data.cFileName, AnsiToWide(entry.NameA).c_str(), MAX_PATH);
-    else
+    if (entry.NameW == NULL || entry.NameW[0] == L'\0')
         return FALSE;
+    lstrcpynW(data.cFileName, entry.NameW, MAX_PATH);
 
     return criteria->AgreeMasksAndAdvanced(&data);
 }
@@ -267,9 +274,7 @@ BOOL DirectoryTreeNeedsLegacyADS(const std::wstring& sourcePathW, BOOL targetSup
     searchPathW.push_back(L'*');
 
     WIN32_FIND_DATAW data = {};
-    searchPathW = MakeLongPathSafeW(searchPathW);
-
-    HANDLE find = FindFirstFileW(searchPathW.c_str(), &data);
+    HANDLE find = gFileSystem->FindFirstFile(searchPathW.c_str(), &data);
     if (find == INVALID_HANDLE_VALUE)
         return TRUE;
 
@@ -282,31 +287,32 @@ BOOL DirectoryTreeNeedsLegacyADS(const std::wstring& sourcePathW, BOOL targetSup
             continue;
         }
 
-        const std::string childNameA = WideToAnsi(data.cFileName);
         const std::wstring childPathW = sally::unicode::BuildPanelChildPathW(
-            sourcePathW, childNameA.c_str(), data.cFileName);
-        const std::string childPathA = WideToAnsi(childPathW);
+            sourcePathW, data.cFileName);
         const BOOL isDir = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
         CQuadWord adsSize;
         DWORD adsWinError = NO_ERROR;
-        if (CheckFileOrDirADS(childPathA.c_str(), isDir, &adsSize, NULL, NULL, NULL,
-                              &adsWinError, 0, NULL, NULL, childPathW) ||
+        if (CheckFileOrDirADS(childPathW, isDir, &adsSize, NULL, NULL,
+                              &adsWinError, 0, NULL, NULL) ||
             adsWinError != NO_ERROR)
         {
-            FindClose(find);
-            return adsWinError != NO_ERROR || !targetSupADS;
+            gFileSystem->CloseFind(find);
+            // Pure ADS loss is handleable via the build-time
+            // AdsLossPromptCallback now; only a PROBE ERROR still forces
+            // legacy (an error is not a loss - the builder rejects it).
+            return adsWinError != NO_ERROR;
         }
 
         if (isDir && DirectoryTreeNeedsLegacyADS(childPathW, targetSupADS))
         {
-            FindClose(find);
+            gFileSystem->CloseFind(find);
             return TRUE;
         }
-    } while (FindNextFileW(find, &data));
+    } while (gFileSystem->FindNextFile(find, &data));
 
     DWORD err = GetLastError();
-    FindClose(find);
+    gFileSystem->CloseFind(find);
     return err != ERROR_NO_MORE_FILES;
 }
 
@@ -321,37 +327,26 @@ BOOL DirectoryTreeNeedsLegacyADS(const std::wstring& sourcePathW, BOOL targetSup
 BOOL SnapshotSelectionNeedsLegacyADS(CActionType type, BOOL sourceSupADS,
                                      BOOL targetSupADS,
                                      const CSelectionSnapshot& snapshot,
-                                     const char* sourcePath,
-                                     const wchar_t* sourcePathW)
+                                     const wchar_t* sourcePath)
 {
-    if ((type != atCopy && type != atMove) || !sourceSupADS || sourcePath == NULL)
+    if ((type != atCopy && type != atMove) || !sourceSupADS || sourcePath == NULL || sourcePath[0] == L'\0')
         return FALSE;
 
-    std::wstring sourcePathWide = (sourcePathW != NULL && sourcePathW[0] != L'\0') ? std::wstring(sourcePathW) : AnsiToWide(sourcePath);
     for (const CSnapshotItem& item : snapshot.Items)
     {
-        CPathBuffer fullPath;
-        const size_t sourceLen = strlen(sourcePath);
-        const size_t itemLen = item.Name.length();
-        const BOOL addSlash = sourceLen > 0 && sourcePath[sourceLen - 1] != '\\';
-        if (sourceLen + (addSlash ? 1 : 0) + itemLen >= static_cast<size_t>(fullPath.Size()))
-            return TRUE;
-
-        lstrcpyn(fullPath, sourcePath, fullPath.Size());
-        if (addSlash)
-            strcat(fullPath, "\\");
-        strcat(fullPath, item.Name.c_str());
-
+        const std::wstring& itemNameW = item.NameW;
+        const wchar_t* itemSourceParent =
+            !item.SourceParentW.empty() ? item.SourceParentW.c_str() : sourcePath;
         const std::wstring fullPathW = sally::unicode::BuildPanelChildPathW(
-            sourcePathWide, item.Name.c_str(), item.NameW.empty() ? NULL : item.NameW.c_str());
+            itemSourceParent, itemNameW.c_str());
 
         CQuadWord adsSize;
         DWORD adsWinError = NO_ERROR;
-        if (CheckFileOrDirADS(fullPath, item.IsDir, &adsSize, NULL, NULL, NULL,
-                              &adsWinError, 0, NULL, NULL, fullPathW) ||
+        if (CheckFileOrDirADS(fullPathW, item.IsDir, &adsSize, NULL, NULL,
+                              &adsWinError, 0, NULL, NULL) ||
             adsWinError != NO_ERROR)
         {
-            return adsWinError != NO_ERROR || !targetSupADS;
+            return adsWinError != NO_ERROR; // loss is promptable now
         }
 
         if (item.IsDir && DirectoryTreeNeedsLegacyADS(fullPathW, targetSupADS))
@@ -361,31 +356,366 @@ BOOL SnapshotSelectionNeedsLegacyADS(CActionType type, BOOL sourceSupADS,
     return FALSE;
 }
 
+// Declared later in this TU (the legacy builder region); the production
+// prompt callbacks below reuse them for exact legacy parity.
+void GetADSStreamsNames(const std::wstring& fileNameW, BOOL isDir,
+                        std::wstring& list);
+
 namespace
 {
 
+// Production build-time prompts for the snapshot builder - the
+// same wording, buttons and answer mapping as the legacy builder's inline
+// prompts (kb decision 2026-07-03: build-time prompts route via CBuildConfig
+// callbacks to gPrompter, not IWorkerObserver).
+CBuildDeletePromptResult SnapshotDeletePrompt(CBuildDeletePromptKind kind,
+                                               const wchar_t* name,
+                                               void* /*context*/)
+{
+    const int msgId = kind == CBuildDeletePromptKind::SystemHiddenDir
+                          ? IDS_DELETESHDIR
+                          : IDS_NONEMPTYDIRDELCONFIRM;
+    std::wstring msg = FormatStrW(LoadStrW(msgId), name != NULL ? name : L"");
+    PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+    if (res.type == PromptResult::kYes)
+        return CBuildDeletePromptResult::Proceed;
+    if (res.type == PromptResult::kNo)
+        return CBuildDeletePromptResult::Skip;
+    return CBuildDeletePromptResult::Cancel;
+}
+
+struct SnapshotAdsLossContext
+{
+    CActionType Type;
+    CBuildScriptState* BsState;
+    HWND Parent;
+};
+
+struct SnapshotLinkContentContext
+{
+    HWND Parent;
+    bool* CancelledByUser;
+};
+
+// CountSize compressed-size error: the legacy AskYesNo ("skip all
+// further errors?") — YES sets the script's sticky flag; the size falls back to
+// the logical size either way.
+void SnapshotCountSizeErrorPrompt(const wchar_t* name, DWORD winError, void* context)
+{
+    COperations* script = static_cast<COperations*>(context);
+    std::wstring msg = (name != NULL ? std::wstring(name) : std::wstring()) +
+                       L": " + GetErrorTextOwned(winError).c_str();
+    if (gPrompter->AskYesNo(LoadStrW(IDS_ERRORTITLE), msg.c_str()).type ==
+        PromptResult::kYes)
+    {
+        script->SkipAllCountSizeErrors = TRUE;
+    }
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+}
+
+// A directory could not be listed. Restores the legacy BuildScriptDir prompt
+// before the legacy recursive builder was removed): "Cannot read
+// directory ...", Skip / Skip All / Cancel, and the build continues on a skip.
+// The builder owns the Skip All latch, so this is only reached while asking.
+CBuildConfig::CBuildSkipAction SnapshotListDirErrorPrompt(const wchar_t* dir,
+                                                                  DWORD winError,
+                                                                  void* context)
+{
+    std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR),
+                                  dir != NULL ? dir : L"",
+                                  GetErrorTextOwned(winError).c_str());
+    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+
+    if (res.type == PromptResult::kCancel)
+    {
+        // The user already knows why the build stopped — remember that so the
+        // caller does not stack a redundant "error building script" box on top.
+        if (context != NULL)
+            *static_cast<bool*>(context) = true;
+        return CBuildConfig::CBuildSkipAction::Cancel;
+    }
+    if (res.type == PromptResult::kSkipAll)
+        return CBuildConfig::CBuildSkipAction::SkipAll;
+    return CBuildConfig::CBuildSkipAction::Skip;
+}
+
+// A file's or directory's alternate data streams could not be enumerated.
+// Restores the legacy CErrorReadingADSDlg (Retry / Ignore / Ignore All /
+// Cancel) that went away with the old recursive builder: only Cancel aborted
+// the operation, every other answer copied on without the streams. The
+// builder owns the Ignore All latch, so this is only reached while asking.
+CBuildConfig::CBuildADSProbeErrorAction SnapshotADSProbeErrorPrompt(const wchar_t* sourceName,
+                                                                   DWORD winError,
+                                                                   void* context)
+{
+    HWND parent = context != NULL ? *static_cast<HWND*>(context)
+                                  : (MainWindow != NULL ? MainWindow->HWindow : NULL);
+    const int res = (int)CErrorReadingADSDlg(parent,
+                                             sourceName != NULL ? sourceName : L"",
+                                             GetErrorTextOwned(winError).c_str(),
+                                             LoadStrW(IDS_ERRORREADINGADS))
+                        .Execute();
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+
+    BOOL ignoreAll = FALSE;
+    switch (NormalizeADSReadErrorResponse(res, &ignoreAll))
+    {
+    case IDRETRY:
+        return CBuildConfig::CBuildADSProbeErrorAction::Retry;
+    case IDCANCEL:
+        return CBuildConfig::CBuildADSProbeErrorAction::Cancel;
+    default:
+        return ignoreAll ? CBuildConfig::CBuildADSProbeErrorAction::IgnoreAll
+                         : CBuildConfig::CBuildADSProbeErrorAction::Ignore;
+    }
+}
+
+// A reparse-point FILE carries size 0 in the directory entry. Resolves the link
+// target's real size for the snapshot builder so the free-space check, the
+// progress total and the FAT32 4 GB guard see what will actually be written —
+// the call legacy made at copy_move.cpp:3574 and that went away with the old
+// builder ("the builder no longer needs mid-build link sizing" was wrong for
+// reparse FILES; it only ever held for junctions). Owns the Ignore All latch.
+struct SnapshotLinkTargetSizeContext
+{
+    HWND Parent;
+    BOOL IgnoreAll;
+};
+
+CBuildConfig::CBuildLinkTargetSizeResult SnapshotLinkTargetSizePrompt(const wchar_t* linkPath,
+                                                                     unsigned __int64* size,
+                                                                     void* context)
+{
+    SnapshotLinkTargetSizeContext* ctx = static_cast<SnapshotLinkTargetSizeContext*>(context);
+    if (ctx == NULL || linkPath == NULL || size == NULL)
+        return CBuildConfig::CBuildLinkTargetSizeResult::Ignore;
+
+    CQuadWord tgtSize(0, 0);
+    BOOL cancel = FALSE;
+    if (GetLinkTgtFileSize(ctx->Parent, linkPath, NULL, &tgtSize, &cancel, &ctx->IgnoreAll))
+    {
+        *size = tgtSize.Value;
+        return CBuildConfig::CBuildLinkTargetSizeResult::Resolved;
+    }
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+    return cancel ? CBuildConfig::CBuildLinkTargetSizeResult::Cancel
+                  : CBuildConfig::CBuildLinkTargetSizeResult::Ignore;
+}
+
+// A file the FAT32 target cannot physically hold (>= 4 GB). Legacy warned before
+// starting the copy; without it the operation dies mid-file after moving 4 GB.
+CBuildConfig::CBuildSkipAction SnapshotFat32TooBigPrompt(const wchar_t* sourceFile,
+                                                         void* context)
+{
+    std::wstring msg = FormatStrW(LoadStrW(IDS_FILEISTOOBIGFORFAT32),
+                                  sourceFile != NULL ? sourceFile : L"");
+    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+
+    if (res.type == PromptResult::kCancel)
+    {
+        if (context != NULL)
+            *static_cast<bool*>(context) = true;
+        return CBuildConfig::CBuildSkipAction::Cancel;
+    }
+    if (res.type == PromptResult::kSkipAll)
+        return CBuildConfig::CBuildSkipAction::SkipAll;
+    return CBuildConfig::CBuildSkipAction::Skip;
+}
+
+// Makes the wait window's "press the ESC key to cancel" promise real again
+// (legacy copy_move.cpp:3043). The builder throttles how often this runs.
+bool SnapshotCancelPoll(void* context)
+{
+    if (!UserWantsToCancelSafeWaitWindow())
+        return false;
+
+    MSG msg; // discard the buffered ESC so it cannot leak into the dialog
+    while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+        ;
+    const bool cancel = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION),
+                                            LoadStrW(IDS_CANCELOPERATION))
+                            .type == PromptResult::kYes;
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+    if (cancel && context != NULL)
+        *static_cast<bool*>(context) = true;
+    return cancel;
+}
+
+// A reparse-point directory is being copied or moved: the link itself, or what
+// it points at? Restores the legacy question (copy_move.cpp:2887). The dialog it
+// drives survived the port to the snapshot builder — it was even widened to
+// wchar_t — but nothing asked any more, so every junction was cloned as a
+// junction. Copied to another volume that leaves a link back to the SOURCE path,
+// dangling anywhere else, where the user was expecting the files.
+CBuildLinkContentPromptResult SnapshotLinkContentPrompt(const wchar_t* linkPath,
+                                                       void* contextRaw)
+{
+    SnapshotLinkContentContext* ctx = static_cast<SnapshotLinkContentContext*>(contextRaw);
+    const std::wstring linkPathW = linkPath != NULL ? linkPath : L"";
+
+    // Describe the link exactly as legacy did: a volume mount point names
+    // itself, a junction or symlink names its destination with the parentheses
+    // the info-dialog string carries stripped off, and an unresolvable reparse
+    // tag says so instead of leaving the field blank.
+    std::wstring detailsW;
+    std::wstring linkTargetW;
+    int repPointType = 0;
+    if (GetReparsePointDestinationOwnedW(linkPathW.c_str(), &linkTargetW, &repPointType, FALSE))
+    {
+        if (repPointType == 1) // MOUNT POINT
+            detailsW = LoadStrW(IDS_VOLMOUNTPOINT);
+        else
+        {
+            detailsW = FormatStrW(LoadStrW(repPointType == 2 ? IDS_INFODLGTYPE9   // JUNCTION
+                                                             : IDS_INFODLGTYPE10), // SYMLINK
+                                  linkTargetW.c_str());
+            if (!detailsW.empty() && detailsW.front() == L'(')
+                detailsW.erase(0, 1);
+            if (!detailsW.empty() && detailsW.back() == L')')
+                detailsW.pop_back();
+        }
+    }
+    else
+        detailsW = LoadStrW(IDS_UNABLETORESOLVELINK);
+
+    const int res = (int)CConfirmLinkTgtCopyDlg(ctx->Parent, linkPathW.c_str(),
+                                                detailsW.c_str())
+                        .Execute();
+    if (MainWindow != NULL)
+        UpdateWindow(MainWindow->HWindow);
+
+    switch (res)
+    {
+    case IDB_ALL:
+        return CBuildLinkContentPromptResult::CopyContentAll;
+    case IDYES:
+        return CBuildLinkContentPromptResult::CopyContent;
+    case IDB_SKIPALL:
+        return CBuildLinkContentPromptResult::CloneLinkAll;
+    case IDB_SKIP:
+        return CBuildLinkContentPromptResult::CloneLink;
+    default:
+        // The user already knows why the build stopped; keep the generic
+        // "error building script" box off the top of it.
+        if (ctx->CancelledByUser != nullptr)
+            *ctx->CancelledByUser = true;
+        return CBuildLinkContentPromptResult::Cancel;
+    }
+}
+
+CBuildAdsLossPromptResult SnapshotAdsLossPrompt(const wchar_t* name,
+                                                 bool isDir,
+                                                 void* contextRaw)
+{
+    SnapshotAdsLossContext* ctx = static_cast<SnapshotAdsLossContext*>(contextRaw);
+    int res;
+    if (ctx->BsState->ConfirmADSLossAll)
+        res = IDYES;
+    else if (ctx->BsState->ConfirmADSLossSkipAll)
+        res = IDB_SKIP;
+    else
+    {
+        // Same flow as the legacy builder: show the actual stream names; an
+        // empty listing is an automatic Yes (nothing user-visible to lose).
+        std::wstring nameWStr = name != NULL ? name : L"";
+        std::wstring streamsW;
+        GetADSStreamsNames(nameWStr, isDir, streamsW);
+        if (streamsW.empty())
+            res = IDYES;
+        else
+            res = (int)CConfirmADSLossDlg(ctx->Parent, !isDir,
+                                          nameWStr.c_str(), streamsW.c_str(),
+                                          ctx->Type == atMove)
+                      .Execute();
+    }
+    switch (res)
+    {
+    case IDB_ALL:
+        ctx->BsState->ConfirmADSLossAll = TRUE; // intentional fallthrough
+    case IDYES:
+        return CBuildAdsLossPromptResult::Proceed;
+    case IDB_SKIPALL:
+        ctx->BsState->ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
+    case IDB_SKIP:
+        return CBuildAdsLossPromptResult::Skip;
+    default:
+        return CBuildAdsLossPromptResult::Reject; // Cancel: abort the build
+    }
+}
+
+} // namespace
+
+// External linkage so the private tests exercise the REAL routing gate (same
+// rationale as SnapshotSelectionNeedsLegacyADS; declared in fileswnd.h).
+// fileswnd.h declared targetPath/mask/sourcePath wide, but this
+// definition stayed narrow (targetPath/mask lagging, and sourcePath's own
+// AnsiToWide fallback below quietly running on wrong data) - the same
+// link-time-masked overload-not-redefinition defect the freefn-width scan
+// already caught for AgreeMask/AgreeQSMask. BuildScriptMain's one real call
+// site already passes wide data for all three (its own targetPath/mask
+// params and sourcePath are owned UTF-16), so the wide declaration
+// was always what production needed.
 BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
-                                      char* targetPath, char* mask,
+                                      const wchar_t* targetPath, const wchar_t* mask,
                                       CAttrsData* attrsData,
                                       CChangeCaseData* chCaseData,
                                       BOOL onlySize,
                                       BOOL sourceSupADS,
                                       BOOL targetSupADS,
-                                      const char* sourcePath,
+                                      const wchar_t* sourcePath,
                                       const wchar_t* sourcePathW,
                                       CCriteriaData* filterCriteria,
                                       const CSelectionSnapshot& snapshot)
 {
-    if (!isDiskPanel || onlySize || attrsData != NULL || chCaseData != NULL ||
-        snapshot.Items.empty())
+    if (!isDiskPanel || snapshot.Items.empty())
+        return FALSE;
+    if (onlySize && type != atCountSize)
+        return FALSE; // counting is the one legitimate onlySize flow
+
+    // The six capabilities are production now: ChangeAttrs
+    // and ChangeCase route to the snapshot builder (attribute compression/
+    // encryption changes have no capability and stay out until one exists).
+    switch (type)
     {
+    case atCopy:
+    case atMove:
+    case atDelete:
+        break;
+    case atChangeAttrs:
+        if (attrsData == NULL || attrsData->ChangeCompression || attrsData->ChangeEncryption)
+            return FALSE;
+        break;
+    case atChangeCase:
+        if (chCaseData == NULL)
+            return FALSE;
+        break;
+    case atConvert:
+    case atRecursiveConvert:
+        // Convert was builder-supported all along; the gate just
+        // never admitted the type. Filters ride the generic FilterPredicate.
+        break;
+    case atCountSize: // Alt+F10 counting (dialog + column modes)
+        break;
+    default:
         return FALSE;
     }
-
-    if (type != atCopy && type != atMove && type != atDelete)
+    if (attrsData != NULL && type != atChangeAttrs)
+        return FALSE;
+    if (chCaseData != NULL && type != atChangeCase)
         return FALSE;
 
-    if (filterCriteria != NULL && type != atCopy && type != atMove)
+    if (filterCriteria != NULL && type != atCopy && type != atMove &&
+        type != atConvert && type != atRecursiveConvert)
         return FALSE;
 
     if ((type == atCopy || type == atMove) &&
@@ -394,23 +724,25 @@ BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
         return FALSE;
     }
 
-    if (type == atDelete && !IsSnapshotBuilderDefaultMask(mask))
-        return FALSE;
+    // Masked delete is absorbed (SnapshotDeleteMaskPredicate);
+    // no default-mask requirement remains for atDelete.
 
     for (const CSnapshotItem& item : snapshot.Items)
     {
-        if (item.IsDir &&
-            ((item.Attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0 ||
-             (type == atDelete && Configuration.CnfrmSHDirDel &&
-              (item.Attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)) != 0) ||
-             (type == atDelete && Configuration.CnfrmNEDirDel)))
-        {
+        // Reparse dirs are absorbed for delete AND copy/move
+        // (copy-the-link; EnableReparseDelete/EnableReparseCopyMove).
+        // A dir under NON-recursive Convert rejects (mirrors the
+        // builder validate rule so the build never aborts the operation).
+        if (item.IsDir && type == atConvert)
             return FALSE;
-        }
     }
 
+    // sourcePath is now the same wide data as sourcePathW's own source (both
+    // ultimately come from the panel's wide path) - no conversion needed for
+    // the fallback anymore, just prefer sourcePathW when it is populated.
+    const wchar_t* sourcePathForADS = sourcePathW != NULL && sourcePathW[0] != L'\0' ? sourcePathW : sourcePath;
     if (SnapshotSelectionNeedsLegacyADS(type, sourceSupADS, targetSupADS, snapshot,
-                                        sourcePath, sourcePathW))
+                                        sourcePathForADS))
     {
         return FALSE;
     }
@@ -418,17 +750,8 @@ BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
     return TRUE;
 }
 
-bool SplitFullPathA(const char* fullPath, std::string& dir, std::string& name)
+namespace
 {
-    if (fullPath == NULL || fullPath[0] == 0)
-        return false;
-    const char* slash = strrchr(fullPath, '\\');
-    if (slash == NULL || slash == fullPath || slash[1] == 0)
-        return false;
-    dir.assign(fullPath, slash - fullPath);
-    name.assign(slash + 1);
-    return !dir.empty() && !name.empty();
-}
 
 bool SplitFullPathW(const wchar_t* fullPath, std::wstring& dir, std::wstring& name)
 {
@@ -448,12 +771,22 @@ bool GenerateCopyOfTargetNameW(const std::wstring& directoryWithBackslash,
                                std::vector<std::wstring>& reservedNames,
                                std::wstring& targetNameW)
 {
-    const std::wstring copyTokenW = AnsiToWide(LoadStr(IDS_NEWNAME_COPY));
+    // LoadStrW is safe here: the earlier "e2e test host catches a real bug"
+    // read was wrong. texts.rc2 (where IDS_NEWNAME_COPY lives) is compiled only into the
+    // language-pack module (lang/lang.rc2 -> texts.rc2), never into sally.rc, so a real
+    // running Sally always resolves this through a genuinely loaded .slg - the e2e test
+    // host's HLanguage == HInstance has no langpack loaded and can't resolve ANY IDS_*
+    // string via either LoadStr or LoadStrW (confirmed empirically: both return their
+    // "ERROR LOADING [WIDE ]STRING" fallback there). The two affected tests
+    // (gtest_f5_unicode_copy_e2e) no longer depend on the literal token text.
+    const std::wstring copyTokenW = LoadStrW(IDS_NEWNAME_COPY);
     if (!isDir)
     {
         if (!sally::unicode::TryGenerateUniqueCopyName(directoryWithBackslash, sourceNameW,
                                                        copyTokenW, reservedNames,
-                                                       targetNameW))
+                                                       targetNameW,
+                                                       [](const wchar_t* path)
+                                                       { return gFileSystem->GetFileAttributes(path); }))
         {
             return false;
         }
@@ -466,7 +799,7 @@ bool GenerateCopyOfTargetNameW(const std::wstring& directoryWithBackslash,
     if (directoryWithBackslash.back() != L'\\' && directoryWithBackslash.back() != L'/')
         return false;
 
-    DWORD dirAttrs = GetFileAttributesW(directoryWithBackslash.c_str());
+    DWORD dirAttrs = gFileSystem->GetFileAttributes(directoryWithBackslash.c_str());
     if (dirAttrs == INVALID_FILE_ATTRIBUTES || (dirAttrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
         return false;
 
@@ -484,7 +817,9 @@ bool GenerateCopyOfTargetNameW(const std::wstring& directoryWithBackslash,
 
         if (sally::unicode::ContainsNameIgnoreCase(reservedNames, candidate))
             continue;
-        if (!sally::unicode::IsOccupiedPathW(directoryWithBackslash, candidate))
+        if (!sally::unicode::IsOccupiedPathW(
+                directoryWithBackslash, candidate,
+                [](const wchar_t* path) { return gFileSystem->GetFileAttributes(path); }))
         {
             targetNameW = candidate;
             reservedNames.push_back(targetNameW);
@@ -494,12 +829,12 @@ bool GenerateCopyOfTargetNameW(const std::wstring& directoryWithBackslash,
     return false;
 }
 
+} // namespace
+
 BOOL CanBuildMain2FromSnapshot(BOOL isDiskPanel,
                                BOOL copy,
-                               const char* targetDir,
-                               const wchar_t* targetDirW,
-                               const char* targetPathWithSlash,
-                               const std::wstring& targetPathWithSlashW,
+                               const wchar_t* targetDir,
+                               const std::wstring& targetPathWithSlash,
                                BOOL targetSupADS,
                                BOOL targetIsFAT32,
                                CCopyMoveData* data,
@@ -507,116 +842,107 @@ BOOL CanBuildMain2FromSnapshot(BOOL isDiskPanel,
                                CBuildConfig& config,
                                COperations* script)
 {
-    if (!isDiskPanel || targetDir == NULL || targetDir[0] == 0 ||
-        targetDirW == NULL || targetDirW[0] == L'\0' ||
-        targetPathWithSlash == NULL || targetPathWithSlash[0] == 0 ||
+    if (!isDiskPanel || targetDir == NULL || targetDir[0] == L'\0' ||
+        targetPathWithSlash.empty() ||
         data == NULL || data->Count < 1 ||
         (data->MakeCopyOfName && !copy))
     {
         return FALSE;
     }
 
-    std::string sourceDirA;
     std::wstring sourceDirW;
     std::vector<std::wstring> reservedNames;
 
     snapshot.Action = copy ? EActionType::Copy : EActionType::Move;
-    snapshot.TargetPath = targetDir;
-    snapshot.TargetPathW = targetDirW;
-    snapshot.Mask = "*.*";
+    snapshot.TargetPathW = targetDir;
+    snapshot.Mask = L"*.*";
     snapshot.CopySecurity = script->CopySecurity != FALSE;
     snapshot.CopyAttrs = script->CopyAttrs != FALSE;
     snapshot.PreserveDirTime = script->PreserveDirTime != FALSE;
     snapshot.StartOnIdle = script->StartOnIdle != FALSE;
 
+    // Main2 absorption: the three legacy specials route here now.
+    // 1. Multi-directory drops - per-item SourceParentW (task-10 model).
+    // 2. MapName rename-maps (shell file-group descriptors) - the explicit
+    //    target leaf rides item.TargetNameW/HasTargetName like copy-of names.
+    // 3. fWide=FALSE ANSI drops - decoded at the bounded clipboard adapter before records exist.
     for (int i = 0; i < data->Count; ++i)
     {
         CCopyMoveRecord* record = data->At(i);
-        if (record == NULL || record->FileName == NULL || record->MapName != NULL ||
-            record->FileNameW == NULL)
-        {
+        if (record == NULL || !record->IsValid())
             return FALSE;
-        }
 
-        std::string itemSourceDirA;
-        std::string sourceNameA;
         std::wstring itemSourceDirW;
         std::wstring sourceNameW;
-        if (!SplitFullPathA(record->FileName, itemSourceDirA, sourceNameA) ||
-            !SplitFullPathW(record->FileNameW, itemSourceDirW, sourceNameW))
+        if (!SplitFullPathW(record->FileName.c_str(), itemSourceDirW, sourceNameW))
         {
             return FALSE;
         }
 
         if (i == 0)
         {
-            sourceDirA = itemSourceDirA;
             sourceDirW = itemSourceDirW;
-            snapshot.SourcePath = sourceDirA;
             snapshot.SourcePathW = sourceDirW;
         }
-        else if (StrICmp(sourceDirA.c_str(), itemSourceDirA.c_str()) != 0 ||
-                 _wcsicmp(sourceDirW.c_str(), itemSourceDirW.c_str()) != 0)
-        {
-            return FALSE;
-        }
 
-        WIN32_FILE_ATTRIBUTE_DATA attrData = {};
-        if (!GetFileAttributesExW(record->FileNameW, GetFileExInfoStandard, &attrData))
+        FileInfo fileInfo = {};
+        if (!gFileSystem->GetFileInfo(record->FileName.c_str(), fileInfo).success)
             return FALSE;
-        DWORD attrs = attrData.dwFileAttributes;
+        DWORD attrs = fileInfo.attributes;
         const bool isDir = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-        const BOOL sourceAndTargetSamePath = IsTheSamePath(sourceDirA.c_str(), const_cast<char*>(targetPathWithSlash));
-        if ((data->MakeCopyOfName && !sourceAndTargetSamePath) ||
-            (!data->MakeCopyOfName && sourceAndTargetSamePath))
-        {
+        const BOOL sourceAndTargetSamePath = IsTheSamePath(itemSourceDirW.c_str(), targetPathWithSlash.c_str());
+        // Legacy-loop semantics: "make copy of" names apply only when the item
+        // pastes back into its own directory; a different target is a plain
+        // copy. A same-path paste WITHOUT copy-of or a rename-map is a no-op
+        // shape - refuse it.
+        const bool wantCopyOfName = data->MakeCopyOfName && sourceAndTargetSamePath;
+        if (!data->MakeCopyOfName && sourceAndTargetSamePath && !record->MapName.has_value())
             return FALSE;
-        }
 
         std::wstring targetNameW;
-        CPathBuffer targetNameA;
-        if (data->MakeCopyOfName)
+        if (wantCopyOfName)
         {
-            if (!GenerateCopyOfTargetNameW(targetPathWithSlashW, sourceNameW,
+            if (!GenerateCopyOfTargetNameW(targetPathWithSlash, sourceNameW,
                                            isDir, reservedNames, targetNameW))
-            {
-                return FALSE;
-            }
-
-            if (WideCharToMultiByte(CP_ACP, 0, targetNameW.c_str(), -1,
-                                    targetNameA, targetNameA.Size(), "?", NULL) == 0 ||
-                targetNameA[0] == 0)
             {
                 return FALSE;
             }
         }
 
         CSnapshotItem item = {};
-        item.Name = sourceNameA;
         item.NameW = sourceNameW;
-        if (data->MakeCopyOfName)
+        if (_wcsicmp(sourceDirW.c_str(), itemSourceDirW.c_str()) != 0)
         {
-            item.TargetName = targetNameA.Get();
+            item.SourceParentW = itemSourceDirW;
+        }
+        if (wantCopyOfName)
+        {
             item.TargetNameW = targetNameW;
             item.HasTargetName = true;
         }
+        else if (record->MapName.has_value() && !record->MapName->empty())
+        {
+            // Legacy contract: MapName is the explicit target LEAF name
+            // (BuildScriptDir/File took it as their targetName parameter).
+            item.TargetNameW = *record->MapName;
+            item.HasTargetName = true;
+        }
         item.IsDir = isDir;
-        item.Size = isDir ? 0 : ((((unsigned __int64)attrData.nFileSizeHigh) << 32) |
-                                 attrData.nFileSizeLow);
+        item.Size = isDir ? 0 : fileInfo.size;
         item.Attr = attrs;
-        item.LastWrite = attrData.ftLastWriteTime;
+        item.LastWrite = fileInfo.lastWriteTime;
         snapshot.Items.push_back(item);
     }
 
-    if (sourceDirA.empty() || sourceDirW.empty() || snapshot.Items.empty())
+    if (sourceDirW.empty() || snapshot.Items.empty())
         return FALSE;
 
-    BOOL sourceSupADS = IsPathOnVolumeSupADS(sourceDirA.c_str(), NULL);
+    BOOL sourceSupADS = IsPathOnVolumeSupADSW(sourceDirW.c_str(), NULL);
 
     const CActionType actionType = copy ? atCopy : atMove;
     if (SnapshotSelectionNeedsLegacyADS(actionType, sourceSupADS, targetSupADS, snapshot,
-                                        sourceDirA.c_str(), sourceDirW.c_str()))
+                                        sourceDirW.c_str()))
     {
         snapshot.Items.clear();
         return FALSE;
@@ -630,12 +956,17 @@ BOOL CanBuildMain2FromSnapshot(BOOL isDiskPanel,
                                    targetPathState == tpsEncryptedNotExisting;
     config.EnableADS = sourceSupADS && targetSupADS;
     config.ADSProbe = BuildScriptLegacyADSProbe;
+    config.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
+    config.SourcePathIsNetwork = script != NULL ? script->SourcePathIsNetwork : FALSE;
+    static SnapshotLinkTargetSizeContext mainLinkSizeCtx;
+    mainLinkSizeCtx = {MainWindow != NULL ? MainWindow->HWindow : NULL, FALSE};
+    config.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
+    config.LinkTargetSizeContext = &mainLinkSizeCtx;
     config.EnableExplicitTargetNames = data->MakeCopyOfName != FALSE;
     config.EnableRecursiveDirectories = TRUE;
     config.ClearReadOnly = script->ClearReadonlyMask == ~(FILE_ATTRIBUTE_READONLY);
     return TRUE;
 }
-} // namespace
 
 // The former SALLY_PRIVATE_TESTS sally::test forwarders were promoted:
 // ShouldReportADSProbeError / NormalizeADSReadErrorResponse live in
@@ -676,67 +1007,33 @@ private:
     CBuildScriptState* Previous;
 };
 
-static std::wstring EffectiveWorkPathW(const char* pathA, const wchar_t* pathW)
+static void SetScriptWorkPath1(COperations* script, const wchar_t* pathW, BOOL inclSubDirs)
 {
-    if (pathW != NULL && pathW[0] != L'\0')
-        return pathW;
-    if (pathA != NULL && pathA[0] != 0)
-        return AnsiToWide(pathA);
-    return std::wstring();
-}
-
-static void SetScriptWorkPath1(COperations* script, const char* pathA,
-                               const wchar_t* pathW, BOOL inclSubDirs)
-{
-    if (script == NULL)
+    if (script == NULL || pathW == NULL || pathW[0] == L'\0')
         return;
-
-    if (pathA != NULL && pathA[0] != 0)
-        script->SetWorkPath1(pathA, inclSubDirs);
-
-    std::wstring effectivePathW = EffectiveWorkPathW(pathA, pathW);
-    if (!effectivePathW.empty())
-        script->SetWorkPath1W(effectivePathW.c_str(), inclSubDirs);
+    script->SetWorkPath1W(pathW, inclSubDirs);
 }
 
-static void SetScriptWorkPath2(COperations* script, const char* pathA,
-                               const wchar_t* pathW, BOOL inclSubDirs)
+static void SetScriptWorkPath2(COperations* script, const wchar_t* pathW, BOOL inclSubDirs)
 {
-    if (script == NULL)
+    if (script == NULL || pathW == NULL || pathW[0] == L'\0')
         return;
-
-    if (pathA != NULL && pathA[0] != 0)
-        script->SetWorkPath2(pathA, inclSubDirs);
-
-    std::wstring effectivePathW = EffectiveWorkPathW(pathA, pathW);
-    if (!effectivePathW.empty())
-        script->SetWorkPath2W(effectivePathW.c_str(), inclSubDirs);
+    script->SetWorkPath2W(pathW, inclSubDirs);
 }
 
+// sourcePathW/targetPathW are the callers' already-resolved effective
+// wide paths - both BuildScriptMain call sites now always have one, so the old
+// ansi-mirror-with-wide-preference fallback (EffectiveWorkPathW) is dead weight.
 static void StampBuildScriptWorkPaths(COperations* script, CActionType type,
-                                      const char* sourcePath,
                                       const wchar_t* sourcePathW,
-                                      const char* targetPath,
                                       const wchar_t* targetPathW)
 {
     if (type != atCopy && type != atMove && type != atDelete)
         return;
 
-    SetScriptWorkPath1(script, sourcePath, sourcePathW, TRUE);
+    SetScriptWorkPath1(script, sourcePathW, TRUE);
     if (type == atCopy || type == atMove)
-        SetScriptWorkPath2(script, targetPath, targetPathW, TRUE);
-}
-
-static std::wstring CopyMoveRecordSourceDirW(CCopyMoveRecord* record,
-                                             const char* sourceDirA)
-{
-    if (record != NULL && record->FileNameW != NULL && record->FileNameW[0] != L'\0')
-    {
-        std::wstring sourceDirW = record->FileNameW;
-        if (CutDirectoryW(sourceDirW))
-            return sourceDirW;
-    }
-    return EffectiveWorkPathW(sourceDirA, NULL);
+        SetScriptWorkPath2(script, targetPathW, TRUE);
 }
 
 //
@@ -830,25 +1127,34 @@ namespace
 
 bool FileStartsWithUtf8Bom(HANDLE hFile)
 {
-    LARGE_INTEGER zero = {};
-    LARGE_INTEGER original = {};
-    if (!SetFilePointerEx(hFile, zero, &original, FILE_CURRENT))
+    uint64_t original = 0;
+    if (!gFileSystem->SeekHandle(hFile, 0, FILE_CURRENT, &original).success)
         return false;
-    SetFilePointerEx(hFile, zero, NULL, FILE_BEGIN);
+    gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, NULL);
     BYTE bom[3] = {};
     DWORD read = 0;
-    bool hasBom = ReadFile(hFile, bom, sizeof(bom), &read, NULL) &&
+    bool hasBom = gFileSystem->ReadFromHandle(hFile, bom, sizeof(bom), &read).success &&
                   read == sizeof(bom) && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
-    SetFilePointerEx(hFile, original, NULL, FILE_BEGIN);
+    gFileSystem->SeekHandle(hFile, (int64_t)original, FILE_BEGIN, NULL);
     return hasBom;
 }
 
-bool WriteAll(HANDLE hFile, const void* data, DWORD len)
+bool WriteAll(HANDLE hFile, const void* data, size_t len)
 {
-    if (len == 0)
-        return true;
-    DWORD written = 0;
-    return WriteFile(hFile, data, len, &written, NULL) && written == len;
+    const BYTE* next = static_cast<const BYTE*>(data);
+    while (len != 0)
+    {
+        const DWORD chunk = static_cast<DWORD>(std::min<size_t>(len, MAXDWORD));
+        DWORD written = 0;
+        FileResult result = gFileSystem->WriteToHandle(hFile, next, chunk, &written);
+        if (!result.success)
+            SetLastError(result.errorCode);
+        if (!result.success || written != chunk)
+            return false;
+        next += written;
+        len -= written;
+    }
+    return true;
 }
 
 } // namespace
@@ -897,7 +1203,7 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
 
                 if (!ExpandMakeFileListW(HWindow, Configuration.FileListHistory[0], &PluginData, f,
                                          indexes[i] < Dirs->Count, NULL, TRUE, maxSizes, maxSizesCount,
-                                         ValidFileData, GetPath(), i != 0))
+                                         ValidFileData, GetPathW(), i != 0))
                 {
                     FilesActionInProgress = FALSE;
                     return FALSE;
@@ -905,8 +1211,8 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
             }
         }
         std::wstring output;
-        bool outputIsExactAnsi = TRUE;
-        std::string ansiOutput;
+        sally::file_list::TextEncoding outputEncoding = sally::file_list::TextEncoding::LegacyAcp;
+        std::string encodedOutput;
 
         // in the second phase, apply these widths
         for (i = 0; i < alloc; i++)
@@ -918,7 +1224,7 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                 std::wstring buff;
                 if (ExpandMakeFileListW(HWindow, Configuration.FileListHistory[0], &PluginData, f,
                                         indexes[i] < Dirs->Count, &buff, FALSE, maxSizes, maxSizesCount,
-                                        ValidFileData, GetPath(), TRUE))
+                                        ValidFileData, GetPathW(), TRUE))
                 {
                     output += buff;
                 }
@@ -929,33 +1235,40 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
                 }
             }
         }
-        outputIsExactAnsi = sally::unicode::TryWideToAnsiExact(output, ansiOutput);
-        LARGE_INTEGER pos = {};
-        SetFilePointerEx(hFile, pos, &pos, FILE_CURRENT);
-        if (outputIsExactAnsi)
+        const Win32TextConversionResult encodeResult =
+            sally::file_list::EncodeText(output, encodedOutput, outputEncoding);
+        if (!encodeResult.Succeeded())
         {
-            if (!WriteAll(hFile, ansiOutput.data(), (DWORD)ansiOutput.length()))
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                 GetErrorTextOwned(encodeResult.Win32Error).c_str());
+            FilesActionInProgress = FALSE;
+            return FALSE;
+        }
+        uint64_t pos = 0;
+        gFileSystem->SeekHandle(hFile, 0, FILE_CURRENT, &pos);
+        if (outputEncoding == sally::file_list::TextEncoding::LegacyAcp)
+        {
+            if (!WriteAll(hFile, encodedOutput.data(), encodedOutput.length()))
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(GetLastError()));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(GetLastError()).c_str());
                 FilesActionInProgress = FALSE;
                 return FALSE;
             }
         }
         else
         {
-            bool hasUtf8Bom = pos.QuadPart > 0 && FileStartsWithUtf8Bom(hFile);
-            if (pos.QuadPart > 0 && !hasUtf8Bom)
+            bool hasUtf8Bom = pos > 0 && FileStartsWithUtf8Bom(hFile);
+            if (pos > 0 && !hasUtf8Bom)
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), L"Cannot append Unicode file-list output to a non-Unicode file.");
                 FilesActionInProgress = FALSE;
                 return FALSE;
             }
             const BYTE bom[] = {0xEF, 0xBB, 0xBF};
-            std::string utf8 = sally::unicode::WideToUtf8(output);
-            if ((pos.QuadPart == 0 && !WriteAll(hFile, bom, sizeof(bom))) ||
-                !WriteAll(hFile, utf8.data(), (DWORD)utf8.length()))
+            if ((pos == 0 && !WriteAll(hFile, bom, sizeof(bom))) ||
+                !WriteAll(hFile, encodedOutput.data(), encodedOutput.length()))
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextW(GetLastError()));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), GetErrorTextOwned(GetLastError()).c_str());
                 FilesActionInProgress = FALSE;
                 return FALSE;
             }
@@ -965,30 +1278,46 @@ BOOL CFilesWindow::MakeFileList(HANDLE hFile)
     return TRUE;
 }
 
-DWORD GetPathFlagsForCopyOp(const char* path, DWORD netFlag, DWORD fixedFlag)
+static BOOL GetFileSystemNameForPathW(const wchar_t* path, DWORD* maximumComponentLength,
+                                      DWORD* fileSystemFlags, std::wstring& fileSystemName)
 {
-    if (IsUNCPath(path))
+    return MyGetVolumeInformationW(path, NULL, NULL, NULL, NULL, NULL,
+                                   maximumComponentLength, fileSystemFlags,
+                                   &fileSystemName);
+}
+
+// Wide target owners use the real implementation directly.
+// Drive letters are ASCII by definition, so only that root byte is folded.
+static DWORD GetPathFlagsForCopyOpW(const wchar_t* path, DWORD netFlag, DWORD fixedFlag)
+{
+    if (path == NULL || path[0] == L'\0')
+        return 0;
+    if (IsUNCPathW(path))
         return netFlag;
-    else
+
+    const UINT drvType = MyGetDriveTypeW(path);
+    if (drvType == DRIVE_REMOTE)
+        return netFlag;
+    if (drvType == DRIVE_FIXED || drvType == DRIVE_RAMDISK || drvType == DRIVE_CDROM)
+        return fixedFlag;
+
+    wchar_t drive = path[0];
+    if (drive >= L'a' && drive <= L'z')
+        drive -= L'a' - L'A';
+    if (drvType == DRIVE_REMOVABLE && drive >= L'A' && drive <= L'Z' && path[1] == L':' &&
+        GetDriveFormFactor((int)(drive - L'A' + 1)) == 0 /* not a floppy */)
     {
-        UINT drvType = MyGetDriveType(path);
-        if (drvType == DRIVE_REMOTE)
-            return netFlag;
-        else if (drvType == DRIVE_FIXED || drvType == DRIVE_RAMDISK || drvType == DRIVE_CDROM)
-            return fixedFlag;
-        else if (drvType == DRIVE_REMOVABLE && UpperCase[path[0]] >= 'A' && UpperCase[path[0]] <= 'Z' && path[1] == ':' &&
-                 GetDriveFormFactor(UpperCase[path[0]] - 'A' + 1) == 0 /* not a floppy */)
-        {
-            return fixedFlag; // removable but not a floppy, e.g. USB stick or a camera via USB (e.g. FZ45) - we treat them as fixed, they're fast enough
-        }
+        return fixedFlag; // removable but not a floppy, e.g. USB stick or a camera via USB (e.g. FZ45) - we treat them as fixed, they're fast enough
     }
     return 0;
 }
 
-BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char* remapNameFrom,
-                             const char* remapNameTo)
+// fileswnd.h:1454 has declared all four parameters const wchar_t*; only this
+// definition lagged. CALL_STACK_MESSAGE stays narrow and takes %ls for wide arguments.
+BOOL CFilesWindow::MoveFiles(const wchar_t* source, const wchar_t* target, const wchar_t* remapNameFrom,
+                             const wchar_t* remapNameTo)
 {
-    CALL_STACK_MESSAGE5("CFilesWindow::MoveFiles(%s, %s, %s, %s)",
+    CALL_STACK_MESSAGE5("CFilesWindow::MoveFiles(%ls, %ls, %ls, %ls)",
                         source, target, remapNameFrom, remapNameTo);
     if (!FilesActionInProgress)
     {
@@ -997,7 +1326,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
 
         FilesActionInProgress = TRUE;
 
-        EnvSetCurrentDirectoryA(gEnvironment, source); // for a faster move (the system prefers it)
+        gEnvironment->SetCurrentDirectory(source); // for a faster move (the system prefers it)
 
         CScopedBuildScriptState scopedBuildScriptState;
         CBuildScriptState& bsState = GetActiveBuildScriptState();
@@ -1011,11 +1340,15 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
             SetCurrentDirectoryToSystem();
             return FALSE;
         }
+        // These two lengths are the ones RemapNames sizes its copies with.
+        // They were computed with strlen() on const wchar_t* - a unit bug feeding a unit bug.
         script->RemapNameFrom = remapNameFrom;
-        script->RemapNameFromLen = (int)strlen(remapNameFrom);
+        script->RemapNameFromLen = (int)wcslen(remapNameFrom);
         script->RemapNameTo = remapNameTo;
-        script->RemapNameToLen = (int)strlen(remapNameTo);
+        script->RemapNameToLen = (int)wcslen(remapNameTo);
 
+        // MoveFiles already receives exact UTF-16 paths. Keep root/volume
+        // classification on those values instead of routing them into the legacy ANSI helpers.
         BOOL sameRootPath = HasTheSameRootPath(source, target);
         script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, target);
         script->ShowStatus = !sameRootPath || script->SameRootButDiffVolume;
@@ -1024,19 +1357,19 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
 
         BOOL fastDirectoryMove = TRUE;          // Configuration.FastDirectoryMove;
         if (fastDirectoryMove &&                // fast-dir-move is not globally disabled
-            HasTheSameRootPath(source, target)) // + within the same drive
+            sameRootPath)                       // + within the same drive
         {
             UINT sourceType = DRIVE_REMOTE;
-            if (source[0] != '\\') // not a UNC path (that is always "remote")
+            if (source[0] != L'\\') // not a UNC path (that is always "remote")
             {
-                char root[4] = " :\\";
+                wchar_t root[4] = L" :\\";
                 root[0] = source[0];
-                sourceType = GetDriveType(root);
+                sourceType = GetDriveTypeW(root);
             }
 
             if (sourceType == DRIVE_REMOTE) // network drive
             {                               // detect Novell disks - fast-directory-move doesn't work on them
-                if (IsNOVELLDrive(source))
+                if (IsNOVELLDriveW(source))
                     fastDirectoryMove = Configuration.NetwareFastDirMove;
             }
         }
@@ -1044,101 +1377,93 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         //---  initialize build interruption test
         bsState.LastTickCount = GetTickCount();
 
-        //---  enumerate files/directories of the source directory
-        CPathBuffer sourceDir;
-        int len = (int)strlen(source);
-        if (source[len - 1] == '\\')
-            len--;
-        memcpy(sourceDir, source, len);
-        sourceDir[len++] = '\\';
-        strcpy(sourceDir + len, "*");
+        //---  snapshot build: the last BuildScriptDir/File consumer
+        //     (archive unpack temp-move with remap) rides the single builder.
+        std::wstring sourceW = source;
+        while (!sourceW.empty() && sourceW.back() == L'\\')
+            sourceW.pop_back();
+        std::wstring targetW = target;
+        while (!targetW.empty() && targetW.back() == L'\\')
+            targetW.pop_back();
 
-        WIN32_FIND_DATAW file;
-        HANDLE find = SalFindFirstFileHW(sourceDir, &file);
-        if (find == INVALID_HANDLE_VALUE)
         {
-            FreeScript(script);
-            FilesActionInProgress = FALSE;
-            SetCurrentDirectoryToSystem();
-            return FALSE;
-        }
-        else
-        {
-            sourceDir[len] = 0;
-
-            CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
+            CreateSafeWaitWindow(LoadStrW(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-
             GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-            CPathBuffer targetDir; // Heap-allocated for long path support
-            strcpy(targetDir, target);
+            // sourceW (already trimmed above) is the authoritative value here -
+            // narrowing it via WideToAnsi just to feed the narrow overload was a pointless
+            // round trip now that IsPathOnVolumeSupADSW exists.
+            BOOL sourceSupADS = IsPathOnVolumeSupADSW(sourceW.c_str(), NULL);
+            BOOL targetIsFAT32;
+            BOOL targetSupADS = IsPathOnVolumeSupADSW(target, &targetIsFAT32);
+            CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, target);
 
-            BOOL sourceSupADS = IsPathOnVolumeSupADS(sourceDir, NULL);
-            BOOL targetIsFAT32 /*, targetSupEFS*/;
-            BOOL targetSupADS = IsPathOnVolumeSupADS(targetDir, &targetIsFAT32);
-            CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, targetDir);
-            DWORD srcAndTgtPathsFlags = GetPathFlagsForCopyOp(sourceDir, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST) |
-                                        GetPathFlagsForCopyOp(targetDir, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
+            CSelectionSnapshot snapshot;
+            snapshot.Action = EActionType::Move;
+            snapshot.SourcePathW = sourceW;
+            snapshot.TargetPathW = targetW;
+            snapshot.Mask = L"*.*";
 
-            script->TargetPathSupADS = targetSupADS;
-            //      script->TargetPathSupEFS = targetSupEFS;
-
-            DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(targetDir, &d1, &d2, &d3, &d4))
+            BOOL enumOK = TRUE;
+            HENUM topEnum = gFileEnumerator->StartEnum((sourceW + L"\\*").c_str());
+            if (topEnum == INVALID_HENUM)
+                enumOK = FALSE;
+            else
             {
-                script->BytesPerCluster = d1 * d2;
-                // W2K and later: the product d1 * d2 * d3 didn't work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-                script->FreeSpace = MyGetDiskFreeSpace(targetDir);
+                FileEnumEntry entry;
+                EnumResult er;
+                while ((er = gFileEnumerator->NextFile(topEnum, entry)).success && !er.noMoreFiles)
+                {
+                    if (entry.name == L"." || entry.name == L"..")
+                        continue;
+                    CSnapshotItem item = {};
+                    item.NameW = entry.name;
+                    item.IsDir = (entry.attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+                    item.Size = item.IsDir ? 0 : entry.size;
+                    item.Attr = entry.attributes;
+                    item.LastWrite = entry.lastWriteTime;
+                    snapshot.Items.push_back(item);
+                }
+                if (!er.success)
+                    enumOK = FALSE;
+                gFileEnumerator->EndEnum(topEnum);
             }
 
-            BOOL scriptOK = TRUE; // result of script creation, success?
-            std::wstring sourceDirW = AnsiToWide(sourceDir);
-            do
+            BOOL scriptOK = FALSE;
+            if (enumOK)
             {
-                if (file.cFileName[0] != 0 &&
-                    (file.cFileName[0] != L'.' ||
-                     (file.cFileName[1] != 0 && (file.cFileName[1] != L'.' || file.cFileName[2] != 0))))
-                {
-                    char fileNameA[MAX_PATH];
-                    WideCharToMultiByte(CP_ACP, 0, file.cFileName, -1, fileNameA, MAX_PATH, NULL, NULL);
-                    if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                    {
-                        if (!BuildScriptDir(script, atMove, sourceDir, sourceSupADS, targetDir,
-                                            targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                            fileNameA, NULL, NULL, NULL, file.dwFileAttributes, NULL,
-                                            TRUE, FALSE, fastDirectoryMove, NULL, NULL, &file.ftLastWriteTime,
-                                            srcAndTgtPathsFlags, sourceDirW.c_str(), file.cFileName))
-                        {
-                            scriptOK = FALSE;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (!BuildScriptFile(script, atMove, sourceDir, sourceSupADS, targetDir,
-                                             targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                             fileNameA, NULL,
-                                             CQuadWord(file.nFileSizeLow, file.nFileSizeHigh),
-                                             NULL, NULL, file.dwFileAttributes, NULL, FALSE, NULL,
-                                             srcAndTgtPathsFlags, file.cFileName, AnsiToWide(sourceDir).c_str()))
-                        {
-                            scriptOK = FALSE;
-                            break;
-                        }
-                    }
-                }
-            } while (SalLPFindNextFile(find, &file));
-            HANDLES(FindClose(find));
-            int i;
-            for (i = 0; i < script->Count; i++)
-                script->TotalSize += script->At(i).Size;
+                CBuildConfig config;
+                config.EnableRecursiveDirectories = TRUE;
+                config.EnableFastDirMove = fastDirectoryMove;
+                config.EnableReparseCopyMove = TRUE;
+                config.SourceSupportsADS = sourceSupADS;
+                config.TargetSupportsADS = targetSupADS;
+                config.TargetIsFAT32 = targetIsFAT32;
+                config.TargetPathIsEncrypted = targetPathState == tpsEncryptedExisting ||
+                                               targetPathState == tpsEncryptedNotExisting;
+                config.EnableADS = sourceSupADS && targetSupADS;
+                config.ADSProbe = BuildScriptLegacyADSProbe;
+                config.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
+                config.ADSProbeErrorContext = &HWindow;
+                static SnapshotLinkTargetSizeContext linkSizeCtx;
+                linkSizeCtx = {HWindow, FALSE};
+                config.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
+                config.LinkTargetSizeContext = &linkSizeCtx;
+                config.SourcePathIsNetwork = script->SourcePathIsNetwork;
+                config.AdsLossPromptCallback = SnapshotAdsLossPrompt;
+                static SnapshotAdsLossContext adsCtx;
+                adsCtx = {atMove, &bsState, HWindow};
+                config.AdsLossPromptContext = &adsCtx;
+
+                scriptOK = BuildScriptFromSnapshot(snapshot, config, bsState, script);
+            }
             SetCursor(oldCur);
             DestroySafeWaitWindow();
             // script built, let it execute
             if (script->Count != 0)
             {
-                CProgressDialog dlg(HWindow, script, LoadStr(IDS_UNPACKTMPMOVE), NULL, NULL, FALSE, NULL);
+                CProgressDialog dlg(HWindow, script, LoadStrW(IDS_UNPACKTMPMOVE), NULL, NULL, FALSE, NULL);
                 int res = 0;
                 if (!scriptOK || (res = (int)dlg.Execute()) == IDABORT || res == 0 || res == -1)
                 {
@@ -1166,7 +1491,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
     return FALSE;
 }
 
-BOOL ContainsString(TIndirectArray<char>* usedNames, const char* name, int* index)
+BOOL ContainsString(TIndirectArray<wchar_t>* usedNames, const wchar_t* name, int* index)
 {
     CALL_STACK_MESSAGE_NONE
     if (usedNames != NULL)
@@ -1182,8 +1507,8 @@ BOOL ContainsString(TIndirectArray<char>* usedNames, const char* name, int* inde
         while (1)
         {
             m = (l + r) / 2;
-            char* hw = usedNames->At(m);
-            int res = StrICmp(hw, name);
+            wchar_t* hw = usedNames->At(m);
+            int res = StrICmpW(hw, name);
             if (res == 0) // found
             {
                 if (index != NULL)
@@ -1218,34 +1543,10 @@ BOOL ContainsString(TIndirectArray<char>* usedNames, const char* name, int* inde
     return FALSE;
 }
 
-void AddStringToNames(TIndirectArray<char>* usedNames, const char* txt)
+BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, const wchar_t* targetDir,
+                                    CCopyMoveData* data)
 {
-    CALL_STACK_MESSAGE_NONE
-    char* str = DupStr(txt);
-    if (str != NULL)
-    {
-        int index;
-        if (ContainsString(usedNames, str, &index))
-        {
-            TRACE_E("Unexpected situation in AddStringToNames().");
-            free(str);
-        }
-        else
-        {
-            usedNames->Insert(index, str);
-            if (!usedNames->IsGood())
-            {
-                free(str);
-                usedNames->ResetState();
-            }
-        }
-    }
-}
-
-BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* targetDir,
-                                    const wchar_t* targetDirW, CCopyMoveData* data)
-{
-    CALL_STACK_MESSAGE3("CFilesWindow::BuildScriptMain2(, %d, %s, )", copy, targetDir);
+    CALL_STACK_MESSAGE3("CFilesWindow::BuildScriptMain2(, %d, %ls, )", copy, targetDir);
     if (!script->IsGood())
         return FALSE;
     script->CompressedSize = CQuadWord(0, 0);
@@ -1256,35 +1557,32 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
 
     CScopedBuildScriptState scopedBuildScriptState;
 
-    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-    CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
+    std::wstring fsName;
     DWORD dummy, flags;
 
     BOOL fastDirectoryMove = TRUE; // Configuration.FastDirectoryMove;
     if (data->Count > 0)
     {
-        char* name = data->At(0)->FileName;
+        const wchar_t* name = data->At(0)->FileName.c_str();
         UINT sourceType = DRIVE_REMOTE;
-        if (name != NULL && LowerCase[*name] >= 'a' && LowerCase[*name] <= 'z' &&
-            *(name + 1) == ':') // not a UNC path (UNC paths are always "remote")
+        if (name != NULL &&
+            ((name[0] >= L'a' && name[0] <= L'z') || (name[0] >= L'A' && name[0] <= L'Z')) &&
+            name[1] == L':') // not a UNC path (UNC paths are always "remote")
         {
-            sourceType = MyGetDriveType(name);
+            sourceType = MyGetDriveTypeW(name);
         }
         if (name != NULL)
         {
             if (sourceType == DRIVE_REMOTE || sourceType == DRIVE_REMOVABLE)
-            {
-                GetRootPath(root, name);
-                EnvSetCurrentDirectoryA(gEnvironment, root);
-            }
+                gEnvironment->SetCurrentDirectory(GetRootPath(name).c_str());
             else
-                EnvSetCurrentDirectoryA(gEnvironment, targetDir);
+                gEnvironment->SetCurrentDirectory(targetDir);
 
-            if (fastDirectoryMove &&                   // fast-dir-move is not globally disabled
+            if (fastDirectoryMove &&                    // fast-dir-move is not globally disabled
                 !copy && sourceType == DRIVE_REMOTE && // + move operation + network disk
-                HasTheSameRootPath(name, targetDir))   // + within one drive
+                HasTheSameRootPath(name, targetDir))  // + within one drive
             {                                          // detect Novell disks - fast-directory-move doesn't work on them
-                if (IsNOVELLDrive(name))
+                if (IsNOVELLDriveW(name))
                     fastDirectoryMove = Configuration.NetwareFastDirMove;
             }
 
@@ -1295,12 +1593,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
             {
                 if (sourceType == DRIVE_REMOTE)
                 {
-                    GetRootPath(root, name);
-                    fsName[0] = 0;
-                    // NOTE: pass MAX_PATH, not fsName.Size() — GetVolumeInformationA has a 16-bit
-                    // arithmetic overflow bug when size >= 32767: (size+1)*2 overflows to 0.
-                    if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
-                        StrICmp(fsName, "CDFS") == 0)
+                    if (GetFileSystemNameForPathW(name, &dummy, &flags, fsName) &&
+                        StrICmpW(fsName.c_str(), L"CDFS") == 0)
                     {
                         script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);
                     }
@@ -1315,64 +1609,32 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     }
 
     // check if the target is a removable medium (floppy, ZIP) -> larger buffer is used for speed
-    if (LowerCase[*targetDir] >= 'a' && LowerCase[*targetDir] <= 'z' &&
-        *(targetDir + 1) == ':')
+    if (((targetDir[0] >= L'a' && targetDir[0] <= L'z') ||
+         (targetDir[0] >= L'A' && targetDir[0] <= L'Z')) &&
+        targetDir[1] == L':')
     {
-        char root2[4] = " :\\";
-        root2[0] = targetDir[0];
-        UINT targetType = GetDriveType(root2);
-
-        if (targetType == DRIVE_REMOVABLE)
+        if (MyGetDriveTypeW(targetDir) == DRIVE_REMOVABLE)
             script->RemovableTgtDisk = TRUE;
     }
 
-    CActionType type = (copy ? atCopy : atMove);
-    CPathBuffer sourcePath;     // Heap-allocated for long path support
-    CPathBuffer lastSourcePath; // Heap-allocated for long path support
-    *lastSourcePath = 0;
-    BOOL sourceSupADS = FALSE;
-    CPathBuffer targetPath;  // Heap-allocated for long path support
-    CPathBuffer mapNameBuf;  // Heap-allocated for long path support
-    strcpy(targetPath, targetDir);
-    SalPathAddBackslash(targetPath, targetPath.Size());
-    std::wstring targetPathWide = (targetDirW != NULL && targetDirW[0] != L'\0')
-                                      ? std::wstring(targetDirW)
-                                      : AnsiToWide(targetPath);
-    if (!targetPathWide.empty() && targetPathWide[targetPathWide.length() - 1] != L'\\')
-        targetPathWide += L'\\';
+    std::wstring targetPathWithSlash = targetDir;
+    SalPathAddBackslashW(targetPathWithSlash);
     BOOL targetIsFAT32 /*, targetSupEFS*/;
-    BOOL targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
+    BOOL targetSupADS = IsPathOnVolumeSupADSW(targetPathWithSlash.c_str(), &targetIsFAT32);
     script->TargetPathSupADS = targetSupADS;
-    DWORD srcAndTgtPathsFlags = GetPathFlagsForCopyOp(targetPath, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
     //  script->TargetPathSupEFS = targetSupEFS;
-    CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, targetPath);
-    char* targetName = targetPath + strlen(targetPath);
-    const std::wstring& targetDirWithBackslashW = targetPathWide;
-    auto targetCandidateExistsW = [&](const char* candidateNameA) -> bool
-    {
-        if (candidateNameA == NULL)
-            return false;
-        std::wstring candidateW = targetDirWithBackslashW + AnsiToWide(candidateNameA);
-        return GetFileAttributesW(candidateW.c_str()) != INVALID_FILE_ATTRIBUTES;
-    };
-    BOOL makeCopyOfName = data->MakeCopyOfName;
-    std::unique_ptr<TIndirectArray<char>> usedNames; // RAII: auto-deleted when scope exits
-    std::vector<std::wstring> usedNamesW;
-    if (makeCopyOfName)
-        usedNames = std::make_unique<TIndirectArray<char>>(100, 50);
-
     DWORD d1, d2, d3, d4;
-    if (MyGetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
+    if (MyGetDiskFreeSpaceW(targetPathWithSlash.c_str(), &d1, &d2, &d3, &d4))
     {
         script->BytesPerCluster = d1 * d2;
         // W2K and later: the product d1 * d2 * d3 did not work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-        script->FreeSpace = MyGetDiskFreeSpace(targetPath);
+        script->FreeSpace = MyGetDiskFreeSpaceW(targetPathWithSlash.c_str());
     }
 
     CSelectionSnapshot snapshot;
     CBuildConfig buildConfig;
-    if (CanBuildMain2FromSnapshot(Is(ptDisk), copy, targetDir, targetDirW,
-                                  targetPath, targetPathWide,
+    if (CanBuildMain2FromSnapshot(Is(ptDisk), copy, targetDir,
+                                  targetPathWithSlash,
                                   targetSupADS, targetIsFAT32,
                                   data, snapshot, buildConfig, script))
     {
@@ -1382,419 +1644,19 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
         return built;
     }
 
-    int i;
-    for (i = 0; i < data->Count; i++)
-    {
-        char* fileName = data->At(i)->FileName;
-        char* mapName = data->At(i)->MapName;
-        const wchar_t* mapNameW = NULL;
-        std::wstring mapNameWide;
-        wchar_t* fileNameW = data->At(i)->FileNameW;  // Wide filename for Unicode support
-        std::wstring itemSourcePathW;
-        const wchar_t* itemSourcePathWPtr = NULL;
-        if (fileNameW != NULL)
-        {
-            itemSourcePathW = fileNameW;
-            CutDirectoryW(itemSourcePathW);
-            itemSourcePathWPtr = itemSourcePathW.c_str();
-        }
-
-        // Extract just the filename part from the wide path (if available)
-        wchar_t* wideNameOnly = NULL;
-        if (fileNameW != NULL)
-        {
-            wchar_t* sw = fileNameW + lstrlenW(fileNameW);
-            while (--sw >= fileNameW && *sw != L'\\')
-                ;
-            wideNameOnly = sw + 1;  // Points to just the filename
-        }
-
-        // For Unicode files, use wide path to get attributes (ANSI path has ?? for non-convertible chars)
-        DWORD attrs = (fileNameW != NULL) ? GetFileAttributesW(fileNameW) : GetFileAttributesW(AnsiToWide(fileName).c_str());
-        if (attrs != 0xFFFFFFFF)
-        {
-            char* s = fileName + strlen(fileName);
-            while (--s >= fileName && *s != '\\')
-                ;
-            if (s > fileName)
-            {
-                memcpy(sourcePath, fileName, s - fileName);
-                sourcePath[s - fileName] = 0;
-                if (StrICmp(lastSourcePath, sourcePath) != 0)
-                {
-                    memcpy(lastSourcePath, fileName, s - fileName + 1);
-                    lastSourcePath[s - fileName + 1] = 0;
-                    sourceSupADS = IsPathOnVolumeSupADS(lastSourcePath, NULL);
-                    srcAndTgtPathsFlags &= ~(OPFL_SRCPATH_IS_NET | OPFL_SRCPATH_IS_FAST);
-                    srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(lastSourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
-                    lastSourcePath[s - fileName] = 0;
-                }
-                if (IsTheSamePath(sourcePath, targetPath) && // "Copy of..." is done only if paths match
-                    makeCopyOfName)                          // check if we will need a "Copy of..." name
-                {
-                    strcpy(targetName, s + 1); // copy the proposed full target name into targetPath
-                    BOOL handledWideCopyName = FALSE;
-                    if (wideNameOnly != NULL && !(attrs & FILE_ATTRIBUTE_DIRECTORY))
-                    {
-                        std::wstring copyTokenW = AnsiToWide(LoadStr(IDS_NEWNAME_COPY));
-                        if (!targetDirWithBackslashW.empty() && !copyTokenW.empty())
-                        {
-                            // The helper expects the destination directory with trailing backslash.
-                            if (sally::unicode::TryGenerateUniqueCopyName(targetDirWithBackslashW, wideNameOnly,
-                                                                          copyTokenW, usedNamesW, mapNameWide))
-                            {
-                                if (WideCharToMultiByte(CP_ACP, 0, mapNameWide.c_str(), -1,
-                                                        mapNameBuf, mapNameBuf.Size(), "?", NULL) > 0)
-                                {
-                                    mapName = mapNameBuf;
-                                    mapNameW = mapNameWide.c_str();
-                                    handledWideCopyName = TRUE;
-                                    usedNamesW.push_back(mapNameWide);
-                                }
-                            }
-                        }
-                    }
-
-                    BOOL isKnown = FALSE;
-                    // mapName must be NULL here, otherwise data->MakeCopyOfName could not be TRUE
-                    if (!handledWideCopyName &&
-                        ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                         targetCandidateExistsW(targetName)))
-                    { // name already exists, we must generate a new one
-                        if (!isKnown)
-                            AddStringToNames(usedNames.get(), targetName);
-                        char copyTxt[100];
-                        lstrcpyn(copyTxt, LoadStr(IDS_NEWNAME_COPY), 100);
-                        char ofTxt[100];
-                        lstrcpyn(ofTxt, LoadStr(IDS_NEWNAME_OF), 100);
-                        char copyOpenPar[100];
-                        lstrcpyn(copyOpenPar, copyTxt, 98);
-                        lstrcpyn(copyOpenPar + strlen(copyOpenPar), " (", 100 - (int)strlen(copyOpenPar));
-                        char hyphenCopy[100];
-                        strcpy(hyphenCopy, " - ");
-                        lstrcpyn(hyphenCopy + strlen(hyphenCopy), copyTxt, 100 - (int)strlen(hyphenCopy));
-                        char number[20];
-                        int val = 0;
-                        if (WindowsVistaAndLater)
-                        {
-                            int len = (int)strlen(targetName);
-                            char* ext = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? NULL : strrchr(s + 1, '.'); // directories have no extensions (copied Vista behavior)
-                            if (ext != NULL && strchr(ext, ' ') != NULL)
-                                ext = NULL; // extension with a space isn't an extension (copied Vista behavior)
-                            char* numBeg = s + 1;
-                            char* numEnd = NULL;
-                            while (1)
-                            {
-                                while (*numBeg != 0 && *numBeg != '(')
-                                    numBeg++;
-                                if (*numBeg == '(')
-                                {
-                                    numEnd = numBeg + 1;
-                                    while (*numEnd >= '0' && *numEnd <= '9')
-                                        numEnd++;
-                                    if (*numEnd != ')')
-                                        numBeg = numEnd;
-                                    else
-                                    {
-                                        numEnd++;
-                                        break; // "(number)" found
-                                    }
-                                }
-                                else
-                                {
-                                    numBeg = NULL;
-                                    break; // "(number)" not present
-                                }
-                            }
-
-                        _VISTA_NEXT_1: // "name - Copy.ext" and "name - Copy (++val).ext"
-
-                            if (++val > 1 && numBeg != NULL)
-                            {
-                                sprintf(number, "(%d)", val);
-                                if (ext != NULL)
-                                {
-                                    if (numBeg < ext)
-                                    {
-                                        lstrcpyn(targetName + (numBeg - (s + 1)), number, (int)(1 + MAX_PATH - (numBeg - (s + 1))));                                 // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), numEnd, (int)min((DWORD)((ext - numEnd) + 1), 1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), hyphenCopy, (int)(1 + MAX_PATH - strlen(targetName)));                             // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, (int)(1 + MAX_PATH - strlen(targetName)));                                    // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    }
-                                    else
-                                    {
-                                        lstrcpyn(targetName + (ext - (s + 1)), hyphenCopy, (int)(1 + MAX_PATH - (ext - (s + 1))));                                // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, (int)min((DWORD)((numBeg - ext) + 1), 1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), number, (int)(1 + MAX_PATH - strlen(targetName)));                              // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), numEnd, (int)(1 + MAX_PATH - strlen(targetName)));                              // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    }
-                                }
-                                else
-                                {
-                                    lstrcpyn(targetName + (numBeg - (s + 1)), number, (int)(1 + MAX_PATH - (numBeg - (s + 1))));     // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    lstrcpyn(targetName + strlen(targetName), numEnd, (int)(1 + MAX_PATH - strlen(targetName)));     // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    lstrcpyn(targetName + strlen(targetName), hyphenCopy, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                }
-                            }
-                            else
-                            {
-                                if (ext == NULL)
-                                    lstrcpyn(targetName + len, hyphenCopy, 1 + MAX_PATH - len); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                else
-                                    lstrcpyn(targetName + (ext - (s + 1)), hyphenCopy, (int)(1 + MAX_PATH - (ext - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                if (val > 1)
-                                {
-                                    sprintf(number, " (%d)", val);
-                                    lstrcpyn(targetName + strlen(targetName), number, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                }
-                                if (ext != NULL)
-                                    lstrcpyn(targetName + strlen(targetName), ext, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                            }
-
-                            if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
-                            {
-                                if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                    targetCandidateExistsW(targetName))
-                                {
-                                    if (!isKnown)
-                                        AddStringToNames(usedNames.get(), targetName);
-                                    goto _VISTA_NEXT_1;
-                                }
-                                else
-                                {
-                                    strcpy(mapNameBuf, targetName);
-                                    mapName = mapNameBuf;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (strncmp(s + 1, copyOpenPar, strlen(copyOpenPar)) == 0)
-                            {
-                                char* num = s + 1 + strlen(copyOpenPar);
-                                while (*num >= '0' && *num <= '9')
-                                    num++;
-                                if (*num == ')')
-                                {
-                                    val = 1;
-
-                                _NEXT_1: // pattern "copy (++val)*"
-
-                                    lstrcpyn(targetName, copyOpenPar, MAX_PATH);
-                                    sprintf(number, "%d)", ++val);
-                                    lstrcpyn(targetName + strlen(targetName), number, (int)(MAX_PATH - strlen(targetName)));
-                                    lstrcpyn(targetName + strlen(targetName), num + 1, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    if (strlen(targetName) < MAX_PATH)                                                            // name assembly succeeded, otherwise we ignore the result
-                                    {
-                                        if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                            targetCandidateExistsW(targetName))
-                                        {
-                                            if (!isKnown)
-                                                AddStringToNames(usedNames.get(), targetName);
-                                            goto _NEXT_1;
-                                        }
-                                        else
-                                        {
-                                            strcpy(mapNameBuf, targetName);
-                                            mapName = mapNameBuf;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    val = 1;
-                                    int len = (int)strlen(targetName);
-                                    char* ext = strrchr(num, '.');
-                                    char* num2 = ext == NULL ? (s + 1 + len - 1) : (ext - 1);
-                                    if (num2 > s && *num2 == ')')
-                                    {
-                                        while (--num2 > s && *num2 >= '0' && *num2 <= '9')
-                                            ;
-                                        if (num2 > s && *num2 == '(')
-                                        {
-                                            if (num2 - 1 > s && *(num2 - 1) == ' ')
-                                                num2--;
-                                        }
-                                        else
-                                            num2 = NULL;
-                                    }
-                                    else
-                                        num2 = NULL;
-
-                                _NEXT_2: // typ "* (++val)"
-
-                                    sprintf(number, " (%d)", ++val);
-                                    if (ext == NULL)
-                                    {
-                                        if (num2 == NULL)
-                                            lstrcpyn(targetName + len, number, 1 + MAX_PATH - len); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        else
-                                            lstrcpyn(targetName + (num2 - (s + 1)), number, (int)(1 + MAX_PATH - (num2 - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    }
-                                    else
-                                    {
-                                        if (num2 == NULL)
-                                            lstrcpyn(targetName + (ext - (s + 1)), number, (int)(1 + MAX_PATH - (ext - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        else
-                                            lstrcpyn(targetName + (num2 - (s + 1)), number, (int)(1 + MAX_PATH - (num2 - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, 1 + MAX_PATH - (int)strlen(targetName));      // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    }
-                                    if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
-                                    {
-                                        if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                            targetCandidateExistsW(targetName))
-                                        {
-                                            if (!isKnown)
-                                                AddStringToNames(usedNames.get(), targetName);
-                                            goto _NEXT_2;
-                                        }
-                                        else
-                                        {
-                                            strcpy(mapNameBuf, targetName);
-                                            mapName = mapNameBuf;
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                            _NEXT_3: // pattern "copy of *", then "copy (++val) of *"
-
-                                lstrcpyn(targetName, copyTxt, MAX_PATH);
-                                lstrcpyn(targetName + strlen(targetName), " ", MAX_PATH - (int)strlen(targetName));
-                                if (++val > 1)
-                                {
-                                    sprintf(number, "(%d) ", val);
-                                    lstrcpyn(targetName + strlen(targetName), number, MAX_PATH - (int)strlen(targetName));
-                                }
-                                if (ofTxt[0] != ' ' || ofTxt[1] != 0)
-                                {
-                                    lstrcpyn(targetName + strlen(targetName), ofTxt, MAX_PATH - (int)strlen(targetName));
-                                    lstrcpyn(targetName + strlen(targetName), " ", MAX_PATH - (int)strlen(targetName));
-                                }
-                                lstrcpyn(targetName + strlen(targetName), s + 1, 1 + MAX_PATH - (int)strlen(targetName)); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                if (strlen(targetName) < MAX_PATH)                                                        // name assembly succeeded, otherwise we ignore the result
-                                {
-                                    if ((isKnown = ContainsString(usedNames.get(), targetName)) != 0 ||
-                                        targetCandidateExistsW(targetName))
-                                    {
-                                        if (!isKnown)
-                                            AddStringToNames(usedNames.get(), targetName);
-                                        goto _NEXT_3;
-                                    }
-                                    else
-                                    {
-                                        strcpy(mapNameBuf, targetName);
-                                        mapName = mapNameBuf;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    *targetName = 0; // restore targetPath
-
-                    // store all names of newly created files
-                    if (usedNames != NULL)
-                    {
-                        if (mapNameW == NULL)
-                            AddStringToNames(usedNames.get(), mapName == NULL ? s + 1 : mapName);
-                    }
-                }
-
-                if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-                {
-                    if (!BuildScriptDir(script, type, sourcePath, sourceSupADS, targetPath,
-                                        targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                        s + 1, NULL, NULL, mapName, attrs, NULL, TRUE, TRUE,
-                                        fastDirectoryMove, NULL, NULL, NULL, srcAndTgtPathsFlags,
-                                        itemSourcePathWPtr, wideNameOnly,
-                                        targetDirWithBackslashW.c_str()))
-                    {
-                        SetCurrentDirectoryToSystem();
-                        return FALSE; // usedNames auto-deleted by unique_ptr
-                    }
-                }
-                else
-                {
-                    HANDLE h;
-                    {
-                        // Use wide path — either from fileNameW or convert ANSI fileName
-                        const wchar_t* fileW = fileNameW;
-                        std::wstring fileWBuf;
-                        if (fileW == NULL)
-                        {
-                            fileWBuf = AnsiToWide(fileName);
-                            fileW = fileWBuf.c_str();
-                        }
-                        h = HANDLES_Q(CreateFileW(fileW, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                  NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-                    }
-                    DWORD err = NO_ERROR;
-                    if (h != INVALID_HANDLE_VALUE)
-                    {
-                        CQuadWord size;
-                        BOOL haveSize = SalGetFileSize(h, size, err);
-                        HANDLES(CloseHandle(h));
-                        if (haveSize)
-                        {
-                            err = NO_ERROR;
-                            if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
-                                                 targetPathState, targetSupADS, targetIsFAT32, NULL,
-                                                 s + 1, NULL, size, NULL, mapName, attrs, NULL, TRUE,
-                                                 NULL, srcAndTgtPathsFlags, wideNameOnly,
-                                                 itemSourcePathWPtr, mapNameW,
-                                                 targetDirWithBackslashW.c_str()))
-                            {
-                                SetCurrentDirectoryToSystem();
-                                return FALSE; // usedNames auto-deleted by unique_ptr
-                            }
-                        }
-                        else
-                        {
-                            if (err == NO_ERROR)
-                                err = ERROR_ACCESS_DENIED; // we must report some error
-                        }
-                    }
-                    else
-                        err = GetLastError();
-                    if (err != NO_ERROR)
-                    {
-                        std::wstring fileNameW = data->At(i)->FileNameW ? std::wstring(data->At(i)->FileNameW) : AnsiToWide(fileName);
-                        std::wstring errTextW = GetErrorTextW(err);
-                        SetCurrentDirectoryToSystem();
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (fileNameW + L": " + errTextW).c_str());
-                        return FALSE; // usedNames auto-deleted by unique_ptr
-                    }
-                }
-            }
-            else
-            {
-                std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
-                SetCurrentDirectoryToSystem();
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(ERROR_INVALID_DATA)).c_str());
-                return FALSE; // usedNames auto-deleted by unique_ptr
-            }
-        }
-        else
-        {
-            std::wstring errFileW = fileNameW ? std::wstring(fileNameW) : AnsiToWide(fileName);
-            DWORD lastErr = GetLastError();
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (errFileW + L": " + GetErrorTextW(lastErr)).c_str());
-        }
-    }
-    // usedNames auto-deleted by unique_ptr when scope exits
-
+    // THE MAIN2 FLIP: no legacy fallback. Every drop shape the
+    // legacy loop served (multi-directory sources, MapName rename-maps,
+    // ANSI-only records, copy-of names, ADS-bearing trees) routes through the
+    // snapshot gate above. A rejection reaching this point is a genuinely
+    // unsupported form; refuse honestly instead of narrowing through CP_ACP.
+    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRORBUILDINGSCRIPT));
     SetCurrentDirectoryToSystem();
-
-    script->TotalSize = CQuadWord(0, 0);
-    for (i = 0; i < script->Count; i++)
-        script->TotalSize += script->At(i).Size;
-    return TRUE;
+    return FALSE;
 }
 
-BOOL CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targetPathW, CCopyMoveData* data)
+BOOL CFilesWindow::DropCopyMove(BOOL copy, const wchar_t* targetPath, CCopyMoveData* data)
 {
-    CALL_STACK_MESSAGE3("CFilesWindow::DropCopyMove(%d, %s, )", copy, targetPath);
+    CALL_STACK_MESSAGE3("CFilesWindow::DropCopyMove(%d, %ls, )", copy, targetPath);
     BOOL started = FALSE;
     if (!FilesActionInProgress)
     {
@@ -1808,11 +1670,14 @@ BOOL CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targ
         {
             if (!copy && data->Count > 0)
             {
-                CPathBuffer source; // Heap-allocated for long path support
-                lstrcpyn(source, data->At(0)->FileName, source.Size());
-                CutDirectory(source);
-                BOOL sameRootPath = HasTheSameRootPath(source, targetPath);
-                script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, targetPath);
+                const CCopyMoveRecord* record = data->At(0);
+                std::wstring sourceDirW = record != NULL && record->IsValid()
+                                              ? record->FileName
+                                              : L"";
+                CutDirectoryW(sourceDirW);
+                BOOL sameRootPath = HasTheSameRootPath(sourceDirW.c_str(), targetPath);
+                script->SameRootButDiffVolume = sameRootPath &&
+                                                 !HasTheSameRootPathAndVolume(sourceDirW.c_str(), targetPath);
                 script->ShowStatus = !sameRootPath || script->SameRootButDiffVolume;
             }
             if (copy)
@@ -1820,20 +1685,15 @@ BOOL CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targ
             script->IsCopyOperation = copy;
             script->IsCopyOrMoveOperation = TRUE;
 
-            char caption[50]; // otherwise the LoadStr buffer gets overwritten before being copied to the dialog's local buffer
-            if (copy)
-                lstrcpyn(caption, LoadStr(IDS_COPY), 50);
-            else
-                lstrcpyn(caption, LoadStr(IDS_MOVE), 50);
             const wchar_t* captionW = copy ? LoadStrW(IDS_COPY) : LoadStrW(IDS_MOVE);
 
             HWND hFocusedWnd = GetFocus();
-            CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
+            CreateSafeWaitWindow(LoadStrW(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
             EnableWindow(MainWindow->HWindow, FALSE);
 
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-            BOOL res = BuildScriptMain2(script, copy, targetPath, targetPathW, data);
+            BOOL res = BuildScriptMain2(script, copy, targetPath, data);
 
             // swapped so the main window can be activated (must not be disabled), otherwise it switches to another app
             EnableWindow(MainWindow->HWindow, TRUE);
@@ -1856,39 +1716,38 @@ BOOL CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targ
                 CQuadWord requiredSpace;
                 if (ShouldWarnNotEnoughSpaceForCopyMove(script, targetPath, &requiredSpace))
                 {
-                    char buf1[50];
-                    char buf2[50];
+                    const std::wstring requiredSpaceText = NumberToStr(requiredSpace);
+                    const std::wstring freeSpaceText = NumberToStr(script->FreeSpace);
                     std::wstring msg = FormatStrW(LoadStrW(IDS_NOTENOUGHSPACE),
-                                                  AnsiToWide(NumberToStr(buf1, requiredSpace)).c_str(),
-                                                  AnsiToWide(NumberToStr(buf2, script->FreeSpace)).c_str());
+                                                  requiredSpaceText.c_str(), freeSpaceText.c_str());
                     cancel = gPrompter->AskYesNo(captionW, msg.c_str()).type != PromptResult::kYes;
                 }
             }
 
             // prepare a refresh for non-auto-refreshed directories
             // change in the target directory and its subdirectories
-            SetScriptWorkPath1(script, targetPath, targetPathW, TRUE);
+            script->SetWorkPath1W(targetPath, TRUE);
             if (!copy) // a move operation modifies the source as well
             {
                 if (data->Count > 0)
                 {
                     CCopyMoveRecord* record = data->At(0);
-                    char* name = record != NULL ? record->FileName : NULL;
+                    const wchar_t* name = record != NULL && record->IsValid()
+                                              ? record->FileName.c_str()
+                                              : NULL;
                     if (name != NULL)
                     {
-                        CPathBuffer path; // Heap-allocated for long path support
-                        lstrcpyn(path, name, path.Size());
-                        if (CutDirectory(path)) // assume a single source directory (panel operations only, not Find)
+                        std::wstring path = name;
+                        if (CutDirectoryW(path)) // assume a single source directory (panel operations only, not Find)
                         {
                             // change in the source directory and its subdirectories
-                            std::wstring pathW = CopyMoveRecordSourceDirW(record, path);
-                            SetScriptWorkPath2(script, path, pathW.c_str(), TRUE);
+                            script->SetWorkPath2W(path.c_str(), TRUE);
                         }
                     }
                 }
             }
 
-            if (cancel || !res || !StartProgressDialog(script, caption, NULL, NULL))
+            if (cancel || !res || !StartProgressDialog(script, captionW, NULL, NULL))
             {
                 UpdateWindow(MainWindow->HWindow);
                 if (!script->IsGood())
@@ -1909,13 +1768,13 @@ BOOL CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targ
 }
 
 BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
-                                   char* targetPath, char* mask, int selCount,
+                                   const wchar_t* targetPath, const wchar_t* mask, int selCount,
                                    int* selection, CFileData* oneFile,
                                    CAttrsData* attrsData, CChangeCaseData* chCaseData,
                                    BOOL onlySize, CCriteriaData* filterCriteria,
                                    const wchar_t* targetPathW)
 {
-    CALL_STACK_MESSAGE5("CFilesWindow::BuildScriptMain(, %d, %s, %s, %d, , , , , ,)",
+    CALL_STACK_MESSAGE5("CFilesWindow::BuildScriptMain(, %d, %ls, %ls, %d, , , , , ,)",
                         type, targetPath, mask, selCount);
     // count == 0, selection == NULL => oneFile points to the current file
     // otherwise selection contains indexes of the count selected items in the filebox
@@ -1929,8 +1788,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     CScopedBuildScriptState scopedBuildScriptState;
     CBuildScriptState& bsState = GetActiveBuildScriptState();
 
-    CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-    CPathBuffer fsName;  // Filesystem names are short (NTFS, FAT32, etc.)
+    std::wstring fsName;
 
     //---  when copying/moving from CD, clear the read-only attribute
     //     and set CurrentDirectory to the slower medium
@@ -1938,26 +1796,36 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     if (type == atCopy || type == atMove)
     {
         UINT sourceType = DRIVE_REMOTE;
-        if (GetPath()[0] != '\\') // not a UNC path (those are always "remote")
+        if (GetPathW()[0] != L'\\') // not a UNC path (those are always "remote")
         {
-            sourceType = MyGetDriveType(GetPath());
+            // Asked of the mirror, this returns the drive type of whatever
+            // the '?'-string names - or DRIVE_NO_ROOT_DIR for nothing at all. It decides
+            // RemovableSrcDisk, which current directory to sit in, and the fast-dir-move
+            // gate below, so a wrong answer here mis-plans the whole operation.
+            sourceType = MyGetDriveTypeW(GetPathW());
         }
 
         if (sourceType == DRIVE_REMOTE || sourceType == DRIVE_REMOVABLE)
         {
-            EnvSetCurrentDirectoryA(gEnvironment, GetPath());
+            gEnvironment->SetCurrentDirectory(GetPathW());
         }
+        else if (targetPathW != NULL && targetPathW[0] != 0)
+            gEnvironment->SetCurrentDirectory(targetPathW); // the typed destination, unnarrowed
         else
-            EnvSetCurrentDirectoryA(gEnvironment, targetPath);
+            gEnvironment->SetCurrentDirectory(targetPath);
 
         if (sourceType == DRIVE_REMOVABLE)
             script->RemovableSrcDisk = TRUE;
 
         if (fastDirectoryMove &&                            // fast-dir-move isn't globally disabled
             sourceType == DRIVE_REMOTE && type == atMove && // network disk + move operation
-            HasTheSameRootPath(GetPath(), targetPath))      // + within the same drive
+            HasTheSameRootPath(GetPathW(),
+                               targetPathW != NULL && targetPathW[0] != 0 ? targetPathW : targetPath)) // + within the same drive
         {                                                   // detect Novell disks - fast-directory-move doesn't work on them
-            if (IsNOVELLDrive(GetPath()))
+            // Completes the fast-dir-move gate started above: the same-root
+            // test went wide in the previous round, but the provider lookup was still
+            // matching the CP_ACP mirror against the ANSI network enumeration.
+            if (IsNOVELLDriveW(GetPathW()))
                 fastDirectoryMove = Configuration.NetwareFastDirMove;
         }
 
@@ -1966,11 +1834,9 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         {
             if (sourceType == DRIVE_REMOTE)
             {
-                GetRootPath(root, GetPath());
                 DWORD dummy, flags;
-                fsName[0] = 0;
-                if (GetVolumeInformation(root, NULL, 0, NULL, &dummy, &flags, fsName, MAX_PATH) &&
-                    StrICmp(fsName, "CDFS") == 0)
+                if (GetFileSystemNameForPathW(GetPathW(), &dummy, &flags, fsName) &&
+                    StrICmpW(fsName.c_str(), L"CDFS") == 0)
                 {
                     script->ClearReadonlyMask = ~(FILE_ATTRIBUTE_READONLY);
                 }
@@ -1983,12 +1849,12 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         }
 
         // check if the target is removable media (floppy, ZIP) -> a larger buffer is used for speed
-        if (LowerCase[*targetPath] >= 'a' && LowerCase[*targetPath] <= 'z' &&
-            *(targetPath + 1) == ':')
+        if (towlower(*targetPath) >= L'a' && towlower(*targetPath) <= L'z' &&
+            *(targetPath + 1) == L':')
         {
-            char root2[4] = " :\\";
+            wchar_t root2[4] = L" :\\";
             root2[0] = targetPath[0];
-            UINT targetType = GetDriveType(root2);
+            UINT targetType = GetDriveTypeW(root2);
 
             if (targetType == DRIVE_REMOVABLE)
                 script->RemovableTgtDisk = TRUE;
@@ -1998,23 +1864,23 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         script->ClearReadonlyMask = 0xFFFFFFFF;
 
     // the mask must not be modified via PrepareMask !!! see MaskName()
-    CPathBuffer nameMask; // Heap-allocated for long path support
+    std::wstring nameMask;
     if (mask != NULL)
     {
-        lstrcpyn(nameMask, mask, nameMask.Size());
-        mask = nameMask;
+        nameMask = mask;
+        mask = nameMask.c_str();
     }
 
     // file access is much faster in the current directory/disk
     if (type != atMove && type != atCopy)
-        EnvSetCurrentDirectoryA(gEnvironment, GetPath());
+        gEnvironment->SetCurrentDirectory(GetPathW());
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-    CPathBuffer sourcePath; // Heap-allocated for long path support
-    strcpy(sourcePath, GetPath());
-    std::wstring sourcePathWide = sally::unicode::EffectivePanelPathW(GetPath(), GetPathW());
-    const wchar_t* sourcePathWArg = !sourcePathWide.empty() ? sourcePathWide.c_str() : NULL;
+    std::wstring sourcePath = GetPathW();
+    // GetPathW() is already the authoritative wide panel path; no ansi-fallback
+    // projection is needed here (EffectivePanelPathW would just return it back).
+    const wchar_t* sourcePathWArg = GetPathW();
 
     BOOL sourceSupADS = FALSE;
     BOOL targetSupADS = FALSE;
@@ -2024,14 +1890,15 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     if (type == atMove || type == atCopy) // outside Copy and Move it makes no sense to check
     {
         sourceSupADS = (filterCriteria == NULL || !filterCriteria->IgnoreADS) &&
-                       IsPathOnVolumeSupADS(sourcePath, NULL);
+                       IsPathOnVolumeSupADSW(sourcePath.c_str(), NULL);
         //    BOOL targetSupEFS;
-        targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
+        targetSupADS = IsPathOnVolumeSupADSW(targetPath, &targetIsFAT32);
         targetPathState = GetTargetPathState(targetPathState, targetPath);
         script->TargetPathSupADS = targetSupADS;
         //    script->TargetPathSupEFS = targetSupEFS;
-        srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(sourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST) |
-                               GetPathFlagsForCopyOp(targetPath, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
+        srcAndTgtPathsFlags |= GetPathFlagsForCopyOpW(sourcePathWArg, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST) |
+                               GetPathFlagsForCopyOpW(targetPathW != NULL && targetPathW[0] != 0 ? targetPathW : targetPath,
+                                                      OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
         script->SourcePathIsNetwork = (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0;
 
         if (filterCriteria != NULL)
@@ -2045,8 +1912,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             if (script->CopySecurity)
             {
                 DWORD dummy1, flags;
-                CPathBuffer dummy2; // Heap-allocated for long path support
-                if (MyGetVolumeInformation(targetPath, NULL, NULL, NULL, NULL, 0, NULL, &dummy1, &flags, dummy2, MAX_PATH) &&
+                if (MyGetVolumeInformationW(targetPath, NULL, NULL, NULL, NULL, NULL, &dummy1, &flags,
+                                            NULL) &&
                     (flags & FS_PERSISTENT_ACLS) == 0)
                 { // wants to copy permissions, but the target path doesn't support them, so we inform the user (the API function for setting security doesn't report any errors — which is poor design)
                     PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_ACLNOTSUPPORTEDONTGTPATH));
@@ -2062,31 +1929,28 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     BOOL countSize = (type == atCountSize);
     CQuadWord oldTotalSize;
 
-    char* useName = (oneFile != NULL ? oneFile->Name : NULL);
-    char* useDOSName = (oneFile != NULL ? oneFile->DosName : NULL);
+    wchar_t* useName = (oneFile != NULL ? oneFile->Name : NULL);
+    wchar_t* useDOSName = (oneFile != NULL ? oneFile->DosName : NULL);
     if (type == atDelete && selCount <= 1 && oneFile != NULL && oneFile->DosName != NULL)
     {
-        char* s = sourcePath + strlen(sourcePath);
-        char* end = s;
-        if (s > sourcePath && *(s - 1) != '\\')
-            *s++ = '\\';
-        strcpy(s, oneFile->Name);
+        std::wstring candidatePath = sourcePath;
+        SalPathAppendW(candidatePath, oneFile->Name);
         // try whether the file name is valid; if not, try its DOS name
         // (handles files accessible only via Unicode or DOS names)
-        if (GetFileAttributesW(AnsiToWide(sourcePath).c_str()) == INVALID_FILE_ATTRIBUTES)
+        if (gFileSystem->GetFileAttributes(candidatePath.c_str()) == INVALID_FILE_ATTRIBUTES)
         {
             DWORD err = GetLastError();
             if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
             {
-                strcpy(s, oneFile->DosName);
-                if (GetFileAttributesW(AnsiToWide(sourcePath).c_str()) != INVALID_FILE_ATTRIBUTES)
+                candidatePath = sourcePath;
+                SalPathAppendW(candidatePath, oneFile->DosName);
+                if (gFileSystem->GetFileAttributes(candidatePath.c_str()) != INVALID_FILE_ATTRIBUTES)
                 {
                     useName = oneFile->DosName;
                     useDOSName = NULL;
                 }
             }
         }
-        *end = 0; // restore sourcePath
     }
 
     CSelectionSnapshot snapshot = TakeSnapshot(type, selCount, selection, oneFile);
@@ -2099,11 +1963,11 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         if (type == atMove || type == atCopy) // outside Copy and Move it makes no sense to check
         {
             DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
+            if (MyGetDiskFreeSpaceW(targetPath, &d1, &d2, &d3, &d4))
             {
                 script->BytesPerCluster = d1 * d2;
                 // W2K and later: the product d1 * d2 * d3 did not work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-                script->FreeSpace = MyGetDiskFreeSpace(targetPath);
+                script->FreeSpace = MyGetDiskFreeSpaceW(targetPath);
             }
         }
 
@@ -2128,20 +1992,21 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                  (!filterCriteria->UseMasks && !filterCriteria->UseAdvanced &&
                   !filterCriteria->SkipEmptyDirs)) &&
                 !script->SameRootButDiffVolume &&
-                HasTheSameRootPath(sourcePath, targetPath);
+                HasTheSameRootPath(sourcePath.c_str(), targetPathW != NULL && targetPathW[0] != 0 ? targetPathW : targetPath);
         }
 
-        if (!wouldUseFastDirMove && snapshotTargetNamesReady &&
+        if (snapshotTargetNamesReady &&
             CanBuildFirstTrancheFromSnapshot(Is(ptDisk), type, targetPath, mask,
                                              attrsData, chCaseData, onlySize,
-                                             sourceSupADS, targetSupADS, sourcePath,
+                                             sourceSupADS, targetSupADS, sourcePath.c_str(),
                                              sourcePathWArg,
                                              filterCriteria, snapshot))
         {
-            snapshot.TargetPath = targetPath != NULL ? targetPath : "";
-            if (targetPathW != NULL)
+            if (targetPathW != NULL && targetPathW[0] != 0)
                 snapshot.TargetPathW = targetPathW;
-            snapshot.Mask = mask != NULL ? mask : "";
+            else if (targetPath != NULL)
+                snapshot.TargetPathW = targetPath;
+            snapshot.Mask = mask != NULL ? mask : L"";
             snapshot.UseRecycleBin = script->CanUseRecycleBin != FALSE;
             snapshot.InvertRecycleBin = script->InvertRecycleBin != FALSE;
             snapshot.OverwriteOlder = script->OverwriteOlder != FALSE;
@@ -2166,8 +2031,21 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             buildConfig.SkipEmptyDirs = filterCriteria != NULL && filterCriteria->SkipEmptyDirs;
             buildConfig.FilterPredicate = buildConfig.EnableFilters ? SnapshotFilterPredicate : nullptr;
             buildConfig.FilterContext = buildConfig.EnableFilters ? filterCriteria : nullptr;
+            if (type == atDelete && !IsSnapshotBuilderDefaultMask(mask))
+            {
+                // Masked delete: match files at every level.
+                buildConfig.EnableFilters = TRUE;
+                buildConfig.FilterPredicate = SnapshotDeleteMaskPredicate;
+                buildConfig.FilterContext = const_cast<wchar_t*>(mask);
+            }
             buildConfig.EnableADS = sourceSupADS && targetSupADS;
             buildConfig.ADSProbe = BuildScriptLegacyADSProbe;
+            buildConfig.ADSProbeErrorCallback = SnapshotADSProbeErrorPrompt;
+            buildConfig.ADSProbeErrorContext = &HWindow;
+            SnapshotLinkTargetSizeContext linkSizeContext = {HWindow, FALSE};
+            buildConfig.LinkTargetSizeCallback = SnapshotLinkTargetSizePrompt;
+            buildConfig.LinkTargetSizeContext = &linkSizeContext;
+            buildConfig.SourcePathIsNetwork = script->SourcePathIsNetwork;
             buildConfig.IgnoreADS = snapshot.IgnoreADS;
             buildConfig.EnableExplicitTargetNames = !IsSnapshotBuilderDefaultMask(mask);
             buildConfig.ClearReadOnly = script->ClearReadonlyMask == ~(FILE_ATTRIBUTE_READONLY);
@@ -2175,125 +2053,128 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             buildConfig.ConfirmDeleteSystemHiddenDir = Configuration.CnfrmSHDirDel;
             buildConfig.ConfirmDeleteNonEmptyDir = Configuration.CnfrmNEDirDel;
 
+            // The six capabilities go live in production.
+            buildConfig.EnableCountSize = TRUE;
+            buildConfig.CountCompressedSizes = type == atCountSize && !onlySize;
+            buildConfig.CountSizeErrorCallback = SnapshotCountSizeErrorPrompt;
+            buildConfig.CountSizeErrorContext = script;
+            // An unreadable directory must not kill the whole operation in
+            // silence: ask, and keep building on Skip (legacy parity).
+            bool buildCancelledByUser = false;
+            buildConfig.ListDirErrorCallback = SnapshotListDirErrorPrompt;
+            buildConfig.ListDirErrorContext = &buildCancelledByUser;
+            buildConfig.CancelPollCallback = SnapshotCancelPoll;
+            buildConfig.CancelPollContext = &buildCancelledByUser;
+            buildConfig.Fat32TooBigCallback = SnapshotFat32TooBigPrompt;
+            buildConfig.Fat32TooBigContext = &buildCancelledByUser;
+            buildConfig.EnableFastDirMove = TRUE;
+            buildConfig.EnableReparseDelete = TRUE;
+            buildConfig.EnableReparseCopyMove = TRUE; // copy-the-link
+            buildConfig.DeletePromptCallback = SnapshotDeletePrompt;
+            SnapshotAdsLossContext adsLossContext = {type, &bsState, HWindow};
+            buildConfig.AdsLossPromptCallback = SnapshotAdsLossPrompt;
+            buildConfig.AdsLossPromptContext = &adsLossContext;
+            SnapshotLinkContentContext linkContentContext = {HWindow, &buildCancelledByUser};
+            buildConfig.LinkContentPromptCallback = SnapshotLinkContentPrompt;
+            buildConfig.LinkContentPromptContext = &linkContentContext;
+            if (type == atChangeAttrs && attrsData != NULL)
+            {
+                buildConfig.EnableChangeAttrs = TRUE;
+                buildConfig.ChangeAttrsAnd = attrsData->AttrAnd;
+                buildConfig.ChangeAttrsOr = attrsData->AttrOr;
+                buildConfig.ChangeAttrsSubDirs = attrsData->SubDirs;
+                snapshot.AttrsData.AttrAnd = attrsData->AttrAnd;
+                snapshot.AttrsData.AttrOr = attrsData->AttrOr;
+                snapshot.AttrsData.SubDirs = attrsData->SubDirs != FALSE;
+            }
+            if (type == atChangeCase && chCaseData != NULL)
+            {
+                buildConfig.EnableChangeCase = TRUE;
+                buildConfig.ChangeCaseFormat = chCaseData->FileNameFormat;
+                buildConfig.ChangeCaseChange = chCaseData->Change;
+                buildConfig.ChangeCaseSubDirs = chCaseData->SubDirs;
+                snapshot.ChangeCaseData.FileNameFormat = chCaseData->FileNameFormat;
+                snapshot.ChangeCaseData.Change = chCaseData->Change;
+                snapshot.ChangeCaseData.SubDirs = chCaseData->SubDirs != FALSE;
+            }
+
             if (!BuildScriptFromSnapshot(snapshot, buildConfig, bsState, script))
             {
+                // Never fail in silence. This used to be a bare
+                // `return FALSE`, so one unreadable directory aborted the whole
+                // operation with no message at all — Ctrl+Q simply did nothing.
+                // A user cancel already explained itself, so it stays quiet.
+                //
+                // A source and target naming the same object gets the message
+                // legacy gave it. Blaming the script builder for that is both
+                // unhelpful and untrue: nothing failed, the request was empty.
+                int selfOpMsgId = 0;
+                switch (bsState.SelfOpReject)
+                {
+                case CBuildScriptState::ESelfOpReject::CopyFileToItself:
+                    selfOpMsgId = IDS_CANNOTCOPYFILETOITSELF;
+                    break;
+                case CBuildScriptState::ESelfOpReject::MoveFileToItself:
+                    selfOpMsgId = IDS_CANNOTMOVEFILETOITSELF;
+                    break;
+                case CBuildScriptState::ESelfOpReject::MoveDirToItself:
+                    selfOpMsgId = IDS_CANNOTMOVEDIRTOITSELF;
+                    break;
+                case CBuildScriptState::ESelfOpReject::None:
+                    break;
+                }
+                if (selfOpMsgId != 0)
+                {
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                         LoadStrW(selfOpMsgId));
+                }
+                else if (!buildCancelledByUser)
+                {
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                         LoadStrW(IDS_ERRORBUILDINGSCRIPT));
+                }
                 SetCurrentDirectoryToSystem();
                 return FALSE;
             }
 
-            StampBuildScriptWorkPaths(script, type, sourcePath, sourcePathWArg,
-                                      targetPath, targetPathW);
+            // CountSize: write the per-item deltas back into the
+            // panel rows (legacy did this inside its do-loop, copy_move :2408).
+            if (type == atCountSize)
+            {
+                for (int wj = 0; wj < selCount && wj < (int)bsState.PerItemTotalSizes.size(); wj++)
+                {
+                    CFileData* wf = (selection[wj] < Dirs->Count)
+                                        ? &Dirs->At(selection[wj])
+                                        : &Files->At(selection[wj] - Dirs->Count);
+                    if (selection[wj] < Dirs->Count)
+                    {
+                        wf->Size.SetUI64(bsState.PerItemTotalSizes[wj]);
+                        wf->SizeValid = 1;
+                    }
+                }
+                if (selCount == 0 && oneFile != NULL &&
+                    (oneFile->Attr & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
+                    !bsState.PerItemTotalSizes.empty())
+                {
+                    oneFile->Size.SetUI64(bsState.PerItemTotalSizes[0]);
+                    oneFile->SizeValid = 1;
+                }
+            }
+
+            StampBuildScriptWorkPaths(script, type, sourcePathWArg,
+                                      targetPathW != NULL && targetPathW[0] != 0 ? targetPathW : targetPath);
             SetCurrentDirectoryToSystem();
             return TRUE;
         }
 
-        int i = 0;
-        do
-        {
-            if (selCount > 1 || oneFile == NULL)
-            {
-                oneFile = (selection[i] < Dirs->Count) ? &Dirs->At(selection[i]) : &Files->At(selection[i] - Dirs->Count);
-                useName = oneFile->Name;
-                useDOSName = oneFile->DosName;
-            }
-            i++;
-            // oneFile points to the selected or caret item in the filebox
-            if (oneFile->Attr & FILE_ATTRIBUTE_DIRECTORY) // it is about ptDisk
-            {
-                if (subDirectories)
-                {
-                    if (countSize)
-                    {
-                        oldTotalSize = script->TotalSize;
-                    }
-                    // Pass wide name if available for Unicode filename support
-                    wchar_t* useNameW = oneFile->NameW;
-                    if (!BuildScriptDir(script, type, sourcePath, sourceSupADS, targetPath,
-                                        targetPathState, targetSupADS, targetIsFAT32, mask,
-                                        useName, useDOSName, attrsData, NULL, oneFile->Attr,
-                                        chCaseData, TRUE, onlySize, fastDirectoryMove,
-                                        filterCriteria, NULL, &oneFile->LastWrite,
-                                        srcAndTgtPathsFlags, sourcePathWArg, useNameW, targetPathW))
-                    {
-                        SetCurrentDirectoryToSystem();
-                        return FALSE;
-                    }
-                    if (countSize)
-                    {
-                        oneFile->SizeValid = 1;
-                        oneFile->Size = script->TotalSize - oldTotalSize;
-                    }
-                }
-                else // change-case: selected directories without recurse-sub-dirs
-                {    // convert: non-recursive + affects only files -> nothing to do with directories
-                    if (type == atChangeCase)
-                    {
-                        COperation op;
-                        op.OpFlags = 0; // case change = rename = report invalid names (not just tolerance of existing ones)
-                        op.Opcode = ocMoveDir;
-                        op.Size = MOVE_DIR_SIZE;
-                        op.Attr = oneFile->Attr;
-                        BOOL skip;
-                        if ((op.SourceName = BuildName(sourcePath, oneFile->Name, NULL, &skip,
-                                                       &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
-                        {
-                            if (!skip)
-                            {
-                                SetCurrentDirectoryToSystem();
-                                return FALSE;
-                            }
-                        }
-                        else
-                        {
-                            if ((op.TargetName = BuildName(sourcePath, oneFile->Name)) == NULL) // too long name already handled by previous condition
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                SetCurrentDirectoryToSystem();
-                                return FALSE;
-                            }
-                            int offset = (int)strlen(op.SourceName) - oneFile->NameLen;
-                            AlterFileName(op.TargetName + offset, op.SourceName + offset, -1,
-                                          chCaseData->FileNameFormat, chCaseData->Change, TRUE);
-                            BOOL sameName = strcmp(op.SourceName + offset, op.TargetName + offset) == 0;
-                            if (!sameName)
-                                script->Add(op);
-                            if (sameName || !script->IsGood())
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                free(op.TargetName);
-                                op.TargetName = NULL;
-                                if (!sameName)
-                                {
-                                    script->ResetState();
-                                    SetCurrentDirectoryToSystem();
-                                    return FALSE;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(oneFile))
-                {
-                    // Pass wide name if available for Unicode filename support
-                    wchar_t* useNameW = oneFile->NameW;
-                    if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
-                                         targetPathState, targetSupADS, targetIsFAT32, mask,
-                                         useName, useDOSName, oneFile->Size, attrsData, NULL,
-                                         oneFile->Attr, chCaseData, onlySize, NULL,
-                                         srcAndTgtPathsFlags, useNameW,
-                                         sourcePathWArg, NULL, targetPathW))
-                    {
-                        SetCurrentDirectoryToSystem();
-                        return FALSE;
-                    }
-                }
-            }
-        } while (i < selCount);
+// no legacy fallback. Every admitted shape routes
+        // through the snapshot builder above; a gate reject reaching here is a
+        // genuinely unsupported form (ADS probe error, attribute compression/
+        // encryption change) and refuses honestly instead of running the
+        // retired lossy pipeline. The panel flows are single-builder from here.
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_ERRORBUILDINGSCRIPT));
+        SetCurrentDirectoryToSystem();
+        return FALSE;
     }
 
     SetCurrentDirectoryToSystem();
@@ -2301,1013 +2182,64 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     for (i = 0; i < script->Count; i++)
         script->TotalSize += script->At(i).Size;
     if (!onlySize)
-        StampBuildScriptWorkPaths(script, type, sourcePath, sourcePathWArg,
-                                  targetPath, targetPathW);
+        StampBuildScriptWorkPaths(script, type, sourcePathWArg,
+                                  targetPathW != NULL && targetPathW[0] != 0 ? targetPathW : targetPath);
     return TRUE;
 }
 
-char ADSStreamsGlobalBuf[5000]; // ADS names separated by commas are stored in this buffer, it's global to avoid stack overflow during recursion
-
-void GetADSStreamsNames(char* listBuf, int bufSize, char* fileName, BOOL isDir,
-                        const std::wstring& fileNameW = std::wstring())
+void GetADSStreamsNames(const std::wstring& fileNameW, BOOL isDir,
+                        std::wstring& list)
 {
-    if (bufSize > 0)
-        listBuf[0] = 0;
-    wchar_t** streamNames;
-    int streamNamesCount;
-    BOOL lowMemory;
-    if (CheckFileOrDirADS(fileName, isDir, NULL, &streamNames, &streamNamesCount, &lowMemory,
-                          NULL, 0, NULL, NULL, fileNameW) &&
-        !lowMemory && streamNames != NULL)
+    list.clear();
+    std::vector<std::wstring> streamNames;
+    BOOL lowMemory = FALSE;
+    if (CheckFileOrDirADS(fileNameW, isDir, NULL, &streamNames, &lowMemory,
+                          NULL, 0, NULL, NULL) &&
+        !lowMemory)
     {
-        int size = bufSize;
-        char* s = listBuf;
-        int i;
-        for (i = 0; size > 100 && i < streamNamesCount; i++)
+        for (size_t i = 0; i < streamNames.size(); i++)
         {
-            wchar_t* str = streamNames[i];
-            if (str[0] == L':')
-                str++;
-            wchar_t* end = str;
-            while (*end != 0 && *end != L':')
-                end++;
-            int wr = 0;
-            if ((wr = WideCharToMultiByte(CP_ACP, 0, str, (int)(end - str), s, size, NULL, NULL)) == 0)
+            size_t start = !streamNames[i].empty() && streamNames[i][0] == L':' ? 1 : 0;
+            size_t end = streamNames[i].find(L':', start);
+            if (end == std::wstring::npos)
+                end = streamNames[i].size();
+            for (size_t pos = start; pos < end; pos++)
             {
-                *s++ = '?';
-                *s = 0;
-            }
-            size -= wr;
-            char* e = s + wr;
-            while (s < e)
-            {
-                if (*s < ' ' && size > 3)
+                const wchar_t ch = streamNames[i][pos];
+                if (ch < L' ')
                 {
-                    memmove(s + 4, s + 1, wr);
-                    size -= 3;
-                    char buf[10];
-                    sprintf(buf, "\\x%02X", (unsigned int)(unsigned char)*s);
-                    memcpy(s, buf, 4);
-                    s += 3;
-                    e += 3;
+                    wchar_t escaped[8];
+                    swprintf_s(escaped, L"\\x%02X", (unsigned int)ch);
+                    list.append(escaped);
                 }
-                s++;
-                wr--;
+                else
+                    list.push_back(ch);
             }
-            *s = 0;
-            if (size > 2 && i + 1 < streamNamesCount)
-            {
-                *s++ = ',';
-                *s++ = ' ';
-                *s = 0;
-                size -= 2;
-            }
-            free(streamNames[i]);
+            if (i + 1 < streamNames.size())
+                list.append(L", ");
         }
-        free(streamNames);
     }
 
-    if (bufSize > 0 && (StrICmp(listBuf, "Zone.Identifier") == 0 || // this stream is automatically created by XP SP2 and should be ignored, so we won't bother the user with it
-                        StrICmp(listBuf, "encryptable") == 0))      // this stream appears mostly on thumbs.db, nobody knows what it is, but Windows creates it, so we ignore it too
+    if (_wcsicmp(list.c_str(), L"Zone.Identifier") == 0 || // created by Windows and safe to ignore
+        _wcsicmp(list.c_str(), L"encryptable") == 0)      // commonly attached to thumbs.db
     {
-        listBuf[0] = 0;
+        list.clear();
     }
 }
 
-BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* sourcePath,
-                                  BOOL sourcePathSupADS, char* targetPath,
-                                  CTargetPathState targetPathState, BOOL targetPathSupADS,
-                                  BOOL targetPathIsFAT32, char* mask, char* dirName,
-                                  char* dirDOSName, CAttrsData* attrsData, char* mapName,
-                                  DWORD sourceDirAttr, CChangeCaseData* chCaseData, BOOL firstLevelDir,
-                                  BOOL onlySize, BOOL fastDirectoryMove, CCriteriaData* filterCriteria,
-                                  BOOL* canDelUpperDirAfterMove, FILETIME* sourceDirTime,
-                                  DWORD srcAndTgtPathsFlags, const wchar_t* sourcePathW,
-                                  wchar_t* dirNameW, const wchar_t* targetPathW)
-{
-    SLOW_CALL_STACK_MESSAGE16("CFilesWindow::BuildScriptDir(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , %s, 0x%X, , %d, %d, %d, , , , 0x%X)",
-                              type, sourcePath, sourcePathSupADS, targetPath,
-                              targetPathState, targetPathSupADS, targetPathIsFAT32,
-                              mask, dirName, mapName, sourceDirAttr, firstLevelDir, onlySize,
-                              fastDirectoryMove, srcAndTgtPathsFlags);
-    CBuildScriptState& bsState = GetActiveBuildScriptState();
-    CPathBuffer text;
-    CPathBuffer finalName;                                      // +200 is a reserve (Windows creates paths longer than MAX_PATH)
-    BOOL sourcePathIsNet = (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0; // valid only for atCopy and atMove
-    const std::wstring effectiveSourcePathW = (sourcePathW != NULL && sourcePathW[0] != L'\0') ? std::wstring(sourcePathW) : std::wstring();
-    const std::wstring effectiveTargetPathW = (targetPathW != NULL && targetPathW[0] != L'\0') ? std::wstring(targetPathW) : std::wstring();
-    const std::wstring effectiveDirNameW = (dirNameW != NULL) ? std::wstring(dirNameW) : AnsiToWide(dirName != NULL ? dirName : "");
-    std::wstring currentSourcePathW;
-    std::wstring currentTargetPathW;
-
-    script->DirsCount++;
-    COperation op;
-    //---  if it's necessary to create the directory targetPath + dirName (for Copy and Move)
-    char* sourceEnd = sourcePath + strlen(sourcePath);
-    char *st, *s = dirName;
-    if (*(sourceEnd - 1) != '\\')
-    {
-        *sourceEnd = '\\';
-        st = sourceEnd + 1;
-    }
-    else
-        st = sourceEnd;
-    // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
-    if (st - sourcePath + strlen(dirName) >= SAL_MAX_LONG_PATH - 2)
-    {
-        *sourceEnd = 0; // restoring original sourcePath
-        std::wstring msg = FormatStrW(LoadStrW(IDS_NAMEISTOOLONG), AnsiToWide(dirName).c_str(), AnsiToWide(sourcePath).c_str());
-        BOOL skip = TRUE;
-        if (!bsState.ErrTooLongSrcDirNameSkipAll)
-        {
-            PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
-            if (res.type == PromptResult::kFocus)
-            {
-                skip = FALSE;
-                MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, dirName);
-            }
-            else if (res.type == PromptResult::kSkipAll)
-            {
-                bsState.ErrTooLongSrcDirNameSkipAll = TRUE;
-            }
-        }
-        return skip;
-    }
-    while (*s != 0)
-        *st++ = *s++;
-    *st = 0;
-    if (!effectiveSourcePathW.empty())
-        currentSourcePathW = sally::unicode::BuildPanelChildPathW(effectiveSourcePathW, dirName, dirNameW);
-    auto currentSourcePathForMessageW = [&]() -> std::wstring {
-        if (!currentSourcePathW.empty())
-            return currentSourcePathW;
-        return AnsiToWide(sourcePath);
-    };
-    auto setCurrentDirSourceNameW = [&](COperation& operation) {
-        if (!currentSourcePathW.empty())
-        {
-            operation.SetSourceNameW(currentSourcePathW, std::wstring());
-            return;
-        }
-        if (!effectiveDirNameW.empty())
-        {
-            std::string parentSourcePath(sourcePath, sourceEnd - sourcePath);
-            operation.SetSourceNameW(parentSourcePath.c_str(), effectiveDirNameW);
-        }
-    };
-    //---  build the path to targetDirName
-    char* targetEnd = NULL;
-    BOOL checkNewDirName = FALSE;
-    if (targetPath != NULL)
-    {
-        int targetLen = (int)strlen(targetPath);
-        targetEnd = targetPath + targetLen;
-        if (*(targetEnd - 1) != '\\')
-        {
-            *targetEnd = '\\';
-            targetLen++;
-        }
-        char* s2;
-        if (mapName == NULL)
-        {
-            // Petr: a bit of a hack: the *.* mask doesn't produce a copy of the source name, which is a problem when copying
-            // directories with invalid names, e.g. "c   ..." + "*.*" = "c   ", so we'll help ourselves a bit and
-            // change the mask to NULL = a simple textual copy of the name
-            char* opMask = mask != NULL && strcmp(mask, "*.*") == 0 ? NULL : mask;
-            s2 = MaskName(finalName, 2 * MAX_PATH + 200, dirName, opMask);
-            if (opMask != NULL)
-                checkNewDirName = strcmp(s2, dirName) != 0;
-        }
-        else
-            s2 = mapName;
-        // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
-        if (strlen(s2) + targetLen >= SAL_MAX_LONG_PATH)
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            *targetEnd = 0; // restoring targetPath
-            std::wstring msg = FormatStrW(LoadStrW(IDS_TOOLONGNAME2), AnsiToWide(targetPath).c_str(), AnsiToWide(s2).c_str());
-            BOOL skip = TRUE;
-            if (!bsState.ErrTooLongTgtDirNameSkipAll)
-            {
-                PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORBUILDINGSCRIPT), msg.c_str());
-                if (res.type == PromptResult::kFocus)
-                {
-                    skip = FALSE;
-                    MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, sourceEnd + 1);
-                }
-                else if (res.type == PromptResult::kSkipAll)
-                {
-                    bsState.ErrTooLongTgtDirNameSkipAll = TRUE;
-                }
-            }
-            return skip;
-        }
-        strcpy(targetPath + targetLen, s2);
-        if (!effectiveTargetPathW.empty())
-        {
-            std::wstring targetDirNameW;
-            if (mapName == NULL && dirName != NULL && strcmp(s2, dirName) == 0)
-                targetDirNameW = effectiveDirNameW;
-            else
-                targetDirNameW = AnsiToWide(s2);
-            currentTargetPathW = sally::unicode::BuildPanelChildPathW(
-                effectiveTargetPathW, s2,
-                targetDirNameW.empty() ? NULL : targetDirNameW.c_str());
-        }
-        targetPathState = GetTargetPathState(targetPathState, targetPath);
-    }
-    //---
-    if (type == atDelete && (sourceDirAttr & FILE_ATTRIBUTE_REPARSE_POINT))
-    { // deleting links (volume mount points + junction points + symlinks)
-        op.Opcode = ocDeleteDirLink;
-        op.OpFlags = 0;
-        op.Size = DELETE_DIRLINK_SIZE;
-        op.Attr = sourceDirAttr;
-        if ((op.SourceName = BuildName(sourcePath, NULL)) == NULL)
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            return FALSE;
-        }
-        op.TargetName = NULL;
-        *sourceEnd = 0; // restoring sourcePath
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        else
-            return TRUE;
-    }
-    //---
-    if (type == atDelete && Configuration.CnfrmSHDirDel &&
-        (sourceDirAttr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
-    {
-        std::wstring sourcePathMsgW = currentSourcePathForMessageW();
-        std::wstring msg = FormatStrW(LoadStrW(IDS_DELETESHDIR), sourcePathMsgW.c_str());
-        PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
-        UpdateWindow(MainWindow->HWindow);
-        if (res.type == PromptResult::kNo || res.type == PromptResult::kCancel) // if CANCEL or NO was chosen, we end or skip the directory
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            if (targetEnd != NULL)
-                *targetEnd = 0; // restoring targetPath
-            return res.type == PromptResult::kNo;
-        }
-    }
-    //---
-    if (type == atMove)
-    {
-        if (strcmp(sourcePath, targetPath) == 0) // nothing to do, bail out
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            *targetEnd = 0; // restoring targetPath
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTMOVEDIRTOITSELF));
-            return FALSE;
-        }
-        BOOL sameDisk;
-        sameDisk = FALSE;
-        if (fastDirectoryMove &&
-            !script->CopySecurity && // if permissions are to be copied, the entire directory cannot be moved (each file must let the system refresh its inherited permissions)
-            (script->CopyAttrs ||    // when copying attributes, the heuristic for setting the Encrypted attribute is skipped
-             targetPathState != tpsEncryptedExisting &&
-                 targetPathState != tpsEncryptedNotExisting) && // if Encrypted attributes must be set, the entire directory cannot be moved (its contents must be checked)
-            (filterCriteria == NULL || !filterCriteria->UseMasks &&
-                                           !filterCriteria->UseAdvanced && !filterCriteria->SkipEmptyDirs)) // if files or directories are filtered, the entire directory cannot be moved
-        {
-            sameDisk = !script->SameRootButDiffVolume &&
-                       HasTheSameRootPath(sourcePath, targetPath); // same disk (UNC and standard)
-        }
-        else
-            sameDisk = (StrICmp(sourcePath, targetPath) == 0); // jen rename
-        if (sameDisk)
-        {
-            if (StrICmp(sourcePath, targetPath) == 0 ||
-                targetPathState == tpsEncryptedNotExisting || targetPathState == tpsNotEncryptedNotExisting) // target directory doesn't exist
-            {
-                if (!script->FastMoveUsed)
-                    script->FastMoveUsed = TRUE;
-                op.Opcode = ocMoveDir;
-                op.OpFlags = checkNewDirName ? 0 : OPFL_IGNORE_INVALID_NAME;
-                op.Size = MOVE_DIR_SIZE;
-                op.Attr = sourceDirAttr;
-                if ((op.SourceName = BuildName(sourcePath, NULL)) == NULL)
-                {
-                _ERROR:
-
-                    *sourceEnd = 0; // restoring sourcePath
-                    *targetEnd = 0; // restoring targetPath
-                    return FALSE;
-                }
-                if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
-                {
-                    free(op.SourceName);
-                    op.SourceName = NULL;
-                    goto _ERROR;
-                }
-                if (!currentSourcePathW.empty() || dirNameW != NULL)
-                    setCurrentDirSourceNameW(op);
-                if (!currentTargetPathW.empty())
-                    op.SetTargetNameW(currentTargetPathW, std::wstring());
-                *sourceEnd = 0; // restoring sourcePath
-                *targetEnd = 0; // restoring targetPath
-                script->Add(op);
-                if (!script->IsGood())
-                {
-                    script->ResetState();
-                    free(op.SourceName);
-                    op.SourceName = NULL;
-                    free(op.TargetName);
-                    op.TargetName = NULL;
-                    return FALSE;
-                }
-                else
-                    return TRUE;
-            }
-        }
-    }
-
-    int createDirIndex = -1;
-    CQuadWord dirStartTotalFileSize = script->TotalFileSize;
-    if (type == atCopy || type == atMove) // create the target directory
-    {
-        srcAndTgtPathsFlags &= ~(OPFL_SRCPATH_IS_NET | OPFL_SRCPATH_IS_FAST);
-        srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(sourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
-        if (targetPathState == tpsEncryptedExisting || targetPathState == tpsNotEncryptedExisting) // target directory exists, get to know its flags (otherwise inherit flags from the parent target directory)
-        {
-            srcAndTgtPathsFlags &= ~(OPFL_TGTPATH_IS_NET | OPFL_TGTPATH_IS_FAST);
-            srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(targetPath, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
-        }
-
-        BOOL dirCreated = FALSE;
-        if (sourcePathSupADS)
-        {
-            if ((targetPathState == tpsEncryptedNotExisting || targetPathState == tpsNotEncryptedNotExisting) && // target directory does not exist
-                (targetPathSupADS || !bsState.ConfirmADSLossAll))                                                        // if ADS should not be ignored
-            {
-                if (script->BytesPerCluster == 0)
-                    TRACE_E("How is it possible that script->BytesPerCluster is not yet set???");
-
-                CQuadWord adsSize;
-                CQuadWord adsOccupiedSpace;
-                DWORD adsWinError;
-
-            READADS_AGAIN:
-
-                if (CheckFileOrDirADS(sourcePath, TRUE, &adsSize, NULL, NULL, NULL, &adsWinError,
-                                      script->BytesPerCluster, &adsOccupiedSpace, NULL,
-                                      currentSourcePathW))
-                { // the source directory has ADS, they must be copied to the target directory
-                    if (targetPathSupADS)
-                    {
-                        script->OccupiedSpace += adsOccupiedSpace;
-                        script->TotalFileSize += adsSize;
-
-                        op.Opcode = ocCreateDir;
-                        op.OpFlags = OPFL_COPY_ADS | (checkNewDirName ? 0 : OPFL_IGNORE_INVALID_NAME);
-                        if (!script->CopyAttrs && // when copying attributes, the heuristic for setting the Encrypted attribute is skipped
-                            ((sourceDirAttr & FILE_ATTRIBUTE_ENCRYPTED) || targetPathState == tpsEncryptedExisting ||
-                             targetPathState == tpsEncryptedNotExisting))
-                        {
-                            op.OpFlags |= OPFL_AS_ENCRYPTED;
-                        }
-                        if (type == atMove && !script->ShowStatus)
-                            script->ShowStatus = TRUE; // if moving the whole directory is impossible (reasons above) and ADS must be copied, we need to show the status
-                        op.Size = CREATE_DIR_SIZE + adsSize;
-                        op.Attr = sourceDirAttr;
-                        if ((op.SourceName = BuildName(sourcePath, NULL)) == NULL)
-                            goto _ERROR;
-                        if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
-                        {
-                            free(op.SourceName);
-                            op.SourceName = NULL;
-                            goto _ERROR;
-                        }
-                        if (!currentSourcePathW.empty() || dirNameW != NULL)
-                            setCurrentDirSourceNameW(op);
-                        if (!currentTargetPathW.empty())
-                            op.SetTargetNameW(currentTargetPathW, std::wstring());
-                        createDirIndex = script->Add(op);
-                        if (!script->IsGood())
-                        {
-                            free(op.SourceName);
-                            op.SourceName = NULL;
-                            free(op.TargetName);
-                            op.TargetName = NULL;
-                            script->ResetState();
-                            goto _ERROR;
-                        }
-                        dirCreated = TRUE;
-                    }
-                    else // copying to a non-NTFS filesystem (prompt to discard ADS)
-                    {
-                        int res;
-                        if (bsState.ConfirmADSLossAll)
-                            res = IDYES;
-                        else
-                        {
-                            if (bsState.ConfirmADSLossSkipAll)
-                                res = IDB_SKIP;
-                            else
-                            {
-                                GetADSStreamsNames(ADSStreamsGlobalBuf, 5000, sourcePath, TRUE,
-                                                   currentSourcePathW);
-                                if (ADSStreamsGlobalBuf[0] == 0)
-                                    res = IDYES;
-                                else
-                                {
-                                    res = (int)CConfirmADSLossDlg(HWindow, FALSE, sourcePath, ADSStreamsGlobalBuf, type == atMove,
-                                                                  currentSourcePathW.empty() ? NULL : currentSourcePathW.c_str()).Execute();
-                                }
-                            }
-                        }
-                        switch (res)
-                        {
-                        case IDB_ALL:
-                            bsState.ConfirmADSLossAll = TRUE; // intentional fallthrough
-                        case IDYES:
-                            break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
-
-                        case IDB_SKIPALL:
-                            bsState.ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
-                        case IDB_SKIP:
-                        {
-                            *sourceEnd = 0; // restoring sourcePath
-                            *targetEnd = 0; // restoring targetPath
-                            return TRUE;
-                        }
-
-                        case IDCANCEL:
-                        {
-                            *sourceEnd = 0; // restoring sourcePath
-                            *targetEnd = 0; // restoring targetPath
-                            return FALSE;
-                        }
-                        }
-                    }
-                }
-                else // an error occurred or no ADS
-                {
-                    if (ShouldReportADSProbeError(sourcePath, adsWinError, sourcePathIsNet))
-                    {
-                        if ((sourceDirAttr & FILE_ATTRIBUTE_REPARSE_POINT) == 0) // it's not a link (for a link, the content does not have to be copied)
-                        {
-                            // first we try whether an error occurs even when listing the directory - such an error
-                            // is easier to understand, so we show it first (before the ADS read error)
-                            lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
-                            if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
-                            {
-                                WIN32_FIND_DATAW f;
-                                HANDLE search = SalFindFirstFileHW(finalName, &f);
-                                if (search == INVALID_HANDLE_VALUE)
-                                {
-                                    DWORD err = GetLastError();
-                                    if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
-                                    {
-                                        std::wstring sourcePathMsgW = currentSourcePathForMessageW();
-                                        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), sourcePathMsgW.c_str(), GetErrorTextW(err));
-                                        BOOL skip = TRUE;
-                                        if (!bsState.ErrListDirSkipAll)
-                                        {
-                                            PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                                            if (res.type == PromptResult::kCancel)
-                                                skip = FALSE;
-                                            else if (res.type == PromptResult::kSkipAll)
-                                                bsState.ErrListDirSkipAll = TRUE;
-                                        }
-                                        *sourceEnd = 0; // restoring sourcePath
-                                        *targetEnd = 0; // restoring targetPath
-                                        return skip;
-                                    }
-                                }
-                                else
-                                    HANDLES(FindClose(search));
-                            }
-                        }
-
-                        // directory listing succeeded (or an unexpected error occurred), report an ADS error
-                        int res;
-                        if (bsState.ErrReadingADSIgnoreAll)
-                            res = IDB_IGNORE;
-                        else
-                        {
-                            res = (int)CErrorReadingADSDlg(HWindow, sourcePath, GetErrorText(adsWinError),
-                                                           NULL, currentSourcePathW.empty() ? NULL : currentSourcePathW.c_str())
-                                      .Execute();
-                        }
-                        switch (NormalizeADSReadErrorResponse(res, &bsState.ErrReadingADSIgnoreAll))
-                        {
-                        case IDRETRY:
-                            goto READADS_AGAIN;
-
-                        case IDB_IGNORE:
-                            break;
-
-                        case IDCANCEL:
-                        {
-                            *sourceEnd = 0; // restoring sourcePath
-                            *targetEnd = 0; // restoring targetPath
-                            return FALSE;
-                        }
-                        }
-                    }
-                }
-            }
-        }
-        if (!dirCreated)
-        {
-            op.Opcode = ocCreateDir;
-            op.OpFlags = checkNewDirName ? 0 : OPFL_IGNORE_INVALID_NAME;
-            if (!script->CopyAttrs && // when copying attributes, the heuristic for setting the Encrypted attribute is skipped
-                ((sourceDirAttr & FILE_ATTRIBUTE_ENCRYPTED) || targetPathState == tpsEncryptedExisting ||
-                 targetPathState == tpsEncryptedNotExisting))
-            {
-                op.OpFlags |= OPFL_AS_ENCRYPTED;
-            }
-            op.Size = CREATE_DIR_SIZE;
-            op.Attr = sourceDirAttr;
-            if ((op.SourceName = BuildName(sourcePath, NULL)) == NULL)
-                goto _ERROR;
-            if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
-            {
-                free(op.SourceName);
-                op.SourceName = NULL;
-                goto _ERROR;
-            }
-            if (!currentSourcePathW.empty() || dirNameW != NULL)
-                setCurrentDirSourceNameW(op);
-            if (!currentTargetPathW.empty())
-                op.SetTargetNameW(currentTargetPathW, std::wstring());
-            createDirIndex = script->Add(op);
-            if (!script->IsGood())
-            {
-                script->ResetState();
-                free(op.SourceName);
-                op.SourceName = NULL;
-                free(op.TargetName);
-                op.TargetName = NULL;
-                goto _ERROR;
-            }
-        }
-    }
-
-    if (type == atChangeAttrs)
-    {
-        op.Opcode = ocChangeAttrs;
-        op.OpFlags = 0;
-        op.Size = CHATTRS_FILE_SIZE;
-        op.Attr = sourceDirAttr;
-        if ((op.SourceName = BuildName(sourcePath, NULL)) == NULL)
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            return FALSE;
-        }
-        op.TargetName = (char*)(DWORD_PTR)((sourceDirAttr & attrsData->AttrAnd) | attrsData->AttrOr);
-        op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            *sourceEnd = 0; // restoring sourcePath
-            return FALSE;
-        }
-
-        if (!attrsData->SubDirs)
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            return TRUE;
-        }
-    }
-
-    BOOL copyMoveDirIsLink = FALSE;
-    BOOL copyMoveSkipLinkContent = FALSE;
-    if ((type == atCopy || type == atMove) && // if it's a link, determine whether to skip or copy its content
-        (sourceDirAttr & FILE_ATTRIBUTE_REPARSE_POINT))
-    {
-        copyMoveDirIsLink = TRUE;
-        int res;
-        if (bsState.ConfirmCopyLinkContentAll)
-            res = IDYES;
-        else
-        {
-            if (bsState.ConfirmCopyLinkContentSkipAll)
-                res = IDB_SKIP;
-            else
-            {
-                CPathBuffer detailsTxt;  // Heap-allocated for long path support
-                CPathBuffer junctionOrSymlinkTgt;  // Heap-allocated for long path support
-                int repPointType;
-                if (GetReparsePointDestination(sourcePath, junctionOrSymlinkTgt, junctionOrSymlinkTgt.Size(), &repPointType, FALSE))
-                {
-                    if (repPointType == 1 /* MOUNT POINT */)
-                        strcpy_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(IDS_VOLMOUNTPOINT));
-                    else
-                    {
-                        sprintf_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(repPointType == 2 /* JUNCTION POINT */ ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
-                                  junctionOrSymlinkTgt.Get());
-                        int len = (int)strlen(detailsTxt);
-                        if (detailsTxt[0] == '(')
-                            memmove(detailsTxt.Get(), detailsTxt.Get() + 1, --len + 1);
-                        if (len > 0 && detailsTxt[len - 1] == ')')
-                            detailsTxt[--len] = 0;
-                    }
-                }
-                else
-                    strcpy_s(detailsTxt.Get(), detailsTxt.Size(), LoadStr(IDS_UNABLETORESOLVELINK));
-
-                res = (int)CConfirmLinkTgtCopyDlg(HWindow, sourcePath, detailsTxt).Execute();
-            }
-        }
-        switch (res)
-        {
-        case IDB_ALL:
-            bsState.ConfirmCopyLinkContentAll = TRUE; // intentional fallthrough
-        case IDYES:
-            break; // copy the link content to the target
-
-        case IDB_SKIPALL:
-            bsState.ConfirmCopyLinkContentSkipAll = TRUE; // intentionalfallthrough
-        case IDB_SKIP:
-            copyMoveSkipLinkContent = TRUE;
-            break; // skip the link content (do not copy)
-
-        case IDCANCEL:
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            *targetEnd = 0; // restoring targetPath
-            return FALSE;
-        }
-        }
-    }
-    //---  build the path to sourceDirName and start searching for contained files
-    BOOL delDirectory = TRUE;       // delete a non-empty directory?
-    BOOL delDirectoryReturn = TRUE; // return value when a non-empty directory isn't removed
-    BOOL canDelDirAfterMove = TRUE; // Move only: FALSE if not everything is moved (filter skipped something), source directory can't be removed (won't be empty)
-    if (!copyMoveDirIsLink || !copyMoveSkipLinkContent)
-    {
-        WIN32_FIND_DATAW f;
-        strcpy(st, "\\*");
-        std::wstring searchPathW;
-        HANDLE search;
-        if (!currentSourcePathW.empty())
-        {
-            searchPathW = currentSourcePathW;
-            if (!sally::unicode::HasTrailingSlashW(searchPathW))
-                searchPathW += L'\\';
-            searchPathW += L"*";
-            search = SalFindFirstFileWideH(searchPathW.c_str(), &f);
-        }
-        else
-            search = SalFindFirstFileHW(sourcePath, &f);
-        *st = 0; // remove "\\*"
-        if (search == INVALID_HANDLE_VALUE)
-        {
-            DWORD err = GetLastError();
-            if (err == ERROR_PATH_NOT_FOUND && type == atCountSize && dirDOSName != NULL && strcmp(dirName, dirDOSName) != 0)
-            { // workaround for computing the size of a directory that must be accessed via DOS-name when we can't handle the UNICODE name (the multibyte version converted back to UNICODE doesn't match the original)
-                lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
-                if (CutDirectory(finalName) &&
-                    SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
-                    SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
-                {
-                    search = SalFindFirstFileHW(finalName, &f);
-                    if (search != INVALID_HANDLE_VALUE)
-                    {
-                        strcpy(*sourceEnd == '\\' ? sourceEnd + 1 : sourceEnd, dirDOSName); // modify sourcePath (it's used further for handling found files and directories)
-                        goto BROWSE_DIR;
-                    }
-                }
-            }
-            if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)
-            {
-                std::wstring sourcePathMsgW = currentSourcePathForMessageW();
-                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), sourcePathMsgW.c_str(), GetErrorTextW(err));
-                *sourceEnd = 0; // restoring sourcePath
-                if (targetEnd != NULL)
-                    *targetEnd = 0; // restoring targetPath
-                BOOL skip = TRUE;
-                if (!bsState.ErrListDirSkipAll)
-                {
-                    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                    if (res.type == PromptResult::kCancel)
-                        skip = FALSE;
-                    else if (res.type == PromptResult::kSkipAll)
-                        bsState.ErrListDirSkipAll = TRUE;
-                }
-                if (!skip)
-                    return FALSE;
-                UpdateWindow(MainWindow->HWindow);
-            }
-            else
-            {
-                *sourceEnd = 0; // restoring sourcePath
-                if (targetEnd != NULL)
-                    *targetEnd = 0; // restoring targetPath
-            }
-        }
-        else
-        {
-
-        BROWSE_DIR:
-
-            //---  browse the directory
-            BOOL askDirDelete = (type == atDelete && firstLevelDir && Configuration.CnfrmNEDirDel);
-            BOOL testFindNextErr = TRUE;
-            do
-            {
-                if (f.cFileName[0] == L'.' &&
-                        (f.cFileName[1] == 0 || (f.cFileName[1] == L'.' && f.cFileName[2] == 0)) ||
-                    f.cFileName[0] == 0)
-                    continue; // "." and ".." plus empty names (would lead to infinite recursion)
-
-                if (askDirDelete)
-                {
-                    std::wstring sourcePathMsgW = currentSourcePathForMessageW();
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_NONEMPTYDIRDELCONFIRM), sourcePathMsgW.c_str());
-                    PromptResult res = gPrompter->AskYesNoCancel(LoadStrW(IDS_QUESTION), msg.c_str());
-                    UpdateWindow(MainWindow->HWindow);
-                    delDirectoryReturn = (res.type != PromptResult::kCancel); // if CANCEL was not chosen, we continue
-                    delDirectory = (res.type == PromptResult::kYes);
-                    if (!delDirectory)
-                    {
-                        testFindNextErr = FALSE;
-                        break;
-                    }
-                    askDirDelete = FALSE;
-                }
-                //---  does anyone want to interrupt script building?
-                if (GetTickCount() - bsState.LastTickCount > BS_TIMEOUT)
-                {
-                    if (UserWantsToCancelSafeWaitWindow())
-                    {
-                        MSG msg; // discard the buffered ESC
-                        while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
-                            ;
-                        int topIndex = ListBox->GetTopIndex();
-                        int focusIndex = GetCaretIndex();
-                        RefreshListBox(-1, topIndex, focusIndex, FALSE, FALSE);
-                        PromptResult res = gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), LoadStrW(IDS_CANCELOPERATION));
-                        UpdateWindow(MainWindow->HWindow);
-                        if (res.type == PromptResult::kYes)
-                            goto BUILD_ERROR;
-                    }
-
-                    bsState.LastTickCount = GetTickCount();
-                }
-
-                //---  build a directory or file
-                char cFileNameA[MAX_PATH];
-                WideCharToMultiByte(CP_ACP, 0, f.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                char cAltNameA[14];
-                WideCharToMultiByte(CP_ACP, 0, f.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-                {
-                    if (!BuildScriptDir(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
-                                        targetPathState, targetPathSupADS, targetPathIsFAT32,
-                                        NULL, cFileNameA,
-                                        cAltNameA[0] != 0 ? cAltNameA : NULL,
-                                        attrsData, NULL, f.dwFileAttributes, chCaseData, FALSE,
-                                        onlySize, fastDirectoryMove, filterCriteria, &canDelDirAfterMove,
-                                        &f.ftLastWriteTime, srcAndTgtPathsFlags,
-                                        !currentSourcePathW.empty() ? currentSourcePathW.c_str() : NULL,
-                                        f.cFileName,
-                                        !currentTargetPathW.empty() ? currentTargetPathW.c_str() : NULL))
-                    {
-                    BUILD_ERROR:
-                        HANDLES(FindClose(search));
-                        *sourceEnd = 0; // restoring sourcePath
-                        if (targetEnd != NULL)
-                            *targetEnd = 0; // restoring targetPath
-                        return FALSE;
-                    }
-                }
-                else
-                {
-                    if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(&f))
-                    {
-                        if (!BuildScriptFile(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
-                                             targetPathState, targetPathSupADS, targetPathIsFAT32,
-                                             NULL, cFileNameA,
-                                             cAltNameA[0] != 0 ? cAltNameA : NULL,
-                                             CQuadWord(f.nFileSizeLow, f.nFileSizeHigh), attrsData, NULL,
-                                             f.dwFileAttributes, chCaseData, onlySize, &f.ftLastWriteTime,
-                                             srcAndTgtPathsFlags, f.cFileName,
-                                             !currentSourcePathW.empty() ? currentSourcePathW.c_str() : NULL,
-                                             NULL,
-                                             !currentTargetPathW.empty() ? currentTargetPathW.c_str() : NULL))
-                            goto BUILD_ERROR;
-                    }
-                    else
-                        canDelDirAfterMove = FALSE; // not everything is being moved (filter skipped something); the source directory cannot be deleted (it would not be empty)
-                }
-            } while (SalLPFindNextFile(search, &f));
-            DWORD err = GetLastError();
-            HANDLES(FindClose(search));
-
-            *sourceEnd = 0; // restoring sourcePath
-            if (targetEnd != NULL)
-                *targetEnd = 0; // restoring targetPath
-
-            if (testFindNextErr && err != ERROR_NO_MORE_FILES)
-            {
-                std::wstring sourcePathMsgW = currentSourcePathForMessageW();
-                std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOTREADDIR), sourcePathMsgW.c_str(), GetErrorTextW(err));
-                BOOL skip = TRUE;
-                if (!bsState.ErrListDirSkipAll)
-                {
-                    PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                    if (res.type == PromptResult::kCancel)
-                        skip = FALSE;
-                    else if (res.type == PromptResult::kSkipAll)
-                        bsState.ErrListDirSkipAll = TRUE;
-                }
-                if (!skip)
-                    return FALSE;
-                UpdateWindow(MainWindow->HWindow);
-            }
-        }
-    }
-    else
-    {
-        *sourceEnd = 0; // restoring sourcePath
-        if (targetEnd != NULL)
-            *targetEnd = 0; // restoring targetPath
-    }
-    //---  change-case: rename only after operations inside are complete
-    if (type == atChangeCase)
-    {
-        op.Opcode = ocMoveDir;
-        op.OpFlags = 0; // case change = rename; we'll report invalid names (not just tolerate existing ones)
-        op.Size = MOVE_DIR_SIZE;
-        op.Attr = sourceDirAttr;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, dirName, NULL, &skip,
-                                       &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        if ((op.TargetName = BuildName(sourcePath, dirName)) == NULL) // overly long name not a concern here, previous condition would handle it
-        {
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        int offset = (int)strlen(op.SourceName) - (int)strlen(dirName);
-        AlterFileName(op.TargetName + offset, op.SourceName + offset, -1,
-                      chCaseData->FileNameFormat, chCaseData->Change, TRUE);
-        BOOL sameName = strcmp(op.SourceName + offset, op.TargetName + offset) == 0;
-        if (!sameName)
-        {
-            if (!currentSourcePathW.empty() || dirNameW != NULL)
-            {
-                setCurrentDirSourceNameW(op);
-                std::wstring alteredW = AlterFileNameW(effectiveDirNameW.c_str(), chCaseData->FileNameFormat, chCaseData->Change, TRUE);
-                if (!currentSourcePathW.empty())
-                {
-                    std::wstring parentSourcePathW = effectiveSourcePathW;
-                    op.SetTargetNameW(parentSourcePathW, alteredW);
-                }
-                else
-                {
-                    std::string parentSourcePath(sourcePath, sourceEnd - sourcePath);
-                    op.SetTargetNameW(parentSourcePath.c_str(), alteredW);
-                }
-            }
-            script->Add(op);
-        }
-        if (sameName || !script->IsGood())
-        {
-            free(op.SourceName);
-            op.SourceName = NULL;
-            free(op.TargetName);
-            op.TargetName = NULL;
-            if (!sameName)
-            {
-                script->ResetState();
-                return FALSE;
-            }
-        }
-    }
-    // if this directory contains a skipped item, the parent directory cannot be deleted
-    // if it's just a link to a directory, delete it regardless of remaining content
-    if (!copyMoveDirIsLink && canDelUpperDirAfterMove != NULL && !canDelDirAfterMove)
-        *canDelUpperDirAfterMove = FALSE;
-    // if nothing inside the directory was copied or moved and we are transferring only files,
-    // cancel creation of the directory (an unnecessary empty directory). If it was a link to a directory,
-    // this rule does not apply (it's a link, not a real directory)
-    if (!copyMoveDirIsLink && (type == atCopy || type == atMove) && filterCriteria != NULL &&
-        filterCriteria->SkipEmptyDirs && createDirIndex >= 0 &&
-        createDirIndex == script->Count - 1)
-    {
-        free(script->At(createDirIndex).SourceName);
-        free(script->At(createDirIndex).TargetName);
-        script->Delete(createDirIndex);
-        if (!script->IsGood())
-            script->ResetState();
-        // if this directory is being skipped, the parent directory cannot be deleted
-        if (canDelUpperDirAfterMove != NULL)
-            *canDelUpperDirAfterMove = FALSE;
-    }
-    else
-    {
-        // if directory's time&date should be preserved, store an operation to set the directory's time&date
-        // (can be done only after finishing writing subdirectories and files into this directory)
-        if ((type == atCopy || type == atMove) &&
-            filterCriteria != NULL && filterCriteria->PreserveDirTime &&
-            createDirIndex >= 0 && createDirIndex < script->Count)
-        {
-            op.Opcode = ocCopyDirTime;
-            op.OpFlags = 0;
-            op.Size = CHATTRS_FILE_SIZE;
-            op.SourceName = sourceDirTime != NULL ? (char*)(DWORD_PTR)sourceDirTime->dwLowDateTime : NULL;
-            op.OwnsSourceName = false;  // SourceName stores timestamp, not a pointer
-            const COperation& createDirOp = script->At(createDirIndex);
-            op.TargetName = DupStr(createDirOp.TargetName);
-            if (op.TargetName == NULL)
-                return FALSE;
-            if (createDirOp.HasWideTarget())
-                op.SetTargetNameW(createDirOp.TargetNameW, std::wstring());
-            op.Attr = sourceDirTime != NULL ? sourceDirTime->dwHighDateTime : 0;
-
-            script->Add(op);
-            if (!script->IsGood())
-            {
-                script->ResetState();
-                return FALSE;
-            }
-        }
-
-        // if we need to delete the directory or a link to it at sourcePath + dirName (delete and move)
-        if (copyMoveDirIsLink && type == atMove ||                                          // for a link canDelDirAfterMove is irrelevant (a link can always be removed)
-            !copyMoveDirIsLink && type == atMove && canDelDirAfterMove || type == atDelete) // delete the source directory or the link to the directory
-        {
-            if (type == atDelete && !delDirectory)
-                return delDirectoryReturn; // CANCEL / NO
-
-            op.Opcode = copyMoveDirIsLink && type == atMove ? ocDeleteDirLink : ocDeleteDir;
-            op.OpFlags = 0;
-            op.Size = copyMoveDirIsLink && type == atMove ? DELETE_DIRLINK_SIZE : DELETE_DIR_SIZE;
-            op.Attr = sourceDirAttr;
-            BOOL skip;
-            BOOL skipTooLongSrcNameErr = FALSE;
-            if ((op.SourceName = BuildName(sourcePath, dirName, NULL, &skip,
-                                           &bsState.ErrTooLongDirNameSkipAll, sourcePath)) == NULL)
-            {
-                if (skip)
-                    skipTooLongSrcNameErr = TRUE; // we also want to add a flag to skip directory creation
-                else
-                    return FALSE;
-            }
-            if (!skipTooLongSrcNameErr)
-            {
-                op.TargetName = NULL;
-                if (!currentSourcePathW.empty() || dirNameW != NULL)
-                    setCurrentDirSourceNameW(op);
-                script->Add(op);
-                if (!script->IsGood())
-                {
-                    script->ResetState();
-                    free(op.SourceName);
-                    op.SourceName = NULL;
-                    return FALSE;
-                }
-            }
-        }
-
-        // if necessary, store a flag to skip directory creation
-        if (type == atCopy || type == atMove)
-        {
-            op.Opcode = ocLabelForSkipOfCreateDir;
-            op.OpFlags = 0;
-            op.Size.SetUI64(0);
-            CQuadWord dirSize = script->TotalFileSize - dirStartTotalFileSize;
-            op.SourceName = (char*)(DWORD_PTR)dirSize.LoDWord;
-            op.TargetName = (char*)(DWORD_PTR)dirSize.HiDWord;
-            op.OwnsSourceName = false;  // SourceName stores size LoDWord, not a pointer
-            op.OwnsTargetName = false;  // TargetName stores size HiDWord, not a pointer
-            op.Attr = createDirIndex;
-
-            script->Add(op);
-            if (!script->IsGood())
-            {
-                script->ResetState();
-                return FALSE;
-            }
-        }
-    }
-    return TRUE;
-}
-
-BOOL GetLinkTgtFileSize(HWND parent, const char* fileName, COperation* op, CQuadWord* size,
+// The COperation leg is gone: both call sites pass op == NULL with
+// an explicit name (the builder no longer needs mid-build link sizing).
+// wide. SalGetFileSize2 is the native-wide owner, and the ADS error
+// dialog has carried a 'fileW' slot since an earlier tranche, so nothing here
+// needed inventing.
+// NOTE: 'op' is dead - every caller passes NULL and the body never reads it.
+// Left alone deliberately; removing it is a cleanup, not part of this widening.
+BOOL GetLinkTgtFileSize(HWND parent, const wchar_t* fileName, COperation* op, CQuadWord* size,
                         BOOL* cancel, BOOL* ignoreAll)
 {
     *cancel = FALSE;
     if (fileName == NULL)
-        fileName = op->SourceName;
+        return FALSE;
 
 READLINKTGTSIZE_AGAIN:
 
@@ -3321,9 +2253,12 @@ READLINKTGTSIZE_AGAIN:
             res = IDB_IGNORE;
         else
         {
-            res = (int)CErrorReadingADSDlg(parent, fileName, GetErrorText(err),
-                                           LoadStr(IDS_ERRORGETTINGLINKTGTSIZE),
-                                           op != NULL && fileName == op->SourceName && op->HasWideSource() ? op->SourceNameW.c_str() : NULL)
+            // The narrow duplicates are gone. They were already unread here -
+            // the wide slots carried fileName / the wide title / owned error text, and the narrow
+            // "" and the old narrow error text were dead arguments. GetErrorTextOwned keeps
+            // FormatMessageW's native text intact instead of re-encoding it through CP_ACP.
+            res = (int)CErrorReadingADSDlg(parent, fileName, GetErrorTextOwned(err).c_str(),
+                                           LoadStrW(IDS_ERRORGETTINGLINKTGTSIZE))
                       .Execute();
         }
         switch (NormalizeADSReadErrorResponse(res, ignoreAll))
@@ -3336,685 +2271,12 @@ READLINKTGTSIZE_AGAIN:
 
         case IDCANCEL:
         {
-            if (op != NULL)
-            {
-                free(op->SourceName);
-                if (op->TargetName != NULL)
-                    free(op->TargetName);
-            }
             *cancel = TRUE;
             break;
         }
         }
         return FALSE;
     }
-}
-
-BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* sourcePath,
-                                   BOOL sourcePathSupADS, char* targetPath,
-                                   CTargetPathState targetPathState, BOOL targetPathSupADS,
-                                   BOOL targetPathIsFAT32, char* mask, char* fileName,
-                                   char* fileDOSName, const CQuadWord& fileSize,
-                                   CAttrsData* attrsData, char* mapName, DWORD sourceFileAttr,
-                                   CChangeCaseData* chCaseData, BOOL onlySize,
-                                   FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
-                                   wchar_t* fileNameW, const wchar_t* sourcePathW,
-                                   const wchar_t* mapNameW,
-                                   const wchar_t* targetPathW)
-{
-    SLOW_CALL_STACK_MESSAGE14("CFilesWindow::BuildScriptFile(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , , %s, 0x%X, , %d, , 0x%X)",
-                              type, sourcePath, sourcePathSupADS, targetPath, targetPathState, targetPathSupADS,
-                              targetPathIsFAT32, mask, fileName, mapName, sourceFileAttr, onlySize, srcAndTgtPathsFlags);
-
-    CBuildScriptState& bsState = GetActiveBuildScriptState();
-    script->FilesCount++;
-    CQuadWord fileSizeLoc = fileSize;
-    CPathBuffer message;
-    COperation op;
-    const std::wstring effectiveSourcePathW = (sourcePathW != NULL && sourcePathW[0] != L'\0')
-                                                  ? std::wstring(sourcePathW)
-                                                  : std::wstring();
-    const std::wstring effectiveTargetPathW = (targetPathW != NULL && targetPathW[0] != L'\0')
-                                                  ? std::wstring(targetPathW)
-                                                  : std::wstring();
-    // Only fall back to AnsiToWide when the ANSI mirror is round-trip clean
-    // (no '?' substitution chars). Otherwise the wide name would gain literal
-    // '?' characters and CreateFileW later fails with error 123 -- the exact
-    // symptom of the Unicode-leaf F5 bug. When refusing the fallback we leave
-    // effectiveFileNameW empty; the downstream gate at !effectiveFileNameW.empty()
-    // already skips SetSourceNameW in that case (op proceeds with SourceName only,
-    // SourceNameW is widened by PopulateWidePathsFromAnsi from the still-lossy
-    // ANSI, and the existing error path surfaces clearly).
-    const std::wstring effectiveFileNameW = [&]() -> std::wstring {
-        if (fileNameW != NULL)
-            return std::wstring(fileNameW);
-        if (fileName == NULL || fileName[0] == '\0')
-            return std::wstring();
-        if (strchr(fileName, '?') != NULL)
-            return std::wstring();
-        return AnsiToWide(fileName);
-    }();
-    auto setFileSourceNameW = [&](COperation& operation) {
-        if (effectiveFileNameW.empty())
-            return;
-        if (!effectiveSourcePathW.empty())
-            operation.SetSourceNameW(effectiveSourcePathW, effectiveFileNameW);
-        else
-            operation.SetSourceNameW(sourcePath, effectiveFileNameW);
-    };
-    auto setFileTargetNameW = [&](COperation& operation, const std::wstring& wideFileName) {
-        if (wideFileName.empty())
-            return;
-        if (!effectiveSourcePathW.empty())
-            operation.SetTargetNameW(effectiveSourcePathW, wideFileName);
-        else
-            operation.SetTargetNameW(sourcePath, wideFileName);
-    };
-    switch (type)
-    {
-    case atCopy:
-    case atMove:
-    {
-        op.Opcode = (type == atCopy) ? ocCopyFile : ocMoveFile;
-        op.FileSize = fileSizeLoc;
-        op.OpFlags = srcAndTgtPathsFlags;
-        if (!script->CopyAttrs && // when copying attributes, the heuristic for setting the Encrypted attribute is skipped
-            ((sourceFileAttr & FILE_ATTRIBUTE_ENCRYPTED) || targetPathState == tpsEncryptedExisting ||
-             targetPathState == tpsEncryptedNotExisting))
-        {
-            op.OpFlags |= OPFL_AS_ENCRYPTED; // if a rename (move within the same volume) is enough, we clear this flag again
-            if (type == atMove && !script->ShowStatus)
-                script->ShowStatus = TRUE; // move with the encrypted attribute set is done via copy, so we need to show status
-        }
-        op.Attr = sourceFileAttr;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
-                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        if (targetPathIsFAT32 && fileSizeLoc > CQuadWord(0xFFFFFFFF /* 4GB minus 1 Byte */, 0))
-        { // file too large for FAT32 (warn the user that the operation will likely fail)
-
-        FAT_TOO_BIG_FILE:
-
-            PromptResult::Type resType = PromptResult::kSkip;
-            if (!bsState.ErrTooBigFileFAT32SkipAll)
-            {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEISTOOBIGFORFAT32), AnsiToWide(op.SourceName).c_str());
-                PromptResult res = gPrompter->AskSkipSkipAllCancel(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-                resType = res.type;
-                if (res.type == PromptResult::kSkipAll)
-                    bsState.ErrTooBigFileFAT32SkipAll = TRUE;
-            }
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return (resType == PromptResult::kSkip || resType == PromptResult::kSkipAll);
-        }
-        CPathBuffer finalName; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
-        if (mapName == NULL)
-        {
-            // Petr: a bit of a hack: the *.* mask doesn't create a copy of the source name, which is a problem when copying
-            // files with invalid names, e.g. "c   ..." + "*.*" = "c   ", so we help ourselves
-            // by changing the mask to NULL = a simple textual copy of the name
-            char* opMask = mask != NULL && strcmp(mask, "*.*") == 0 ? NULL : mask;
-            if ((op.TargetName = BuildName(targetPath,
-                                           MaskName(finalName, 2 * MAX_PATH + 200, fileName, opMask),
-                                           NULL, &skip, &bsState.ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
-            {
-                free(op.SourceName);
-                op.SourceName = NULL;
-                return skip;
-            }
-        }
-        else
-        {
-            if ((op.TargetName = BuildName(targetPath, mapName, NULL, &skip,
-                                           &bsState.ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
-            {
-                free(op.SourceName);
-                op.SourceName = NULL;
-                return skip;
-            }
-        }
-
-        // Set wide paths early whenever we have a usable wide directory path.
-        if (!effectiveFileNameW.empty())
-        {
-            if (!effectiveSourcePathW.empty())
-                op.SetSourceNameW(effectiveSourcePathW, effectiveFileNameW);
-            else
-                op.SetSourceNameW(sourcePath, effectiveFileNameW);
-            if (mapNameW != NULL && mapNameW[0] != L'\0')
-            {
-                if (!effectiveTargetPathW.empty())
-                    op.SetTargetNameW(effectiveTargetPathW, mapNameW);
-                else
-                    op.SetTargetNameW(targetPath, mapNameW);
-            }
-            else
-            {
-                // For target, use the same wide filename if mask is NULL or "*.*"
-                if (mapName == NULL && (mask == NULL || strcmp(mask, "*.*") == 0))
-                {
-                    if (!effectiveTargetPathW.empty())
-                        op.SetTargetNameW(effectiveTargetPathW, effectiveFileNameW);
-                    else
-                        op.SetTargetNameW(targetPath, effectiveFileNameW);
-                }
-            }
-        }
-
-        if (type == atMove && op.AreSourceAndTargetExactlySamePath() ||
-            type == atCopy && op.AreSourceAndTargetSamePath())
-        {
-            free(op.SourceName);
-            op.SourceName = NULL;
-            free(op.TargetName);
-            op.TargetName = NULL;
-            if (type == atMove) // moving where it already is ...
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTMOVEFILETOITSELF));
-            else
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_CANNOTCOPYFILETOITSELF));
-            return FALSE;
-        }
-        // if a rename (within the same volume) is enough, remove the OPFL_AS_ENCRYPTED flag again
-        if (op.Opcode == ocMoveFile && (op.OpFlags & OPFL_AS_ENCRYPTED) &&
-            (sourceFileAttr & FILE_ATTRIBUTE_ENCRYPTED) &&
-            !script->SameRootButDiffVolume && HasTheSameRootPath(sourcePath, targetPath))
-        {
-            op.OpFlags &= ~OPFL_AS_ENCRYPTED;
-        }
-        if (type == atCopy || op.Opcode == ocMoveFile && (op.OpFlags & OPFL_AS_ENCRYPTED) ||
-            script->SameRootButDiffVolume || !HasTheSameRootPath(sourcePath, targetPath))
-        {
-            // if the path ends with a space/period, it is invalid and we must not perform the copy,
-            // CreateFile trims spaces/periods, potentially resulting in copying a different file or to a different name
-            BOOL invalidSrcName = FileNameIsInvalid(op.SourceName, TRUE);
-
-            // optimization "overwrite older" for copying from a slow network to a fast local disk
-            // (reading file times over a slow network is much faster when the directory
-            // listing is read sequentially instead of querying each file individually)
-            if (!invalidSrcName && (srcAndTgtPathsFlags & OPFL_TGTPATH_IS_NET) == 0 && script->OverwriteOlder && fileLastWriteTime != NULL)
-            {
-                BOOL invalidTgtName = FileNameIsInvalid(op.TargetName, TRUE);
-                if (!invalidTgtName)
-                {
-                    HANDLE find;
-                    WIN32_FIND_DATAW dataOut;
-                    find = SalFindFirstFileHW(op.TargetName, &dataOut);
-                    if (find != INVALID_HANDLE_VALUE)
-                    {
-                        HANDLES(FindClose(find));
-
-                        const char* tgtName = SalPathFindFileName(op.TargetName);
-                        char cFileNameA[MAX_PATH];
-                        WideCharToMultiByte(CP_ACP, 0, dataOut.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                        if (StrICmp(tgtName, cFileNameA) == 0 &&                        // if it's not just a DOS-name match (that would change the DOS-name instead of overwriting)
-                            (dataOut.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // if it's not a directory (overwrite older cannot handle directories)
-                        {
-                            // truncate timestamps to seconds (different FSs store timestamps with different precision, so there were "differences" even between "identical" times)
-                            FILETIME roundedInTime;
-                            *(unsigned __int64*)&roundedInTime = *(unsigned __int64*)fileLastWriteTime - (*(unsigned __int64*)fileLastWriteTime % 10000000);
-                            *(unsigned __int64*)&dataOut.ftLastWriteTime = *(unsigned __int64*)&dataOut.ftLastWriteTime - (*(unsigned __int64*)&dataOut.ftLastWriteTime % 10000000);
-
-                            if (CompareFileTime(&roundedInTime, &dataOut.ftLastWriteTime) <= 0) // source file is not newer than the target one - skip the copy operation
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                free(op.TargetName);
-                                op.TargetName = NULL;
-                                return TRUE;
-                            }
-                            op.OpFlags |= OPFL_OVERWROLDERALRTESTED;
-                        }
-                    }
-                }
-            }
-
-            // links: fileSizeLoc == 0, the file size must be obtained later via GetLinkTgtFileSize()
-            if ((sourceFileAttr & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
-            {
-                BOOL cancel;
-                CQuadWord size;
-                if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &bsState.ErrGetFileSizeOfLnkTgtIgnAll))
-                {
-                    fileSizeLoc = size;
-                    op.FileSize = fileSizeLoc;
-
-                    // we have a new file size, we need to handle this again:
-                    // file too large for FAT32 (warn the user the operation will likely fail)
-                    if (targetPathIsFAT32 && fileSizeLoc > CQuadWord(0xFFFFFFFF /* 4GB minus 1 Byte */, 0))
-                    {
-                        free(op.TargetName);
-                        op.TargetName = NULL;
-
-                        goto FAT_TOO_BIG_FILE;
-                    }
-                }
-                if (cancel)
-                    return FALSE;
-            }
-
-            if (fileSizeLoc >= COPY_MIN_FILE_SIZE)
-                op.Size = fileSizeLoc;
-            else
-                op.Size = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
-
-            if (sourcePathSupADS &&                           // if there's a chance that ADS will be found and
-                (targetPathSupADS || !bsState.ConfirmADSLossAll))     // if ADS should not be ignored
-            {
-                CQuadWord adsSize;
-                CQuadWord adsOccupiedSpace;
-                DWORD adsWinError;
-                BOOL onlyDiscardableStreams;
-                const std::wstring adsSourceNameW = op.HasWideSource() ? op.SourceNameW : std::wstring();
-
-            READFILEADS_AGAIN:
-
-                if (!invalidSrcName &&
-                    CheckFileOrDirADS(op.SourceName, FALSE, &adsSize, NULL, NULL, NULL, &adsWinError,
-                                      script->BytesPerCluster, &adsOccupiedSpace,
-                                      &onlyDiscardableStreams, adsSourceNameW))
-                { // the source file has ADS, they must be copied to the target file
-                    if (targetPathSupADS)
-                    {
-                        op.OpFlags |= OPFL_COPY_ADS;
-                        op.Size += adsSize;
-                        script->OccupiedSpace += adsOccupiedSpace;
-                        script->TotalFileSize += adsSize;
-                    }
-                    else // copying to a non-NTFS filesystem (prompt about discarding ADS)
-                    {
-                        int res;
-                        if (bsState.ConfirmADSLossAll || onlyDiscardableStreams)
-                            res = IDYES;
-                        else
-                        {
-                            if (bsState.ConfirmADSLossSkipAll)
-                                res = IDB_SKIP;
-                            else
-                            {
-                                GetADSStreamsNames(ADSStreamsGlobalBuf, 5000, op.SourceName, FALSE,
-                                                   adsSourceNameW);
-                                if (ADSStreamsGlobalBuf[0] == 0)
-                                    res = IDYES;
-                                else
-                                {
-                                    res = (int)CConfirmADSLossDlg(HWindow, TRUE, op.SourceName, ADSStreamsGlobalBuf, type == atMove,
-                                                                  adsSourceNameW.empty() ? NULL : adsSourceNameW.c_str()).Execute();
-                                }
-                            }
-                        }
-                        switch (res)
-                        {
-                        case IDB_ALL:
-                            bsState.ConfirmADSLossAll = TRUE; // intentional fallthrough
-                        case IDYES:
-                            break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
-
-                        case IDB_SKIPALL:
-                            bsState.ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
-                        case IDB_SKIP:
-                        {
-                            free(op.SourceName);
-                            op.SourceName = NULL;
-                            free(op.TargetName);
-                            op.TargetName = NULL;
-                            return TRUE;
-                        }
-
-                        case IDCANCEL:
-                        {
-                            free(op.SourceName);
-                            op.SourceName = NULL;
-                            free(op.TargetName);
-                            op.TargetName = NULL;
-                            return FALSE;
-                        }
-                        }
-                    }
-                }
-                else // an error occurred or no ADS
-                {
-                    if (invalidSrcName ||
-                        ShouldReportADSProbeError(op.SourceName, adsWinError,
-                                                  (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0))
-                    {
-                        // firstly, we try whether an error occurs even during opening the file - such an error
-                        // the user understands it more easily, so we show it preferentially (before the ADS read error)
-                        HANDLE in;
-                        if (!invalidSrcName)
-                        {
-                            // Use OpenSourceFile which handles wide paths (Unicode filenames)
-                            in = op.OpenSourceFile(FILE_FLAG_SEQUENTIAL_SCAN);
-                        }
-                        else
-                        {
-                            in = INVALID_HANDLE_VALUE;
-                        }
-                        if (!invalidSrcName && in != INVALID_HANDLE_VALUE) // opening the file succeeded, report an ADS error
-                        {
-                            HANDLES(CloseHandle(in));
-
-                            int res;
-                            if (bsState.ErrReadingADSIgnoreAll)
-                                res = IDB_IGNORE;
-                            else
-                            {
-                                res = (int)CErrorReadingADSDlg(HWindow, op.SourceName, GetErrorText(adsWinError),
-                                                               NULL, op.HasWideSource() ? op.SourceNameW.c_str() : NULL)
-                                          .Execute();
-                            }
-                            switch (NormalizeADSReadErrorResponse(res, &bsState.ErrReadingADSIgnoreAll))
-                            {
-                            case IDRETRY:
-                                goto READFILEADS_AGAIN;
-
-                            case IDB_IGNORE:
-                                break;
-
-                            case IDCANCEL:
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                free(op.TargetName);
-                                op.TargetName = NULL;
-                                return FALSE;
-                            }
-                            }
-                        }
-                        else // report a file open error
-                        {
-                            DWORD err = GetLastError();
-                            if (invalidSrcName)
-                                err = ERROR_INVALID_NAME;
-                            int res;
-                            if (bsState.ErrFileSkipAll)
-                                res = IDB_SKIP;
-                            else
-                            {
-                                res = (int)CFileErrorDlg(HWindow, LoadStr(IDS_ERROROPENINGFILE), op.SourceName,
-                                                         GetErrorText(err))
-                                          .Execute();
-                            }
-                            switch (res)
-                            {
-                            case IDRETRY:
-                                goto READFILEADS_AGAIN;
-
-                            case IDB_SKIPALL:
-                                bsState.ErrFileSkipAll = TRUE; // intentional fallthrough
-                            case IDB_SKIP:
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                free(op.TargetName);
-                                op.TargetName = NULL;
-                                return TRUE;
-                            }
-
-                            case IDCANCEL:
-                            {
-                                free(op.SourceName);
-                                op.SourceName = NULL;
-                                free(op.TargetName);
-                                op.TargetName = NULL;
-                                return FALSE;
-                            }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (script->BytesPerCluster == 0)
-                TRACE_E("How is it possible that script->BytesPerCluster is not yet set???");
-            else
-            {
-                script->OccupiedSpace += fileSizeLoc - ((fileSizeLoc - CQuadWord(1, 0)) % CQuadWord(script->BytesPerCluster, 0)) +
-                                         CQuadWord(script->BytesPerCluster - 1, 0);
-            }
-            script->TotalFileSize += fileSizeLoc;
-        }
-        else
-        {
-            op.Size = MOVE_FILE_SIZE;
-            if (!script->FastMoveUsed)
-                script->FastMoveUsed = TRUE;
-        }
-
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            free(op.TargetName);
-            op.TargetName = NULL;
-            return FALSE;
-        }
-        else
-            return TRUE;
-    }
-
-    case atDelete:
-    {
-        op.Opcode = ocDeleteFile;
-        op.OpFlags = 0;
-        op.Size = DELETE_FILE_SIZE;
-        op.Attr = sourceFileAttr;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
-                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        op.TargetName = NULL;
-        setFileSourceNameW(op);
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        else
-            return TRUE;
-    }
-
-    case atCountSize:
-    {
-        if (script->BytesPerCluster == 0) // no space-estimate risk
-        {
-            DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(sourcePath, &d1, &d2, &d3, &d4))
-                script->BytesPerCluster = d1 * d2;
-        }
-
-        CPathBuffer name; // Heap-allocated for long path support
-        int l = (int)strlen(sourcePath);
-        memmove(name, sourcePath, l);
-        if (name[l - 1] != '\\')
-            name[l++] = '\\';
-        memmove(name + l, fileName, 1 + strlen(fileName)); // name is always < MAX_PATH
-        std::wstring nameW;
-        if (!effectiveSourcePathW.empty() && !effectiveFileNameW.empty())
-            nameW = sally::unicode::BuildPanelChildPathW(effectiveSourcePathW, fileName, fileNameW);
-        CQuadWord s;
-        DWORD err = NO_ERROR;
-        if (FileBasedCompression && !onlySize &&                                         // if compression is even possible
-            (sourceFileAttr & (FILE_ATTRIBUTE_COMPRESSED | FILE_ATTRIBUTE_SPARSE_FILE))) // if the file is compressed or sparse (sparse file)
-        {
-            if (!nameW.empty())
-                s.LoDWord = GetCompressedFileSizeW(nameW.c_str(), &s.HiDWord);
-            else
-                s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
-            err = GetLastError();
-            if (nameW.empty() && err == ERROR_FILE_NOT_FOUND && fileDOSName != NULL && strcmp(fileName, fileDOSName) != 0)
-            {                                                            // workaround for computing the size of a file that must be accessed via DOS-name when we cannot do it via the UNICODE name (the multibyte version of the name converted back to UNICODE doesn't match the original file name)
-                memmove(name + l, fileDOSName, 1 + strlen(fileDOSName)); // name is always < MAX_PATH
-                s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
-                err = GetLastError();
-                if (s.LoDWord == 0xFFFFFFFF && err != NO_ERROR)
-                    memmove(name + l, fileName, 1 + strlen(fileName)); // (name is always < MAX_PATH - in case of an error, the report will use the full name instead of the DOS name
-            }
-        }
-        else
-        {
-            s = fileSizeLoc;
-        }
-        if (s.LoDWord == 0xFFFFFFFF && err != NO_ERROR)
-        {
-            if (!script->SkipAllCountSizeErrors)
-            {
-                // TODO: Use wide format string when IDS_GETCOMPRFILESIZEERROR supports %ls
-                if (nameW.empty())
-                    nameW = AnsiToWide(name);
-                script->SkipAllCountSizeErrors =
-                    gPrompter->AskYesNo(LoadStrW(IDS_ERRORTITLE),
-                        (nameW + L": " + GetErrorTextW(err)).c_str()).type == PromptResult::kYes;
-                UpdateWindow(MainWindow->HWindow);
-            }
-            s = fileSizeLoc; // cannot determine compressed size, we settle for the normal size
-        }
-
-        script->Sizes.Add(fileSizeLoc); // the output dialog is prepared for the case when this array is in an error state
-        script->TotalSize += fileSizeLoc;
-        if (script->BytesPerCluster != 0)
-        {
-            script->OccupiedSpace += s - ((s - CQuadWord(1, 0)) % CQuadWord(script->BytesPerCluster, 0)) +
-                                     CQuadWord(script->BytesPerCluster - 1, 0);
-        }
-        else
-        {
-            script->OccupiedSpace += s;
-        }
-        script->TotalFileSize += s;
-        script->CompressedSize += s;
-
-        return TRUE;
-    }
-
-    case atRecursiveConvert:
-    case atConvert:
-    {
-        op.Opcode = ocConvert;
-        op.OpFlags = 0;
-        op.Attr = sourceFileAttr;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        op.TargetName = NULL;
-
-        // links: fileSizeLoc == 0, the file size must be obtained later via GetLinkTgtFileSize()
-        if ((sourceFileAttr & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
-        {
-            BOOL cancel;
-            CQuadWord size;
-            if (GetLinkTgtFileSize(HWindow, NULL, &op, &size, &cancel, &bsState.ErrGetFileSizeOfLnkTgtIgnAll))
-                fileSizeLoc = size;
-            if (cancel)
-                return FALSE;
-        }
-
-        if (fileSizeLoc >= CONVERT_MIN_FILE_SIZE)
-            op.Size = fileSizeLoc;
-        else
-            op.Size = CONVERT_MIN_FILE_SIZE; // zero/small files take at least as long as files of size CONVERT_MIN_FILE_SIZE
-        setFileSourceNameW(op);
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        else
-            return TRUE;
-    }
-
-    case atChangeAttrs:
-    {
-        op.Opcode = ocChangeAttrs;
-        op.OpFlags = 0;
-        op.Attr = sourceFileAttr;
-        // compression: zero/small files take at least as long as files of size COMPRESS_ENCRYPT_MIN_FILE_SIZE
-        op.Size = (attrsData->ChangeCompression || attrsData->ChangeEncryption) ? max(fileSizeLoc, COMPRESS_ENCRYPT_MIN_FILE_SIZE) : CHATTRS_FILE_SIZE;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        setFileSourceNameW(op);
-        op.TargetName = (char*)(DWORD_PTR)((op.GetSourceAttributes() & attrsData->AttrAnd) | attrsData->AttrOr);
-        op.OwnsTargetName = false;  // TargetName stores attributes, not a pointer
-        script->Add(op);
-        if (!script->IsGood())
-        {
-            script->ResetState();
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        else
-            return TRUE;
-    }
-
-    case atChangeCase:
-    {
-        op.Opcode = ocMoveFile;
-        op.FileSize = fileSizeLoc;
-        op.OpFlags = 0;
-        op.Size = MOVE_FILE_SIZE;
-        op.Attr = sourceFileAttr;
-        BOOL skip;
-        if ((op.SourceName = BuildName(sourcePath, fileName, NULL, &skip,
-                                       &bsState.ErrTooLongNameSkipAll, sourcePath)) == NULL)
-        {
-            return skip;
-        }
-        if ((op.TargetName = BuildName(sourcePath, fileName)) == NULL) // if the name is too long, it will manifest already at this earlier condition
-        {
-            free(op.SourceName);
-            op.SourceName = NULL;
-            return FALSE;
-        }
-        int offset = (int)strlen(op.SourceName) - (int)strlen(fileName);
-        AlterFileName(op.TargetName + offset, op.SourceName + offset, -1,
-                      chCaseData->FileNameFormat, chCaseData->Change, FALSE);
-        BOOL sameName = strcmp(op.SourceName + offset, op.TargetName + offset) == 0;
-        if (!sameName)
-        {
-            setFileSourceNameW(op);
-            if (!effectiveFileNameW.empty())
-            {
-                std::wstring alteredW = AlterFileNameW(effectiveFileNameW.c_str(), chCaseData->FileNameFormat, chCaseData->Change, FALSE);
-                setFileTargetNameW(op, alteredW);
-            }
-            script->Add(op);
-        }
-        if (sameName || !script->IsGood())
-        {
-            free(op.SourceName);
-            op.SourceName = NULL;
-            free(op.TargetName);
-            op.TargetName = NULL;
-            if (!script->IsGood())
-                script->ResetState();
-            return sameName;
-        }
-        else
-            return TRUE;
-    }
-    }
-    return FALSE; // cannot do anything else
 }
 
 void CFilesWindow::CalculateDirSizes()
@@ -4057,10 +2319,13 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     }
 
     //---  get the full long name
-    CPathBuffer dcFileName; // ZIP: name for disk cache (heap-allocated for long path support)
+    std::wstring dcFileName = sally::text::Fold(GetZIPArchive());
     CFileData* f = &Files->At(index - Dirs->Count);
 
-    if (!SalIsValidFileNameComponent(f->Name))
+    // Validate the wide name. Asking the ANSI validator about the mirror meant every
+    // non-ANSI entry in an archive was reported as having an invalid name, because the
+    // '?' the mirror is made of is itself one of the rejected characters (audit C5).
+    if (!SalIsValidFileNameComponentW(f->Name))
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNABLETOEDITINVFILES));
         return;
@@ -4073,8 +2338,10 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
         if (index != j) // do not compare the same item
         {
             CFileData* f2 = j < Dirs->Count ? &Dirs->At(j) : &Files->At(j - Dirs->Count);
+            // StrNICmp is wide and Name is the only name, so this compare IS
+            // the wide truth; the PanelItemWideNamesAgree confirmation it used to carry is gone.
             if (f2->NameLen == f->NameLen &&
-                StrNICmp(f->Name, f2->Name, f2->NameLen) == 0)
+                StrNICmpW(f->Name, f2->Name, f2->NameLen) == 0)
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNABLETOEDITDUPFILES));
                 return;
@@ -4082,13 +2349,11 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
         }
     }
 
-    StrICpy(dcFileName, GetZIPArchive()); // the archive file name should be compared case-insensitively (Windows file system), so we always convert it to lowercase
-    SalPathAppend(dcFileName, GetZIPPath(), 2 * MAX_PATH);
-    SalPathAppend(dcFileName, f->Name, 2 * MAX_PATH);
+    SalPathAppendW(dcFileName, GetZIPPath());
+    SalPathAppendW(dcFileName, f->Name);
 
     // disk-cache settings for the plugin (default values change only for plugins)
-    CPathBuffer arcCacheTmpPath; // Heap-allocated for long path support
-    arcCacheTmpPath[0] = 0;
+    std::wstring arcCacheTmpPath;
     BOOL arcCacheOwnDelete = FALSE;
     BOOL arcCacheCacheCopies = TRUE;
     CPluginInterfaceAbstract* plugin = NULL; // != NULL if the plugin deletes files on its own
@@ -4115,31 +2380,25 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
     DWORD attr = -1;
     memset(&lastWrite, 0, sizeof(lastWrite));
     int errorCode;
-    char* name = (char*)DiskCache.GetName(dcFileName, f->Name, &exists, FALSE,
-                                          arcCacheTmpPath[0] != 0 ? arcCacheTmpPath.Get() : NULL,
-                                          plugin != NULL, plugin, &errorCode);
+    const wchar_t* name = DiskCache.GetName(dcFileName.c_str(), f->Name, &exists, FALSE,
+                                            !arcCacheTmpPath.empty() ? arcCacheTmpPath.c_str() : NULL,
+                                            plugin != NULL, plugin, &errorCode);
     if (name == NULL)
     {
-        if (errorCode == DCGNE_TOOLONGNAME)
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_UNPACKTOOLONGNAME));
-        }
         return;
     }
-    char dosName[14];
+    WCHAR dosName[14];
     dosName[0] = 0;
     WIN32_FIND_DATAW data;
     if (!exists) // we must unpack it
     {
-        char* backSlash = strrchr(name, '\\');
-        CPathBuffer tmpPath; // Heap-allocated for long path support
-        memcpy(tmpPath, name, backSlash - name);
-        tmpPath[backSlash - name] = 0;
+        const wchar_t* backSlash = wcsrchr(name, L'\\');
+        const std::wstring tmpPath(name, backSlash);
         BeginStopRefresh(); // the snooper can take a break
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
         HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
         if (PackUnpackOneFile(this, GetZIPArchive(), PluginData.GetInterface(),
-                              dcFileName + strlen(GetZIPArchive()) + 1, f, tmpPath,
+                              dcFileName.c_str() + wcslen(GetZIPArchive()) + 1, f, tmpPath.c_str(),
                               NULL, NULL))
         {
             SetCursor(oldCur);
@@ -4148,34 +2407,33 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             HANDLE find = SalFindFirstFileHW(name, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
-                HANDLES(FindClose(find));
+                gFileSystem->CloseFind(find);
                 fileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh);
                 lastWrite = data.ftLastWriteTime;
                 attr = data.dwFileAttributes;
                 if (data.cAlternateFileName[0] != 0)
-                    WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, dosName, 14, NULL, NULL);
+                    lstrcpynW(dosName, data.cAlternateFileName, 14);
             }
 
-            DiskCache.NamePrepared(dcFileName, fileSize);
+            DiskCache.NamePrepared(dcFileName.c_str(), fileSize);
             EndStopRefresh(); // the snooper resumes now
         }
         else
         {
             SetCursor(oldCur);
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-            DiskCache.ReleaseName(dcFileName, FALSE); // not unpacked, nothing to cache
+            DiskCache.ReleaseName(dcFileName.c_str(), FALSE); // not unpacked, nothing to cache
             EndStopRefresh();                         // the snooperresumes now
             return;
         }
     }
 
     // split the full file name into path (buf) and name (s)
-    CPathBuffer buf; // Heap-allocated for long path support
-    char* s = strrchr(name, '\\');
+    std::wstring buf;
+    const wchar_t* s = wcsrchr(name, L'\\');
     if (s != NULL)
     {
-        memcpy(buf, name, s - name);
-        buf[s - name] = 0;
+        buf.assign(name, s);
         s++;
     }
 
@@ -4195,7 +2453,7 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
         {
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             MainWindow->SetDefaultDirectories();
-            ExecuteAssociation(GetListBoxHWND(), buf, s);
+            ExecuteAssociationW(GetListBoxHWND(), buf.c_str(), s);
             SetCursor(oldCur);
         }
     }
@@ -4205,22 +2463,24 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
         HANDLE find = SalFindFirstFileHW(name, &data);
         if (find != INVALID_HANDLE_VALUE)
         {
-            HANDLES(FindClose(find));
+            gFileSystem->CloseFind(find);
             fileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh);
             lastWrite = data.ftLastWriteTime;
             attr = data.dwFileAttributes;
             if (data.cAlternateFileName[0] != 0)
-                WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, dosName, 14, NULL, NULL);
+                lstrcpynW(dosName, data.cAlternateFileName, 14);
         }
     }
 
-    if (UnpackedAssocFiles.AddFile(GetZIPArchive(), GetZIPPath(), buf, s, dosName, lastWrite, fileSize, attr))
+    // The trailing f->NameW argument is gone with CFileTimeStampsItem's wide
+    // twin: 's' is CDiskCache::GetName's tmpName leaf verbatim, so it is already the wide name.
+    if (UnpackedAssocFiles.AddFile(GetZIPArchive(), GetZIPPath(), buf.c_str(), s, dosName, lastWrite, fileSize, attr))
     {                                                                         // this file doesn't have the disk-cache 'lock' object ExecuteAssocEvent yet
-        DiskCache.AssignName(dcFileName, ExecuteAssocEvent, FALSE, crtCache); // arcCacheCacheCopies has no effect – caching is done until the archive is closed, we won't unpack earlier
+        DiskCache.AssignName(dcFileName.c_str(), ExecuteAssocEvent, FALSE, crtCache); // arcCacheCacheCopies has no effect – caching is done until the archive is closed, we won't unpack earlier
     }
     else
     { // it is unnecessary to add the same 'lock' object to a tmp file
-        DiskCache.ReleaseName(dcFileName, FALSE);
+        DiskCache.ReleaseName(dcFileName.c_str(), FALSE);
     }
     AssocUsed = TRUE;
 }

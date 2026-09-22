@@ -4,6 +4,23 @@
 
 #include "precomp.h"
 
+static std::wstring ExpandPluralWide(int resID, int parametersCount,
+                                     const CQuadWord* parameters)
+{
+    const std::wstring format = SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID).c_str();
+    return SPLExpandPluralStringOwned(SalamanderGeneral, format.c_str(),
+                                      parametersCount, parameters);
+}
+
+static void AppendOperationStatus(std::wstring& status, std::wstring_view addition)
+{
+    if (addition.empty())
+        return;
+    if (!status.empty())
+        status.append(L", ");
+    status.append(addition);
+}
+
 //
 // ****************************************************************************
 // COperationDlg
@@ -54,9 +71,9 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
         const char* Shell32DLLName = "shell32.dll";
         HINSTANCE iconsDLL;
         if (WindowsVistaAndLater)
-            iconsDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+            iconsDLL = HANDLES(LoadLibraryExA("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
         else
-            iconsDLL = HANDLES(LoadLibraryEx(Shell32DLLName, NULL, LOAD_LIBRARY_AS_DATAFILE));
+            iconsDLL = HANDLES(LoadLibraryExA(Shell32DLLName, NULL, LOAD_LIBRARY_AS_DATAFILE));
         BOOL err = FALSE;
         if (iconsDLL != NULL)
         {
@@ -88,7 +105,7 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
 
     SimpleLook = TRUE;
 
-    TitleText = NULL;
+    TitleText.clear();
 
     IsDirtyStatus = FALSE;
     IsDirtyProgress = FALSE;
@@ -190,9 +207,9 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
 
     PauseButtonIsEnabled = TRUE;
     PauseButtonIsResume = FALSE;
-    PauseButtonPauseText[0] = 0; // filled in WM_INITDIALOG
+    PauseButtonPauseText.clear(); // filled in WM_INITDIALOG
     ConPauseButtonIsResume = FALSE;
-    ConPauseButtonPauseText[0] = 0; // filled in WM_INITDIALOG
+    ConPauseButtonPauseText.clear(); // filled in WM_INITDIALOG
 }
 
 COperationDlg::~COperationDlg()
@@ -208,8 +225,6 @@ COperationDlg::~COperationDlg()
         ImageList_Destroy(ConsImageList);
     if (ItemsImageList != NULL)
         ImageList_Destroy(ItemsImageList);
-    if (TitleText != NULL)
-        SalamanderGeneral->Free(TitleText);
 }
 
 void COperationDlg::ShowControlsAndChangeSize(BOOL simple)
@@ -270,32 +285,39 @@ void COperationDlg::ShowControlsAndChangeSize(BOOL simple)
     }
 }
 
-void COperationDlg::SetDlgTitle(int progressValue, const char* state)
+void COperationDlg::SetDlgTitle(int progressValue, const wchar_t* state)
 {
-    if (TitleText != NULL)
+    if (!TitleText.empty())
     {
-        char txt[500];
-        char txt2[500];
-        char* text = txt;
-        if (progressValue != -1)
+        try
         {
-            _snprintf_s(txt, _TRUNCATE, "(%d %%) %s", (int)((progressValue /*+ 5*/) / 10), TitleText); // do not round (100% must appear only at 100%, not at 99.5%)
-        }
-        else
-        {
-            if (state != NULL)
-                _snprintf_s(txt, _TRUNCATE, "(%s) %s", state, TitleText);
+            std::wstring text;
+            if (progressValue != -1)
+            {
+                // Do not round: 100% must appear only at 100%, not at 99.5%.
+                text = SPLFormatStringOwned(L"(%d %%) %s",
+                                            (int)((progressValue /*+ 5*/) / 10),
+                                            TitleText.c_str());
+            }
             else
-                text = TitleText; // progress unknown, status also unknown (shows plain title)
+            {
+                text = state != NULL
+                           ? SPLFormatStringOwned(L"(%s) %s", state, TitleText.c_str())
+                           : TitleText;
+            }
+            if (SPLGetWindowTextOwned(HWindow) != text)
+            {
+                SetWindowTextW(HWindow, text.c_str());
+                HWND foreground = GetForegroundWindow();
+                while (foreground != HWindow && (foreground = ::GetParent(foreground)) != NULL)
+                    ;
+                if (foreground != HWindow && CurrentFlashWnd != NULL)
+                    FlashWindow(CurrentFlashWnd, TRUE); // changing the title cancels flashing, so enable it again
+            }
         }
-        if (!GetWindowText(HWindow, txt2, 500) || strcmp(text, txt2) != 0)
+        catch (...)
         {
-            SetWindowText(HWindow, text);
-            HWND foreground = GetForegroundWindow();
-            while (foreground != HWindow && (foreground = ::GetParent(foreground)) != NULL)
-                ;
-            if (foreground != HWindow && CurrentFlashWnd != NULL)
-                FlashWindow(CurrentFlashWnd, TRUE); // changing the title cancels flashing, so enable it again
+            // Keep the last complete title on allocation failure.
         }
     }
 }
@@ -312,7 +334,9 @@ void COperationDlg::ScheduleDelayedUpdate()
 
 BOOL COperationDlg::UpdateDataInDialog()
 {
-    BOOL reportProgressChange = TRUE;
+    try
+    {
+        BOOL reportProgressChange = TRUE;
     int workerID = -1;
     if (IsDirtyConsListView) // find out what actually changed
         workerID = Oper->GetChangedWorker(&reportProgressChange);
@@ -344,10 +368,8 @@ BOOL COperationDlg::UpdateDataInDialog()
         IsDirtyProgress = FALSE;
 
         int progressValue = -1;
-        char statusText[300];
-        statusText[0] = 0;
-        char timeLeftText[100];
-        timeLeftText[0] = 0;
+        std::wstring statusText;
+        std::wstring timeLeftText;
         CQuadWord transferred(0, 0);
         CQuadWord total(0, 0);
         CQuadWord waiting(0, 0);
@@ -391,9 +413,10 @@ BOOL COperationDlg::UpdateDataInDialog()
             (doneOrSkippedCount != DisplayedDoneOrSkippedCount ||
              totalCount != DisplayedTotalCount))
         {
-            char buf[200];
-            _snprintf_s(buf, _TRUNCATE, "%s (%d / %d)", OperationsTextOrig.c_str(), doneOrSkippedCount, totalCount);
-            SetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf);
+            const std::wstring operationsText =
+                SPLFormatStringOwned(L"%s (%d / %d)", OperationsTextOrig.c_str(),
+                                     doneOrSkippedCount, totalCount);
+            SetWindowTextW(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), operationsText.c_str());
             DisplayedDoneOrSkippedCount = doneOrSkippedCount;
             DisplayedTotalCount = totalCount;
         }
@@ -402,43 +425,29 @@ BOOL COperationDlg::UpdateDataInDialog()
         if (operState == opstInProgress) // verify there is at least one worker not paused; otherwise the operation is not actually running
             reallyInProgress = !WorkersList->EmptyOrAllShouldStop() && !PauseButtonIsResume && PauseButtonIsEnabled;
 
-        char num1[100];
-        char num2[100];
+        std::wstring num1;
+        std::wstring num2;
         if (operType == fotDelete || operType == fotChangeAttrs)
         {
             if (doneOrSkippedCount != 0 || totalCount != 0)
             {
                 CQuadWord param(totalCount, 0);
-                SalamanderGeneral->ExpandPluralString(num2, 100, LoadStr(IDS_OPERDLGSTATUS3), 1, &param);
-                _snprintf_s(statusText, _TRUNCATE, num2, doneOrSkippedCount, totalCount);
+                const std::wstring plural = ExpandPluralWide(IDS_OPERDLGSTATUS3, 1, &param);
+                statusText = SPLFormatStringOwned(plural.c_str(), doneOrSkippedCount, totalCount);
             }
             if (errorsCount > 0)
             {
                 CQuadWord param(errorsCount, 0);
-                SalamanderGeneral->ExpandPluralString(num2, 100, LoadStr(IDS_OPERDLGSTATUS5), 1, &param);
-                _snprintf_s(num1, _TRUNCATE, num2, errorsCount);
-
-                int statusTextLen = (int)strlen(statusText);
-                if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                {
-                    statusText[statusTextLen++] = ',';
-                    statusText[statusTextLen++] = ' ';
-                }
-                lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                const std::wstring plural = ExpandPluralWide(IDS_OPERDLGSTATUS5, 1, &param);
+                num1 = SPLFormatStringOwned(plural.c_str(), errorsCount);
+                AppendOperationStatus(statusText, num1);
             }
             if (unknownSizeCount != 0)
             {
                 CQuadWord param(unknownSizeCount, 0);
-                SalamanderGeneral->ExpandPluralString(num2, 100, LoadStr(IDS_OPERDLGSTATUS4), 1, &param);
-                _snprintf_s(num1, _TRUNCATE, num2, unknownSizeCount);
-
-                int statusTextLen = (int)strlen(statusText);
-                if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                {
-                    statusText[statusTextLen++] = ',';
-                    statusText[statusTextLen++] = ' ';
-                }
-                lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                const std::wstring plural = ExpandPluralWide(IDS_OPERDLGSTATUS4, 1, &param);
+                num1 = SPLFormatStringOwned(plural.c_str(), unknownSizeCount);
+                AppendOperationStatus(statusText, num1);
             }
             if (reallyInProgress) // show status only for a running operation
             {
@@ -475,20 +484,18 @@ BOOL COperationDlg::UpdateDataInDialog()
                         while (expon--)
                             dif *= 60;
                         secs = ((secs + dif / 2) / dif) * dif; // round 'secs' to 'dif' seconds
-                        SalamanderGeneral->PrintTimeLeft(timeLeftText, CQuadWord(secs, 0));
+                        timeLeftText = SPLPrintTimeLeftOwned(SalamanderGeneral, CQuadWord(secs, 0));
                         LastTimeEstimation = secs;
                     }
 
                     if (transferIdleTime > 30)
                     {
-                        int statusTextLen = (int)strlen(statusText);
-                        if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                        {
-                            statusText[statusTextLen++] = ',';
-                            statusText[statusTextLen++] = ' ';
-                        }
-                        SalamanderGeneral->PrintTimeLeft(num1, CQuadWord(transferIdleTime, 0));
-                        _snprintf_s(statusText + statusTextLen, 300 - statusTextLen, _TRUNCATE, LoadStr(IDS_OPERDLGCONNECTIONSIDLE2), num1);
+                        num1 = SPLPrintTimeLeftOwned(SalamanderGeneral,
+                                                     CQuadWord(transferIdleTime, 0));
+                        AppendOperationStatus(
+                            statusText,
+                            SPLFormatStringOwned(LangStr(IDS_OPERDLGCONNECTIONSIDLE2).c_str(),
+                                                 num1.c_str()));
                     }
                 }
                 //        else progressValue = -1;  // commented out because Pause/Resume resets progress to a nonsensical value
@@ -501,42 +508,29 @@ BOOL COperationDlg::UpdateDataInDialog()
             {
                 if (total != CQuadWord(0, 0) || transferred != CQuadWord(0, 0))
                 {
-                    SalamanderGeneral->PrintDiskSize(num1, transferred, 0);
+                    num1 = SPLPrintDiskSizeOwned(SalamanderGeneral, transferred, 0);
                     if (total != CQuadWord(0, 0))
                     {
-                        SalamanderGeneral->PrintDiskSize(num2, total, 0);
-                        _snprintf_s(statusText, _TRUNCATE, LoadStr(IDS_OPERDLGSTATUS2), num1, num2);
+                        num2 = SPLPrintDiskSizeOwned(SalamanderGeneral, total, 0);
+                        statusText = SPLFormatStringOwned(LangStr(IDS_OPERDLGSTATUS2).c_str(),
+                                                          num1.c_str(), num2.c_str());
                     }
                     else
-                        lstrcpyn(statusText, num1, 300);
+                        statusText = num1;
                 }
                 if (errorsCount > 0)
                 {
                     CQuadWord param(errorsCount, 0);
-                    SalamanderGeneral->ExpandPluralString(num2, 100, LoadStr(IDS_OPERDLGSTATUS5), 1, &param);
-                    _snprintf_s(num1, _TRUNCATE, num2, errorsCount);
-
-                    int statusTextLen = (int)strlen(statusText);
-                    if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                    {
-                        statusText[statusTextLen++] = ',';
-                        statusText[statusTextLen++] = ' ';
-                    }
-                    lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                    const std::wstring plural = ExpandPluralWide(IDS_OPERDLGSTATUS5, 1, &param);
+                    num1 = SPLFormatStringOwned(plural.c_str(), errorsCount);
+                    AppendOperationStatus(statusText, num1);
                 }
                 if (unknownSizeCount != 0)
                 {
                     CQuadWord param(unknownSizeCount, 0);
-                    SalamanderGeneral->ExpandPluralString(num2, 100, LoadStr(IDS_OPERDLGSTATUS4), 1, &param);
-                    _snprintf_s(num1, _TRUNCATE, num2, unknownSizeCount);
-
-                    int statusTextLen = (int)strlen(statusText);
-                    if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                    {
-                        statusText[statusTextLen++] = ',';
-                        statusText[statusTextLen++] = ' ';
-                    }
-                    lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                    const std::wstring plural = ExpandPluralWide(IDS_OPERDLGSTATUS4, 1, &param);
+                    num1 = SPLFormatStringOwned(plural.c_str(), unknownSizeCount);
+                    AppendOperationStatus(statusText, num1);
                 }
                 if (reallyInProgress) // show status only for a running operation
                 {
@@ -573,60 +567,62 @@ BOOL COperationDlg::UpdateDataInDialog()
                             while (expon--)
                                 dif *= CQuadWord(60, 0);
                             secs = ((secs + dif / CQuadWord(2, 0)) / dif) * dif; // round 'secs' to 'dif' seconds
-                            SalamanderGeneral->PrintTimeLeft(timeLeftText, secs);
+                            timeLeftText = SPLPrintTimeLeftOwned(SalamanderGeneral, secs);
                             LastTimeEstimation = (int)secs.Value;
                         }
 
-                        int statusTextLen = (int)strlen(statusText);
-                        if (statusTextLen > 0 && statusTextLen + 2 < 300)
-                        {
-                            statusText[statusTextLen++] = ',';
-                            statusText[statusTextLen++] = ' ';
-                        }
                         if (transferIdleTime <= 30)
                         {
-                            SalamanderGeneral->PrintDiskSize(num1, CQuadWord(speed, 0), 0);
-                            _snprintf_s(statusText + statusTextLen, 300 - statusTextLen, _TRUNCATE, LoadStr(IDS_OPERDLGSTATUS1), num1);
+                            num1 = SPLPrintDiskSizeOwned(SalamanderGeneral,
+                                                         CQuadWord(speed, 0), 0);
+                            AppendOperationStatus(
+                                statusText,
+                                SPLFormatStringOwned(LangStr(IDS_OPERDLGSTATUS1).c_str(),
+                                                     num1.c_str()));
                         }
                         else
                         {
-                            SalamanderGeneral->PrintTimeLeft(num1, CQuadWord(transferIdleTime, 0));
-                            _snprintf_s(statusText + statusTextLen, 300 - statusTextLen, _TRUNCATE, LoadStr(IDS_OPERDLGCONNECTIONSIDLE), num1);
+                            num1 = SPLPrintTimeLeftOwned(SalamanderGeneral,
+                                                         CQuadWord(transferIdleTime, 0));
+                            AppendOperationStatus(
+                                statusText,
+                                SPLFormatStringOwned(LangStr(IDS_OPERDLGCONNECTIONSIDLE).c_str(),
+                                                     num1.c_str()));
                         }
                     }
                 }
             }
         }
 
-        Status->SetText(statusText);
+        Status->SetText(statusText.c_str());
 
-        if (timeLeftText[0] == 0)
+        if (timeLeftText.empty())
         {
             switch (operState)
             {
             case opstInProgress:
             {
                 if (reallyInProgress || !WorkersList->EmptyOrAllShouldStop())
-                    lstrcpyn(timeLeftText, LoadStr(reallyInProgress ? IDS_LISTWNDESTIMTIMEUNKNOWN : IDS_OPERDLGTIMLEFTWAIT), 100);
+                    timeLeftText = LangStr(reallyInProgress ? IDS_LISTWNDESTIMTIMEUNKNOWN : IDS_OPERDLGTIMLEFTWAIT);
                 break;
             }
 
             case opstFinishedWithSkips:
             case opstSuccessfullyFinished:
-                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGTIMLEFTDONE), 100);
+                timeLeftText = LangStr(IDS_OPERDLGTIMLEFTDONE);
                 break;
             case opstFinishedWithErrors:
-                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGTIMLEFTWAIT), 100);
+                timeLeftText = LangStr(IDS_OPERDLGTIMLEFTWAIT);
                 break;
             }
             LastTimeEstimation = -1;
         }
-        TimeLeft->SetText(timeLeftText);
+        TimeLeft->SetText(timeLeftText.c_str());
 
-        char elapsedTime[100];
         DWORD elapsedSecs = Oper->GetElapsedSeconds();
-        SalamanderGeneral->PrintTimeLeft(elapsedTime, CQuadWord(elapsedSecs, 0));
-        ElapsedTime->SetText(elapsedTime);
+        const std::wstring elapsedTime =
+            SPLPrintTimeLeftOwned(SalamanderGeneral, CQuadWord(elapsedSecs, 0));
+        ElapsedTime->SetText(elapsedTime.c_str());
 
         if (progressValue > 1000)
         {
@@ -642,14 +638,14 @@ BOOL COperationDlg::UpdateDataInDialog()
         {
             if (progressValue == -1)
             {
-                num1[0] = 0;
+                num1.clear();
                 if ((operType == fotCopyDownload || operType == fotMoveDownload ||
                      operType == fotCopyUpload || operType == fotMoveUpload) &&
                     transferred > CQuadWord(0, 0))
                 {
-                    SalamanderGeneral->PrintDiskSize(num1, transferred, 0);
+                    num1 = SPLPrintDiskSizeOwned(SalamanderGeneral, transferred, 0);
                 }
-                SetDlgTitle(-1, num1[0] != 0 ? num1 : NULL);
+                SetDlgTitle(-1, num1.empty() ? NULL : num1.c_str());
             }
             else
                 SetDlgTitle(progressValue, NULL);
@@ -661,24 +657,23 @@ BOOL COperationDlg::UpdateDataInDialog()
         }
         else
         {
-            const char* progressTxt = "";
+            std::wstring progressText;
             if (operState == opstFinishedWithErrors)
-                SetDlgTitle(-1, (progressTxt = LoadStr(IDS_OPERDLGTITLE_ERRORS)));
+                progressText = LangStr(IDS_OPERDLGTITLE_ERRORS);
             else
             {
                 if (operState == opstSuccessfullyFinished || operState == opstFinishedWithSkips)
-                    SetDlgTitle(-1, (progressTxt = LoadStr(IDS_OPERDLGTITLE_DONE)));
+                    progressText = LangStr(IDS_OPERDLGTITLE_DONE);
                 else
-                {
-                    SetDlgTitle(-1, (progressTxt = LoadStr(WorkersList->EmptyOrAllShouldStop() ? IDS_OPERDLGTITLE_STOPPED : WorkersList->AtLeastOneWorkerIsWaitingForUser() ? IDS_OPERDLGTITLE_WAITING
-                                                                                                                                                                            : IDS_OPERDLGTITLE_PAUSED))); // not finished, but no workers are added, so the operation is not running...
-                }
+                    progressText = LangStr(WorkersList->EmptyOrAllShouldStop() ? IDS_OPERDLGTITLE_STOPPED : WorkersList->AtLeastOneWorkerIsWaitingForUser() ? IDS_OPERDLGTITLE_WAITING
+                                                                                                                                                          : IDS_OPERDLGTITLE_PAUSED); // not finished, but no workers are added, so the operation is not running...
             }
+            SetDlgTitle(-1, progressText.c_str());
             if ((int)ProgressValue < 0)
             {
                 if (ProgressValue == -1)
                     Progress->Stop(); // stop the progress animation immediately
-                Progress->SetProgress(0, progressTxt);
+                Progress->SetProgress(0, progressText.c_str());
                 progressValue = -2;
             }
             else
@@ -731,20 +726,27 @@ BOOL COperationDlg::UpdateDataInDialog()
     }
     if (listsChange)
         EnableErrorsButton();
-    return change;
+        return change;
+    }
+    catch (...)
+    {
+        TRACE_E("COperationDlg::UpdateDataInDialog(): unable to compose dynamic status text");
+        return FALSE;
+    }
 }
 
 void COperationDlg::InitColumns()
 {
     CALL_STACK_MESSAGE1("COperationDlg::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[3] = {IDS_OPERDLGCONS_ID, IDS_OPERDLGCONS_ACTION, IDS_OPERDLGCONS_STATUS};
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
     lvc.fmt = LVCFMT_LEFT;
     int i;
     for (i = 0; i < 3; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        const std::wstring headerTextW = std::wstring(LangStr(header[i]).c_str());
+        lvc.pszText = const_cast<LPWSTR>(headerTextW.c_str());
         lvc.iSubItem = i;
         ListView_InsertColumn(ConsListView, i, &lvc);
     }
@@ -752,7 +754,8 @@ void COperationDlg::InitColumns()
     int j;
     for (j = 0; j < 2; j++) // create columns
     {
-        lvc.pszText = LoadStr(header2[j]);
+        const std::wstring header2TextW = std::wstring(LangStr(header2[j]).c_str());
+        lvc.pszText = const_cast<LPWSTR>(header2TextW.c_str());
         lvc.iSubItem = j;
         ListView_InsertColumn(ItemsListView, j, &lvc);
     }
@@ -1009,7 +1012,8 @@ void COperationDlg::EnablePauseButton()
     if (PauseButtonIsResume != showResume)
     {
         PauseButtonIsResume = showResume;
-        SetWindowText(button, PauseButtonIsResume ? LoadStr(IDS_OPERDLGRESUMEBUTTON) : PauseButtonPauseText);
+        SetWindowTextW(button, PauseButtonIsResume ? LangStr(IDS_OPERDLGRESUMEBUTTON).c_str()
+                                                   : PauseButtonPauseText.c_str());
     }
     PauseButtonIsEnabled = someIsWorking;
     if ((IsWindowEnabled(button) != 0) != someIsWorking)
@@ -1045,7 +1049,8 @@ void COperationDlg::EnablePauseConButton(int index)
     if (ConPauseButtonIsResume != showResume)
     {
         ConPauseButtonIsResume = showResume;
-        SetWindowText(button, ConPauseButtonIsResume ? LoadStr(IDS_OPERDLGRESUMECONBUTTON) : ConPauseButtonPauseText);
+        SetWindowTextW(button, ConPauseButtonIsResume ? LangStr(IDS_OPERDLGRESUMECONBUTTON).c_str()
+                                                      : ConPauseButtonPauseText.c_str());
     }
     if ((IsWindowEnabled(button) != 0) != isWorking)
     {
@@ -1088,18 +1093,23 @@ void COperationDlg::EnableRetryItem(int index)
 
 void COperationDlg::ToggleSimpleLook()
 {
-    char text[100];
-    GetDlgItemText(HWindow, IDB_SHOWDETAILS, text, 100);
-    SimpleLook = !SimpleLook;
-    char c = SimpleLook ? '>' : '<';
-    int len = (int)strlen(text);
-    if (len >= 2)
+    try
     {
-        text[len - 1] = c;
-        text[len - 2] = c;
+        std::wstring text = SPLGetDlgItemTextOwned(HWindow, IDB_SHOWDETAILS);
+        SimpleLook = !SimpleLook;
+        const wchar_t c = SimpleLook ? L'>' : L'<';
+        if (text.size() >= 2)
+        {
+            text[text.size() - 1] = c;
+            text[text.size() - 2] = c;
+        }
+        SetDlgItemTextW(HWindow, IDB_SHOWDETAILS, text.c_str());
+        ShowControlsAndChangeSize(SimpleLook);
     }
-    SetDlgItemText(HWindow, IDB_SHOWDETAILS, text);
-    ShowControlsAndChangeSize(SimpleLook);
+    catch (...)
+    {
+        // Leave the current presentation unchanged on allocation failure.
+    }
 }
 
 void COperationDlg::LayoutDialog(BOOL showSizeBox)
@@ -1250,21 +1260,21 @@ void COperationDlg::SetShowLowDiskWarning(BOOL show)
 void COperationDlg::SolveErrorOnConnection(int index)
 {
     int workerID = WorkersList->GetWorkerID(index);
-    char errBuf[FTPWORKER_ERRDESCR_BUFSIZE];
+    std::wstring errorText;
     CCertificate* unverifiedCertificate;
-    if (WorkersList->GetErrorDescr(index, errBuf, FTPWORKER_ERRDESCR_BUFSIZE, &unverifiedCertificate))
+    if (WorkersList->GetErrorDescr(index, errorText, &unverifiedCertificate))
     {
         if (unverifiedCertificate != NULL) // SSL: the server certificate changed and the new one cannot be verified by a trusted certificate authority, so ask the user whether to trust it
         {
-            char errBuf2[300];
-            if (!unverifiedCertificate->CheckCertificate(errBuf2, 300)) // revalidate the certificate and obtain the corresponding error message
+            std::wstring certificateError;
+            if (!unverifiedCertificate->CheckCertificate(certificateError)) // revalidate the certificate and obtain the corresponding error message
             {
                 INT_PTR dlgRes;
                 do
                 {
                     CurrentFlashWnd = SalamanderGeneral->GetWndToFlash(HWindow);
                     DlgWillCloseIfOpFinWithSkips = FALSE;
-                    dlgRes = CCertificateErrDialog(HWindow, errBuf2).Execute();
+                    dlgRes = CCertificateErrDialog(HWindow, certificateError.c_str()).Execute();
                     DlgWillCloseIfOpFinWithSkips = (IsDlgButtonChecked(HWindow, IDC_OPCLOSEWINWHENDONE) == BST_CHECKED);
                     if (CurrentFlashWnd != NULL)
                     {
@@ -1309,7 +1319,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
                         }
                         else
                         {
-                            if (unverifiedCertificate->CheckCertificate(errBuf2, 300))
+                            if (unverifiedCertificate->CheckCertificate(certificateError))
                             {                // the server certificate is already trusted (the user probably imported it manually)
                                 dlgRes = -1; // just to avoid looping
                                 unverifiedCertificate->SetVerified(true);
@@ -1340,14 +1350,25 @@ void COperationDlg::SolveErrorOnConnection(int index)
             BOOL retryLoginWithoutAsking;
             BOOL proxyUsed;
             CProxyScriptParams proxyScriptParams;
-            Oper->GetLoginErrorDlgInfo(proxyScriptParams.User, USER_MAX_SIZE,
-                                       proxyScriptParams.Password, PASSWORD_MAX_SIZE,
-                                       proxyScriptParams.Account, ACCOUNT_MAX_SIZE,
-                                       &retryLoginWithoutAsking,
-                                       &proxyUsed, proxyScriptParams.ProxyUser, USER_MAX_SIZE,
-                                       proxyScriptParams.ProxyPassword, PASSWORD_MAX_SIZE);
-            CLoginErrorDlg dlg(HWindow, errBuf, &proxyScriptParams, LoadStr(IDS_SOLVEERRSUBJECT),
-                               NULL, LoadStr(IDS_SOLVEERRRETRY), LoadStr(IDS_SOLVEERRREPLY),
+            if (!Oper->GetLoginErrorDlgInfo(proxyScriptParams.User,
+                                            proxyScriptParams.Password,
+                                            proxyScriptParams.Account,
+                                            &retryLoginWithoutAsking,
+                                            &proxyUsed, proxyScriptParams.ProxyUser,
+                                            proxyScriptParams.ProxyPassword))
+            {
+                SalamanderGeneral->SalMessageBox(
+                    HWindow, LangStr(IDS_OPERDOPPR_LOWMEM).c_str(),
+                    LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+                return;
+            }
+            // 'dlg' outlives this statement (Execute() runs below), so the wide strings it
+            // borrows must too - named locals, not inline temporaries.
+            std::wstring solveErrSubjectW = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SOLVEERRSUBJECT).c_str();
+            std::wstring solveErrRetryW = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SOLVEERRRETRY).c_str();
+            std::wstring solveErrReplyW = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SOLVEERRREPLY).c_str();
+            CLoginErrorDlg dlg(HWindow, errorText.c_str(), &proxyScriptParams, solveErrSubjectW.c_str(),
+                               NULL, solveErrRetryW.c_str(), solveErrReplyW.c_str(),
                                TRUE, FALSE, proxyUsed);
             dlg.RetryWithoutAsking = retryLoginWithoutAsking;
             CurrentFlashWnd = SalamanderGeneral->GetWndToFlash(HWindow);
@@ -1362,8 +1383,11 @@ void COperationDlg::SolveErrorOnConnection(int index)
             if (res == IDOK)
             {
                 LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
-                Oper->SetLoginErrorDlgInfo(proxyScriptParams.Password, proxyScriptParams.Account, dlg.RetryWithoutAsking,
-                                           proxyUsed, proxyScriptParams.ProxyUser, proxyScriptParams.ProxyPassword);
+                if (!Oper->SetLoginErrorDlgInfo(proxyScriptParams.Password.c_str(),
+                                                proxyScriptParams.Account.c_str(), dlg.RetryWithoutAsking,
+                                                proxyUsed, proxyScriptParams.ProxyUser.c_str(),
+                                                proxyScriptParams.ProxyPassword.c_str()))
+                    return;
                 // notify the relevant worker or all workers with a connection error
                 WorkersList->PostLoginChanged(dlg.ApplyToAll ? -1 : workerID);
             }
@@ -1426,8 +1450,7 @@ void COperationDlg::CorrectLookOfPrevFocusedDisabledButton(HWND prevFocus)
 {
     if (prevFocus != NULL && !IsWindowEnabled(prevFocus))
     {
-        char className[31];
-        if (GetClassName(prevFocus, className, 31) && _stricmp(className, "button") == 0)
+        if (FTPWindowHasClass(prevFocus, L"button"))
         {
             LONG style = GetWindowLong(prevFocus, GWL_STYLE);
             if ((style & BS_CHECKBOX) == 0 && (style & BS_DEFPUSHBUTTON) != 0)

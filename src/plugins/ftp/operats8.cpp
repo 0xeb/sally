@@ -1,8 +1,19 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static char* DupWorkerErrorString(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
 
 //
 // ****************************************************************************
@@ -61,11 +72,11 @@ BOOL CFTPWorker::HandleFlushDataError(CFTPQueueItemCopyOrMove* curItem, BOOL& lo
     case fderWriteError:
     {
         if (DiskWork.ProblemID == ITEMPR_RESUMETESTFAILED)
-            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGUNABLETORESUME), -1, TRUE);
+            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGUNABLETORESUME).c_str(), -1, TRUE);
         if (DiskWork.ProblemID == ITEMPR_RESUMETESTFAILED &&
             curItem->TgtFileState != TGTFILESTATE_RESUMED)
         { // Resume or Overwrite: resume failed, perform Overwrite
-            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGOVERWRTGTFILE), -1, TRUE);
+            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGOVERWRTGTFILE).c_str(), -1, TRUE);
             Queue->UpdateForceAction(CurItem, fqiaOverwrite);
             Queue->UpdateItemState(CurItem, sqisWaiting, ITEMPR_OK, NO_ERROR, NULL, Oper); // at least this worker will look for new work, so some worker will surely take care of this item (no need to post "new work available")
         }
@@ -81,14 +92,14 @@ BOOL CFTPWorker::HandleFlushDataError(CFTPQueueItemCopyOrMove* curItem, BOOL& lo
 }
 
 void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                            CPathBuffer& buf, CPathBuffer& errBuf, int& cmdLen, BOOL& sendCmd,
-                                            char* reply, int replySize, int replyCode, CPathBuffer& errText,
+                                            std::string& buf, std::string& errBuf, int& cmdLen, BOOL& sendCmd,
+                                            char* reply, int replySize, int replyCode, std::string& errText,
                                             BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                             BOOL& handleShouldStop)
 {
     CFTPQueueItemCopyOrMove* curItem = (CFTPQueueItemCopyOrMove*)CurItem;
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuf[USER_MAX_SIZE];
+    const wchar_t* hostBuf = NULL;
+    const wchar_t* userBuf = NULL;
     unsigned short portBuf;
 
     // ensure flushing the data from the data connection to the disk thread and once the flush is complete
@@ -161,11 +172,11 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     {
                         if (DiskWorkIsUsed)
                             TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState3(): DiskWorkIsUsed may not be TRUE here!");
-                        InitDiskWork(WORKER_DISKWORKWRITEFINISHED, fdwtCheckOrWriteFile, NULL, NULL,
-                                     fqiaNone, FALSE, flushBuffer, &OpenedFileCurOffset,
-                                     ResumingOpenedFile ? (OpenedFileSize > OpenedFileCurOffset ? &OpenedFileSize : &OpenedFileCurOffset) : &OpenedFileCurOffset,
-                                     validBytesInFlushBuffer, OpenedFile);
-                        if (FTPDiskThread->AddWork(&DiskWork))
+                        const BOOL diskWorkReady = InitDiskWork(WORKER_DISKWORKWRITEFINISHED, fdwtCheckOrWriteFile, NULL, NULL,
+                                                               fqiaNone, FALSE, flushBuffer, &OpenedFileCurOffset,
+                                                               ResumingOpenedFile ? (OpenedFileSize > OpenedFileCurOffset ? &OpenedFileSize : &OpenedFileCurOffset) : &OpenedFileCurOffset,
+                                                               validBytesInFlushBuffer, OpenedFile);
+                        if (diskWorkReady && FTPDiskThread->AddWork(&DiskWork))
                             DiskWorkIsUsed = TRUE;
                         else // cannot flush the data, the item processing cannot continue
                         {
@@ -304,10 +315,10 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     }
                     else
                     {
-                        Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                         if (LockedFileUID != 0)
                             TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState3(): LockedFileUID != 0!");
-                        if (FTPOpenedFiles.OpenFile(userBuf, hostBuf, portBuf, curItem->Path,
+                        if (FTPOpenedFiles.OpenFile(TextPolicy.GetCodec(), userBuf, hostBuf, portBuf, curItem->Path,
                                                     Oper->GetFTPServerPathType(curItem->Path),
                                                     curItem->Name, &LockedFileUID, ffatRead))
                         { // the file on the server is not open yet, we can work with it, allocate the data connection
@@ -366,10 +377,16 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
 
                                 if (Oper->GetUsePassiveMode()) // passive mode (PASV)
                                 {
-                                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
-                                                      ftpcmdPassive, &cmdLen); // cannot report an error
-                                    sendCmd = TRUE;
-                                    SubState = fwssWorkCopyWaitForPASVRes;
+                                    if (PrepareFTPCommand(buf, &errBuf, ftpcmdPassive, &cmdLen))
+                                    {
+                                        sendCmd = TRUE;
+                                        SubState = fwssWorkCopyWaitForPASVRes;
+                                    }
+                                    else
+                                    {
+                                        Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                        lookForNewWork = TRUE;
+                                    }
                                 }
                                 else // active mode (PORT)
                                 {
@@ -463,27 +480,33 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                         {
                             if (Oper->GetResumeIsNotSupported()) // optimization: we know REST will fail, so we will not send it
                             {
-                                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGRESUMENOTSUP), -1, TRUE);
+                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGRESUMENOTSUP).c_str(), -1, TRUE);
                                 nextLoopCopy = TRUE;
                                 SubState = fwssWorkCopyResumeError;
                             }
                             else // send REST
                             {
                                 OpenedFileCurOffset = OpenedFileSize - CQuadWord(resumeOverlap, 0);
-                                char num[50];
-                                _ui64toa(OpenedFileCurOffset.Value, num, 10);
+                                std::string num;
 
                                 OpenedFileResumedAtOffset = OpenedFileCurOffset;
 
-                                PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
-                                                  ftpcmdRestartTransfer, &cmdLen, num); // cannot report an error
-                                sendCmd = TRUE;
-                                SubState = fwssWorkCopyWaitForResumeRes;
+                                if (FTPFormatString(num, "%I64u", OpenedFileCurOffset.Value) &&
+                                    PrepareFTPCommand(buf, &errBuf, ftpcmdRestartTransfer, &cmdLen, num.c_str()))
+                                {
+                                    sendCmd = TRUE;
+                                    SubState = fwssWorkCopyWaitForResumeRes;
+                                }
+                                else
+                                {
+                                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                    lookForNewWork = TRUE;
+                                }
                             }
                         }
                         else // REST is unnecessary, we read the file from the beginning, but still perform Resume (check the existing part, then write) -> start reading the file
                         {
-                            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGRESUMEFROMBEG), -1, TRUE);
+                            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGRESUMEFROMBEG).c_str(), -1, TRUE);
                             nextLoopCopy = TRUE;
                             SubState = fwssWorkCopySendRetrCmd;
                         }
@@ -491,7 +514,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     else // Overwrite/Create-New or REST is unnecessary, read the file from the beginning -> start reading the file
                     {
                         if (OpenedFileSize > CQuadWord(0, 0))
-                            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGRESUMEUSELESS), -1, TRUE);
+                            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGRESUMEUSELESS).c_str(), -1, TRUE);
                         ResumingOpenedFile = FALSE;
                         nextLoopCopy = TRUE;
                         SubState = fwssWorkCopySendRetrCmd;
@@ -570,7 +593,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                 }
                 else // resume failed, perform Overwrite
                 {
-                    Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGOVERWRTGTFILE), -1, TRUE);
+                    Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGOVERWRTGTFILE).c_str(), -1, TRUE);
                     ResumingOpenedFile = FALSE;
                     OpenedFileCurOffset.Set(0, 0);
                     OpenedFileResumedAtOffset.Set(0, 0);
@@ -618,13 +641,18 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                         FlushDataError = fderNone;
                     }
 
-                    CommandTransfersData = TRUE;
-                    PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
-                                      ftpcmdRetrieveFile, &cmdLen, curItem->Name); // cannot report an error
-                    sendCmd = TRUE;
-
-                    postActivate = TRUE;
-                    SubState = fwssWorkCopyActivateDataCon;
+                    if (PrepareFTPCommand(buf, &errBuf, ftpcmdRetrieveFile, &cmdLen, curItem->Name))
+                    {
+                        CommandTransfersData = TRUE;
+                        sendCmd = TRUE;
+                        postActivate = TRUE;
+                        SubState = fwssWorkCopyActivateDataCon;
+                    }
+                    else
+                    {
+                        Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                        lookForNewWork = TRUE;
+                    }
                 }
                 break;
             }
@@ -684,10 +712,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                 case fweCmdReplyReceived:
                 {
                     ListCmdReplyCode = replyCode;
-                    CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
-                    if (ListCmdReplyText != NULL)
-                        SalamanderGeneral->Free(ListCmdReplyText);
-                    ListCmdReplyText = SalamanderGeneral->DupStr(errText); /* low memory = we can live without the reply description */
+                    CopyStr(ListCmdReplyText, reply, replySize); /* low memory = we can live without the reply description */
 
                     BOOL waitForDataConFinish = FALSE;
                     if (!ShouldStop && WorkerDataCon != NULL)
@@ -761,8 +786,8 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     {
                         if (DataConAllDataTransferred && CommandReplyTimeout)
                         { // we successfully received all data + the server did not respond => in 99.9% the file is completely downloaded and only the control connection is stuck (happens during uploads/downloads longer than 1.5 hours) => force Resume (it tests the file size + sets the date/time, etc.)
-                            _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGDWNLOADFORCRESUM), curItem->Name);
-                            Logs.LogMessage(LogUID, errText, -1, TRUE);
+                            if (FTPFormatString(errText, LoadStr(IDS_LOGMSGDWNLOADFORCRESUM), curItem->Name))
+                                Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
                             Queue->UpdateForceAction(CurItem, fqiaResume);
                         }
@@ -797,7 +822,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                 WorkerDataCon = NULL;
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
                                 WorkerDataConState = wdcsDoesNotExist;
-                                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGDATACONNOTOPENED), -1, TRUE);
+                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGDATACONNOTOPENED).c_str(), -1, TRUE);
                                 // the data connection simply did not open (it did not make it or an error occurred) -> retry the download attempt
                                 Queue->UpdateItemState(CurItem, sqisWaiting, ITEMPR_OK, NO_ERROR, NULL, Oper); // at least this worker will look for new work, so some worker will surely take care of this item (no need to post "new work available")
                                 lookForNewWork = TRUE;
@@ -867,15 +892,15 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     int dataSSLErrorOccured = SSLCONERR_NOERROR;
                     BOOL dataConDecomprErrorOccured = FALSE;
                     //BOOL dataConDecomprMissingStreamEnd = FALSE;  // unfortunately this check is unusable, e.g. Serv-U 7 and 8 simply do not terminate the stream
-                    errBuf[0] = 0;
+                    errBuf.clear();
                     if (dataConExisted)
                     {
                         HANDLES(LeaveCriticalSection(&WorkerCritSect));
                         WorkerDataCon->GetError(&dataConError, &dataConLowMem, NULL, &dataConNoDataTransTimeout,
                                                 &dataSSLErrorOccured, &dataConDecomprErrorOccured);
                         //dataConDecomprMissingStreamEnd = WorkerDataCon->GetDecomprMissingStreamEnd();
-                        if (!WorkerDataCon->GetProxyError(errBuf, 50 + FTP_MAX_PATH, NULL, 0, TRUE))
-                            errBuf[0] = 0;
+                        if (!WorkerDataCon->GetProxyError(errBuf, NULL, TRUE))
+                            errBuf.clear();
                         // since we are already in the CSocketsThread::CritSect section, this call
                         // is also possible from the CSocket::SocketCritSect section (no dead-lock risk)
                         // the data connection should be closed already, so closing it is probably redundant, but we play it safe...
@@ -954,26 +979,41 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                                 }
                                                 else
                                                 {
+                                                    // ErrAllocDescr is read back as negotiated server bytes (see the
+                                                    // ITEMPR_* contract in operats.h; both readers decode it with the
+                                                    // session codec). The two local-text sources below therefore have to
+                                                    // cross into the session encoding here instead of travelling as ACP
+                                                    // bytes; an unrepresentable message is dropped so the reader falls
+                                                    // back to WinError rather than showing "<invalid server text>".
+                                                    const CFtpTextCodec textCodec = TextPolicy.GetCodec();
+                                                    errText.clear();
                                                     if (dataSSLErrorOccured != SSLCONERR_NOERROR || dataConDecomprErrorOccured)
-                                                        lstrcpyn(errText, LoadStr(dataConDecomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH);
+                                                    {
+                                                        const std::wstring localText = LangStr(dataConDecomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR);
+                                                        if (!textCodec.Encode(localText.c_str(), localText.size(), errText))
+                                                            errText.clear();
+                                                    }
                                                     else
                                                     {
-                                                        errText[0] = 0;
-                                                        if (FTP_DIGIT_1(ListCmdReplyCode) != FTP_D1_SUCCESS && ListCmdReplyText != NULL)
+                                                        if (FTP_DIGIT_1(ListCmdReplyCode) != FTP_D1_SUCCESS && !ListCmdReplyText.empty())
                                                         { // if we do not have a network error description from the server, settle for the system description
-                                                            lstrcpyn(errText, ListCmdReplyText, 200 + FTP_MAX_PATH);
+                                                            FTPFormatString(errText, "%s", ListCmdReplyText.c_str());
                                                         }
 
-                                                        if (errText[0] == 0 && errBuf[0] != 0) // try to take the error text from the proxy server
-                                                            lstrcpyn(errText, errBuf, 200 + FTP_MAX_PATH);
+                                                        if (errText.empty() && !errBuf.empty()) // try to take the error text from the proxy server
+                                                        {                                       // the proxy description is built from LoadStr/FTPGetErrorText, so it is local text
+                                                            std::wstring proxyText;
+                                                            if (!FtpDecodeLocalText(errBuf, proxyText) ||
+                                                                !textCodec.Encode(proxyText.c_str(), proxyText.size(), errText))
+                                                                errText.clear();
+                                                        }
 
                                                         //                              if (errText[0] == 0 && dataConDecomprMissingStreamEnd)
-                                                        //                                lstrcpyn(errText, LoadStr(IDS_ERRDATACONDECOMPRERROR), 200 + FTP_MAX_PATH);
                                                     }
 
                                                     // error on the item, record this state
                                                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_INCOMPLETEDOWNLOAD, dataConError,
-                                                                           (errText[0] != 0 ? SalamanderGeneral->DupStr(errText) : NULL), Oper);
+                                                                           (!errText.empty() ? DupWorkerErrorString(errText.c_str()) : NULL), Oper);
                                                 }
                                                 lookForNewWork = TRUE;
                                             }
@@ -983,7 +1023,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                     {
                                         if (ResumingOpenedFile && OpenedFileCurOffset < OpenedFileSize)
                                         { // the entire block at the end of the file was not tested (the server file is shorter than on disk -> the files differ and resume is not possible)
-                                            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGUNABLETORESUME2), -1, TRUE);
+                                            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGUNABLETORESUME2).c_str(), -1, TRUE);
                                             if (curItem->TgtFileState == TGTFILESTATE_RESUMED) // Overwrite is not possible, record the error and look for other work
                                             {
                                                 Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_RESUMETESTFAILED, NO_ERROR, NULL, Oper);
@@ -991,7 +1031,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                             }
                                             else // Resume or Overwrite: Resume failed, perform Overwrite
                                             {
-                                                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGOVERWRTGTFILE), -1, TRUE);
+                                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGOVERWRTGTFILE).c_str(), -1, TRUE);
                                                 Queue->UpdateForceAction(CurItem, fqiaOverwrite);
                                                 Queue->UpdateItemState(CurItem, sqisWaiting, ITEMPR_OK, NO_ERROR, NULL, Oper); // at least this worker will look for new work, so some worker will surely take care of this item (no need to post "new work available")
                                                 lookForNewWork = TRUE;
@@ -1028,11 +1068,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                     }
                 }
                 ListCmdReplyCode = -1;
-                if (ListCmdReplyText != NULL)
-                {
-                    SalamanderGeneral->Free(ListCmdReplyText);
-                    ListCmdReplyText = NULL;
-                }
+                ListCmdReplyText.clear();
                 break;
             }
 
@@ -1055,17 +1091,23 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                         FTPOpenedFiles.CloseFile(LockedFileUID);
                         LockedFileUID = 0;
                     }
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     if (LockedFileUID != 0)
                         TRACE_E("Unexpected situation 2 in CFTPWorker::HandleEventInWorkingState3(): LockedFileUID != 0!");
-                    if (FTPOpenedFiles.OpenFile(userBuf, hostBuf, portBuf, curItem->Path,
+                    if (FTPOpenedFiles.OpenFile(TextPolicy.GetCodec(), userBuf, hostBuf, portBuf, curItem->Path,
                                                 Oper->GetFTPServerPathType(curItem->Path),
                                                 curItem->Name, &LockedFileUID, ffatDelete))
                     { // the file on the server is not open yet, we can try to delete it
-                        PrepareFTPCommand(buf, 200 + FTP_MAX_PATH, errBuf, 50 + FTP_MAX_PATH,
-                                          ftpcmdDeleteFile, &cmdLen, CurItem->Name); // cannot report an error
-                        sendCmd = TRUE;
-                        SubState = fwssWorkCopyMoveWaitForDELERes;
+                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdDeleteFile, &cmdLen, CurItem->Name))
+                        {
+                            sendCmd = TRUE;
+                            SubState = fwssWorkCopyMoveWaitForDELERes;
+                        }
+                        else
+                        {
+                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                            lookForNewWork = TRUE;
+                        }
                     }
                     else // another operation is already running on this file, let the user try again later
                     {
@@ -1095,16 +1137,16 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                         nextLoopCopy = TRUE;
 
                         // if the file/link was deleted, update the listing in the cache
-                        Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                         UploadListingCache.ReportDelete(userBuf, hostBuf, portBuf, CurItem->Path,
                                                         Oper->GetFTPServerPathType(CurItem->Path),
                                                         CurItem->Name, FALSE);
                     }
                     else // display the error to the user and process the next queue item
                     {
-                        CopyStr(errText, 200 + FTP_MAX_PATH, reply, replySize);
+                        CopyStr(errText, reply, replySize);
                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETODELSRCFILE, NO_ERROR,
-                                               SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                               DupWorkerErrorString(errText.c_str()) /* low memory = the error will be without details */,
                                                Oper);
                         lookForNewWork = TRUE;
                     }
@@ -1114,7 +1156,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                 case fweCmdConClosed: // the connection closed/timed out (see ErrorDescr) -> try to restore it
                 {
                     // if we do not know the result of deleting the file/link, invalidate the cache listing
-                    Oper->GetUserHostPort(userBuf, hostBuf, &portBuf);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &portBuf);
                     UploadListingCache.ReportDelete(userBuf, hostBuf, portBuf, CurItem->Path,
                                                     Oper->GetFTPServerPathType(CurItem->Path),
                                                     CurItem->Name, TRUE);

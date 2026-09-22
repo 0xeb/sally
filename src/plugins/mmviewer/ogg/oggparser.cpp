@@ -15,9 +15,7 @@
 #include "..\lang\lang.rh"
 #include "..\output.h"
 
-char* LoadStr(int resID);
-char* FStr(const char* format, ...);
-void FormatSize2(__int64 size, char* str_size, BOOL nozero = FALSE);
+std::wstring LangStr(int resID);
 
 typedef struct
 {
@@ -54,11 +52,11 @@ int FindComment(const char* in_string, int& offset, OGG_COMMENT comments[]) //s=
 }
 
 CParserResultEnum
-CParserOGG::OpenFile(const char* fileName)
+CParserOGG::OpenFile(const wchar_t* fileName)
 {
     CloseFile();
 
-    f = fopen(fileName, "rb");
+    _wfopen_s(&f, fileName, L"rb");
 
     if (!f)
         return preOpenError;
@@ -133,16 +131,15 @@ CParserOGG::GetFileInfo(COutputInterface* output)
 
         vorbis_info* vi;
         vorbis_comment* vc;
-        char time[64], size[64];
         TDirectArray<char*> addstr(512, 512);
 
         vi = ov_info(&vf, -1);
 
         int s = (int)ov_time_total(&vf, -1); // (s) Total time.
-        if (s / 3600)
-            lstrcpy(time, FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60));
-        else
-            lstrcpy(time, FStr("%02lu:%02lu", s / 60 % 60, s % 60));
+        const std::wstring duration = s / 3600
+                                          ? FStrW(L"%02lu:%02lu:%02lu", s / 3600,
+                                                  s / 60 % 60, s % 60)
+                                          : FStrW(L"%02lu:%02lu", s / 60 % 60, s % 60);
 
         vc = ov_comment(&vf, -1);
         if (vc)
@@ -166,15 +163,15 @@ CParserOGG::GetFileInfo(COutputInterface* output)
         }
 
         // dump
-        output->AddHeader(LoadStr(IDS_OGG_INFO));
-        output->AddItem(LoadStr(IDS_OGG_BITRATE), FStr("%lu", vi->bitrate_nominal / 1000));
-        FormatSize2(vi->rate, size);
-        output->AddItem(LoadStr(IDS_OGG_FREQUENCY), size);
-        output->AddItem(LoadStr(IDS_OGG_CHANNELS), FStr("%lu", vi->channels));
-        output->AddItem(LoadStr(IDS_OGG_LENGTH), time);
-        FormatSize2((long)ov_pcm_total(&vf, -1), size);
-        output->AddItem(LoadStr(IDS_OGG_SAMPLES), size);
-        output->AddItem(LoadStr(IDS_OGG_VERSION), FStr("%lu", vi->version));
+        output->AddHeader(LangStr(IDS_OGG_INFO).c_str());
+        output->AddItem(LangStr(IDS_OGG_BITRATE).c_str(),
+                        std::to_wstring(vi->bitrate_nominal / 1000).c_str());
+        output->AddItem(LangStr(IDS_OGG_FREQUENCY).c_str(), FormatSize2W(vi->rate).c_str());
+        output->AddItem(LangStr(IDS_OGG_CHANNELS).c_str(), std::to_wstring(vi->channels).c_str());
+        output->AddItem(LangStr(IDS_OGG_LENGTH).c_str(), duration.c_str());
+        output->AddItem(LangStr(IDS_OGG_SAMPLES).c_str(),
+                        FormatSize2W(static_cast<long>(ov_pcm_total(&vf, -1))).c_str());
+        output->AddItem(LangStr(IDS_OGG_VERSION).c_str(), std::to_wstring(vi->version).c_str());
 
         BOOL first = TRUE;
         int i;
@@ -185,10 +182,10 @@ CParserOGG::GetFileInfo(COutputInterface* output)
                 if (first)
                 {
                     output->AddSeparator();
-                    output->AddHeader(LoadStr(IDS_OGG_STDTAGS));
+                    output->AddHeader(LangStr(IDS_OGG_STDTAGS).c_str());
                     first = FALSE;
                 }
-                output->AddItem(LoadStr(comments[i].str_id), comments[i].str);
+                output->AddItem(LangStr(comments[i].str_id).c_str(), comments[i].str);
                 SalGeneral->Free(comments[i].str);
             }
         }
@@ -196,16 +193,16 @@ CParserOGG::GetFileInfo(COutputInterface* output)
         if (addstr.Count)
         {
             output->AddSeparator();
-            output->AddHeader(LoadStr(IDS_OGG_ADDINFO));
+            output->AddHeader(LangStr(IDS_OGG_ADDINFO).c_str());
             for (i = 0; i < addstr.Count; i++)
             {
-                output->AddItem(LoadStr(IDS_OGG_OTHERTAG), addstr[i]);
+                output->AddItem(LangStr(IDS_OGG_OTHERTAG).c_str(), addstr[i]);
                 SalGeneral->Free(addstr[i]);
             }
         }
 
         output->AddSeparator();
-        output->AddItem(LoadStr(IDS_OGG_VENDOR), vc->vendor);
+        output->AddItem(LangStr(IDS_OGG_VENDOR).c_str(), vc->vendor);
 
         return preOK;
     }

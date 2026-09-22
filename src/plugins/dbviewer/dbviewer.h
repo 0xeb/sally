@@ -34,7 +34,7 @@ struct CCSVConfig
 };
 
 extern BOOL CfgAutoSelect;
-extern char CfgDefaultCoding[210];
+extern std::wstring CfgDefaultCoding;
 extern CCSVConfig CfgDefaultCSV;
 
 void OnConfiguration(HWND hParent, BOOL bFromSalamander);
@@ -51,11 +51,11 @@ extern CSalamanderGUIAbstract* SalamanderGUI;
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
-    virtual BOOL WINAPI ViewFile(const char* name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                  BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex);
-    virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name) { return TRUE; }
 };
 
 class CPluginInterface : public CPluginInterfaceAbstract
@@ -81,7 +81,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param);
     virtual void WINAPI ClearHistory(HWND parent);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -143,8 +143,8 @@ protected:
     BOOL ReleaseGraphics();
 
     BOOL InitCodingSubmenu();
-    BOOL GetCodingMenuIndex(const char* coding);
-    BOOL GetNextCodingMenuIndex(const char* coding, BOOL next);
+    BOOL GetCodingMenuIndex(const std::wstring& coding);
+    BOOL GetNextCodingMenuIndex(const std::wstring& coding, BOOL next);
     void OnFind(WORD command);
 
     BOOL InsertMenuBand();

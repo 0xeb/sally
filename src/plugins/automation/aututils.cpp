@@ -52,10 +52,6 @@ static int DisplayError(
     MSGBOXEX_PARAMS msgbox = {
         0,
     };
-    PTSTR pszTemp;
-    PTSTR pszText;
-    size_t cchRemaining;
-    TCHAR* pszEnd;
     int res;
 
     if (ei->scode == SALAUT_E_ABORT || (pShim != NULL && !pShim->DisplayErrorHook(ei, src, bDebug)))
@@ -65,59 +61,40 @@ static int DisplayError(
     }
 
     msgbox.HParent = SalamanderGeneral->GetMsgBoxParent();
-    msgbox.Caption = SalamanderGeneral->LoadStr(g_hLangInst, IDS_SCRIPTERROR);
+    const std::wstring caption =
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_SCRIPTERROR);
+    msgbox.Caption = caption.c_str();
     msgbox.Flags = MSGBOXEX_ICONHAND;
-
-    pszTemp = new TCHAR[512];
-    pszText = new TCHAR[1024];
-    pszTemp[0] = _T('\0');
-    pszText[0] = _T('\0');
-
-    cchRemaining = 1024;
-    pszEnd = pszText;
+    std::wstring text;
+    std::wstring aliasButtonNames;
 
     if (line >= 0)
-    {
-        StringCchPrintf(pszTemp, 512, SalamanderGeneral->LoadStr(g_hLangInst, IDS_LINE), line);
-        StringCchCatEx(pszEnd, cchRemaining, pszTemp, &pszEnd, &cchRemaining, 0);
-    }
+        text += SPLFormatStringOwned(SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_LINE).c_str(), line);
 
     if (col >= 0)
-    {
-        StringCchPrintf(pszTemp, 512, SalamanderGeneral->LoadStr(g_hLangInst, IDS_COLUMN), col);
-        StringCchCatEx(pszEnd, cchRemaining, pszTemp, &pszEnd, &cchRemaining, 0);
-    }
+        text += SPLFormatStringOwned(SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_COLUMN).c_str(), col);
 
     if (ei->bstrSource)
-    {
-        StringCchPrintf(pszTemp, 512, SalamanderGeneral->LoadStr(g_hLangInst, IDS_SOURCE), (PCTSTR)_bstr_t(ei->bstrSource));
-        StringCchCatEx(pszEnd, cchRemaining, pszTemp, &pszEnd, &cchRemaining, 0);
-    }
+        text += SPLFormatStringOwned(SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_SOURCE).c_str(), ei->bstrSource);
 
     if (ei->bstrDescription)
-    {
-        StringCchPrintf(pszTemp, 512, SalamanderGeneral->LoadStr(g_hLangInst, IDS_ERROR), (PCTSTR)_bstr_t(ei->bstrDescription));
-        StringCchCatEx(pszEnd, cchRemaining, pszTemp, &pszEnd, &cchRemaining, 0);
-    }
+        text += SPLFormatStringOwned(SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ERROR).c_str(), ei->bstrDescription);
 
-    msgbox.Text = pszText;
+    msgbox.Text = text.c_str();
 
     if (bDebug)
     {
         msgbox.Flags |= MSGBOXEX_OKCANCEL;
-        msgbox.AliasBtnNames = SalamanderGeneral->LoadStr(g_hLangInst, IDS_DEBUGABORT);
+        aliasButtonNames = SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_DEBUGABORT);
     }
     else
     {
         msgbox.Flags |= MSGBOXEX_OK;
-        msgbox.AliasBtnNames = SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABORT);
+        aliasButtonNames = SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ABORT);
     }
-
-    delete[] pszTemp;
+    msgbox.AliasBtnNames = aliasButtonNames.c_str();
 
     res = ProtectedMessageBox(&msgbox);
-
-    delete[] pszText;
 
     if (res < 0)
     {
@@ -217,33 +194,33 @@ void FreeException(EXCEPINFO& ei)
 
 void FormatErrorText(
     HRESULT hrCode,
-    TCHAR* pszBuffer,
+    wchar_t* pszBuffer,
     UINT cchMax)
 {
     UINT facility = HRESULT_FACILITY(hrCode);
     UINT code;
     HRESULT hr;
-    PTSTR end;
+    wchar_t* end;
     size_t remaining;
 
     if (facility == FACILITY_WIN32 || HIWORD(hrCode) == 0)
     {
         code = HRESULT_CODE(hrCode);
 
-        hr = StringCchPrintfEx(pszBuffer, cchMax, &end, &remaining, 0,
-                               _T("(%u) "), code);
+        hr = StringCchPrintfExW(pszBuffer, cchMax, &end, &remaining, 0,
+                                L"(%u) ", code);
     }
     else
     {
         code = hrCode;
 
-        hr = StringCchPrintfEx(pszBuffer, cchMax, &end, &remaining, 0,
-                               _T("(0x%08X) "), code);
+        hr = StringCchPrintfExW(pszBuffer, cchMax, &end, &remaining, 0,
+                                L"(0x%08X) ", code);
     }
 
     if (SUCCEEDED(hr))
     {
-        DWORD len = FormatMessage(
+        DWORD len = FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             code,
@@ -256,25 +233,25 @@ void FormatErrorText(
         {
             // trim CRLF
             end += len - 1;
-            while (end > pszBuffer && _istspace(*end))
+            while (end > pszBuffer && iswspace(*end))
             {
-                *end = _T('\0');
+                *end = L'\0';
                 --end;
             }
         }
         else
         {
-            LoadString(g_hLangInst, IDS_UNKERROR, end, (int)remaining);
+            LoadStringW(g_hLangInst, IDS_UNKERROR, end, (int)remaining);
         }
     }
 }
 
-UINT HashString(__in_z PCTSTR s)
+UINT HashString(__in_z PCWSTR s)
 {
     UINT uHash;
 
     uHash = 0;
-    while (*s != '\0')
+    while (*s != L'\0')
     {
         uHash = *s + (uHash << 6) + (uHash << 16) - uHash;
         ++s;

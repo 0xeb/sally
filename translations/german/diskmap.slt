@@ -76,3 +76,7 @@ COMMENT,"Deutsche Version"
 78,1,"Byte"
 79,1,"Bytes"
 
+[STRINGTABLE 3]
+80,1,"Nichts anzuzeigen..."
+81,1,"...dieser Ordner enthält keine Dateien zum Abbilden"
+

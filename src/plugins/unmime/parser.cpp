@@ -112,6 +112,7 @@
 //
 
 #include "precomp.h"
+#include "common/ByteFormat.h"
 
 #include "unmime.rh"
 #include "unmime.rh2"
@@ -119,6 +120,10 @@
 #include "parser.h"
 #include "decoder.h"
 #include "unmime.h"
+#include "unmime_name.h"
+#include "unmime_text.h"
+
+#include <vector>
 
 int iErrorStr;
 
@@ -209,11 +214,11 @@ static int __cdecl compare_header_names(const void* elem1, const void* elem2)
 
 #define TEXTBUFSIZE (256 * 1024)
 
-BOOL CInputFile::Open(LPCTSTR pszName)
+BOOL CInputFile::Open(const wchar_t* pszName)
 {
     CALL_STACK_MESSAGE1("CInputFile::Open()");
-    if ((hFile = CreateFile(pszName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                            FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
+    if ((hFile = CreateFileW(pszName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                             FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
     {
         iErrorStr = -1;
         return Error(IDS_OPENERROR);
@@ -308,13 +313,13 @@ void CParserOutput::StartBlock(int iType, int iLine)
     m->iBlockType = iType;
     m->iEncoding = ENCODING_NONE;
     m->bEmpty = 1;
-    m->cFileName[0] = 0;
+    m->cFileName.clear();
     m->bSelected = 0;
     m->bAttachment = 0;
     m->iSize = 0;
     m->iBadBlock = 0;
     m->iPart = 0;
-    strcpy(m->cCharset, "us-ascii");
+    m->cCharset = "us-ascii";
     Markers.Add(m);
     pCurrentBlock = (CStartMarker*)Markers[Markers.Count - 1];
     iLevel++;
@@ -348,15 +353,19 @@ void CParserOutput::ReturnToLastStart()
         pCurrentBlock = NULL;
 }
 
-void CParserOutput::SelectBlock(LPCTSTR pszFileName)
+void CParserOutput::SelectBlock(const wchar_t* pszFileName)
 {
-    CALL_STACK_MESSAGE2("CParserOutput::SelectBlock(%s)", pszFileName);
+    CALL_STACK_MESSAGE1("CParserOutput::SelectBlock()");
     int i;
     for (i = 0; i < Markers.Count; i++)
     {
         CStartMarker* p = (CStartMarker*)Markers[i];
         if (p->iMarkerType == MARKER_START)
-            if (!lstrcmpi(p->cFileName, pszFileName))
+            // p->cFileName is byte-domain (built by the header/synthesis code in this
+            // file); pszFileName is the wide name Salamander hands back from CFileData::Name,
+            // which this plugin produced by an exact narrow->wide projection of the same
+            // bytes (see ListArchive) - so re-projecting here for the comparison is lossless.
+            if (EqualUnmimeNameBytesAndWide(p->cFileName, pszFileName))
             {
                 p->bSelected = 1;
                 return;
@@ -382,7 +391,6 @@ void CParserOutput::UnselectAll()
 #define NEXTLINE_MAX 1000
 #define NAME_MAX 50
 #define TEXT_MAX 1000
-#define CURRENTCHARSET_MAX 20
 
 // states the parser can be in
 typedef enum eParserState
@@ -400,9 +408,9 @@ static char* cSavedNextLine;
 static char* cName;
 static char* cText;
 static char iCurrentEncoding, iSavedCurrentEncoding;
-static char* cCurrentCharset;
+static std::string cCurrentCharset;
 static int iMessageNumber, iBinaryNumber;
-static char* cFileName;
+static std::string cFileName;
 static int iNameOrigin; // name origin: 0..default, 1..content-type, 2..content-disposition, 3..content-location
 static int* piDefaultNumber;
 static CDecoder* pDummyDecoder; // decoder used to compute the size of files stored in the "archive"
@@ -468,17 +476,6 @@ static void SkipChars(LPCSTR& pszText, LPCSTR pszChars)
     }
 }
 
-static void TrimChars(LPSTR pszText, LPCSTR pszChars)
-{
-    int i = (int)strlen(pszText) - 1;
-    while (i >= 0 && strchr(pszChars, pszText[i]) != NULL)
-        pszText[i--] = 0;
-    LPCSTR p = pszText;
-    SkipChars(p, pszChars);
-    if (p > pszText)
-        strcpy(pszText, p);
-}
-
 void GetWord(LPSTR& pszText, LPSTR pszWord, int iMaxWord, LPCSTR pszDelimiters)
 {
     //CALL_STACK_MESSAGE4("GetWord(%s, , %d, %s)", pszText, iMaxWord, pszDelimiters);
@@ -515,7 +512,7 @@ static BOOL ParseHeader(LPCSTR pszLine, LPSTR pszName, int iMaxName, LPSTR pszTe
         return FALSE;
     }
     SkipCWSP(pszLine);
-    lstrcpyn(pszText, pszLine, iMaxText);
+    lstrcpynA(pszText, pszLine, iMaxText);
     return TRUE;
 }
 
@@ -533,40 +530,11 @@ static void ParseContentType(LPCSTR pszText, LPSTR pszType, int iMaxType, LPSTR 
 static BOOL GetParameter(LPSTR pszText, LPCSTR pszParam, LPSTR pszBuffer, int iBufferSize)
 {
     CALL_STACK_MESSAGE3("GetParameter(%s, , , %d)", pszText, iBufferSize);
-    // create lowercase copies of the strings so I can search case-insensitively,
-    // I was afraid to use StrStrI... (I do not know if it is available on all systems)
-    char* text = new char[strlen(pszText) + 1];
-    strcpy(text, pszText);
-    CharLower(text);
-    char* param = new char[strlen(pszParam) + 1];
-    strcpy(param, pszParam);
-    CharLower(param);
-    // ---
-    char* substr = strstr(text, param);
-    while (substr != NULL)
-    {
-        if (substr == text || strchr(" \t;()", substr[-1]) != NULL)
-        {
-            const char* p = substr + strlen(param);
-            SkipCWSP(p);
-            if (*p == '=')
-            {
-                SkipCWSP(++p);
-                p = p - text + pszText;
-                if (*p == '"')
-                    GetWord(++p, pszBuffer, iBufferSize, "\"");
-                else
-                    GetWord(p, pszBuffer, iBufferSize, " \t;()");
-                delete[] text;
-                delete[] param;
-                return TRUE;
-            }
-        }
-        substr = strstr(substr + 1, pszParam);
-    }
-    delete[] text;
-    delete[] param;
-    return FALSE;
+    std::string value;
+    if (!UnmimeEncodedName::GetParameter(pszText, pszParam, value))
+        return FALSE;
+    lstrcpynA(pszBuffer, value.c_str(), iBufferSize);
+    return TRUE;
 }
 
 static HEADERINFO* GetHeaderInfo(LPSTR pszName)
@@ -631,32 +599,19 @@ static void PopBoundary()
         iMultipart--;
 }
 
-static void DestroyIllegalChars(LPSTR pszPath)
-{
-    CALL_STACK_MESSAGE2("DestroyIllegalChars(%s)", pszPath);
-    while (*pszPath)
-    {
-        if (strchr("*?\\/<>|\":", *pszPath) != NULL)
-            *pszPath = '_';
-        pszPath++;
-    }
-}
-
 ////// DECODED FILE NAMES ///////////////////////////////////////////////////////
 
 static void SetDefaultFileName(BOOL bAppendCharset)
 {
     CALL_STACK_MESSAGE1("SetDefaultFileName()");
     iNameOrigin = 0;
-    sprintf(cFileName, "message%#03ld", iMessageNumber);
-    if (bAppendCharset && _stricmp(cCurrentCharset, "us-ascii"))
+    cFileName = sally::bytes::Format("message%#03ld", iMessageNumber);
+    if (bAppendCharset && _stricmp(cCurrentCharset.c_str(), "us-ascii"))
     {
-        strcat(cFileName, "(");
-        strcat(cFileName, cCurrentCharset);
-        strcat(cFileName, ")");
-        DestroyIllegalChars(cFileName);
+        cFileName.append("(").append(cCurrentCharset).append(")");
+        UnmimeEncodedName::Sanitize(cFileName);
     }
-    strcat(cFileName, ".txt");
+    cFileName.append(".txt");
     piDefaultNumber = &iMessageNumber;
 }
 
@@ -668,7 +623,7 @@ static void SetDefaultMIMEFileName(LPCSTR pszType, LPCSTR pszSubType, BOOL bAppe
     {
         if (!_stricmp(pszSubType, "html"))
         {
-            sprintf(cFileName, "message%#03ld.htm", iMessageNumber);
+            cFileName = sally::bytes::Format("message%#03ld.htm", iMessageNumber);
             piDefaultNumber = &iMessageNumber;
         }
         else
@@ -676,168 +631,146 @@ static void SetDefaultMIMEFileName(LPCSTR pszType, LPCSTR pszSubType, BOOL bAppe
     }
     else
     {
-        sprintf(cFileName, "binary%#03ld.bin", iBinaryNumber);
+        cFileName = sally::bytes::Format("binary%#03ld.bin", iBinaryNumber);
         piDefaultNumber = &iBinaryNumber;
     }
-}
-
-static void InsertSuffix(char* filename, int suffix)
-{
-    CPathBuffer temp; // Heap-allocated for long path support
-    char* ext = strrchr(filename, '.');
-    if (ext != NULL) // ".cvspass" is an extension in Windows
-    {
-        *ext++ = 0;
-        sprintf(temp.Get(), "%s(%ld).%s", filename, suffix, ext);
-    }
-    else
-        sprintf(temp.Get(), "%s(%ld)", filename, suffix);
-    lstrcpyn(filename, temp, MAX_PATH); // filename buffer size is MAX_PATH
-}
-
-static int __cdecl compare_file_names(const void* elem1, const void* elem2)
-{
-    return _stricmp(*((char**)elem1), *((char**)elem2));
 }
 
 static void MakeNamesUnique(CParserOutput* pOutput)
 {
     CALL_STACK_MESSAGE1("MakeNamesUnique()");
     int numblocks = pOutput->Markers.Count / 2;
-    char** index = new char*[numblocks];
+    std::vector<std::string*> index;
+    index.reserve(numblocks);
     // build an index of file names
-    int i, j;
-    for (i = 0, j = 0; i < pOutput->Markers.Count; i++)
+    int i;
+    for (i = 0; i < pOutput->Markers.Count; i++)
     {
         if (pOutput->Markers[i]->iMarkerType == MARKER_START)
-        {
-            if (j >= numblocks) // should not happen, but just to be safe...
-            {
-                TRACE_E("MakeNamesUnique(): inconsistency in parser output - numblocks != pOutput->Markers.Count / 2");
-                delete[] index;
-                return;
-            }
-            index[j++] = ((CStartMarker*)pOutput->Markers[i])->cFileName;
-        }
+            index.push_back(&((CStartMarker*)pOutput->Markers[i])->cFileName);
     }
     // sort the index
-    qsort(index, numblocks, sizeof(char*), compare_file_names);
+    std::sort(index.begin(), index.end(), [](const std::string* left, const std::string* right) {
+        return _stricmp(left->c_str(), right->c_str()) < 0;
+    });
     // identical names now lie next to each other and we can easily catch them
-    int k, l;
-    for (k = 1, l = 0; k < numblocks; k++)
+    size_t k, l;
+    for (k = 1, l = 0; k < index.size(); k++)
     {
-        if (!_stricmp(index[k], index[l]))
-            InsertSuffix(index[k], k - l);
+        if (!_stricmp(index[k]->c_str(), index[l]->c_str()))
+            UnmimeEncodedName::InsertSuffix(*index[k], static_cast<int>(k - l));
         else
             l = k;
     }
-    delete[] index;
 }
 
 // custom decoders for decoding encoded names (they decode into the buffer)
 class CBase64MiniDecoder : public CBase64Decoder
 {
 public:
-    CBase64MiniDecoder(char*& ptr) : q(ptr) {}
-    virtual BOOL BufferedWrite(void* pBuffer, int nBytes)
+    explicit CBase64MiniDecoder(std::string& output) : Output(output) {}
+    BOOL BufferedWrite(const void* buffer, int bytes) override
     {
-        *q++ = *((char*)pBuffer);
+        Output.append(static_cast<const char*>(buffer), bytes);
         return TRUE;
     };
-    char*& q;
+
+    std::string& Output;
 };
 
 class CQPMiniDecoder : public CQPDecoder
 {
 public:
-    CQPMiniDecoder(char*& ptr) : q(ptr) {}
-    virtual BOOL BufferedWrite(void* pBuffer, int nBytes)
+    explicit CQPMiniDecoder(std::string& output) : Output(output) {}
+    BOOL BufferedWrite(const void* buffer, int bytes) override
     {
-        *q++ = *((char*)pBuffer);
+        Output.append(static_cast<const char*>(buffer), bytes);
         return TRUE;
     };
-    char*& q;
+
+    std::string& Output;
 };
 
-static BOOL DecodeWord(const char*& p, char*& q)
+static BOOL DecodeWord(const char*& p, std::string& output)
 {
     CALL_STACK_MESSAGE1("DecodeWord()");
-    char conversion[200]; // space for the code page (51 characters) plus the target code-page suffix ('-' and ' ' are ignored)
-    GetWord(p, conversion, 50, "?");
-    if (*p++ != '?')
+    std::string conversion = UnmimeEncodedName::TakeWord(p, "?");
+    if (*p != '?')
         return FALSE;
-    char text[500];
-    GetWord(p, text, 2, "?");
-    if (*p++ != '?')
+    ++p;
+    std::string encoding = UnmimeEncodedName::TakeWord(p, "?");
+    if (*p != '?')
         return FALSE;
-    char enc = tolower(text[0]);
+    ++p;
+    if (encoding.empty())
+        return FALSE;
+    char enc = static_cast<char>(tolower(static_cast<unsigned char>(encoding[0])));
     if (enc != 'q' && enc != 'b')
         return FALSE;
-    GetWord(p, text, 500, "?");
+    std::string text = UnmimeEncodedName::TakeWord(p, "?");
     if (p[0] != '?' || p[1] != '=')
         return FALSE;
     p += 2;
-    char* start = q;
+    const size_t start = output.size();
     if (enc == 'q')
     {
-        CQPMiniDecoder Decoder(q);
+        CQPMiniDecoder Decoder(output);
         Decoder.Start(NULL, NULL, TRUE);
-        Decoder.DecodeLine(text, TRUE);
+        Decoder.DecodeLine(text.data(), TRUE);
     }
     else
     {
-        CBase64MiniDecoder Decoder(q);
+        CBase64MiniDecoder Decoder(output);
         Decoder.Start(NULL, NULL, TRUE);
-        Decoder.DecodeLine(text, TRUE);
+        Decoder.DecodeLine(text.data(), TRUE);
     }
 
     // 'conversion' is the conversion that needs to be performed (conversion to the code page used by Windows);
     // 'start' through 'q' is the string to recode
-    char codePage[101];
-    SalamanderGeneral->GetWindowsCodePage(NULL, codePage);
-    if (codePage[0] != 0) // only if the Windows code page is known
+    // Code page names are always plain ASCII, so narrowing GetWindowsCodePage's wide
+    // result back into 'conversion' (byte-domain, matches GetConversionTable's byte-domain
+    // output table) cannot lose anything.
+    std::wstring codePageW;
+    SPLGetWindowsCodePageOwned(SalamanderGeneral, NULL, codePageW);
+    if (!codePageW.empty()) // only if the Windows code page is known
     {
-        strcat(conversion, codePage);
+        std::string codePage;
+        if (!EncodeUnmimeAsciiToken(codePageW, codePage))
+            return FALSE;
+        conversion.append(codePage);
         char table[256];
-        if (SalamanderGeneral->GetConversionTable(NULL, table, conversion))
-        {
-            char* s = start;
-            while (s < q)
-            {
-                *s = table[(unsigned char)*s];
-                s++;
-            }
-        }
+        std::wstring conversionName;
+        if (DecodeUnmimeAsciiToken(conversion, conversionName) &&
+            SalamanderGeneral->GetConversionTable(NULL, table, conversionName.c_str()))
+            for (size_t index = start; index < output.size(); ++index)
+                output[index] = table[static_cast<unsigned char>(output[index])];
     }
     return TRUE;
 }
 
 // this function decodes special file names, e.g. "=?iso-8859-2?B?vmx1u2916Gv9IGv58i54eHg=?="
 // it requires modified QP and Base64 decoders
-static void DecodeSpecialWords(LPSTR pszText)
+static void DecodeSpecialWords(std::string& text)
 {
-    CALL_STACK_MESSAGE2("DecodeSpecialWords(%s)", pszText);
-    CPathBuffer temp; // Heap-allocated for long path support
-    int i = 0, j = 0;
-    while (pszText[i])
+    CALL_STACK_MESSAGE2("DecodeSpecialWords(%s)", text.c_str());
+    std::string decoded;
+    decoded.reserve(text.size());
+    size_t i = 0;
+    while (i < text.size())
     {
-        if (pszText[i] == '=' && pszText[i + 1] == '?')
+        if (text[i] == '=' && i + 1 < text.size() && text[i + 1] == '?')
         {
-            const char* p = pszText + i + 2;
-            char* q = temp.Get() + j;
-            if (!DecodeWord(p, q))
-                temp[j++] = pszText[i++];
+            const char* begin = text.c_str();
+            const char* p = begin + i + 2;
+            if (!DecodeWord(p, decoded))
+                decoded.push_back(text[i++]);
             else
-            {
-                i = (int)(p - pszText);
-                j = (int)(q - temp.Get());
-            }
+                i = static_cast<size_t>(p - begin);
         }
         else
-            temp[j++] = pszText[i++];
+            decoded.push_back(text[i++]);
     }
-    temp[j] = 0;
-    lstrcpyn(pszText, temp, MAX_PATH); // pszText buffer size is MAX_PATH
+    text.swap(decoded);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -945,7 +878,6 @@ static BOOL TestUUBlock(CParserOutput* pOutput, BOOL& bEnd)
     bEnd = FALSE;
     // are we on a UU header?
     char text[8];
-    CPathBuffer filename; // Heap-allocated for long path support
     const char* line = cLine;
     SkipWSP(line);
     GetWord(line, text, 8, " \t");
@@ -962,7 +894,7 @@ static BOOL TestUUBlock(CParserOutput* pOutput, BOOL& bEnd)
     SkipWSP(line);
     if (!*line)
         return FALSE;
-    GetWord(line, filename, filename.Size(), " \t"); // the file name also has to be present
+    std::string filename = UnmimeEncodedName::TakeWord(line, " \t"); // the file name also has to be present
     SkipWSP(line);
     if (*line)
         return FALSE; // and nothing more
@@ -1004,9 +936,9 @@ static BOOL TestUUBlock(CParserOutput* pOutput, BOOL& bEnd)
             p->bAttachment = 1;
             p->bEmpty = 0;
             p->iSize = size;
-            strcpy(p->cCharset, "us-ascii");
-            strcpy(p->cFileName, filename);
-            DestroyIllegalChars(p->cFileName);
+            p->cCharset = "us-ascii";
+            p->cFileName = filename;
+            UnmimeEncodedName::Sanitize(p->cFileName);
             pOutput->EndBlock(InputFile.iCurrentLine + 2);
             return TRUE;
         }
@@ -1047,7 +979,7 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
     // yes, extract the attributes line, size, part, and name
     const char* line = cLine + 8;
     char text[50], value[50];
-    CPathBuffer filename; // Heap-allocated for long path support
+    std::string filename;
     int size, part = 0, attrLine = 0, attrSize = 0, attrName = 0, partsize;
     while (*line)
     {
@@ -1068,8 +1000,8 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
         else if (!strcmp(text, "name"))
         {
             attrName = 1;
-            lstrcpyn(filename, line, filename.Size());
-            TrimChars(filename, " \"");
+            filename = line;
+            UnmimeEncodedName::Trim(filename, " \"");
             line = "";
         }
         else if (!strcmp(text, "part"))
@@ -1171,12 +1103,12 @@ static BOOL TestYEncBlock(CParserOutput* pOutput, BOOL& bEnd)
             p->bAttachment = 1;
             p->bEmpty = 0;
             p->iSize = pDecoder->iDecodedSize;
-            strcpy(p->cCharset, "us-ascii");
+            p->cCharset = "us-ascii";
             if (part)
-                sprintf(p->cFileName, "%s.%03d", filename.Get(), part);
+                p->cFileName = sally::bytes::Format("%s.%03d", filename.c_str(), part);
             else
-                strcpy(p->cFileName, filename);
-            DestroyIllegalChars(p->cFileName);
+                p->cFileName = filename;
+            UnmimeEncodedName::Sanitize(p->cFileName);
             pOutput->EndBlock(InputFile.iCurrentLine + 2);
             delete pDecoder;
             return TRUE;
@@ -1230,9 +1162,9 @@ static BOOL TestBinHexBlock(CParserOutput* pOutput, BOOL& bEnd)
                 p->iBadBlock = BADBLOCK_DAMAGED;
             else if (pDecoder->bCRCFailed)
                 p->iBadBlock = BADBLOCK_CRC;
-            strcpy(p->cCharset, "us-ascii");
-            strcpy(p->cFileName, pDecoder->cFileName);
-            DestroyIllegalChars(p->cFileName);
+            p->cCharset = "us-ascii";
+            p->cFileName = pDecoder->cFileName;
+            UnmimeEncodedName::Sanitize(p->cFileName);
             pOutput->EndBlock(InputFile.iCurrentLine + 2);
             delete pDecoder;
             return TRUE;
@@ -1249,9 +1181,9 @@ static BOOL TestBinHexBlock(CParserOutput* pOutput, BOOL& bEnd)
 //  ParseMailFile - main function for decoding mail
 //
 
-BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendCharset)
+BOOL ParseMailFile(const wchar_t* pszFileName, CParserOutput* pOutput, BOOL bAppendCharset)
 {
-    CALL_STACK_MESSAGE2("ParseMailFile(%s, )", pszFileName);
+    CALL_STACK_MESSAGE2("ParseMailFile(%ls, )", pszFileName);
 
     if (!bHeaderNamesSorted)
     {
@@ -1269,8 +1201,6 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
     cSavedNextLine = new char[1000];
     cName = new char[50];
     cText = new char[1000];
-    cCurrentCharset = new char[20];
-    cFileName = new char[MAX_PATH];
     cBoundaries = new char[MULTIPARTSTACK_MAX][200];
 
     BOOL goback, bEnd;
@@ -1284,7 +1214,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
     iCurrentEncoding = ENCODING_UNKNOWN;
     iMessageNumber = iBinaryNumber = 0;
     piDefaultNumber = &iMessageNumber;
-    strcpy(cCurrentCharset, "us-ascii");
+    cCurrentCharset = "us-ascii";
     pOutput->iLevel = 0;
     bNextLast = InputFile.ReadLine(cLine);
     iNameOrigin = 0;
@@ -1387,7 +1317,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                     }
                     iState = STATE_HEADER;
                     pOutput->StartBlock(BLOCK_HEADER, InputFile.iCurrentLine); // start the header
-                    strcpy(cCurrentCharset, "us-ascii");                       // default charset
+                    cCurrentCharset = "us-ascii";                              // default charset
                     SetDefaultFileName(FALSE);
                     iCurrentEncoding = ENCODING_NONE;
                     bNextBlockIsAttachment = FALSE;
@@ -1427,7 +1357,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                 {
                     if (!_stricmp(cName, "Content-Type"))
                     {
-                        GetParameter(cText, "charset", cCurrentCharset, CURRENTCHARSET_MAX);
+                        UnmimeEncodedName::GetParameter(cText, "charset", cCurrentCharset);
                         char cType[20], cSubType[20];
                         ParseContentType(cText, cType, sizeof(cType), cSubType, sizeof(cSubType));
                         if (iMultipart < MULTIPARTSTACK_MAX && !_stricmp(cType, "multipart"))
@@ -1444,7 +1374,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
 
                         if (iNameOrigin == 0)
                         {
-                            if (GetParameter(cText, "name", cFileName, MAX_PATH))
+                            if (UnmimeEncodedName::GetParameter(cText, "name", cFileName))
                             {
                                 iNameOrigin = 1;
                                 bNextBlockIsAttachment = TRUE;
@@ -1473,7 +1403,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                         GetWord(p, cDisp, sizeof(cDisp), " \t();");
                         if (!_stricmp(cDisp, "attachment"))
                             bNextBlockIsAttachment = TRUE;
-                        if (GetParameter(cText, "filename", cFileName, MAX_PATH))
+                        if (UnmimeEncodedName::GetParameter(cText, "filename", cFileName))
                         {
                             iNameOrigin = 2;
                             bNextBlockIsAttachment = TRUE;
@@ -1481,26 +1411,23 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                     }
                     else if (!_stricmp(cName, "Content-Location"))
                     {
-                        CPathBuffer cDisp; // Heap-allocated for long path support
-                        char* p = cText;
-                        GetWord(p, cDisp, cDisp.Size(), " \t();"); // Perhaps a better separators needed. Entire line needed in examined examples
-                        if (!_strnicmp(cDisp, "file:", 5) || !_strnicmp(cDisp, "http:", 5))
+                        const char* p = cText;
+                        std::string cDisp = UnmimeEncodedName::TakeWord(p, " \t();"); // Perhaps better separators are needed. Entire line is needed in examined examples.
+                        if (!_strnicmp(cDisp.c_str(), "file:", 5) || !_strnicmp(cDisp.c_str(), "http:", 5))
                         {
-                            char* p2 = strrchr(cDisp.Get(), '\\');
-                            p = strrchr(cDisp.Get(), '/');
-                            p = max(p, p2);
-                            if (p && p[1])
+                            const size_t separator = cDisp.find_last_of("\\/");
+                            if (separator != std::string::npos && separator + 1 < cDisp.size())
                             { // Do not take empty fname from from e.g. http://github.com/0xeb/sally/
                                 iNameOrigin = 3;
                                 bNextBlockIsAttachment = TRUE;
-                                strcpy(cFileName, p + 1);
+                                cFileName = cDisp.substr(separator + 1);
                                 // Strip params after .asp in http://toplist.cz/count.asp?id=1034442
-                                p = strchr(cFileName, '?');
+                                size_t parameter = cFileName.find('?');
                                 // And also after .jpg in http://www.anna-reality.cz/showthumb.php?img=fotky/brezova_936m2_1.jpg&width=120&height=120&quality=80
-                                if (!p)
-                                    p = strchr(cFileName, '&');
-                                if (p)
-                                    *p = 0;
+                                if (parameter == std::string::npos)
+                                    parameter = cFileName.find('&');
+                                if (parameter != std::string::npos)
+                                    cFileName.erase(parameter);
                             }
                         }
                         else if (!*p)
@@ -1511,7 +1438,7 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                             // Should we look for \ and / as well?
                             iNameOrigin = 3;
                             bNextBlockIsAttachment = TRUE;
-                            strcpy(cFileName, cDisp);
+                            cFileName = cDisp;
                         }
                     }
 
@@ -1560,15 +1487,15 @@ BOOL ParseMailFile(LPCTSTR pszFileName, CParserOutput* pOutput, BOOL bAppendChar
                             CStartMarker* p = pOutput->pCurrentBlock;
                             p->iEncoding = iCurrentEncoding;
                             p->bAttachment = bNextBlockIsAttachment;
-                            strcpy(p->cCharset, cCurrentCharset);
-                            strcpy(p->cFileName, cFileName);
+                            p->cCharset = cCurrentCharset;
+                            p->cFileName = cFileName;
                             if (iNameOrigin == 0)
                                 (*piDefaultNumber)++;
                             else
                             {
                                 iNameOrigin = 0;
                                 DecodeSpecialWords(p->cFileName);
-                                DestroyIllegalChars(p->cFileName);
+                                UnmimeEncodedName::Sanitize(p->cFileName);
                             }
                             CreateDecoder();
                             if (pDummyDecoder != NULL)
@@ -1608,13 +1535,13 @@ skipout:
             ptr->iBlockType = BLOCK_MAINHEADER;
             ptr->iEncoding = ENCODING_NONE;
             ptr->bEmpty = !G.bListMailHeaders;
-            ptr->cFileName[0] = 0;
+            ptr->cFileName.clear();
             ptr->bSelected = 0;
             ptr->bAttachment = 0;
             ptr->iSize = 0;
             ptr->iBadBlock = 0;
             ptr->iPart = 0;
-            strcpy(ptr->cCharset, "us-ascii");
+            ptr->cCharset = "us-ascii";
             pOutput->Markers.Insert(0, ptr);
         }
     }
@@ -1630,16 +1557,16 @@ skipout:
             switch (ptr->iBlockType)
             {
             case BLOCK_MAINHEADER:
-                sprintf(ptr->cFileName, "header%#03ld.txt", h++);
+                ptr->cFileName = sally::bytes::Format("header%#03ld.txt", h++);
                 break;
             case BLOCK_HEADER:
-                sprintf(ptr->cFileName, "subheader%#03ld.txt", s++);
+                ptr->cFileName = sally::bytes::Format("subheader%#03ld.txt", s++);
                 break;
             case BLOCK_PREAMBLE:
-                sprintf(ptr->cFileName, "preamble%#03ld.txt", p++);
+                ptr->cFileName = sally::bytes::Format("preamble%#03ld.txt", p++);
                 break;
             case BLOCK_EPILOG:
-                sprintf(ptr->cFileName, "epilog%#03ld.txt", e++);
+                ptr->cFileName = sally::bytes::Format("epilog%#03ld.txt", e++);
                 break;
             }
         }
@@ -1655,8 +1582,6 @@ skipout:
     delete[] cSavedNextLine;
     delete[] cName;
     delete[] cText;
-    delete[] cCurrentCharset;
-    delete[] cFileName;
     delete[] cBoundaries;
 
     return TRUE;

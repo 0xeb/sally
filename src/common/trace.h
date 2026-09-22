@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 // macro TRACE_ENABLE - enables output of messages to server
 // macro MULTITHREADED_TRACE_ENABLE - enables TID to UTID remapping
 // macro TRACE_TO_FILE - enables output of messages to file in TEMP (requires TRACE_ENABLE definition)
@@ -331,7 +333,8 @@ class CWStr
 {
 protected:
     BOOL IsOK;
-    WCHAR* AllocBuf;
+    BOOL OwnsStr;
+    std::wstring OwnedStr;
     const WCHAR* Str;
 
 public:
@@ -339,24 +342,19 @@ public:
     CWStr(const WCHAR* s)
     {
         IsOK = TRUE;
-        AllocBuf = NULL;
+        OwnsStr = FALSE;
         Str = s;
     }
-    ~CWStr()
-    {
-        if (AllocBuf != NULL)
-            free(AllocBuf);
-    }
 
-    const WCHAR* c_str() { return IsOK ? (const WCHAR*)(AllocBuf != NULL ? AllocBuf : Str) : L"Error in CWStr()"; }
+    const WCHAR* c_str() const { return IsOK ? (OwnsStr ? OwnedStr.c_str() : Str) : L"Error in CWStr()"; }
 };
 
 #if defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
-extern const TCHAR* __FILE_MAPPING_NAME;
-extern const TCHAR* __OPEN_CONNECTION_MUTEX;
-extern const TCHAR* __CONNECT_DATA_READY_EVENT_NAME;
-extern const TCHAR* __CONNECT_DATA_ACCEPTED_EVENT_NAME;
+extern const wchar_t* __FILE_MAPPING_NAME;
+extern const wchar_t* __OPEN_CONNECTION_MUTEX;
+extern const wchar_t* __CONNECT_DATA_READY_EVENT_NAME;
+extern const wchar_t* __CONNECT_DATA_ACCEPTED_EVENT_NAME;
 
 #define __PIPE_SIZE 100 // maximum data in pipe (in kB)
 #define __COMMUNICATION_WAIT_TIMEOUT 5000
@@ -458,6 +456,10 @@ inline void __TraceEmptyFunction() {}
 #define SetTraceProcessNameW(name) __TraceEmptyFunction()
 #define SetTraceThreadName(name) __TraceEmptyFunction()
 #define SetTraceThreadNameW(name) __TraceEmptyFunction()
+// TRACE_I/TRACE_E etc. are no-ops here, so nothing actually reaches GetTrace() - callers that
+// guard on this before tracing can just skip the guard's condition, but keep it callable
+// unconditionally so shared code (e.g. C__Handles::~C__Handles) doesn't need its own #ifdef.
+inline bool IsTraceAlive() { return false; }
 
 #else // TRACE_ENABLE
 
@@ -481,19 +483,33 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 #endif // MULTITHREADED_TRACE_ENABLE
 
 // info-trace, manually specified position in file
+// IsTraceAlive() guard: GetTrace() is a Meyer's singleton with no guaranteed
+// destruction order relative to whatever background thread or other static destructor might
+// still call TRACE_I/TRACE_E at process exit - see IsTraceAlive()'s own declaration above for the
+// full story (a real, observed crash). Guarding every use through these two macros, rather than
+// each of the many call sites individually, is the only way to close the hazard for good: any
+// background thread (icon loading, shell-change snooping, etc.) still running when exit() tears
+// GetTrace() down is a live race, not a hypothetical one. TRACE_I/TRACE_E's result is discarded at
+// every real call site in this codebase (verified), so folding the whole expression through a
+// comma into a plain int is safe. TRACE_C/TRACE_MC (below) are intentionally NOT guarded this way
+// - if something is bad enough to call those, still crash; only the logging half needs the guard.
 #define TRACE_MI(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-     __Trace.OStream() << str, __Trace) \
-        .SetInfo(file, line) \
-        .SendMessageToServer(__mtInformation) \
-        .RestoreLastError()
+    (IsTraceAlive() ? ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+                        GetTrace().OStream() << str, GetTrace()) \
+                           .SetInfo(file, line) \
+                           .SendMessageToServer(__mtInformation) \
+                           .RestoreLastError(), \
+                       0) \
+                    : 0)
 
 #define TRACE_MIW(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-     __Trace.OStreamW() << str, __Trace) \
-        .SetInfoW(file, line) \
-        .SendMessageToServer(__mtInformationW) \
-        .RestoreLastError()
+    (IsTraceAlive() ? ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+                        GetTrace().OStreamW() << str, GetTrace()) \
+                           .SetInfoW(file, line) \
+                           .SendMessageToServer(__mtInformationW) \
+                           .RestoreLastError(), \
+                       0) \
+                    : 0)
 
 // info-trace
 #define TRACE_I(str) TRACE_MI(__FILE__, __LINE__, str)
@@ -504,19 +520,24 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 #define TRACE_WW(str) TRACE_IW(str)
 
 // error-trace, manually specified position in file
+// Same IsTraceAlive() guard as TRACE_MI/TRACE_MIW above - see the comment there.
 #define TRACE_ME(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-     __Trace.OStream() << str, __Trace) \
-        .SetInfo(file, line) \
-        .SendMessageToServer(__mtError) \
-        .RestoreLastError()
+    (IsTraceAlive() ? ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+                        GetTrace().OStream() << str, GetTrace()) \
+                           .SetInfo(file, line) \
+                           .SendMessageToServer(__mtError) \
+                           .RestoreLastError(), \
+                       0) \
+                    : 0)
 
 #define TRACE_MEW(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-     __Trace.OStreamW() << str, __Trace) \
-        .SetInfoW(file, line) \
-        .SendMessageToServer(__mtErrorW) \
-        .RestoreLastError()
+    (IsTraceAlive() ? ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+                        GetTrace().OStreamW() << str, GetTrace()) \
+                           .SetInfoW(file, line) \
+                           .SendMessageToServer(__mtErrorW) \
+                           .RestoreLastError(), \
+                       0) \
+                    : 0)
 
 // error-trace
 #define TRACE_E(str) TRACE_ME(__FILE__, __LINE__, str)
@@ -532,16 +553,16 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 // and working with EBP/ESP (that depends on compiler and enabled optimizations), therefore
 // at least for now we use the old primitive way of crash by writing to NULL
 #define TRACE_MC(file, line, str) \
-    ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-      __Trace.OStream() << str, __Trace) \
+    ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+      GetTrace().OStream() << str, GetTrace()) \
          .SetInfo(file, line) \
          .SendMessageToServer(__mtError, TRUE) \
          .RestoreLastError(), \
      *((int*)NULL) = 0x666)
 
 #define TRACE_MCW(file, line, str) \
-    ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
-      __Trace.OStreamW() << str, __Trace) \
+    ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().StoreLastError(), \
+      GetTrace().OStreamW() << str, GetTrace()) \
          .SetInfoW(file, line) \
          .SendMessageToServer(__mtErrorW, TRUE) \
          .RestoreLastError(), \
@@ -551,17 +572,19 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 #define TRACE_C(str) TRACE_MC(__FILE__, __LINE__, str)
 #define TRACE_CW(str) TRACE_MCW(__WFILE__, __LINE__, str)
 
-#define ConnectToTraceServer() __Trace.Connect(TRUE)
-#define IsConnectedToTraceServer() __Trace.IsConnected()
-#define DisconnectFromTraceServer() __Trace.Disconnect()
+// Same IsTraceAlive() guard as TRACE_MI/TRACE_MIW above - every real call site
+// discards the BOOL result already, so folding the false branch to FALSE is safe.
+#define ConnectToTraceServer() (IsTraceAlive() ? GetTrace().Connect(TRUE) : FALSE)
+#define IsConnectedToTraceServer() (IsTraceAlive() && GetTrace().IsConnected())
+#define DisconnectFromTraceServer() (IsTraceAlive() ? GetTrace().Disconnect() : (void)0)
 #ifdef TRACE_TO_FILE
-#define CloseTraceMsgsFile() __Trace.CloseTraceFile()
+#define CloseTraceMsgsFile() GetTrace().CloseTraceFile()
 #endif // TRACE_TO_FILE
 
-#define SetTraceProcessName(name) __Trace.SetProcessName(name)
-#define SetTraceProcessNameW(name) __Trace.SetProcessNameW(name)
-#define SetTraceThreadName(name) __Trace.SetThreadName(name)
-#define SetTraceThreadNameW(name) __Trace.SetThreadNameW(name)
+#define SetTraceProcessName(name) GetTrace().SetProcessName(name)
+#define SetTraceProcessNameW(name) GetTrace().SetProcessNameW(name)
+#define SetTraceThreadName(name) GetTrace().SetThreadName(name)
+#define SetTraceThreadNameW(name) GetTrace().SetThreadNameW(name)
 
 #ifdef MULTITHREADED_TRACE_ENABLE
 
@@ -621,7 +644,7 @@ protected:
 #ifdef TRACE_TO_FILE
     HANDLE HTraceFile; // file opened for writing in TEMP, all messages are written to it
 #ifdef __TRACESERVER
-    WCHAR TraceFileName[MAX_PATH]; // name of file HTraceFile
+    std::wstring TraceFileName; // name of file HTraceFile
 #endif // __TRACESERVER
 #endif // TRACE_TO_FILE
 
@@ -672,24 +695,34 @@ protected:
     BOOL SendIgnoreAutoClear(BOOL ignore);
 };
 
-extern C__Trace __Trace;
+// Function-local static (Meyer's singleton), not a plain global object - same
+// rationale as common/handles.h's GetHandles(). A plain global __Trace was subject to the
+// static-initialization-order fiasco: any global object whose constructor (directly or
+// transitively) reaches a TRACE_I/TRACE_E/SetTraceProcessName call needs __Trace's own
+// constructor (InitializeCriticalSection) to have already run, but C++ does not order
+// global-constructor execution across translation units - this crashed
+// (EnterCriticalSection on an uninitialized CRITICAL_SECTION) on the very first
+// SetTraceProcessName() call in salmon.exe's wWinMain, immediately after fixing the identical
+// __Handles issue moved the crash here instead. A function-local static is guaranteed to
+// construct on first use, eliminating the ordering hazard entirely.
+C__Trace& GetTrace();
+
+// True until ~C__Trace() runs. Function-local statics with cross-dependencies
+// (here: C__Handles::~C__Handles() wants to log via GetTrace() during its own static
+// destruction) have no language-level guarantee about relative destruction order - only reverse
+// order of construction, which is whatever each singleton's first caller happened to trigger at
+// runtime. Observed live via a crash dump: GetHandles() was constructed before GetTrace() in this
+// build, so at exit GetTrace() (constructed later, "on top") destructed FIRST, leaving
+// ~C__Handles() to EnterCriticalSection on GetTrace()'s already-DeleteCriticalSection'd
+// CRITICAL_SECTION - a straight access violation on a zeroed structure. Anything that might run
+// during another singleton's static destruction and wants to use GetTrace() must check this
+// first; there is no way to make the ordering itself reliable.
+bool IsTraceAlive();
 
 #endif // TRACE_ENABLE
 
 #define TRACE_MIT TRACE_MI
 
-#ifndef UNICODE
-
-#define TRACE_IT TRACE_I
-#define TRACE_WT TRACE_W
-#define TRACE_MET TRACE_ME
-#define TRACE_ET TRACE_E
-#define TRACE_MCT TRACE_MC
-#define TRACE_CT TRACE_C
-#define SetTraceProcessNameT SetTraceProcessName
-#define SetTraceThreadNameT SetTraceThreadName
-
-#else // UNICODE
 
 #define TRACE_IT TRACE_IW
 #define TRACE_WT TRACE_WW
@@ -700,4 +733,3 @@ extern C__Trace __Trace;
 #define SetTraceProcessNameT SetTraceProcessNameW
 #define SetTraceThreadNameT SetTraceThreadNameW
 
-#endif // UNICODE

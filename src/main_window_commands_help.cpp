@@ -1,25 +1,32 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
+#include "common/IShell.h"
+#include "menu_item_text.h"
+#include "ui/UnicodeHistoryUtils.h"
+
 #include "ui/IPrompter.h"
+#include "common/IFileEnumerator.h"
 #include "common/IFileSystem.h"
+#include "common/IPathService.h"
 
 // #97: defined in main_window_config_persistence.cpp - clamps a normal window rect to a
 // visible, sane size on a real monitor.
 RECT SanitizeMainWindowNormalRect(RECT rect);
 #include "common/fsutil.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/PanelPathPolicy.h"
 #include "common/IEnvironment.h"
 #include "windows_terminal_ui.h"
 #include "common/IRegistry.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
-#include "htmlhelp.h"
+#include <htmlhelp.h>
 #include "stswnd.h"
 #include "editwnd.h"
 #include "usermenu.h"
@@ -53,7 +60,7 @@ extern "C"
 #include "viewer.h"
 #include "common/widepath.h"
 
-static const char* CHECKVER_PLUGIN_DLL_SUFFIX = "checkver\\checkver.dll";
+static const wchar_t* CHECKVER_PLUGIN_DLL_SUFFIX = L"checkver\\checkver.dll";
 // Keep this in sync with CM_CHECK_VERSION in src/plugins/checkver/checkver.rh2.
 static const int CHECKVER_CMD_CHECK_VERSION = 90;
 
@@ -350,12 +357,12 @@ static LRESULT CALLBACK MainRebarDarkSubclassProc(HWND hwnd, UINT uMsg, WPARAM w
   QueryPerformanceCounter(&t2);
   c = 0;
   for (i = 0; i < count; i++)
-    c += StrICmp(s1, len1, s2, len1);
+    c += StrICmpW(s1, len1, s2, len1);
   QueryPerformanceCounter(&t3);
 
   QueryPerformanceFrequency(&f);
 
-  char buff[200];
+  wchar_t buff[200];
   double a = (double)(t2.QuadPart - t1.QuadPart) / f.QuadPart;
   double b = (double)(t3.QuadPart - t2.QuadPart) / f.QuadPart;
   sprintf(buff, "t1=%1.4lg\nt2=%1.4lg", a, b);
@@ -400,81 +407,78 @@ typedef struct tagHH_LAST_ERROR
     BSTR description;
 } HH_LAST_ERROR;
 
-BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)
+BOOL OpenHtmlHelp(const wchar_t* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)
 {
     //  SalMessageBox(parent, "This beta version doesn't contain help.\nPlease wait for the next beta version.",
     //                "Open Salamander Help", MB_OK | MB_ICONINFORMATION);
 
     HANDLES(EnterCriticalSection(&OpenHtmlHelpCS));
 
-    CPathBuffer helpPath;
-    if (CurrentHelpDir[0] == 0)
+    std::wstring helpPath;
+    if (CurrentHelpDir.empty())
     {
-        CPathBuffer helpSubdir; // Heap-allocated for long path support
-        helpSubdir[0] = 0;
+        std::wstring helpSubdir;
         CLanguage language;
-        if (language.Init(Configuration.LoadedSLGName, NULL))
+        if (language.Init(Configuration.LoadedSLGName.c_str(), NULL))
         {
-            lstrcpyn(helpSubdir, language.HelpDir, helpSubdir.Size());
+            helpSubdir = language.HelpDir;
             language.Free();
         }
-        if (helpSubdir[0] == 0)
+        if (helpSubdir.empty())
         {
             TRACE_E("OpenHtmlHelp(): unable to get (or empty) SLGHelpDir!");
-            strcpy(helpSubdir, "english");
+            helpSubdir = L"english";
         }
         BOOL ok = FALSE;
-        if (GetModuleFileName(HInstance, CurrentHelpDir, CurrentHelpDir.Size()) != 0 &&
-            CutDirectory(CurrentHelpDir) &&
-            SalPathAppend(CurrentHelpDir, "help", CurrentHelpDir.Size()) &&
-            DirExists(CurrentHelpDir))
+        std::wstring modulePath;
+        if (gPathService->GetModuleFileName(HInstance, modulePath).success &&
+            CutDirectoryW(modulePath))
         {
-            lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-            if (!SalPathAppend(helpPath, helpSubdir, helpPath.Size()) ||
-                !DirExists(helpPath))
+            SalPathAppendW(modulePath, L"help");
+            if (DirExistsW(modulePath.c_str()))
             { // the directory from the current .slg file does not exist
-                lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-                if (_stricmp(helpSubdir, "english") == 0 || // we already tested "english" and it does not exist so no point in trying again
-                    !SalPathAppend(helpPath, "english", helpPath.Size()) ||
-                    !DirExists(helpPath))
-                { // the ENGLISH directory does not exist
-                    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-                    if (SalPathAppend(helpPath, "*", helpPath.Size()))
-                    { // try to find at least some other directory
-                        WIN32_FIND_DATAW data;
-                        HANDLE find = SalFindFirstFileHW(helpPath, &data);
-                        if (find != INVALID_HANDLE_VALUE)
+                CurrentHelpDir = modulePath;
+                helpPath = CurrentHelpDir;
+                SalPathAppendW(helpPath, helpSubdir.c_str());
+                if (!DirExistsW(helpPath.c_str()))
+                { // the directory from the current .slg file does not exist
+                    helpPath = CurrentHelpDir;
+                    SalPathAppendW(helpPath, L"english");
+                    if (_wcsicmp(helpSubdir.c_str(), L"english") == 0 || // we already tested "english" and it does not exist so no point in trying again
+                        !DirExistsW(helpPath.c_str()))
+                    { // the ENGLISH directory does not exist
+                        HENUM find = gFileEnumerator->StartEnum(CurrentHelpDir.c_str(), L"*");
+                        if (find != INVALID_HENUM)
                         {
-                            do
+                            FileEnumEntry data;
+                            for (;;)
                             {
-                                char cFileNameA[MAX_PATH];
-                                WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                                if (strcmp(cFileNameA, ".") != 0 && strcmp(cFileNameA, "..") != 0 &&
-                                    (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // only if it is a directory
+                                const EnumResult next = gFileEnumerator->NextFile(find, data);
+                                if (!next.success || next.noMoreFiles)
+                                    break;
+                                if (data.name != L"." && data.name != L".." && data.IsDirectory())
                                 {
-                                    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-                                    if (SalPathAppend(helpPath, cFileNameA, helpPath.Size()))
-                                    {
-                                        ok = TRUE;
-                                        break;
-                                    }
+                                    helpPath = CurrentHelpDir;
+                                    SalPathAppendW(helpPath, data.name.c_str());
+                                    ok = TRUE;
+                                    break;
                                 }
-                            } while (SalLPFindNextFile(find, &data));
-                            HANDLES(FindClose(find));
+                            }
+                            gFileEnumerator->EndEnum(find);
                         }
                     }
+                    else
+                        ok = TRUE;
                 }
                 else
                     ok = TRUE;
+                if (ok)
+                    CurrentHelpDir = helpPath;
             }
-            else
-                ok = TRUE;
-            if (ok)
-                lstrcpyn(CurrentHelpDir, helpPath, CurrentHelpDir.Size());
         }
         if (!ok)
         {
-            CurrentHelpDir[0] = 0;
+            CurrentHelpDir.clear();
 
             HANDLES(LeaveCriticalSection(&OpenHtmlHelpCS));
 
@@ -534,26 +538,30 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     if (helpFileName != NULL) // plugin help: to open the window in the right position
     {                         // with remembered Favorites, we must open "sally.chm" first (then
                               // the plugin help opens in this same window)
-        lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-        if (SalPathAppend(helpPath, "sally.chm", helpPath.Size()) &&
-            FileExists(helpPath))
+        helpPath = CurrentHelpDir;
+        SalPathAppendW(helpPath, L"sally.chm");
+        if (FileExistsW(helpPath.c_str()))
         {
-            HtmlHelp(NULL, helpPath, HH_DISPLAY_TOC, 0); // ignore potential error
+            HtmlHelpW(NULL, helpPath.c_str(), HH_DISPLAY_TOC, 0); // ignore potential error
         }
     }
 
     BOOL ret = FALSE;
 
-    lstrcpyn(helpPath, CurrentHelpDir, helpPath.Size());
-    if (SalPathAppend(helpPath, helpFileName == NULL ? "sally.chm" : helpFileName, helpPath.Size()) &&
-        FileExists(helpPath))
+    helpPath = CurrentHelpDir;
+    SalPathAppendW(helpPath, helpFileName == NULL ? L"sally.chm" : helpFileName);
+    if (FileExistsW(helpPath.c_str()))
     {
-        if (HtmlHelp(NULL, helpPath, uCommand, dwData) == NULL)
+        if (HtmlHelpW(NULL, helpPath.c_str(), uCommand, dwData) == NULL)
         {
             BOOL errorHandled = FALSE;
             HH_LAST_ERROR lasterror;
             lasterror.cbStruct = sizeof(lasterror);
-            if (HtmlHelp(NULL, NULL, HH_GET_LAST_ERROR, (DWORD_PTR)&lasterror) != NULL)
+            // HH_GET_LAST_ERROR carries no string, so this compiled either way -
+            // which is exactly why the unsuffixed macro survived here. HtmlHelpA and HtmlHelpW are
+            // separate exports; this queries the error left by the HtmlHelpW call above, so it has
+            // to be the W form too.
+            if (HtmlHelpW(NULL, NULL, HH_GET_LAST_ERROR, (DWORD_PTR)&lasterror) != NULL)
             {
                 // Only report an error if we found one:
                 if (FAILED(lasterror.hr))
@@ -756,30 +764,6 @@ void CMainWindow::SafeHandleMenuNewMsg2(UINT uMsg, WPARAM wParam, LPARAM lParam,
     }
 }
 
-void CMainWindow::PostChangeOnPathNotification(const char* path, BOOL includingSubdirs)
-{
-    CALL_STACK_MESSAGE3("CMainWindow::PostChangeOnPathNotification(%s, %d)", path, includingSubdirs);
-
-    HANDLES(EnterCriticalSection(&DispachChangeNotifCS));
-
-    // add this notification to the array (for later processing)
-    CChangeNotifData data;
-    lstrcpyn(data.Path, path, MAX_PATH);
-    data.PathW = NULL;
-    data.IncludingSubdirs = includingSubdirs;
-    ChangeNotifArray.Add(data);
-    if (!ChangeNotifArray.IsGood())
-        ChangeNotifArray.ResetState(); // ignore errors (at worst we won't refresh)
-
-    // post a request to distribute path change notifications
-    HANDLES(EnterCriticalSection(&TimeCounterSection));
-    int t1 = MyTimeCounter++;
-    HANDLES(LeaveCriticalSection(&TimeCounterSection));
-    PostMessage(HWindow, WM_USER_DISPACHCHANGENOTIF, 0, t1);
-
-    HANDLES(LeaveCriticalSection(&DispachChangeNotifCS));
-}
-
 static wchar_t* DupWideChangeNotifPath(const wchar_t* path)
 {
     if (path == NULL)
@@ -816,7 +800,6 @@ void CMainWindow::PostChangeOnPathNotificationW(const wchar_t* path, BOOL includ
     HANDLES(EnterCriticalSection(&DispachChangeNotifCS));
 
     CChangeNotifData data;
-    data.Path[0] = 0;
     data.PathW = DupWideChangeNotifPath(path);
     data.IncludingSubdirs = includingSubdirs;
     if (data.PathW != NULL || path == NULL)
@@ -865,8 +848,6 @@ void BroadcastConfigChanged()
 
 void CMainWindow::FillViewModeMenu(CMenuPopup* popup, int firstIndex, int type)
 {
-    char buff[VIEW_NAME_MAX + 10];
-
     DWORD fistCMID;
     CFilesWindow* panel;
 
@@ -904,7 +885,6 @@ void CMainWindow::FillViewModeMenu(CMenuPopup* popup, int firstIndex, int type)
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_STATE |
                MENU_MASK_ID /*| MENU_MASK_SKILLLEVEL*/;
     mii.Type = MENU_TYPE_STRING | MENU_TYPE_RADIOCHECK;
-    mii.String = buff;
     int i;
     for (i = 0; i < VIEW_TEMPLATES_COUNT; i++)
     {
@@ -912,9 +892,10 @@ void CMainWindow::FillViewModeMenu(CMenuPopup* popup, int firstIndex, int type)
             continue;
 
         CViewTemplate* tmpl = &ViewTemplates.Items[i];
-        if (tmpl->Name[0] != 0)
+        if (!tmpl->Name.empty())
         {
-            sprintf(buff, "%s\tAlt+%d", tmpl->Name, i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
+            const std::wstring label = FormatStrW(L"%s\tAlt+%d", tmpl->Name.c_str(), i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
+            mii.String = const_cast<wchar_t*>(label.c_str());
 
             mii.ID = fistCMID + i;
 
@@ -1072,37 +1053,39 @@ void CMainWindow::SafeHandleMenuChngDrvMsg2(UINT uMsg, WPARAM wParam, LPARAM lPa
     }
 }
 
-void CMainWindow::ApplyCommandLineParams(const CCommandLineParams* cmdLineParams, BOOL setActivePanelAndPanelPaths)
+void CMainWindow::ApplyCommandLineParams(
+    const sally::cmdline::CommandLineRequest* cmdLineParams,
+    BOOL setActivePanelAndPanelPaths)
 {
     if (setActivePanelAndPanelPaths)
     {
         // first set the active panel
-        if (cmdLineParams->ActivatePanel == 1 && GetActivePanel() == RightPanel ||
-            cmdLineParams->ActivatePanel == 2 && GetActivePanel() == LeftPanel)
+        if (cmdLineParams->activatePanel == 1 && GetActivePanel() == RightPanel ||
+            cmdLineParams->activatePanel == 2 && GetActivePanel() == LeftPanel)
         {
             ChangePanel(FALSE);
         }
         // then we can set the path in the active panel
-        if (cmdLineParams->LeftPath[0] == 0 && cmdLineParams->RightPath[0] == 0 && cmdLineParams->ActivePath[0] != 0)
-            GetActivePanel()->ChangeDir(cmdLineParams->ActivePath); // makes no sense to combine with setting the left/right panel
+        if (cmdLineParams->leftPath.empty() && cmdLineParams->rightPath.empty() && !cmdLineParams->activePath.empty())
+            GetActivePanel()->ChangeDir(cmdLineParams->activePath.c_str()); // makes no sense to combine with setting the left/right panel
         else
         {
-            if (cmdLineParams->LeftPath[0] != 0)
-                LeftPanel->ChangeDir(cmdLineParams->LeftPath);
-            if (cmdLineParams->RightPath[0] != 0)
-                RightPanel->ChangeDir(cmdLineParams->RightPath);
+            if (!cmdLineParams->leftPath.empty())
+                LeftPanel->ChangeDir(cmdLineParams->leftPath.c_str());
+            if (!cmdLineParams->rightPath.empty())
+                RightPanel->ChangeDir(cmdLineParams->rightPath.c_str());
         }
     }
 
-    if (cmdLineParams->SetMainWindowIconIndex)
+    if (cmdLineParams->setMainWindowIconIndex)
     {
-        Configuration.MainWindowIconIndexForced = cmdLineParams->MainWindowIconIndex;
+        Configuration.MainWindowIconIndexForced = cmdLineParams->mainWindowIconIndex;
         SetWindowIcon();
     }
-    if (cmdLineParams->SetTitlePrefix)
+    if (cmdLineParams->setTitlePrefix)
     {
         Configuration.UseTitleBarPrefixForced = TRUE;
-        lstrcpyn(Configuration.TitleBarPrefixForced, cmdLineParams->TitlePrefix, TITLE_PREFIX_MAX);
+        Configuration.TitleBarPrefixForced = cmdLineParams->titlePrefix;
         SetWindowTitle();
     }
 }
@@ -1179,15 +1162,17 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
     if (registry == NULL)
         registry = GetWin32Registry();
     if (registry != NULL &&
-        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_A, hKey).success)
+        registry->OpenKeyReadWrite(HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_W, hKey).success)
     {
         // older SHELL32.DLL versions may not export this, fileIconInit will be NULL
         FT_FileIconInit fileIconInit = NULL;
-        fileIconInit = (FT_FileIconInit)GetProcAddress(Shell32DLL, MAKEINTRESOURCE(660)); // no header available
+        // GetProcAddress's 2nd argument is always LPCSTR (exported symbol/ordinal names are
+        // ANSI-only, no GetProcAddressW exists) - explicit MAKEINTRESOURCEA.
+        fileIconInit = (FT_FileIconInit)GetProcAddress(Shell32DLL, MAKEINTRESOURCEA(660)); // no header available
 
-        char size[50];
+        std::wstring size;
         BOOL deleteVal = FALSE;
-        if (!GetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size, _countof(size)).success)
+        if (!registry->GetString(hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_W, size).success)
         {
             // The values for the icon size are Shell Icon Size and
             // Shell Small Icon Size (both are stored as strings - not
@@ -1198,26 +1183,26 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
             // half of that for the small icon size. If you're trying to cause
             // a refresh and the registry entry doesn't exist, you can just
             // assume that the size is set to SM_CXICON.
-            sprintf(size, "%d", GetSystemMetrics(SM_CXICON));
+            size = std::to_wstring(GetSystemMetrics(SM_CXICON));
             deleteVal = TRUE;
         }
-        int val = atoi(size);
+        int val = _wtoi(size.c_str());
         if (val > 0) // unfortunately (according to net) users set icon sizes randomly (72, 96, 128, etc.) so we cannot filter out "strange" sizes
         {
             IgnoreWM_SETTINGCHANGE = TRUE;
 
-            sprintf(size, "%d", val - 1);
-            SetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size);
-            SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
+            size = std::to_wstring(val - 1);
+            registry->SetString(hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_W, size.c_str());
+            SendMessageW(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM)L"WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(FALSE);
-            sprintf(size, "%d", val);
-            SetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A, size);
-            SendMessage(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM) "WindowMetrics");
+            size = std::to_wstring(val);
+            registry->SetString(hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_W, size.c_str());
+            SendMessageW(MainWindow->HWindow, WM_SETTINGCHANGE, SPI_SETICONMETRICS, (LPARAM)L"WindowMetrics");
             if (fileIconInit != NULL)
                 fileIconInit(TRUE);
             if (deleteVal)
-                DeleteValueA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_A); // clean up after ourselves
+                registry->DeleteValue(hKey, SAL_REG_VALUE_SHELL_ICON_SIZE_W); // clean up after ourselves
             registry->CloseKey(hKey);
 
             IgnoreWM_SETTINGCHANGE = FALSE;
@@ -1271,7 +1256,7 @@ void CMainWindow::RebuildDriveBarsIfNeeded(BOOL useDrivesMask, DWORD drivesMask,
         if (!useDrivesMask)
         {
             DWORD netDrives; // bit array of network drives
-            GetNetworkDrives(netDrives, NULL);
+            GetNetworkDrives(netDrives);
             drivesMask = GetLogicalDrives() | netDrives;
         }
 
@@ -1349,14 +1334,14 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 };
 */
             InsertMenu(h, pos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(h, pos + 1, MF_BYPOSITION | MF_STRING | MF_ENABLED | (Configuration.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED),
-                       CM_ALWAYSONTOP, LoadStr(IDS_ALWAYSONTOP));
+            InsertMenuW(h, pos + 1, MF_BYPOSITION | MF_STRING | MF_ENABLED | (Configuration.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED),
+                       CM_ALWAYSONTOP, LoadStrW(IDS_ALWAYSONTOP));
         }
         SetWindowPos(HWindow,
                      Configuration.AlwaysOnTop ? HWND_TOPMOST : HWND_NOTOPMOST,
                      0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
-        HTopRebar = CreateWindowEx(WS_EX_TOOLWINDOW, REBARCLASSNAME, "",
+        HTopRebar = CreateWindowExW(WS_EX_TOOLWINDOW, REBARCLASSNAMEW, L"",
                                    WS_VISIBLE | WS_BORDER | WS_CHILD |
                                        WS_CLIPCHILDREN | WS_CLIPSIBLINGS |
                                        RBS_VARHEIGHT | CCS_NODIVIDER |
@@ -1366,7 +1351,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                    HWindow, (HMENU)0, HInstance, NULL);
         if (HTopRebar == NULL)
         {
-            TRACE_E("CreateWindowEx on " << REBARCLASSNAME);
+            TRACE_EW(L"CreateWindowEx on " << REBARCLASSNAME);
             return -1;
         }
 
@@ -1392,7 +1377,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             TRACE_E(LOW_MEMORY);
             return -1;
         }
-        if (!LeftPanel->Create(CWINDOW_CLASSNAME2, "",
+        if (!LeftPanel->Create(CWINDOW_CLASSNAME2, L"",
                                WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                0, 0, 0, 0,
                                HWindow,
@@ -1411,7 +1396,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             TRACE_E(LOW_MEMORY);
             return -1;
         }
-        if (!RightPanel->Create(CWINDOW_CLASSNAME2, "",
+        if (!RightPanel->Create(CWINDOW_CLASSNAME2, L"",
                                 WS_VISIBLE | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                 0, 0, 0, 0,
                                 HWindow,
@@ -1529,7 +1514,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         BottomToolBar->SetImageList(HBottomTBImageList);
         BottomToolBar->SetHotImageList(HHotBottomTBImageList);
 
-        TaskbarRestartMsg = RegisterWindowMessage(TEXT("TaskbarCreated"));
+        TaskbarRestartMsg = RegisterWindowMessageW(L"TaskbarCreated");
 
         Created = TRUE;
         return 0;
@@ -1593,14 +1578,24 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             return 0;
 
         // detection based on EXPLORER.EXE on NT4
-        if (lParam != 0 && stricmp((LPCTSTR)lParam, "Environment") == 0)
+        // The main window is registered and created through CWindow's wide-only adapters
+        // (sally_entry_lifecycle.cpp), so it is a genuine Unicode window
+        // and DefWindowProcW delivers WM_SETTINGCHANGE's lParam as wchar_t*. Reading it with
+        // stricmp saw 'E',0 and stopped at the embedded NUL, so NEITHER branch below could ever
+        // match - and RegenEnvironmentVariables() has no other caller, so environment variables
+        // were never regenerated on a settings broadcast at all. Silent: it compiles clean, and
+        // the fallback path below quietly absorbed every notification.
+        if (lParam != 0 && _wcsicmp((LPCWSTR)lParam, L"Environment") == 0)
         {
             // environment variables changed, refresh them
             if (Configuration.ReloadEnvVariables)
                 RegenEnvironmentVariables();
             return 0;
         }
-        if (lParam != 0 && stricmp((LPCTSTR)lParam, "Extensions.c_str()") == 0)
+        // The literal read "Extensions.c_str()" - a scar from an earlier mechanical
+        // sweep that appended .c_str() inside the string rather than after it. Upstream
+        // (mainwnd3.cpp:1262) compares against "Extensions"; restored, and widened with its sibling.
+        if (lParam != 0 && _wcsicmp((LPCWSTR)lParam, L"Extensions") == 0)
         {
             // file associations changed, refresh them
             // this path is probably no longer used, it's some old branch,
@@ -1664,9 +1659,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             break;
         }
 
-        // convert PIDL to a path
-        CPathBuffer szPath; // Heap-allocated for long path support
-        *szPath = 0; // an empty path means everything changed
+        // Convert the PIDL through the shell adapter into one exact dynamic owner.
+        // An empty path means everything changed.
+        std::wstring szPath;
         if (ppidl != NULL)
         {
             switch (wEventId)
@@ -1688,26 +1683,25 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             case SHCNE_DRIVEADDGUI:
             case SHCNE_EXTENDED_EVENT:
             {
-                if (!SHGetPathFromIDList(ppidl[0], szPath))
-                    szPath[0] = 0;
+                if (gShell == NULL || !gShell->GetFileSystemPathFromIdList(ppidl[0], szPath).success)
+                    szPath.clear();
                 break;
             }
             }
         }
         SHChangeNotification_Unlock(hLock); // ppidl is translated, we can free the memory
         ppidl = NULL;
-
         if (wEventId == SHCNE_UPDATEITEM)
         {
             //        TRACE_I("SHCNE_UPDATEITEM: " << szPath);
             if (LeftPanel != NULL && RightPanel != NULL)
             {
-                LeftPanel->IconOverlaysChangedOnPath(szPath);
-                RightPanel->IconOverlaysChangedOnPath(szPath);
-                if (CutDirectory(szPath))
+                LeftPanel->IconOverlaysChangedOnPath(szPath.c_str());
+                RightPanel->IconOverlaysChangedOnPath(szPath.c_str());
+                if (CutDirectoryW(szPath))
                 {
-                    LeftPanel->IconOverlaysChangedOnPath(szPath);
-                    RightPanel->IconOverlaysChangedOnPath(szPath);
+                    LeftPanel->IconOverlaysChangedOnPath(szPath.c_str());
+                    RightPanel->IconOverlaysChangedOnPath(szPath.c_str());
                 }
             }
         }
@@ -1728,8 +1722,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // (if it is displayed for the drive with inserted media)
                 if (wEventId == SHCNE_MEDIAINSERTED)
                 {
-                    if (*CheckPathRootWithRetryMsgBox != 0 &&
-                        HasTheSameRootPath(CheckPathRootWithRetryMsgBox, szPath))
+                    if (!CheckPathRootWithRetryMsgBox.empty() &&
+                        HasTheSameRootPath(CheckPathRootWithRetryMsgBox.c_str(), szPath.c_str()))
                     {
                         if (LastDriveSelectErrDlgHWnd != NULL)
                             PostMessage(LastDriveSelectErrDlgHWnd, WM_COMMAND, IDRETRY, 0);
@@ -1744,9 +1738,17 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // if the panels show CD-ROM or removable media, refresh them
                 while (1)
                 {
-                    if ((panel->Is(ptDisk) || panel->Is(ptZIPArchive)) && !IsUNCPath(panel->GetPath()))
+                    // Decides whether this panel sits on removable media and
+                    // must be refreshed after a device change. Asked of the CP_ACP mirror,
+                    // MyGetDriveType reports the type of whatever the '?'-string names - or
+                    // DRIVE_NO_ROOT_DIR for nothing at all - so a panel on a CD or a USB
+                    // stick silently stops refreshing when the medium changes. For an
+                    // archive panel GetPathW() is the directory CONTAINING the archive
+                    // (SetPathW(archiveDirW) in ChangePathToArchive), so it is a real
+                    // filesystem path here too.
+                    if ((panel->Is(ptDisk) || panel->Is(ptZIPArchive)) && !IsUNCPathW(panel->GetPathW()))
                     {
-                        UINT type = MyGetDriveType(panel->GetPath());
+                        UINT type = MyGetDriveTypeW(panel->GetPathW());
                         if (type == DRIVE_CDROM || type == DRIVE_REMOVABLE)
                         {
                             HANDLES(EnterCriticalSection(&TimeCounterSection)); // capture the time when a refresh is needed
@@ -1805,7 +1807,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
           if (panel->Is(ptDisk) || panel->Is(ptZIPArchive))
           {
-            UINT type = MyGetDriveType(panel->GetPath());
+            UINT type = MyGetDriveType(panel->GetPathW());
             if (type == DRIVE_CDROM || type == DRIVE_REMOVABLE)
             {
               HANDLES(EnterCriticalSection(&TimeCounterSection));  // capture the time when a refresh is needed
@@ -2188,8 +2190,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         BOOL oldUseCustomPanelFont = UseCustomPanelFont;
         LOGFONT oldLogFont = LogFont;
         CConfigurationDlg dlg(HWindow, UserMenuItems, (int)wParam, (int)lParam);
-        int res = dlg.Execute(LoadStr(IDS_BUTTON_OK), LoadStr(IDS_BUTTON_CANCEL),
-                              LoadStr(IDS_BUTTON_HELP));
+        // wide: CTreePropDialog::Execute embeds these into a DLGTEMPLATE, whose
+        // control-text fields are always UTF-16 regardless of ANSI/Unicode entry point.
+        int res = dlg.Execute(LoadStrW(IDS_BUTTON_OK), LoadStrW(IDS_BUTTON_CANCEL),
+                              LoadStrW(IDS_BUTTON_HELP));
         if (readingUMIcons)
             UserMenuIconBkgndReader.EndUserMenuIconsInUse();
 
@@ -2456,25 +2460,38 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     IContextMenu* menu2 = ContextMenuNew->GetMenu2();
                     menu2->AddRef(); // just in case ContextMenuNew vanishes asynchronously (message loop)
                     CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
-                    ici.hwnd = shellExecuteWnd.Create(HWindow, "SEW: CMainWindow::WindowProc cmd=%d", LOWORD(wParam) - CM_NEWMENU_MIN);
-                    ici.lpVerb = MAKEINTRESOURCE((LOWORD(wParam) - CM_NEWMENU_MIN));
+                    CMINVOKECOMMANDINFOEX ici;
+                    ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
+                    ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
+                    // CMIC_MASK_UNICODE + lpDirectoryW, same as the shell-verb
+                    // invocations in ShellAction: without it, lpDirectory alone reaches the
+                    // handler, and for a non-ANSI panel path that is "D:\???\" - a working
+                    // directory that does not exist, so New > Text Document/Folder either
+                    // failed or landed in the wrong place even though the submenu itself
+                    // (built via GetNewOrBackgroundMenuW) already listed the right folder.
+                    ici.fMask = CMIC_MASK_UNICODE;
+                    ici.hwnd = shellExecuteWnd.Create(HWindow, L"SEW: CMainWindow::WindowProc cmd=%d", LOWORD(wParam) - CM_NEWMENU_MIN);
+                    // lpVerb is always LPCSTR regardless of the Ex/wide fields alongside it.
+                    ici.lpVerb = MAKEINTRESOURCEA((LOWORD(wParam) - CM_NEWMENU_MIN));
+                    ici.lpVerbW = MAKEINTRESOURCEW((LOWORD(wParam) - CM_NEWMENU_MIN));
                     ici.lpParameters = NULL;
-                    ici.lpDirectory = activePanel->GetPath();
+                    const std::wstring dirW = activePanel->GetPathW();
+                    ici.lpDirectoryW = dirW.c_str();
                     ici.nShow = SW_SHOWNORMAL;
                     ici.dwHotKey = 0;
                     ici.hIcon = 0;
                     activePanel->FocusFirstNewItem = TRUE; // select the newly generated file/directory
 
-                    CMainWindowWindowProcAux(menu2, ici);
+                    CMainWindowWindowProcAux(menu2, *(CMINVOKECOMMANDINFO*)&ici);
 
                     menu2->Release();
                 }
                 //---  refresh directories that are not automatically refreshed
                 // announce a change in the current directory (a new file or directory is most likely created there)
-                MainWindow->PostChangeOnPathNotification(activePanel->GetPath(), FALSE);
+                // Wide: the notification is MATCHED against watched paths, so a
+                // CP_ACP rendering of a path the code page cannot represent names a different
+                // directory (or none) and the panel silently never refreshes after New.
+                MainWindow->PostChangeOnPathNotificationW(activePanel->GetPathW(), FALSE);
             }
             else
                 TRACE_E("ContextMenuNew is not valid anymore, it is not posible to invoke menu New command.");
@@ -2544,8 +2561,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
                 CUserMenuAdvancedData userMenuAdvancedData;
 
-                char* list = userMenuAdvancedData.ListOfSelNames;
-                char* listEnd = list + USRMNUARGS_MAXLEN - 1;
+                std::wstring& list = userMenuAdvancedData.ListOfSelNames;
                 BOOL smallBuf = FALSE;
                 if (activePanel->SelectedCount > 0)
                 {
@@ -2556,14 +2572,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         CFileData* file = (i < activePanel->Dirs->Count) ? &activePanel->Dirs->At(i) : &activePanel->Files->At(i - activePanel->Dirs->Count);
                         if (file->Selected)
                         {
-                            if (list > userMenuAdvancedData.ListOfSelNames)
-                            {
-                                if (list < listEnd)
-                                    *list++ = ' ';
-                                else
-                                    break;
-                            }
-                            if (!AddToListOfNames(&list, listEnd, file->Name, file->NameLen))
+                            if (!AppendUserMenuArgument(list, file->Name, file->NameLen, USRMNUARGS_MAXLEN - 1))
                                 break;
                         }
                     }
@@ -2574,7 +2583,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 {
                     BOOL subDir;
                     if (activePanel->Dirs->Count > 0)
-                        subDir = (strcmp(activePanel->Dirs->At(0).Name, "..") == 0);
+                        subDir = (wcscmp(activePanel->Dirs->At(0).Name, L"..") == 0);
                     else
                         subDir = FALSE;
                     int index = activePanel->GetCaretIndex();
@@ -2582,25 +2591,22 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        if (!AddToListOfNames(&list, listEnd, file->Name, file->NameLen))
+                        if (!AppendUserMenuArgument(list, file->Name, file->NameLen, USRMNUARGS_MAXLEN - 1))
                             smallBuf = TRUE;
                     }
                 }
                 if (smallBuf)
                 {
-                    userMenuAdvancedData.ListOfSelNames[0] = 0; // small buffer for the list of selected names
+                    list.clear(); // the expanded command cannot carry the complete selection
                     userMenuAdvancedData.ListOfSelNamesIsEmpty = FALSE;
                 }
                 else
                 {
-                    *list = 0;
-                    userMenuAdvancedData.ListOfSelNamesIsEmpty = userMenuAdvancedData.ListOfSelNames[0] == 0;
+                    userMenuAdvancedData.ListOfSelNamesIsEmpty = list.empty();
                 }
 
-                char* listFull = userMenuAdvancedData.ListOfSelFullNames;
-                char* listFullEnd = listFull + USRMNUARGS_MAXLEN - 1;
+                std::wstring& listFull = userMenuAdvancedData.ListOfSelFullNames;
                 smallBuf = FALSE;
-                CPathBuffer fullName;  // Heap-allocated for long path support
                 if (activePanel->SelectedCount > 0)
                 {
                     int count = activePanel->Files->Count + activePanel->Dirs->Count;
@@ -2610,16 +2616,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         CFileData* file = (i < activePanel->Dirs->Count) ? &activePanel->Dirs->At(i) : &activePanel->Files->At(i - activePanel->Dirs->Count);
                         if (file->Selected)
                         {
-                            if (listFull > userMenuAdvancedData.ListOfSelFullNames)
-                            {
-                                if (listFull < listFullEnd)
-                                    *listFull++ = ' ';
-                                else
-                                    break;
-                            }
-                            lstrcpyn(fullName, activePanel->GetPath(), fullName.Size());
-                            if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
-                                !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                            std::wstring fullName = activePanel->GetPathW();
+                            SalPathAppendW(fullName, file->Name);
+                            if (!AppendUserMenuArgument(listFull, fullName.c_str(), fullName.length(), USRMNUARGS_MAXLEN - 1))
                                 break;
                         }
                     }
@@ -2630,7 +2629,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 {
                     BOOL subDir;
                     if (activePanel->Dirs->Count > 0)
-                        subDir = (strcmp(activePanel->Dirs->At(0).Name, "..") == 0);
+                        subDir = (wcscmp(activePanel->Dirs->At(0).Name, L"..") == 0);
                     else
                         subDir = FALSE;
                     int index = activePanel->GetCaretIndex();
@@ -2638,9 +2637,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        lstrcpyn(fullName, activePanel->GetPath(), fullName.Size());
-                        if (!SalPathAppend(fullName, file->Name, fullName.Size()) ||
-                            !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                        std::wstring fullName = activePanel->GetPathW();
+                        SalPathAppendW(fullName, file->Name);
+                        if (!AppendUserMenuArgument(listFull, fullName.c_str(), fullName.length(), USRMNUARGS_MAXLEN - 1))
                         {
                             smallBuf = TRUE;
                         }
@@ -2648,35 +2647,32 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 if (smallBuf)
                 {
-                    userMenuAdvancedData.ListOfSelFullNames[0] = 0; // small buffer for the list of selected full names
+                    listFull.clear(); // the expanded command cannot carry the complete selection
                     userMenuAdvancedData.ListOfSelFullNamesIsEmpty = FALSE;
                 }
                 else
                 {
-                    *listFull = 0;
-                    userMenuAdvancedData.ListOfSelFullNamesIsEmpty = userMenuAdvancedData.ListOfSelFullNames[0] == 0;
+                    userMenuAdvancedData.ListOfSelFullNamesIsEmpty = listFull.empty();
                 }
 
                 if (LeftPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), userMenuAdvancedData.FullPathLeft.Size());
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, userMenuAdvancedData.FullPathLeft.Size()))
-                        userMenuAdvancedData.FullPathLeft[0] = 0;
+                    userMenuAdvancedData.FullPathLeft = LeftPanel->GetPathW();
+                    SalPathAddBackslashW(userMenuAdvancedData.FullPathLeft);
                 }
                 else
-                    userMenuAdvancedData.FullPathLeft[0] = 0;
+                    userMenuAdvancedData.FullPathLeft.clear();
                 if (RightPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), userMenuAdvancedData.FullPathRight.Size());
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, userMenuAdvancedData.FullPathRight.Size()))
-                        userMenuAdvancedData.FullPathRight[0] = 0;
+                    userMenuAdvancedData.FullPathRight = RightPanel->GetPathW();
+                    SalPathAddBackslashW(userMenuAdvancedData.FullPathRight);
                 }
                 else
-                    userMenuAdvancedData.FullPathRight[0] = 0;
-                userMenuAdvancedData.FullPathInactive = (activePanel == LeftPanel) ? userMenuAdvancedData.FullPathRight : userMenuAdvancedData.FullPathLeft;
+                    userMenuAdvancedData.FullPathRight.clear();
+                userMenuAdvancedData.FullPathInactive = (activePanel == LeftPanel) ? &userMenuAdvancedData.FullPathRight : &userMenuAdvancedData.FullPathLeft;
 
-                userMenuAdvancedData.CompareName1[0] = 0;
-                userMenuAdvancedData.CompareName2[0] = 0;
+                userMenuAdvancedData.CompareName1.clear();
+                userMenuAdvancedData.CompareName2.clear();
                 userMenuAdvancedData.CompareNamesAreDirs = FALSE;
                 userMenuAdvancedData.CompareNamesReversed = FALSE;
                 CFilesWindow* inactivePanel = (activePanel == LeftPanel) ? RightPanel : LeftPanel;
@@ -2685,7 +2681,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 BOOL f2FromInactPanel = FALSE;
                 int focus = activePanel->GetCaretIndex();
                 BOOL focusOnUpDir = (focus == 0 && activePanel->Dirs->Count > 0 &&
-                                     strcmp(activePanel->Dirs->At(0).Name, "..") == 0);
+                                     wcscmp(activePanel->Dirs->At(0).Name, L"..") == 0);
                 int indexes[3];
                 int selCount = activePanel->GetSelItems(3, indexes); // interested in: 0-2=number selected, 3=more than two
                 int tgtIndexes[2];
@@ -2745,8 +2741,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                             for (i = 0; i < c; i++)
                             {
                                 CFileData* f = (i < inactivePanel->Dirs->Count) ? &inactivePanel->Dirs->At(i) : &inactivePanel->Files->At(i - inactivePanel->Dirs->Count);
+                                // wide: ANSI compare first (cheap), wide compare to
+                                // confirm - two different names outside the code page share one
+                                // StrICmp is wide over the only name.
                                 if (f->NameLen == f1->NameLen &&
-                                    StrICmp(f->Name, f1->Name) == 0)
+                                    StrICmpW(f->Name, f1->Name) == 0)
                                 {
                                     if ((i < inactivePanel->Dirs->Count) == userMenuAdvancedData.CompareNamesAreDirs) // both items are files/directories
                                     {
@@ -2761,30 +2760,24 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 if (f1 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), userMenuAdvancedData.CompareName1.Size());
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, userMenuAdvancedData.CompareName1.Size()))
-                        userMenuAdvancedData.CompareName1[0] = 0;
+                    userMenuAdvancedData.CompareName1 = activePanel->GetPathW();
+                    SalPathAppendW(userMenuAdvancedData.CompareName1, f1->Name);
                 }
                 if (f2 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName2,
-                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), userMenuAdvancedData.CompareName2.Size());
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, userMenuAdvancedData.CompareName2.Size()))
-                        userMenuAdvancedData.CompareName2[0] = 0;
-                    else
-                    {
-                        if (f2FromInactPanel && inactivePanel == LeftPanel)
-                            userMenuAdvancedData.CompareNamesReversed = TRUE;
-                    }
+                    userMenuAdvancedData.CompareName2 = (f2FromInactPanel ? inactivePanel : activePanel)->GetPathW();
+                    SalPathAppendW(userMenuAdvancedData.CompareName2, f2->Name);
+                    if (f2FromInactPanel && inactivePanel == LeftPanel)
+                        userMenuAdvancedData.CompareNamesReversed = TRUE;
                 }
-                if (userMenuAdvancedData.CompareName1[0] != 0 &&
-                    userMenuAdvancedData.CompareName2[0] == 0 && activePanel == RightPanel)
+                if (!userMenuAdvancedData.CompareName1.empty() &&
+                    userMenuAdvancedData.CompareName2.empty() && activePanel == RightPanel)
                 {
                     userMenuAdvancedData.CompareNamesReversed = TRUE;
                 }
 
                 CUMDataFromPanel data(activePanel);
-                EnvSetCurrentDirectoryA(gEnvironment, activePanel->GetPath());
+                gEnvironment->SetCurrentDirectory(activePanel->GetPathW());
                 UserMenu(HWindow, LOWORD(wParam) - CM_USERMENU_MIN, GetNextFileFromPanel,
                          &data, &userMenuAdvancedData);
                 SetCurrentDirectoryToSystem();
@@ -2898,7 +2891,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 */
         case CM_FORUM:
         {
-            ShellExecute(HWindow, "open", "https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecuteW(HWindow, L"open", L"https://github.com/0xeb/sally/discussions", NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 
@@ -3068,39 +3061,36 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             // Same directory salmon uses, computed directly so this works even when salmon
             // is not running: %LOCALAPPDATA%\Open Salamander.
-            char reportPath[MAX_PATH];
-            reportPath[0] = 0;
-            if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, reportPath) != S_OK)
+            std::wstring reportPath;
+            if (gShell == NULL || !gShell->GetKnownFolderPath(FOLDERID_LocalAppData, reportPath).success)
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_BUGREPORT_FAILED));
                 return 0;
             }
-            int len = lstrlen(reportPath);
-            if (len > 0 && reportPath[len - 1] == '\\')
-                reportPath[len - 1] = 0;
-            lstrcat(reportPath, "\\Open Salamander");
+            SalPathAppendW(reportPath, L"Open Salamander");
 
             // Directory creation goes through the interface, never Win32 directly, so this
             // file stays out of the win32-isolation allowlist.
-            std::wstring reportDirW = AnsiToWide(reportPath);
-            if (gFileSystem != NULL && !gFileSystem->DirectoryExists(reportDirW.c_str()))
-                gFileSystem->CreateDirectory(reportDirW.c_str());
+            // reportPath is wchar_t[]; the AnsiToWide that stood here was
+            // converting an already-wide buffer.
+            if (gFileSystem != NULL && !gFileSystem->DirectoryExists(reportPath.c_str()))
+                gFileSystem->CreateDirectory(reportPath.c_str());
 
             // Must end in .TXT: that is what salmon's existing scan of this directory looks
             // for when it offers to compress and upload old reports.
             SYSTEMTIME st;
             GetLocalTime(&st);
-            char fileName[64];
-            _snprintf_s(fileName, _TRUNCATE, "\\Sally-report-%04d%02d%02d-%02d%02d%02d.TXT",
+            wchar_t fileName[64];
+            _snwprintf_s(fileName, _TRUNCATE, L"Sally-report-%04d%02d%02d-%02d%02d%02d.TXT",
                         st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
-            lstrcat(reportPath, fileName);
+            SalPathAppendW(reportPath, fileName);
 
-            if (CCallStack::CreateBugReportFile(NULL, GetCurrentThreadId(), -1, reportPath))
+            // The crash-report payload is deliberately ANSI, but this path is UTF-16 from its
+            // profile-directory source to the crash-safe file creation boundary.
+            if (CCallStack::CreateBugReportFile(NULL, GetCurrentThreadId(), -1, reportPath.c_str()))
             {
-                char message[MAX_PATH + 200];
-                _snprintf_s(message, _TRUNCATE, "%s\n\n%s",
-                            LoadStr(IDS_BUGREPORT_WRITTEN), reportPath);
-                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), AnsiToWide(message).c_str());
+                std::wstring message = FormatStrW(L"%s\n\n%s", LoadStrW(IDS_BUGREPORT_WRITTEN), reportPath.c_str());
+                gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), message.c_str());
             }
             else
             {
@@ -3154,14 +3144,18 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             {
                 UpdateWindow(HWindow);
 
+                // Only the UNC prefix matters here and "\\\\" survives any code
+                // page, so this was not producing a wrong answer - but the mirror is not
+                // needed to ask the question, and leaving it invites the next reader to
+                // reach for the removed ANSI mirror again.
                 if ((LeftPanel->Is(ptDisk) || LeftPanel->Is(ptZIPArchive)) &&
-                    IsUNCPath(LeftPanel->GetPath()) &&
+                    IsUNCPathW(LeftPanel->GetPathW()) &&
                     LeftPanel->DirectoryLine != NULL)
                 {
                     LeftPanel->DirectoryLine->BuildHotTrackItems();
                 }
                 if ((RightPanel->Is(ptDisk) || RightPanel->Is(ptZIPArchive)) &&
-                    IsUNCPath(RightPanel->GetPath()) &&
+                    IsUNCPathW(RightPanel->GetPathW()) &&
                     RightPanel->DirectoryLine != NULL)
                 {
                     RightPanel->DirectoryLine->BuildHotTrackItems();
@@ -3180,22 +3174,19 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 PostMessage(HWindow, WM_USER_DRIVES_CHANGE, 0, 0);
             }
 
-            const char* focusPlugin = dlg.GetFocusPlugin();
+            const wchar_t* focusPlugin = dlg.GetFocusPlugin();
             if (focusPlugin[0] != 0)
             {
-                CPathBuffer newPath; // Heap-allocated for long path support
-                lstrcpyn(newPath, focusPlugin, newPath.Size());
-                const char* newName;
-                char* p = strrchr(newPath, '\\');
-                if (p != NULL)
+                std::wstring newPath = focusPlugin;
+                const size_t separator = newPath.find_last_of(L'\\');
+                const wchar_t* newName = L"";
+                if (separator != std::wstring::npos)
                 {
-                    p++;
-                    *p = 0;
-                    newName = focusPlugin + int(p - newPath);
+                    newName = focusPlugin + separator + 1;
+                    newPath.resize(separator + 1);
                 }
-                else
-                    newName = "";
-                SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath.Get());
+                // SendMessage is synchronous, so 'focusPlugin' and 'newPath' outlive the call.
+                SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath.c_str());
             }
 
             EndStopRefresh(); // snooper starts again now
@@ -3204,21 +3195,23 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_SAVECONFIG:
         {
+            // ConfigurationNameW preserves non-ASCII install directories.
             // if an exported configuration already exists, show a warning
-            if (FileExists(ConfigurationName))
+            if (FileExistsW(ConfigurationNameW.c_str()))
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_SAVECFG_EXPFILEEXISTS), AnsiToWide(ConfigurationName).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_SAVECFG_EXPFILEEXISTS), ConfigurationNameW.c_str());
                 PromptResult ret = gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 if (ret.type == PromptResult::kCancel)
                 {
                     // navigate the user to the correct directory and focus the configuration file to make it easier
-                    CPathBuffer path; // Heap-allocated for long path support
-                    char* s = strrchr(ConfigurationName, '\\');
-                    if (s != NULL)
+                    size_t s = ConfigurationNameW.find_last_of(L'\\');
+                    if (s != std::wstring::npos)
                     {
-                        memcpy(path, ConfigurationName, s - ConfigurationName);
-                        path[s - ConfigurationName] = 0;
-                        SendMessage(activePanel->HWindow, WM_USER_FOCUSFILE, (WPARAM)(s + 1), (LPARAM)path.Get());
+                        std::wstring path = ConfigurationNameW.substr(0, s);
+                        CFocusFileDataW focus;
+                        focus.Name = ConfigurationNameW.c_str() + s + 1;
+                        focus.Path = path.c_str();
+                        SendMessage(activePanel->HWindow, WM_USER_FOCUSFILEW, (WPARAM)&focus, 0);
                     }
                     return 0;
                 }
@@ -3238,9 +3231,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 SaveConfig();
             }
 
-            CPathBuffer file; // Heap-allocated for long path support
-            CPathBuffer defDir; // Heap-allocated for long path support
-            strcpy(file, "config_.reg");
+            // Wide end to end: a non-ANSI Windows account name puts a non-ANSI component in
+            // CreateOurPathInRoamingAPPDATAW's own suggested directory, and the user is free to
+            // type/browse to any real path in the save dialog regardless of the active ANSI code
+            // page - narrowing anywhere in this chain (the old OPENFILENAME/SalGetFullName/
+            // ExportConfiguration route) could silently target a different, wrong file.
+            std::wstring defDir;
 
             bool clearKeyBeforeImport = true;
             gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE),
@@ -3249,7 +3245,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             if (WindowsVistaAndLater)
             {
-                if (!CreateOurPathInRoamingAPPDATA(defDir))
+                if (!CreateOurPathInRoamingAPPDATAW(defDir))
                 {
                     TRACE_E("CM_EXPORTCONFIG: unexpected situation: unable to get our directory under CSIDL_APPDATA");
                     return 0;
@@ -3257,40 +3253,44 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             }
             else
             {
-                GetModuleFileName(HInstance, defDir, defDir.Size());
-                *strrchr(defDir, '\\') = 0;
+                if (gPathService == NULL || !gPathService->GetModuleFileName(HInstance, defDir).success)
+                    return 0;
+                const size_t separator = defDir.find_last_of(L'\\');
+                if (separator == std::wstring::npos)
+                    return 0;
+                defDir.resize(separator);
             }
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
-            ofn.hwndOwner = HWindow;
-            char* s = LoadStr(IDS_REGFILTER);
-            ofn.lpstrFilter = s;
+            std::wstring fileName = L"config_.reg";
+            wchar_t* filter = LoadStrW(IDS_REGFILTER);
+            wchar_t* s = filter;
             while (*s != 0) // create a double-null-terminated list
             {
-                if (*s == '|')
+                if (*s == L'|')
                     *s = 0;
                 s++;
             }
+            OPENFILENAMEW ofn;
+            memset(&ofn, 0, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = HWindow;
+            ofn.lpstrFilter = filter;
             ofn.nFilterIndex = 1;
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
-            ofn.lpstrInitialDir = defDir;
-
+            ofn.lpstrInitialDir = defDir.c_str();
             ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
-            ofn.lpstrDefExt = "reg";
+            ofn.lpstrDefExt = L"reg";
 
-            if (SafeGetSaveFileName(&ofn))
+            if (SafeGetSaveFileNameOwnedW(&ofn, fileName))
             {
-                if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
+                std::wstring fullName = fileName;
+                if (SalGetFullNameW(fullName))
                 {
                     // perform the export
-                    if (ExportConfiguration(HWindow, file, clearKeyBeforeImport))
+                    if (ExportConfigurationW(HWindow, fullName.c_str(), clearKeyBeforeImport))
                     {
                         gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_CONFIGEXPORTED));
                     }
                     else
-                        gFileSystem->DeleteFile(AnsiToWide(file).c_str());
+                        gFileSystem->DeleteFile(fullName.c_str());
                 }
             }
             return 0;
@@ -3308,22 +3308,27 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             if (dlg.Execute() == IDOK)
             {
                 // user chose Focus
-                const char* path = dlg.GetFocusedPath();
+                // wide route: the local path came straight from NetShareEnum's
+                // wide result via GetFocusedPathW, never through the CP_ACP mirror, so a
+                // shared folder outside CP_ACP now focuses the right item instead of the
+                // wrong one (or none at all).
+                const wchar_t* path = dlg.GetFocusedPathW();
                 if (path != NULL)
                 {
-                    CPathBuffer newPath; // Heap-allocated for long path support
-                    lstrcpyn(newPath, path, newPath.Size());
-                    const char* newName;
-                    char* p = strrchr(newPath, '\\');
-                    if (p != NULL)
+                    std::wstring newPath = path;
+                    const wchar_t* newName;
+                    size_t p = newPath.find_last_of(L'\\');
+                    if (p != std::wstring::npos)
                     {
-                        p++;
-                        *p = 0;
-                        newName = path + int(p - newPath);
+                        newName = path + (p + 1);
+                        newPath.resize(p + 1);
                     }
                     else
-                        newName = "";
-                    SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath.Get());
+                        newName = L""; // no backslash - newPath stays the full path, matching the narrow behavior
+                    CFocusFileDataW focus;
+                    focus.Name = newName;
+                    focus.Path = newPath.c_str();
+                    SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILEW, (WPARAM)&focus, 0);
                 }
             }
             break;
@@ -3585,7 +3590,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_LEFTREFRESH: // refresh the left panel
         {
-            LeftPanel->NextFocusName[0] = 0;
             LeftPanel->NextFocusNameW.clear();
             while (SnooperSuspended)
                 EndSuspendMode(); // safety catch to resume refreshing
@@ -3603,7 +3607,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_RIGHTREFRESH: // refresh the right panel
         {
-            RightPanel->NextFocusName[0] = 0;
             RightPanel->NextFocusNameW.clear();
             while (SnooperSuspended)
                 EndSuspendMode(); // safety catch to resume refreshing
@@ -3621,7 +3624,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_ACTIVEREFRESH: // refresh the right panel
         {
-            activePanel->NextFocusName[0] = 0;
             activePanel->NextFocusNameW.clear();
             while (SnooperSuspended)
                 EndSuspendMode(); // safety catch to resume refreshing
@@ -3687,8 +3689,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            CPathBuffer temporarySelected; // Heap-allocated for long path support
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+            const std::wstring temporarySelected = activePanel->SelectFocusedItemAndGetName();
 
             activePanel->EmailFiles();
 
@@ -3718,8 +3719,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            CPathBuffer temporarySelected; // Heap-allocated for long path support
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+            const std::wstring temporarySelected = activePanel->SelectFocusedItemAndGetName();
 
             if (activePanel->Is(ptDisk)) // source is disk - all operations go here
             {
@@ -3852,8 +3852,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 activePanel->StoreSelection(); // save selection for Restore Selection command
 
                 // if no item is selected, choose the one under the focus and store its name
-                CPathBuffer temporarySelected; // Heap-allocated for long path support
-                activePanel->SelectFocusedItemAndGetName(temporarySelected, temporarySelected.Size());
+                const std::wstring temporarySelected = activePanel->SelectFocusedItemAndGetName();
 
                 activePanel->Convert();
 
@@ -4203,16 +4202,22 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // currently we support only ptDisk<->ptDisk, ptDisk<->ptZIPArchive and ptZIPArchive<->ptZIPArchive
             //if (LeftPanel->Is(ptPluginFS) || RightPanel->Is(ptPluginFS))
             //{
-            //  SalMessageBox(HWindow, LoadStr(IDS_COMPARE_FS), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONINFORMATION);
+            //  SalMessageBoxW(HWindow, LoadStrW(IDS_COMPARE_FS), LoadStrW(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONINFORMATION);
             //  return 0;
             //}
 
             // if both panels point to the same path, exit
-            CPathBuffer leftPath;  // Heap-allocated for long path support
-            CPathBuffer rightPath; // Heap-allocated for long path support
-            LeftPanel->GetGeneralPath(leftPath, leftPath.Size());
-            RightPanel->GetGeneralPath(rightPath, rightPath.Size());
-            if (strcmp(leftPath, rightPath) == 0) // case sensitive; if this condition fails, it's fine
+            // Wide comparison. GetGeneralPath's plugin-FS route (PluginFS.GetCurrentPath)
+            // can be a best-fit ANSI mirror of the plugin's real wide path (confirmed for regedt,
+            // whose registry key names are genuinely Unicode) - two DIFFERENT wide paths that both
+            // mangle to the same '?'-laden narrow string used to strcmp equal and silently no-op
+            // "Compare Directories" instead of opening it. leftPath/rightPath are used only for
+            // this one check.
+            std::wstring leftPath;
+            std::wstring rightPath;
+            LeftPanel->GetGeneralPath(leftPath);
+            RightPanel->GetGeneralPath(rightPath);
+            if (leftPath == rightPath) // case sensitive; if this condition fails, it's fine
             {
                 gPrompter->ShowInfo(LoadStrW(IDS_COMPAREDIRSTITLE), LoadStrW(IDS_COMPARE_SAMEPATH));
                 return 0;
@@ -4579,10 +4584,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             LeftPanel = RightPanel;
             RightPanel = swap;
             // swap toolbar records
-            char buff[1024];
-            lstrcpy(buff, Configuration.LeftToolBar);
-            lstrcpy(Configuration.LeftToolBar, Configuration.RightToolBar);
-            lstrcpy(Configuration.RightToolBar, buff);
+            std::swap(Configuration.LeftToolBar, Configuration.RightToolBar);
             // set panel variables and load the toolbars
             LeftPanel->DirectoryLine->SetLeftPanel(TRUE);
             RightPanel->DirectoryLine->SetLeftPanel(FALSE);
@@ -4834,7 +4836,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 NeedToResentDispachChangeNotif = TRUE;
             else
             {
-                CPathBuffer path; // Heap-allocated for long path support
                 std::wstring pathW;
                 BOOL includingSubdirs;
                 BOOL ok = TRUE;
@@ -4844,11 +4845,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     if (ChangeNotifArray.Count > 0)
                     {
                         CChangeNotifData* item = &ChangeNotifArray[ChangeNotifArray.Count - 1];
-                        pathW = item->PathW != NULL ? item->PathW : AnsiToWide(item->Path);
-                        if (item->PathW != NULL)
-                            WideToAnsi(pathW, path, path.Size());
-                        else
-                            strcpy(path, item->Path);
+                        pathW = item->PathW != NULL ? item->PathW : L"";
                         includingSubdirs = item->IncludingSubdirs;
                         FreeChangeNotifData(*item);
                         ChangeNotifArray.Delete(ChangeNotifArray.Count - 1);
@@ -4872,15 +4869,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     if (ok) // distribute a notification about the change on 'path' with 'includingSubdirs'
                     {
                         // send the message to all loaded plugins
-                        Plugins.AcceptChangeOnPathNotification(path, includingSubdirs);
+                        Plugins.AcceptChangeOnPathNotification(pathW.c_str(), includingSubdirs);
 
                         if (GetNonActivePanel() != NULL) // non-active panel first (due to timestamps of subdirectory changes on NTFS)
                         {
-                            GetNonActivePanel()->AcceptChangeOnPathNotificationW(pathW.c_str(), includingSubdirs);
+                            GetNonActivePanel()->AcceptChangeOnPathNotification(pathW.c_str(), includingSubdirs);
                         }
                         if (GetActivePanel() != NULL) // then the active panel
                         {
-                            GetActivePanel()->AcceptChangeOnPathNotificationW(pathW.c_str(), includingSubdirs);
+                            GetActivePanel()->AcceptChangeOnPathNotification(pathW.c_str(), includingSubdirs);
                         }
 
                         if (DetachedFSList->Count > 0)
@@ -4892,7 +4889,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                             for (i = 0; i < DetachedFSList->Count; i++)
                             {
                                 CPluginFSInterfaceEncapsulation* fs = DetachedFSList->At(i);
-                                fs->AcceptChangeOnPathNotification(fs->GetPluginFSName(), path, includingSubdirs);
+                                fs->AcceptChangeOnPathNotification(fs->GetPluginFSName(), pathW.c_str(), includingSubdirs);
                             }
                             LeavePlugin();
                         }
@@ -5073,7 +5070,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 MENU_ITEM_INFO mii;
                 mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
                 mii.Type = MENU_TYPE_STRING;
-                mii.String = LoadStr(IDS_MENU_HELP_CHECKNEWVERSION);
+                mii.String = LoadStrW(IDS_MENU_HELP_CHECKNEWVERSION);
                 mii.ID = CM_HELP_CHECKNEWVERSION;
 
                 int aboutPos = popup->FindItemPosition(CM_HELP_ABOUT);
@@ -5170,11 +5167,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         case CML_EDIT:
         {
             // If this is a "change directory" paste operation, show it in the Paste item
-            char text[220];
-            char tail[50];
-            tail[0] = 0;
-
-            strcpy(text, LoadStr(IDS_MENU_EDIT_PASTE));
+            std::wstring text = LoadStrW(IDS_MENU_EDIT_PASTE);
 
             CFilesWindow* activePanel = GetActivePanel();
             BOOL activePanelIsDisk = (activePanel != NULL && activePanel->Is(ptDisk));
@@ -5182,18 +5175,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 (!activePanelIsDisk || !EnablerPasteFiles) && // PasteFiles has higher priority
                 !EnablerPasteFilesToArcOrFS)                  // PasteFilesToArcOrFS has higher priority
             {
-                char* p = strrchr(text, '\t');
-                if (p != NULL)
-                    strcpy(tail, p);
-                else
-                    p = text + strlen(text);
-
-                sprintf(p, " (%s)%s", LoadStr(IDS_PASTE_CHANGE_DIRECTORY), tail);
+                text = DecorateMenuActionTextW(text.c_str(), LoadStrW(IDS_PASTE_CHANGE_DIRECTORY));
             }
 
             MENU_ITEM_INFO mii;
             mii.Mask = MENU_MASK_STRING;
-            mii.String = text;
+            mii.String = text.data();
             popup->SetItemInfo(CM_CLIPPASTE, FALSE, &mii);
             break;
         }
@@ -5209,7 +5196,18 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // if the menu does not exist, let it be created
             if ((!ContextMenuNew->MenuIsAssigned()) && activePanel->Is(ptDisk) &&
                 activePanel->CheckPath(FALSE) == ERROR_SUCCESS)
-                GetNewOrBackgroundMenu(HWindow, activePanel->GetPath(), ContextMenuNew, CM_NEWMENU_MIN, CM_NEWMENU_MAX, FALSE);
+            {
+                // Wide-first, same as ShellAction's onlyPanelMenu/background-
+                // right-click branches: on the CP_ACP mirror, a folder the code page cannot
+                // spell binds to nothing, so the Files->New submenu came back empty.
+                GetNewOrBackgroundMenuW(HWindow, activePanel->GetPathW(), ContextMenuNew, CM_NEWMENU_MIN, CM_NEWMENU_MAX, FALSE);
+                if (!ContextMenuNew->MenuIsAssigned())
+                {
+                    // Legacy path still covers "\\" and "\\server", which SHParseDisplayName
+                    // does not resolve to a bindable folder.
+                    GetNewOrBackgroundMenuW(HWindow, activePanel->GetPathW(), ContextMenuNew, CM_NEWMENU_MIN, CM_NEWMENU_MAX, FALSE);
+                }
+            }
 
             // if the menu exists, build our menu based on it
             if (ContextMenuNew->MenuIsAssigned())
@@ -5221,7 +5219,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 MENU_ITEM_INFO mii;
                 mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_STATE;
                 mii.Type = MENU_TYPE_STRING;
-                mii.String = LoadStr(IDS_NEWISNOTAVAILABLE);
+                mii.String = LoadStrW(IDS_NEWISNOTAVAILABLE);
                 mii.State = MENU_STATE_GRAYED;
                 popup->InsertItem(0, TRUE, &mii);
             }
@@ -5434,29 +5432,29 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 DragAnchorX = p.x - r.left;
                 SetCapture(HWindow);
 
-                HWND toolTip = CreateWindowEx(0,
-                                              TOOLTIPS_CLASS,
-                                              NULL,
-                                              TTS_ALWAYSTIP | TTS_NOPREFIX,
-                                              CW_USEDEFAULT,
-                                              CW_USEDEFAULT,
-                                              CW_USEDEFAULT,
-                                              CW_USEDEFAULT,
-                                              NULL,
-                                              NULL,
-                                              HInstance,
-                                              NULL);
+                HWND toolTip = CreateWindowExW(0,
+                                               TOOLTIPS_CLASSW,
+                                               NULL,
+                                               TTS_ALWAYSTIP | TTS_NOPREFIX,
+                                               CW_USEDEFAULT,
+                                               CW_USEDEFAULT,
+                                               CW_USEDEFAULT,
+                                               CW_USEDEFAULT,
+                                               NULL,
+                                               NULL,
+                                               HInstance,
+                                               NULL);
                 ToolTipWindow.AttachToWindow(toolTip);
                 ToolTipWindow.SetToolWindow(HWindow);
-                TOOLINFO ti;
-                ti.cbSize = sizeof(TOOLINFO);
+                TOOLINFOW ti;
+                ti.cbSize = sizeof(ti);
                 ti.uFlags = TTF_SUBCLASS | TTF_ABSOLUTE | TTF_TRACK;
                 ti.hwnd = HWindow;
                 ti.uId = 1;
                 GetClientRect(HWindow, &ti.rect);
                 ti.hinst = HInstance;
-                ti.lpszText = LPSTR_TEXTCALLBACK;
-                SendMessage(ToolTipWindow.HWindow, TTM_ADDTOOL, 0, (LPARAM)&ti);
+                ti.lpszText = LPSTR_TEXTCALLBACKW;
+                SendMessageW(ToolTipWindow.HWindow, TTM_ADDTOOLW, 0, (LPARAM)&ti);
 
                 int splitWidth = MainWindow->GetSplitBarWidth();
                 DragSplitPosition = SplitPosition;
@@ -5608,11 +5606,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (HasLockedUI())
             break;
         LPNMHDR lphdr = (LPNMHDR)lParam;
-        if (lphdr->code == TTN_NEEDTEXT && lphdr->hwndFrom == ToolTipWindow.HWindow)
+        if (lphdr->code == TTN_NEEDTEXTW && lphdr->hwndFrom == ToolTipWindow.HWindow)
         {
-            char* text = ((LPTOOLTIPTEXT)lParam)->szText;
-            sprintf(text, "%.1lf %%", DragSplitPosition * 100);
-            PointToLocalDecimalSeparator(text, 15);
+            LPTOOLTIPTEXTW info = (LPTOOLTIPTEXTW)lParam;
+            std::wstring wideText = FormatStrW(L"%.1lf %%", DragSplitPosition * 100);
+            PointToLocalDecimalSeparator(wideText);
+            wcscpy_s(info->szText, wideText.c_str());
             return 0;
         }
 
@@ -5977,7 +5976,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (data->GetPluginInterfaceForMenuExt()->NotEmpty())
             {
-                CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%s v. %s)",
+                CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%ls v. %ls)",
                                     (int)lParam, data->DLLName.c_str(), data->Version.c_str());
 
                 // lower the thread priority to "normal" (so operations don't burden the system)
@@ -6015,7 +6014,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 if (!SalShExtPastedData.IsLocked())
                 {
                     BOOL isOnClipboard = FALSE;
-                    if (SalShExtSharedMemView->DoPasteFromSalamander &&
+                    if ((SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_PASTE_ACTIVE) != 0 &&
                         SalShExtSharedMemView->SalamanderMainWndPID == GetCurrentProcessId() &&
                         SalShExtSharedMemView->SalamanderMainWndTID == GetCurrentThreadId() &&
                         SalShExtSharedMemView->PastedDataID == SalShExtPastedData.GetDataID())
@@ -6026,7 +6025,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         IDataObject* dataObj;
                         if (OleGetClipboard(&dataObj) == S_OK && dataObj != NULL)
                         {
-                            if (IsFakeDataObject(dataObj, NULL, NULL, 0))
+                            if (IsFakeDataObject(dataObj, NULL, NULL))
                             {
                                 isOnClipboard = TRUE;
                             }
@@ -6061,8 +6060,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (SalShExtSharedMemView != NULL) // shared memory is available (we cannot handle cut/copy&paste errors)
         {
             BOOL tmpPasteDone = FALSE;
-            CPathBuffer tgtPath; // Heap-allocated for long path support
-            tgtPath[0] = 0;
+            std::wstring tgtPath;
             int operation = 0;
             DWORD dataID = -1;
             WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
@@ -6076,7 +6074,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     SalShExtPastedData.SetLock(TRUE);
                     LastSalamanderIdleTime = GetTickCount();
                     SalShExtSharedMemView->SalBusyState = 1 /* Salamander is not busy and now is waiting for a paste operation */;
-                    SalShExtSharedMemView->PasteDone = FALSE;
+                    SalShExtSharedMemView->StateFlags &= ~SALSHEXT_STATE_PASTE_DONE;
 
                     int count = 0;
                     while (count++ < 50) // wait no longer than 5 seconds
@@ -6084,13 +6082,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         ReleaseMutex(SalShExtSharedMemMutex);
                         Sleep(100); // give the copy hook 100 ms to respond
                         WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-                        if (SalShExtSharedMemView->PasteDone) // copy hook supplied the target path for Paste and other data
+                        if ((SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_PASTE_DONE) != 0)
                         {
                             //                TRACE_I("WM_USER_SALSHEXT_PASTE: copy hook returned: paste done!");
-                            lstrcpyn(tgtPath, SalShExtSharedMemView->TargetPath, tgtPath.Size());
-                            operation = SalShExtSharedMemView->Operation;
-                            dataID = SalShExtSharedMemView->PastedDataID;
-                            tmpPasteDone = TRUE;
+                            if (SalShExtReadResponseLocked(tgtPath))
+                            {
+                                operation = SalShExtSharedMemView->Operation;
+                                dataID = SalShExtSharedMemView->PastedDataID;
+                                tmpPasteDone = TRUE;
+                            }
                             break;
                         }
                     }
@@ -6105,10 +6105,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 LastSalamanderIdleTime = GetTickCount();
                 //          TRACE_I("WM_USER_SALSHEXT_PASTE: calling SalShExtPastedData.DoPasteOperation");
                 ProgressDialogActivateDrop = LastWndFromPasteGetData;
-                SalShExtPastedData.DoPasteOperation(operation == SALSHEXT_COPY, tgtPath);
+                SalShExtPastedData.DoPasteOperation(operation == SALSHEXT_COPY, tgtPath.c_str());
                 ProgressDialogActivateDrop = NULL; // clear global variable for next use of the progress dialog
                 LastWndFromPasteGetData = NULL;    // reset for the next Paste operation here
-                SHChangeNotify(SHCNE_UPDATEDIR, SHCNF_PATH, tgtPath, NULL);
+                SHChangeNotify(SHCNE_UPDATEDIR, SHCNF_PATHW, tgtPath.c_str(), NULL);
                 SalamanderBusy = FALSE;
             }
             SalShExtPastedData.SetLock(FALSE);
@@ -6117,6 +6117,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         //      TRACE_I("WM_USER_SALSHEXT_PASTE: end");
         return 0;
     }
+
+    case WM_USER_SALSHEXT_CAPTUREPAYLOAD:
+        SalShExtCaptureResponse();
+        return 0;
 
     case WM_USER_REFRESH_SHARES:
     {
@@ -6166,7 +6170,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             CanClose = FALSE; // don't let ourselves be closed; we are inside the method
             BOOL postWM_USER_CLOSE_MAINWND = FALSE;
             BOOL postWM_USER_FORCECLOSE_MAINWND = FALSE;
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 if (msg.message == WM_USER_CLOSE_MAINWND && msg.hwnd == HWindow)
                     postWM_USER_CLOSE_MAINWND = TRUE;
@@ -6177,7 +6181,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     else
                     {
                         TranslateMessage(&msg);
-                        DispatchMessage(&msg);
+                        DispatchMessageW(&msg);
                     }
                 }
             }
@@ -6205,10 +6209,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         // if OneDrive Personal/Business was connected or disconnected, refresh the Drive bars
         // so the icon or drop down menu disappears or appears
-        BOOL oneDrivePersonal = OneDrivePath[0] != 0;
+        BOOL oneDrivePersonal = !OneDrivePath.empty();
         int oneDriveBusinessStoragesCount = OneDriveBusinessStorages.Count;
         InitOneDrivePath();
-        if (oneDrivePersonal != (OneDrivePath[0] != 0) ||
+        if (oneDrivePersonal != !OneDrivePath.empty() ||
             oneDriveBusinessStoragesCount != OneDriveBusinessStorages.Count)
         {
             PostMessage(HWindow, WM_USER_DRIVES_CHANGE, 0, 0);
@@ -6266,11 +6270,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_USER_SLGINCOMPLETE:
     {
-        char buff[1000];
-        sprintf(buff, "%s\n", LoadStr(IDS_SLGINCOMPLETE_TEXT));
+        // wide: LoadStr()+AnsiToWide() was a lossy round trip - the narrow
+        // LoadStringA call already mangled any character outside the process ANSI code page
+        // before AnsiToWide ever ran. LoadStrW is already used one line below for the title;
+        // use it here too instead of narrowing then re-widening.
+        WCHAR buff[1000];
+        swprintf_s(buff, L"%s\n", LoadStrW(IDS_SLGINCOMPLETE_TEXT));
         Configuration.ShowSLGIncomplete = FALSE;
         CMessageBox(HWindow, MSGBOXEX_OK | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT | MSGBOXEX_ICONINFORMATION,
-                    LoadStr(IDS_SLGINCOMPLETE_TITLE), buff, NULL,
+                    LoadStrW(IDS_SLGINCOMPLETE_TITLE), buff, NULL,
                     NULL, NULL, 0, NULL, NULL, IsSLGIncomplete, NULL)
             .Execute();
         break;
@@ -6322,7 +6330,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 KillTimer(HWindow, IDT_POSTENDSUSPMODE); // if activation hasn't happened yet, cancel (it may start again)
 
                 MSG msg; // pump WM_USER_END_SUSPMODE from the queue, otherwise suspend mode ends shortly (e.g. opening File Comparator triggers activation+deactivation after 10ms)
-                while (PeekMessage(&msg, HWindow, WM_USER_END_SUSPMODE, WM_USER_END_SUSPMODE, PM_REMOVE))
+                while (PeekMessageW(&msg, HWindow, WM_USER_END_SUSPMODE, WM_USER_END_SUSPMODE, PM_REMOVE))
                     ;
 
                 while (ActivateSuspMode > actSusMode)
@@ -6339,14 +6347,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (!LeftPanel->DontClearNextFocusName)
             {
-                LeftPanel->NextFocusName[0] = 0;
                 LeftPanel->NextFocusNameW.clear();
             }
             else
                 LeftPanel->DontClearNextFocusName = FALSE;
             if (!RightPanel->DontClearNextFocusName)
             {
-                RightPanel->NextFocusName[0] = 0;
                 RightPanel->NextFocusNameW.clear();
             }
             else
@@ -6475,7 +6481,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     MyShutdownBlockReasonCreate(HWindow, blockReason);
                 }
 
-                if (gPrompter->AskYesNo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_FORCEDSHUTDOWNDISKOPER)).type == PromptResult::kYes)
+                if (gPrompter->AskYesNo(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_FORCEDSHUTDOWNDISKOPER)).type == PromptResult::kYes)
                 {
                     ProgressDlgArray.PostCancelToAllDlgs(); // dialogs and workers run in their own threads, they may exit
                     while (ProgressDlgArray.RemoveFinishedDlgs() > 0)
@@ -6485,7 +6491,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 MyShutdownBlockReasonDestroy(HWindow);
             }
             else
-                gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_FORCEDSHUTDOWN));
+                gPrompter->ShowInfo(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_FORCEDSHUTDOWN));
             // unfortunately there's no way to tell whether shutdown is still running or the user
             // has cancelled it (black full screen window on Win7). If not, the OS kills the app; we
             // already warned the user, nothing more to do.
@@ -6586,7 +6592,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 else
                 {
                     if (!LockedUIReason.empty() && HasLockedUI())
-                        gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), AnsiToWide(LockedUIReason.c_str()).c_str());
+                        gPrompter->ShowInfo(SALAMANDER_TEXT_VERSIONW(), LockedUIReason.c_str());
                     else
                         TRACE_E("WM_USER_CLOSE_MAINWND: SalamanderBusy == TRUE!");
                     if (uMsg == WM_QUERYENDSESSION)
@@ -6721,10 +6727,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                             WindowsManager.CS.Leave();
                             // pretend we are responding software by pumping messages
                             MSG msg;
-                            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                             {
                                 TranslateMessage(&msg);
-                                DispatchMessage(&msg);
+                                DispatchMessageW(&msg);
                             }
                             // give the Find thread some time to react
                             Sleep(50);
@@ -6849,10 +6855,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
                 HKEY salamander;
                 if (registry != NULL &&
-                    OpenKeyReadA(registry, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success)
+                    registry->OpenKeyRead(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander).success)
                 {
                     DWORD saveInProgress = 0;
-                    if (!GetDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
+                    if (!registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
                     { // configuration is not corrupted
                         cfgOK = TRUE;
                     }
@@ -6866,23 +6872,22 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             BOOL backupOK = FALSE;
             if (cfgOK) // old configuration seems OK; back it up in case saving the new configuration fails
             {
-                char backup[200];
-                sprintf_s(backup, "%s.backup.63A7CD13", SALAMANDER_ROOT_REG); // "63A7CD13" prevents the key name from matching a user key
+                const std::wstring backup = FormatStrW(L"%ls.backup.63A7CD13", SALAMANDER_ROOT_REG); // "63A7CD13" prevents the key name from matching a user key
                 if (registry != NULL)
-                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup); // delete the old backup if one exists
+                    registry->DeleteKeyRecursive(HKEY_CURRENT_USER, backup.c_str()); // delete the old backup if one exists
                 if (registry != NULL)
                 {
                     HKEY salBackup = NULL;
-                    RegistryResult openBackupRes = OpenKeyReadA(registry, HKEY_CURRENT_USER, backup, salBackup);
+                    RegistryResult openBackupRes = registry->OpenKeyRead(HKEY_CURRENT_USER, backup.c_str(), salBackup);
                     if (!openBackupRes.success) // check that no backup exists
                     {
-                        if (CreateKeyA(registry, HKEY_CURRENT_USER, backup, salBackup).success) // create a key for the backup
+                        if (registry->CreateKey(HKEY_CURRENT_USER, backup.c_str(), salBackup).success) // create a key for the backup
                         {
                             // I tried RegCopyTree (without KEY_ALL_ACCESS it failed) and it was as fast as SHCopyKey
-                            if (SHCopyKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salBackup, 0) == ERROR_SUCCESS)
+                            if (SHCopyKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salBackup, 0) == ERROR_SUCCESS)
                             { // creating the backup
                                 DWORD copyIsOK = 1;
-                                if (SetDWordA(registry, salBackup, SALAMANDER_COPY_IS_OK, copyIsOK).success)
+                                if (registry->SetDWord(salBackup, SAL_REG_VALUE_COPY_IS_OK_W, copyIsOK).success)
                                     backupOK = TRUE;
                             }
                             registry->CloseKey(salBackup);
@@ -6982,14 +6987,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         }
 
         // if CShellExecuteWnd windows exist, offer to abort closing or send a bug report and terminate
-        char reason[BUG_REPORT_REASON_MAX]; // problem reason + list of windows (multiline)
-        strcpy(reason, "Some faulty shell extension has locked our main window.");
-        if (EnumCShellExecuteWnd(shutdown ? analysing.HWindow : HWindow,
-                                 reason + (int)strlen(reason), BUG_REPORT_REASON_MAX - ((int)strlen(reason) + 1)) > 0)
+        std::wstring reason = L"Some faulty shell extension has locked our main window.";
+        if (EnumCShellExecuteWnd(shutdown ? analysing.HWindow : HWindow, reason) > 0)
         {
             // ask whether Salamander should continue or generate a bug report
             if (CriticalShutdown || // during critical shutdown there's no point in asking anything, let the system terminate us quietly
-                gPrompter->AskYesNo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTBREAK3)).type == PromptResult::kYes)
+                gPrompter->AskYesNo(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_SHELLEXTBREAK3)).type == PromptResult::kYes)
             {
                 if (uMsg == WM_QUERYENDSESSION)
                     TRACE_I("WM_QUERYENDSESSION: cancelling shutdown: some faulty shell extension has locked our main window");
@@ -6997,7 +7000,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             }
 
             // and break here
-            strcpy(BugReportReasonBreak, reason);
+            SetBugReportReasonBreak(std::move(reason));
             TaskList.FireEvent(TASKLIST_TODO_BREAK, GetCurrentProcessId());
             // freeze this thread
             while (1)
@@ -7063,11 +7066,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         // This is already violated during Shutdown / Log Off / Restart because we must distribute
         // messages, otherwise we are considered "not responding" and the system kills us prematurely.
 
-        if (StrICmp(Configuration.SLGName, Configuration.LoadedSLGName) != 0) // if the user changed Salamander's language
+        if (StrICmpW(Configuration.SLGName.c_str(), Configuration.LoadedSLGName.c_str()) != 0) // if the user changed Salamander's language
         {
             Plugins.ClearLastSLGNames(); // so that a new fallback language will be selected for all plugins if needed
             Configuration.UseAsAltSLGInOtherPlugins = FALSE;
-            Configuration.AltPluginSLGName[0] = 0;
+            Configuration.AltPluginSLGName.clear();
         }
 
         if (Configuration.AutoSave)
@@ -7251,15 +7254,15 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // some crazy shell extension has just called DestroyWindow on Salamander's main window
 
             MSG msg; // flush the message queue (WMP9 buffered Enter and dismissed our OK)
-            // while (PeekMessage(&msg, HWindow, 0, 0, PM_REMOVE));  // Petr: I replaced it by discarding key messages only; without TranslateMessage and DispatchMessage we risk an endless loop (discovered during unloading Automation with memory leaks; before showing the leak message box, an infinite loop occurred because WM_PAINT kept being added to the queue and we kept discarding it)
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            // while (PeekMessageW(&msg, HWindow, 0, 0, PM_REMOVE));  // Petr: I replaced it by discarding key messages only; without TranslateMessage and DispatchMessage we risk an endless loop (discovered during unloading Automation with memory leaks; before showing the leak message box, an infinite loop occurred because WM_PAINT kept being added to the queue and we kept discarding it)
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                 ;
 
             // ask the user to send us a break report
-            gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTBREAK));
+            gPrompter->ShowError(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_SHELLEXTBREAK));
 
             // and break here
-            strcpy(BugReportReasonBreak, "Some faulty shell extension destroyed our main window.");
+            SetBugReportReasonBreak(L"Some faulty shell extension destroyed our main window.");
             TaskList.FireEvent(TASKLIST_TODO_BREAK, GetCurrentProcessId());
             // freeze this thread
             // MainWindow no longer exists anyway; we would crash at the next opportunity
@@ -7392,7 +7395,7 @@ MENU_TEMPLATE_ITEM TaskBarIconMenu[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            InsertMenu(hMenu, 0, MF_BYPOSITION | MF_STRING, CM_EXIT, LoadStr(IDS_CONTEXTMENU_EXIT));
+            InsertMenuW(hMenu, 0, MF_BYPOSITION | MF_STRING, CM_EXIT, LoadStrW(IDS_CONTEXTMENU_EXIT));
 
             POINT p;
             GetCursorPos(&p);
@@ -7460,13 +7463,11 @@ MENU_TEMPLATE_ITEM TaskBarIconMenu[] =
         CFileData* f;
         f = (index < GetActivePanel()->Dirs->Count) ? &GetActivePanel()->Dirs->At(index) : &GetActivePanel()->Files->At(index - GetActivePanel()->Dirs->Count);
 
-        CPathBuffer buff; // Heap-allocated for long path support
-        strcpy(buff, GetActivePanel()->GetPath());
-        if (buff[strlen(buff) - 1] != '\\')
-            strcat(buff, "\\");
-        strcat(buff, f->Name);
-        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, buff, -1, fs->szName, sizeof(fs->szName) / 2);
-        fs->szName[sizeof(fs->szName) / 2 - 1] = 0;
+        std::wstring fullName = activePanel->GetPathW();
+        SalPathAppendW(fullName, f->Name);
+        if (fullName.length() >= _countof(fs->szName))
+            return 0; // frozen shell-message payload cannot represent this path exactly
+        wcscpy_s(fs->szName, _countof(fs->szName), fullName.c_str());
         fs->ftTime = f->LastWrite;
         fs->dwSize = f->Size.LoDWord;
         fs->bAttr = (BYTE)f->Attr;
@@ -7513,7 +7514,8 @@ MENU_TEMPLATE_ITEM TaskBarIconMenu[] =
         {
             //--- refresh directories that are not automatically refreshed
             // a change in the directory shown in the panel and preferably its subdirectories (who knows what the system does)
-            PostChangeOnPathNotification(panel->GetPath(), TRUE);
+            // Wide, for the same reason as the New-command notification above.
+            PostChangeOnPathNotificationW(panel->GetPathW(), TRUE);
         }
         break;
     }

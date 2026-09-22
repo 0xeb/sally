@@ -26,35 +26,35 @@
 #include "lang\lang.rh"
 #include "cfgdlg.h"
 
+#define NETHOOD_WIDEN_IMPL(value) L##value
+#define NETHOOD_WIDEN(value) NETHOOD_WIDEN_IMPL(value)
+
 extern CNethoodCache g_oNethoodCache;
 extern CNethoodIcons g_oIcons;
 extern CNethoodPluginInterfaceForMenuExt g_oMenuExt;
 
-static const TCHAR CONFIG_VERSION[] = TEXT("Version");
+static const wchar_t CONFIG_VERSION[] = L"Version";
 #define CURRENT_CONFIG_VERSION 1
-static const TCHAR CONFIG_SYSSHARES[] = TEXT("ShowSystemShares");
-static const TCHAR CONFIG_NETSHORTCUTS[] = TEXT("ShowShortcuts");
-static const TCHAR CONFIG_SHOWSERVERS[] = TEXT("ShowServers");
-static const TCHAR CONFIG_PRELOAD[] = TEXT("Preload");
-static const TCHAR CONFIG_TSCVOLUMES[] = TEXT("ShowRDSVolumes"); // Remote Desktop Services
+static const wchar_t CONFIG_SYSSHARES[] = L"ShowSystemShares";
+static const wchar_t CONFIG_NETSHORTCUTS[] = L"ShowShortcuts";
+static const wchar_t CONFIG_SHOWSERVERS[] = L"ShowServers";
+static const wchar_t CONFIG_PRELOAD[] = L"Preload";
+static const wchar_t CONFIG_TSCVOLUMES[] = L"ShowRDSVolumes"; // Remote Desktop Services
 
 void WINAPI
 CNethoodPluginInterface::About(
     __in HWND hwndParent)
 {
-    TCHAR szMessage[256];
-
-    StringCchPrintf(szMessage, COUNTOF(szMessage),
-                    TEXT("%s ") TEXT(VERSINFO_VERSION) TEXT("\n\n")
-                        TEXT(VERSINFO_COPYRIGHT) TEXT("\n\n")
-                            TEXT("%s"),
-                    SalamanderGeneral->LoadStr(GetLangInstance(), IDS_PLUGIN_NAME),
-                    SalamanderGeneral->LoadStr(GetLangInstance(), IDS_DESCRIPTION));
+    const std::wstring message = SPLFormatStringOwned(
+        L"%s %s\n\n%s\n\n%s",
+        SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_PLUGIN_NAME).c_str(),
+        NETHOOD_WIDEN(VERSINFO_VERSION), NETHOOD_WIDEN(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_DESCRIPTION).c_str());
 
     SalamanderGeneral->SalMessageBox(
         hwndParent,
-        szMessage,
-        SalamanderGeneral->LoadStr(GetLangInstance(), IDS_ABOUT),
+        message.c_str(),
+        SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_ABOUT).c_str(),
         MB_OK | MB_ICONINFORMATION);
 }
 
@@ -179,13 +179,10 @@ CNethoodPluginInterface::Connect(
     __in HWND parent,
     __in CSalamanderConnectAbstract* salamander)
 {
-    CPathBuffer szFileMenu;
+    std::wstring fileMenu = L",\t";
     int iIcon = -1;
 
-    szFileMenu[0] = TEXT(',');
-    szFileMenu[1] = TEXT('\t');
-
-    LoadString(GetLangInstance(), IDS_MENUITEM, &szFileMenu[2], szFileMenu.Size() - 2);
+    fileMenu.append(SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_MENUITEM).c_str());
 
     g_oIcons.Load();
 
@@ -221,12 +218,12 @@ CNethoodPluginInterface::Connect(
 
     assert(iIcon >= 0);
     salamander->SetPluginIcon(iIcon);
-    salamander->SetChangeDriveMenuItem(szFileMenu, iIcon);
+    salamander->SetChangeDriveMenuItem(fileMenu.c_str(), iIcon);
     salamander->SetPluginMenuAndToolbarIcon(-1);
 
     if (m_bPreload)
     {
-        g_oNethoodCache.GetPathStatus(TEXT("\\"), NULL, NULL);
+        g_oNethoodCache.GetPathStatus(L"\\", NULL, NULL);
     }
 }
 
@@ -288,7 +285,7 @@ CNethoodPluginInterface::ClearHistory(
 
 void WINAPI
 CNethoodPluginInterface::AcceptChangeOnPathNotification(
-    __in const char* path,
+    __in const wchar_t* path,
     __in BOOL includingSubdirs)
 {
 }

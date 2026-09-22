@@ -27,3 +27,4 @@ xwin*/
 
 # CMake generated
 /src/git_version.h
+build-unicode-canary/

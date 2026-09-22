@@ -56,8 +56,8 @@ public:
     };
 
 private:
-    CPathBuffer m_szFileName;
-    TCHAR m_szDisplayName[64];
+    std::wstring m_szFileName;
+    std::wstring m_szDisplayName;
     CLSID m_clsidEngine;
     IActiveScript* m_pScript;
     class CScriptSite* m_pSite;
@@ -88,7 +88,7 @@ private:
         free(s);
     }
 
-    static HRESULT LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s, __out_opt ULONG* cch);
+    static HRESULT LoadOleStringFromFile(PCWSTR pszFileName, __out LPOLESTR& s, __out_opt ULONG* cch);
 
     bool ExecuteWorker(__inout EXECUTION_INFO* info);
     bool ExecuteInSeparateThread(__inout EXECUTION_INFO* info);
@@ -105,21 +105,21 @@ private:
 
 public:
     CScriptInfo(
-        PCTSTR pszFileName,
+        PCWSTR pszFileName,
         CScriptContainer* pContainer);
 
     ~CScriptInfo();
 
-    PCTSTR GetFileName() const
+    PCWSTR GetFileName() const
     {
-        return m_szFileName;
+        return m_szFileName.c_str();
     }
 
-    PCTSTR GetFileExt() const;
+    PCWSTR GetFileExt() const;
 
-    PCTSTR GetDisplayName() const
+    PCWSTR GetDisplayName() const
     {
-        return m_szDisplayName;
+        return m_szDisplayName.c_str();
     }
 
     REFCLSID GetEngineCLSID() const
@@ -221,27 +221,27 @@ private:
     CScriptContainer* m_pChild;
     CScriptContainer* m_pParent;
     CScriptInfo* m_pScripts;
-    CPathBuffer m_szPath;
-    PTSTR m_pszName;
+    std::wstring m_szPath;
+    std::wstring m_szName;
 
     friend class CScriptLookup;
 
 public:
     CScriptContainer();
-    CScriptContainer(CScriptContainer* pParent, PCTSTR pszPath, bool bFullPath);
+    CScriptContainer(CScriptContainer* pParent, PCWSTR pszPath, bool bFullPath);
     ~CScriptContainer();
 
     void Clear();
-    bool Fill(__in_z PCTSTR pszPath);
+    bool Fill(__in_z PCWSTR pszPath);
 
-    PCTSTR GetPath() const
+    PCWSTR GetPath() const
     {
-        return m_szPath;
+        return m_szPath.c_str();
     }
 
-    PCTSTR GetName() const
+    PCWSTR GetName() const
     {
-        return m_pszName;
+        return m_szName.c_str();
     }
 
     const CScriptContainer* FirstChild() const
@@ -259,7 +259,7 @@ public:
         return m_pScripts;
     }
 
-    CScriptContainer* FirstChild(PCTSTR pszPath, bool bFullPath);
+    CScriptContainer* FirstChild(PCWSTR pszPath, bool bFullPath);
 };
 
 class CScriptLookup
@@ -279,7 +279,7 @@ private:
         UNIQUIER_MAX = 255,
     };
 
-    UINT HashPath(__in_z PCTSTR pszPath);
+    UINT HashPath(__in_z PCWSTR pszPath);
 
     int FillContainer(
         CScriptContainer* pContainer,
@@ -302,13 +302,13 @@ private:
 
     CScriptInfo* AddScriptFromFile(
         CScriptContainer* pContainer,
-        PCTSTR pszFullPath,
+        PCWSTR pszFullPath,
         HKEY hKey,
         CSalamanderRegistryAbstract* registry);
 
     int GetUniquier(
         UINT nHash,
-        __in_z PCTSTR pszPath,
+        __in_z PCWSTR pszPath,
         HKEY hKey,
         CSalamanderRegistryAbstract* registry);
 
@@ -340,7 +340,7 @@ private:
     void RemoveDirtyScripts();
     void RemoveEmptyContainers(CScriptContainer* pContainer);
 
-    CScriptInfo* LookupScriptByPath(UINT nHash, PCTSTR pszFullPath);
+    CScriptInfo* LookupScriptByPath(UINT nHash, PCWSTR pszFullPath);
 
     /// This data structure holds bitmap of free uniquiers for
     /// single hash bucket.

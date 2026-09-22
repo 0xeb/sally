@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include "spl_buffer.h"
+
 #ifdef _MSC_VER
 #pragma pack(push, enter_include_spl_gui) // to make structures independent of alignment settings
 #pragma pack(4)
@@ -53,6 +55,16 @@
 // tooltip messages
 #define TOOLTIP_TEXT_MAX 5000          // maximum length of tool tip string (WM_USER_TTGETTEXT message)
 #define WM_USER_TTGETTEXT WM_APP + 240 // [ID passed in SetCurrentToolTip, buffer limited to TOOLTIP_TEXT_MAX]
+// Wide form of WM_USER_TTGETTEXT: lParam is a 'wchar_t*' buffer, again limited to
+// TOOLTIP_TEXT_MAX *characters*. Deliberately a SEPARATE message number rather than a
+// reinterpretation of WM_USER_TTGETTEXT's lParam: a window message carries no compile-time
+// type, so widening the old message in place would leave every not-yet-ported handler
+// writing narrow bytes into a wide buffer -- it would still compile, still run, and produce
+// mojibake. With a distinct number an unported window simply never answers, and the tooltip
+// falls back to the narrow message below. Silence is recoverable; silent corruption is not.
+// Salamander asks for the wide text FIRST and only falls back to WM_USER_TTGETTEXT when the
+// window leaves the wide buffer empty, so v107 plugins keep working unchanged.
+#define WM_USER_TTGETTEXTW WM_APP + 241 // [ID passed in SetCurrentToolTip, wchar_t buffer limited to TOOLTIP_TEXT_MAX]
 
 // button pressed
 #define WM_USER_BUTTON WM_APP + 244 // [(LO)WORD buttonID, (LO)WORD event was triggered from keyboard, if opening menu, select first item]
@@ -85,7 +97,7 @@ public:
     //
     // can be called from any thread, thread with the control must be running, otherwise blocking occurs
     // (SendMessage is used to deliver 'progress' value to the control);
-    virtual void WINAPI SetProgress(DWORD progress, const char* text) = 0;
+    virtual void WINAPI SetProgress(DWORD progress, const wchar_t* text) = 0;
 
     // has meaning in combination with calling SetProgress(-1)
     // specifies how many milliseconds after calling SetProgress(-1) the rectangle will continue moving on its own
@@ -124,7 +136,7 @@ public:
     // can be called from any thread, thread with the control must be running, otherwise blocking occurs
     // (SendMessage is used to deliver 'progress' value to the control);
     virtual void WINAPI SetProgress2(const CQuadWord& progressCurrent, const CQuadWord& progressTotal,
-                                     const char* text) = 0;
+                                     const wchar_t* text) = 0;
 
     // usage examples:
     //
@@ -194,21 +206,21 @@ class CGUIStaticTextAbstract
 public:
     // sets the control text; calling this method is faster and less computationally expensive
     // than setting text via WM_SETTEXT; returns TRUE on success, otherwise FALSE
-    virtual BOOL WINAPI SetText(const char* text) = 0;
+    virtual BOOL WINAPI SetText(const wchar_t* text) = 0;
 
     // returns the control text; can be called from any thread;
     // returns NULL if SetText was not yet called and static control had no text
-    virtual const char* WINAPI GetText() = 0;
+    virtual const wchar_t* WINAPI GetText() = 0;
 
     // sets the character for path separator; has meaning in case of STF_PATH_ELLIPSIS;
     // default is set to '\\';
-    virtual void WINAPI SetPathSeparator(char separator) = 0;
+    virtual void WINAPI SetPathSeparator(wchar_t separator) = 0;
 
     // assigns text that will be displayed as tooltip
     // returns TRUE if text copy was successfully allocated, otherwise returns FALSE
-    virtual BOOL WINAPI SetToolTipText(const char* text) = 0;
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text) = 0;
 
-    // assigns window and id, which will receive WM_USER_TTGETTEXT when tooltip is displayed
+    // assigns window and id, which will receive WM_USER_TTGETTEXTW when tooltip is displayed
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id) = 0;
 };
 
@@ -226,16 +238,16 @@ class CGUIHyperLinkAbstract
 public:
     // sets the control text; calling this method is faster and less computationally expensive
     // than setting text via WM_SETTEXT; returns TRUE on success, otherwise FALSE
-    virtual BOOL WINAPI SetText(const char* text) = 0;
+    virtual BOOL WINAPI SetText(const wchar_t* text) = 0;
 
     // returns the control text; can be called from any thread
     // returns NULL if SetText was not yet called and static control had no text
-    virtual const char* WINAPI GetText() = 0;
+    virtual const wchar_t* WINAPI GetText() = 0;
 
     // assigns action to open URL address (file="https://github.com/0xeb/sally") or
     // launch program (file="C:\\TEST.EXE"); ShellExecute with 'open' command
     // is called on the parameter.
-    virtual void WINAPI SetActionOpen(const char* file) = 0;
+    virtual void WINAPI SetActionOpen(const wchar_t* file) = 0;
 
     // assigns action PostCommand(WM_COMMAND, command, 0) to parent window
     virtual void WINAPI SetActionPostCommand(WORD command) = 0;
@@ -249,13 +261,13 @@ public:
     // the control) and by mouse click; hint (tooltip) is then displayed directly
     // below the text and won't close until user clicks outside it with mouse or
     // presses a key
-    virtual BOOL WINAPI SetActionShowHint(const char* text) = 0;
+    virtual BOOL WINAPI SetActionShowHint(const wchar_t* text) = 0;
 
     // assigns text that will be displayed as tooltip
     // returns TRUE if text copy was successfully allocated, otherwise returns FALSE
-    virtual BOOL WINAPI SetToolTipText(const char* text) = 0;
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text) = 0;
 
-    // assigns window and id, which will receive WM_USER_TTGETTEXT when tooltip is displayed
+    // assigns window and id, which will receive WM_USER_TTGETTEXTW when tooltip is displayed
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id) = 0;
 };
 
@@ -270,9 +282,9 @@ class CGUIButtonAbstract
     // the object was attached to the windows control and the interface pointer was obtained.
 public:
     // assigns text that will be displayed as tooltip; returns TRUE on success, otherwise FALSE
-    virtual BOOL WINAPI SetToolTipText(const char* text) = 0;
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text) = 0;
 
-    // assigns window and id, which will receive WM_USER_TTGETTEXT when tooltip is displayed
+    // assigns window and id, which will receive WM_USER_TTGETTEXTW when tooltip is displayed
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id) = 0;
 };
 
@@ -394,7 +406,7 @@ struct MENU_ITEM_INFO
     HBITMAP HBmpChecked;
     HBITMAP HBmpUnchecked;
     HBITMAP HBmpItem;
-    char* String;
+    wchar_t* String;
     DWORD StringLen;
     int ImageIndex;
     HICON HIcon;
@@ -1249,7 +1261,7 @@ struct TLBI_ITEM_INFO2
     DWORD Style;
     DWORD State;
     DWORD ID;
-    char* Text;
+    wchar_t* Text;
     int TextLen;
     int Width;
     int ImageIndex;
@@ -1259,7 +1271,7 @@ struct TLBI_ITEM_INFO2
     DWORD* Enabler;
 
     DWORD Index;
-    char* Name;
+    wchar_t* Name;
     int NameLen;
 };
 
@@ -1326,7 +1338,7 @@ struct TOOLBAR_TOOLTIP
     DWORD ID;         // ID of button for which tooltip is requested
     DWORD Index;      // index of button for which tooltip is requested
     DWORD CustomData; // custom data of button, if defined // FIXME_X64 - too small for pointer, is it ever needed?
-    char* Buffer;     // this buffer needs to be filled, maximum character count is TOOLTIP_TEXT_MAX
+    wchar_t* Buffer;     // this buffer needs to be filled, maximum character count is TOOLTIP_TEXT_MAX
                       // by default the message inserts terminator at the first character
 };
 
@@ -1867,7 +1879,11 @@ public:
     // 'imageWidth' specifies single icon width in pixels; returns TRUE on success, otherwise FALSE
     // note: PNG must be a strip of icons one row high
     // note: PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
-    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth) = 0;
+    // LPCTSTR -> LPCWSTR. Safe despite this being a resource name that
+    // callers usually pass as MAKEINTRESOURCE(id): the W form encodes an integer id in
+    // the low word exactly as the A form does, so an id-valued pointer is unaffected and
+    // a genuine string name simply becomes wide.
+    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCWSTR lpBitmapName, int imageWidth) = 0;
 
     // replaces icon at given index with icon 'hIcon'; returns TRUE on success, otherwise FALSE
     virtual BOOL WINAPI ReplaceIcon(int index, HICON hIcon) = 0;
@@ -2146,11 +2162,11 @@ public:
     //
     // ToolTip support
     //
-    // Searches 'buf' for first occurrence of '\t' character. If 'stripHotKey' is TRUE, the
+    // Searches 'text' for first occurrence of '\t' character. If 'stripHotKey' is TRUE, the
     // string is terminated at this character. Otherwise a space is inserted in its place and
-    // the rest of the text is parenthesized. Buffer 'buf' must be large enough when 'stripHotKey'
-    // is FALSE to allow the text in buffer to be extended by two characters (parenthesizing).
-    virtual void WINAPI PrepareToolTipText(char* buf, BOOL stripHotKey) = 0;
+    // the rest of the text is parenthesized. The caller-owned record grows as needed.
+    virtual BOOL WINAPI PrepareToolTipText(CSalamanderStringBuffer* text,
+                                           BOOL stripHotKey) = 0;
 
     ///////////////////////////////////////////////////////////////////////////
     //
@@ -2167,7 +2183,7 @@ public:
     // Usage example: SetSubjectTruncatedText(GetDlgItem(HWindow, IDS_SUBJECT), "&Rename %s to",
     //                                          file->Name, fileIsDir, TRUE)
     // can be called from any thread
-    virtual void WINAPI SetSubjectTruncatedText(HWND subjectWnd, const char* subjectFormatString, const char* fileName,
+    virtual void WINAPI SetSubjectTruncatedText(HWND subjectWnd, const wchar_t* subjectFormatString, const wchar_t* fileName,
                                                 BOOL isDir, BOOL duplicateAmpersands) = 0;
 
     ///////////////////////////////////////////////////////////////////////////
@@ -2201,6 +2217,50 @@ public:
     // via GetObject()
     virtual int WINAPI GetWindowFontHeight(HWND hWindow) = 0;
 };
+
+inline BOOL SPLPrepareToolTipTextOwned(CSalamanderGUIAbstract* gui,
+                                       std::wstring& text,
+                                       BOOL stripHotKey)
+{
+    CSalamanderStringBufferOwner owner(text);
+    if (gui == NULL || !owner.IsValid() ||
+        !gui->PrepareToolTipText(owner.Buffer(), stripHotKey))
+        return FALSE;
+    return owner.GetValue(text);
+}
+
+// TOOLBAR_TOOLTIP::Buffer and WM_USER_TTGETTEXTW remain fixed external message
+// records. Keep their capacity here at the adapter instead of exposing it to
+// the live GUI service.
+inline BOOL SPLPrepareToolTipTextForAbiBuffer(CSalamanderGUIAbstract* gui,
+                                              wchar_t* buffer,
+                                              size_t capacity,
+                                              BOOL stripHotKey) noexcept
+{
+    if (buffer == NULL || capacity == 0)
+        return FALSE;
+    const size_t length = wcsnlen(buffer, capacity);
+    if (length == capacity)
+        return FALSE;
+    try
+    {
+        std::wstring text(buffer, length);
+        if (!SPLPrepareToolTipTextOwned(gui, text, stripHotKey) ||
+            text.size() >= capacity)
+            return FALSE;
+        wmemcpy(buffer, text.c_str(), text.size() + 1);
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    }
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    }
+    return FALSE;
+}
 
 #ifdef _MSC_VER
 #pragma pack(pop, enter_include_spl_gui)

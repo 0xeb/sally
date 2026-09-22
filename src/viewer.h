@@ -9,13 +9,14 @@
 #define BORDER_WIDTH 3         // separates the text from the window edge
 #define APROX_LINE_LEN 1000
 
-#define FIND_TEXT_LEN 201                    // +1; WARNING: should match GREP_TEXT_LEN
-#define FIND_LINE_LEN 10000                  // must be > FIND_TEXT_LEN and the max line length for REGEXP (different macro for GREP)
+#define FIND_LINE_LEN 10000                  // maximum line length for REGEXP (different macro for GREP)
 #define TEXT_MAX_LINE_LEN 10000              // when a line is longer we ask about switching to hex mode; must be <= FIND_LINE_LEN
 #define RECOGNIZE_FILE_TYPE_BUFFER_LEN 10000 // how many characters from the start of the file to use to recognize the file type (RecognizeFileType())
 
 #include <vector>
+#include "common/unicode/HexPattern.h"
 #include "common/unicode/ViewerBomText.h"
+#include "common/text/LegacySearchTextEncoding.h"
 
 #define VIEWER_HISTORY_SIZE 30 // number of remembered strings
 
@@ -30,20 +31,21 @@
 #define WM_USER_VIEWERREFRESH WM_APP + 201 // [0, 0] - perform a refresh
 
 #ifndef INSIDE_SALAMANDER
-char* LoadStr(int resID);
-char* GetErrorText(DWORD error);
+wchar_t* LoadStr(int resID);
+wchar_t* GetErrorText(DWORD error);
 #endif // INSIDE_SALAMANDER
 
-extern char* ViewerHistory[VIEWER_HISTORY_SIZE];
+extern wchar_t* ViewerHistory[VIEWER_HISTORY_SIZE];
 
-void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
-                     int textLen, BOOL hexMode, int historySize, char* history[],
+void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, wchar_t* Text,
+                     int textLen, BOOL hexMode, int historySize, wchar_t* history[],
                      BOOL changeOnlyHistory = FALSE);
-void DoHexValidation(HWND edit, const int textLen);
-void ConvertHexToString(char* text, char* hex, int& len);
-
+void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, std::wstring& text,
+                     BOOL hexMode, int historySize, wchar_t* history[],
+                     BOOL changeOnlyHistory = FALSE);
+void DoHexValidation(HWND edit);
 int GetHexOffsetMode(unsigned __int64 fileSize, int& hexOffsetLength);
-void PrintHexOffset(char* s, unsigned __int64 offset, int mode);
+void PrintHexOffset(char* s, unsigned __int64 offset, int mode); // formats the legacy/hex byte-view line
 
 void GetDefaultViewerLogFont(LOGFONT* lf);
 
@@ -58,7 +60,7 @@ public:
         HexMode,
         Regular;
 
-    char Text[FIND_TEXT_LEN];
+    std::wstring Text;
 
     CFindSetDialog(HINSTANCE modul, int resID, UINT helpID)
         : CCommonDialog(modul, resID, helpID, NULL, ooStatic)
@@ -68,7 +70,7 @@ public:
         CaseSensitive = FALSE;
         HexMode = FALSE;
         Regular = FALSE;
-        Text[0] = 0;
+        Text.clear();
     }
 
     CFindSetDialog& operator=(CFindSetDialog& d)
@@ -78,7 +80,7 @@ public:
         CaseSensitive = d.CaseSensitive;
         HexMode = d.HexMode;
         Regular = d.Regular;
-        memmove(Text, d.Text, FIND_TEXT_LEN);
+        Text = d.Text;
         return *this;
     }
 
@@ -120,38 +122,47 @@ enum CViewType
 class CViewerWindow : public CWindow
 {
 public:
-    CViewerWindow(const char* fileName, CViewType type, const char* caption,
+    CViewerWindow(const wchar_t* fileName, CViewType type, const wchar_t* caption,
                   BOOL wholeCaption, CObjectOrigin origin, int enumFileNamesSourceUID,
                   int enumFileNamesLastFileIndex);
     ~CViewerWindow();
 
-    void OpenFile(const char* file, const char* caption, BOOL wholeCaption); // does not manage Lock
-    void OpenFileW(const wchar_t* file, const char* caption, BOOL wholeCaption); // does not manage Lock
+    void OpenFile(const wchar_t* file, const wchar_t* caption, BOOL wholeCaption); // does not manage Lock
 
     virtual BOOL Is(int type) { return type == otViewerWindow || CWindow::Is(type); }
     BOOL IsGood() { return Buffer != NULL && ViewerFont != NULL; }
     void InitFindDialog(CFindSetDialog& dlg)
     {
         FindDialog = dlg;
-        if (FindDialog.Text[0] == 0)
+        if (FindDialog.Text.empty())
             return;
         else
         {
             if (FindDialog.Regular)
             {
-                RegExp.Set(FindDialog.Text, 0);
+                std::string pattern;
+                if (sally::legacy_search::EncodePatternAcpLossy(FindDialog.Text, pattern))
+                    RegExp.Set(pattern.c_str(), 0);
+                else
+                    RegExp.Clear();
             }
             else
             {
                 if (FindDialog.HexMode)
                 {
-                    char hex[FIND_TEXT_LEN];
-                    int len;
-                    ConvertHexToString(FindDialog.Text, hex, len);
-                    SearchData.Set(hex, len, 0);
+                    std::vector<std::uint8_t> bytes;
+                    if (Sally::Unicode::ParseHexPattern(FindDialog.Text.c_str(), bytes))
+                        SearchData.Set(bytes.empty() ? "" : reinterpret_cast<const char*>(bytes.data()),
+                                       static_cast<int>(bytes.size()), 0);
                 }
                 else
-                    SearchData.Set(FindDialog.Text, 0);
+                {
+                    std::string pattern;
+                    if (sally::legacy_search::EncodePatternAcpLossy(FindDialog.Text, pattern))
+                        SearchData.Set(pattern.c_str(), 0);
+                    else
+                        SearchData.Clear();
+                }
             }
         }
     }
@@ -161,10 +172,10 @@ public:
 
     void ConfigHasChanged(); // called after OK in the configuration dialog
 
-    // returns text for Find - the (null-terminated) selected block; 'buf' is at least
-    // FIND_TEXT_LEN bytes; returns TRUE if the buffer is filled (a block exists, etc.); returns the number
-    // of written characters without the null terminator into 'len'
-    BOOL GetFindText(char* buf, int& len);
+    // Returns the selected raw byte range for hex or legacy-byte search seeding.
+    BOOL GetFindBytes(std::string& bytes);
+    // the selection as decoded text, with no CP_ACP round trip
+    BOOL GetFindTextW(std::wstring& out);
 
 protected:
     void FatalFileErrorOccured(DWORD repeatCmd = -1); // called when a file error occurs (viewer refresh/clear is required)
@@ -347,11 +358,13 @@ protected:
     void FindNewSeekY(__int64 newSeekY, BOOL& fatalErr);
 
     // calls SalMessageBox internally and blocks Paint just for it (only clears the viewer background, does not touch the file)
-    int SalMessageBoxViewerPaintBlocked(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType);
+    // Wide. It converted its arguments to std::wstring on entry and
+    // called the already-wide gPrompter, so every caller was narrowing text that
+    // was about to be widened again.
+    int SalMessageBoxViewerPaintBlocked(HWND hParent, const wchar_t* lpText, const wchar_t* lpCaption, UINT uType);
 
     unsigned char* Buffer; // buffer with size VIEW_BUFFER_SIZE
-    std::string FileName;   // currently viewed file, ANSI compatibility mirror
-    std::wstring FileNameW; // currently viewed file, exact UTF-16 path when available
+    std::wstring FileNameW; // currently viewed file, exact UTF-16 path
     __int64 Seek,          // offset of byte 0 in Buffer within the file
         Loaded,            // number of valid bytes in Buffer
         OriginX,           // first displayed column (in characters)
@@ -406,17 +419,18 @@ protected:
     BOOL WrapText; // local copy of Configuration.WrapText
 
     BOOL CodePageAutoSelect;  // local copy of Configuration.CodePageAutoSelect
-    char DefaultConvert[200]; // local copy of Configuration.DefaultConvert
+    std::wstring DefaultConvert; // local copy of Configuration.DefaultConvert
 
     BOOL ExitTextMode;  // TRUE = the current message processing must end quickly; switching to hex mode
                         //         (the file is unsuitable for text mode, it lacks EOLs)
     BOOL ForceTextMode; // TRUE = the user insists on text mode at any cost (they will wait)
 
-    int CodeType;        // numeric encoding identifier; CodeTables memory for this viewer window
-    BOOL UseCodeTable;   // should CodeTable be used for recoding?
-    char CodeTable[256]; // code table
+    int CodeType;                   // numeric encoding identifier; CodeTables memory for this viewer window
+    BOOL UseCodeTable;              // should CodeTable be used for recoding?
+    char CodeTable[256];            // byte-to-byte code table for the legacy viewer
     Sally::Unicode::BomEncoding TextEncoding; // BOM-marked text decoding mode
     __int64 TextContentOffset;                // first raw byte after the BOM in decoded text mode
+
 
     // Sparse checkpoints into the decoded (BOM-marked Unicode) line stream.
     //
@@ -462,14 +476,12 @@ protected:
     const CDecodedLine* NearestDecodedCheckpoint(__int64 seek) const;
     void ResetDecodedLineIndex();
 
-    char CurrentDir[SAL_MAX_LONG_PATH]; // path for the open dialog
-
     BOOL WaitForViewerRefresh;   // TRUE - waiting for WM_USER_VIEWERREFRESH; other commands are skipped
     __int64 LastSeekY;           // SeekY before the error
     __int64 LastOriginX;         // OriginX before the error
     DWORD RepeatCmdAfterRefresh; // command to repeat after refresh (-1 = no command)
 
-    std::string Caption;   // if not empty, contains the proposed viewer window caption
+    std::wstring Caption; // if not empty, contains the proposed viewer window caption
     BOOL WholeCaption; // meaningful if Caption is not empty. TRUE -> only
                        // Caption is displayed in the viewer title; FALSE -> append
                        // the standard " - Viewer" to Caption.
@@ -504,10 +516,7 @@ void ReleaseViewer();
 void ClearViewerHistory(BOOL dataOnly); // clears histories; for dataOnly==FALSE also clears the Find dialog combobox (if any)
 void UpdateViewerColors(SALCOLOR* colors);
 
-extern const char* CVIEWERWINDOW_CLASSNAME; // viewer window class
-#ifndef _UNICODE
-extern const wchar_t* CVIEWERWINDOW_CLASSNAMEW; // Unicode viewer window class
-#endif // _UNICODE
+extern const wchar_t* CVIEWERWINDOW_CLASSNAME; // viewer window class
 
 extern CWindowQueue ViewerWindowQueue; // list of all viewer windows
 
@@ -524,16 +533,13 @@ extern int CharWidth, // character width (in points)
 // measure individual characters and map those with an incorrect width to a replacement character with the correct width
 extern CRITICAL_SECTION ViewerFontMeasureCS; // critical section for measuring the font
 extern BOOL ViewerFontMeasured;              // TRUE = the font created from ViewerLogFont was already measured; FALSE = the font must be measured
-extern BOOL ViewerFontNeedsMapping;          // TRUE = ViewerFontMapping must be used; FALSE = the font is OK and mapping is unnecessary
-extern char ViewerFontMapping[256];          // remapping to characters that have the expected fixed width
+// One UTF-16 display cell for each byte in the explicit legacy/hex view. Text
+// encodings with native Unicode decoders never use this table.
+extern wchar_t ViewerFontMapping[256];
 
 extern HANDLE ViewerContinue; // helper event - waiting for the message-loop thread to start
 
-BOOL OpenViewer(const char* name, CViewType mode, int left, int top, int width, int height,
+BOOL OpenViewer(const wchar_t* name, CViewType mode, int left, int top, int width, int height,
                 UINT showCmd, BOOL returnLock, HANDLE* lock, BOOL* lockOwner,
                 CSalamanderPluginViewerData* viewerData, int enumFileNamesSourceUID,
                 int enumFileNamesLastFileIndex);
-BOOL OpenViewerW(const wchar_t* nameW, const char* nameA, CViewType mode, int left, int top,
-                 int width, int height, UINT showCmd, BOOL returnLock, HANDLE* lock,
-                 BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
-                 int enumFileNamesSourceUID, int enumFileNamesLastFileIndex);

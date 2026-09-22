@@ -45,7 +45,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
 
     case MID_UNDO:
     {
-        SG->ShowMessageBox("Undo", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+        SG->ShowMessageBox(RenamerTextToWide("Undo").c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
         break;
     }
     }

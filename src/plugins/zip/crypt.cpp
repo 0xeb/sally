@@ -96,7 +96,7 @@ int InitKeys(const char* password, const char* header, char check,
     {
         char buffer[MAX_PASSWORD];
 
-        CharToOem(password, buffer);
+        CharToOemA(password, buffer);
         ret = testkey(buffer, header, check, keys);
     }
 #endif

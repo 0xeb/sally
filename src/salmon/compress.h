@@ -4,11 +4,13 @@
 
 #pragma once
 
+#include <string>
+
 // structure passed to the compression thread, used to transfer input/output parameters
 struct CCompressParams
 {
-    BOOL Result;                     // TRUE if the operation completed successfully, otherwise FALSE
-    char ErrorMessage[2 * MAX_PATH]; // if Result is FALSE, contains the error description
+    BOOL Result = FALSE;
+    std::wstring ErrorMessage;
 };
 
 BOOL StartCompressThread(CCompressParams* params);

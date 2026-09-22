@@ -28,24 +28,24 @@ int SalamanderVersion = 0;
 
 CSalamanderGUIAbstract* SalGUI = NULL;
 
-const char* CONFIG_WIDTH = "Window Width";
-const char* CONFIG_HEIGHT = "Window Height";
-const char* CONFIG_MAXIMIZED = "Maximized";
-const char* CONFIG_CUSTOMFONT = "Custom Font";
-const char* CONFIG_MANUALFONT = "Manual Mode Font";
+const wchar_t* CONFIG_WIDTH = L"Window Width";
+const wchar_t* CONFIG_HEIGHT = L"Window Height";
+const wchar_t* CONFIG_MAXIMIZED = L"Maximized";
+const wchar_t* CONFIG_CUSTOMFONT = L"Custom Font";
+const wchar_t* CONFIG_MANUALFONT = L"Manual Mode Font";
 const char* CONFIG_MASKHISTORY = "Mask History %d";
 const char* CONFIG_NEWNAMEHISTORY = "New Name History %d";
 const char* CONFIG_SEARCHHISTORY = "Search History %d";
 const char* CONFIG_REPLACEHISTORY = "Replace History %d";
 const char* CONFIG_COMMANDHISTORY = "Command History %d";
-const char* CONFIG_COMMAND = "Command";
-const char* CONFIG_ARGUMENTS = "Arguments";
-const char* CONFIG_INITDIR = "InitDir";
-const char* CONFIG_LASTUSED = "Last Used Options";
-const char* CONFIG_LASTMASK = "Last Last Mask";
-const char* CONFIG_LASTSUBDIRS = "Last Subdirs";
-const char* CONFIG_LASTREMOVESOURCE = "Last Remove Source Path";
-const char* CONFIG_CONFIRMESCCLOSE = "Confirm ESC Close";
+const wchar_t* CONFIG_COMMAND = L"Command";
+const wchar_t* CONFIG_ARGUMENTS = L"Arguments";
+const wchar_t* CONFIG_INITDIR = L"InitDir";
+const wchar_t* CONFIG_LASTUSED = L"Last Used Options";
+const wchar_t* CONFIG_LASTMASK = L"Last Last Mask";
+const wchar_t* CONFIG_LASTSUBDIRS = L"Last Subdirs";
+const wchar_t* CONFIG_LASTREMOVESOURCE = L"Last Remove Source Path";
+const wchar_t* CONFIG_CONFIRMESCCLOSE = L"Confirm ESC Close";
 
 CThreadQueue ThreadQueue("Renamer Dialogs");
 CWindowQueueEx WindowQueue;
@@ -70,34 +70,35 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide - SG->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SG->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SG, HLanguage, resID);
 }
 
-BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglist)
+BOOL ErrorHelper(HWND parent, const wchar_t* message, int lastError, va_list arglist)
 {
-    CALL_STACK_MESSAGE3("ErrorHelper(, %s, %d, )", message, lastError);
-    char buf[1024]; //temp variable
+    CALL_STACK_MESSAGE3("ErrorHelper(, %ls, %d, )", message, lastError);
+    wchar_t buf[1024]; //temp variable
     *buf = 0;
-    vsprintf(buf, message, arglist);
+    vswprintf_s(buf, _countof(buf), message, arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
+        int l = lstrlenW(buf);
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
     if (SG)
     {
         if (parent == (HWND)-1)
             parent = SG->GetMsgBoxParent();
-        SG->SalMessageBox(parent, buf, LoadStr(IDS_RENAMERERR), MB_ICONERROR);
+        SG->SalMessageBox(parent, buf, LangStr(IDS_RENAMERERR).c_str(), MB_ICONERROR);
     }
     else
     {
         if (parent == (HWND)-1)
             parent = 0;
-        MessageBox(parent, buf, "Renamer - Error", MB_OK | MB_ICONERROR);
+        MessageBoxW(parent, buf, L"Renamer - Error", MB_OK | MB_ICONERROR);
     }
     return FALSE;
 }
@@ -109,16 +110,16 @@ BOOL Error(HWND parent, int error, ...)
     CALL_STACK_MESSAGE2("Error(, %d, )", error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(parent, LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(parent, LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
 
-BOOL Error(HWND parent, const char* error, ...)
+BOOL Error(HWND parent, const wchar_t* error, ...)
 {
     CALL_STACK_MESSAGE_NONE
     int lastError = GetLastError();
-    CALL_STACK_MESSAGE2("Error(, %s, )", error);
+    CALL_STACK_MESSAGE2("Error(, %ls, )", error);
     va_list arglist;
     va_start(arglist, error);
     BOOL ret = ErrorHelper(parent, error, lastError, arglist);
@@ -133,7 +134,7 @@ BOOL Error(int error, ...)
     CALL_STACK_MESSAGE2("Error(%d, )", error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(DialogStackPeek(), LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(DialogStackPeek(), LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
@@ -144,7 +145,7 @@ BOOL Error(int error, ...)
 //   CALL_STACK_MESSAGE3("ErrorL(%d, , %d, )", lastError, error);
 //   va_list arglist;
 //   va_start(arglist, error);
-//   BOOL ret = ErrorHelper(parent, LoadStr(error), lastError, arglist);
+//   BOOL ret = ErrorHelper(parent, LangStr(error), lastError, arglist);
 //   va_end(arglist);
 //   return ret;
 // }
@@ -154,7 +155,7 @@ BOOL ErrorL(int lastError, int error, ...)
     CALL_STACK_MESSAGE3("ErrorL(%d, %d, )", lastError, error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(DialogStackPeek(), LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(DialogStackPeek(), LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
@@ -196,14 +197,22 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // cannot call Error here because it uses SG->SalMessageBox (SG is not initialized yet and the interface is incompatible)
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Renamer" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // (spl_vers.h) used by ~35 plugins - widen only at this call site via the same
+        // two-macro token-paste idiom already used for __WFILE__ in common/trace.h, rather
+        // than touching the shared macro itself.
+#define RENAMER_WIDEN2(x) L##x
+#define RENAMER_WIDEN(x) RENAMER_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    RENAMER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Renamer" /* do not translate! */, MB_OK | MB_ICONERROR);
+#undef RENAMER_WIDEN
+#undef RENAMER_WIDEN2
         return NULL;
     }
 
     // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Renamer" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Renamer" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -212,20 +221,20 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalGUI = salamander->GetSalamanderGUI();
 
     // set the help file name
-    SG->SetHelpFileName("renamer.chm");
+    SG->SetHelpFileName(L"renamer.chm");
 
     if (!InitDialogs())
         return NULL;
 
     // set the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION | FUNCTION_CONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_DESCRIPTION),
-                                   "Renamer" /* do not translate! */);
+                                   RenamerTextToWide(VERSINFO_VERSION_NO_PLATFORM).c_str(),
+                                   RenamerTextToWide(VERSINFO_COPYRIGHT).c_str(),
+                                   LangStr(IDS_DESCRIPTION).c_str(),
+                                   L"Renamer" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -237,13 +246,13 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_DESCRIPTION));
-    SG->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring version = RenamerTextToWide(VERSINFO_VERSION);
+    const std::wstring copyright = RenamerTextToWide(VERSINFO_COPYRIGHT);
+    wchar_t buf[1000];
+    _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"%ls %ls\n\n%ls\n\n%ls",
+                 LangStr(IDS_PLUGINNAME).c_str(), version.c_str(), copyright.c_str(),
+                 LangStr(IDS_DESCRIPTION).c_str());
+    SG->SalMessageBox(parent, buf, LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -256,7 +265,7 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
         if (force)
             UpdateWindow(SG->GetMainWindowHWND());
         if (force)
-            SG->CreateSafeWaitWindow(LoadStr(IDS_WAITINGFORWINDOWS), NULL, 0, FALSE, NULL);
+            SG->CreateSafeWaitWindow(LangStr(IDS_WAITINGFORWINDOWS).c_str(), NULL, 0, FALSE, NULL);
         ret = WindowQueue.CloseAllWindows(force, 1000, INFINITE) || force;
         if (force)
             SG->DestroySafeWaitWindow();
@@ -288,19 +297,17 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     LastRemoveSourcePath = FALSE;
     UseCustomFont = FALSE;
     ConfirmESCClose = TRUE;
-    lstrcpy(Command, "notepad");
-    lstrcpy(Arguments, "\"$(Name)\"");
-    lstrcpy(InitDir, "$(FullPath)");
+    Command = L"notepad";
+    Arguments = L"\"$(Name)\"";
+    InitDir = L"$(FullPath)";
     if (regKey)
     {
-        char buffer[4096];
-
         // history
-        LoadHistory(regKey, CONFIG_MASKHISTORY, MaskHistory, buffer, MAX_GROUPMASK, registry);
-        LoadHistory(regKey, CONFIG_NEWNAMEHISTORY, NewNameHistory, buffer, 2 * MAX_PATH, registry);
-        LoadHistory(regKey, CONFIG_SEARCHHISTORY, SearchHistory, buffer, MAX_PATH, registry);
-        LoadHistory(regKey, CONFIG_REPLACEHISTORY, ReplaceHistory, buffer, MAX_PATH, registry);
-        LoadHistory(regKey, CONFIG_COMMANDHISTORY, CommandHistory, buffer, MAX_PATH, registry);
+        LoadHistory(regKey, CONFIG_MASKHISTORY, MaskHistory, registry);
+        LoadHistory(regKey, CONFIG_NEWNAMEHISTORY, NewNameHistory, registry);
+        LoadHistory(regKey, CONFIG_SEARCHHISTORY, SearchHistory, registry);
+        LoadHistory(regKey, CONFIG_REPLACEHISTORY, ReplaceHistory, registry);
+        LoadHistory(regKey, CONFIG_COMMANDHISTORY, CommandHistory, registry);
 
         // load from the registry
         registry->GetValue(regKey, CONFIG_CUSTOMFONT, REG_DWORD, &UseCustomFont, sizeof(int));
@@ -320,7 +327,10 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         if (registry->OpenKey(regKey, CONFIG_LASTUSED, subKey))
         {
             LastOptions.Load(subKey, registry);
-            registry->GetValue(subKey, CONFIG_LASTMASK, REG_SZ, LastMask, MAX_GROUPMASK);
+            // LastMask stays narrow (feeds the still-narrow Mask dialog
+            // control), but the shared registry facade's REG_SZ path is wide-only -
+            // bridge here, same pattern as regedt's Command/Arguments/InitDir fix.
+            GetValueSZ(registry, subKey, CONFIG_LASTMASK, LastMask, MAX_GROUPMASK);
             registry->GetValue(subKey, CONFIG_LASTSUBDIRS, REG_DWORD, &LastSubdirs, sizeof(BOOL));
             registry->GetValue(subKey, CONFIG_LASTREMOVESOURCE, REG_DWORD,
                                &LastRemoveSourcePath, sizeof(BOOL));
@@ -328,20 +338,20 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         }
 
         // Counter dialog settings
-        if (registry->OpenKey(regKey, SAL_REG_SUBKEY_COUNTER_A, subKey))
+        if (registry->OpenKey(regKey, SAL_REG_SUBKEY_COUNTER_W, subKey))
         {
-            registry->GetValue(subKey, SAL_REG_VALUE_START_A, REG_DWORD, &LastCounterStart, sizeof(int));
-            registry->GetValue(subKey, SAL_REG_VALUE_STEP_A, REG_BINARY, &LastCounterStep, sizeof(double));
-            registry->GetValue(subKey, SAL_REG_VALUE_BASE_A, REG_DWORD, &LastCounterBase, sizeof(int));
-            registry->GetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_A, REG_DWORD, &LastCounterMinWidth, sizeof(int));
-            registry->GetValue(subKey, SAL_REG_VALUE_FILL_A, REG_DWORD, &LastCounterFill, sizeof(int));
-            registry->GetValue(subKey, SAL_REG_VALUE_LEFT_A, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
+            registry->GetValue(subKey, SAL_REG_VALUE_START_W, REG_DWORD, &LastCounterStart, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_STEP_W, REG_BINARY, &LastCounterStep, sizeof(double));
+            registry->GetValue(subKey, SAL_REG_VALUE_BASE_W, REG_DWORD, &LastCounterBase, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_W, REG_DWORD, &LastCounterMinWidth, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_FILL_W, REG_DWORD, &LastCounterFill, sizeof(int));
+            registry->GetValue(subKey, SAL_REG_VALUE_LEFT_W, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
             registry->CloseKey(subKey);
         }
 
-        registry->GetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, Command.Size());
-        registry->GetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, Arguments.Size());
-        registry->GetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, InitDir.Size());
+        SPLRegistryGetStringOwned(registry, regKey, CONFIG_COMMAND, Command);
+        SPLRegistryGetStringOwned(registry, regKey, CONFIG_ARGUMENTS, Arguments);
+        SPLRegistryGetStringOwned(registry, regKey, CONFIG_INITDIR, InitDir);
 
         registry->GetValue(regKey, CONFIG_CONFIRMESCCLOSE, REG_DWORD, &ConfirmESCClose, sizeof(BOOL));
     }
@@ -369,15 +379,15 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
         {
             SalPrintf(buf, 32, CONFIG_MASKHISTORY, i);
-            registry->DeleteValue(regKey, buf);
+            registry->DeleteValue(regKey, RenamerTextToWide(buf).c_str());
             SalPrintf(buf, 32, CONFIG_NEWNAMEHISTORY, i);
-            registry->DeleteValue(regKey, buf);
+            registry->DeleteValue(regKey, RenamerTextToWide(buf).c_str());
             SalPrintf(buf, 32, CONFIG_SEARCHHISTORY, i);
-            registry->DeleteValue(regKey, buf);
+            registry->DeleteValue(regKey, RenamerTextToWide(buf).c_str());
             SalPrintf(buf, 32, CONFIG_REPLACEHISTORY, i);
-            registry->DeleteValue(regKey, buf);
+            registry->DeleteValue(regKey, RenamerTextToWide(buf).c_str());
             SalPrintf(buf, 32, CONFIG_COMMANDHISTORY, i);
-            registry->DeleteValue(regKey, buf);
+            registry->DeleteValue(regKey, RenamerTextToWide(buf).c_str());
         }
     }
 
@@ -413,26 +423,26 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     if (registry->CreateKey(regKey, CONFIG_LASTUSED, subKey))
     {
         LastOptions.Save(subKey, registry);
-        registry->SetValue(subKey, CONFIG_LASTMASK, REG_SZ, LastMask, -1);
+        SetValueSZ(registry, subKey, CONFIG_LASTMASK, LastMask);
         registry->SetValue(subKey, CONFIG_LASTSUBDIRS, REG_DWORD, &LastSubdirs, sizeof(BOOL));
         registry->SetValue(subKey, CONFIG_LASTREMOVESOURCE, REG_DWORD,
                            &LastRemoveSourcePath, sizeof(BOOL));
         registry->CloseKey(subKey);
     }
     // Counter dialog settings
-    if (registry->CreateKey(regKey, SAL_REG_SUBKEY_COUNTER_A, subKey))
+    if (registry->CreateKey(regKey, SAL_REG_SUBKEY_COUNTER_W, subKey))
     {
-        registry->SetValue(subKey, SAL_REG_VALUE_START_A, REG_DWORD, &LastCounterStart, sizeof(int));
-        registry->SetValue(subKey, SAL_REG_VALUE_STEP_A, REG_BINARY, &LastCounterStep, sizeof(double));
-        registry->SetValue(subKey, SAL_REG_VALUE_BASE_A, REG_DWORD, &LastCounterBase, sizeof(int));
-        registry->SetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_A, REG_DWORD, &LastCounterMinWidth, sizeof(int));
-        registry->SetValue(subKey, SAL_REG_VALUE_FILL_A, REG_DWORD, &LastCounterFill, sizeof(int));
-        registry->SetValue(subKey, SAL_REG_VALUE_LEFT_A, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
+        registry->SetValue(subKey, SAL_REG_VALUE_START_W, REG_DWORD, &LastCounterStart, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_STEP_W, REG_BINARY, &LastCounterStep, sizeof(double));
+        registry->SetValue(subKey, SAL_REG_VALUE_BASE_W, REG_DWORD, &LastCounterBase, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_MIN_WIDTH_W, REG_DWORD, &LastCounterMinWidth, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_FILL_W, REG_DWORD, &LastCounterFill, sizeof(int));
+        registry->SetValue(subKey, SAL_REG_VALUE_LEFT_W, REG_DWORD, &LastCounterLeft, sizeof(BOOL));
         registry->CloseKey(subKey);
     }
-    registry->SetValue(regKey, CONFIG_COMMAND, REG_SZ, Command, -1);
-    registry->SetValue(regKey, CONFIG_ARGUMENTS, REG_SZ, Arguments, -1);
-    registry->SetValue(regKey, CONFIG_INITDIR, REG_SZ, InitDir, -1);
+    SPLRegistrySetString(registry, regKey, CONFIG_COMMAND, Command);
+    SPLRegistrySetString(registry, regKey, CONFIG_ARGUMENTS, Arguments);
+    SPLRegistrySetString(registry, regKey, CONFIG_INITDIR, InitDir);
     registry->SetValue(regKey, CONFIG_CONFIRMESCCLOSE, REG_DWORD, &ConfirmESCClose, sizeof(BOOL));
 }
 
@@ -443,7 +453,7 @@ void OnConfiguration(HWND hParent)
     static BOOL InConfiguration = FALSE;
     if (InConfiguration)
     {
-        SG->SalMessageBox(hParent, LoadStr(IDS_CFG_CONFLICT), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
+        SG->SalMessageBox(hParent, LangStr(IDS_CFG_CONFLICT).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION | MB_OK);
         return;
     }
     InConfiguration = TRUE;
@@ -473,10 +483,10 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
   {MNTT_PE, 0
 };
 */
-    salamander->AddMenuItem(-1, LoadStr(IDS_PLUGMENU_RENAME), SALHOTKEY('R', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
+    salamander->AddMenuItem(-1, LangStr(IDS_PLUGMENU_RENAME).c_str(), SALHOTKEY('R', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
                             MID_RENAME, FALSE, MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DIR_FOCUSED | MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIRS_SELECTED,
                             MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
-    // salamander->AddMenuItem(-1, LoadStr(IDS_PLUGMENU_UNDO), 0, MID_UNDO, FALSE,
+    // salamander->AddMenuItem(-1, LangStr(IDS_PLUGMENU_UNDO), 0, MID_UNDO, FALSE,
     //     MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
     // set the plugin icon

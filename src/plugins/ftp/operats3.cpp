@@ -1,17 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
-const char* GetWorkerErrorTxt(int error, char* errBuf, int errBufSize)
+static BOOL FormatWorkerStatusValue(std::wstring& output, const CQuadWord& value,
+                                    BOOL timeLeft) noexcept
 {
-    char* e;
-    if (error != NO_ERROR)
-        e = FTPGetErrorText(error, errBuf, errBufSize);
-    else
-        e = LoadStr(IDS_UNKNOWNERROR);
-    return e;
+    return timeLeft ? SPLPrintTimeLeftOwned(SalamanderGeneral, value, output)
+                    : SPLPrintDiskSizeOwned(SalamanderGeneral, value, 0, output);
 }
 
 //
@@ -19,13 +16,14 @@ const char* GetWorkerErrorTxt(int error, char* errBuf, int errBufSize)
 // CFTPWorker
 //
 
-CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
-                       unsigned short port, const char* user)
+CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const wchar_t* host,
+                       unsigned short port, const wchar_t* user)
+    : TextPolicy(FtpLocalTextCodePage())
 {
     ControlConnectionUID = -1;
 
     HaveWorkingPath = FALSE;
-    WorkingPath[0] = 0;
+    WorkingPath.clear();
     CurrentTransferMode = ctrmUnknown;
 
     EventConnectSent = FALSE;
@@ -53,7 +51,7 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
     State = fwsLookingForWork;
     SubState = fwssNone;
     CurItem = NULL;
-    ErrorDescr[0] = 0;
+    ErrorDescr.clear();
     ConnectAttemptNumber = 0;
     UnverifiedCertificate = NULL;
 
@@ -94,7 +92,7 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
     memset(&StartTimeOfListing, 0, sizeof(StartTimeOfListing));
     StartLstTimeOfListing = 0;
     ListCmdReplyCode = -1;
-    ListCmdReplyText = NULL;
+    ListCmdReplyText.clear();
 
     OpenedInFile = NULL;
     OpenedInFileSize.Set(0, 0);
@@ -120,7 +118,7 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
     UploadDirGetTgtPathListing = FALSE;
 
     UploadAutorenamePhase = 0;
-    UploadAutorenameNewName[0] = 0;
+    UploadAutorenameNewName.clear();
     UploadType = utNone;
     UseDeleteForOverwrite = FALSE;
 
@@ -135,8 +133,6 @@ CFTPWorker::~CFTPWorker()
 {
     if (UnverifiedCertificate != NULL)
         UnverifiedCertificate->Release();
-    if (ListCmdReplyText != NULL)
-        SalamanderGeneral->Free(ListCmdReplyText);
     if (WorkerDataConState != wdcsDoesNotExist)
         TRACE_E("Unexpected situation in CFTPWorker::~CFTPWorker(): WorkerDataConState is not wdcsDoesNotExist!");
     if (WorkerDataCon != NULL)
@@ -289,29 +285,14 @@ void CFTPWorker::CorrectErrorDescr()
         TRACE_E("Incorrect call to CFTPWorker::CorrectErrorDescr(): not from section WorkerCritSect!");
 #endif
 
-    // translate CR+LF to spaces
-    char* s = ErrorDescr;
-    char* end = ErrorDescr + FTPWORKER_ERRDESCR_BUFSIZE - 1;
-    while (s < end && *s != 0)
-    {
-        if (*s == '\r')
-            *s = ' ';
-        if (*s == '\n')
-            *s = ' ';
-        s++;
-    }
-    // drop spaces and periods from the end of the string
-    end = s;
-    while (end > ErrorDescr && (*(end - 1) == '.' || *(end - 1) == ' '))
-        end--;
-    *end = 0;
+    FtpNormalizeWorkerError(ErrorDescr);
 }
 
-void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* path, const char* name,
+BOOL CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const wchar_t* path, const wchar_t* name,
                               CFTPQueueItemAction forceAction, BOOL alreadyRenamedName,
                               char* flushDataBuffer, CQuadWord const* checkFromOffset,
                               CQuadWord const* writeOrReadFromOffset, int validBytesInFlushDataBuffer,
-                              HANDLE workFile)
+                              HANDLE workFile) noexcept
 {
 #ifdef _DEBUG
     if (SocketCritSect.RecursionCount == 0 /* does not catch the situation where
@@ -320,18 +301,25 @@ void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* pa
         TRACE_E("Incorrect call to CFTPWorker::InitDiskWork(): not from section SocketCritSect!");
 #endif
 
+    std::wstring stagedPath;
+    std::wstring stagedName;
+    try
+    {
+        stagedPath = path != NULL ? path : L"";
+        stagedName = name != NULL ? name : L"";
+    }
+    catch (...)
+    {
+        DiskWork.FlushDataBuffer = flushDataBuffer;
+        return FALSE;
+    }
+
     DiskWork.SocketMsg = Msg;
     DiskWork.SocketUID = UID;
     DiskWork.MsgID = msgID;
     DiskWork.Type = type;
-    if (path != NULL)
-        lstrcpyn(DiskWork.Path, path, MAX_PATH);
-    else
-        DiskWork.Path[0] = 0;
-    if (name != NULL)
-        lstrcpyn(DiskWork.Name, name, MAX_PATH);
-    else
-        DiskWork.Name[0] = 0;
+    DiskWork.Path.swap(stagedPath);
+    DiskWork.Name.swap(stagedName);
     DiskWork.ForceAction = forceAction;
     DiskWork.AlreadyRenamedName = alreadyRenamedName;
     Oper->GetDiskOperDefaults(&DiskWork);
@@ -373,44 +361,135 @@ void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* pa
         DiskWork.WorkFile = NULL;
     }
     DiskWork.EOLsInFlushDataBuffer = 0;
+    return TRUE;
 }
 
-void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
+void CFTPWorker::EnsureErrorDescr(BOOL success) noexcept
+{
+    if (!success)
+    {
+        ErrorDescr.clear();
+        try
+        {
+            FtpStoreWideText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), ErrorDescr);
+        }
+        catch (...)
+        {
+        }
+    }
+}
+
+void CFTPWorker::SetLocalErrorDescr(std::string_view text) noexcept
+{
+    std::wstring decoded;
+    const BOOL success = FtpDecodeLocalText(text, decoded);
+    if (success)
+        ErrorDescr.swap(decoded);
+    EnsureErrorDescr(success);
+}
+
+void CFTPWorker::SetServerErrorDescr(std::string_view text) noexcept
+{
+    std::wstring decoded;
+    const BOOL success = FtpDecodeServerTextForPresentation(TextPolicy.GetCodec(), text, decoded);
+    if (success)
+        ErrorDescr.swap(decoded);
+    EnsureErrorDescr(success);
+}
+
+void CFTPWorker::SetFormattedWideErrorDescr(int formatID, std::wstring_view argument) noexcept
+{
+    std::wstring formatted;
+    BOOL success = FALSE;
+    try
+    {
+        success = FtpFormatWideText(LangStr(formatID).c_str(), argument, formatted);
+    }
+    catch (...)
+    {
+    }
+    if (success)
+        ErrorDescr.swap(formatted);
+    EnsureErrorDescr(success);
+}
+
+void CFTPWorker::SetFormattedLocalErrorDescr(int formatID, std::string_view argument) noexcept
+{
+    std::wstring decoded;
+    if (!FtpDecodeLocalText(argument, decoded))
+    {
+        EnsureErrorDescr(FALSE);
+        return;
+    }
+    SetFormattedWideErrorDescr(formatID, decoded);
+}
+
+void CFTPWorker::SetFormattedServerErrorDescr(int formatID, std::string_view argument) noexcept
+{
+    std::wstring decoded;
+    if (!FtpDecodeServerTextForPresentation(TextPolicy.GetCodec(), argument, decoded))
+    {
+        EnsureErrorDescr(FALSE);
+        return;
+    }
+    SetFormattedWideErrorDescr(formatID, decoded);
+}
+
+void CFTPWorker::LogErrorDescr()
+{
+    std::wstring logLine;
+    if (FtpFormatWideText(L"%s\r\n", ErrorDescr, logLine))
+        Logs.LogMessage(LogUID, logLine.c_str(), static_cast<int>(logLine.size()), TRUE);
+    else
+        Logs.LogMessage(LogUID, ErrorDescr.c_str(), static_cast<int>(ErrorDescr.size()), TRUE);
+}
+
+const char* GetWorkerErrorTxt(int error, std::string& errorText) noexcept
+{
+    if (error != NO_ERROR)
+        return FTPGetErrorText(error, errorText) ? errorText.c_str() : LoadStr(IDS_UNKNOWNERROR);
+    return LoadStr(IDS_UNKNOWNERROR);
+}
+
+void CFTPWorker::GetListViewData(LVITEM* itemData, std::wstring& text) noexcept
 {
     CALL_STACK_MESSAGE1("CFTPWorker::GetListViewData()");
 
     HANDLES(EnterCriticalSection(&WorkerCritSect));
-    if (itemData->mask & LVIF_IMAGE)
-        itemData->iImage = 0; // we only have a single icon for now
-    if ((itemData->mask & LVIF_TEXT) && bufSize > 0)
+    try
     {
-        switch (itemData->iSubItem)
+        text.clear();
+        if (itemData->mask & LVIF_IMAGE)
+            itemData->iImage = 0; // we only have a single icon for now
+        if (itemData->mask & LVIF_TEXT)
         {
+            switch (itemData->iSubItem)
+            {
         case 0: // ID
         {
-            _snprintf_s(buf, bufSize, _TRUNCATE, "%d", ID);
+            text = SPLFormatStringOwned(L"%d", ID);
             break;
         }
 
         case 1: // Action
         {
             if (ShouldStop)
-                _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_STOPPING));
+                text = LangStr(IDS_OPERDLGCOACT_STOPPING);
             else
             {
                 switch (State)
                 {
                 case fwsLookingForWork:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_LOOKFORWORK));
+                    text = LangStr(IDS_OPERDLGCOACT_LOOKFORWORK);
                     break;
                 case fwsSleeping:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_SLEEPING));
+                    text = LangStr(IDS_OPERDLGCOACT_SLEEPING);
                     break;
                 case fwsConnectionError:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_WAITFORUSER));
+                    text = LangStr(IDS_OPERDLGCOACT_WAITFORUSER);
                     break;
                 case fwsStopped:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_STOPPING));
+                    text = LangStr(IDS_OPERDLGCOACT_STOPPING);
                     break;
 
                 case fwsPreparing:
@@ -477,14 +556,23 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                         }
                         }
                         if (strResID != -1)
-                            _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(strResID), CurItem->Name);
+                        {
+                            std::wstring remoteName;
+                            const wchar_t* displayName = CurItem->LocalName;
+                            if (displayName == NULL)
+                            {
+                                remoteName = Queue->DecodeRemoteText(CurItem->Name);
+                                displayName = remoteName.c_str();
+                            }
+                            text = SPLFormatStringOwned(LangStr(strResID).c_str(), displayName);
+                        }
                         else
-                            buf[0] = 0;
+                            text.clear();
                     }
                     else
                     {
                         TRACE_E("Unexpected situation in CFTPWorker::GetListViewData(): missing active operation item!");
-                        buf[0] = 0;
+                        text.clear();
                     }
                     break;
                 }
@@ -492,7 +580,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                 default:
                 {
                     TRACE_E("Unexpected situation in CFTPWorker::GetListViewData(): unknown worker state!");
-                    buf[0] = 0;
+                    text.clear();
                     break;
                 }
                 }
@@ -502,7 +590,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
 
         case 2: // Status
         {
-            buf[0] = 0;
+            std::wstring status;
             if (!ShouldStop)
             {
                 switch (State)
@@ -510,7 +598,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                 case fwsLookingForWork:
                 {
                     if (ShouldBePaused)
-                        _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_PAUSED));
+                        status = LangStr(IDS_OPERDLGCOACT_PAUSED);
                     break;
                 }
 
@@ -519,28 +607,30 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                     break; // no text in these cases
 
                 case fwsPreparing:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_PREPARING));
+                    status = LangStr(IDS_OPERDLGCOACT_PREPARING);
                     break;
                 case fwsConnecting:
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_CONNECTING));
+                    status = LangStr(IDS_OPERDLGCOACT_CONNECTING);
                     break;
 
                 case fwsWaitingForReconnect:
                 {
                     if (ShouldBePaused)
-                        _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_PAUSED));
+                        status = LangStr(IDS_OPERDLGCOACT_PAUSED);
                     else
                     {
-                        _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_WAITRECON),
-                                    Config.GetDelayBetweenConRetries(), ConnectAttemptNumber,
-                                    Config.GetConnectRetries() + 1, ErrorDescr);
+                        status = SPLFormatStringOwned(
+                            LangStr(IDS_OPERDLGCOACT_WAITRECON).c_str(),
+                            Config.GetDelayBetweenConRetries(), ConnectAttemptNumber,
+                            Config.GetConnectRetries() + 1, ErrorDescr.c_str());
                     }
                     break;
                 }
 
                 case fwsConnectionError:
                 {
-                    _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_CONERROR), ErrorDescr);
+                    status = SPLFormatStringOwned(
+                        LangStr(IDS_OPERDLGCOACT_CONERROR).c_str(), ErrorDescr.c_str());
                     break;
                 }
 
@@ -548,54 +638,38 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                 {
                     if (CurItem != NULL) // "always true"
                     {
-                        char* bufRest = buf;
-                        int bufRestSize = bufSize;
-                        int prefixLen = -1;
                         if (ShouldBePaused)
-                        {
-                            prefixLen = _snprintf_s(buf, bufSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_PAUSED));
-                            if (prefixLen >= 0 && prefixLen + 2 < bufSize)
-                            {
-                                buf[prefixLen] = ':';
-                                buf[prefixLen + 1] = ' ';
-                                buf[prefixLen + 2] = 0;
-                                bufRest += prefixLen + 2;
-                                bufRestSize -= prefixLen + 2;
-                            }
-                            else
-                            {
-                                prefixLen = -1;
-                                buf[0] = 0;
-                            }
-                        }
+                            status = LangStr(IDS_OPERDLGCOACT_PAUSED);
+                        std::wstring action;
                         if (SubState == fwssWorkUploadWaitForListing)
-                            _snprintf_s(bufRest, bufRestSize, _TRUNCATE, LoadStr(IDS_OPERDLGCOACT_WAITFORLIST));
+                            action = LangStr(IDS_OPERDLGCOACT_WAITFORLIST);
                         else
                         {
-                            if ((StatusType == wstDownloadStatus || StatusType == wstUploadStatus) && bufRestSize > 0 &&
+                            if ((StatusType == wstDownloadStatus || StatusType == wstUploadStatus) &&
                                 (StatusTransferred > CQuadWord(0, 0) || !ShouldBePaused && StatusConnectionIdleTime > 30))
                             {
-                                char num1[100];
-                                char num2[100];
-                                char num3[100];
-                                if (ShouldBePaused)
-                                    num3[0] = 0;
-                                else
+                                std::wstring num1;
+                                std::wstring num2;
+                                std::wstring num3;
+                                if (!ShouldBePaused)
                                 {
                                     if (StatusConnectionIdleTime <= 30)
                                     {
                                         if (StatusSpeed > 0)
                                         {
-                                            SalamanderGeneral->PrintDiskSize(num1, CQuadWord(StatusSpeed, 0), 0);
-                                            _snprintf_s(num3, _TRUNCATE, LoadStr(IDS_LISTWNDDOWNLOADSPEED), num1);
+                                            FormatWorkerStatusValue(num1, CQuadWord(StatusSpeed, 0), FALSE);
+                                            num3 = SPLFormatStringOwned(
+                                                LangStr(IDS_LISTWNDDOWNLOADSPEED).c_str(),
+                                                num1.c_str());
                                         }
-                                        else
-                                            num3[0] = 0;
                                     }
                                     else
                                     {
-                                        SalamanderGeneral->PrintTimeLeft(num1, CQuadWord(StatusConnectionIdleTime, 0));
-                                        _snprintf_s(num3, _TRUNCATE, LoadStr(IDS_LISTWNDCONNECTIONIDLE), num1);
+                                        FormatWorkerStatusValue(
+                                            num1, CQuadWord(StatusConnectionIdleTime, 0), TRUE);
+                                        num3 = SPLFormatStringOwned(
+                                            LangStr(IDS_LISTWNDCONNECTIONIDLE).c_str(),
+                                            num1.c_str());
                                     }
                                 }
                                 CQuadWord transferredSize;
@@ -607,17 +681,17 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                 {
                                     transferredSize = ResumingFileOnServer ? FileOnServerResumedAtOffset + StatusTransferred : StatusTransferred;
                                 }
-                                SalamanderGeneral->PrintDiskSize(num1, transferredSize, 0); // careful, num1 is used when creating num3
+                                FormatWorkerStatusValue(num1, transferredSize, FALSE);
                                 if (StatusTotal != CQuadWord(-1, -1))
                                 {
                                     if (StatusType == wstUploadStatus && StatusTotal == transferredSize)
-                                        num3[0] = 0; // nothing else will be uploaded
-                                    int off = 0;
-                                    SalamanderGeneral->PrintDiskSize(num2, StatusTotal, 0);
-                                    off = _snprintf_s(bufRest, bufRestSize, _TRUNCATE, LoadStr(num3[0] != 0 ? IDS_LISTWNDSTATUS1 : IDS_OPERDLGSTATUS2),
-                                                      num1, num2, num3);
-                                    if (off < 0)
-                                        off = bufRestSize;
+                                        num3.clear(); // nothing else will be uploaded
+                                    FormatWorkerStatusValue(num2, StatusTotal, FALSE);
+                                    action = SPLFormatStringOwned(
+                                        LangStr(!num3.empty() ? IDS_LISTWNDSTATUS1
+                                                              : IDS_OPERDLGSTATUS2)
+                                            .c_str(),
+                                        num1.c_str(), num2.c_str(), num3.c_str());
                                     if (StatusTotal > CQuadWord(0, 0))
                                     {
                                         int progress = ((int)((CQuadWord(1000, 0) * transferredSize) / StatusTotal).Value /*+ 5*/) / 10; // do not round (100% must appear only at 100%, not at 99.5%)
@@ -626,8 +700,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                         if (progress < 0)
                                             progress = 0;
 
-                                        char timeLeftText[200];
-                                        timeLeftText[0] = 0;
+                                        std::wstring timeLeftText;
                                         if (!ShouldBePaused && (StatusSpeed > 0 || StatusConnectionIdleTime > 30))
                                         {
                                             if (StatusTotal > CQuadWord(0, 0) && StatusSpeed > 0 && StatusConnectionIdleTime <= 30 &&
@@ -661,12 +734,13 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                                 while (expon--)
                                                     dif *= CQuadWord(60, 0);
                                                 secs = ((secs + dif / CQuadWord(2, 0)) / dif) * dif; // round 'secs' to 'dif' seconds
-                                                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGCOACT_TIMELEFT), 200);
-                                                int len = (int)strlen(timeLeftText);
-                                                if (len < 99) // total of 200, so if 100 characters must remain for the time value, len must be < 99
+                                                std::wstring timeValue;
+                                                FormatWorkerStatusValue(timeValue, secs, TRUE);
+                                                timeLeftText = LangStr(IDS_OPERDLGCOACT_TIMELEFT);
+                                                if (!timeValue.empty())
                                                 {
-                                                    timeLeftText[len++] = ' ';
-                                                    SalamanderGeneral->PrintTimeLeft(timeLeftText + len, secs);
+                                                    timeLeftText.push_back(L' ');
+                                                    timeLeftText.append(timeValue);
                                                 }
                                                 LastTimeEstimation = (int)secs.Value;
                                             }
@@ -674,32 +748,41 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                             {
                                                 if (StatusConnectionIdleTime > 30)
                                                 {
-                                                    char idleTime[100];
-                                                    SalamanderGeneral->PrintTimeLeft(idleTime, CQuadWord(StatusConnectionIdleTime, 0));
-                                                    _snprintf_s(timeLeftText, _TRUNCATE, LoadStr(IDS_OPERDLGCONNECTIONSIDLE), idleTime);
+                                                    std::wstring idleTime;
+                                                    FormatWorkerStatusValue(
+                                                        idleTime,
+                                                        CQuadWord(StatusConnectionIdleTime, 0),
+                                                        TRUE);
+                                                    timeLeftText = SPLFormatStringOwned(
+                                                        LangStr(IDS_OPERDLGCONNECTIONSIDLE).c_str(),
+                                                        idleTime.c_str());
                                                 }
                                             }
                                         }
-                                        if (off < bufRestSize)
-                                        {
-                                            if (timeLeftText[0] != 0)
-                                                _snprintf_s(bufRest + off, bufRestSize - off, _TRUNCATE, ", %d %%, %s", progress, timeLeftText);
-                                            else
-                                                _snprintf_s(bufRest + off, bufRestSize - off, _TRUNCATE, ", %d %%", progress);
-                                        }
+                                        action.append(
+                                            !timeLeftText.empty()
+                                                ? SPLFormatStringOwned(L", %d %%, %s", progress,
+                                                                       timeLeftText.c_str())
+                                                : SPLFormatStringOwned(L", %d %%", progress));
                                     }
                                 }
                                 else
                                 {
-                                    if (num3[0] != 0)
-                                        _snprintf_s(bufRest, bufRestSize, _TRUNCATE, LoadStr(IDS_LISTWNDSTATUS2), num1, num3);
+                                    if (!num3.empty())
+                                        action = SPLFormatStringOwned(
+                                            LangStr(IDS_LISTWNDSTATUS2).c_str(),
+                                            num1.c_str(), num3.c_str());
                                     else
-                                        lstrcpyn(bufRest, num1, bufRestSize);
+                                        action = num1;
                                 }
                             }
                         }
-                        if (prefixLen != -1 && *bufRest == 0)
-                            *(bufRest - 2) = 0; // the prefix does not need ": "
+                        if (!action.empty())
+                        {
+                            if (!status.empty())
+                                status.append(L": ");
+                            status.append(action);
+                        }
                     }
                     else
                         TRACE_E("Unexpected situation 2 in CFTPWorker::GetListViewData(): missing active operation item!");
@@ -713,10 +796,18 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                 }
                 }
             }
+            text.swap(status);
             break;
         }
+            }
+            itemData->pszText = const_cast<LPWSTR>(text.c_str());
         }
-        itemData->pszText = buf;
+    }
+    catch (...)
+    {
+        text.clear();
+        if (itemData->mask & LVIF_TEXT)
+            itemData->pszText = const_cast<LPWSTR>(text.c_str());
     }
     HANDLES(LeaveCriticalSection(&WorkerCritSect));
 }
@@ -739,7 +830,7 @@ BOOL CFTPWorker::HaveError()
     return ret;
 }
 
-BOOL CFTPWorker::GetErrorDescr(char* buf, int bufSize, BOOL* postActivate, CCertificate** unverifiedCertificate)
+BOOL CFTPWorker::GetErrorDescr(std::wstring& errorText, BOOL* postActivate, CCertificate** unverifiedCertificate)
 {
     CALL_STACK_MESSAGE1("CFTPWorker::GetErrorDescr(,)");
 
@@ -747,7 +838,9 @@ BOOL CFTPWorker::GetErrorDescr(char* buf, int bufSize, BOOL* postActivate, CCert
     if (unverifiedCertificate != NULL)
         *unverifiedCertificate = NULL;
     BOOL operStatusMaybeChanged = FALSE;
-    BOOL ret = HaveError();
+    BOOL ret = State == fwsConnectionError || State == fwsWaitingForReconnect;
+    if (ret && !FtpStoreWideText(ErrorDescr, errorText))
+        ret = FALSE;
     if (ret)
     {
         if (State == fwsWaitingForReconnect)
@@ -759,7 +852,6 @@ BOOL CFTPWorker::GetErrorDescr(char* buf, int bufSize, BOOL* postActivate, CCert
             *postActivate = TRUE; // fweActivate is posted after the method finishes; in fwsConnectionError the item must return to the queue
             Oper->ReportWorkerChange(ID, FALSE);
         }
-        lstrcpyn(buf, ErrorDescr, bufSize);
         if (unverifiedCertificate != NULL && UnverifiedCertificate != NULL)
         {
             *unverifiedCertificate = UnverifiedCertificate;
@@ -890,7 +982,7 @@ BOOL CFTPWorker::InformAboutPause(BOOL pause)
     BOOL ret = FALSE;
     if (ShouldBePaused != pause) // if this is not a redundant or repeated call
     {
-        Logs.LogMessage(LogUID, LoadStr(pause ? IDS_LOGMSGPAUSE : IDS_LOGMSGRESUME), -1, TRUE);
+        Logs.LogMessage(LogUID, LangStr(pause ? IDS_LOGMSGPAUSE : IDS_LOGMSGRESUME).c_str(), -1, TRUE);
         ShouldBePaused = pause;
         Oper->ReportWorkerChange(ID, FALSE);
         ret = TRUE; // we will call PostShouldPauseOrResume()
@@ -1053,9 +1145,9 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
     {
         if (WaitForCmdErrError != NO_ERROR) // if there is something to show, display it
         {
-            char errBuf[300];
-            FTPGetErrorTextForLog(WaitForCmdErrError, errBuf, 300);
-            Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+            std::string errorText;
+            if (FTPGetErrorTextForLog(WaitForCmdErrError, errorText))
+                Logs.LogMessage(LogUID, errorText.c_str(), -1, TRUE);
         }
         CommandState = fwcsIdle;
         CommandTransfersData = FALSE;
@@ -1074,13 +1166,13 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
     }
     if (CurItem != NULL)
     {
-        char userBuf[USER_MAX_SIZE];
-        char hostBuf[HOST_MAX_SIZE];
+        const wchar_t* userBuf = NULL;
+        const wchar_t* hostBuf = NULL;
         unsigned short port;
         if (UploadDirGetTgtPathListing)
         { // listing failed; inform waiting workers about it
             UploadDirGetTgtPathListing = FALSE;
-            Oper->GetUserHostPort(userBuf, hostBuf, &port);
+            Oper->GetUserHostPort(&userBuf, hostBuf, &port);
             char* tgtPath = NULL;
             if (CurItem->Type == fqitUploadCopyExploreDir || CurItem->Type == fqitUploadMoveExploreDir)
                 tgtPath = ((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtPath;
@@ -1106,7 +1198,7 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
                 case fwssWorkCopyMoveWaitForDELERes:
                 {
                     // if we do not know how deleting the file/link/directory ended, invalidate the listing in the cache
-                    Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                    Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                     UploadListingCache.ReportDelete(userBuf, hostBuf, port, CurItem->Path,
                                                     Oper->GetFTPServerPathType(CurItem->Path),
                                                     CurItem->Name, TRUE);
@@ -1118,7 +1210,7 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
                     if (CurItem->Type == fqitUploadCopyExploreDir || CurItem->Type == fqitUploadMoveExploreDir) // "always true"
                     {
                         // if we do not know how creating the directory ended, invalidate the listing in the cache
-                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                         CFTPQueueItemCopyMoveUploadExplore* curItem = (CFTPQueueItemCopyMoveUploadExplore*)CurItem;
                         UploadListingCache.ReportCreateDirs(userBuf, hostBuf, port, curItem->TgtPath,
                                                             Oper->GetFTPServerPathType(curItem->TgtPath),
@@ -1132,11 +1224,11 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
                     if (CurItem->Type == fqitUploadCopyExploreDir || CurItem->Type == fqitUploadMoveExploreDir) // "always true"
                     {
                         // if we do not know how creating the directory ended, invalidate the listing in the cache
-                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                         CFTPQueueItemCopyMoveUploadExplore* curItem = (CFTPQueueItemCopyMoveUploadExplore*)CurItem;
                         UploadListingCache.ReportCreateDirs(userBuf, hostBuf, port, curItem->TgtPath,
                                                             Oper->GetFTPServerPathType(curItem->TgtPath),
-                                                            UploadAutorenameNewName, TRUE);
+                                                            UploadAutorenameNewName.c_str(), TRUE);
                     }
                     break;
                 }
@@ -1147,7 +1239,7 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
                     if (CurItem->Type == fqitUploadCopyFile || CurItem->Type == fqitUploadMoveFile) // "always true"
                     {
                         // STOR command result is unknown; invalidate the listing
-                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                         CFTPQueueItemCopyOrMoveUpload* curItem = (CFTPQueueItemCopyOrMoveUpload*)CurItem;
                         UploadListingCache.ReportFileUploaded(userBuf, hostBuf, port, curItem->TgtPath,
                                                               Oper->GetFTPServerPathType(curItem->TgtPath),
@@ -1167,7 +1259,7 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
                     if (CurItem->Type == fqitUploadCopyFile || CurItem->Type == fqitUploadMoveFile) // "always true"
                     {
                         // if we do not know how deleting the file/link/directory ended, invalidate the listing in the cache
-                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                         CFTPQueueItemCopyOrMoveUpload* curItem = (CFTPQueueItemCopyOrMoveUpload*)CurItem;
                         UploadListingCache.ReportDelete(userBuf, hostBuf, port, curItem->TgtPath,
                                                         Oper->GetFTPServerPathType(curItem->TgtPath),
@@ -1191,7 +1283,7 @@ void CFTPWorker::ReleaseData(CUploadWaitingWorker** uploadFirstWaitingWorker)
     // clear the worker data
     State = fwsStopped; // no need to call Oper->OperationStatusMaybeChanged(); CFTPOperation::DeleteWorkers() will call it
     SubState = fwssNone;
-    ErrorDescr[0] = 0;
+    ErrorDescr.clear();
     if (UnverifiedCertificate != NULL)
         UnverifiedCertificate->Release();
     UnverifiedCertificate = NULL;
@@ -1256,8 +1348,8 @@ void CFTPWorker::CloseOpenedFile(BOOL transferAborted, BOOL setDateAndTime, cons
                 // let the file be closed (if adding to the disk thread fails the file remains open,
                 // because we cannot close it directly; the disk thread might be using its handle)
                 BOOL delEmptyFile = (transferAborted ? CanDeleteEmptyFile : FALSE);
-                FTPDiskThread->AddFileToClose(((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath,
-                                              ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName,
+                FTPDiskThread->AddFileToClose(((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtPath,
+                                              ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName,
                                               OpenedFile, delEmptyFile, setDateAndTime, date,
                                               time, deleteFile, setEndOfFile, NULL);
                 if (deleteFile || delEmptyFile && OpenedFileSize == CQuadWord(0, 0)) // the file will almost certainly be deleted - either by direct command or because the transfer never started, so reset TgtFileState (avoid bothering with "transfer has failed")
@@ -1303,7 +1395,7 @@ void CFTPWorker::CloseOpenedInFile()
             {
                 // let the file be closed (if adding to the disk thread fails the file remains open,
                 // because we cannot close it directly; the disk thread might be using its handle)
-                FTPDiskThread->AddFileToClose(CurItem->Path, CurItem->Name, OpenedInFile, FALSE, FALSE, NULL,
+                FTPDiskThread->AddFileToClose(CurItem->LocalPath, CurItem->LocalName, OpenedInFile, FALSE, FALSE, NULL,
                                               NULL, FALSE, NULL, NULL);
                 OpenedInFile = NULL;
                 OpenedInFileSize.Set(0, 0);
@@ -2225,13 +2317,13 @@ void CFTPWorker::ReadFTPErrorReplies()
     int replyCode;
     while (ReadFTPReply(&reply, &replySize, &replyCode)) // as long as we have a server reply
     {                                                    // log any error messages from the server
-        Logs.LogMessage(LogUID, reply, replySize, TRUE);
-        if (ErrorDescr[0] == 0 &&                               // we do not have an error description yet
+        Logs.LogServerMessage(LogUID, reply, replySize, TextPolicy, TRUE);
+        if (ErrorDescr.empty() &&                               // we do not have an error description yet
             (replyCode == -1 ||                                 // not an FTP response
              FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR || // transient error description
              FTP_DIGIT_1(replyCode) == FTP_D1_ERROR))           // error description
         {
-            CopyStr(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, reply, replySize);
+            SetServerErrorDescr(std::string_view(reply, static_cast<size_t>(replySize)));
         }
         SkipFTPReply(replySize);
     }
@@ -2241,8 +2333,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
 {
     CALL_STACK_MESSAGE2("CFTPWorker::HandleSocketEvent(%d, ,)", (int)event);
 
-    char errBuf[300];
-    char errText[200];
+    std::string errorText;
 
     if (event == fwseIPReceived) // store the IP address in the operation and call HandleEvent
     {
@@ -2252,8 +2343,8 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
         else                          // error, store it in ErrorDescr for later use
         {
             HANDLES(EnterCriticalSection(&WorkerCritSect));
-            _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_WORKERGETIPERROR),
-                        GetWorkerErrorTxt(data2, errBuf, 300));
+            SetFormattedLocalErrorDescr(IDS_WORKERGETIPERROR,
+                                        GetWorkerErrorTxt(data2, errorText));
             CorrectErrorDescr();
             resEvent = fweIPRecFailure;
             HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -2269,10 +2360,17 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
             CFTPWorkerEvent resEvent = fweConnected;
             if (data1 != NO_ERROR) // error, store it in ErrorDescr for later use
             {
-                if (!GetProxyError(errBuf, 300, NULL, 0, TRUE))
-                    GetWorkerErrorTxt(data1, errBuf, 300);
+                std::string proxyError;
+                const char* errorDetail;
+                if (!GetProxyError(proxyError, NULL, TRUE))
+                    errorDetail = GetWorkerErrorTxt(data1, errorText);
+                else
+                {
+                    errorText.swap(proxyError);
+                    errorDetail = errorText.c_str();
+                }
                 HANDLES(EnterCriticalSection(&WorkerCritSect));
-                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_WORKEROPENCONERR), errBuf);
+                SetFormattedLocalErrorDescr(IDS_WORKEROPENCONERR, errorDetail);
                 CorrectErrorDescr();
                 resEvent = fweConnectFailure;
                 HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -2308,12 +2406,12 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                 {
                     if (data1 != NO_ERROR) // only if we have an error
                     {
-                        FTPGetErrorTextForLog(data1, errBuf, 300);
-                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                        if (FTPGetErrorTextForLog(data1, errorText))
+                            Logs.LogMessage(LogUID, errorText.c_str(), -1, TRUE);
                     }
-                    if (ErrorDescr[0] == 0) // when closing the connection we must fill ErrorDescr (even with "unknown error")
+                    if (ErrorDescr.empty()) // when closing the connection we must fill ErrorDescr (even with "unknown error")
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE);
+                        SetLocalErrorDescr(GetWorkerErrorTxt(data1, errorText));
                         CorrectErrorDescr();
                     }
                     break;
@@ -2340,13 +2438,13 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                         if (!firstRound)
                             HANDLES(EnterCriticalSection(&WorkerCritSect));
                         firstRound = FALSE;
-                        Logs.LogMessage(LogUID, reply, replySize, CommandState == fwcsIdle); // put the command reply into the log (time is printed for "unexpected replies")
+                        Logs.LogServerMessage(LogUID, reply, replySize, TextPolicy, CommandState == fwcsIdle); // put the command reply into the log (time is printed for "unexpected replies")
                         if (FTP_DIGIT_1(replyCode) != FTP_D1_MAYBESUCCESS)                   // command reply
                         {                                                                    // this completes the command
                             CommandState = fwcsIdle;                                         // HandleEvent() will probably send another command, so switch to "idle" immediately
                             CommandTransfersData = FALSE;
                         }
-                        ErrorDescr[0] = 0; // guard against duplicate messages (receiving the expected reply = connection OK, so discard the supposed error text)
+                        ErrorDescr.clear(); // guard against duplicate messages (receiving the expected reply = connection OK, so discard the supposed error text)
                         HANDLES(LeaveCriticalSection(&WorkerCritSect));
                         if (FTP_DIGIT_1(replyCode) != FTP_D1_MAYBESUCCESS) // command reply
                         {
@@ -2373,12 +2471,12 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                 {
                     if (data1 != NO_ERROR) // only if we have an error
                     {
-                        FTPGetErrorTextForLog(data1, errBuf, 300);
-                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                        if (FTPGetErrorTextForLog(data1, errorText))
+                            Logs.LogMessage(LogUID, errorText.c_str(), -1, TRUE);
                     }
                     deleteTimerTimeout = TRUE;
                     handleClose = TRUE;
-                    lstrcpyn(ErrorDescr, LoadStr(IDS_CONNECTIONLOSTERROR), FTPWORKER_ERRDESCR_BUFSIZE);
+                    SetLocalErrorDescr(LoadStr(IDS_CONNECTIONLOSTERROR));
                     CorrectErrorDescr();
                     break;
                 }
@@ -2429,18 +2527,21 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                             }
                             // else ;  // the connection has not opened yet -> time out
 
-                            if (WorkerDataCon != NULL ? WorkerDataCon->GetProxyTimeoutDescr(errText, 200) : WorkerUploadDataCon->GetProxyTimeoutDescr(errText, 200))
+                            std::string proxyTimeoutText;
+                            if (WorkerDataCon != NULL ? WorkerDataCon->GetProxyTimeoutDescr(proxyTimeoutText) : WorkerUploadDataCon->GetProxyTimeoutDescr(proxyTimeoutText))
                             { // if we have any timeout description for the data connection, write it to the log
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
-                                sprintf(errBuf, LoadStr(IDS_LOGMSGDATCONERROR), errText);
-                                Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                                std::string logMessage;
+                                if (FTPFormatString(logMessage, LoadStr(IDS_LOGMSGDATCONERROR),
+                                                    proxyTimeoutText.c_str()))
+                                    Logs.LogMessage(LogUID, logMessage.c_str(), -1, TRUE);
                             }
                             else
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
                         }
                     }
 
-                    Logs.LogMessage(LogUID, LoadStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT), -1, TRUE);
+                    Logs.LogMessage(LogUID, LangStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT).c_str(), -1, TRUE);
 
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -2451,8 +2552,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     handleClose = TRUE;
                     isTimeout = TRUE;
                     HANDLES(EnterCriticalSection(&WorkerCritSect));
-                    lstrcpyn(ErrorDescr, LoadStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT),
-                             FTPWORKER_ERRDESCR_BUFSIZE);
+                    SetLocalErrorDescr(LoadStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT));
                     CorrectErrorDescr();
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));
                     break;
@@ -2475,14 +2575,14 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                 {
                     if (data1 != NO_ERROR) // only if we have an error
                     {
-                        FTPGetErrorTextForLog(data1, errBuf, 300);
-                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                        if (FTPGetErrorTextForLog(data1, errorText))
+                            Logs.LogMessage(LogUID, errorText.c_str(), -1, TRUE);
                     }
                     deleteTimerShowErr = TRUE;
                     handleClose = TRUE;
-                    if (ErrorDescr[0] == 0)
+                    if (ErrorDescr.empty())
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE);
+                        SetLocalErrorDescr(GetWorkerErrorTxt(data1, errorText));
                         CorrectErrorDescr();
                     }
                     break;
@@ -2492,8 +2592,8 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                 {
                     if (WaitForCmdErrError != NO_ERROR) // only if we have an error
                     {
-                        FTPGetErrorTextForLog(WaitForCmdErrError, errBuf, 300);
-                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                        if (FTPGetErrorTextForLog(WaitForCmdErrError, errorText))
+                            Logs.LogMessage(LogUID, errorText.c_str(), -1, TRUE);
                     }
 
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -2504,10 +2604,9 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
 
                     handleClose = TRUE;
                     HANDLES(EnterCriticalSection(&WorkerCritSect));
-                    if (ErrorDescr[0] == 0)
+                    if (ErrorDescr.empty())
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(WaitForCmdErrError, errBuf, 300),
-                                 FTPWORKER_ERRDESCR_BUFSIZE);
+                        SetLocalErrorDescr(GetWorkerErrorTxt(WaitForCmdErrError, errorText));
                         CorrectErrorDescr();
                     }
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));

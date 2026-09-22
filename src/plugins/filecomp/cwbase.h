@@ -19,7 +19,7 @@ protected:
     typedef std::vector<CChar*> CLineBuffer;
     struct CFCFileData
     {
-        const char* Name;
+        const wchar_t* Name;
         CChar* Begin;
         CChar* End;
         size_t Length;

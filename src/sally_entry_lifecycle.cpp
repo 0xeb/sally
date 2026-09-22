@@ -1,16 +1,16 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 #include <time.h>
-#include <vector>
 //#ifdef MSVC_RUNTIME_CHECKS
 #include <rtcapi.h>
 //#endif // MSVC_RUNTIME_CHECKS
 
 #include "allochan.h"
+#include "common/fsutil.h" // GetRootPath / IsUNCPathW / IsTheSamePath
 #include "menu.h"
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -21,8 +21,11 @@
 #include "snooper.h"
 #include "viewer.h"
 #include "ui/IPrompter.h"
+#include "common/Win32TextCodec.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
+#include "common/ExternalToolRunner.h"
 #include "common/IRegistry.h"
 #include "ui/IPrompter.h"
 #include "editwnd.h"
@@ -47,18 +50,16 @@
 // Issue #82: shell-extension DLLs from OLD Sally/Salamander installs stay loaded/locked by
 // Explorer after an upgrade, keeping their install folders undeletable. The CLSID-family sweep
 // lives in salext_cleanup.cpp so it can run headlessly against fake interfaces; this wrapper
-// only converts the ANSI path, supplies the OS-abstraction interfaces, and traces the outcome.
-static void CleanupStaleShellExtensions(const char* currentSalextPathA)
+// supplies the OS-abstraction interfaces and traces the outcome.
+// wide: the caller already has a genuine wide path (BuildModuleRelativePathW) -
+// used to narrow-then-rewiden here via MultiByteToWideChar, which could not recover characters
+// the CALLER's own narrowing (a since-removed GetModuleFileName/CP_ACP step) had already lost.
+static void CleanupStaleShellExtensions(const wchar_t* currentSalextPathW)
 {
-    wchar_t currentPath[2 * MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, currentSalextPathA != NULL ? currentSalextPathA : "", -1,
-                        currentPath, (int)(sizeof(currentPath) / sizeof(currentPath[0])));
-    currentPath[(sizeof(currentPath) / sizeof(currentPath[0])) - 1] = 0;
-
     IRegistry* registry = gRegistry != NULL ? gRegistry : GetWin32Registry();
     IFileSystem* fs = gFileSystem != NULL ? gFileSystem : GetWin32FileSystem();
 
-    SalextCleanupStats stats = ReclaimStaleSalextRegistrations(currentPath, registry, fs);
+    SalextCleanupStats stats = ReclaimStaleSalextRegistrations(currentSalextPathW != NULL ? currentSalextPathW : L"", registry, fs);
 
     if (stats.stale > 0)
         TRACE_I("CleanupStaleShellExtensions(): " << stats.stale << " stale registration(s), "
@@ -70,7 +71,8 @@ static void CleanupStaleShellExtensions(const char* currentSalextPathA)
 
 static BOOL FileExistsWLocal(const wchar_t* path)
 {
-    DWORD attr = GetFileAttributesW(path);
+    IFileSystem* fs = gFileSystem != NULL ? gFileSystem : GetWin32FileSystem();
+    DWORD attr = fs->GetFileAttributes(path);
     if (attr == INVALID_FILE_ATTRIBUTES)
     {
         DWORD err = GetLastError();
@@ -94,7 +96,7 @@ static BOOL GetOurPathInRoamingAPPDATAW(std::wstring& path)
 
 static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePath, std::wstring& path)
 {
-    DWORD capacity = MAX_PATH;
+    DWORD capacity = 256;
     for (;;)
     {
         std::wstring modulePath;
@@ -119,9 +121,9 @@ static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePa
             return TRUE;
         }
 
-        if (capacity >= SAL_MAX_LONG_PATH)
+        if (capacity > MAXDWORD / 2)
             return FALSE;
-        capacity = capacity > SAL_MAX_LONG_PATH / 2 ? SAL_MAX_LONG_PATH : capacity * 2;
+        capacity *= 2;
     }
 }
 
@@ -183,7 +185,7 @@ void X64StressTestAlloc()
     // verify success
     void* testNew = new char; // new goes through alloc, but let's verify anyway
     if (testNew <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
-        MessageBox(NULL, "new address <= 0x00000000ffffffff!\nPlease open an issue at https://github.com/0xeb/sally/issues with this information.", "X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
+        MessageBoxW(NULL, L"new address <= 0x00000000ffffffff!\nPlease open an issue at https://github.com/0xeb/sally/issues with this information.", L"X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
     delete testNew;
 }
 
@@ -205,8 +207,10 @@ int MyEntryPoint()
         ret = WinMainCRTStartup();
     }
     else
-        MessageBox(NULL, "Sally Bug Reporter (salmon.exe) initialization has failed. Please reinstall Sally.",
-                   SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONSTOP);
+        // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already used
+        // elsewhere in this file (e.g. below, around the SalmonInit()-adjacent error paths).
+        MessageBoxW(NULL, L"Sally Bug Reporter (salmon.exe) initialization has failed. Please reinstall Sally.",
+                    SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONSTOP);
 
     // the debugger no longer reaches here, we get killed in RTL (tested under VC 2008 with our RTL)
 
@@ -232,10 +236,8 @@ int GTDExceptionHasOccured = 0;
 int SHLExceptionHasOccured = 0;
 int RelExceptionHasOccured = 0;
 
-char DecimalSeparator[5] = "."; // "characters" (max. 4 characters) retrieved from the system
-int DecimalSeparatorLen = 1;    // length in characters without the null terminator
-char ThousandsSeparator[5] = " ";
-int ThousandsSeparatorLen = 1;
+std::wstring DecimalSeparator = L".";
+std::wstring ThousandsSeparator = L" ";
 
 BOOL WindowsXP64AndLater = FALSE;  // JRYFIXME - remove
 BOOL WindowsVistaAndLater = FALSE; // JRYFIXME - remove
@@ -251,7 +253,6 @@ BOOL RunningAsAdmin = FALSE;
 DWORD CCVerMajor = 0;
 DWORD CCVerMinor = 0;
 
-CPathBuffer ConfigurationName; // Heap-allocated for long path support (ANSI mirror)
 std::wstring ConfigurationNameW; // Authoritative wide path (supports non-ASCII install dirs)
 BOOL ConfigurationNameIgnoreIfNotExists = TRUE;
 
@@ -271,25 +272,25 @@ BOOL ChangeDirectoryRequest = FALSE;
 
 BOOL SkipOneActivateRefresh = FALSE;
 
-std::string DirColumnStr;
-int DirColumnStrLen = 0;
-std::string ColExtStr;
-int ColExtStrLen = 0;
+std::wstring DirColumnStrW;
+int DirColumnStrWLen = 0;
+std::wstring ColExtStrW;
+int ColExtStrWLen = 0;
 int TextEllipsisWidth = 0;
 int TextEllipsisWidthEnv = 0;
-std::string ProgDlgHoursStr;
-std::string ProgDlgMinutesStr;
-std::string ProgDlgSecsStr;
+std::wstring ProgDlgHoursStr;
+std::wstring ProgDlgMinutesStr;
+std::wstring ProgDlgSecsStr;
 
-char FolderTypeName[80] = "";
+wchar_t FolderTypeName[80] = L"";
 int FolderTypeNameLen = 0;
-std::string UpDirTypeName;
+std::wstring UpDirTypeName;
 int UpDirTypeNameLen = 0;
-std::string CommonFileTypeName;
+std::wstring CommonFileTypeName;
 int CommonFileTypeNameLen = 0;
-std::string CommonFileTypeName2;
+std::wstring CommonFileTypeName2;
 
-CPathBuffer WindowsDirectory; // Heap-allocated for long path support
+std::wstring WindowsDirectory;
 
 // to ensure escape from removed drives to fixed drive (after device ejection - USB flash disk, etc.)
 BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeLeftPanelToFixedWhenIdle to TRUE is unnecessary
@@ -298,7 +299,7 @@ BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is curren
 BOOL ChangeRightPanelToFixedWhenIdle = FALSE;
 BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = in idle opens configuration to Drives and focuses "If path in panel is inaccessible, go to:"
 
-char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if the string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
+wchar_t IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if the string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
 
 UINT TaskbarBtnCreatedMsg = 0;
 
@@ -314,16 +315,16 @@ const char* SALCF_FAKE_REALPATH = "SalFakeRealPath";
 const char* SALCF_FAKE_SRCTYPE = "SalFakeSrcType";
 const char* SALCF_FAKE_SRCFSPATH = "SalFakeSrcFSPath";
 
-const char* MAINWINDOW_NAME = "Sally";
-const char* CMAINWINDOW_CLASSNAME = "SalamanderMainWindowVer25";
-const wchar_t* CMAINWINDOW_CLASSNAMEW = L"SalamanderMainWindowVer25";
-const char* SAVEBITS_CLASSNAME = "SalamanderSaveBits";
-const char* SHELLEXECUTE_CLASSNAME = "SalamanderShellExecute";
+const wchar_t* MAINWINDOW_NAME = L"Sally";
+const wchar_t* CMAINWINDOW_CLASSNAME = L"SalamanderMainWindowVer25";
+const wchar_t* SAVEBITS_CLASSNAME = L"SalamanderSaveBits";
+const wchar_t* SAFEWAIT_CLASSNAMEW = L"SalamanderSafeWaitWindow";
+const wchar_t* SHELLEXECUTE_CLASSNAMEW = L"SalamanderShellExecute";
 
 CAssociations Associations; // associations loaded from registry
 CShares Shares;
 
-char DefaultDir['Z' - 'A' + 1][SAL_MAX_LONG_PATH];
+std::wstring DefaultDir['Z' - 'A' + 1];
 
 HACCEL AccelTable1 = NULL;
 HACCEL AccelTable2 = NULL;
@@ -333,10 +334,10 @@ HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
 HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
 HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
 HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
-CPathBuffer CurrentHelpDir; // Heap-allocated for long path support // after first use of help, this contains path to help directory (location of all .chm files)
+std::wstring CurrentHelpDir; // after first use of help, this contains path to help directory (location of all .chm files)
 WORD LanguageID = 0;                // language-id of .SPL file
 
-CPathBuffer OpenReadmeInNotepad; // Heap-allocated for long path support // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
+std::wstring OpenReadmeInNotepad; // used only when launched from installer: filename to open in notepad during IDLE (start notepad)
 
 BOOL UseCustomPanelFont = FALSE;
 HFONT Font = NULL;
@@ -429,20 +430,16 @@ const char* LOW_MEMORY = "Low memory.";
 
 BOOL DragFullWindows = TRUE;
 
-CWindowQueue ViewerWindowQueue("Internal Viewers");
+CWindowQueue ViewerWindowQueue(L"Internal Viewers");
 
 CFindSetDialog GlobalFindDialog(NULL /* ignored */, 0 /* ignored */, 0 /* ignored */);
 
 CNames GlobalSelection;
-CDirectorySizesHolder DirectorySizesHolder;
 
 HWND PluginProgressDialog = NULL;
 HWND PluginMsgBoxParent = NULL;
 
 BOOL CriticalShutdown = FALSE;
-
-HANDLE SalOpenFileMapping = NULL;
-void* SalOpenSharedMem = NULL;
 
 // mutex for synchronizing load/save to Registry (two processes cannot do it at once, it has unpleasant consequences)
 CLoadSaveToRegistryMutex LoadSaveToRegistryMutex;
@@ -915,30 +912,30 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime)
 
 BOOL InitPreloadedStrings()
 {
-    DirColumnStr = LoadStr(IDS_DIRCOLUMN);
-    DirColumnStrLen = (int)DirColumnStr.length();
+    DirColumnStrW = LoadStrW(IDS_DIRCOLUMN);
+    DirColumnStrWLen = (int)DirColumnStrW.length();
 
-    ColExtStr = LoadStr(IDS_COLUMN_NAME_EXT);
-    ColExtStrLen = (int)ColExtStr.length();
+    ColExtStrW = LoadStrW(IDS_COLUMN_NAME_EXT);
+    ColExtStrWLen = (int)ColExtStrW.length();
 
-    UpDirTypeName = LoadStr(IDS_UPDIRTYPENAME);
+    UpDirTypeName = LoadStrW(IDS_UPDIRTYPENAME);
     UpDirTypeNameLen = (int)UpDirTypeName.length();
 
-    CommonFileTypeName = LoadStr(IDS_COMMONFILETYPE);
+    CommonFileTypeName = LoadStrW(IDS_COMMONFILETYPE);
     CommonFileTypeNameLen = (int)CommonFileTypeName.length();
-    CommonFileTypeName2 = LoadStr(IDS_COMMONFILETYPE2);
+    CommonFileTypeName2 = LoadStrW(IDS_COMMONFILETYPE2);
 
-    ProgDlgHoursStr = LoadStr(IDS_PROGDLGHOURS);
-    ProgDlgMinutesStr = LoadStr(IDS_PROGDLGMINUTES);
-    ProgDlgSecsStr = LoadStr(IDS_PROGDLGSECS);
+    ProgDlgHoursStr = LoadStrW(IDS_PROGDLGHOURS);
+    ProgDlgMinutesStr = LoadStrW(IDS_PROGDLGMINUTES);
+    ProgDlgSecsStr = LoadStrW(IDS_PROGDLGSECS);
 
     return TRUE;
 }
 
 void ReleasePreloadedStrings()
 {
-    DirColumnStr.clear();
-    ColExtStr.clear();
+    DirColumnStrW.clear();
+    ColExtStrW.clear();
 
     UpDirTypeName.clear();
 
@@ -949,8 +946,8 @@ void ReleasePreloadedStrings()
     ProgDlgMinutesStr.clear();
     ProgDlgSecsStr.clear();
 
-    DirColumnStrLen = 0;
-    ColExtStrLen = 0;
+    DirColumnStrWLen = 0;
+    ColExtStrWLen = 0;
     UpDirTypeNameLen = 0;
     CommonFileTypeNameLen = 0;
 }
@@ -966,39 +963,30 @@ void InitLocales()
         IsAlpha[i] = IsCharAlpha((char)i);
     }
 
-    if ((DecimalSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
-        DecimalSeparatorLen > 5)
+    const auto loadLocaleText = [](LCTYPE type, const wchar_t* fallback)
     {
-        strcpy(DecimalSeparator, ".");
-        DecimalSeparatorLen = 1;
-    }
-    else
-    {
-        DecimalSeparatorLen--;
-        DecimalSeparator[DecimalSeparatorLen] = 0; // ensure null terminator at the end
-    }
-
-    if ((ThousandsSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
-        ThousandsSeparatorLen > 5)
-    {
-        strcpy(ThousandsSeparator, " ");
-        ThousandsSeparatorLen = 1;
-    }
-    else
-    {
-        ThousandsSeparatorLen--;
-        ThousandsSeparator[ThousandsSeparatorLen] = 0; // ensure null terminator at the end
-    }
+        const int required = GetLocaleInfoW(LOCALE_USER_DEFAULT, type, NULL, 0);
+        if (required <= 1)
+            return std::wstring(fallback);
+        std::wstring value(static_cast<size_t>(required), L'\0');
+        const int written = GetLocaleInfoW(LOCALE_USER_DEFAULT, type, value.data(), required);
+        if (written <= 1)
+            return std::wstring(fallback);
+        value.resize(static_cast<size_t>(written - 1));
+        return value;
+    };
+    DecimalSeparator = loadLocaleText(LOCALE_SDECIMAL, L".");
+    ThousandsSeparator = loadLocaleText(LOCALE_STHOUSAND, L" ");
 }
 
 // ****************************************************************************
 
-HICON GetFileOrPathIconAux(const char* path, BOOL large, BOOL isDir)
+HICON GetFileOrPathIconAuxW(const wchar_t* path, BOOL large, BOOL isDir)
 {
     __try
     {
         SHFILEINFO shi;
-        if (!GetFileIcon(path, FALSE, &shi.hIcon, large ? ICONSIZE_32 : ICONSIZE_16, TRUE, isDir))
+        if (!GetFileIcon(path, &shi.hIcon, large ? ICONSIZE_32 : ICONSIZE_16, TRUE, isDir))
             shi.hIcon = NULL;
         //We switched to our own implementation (lower memory requirements, working XOR icons)
         //shi.hIcon = NULL;
@@ -1016,15 +1004,15 @@ HICON GetFileOrPathIconAux(const char* path, BOOL large, BOOL isDir)
     return NULL;
 }
 
-HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
+HICON GetDriveIconW(const wchar_t* root, UINT type, BOOL accessible, BOOL large)
 {
-    CALL_STACK_MESSAGE5("GetDriveIcon(%s, %u, %d, %d)", root, type, accessible, large);
+    CALL_STACK_MESSAGE5("GetDriveIconW(%ls, %u, %d, %d)", root, type, accessible, large);
     int id;
     switch (type)
     {
     case DRIVE_REMOVABLE: // icons for 3.5", 5.25"
     {
-        HICON i = GetFileOrPathIconAux(root, large, TRUE);
+        HICON i = GetFileOrPathIconAuxW(root, large, TRUE);
         if (i != NULL)
             return i;
         id = 28; // 3 1/2" floppy drive
@@ -1044,10 +1032,11 @@ HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large)
     default:
     {
         id = 32;
-        if (type == DRIVE_FIXED && root[1] == ':')
+        if (type == DRIVE_FIXED && root[1] == L':')
         {
-            CPathBuffer win; // Heap-allocated for long path support
-            if (EnvGetWindowsDirectoryA(gEnvironment, win, win.Size()).success && win[1] == ':' && win[0] == root[0])
+            std::wstring winW;
+            if (gEnvironment->GetWindowsDirectory(winW).success &&
+                winW.length() > 1 && winW[1] == L':' && winW[0] == root[0])
                 id = 36;
         }
         break;
@@ -1077,190 +1066,9 @@ HICON SalLoadIcon(HINSTANCE hDLL, int id, int iconSize)
 
 // ****************************************************************************
 
-char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll, const char* sourcePath)
-{
-    if (skip != NULL)
-        *skip = FALSE;
-    int l1 = (int)strlen(path); // is always on stack ...
-    int l2, len = l1;
-    if (name != NULL)
-    {
-        l2 = (int)strlen(name);
-        len += l2;
-        if (path[l1 - 1] != '\\')
-            len++;
-        if (len >= MAX_PATH && dosName != NULL)
-        {
-            int l3 = (int)strlen(dosName);
-            if (len - l2 + l3 < MAX_PATH)
-            {
-                len = len - l2 + l3;
-                name = dosName;
-                l2 = l3;
-            }
-        }
-    }
-    // With wide path support (\\?\), we can handle paths up to SAL_MAX_LONG_PATH (32767)
-    // Only reject paths that exceed that limit
-    if (len >= SAL_MAX_LONG_PATH)
-    {
-        char* text = (char*)malloc(len + 200);
-        if (text != NULL)
-        {
-            _snprintf_s(text, len + 200, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), name, path);
-
-            if (skip != NULL)
-            {
-                if (skipAll == NULL || !*skipAll)
-                {
-                    PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                    if (res.type == PromptResult::kSkip || res.type == PromptResult::kSkipAll)
-                        *skip = TRUE;
-                    if (res.type == PromptResult::kSkipAll && skipAll != NULL)
-                        *skipAll = TRUE;
-                    if (res.type == PromptResult::kFocus)
-                        MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, name);
-                }
-                else
-                    *skip = TRUE;
-            }
-            else
-            {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-            }
-            free(text);
-        }
-        return NULL;
-    }
-    char* txt = (char*)malloc(len + 1);
-    if (txt == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return txt;
-    }
-    if (name != NULL)
-    {
-        memmove(txt, path, l1);
-        if (path[l1 - 1] != '\\')
-            txt[l1++] = '\\';
-        memmove(txt + l1, name, l2 + 1);
-    }
-    else
-        memmove(txt, path, l1 + 1);
-    return txt;
-}
-
-// Wide version of BuildName: constructs full path from directory + name.
-// Returns malloc'd wchar_t* (caller must free) or NULL on error.
-// No DOS name fallback — wide paths support long names natively.
-wchar_t* BuildNameW(const wchar_t* path, const wchar_t* name, BOOL* skip, BOOL* skipAll, const wchar_t* sourcePath)
-{
-    if (skip != NULL)
-        *skip = FALSE;
-    int l1 = (int)wcslen(path);
-    int l2, len = l1;
-    if (name != NULL)
-    {
-        l2 = (int)wcslen(name);
-        len += l2;
-        if (path[l1 - 1] != L'\\')
-            len++;
-    }
-    if (len >= SAL_MAX_LONG_PATH)
-    {
-        wchar_t* text = (wchar_t*)malloc((len + 200) * sizeof(wchar_t));
-        if (text != NULL)
-        {
-            _snwprintf_s(text, len + 200, _TRUNCATE, L"%s: name too long for path %s", name, path);
-
-            if (skip != NULL)
-            {
-                if (skipAll == NULL || !*skipAll)
-                {
-                    PromptResult res = gPrompter->AskSkipSkipAllFocus(LoadStrW(IDS_ERRORTITLE), text);
-                    if (res.type == PromptResult::kSkip || res.type == PromptResult::kSkipAll)
-                        *skip = TRUE;
-                    if (res.type == PromptResult::kSkipAll && skipAll != NULL)
-                        *skipAll = TRUE;
-                    if (res.type == PromptResult::kFocus)
-                        MainWindow->PostFocusNameInPanel(PANEL_SOURCE, WideToAnsi(sourcePath).c_str(), WideToAnsi(name).c_str());
-                }
-                else
-                    *skip = TRUE;
-            }
-            else
-            {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), text);
-            }
-            free(text);
-        }
-        return NULL;
-    }
-    wchar_t* txt = (wchar_t*)malloc((len + 1) * sizeof(wchar_t));
-    if (txt == NULL)
-    {
-        TRACE_E(LOW_MEMORY);
-        return txt;
-    }
-    if (name != NULL)
-    {
-        memmove(txt, path, l1 * sizeof(wchar_t));
-        if (path[l1 - 1] != L'\\')
-            txt[l1++] = L'\\';
-        memmove(txt + l1, name, (l2 + 1) * sizeof(wchar_t));
-    }
-    else
-        memmove(txt, path, (l1 + 1) * sizeof(wchar_t));
-    return txt;
-}
-
 // ****************************************************************************
 
-BOOL HasTheSameRootPath(const char* path1, const char* path2)
-{
-    if (LowerCase[path1[0]] == LowerCase[path2[0]] && path1[1] == path2[1])
-    {
-        if (path1[1] == ':')
-            return TRUE; // same root for normal ("c:\path") path
-        else
-        {
-            if (path1[0] == '\\' && path1[1] == '\\') // both UNC
-            {
-                const char* s1 = path1 + 2;
-                const char* s2 = path2 + 2;
-                while (*s1 != 0 && *s1 != '\\')
-                {
-                    if (LowerCase[*s1] == LowerCase[*s2])
-                    {
-                        s1++;
-                        s2++;
-                    }
-                    else
-                        break; // different machines
-                }
-                if (*s1 != 0 && *s1++ == *s2++) // skip '\\'
-                {
-                    while (*s1 != 0 && *s1 != '\\')
-                    {
-                        if (LowerCase[*s1] == LowerCase[*s2])
-                        {
-                            s1++;
-                            s2++;
-                        }
-                        else
-                            break; // different drives
-                    }
-                    return (*s1 == 0 && (*s2 == 0 || *s2 == '\\')) || *s1 == *s2 ||
-                           (*s2 == 0 && (*s1 == 0 || *s1 == '\\'));
-                }
-            }
-        }
-    }
-    return FALSE;
-}
-
-// Wide version of HasTheSameRootPath
-BOOL HasTheSameRootPathW(const wchar_t* path1, const wchar_t* path2)
+BOOL HasTheSameRootPath(const wchar_t* path1, const wchar_t* path2)
 {
     if (towlower(path1[0]) == towlower(path2[0]) && path1[1] == path2[1])
     {
@@ -1305,65 +1113,71 @@ BOOL HasTheSameRootPathW(const wchar_t* path1, const wchar_t* path2)
 
 // ****************************************************************************
 
-BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
+// This is not a reuse of
+// PathsAreOnTheSameVolumeW's algorithm below, which drops the same-root gate
+// this function starts from and answers a related but not identical question
+// (it isn't a drop-in behavioral twin). Narrowed, two DIFFERENT Unicode
+// directories can collapse to the same '?'-bearing path, so the narrow form
+// can answer "same volume" for paths it never actually distinguished — the
+// same failure mode already fixed for PathsAreOnTheSameVolumeW's callers.
+BOOL HasTheSameRootPathAndVolume(const wchar_t* p1, const wchar_t* p2)
 {
-    CALL_STACK_MESSAGE3("HasTheSameRootPathAndVolume(%s, %s)", p1, p2);
-
     BOOL ret = FALSE;
     if (HasTheSameRootPath(p1, p2))
     {
         ret = TRUE;
-        CPathBuffer root;  // Heap-allocated for long path support
-        CPathBuffer ourPath;  // Heap-allocated for long path support
-        char p1Volume[100] = "1";
-        char p2Volume[100] = "2";
-        CPathBuffer resPath;  // Heap-allocated for long path support
-        lstrcpyn(resPath, p1, resPath.Size());
-        ResolveSubsts(resPath, resPath.Size());
-        GetRootPath(root, resPath);
-        if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // it makes sense to look for reparse points only on fixed drives
+        std::wstring resPath(p1);
+        ResolveSubstsW(resPath);
+        std::wstring root = GetRootPath(resPath.c_str());
+        if (!IsUNCPathW(root.c_str()) && GetDriveTypeW(root.c_str()) == DRIVE_FIXED) // it makes sense to look for reparse points only on fixed drives
         {
             // if it's not a root path, we'll try traversing through reparse points
+            wchar_t p1Volume[100] = L"1";
+            wchar_t p2Volume[100] = L"2";
             BOOL cutPathIsPossible = TRUE;
-            CPathBuffer p1NetPath;  // Heap-allocated for long path support
-            p1NetPath[0] = 0;
-            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
+            CLocalPathResolutionW res1;
+            ResolveLocalPathWithReparsePointsW(p1, res1);
+            std::wstring ourPath = res1.ResPath;
+            cutPathIsPossible = res1.CutResPathIsPossible;
+            std::wstring p1NetPath = res1.NetPath;
 
-            if (p1NetPath[0] == 0) // cannot get volume from network path, won't even try
+            if (p1NetPath.empty()) // cannot get volume from network path, won't even try
             {
-                while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
+                while (!GetVolumeNameForVolumeMountPointW(ourPath.c_str(), p1Volume, 100))
                 {
-                    if (!cutPathIsPossible || !CutDirectory(ourPath))
+                    if (!cutPathIsPossible || !CutDirectoryW(ourPath))
                     {
-                        strcpy(p1Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
+                        wcscpy(p1Volume, L"fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
-                    SalPathAddBackslash(ourPath, ourPath.Size());
+                    SalPathAddBackslashW(ourPath);
                 }
             }
 
             // if we're under W2K and it's not a root path, we'll try traversing through reparse points
             cutPathIsPossible = TRUE;
-            CPathBuffer p2NetPath; // Heap-allocated for long path support
-            p2NetPath[0] = 0;
-            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
+            CLocalPathResolutionW res2;
+            ResolveLocalPathWithReparsePointsW(p2, res2);
+            ourPath = res2.ResPath;
+            cutPathIsPossible = res2.CutResPathIsPossible;
+            std::wstring p2NetPath = res2.NetPath;
 
-            if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // if only one of the paths is network or
-                p1NetPath[0] != 0 && !HasTheSameRootPath(p1NetPath, p2NetPath))
+            if (p1NetPath.empty() != p2NetPath.empty() || // if only one of the paths is network or
+                !p1NetPath.empty() && !HasTheSameRootPath(p1NetPath.c_str(), p2NetPath.c_str()))
                 ret = FALSE; // they don't have the same root, we report different volumes (cannot verify volumes on network paths)
 
-            if (p2NetPath[0] == 0 && ret) // cannot get volume from network path, won't even try + if already decided, also won't try
+            if (p2NetPath.empty() && ret) // cannot get volume from network path, won't even try + if already decided, also won't try
             {
-                while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
+                while (!GetVolumeNameForVolumeMountPointW(ourPath.c_str(), p2Volume, 100))
                 {
-                    if (!cutPathIsPossible || !CutDirectory(ourPath))
+                    if (!cutPathIsPossible || !CutDirectoryW(ourPath))
                     {
-                        strcpy(p2Volume, "fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
+                        wcscpy(p2Volume, L"fail"); // even root didn't succeed, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure for both paths we return MATCH, because it's more likely)
                         break;
                     }
-                    SalPathAddBackslash(ourPath, ourPath.Size());
+                    SalPathAddBackslashW(ourPath);
                 }
-                if (strcmp(p1Volume, p2Volume) != 0)
+                if (wcscmp(p1Volume, p2Volume) != 0)
                     ret = FALSE;
             }
         }
@@ -1373,86 +1187,99 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
 
 // ****************************************************************************
 
-BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOnlyEstimation)
+// Wide-native, on top of the ported reparse walk.
+//
+// The volume NAMES this compares are GUIDs and always ASCII — what was lossy is
+// the two PATHS on the way in. Narrowed, two different Unicode directories can
+// resolve to the same '?'-bearing path, so the function answered "same volume"
+// for paths it had never actually distinguished. That answer decides whether a
+// move is a rename or a copy-then-delete, so getting it wrong is not cosmetic.
+BOOL PathsAreOnTheSameVolumeW(const wchar_t* path1, const wchar_t* path2, BOOL* resIsOnlyEstimation)
 {
-    CPathBuffer root1; // Heap-allocated for long path support
-    CPathBuffer root2; // Heap-allocated for long path support
-    CPathBuffer ourPath; // Heap-allocated for long path support
-    CPathBuffer path1NetPath; // Heap-allocated for long path support
-    CPathBuffer path2NetPath; // Heap-allocated for long path support
-    lstrcpyn(ourPath, path1, ourPath.Size());
-    ResolveSubsts(ourPath, ourPath.Size());
-    GetRootPath(root1, ourPath);
-    lstrcpyn(ourPath, path2, ourPath.Size());
-    ResolveSubsts(ourPath, ourPath.Size());
-    GetRootPath(root2, ourPath);
+    std::wstring ourPath(path1);
+    ResolveSubstsW(ourPath);
+    std::wstring root1 = GetRootPath(ourPath.c_str());
+    ourPath.assign(path2);
+    ResolveSubstsW(ourPath);
+    std::wstring root2 = GetRootPath(ourPath.c_str());
+
     BOOL ret = TRUE;
     BOOL trySimpleTest = TRUE;
     if (resIsOnlyEstimation != NULL)
         *resIsOnlyEstimation = TRUE;
-    if (!IsUNCPath(path1) && !IsUNCPath(path2)) // volumes on UNC paths don't make sense to resolve
+
+    if (!IsUNCPathW(path1) && !IsUNCPathW(path2)) // volumes on UNC paths don't make sense to resolve
     {
-        char p1Volume[100] = "1";
-        char p2Volume[100] = "2";
-        UINT drvType1 = GetDriveType(root1);
-        UINT drvType2 = GetDriveType(root2);
+        wchar_t p1Volume[100] = L"1";
+        wchar_t p2Volume[100] = L"2";
+        UINT drvType1 = GetDriveTypeW(root1.c_str());
+        UINT drvType2 = GetDriveTypeW(root2.c_str());
         if (drvType1 != DRIVE_REMOTE && drvType2 != DRIVE_REMOTE) // except for network there's a chance to get volume name
         {
+            std::wstring path1NetPath, path2NetPath;
             BOOL cutPathIsPossible = TRUE;
-            path1NetPath[0] = 0;         // network path that the current (last) local symlink in the path leads to
             if (drvType1 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
             {
-                // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
-                ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
+                CLocalPathResolutionW res;
+                ResolveLocalPathWithReparsePointsW(path1, res);
+                ourPath = res.ResPath;
+                cutPathIsPossible = res.CutResPathIsPossible;
+                path1NetPath = res.NetPath;
             }
             else
-                lstrcpyn(ourPath, root1, ourPath.Size());
+                ourPath = root1;
+
             int numOfGetVolNamesFailed = 0;
-            if (path1NetPath[0] == 0) // cannot get volume name from network path, won't even try
+            if (path1NetPath.empty()) // cannot get volume name from network path, won't even try
             {
-                while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
+                while (!GetVolumeNameForVolumeMountPointW(ourPath.c_str(), p1Volume, 100))
                 {
-                    if (!cutPathIsPossible || !CutDirectory(ourPath))
-                    { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany's - on failure for both paths with same roots we return MATCH, because it's more probable)
+                    if (!cutPathIsPossible || !CutDirectoryW(ourPath))
+                    { // even root didn't return success (happens on substed drives); on failure for
+                      // both paths with the same roots we return MATCH, because it's more probable
                         numOfGetVolNamesFailed++;
                         break;
                     }
-                    SalPathAddBackslash(ourPath, ourPath.Size());
+                    SalPathAddBackslashW(ourPath);
                 }
             }
 
             cutPathIsPossible = TRUE;
-            path2NetPath[0] = 0;         // network path that the current (last) local symlink in the path leads to
-            if (drvType2 == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
+            if (drvType2 == DRIVE_FIXED)
             {
-                // if we're on W2K and it's not a root path, we'll try to traverse through reparse points
-                ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
+                CLocalPathResolutionW res;
+                ResolveLocalPathWithReparsePointsW(path2, res);
+                ourPath = res.ResPath;
+                cutPathIsPossible = res.CutResPathIsPossible;
+                path2NetPath = res.NetPath;
             }
             else
-                lstrcpyn(ourPath, root2, ourPath.Size());
-            if (path2NetPath[0] == 0) // cannot get volume name from network path, won't even try
+                ourPath = root2;
+
+            if (path2NetPath.empty())
             {
-                if (path1NetPath[0] == 0)
+                if (path1NetPath.empty())
                 {
-                    while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
+                    while (!GetVolumeNameForVolumeMountPointW(ourPath.c_str(), p2Volume, 100))
                     {
-                        if (!cutPathIsPossible || !CutDirectory(ourPath))
-                        { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany's - on failure for both paths with same roots we return MATCH, because it's more probable)
+                        if (!cutPathIsPossible || !CutDirectoryW(ourPath))
+                        {
                             numOfGetVolNamesFailed++;
                             break;
                         }
-                        SalPathAddBackslash(ourPath, ourPath.Size());
+                        SalPathAddBackslashW(ourPath);
                     }
                     if (numOfGetVolNamesFailed != 2)
                     {
+                        // the only certain case is when a volume name was obtained for BOTH paths
                         if (numOfGetVolNamesFailed == 0 && resIsOnlyEstimation != NULL)
-                            *resIsOnlyEstimation = FALSE; // the only case when we're sure about the result is when we succeeded getting volume name from both paths (they also couldn't be network paths)
-                        if (numOfGetVolNamesFailed == 1 || strcmp(p1Volume, p2Volume) != 0)
-                            ret = FALSE; // only one volume name was obtained, so they're not the same volumes (and if they are, we can't determine it - maybe if failure was due to SUBST, it could be resolved by resolving the target path from SUBST)
+                            *resIsOnlyEstimation = FALSE;
+                        if (numOfGetVolNamesFailed == 1 || wcscmp(p1Volume, p2Volume) != 0)
+                            ret = FALSE;
                         trySimpleTest = FALSE;
                     }
                 }
-                else // only one path is network, so they're not the same volumes (and if they are, we can't determine it)
+                else // only one path is network, so they're not the same volumes
                 {
                     ret = FALSE;
                     trySimpleTest = FALSE;
@@ -1460,12 +1287,12 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             }
             else
             {
-                if (path1NetPath[0] != 0) // compare roots of network paths
+                if (!path1NetPath.empty()) // compare roots of network paths
                 {
-                    GetRootPath(root1, path1NetPath);
-                    GetRootPath(root2, path2NetPath);
+                    root1 = GetRootPath(path1NetPath.c_str());
+                    root2 = GetRootPath(path2NetPath.c_str());
                 }
-                else // only one path is network, so they're not the same volumes (and if they are, we can't determine it)
+                else // only one path is network, so they're not the same volumes
                 {
                     ret = FALSE;
                     trySimpleTest = FALSE;
@@ -1476,15 +1303,14 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
 
     if (trySimpleTest) // let's just try if root paths match (network paths + everything on NT)
     {
-        ret = _stricmp(root1, root2) == 0;
+        ret = _wcsicmp(root1.c_str(), root2.c_str()) == 0;
 
         if (resIsOnlyEstimation != NULL)
         {
-            lstrcpyn(path1NetPath, path1, path1NetPath.Size());
-            lstrcpyn(path2NetPath, path2, path2NetPath.Size());
-            if (ResolveSubsts(path1NetPath, path1NetPath.Size()) && ResolveSubsts(path2NetPath, path2NetPath.Size()))
+            std::wstring p1(path1), p2(path2);
+            if (ResolveSubstsW(p1) && ResolveSubstsW(p2))
             {
-                if (IsTheSamePath(path1NetPath, path2NetPath))
+                if (IsTheSamePath(p1.c_str(), p2.c_str()))
                     *resIsOnlyEstimation = FALSE; // same paths = definitely same volumes
             }
         }
@@ -1492,99 +1318,9 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
     return ret;
 }
 
-// ****************************************************************************
-
-BOOL IsTheSamePath(const char* path1, const char* path2)
-{
-    if (*path1 == '\\')
-        path1++;
-    if (*path2 == '\\')
-        path2++;
-    while (*path1 != 0 && LowerCase[*path1] == LowerCase[*path2])
-    {
-        path1++;
-        path2++;
-    }
-    if (*path1 == '\\')
-        path1++;
-    if (*path2 == '\\')
-        path2++;
-    return *path1 == 0 && *path2 == 0;
-}
-
-// ****************************************************************************
-
-int CommonPrefixLength(const char* path1, const char* path2)
-{
-    const char* lastBackslash = path1;
-    int backslashCount = 0;
-    int sameCount = 0;
-    const char* s1 = path1;
-    const char* s2 = path2;
-    while (*s1 != 0 && *s2 != 0 && LowerCase[*s1] == LowerCase[*s2])
-    {
-        if (*s1 == '\\')
-        {
-            lastBackslash = s1;
-            backslashCount++;
-        }
-        s1++;
-        s2++;
-    }
-
-    if (s1 - path1 < 3)
-        return 0;
-
-    if (*s1 == 0 && *s2 == '\\' || *s1 == '\\' && *s2 == 0 ||
-        *s1 == 0 && *s2 == 0 && *(s1 - 1) != '\\')
-    {
-        lastBackslash = s1; // this terminator won't be in lastBackslash
-        backslashCount++;
-    }
-
-    if (path1[1] == ':')
-    {
-        // classic path
-        if (path1[2] != '\\')
-            return 0;
-
-        // handle special case: for root path we must return length including the last backslash
-        if (lastBackslash - path1 < 3)
-            return 3;
-
-        return (int)(lastBackslash - path1);
-    }
-    else
-    {
-        // UNC path
-        if (path1[0] != '\\' || path1[1] != '\\')
-            return 0;
-        if (backslashCount < 4) // path must have form "\\machine\share"
-            return 0;
-
-        return (int)(lastBackslash - path1);
-    }
-}
-
-// ****************************************************************************
-
-BOOL SalPathIsPrefix(const char* prefix, const char* path)
-{
-    int commonLen = CommonPrefixLength(prefix, path);
-    if (commonLen == 0)
-        return FALSE;
-
-    int prefixLen = (int)strlen(prefix);
-    if (prefixLen < 3)
-        return FALSE;
-
-    // CommonPrefixLength returned length without the last backslash (unless it was a root path)
-    // if our prefix has trailing backslash, we must discard it
-    if (prefixLen > 3 && prefix[prefixLen - 1] == '\\')
-        prefixLen--;
-
-    return (commonLen == prefixLen);
-}
+// PathsAreOnTheSameVolume (narrow) deleted: superseded entirely by
+// PathsAreOnTheSameVolumeW (a genuinely separate, already-existing implementation, not a
+// signature twin) - confirmed zero remaining callers of the narrow free function.
 
 // ****************************************************************************
 
@@ -1603,15 +1339,15 @@ BOOL IsDirError(DWORD err)
 
 // ****************************************************************************
 
-BOOL CutDirectory(char* path, char** cutDir)
+BOOL CutDirectory(wchar_t* path, wchar_t** cutDir)
 {
-    CALL_STACK_MESSAGE2("CutDirectory(%s,)", path);
-    int l = (int)strlen(path);
-    char* lastBackslash = path + l - 1;
-    while (--lastBackslash >= path && *lastBackslash != '\\')
+    CALL_STACK_MESSAGE2("CutDirectory(%ls,)", path);
+    int l = (int)wcslen(path);
+    wchar_t* lastBackslash = path + l - 1;
+    while (--lastBackslash >= path && *lastBackslash != L'\\')
         ;
-    char* nextBackslash = lastBackslash;
-    while (--nextBackslash >= path && *nextBackslash != '\\')
+    wchar_t* nextBackslash = lastBackslash;
+    while (--nextBackslash >= path && *nextBackslash != L'\\')
         ;
     if (lastBackslash < path)
     {
@@ -1623,16 +1359,18 @@ BOOL CutDirectory(char* path, char** cutDir)
     {
         if (cutDir != NULL)
         {
-            if (*(path + l - 1) == '\\')
+            if (*(path + l - 1) == L'\\')
                 *(path + --l) = 0; // remove trailing '\\'
-            memmove(lastBackslash + 2, lastBackslash + 1, l - (lastBackslash - path));
+            // l and the pointer difference count CHARACTERS; memmove wants BYTES.
+            memmove(lastBackslash + 2, lastBackslash + 1,
+                    (size_t)(l - (lastBackslash - path)) * sizeof(wchar_t));
             *cutDir = lastBackslash + 2; // "somedir" or "seconddir"
         }
         *(lastBackslash + 1) = 0; // "c:\"
     }
     else // "c:\firstdir\seconddir" or "c:\firstdir\seconddir\"
     {    // UNC: "\\server\share\path"
-        if (path[0] == '\\' && path[1] == '\\' && nextBackslash <= path + 2)
+        if (path[0] == L'\\' && path[1] == L'\\' && nextBackslash <= path + 2)
         { // "\\server\share" - cannot be shortened
             if (cutDir != NULL)
                 *cutDir = path + l;
@@ -1641,7 +1379,7 @@ BOOL CutDirectory(char* path, char** cutDir)
         *lastBackslash = 0;
         if (cutDir != NULL) // cut off trailing '\'
         {
-            if (*(path + l - 1) == '\\')
+            if (*(path + l - 1) == L'\\')
                 *(path + l - 1) = 0;
             *cutDir = lastBackslash + 1;
         }
@@ -1650,37 +1388,6 @@ BOOL CutDirectory(char* path, char** cutDir)
 }
 
 // CutDirectoryW moved to common/SalPathWide.cpp (shared with private tests).
-
-// ****************************************************************************
-
-int GetRootPath(char* root, const char* path)
-{                                           // WARNING: unusual usage from GetShellFolder(): for "\\\\" returns "\\\\\\", for "\\\\server" returns "\\\\server\\"
-    if (path[0] == '\\' && path[1] == '\\') // UNC
-    {
-        const char* s = path + 2;
-        while (*s != 0 && *s != '\\')
-            s++;
-        if (*s != 0)
-            s++; // '\\'
-        while (*s != 0 && *s != '\\')
-            s++;
-        int len = (int)(s - path);
-        if (len > MAX_PATH - 2)
-            len = MAX_PATH - 2; // to fit with '\\' into MAX_PATH buffer (expected size), truncation doesn't matter, 100% it's an error anyway
-        memcpy(root, path, len);
-        root[len] = '\\';
-        root[len + 1] = 0;
-        return len + 1;
-    }
-    else
-    {
-        root[0] = path[0];
-        root[1] = ':';
-        root[2] = '\\';
-        root[3] = 0;
-        return 3;
-    }
-}
 
 // ****************************************************************************
 
@@ -2216,35 +1923,34 @@ BOOL GetShortcutOverlay()
 
     HKEY hKey;
     IRegistry* registry = GetMainSalamanderRegistry();
-    if (OpenKeyReadA(registry, HKEY_LOCAL_MACHINE,
-                     "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons",
-                     hKey).success)
+    if (registry->OpenKeyRead(HKEY_LOCAL_MACHINE,
+                              SAL_REG_KEY_EXPLORER_SHELL_ICONS_W,
+                              hKey).success)
     {
-        CPathBuffer buff;
-        buff[0] = 0;
-        GetStringA(registry, hKey, "29", buff, buff.Size());
-        if (buff[0] != 0)
+        std::wstring buff;
+        registry->GetString(hKey, L"29", buff);
+        if (!buff.empty())
         {
-            char* num = strrchr(buff, ','); // icon number is after the last comma
-            if (num != NULL)
+            const size_t comma = buff.find_last_of(L','); // icon number is after the last comma
+            if (comma != std::wstring::npos)
             {
-                int index = atoi(num + 1);
-                *num = 0;
+                int index = _wtoi(buff.c_str() + comma + 1);
+                buff.resize(comma);
 
                 HICON hIcons[2] = {0, 0};
 
-                ExtractIcons(buff, index,
-                             MAKELONG(32, 16),
-                             MAKELONG(32, 16),
-                             hIcons, NULL, 2, IconLRFlags);
+                ExtractIconsW(buff.c_str(), index,
+                              MAKELONG(32, 16),
+                              MAKELONG(32, 16),
+                              hIcons, NULL, 2, IconLRFlags);
 
                 HShortcutOverlays[ICONSIZE_32] = hIcons[0];
                 HShortcutOverlays[ICONSIZE_16] = hIcons[1];
 
-                ExtractIcons(buff, index,
-                             48,
-                             48,
-                             hIcons, NULL, 1, IconLRFlags);
+                ExtractIconsW(buff.c_str(), index,
+                              48,
+                              48,
+                              hIcons, NULL, 1, IconLRFlags);
                 HShortcutOverlays[ICONSIZE_48] = hIcons[0];
 
                 for (i = 0; i < ICONSIZE_COUNT; i++)
@@ -2377,14 +2083,14 @@ void GetSystemDPI(HDC hDC)
         ReleaseDC(NULL, hTmpDC);
 }
 
-// Helper to isolate SEH from functions that use C++ objects (CPathBuffer, std::wstring).
+// Helper to isolate SEH from functions that use C++ objects such as std::wstring.
 // SEH (__try/__except) cannot coexist with objects that require unwinding.
-static HICON GetDirectoryIconSEH(const char* path, CIconSizeEnum sizeIndex)
+static HICON GetDirectoryIconSEH(const wchar_t* path, CIconSizeEnum sizeIndex)
 {
     HICON hIcon = NULL;
     __try
     {
-        if (!GetFileIcon(path, FALSE, &hIcon, sizeIndex, FALSE, FALSE))
+        if (!GetFileIcon(path, &hIcon, sizeIndex, FALSE, FALSE))
             hIcon = NULL;
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 15))
@@ -2458,8 +2164,8 @@ static HBITMAP CreateBottomTBKeyCapStrip(int capW, int capH, COLORREF fill, COLO
 
     for (int keyIndex = 0; keyIndex < 12; keyIndex++)
     {
-        char keyText[8];
-        sprintf_s(keyText, "F%d", keyIndex + 1);
+        wchar_t keyText[8];
+        swprintf_s(keyText, L"F%d", keyIndex + 1);
         RECT cap = {keyIndex * capW, 0, (keyIndex + 1) * capW - 1, capH}; // 1px gap between caps
         DrawBottomBarKeyCap(hDC, &cap, keyText, fill, textColor, outline);
     }
@@ -2495,13 +2201,13 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
     HKEY hKey;
     IRegistry* registry = GetMainSalamanderRegistry();
-    if (OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_A, hKey).success)
+    if (registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_WINDOW_METRICS_W, hKey).success)
     {
         // other interesting values: "Shell Icon Size", "Shell Small Icon Size"
-        char buff[100];
-        if (GetStringA(registry, hKey, SAL_REG_VALUE_SHELL_ICON_BPP_A, buff, _countof(buff)).success)
+        std::wstring iconBpp;
+        if (registry->GetString(hKey, SAL_REG_VALUE_SHELL_ICON_BPP_W, iconBpp).success)
         {
-            iconColorsCount = atoi(buff);
+            iconColorsCount = _wtoi(iconBpp.c_str());
         }
         else
         {
@@ -2533,7 +2239,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     if (!colorsOnly)
     {
         // Load shell32.dll first - always available (including under Wine)
-        Shell32DLL = HANDLES(LoadLibraryEx("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+        Shell32DLL = HANDLES(LoadLibraryExA("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
         if (Shell32DLL == NULL)
         {
             TRACE_E("Unable to load library shell32.dll.");
@@ -2541,7 +2247,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         }
 
         // Try to load imageres.dll - may fail under Wine (not included)
-        ImageResDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+        ImageResDLL = HANDLES(LoadLibraryExA("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
         BOOL hasImageResDLL = (ImageResDLL != NULL);
         if (!hasImageResDLL)
         {
@@ -2625,13 +2331,13 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             SimpleIconLists[i]->SetBkColor(GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]));
         }
 
-        if (!ThrobberFrames->CreateFromPNG(HInstance, MAKEINTRESOURCE(IDB_THROBBER), THROBBER_WIDTH))
+        if (!ThrobberFrames->CreateFromPNG(HInstance, MAKEINTRESOURCEW(IDB_THROBBER), THROBBER_WIDTH))
         {
             TRACE_E("Unable to create throbber.");
             return FALSE;
         }
 
-        if (!LockFrames->CreateFromPNG(HInstance, MAKEINTRESOURCE(IDB_LOCK), LOCK_WIDTH))
+        if (!LockFrames->CreateFromPNG(HInstance, MAKEINTRESOURCEW(IDB_LOCK), LOCK_WIDTH))
         {
             TRACE_E("Unable to create lock.");
             return FALSE;
@@ -2723,14 +2429,14 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                     TRACE_E("Cannot retrieve icon from IMAGERES.DLL or SHELL32.DLL resID=" << resID[i]);
             }
         }
-        CPathBuffer systemDir;
-        EnvGetSystemDirectoryA(gEnvironment, systemDir, systemDir.Size());
+        std::wstring systemDirW;
+        const BOOL haveSystemDir = gEnvironment->GetSystemDirectory(systemDirW).success;
         // 16x16, 32x32, 48x48
         int sizeIndex;
         for (sizeIndex = ICONSIZE_16; sizeIndex < ICONSIZE_COUNT; sizeIndex++)
         {
             // directory icon
-            hIcon = GetDirectoryIconSEH(systemDir, (CIconSizeEnum)sizeIndex);
+            hIcon = haveSystemDir ? GetDirectoryIconSEH(systemDirW.c_str(), (CIconSizeEnum)sizeIndex) : NULL;
             if (hIcon != NULL) // if we can't get the icon, there's still the 4th one from shell32.dll
             {
                 SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsDirectory, hIcon);
@@ -3124,58 +2830,29 @@ void ReleaseGraphics(BOOL colorsOnly)
 
 // ****************************************************************************
 
-char* NumberToStr(char* buffer, const CQuadWord& number)
-{
-    _ui64toa(number.Value, buffer, 10);
-    int l = (int)strlen(buffer);
-    char* s = buffer + l;
-    int c = 0;
-    while (--s > buffer)
-    {
-        if ((++c % 3) == 0)
-        {
-            memmove(s + ThousandsSeparatorLen, s, (c / 3) * 3 + (c / 3 - 1) * ThousandsSeparatorLen + 1);
-            memcpy(s, ThousandsSeparator, ThousandsSeparatorLen);
-        }
-    }
-    return buffer;
-}
+// 2026-08-25: NumberToStr2 (an alternate int-returning, thousands-separator-
+// inserting variant of NumberToStr) was deleted - confirmed-dead (zero callers anywhere).
 
-int NumberToStr2(char* buffer, const CQuadWord& number)
+BOOL PointToLocalDecimalSeparator(std::wstring& text) noexcept
 {
-    _ui64toa(number.Value, buffer, 10);
-    int l = (int)strlen(buffer);
-    char* s = buffer + l;
-    int c = 0;
-    while (--s > buffer)
+    const std::wstring::size_type point = text.find_last_of(L'.');
+    if (point == std::wstring::npos)
+        return TRUE;
+    try
     {
-        if ((++c % 3) == 0)
-        {
-            memmove(s + ThousandsSeparatorLen, s, (c / 3) * 3 + (c / 3 - 1) * ThousandsSeparatorLen + 1);
-            memcpy(s, ThousandsSeparator, ThousandsSeparatorLen);
-            l += ThousandsSeparatorLen;
-        }
+        text.replace(point, 1, DecimalSeparator);
+        return TRUE;
     }
-    return l;
-}
-
-// ****************************************************************************
-
-BOOL PointToLocalDecimalSeparator(char* buffer, int bufferSize)
-{
-    char* s = strrchr(buffer, '.');
-    if (s != NULL)
+    catch (const std::bad_alloc&)
     {
-        int len = (int)strlen(buffer);
-        if (len - 1 + DecimalSeparatorLen > bufferSize - 1)
-        {
-            TRACE_E("PointToLocalDecimalSeparator() small buffer!");
-            return FALSE;
-        }
-        memmove(s + DecimalSeparatorLen, s + 1, len - (s - buffer));
-        memcpy(s, DecimalSeparator, DecimalSeparatorLen);
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
     }
-    return TRUE;
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
 }
 
 // ****************************************************************************
@@ -3187,25 +2864,25 @@ BOOL PointToLocalDecimalSeparator(char* buffer, int bufferSize)
 // argCount - on input is the number of elements in argv, on output contains number of parameters
 // cmdLine - command line parameters (without .exe file name - from WinMain)
 
-BOOL GetCmdLine(char* buf, int size, char* argv[], int& argCount, char* cmdLine)
+BOOL GetCmdLine(wchar_t* buf, int size, wchar_t* argv[], int& argCount, const wchar_t* cmdLine)
 {
     int space = argCount;
     argCount = 0;
-    char* c = buf;
-    char* end = buf + size;
+    wchar_t* c = buf;
+    wchar_t* end = buf + size;
 
-    char* s = cmdLine;
-    char term;
+    const wchar_t* s = cmdLine;
+    wchar_t term;
     while (*s != 0)
     {
-        if (*s == '"') // opening '"'
+        if (*s == L'"') // opening '"'
         {
             if (*++s == 0)
                 break;
-            term = '"';
+            term = L'"';
         }
         else
-            term = ' ';
+            term = L' ';
 
         if (argCount < space && c < end)
             argv[argCount++] = c;
@@ -3216,11 +2893,11 @@ BOOL GetCmdLine(char* buf, int size, char* argv[], int& argCount, char* cmdLine)
         {
             if (*s == term || *s == 0)
             {
-                if (*s == 0 || term != '"' || *++s != '"') // unless it's replacement "" -> "
+                if (*s == 0 || term != L'"' || *++s != L'"') // unless it's replacement "" -> "
                 {
                     if (*s != 0)
                         s++;
-                    while (*s != 0 && *s == ' ')
+                    while (*s != 0 && *s == L' ')
                         s++;
                     if (c < end)
                     {
@@ -3260,7 +2937,7 @@ HRESULT GetComCtlVersion(LPDWORD pdwMajor, LPDWORD pdwMinor)
 {
     HINSTANCE hComCtl;
     //load the DLL
-    hComCtl = HANDLES(LoadLibrary(TEXT("comctl32.dll")));
+    hComCtl = HANDLES(LoadLibraryW(L"comctl32.dll"));
     if (hComCtl)
     {
         HRESULT hr = S_OK;
@@ -3270,7 +2947,10 @@ HRESULT GetComCtlVersion(LPDWORD pdwMajor, LPDWORD pdwMinor)
      don't implement this function. That makes the lack of implementation of the
      function a version marker in itself.
     */
-        pDllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(hComCtl, TEXT("DllGetVersion")); // has no header
+        // GetProcAddress's 2nd argument is always LPCSTR - exported symbol names are ANSI-only,
+        // there is no GetProcAddressW - so a plain narrow literal, not TEXT(), is correct
+        // regardless of this project's own UNICODE define.
+        pDllGetVersion = (DLLGETVERSIONPROC)GetProcAddress(hComCtl, "DllGetVersion"); // has no header
         if (pDllGetVersion)
         {
             DLLVERSIONINFO dvi;
@@ -3307,12 +2987,12 @@ HRESULT GetComCtlVersion(LPDWORD pdwMajor, LPDWORD pdwMinor)
 
 void InitDefaultDir()
 {
-    char dir[4] = " :\\";
-    char d;
-    for (d = 'A'; d <= 'Z'; d++)
+    wchar_t dir[4] = L" :\\";
+    wchar_t d;
+    for (d = L'A'; d <= L'Z'; d++)
     {
         dir[0] = d;
-        strcpy(DefaultDir[d - 'A'], dir);
+        DefaultDir[d - L'A'] = dir;
     }
 }
 
@@ -3321,18 +3001,39 @@ void InitDefaultDir()
 BOOL PackErrorHandler(HWND parent, const WORD err, ...)
 {
     va_list argList;
-    char buff[1000];
     BOOL ret = FALSE;
 
     parent = parent == NULL ? (MainWindow != NULL ? MainWindow->HWindow : NULL) : parent;
 
+    // The packer callback keeps a byte varargs transport, but it is explicitly UTF-8:
+    // resources and semantic values are UTF-16 owners on both sides of this adapter.
+    const std::wstring format = LoadStrOwned(err);
+    std::string formatUtf8;
+    std::wstring message;
     va_start(argList, err);
-    FormatMessage(FORMAT_MESSAGE_FROM_STRING, LoadStr(err), 0, 0, buff, 1000, &argList);
-    if (err < IDS_PACKQRY_PREFIX)
-        gPrompter->ShowError(LoadStrW(IDS_PACKERR_TITLE), AnsiToWide(buff).c_str());
+    if (Win32EncodeText(CP_UTF8, format.c_str(), format.size(), formatUtf8))
+    {
+        char* formatted = NULL;
+        const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                                            formatUtf8.c_str(), 0, 0,
+                                            reinterpret_cast<LPSTR>(&formatted), 0, &argList);
+        if (length != 0 && formatted != NULL)
+        {
+            if (!Win32DecodeText(CP_UTF8, formatted, length, message))
+                message = L"Unable to decode packer diagnostic.";
+            LocalFree(formatted);
+        }
+        else
+            message = format;
+    }
     else
-        ret = gPrompter->ConfirmError(LoadStrW(IDS_PACKERR_TITLE), AnsiToWide(buff).c_str()).type == PromptResult::kOk;
+        message = L"Unable to encode packer diagnostic.";
     va_end(argList);
+
+    if (err < IDS_PACKQRY_PREFIX)
+        gPrompter->ShowError(LoadStrOwned(IDS_PACKERR_TITLE).c_str(), message.c_str());
+    else
+        ret = gPrompter->ConfirmError(LoadStrOwned(IDS_PACKERR_TITLE).c_str(), message.c_str()).type == PromptResult::kOk;
     return ret;
 }
 
@@ -3498,22 +3199,6 @@ void TurnOFFWindowGhosting() // when "ghosting" is not turned off, safe-wait win
 //
 // ****************************************************************************
 
-void UIDToString(GUID* uid, char* buff, int buffSize)
-{
-    wchar_t buffw[64] = {0};
-    StringFromGUID2(*uid, buffw, 64);
-    WideCharToMultiByte(CP_ACP, 0, buffw, -1, buff, buffSize, NULL, NULL);
-    buff[buffSize - 1] = 0;
-}
-
-void StringToUID(char* buff, GUID* uid)
-{
-    wchar_t buffw[64] = {0};
-    MultiByteToWideChar(CP_ACP, 0, buff, -1, buffw, 64);
-    buffw[63] = 0;
-    CLSIDFromString(buffw, uid);
-}
-
 void CleanUID(char* uid)
 {
     char* s = uid;
@@ -3553,7 +3238,6 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
     va_end(vl);
 
     static wchar_t buf[RTC_ERROR_DESCRIPTION_SIZE];
-    static char bufA[RTC_ERROR_DESCRIPTION_SIZE];
     const char* err = _RTC_GetErrDesc(rtc_errnum);
     _snwprintf_s(buf, _TRUNCATE, L"  Error Number: %d\r\n  Description: %S\r\n  Line: #%d\r\n  File: %s\r\n  Module: %s\r\n",
                  rtc_errnum,
@@ -3562,9 +3246,8 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
                  file ? file : L"Unknown",
                  module ? module : L"Unknown");
 
-    WideCharToMultiByte(CP_ACP, 0, buf, -1, bufA, RTC_ERROR_DESCRIPTION_SIZE, NULL, NULL);
-    bufA[RTC_ERROR_DESCRIPTION_SIZE - 1] = 0;
-    lstrcpyn(RTCErrorDescription, bufA, RTC_ERROR_DESCRIPTION_SIZE);
+    sally::diagnostic::CopyAcpLossy(buf, RTCErrorDescription,
+                                    RTC_ERROR_DESCRIPTION_SIZE);
 
     // better to break here with exception, hopefully clearer callstack - if not, we can remove this exception here
     // see description of _CrtDbgReportW behavior - http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=VS.90).aspx
@@ -3591,23 +3274,25 @@ DWORD LastCrtCheckMemoryTime; // when we last checked memory in IDLE
 
 #endif //_DEBUG
 
-STDAPI _StrRetToBuf(STRRET* psr, LPCITEMIDLIST pidl, LPSTR pszBuf, UINT cchBuf);
-
 BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
 {
-    char names[1000];
+    wchar_t names[1000];
     int skipped;
     Plugins.RemoveNoLongerExistingPlugins(FALSE, TRUE, names, 1000, 10, &skipped, MainWindow->HWindow);
     if (names[0] != 0)
     {
         *doNotDeleteImportedCfg = TRUE;
-        char skippedNames[200];
+        wchar_t skippedNames[200];
         skippedNames[0] = 0;
         if (skipped > 0)
-            sprintf(skippedNames, LoadStr(IDS_NUMOFSKIPPEDPLUGINNAMES), skipped);
-        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTALLPLUGINSCFGIMPORTED), AnsiToWide(names).c_str(), AnsiToWide(skippedNames).c_str());
+        {
+            // was sprintf() into a wide buffer with a narrow format, and the two
+            // AnsiToWide() calls below re-encoded buffers that had never been narrow.
+            _snwprintf_s(skippedNames, _TRUNCATE, LoadStrW(IDS_NUMOFSKIPPEDPLUGINNAMES), skipped);
+        }
+        std::wstring msg = FormatStrW(LoadStrW(IDS_NOTALLPLUGINSCFGIMPORTED), names, skippedNames);
         // OK = start without missing plugins, Cancel = exit
-        return gPrompter->ConfirmError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), msg.c_str()).type == PromptResult::kCancel;
+        return gPrompter->ConfirmError(SALAMANDER_TEXT_VERSIONW(), msg.c_str()).type == PromptResult::kCancel;
     }
     return FALSE;
 }
@@ -3615,9 +3300,6 @@ BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
 // Wide version - no MAX_PATH buffer limitations
 void StartNotepadW(const wchar_t* file)
 {
-    STARTUPINFOW si = {0};
-    PROCESS_INFORMATION pi;
-
     std::wstring sysDir;
     if (!gEnvironment->GetSystemDirectory(sysDir).success)
         return;
@@ -3627,24 +3309,14 @@ void StartNotepadW(const wchar_t* file)
     cmdLine += file;
     cmdLine += L"\"";
 
-    si.cb = sizeof(STARTUPINFOW);
-    // CreateProcessW needs a mutable buffer for cmdLine
-    std::vector<wchar_t> cmdBuf(cmdLine.begin(), cmdLine.end());
-    cmdBuf.push_back(L'\0');
-
-    if (::CreateProcessW(NULL, cmdBuf.data(), NULL, NULL, TRUE,
-                         CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
-                         NULL, sysDir.c_str(), &si, &pi))
-    {
-        ::CloseHandle(pi.hProcess);
-        ::CloseHandle(pi.hThread);
-    }
-}
-
-// ANSI wrapper
-void StartNotepad(const char* file)
-{
-    StartNotepadW(AnsiToWide(file).c_str());
+    ExternalToolRequest request;
+    request.commandLine = cmdLine;
+    request.workingDirectory = sysDir;
+    request.inheritHandles = true;
+    ExternalToolResult result = gExternalToolRunner != NULL
+                                    ? gExternalToolRunner->Launch(request)
+                                    : ExternalToolResult::Error(ERROR_INVALID_PARAMETER);
+    result.CloseProcess();
 }
 
 BOOL RunningInCompatibilityMode()
@@ -3654,17 +3326,20 @@ BOOL RunningInCompatibilityMode()
     // WARNING: Application Verifier sets Windows version higher than it really is,
     // it does this when testing app for "Windows 7 Software Logo".
     WORD kernel32major, kernel32minor;
-    if (GetModuleVersion(GetModuleHandle("kernel32.dll"), &kernel32major, &kernel32minor))
+    if (GetModuleVersion(GetModuleHandleA("kernel32.dll"), &kernel32major, &kernel32minor))
     {
         TRACE_I("kernel32.dll: " << kernel32major << ":" << kernel32minor);
         // we must call GetVersionEx, because it returns values according to the set Compatibility Mode
         // (SalIsWindowsVersionOrGreater ignores the set Compatibility Mode)
-        OSVERSIONINFO os;
-        os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+        // Explicitly OSVERSIONINFOA (not the wchar_t-generic OSVERSIONINFO) - the code below
+        // deliberately resolves and calls "GetVersionExA" by name, so the struct it fills
+        // must always be the A layout regardless of this project's own UNICODE define.
+        OSVERSIONINFOA os;
+        os.dwOSVersionInfoSize = sizeof(OSVERSIONINFOA);
 
         // just avoiding deprecated warning, GetVersionEx should be available always and everywhere
         typedef BOOL(WINAPI * FDynGetVersionExA)(LPOSVERSIONINFOA lpVersionInformation);
-        FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandle("kernel32.dll"),
+        FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandleA("kernel32.dll"),
                                                                                "GetVersionExA");
         if (DynGetVersionExA == NULL)
         {
@@ -3698,229 +3373,148 @@ BOOL RunningInCompatibilityMode()
     return FALSE;
 }
 
-void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targetSize, BOOL hotpathForJumplist)
+static std::wstring ResolveCommandLinePath(const std::wstring& argument,
+                                           BOOL hotpathForJumplist)
 {
-    CPathBuffer curDir; // Heap-allocated for long path support
+    if (argument.empty())
+        return {};
+
+    std::wstring result = argument;
     if (hotpathForJumplist)
     {
-        BOOL ret = ExpandHotPath(NULL, argv, target, targetSize, FALSE); // if path syntax is not OK, TRACE_E will fire, which doesn't bother us
-        if (!ret)
-        {
+        std::wstring expanded;
+        if (ExpandHotPath(NULL, argument.c_str(), expanded, FALSE))
+            result.swap(expanded);
+        else
             TRACE_E("ExpandHotPath failed.");
-            // if expansion fails, we use the string without expansion
-            lstrcpyn(target, argv, targetSize);
-        }
     }
     else
     {
-        DWORD auxRes = ExpandEnvironmentStrings(argv, target, targetSize); // users wanted the ability to pass env variables as parameters
-        if (auxRes == 0 || auxRes > targetSize)
+        // ExpandEnvironmentStringsW reports the required size including NUL.
+        // Query first so semantic command-line paths never inherit a ceiling.
+        DWORD required = ExpandEnvironmentStringsW(argument.c_str(), NULL, 0);
+        if (required != 0)
         {
-            TRACE_E("ExpandEnvironmentStrings failed.");
-            // if expansion fails, we use the string without expansion
-            lstrcpyn(target, argv, targetSize);
+            std::vector<wchar_t> expanded(required);
+            DWORD written = ExpandEnvironmentStringsW(argument.c_str(),
+                                                       expanded.data(), required);
+            if (written != 0 && written <= required)
+                result.assign(expanded.data());
+            else
+                TRACE_E("ExpandEnvironmentStrings failed.");
         }
+        else
+            TRACE_E("ExpandEnvironmentStrings failed.");
     }
-    if (!IsPluginFSPath(target) && EnvGetCurrentDirectoryA(gEnvironment, curDir, curDir.Size()).success)
+
+    std::wstring curDir;
+    if (!IsPluginFSPath(result.c_str()) &&
+        gEnvironment->GetCurrentDirectory(curDir).success)
     {
-        SalGetFullName(target, NULL, curDir, NULL, NULL, targetSize);
+        SalGetFullNameW(result, NULL, curDir.c_str(), NULL, NULL);
     }
+    return result;
 }
 
-// if parameters are OK, returns TRUE, otherwise returns FALSE
-BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams)
+// If parameters are valid, returns TRUE. All semantic text remains dynamically
+// owned UTF-16 from GetCommandLineW through startup and activation handoff.
+BOOL ParseCommandLineParameters(
+    LPSTR cmdLine, sally::cmdline::CommandLineRequest* commandLineRequest)
 {
-    // we don't want to change paths, change icon, change prefix -- everything needs to be zeroed
-    ZeroMemory(cmdLineParams, sizeof(CCommandLineParams));
+    if (commandLineRequest == NULL)
+        return FALSE;
 
-    char buf[4096];
-    char* argv[20];
-    int p = 20; // number of elements in argv array
-
-    CPathBuffer curDir; // Heap-allocated for long path support
-    // Build the install-relative config.reg path in Unicode so non-ASCII install
-    // directories (issue #63) survive intact. The ANSI ConfigurationName mirrors
-    // the wide path lossy-encoded for legacy readers; ConfigurationNameW is the
-    // authoritative form used by ImportConfigurationW.
-    ConfigurationNameW.clear();
-    if (!BuildModuleRelativePathW(HInstance, L"config.reg", ConfigurationNameW))
-        ConfigurationNameW.clear();
-    if (!ConfigurationNameW.empty() && !FileExistsWLocal(ConfigurationNameW.c_str()))
+    (void)cmdLine; // WinMain's lpCmdLine has already passed through CP_ACP.
+    try
     {
-        std::wstring appdataW;
-        if (GetOurPathInRoamingAPPDATAW(appdataW))
+        sally::cmdline::CommandLineRequest parsed =
+            sally::cmdline::ParseRawCommandLine(GetCommandLineW());
+        if (!parsed.ok())
+            return FALSE;
+
+        // Build the install-relative config.reg path in Unicode so non-ASCII
+        // install directories survive intact through ImportConfigurationW.
+        ConfigurationNameW.clear();
+        if (!BuildModuleRelativePathW(HInstance, L"config.reg", ConfigurationNameW))
+            ConfigurationNameW.clear();
+        if (!ConfigurationNameW.empty() &&
+            !FileExistsWLocal(ConfigurationNameW.c_str()))
         {
-            if (!appdataW.empty() && appdataW.back() != L'\\')
-                appdataW.push_back(L'\\');
-            appdataW.append(L"config.reg");
-            if (FileExistsWLocal(appdataW.c_str()))
+            std::wstring appdata;
+            if (GetOurPathInRoamingAPPDATAW(appdata))
             {
-                ConfigurationNameW = appdataW;
-                ConfigurationNameIgnoreIfNotExists = FALSE;
+                if (!appdata.empty() && appdata.back() != L'\\')
+                    appdata.push_back(L'\\');
+                appdata.append(L"config.reg");
+                if (FileExistsWLocal(appdata.c_str()))
+                {
+                    ConfigurationNameW = appdata;
+                    ConfigurationNameIgnoreIfNotExists = FALSE;
+                }
             }
         }
-    }
-    if (!ConfigurationNameW.empty())
-    {
-        std::string ansi = WideToAnsi(ConfigurationNameW);
-        lstrcpyn(ConfigurationName.Get(), ansi.c_str(), ConfigurationName.Size());
-    }
-    else
-    {
-        // Wide build failed; fall back to legacy ANSI lookup so behavior on ASCII
-        // install paths is preserved.
-        GetModuleFileName(HInstance, ConfigurationName.Get(), ConfigurationName.Size());
-        *(strrchr(ConfigurationName.Get(), '\\') + 1) = 0;
-        const char* configReg = "config.reg";
-        strcat(ConfigurationName.Get(), configReg);
-        if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
-            SalPathAppend(curDir, configReg, curDir.Size()) && FileExists(curDir))
+
+        parsed.leftPath = ResolveCommandLinePath(parsed.leftPath, FALSE);
+        parsed.rightPath = ResolveCommandLinePath(parsed.rightPath, FALSE);
+        parsed.activePath = ResolveCommandLinePath(
+            parsed.activePath, parsed.activePathUsesHotPath ? TRUE : FALSE);
+
+        if (parsed.configFileSpecified)
         {
-            lstrcpyn(ConfigurationName, curDir, ConfigurationName.Size());
+            const std::wstring& config = parsed.configFile;
+            if ((config.size() >= 2 && config[0] == L'\\' &&
+                 config[1] == L'\\') ||
+                (config.size() >= 2 && config[1] == L':'))
+            {
+                ConfigurationNameW = config;
+            }
+            else
+            {
+                if (!BuildModuleRelativePathW(HInstance, config.c_str(),
+                                              ConfigurationNameW))
+                {
+                    ConfigurationNameW.clear();
+                }
+                if (!ConfigurationNameW.empty() &&
+                    !FileExistsWLocal(ConfigurationNameW.c_str()))
+                {
+                    std::wstring appdata;
+                    if (GetOurPathInRoamingAPPDATAW(appdata))
+                    {
+                        if (!appdata.empty() && appdata.back() != L'\\')
+                            appdata.push_back(L'\\');
+                        appdata.append(config);
+                        if (FileExistsWLocal(appdata.c_str()))
+                            ConfigurationNameW = appdata;
+                    }
+                }
+            }
             ConfigurationNameIgnoreIfNotExists = FALSE;
         }
-        ConfigurationNameW = AnsiToWide(ConfigurationName.Get());
-    }
-    *OpenReadmeInNotepad = 0;
-    if (GetCmdLine(buf, _countof(buf), argv, p, cmdLine))
-    {
-        int i;
-        for (i = 0; i < p; i++)
+
+        if (parsed.setMainWindowIconIndex)
         {
-            if (StrICmp(argv[i], "-l") == 0) // left panel path
-            {
-                if (i + 1 < p)
-                {
-                    GetCommandLineParamExpandEnvVars(argv[i + 1], cmdLineParams->LeftPath, 2 * MAX_PATH, FALSE);
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-r") == 0) // right panel path
-            {
-                if (i + 1 < p)
-                {
-                    GetCommandLineParamExpandEnvVars(argv[i + 1], cmdLineParams->RightPath, 2 * MAX_PATH, FALSE);
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-a") == 0) // active panel path
-            {
-                if (i + 1 < p)
-                {
-                    GetCommandLineParamExpandEnvVars(argv[i + 1], cmdLineParams->ActivePath, 2 * MAX_PATH, FALSE);
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-aj") == 0) // active panel path (hot paths syntax for jumplist) - internal, undocumented
-            {
-                if (i + 1 < p)
-                {
-                    GetCommandLineParamExpandEnvVars(argv[i + 1], cmdLineParams->ActivePath, 2 * MAX_PATH, TRUE);
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-c") == 0) // default config file
-            {
-                if (i + 1 < p)
-                {
-                    char* s = argv[i + 1];
-                    if (*s == '\\' && *(s + 1) == '\\' || // UNC full path
-                        *s != 0 && *(s + 1) == ':')       // "c:\" full path
-                    {                                     // full path
-                        lstrcpyn(ConfigurationName, argv[i + 1], ConfigurationName.Size());
-                    }
-                    else // relative path
-                    {
-                        GetModuleFileName(HInstance, ConfigurationName.Get(), ConfigurationName.Size());
-                        *(strrchr(ConfigurationName.Get(), '\\') + 1) = 0;
-                        SalPathAppend(ConfigurationName, s, ConfigurationName.Size());
-                        if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
-                            SalPathAppend(curDir, s, curDir.Size()) && FileExists(curDir))
-                        { // if relatively specified file after -C doesn't exist next to .exe, we also look for it in APPDATA
-                            lstrcpyn(ConfigurationName, curDir, ConfigurationName.Size());
-                        }
-                    }
-                    ConfigurationNameW = AnsiToWide(ConfigurationName.Get());
-                    ConfigurationNameIgnoreIfNotExists = FALSE;
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-i") == 0) // icon index
-            {
-                if (i + 1 < p)
-                {
-                    char* s = argv[i + 1];
-                    if ((*s == '0' || *s == '1' || *s == '2' || *s == '3') && *(s + 1) == 0) // 0, 1, 2, 3
-                    {
-                        Configuration.MainWindowIconIndexForced = (*s - '0');
-
-                        cmdLineParams->SetMainWindowIconIndex = TRUE;
-                        cmdLineParams->MainWindowIconIndex = Configuration.MainWindowIconIndexForced;
-                    }
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-t") == 0) // title prefix
-            {
-                if (i + 1 < p)
-                {
-                    Configuration.UseTitleBarPrefixForced = TRUE;
-                    char* s = argv[i + 1];
-                    if (*s != 0)
-                    {
-                        lstrcpyn(Configuration.TitleBarPrefixForced, s, TITLE_PREFIX_MAX);
-
-                        cmdLineParams->SetTitlePrefix = TRUE;
-                        lstrcpyn(cmdLineParams->TitlePrefix, s, MAX_PATH);
-                    }
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-o") == 0) // pretend as if OnlyOneInstance was set
-            {
-                Configuration.ForceOnlyOneInstance = TRUE;
-                continue;
-            }
-
-            if (StrICmp(argv[i], "-p") == 0) // activate panel
-            {
-                if (i + 1 < p)
-                {
-                    char* s = argv[i + 1];
-                    if ((*s == '0' || *s == '1' || *s == '2') && *(s + 1) == 0) // 0, 1, 2
-                    {
-                        cmdLineParams->ActivatePanel = (*s - '0');
-                    }
-                    i++;
-                    continue;
-                }
-            }
-
-            if (StrICmp(argv[i], "-run_notepad") == 0 && i + 1 < p)
-            { // Vista+: after installation: installer (SFX7ZIP) executes Salamander and asks for execution of notepad with readme file
-                lstrcpyn(OpenReadmeInNotepad, argv[i + 1], OpenReadmeInNotepad.Size());
-                i++;
-                continue;
-            }
-
-            return FALSE; // wrong parameters
+            Configuration.MainWindowIconIndexForced =
+                parsed.mainWindowIconIndex;
         }
+        if (parsed.titlePrefixSpecified)
+        {
+            Configuration.UseTitleBarPrefixForced = TRUE;
+            if (parsed.setTitlePrefix)
+                Configuration.TitleBarPrefixForced = parsed.titlePrefix;
+        }
+        if (parsed.forceOnlyOneInstance)
+            Configuration.ForceOnlyOneInstance = TRUE;
+
+        OpenReadmeInNotepad = parsed.runNotepadPath;
+        *commandLineRequest = std::move(parsed);
+        return TRUE;
     }
-    return TRUE;
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
 }
 
 int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine, int cmdShow)
@@ -3975,7 +3569,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
   char *test = (char *)malloc(16);
 //  char *test = (char *)HeapAlloc(GetProcessHeap(), 0, 16);
-  char bufff[100];
+  wchar_t bufff[100];
   sprintf(bufff, "test=%p", test);
   MessageBox(NULL, bufff, "a", MB_OK);
   test[16] = 0;
@@ -3985,8 +3579,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     int testChar = testCharValue;
     if (testChar != 129) // if testChar is negative, we have a problem: LowerCase[testCharValue] reaches outside the array...
     {
-        MessageBox(NULL, "Default type 'char' is not 'unsigned char', but 'signed char'. See '/J' compiler switch in MSVC.",
-                   "Compilation Error", MB_OK | MB_ICONSTOP);
+        // wide: English-only compiler-config diagnostic, no LoadStr/resource
+        // involved - same shape as heap.cpp's Debug leak popup (iteration 196).
+        MessageBoxW(NULL, L"Default type 'char' is not 'unsigned char', but 'signed char'. See '/J' compiler switch in MSVC.",
+                    L"Compilation Error", MB_OK | MB_ICONSTOP);
     }
 
     MainThreadID = GetCurrentThreadId();
@@ -3998,9 +3594,9 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // And I was wondering why their paint runs so nicely.
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-    SetTraceProcessName("Salamander");
-    SetThreadNameInVCAndTrace("Main");
-    SetMessagesTitle(MAINWINDOW_NAME);
+    SetTraceProcessNameW(MAINWINDOW_NAME);
+    SetThreadNameInVCAndTrace(L"Main");
+    SetMessagesTitleW(MAINWINDOW_NAME);
 
     // Initialize default UI prompter (UTF-16 first) for decoupled prompts.
     gPrompter = GetUIPrompter();
@@ -4017,23 +3613,23 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     //                                    WPMessageHookProc,
     //                                    NULL, GetCurrentThreadId());
 
-    User32DLL = NOHANDLES(LoadLibrary("user32.dll"));
+    User32DLL = NOHANDLES(LoadLibraryA("user32.dll"));
     if (User32DLL == NULL)
         TRACE_E("Unable to load library user32.dll."); // not a fatal error
 
     TurnOFFWindowGhosting();
 
-    NtDLL = HANDLES(LoadLibrary("NTDLL.DLL"));
+    NtDLL = HANDLES(LoadLibraryA("NTDLL.DLL"));
     if (NtDLL == NULL)
         TRACE_E("Unable to load library ntdll.dll."); // not a fatal error
 
     // detection of default user charset for fonts
     CHARSETINFO ci;
     memset(&ci, 0, sizeof(ci));
-    char bufANSI[10];
-    if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_IDEFAULTANSICODEPAGE, bufANSI, 10))
+    wchar_t bufANSI[10];
+    if (GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_IDEFAULTANSICODEPAGE, bufANSI, 10))
     {
-        if (TranslateCharsetInfo((DWORD*)(DWORD_PTR)MAKELONG(atoi(bufANSI), 0), &ci, TCI_SRCCODEPAGE))
+        if (TranslateCharsetInfo((DWORD*)(DWORD_PTR)MAKELONG(_wtoi(bufANSI), 0), &ci, TCI_SRCCODEPAGE))
         {
             UserCharset = ci.ciCharset;
         }
@@ -4061,8 +3657,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         // we probably won't get here, on older systems exports of statically linked libraries will be missing
         // and the user will be served some incomprehensible message at the PE loader level in Windows
         // do not call SalMessageBox
-        MessageBox(NULL, "You need at least Windows 7 to run this program.",
-                   SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONEXCLAMATION);
+        // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already used
+        // elsewhere in this file (e.g. the language-file error paths above).
+        MessageBoxW(NULL, L"You need at least Windows 7 to run this program.",
+                    SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONEXCLAMATION);
     EXIT_1:
         if (User32DLL != NULL)
         {
@@ -4090,18 +3688,18 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
     // if possible, we'll use GetNativeSystemInfo, otherwise we'll keep the result of GetSystemInfo
     typedef void(WINAPI * PGNSI)(LPSYSTEM_INFO);
-    PGNSI pGNSI = (PGNSI)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetNativeSystemInfo"); // Min: XP
+    PGNSI pGNSI = (PGNSI)GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetNativeSystemInfo"); // Min: XP
     if (pGNSI != NULL)
         pGNSI(&si);
     Windows64Bit = si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64;
 
-    if (!EnvGetWindowsDirectoryA(gEnvironment, WindowsDirectory, WindowsDirectory.Size()).success)
-        *WindowsDirectory = 0;
+    if (!gEnvironment->GetWindowsDirectory(WindowsDirectory).success)
+        WindowsDirectory.clear();
 
     // we're interested in the ITaskbarList3 interface, which MS introduced from Windows 7 - for example progress in taskbar buttons
     if (Windows7AndLater)
     {
-        TaskbarBtnCreatedMsg = RegisterWindowMessage("TaskbarButtonCreated");
+        TaskbarBtnCreatedMsg = RegisterWindowMessageA("TaskbarButtonCreated");
         if (TaskbarBtnCreatedMsg == 0)
         {
             DWORD err = GetLastError();
@@ -4122,42 +3720,39 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
     // try to extract "AutoImportConfig" value from current configuration -> exists in case we're performing UPGRADE
     BOOL autoImportConfig = FALSE;
-    char autoImportConfigFromKey[200];
-    autoImportConfigFromKey[0] = 0;
-    if (!GetUpgradeInfo(&autoImportConfig, autoImportConfigFromKey, 200)) // user wishes to exit the software
+    std::wstring autoImportConfigFromKey;
+    if (!GetUpgradeInfo(&autoImportConfig, autoImportConfigFromKey)) // user wishes to exit the software
     {
         myExitCode = 0;
     EXIT_1a:
         ReleaseWinLib();
         goto EXIT_1;
     }
-    const char* configKey = autoImportConfig ? autoImportConfigFromKey : SalamanderConfigurationRoots[0];
+    const wchar_t* configKey = autoImportConfig ? autoImportConfigFromKey.c_str() : SalamanderConfigurationRoots[0];
 
     // try to extract the language-determining key from current configuration
     LoadSaveToRegistryMutex.Enter();
     HKEY hSalamander;
     DWORD langChanged = FALSE; // TRUE = we're starting Salamander for the first time with a different language (we'll load all plugins to verify we have this language version for them too, or let user decide which alternative versions to use)
-    if (OpenKey(HKEY_CURRENT_USER, configKey, hSalamander))
+    if (OpenKeyW(HKEY_CURRENT_USER, configKey, hSalamander))
     {
         HKEY actKey;
         DWORD configVersion = 1; // this is config from 1.52 and older
-        if (OpenKey(hSalamander, SALAMANDER_VERSION_REG, actKey))
+        if (OpenKeyW(hSalamander, SALAMANDER_VERSION_REG, actKey))
         {
             configVersion = 2; // this is config from 1.6b1
-            GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
-                     &configVersion, sizeof(DWORD));
+            GetValueW(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
+                      &configVersion, sizeof(DWORD));
             CloseKey(actKey);
         }
         if (configVersion >= 59 /* 2.53 beta 2 */ && // before 2.53 beta 2 there was only English, so reading doesn't make sense, we'll offer user default system language or manual language selection
-            OpenKey(hSalamander, SALAMANDER_CONFIG_REG, actKey))
+            OpenKeyW(hSalamander, SALAMANDER_CONFIG_REG, actKey))
         {
-            GetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
-                     Configuration.SLGName, Configuration.SLGName.Size());
-            GetValue(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
-                     &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
-            GetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
-                     Configuration.AltPluginSLGName, Configuration.AltPluginSLGName.Size());
-            GetValue(actKey, CONFIG_LANGUAGECHANGED_REG, REG_DWORD, &langChanged, sizeof(DWORD));
+            GetStringValueW(actKey, CONFIG_LANGUAGE_REG, Configuration.SLGName);
+            GetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
+                      &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
+            GetStringValueW(actKey, CONFIG_ALTLANGFORPLUGINS_REG, Configuration.AltPluginSLGName);
+            GetValueW(actKey, CONFIG_LANGUAGECHANGED_REG, REG_DWORD, &langChanged, sizeof(DWORD));
             CloseKey(actKey);
         }
         CloseKey(hSalamander);
@@ -4168,26 +3763,28 @@ FIND_NEW_SLG_FILE:
 
     // if key doesn't exist, we'll show selection dialog
     BOOL newSLGFile = FALSE; // TRUE if .SLG was selected during this Salamander launch
-    if (Configuration.SLGName[0] == 0)
+    if (Configuration.SLGName.empty())
     {
         CLanguageSelectorDialog slgDialog(NULL, Configuration.SLGName, NULL);
         slgDialog.Initialize();
         if (slgDialog.GetLanguagesCount() == 0)
         {
-            MessageBox(NULL, "Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                             "Please reinstall Open Salamander.",
-                       SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+            // wide: same MessageBoxW/SALAMANDER_TEXT_VERSIONW() pairing already
+            // used a few lines below in this same function (the "not a valid language file" path).
+            MessageBoxW(NULL, L"Unable to find any language file (.SLG) in subdirectory LANG.\n"
+                              L"Please reinstall Open Salamander.",
+                        SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }
         Configuration.UseAsAltSLGInOtherPlugins = FALSE;
-        Configuration.AltPluginSLGName[0] = 0;
+        Configuration.AltPluginSLGName.clear();
 
-        CPathBuffer prevVerSLGName; // Heap-allocated for long path support
+        std::wstring prevVerSLGName;
         if (!autoImportConfig &&                            // during UPGRADE this doesn't make sense (language is read a few lines above, this routine would just re-read it)
             FindLanguageFromPrevVerOfSal(prevVerSLGName) && // we'll import language from previous version, it's quite probable user wants to use it again (it's about importing old Salamander configuration)
-            slgDialog.SLGNameExists(prevVerSLGName))
+            slgDialog.SLGNameExists(prevVerSLGName.c_str()))
         {
-            lstrcpy(Configuration.SLGName, prevVerSLGName);
+            Configuration.SLGName = prevVerSLGName;
         }
         else
         {
@@ -4225,8 +3822,7 @@ FIND_NEW_SLG_FILE:
     }
 
     std::wstring pathW;
-    std::wstring slgNameW = AnsiToWide(Configuration.SLGName.Get());
-    BuildModuleRelativePathW(NULL, (L"lang\\" + slgNameW).c_str(), pathW);
+    BuildModuleRelativePathW(NULL, (L"lang\\" + Configuration.SLGName).c_str(), pathW);
     HLanguage = pathW.empty() ? NULL : HANDLES(LoadLibraryW(pathW.c_str()));
     LanguageID = 0;
     if (HLanguage == NULL || !IsSLGFileValid(HInstance, HLanguage, LanguageID, IsSLGIncomplete))
@@ -4238,8 +3834,8 @@ FIND_NEW_SLG_FILE:
             std::wstring errorText = FormatStrW(L"File %s was not found or is not valid language file.\nSally "
                                                 L"will try to search for some other language file (.SLG).",
                                                 pathW.c_str());
-            MessageBoxW(NULL, errorText.c_str(), AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), MB_OK | MB_ICONERROR);
-            Configuration.SLGName[0] = 0;
+            MessageBoxW(NULL, errorText.c_str(), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
+            Configuration.SLGName.clear();
             goto FIND_NEW_SLG_FILE;
         }
         else // shouldn't happen at all - .SLG file was already tested
@@ -4252,19 +3848,22 @@ FIND_NEW_SLG_FILE:
         }
     }
 
-    strcpy(Configuration.LoadedSLGName, Configuration.SLGName);
+    Configuration.LoadedSLGName = Configuration.SLGName;
 
     // let already running salmon load the selected SLG (it was using some provisional one so far)
-    SalmonSetSLG(Configuration.SLGName);
+    SalmonSetSLG(Configuration.SLGName.c_str());
 
     // set localized messages into ALLOCHAN module (ensures reporting to user when memory is low + Retry button + if all fails then Cancel to terminate the software)
-    SetAllocHandlerMessage(LoadStr(IDS_ALLOCHANDLER_MSG), SALAMANDER_TEXT_VERSION,
-                           LoadStr(IDS_ALLOCHANDLER_WRNIGNORE), LoadStr(IDS_ALLOCHANDLER_WRNABORT));
+    // SetAllocHandlerMessage is wchar_t-generic (winlib's own ALLOCHAN string table);
+    // LoadStr/SALAMANDER_TEXT_VERSION are permanently narrow, so under _UNICODE this needs their
+    // already-established wide siblings instead.
+    SetAllocHandlerMessage(LoadStrW(IDS_ALLOCHANDLER_MSG), SALAMANDER_TEXT_VERSIONW(),
+                           LoadStrW(IDS_ALLOCHANDLER_WRNIGNORE), LoadStrW(IDS_ALLOCHANDLER_WRNABORT));
 
-    CCommandLineParams cmdLineParams;
+    sally::cmdline::CommandLineRequest cmdLineParams;
     if (!ParseCommandLineParameters(cmdLine, &cmdLineParams))
     {
-        gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_INVALIDCMDLINE));
+        gPrompter->ShowError(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_INVALIDCMDLINE));
 
     EXIT_2:
         if (HLanguage != NULL)
@@ -4301,13 +3900,13 @@ FIND_NEW_SLG_FILE:
     // if configuration doesn't exist or will be subsequently changed during file import, user is out of luck
     // and splash screen will follow default or old value
     LoadSaveToRegistryMutex.Enter();
-    if (OpenKey(HKEY_CURRENT_USER, configKey, hSalamander))
+    if (OpenKeyW(HKEY_CURRENT_USER, configKey, hSalamander))
     {
         HKEY actKey;
-        if (OpenKey(hSalamander, SALAMANDER_CONFIG_REG, actKey))
+        if (OpenKeyW(hSalamander, SALAMANDER_CONFIG_REG, actKey))
         {
-            GetValue(actKey, CONFIG_SHOWSPLASHSCREEN_REG, REG_DWORD,
-                     &Configuration.ShowSplashScreen, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_SHOWSPLASHSCREEN_REG, REG_DWORD,
+                      &Configuration.ShowSplashScreen, sizeof(DWORD));
             CloseKey(actKey);
         }
         CloseKey(hSalamander);
@@ -4330,7 +3929,7 @@ FIND_NEW_SLG_FILE:
         goto EXIT_2;
     }
 
-    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), MAINWINDOW_NAME); // j.r. - move to correct place
+    SetWinLibStrings(LoadStrW(IDS_INVALIDNUMBER), MAINWINDOW_NAME); // j.r. - move to correct place
 
     // initialization of packers; previously done in constructors; now moved here,
     // when language DLL is already decided
@@ -4365,7 +3964,7 @@ FIND_NEW_SLG_FILE:
     // pointer into 'SalamanderConfigurationRoots' array to configuration that should be
     // loaded (NULL -> none; default values will be used)
     if (autoImportConfig)
-        SALAMANDER_ROOT_REG = autoImportConfigFromKey; // during UPGRADE searching for configuration doesn't make sense
+        SALAMANDER_ROOT_REG = autoImportConfigFromKey.c_str(); // during UPGRADE searching for configuration doesn't make sense
     else
     {
         if (!FindLatestConfiguration(deleteConfigurations, SALAMANDER_ROOT_REG))
@@ -4413,7 +4012,7 @@ FIND_NEW_SLG_FILE:
 
     //--- initialization part
     CALL_STACK_MESSAGE1("WinMainBody::inicialization");
-    IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_DATA));
+    IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_DATA));
 
     InitDefaultDir();
     PackSetErrorHandler(PackErrorHandler);
@@ -4498,7 +4097,7 @@ FIND_NEW_SLG_FILE:
     InitFileNamesEnumForViewers();
 
     // load list of shared directories
-    IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_SHARES));
+    IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_SHARES));
     Shares.Refresh();
 
     CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_SAVEBITS,
@@ -4510,56 +4109,104 @@ FIND_NEW_SLG_FILE:
                                         NULL,
                                         SAVEBITS_CLASSNAME,
                                         NULL);
+    CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_SAVEBITS,
+                                         0,
+                                         0,
+                                         NULL,
+                                         LoadCursorW(NULL, MAKEINTRESOURCEW(32512)), // IDC_ARROW is bound to A without UNICODE.
+                                         (HBRUSH)(COLOR_3DFACE + 1),
+                                         NULL,
+                                         SAFEWAIT_CLASSNAMEW,
+                                         NULL);
+    // CShellExecuteWnd stores its diagnostic title in UTF-16 and is
+    // enumerated with GetWindowTextW. Register the class with the matching W window proc;
+    // an ANSI class would round-trip that title through CP_ACP before the crash report.
     CMainWindow::RegisterUniversalClass(CS_DBLCLKS,
-                                        0,
-                                        0,
-                                        NULL,
-                                        LoadCursor(NULL, IDC_ARROW),
-                                        (HBRUSH)(COLOR_3DFACE + 1),
-                                        NULL,
-                                        SHELLEXECUTE_CLASSNAME,
-                                        NULL);
+                                         0,
+                                         0,
+                                         NULL,
+                                         LoadCursor(NULL, IDC_ARROW),
+                                         (HBRUSH)(COLOR_3DFACE + 1),
+                                         NULL,
+                                         SHELLEXECUTE_CLASSNAMEW,
+                                         NULL);
 
     Associations.ReadAssociations(FALSE); // loading associations from Registry
 
     // shell extensions registration
     // if we find library in "utils" subdirectory, we'll verify its registration and potentially register it
-    CPathBuffer shellExtPath; // Heap-allocated for long path support
-    GetModuleFileName(HInstance, shellExtPath, shellExtPath.Size());
-    char* shellExtPathSlash = strrchr(shellExtPath, '\\');
-    if (shellExtPathSlash != NULL)
+    // wide: GetModuleFileName (ANSI) narrowed Sally's own install path via CP_ACP
+    // right at the source - a non-ASCII install path (Unicode user-profile name, non-English
+    // portable install) could produce a '?'-collapsed path that FileExists() reports missing
+    // (silently skipping registration) or, worse, one that happens to match a DIFFERENT real
+    // file. SECRegisterToRegistry (shexreg.c) is narrow-only throughout, and widening its
+    // registry read/write format is a bigger, separate job (deferred - the value it writes is
+    // also read back narrow elsewhere, so switching the write format alone risks breaking that
+    // readback for everyone, not just non-ASCII installs). Resolve the narrow representation
+    // through an exact round-trip or 8.3 short-path fallback instead of blind best-fit, matching
+    // the ANSI-boundary policy already established at ChangePathToArchive
+    // (files_window_actions.cpp) - if neither succeeds, skip registering that DLL rather than
+    // risk registering (or reporting missing) the wrong file.
+    std::wstring shellExtX86PathW, shellExtX64PathW;
+    BOOL haveX86PathW = BuildModuleRelativePathW(HInstance, L"utils\\salextx86.dll", shellExtX86PathW);
+    BOOL haveX64PathW = BuildModuleRelativePathW(HInstance, L"utils\\salextx64.dll", shellExtX64PathW);
+    auto resolveShellExtPath = [](const std::wstring& wide, std::wstring& outPath) -> BOOL
     {
-        strcpy(shellExtPathSlash + 1, "utils\\salextx86.dll");
+        // SECRegisterToRegistry takes const wchar_t* directly - the ANSI
+        // round-trip is a VALIDATION that this path is safe for whatever narrow registry
+        // format it writes internally, not the value to store. Storing the ansi bytes here
+        // (reinterpreted as wide chars) was a real bug: it would hand SECRegisterToRegistry
+        // and FileExistsW a corrupted path instead of the verified wide one.
+        std::string ansi;
+        const std::wstring* verified = &wide;
+        std::wstring shortWide;
+        if (!Win32EncodeAcpExact(wide, ansi))
+        {
+            shortWide = GetShortPathW(wide.c_str());
+            if (shortWide.empty() || !Win32EncodeAcpExact(shortWide, ansi))
+                return FALSE;
+            verified = &shortWide;
+        }
+        if (verified->empty())
+            return FALSE;
+        outPath = *verified;
+        return TRUE;
+    };
+    std::wstring shellExtX86Path, shellExtX64Path;
+    BOOL haveX86Path = haveX86PathW && resolveShellExtPath(shellExtX86PathW, shellExtX86Path);
+    BOOL haveX64Path = haveX64PathW && resolveShellExtPath(shellExtX64PathW, shellExtX64Path);
+    if (haveX86Path || haveX64Path)
+    {
 #ifdef _WIN64
-        BOOL x86Present = FileExists(shellExtPath);
+        BOOL x86Present = haveX86Path && FileExistsW(shellExtX86Path.c_str());
         BOOL x86Registered = FALSE;
         if (x86Present)
-            x86Registered = SECRegisterToRegistry(shellExtPath, TRUE, KEY_WOW64_32KEY);
-        strcpy(shellExtPathSlash + 1, "utils\\salextx64.dll");
-        if (FileExists(shellExtPath))
+            x86Registered = SECRegisterToRegistry(shellExtX86Path.c_str(), TRUE, KEY_WOW64_32KEY);
+        if (haveX64Path && FileExistsW(shellExtX64Path.c_str()))
         {
-            SalShExtRegistered = SECRegisterToRegistry(shellExtPath, FALSE, 0);
+            SalShExtRegistered = SECRegisterToRegistry(shellExtX64Path.c_str(), FALSE, 0);
             if (x86Present) // if x86 DLL was present, both must register successfully
                 SalShExtRegistered &= x86Registered;
         }
         else
             SalShExtRegistered = FALSE;
+        const std::wstring& cleanupPathW = shellExtX64PathW;
 #else  // _WIN64
-        if (FileExists(shellExtPath))
-            SalShExtRegistered = SECRegisterToRegistry(shellExtPath, FALSE, 0);
+        if (haveX86Path && FileExistsW(shellExtX86Path.c_str()))
+            SalShExtRegistered = SECRegisterToRegistry(shellExtX86Path.c_str(), FALSE, 0);
         if (Windows64Bit)
         {
-            strcpy(shellExtPathSlash + 1, "utils\\salextx64.dll");
-            if (FileExists(shellExtPath))
-                SalShExtRegistered &= SECRegisterToRegistry(shellExtPath, TRUE, KEY_WOW64_64KEY);
+            if (haveX64Path && FileExistsW(shellExtX64Path.c_str()))
+                SalShExtRegistered &= SECRegisterToRegistry(shellExtX64Path.c_str(), TRUE, KEY_WOW64_64KEY);
             else
                 SalShExtRegistered = FALSE;
         }
+        const std::wstring& cleanupPathW = Windows64Bit ? shellExtX64PathW : shellExtX86PathW;
 #endif // _WIN64
 
         // #82: reclaim previous installs' salext DLLs still locked by Explorer so their folders
         // become deletable (schedules delete-on-reboot; best-effort, needs admin).
-        CleanupStaleShellExtensions(shellExtPath);
+        CleanupStaleShellExtensions(cleanupPathW.c_str());
     }
 
     //--- creating main window
@@ -4572,7 +4219,7 @@ FIND_NEW_SLG_FILE:
                                             NULL,
                                             CFILESBOX_CLASSNAME,
                                             NULL) &&
-        CMainWindow::RegisterUniversalClassW(CS_DBLCLKS,
+        CMainWindow::RegisterUniversalClass(CS_DBLCLKS,
                                              0,
                                              0,
                                              HANDLES(LoadIcon(HInstance,
@@ -4580,14 +4227,14 @@ FIND_NEW_SLG_FILE:
                                              LoadCursor(NULL, IDC_ARROW),
                                              (HBRUSH)(COLOR_WINDOW + 1),
                                              NULL,
-                                             CMAINWINDOW_CLASSNAMEW,
+                                             CMAINWINDOW_CLASSNAME,
                                              NULL))
     {
         MainWindow = new CMainWindow;
         if (MainWindow != NULL)
         {
             MainWindow->CmdShow = cmdShow;
-            if (MainWindow->CreateW(CMAINWINDOW_CLASSNAMEW,
+            if (MainWindow->Create(CMAINWINDOW_CLASSNAME,
                                     L"",
                                     WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                                     CW_USEDEFAULT, 0, CW_USEDEFAULT, 0,
@@ -4600,7 +4247,7 @@ FIND_NEW_SLG_FILE:
                 PluginMsgBoxParent = MainWindow->HWindow;
 
                 // extract Group Policy from registry
-                IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_POLICY));
+                IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_POLICY));
                 SystemPolicies.LoadFromRegistry();
 
                 CALL_STACK_MESSAGE1("WinMainBody::load_config");
@@ -4723,7 +4370,7 @@ FIND_NEW_SLG_FILE:
                         }
                         // browse array and if any root is marked for deletion, delete it + delete old configuration
                         // after UPGRADE and also delete "AutoImportConfig" value in this Salamander version's configuration key
-                        MainWindow->DeleteOldConfigurations(deleteConfigurations, autoImportConfig, autoImportConfigFromKey,
+                        MainWindow->DeleteOldConfigurations(deleteConfigurations, autoImportConfig, autoImportConfigFromKey.c_str(),
                                                             doNotDeleteImportedCfg);
 
                         // only first Salamander instance: let's see if TEMP needs cleaning
@@ -4739,7 +4386,7 @@ FIND_NEW_SLG_FILE:
 
                         if (importCfgFromFileWasSkipped) // if we skipped config.reg or other .reg file import (parameter -C)
                         {                                // inform user about need for new Salamander start and let them exit the software
-                            gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_IMPORTCFGFROMFILESKIPPED));
+                            gPrompter->ShowInfo(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_IMPORTCFGFROMFILESKIPPED));
                             PostMessage(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
                         }
                         /*
@@ -4771,8 +4418,8 @@ FIND_NEW_SLG_FILE:
                     DWORD activateParamsRequestUID = 0;
                     BOOL skipMenuBar;
                     MSG msg;
-                    BOOL haveMSG = FALSE; // FALSE if GetMessage() should be called in loop condition
-                    while (haveMSG || GetMessage(&msg, NULL, 0, 0))
+                    BOOL haveMSG = FALSE; // FALSE if GetMessageW() should be called in loop condition
+                    while (haveMSG || GetMessageW(&msg, NULL, 0, 0))
                     {
                         haveMSG = FALSE;
                         if (msg.message != WM_USER_SHOWWINDOW && msg.message != WM_USER_WAKEUP_FROM_IDLE && /*msg.message != WM_USER_SETPATHS &&*/
@@ -4815,7 +4462,7 @@ FIND_NEW_SLG_FILE:
                                      (MainWindow->EditMode || !TranslateAccelerator(MainWindow->HWindow, AccelTable2, &msg))))
                             {
                                 TranslateMessage(&msg);
-                                DispatchMessage(&msg);
+                                DispatchMessageW(&msg);
                             }
                         }
 
@@ -4825,11 +4472,11 @@ FIND_NEW_SLG_FILE:
                         }
 
                     TEST_IDLE:
-                        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                         {
                             if (msg.message == WM_QUIT)
-                                break;      // equivalent to GetMessage() returning FALSE
-                            haveMSG = TRUE; // we have a message, process it (without calling GetMessage())
+                                break;      // equivalent to GetMessageW() returning FALSE
+                            haveMSG = TRUE; // we have a message, process it (without calling GetMessageW())
                         }
                         else // if there is no message in the queue, perform idle processing
                         {
@@ -4844,7 +4491,7 @@ FIND_NEW_SLG_FILE:
                                         HWND hParent = NULL;
                                         if (MainWindow != NULL)
                                             hParent = MainWindow->HWindow;
-                                        MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "Sally", MB_OK | MB_ICONERROR);
+                                        MessageBoxW(hParent, L"_CrtCheckMemory failed. Look to the Trace Server for details.", L"Sally", MB_OK | MB_ICONERROR);
                                     }
                                     LastCrtCheckMemoryTime = GetTickCount();
                                 }
@@ -4861,34 +4508,18 @@ FIND_NEW_SLG_FILE:
                                 if (WaitForESCReleaseBeforeTestingESC)
                                     WaitForESCReleaseBeforeTestingESC = FALSE;
 
-                                // check whether another "OnlyOneInstance" Salamander asks us to activate and set panel paths
-                                // FControlThread would then set parameters into global CommandLineParams and increase RequestUID
-                                // if the main thread was in IDLE, it woke up due to posted WM_USER_WAKEUP_FROM_IDLE
-                                if (!SalamanderBusy && CommandLineParams.RequestUID > activateParamsRequestUID)
+                                // Check whether another "OnlyOneInstance" Sally asks us to
+                                // activate and set panel paths. The task-list adapter owns the
+                                // synchronized dynamic handoff and acknowledges only after this
+                                // thread has copied a fresh request.
+                                if (!SalamanderBusy)
                                 {
-                                    CCommandLineParams paramsCopy;
-                                    BOOL applyParams = FALSE;
-
-                                    NOHANDLES(EnterCriticalSection(&CommandLineParamsCS));
-                                    // just before entering the critical section a timeout may have occurred in the control thread; verify it still wants the result
-                                    // also verify the request has not expired (the calling thread waits only until TASKLIST_TODO_TIMEOUT and then
-                                    // gives up and starts a new Salamander instance; we do not want to fulfill the request in that case)
-                                    DWORD tickCount = GetTickCount();
-                                    if (CommandLineParams.RequestUID != 0 && tickCount - CommandLineParams.RequestTimestamp < TASKLIST_TODO_TIMEOUT)
+                                    sally::cmdline::CommandLineRequest paramsCopy;
+                                    if (MainWindow != NULL &&
+                                        TaskList.TakePendingActivationRequest(
+                                            activateParamsRequestUID, paramsCopy))
                                     {
-                                        memcpy(&paramsCopy, &CommandLineParams, sizeof(CCommandLineParams));
-                                        applyParams = TRUE;
-
-                                        // store the UID we already processed so we do not loop
-                                        activateParamsRequestUID = CommandLineParams.RequestUID;
-                                        // signal the control thread that we accepted the paths
-                                        SetEvent(CommandLineParamsProcessed);
-                                    }
-                                    NOHANDLES(LeaveCriticalSection(&CommandLineParamsCS));
-
-                                    // we released shared resources, we can work on the paths
-                                    if (applyParams && MainWindow != NULL)
-                                    {
+                                        activateParamsRequestUID = paramsCopy.requestUID;
                                         SendMessage(MainWindow->HWindow, WM_USER_SHOWWINDOW, 0, 0);
                                         MainWindow->ApplyCommandLineParams(&paramsCopy);
                                     }
@@ -4938,7 +4569,7 @@ FIND_NEW_SLG_FILE:
                                             msg.time = GetTickCount();
                                             GetCursorPos(&msg.pt);
 
-                                            haveMSG = TRUE; // we have a message, process it (without calling GetMessage())
+                                            haveMSG = TRUE; // we have a message, process it (without calling GetMessageW())
                                         }
                                     }
                                     else
@@ -4952,7 +4583,7 @@ FIND_NEW_SLG_FILE:
                                             {
                                                 if (data->GetPluginInterfaceForMenuExt()->NotEmpty())
                                                 {
-                                                    CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%s v. %s)",
+                                                    CALL_STACK_MESSAGE4("CPluginInterfaceForMenuExt::ExecuteMenuItem(, , %d,) (%ls v. %ls)",
                                                                         id, data->DLLName.c_str(), data->Version.c_str());
 
                                                     // lower thread priority to "normal" (so operations do not overload the machine)
@@ -5038,10 +4669,10 @@ FIND_NEW_SLG_FILE:
                                         goto TEST_IDLE; // try "idle" again (e.g. to process another posted command/unload/Pack/Unpack)
                                     }
                                 }
-                                if (!SalamanderBusy && *OpenReadmeInNotepad != 0)
+                                if (!SalamanderBusy && !OpenReadmeInNotepad.empty())
                                 { // start notepad with file 'OpenReadmeInNotepad' for installer on Vista+
-                                    StartNotepad(OpenReadmeInNotepad);
-                                    *OpenReadmeInNotepad = 0;
+                                    StartNotepadW(OpenReadmeInNotepad.c_str());
+                                    OpenReadmeInNotepad.clear();
                                 }
                                 CannotCloseSalMainWnd = FALSE;
                             }
@@ -5107,9 +4738,6 @@ FIND_NEW_SLG_FILE:
     HANDLES(FreeLibrary(HLanguage));
     HLanguage = NULL;
 
-    // just in case, close it last, but probably unnecessary worry
-    ReleaseSalOpen();
-
     if (NtDLL != NULL)
     {
         HANDLES(FreeLibrary(NtDLL));
@@ -5130,6 +4758,11 @@ FIND_NEW_SLG_FILE:
     // (C__GCHeapInit destructor) doesn't report std::string/std::vector heap allocations
     // from CPluginData objects still alive in the global Plugins array.
     Plugins.ReleaseData();
+
+    // Same reason: TaskList is a compiler-group global, destroyed after the leak checker has
+    // already taken its final checkpoint, so its activation-request owner and the debug container
+    // proxies of that request's members would be reported as leaks on every debug exit.
+    TaskList.ReleasePendingRequest();
 
     TRACE_I("End");
     return 0;
@@ -5160,4 +4793,86 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int cmdShow
         return 1;
     }
 #endif // CALLSTK_DISABLE
+}
+
+// ****************************************************************************
+// Wide common-prefix and prefix test.
+//
+// The narrow forms compare with `LowerCase[]`, the 256-entry CP_ACP table, so
+// two path components differing only outside the active code page compare EQUAL
+// and a longer common prefix is reported than actually exists. On a path the
+// code page cannot represent the comparison is meaningless entirely.
+//
+// Folding is per character (see sally::unicode::FoldCharW) because this is a
+// positional walk, not a string comparison - CompareFolded cannot report WHERE
+// two paths diverge.
+
+int CommonPrefixLength(const wchar_t* path1, const wchar_t* path2)
+{
+    const wchar_t* lastBackslash = path1;
+    int backslashCount = 0;
+    const wchar_t* s1 = path1;
+    const wchar_t* s2 = path2;
+    while (*s1 != 0 && *s2 != 0 &&
+           sally::unicode::FoldCharW(*s1) == sally::unicode::FoldCharW(*s2))
+    {
+        if (*s1 == L'\\')
+        {
+            lastBackslash = s1;
+            backslashCount++;
+        }
+        s1++;
+        s2++;
+    }
+
+    if (s1 - path1 < 3)
+        return 0;
+
+    if (*s1 == 0 && *s2 == L'\\' || *s1 == L'\\' && *s2 == 0 ||
+        *s1 == 0 && *s2 == 0 && *(s1 - 1) != L'\\')
+    {
+        lastBackslash = s1; // this terminator won't be in lastBackslash
+        backslashCount++;
+    }
+
+    if (path1[1] == L':')
+    {
+        // classic path
+        if (path1[2] != L'\\')
+            return 0;
+
+        // handle special case: for root path we must return length including the last backslash
+        if (lastBackslash - path1 < 3)
+            return 3;
+
+        return (int)(lastBackslash - path1);
+    }
+    else
+    {
+        // UNC path
+        if (path1[0] != L'\\' || path1[1] != L'\\')
+            return 0;
+        if (backslashCount < 4) // path must have form "\machine\share"
+            return 0;
+
+        return (int)(lastBackslash - path1);
+    }
+}
+
+BOOL SalPathIsPrefix(const wchar_t* prefix, const wchar_t* path)
+{
+    int commonLen = CommonPrefixLength(prefix, path);
+    if (commonLen == 0)
+        return FALSE;
+
+    int prefixLen = (int)wcslen(prefix);
+    if (prefixLen < 3)
+        return FALSE;
+
+    // CommonPrefixLength returned length without the last backslash (unless it was a root path)
+    // if our prefix has trailing backslash, we must discard it
+    if (prefixLen > 3 && prefix[prefixLen - 1] == L'\\')
+        prefixLen--;
+
+    return (commonLen == prefixLen);
 }

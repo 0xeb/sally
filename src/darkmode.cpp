@@ -5,9 +5,9 @@
 #include "precomp.h"
 #include "darkmode.h"
 #include "combo_dark_paint.h"
+#include "common/IRegistry.h"
 
 #include <commctrl.h>
-#include <tchar.h>
 #include <uxtheme.h>
 #include <vssym32.h>
 
@@ -48,16 +48,16 @@ const COLORREF DIALOG_DARK_INACTIVE_SELECTION = RGB(75, 75, 78);
 const COLORREF DIALOG_DARK_TOOLTIP_BG = RGB(43, 43, 43);
 const COLORREF DIALOG_DARK_FRAME = RGB(62, 62, 66);
 const COLORREF DIALOG_DARK_SUBTLE_LINE = RGB(55, 55, 58);
-const TCHAR* IMMERSIVE_COLOR_SET_PARAM = TEXT("ImmersiveColorSet");
-const TCHAR* WINDOWS_THEME_ELEMENT_PARAM = TEXT("WindowsThemeElement");
-const TCHAR* LIGHT_SURFACE_PROP = TEXT("SallyLightSurface");
-const TCHAR* BUTTON_CLASS_NAME = TEXT("Button");
-const TCHAR* COMBOBOX_CLASS_NAME = TEXT("ComboBox");
-const TCHAR* EDIT_CLASS_NAME = TEXT("Edit");
-const TCHAR* HEADER_CLASS_NAME = TEXT("SysHeader32");
-const TCHAR* LISTBOX_CLASS_NAME = TEXT("ListBox");
-const TCHAR* SCROLLBAR_CLASS_NAME = TEXT("ScrollBar");
-const TCHAR* STATIC_CLASS_NAME = TEXT("Static");
+const wchar_t* IMMERSIVE_COLOR_SET_PARAM = L"ImmersiveColorSet";
+const wchar_t* WINDOWS_THEME_ELEMENT_PARAM = L"WindowsThemeElement";
+const wchar_t* LIGHT_SURFACE_PROP = L"SallyLightSurface";
+const wchar_t* BUTTON_CLASS_NAME = L"Button";
+const wchar_t* COMBOBOX_CLASS_NAME = L"ComboBox";
+const wchar_t* EDIT_CLASS_NAME = L"Edit";
+const wchar_t* HEADER_CLASS_NAME = L"SysHeader32";
+const wchar_t* LISTBOX_CLASS_NAME = L"ListBox";
+const wchar_t* SCROLLBAR_CLASS_NAME = L"ScrollBar";
+const wchar_t* STATIC_CLASS_NAME = L"Static";
 const WCHAR* UXTHEME_DARKMODE_EXPLORER = L"DarkMode_Explorer";
 const WCHAR* UXTHEME_EXPLORER = L"Explorer";
 const UINT_PTR GROUPBOX_SUBCLASS_ID = 1;
@@ -65,14 +65,14 @@ const UINT_PTR STATIC_EDGE_SUBCLASS_ID = 2;
 const UINT_PTR HEADER_SUBCLASS_ID = 4;
 const UINT_PTR CHECK_RADIO_SUBCLASS_ID = 8;
 const UINT_PTR EDIT_FRAME_SUBCLASS_ID = 16;
-const TCHAR* CHECK_RADIO_HOT_PROP = TEXT("SallyCheckRadioHot");
+const wchar_t* CHECK_RADIO_HOT_PROP = L"SallyCheckRadioHot";
 
 HBRUSH DialogDarkBrush = NULL;
 HBRUSH DialogDarkInputBrush = NULL;
 
-void DebugOutA(const char* text)
+void DebugOutW(const wchar_t* text)
 {
-    OutputDebugStringA(text);
+    OutputDebugStringW(text);
 }
 
 int NormalizeThemeMode(int mode)
@@ -102,19 +102,17 @@ BOOL IsHighContrastEnabled()
 
 BOOL ReadSystemPrefersDarkApps()
 {
+    IRegistry* registry = gRegistry != NULL ? gRegistry : GetWin32Registry();
     HKEY hKey = NULL;
-    if (RegOpenKeyEx(HKEY_CURRENT_USER,
-                     SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_T,
-                     0, KEY_READ, &hKey) != ERROR_SUCCESS)
+    if (!registry->OpenKeyRead(HKEY_CURRENT_USER,
+                               SAL_REG_KEY_WINDOWS_THEME_PERSONALIZE_W,
+                               hKey).success)
         return FALSE;
 
     DWORD value = 1;
-    DWORD valueSize = sizeof(value);
-    DWORD type = 0;
-    LONG regRet = RegQueryValueEx(hKey, SAL_REG_VALUE_APPS_USE_LIGHT_THEME_T, NULL, &type, (LPBYTE)&value, &valueSize);
-    RegCloseKey(hKey);
-
-    if (regRet != ERROR_SUCCESS || type != REG_DWORD)
+    const RegistryResult result = registry->GetDWord(hKey, SAL_REG_VALUE_APPS_USE_LIGHT_THEME_W, value);
+    registry->CloseKey(hKey);
+    if (!result.success)
         return FALSE;
 
     return value == 0;
@@ -127,9 +125,9 @@ void EnsureInitialized()
 
     Initialized = TRUE;
 
-    HMODULE hDwm = GetModuleHandle(TEXT("dwmapi.dll"));
+    HMODULE hDwm = GetModuleHandleW(L"dwmapi.dll");
     if (hDwm == NULL)
-        hDwm = LoadLibrary(TEXT("dwmapi.dll"));
+        hDwm = LoadLibraryW(L"dwmapi.dll");
 
     if (hDwm != NULL)
         DwmSetWindowAttributePtr = (PFNDWMSETWINDOWATTRIBUTE)GetProcAddress(hDwm, "DwmSetWindowAttribute");
@@ -139,10 +137,10 @@ void EnsureInitialized()
         InitSupportLogged = TRUE;
         TRACE_I("DarkMode init: Windows10AndLater=" << Windows10AndLater
                                                     << ", DwmSetWindowAttribute=" << (void*)DwmSetWindowAttributePtr);
-        char msg[200];
-        sprintf_s(msg, "DarkMode init: Windows10AndLater=%d DwmSetWindowAttribute=%p\n",
-                  (int)Windows10AndLater, (void*)DwmSetWindowAttributePtr);
-        DebugOutA(msg);
+        wchar_t msg[200];
+        swprintf_s(msg, _countof(msg), L"DarkMode init: Windows10AndLater=%d DwmSetWindowAttribute=%p\n",
+                   (int)Windows10AndLater, (void*)DwmSetWindowAttributePtr);
+        DebugOutW(msg);
     }
 }
 
@@ -170,12 +168,12 @@ BOOL IsThemeSettingHint(LPARAM lParam)
     if (lParam == 0)
         return FALSE;
 
-    LPCTSTR valueName = (LPCTSTR)lParam;
+    LPCWSTR valueName = (LPCWSTR)lParam;
     if (valueName == NULL || *valueName == 0)
         return FALSE;
 
-    return _tcsicmp(valueName, IMMERSIVE_COLOR_SET_PARAM) == 0 ||
-           _tcsicmp(valueName, WINDOWS_THEME_ELEMENT_PARAM) == 0;
+    return _wcsicmp(valueName, IMMERSIVE_COLOR_SET_PARAM) == 0 ||
+           _wcsicmp(valueName, WINDOWS_THEME_ELEMENT_PARAM) == 0;
 }
 
 BOOL CALLBACK ApplyThreadWindowProc(HWND hwnd, LPARAM lParam)
@@ -217,30 +215,30 @@ void DrawRectOutline(HDC hdc, const RECT* rect, COLORREF color)
     SelectObject(hdc, oldPen);
 }
 
-BOOL HasClassName(HWND hwnd, LPCTSTR expectedClassName)
+BOOL HasClassName(HWND hwnd, LPCWSTR expectedClassName)
 {
     if (hwnd == NULL || expectedClassName == NULL || !IsWindow(hwnd))
         return FALSE;
 
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
+    wchar_t className[64] = {0};
+    if (GetClassNameW(hwnd, className, _countof(className)) == 0)
         return FALSE;
 
-    return _tcsicmp(className, expectedClassName) == 0;
+    return _wcsicmp(className, expectedClassName) == 0;
 }
 
-BOOL HasAnyClassName(HWND hwnd, LPCTSTR firstClassName, LPCTSTR secondClassName = NULL, LPCTSTR thirdClassName = NULL)
+BOOL HasAnyClassName(HWND hwnd, LPCWSTR firstClassName, LPCWSTR secondClassName = NULL, LPCWSTR thirdClassName = NULL)
 {
     if (hwnd == NULL || !IsWindow(hwnd))
         return FALSE;
 
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
+    wchar_t className[64] = {0};
+    if (GetClassNameW(hwnd, className, _countof(className)) == 0)
         return FALSE;
 
-    return (firstClassName != NULL && _tcsicmp(className, firstClassName) == 0) ||
-           (secondClassName != NULL && _tcsicmp(className, secondClassName) == 0) ||
-           (thirdClassName != NULL && _tcsicmp(className, thirdClassName) == 0);
+    return (firstClassName != NULL && _wcsicmp(className, firstClassName) == 0) ||
+           (secondClassName != NULL && _wcsicmp(className, secondClassName) == 0) ||
+           (thirdClassName != NULL && _wcsicmp(className, thirdClassName) == 0);
 }
 
 BOOL IsGroupBox(HWND hwnd)
@@ -409,12 +407,13 @@ BOOL PaintDarkHeader(HWND hwnd, HDC paintDC)
         if (!Header_GetItemRect(hwnd, i, &itemRect))
             continue;
 
-        TCHAR text[256] = {0};
-        HDITEM item = {0};
+        wchar_t text[256] = {0};
+        HDITEMW item = {0};
         item.mask = HDI_TEXT | HDI_FORMAT;
         item.pszText = text;
         item.cchTextMax = _countof(text);
-        Header_GetItem(hwnd, i, &item);
+        if (!SendMessageW(hwnd, HDM_GETITEMW, i, (LPARAM)&item))
+            continue;
 
         RECT textRect = itemRect;
         textRect.left += 6;
@@ -426,7 +425,7 @@ BOOL PaintDarkHeader(HWND hwnd, HDC paintDC)
             flags |= DT_RIGHT;
         else
             flags |= DT_LEFT;
-        DrawText(hdc, text, -1, &textRect, flags);
+        DrawTextW(hdc, text, -1, &textRect, flags);
 
         MoveToEx(hdc, itemRect.right - 1, itemRect.top, NULL);
         LineTo(hdc, itemRect.right - 1, itemRect.bottom);
@@ -492,9 +491,9 @@ BOOL PaintDarkGroupBox(HWND hwnd, HDC paintDC)
         COLORREF oldTextColor = SetTextColor(hdc, IsWindowEnabled(hwnd) ? colors.DialogText : colors.DisabledText);
         COLORREF oldBkColor = SetBkColor(hdc, colors.DialogBackground);
 
-        TEXTMETRIC tm;
+        TEXTMETRICW tm;
         memset(&tm, 0, sizeof(tm));
-        GetTextMetrics(hdc, &tm);
+        GetTextMetricsW(hdc, &tm);
         int frameTop = max(1, (tm.tmHeight + 1) / 2);
 
         HPEN hPen = CreatePen(PS_SOLID, 1, colors.Border);
@@ -520,19 +519,19 @@ BOOL PaintDarkGroupBox(HWND hwnd, HDC paintDC)
         if (hPen != NULL)
             DeleteObject(hPen);
 
-        int textLen = GetWindowTextLength(hwnd);
+        int textLen = GetWindowTextLengthW(hwnd);
         if (textLen > 0)
         {
-            TCHAR* text = new TCHAR[textLen + 1];
+            wchar_t* text = new wchar_t[textLen + 1];
             if (text != NULL)
             {
-                int copied = GetWindowText(hwnd, text, textLen + 1);
+                int copied = GetWindowTextW(hwnd, text, textLen + 1);
                 if (copied > 0)
                 {
                     DWORD textFlags = GetGroupBoxTextFlags(hwnd);
                     DWORD calcFlags = (textFlags & ~(DWORD)(DT_CENTER | DT_RIGHT)) | DT_LEFT | DT_CALCRECT;
                     RECT textCalc = {0, 0, max(0, client.right - client.left), tm.tmHeight + tm.tmExternalLeading + 4};
-                    DrawText(hdc, text, copied, &textCalc, calcFlags);
+                    DrawTextW(hdc, text, copied, &textCalc, calcFlags);
 
                     int textWidth = textCalc.right - textCalc.left;
                     int textHeight = max(tm.tmHeight, textCalc.bottom - textCalc.top);
@@ -566,7 +565,7 @@ BOOL PaintDarkGroupBox(HWND hwnd, HDC paintDC)
                         client.top,
                         min(client.right - margin, textLeft + textWidth),
                         gap.bottom};
-                    DrawText(hdc, text, copied, &textRect, textFlags);
+                    DrawTextW(hdc, text, copied, &textRect, textFlags);
                 }
                 delete[] text;
             }
@@ -676,11 +675,11 @@ BOOL PaintDarkCheckRadioButton(HWND hwnd, HDC paintDC)
     COLORREF oldTextColor = SetTextColor(hdc, IsWindowEnabled(hwnd) ? colors.DialogText : colors.DisabledText);
     COLORREF oldBkColor = SetBkColor(hdc, colors.DialogBackground);
 
-    TEXTMETRIC tm;
+    TEXTMETRICW tm;
     memset(&tm, 0, sizeof(tm));
-    GetTextMetrics(hdc, &tm);
+    GetTextMetricsW(hdc, &tm);
 
-    BOOL hot = GetProp(hwnd, CHECK_RADIO_HOT_PROP) != NULL;
+    BOOL hot = GetPropW(hwnd, CHECK_RADIO_HOT_PROP) != NULL;
     BOOL radio = IsRadioButtonStyle(style);
     int part = radio ? BP_RADIOBUTTON : BP_CHECKBOX;
     int state = GetCheckRadioThemeState(hwnd, style, hot);
@@ -753,15 +752,15 @@ BOOL PaintDarkCheckRadioButton(HWND hwnd, HDC paintDC)
         DrawFrameControl(hdc, &glyphRect, DFC_BUTTON, glyphState);
     }
 
-    int textLen = GetWindowTextLength(hwnd);
+    int textLen = GetWindowTextLengthW(hwnd);
     if (textLen > 0 && textRect.right > textRect.left && textRect.bottom > textRect.top)
     {
-        TCHAR* text = new TCHAR[textLen + 1];
+        wchar_t* text = new wchar_t[textLen + 1];
         if (text != NULL)
         {
-            int copied = GetWindowText(hwnd, text, textLen + 1);
+            int copied = GetWindowTextW(hwnd, text, textLen + 1);
             if (copied > 0)
-                DrawText(hdc, text, copied, &textRect, GetCheckRadioTextFlags(hwnd));
+                DrawTextW(hdc, text, copied, &textRect, GetCheckRadioTextFlags(hwnd));
             delete[] text;
         }
     }
@@ -817,9 +816,9 @@ LRESULT CALLBACK CheckRadioSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     case WM_MOUSEMOVE:
     {
-        if (DarkMode_ShouldUseDark() && IsCheckOrRadioButton(hwnd) && GetProp(hwnd, CHECK_RADIO_HOT_PROP) == NULL)
+        if (DarkMode_ShouldUseDark() && IsCheckOrRadioButton(hwnd) && GetPropW(hwnd, CHECK_RADIO_HOT_PROP) == NULL)
         {
-            SetProp(hwnd, CHECK_RADIO_HOT_PROP, (HANDLE)(UINT_PTR)1);
+            SetPropW(hwnd, CHECK_RADIO_HOT_PROP, (HANDLE)(UINT_PTR)1);
             TRACKMOUSEEVENT tme = {0};
             tme.cbSize = sizeof(tme);
             tme.dwFlags = TME_LEAVE;
@@ -832,7 +831,7 @@ LRESULT CALLBACK CheckRadioSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     case WM_MOUSELEAVE:
     {
-        RemoveProp(hwnd, CHECK_RADIO_HOT_PROP);
+        RemovePropW(hwnd, CHECK_RADIO_HOT_PROP);
         InvalidateCheckRadio(hwnd);
         break;
     }
@@ -865,7 +864,7 @@ LRESULT CALLBACK CheckRadioSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 
     case WM_NCDESTROY:
     {
-        RemoveProp(hwnd, CHECK_RADIO_HOT_PROP);
+        RemovePropW(hwnd, CHECK_RADIO_HOT_PROP);
         RemoveWindowSubclass(hwnd, CheckRadioSubclassProc, uIdSubclass);
         break;
     }
@@ -1078,13 +1077,11 @@ BOOL GetChildRectInParent(HWND hParent, HWND hChild, RECT* rect)
     return TRUE;
 }
 
-BOOL IsComboBoxControl(HWND hwnd)
-{
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
-        return FALSE;
-    return _tcsicmp(className, COMBOBOX_CLASS_NAME) == 0;
-}
+// [merge:main->unicode] main shipped this as its own TCHAR/GetClassName/_tcsicmp helper, which
+// cannot compile here: COMBOBOX_CLASS_NAME is a wide literal on this branch and <tchar.h> is gone.
+// HasClassName() above is the identical predicate, already wide, so the helper is redundant
+// rather than in need of porting - deleted, and its three call sites now use HasClassName
+// directly. Strict simplification: same behaviour, one implementation instead of two.
 
 BOOL PaintDarkComboClient(HWND hwnd, HDC paintDC)
 {
@@ -1188,7 +1185,7 @@ LRESULT CALLBACK EditFrameSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
         // A combobox must be owner-drawn outright. Letting it paint and then outlining the edge
         // leaves its own white frame and white drop-down button underneath - that was the third
         // failed attempt at #98.
-        if (DarkMode_ShouldUseDark() && IsComboBoxControl(hwnd))
+        if (DarkMode_ShouldUseDark() && HasClassName(hwnd, COMBOBOX_CLASS_NAME))
         {
             PAINTSTRUCT ps;
             HDC hdc = HANDLES(BeginPaint(hwnd, &ps));
@@ -1207,7 +1204,7 @@ LRESULT CALLBACK EditFrameSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
 
     case WM_PRINTCLIENT:
     {
-        if (DarkMode_ShouldUseDark() && IsComboBoxControl(hwnd) &&
+        if (DarkMode_ShouldUseDark() && HasClassName(hwnd, COMBOBOX_CLASS_NAME) &&
             PaintDarkComboClient(hwnd, (HDC)wParam))
         {
             return 0;
@@ -1218,7 +1215,7 @@ LRESULT CALLBACK EditFrameSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPAR
     case WM_ERASEBKGND:
     {
         // The owner-draw above covers the whole client; erasing first only flickers.
-        if (DarkMode_ShouldUseDark() && IsComboBoxControl(hwnd))
+        if (DarkMode_ShouldUseDark() && HasClassName(hwnd, COMBOBOX_CLASS_NAME))
             return TRUE;
         break;
     }
@@ -1284,11 +1281,11 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
     if (DarkMode_IsLightSurface(hwnd))
         return;
 
-    TCHAR className[64] = {0};
-    if (GetClassName(hwnd, className, _countof(className)) == 0)
+    wchar_t className[64] = {0};
+    if (GetClassNameW(hwnd, className, _countof(className)) == 0)
         return;
 
-    if (_tcsicmp(className, SCROLLBAR_CLASS_NAME) == 0)
+    if (_wcsicmp(className, SCROLLBAR_CLASS_NAME) == 0)
     {
         // Custom panel scrollbars are separate controls and need explicit theming.
         ApplyWindowTheme(hwnd, useDark);
@@ -1296,7 +1293,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, WC_LISTVIEW) == 0)
+    if (_wcsicmp(className, WC_LISTVIEWW) == 0)
     {
         ApplyWindowTheme(hwnd, useDark, UXTHEME_EXPLORER);
         HWND hHeader = ListView_GetHeader(hwnd);
@@ -1317,7 +1314,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, WC_TREEVIEW) == 0)
+    if (_wcsicmp(className, WC_TREEVIEWW) == 0)
     {
         ApplyWindowTheme(hwnd, useDark, UXTHEME_EXPLORER);
         DarkModeColors colors;
@@ -1330,15 +1327,15 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, LISTBOX_CLASS_NAME) == 0)
+    if (_wcsicmp(className, LISTBOX_CLASS_NAME) == 0)
     {
         ApplyWindowTheme(hwnd, useDark, UXTHEME_EXPLORER);
         InvalidateRect(hwnd, NULL, TRUE);
         return;
     }
 
-    if (_tcsicmp(className, WC_HEADER) == 0 ||
-        _tcsicmp(className, HEADER_CLASS_NAME) == 0)
+    if (_wcsicmp(className, WC_HEADERW) == 0 ||
+        _wcsicmp(className, HEADER_CLASS_NAME) == 0)
     {
         ApplyWindowTheme(hwnd, useDark, UXTHEME_EXPLORER);
         SetWindowSubclass(hwnd, HeaderSubclassProc, HEADER_SUBCLASS_ID, 0);
@@ -1346,14 +1343,14 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, TOOLTIPS_CLASS) == 0)
+    if (_wcsicmp(className, TOOLTIPS_CLASSW) == 0)
     {
         ApplyWindowTheme(hwnd, useDark);
         ApplyTooltipTheme(hwnd);
         return;
     }
 
-    if (_tcsicmp(className, STATIC_CLASS_NAME) == 0)
+    if (_wcsicmp(className, STATIC_CLASS_NAME) == 0)
     {
         ApplyWindowTheme(hwnd, useDark);
         if (IsStaticEdge(hwnd))
@@ -1362,7 +1359,7 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, BUTTON_CLASS_NAME) == 0)
+    if (_wcsicmp(className, BUTTON_CLASS_NAME) == 0)
     {
         ApplyWindowTheme(hwnd, useDark);
         if (IsCheckOrRadioButton(hwnd))
@@ -1371,21 +1368,21 @@ void ApplyListTreeThemeToControl(HWND hwnd, BOOL useDark)
         return;
     }
 
-    if (_tcsicmp(className, EDIT_CLASS_NAME) == 0 ||
-        _tcsicmp(className, UPDOWN_CLASS) == 0)
+    if (_wcsicmp(className, EDIT_CLASS_NAME) == 0 ||
+        _wcsicmp(className, UPDOWN_CLASSW) == 0)
     {
         ApplyEditLikeTheme(hwnd, useDark); // #98: paints its own frame in dark mode
         return;
     }
 
-    if (_tcsicmp(className, COMBOBOX_CLASS_NAME) == 0)
+    if (_wcsicmp(className, COMBOBOX_CLASS_NAME) == 0)
     {
         ApplyEditLikeTheme(hwnd, useDark); // #98
         ApplyComboBoxChildThemes(hwnd, useDark);
         return;
     }
 
-    if (_tcsicmp(className, WC_COMBOBOXEX) == 0)
+    if (_wcsicmp(className, WC_COMBOBOXEXW) == 0)
     {
         ApplyWindowTheme(hwnd, useDark);
         HWND hCombo = (HWND)SendMessage(hwnd, CBEM_GETCOMBOCONTROL, 0, 0);
@@ -1451,9 +1448,9 @@ void DarkMode_SetThemeMode(int themeMode)
     {
         ThemeMode = normalized;
         TRACE_I("DarkMode theme mode changed to " << ThemeMode);
-        char msg[80];
-        sprintf_s(msg, "DarkMode theme mode changed to %d\n", ThemeMode);
-        DebugOutA(msg);
+        wchar_t msg[80];
+        swprintf_s(msg, _countof(msg), L"DarkMode theme mode changed to %d\n", ThemeMode);
+        DebugOutW(msg);
     }
     else
         ThemeMode = normalized;
@@ -1539,16 +1536,16 @@ void DarkMode_SetLightSurface(HWND hwnd, BOOL enable)
         return;
 
     if (enable)
-        SetProp(hwnd, LIGHT_SURFACE_PROP, (HANDLE)1);
+        SetPropW(hwnd, LIGHT_SURFACE_PROP, (HANDLE)1);
     else
-        RemoveProp(hwnd, LIGHT_SURFACE_PROP);
+        RemovePropW(hwnd, LIGHT_SURFACE_PROP);
 }
 
 BOOL DarkMode_IsLightSurface(HWND hwnd)
 {
     for (HWND current = hwnd; current != NULL; current = GetParent(current))
     {
-        if (GetProp(current, LIGHT_SURFACE_PROP) != NULL)
+        if (GetPropW(current, LIGHT_SURFACE_PROP) != NULL)
             return TRUE;
     }
     return FALSE;
@@ -1650,7 +1647,7 @@ void DarkMode_ApplyTitleBar(HWND hwnd)
         {
             SupportWarningLogged = TRUE;
             TRACE_I("DarkMode unsupported: DwmSetWindowAttribute is unavailable");
-            DebugOutA("DarkMode unsupported: DwmSetWindowAttribute is unavailable\n");
+            DebugOutW(L"DarkMode unsupported: DwmSetWindowAttribute is unavailable\n");
         }
         return;
     }
@@ -1668,10 +1665,10 @@ void DarkMode_ApplyTitleBar(HWND hwnd)
         finalHr = hrOld;
     }
 
-    char msg[220];
-    sprintf_s(msg, "DarkMode apply: hwnd=%p mode=%d useDark=%d hrNew=0x%08lX hrOld=0x%08lX\n",
-              hwnd, ThemeMode, (int)useDark, (unsigned long)hrNew, (unsigned long)hrOld);
-    DebugOutA(msg);
+    wchar_t msg[220];
+    swprintf_s(msg, _countof(msg), L"DarkMode apply: hwnd=%p mode=%d useDark=%d hrNew=0x%08lX hrOld=0x%08lX\n",
+               hwnd, ThemeMode, (int)useDark, (unsigned long)hrNew, (unsigned long)hrOld);
+    DebugOutW(msg);
 
     if (FAILED(finalHr))
     {

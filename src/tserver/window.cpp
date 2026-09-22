@@ -9,6 +9,12 @@
 #include <stdio.h>
 #include <commctrl.h>
 #include <limits.h>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "lstrfix.h"
 #include "trace.h"
@@ -19,6 +25,7 @@
 #include "winlib.h"
 #include "sheets.h"
 #include "tablist.h"
+#include "trace_export.h"
 #include "tserver.h"
 #include "dialog.h"
 #include "registry.h"
@@ -224,369 +231,124 @@ void CMainWindow::ShowMessageDetails()
     }
 }
 
-void AddChars(WCHAR* buffer, int count, WCHAR chr = L' ')
+static BOOL WriteWideText(HANDLE file, const std::wstring& text)
 {
-    WCHAR* p;
-    p = buffer + wcslen(buffer);
-    for (int i = 0; i < count; i++)
+    if (text.size() > ((std::numeric_limits<size_t>::max)() / sizeof(wchar_t)))
+        return FALSE;
+    const BYTE* bytes = reinterpret_cast<const BYTE*>(text.data());
+    size_t remaining = text.size() * sizeof(wchar_t);
+    const DWORD maximumChunk = MAXDWORD & ~static_cast<DWORD>(sizeof(wchar_t) - 1);
+    while (remaining != 0)
     {
-        *p = chr;
-        p++;
+        const DWORD chunk = static_cast<DWORD>((std::min<size_t>)(remaining, maximumChunk));
+        DWORD written = 0;
+        if (!WriteFile(file, bytes, chunk, &written, NULL) || written != chunk)
+            return FALSE;
+        bytes += written;
+        remaining -= written;
     }
-    *p = 0;
+    return TRUE;
 }
 
-void AddChars(WCHAR* buffer, size_t count, WCHAR chr = L' ')
+static BOOL SelectLogFileOwned(HWND owner, std::wstring& fileName)
 {
-    WCHAR* p;
-    p = buffer + wcslen(buffer);
-    for (size_t i = 0; i < count; i++)
+    const size_t limit = (std::numeric_limits<DWORD>::max)();
+    if (fileName.size() >= limit)
+        return FALSE;
+    static const WCHAR filter[] = L"Log file (*.log)\0*.log\0";
+    OPENFILENAMEW ofn = {};
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = owner;
+    ofn.lpstrFilter = filter;
+    ofn.nFilterIndex = 1;
+    ofn.lpstrDefExt = L"log";
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_EXPLORER;
+
+    std::vector<WCHAR> buffer((std::max<size_t>)(fileName.size() + 1, 2), L'\0');
+    for (;;)
     {
-        *p = chr;
-        p++;
+        std::copy(fileName.begin(), fileName.end(), buffer.begin());
+        buffer[fileName.size()] = L'\0';
+        ofn.lpstrFile = buffer.data();
+        ofn.nMaxFile = static_cast<DWORD>(buffer.size());
+        if (GetSaveFileNameW(&ofn))
+        {
+            fileName.assign(buffer.data());
+            return TRUE;
+        }
+        if (CommDlgExtendedError() != FNERR_BUFFERTOOSMALL)
+            return FALSE;
+        size_t required = *reinterpret_cast<const WORD*>(buffer.data());
+        size_t doubled = buffer.size() <= limit / 2 ? buffer.size() * 2 : limit;
+        size_t next = (std::max)(doubled, required + 1);
+        if (next <= buffer.size() || next > limit)
+            return FALSE;
+        buffer.assign(next, L'\0');
     }
-    *p = 0;
 }
 
-DWORD StringByteCount(const WCHAR* text)
+static BOOL GetFullPathOwned(const std::wstring& path, std::wstring& fullPath)
 {
-    return (DWORD)(sizeof(WCHAR) * wcslen(text));
+    DWORD capacity = GetFullPathNameW(path.c_str(), 0, NULL, NULL);
+    if (capacity == 0)
+        return FALSE;
+    std::vector<WCHAR> buffer(capacity, L'\0');
+    for (;;)
+    {
+        DWORD length = GetFullPathNameW(path.c_str(), static_cast<DWORD>(buffer.size()), buffer.data(), NULL);
+        if (length == 0)
+            return FALSE;
+        if (length < buffer.size())
+        {
+            fullPath.assign(buffer.data(), length);
+            return TRUE;
+        }
+        if (length == (std::numeric_limits<DWORD>::max)())
+            return FALSE;
+        buffer.assign(static_cast<size_t>(length) + 1, L'\0');
+    }
 }
 
 void CMainWindow::ExportAllMessages()
 {
-    WCHAR fileName[MAX_PATH];
-    wcscpy_s(fileName, L"tserver.log");
-
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = HWindow;
-    WCHAR filter[MAX_PATH];
-    wcscpy_s(filter, L"Log file (*.log)\0*.log\0");
-    ofn.lpstrFilter = filter;
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrFileTitle = fileName;
-    ofn.nMaxFileTitle = MAX_PATH;
-    ofn.lpstrDefExt = L"log";
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_EXPLORER;
-
-    if (GetSaveFileName(&ofn))
+    std::wstring fileName = L"tserver.log";
+    if (SelectLogFileOwned(HWindow, fileName))
     {
-        WCHAR fullName[MAX_PATH];
-        if (GetFullPathName(fileName, MAX_PATH, fullName, NULL) != 0)
+        std::wstring fullName;
+        if (GetFullPathOwned(fileName, fullName))
         {
-            HANDLE file;
-            WCHAR line[10000];
-            WCHAR separator[10000];
-            DWORD written;
-
-            file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                                        FILE_ATTRIBUTE_ARCHIVE, NULL));
+            HANDLE file = HANDLES_Q(CreateFileW(fullName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                                                FILE_ATTRIBUTE_ARCHIVE, NULL));
             if (file == INVALID_HANDLE_VALUE)
                 return;
 
-            // calculate maximum column widths
-
-            const WCHAR* strPID = L"PID";
-            const WCHAR* strUPID = L"UPID";
-            const WCHAR* strPName = L"PName";
-            const WCHAR* strTID = L"TID";
-            const WCHAR* strUTID = L"UTID";
-            const WCHAR* strTName = L"TName";
-            const WCHAR* strDate = L"Date";
-            const WCHAR* strTime = L"Time";
-            const WCHAR* strCounter = L"Counter [ms]";
-            const WCHAR* strModule = L"Module";
-            const WCHAR* strLine = L"Line";
-            const WCHAR* strMessage = L"Message";
-
-            size_t maxPID = wcslen(strPID);
-            size_t maxUPID = wcslen(strUPID);
-            size_t maxPName = wcslen(strPName);
-            size_t maxTID = wcslen(strTID);
-            size_t maxUTID = wcslen(strUTID);
-            size_t maxTName = wcslen(strTName);
-            size_t maxDate = wcslen(strDate);
-            size_t maxTime = wcslen(strTime);
-            size_t maxCounter = wcslen(strCounter);
-            size_t maxModule = wcslen(strModule);
-            size_t maxLine = wcslen(strLine);
-            size_t maxMessage = wcslen(strMessage);
-
+            const TraceServerExport::Row headers = {
+                L"PID", L"UPID", L"PName", L"TID", L"UTID", L"TName",
+                L"Date", L"Time", L"Counter [ms]", L"Module", L"Line", L"Message"};
+            std::vector<TraceServerExport::Row> rows;
+            rows.reserve(static_cast<size_t>(Data.Messages.Count));
             for (int i = 0; i < Data.Messages.Count; i++)
             {
-                WCHAR buff[1000];
-
-                //PID
-                swprintf_s(buff, L"%d", Data.Messages[i].ProcessID);
-                if (wcslen(buff) > maxPID)
-                    maxPID = wcslen(buff);
-
-                //UPID
-                swprintf_s(buff, L"%d", Data.Messages[i].UniqueProcessID);
-                if (wcslen(buff) > maxUPID)
-                    maxUPID = wcslen(buff);
-
-                //PName
-                Data.GetProcessName(Data.Messages[i].UniqueProcessID, buff, 1000);
-                if (wcslen(buff) > maxPName)
-                    maxPName = wcslen(buff);
-
-                //TID
-                swprintf_s(buff, L"%d", Data.Messages[i].ThreadID);
-                if (wcslen(buff) > maxTID)
-                    maxTID = wcslen(buff);
-
-                //UTID
-                swprintf_s(buff, L"%d", Data.Messages[i].UniqueThreadID);
-                if (wcslen(buff) > maxUTID)
-                    maxUTID = wcslen(buff);
-
-                //TName
-                Data.GetThreadName(Data.Messages[i].UniqueProcessID,
-                                   Data.Messages[i].UniqueThreadID,
-                                   buff, 1000);
-                if (wcslen(buff) > maxTName)
-                    maxTName = wcslen(buff);
-
-                //Date
-                GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                              &Data.Messages[i].Time, NULL, buff,
-                              1000);
-                if (wcslen(buff) > maxDate)
-                    maxDate = wcslen(buff);
-
-                //Time
-                GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                              &Data.Messages[i].Time,
-                              L"hh':'mm':'ss", buff, 1000);
-                SWPrintFToEnd_s(buff, L".%03d", Data.Messages[i].Time.wMilliseconds);
-                if (wcslen(buff) > maxTime)
-                    maxTime = wcslen(buff);
-
-                //Counter
-                swprintf_s(buff, L"%.3lf", Data.Messages[i].Counter);
-                if (wcslen(buff) > maxCounter)
-                    maxCounter = wcslen(buff);
-
-                //Module
-                swprintf_s(buff, L"%s", Data.Messages[i].File);
-                if (wcslen(buff) > maxModule)
-                    maxModule = wcslen(buff);
-
-                //Line
-                swprintf_s(buff, L"%d", Data.Messages[i].Line);
-                if (wcslen(buff) > maxLine)
-                    maxLine = wcslen(buff);
-
-                //Message
-                swprintf_s(buff, L"%s", Data.Messages[i].Message);
-                if (wcslen(buff) > maxMessage)
-                    maxMessage = wcslen(buff);
+                TraceServerExport::Row row;
+                for (size_t column = 0; column < row.size(); column++)
+                    row[column] = TabList->GetTextOwned(i, static_cast<int>(column + 1), FALSE);
+                rows.emplace_back(std::move(row));
             }
+            const TraceServerExport::Widths widths =
+                TraceServerExport::CalculateWidths(headers, rows);
+            const std::wstring separator = TraceServerExport::BuildSeparator(widths);
 
-            // print the header
-            swprintf_s(line, L"\xFEFF" /* BOM */ L"Trace Server Log File\r\n\r\n");
-            WriteFile(file, line, StringByteCount(line), &written, NULL);
-
-            // separator
-
-            wcscpy_s(separator, L"-+");
-
-            //PID
-            AddChars(separator, maxPID, L'-');
-            wcscat_s(separator, L"+");
-
-            //UPID
-            AddChars(separator, maxUPID, L'-');
-            wcscat_s(separator, L"+");
-
-            //PName
-            AddChars(separator, maxPName, L'-');
-            wcscat_s(separator, L"+");
-
-            //TID
-            AddChars(separator, maxTID, L'-');
-            wcscat_s(separator, L"+");
-
-            //UTID
-            AddChars(separator, maxUTID, L'-');
-            wcscat_s(separator, L"+");
-
-            //TName
-            AddChars(separator, maxTName, L'-');
-            wcscat_s(separator, L"+");
-
-            //Date
-            AddChars(separator, maxDate, L'-');
-            wcscat_s(separator, L"+");
-
-            //Time
-            AddChars(separator, maxTime, L'-');
-            wcscat_s(separator, L"+");
-
-            //Counter
-            AddChars(separator, maxCounter, L'-');
-            wcscat_s(separator, L"+");
-
-            //Module
-            AddChars(separator, maxModule, L'-');
-            wcscat_s(separator, L"+");
-
-            //Line
-            AddChars(separator, maxLine, L'-');
-            wcscat_s(separator, L"+");
-
-            //Message
-            AddChars(separator, maxMessage, L'-');
-
-            wcscat_s(separator, L"\r\n");
-
-            WriteFile(file, separator, StringByteCount(separator), &written, NULL);
-
-            wcscpy_s(line, L" |");
-
-            //PID
-            AddChars(line, maxPID - wcslen(strPID));
-            SWPrintFToEnd_s(line, L"%s|", strPID);
-
-            //UPID
-            AddChars(line, maxUPID - wcslen(strUPID));
-            SWPrintFToEnd_s(line, L"%s|", strUPID);
-
-            //PName
-            SWPrintFToEnd_s(line, L"%s", strPName);
-            AddChars(line, maxPName - wcslen(strPName));
-            wcscat_s(line, L"|");
-
-            //TID
-            AddChars(line, maxTID - wcslen(strTID));
-            SWPrintFToEnd_s(line, L"%s|", strTID);
-
-            //UTID
-            AddChars(line, maxUTID - wcslen(strUTID));
-            SWPrintFToEnd_s(line, L"%s|", strUTID);
-
-            //TName
-            SWPrintFToEnd_s(line, L"%s", strTName);
-            AddChars(line, maxTName - wcslen(strTName));
-            wcscat_s(line, L"|");
-
-            //Date
-            AddChars(line, maxDate - wcslen(strDate));
-            SWPrintFToEnd_s(line, L"%s|", strDate);
-
-            //Time
-            AddChars(line, maxTime - wcslen(strTime));
-            SWPrintFToEnd_s(line, L"%s|", strTime);
-
-            //Counter
-            AddChars(line, maxCounter - wcslen(strCounter));
-            SWPrintFToEnd_s(line, L"%s|", strCounter);
-
-            //Module
-            SWPrintFToEnd_s(line, L"%s", strModule);
-            AddChars(line, maxModule - wcslen(strModule));
-            wcscat_s(line, L"|");
-
-            //Line
-            AddChars(line, maxLine - wcslen(strLine));
-            SWPrintFToEnd_s(line, L"%s|", strLine);
-
-            //Message
-            SWPrintFToEnd_s(line, L"%s", strMessage);
-            AddChars(line, maxMessage - wcslen(strMessage));
-
-            SWPrintFToEnd_s(line, L"\r\n");
-
-            WriteFile(file, line, StringByteCount(line), &written, NULL);
-
-            WriteFile(file, separator, StringByteCount(separator), &written, NULL);
-
-            // dump the rows into the file
-            for (int i = 0; i < Data.Messages.Count; i++)
+            BOOL writeSucceeded = WriteWideText(file, L"\xFEFF" L"Trace Server Log File\r\n\r\n") &&
+                                  WriteWideText(file, separator) &&
+                                  WriteWideText(file, TraceServerExport::BuildLine(headers, widths, L" |")) &&
+                                  WriteWideText(file, separator);
+            for (size_t row = 0; writeSucceeded && row < rows.size(); row++)
             {
-                WCHAR buff[1000];
-
-                wcscpy_s(line, IsErrorMsg(Data.Messages[i].Type) ? L"E|" : L"I|");
-
-                //PID
-                swprintf_s(buff, L"%d", Data.Messages[i].ProcessID);
-                AddChars(line, maxPID - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //PID
-                swprintf_s(buff, L"%d", Data.Messages[i].UniqueProcessID);
-                AddChars(line, maxUPID - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //PName
-                Data.GetProcessName(Data.Messages[i].UniqueProcessID, buff, 1000);
-                wcscat_s(line, buff);
-                AddChars(line, maxPName - wcslen(buff));
-                wcscat_s(line, L"|");
-
-                //TID
-                swprintf_s(buff, L"%d", Data.Messages[i].ThreadID);
-                AddChars(line, maxTID - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //UTID
-                swprintf_s(buff, L"%d", Data.Messages[i].UniqueThreadID);
-                AddChars(line, maxUTID - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //TName
-                Data.GetThreadName(Data.Messages[i].UniqueProcessID,
-                                   Data.Messages[i].UniqueThreadID,
-                                   buff, 1000);
-                wcscat_s(line, buff);
-                AddChars(line, maxTName - wcslen(buff));
-                wcscat_s(line, L"|");
-
-                //Date
-                GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                              &Data.Messages[i].Time, NULL, buff,
-                              1000);
-                AddChars(line, maxDate - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //Time
-                GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                              &Data.Messages[i].Time,
-                              L"hh':'mm':'ss", buff, 1000);
-                SWPrintFToEnd_s(buff, L".%03d", Data.Messages[i].Time.wMilliseconds);
-                AddChars(line, maxTime - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //Counter
-                swprintf_s(buff, L"%.3lf", Data.Messages[i].Counter);
-                wcscat_s(line, buff);
-                AddChars(line, maxCounter - wcslen(buff));
-                wcscat_s(line, L"|");
-
-                //Module
-                swprintf_s(buff, L"%s", Data.Messages[i].File);
-                wcscat_s(line, buff);
-                AddChars(line, maxModule - wcslen(buff));
-                wcscat_s(line, L"|");
-
-                //Line
-                swprintf_s(buff, L"%d", Data.Messages[i].Line);
-                AddChars(line, maxLine - wcslen(buff));
-                SWPrintFToEnd_s(line, L"%s|", buff);
-
-                //Message
-                swprintf_s(buff, L"%s", Data.Messages[i].Message);
-                SWPrintFToEnd_s(line, L"%s", buff);
-
-                SWPrintFToEnd_s(line, L"\r\n");
-                WriteFile(file, line, StringByteCount(line), &written, NULL);
+                const wchar_t* prefix = IsErrorMsg(Data.Messages[static_cast<int>(row)].Type) ? L"E|" : L"I|";
+                writeSucceeded = WriteWideText(file, TraceServerExport::BuildLine(rows[row], widths, prefix));
             }
-            WriteFile(file, separator, StringByteCount(separator), &written, NULL);
+            if (writeSucceeded)
+                WriteWideText(file, separator);
             HANDLES(CloseHandle(file));
         }
     }
@@ -768,7 +530,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // connect (which then fails unless it is a version 7 or newer client)
         SetTimer(HWindow, RESET_DATA_ACCEPT_EVENT_TIMER_ID, RESET_DATA_ACCEPT_EVENT_TIMER_TO, NULL);
 
-        TaskbarRestartMsg = RegisterWindowMessage(TEXT("TaskbarCreated"));
+        TaskbarRestartMsg = RegisterWindowMessageW(L"TaskbarCreated");
 
         break;
     }
@@ -1023,7 +785,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 MessageBeep(MB_ICONEXCLAMATION);
                 break;
             }
-            HMENU hMenu = LoadMenu(HInstance, MAKEINTRESOURCE(IDM_ICON_POPUP));
+            HMENU hMenu = LoadMenuW(HInstance, MAKEINTRESOURCEW(IDM_ICON_POPUP));
             HMENU hPopupMenu = GetSubMenu(hMenu, 0);
             POINT p;
             GetCursorPos(&p);

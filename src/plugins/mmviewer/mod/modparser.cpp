@@ -12,8 +12,7 @@
 #include "..\lang\lang.rh"
 #include "..\output.h"
 
-extern char* LoadStr(int resID);
-char* FStr(const char* format, ...);
+extern std::wstring LangStr(int resID);
 
 BOOL CParserMOD::ReadImpulseTrackerModule()
 {
@@ -313,11 +312,11 @@ BOOL CParserMOD::Read669Module()
 }
 
 CParserResultEnum
-CParserMOD::OpenFile(const char* fileName)
+CParserMOD::OpenFile(const wchar_t* fileName)
 {
     CloseFile();
 
-    f = fopen(fileName, "rb");
+    _wfopen_s(&f, fileName, L"rb");
 
     if (!f)
         return preOpenError;
@@ -350,11 +349,11 @@ CParserMOD::GetFileInfo(COutputInterface* output)
                             if (!ReadProTrackerModule())
                                 return preUnknownFile;
 
-        output->AddHeader(LoadStr(IDS_MOD_INFO));
-        output->AddItem(LoadStr(IDS_MOD_TITLE), modulename);
-        output->AddItem(LoadStr(IDS_MOD_PATTERNS), FStr("%lu", patterns));
-        output->AddItem(LoadStr(IDS_MOD_SAMPLES), FStr("%lu", samples));
-        output->AddItem(LoadStr(IDS_MOD_INSTRUMENTS), FStr("%lu", instruments));
+        output->AddHeader(LangStr(IDS_MOD_INFO).c_str());
+        output->AddItem(LangStr(IDS_MOD_TITLE).c_str(), modulename);
+        output->AddItem(LangStr(IDS_MOD_PATTERNS).c_str(), std::to_wstring(patterns).c_str());
+        output->AddItem(LangStr(IDS_MOD_SAMPLES).c_str(), std::to_wstring(samples).c_str());
+        output->AddItem(LangStr(IDS_MOD_INSTRUMENTS).c_str(), std::to_wstring(instruments).c_str());
 
         return preOK;
     }

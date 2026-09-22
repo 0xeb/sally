@@ -1,7 +1,7 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\chinesesimplified\renamer.atp"
-TEXTVERSION,"1.13 (x86)"
-VERSION,"1,1,3,180"
+TEXTVERSION,"1.13 (x64)"
+VERSION,"1,1,3,188"
 
 [TRANSLATION]
 LANGID,2052
@@ -455,4 +455,5 @@ COMMENT,"简体中文版"
 1284,1,"浏览..."
 1285,1,"Sally 目录"
 1286,1,"下次关闭指重命名不再询问(&C)"
-
+1287,0,"Environment variable "%s" was not found."
+1288,0,"Value of environment variable "%s" is too large."

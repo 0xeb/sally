@@ -52,7 +52,7 @@ void EnableExceptionsOn64()
     typedef BOOL(WINAPI * FIsWow64Process)(HANDLE, PBOOL);
 #define PROCESS_CALLBACK_FILTER_ENABLED 0x1
 
-    HINSTANCE hDLL = LoadLibrary("KERNEL32.DLL");
+    HINSTANCE hDLL = LoadLibraryA("KERNEL32.DLL");
     if (hDLL != NULL)
     {
         FIsWow64Process isWow64 = (FIsWow64Process)GetProcAddress(hDLL, "IsWow64Process");                                                      // Min: XP SP2
@@ -79,60 +79,65 @@ void mainCRTStartup()
     BOOL help = FALSE;
     BOOL error = FALSE;
     int retBase = 10000;
-    char exeName[1000];
-    char* cmdline;
+    // Wide. salspawn launches whatever command line Salamander hands it, so a
+    // non-ANSI path in that line was being flattened through CP_ACP before CreateProcess ever
+    // saw it - the one satellite still doing that (salmon went wide already, and salopen was retired).
+    //
+    // This binary is built with NO CRT (see CMakeLists.txt "minimal, no CRT" and the
+    // mainCRTStartup entry point above), so everything below stays raw wchar_t pointer walking
+    // and Win32 - no wcslen, no wcscpy.
+    wchar_t* exeName = NULL;
+    const wchar_t* cmdline;
     DWORD exitCode;
-
-    exeName[0] = '\0';
 
     // we don't want any critical errors like "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
 
-    cmdline = GetCommandLine();
+    cmdline = GetCommandLineW();
     // skip leading spaces
-    while (*cmdline == ' ' || *cmdline == '\t')
+    while (*cmdline == L' ' || *cmdline == L'\t')
         cmdline++;
     // skip exe name
-    if (*cmdline == '"')
+    if (*cmdline == L'"')
     {
         cmdline++;
-        while (*cmdline != '\0' && *cmdline != '"')
+        while (*cmdline != L'\0' && *cmdline != L'"')
             cmdline++;
-        if (*cmdline == '"')
+        if (*cmdline == L'"')
             cmdline++;
     }
     else
-        while (*cmdline != '\0' && *cmdline != ' ' && *cmdline != '\t')
+        while (*cmdline != L'\0' && *cmdline != L' ' && *cmdline != L'\t')
             cmdline++;
     // get params
     while (1)
     {
         // skip spaces
-        while (*cmdline == ' ' || *cmdline == '\t')
+        while (*cmdline == L' ' || *cmdline == L'\t')
             cmdline++;
-        if (*cmdline == '\0')
+        if (*cmdline == L'\0')
             break;
         // is it a switch ?
-        if (*cmdline == '-' || *cmdline == '/')
+        if (*cmdline == L'-' || *cmdline == L'/')
         {
             cmdline += 2;
             switch (*(cmdline - 1))
             {
-            case '?':
-            case 'h':
-            case 'H':
+            case L'?':
+            case L'h':
+            case L'H':
                 help = TRUE;
                 break;
-            case 'c':
-                if (*cmdline > '9' || *cmdline < '0')
+            case L'c':
+                if (*cmdline > L'9' || *cmdline < L'0')
                 {
                     help = TRUE;
                     break;
                 }
                 retBase = 0;
-                while (*cmdline <= '9' && *cmdline >= '0')
-                    retBase = retBase * 10 + *cmdline++ - '0';
-                if (*cmdline != ' ' && *cmdline != '\t' && *cmdline != '\0')
+                while (*cmdline <= L'9' && *cmdline >= L'0')
+                    retBase = retBase * 10 + *cmdline++ - L'0';
+                if (*cmdline != L' ' && *cmdline != L'\t' && *cmdline != L'\0')
                 {
                     help = TRUE;
                     break;
@@ -145,15 +150,29 @@ void mainCRTStartup()
         // if not, it must be a line to execute
         else
         {
-            int len = 0;
-            while (len < 1000 && *cmdline != '\0')
-                exeName[len++] = *cmdline++;
-            exeName[len] = '\0';
+            const wchar_t* commandStart = cmdline;
+            SIZE_T commandLength = 0;
+            while (*cmdline != L'\0')
+            {
+                commandLength++;
+                cmdline++;
+            }
+            if (commandLength >= MAXINT ||
+                commandLength > (((SIZE_T)-1) / sizeof(wchar_t)) - 1)
+                ExitProcess(ERROR_NOT_ENOUGH_MEMORY + retBase * 2);
+            exeName = (wchar_t*)HeapAlloc(GetProcessHeap(), 0,
+                                          (commandLength + 1) * sizeof(wchar_t));
+            if (exeName == NULL)
+                ExitProcess(ERROR_NOT_ENOUGH_MEMORY + retBase * 2);
+            lstrcpynW(exeName, commandStart, (int)commandLength + 1);
         }
     }
 
-    if (exeName[0] == '\0' || help)
+    if (exeName == NULL || exeName[0] == L'\0' || help)
     {
+        // The banner stays a narrow WriteFile on purpose: this is raw BYTE output to a console
+        // handle, not text handed to a Win32 text API, and every character in it is ASCII by
+        // construction. Widening it would mean emitting UTF-16 bytes to a byte stream.
         DWORD written;
         WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),
                   "SALSPAWN: Spawn for Open Salamander, Copyright (C) 1998-2023 Open Salamander Authors\n\nUsage: salspawn [-|/<switch>] <executable> [exe params]\n\nAvailable switches:\n  ?,h,H - this help screen\n  c<num> - sets base of SALSPAWN error level to <num>\n\n",
@@ -162,7 +181,7 @@ void mainCRTStartup()
     }
 
     PROCESS_INFORMATION pi;
-    STARTUPINFO si;
+    STARTUPINFOW si;
     si.cb = sizeof(si);
     si.lpReserved = NULL;
     si.lpTitle = NULL;
@@ -170,11 +189,16 @@ void mainCRTStartup()
     si.cbReserved2 = 0;
     si.lpReserved2 = 0;
     si.dwFlags = 0;
-    if (!CreateProcess(NULL, exeName, NULL, NULL, TRUE, CREATE_NEW_PROCESS_GROUP,
-                       NULL, NULL, &si, &pi))
+    // CreateProcessW's second parameter is in/out and must be writable, which is why the command
+    // line was copied into dynamically allocated storage above.
+    if (!CreateProcessW(NULL, exeName, NULL, NULL, TRUE, CREATE_NEW_PROCESS_GROUP,
+                        NULL, NULL, &si, &pi))
     {
-        ExitProcess(GetLastError() + retBase * 2);
+        DWORD createError = GetLastError();
+        HeapFree(GetProcessHeap(), 0, exeName);
+        ExitProcess(createError + retBase * 2);
     }
+    HeapFree(GetProcessHeap(), 0, exeName);
 
     if (WaitForSingleObject(pi.hProcess, INFINITE) == WAIT_FAILED)
     {

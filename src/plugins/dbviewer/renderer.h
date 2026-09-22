@@ -197,6 +197,18 @@ class CViewerWindow;
 class CRendererWindow : public CWindow
 {
 public:
+    enum class FindMode
+    {
+        WideLiteral,
+        EncodedLiteral,
+        EncodedRegularExpression,
+        // Regular expression over UTF-8 rather than ANSI. Used for Unicode databases,
+        // where ANSI cannot represent every cell: encoding those cells to ANSI either
+        // loses the characters or fails outright, so the cell could not be searched
+        // faithfully at all. UTF-8 represents every cell, so no cell is ever skipped.
+        Utf8RegularExpression,
+    };
+
     CDatabase Database; // interface for working with the opened database
     CViewerWindow* Viewer;
 
@@ -230,8 +242,8 @@ public:
     BOOL Creating; // window is being created -- do not erase background yet
 
     BOOL AutoSelect;
-    char Coding[210];
-    char DefaultCoding[210];
+    std::wstring Coding;
+    std::wstring DefaultCoding;
     BOOL UseCodeTable; // should the CodeTable be used for recoding?
     // CodeTable matters only when UseCodeTable is TRUE
     char CodeTable[256]; // translation table
@@ -253,7 +265,7 @@ public:
     void OnFileReOpen();
     void OnGoto();
 
-    BOOL OpenFile(const char* name, BOOL useDefaultConfig);
+    BOOL OpenFile(const wchar_t* name, BOOL useDefaultConfig);
 
     // update scroll bar information
     void SetupScrollBars(DWORD update = UPDATE_VERT_SCROLL | UPDATE_HORZ_SCROLL);
@@ -267,7 +279,7 @@ public:
     void SelectAll();
 
     // if conversion == NULL, "Don't Convert" will be applied
-    void SelectConversion(const char* conversion);
+    void SelectConversion(const wchar_t* conversion);
 
     // invoke the column management dialog
     void ColumnsWasChanged();
@@ -279,7 +291,8 @@ public:
     int GetBookmarkCount() { return Bookmarks.GetCount(); }
 
     // Find
-    void Find(BOOL forward, BOOL wholeWords,
+    void Find(BOOL forward, BOOL wholeWords, BOOL caseSensitive,
+              FindMode mode, const std::wstring& pattern,
               CSalamanderBMSearchData* bmSearchData,
               CSalamanderREGEXPSearchData* regexpSearchData);
 

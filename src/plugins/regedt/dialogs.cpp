@@ -4,12 +4,15 @@
 
 #include "precomp.h"
 
+#include <algorithm>
+#include "regedt_number_parse.h"
+
 TDirectArray<DWORD_PTR> DialogStack(4, 4);
 CCS DialogStackCS;
 
 BOOL MinBeepWhenDone;
 
-LPWSTR CopyOrMoveHistory[MAX_HISTORY_ENTRIES];
+std::vector<std::wstring> CopyOrMoveHistory;
 
 HFONT EnvFont = NULL; // environment font (edit, toolbar, header, status)
 int EnvFontHeight;    // font height
@@ -73,7 +76,7 @@ void WINAPI HTMLHelpCallback(HWND hWindow, UINT helpID)
 BOOL InitDialogs()
 {
     CALL_STACK_MESSAGE1("InitDialogs()");
-    if (!InitializeWinLib("RegEdt", DLLInstance))
+    if (!InitializeWinLib(L"RegEdt", DLLInstance))
         return FALSE;
     SetupWinLibHelp(HTMLHelpCallback);
 
@@ -83,13 +86,9 @@ BOOL InitDialogs()
         return FALSE;
     }
 
-    int i;
-    for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
-    {
-        CopyOrMoveHistory[i] = NULL;
-        PatternHistory[i] = NULL;
-        LookInHistory[i] = NULL;
-    }
+    CopyOrMoveHistory.clear();
+    PatternHistory.clear();
+    LookInHistory.clear();
 
     MinBeepWhenDone = TRUE;
     SG->GetConfigParameter(SALCFG_MINBEEPWHENDONE, &MinBeepWhenDone, sizeof(BOOL), NULL);
@@ -105,16 +104,9 @@ void ReleaseDialogs()
     CALL_STACK_MESSAGE1("ReleaseDialogs()");
     ReleaseWinLib(DLLInstance);
 
-    int i;
-    for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
-    {
-        if (CopyOrMoveHistory[i])
-            delete[] CopyOrMoveHistory[i];
-        if (PatternHistory[i])
-            delete[] PatternHistory[i];
-        if (LookInHistory[i])
-            delete[] LookInHistory[i];
-    }
+    CopyOrMoveHistory.clear();
+    PatternHistory.clear();
+    LookInHistory.clear();
 
     if (EnvFont)
         DeleteObject(EnvFont);
@@ -166,65 +158,35 @@ HWND DialogStackPeek()
     return ret;
 }
 
-void HistoryComboBox(CTransferInfoEx& ti, int id, LPWSTR text, int textMax,
-                     int historySize, LPWSTR* history)
+void HistoryComboBox(CTransferInfoEx& ti, int id, std::wstring& text,
+                     std::vector<std::wstring>& history)
 {
-    CALL_STACK_MESSAGE4("HistoryComboBox(, %d, , %d, %d, )", id, textMax,
-                        historySize);
     HWND combo;
-
     if (!ti.GetControl(combo, id))
         return;
 
     if (ti.Type == ttDataFromWindow)
     {
-        ti.EditLineW(id, text, textMax);
-
-        int toMove = historySize - 1;
-
-        // check whether the same item is already in the history
-        int i;
-        for (i = 0; i < historySize; i++)
-        {
-            if (history[i] == NULL)
-                break;
-            if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                               history[i], -1,
-                               text, -1) == CSTR_EQUAL)
-            {
-                toMove = i;
-                break;
-            }
-        }
-        // allocate memory for the new entry
-        LPWSTR ptr = new WCHAR[wcslen(text) + 1];
-        if (ptr)
-        {
-            // free the memory of the entry being deleted
-            if (history[toMove])
-                delete[] history[toMove];
-            // make room for the path we are going to store
-            for (i = toMove; i > 0; i--)
-                history[i] = history[i - 1];
-            // store the path
-            wcscpy(ptr, text);
-            history[0] = ptr;
-        }
+        text = SPLGetWindowTextOwned(combo);
+        const auto duplicate = std::find_if(history.begin(), history.end(), [&text](const std::wstring& item) {
+            return CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
+                                  item.c_str(), -1, text.c_str(), -1) == CSTR_EQUAL;
+        });
+        if (duplicate != history.end())
+            history.erase(duplicate);
+        history.insert(history.begin(), text);
+        if (history.size() > MAX_HISTORY_ENTRIES)
+            history.resize(MAX_HISTORY_ENTRIES);
     }
+
     SendMessage(combo, CB_RESETCONTENT, 0, 0);
-    int i;
-    for (i = 0; i < historySize; i++)
-    {
-        if (history[i] == NULL)
-            break;
-        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)history[i]);
-    }
+    for (const std::wstring& item : history)
+        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(item.c_str()));
     if (ti.Type == ttDataFromWindow)
         SendMessage(combo, CB_SETCURSEL, 0, 0);
     else
     {
-        SendMessage(combo, CB_LIMITTEXT, textMax - 1, 0);
-        SendMessageW(combo, WM_SETTEXT, 0, (LPARAM)text);
+        SendMessageW(combo, WM_SETTEXT, 0, reinterpret_cast<LPARAM>(text.c_str()));
         SendMessage(combo, CB_SETEDITSEL, 0, -1);
     }
 }
@@ -410,11 +372,10 @@ void CDialogEx::NotifDlgJustCreated()
 void CNewKeyDialog::Validate(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CNewKeyDialog::Validate()");
-    WCHAR buf[MAX_FULL_KEYNAME];
-    ti.EditLineW(IDE_NAME, buf, MAX_FULL_KEYNAME);
-    if (wcslen(buf) == 0)
+    const std::wstring name = SPLGetDlgItemTextOwned(HWindow, IDE_NAME);
+    if (name.empty())
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTY), LoadStr(IDS_ERROR), MB_ICONERROR);
+        SG->SalMessageBox(HWindow, LoadStrW(IDS_EMPTY).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_ICONERROR);
         ti.ErrorOn(IDE_NAME);
     }
 }
@@ -429,7 +390,10 @@ void CNewKeyDialog::Transfer(CTransferInfoEx& ti)
         if (Text)
             SendMessageW(GetDlgItem(HWindow, IDS_TEXT), WM_SETTEXT, 0, (LPARAM)Text);
     }
-    ti.EditLineW(IDE_NAME, KeyName, MAX_FULL_KEYNAME);
+    if (ti.Type == ttDataToWindow)
+        SetDlgItemTextW(HWindow, IDE_NAME, KeyName.c_str());
+    else
+        KeyName = SPLGetDlgItemTextOwned(HWindow, IDE_NAME);
     if (Direct)
         ti.CheckBox(IDC_DIRECT, *Direct);
 }
@@ -459,7 +423,7 @@ void CNewValDialog::Transfer(CTransferInfoEx& ti)
             if (DlgType == vdtNewValDialog && tt->CanCreate ||
                 DlgType == vdtEditValDialog && tt->CanEdit)
             {
-                int ret = (int)SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)tt->Text);
+                int ret = (int)SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)tt->Text);
                 if (ret != CB_ERR)
                 {
                     SendMessage(combo, CB_SETITEMDATA, ret, (LPARAM)tt->Type);
@@ -508,13 +472,13 @@ void CEditValDialog::Validate(CTransferInfoEx& ti)
 
     if (*Type == REG_DWORD || *Type == REG_DWORD_BIG_ENDIAN || *Type == REG_QWORD)
     {
-        char buffer[21];
         HWND dataHWnd = GetDlgItem(HWindow, IDE_DATA);
-        int i = (int)SendMessage(dataHWnd, WM_GETTEXT, 21, (LPARAM)buffer);
+        const std::wstring buffer = SPLGetWindowTextOwned(dataHWnd);
         QWORD d;
         if (Hex)
         {
-            if (i == 0 || i > 16 || !HexStringToNumber(buffer, d))
+            if (buffer.empty() || buffer.size() > 16 ||
+                !ParseRegedtUnsignedHex(buffer, d))
             {
                 Error(IDS_INVALIDHEXVALUE);
                 ti.ErrorOn(IDE_DATA);
@@ -523,7 +487,7 @@ void CEditValDialog::Validate(CTransferInfoEx& ti)
         }
         else
         {
-            if (i == 0 || !DecStringToNumber(buffer, d))
+            if (buffer.empty() || !ParseRegedtUnsignedDecimal(buffer, d))
             {
                 Error(IDS_INVALIDDECVALUE);
                 ti.ErrorOn(IDE_DATA);
@@ -569,12 +533,11 @@ void CEditValDialog::Transfer(CTransferInfoEx& ti)
             SendMessageW(dataHWnd, EM_LIMITTEXT, *Type == REG_QWORD ? 16 : 8, 0);
             SetWindowPos(dataHWnd, NULL, 0, 0, (int)(EditWidth * 0.46), EditHeight, SWP_NOZORDER | SWP_NOMOVE);
 
-            char buffer[17];
             QWORD d = *Type == REG_QWORD ? *(LPQWORD)Data : *(LPDWORD)Data;
             if (*Type == REG_DWORD_BIG_ENDIAN)
                 d = d >> 24 | (d & 0x00FF0000) >> 8 | (d & 0x0000FF00) << 8 | (d & 0x000000FF) << 24;
-            _ui64toa(d, buffer, 16);
-            SendMessage(dataHWnd, WM_SETTEXT, 0, (LPARAM)buffer);
+            const std::wstring buffer = SPLFormatStringOwned(L"%I64x", d);
+            SetWindowTextW(dataHWnd, buffer.c_str());
         }
 
         SetFocus(GetDlgItem(HWindow, IDE_DATA));
@@ -583,13 +546,12 @@ void CEditValDialog::Transfer(CTransferInfoEx& ti)
     {
         if (*Type == REG_DWORD || *Type == REG_DWORD_BIG_ENDIAN || *Type == REG_QWORD)
         {
-            char buffer[21];
-            int i = (int)SendMessage(dataHWnd, WM_GETTEXT, 21, (LPARAM)buffer);
+            const std::wstring buffer = SPLGetWindowTextOwned(dataHWnd);
             QWORD d;
             if (Hex)
-                HexStringToNumber(buffer, d);
+                ParseRegedtUnsignedHex(buffer, d);
             else
-                DecStringToNumber(buffer, d);
+                ParseRegedtUnsignedDecimal(buffer, d);
             if (*Type == REG_DWORD_BIG_ENDIAN) // reverse the endianness
             {
                 d = d >> 24 | (d & 0x00FF0000) >> 8 | (d & 0x0000FF00) << 8 | (d & 0x000000FF) << 24;
@@ -701,32 +663,32 @@ CEditValDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     break;
                 *Type = (DWORD)SendMessage(combo, CB_GETITEMDATA, ret, 0); // x64 - Type is DWORD
 
-                char buffer[21];
                 HWND dataHWnd = GetDlgItem(HWindow, IDE_DATA);
-                int i = (int)SendMessage(dataHWnd, WM_GETTEXT, 21, (LPARAM)buffer);
+                std::wstring buffer = SPLGetWindowTextOwned(dataHWnd);
                 QWORD d;
                 BOOL success = TRUE;
                 if (hex)
                 {
-                    if (i == 0 || !DecStringToNumber(buffer, d))
+                    if (buffer.empty() || !ParseRegedtUnsignedDecimal(buffer, d))
                     {
-                        if (i != 0)
+                        if (!buffer.empty())
                             Error(IDS_INVALIDDECVALUE);
                         success = FALSE;
                     }
                     else
-                        _ui64toa(d, buffer, 16);
+                        buffer = SPLFormatStringOwned(L"%I64x", d);
                 }
                 else
                 {
-                    if (i == 0 || i > 16 || !HexStringToNumber(buffer, d))
+                    if (buffer.empty() || buffer.size() > 16 ||
+                        !ParseRegedtUnsignedHex(buffer, d))
                     {
-                        if (i != 0)
+                        if (!buffer.empty())
                             Error(IDS_INVALIDHEXVALUE);
                         success = FALSE;
                     }
                     else
-                        _ui64toa(d, buffer, 10);
+                        buffer = SPLFormatStringOwned(L"%I64u", d);
                 }
                 if (success)
                 {
@@ -735,7 +697,7 @@ CEditValDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (*Type == REG_QWORD)
                         max *= 2;
                     if (success)
-                        SendMessage(dataHWnd, WM_SETTEXT, 0, (LPARAM)buffer);
+                        SetWindowTextW(dataHWnd, buffer.c_str());
                     SendMessageW(dataHWnd, EM_LIMITTEXT, max, 0);
                 }
                 else
@@ -763,28 +725,28 @@ BOOL CRawEditValDialog::ExportToTempFile()
 {
     CALL_STACK_MESSAGE1("CRawEditValDialog::ExportToTempFile()");
     // already exported
-    if (*TempFile)
+    if (!TempFile.empty())
         return TRUE;
 
     // create a temp file name
-    if (!SG->SalGetTempFileName(NULL, "SAL", TempDir, FALSE, NULL))
+    if (!SPLSalGetTempFileNameOwned(SG, NULL, L"SAL", TempDir, FALSE, NULL))
         return Error(IDS_CREATETEMP);
 
-    SG->SalPathAddBackslash(strcpy(TempFile, TempDir), TempFile.Size());
-    int tlen = (int)strlen(TempFile);
-    TempFile[tlen++] = '_';
-    int len = min(TempFile.Size() - tlen - 1, (int)wcslen(KeyName));
-    WStrToStr(TempFile.Get() + tlen, TempFile.Size(), KeyName, len);
-    TempFile[len + tlen] = 0;
-    ReplaceUnsafeCharacters(TempFile + tlen);
+    TempFile = TempDir;
+    SPLSalPathAddBackslashOwned(TempFile);
+    TempFile.push_back(L'_');
+    const size_t nameOffset = TempFile.size();
+    TempFile.append(KeyName);
+    ReplaceUnsafeCharacters(TempFile.data() + nameOffset);
 
     // create/open the temp file
-    HANDLE file = CreateFile(TempFile, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE file = CreateFileW(TempFile.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
-        SG->RemoveTemporaryDir(TempDir);
-        *TempDir = *TempFile = 0;
+        SG->RemoveTemporaryDir(TempDir.c_str());
+        TempDir.clear();
+        TempFile.clear();
         return Error(IDS_CREATETEMP);
     }
 
@@ -795,8 +757,9 @@ BOOL CRawEditValDialog::ExportToTempFile()
 
     if (!b)
     {
-        SG->RemoveTemporaryDir(TempDir);
-        *TempDir = *TempFile = 0;
+        SG->RemoveTemporaryDir(TempDir.c_str());
+        TempDir.clear();
+        TempFile.clear();
         Error(IDS_WRITETEMP);
     }
 
@@ -807,8 +770,8 @@ BOOL CRawEditValDialog::ImportFromTempFile()
 {
     CALL_STACK_MESSAGE1("CRawEditValDialog::ImportFromTempFile()");
     // create/open the temp file
-    HANDLE file = CreateFile(TempFile, GENERIC_READ, FILE_SHARE_READ, NULL,
-                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE file = CreateFileW(TempFile.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return Error(IDS_OPENTEMP);
 
@@ -888,10 +851,13 @@ CRawEditValDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDB_EDIT:
         {
-            if (ExportToTempFile() && ExecuteEditor(TempFile))
+            if (ExportToTempFile())
             {
-                Edit = TRUE;
-                ShowWindow(GetDlgItem(HWindow, IDS_MESSAGE), SW_SHOW);
+                if (ExecuteEditor(TempFile.c_str()))
+                {
+                    Edit = TRUE;
+                    ShowWindow(GetDlgItem(HWindow, IDS_MESSAGE), SW_SHOW);
+                }
             }
             break;
         }
@@ -901,8 +867,8 @@ CRawEditValDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DESTROY:
     {
-        if (*TempDir)
-            SG->RemoveTemporaryDir(TempDir);
+        if (!TempDir.empty())
+            SG->RemoveTemporaryDir(TempDir.c_str());
         break;
     }
     }
@@ -925,7 +891,7 @@ void CCopyOrMoveDialog::Transfer(CTransferInfoEx& ti)
         if (Text)
             SendMessageW(GetDlgItem(HWindow, IDS_TEXT), WM_SETTEXT, 0, (LPARAM)Text);
     }
-    HistoryComboBox(ti, IDE_NAME, KeyName, MAX_FULL_KEYNAME, MAX_HISTORY_ENTRIES, CopyOrMoveHistory);
+    HistoryComboBox(ti, IDE_NAME, KeyName, CopyOrMoveHistory);
     if (Direct)
         ti.CheckBox(IDC_DIRECT, *Direct);
 }
@@ -940,10 +906,8 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Validate()");
     int e1, e2;
-    CPathBuffer buffer; // Heap-allocated for long path support
-
-    ti.EditLine(IDE_COMMAND, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpCommandVariables))
+    const std::wstring command = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+    if (!SG->ValidateVarString(HWindow, command.c_str(), e1, e2, ExpCommandVariables))
     {
         ti.ErrorOn(IDE_COMMAND);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_COMMAND), TRUE);
@@ -951,8 +915,8 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
         return;
     }
 
-    ti.EditLine(IDE_ARGUMENTS, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpArgumentsVariables))
+    const std::wstring arguments = SPLGetDlgItemTextOwned(HWindow, IDE_ARGUMENTS);
+    if (!SG->ValidateVarString(HWindow, arguments.c_str(), e1, e2, ExpArgumentsVariables))
     {
         ti.ErrorOn(IDE_ARGUMENTS);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_ARGUMENTS), TRUE);
@@ -960,8 +924,8 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
         return;
     }
 
-    ti.EditLine(IDE_INITDIR, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpInitDirVariables))
+    const std::wstring initDir = SPLGetDlgItemTextOwned(HWindow, IDE_INITDIR);
+    if (!SG->ValidateVarString(HWindow, initDir.c_str(), e1, e2, ExpInitDirVariables))
     {
         ti.ErrorOn(IDE_INITDIR);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_INITDIR), TRUE);
@@ -973,9 +937,18 @@ void CConfigDialog::Validate(CTransferInfoEx& ti)
 void CConfigDialog::Transfer(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDE_COMMAND, Command, Command.Size());
-    ti.EditLine(IDE_ARGUMENTS, Arguments, Arguments.Size());
-    ti.EditLine(IDE_INITDIR, InitDir, InitDir.Size());
+    if (ti.Type == ttDataToWindow)
+    {
+        SetDlgItemTextW(HWindow, IDE_COMMAND, Command.c_str());
+        SetDlgItemTextW(HWindow, IDE_ARGUMENTS, Arguments.c_str());
+        SetDlgItemTextW(HWindow, IDE_INITDIR, InitDir.c_str());
+    }
+    else
+    {
+        Command = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+        Arguments = SPLGetDlgItemTextOwned(HWindow, IDE_ARGUMENTS);
+        InitDir = SPLGetDlgItemTextOwned(HWindow, IDE_INITDIR);
+    }
 }
 
 INT_PTR
@@ -1035,24 +1008,21 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 1)
                 {
-                    CPathBuffer path; // Heap-allocated for long path support
-                    path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, path.Size());
-                    if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
-                        SetDlgItemText(HWindow, IDE_COMMAND, path);
+                    std::wstring path = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+                    if (ShowOpenFileDialog(HWindow, NULL, LangStr(IDS_EXEFILES).c_str(), path))
+                        SetDlgItemTextW(HWindow, IDE_COMMAND, path.c_str());
                 }
                 else if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 30)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpCommandVariables[cmd - 2].Name);
-                        SendDlgItemMessage(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpCommandVariables[cmd - 2].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }
@@ -1120,16 +1090,15 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 19)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpArgumentsVariables[cmd - 1].Name);
-                        SendDlgItemMessage(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpArgumentsVariables[cmd - 1].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }
@@ -1172,16 +1141,15 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 6)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpInitDirVariables[cmd - 1].Name);
-                        SendDlgItemMessage(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpInitDirVariables[cmd - 1].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }
@@ -1205,19 +1173,17 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 void CExportDialog::Validate(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CExportDialog::Validate()");
-    WCHAR buffer[MAX_FULL_KEYNAME];
-    ti.EditLineW(IDE_NAME, buffer, MAX_FULL_KEYNAME);
-    if (wcslen(buffer) == 0)
+    const std::wstring name = SPLGetDlgItemTextOwned(HWindow, IDE_NAME);
+    if (name.empty())
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTY), LoadStr(IDS_ERROR), MB_ICONERROR);
+        SG->SalMessageBox(HWindow, LoadStrW(IDS_EMPTY).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_ICONERROR);
         ti.ErrorOn(IDE_NAME);
     }
 
-    CPathBuffer buffer2; // Heap-allocated for long path support
-    ti.EditLine(IDE_FILE, buffer2, buffer2.Size());
-    if (strlen(buffer2) == 0)
+    const std::wstring file = SPLGetDlgItemTextOwned(HWindow, IDE_FILE);
+    if (file.empty())
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTY), LoadStr(IDS_ERROR), MB_ICONERROR);
+        SG->SalMessageBox(HWindow, LoadStrW(IDS_EMPTY).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_ICONERROR);
         ti.ErrorOn(IDE_FILE);
     }
 }
@@ -1225,8 +1191,14 @@ void CExportDialog::Validate(CTransferInfoEx& ti)
 void CExportDialog::Transfer(CTransferInfoEx& ti)
 {
     CALL_STACK_MESSAGE1("CExportDialog::Transfer()");
-    ti.EditLineW(IDE_NAME, Path, MAX_FULL_KEYNAME);
-    ti.EditLine(IDE_FILE, File, MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+        SetDlgItemTextW(HWindow, IDE_NAME, Path.c_str());
+    else
+        Path = SPLGetDlgItemTextOwned(HWindow, IDE_NAME);
+    if (ti.Type == ttDataToWindow)
+        SetDlgItemTextW(HWindow, IDE_FILE, File->c_str());
+    else
+        *File = SPLGetDlgItemTextOwned(HWindow, IDE_FILE);
 }
 
 INT_PTR
@@ -1242,14 +1214,17 @@ CExportDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDB_BROWSE:
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            path[0] = 0;
-            GetDlgItemText(HWindow, IDE_FILE, path, path.Size());
-            SG->SalPathRemoveBackslash(path);
-            if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_REGFILES), path, TRUE))
+            std::wstring path = SPLGetDlgItemTextOwned(HWindow, IDE_FILE);
+            if (!path.empty() && path.back() == L'\\')
+                path.pop_back();
+            if (ShowOpenFileDialog(HWindow, NULL, LangStr(IDS_REGFILES).c_str(), path, TRUE))
             {
-                SG->SalPathAddExtension(path, ".reg", path.Size());
-                SetDlgItemText(HWindow, IDE_FILE, path);
+                // scan back to the first '.' or '\\', exactly as pre-unicode's
+                // SalPathAddExtension did; find_last_of returns npos when the
+                // character is absent, so comparing the two positions directly
+                // gets both the no-extension and the no-separator case wrong
+                SPLSalPathAddExtensionOwned(SG, path, L".reg");
+                SetDlgItemTextW(HWindow, IDE_FILE, path.c_str());
             }
             return TRUE;
         }

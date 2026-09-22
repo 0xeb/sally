@@ -24,7 +24,7 @@ class CChangeMonitorThread : public CThread
     CChangeMonitorThreadState State;
     TIndirectArray<CPluginFSInterface> ConnectedFS;
     int Root;
-    WCHAR Key[MAX_KEYNAME];
+    std::wstring Key;
     HANDLE ActionEvent;
     CActionEvent Action;
     HANDLE RegistryEvent;
@@ -47,7 +47,7 @@ class CChangeMonitor
 public:
     CChangeMonitor();
     ~CChangeMonitor();
-    void AddPath(int root, LPWSTR key, CPluginFSInterface* fs);
+    void AddPath(int root, const wchar_t* key, CPluginFSInterface* fs);
     void Cancel(CPluginFSInterface* fs);
     void Stop();
     void IgnoreNextRootChange(int root);
@@ -56,24 +56,3 @@ public:
 };
 
 extern CChangeMonitor ChangeMonitor;
-
-/*
-class CChangeMonitor : public CThread
-{
-    CPluginFSInterface *FS;
-    int Root;
-    WCHAR Key[MAX_KEYNAME];
-    HANDLE ActionEvent;
-    enum {aeNoAction, aeSetPath, aeFinish, aeCancel} Action;
-    HANDLE RegistryEvent;
-    CCS CS;
-  
-  public:
-    CChangeMonitor(CPluginFSInterface * fs);
-    ~CChangeMonitor();
-    void SetPath(int root, WCHAR * key);
-    void Cancel();
-    void Finish();
-    virtual unsigned Body();
-};
-*/

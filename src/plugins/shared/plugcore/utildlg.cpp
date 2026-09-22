@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_narrow_compat.h"
 
 // ****************************************************************************
 //
@@ -30,7 +31,6 @@ CDialogEx::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     return CDialog::DialogProc(uMsg, wParam, lParam);
 }
-
 void CDialogEx::NotifDlgJustCreated()
 {
     SalGUI->ArrangeHorizontalLines(HWindow);
@@ -60,7 +60,7 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
         {
             if (history[i] == NULL)
                 break;
-            if (SG->StrICmp(history[i], text) == 0)
+            if (SG->StrICmp(ToWideArg(history[i]).c_str(), ToWideArg(text).c_str()) == 0)
             {
                 toMove = i;
                 break;
@@ -95,37 +95,5 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
         SendMessage(combo, CB_LIMITTEXT, textMax - 1, 0);
         SendMessage(combo, WM_SETTEXT, 0, (LPARAM)text);
         SendMessage(combo, CB_SETEDITSEL, 0, -1);
-    }
-}
-
-void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
-                 char* buffer, int bufferSize, CSalamanderRegistryAbstract* registry)
-{
-    CALL_STACK_MESSAGE3("LoadHistory(, %s, , , %d, )", keyPattern, bufferSize);
-    char buf[32];
-    for (int i = 0; i < MAX_HISTORY_ENTRIES; i++)
-    {
-        SalPrintf(buf, 32, keyPattern, i);
-        if (!registry->GetValue(regKey, buf, REG_SZ, buffer, bufferSize))
-            break;
-        char* ptr = new char[strlen(buffer) + 1];
-        if (!ptr)
-            break;
-        strcpy(ptr, buffer);
-        history[i] = ptr;
-    }
-}
-
-void SaveHistory(HKEY regKey, const char* keyPattern, char** history,
-                 CSalamanderRegistryAbstract* registry)
-{
-    CALL_STACK_MESSAGE2("SaveHistory(, %s, , )", keyPattern);
-    char buf[32];
-    for (int i = 0; i < MAX_HISTORY_ENTRIES; i++)
-    {
-        if (history[i] == NULL)
-            break;
-        SalPrintf(buf, 32, keyPattern, i);
-        registry->SetValue(regKey, buf, REG_SZ, history[i], -1);
     }
 }

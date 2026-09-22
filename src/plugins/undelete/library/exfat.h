@@ -145,7 +145,7 @@ private:
     BOOL OpenFAT();
     DWORD GetFATItem(DWORD index);
     QWORD GetFATItems() { return FATItems; }
-    BOOL LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD dirFirstCluster, QWORD dirFileSize, BOOL dirClusterChainInFAT, BOOL isRootDirectory, CHAR* tracePath);
+    BOOL LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD dirFirstCluster, QWORD dirFileSize, BOOL dirClusterChainInFAT, BOOL isRootDirectory, std::basic_string<CHAR>* tracePath);
     DWORD GetClusterChainLen(DWORD index);                                                                    // return number of clusters in cluster chain starting at 'index'
     BOOL LoadClusterChain(BYTE** buff, DWORD firstCluster, QWORD fileSize, BOOL chainInFAT, QWORD* clusters); // allocate 'buffer' and read clusters based on cluster chain starting at 'index', returns number of 'clusters'
     DWORD ConvertExFATAttr(DWORD exfatattr);
@@ -264,7 +264,7 @@ static WORD UpdateEntriesChecksum(WORD checksum, EXFAT_DIRENTRY* item, BOOL prim
 }
 
 template <typename CHAR>
-BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD dirFirstCluster, QWORD dirFileSize, BOOL dirClusterChainInFAT, BOOL isRootDirectory, CHAR* tracePath)
+BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD dirFirstCluster, QWORD dirFileSize, BOOL dirClusterChainInFAT, BOOL isRootDirectory, std::basic_string<CHAR>* tracePath)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -272,12 +272,10 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
     QWORD dirClusterCount;
 
 #ifdef TRACE_ENABLE
-    int tracePathLen = (int)String<CHAR>::StrLen(tracePath);
+    const size_t tracePathLen = tracePath->size();
     if (parent->FileNames != NULL)
-        String<CHAR>::StrCat_s(tracePath, MAX_PATH, parent->FileNames->FNName);
-    CHAR* backslash = String<CHAR>::NewFromASCII("\\");
-    String<CHAR>::StrCat_s(tracePath, MAX_PATH, backslash);
-    delete backslash;
+        tracePath->append(parent->FileNames->FNName);
+    tracePath->push_back(static_cast<CHAR>('\\'));
 #endif
 
     if (!LoadClusterChain(&dirClusterChain, dirFirstCluster, dirFileSize, dirClusterChainInFAT, &dirClusterCount))
@@ -307,7 +305,7 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
         {
             if (!isRootDirectory)
             {
-                TRACE_IW(L"LoadDirectoryTree() entry 0x" << std::hex << (int)iter->Generic.EntryType << std::dec << L" found outside Root directory! Path: " << CWStr(tracePath).c_str());
+                TRACE_IW(L"LoadDirectoryTree() entry 0x" << std::hex << (int)iter->Generic.EntryType << std::dec << L" found outside Root directory! Path: " << CWStr(tracePath->c_str()).c_str());
                 exit = TRUE;
             }
             break;
@@ -330,7 +328,7 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
 
         default:
         {
-            TRACE_IW(L"LoadDirectoryTree() unknown entry 0x" << std::hex << (int)iter->Generic.EntryType << std::dec << L" Path: " << CWStr(tracePath).c_str());
+            TRACE_IW(L"LoadDirectoryTree() unknown entry 0x" << std::hex << (int)iter->Generic.EntryType << std::dec << L" Path: " << CWStr(tracePath->c_str()).c_str());
             exit = TRUE;
         }
         }
@@ -443,7 +441,7 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
                     default:
                     {
                         // don't update checksum so item is ignored
-                        TRACE_IW(L"LoadDirectoryTree() Unknown secondary entry under '" << name << L"' entry! Path: " << CWStr(tracePath).c_str());
+                        TRACE_IW(L"LoadDirectoryTree() Unknown secondary entry under '" << name << L"' entry! Path: " << CWStr(tracePath->c_str()).c_str());
                         break;
                     }
                     }
@@ -481,7 +479,7 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
                 }
                 else
                 {
-                    TRACE_IW(L"LoadDirectoryTree() invalid checksum on '" << name << L"' entry! Path: " << CWStr(tracePath).c_str());
+                    TRACE_IW(L"LoadDirectoryTree() invalid checksum on '" << name << L"' entry! Path: " << CWStr(tracePath->c_str()).c_str());
                 }
 
                 break;
@@ -492,7 +490,7 @@ BOOL CExFATSnapshot<CHAR>::LoadDirectoryTree(FILE_RECORD_I<CHAR>* parent, DWORD 
     }
     delete dirClusterChain;
 #ifdef TRACE_ENABLE
-    tracePath[tracePathLen] = 0;
+    tracePath->resize(tracePathLen);
 #endif
     return ret;
 }
@@ -602,13 +600,13 @@ BOOL CExFATSnapshot<CHAR>::AddVirtualDirs(FILE_RECORD_I<CHAR>** DeletedFiles)
     FILE_RECORD_I<CHAR>* metafiles;
 
     // add virtual directories {All Deleted Files} and {Metafiles} into root
-    if (!AddFileOrDir(this->Root, String<wchar_t>::LoadStr(IDS_ALLDELETEDFILES), -1, EXFAT_ATTR_DIRECTORY,
+    if (!AddFileOrDir(this->Root, String<wchar_t>::LangStr(IDS_ALLDELETEDFILES).c_str(), -1, EXFAT_ATTR_DIRECTORY,
                       FR_FLAGS_VIRTUALDIR, NULL, NULL, NULL, 0, 0, 0, &deletedfiles))
     {
         return FALSE;
     }
     VirtualDirsCount++;
-    if (!AddFileOrDir(this->Root, String<wchar_t>::LoadStr(IDS_METAFILES), -1, EXFAT_ATTR_DIRECTORY,
+    if (!AddFileOrDir(this->Root, String<wchar_t>::LangStr(IDS_METAFILES).c_str(), -1, EXFAT_ATTR_DIRECTORY,
                       FR_FLAGS_VIRTUALDIR, NULL, NULL, NULL, 0, 0, 0, &metafiles))
     {
         return FALSE;
@@ -692,11 +690,12 @@ BOOL CExFATSnapshot<CHAR>::Update(CSnapshotProgressDlg* progress, DWORD udFlags,
 
     this->Progress->SetProgressText(IDS_READINGDIRS);
 #ifdef TRACE_ENABLE
-    CHAR tracePath[MAX_PATH] = {0};
+    std::basic_string<CHAR> tracePath;
+    std::basic_string<CHAR>* tracePathOwner = &tracePath;
 #else
-    CHAR* tracePath = NULL;
+    std::basic_string<CHAR>* tracePathOwner = NULL;
 #endif
-    if (!LoadDirectoryTree(this->Root, this->Volume->ExFATBoot.RootDirFirstCluster, -1, TRUE, TRUE, tracePath))
+    if (!LoadDirectoryTree(this->Root, this->Volume->ExFATBoot.RootDirFirstCluster, -1, TRUE, TRUE, tracePathOwner))
     {
         Free();
         return FALSE;

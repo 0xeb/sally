@@ -22,7 +22,7 @@ public:
     CParserMP4() : f(NULL) {};
     ~CParserMP4() { CloseFile(); }
 
-    virtual CParserResultEnum OpenFile(const char* fileName);
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName);
     virtual CParserResultEnum CloseFile();
     virtual CParserResultEnum GetFileInfo(COutputInterface* output);
 };

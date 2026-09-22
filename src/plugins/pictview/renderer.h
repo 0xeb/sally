@@ -7,7 +7,7 @@
 #include "lib/pvw32dll.h"
 
 // Path to focus, used by menu File/Focus
-extern TCHAR Focus_Path[32768];
+extern std::wstring Focus_Path;
 
 // Used by SaveAs dlg to get the current path in the source(=active) panel
 extern HWND ghSaveAsWindow;
@@ -200,7 +200,8 @@ protected:
     void OnDelete(BOOL toRecycle);
     void OnCopyTo();
 
-    BOOL RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR* newName, int newNameSize, BOOL* tryAgain);
+    BOOL RenameFileInternal(const wchar_t* oldPath, const wchar_t* oldName,
+                            std::wstring& newName, BOOL* tryAgain);
 
     void FreeComment(void);
     void DuplicateComment(void);

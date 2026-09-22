@@ -697,7 +697,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
     if (DataEnd - DataStart < 8)
     {
         SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                         LoadStr(IDS_ERR_NORPM), LoadStr(IDS_ERR_RPMTITLE),
+                                         LangStr(IDS_ERR_NORPM).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
@@ -707,7 +707,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
         header[2] != RPMHEADER_MAGIC2)
     {
         SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                         LoadStr(IDS_ERR_NORPM), LoadStr(IDS_ERR_RPMTITLE),
+                                         LangStr(IDS_ERR_NORPM).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
@@ -718,7 +718,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
     if (header[3] != 0x01)
     {
         SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                         LoadStr(IDS_ERR_BADRPMVERSION), LoadStr(IDS_ERR_RPMTITLE),
+                                         LangStr(IDS_ERR_BADRPMVERSION).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
@@ -726,7 +726,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
     if (header == NULL)
     {
         SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                         LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                         LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
@@ -738,7 +738,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
         if (Index == NULL)
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             return FALSE;
         }
@@ -746,7 +746,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
         if (SectionData == NULL)
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             delete[] Index;
             return FALSE;
@@ -768,7 +768,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
                 delete[] Index;
                 delete[] SectionData;
                 SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                 LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE),
+                                                 LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 return FALSE;
             }
@@ -780,7 +780,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
         else if (header == NULL)
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             return FALSE;
         }
@@ -798,7 +798,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
                 delete[] Index;
                 delete[] SectionData;
                 SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                 LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                                 LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 return FALSE;
             }
@@ -808,7 +808,7 @@ BOOL CRPM::RPMReadHeader(FILE* fContents)
         else if (header == NULL)
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             return FALSE;
         }
@@ -965,7 +965,7 @@ BOOL CRPM::RPMReadSignature(FILE* fContents, short signatureType)
         if (buffer == NULL)
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             return FALSE;
         }
@@ -982,7 +982,7 @@ BOOL CRPM::RPMReadSignature(FILE* fContents, short signatureType)
         if (!RPMReadHeader(fContents))
         {
             SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                             LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                             LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             return FALSE;
         }
@@ -991,7 +991,7 @@ BOOL CRPM::RPMReadSignature(FILE* fContents, short signatureType)
             if (FReadBlock(8 - SectionSize % 8) == NULL)
             {
                 SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                                 LoadStr(IDS_ERR_FREAD), LoadStr(IDS_ERR_RPMTITLE),
+                                                 LangStr(IDS_ERR_FREAD).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 return FALSE;
             }
@@ -1005,7 +1005,7 @@ BOOL CRPM::RPMReadSignature(FILE* fContents, short signatureType)
         break;
     default:
         SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                         LoadStr(IDS_ERR_BADSIGNATURE), LoadStr(IDS_ERR_RPMTITLE),
+                                         LangStr(IDS_ERR_BADSIGNATURE).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }

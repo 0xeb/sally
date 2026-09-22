@@ -88,11 +88,11 @@ public:
     CBlockedFile();
     ~CBlockedFile();
 
-    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent);
-    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent);
+    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent);
+    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent);
     virtual __int64 Seek(__int64 lDistanceToMove, DWORD dwMoveMethod);
 
-    virtual BOOL Close(LPCTSTR fileName, HWND parent);
+    virtual BOOL Close(const wchar_t* fileName, HWND parent);
 
     virtual DWORD GetFileSize(LPDWORD lpFileSizeHigh);
 

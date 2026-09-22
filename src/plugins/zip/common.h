@@ -37,13 +37,19 @@ public:
     BOOL Unix;
 };
 
+// Name is wide - the selected-file name from the panel (SalEnumSelection's own
+// wide names), stored losslessly. Was LPTSTR (narrow): EnumFiles used to CP_ACP-narrow every
+// name before constructing one of these, and REFUSED (aborted the whole batch operation) the
+// moment any single selected file's name couldn't survive that round trip - see EnumFiles'
+// own comment in common.cpp. Widening removes the round trip entirely, so the refusal no
+// longer applies to representable-but-non-ANSI names.
 struct CExtInfo
 {
-    LPTSTR Name;
+    wchar_t* Name;
     int ItemNumber; // # of item in Cetral Directory, not offset
     bool IsDir;
 
-    CExtInfo(LPCTSTR pName, bool isDir, int nItem);
+    CExtInfo(const wchar_t* pName, bool isDir, int nItem);
     ~CExtInfo();
 };
 
@@ -74,8 +80,8 @@ struct CConfiguration
     bool AutoExpandMV;                 //automatically expand multi-volume archives
                                        //on non-removable disks
     int Version;                       //config version (0 - default; 1 - beta 3; 2 - beta 4)
-    char DefSfxFile[MAX_PATH];         //default sfx package
-    char LastExportPath[MAX_PATH];     //default path to export sfx settings to
+    std::wstring DefSfxFile;           // default SFX package basename
+    std::wstring LastExportPath;       // default path to export SFX settings to
     int CurSalamanderVersion;          //current version of Altap Salamnder
     int ChangeLangReaction;            //viz CLR_xxx
     BOOL WinZipNames;                  // winzip compatible multi-volume archive names
@@ -146,20 +152,26 @@ struct CFile
     QWORD Size;
     QWORD FilePointer;
     QWORD RealFilePointer;
-    char* FileName;
+    std::wstring FileName;
     int Flags;
     char* OutputBuffer;
     unsigned BufferPosition;
     char* InputBuffer;
     // unsigned  InputPosition;
     unsigned BigFile : 1; // the file can be larger than 4GB
+
+    CFile()
+        : File(INVALID_HANDLE_VALUE), Size(0), FilePointer(0), RealFilePointer(0), Flags(0),
+          OutputBuffer(NULL), BufferPosition(0), InputBuffer(NULL), BigFile(0)
+    {
+    }
 };
 
 class CZipCommon
 {
 public:
     CFile* ZipFile;             //zip file hanndle
-    CPathBuffer ZipName; //name of zip file
+    std::wstring ZipName; // local archive path
     const char* ZipRoot;
     int RootLen; //length of ZipRoot
     bool ZeroZip;
@@ -179,7 +191,6 @@ public:
     CQuadWord ProgressTotalSize;
     bool Fatal;
     bool UserBreak;
-    CPathBuffer OriginalCurrentDir;
     bool Extract;
     //bool                MenuSfx;//this is set when creating self extracting archive from menu
     char* Comment;
@@ -197,11 +208,11 @@ public:
     CSalAES AESContext;
     BOOL AESContextValid; // is it necessary to call fcrypt_end?
 
-    TIndirectArray2<char>* ArchiveVolumes;
+    std::vector<std::wstring>* ArchiveVolumes;
 
-    CZipCommon(const char* zipName, const char* zipRoot,
+    CZipCommon(const wchar_t* zipName, const char* zipRoot,
                CSalamanderForOperationsAbstract* salamander,
-               TIndirectArray2<char>* archiveVolumes);
+               std::vector<std::wstring>* archiveVolumes);
 
     ~CZipCommon();
 
@@ -213,14 +224,14 @@ public:
     int Write(CFile* file, const void* buffer, unsigned bytesToWrite, bool* skipAll);
     int Flush(CFile* file, const void* buffer, unsigned bytesToWrite, bool* skipAll);
     // if 'useReadCache' is TRUE, InputBuffer is allocated inside 'file'
-    int CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
+    int CreateCFile(CFile** file, const wchar_t* fileName, unsigned int access,
                     unsigned int share, unsigned int creation, unsigned int attributes,
                     int flags, bool* skipAll, bool bigFile, bool useReadCache);
 
     int CloseCFile(CFile* file);
 
-    int ProcessError(int errorID, int lastError, const char* fileName,
-                     int flags, bool* skipAll, char* extText = NULL);
+    int ProcessError(int errorID, int lastError, const wchar_t* fileName,
+                     int flags, bool* skipAll, const wchar_t* extText = NULL);
 
     //zip processing functions
     int CheckZipFormat();
@@ -231,6 +242,9 @@ public:
     void ProcessHeader(CFileHeader* fileHeader, CFileInfo* fileInfo);
     bool IsDirByHeader(CFileHeader* fileHeader);
     int ProcessName(CFileHeader* fileHeader, char* outputName);
+    // Wide-primary twin of ProcessName - see common.cpp for why this exists (the UTF-8
+    // entry-name mangling bug) and its scope (display only, via CZipList::List).
+    int ProcessNameW(CFileHeader* fileHeader, wchar_t* outputName);
     int ReadLocalHeader(CLocalFileHeader* fileHeader, QWORD offset);
     void ProcessLocalHeader(CLocalFileHeader* fileHeader,
                             CFileInfo* fileInfo, CAESExtraField* aesExtraField);
@@ -244,28 +258,28 @@ public:
       return parent ? parent : SalamanderGeneral->GetMainWindowHWND();
     }*/
     void DetectRemovable();
-    int TestIfExist(const char* name);
+    int TestIfExist(const wchar_t* name);
 
 #ifndef SSZIP
     int ChangeDisk();
-    void FindLastFile(char* lastFile);
+    std::wstring FindLastFile();
 #else  //SSZIP
     int ChangeDisk()
     {
         TRACE_E("ChangeDisk() - dummy, tato funkce by nemnela byt nikdy volana");
         return -1;
     }
-    void FindLastFile(char* lastFile)
+    std::wstring FindLastFile()
     {
         TRACE_E("FindLastFile() - dummy, tato funkce by nemnela byt nikdy volana");
-        *lastFile = 0;
+        return {};
     }
 #endif //SSZIP
 };
 
 struct CSfxLang
 {
-    CPathBuffer FileName;
+    std::string FileName; // encoded SFX package basename
     DWORD LangID;
     char* DlgTitle;
     char* DlgText;
@@ -290,27 +304,37 @@ extern HINSTANCE HLanguage;   // handle of the SLG - language-dependent resource
 extern const CConfiguration DefConfig;
 extern CConfiguration Config;
 
-char* LoadStr(int resID);
-WCHAR* LoadStrW(int resID);
+std::wstring LangStr(int resID);
+
+// Best-effort wide->narrow bridge for this plugin's explicit byte boundaries.
+//
+// (1) The SFX script that WriteSFXComment builds: those bytes are written to a file with
+//     Write(outFile, buf, strlen(buf)) and then parsed by the SFX stub, which reads bytes.
+// (2) The ZIP archive comment and a handful of ZIP-format fields, which the format itself
+//     defines as bytes.
+// These are file FORMATS whose width is not ours to choose. Never use this helper for OS paths or
+// ordinary UI presentation.
+inline std::string ZipLegacyFormatBytes(const wchar_t* wide)
+{
+    if (wide == NULL)
+        return std::string();
+    std::string out;
+    EncodeZipLegacyTextExact(wide, out);
+    return out;
+}
+std::wstring LoadStrW(int resID);
 
 int InflateBuffer(char* sour, int sourSize, char* dest, int* destSize);
-int LoadSfxFileData(char* fileName, CSfxLang** lang);
-void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size);
-int MakeFileName(int number, bool seqNames, const char* archive, char* name,
-                 BOOL winZipNames);
-
-int RenumberName(int number, const char* oldName, char* newName,
-                 bool lastFile, BOOL winzip);
-void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext);
-
+int LoadSfxFileData(const wchar_t* fileName, CSfxLang** lang);
+std::wstring GetInfo(FILETIME* lastWrite, QWORD size);
 //bool HasExtension(const char * filename, const char * extension);
 bool Atod(const char* string, char* decSep, double* val);
 DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size);
 DWORD PackSfxSettings(CSfxSettings* settings, char*& buffer, DWORD& size);
-char* FormatMessage(char* buffer, int errorID, int lastError);
-LPTSTR StrNChr(LPCTSTR lpStart, int nChar, char wMatch);
-LPTSTR StrRChr(LPCTSTR lpStart, LPCTSTR lpEnd, char wMatch);
-LPTSTR TrimTralingSpaces(LPTSTR lpString);
+std::wstring FormatZipErrorMessage(int errorID, int lastError);
+char* StrNChr(const char* lpStart, int nChar, char wMatch);
+char* StrRChr(const char* lpStart, const char* lpEnd, char wMatch);
+char* TrimTralingSpaces(char* lpString);
 //***********************************************************************************
 //
 // Routines from SHLWAPI.DLL

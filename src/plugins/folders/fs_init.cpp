@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+
 #include "dialogs.h"
 #include "folders.h"
 
@@ -14,7 +15,7 @@
 #include "lang\lang.rh"
 
 // FS name assigned by Salamander after the plugin is loaded
-CPathBuffer AssignedFSName; // Heap-allocated for long path support
+std::wstring AssignedFSName;
 
 // image list for simple FS icons
 HIMAGELIST DFSImageList = NULL;
@@ -23,7 +24,7 @@ HIMAGELIST DFSImageList = NULL;
 // shared for both the archiver and the FS
 const CFileData** TransferFileData = NULL;
 int* TransferIsDir = NULL;
-char* TransferBuffer = NULL;
+wchar_t* TransferBuffer = NULL;
 int* TransferLen = NULL;
 DWORD* TransferRowData = NULL;
 CPluginDataInterfaceAbstract** TransferPluginDataIface = NULL;
@@ -73,7 +74,7 @@ void ReleaseFS()
 //
 
 CPluginFSInterfaceAbstract* WINAPI
-CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
     ActiveFSCount++;
 
@@ -102,7 +103,7 @@ void WINAPI
 CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(%d)", panel);
-    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName, "", NULL);
+    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName.c_str(), L"", NULL);
 }
 
 #define CMD_ID_FIRST 1
@@ -113,7 +114,7 @@ LPITEMIDLIST ChangePathNewPIDL = NULL;
 
 void WINAPI
 CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                   const char* pluginFSName, int pluginFSNameIndex,
+                                   const wchar_t* pluginFSName, int pluginFSNameIndex,
                                    CFileData& file, int isDir)
 {
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
@@ -128,7 +129,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
             {
                 ChangePathNewFolder = newFolder; // passing the path through globals
                 ChangePathNewPIDL = newPIDL;
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, "?");
+                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, L"?");
                 if (ChangePathNewFolder != NULL)
                 {
                     ChangePathNewFolder->Release();
@@ -147,7 +148,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
             {
                 ChangePathNewFolder = newFolder;
                 ChangePathNewPIDL = newPIDL;
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, "?");
+                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, L"?");
                 if (ChangePathNewFolder != NULL)
                 {
                     ChangePathNewFolder->Release();
@@ -195,7 +196,7 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
     BOOL ret = FALSE;
     if (isInPanel)
@@ -293,7 +294,8 @@ CPluginDataInterface::GetPluginIcon(const CFileData* file, int iconSize, BOOL& d
     LPITEMIDLIST pidlFull = ILCombine(FolderPIDL, (LPCITEMIDLIST)file->PluginData);
     if (pidlFull != NULL)
     {
-        if (SalamanderGeneral->GetFileIcon((const char*)pidlFull, TRUE, &hIcon, iconSize, FALSE, FALSE))
+        if (SalamanderGeneral->GetFileIconFromPIDL(
+                pidlFull, &hIcon, iconSize, FALSE, FALSE))
             destroyIcon = TRUE;
         ILFree(pidlFull);
     }
@@ -366,8 +368,8 @@ void WINAPI GetRowText()
 
     if (SUCCEEDED(pluginData->GetDetailsHelper(realIndex, &di)))
     {
-        StrRetToBuf(&di.str, di.pidl, TransferBuffer, TRANSFER_BUFFER_MAX);
-        *TransferLen = (int)strlen(TransferBuffer);
+        StrRetToBufW(&di.str, di.pidl, TransferBuffer, TRANSFER_BUFFER_MAX);
+        *TransferLen = (int)wcslen(TransferBuffer);
     }
     else
     {
@@ -376,7 +378,7 @@ void WINAPI GetRowText()
 }
 
 void WINAPI
-CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                 const CFileData* upperDir)
 {
     // obtain the global variables for quick access
@@ -403,8 +405,8 @@ CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, c
             }
             else
             {
-                lstrcpyn(column.Name, shellCol->Name, SAL_ARRAYSIZE(column.Name));
-                lstrcpyn(column.Description, "", SAL_ARRAYSIZE(column.Description));
+                lstrcpynW(column.Name, shellCol->Name, SAL_ARRAYSIZE(column.Name));
+                lstrcpynW(column.Description, L"", SAL_ARRAYSIZE(column.Description));
                 column.GetText = GetRowText;
                 column.SupportSorting = 0;
                 column.LeftAlignment = (shellCol->Fmt == LVCFMT_LEFT) ? 1 : 0;
@@ -421,8 +423,8 @@ CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, c
 BOOL WINAPI
 CPluginDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOOL isDir,
                                          int selectedFiles, int selectedDirs, BOOL displaySize,
-                                         const CQuadWord& selectedSize, char* buffer,
-                                         DWORD* hotTexts, int& hotTextsCount)
+                                         const CQuadWord& selectedSize, CSalamanderStringBuffer* buffer,
+                                         CSalamanderTextRangeBuffer* hotTexts)
 {
     return FALSE;
 }
@@ -446,7 +448,7 @@ BOOL CPluginDataInterface::GetShellColumns()
             break;
 
         CShellColumn col;
-        StrRetToBuf(&di.str, NULL, col.Name, SAL_ARRAYSIZE(col.Name));
+        StrRetToBufW(&di.str, NULL, col.Name, SAL_ARRAYSIZE(col.Name));
         col.Fmt = di.fmt;
         col.Char = di.cxChar;
         col.Flags = SHCOLSTATE_ONBYDEFAULT; // columns shown by default

@@ -38,7 +38,7 @@ public:
         SUPPORTED_SERVICES = 0U
     };
 
-    static PCTSTR SUGGESTED_NAME;
+    static PCWSTR SUGGESTED_NAME;
 };
 
 typedef enum _WPDFS_LEVEL

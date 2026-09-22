@@ -387,11 +387,13 @@ public:
         bool IsOK() { return bOK; };
     };
 
-    // Used internally when traversing catalog and reconstructing file tree
+    // Used internally when traversing catalog and reconstructing file tree. Wide: 'name' feeds
+    // CSalamanderDirectoryAbstract::AddDir/AddFile's 'path' argument directly, which the SDK
+    // requires wide.
     struct FolderInfo
     {
         UInt32 id;
-        char name[1];
+        wchar_t name[1];
     };
 
 private:
@@ -417,12 +419,12 @@ public:
 
     virtual BOOL Open(BOOL quiet);
     virtual BOOL DumpInfo(FILE* outStream);
-    virtual BOOL ListDirectory(char* path, int session,
+    virtual BOOL ListDirectory(const std::wstring& path, int session,
                                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
-    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                           const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
+    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                           const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
-    BOOL GetRootName(char* rootName, int maxlen);
+    BOOL GetRootName(std::wstring& rootName);
 
     friend class CUDFISO;
     friend class BTree;

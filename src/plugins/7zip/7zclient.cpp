@@ -23,10 +23,6 @@
 // C7zClient
 //
 
-#ifndef _UNICODE
-bool g_IsNT = false;
-#endif
-
 HINSTANCE g_hInstance;
 
 // {23170F69-40C1-278A-1000-000110070000}
@@ -59,21 +55,15 @@ char *C7zClient::CItemData::GetMethodStr() {
 
 C7zClient::CItemData::CItemData()
 {
-    Method = NULL;
 }
 
 C7zClient::CItemData::~CItemData()
 {
-    delete[] Method;
 }
 
-void C7zClient::CItemData::SetMethod(const char* method)
+void C7zClient::CItemData::SetMethod(const wchar_t* method)
 {
-    delete[] Method;
-    Method = new char[strlen(method) + 1];
-    if (Method == NULL)
-        return;
-    strcpy(Method, method);
+    Method = method;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,12 +78,16 @@ C7zClient::~C7zClient()
 
 BOOL C7zClient::CreateObject(const GUID* interfaceID, void** object)
 {
-    TCHAR dllPath[MAX_PATH];
-    if (!GetModuleFileName(DLLInstance, dllPath, MAX_PATH))
+    std::wstring dllPath;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, dllPath))
         return FALSE;
-    lstrcpy(_tcsrchr(dllPath, '\\') + 1, _T("7za.dll"));
+    const size_t dllName = dllPath.find_last_of(L'\\');
+    if (dllName == std::wstring::npos)
+        return FALSE;
+    dllPath.resize(dllName + 1);
+    dllPath += L"7za.dll";
 
-    if (!Load(dllPath))
+    if (!Load(dllPath.c_str()))
         return Error(IDS_CANT_LOAD_LIBRARY);
 
     TCreateObjectFunc createObjectFunc = (TCreateObjectFunc)GetProc("CreateObject");
@@ -109,7 +103,7 @@ BOOL C7zClient::CreateObject(const GUID* interfaceID, void** object)
     return TRUE;
 }
 
-BOOL C7zClient::OpenArchive(const char* fileName, IInArchive** archive, UString& password, BOOL quiet /* = FALSE*/)
+BOOL C7zClient::OpenArchive(const wchar_t* fileName, IInArchive** archive, UString& password, BOOL quiet /* = FALSE*/)
 {
     CMyComPtr<IInArchive> a;
     if (!CreateObject(&IID_IInArchive, (void**)&a))
@@ -119,7 +113,7 @@ BOOL C7zClient::OpenArchive(const char* fileName, IInArchive** archive, UString&
     CMyComPtr<IInStream> file = fileSpec;
 
     if (!fileSpec->Open(fileName))
-        return Error(IDS_CANT_OPEN_ARCHIVE, quiet, fileName);
+        return ErrorWidePath(IDS_CANT_OPEN_ARCHIVE, quiet, fileName);
 
     CArchiveOpenCallbackImp* openCallbackSpec = new CArchiveOpenCallbackImp(password);
     CMyComPtr<IArchiveOpenCallback> openCallback(openCallbackSpec);
@@ -131,14 +125,14 @@ BOOL C7zClient::OpenArchive(const char* fileName, IInArchive** archive, UString&
         return FALSE;
     }
     if (S_OK != ret)
-        return Error(password.IsEmpty() ? IDS_UNSUPPORTED_ARCHIVE : IDS_CANT_OPEN_ARCHIVE_PWD, quiet, fileName);
+        return ErrorWidePath(password.IsEmpty() ? IDS_UNSUPPORTED_ARCHIVE : IDS_CANT_OPEN_ARCHIVE_PWD, quiet, fileName);
 
     *archive = a.Detach();
 
     return TRUE;
 }
 
-BOOL C7zClient::ListArchive(const char* fileName, CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData, UString& password)
+BOOL C7zClient::ListArchive(const wchar_t* fileName, CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData, UString& password)
 {
     CMyComPtr<IInArchive> inArchive;
 
@@ -148,15 +142,14 @@ BOOL C7zClient::ListArchive(const char* fileName, CSalamanderDirectoryAbstract* 
     UINT32 numItems = 0;
     inArchive->GetNumberOfItems(&numItems);
     UINT32 i;
-    BOOL reportTooLongPathErr = TRUE;
     // Get the path-less archive file name
-    LPCTSTR archiveName = _tcsrchr(fileName, '\\');
+    const wchar_t* archiveName = wcsrchr(fileName, L'\\');
     if (archiveName)
         archiveName++;
     else
         archiveName = fileName;
     for (i = 0; i < numItems; i++)
-        AddFileDir(inArchive, i, dir, pluginData, &reportTooLongPathErr, archiveName);
+        AddFileDir(inArchive, i, dir, pluginData, archiveName);
 
     return TRUE;
 }
@@ -186,11 +179,11 @@ BOOL C7zClient::FillItemData(IInArchive* archive, UINT32 index, C7zClient::CItem
 
     // method
     if (archive->GetProperty(index, kpidMethod, &propVariant) != S_OK)
-        itemData->SetMethod("Unknown");
+        itemData->SetMethod(L"Unknown");
     else if (propVariant.vt == VT_EMPTY)
-        itemData->SetMethod("None");
+        itemData->SetMethod(L"None");
     else
-        itemData->SetMethod(GetAnsiString(propVariant.bstrVal));
+        itemData->SetMethod(propVariant.bstrVal);
 
     /*  // 06F10701 is the id for 7zAES -> so it's the password :)
 //  if (strstr(itemData->Method, "06F10701") != NULL)
@@ -204,15 +197,15 @@ BOOL C7zClient::FillItemData(IInArchive* archive, UINT32 index, C7zClient::CItem
 
 BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
                            CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData,
-                           BOOL* reportTooLongPathErr, const char* archiveName)
+                           const wchar_t* archiveName)
 {
     NWindows::NCOM::CPropVariant propVariant;
     // path
     archive->GetProperty(idx, kpidPath, &propVariant);
-    CSysString path = GetAnsiString(propVariant.bstrVal);
+    UString path = propVariant.bstrVal;
 
     BOOL ret = FALSE;
-    LPTSTR p = NULL;
+    wchar_t* p = NULL;
     C7zClient::CItemData* itemData = NULL;
 
     if (path.IsEmpty())
@@ -220,7 +213,7 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
         // kpidPath is empty -> take the archive name w/o the last extension
         assert(!idx);
         path = archiveName;
-        int dot = path.ReverseFind('.');
+        int dot = path.ReverseFind(L'.');
         if (dot >= 0)
         {
             path.Delete(dot, path.Len() - dot);
@@ -228,18 +221,17 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
     }
     try
     {
-        p = new TCHAR[path.Len() + 2]; // lengthof('\\' + '\0') == 2
-        // The typecast to LPCTSTR tells the compiler to call operator const T*() on the returned AString object
-        _stprintf(p, "\\%s", (LPCTSTR)path);
+        p = new wchar_t[path.Len() + 2]; // lengthof('\\' + '\0') == 2
+        swprintf_s(p, path.Len() + 2, L"\\%s", (const wchar_t*)path);
 
         // name
-        LPTSTR fileName = _tcsrchr(p, '\\');
+        wchar_t* fileName = wcsrchr(p, L'\\');
         if (fileName != NULL)
         {
             *fileName = '\0';
             fileName++;
         }
-        LPTSTR filePath = p;
+        wchar_t* filePath = p;
 
         CFileData fd;
         fd.Name = SalamanderGeneral->DupStr(fileName);
@@ -249,8 +241,8 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
             throw FALSE;
         } // if
 
-        fd.NameLen = _tcslen(fd.Name);
-        LPTSTR s = _tcsrchr(fd.Name, '.');
+        fd.NameLen = static_cast<DWORD>(wcslen(fd.Name)); // UString length is 32-bit
+        wchar_t* s = wcsrchr(fd.Name, L'.');
         if (s != NULL)
             fd.Ext = s + 1; // ".cvspass" is treated as an extension on Windows ...
         else
@@ -316,16 +308,7 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
                 SalamanderGeneral->Free(fd.Name);
                 delete itemData; // already stored in fd.PluginData
                 // dir->Clear(pluginData);  // Petr: no reason to throw the rest away
-                if (_tcslen(filePath) > MAX_PATH - 5) // Petr: too-long-path test copied from Salamander
-                {
-                    if (*reportTooLongPathErr)
-                    {
-                        Error(IDS_ERRADDDIR_TOOLONG);
-                        *reportTooLongPathErr = FALSE; // Petr: prevent repeated too-long-path reports, there can be many
-                    }
-                }
-                else
-                    Error(IDS_ERROR);
+                Error(IDS_ERROR);
                 throw FALSE;
             }
         }
@@ -343,16 +326,7 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
                 SalamanderGeneral->Free(fd.Name);
                 delete itemData; // already stored in fd.PluginData
                 // dir->Clear(pluginData);  // Petr: no reason to throw the rest away
-                if (_tcslen(filePath) > MAX_PATH - 5) // Petr: too-long-path test copied from Salamander
-                {
-                    if (*reportTooLongPathErr)
-                    {
-                        Error(IDS_ERRADDFILE_TOOLONG);
-                        *reportTooLongPathErr = FALSE; // Petr: prevent repeated too-long-path reports, there can be many
-                    }
-                }
-                else
-                    Error(IDS_ERROR);
+                Error(IDS_ERROR);
                 throw FALSE;
             }
         }
@@ -373,7 +347,7 @@ compare(const void* arg1, const void* arg2)
     return *(UINT32*)arg1 - *(UINT32*)arg2;
 }
 
-int C7zClient::Decompress(CSalamanderForOperationsAbstract* salamander, const char* archiveName, const char* outDir,
+int C7zClient::Decompress(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName, const wchar_t* outDir,
                           TIndirectArray<CArchiveItemInfo>* itemList, UString& password, BOOL silentDelete /* = FALSE*/)
 {
     CMyComPtr<IInArchive> inArchive;
@@ -469,7 +443,7 @@ int C7zClient::Decompress(CSalamanderForOperationsAbstract* salamander, const ch
     return ret;
 } /* C7zClient::Decompress */
 
-int C7zClient::TestArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName)
+int C7zClient::TestArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName)
 {
     CMyComPtr<IInArchive> inArchive;
     UString Password;
@@ -627,19 +601,18 @@ int C7zClient::DeleteMakeUpdateList(TIndirectArray<CArchiveItem>* archiveItems, 
     return OPER_OK;
 } /* C7zClient::DeleteMakeUpdateList */
 
-int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
+int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName,
                       TIndirectArray<CArchiveItemInfo>* deleteList, bool passwordIsDefined, UString& password)
 {
-    CPathBuffer tmpName; // Heap-allocated for long path support
+    std::wstring tmpName;
     DWORD err;
 
-    CPathBuffer srcPath; // Heap-allocated for long path support
-    lstrcpyn(srcPath, archiveName, srcPath.Size());
-    char* rbackslash = _tcsrchr(srcPath.Get(), '\\');
-    if (rbackslash != NULL)
-        *rbackslash = '\0';
+    std::wstring srcPath = archiveName;
+    const size_t rbackslash = srcPath.find_last_of(L'\\');
+    if (rbackslash != std::wstring::npos)
+        srcPath.resize(rbackslash);
 
-    if (!SalamanderGeneral->SalGetTempFileName(srcPath, "sal", tmpName, TRUE, &err))
+    if (!SPLSalGetTempFileNameOwned(SalamanderGeneral, srcPath.c_str(), L"sal", tmpName, TRUE, &err))
     {
         SysError(IDS_CANT_CREATE_TMPFILE, err, FALSE);
         return OPER_CANCEL;
@@ -675,7 +648,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
         }
         CMyComPtr<IOutStream> outStream(outStreamSpec);
 
-        if (!outStreamSpec->Open(tmpName, OPEN_EXISTING))
+        if (!outStreamSpec->Open(tmpName.c_str(), OPEN_EXISTING))
         {
             Error(IDS_CANT_CREATE_ARCHIVE);
             throw OPER_CANCEL;
@@ -731,20 +704,19 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
             // close the open archive
             inArchive->Close();
             // delete it
-            CWidePath wArchiveName(archiveName);
-            if (DeleteFileW(wArchiveName))
+            if (DeleteFileW(archiveName))
             {
                 DWORD err2;
                 // rename the tmp file to the archive
-                if (!SalamanderGeneral->SalMoveFile(tmpName, archiveName, &err2))
+                if (!SalamanderGeneral->SalMoveFile(tmpName.c_str(), archiveName, &err2))
                 {
-                    SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName.Get());
+                    SysErrorWidePath(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName.c_str());
                     throw OPER_CANCEL;
                 }
             }
             else
             {
-                Error(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
+                ErrorWidePath(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
                 throw OPER_CANCEL;
             }
         }
@@ -777,10 +749,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
     }
 
     delete archiveItems;
-    {
-        CWidePath wTmpName(tmpName);
-        DeleteFileW(wTmpName);
-    }
+    DeleteFileW(tmpName.c_str());
 
     return ret;
 } /* C7zClient::Delete */
@@ -928,12 +897,11 @@ int C7zClient::UpdateMakeUpdateList(TIndirectArray<CFileItem>* fileList, TIndire
 
                 if (mode == Ask)
                 {
-                    char fifd[1024], aifd[1024];
-                    GetInfo(fifd, &fi->LastWriteTime, fi->Size);
-                    GetInfo(aifd, &ai->LastWrite, ai->Size);
+                    const std::wstring fifd = GetInfoW(&fi->LastWriteTime, fi->Size);
+                    const std::wstring aifd = GetInfoW(&ai->LastWrite, ai->Size);
 
                     int userAct = SalamanderGeneral->DialogOverwrite(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_YESALLSKIPCANCEL,
-                                                                     GetAnsiString(ai->Name), aifd, GetAnsiString(fi->FullPath), fifd);
+                                                                     ai->Name, aifd.c_str(), fi->FullPath, fifd.c_str());
 
                     switch (userAct)
                     {
@@ -1079,16 +1047,16 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
     return S_OK;
 }
 
-int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
-                      const char* srcPath, BOOL isNewArchive, TIndirectArray<CFileItem>* fileList,
+int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName,
+                      const wchar_t* srcPath, BOOL isNewArchive, TIndirectArray<CFileItem>* fileList,
                       CCompressParams* compressParams, bool passwordIsDefined, UString password)
 {
-    CPathBuffer tmpName; // Heap-allocated for long path support
+    std::wstring tmpName = archiveName;
     // trim the filename from archiveName, leaving the target path where we will extract
-    lstrcpyn(tmpName, archiveName, tmpName.Size());
-    SalamanderGeneral->CutDirectory(tmpName, NULL);
+    SPLCutDirectoryOwned(SalamanderGeneral, tmpName);
     DWORD err;
-    if (!SalamanderGeneral->SalGetTempFileName(tmpName, "sal", tmpName, TRUE, &err))
+    std::wstring tempFile;
+    if (!SPLSalGetTempFileNameOwned(SalamanderGeneral, tmpName.c_str(), L"sal", tempFile, TRUE, &err))
     {
         SysError(IDS_CANT_CREATE_TMPFILE, err, FALSE);
         return OPER_CANCEL;
@@ -1145,7 +1113,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
         }
         CMyComPtr<IOutStream> outStream(outStreamSpec);
 
-        if (!outStreamSpec->Open(tmpName, OPEN_EXISTING))
+        if (!outStreamSpec->Open(tempFile.c_str(), OPEN_EXISTING))
         {
             Error(IDS_CANT_CREATE_ARCHIVE);
             throw OPER_CANCEL;
@@ -1206,19 +1174,18 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
                 // close the open archive
                 inArchive->Close();
                 // delete it
-                CWidePath wArchiveName2(archiveName);
-                if (!DeleteFileW(wArchiveName2))
+                if (!DeleteFileW(archiveName))
                 {
-                    Error(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
+                    ErrorWidePath(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
                     throw OPER_CANCEL;
                 }
             }
 
             DWORD err2;
             // rename the tmp file to the archive
-            if (!SalamanderGeneral->SalMoveFile(tmpName, archiveName, &err2))
+            if (!SalamanderGeneral->SalMoveFile(tempFile.c_str(), archiveName, &err2))
             {
-                SysError(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tmpName.Get());
+                SysErrorWidePath(IDS_CANT_MOVE_TMPARCHIVE, err2, FALSE, tempFile.c_str());
                 throw OPER_CANCEL;
             }
         }
@@ -1275,10 +1242,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
     delete archiveItems;
     delete updateList;
 
-    {
-        CWidePath wTmpName2(tmpName);
-        DeleteFileW(wTmpName2);
-    }
+    DeleteFileW(tempFile.c_str());
 
     return ret;
 } /* C7zClient::Update */

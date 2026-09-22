@@ -10,143 +10,15 @@
 #include "IFileSystem.h"
 #include "IPathService.h"
 #include "fsutil.h"
+#include <aclapi.h>
+#include <limits>
+#include <new>
+#include <ntddscsi.h>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
-namespace
-{
-bool HasLongPrefix(const wchar_t* path)
-{
-    return path != NULL && wcsncmp(path, L"\\\\?\\", 4) == 0;
-}
-
-bool IsUNCPath(const wchar_t* path)
-{
-    return path != NULL && path[0] == L'\\' && path[1] == L'\\' && !HasLongPrefix(path);
-}
-
-bool IsDriveAbsolutePath(const wchar_t* path)
-{
-    return path != NULL &&
-           ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z')) &&
-           path[1] == L':' &&
-           (path[2] == L'\\' || path[2] == L'/');
-}
-
-void NormalizePathSeparators(std::wstring& path)
-{
-    for (size_t i = 0; i < path.size(); ++i)
-    {
-        if (path[i] == L'/')
-            path[i] = L'\\';
-    }
-}
-
-const wchar_t* GetBaseName(const wchar_t* path)
-{
-    if (path == NULL)
-        return NULL;
-
-    const wchar_t* lastSlash = wcsrchr(path, L'\\');
-    const wchar_t* lastAltSlash = wcsrchr(path, L'/');
-    const wchar_t* name = path;
-    if (lastSlash != NULL && lastSlash >= name)
-        name = lastSlash + 1;
-    if (lastAltSlash != NULL && lastAltSlash + 1 > name)
-        name = lastAltSlash + 1;
-    return name;
-}
-
-bool BuildExtendedAbsolutePath(const wchar_t* inputPath, std::wstring& outPath)
-{
-    if (inputPath == NULL || inputPath[0] == L'\0')
-    {
-        SetLastError(ERROR_INVALID_PARAMETER);
-        return false;
-    }
-
-    if (HasLongPrefix(inputPath))
-    {
-        outPath.assign(inputPath);
-        return true;
-    }
-
-    if (gPathService == NULL)
-        gPathService = GetWin32PathService();
-    if (gPathService == NULL)
-    {
-        SetLastError(ERROR_INVALID_FUNCTION);
-        return false;
-    }
-
-    std::wstring fullPath;
-    if (IsReservedNulBasenameW(inputPath))
-    {
-        if (IsDriveAbsolutePath(inputPath) || IsUNCPath(inputPath))
-        {
-            fullPath.assign(inputPath);
-            NormalizePathSeparators(fullPath);
-        }
-        else
-        {
-            // GetFullPathNameW("...\\nul") resolves to device path (\\.\nul), so
-            // resolve only the parent and then append the reserved file name.
-            const wchar_t* baseName = GetBaseName(inputPath);
-            size_t parentLen = (baseName != NULL) ? static_cast<size_t>(baseName - inputPath) : 0;
-            std::wstring parentPath = parentLen > 0 ? std::wstring(inputPath, parentLen) : std::wstring(L".");
-
-            PathResult parentRes = gPathService->GetFullPathName(parentPath.c_str(), fullPath);
-            if (!parentRes.success)
-            {
-                SetLastError(parentRes.errorCode);
-                return false;
-            }
-            if (fullPath.empty())
-            {
-                SetLastError(ERROR_INVALID_PARAMETER);
-                return false;
-            }
-            if (fullPath.back() != L'\\' && fullPath.back() != L'/')
-                fullPath.push_back(L'\\');
-            fullPath.append(baseName != NULL ? baseName : L"nul");
-        }
-    }
-    else
-    {
-        PathResult fullRes = gPathService->GetFullPathName(inputPath, fullPath);
-        if (!fullRes.success)
-        {
-            SetLastError(fullRes.errorCode);
-            return false;
-        }
-
-        if (fullPath.empty())
-        {
-            SetLastError(ERROR_INVALID_PARAMETER);
-            return false;
-        }
-    }
-
-    if (HasLongPrefix(fullPath.c_str()))
-    {
-        outPath.swap(fullPath);
-        return true;
-    }
-
-    if (IsUNCPath(fullPath.c_str()))
-        outPath = L"\\\\?\\UNC\\" + fullPath.substr(2);
-    else
-        outPath = L"\\\\?\\" + fullPath;
-
-    if (outPath.size() > SAL_MAX_LONG_PATH - 1)
-    {
-        SetLastError(ERROR_FILENAME_EXCED_RANGE);
-        return false;
-    }
-    return true;
-}
-} // namespace
-
-// RAII wrapper for ToLongPath result
+// RAII wrapper for canonical literal I/O path preparation.
 class LongPath
 {
 public:
@@ -160,7 +32,7 @@ public:
             return;
         }
 
-        PathResult res = gPathService->ToLongPath(path, m_path);
+        PathResult res = gPathService->PrepareForIo(path, m_path);
         if (!res.success)
         {
             SetLastError(res.errorCode);
@@ -249,16 +121,6 @@ public:
 
     FileResult DeleteFile(const wchar_t* path) override
     {
-        if (IsReservedNulBasenameW(path))
-        {
-            std::wstring specialPath;
-            if (!BuildExtendedAbsolutePath(path, specialPath))
-                return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
-            if (::DeleteFileW(specialPath.c_str()))
-                return FileResult::Ok();
-            return FileResult::Error(GetLastError());
-        }
-
         LongPath lp(path);
         if (!lp.IsValid())
             return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
@@ -291,10 +153,16 @@ public:
 
     FileResult CreateDirectory(const wchar_t* path) override
     {
+        return CreateDirectoryWithSecurity(path, NULL);
+    }
+
+    FileResult CreateDirectoryWithSecurity(const wchar_t* path,
+                                           LPSECURITY_ATTRIBUTES securityAttributes) override
+    {
         LongPath lp(path);
         if (!lp.IsValid())
             return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
-        if (::CreateDirectoryW(lp.Get(), NULL))
+        if (::CreateDirectoryW(lp.Get(), securityAttributes))
             return FileResult::Ok();
         // Keep raw Win32 semantics: an existing directory is reported as
         // Error(ERROR_ALREADY_EXISTS). SalLPCreateDirectory callers distinguish
@@ -347,6 +215,15 @@ public:
         return ::FindNextFileW(findHandle, findData);
     }
 
+    FileResult CloseFind(HANDLE findHandle) override
+    {
+        if (findHandle == INVALID_HANDLE_VALUE || findHandle == NULL)
+            return FileResult::Error(ERROR_INVALID_HANDLE);
+        if (!HANDLES(FindClose(findHandle)))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
     HANDLE OpenFileForRead(const wchar_t* path, DWORD shareMode) override
     {
         LongPath lp(path);
@@ -372,10 +249,13 @@ public:
                              disposition, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     }
 
-    void CloseHandle(HANDLE h) override
+    FileResult CloseFileHandle(HANDLE h) override
     {
-        if (h != INVALID_HANDLE_VALUE && h != NULL)
-            ::CloseHandle(h);
+        if (h == INVALID_HANDLE_VALUE || h == NULL)
+            return FileResult::Error(ERROR_INVALID_HANDLE);
+        if (!::CloseHandle(h))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
     }
 
     // --- P2-a handle I/O ops ---------------------------------------------
@@ -400,6 +280,40 @@ public:
         return FileResult::Ok();
     }
 
+    FileResult ReadFromHandleOverlapped(HANDLE h, void* buffer, DWORD toRead,
+                                         OVERLAPPED* overlapped) override
+    {
+        if (!::ReadFile(h, buffer, toRead, NULL, overlapped))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
+    FileResult WriteToHandleOverlapped(HANDLE h, const void* buffer, DWORD toWrite,
+                                        OVERLAPPED* overlapped) override
+    {
+        if (!::WriteFile(h, buffer, toWrite, NULL, overlapped))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
+    FileResult CompleteHandleIo(HANDLE h, OVERLAPPED* overlapped,
+                                 DWORD* transferred, bool wait) override
+    {
+        DWORD bytes = 0;
+        if (!::GetOverlappedResult(h, overlapped, &bytes, wait ? TRUE : FALSE))
+            return FileResult::Error(::GetLastError());
+        if (transferred)
+            *transferred = bytes;
+        return FileResult::Ok();
+    }
+
+    FileResult CancelHandleIo(HANDLE h) override
+    {
+        if (!::CancelIo(h))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
     FileResult SeekHandle(HANDLE h, int64_t distance, DWORD moveMethod, uint64_t* newPos) override
     {
         LARGE_INTEGER li;
@@ -420,6 +334,14 @@ public:
         return FileResult::Ok();
     }
 
+    FileResult GetHandleFileTime(HANDLE h, FILETIME* creation,
+                                 FILETIME* lastAccess, FILETIME* lastWrite) override
+    {
+        if (!::GetFileTime(h, creation, lastAccess, lastWrite))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
     FileResult GetHandleFileSize(HANDLE h, uint64_t* size) override
     {
         LARGE_INTEGER li;
@@ -428,6 +350,90 @@ public:
         if (size)
             *size = (uint64_t)li.QuadPart;
         return FileResult::Ok();
+    }
+
+    FileResult GetHandleStreams(
+        HANDLE h, std::vector<FileStreamEntry>& streams) override
+    {
+        streams.clear();
+        size_t capacity = sizeof(FILE_STREAM_INFO) + 256 * sizeof(wchar_t);
+        std::vector<BYTE> storage;
+        for (;;)
+        {
+            if (capacity > MAXDWORD)
+                return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            storage.assign(capacity, 0);
+            if (::GetFileInformationByHandleEx(
+                    h, FileStreamInfo, storage.data(), (DWORD)storage.size()))
+                break;
+
+            const DWORD error = ::GetLastError();
+            // Directories without named streams can report EOF instead of
+            // returning an empty FILE_STREAM_INFO list.  That is a successful
+            // enumeration with zero entries, not an ADS probe failure.
+            if (error == ERROR_HANDLE_EOF)
+                return FileResult::Ok();
+            if (error != ERROR_MORE_DATA && error != ERROR_INSUFFICIENT_BUFFER)
+                return FileResult::Error(error);
+            if (capacity > MAXDWORD / 2)
+                return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+            capacity *= 2;
+        }
+
+        const BYTE* current = storage.data();
+        const BYTE* const end = storage.data() + storage.size();
+        for (;;)
+        {
+            if ((size_t)(end - current) < offsetof(FILE_STREAM_INFO, StreamName))
+            {
+                streams.clear();
+                return FileResult::Error(ERROR_INVALID_DATA);
+            }
+            const FILE_STREAM_INFO* info = (const FILE_STREAM_INFO*)current;
+            const size_t nameBytes = info->StreamNameLength;
+            // A zero-length name ends the list; it is not a stream.
+            //
+            // GetFileInformationByHandleEx reports no byte count, and 'storage' is
+            // zero-filled, so a call that succeeds having written nothing leaves a
+            // record that parses cleanly as one entry with an empty name and a
+            // NextEntryOffset of 0. Pre-unicode guarded this with its
+            // "if (ioStatus.Information > 0) // check whether we obtained any data at
+            // all"; the Win32 form of the same check is that no real FILE_STREAM_INFO
+            // has an empty name - even the default stream is called "::$DATA". Without
+            // it, the phantom entry is not "::$DATA", so every such file looked like it
+            // carried an alternate data stream: the copy warns about ADS loss it is not
+            // about to cause, and reports the streams as non-discardable.
+            if (nameBytes == 0)
+                return FileResult::Ok();
+            if (nameBytes % sizeof(wchar_t) != 0 ||
+                nameBytes > (size_t)(end - current) -
+                                offsetof(FILE_STREAM_INFO, StreamName))
+            {
+                streams.clear();
+                return FileResult::Error(ERROR_INVALID_DATA);
+            }
+
+            FileStreamEntry entry;
+            entry.name.assign(info->StreamName,
+                              nameBytes / sizeof(wchar_t));
+            entry.size = info->StreamSize.QuadPart < 0
+                             ? 0
+                             : (uint64_t)info->StreamSize.QuadPart;
+            entry.allocationSize = info->StreamAllocationSize.QuadPart < 0
+                                       ? 0
+                                       : (uint64_t)info->StreamAllocationSize.QuadPart;
+            streams.push_back(std::move(entry));
+
+            if (info->NextEntryOffset == 0)
+                return FileResult::Ok();
+            if (info->NextEntryOffset < offsetof(FILE_STREAM_INFO, StreamName) ||
+                info->NextEntryOffset > (size_t)(end - current))
+            {
+                streams.clear();
+                return FileResult::Error(ERROR_INVALID_DATA);
+            }
+            current += info->NextEntryOffset;
+        }
     }
 
     FileResult FlushHandle(HANDLE h) override
@@ -452,6 +458,16 @@ public:
         DWORD bytes = 0;
         if (!::DeviceIoControl(h, FSCTL_SET_COMPRESSION, &state, sizeof(state),
                                NULL, 0, &bytes, NULL))
+            return FileResult::Error(::GetLastError());
+        return FileResult::Ok();
+    }
+
+    FileResult SetHandleCompressionOverlapped(HANDLE h, bool compress,
+                                               OVERLAPPED* overlapped) override
+    {
+        USHORT state = compress ? COMPRESSION_FORMAT_DEFAULT : COMPRESSION_FORMAT_NONE;
+        if (!::DeviceIoControl(h, FSCTL_SET_COMPRESSION, &state, sizeof(state),
+                               NULL, 0, NULL, overlapped))
             return FileResult::Error(::GetLastError());
         return FileResult::Ok();
     }
@@ -488,33 +504,200 @@ public:
 
     FileResult GetPathSecurity(const wchar_t* path, std::vector<BYTE>& sd) override
     {
+        sd.clear();
         LongPath lp(path);
+        if (!lp.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
         const SECURITY_INFORMATION si = OWNER_SECURITY_INFORMATION |
                                         GROUP_SECURITY_INFORMATION |
                                         DACL_SECURITY_INFORMATION;
         DWORD needed = 0;
-        ::GetFileSecurityW(lp.Get(), si, NULL, 0, &needed);
-        DWORD err = ::GetLastError();
-        if (needed == 0)
-            return FileResult::Error(err != ERROR_SUCCESS ? err : ERROR_ACCESS_DENIED);
-        sd.assign(needed, 0);
-        if (!::GetFileSecurityW(lp.Get(), si, (PSECURITY_DESCRIPTOR)sd.data(), needed, &needed))
+        for (;;)
         {
-            sd.clear();
-            return FileResult::Error(::GetLastError());
+            const DWORD capacity = (DWORD)sd.size();
+            if (::GetFileSecurityW(
+                    lp.Get(), si,
+                    sd.empty() ? NULL : (PSECURITY_DESCRIPTOR)sd.data(),
+                    capacity, &needed))
+            {
+                if (needed != 0 && needed < sd.size())
+                    sd.resize(needed);
+                return FileResult::Ok();
+            }
+
+            const DWORD error = ::GetLastError();
+            if (error != ERROR_INSUFFICIENT_BUFFER || needed == 0 ||
+                needed <= capacity)
+            {
+                sd.clear();
+                return FileResult::Error(
+                    error != ERROR_SUCCESS ? error : ERROR_ACCESS_DENIED);
+            }
+            sd.assign(needed, 0);
         }
-        return FileResult::Ok();
     }
 
     FileResult SetPathSecurity(const wchar_t* path, const BYTE* sd, size_t len) override
     {
-        if (sd == NULL || len == 0)
+        if (sd == NULL || len < SECURITY_DESCRIPTOR_MIN_LENGTH)
             return FileResult::Error(ERROR_INVALID_PARAMETER);
-        LongPath lp(path);
-        const SECURITY_INFORMATION si = DACL_SECURITY_INFORMATION;
-        if (!::SetFileSecurityW(lp.Get(), si, (PSECURITY_DESCRIPTOR)const_cast<BYTE*>(sd)))
+        PSECURITY_DESCRIPTOR descriptor =
+            (PSECURITY_DESCRIPTOR)const_cast<BYTE*>(sd);
+        if (!::IsValidSecurityDescriptor(descriptor) ||
+            ::GetSecurityDescriptorLength(descriptor) > len)
+            return FileResult::Error(ERROR_INVALID_SECURITY_DESCR);
+
+        PSID owner = NULL;
+        PSID group = NULL;
+        PACL dacl = NULL;
+        BOOL ownerDefaulted = FALSE;
+        BOOL groupDefaulted = FALSE;
+        BOOL daclPresent = FALSE;
+        BOOL daclDefaulted = FALSE;
+        SECURITY_DESCRIPTOR_CONTROL control = 0;
+        DWORD revision = 0;
+        if (!::GetSecurityDescriptorOwner(descriptor, &owner, &ownerDefaulted) ||
+            !::GetSecurityDescriptorGroup(descriptor, &group, &groupDefaulted) ||
+            !::GetSecurityDescriptorDacl(descriptor, &daclPresent, &dacl, &daclDefaulted) ||
+            !::GetSecurityDescriptorControl(descriptor, &control, &revision))
+        {
             return FileResult::Error(::GetLastError());
-        return FileResult::Ok();
+        }
+
+        LongPath lp(path);
+        if (!lp.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        const bool inheritedDacl = (control & SE_DACL_PROTECTED) == 0;
+        const SECURITY_INFORMATION securityInfo =
+            OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION |
+            DACL_SECURITY_INFORMATION |
+            (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION
+                           : PROTECTED_DACL_SECURITY_INFORMATION);
+        auto setParts = [&](SECURITY_INFORMATION info, PSID partOwner,
+                            PSID partGroup, PACL partDacl) -> DWORD {
+            return ::SetNamedSecurityInfoW(const_cast<LPWSTR>(lp.Get()),
+                                           SE_FILE_OBJECT, info, partOwner,
+                                           partGroup, partDacl, NULL);
+        };
+
+        const DWORD initialError = setParts(
+            securityInfo, owner, group, daclPresent ? dacl : NULL);
+        if (initialError == ERROR_SUCCESS)
+            return FileResult::Ok();
+
+        // Preserve the worker's historical recovery behavior without leaking
+        // LocalFree-owned security pointers into core. If setting all three
+        // components at once fails, accept already-equal owner/group values,
+        // and otherwise apply each component separately with the DACL last.
+        std::vector<BYTE> targetDescriptor;
+        PSID targetOwner = NULL;
+        PSID targetGroup = NULL;
+        PACL targetDacl = NULL;
+        auto readTarget = [&]() -> bool {
+            if (!GetPathSecurity(path, targetDescriptor).success)
+                return false;
+            BOOL targetOwnerDefaulted = FALSE;
+            BOOL targetGroupDefaulted = FALSE;
+            BOOL targetDaclPresent = FALSE;
+            BOOL targetDaclDefaulted = FALSE;
+            return ::GetSecurityDescriptorOwner(targetDescriptor.data(), &targetOwner,
+                                                &targetOwnerDefaulted) &&
+                   ::GetSecurityDescriptorGroup(targetDescriptor.data(), &targetGroup,
+                                                &targetGroupDefaulted) &&
+                   ::GetSecurityDescriptorDacl(targetDescriptor.data(), &targetDaclPresent,
+                                               &targetDacl, &targetDaclDefaulted);
+        };
+        bool targetRead = readTarget();
+
+        std::vector<BYTE> tokenUserStorage;
+        PSID currentUser = NULL;
+        HANDLE token = NULL;
+        if (::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token))
+        {
+            DWORD needed = 0;
+            ::GetTokenInformation(token, TokenUser, NULL, 0, &needed);
+            if (needed != 0)
+            {
+                tokenUserStorage.assign(needed, 0);
+                if (::GetTokenInformation(token, TokenUser,
+                                          tokenUserStorage.data(), needed, &needed))
+                {
+                    currentUser =
+                        ((TOKEN_USER*)tokenUserStorage.data())->User.Sid;
+                }
+            }
+            ::CloseHandle(token);
+        }
+
+        bool ownerOfFile = targetRead && targetOwner != NULL &&
+                           currentUser != NULL &&
+                           ::EqualSid(targetOwner, currentUser);
+        if (!ownerOfFile && currentUser != NULL &&
+            setParts(OWNER_SECURITY_INFORMATION, currentUser, NULL, NULL) ==
+                ERROR_SUCCESS)
+        {
+            ownerOfFile = true;
+            targetRead = readTarget();
+        }
+
+        const SECURITY_INFORMATION daclInfo =
+            DACL_SECURITY_INFORMATION |
+            (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION
+                           : PROTECTED_DACL_SECURITY_INFORMATION);
+        bool ownerOk = false;
+        bool groupOk = false;
+        bool daclOk = false;
+
+        if (ownerOfFile && currentUser != NULL)
+        {
+            const DWORD aclSize = sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE) -
+                                  sizeof(DWORD) + ::GetLengthSid(currentUser);
+            std::vector<BYTE> aclStorage(aclSize, 0);
+            PACL temporaryDacl = (PACL)aclStorage.data();
+            if (::InitializeAcl(temporaryDacl, aclSize, ACL_REVISION) &&
+                ::AddAccessAllowedAce(temporaryDacl, ACL_REVISION,
+                                      READ_CONTROL | WRITE_DAC | WRITE_OWNER,
+                                      currentUser) &&
+                setParts(DACL_SECURITY_INFORMATION |
+                             PROTECTED_DACL_SECURITY_INFORMATION,
+                         NULL, NULL, temporaryDacl) == ERROR_SUCCESS)
+            {
+                ownerOk = setParts(OWNER_SECURITY_INFORMATION, owner, NULL,
+                                   NULL) == ERROR_SUCCESS;
+                groupOk = setParts(GROUP_SECURITY_INFORMATION, NULL, group,
+                                   NULL) == ERROR_SUCCESS;
+                daclOk = setParts(daclInfo, NULL, NULL,
+                                  daclPresent ? dacl : NULL) == ERROR_SUCCESS;
+            }
+        }
+
+        if (!ownerOk)
+        {
+            ownerOk = setParts(OWNER_SECURITY_INFORMATION, owner, NULL, NULL) ==
+                          ERROR_SUCCESS ||
+                      targetRead &&
+                          ((owner == NULL && targetOwner == NULL) ||
+                           (owner != NULL && targetOwner != NULL &&
+                            ::EqualSid(owner, targetOwner)));
+        }
+        if (!groupOk)
+        {
+            groupOk = setParts(GROUP_SECURITY_INFORMATION, NULL, group, NULL) ==
+                          ERROR_SUCCESS ||
+                      targetRead &&
+                          ((group == NULL && targetGroup == NULL) ||
+                           (group != NULL && targetGroup != NULL &&
+                            ::EqualSid(group, targetGroup)));
+        }
+        if (!daclOk)
+        {
+            daclOk = setParts(daclInfo, NULL, NULL,
+                              daclPresent ? dacl : NULL) == ERROR_SUCCESS;
+        }
+
+        return ownerOk && groupOk && daclOk
+                   ? FileResult::Ok()
+                   : FileResult::Error(initialError);
     }
 
     // --- P2-a move + volume ----------------------------------------------
@@ -551,25 +734,306 @@ public:
 
     FileResult QueryVolumeCapabilities(const wchar_t* path, VolumeCapabilities& caps) override
     {
-        // GetVolumeInformation needs the volume root; derive it from the path.
-        wchar_t root[MAX_PATH] = {};
-        if (!::GetVolumePathNameW(path, root, MAX_PATH))
-            return FileResult::Error(::GetLastError());
+        LongPath lp(path);
+        if (!lp.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
 
-        wchar_t fsName[MAX_PATH] = {};
-        DWORD flags = 0, maxComp = 0, serial = 0;
-        if (!::GetVolumeInformationW(root, NULL, 0, &serial, &maxComp, &flags,
-                                     fsName, MAX_PATH))
-            return FileResult::Error(::GetLastError());
-        caps.fileSystemName = fsName;
-        caps.flags = flags;
+        try
+        {
+            std::wstring root;
+            DWORD rootCapacity = 256;
+            for (;;)
+            {
+                root.assign(rootCapacity, L'\0');
+                if (::GetVolumePathNameW(lp.Get(), root.data(), rootCapacity))
+                {
+                    root.resize(wcslen(root.c_str()));
+                    break;
+                }
+                const DWORD error = ::GetLastError();
+                if (error != ERROR_FILENAME_EXCED_RANGE && error != ERROR_INSUFFICIENT_BUFFER &&
+                    error != ERROR_MORE_DATA)
+                    return FileResult::Error(error);
+                if (rootCapacity > (std::numeric_limits<DWORD>::max)() / 2)
+                    return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+                rootCapacity *= 2;
+            }
 
-        DWORD sectorsPerCluster = 0, bytesPerSector = 0, freeClusters = 0, totalClusters = 0;
-        caps.bytesPerCluster = 0;
-        if (::GetDiskFreeSpaceW(root, &sectorsPerCluster, &bytesPerSector,
-                                &freeClusters, &totalClusters))
-            caps.bytesPerCluster = sectorsPerCluster * bytesPerSector;
+            std::wstring fsName;
+            DWORD fsCapacity = 64;
+            DWORD flags = 0, maxComp = 0, serial = 0;
+            for (;;)
+            {
+                fsName.assign(fsCapacity, L'\0');
+                if (::GetVolumeInformationW(root.c_str(), NULL, 0, &serial, &maxComp, &flags,
+                                            fsName.data(), fsCapacity))
+                {
+                    fsName.resize(wcslen(fsName.c_str()));
+                    break;
+                }
+                const DWORD error = ::GetLastError();
+                if (error != ERROR_FILENAME_EXCED_RANGE && error != ERROR_INSUFFICIENT_BUFFER &&
+                    error != ERROR_MORE_DATA)
+                    return FileResult::Error(error);
+                if (fsCapacity > (std::numeric_limits<DWORD>::max)() / 2)
+                    return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+                fsCapacity *= 2;
+            }
+            caps.fileSystemName.swap(fsName);
+            caps.flags = flags;
+
+            DWORD sectorsPerCluster = 0, bytesPerSector = 0, freeClusters = 0, totalClusters = 0;
+            caps.bytesPerCluster = 0;
+            if (::GetDiskFreeSpaceW(root.c_str(), &sectorsPerCluster, &bytesPerSector,
+                                    &freeClusters, &totalClusters))
+                caps.bytesPerCluster = sectorsPerCluster * bytesPerSector;
+            return FileResult::Ok();
+        }
+        catch (const std::bad_alloc&)
+        {
+            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            return FileResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+    }
+
+    FileResult SetVolumeLabel(const wchar_t* rootPath, const wchar_t* label) override
+    {
+        LongPath root(rootPath);
+        if (!root.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        if (!::SetVolumeLabelW(root.Get(), label))
+            return FileResult::Error(::GetLastError());
         return FileResult::Ok();
+    }
+
+    FileResult QueryVolumeTrim(const wchar_t* volume, bool* enabled) override
+    {
+        if (enabled == NULL)
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath path(volume);
+        if (!path.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        HANDLE handle = ::CreateFileW(path.Get(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (handle == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+
+        STORAGE_PROPERTY_QUERY query = {};
+        query.PropertyId = (STORAGE_PROPERTY_ID)StorageDeviceTrimProperty;
+        query.QueryType = PropertyStandardQuery;
+        DEVICE_TRIM_DESCRIPTOR descriptor = {};
+        DWORD returned = 0;
+        const BOOL ok = ::DeviceIoControl(handle, IOCTL_STORAGE_QUERY_PROPERTY,
+                                          &query, sizeof(query), &descriptor, sizeof(descriptor),
+                                          &returned, NULL);
+        const DWORD error = ok && returned == sizeof(descriptor) ? ERROR_SUCCESS :
+                            ok ? ERROR_INVALID_DATA : ::GetLastError();
+        ::CloseHandle(handle);
+        if (error != ERROR_SUCCESS)
+            return FileResult::Error(error);
+        *enabled = descriptor.TrimEnabled != 0;
+        return FileResult::Ok();
+    }
+
+    FileResult QueryVolumeSeekPenalty(const wchar_t* volume, bool* incursPenalty) override
+    {
+        if (incursPenalty == NULL)
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath path(volume);
+        if (!path.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        HANDLE handle = ::CreateFileW(path.Get(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
+                                      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (handle == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+
+        STORAGE_PROPERTY_QUERY query = {};
+        query.PropertyId = (STORAGE_PROPERTY_ID)StorageDeviceSeekPenaltyProperty;
+        query.QueryType = PropertyStandardQuery;
+        DEVICE_SEEK_PENALTY_DESCRIPTOR descriptor = {};
+        DWORD returned = 0;
+        const BOOL ok = ::DeviceIoControl(handle, IOCTL_STORAGE_QUERY_PROPERTY,
+                                          &query, sizeof(query), &descriptor, sizeof(descriptor),
+                                          &returned, NULL);
+        const DWORD error = ok && returned == sizeof(descriptor) ? ERROR_SUCCESS :
+                            ok ? ERROR_INVALID_DATA : ::GetLastError();
+        ::CloseHandle(handle);
+        if (error != ERROR_SUCCESS)
+            return FileResult::Error(error);
+        *incursPenalty = descriptor.IncursSeekPenalty != 0;
+        return FileResult::Ok();
+    }
+
+    FileResult QueryVolumeRotationRate(const wchar_t* volume, WORD* rpm) override
+    {
+        if (rpm == NULL)
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath path(volume);
+        if (!path.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        HANDLE handle = ::CreateFileW(path.Get(), GENERIC_READ | GENERIC_WRITE,
+                                      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                      OPEN_EXISTING, 0, NULL);
+        if (handle == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+
+        struct ATAIdentifyDeviceQuery
+        {
+            ATA_PASS_THROUGH_EX header;
+            WORD data[256];
+        } query = {};
+        query.header.Length = sizeof(query.header);
+        query.header.AtaFlags = ATA_FLAGS_DATA_IN;
+        query.header.DataTransferLength = sizeof(query.data);
+        query.header.TimeOutValue = 3;
+        query.header.DataBufferOffset = (DWORD)((BYTE*)&query.data - (BYTE*)&query);
+        query.header.CurrentTaskFile[6] = 0xec;
+        DWORD returned = 0;
+        const BOOL ok = ::DeviceIoControl(handle, IOCTL_ATA_PASS_THROUGH,
+                                          &query, sizeof(query), &query, sizeof(query),
+                                          &returned, NULL);
+        const DWORD error = ok && returned == sizeof(query) ? ERROR_SUCCESS :
+                            ok ? ERROR_INVALID_DATA : ::GetLastError();
+        ::CloseHandle(handle);
+        if (error != ERROR_SUCCESS)
+            return FileResult::Error(error);
+        *rpm = query.data[217];
+        return FileResult::Ok();
+    }
+
+    FileResult QueryDriveMediaType(wchar_t driveLetter, DWORD* mediaType) override
+    {
+        if (mediaType == NULL || !((driveLetter >= L'A' && driveLetter <= L'Z') ||
+                                   (driveLetter >= L'a' && driveLetter <= L'z')))
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        wchar_t volume[] = L"\\\\.\\A:";
+        volume[4] = driveLetter;
+        HANDLE handle = ::CreateFileW(volume, 0, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+        if (handle == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+        DISK_GEOMETRY geometry[20] = {};
+        DWORD returned = 0;
+        const BOOL ok = ::DeviceIoControl(handle, IOCTL_STORAGE_GET_MEDIA_TYPES, NULL, 0,
+                                          geometry, sizeof(geometry), &returned, NULL);
+        const DWORD error = ok && returned >= sizeof(DISK_GEOMETRY) ? ERROR_SUCCESS :
+                            ok ? ERROR_INVALID_DATA : ::GetLastError();
+        ::CloseHandle(handle);
+        if (error != ERROR_SUCCESS)
+            return FileResult::Error(error);
+        *mediaType = (DWORD)geometry[0].MediaType;
+        return FileResult::Ok();
+    }
+
+    FileResult GetCompressedSize(const wchar_t* path, uint64_t* size) override
+    {
+        if (size == NULL)
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath decorated(path);
+        if (!decorated.IsValid())
+            return FileResult::Error(::GetLastError());
+        ULARGE_INTEGER s;
+        s.LowPart = ::GetCompressedFileSizeW(decorated.Get(), &s.HighPart);
+        if (s.LowPart == INVALID_FILE_SIZE)
+        {
+            DWORD err = ::GetLastError();
+            if (err != NO_ERROR)
+                return FileResult::Error(err);
+        }
+        *size = s.QuadPart;
+        return FileResult::Ok();
+    }
+
+    // --- reparse points as opaque blobs ----------------------
+
+    FileResult GetReparseData(const wchar_t* path, std::vector<BYTE>& data) override
+    {
+        data.clear();
+        LongPath decorated(path);
+        if (!decorated.IsValid())
+            return FileResult::Error(::GetLastError());
+        HANDLE h = ::CreateFileW(decorated.Get(), FILE_READ_ATTRIBUTES,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                 NULL, OPEN_EXISTING,
+                                 FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+                                 NULL);
+        if (h == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+        data.resize(MAXIMUM_REPARSE_DATA_BUFFER_SIZE);
+        DWORD bytes = 0;
+        BOOL ok = ::DeviceIoControl(h, FSCTL_GET_REPARSE_POINT, NULL, 0,
+                                    data.data(), (DWORD)data.size(), &bytes, NULL);
+        DWORD err = ok ? NO_ERROR : ::GetLastError();
+        ::CloseHandle(h);
+        if (!ok)
+        {
+            data.clear();
+            return FileResult::Error(err);
+        }
+        data.resize(bytes);
+        return FileResult::Ok();
+    }
+
+    FileResult SetReparseData(const wchar_t* path, const BYTE* data, size_t len) override
+    {
+        if (data == NULL || len == 0 ||
+            len > MAXIMUM_REPARSE_DATA_BUFFER_SIZE)
+            return FileResult::Error(ERROR_INVALID_PARAMETER);
+        LongPath decorated(path);
+        if (!decorated.IsValid())
+            return FileResult::Error(::GetLastError());
+        HANDLE h = ::CreateFileW(decorated.Get(), GENERIC_WRITE,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+                                 FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS,
+                                 NULL);
+        if (h == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+        DWORD bytes = 0;
+        BOOL ok = ::DeviceIoControl(h, FSCTL_SET_REPARSE_POINT,
+                                    const_cast<BYTE*>(data), (DWORD)len,
+                                    NULL, 0, &bytes, NULL);
+        DWORD err = ok ? NO_ERROR : ::GetLastError();
+        ::CloseHandle(h);
+        return ok ? FileResult::Ok() : FileResult::Error(err);
+    }
+
+    FileResult DeleteDirectoryReparseData(const wchar_t* path) override
+    {
+        std::vector<BYTE> data;
+        const FileResult readResult = GetReparseData(path, data);
+        if (!readResult.success)
+            return readResult;
+        if (data.size() < sizeof(DWORD))
+            return FileResult::Error(ERROR_INVALID_REPARSE_DATA);
+
+        const DWORD tag = *(const DWORD*)data.data();
+        if (tag != IO_REPARSE_TAG_MOUNT_POINT && tag != IO_REPARSE_TAG_SYMLINK)
+            return FileResult::Error(ERROR_REPARSE_TAG_MISMATCH);
+
+        LongPath decorated(path);
+        if (!decorated.IsValid())
+            return FileResult::Error(LastErrorOr(ERROR_INVALID_PARAMETER));
+        HANDLE h = ::CreateFileW(decorated.Get(), GENERIC_WRITE,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE |
+                                     FILE_SHARE_DELETE,
+                                 NULL, OPEN_EXISTING,
+                                 FILE_FLAG_OPEN_REPARSE_POINT |
+                                     FILE_FLAG_BACKUP_SEMANTICS,
+                                 NULL);
+        if (h == INVALID_HANDLE_VALUE)
+            return FileResult::Error(::GetLastError());
+
+        REPARSE_GUID_DATA_BUFFER header = {};
+        header.ReparseTag = tag;
+        DWORD bytes = 0;
+        const BOOL ok = ::DeviceIoControl(
+            h, FSCTL_DELETE_REPARSE_POINT, &header,
+            REPARSE_GUID_DATA_BUFFER_HEADER_SIZE, NULL, 0, &bytes, NULL);
+        const DWORD error = ok ? ERROR_SUCCESS : ::GetLastError();
+        ::CloseHandle(h);
+        return ok ? FileResult::Ok() : FileResult::Error(error);
     }
 };
 

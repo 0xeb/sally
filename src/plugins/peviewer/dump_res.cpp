@@ -7,13 +7,15 @@
 #include "peviewer.h"
 #include "pefile.h"
 #include "dump_res.h"
+#include "peviewer_text.h"
 
-char* GetName(LPVOID ptr, char* buffer, int size)
+std::string GetName(LPVOID ptr)
 {
-    USHORT len = *(USHORT*)ptr;
-    len = WideCharToMultiByte(CP_ACP, 0, MakePtr(LPWSTR, ptr, 2), len, buffer, size, NULL, NULL);
-    buffer[min(len, size - 1)] = 0;
-    return buffer;
+    const USHORT len = *(USHORT*)ptr;
+    std::string name;
+    if (!EncodePeviewerResourceName(std::wstring_view(MakePtr(LPWSTR, ptr, 2), len), name))
+        return std::string();
+    return name;
 }
 
 char* MakeSpace(char* buffer, int length)
@@ -25,13 +27,12 @@ char* MakeSpace(char* buffer, int length)
     return buffer;
 }
 
-char* GetType(char* buffer, DWORD id, int level)
+std::string GetType(DWORD id, int level)
 {
-    char langName[128];
-    *buffer = 0;
     if (level == 1)
-        return buffer;
+        return std::string();
     const char* str = NULL;
+    std::string localeName;
     if (level == 0)
     {
         switch (id)
@@ -103,14 +104,12 @@ char* GetType(char* buffer, DWORD id, int level)
     }
     else
     {
-        if (id && GetLocaleInfoA(MAKELCID(MAKELANGID(id, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
-            str = langName;
+        if (id && GetPeviewerLocaleLanguageText(static_cast<LANGID>(id), localeName))
+            str = localeName.c_str();
     }
     if (str)
-    {
-        sprintf(buffer, " (%s)", str);
-    }
-    return buffer;
+        return std::string(" (") + str + ")";
+    return std::string();
 }
 
 BOOL DumpResDirectory(LPVOID lpFile, DWORD fileSize, CFileStream* outStream,
@@ -120,7 +119,6 @@ BOOL DumpResDirectory(LPVOID lpFile, DWORD fileSize, CFileStream* outStream,
     PIMAGE_RESOURCE_DIRECTORY rsdirh = MakePtr(PIMAGE_RESOURCE_DIRECTORY, lpFile, dirOffset);
     UINT width = 31;
 
-    char buffer[1000];
     char buf[100];
     int space;
     const char* head;
@@ -142,9 +140,10 @@ BOOL DumpResDirectory(LPVOID lpFile, DWORD fileSize, CFileStream* outStream,
     outStream->fprintf(head, MakeSpace(buf, space));
     space += 2;
     outStream->fprintf("%s%-*s0x%08X\n", MakeSpace(buf, space), width, "Characteristics:", rsdirh->Characteristics);
-    TimeDateStampToString(rsdirh->TimeDateStamp, buffer);
+    std::string timestamp;
+    FormatPeviewerTimestamp(rsdirh->TimeDateStamp, timestamp);
     outStream->fprintf("%s%-*s0x%08X%s\n", MakeSpace(buf, space), width, "Time Date Stamp:",
-                       rsdirh->TimeDateStamp, buffer);
+                       rsdirh->TimeDateStamp, timestamp.c_str());
     outStream->fprintf("%s%-*s%u.%02u\n", MakeSpace(buf, space), width, "Version:", rsdirh->MajorVersion, rsdirh->MinorVersion);
     outStream->fprintf("%s%-*s%u\n", MakeSpace(buf, space), width, "Number of Name Entries:", rsdirh->NumberOfNamedEntries);
     outStream->fprintf("%s%-*s%u\n", MakeSpace(buf, space), width, "Number of ID Entries:", rsdirh->NumberOfIdEntries);
@@ -173,8 +172,8 @@ BOOL DumpResDirectory(LPVOID lpFile, DWORD fileSize, CFileStream* outStream,
                     s = "Language Name:";
                     break;
                 }
-                outStream->fprintf("%s%s %s\n", MakeSpace(buf, space), s,
-                                   GetName(MakePtr(LPVOID, lpFile, dirRootOffset + rsdir->NameOffset), buffer, 1000));
+                const std::string name = GetName(MakePtr(LPVOID, lpFile, dirRootOffset + rsdir->NameOffset));
+                outStream->fprintf("%s%s %s\n", MakeSpace(buf, space), s, name.c_str());
             }
             else
             {
@@ -191,7 +190,8 @@ BOOL DumpResDirectory(LPVOID lpFile, DWORD fileSize, CFileStream* outStream,
                     s = "Language ID:";
                     break;
                 }
-                outStream->fprintf("%s%s %u%s\n", MakeSpace(buf, space), s, rsdir->Id, GetType(buffer, rsdir->Id, level));
+                const std::string type = GetType(rsdir->Id, level);
+                outStream->fprintf("%s%s %u%s\n", MakeSpace(buf, space), s, rsdir->Id, type.c_str());
             }
             if (level < 2)
             {
@@ -247,5 +247,5 @@ void CResourceDirectoryDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CResourceDirectoryDumper::GetExceptionMessage()
 {
-    return _T("Resource Directory is corrupted.");
+    return L"Resource Directory is corrupted.";
 }

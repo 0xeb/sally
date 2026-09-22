@@ -32,35 +32,35 @@ public:
     }
     virtual ~CLogItemBase() {}
     int GetLevel() const { return this->_level; }
-    virtual TCHAR const* GetText() const = 0;
-    virtual TCHAR const* GetPath() const = 0;
+    virtual wchar_t const* GetText() const = 0;
+    virtual wchar_t const* GetPath() const = 0;
 };
 
 class CBasicLogItem : public CLogItemBase
 {
 protected:
-    TCHAR const* _text;
-    TCHAR const* _path;
+    wchar_t const* _text;
+    wchar_t const* _path;
 
 public:
-    CBasicLogItem(int level, TCHAR const* text, TCHAR const* path) : CLogItemBase(level)
+    CBasicLogItem(int level, wchar_t const* text, wchar_t const* path) : CLogItemBase(level)
     {
         this->_text = text;
         this->_path = path;
     }
     ~CBasicLogItem() {}
-    TCHAR const* GetText() const { return this->_text; }
-    TCHAR const* GetPath() const { return this->_path; }
+    wchar_t const* GetText() const { return this->_text; }
+    wchar_t const* GetPath() const { return this->_path; }
 };
 
 class CStaticLogItem : public CLogItemBase
 {
 protected:
-    TCHAR const* _text;
+    wchar_t const* _text;
     CZString const* _path;
 
 public:
-    CStaticLogItem(int level, TCHAR const* text, CZString const* path) : CLogItemBase(level)
+    CStaticLogItem(int level, wchar_t const* text, CZString const* path) : CLogItemBase(level)
     {
         this->_text = text;
         this->_path = path;
@@ -71,8 +71,8 @@ public:
             delete this->_path;
         this->_path = NULL;
     }
-    TCHAR const* GetText() const { return this->_text; }
-    TCHAR const* GetPath() const { return this->_path->GetString(); }
+    wchar_t const* GetText() const { return this->_text; }
+    wchar_t const* GetPath() const { return this->_path->GetString(); }
 };
 
 class CSmartLogItem : public CLogItemBase
@@ -96,8 +96,8 @@ public:
             delete this->_path;
         this->_path = NULL;
     }
-    TCHAR const* GetText() const { return this->_text->GetString(); }
-    TCHAR const* GetPath() const { return this->_path->GetString(); }
+    wchar_t const* GetText() const { return this->_text->GetString(); }
+    wchar_t const* GetPath() const { return this->_path->GetString(); }
 };
 
 class CLogger
@@ -131,11 +131,11 @@ public:
         this->_lock = NULL;
     }
 
-    static CLogItemBase* CreateLogItem(int level, TCHAR const* text, TCHAR const* path)
+    static CLogItemBase* CreateLogItem(int level, wchar_t const* text, wchar_t const* path)
     {
         return new CBasicLogItem(level, text, path);
     }
-    static CLogItemBase* CreateLogItem(int level, TCHAR const* text, CZString const* path)
+    static CLogItemBase* CreateLogItem(int level, wchar_t const* text, CZString const* path)
     {
         if (path == NULL)
             return new CBasicLogItem(level, text, NULL);

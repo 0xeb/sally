@@ -136,7 +136,8 @@ DECLARE_INTERFACE(ImpICopyHook)
     STDMETHOD_(ULONG, Release)
     (THIS) PURE;
 
-    // *** ICopyHookA methods ***
+    // ICopyHookA is retained only for old callers. It immediately widens dynamically and routes
+    // to the same implementation as the preferred IShellCopyHookW surface.
     STDMETHOD_(UINT, CopyCallback)
     (THIS_ HWND hwnd, UINT wFunc, UINT wFlags,
      LPCSTR pszSrcFile, DWORD dwSrcAttribs,
@@ -239,7 +240,7 @@ DECLARE_INTERFACE(IShellExt)
          UINT idCmd,
      UINT uType,
      UINT * pwReserved,
-     LPSTR pszName,
+     LPWSTR pszName,
      UINT cchMax) PURE;
 
 #endif // ENABLE_SH_MENU_EXT

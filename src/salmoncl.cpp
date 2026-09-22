@@ -6,9 +6,8 @@
 
 #include "salmoncl.h"
 #include "salmon_registry_mutex_policy.h"
+#include "common/Win32EarlyStartupRegistry.h"
 #include "common/unicode/helpers.h"
-
-#define MAX_ENV_PATH 32766
 
 CSalmonSharedMemory* SalmonSharedMemory = NULL;
 HANDLE SalmonFileMapping = NULL;
@@ -23,7 +22,7 @@ HANDLE GetBugReporterRegistryMutex()
 {
     // permissions fully open for all processes
     SECURITY_ATTRIBUTES secAttr;
-    char secDesc[SECURITY_DESCRIPTOR_MIN_LENGTH];
+    BYTE secDesc[SECURITY_DESCRIPTOR_MIN_LENGTH];
     secAttr.nLength = sizeof(secAttr);
     secAttr.bInheritHandle = FALSE;
     secAttr.lpSecurityDescriptor = &secDesc;
@@ -31,17 +30,17 @@ HANDLE GetBugReporterRegistryMutex()
     SetSecurityDescriptorDacl(secAttr.lpSecurityDescriptor, TRUE, 0, FALSE);
     // it would be convenient to add SID to the mutex name, because processes with different SID run with a different HKCU tree
     // but for simplicity we skip that and the mutex will be truly global
-    const char* MUTEX_NAME = sally::salmon::BugReporterRegistryMutexName();
-    HANDLE hMutex = NOHANDLES(CreateMutex(&secAttr, FALSE, MUTEX_NAME));
+    const wchar_t* MUTEX_NAME = sally::salmon::BugReporterRegistryMutexName();
+    HANDLE hMutex = NOHANDLES(CreateMutexW(&secAttr, FALSE, MUTEX_NAME));
     if (hMutex == NULL) // create can already open an existing mutex, but it can fail, so we try open afterwards
-        hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, MUTEX_NAME));
+        hMutex = NOHANDLES(OpenMutexW(SYNCHRONIZE, FALSE, MUTEX_NAME));
     return hMutex;
 }
 
 BOOL SalmonGetBugReportUID(DWORD64* uid)
 {
-    const char* BUG_REPORTER_KEY = SAL_REG_KEY_BUG_REPORTER_A;
-    const char* BUG_REPORTER_UID = SAL_REG_VALUE_BUG_REPORTER_UID_A;
+    const wchar_t* BUG_REPORTER_KEY = SAL_REG_KEY_BUG_REPORTER_W;
+    const wchar_t* BUG_REPORTER_UID = SAL_REG_VALUE_BUG_REPORTER_UID_W;
 
     // this section runs at Salamander startup and theoretically concurrent registry read/write can occur
     // therefore we will guard access with a global mutex
@@ -50,13 +49,13 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
         WaitForSingleObject(hMutex, INFINITE);
     *uid = 0;
     HKEY hKey;
-    LONG res = NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, KEY_READ, &hKey));
+    LONG res = NOHANDLES(RegOpenKeyExW(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, KEY_READ, &hKey));
     if (res == ERROR_SUCCESS)
     {
         // try to load the old value if it exists
         DWORD gettedType;
         DWORD bufferSize = sizeof(*uid);
-        res = RegQueryValueEx(hKey, BUG_REPORTER_UID, 0, &gettedType, (BYTE*)uid, &bufferSize);
+        res = RegQueryValueExW(hKey, BUG_REPORTER_UID, 0, &gettedType, (BYTE*)uid, &bufferSize);
         if (res != ERROR_SUCCESS || gettedType != REG_QWORD)
             *uid = 0;
         NOHANDLES(RegCloseKey(hKey));
@@ -73,11 +72,11 @@ BOOL SalmonGetBugReportUID(DWORD64* uid)
 
             // try to save it
             DWORD createType;
-            LONG res2 = NOHANDLES(RegCreateKeyEx(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, NULL, REG_OPTION_NON_VOLATILE,
-                                                 KEY_READ | KEY_WRITE, NULL, &hKey, &createType));
+            LONG res2 = NOHANDLES(RegCreateKeyExW(HKEY_CURRENT_USER, BUG_REPORTER_KEY, 0, NULL, REG_OPTION_NON_VOLATILE,
+                                                  KEY_READ | KEY_WRITE, NULL, &hKey, &createType));
             if (res2 == ERROR_SUCCESS)
             {
-                res2 = RegSetValueEx(hKey, BUG_REPORTER_UID, 0, REG_QWORD, (BYTE*)uid, sizeof(*uid));
+                res2 = RegSetValueExW(hKey, BUG_REPORTER_UID, 0, REG_QWORD, (BYTE*)uid, sizeof(*uid));
                 if (res2 != ERROR_SUCCESS)
                     *uid = 0; // on failure we want zero
                 NOHANDLES(RegCloseKey(hKey));
@@ -113,101 +112,126 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 
     // we now put the path for bug reports into LOCAL_APPDATA, where Windows WER stores minidumps by default
     // we don't create the path immediately, we take care of that at the moment of the crash
-    if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, mem->BugPath) == S_OK)
+    if (SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, mem->BugPath) == S_OK)
     {
-        int len = lstrlen(mem->BugPath);
+        int len = lstrlenW(mem->BugPath);
         if (len > 0 && mem->BugPath[len - 1] == '\\') // better verify the trailing backslash at the end of the path
             mem->BugPath[len - 1] = 0;
-        lstrcat(mem->BugPath, "\\Open Salamander");
+        wcscat_s(mem->BugPath, L"\\Open Salamander");
     }
 
     // base name for bug reports
-    strcpy(mem->BugName, "AS" VERSINFO_SAL_SHORT_VERSION);
+    wcscpy_s(mem->BugName, L"AS" VERSINFO_SAL_SHORT_VERSION);
 
     return (mem->Process != NULL && mem->Fire != NULL && mem->Done != NULL && mem->SetSLG != NULL &&
             mem->CheckBugs != NULL && mem->BugPath[0] != 0);
 }
 
-void GetStartupSLGName(char* slgName, DWORD slgNameMax)
+std::wstring GetStartupSLGName()
 {
     // extract from registry the SLG name that will probably be used
     // later during Salamander runtime a different one may be selected, which will be changed afterwards
     // this serves only as a default; if the record is not found, we pass an empty string
-    slgName[0] = 0;
-
-    CPathBuffer keyName; // Heap-allocated for long path support
-    sprintf(keyName.Get(), "%s\\%s", SalamanderConfigurationRoots[0], SALAMANDER_CONFIG_REG);
+    std::wstring slgName;
+    const std::wstring keyName = std::wstring(SalamanderConfigurationRoots[0]) + L"\\" + SALAMANDER_CONFIG_REG;
     HKEY hKey;
-    LONG res = NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, keyName, 0, KEY_READ, &hKey));
+    LONG res = NOHANDLES(RegOpenKeyExW(HKEY_CURRENT_USER, keyName.c_str(), 0, KEY_READ, &hKey));
     if (res == ERROR_SUCCESS)
     {
-        DWORD gettedType;
-        res = SalRegQueryValueEx(hKey, CONFIG_LANGUAGE_REG, 0, &gettedType, (BYTE*)slgName, &slgNameMax);
-        if (res != ERROR_SUCCESS || gettedType != REG_SZ)
-            slgName[0] = 0;
+        DWORD valueType = 0;
+        DWORD bufferSize = 0;
+        res = sally::registry::QueryValueForEarlyStartupW(hKey, CONFIG_LANGUAGE_REG,
+                                                          &valueType, NULL, &bufferSize);
+        if ((res == ERROR_SUCCESS || res == ERROR_MORE_DATA) && valueType == REG_SZ && bufferSize > 0)
+        {
+            std::vector<wchar_t> buffer(bufferSize / sizeof(wchar_t) + 1, L'\0');
+            res = sally::registry::QueryValueForEarlyStartupW(hKey, CONFIG_LANGUAGE_REG,
+                                                              &valueType, reinterpret_cast<BYTE*>(buffer.data()), &bufferSize);
+            if (res == ERROR_SUCCESS && valueType == REG_SZ)
+                slgName.assign(buffer.data());
+        }
         RegCloseKey(hKey);
     }
+    return slgName;
 }
 
-BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGName
+static BOOL GetModuleFileNameOwnedW(HMODULE module, std::wstring& path)
+{
+    DWORD capacity = 256;
+    while (capacity <= MAXDWORD / 2)
+    {
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        SetLastError(ERROR_SUCCESS);
+        const DWORD length = GetModuleFileNameW(module, buffer.data(), capacity);
+        if (length == 0)
+            return FALSE;
+        if (length < capacity - 1 || length == capacity - 1 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        {
+            path.assign(buffer.data(), length);
+            return TRUE;
+        }
+        capacity *= 2;
+    }
+    return FALSE;
+}
+
+BOOL SalmonStartProcess(const wchar_t* fileMappingName)
 {
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
-    CPathBuffer slgName; // Heap-allocated for long path support (registry value, ASCII filename)
-
     HSalmonProcess = NULL;
 
     // issue #63: wide install paths so non-ASCII directories (Cyrillic, etc.)
     // don't get mangled by ANSI GetModuleFileName -> CreateProcess.
-    std::wstring exePath(SAL_MAX_LONG_PATH, L'\0');
-    DWORD moduleLen = GetModuleFileNameW(NULL, &exePath[0], SAL_MAX_LONG_PATH);
-    if (moduleLen == 0 || moduleLen >= SAL_MAX_LONG_PATH)
+    std::wstring exePath;
+    if (!GetModuleFileNameOwnedW(NULL, exePath))
         return FALSE;
-    exePath.resize(moduleLen);
     size_t slash = exePath.find_last_of(L'\\');
     if (slash == std::wstring::npos)
         return FALSE;
     std::wstring rtlDirW(exePath, 0, slash + 1);
     std::wstring salmonExeW = rtlDirW + L"utils\\salmon.exe";
 
-    GetStartupSLGName(slgName, slgName.Size());
+    const std::wstring slgName = GetStartupSLGName();
 
     std::wstring cmdW;
-    cmdW.reserve(salmonExeW.size() + lstrlenA(fileMappingName) + 64);
+    cmdW.reserve(salmonExeW.size() + wcslen(fileMappingName) + 64);
     cmdW.append(L"\"").append(salmonExeW).append(L"\"");
-    cmdW.append(L" \"").append(AnsiToWide(fileMappingName)).append(L"\"");
-    cmdW.append(L" \"").append(AnsiToWide(slgName.Get())).append(L"\"");
+    cmdW.append(L" \"").append(fileMappingName).append(L"\"");
+    cmdW.append(L" \"").append(slgName).append(L"\"");
 
     memset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     si.wShowWindow = SW_SHOWNORMAL;
 
-    std::wstring oldCurDirW(SAL_MAX_LONG_PATH, L'\0');
-    DWORD oldLen = GetCurrentDirectoryW(SAL_MAX_LONG_PATH, &oldCurDirW[0]);
-    if (oldLen == 0 || oldLen >= SAL_MAX_LONG_PATH)
-        oldCurDirW.clear();
-    else
-        oldCurDirW.resize(oldLen);
+    std::wstring oldCurDirW;
+    const DWORD currentDirectorySize = GetCurrentDirectoryW(0, NULL);
+    if (currentDirectorySize > 0)
+    {
+        std::vector<wchar_t> currentDirectory(currentDirectorySize, L'\0');
+        const DWORD length = GetCurrentDirectoryW(currentDirectorySize, currentDirectory.data());
+        if (length > 0 && length < currentDirectorySize)
+            oldCurDirW.assign(currentDirectory.data(), length);
+    }
 
     // another attempt to solve the problem before we split SALMON.EXE into EXE+DLL:
     // extend PATH for the child so it can see the install-dir-local RTL.
-    std::wstring envPATHW(MAX_ENV_PATH, L'\0');
-    DWORD envLen = GetEnvironmentVariableW(L"PATH", &envPATHW[0], MAX_ENV_PATH);
-    BOOL envExtended = FALSE;
-    if (envLen != 0 && envLen < MAX_ENV_PATH)
+    std::wstring envPATHW;
+    const DWORD envSize = GetEnvironmentVariableW(L"PATH", NULL, 0);
+    const BOOL hadEnvironmentPath = envSize > 0;
+    if (hadEnvironmentPath)
     {
-        envPATHW.resize(envLen);
-        if (envPATHW.size() + 1 + rtlDirW.size() < MAX_ENV_PATH)
-        {
-            std::wstring newPATH = envPATHW;
-            newPATH.append(L";").append(rtlDirW);
-            SetEnvironmentVariableW(L"PATH", newPATH.c_str());
-            envExtended = TRUE;
-        }
+        std::vector<wchar_t> environmentPath(envSize, L'\0');
+        const DWORD envLen = GetEnvironmentVariableW(L"PATH", environmentPath.data(), envSize);
+        if (envLen > 0 && envLen < envSize)
+            envPATHW.assign(environmentPath.data(), envLen);
     }
-    else
+    BOOL envExtended = FALSE;
+    if (!envPATHW.empty())
     {
-        envPATHW.clear();
+        std::wstring newPATH = envPATHW;
+        newPATH.append(L";").append(rtlDirW);
+        envExtended = SetEnvironmentVariableW(L"PATH", newPATH.c_str());
     }
 
     SetCurrentDirectoryW(rtlDirW.c_str());
@@ -229,7 +253,7 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     if (!oldCurDirW.empty())
         SetCurrentDirectoryW(oldCurDirW.c_str());
     if (envExtended)
-        SetEnvironmentVariableW(L"PATH", envPATHW.c_str());
+        SetEnvironmentVariableW(L"PATH", hadEnvironmentPath ? envPATHW.c_str() : NULL);
     return ret;
 }
 
@@ -254,7 +278,7 @@ void EnableExceptionsOn64()
     typedef BOOL(WINAPI * FIsWow64Process)(HANDLE, PBOOL);
 #define PROCESS_CALLBACK_FILTER_ENABLED 0x1
 
-    HINSTANCE hDLL = LoadLibrary("KERNEL32.DLL");
+    HINSTANCE hDLL = LoadLibraryW(L"KERNEL32.DLL");
     if (hDLL != NULL)
     {
         FIsWow64Process isWow64 = (FIsWow64Process)GetProcAddress(hDLL, "IsWow64Process");                                                      // Min: XP SP2
@@ -279,14 +303,14 @@ BOOL SalmonInit()
     EnableExceptionsOn64();
 
     SalmonSharedMemory = NULL;
-    char salmonFileMappingName[SALMON_FILEMAPPIN_NAME_SIZE];
+    std::wstring salmonFileMappingName;
     // allocation of shared space in pagefile.sys
     DWORD ti = (GetTickCount() >> 3) & 0xFFF;
     while (TRUE) // looking for a unique name for file-mapping
     {
-        wsprintf(salmonFileMappingName, "Salmon%X", ti++);
-        SalmonFileMapping = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 aren't we passing x86/x64 incompatible data?
-                                                        sizeof(CSalmonSharedMemory), salmonFileMappingName));
+        salmonFileMappingName = FormatStrW(L"Salmon%X", ti++);
+        SalmonFileMapping = NOHANDLES(CreateFileMappingW(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 aren't we passing x86/x64 incompatible data?
+                                                         sizeof(CSalmonSharedMemory), salmonFileMappingName.c_str()));
         if (SalmonFileMapping == NULL || GetLastError() != ERROR_ALREADY_EXISTS)
             break;
         NOHANDLES(CloseHandle(SalmonFileMapping));
@@ -302,7 +326,7 @@ BOOL SalmonInit()
                 SalmonGetBugReportUID(&SalmonSharedMemory->UID);
 
                 // if salmon fails to start, we still return TRUE - problem will be reported later after SLG is loaded
-                SalmonStartProcess(salmonFileMappingName);
+                SalmonStartProcess(salmonFileMappingName.c_str());
                 return TRUE;
             }
         }
@@ -314,11 +338,11 @@ BOOL SalmonInit()
 // info that salmon is not running needs to be displayed only once
 static BOOL SalmonNotRunningReported = FALSE;
 
-void SalmonSetSLG(const char* slgName)
+void SalmonSetSLG(const wchar_t* slgName)
 {
     ResetEvent(SalmonSharedMemory->Done);
 
-    strcpy(SalmonSharedMemory->SLGName, slgName);
+    wcscpy_s(SalmonSharedMemory->SLGName, slgName);
     SetEvent(SalmonSharedMemory->SetSLG);
 
     // wait for signal from Salmon that it processed the task (event Done) or for the case when someone killed Salmon
@@ -333,7 +357,12 @@ void SalmonSetSLG(const char* slgName)
 #ifdef _DEBUG
             TRACE_E("Salmon is not running (debug build, suppressing dialog)");
 #else
-            MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+            // wide: this fires whenever a .slg language pack is loaded
+            // (HLanguage != NULL), so IDS_SALMON_NOT_RUNNING's translation can contain
+            // characters outside the process ANSI code page - MessageBoxA/LoadStr silently
+            // mangled it. SALAMANDER_TEXT_VERSIONW()/LoadStrW/MessageBoxW already proven
+            // together elsewhere (sally_entry_lifecycle.cpp).
+            MessageBoxW(NULL, LoadStrW(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
 #endif
             SalmonNotRunningReported = TRUE;
         }
@@ -358,7 +387,8 @@ void SalmonCheckBugs()
 #ifdef _DEBUG
             TRACE_E("Salmon is not running (debug build, suppressing dialog)");
 #else
-            MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+            // wide - see SalmonSetSLG's identical call above.
+            MessageBoxW(NULL, LoadStrW(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSIONW(), MB_OK | MB_ICONERROR);
 #endif
             SalmonNotRunningReported = TRUE;
         }
@@ -366,7 +396,7 @@ void SalmonCheckBugs()
     ResetEvent(SalmonSharedMemory->Done);
 }
 
-BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath)
+const wchar_t* SalmonFireAndWait(const EXCEPTION_POINTERS* e)
 {
     SalmonSharedMemory->ThreadId = GetCurrentThreadId();
     SalmonSharedMemory->ExceptionRecord = *e->ExceptionRecord;
@@ -380,9 +410,12 @@ BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath)
     WaitForMultipleObjects(2, arr, FALSE, INFINITE);
     ResetEvent(SalmonSharedMemory->Done);
 
-    strcpy(bugReportPath, SalmonSharedMemory->BugPath);
-    SalPathAppend(bugReportPath, SalmonSharedMemory->BaseName, MAX_PATH);
-    strcat(bugReportPath, ".TXT");
+    // Packed Salmon IPC v5 fixes these fields at MAX_PATH. Keep its matching output
+    // buffer inside this adapter so the capacity does not become core path ownership.
+    static wchar_t bugReportPath[MAX_PATH];
+    wcscpy_s(bugReportPath, SalmonSharedMemory->BugPath);
+    SalPathAppendW(bugReportPath, SalmonSharedMemory->BaseName, _countof(bugReportPath));
+    wcscat_s(bugReportPath, L".TXT");
 
-    return TRUE;
+    return bugReportPath;
 }

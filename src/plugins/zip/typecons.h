@@ -234,21 +234,28 @@ struct CFileInfo
 
 struct CSfxSettings
 {
+    // Encoded byte fields consumed by the legacy self-extractor stub. These are frozen
+    // SFX-format limits, not capacities for ordinary Unicode path ownership.
+    static constexpr size_t SFX_FILE_FIELD_BYTES = 260;
+    static constexpr size_t SFX_TARGET_DIR_FIELD_BYTES = 520;
+    static constexpr size_t SFX_ICON_FILE_FIELD_BYTES = 260;
+    static constexpr size_t SFX_WAIT_FOR_FIELD_BYTES = 260;
+
     unsigned Flags;
     char Command[SE_MAX_COMMANDLINE];
-    char SfxFile[MAX_PATH];
+    char SfxFile[SFX_FILE_FIELD_BYTES];
     char Text[SE_MAX_TEXT];
     char Title[SE_MAX_TITLE];
-    char TargetDir[2 * MAX_PATH];
+    char TargetDir[SFX_TARGET_DIR_FIELD_BYTES];
     char ExtractBtnText[SE_MAX_EXTRBTN];
     char Vendor[SE_MAX_VENDOR];
     char WWW[SE_MAX_WWW];
-    char IconFile[MAX_PATH];
+    char IconFile[SFX_ICON_FILE_FIELD_BYTES];
     DWORD IconIndex;
     UINT MBoxStyle;
     std::string MBoxText;
     char MBoxTitle[SE_MAX_TITLE];
-    char WaitFor[MAX_PATH];
+    char WaitFor[SFX_WAIT_FOR_FIELD_BYTES];
 
     CSfxSettings()
     {

@@ -74,8 +74,8 @@ public:
     // Event log for diagnostics/assertions
     struct LogEntry
     {
-        std::string method;
-        std::string detail;
+        std::string method;      // stable ASCII method name (counting API)
+        std::wstring detail;     // wide primary argument
     };
 
     std::vector<LogEntry> GetLog() const
@@ -98,7 +98,7 @@ public:
 
     void SetOperationInfo(CProgressData* /*data*/) override
     {
-        Log("SetOperationInfo", "");
+        Log("SetOperationInfo", L"");
     }
 
     void SetProgress(int operationPercent, int summaryPercent) override
@@ -135,132 +135,133 @@ public:
 
     // --- Error dialogs ---
 
-    int AskFileError(const char* /*title*/, const char* fileName, const char* /*errorText*/) override
+    int AskFileError(const wchar_t* /*title*/, const wchar_t* fileName, const wchar_t* /*errorText*/) override
     {
-        Log("AskFileError", fileName ? fileName : "");
+        Log("AskFileError", fileName ? fileName : L"");
         return FileErrorResponse;
     }
 
-    int AskFileErrorById(int /*titleId*/, const char* fileName, DWORD /*win32Error*/) override
+    int AskFileErrorById(int /*titleId*/, const wchar_t* fileName, DWORD /*win32Error*/) override
     {
-        Log("AskFileErrorById", fileName ? fileName : "");
+        Log("AskFileErrorById", fileName ? fileName : L"");
         return FileErrorResponse;
     }
 
-    int AskFileErrorByIds(int /*titleId*/, const char* fileName, int /*errorTextId*/) override
+    int AskFileErrorByIds(int /*titleId*/, const wchar_t* fileName, int /*errorTextId*/) override
     {
-        Log("AskFileErrorByIds", fileName ? fileName : "");
+        Log("AskFileErrorByIds", fileName ? fileName : L"");
         return FileErrorResponse;
     }
 
     // --- Overwrite ---
 
-    int AskOverwrite(const char* sourceName, const char* /*sourceInfo*/,
-                     const char* /*targetName*/, const char* /*targetInfo*/) override
+    int AskOverwrite(const wchar_t* sourceName, const wchar_t* /*sourceInfo*/,
+                     const wchar_t* /*targetName*/, const wchar_t* /*targetInfo*/,
+                     bool /*dirOverwrite*/ = false) override
     {
-        Log("AskOverwrite", sourceName ? sourceName : "");
+        Log("AskOverwrite", sourceName ? sourceName : L"");
         return OverwriteResponse;
     }
 
     // --- Hidden/system ---
 
-    int AskHiddenOrSystem(const char* /*title*/, const char* fileName,
-                          const char* /*actionText*/) override
+    int AskHiddenOrSystem(const wchar_t* /*title*/, const wchar_t* fileName,
+                          const wchar_t* /*actionText*/) override
     {
-        Log("AskHiddenOrSystem", fileName ? fileName : "");
+        Log("AskHiddenOrSystem", fileName ? fileName : L"");
         return HiddenSystemResponse;
     }
 
-    int AskHiddenOrSystemById(int /*titleId*/, const char* fileName, int /*actionId*/) override
+    int AskHiddenOrSystemById(int /*titleId*/, const wchar_t* fileName, int /*actionId*/) override
     {
-        Log("AskHiddenOrSystemById", fileName ? fileName : "");
+        Log("AskHiddenOrSystemById", fileName ? fileName : L"");
         return HiddenSystemResponse;
     }
 
     // --- Cannot move ---
 
-    int AskCannotMove(const char* /*errorText*/, const char* fileName,
-                      const char* /*destPath*/, bool /*isDirectory*/) override
+    int AskCannotMove(const wchar_t* /*errorText*/, const wchar_t* fileName,
+                      const wchar_t* /*destPath*/, bool /*isDirectory*/) override
     {
-        Log("AskCannotMove", fileName ? fileName : "");
+        Log("AskCannotMove", fileName ? fileName : L"");
         return CannotMoveResponse;
     }
 
-    int AskCannotMoveErr(const char* sourceName, const char* /*targetName*/,
+    int AskCannotMoveErr(const wchar_t* sourceName, const wchar_t* /*targetName*/,
                          DWORD /*win32Error*/, bool /*isDirectory*/) override
     {
-        Log("AskCannotMoveErr", sourceName ? sourceName : "");
+        Log("AskCannotMoveErr", sourceName ? sourceName : L"");
         return CannotMoveResponse;
     }
 
     // --- Notifications ---
 
-    void NotifyError(const char* /*title*/, const char* fileName,
-                     const char* /*errorText*/) override
+    void NotifyError(const wchar_t* /*title*/, const wchar_t* fileName,
+                     const wchar_t* /*errorText*/) override
     {
-        Log("NotifyError", fileName ? fileName : "");
+        Log("NotifyError", fileName ? fileName : L"");
     }
 
-    void NotifyErrorById(int /*titleId*/, const char* fileName, int /*detailId*/) override
+    void NotifyErrorById(int /*titleId*/, const wchar_t* fileName, int /*detailId*/) override
     {
-        Log("NotifyErrorById", fileName ? fileName : "");
+        Log("NotifyErrorById", fileName ? fileName : L"");
     }
 
     // --- ADS ---
 
-    int AskADSReadError(const char* fileName, const char* /*adsName*/) override
+    int AskADSReadError(const wchar_t* fileName, const wchar_t* /*adsName*/) override
     {
-        Log("AskADSReadError", fileName ? fileName : "");
+        Log("AskADSReadError", fileName ? fileName : L"");
         return IgnoreErrorResponse;
     }
 
-    int AskADSOverwrite(const char* sourceName, const char* /*sourceInfo*/,
-                        const char* /*targetName*/, const char* /*targetInfo*/) override
+    int AskADSOverwrite(const wchar_t* sourceName, const wchar_t* /*sourceInfo*/,
+                        const wchar_t* /*targetName*/, const wchar_t* /*targetInfo*/) override
     {
-        Log("AskADSOverwrite", sourceName ? sourceName : "");
+        Log("AskADSOverwrite", sourceName ? sourceName : L"");
         return OverwriteResponse;
     }
 
-    int AskADSOpenError(const char* fileName, const char* /*adsName*/,
-                        const char* /*errorText*/) override
+    int AskADSOpenError(const wchar_t* fileName, const wchar_t* /*adsName*/,
+                        const wchar_t* /*errorText*/) override
     {
-        Log("AskADSOpenError", fileName ? fileName : "");
+        Log("AskADSOpenError", fileName ? fileName : L"");
         return IgnoreErrorResponse;
     }
 
-    int AskADSOpenErrorById(int /*titleId*/, const char* fileName, DWORD /*win32Error*/) override
+    int AskADSOpenErrorById(int /*titleId*/, const wchar_t* fileName, DWORD /*win32Error*/) override
     {
-        Log("AskADSOpenErrorById", fileName ? fileName : "");
+        Log("AskADSOpenErrorById", fileName ? fileName : L"");
         return IgnoreErrorResponse;
     }
 
     // --- Attributes / permissions / time ---
 
-    int AskSetAttrsError(const char* fileName, DWORD /*failedAttrs*/,
+    int AskSetAttrsError(const wchar_t* fileName, DWORD /*failedAttrs*/,
                          DWORD /*currentAttrs*/) override
     {
-        Log("AskSetAttrsError", fileName ? fileName : "");
+        Log("AskSetAttrsError", fileName ? fileName : L"");
         return IgnoreErrorResponse;
     }
 
-    int AskCopyPermError(const char* sourceFile, const char* /*targetFile*/,
-                         const char* /*errorText*/) override
+    int AskCopyPermError(const wchar_t* sourceFile, const wchar_t* /*targetFile*/,
+                         DWORD /*win32Error*/) override
     {
-        Log("AskCopyPermError", sourceFile ? sourceFile : "");
+        Log("AskCopyPermError", sourceFile ? sourceFile : L"");
         return IgnoreErrorResponse;
     }
 
-    int AskCopyDirTimeError(const char* dirName, DWORD /*errorCode*/) override
+    int AskCopyDirTimeError(const wchar_t* dirName, DWORD /*errorCode*/) override
     {
-        Log("AskCopyDirTimeError", dirName ? dirName : "");
+        Log("AskCopyDirTimeError", dirName ? dirName : L"");
         return IgnoreErrorResponse;
     }
 
     // --- Encryption ---
 
-    int AskEncryptionLoss(bool /*isEncrypted*/, const char* fileName, bool /*isDir*/) override
+    int AskEncryptionLoss(bool /*isEncrypted*/, const wchar_t* fileName, bool /*isDir*/) override
     {
-        Log("AskEncryptionLoss", fileName ? fileName : "");
+        Log("AskEncryptionLoss", fileName ? fileName : L"");
         return EncryptionLossResponse;
     }
 
@@ -275,7 +276,7 @@ private:
     mutable std::mutex m_logMutex;
     std::vector<LogEntry> m_log;
 
-    void Log(const char* method, const char* detail)
+    void Log(const char* method, const wchar_t* detail)
     {
         std::lock_guard<std::mutex> lk(m_logMutex);
         m_log.push_back({method, detail});

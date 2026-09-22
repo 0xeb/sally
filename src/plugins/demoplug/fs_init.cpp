@@ -13,7 +13,7 @@
 #include "precomp.h"
 
 // FS name assigned by Salamander after the plugin loads
-CPathBuffer AssignedFSName;
+std::wstring AssignedFSName;
 extern int AssignedFSNameLen = 0;
 
 // image list for simple FS icons
@@ -23,7 +23,7 @@ HIMAGELIST DFSImageList = NULL;
 // shared between the archiver and the FS
 const CFileData** TransferFileData = NULL;
 int* TransferIsDir = NULL;
-char* TransferBuffer = NULL;
+wchar_t* TransferBuffer = NULL;
 int* TransferLen = NULL;
 DWORD* TransferRowData = NULL;
 CPluginDataInterfaceAbstract** TransferPluginDataIface = NULL;
@@ -70,7 +70,7 @@ void ReleaseFS()
 //
 
 CPluginFSInterfaceAbstract* WINAPI
-CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
 
     // this is where a dedicated FS object should be created for each fsNameIndex...
@@ -94,8 +94,8 @@ CPluginInterfaceForFS::CloseFS(CPluginFSInterfaceAbstract* fs)
         delete dfsFS;
 }
 
-CPathBuffer ConnectPath;
-char** History = NULL;
+std::wstring ConnectPath;
+wchar_t** History = NULL;
 int HistoryCount = 0;
 
 INT_PTR CALLBACK ConnectDlgProc(HWND HWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -115,8 +115,7 @@ INT_PTR CALLBACK ConnectDlgProc(HWND HWindow, UINT uMsg, WPARAM wParam, LPARAM l
         // populate the dialog with data
         SalamanderGeneral->LoadComboFromStdHistoryValues(GetDlgItem(HWindow, IDC_PATH),
                                                          History, HistoryCount);
-        SendDlgItemMessage(HWindow, IDC_PATH, CB_LIMITTEXT, ConnectPath.Size() - 1, 0);
-        SendDlgItemMessage(HWindow, IDC_PATH, WM_SETTEXT, 0, (LPARAM)(const char*)ConnectPath);
+        SetDlgItemTextW(HWindow, IDC_PATH, ConnectPath.c_str());
 
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDC_PATH)); // install WordBreakProc into the combo box
 
@@ -130,8 +129,8 @@ INT_PTR CALLBACK ConnectDlgProc(HWND HWindow, UINT uMsg, WPARAM wParam, LPARAM l
         case IDOK:
         {
             // read data from the dialog
-            SendDlgItemMessage(HWindow, IDC_PATH, WM_GETTEXT, ConnectPath.Size(), (LPARAM)(char*)ConnectPath);
-            SalamanderGeneral->AddValueToStdHistoryValues(History, HistoryCount, ConnectPath, FALSE);
+            ConnectPath = SPLGetDlgItemTextOwned(HWindow, IDC_PATH);
+            SalamanderGeneral->AddValueToStdHistoryValues(History, HistoryCount, ConnectPath.c_str(), FALSE);
         }
         case IDCANCEL:
         {
@@ -160,9 +159,9 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
 
             // change the active panel path to AssignedFSName:ConnectPath
             ConnectData.UseConnectData = TRUE;
-            lstrcpyn(ConnectData.UserPart, ConnectPath, MAX_PATH);
+            ConnectData.UserPart = ConnectPath;
             int failReason;
-            BOOL changeRes = SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName, "", &failReason);
+            BOOL changeRes = SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName.c_str(), L"", &failReason);
             // NOTE: on success it returns failReason==CHPPFR_SHORTERPATH (the user-part of the path is not empty)
             ConnectData.UseConnectData = FALSE;
             if (!changeRes && failReason == CHPPFR_INVALIDPATH)
@@ -188,10 +187,10 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
       }
 */
             /*
-      CPathBuffer buf;
-      if (SalamanderGeneral->GetLastWindowsPanelPath(panel, buf, buf.Size()))
+      std::wstring lastPath;   // owned; no caller buffer, no path ceiling
+      if (SPLGetLastWindowsPanelPathOwned(SalamanderGeneral, panel, lastPath))
       {
-        if (!SalamanderGeneral->ChangePanelPathToDisk(panel, buf, &failReason))
+        if (!SalamanderGeneral->ChangePanelPathToDisk(panel, lastPath.c_str(), &failReason))
         {
           // repeating the prompt makes no sense
         }
@@ -219,22 +218,22 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
 BOOL WINAPI
 CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                       CPluginFSInterfaceAbstract* pluginFS,
-                                                      const char* pluginFSName, int pluginFSNameIndex,
+                                                      const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                       BOOL isDetachedFS, BOOL& refreshMenu,
                                                       BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
-    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %s, %d, %d, , , ,)",
+    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %ls, %d, %d, , , ,)",
                         panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS);
 
     // create the menu
-    char** strings;
-    static char buffShowInPanel[] = "&Show in Panel";
-    static char buffDisconnect[] = "&Disconnect";
-    char* strings1[] = {buffShowInPanel, buffDisconnect, NULL}; // entries for a detached plugin FS
-    static char buffRefresh[] = "&Refresh";
-    char* strings2[] = {buffRefresh, buffDisconnect, NULL}; // entries for an active plugin FS
-    static char buffConnect[] = "Connect To...";
-    char* strings3[] = {buffConnect, NULL}; // entries for the FS
+    wchar_t** strings;
+    static wchar_t buffShowInPanel[] = L"&Show in Panel";
+    static wchar_t buffDisconnect[] = L"&Disconnect";
+    wchar_t* strings1[] = {buffShowInPanel, buffDisconnect, NULL}; // entries for a detached plugin FS
+    static wchar_t buffRefresh[] = L"&Refresh";
+    wchar_t* strings2[] = {buffRefresh, buffDisconnect, NULL}; // entries for an active plugin FS
+    static wchar_t buffConnect[] = L"Connect To...";
+    wchar_t* strings3[] = {buffConnect, NULL}; // entries for the FS
     if (pluginFS != NULL)
     {
         if (isDetachedFS)
@@ -246,7 +245,7 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
         strings = strings3;
 
     HMENU menu = CreatePopupMenu();
-    MENUITEMINFO mi;
+    MENUITEMINFOW mi;
     memset(&mi, 0, sizeof(mi));
     mi.cbSize = sizeof(mi);
     mi.fMask = MIIM_TYPE | MIIM_ID;
@@ -254,11 +253,11 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
     int i;
     for (i = 0; strings[i] != NULL; i++)
     {
-        char* p = strings[i];
+        wchar_t* p = strings[i];
         mi.wID = i + 1;
         mi.dwTypeData = p;
-        mi.cch = (UINT)strlen(p);
-        InsertMenuItem(menu, i, TRUE, &mi);
+        mi.cch = (UINT)wcslen(p);
+        InsertMenuItemW(menu, i, TRUE, &mi);
     }
     DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                  x, y, parent, NULL);
@@ -367,9 +366,9 @@ CPluginInterfaceForFS::ExecuteChangeDrivePostCommand(int panel, int postCmd, voi
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex);
     ((CPluginFSInterface*)pluginFS)->CalledFromDisconnectDialog = TRUE; // suppress unnecessary prompts (the user requested a disconnect, just perform it)
     BOOL ret = FALSE;
@@ -389,51 +388,52 @@ CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
 
 void WINAPI
 CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                   const char* pluginFSName, int pluginFSNameIndex,
+                                   const wchar_t* pluginFSName, int pluginFSNameIndex,
                                    CFileData& file, int isDir)
 {
 #ifndef DEMOPLUG_QUIET
-    char buf[300];
-    sprintf(buf, "%s %s in %s panel", isDir ? (isDir == 2 ? "UpDir" : "Subdirectory") : "File", file.Name,
-            panel == PANEL_LEFT ? "left" : "right");
-    SalamanderGeneral->ShowMessageBox(buf, "FS Execute", MSGBOX_INFO);
+    const std::wstring message = SPLFormatStringOwned(
+        L"%s %s in %s panel", isDir ? (isDir == 2 ? L"UpDir" : L"Subdirectory") : L"File",
+        file.Name, panel == PANEL_LEFT ? L"left" : L"right");
+    SalamanderGeneral->ShowMessageBox(message.c_str(), L"FS Execute", MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // subdirectory or up-dir
     {
-        CPathBuffer newPath;
-        strcpy(newPath, fs->Path);
+        std::wstring newPath(fs->Path);
         if (isDir == 2) // parent directory
         {
-            char* cutDir = NULL;
-            if (SalamanderGeneral->CutDirectory(newPath, &cutDir)) // shorten the path by the last component
+            while (newPath.size() > 1 && newPath.back() == L'\\')
+                newPath.pop_back();
+            const size_t separator = newPath.find_last_of(L"\\/");
+            const std::wstring cutDir = separator == std::wstring::npos ? newPath : newPath.substr(separator + 1);
+            if (SPLCutDirectoryOwned(SalamanderGeneral, newPath)) // shorten the path by the last component
             {
                 int topIndex; // next top index, -1 -> invalid
-                if (!fs->TopIndexMem.FindAndPop(newPath, topIndex))
+                if (!fs->TopIndexMem.FindAndPop(newPath.c_str(), topIndex))
                     topIndex = -1;
                 // change the path in the panel
                 fs = NULL; // after ChangePanelPathToXXX the pointer may no longer be valid
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath, NULL,
-                                                             topIndex, cutDir);
+                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str(), NULL,
+                                                             topIndex, cutDir.c_str());
             }
         }
         else // subdirectory
         {
             // backup data for TopIndexMem (backupPath + topIndex)
-            CPathBuffer backupPath;
-            strcpy(backupPath, newPath);
+            const std::wstring backupPath(newPath);
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (SalamanderGeneral->SalPathAppend(newPath, file.Name, newPath.Size())) // set the path
+            SPLSalPathAppendOwned(newPath, file.Name); // set the path
+            // change the path in the panel
             {
-                // change the path in the panel
                 fs = NULL; // after ChangePanelPathToXXX the pointer may no longer be valid
-                if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath))
+                if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str()))
                 {
                     fs = (CPluginFSInterface*)SalamanderGeneral->GetPanelPluginFS(panel); // in case the FS in the panel changes we must fetch the current object
                     if (fs != NULL && fs == pluginFS)                                     // if it is the original FS
-                        fs->TopIndexMem.Push(backupPath, topIndex);                       // remember the top index for returning
+                        fs->TopIndexMem.Push(backupPath.c_str(), topIndex);               // remember the top index for returning
                 }
             }
         }
@@ -441,7 +441,9 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
     else // file
     {
         SalamanderGeneral->SetUserWorkedOnPanelPath(panel);
-        SalamanderGeneral->ExecuteAssociation(SalamanderGeneral->GetMainWindowHWND(), fs->Path, file.Name);
+        SalamanderGeneral->ExecuteAssociation(SalamanderGeneral->GetMainWindowHWND(),
+                                              fs->Path.c_str(),
+                                              file.Name);
     }
 }
 
@@ -450,27 +452,20 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
 // CTopIndexMem
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+static std::wstring NormalizeTopIndexPath(const wchar_t* path)
 {
-    // determine whether path follows Path (path == Path+"\\name")
-    const char* s = path + strlen(path);
-    if (s > path && *(s - 1) == '\\')
-        s--;
-    BOOL ok;
-    if (s == path)
-        ok = FALSE;
-    else
-    {
-        if (s > path && *s == '\\')
-            s--;
-        while (s > path && *s != '\\')
-            s--;
+    std::wstring normalized(path != NULL ? path : L"");
+    while (normalized.size() > 1 && normalized.back() == L'\\')
+        normalized.pop_back();
+    return normalized;
+}
 
-        int l = (int)strlen(Path);
-        if (l > 0 && Path[l - 1] == '\\')
-            l--;
-        ok = s - path == l && SalamanderGeneral->StrNICmp(path, Path, l) == 0;
-    }
+void CTopIndexMem::Push(const wchar_t* path, int topIndex)
+{
+    const std::wstring normalized = NormalizeTopIndexPath(path);
+    std::wstring parent(normalized);
+    const BOOL hasParent = SPLCutDirectoryOwned(SalamanderGeneral, parent);
+    const BOOL ok = hasParent && SalamanderGeneral->IsTheSamePath(parent.c_str(), NormalizeTopIndexPath(Path.c_str()).c_str());
 
     if (ok) // it follows -> remember the next top index
     {
@@ -481,38 +476,24 @@ void CTopIndexMem::Push(const char* path, int topIndex)
                 TopIndexes[i] = TopIndexes[i + 1];
             TopIndexesCount--;
         }
-        strcpy(Path, path);
+        Path = normalized;
         TopIndexes[TopIndexesCount++] = topIndex;
     }
     else // does not follow -> first top index in the sequence
     {
-        strcpy(Path, path);
+        Path = normalized;
         TopIndexesCount = 1;
         TopIndexes[0] = topIndex;
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+BOOL CTopIndexMem::FindAndPop(const wchar_t* path, int& topIndex)
 {
-    // determine whether path matches Path (path == Path)
-    int l1 = (int)strlen(path);
-    if (l1 > 0 && path[l1 - 1] == '\\')
-        l1--;
-    int l2 = (int)strlen(Path);
-    if (l2 > 0 && Path[l2 - 1] == '\\')
-        l2--;
-    if (l1 == l2 && SalamanderGeneral->StrNICmp(path, Path, l1) == 0)
+    if (SalamanderGeneral->IsTheSamePath(NormalizeTopIndexPath(path).c_str(), NormalizeTopIndexPath(Path.c_str()).c_str()))
     {
         if (TopIndexesCount > 0)
         {
-            char* s = Path + strlen(Path);
-            if (s > Path && *(s - 1) == '\\')
-                s--;
-            if (s > Path && *s == '\\')
-                s--;
-            while (s > Path && *s != '\\')
-                s--;
-            *s = 0;
+            SPLCutDirectoryOwned(SalamanderGeneral, Path);
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;
         }
@@ -534,11 +515,11 @@ BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
 // CPluginFSDataInterface
 //
 
-CPluginFSDataInterface::CPluginFSDataInterface(const char* path)
+CPluginFSDataInterface::CPluginFSDataInterface(const wchar_t* path)
 {
-    strcpy(Path, path);
-    SalamanderGeneral->SalPathAddBackslash(Path, MAX_PATH);
-    Name = Path + strlen(Path);
+    Path = path != NULL ? path : L"";
+    SPLSalPathAddBackslashOwned(Path);
+    NameOffset = Path.size();
 }
 
 HIMAGELIST WINAPI
@@ -550,9 +531,12 @@ CPluginFSDataInterface::GetSimplePluginIcons(int iconSize)
 HICON WINAPI
 CPluginFSDataInterface::GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon)
 {
-    lstrcpyn(Name, file->Name, (int)(MAX_PATH - (Name - Path)));
+    std::wstring iconPath(Path);
+    iconPath.resize(NameOffset);
+    iconPath.append(file->Name);
     HICON icon;
-    if (!SalamanderGeneral->GetFileIcon(Path, FALSE, &icon, iconSize, FALSE, FALSE))
+    if (!SalamanderGeneral->GetFileIcon(iconPath.c_str(), &icon, iconSize,
+                                        FALSE, FALSE))
         icon = NULL;
     destroyIcon = TRUE;
     return icon; // icon or NULL (failure)
@@ -569,20 +553,20 @@ int FSlen, FSlen2;
 void WINAPI GetTypeText()
 {
     FSdata = (CFSData*)((*TransferFileData)->PluginData);
-    memcpy(TransferBuffer, FSdata->TypeName, (*TransferLen = (int)strlen(FSdata->TypeName)));
+    memcpy(TransferBuffer, FSdata->TypeName, (*TransferLen = (int)wcslen(FSdata->TypeName)) * sizeof(wchar_t));
 }
 
 void WINAPI GetCreatedText()
 {
     FileTimeToLocalFileTime(&((CFSData*)((*TransferFileData)->PluginData))->CreationTime, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
     if (FSlen < 0)
-        FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
-    *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+        FSlen = _snwprintf(TransferBuffer, 50, L"%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
+    *(TransferBuffer + FSlen++) = L' ';
+    FSlen2 = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
     if (FSlen2 < 0)
-        FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
+        FSlen2 = _snwprintf(TransferBuffer + FSlen, 50, L"%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;
 }
 
@@ -590,13 +574,13 @@ void WINAPI GetModifiedText()
 {
     FileTimeToLocalFileTime(&(*TransferFileData)->LastWrite, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
     if (FSlen < 0)
-        FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
-    *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+        FSlen = _snwprintf(TransferBuffer, 50, L"%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
+    *(TransferBuffer + FSlen++) = L' ';
+    FSlen2 = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
     if (FSlen2 < 0)
-        FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
+        FSlen2 = _snwprintf(TransferBuffer + FSlen, 50, L"%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;
 }
 
@@ -604,13 +588,13 @@ void WINAPI GetAccessedText()
 {
     FileTimeToLocalFileTime(&((CFSData*)((*TransferFileData)->PluginData))->LastAccessTime, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
     if (FSlen < 0)
-        FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
-    *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+        FSlen = _snwprintf(TransferBuffer, 50, L"%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
+    *(TransferBuffer + FSlen++) = L' ';
+    FSlen2 = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
     if (FSlen2 < 0)
-        FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
+        FSlen2 = _snwprintf(TransferBuffer + FSlen, 50, L"%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;
 }
 
@@ -622,7 +606,7 @@ int WINAPI PluginSimpleIconCallback()
 void AddTypeColumn(BOOL leftPanel, CSalamanderViewAbstract* view, int& i, const CColumn* origTypeColumn)
 {
     CColumn column = *origTypeColumn;
-    strcpy(column.Name, "DFS Type");
+    wcscpy(column.Name, L"DFS Type");
     column.GetText = GetTypeText;
     column.CustomData = 4;
     column.ID = COLUMN_ID_CUSTOM;
@@ -634,8 +618,8 @@ void AddTypeColumn(BOOL leftPanel, CSalamanderViewAbstract* view, int& i, const 
 void AddTimeColumns(BOOL leftPanel, CSalamanderViewAbstract* view, int& i)
 {
     CColumn column;
-    strcpy(column.Name, "Created");
-    strcpy(column.Description, "Creation Time");
+    wcscpy(column.Name, L"Created");
+    wcscpy(column.Description, L"Creation Time");
     column.GetText = GetCreatedText;
     column.CustomData = 1;
     column.SupportSorting = 1;
@@ -645,16 +629,16 @@ void AddTimeColumns(BOOL leftPanel, CSalamanderViewAbstract* view, int& i)
     column.FixedWidth = leftPanel ? LOWORD(CreatedFixedWidth) : HIWORD(CreatedFixedWidth);
     view->InsertColumn(i++, &column);
 
-    strcpy(column.Name, "Modified");
-    strcpy(column.Description, "Last Write Time");
+    wcscpy(column.Name, L"Modified");
+    wcscpy(column.Description, L"Last Write Time");
     column.GetText = GetModifiedText;
     column.CustomData = 2;
     column.Width = leftPanel ? LOWORD(ModifiedWidth) : HIWORD(ModifiedWidth);
     column.FixedWidth = leftPanel ? LOWORD(ModifiedFixedWidth) : HIWORD(ModifiedFixedWidth);
     view->InsertColumn(i++, &column);
 
-    strcpy(column.Name, "Accessed");
-    strcpy(column.Description, "Last Access Time");
+    wcscpy(column.Name, L"Accessed");
+    wcscpy(column.Description, L"Last Access Time");
     column.GetText = GetAccessedText;
     column.CustomData = 3;
     column.Width = leftPanel ? LOWORD(AccessedWidth) : HIWORD(AccessedWidth);
@@ -663,7 +647,7 @@ void AddTimeColumns(BOOL leftPanel, CSalamanderViewAbstract* view, int& i)
 }
 
 void WINAPI
-CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                   const CFileData* upperDir)
 {
     view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen, TransferRowData,
@@ -809,46 +793,51 @@ CPluginFSDataInterface::ColumnWidthWasChanged(BOOL leftPanel, const CColumn* col
 
 struct CFSInfoLineData
 {
-    const char* Name;
-    const char* Type;
+    std::wstring Name;
+    std::wstring Type;
 };
 
-const char* WINAPI FSInfoLineFile(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineFile(HWND parent, void* param)
 {
     CFSInfoLineData* data = (CFSInfoLineData*)param;
-    return data->Name;
+    return data->Name.c_str();
 }
 
-const char* WINAPI FSInfoLineType(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineType(HWND parent, void* param)
 {
     CFSInfoLineData* data = (CFSInfoLineData*)param;
-    return data->Type;
+    return data->Type.c_str();
 }
 
 CSalamanderVarStrEntry FSInfoLine[] =
     {
-        {"File", FSInfoLineFile},
-        {"Type", FSInfoLineType},
+        {L"File", FSInfoLineFile},
+        {L"Type", FSInfoLineType},
         {NULL, NULL}};
 
 BOOL WINAPI
 CPluginFSDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOOL isDir,
                                            int selectedFiles, int selectedDirs, BOOL displaySize,
-                                           const CQuadWord& selectedSize, char* buffer,
-                                           DWORD* hotTexts, int& hotTextsCount)
+                                           const CQuadWord& selectedSize,
+                                           CSalamanderStringBuffer* buffer,
+                                           CSalamanderTextRangeBuffer* hotTexts)
 {
+    if (buffer == NULL || hotTexts == NULL)
+        return FALSE;
     if (file != NULL)
     {
         CFSInfoLineData data;
         data.Name = file->Name;
         data.Type = ((CFSData*)file->PluginData)->TypeName;
-        hotTextsCount = 100;
         if (!SalamanderGeneral->ExpandVarString(SalamanderGeneral->GetMsgBoxParent(),
-                                                "$(File): $(Type)", buffer, 1000, FSInfoLine,
-                                                &data, FALSE, hotTexts, &hotTextsCount))
+                                                L"$(File): $(Type)", buffer, FSInfoLine,
+                                                &data, FALSE, hotTexts))
         {
-            strcpy(buffer, "Error!");
-            hotTextsCount = 0;
+            const std::vector<CSalamanderTextRange> noRanges;
+            return sally::plugin_abi::WriteTextAndRanges(
+                       *buffer, *hotTexts, L"Error!", noRanges)
+                       ? TRUE
+                       : FALSE;
         }
         return TRUE;
     }
@@ -857,11 +846,14 @@ CPluginFSDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOO
         if (selectedFiles == 0 && selectedDirs == 0) // Information Line for an empty panel
         {
             // return FALSE;  // let Salamander print the text
-            strcpy(buffer, "No items found");
-            hotTextsCount = 0;
-            return TRUE;
+            const std::vector<CSalamanderTextRange> noRanges;
+            return sally::plugin_abi::WriteTextAndRanges(
+                       *buffer, *hotTexts, L"No items found", noRanges)
+                       ? TRUE
+                       : FALSE;
         }
         // return FALSE;  // let Salamander print the counts of selected files and directories
+        std::wstring text;
         if (displaySize)
         {
             /*
@@ -876,10 +868,11 @@ CPluginFSDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOO
       if (mySize != selectedSize) TRACE_E("Unexpected situation in CPluginFSDataInterface::GetInfoLineContent().");
 */
 
-            char num[100];
-            SalamanderGeneral->PrintDiskSize(num, selectedSize, 0);
+            const std::wstring num = SPLPrintDiskSizeOwned(SalamanderGeneral, selectedSize, 0);
             // for simplicity we do not use "plural" strings (see SalamanderGeneral->ExpandPluralString())
-            sprintf(buffer, "Selected (<%s>): <%d> files and <%d> directories", num, selectedFiles, selectedDirs);
+            text = SPLFormatStringOwned(
+                L"Selected (<%s>): <%d> files and <%d> directories",
+                num.c_str(), selectedFiles, selectedDirs);
 
             /*    // example of using a standard string
       SalamanderGeneral->ExpandPluralBytesFilesDirs(buffer, 1000, selectedSize, selectedFiles,
@@ -887,8 +880,16 @@ CPluginFSDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOO
 */
         }
         else
-            sprintf(buffer, "Selected: <%d> files and <%d> directories", selectedFiles, selectedDirs);
-        return SalamanderGeneral->LookForSubTexts(buffer, hotTexts, &hotTextsCount);
+            text = SPLFormatStringOwned(
+                L"Selected: <%d> files and <%d> directories",
+                selectedFiles, selectedDirs);
+        std::vector<CSalamanderTextRange> ranges;
+        if (!SPLLookForSubTextsOwned(SalamanderGeneral, text, ranges))
+            return FALSE;
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, ranges)
+                   ? TRUE
+                   : FALSE;
     }
 }
 
@@ -897,7 +898,7 @@ CPluginFSDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOO
 // CFSData
 //
 
-CFSData::CFSData(const FILETIME& creationTime, const FILETIME& lastAccessTime, const char* type)
+CFSData::CFSData(const FILETIME& creationTime, const FILETIME& lastAccessTime, const wchar_t* type)
 {
     CreationTime = creationTime;
     LastAccessTime = lastAccessTime;

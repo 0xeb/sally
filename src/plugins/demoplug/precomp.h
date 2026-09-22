@@ -56,6 +56,8 @@
 #include "spl_vers.h"
 #include "spl_gui.h"
 
+#include "common/unicode/helpers.h"
+
 #include "dbg.h"
 #include "mhandles.h"
 #include "arraylt.h"

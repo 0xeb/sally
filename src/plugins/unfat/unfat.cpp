@@ -19,6 +19,8 @@
 #include "unfat.rh2"
 #include "lang\lang.rh"
 
+#include <vector>
+
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to the SPL module - language-independent resources
@@ -72,9 +74,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide. SalamanderGeneral->LoadStr has returned WCHAR* since the v108
+// ABI break; this went through LoadStrNarrow and was widened again at every call site.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 int WINAPI SalamanderPluginGetReqVer()
@@ -94,14 +98,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is made for the current version of Salamander or newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "UnFAT" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-225).
+        MessageBoxW(salamander->GetParentWindow(),
+                    _CRT_WIDE(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"UnFAT" /* do not translate! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // let Salamander load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "UnFAT" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"UnFAT" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -112,19 +118,19 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &SortByExtDirsAsFiles,
                                           sizeof(SortByExtDirsAsFiles), NULL);
 
-    if (!InitializeWinLib("UnFAT" /* do not translate! */, DLLInstance))
+    if (!InitializeWinLib(L"UnFAT" /* do not translate! */, DLLInstance))
         return NULL;
-    SetWinLibStrings("Invalid number!", LoadStr(IDS_PLUGINNAME));
+    SetWinLibStrings(L"Invalid number!", LangStr(IDS_PLUGINNAME).c_str());
 
     // set up the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_PANELARCHIVERVIEW | FUNCTION_CUSTOMARCHIVERUNPACK,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "UnFAT" /* do not translate! */, "ima");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"UnFAT" /* do not translate! */, L"ima");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -133,54 +139,16 @@ BOOL Error(int resID, BOOL quiet, ...)
 {
     if (!quiet)
     {
-        char buf[1024];
-        buf[0] = 0;
         va_list arglist;
         va_start(arglist, quiet);
-        vsprintf(buf, LoadStr(resID), arglist);
+        const std::wstring message = SPLFormatStringOwnedV(LangStr(resID).c_str(), arglist);
         va_end(arglist);
 
-        SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(message.c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
     }
     return FALSE;
 }
 
-BOOL Error(char* msg, DWORD err, BOOL quiet)
-{
-    if (!quiet)
-    {
-        //    if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES)  // treat as an error
-        //    {
-        char buf[1024];
-        sprintf(buf, "%s\n\n%s", msg, SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
-        //    }
-    }
-    return FALSE;
-}
-
-/*
-BOOL SysError(int title, int error, ...)
-{
-  int lastErr = GetLastError();
-  CALL_STACK_MESSAGE3("SysError(%d, %d, ...)", title, error);
-  char buf[1024];
-  *buf = 0;
-  va_list arglist;
-  va_start(arglist, error);
-  vsprintf(buf, LoadStr(error), arglist);
-  va_end(arglist);
-  if (lastErr != ERROR_SUCCESS)
-  {
-    strcat(buf, " ");
-    int l = strlen(buf);
-    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
-  }
-  SalamanderGeneral->ShowMessageBox(buf, LoadStr(title), MSGBOX_ERROR);
-  return FALSE;
-}
-*/
 // ****************************************************************************
 //
 // CPluginInterface
@@ -188,13 +156,49 @@ BOOL SysError(int title, int error, ...)
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = LangStr(IDS_PLUGINNAME) + L" " _CRT_WIDE(VERSINFO_VERSION) L"\n\n" _CRT_WIDE(VERSINFO_COPYRIGHT) L"\n\n" +
+                              LangStr(IDS_PLUGIN_DESCRIPTION);
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
+}
+
+HANDLE SafeFileCreateWithOwnedSkipPath(const wchar_t* fileName,
+                                       DWORD desiredAccess,
+                                       DWORD shareMode,
+                                       DWORD flagsAndAttributes,
+                                       BOOL isDir,
+                                       HWND parent,
+                                       const wchar_t* sourceFileName,
+                                       const wchar_t* sourceFileInfo,
+                                       DWORD* silentMask,
+                                       BOOL allowSkip,
+                                       BOOL* skipped,
+                                       std::wstring* skipPath,
+                                       CQuadWord* allocateWholeFile,
+                                       SAFE_FILE* file)
+{
+    std::vector<wchar_t> skipBuffer;
+    if (skipPath != nullptr)
+    {
+        const size_t required = wcslen(fileName) + 1;
+        if (required > INT_MAX)
+        {
+            skipPath->clear();
+            if (skipped != nullptr)
+                *skipped = FALSE;
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            return INVALID_HANDLE_VALUE;
+        }
+        skipBuffer.resize(required);
+    }
+
+    HANDLE result = SalamanderSafeFile->SafeFileCreate(
+        fileName, desiredAccess, shareMode, flagsAndAttributes, isDir, parent,
+        sourceFileName, sourceFileInfo, silentMask, allowSkip, skipped,
+        skipBuffer.empty() ? nullptr : skipBuffer.data(), static_cast<int>(skipBuffer.size()),
+        allocateWholeFile, file);
+    if (skipPath != nullptr)
+        skipPath->assign(skipBuffer.data());
+    return result;
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -221,8 +225,8 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
     // BASIC SECTION
-    salamander->AddPanelArchiver("ima", FALSE, FALSE);
-    salamander->AddCustomUnpacker("UnFAT (Plugin)", "*.ima", FALSE);
+    salamander->AddPanelArchiver(L"ima", FALSE, FALSE);
+    salamander->AddCustomUnpacker(L"UnFAT (Plugin)", L"*.ima", FALSE);
 }
 
 void CPluginInterface::Event(int event, DWORD param)
@@ -250,11 +254,11 @@ CPluginInterface::GetInterfaceForArchiver()
 //
 
 BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander,
-                                              const char* fileName,
+                                              const wchar_t* fileName,
                                               CSalamanderDirectoryAbstract* dir,
                                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %ls, ,)", fileName);
     pluginData = NULL;
 
     // attempt to open the FAT image
@@ -272,12 +276,12 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     return ret;
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                                 CPluginDataInterfaceAbstract* pluginData,
-                                                const char* targetDir, const char* archiveRoot, SalEnumSelection next,
+                                                const wchar_t* targetDir, const wchar_t* archiveRoot, SalEnumSelection next,
                                                 void* nextParam)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, %s, %s, ,)", fileName, targetDir, archiveRoot);
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, %ls, %ls, ,)", fileName, targetDir, archiveRoot);
 
     HWND hParent = SalamanderGeneral->GetMsgBoxParent();
 
@@ -292,7 +296,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     CQuadWord size;
     CQuadWord totalSize(0, 0);
     CQuadWord realTotalSize(0, 0);
-    const char* name;
+    const wchar_t* name;
     const CFileData* fileData;
     int errorOccured;
     while ((name = next(hParent, 1, &isDir, &size, &fileData, nextParam, &errorOccured)) != NULL)
@@ -315,50 +319,47 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     // check whether an error occurred or the user requested to cancel the operation (Cancel button) +
     // check the free disk space and optionally unpack
     if (errorOccured != SALENUM_CANCEL &&
-        SalamanderGeneral->TestFreeSpace(hParent, targetDir, realTotalSize, LoadStr(IDS_PLUGINNAME)))
+        SalamanderGeneral->TestFreeSpace(hParent, targetDir, realTotalSize, LangStr(IDS_PLUGINNAME).c_str()))
     {
-        CPathBuffer title;
-        sprintf(title, LoadStr(IDS_EXTRACTING_ARCHIVE), SalamanderGeneral->SalPathFindFileName(fileName));
-        salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
+        const std::wstring title = SPLFormatStringOwned(
+            LangStr(IDS_EXTRACTING_ARCHIVE).c_str(), SalamanderGeneral->SalPathFindFileName(fileName));
+        salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
         // set the maximum value for the TOTAL progress bar
         salamander->ProgressSetTotalSize(CQuadWord(-1, -1), totalSize);
 
         BOOL toSkip = FALSE;
 
         CAllocWholeFileEnum allocWholeFileOnStart = awfNeededTest;
-        CPathBuffer skipPath; // all subdirectories and files under this path will be ignored
-        skipPath[0] = 0;     // disallow skipping for now
+        std::wstring skipPath; // all subdirectories and files under this path will be ignored
         DWORD silentMask = 0; // mask holding skip modes; 0 = no skip
         ret = TRUE;
         next(NULL, -1, NULL, NULL, NULL, nextParam, NULL); // reset the enumeration
         while ((name = next(NULL /* do not report errors the second time */, 1, &isDir, &size, &fileData, nextParam, NULL)) != NULL)
         {
-            CPathBuffer destPath;
-            strcpy(destPath, targetDir);
+            std::wstring destPath(targetDir);
 
-            CPathBuffer nameInArchive;
-            strcpy(nameInArchive, archiveRoot);
-            SalamanderGeneral->SalPathAppend(nameInArchive, name, nameInArchive.Size());
+            std::wstring nameInArchive(archiveRoot);
+            SPLSalPathAppendOwned(nameInArchive, name);
 
             // reset the FILE progress bar to its initial value
             salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE);
 
-            if (SalamanderGeneral->SalPathAppend(destPath, name, destPath.Size()))
+            SPLSalPathAppendOwned(destPath, name);
             {
-                if (skipPath[0] != 0)
+                if (!skipPath.empty())
                 {
-                    if (SalamanderGeneral->PathIsPrefix(skipPath, destPath))
+                    if (SalamanderGeneral->PathIsPrefix(skipPath.c_str(), destPath.c_str()))
                         continue; // the item lies under skipPath so it is ignored
                     else
-                        skipPath[0] = 0; // the item does not belong under skipPath, discard skipPath
+                        skipPath.clear(); // the item does not belong under skipPath, discard skipPath
                 }
 
                 if (isDir)
                 {
                     // create the target path
                     BOOL skipped;
-                    if (SalamanderSafeFile->SafeFileCreate(destPath, 0, 0, 0, TRUE, hParent, NULL, NULL, &silentMask, TRUE, &skipped,
-                                                           skipPath, skipPath.Size(), NULL, NULL) == INVALID_HANDLE_VALUE)
+                    if (SafeFileCreateWithOwnedSkipPath(destPath.c_str(), 0, 0, 0, TRUE, hParent, NULL, NULL, &silentMask, TRUE, &skipped,
+                                                        &skipPath, NULL, NULL) == INVALID_HANDLE_VALUE)
                     {
                         if (!skipped)
                         {
@@ -369,9 +370,9 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     // set the maximum value for the FILE progress bar
                     salamander->ProgressSetTotalSize(COPY_MIN_FILE_SIZE, CQuadWord(-1, -1));
                     // "extracting: %s..."
-                    CPathBuffer progressText;
-                    sprintf(progressText, LoadStr(IDS_EXTRACTING), (const char*)nameInArchive);
-                    salamander->ProgressDialogAddText(progressText, TRUE);
+                    const std::wstring progressText =
+                        SPLFormatStringOwned(LangStr(IDS_EXTRACTING).c_str(), nameInArchive.c_str());
+                    salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
 
                     CQuadWord size2 = COPY_MIN_FILE_SIZE;
                     if (!salamander->ProgressAddSize((int)size2.Value, TRUE))
@@ -386,13 +387,13 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     // set the maximum value for the FILE progress bar
                     salamander->ProgressSetTotalSize(fileData->Size, CQuadWord(-1, -1));
 
-                    char* lastComp = _tcsrchr(destPath, '\\');
-                    if (lastComp != NULL)
-                        *lastComp = '\0';
+                    const size_t lastComp = destPath.find_last_of(L'\\');
+                    if (lastComp != std::wstring::npos)
+                        destPath.resize(lastComp);
 
                     BOOL skipped;
-                    if (!fatImage.UnpackFile(salamander, fileName, nameInArchive, fileData, destPath,
-                                             &silentMask, TRUE, &skipped, skipPath, skipPath.Size(),
+                    if (!fatImage.UnpackFile(salamander, fileName, nameInArchive.c_str(), fileData, destPath.c_str(),
+                                             &silentMask, TRUE, &skipped, &skipPath,
                                              hParent, &allocWholeFileOnStart))
                     {
                         if (!skipped)
@@ -403,8 +404,6 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     }
                 }
             }
-            else
-                TRACE_E("skipping " << name);
         } // while
 
         salamander->CloseProgressDialog();
@@ -413,12 +412,12 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const char* nameInArchive,
-                                                const CFileData* fileData, const char* targetDir,
-                                                const char* newFileName, BOOL* renamingNotSupported)
+                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                                const wchar_t* nameInArchive,
+                                                const CFileData* fileData, const wchar_t* targetDir,
+                                                const wchar_t* newFileName, BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, %s, , %s, ,)", fileName,
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, %ls, , %ls, ,)", fileName,
                         nameInArchive, targetDir);
 
     if (newFileName != NULL)
@@ -435,9 +434,9 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 
     BOOL ret = TRUE;
 
-    CPathBuffer title;
-    sprintf(title, LoadStr(IDS_EXTRACTING_ARCHIVE), SalamanderGeneral->SalPathFindFileName(fileName));
-    salamander->OpenProgressDialog(title, FALSE, NULL, FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LangStr(IDS_EXTRACTING_ARCHIVE).c_str(), SalamanderGeneral->SalPathFindFileName(fileName));
+    salamander->OpenProgressDialog(title.c_str(), FALSE, NULL, FALSE);
     CQuadWord totalSize;
     if (fileData->Size < COPY_MIN_FILE_SIZE)
         totalSize = COPY_MIN_FILE_SIZE;
@@ -449,7 +448,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 
     CAllocWholeFileEnum allocWholeFileOnStart = awfNeededTest;
     ret = fatImage.UnpackFile(salamander, fileName, nameInArchive, fileData, targetDir,
-                              &silentDummy, FALSE, NULL, NULL, 0, hParent,
+                              &silentDummy, FALSE, NULL, NULL, hParent,
                               &allocWholeFileOnStart);
 
     salamander->CloseProgressDialog();
@@ -458,7 +457,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 }
 
 void CalcSize(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGroup* maskGroup,
-              char* path, int pathBufSize, CQuadWord* totalSize, CQuadWord* realTotalSize)
+              CQuadWord* totalSize, CQuadWord* realTotalSize)
 {
     *totalSize += COPY_MIN_FILE_SIZE; // account for the directory
 
@@ -480,29 +479,26 @@ void CalcSize(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGroup* mas
     }
 
     count = dir->GetDirsCount();
-    size_t pathLen = strlen(path);
     int j;
     for (j = 0; j < count; j++)
     {
         CFileData const* file = dir->GetDir(j);
-        SalamanderGeneral->SalPathAppend(path, file->Name, pathBufSize);
         CSalamanderDirectoryAbstract const* subDir = dir->GetSalDir(j);
-        CalcSize(subDir, maskGroup, path, pathBufSize, totalSize, realTotalSize);
-        path[pathLen] = 0;
+        CalcSize(subDir, maskGroup, totalSize, realTotalSize);
     }
 }
 
 BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGroup* maskGroup,
                     CSalamanderForOperationsAbstract* salamander, CFATImage* img,
-                    const char* archiveName, const char* targetDir,
-                    char* path, int pathBufSize, DWORD* silent, char* skipPath, int skipPathMax)
+                    const wchar_t* archiveName, const wchar_t* targetDir,
+                     std::wstring& path, DWORD* silent, std::wstring& skipPath)
 {
     HWND hParent = SalamanderGeneral->GetMsgBoxParent();
     // process files first
     CAllocWholeFileEnum allocWholeFileOnStart = awfNeededTest;
     int filesCount = dir->GetFilesCount();
     int unpackedCount = 0;
-    size_t pathLen = strlen(path);
+    size_t pathLen = path.size();
 
     int i;
     for (i = 0; i < filesCount; i++)
@@ -516,28 +512,27 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
             // set the maximum value for the FILE progress bar
             salamander->ProgressSetTotalSize(fileData->Size, CQuadWord(-1, -1));
 
-            CPathBuffer myTargetDir;
-            lstrcpyn(myTargetDir, targetDir, myTargetDir.Size());
-            SalamanderGeneral->SalPathAppend(myTargetDir, path, myTargetDir.Size());
+            std::wstring myTargetDir(targetDir);
+            SPLSalPathAppendOwned(myTargetDir, path.c_str());
 
-            SalamanderGeneral->SalPathAppend(path, fileData->Name, pathBufSize);
+            SPLSalPathAppendOwned(path, fileData->Name);
 
             BOOL unpack = TRUE;
-            if (skipPath[0] != 0)
+            if (!skipPath.empty())
             {
-                if (SalamanderGeneral->PathIsPrefix(skipPath, myTargetDir))
+                if (SalamanderGeneral->PathIsPrefix(skipPath.c_str(), myTargetDir.c_str()))
                 {
                     unpack = FALSE; // the item lies under skipPath so it is ignored
                 }
                 else
-                    skipPath[0] = 0; // the item does not belong under skipPath, discard skipPath
+                    skipPath.clear(); // the item does not belong under skipPath, discard skipPath
             }
 
             if (unpack)
             {
                 BOOL skipped;
-                if (!img->UnpackFile(salamander, archiveName, path, fileData, myTargetDir, silent,
-                                     TRUE, &skipped, skipPath, skipPathMax, hParent, &allocWholeFileOnStart))
+                if (!img->UnpackFile(salamander, archiveName, path.c_str(), fileData, myTargetDir.c_str(), silent,
+                                      TRUE, &skipped, &skipPath, hParent, &allocWholeFileOnStart))
                 {
                     // skip || skip all || cancel || error
                     if (!skipped)
@@ -547,42 +542,41 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
 
             unpackedCount++;
 
-            path[pathLen] = 0;
+            path.resize(pathLen);
         }
     }
 
     // then recurse into directories
     int dirsCount = dir->GetDirsCount();
-    pathLen = strlen(path);
+    pathLen = path.size();
     int j;
     for (j = 0; j < dirsCount; j++)
     {
         CFileData const* subDirData = dir->GetDir(j);
-        SalamanderGeneral->SalPathAppend(path, subDirData->Name, pathBufSize);
+        SPLSalPathAppendOwned(path, subDirData->Name);
         CSalamanderDirectoryAbstract const* subDir = dir->GetSalDir(j);
 
         BOOL unpack = TRUE;
-        if (skipPath[0] != 0)
+        if (!skipPath.empty())
         {
-            CPathBuffer testPath;
-            lstrcpyn(testPath, targetDir, testPath.Size());
-            SalamanderGeneral->SalPathAppend(testPath, path, testPath.Size());
+            std::wstring testPath(targetDir);
+            SPLSalPathAppendOwned(testPath, path.c_str());
 
-            if (SalamanderGeneral->PathIsPrefix(skipPath, testPath))
+            if (SalamanderGeneral->PathIsPrefix(skipPath.c_str(), testPath.c_str()))
             {
                 unpack = FALSE; // the item lies under skipPath so it is ignored
             }
             else
-                skipPath[0] = 0; // the item does not belong under skipPath, discard skipPath
+                skipPath.clear(); // the item does not belong under skipPath, discard skipPath
         }
 
         if (unpack)
         {
             if (!ExtractArchive(subDir, maskGroup, salamander, img, archiveName,
-                                targetDir, path, pathBufSize, silent, skipPath, skipPathMax))
+                                targetDir, path, silent, skipPath))
                 return FALSE;
         }
-        path[pathLen] = 0;
+        path.resize(pathLen);
     }
 
     if (unpackedCount == 0 && dirsCount == 0)
@@ -593,19 +587,18 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
         salamander->ProgressSetTotalSize(COPY_MIN_FILE_SIZE, CQuadWord(-1, -1));
 
         // an empty directory must be created explicitly
-        CPathBuffer dirName; // Heap-allocated for long path support
-        lstrcpyn(dirName, targetDir, dirName.Size());
-        SalamanderGeneral->SalPathAppend(dirName, path, dirName.Size());
+        std::wstring dirName(targetDir);
+        SPLSalPathAppendOwned(dirName, path.c_str());
 
         // "extracting: %s..."
-        CPathBuffer progressText;
-        sprintf(progressText, LoadStr(IDS_EXTRACTING), path);
-        salamander->ProgressDialogAddText(progressText, TRUE);
+        const std::wstring progressText =
+            SPLFormatStringOwned(LangStr(IDS_EXTRACTING).c_str(), path.c_str());
+        salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
 
         // create the target path
         BOOL skipped;
-        if (SalamanderSafeFile->SafeFileCreate(dirName, 0, 0, 0, TRUE, hParent, NULL, NULL, silent, TRUE, &skipped,
-                                               skipPath, skipPathMax, NULL, NULL) == INVALID_HANDLE_VALUE)
+        if (SafeFileCreateWithOwnedSkipPath(dirName.c_str(), 0, 0, 0, TRUE, hParent, NULL, NULL, silent, TRUE, &skipped,
+                                            &skipPath, NULL, NULL) == INVALID_HANDLE_VALUE)
         {
             if (!skipped)
                 return FALSE;
@@ -619,11 +612,11 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
     return TRUE;
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                                     const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                                     const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                                      CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
     CSalamanderDirectoryAbstract* dir = SalamanderGeneral->AllocSalamanderDirectory(FALSE);
@@ -641,21 +634,20 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
             int err;
             if (maskGroup->PrepareMasks(err))
             {
-                CPathBuffer path; // Heap-allocated for long path support
-                path[0] = 0;
+                std::wstring path;
                 CQuadWord totalSize(0, 0);
                 CQuadWord realTotalSize(0, 0);
-                CalcSize(dir, maskGroup, path, path.Size(), &totalSize, &realTotalSize);
+                CalcSize(dir, maskGroup, &totalSize, &realTotalSize);
 
                 if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                                     targetDir, realTotalSize, LoadStr(IDS_PLUGINNAME)))
+                                                     targetDir, realTotalSize, LangStr(IDS_PLUGINNAME).c_str()))
                 {
                     if (delArchiveWhenDone)
                         archiveVolumes->Add(fileName, -2);
 
-                    CPathBuffer title;
-                    sprintf(title, LoadStr(IDS_EXTRACTING_ARCHIVE), SalamanderGeneral->SalPathFindFileName(fileName));
-                    salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
+                    const std::wstring title = SPLFormatStringOwned(
+                        LangStr(IDS_EXTRACTING_ARCHIVE).c_str(), SalamanderGeneral->SalPathFindFileName(fileName));
+                    salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
                     // set the maximum value for the TOTAL progress bar
                     salamander->ProgressSetTotalSize(CQuadWord(-1, -1), totalSize);
 
@@ -663,11 +655,10 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                     CFATImage fatImage; // the destructor calls Close
                     if (fatImage.Open(fileName, FALSE, hParent))
                     {
-                        path[0] = 0;
+                        path.clear();
                         DWORD silent = 0;
-                        CPathBuffer skipPath; // all subdirectories and files under this path will be ignored
-                        skipPath[0] = 0;      // disallow skipping for now
-                        ret = ExtractArchive(dir, maskGroup, salamander, &fatImage, fileName, targetDir, path, path.Size(), &silent, skipPath, skipPath.Size());
+                        std::wstring skipPath; // all subdirectories and files under this path will be ignored
+                        ret = ExtractArchive(dir, maskGroup, salamander, &fatImage, fileName, targetDir, path, &silent, skipPath);
                     }
 
                     salamander->CloseProgressDialog();

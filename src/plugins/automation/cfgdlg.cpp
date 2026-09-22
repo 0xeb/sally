@@ -21,7 +21,33 @@ extern HINSTANCE g_hLangInst;
 extern CAutomationPluginInterface g_oAutomationPlugin;
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
-const _TCHAR CAutomationConfigDialog::SublassPropName[] = _T("AutCfgDlg");
+const char CAutomationConfigDialog::SublassPropName[] = "AutCfgDlg";
+
+namespace
+{
+std::wstring GetListViewItemTextOwned(HWND list, int item)
+{
+    size_t capacity = 2;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<int>::max)());
+    for (;;)
+    {
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        LVITEMW entry = {};
+        entry.iSubItem = 0;
+        entry.pszText = buffer.data();
+        entry.cchTextMax = static_cast<int>(buffer.size());
+        const LRESULT copied = SendMessageW(
+            list, LVM_GETITEMTEXTW, item, reinterpret_cast<LPARAM>(&entry));
+        if (copied <= 0)
+            return std::wstring();
+        if (copied < static_cast<LRESULT>(buffer.size() - 1))
+            return std::wstring(buffer.data(), static_cast<size_t>(copied));
+        if (capacity > limit / 2)
+            return std::wstring();
+        capacity *= 2;
+    }
+}
+}
 
 CAutomationConfigDialog::CAutomationConfigDialog(HWND hwndParent)
     : CDialog(g_hLangInst, IDD_CONFIG, IDD_CONFIG, hwndParent)
@@ -96,28 +122,29 @@ void CAutomationConfigDialog::Transfer(CTransferInfo& ti)
     int bEnableDebugger;
     int cDirs;
     int iDir;
-    LVITEM lvi = {
+    LVITEMW lvi = {
         0,
     };
     HWND hwndList = GetDlgItem(HWindow, IDC_DIRLIST);
     _ASSERTE(hwndList);
+    ListView_SetUnicodeFormat(hwndList, TRUE);
 
     if (ti.Type == ttDataToWindow)
     {
         bEnableDebugger = g_oAutomationPlugin.IsDebuggerEnabled();
 
-        LVCOLUMN lvcol = {
+        LVCOLUMNW lvcol = {
             0,
         };
-        ListView_InsertColumn(hwndList, 0, &lvcol);
+        SendMessageW(hwndList, LVM_INSERTCOLUMNW, 0, reinterpret_cast<LPARAM>(&lvcol));
 
         cDirs = g_oAutomationPlugin.GetScriptDirectoryCount();
         lvi.mask = LVIF_TEXT;
         for (iDir = 0; iDir < cDirs; iDir++)
         {
             lvi.iItem = iDir;
-            lvi.pszText = const_cast<PTSTR>(g_oAutomationPlugin.GetScriptDirectoryRaw(iDir));
-            ListView_InsertItem(hwndList, &lvi);
+            lvi.pszText = const_cast<PWSTR>(g_oAutomationPlugin.GetScriptDirectoryRaw(iDir));
+            SendMessageW(hwndList, LVM_INSERTITEMW, 0, reinterpret_cast<LPARAM>(&lvi));
         }
 
         ListView_SetColumnWidth(hwndList, 0, LVSCW_AUTOSIZE);
@@ -134,12 +161,8 @@ void CAutomationConfigDialog::Transfer(CTransferInfo& ti)
         lvi.mask = LVIF_TEXT;
         for (iDir = 0; iDir < cDirs; iDir++)
         {
-            CPathBuffer szDir;
-            lvi.iItem = iDir;
-            lvi.pszText = szDir;
-            lvi.cchTextMax = szDir.Size();
-            ListView_GetItem(hwndList, &lvi);
-            g_oAutomationPlugin.AddScriptDirectory(szDir);
+            const std::wstring directory = GetListViewItemTextOwned(hwndList, iDir);
+            g_oAutomationPlugin.AddScriptDirectory(directory.c_str());
         }
     }
 }
@@ -166,11 +189,11 @@ BOOL CAutomationConfigDialog::OnDirListNotify(NMHDR* pnmhdr)
     case LVN_KEYDOWN:
         return OnDirListKeyDown(reinterpret_cast<NMLVKEYDOWN*>(pnmhdr));
 
-    case LVN_BEGINLABELEDIT:
-        return OnDirListBeginLabelEdit(reinterpret_cast<NMLVDISPINFO*>(pnmhdr));
+    case LVN_BEGINLABELEDITW:
+        return OnDirListBeginLabelEdit(reinterpret_cast<NMLVDISPINFOW*>(pnmhdr));
 
-    case LVN_ENDLABELEDIT:
-        return OnDirListEndLabelEdit(reinterpret_cast<NMLVDISPINFO*>(pnmhdr));
+    case LVN_ENDLABELEDITW:
+        return OnDirListEndLabelEdit(reinterpret_cast<NMLVDISPINFOW*>(pnmhdr));
 
     case LVN_ITEMCHANGED:
         return OnDirListItemChanged(reinterpret_cast<NMLISTVIEW*>(pnmhdr));
@@ -216,7 +239,7 @@ BOOL CAutomationConfigDialog::EditDirectory()
     iSel = ListView_GetNextItem(hwndList, -1, LVNI_ALL | LVNI_SELECTED);
     if (iSel >= 0)
     {
-        ListView_EditLabel(hwndList, iSel);
+        SendMessageW(hwndList, LVM_EDITLABELW, iSel, 0);
         return TRUE;
     }
 
@@ -255,14 +278,14 @@ BOOL CAutomationConfigDialog::MoveDirectory(int iDelta)
 {
     int iSel, iNew;
     HWND hwndList;
-    LVITEM lvi1 = {
+    LVITEMW lvi1 = {
         0,
     };
-    LVITEM lvi2 = {
+    LVITEMW lvi2 = {
         0,
     };
-    TCHAR szItemText1[1024];
-    TCHAR szItemText2[1024];
+    wchar_t szItemText1[1024];
+    wchar_t szItemText2[1024];
 
     hwndList = GetDlgItem(HWindow, IDC_DIRLIST);
 
@@ -283,14 +306,14 @@ BOOL CAutomationConfigDialog::MoveDirectory(int iDelta)
     lvi1.iItem = iSel;
     lvi1.pszText = szItemText1;
     lvi1.cchTextMax = _countof(szItemText1);
-    ListView_GetItem(hwndList, &lvi1);
+    SendMessageW(hwndList, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&lvi1));
 
     lvi2.mask = LVIF_TEXT | LVIF_STATE;
     lvi2.stateMask = ~0u;
     lvi2.iItem = iNew;
     lvi2.pszText = szItemText2;
     lvi2.cchTextMax = _countof(szItemText2);
-    ListView_GetItem(hwndList, &lvi2);
+    SendMessageW(hwndList, LVM_GETITEMW, 0, reinterpret_cast<LPARAM>(&lvi2));
 
     lvi1.iItem = iNew;
     lvi2.iItem = iSel;
@@ -298,15 +321,15 @@ BOOL CAutomationConfigDialog::MoveDirectory(int iDelta)
     lvi1.stateMask = lvi2.stateMask = ~0u;
 
     // swap the items
-    ListView_SetItem(hwndList, &lvi1);
-    ListView_SetItem(hwndList, &lvi2);
+    SendMessageW(hwndList, LVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&lvi1));
+    SendMessageW(hwndList, LVM_SETITEMW, 0, reinterpret_cast<LPARAM>(&lvi2));
 
     return TRUE;
 }
 
 BOOL CAutomationConfigDialog::NewDirectory()
 {
-    LVITEM lvi = {
+    LVITEMW lvi = {
         0,
     };
     int iSel;
@@ -317,15 +340,14 @@ BOOL CAutomationConfigDialog::NewDirectory()
     lvi.mask = LVIF_STATE /*LVIF_TEXT*/;
     lvi.iItem = INT_MAX;
     lvi.state = LVIS_SELECTED;
-    //lvi.pszText = const_cast<PTSTR>(g_oAutomationPlugin.GetScriptDirectoryRaw(iDir));
-    iSel = ListView_InsertItem(hwndList, &lvi);
+    iSel = static_cast<int>(SendMessageW(hwndList, LVM_INSERTITEMW, 0, reinterpret_cast<LPARAM>(&lvi)));
     ListView_EnsureVisible(hwndList, iSel, FALSE);
-    ListView_EditLabel(hwndList, iSel);
+    SendMessageW(hwndList, LVM_EDITLABELW, iSel, 0);
 
     return TRUE;
 }
 
-BOOL CAutomationConfigDialog::OnDirListBeginLabelEdit(NMLVDISPINFO* nmlv)
+BOOL CAutomationConfigDialog::OnDirListBeginLabelEdit(NMLVDISPINFOW* nmlv)
 {
     HWND hwndEdit = ListView_GetEditControl(nmlv->hdr.hwndFrom);
     _ASSERTE(IsWindow(hwndEdit));
@@ -342,7 +364,7 @@ BOOL CAutomationConfigDialog::OnDirListBeginLabelEdit(NMLVDISPINFO* nmlv)
     return TRUE;
 }
 
-BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFO* nmlv)
+BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFOW* nmlv)
 {
     UnsubclassLabelEdit();
 
@@ -353,26 +375,17 @@ BOOL CAutomationConfigDialog::OnDirListEndLabelEdit(NMLVDISPINFO* nmlv)
             // the edit was cancelled,
             // if the text is empty (e.g. new directory insertion
             // was cancelled), delete the item
-            CPathBuffer szText;
-            LVITEM lvi = {
-                0,
-            };
-            szText[0] = _T('\0');
-            lvi.mask = LVIF_TEXT;
-            lvi.iItem = nmlv->item.iItem;
-            lvi.pszText = szText;
-            lvi.cchTextMax = szText.Size();
-            if (ListView_GetItem(nmlv->hdr.hwndFrom, &lvi) && szText[0] == _T('\0'))
-            {
+            if (GetListViewItemTextOwned(nmlv->hdr.hwndFrom,
+                                         nmlv->item.iItem)
+                    .empty())
                 DeleteDirectory();
-            }
         }
 
         DirSelChanged();
 
         return TRUE;
     }
-    else if (nmlv->item.pszText[0] == _T('\0'))
+    else if (nmlv->item.pszText[0] == L'\0')
     {
         // the text was deleted, remove the item
         DeleteDirectory();
@@ -458,13 +471,13 @@ BOOL CAutomationConfigDialog::OnHeaderCommand(int nId)
 
 void CAutomationConfigDialog::SubclassLabelEdit(HWND hwndEdit)
 {
-    if (!SetProp(hwndEdit, SublassPropName, this))
+    if (!SetPropA(hwndEdit, SublassPropName, this))
     {
         return;
     }
 
     m_hwndSubclassedEdit = hwndEdit;
-    m_pfnSubclassedEdit = reinterpret_cast<WNDPROC>(SetWindowLongPtr(
+    m_pfnSubclassedEdit = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
         hwndEdit, GWLP_WNDPROC,
         reinterpret_cast<LONG_PTR>(&LabelEditSubclassProc)));
 
@@ -476,9 +489,9 @@ void CAutomationConfigDialog::UnsubclassLabelEdit()
 {
     if (IsWindow(m_hwndSubclassedEdit))
     {
-        SetWindowLongPtr(m_hwndSubclassedEdit, GWLP_WNDPROC,
+        SetWindowLongPtrW(m_hwndSubclassedEdit, GWLP_WNDPROC,
                          reinterpret_cast<LONG_PTR>(m_pfnSubclassedEdit));
-        SetProp(m_hwndSubclassedEdit, SublassPropName, NULL);
+        SetPropA(m_hwndSubclassedEdit, SublassPropName, NULL);
     }
 
     m_hwndSubclassedEdit = NULL;
@@ -493,7 +506,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
 {
     LRESULT res;
     CAutomationConfigDialog* pDialog;
-    pDialog = reinterpret_cast<CAutomationConfigDialog*>(GetProp(hwnd, SublassPropName));
+    pDialog = reinterpret_cast<CAutomationConfigDialog*>(GetPropA(hwnd, SublassPropName));
     _ASSERTE(pDialog);
 
     switch (uMsg)
@@ -525,7 +538,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
     {
         NCCALCSIZE_PARAMS* nccs;
 
-        res = CallWindowProc(pDialog->m_pfnSubclassedEdit,
+        res = CallWindowProcW(pDialog->m_pfnSubclassedEdit,
                              hwnd, uMsg, wParam, lParam);
 
         nccs = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
@@ -565,7 +578,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
 
     case WM_NCPAINT:
     {
-        res = CallWindowProc(pDialog->m_pfnSubclassedEdit,
+        res = CallWindowProcW(pDialog->m_pfnSubclassedEdit,
                              hwnd, uMsg, wParam, lParam);
 
         pDialog->DrawBrowseBtn();
@@ -575,7 +588,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
 
     case WM_NCHITTEST:
     {
-        res = CallWindowProc(pDialog->m_pfnSubclassedEdit,
+        res = CallWindowProcW(pDialog->m_pfnSubclassedEdit,
                              hwnd, uMsg, wParam, lParam);
 
         if (res == HTNOWHERE && pDialog->ScreenPointInButtonRect(MAKEPOINTS(lParam)))
@@ -588,7 +601,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
 
     case WM_NCLBUTTONDOWN:
     {
-        res = CallWindowProc(pDialog->m_pfnSubclassedEdit,
+        res = CallWindowProcW(pDialog->m_pfnSubclassedEdit,
                              hwnd, uMsg, wParam, lParam);
 
         if (pDialog->ScreenPointInButtonRect(MAKEPOINTS(lParam)))
@@ -604,7 +617,7 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
 
     case WM_LBUTTONUP:
     {
-        res = CallWindowProc(pDialog->m_pfnSubclassedEdit,
+        res = CallWindowProcW(pDialog->m_pfnSubclassedEdit,
                              hwnd, uMsg, wParam, lParam);
 
         if (pDialog->m_bMouseCaptured)
@@ -634,11 +647,11 @@ LRESULT CALLBACK CAutomationConfigDialog::LabelEditSubclassProc(
     }
 
     case WM_NCDESTROY:
-        SetProp(hwnd, SublassPropName, NULL);
+        SetPropA(hwnd, SublassPropName, NULL);
         break;
     }
 
-    return CallWindowProc(pDialog->m_pfnSubclassedEdit, hwnd, uMsg, wParam, lParam);
+    return CallWindowProcW(pDialog->m_pfnSubclassedEdit, hwnd, uMsg, wParam, lParam);
 }
 
 void CAutomationConfigDialog::DrawBrowseBtn()
@@ -728,40 +741,33 @@ void CAutomationConfigDialog::OnBrowseBtnClicked()
     {
     case ID_BROWSE:
     {
-        CPathBuffer szInit;
-        CPathBuffer szPath;
-
-        GetWindowText(m_hwndSubclassedEdit, szInit, szInit.Size());
+        const std::wstring initialDirectory =
+            SPLGetWindowTextOwned(m_hwndSubclassedEdit);
 
         m_bBrowsing = true;
 
         HWND hwndList = GetDlgItem(HWindow, IDC_DIRLIST);
         int iSel = ListView_GetNextItem(hwndList, -1, LVNI_ALL | LVNI_SELECTED);
 
-        if (SalamanderGeneral->GetTargetDirectory(
-                HWindow, HWindow,
-                SalamanderGeneral->LoadStr(g_hLangInst, IDS_ADDDIRTITLE),
-                SalamanderGeneral->LoadStr(g_hLangInst, IDS_ADDDIRDESCR),
-                szPath, FALSE,
-                szInit))
+        std::wstring selectedDirectory;
+        if (SPLGetTargetDirectoryOwned(
+                SalamanderGeneral, HWindow, HWindow,
+                SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ADDDIRTITLE).c_str(),
+                SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ADDDIRDESCR).c_str(),
+                selectedDirectory, FALSE, initialDirectory.c_str()))
         {
-            ListView_SetItemText(hwndList, iSel, 0, szPath);
+            LVITEMW lvi = {
+                0,
+            };
+            lvi.iSubItem = 0;
+            lvi.pszText = const_cast<wchar_t*>(selectedDirectory.c_str());
+            SendMessageW(hwndList, LVM_SETITEMTEXTW, iSel, reinterpret_cast<LPARAM>(&lvi));
             ListView_SetColumnWidth(hwndList, 0, LVSCW_AUTOSIZE);
         }
         else
         {
-            LVITEM lvi = {
-                0,
-            };
-            szInit[0] = _T('\0');
-            lvi.mask = LVIF_TEXT;
-            lvi.iItem = iSel;
-            lvi.pszText = szInit;
-            lvi.cchTextMax = szInit.Size();
-            if (ListView_GetItem(hwndList, &lvi) && szInit[0] == _T('\0'))
-            {
+            if (GetListViewItemTextOwned(hwndList, iSel).empty())
                 DeleteDirectory();
-            }
         }
 
         m_bBrowsing = false;
@@ -772,37 +778,37 @@ void CAutomationConfigDialog::OnBrowseBtnClicked()
     }
 
     case ID_SALDIR:
-        InsertVariable(_T("$(SalDir)"));
+        InsertVariable(L"$(SalDir)");
         break;
 
     case ID_ENVVAR:
-        InsertVariable(_T("$[]"), 2);
+        InsertVariable(L"$[]", 2);
         break;
     }
 }
 
-void CAutomationConfigDialog::InsertVariable(PCTSTR pszVar, int nCaretPos)
+void CAutomationConfigDialog::InsertVariable(PCWSTR pszVar, int nCaretPos)
 {
     int iStart, iEnd, nLen;
 
-    nLen = GetWindowTextLength(m_hwndSubclassedEdit);
-    SendMessage(m_hwndSubclassedEdit, EM_GETSEL, (WPARAM)&iStart, (LPARAM)&iEnd);
+    nLen = GetWindowTextLengthW(m_hwndSubclassedEdit);
+    SendMessageW(m_hwndSubclassedEdit, EM_GETSEL, (WPARAM)&iStart, (LPARAM)&iEnd);
     if (iStart == 0 && iEnd == nLen)
     {
         iStart = nLen;
-        SendMessage(m_hwndSubclassedEdit, EM_SETSEL, iStart, iStart);
+        SendMessageW(m_hwndSubclassedEdit, EM_SETSEL, iStart, iStart);
     }
 
-    SendMessage(m_hwndSubclassedEdit, EM_REPLACESEL, TRUE, (LPARAM)pszVar);
+    SendMessageW(m_hwndSubclassedEdit, EM_REPLACESEL, TRUE, (LPARAM)pszVar);
 
     if (nCaretPos < 0)
     {
-        iStart += (int)_tcslen(pszVar);
+        iStart += (int)wcslen(pszVar);
     }
     else
     {
         iStart += nCaretPos;
     }
 
-    SendMessage(m_hwndSubclassedEdit, EM_SETSEL, iStart, iStart);
+    SendMessageW(m_hwndSubclassedEdit, EM_SETSEL, iStart, iStart);
 }

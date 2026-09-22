@@ -1,4 +1,4 @@
-/* $Id$ */
+﻿/* $Id$ */
 /***************************************************************************
  *             chm_lib.c - CHM archive manipulation routines               *
  *                           -------------------                           *
@@ -657,7 +657,9 @@ static Int64 _chm_fetch_bytes(struct chmFile* h,
 }
 
 /* open an ITS archive */
-#ifdef PPC_BSTR
+#if defined(WIN32) && !defined(PPC_BSTR)
+struct chmFile* chm_open_w(const wchar_t* filename)
+#elif defined(PPC_BSTR)
 /* RWE 6/12/2003 */
 struct chmFile* chm_open(BSTR filename)
 #else
@@ -701,7 +703,7 @@ struct chmFile* chm_open(const char* filename)
         return NULL;
     }
 #else
-    if ((newHandle->fd = CreateFileA(filename,
+    if ((newHandle->fd = CreateFileW(filename,
                                      GENERIC_READ,
                                      0,
                                      NULL,

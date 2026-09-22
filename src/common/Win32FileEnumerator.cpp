@@ -39,23 +39,6 @@ public:
             return INVALID_HENUM;
         }
 
-        // Build search path
-        std::wstring searchPath = path;
-
-        // If path doesn't end with pattern, add one
-        if (!HasPattern(path))
-        {
-            // Ensure path ends with backslash
-            if (!searchPath.empty() && searchPath.back() != L'\\')
-                searchPath += L'\\';
-
-            // Add pattern or default wildcard
-            if (pattern && *pattern)
-                searchPath += pattern;
-            else
-                searchPath += L'*';
-        }
-
         if (gPathService == nullptr)
             gPathService = GetWin32PathService();
         if (gPathService == nullptr)
@@ -65,7 +48,7 @@ public:
         }
 
         std::wstring longPath;
-        PathResult pathRes = gPathService->ToLongPath(searchPath.c_str(), longPath);
+        PathResult pathRes = gPathService->PrepareEnumerationPattern(path, pattern, longPath);
         if (!pathRes.success)
         {
             SetLastError(pathRes.errorCode);
@@ -147,13 +130,17 @@ public:
 
         if (gPathService == nullptr)
             gPathService = GetWin32PathService();
-        std::wstring longPath = path;
-        if (gPathService != nullptr)
+        if (gPathService == nullptr)
         {
-            std::wstring converted;
-            PathResult res = gPathService->ToLongPath(path, converted);
-            if (res.success)
-                longPath = converted;
+            SetLastError(ERROR_INVALID_FUNCTION);
+            return INVALID_HENUM;
+        }
+        std::wstring longPath;
+        PathResult res = gPathService->PrepareForIo(path, longPath);
+        if (!res.success)
+        {
+            SetLastError(res.errorCode);
+            return INVALID_HENUM;
         }
 
         StreamState* state = (StreamState*)malloc(sizeof(StreamState));

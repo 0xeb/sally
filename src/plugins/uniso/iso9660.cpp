@@ -8,6 +8,8 @@
 #include "uniso.h"
 #include "isoimage.h"
 #include "iso9660.h"
+#include "uniso_text.h"
+#include "iso_name_decode.h"
 
 #include "uniso.rh"
 #include "uniso.rh2"
@@ -158,7 +160,7 @@ void CISO9660::FillPathTableRecord(CPathTableRecord& record, BYTE bytes[])
 #define ROTATE(a) ((((a) & 0xffff) >> 8) | (((a) & 0xff) << 8))
 
 //
-void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRecord& dr)
+std::string CISO9660::ExtractExtFileName(const char* src, CDirectoryRecord& dr)
 {
     // processing extensions
     const char* srcSU = src + dr.LengthOfFileIdentifier;
@@ -181,8 +183,7 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
         if (strncmp((char*)rrHeader.Signature, "RR", 2) == 0)
             ext = extRockRidge; // this is a RockRidge entry
 
-        CPathBuffer extFileName;
-        ZeroMemory(extFileName.Get(), extFileName.Size());
+        std::string extFileName;
 
         switch (ext)
         {
@@ -190,24 +191,24 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
         {
             BOOL bNM = FALSE;
 
-            while (srcSU < srcEnd)
+            while (srcSU + sizeof(rrHeader) <= srcEnd)
             {
                 memcpy(&rrHeader, srcSU, sizeof(rrHeader));
 
-                if (strncmp((char*)rrHeader.Signature, "NM", 2) == 0)
+                if (rrHeader.Length < sizeof(rrHeader) || srcSU + rrHeader.Length > srcEnd)
+                    break;
+
+                if (strncmp((char*)rrHeader.Signature, "NM", 2) == 0 && rrHeader.Length >= 5)
                 {
                     bNM = TRUE;
-                    strncat(extFileName, srcSU + 5, rrHeader.Length - 5);
+                    extFileName.append(srcSU + 5, rrHeader.Length - 5);
                 }
 
                 srcSU += rrHeader.Length;
             } // while
 
             if (bNM)
-            {
-                strcpy(fileName, extFileName);
-                return;
-            }
+                return extFileName;
         }
         break;
 
@@ -216,63 +217,55 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
         } // switch
     }
 
-    lstrcpyn(fileName, src, dr.LengthOfFileIdentifier + 1);
+    return std::string(src, dr.LengthOfFileIdentifier);
 }
 
 //
 // Extracts the file name from 'src'
 // used for file names in ISO levels 1, 2, and 3
 //
-void CISO9660::ExtractFileName(char* fileName, const char* src, CISO9660::CDirectoryRecord& dr)
+std::string CISO9660::ExtractFileName(const char* src, CISO9660::CDirectoryRecord& dr)
 {
-    CPathBuffer tmpFileName;
-    ZeroMemory(tmpFileName.Get(), tmpFileName.Size());
-
-    ExtractExtFileName(tmpFileName, src, dr);
+    std::string fileName = ExtractExtFileName(src, dr);
 
     // iso filename
-    char* sep2 = strchr(tmpFileName, ISO_SEPARATOR2);
-
-    if (sep2 != NULL)
+    const size_t sep2 = fileName.find(ISO_SEPARATOR2);
+    if (sep2 != std::string::npos)
     {
-        *sep2 = '\0';
-
-        char* sep1 = strchr(tmpFileName, ISO_SEPARATOR1);
-        if (sep1 && sep2 - sep1 == 1)
-            *sep1 = '\0';
+        const size_t sep1 = fileName.find(ISO_SEPARATOR1);
+        fileName.resize(sep1 != std::string::npos && sep2 - sep1 == 1 ? sep1 : sep2);
     }
-
-    strcpy(fileName, tmpFileName);
+    return fileName;
 }
 
 #define READ_SIZE 4096
 
-void CISO9660::ConvJolietName(char* dest, const char* src, int nLen)
+// 2026-08-26: the narrow ConvJolietName was deleted - confirmed-dead (zero
+// callers anywhere; already-migrated to ConvJolietNameW below, and gtest_win32_isolation.cpp's
+// FilesWindowDirectoryReadJolietNameWidthPolicy-adjacent test already asserted the old narrow
+// calls were gone from both call sites). It had also lost the unguarded
+// WideCharToMultiByte(CP_ACP, 0, ...) best-fit-substitution problem this codebase's technique
+// looks for, but the function had no live caller left to corrupt.
+
+std::wstring CISO9660::ConvJolietNameW(const char* src, int nLen)
 {
-    CPathBuffer tmp;
-    ZeroMemory(tmp.Get(), tmp.Size());
-
-    memcpy(tmp.Get(), src, nLen);
-
-    WCHAR* uname = (WCHAR*)tmp.Get();
-    int i;
-    for (i = 0; i < (nLen / 2); i++)
-        uname[i] = (WORD)ROTATE(uname[i]);
-
-    CPathBuffer final_buf;
-    ZeroMemory(final_buf.Get(), final_buf.Size());
-    WideCharToMultiByte(CP_ACP, 0, uname, nLen / 2, final_buf, final_buf.Size() - 1, 0, 0);
-    final_buf.Get()[final_buf.Size() - 1] = 0;
-
-    strcpy(dest, final_buf);
+    return DecodeJolietName(src, nLen > 0 ? (size_t)nLen : 0);
 }
 
-BOOL CISO9660::AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr,
+void CISO9660::ExtractJolietFileNameW(std::wstring& fileName)
+{
+    StripIsoVersionSuffix(fileName);
+}
+
+BOOL CISO9660::AddFileDir(const wchar_t* path, const wchar_t* fileName, CDirectoryRecord& dr,
                           CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     CFileData fd;
 
     memset(&fd, 0, sizeof(CFileData));
+    // fileName is already exact wide (Joliet: decoded directly, never
+    // narrowed; non-Joliet: widened once from the always-ASCII-by-spec d-characters) - no
+    // conversion needed here any more.
     fd.Name = SalamanderGeneral->DupStr(fileName);
     if (fd.Name == NULL)
     {
@@ -280,8 +273,8 @@ BOOL CISO9660::AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr
         return FALSE;
     } // if
 
-    fd.NameLen = strlen(fd.Name);
-    char* s = strrchr(fd.Name, '.');
+    fd.NameLen = (int)wcslen(fd.Name);
+    wchar_t* s = wcsrchr(fd.Name, L'.');
     if (s != NULL)
         fd.Ext = s + 1; // ".cvspass" is extension in Windows
     else
@@ -298,7 +291,7 @@ BOOL CISO9660::AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr
     filePos->Type = FS_TYPE_ISO9660;
 
     char u[1204];
-    sprintf(u, "CISO9960::AddFileDir(): name: %s, Extent: 0x%X", fileName, dr.LocationOfExtent);
+    sprintf(u, "CISO9960::AddFileDir(): name: %ls, Extent: 0x%X", fileName, dr.LocationOfExtent);
     TRACE_I(u);
 
     fd.PluginData = (DWORD_PTR)filePos;
@@ -358,38 +351,28 @@ BOOL CISO9660::AddFileDir(const char* path, char* fileName, CDirectoryRecord& dr
     return TRUE;
 }
 
-char* CISO9660::GetBootRecordTypeStr(EBootRecordType type)
+const wchar_t* CISO9660::GetBootRecordTypeStr(EBootRecordType type)
 {
     CALL_STACK_MESSAGE1("CISO9660::GetBootRecordTypeStr()");
-
-    static char buffer[8];
-
-    ZeroMemory(buffer, 8);
-    buffer[0] = '-';
 
     switch (type)
     {
     case biNoEmul:
-        strcat(buffer, "noemul");
-        break;
+        return L"-noemul";
     case bi120:
-        strcat(buffer, "1.2");
-        break;
+        return L"-1.2";
     case bi144:
-        strcat(buffer, "1.44");
-        break;
+        return L"-1.44";
     case bi288:
-        strcat(buffer, "2.88");
-        break;
+        return L"-2.88";
     case biHDD:
-        strcat(buffer, "hdd");
-        break;
+        return L"-hdd";
     } // switch
 
-    return buffer;
+    return L"-";
 }
 
-BOOL CISO9660::AddBootRecord(char* path, int session,
+BOOL CISO9660::AddBootRecord(std::wstring& path, int session,
                              CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     // add boot image file
@@ -405,19 +388,20 @@ BOOL CISO9660::AddBootRecord(char* path, int session,
         //    dr.RecordingDateAndTime = ;
         dr.DataLength = BootRecordInfo->Length;
 
-        CPathBuffer fileName; // Heap-allocated for long path support
+        std::wstring sessionNumber = std::to_wstring(session == -1 ? 1 : session);
+        if (sessionNumber.size() < 2)
+            sessionNumber.insert(sessionNumber.begin(), L'0');
+        const std::wstring fileName = L"s" + sessionNumber + L"-bootdisk" + GetBootRecordTypeStr(BootRecordInfo->Type) + L".ima";
         if (session == -1)
         {
             session = 1;
-            sprintf(fileName, "s%02d-bootdisk%s.ima", session, GetBootRecordTypeStr(BootRecordInfo->Type));
-            if (!AddFileDir("\\", fileName, dr, dir, pluginData))
+            if (!AddFileDir(L"\\", fileName.c_str(), dr, dir, pluginData))
                 return FALSE;
-            strcat(path, "Session 01");
+            SPLSalPathAppendOwned(path, L"Session 01");
         }
         else
         {
-            sprintf(fileName, "s%02d-bootdisk%s.ima", session, GetBootRecordTypeStr(BootRecordInfo->Type));
-            if (!AddFileDir("\\", fileName, dr, dir, pluginData))
+            if (!AddFileDir(L"\\", fileName.c_str(), dr, dir, pluginData))
                 return FALSE;
         }
     }
@@ -425,17 +409,18 @@ BOOL CISO9660::AddBootRecord(char* path, int session,
     return TRUE;
 }
 
-BOOL CISO9660::ListDirectory(char* path, int session,
+BOOL CISO9660::ListDirectory(const std::wstring& path, int session,
                              CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE3("CISO9660::ListDirectory(%s, %d, , )", path, session);
+    CALL_STACK_MESSAGE3("CISO9660::ListDirectory(%ls, %d, , )", path.c_str(), session);
 
-    AddBootRecord(path, session, dir, pluginData);
-    return ListDirectoryRe(path, &Root, dir, pluginData) != ERR_TERMINATE;
+    std::wstring listingPath(path);
+    AddBootRecord(listingPath, session, dir, pluginData);
+    return ListDirectoryRe(listingPath, &Root, dir, pluginData) != ERR_TERMINATE;
 }
 
 //
-int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
+int CISO9660::ListDirectoryRe(const std::wstring& path, CDirectoryRecord* root,
                               CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     if (root == NULL)
@@ -490,23 +475,23 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
             {
                 if (dirRecord.LengthOfFileIdentifier > 1)
                 {
-                    CPathBuffer dirName;
-                    ZeroMemory(dirName.Get(), dirName.Size());
-                    ConvJolietName(dirName, (data + offset + 33), dirRecord.LengthOfFileIdentifier);
-                    if (AddFileDir(path, dirName, dirRecord, dir, pluginData))
+                    // Joliet names are UTF-16BE, unambiguous - decode
+                    // straight to wide (ConvJolietNameW), no CP_ACP narrowing, so a directory
+                    // name outside the machine's code page is not corrupted before it becomes
+                    // the real fd.Name and the recursion path component below.
+                    const std::wstring dirNameW = ConvJolietNameW((data + offset + 33), dirRecord.LengthOfFileIdentifier);
+                    if (AddFileDir(path.c_str(), dirNameW.c_str(), dirRecord, dir, pluginData))
                     {
-                        int pathLen = (int)strlen(path);
-                        strcat(path, "\\");
-                        strcat(path, dirName);
+                        std::wstring childPath(path);
+                        SPLSalPathAppendOwned(childPath, dirNameW.c_str());
                         // descend only when everything is OK
                         if (ret == ERR_OK)
                         {
-                            ret = ListDirectoryRe(path, &dirRecord, dir, pluginData);
+                            ret = ListDirectoryRe(childPath, &dirRecord, dir, pluginData);
                             // if we surface with a termination error, keep processing as much as possible
                             if (ret == ERR_TERMINATE)
                                 ret = ERR_CONTINUE;
                         }
-                        path[pathLen] = '\0';
                     }
                     else
                         ret = ERR_TERMINATE;
@@ -517,25 +502,28 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
                 char firstChar = data[offset + 33];
                 if (firstChar != 0x00 && firstChar != 0x01)
                 {
-                    CPathBuffer extFileName;
-                    ZeroMemory(extFileName.Get(), extFileName.Size());
-                    ExtractExtFileName(extFileName, (data + offset + 33), dirRecord);
-
-                    if (AddFileDir(path, extFileName, dirRecord, dir, pluginData))
+                    const std::string extFileName = ExtractExtFileName((data + offset + 33), dirRecord);
+                    std::wstring extFileNameW;
+                    if (!DecodeUnisoLegacyText(extFileName, extFileNameW))
                     {
-                        int pathLen = (int)strlen(path);
-                        strcat(path, "\\");
-                        strcat(path, extFileName);
+                        Error(IDS_INSUFFICIENT_MEMORY);
+                        ret = ERR_TERMINATE;
+                        break;
+                    }
+
+                    if (AddFileDir(path.c_str(), extFileNameW.c_str(), dirRecord, dir, pluginData))
+                    {
+                        std::wstring childPath(path);
+                        SPLSalPathAppendOwned(childPath, extFileNameW.c_str());
                         //          TRACE_I(path);
                         // descend only when everything is OK
                         if (ret == ERR_OK)
                         {
-                            ret = ListDirectoryRe(path, &dirRecord, dir, pluginData);
+                            ret = ListDirectoryRe(childPath, &dirRecord, dir, pluginData);
                             // if we surface with a termination error, keep processing as much as possible
                             if (ret == ERR_TERMINATE)
                                 ret = ERR_CONTINUE;
                         }
-                        path[pathLen] = '\0';
                     }
                     else
                         ret = ERR_TERMINATE;
@@ -544,20 +532,31 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
         }
         else
         {
-            CPathBuffer fileName;
-            ZeroMemory(fileName.Get(), fileName.Size());
-
-            char* src = (data + offset + 33);
             if (Ext == extJoliet)
             {
-                ConvJolietName(fileName, src, dirRecord.LengthOfFileIdentifier);
-                src = fileName.Get();
+                // Decode straight to wide and strip the trailing
+                // ';version' there too - no CP_ACP round trip for the real extraction-target
+                // filename (fd.Name feeds SalPathAppend in UnpackFile).
+                std::wstring fileNameW = ConvJolietNameW((data + offset + 33), dirRecord.LengthOfFileIdentifier);
+                ExtractJolietFileNameW(fileNameW);
+
+                if (!AddFileDir(path.c_str(), fileNameW.c_str(), dirRecord, dir, pluginData))
+                    ret = ERR_TERMINATE;
             }
+            else
+            {
+                const std::string fileName = ExtractFileName((data + offset + 33), dirRecord);
+                std::wstring fileNameW;
+                if (!DecodeUnisoLegacyText(fileName, fileNameW))
+                {
+                    Error(IDS_INSUFFICIENT_MEMORY);
+                    ret = ERR_TERMINATE;
+                    break;
+                }
 
-            ExtractFileName(fileName, src, dirRecord);
-
-            if (!AddFileDir(path, fileName, dirRecord, dir, pluginData))
-                ret = ERR_TERMINATE;
+                if (!AddFileDir(path.c_str(), fileNameW.c_str(), dirRecord, dir, pluginData))
+                    ret = ERR_TERMINATE;
+            }
         } // if
 
         offset += dirRecord.LengthOfDirectoryRecord;
@@ -568,29 +567,24 @@ int CISO9660::ListDirectoryRe(char* path, CDirectoryRecord* root,
     return ret;
 }
 
-int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path, const char* nameInArc,
+int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path, const std::wstring& nameInArc,
                          const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE6("CISO9660::UnpackFile( , %s, %s, %s, , %u, %d)", srcPath, path, nameInArc, silent, toSkip);
+    CALL_STACK_MESSAGE5("CISO9660::UnpackFile( , %ls, %ls, , %u, %d)", path.c_str(), nameInArc.c_str(), silent, toSkip);
 
     ///
-    CPathBuffer name; // Heap-allocated for long path support
-    lstrcpyn(name, path, name.Size());
-    if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-    {
-        Error(IDS_ERR_TOO_LONG_NAME);
-        return UNPACK_ERROR;
-    }
+    std::wstring name(path);
+    SPLSalPathAppendOwned(name, fileData->Name);
 
-    char fileInfo[100];
     FILETIME ft = fileData->LastWrite;
-    GetInfo(fileInfo, &ft, fileData->Size);
+    const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
 
     DWORD attrs = fileData->Attr;
 
-    HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                      SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+    HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                      SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                       &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
+
     CBufferedFile file(hFile, GENERIC_WRITE);
     // set file time
     file.SetFileTime(&ft, &ft, &ft);
@@ -633,10 +627,9 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
         {
             if (silent == 0)
             {
-                char error[1024];
-                sprintf(error, LoadStr(IDS_ERROR_READING_SECTOR), block);
+                const std::wstring error = SPLFormatStringOwned(LangStr(IDS_ERROR_READING_SECTOR).c_str(), block);
                 int userAction = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL,
-                                                                fileData->Name, error, LoadStr(IDS_READERROR));
+                                                                fileData->Name, error.c_str(), LangStr(IDS_READERROR).c_str());
 
                 switch (userAction)
                 {
@@ -661,7 +654,7 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
 
         if (!salamander->ProgressAddSize(nbytes, TRUE)) // delayedPaint==TRUE, so we do not slow things down
         {
-            salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+            salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
             salamander->ProgressEnableCancel(FALSE);
 
             ret = UNPACK_CANCEL;
@@ -670,7 +663,7 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
         }
 
         ULONG written;
-        if (!file.Write(buffer, nbytes, &written, name, NULL))
+        if (!file.Write(buffer, nbytes, &written, name.c_str(), NULL))
         {
             // Error message was already displayed by SafeWriteFile()
             ret = UNPACK_CANCEL;
@@ -685,7 +678,7 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
     //  sprintf(u, "CISOImage::UnpackFile(): ret: %d, bFileComplete: %d", ret, bFileComplete);
     //  TRACE_I(u);
 
-    if (!file.Close(name, NULL))
+    if (!file.Close(name.c_str(), NULL))
     {
         // Flushing cache may fail
         ret = UNPACK_CANCEL;
@@ -697,73 +690,77 @@ int CISO9660::UnpackFile(CSalamanderForOperationsAbstract* salamander, const cha
         // because it was created with the read-only attribute, we must clear
         // the R attribute so the file can be deleted
         attrs &= ~FILE_ATTRIBUTE_READONLY;
-        if (!SetFileAttributes(name, attrs))
-            Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+        if (!SetFileAttributesW(name.c_str(), attrs))
+            Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 
         // the user cancelled the operation
         // delete the incomplete file afterwards
-        if (!DeleteFile(name))
-            Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError());
+        if (!DeleteFileW(name.c_str()))
+            Error(LangStr(IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError());
     }
     else
-        SetFileAttrs(name, attrs);
+        SetFileAttrs(name.c_str(), attrs);
 
     return ret;
 }
 
 BOOL CISO9660::DumpInfo(FILE* outStream)
 {
-    char* s;
-
     CALL_STACK_MESSAGE1("CISO9660::DumpInfo()");
 
+    const auto writeField = [outStream](const char* label, const BYTE* data, size_t count) {
+        std::string value;
+        if (!CopyUnisoReportField(std::string_view(reinterpret_cast<const char*>(data), count), value))
+            return false;
+        return value.empty() || fprintf(outStream, "%s%s\n", label, value.c_str()) >= 0;
+    };
+
     // display info from the PVD
-    s = ViewerStrNcpy((char*)PVD.SystemIdentifier, 32);
-    if (*s)
-        fprintf(outStream, "    System Identifier:        %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.VolumeIdentifier, 32);
-    if (*s)
-        fprintf(outStream, "    Volume:                   %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.VolumeSetIdentifier, 128);
-    if (*s)
-        fprintf(outStream, "    Volume Set:               %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.PublisherIdentifier, 128);
-    if (*s)
-        fprintf(outStream, "    Publisher:                %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.DataPreparerIdentifier, 128);
-    if (*s)
-        fprintf(outStream, "    Data Preparer:            %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.ApplicationIdentifier, 128);
-    if (*s)
-        fprintf(outStream, "    Application:              %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.CopyrightFileIdentifier, 37);
-    if (*s)
-        fprintf(outStream, "    Copyright File:           %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.AbstractFileIdentifier, 37);
-    if (*s)
-        fprintf(outStream, "    Abstract File:            %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.BibliographicFileIdentifier, 37);
-    if (*s)
-        fprintf(outStream, "    Bibliographic File:       %s\n", s);
+    if (!writeField("    System Identifier:        ", PVD.SystemIdentifier, 32) ||
+        !writeField("    Volume:                   ", PVD.VolumeIdentifier, 32) ||
+        !writeField("    Volume Set:               ", PVD.VolumeSetIdentifier, 128) ||
+        !writeField("    Publisher:                ", PVD.PublisherIdentifier, 128) ||
+        !writeField("    Data Preparer:            ", PVD.DataPreparerIdentifier, 128) ||
+        !writeField("    Application:              ", PVD.ApplicationIdentifier, 128) ||
+        !writeField("    Copyright File:           ", PVD.CopyrightFileIdentifier, 37) ||
+        !writeField("    Abstract File:            ", PVD.AbstractFileIdentifier, 37) ||
+        !writeField("    Bibliographic File:       ", PVD.BibliographicFileIdentifier, 37))
+        return FALSE;
 
     //  fprintf(outStream, "\n");
 
     SYSTEMTIME st;
     ISODateTimeStrToSystemTime(PVD.VolumeCreationDateAndTime, &st);
     if (st.wYear != 0)
-        fprintf(outStream, "    Volume Creation Date:     %s\n", ViewerPrintSystemTime(&st));
+    {
+        std::string formatted;
+        if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Volume Creation Date:     %s\n", formatted.c_str()) < 0)
+            return FALSE;
+    }
 
     ISODateTimeStrToSystemTime(PVD.VolumeModificationDateAndTime, &st);
     if (st.wYear != 0)
-        fprintf(outStream, "    Volume Modification Date: %s\n", ViewerPrintSystemTime(&st));
+    {
+        std::string formatted;
+        if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Volume Modification Date: %s\n", formatted.c_str()) < 0)
+            return FALSE;
+    }
 
     ISODateTimeStrToSystemTime(PVD.VolumeExpirationDateAndTime, &st);
     if (st.wYear != 0)
-        fprintf(outStream, "    Volume Expiration Date:   %s\n", ViewerPrintSystemTime(&st));
+    {
+        std::string formatted;
+        if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Volume Expiration Date:   %s\n", formatted.c_str()) < 0)
+            return FALSE;
+    }
 
     ISODateTimeStrToSystemTime(PVD.VolumeEffectiveDateAndTime, &st);
     if (st.wYear != 0)
-        fprintf(outStream, "    Volume Effective Date:    %s\n", ViewerPrintSystemTime(&st));
+    {
+        std::string formatted;
+        if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Volume Effective Date:    %s\n", formatted.c_str()) < 0)
+            return FALSE;
+    }
 
     return TRUE;
 }

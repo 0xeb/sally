@@ -40,17 +40,12 @@ public:
     {
         ViewerFontNeedsMapping = false;
         ViewerFontMapping = NULL; //(CChar *)malloc(sizeof(CChar) * TCharSpecific<CChar>::CharCount() );
-        Buffer = NULL;
-        BufferSize = 0;
         pMappedFont = NULL;
     }
 
     ~TMappedTextOut()
     {
         MappedFontFactory.ReleaseMappedFont(pMappedFont);
-        //      if (ViewerFontMapping) free(ViewerFontMapping);
-        if (Buffer)
-            free(Buffer);
     }
 
     void FontHasChanged(LOGFONT* plf, HFONT font, int fontWidth, int fontHeight);
@@ -63,28 +58,21 @@ public:
         {
             if (sizeof(CChar) > 1)
                 CalcMappingIfNeeded(hdc, lpString, cbCount);
-            const CChar* s = lpString;
-            if (cbCount >= BufferSize) // realloc buffer if needed
+            try
             {
-                size_t newSize = __max(cbCount + 1, BufferSize * 2);
-                CChar* buf = (CChar*)realloc(Buffer, newSize * sizeof(CChar));
-                if (!buf)
-                {
-                    TRACE_E("Low memory");
-                    return FALSE;
-                }
-                Buffer = buf;
-                BufferSize = newSize;
+                Buffer.resize(cbCount);
+                for (size_t i = 0; i < cbCount; ++i)
+                    Buffer[i] = ViewerFontMapping[TCharSpecific<CChar>::Unsigned(lpString[i])];
             }
-            const CChar* end = s + cbCount;
-            CChar* d = Buffer;
-            while (s < end)
-                *d++ = ViewerFontMapping[TCharSpecific<CChar>::Unsigned(*s++)];
-            *d = 0;
-            return ExtTextOutX(hdc, X, Y, fuOptions, lprc, Buffer, cbCount, lpDx);
+            catch (...)
+            {
+                TRACE_E("Low memory");
+                return FALSE;
+            }
+            return DrawFileCompText(hdc, X, Y, fuOptions, lprc, Buffer.data(), cbCount, lpDx);
         }
         else
-            return ExtTextOutX(hdc, X, Y, fuOptions, lprc, lpString, cbCount, lpDx);
+            return DrawFileCompText(hdc, X, Y, fuOptions, lprc, lpString, cbCount, lpDx);
     }
 
     // true = only on XP64/Vista it is necessary to map characters before drawing (some glyphs have an incorrect width)
@@ -99,7 +87,6 @@ public:
 private:
     bool ViewerFontNeedsMapping; // TRUE = only on XP64/Vista do characters need to be remapped before rendering (some glyphs are wrongly sized)
     CChar* ViewerFontMapping;    // character map used when ViewerFontNeedsMapping is true
-    CChar* Buffer;
-    size_t BufferSize;
+    std::basic_string<CChar> Buffer;
     LPVOID pMappedFont;
 };

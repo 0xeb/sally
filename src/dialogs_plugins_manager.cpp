@@ -4,8 +4,13 @@
 
 #include "precomp.h"
 
+#include <algorithm>
+
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/IPathService.h"
+#include "common/OpenFileSelection.h"
+#include "common/fsutil.h" // IsTheSamePath
 #include "tasklist.h"
 #include "mainwnd.h"
 #include "edtlbwnd.h"
@@ -14,13 +19,14 @@
 #include "usermenu.h"
 #include "execute.h"
 #include "plugins.h"
+#include "wide_commctrl.h"
 #include "fileswnd.h"
 #include "gui.h"
 #include "menu.h"
 #include "shellib.h"
 #include "darkmode.h"
 
-static CPathBuffer LastSelectedPluginDLLName; // Heap-allocated for long path support // after reopening Plugins Manager, select the last chosen plugin
+static std::wstring LastSelectedPluginDLLName; // after reopening Plugins Manager, select the last chosen plugin
 
 static void FillRectWithColor(HDC hDC, const RECT* rect, COLORREF color)
 {
@@ -37,24 +43,25 @@ static void FillRectWithColor(HDC hDC, const RECT* rect, COLORREF color)
 // CPluginsDlg
 //
 
-CPluginsDlg::CPluginsDlg(HWND hParent) : CCommonDialog(HLanguage, IDD_PLUGINS, IDD_PLUGINS, hParent)
+// The manager renders plugin-owned UTF-16 metadata. An ANSI
+// dialog would cause USER32 to project those names through CP_ACP before the
+// controls receive them.
+CPluginsDlg::CPluginsDlg(HWND hParent)
+    : CCommonDialog(HLanguage, IDD_PLUGINS, IDD_PLUGINS, hParent, ooStandard, NULL)
 {
     HListView = NULL;
     Header = NULL;
     HImageList = NULL;
     RefreshPanels = FALSE;
     DrivesBarChange = FALSE;
-    FocusPlugin[0] = 0;
+    FocusPlugin.clear();
     Url = NULL;
-    ShowInBarText[0] = 0;
-    ShowInChDrvText[0] = 0;
-    InstalledPluginsText[0] = 0;
 }
 
 void CPluginsDlg::InitColumns()
 {
     CALL_STACK_MESSAGE1("CPluginsDlg::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[4] = {IDS_PLUGINS_NAME, IDS_PLUGINS_LOADED, IDS_PLUGINS_VERSION, IDS_PLUGINS_LOCATION};
 
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
@@ -62,9 +69,9 @@ void CPluginsDlg::InitColumns()
     int i;
     for (i = 0; i < 4; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        lvc.pszText = LoadStrW(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        ListView_InsertColumnW(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER);   // widths will be set later in SetColumnWidths()
     }
 }
@@ -116,10 +123,9 @@ void CPluginsDlg::RefreshListView(BOOL setOnly, int selIndex, const CPluginData*
 
     if (Header != NULL)
     {
-        char buf[300];
-        sprintf(buf, InstalledPluginsText, Plugins.GetCount(), numOfLoaded);
+        const std::wstring text = FormatStrW(InstalledPluginsText.c_str(), Plugins.GetCount(), numOfLoaded);
         SendMessage(Header->HWindow, WM_SETREDRAW, FALSE, 0);
-        SetWindowText(Header->HWindow, buf);
+        SetWindowTextW(Header->HWindow, text.c_str());
         SendMessage(Header->HWindow, WM_SETREDRAW, TRUE, 0);
         InvalidateRect(Header->HWindow, NULL, TRUE);
     }
@@ -223,10 +229,7 @@ void CPluginsDlg::OnSelChanged()
     HWND showInChDrv = GetDlgItem(HWindow, IDC_PLUGINSHOWINCHDRV);
     if (p != NULL)
     {
-        if (!p->DLLName.empty())
-            lstrcpyn(LastSelectedPluginDLLName, p->DLLName.c_str(), LastSelectedPluginDLLName.Size());
-        else
-            *LastSelectedPluginDLLName = 0;
+        LastSelectedPluginDLLName = p->DLLName;
 
         if (!IsWindowVisible(showInBar))
             ShowWindow(showInBar, SW_SHOW);
@@ -234,137 +237,84 @@ void CPluginsDlg::OnSelChanged()
             ShowWindow(showInChDrv, SW_SHOW);
 
         // description
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description.c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description.c_str());
         // copyright
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright.c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright.c_str());
         // www
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINWWW),
-                      !p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str() : LoadStr(IDS_PLUGINURLNONE));
-        Url->SetActionOpen(!p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str() : "");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINWWW),
+                       !p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str()
+                                                     : LoadStrW(IDS_PLUGINURLNONE));
+        Url->SetActionOpen(!p->PluginHomePageURL.empty() ? p->PluginHomePageURL.c_str() : L"");
         // extension
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS),
-                      p->Extensions.c_str()[0] == 0 ? LoadStr(IDS_PLUGINEXTNONE) : p->Extensions.c_str());
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS),
+                       p->Extensions.c_str()[0] == 0 ? LoadStrW(IDS_PLUGINEXTNONE)
+                                                     : p->Extensions.c_str());
         // FS Name
-        char buf[500];
-        buf[0] = 0;
-        int remainingSize = sizeof(buf); // store the list of FS names in 'buf', names will be separated by ';'
-        int i;
-        for (i = 0; remainingSize > 1 && i < (int)p->FSNames.size(); i++)
+        std::wstring fsNames;
+        for (size_t i = 0; i < p->FSNames.size(); ++i)
         {
-            _snprintf_s(buf + (sizeof(buf) - remainingSize), remainingSize, _TRUNCATE,
-                        (i + 1 != (int)p->FSNames.size()) ? "%s;" : "%s", p->FSNames[i].c_str());
-            remainingSize = (int)sizeof(buf) - (int)strlen(buf);
+            if (i != 0)
+                fsNames += L';';
+            fsNames += p->FSNames[i];
         }
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFSNAME),
-                      buf[0] == 0 ? LoadStr(IDS_PLUGINFSNONE) : buf);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINFSNAME),
+                       fsNames.empty() ? LoadStrW(IDS_PLUGINFSNONE) : fsNames.c_str());
         // Functions
-        buf[0] = 0;
+        std::wstring functions;
+        const auto appendFunction = [&functions](const wchar_t* text, bool sameLine)
+        {
+            if (!functions.empty())
+                functions += sameLine ? L", " : L",\n";
+            functions += text;
+        };
         if (p->SupportPanelView)
-            strcat(buf, LoadStr(IDS_PLUGINFUNCVIEW));
+            appendFunction(LoadStrW(IDS_PLUGINFUNCVIEW), false);
         if (p->SupportPanelEdit)
-        {
-            if (buf[0] != 0)
-                strcat(buf, ",\n");
-            strcat(buf, LoadStr(IDS_PLUGINFUNCEDIT));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCEDIT), false);
         if (p->SupportCustomPack)
-        {
-            if (buf[0] != 0)
-                strcat(buf, ",\n");
-            strcat(buf, LoadStr(IDS_PLUGINFUNCCUSTPACK));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCCUSTPACK), false);
         if (p->SupportCustomUnpack)
-        {
-            if (p->SupportCustomPack)
-                strcat(buf, ", "); // text of custom packer is shorter - same line
-            else
-            {
-                if (buf[0] != 0)
-                    strcat(buf, ",\n");
-            }
-            strcat(buf, LoadStr(IDS_PLUGINFUNCCUSTUNPACK));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCCUSTUNPACK), p->SupportCustomPack != FALSE);
         if (p->SupportViewer)
-        {
-            if (buf[0] != 0)
-                strcat(buf, ",\n");
-            strcat(buf, LoadStr(IDS_PLUGINFUNCFILEVIEWER));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCFILEVIEWER), false);
         if (p->MenuItems.Count > 0 || p->SupportDynMenuExt)
-        {
-            if (p->SupportViewer)
-                strcat(buf, ", "); // viewer text is shorter - same line
-            else
-            {
-                if (buf[0] != 0)
-                    strcat(buf, ",\n");
-            }
-            strcat(buf, LoadStr(IDS_PLUGINFUNCMENUEXTENSION));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCMENUEXTENSION), p->SupportViewer != FALSE);
 
         if (p->SupportFS)
-        {
-            // viewer+menu text is shorter - same line
-            if (p->SupportViewer || p->MenuItems.Count > 0 || p->SupportDynMenuExt)
-                strcat(buf, ", ");
-            else
-            {
-                if (buf[0] != 0)
-                    strcat(buf, ",\n");
-            }
-            strcat(buf, LoadStr(IDS_PLUGINFUNCFILESYSTEM));
-        }
+            appendFunction(LoadStrW(IDS_PLUGINFUNCFILESYSTEM),
+                           p->SupportViewer || p->MenuItems.Count > 0 || p->SupportDynMenuExt);
 
         // Thumbnails
         if (p->ThumbnailMasks.GetMasksString()[0] != 0)
         {
-            if (p->SupportViewer || p->MenuItems.Count > 0 || p->SupportDynMenuExt || p->SupportFS)
-                strcat(buf, ", ");
-            else
-            {
-                if (buf[0] != 0)
-                    strcat(buf, ",\n");
-            }
-            strcat(buf, LoadStr(IDS_PLUGINFUNCTHUMBLOADER));
-            SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), p->ThumbnailMasks.GetMasksString());
+            appendFunction(LoadStrW(IDS_PLUGINFUNCTHUMBLOADER),
+                           p->SupportViewer || p->MenuItems.Count > 0 || p->SupportDynMenuExt || p->SupportFS);
+            SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), p->ThumbnailMasks.GetMasksString());
         }
         else
-            SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), LoadStr(IDS_PLUGINTHUMBNONE));
+            SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), LoadStrW(IDS_PLUGINTHUMBNONE));
 
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), buf);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), functions.c_str());
 
-        CPathBuffer buff;
-        char pluginName[300];
-        lstrcpyn(pluginName, p->Name.c_str(), 299);
-        DuplicateAmpersands(pluginName, 299); // plugin name may contain the '&' character
-        sprintf(buff, ShowInBarText, pluginName);
-        SetWindowText(showInBar, buff);
+        std::wstring pluginName = p->Name;
+        for (size_t pos = 0; (pos = pluginName.find(L'&', pos)) != std::wstring::npos; pos += 2)
+            pluginName.insert(pos, 1, L'&');
+        const std::wstring showInBarText = FormatStrW(ShowInBarText.c_str(), pluginName.c_str());
+        SetWindowTextW(showInBar, showInBarText.c_str());
 
-        char fsItemText[200];
-        const char* itemText;
+        std::wstring itemText;
         if (!p->ChDrvMenuFSItemName.empty())
         {
-            const char* s = p->ChDrvMenuFSItemName.c_str();
-            while (*s != 0 && *s != '\t')
-                s++;
-            if (*s == 0)
-                itemText = p->ChDrvMenuFSItemName.c_str();
-            else // there is at least one tab character
-            {
-                lstrcpyn(fsItemText, s + 1, 200);
-                itemText = fsItemText;
-                char* s2 = fsItemText;
-                while (*s2 != 0 && *s2 != '\t')
-                    s2++;
-                if (*s2 == '\t')
-                    *s2 = 0;
-            }
+            const size_t firstTab = p->ChDrvMenuFSItemName.find(L'\t');
+            const size_t start = firstTab == std::wstring::npos ? 0 : firstTab + 1;
+            const size_t secondTab = p->ChDrvMenuFSItemName.find(L'\t', start);
+            itemText = p->ChDrvMenuFSItemName.substr(start, secondTab - start);
         }
         else
-            itemText = "FS";
+            itemText = L"FS";
 
-        sprintf(buff, ShowInChDrvText, itemText);
-        SetWindowText(showInChDrv, buff);
+        const std::wstring showInDriveText = FormatStrW(ShowInChDrvText.c_str(), itemText.c_str());
+        SetWindowTextW(showInChDrv, showInDriveText.c_str());
 
         int orderIndex = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (orderIndex != -1)
@@ -390,14 +340,14 @@ void CPluginsDlg::OnSelChanged()
     }
     else
     {
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINWWW), "");
-        Url->SetActionOpen("");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFSNAME), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), "");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINWWW), L"");
+        Url->SetActionOpen(L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS), L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINFSNAME), L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), L"");
+        SetWindowTextW(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), L"");
         /*if (IsWindowVisible(showInBar))*/ ShowWindow(showInBar, SW_HIDE);     // condition commented out because it misbehaves during WM_INITDIALOG (the dialog is not visible as a whole -> the check fails)
         /*if (IsWindowVisible(showInChDrv))*/ ShowWindow(showInChDrv, SW_HIDE); // condition commented out because it misbehaves during WM_INITDIALOG (the dialog is not visible as a whole -> the check fails)
         EnableButtons(NULL);
@@ -500,13 +450,13 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         // copy the Show In Bar checkbox text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINSHOWINBAR, ShowInBarText, 200);
+        ShowInBarText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_PLUGINSHOWINBAR));
 
         // copy the Show In Change Drive Menu checkbox text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINSHOWINCHDRV, ShowInChDrvText, 200);
+        ShowInChDrvText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_PLUGINSHOWINCHDRV));
 
         // copy the "Installed Plugins:" text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINHEADER, InstalledPluginsText, 200);
+        InstalledPluginsText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_PLUGINHEADER));
 
         // Add will have a drop-down
         // new CButton(HWindow, IDB_PLUGINADD, BTF_DROPDOWN);
@@ -518,6 +468,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // listview setup
         HListView = GetDlgItem(HWindow, IDL_PLUGINS);
+        ListView_SetUnicodeFormat(HListView, TRUE);
         ListView_SetExtendedListViewStyleEx(HListView, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);
 
         // header line
@@ -534,7 +485,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // for convenience select the last chosen item (if it exists)
         CPluginData* lastSelectPluginData = NULL;
         int lastSelectedPluginIndex = 0;
-        if (Plugins.FindDLL(LastSelectedPluginDLLName, lastSelectedPluginIndex))
+        if (Plugins.FindDLL(LastSelectedPluginDLLName.c_str(), lastSelectedPluginIndex))
             lastSelectPluginData = Plugins.Get(lastSelectedPluginIndex);
 
         // insert items
@@ -725,96 +676,66 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDB_PLUGINADD:
         {
             RefreshPanels = TRUE;
-            char fileName[2000];
-            fileName[0] = 0;
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
+            OPENFILENAMEW ofn;
+            memset(&ofn, 0, sizeof(OPENFILENAMEW));
+            ofn.lStructSize = sizeof(OPENFILENAMEW);
             ofn.hwndOwner = HWindow;
-            char* s = LoadStr(IDS_PLUGINFILTER);
-            ofn.lpstrFilter = s;
-            while (*s != 0) // creating a double-null terminated list
-            {
-                if (*s == '|')
-                    *s = 0;
-                s++;
-            }
-            ofn.lpstrFile = fileName;
-            ofn.nMaxFile = 2000;
-            ofn.lpstrDefExt = "SPL";
+            std::wstring filter = LoadStrW(IDS_PLUGINFILTER);
+            std::replace(filter.begin(), filter.end(), L'|', L'\0');
+            filter.push_back(L'\0'); // OPENFILENAME requires a double-NUL terminator
+            ofn.lpstrFilter = filter.c_str();
+            ofn.lpstrDefExt = L"SPL";
 
-            CPathBuffer buf; // Heap-allocated for long path support
-            GetModuleFileName(HInstance, buf, buf.Size());
-            s = strrchr(buf, '\\');
-            if (s != NULL)
+            std::wstring pluginsDir;
+            if (gPathService != NULL &&
+                gPathService->GetModuleFileName(HInstance, pluginsDir).success)
             {
-                strcpy(s + 1, "plugins");
-                ofn.lpstrInitialDir = buf;
+                const size_t separator = pluginsDir.find_last_of(L"\\/");
+                if (separator != std::wstring::npos)
+                {
+                    pluginsDir.erase(separator + 1);
+                    pluginsDir += L"plugins";
+                    ofn.lpstrInitialDir = pluginsDir.c_str();
+                }
             }
 
             ofn.nFilterIndex = 1;
-            ofn.lpstrTitle = LoadStr(IDS_PLUGINADDTITLE);
+            ofn.lpstrTitle = LoadStrW(IDS_PLUGINADDTITLE);
             ofn.Flags = OFN_ALLOWMULTISELECT | OFN_EXPLORER | OFN_FILEMUSTEXIST |
                         OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR;
 
-            if (SafeGetOpenFileName(&ofn))
-            {
-                // loop over all selected names
-                CPathBuffer oneName; // Heap-allocated for long path support
-                char* fName = NULL;
-                int off = 0;
-                strcpy(oneName, fileName);
-                off = (int)strlen(oneName);
-                if (off + 1 < 2000 && *(fileName + off + 1) != 0) // not a single name
-                {
-                    fName = oneName + off;
-                    if (off > 0 && *(fileName + off - 1) != '\\') // missing backslash
-                    {
-                        *fName++ = '\\';
-                        *fName = 0;
-                    }
-                }
+            std::vector<std::wstring> fileNames;
 
+            if (SafeGetOpenFileNamesOwnedW(&ofn, fileNames))
+            {
                 BOOL pluginAdded = FALSE;
                 CPluginData* addedPlugin = NULL;
-                while (1)
+                for (const std::wstring& oneName : fileNames)
                 {
-                    if (fName != NULL && off + 1 < 2000)
-                    {
-                        strcpy(fName, fileName + off + 1);
-                        off += (int)(strlen(fileName + off + 1) + 1);
-                    }
+                    std::wstring pluginName = oneName;
+                    if (!pluginsDir.empty() && oneName.size() > pluginsDir.size() &&
+                        StrNICmpW(oneName.c_str(), pluginsDir.c_str(), static_cast<int>(pluginsDir.size())) == 0 &&
+                        (oneName[pluginsDir.size()] == L'\\' || oneName[pluginsDir.size()] == L'/'))
+                        pluginName.erase(0, pluginsDir.size() + 1);
 
-                    // oneName contains the name of the x-th selected plugin (enumeration)
-                    CPathBuffer pluginName; // Heap-allocated for long path support
-                    if (StrNICmp(oneName, buf, (int)strlen(buf)) == 0 && oneName[(int)strlen(buf)] == '\\')
-                    {
-                        memmove(pluginName.Get(), oneName + strlen(buf) + 1, strlen(oneName) - strlen(buf) + 1 - 1);
-                    }
-                    else
-                        strcpy(pluginName, oneName);
                     BOOL add = TRUE;
                     int index;
-                    if (Plugins.FindDLL(pluginName, index))
+                    if (Plugins.FindDLL(pluginName.c_str(), index))
                     {
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINEXISTS), AnsiToWide(Plugins.Get(index)->Name.c_str()).c_str(),
-                                AnsiToWide(Plugins.Get(index)->DLLName.c_str()).c_str());
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINEXISTS), Plugins.Get(index)->Name.c_str(),
+                                                      Plugins.Get(index)->DLLName.c_str());
                         //                add = SalMessageBox(HWindow, buf2, LoadStr(IDS_QUESTION),
                         //                                    MB_YESNOCANCEL | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES;
                         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
                         add = FALSE;
                     }
-                    if (add && Plugins.AddPlugin(HWindow, pluginName))
+                    if (add && Plugins.AddPlugin(HWindow, pluginName.c_str()))
                     {
                         pluginAdded = TRUE;
                         int pluginIndex;
-                        if (Plugins.FindDLL(pluginName, pluginIndex))
+                        if (Plugins.FindDLL(pluginName.c_str(), pluginIndex))
                             addedPlugin = Plugins.Get(pluginIndex);
                     }
-
-                    // finish when two zero characters are found
-                    if (off + 1 >= 2000 || *(fileName + off + 1) == 0)
-                        break;
                 }
 
                 if (pluginAdded)
@@ -831,13 +752,12 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case IDB_PLUGINREMOVE:
         {
             RefreshPanels = TRUE;
-            CPathBuffer name; // Heap-allocated for long path support
             int index, lvIndex;
             CPluginData* p = GetSelectedPlugin(&index, &lvIndex);
             if (p != NULL)
             {
-                strcpy(name, p->Name.c_str());
-                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINREMOVEOK), AnsiToWide(name).c_str());
+                const std::wstring name = p->Name;
+                std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINREMOVEOK), name.c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes)
                 {
                     Plugins.Remove(HWindow, index, TRUE);
@@ -855,7 +775,7 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (p->InitDLL(HWindow))
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINTESTOK), AnsiToWide(p->Name.c_str()).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINTESTOK), p->Name.c_str());
                     gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                 }
                 RefreshListView(); // a DLL was loaded, we have fresher data ...
@@ -878,18 +798,23 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CPluginData* p = GetSelectedPlugin();
             if (p != NULL)
             {
-                CPathBuffer buf; // Heap-allocated for long path support
-                const char* s = p->DLLName.c_str();
-                if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-                    (*s == 0 || *(s + 1) != ':'))       // not "c:" -> relative path to plugins subdirectory
+                FocusPlugin = p->DLLName;
+                const wchar_t* dllName = p->DLLName.c_str();
+                if ((*dllName != L'\\' || *(dllName + 1) != L'\\') && // not UNC
+                    (*dllName == 0 || *(dllName + 1) != L':'))          // not "c:" -> relative path to plugins subdirectory
                 {
-                    GetModuleFileName(HInstance, buf, buf.Size());
-                    char* p2 = strrchr(buf, '\\') + 1;
-                    strcpy(p2, "plugins\\");
-                    strcat(p2, p->DLLName.c_str());
-                    s = buf;
+                    std::wstring modulePath;
+                    if (gPathService != NULL &&
+                        gPathService->GetModuleFileName(HInstance, modulePath).success)
+                    {
+                        const size_t separator = modulePath.find_last_of(L"\\/");
+                        if (separator != std::wstring::npos)
+                        {
+                            modulePath.erase(separator + 1);
+                            FocusPlugin = modulePath + L"plugins\\" + p->DLLName;
+                        }
+                    }
                 }
-                lstrcpyn(FocusPlugin, s, FocusPlugin.Size());
                 PostMessage(HWindow, WM_COMMAND, IDOK, 0);
             }
             return 0;
@@ -924,41 +849,59 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CPluginKeys
 //
 
-void GetKeyName(UINT vk, char* buff)
+static std::wstring GetKeyName(UINT vk)
 {
     LONG scan = (LONG)MapVirtualKey(vk, 0) << 16;
-    GetKeyNameText(scan, buff, 50);
-}
-
-void GetHotKeyText(WORD hotKey, char* buff)
-{
-    BYTE wVirtKey = LOBYTE(hotKey);
-    BYTE wMods = HIBYTE(hotKey);
-    buff[0] = 0;
-    if (wVirtKey != 0 || wMods != 0)
+    std::size_t capacity = 32;
+    for (;;)
     {
-        const char* plus = "+";
-        if (wMods & HOTKEYF_CONTROL)
-        {
-            GetKeyName(VK_CONTROL, buff);
-            lstrcat(buff, plus);
-        }
-        if (wMods & HOTKEYF_SHIFT)
-        {
-            GetKeyName(VK_SHIFT, buff + lstrlen(buff));
-            lstrcat(buff, plus);
-        }
-        if (wMods & HOTKEYF_ALT)
-        {
-            GetKeyName(VK_MENU, buff + lstrlen(buff));
-            lstrcat(buff, plus);
-        }
-        GetKeyName(wVirtKey, buff + lstrlen(buff));
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        const int copied = GetKeyNameTextW(scan, buffer.data(),
+                                           static_cast<int>(capacity));
+        if (copied <= 0)
+            return std::wstring();
+        if (static_cast<std::size_t>(copied) + 1 < capacity)
+            return std::wstring(buffer.data(), copied);
+        if (capacity > static_cast<std::size_t>((std::numeric_limits<int>::max)()) / 2)
+            return std::wstring();
+        capacity *= 2;
     }
 }
 
+std::wstring GetHotKeyText(WORD hotKey)
+{
+    BYTE wVirtKey = LOBYTE(hotKey);
+    BYTE wMods = HIBYTE(hotKey);
+    std::wstring text;
+    if (wVirtKey != 0 || wMods != 0)
+    {
+        if (wMods & HOTKEYF_CONTROL)
+        {
+            text += GetKeyName(VK_CONTROL);
+            text += L'+';
+        }
+        if (wMods & HOTKEYF_SHIFT)
+        {
+            text += GetKeyName(VK_SHIFT);
+            text += L'+';
+        }
+        if (wMods & HOTKEYF_ALT)
+        {
+            text += GetKeyName(VK_MENU);
+            text += L'+';
+        }
+        text += GetKeyName(wVirtKey);
+    }
+    return text;
+}
+
 CPluginKeys::CPluginKeys(HWND hParent, CPluginData* plugin)
-    : CCommonDialog(HLanguage, IDD_PLUGINKEYS, IDD_PLUGINKEYS, hParent)
+    // Unicode opt-in. WM_INITDIALOG formats this dialog's title with the
+    // PLUGIN'S NAME and writes it back with SetWindowTextW; on an ANSI-class dialog USER32
+    // re-narrows that through CP_ACP, so a plugin name outside the code page came back
+    // mangled in its own title bar. Caught by gtest_wide_text_on_ansi_dialog, whose
+    // inventory was empty until this call appeared.
+    : CCommonDialog(HLanguage, IDD_PLUGINKEYS, IDD_PLUGINKEYS, hParent, ooStandard, NULL)
 {
     HListView = NULL;
     Header = NULL;
@@ -1006,7 +949,7 @@ void CPluginKeys::Transfer(CTransferInfo& ti)
 void CPluginKeys::InitColumns()
 {
     CALL_STACK_MESSAGE1("CPluginKeys::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[2] = {IDS_PLUGIN_COMMAND, IDS_PLUGIN_KEY};
 
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
@@ -1014,9 +957,9 @@ void CPluginKeys::InitColumns()
     int i;
     for (i = 0; i < 2; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        lvc.pszText = LoadStrW(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        ListView_InsertColumnW(HListView, i, &lvc);
     }
 }
 
@@ -1054,29 +997,29 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
 
         if (!setOnly)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_IMAGE | LVIF_TEXT | LVIF_INDENT | LVIF_PARAM;
             lvi.iImage = item->Type == pmitStartSubmenu ? 1 : 0;
             lvi.iItem = row;
             lvi.iSubItem = 0;
-            char pszTextBuff[] = "";
+            wchar_t pszTextBuff[] = L"";
             lvi.pszText = pszTextBuff;
             lvi.iIndent = level;
             lvi.lParam = i; // for identification
-            ListView_InsertItem(HListView, &lvi);
+            ListView_InsertItemW(HListView, &lvi);
         }
         // command name
-        char buff[500];
-        lstrcpyn(buff, item->Name.c_str(), 500);
+        wchar_t buff[500];
+        lstrcpynW(buff, item->Name.c_str(), _countof(buff));
         RemoveAmpersands(buff);
 
         // remove the hint from the text if present
         if ((item->HotKey & HOTKEY_HINT) != 0)
         {
-            char* p = buff;
+            wchar_t* p = buff;
             while (*p != 0)
             {
-                if (*p == '\t')
+                if (*p == L'\t')
                 {
                     *p = 0;
                     break;
@@ -1085,10 +1028,10 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
             }
         }
 
-        ListView_SetItemText(HListView, row, 0, buff);
+        ListView_SetItemTextW(HListView, row, 0, buff);
         // shortcut key
-        GetHotKeyText(LOWORD(HotKeys[i]), buff);
-        ListView_SetItemText(HListView, row, 1, buff);
+        std::wstring hotKeyText = GetHotKeyText(LOWORD(HotKeys[i]));
+        ListView_SetItemTextW(HListView, row, 1, hotKeyText.data());
         row++;
         if (item->Type == pmitStartSubmenu)
             level++;
@@ -1107,11 +1050,11 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
 CPluginMenuItem*
 CPluginKeys::GetItem(int index)
 {
-    LVITEM lvi;
+    LVITEMW lvi;
     lvi.iItem = index;
     lvi.iSubItem = 0;
     lvi.mask = LVIF_PARAM;
-    ListView_GetItem(HListView, &lvi);
+    ListView_GetItemW(HListView, &lvi);
     int i = (int)lvi.lParam;
     if (i >= 0 && i < Plugin->MenuItems.Count)
         return Plugin->MenuItems[i];
@@ -1126,11 +1069,11 @@ CPluginKeys::GetSelectedItem(int* orgIndex)
         return NULL;
     if (orgIndex != NULL)
     {
-        LVITEM lvi;
+        LVITEMW lvi;
         lvi.iItem = index;
         lvi.iSubItem = 0;
         lvi.mask = LVIF_PARAM;
-        ListView_GetItem(HListView, &lvi);
+        ListView_GetItemW(HListView, &lvi);
         *orgIndex = (int)lvi.lParam;
     }
     return GetItem(index);
@@ -1181,7 +1124,7 @@ void CPluginKeys::EnableButtons()
 
 void CPluginKeys::HandleConflictWarning()
 {
-    char buff[500];
+    wchar_t buff[500];
     buff[0] = 0;
 
     BYTE virtKey;
@@ -1191,7 +1134,7 @@ void CPluginKeys::HandleConflictWarning()
         // does the hot key belong to Salamander?
         if (IsSalHotKey(hotKey))
         {
-            strcpy(buff, LoadStr(IDS_HOTKEY_SAL_CONFLICT));
+            wcscpy_s(buff, _countof(buff), LoadStrW(IDS_HOTKEY_SAL_CONFLICT));
         }
 
         // search in ours
@@ -1202,7 +1145,7 @@ void CPluginKeys::HandleConflictWarning()
             {
                 if (HOTKEY_GET(HotKeys[i]) == hotKey)
                 {
-                    sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), Plugin->Name.c_str());
+                    swprintf_s(buff, _countof(buff), LoadStrW(IDS_HOTKEY_PLUGIN_CONFLICT), Plugin->Name.c_str());
                     break;
                 }
             }
@@ -1216,11 +1159,11 @@ void CPluginKeys::HandleConflictWarning()
             if (Plugins.FindHotKey(hotKey, TRUE, Plugin, &pluginIndex, &menuItemIndex))
             {
                 CPluginData* plugin = Plugins.Get(pluginIndex);
-                sprintf(buff, LoadStr(IDS_HOTKEY_PLUGIN_CONFLICT), plugin->Name.c_str());
+                swprintf_s(buff, _countof(buff), LoadStrW(IDS_HOTKEY_PLUGIN_CONFLICT), plugin->Name.c_str());
             }
         }
     }
-    SetDlgItemText(HWindow, IDC_CONFLICT_WARNING, buff);
+    SetDlgItemTextW(HWindow, IDC_CONFLICT_WARNING, buff);
 }
 
 INT_PTR
@@ -1232,14 +1175,15 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         // dialog box title
-        char buff[500];
-        char buff2[500];
-        GetWindowText(HWindow, buff, 500);
-        sprintf(buff2, buff, Plugin->Name.c_str());
-        SetWindowText(HWindow, buff2);
+        wchar_t buff[500];
+        wchar_t buff2[500];
+        GetWindowTextW(HWindow, buff, 500);
+        swprintf_s(buff2, buff, Plugin->Name.c_str());
+        SetWindowTextW(HWindow, buff2);
 
         // listview setup
         HListView = GetDlgItem(HWindow, IDL_COMMANDS);
+        ListView_SetUnicodeFormat(HListView, TRUE);
         ListView_SetExtendedListViewStyleEx(HListView, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);
 
         // header line
@@ -1329,7 +1273,7 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDC_RESET:
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), AnsiToWide(Plugin->Name.c_str()).c_str());
+            std::wstring msg = FormatStrW(LoadStrW(IDS_PLUGINRESETKEYS), Plugin->Name.c_str());
             if (gPrompter->ConfirmError(LoadStrW(IDS_INFOTITLE), msg.c_str()).type == PromptResult::kOk)
             {
                 int i;
@@ -1415,7 +1359,7 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_ARCHIVENAME, FileStamps->GetZIPFile());
+        SetDlgItemTextW(HWindow, IDT_ARCHIVENAME, FileStamps->GetZIPFile());
         HWND list = GetDlgItem(HWindow, IDL_UPDATEDFILES);
         FileStamps->AddFilesToListBox(list);
         SendMessage(list, LB_SETSEL, TRUE, -1);
@@ -1458,13 +1402,13 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 SendMessage(list, LB_GETSELITEMS, selCount, (LPARAM)indexes.get());
                 IntSort(indexes.get(), 0, selCount - 1); // indexes may not be sorted, so sort them just in case
 
-                CPathBuffer path; // Heap-allocated for long path support
-                char* initPath;
-                strcpy(path, FileStamps->GetZIPFile());
-                if (!CutDirectory(path))
-                    initPath = NULL;
-                else
-                    initPath = path;
+                std::wstring path = FileStamps->GetZIPFile();
+                const wchar_t* initPath = NULL;
+                if (!path.empty() && CutDirectory(path.data()))
+                {
+                    path.resize(wcslen(path.c_str()));
+                    initPath = path.c_str();
+                }
                 if (Panel->CheckPath(TRUE, initPath) != ERROR_SUCCESS)
                     initPath = NULL;
 
@@ -1581,7 +1525,7 @@ void CCfgPageConfirmations::Transfer(CTransferInfo& ti)
 HTREEITEM
 CCfgPageConfirmations::AddItem(HTREEITEM hParent, int iImage, int textResID, int* value)
 {
-    TVINSERTSTRUCT tvis;
+    TVINSERTSTRUCTW tvis;
     tvis.hParent = hParent;
     tvis.hInsertAfter = TVI_LAST;
     tvis.item.mask = TVIF_TEXT | TVIF_STATE; // | TVIF_PARAM;
@@ -1594,10 +1538,11 @@ CCfgPageConfirmations::AddItem(HTREEITEM hParent, int iImage, int textResID, int
         tvis.item.state |= TVIS_EXPANDED;
     }
 
-    tvis.item.pszText = LoadStr(textResID);
+    std::wstring itemText = LoadStrOwned(textResID);
+    tvis.item.pszText = itemText.data();
     tvis.item.stateMask = tvis.item.state;
 
-    HTREEITEM ret = TreeView_InsertItem(HTreeView, &tvis);
+    HTREEITEM ret = (HTREEITEM)SendMessageW(HTreeView, TVM_INSERTITEMW, 0, (LPARAM)&tvis);
     if (iImage == -1)
     {
         CConfirmationItem item;
@@ -1803,29 +1748,33 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_DRVSPEC_REMOTEMON, Configuration.DrvSpecRemoteMon);
     ti.CheckBox(IDC_DRVSPEC_REMOTESIMPLE, Configuration.DrvSpecRemoteSimple);
     ti.CheckBox(IDC_DRVSPEC_REMOTEACT, Configuration.DrvSpecRemoteDoNotRefreshOnAct);
-    CPathBuffer path; // Heap-allocated for long path support
-    CPathBuffer newPath; // Heap-allocated for long path support
     if (ti.Type == ttDataToWindow)
     {
-        GetIfPathIsInaccessibleGoTo(path);
-        ti.EditLine(IDE_DRVSPEC_ONERRGOTO, path, path.Size());
+        // Fetch wide so a non-ASCII My-Documents/username path (the
+        // IfPathIsInaccessibleGoToIsMyDocs=TRUE default) displays correctly instead of
+        // mangling through the old GetIfPathIsInaccessibleGoTo -> WideToAnsi round trip.
+        std::wstring path;
+        GetIfPathIsInaccessibleGoToW(path);
+        SetDlgItemTextW(HWindow, IDE_DRVSPEC_ONERRGOTO, path.c_str());
         IfPathIsInaccessibleGoToChanged = FALSE;
     }
     else
     {
         if (IfPathIsInaccessibleGoToChanged) // change only if the user actually edited the path
         {
-            ti.EditLine(IDE_DRVSPEC_ONERRGOTO, newPath, newPath.Size());
-            GetIfPathIsInaccessibleGoTo(path, TRUE);
-            if (IsTheSamePath(path, newPath)) // user wants to go to My Documents
+            const std::wstring newPathW =
+                GetWindowTextStringW(GetDlgItem(HWindow, IDE_DRVSPEC_ONERRGOTO));
+            std::wstring path;
+            GetIfPathIsInaccessibleGoToW(path, TRUE);
+            if (IsTheSamePath(path.c_str(), newPathW.c_str())) // user wants to go to My Documents
             {
                 Configuration.IfPathIsInaccessibleGoToIsMyDocs = TRUE;
-                Configuration.IfPathIsInaccessibleGoTo[0] = 0;
+                Configuration.IfPathIsInaccessibleGoTo.clear();
             }
             else
             {
+                Configuration.IfPathIsInaccessibleGoTo = newPathW;
                 Configuration.IfPathIsInaccessibleGoToIsMyDocs = FALSE;
-                lstrcpyn(Configuration.IfPathIsInaccessibleGoTo, newPath, Configuration.IfPathIsInaccessibleGoTo.Size());
             }
         }
     }
@@ -1853,12 +1802,20 @@ CCfgPageDrives::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (LOWORD(wParam) == IDB_BROWSECOMMAND)
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            GetDlgItemText(HWindow, IDE_DRVSPEC_ONERRGOTO, path, path.Size());
-            if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_BROWSEONERRGOTOTITLE),
-                                   LoadStr(IDS_BROWSEONERRGOTOTEXT), path, FALSE, path))
+            // wide: same GetTargetDirectory narrowing fixed at
+            // the sibling dialogs. This dialog's own Transfer() already handles
+            // IDE_DRVSPEC_ONERRGOTO wide via ti.EditLineW - GetDlgItemTextW/
+            // SetDlgItemTextW here are safe for the same reason (standard child controls are
+            // always wide-registered by USER32 regardless of the dialog's own class), and
+            // bring this handler in line with Transfer()'s existing treatment of the same
+            // control.
+            const std::wstring initDirW =
+                GetWindowTextStringW(GetDlgItem(HWindow, IDE_DRVSPEC_ONERRGOTO));
+            std::wstring pathW;
+            if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_BROWSEONERRGOTOTITLE),
+                                    LoadStrW(IDS_BROWSEONERRGOTOTEXT), pathW, FALSE, initDirW.c_str()))
             {
-                SetDlgItemText(HWindow, IDE_DRVSPEC_ONERRGOTO, path);
+                SetDlgItemTextW(HWindow, IDE_DRVSPEC_ONERRGOTO, pathW.c_str());
             }
         }
         if (HIWORD(wParam) == EN_CHANGE && LOWORD(wParam) == IDE_DRVSPEC_ONERRGOTO)
@@ -1885,8 +1842,11 @@ CCfgPageViewEdit::CCfgPageViewEdit()
 //
 
 CCfgPageViewers::CCfgPageViewers(BOOL alternative)
-    : CCommonPropSheetPage(alternative ? LoadStr(IDS_ALTVIEWERS) : NULL, HLanguage,
-                           IDD_CFGPAGE_VIEWERS, IDD_CFGPAGE_VIEWERS, PSP_USETITLE, NULL),
+    // CCommonPropSheetPage's title is TCHAR*; LoadStr is permanently narrow.
+    : CCommonPropSheetPage(alternative ?
+                                        LoadStrW(IDS_ALTVIEWERS)
+                                        : NULL,
+                           HLanguage, IDD_CFGPAGE_VIEWERS, IDD_CFGPAGE_VIEWERS, PSP_USETITLE, NULL),
       ViewerMasks(10, 5)
 {
     Alternative = alternative;
@@ -1904,8 +1864,8 @@ void CCfgPageViewers::Transfer(CTransferInfo& ti)
         Dirty = FALSE;
         // populate the combo box with viewers
         HWND hCombo = GetDlgItem(HWindow, IDC_VIEW_TYPE);
-        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_VIEWER_EXTERNAL));
-        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_VIEWER_INTERNAL));
+        SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_VIEWER_EXTERNAL).c_str());
+        SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(IDS_VIEWER_INTERNAL).c_str());
         int count = 0;
         int index;
         while ((index = Plugins.GetViewerIndex(count++)) != -1) // while "file viewer" plug-ins exist
@@ -1913,9 +1873,8 @@ void CCfgPageViewers::Transfer(CTransferInfo& ti)
             CPluginData* p = Plugins.Get(index);
             if (p != NULL)
             {
-                CPathBuffer buf; // Heap-allocated for long path support
-                p->GetDisplayName(buf, buf.Size());
-                SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buf.Get());
+                const std::wstring displayName = p->GetDisplayName();
+                SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)displayName.c_str());
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageViewers::Transfer().");
@@ -1949,7 +1908,7 @@ void CCfgPageViewers::Validate(CTransferInfo& ti)
         {
             CMaskGroup masks(ViewerMasks[i]->Masks->GetMasksString());
             int errorPos1, errorPos2;
-            const char* forbiddenChar = strchr(masks.GetMasksString(), '|');
+            const wchar_t* forbiddenChar = wcschr(masks.GetMasksString(), '|');
             if (forbiddenChar != NULL || !masks.PrepareMasks(errorPos1))
             {
                 if (forbiddenChar != NULL)
@@ -2029,16 +1988,13 @@ void CCfgPageViewers::LoadControls()
     }
     }
     SendDlgItemMessage(HWindow, IDC_VIEW_TYPE, CB_SETCURSEL, cmbSel, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Command.c_str()));
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->Command.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->Arguments.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so the browse overwrites the content
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->InitDir.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so the browse overwrites the content
     DisableNotification = FALSE;
 }
@@ -2053,16 +2009,10 @@ void CCfgPageViewers::StoreControls()
         Dirty = TRUE;
         CViewerMasksItem* item = ViewerMasks[index];
 
-        CPathBuffer command; // Heap-allocated for long path support
-        CPathBuffer arguments; // Heap-allocated for long path support
-        CPathBuffer initdir; // Heap-allocated for long path support
-        SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    command.Size(), (LPARAM)command.Get());
-        SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
-                    arguments.Size(), (LPARAM)arguments.Get());
-        SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    initdir.Size(), (LPARAM)initdir.Get());
-        item->Set(item->Masks->GetMasksString(), command, arguments, initdir);
+        const std::wstring command = GetWindowTextStringW(GetDlgItem(HWindow, IDE_COMMAND));
+        const std::wstring arguments = GetWindowTextStringW(GetDlgItem(HWindow, IDE_ARGUMENTS));
+        const std::wstring initdir = GetWindowTextStringW(GetDlgItem(HWindow, IDE_INITDIR));
+        item->Set(item->Masks->GetMasksString(), command.c_str(), arguments.c_str(), initdir.c_str());
 
         int cmbSel = (int)SendDlgItemMessage(HWindow, IDC_VIEW_TYPE, CB_GETCURSEL, 0, 0);
         int type;
@@ -2211,7 +2161,7 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CViewerMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    *dispInfo->Text = ((CViewerMasksItem*)dispInfo->ItemID)->Masks->GetMasksString();
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }
@@ -2229,13 +2179,13 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         ViewerMasks.Add(item);
-                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CViewerMasksItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                     }
 
                     LoadControls();
@@ -2254,6 +2204,9 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
               int srcIndex = index;
               int dstIndex = index + (dispInfo->Up ? -1 : 1);
 
+              // Raw swap storage for the memcpy trio below, NOT text. sizeof() is a
+              // BYTE count, so this has to stay a byte buffer; the locals sweep widened
+              // it, which quietly doubled it to 2*sizeof(CViewerMasksItem).
               char buf[sizeof(CViewerMasksItem)];
               memcpy(buf, ViewerMasks[srcIndex], sizeof(CViewerMasksItem));
               memcpy(ViewerMasks[srcIndex], ViewerMasks[dstIndex], sizeof(CViewerMasksItem));
@@ -2286,6 +2239,11 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         ViewerMasks[i] = ViewerMasks[i - 1];
                 }
                 ViewerMasks[dstIndex] = tmp;
+
+                // The owner-drawn rows store item pointers, so keep their identities in
+                // the same order as the owning array.
+                for (int i = 0; i < ViewerMasks.Count; i++)
+                    EditLB->SetItemID(i, (INT_PTR)ViewerMasks[i]);
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;
@@ -2415,16 +2373,13 @@ void CCfgPageEditors::LoadControls()
     if (!empty)
         item = (CEditorMasksItem*)itemID;
     DisableNotification = TRUE;
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_LIMITTEXT, MAX_PATH - 1, 0);
-    SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Command.c_str()));
-    SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->Arguments.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_COMMAND), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->Command.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->Arguments.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), EM_SETSEL, 0, -1); // so the browse overwrites the content
-    SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
-                (LPARAM)(empty ? "" : item->InitDir.c_str()));
+    SendMessageW(GetDlgItem(HWindow, IDE_INITDIR), WM_SETTEXT, 0,
+                 (LPARAM)(empty ? L"" : item->InitDir.c_str()));
     SendMessage(GetDlgItem(HWindow, IDE_INITDIR), EM_SETSEL, 0, -1); // so the browse overwrites the content
     DisableNotification = FALSE;
 }
@@ -2438,16 +2393,10 @@ void CCfgPageEditors::StoreControls()
         Dirty = TRUE;
         CEditorMasksItem* item = EditorMasks[index];
 
-        CPathBuffer command; // Heap-allocated for long path support
-        CPathBuffer arguments; // Heap-allocated for long path support
-        CPathBuffer initdir; // Heap-allocated for long path support
-        SendMessage(GetDlgItem(HWindow, IDE_COMMAND), WM_GETTEXT,
-                    command.Size(), (LPARAM)command.Get());
-        SendMessage(GetDlgItem(HWindow, IDE_ARGUMENTS), WM_GETTEXT,
-                    arguments.Size(), (LPARAM)arguments.Get());
-        SendMessage(GetDlgItem(HWindow, IDE_INITDIR), WM_GETTEXT,
-                    initdir.Size(), (LPARAM)initdir.Get());
-        item->Set(item->Masks->GetMasksString(), command, arguments, initdir);
+        const std::wstring command = GetWindowTextStringW(GetDlgItem(HWindow, IDE_COMMAND));
+        const std::wstring arguments = GetWindowTextStringW(GetDlgItem(HWindow, IDE_ARGUMENTS));
+        const std::wstring initdir = GetWindowTextStringW(GetDlgItem(HWindow, IDE_INITDIR));
+        item->Set(item->Masks->GetMasksString(), command.c_str(), arguments.c_str(), initdir.c_str());
     }
 }
 
@@ -2566,7 +2515,7 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CEditorMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    *dispInfo->Text = ((CEditorMasksItem*)dispInfo->ItemID)->Masks->GetMasksString();
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }
@@ -2584,13 +2533,13 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             return TRUE;
                         }
                         EditorMasks.Add(item);
-                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                         EditLB->SetItemData((INT_PTR)item);
                     }
                     else
                     {
                         item = (CEditorMasksItem*)dispInfo->ItemID;
-                        item->Set(dispInfo->Buffer, item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
+                        item->Set(dispInfo->Text->c_str(), item->Command.c_str(), item->Arguments.c_str(), item->InitDir.c_str());
                     }
 
                     EnableControls();
@@ -2609,6 +2558,9 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
               int srcIndex = index;
               int dstIndex = index + (dispInfo->Up ? -1 : 1);
 
+              // Raw swap storage for the memcpy trio below, NOT text. sizeof() is a
+              // BYTE count, so this has to stay a byte buffer; the locals sweep widened
+              // it, which quietly doubled it to 2*sizeof(CEditorMasksItem).
               char buf[sizeof(CEditorMasksItem)];
               memcpy(buf, EditorMasks[srcIndex], sizeof(CEditorMasksItem));
               memcpy(EditorMasks[srcIndex], EditorMasks[dstIndex], sizeof(CEditorMasksItem));
@@ -2641,6 +2593,11 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         EditorMasks[i] = EditorMasks[i - 1];
                 }
                 EditorMasks[dstIndex] = tmp;
+
+                // The owner-drawn rows store item pointers, so keep their identities in
+                // the same order as the owning array.
+                for (int i = 0; i < EditorMasks.Count; i++)
+                    EditLB->SetItemID(i, (INT_PTR)EditorMasks[i]);
 
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE); // allow change
                 return TRUE;
@@ -2719,7 +2676,7 @@ void CCfgPageMainWindow::Transfer(CTransferInfo& ti)
         int resIDs[3] = {IDS_TITLEBAR_DIRECTORY, IDS_TITLEBAR_COMPOSITE, IDS_TITLEBAR_FULLPATH}; // must correspond with TITLE_BAR_MODE_xxx
         int i;
         for (i = 0; i < 3; i++)
-            SendDlgItemMessage(HWindow, IDC_TITLEBAR_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+            SendDlgItemMessageW(HWindow, IDC_TITLEBAR_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(resIDs[i]).c_str());
     }
 
     ti.CheckBox(IDC_STATUSAREA, Configuration.StatusArea);
@@ -2732,20 +2689,19 @@ void CCfgPageMainWindow::Transfer(CTransferInfo& ti)
 
     // back up data so we can detect change
     BOOL oldUseTitleBarPrefix = Configuration.UseTitleBarPrefix;
-    char oldTitleBarPrefix[TITLE_PREFIX_MAX];
-    lstrcpyn(oldTitleBarPrefix, Configuration.TitleBarPrefix, TITLE_PREFIX_MAX);
+    const std::wstring oldTitleBarPrefix = Configuration.TitleBarPrefix;
 
     ti.CheckBox(IDC_TITLEBAR_PREFIX, Configuration.UseTitleBarPrefix);
-    ti.EditLine(IDC_TITLEBAR_PREFIX_TEXT, Configuration.TitleBarPrefix, TITLE_PREFIX_MAX);
+    ti.EditLineW(IDC_TITLEBAR_PREFIX_TEXT, Configuration.TitleBarPrefix);
 
     if (ti.Type == ttDataFromWindow)
     {
         // if the user changed prefix settings, remove any command line option
         if (Configuration.UseTitleBarPrefix != oldUseTitleBarPrefix ||
-            Configuration.UseTitleBarPrefix && strcmp(Configuration.TitleBarPrefix, oldTitleBarPrefix) != 0)
+            Configuration.UseTitleBarPrefix && Configuration.TitleBarPrefix != oldTitleBarPrefix)
         {
             Configuration.UseTitleBarPrefixForced = FALSE;
-            Configuration.TitleBarPrefixForced[0] = 0;
+            Configuration.TitleBarPrefixForced.clear();
         }
     }
 
@@ -2782,13 +2738,13 @@ BOOL CCfgPageMainWindow::InitIconCombobox()
     ScreenToClient(HWindow, &p);
 
     // create the EX version capable of displaying an image list
-    HWND hNewCombo = CreateWindowEx(0, WC_COMBOBOXEX, NULL,
-                                    WS_BORDER | WS_CHILD | CBS_DROPDOWNLIST | WS_TABSTOP,
-                                    0, 0, 0, (MAINWINDOWICONS_COUNT + 1) * (r.bottom - r.top), // give it some reserve so the list is not clipped on HDPI
-                                    HWindow,
-                                    NULL,
-                                    HInstance,
-                                    NULL);
+    HWND hNewCombo = CreateWindowExW(0, WC_COMBOBOXEXW, NULL,
+                                     WS_BORDER | WS_CHILD | CBS_DROPDOWNLIST | WS_TABSTOP,
+                                     0, 0, 0, (MAINWINDOWICONS_COUNT + 1) * (r.bottom - r.top), // give it some reserve so the list is not clipped on HDPI
+                                     HWindow,
+                                     NULL,
+                                     HInstance,
+                                     NULL);
     SetWindowLongPtr(hNewCombo, GWLP_ID, IDC_TITLEBAR_ICON_INDEX);
 
     // since Vista, if font aliasing is set to Standard, the combobox had aliased font while the rest of the dialog
@@ -2798,7 +2754,7 @@ BOOL CCfgPageMainWindow::InitIconCombobox()
 
     HIconsList = ImageList_Create(16, 16, GetImageListColorFlags() | ILC_MASK, 0, 1);
 
-    COMBOBOXEXITEM cbei;
+    COMBOBOXEXITEMW cbei;
     cbei.mask = CBEIF_TEXT | CBEIF_IMAGE | CBEIF_SELECTEDIMAGE;
     int i;
     for (i = 0; i < MAINWINDOWICONS_COUNT; i++)
@@ -2808,10 +2764,11 @@ BOOL CCfgPageMainWindow::InitIconCombobox()
         DestroyIcon(hIcon);
 
         cbei.iItem = i;
-        cbei.pszText = LoadStr(MainWindowIcons[i].TextResID);
+        std::wstring itemText = LoadStrOwned(MainWindowIcons[i].TextResID);
+        cbei.pszText = itemText.data();
         cbei.iImage = i;
         cbei.iSelectedImage = i;
-        SendMessage(hNewCombo, CBEM_INSERTITEM, 0, (LPARAM)&cbei);
+        SendMessageW(hNewCombo, CBEM_INSERTITEMW, 0, (LPARAM)&cbei);
     }
 
     SendMessage(hNewCombo, CBEM_SETIMAGELIST, 0, (LPARAM)HIconsList);
@@ -2887,12 +2844,14 @@ void CCfgPageAppearance::LoadControls()
 
     HDC hDC = HANDLES(GetDC(HWindow));
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HPanelFont, MAKELPARAM(TRUE, 0));
-    char buf[LF_FACESIZE + 200];
-    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
+    wchar_t buf[LF_FACESIZE + 200];
+    // LOGFONT is the SDK's UNICODE-macro-driven typedef; lfFaceName is already
+    // WCHAR[32] under _UNICODE, so AnsiToWide (narrow-only) is neither needed nor callable there.
+    _snwprintf_s(buf, _TRUNCATE, LoadStrW(IDS_FONTDESCRIPTION),
                 MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
                 logFont.lfFaceName,
-                LoadStr(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
-    SetWindowText(hEdit, buf);
+                LoadStrW(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
+    SetWindowTextW(hEdit, buf);
 
     HANDLES(ReleaseDC(HWindow, hDC));
 }
@@ -2912,7 +2871,7 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
         int resIDs[3] = {IDS_THEME_MODE_LIGHT, IDS_THEME_MODE_DARK, IDS_THEME_MODE_SYSTEM}; // must match THEME_MODE_*
         SendDlgItemMessage(HWindow, IDC_THEME_MODE, CB_RESETCONTENT, 0, 0);
         for (int i = 0; i < 3; i++)
-            SendDlgItemMessage(HWindow, IDC_THEME_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+            SendDlgItemMessageW(HWindow, IDC_THEME_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(resIDs[i]).c_str());
         SendDlgItemMessage(HWindow, IDC_THEME_MODE, CB_SETCURSEL, Configuration.ThemeMode, 0);
     }
 
@@ -2923,7 +2882,7 @@ void CCfgPageAppearance::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_PANELZOOM, Configuration.ShowPanelZoom);
     ti.CheckBox(IDC_SINGLECLICK, Configuration.SingleClick);
 
-    ti.EditLine(IDC_INFOLINECONTENT, Configuration.InfoLineContent, 200);
+    ti.EditLineW(IDC_INFOLINECONTENT, Configuration.InfoLineContent);
     ti.EditLine(IDC_THUMBNAILSIZE, Configuration.ThumbnailSize);
     if (ti.Type == ttDataFromWindow)
     {
@@ -2955,10 +2914,9 @@ void CCfgPageAppearance::Validate(CTransferInfo& ti)
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_INFOLINECONTENT))
     {
-        CPathBuffer buff; // Heap-allocated for long path support
-        SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
+        const std::wstring buff = GetWindowTextStringW(hWnd);
         int errorPos1, errorPos2;
-        if (!ValidateInfoLineItems(HWindow, buff, errorPos1, errorPos2))
+        if (!ValidateInfoLineItems(HWindow, buff.c_str(), errorPos1, errorPos2))
         {
             ti.ErrorOn(IDC_INFOLINECONTENT);
             PostMessage(hWnd, EM_SETSEL, errorPos1, errorPos2);
@@ -3042,8 +3000,8 @@ MENU_TEMPLATE_ITEM CfgPageAppearanceMenu[] =
 */
             HMENU hMenu = CreatePopupMenu();
             BOOL cstFont = LocalUseCustomPanelFont;
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
+            InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStrW(IDS_USEDEFAULTFONT));
+            InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStrW(IDS_USECUSTOMFONT));
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -3096,7 +3054,7 @@ MENU_TEMPLATE_ITEM CfgPageAppearanceMenu[] =
 //
 
 const int DRIVES_COUNT = 'z' - 'a' + 1;
-const char FIRST_DRIVE = 'a'; // use 'A' here if uppercase letters are desired
+const wchar_t FIRST_DRIVE = 'a'; // use 'A' here if uppercase letters are desired
 
 // restrict the listbox so clicks outside existing items have no effect
 class CDriveListBox : public CWindow
@@ -3225,13 +3183,13 @@ CCfgPageChangeDrive::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HFONT hFont = (HFONT)SendDlgItemMessage(HWindow, IDL_CHD_DRIVES, WM_GETFONT, 0, 0);
         HDC hDC = HANDLES(GetDC(HWindow));
         HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
-        char buff[] = " :";
+        wchar_t buff[] = L" :";
         int i;
         for (i = 0; i < DRIVES_COUNT; i++)
         {
             buff[0] = FIRST_DRIVE + i;
             SIZE sz;
-            GetTextExtentPoint32(hDC, buff, 2, &sz);
+            GetTextExtentPoint32W(hDC, buff, 2, &sz);
             if (sz.cx > CharSize.cx || sz.cy > CharSize.cy)
                 CharSize = sz;
         }
@@ -3250,10 +3208,10 @@ CCfgPageChangeDrive::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CHyperLink* hl;
         hl = new CHyperLink(HWindow, IDS_CHD_HOTPATHS, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_CHDHOTPATHS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_CHDHOTPATHS_HINT));
         hl = new CHyperLink(HWindow, IDS_CHD_PLUGINS, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_CHDPLUGINS_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_CHDPLUGINS_HINT));
 
         break;
     }
@@ -3304,9 +3262,9 @@ CCfgPageChangeDrive::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             SetBkMode(hDC, TRANSPARENT);
             RECT dr = r;
-            char text[] = " :";
+            wchar_t text[] = L" :";
             text[0] = FIRST_DRIVE + lpdis->itemID;
-            DrawText(hDC, text, 2, &dr, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(hDC, text, 2, &dr, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             if (lpdis->itemState & ODS_FOCUS)
             {
@@ -3371,7 +3329,7 @@ void CCfgPagePanels::Transfer(CTransferInfo& ti)
         int i;
         for (i = 0; i < MANGLE_ITEMS; i++)
         {
-            SendDlgItemMessage(HWindow, IDC_NAMEMANGLE, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+            SendDlgItemMessageW(HWindow, IDC_NAMEMANGLE, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(resIDs[i]).c_str());
             if (!selected && Configuration.FileNameFormat == mangles[i])
             {
                 SendDlgItemMessage(HWindow, IDC_NAMEMANGLE, CB_SETCURSEL, i, 0);
@@ -3385,7 +3343,7 @@ void CCfgPagePanels::Transfer(CTransferInfo& ti)
         selected = FALSE;
         for (i = 0; i < SIZE_ITEMS; i++)
         {
-            SendDlgItemMessage(HWindow, IDC_SIZEFORMAT, CB_ADDSTRING, 0, (LPARAM)LoadStr(resID2s[i]));
+            SendDlgItemMessageW(HWindow, IDC_SIZEFORMAT, CB_ADDSTRING, 0, (LPARAM)LoadStrOwned(resID2s[i]).c_str());
             if (!selected && Configuration.SizeFormat == sizes[i])
             {
                 SendDlgItemMessage(HWindow, IDC_SIZEFORMAT, CB_SETCURSEL, i, 0);
@@ -3452,7 +3410,8 @@ CCfgPagePanels::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CTaskListDialog
 //
 
-CTaskListDialog::CTaskListDialog(HWND parent) : CCommonDialog(HLanguage, IDD_TASKLIST, IDD_TASKLIST, parent)
+CTaskListDialog::CTaskListDialog(HWND parent)
+    : CCommonDialog(HLanguage, IDD_TASKLIST, IDD_TASKLIST, parent, ooStandard, NULL)
 {
     DisplayedVersion = 0;
 }
@@ -3469,12 +3428,12 @@ void CTaskListDialog::Refresh()
     }
 
     // save the text of the previously selected item
-    char oldSelected[250];
-    int oldIndex = (int)SendMessage(list, LB_GETCURSEL, 0, 0);
-    if (oldIndex == LB_ERR || SendMessage(list, LB_GETTEXT, oldIndex, (LPARAM)oldSelected) == LB_ERR)
+    wchar_t oldSelected[250];
+    int oldIndex = (int)SendMessageW(list, LB_GETCURSEL, 0, 0);
+    if (oldIndex == LB_ERR || SendMessageW(list, LB_GETTEXT, oldIndex, (LPARAM)oldSelected) == LB_ERR)
         oldSelected[0] = 0;
 
-    SendMessage(list, LB_RESETCONTENT, 0, 0);
+    SendMessageW(list, LB_RESETCONTENT, 0, 0);
 
     CProcessListItem items[MAX_TL_ITEMS];
     int c = TaskList.GetItems(items, &DisplayedVersion);
@@ -3482,28 +3441,28 @@ void CTaskListDialog::Refresh()
     int i;
     for (i = 0; i < c; i++)
     {
-        char date[50], time[50];
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &items[i].StartTime, NULL, time, 50) == 0)
+        wchar_t date[50], time[50];
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &items[i].StartTime, NULL, time, (int)_countof(time)) == 0)
         {
-            sprintf(time, "%u:%02u:%02u", items[i].StartTime.wHour, items[i].StartTime.wMinute,
-                    items[i].StartTime.wSecond);
+            swprintf_s(time, _countof(time), L"%u:%02u:%02u", items[i].StartTime.wHour, items[i].StartTime.wMinute,
+                       items[i].StartTime.wSecond);
         }
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &items[i].StartTime, NULL, date, 50) == 0)
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &items[i].StartTime, NULL, date, (int)_countof(date)) == 0)
         {
-            sprintf(date, "%u.%u.%u", items[i].StartTime.wDay, items[i].StartTime.wMonth,
-                    items[i].StartTime.wYear);
+            swprintf_s(date, _countof(date), L"%u.%u.%u", items[i].StartTime.wDay, items[i].StartTime.wMonth,
+                       items[i].StartTime.wYear);
         }
 
-        char buf[100];
-        sprintf(buf, LoadStr(IDS_TASKLISTLINE), items[i].PID, date, time,
-                (items[i].PID == PID ? LoadStr(IDS_TASKLISTCURLINE) : ""));
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
+        wchar_t buf[100];
+        swprintf_s(buf, _countof(buf), LoadStrW(IDS_TASKLISTLINE), items[i].PID, date, time,
+                   (items[i].PID == PID ? LoadStrW(IDS_TASKLISTCURLINE) : L""));
+        SendMessageW(list, LB_ADDSTRING, 0, (LPARAM)buf);
 
-        if (strcmp(buf, oldSelected) == 0)
-            SendMessage(list, LB_SETCURSEL, i, 0);
+        if (wcscmp(buf, oldSelected) == 0)
+            SendMessageW(list, LB_SETCURSEL, i, 0);
     }
-    if (SendMessage(list, LB_GETCURSEL, 0, 0) == LB_ERR)
-        SendMessage(list, LB_SETCURSEL, 0, 0); // fallback
+    if (SendMessageW(list, LB_GETCURSEL, 0, 0) == LB_ERR)
+        SendMessageW(list, LB_SETCURSEL, 0, 0); // fallback
 }
 
 DWORD
@@ -3512,16 +3471,11 @@ CTaskListDialog::GetCurPID()
     HWND list = GetDlgItem(HWindow, IDC_SALAMLIST);
     if (list != NULL)
     {
-        int i = (int)SendMessage(list, LB_GETCARETINDEX, 0, 0);
-        char buf[100];
-        if (SendMessage(list, LB_GETTEXT, i, (LPARAM)buf) != LB_ERR)
+        int i = (int)SendMessageW(list, LB_GETCARETINDEX, 0, 0);
+        wchar_t buf[100];
+        if (SendMessageW(list, LB_GETTEXT, i, (LPARAM)buf) != LB_ERR)
         {
-            char* s = buf + 4;
-            char* end = s;
-            while (*end != ' ' && *end != 0)
-                end++;
-            *end = 0;
-            return atoi(s);
+            return wcstoul(buf + 4, NULL, 10);
         }
     }
     return -1;

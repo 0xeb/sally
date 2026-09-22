@@ -76,3 +76,7 @@ COMMENT,"Slovenská verzia"
 78,1,"bajt"
 79,1,"bajtov"
 
+[STRINGTABLE 3]
+80,1,"Nič na zobrazenie..."
+81,1,"...tento priečinok neobsahuje žiadne súbory na zmapovanie"
+

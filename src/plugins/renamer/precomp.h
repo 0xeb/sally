@@ -43,6 +43,8 @@
 #include "regiface.h"
 #include "utils.h"
 #include "varstr.h"
+#include "renamer_text.h"
+#include "renamer_owned_path.h"
 #include "renamer.h"
 #include "crenamer.h"
 #include "dialogs.h"

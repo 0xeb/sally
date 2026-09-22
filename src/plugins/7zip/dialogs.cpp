@@ -50,16 +50,16 @@ int PPMdDictSize[] =
 int PPMdWordSize[] =
     {2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32};
 
-void FormatBytes(LPTSTR buffer, int bytes)
+void FormatBytes(LPWSTR buffer, size_t bufferChars, int bytes)
 {
+    // Was _stprintf - tchar.h's alias for the non-conforming _swprintf, which takes
+    // no capacity. The only caller passes a wchar_t[64] and the output is at most "-2147483648 M",
+    // so this never overran; the capacity parameter exists so that stays true by construction
+    // rather than by inspection.
     if (bytes >= 1024)
-    {
-        _stprintf(buffer, _T("%d M"), bytes / 1024);
-    }
+        _snwprintf_s(buffer, bufferChars, _TRUNCATE, L"%d M", bytes / 1024);
     else
-    {
-        _stprintf(buffer, _T("%d K"), bytes);
-    }
+        _snwprintf_s(buffer, bufferChars, _TRUNCATE, L"%d K", bytes);
 }
 
 void SetComboCurSelData(HWND hWnd, DWORD data)
@@ -203,7 +203,7 @@ void CCompressParamsDlg::FillCompressLevelCombo()
     for (i = 0; i < sizeof(CompressLevel) / sizeof(CResDataPair); i++)
     {
         // insert an item
-        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressLevel), CB_ADDSTRING, 0, (LPARAM)LoadStr(CompressLevel[i].ResId));
+        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressLevel), CB_ADDSTRING, 0, (LPARAM)LangStr(CompressLevel[i].ResId).c_str());
         if (res != CB_ERR)
             // set the data
             SendMessage(GetDlgItem(HWindow, IDCfgCompressLevel), CB_SETITEMDATA, (WPARAM)res, (LPARAM)CompressLevel[i].Data);
@@ -218,7 +218,7 @@ void CCompressParamsDlg::FillCompressMethodCombo()
     for (i = 0; i < sizeof(CompressMethod) / sizeof(CResDataPair); i++)
     {
         // insert an item
-        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressMethod), CB_ADDSTRING, 0, (LPARAM)LoadStr(CompressMethod[i].ResId));
+        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressMethod), CB_ADDSTRING, 0, (LPARAM)LangStr(CompressMethod[i].ResId).c_str());
         if (res != CB_ERR)
             // set the data
             SendMessage(GetDlgItem(HWindow, IDCfgCompressMethod), CB_SETITEMDATA, (WPARAM)res, (LPARAM)CompressMethod[i].Data);
@@ -233,8 +233,8 @@ void CCompressParamsDlg::FillDictSizeCombo(int values[], int size)
     for (i = 0; i < size; i++)
     {
         // insert an item
-        TCHAR buffer[64];
-        FormatBytes(buffer, values[i]);
+        wchar_t buffer[64];
+        FormatBytes(buffer, _countof(buffer), values[i]);
         int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgDictSize), CB_ADDSTRING, 0, (LPARAM)buffer);
         if (res != CB_ERR)
             // set the data
@@ -250,8 +250,8 @@ void CCompressParamsDlg::FillWordSizeCombo(int values[], int size)
     for (i = 0; i < size; i++)
     {
         // insert an item
-        TCHAR buffer[64];
-        _stprintf(buffer, _T("%d"), values[i]);
+        wchar_t buffer[64];
+        _snwprintf_s(buffer, _countof(buffer), _TRUNCATE, L"%d", values[i]);
         int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgWordSize), CB_ADDSTRING, 0, (LPARAM)buffer);
         if (res != CB_ERR)
             // set the data
@@ -523,13 +523,13 @@ CExtOptionsDialog::CExtOptionsDialog(HWND hParent)
 {
     Encrypt = FALSE;
 
-    Archive[0] = '\0';
+    Archive.clear();
     Password[0] = '\0';
     ConfirmedPassword[0] = '\0';
 
     NotAgain = FALSE;
 
-    Title = NULL;
+    Title.clear();
 }
 
 void CExtOptionsDialog::Transfer(CTransferInfo& ti)
@@ -561,8 +561,8 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        if (Title != NULL)
-            SetWindowText(HWindow, Title);
+        if (!Title.empty())
+            SetWindowTextW(HWindow, Title.c_str());
 
         if (!CreateChilds())
         {
@@ -571,7 +571,7 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         // set archive name
-        SetWindowText(GetDlgItem(HWindow, IDC_NA_ARCHIVE), Archive);
+        SetWindowTextW(GetDlgItem(HWindow, IDC_NA_ARCHIVE), Archive.c_str());
 
         // do not encrypt files by default
         EnableWindow(GetDlgItem(HWindow, IDC_NA_PASSWORD), FALSE);
@@ -592,16 +592,18 @@ CExtOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (TransferData(ttDataFromWindow))
                 if (Encrypt)
                 {
-                    if (lstrlen(Password) <= 0)
+                    if (lstrlenA(Password) <= 0)
                     {
-                        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_EMPTYPASSWORD), LoadStr(IDS_ERROR),
+                        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_EMPTYPASSWORD).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(),
                                                          MB_OK | MB_ICONEXCLAMATION);
                         return TRUE;
                     }
 
-                    if (lstrcmp(Password, ConfirmedPassword) != 0)
+                    if (lstrcmpA(Password, ConfirmedPassword) != 0)
                     {
-                        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_PASSWORDSNOTMATCH), LoadStr(IDS_ERROR),
+                        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PASSWORDSNOTMATCH).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ERROR).c_str(),
                                                          MB_OK | MB_ICONEXCLAMATION);
                         return TRUE;
                     }

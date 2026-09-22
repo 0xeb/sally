@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 #define TRACE_SERVER_VERSION 7 // current server version
 
 #define HOT_KEY_ID 0x0001
@@ -255,9 +257,8 @@ public:
     int FindProcessNameIndex(DWORD uniqueProcessID);
     int FindThreadNameIndex(DWORD uniqueProcessID, DWORD uniqueThreadID);
 
-    void GetProcessName(DWORD uniqueProcessID, WCHAR* buff, int buffLen);
-    void GetThreadName(DWORD uniqueProcessID, DWORD uniqueThreadID,
-                       WCHAR* buff, int buffLen);
+    std::wstring GetProcessNameOwned(DWORD uniqueProcessID);
+    std::wstring GetThreadNameOwned(DWORD uniqueProcessID, DWORD uniqueThreadID);
 
     /// Opens BOSS with the corresponding file and line.
     void GotoEditor(int index);

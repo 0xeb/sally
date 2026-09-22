@@ -168,20 +168,20 @@ public:
     ~CFATImage();
 
     // open the FAT image 'fileName' and load
-    BOOL Open(const char* fileName, BOOL quiet, HWND hParent);
+    BOOL Open(const wchar_t* fileName, BOOL quiet, HWND hParent);
 
     BOOL ListImage(CSalamanderDirectoryAbstract* dir, HWND hParent);
 
-    BOOL UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
-                    const char* nameInArchive, const CFileData* fileData,
-                    const char* targetDir, DWORD* silentMask,
-                    BOOL allowSkip, BOOL* skipped, char* skipPath, int skipPathMax,
+    BOOL UnpackFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName,
+                    const wchar_t* nameInArchive, const CFileData* fileData,
+                    const wchar_t* targetDir, DWORD* silentMask,
+                    BOOL allowSkip, BOOL* skipped, std::wstring* skipPath,
                     HWND hParent, CAllocWholeFileEnum* allocWholeFileOnStart);
 
 protected:
     void Close();
 
-    BOOL AddDirectory(char* root, TDirectArray<DWORD>* fat,
+    BOOL AddDirectory(std::wstring& root, TDirectArray<DWORD>* fat,
                       CSalamanderDirectoryAbstract* dir, DWORD sector,
                       HWND hParent);
 

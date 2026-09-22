@@ -30,5 +30,5 @@
 // an extra‑large block of memory (i.e., more than 500 MB).
 // warningAbort:
 // Do you really want to terminate this application?\n\nWARNING: All unsaved data will be lost!
-void SetAllocHandlerMessage(const TCHAR* message, const TCHAR* title,
-                            const TCHAR* warningIgnore, const TCHAR* warningAbort);
+void SetAllocHandlerMessage(const wchar_t* message, const wchar_t* title,
+                            const wchar_t* warningIgnore, const wchar_t* warningAbort);

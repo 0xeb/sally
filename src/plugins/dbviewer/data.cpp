@@ -12,6 +12,18 @@
 #include "dbviewer.rh"
 #include "dbviewer.rh2"
 #include "lang\lang.rh"
+#include "display_text.h"
+
+static wchar_t* DuplicateWideString(const std::wstring& text)
+{
+    if (text.size() > (static_cast<size_t>(INT_MAX) / sizeof(wchar_t)) - 1)
+        return NULL;
+    const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+    wchar_t* copy = static_cast<wchar_t*>(SalGeneral->Alloc(static_cast<int>(bytes)));
+    if (copy != NULL)
+        memcpy(copy, text.c_str(), bytes);
+    return copy;
+}
 
 //****************************************************************************
 //
@@ -32,7 +44,7 @@ CDatabase::~CDatabase()
     Close();
 }
 
-BOOL CDatabase::Open(const char* fileName)
+BOOL CDatabase::Open(const wchar_t* fileName)
 {
     if (IsOpened())
     {
@@ -69,8 +81,8 @@ BOOL CDatabase::Open(const char* fileName)
             CDatabaseColumn column;
             CFieldInfo fieldInfo;
 
-            char type[100];
-            fieldInfo.Type = type;
+            std::wstring type;
+            fieldInfo.Type = &type;
 
             HDC hDC = GetDC(NULL);
             HFONT oldFont = (HFONT)SelectObject(hDC, Renderer->HFont);
@@ -91,7 +103,7 @@ BOOL CDatabase::Open(const char* fileName)
                     Parser->ShowParserError(Renderer->HWindow, psOOM);
                     break;
                 }
-                column.Type = SalGeneral->DupStr(type);
+                column.Type = DuplicateWideString(type);
                 if (column.Type == NULL)
                 {
                     Parser->ShowParserError(Renderer->HWindow, psOOM);
@@ -110,7 +122,11 @@ BOOL CDatabase::Open(const char* fileName)
                 // compute the column width from the number of characters in the column
                 // if the column header is wider, use that instead
                 if (!IsUnicode)
-                    GetTextExtentPoint32A(hDC, column.Name, (int)strlen(column.Name), &sz);
+                {
+                    std::wstring columnName;
+                    sally::dbviewer::DecodeLegacyDisplayText(column.Name, strlen(column.Name), nullptr, columnName);
+                    GetTextExtentPoint32W(hDC, columnName.c_str(), static_cast<int>(columnName.size()), &sz);
+                }
                 else
                     GetTextExtentPoint32W(hDC, (LPWSTR)column.Name, (int)wcslen((LPWSTR)column.Name), &sz);
                 column.Width = sz.cx;
@@ -157,8 +173,8 @@ BOOL CDatabase::Open(const char* fileName)
             {
                 Close();
                 ret = FALSE;
-                SalGeneral->SalMessageBox(Renderer->HWindow, LoadStr(IDS_NOVALIDCOLUMN),
-                                          LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONEXCLAMATION);
+                SalGeneral->SalMessageBox(Renderer->HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_NOVALIDCOLUMN).c_str(),
+                                          SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
             }
         }
         else
@@ -175,8 +191,8 @@ BOOL CDatabase::Open(const char* fileName)
         if (Parser)
             Parser->ShowParserError(Renderer->HWindow, psOOM);
         else
-            SalGeneral->SalMessageBox(Renderer->HWindow, LoadStr(IDS_DBFE_OOM),
-                                      LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONEXCLAMATION);
+            SalGeneral->SalMessageBox(Renderer->HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_DBFE_OOM).c_str(),
+                                      SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
     }
 
     return ret;
@@ -340,6 +356,13 @@ CDatabase::GetCellTextW(const CDatabaseColumn* column, size_t* textLen)
         return FALSE;
     }
     return Parser->GetCellTextW(column->OriginalIndex, textLen);
+}
+
+bool CDatabase::TryGetLocalizedCellText(const CDatabaseColumn* column,
+                                        std::wstring& text)
+{
+    return Parser != NULL &&
+           Parser->TryGetLocalizedCellText(column->OriginalIndex, text);
 }
 
 BOOL CDatabase::IsRecordDeleted()

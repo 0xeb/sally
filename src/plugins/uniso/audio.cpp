@@ -32,7 +32,7 @@ BOOL CAudio::DumpInfo(FILE* outStream)
     return TRUE;
 }
 
-BOOL CAudio::AddFileDir(const char* path, char* fileName,
+BOOL CAudio::AddFileDir(const wchar_t* path, const wchar_t* fileName,
                         CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     CFileData fd;
@@ -45,8 +45,8 @@ BOOL CAudio::AddFileDir(const char* path, char* fileName,
         return FALSE;
     } // if
 
-    fd.NameLen = strlen(fd.Name);
-    char* s = strrchr(fd.Name, '.');
+    fd.NameLen = static_cast<DWORD>(wcslen(fd.Name)); // generated track names are format-bounded
+    wchar_t* s = wcsrchr(fd.Name, L'.');
     if (s != NULL)
         fd.Ext = s + 1; // ".cvspass" is extension in Windows
     else
@@ -78,28 +78,25 @@ BOOL CAudio::AddFileDir(const char* path, char* fileName,
     return TRUE;
 }
 
-BOOL CAudio::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir,
+BOOL CAudio::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir,
                            CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE3("CAudio::ListDirectory(%s, %d, ,)", path, session);
+    CALL_STACK_MESSAGE3("CAudio::ListDirectory(%ls, %d, ,)", path.c_str(), session);
 
-    CPathBuffer audioTrack; // Heap-allocated for long path support
-    const char* label = Image->GetTrack(Track)->GetLabel();
-
-    if (*label)
-    {
-        sprintf(audioTrack.Get(), "%02d %s", Track + 1, label);
-    }
+    const std::wstring label(Image->GetTrack(Track)->GetLabel());
+    const std::wstring trackNumber = Track + 1 < 10 ? L"0" + std::to_wstring(Track + 1)
+                                                    : std::to_wstring(Track + 1);
+    std::wstring audioTrack;
+    if (!label.empty())
+        audioTrack = trackNumber + L" " + label;
     else
-    {
-        sprintf(audioTrack.Get(), "Audio Track %02d", Track + 1);
-    }
+        audioTrack = L"Audio Track " + trackNumber;
 
-    return AddFileDir(path, audioTrack, dir, pluginData);
+    return AddFileDir(path.c_str(), audioTrack.c_str(), dir, pluginData);
 }
 
-int CAudio::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                       const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CAudio::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                       const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
     return UNPACK_AUDIO_UNSUP;
 }
@@ -114,24 +111,21 @@ BOOL CAudio::Open(BOOL quiet)
 // CAudioTrack
 //
 
-CAudioTrack::~CAudioTrack()
+const wchar_t* CAudioTrack::GetLabel()
 {
-    if (Label)
-    {
-        free(Label);
-    }
+    return Label.c_str();
 }
 
-const char* CAudioTrack::GetLabel()
+bool CAudioTrack::SetLabel(std::wstring_view label) noexcept
 {
-    return Label ? Label : "";
-}
-
-void CAudioTrack::SetLabel(const char* label)
-{
-    if (Label)
+    try
     {
-        free(Label);
+        std::wstring staged(label);
+        Label.swap(staged);
+        return true;
     }
-    Label = _strdup(label);
+    catch (...)
+    {
+        return false;
+    }
 }

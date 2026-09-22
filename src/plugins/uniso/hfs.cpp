@@ -8,6 +8,7 @@
 #include "uniso.h"
 #include "isoimage.h"
 #include "hfs.h"
+#include "hfs_root_name_copy.h"
 
 #include "uniso.rh"
 #include "uniso.rh2"
@@ -50,42 +51,33 @@ static void ConvertHFSDate(FILETIME& ft, UInt32 HFSDate)
     SystemTimeToFileTime(&st, &ft);
 }
 
-static void FixIllegalFSChars(char* s)
+static void SanitizeHfsName(std::wstring& name)
 {
-    char* s2 = s + strlen(s);
-
-    // Remove trailing spaces
-    while ((s2 > s) && (s2[-1] == ' '))
-        *--s2 = 0;
+    while (!name.empty() && name.back() == L' ')
+        name.pop_back();
 
     // Just empty path (or consisting of spaces only)?
-    if (!*s)
+    if (name.empty())
     {
         // Firefox 3.0.7.dmg contains link called " "
-        *s = '_';
-        s[1] = 0;
+        name = L"_";
         return;
     }
-    if ((s2 > s) && (s2[-1] == '/'))
+    if (name.back() == L'/')
     {
         // HDD_Installer_MacOSX.dmg contains .dmg with "HASP Installation/"
-        s2[-1] = 0;
+        name.pop_back();
+        if (name.empty())
+        {
+            name = L"_";
+            return;
+        }
     }
 
-    while (*s)
+    for (wchar_t& ch : name)
     {
-        if (IsDBCSLeadByte(*s))
-        {
-            s++; // Skip both the lead and following bytes
-            if (!*s)
-                break; // Invalid string! Lead byte followed by terminating byte!
-        }
-        else
-        {
-            if (((unsigned char)*s < 32) || (*s == '?') || (*s == '\\') || (*s == '*'))
-                *s = '_';
-        }
-        s++;
+        if (ch < 32 || ch == L'?' || ch == L'\\' || ch == L'*')
+            ch = L'_';
     }
 }
 
@@ -251,9 +243,9 @@ BOOL CHFS::DumpInfo(FILE* outStream)
     return FALSE;
 }
 
-BOOL CHFS::GetRootName(char* rootName, int maxlen)
+BOOL CHFS::GetRootName(std::wstring& rootName)
 {
-    CALL_STACK_MESSAGE3("CHFS::GetRootName(%s, %i)", rootName, maxlen);
+    CALL_STACK_MESSAGE1("CHFS::GetRootName()");
     int nRecords = pCatalog->GetNumRecords();
 
     for (int i = 0; i < min(5, nRecords); i++)
@@ -261,16 +253,22 @@ BOOL CHFS::GetRootName(char* rootName, int maxlen)
         HFSPlusCatalogKey* pKey = (HFSPlusCatalogKey*)pCatalog->GetRecord(i);
         int keyLen = FromM16(pKey->keyLength);
         int nameLen = FromM16(pKey->nodeName.length);
-        wchar_t fileNameW[256];
-
-        if ((keyLen <= 6) || (nameLen == 0) || (pKey->parentID != FromM32(kHFSRootParentID)))
+        if ((keyLen <= 6) || (nameLen <= 0) || (nameLen > 255) || (pKey->parentID != FromM32(kHFSRootParentID)))
             continue; // skip threads
-        for (int j = 0; j < nameLen; j++)
-            fileNameW[j] = FromM16(pKey->nodeName.unicode[j]);
-        fileNameW[nameLen] = 0;
-        if (WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, fileNameW, nameLen + 1, rootName, maxlen, NULL, NULL) > 0)
+
+        std::wstring decodedName;
+        try
         {
-            rootName[maxlen - 1] = 0;
+            decodedName.resize(static_cast<size_t>(nameLen));
+        }
+        catch (...)
+        {
+            return FALSE;
+        }
+        for (int j = 0; j < nameLen; j++)
+            decodedName[static_cast<size_t>(j)] = FromM16(pKey->nodeName.unicode[j]);
+        if (CopyHfsRootNameOwned(decodedName.data(), nameLen, rootName))
+        {
             bSkipRootParent = TRUE;
             return TRUE;
         }
@@ -278,10 +276,10 @@ BOOL CHFS::GetRootName(char* rootName, int maxlen)
     return FALSE;
 }
 
-BOOL CHFS::ListDirectory(char* rootPath, int session,
+BOOL CHFS::ListDirectory(const std::wstring& rootPath, int session,
                          CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE5("CHFS::ListDirectory(%s, %i, %p, %p)", rootPath, session, dir, pluginData);
+    CALL_STACK_MESSAGE5("CHFS::ListDirectory(%ls, %i, %p, %p)", rootPath.c_str(), session, dir, pluginData);
     int nRecords = pCatalog->GetNumRecords();
 
     for (int i = 0; i < nRecords; i++)
@@ -289,10 +287,8 @@ BOOL CHFS::ListDirectory(char* rootPath, int session,
         HFSPlusCatalogKey* pKey = (HFSPlusCatalogKey*)pCatalog->GetRecord(i);
         int keyLen = FromM16(pKey->keyLength);
         int nameLen = FromM16(pKey->nodeName.length);
-        wchar_t fileNameW[256];
-        char fileName[256 * 2]; // twice the length for MBCS
         CFileData fd;
-        char* path = rootPath;
+        const wchar_t* path = rootPath.c_str();
         union
         {
             SInt16* type;
@@ -300,30 +296,42 @@ BOOL CHFS::ListDirectory(char* rootPath, int session,
             HFSPlusCatalogFile* file;
         } rec;
 
-        if ((keyLen <= 6) || (nameLen == 0) || (bSkipRootParent && pKey->parentID == FromM32(kHFSRootParentID)))
+        if ((keyLen <= 6) || (nameLen <= 0) || (nameLen > 255) || (bSkipRootParent && pKey->parentID == FromM32(kHFSRootParentID)))
         {
             continue; // Skip threads with empty name and RootParent already used as volume label
         }
+
+        std::wstring fileName;
+        try
+        {
+            fileName.resize(static_cast<size_t>(nameLen));
+        }
+        catch (...)
+        {
+            return Error(IDS_INSUFFICIENT_MEMORY, FALSE);
+        }
         for (int j = 0; j < nameLen; j++)
-            fileNameW[j] = FromM16(pKey->nodeName.unicode[j]);
-        fileNameW[nameLen] = 0;
-        if ((WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, fileNameW, nameLen + 1, fileName, sizeof(fileName), NULL, NULL) <= 0) || !fileName[0])
+            fileName[static_cast<size_t>(j)] = FromM16(pKey->nodeName.unicode[j]);
+        if (fileName.empty() || fileName[0] == L'\0')
         {
             // Invalid or empty (thread,...) name -> silently skip
             continue;
         }
 
-        FixIllegalFSChars(fileName);
+        // The catalog's own name is already UTF-16 - used directly for fd.Name
+        // rather than round-tripping through CP_ACP, which would lossily collapse names best-fit
+        // could represent losslessly (same class of bug the unfat tick found and fixed).
+        SanitizeHfsName(fileName);
         memset(&fd, 0, sizeof(CFileData));
         // File Name
-        fd.Name = SalamanderGeneral->DupStr(fileName);
+        fd.Name = SalamanderGeneral->DupStr(fileName.c_str());
         if (!fd.Name)
         {
             return Error(IDS_INSUFFICIENT_MEMORY, FALSE);
         }
-        fd.NameLen = strlen(fd.Name);
+        fd.NameLen = static_cast<DWORD>(wcslen(fd.Name)); // HFSUniStr255 is format-bounded
         // Extension
-        char* ext = strrchr(fd.Name, '.');
+        wchar_t* ext = wcsrchr(fd.Name, L'.');
         if (ext != NULL)
             fd.Ext = ext + 1; // ".cvspass" is extension in Windows
         else
@@ -340,7 +348,7 @@ BOOL CHFS::ListDirectory(char* rootPath, int session,
         filePos->Type = FS_TYPE_HFS;
         fd.PluginData = (DWORD_PTR)filePos;
 
-        if (fileName[0] == '.')
+        if (fileName[0] == L'.')
         {
             // Files and folders starting with dot are hidden
             fd.Attr |= FILE_ATTRIBUTE_HIDDEN;
@@ -356,23 +364,23 @@ BOOL CHFS::ListDirectory(char* rootPath, int session,
                 break;
             }
         }
-        if (path == rootPath)
+        if (path == rootPath.c_str())
         {
-            path = rootPath;
+            path = rootPath.c_str();
         }
         rec.type = (SInt16*)((char*)pKey + keyLen + sizeof(UInt16));
         if (*rec.type == kHFSFolderRecord)
         {
             ConvertHFSDate(fd.LastWrite, rec.dir->contentModDate ? rec.dir->contentModDate : rec.dir->createDate);
 
-            size_t strElements = strlen(path) + 1 + strlen(fileName) + 1;
-            FolderInfo* fi = (FolderInfo*)malloc(sizeof(FolderInfo) + strElements - 1); // one character is already part of the FolderInfo structure
+            std::wstring folderPath(path);
+            SPLSalPathAppendOwned(folderPath, fileName.c_str());
+            const size_t strElements = folderPath.size() + 1;
+            FolderInfo* fi = (FolderInfo*)malloc(sizeof(FolderInfo) + (strElements - 1) * sizeof(wchar_t)); // one character is already part of the FolderInfo structure
             if (fi)
             {
                 fi->id = rec.dir->folderID;
-                strcpy_s(fi->name, strElements, path); // due to the FolderInfo structure, the destination buffer size checking via the strcpy_s templates fails
-                strcat_s(fi->name, strElements, "\\");
-                strcat_s(fi->name, strElements, fileName);
+                wcscpy_s(fi->name, strElements, folderPath.c_str()); // due to the FolderInfo structure, the destination buffer size checking via the wcscpy_s templates fails
 
                 if (nFolders >= nAllocedFolders)
                 {
@@ -434,10 +442,10 @@ BOOL CHFS::ListDirectory(char* rootPath, int session,
     return TRUE;
 }
 
-int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                     const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                     const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE4("CHFS::UnpackFile(, %s, %s, %s,,,)", srcPath, path, nameInArc);
+    CALL_STACK_MESSAGE3("CHFS::UnpackFile(, %ls, %ls,,,)", path.c_str(), nameInArc.c_str());
     BOOL ret = UNPACK_OK;
     CISOImage::CFilePos* filePos = (CISOImage::CFilePos*)fileData->PluginData;
     HFSPlusCatalogKey* pKey = (HFSPlusCatalogKey*)pCatalog->GetRecord(filePos->Extent);
@@ -456,18 +464,12 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
         UInt64 size = fileData->Size.Value;
         DWORD attrs = fileData->Attr;
         HANDLE hFile;
-        CPathBuffer name; // Heap-allocated for long path support
-        char fileInfo[100];
+        std::wstring name(path);
         FILETIME ft;
         BOOL bFileComplete = TRUE;
         CQuadWord qwSize;
 
-        lstrcpyn(name, path, name.Size());
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-        {
-            Error(IDS_ERR_TOO_LONG_NAME, FALSE);
-            return UNPACK_ERROR;
-        }
+        SPLSalPathAppendOwned(name, fileData->Name);
 
         DWORD tmp = 0;
         for (int i = 0; i < 8; i++)
@@ -488,9 +490,9 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
 
         qwSize.Value = size;
         ft = fileData->LastWrite;
-        GetInfo(fileInfo, &ft, fileData->Size);
-        hFile = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                   SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+        const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
+        hFile = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                   SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                    &silent, TRUE, &toSkip, NULL, 0, &qwSize, NULL);
 
         // Continue, but skip this file
@@ -539,14 +541,14 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
                 // delayedPaint==TRUE, to avoid slow-downs
                 if (!salamander->ProgressAddSize(nbytes, TRUE))
                 {
-                    salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+                    salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
                     salamander->ProgressEnableCancel(FALSE);
 
                     ret = UNPACK_CANCEL;
                     bFileComplete = FALSE;
                     break;
                 }
-                if (!file.Write(buffer, nbytes, &dwBytesRead, name, NULL))
+                if (!file.Write(buffer, nbytes, &dwBytesRead, name.c_str(), NULL))
                 {
                     // Error message was already displayed by SafeWriteFile()
                     ret = UNPACK_CANCEL;
@@ -559,7 +561,7 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
         }
         free(buffer);
 
-        if (!file.Close(name, NULL))
+        if (!file.Close(name.c_str(), NULL))
         {
             // Flushing cache may fail
             ret = UNPACK_CANCEL;
@@ -570,17 +572,17 @@ int CHFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
             // because it was created with the read-only attribute, we must clear
             // the R attribute so the file can be deleted
             attrs &= ~FILE_ATTRIBUTE_READONLY;
-            if (!SetFileAttributes(name, attrs))
-                Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+            if (!SetFileAttributesW(name.c_str(), attrs))
+                Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 
             // the user cancelled the operation
             // delete the incomplete file afterwards
-            if (!DeleteFile(name))
-                Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError());
+            if (!DeleteFileW(name.c_str()))
+                Error(LangStr(IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError());
         }
         else
         {
-            SetFileAttrs(name, attrs);
+            SetFileAttrs(name.c_str(), attrs);
         }
     }
     return ret;

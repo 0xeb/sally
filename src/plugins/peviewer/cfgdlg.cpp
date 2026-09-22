@@ -176,7 +176,7 @@ void CPeViewerConfigDialog::BuildConfigurationChain()
 
 int CPeViewerConfigDialog::InsertItem(HWND hwndLB, const CFG_DUMPER* pDumperCfg, int index, bool bSelect)
 {
-    PCTSTR pszDumperTitle = GetDumperTitleStr(pDumperCfg->nTitleId);
+    PCWSTR pszDumperTitle = GetDumperTitleStr(pDumperCfg->nTitleId);
     LRESULT iItem = SendMessage(hwndLB, LB_INSERTSTRING, index, (LPARAM)pszDumperTitle);
     SendMessage(hwndLB, LB_SETITEMDATA, iItem, (LPARAM)pDumperCfg);
 

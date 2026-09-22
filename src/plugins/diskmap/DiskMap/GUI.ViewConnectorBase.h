@@ -10,9 +10,9 @@
 class CSalamanderCallbackAbstract
 {
 public:
-    virtual BOOL FocusFile(TCHAR const* filename) = 0;
+    virtual BOOL FocusFile(wchar_t const* filename) = 0;
     virtual BOOL CanFocusFile() = 0;
-    virtual BOOL OpenFolder(TCHAR const* path) = 0;
+    virtual BOOL OpenFolder(wchar_t const* path) = 0;
     virtual BOOL CanOpenFolder() = 0;
     virtual void SetCloseConfirm(BOOL value) = 0;
     virtual BOOL GetCloseConfirm() = 0;
@@ -24,7 +24,7 @@ public:
     virtual int GetPathFormat() = 0;
     virtual BOOL ConfirmClose(HWND parent) = 0;
     virtual void About(HWND hWndParent) = 0;
-    virtual int GetClusterSize(TCHAR const* path) = 0;
+    virtual int GetClusterSize(wchar_t const* path) = 0;
 };
 #endif
 

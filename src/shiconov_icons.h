@@ -45,3 +45,14 @@ typedef HRESULT(STDAPICALLTYPE* ShellIconExtractFn)(PCSTR pszIconFile, int iInde
 
 int LoadShellOverlayIcons(const char* iconFile, int iconIndex, const int* sizes, int sizeCount,
                           HICON* icons, ShellIconExtractFn extract = NULL);
+
+// wide: IShellIconOverlayIdentifier::GetOverlayInfo hands back the icon file path
+// wide (COM-only API, no ANSI form) - a handler installed under a path the active code page
+// cannot spell used to get '?'-mangled by narrowing it just to call the narrow loader above.
+// Same contract as the narrow form, calling SHDefExtractIconW by default.
+typedef HRESULT(STDAPICALLTYPE* ShellIconExtractFnW)(PCWSTR pszIconFile, int iIndex, UINT uFlags,
+                                                     HICON* phiconLarge, HICON* phiconSmall,
+                                                     UINT nIconSize);
+
+int LoadShellOverlayIconsW(const wchar_t* iconFile, int iconIndex, const int* sizes, int sizeCount,
+                           HICON* icons, ShellIconExtractFnW extract = NULL);

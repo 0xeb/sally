@@ -302,9 +302,9 @@ BOOL CISOImage::CheckForBootSectorOrMBR()
 }
 
 static BOOL
-processCCDFile(CISOImage* pISOImage, CFile& File, const char* fileName, CCD* ccd, BOOL quiet /* = FALSE*/)
+processCCDFile(CISOImage* pISOImage, CFile& File, const wchar_t* fileName, CCD* ccd, BOOL quiet /* = FALSE*/)
 {
-    CALL_STACK_MESSAGE3("processCCDFile(%s, , %d)", fileName, quiet);
+    CALL_STACK_MESSAGE3("processCCDFile(%ls, , %d)", fileName, quiet);
 
     if (fileName == NULL)
         return FALSE;
@@ -314,7 +314,7 @@ processCCDFile(CISOImage* pISOImage, CFile& File, const char* fileName, CCD* ccd
     TIndirectArray<TextSection> sections(100, 50, dtDelete);
 
     BOOL ret = TRUE;
-    if ((f = fopen(fileName, "r")) == NULL)
+    if ((f = _wfopen(fileName, L"r")) == NULL)
     {
         if (ccd->DisplayMissingCCDWarning)
         {
@@ -400,9 +400,9 @@ processCCDFile(CISOImage* pISOImage, CFile& File, const char* fileName, CCD* ccd
     return ret;
 }
 
-BOOL CISOImage::ReadSessionCCD(char* fileName, BOOL quiet /* = FALSE*/)
+BOOL CISOImage::ReadSessionCCD(const wchar_t* fileName, BOOL quiet /* = FALSE*/)
 {
-    CALL_STACK_MESSAGE3("CISOImage::ReadSessionCCD(%s, %d)", fileName, quiet);
+    CALL_STACK_MESSAGE3("CISOImage::ReadSessionCCD(%ls, %d)", fileName, quiet);
 
     BOOL ret = TRUE;
 

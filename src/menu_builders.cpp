@@ -417,8 +417,7 @@ CfgSkillLevelToMenu(BYTE cfgSkillLevel)
 void FillContextMenuFromButtons(CMenuPopup* popup, HWND hWindow, int* buttonsID)
 {
     MENU_ITEM_INFO mii;
-    char buff[1024];
-    mii.String = buff;
+    std::wstring text;
     BOOL nextDefault = FALSE;
     while (*buttonsID != 0)
     {
@@ -442,7 +441,8 @@ void FillContextMenuFromButtons(CMenuPopup* popup, HWND hWindow, int* buttonsID)
                 mii.State = 0;
                 mii.ID = *buttonsID;
                 HWND hButton = GetDlgItem(hWindow, *buttonsID);
-                GetWindowText(hButton, buff, 1024);
+                text = GetWindowTextStringW(hButton);
+                mii.String = text.data();
                 if (!IsWindowEnabled(hButton))
                     mii.State |= MENU_STATE_GRAYED;
             }

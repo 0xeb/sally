@@ -1,9 +1,8 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 //
 // ****************************************************************************
 // CFTPParser
@@ -129,7 +128,13 @@ void FillEmptyValues(BOOL& err, CFileData* file, BOOL isDir,
                 // case stctName:   // this cannot occur here; it can only be in the first column
                 case stctGeneralText:
                 {
-                    char* str = SalamanderGeneral->DupStr(col->EmptyValue);
+                    char* str = NULL;
+                    if (col->EmptyValue != NULL)
+                    {
+                        str = (char*)SalamanderGeneral->Alloc(strlen(col->EmptyValue) + 1);
+                        if (str != NULL)
+                            strcpy(str, col->EmptyValue);
+                    }
                     if (str == NULL && col->EmptyValue != NULL)
                     {
                         if (lowMem != NULL)
@@ -145,8 +150,8 @@ void FillEmptyValues(BOOL& err, CFileData* file, BOOL isDir,
                 {                                       //  whenever a column of type "Extension" exists
                     if (SortByExtDirsAsFiles || !isDir) // extensions are not detected for directories
                     {
-                        char* t = file->Ext; // already done: file->Ext = file->Name + file->NameLen
-                        while (--t >= file->Name && *t != '.')
+                        wchar_t* t = file->Ext; // already done: file->Ext = file->Name + file->NameLen
+                        while (--t >= file->Name && *t != L'.')
                             ;
                         //              if (t > file->Name) file->Ext = t + 1;   // ".cvspass" in Windows is treated as an extension ...
                         if (t >= file->Name)
@@ -281,7 +286,8 @@ BOOL CFTPParser::GetNextItemFromListing(CFileData* file, BOOL* isDir,
                                         CFTPListingPluginDataInterface* dataIface,
                                         TIndirectArray<CSrvTypeColumn>* columns,
                                         const char** listing, const char* listingEnd,
-                                        const char** itemStart, BOOL* lowMem, DWORD* emptyCol)
+                                        const char** itemStart, BOOL* lowMem, DWORD* emptyCol,
+                                        const CFtpTextCodec& textCodec)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CFTPParser::GetNextItemFromListing()");
     // set default values (it is a file and not hidden)
@@ -316,7 +322,8 @@ BOOL CFTPParser::GetNextItemFromListing(CFileData* file, BOOL* isDir,
             for (j = 0; j < Rules.Count; j++)
             {
                 BOOL brk = FALSE;
-                if (Rules[j]->UseRule(file, isDir, dataIface, columns, &s, listingEnd, this, &err, emptyCol))
+                if (Rules[j]->UseRule(file, isDir, dataIface, columns, &s, listingEnd, this, &err,
+                                      emptyCol, textCodec))
                 {
                     if (SkipThisLineItIsIncomlete || // an incomplete listing was detected - skip the processed trailing part of the listing
                         !emptyCol[0])
@@ -366,7 +373,7 @@ BOOL CFTPParser::GetNextItemFromListing(CFileData* file, BOOL* isDir,
         !err && !emptyCol[0] && file->Name != NULL /* always true */) // Name was populated -> we have a file/directory
     {
         // set the previously ignored members of 'file'
-        file->NameLen = strlen(file->Name);
+        file->NameLen = (int)wcslen(file->Name);
         file->Ext = file->Name + file->NameLen;
 
         // fill the empty values into empty columns
@@ -396,7 +403,8 @@ BOOL CFTPParserRule::UseRule(CFileData* file, BOOL* isDir,
                              CFTPListingPluginDataInterface* dataIface,
                              TIndirectArray<CSrvTypeColumn>* columns,
                              const char** listing, const char* listingEnd,
-                             CFTPParser* actualParser, BOOL* lowMemErr, DWORD* emptyCol)
+                             CFTPParser* actualParser, BOOL* lowMemErr, DWORD* emptyCol,
+                             const CFtpTextCodec& textCodec)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CFTPParserRule::UseRule()");
     const char* s = *listing;
@@ -404,7 +412,7 @@ BOOL CFTPParserRule::UseRule(CFileData* file, BOOL* isDir,
     for (i = 0; !(actualParser->SkipThisLineItIsIncomlete) && i < Functions.Count; i++)
     {
         if (!Functions[i]->UseFunction(file, isDir, dataIface, columns, &s, listingEnd,
-                                       actualParser, lowMemErr, emptyCol))
+                                       actualParser, lowMemErr, emptyCol, textCodec))
             break;
     }
     // if all functions of the rule are successfully used and the "pointer" is at the end
@@ -588,6 +596,11 @@ BOOL AssignNumberToColumn(int col, TIndirectArray<CSrvTypeColumn>* columns, BOOL
 {
     if (col >= 0 && col < columns->Count) // "always true"
     {
+        // Mark the column as no longer empty. Without this, FillEmptyValues()
+        // still sees the column as unassigned and overwrites whatever was parsed
+        // here with the column's configured empty value - which is 0 for
+        // stctSize, so every file in every listing showed 0 bytes. Every sibling
+        // assigner (Day, Month, Year, Date, Time, String) sets its flag too.
         emptyCol[col] = FALSE;
         switch (columns->At(col)->Type)
         {
@@ -631,43 +644,56 @@ BOOL AssignNumberToColumn(int col, TIndirectArray<CSrvTypeColumn>* columns, BOOL
 
 BOOL AssignStringToColumn(int col, TIndirectArray<CSrvTypeColumn>* columns, const char* beg,
                           const char* end, BOOL* lowMemErr, DWORD* emptyCol,
-                          CFileData* file, CFTPListingPluginDataInterface* dataIface)
+                          CFileData* file, CFTPListingPluginDataInterface* dataIface,
+                          const CFtpTextCodec& textCodec)
 {
     if (col >= 0 && col < columns->Count) // "always true"
     {
-        char* str = (char*)SalamanderGeneral->Alloc((int)(end - beg) + 1);
-        if (str == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            *lowMemErr = TRUE;
-            return FALSE;
-        }
-        memcpy(str, beg, end - beg);
-        str[end - beg] = 0;
-
         emptyCol[col] = FALSE;
         switch (columns->At(col)->Type)
         {
         case stctName:
         {
+            std::wstring nameW;
+            textCodec.DecodeName(beg, end - beg, nameW);
+            if (!dataIface->StoreRawName(*file, beg, end - beg))
+            {
+                *lowMemErr = TRUE;
+                return FALSE;
+            }
+            wchar_t* name = (wchar_t*)SalamanderGeneral->Alloc((nameW.size() + 1) * sizeof(wchar_t));
+            if (name == NULL)
+            {
+                TRACE_E(LOW_MEMORY);
+                *lowMemErr = TRUE;
+                return FALSE;
+            }
+            memcpy(name, nameW.c_str(), (nameW.size() + 1) * sizeof(wchar_t));
             if (file->Name != NULL)
                 SalamanderGeneral->Free(file->Name);
-            file->Name = str;
-            if (end - beg > MAX_PATH - 5)
-            {
-                file->Name[MAX_PATH - 5] = 0; // file->Name can be at most MAX_PATH - 5 characters long (Salamander limitation - hopefully not an issue for viewing, the user must perform the operation in other software)
-                TRACE_E("Too long file or directory name, cutting to MAX_PATH-5 characters! Using name: " << file->Name);
-            }
+            file->Name = name;
+            emptyCol[col] = FALSE;
             break;
         }
 
         case stctGeneralText:
+        {
+            char* str = (char*)SalamanderGeneral->Alloc((int)(end - beg) + 1);
+            if (str == NULL)
+            {
+                TRACE_E(LOW_MEMORY);
+                *lowMemErr = TRUE;
+                return FALSE;
+            }
+            memcpy(str, beg, end - beg);
+            str[end - beg] = 0;
+            emptyCol[col] = FALSE;
             dataIface->StoreStringToColumn(*file, col, str);
             break;
+        }
 
         default:
         {
-            SalamanderGeneral->Free(str);
             TRACE_E("AssignStringToColumn(): Invalid string column type!");
             return FALSE;
         }
@@ -682,180 +708,147 @@ BOOL AssignStringToColumn(int col, TIndirectArray<CSrvTypeColumn>* columns, cons
     }
 }
 
-// returns the number of the month whose name is encoded by three letters; if it is an unknown
-// month code, returns -1
-int GetMonthFromThreeLetters(const char* month, const char* monthStr)
+static BOOL AssignWideStringToColumn(int col, TIndirectArray<CSrvTypeColumn>* columns,
+                                     std::wstring_view value, BOOL* lowMemErr,
+                                     DWORD* emptyCol, CFileData* file,
+                                     CFTPListingPluginDataInterface* dataIface,
+                                     const CFtpTextCodec& textCodec)
 {
-    char firstLetter = LowerCase[*month++];
-    char secondLetter = LowerCase[*month++];
-    char thirdLetter = LowerCase[*month];
-    int i;
-    for (i = 0; i < 12; i++)
-    {
-        if (*monthStr == firstLetter &&
-            *(monthStr + 1) == secondLetter &&
-            *(monthStr + 2) == thirdLetter)
-            return i + 1;
-        monthStr += 4;
-    }
-    return -1;
+    std::string encoded;
+    if (!textCodec.Encode(value.empty() ? L"" : value.data(), value.size(), encoded))
+        return FALSE;
+    return AssignStringToColumn(col, columns, encoded.data(),
+                                encoded.data() + encoded.size(), lowMemErr,
+                                emptyCol, file, dataIface, textCodec);
 }
 
 struct CMonthNameNumberLanguage
 {
-    const char* Name;
+    const wchar_t* Name;
     int Number;
     DWORD AllowedLanguagesMask;
 };
 
-// precomputed table for looking up the month number + the mask of allowed languages
-// NOTE: months must be in lowercase!
-// PARSER_LANG_ENGLISH:   "jan feb mar apr may jun jul aug sep oct nov dec"
-// PARSER_LANG_GERMAN:    "jan feb mär apr mai jun jul aug sep okt nov dez"
-// PARSER_LANG_NORWEIGAN: "jan feb mar apr mai jun jul aug sep okt nov des"
-// PARSER_LANG_SWEDISH:   "jan feb mar apr maj jun jul aug sep okt nov dec"
-CMonthNameNumberLanguage MonthNameNumberLanguageArr[] =
-    {
-        {"jan", 1, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"feb", 2, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"mar", 3, PARSER_LANG_ENGLISH | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"apr", 4, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"may", 5, PARSER_LANG_ENGLISH},
-        {"jun", 6, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"jul", 7, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"aug", 8, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"sep", 9, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"oct", 10, PARSER_LANG_ENGLISH},
-        {"nov", 11, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"dec", 12, PARSER_LANG_ENGLISH | PARSER_LANG_SWEDISH},
-        {"mär", 3, PARSER_LANG_GERMAN},
-        {"mai", 5, PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN},
-        {"okt", 10, PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
-        {"dez", 12, PARSER_LANG_GERMAN},
-        {"des", 12, PARSER_LANG_NORWEIGAN},
-        {"maj", 5, PARSER_LANG_SWEDISH},
-        {NULL, -1, 0}};
+static const CMonthNameNumberLanguage MonthNameNumberLanguageArr[] = {
+    {L"jan", 1, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"feb", 2, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"mar", 3, PARSER_LANG_ENGLISH | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"apr", 4, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"may", 5, PARSER_LANG_ENGLISH},
+    {L"jun", 6, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"jul", 7, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"aug", 8, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"sep", 9, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"oct", 10, PARSER_LANG_ENGLISH},
+    {L"nov", 11, PARSER_LANG_ENGLISH | PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"dec", 12, PARSER_LANG_ENGLISH | PARSER_LANG_SWEDISH},
+    {L"m\u00E4r", 3, PARSER_LANG_GERMAN},
+    {L"mai", 5, PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN},
+    {L"okt", 10, PARSER_LANG_GERMAN | PARSER_LANG_NORWEIGAN | PARSER_LANG_SWEDISH},
+    {L"dez", 12, PARSER_LANG_GERMAN},
+    {L"des", 12, PARSER_LANG_NORWEIGAN},
+    {L"maj", 5, PARSER_LANG_SWEDISH},
+    {NULL, -1, 0}};
 
-// returns the number of the month whose name is encoded by three letters, checks whether it is
-// a month name in an allowed language and possibly restricts the allowed languages for further
-// language detection; if it is an unknown month or a month in a disallowed language,
-// returns -1
-int GetMonthFromThreeLettersAllLangs(const char* month, DWORD* allowedLanguagesMask)
+static const CMonthNameNumberLanguage MonthTextNameNumberLanguageArr[] = {
+    {L"Jan.", 1, PARSER_LANG_GERMAN}, {L"Feb.", 2, PARSER_LANG_GERMAN},
+    {L"M\u00E4rz", 3, PARSER_LANG_GERMAN}, {L"Apr.", 4, PARSER_LANG_GERMAN},
+    {L"Mai", 5, PARSER_LANG_GERMAN}, {L"Juni", 6, PARSER_LANG_GERMAN},
+    {L"Juli", 7, PARSER_LANG_GERMAN}, {L"Aug.", 8, PARSER_LANG_GERMAN},
+    {L"Sept.", 9, PARSER_LANG_GERMAN}, {L"Okt.", 10, PARSER_LANG_GERMAN},
+    {L"Nov.", 11, PARSER_LANG_GERMAN}, {L"Dez.", 12, PARSER_LANG_GERMAN},
+    {NULL, -1, 0}};
+
+static int MatchMonthFromLocalNames(const char* month, const char* monthEnd,
+                                    const char* encodedNames,
+                                    const CFtpTextCodec& textCodec,
+                                    size_t& matchedBytes)
 {
-    int res = -1;
-    DWORD mask = 0; // mask of languages in which this month has the same name
-    char lowerMonth[4];
-    lowerMonth[0] = LowerCase[month[0]];
-    lowerMonth[1] = LowerCase[month[1]];
-    lowerMonth[2] = LowerCase[month[2]];
-    lowerMonth[3] = 0;
-    CMonthNameNumberLanguage* i = MonthNameNumberLanguageArr;
-    while (i->Name != NULL)
+    std::wstring names;
+    if (!FtpDecodeLocalText(encodedNames, names))
+        return -1;
+    size_t tokenStart = 0;
+    for (int number = 1; number <= 12; ++number)
     {
-        if (strcmp(lowerMonth, i->Name) == 0)
+        const size_t tokenEnd = names.find(L' ', tokenStart);
+        const size_t end = tokenEnd == std::wstring::npos ? names.size() : tokenEnd;
+        size_t consumed = 0;
+        if (FtpMatchEncodedPrefixNoCase(
+                textCodec, std::string_view(month, static_cast<size_t>(monthEnd - month)),
+                std::wstring_view(names).substr(tokenStart, end - tokenStart), consumed) ==
+            CFtpTextCompareStatus::Equal)
         {
-            res = i->Number;
-            mask = i->AllowedLanguagesMask;
+            matchedBytes = consumed;
+            return number;
+        }
+        if (tokenEnd == std::wstring::npos)
             break;
-        }
-        i++;
-    }
-    if (res == -1 || (*allowedLanguagesMask & mask) == 0)
-        return -1; // error (month not found or month from a disallowed language)
-    else
-    {
-        *allowedLanguagesMask &= mask;
-        return res;
-    }
-}
-
-// returns the number of the month whose name is encoded by text; if it is an unknown
-// month code, returns -1
-int GetMonthFromText(const char** month, const char* monthEnd, const char* monthStr)
-{
-    const char* s = *month;
-    const char* monthStrEnd = monthStr;
-    int m;
-    for (m = 1; m <= 12; m++)
-    {
-        while (*monthStrEnd != 0 && *monthStrEnd != ' ')
-            monthStrEnd++;
-        if (monthStrEnd - monthStr <= monthEnd - s &&
-            SalamanderGeneral->StrNICmp(s, monthStr, (int)(monthStrEnd - monthStr)) == 0)
-        {
-            *month = s + (monthStrEnd - monthStr);
-            return m;
-        }
-        if (*monthStrEnd != 0)
-            monthStrEnd++;
-        monthStr = monthStrEnd;
+        tokenStart = tokenEnd + 1;
     }
     return -1;
 }
 
-struct CMonthTxtNameNumberLanguage
+static int MatchMonthFromTable(const char* month, const char* monthEnd,
+                               const CMonthNameNumberLanguage* table,
+                               DWORD* allowedLanguagesMask,
+                               const CFtpTextCodec& textCodec,
+                               size_t& matchedBytes)
 {
-    const char* Name;
-    int NameLen;
-    int Number;
-    DWORD AllowedLanguagesMask;
-};
-
-// precomputed table for looking up the month number + the mask of allowed languages
-// PARSER_LANG_GERMAN:  "Jan. Feb. März Apr. Mai Juni Juli Aug. Sept. Okt. Nov. Dez."
-CMonthTxtNameNumberLanguage MonthTxtNameNumberLanguageArr[] =
+    for (const CMonthNameNumberLanguage* item = table; item->Name != NULL; ++item)
     {
-        {"Jan.", 4, 1, PARSER_LANG_GERMAN},
-        {"Feb.", 4, 2, PARSER_LANG_GERMAN},
-        {"März", 4, 3, PARSER_LANG_GERMAN},
-        {"Apr.", 4, 4, PARSER_LANG_GERMAN},
-        {"Mai", 3, 5, PARSER_LANG_GERMAN},
-        {"Juni", 4, 6, PARSER_LANG_GERMAN},
-        {"Juli", 4, 7, PARSER_LANG_GERMAN},
-        {"Aug.", 4, 8, PARSER_LANG_GERMAN},
-        {"Sept.", 5, 9, PARSER_LANG_GERMAN},
-        {"Okt.", 4, 10, PARSER_LANG_GERMAN},
-        {"Nov.", 4, 11, PARSER_LANG_GERMAN},
-        {"Dez.", 4, 12, PARSER_LANG_GERMAN},
-        {NULL, -1, 0}};
-
-// returns the number of the month whose name is the text '*month', checks whether it is
-// a month name in an allowed language and possibly restricts the allowed languages for further
-// language detection; if it is an unknown month or a month in a disallowed language,
-// returns -1
-int GetMonthFromTextAllLangs(const char** month, const char* monthEnd, DWORD* allowedLanguagesMask)
-{
-    const char* s = *month;
-    int res = -1;
-    DWORD mask = 0; // mask of languages in which this month has the same name
-    int monthLen = 0;
-    CMonthTxtNameNumberLanguage* i = MonthTxtNameNumberLanguageArr;
-    while (i->Name != NULL)
-    {
-        if (i->NameLen <= monthEnd - s && SalamanderGeneral->StrNICmp(s, i->Name, i->NameLen) == 0)
+        size_t consumed = 0;
+        if (FtpMatchEncodedPrefixNoCase(
+                textCodec, std::string_view(month, static_cast<size_t>(monthEnd - month)),
+                item->Name, consumed) == CFtpTextCompareStatus::Equal &&
+            (*allowedLanguagesMask & item->AllowedLanguagesMask) != 0)
         {
-            res = i->Number;
-            mask = i->AllowedLanguagesMask;
-            monthLen = i->NameLen;
-            break;
+            *allowedLanguagesMask &= item->AllowedLanguagesMask;
+            matchedBytes = consumed;
+            return item->Number;
         }
-        i++;
     }
-    if (res == -1 || (*allowedLanguagesMask & mask) == 0)
-        return -1; // error (month not found or month from a disallowed language)
-    else
-    {
-        *allowedLanguagesMask &= mask;
-        *month += monthLen;
-        return res;
-    }
+    return -1;
+}
+
+static const char* FindListingLineEnd(const char* text, const char* listingEnd) noexcept
+{
+    while (text < listingEnd && *text != '\r' && *text != '\n')
+        ++text;
+    return text;
+}
+
+static const char* FindListingLineStart(const char* listingBeg, const char* text) noexcept
+{
+    while (text > listingBeg && text[-1] != '\r' && text[-1] != '\n')
+        --text;
+    return text;
+}
+
+static BOOL EncodedCharacterIsInSet(const CFtpTextCodec& textCodec,
+                                    const char* text, const char* textEnd,
+                                    std::wstring_view characterSet,
+                                    size_t& characterBytes,
+                                    BOOL& isInSet) noexcept
+{
+    if (!FtpEncodedCharacterByteLength(
+            textCodec,
+            std::string_view(text, static_cast<size_t>(textEnd - text)),
+            characterBytes))
+        return FALSE;
+
+    std::wstring character;
+    if (!textCodec.Decode(text, characterBytes, character))
+        return FALSE;
+    isInSet = characterSet.find(character) != std::wstring_view::npos;
+    return TRUE;
 }
 
 BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                                      CFTPListingPluginDataInterface* dataIface,
                                      TIndirectArray<CSrvTypeColumn>* columns, const char** listing,
                                      const char* listingEnd, CFTPParser* actualParser,
-                                     BOOL* lowMemErr, DWORD* emptyCol)
+                                     BOOL* lowMemErr, DWORD* emptyCol,
+                                     const CFtpTextCodec& textCodec)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE2("CFTPParserFunction::UseFunction(%d)", (int)Function);
     BOOL ret = TRUE;
@@ -928,7 +921,7 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         {
             if (Parameters.Count > 0 && // also assign it to the column
                 !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
-                                      s, lowMemErr, emptyCol, file, dataIface))
+                                      s, lowMemErr, emptyCol, file, dataIface, textCodec))
             {
                 ret = FALSE;
             }
@@ -946,7 +939,7 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         {
             if (Parameters.Count > 0 && // also assign it to the column
                 !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
-                                      s, lowMemErr, emptyCol, file, dataIface))
+                                      s, lowMemErr, emptyCol, file, dataIface, textCodec))
             {
                 ret = FALSE;
             }
@@ -977,7 +970,14 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
             num = num * 10 + (*s++ - '0');
         if (minus)
             num = -num;
-        if (s == beg || s < listingEnd && IsCharAlpha(*s))
+        BOOL followedByLetter = FALSE;
+        if (s == beg ||
+            s < listingEnd &&
+                (!FtpEncodedTextStartsWithAlpha(
+                     textCodec,
+                     std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                     followedByLetter) ||
+                 followedByLetter))
             ret = FALSE; // success only if the number exists (at least one digit) and does not end with a letter
         else
         {
@@ -993,18 +993,32 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
 
     case fpfNumber_with_separators: // number with separators
     {
-        BOOL needDealloc = FALSE;
-        const char* sep = Parameters.Count > 1 ? Parameters[1]->GetString(s, listingEnd, &needDealloc, lowMemErr) : NULL;
-        if (*lowMemErr)
+        std::wstring separators;
+        if (Parameters.Count > 1 &&
+            !Parameters[1]->GetStringOperand(separators, file, dataIface, columns,
+                                             s, listingEnd, textCodec))
         {
             ret = FALSE;
             break;
         }
-        if (sep == NULL)
-            sep = "";
         // skip separators except '+', '-' and digits
-        while (s < listingEnd && *s != '+' && *s != '-' && (*s < '0' || *s > '9') && strchr(sep, *s) != NULL)
-            s++;
+        while (s < listingEnd && *s != '+' && *s != '-' &&
+               (*s < '0' || *s > '9') && *s != '\r' && *s != '\n')
+        {
+            size_t characterBytes = 0;
+            BOOL isSeparator = FALSE;
+            if (!EncodedCharacterIsInSet(textCodec, s, listingEnd, separators,
+                                         characterBytes, isSeparator))
+            {
+                ret = FALSE;
+                break;
+            }
+            if (!isSeparator)
+                break;
+            s += characterBytes;
+        }
+        if (!ret)
+            break;
         BOOL minus = FALSE;
         if (s < listingEnd)
         {
@@ -1026,15 +1040,31 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 num = num * 10 + (*s++ - '0');
             else
             {
-                if (strchr(sep, *s) != NULL)
-                    s++;
-                else
+                size_t characterBytes = 0;
+                BOOL isSeparator = FALSE;
+                if (!EncodedCharacterIsInSet(textCodec, s, listingEnd, separators,
+                                             characterBytes, isSeparator))
+                {
+                    ret = FALSE;
                     break;
+                }
+                if (!isSeparator)
+                    break;
+                s += characterBytes;
             }
         }
+        if (!ret)
+            break;
         if (minus)
             num = -num;
-        if (s == *listing || s < listingEnd && IsCharAlpha(*s))
+        BOOL followedByLetter = FALSE;
+        if (s == *listing ||
+            s < listingEnd &&
+                (!FtpEncodedTextStartsWithAlpha(
+                     textCodec,
+                     std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                     followedByLetter) ||
+                 followedByLetter))
             ret = FALSE; // success only if the number exists (at least one character) and does not end with a letter
         else
         {
@@ -1045,22 +1075,33 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 ret = FALSE;
             }
         }
-        if (needDealloc && sep != NULL)
-            free((void*)sep);
         break;
     }
 
     case fpfMonth_3: // month encoded into three letters ("jan", "feb", "mar", etc.)
     {
-        if (s + 2 < listingEnd)
+        const char* wordEnd = s;
+        while (wordEnd < listingEnd && *wordEnd > ' ')
+            ++wordEnd;
+        if (s < wordEnd)
         {
             int month;
+            size_t matchedBytes = 0;
             if (Parameters.Count == 2)
-                month = GetMonthFromThreeLetters(s, Parameters[1]->String);
+                month = MatchMonthFromLocalNames(s, wordEnd, Parameters[1]->String,
+                                                 textCodec, matchedBytes);
             else
-                month = GetMonthFromThreeLettersAllLangs(s, &actualParser->AllowedLanguagesMask);
-            s += 3;
-            if (month == -1 || s < listingEnd && IsCharAlpha(*s))
+                month = MatchMonthFromTable(s, wordEnd, MonthNameNumberLanguageArr,
+                                            &actualParser->AllowedLanguagesMask,
+                                            textCodec, matchedBytes);
+            s += matchedBytes;
+            BOOL followedByLetter = FALSE;
+            if (month == -1 ||
+                !FtpEncodedTextStartsWithAlpha(
+                    textCodec,
+                    std::string_view(s, static_cast<size_t>(wordEnd - s)),
+                    followedByLetter) ||
+                followedByLetter)
                 ret = FALSE; // success only if the month was recognized and it does not end with a letter
             else
             {
@@ -1085,11 +1126,22 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         if (s < wordEnd)
         {
             int month;
+            size_t matchedBytes = 0;
             if (Parameters.Count == 2)
-                month = GetMonthFromText(&s, wordEnd, Parameters[1]->String);
+                month = MatchMonthFromLocalNames(s, wordEnd, Parameters[1]->String,
+                                                 textCodec, matchedBytes);
             else
-                month = GetMonthFromTextAllLangs(&s, wordEnd, &actualParser->AllowedLanguagesMask);
-            if (month == -1 || s < listingEnd && IsCharAlpha(*s))
+                month = MatchMonthFromTable(s, wordEnd, MonthTextNameNumberLanguageArr,
+                                            &actualParser->AllowedLanguagesMask,
+                                            textCodec, matchedBytes);
+            s += matchedBytes;
+            BOOL followedByLetter = FALSE;
+            if (month == -1 ||
+                !FtpEncodedTextStartsWithAlpha(
+                    textCodec,
+                    std::string_view(s, static_cast<size_t>(wordEnd - s)),
+                    followedByLetter) ||
+                followedByLetter)
                 ret = FALSE; // success only if the month was recognized and it does not end with a letter
             else
             {
@@ -1113,7 +1165,14 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         int num = 0;
         while (s < listingEnd && *s >= '0' && *s <= '9')
             num = num * 10 + (*s++ - '0');
-        if (s == *listing || s < listingEnd && IsCharAlpha(*s))
+        BOOL followedByLetter = FALSE;
+        if (s == *listing ||
+            s < listingEnd &&
+                (!FtpEncodedTextStartsWithAlpha(
+                     textCodec,
+                     std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                     followedByLetter) ||
+                 followedByLetter))
             ret = FALSE; // success only if the number exists (at least one digit) and does not end with a letter
         else
         {
@@ -1218,8 +1277,14 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                     }
                     if (ret)
                     {
-                        if (s < listingEnd && IsCharAlphaNumeric(*s))
-                            ret = FALSE; // success only if it does not end with a letter
+                        BOOL followedByAlphaNumeric = FALSE;
+                        if (s < listingEnd &&
+                            (!FtpEncodedTextStartsWithAlphaNumeric(
+                                 textCodec,
+                                 std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                                 followedByAlphaNumeric) ||
+                             followedByAlphaNumeric))
+                            ret = FALSE; // success only if it does not end with a letter or digit
                         else
                         {
                             if (Parameters.Count > 0 && // also assign it to the column
@@ -1271,8 +1336,14 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
             else
                 ret = FALSE; // invalid time or year format
         }
+        BOOL followedByLetter = FALSE;
         if (ret &&
-            (s < listingEnd && IsCharAlpha(*s) || // success only if it does not end with a letter
+            (s < listingEnd &&
+                 (!FtpEncodedTextStartsWithAlpha(
+                      textCodec,
+                      std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                      followedByLetter) ||
+                  followedByLetter) || // success only if it does not end with a letter
              Parameters.Count > 1 &&              // also assign it to the column
                  (!AssignYearToColumn(Parameters[0]->GetColumnIndex(), columns, year,
                                       emptyCol, file, dataIface, !timeIsEmpty /* TRUE = a year correction is needed, ActualYear is only the first estimate */) ||
@@ -1289,15 +1360,20 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         if (Parameters.Count > 0)
         {
             int num = (int)Parameters[Parameters.Count == 1 ? 0 : 1]->GetNumber();
-            while (num-- && s < listingEnd && *s != '\r' && *s != '\n')
-                s++;
-            if (num != -1)
+            const char* lineEnd = FindListingLineEnd(s, listingEnd);
+            size_t consumedBytes = 0;
+            if (num < 0 ||
+                !FtpAdvanceEncodedCharacters(
+                    textCodec,
+                    std::string_view(s, static_cast<size_t>(lineEnd - s)),
+                    static_cast<size_t>(num), consumedBytes))
                 ret = FALSE; // success only if the "pointer" advances by 'num'
             else
             {
+                s += consumedBytes;
                 if (Parameters.Count > 1 && // also assign it to the column
                     !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
-                                          s, lowMemErr, emptyCol, file, dataIface))
+                                          s, lowMemErr, emptyCol, file, dataIface, textCodec))
                 {
                     ret = FALSE;
                 }
@@ -1313,59 +1389,35 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
     {
         if (Parameters.Count > 0)
         {
-            BOOL needDealloc = FALSE;
-            const char* str = Parameters[Parameters.Count == 1 ? 0 : 1]->GetString(s, listingEnd, &needDealloc, lowMemErr);
-            if (*lowMemErr)
+            std::wstring sample;
+            if (!Parameters[Parameters.Count == 1 ? 0 : 1]->GetStringOperand(
+                    sample, file, dataIface, columns, s, listingEnd, textCodec))
             {
                 ret = FALSE;
                 break;
             }
-            if (str != NULL)
-            {
-                const char* found = NULL;
-                if (*str != 0)
-                {
-                    while (s < listingEnd && *s != '\r' && *s != '\n')
-                    {
-                        if (LowerCase[*str] == LowerCase[*s]) // the first letter of the searched pattern matches
-                        {                                     // search for 'str' in 's' (using the simplest algorithm - O(m*n), but almost O(1) in real cases)
-                            const char* m = str + 1;
-                            const char* t = s + 1;
-                            while (*m != 0 && t < listingEnd && *t != '\r' && *t != '\n' &&
-                                   LowerCase[*m] == LowerCase[*t])
-                            {
-                                m++;
-                                t++;
-                            }
-                            if (*m == 0) // found
-                            {
-                                found = s;
-                                s = t;
-                                break;
-                            }
-                        }
-                        s++;
-                    }
-                }
-                else
-                    found = s;
-                if (found == NULL)
-                    ret = FALSE; // success only when 'str' is found
-                else
-                {
-                    if (Parameters.Count > 1 && // also assign it to the column
-                        !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
-                                              Function == fpfAll_to ? s : found, lowMemErr, emptyCol,
-                                              file, dataIface))
-                    {
-                        ret = FALSE;
-                    }
-                }
-            }
+            const char* lineEnd = FindListingLineEnd(s, listingEnd);
+            size_t matchOffset = 0;
+            size_t matchBytes = 0;
+            const CFtpTextCompareStatus match = FtpFindEncodedTextNoCase(
+                textCodec,
+                std::string_view(s, static_cast<size_t>(lineEnd - s)),
+                sample, matchOffset, matchBytes);
+            if (match != CFtpTextCompareStatus::Equal)
+                ret = FALSE; // success only when the sample is found and decoding succeeds
             else
-                ret = FALSE; // should never happen (NULL only on low-memory, which does not reach here)
-            if (needDealloc && str != NULL)
-                free((void*)str);
+            {
+                const char* found = s + matchOffset;
+                const char* afterMatch = found + matchBytes;
+                if (Parameters.Count > 1 && // also assign it to the column
+                    !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
+                                          Function == fpfAll_to ? afterMatch : found,
+                                          lowMemErr, emptyCol, file, dataIface, textCodec))
+                {
+                    ret = FALSE;
+                }
+                s = afterMatch;
+            }
         }
         else
             ret = FALSE; // "cannot happen"
@@ -1463,9 +1515,9 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                     nameEnd = s;
                 *isDir = !isFile;
                 if (!AssignStringToColumn(Parameters[1]->GetColumnIndex(), columns, *listing, nameEnd,
-                                          lowMemErr, emptyCol, file, dataIface) ||
+                                          lowMemErr, emptyCol, file, dataIface, textCodec) ||
                     state == 3 && !AssignStringToColumn(Parameters[2]->GetColumnIndex(), columns, linkBeg, s,
-                                                        lowMemErr, emptyCol, file, dataIface))
+                                                        lowMemErr, emptyCol, file, dataIface, textCodec))
                 {
                     ret = FALSE;
                 }
@@ -1532,10 +1584,15 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                     {
                         if (*s < '0' || *s > '9')
                         {
-                            if (!IsCharAlpha(*s))
-                                state = 4; // success
-                            else
+                            BOOL followedByLetter = FALSE;
+                            if (!FtpEncodedTextStartsWithAlpha(
+                                    textCodec,
+                                    std::string_view(s, static_cast<size_t>(listingEnd - s)),
+                                    followedByLetter) ||
+                                followedByLetter)
                                 state = 100; // error
+                            else
+                                state = 4; // success
                         }
                         break;
                     }
@@ -1551,7 +1608,7 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
             {
                 if (Parameters.Count > 0 && // also assign it to the column
                     !AssignStringToColumn(Parameters[0]->GetColumnIndex(), columns, *listing,
-                                          s, lowMemErr, emptyCol, file, dataIface))
+                                          s, lowMemErr, emptyCol, file, dataIface, textCodec))
                 {
                     ret = FALSE;
                 }
@@ -1565,7 +1622,8 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
     case fpfIf: // condition (if the expression is not met, report an error)
     {
         if (Parameters.Count < 1 || // "cannot happen"
-            !Parameters[0]->GetBoolean(file, isDir, dataIface, columns, s, listingEnd, actualParser))
+            !Parameters[0]->GetBoolean(file, isDir, dataIface, columns, s, listingEnd,
+                                       actualParser, textCodec))
         {
             ret = FALSE; // FALSE = we cannot continue further
         }
@@ -1586,10 +1644,15 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 case stctName:
                 case stctGeneralText: // pfptColumnString
                 {
-                    const char* beg;
-                    const char* end;
-                    Parameters[1]->GetStringOperand(&beg, &end, file, dataIface, columns, s, listingEnd);
-                    if (!AssignStringToColumn(i, columns, beg, end, lowMemErr, emptyCol, file, dataIface))
+                    std::wstring value;
+                    if (!Parameters[1]->GetStringOperand(value, file, dataIface, columns,
+                                                          s, listingEnd, textCodec))
+                    {
+                        ret = FALSE;
+                        break;
+                    }
+                    if (!AssignWideStringToColumn(i, columns, value, lowMemErr, emptyCol,
+                                                  file, dataIface, textCodec))
                         ret = FALSE;
                     break;
                 }
@@ -1636,7 +1699,7 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 if (i == COL_IND_ISDIR || i == COL_IND_ISHIDDEN || i == COL_IND_ISLINK) // pfptColumnBoolean
                 {
                     BOOL val = Parameters[1]->GetBoolean(file, isDir, dataIface, columns, s,
-                                                         listingEnd, actualParser);
+                                                         listingEnd, actualParser, textCodec);
                     if (i == COL_IND_ISHIDDEN)
                         file->Hidden = val ? 1 : 0;
                     else
@@ -1670,34 +1733,28 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 case stctName:
                 case stctGeneralText: // pfptColumnString
                 {
-                    const char* beg;
-                    const char* end;
-                    Parameters[0]->GetStringOperand(&beg, &end, file, dataIface, columns, s, listingEnd);
-                    const char* newBeg = beg;
-                    const char* newEnd = end;
-                    if (Function == fpfCut_white_spaces_start || Function == fpfCut_white_spaces)
-                        while (newBeg < newEnd && *newBeg <= ' ')
-                            newBeg++;
-                    if (Function == fpfCut_white_spaces_end || Function == fpfCut_white_spaces)
-                        while (newEnd > newBeg && *(newEnd - 1) <= ' ')
-                            newEnd--;
-                    if (newBeg != beg || newEnd != end)
+                    std::wstring value;
+                    if (!Parameters[0]->GetStringOperand(value, file, dataIface, columns,
+                                                          s, listingEnd, textCodec))
                     {
-                        char* str = (char*)malloc((newEnd - newBeg) + 1); // +1 to avoid issues with empty strings
-                        if (str == NULL)
-                        {
-                            TRACE_E(LOW_MEMORY);
-                            *lowMemErr = TRUE;
+                        ret = FALSE;
+                        break;
+                    }
+                    size_t newBeg = 0;
+                    size_t newEnd = value.size();
+                    if (Function == fpfCut_white_spaces_start || Function == fpfCut_white_spaces)
+                        while (newBeg < newEnd && value[newBeg] <= L' ')
+                            ++newBeg;
+                    if (Function == fpfCut_white_spaces_end || Function == fpfCut_white_spaces)
+                        while (newEnd > newBeg && value[newEnd - 1] <= L' ')
+                            --newEnd;
+                    if (newBeg != 0 || newEnd != value.size())
+                    {
+                        if (!AssignWideStringToColumn(
+                                i, columns,
+                                std::wstring_view(value).substr(newBeg, newEnd - newBeg),
+                                lowMemErr, emptyCol, file, dataIface, textCodec))
                             ret = FALSE;
-                            break;
-                        }
-                        memcpy(str, newBeg, newEnd - newBeg);
-                        if (!AssignStringToColumn(i, columns, str, str + (newEnd - newBeg),
-                                                  lowMemErr, emptyCol, file, dataIface))
-                        {
-                            ret = FALSE;
-                        }
-                        free(str);
                     }
                     break;
                 }
@@ -1719,10 +1776,16 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
         if (Parameters.Count > 0)
         {
             int num = (int)Parameters[0]->GetNumber();
-            while (num-- && s > actualParser->ListingBeg && *(s - 1) != '\r' && *(s - 1) != '\n')
-                s--;
-            if (num != -1)
+            const char* lineStart = FindListingLineStart(actualParser->ListingBeg, s);
+            size_t remainingBytes = 0;
+            if (num < 0 ||
+                !FtpRetreatEncodedCharacters(
+                    textCodec,
+                    std::string_view(lineStart, static_cast<size_t>(s - lineStart)),
+                    static_cast<size_t>(num), remainingBytes))
                 ret = FALSE; // success only if the "pointer" advances by 'num'
+            else
+                s = lineStart + remainingBytes;
         }
         else
             ret = FALSE; // "cannot happen"
@@ -1743,30 +1806,32 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 case stctName:
                 case stctGeneralText: // pfptColumnString
                 {
-                    const char* begDst;
-                    const char* endDst;
-                    Parameters[0]->GetStringOperand(&begDst, &endDst, file, dataIface, columns, s, listingEnd);
-                    const char* beg;
-                    const char* end;
-                    Parameters[1]->GetStringOperand(&beg, &end, file, dataIface, columns, s, listingEnd);
-                    if (beg < end) // if we are not adding an empty string (that is ignored)
+                    std::wstring destination;
+                    std::wstring addition;
+                    if (!Parameters[0]->GetStringOperand(destination, file, dataIface, columns,
+                                                          s, listingEnd, textCodec) ||
+                        !Parameters[1]->GetStringOperand(addition, file, dataIface, columns,
+                                                          s, listingEnd, textCodec))
                     {
-                        char* str = (char*)malloc((endDst - begDst) + (end - beg));
-                        if (str == NULL)
+                        ret = FALSE;
+                        break;
+                    }
+                    if (!addition.empty())
+                    {
+                        try
+                        {
+                            destination.append(addition);
+                        }
+                        catch (...)
                         {
                             TRACE_E(LOW_MEMORY);
                             *lowMemErr = TRUE;
                             ret = FALSE;
                             break;
                         }
-                        memcpy(str, begDst, endDst - begDst);
-                        memcpy(str + (endDst - begDst), beg, end - beg);
-                        if (!AssignStringToColumn(i, columns, str, str + (endDst - begDst) + (end - beg),
-                                                  lowMemErr, emptyCol, file, dataIface))
-                        {
+                        if (!AssignWideStringToColumn(i, columns, destination, lowMemErr,
+                                                      emptyCol, file, dataIface, textCodec))
                             ret = FALSE;
-                        }
-                        free(str);
                     }
                     break;
                 }
@@ -1796,29 +1861,28 @@ BOOL CFTPParserFunction::UseFunction(CFileData* file, BOOL* isDir,
                 case stctName:
                 case stctGeneralText: // pfptColumnString
                 {
-                    const char* beg;
-                    const char* end;
-                    Parameters[0]->GetStringOperand(&beg, &end, file, dataIface, columns, s, listingEnd);
-                    if (num <= end - beg)
+                    std::wstring value;
+                    if (!Parameters[0]->GetStringOperand(value, file, dataIface, columns,
+                                                          s, listingEnd, textCodec))
                     {
-                        const char* newEnd = end - num;
-                        char* str = (char*)malloc((newEnd - beg) + 1); // +1 to avoid issues with empty strings
-                        if (str == NULL)
-                        {
-                            TRACE_E(LOW_MEMORY);
-                            *lowMemErr = TRUE;
-                            ret = FALSE;
-                            break;
-                        }
-                        memcpy(str, beg, newEnd - beg);
-                        if (!AssignStringToColumn(i, columns, str, str + (newEnd - beg),
-                                                  lowMemErr, emptyCol, file, dataIface))
-                        {
-                            ret = FALSE;
-                        }
-                        free(str);
+                        ret = FALSE;
+                        break;
                     }
-                    else
+                    size_t newEnd = value.size();
+                    int remaining = num;
+                    while (remaining > 0 && newEnd > 0)
+                    {
+                        --newEnd;
+                        if (newEnd > 0 && value[newEnd] >= 0xDC00 && value[newEnd] <= 0xDFFF &&
+                            value[newEnd - 1] >= 0xD800 && value[newEnd - 1] <= 0xDBFF)
+                            --newEnd;
+                        --remaining;
+                    }
+                    if (remaining != 0)
+                        ret = FALSE;
+                    else if (!AssignWideStringToColumn(
+                                 i, columns, std::wstring_view(value).substr(0, newEnd),
+                                 lowMemErr, emptyCol, file, dataIface, textCodec))
                         ret = FALSE;
                     break;
                 }

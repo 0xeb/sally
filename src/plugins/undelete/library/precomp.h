@@ -16,8 +16,12 @@
 #include <crtdbg.h>
 #include <limits.h>
 #include <commctrl.h>
+#include <limits>
+#include <memory>
 #include <ostream>
 #include <stdio.h>
+#include <string>
+#include <vector>
 #include <winioctl.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'

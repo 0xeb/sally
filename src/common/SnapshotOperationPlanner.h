@@ -11,7 +11,6 @@
 
 #include "CBuildConfig.h"
 #include "CSelectionSnapshot.h"
-#include "unicode/helpers.h"
 
 #include <string>
 #include <utility>
@@ -33,6 +32,8 @@ enum class PlannedOperationKind
     ChangeAttrsDirectory, // P5
     ChangeCaseFile,       // P5
     ChangeCaseDirectory,  // P5
+    CountSizeFile,
+    CountSizeDirectory,
 };
 
 struct CPlannedSnapshotItem
@@ -41,19 +42,14 @@ struct CPlannedSnapshotItem
     PlannedOperationKind Kind = PlannedOperationKind::CopyFile;
     bool IsDir = false;
 
-    std::string SourceParentA;
+    // Operation paths and leaf names are Unicode-only.
     std::wstring SourceParentW;
-    std::string TargetParentA;
     std::wstring TargetParentW;
 
-    std::string ItemNameA;
     std::wstring ItemNameW;
-    std::string TargetNameA;
     std::wstring TargetNameW;
 
-    std::string SourcePathA;
     std::wstring SourcePathW;
-    std::string TargetPathA;
     std::wstring TargetPathW;
 
     unsigned __int64 Size = 0;
@@ -76,90 +72,9 @@ struct CPlannedSnapshotItem
 
 using CPlannedFileOperation = CPlannedSnapshotItem;
 
-inline std::wstring SnapshotPathW(const std::string& ansiPath, const std::wstring& widePath)
+inline bool IsDefaultMask(const std::wstring& mask)
 {
-    if (!widePath.empty())
-        return widePath;
-    return AnsiToWide(ansiPath.c_str());
-}
-
-inline bool SnapshotPathA(const std::string& ansiPath, const std::wstring& widePath, std::string& out)
-{
-    if (!ansiPath.empty())
-    {
-        out = ansiPath;
-        return true;
-    }
-    if (widePath.empty())
-        return false;
-    return sally::unicode::TryWideToAnsiRoundTripExact(widePath, out);
-}
-
-inline std::wstring SnapshotItemNameW(const CSnapshotItem& item)
-{
-    if (!item.NameW.empty())
-        return item.NameW;
-    return AnsiToWide(item.Name.c_str());
-}
-
-inline bool SnapshotItemNameA(const CSnapshotItem& item, const std::wstring& itemNameW, std::string& out)
-{
-    if (!item.Name.empty())
-    {
-        out = item.Name;
-        return true;
-    }
-    if (itemNameW.empty())
-        return false;
-    return sally::unicode::TryWideToAnsiRoundTripExact(itemNameW, out);
-}
-
-inline std::wstring SnapshotTargetNameW(const CSnapshotItem& item,
-                                        const std::wstring& fallbackNameW)
-{
-    if (!item.HasTargetName)
-        return fallbackNameW;
-    if (!item.TargetNameW.empty())
-        return item.TargetNameW;
-    return AnsiToWide(item.TargetName.c_str());
-}
-
-inline bool SnapshotTargetNameA(const CSnapshotItem& item,
-                                const std::wstring& targetNameW,
-                                const std::string& fallbackNameA,
-                                std::string& out)
-{
-    if (!item.HasTargetName)
-    {
-        out = fallbackNameA;
-        return true;
-    }
-    if (!item.TargetName.empty())
-    {
-        out = item.TargetName;
-        return true;
-    }
-    if (targetNameW.empty())
-        return false;
-    return sally::unicode::TryWideToAnsiRoundTripExact(targetNameW, out);
-}
-
-inline bool IsDefaultMask(const std::string& mask)
-{
-    return mask.empty() || mask == "*.*";
-}
-
-inline std::string JoinPathA(const std::string& dir, const std::string& name)
-{
-    if (dir.empty())
-        return name;
-    if (name.empty())
-        return dir;
-    std::string out = dir;
-    if (out.back() != '\\')
-        out.push_back('\\');
-    out += name;
-    return out;
+    return mask.empty() || mask == L"*.*";
 }
 
 inline std::wstring JoinPathW(const std::wstring& dir, const std::wstring& name)
@@ -187,17 +102,15 @@ inline PlannedOperationKind PlannedKindFor(EActionType action, bool isDir)
         return isDir ? PlannedOperationKind::ChangeAttrsDirectory : PlannedOperationKind::ChangeAttrsFile;
     if (action == EActionType::ChangeCase)
         return isDir ? PlannedOperationKind::ChangeCaseDirectory : PlannedOperationKind::ChangeCaseFile;
+    if (action == EActionType::CountSize)
+        return isDir ? PlannedOperationKind::CountSizeDirectory : PlannedOperationKind::CountSizeFile;
     return isDir ? PlannedOperationKind::DeleteDirectory : PlannedOperationKind::DeleteFile;
 }
 
 inline bool TryPlanChildItem(EActionType action,
-                             const std::string& sourceParentA,
                              const std::wstring& sourceParentW,
-                             const std::string& targetParentA,
                              const std::wstring& targetParentW,
-                             const std::string& itemNameA,
                              const std::wstring& itemNameW,
-                             const std::string& targetNameA,
                              const std::wstring& targetNameW,
                              bool isDir,
                              unsigned __int64 size,
@@ -212,20 +125,19 @@ inline bool TryPlanChildItem(EActionType action,
         action != EActionType::Convert &&
         action != EActionType::RecursiveConvert &&
         action != EActionType::ChangeAttrs && // P5
-        action != EActionType::ChangeCase)    // P5
+        action != EActionType::ChangeCase &&  // P5
+        action != EActionType::CountSize)
     {
         return false;
     }
-    if (sourceParentA.empty() || sourceParentW.empty() ||
-        itemNameA.empty() || itemNameW.empty())
+    if (sourceParentW.empty() || itemNameW.empty())
     {
         return false;
     }
 
     const bool needsTarget = (action == EActionType::Copy || action == EActionType::Move);
     if (needsTarget &&
-        (targetParentA.empty() || targetParentW.empty() ||
-         targetNameA.empty() || targetNameW.empty()))
+        (targetParentW.empty() || targetNameW.empty()))
     {
         return false;
     }
@@ -233,19 +145,13 @@ inline bool TryPlanChildItem(EActionType action,
     plan.Action = action;
     plan.Kind = PlannedKindFor(action, isDir);
     plan.IsDir = isDir;
-    plan.SourceParentA = sourceParentA;
     plan.SourceParentW = sourceParentW;
-    plan.TargetParentA = targetParentA;
     plan.TargetParentW = targetParentW;
-    plan.ItemNameA = itemNameA;
     plan.ItemNameW = itemNameW;
-    plan.TargetNameA = needsTarget ? targetNameA : itemNameA;
     plan.TargetNameW = needsTarget ? targetNameW : itemNameW;
-    plan.SourcePathA = JoinPathA(plan.SourceParentA, plan.ItemNameA);
     plan.SourcePathW = JoinPathW(plan.SourceParentW, plan.ItemNameW);
     if (plan.HasTarget())
     {
-        plan.TargetPathA = JoinPathA(plan.TargetParentA, plan.TargetNameA);
         plan.TargetPathW = JoinPathW(plan.TargetParentW, plan.TargetNameW);
     }
     plan.Size = size;
@@ -268,57 +174,56 @@ inline bool TryPlanSnapshotItem(const CSelectionSnapshot& snapshot,
         snapshot.Action != EActionType::Convert &&
         snapshot.Action != EActionType::RecursiveConvert &&
         snapshot.Action != EActionType::ChangeAttrs && // P5 (file-only)
-        snapshot.Action != EActionType::ChangeCase)    // P5 (file-only)
+        snapshot.Action != EActionType::ChangeCase &&  // P5 (file-only)
+        snapshot.Action != EActionType::CountSize)
     {
         return false;
     }
 
-    std::wstring sourcePathW = SnapshotPathW(snapshot.SourcePath, snapshot.SourcePathW);
-    std::string sourcePathA;
-    if (sourcePathW.empty() || !SnapshotPathA(snapshot.SourcePath, sourcePathW, sourcePathA))
+    std::wstring sourcePathW = snapshot.SourcePathW;
+    if (sourcePathW.empty())
         return false;
 
+    // Main2 absorption: a top-level item may live under its own
+    // parent (multi-directory drops). Empty = inherit the snapshot source.
+    if (!item.SourceParentW.empty())
+    {
+        sourcePathW = item.SourceParentW;
+    }
+
     std::wstring targetPathW;
-    std::string targetPathA;
     if (snapshot.Action == EActionType::Copy || snapshot.Action == EActionType::Move)
     {
-        targetPathW = SnapshotPathW(snapshot.TargetPath, snapshot.TargetPathW);
-        if (targetPathW.empty() || !SnapshotPathA(snapshot.TargetPath, targetPathW, targetPathA))
+        targetPathW = snapshot.TargetPathW;
+        if (targetPathW.empty())
             return false;
         if (!IsDefaultMask(snapshot.Mask) && !config.EnableExplicitTargetNames)
             return false;
     }
 
-    const std::wstring itemNameW = SnapshotItemNameW(item);
-    std::string itemNameA;
-    if (itemNameW.empty() || !SnapshotItemNameA(item, itemNameW, itemNameA) || itemNameA.empty())
+    const std::wstring& itemNameW = item.NameW;
+    if (itemNameW.empty())
         return false;
 
-    std::string targetNameA;
     std::wstring targetNameW;
     if (snapshot.Action == EActionType::Copy || snapshot.Action == EActionType::Move)
     {
-        targetNameW = SnapshotTargetNameW(item, itemNameW);
-        if (!SnapshotTargetNameA(item, targetNameW, itemNameA, targetNameA))
-            return false;
+        targetNameW = item.HasTargetName ? item.TargetNameW : itemNameW;
 
         if (!IsDefaultMask(snapshot.Mask) &&
-            (!item.HasTargetName || targetNameW.empty() || targetNameA.empty()))
+            (!item.HasTargetName || targetNameW.empty()))
         {
             return false;
         }
     }
     else
     {
-        targetNameA = itemNameA;
         targetNameW = itemNameW;
     }
 
     return TryPlanChildItem(snapshot.Action,
-                            sourcePathA, sourcePathW,
-                            targetPathA, targetPathW,
-                            itemNameA, itemNameW,
-                            targetNameA, targetNameW,
+                            sourcePathW, targetPathW,
+                            itemNameW, targetNameW,
                             item.IsDir,
                             item.Size, item.Attr, item.LastWrite,
                             plan);

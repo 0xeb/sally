@@ -17,6 +17,4 @@ char Junk_NTFS[20] = {'N', 0, 'T', 0, 'F', 0, 'S', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 char Junk_GURE[12] = {'G', 0, 'U', 0, 'R', 0, 'E', 0, 0, 0, 0, 0};
 
 template <>
-const char* const EFIC_CONTEXT<char>::STRING_EFS = "$EFS";
-template <>
 const wchar_t* const EFIC_CONTEXT<wchar_t>::STRING_EFS = L"$EFS";

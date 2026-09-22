@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
@@ -7,6 +7,8 @@
 
 #include "mainwnd.h"
 #include "ui/IPrompter.h"
+#include "common/IRegistry.h"
+#include "common/reg_sz_safe_length.h"
 
 CRegistryWorkerThread RegistryWorkerThread;
 
@@ -14,43 +16,42 @@ CRegistryWorkerThread RegistryWorkerThread;
 
 BOOL ClearKeyAux(HKEY key)
 {
-    CPathBuffer name;
-    HKEY subKey;
-    while (RegEnumKey(key, 0, name, name.Size() - 1) == ERROR_SUCCESS)
+    std::vector<std::wstring> subKeys;
+    if (!gRegistry->EnumSubKeys(key, subKeys).success)
+        return FALSE;
+    for (const std::wstring& name : subKeys)
     {
-        if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
+        HKEY subKey = NULL;
+        if (gRegistry->OpenKeyReadWrite(key, name.c_str(), subKey).success)
         {
             BOOL ret = ClearKeyAux(subKey);
-            HANDLES(RegCloseKey(subKey));
-            if (!ret || RegDeleteKey(key, name) != ERROR_SUCCESS)
+            gRegistry->CloseKey(subKey);
+            if (!ret || !gRegistry->DeleteKey(key, name.c_str()).success)
                 return FALSE;
         }
         else
             return FALSE;
     }
 
-    DWORD size = name.Size();
-    while (RegEnumValue(key, 0, name, &size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-        if (RegDeleteValue(key, name) != ERROR_SUCCESS)
+    std::vector<std::wstring> values;
+    if (!gRegistry->EnumValues(key, values).success)
+        return FALSE;
+    for (const std::wstring& name : values)
+        if (!gRegistry->DeleteValue(key, name.c_str()).success)
         {
             TRACE_E("Unable to delete values in specified key (in registry).");
-            break;
+            return FALSE;
         }
-        else
-            size = name.Size();
 
     return TRUE;
 }
 
 // ****************************************************************************
 
-BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BOOL quiet)
+BOOL CreateKeyAux(HWND parent, HKEY hKey, const wchar_t* name, HKEY& createdKey, BOOL quiet)
 {
-    DWORD createType; // info whether the key was created or just opened
-    LONG res = HANDLES(RegCreateKeyEx(hKey, name, 0, NULL, REG_OPTION_NON_VOLATILE,
-                                      KEY_READ | KEY_WRITE, NULL, &createdKey,
-                                      &createType));
-    if (res == ERROR_SUCCESS)
+    RegistryResult result = gRegistry->CreateKey(hKey, name, createdKey);
+    if (result.success)
         return TRUE;
     else
     {
@@ -58,12 +59,15 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res), "Error Saving Configuration",
-                           MB_OK | MB_ICONEXCLAMATION);
+                // Pre-langpack fallback (gPrompter/LoadStrW aren't up yet) - now
+                // wide too via MessageBoxW/GetErrorTextOwned, so a non-ASCII system error message
+                // (a non-English Windows install) doesn't get CP_ACP-mangled here.
+                MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(), L"Error Saving Configuration",
+                            MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextW(res));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextOwned(result.errorCode).c_str());
             }
         }
         return FALSE;
@@ -72,23 +76,23 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
 
 // ****************************************************************************
 
-BOOL OpenKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& openedKey, BOOL quiet)
+BOOL OpenKeyAux(HWND parent, HKEY hKey, const wchar_t* name, HKEY& openedKey, BOOL quiet)
 {
-    LONG res = HANDLES_Q(RegOpenKeyEx(hKey, name, 0, KEY_READ, &openedKey));
-    if (res == ERROR_SUCCESS)
+    RegistryResult result = gRegistry->OpenKeyRead(hKey, name, openedKey);
+    if (result.success)
         return TRUE;
     else
     {
-        if (!quiet && res != ERROR_FILE_NOT_FOUND)
+        if (!quiet && !result.notFound())
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
-                           "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(),
+                            L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(result.errorCode).c_str());
             }
         }
         return FALSE;
@@ -99,24 +103,24 @@ BOOL OpenKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& openedKey, BOOL 
 
 void CloseKeyAux(HKEY hKey)
 {
-    HANDLES(RegCloseKey(hKey));
+    gRegistry->CloseKey(hKey);
 }
 
 // ****************************************************************************
 
-BOOL DeleteKeyAux(HKEY hKey, const char* name)
+BOOL DeleteKeyAux(HKEY hKey, const wchar_t* name)
 {
-    return RegDeleteKey(hKey, name) == ERROR_SUCCESS;
+    return gRegistry->DeleteKey(hKey, name).success;
 }
 
 // ****************************************************************************
 
-BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buffer, DWORD bufferSize, BOOL quiet)
+BOOL GetValueAux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize, BOOL quiet)
 {
-    DWORD gettedType;
-    LONG res = SalRegQueryValueEx(hKey, name, 0, &gettedType, (BYTE*)buffer, &bufferSize);
-    if (res == ERROR_SUCCESS)
-        if (gettedType == type)
+    RegValueType returnedType = RegValueType::None;
+    RegistryResult result = gRegistry->ReadValue(hKey, name, returnedType, buffer, bufferSize);
+    if (result.success)
+        if (static_cast<DWORD>(returnedType) == type)
             return TRUE;
         else
         {
@@ -124,8 +128,8 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
             {
                 if (HLanguage == NULL)
                 {
-                    MessageBox(parent, "Unexpected value type.",
-                               "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                    MessageBoxW(parent, L"Unexpected value type.",
+                                L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
                 }
                 else
                 {
@@ -136,18 +140,18 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
         }
     else
     {
-        if (res != ERROR_FILE_NOT_FOUND)
+        if (!result.notFound())
         {
             if (!quiet)
             {
                 if (HLanguage == NULL)
                 {
-                    MessageBox(parent, GetErrorText(res),
-                               "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                    MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(),
+                                L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
                 }
                 else
                 {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(result.errorCode).c_str());
                 }
             }
         }
@@ -155,22 +159,22 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
     }
 }
 
-BOOL GetValue2Aux(HWND parent, HKEY hKey, const char* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
+BOOL GetValue2Aux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
 {
-    DWORD gettedType;
-    LONG res = SalRegQueryValueEx(hKey, name, 0, &gettedType, (BYTE*)buffer, &bufferSize);
-    if (res == ERROR_SUCCESS)
-        if (gettedType == type1 || gettedType == type2)
+    RegValueType actualType = RegValueType::None;
+    RegistryResult result = gRegistry->ReadValue(hKey, name, actualType, buffer, bufferSize);
+    if (result.success)
+        if (static_cast<DWORD>(actualType) == type1 || static_cast<DWORD>(actualType) == type2)
         {
-            *returnedType = gettedType;
+            *returnedType = static_cast<DWORD>(actualType);
             return TRUE;
         }
         else
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, "Unexpected value type.",
-                           "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, L"Unexpected value type.",
+                            L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
@@ -180,36 +184,69 @@ BOOL GetValue2Aux(HWND parent, HKEY hKey, const char* name, DWORD type1, DWORD t
         }
     else
     {
-        if (res != ERROR_FILE_NOT_FOUND)
+        if (!result.notFound())
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
-                           "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(),
+                            L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(result.errorCode).c_str());
             }
         }
         return FALSE;
     }
 }
 
-BOOL GetValueDontCheckTypeAux(HKEY hKey, const char* name, void* buffer, DWORD bufferSize)
+BOOL GetValueDontCheckTypeAux(HKEY hKey, const wchar_t* name, void* buffer, DWORD bufferSize)
 {
-    return SalRegQueryValueEx(hKey, name, 0, NULL, (BYTE*)buffer, &bufferSize) == ERROR_SUCCESS;
+    RegValueType type = RegValueType::None;
+    return gRegistry->ReadValue(hKey, name, type, buffer, bufferSize).success;
 }
 
 // ****************************************************************************
 
-BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
+BOOL SetValueAux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type,
                  const void* data, DWORD dataSize, BOOL quiet)
 {
     if (dataSize == -1)
-        dataSize = (DWORD)strlen((char*)data) + 1;
-    LONG res = RegSetValueEx(hKey, name, 0, type, (CONST BYTE*)data, dataSize);
-    if (res == ERROR_SUCCESS)
+    {
+        // RegSetValueExW measures BYTES. The -1 convention is documented in
+        // regwork.h as "for strings"; strlen() over wide data measured ONE CHARACTER and wrote
+        // two bytes, so every REG_SZ written through this path was a single-character value.
+        //
+        // ...and the wcslen() that replaced it needs the SAME bound that
+        // SetValueW's REG_SZ branch already applies (sally_strings_waitwindow.cpp).
+        // This is the second, parallel wide registry-write path - SetValueW goes through
+        // gRegistry->SetString, this one through CRegistryWorkerThread - and the earlier
+        // mitigation was only ever applied to the first. A caller passing genuinely narrow data
+        // here therefore still got an UNBOUNDED wcslen() over it: one trailing zero BYTE is not
+        // the two consecutive zero bytes wcslen looks for, so the scan ran past the buffer into
+        // whatever followed until a wide NUL happened to appear, and that garbage distance became
+        // the write length. Observed live: the main window's "Split Position" / "Before Zoom
+        // Split Position" stored as 515 chars of "50.0" + 0xCC debug fill, which then failed to
+        // read back as ERROR_MORE_DATA - the user-visible "(234) More data is available" dialog
+        // on every startup. Those two call sites are now genuinely wide, but bounding the scan
+        // here is what stops the NEXT such caller from silently corrupting a value instead of
+        // failing loudly. Same lesson as the ac00cbe9 handle-tracking mismatch: this codebase has
+        // two parallel registry abstractions, and a fix applied to only one of them is not a fix.
+        size_t len;
+        if (!ComputeRegSzSafeLength((const wchar_t*)data, len))
+        {
+            // TRACE_EW, not TRACE_E: the value name is already wide, and narrowing it through
+            // WideToAnsi purely to print it would mangle exactly the names most worth seeing
+            // in this message - and add an ANSI conversion to a file that has none.
+            TRACE_EW(L"SetValueAux: REG_SZ value '" << name << L"' has no wide NUL "
+                     L"terminator within the safe scan bound - refusing to write (narrow data "
+                     L"passed where a wide string was required?)");
+            return FALSE;
+        }
+        dataSize = (DWORD)((len + 1) * sizeof(wchar_t));
+    }
+    RegistryResult result = gRegistry->WriteValue(hKey, name, static_cast<RegValueType>(type), data, dataSize);
+    if (result.success)
         return TRUE;
     else
     {
@@ -217,12 +254,12 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
-                           "Error Saving Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(),
+                            L"Error Saving Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextW(res));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORSAVECONFIG), GetErrorTextOwned(result.errorCode).c_str());
             }
         }
         return FALSE;
@@ -231,26 +268,26 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
 
 // ****************************************************************************
 
-BOOL DeleteValueAux(HKEY hKey, const char* name)
+BOOL DeleteValueAux(HKEY hKey, const wchar_t* name)
 {
-    return RegDeleteValue(hKey, name) == ERROR_SUCCESS;
+    return gRegistry->DeleteValue(hKey, name).success;
 }
 
 // ****************************************************************************
 
-BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& bufferSize)
+BOOL GetSizeAux(HWND parent, HKEY hKey, const wchar_t* name, DWORD type, DWORD& bufferSize)
 {
-    DWORD gettedType;
-    LONG res = SalRegQueryValueEx(hKey, name, 0, &gettedType, NULL, &bufferSize);
-    if (res == ERROR_SUCCESS)
-        if (gettedType == type)
+    RegValueType actualType = RegValueType::None;
+    RegistryResult result = gRegistry->ReadValue(hKey, name, actualType, NULL, bufferSize);
+    if (result.success)
+        if (static_cast<DWORD>(actualType) == type)
             return TRUE;
         else
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, "Unexpected value type.",
-                           "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, L"Unexpected value type.",
+                            L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
@@ -260,16 +297,16 @@ BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& buf
         }
     else
     {
-        if (res != ERROR_FILE_NOT_FOUND)
+        if (!result.notFound())
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
-                           "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
+                MessageBoxW(parent, GetErrorTextOwned(result.errorCode).c_str(),
+                            L"Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
             {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(res));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(result.errorCode).c_str());
             }
         }
         return FALSE;
@@ -411,10 +448,10 @@ void CRegistryWorkerThread::WaitForWorkDoneWithMessageLoop()
             if (waitRes == WAIT_OBJECT_0 + 1) // new input
             {
                 MSG msg;
-                while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
         }
@@ -437,7 +474,7 @@ BOOL CRegistryWorkerThread::ClearKey(HKEY key)
         return ClearKeyAux(key);
 }
 
-BOOL CRegistryWorkerThread::CreateKey(HKEY key, const char* name, HKEY& createdKey)
+BOOL CRegistryWorkerThread::CreateKey(HKEY key, const wchar_t* name, HKEY& createdKey)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -456,7 +493,7 @@ BOOL CRegistryWorkerThread::CreateKey(HKEY key, const char* name, HKEY& createdK
         return CreateKeyAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, createdKey, FALSE);
 }
 
-BOOL CRegistryWorkerThread::OpenKey(HKEY key, const char* name, HKEY& openedKey)
+BOOL CRegistryWorkerThread::OpenKey(HKEY key, const wchar_t* name, HKEY& openedKey)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -492,7 +529,7 @@ void CRegistryWorkerThread::CloseKey(HKEY key)
         CloseKeyAux(key);
 }
 
-BOOL CRegistryWorkerThread::DeleteKey(HKEY key, const char* name)
+BOOL CRegistryWorkerThread::DeleteKey(HKEY key, const wchar_t* name)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -509,7 +546,7 @@ BOOL CRegistryWorkerThread::DeleteKey(HKEY key, const char* name)
         return DeleteKeyAux(key, name);
 }
 
-BOOL CRegistryWorkerThread::GetValue(HKEY key, const char* name, DWORD type, void* buffer, DWORD bufferSize)
+BOOL CRegistryWorkerThread::GetValue(HKEY key, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -532,7 +569,7 @@ BOOL CRegistryWorkerThread::GetValue(HKEY key, const char* name, DWORD type, voi
     }
 }
 
-BOOL CRegistryWorkerThread::GetValue2(HKEY key, const char* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
+BOOL CRegistryWorkerThread::GetValue2(HKEY key, const wchar_t* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -557,7 +594,7 @@ BOOL CRegistryWorkerThread::GetValue2(HKEY key, const char* name, DWORD type1, D
     }
 }
 
-BOOL CRegistryWorkerThread::SetValue(HKEY key, const char* name, DWORD type, const void* data, DWORD dataSize)
+BOOL CRegistryWorkerThread::SetValue(HKEY key, const wchar_t* name, DWORD type, const void* data, DWORD dataSize)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -577,7 +614,7 @@ BOOL CRegistryWorkerThread::SetValue(HKEY key, const char* name, DWORD type, con
         return SetValueAux(MainWindow != NULL ? MainWindow->HWindow : NULL, key, name, type, data, dataSize, FALSE);
 }
 
-BOOL CRegistryWorkerThread::DeleteValue(HKEY key, const char* name)
+BOOL CRegistryWorkerThread::DeleteValue(HKEY key, const wchar_t* name)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -594,7 +631,7 @@ BOOL CRegistryWorkerThread::DeleteValue(HKEY key, const char* name)
         return DeleteValueAux(key, name);
 }
 
-BOOL CRegistryWorkerThread::GetSize(HKEY key, const char* name, DWORD type, DWORD& bufferSize)
+BOOL CRegistryWorkerThread::GetSize(HKEY key, const wchar_t* name, DWORD type, DWORD& bufferSize)
 {
     CInUseHandler i;
     if (i.CanUseThread(this))
@@ -618,7 +655,7 @@ unsigned
 CRegistryWorkerThread::Body()
 {
     CALL_STACK_MESSAGE1("CRegistryWorkerThread::Body()");
-    SetThreadNameInVCAndTrace("RegistryWorker");
+    SetThreadNameInVCAndTrace(L"RegistryWorker");
     TRACE_I("Begin");
 
     int loops = 0;

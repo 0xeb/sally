@@ -76,3 +76,7 @@ COMMENT,"Nederlandse versie"
 78,1,"byte"
 79,1,"bytes"
 
+[STRINGTABLE 3]
+80,1,"Niets om weer te geven..."
+81,1,"...deze map bevat geen bestanden om in kaart te brengen"
+

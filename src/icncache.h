@@ -12,7 +12,7 @@
 class CIconData
 {
 public:
-    char* NameAndData;           // allocated by DWORD, ends null-terminated (for comparison);
+    wchar_t* NameAndData;           // allocated by DWORD, ends null-terminated (for comparison);
                                  // for Flag==3 (and for ==1, if followed by ==3) additionally appended icon-location string;
                                  // for Flag==4,5,6 additionally appended file tag (CQuadWord Size + FILETIME LastWrite)
                                  //   and list of CPluginInterfaceForThumbLoaderEncapsulation interfaces
@@ -110,7 +110,7 @@ public:
     // 'file' is file-data of file/directory 'name' (used only if 'dataIface'
     // is not NULL); 'dataIface' is NULL except when it's ptPluginFS with icons of type
     // pitFromPlugin
-    BOOL GetIndex(const char* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
+    BOOL GetIndex(const wchar_t* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
                   const CFileData* file);
 
     // copies known icons and thumbnails (old and new cache must be sorted!)
@@ -178,9 +178,9 @@ struct CAssociationIndexAndFlag
 class CAssociationData
 {
 public:
-    char* ExtensionAndData; // allocated by DWORD, ends null-terminated (for comparison);
+    wchar_t* ExtensionAndData; // allocated by DWORD, ends null-terminated (for comparison);
                             // extension + additionally appended icon-location string;
-    char* Type;             // file-type string; instead of "" is NULL (to save memory)
+    wchar_t* Type;             // file-type string; instead of "" is NULL (to save memory)
 
 private:
     // for each icon size we need a pair of Index+Flag
@@ -266,7 +266,7 @@ public:
 
     // returns "found?" and index of item or where to insert (sorted array);
     // 'name' must be aligned by DWORD ;
-    BOOL GetIndex(const char* name, int& index);
+    BOOL GetIndex(const wchar_t* name, int& index);
 
     // allocates space for icon; returns its index or -1 on error
     // variables 'iconList' and 'iconListIndex' can be NULL (then they are not set)
@@ -284,14 +284,14 @@ public:
     void ReadAssociations(BOOL showWaitWnd);
 
     // ext must be aligned by DWORD
-    BOOL IsAssociated(char* ext, BOOL& addtoIconCache, CIconSizeEnum iconSize);
-    BOOL IsAssociatedStatic(char* ext, const char*& iconLocation, CIconSizeEnum iconSize);
-    BOOL IsAssociated(char* ext);
+    BOOL IsAssociated(const wchar_t* ext, BOOL& addtoIconCache, CIconSizeEnum iconSize);
+    BOOL IsAssociatedStatic(const wchar_t* ext, const wchar_t*& iconLocation, CIconSizeEnum iconSize);
+    BOOL IsAssociated(const wchar_t* ext);
 
 protected:
     // helper method
-    void InsertData(const char* origin, int index, BOOL overwriteItem, char* e, char* s,
-                    CAssociationData& data, LONG& size, const char* iconLocation, const char* type);
+    void InsertData(const wchar_t* origin, int index, BOOL overwriteItem, wchar_t* e, wchar_t* s,
+                    CAssociationData& data, LONG& size, const wchar_t* iconLocation, const wchar_t* type);
 };
 
 extern CAssociations Associations; // here are stored the loaded associations

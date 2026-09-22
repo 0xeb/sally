@@ -63,12 +63,11 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         // insert the current version
-        char buff[1000];
-        char buff2[1000];
-        GetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff, 1000);
-        wsprintf(buff2, buff, VERSINFO_VERSION);
-        SetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff2);
-        SetDlgItemText(HWindow, IDC_ABOUT_COPYRIGHT, VERSINFO_COPYRIGHT);
+        const std::wstring titleFormat = SPLGetDlgItemTextOwned(HWindow, IDC_ABOUT_TITLE);
+        const std::wstring title = SPLFormatStringOwned(titleFormat.c_str(),
+                                                        _CRT_WIDE(VERSINFO_VERSION));
+        SetDlgItemTextW(HWindow, IDC_ABOUT_TITLE, title.c_str());
+        SetDlgItemTextW(HWindow, IDC_ABOUT_COPYRIGHT, _CRT_WIDE(VERSINFO_COPYRIGHT));
         // the plugin name and version will be bold
         SalamanderGUI->AttachStaticText(HWindow, IDC_ABOUT_TITLE, STF_BOLD);
         SalamanderGUI->AttachStaticText(HWindow, IDC_ABOUT_DEPRO, STF_BOLD);
@@ -81,11 +80,11 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CGUIHyperLinkAbstract* hl;
         hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_ABOUT_EMAIL, STF_UNDERLINE | STF_HYPERLINK_COLOR);
         if (hl != NULL)
-            hl->SetActionOpen("mailto:tomas@tjelinek.com");
+            hl->SetActionOpen(L"mailto:tomas@tjelinek.com");
 
         hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_ABOUT_WWW, STF_UNDERLINE | STF_HYPERLINK_COLOR);
         if (hl != NULL)
-            hl->SetActionOpen("http://www.tjelinek.com/");
+            hl->SetActionOpen(L"http://www.tjelinek.com/");
 
         break;
     }

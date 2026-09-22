@@ -12,8 +12,7 @@
 #include <string>
 
 // Eliminates '.' and '..' components in the path after the root.
-BOOL SalRemovePointsFromPath(char* afterRoot);
-BOOL SalRemovePointsFromPath(WCHAR* afterRoot);
+BOOL SalRemovePointsFromPath(wchar_t* afterRoot);
 
 // Wide path resolution: trims, resolves relative/drive-relative forms against
 // curDir / the per-drive default dirs, removes dots, normalizes backslashes.
@@ -25,4 +24,4 @@ BOOL SalGetFullNameW(std::wstring& name, int* errTextID = NULL, const wchar_t* c
 // 'a'..'z' (lower-case letter). Production implements this over the
 // DefaultDir table (sally_path_utils.cpp); tests provide a stub
 // (tests/sally/src/tests/test_defaultdir_stub.cpp).
-const char* SalGetDefaultDirForDrive(wchar_t lowerDriveLetter);
+const wchar_t* SalGetDefaultDirForDrive(wchar_t lowerDriveLetter);

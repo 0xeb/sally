@@ -22,4 +22,4 @@ void MakeCrcTable(DWORD* crcTab);
 //run a set of bytes through the crc shift register, if buffer is a NULL
 //pointer, then initialize the crc shift register contents instead
 //return the current crc in either case
-DWORD UpdateCrc(char* buffer, unsigned length, DWORD crcVal, const DWORD* crcTab);
+DWORD UpdateCrc(wchar_t* buffer, unsigned length, DWORD crcVal, const DWORD* crcTab);

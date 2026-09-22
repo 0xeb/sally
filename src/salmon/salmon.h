@@ -4,22 +4,29 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 extern HINSTANCE HLanguage;
-extern char BugReportPath[MAX_PATH]; // the path will end with a trailing backslash
+extern std::wstring BugReportPath; // the path ends with a trailing backslash when nonempty
+extern std::wstring CrashReportName;
 struct CBugReport
 {
-    char Name[MAX_PATH];
+    std::wstring Name;
 };
-extern TDirectArray<CBugReport> BugReports;
+extern std::vector<CBugReport> BugReports;
 extern BOOL ReportOldBugs;
-extern char AppTitle[200];
 
 extern CSalmonSharedMemory* SalmonSharedMemory;
 
-char* LoadStr(int resID, HINSTANCE hInstance);
+std::wstring LoadStr(int resID, HINSTANCE hInstance);
+// Compatibility alias retained for call sites widened before LoadStr itself became wide.
+std::wstring LoadStrW(int resID, HINSTANCE hInstance);
 char* GetErrorText(DWORD error);
+std::wstring FormatText(const wchar_t* format, ...);
+BOOL GetCurrentModulePath(std::wstring& path);
 
-void OpenFolder(HWND hWnd, const char* szDir);
+void OpenFolder(HWND hWnd, const wchar_t* szDir);
 
 BOOL RestartSalamander(HWND hParent);
 
@@ -31,7 +38,7 @@ BOOL GetBugReportNames();
 
 int GetUniqueBugReportCount();
 
-void GetReportBaseName(char* name, int nameSize, const char* targetPath, const char* shortName, DWORD64 uid, SYSTEMTIME lt);
+std::wstring GetReportBaseName(const wchar_t* targetPath, const wchar_t* shortName, DWORD64 uid, SYSTEMTIME lt);
 
 BOOL SaveDescriptionAndEmail();
 

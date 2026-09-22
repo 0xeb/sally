@@ -4,47 +4,60 @@
 
 #include "precomp.h"
 
+#include "common/text/CaseFolding.h"
 #include "cfgdlg.h"
 #include "plugins.h"
 #include "zip.h"
 #include "pack.h"
 
 // custom packers / unpackers
-const char* SALAMANDER_CPU_TITLE = "Title";
-const char* SALAMANDER_CPU_EXT = "Ext";
-const char* SALAMANDER_CPU_TYPE = "Type";
-const char* SALAMANDER_CPU_SUPLONG = "Support Long Names";
-const char* SALAMANDER_CPU_ANSILIST = "Need ANSI List";
+const wchar_t* SALAMANDER_CPU_TITLE = L"Title";
+const wchar_t* SALAMANDER_CPU_EXT = L"Ext";
+const wchar_t* SALAMANDER_CPU_TYPE = L"Type";
+const wchar_t* SALAMANDER_CPU_SUPLONG = L"Support Long Names";
+const wchar_t* SALAMANDER_CPU_ANSILIST = L"Need ANSI List";
 // custom packers only
-const char* SALAMANDER_CP_EXECCOPY = "Copy Command";
-const char* SALAMANDER_CP_ARGSCOPY = "Copy Arguments";
-const char* SALAMANDER_CP_SUPMOVE = "Support Move";
-const char* SALAMANDER_CP_EXECMOVE = "Move Command";
-const char* SALAMANDER_CP_ARGSMOVE = "Move Arguments";
+const wchar_t* SALAMANDER_CP_EXECCOPY = L"Copy Command";
+const wchar_t* SALAMANDER_CP_ARGSCOPY = L"Copy Arguments";
+const wchar_t* SALAMANDER_CP_SUPMOVE = L"Support Move";
+const wchar_t* SALAMANDER_CP_EXECMOVE = L"Move Command";
+const wchar_t* SALAMANDER_CP_ARGSMOVE = L"Move Arguments";
 // custom unpackers only
-const char* SALAMANDER_CU_EXECEXTRACT = "Extract Command";
-const char* SALAMANDER_CU_ARGSEXTRACT = "Extract Arguments";
+const wchar_t* SALAMANDER_CU_EXECEXTRACT = L"Extract Command";
+const wchar_t* SALAMANDER_CU_ARGSEXTRACT = L"Extract Arguments";
+
+// The pre-2.5b44 upgrade step that lowercases a custom packer's/unpacker's extension.
+//
+// sally::text::Fold is LCMAP_UPPERCASE - it builds a comparison KEY, not a display form - so
+// using it here inverted the upgrade. The extension it produces is user-visible and is written
+// back to the configuration on save: the Pack dialog started proposing "Documents.ZIP" where the
+// entire purpose of this step is to turn a legacy "ZIP" into "zip".
+static void LowerCaseExtensionForUpgrade(std::wstring& ext)
+{
+    if (!ext.empty())
+        CharLowerBuffW(ext.data(), (DWORD)ext.size());
+}
 
 // conversion table for translating exe to a variable
 struct SPackConvTable
 {
-    const char* exe;
-    const char* variable;
+    const wchar_t* exe;
+    const wchar_t* variable;
 };
 
 SPackConvTable PackConversionTable[] = {
-    {"jar32", "$(Jar32bitExecutable)"},
-    {"jar16", "$(Jar16bitExecutable)"},
-    {"rar", "$(Rar32bitExecutable)"},
-    {"arj32", "$(Arj32bitExecutable)"},
-    {"arj", "$(Arj16bitExecutable)"},
-    {"ace32", "$(Ace32bitExecutable)"},
-    {"ace", "$(Ace16bitExecutable)"},
-    {"lha", "$(Lha16bitExecutable)"},
-    {"uc", "$(UC216bitExecutable)"},
-    {"pkzip25", "$(Zip32bitExecutable)"},
-    {"pkzip", "$(Zip16bitExecutable)"},
-    {"pkunzip", "$(Unzip16bitExecutable)"},
+    {L"jar32", L"$(Jar32bitExecutable)"},
+    {L"jar16", L"$(Jar16bitExecutable)"},
+    {L"rar", L"$(Rar32bitExecutable)"},
+    {L"arj32", L"$(Arj32bitExecutable)"},
+    {L"arj", L"$(Arj16bitExecutable)"},
+    {L"ace32", L"$(Ace32bitExecutable)"},
+    {L"ace", L"$(Ace16bitExecutable)"},
+    {L"lha", L"$(Lha16bitExecutable)"},
+    {L"uc", L"$(UC216bitExecutable)"},
+    {L"pkzip25", L"$(Zip32bitExecutable)"},
+    {L"pkzip", L"$(Zip16bitExecutable)"},
+    {L"pkunzip", L"$(Unzip16bitExecutable)"},
     {NULL, NULL}};
 
 // order in which custom packers/unpackers were historically added
@@ -53,129 +66,129 @@ int CustomOrder[] = {0, 1, 9, 10, 2, 3, 4, 11, 5, 6, 7, 8};
 // custom packer table
 SPackCustomPacker CustomPackers[] = {
     // JAR32
-    {{"a \"$(ArchiveFullName)\" !\"$(ListFullName)\"", "a -v1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
-     {"m \"$(ArchiveFullName)\" !\"$(ListFullName)\"", "m -v1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
+    {{L"a \"$(ArchiveFullName)\" !\"$(ListFullName)\"", L"a -v1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
+     {L"m \"$(ArchiveFullName)\" !\"$(ListFullName)\"", L"m -v1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
      {IDS_DP_JAR_E, IDS_DP_JARV_E},
-     "j",
+     L"j",
      TRUE,
      FALSE,
-     "jar32"},
+     L"jar32"},
     // RAR32
-    {{"a -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", "a -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""}, // since version 5.0 we must enforce the -scol switch, version 4.20 is fine; appears elsewhere and in the registry
-     {"m -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", "m -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
+    {{L"a -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", L"a -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""}, // since version 5.0 we must enforce the -scol switch, version 4.20 is fine; appears elsewhere and in the registry
+     {L"m -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", L"m -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
      {IDS_DP_RAR_E, IDS_DP_RARV_E},
-     "rar",
+     L"rar",
      TRUE,
      FALSE,
-     "rar"},
+     L"rar"},
     // ARJ16
-    {{"a -pa $(ArchiveDOSFullName) !$(ListDOSFullName)", "a -pav1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
-     {"m -pa $(ArchiveDOSFullName) !$(ListDOSFullName)", "m -pav1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
+    {{L"a -pa $(ArchiveDOSFullName) !$(ListDOSFullName)", L"a -pav1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
+     {L"m -pa $(ArchiveDOSFullName) !$(ListDOSFullName)", L"m -pav1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
      {IDS_DP_ARJ16_E, IDS_DP_ARJ16V_E},
-     "arj",
+     L"arj",
      FALSE,
      FALSE,
-     "arj"},
+     L"arj"},
     // LZH
-    {{"a -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
-     {"m -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+    {{L"a -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+     {L"m -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
      {IDS_DP_LHA_E, -1},
-     "lzh",
+     L"lzh",
      FALSE,
      FALSE,
-     "lha"},
+     L"lha"},
     // UC2
-    {{"A !SYSHID=ON ##\\ $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
-     {"AM !SYSHID=ON ##\\ $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+    {{L"A !SYSHID=ON ##\\ $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+     {L"AM !SYSHID=ON ##\\ $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
      {IDS_DP_UC2_E, -1},
-     "uc2",
+     L"uc2",
      FALSE,
      FALSE,
-     "uc"},
+     L"uc"},
     // JAR16
-    {{"a $(ArchiveDOSFullName) !$(ListDOSFullName)", "a -v1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
-     {"m $(ArchiveDOSFullName) !$(ListDOSFullName)", "m -v1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
+    {{L"a $(ArchiveDOSFullName) !$(ListDOSFullName)", L"a -v1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
+     {L"m $(ArchiveDOSFullName) !$(ListDOSFullName)", L"m -v1440 $(ArchiveDOSFullName) !$(ListDOSFullName)"},
      {IDS_DP_JAR16_E, IDS_DP_JAR16V_E},
-     "j",
+     L"j",
      FALSE,
      FALSE,
-     "jar16"},
+     L"jar16"},
     // RAR16
-    {{"a $(ArchiveDOSFullName) @$(ListDOSFullName)", "a -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
-     {"m $(ArchiveDOSFullName) @$(ListDOSFullName)", "m -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
+    {{L"a $(ArchiveDOSFullName) @$(ListDOSFullName)", L"a -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
+     {L"m $(ArchiveDOSFullName) @$(ListDOSFullName)", L"m -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
      {IDS_DP_RAR16_E, IDS_DP_RAR16V_E},
-     "rar",
+     L"rar",
      FALSE,
      FALSE,
-     "rar"},
+     L"rar"},
     // ZIP32
-    {{"-add -nozipextension -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"", NULL},
-     {"-add -nozipextension -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"", NULL},
+    {{L"-add -nozipextension -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"", NULL},
+     {L"-add -nozipextension -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"", NULL},
      {IDS_DP_ZIP32_E, -1},
-     "zip",
+     L"zip",
      TRUE,
      TRUE,
-     "pkzip25"},
+     L"pkzip25"},
     // ZIP16
-    {{"-P -whs $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
-     {"-m -P -whs $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+    {{L"-P -whs $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
+     {L"-m -P -whs $(ArchiveDOSFullName) @$(ListDOSFullName)", NULL},
      {IDS_DP_ZIP16_E, -1},
-     "zip",
+     L"zip",
      FALSE,
      FALSE,
-     "pkzip"},
+     L"pkzip"},
     // ARJ32
-    {{"a -pa \"$(ArchiveFullName)\" !\"$(ListFullName)\"", "a -pav1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
-     {"m -pa \"$(ArchiveFullName)\" !\"$(ListFullName)\"", "m -pav1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
+    {{L"a -pa \"$(ArchiveFullName)\" !\"$(ListFullName)\"", L"a -pav1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
+     {L"m -pa \"$(ArchiveFullName)\" !\"$(ListFullName)\"", L"m -pav1440 \"$(ArchiveFullName)\" !\"$(ListFullName)\""},
      {IDS_DP_ARJ32_E, IDS_DP_ARJ32V_E},
-     "arj",
+     L"arj",
      TRUE,
      FALSE,
-     "arj32"},
+     L"arj32"},
     // ACE32
-    {{"a \"$(ArchiveFullName)\" @\"$(ListFullName)\"", "a -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
-     {"m \"$(ArchiveFullName)\" @\"$(ListFullName)\"", "m -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
+    {{L"a \"$(ArchiveFullName)\" @\"$(ListFullName)\"", L"a -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
+     {L"m \"$(ArchiveFullName)\" @\"$(ListFullName)\"", L"m -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\""},
      {IDS_DP_ACE_E, IDS_DP_ACEV_E},
-     "ace",
+     L"ace",
      TRUE,
      TRUE,
-     "ace32"},
+     L"ace32"},
     // ACE16
-    {{"a $(ArchiveDOSFullName) @$(ListDOSFullName)", "a -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
-     {"m $(ArchiveDOSFullName) @$(ListDOSFullName)", "m -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
+    {{L"a $(ArchiveDOSFullName) @$(ListDOSFullName)", L"a -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
+     {L"m $(ArchiveDOSFullName) @$(ListDOSFullName)", L"m -v1440 $(ArchiveDOSFullName) @$(ListDOSFullName)"},
      {IDS_DP_ACE16_E, IDS_DP_ACE16V_E},
-     "ace",
+     L"ace",
      FALSE,
      FALSE,
-     "ace"},
+     L"ace"},
 };
 
 // custom unpacker table
 SPackCustomUnpacker CustomUnpackers[] = {
     // JAR32
-    {"x -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"", IDS_DU_JAR_E, "*.j", TRUE, FALSE, "jar32"},
+    {L"x -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"", IDS_DU_JAR_E, L"*.j", TRUE, FALSE, L"jar32"},
     // RAR32
-    {"x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_RAR_E, "*.rar", TRUE, FALSE, "rar"}, // since version 5.0 we must enforce the -scol switch, version 4.20 is fine; appears elsewhere and in the registry
+    {L"x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_RAR_E, L"*.rar", TRUE, FALSE, L"rar"}, // since version 5.0 we must enforce the -scol switch, version 4.20 is fine; appears elsewhere and in the registry
     // ARJ16
-    {"x -va -jyc $(ArchiveDOSFullName) !$(ListDOSFullName)", IDS_DU_ARJ16_E, "*.arj", FALSE, FALSE, "arj"},
+    {L"x -va -jyc $(ArchiveDOSFullName) !$(ListDOSFullName)", IDS_DU_ARJ16_E, L"*.arj", FALSE, FALSE, L"arj"},
     // LZH
-    {"x -a -l1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_LHA_E, "*.lzh", FALSE, FALSE, "lha"},
+    {L"x -a -l1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_LHA_E, L"*.lzh", FALSE, FALSE, L"lha"},
     // UC2
-    {"ESF $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_UC2_E, "*.uc2", FALSE, FALSE, "uc"},
+    {L"ESF $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_UC2_E, L"*.uc2", FALSE, FALSE, L"uc"},
     // JAR16
-    {"x -jyc $(ArchiveDOSFullName) !$(ListDOSFullName)", IDS_DU_JAR16_E, "*.j", FALSE, FALSE, "jar16"},
+    {L"x -jyc $(ArchiveDOSFullName) !$(ListDOSFullName)", IDS_DU_JAR16_E, L"*.j", FALSE, FALSE, L"jar16"},
     // RAR16
-    {"x $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_RAR16_E, "*.rar", FALSE, FALSE, "rar"},
+    {L"x $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_RAR16_E, L"*.rar", FALSE, FALSE, L"rar"},
     // ZIP32
-    {"-ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_ZIP32_E, "*.zip;*.pk3;*.jar", TRUE, TRUE, "pkzip25"},
+    {L"-ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_ZIP32_E, L"*.zip;*.pk3;*.jar", TRUE, TRUE, L"pkzip25"},
     // ZIP16
-    {"-d -Jhrs $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_ZIP16_E, "*.zip", FALSE, FALSE, "pkunzip"},
+    {L"-d -Jhrs $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_ZIP16_E, L"*.zip", FALSE, FALSE, L"pkunzip"},
     // ARJ32
-    {"x -va -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"", IDS_DU_ARJ32_E, "*.arj", TRUE, FALSE, "arj32"},
+    {L"x -va -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"", IDS_DU_ARJ32_E, L"*.arj", TRUE, FALSE, L"arj32"},
     // ACE32
-    {"x \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_ACE_E, "*.ace", TRUE, TRUE, "ace32"},
+    {L"x \"$(ArchiveFullName)\" @\"$(ListFullName)\"", IDS_DU_ACE_E, L"*.ace", TRUE, TRUE, L"ace32"},
     // ACE16
-    {"x $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_ACE16_E, "*.ace", FALSE, FALSE, "ace"},
+    {L"x $(ArchiveDOSFullName) @$(ListDOSFullName)", IDS_DU_ACE16_E, L"*.ace", FALSE, FALSE, L"ace"},
 };
 
 //
@@ -212,11 +225,11 @@ void CPackerConfig::AddDefault(int SalamVersion)
     case 1: // v1.52 had no packers
         if ((index = AddPacker()) == -1)
             return;
-        SetPacker(index, 0, "ZIP (Plugin)", "zip", TRUE);
+        SetPacker(index, 0, L"ZIP (Plugin)", L"zip", TRUE);
     case 2: // added after beta1
         if ((index = AddPacker()) == -1)
             return;
-        SetPacker(index, 3, "PAK (Plugin)", "pak", TRUE);
+        SetPacker(index, 3, L"PAK (Plugin)", L"pak", TRUE);
     case 3:  // added after beta2
     case 4:  // beta 3 but with old configuration (contains $(SpawnName))
     case 5:; // what is new in beta4?
@@ -227,10 +240,10 @@ void CPackerConfig::AddDefault(int SalamVersion)
     switch (SalamVersion)
     {
         // parameters format
-        //BOOL SetPacker(int index, int type, const char *title, const char *ext, BOOL old,
+        //BOOL SetPacker(int index, int type, const wchar_t *title, const wchar_t *ext, BOOL old,
         //               BOOL supportLongNames = FALSE, BOOL supportMove = FALSE,
-        //               const char *cmdExecCopy = NULL, const char *cmdArgsCopy = NULL,
-        //               const char *cmdExecMove = NULL, const char *cmdArgsMove = NULL,
+        //               const wchar_t *cmdExecCopy = NULL, const wchar_t *cmdArgsCopy = NULL,
+        //               const wchar_t *cmdExecMove = NULL, const wchar_t *cmdArgsMove = NULL,
         //               BOOL needANSIListFile = FALSE);
 
     case 0: // default config
@@ -240,7 +253,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
             int idx = CustomOrder[i];
             if ((index = AddPacker()) == -1)
                 return;
-            SetPacker(index, 1, LoadStr(CustomPackers[idx].Title[0]), CustomPackers[idx].Ext, TRUE,
+            SetPacker(index, 1, LoadStrW(CustomPackers[idx].Title[0]), CustomPackers[idx].Ext, TRUE,
                       CustomPackers[idx].SupLN, TRUE,
                       CustomPackers[idx].Exe, CustomPackers[idx].CopyArgs[0],
                       CustomPackers[idx].Exe, CustomPackers[idx].MoveArgs[0],
@@ -249,7 +262,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
             {
                 if ((index = AddPacker()) == -1)
                     return;
-                SetPacker(index, 1, LoadStr(CustomPackers[idx].Title[1]), CustomPackers[idx].Ext, TRUE,
+                SetPacker(index, 1, LoadStrW(CustomPackers[idx].Title[1]), CustomPackers[idx].Ext, TRUE,
                           CustomPackers[idx].SupLN, TRUE,
                           CustomPackers[idx].Exe, CustomPackers[idx].CopyArgs[1],
                           CustomPackers[idx].Exe, CustomPackers[idx].MoveArgs[1],
@@ -262,7 +275,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
             int idx = CustomOrder[i];
             if ((index = AddPacker()) == -1)
                 return;
-            SetPacker(index, 1, LoadStr(CustomPackers[idx].Title[0]), CustomPackers[idx].Ext, TRUE,
+            SetPacker(index, 1, LoadStrW(CustomPackers[idx].Title[0]), CustomPackers[idx].Ext, TRUE,
                       CustomPackers[idx].SupLN, TRUE,
                       CustomPackers[idx].Exe, CustomPackers[idx].CopyArgs[0],
                       CustomPackers[idx].Exe, CustomPackers[idx].MoveArgs[0],
@@ -271,7 +284,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
             {
                 if ((index = AddPacker()) == -1)
                     return;
-                SetPacker(index, 1, LoadStr(CustomPackers[idx].Title[1]), CustomPackers[idx].Ext, TRUE,
+                SetPacker(index, 1, LoadStrW(CustomPackers[idx].Title[1]), CustomPackers[idx].Ext, TRUE,
                           CustomPackers[idx].SupLN, TRUE,
                           CustomPackers[idx].Exe, CustomPackers[idx].CopyArgs[1],
                           CustomPackers[idx].Exe, CustomPackers[idx].MoveArgs[1],
@@ -284,23 +297,23 @@ void CPackerConfig::AddDefault(int SalamVersion)
         for (index = 0; index < GetPackersCount(); index++)
             if (GetPackerType(index) == 1)
             {
-                const char* cmdC = GetPackerCmdExecCopy(index);
-                const char* cmdM = GetPackerCmdExecMove(index);
-                if (strncmp(cmdC, "$(SpawnName) ", 13) == 0 ||
-                    GetPackerSupMove(index) && strncmp(cmdM, "$(SpawnName) ", 13) == 0)
+                const wchar_t* cmdC = GetPackerCmdExecCopy(index);
+                const wchar_t* cmdM = GetPackerCmdExecMove(index);
+                if (wcsncmp(cmdC, L"$(SpawnName) ", 13) == 0 ||
+                    GetPackerSupMove(index) && wcsncmp(cmdM, L"$(SpawnName) ", 13) == 0)
                 {
-                    std::string copyCmdBuf = (strncmp(cmdC, "$(SpawnName) ", 13) == 0) ? (cmdC + 13) : cmdC;
-                    std::string copyArgBuf = GetPackerCmdArgsCopy(index);
+                    std::wstring copyCmdBuf = (wcsncmp(cmdC, L"$(SpawnName) ", 13) == 0) ? (cmdC + 13) : cmdC;
+                    std::wstring copyArgBuf = GetPackerCmdArgsCopy(index);
 
-                    std::string moveCmdBuf, moveArgBuf;
+                    std::wstring moveCmdBuf, moveArgBuf;
                     if (GetPackerSupMove(index))
                     {
-                        moveCmdBuf = (strncmp(cmdM, "$(SpawnName) ", 13) == 0) ? (cmdM + 13) : cmdM;
+                        moveCmdBuf = (wcsncmp(cmdM, L"$(SpawnName) ", 13) == 0) ? (cmdM + 13) : cmdM;
                         moveArgBuf = GetPackerCmdArgsMove(index);
                     }
 
-                    std::string TitleBuf = GetPackerTitle(index);
-                    std::string ExtBuf = GetPackerExt(index);
+                    std::wstring TitleBuf = GetPackerTitle(index);
+                    std::wstring ExtBuf = GetPackerExt(index);
 
                     SetPacker(index, GetPackerType(index), TitleBuf.c_str(), ExtBuf.c_str(), TRUE,
                               GetPackerSupLongNames(index), GetPackerSupMove(index),
@@ -322,8 +335,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                 GetPackerCmdExecCopy(index) != NULL && GetPackerCmdExecMove(index) != NULL)
             {
                 // take the old commands
-                std::string cmdC = GetPackerCmdExecCopy(index);
-                std::string cmdM = GetPackerCmdExecMove(index);
+                std::wstring cmdC = GetPackerCmdExecCopy(index);
+                std::wstring cmdM = GetPackerCmdExecMove(index);
                 i = 0;
                 BOOL found = FALSE;
                 // and search the table with them
@@ -341,7 +354,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
                                 if (GetPackerSupLongNames(index))
                                     cmdC = PackConversionTable[i].variable;
                                 else
-                                    cmdC = "$(Rar16bitExecutable)";
+                                    cmdC = L"$(Rar16bitExecutable)";
                             else
                                 // for others it's simple
                                 cmdC = PackConversionTable[i].variable;
@@ -354,7 +367,7 @@ void CPackerConfig::AddDefault(int SalamVersion)
                                 if (GetPackerSupLongNames(index))
                                     cmdM = PackConversionTable[i].variable;
                                 else
-                                    cmdM = "$(Rar16bitExecutable)";
+                                    cmdM = L"$(Rar16bitExecutable)";
                             else
                                 // for others it's simple
                                 cmdM = PackConversionTable[i].variable;
@@ -364,10 +377,10 @@ void CPackerConfig::AddDefault(int SalamVersion)
                     i++;
                 }
                 // strings must be copied somewhere or we delete them before use
-                std::string title = GetPackerTitle(index);
-                std::string ext = GetPackerExt(index);
-                std::string argsC = GetPackerCmdArgsCopy(index) ? GetPackerCmdArgsCopy(index) : "";
-                std::string argsM = GetPackerCmdArgsMove(index) ? GetPackerCmdArgsMove(index) : "";
+                std::wstring title = GetPackerTitle(index);
+                std::wstring ext = GetPackerExt(index);
+                std::wstring argsC = GetPackerCmdArgsCopy(index) ? GetPackerCmdArgsCopy(index) : L"";
+                std::wstring argsM = GetPackerCmdArgsMove(index) ? GetPackerCmdArgsMove(index) : L"";
 
                 if (found)
                     SetPacker(index, GetPackerType(index), title.c_str(), ext.c_str(), GetPackerOldType(index),
@@ -381,9 +394,9 @@ void CPackerConfig::AddDefault(int SalamVersion)
             if ((GetPackerOldType(index) && GetPackerType(index) == 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* s = GetPackerCmdExecCopy(index);
-                if (s != NULL && (strcmp(s, "$(Zip32bitExecutable)") == 0 ||
-                                  strcmp(s, "$(Ace32bitExecutable)") == 0))
+                const wchar_t* s = GetPackerCmdExecCopy(index);
+                if (s != NULL && (wcscmp(s, L"$(Zip32bitExecutable)") == 0 ||
+                                  wcscmp(s, L"$(Ace32bitExecutable)") == 0))
                 {
                     Packers[index]->NeedANSIListFile = TRUE;
                 }
@@ -396,11 +409,11 @@ void CPackerConfig::AddDefault(int SalamVersion)
             if ((GetPackerOldType(index) && GetPackerType(index) != 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) != CUSTOMPACKER_EXTERNAL))
             { // take only plug-ins (not external packers)
-                std::string& s = Packers[index]->Title;
-                size_t pos = s.find("(Internal)");
-                if (pos != std::string::npos && pos + 10 == s.length())
+                std::wstring& s = Packers[index]->Title;
+                size_t pos = s.find(L"(Internal)");
+                if (pos != std::wstring::npos && pos + 10 == s.length())
                 {
-                    s.replace(pos, 10, "(Plugin)");
+                    s.replace(pos, 10, L"(Plugin)");
                 }
             }
         }
@@ -411,28 +424,28 @@ void CPackerConfig::AddDefault(int SalamVersion)
     {
         // LHA gained "-m", we must add it and if archivers-auto-config added LHA a second time
         // because "-m" did not match, remove that new entry
-        const char* newLHACopyArgs = "a -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)";
-        const char* newLHAMoveArgs = "m -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)";
+        const wchar_t* newLHACopyArgs = L"a -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)";
+        const wchar_t* newLHAMoveArgs = L"m -m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)";
         BOOL canDelLHA = FALSE;
         for (index = 0; index < GetPackersCount(); index++)
         {
             if ((GetPackerOldType(index) && GetPackerType(index) == 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* copyEXE = GetPackerCmdExecCopy(index);
-                const char* copyArgs = GetPackerCmdArgsCopy(index);
-                const char* moveEXE = GetPackerCmdExecMove(index);
-                const char* moveArgs = GetPackerCmdArgsMove(index);
+                const wchar_t* copyEXE = GetPackerCmdExecCopy(index);
+                const wchar_t* copyArgs = GetPackerCmdArgsCopy(index);
+                const wchar_t* moveEXE = GetPackerCmdExecMove(index);
+                const wchar_t* moveArgs = GetPackerCmdArgsMove(index);
 
                 // check whether this is an LHA custom packer
-                if (copyEXE != NULL && strcmp(copyEXE, "$(Lha16bitExecutable)") == 0 &&
-                    moveEXE != NULL && strcmp(moveEXE, "$(Lha16bitExecutable)") == 0)
+                if (copyEXE != NULL && wcscmp(copyEXE, L"$(Lha16bitExecutable)") == 0 &&
+                    moveEXE != NULL && wcscmp(moveEXE, L"$(Lha16bitExecutable)") == 0)
                 {
                     // test whether this is an old LHA custom packer entry
                     if (copyArgs != NULL &&
-                        strcmp(copyArgs, "a -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)") == 0 &&
+                        wcscmp(copyArgs, L"a -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)") == 0 &&
                         moveArgs != NULL &&
-                        strcmp(moveArgs, "m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)") == 0)
+                        wcscmp(moveArgs, L"m -p -a -l1 -x1 -c $(ArchiveDOSFullName) @$(ListDOSFullName)") == 0)
                     {
                         if (canDelLHA)
                         {
@@ -451,8 +464,8 @@ void CPackerConfig::AddDefault(int SalamVersion)
                     else
                     {
                         // test whether this is an entry added by archivers-auto-config for the LHA custom packer
-                        if (copyArgs != NULL && strcmp(copyArgs, newLHACopyArgs) == 0 &&
-                            moveArgs != NULL && strcmp(moveArgs, newLHAMoveArgs) == 0)
+                        if (copyArgs != NULL && wcscmp(copyArgs, newLHACopyArgs) == 0 &&
+                            moveArgs != NULL && wcscmp(moveArgs, newLHAMoveArgs) == 0)
                         {
                             if (canDelLHA)
                             {
@@ -491,27 +504,27 @@ void CPackerConfig::AddDefault(int SalamVersion)
     case 33: // 2.5b12 - for now, only for transferring plugin configuration from version 2.5b11
     {
         // PKZIP25 gained "-nozipextension", we must add it
-        const char* newPKZIP25CopyArgs = "-add -nozipextension -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
-        const char* newPKZIP25MoveArgs = "-add -nozipextension -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newPKZIP25CopyArgs = L"-add -nozipextension -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newPKZIP25MoveArgs = L"-add -nozipextension -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
         for (index = 0; index < GetPackersCount(); index++)
         {
             if ((GetPackerOldType(index) && GetPackerType(index) == 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* copyEXE = GetPackerCmdExecCopy(index);
-                const char* copyArgs = GetPackerCmdArgsCopy(index);
-                const char* moveEXE = GetPackerCmdExecMove(index);
-                const char* moveArgs = GetPackerCmdArgsMove(index);
+                const wchar_t* copyEXE = GetPackerCmdExecCopy(index);
+                const wchar_t* copyArgs = GetPackerCmdArgsCopy(index);
+                const wchar_t* moveEXE = GetPackerCmdExecMove(index);
+                const wchar_t* moveArgs = GetPackerCmdArgsMove(index);
 
                 // check whether this is a PKZIP25 custom packer
-                if (copyEXE != NULL && strcmp(copyEXE, "$(Zip32bitExecutable)") == 0 &&
-                    moveEXE != NULL && strcmp(moveEXE, "$(Zip32bitExecutable)") == 0)
+                if (copyEXE != NULL && wcscmp(copyEXE, L"$(Zip32bitExecutable)") == 0 &&
+                    moveEXE != NULL && wcscmp(moveEXE, L"$(Zip32bitExecutable)") == 0)
                 {
                     // test whether this is an old PKZIP25 custom packer entry
                     if (copyArgs != NULL &&
-                        strcmp(copyArgs, "-add -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
+                        wcscmp(copyArgs, L"-add -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
                         moveArgs != NULL &&
-                        strcmp(moveArgs, "-add -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
+                        wcscmp(moveArgs, L"-add -move -path -attr \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-nozipextension")
                         Packers[index]->CmdArgsCopy = newPKZIP25CopyArgs;
@@ -529,38 +542,38 @@ void CPackerConfig::AddDefault(int SalamVersion)
     if (SalamVersion > 1 && SalamVersion < 81)
     {
         // since RAR 5.0 filelists are ANSI by default instead of OEM, so we must force OEM with a switch
-        const char* newRAR5CopyArgs = "a -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
-        const char* newRAR5MoveArgs = "m -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
-        const char* newRAR5CopyVolArgs = "a -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
-        const char* newRAR5MoveVolArgs = "m -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newRAR5CopyArgs = L"a -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newRAR5MoveArgs = L"m -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newRAR5CopyVolArgs = L"a -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newRAR5MoveVolArgs = L"m -scol -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
         for (index = 0; index < GetPackersCount(); index++)
         {
             if ((GetPackerOldType(index) && GetPackerType(index) == 1) ||
                 (!GetPackerOldType(index) && GetPackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* copyEXE = GetPackerCmdExecCopy(index);
-                const char* copyArgs = GetPackerCmdArgsCopy(index);
-                const char* moveEXE = GetPackerCmdExecMove(index);
-                const char* moveArgs = GetPackerCmdArgsMove(index);
+                const wchar_t* copyEXE = GetPackerCmdExecCopy(index);
+                const wchar_t* copyArgs = GetPackerCmdArgsCopy(index);
+                const wchar_t* moveEXE = GetPackerCmdExecMove(index);
+                const wchar_t* moveArgs = GetPackerCmdArgsMove(index);
 
                 // check whether this is a RAR Win32 custom packer
-                if (copyEXE != NULL && strcmp(copyEXE, "$(Rar32bitExecutable)") == 0 &&
-                    moveEXE != NULL && strcmp(moveEXE, "$(Rar32bitExecutable)") == 0)
+                if (copyEXE != NULL && wcscmp(copyEXE, L"$(Rar32bitExecutable)") == 0 &&
+                    moveEXE != NULL && wcscmp(moveEXE, L"$(Rar32bitExecutable)") == 0)
                 {
                     // test whether this is an old RAR Win32 custom packer entry
                     if (copyArgs != NULL &&
-                        strcmp(copyArgs, "a \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
+                        wcscmp(copyArgs, L"a \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
                         moveArgs != NULL &&
-                        strcmp(moveArgs, "m \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
+                        wcscmp(moveArgs, L"m \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
                         Packers[index]->CmdArgsCopy = newRAR5CopyArgs;
                         Packers[index]->CmdArgsMove = newRAR5MoveArgs;
                     }
                     if (copyArgs != NULL &&
-                        strcmp(copyArgs, "a -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
+                        wcscmp(copyArgs, L"a -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
                         moveArgs != NULL &&
-                        strcmp(moveArgs, "m -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
+                        wcscmp(moveArgs, L"m -v1440 \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
                         Packers[index]->CmdArgsCopy = newRAR5CopyVolArgs;
@@ -663,13 +676,13 @@ void CPackerConfig::DeletePacker(int index)
     Packers.Delete(index);
 }
 
-BOOL CPackerConfig::SetPacker(int index, int type, const char* title, const char* ext, BOOL old,
+BOOL CPackerConfig::SetPacker(int index, int type, const wchar_t* title, const wchar_t* ext, BOOL old,
                               BOOL supportLongNames, BOOL supportMove,
-                              const char* cmdExecCopy, const char* cmdArgsCopy,
-                              const char* cmdExecMove, const char* cmdArgsMove,
+                              const wchar_t* cmdExecCopy, const wchar_t* cmdArgsCopy,
+                              const wchar_t* cmdExecMove, const wchar_t* cmdArgsMove,
                               BOOL needANSIListFile)
 {
-    CALL_STACK_MESSAGE13("CPackerConfig::SetPacker(%d, %d, %s, %s, %d, %d, %d, %s, %s, %s, %s, %d)",
+    CALL_STACK_MESSAGE13("CPackerConfig::SetPacker(%d, %d, %ls, %ls, %d, %d, %d, %ls, %ls, %ls, %ls, %d)",
                          index, type, title, ext, old, supportLongNames, supportMove,
                          cmdExecCopy, cmdArgsCopy, cmdExecMove, cmdArgsMove, needANSIListFile);
     CPackerConfigData* data = Packers[index];
@@ -681,14 +694,14 @@ BOOL CPackerConfig::SetPacker(int index, int type, const char* title, const char
     if (old && data->Type == 1 ||
         !old && data->Type == CUSTOMPACKER_EXTERNAL)
     {
-        data->CmdExecCopy = cmdExecCopy ? cmdExecCopy : "";
-        data->CmdArgsCopy = cmdArgsCopy ? cmdArgsCopy : "";
+        data->CmdExecCopy = cmdExecCopy ? cmdExecCopy : L"";
+        data->CmdArgsCopy = cmdArgsCopy ? cmdArgsCopy : L"";
         data->SupportMove = supportMove;
 
         if (data->SupportMove)
         {
-            data->CmdExecMove = cmdExecMove ? cmdExecMove : "";
-            data->CmdArgsMove = cmdArgsMove ? cmdArgsMove : "";
+            data->CmdExecMove = cmdExecMove ? cmdExecMove : L"";
+            data->CmdArgsMove = cmdArgsMove ? cmdArgsMove : L"";
         }
         data->SupportLongNames = supportLongNames;
         data->NeedANSIListFile = needANSIListFile;
@@ -707,24 +720,25 @@ BOOL CPackerConfig::SetPacker(int index, int type, const char* title, const char
     }
 }
 
-BOOL CPackerConfig::SetPackerTitle(int index, const char* title)
+BOOL CPackerConfig::SetPackerTitle(int index, const wchar_t* title)
 {
     CPackerConfigData* data = Packers[index];
     data->Title = title;
     return TRUE;
 }
 
-BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL move,
-                                  const char* sourcePath, SalEnumSelection2 next, void* param)
+BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const wchar_t* zipFile, BOOL move,
+                                  const wchar_t* sourcePath, SalEnumSelection2 next, void* param,
+                                  SalEnumLastNameW lastNameW)
 {
-    CALL_STACK_MESSAGE4("CPackerConfig::ExecutePacker(, %s, %d, %s, , ,)",
+    CALL_STACK_MESSAGE4("CPackerConfig::ExecutePacker(, %ls, %d, %ls, , ,)",
                         zipFile, move, sourcePath);
     if (PreferedPacker >= 0 && PreferedPacker < Packers.Count)
     {
         CPackerConfigData* data = Packers[PreferedPacker];
         if (data->Type == CUSTOMPACKER_EXTERNAL)
         {
-            std::string command;
+            std::wstring command;
             if (move)
             {
                 if (!data->SupportMove)
@@ -732,15 +746,15 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
                     TRACE_E("Using \"Move to archive\" with packer, which does not support it !!!");
                     return FALSE;
                 }
-                command = std::string(data->CmdExecMove) + " " + data->CmdArgsMove;
+                command = data->CmdExecMove + L" " + data->CmdArgsMove;
             }
             else
             {
-                command = std::string(data->CmdExecCopy) + " " + data->CmdArgsCopy;
+                command = data->CmdExecCopy + L" " + data->CmdArgsCopy;
             }
             BOOL ret = PackUniversalCompress(NULL, command.c_str(), NULL, sourcePath, FALSE,
                                              data->SupportLongNames, zipFile, sourcePath, NULL,
-                                             next, param, data->NeedANSIListFile);
+                                             next, param, data->NeedANSIListFile, lastNameW);
             return ret;
         }
         else
@@ -748,7 +762,7 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
             CPluginData* plugin = Plugins.Get(-data->Type - 1);
             if (plugin != NULL && plugin->SupportCustomPack)
             {
-                return plugin->PackToArchive(panel, zipFile, "", move, sourcePath, next, param);
+                return plugin->PackToArchive(panel, zipFile, L"", move, sourcePath, next, param);
             }
             else
                 TRACE_E("Unexpected situation in CPackerConfig::ExecutePacker().");
@@ -764,32 +778,32 @@ BOOL CPackerConfig::Save(int index, HKEY hKey)
     int type = GetPackerType(index);
     d = type;
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &d, sizeof(d));
+        ret &= SetValueW(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &d, sizeof(d));
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_TITLE, REG_SZ, GetPackerTitle(index), -1);
+        ret &= SetValueW(hKey, SALAMANDER_CPU_TITLE, REG_SZ, GetPackerTitle(index), -1);
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_EXT, REG_SZ, GetPackerExt(index), -1);
+        ret &= SetValueW(hKey, SALAMANDER_CPU_EXT, REG_SZ, GetPackerExt(index), -1);
     if (ret && type == CUSTOMPACKER_EXTERNAL)
     {
         d = GetPackerSupLongNames(index);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &d, sizeof(d));
+            ret &= SetValueW(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &d, sizeof(d));
         d = GetPackerNeedANSIListFile(index);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &d, sizeof(d));
+            ret &= SetValueW(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &d, sizeof(d));
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CP_EXECCOPY, REG_SZ, GetPackerCmdExecCopy(index), -1);
+            ret &= SetValueW(hKey, SALAMANDER_CP_EXECCOPY, REG_SZ, GetPackerCmdExecCopy(index), -1);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CP_ARGSCOPY, REG_SZ, GetPackerCmdArgsCopy(index), -1);
+            ret &= SetValueW(hKey, SALAMANDER_CP_ARGSCOPY, REG_SZ, GetPackerCmdArgsCopy(index), -1);
         d = GetPackerSupMove(index);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CP_SUPMOVE, REG_DWORD, &d, sizeof(d));
+            ret &= SetValueW(hKey, SALAMANDER_CP_SUPMOVE, REG_DWORD, &d, sizeof(d));
         if (ret && d == TRUE)
         {
             if (ret)
-                ret &= SetValue(hKey, SALAMANDER_CP_EXECMOVE, REG_SZ, GetPackerCmdExecMove(index), -1);
+                ret &= SetValueW(hKey, SALAMANDER_CP_EXECMOVE, REG_SZ, GetPackerCmdExecMove(index), -1);
             if (ret)
-                ret &= SetValue(hKey, SALAMANDER_CP_ARGSMOVE, REG_SZ, GetPackerCmdArgsMove(index), -1);
+                ret &= SetValueW(hKey, SALAMANDER_CP_ARGSMOVE, REG_SZ, GetPackerCmdArgsMove(index), -1);
         }
     }
     return ret;
@@ -797,53 +811,47 @@ BOOL CPackerConfig::Save(int index, HKEY hKey)
 
 BOOL CPackerConfig::Load(HKEY hKey)
 {
-    CPathBuffer title;
-    title[0] = 0;
-    CPathBuffer ext;
+    std::wstring title;
+    std::wstring ext;
     DWORD type;
     DWORD suplong = FALSE;
     DWORD needANSI = FALSE;
-    CPathBuffer execcopy;
-    execcopy[0] = 0;
-    CPathBuffer argscopy;
-    argscopy[0] = 0;
+    std::wstring execcopy;
+    std::wstring argscopy;
     DWORD supmove = FALSE;
-    CPathBuffer execmove;
-    execmove[0] = 0;
-    CPathBuffer argsmove;
-    argsmove[0] = 0;
-    int max = title.Size();
+    std::wstring execmove;
+    std::wstring argsmove;
 
     BOOL ret = TRUE;
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &type, sizeof(DWORD));
+        ret &= GetValueW(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &type, sizeof(DWORD));
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_TITLE, REG_SZ, title, max);
+        ret &= GetStringValueW(hKey, SALAMANDER_CPU_TITLE, title);
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_EXT, REG_SZ, ext, max);
+        ret &= GetStringValueW(hKey, SALAMANDER_CPU_EXT, ext);
     if (ret && (Configuration.ConfigVersion < 6 && type == 1 ||
                 Configuration.ConfigVersion >= 6 && type == CUSTOMPACKER_EXTERNAL))
     {
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &suplong, sizeof(DWORD));
+            ret &= GetValueW(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &suplong, sizeof(DWORD));
         if (ret)
         {
-            if (!GetValue(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &needANSI, sizeof(DWORD)))
+            if (!GetValueW(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &needANSI, sizeof(DWORD)))
                 needANSI = FALSE; // in older versions it wasn't present, assumed FALSE
         }
 
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CP_EXECCOPY, REG_SZ, execcopy, max);
+            ret &= GetStringValueW(hKey, SALAMANDER_CP_EXECCOPY, execcopy);
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CP_ARGSCOPY, REG_SZ, argscopy, max);
+            ret &= GetStringValueW(hKey, SALAMANDER_CP_ARGSCOPY, argscopy);
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CP_SUPMOVE, REG_DWORD, &supmove, sizeof(DWORD));
+            ret &= GetValueW(hKey, SALAMANDER_CP_SUPMOVE, REG_DWORD, &supmove, sizeof(DWORD));
         if (ret && supmove == TRUE)
         {
             if (ret)
-                ret &= GetValue(hKey, SALAMANDER_CP_EXECMOVE, REG_SZ, execmove, max);
+                ret &= GetStringValueW(hKey, SALAMANDER_CP_EXECMOVE, execmove);
             if (ret)
-                ret &= GetValue(hKey, SALAMANDER_CP_ARGSMOVE, REG_SZ, argsmove, max);
+                ret &= GetStringValueW(hKey, SALAMANDER_CP_ARGSMOVE, argsmove);
         }
     }
 
@@ -853,15 +861,11 @@ BOOL CPackerConfig::Load(HKEY hKey)
         if ((index = AddPacker()) == -1)
             return FALSE;
         if (Configuration.ConfigVersion < 44) // convert extension to lowercase
-        {
-            CPathBuffer extAux;
-            lstrcpyn(extAux, ext, extAux.Size());
-            StrICpy(ext, extAux);
-        }
-        ret &= SetPacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,
+            LowerCaseExtensionForUpgrade(ext);
+        ret &= SetPacker(index, (int)type, title.c_str(), ext.c_str(), Configuration.ConfigVersion < 6,
                          (BOOL)suplong, BOOL(supmove),
-                         execcopy, argscopy,
-                         execmove, argsmove, needANSI);
+                         execcopy.c_str(), argscopy.c_str(),
+                         execmove.c_str(), argsmove.c_str(), needANSI);
     }
 
     return ret;
@@ -899,14 +903,14 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
         {
             if (Unpackers[i]->Ext.empty())
                 continue;
-            std::string result;
-            result += "*.";
-            for (const char* ptr = Unpackers[i]->Ext.c_str(); *ptr != '\0'; ptr++)
+            std::wstring result;
+            result += L"*.";
+            for (const wchar_t* ptr = Unpackers[i]->Ext.c_str(); *ptr != L'\0'; ptr++)
             {
                 result += *ptr;
-                if (*ptr == ';')
+                if (*ptr == L';')
                 {
-                    result += "*.";
+                    result += L"*.";
                 }
             }
             Unpackers[i]->Ext = result;
@@ -922,40 +926,40 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
     case 1: // v1.52 had no packers
         if ((index = AddUnpacker()) == -1)
             return;
-        SetUnpacker(index, 0, "ZIP (Plugin)", "*.zip", TRUE);
+        SetUnpacker(index, 0, L"ZIP (Plugin)", L"*.zip", TRUE);
     case 2: // added after beta1
         // hack to add the pk3 extension to zip
         for (i = 0; i < Unpackers.Count; i++)
-            if (!strnicmp(Unpackers[i]->Ext.c_str(), "*.zip", 5))
+            if (!_wcsnicmp(Unpackers[i]->Ext.c_str(), L"*.zip", 5))
             {
-                Unpackers[i]->Ext += ";*.pk3;*.jar";
+                Unpackers[i]->Ext += L";*.pk3;*.jar";
                 break;
             }
         // and new formats
         if ((index = AddUnpacker()) == -1)
             return;
-        SetUnpacker(index, 3, "PAK (Plugin)", "*.pak", TRUE);
+        SetUnpacker(index, 3, L"PAK (Plugin)", L"*.pak", TRUE);
     case 3: // what was added after beta2
     case 4: // beta 3 but without the $(SpawnName) variable
     case 5: // what is new in beta4?
         if ((index = AddUnpacker()) == -1)
             return;
-        SetUnpacker(index, 2, "TAR (Plugin)", "*.TAR;*.TGZ;*.TBZ;*.TAZ;"
-                                              "*.TAR.GZ;*.TAR.BZ;*.TAR.BZ2;*.TAR.Z;"
-                                              "*_TAR.GZ;*_TAR.BZ;*_TAR.BZ2;*_TAR.Z;"
-                                              "*_TAR_GZ;*_TAR_BZ;*_TAR_BZ2;*_TAR_Z;"
-                                              "*.TAR_GZ;*.TAR_BZ;*.TAR_BZ2;*.TAR_Z;"
-                                              "*.GZ;*.BZ;*.BZ2;*.Z;"
-                                              "*.RPM;*.CPIO",
+        SetUnpacker(index, 2, L"TAR (Plugin)", L"*.TAR;*.TGZ;*.TBZ;*.TAZ;"
+                                               L"*.TAR.GZ;*.TAR.BZ;*.TAR.BZ2;*.TAR.Z;"
+                                               L"*_TAR.GZ;*_TAR.BZ;*_TAR.BZ2;*_TAR.Z;"
+                                               L"*_TAR_GZ;*_TAR_BZ;*_TAR_BZ2;*_TAR_Z;"
+                                               L"*.TAR_GZ;*.TAR_BZ;*.TAR_BZ2;*.TAR_Z;"
+                                               L"*.GZ;*.BZ;*.BZ2;*.Z;"
+                                               L"*.RPM;*.CPIO",
                     TRUE);
     }
     // now external
     switch (SalamVersion)
     {
         // parameters
-        //BOOL SetUnpacker(int index, int type, const char *title, const char *ext, BOOL old,
+        //BOOL SetUnpacker(int index, int type, const wchar_t *title, const wchar_t *ext, BOOL old,
         //                 BOOL supportLongNames = FALSE,
-        //                 const char *cmdExecExtract = NULL, const char *cmdArgsExtract = NULL,
+        //                 const wchar_t *cmdExecExtract = NULL, const wchar_t *cmdArgsExtract = NULL,
         //                 BOOL needANSIListFile = FALSE);
 
     case 0: // default config
@@ -965,7 +969,7 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
             int idx = CustomOrder[i];
             if ((index = AddUnpacker()) == -1)
                 return;
-            SetUnpacker(index, 1, LoadStr(CustomUnpackers[idx].Title), CustomUnpackers[idx].Ext, TRUE,
+            SetUnpacker(index, 1, LoadStrW(CustomUnpackers[idx].Title), CustomUnpackers[idx].Ext, TRUE,
                         CustomUnpackers[idx].SupLN, CustomUnpackers[idx].Exe,
                         CustomUnpackers[idx].Args, CustomUnpackers[idx].Ansi);
         }
@@ -975,7 +979,7 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
             int idx = CustomOrder[i];
             if ((index = AddUnpacker()) == -1)
                 return;
-            SetUnpacker(index, 1, LoadStr(CustomUnpackers[idx].Title), CustomUnpackers[idx].Ext, TRUE,
+            SetUnpacker(index, 1, LoadStrW(CustomUnpackers[idx].Title), CustomUnpackers[idx].Ext, TRUE,
                         CustomUnpackers[idx].SupLN, CustomUnpackers[idx].Exe,
                         CustomUnpackers[idx].Args, CustomUnpackers[idx].Ansi);
         }
@@ -985,13 +989,13 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
         for (index = 0; index < GetUnpackersCount(); index++)
             if (GetUnpackerType(index) == 1)
             {
-                const char* cmd = GetUnpackerCmdExecExtract(index);
-                if (strncmp(cmd, "$(SpawnName) ", 13) == 0)
+                const wchar_t* cmd = GetUnpackerCmdExecExtract(index);
+                if (wcsncmp(cmd, L"$(SpawnName) ", 13) == 0)
                 {
-                    std::string extractCmdBuf = cmd + 13;
-                    std::string extractArgBuf = GetUnpackerCmdArgsExtract(index);
-                    std::string TitleBuf = GetUnpackerTitle(index);
-                    std::string ExtBuf = GetUnpackerExt(index);
+                    std::wstring extractCmdBuf = cmd + 13;
+                    std::wstring extractArgBuf = GetUnpackerCmdArgsExtract(index);
+                    std::wstring TitleBuf = GetUnpackerTitle(index);
+                    std::wstring ExtBuf = GetUnpackerExt(index);
 
                     SetUnpacker(index, GetUnpackerType(index), TitleBuf.c_str(), ExtBuf.c_str(), TRUE,
                                 GetUnpackerSupLongNames(index), extractCmdBuf.c_str(), extractArgBuf.c_str(),
@@ -1010,7 +1014,7 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                 GetUnpackerCmdExecExtract(index) != NULL)
             {
                 // take the old commands
-                std::string cmd = GetUnpackerCmdExecExtract(index);
+                std::wstring cmd = GetUnpackerCmdExecExtract(index);
                 i = 0;
                 BOOL found = FALSE;
                 // and search the table with it
@@ -1025,7 +1029,7 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                             if (GetUnpackerSupLongNames(index))
                                 cmd = PackConversionTable[i].variable;
                             else
-                                cmd = "$(Rar16bitExecutable)";
+                                cmd = L"$(Rar16bitExecutable)";
                         else
                             // for others it's simple
                             cmd = PackConversionTable[i].variable;
@@ -1034,9 +1038,9 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
                     i++;
                 }
                 // strings must be copied somewhere or we delete them before use
-                std::string title = GetUnpackerTitle(index);
-                std::string ext = GetUnpackerExt(index);
-                std::string args = GetUnpackerCmdArgsExtract(index) ? GetUnpackerCmdArgsExtract(index) : "";
+                std::wstring title = GetUnpackerTitle(index);
+                std::wstring ext = GetUnpackerExt(index);
+                std::wstring args = GetUnpackerCmdArgsExtract(index) ? GetUnpackerCmdArgsExtract(index) : L"";
 
                 if (found)
                     SetUnpacker(index, GetUnpackerType(index), title.c_str(), ext.c_str(), GetUnpackerOldType(index),
@@ -1050,9 +1054,9 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
             if ((GetUnpackerOldType(index) && GetUnpackerType(index) == 1) ||
                 (!GetUnpackerOldType(index) && GetUnpackerType(index) == CUSTOMUNPACKER_EXTERNAL))
             {
-                const char* s = GetUnpackerCmdExecExtract(index);
-                if (s != NULL && (strcmp(s, "$(Zip32bitExecutable)") == 0 ||
-                                  strcmp(s, "$(Ace32bitExecutable)") == 0))
+                const wchar_t* s = GetUnpackerCmdExecExtract(index);
+                if (s != NULL && (wcscmp(s, L"$(Zip32bitExecutable)") == 0 ||
+                                  wcscmp(s, L"$(Ace32bitExecutable)") == 0))
                 {
                     Unpackers[index]->NeedANSIListFile = TRUE;
                 }
@@ -1065,11 +1069,11 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
             if ((GetUnpackerOldType(index) && GetUnpackerType(index) != 1) ||
                 (!GetUnpackerOldType(index) && GetUnpackerType(index) != CUSTOMUNPACKER_EXTERNAL))
             { // take only plug-ins (not external unpackers)
-                std::string& s = Unpackers[index]->Title;
-                size_t pos = s.find("(Internal)");
-                if (pos != std::string::npos && pos + 10 == s.length())
+                std::wstring& s = Unpackers[index]->Title;
+                size_t pos = s.find(L"(Internal)");
+                if (pos != std::wstring::npos && pos + 10 == s.length())
                 {
-                    s.replace(pos, 10, "(Plugin)");
+                    s.replace(pos, 10, L"(Plugin)");
                 }
             }
         }
@@ -1099,24 +1103,24 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
     case 33: // 2.5b12 - only to transfer plugin configuration from version 2.5b11
     {
         // PKZIP25 gained "-nozipextension -directories" and "*.pk3;*.jar", we must add it
-        const char* newPKZIP25Args = "-ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
-        const char* newPKZIP25Ext = "*.zip;*.pk3;*.jar";
+        const wchar_t* newPKZIP25Args = L"-ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newPKZIP25Ext = L"*.zip;*.pk3;*.jar";
         for (index = 0; index < GetUnpackersCount(); index++)
         {
             if ((GetUnpackerOldType(index) && GetUnpackerType(index) == 1) ||
                 (!GetUnpackerOldType(index) && GetUnpackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* extrEXE = GetUnpackerCmdExecExtract(index);
-                const char* extrArgs = GetUnpackerCmdArgsExtract(index);
-                const char* ext = GetUnpackerExt(index);
+                const wchar_t* extrEXE = GetUnpackerCmdExecExtract(index);
+                const wchar_t* extrArgs = GetUnpackerCmdArgsExtract(index);
+                const wchar_t* ext = GetUnpackerExt(index);
 
                 // check whether this is a PKZIP25 custom unpacker
-                if (extrEXE != NULL && strcmp(extrEXE, "$(Zip32bitExecutable)") == 0)
+                if (extrEXE != NULL && wcscmp(extrEXE, L"$(Zip32bitExecutable)") == 0)
                 {
                     // test whether this is an old PKZIP25 custom unpacker entry
                     if (extrArgs != NULL &&
-                        strcmp(extrArgs, "-ext -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
-                        strcmp(ext, "*.zip") == 0)
+                        wcscmp(extrArgs, L"-ext -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0 &&
+                        wcscmp(ext, L"*.zip") == 0)
                     {
                         // convert to new arguments (added "-nozipextension" + "*.pk3;*.jar")
                         Unpackers[index]->CmdArgsExtract = newPKZIP25Args;
@@ -1134,22 +1138,22 @@ void CUnpackerConfig::AddDefault(int SalamVersion)
     if (SalamVersion > 1 && SalamVersion < 81)
     {
         // since RAR 5.0 filelists are ANSI by default instead of OEM, so we must force OEM with a switch
-        const char* newRAR5Args = "x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
+        const wchar_t* newRAR5Args = L"x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"";
         for (index = 0; index < GetUnpackersCount(); index++)
         {
             if ((GetUnpackerOldType(index) && GetUnpackerType(index) == 1) ||
                 (!GetUnpackerOldType(index) && GetUnpackerType(index) == CUSTOMPACKER_EXTERNAL))
             {
-                const char* extrEXE = GetUnpackerCmdExecExtract(index);
-                const char* extrArgs = GetUnpackerCmdArgsExtract(index);
-                const char* ext = GetUnpackerExt(index);
+                const wchar_t* extrEXE = GetUnpackerCmdExecExtract(index);
+                const wchar_t* extrArgs = GetUnpackerCmdArgsExtract(index);
+                const wchar_t* ext = GetUnpackerExt(index);
 
                 // check whether this is a RAR Win32 custom unpacker
-                if (extrEXE != NULL && strcmp(extrEXE, "$(Rar32bitExecutable)") == 0)
+                if (extrEXE != NULL && wcscmp(extrEXE, L"$(Rar32bitExecutable)") == 0)
                 {
                     // test whether this is an old RAR Win32 custom unpacker entry
                     if (extrArgs != NULL &&
-                        strcmp(extrArgs, "x \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
+                        wcscmp(extrArgs, L"x \"$(ArchiveFullName)\" @\"$(ListFullName)\"") == 0)
                     {
                         // convert to new arguments (added "-scol")
                         Unpackers[index]->CmdArgsExtract = newRAR5Args;
@@ -1247,12 +1251,12 @@ void CUnpackerConfig::DeleteUnpacker(int index)
     Unpackers.Delete(index);
 }
 
-BOOL CUnpackerConfig::SetUnpacker(int index, int type, const char* title, const char* ext, BOOL old,
+BOOL CUnpackerConfig::SetUnpacker(int index, int type, const wchar_t* title, const wchar_t* ext, BOOL old,
                                   BOOL supportLongNames,
-                                  const char* cmdExecExtract, const char* cmdArgsExtract,
+                                  const wchar_t* cmdExecExtract, const wchar_t* cmdArgsExtract,
                                   BOOL needANSIListFile)
 {
-    CALL_STACK_MESSAGE10("CUnpackerConfig::SetUnpacker(%d, %d, %s, %s, %d, %d, %s, %s, %d)",
+    CALL_STACK_MESSAGE10("CUnpackerConfig::SetUnpacker(%d, %d, %ls, %ls, %d, %d, %ls, %ls, %d)",
                          index, type, title, ext, old, supportLongNames, cmdExecExtract, cmdArgsExtract,
                          needANSIListFile);
     CUnpackerConfigData* data = Unpackers[index];
@@ -1264,8 +1268,8 @@ BOOL CUnpackerConfig::SetUnpacker(int index, int type, const char* title, const 
     if (old && data->Type == 1 ||
         !old && data->Type == CUSTOMUNPACKER_EXTERNAL)
     {
-        data->CmdExecExtract = cmdExecExtract ? cmdExecExtract : "";
-        data->CmdArgsExtract = cmdArgsExtract ? cmdArgsExtract : "";
+        data->CmdExecExtract = cmdExecExtract ? cmdExecExtract : L"";
+        data->CmdArgsExtract = cmdArgsExtract ? cmdArgsExtract : L"";
         data->SupportLongNames = supportLongNames;
         data->NeedANSIListFile = needANSIListFile;
     }
@@ -1283,17 +1287,17 @@ BOOL CUnpackerConfig::SetUnpacker(int index, int type, const char* title, const 
     }
 }
 
-BOOL CUnpackerConfig::SetUnpackerTitle(int index, const char* title)
+BOOL CUnpackerConfig::SetUnpackerTitle(int index, const wchar_t* title)
 {
     CUnpackerConfigData* data = Unpackers[index];
     data->Title = title;
     return TRUE;
 }
 
-BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const char* zipFile, const char* mask,
-                                      const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
+BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const wchar_t* zipFile, const wchar_t* mask,
+                                      const wchar_t* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CUnpackerConfig::ExecuteUnpacker(, %s, %s, %s, %d, )",
+    CALL_STACK_MESSAGE5("CUnpackerConfig::ExecuteUnpacker(, %ls, %ls, %ls, %d, )",
                         zipFile, mask, targetDir, delArchiveWhenDone);
     if (PreferedUnpacker != -1 && PreferedUnpacker < Unpackers.Count)
     {
@@ -1303,8 +1307,8 @@ BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const ch
             if (delArchiveWhenDone)
                 TRACE_E("CUnpackerConfig::ExecuteUnpacker(): delArchiveWhenDone is TRUE for external archiver (unsupported, ignoring)");
 
-            char* tmpMask = DupStr(mask);
-            std::string command = std::string(data->CmdExecExtract) + " " + data->CmdArgsExtract;
+            wchar_t* tmpMask = DupStr(mask);
+            std::wstring command = data->CmdExecExtract + L" " + data->CmdArgsExtract;
             if (tmpMask == NULL)
             {
                 TRACE_E(LOW_MEMORY);
@@ -1312,7 +1316,7 @@ BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const ch
             }
 
             // we must store the pointer for deallocation; it will be destroyed
-            char* tmpMask2 = tmpMask;
+            wchar_t* tmpMask2 = tmpMask;
             BOOL ret = PackUniversalUncompress(parent, command.c_str(), NULL, targetDir, FALSE, panel,
                                                data->SupportLongNames, zipFile, targetDir,
                                                NULL, PackEnumMask, &tmpMask, data->NeedANSIListFile);
@@ -1340,62 +1344,59 @@ BOOL CUnpackerConfig::Save(int index, HKEY hKey)
     int type = GetUnpackerType(index);
     d = type;
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &d, sizeof(d));
+        ret &= SetValueW(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &d, sizeof(d));
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_TITLE, REG_SZ, GetUnpackerTitle(index), -1);
+        ret &= SetValueW(hKey, SALAMANDER_CPU_TITLE, REG_SZ, GetUnpackerTitle(index), -1);
     if (ret)
-        ret &= SetValue(hKey, SALAMANDER_CPU_EXT, REG_SZ, GetUnpackerExt(index), -1);
+        ret &= SetValueW(hKey, SALAMANDER_CPU_EXT, REG_SZ, GetUnpackerExt(index), -1);
     if (ret && type == CUSTOMUNPACKER_EXTERNAL)
     {
         d = GetUnpackerSupLongNames(index);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &d, sizeof(d));
+            ret &= SetValueW(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &d, sizeof(d));
         d = GetUnpackerNeedANSIListFile(index);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &d, sizeof(d));
+            ret &= SetValueW(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &d, sizeof(d));
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CU_EXECEXTRACT, REG_SZ, GetUnpackerCmdExecExtract(index), -1);
+            ret &= SetValueW(hKey, SALAMANDER_CU_EXECEXTRACT, REG_SZ, GetUnpackerCmdExecExtract(index), -1);
         if (ret)
-            ret &= SetValue(hKey, SALAMANDER_CU_ARGSEXTRACT, REG_SZ, GetUnpackerCmdArgsExtract(index), -1);
+            ret &= SetValueW(hKey, SALAMANDER_CU_ARGSEXTRACT, REG_SZ, GetUnpackerCmdArgsExtract(index), -1);
     }
     return ret;
 }
 
 BOOL CUnpackerConfig::Load(HKEY hKey)
 {
-    CPathBuffer title;
-    CPathBuffer ext;
+    std::wstring title;
+    std::wstring ext;
     DWORD type;
     DWORD suplong = FALSE;
     DWORD needANSI = FALSE;
-    CPathBuffer execcopy;
-    execcopy[0] = 0;
-    CPathBuffer argscopy;
-    argscopy[0] = 0;
-    int max = title.Size();
+    std::wstring execcopy;
+    std::wstring argscopy;
 
     BOOL ret = TRUE;
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &type, sizeof(DWORD));
+        ret &= GetValueW(hKey, SALAMANDER_CPU_TYPE, REG_DWORD, &type, sizeof(DWORD));
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_TITLE, REG_SZ, title, max);
+        ret &= GetStringValueW(hKey, SALAMANDER_CPU_TITLE, title);
     if (ret)
-        ret &= GetValue(hKey, SALAMANDER_CPU_EXT, REG_SZ, ext, max);
+        ret &= GetStringValueW(hKey, SALAMANDER_CPU_EXT, ext);
     if (ret && (Configuration.ConfigVersion < 6 && type == 1 ||
                 Configuration.ConfigVersion >= 6 && type == CUSTOMUNPACKER_EXTERNAL))
     {
         if (ret)
         {
-            if (!GetValue(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &needANSI, sizeof(DWORD)))
+            if (!GetValueW(hKey, SALAMANDER_CPU_ANSILIST, REG_DWORD, &needANSI, sizeof(DWORD)))
                 needANSI = FALSE; // in older versions it wasn't present, assumed FALSE
         }
 
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &suplong, sizeof(DWORD));
+            ret &= GetValueW(hKey, SALAMANDER_CPU_SUPLONG, REG_DWORD, &suplong, sizeof(DWORD));
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CU_EXECEXTRACT, REG_SZ, execcopy, max);
+            ret &= GetStringValueW(hKey, SALAMANDER_CU_EXECEXTRACT, execcopy);
         if (ret)
-            ret &= GetValue(hKey, SALAMANDER_CU_ARGSEXTRACT, REG_SZ, argscopy, max);
+            ret &= GetStringValueW(hKey, SALAMANDER_CU_ARGSEXTRACT, argscopy);
     }
 
     if (ret)
@@ -1404,14 +1405,10 @@ BOOL CUnpackerConfig::Load(HKEY hKey)
         if ((index = AddUnpacker()) == -1)
             return FALSE;
         if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
-        {
-            CPathBuffer extAux;
-            lstrcpyn(extAux, ext, extAux.Size());
-            StrICpy(ext, extAux);
-        }
-        ret &= SetUnpacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,
+            LowerCaseExtensionForUpgrade(ext);
+        ret &= SetUnpacker(index, (int)type, title.c_str(), ext.c_str(), Configuration.ConfigVersion < 6,
                            (BOOL)suplong,
-                           execcopy, argscopy, needANSI);
+                           execcopy.c_str(), argscopy.c_str(), needANSI);
     }
 
     return ret;

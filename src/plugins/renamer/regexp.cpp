@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -93,6 +93,18 @@ const char* RegExpErrorText(CRegExpErrors err)
 //
 //*****************************************************************************
 //*****************************************************************************
+
+// The shared LowerCase[] table is built with CharLowerA, i.e. in the ACP. The renamer now
+// feeds this engine UTF-8 (see renamer_text.h), and folding a UTF-8 lead or continuation
+// byte through an ACP table produces a byte that means nothing - and can collide with an
+// unrelated sequence, yielding false matches. Restrict the engine's own folding to ASCII;
+// non-ASCII case insensitivity is handled by pre-folding both pattern and subject in
+// CRenamer::SetOptions (renamer_case_fold.h).
+static inline char RegexpLowerCase(char c)
+{
+    const unsigned char byte = (unsigned char)c;
+    return (char)(byte >= 'A' && byte <= 'Z' ? byte - 'A' + 'a' : byte);
+}
 
 /*
  * The first byte of the regexp internal "program" is actually this magic
@@ -918,7 +930,7 @@ char* CRegExp::RegAtom(int* flagp, int* fixedw)
                 FAIL(State);
         }
         ret = RegNode(EXACTLY);
-        RegC(Caseles ? LowerCase[c] : c);
+        RegC(Caseles ? RegexpLowerCase(c) : c);
         RegC('\0');
     LENDSLASH:
         RegParse++;
@@ -944,7 +956,7 @@ char* CRegExp::RegAtom(int* flagp, int* fixedw)
         ret = RegNode(EXACTLY);
         while (len > 0)
         {
-            RegC(Caseles ? LowerCase[*RegParse] : *RegParse);
+            RegC(Caseles ? RegexpLowerCase(*RegParse) : *RegParse);
             RegParse++;
             len--;
         }
@@ -1174,7 +1186,7 @@ inline int
 HexToNumber(char c)
 {
     CALL_STACK_MESSAGE_NONE
-    return IsDigit(c) ? c - '0' : LowerCase[c] - 'a' + 10;
+    return IsDigit(c) ? c - '0' : RegexpLowerCase(c) - 'a' + 10;
 }
 
 char CRegExp::GetEscapedChar()
@@ -1476,7 +1488,7 @@ int CRegExp::RegMatch(char* prog) /* 0 failure, 1 success */
 
             opnd = OPERAND(scan);
             /* Inline the first character, for speed. */
-            if (RegInput == RegEol || *opnd != (Caseles ? LowerCase[*RegInput] : *RegInput))
+            if (RegInput == RegEol || *opnd != (Caseles ? RegexpLowerCase(*RegInput) : *RegInput))
                 return (0);
             len = (int)strlen(opnd);
             if (len > RegEol - RegInput || len > 1 &&
@@ -1592,7 +1604,7 @@ int CRegExp::RegMatch(char* prog) /* 0 failure, 1 success */
             {
                 /* If it could work, try it. */
                 if (nextch == -1 ||
-                    (Caseles ? LowerCase[*RegInput] : *RegInput) == (char)nextch)
+                    (Caseles ? RegexpLowerCase(*RegInput) : *RegInput) == (char)nextch)
                     if (RegMatch(next))
                         return (1);
                 /* Couldn't or didn't -- back up. */
@@ -1628,7 +1640,7 @@ int CRegExp::RegMatch(char* prog) /* 0 failure, 1 success */
                 save = RegInput;
                 /* If it could work, try it. */
                 if (nextch == -1 ||
-                    (Caseles ? LowerCase[*RegInput] : *RegInput) == (char)nextch)
+                    (Caseles ? RegexpLowerCase(*RegInput) : *RegInput) == (char)nextch)
                     if (RegMatch(next))
                         return 1;
                 RegInput = save;
@@ -1729,7 +1741,7 @@ int CRegExp::RegRepeat(char* p)
         break;
     case EXACTLY:
         if (Caseles)
-            while (scan < RegEol && *opnd == LowerCase[*scan])
+            while (scan < RegEol && *opnd == RegexpLowerCase(*scan))
             {
                 scan++;
             }
@@ -1771,7 +1783,7 @@ int CRegExp::RegMatchSimple(char op, char* opnd)
     case ANYDOT:
         return 1;
     case EXACTLY:
-        return *opnd == (Caseles ? LowerCase[*RegInput] : *RegInput);
+        return *opnd == (Caseles ? RegexpLowerCase(*RegInput) : *RegInput);
     case ANYOF:
         return INCLASS(opnd, *RegInput);
     }

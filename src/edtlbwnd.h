@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 #define EDTLBN_FIRST (0U - 3050U)
 // the EDTLB_DISPINFO structure is sent
 #define EDTLBN_GETDISPINFO (EDTLBN_FIRST - 1U)
@@ -31,10 +33,9 @@ typedef struct
 {
     NMHDR Hdr;
     CEdtLBEnum ToDo;
-    char* Buffer;
+    std::wstring* Text;
     HICON HIcon;
     int Index;
-    int BufferLen;
     INT_PTR ItemID;
     BOOL Bold;    // should the text be printed bold?
                   //  BOOL          Up;            // for EDTLBN_MOVEITEM
@@ -74,7 +75,7 @@ protected:
     CEditLBEdit* EditLine;
     HWND HDlg;
     EDTLB_DISPINFO DispInfo;
-    CPathBuffer Buffer;
+    std::wstring Buffer;
     int ItemsCount;
     BOOL SaveDisabled;
     DWORD Flags;

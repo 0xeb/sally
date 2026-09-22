@@ -388,7 +388,7 @@ protected:
             HFONT hfold = SelectFont(refDC, hfnormal);
 
             SIZE sz;
-            GetTextExtentPoint32(refDC, TEXT("..."), 3, &sz); //obtain the width of "..." and character height
+            GetTextExtentPoint32W(refDC, L"...", 3, &sz); //obtain the width of "..." and character height
             titleheight = sz.cy + 5;
 
             SelectFont(refDC, hfold);
@@ -408,7 +408,7 @@ protected:
                 hfold = SelectFont(bgdc, hfnormal);
                 CZFile* file = item->directory->GetFile();
                 bgRect.right = item->width;
-                ExtTextOut(bgdc, 5, 1, ETO_OPAQUE | ETO_CLIPPED, &bgRect, file->GetName(), (UINT)file->GetNameLen(), NULL);
+                ExtTextOutW(bgdc, 5, 1, ETO_OPAQUE | ETO_CLIPPED, &bgRect, file->GetName(), (UINT)file->GetNameLen(), NULL);
                 SelectFont(bgdc, hfold);
 
                 BYTE* titledta = bgTxt->LockBits();
@@ -514,7 +514,7 @@ protected:
 
                     CZFile* file = item->directory->GetFile();
 
-                    ExtTextOut(dc, item->x + 5, item->y + 3, ETO_CLIPPED, &rct, file->GetName(), (UINT)file->GetNameLen(), NULL);
+                    ExtTextOutW(dc, item->x + 5, item->y + 3, ETO_CLIPPED, &rct, file->GetName(), (UINT)file->GetNameLen(), NULL);
                 }
                 SelectFont(dc, hfold);
 

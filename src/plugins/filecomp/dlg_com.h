@@ -12,7 +12,7 @@
 // wParam:
 enum
 {
-    WN_ERROR,                // (const char*)lParam contains the error text
+    WN_ERROR,                // (const wchar_t*)lParam contains the error text
     WN_NO_DIFFERENCE,        // lParam is ignored
     WN_NO_ALL_DIFFS_IGNORED, // lParam is ignored
     WN_BINARY_FILES_DIFFER,  // (CBinaryCompareResults*)lParam contains the diff results
@@ -153,6 +153,24 @@ struct CRegBLOBConfiguration
     int Context;
     int TabSize;
     LOGFONT FileViewLogFont;
+    BOOL UseViewerFont;
+    unsigned char WhiteSpace;
+
+    // switches
+    CFileViewMode ViewMode;
+    BOOL ShowWhiteSpace;
+    BOOL DetailedDifferences;
+};
+
+struct CRegBLOBConfigurationNarrow
+{ // The 92-byte layout every release before the global UNICODE flip wrote: identical to
+  // CRegBLOBConfiguration except that LOGFONT was LOGFONTA, which also shifts every field after
+  // it. The registry reader accepts a value shorter than the buffer without complaint, so the
+  // config version is the only thing that distinguishes the two. DO NOT MODIFY!!!
+    BOOL ConfirmSelection;
+    int Context;
+    int TabSize;
+    LOGFONTA FileViewLogFont;
     BOOL UseViewerFont;
     unsigned char WhiteSpace;
 

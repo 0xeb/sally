@@ -13,15 +13,13 @@
 #include "uniso.rh2"
 #include "lang\lang.rh"
 
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#include "udf_ostacompress.h"
+#include "uniso_text.h"
 
-typedef wchar_t unicode_t;
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 #define SECTOR_SIZE 0x800
 #define INVALID_SECTOR_NUMBER -11111111 // reasonable negative number; Should not be -1 or so!!
-
-// Maximum length of filenames allowed in UDF.
-#define MAX_UDF_FILE_NAME_LEN 2048
 
 // Flags for testing the File Identifier Descriptor
 #define UDF_HIDDEN 0x01
@@ -72,87 +70,6 @@ UDFTimeStampToFileTime(CUDF::CTimeStamp& stamp, FILETIME* ft)
         ft->dwLowDateTime = (DWORD)(newtime & 0x00000000ffffffff);
         ft->dwHighDateTime = (DWORD)(newtime >> 32);
     }
-}
-
-static int
-UnicodeLength(unicode_t* string)
-{
-    int length;
-    length = 0;
-    while (*string++)
-        length++;
-
-    return length;
-}
-
-static int
-UnicodeUncompress(BYTE* compressed, int numberOfBytes, unicode_t* unicode)
-{
-    unsigned int compID;
-    int returnValue, unicodeIndex, byteIndex;
-
-    // Use 'compressed' to store current byte being read.
-    compID = compressed[0];
-
-    // First check for valid compID.
-    if (compID != 8 && compID != 16)
-    {
-        returnValue = -1;
-    }
-    else
-    {
-        unicodeIndex = 0;
-        byteIndex = 1;
-        if (16 == compID)
-        {
-            // Make it odd number: length byte plus even number of text bytes
-            numberOfBytes = ((numberOfBytes - 1) & 0xFFFE) + 1;
-        }
-
-        // Loop through all the bytes.
-        while (byteIndex < numberOfBytes)
-        {
-            if (compID == 16)
-            {
-                // Move the first byte to the high bits of the unicode char.
-                unicode[unicodeIndex] = compressed[byteIndex++] << 8;
-            }
-            else
-            {
-                unicode[unicodeIndex] = 0;
-            }
-            if (byteIndex < numberOfBytes)
-            {
-                // Then the next byte to the low bits.
-                unicode[unicodeIndex] |= compressed[byteIndex++];
-            }
-            unicodeIndex++;
-        }
-        returnValue = unicodeIndex;
-    }
-
-    return returnValue;
-}
-
-void DecodeOSTACompressed(BYTE* id, int len, char* result)
-{
-    unicode_t uncompressed[1024];
-    int ucompChars;
-
-    ucompChars = UnicodeUncompress(id, len, uncompressed);
-    if (ucompChars < 0)
-    { // Invalid string?
-        *result = 0;
-        return;
-    }
-    uncompressed[ucompChars] = 0;
-    int length = MIN(ucompChars, UnicodeLength(uncompressed)) + 1 /*terminating zero*/;
-
-    char final[1024];
-
-    WideCharToMultiByte(CP_ACP, 0, uncompressed, length, final, sizeof(final) - 1, 0, 0);
-    final[sizeof(final) - 1] = 0;
-    strcpy(result, final);
 }
 
 /*
@@ -535,7 +452,7 @@ int CUDF::ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CU
     return cnt;
 }
 
-int CUDF::ReadFileIdentifier(Uint8* sector, Uint8* fileChar, char* fileName, CAD* fileICB)
+int CUDF::ReadFileIdentifier(Uint8* sector, Uint8* fileChar, std::wstring& fileName, CAD* fileICB)
 {
     Uint8 fi;
     Uint16 iu;
@@ -545,9 +462,12 @@ int CUDF::ReadFileIdentifier(Uint8* sector, Uint8* fileChar, char* fileName, CAD
     LongAD(sector + 20, fileICB);
     iu = GET_WORD(sector, 36);
     if (fi)
-        DecodeOSTACompressed(sector + 38 + iu, fi, fileName);
+    {
+        if (!DecodeOSTACompressedOwned(sector + 38 + iu, fi, fileName))
+            fileName.clear();
+    }
     else
-        fileName[0] = '\0';
+        fileName.clear();
     return 4 * ((38 + fi + iu + 3) / 4);
 }
 
@@ -747,7 +667,7 @@ int CUDF::ReadAllocDesc(BYTE data[], CFileEntry* fe, BYTE* vat, DWORD* o)
     return len;
 }
 
-BOOL CUDF::AddFileDir(const char* path, char* fileName, BYTE fileChar, CAD* icb,
+BOOL CUDF::AddFileDir(const wchar_t* path, const wchar_t* fileName, BYTE fileChar, CAD* icb,
                       CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     CFileData fd;
@@ -764,8 +684,8 @@ BOOL CUDF::AddFileDir(const char* path, char* fileName, BYTE fileChar, CAD* icb,
             throw FALSE;
         } // if
 
-        fd.NameLen = strlen(fd.Name);
-        char* s = strrchr(fd.Name, '.');
+        fd.NameLen = static_cast<DWORD>(wcslen(fd.Name)); // UDF identifiers are byte-length-prefixed
+        wchar_t* s = wcsrchr(fd.Name, L'.');
         if (s != NULL)
             fd.Ext = s + 1; // ".cvspass" is extension in Windows
         else
@@ -851,10 +771,10 @@ BOOL CUDF::AddFileDir(const char* path, char* fileName, BYTE fileChar, CAD* icb,
     return ret;
 }
 
-BOOL CUDF::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir,
+BOOL CUDF::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir,
                          CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE3("CUDF::ListDirectory(%s, %d, , )", path, session);
+    CALL_STACK_MESSAGE3("CUDF::ListDirectory(%ls, %d, , )", path.c_str(), session);
 
     Uint8 sector[SECTOR_SIZE];
     CAD rootICB;
@@ -901,10 +821,10 @@ BOOL CUDF::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* 
     return ScanDir(fileICB, path, dir, pluginData) != ERR_TERMINATE;
 }
 
-int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
+int CUDF::ScanDir(CUDF::CAD dirICB, const std::wstring& path,
                   CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
-    char fileName[MAX_UDF_FILE_NAME_LEN + 1];
+    std::wstring fileName;
     Uint8 directory[2 * SECTOR_SIZE];
     Uint32 lbNum;
     Uint8 fileChar;
@@ -947,16 +867,13 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
 
             if (!(fileChar & UDF_PARENT))
             {
-                if (!AddFileDir(path, fileName, fileChar, &icb, dir, pluginData))
+                if (!AddFileDir(path.c_str(), fileName.c_str(), fileChar, &icb, dir, pluginData))
                     return ERR_TERMINATE;
 
                 if (fileChar & UDF_DIRECTORY)
                 {
-                    CPathBuffer newPath;
-                    ZeroMemory(newPath.Get(), newPath.Size());
-                    strcpy(newPath, path);
-                    strcat(newPath, "\\");
-                    strcat(newPath, fileName);
+                    std::wstring newPath(path);
+                    SPLSalPathAppendOwned(newPath, fileName.c_str());
 
                     CAD fileICB;
                     CICBTag icbTag;
@@ -981,10 +898,10 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
     return ret;
 }
 
-int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                     const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                     const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CUDF::UnpackFile( , %s, %s, %s, %p, %u, %d)", srcPath, path, nameInArc, fileData, silent, toSkip);
+    CALL_STACK_MESSAGE6("CUDF::UnpackFile( , %ls, %ls, %p, %u, %d)", path.c_str(), nameInArc.c_str(), fileData, silent, toSkip);
 
     // TODO: extraction according to allocation strategy 4096
     // if the file is a sequence of allocation descriptors, we cannot extract it because we would need to track
@@ -1076,21 +993,15 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
             throw UNPACK_CANCEL;
         }
 
-        CPathBuffer name; // Heap-allocated for long path support
-        lstrcpyn(name, path, name.Size());
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-        {
-            Error(IDS_ERR_TOO_LONG_NAME, silent == 1);
-            throw UNPACK_ERROR;
-        }
+        std::wstring name(path);
+        SPLSalPathAppendOwned(name, fileData->Name);
 
-        char fileInfo[100];
         FILETIME ft = fileData->LastWrite;
-        GetInfo(fileInfo, &ft, fileData->Size);
+        const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
         DWORD attrs = fileData->Attr;
 
-        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                           &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
 
         CBufferedFile file(hFile, GENERIC_WRITE);
@@ -1144,10 +1055,9 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
                 {
                     if (silent == 0)
                     {
-                        char error[1024];
-                        sprintf(error, LoadStr(IDS_ERROR_READING_SECTOR), block);
+                        const std::wstring error = SPLFormatStringOwned(LangStr(IDS_ERROR_READING_SECTOR).c_str(), block);
                         int userAction = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL,
-                                                                        fileData->Name, error, LoadStr(IDS_READERROR));
+                                                                        fileData->Name, error.c_str(), LangStr(IDS_READERROR).c_str());
 
                         switch (userAction)
                         {
@@ -1169,7 +1079,7 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
 
                 if (!salamander->ProgressAddSize(nbytes, TRUE)) // delayedPaint==TRUE, to make things faster
                 {
-                    salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+                    salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
                     salamander->ProgressEnableCancel(FALSE);
 
                     ret = UNPACK_CANCEL;
@@ -1179,7 +1089,7 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
 
                 ULONG written;
                 // picb->Offset is nonzero only for small (less than a sector) files inlined within File Entry
-                if (!file.Write(sector + picb->Offset, nbytes, &written, name, NULL))
+                if (!file.Write(sector + picb->Offset, nbytes, &written, name.c_str(), NULL))
                 {
                     // Error message was already displayed by SafeWriteFile()
                     ret = UNPACK_CANCEL;
@@ -1194,7 +1104,7 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
         //    sprintf(u, "CISOImage::UnpackFile(): ret: %d, bFileComplete: %d", ret, bFileComplete);
         //    TRACE_I(u);
 
-        if (!file.Close(name, NULL))
+        if (!file.Close(name.c_str(), NULL))
         {
             // Flushing cache may fail
             ret = UNPACK_CANCEL;
@@ -1206,16 +1116,16 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
             // because it was created with the read-only attribute, we must clear
             // the R attribute so the file can be deleted
             attrs &= ~FILE_ATTRIBUTE_READONLY;
-            if (!SetFileAttributes(name, attrs))
-                Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError(), silent == 1);
+            if (!SetFileAttributesW(name.c_str(), attrs))
+                Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError(), silent == 1);
 
             // the user cancelled the operation
             // delete the incomplete file afterwards
-            if (!DeleteFile(name))
-                Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError(), silent == 1);
+            if (!DeleteFileW(name.c_str()))
+                Error(LangStr(IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError(), silent == 1);
         }
         else
-            SetFileAttrs(name, attrs, silent == 1);
+            SetFileAttrs(name.c_str(), attrs, silent == 1);
     }
     catch (int e)
     {
@@ -1231,25 +1141,37 @@ BOOL CUDF::DumpInfo(FILE* outStream)
 {
     CALL_STACK_MESSAGE1("CUDF::DumpInfo( )");
 
-    char buffer[256], *s;
-
     // display info from the PVD
-    DecodeOSTACompressed((BYTE*)PVD.VolumeIdentifier, 32, buffer);
-    fprintf(outStream, "    Volume:             %s\n", buffer);
-    DecodeOSTACompressed((BYTE*)PVD.VolumeSetIdentifier, 128, buffer);
-    fprintf(outStream, "    Volume Set:         %s\n", buffer);
-    s = ViewerStrNcpy((char*)PVD.ApplicationIdentifier.Identifier, 23);
-    if (*s)
-        fprintf(outStream, "    Application:        %s\n", s);
-    s = ViewerStrNcpy((char*)PVD.ImplementationIdentifier.Identifier, 23);
-    if (*s)
-        fprintf(outStream, "    Implementation:     %s\n", s);
+    const auto writeOstaField = [outStream](const char* label, const BYTE* data, int count) {
+        if (count <= 0 || (data[0] != 8 && data[0] != 16))
+            return fprintf(outStream, "%s\n", label) >= 0;
+        std::wstring decoded;
+        std::string encoded;
+        if (!DecodeOSTACompressedOwned(data, count, decoded) || !EncodeUnisoReportText(decoded, encoded))
+            return false;
+        return fprintf(outStream, "%s%s\n", label, encoded.c_str()) >= 0;
+    };
+    const auto writeByteField = [outStream](const char* label, const char* data, size_t count) {
+        std::string value;
+        if (!CopyUnisoReportField(std::string_view(data, count), value))
+            return false;
+        return value.empty() || fprintf(outStream, "%s%s\n", label, value.c_str()) >= 0;
+    };
+    if (!writeOstaField("    Volume:             ", (BYTE*)PVD.VolumeIdentifier, 32) ||
+        !writeOstaField("    Volume Set:         ", (BYTE*)PVD.VolumeSetIdentifier, 128) ||
+        !writeByteField("    Application:        ", PVD.ApplicationIdentifier.Identifier, 23) ||
+        !writeByteField("    Implementation:     ", PVD.ImplementationIdentifier.Identifier, 23))
+        return FALSE;
     //  fprintf(outStream, "\n");
 
     SYSTEMTIME st;
     UDFTimeStampToSystemTime(PVD.RecordingDateandTime, &st);
     if (st.wYear != 0)
-        fprintf(outStream, "    Recording Date:     %s\n", ViewerPrintSystemTime(&st));
+    {
+        std::string formatted;
+        if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Recording Date:     %s\n", formatted.c_str()) < 0)
+            return FALSE;
+    }
 
     return TRUE;
 }

@@ -5,7 +5,7 @@
 //
 // Stub implementations of MSVC Runtime Check functions
 //
-// These stubs are needed for no-CRT utilities (salspawn, salopen, fcremote)
+// These stubs are needed for no-CRT utilities (salspawn, fcremote)
 // when building in Debug mode. Debug builds enable /RTC1 which generates
 // calls to _RTC_* functions, but these utilities don't link against the CRT.
 //
@@ -49,7 +49,7 @@ void _RTC_CheckStackVars(void* frame, void* rtc_var_desc)
 }
 
 // Called when an uninitialized local variable is used
-void __cdecl _RTC_UninitUse(const char* varname)
+void __cdecl _RTC_UninitUse(const wchar_t* varname)
 {
     (void)varname;
 }

@@ -8,8 +8,8 @@ namespace sally::salmon
 {
 inline constexpr bool kBugReporterRegistryMutexIsGlobalByPolicy = true;
 
-inline const char* BugReporterRegistryMutexName()
+inline const wchar_t* BugReporterRegistryMutexName()
 {
-    return SAL_REG_MUTEX_GLOBAL_BUG_REPORTER_A;
+    return SAL_REG_MUTEX_GLOBAL_BUG_REPORTER_W;
 }
 } // namespace sally::salmon

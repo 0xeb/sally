@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -14,10 +14,15 @@
 */
 
 #include "precomp.h"
+
+#include <algorithm>
+#include <new>
+#include <vector>
 #include "nethood.h"
 #include "nethoodfs.h"
 #include "cache.h"
 #include "globals.h"
+#include "resource_enum_buffer.h"
 #include "nethood.rh"
 #include "nethood.rh2"
 #include "lang\lang.rh"
@@ -90,7 +95,7 @@ CNethoodCacheNode::CNethoodCacheNode()
 
 CNethoodCacheNode::~CNethoodCacheNode()
 {
-    TRACE_I("Deleting node " << (m_pszDisplayName != NULL ? m_pszDisplayName : "(null)") << " [" << m_myIterator << "]");
+    TRACE_IW(L"Deleting node " << (m_pszDisplayName != NULL ? m_pszDisplayName : L"(null)") << L" [" << m_myIterator << L"]");
 
     // Notify everyone that we are vanishing.
     if (m_status != StatusDead)
@@ -109,7 +114,7 @@ CNethoodCacheNode::~CNethoodCacheNode()
     delete[] m_pszExplicitDisplayName;
 }
 
-void CNethoodCacheNode::SetName(PCTSTR pszName, int nLen)
+void CNethoodCacheNode::SetName(PCWSTR pszName, int nLen)
 {
     if (m_pszName != NULL)
     {
@@ -125,17 +130,17 @@ void CNethoodCacheNode::SetName(PCTSTR pszName, int nLen)
     {
         if (nLen < 0)
         {
-            nLen = static_cast<int>(_tcslen(pszName));
+            nLen = static_cast<int>(wcslen(pszName));
         }
 
-        m_pszName = new TCHAR[nLen + 1];
-        StringCchCopy(m_pszName, nLen + 1, pszName);
+        m_pszName = new wchar_t[nLen + 1];
+        StringCchCopyW(m_pszName, nLen + 1, pszName);
 
-        m_pszDisplayName = const_cast<PTSTR>(GetDisplayName(m_pszName, m_pszComment));
+        m_pszDisplayName = const_cast<PWSTR>(GetDisplayName(m_pszName, m_pszComment));
     }
 }
 
-void CNethoodCacheNode::SetComment(__in PCTSTR pszComment)
+void CNethoodCacheNode::SetComment(__in PCWSTR pszComment)
 {
     if (m_pszComment != NULL)
     {
@@ -149,16 +154,16 @@ void CNethoodCacheNode::SetComment(__in PCTSTR pszComment)
     }
     else
     {
-        size_t nLen = _tcslen(pszComment);
+        size_t nLen = wcslen(pszComment);
 
-        m_pszComment = new TCHAR[nLen + 1];
-        StringCchCopy(m_pszComment, nLen + 1, pszComment);
+        m_pszComment = new wchar_t[nLen + 1];
+        StringCchCopyW(m_pszComment, nLen + 1, pszComment);
 
-        m_pszDisplayName = const_cast<PTSTR>(GetDisplayName(m_pszName, m_pszComment));
+        m_pszDisplayName = const_cast<PWSTR>(GetDisplayName(m_pszName, m_pszComment));
     }
 }
 
-void CNethoodCacheNode::SetProvider(__in PCTSTR pszProvider)
+void CNethoodCacheNode::SetProvider(__in PCWSTR pszProvider)
 {
     if (m_pszProvider != NULL)
     {
@@ -172,17 +177,17 @@ void CNethoodCacheNode::SetProvider(__in PCTSTR pszProvider)
     }
     else
     {
-        size_t nLen = _tcslen(pszProvider);
+        size_t nLen = wcslen(pszProvider);
 
-        m_pszProvider = new TCHAR[nLen + 1];
-        StringCchCopy(m_pszProvider, nLen + 1, pszProvider);
+        m_pszProvider = new wchar_t[nLen + 1];
+        StringCchCopyW(m_pszProvider, nLen + 1, pszProvider);
     }
 }
 
-void CNethoodCacheNode::SetDisplayName(__in PCTSTR pszDisplayName)
+void CNethoodCacheNode::SetDisplayName(__in PCWSTR pszDisplayName)
 {
     assert(m_type == TypeTSCVolume);
-    assert(pszDisplayName != NULL && *pszDisplayName != TEXT('\0'));
+    assert(pszDisplayName != NULL && *pszDisplayName != L'\0');
 
     if (m_pszExplicitDisplayName != NULL)
     {
@@ -190,10 +195,10 @@ void CNethoodCacheNode::SetDisplayName(__in PCTSTR pszDisplayName)
         m_pszExplicitDisplayName = NULL;
     }
 
-    size_t nLen = _tcslen(pszDisplayName);
+    size_t nLen = wcslen(pszDisplayName);
 
-    m_pszExplicitDisplayName = new TCHAR[nLen + 1];
-    StringCchCopy(m_pszExplicitDisplayName, nLen + 1, pszDisplayName);
+    m_pszExplicitDisplayName = new wchar_t[nLen + 1];
+    StringCchCopyW(m_pszExplicitDisplayName, nLen + 1, pszDisplayName);
 
     // Redirect the display name to point to the now formed explicit name.
     m_pszDisplayName = m_pszExplicitDisplayName;
@@ -286,7 +291,7 @@ void CNethoodCacheNode::NotifyNodeUpdated()
     m_pCache->UnlockCache();
 }
 
-void CNethoodCacheNode::SetNetResource(__in const NETRESOURCE* pNetResource)
+void CNethoodCacheNode::SetNetResource(__in const NETRESOURCEW* pNetResource)
 {
     m_sNetResource.dwScope = pNetResource->dwScope;
     m_sNetResource.dwType = pNetResource->dwType;
@@ -299,30 +304,30 @@ void CNethoodCacheNode::SetNetResource(__in const NETRESOURCE* pNetResource)
     m_sNetResource.lpComment = m_pszComment;
     SetProvider(pNetResource->lpProvider);
     m_sNetResource.lpProvider = m_pszProvider;
-    m_pszDisplayName = const_cast<PTSTR>(GetDisplayNameFromNetResource(&m_sNetResource));
+    m_pszDisplayName = const_cast<PWSTR>(GetDisplayNameFromNetResource(&m_sNetResource));
     m_type = static_cast<Type>(m_sNetResource.dwDisplayType);
     m_bNetResourceValid = true;
 }
 
-PCTSTR CNethoodCacheNode::GetDisplayNameFromNetResource(
-    __in const NETRESOURCE* pNetResource)
+PCWSTR CNethoodCacheNode::GetDisplayNameFromNetResource(
+    __in const NETRESOURCEW* pNetResource)
 {
     return GetDisplayName(
         (pNetResource->dwType == RESOURCETYPE_SHORTCUT) ? NULL : pNetResource->lpRemoteName,
         pNetResource->lpComment);
 }
 
-PCTSTR CNethoodCacheNode::GetDisplayName(
-    __in PCTSTR pszName,
-    __in PCTSTR pszComment)
+PCWSTR CNethoodCacheNode::GetDisplayName(
+    __in PCWSTR pszName,
+    __in PCWSTR pszComment)
 {
-    PCTSTR pszDisplayName;
+    PCWSTR pszDisplayName;
 
     if (pszName == NULL)
     {
         if (pszComment == NULL)
         {
-            pszDisplayName = TEXT("");
+            pszDisplayName = L"";
         }
         else
         {
@@ -331,7 +336,7 @@ PCTSTR CNethoodCacheNode::GetDisplayName(
     }
     else
     {
-        PCTSTR pszBackSlash = _tcsrchr(pszName, TEXT('\\'));
+        PCWSTR pszBackSlash = wcsrchr(pszName, L'\\');
 
         if (pszBackSlash == NULL)
         {
@@ -340,7 +345,7 @@ PCTSTR CNethoodCacheNode::GetDisplayName(
         else
         {
             pszDisplayName = pszBackSlash + 1;
-            assert(*pszDisplayName != TEXT('\0'));
+            assert(*pszDisplayName != L'\0');
         }
     }
 
@@ -402,21 +407,21 @@ bool CNethoodCacheNode::CanKill() const
     //assert(m_status == StatusDead);
     assert(m_pCache->IsLocked());
 #ifdef TRACE_ENABLE
-    const TCHAR* pszName = GetDisplayName();
+    const wchar_t* pszName = GetDisplayName();
     if (pszName == NULL)
     {
-        pszName = TEXT("\\");
+        pszName = L"\\";
     }
     if (m_cRef == 0)
     {
-        TRACE_I("No outstanding references to dead node " << pszName << ", can kill=yes");
+        TRACE_IW(L"No outstanding references to dead node " << pszName << L", can kill=yes");
     }
     else
     {
-        // assert(*pszName != TEXT('\\'));
+        // assert(*pszName != L'\\');
         // why was this here?
         // should it rather be assert(strcmp(pszName, "\\")) => the root node must not be killed
-        TRACE_I(m_cRef << " outstanding references to dead node " << pszName << ", can kill=no");
+        TRACE_IW(m_cRef << L" outstanding references to dead node " << pszName << L", can kill=no");
     }
 #endif
     return (m_cRef == 0);
@@ -426,15 +431,15 @@ bool CNethoodCacheNode::CanKill() const
 //------------------------------------------------------------------------------
 // CUncPathParser
 
-CUncPathParser::CUncPathParser(__in_opt PCTSTR pszUncPath)
+CUncPathParser::CUncPathParser(__in_opt PCWSTR pszUncPath)
 {
     Initialize(pszUncPath);
 }
 
 bool CUncPathParser::NextToken()
 {
-    const TCHAR* pchStart;
-    const TCHAR* pch;
+    const wchar_t* pchStart;
+    const wchar_t* pch;
     UINT uPrevClassification;
 
     if (m_pchData == NULL)
@@ -457,7 +462,7 @@ bool CUncPathParser::NextToken()
         return false;
     }
 
-    if (*pchStart != TEXT('\\'))
+    if (*pchStart != L'\\')
     {
         m_pchData = NULL;
         m_nLength = 0;
@@ -466,7 +471,7 @@ bool CUncPathParser::NextToken()
     }
 
     ++pchStart;
-    if (*pchStart == TEXT('\\'))
+    if (*pchStart == L'\\')
     {
         if (m_pchData == NULL)
         {
@@ -493,7 +498,7 @@ bool CUncPathParser::NextToken()
 
     while (pch < m_pchMax)
     {
-        if (*pch == TEXT('\\'))
+        if (*pch == L'\\')
         {
             break;
         }
@@ -518,12 +523,12 @@ bool CUncPathParser::NextToken()
     return true;
 }
 
-void CUncPathParser::Initialize(__in PCTSTR pszUncPath)
+void CUncPathParser::Initialize(__in PCWSTR pszUncPath)
 {
     m_pszPath = pszUncPath;
     m_pchData = NULL;
     m_nLength = 0;
-    m_pchMax = (m_pszPath == NULL) ? NULL : (m_pszPath + _tcslen(m_pszPath));
+    m_pchMax = (m_pszPath == NULL) ? NULL : (m_pszPath + wcslen(m_pszPath));
     m_uClassification = 0;
     m_uError = NO_ERROR;
 }
@@ -533,7 +538,7 @@ void CUncPathParser::Reset()
     assert(m_pszPath != NULL);
     m_pchData = NULL;
     m_nLength = 0;
-    m_pchMax = m_pszPath + _tcslen(m_pszPath);
+    m_pchMax = m_pszPath + wcslen(m_pszPath);
     m_uClassification = 0;
     m_uError = NO_ERROR;
 }
@@ -581,24 +586,16 @@ UINT CUncPathParser::Validate(__out_opt int* pcTokens)
     return uError;
 }
 
-/*static*/ UINT CUncPathParser::Validate(__in PCTSTR pszUncPath)
+/*static*/ UINT CUncPathParser::Validate(__in PCWSTR pszUncPath)
 {
     CUncPathParser oParser(pszUncPath);
     return oParser.Validate();
 }
 
-bool CUncPathParser::GetPathUpToCurrentToken(
-    __out_ecount(cchMax) PTSTR pszPath,
-    __in size_t cchMax) const
+std::wstring CUncPathParser::GetPathUpToCurrentToken() const
 {
-    size_t cchToCopy;
-
-    cchToCopy = (m_pchData - m_pszPath) + m_nLength;
-    assert(cchMax >= cchToCopy + 1);
-
-    memcpy(pszPath, m_pszPath, cchToCopy * sizeof(TCHAR));
-    pszPath[cchToCopy] = TEXT('\0');
-    return true;
+    const size_t length = (m_pchData - m_pszPath) + m_nLength;
+    return std::wstring(m_pszPath, length);
 }
 
 //------------------------------------------------------------------------------
@@ -688,12 +685,11 @@ void CNethoodCache::Destroy()
 }
 
 UINT CNethoodCache::GetPathStatus(
-    __in PCTSTR pszPath,
+    __in PCWSTR pszPath,
     __in_opt CNethoodCacheEventConsumer* pEventConsumer,
     __out Node* node,
     __in unsigned uFlags,
-    __out_ecount_opt(cchMax) PTSTR pszTargetPath,
-    __in_opt size_t cchMax)
+    __out_opt std::wstring* targetPath)
 {
     Node nodeParent = m_oTree.GetRoot();
     Node nodeChild;
@@ -708,6 +704,9 @@ UINT CNethoodCache::GetPathStatus(
     bool bForce = !!(uFlags & GPSF_FORCE);
     int cTokens;
     int iToken = 0;
+
+    if (targetPath != NULL)
+        targetPath->clear();
 
     // Consumer cannot be specified without also returning ther node.
     assert(node || !pEventConsumer);
@@ -767,16 +766,16 @@ UINT CNethoodCache::GetPathStatus(
         if (data.GetType() == CNethoodCacheNode::TypeShare)
         {
             uError = ERROR_NETHOODCACHE_FULL_UNC_PATH;
-            if (pszTargetPath != NULL)
+            if (targetPath != NULL)
             {
-                GetUncPath(nodeFind, pszTargetPath, cchMax);
+                GetUncPath(nodeFind, *targetPath);
 
                 // Append remainder of the path to the
                 // resulting UNC path.
                 while (oParser.NextToken())
                 {
-                    StringCchCat(pszTargetPath, cchMax, TEXT("\\"));
-                    StringCchCatN(pszTargetPath, cchMax, oParser.GetTokenData(), oParser.GetTokenLength());
+                    targetPath->push_back(L'\\');
+                    targetPath->append(oParser.GetTokenData(), oParser.GetTokenLength());
                 }
             }
             break;
@@ -784,15 +783,15 @@ UINT CNethoodCache::GetPathStatus(
         else if (data.GetType() == CNethoodCacheNode::TypeTSCVolume)
         {
             uError = ERROR_NETHOODCACHE_FULL_UNC_PATH;
-            if (pszTargetPath != NULL)
+            if (targetPath != NULL)
             {
-                StringCchCopy(pszTargetPath, cchMax, data.GetName());
+                targetPath->assign(data.GetName());
                 // Append remainder of the path to the
                 // resulting UNC path.
                 while (oParser.NextToken())
                 {
-                    StringCchCat(pszTargetPath, cchMax, TEXT("\\"));
-                    StringCchCatN(pszTargetPath, cchMax, oParser.GetTokenData(), oParser.GetTokenLength());
+                    targetPath->push_back(L'\\');
+                    targetPath->append(oParser.GetTokenData(), oParser.GetTokenLength());
                 }
             }
             break;
@@ -803,15 +802,15 @@ UINT CNethoodCache::GetPathStatus(
                  m_displayTscVolumes != TSCDisplayNone)
         {
             if (oParser.GetTokenLength() == 8 &&
-                _tcsicmp(oParser.GetTokenData(), TEXT("tsclient")) == 0)
+                _wcsicmp(oParser.GetTokenData(), L"tsclient") == 0)
             {
                 uError = ERROR_NETHOODCACHE_SYMLINK;
-                if (pszTargetPath != NULL)
+                if (targetPath != NULL)
                 {
-                    StringCchCopy(pszTargetPath, cchMax, TEXT("\\"));
+                    targetPath->assign(L"\\");
                     if (m_displayTscVolumes == TSCDisplayFolder)
                     {
-                        StringCchCat(pszTargetPath, cchMax, m_oTree.GetAt(m_nodeTscFolder).GetDisplayName());
+                        targetPath->append(m_oTree.GetAt(m_nodeTscFolder).GetDisplayName());
                     }
                 }
 
@@ -978,7 +977,7 @@ CNethoodCache::Node CNethoodCache::FindNextSiblingNode(
 
 CNethoodCache::Node CNethoodCache::FindNextSiblingNode(
     __in Node startNode,
-    __in PCTSTR pszDisplayName)
+    __in PCWSTR pszDisplayName)
 {
     Node node;
     int iCompare = 0;
@@ -1008,19 +1007,15 @@ CNethoodCache::Node CNethoodCache::NewNode(
 
     if ((token.GetTokenClassification() & CUncPathParser::TokenServer) != 0)
     {
-        CPathBuffer szRemoteName;
-
-        token.GetPathUpToCurrentToken(szRemoteName, szRemoteName.Size());
+        const std::wstring remoteName = token.GetPathUpToCurrentToken();
         nodeData.SetType(CNethoodCacheNode::TypeServer);
-        nodeData.SetName(szRemoteName);
+        nodeData.SetName(remoteName.c_str());
     }
     else if ((token.GetTokenClassification() & CUncPathParser::TokenShare) != 0)
     {
-        CPathBuffer szShareName;
-
-        token.GetPathUpToCurrentToken(szShareName, szShareName.Size());
+        const std::wstring shareName = token.GetPathUpToCurrentToken();
         nodeData.SetType(CNethoodCacheNode::TypeShare);
-        nodeData.SetName(szShareName);
+        nodeData.SetName(shareName.c_str());
     }
     else
     {
@@ -1046,7 +1041,7 @@ int CNethoodCache::CompareNode(
 
 int CNethoodCache::CompareNode(
     __in Node node,
-    __in PCTSTR pszDisplayName)
+    __in PCWSTR pszDisplayName)
 {
     const CNethoodCacheNode& nodeData = m_oTree.GetAt(node);
 
@@ -1069,7 +1064,7 @@ bool CNethoodCache::ScheduleEnumeration(
 
     if (uDelay == 0)
     {
-        TRACE_I("Scheduling enumeration of " << DbgGetNodeName(node));
+        TRACE_IW(L"Scheduling enumeration of " << DbgGetNodeName(node));
     }
 
     TRACE_I("node=" << node << "[" << m_oTree.GetAt(node).GetStatus() << "], nodeDependsOn=" << nodeDependsOn << "[" << m_oTree.GetAt(nodeDependsOn).GetStatus() << "], uDelay=" << uDelay);
@@ -1190,21 +1185,14 @@ bool CNethoodCache::BeginEnumerationThread(__in Node node)
 
 bool CNethoodCache::GetPathWorker(
     __in Node node,
-    __out_ecount(cchMax) PTSTR pszPath,
-    __in size_t cchMax,
+    __out std::wstring& path,
     __in PathAssemblyType type)
 {
-    PTSTR psz;
-    PCTSTR pszName;
-    size_t cchName;
+    PCWSTR pszName;
     CNethoodCacheNode::Type nodeType;
 
     assert(node != NULL);
-    assert(pszPath != NULL);
-    assert(cchMax > 0);
-
-    psz = pszPath + cchMax - 1;
-    *psz = TEXT('\0');
+    path.clear();
 
     /*assert((type == PathUnc && m_oTree.GetAt(node).GetType() == CNethoodCacheNode::TypeShare) || type == PathFull);
 	if (type == PathUnc && m_oTree.GetAt(node).GetType() != CNethoodCacheNode::TypeShare)
@@ -1217,12 +1205,12 @@ bool CNethoodCache::GetPathWorker(
     {
         if (nodeType == CNethoodCacheNode::TypeTSCVolume)
         {
-            StringCchCopy(pszPath, cchMax, m_oTree.GetAt(node).GetName());
+            path.assign(m_oTree.GetAt(node).GetName());
             return true;
         }
         else if (nodeType == CNethoodCacheNode::TypeTSCFolder)
         {
-            StringCchCopy(pszPath, cchMax, TEXT("\\\\tsclient"));
+            path.assign(L"\\\\tsclient");
             return true;
         }
     }
@@ -1234,27 +1222,17 @@ bool CNethoodCache::GetPathWorker(
         pszName = nodeData.GetDisplayName();
         if (pszName == NULL)
         {
-            if (pszPath + cchMax - psz == 1)
+            if (path.empty())
             {
                 // Root node.
-                StringCchCopy(pszPath, cchMax, TEXT("\\"));
+                path.assign(L"\\");
                 return true;
             }
             break;
         }
 
-        cchName = _tcslen(pszName);
-
-        psz -= cchName;
-        if (psz - 1 < pszPath)
-        {
-            return false;
-        }
-
-        memcpy(psz, pszName, cchName * sizeof(TCHAR));
-
-        --psz;
-        *psz = TEXT('\\');
+        path.insert(0, pszName);
+        path.insert(path.begin(), L'\\');
 
         node = m_oTree.GetParent(node);
 
@@ -1262,12 +1240,7 @@ bool CNethoodCache::GetPathWorker(
             (((node != NULL) && m_oTree.GetAt(node).GetHint() == CNethoodCacheNode::HintRoot) ||
              (type == PathUnc)))
         {
-            --psz;
-            if (psz < pszPath)
-            {
-                return false;
-            }
-            *psz = TEXT('\\');
+            path.insert(path.begin(), L'\\');
 
             if (type == PathUnc)
             {
@@ -1276,7 +1249,6 @@ bool CNethoodCache::GetPathWorker(
         }
     }
 
-    memmove(pszPath, psz, (pszPath + cchMax - psz) * sizeof(TCHAR));
     return true;
 }
 
@@ -1284,7 +1256,7 @@ bool CNethoodCache::PutNodeOnStandbyList(__in Node node)
 {
     bool res = true;
 
-    TRACE_I("Putting " << DbgGetNodeName(node) << " on stand-by list");
+    TRACE_IW(L"Putting " << DbgGetNodeName(node) << L" on stand-by list");
 
     LockCache();
 
@@ -1341,7 +1313,7 @@ bool CNethoodCache::CreateMgmtThread()
 
 bool CNethoodCache::RemoveNodeFromStandbyList(__in Node node)
 {
-    TRACE_I("Removing " << DbgGetNodeName(node) << " from stand-by list");
+    TRACE_IW(L"Removing " << DbgGetNodeName(node) << L" from stand-by list");
 
     LockCache();
 
@@ -1409,25 +1381,21 @@ CNethoodCache::Node CNethoodCache::FindValidItem(
 
 bool CNethoodCache::FindAccessiblePath(
     __in Node node,
-    __out_ecount(cchPath) PTSTR pszPath,
-    __in size_t cchMax)
+    __out std::wstring& path)
 {
     bool bRet = true;
     Node nodeValid;
-
-    assert(cchMax > 1);
 
     LockCache();
 
     nodeValid = FindValidItem(node, NULL);
     if (nodeValid != NULL)
     {
-        bRet = GetFullPath(nodeValid, pszPath, cchMax);
+        bRet = GetFullPath(nodeValid, path);
     }
     else
     {
-        pszPath[0] = TEXT('\\');
-        pszPath[1] = TEXT('\0');
+        path.assign(L"\\");
     }
 
     UnlockCache();
@@ -1464,7 +1432,7 @@ void CNethoodCache::SpreadError(
     }
 }
 
-UINT CNethoodCache::EnsurePathExists(__in PCTSTR pszPath)
+UINT CNethoodCache::EnsurePathExists(__in PCWSTR pszPath)
 {
     CUncPathParser oParser(pszPath);
     Node nodeRoot = m_oTree.GetRoot();
@@ -1490,7 +1458,7 @@ UINT CNethoodCache::EnsurePathExists(__in PCTSTR pszPath)
     }
 
     bTsc = (oParser.GetTokenLength() == 8) &&
-           _tcsnicmp(oParser.GetTokenData(), TEXT("tsclient"), 8) == 0 &&
+           _wcsnicmp(oParser.GetTokenData(), L"tsclient", 8) == 0 &&
            (m_displayTscVolumes != TSCDisplayNone);
 
     LockCache();
@@ -1547,10 +1515,10 @@ UINT CNethoodCache::EnsurePathExists(__in PCTSTR pszPath)
     {
         CTsClientName oClientName(this);
         CTsNameFormatter oFormatter;
-        TCHAR szTrueDisplayName[128];
-        TCHAR szVolumeName[16];
+        wchar_t szTrueDisplayName[128];
+        wchar_t szVolumeName[16];
 
-        StringCchCopyN(szVolumeName, COUNTOF(szVolumeName),
+        StringCchCopyNW(szVolumeName, COUNTOF(szVolumeName),
                        oParser.GetTokenData(), oParser.GetTokenLength());
 
         oFormatter.Format(m_displayTscVolumes, szVolumeName,
@@ -1567,7 +1535,7 @@ UINT CNethoodCache::EnsurePathExists(__in PCTSTR pszPath)
         }
 
         // Refresh TS volumes (enumerated as a part of the root).
-        GetPathStatus(TEXT("\\"), NULL, NULL);
+        GetPathStatus(L"\\", NULL, NULL);
     }
     else
     {
@@ -1592,7 +1560,7 @@ void CNethoodCache::AddRefNode(__in Node node)
 
     assert(m_oTree.GetAt(node).GetStatus() != CNethoodCacheNode::StatusDead);
     LONG cRef = m_oTree.GetAt(node).AddRef();
-    TRACE_I("The node " << DbgGetNodeName(node) << " was referenced, cRef=" << cRef);
+    TRACE_IW(L"The node " << DbgGetNodeName(node) << L" was referenced, cRef=" << cRef);
 
     UnlockCache();
 }
@@ -1600,18 +1568,18 @@ void CNethoodCache::AddRefNode(__in Node node)
 void CNethoodCache::ReleaseNode(__in Node node)
 {
 #ifdef TRACE_ENABLE
-    TCHAR szNodeName[64];
-    StringCchCopy(szNodeName, COUNTOF(szNodeName), DbgGetNodeName(node));
+    wchar_t szNodeName[64];
+    StringCchCopyW(szNodeName, COUNTOF(szNodeName), DbgGetNodeName(node));
 #endif
 
     LockCache();
 
     LONG cRef = m_oTree.GetAt(node).Release();
-    TRACE_I("The node " << szNodeName << " was DEreferenced, cRef=" << cRef);
+    TRACE_IW(L"The node " << szNodeName << L" was DEreferenced, cRef=" << cRef);
 
     if (cRef == 0 && m_oTree.GetAt(node).GetStatus() == CNethoodCacheNode::StatusDead)
     {
-        TRACE_I("Last reference to the dead node " << szNodeName << " was released and is going to be destroyed.");
+        TRACE_IW(L"Last reference to the dead node " << szNodeName << L" was released and is going to be destroyed.");
         m_oTree.Remove(node);
     }
 
@@ -1663,10 +1631,15 @@ void CNethoodCache::SetDisplayTSClientVolumes(TSCDisplayMode mode)
         m_nodeTscFolder = InsertNode(m_oTree.GetRoot(), NULL);
         CNethoodCacheNode& nodeTscFolder = m_oTree.GetAt(m_nodeTscFolder);
         nodeTscFolder.SetHint(CNethoodCacheNode::HintTSCFolder);
-        NETRESOURCE sNetResource = {
+        NETRESOURCEW sNetResource = {
             0,
         };
-        sNetResource.lpRemoteName = SalamanderGeneral->LoadStr(GetLangInstance(), IDS_TSFOLDER);
+        // Named local: SPLLoadStrOwned returns by value, so taking .c_str()
+        // straight into lpRemoteName left it dangling at the end of that
+        // statement - before SetNetResource() below ever read it.
+        std::wstring tscFolderNameW =
+            SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_TSFOLDER);
+        sNetResource.lpRemoteName = const_cast<LPWSTR>(tscFolderNameW.c_str());
         sNetResource.dwUsage = RESOURCEUSAGE_CONTAINER;
         nodeTscFolder.SetNetResource(&sNetResource);
         nodeTscFolder.SetType(CNethoodCacheNode::TypeTSCFolder);
@@ -1694,7 +1667,7 @@ bool CNethoodCache::EnsureWtsApiInitialized()
         return true;
     }
 
-    HMODULE hWtsApi32 = HANDLES(LoadLibrary(TEXT("wtsapi32.dll")));
+    HMODULE hWtsApi32 = HANDLES(LoadLibraryW(L"wtsapi32.dll"));
     if (hWtsApi32 != NULL)
     {
         m_pfnWTSRegisterSessionNotification = (PFN_WTSRegisterSessionNotification)
@@ -1753,7 +1726,7 @@ void CNethoodCache::WTSSessionChange(DWORD dwSessionId, int nStatus)
 
     TRACE_I("WTS session change, session id=" << dwSessionId << ", status=" << (nStatus < COUNTOF(STATUS_NAMES) ? STATUS_NAMES[nStatus] : "???"));
 
-    LPTSTR pszClientName;
+    LPWSTR pszClientName;
     DWORD cbReturned;
 
     if (WTSQuerySessionInformation(
@@ -1763,7 +1736,7 @@ void CNethoodCache::WTSSessionChange(DWORD dwSessionId, int nStatus)
             &pszClientName,
             &cbReturned))
     {
-        TRACE_I("Client name=" << pszClientName);
+        TRACE_IW(L"Client name=" << pszClientName);
 
         WTSFreeMemory(pszClientName);
     }
@@ -1782,7 +1755,7 @@ bool CNethoodCache::AreTSAvailable()
     {
         SC_HANDLE hTsService;
 
-        hTsService = OpenService(hScManager, TEXT("TermService"), SERVICE_QUERY_STATUS);
+        hTsService = OpenServiceW(hScManager, L"TermService", SERVICE_QUERY_STATUS);
         if (hTsService != NULL)
         {
             SERVICE_STATUS status;
@@ -1808,7 +1781,7 @@ CNethoodCacheEnumerationThread::CNethoodCacheEnumerationThread(
     __in CNethoodCache* pCache,
     __in CNethoodCache::Node node) : _baseClass()
 {
-    StringCchPrintf(Name, COUNTOF(Name), TEXT("NethoodCacheEnum:%p"), node);
+    Name = SPLFormatStringOwned(L"NethoodCacheEnum:%p", node);
 
     m_pCache = pCache;
     m_node = node;
@@ -1826,11 +1799,11 @@ unsigned CNethoodCacheEnumerationThread::Body()
     DWORD dwScope;
     DWORD dwType;
     DWORD dwUsage;
-    NETRESOURCE* pNetResource = NULL;
-    NETRESOURCE sNetResource = {
+    NETRESOURCEW* pNetResource = NULL;
+    NETRESOURCEW sNetResource = {
         0,
     };
-    NETRESOURCE* pBuffer = NULL;
+    NethoodResourceBuffer enumStorage;
     DWORD cEntries = 0;
 
 #if DBG_TRUNCATE_EVERY_NTH_ENUM || DBG_FAIL_EVERY_NTH_ENUM
@@ -1838,7 +1811,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
     LONG nDbgEnumCounter = InterlockedIncrement(&nStaticDbgEnumCounter);
 #endif
 
-    TRACE_I("Starting enumeration of " << m_pCache->DbgGetNodeName(m_node));
+    TRACE_IW(L"Starting enumeration of " << m_pCache->DbgGetNodeName(m_node));
 
     if (data.GetHint() == CNethoodCacheNode::HintRoot)
     {
@@ -1867,10 +1840,10 @@ unsigned CNethoodCacheEnumerationThread::Body()
         }
         else if (data.GetHint() == CNethoodCacheNode::HintServer)
         {
-            sNetResource.lpRemoteName = const_cast<PTSTR>(data.GetName());
+            sNetResource.lpRemoteName = const_cast<PWSTR>(data.GetName());
 #if 0
 			DWORD cbBuffer = 1024;
-			PTSTR pszSystem;
+			PWSTR pszSystem;
 
 			void *pBuffer = _alloca(cbBuffer);
 
@@ -1878,14 +1851,14 @@ unsigned CNethoodCacheEnumerationThread::Body()
 			dwError = WNetGetResourceInformation(&sNetResource, pBuffer, &cbBuffer, &pszSystem);
 			if (dwError == NO_ERROR)
 			{
-				pNetResource = (NETRESOURCE *)pBuffer;
+				pNetResource = (NETRESOURCEW *)pBuffer;
 			}
 #endif
             pNetResource = &sNetResource;
         }
         else
         {
-            sNetResource.lpRemoteName = const_cast<PTSTR>(data.GetName());
+            sNetResource.lpRemoteName = const_cast<PWSTR>(data.GetName());
             pNetResource = &sNetResource;
             //assert(0);
         }
@@ -1913,17 +1886,15 @@ unsigned CNethoodCacheEnumerationThread::Body()
 
     if (dwError == NO_ERROR)
     {
-        pBuffer = reinterpret_cast<NETRESOURCE*>(new BYTE[ENUM_BUFFER_SIZE]);
-        assert(pBuffer != NULL); // should never fail if connected to Salamander's heap
-
         m_pCache->LockCache();
         BeginEnumeration(PhaseNetwork);
 
         for (;;)
         {
-            dwError = EnumResource(hEnum, cEntries, pBuffer, ENUM_BUFFER_SIZE);
+            NETRESOURCEW* resources = NULL;
+            dwError = NethoodEnumerateResourceBatch(hEnum, cEntries, enumStorage, resources);
             dwError = ExtendWNetError(dwError);
-            if ((dwError == NO_ERROR || dwError == ERROR_MORE_DATA) && cEntries > 0)
+            if (dwError == NO_ERROR && cEntries > 0)
             {
 #if DBG_TRUNCATE_EVERY_NTH_ENUM
                 if (cEntries > 1 && nDbgEnumCounter % DBG_TRUNCATE_EVERY_NTH_ENUM == 0)
@@ -1933,7 +1904,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
                 }
 #endif
 
-                ProcessEnumeration(pBuffer, cEntries, 0);
+                ProcessEnumeration(resources, cEntries, 0);
             }
             else
             {
@@ -1946,8 +1917,6 @@ unsigned CNethoodCacheEnumerationThread::Body()
             dwError = NO_ERROR;
         }
 
-        delete[] reinterpret_cast<BYTE*>(pBuffer);
-        pBuffer = NULL;
         CloseEnum(hEnum);
         hEnum = NULL;
 
@@ -2017,7 +1986,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
     }
     else
     {
-        TRACE_I("Enumeration of " << m_pCache->DbgGetNodeName(m_node) << " failed (WNet error=" << dwError << ")");
+        TRACE_IW(L"Enumeration of " << m_pCache->DbgGetNodeName(m_node) << L" failed (WNet error=" << dwError << L")");
 
         m_pCache->LockCache();
         /*data.SetLastEnumerationResult(dwError);
@@ -2031,7 +2000,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
 
 void CNethoodCacheEnumerationThread::ProcessEnumeration(
     __in CNethoodCache::Node nodeParent,
-    __in const NETRESOURCE* pNetResource,
+    __in const NETRESOURCEW* pNetResource,
     __in DWORD cElements,
     __in UINT uFlags,
     __in_opt const CTsClientName* poClientName)
@@ -2047,7 +2016,7 @@ void CNethoodCacheEnumerationThread::ProcessEnumeration(
             if (m_pCache->GetDisplayTSClientVolumes() != CNethoodCache::TSCDisplayNone &&
                 m_pCache->m_oTree.GetAt(nodeParent).IsRoot() &&
                 pNetResource->lpRemoteName &&
-                _tcsicmp(pNetResource->lpRemoteName, TEXT("\\\\tsclient")) == 0)
+                _wcsicmp(pNetResource->lpRemoteName, L"\\\\tsclient") == 0)
             {
                 // Hide \\tsclient from the root view.
                 --cElements;
@@ -2077,7 +2046,7 @@ void CNethoodCacheEnumerationThread::ProcessEnumeration(
 
             if (oTsNameFormatter.NeedsExtraFormatting(m_pCache->GetDisplayTSClientVolumes()))
             {
-                TCHAR szNewDisplayName[64];
+                wchar_t szNewDisplayName[64];
 
                 oTsNameFormatter.Format(
                     m_pCache->GetDisplayTSClientVolumes(),
@@ -2106,37 +2075,29 @@ void CNethoodCacheEnumerationThread::ProcessEnumeration(
 }
 
 void CNethoodCacheEnumerationThread::ProcessShareInfo(
-    __in PCTSTR pszServerName,
+    __in PCWSTR pszServerName,
     __in const SHARE_INFO_1& sShareInfo)
 {
-    NETRESOURCE sNetResource = {
+    NETRESOURCEW sNetResource = {
         0,
     };
-    CPathBuffer szRemoteName;
+    std::wstring remoteName = pszServerName;
+    if (!remoteName.empty() && remoteName.back() != L'\\')
+        remoteName.push_back(L'\\');
+    remoteName.append(sShareInfo.shi1_netname);
 
     sNetResource.dwScope = RESOURCE_GLOBALNET;
     sNetResource.dwType = RESOURCETYPE_DISK;
     sNetResource.dwDisplayType = RESOURCEDISPLAYTYPE_SHARE;
     sNetResource.dwUsage = RESOURCEUSAGE_CONNECTABLE;
 
-#ifdef _UNICODE
-    StringCchPrintf(szRemoteName, szRemoteName.Size(), L"%s\\%s",
-                    pszServerName, sShareInfo.shi1_netname);
+    // NETRESOURCE is NETRESOURCEW throughout this file now, so this
+    // member is always wide - the #ifdef _UNICODE/#else split that used to exist here (one
+    // genuinely wide branch, one building a narrow szRemoteName for a narrow sNetResource)
+    // no longer has a narrow case to handle. Collapsed to the wide-only logic; this does NOT
+    // define UNICODE (that is a separate, deliberately-deferred flip).
     sNetResource.lpComment = sShareInfo.shi1_remark;
-#else
-    StringCchPrintf(szRemoteName, szRemoteName.Size(), "%s\\%ls",
-                    pszServerName, sShareInfo.shi1_netname);
-    CPathBuffer szComment; // Heap-allocated for long path support
-    if (sShareInfo.shi1_remark && *sShareInfo.shi1_remark != L'\0')
-    {
-        if (WideCharToMultiByte(CP_ACP, 0, sShareInfo.shi1_remark,
-                                -1, szComment, szComment.Size(), NULL, NULL) > 0)
-        {
-            sNetResource.lpComment = szComment;
-        }
-    }
-#endif
-    sNetResource.lpRemoteName = szRemoteName;
+    sNetResource.lpRemoteName = const_cast<PWSTR>(remoteName.c_str());
 
     ProcessEnumeration(&sNetResource, 1,
                        m_pCache->GetDisplaySystemShares() == CNethoodCache::SysShareDisplayHidden ? ProcessHidden : 0);
@@ -2204,7 +2165,7 @@ void CNethoodCacheEnumerationThread::Invalidate()
 
 CNethoodCache::Node CNethoodCacheEnumerationThread::FindNode(
     __in CNethoodCache::Node nodeParent,
-    __in const NETRESOURCE* pNetResource)
+    __in const NETRESOURCEW* pNetResource)
 {
     CNethoodCache::Node nodeFirstChild;
     CNethoodCache::Node nodeFind = NULL;
@@ -2281,10 +2242,14 @@ DWORD CNethoodCacheEnumerationThread::ExtendWNetError(__in DWORD dwError)
     if (dwError == ERROR_EXTENDED_ERROR)
     {
         DWORD dwExtendedError;
-        TCHAR szDescription[128];
-        TCHAR szProvider[128];
+        // Widened: this buffer is purely internal (never
+        // returned to a caller), so switching to the W form loses no data and
+        // needs no signature change. Genuinely isolated from the NETRESOURCEW/
+        // Node chain that blocks the rest of this file's widening.
+        wchar_t szDescription[128];
+        wchar_t szProvider[128];
 
-        if (WNetGetLastError(
+        if (WNetGetLastErrorW(
                 &dwExtendedError,
                 szDescription,
                 COUNTOF(szDescription),
@@ -2302,17 +2267,23 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
     __in DWORD dwScope,
     __in DWORD dwType,
     __in DWORD dwUsage,
-    __in NETRESOURCE* pNetResource,
+    __in NETRESOURCEW* pNetResource,
     __out HANDLE* phEnum)
 {
     DWORD dwError;
 
-    dwError = WNetOpenEnum(dwScope, dwType, dwUsage, pNetResource, phEnum);
+    dwError = WNetOpenEnumW(dwScope, dwType, dwUsage, pNetResource, phEnum);
     if (IsLogonFailure(dwError))
     {
         // Access to the network resource was denied; try to
         // authenticate the user.
 
+        // SalWNetAddConnection2Interactive is a shared SDK method
+        // (spl_gen.h) whose LPNETRESOURCE parameter is the ambiguous wchar_t-generic macro, not
+        // genuinely narrow-only as this comment previously claimed - it resolves LPNETRESOURCEW
+        // under _UNICODE, exactly matching pNetResource's own always-wide NETRESOURCEW* type
+        //. ProjectNetResourceFieldToAnsiExact's refuse-if-lossy dance below is only
+        // needed for the narrow build; under _UNICODE pNetResource is passed straight through.
         dwError = SalamanderGeneral->SalWNetAddConnection2Interactive(pNetResource);
         /*
                 // It seems that the CONNECT_TEMPORARY flag vanished from
@@ -2331,7 +2302,7 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
         if (dwError == NO_ERROR)
         {
             // Try once more.
-            dwError = WNetOpenEnum(dwScope, dwType, dwUsage,
+            dwError = WNetOpenEnumW(dwScope, dwType, dwUsage,
                                    pNetResource, phEnum);
         }
     }
@@ -2339,41 +2310,18 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
     return dwError;
 }
 
-DWORD CNethoodCacheEnumerationThread::EnumResource(
-    __in HANDLE hEnum,
-    __out DWORD& cEntries,
-    __out NETRESOURCE* pBuffer,
-    __in DWORD cbBuffer)
-{
-    DWORD dwError;
-
-    cEntries = -1;
-    dwError = WNetEnumResource(hEnum, &cEntries, pBuffer, &cbBuffer);
-
-    return dwError;
-}
-
-DWORD CNethoodCacheEnumerationThread::EnumHiddenSharesNt(__in PCTSTR pszServerName)
+DWORD CNethoodCacheEnumerationThread::EnumHiddenSharesNt(__in PCWSTR pszServerName)
 {
     SHARE_INFO_1* pShareInfo;
     DWORD cRead;
     DWORD cTotal;
     DWORD res;
 
-#ifndef _UNICODE
-    WCHAR szServerNameW[32768];
-    if (!MultiByteToWideChar(CP_ACP, 0, pszServerName, -1, szServerNameW, COUNTOF(szServerNameW)))
-    {
-        return GetLastError();
-    }
-#endif
-
+    // pszServerName is PCWSTR now (cache.h widened) - the
+    // #ifndef _UNICODE narrow->wide conversion this used to need is obsolete, NetShareEnum
+    // (always wide-native) takes it directly. This does NOT define UNICODE (deferred).
     res = NetShareEnum(
-#ifdef _UNICODE
-        pszServerName,
-#else
-        szServerNameW,
-#endif
+        const_cast<LPWSTR>(pszServerName),
         1, reinterpret_cast<BYTE**>(&pShareInfo),
         MAX_PREFERRED_LENGTH, &cRead, &cTotal, NULL);
     if (res == ERROR_SUCCESS || res == ERROR_MORE_DATA)
@@ -2397,7 +2345,7 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenSharesNt(__in PCTSTR pszServerNa
     return res;
 }
 
-DWORD CNethoodCacheEnumerationThread::EnumHiddenShares(__in PCTSTR pszServerName)
+DWORD CNethoodCacheEnumerationThread::EnumHiddenShares(__in PCWSTR pszServerName)
 {
 #if ENUM_HIDDEN_SHARES
     DWORD res;
@@ -2410,25 +2358,32 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenShares(__in PCTSTR pszServerName
 #endif
 }
 
-BOOL CNethoodCacheEnumerationThread::GetShortcutsDir(__out PTSTR pszPath)
+BOOL CNethoodCacheEnumerationThread::GetShortcutsDir(std::wstring& path)
 {
-    return SHGetSpecialFolderPath(NULL, pszPath, CSIDL_NETHOOD, FALSE);
+    PWSTR knownPath = NULL;
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_NetHood, KF_FLAG_DEFAULT, NULL, &knownPath);
+    if (FAILED(result) || knownPath == NULL)
+        return FALSE;
+    path.assign(knownPath);
+    CoTaskMemFree(knownPath);
+    return TRUE;
 }
 
 BOOL CNethoodCacheEnumerationThread::AddNetworkShortcut(
-    __in PCTSTR pszName,
-    __in PTSTR pszPath)
+    __in PCWSTR pszName,
+    __in PCWSTR pszPath)
 {
-    if (ResolveNetShortcut(pszPath))
+    std::wstring resolvedPath(pszPath);
+    if (ResolveNetShortcut(resolvedPath))
     {
-        NETRESOURCE sNetResource = {
+        NETRESOURCEW sNetResource = {
             0,
         };
 
         sNetResource.dwDisplayType = RESOURCEDISPLAYTYPE_SHARE;
         sNetResource.dwType = CNethoodCacheNode::RESOURCETYPE_SHORTCUT;
-        sNetResource.lpComment = const_cast<PTSTR>(pszName);
-        sNetResource.lpRemoteName = pszPath;
+        sNetResource.lpComment = const_cast<PWSTR>(pszName);
+        sNetResource.lpRemoteName = resolvedPath.data();
         ProcessEnumeration(&sNetResource, 1, ProcessShortcut);
     }
 
@@ -2436,24 +2391,22 @@ BOOL CNethoodCacheEnumerationThread::AddNetworkShortcut(
 }
 
 BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
-    __inout_ecount(MAX_PATH) PTSTR path)
+    std::wstring& path)
 {
-    if (path[0] == '\\')
+    if (path.empty() || path[0] == L'\\')
         return FALSE; // UNC path -> not a NetHood location
 
-    CPathBuffer name; // Heap-allocated for long path support
-    name[0] = path[0];
-    name[1] = TEXT(':');
-    name[2] = TEXT('\\');
-    name[3] = TEXT('\0');
-    if (GetDriveType(name) != DRIVE_FIXED)
+    wchar_t root[] = {path[0], L':', L'\\', L'\0'};
+    if (GetDriveTypeW(root) != DRIVE_FIXED)
         return FALSE; // not a local fixed path -> not a NetHood location
 
     BOOL tryTarget = FALSE; // if TRUE, it is worth trying to find the "target.lnk" file
-    lstrcpyn(name, path, name.Size());
-    if (SalamanderGeneral->SalPathAppend(name, "desktop.ini", name.Size()))
+    std::wstring name = path;
+    if (!name.empty() && name.back() != L'\\')
+        name.push_back(L'\\');
+    name.append(L"desktop.ini");
     {
-        HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileW(name.c_str(), GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
@@ -2499,33 +2452,46 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
 
     if (tryTarget)
     {
-        lstrcpyn(name, path, name.Size());
-        if (SalamanderGeneral->SalPathAppend(name, "target.lnk", name.Size()))
+        name = path;
+        if (!name.empty() && name.back() != L'\\')
+            name.push_back(L'\\');
+        name.append(L"target.lnk");
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(name.c_str(), &data));
             if (find != INVALID_HANDLE_VALUE) // The file exists and we already retrieved its metadata.
             {
                 HANDLES(FindClose(find));
 
-                IShellLink* link;
+                IShellLinkW* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
-                        OLECHAR oleName[32768];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, COUNTOF(oleName));
-                        oleName[COUNTOF(oleName) - 1] = 0;
-                        if (fileInt->Load(oleName, STGM_READ) == S_OK)
+                        if (fileInt->Load(name.c_str(), STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, name.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
-                            {                                        // Skip Resolve; it's not critical here and would slow things down.
-                                StringCchCopy(path, MAX_PATH, name); // Finally we know where the shortcut points.
-                                ok = TRUE;
+                            std::vector<wchar_t> target(256, L'\0');
+                            for (;;)
+                            {
+                                std::fill(target.begin(), target.end(), L'\0');
+                                if (link->GetPath(target.data(), static_cast<int>(target.size()),
+                                                  &data, SLGP_UNCPRIORITY) != NOERROR)
+                                    break;
+                                const size_t length = wcsnlen_s(target.data(), target.size());
+                                if (length + 1 < target.size())
+                                {
+                                    path.assign(target.data(), length);
+                                    ok = TRUE;
+                                    break;
+                                }
+                                if (target.size() > static_cast<size_t>(INT_MAX) / 2)
+                                    break;
+                                target.resize(target.size() * 2, L'\0');
                             }
+                            // Skip Resolve; it is not critical here and would slow things down.
                         }
                         fileInt->Release();
                     }
@@ -2540,26 +2506,22 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
 
 DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
 {
-    CPathBuffer szShortcutsPath;
-    CPathBuffer szFindMask;
-    CPathBuffer szShortcut;
+    std::wstring shortcutsPath;
+    std::wstring findMask;
+    std::wstring shortcut;
     HANDLE hFind;
-    WIN32_FIND_DATA wfd;
+    WIN32_FIND_DATAW wfd;
     BOOL res;
 
-    if (!GetShortcutsDir(szShortcutsPath))
-    {
+    if (!GetShortcutsDir(shortcutsPath))
         return NO_ERROR;
-    }
 
-    StringCchCopy(szFindMask, szFindMask.Size(), szShortcutsPath);
-    if (!SalamanderGeneral->SalPathAppend(szFindMask, TEXT("*"),
-                                          szFindMask.Size()))
-    {
-        return NO_ERROR;
-    }
+    findMask = shortcutsPath;
+    if (!findMask.empty() && findMask.back() != L'\\')
+        findMask.push_back(L'\\');
+    findMask.push_back(L'*');
 
-    hFind = HANDLES_Q(FindFirstFile(szFindMask, &wfd));
+    hFind = HANDLES_Q(FindFirstFileW(findMask.c_str(), &wfd));
     if (hFind == INVALID_HANDLE_VALUE)
     {
         return NO_ERROR;
@@ -2572,19 +2534,17 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
         {
             if ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
                 wfd.cFileName[0] != 0 &&
-                (wfd.cFileName[0] != TEXT('.') || wfd.cFileName[1] != 0 &&
-                                                      (wfd.cFileName[1] != TEXT('.') || wfd.cFileName[2] != 0)))
+                (wfd.cFileName[0] != L'.' || wfd.cFileName[1] != 0 &&
+                                                      (wfd.cFileName[1] != L'.' || wfd.cFileName[2] != 0)))
             { // directories except empty names, "." and ".."
-                StringCchCopy(szShortcut, szShortcut.Size(),
-                              szShortcutsPath);
-                if (SalamanderGeneral->SalPathAppend(szShortcut,
-                                                     wfd.cFileName, szShortcut.Size()))
-                {
-                    AddNetworkShortcut(wfd.cFileName, szShortcut);
-                }
+                shortcut = shortcutsPath;
+                if (!shortcut.empty() && shortcut.back() != L'\\')
+                    shortcut.push_back(L'\\');
+                shortcut.append(wfd.cFileName);
+                AddNetworkShortcut(wfd.cFileName, shortcut.c_str());
             }
 
-            res = FindNextFile(hFind, &wfd);
+            res = FindNextFileW(hFind, &wfd);
         }
 
         CoUninitialize();
@@ -2597,12 +2557,11 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
 
 DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
 {
-    NETRESOURCE sNetResource = {
+    NETRESOURCEW sNetResource = {
         0,
     };
     HANDLE hEnum;
-    char achEnumBuffer[1024];
-    NETRESOURCE* pEnumResource = (NETRESOURCE*)achEnumBuffer;
+    NethoodResourceBuffer enumStorage;
     DWORD dwError;
     DWORD cEntries = 0;
     CNethoodCache::Node nodeParent;
@@ -2620,24 +2579,25 @@ DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
 
     assert(nodeParent != NULL);
 
-    static TCHAR remoteName[] = "\\\\tsclient";
-    sNetResource.lpRemoteName = TEXT(remoteName);
+    static wchar_t remoteName[] = L"\\\\tsclient";
+    sNetResource.lpRemoteName = remoteName;
 
-    TRACE_I("Opening TS client enumeration, client name " << (PCTSTR)oClientName);
+    TRACE_IW(L"Opening TS client enumeration, client name " << (PCWSTR)oClientName);
 
     dwError = OpenEnum(RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEUSAGE_ALL, &sNetResource, &hEnum);
     dwError = ExtendWNetError(dwError);
 
     if (dwError == NO_ERROR)
     {
-        dwError = EnumResource(hEnum, cEntries, pEnumResource, sizeof(achEnumBuffer));
+        NETRESOURCEW* resources = NULL;
+        dwError = NethoodEnumerateResourceBatch(hEnum, cEntries, enumStorage, resources);
         dwError = ExtendWNetError(dwError);
 
         TRACE_I("Enumerating TC client resources returned error " << dwError << ", " << cEntries << " entries available.");
 
         if (dwError == NO_ERROR)
         {
-            ProcessEnumeration(nodeParent, pEnumResource, cEntries, ProcessTSCVolume, &oClientName);
+            ProcessEnumeration(nodeParent, resources, cEntries, ProcessTSCVolume, &oClientName);
         }
         CloseEnum(hEnum);
     }
@@ -2649,7 +2609,7 @@ DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
     {
         int nTscFolderName;
         CNethoodCacheNode& nodeTscFolderData = m_pCache->m_oTree.GetAt(m_pCache->m_nodeTscFolder);
-        TCHAR szComment[64];
+        wchar_t szComment[64];
 
         memset(&sNetResource, 0, sizeof(sNetResource));
 
@@ -2664,17 +2624,18 @@ DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
             nTscFolderName = IDS_TSHOST;
         }
 
-        sNetResource.lpRemoteName = SalamanderGeneral->LoadStr(
-            GetLangInstance(), nTscFolderName);
+        const std::wstring remoteName =
+            SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), nTscFolderName);
+        sNetResource.lpRemoteName = const_cast<LPWSTR>(remoteName.c_str());
         sNetResource.dwUsage = RESOURCEUSAGE_CONTAINER;
 
         if (oClientName.Length() > 0)
         {
-            StringCchPrintf(szComment, COUNTOF(szComment),
-                            SalamanderGeneral->LoadStr(
+            StringCchPrintfW(szComment, COUNTOF(szComment),
+                            SPLLoadStrOwned(SalamanderGeneral,
                                 GetLangInstance(),
-                                IDS_TSFOLDERCOMMENT),
-                            (PCTSTR)oClientName);
+                                IDS_TSFOLDERCOMMENT).c_str(),
+                            (PCWSTR)oClientName);
 
             sNetResource.lpComment = szComment;
         }
@@ -2738,13 +2699,13 @@ void CNethoodCacheBeginDependentEnumerationConsumer::OnCacheNodeUpdated(
         const CNethoodCacheNode& dataToEnum = m_pCache->GetItemData(m_node);
         if (dataToEnum.GetType() == CNethoodCacheNode::TypeShare)
         {
-            TRACE_I("Node " << m_pCache->DbgGetNodeName(m_node) << " is UNC path, spreading error to child nodes.");
+            TRACE_IW(L"Node " << m_pCache->DbgGetNodeName(m_node) << L" is UNC path, spreading error to child nodes.");
             m_pCache->SpreadError(m_node, ERROR_NETHOODCACHE_FULL_UNC_PATH, CNethoodCache::SpreadRemoveChildren);
             bKillDependentNode = false;
         }
         else
         {
-            TRACE_I("Starting dependent enumeration of " << m_pCache->DbgGetNodeName(m_node));
+            TRACE_IW(L"Starting dependent enumeration of " << m_pCache->DbgGetNodeName(m_node));
             assert(dataToEnum.IsContainer() || dataToEnum.GetLastEnumerationResult() == -1);
             m_pCache->BeginEnumerationThread(m_node);
         }
@@ -2757,7 +2718,7 @@ void CNethoodCacheBeginDependentEnumerationConsumer::OnCacheNodeUpdated(
 
     if (bKillDependentNode)
     {
-        TRACE_I("Killing node " << m_pCache->DbgGetNodeName(m_node) << " and its children.");
+        TRACE_IW(L"Killing node " << m_pCache->DbgGetNodeName(m_node) << L" and its children.");
 
         // This will kill ourselves through the
         // CNethoodCacheHitmanConsumer.
@@ -2803,7 +2764,7 @@ void CNethoodCacheHitmanConsumer::OnCacheNodeUpdated(__in CNethoodCache::Node no
 // CNethoodCacheManagementThread
 
 CNethoodCacheManagementThread::CNethoodCacheManagementThread(
-    __in CNethoodCache* pCache) : _baseClass("NethoodCacheManagement")
+    __in CNethoodCache* pCache) : _baseClass(L"NethoodCacheManagement")
 {
     m_pCache = pCache;
     m_hwndWtsNotify = NULL;
@@ -2861,7 +2822,7 @@ unsigned CNethoodCacheManagementThread::Body()
                 DestroyWindow(m_hwndWtsNotify);
                 DrainMsgQueue(true);
 
-                if (!UnregisterClass(MAKEINTATOM(m_wndWtsNotifyCls), g_hInstance))
+                if (!UnregisterClassW(MAKEINTATOM(m_wndWtsNotifyCls), g_hInstance))
                     TRACE_E("UnregisterClass(m_wndWtsNotifyCls) has failed");
 
                 m_hwndWtsNotify = NULL;
@@ -2959,11 +2920,11 @@ void CNethoodCacheManagementThread::DrainMsgQueue(bool bQuitting)
     {
         if (bQuitting)
         {
-            res = GetMessage(&msg, NULL, 0, 0);
+            res = GetMessageW(&msg, NULL, 0, 0);
         }
         else
         {
-            res = PeekMessage(&msg, NULL, 0, 0, PM_REMOVE);
+            res = PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);
         }
 
         if (res <= 0) /* GetMessage may return -1 on error */
@@ -2972,41 +2933,44 @@ void CNethoodCacheManagementThread::DrainMsgQueue(bool bQuitting)
         }
 
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
     }
 }
 
 void CNethoodCacheManagementThread::CreateWtsNotifyWindow()
 {
-    WNDCLASSEX wc = {
-        0,
-    };
-    TCHAR szClassName[64];
+    try
+    {
+        const std::wstring className = SPLFormatStringOwned(L"NethoodWtsNotify:%p", this);
+        WNDCLASSEXW wc = {0};
+        wc.cbSize = sizeof(WNDCLASSEXW);
+        wc.lpfnWndProc = &CNethoodCacheManagementThread::WtsNotifyWndProc;
+        wc.hInstance = g_hInstance;
+        wc.lpszClassName = className.c_str();
 
-    StringCchPrintf(szClassName, COUNTOF(szClassName), TEXT("NethoodWtsNotify:%p"), this);
+        m_wndWtsNotifyCls = RegisterClassExW(&wc);
+        assert(m_wndWtsNotifyCls);
 
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.lpfnWndProc = &CNethoodCacheManagementThread::WtsNotifyWndProc;
-    wc.hInstance = g_hInstance;
-    wc.lpszClassName = szClassName;
-
-    m_wndWtsNotifyCls = RegisterClassEx(&wc);
-    assert(m_wndWtsNotifyCls);
-
-    m_hwndWtsNotify = CreateWindowEx(
-        0, // exStyle
-        szClassName,
-        NULL, // name
-        WS_POPUP,
-        0,
-        0,
-        0,
-        0,
-        HWND_MESSAGE,
-        NULL,
-        g_hInstance,
-        this);
-    assert(m_hwndWtsNotify);
+        m_hwndWtsNotify = CreateWindowExW(
+            0, // exStyle
+            className.c_str(),
+            NULL, // name
+            WS_POPUP,
+            0,
+            0,
+            0,
+            0,
+            HWND_MESSAGE,
+            NULL,
+            g_hInstance,
+            this);
+        assert(m_hwndWtsNotify);
+    }
+    catch (const std::bad_alloc&)
+    {
+        TRACE_E("Unable to allocate the WTS notification window class name.");
+        return;
+    }
 
     DrainMsgQueue();
 }
@@ -3065,7 +3029,7 @@ LRESULT WINAPI CNethoodCacheManagementThread::WtsNotifyWndProc(
     }
     }
 
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 //------------------------------------------------------------------------------
@@ -3079,13 +3043,13 @@ CTsClientName::CTsClientName(CNethoodCache* pCache)
 
     m_pCache = pCache;
 
-    if (WTSQuerySessionInformation(
+    if (WTSQuerySessionInformationW(
             WTS_CURRENT_SERVER_HANDLE,
             WTS_CURRENT_SESSION,
             WTSClientName,
             &m_pszClientName, &cbReturned))
     {
-        m_cchClientName = (cbReturned / sizeof(TCHAR)) - 1; // exclude nul-terminator
+        m_cchClientName = (cbReturned / sizeof(wchar_t)) - 1; // exclude nul-terminator
         assert(m_cchClientName >= 0);
     }
     else
@@ -3109,16 +3073,13 @@ CTsClientName::~CTsClientName()
 //------------------------------------------------------------------------------
 // CTsNameFormatter
 
-CTsNameFormatter::CTsNameFormatter()
-{
-    m_pszFormat = NULL;
-}
+CTsNameFormatter::CTsNameFormatter() = default;
 
 void CTsNameFormatter::Format(
     __in CNethoodCache::TSCDisplayMode displayMode,
-    __in PCTSTR pszVolumeName,
+    __in PCWSTR pszVolumeName,
     __in const CTsClientName* poClientName,
-    __out_ecount(cchMax) PTSTR pszDisplayName,
+    __out_ecount(cchMax) PWSTR pszDisplayName,
     __in size_t cchMax)
 {
     assert(pszVolumeName != NULL);
@@ -3129,15 +3090,14 @@ void CTsNameFormatter::Format(
         poClientName == NULL ||
         poClientName->Length() == 0)
     {
-        StringCchCopy(pszDisplayName, cchMax, pszVolumeName);
+        StringCchCopyW(pszDisplayName, cchMax, pszVolumeName);
         return;
     }
 
-    if (m_pszFormat == NULL)
+    if (m_format.empty())
     {
-        m_pszFormat = SalamanderGeneral->LoadStr(GetLangInstance(),
-                                                 IDS_TSCLIENT);
-        assert(m_pszFormat != NULL);
+        m_format = SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_TSCLIENT);
+        assert(!m_format.empty());
     }
 
     // Use FormatMessage to take advantage of the indexed insertion
@@ -3146,11 +3106,11 @@ void CTsNameFormatter::Format(
 
     DWORD_PTR args[2];
     args[0] = reinterpret_cast<DWORD_PTR>(pszVolumeName);
-    args[1] = reinterpret_cast<DWORD_PTR>((PCTSTR)(*poClientName));
+    args[1] = reinterpret_cast<DWORD_PTR>((PCWSTR)(*poClientName));
 
-    FormatMessage(
+    FormatMessageW(
         FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ARGUMENT_ARRAY, // flags
-        m_pszFormat,                                                // source
+        m_format.c_str(),                                           // source
         0,                                                          // message id
         0,                                                          // lang id
         pszDisplayName,                                             // buffer

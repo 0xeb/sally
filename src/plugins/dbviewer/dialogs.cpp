@@ -12,6 +12,7 @@
 #include "dbviewer.rh"
 #include "dbviewer.rh2"
 #include "lang\lang.rh"
+#include "display_text.h"
 
 // from windowsx.h
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
@@ -25,83 +26,42 @@
         SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
     }
 
-char* FindHistory[FIND_HISTORY_SIZE];
+sally::dbviewer::FindHistoryEntries FindHistory;
 
 //****************************************************************************
 //
 // HistoryComboBox
 //
 
-void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
-                     int textLen, int historySize, char* history[])
+void HistoryComboBox(CTransferInfo& ti, int ctrlID, std::wstring& text,
+                     sally::dbviewer::FindHistoryEntries& history)
 {
-    CALL_STACK_MESSAGE4("HistoryComboBox(, , %d, , %d, %d, )",
-                        ctrlID, textLen, historySize);
+    CALL_STACK_MESSAGE2("HistoryComboBox(, , %d, , )", ctrlID);
     HWND hwnd;
     if (ti.GetControl(hwnd, ctrlID))
     {
         if (ti.Type == ttDataToWindow)
         {
-            SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
-            SendMessage(hwnd, CB_LIMITTEXT, textLen - 1, 0);
-            SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)Text);
+            SendMessageW(hwnd, CB_RESETCONTENT, 0, 0);
+            SetWindowTextW(hwnd, text.c_str());
         }
         else
         {
-            SendMessage(hwnd, WM_GETTEXT, textLen, (LPARAM)Text);
-            SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
-            SendMessage(hwnd, CB_LIMITTEXT, textLen - 1, 0);
-            SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)Text);
+            text = SPLGetWindowTextOwned(hwnd);
+            SendMessageW(hwnd, CB_RESETCONTENT, 0, 0);
+            SetWindowTextW(hwnd, text.c_str());
 
             // everything is OK, add it to the history
-            if (ti.IsGood())
+            if (ti.IsGood() && !text.empty())
             {
-                if (Text[0] != 0)
-                {
-                    BOOL insert = TRUE;
-                    int i;
-                    for (i = 0; i < historySize; i++)
-                    {
-                        if (history[i] != NULL)
-                        {
-                            if (strcmp(history[i], Text) == 0) // if already in the history
-                            {                                  // move it to position 0
-                                if (i > 0)
-                                {
-                                    char* swap = history[i];
-                                    memmove(history + 1, history, i * sizeof(char*));
-                                    history[0] = swap;
-                                }
-                                insert = FALSE;
-                                break;
-                            }
-                        }
-                        else
-                            break;
-                    }
-
-                    if (insert)
-                    {
-                        char* newText = _tcsdup(Text);
-                        if (newText != NULL)
-                        {
-                            if (history[historySize - 1] != NULL)
-                                free(history[historySize - 1]);
-                            memmove(history + 1, history,
-                                    (historySize - 1) * sizeof(char*));
-                            history[0] = newText;
-                        }
-                        else
-                            TRACE_E("Low memory");
-                    }
-                }
+                if (!sally::dbviewer::RememberFindText(history, text))
+                    TRACE_E("Low memory");
             }
         }
 
-        int i;
-        for (i = 0; i < historySize; i++) // fill the combo box list
-            if (history[i] != NULL)
-                SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)history[i]);
+        for (const std::wstring& entry : history) // fill the combo box list
+            if (!entry.empty())
+                SendMessageW(hwnd, CB_ADDSTRING, 0, (LPARAM)entry.c_str());
             else
                 break;
     }
@@ -160,10 +120,10 @@ void CGoToDialog::Transfer(CTransferInfo& ti)
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_GOTO_RECORD))
     {
-        TCHAR buff[20];
+        wchar_t buff[20];
         if (ti.Type == ttDataToWindow)
         {
-            wsprintf(buff, _T("%d"), (*pRecord) + 1);
+            wsprintf(buff, L"%d", (*pRecord) + 1);
             SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)buff);
         }
         else
@@ -387,12 +347,12 @@ void CConfigurationDialog::SetFontText()
 
     HDC hDC = GetDC(HWindow);
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
-    char buf[LF_FACESIZE + 200];
-    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
-                MulDiv(-oldHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
-                logFont.lfFaceName,
-                LoadStr(UseCustomFont ? IDS_CUSTOMFONT : IDS_DEFAULTFONT));
-    SetWindowText(hEdit, buf);
+    const std::wstring description = SPLFormatStringOwned(
+        LangStr(IDS_FONTDESCRIPTION).c_str(),
+        MulDiv(-oldHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+        logFont.lfFaceName,
+        LangStr(UseCustomFont ? IDS_CUSTOMFONT : IDS_DEFAULTFONT).c_str());
+    SetWindowTextW(hEdit, description.c_str());
     ReleaseDC(HWindow, hDC);
 }
 
@@ -427,8 +387,8 @@ MENU_TEMPLATE_ITEM ConfigurationDialogMenu[] =
 */
             HMENU hMenu = CreatePopupMenu();
             BOOL cstFont = UseCustomFont;
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
+            InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LangStr(IDS_USEDEFAULTFONT).c_str());
+            InsertMenuW(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LangStr(IDS_USECUSTOMFONT).c_str());
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -491,32 +451,38 @@ CColumnsDialog::CColumnsDialog(HWND hParent, CRendererWindow* renderer)
 void CColumnsDialog::SetLVTexts(int index)
 {
     CDatabaseColumn* column = &MyColumns[index];
-    char buff[100];
+    std::wstring nameText;
+    std::wstring sizeTextW;
+    std::wstring decimalsText;
 
     // name
     if (!Renderer->Database.GetIsUnicode())
     {
-        ListView_SetItemText(HListView, index, 0, column->Name);
+        sally::dbviewer::DecodeLegacyDisplayText(
+            column->Name, strlen(column->Name),
+            Renderer->UseCodeTable
+                ? reinterpret_cast<const unsigned char*>(Renderer->CodeTable)
+                : nullptr,
+            nameText);
     }
     else
-    {
-        ListView_SetItemTextW(HListView, index, 0, (LPWSTR)column->Name);
-    }
+        nameText = reinterpret_cast<const wchar_t*>(column->Name);
+    ListView_SetItemTextW(HListView, index, 0,
+                          const_cast<wchar_t*>(nameText.c_str()));
 
     // type
-    ListView_SetItemText(HListView, index, 1, column->Type);
+    ListView_SetItemTextW(HListView, index, 1, column->Type);
 
     // len
-    buff[0] = 0;
     if (column->FieldLen != -1)
-        SalGeneral->PrintDiskSize(buff, CQuadWord(column->FieldLen, 0), 2);
-    ListView_SetItemText(HListView, index, 2, buff);
+        sizeTextW = SPLPrintDiskSizeOwned(SalGeneral, CQuadWord(column->FieldLen, 0), 2);
+    ListView_SetItemTextW(HListView, index, 2, const_cast<wchar_t*>(sizeTextW.c_str()));
 
     // digits
-    buff[0] = 0;
     if (column->Decimals != -1)
-        sprintf(buff, "%d", column->Decimals);
-    ListView_SetItemText(HListView, index, 3, buff);
+        decimalsText = std::to_wstring(column->Decimals);
+    ListView_SetItemTextW(HListView, index, 3,
+                          const_cast<wchar_t*>(decimalsText.c_str()));
 
     // visibility
     UINT state = INDEXTOSTATEIMAGEMASK((column->Visible ? 2 : 1));
@@ -531,14 +497,14 @@ void CColumnsDialog::Transfer(CTransferInfo& ti)
         int i;
         for (i = 0; i < MyColumns.Count; i++)
         {
-            char emptyBuff[] = "";
-            LVITEM lvi;
+            wchar_t emptyBuff[] = L"";
+            LVITEMW lvi = {};
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
             lvi.pszText = emptyBuff;
-            ListView_InsertItem(HListView, &lvi);
+            SNDMSG(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
 
             SetLVTexts(i);
         }
@@ -571,7 +537,7 @@ void CColumnsDialog::Validate(CTransferInfo& ti)
     }
     if (!visible)
     {
-        SalGeneral->SalMessageBox(HWindow, LoadStr(IDS_NOVISIBLE_FIELD), LoadStr(IDS_PLUGINNAME),
+        SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_NOVISIBLE_FIELD).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                   MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_COL_LV);
     }
@@ -660,31 +626,32 @@ CColumnsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int colWidth = (int)(r.right / 4);
 
         // populate the list view with the Name column
-        LVCOLUMN lvc;
+        // W column headers - these are localized UI strings, not file data.
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_COLUMNS_NAME);
+        lvc.pszText = const_cast<LPWSTR>(LangStr(IDS_COLUMNS_NAME).c_str());
         lvc.cx = r.right - 2 * colWidth - (int)(colWidth / 1.4) - GetSystemMetrics(SM_CXVSCROLL);
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        SNDMSG(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)(LVCOLUMNW*)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_COLUMNS_TYPE);
+        lvc.pszText = const_cast<LPWSTR>(LangStr(IDS_COLUMNS_TYPE).c_str());
         lvc.cx = colWidth;
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        SNDMSG(HListView, LVM_INSERTCOLUMNW, 1, (LPARAM)(LVCOLUMNW*)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_COLUMNS_LENGTH);
+        lvc.pszText = const_cast<LPWSTR>(LangStr(IDS_COLUMNS_LENGTH).c_str());
         lvc.cx = colWidth;
         lvc.iSubItem = 2;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        SNDMSG(HListView, LVM_INSERTCOLUMNW, 2, (LPARAM)(LVCOLUMNW*)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_COLUMNS_DECIMALS);
+        lvc.pszText = const_cast<LPWSTR>(LangStr(IDS_COLUMNS_DECIMALS).c_str());
         lvc.cx = (int)(colWidth / 1.4);
         lvc.iSubItem = 3;
-        ListView_InsertColumn(HListView, 3, &lvc);
+        SNDMSG(HListView, LVM_INSERTCOLUMNW, 3, (LPARAM)(LVCOLUMNW*)&lvc);
         GetClientRect(HWindow, &r);
         MinDlgW = PrevDlgW = r.right;
         MinDlgH = PrevDlgH = r.bottom;
@@ -813,35 +780,7 @@ CColumnsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 void CFindDialog::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_FIND_REGEXP, Regular);
-    HistoryComboBox(HWindow, ti, IDC_FIND_TEXT, Text, SizeOf(Text),
-                    FIND_HISTORY_SIZE, FindHistory);
-    /*
-  if (ti.Type == ttDataToWindow)
-  { // initialize the searched text according to the selection in the viewer (parent of this dialog)
-    CWindowsObject *win = WindowsManager.GetWindowPtr(Parent);
-    if (win != NULL && win->Is(otViewerWindow))  // double-check that this is a viewer window
-    {
-      CViewerWindow *view = (CViewerWindow *)win;
-      char buf[FIND_TEXT_LEN];
-      char hexBuf[FIND_TEXT_LEN];
-      int len;
-      if (view->GetFindText(buf, len))
-      {
-        if (HexMode)
-        {
-          if (len * 3 > FIND_TEXT_LEN) len = (FIND_TEXT_LEN - 1) / 3;
-          int i;
-          for (i = 0; i < len; i++)
-          {
-            sprintf(hexBuf + i * 3, i == len - 1 ? "%02X" : "%02X ", (unsigned)buf[i]);
-          }
-          strcpy(buf, hexBuf);
-        }
-        SendMessage(GetDlgItem(HWindow, IDC_FINDTEXT), WM_SETTEXT, 0, (LPARAM)buf);
-      }
-    }
-  }
-  */
+    HistoryComboBox(ti, IDC_FIND_TEXT, Text, FindHistory);
     ti.RadioButton(IDC_FIND_SBACKWARD, 0, Forward);
     ti.RadioButton(IDC_FIND_SFORWARD, 1, Forward);
     ti.CheckBox(IDC_FIND_WHOLEWORDS, WholeWords);
@@ -855,11 +794,10 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_USER_CLEARHISTORY:
     {
-        CPathBuffer buffer; // Heap-allocated for long path support
         HWND cb = GetDlgItem(HWindow, IDC_FIND_TEXT);
-        SendMessage(cb, WM_GETTEXT, buffer.Size(), (LPARAM)buffer.Get());
-        SendMessage(cb, CB_RESETCONTENT, 0, 0);
-        SendMessage(cb, WM_SETTEXT, 0, (LPARAM)buffer.Get());
+        const std::wstring text = SPLGetWindowTextOwned(cb);
+        SendMessageW(cb, CB_RESETCONTENT, 0, 0);
+        SendMessageW(cb, WM_SETTEXT, 0, (LPARAM)text.c_str());
         break;
     }
     }

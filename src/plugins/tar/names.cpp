@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
 #include "dlldefs.h"
 #include "names.h"
 
@@ -30,29 +29,32 @@ CNameTree::~CNameTree()
     }
 }
 
-void CNameTree::Add(const char* name, const BOOL isDir, const char* path, const CFileData* fileData)
+void CNameTree::Add(const wchar_t* name, const BOOL isDir, const wchar_t* path, const CFileData* fileData)
 {
-    CALL_STACK_MESSAGE4("CNameTree::Add(%s, %d, %s, )", name, isDir, path);
-    if (*name == '\0' || *name == '*' || *name == '?')
+    CALL_STACK_MESSAGE4("CNameTree::Add(%ls, %d, %ls, )", name, isDir, path);
+    if (*name == L'\0' || *name == L'*' || *name == L'?')
     {
         // the name ends here (at least the exact, mask-free part)
         if (EndingNames == NULL)
             EndingNames = new TDirectArray<SEndingFile>(1, 1);
 
         SEndingFile tmpEndingFile;
-        if (path != NULL && *path != '\0')
+        if (path != NULL && *path != L'\0')
         {
-            tmpEndingFile.path = (char*)malloc(strlen(path) + 1);
-            strcpy(tmpEndingFile.path, path);
+            tmpEndingFile.path = (wchar_t*)malloc((wcslen(path) + 1) * sizeof(wchar_t));
+            wcscpy(tmpEndingFile.path, path);
         }
         else
             tmpEndingFile.path = NULL;
         tmpEndingFile.isDir = isDir;
         tmpEndingFile.fileData = fileData;
-        if (*name != '\0')
+        if (*name != L'\0')
         {
-            tmpEndingFile.mask = (char*)malloc(strlen(name) + 1);
-            SalamanderGeneral->PrepareMask(tmpEndingFile.mask, name);
+            const std::wstring preparedMask =
+                SPLPrepareMaskOwned(SalamanderGeneral, name);
+            tmpEndingFile.mask = (wchar_t*)malloc(
+                (preparedMask.size() + 1) * sizeof(wchar_t));
+            wcscpy(tmpEndingFile.mask, preparedMask.c_str());
         }
         else
             tmpEndingFile.mask = NULL;
@@ -93,15 +95,15 @@ void CNameTree::Add(const char* name, const BOOL isDir, const char* path, const 
     }
 }
 
-BOOL CNameTree::IsNamePresent(const char* name, const BOOL hasExtension)
+BOOL CNameTree::IsNamePresent(const wchar_t* name, const BOOL hasExtension)
 {
-    SLOW_CALL_STACK_MESSAGE3("CNameTree::IsNamePresent(%s, %d)", name, hasExtension);
+    SLOW_CALL_STACK_MESSAGE3("CNameTree::IsNamePresent(%ls, %d)", name, hasExtension);
     if (EndingNames != NULL)
     {
         int i;
         for (i = 0; i < EndingNames->Count; i++)
             if ((EndingNames->At(i).mask == NULL &&
-                 ((EndingNames->At(i).isDir && (*name == '\\')) || *name == '\0')) ||
+                 ((EndingNames->At(i).isDir && (*name == L'\\')) || *name == L'\0')) ||
                 (EndingNames->At(i).mask != NULL &&
                  SalamanderGeneral->AgreeMask(name, EndingNames->At(i).mask, hasExtension)))
                 return TRUE;

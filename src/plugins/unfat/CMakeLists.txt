@@ -6,6 +6,7 @@ sal_add_plugin(NAME unfat
     "${SAL_PLUGINS}/unfat/fat.cpp"
     "${SAL_PLUGINS}/unfat/precomp.cpp"
     "${SAL_PLUGINS}/unfat/unfat.cpp"
+    "${SAL_PLUGINS}/unfat/unfat_text.cpp"
   RC "${SAL_PLUGINS}/unfat/unfat.rc"
   DEF "${SAL_PLUGINS}/unfat/unfat.def"
 )

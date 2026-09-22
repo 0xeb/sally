@@ -1,15 +1,26 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static char* DupListingWorkerError(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
 
 //
 // ****************************************************************************
 // CFTPWorker
 //
 
-void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, CPathBuffer& errBuf, BOOL& conClosedRetryItem, BOOL& lookForNewWork)
+void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, std::string& errBuf, BOOL& conClosedRetryItem, BOOL& lookForNewWork)
 {
     DWORD localIP;
     unsigned short localPort = 0; // listen on any port
@@ -69,21 +80,17 @@ void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, CPathBuffer& e
         {
             if (error != NO_ERROR)
             {
-                FTPGetErrorText(error, errBuf, errBuf.Size());
-                char* s = errBuf + strlen(errBuf);
-                while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                *s = 0; // trim newline characters from the error text
-                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON2), errBuf.Get());
+                FTPGetErrorText(error, errBuf);
+                while (!errBuf.empty() && (errBuf.back() == '\n' || errBuf.back() == '\r'))
+                    errBuf.pop_back();
+                SetFormattedLocalErrorDescr(IDS_PROXYERRUNABLETOCON2, errBuf);
             }
             else
-                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON));
-            _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), ErrorDescr);
-            lstrcpyn(ErrorDescr, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // we want the error text to contain "data con. err.:"
+                SetLocalErrorDescr(LoadStr(IDS_PROXYERRUNABLETOCON));
+            SetFormattedWideErrorDescr(IDS_LOGMSGDATCONERROR, ErrorDescr); // retain the "data con. err.:" prefix
             CorrectErrorDescr();
 
-            // Write the timeout to the log.
-            Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+            LogErrorDescr();
 
             // "Manually" close the control connection.
             HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -97,8 +104,8 @@ void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, CPathBuffer& e
     }
 }
 
-void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CPathBuffer& errBuf,
-                               CPathBuffer& buf, int& cmdLen, BOOL& sendCmd, BOOL& conClosedRetryItem,
+void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, std::string& errBuf,
+                               std::string& buf, int& cmdLen, BOOL& sendCmd, BOOL& conClosedRetryItem,
                                CFTPWorkerSubState waitForPORTRes)
 {
     if (ShouldStop)
@@ -137,23 +144,26 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CP
                 SocketsThread->DeleteTimer(UID, WORKER_LISTENTIMEOUTTIMID);
 
                 HANDLES(LeaveCriticalSection(&WorkerCritSect));
-                errBuf[0] = 0;
+                errBuf.clear();
                 DWORD listenOnIP;
                 unsigned short listenOnPort;
                 BOOL ok = WorkerDataCon->GetListenIPAndPort(&listenOnIP, &listenOnPort);
                 if (!ok)
                 {
-                    if (!WorkerDataCon->GetProxyError(errBuf, errBuf.Size(), NULL, 0, TRUE))
-                        errBuf[0] = 0;
+                    if (!WorkerDataCon->GetProxyError(errBuf, NULL, TRUE))
+                        errBuf.clear();
                 }
                 HANDLES(EnterCriticalSection(&WorkerCritSect));
 
                 if (ok)
                 {
-                    PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                      ftpcmdSetPort, &cmdLen, listenOnIP, listenOnPort); // cannot report an error
-                    sendCmd = TRUE;
-                    SubState = waitForPORTRes;
+                    if (PrepareFTPCommand(buf, &errBuf, ftpcmdSetPort, &cmdLen, listenOnIP, listenOnPort))
+                    {
+                        sendCmd = TRUE;
+                        SubState = waitForPORTRes;
+                    }
+                    else
+                        handleShouldStop = TRUE;
                 }
                 else // error while opening the "listen" port on the proxy server - perform a retry...
                 {
@@ -173,10 +183,10 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CP
                     }
 
                     // Prepare the error (timeout) text into 'ErrorDescr'
-                    if (errBuf[0] == 0)
-                        lstrcpyn(ErrorDescr, LoadStr(IDS_PROXYERROPENACTDATA), FTPWORKER_ERRDESCR_BUFSIZE);
+                    if (errBuf.empty())
+                        SetLocalErrorDescr(LoadStr(IDS_PROXYERROPENACTDATA));
                     else
-                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf.Get());
+                        SetFormattedLocalErrorDescr(IDS_LOGMSGDATCONERROR, errBuf);
                     needRetry = TRUE;
                 }
             }
@@ -188,12 +198,12 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CP
         case fweDataConListenTimeout:
         {
             // Close the data connection and prepare the error (timeout) text into 'ErrorDescr'.
-            errBuf[0] = 0;
+            errBuf.clear();
             if (WorkerDataCon != NULL)
             {
                 HANDLES(LeaveCriticalSection(&WorkerCritSect));
-                if (!WorkerDataCon->GetProxyTimeoutDescr(errBuf, errBuf.Size()))
-                    errBuf[0] = 0;
+                if (!WorkerDataCon->GetProxyTimeoutDescr(errBuf))
+                    errBuf.clear();
                 // Since we are already inside the CSocketsThread::CritSect section, this call
                 // It can also be called from the CSocket::SocketCritSect section (no risk of deadlock).
                 if (WorkerDataCon->IsConnected())       // close the "data connection", the system will attempt a "graceful"
@@ -204,10 +214,10 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CP
                 HANDLES(EnterCriticalSection(&WorkerCritSect));
                 WorkerDataConState = wdcsDoesNotExist;
             }
-            if (errBuf[0] == 0)
-                lstrcpyn(ErrorDescr, LoadStr(IDS_PREPACTDATACONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+            if (errBuf.empty())
+                SetLocalErrorDescr(LoadStr(IDS_PREPACTDATACONTIMEOUT));
             else
-                _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf.Get());
+                SetFormattedLocalErrorDescr(IDS_LOGMSGDATCONERROR, errBuf);
             needRetry = TRUE;
             break;
         }
@@ -217,9 +227,7 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CP
         {
             CorrectErrorDescr();
 
-            // Write the timeout to the log.
-            _snprintf_s(errBuf, errBuf.Size(), _TRUNCATE, "%s\r\n", ErrorDescr);
-            Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+            LogErrorDescr();
 
             // "Manually" close the control connection.
             HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -285,7 +293,7 @@ void CFTPWorker::WaitForPASVRes(CFTPWorkerEvent event, char* reply, int replySiz
         else // passive mode is not supported; try active mode instead
         {
             Oper->SetUsePassiveMode(FALSE);
-            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGPASVNOTSUPPORTED), -1);
+            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGPASVNOTSUPPORTED).c_str(), -1);
 
             if (ShouldStop)
             {
@@ -365,7 +373,7 @@ void CFTPWorker::WaitForPORTRes(CFTPWorkerEvent event, BOOL& nextLoop, BOOL& con
     }
 }
 
-void CFTPWorker::SetTypeA(BOOL& handleShouldStop, CPathBuffer& errBuf, CPathBuffer& buf, int& cmdLen,
+void CFTPWorker::SetTypeA(BOOL& handleShouldStop, std::string& errBuf, std::string& buf, int& cmdLen,
                           BOOL& sendCmd, BOOL& nextLoop, CCurrentTransferMode trMode,
                           BOOL asciiTrMode, CFTPWorkerSubState waitForTYPERes,
                           CFTPWorkerSubState trModeAlreadySet)
@@ -392,10 +400,13 @@ void CFTPWorker::SetTypeA(BOOL& handleShouldStop, CPathBuffer& errBuf, CPathBuff
     {
         if (CurrentTransferMode != trMode) // we need ASCII mode; set it if necessary
         {
-            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                              ftpcmdSetTransferMode, &cmdLen, asciiTrMode); // cannot report an error
-            sendCmd = TRUE;
-            SubState = waitForTYPERes;
+            if (PrepareFTPCommand(buf, &errBuf, ftpcmdSetTransferMode, &cmdLen, asciiTrMode))
+            {
+                sendCmd = TRUE;
+                SubState = waitForTYPERes;
+            }
+            else
+                handleShouldStop = TRUE;
         }
         else // the ASCII mode is already set
         {
@@ -446,12 +457,13 @@ void CFTPWorker::WaitForTYPERes(CFTPWorkerEvent event, int replyCode, BOOL& next
 }
 
 void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                            BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                            BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                             int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
-                                            int replyCode, CPathBuffer& ftpPath, CPathBuffer& errText,
+                                            int replyCode, std::string& ftpPath, std::string& errText,
                                             BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                             BOOL& handleShouldStop, BOOL* listingNotAccessible)
 {
+    const wchar_t* host = NULL;
     // NOTE: this method is also used for listing the target path during upload (UploadDirGetTgtPathListing==TRUE)!!!
     if (listingNotAccessible != NULL)
         *listingNotAccessible = FALSE;
@@ -486,22 +498,32 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 Oper->GetGlobalTransferSpeedMeter()->JustConnected();
             }
 
-            if (UploadDirGetTgtPathListing)
-                lstrcpyn(ftpPath, tgtPath, ftpPath.Size());
-            else
-                lstrcpyn(ftpPath, CurItem->Path, ftpPath.Size());
-            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-            if (UploadDirGetTgtPathListing || FTPPathAppend(type, ftpPath, ftpPath.Size(), CurItem->Name, TRUE))
+            const char* sourcePath = UploadDirGetTgtPathListing ? tgtPath : CurItem->Path;
+            if (!FTPFormatString(ftpPath, "%s", sourcePath))
+            {
+                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                if (listingNotAccessible != NULL)
+                    *listingNotAccessible = TRUE;
+                lookForNewWork = TRUE;
+                break;
+            }
+            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath.c_str());
+            if (UploadDirGetTgtPathListing || FTPPathAppend(type, ftpPath, CurItem->Name, TRUE))
             { // we have the path; send CWD to the server to enter the inspected directory
-                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGLISTINGPATH), ftpPath.Get());
-                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                if (FTPFormatString(errText, LoadStr(IDS_LOGMSGLISTINGPATH), ftpPath.c_str()))
+                    Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
-                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                  ftpcmdChangeWorkingPath, &cmdLen, ftpPath.Get()); // cannot report an error
-                sendCmd = TRUE;
-                SubState = fwssWorkExplWaitForCWDRes;
-
-                HaveWorkingPath = FALSE; // we are changing the current working directory on the server
+                if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, ftpPath.c_str()))
+                {
+                    sendCmd = TRUE;
+                    SubState = fwssWorkExplWaitForCWDRes;
+                    HaveWorkingPath = FALSE; // we are changing the current working directory on the server
+                }
+                else
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                    lookForNewWork = TRUE;
+                }
             }
             else // path syntax error or the resulting path would be too long
             {
@@ -534,19 +556,25 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                         }
                         else
                         {
-                            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                              ftpcmdPrintWorkingPath, &cmdLen); // cannot report an error
-                            sendCmd = TRUE;
-                            SubState = fwssWorkExplWaitForPWDRes;
+                            if (PrepareFTPCommand(buf, &errBuf, ftpcmdPrintWorkingPath, &cmdLen))
+                            {
+                                sendCmd = TRUE;
+                                SubState = fwssWorkExplWaitForPWDRes;
+                            }
+                            else
+                            {
+                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                lookForNewWork = TRUE;
+                            }
                         }
                     }
                 }
                 else // an error occurred; display it to the user and continue processing the next queue item
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed,
                                            UploadDirGetTgtPathListing ? ITEMPR_UNABLETOCWDONLYPATH : ITEMPR_UNABLETOCWD,
-                                           NO_ERROR, SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           NO_ERROR, DupListingWorkerError(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     if (listingNotAccessible != NULL)
                         *listingNotAccessible = TRUE;
@@ -578,27 +606,26 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                         handleShouldStop = TRUE; // check whether the worker should stop
                     else
                     {
-                        if (UploadDirGetTgtPathListing || FTPGetDirectoryFromReply(reply, replySize, ftpPath, ftpPath.Size()))
+                        if (UploadDirGetTgtPathListing || FTPGetDirectoryFromReply(reply, replySize, WorkingPath))
                         { // we have the working path; check whether a cycle (endless loop) is occurring
                             BOOL cycle = FALSE;
                             if (!UploadDirGetTgtPathListing)
                             {
-                                lstrcpyn(WorkingPath, ftpPath, WorkingPath.Size());
                                 HaveWorkingPath = TRUE;
 
                                 // Check whether the path did not shorten (jump to the parent directory = guaranteed endless loop).
-                                lstrcpyn(ftpPath, CurItem->Path, ftpPath.Size());
-                                CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-                                if (FTPPathAppend(type, ftpPath, ftpPath.Size(), CurItem->Name, TRUE))
+                                if (FTPFormatString(ftpPath, "%s", CurItem->Path))
                                 { // perform the test only if composing the path succeeds - "always true"
-                                    if (!FTPIsTheSameServerPath(type, WorkingPath, ftpPath) &&
-                                        FTPIsPrefixOfServerPath(type, WorkingPath, ftpPath))
+                                    CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath.c_str());
+                                    if (FTPPathAppend(type, ftpPath, CurItem->Name, TRUE) &&
+                                        !FTPIsTheSameServerPath(type, WorkingPath.c_str(), ftpPath.c_str()) &&
+                                        FTPIsPrefixOfServerPath(type, WorkingPath.c_str(), ftpPath.c_str()))
                                     { // this is a jump to the parent directory
                                         cycle = TRUE;
                                     }
                                 }
                                 // Check whether we have already visited this path, which would mean entering an endless loop.
-                                if (!cycle && Oper->IsAlreadyExploredPath(WorkingPath))
+                                if (!cycle && Oper->IsAlreadyExploredPath(WorkingPath.c_str()))
                                     cycle = TRUE;
                             }
 
@@ -671,10 +698,16 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
 
                                     if (Oper->GetUsePassiveMode()) // passive mode (PASV)
                                     {
-                                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                          ftpcmdPassive, &cmdLen); // cannot report an error
-                                        sendCmd = TRUE;
-                                        SubState = fwssWorkExplWaitForPASVRes;
+                                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdPassive, &cmdLen))
+                                        {
+                                            sendCmd = TRUE;
+                                            SubState = fwssWorkExplWaitForPASVRes;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
                                     }
                                     else // active mode (PORT)
                                     {
@@ -692,9 +725,9 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                     pwdErr = TRUE; // an error occurred; display it to the user and continue processing the next queue item
                 if (pwdErr)
                 {
-                    CopyStr(errText, errText.Size(), reply, replySize);
+                    CopyStr(errText, reply, replySize);
                     Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOPWD, NO_ERROR,
-                                           SalamanderGeneral->DupStr(errText) /* low memory = the error will be without details */,
+                                           DupListingWorkerError(errText.c_str()) /* low memory = the error will be without details */,
                                            Oper);
                     lookForNewWork = TRUE;
                 }
@@ -774,11 +807,17 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 GetLocalTime(&StartTimeOfListing);
                 StartLstTimeOfListing = IncListingCounter();
 
-                Oper->GetListCommand(buf, buf.Size());
-                lstrcpyn(errBuf, buf, errBuf.Size());
-                cmdLen = (int)strlen(buf);
-                CommandTransfersData = TRUE;
-                sendCmd = TRUE;
+                if (Oper->GetListCommand(buf) && FTPFormatString(errBuf, "%s", buf.c_str()))
+                {
+                    cmdLen = static_cast<int>(buf.size());
+                    CommandTransfersData = TRUE;
+                    sendCmd = TRUE;
+                }
+                else
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                    lookForNewWork = TRUE;
+                }
 
                 postActivate = TRUE;
                 SubState = fwssWorkExplActivateDataCon;
@@ -823,10 +862,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
             case fweCmdReplyReceived:
             {
                 ListCmdReplyCode = replyCode;
-                CopyStr(errText, errText.Size(), reply, replySize);
-                if (ListCmdReplyText != NULL)
-                    SalamanderGeneral->Free(ListCmdReplyText);
-                ListCmdReplyText = SalamanderGeneral->DupStr(errText); /* low memory = we will do without the reply description */
+                CopyStr(ListCmdReplyText, reply, replySize); /* low memory = we will do without the reply description */
 
                 BOOL waitForDataConFinish = FALSE;
                 if (!ShouldStop && WorkerDataCon != NULL)
@@ -848,7 +884,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                 WorkerDataCon = NULL;
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
                                 WorkerDataConState = wdcsDoesNotExist;
-                                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGDATACONNOTOPENED), -1, TRUE);
+                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGDATACONNOTOPENED).c_str(), -1, TRUE);
                                 Queue->UpdateItemState(CurItem, sqisWaiting, ITEMPR_OK, NO_ERROR, NULL, Oper); // at least this worker will go look for new work, so some worker will certainly handle this item (no need to post "new work available")
                                 lookForNewWork = TRUE;
                                 break;
@@ -952,7 +988,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 if (WorkerDataCon != NULL) // "always true"
                 {
                     // VMS (cs.felk.cvut.cz) reports an error even for an empty directory (cannot be considered an error).
-                    BOOL isVMSFileNotFound = ListCmdReplyText != NULL && FTPIsEmptyDirListErrReply(ListCmdReplyText);
+                    BOOL isVMSFileNotFound = !ListCmdReplyText.empty() && FTPIsEmptyDirListErrReply(ListCmdReplyText.c_str());
                     int listCmdReplyCode = ListCmdReplyCode;
                     DWORD err;
                     BOOL lowMem, noDataTransTimeout;
@@ -966,8 +1002,8 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                         TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState2(): data connection has left opened!");
                     }
                     WorkerDataCon->GetError(&err, &lowMem, NULL, &noDataTransTimeout, &sslErrorOccured, NULL);
-                    if (!WorkerDataCon->GetProxyError(errBuf, errBuf.Size(), NULL, 0, TRUE))
-                        errBuf[0] = 0;
+                    if (!WorkerDataCon->GetProxyError(errBuf, NULL, TRUE))
+                        errBuf.clear();
                     if (lowMem) // the "data connection" reports out-of-memory ("always false")
                     {
                         // Since we are already inside the CSocketsThread::CritSect section, this call
@@ -1004,18 +1040,17 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                       FTP_DIGIT_2(listCmdReplyCode) != FTP_D2_CONNECTION &&
                                                       !isVMSFileNotFound;
                             BOOL decomprErr = FALSE;
-                            int allocatedListingLen = 0;
-                            char* allocatedListing = NULL;
+                            std::string allocatedListing;
+                            BOOL haveAllocatedListing = FALSE;
                             if (!listingIsNotOK)
                             {
                                 // obtain the data from the "data connection"
-                                allocatedListing = WorkerDataCon->GiveData(&allocatedListingLen, &decomprErr);
+                                haveAllocatedListing = WorkerDataCon->GiveData(allocatedListing, &decomprErr);
                                 if (decomprErr) // on decompression error discard the result and display the error
                                 {
                                     listingIsNotOK = TRUE;
-                                    allocatedListingLen = 0;
-                                    free(allocatedListing);
-                                    allocatedListing = NULL;
+                                    FTPSecureWipe(allocatedListing);
+                                    haveAllocatedListing = FALSE;
                                 }
                             }
                             // Since we are already inside the CSocketsThread::CritSect section, this call
@@ -1057,30 +1092,30 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     }
                                     else
                                     {
+                                        errText.clear();
                                         if (sslErrorOccured != SSLCONERR_NOERROR)
-                                            lstrcpyn(errText, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), errText.Size());
+                                            FTPFormatString(errText, "%s", LoadStr(IDS_ERRDATACONSSLCONNECTERROR));
                                         else
                                         {
-                                            errText[0] = 0;
                                             if (FTP_DIGIT_1(listCmdReplyCode) != FTP_D1_SUCCESS &&
                                                 (FTP_DIGIT_2(listCmdReplyCode) == FTP_D2_CONNECTION ||
                                                  FTP_DIGIT_2(listCmdReplyCode) != FTP_D2_CONNECTION && !isVMSFileNotFound) &&
-                                                ListCmdReplyText != NULL)
+                                                !ListCmdReplyText.empty())
                                             { // if we do not have a network error description from the server, use the system description
-                                                lstrcpyn(errText, ListCmdReplyText, errText.Size());
+                                                FTPFormatString(errText, "%s", ListCmdReplyText.c_str());
                                             }
 
-                                            if (errText[0] == 0 && errBuf[0] != 0) // try to take the error text from the proxy server
-                                                lstrcpyn(errText, errBuf, errText.Size());
+                                            if (errText.empty() && !errBuf.empty()) // try to take the error text from the proxy server
+                                                FTPFormatString(errText, "%s", errBuf.c_str());
 
-                                            if (errText[0] == 0 && decomprErr)
-                                                lstrcpyn(errText, LoadStr(IDS_ERRDATACONDECOMPRERROR), errText.Size());
+                                            if (errText.empty() && decomprErr)
+                                                FTPFormatString(errText, "%s", LoadStr(IDS_ERRDATACONDECOMPRERROR));
                                         }
 
                                         // Item error; record this state into it.
                                         Queue->UpdateItemState(CurItem, sqisFailed,
                                                                UploadDirGetTgtPathListing ? ITEMPR_UPLOADCANNOTLISTTGTPATH : ITEMPR_INCOMPLETELISTING,
-                                                               err, (errText[0] != 0 ? SalamanderGeneral->DupStr(errText) : NULL), Oper);
+                                                               err, (!errText.empty() ? DupListingWorkerError(errText.c_str()) : NULL), Oper);
                                     }
                                     if (!quickRetry &&
                                         FTP_DIGIT_1(listCmdReplyCode) != FTP_D1_SUCCESS &&
@@ -1107,31 +1142,30 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                 else
                                 {
                                     if (HaveWorkingPath)
-                                        pathType = Oper->GetFTPServerPathType(WorkingPath);
+                                        pathType = Oper->GetFTPServerPathType(WorkingPath.c_str());
                                     else
                                         TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState2(): WorkingPath is unknown!");
                                 }
-                                char userTmp[USER_MAX_SIZE];
+                                const wchar_t* userTmp = NULL;
                                 if (!delOrChangeAttrExpl && !UploadDirGetTgtPathListing) // when deleting, changing attributes, and during upload we do not store listings in the cache because they will change immediately
                                 {                                                        // download only: if the user wants to use the cache, add the newly loaded listing into the cache
-                                    if (HaveWorkingPath && Oper->GetUseListingsCache() && allocatedListing != NULL)
+                                    if (HaveWorkingPath && Oper->GetUseListingsCache() && haveAllocatedListing)
                                     {
                                         unsigned short port;
-                                        Oper->GetUserHostPort(NULL, host, &port);
-                                        Oper->GetUser(userTmp, USER_MAX_SIZE);
-                                        Oper->GetListCommand(buf, buf.Size());
-                                        ListingCache.AddOrUpdatePathListing(host, port, userTmp, pathType, WorkingPath,
-                                                                            buf, Oper->GetEncryptControlConnection(),
-                                                                            allocatedListing, allocatedListingLen,
-                                                                            &listingDate, StartLstTimeOfListing);
+                                        Oper->GetUserHostPort(&userTmp, host, &port);
+                                        if (Oper->GetListCommand(buf))
+                                            ListingCache.AddOrUpdatePathListing(host, port, userTmp, pathType, WorkingPath.c_str(),
+                                                                                Oper->GetPathTextCodec(), buf.c_str(), Oper->GetEncryptControlConnection(),
+                                                                                allocatedListing,
+                                                                                &listingDate, StartLstTimeOfListing);
                                     }
                                 }
 
                                 char* welcomeReply = Oper->AllocServerFirstReply();
                                 char* systReply = Oper->AllocServerSystemReply();
-                                char listingServerType[SERVERTYPE_MAX_SIZE];
-                                Oper->GetListingServerType(listingServerType);
-                                BOOL err2 = allocatedListing == NULL;
+                                std::string listingServerType;
+                                BOOL err2 = !haveAllocatedListing ||
+                                            !Oper->GetListingServerType(listingServerType);
 
                                 if (UploadDirGetTgtPathListing) // upload listing: store the listing in the cache
                                 {
@@ -1139,12 +1173,13 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     if (!err2)
                                     {
                                         unsigned short port;
-                                        Oper->GetUserHostPort(userTmp, host, &port);
+                                        Oper->GetUserHostPort(&userTmp, host, &port);
                                         // The call UploadListingCache.ListingFinished() is possible only because we are in the CSocketsThread::CritSect section.
                                         err2 = !UploadListingCache.ListingFinished(userTmp, host, port, tgtPath,
-                                                                                   pathType, allocatedListing, allocatedListingLen,
+                                                                                   pathType, allocatedListing.data(), static_cast<int>(allocatedListing.size()),
                                                                                    listingDate, welcomeReply, systReply,
-                                                                                   listingServerType[0] != 0 ? listingServerType : NULL);
+                                                                                   listingServerType.empty() ? NULL : listingServerType.c_str(),
+                                                                                   TextPolicy.GetCodec());
                                         uploadFinished = !err2;
                                     }
                                 }
@@ -1179,7 +1214,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     err2 |= ftpQueueItems == NULL || !HaveWorkingPath;
                                     if (!err2)
                                     {
-                                        if (listingServerType[0] != 0) // this is not autodetection; find listingServerType
+                                        if (!listingServerType.empty()) // this is not autodetection; find listingServerType
                                         {
                                             int i;
                                             for (i = 0; i < serverTypeListCount; i++)
@@ -1188,11 +1223,17 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                 const char* s = serverType->TypeName;
                                                 if (*s == '*')
                                                     s++;
-                                                if (SalamanderGeneral->StrICmp(listingServerType, s) == 0)
+                                                const CFtpTextCompareStatus comparison = FtpCompareLocalTextNoCase(listingServerType, s);
+                                                if (comparison == CFtpTextCompareStatus::Failure)
+                                                {
+                                                    err2 = TRUE;
+                                                    break;
+                                                }
+                                                if (comparison == CFtpTextCompareStatus::Equal)
                                                 {
                                                     // serverType is selected; let us test its parser on the listing.
                                                     serverType->ParserAlreadyTested = TRUE;
-                                                    if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing, allocatedListingLen,
+                                                    if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing.data(), static_cast<int>(allocatedListing.size()),
                                                                                serverType, &err2, isVMS, isAS400, transferMode, &totalSize,
                                                                                &sizeInBytes, selFiles, selDirs,
                                                                                includeSubdirs, attrAndMask, attrOrMask,
@@ -1205,11 +1246,11 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                 }
                                             }
                                             if (i == serverTypeListCount)
-                                                listingServerType[0] = 0; // listingServerType does not exist -> run autodetection
+                                                listingServerType.clear(); // listingServerType does not exist -> run autodetection
                                         }
 
                                         // autodetection - select the server type with the satisfied autodetection condition.
-                                        if (!err2 && needSimpleListing && listingServerType[0] == 0)
+                                        if (!err2 && needSimpleListing && listingServerType.empty())
                                         {
                                             if (welcomeReply == NULL || systReply == NULL)
                                                 err2 = TRUE;
@@ -1226,7 +1267,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                         if (serverType->CompiledAutodetCond == NULL)
                                                         {
                                                             serverType->CompiledAutodetCond = CompileAutodetectCond(HandleNULLStr(serverType->AutodetectCond),
-                                                                                                                    NULL, NULL, NULL, NULL, 0);
+                                                                                                                    NULL, NULL, NULL, NULL);
                                                             if (serverType->CompiledAutodetCond == NULL) // this can only be a low-memory error
                                                             {
                                                                 err2 = TRUE;
@@ -1238,7 +1279,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                         {
                                                             // serverType is selected; let us test its parser on the listing.
                                                             serverType->ParserAlreadyTested = TRUE;
-                                                            if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing, allocatedListingLen,
+                                                            if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing.data(), static_cast<int>(allocatedListing.size()),
                                                                                        serverType, &err2, isVMS, isAS400, transferMode, &totalSize,
                                                                                        &sizeInBytes, selFiles, selDirs,
                                                                                        includeSubdirs, attrAndMask, attrOrMask,
@@ -1251,7 +1292,8 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                                     const char* s = serverType->TypeName;
                                                                     if (*s == '*')
                                                                         s++;
-                                                                    lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                                                                    if (!FtpStoreLocalTextBytes(s, listingServerType))
+                                                                        err2 = TRUE;
                                                                 }
                                                                 needSimpleListing = err2; // either we parsed the listing successfully or a low-memory error occurred; exit
                                                                 break;
@@ -1272,7 +1314,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                     {
                                                         // serverType is selected; let us test its parser on the listing.
                                                         // serverType->ParserAlreadyTested = TRUE;  // pointless, not used later
-                                                        if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing, allocatedListingLen,
+                                                        if (ParseListingToFTPQueue(ftpQueueItems, allocatedListing.data(), static_cast<int>(allocatedListing.size()),
                                                                                    serverType, &err2, isVMS, isAS400, transferMode, &totalSize,
                                                                                    &sizeInBytes, selFiles, selDirs,
                                                                                    includeSubdirs, attrAndMask, attrOrMask,
@@ -1285,7 +1327,8 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                                 const char* s = serverType->TypeName;
                                                                 if (*s == '*')
                                                                     s++;
-                                                                lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                                                                if (!FtpStoreLocalTextBytes(s, listingServerType))
+                                                                    err2 = TRUE;
                                                             }
                                                             needSimpleListing = err2; // either we parsed the listing successfully or a low-memory error occurred; exit
                                                             break;
@@ -1300,9 +1343,8 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     {
                                         if (needSimpleListing) // unknown listing format
                                         {                      // write "Unknown Server Type" to the log
-                                            lstrcpyn(errText, LoadStr(listingServerType[0] == 0 ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2),
-                                                     errText.Size());
-                                            Logs.LogMessage(LogUID, errText, -1, TRUE);
+                                            if (FTPFormatString(errText, "%s", LoadStr(listingServerType.empty() ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2)))
+                                                Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
                                             // Item error; record this state into it.
                                             Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOPARSELISTING, NO_ERROR, NULL, Oper);
@@ -1310,10 +1352,10 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                         }
                                         else // log which parser handled it
                                         {
-                                            if (listingServerType[0] != 0) // "always true"
+                                            if (!listingServerType.empty()) // "always true"
                                             {
-                                                _snprintf_s(errText, errText.Size(), _TRUNCATE, LoadStr(IDS_LOGMSGPARSEDBYSRVTYPE), listingServerType);
-                                                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                                                if (FTPFormatString(errText, LoadStr(IDS_LOGMSGPARSEDBYSRVTYPE), listingServerType.c_str()))
+                                                    Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
                                             }
 
                                             BOOL nonEmptyDirSkipOrAsk = FALSE;
@@ -1573,7 +1615,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
 
                                                         // We will consider this path successfully traversed (we collect paths to detect simple cycles).
                                                         if (HaveWorkingPath)
-                                                            Oper->AddToExploredPaths(WorkingPath);
+                                                            Oper->AddToExploredPaths(WorkingPath.c_str());
 
                                                         // For the item/operation CurItem->ParentUID decrease NotDone by one (for CurItem in state sqisProcessing) and increase NotDone + Skipped + Failed + UINeeded according to
                                                         // childItemsNotDone + childItemsSkipped + childItemsFailed + childItemsUINeeded
@@ -1626,22 +1668,14 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     SalamanderGeneral->Free(welcomeReply);
                                 if (systReply != NULL)
                                     SalamanderGeneral->Free(systReply);
-                                if (allocatedListing != NULL)
-                                {
-                                    memset(allocatedListing, 0, allocatedListingLen); // it may involve sensitive data, better to zero it
-                                    free(allocatedListing);
-                                }
+                                FTPSecureWipe(allocatedListing);
                             }
                         }
                     }
                 }
             }
             ListCmdReplyCode = -1;
-            if (ListCmdReplyText != NULL)
-            {
-                SalamanderGeneral->Free(ListCmdReplyText);
-                ListCmdReplyText = NULL;
-            }
+            ListCmdReplyText.clear();
 
             // If we are exploring directories for delete/change-attr or doing an upload listing, we must
             // reset the speed meter (explore speed and upload listing are not measured; this

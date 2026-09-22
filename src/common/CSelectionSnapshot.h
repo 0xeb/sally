@@ -34,12 +34,14 @@ enum class EActionType
 // Per-item data captured from the panel's Files/Dirs arrays.
 struct CSnapshotItem
 {
-    std::string Name;       // filename (ANSI)
-    std::wstring NameW;     // filename (Unicode, empty if same as ANSI)
-    std::string TargetName; // explicit target filename for rename/copy-of mapping
-    std::wstring TargetNameW; // explicit target filename (Unicode)
-    std::string DosName;    // DOS 8.3 name (empty if none)
-    bool HasTargetName;     // true when TargetName/TargetNameW are authoritative
+    std::wstring NameW;     // filename
+    // Optional per-item source parent (Main2 absorption - multi-dir
+    // drops). Empty = the item lives under snapshot.SourcePathW,
+    // which is every panel producer. Only TOP-level items consult this; child
+    // recursion derives parents from the walk.
+    std::wstring SourceParentW;
+    std::wstring TargetNameW; // explicit target filename for rename/copy-of mapping
+    bool HasTargetName;     // true when TargetNameW is authoritative
     bool IsDir;             // true for directories
     unsigned __int64 Size;  // file size in bytes (0 for dirs unless counted)
     DWORD Attr;             // FILE_ATTRIBUTE_* flags
@@ -67,16 +69,15 @@ struct CSnapshotChangeCaseData
 // Convert parameters (matches CConvertData in worker.h).
 struct CSnapshotConvertData
 {
-    char CodeTable[256];    // character mapping table
-    int EOFType;            // end-of-file type
+    char CodeTable[256]; // byte-to-byte character mapping table
+    int EOFType;         // end-of-file type
 };
 
 // Immutable selection snapshot — everything needed to build a COperations script.
 struct CSelectionSnapshot
 {
     // --- Source ---
-    std::string SourcePath;     // current panel directory (ANSI)
-    std::wstring SourcePathW;   // current panel directory (Unicode)
+    std::wstring SourcePathW;   // current panel directory
 
     // --- Selected items ---
     std::vector<CSnapshotItem> Items; // selected files and directories
@@ -85,9 +86,8 @@ struct CSelectionSnapshot
     EActionType Action;
 
     // --- Target (copy/move only) ---
-    std::string TargetPath;     // destination directory
-    std::wstring TargetPathW;   // destination directory (Unicode)
-    std::string Mask;           // file mask for target name mapping (e.g. "*.*")
+    std::wstring TargetPathW;   // destination directory
+    std::wstring Mask;          // file mask for target name mapping (e.g. L"*.*")
 
     // --- Options ---
     bool UseRecycleBin;         // delete to recycle bin

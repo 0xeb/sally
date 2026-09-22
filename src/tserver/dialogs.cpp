@@ -41,7 +41,7 @@ void CAboutDialog::Transfer(CTransferInfo& ti)
     {
         HWND hCtrl;
         if (ti.GetControl(hCtrl, IDC_ABOUT_TEXT1))
-            SetWindowText(hCtrl, AboutText1);
+            SetWindowTextW(hCtrl, AboutText1);
     }
 }
 
@@ -289,7 +289,7 @@ void CDetailsDialog::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDC_DETAILS_MODULE, Message->File, 2 * MAX_PATH);
+        ti.EditLine(IDC_DETAILS_MODULE, Message->File, lstrlenW(Message->File) + 1);
         int val = Message->Line;
         ti.EditLine(IDC_DETAILS_LINE, val);
         ti.EditLine(IDC_DETAILS_MSG, Message->Message, 5000);

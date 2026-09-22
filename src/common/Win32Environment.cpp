@@ -2,8 +2,46 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "IEnvironment.h"
-#include <stdlib.h>
-#include <lmcons.h>  // For UNLEN
+
+#include <limits>
+#include <new>
+#include <stdexcept>
+
+namespace
+{
+bool ResizeBuffer(std::wstring& buffer, DWORD capacity)
+{
+    try
+    {
+        buffer.resize(static_cast<size_t>(capacity));
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    catch (const std::length_error&)
+    {
+        return false;
+    }
+}
+
+bool GrowCapacity(DWORD current, DWORD suggested, DWORD& capacity)
+{
+    unsigned long long candidate = suggested;
+    if (candidate <= current)
+        candidate = static_cast<unsigned long long>(current) * 2;
+    if (candidate <= current || candidate > (std::numeric_limits<DWORD>::max)())
+        return false;
+    capacity = static_cast<DWORD>(candidate);
+    return true;
+}
+
+EnvResult GrowthFailure()
+{
+    return EnvResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+}
+} // namespace
 
 class Win32Environment : public IEnvironment
 {
@@ -13,22 +51,34 @@ public:
         if (!name)
             return EnvResult::Error(ERROR_INVALID_PARAMETER);
 
-        // First call to get size
-        DWORD size = ::GetEnvironmentVariableW(name, nullptr, 0);
-        if (size == 0)
+        DWORD capacity = 256;
+        for (;;)
         {
-            DWORD err = GetLastError();
-            return EnvResult::Error(err);
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+
+            SetLastError(ERROR_SUCCESS);
+            const DWORD written = ::GetEnvironmentVariableW(name, buffer.data(), capacity);
+            if (written == 0)
+            {
+                const DWORD error = GetLastError();
+                if (error != ERROR_SUCCESS)
+                    return EnvResult::Error(error);
+                buffer.clear();
+                value.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (written < capacity)
+            {
+                buffer.resize(written);
+                value.swap(buffer);
+                return EnvResult::Ok();
+            }
+
+            if (!GrowCapacity(capacity, written, capacity))
+                return GrowthFailure();
         }
-
-        // Allocate and read
-        value.resize(size);
-        DWORD written = ::GetEnvironmentVariableW(name, &value[0], size);
-        if (written == 0)
-            return EnvResult::Error(GetLastError());
-
-        value.resize(written);  // Remove null terminator from length
-        return EnvResult::Ok();
     }
 
     EnvResult SetVariable(const wchar_t* name, const wchar_t* value) override
@@ -45,87 +95,90 @@ public:
 
     EnvResult GetTempPath(std::wstring& path) override
     {
-        wchar_t buffer[MAX_PATH + 1];
-        DWORD len = ::GetTempPathW(MAX_PATH + 1, buffer);
-        if (len == 0)
-            return EnvResult::Error(GetLastError());
-
-        // GetTempPath can return > MAX_PATH, handle that case
-        if (len > MAX_PATH)
+        DWORD capacity = 256;
+        for (;;)
         {
-            path.resize(len);
-            len = ::GetTempPathW(len, &path[0]);
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            const DWORD len = ::GetTempPathW(capacity, buffer.data());
             if (len == 0)
                 return EnvResult::Error(GetLastError());
-            path.resize(len);
+            if (len < capacity)
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (!GrowCapacity(capacity, len, capacity))
+                return GrowthFailure();
         }
-        else
-        {
-            path = buffer;
-        }
-
-        return EnvResult::Ok();
     }
 
     EnvResult GetSystemDirectory(std::wstring& path) override
     {
-        wchar_t buffer[MAX_PATH];
-        UINT len = ::GetSystemDirectoryW(buffer, MAX_PATH);
-        if (len == 0)
-            return EnvResult::Error(GetLastError());
-
-        if (len >= MAX_PATH)
+        DWORD capacity = 256;
+        for (;;)
         {
-            path.resize(len + 1);
-            len = ::GetSystemDirectoryW(&path[0], len + 1);
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            const UINT len = ::GetSystemDirectoryW(buffer.data(), capacity);
             if (len == 0)
                 return EnvResult::Error(GetLastError());
-            path.resize(len);
+            if (len < capacity)
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (!GrowCapacity(capacity, len, capacity))
+                return GrowthFailure();
         }
-        else
-        {
-            path = buffer;
-        }
-
-        return EnvResult::Ok();
     }
 
     EnvResult GetWindowsDirectory(std::wstring& path) override
     {
-        wchar_t buffer[MAX_PATH];
-        UINT len = ::GetWindowsDirectoryW(buffer, MAX_PATH);
-        if (len == 0)
-            return EnvResult::Error(GetLastError());
-
-        if (len >= MAX_PATH)
+        DWORD capacity = 256;
+        for (;;)
         {
-            path.resize(len + 1);
-            len = ::GetWindowsDirectoryW(&path[0], len + 1);
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            const UINT len = ::GetWindowsDirectoryW(buffer.data(), capacity);
             if (len == 0)
                 return EnvResult::Error(GetLastError());
-            path.resize(len);
+            if (len < capacity)
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (!GrowCapacity(capacity, len, capacity))
+                return GrowthFailure();
         }
-        else
-        {
-            path = buffer;
-        }
-
-        return EnvResult::Ok();
     }
 
     EnvResult GetCurrentDirectory(std::wstring& path) override
     {
-        DWORD len = ::GetCurrentDirectoryW(0, nullptr);
-        if (len == 0)
-            return EnvResult::Error(GetLastError());
-
-        path.resize(len);
-        len = ::GetCurrentDirectoryW(len, &path[0]);
-        if (len == 0)
-            return EnvResult::Error(GetLastError());
-
-        path.resize(len);  // Remove null terminator from length
-        return EnvResult::Ok();
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            const DWORD len = ::GetCurrentDirectoryW(capacity, buffer.data());
+            if (len == 0)
+                return EnvResult::Error(GetLastError());
+            if (len < capacity)
+            {
+                buffer.resize(len);
+                path.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (!GrowCapacity(capacity, len, capacity))
+                return GrowthFailure();
+        }
     }
 
     EnvResult SetCurrentDirectory(const wchar_t* path) override
@@ -144,43 +197,70 @@ public:
         if (!source)
             return EnvResult::Error(ERROR_INVALID_PARAMETER);
 
-        // First call to get size
-        DWORD size = ::ExpandEnvironmentStringsW(source, nullptr, 0);
-        if (size == 0)
-            return EnvResult::Error(GetLastError());
-
-        // Allocate and expand
-        expanded.resize(size);
-        DWORD written = ::ExpandEnvironmentStringsW(source, &expanded[0], size);
-        if (written == 0)
-            return EnvResult::Error(GetLastError());
-
-        expanded.resize(written - 1);  // Remove null terminator from length
-        return EnvResult::Ok();
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            const DWORD written = ::ExpandEnvironmentStringsW(source, buffer.data(), capacity);
+            if (written == 0)
+                return EnvResult::Error(GetLastError());
+            if (written <= capacity)
+            {
+                buffer.resize(written - 1);
+                expanded.swap(buffer);
+                return EnvResult::Ok();
+            }
+            if (!GrowCapacity(capacity, written, capacity))
+                return GrowthFailure();
+        }
     }
 
     EnvResult GetComputerName(std::wstring& name) override
     {
-        wchar_t buffer[MAX_COMPUTERNAME_LENGTH + 1];
-        DWORD size = MAX_COMPUTERNAME_LENGTH + 1;
-
-        if (!::GetComputerNameW(buffer, &size))
-            return EnvResult::Error(GetLastError());
-
-        name = buffer;
-        return EnvResult::Ok();
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            DWORD size = capacity;
+            if (::GetComputerNameW(buffer.data(), &size))
+            {
+                buffer.resize(size);
+                name.swap(buffer);
+                return EnvResult::Ok();
+            }
+            const DWORD error = GetLastError();
+            if (error != ERROR_BUFFER_OVERFLOW)
+                return EnvResult::Error(error);
+            if (!GrowCapacity(capacity, size, capacity))
+                return GrowthFailure();
+        }
     }
 
     EnvResult GetUserName(std::wstring& name) override
     {
-        wchar_t buffer[UNLEN + 1];
-        DWORD size = UNLEN + 1;
-
-        if (!::GetUserNameW(buffer, &size))
-            return EnvResult::Error(GetLastError());
-
-        name = buffer;
-        return EnvResult::Ok();
+        DWORD capacity = 256;
+        for (;;)
+        {
+            std::wstring buffer;
+            if (!ResizeBuffer(buffer, capacity))
+                return GrowthFailure();
+            DWORD size = capacity;
+            if (::GetUserNameW(buffer.data(), &size))
+            {
+                buffer.resize(size > 0 ? size - 1 : 0);
+                name.swap(buffer);
+                return EnvResult::Ok();
+            }
+            const DWORD error = GetLastError();
+            if (error != ERROR_INSUFFICIENT_BUFFER)
+                return EnvResult::Error(error);
+            if (!GrowCapacity(capacity, size, capacity))
+                return GrowthFailure();
+        }
     }
 };
 

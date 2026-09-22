@@ -248,21 +248,21 @@ public:
 
     virtual BOOL Open(BOOL quiet);
     virtual BOOL DumpInfo(FILE* outStream);
-    virtual BOOL ListDirectory(char* path, int session,
+    virtual BOOL ListDirectory(const std::wstring& path, int session,
                                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
-    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                           const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
+    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                           const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
 protected:
     BOOL ReadBlockPhys(Uint32 lbNumber, size_t blocks, unsigned char* data);
     BOOL ReadBlockLog(Uint32 lbNumber, size_t blocks, unsigned char* data);
 
-    BOOL AddFileDir(const char* path, char* fileName, BYTE fileChar, CAD* icb,
+    BOOL AddFileDir(const wchar_t* path, const wchar_t* fileName, BYTE fileChar, CAD* icb,
                     CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
     int FindPartition(int partnum, CUDF::CPartition* part);
 
-    int ScanDir(CUDF::CAD dirICB, char* path,
+    int ScanDir(CUDF::CAD dirICB, const std::wstring& path,
                 CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
     void ReadExtentAd(BYTE sector[], CExtentAd* extent);
@@ -280,7 +280,7 @@ protected:
     int MapICB(CUDF::CAD icb, CICBTag* icbTag, CUDF::CAD* file);
     int MapICB(CUDF::CAD icb, CFileEntry* fe);
     int ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CUDF::CAD* ad, int maxAds);
-    int ReadFileIdentifier(Uint8* sector, Uint8* fileChar, char* fileName, CAD* fileICB);
+    int ReadFileIdentifier(Uint8* sector, Uint8* fileChar, std::wstring& fileName, CAD* fileICB);
 
     void ReadStrategy(BYTE data[], Uint16* entries, Uint16* strategy, Uint16* strategyParam);
 

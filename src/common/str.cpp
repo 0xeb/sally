@@ -2,16 +2,30 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <new>
+#include <stdexcept>
+
+#ifdef SALLY_STR_COMPARISON_STANDALONE
+#include <cstddef>
+#include <cwchar>
+#include <string>
+#else
 #include "precomp.h"
 
 #include <windows.h>
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h> // I need LPCOLORMAP
+#endif
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
 #endif
+
+// Wide comparison family (StrICmpW etc). Included OUTSIDE the
+// INSIDE_SPL split on purpose: both branches need it, and an earlier attempt put
+// it inside the plugin branch where sally.exe never saw it.
+#include "common/text/CaseFolding.h"
 
 #ifndef STR_DISABLE
 
@@ -89,20 +103,22 @@ char* DupStr(const char* txt)
     return s;
 }
 
-char* DupStrEx(const char* str, BOOL& err)
-{
-    char* s = DupStr(str);
-    if (str != NULL && s == NULL)
-        err = TRUE;
-    return s;
-}
-
 // ****************************************************************************
 
 char* StrNCat(char* dst, const char* src, int dstSize)
 {
     int i = lstrlenA(dst);
     lstrcpynA(dst + i, src, dstSize - i);
+    return dst;
+}
+
+// str.h declared this wide overload with no body anywhere in the
+// tree - a link error waiting to happen for any wide caller (OPEN-ITEMS.md:
+// "StrIStr x2 and StrNCat have NO W TWIN"). Mirrors the narrow StrNCat above.
+wchar_t* StrNCat(wchar_t* dst, const wchar_t* src, int dstSize)
+{
+    int i = lstrlenW(dst);
+    lstrcpynW(dst + i, src, dstSize - i);
     return dst;
 }
 
@@ -557,6 +573,48 @@ const char* StrIStr(const char* txtStart, const char* txtEnd,
     return NULL;
 }
 
+// str.h declared both wide overloads with no body anywhere in the
+// tree (OPEN-ITEMS.md: "StrIStr x2... NO W TWIN"). This is a SEARCH primitive
+// over names (shell-extension/registry display strings), not file content
+// bytes, so wide is the right call - mirrors the narrow versions above,
+// StrNICmpW in place of StrNICmp.
+const wchar_t* StrIStr(const wchar_t* txt, const wchar_t* pattern)
+{
+    if (txt == NULL || pattern == NULL)
+        return NULL;
+
+    const wchar_t* s = txt;
+    int len = (int)wcslen(pattern);
+    int txtLen = (int)wcslen(txt);
+    while (txtLen >= len)
+    {
+        if (StrNICmpW(s, pattern, len) == 0)
+            return s;
+        s++;
+        txtLen--;
+    }
+    return NULL;
+}
+
+const wchar_t* StrIStr(const wchar_t* txtStart, const wchar_t* txtEnd,
+                       const wchar_t* patternStart, const wchar_t* patternEnd)
+{
+    if (txtStart == NULL || patternStart == NULL)
+        return NULL;
+
+    const wchar_t* s = txtStart;
+    int len = (int)(patternEnd - patternStart);
+    int txtLen = (int)(txtEnd - txtStart);
+    while (txtLen >= len)
+    {
+        if (StrNICmpW(s, patternStart, len) == 0)
+            return s;
+        s++;
+        txtLen--;
+    }
+    return NULL;
+}
+
 //
 //*****************************************************************************
 
@@ -661,3 +719,100 @@ CConvertTab ConvertTab;
 */
 
 #endif // STR_DISABLE
+
+// Wide sibling. Folds via sally::text::Fold instead of the CP_ACP
+// LowerCase[] table - see the StrICmpW family below for why that matters.
+bool StrICpyW(std::wstring& dest, const wchar_t* src) noexcept
+{
+    if (src == NULL)
+    {
+        dest.clear();
+        return false;
+    }
+    try
+    {
+        std::wstring folded = sally::text::Fold(src);
+        dest.swap(folded);
+        return true;
+    }
+    catch (const std::bad_alloc&)
+    {
+#ifndef SALLY_STR_COMPARISON_STANDALONE
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+#endif
+    }
+    catch (const std::length_error&)
+    {
+#ifndef SALLY_STR_COMPARISON_STANDALONE
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+#endif
+    }
+    return false;
+}
+
+// ****************************************************************************
+// Wide siblings of the comparison family.
+//
+// THESE ARE TEXT COMPARISONS, NOT BYTE COMPARISONS. The narrow forms above are
+// documented as "not case sensitive and ignores regional settings", and they
+// implement that with `LowerCase[]` - a 256-entry table filled from CharLower
+// under the active code page. That is exactly the ANSI binding this program
+// removes: two characters that differ only outside CP_ACP fold to the same entry,
+// so the narrow forms call distinct strings equal.
+//
+// The wide forms delegate to sally::text::CompareFolded, whose default
+// FoldMode::Invariant matches the documented "ignores regional settings"
+// contract. StrCmpExW is the exception: it is case-SENSITIVE, so it needs no
+// folding at all and compares code units directly.
+
+int StrICmpW(const wchar_t* s1, const wchar_t* s2)
+{
+    const int r = sally::text::CompareFolded(s1 != NULL ? s1 : L"", s2 != NULL ? s2 : L"");
+    return r < 0 ? -1 : (r > 0 ? 1 : 0);
+}
+
+int StrNICmpW(const wchar_t* s1, const wchar_t* s2, int n)
+{
+    if (n <= 0)
+        return 0;
+    const std::wstring a(s1 != NULL ? s1 : L"", 0, (size_t)n);
+    const std::wstring b(s2 != NULL ? s2 : L"", 0, (size_t)n);
+    const int r = sally::text::CompareFolded(a, b);
+    return r < 0 ? -1 : (r > 0 ? 1 : 0);
+}
+
+// l1/l2 accept -1 meaning "use wcslen". The narrow forms have no such
+// convention, but the wide ones need it: a caller converting a narrow string
+// with ToWideArg(s, len) already has exactly the intended substring in hand and
+// has no separate WCHAR count to pass. Without -1 every such call site would
+// have to name the temporary just to measure it.
+int StrICmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2)
+{
+    if (l1 < 0)
+        l1 = s1 != NULL ? (int)wcslen(s1) : 0;
+    if (l2 < 0)
+        l2 = s2 != NULL ? (int)wcslen(s2) : 0;
+    const std::wstring a(s1 != NULL ? s1 : L"", (size_t)(l1 > 0 ? l1 : 0));
+    const std::wstring b(s2 != NULL ? s2 : L"", (size_t)(l2 > 0 ? l2 : 0));
+    const int r = sally::text::CompareFolded(a, b);
+    return r < 0 ? -1 : (r > 0 ? 1 : 0);
+}
+
+int StrCmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2)
+{
+    if (l1 < 0)
+        l1 = s1 != NULL ? (int)wcslen(s1) : 0;
+    if (l2 < 0)
+        l2 = s2 != NULL ? (int)wcslen(s2) : 0;
+    // Case SENSITIVE: no folding. Compare the common prefix, then length.
+    const int common = l1 < l2 ? l1 : l2;
+    if (common > 0)
+    {
+        const int r = wcsncmp(s1, s2, (size_t)common);
+        if (r != 0)
+            return r < 0 ? -1 : 1;
+    }
+    if (l1 == l2)
+        return 0;
+    return l1 < l2 ? -1 : 1;
+}

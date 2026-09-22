@@ -6,6 +6,8 @@
 
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
+#include "peviewer_text.h"
+
 #define SIZE_OF_NT_SIGNATURE sizeof(DWORD)
 #define MAXRESOURCENAME 13
 
@@ -41,8 +43,6 @@
 
 #define FIELD_SIZE(s, f) sizeof(((s*)0)->f)
 #define STRUCT_HAS_FIELD(s, f, size) ((size) >= offsetof(s, f) + FIELD_SIZE(s, f))
-
-BOOL TimeDateStampToString(DWORD timeDateStamp, char* buffer);
 
 class CPEFile
 {
@@ -90,6 +90,7 @@ private:
     BOOL OutputEnabled;
     BOOL Dirty;
     BOOL Empty;
+    BOOL Failed;
 
 public:
     CFileStream(FILE* stream)
@@ -98,6 +99,7 @@ public:
         OutputEnabled = TRUE;
         Dirty = FALSE;
         Empty = TRUE;
+        Failed = FALSE;
     }
     void fprintf(const char* format, ...)
     {
@@ -105,17 +107,44 @@ public:
         {
             va_list args;
             va_start(args, format);
-            vfprintf(Stream, format, args);
+            if (vfprintf(Stream, format, args) < 0)
+                Failed = TRUE;
             va_end(args);
             Dirty = TRUE;
             Empty = FALSE;
         }
+    }
+    bool WriteWide(std::wstring_view text)
+    {
+        if (!OutputEnabled)
+            return true;
+        std::string encoded;
+        // Lossy, not exact. The strict codec latched Failed here, DumpFileInfo answered
+        // FALSE on it, and ViewFile then deleted the temp file and showed IDS_EXCEPTION -
+        // so a single character the active code page cannot spell, anywhere in a PE's
+        // VERSIONINFO, threw away a report whose headers, sections, imports and exports
+        // had all been produced correctly. Degrading that one field to '?' is what
+        // pre-unicode did and is the only outcome here that shows the user anything.
+        if (!EncodePeviewerReportTextLossy(text, encoded))
+        {
+            Failed = TRUE;
+            return false;
+        }
+        if (::fprintf(Stream, "%s", encoded.c_str()) < 0)
+        {
+            Failed = TRUE;
+            return false;
+        }
+        Dirty = TRUE;
+        Empty = FALSE;
+        return true;
     }
     void SetEnabled(BOOL enabled) { OutputEnabled = enabled; }
     BOOL GetEnabled() { return OutputEnabled; }
     void SetDirty(BOOL dirty) { Dirty = dirty; }
     BOOL GetDirty() { return Dirty; }
     BOOL IsEmpty() { return Empty; }
+    BOOL HasFailed() { return Failed; }
 };
 
 class CFileStreamEnabler
@@ -526,16 +555,11 @@ private:
     typedef CSortedStringListTraitsW CStringListTraits;
     typedef CSortedStringListT<WCHAR, CStringListTraits> CStringList;
 
-    enum
-    {
-        MAX_ASSEMBLY_NAME = 500
-    };
-
     static void DumpMetadata(CFileStream* outStream, IMetaDataImport* pMetaDataImport, mdAssembly assembly);
     static void DumpRuntimeVersion(CFileStream* outStream, IMetaDataImport* pMetaDataImport);
     static void DumpCustomAttributes(CFileStream* outStream, IMetaDataImport* pMetaDataImport, mdToken scope);
     static void DumpCustomAttribute(CFileStream* outStream, IMetaDataImport* pMetaDataImport, mdCustomAttribute customAttribute);
-    static HRESULT GetCustomAttributeTypeNameFromMemberRef(IMetaDataImport* pMetaDataImport, mdMemberRef memberRef, PWSTR wzTypeName, DWORD cchTypeName);
+    static HRESULT GetCustomAttributeTypeNameFromMemberRef(IMetaDataImport* pMetaDataImport, mdMemberRef memberRef, std::wstring& typeName);
     static void DumpTargetFrameworkVersion(CFileStream* outStream, const BYTE* pBlob, DWORD cbBlob);
     static void DumpReferencedAssemblies(CFileStream* outStream, IMetaDataAssemblyImport* pMetaDataAssemblyImport);
     static void DumpAssemblyReference(CStringList& list, IMetaDataAssemblyImport* pMetaDataAssemblyImport, mdAssemblyRef assemblyRef);

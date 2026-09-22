@@ -16,12 +16,6 @@ UINT GetPanelTextDrawOptions(UINT options)
     return options | ETO_CLIPPED;
 }
 
-BOOL GdiPanelTextPainter::DrawAnsi(HDC hdc, int x, int y, UINT options, const RECT* rect,
-                                   const char* text, UINT count, const INT* dx)
-{
-    return ExtTextOutA(hdc, x, y, GetPanelTextDrawOptions(options), rect, text, count, dx);
-}
-
 BOOL GdiPanelTextPainter::DrawWide(HDC hdc, int x, int y, UINT options, const RECT* rect,
                                    const wchar_t* text, UINT count, const INT* dx)
 {
@@ -36,12 +30,6 @@ IPanelTextPainter* GetPanelTextPainter()
 void SetPanelTextPainterForTests(IPanelTextPainter* painter)
 {
     TestPanelTextPainter = painter;
-}
-
-BOOL DrawPanelTextA(HDC hdc, int x, int y, UINT options, const RECT* rect,
-                    const char* text, UINT count, const INT* dx)
-{
-    return GetPanelTextPainter()->DrawAnsi(hdc, x, y, options, rect, text, count, dx);
 }
 
 BOOL DrawPanelTextW(HDC hdc, int x, int y, UINT options, const RECT* rect,

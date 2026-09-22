@@ -4,10 +4,13 @@
 
 #pragma once
 
+#include <string>
+
+#include "find_history.h"
+
 class CRendererWindow;
 
-#define FIND_HISTORY_SIZE 10 // number of remembered strings
-extern char* FindHistory[FIND_HISTORY_SIZE];
+extern sally::dbviewer::FindHistoryEntries FindHistory;
 
 //****************************************************************************
 //
@@ -147,8 +150,6 @@ protected:
 
 // ****************************************************************************
 
-#define FIND_TEXT_LEN 201 // +1
-
 class CFindDialog : public CCommonDialog
 {
 public:
@@ -157,7 +158,7 @@ public:
         CaseSensitive,
         Regular;
 
-    char Text[FIND_TEXT_LEN];
+    std::wstring Text;
 
     CFindDialog(HINSTANCE hInstance, int resID, int helpID)
         : CCommonDialog(hInstance, resID, helpID, NULL)
@@ -166,16 +167,15 @@ public:
         WholeWords = FALSE;
         CaseSensitive = FALSE;
         Regular = FALSE;
-        Text[0] = 0;
     }
 
-    CFindDialog& operator=(CFindDialog& d)
+    CFindDialog& operator=(const CFindDialog& d)
     {
         Forward = d.Forward;
         WholeWords = d.WholeWords;
         CaseSensitive = d.CaseSensitive;
         Regular = d.Regular;
-        memcpy(Text, d.Text, sizeof(Text[0]) * FIND_TEXT_LEN);
+        Text = d.Text;
         return *this;
     }
 

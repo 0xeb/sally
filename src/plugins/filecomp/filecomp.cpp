@@ -1,10 +1,36 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "reg_sz_narrow_bridge.h"
+#include "common/LegacyLogFontImport.h" // ImportLegacyLogFont
 
 #pragma comment(lib, "uxtheme.lib")
+
+// Registry-corruption bug family (see 24-intree-plugins-wide.md):
+// CSalamanderRegistry::GetValue/SetValue's REG_SZ path is wide-only - reads
+// memcpy the stored UTF-16LE bytes straight into the caller's buffer, and
+// writes derive their length from wcslen() over 'data' regardless of the
+// dataSize argument. ASCII8InputEncTableName is genuinely narrow (char*) by design,
+// so it must bridge here rather than
+// round-trip through GetValue/SetValue directly. Same wiring as
+// plugins/ftp/ftp.cpp's SetValueSZ/GetValueSZ.
+static BOOL SetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const char* narrowValue)
+{
+    std::wstring wide;
+    if (!EncodeRegSzFromNarrowOwned(narrowValue, wide))
+        return FALSE;
+    return SPLRegistrySetString(registry, regKey, name, wide);
+}
+
+static BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, char* narrowBuf, int narrowBufSize)
+{
+    std::wstring wideBuf;
+    if (!SPLRegistryGetStringOwned(registry, regKey, name, wideBuf))
+        return FALSE;
+    return DecodeRegSzToNarrow(wideBuf.c_str(), narrowBuf, narrowBufSize);
+}
 
 // enables dumping blocks that remain allocated on the heap after the plugin finishes
 // #define DUMP_MEM
@@ -21,34 +47,34 @@ HINSTANCE hNormalizDll = NULL;
 TNormalizeString PNormalizeString = NULL;
 BOOL AlwaysOnTop = FALSE;
 
-const char* CONFIG_VERSION = "Version";
-const char* CONFIG_CONFIGURATION = "Configuration";
-const char* CONFIG_COLORS = "Colors";
-const char* CONFIG_CUSTOMCOLORS = "Custom Colors";
-const char* CONFIG_DEFOPTIONS = "Default Diff Options";
-const char* CONFIG_FORCETEXT = "Force Text";
-const char* CONFIG_FORCEBINARY = "Force Binary";
-const char* CONFIG_IGNORESPACECHANGE = "Ignore Space Change";
-const char* CONFIG_IGNOREALLSPACE = "Ignore All Space";
-const char* CONFIG_IGNORELINEBREAKSCHG = "Ignore Line Breaks Changes";
-const char* CONFIG_IGNORECASE = "Ignore Case";
-const char* CONFIG_EOLCONVERSION0 = "EOL Conversion 0";
-const char* CONFIG_EOLCONVERSION1 = "EOL Conversion 1";
-const char* CONFIG_REBARBANDSLAYOUT = "Rebar Bands Layout";
-const char* CONFIG_HISTORY = "History %d";
-const char* CONFIG_LASTCFGPAGE = "Last Configuration Page";
-const char* CONFIG_LOADONSTART = "Load On Start";
-const char* CONFIG_VIEW_HORIZONTAL = "Horizontal View";
-const char* CONFIG_AUTO_COPY = "Auto-Copy Selection";
-const char* CONFIG_NORMALIZATION_FORM = "Normalization Form";
-const char* CONFIG_ENCODING0 = "Encoding 0";
-const char* CONFIG_ENCODING1 = "Encoding 1";
-const char* CONFIG_ENDIANS0 = "Endians 0";
-const char* CONFIG_ENDIANS1 = "Endians 1";
-const char* CONFIG_INPUTENC0 = "InputEnc 0";
-const char* CONFIG_INPUTENC1 = "InputEnc 1";
-const char* CONFIG_INPUTENCTABLE0 = "InputEnc Table 0";
-const char* CONFIG_INPUTENCTABLE1 = "InputEnc Table 1";
+const wchar_t* CONFIG_VERSION = L"Version";
+const wchar_t* CONFIG_CONFIGURATION = L"Configuration";
+const wchar_t* CONFIG_COLORS = L"Colors";
+const wchar_t* CONFIG_CUSTOMCOLORS = L"Custom Colors";
+const wchar_t* CONFIG_DEFOPTIONS = L"Default Diff Options";
+const wchar_t* CONFIG_FORCETEXT = L"Force Text";
+const wchar_t* CONFIG_FORCEBINARY = L"Force Binary";
+const wchar_t* CONFIG_IGNORESPACECHANGE = L"Ignore Space Change";
+const wchar_t* CONFIG_IGNOREALLSPACE = L"Ignore All Space";
+const wchar_t* CONFIG_IGNORELINEBREAKSCHG = L"Ignore Line Breaks Changes";
+const wchar_t* CONFIG_IGNORECASE = L"Ignore Case";
+const wchar_t* CONFIG_EOLCONVERSION0 = L"EOL Conversion 0";
+const wchar_t* CONFIG_EOLCONVERSION1 = L"EOL Conversion 1";
+const wchar_t* CONFIG_REBARBANDSLAYOUT = L"Rebar Bands Layout";
+const wchar_t* CONFIG_HISTORY = L"History %d";
+const wchar_t* CONFIG_LASTCFGPAGE = L"Last Configuration Page";
+const wchar_t* CONFIG_LOADONSTART = L"Load On Start";
+const wchar_t* CONFIG_VIEW_HORIZONTAL = L"Horizontal View";
+const wchar_t* CONFIG_AUTO_COPY = L"Auto-Copy Selection";
+const wchar_t* CONFIG_NORMALIZATION_FORM = L"Normalization Form";
+const wchar_t* CONFIG_ENCODING0 = L"Encoding 0";
+const wchar_t* CONFIG_ENCODING1 = L"Encoding 1";
+const wchar_t* CONFIG_ENDIANS0 = L"Endians 0";
+const wchar_t* CONFIG_ENDIANS1 = L"Endians 1";
+const wchar_t* CONFIG_INPUTENC0 = L"InputEnc 0";
+const wchar_t* CONFIG_INPUTENC1 = L"InputEnc 1";
+const wchar_t* CONFIG_INPUTENCTABLE0 = L"InputEnc Table 0";
+const wchar_t* CONFIG_INPUTENCTABLE1 = L"InputEnc Table 1";
 
 BOOL LoadOnStart;
 
@@ -75,7 +101,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
     CALL_STACK_MESSAGE1("SalamanderPluginEntry()");
 
-    SG->SetHelpFileName("filecomp.chm");
+    SG->SetHelpFileName(L"filecomp.chm");
 
     if (!InitDialogs())
     {
@@ -86,21 +112,21 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     InitXUnicode();
     MappedFontFactory.Init();
 
-    hNormalizDll = LoadLibrary("normaliz.dll");
+    hNormalizDll = LoadLibraryW(L"normaliz.dll");
     if (hNormalizDll)
     {
         PNormalizeString = (TNormalizeString)GetProcAddress(hNormalizDll, "NormalizeString"); // Min: Vista
     }
 
     // set basic metadata about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION | FUNCTION_CONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "File Comparator" /* do not translate! */);
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SG, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"File Comparator" /* do not translate! */);
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // must be after salamander->SetBasicPluginData because worker threads use the plugin
     // version at startup and salamander->SetBasicPluginData updates that value (it used to
@@ -118,13 +144,14 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SG->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls %ls\n\n%ls\n\n%ls",
+        SPLLoadStrOwned(SG, HLanguage, IDS_PLUGINNAME).c_str(),
+        _CRT_WIDE(VERSINFO_VERSION), _CRT_WIDE(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SG, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str());
+    SG->SalMessageBox(parent, text.c_str(),
+                      SPLLoadStrOwned(SG, HLanguage, IDS_ABOUT).c_str(),
+                      MB_OK | MB_ICONINFORMATION);
 }
 
 void WINAPI
@@ -202,7 +229,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     DefCompareOptions = DefaultCompareOptions;
 
     // history
-    CBHistoryEntries = 0;
+    CBHistory.clear();
 
     // last configuration page that was opened
     LastCfgPage = 0;
@@ -211,21 +238,43 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     {
         DWORD configVersion = 0;
         registry->GetValue(regKey, CONFIG_VERSION, REG_DWORD, &configVersion, sizeof(DWORD));
-        if ((configVersion == CURRENT_CONFIG_VERSION) || (configVersion == CURRENT_CONFIG_VERSION_NORECOMPAREBUTTON) || (configVersion == CURRENT_CONFIG_VERSION_PRESEPARATEOPTIONS))
+        if ((configVersion == CURRENT_CONFIG_VERSION) || (configVersion == CURRENT_CONFIG_VERSION_NARROWLOGFONT) || (configVersion == CURRENT_CONFIG_VERSION_NORECOMPAREBUTTON) || (configVersion == CURRENT_CONFIG_VERSION_PRESEPARATEOPTIONS))
         {
-            CRegBLOBConfiguration blob;
-            // load configuration from the registry
-            if (registry->GetValue(regKey, CONFIG_CONFIGURATION, REG_BINARY, &blob, sizeof(blob)))
-            { // Configuration as stored in binary form in registry
-                ::Configuration.ConfirmSelection = blob.ConfirmSelection;
-                ::Configuration.Context = blob.Context;
-                ::Configuration.TabSize = blob.TabSize;
-                ::Configuration.FileViewLogFont = blob.FileViewLogFont;
-                ::Configuration.UseViewerFont = blob.UseViewerFont;
-                ::Configuration.WhiteSpace = blob.WhiteSpace;
-                ::Configuration.ViewMode = blob.ViewMode;
-                ::Configuration.ShowWhiteSpace = blob.ShowWhiteSpace;
-                ::Configuration.DetailedDifferences = blob.DetailedDifferences;
+            if (configVersion <= CURRENT_CONFIG_VERSION_NARROWLOGFONT)
+            { // stored by a narrow release: a different, shorter layout - convert it
+                CRegBLOBConfigurationNarrow blob;
+                memset(&blob, 0, sizeof(blob));
+                if (registry->GetValue(regKey, CONFIG_CONFIGURATION, REG_BINARY, &blob, sizeof(blob)))
+                {
+                    ::Configuration.ConfirmSelection = blob.ConfirmSelection;
+                    ::Configuration.Context = blob.Context;
+                    ::Configuration.TabSize = blob.TabSize;
+                    // on failure the default font stays; the switches below are still good
+                    ImportLegacyLogFont(blob.FileViewLogFont, ::Configuration.FileViewLogFont);
+                    ::Configuration.UseViewerFont = blob.UseViewerFont;
+                    ::Configuration.WhiteSpace = blob.WhiteSpace;
+                    ::Configuration.ViewMode = blob.ViewMode;
+                    ::Configuration.ShowWhiteSpace = blob.ShowWhiteSpace;
+                    ::Configuration.DetailedDifferences = blob.DetailedDifferences;
+                }
+            }
+            else
+            {
+                CRegBLOBConfiguration blob;
+                memset(&blob, 0, sizeof(blob));
+                // load configuration from the registry
+                if (registry->GetValue(regKey, CONFIG_CONFIGURATION, REG_BINARY, &blob, sizeof(blob)))
+                { // Configuration as stored in binary form in registry
+                    ::Configuration.ConfirmSelection = blob.ConfirmSelection;
+                    ::Configuration.Context = blob.Context;
+                    ::Configuration.TabSize = blob.TabSize;
+                    ::Configuration.FileViewLogFont = blob.FileViewLogFont;
+                    ::Configuration.UseViewerFont = blob.UseViewerFont;
+                    ::Configuration.WhiteSpace = blob.WhiteSpace;
+                    ::Configuration.ViewMode = blob.ViewMode;
+                    ::Configuration.ShowWhiteSpace = blob.ShowWhiteSpace;
+                    ::Configuration.DetailedDifferences = blob.DetailedDifferences;
+                }
             }
 
             // load colors
@@ -277,19 +326,23 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
                 registry->GetValue(regKey, CONFIG_ENDIANS1, REG_DWORD, &DefCompareOptions.Endians[1], 4);
                 registry->GetValue(regKey, CONFIG_INPUTENC0, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[0], 4);
                 registry->GetValue(regKey, CONFIG_INPUTENC1, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[1], 4);
-                registry->GetValue(regKey, CONFIG_INPUTENCTABLE0, REG_SZ, DefCompareOptions.ASCII8InputEncTableName[0], 101);
-                registry->GetValue(regKey, CONFIG_INPUTENCTABLE1, REG_SZ, DefCompareOptions.ASCII8InputEncTableName[1], 101);
+                GetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0], 101);
+                GetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1], 101);
                 DWORD dw;
                 if (registry->GetValue(regKey, CONFIG_NORMALIZATION_FORM, REG_DWORD, &dw, sizeof(DWORD)))
                     DefCompareOptions.NormalizationForm = dw ? TRUE : FALSE;
             }
             // history of recently used files
-            TCHAR buf[32];
-            for (; CBHistoryEntries < MAX_HISTORY_ENTRIES; CBHistoryEntries++)
+            wchar_t buf[32];
+            for (int historyIndex = 0; historyIndex < MAX_HISTORY_ENTRIES;
+                 ++historyIndex)
             {
-                _stprintf(buf, CONFIG_HISTORY, CBHistoryEntries);
-                if (!registry->GetValue(regKey, buf, REG_SZ, CBHistory[CBHistoryEntries], SizeOf(CBHistory[CBHistoryEntries])))
+                _snwprintf_s(buf, _countof(buf), _TRUNCATE, CONFIG_HISTORY,
+                             historyIndex);
+                std::wstring historyPath;
+                if (!SPLRegistryGetStringOwned(registry, regKey, buf, historyPath))
                     break;
+                CBHistory.push_back(std::move(historyPath));
             }
             if (configVersion > CURRENT_CONFIG_VERSION_NORECOMPAREBUTTON)
             {
@@ -333,6 +386,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 
     // configuration block
     CRegBLOBConfiguration blob;
+    memset(&blob, 0, sizeof(blob)); // the struct has padding, and it all goes to the registry
     // Configuration is stored in binary form in registry
     blob.ConfirmSelection = ::Configuration.ConfirmSelection;
     blob.Context = ::Configuration.Context;
@@ -363,30 +417,30 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_ENDIANS1, REG_DWORD, &DefCompareOptions.Endians[1], 4);
     registry->SetValue(regKey, CONFIG_INPUTENC0, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[0], 4);
     registry->SetValue(regKey, CONFIG_INPUTENC1, REG_DWORD, &DefCompareOptions.PerformASCII8InputEnc[1], 4);
-    registry->SetValue(regKey, CONFIG_INPUTENCTABLE0, REG_SZ, DefCompareOptions.ASCII8InputEncTableName[0], int(strlen(DefCompareOptions.ASCII8InputEncTableName[0])));
-    registry->SetValue(regKey, CONFIG_INPUTENCTABLE1, REG_SZ, DefCompareOptions.ASCII8InputEncTableName[1], int(strlen(DefCompareOptions.ASCII8InputEncTableName[1])));
+    SetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE0, DefCompareOptions.ASCII8InputEncTableName[0]);
+    SetValueSZ(registry, regKey, CONFIG_INPUTENCTABLE1, DefCompareOptions.ASCII8InputEncTableName[1]);
     dw = DefCompareOptions.NormalizationForm;
     registry->SetValue(regKey, CONFIG_NORMALIZATION_FORM, REG_DWORD, &dw, sizeof(DWORD));
     // history of recently used files
     BOOL b;
     if (SG->GetConfigParameter(SALCFG_SAVEHISTORY, &b, sizeof(BOOL), NULL) && b)
     {
-        char buf[32];
+        wchar_t buf[32];
         int i;
-        for (i = 0; i < CBHistoryEntries; i++)
+        for (i = 0; i < static_cast<int>(CBHistory.size()); i++)
         {
-            sprintf(buf, CONFIG_HISTORY, i);
-            registry->SetValue(regKey, buf, REG_SZ, CBHistory[i], int(strlen(CBHistory[i])));
+            _snwprintf_s(buf, _countof(buf), _TRUNCATE, CONFIG_HISTORY, i);
+            SPLRegistrySetString(registry, regKey, buf, CBHistory[i]);
         }
     }
     else
     {
         // trim the history list
-        char buf[32];
+        wchar_t buf[32];
         int i;
         for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
         {
-            sprintf(buf, CONFIG_HISTORY, i);
+            _snwprintf_s(buf, _countof(buf), _TRUNCATE, CONFIG_HISTORY, i);
             registry->DeleteValue(regKey, buf);
         }
     }
@@ -427,7 +481,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
   {MNTT_PE, 0
 };
 */
-    salamander->AddMenuItem(-1, LoadStr(IDS_COMPAREFILES), SALHOTKEY('C', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MID_COMPAREFILES, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SG, HLanguage, IDS_COMPAREFILES).c_str(), SALHOTKEY('C', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MID_COMPAREFILES, FALSE,
                             MENU_EVENT_DISK, 0, MENU_SKILLLEVEL_ALL);
     // assign the plugin icon
     HBITMAP hBmp = (HBITMAP)LoadImage(DLLInstance, MAKEINTRESOURCE(IDB_FILECOMP),
@@ -476,9 +530,7 @@ void CPluginInterface::ClearHistory(HWND parent)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::ClearHistory()");
     MainWindowQueue.BroadcastMessage(WM_USER_CLEARHISTORY, 0, 0);
-    int i;
-    for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
-        CBHistory[i][0] = 0;
+    CBHistory.clear();
 }
 
 // ****************************************************************************
@@ -495,18 +547,14 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
     {
     case MID_COMPAREFILES:
     {
-        // Use std::string/wstring for long path support
-        const int LONG_PATH_SIZE = 32767;
-        std::string file1, file2;
-        std::wstring file1W, file2W;
-        char pathBuf[LONG_PATH_SIZE]; // Temp buffer for GetPanelPath
-        wchar_t widePathBuf[LONG_PATH_SIZE]; // Temp buffer for wide path conversion
+        std::wstring file1, file2;
+        std::wstring panelPath;
         const CFileData *fd1, *fd2 = NULL;
         int index = 0;
         BOOL isDir;
         BOOL secondFromSource = FALSE;
         int tgtPathType;
-        SG->GetPanelPath(PANEL_TARGET, NULL, 0, &tgtPathType, NULL);
+        SG->GetPanelPath(PANEL_TARGET, NULL, &tgtPathType, NULL);
         BOOL tgtPanelIsDisk = (tgtPathType == PATH_TYPE_WINDOWS);
 
         fd1 = SG->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
@@ -558,37 +606,17 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
             goto SELECTION_FINISHED; // empty panel
 
         // store the name of the first file
-        if (!SG->GetPanelPath(PANEL_SOURCE, pathBuf, LONG_PATH_SIZE, NULL, NULL))
+        if (!SPLGetPanelPathOwned(SG, PANEL_SOURCE, panelPath))
             return NULL;
-        SG->SalPathAppend(pathBuf, fd1->Name, LONG_PATH_SIZE);
-        file1 = pathBuf;
-        // Build wide path for Unicode filenames or long paths
-        MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
-        file1W = widePathBuf;
-        // Replace the corrupted ANSI filename part with the correct Unicode name
-        if (fd1->UseWideName())
-        {
-            size_t lastSlash = file1W.rfind(L'\\');
-            if (lastSlash != std::wstring::npos)
-                file1W = file1W.substr(0, lastSlash + 1) + fd1->NameW;
-        }
+        file1 = panelPath;
+        SPLSalPathAppendOwned(file1, fd1->Name);
 
         if (fd2 &&
             !isDir && fd2 != fd1) // in case we take the file from the focus
         {
             // store the name of the second file
-            SG->GetPanelPath(PANEL_SOURCE, pathBuf, LONG_PATH_SIZE, NULL, NULL);
-            SG->SalPathAppend(pathBuf, fd2->Name, LONG_PATH_SIZE);
-            file2 = pathBuf;
-            // Build wide path for Unicode filenames or long paths
-            MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
-            file2W = widePathBuf;
-            if (fd2->UseWideName())
-            {
-                size_t lastSlash = file2W.rfind(L'\\');
-                if (lastSlash != std::wstring::npos)
-                    file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW;
-            }
+            file2 = panelPath;
+            SPLSalPathAppendOwned(file2, fd2->Name);
             secondFromSource = TRUE;
         }
         else
@@ -608,12 +636,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                         // For Unicode filenames, compare using wide names
                         if (!isDir)
                         {
-                            if (fd1->UseWideName() && fd2->UseWideName())
-                            {
-                                if (_wcsicmp(fd1->NameW, fd2->NameW) == 0)
-                                    break;
-                            }
-                            else if (SG->StrICmp(fd1->Name, fd2->Name) == 0)
+                            if (SG->StrICmp(fd1->Name, fd2->Name) == 0)
                                 break;
                         }
                     }
@@ -622,19 +645,9 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                 if (fd2)
                 {
                     // store the name of the second file
-                    if (!SG->GetPanelPath(PANEL_TARGET, pathBuf, LONG_PATH_SIZE, NULL, NULL))
+                    if (!SPLGetPanelPathOwned(SG, PANEL_TARGET, file2))
                         return NULL;
-                    SG->SalPathAppend(pathBuf, fd2->Name, LONG_PATH_SIZE);
-                    file2 = pathBuf;
-                    // Build wide path for Unicode filenames or long paths
-                    MultiByteToWideChar(CP_ACP, 0, pathBuf, -1, widePathBuf, LONG_PATH_SIZE);
-                    file2W = widePathBuf;
-                    if (fd2->UseWideName())
-                    {
-                        size_t lastSlash = file2W.rfind(L'\\');
-                        if (lastSlash != std::wstring::npos)
-                            file2W = file2W.substr(0, lastSlash + 1) + fd2->NameW;
-                    }
+                    SPLSalPathAppendOwned(file2, fd2->Name);
                 }
             }
         }
@@ -643,14 +656,11 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
 
         BOOL doNotSwapNames = secondFromSource || SG->GetSourcePanel() == PANEL_LEFT;
         SG->GetConfigParameter(SALCFG_ALWAYSONTOP, &AlwaysOnTop, sizeof(AlwaysOnTop), NULL);
-        // Pass wide paths for Unicode/long path filenames
-        const std::string& f1 = doNotSwapNames ? file1 : file2;
-        const std::string& f2 = doNotSwapNames ? file2 : file1;
-        const std::wstring& w1 = doNotSwapNames ? file1W : file2W;
-        const std::wstring& w2 = doNotSwapNames ? file2W : file1W;
-        CFilecompThread* d = new CFilecompThread(f1.c_str(), f2.c_str(), FALSE, "",
-                                                 w1.empty() ? NULL : w1.c_str(),
-                                                 w2.empty() ? NULL : w2.c_str());
+        const std::wstring& path1 = doNotSwapNames ? file1 : file2;
+        const std::wstring& path2 = doNotSwapNames ? file2 : file1;
+        CFilecompThread* d = new CFilecompThread(
+            path1.empty() ? NULL : path1.c_str(),
+            path2.empty() ? NULL : path2.c_str(), FALSE, "");
         if (!d)
             return Error((HWND)-1, IDS_LOWMEM);
         if (!d->Create(ThreadQueue))
@@ -694,22 +704,10 @@ CFilecompThread::Body()
     HWND wnd;
     CCompareOptions options = DefCompareOptions;
 
-    // Local buffers for dialog editing (dialog needs writable char and wchar_t buffers)
-    // Use heap allocation to avoid ~393KB stack usage which could cause stack overflow
-    const int DIALOG_PATH_SIZE = 32767;
-    std::unique_ptr<char[]> dialogPath1(new char[DIALOG_PATH_SIZE]);
-    std::unique_ptr<char[]> dialogPath2(new char[DIALOG_PATH_SIZE]);
-    std::unique_ptr<wchar_t[]> dialogPath1W(new wchar_t[DIALOG_PATH_SIZE]);
-    std::unique_ptr<wchar_t[]> dialogPath2W(new wchar_t[DIALOG_PATH_SIZE]);
-    strcpy(dialogPath1.get(), Path1.c_str());
-    strcpy(dialogPath2.get(), Path2.c_str());
-    wcscpy(dialogPath1W.get(), Path1W.c_str());
-    wcscpy(dialogPath2W.get(), Path2W.c_str());
-
     if (Path1.empty() || Path2.empty() || !DontConfirmSelection && Configuration.ConfirmSelection)
     {
-        CCompareFilesDialog* dlg = new CCompareFilesDialog(0, dialogPath1.get(), dialogPath2.get(), succes, &options,
-                                                              dialogPath1W.get(), dialogPath2W.get(), DIALOG_PATH_SIZE);
+        CCompareFilesDialog* dlg = new CCompareFilesDialog(
+            0, Path1, Path2, succes, &options);
         if (!dlg)
         {
             Error(HWND(NULL), IDS_LOWMEM);
@@ -740,13 +738,13 @@ CFilecompThread::Body()
         }
 
         MSG msg;
-        while (IsWindow(wnd) && GetMessage(&msg, NULL, 0, 0))
+        while (IsWindow(wnd) && GetMessageW(&msg, NULL, 0, 0))
         {
             if (!dialogBox && !TranslateAccelerator(wnd, HAccels, &msg) ||
                 dialogBox && !IsDialogMessage(wnd, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
 
@@ -754,9 +752,6 @@ CFilecompThread::Body()
             break; // leave the message loop
 
     LLAUNCHFC:
-
-        // Use the wide path buffers directly - they contain the actual Unicode paths
-        // (the dialog now reads/writes via wide APIs)
 
         WINDOWPLACEMENT wp;
         wp.length = sizeof(wp);
@@ -770,9 +765,9 @@ CFilecompThread::Body()
                    workRect.top - monitorRect.top);
 
         // if the main window is minimized, keep the File Comparator restored instead
-        CMainWindow* win = new CMainWindow(dialogPath1.get(), dialogPath2.get(), &options,
-                                           wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW,
-                                           dialogPath1W.get(), dialogPath2W.get());
+        CMainWindow* win = new CMainWindow(
+            Path1.c_str(), Path2.c_str(), &options,
+            wp.showCmd == SW_SHOWMAXIMIZED ? SW_SHOWMAXIMIZED : SW_SHOW);
         if (!win)
         {
             Error(HWND(NULL), IDS_LOWMEM);
@@ -780,7 +775,7 @@ CFilecompThread::Body()
         }
         wnd = win->CreateEx(AlwaysOnTop ? WS_EX_TOPMOST : 0,
                             MAINWINDOW_CLASSNAME,
-                            LoadStr(IDS_PLUGINNAME),
+                            LangStr(IDS_PLUGINNAME).c_str(),
                             WS_OVERLAPPEDWINDOW | WS_VISIBLE | (wp.showCmd == SW_SHOWMAXIMIZED ? WS_MAXIMIZE : 0),
                             wp.rcNormalPosition.left,
                             wp.rcNormalPosition.top,
@@ -798,10 +793,10 @@ CFilecompThread::Body()
         dialogBox = FALSE;
     }
 LBODYFINAL:
-    if (*ReleaseEvent)
+    if (!ReleaseEvent.empty())
     {
         // allow filecomp.exe to continue
-        HANDLE event = OpenEvent(EVENT_MODIFY_STATE, FALSE, ReleaseEvent);
+        HANDLE event = OpenEventA(EVENT_MODIFY_STATE, FALSE, ReleaseEvent.c_str());
         SetEvent(event);
         CloseHandle(event);
     }

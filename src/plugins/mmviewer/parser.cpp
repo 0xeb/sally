@@ -72,58 +72,62 @@ void ShowParserError(HWND hParent, CParserResultEnum result)
         strID = IDS_MMV_EXTENSION_ERROR;
         break;
     }
-    const char* text;
+    std::wstring textOwner;
+    const wchar_t* text;
     if (strID == -1)
-        text = "Unknown error";
+        text = L"Unknown error";
     else
-        text = LoadStr(strID);
-    SalGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+    {
+        textOwner = SPLLoadStrOwned(SalGeneral, HLanguage, strID);
+        text = textOwner.c_str();
+    }
+    SalGeneral->SalMessageBox(hParent, text, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
 }
 
 CParserResultEnum
-CreateAppropriateParser(const char* fileName, CParserInterface** parser)
+CreateAppropriateParser(const wchar_t* fileName, CParserInterface** parser)
 {
     CParserInterface* iface = NULL;
 
-    const char* ext = strrchr(fileName, '.'); // ".cvspass" is an extension in Windows
+    const wchar_t* ext = wcsrchr(fileName, L'.'); // ".cvspass" is an extension in Windows
 
     if (!ext)
         return preUnknownFile;
 
 #ifdef _MP4_SUPPORT_
-    if ((SalGeneral->StrICmp(ext, ".mp4") == 0) || (SalGeneral->StrICmp(ext, ".m4a") == 0) || (SalGeneral->StrICmp(ext, ".aac") == 0))
+    if ((SalGeneral->StrICmp(ext, L".mp4") == 0) || (SalGeneral->StrICmp(ext, L".m4a") == 0) || (SalGeneral->StrICmp(ext, L".aac") == 0))
         iface = new CParserMP4();
 #endif
 
 #ifdef _MPG_SUPPORT_
-    if ((SalGeneral->StrICmp(ext, ".mp3") == 0) || (SalGeneral->StrICmp(ext, ".mp2") == 0))
+    if ((SalGeneral->StrICmp(ext, L".mp3") == 0) || (SalGeneral->StrICmp(ext, L".mp2") == 0))
         iface = new CParserMPG();
 #endif
 
 #ifdef _WAV_SUPPORT_
-    if ((SalGeneral->StrICmp(ext, ".wav") == 0) || (SalGeneral->StrICmp(ext, ".wave") == 0))
+    if ((SalGeneral->StrICmp(ext, L".wav") == 0) || (SalGeneral->StrICmp(ext, L".wave") == 0))
         iface = new CParserWAV();
 #endif
 
 #ifdef _WMA_SUPPORT_
-    if (SalGeneral->StrICmp(ext, ".wma") == 0)
+    if (SalGeneral->StrICmp(ext, L".wma") == 0)
         iface = new CParserWMA();
 #endif
 
 #ifdef _VQF_SUPPORT_
-    if (SalGeneral->StrICmp(ext, ".vqf") == 0)
+    if (SalGeneral->StrICmp(ext, L".vqf") == 0)
         iface = new CParserVQF();
 #endif
 
 #ifdef _OGG_SUPPORT_
-    if (SalGeneral->StrICmp(ext, ".ogg") == 0)
+    if (SalGeneral->StrICmp(ext, L".ogg") == 0)
         iface = new CParserOGG();
 #endif
 
 #ifdef _MOD_SUPPORT_
-    if ((SalGeneral->StrICmp(ext, ".it") == 0) || (SalGeneral->StrICmp(ext, ".s3m") == 0) || (SalGeneral->StrICmp(ext, ".stm") == 0) ||
-        (SalGeneral->StrICmp(ext, ".xm") == 0) || (SalGeneral->StrICmp(ext, ".mod") == 0) || (SalGeneral->StrICmp(ext, ".mtm") == 0) ||
-        (SalGeneral->StrICmp(ext, ".669") == 0))
+    if ((SalGeneral->StrICmp(ext, L".it") == 0) || (SalGeneral->StrICmp(ext, L".s3m") == 0) || (SalGeneral->StrICmp(ext, L".stm") == 0) ||
+        (SalGeneral->StrICmp(ext, L".xm") == 0) || (SalGeneral->StrICmp(ext, L".mod") == 0) || (SalGeneral->StrICmp(ext, L".mtm") == 0) ||
+        (SalGeneral->StrICmp(ext, L".669") == 0))
         iface = new CParserMOD();
 #endif
 

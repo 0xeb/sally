@@ -357,7 +357,7 @@ BOOL CToolBar::Refresh()
                 r.right = 0;
                 r.bottom = 0;
                 DWORD noPrefix = item->Style & TLBI_STYLE_NOPREFIX ? DT_NOPREFIX : 0;
-                DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen,
+                DrawTextW(CacheBitmap->HMemDC, item->Text, item->TextLen,
                          &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | noPrefix | DT_CALCRECT);
                 textWidth = r.right;
                 textPresent = TRUE;
@@ -711,13 +711,13 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 textR2.right++;
                 textR2.bottom++;
                 SetTextColor(CacheBitmap->HMemDC, GetToolBarTextHilightColor());
-                DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen,
+                DrawTextW(CacheBitmap->HMemDC, item->Text, item->TextLen,
                          &textR2, noPrefix | DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 SetTextColor(CacheBitmap->HMemDC, GetToolBarTextShadowColor());
             }
             else
                 SetTextColor(CacheBitmap->HMemDC, GetToolBarTextColor());
-            DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
+            DrawTextW(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
                      noPrefix | DT_NOCLIP | DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             if (hOldFont != NULL)
                 SelectObject(CacheBitmap->HMemDC, hOldFont);

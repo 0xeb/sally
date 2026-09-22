@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -44,26 +44,26 @@ void CCommonDialog::NotifDlgJustCreated()
 // CProgressDlg
 //
 
-CProgressDlg::CProgressDlg(HWND parent, const char* title, const char* operation, CObjectOrigin origin, int resID)
+CProgressDlg::CProgressDlg(HWND parent, const wchar_t* title, const wchar_t* operation, CObjectOrigin origin, int resID)
     : CCommonDialog(HLanguage, resID ? resID : IDD_PROGRESSDLG, parent, origin)
 {
     ProgressBar = NULL;
     WantCancel = FALSE;
     LastTickCount = 0;
-    TextCache[0] = 0;
+    TextCache.clear();
     TextCacheIsDirty = FALSE;
     ProgressCache = 0;
     ProgressCacheIsDirty = FALSE;
     ProgressTotalCache = 0;
     ProgressTotalCacheIsDirty = FALSE;
 
-    strncpy_s(Title, title, _TRUNCATE);
-    strncpy_s(Operation, operation, _TRUNCATE);
+    Title = title != NULL ? title : L"";
+    Operation = operation != NULL ? operation : L"";
 }
 
-void CProgressDlg::Set(const char* fileName, DWORD progressTotal, BOOL dalayedPaint)
+void CProgressDlg::Set(const wchar_t* fileName, DWORD progressTotal, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", sizeof(TextCache));
+    TextCache = fileName != NULL ? fileName : L"";
     TextCacheIsDirty = TRUE;
 
     if (progressTotal != ProgressTotalCache)
@@ -107,12 +107,12 @@ void CProgressDlg::EnableCancel(BOOL enable)
             PostMessage(cancel, BM_SETSTYLE, enable ? BS_DEFPUSHBUTTON : BS_PUSHBUTTON, TRUE);
 
             MSG msg;
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
             {
                 if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
         }
@@ -130,12 +130,12 @@ BOOL CProgressDlg::GetWantCancel()
     }
 
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
     {
         if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -149,19 +149,19 @@ void CProgressDlg::FlushDataToControls()
 
     if (TextCacheIsDirty)
     {
-        SetDlgItemText(HWindow, IDT_FILENAME, TextCache);
+        SetDlgItemTextW(HWindow, IDT_FILENAME, TextCache.c_str());
         TextCacheIsDirty = FALSE;
     }
 
     if (ProgressTotalCacheIsDirty)
     {
-        char buf[100];
         if (ProgressTotalCache == -1)
-            ::SetWindowText(HWindow, Title);
+            ::SetWindowTextW(HWindow, Title.c_str());
         else
         {
-            sprintf(buf, "(%d %%) %s", (int)((ProgressTotalCache /*+ 5*/) / 10), Title); // do not round (100% must appear only at 100% and not at 99.5%)
-            ::SetWindowText(HWindow, buf);
+            const std::wstring caption = SPLFormatStringOwned(
+                L"(%d %%) %s", (int)((ProgressTotalCache /*+ 5*/) / 10), Title.c_str());
+            ::SetWindowTextW(HWindow, caption.c_str()); // do not round (100% must appear only at 100% and not at 99.5%)
         }
 
         ProgressBar->SetProgress(ProgressTotalCache, NULL);
@@ -187,8 +187,8 @@ CProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return FALSE;           // end of processing
         }
 
-        ::SetWindowText(HWindow, Title);
-        SetDlgItemText(HWindow, IDT_OPERATION, Operation);
+        ::SetWindowTextW(HWindow, Title.c_str());
+        SetDlgItemTextW(HWindow, IDT_OPERATION, Operation.c_str());
 
         break; // request focus from DefDlgProc
     }
@@ -201,7 +201,7 @@ CProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 FlushDataToControls();
 
-                if (SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_YESNO_CANCEL), TitleWMobile,
+                if (SalamanderGeneral->SalMessageBox(HWindow, LangStr(IDS_YESNO_CANCEL).c_str(), TitleWMobile,
                                                      MB_YESNO | MB_ICONQUESTION) == IDYES)
                 {
                     WantCancel = TRUE;
@@ -220,20 +220,20 @@ CProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CProgress2Dlg
 //
 
-CProgress2Dlg::CProgress2Dlg(HWND parent, const char* title, const char* operation, const char* operation2, CObjectOrigin origin, int resID)
+CProgress2Dlg::CProgress2Dlg(HWND parent, const wchar_t* title, const wchar_t* operation, const wchar_t* operation2, CObjectOrigin origin, int resID)
     : CProgressDlg(parent, title, operation, origin, resID ? resID : IDD_PROGRESS2DLG)
 {
     ProgressBar2 = NULL;
-    TextCache2[0] = 0;
+    TextCache2.clear();
     TextCache2IsDirty = FALSE;
 
-    strncpy_s(Operation2, operation2, _TRUNCATE);
+    Operation2 = operation2 != NULL ? operation2 : L"";
 }
 
-void CProgress2Dlg::Set(const char* fileName, const char* fileName2, BOOL dalayedPaint)
+void CProgress2Dlg::Set(const wchar_t* fileName, const wchar_t* fileName2, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", sizeof(TextCache));
-    lstrcpyn(TextCache2, fileName2 != NULL ? fileName2 : "", sizeof(TextCache2));
+    TextCache = fileName != NULL ? fileName : L"";
+    TextCache2 = fileName2 != NULL ? fileName2 : L"";
     TextCache2IsDirty = TextCacheIsDirty = TRUE;
 
     if (!dalayedPaint)
@@ -249,7 +249,7 @@ void CProgress2Dlg::FlushDataToControls()
 
     if (TextCache2IsDirty)
     {
-        SetDlgItemText(HWindow, IDT_FILENAME2, TextCache2);
+        SetDlgItemTextW(HWindow, IDT_FILENAME2, TextCache2.c_str());
         TextCache2IsDirty = FALSE;
     }
 
@@ -278,7 +278,7 @@ CProgress2Dlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return FALSE;           // end of processing
         }
 
-        SetDlgItemText(HWindow, IDT_OPERATION2, Operation2);
+        SetDlgItemTextW(HWindow, IDT_OPERATION2, Operation2.c_str());
 
         break; // request focus from DefDlgProc
     }
@@ -348,7 +348,7 @@ BOOL CChangeAttrDialog::GetAndValidateTime(CTransferInfo* ti, int resIDDate, int
     FILETIME dummyFT;
     if (!SystemTimeToFileTime(&st2, &dummyFT))
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_ERR_INVALIDDATEFORMAT), TitleWMobileError,
+        SalamanderGeneral->SalMessageBox(HWindow, LangStr(IDS_ERR_INVALIDDATEFORMAT).c_str(), TitleWMobileError,
                                          MB_OK | MB_ICONEXCLAMATION);
         ti->ErrorOn(resIDDate);
         return FALSE;

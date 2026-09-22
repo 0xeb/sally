@@ -12,6 +12,9 @@
 
 #include "precomp.h"
 
+#define DEMOPLUG_WIDEN_IMPL(value) L##value
+#define DEMOPLUG_WIDEN(value) DEMOPLUG_WIDEN_IMPL(value)
+
 // plugin interface object whose methods are invoked by Salamander
 CPluginInterface PluginInterface;
 // additional parts of the CPluginInterface implementation
@@ -22,10 +25,10 @@ CPluginInterfaceForFS InterfaceForFS;
 CPluginInterfaceForThumbLoader InterfaceForThumbLoader;
 
 // global data
-const char* PluginNameEN = "DemoPlug";    // untranslated plugin name, used before the language module loads and for debugging
-const char* PluginNameShort = "DEMOPLUG"; // plugin name (short form, without spaces)
+const wchar_t* PluginNameEN = L"DemoPlug"; // untranslated plugin name, used before the language module loads and for debugging
+const wchar_t* PluginNameShort = L"DEMOPLUG"; // plugin name (short form, without spaces)
 
-CPathBuffer Str("default");
+std::wstring Str(L"default");
 int Number = 0;
 int Selection = 1; // "second" in configuration dialog
 BOOL CheckBox = FALSE;
@@ -45,21 +48,21 @@ int DFSTypeWidth = 0;                     // DFS Type column (FS): low/high word
 
 DWORD LastCfgPage = 0; // start page (sheet) in configuration dialog
 
-const char* CONFIG_KEY = "test key";
-const char* CONFIG_STR = "test string";
-const char* CONFIG_NUMBER = "test number";
-const char* CONFIG_SAVEPOS = "SavePosition";
-const char* CONFIG_WNDPLACEMENT = "WindowPlacement";
-const char* CONFIG_SIZE2FIXEDWIDTH = "Size2FixedWidth";
-const char* CONFIG_SIZE2WIDTH = "Size2Width";
-const char* CONFIG_CREATEDFIXEDWIDTH = "CreatedFixedWidth";
-const char* CONFIG_CREATEDWIDTH = "CreatedWidth";
-const char* CONFIG_MODIFIEDFIXEDWIDTH = "ModifiedFixedWidth";
-const char* CONFIG_MODIFIEDWIDTH = "ModifiedWidth";
-const char* CONFIG_ACCESSEDFIXEDWIDTH = "AccessedFixedWidth";
-const char* CONFIG_ACCESSEDWIDTH = "AccessedWidth";
-const char* CONFIG_DFSTYPEFIXEDWIDTH = "DFSTypeFixedWidth";
-const char* CONFIG_DFSTYPEWIDTH = "DFSTypeWidth";
+const wchar_t* CONFIG_KEY = L"test key";
+const wchar_t* CONFIG_STR = L"test string";
+const wchar_t* CONFIG_NUMBER = L"test number";
+const wchar_t* CONFIG_SAVEPOS = L"SavePosition";
+const wchar_t* CONFIG_WNDPLACEMENT = L"WindowPlacement";
+const wchar_t* CONFIG_SIZE2FIXEDWIDTH = L"Size2FixedWidth";
+const wchar_t* CONFIG_SIZE2WIDTH = L"Size2Width";
+const wchar_t* CONFIG_CREATEDFIXEDWIDTH = L"CreatedFixedWidth";
+const wchar_t* CONFIG_CREATEDWIDTH = L"CreatedWidth";
+const wchar_t* CONFIG_MODIFIEDFIXEDWIDTH = L"ModifiedFixedWidth";
+const wchar_t* CONFIG_MODIFIEDWIDTH = L"ModifiedWidth";
+const wchar_t* CONFIG_ACCESSEDFIXEDWIDTH = L"AccessedFixedWidth";
+const wchar_t* CONFIG_ACCESSEDWIDTH = L"AccessedWidth";
+const wchar_t* CONFIG_DFSTYPEFIXEDWIDTH = L"DFSTypeFixedWidth";
+const wchar_t* CONFIG_DFSTYPEWIDTH = L"DFSTypeWidth";
 
 // ConfigVersion: 0 - no configuration was loaded from the registry (fresh plugin installation),
 //                1 - first configuration version
@@ -69,7 +72,7 @@ const char* CONFIG_DFSTYPEWIDTH = "DFSTypeWidth";
 
 int ConfigVersion = 0;           // version of the configuration loaded from the registry (see the descriptions above)
 #define CURRENT_CONFIG_VERSION 4 // current configuration version (stored in the registry when the plugin unloads)
-const char* CONFIG_VERSION = "Version";
+const wchar_t* CONFIG_VERSION = L"Version";
 
 // pointers to lowercase/uppercase mapping tables
 unsigned char* LowerCase = NULL;
@@ -101,7 +104,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_BAR_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            MessageBox(NULL, "InitCommonControlsEx failed!", "Error", MB_OK | MB_ICONERROR);
+            // wide: English-only diagnostic, no LangStr involved (language module
+            // isn't even loaded yet at DllMain time) - same shape as undelete.cpp's fix (208).
+            MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
     }
@@ -109,9 +114,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 void OnConfiguration(HWND hParent)
@@ -119,7 +124,7 @@ void OnConfiguration(HWND hParent)
     static BOOL InConfiguration = FALSE;
     if (InConfiguration)
     {
-        SalamanderGeneral->SalMessageBox(hParent, LoadStr(IDS_CFG_ALREADY_OPENED), LoadStr(IDS_PLUGINNAME),
+        SalamanderGeneral->SalMessageBox(hParent, LangStr(IDS_CFG_ALREADY_OPENED).c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                          MB_ICONINFORMATION | MB_OK);
         return;
     }
@@ -133,13 +138,11 @@ void OnConfiguration(HWND hParent)
 
 void OnAbout(HWND hParent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%s %s\n\n%s\n\n%s", LangStr(IDS_PLUGINNAME).c_str(),
+        DEMOPLUG_WIDEN(VERSINFO_VERSION), DEMOPLUG_WIDEN(VERSINFO_COPYRIGHT),
+        LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(hParent, text.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void InitIconOverlays()
@@ -147,7 +150,7 @@ void InitIconOverlays()
     // clear the currently registered icon overlays so we stay clean even if an error occurs
     SalamanderGeneral->SetPluginIconOverlays(0, NULL);
 
-    HINSTANCE imageResDLL = HANDLES(LoadLibraryEx("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
+    HINSTANCE imageResDLL = HANDLES(LoadLibraryExW(L"imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
     // Salamander does not run without imageres.dll, so loading it here cannot fail
 
     // 48x48 only from XP onward (soon obsolete, we will run only on XP+, then drop it)
@@ -224,7 +227,7 @@ void WINAPI TestLoadOrSaveConfiguration(BOOL load, HKEY regKey,
                                         CSalamanderRegistryAbstract *registry, void *param)
 {
   CALL_STACK_MESSAGE2("TestLoadOrSaveConfiguration(%d, ,)", load);
-  CPathBuffer buf;
+  std::wstring buf;
   if (load)  // load
   {
     // load default configuration
@@ -383,13 +386,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
 #endif                           // DEMOPLUG_COMPATIBLE_WITH_500
     {                            // reject older versions
-        MessageBox(salamander->GetParentWindow(),
+        // wide: DEMOPLUG_COMPATIBLE_WITH_500 is unconditionally defined
+        // (precomp.h:39), so only this branch's literal is ever live for this build - the
+        // #else branch below is dead code, left untouched (same treatment as diskmap's dead
+        // #ifdef OPENSAL_VERSION branch, iteration 213).
+        MessageBoxW(salamander->GetParentWindow(),
 #ifdef DEMOPLUG_COMPATIBLE_WITH_500
-                   "This plugin requires Open Salamander 5.0 or later.",
+                    L"This plugin requires Open Salamander 5.0 or later.",
 #else  // DEMOPLUG_COMPATIBLE_WITH_500
                    REQUIRE_LAST_VERSION_OF_SALAMANDER,
 #endif // DEMOPLUG_COMPATIBLE_WITH_500
-                   PluginNameEN, MB_OK | MB_ICONERROR);
+                    L"DemoPlug", MB_OK | MB_ICONERROR);
         return NULL;
     }
 
@@ -405,7 +412,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // configure the help file name
-    SalamanderGeneral->SetHelpFileName("demoplug.chm");
+    SalamanderGeneral->SetHelpFileName(L"demoplug.chm");
 
     //  BYTE c = SalamanderGeneral->GetUserDefaultCharset();
 
@@ -428,15 +435,15 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 #ifndef DEMOPLUG_QUIET
     // display a test notification
-    char buf[100];
-    sprintf(buf, "SalamanderPluginEntry called, Salamander version %d", salamander->GetVersion());
-    TRACE_I(buf); // into TRACE SERVER
-    SalamanderGeneral->SalMessageBox(salamander->GetParentWindow(), buf, LoadStr(IDS_PLUGINNAME),
+    const std::wstring message = SPLFormatStringOwned(
+        L"SalamanderPluginEntry called, Salamander version %d", salamander->GetVersion());
+    TRACE_IW(message.c_str()); // into TRACE SERVER
+    SalamanderGeneral->SalMessageBox(salamander->GetParentWindow(), message.c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                      MB_OK | MB_ICONINFORMATION); // into a window
 #endif                                                            // DEMOPLUG_QUIET
 
     // provide basic information about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_PANELARCHIVERVIEW | FUNCTION_PANELARCHIVEREDIT |
                                        FUNCTION_CUSTOMARCHIVERPACK | FUNCTION_CUSTOMARCHIVERUNPACK |
                                        FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION |
@@ -445,34 +452,40 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                        FUNCTION_DYNAMICMENUEXT |
 #endif // ENABLE_DYNAMICMENUEXT
                                        FUNCTION_FILESYSTEM,
-                                   VERSINFO_VERSION_NO_PLATFORM, VERSINFO_COPYRIGHT, LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   PluginNameShort, "dop;dop2", "dfs");
+                                   DEMOPLUG_WIDEN(VERSINFO_VERSION_NO_PLATFORM), DEMOPLUG_WIDEN(VERSINFO_COPYRIGHT), LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   PluginNameShort, L"dop;dop2", L"dfs");
 
     // request notifications about master password creation, changes, and removal
     SalamanderGeneral->SetPluginUsesPasswordManager();
 
     // set the plugin home page URL
-    salamander->SetPluginHomePageURL(LoadStr(IDS_PLUGIN_HOME));
+    salamander->SetPluginHomePageURL(LangStr(IDS_PLUGIN_HOME).c_str());
 
     // obtain our FS name (it might not stay "dfs" because Salamander can adjust it)
-    SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);
-    AssignedFSNameLen = (int)strlen(AssignedFSName);
+    AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
+    AssignedFSNameLen = (int)AssignedFSName.length();
 
     // test adding multiple filesystem names
-    CPathBuffer demoFSAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
+    std::wstring demoFSAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
     int demoFSFSNameIndex; // should live in a global variable (so it can be used throughout the plugin)
-    if (salamander->AddFSName("demofs", &demoFSFSNameIndex))
-        SalamanderGeneral->GetPluginFSName(demoFSAssignedFSName, demoFSFSNameIndex);
-    CPathBuffer demoAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
+    if (salamander->AddFSName(L"demofs", &demoFSFSNameIndex))
+    {
+        demoFSAssignedFSName = SPLGetPluginFSNameOwned(
+            SalamanderGeneral, demoFSFSNameIndex);
+    }
+    std::wstring demoAssignedFSName; // should live in a global variable (so it can be used throughout the plugin)
     int demoFSNameIndex; // should live in a global variable (so it can be used throughout the plugin)
-    if (salamander->AddFSName("demo", &demoFSNameIndex))
-        SalamanderGeneral->GetPluginFSName(demoAssignedFSName, demoFSNameIndex);
+    if (salamander->AddFSName(L"demo", &demoFSNameIndex))
+    {
+        demoAssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral,
+                                                      demoFSNameIndex);
+    }
 
     // test module enumeration
     /*
   int index = 0;
-  CPathBuffer module;
-  CPathBuffer version;
+  std::wstring module;
+  std::wstring version;
   while (SalamanderGeneral->EnumInstalledModules(&index, module, version))
   {
     TRACE_I("Module " << module << ", version " << version);
@@ -482,15 +495,15 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     //  SalamanderGeneral->CallLoadOrSaveConfiguration(TRUE, TestLoadOrSaveConfiguration, (void *)0x1234);
 
     // test CopyTextToClipboard
-    //  BOOL success = SalamanderGeneral->CopyTextToClipboard("test", -1,
+    //  BOOL success = SalamanderGeneral->CopyTextToClipboard(L"test", -1,
     //                                                        TRUE, salamander->GetParentWindow());
 
     // test CopyTextToClipboardW
-    //  BOOL success = SalamanderGeneral->CopyTextToClipboardW(L"test", -1,
+    //  BOOL success = SalamanderGeneral->CopyTextToClipboard(L"test", -1,
     //                                                         TRUE, salamander->GetParentWindow());
 
     // test SetPluginBugReportInfo
-    //  SalamanderGeneral->SetPluginBugReportInfo(LoadStr(IDS_PLUGIN_BUGREP), LoadStr(IDS_PLUGIN_EMAIL));
+    //  SalamanderGeneral->SetPluginBugReportInfo(LangStr(IDS_PLUGIN_BUGREP).c_str(), LangStr(IDS_PLUGIN_EMAIL).c_str());
     /*
   int gcp_type;
   BOOL gcp_val;
@@ -546,8 +559,8 @@ CPluginInterface::Release(HWND parent, BOOL force)
 {
     CALL_STACK_MESSAGE2("CPluginInterface::Release(, %d)", force);
     BOOL ret = ViewerWindowQueue.Empty();
-    if (!ret && (force || SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_VIEWER_OPENWNDS),
-                                                           LoadStr(IDS_PLUGINNAME),
+    if (!ret && (force || SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_VIEWER_OPENWNDS).c_str(),
+                                                           LangStr(IDS_PLUGINNAME).c_str(),
                                                            MB_YESNO | MB_ICONQUESTION) == IDYES))
     {
         ret = ViewerWindowQueue.CloseAllWindows(force) || force;
@@ -565,13 +578,11 @@ CPluginInterface::Release(HWND parent, BOOL force)
             ReleaseFS();
 
             // remove all filesystem file copies from the disk cache (theoretically redundant, each FS should clean its copies)
-            CPathBuffer uniqueFileName;
-            strcpy(uniqueFileName, AssignedFSName);
-            strcat(uniqueFileName, ":");
+            std::wstring uniqueFileName = AssignedFSName + L":";
             // disk names are case-insensitive while the disk cache is case-sensitive, converting
             // to lowercase makes the disk cache behave as case-insensitive as well
-            SalamanderGeneral->ToLowerCase(uniqueFileName);
-            SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
+            std::transform(uniqueFileName.begin(), uniqueFileName.end(), uniqueFileName.begin(), towlower);
+            SalamanderGeneral->RemoveFilesFromCache(uniqueFileName.c_str());
         }
     }
     if (ret && InterfaceForFS.GetActiveFSCount() != 0)
@@ -594,7 +605,7 @@ CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistr
         HKEY actKey;
         if (registry->OpenKey(regKey, CONFIG_KEY, actKey))
         {
-            registry->GetValue(actKey, CONFIG_STR, REG_SZ, Str, MAX_PATH);
+            SPLRegistryGetStringOwned(registry, actKey, CONFIG_STR, Str);
             registry->CloseKey(actKey);
         }
 
@@ -627,7 +638,7 @@ CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRegistr
     HKEY actKey;
     if (registry->CreateKey(regKey, CONFIG_KEY, actKey))
     {
-        registry->SetValue(actKey, CONFIG_STR, REG_SZ, Str, -1);
+        SPLRegistrySetString(registry, actKey, CONFIG_STR, Str);
         registry->CloseKey(actKey);
     }
 
@@ -662,48 +673,48 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     // basic section:
     // salamander->AddCustomPacker("DemoPlug (Plugin)", "dop", FALSE);      // first version: 'update==FALSE' (there is no upgrade involved)
     // salamander->AddCustomUnpacker("DemoPlug (Plugin)", "*.dop", FALSE);  // first version: 'update==FALSE' (there is no upgrade involved)
-    salamander->AddCustomPacker("DemoPlug (Plugin)", "dop", ConfigVersion < 4);            // in version 4 we changed the extension to "dop", hence 'update==ConfigVersion < 4' (older versions must update the extension to "dop")
-    salamander->AddCustomUnpacker("DemoPlug (Plugin)", "*.dop;*.dop2", ConfigVersion < 4); // in version 4 we changed the extensions to *.dop and *.dop2, hence 'update==ConfigVersion < 4' (older versions must update the extensions to "*.dop;*.dop2")
-    salamander->AddPanelArchiver("dop;dop2", TRUE, FALSE);
-    salamander->AddViewer("*.dop;*.dop2", FALSE);
+    salamander->AddCustomPacker(L"DemoPlug (Plugin)", L"dop", ConfigVersion < 4);            // in version 4 we changed the extension to "dop", hence 'update==ConfigVersion < 4' (older versions must update the extension to "dop")
+    salamander->AddCustomUnpacker(L"DemoPlug (Plugin)", L"*.dop;*.dop2", ConfigVersion < 4); // in version 4 we changed the extensions to *.dop and *.dop2, hence 'update==ConfigVersion < 4' (older versions must update the extensions to "*.dop;*.dop2")
+    salamander->AddPanelArchiver(L"dop;dop2", TRUE, FALSE);
+    salamander->AddViewer(L"*.dop;*.dop2", FALSE);
 
 #if !defined(ENABLE_DYNAMICMENUEXT)
-    salamander->AddMenuItem(0, "E&nter Disk Path", SALHOTKEY('Z', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MENUCMD_ENTERDISKPATH, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(0, L"E&nter Disk Path", SALHOTKEY('Z', HOTKEYF_CONTROL | HOTKEYF_SHIFT), MENUCMD_ENTERDISKPATH, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DISK, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&Disconnect", 0, MENUCMD_DISCONNECT_ACTIVE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_THIS_PLUGIN_FS, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"&Disconnect", 0, MENUCMD_DISCONNECT_ACTIVE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_THIS_PLUGIN_FS, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&Always", 0, MENUCMD_ALWAYS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, "D&irectory", 0, MENUCMD_DIR, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DIR_FOCUSED, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, "A&rchive File", 0, MENUCMD_ARCFILE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"&Always", 0, MENUCMD_ALWAYS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"D&irectory", 0, MENUCMD_DIR, FALSE, MENU_EVENT_TRUE, MENU_EVENT_DIR_FOCUSED, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"A&rchive File", 0, MENUCMD_ARCFILE, FALSE, MENU_EVENT_TRUE, MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&File on Disk", 0, MENUCMD_FILEONDISK, FALSE,
+    salamander->AddMenuItem(-1, L"&File on Disk", 0, MENUCMD_FILEONDISK, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_DISK | MENU_EVENT_FILE_FOCUSED, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, "Ar&chive File on Disk", 0, MENUCMD_ARCFILEONDISK, FALSE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, L"Ar&chive File on Disk", 0, MENUCMD_ARCFILEONDISK, FALSE, MENU_EVENT_TRUE,
                             MENU_EVENT_DISK | MENU_EVENT_ARCHIVE_FOCUSED, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "*.D&OP File(s)", 0, MENUCMD_DOPFILES, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, "Fil&e(s) and/or Directory(ies) in Archive", 0, MENUCMD_FILESDIRSINARC, FALSE,
+    salamander->AddMenuItem(-1, L"*.D&OP File(s)", 0, MENUCMD_DOPFILES, TRUE, 0, 0, MENU_SKILLLEVEL_ALL);
+    salamander->AddMenuItem(-1, L"Fil&e(s) and/or Directory(ies) in Archive", 0, MENUCMD_FILESDIRSINARC, FALSE,
                             MENU_EVENT_FILE_FOCUSED | MENU_EVENT_DIR_FOCUSED |
                                 MENU_EVENT_FILES_SELECTED | MENU_EVENT_DIRS_SELECTED,
                             MENU_EVENT_THIS_PLUGIN_ARCH, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddSubmenuStart(-1, "Skill Level Demo", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddSubmenuStart(-1, L"Skill Level Demo", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddMenuItem(-1, "For Beginning, Intermediate, and Advanced Users", 0, MENUCMD_ALLUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, L"For Beginning, Intermediate, and Advanced Users", 0, MENUCMD_ALLUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddSubmenuStart(0, "Intermediate and Advanced", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddSubmenuStart(0, L"Intermediate and Advanced", 0, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                                 MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddMenuItem(-1, "For Intermediate and Advanced Users", 0, MENUCMD_INTADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, L"For Intermediate and Advanced Users", 0, MENUCMD_INTADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddMenuItem(0, "For Advanced Users", 0, MENUCMD_ADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(0, L"For Advanced Users", 0, MENUCMD_ADVUSERS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_ADVANCED);
     salamander->AddSubmenuEnd();
     salamander->AddSubmenuEnd();
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&Controls provided by Open Salamander...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, L"&Controls provided by Open Salamander...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
     salamander->AddMenuItem(-1, NULL, 0, MENUCMD_SEP, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED); // separator
-    salamander->AddMenuItem(-1, "Press Shift key when opening menu to hide this item", 0, MENUCMD_HIDDENITEM, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED);
+    salamander->AddMenuItem(-1, L"Press Shift key when opening menu to hide this item", 0, MENUCMD_HIDDENITEM, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED);
 #endif // !defined(ENABLE_DYNAMICMENUEXT)
 
     CGUIIconListAbstract* iconList = SalamanderGUI->CreateIconList();
@@ -713,11 +724,11 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     DestroyIcon(hIcon);
     salamander->SetIconListForGUI(iconList); // Salamander handles destroying the icon list
 
-    salamander->SetChangeDriveMenuItem("\tDemoPlug FS", 0);
+    salamander->SetChangeDriveMenuItem(L"\tDemoPlug FS", 0);
     salamander->SetPluginIcon(0);
     salamander->SetPluginMenuAndToolbarIcon(0);
 
-    salamander->SetThumbnailLoader("*.bmp"); // we provide thumbnails for .BMP files
+    salamander->SetThumbnailLoader(L"*.bmp"); // we provide thumbnails for .BMP files
 
     // section for upgrades:
     /*
@@ -730,13 +741,13 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     if (ConfigVersion < 4) // version 4: changed the extensions from "dmp/dmp2" to "dop/dop2"
     {
         // add new extensions
-        salamander->AddPanelArchiver("dop;dop2", TRUE, TRUE);
-        salamander->AddViewer("*.dop;*.dop2", TRUE);
+        salamander->AddPanelArchiver(L"dop;dop2", TRUE, TRUE);
+        salamander->AddViewer(L"*.dop;*.dop2", TRUE);
         // remove the old extensions
-        salamander->ForceRemovePanelArchiver("dmp");
-        salamander->ForceRemovePanelArchiver("dmp2");
-        salamander->ForceRemoveViewer("*.dmp");
-        salamander->ForceRemoveViewer("*.dmp2");
+        salamander->ForceRemovePanelArchiver(L"dmp");
+        salamander->ForceRemovePanelArchiver(L"dmp2");
+        salamander->ForceRemoveViewer(L"*.dmp");
+        salamander->ForceRemoveViewer(L"*.dmp2");
     }
 }
 

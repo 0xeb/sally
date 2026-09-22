@@ -238,12 +238,14 @@ BOOL CKeepAliveDataConSocket::PassiveConnect(DWORD* error)
         if (ProxyServer != NULL && IsSOCKSOrHTTPProxy(ProxyServer->ProxyType))
         {
             connectToProxy = TRUE;
-            in_addr srvAddr;
-            srvAddr.s_addr = auxServerIP;
+            std::wstring srvAddress;
+            const wchar_t* numericHost = FTPFormatIPv4Address(auxServerIP, srvAddress)
+                                             ? srvAddress.c_str()
+                                             : NULL;
             conRes = ConnectWithProxy(ProxyServer->ProxyHostIP, ProxyServer->ProxyPort,
-                                      ProxyServer->ProxyType, &err, inet_ntoa(srvAddr),
-                                      auxServerPort, ProxyServer->ProxyUser,
-                                      ProxyServer->ProxyPassword, auxServerIP);
+                                      ProxyServer->ProxyType, &err, numericHost,
+                                      auxServerPort, ProxyServer->ProxyUser.c_str(),
+                                      ProxyServer->ProxyPassword.c_str(), auxServerIP);
         }
         else
             conRes = Connect(auxServerIP, auxServerPort, &err);
@@ -254,26 +256,25 @@ BOOL CKeepAliveDataConSocket::PassiveConnect(DWORD* error)
             NetEventLastError = err; // record the error (except fatal errors such as out-of-memory)
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-            char buf[500];
-            char errBuf[300];
+            std::string logMessage;
+            std::string errorText;
             in_addr srvAddr;
             srvAddr.s_addr = connectToProxy ? ProxyServer->ProxyHostIP : auxServerIP;
             if (err != 0)
             {
-                FTPGetErrorText(err, errBuf, 300);
-                char* s = errBuf + strlen(errBuf);
-                while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                *s = 0; // trim newline characters from the error text
-                _snprintf_s(buf, _TRUNCATE, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX2 : IDS_LOGMSGUNABLETOOPEN2), inet_ntoa(srvAddr),
-                            (connectToProxy ? ProxyServer->ProxyPort : auxServerPort), errBuf);
+                FTPGetErrorText(err, errorText);
+                while (!errorText.empty() && (errorText.back() == '\n' || errorText.back() == '\r'))
+                    errorText.pop_back();
+                FTPFormatString(logMessage, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX2 : IDS_LOGMSGUNABLETOOPEN2), inet_ntoa(srvAddr),
+                                (connectToProxy ? ProxyServer->ProxyPort : auxServerPort), errorText.c_str());
             }
             else
             {
-                _snprintf_s(buf, _TRUNCATE, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX : IDS_LOGMSGUNABLETOOPEN), inet_ntoa(srvAddr),
-                            (connectToProxy ? ProxyServer->ProxyPort : auxServerPort));
+                FTPFormatString(logMessage, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX : IDS_LOGMSGUNABLETOOPEN), inet_ntoa(srvAddr),
+                                (connectToProxy ? ProxyServer->ProxyPort : auxServerPort));
             }
-            Logs.LogMessage(logUID, buf, -1, TRUE);
+            if (!logMessage.empty())
+                Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             ret = FALSE;
         }
         if (error != NULL)
@@ -358,7 +359,7 @@ void CKeepAliveDataConSocket::ActivateConnection()
     if (passiveModeRetry) // in passive mode the first connection attempt was rejected, perform a second attempt
     {
         // CloseSocketEx(NULL);           // no point in closing the old data-connection socket (it must already be closed)
-        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGDATACONRECON), -1, TRUE);
+        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGDATACONRECON).c_str(), -1, TRUE);
         PassiveConnect(NULL);
     }
 }
@@ -390,7 +391,7 @@ void CKeepAliveDataConSocket::EncryptPassiveDataCon()
     HANDLES(EnterCriticalSection(&SocketCritSect));
     int err;
     if (UsePassiveMode && EncryptConnection &&
-        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, ParentControlSocket))
+        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, ParentControlSocket))
     {
         SSLErrorOccured = err;
         if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -415,16 +416,15 @@ void CKeepAliveDataConSocket::LogNetEventLastError(BOOL canBeProxyError)
     HANDLES(EnterCriticalSection(&SocketCritSect));
     if (NetEventLastError != NO_ERROR)
     {
-        char buf[500];
-        char errBuf[300];
-        if (!canBeProxyError || !GetProxyError(errBuf, 300, NULL, 0, TRUE))
-            FTPGetErrorText(NetEventLastError, errBuf, 300);
-        char* s = errBuf + strlen(errBuf);
-        while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-            s--;
-        *s = 0; // trim newline characters from the error text
-        _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
-        Logs.LogMessage(LogUID, buf, -1, TRUE);
+        std::string errorText;
+        if ((!canBeProxyError || !GetProxyError(errorText, NULL, TRUE)) &&
+            !FTPGetErrorText(NetEventLastError, errorText))
+            errorText = LoadStr(IDS_UNKNOWNERROR);
+        while (!errorText.empty() && (errorText.back() == '\n' || errorText.back() == '\r'))
+            errorText.pop_back();
+        std::string logMessage;
+        if (FTPFormatString(logMessage, LoadStr(IDS_LOGMSGDATCONERROR), errorText.c_str()))
+            Logs.LogMessage(LogUID, logMessage.c_str(), -1, TRUE);
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
@@ -441,7 +441,7 @@ void CKeepAliveDataConSocket::ConnectionAccepted(BOOL success, DWORD winError, B
     if (success && EncryptConnection)
     {
         int err;
-        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, ParentControlSocket))
+        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, ParentControlSocket))
         {
             SSLErrorOccured = err;
             if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -608,7 +608,7 @@ void CKeepAliveDataConSocket::ReceiveTimer(DWORD id, void* param)
     { // periodic no-data-transfer timeout check
         if ((GetTickCount() - LastActivityTime) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
         { // timeout occurred, close the data connection to simulate the server doing it
-            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGNODATATRTIMEOUT), -1, TRUE);
+            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGNODATATRTIMEOUT).c_str(), -1, TRUE);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
             CSocket::ReceiveNetEvent(MAKELPARAM(FD_CLOSE, WSAECONNRESET), GetMsgIndex()); // call the base method
             HANDLES(EnterCriticalSection(&SocketCritSect));
@@ -657,14 +657,14 @@ BOOL CKeepAliveDataConSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsign
     else
     {
         return CSocket::OpenForListeningWithProxy(listenOnIP, listenOnPort,
-                                                  ProxyServer->Host,
+                                                  ProxyServer->Host.c_str(),
                                                   ProxyServer->HostIP,
                                                   ProxyServer->HostPort,
                                                   ProxyServer->ProxyType,
                                                   ProxyServer->ProxyHostIP,
                                                   ProxyServer->ProxyPort,
-                                                  ProxyServer->ProxyUser,
-                                                  ProxyServer->ProxyPassword,
+                                                  ProxyServer->ProxyUser.c_str(),
+                                                  ProxyServer->ProxyPassword.c_str(),
                                                   listenError, err);
     }
 }
@@ -1144,7 +1144,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                             if (EncryptConnection)
                             {
                                 int err;
-                                if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+                                if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, SSLConForReuse))
                                 {
                                     errorOccured = TRUE;
                                     SSLErrorOccured = err;
@@ -1404,7 +1404,7 @@ void CUploadDataConnectionSocket::ReceiveTimer(DWORD id, void* param)
             (GetTickCount() - LastActivityTime) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
         { // timeout occurred, close the data connection to simulate the server doing it
             NoDataTransTimeout = TRUE;
-            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGNODATATRTIMEOUT), -1, TRUE);
+            Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGNODATATRTIMEOUT).c_str(), -1, TRUE);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
             CSocket::ReceiveNetEvent(MAKELPARAM(FD_CLOSE, WSAECONNRESET), GetMsgIndex()); // call the base method
             HANDLES(EnterCriticalSection(&SocketCritSect));

@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #define MNTS_ALL (MNTS_B | MNTS_I | MNTS_A)
 
 #define MAX_HISTORY_ENTRIES 20
@@ -22,7 +25,7 @@ extern HINSTANCE DLLInstance; //dll instance handle
 
 extern BOOL MinBeepWhenDone;
 
-extern LPWSTR CopyOrMoveHistory[MAX_HISTORY_ENTRIES];
+extern std::vector<std::wstring> CopyOrMoveHistory;
 
 extern int DialogWidth;
 extern int DialogHeight;
@@ -60,8 +63,8 @@ public:
 
 class CTransferInfoEx;
 
-void HistoryComboBox(CTransferInfoEx& ti, int id, LPWSTR text, int textMax,
-                     int historySize, LPWSTR* history);
+void HistoryComboBox(CTransferInfoEx& ti, int id, std::wstring& text,
+                     std::vector<std::wstring>& history);
 
 class CTransferInfoEx : public CTransferInfo
 {
@@ -98,17 +101,16 @@ protected:
 class CNewKeyDialog : public CDialogEx
 {
 protected:
-    WCHAR* KeyName;
-    WCHAR* Text;
-    WCHAR* Title;
+    std::wstring& KeyName;
+    const WCHAR* Text;
+    const WCHAR* Title;
     BOOL* Direct;
 
 public:
-    CNewKeyDialog(HWND parent, WCHAR* keyName, BOOL* direct = NULL, WCHAR* text = NULL, WCHAR* title = NULL,
+    CNewKeyDialog(HWND parent, std::wstring& keyName, BOOL* direct = NULL, const WCHAR* text = NULL, const WCHAR* title = NULL,
                   int resID = IDD_CREATEKEY)
-        : CDialogEx(resID, parent, SG->GetMainWindowHWND())
+        : CDialogEx(resID, parent, SG->GetMainWindowHWND()), KeyName(keyName)
     {
-        KeyName = keyName;
         Text = text;
         Title = title;
         Direct = direct;
@@ -131,7 +133,7 @@ protected:
     DWORD* Type;
 
 public:
-    CNewValDialog(HWND parent, WCHAR* keyName, DWORD* type, BOOL* direct, int resID = IDD_NEWVALUE)
+    CNewValDialog(HWND parent, std::wstring& keyName, DWORD* type, BOOL* direct, int resID = IDD_NEWVALUE)
         : CNewKeyDialog(parent, keyName, direct, NULL, NULL, resID)
     {
         DlgType = vdtNewValDialog;
@@ -154,7 +156,7 @@ protected:
     int EditHeight;
 
 public:
-    CEditValDialog(HWND parent, WCHAR* keyName, DWORD* type, LPBYTE& data,
+    CEditValDialog(HWND parent, std::wstring& keyName, DWORD* type, LPBYTE& data,
                    DWORD& size, BOOL defaultValue)
         : CNewValDialog(parent, keyName, type, NULL, IDD_EDITVAL), Data(data), Size(size)
     {
@@ -178,18 +180,17 @@ protected:
     DWORD& Size;
     BOOL DefaultValue;
     DWORD Allocated;
-    CPathBuffer TempFile; // Heap-allocated for long path support
-    CPathBuffer TempDir; // Heap-allocated for long path support
+    std::wstring TempFile;
+    std::wstring TempDir;
     BOOL Edit;
 
 public:
-    CRawEditValDialog(HWND parent, WCHAR* keyName, DWORD* type, LPBYTE& data,
+    CRawEditValDialog(HWND parent, std::wstring& keyName, DWORD* type, LPBYTE& data,
                       DWORD& size, BOOL defaultValue)
         : CNewValDialog(parent, keyName, type, NULL, IDD_RAWEDITVAL), Data(data), Size(size)
     {
         DefaultValue = defaultValue;
         Allocated = Size;
-        *TempDir = *TempFile = 0;
         Edit = FALSE;
     }
 
@@ -206,7 +207,7 @@ class CCopyOrMoveDialog : public CNewKeyDialog
 {
 protected:
 public:
-    CCopyOrMoveDialog(HWND parent, WCHAR* keyName, BOOL* direct, WCHAR* text, WCHAR* title)
+    CCopyOrMoveDialog(HWND parent, std::wstring& keyName, BOOL* direct, const WCHAR* text, const WCHAR* title)
         : CNewKeyDialog(parent, keyName, direct, text, title, IDD_COPY)
     {
         ;
@@ -234,15 +235,14 @@ protected:
 class CExportDialog : public CDialogEx
 {
 protected:
-    LPWSTR Path;
-    char* File;
+    std::wstring& Path;
+    std::wstring* File;
     BOOL* Direct;
 
 public:
-    CExportDialog(HWND parent, LPWSTR path, char* file, BOOL* direct)
-        : CDialogEx(IDD_EXPORT, parent, SG->GetMainWindowHWND())
+    CExportDialog(HWND parent, std::wstring& path, std::wstring* file, BOOL* direct)
+        : CDialogEx(IDD_EXPORT, parent, SG->GetMainWindowHWND()), Path(path)
     {
-        Path = path;
         File = file;
         Direct = direct;
     }

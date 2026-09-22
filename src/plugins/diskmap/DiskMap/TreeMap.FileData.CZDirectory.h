@@ -26,9 +26,9 @@ protected:
 
     CZRoot* _root;
 
-    INT64 PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, size_t pathsize);
+    INT64 PopulateDir(CWorkerThread* mythread, std::wstring path);
 
-    CZDirectory(CZDirectory* parent, TCHAR const* name, FILETIME* createtime, FILETIME* modifytime) : CZFile(parent, name, 0, 0, 0, createtime, modifytime)
+    CZDirectory(CZDirectory* parent, wchar_t const* name, FILETIME* createtime, FILETIME* modifytime) : CZFile(parent, name, 0, 0, 0, createtime, modifytime)
     {
         this->_files = new TAutoIndirectArray<CZFile>(ARRAY_BLOCKSIZE_CFILELIST, TRUE);
 
@@ -53,7 +53,7 @@ public:
     int GetFileCount() { return this->_files->GetCount(); }
     CZFile* GetFile(int i) { return this->_files->At(i); }
 
-    virtual TCHAR* CalcExt() { return this->_ext = NULL; } //directories do not have extensions
+    virtual wchar_t* CalcExt() { return this->_ext = NULL; } //directories do not have extensions
 
     int GetSubFileCount() const { return this->_filecount; }
     int GetSubDirsCount() const { return this->_dircount; }

@@ -4,6 +4,93 @@
 
 #include "precomp.h"
 
+namespace
+{
+BOOL FormatServerMessage3(const CFtpTextCodec& codec, int resourceID,
+                          std::string_view first, std::string_view second,
+                          std::string_view third, std::wstring& message) noexcept
+{
+    try
+    {
+        std::wstring firstText;
+        std::wstring secondText;
+        std::wstring thirdText;
+        if (!FtpDecodeServerTextForPresentation(codec, first, firstText) ||
+            !FtpDecodeServerTextForPresentation(codec, second, secondText) ||
+            !FtpDecodeServerTextForPresentation(codec, third, thirdText))
+            return FALSE;
+        std::wstring staged = SPLFormatStringOwned(
+            LangStr(resourceID).c_str(), firstText.c_str(), secondText.c_str(),
+            thirdText.c_str());
+        message.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL FormatDownloadErrorMessage(const CFtpTextCodec& codec,
+                                std::string_view fileName,
+                                std::string_view workPath, int suffixResourceID,
+                                std::string_view detail, BOOL detailIsServerText,
+                                std::wstring& message) noexcept
+{
+    try
+    {
+        std::wstring prefix;
+        if (!FtpFormatServerReplyMessage(codec, LangStr(IDS_DOWNLOADFILEERROR).c_str(),
+                                         fileName, workPath, prefix))
+            return FALSE;
+
+        std::wstring suffix;
+        if (detailIsServerText)
+        {
+            if (!FtpFormatServerReplyMessage(codec, LangStr(suffixResourceID).c_str(),
+                                             detail, std::string_view(), suffix))
+                return FALSE;
+        }
+        else
+        {
+            std::wstring detailText;
+            if (!FtpDecodeLocalText(detail, detailText))
+                detailText = L"<invalid local error text>";
+            suffix = SPLFormatStringOwned(LangStr(suffixResourceID).c_str(),
+                                          detailText.c_str());
+        }
+        prefix.append(suffix);
+        message.swap(prefix);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL FormatServerMessage2WithSuffix(const CFtpTextCodec& codec, int resourceID,
+                                    int suffixResourceID, std::string_view first,
+                                    std::string_view second,
+                                    std::wstring& message) noexcept
+{
+    try
+    {
+        std::wstring staged;
+        if (!FtpFormatServerReplyMessage(codec, LangStr(resourceID).c_str(),
+                                         first, second, staged))
+            return FALSE;
+        staged.append(LangStr(suffixResourceID));
+        message.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+}
+
 //
 // ****************************************************************************
 // CControlConnectionSocket
@@ -12,14 +99,14 @@
 void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName,
                                                CQuadWord const& fileSizeInBytes,
                                                BOOL asciiMode, const char* workPath,
-                                               const char* tgtFileName, BOOL* newFileCreated,
+                                               const wchar_t* tgtFileName, BOOL* newFileCreated,
                                                BOOL* newFileIncomplete, CQuadWord* newFileSize,
                                                int* totalAttemptNum, int panel, BOOL notInPanel,
-                                               char* userBuf, int userBufSize)
+                                               std::wstring& user)
 {
-    CALL_STACK_MESSAGE10("CControlConnectionSocket::DownloadOneFile(, %s, , %d, %s, %s, , , , %d, %d, %d, %s, %d)",
-                         fileName, asciiMode, workPath, tgtFileName, *totalAttemptNum, panel,
-                         notInPanel, userBuf, userBufSize);
+    CALL_STACK_MESSAGE7("CControlConnectionSocket::DownloadOneFile(, %s, , %d, %s, , , , %d, %d, %d,)",
+                        fileName, asciiMode, workPath, *totalAttemptNum, panel,
+                        notInPanel);
 
     *newFileCreated = FALSE;
     *newFileIncomplete = FALSE;
@@ -28,21 +115,22 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
     HANDLES(EnterCriticalSection(&SocketCritSect));
     BOOL usePassiveModeAux = UsePassiveMode;
     int logUID = LogUID; // log UID of this connection
-    CPathBuffer errBuf;
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuffer[USER_MAX_SIZE];
-    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+    std::wstring hostBuf;
+    std::wstring userSnapshot;
+    BOOL userStored = FtpStoreWideText(User, userSnapshot) &&
+                      FtpStoreWideText(Host.c_str(), hostBuf);
     unsigned short portBuf = Port;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+    if (!userStored)
+        return;
 
     int lockedFileUID; // UID of the locked file (in FTPOpenedFiles) - we lock the file for download
-    if (FTPOpenedFiles.OpenFile(userBuffer, hostBuf, portBuf, workPath,
+    if (FTPOpenedFiles.OpenFile(GetTextCodec(), userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath,
                                 GetFTPServerPathType(workPath),
                                 fileName, &lockedFileUID, ffatRead))
     { // the file on the server is not open yet, we can work with it, allocate an object for the "data connection"
         HANDLES(EnterCriticalSection(&SocketCritSect));
-        CFTPProxyForDataCon* dataConProxyServer = ProxyServer == NULL ? NULL : ProxyServer->AllocProxyForDataCon(ServerIP, Host, HostIP, Port);
+        CFTPProxyForDataCon* dataConProxyServer = ProxyServer == NULL ? NULL : ProxyServer->AllocProxyForDataCon(ServerIP, Host.c_str(), HostIP, Port);
         BOOL dataConProxyServerOK = ProxyServer == NULL || dataConProxyServer != NULL;
         HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -61,20 +149,21 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
         }
         else
         {
-            CPathBuffer cmdBuf;
-            CPathBuffer logBuf;
-            const char* retryMsgAux = NULL;
+            std::string cmdBuf;
+            std::string logBuf;
+            const std::string* retryMessageToUse = NULL;
             BOOL canRetry = FALSE;
-            char retryMsgBuf[300];
+            std::string nextRetryMessage;
             BOOL reconnected = FALSE;
-            char replyBuf[700];
+            std::string replyBuf;
+            std::string changePathReply;
             BOOL setStartTimeIfConnected = TRUE;
             BOOL sslErrReconnect = FALSE;     // TRUE = reconnect because of SSL errors
             BOOL fastSSLErrReconnect = FALSE; // TRUE = server certificate changed, an immediate reconnect is desirable (without 20 seconds of waiting)
             while (ReconnectIfNeeded(notInPanel, panel == PANEL_LEFT, parent,
-                                     userBuf, userBufSize, &reconnected,
+                                     user, &reconnected,
                                      setStartTimeIfConnected, totalAttemptNum,
-                                     retryMsgAux, NULL,
+                                     retryMessageToUse, NULL,
                                      sslErrReconnect ? IDS_DOWNLOADONEFILEERROR : -1,
                                      fastSSLErrReconnect)) // if needed, we reconnect
             {
@@ -85,18 +174,18 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 setStartTimeIfConnected = TRUE;
                 BOOL run = FALSE;
                 BOOL ok = TRUE;
-                CPathBuffer newPath;
+                std::string newPath;
                 BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
                 if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
                 {
                     // use the cache; in normal cases the path should be there
-                    ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
+                    ok = GetCurrentWorkingPath(parent, newPath, FALSE, &canRetry, &nextRetryMessage);
                     if (!ok && canRetry) // "retry" is allowed
                     {
                         run = TRUE;
-                        retryMsgAux = retryMsgBuf;
+                        retryMessageToUse = &nextRetryMessage;
                     }
-                    if (ok && strcmp(newPath, workPath) != 0) // the working directory on the server differs - change required
+                    if (ok && newPath != workPath) // the working directory on the server differs - change required
                         needChangeDir = TRUE;                 // (assumption: the server always returns the same working path string)
                 }
                 if (ok && needChangeDir) // if we need to change the working directory
@@ -106,13 +195,16 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     // does not matter, because the code preceding this call runs only if no reconnect happened
                     // - "if (!reconnected)" - if a reconnect occurs, both code paths are identical
                     ok = SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, workPath,
-                                               userBuf, userBufSize, &success,
-                                               replyBuf, 700, NULL,
+                                               user, &success,
+                                               changePathReply, NULL,
                                                totalAttemptNum, NULL, TRUE, NULL);
                     if (ok && !success && workPath[0] != 0) // send succeeded but the server reports an error (+ignore errors with an empty path) -> file cannot be
                     {                                       // downloaded (it is on the current path in the panel)
-                        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CHANGEWORKPATHERROR), workPath, replyBuf);
-                        SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                        std::wstring errorText;
+                        if (!FtpFormatServerReplyMessage(GetTextCodec(), LangStr(IDS_CHANGEWORKPATHERROR).c_str(),
+                                                         std::string_view(workPath), changePathReply, errorText))
+                            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                          MB_OK | MB_ICONEXCLAMATION);
                         ok = FALSE;
                     }
@@ -121,17 +213,16 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 ReuseSSLSessionFailed = FALSE;
                 if (ok && usePassiveModeAux) // passive mode (PASV)
                 {
-                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                                      ftpcmdPassive, NULL); // cannot fail
                     int ftpReplyCode;
-                    if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                                       &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                                       retryMsgBuf, 300, NULL))
+                    if (PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdPassive, NULL) &&
+                        SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                                       &ftpReplyCode, &replyBuf, FALSE, FALSE, FALSE, &canRetry,
+                                       &nextRetryMessage, NULL))
                     {
                         DWORD ip;
                         unsigned short port;
                         if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS &&      // success (should be 227)
-                            FTPGetIPAndPortFromReply(replyBuf, -1, &ip, &port)) // successfully obtained IP+port
+                            FTPGetIPAndPortFromReply(replyBuf, &ip, &port)) // successfully obtained IP+port
                         {
                             dataConnection->SetPassive(ip, port, logUID);
                             dataConnection->PassiveConnect(NULL); // first attempt; the result does not matter (checked later)
@@ -142,7 +233,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                             UsePassiveMode = usePassiveModeAux = FALSE; // we will try again in the active mode (PORT)
                             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-                            Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGPASVNOTSUPPORTED), -1);
+                            Logs.LogMessage(logUID, LangStr(IDS_LOGMSGPASVNOTSUPPORTED).c_str(), -1);
                         }
                     }
                     else // error -> connection closed
@@ -151,7 +242,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                         if (canRetry) // "retry" is allowed
                         {
                             run = TRUE;
-                            retryMsgAux = retryMsgBuf;
+                            retryMessageToUse = &nextRetryMessage;
                         }
                     }
                 }
@@ -163,21 +254,19 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     unsigned short localPort = 0; // listen on any port
                     dataConnection->SetActive(logUID);
                     if (OpenForListeningAndWaitForRes(parent, dataConnection, &localIP, &localPort, &canRetry,
-                                                      retryMsgBuf, 300, GetWaitTime(WAITWND_COMOPER),
-                                                      errBuf, errBuf.Size()))
+                                                      &nextRetryMessage, GetWaitTime(WAITWND_COMOPER)))
                     {
-                        PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                                          ftpcmdSetPort, NULL, localIP, localPort); // cannot fail
                         int ftpReplyCode;
-                        if (!SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                                            &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                                            retryMsgBuf, 300, NULL)) // ignore the server reply; the error shows later (timeout when listing)
+                        if (!PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdSetPort, NULL, localIP, localPort) ||
+                            !SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                                            &ftpReplyCode, NULL, FALSE, FALSE, FALSE, &canRetry,
+                                            &nextRetryMessage, NULL)) // ignore the server reply; the error shows later (timeout when listing)
                         {                                            // error -> connection closed
                             ok = FALSE;
                             if (canRetry) // "retry" is allowed
                             {
                                 run = TRUE;
-                                retryMsgAux = retryMsgBuf;
+                                retryMessageToUse = &nextRetryMessage;
                             }
                         }
                     }
@@ -187,21 +276,21 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                         if (canRetry) // "retry" is allowed, proceed to the next reconnect
                         {
                             run = TRUE;
-                            retryMsgAux = retryMsgBuf;
+                            retryMessageToUse = &nextRetryMessage;
                         }
                     }
                 }
 
                 if (ok) // if we are still connected, change the transfer mode according to 'asciiMode' (ignore success)
                 {
-                    if (!SetCurrentTransferMode(parent, asciiMode, NULL, NULL, 0, FALSE, &canRetry,
-                                                retryMsgBuf, 300))
+                    if (!SetCurrentTransferMode(parent, asciiMode, NULL, NULL, FALSE, &canRetry,
+                                                &nextRetryMessage))
                     { // error -> connection closed
                         ok = FALSE;
                         if (canRetry) // "retry" is allowed
                         {
                             run = TRUE;
-                            retryMsgAux = retryMsgBuf;
+                            retryMessageToUse = &nextRetryMessage;
                         }
                     }
                 }
@@ -210,7 +299,16 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 {
                     // set the target file name in the data connection; data flushes will be performed
                     // into this file (it is always overwritten, we will not do any resume here)
-                    dataConnection->SetDirectFlushParams(tgtFileName, asciiMode ? ctrmASCII : ctrmBinary);
+                    if (!dataConnection->SetDirectFlushParams(tgtFileName, asciiMode ? ctrmASCII : ctrmBinary))
+                    {
+                        ok = FALSE;
+                        SalamanderGeneral->SalMessageBox(parent,
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_OPERDOPPR_LOWMEM).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                         MB_OK | MB_ICONEXCLAMATION);
+                    }
+                    else
+                    {
 
                     if (fileSizeInBytes != CQuadWord(-1, -1)) // if the file size in bytes is known, set it
                         dataConnection->SetDataTotalSize(fileSizeInBytes);
@@ -219,18 +317,16 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     CSendCmdUserIfaceForListAndDownload userIface(TRUE, parent, dataConnection, logUID);
 
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
                     CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply.c_str(), ServerSystem.c_str(), workPath);
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                                      ftpcmdRetrieveFile, NULL, fileName); // cannot report an error
                     BOOL fileIncomplete = TRUE;
                     BOOL tgtFileError = FALSE;
-                    userIface.InitWnd(fileName, hostBuf, workPath, pathType);
-                    BOOL sendCmdRes = SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                                                     &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                                                     retryMsgBuf, 300, &userIface);
+                    userIface.InitWnd(fileName, hostBuf.c_str(), workPath, pathType, GetTextCodec());
+                    BOOL sendCmdRes = PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdRetrieveFile, NULL, fileName) &&
+                                      SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                                                     &ftpReplyCode, &replyBuf, FALSE, FALSE, FALSE, &canRetry,
+                                                     &nextRetryMessage, &userIface);
                     int asciiTrForBinFileHowToSolve = 0;
                     if (dataConnection->IsAsciiTrForBinFileProblem(&asciiTrForBinFileHowToSolve))
                     {                                         // the "ascii transfer mode for binary file" problem was detected
@@ -255,13 +351,13 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                             // wait for the file to close in the disk cache; otherwise the file cannot be deleted
                             dataConnection->WaitForFileClose(5000); // max. 5 seconds
 
-                            SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFile(tgtFileName);
+                            SetFileAttributesW(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                            DeleteFileW(tgtFileName);
                             asciiMode = FALSE; // download again in binary mode
 
                             ok = FALSE; // repeat the download
                             run = TRUE;
-                            retryMsgAux = NULL;
+                            retryMessageToUse = NULL;
                             setStartTimeIfConnected = FALSE;
                         }
                         else
@@ -271,8 +367,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                 // wait for the file to close in the disk cache; otherwise the file cannot be deleted
                                 dataConnection->WaitForFileClose(5000); // max. 5 seconds
 
-                                SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                                DeleteFile(tgtFileName);
+                                SetFileAttributesW(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                                DeleteFileW(tgtFileName);
                                 ok = FALSE; // do not show any message; the user already confirmed the cancel
                             }
                         }
@@ -308,8 +404,9 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                         sslReuseErr)
                                     {                                                                       // we need to reconnect
                                         CloseControlConnection(parent);                                     // close the current control connection
-                                        lstrcpyn(retryMsgBuf, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 300); // set the error text for the reconnect wait dialog
-                                        retryMsgAux = retryMsgBuf;
+                                        if (!FtpStoreProtocolBytes(LoadStr(IDS_ERRDATACONSSLCONNECTERROR), nextRetryMessage))
+                                            TRACE_E(LOW_MEMORY);
+                                        retryMessageToUse = &nextRetryMessage;
                                         sslErrReconnect = TRUE;
                                         run = TRUE;
                                         fastSSLErrReconnect = sslErrorOccured == SSLCONERR_UNVERIFIEDCERT || sslReuseErr;
@@ -317,15 +414,15 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                     else
                                     {
                                         // display the message "Unable to download file from server"
-                                        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-                                        int len = (int)strlen(errBuf);
                                         BOOL isNetErr = TRUE;
+                                        BOOL detailIsServerText = TRUE;
                                         int useSuffixResID = IDS_DOWNLOADFILEERRORSUFIX2; // server reply:  (prefix for the message in 'replyBuf')
                                         if (tgtFileErr != NO_ERROR || FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS ||
                                             noDataTrTimeout || sslErrorOccured != SSLCONERR_NOERROR ||
                                             decomprErrorOccured /*|| decomprMissingStreamEnd*/)
                                         {                                                 // if we do not have an error description from the server, settle for the system description
                                             useSuffixResID = IDS_DOWNLOADFILEERRORSUFIX1; // error:
+                                            detailIsServerText = FALSE;
                                             isNetErr = sslErrorOccured != SSLCONERR_NOERROR || netErr != NO_ERROR ||
                                                        tgtFileErr == NO_ERROR || decomprErrorOccured /*|| decomprMissingStreamEnd*/;
                                             if (!isNetErr)
@@ -334,39 +431,52 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                                 tgtFileError = TRUE;
                                             }
                                             if (sslErrorOccured != SSLCONERR_NOERROR || decomprErrorOccured)
-                                                lstrcpyn(replyBuf, LoadStr(decomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 700);
+                                            {
+                                                if (!FTPFormatString(replyBuf, "%s", LoadStr(decomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR)))
+                                                    replyBuf.clear();
+                                            }
                                             else
                                             {
                                                 if (noDataTrTimeout)
-                                                    lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNODATATRTIMEOUT), 700);
+                                                {
+                                                    if (!FTPFormatString(replyBuf, "%s", LoadStr(IDS_ERRDATACONNODATATRTIMEOUT)))
+                                                        replyBuf.clear();
+                                                }
                                                 else
                                                 {
                                                     if (netErr != NO_ERROR)
                                                     {
-                                                        if (!dataConnection->GetProxyError(replyBuf, 700, NULL, 0, TRUE))
+                                                        if (!dataConnection->GetProxyError(replyBuf, NULL, TRUE))
                                                         {
                                                             if (!isNetErr)
                                                                 useSuffixResID = IDS_DOWNLOADFILEERRORSUFIX3; // error writing target file:
-                                                            FTPGetErrorText(netErr, replyBuf, 700);
+                                                            if (!FTPGetErrorText(netErr, replyBuf))
+                                                                replyBuf.clear();
                                                         }
                                                     }
                                                     else
                                                     {
                                                         if (userIface.GetDatConCancelled())
-                                                            lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNOTOPENED), 700);
+                                                        {
+                                                            if (!FTPFormatString(replyBuf, "%s", LoadStr(IDS_ERRDATACONNOTOPENED)))
+                                                                replyBuf.clear();
+                                                        }
                                                         else
                                                         {
-                                                            /*if (decomprMissingStreamEnd) lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONDECOMPRERROR), 700);
-                              else*/
-                                                            lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
+                                                            if (!FTPFormatString(replyBuf, "%s", LoadStr(IDS_UNKNOWNERROR)))
+                                                                replyBuf.clear();
                                                         }
                                                     }
                                                 }
                                             }
                                         }
-                                        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(useSuffixResID), replyBuf);
-                                        SalamanderGeneral->SalMessageBox(parent, errBuf,
-                                                                         LoadStr(IDS_FTPERRORTITLE),
+                                        std::wstring errorText;
+                                        if (!FormatDownloadErrorMessage(GetTextCodec(), fileName, workPath,
+                                                                        useSuffixResID, replyBuf,
+                                                                        detailIsServerText, errorText))
+                                            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                                        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(),
+                                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                                          MB_OK | MB_ICONEXCLAMATION);
                                     }
                                 }
@@ -382,7 +492,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                 if (canRetry) // adopt the message for the message box that reports the connection interruption
                                 {
                                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                                    ConnectionLostMsg = retryMsgBuf;
+                                    ConnectionLostMsg = nextRetryMessage;
                                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                                 }
                             }
@@ -393,7 +503,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                 if (canRetry) // "retry" is allowed
                                 {
                                     run = TRUE;
-                                    retryMsgAux = retryMsgBuf;
+                                    retryMessageToUse = &nextRetryMessage;
                                 }
                             }
                         }
@@ -404,8 +514,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
 
                         if (run) // go for another attempt; clean the target file just in case (it may have been created before the error/interruption)
                         {        // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                            SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFile(tgtFileName);
+                            SetFileAttributesW(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                            DeleteFileW(tgtFileName);
                         }
                         else // finish the download
                         {
@@ -419,8 +529,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                     TRACE_E("CControlConnectionSocket::DownloadOneFile(): unexpected situation: file was not created, but its size is not null!");
 
                                 // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                                SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL); // so a read-only file can be overwritten
-                                HANDLE file = HANDLES_Q(CreateFile(tgtFileName, GENERIC_WRITE,
+                                SetFileAttributesW(tgtFileName, FILE_ATTRIBUTE_NORMAL); // so a read-only file can be overwritten
+                                HANDLE file = HANDLES_Q(CreateFileW(tgtFileName, GENERIC_WRITE,
                                                                    FILE_SHARE_READ, NULL,
                                                                    CREATE_ALWAYS,
                                                                    FILE_FLAG_SEQUENTIAL_SCAN,
@@ -435,19 +545,28 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                     DWORD err = GetLastError();
 
                                     // display the message "Unable to download file from server"
-                                    _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-                                    int len = (int)strlen(errBuf);
                                     if (err != NO_ERROR)
-                                        FTPGetErrorText(err, replyBuf, 700);
+                                    {
+                                        if (!FTPGetErrorText(err, replyBuf))
+                                            replyBuf.clear();
+                                    }
                                     else
-                                        lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
-                                    _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX3), replyBuf);
-                                    SalamanderGeneral->SalMessageBox(parent, errBuf,
-                                                                     LoadStr(IDS_FTPERRORTITLE),
+                                    {
+                                        if (!FTPFormatString(replyBuf, "%s", LoadStr(IDS_UNKNOWNERROR)))
+                                            replyBuf.clear();
+                                    }
+                                    std::wstring errorText;
+                                    if (!FormatDownloadErrorMessage(GetTextCodec(), fileName, workPath,
+                                                                    IDS_DOWNLOADFILEERRORSUFIX3,
+                                                                    replyBuf, FALSE, errorText))
+                                        errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                                    SalamanderGeneral->SalMessageBox(parent, errorText.c_str(),
+                                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                                      MB_OK | MB_ICONEXCLAMATION);
                                 }
                             }
                         }
+                    }
                     }
                 }
 
@@ -466,56 +585,58 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
     else
     {
         // display the message "Unable to download file from server - file is locked by another operation"
-        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-        int len = (int)strlen(errBuf);
-        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX4));
-        SalamanderGeneral->SalMessageBox(parent, errBuf,
-                                         LoadStr(IDS_FTPERRORTITLE),
+        std::wstring errorText;
+        if (!FormatDownloadErrorMessage(GetTextCodec(), fileName, workPath,
+                                        IDS_DOWNLOADFILEERRORSUFIX4,
+                                        std::string_view(), FALSE, errorText))
+            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
     }
 }
 
-BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* newName,
+BOOL CControlConnectionSocket::CreateDir(std::string& changedPath, HWND parent, std::string& newName,
                                          const char* workPath, int* totalAttemptNum, int panel,
-                                         BOOL notInPanel, char* userBuf, int userBufSize)
+                                         BOOL notInPanel, std::wstring& user)
 {
-    CALL_STACK_MESSAGE8("CControlConnectionSocket::CreateDir(, , %s, , %s, %d, %d, %d, %s, %d)",
-                        newName, workPath, *totalAttemptNum, panel, notInPanel, userBuf, userBufSize);
+    CALL_STACK_MESSAGE6("CControlConnectionSocket::CreateDir(, , %s, , %s, %d, %d, %d,)",
+                        newName.c_str(), workPath, *totalAttemptNum, panel, notInPanel);
 
-    changedPath[0] = 0;
+    changedPath.clear();
 
     BOOL retSuccess = FALSE;
     BOOL reconnected = FALSE;
     BOOL setStartTimeIfConnected = TRUE;
     BOOL canRetry = FALSE;
-    const char* retryMsgAux = NULL;
-    char retryMsgBuf[300];
-    char replyBuf[700];
-    CPathBuffer errBuf;
-    CPathBuffer cmdBuf;
-    CPathBuffer logBuf;
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuffer[USER_MAX_SIZE];
+    const std::string* retryMessageToUse = NULL;
+    std::string nextRetryMessage;
+    std::string replyBuf;
+    std::string changePathReply;
+    std::string cmdBuf;
+    std::string logBuf;
+    std::wstring hostBuf;
+    std::wstring userSnapshot;
     while (ReconnectIfNeeded(notInPanel, panel == PANEL_LEFT, parent,
-                             userBuf, userBufSize, &reconnected,
+                             user, &reconnected,
                              setStartTimeIfConnected, totalAttemptNum,
-                             retryMsgAux, NULL, -1, FALSE)) // if needed, we reconnect
+                             retryMessageToUse, NULL, -1, FALSE)) // if needed, we reconnect
     {
         setStartTimeIfConnected = TRUE;
         BOOL run = FALSE;
         BOOL ok = TRUE;
-        CPathBuffer newPath;
+        std::string newPath;
         BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
         if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
         {
             // use the cache; in normal cases the path should be there
-            ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
+            ok = GetCurrentWorkingPath(parent, newPath, FALSE, &canRetry, &nextRetryMessage);
             if (!ok && canRetry) // "retry" is allowed
             {
                 run = TRUE;
-                retryMsgAux = retryMsgBuf;
+                retryMessageToUse = &nextRetryMessage;
             }
-            if (ok && strcmp(newPath, workPath) != 0) // the working directory on the server differs - change required
+            if (ok && newPath != workPath) // the working directory on the server differs - change required
                 needChangeDir = TRUE;                 // (assumption: the server always returns the same working path string)
         }
         if (ok && needChangeDir) // if we need to change the working directory
@@ -525,13 +646,16 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
             // does not matter, because the code preceding this call runs only if no reconnect happened
             // - "if (!reconnected)" - if a reconnect occurs, both code paths are identical
             ok = SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, workPath,
-                                       userBuf, userBufSize, &success,
-                                       replyBuf, 700, NULL,
+                                       user, &success,
+                                       changePathReply, NULL,
                                        totalAttemptNum, NULL, TRUE, NULL);
             if (ok && !success && workPath[0] != 0) // send succeeded but the server reports an error (+ignore errors with an empty path) -> file cannot be
             {                                       // downloaded (it is on the current path in the panel)
-                _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CHANGEWORKPATHERROR), workPath, replyBuf);
-                SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                std::wstring errorText;
+                if (!FtpFormatServerReplyMessage(GetTextCodec(), LangStr(IDS_CHANGEWORKPATHERROR).c_str(),
+                                                 std::string_view(workPath), changePathReply, errorText))
+                    errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 ok = FALSE;
             }
@@ -540,53 +664,60 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
         if (ok)
         {
             // create the requested directory
-            PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                              ftpcmdCreateDir, NULL, newName); // cannot fail
             BOOL refreshWorkingPath = TRUE;
             int ftpReplyCode;
-            if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                               &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                               retryMsgBuf, 300, NULL))
+            if (PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdCreateDir, NULL, newName.c_str()) &&
+                SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                               &ftpReplyCode, &replyBuf, FALSE, FALSE, FALSE, &canRetry,
+                               &nextRetryMessage, NULL))
             {
                 retSuccess = FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS;
                 if (retSuccess && workPath[0] != 0) // if the directory/directories were created, adjust the listing(s) (if the FTP command does not report success, we simply assume no directory was created - on VMS multiple directories can be created at once; partial creation might occur, but we do not handle that)
                 {
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                    BOOL identityStored = FtpStoreWideText(User, userSnapshot) &&
+                                          FtpStoreWideText(Host.c_str(), hostBuf);
                     unsigned short portBuf = Port;
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
-                    UploadListingCache.ReportCreateDirs(hostBuf, userBuffer, portBuf, workPath,
-                                                        GetFTPServerPathType(workPath), newName, FALSE);
+                    if (identityStored)
+                        UploadListingCache.ReportCreateDirs(userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath,
+                                                            GetFTPServerPathType(workPath), newName.c_str(), FALSE);
+                    else
+                        TRACE_E(LOW_MEMORY);
                 }
                 if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS && // success is returned (should be 257)
-                    FTPGetDirectoryFromReply(replyBuf, (int)strlen(replyBuf), newPath, newPath.Size()))
+                    FTPGetDirectoryFromReply(replyBuf, newPath))
                 {                   // directory 'newPath' has just been created
-                    newName[0] = 0; // no focus after refresh yet
-                    CFTPServerPathType pathType = GetFTPServerPathType(newPath);
-                    CPathBuffer cutDir;
+                    newName.clear(); // no focus after refresh yet
+                    CFTPServerPathType pathType = GetFTPServerPathType(newPath.c_str());
+                    std::string cutDir;
                     if (pathType != ftpsptUnknown &&
-                        FTPCutDirectory(pathType, newPath, newPath.Size(), cutDir, cutDir.Size(), NULL))
+                        FTPCutDirectory(pathType, newPath, &cutDir, NULL))
                     {
-                        if (!FTPIsPrefixOfServerPath(pathType, workPath, newPath))
+                        if (!FTPIsPrefixOfServerPath(pathType, workPath, newPath.c_str()))
                         {
-                            lstrcpyn(changedPath, newPath, FTP_MAX_PATH);
-                            refreshWorkingPath = FALSE;
+                            if (FtpStoreProtocolBytes(newPath, changedPath))
+                                refreshWorkingPath = FALSE;
+                            else
+                                TRACE_E(LOW_MEMORY);
                         }
-                        if (FTPIsTheSameServerPath(pathType, newPath, workPath))
-                            lstrcpyn(newName, cutDir, 2 * MAX_PATH); // directory name for focus after the refresh
+                        if (FTPIsTheSameServerPath(pathType, newPath.c_str(), workPath))
+                            newName = cutDir; // directory name for focus after the refresh
                     }
                     else // probably the server returns a relative directory name in reply "257" (e.g. warftpd)
                     {
-                        lstrcpyn(newName, newPath, 2 * MAX_PATH); // directory name for focus after the refresh
+                        newName.assign(newPath); // directory name for focus after the refresh
                     }
                 }
                 else // error (including unexpected format of reply "257")
                 {
                     if (!retSuccess) // do not display an error message for a successful reply
                     {
-                        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CREATEDIRERROR), newName, replyBuf);
-                        SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                        std::wstring errorText;
+                        if (!FtpFormatServerReplyMessage(GetTextCodec(), LangStr(IDS_CREATEDIRERROR).c_str(),
+                                                         newName, replyBuf, errorText))
+                            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                          MB_OK | MB_ICONEXCLAMATION);
                     }
                 }
@@ -596,21 +727,24 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                 if (workPath[0] != 0) // we do not know whether the directory/directories were created; invalidate the listing(s)
                 {
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                    BOOL identityStored = FtpStoreWideText(User, userSnapshot) &&
+                                          FtpStoreWideText(Host.c_str(), hostBuf);
                     unsigned short portBuf = Port;
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
-                    UploadListingCache.ReportCreateDirs(hostBuf, userBuffer, portBuf, workPath,
-                                                        GetFTPServerPathType(workPath), newName, TRUE);
+                    if (identityStored)
+                        UploadListingCache.ReportCreateDirs(userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath,
+                                                            GetFTPServerPathType(workPath), newName.c_str(), TRUE);
+                    else
+                        TRACE_E(LOW_MEMORY);
                 }
                 if (canRetry) // "retry" is allowed
                 {
                     run = TRUE;
-                    retryMsgAux = retryMsgBuf;
+                    retryMessageToUse = &nextRetryMessage;
                 }
             }
-            if (refreshWorkingPath)
-                lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+            if (refreshWorkingPath && !FtpStoreProtocolBytes(workPath, changedPath))
+                TRACE_E(LOW_MEMORY);
         }
 
         if (!run)
@@ -619,79 +753,85 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
     return retSuccess;
 }
 
-BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const char* fromName,
-                                           char* newName, const char* workPath, int* totalAttemptNum,
-                                           int panel, BOOL notInPanel, char* userBuf, int userBufSize,
+BOOL CControlConnectionSocket::QuickRename(std::string& changedPath, HWND parent, const char* fromName,
+                                           std::string& newName, const char* workPath, int* totalAttemptNum,
+                                           int panel, BOOL notInPanel, std::wstring& user,
                                            BOOL isVMS, BOOL isDir)
 {
-    CALL_STACK_MESSAGE11("CControlConnectionSocket::QuickRename(, , %s, %s, , %s, %d, %d, %d, %s, %d, %d, %d)",
-                         fromName, newName, workPath, *totalAttemptNum, panel, notInPanel, userBuf,
-                         userBufSize, isVMS, isDir);
+    CALL_STACK_MESSAGE9("CControlConnectionSocket::QuickRename(, , %s, %s, , %s, %d, %d, %d, , %d, %d)",
+                        fromName, newName.c_str(), workPath, *totalAttemptNum, panel, notInPanel,
+                        isVMS, isDir);
 
-    changedPath[0] = 0;
-    if (strcmp(fromName, newName) == 0)
+    changedPath.clear();
+    if (strcmp(fromName, newName.c_str()) == 0)
     {
-        newName[0] = 0;
+        newName.clear();
         return TRUE; // nothing to do; the name does not change
     }
 
-    CPathBuffer fromNameBuf;
+    std::string fromNameBuf;
     const char* fromNameForSrv = fromName;
     if (isVMS && isDir)
     {
-        FTPMakeVMSDirName(fromNameBuf, fromNameBuf.Size(), fromName);
-        fromNameForSrv = fromNameBuf;
+        if (!FTPMakeVMSDirName(fromNameBuf, fromName))
+        {
+            TRACE_E(LOW_MEMORY);
+            return FALSE;
+        }
+        fromNameForSrv = fromNameBuf.c_str();
     }
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    char hostBuf[HOST_MAX_SIZE];
-    char userBuffer[USER_MAX_SIZE];
-    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+    std::wstring hostBuf;
+    std::wstring userSnapshot;
+    BOOL userStored = FtpStoreWideText(User, userSnapshot) &&
+                      FtpStoreWideText(Host.c_str(), hostBuf);
     unsigned short portBuf = Port;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+    if (!userStored)
+        return FALSE;
 
     BOOL retSuccess = FALSE;
     BOOL srcLocked = FALSE;
     BOOL tgtLocked = FALSE;
-    CPathBuffer errBuf;
     CFTPServerPathType pathType = GetFTPServerPathType(workPath);
     int lockedFromFileUID; // UID of the locked file (in FTPOpenedFiles) - we lock the file for renaming
-    if (isDir || FTPOpenedFiles.OpenFile(userBuffer, hostBuf, portBuf, workPath, pathType,
+    if (isDir || FTPOpenedFiles.OpenFile(GetTextCodec(), userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath, pathType,
                                          fromNameForSrv, &lockedFromFileUID, ffatRename))
     {                        // the file on the server is not open yet, we can work with it, allocate an object for the "data connection"
         int lockedToFileUID; // UID of the locked file (in FTPOpenedFiles) - we lock the file for renaming
-        if (isDir || FTPOpenedFiles.OpenFile(userBuffer, hostBuf, portBuf, workPath, pathType,
-                                             newName, &lockedToFileUID, ffatRename))
+        if (isDir || FTPOpenedFiles.OpenFile(GetTextCodec(), userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath, pathType,
+                                             newName.c_str(), &lockedToFileUID, ffatRename))
         { // the file on the server is not open yet, we can work with it, allocate an object for the "data connection"
             BOOL reconnected = FALSE;
             BOOL setStartTimeIfConnected = TRUE;
             BOOL canRetry = FALSE;
-            const char* retryMsgAux = NULL;
-            char retryMsgBuf[300];
-            char replyBuf[700];
-            CPathBuffer cmdBuf;
-            CPathBuffer logBuf;
+            const std::string* retryMessageToUse = NULL;
+            std::string nextRetryMessage;
+            std::string replyBuf;
+            std::string changePathReply;
+            std::string cmdBuf;
+            std::string logBuf;
             while (ReconnectIfNeeded(notInPanel, panel == PANEL_LEFT, parent,
-                                     userBuf, userBufSize, &reconnected,
+                                     user, &reconnected,
                                      setStartTimeIfConnected, totalAttemptNum,
-                                     retryMsgAux, NULL, -1, FALSE)) // if needed, we reconnect
+                                     retryMessageToUse, NULL, -1, FALSE)) // if needed, we reconnect
             {
                 setStartTimeIfConnected = TRUE;
                 BOOL run = FALSE;
                 BOOL ok = TRUE;
-                CPathBuffer newPath;
+                std::string newPath;
                 BOOL needChangeDir = reconnected; // after a reconnect we try to set the working directory again
                 if (!reconnected)                 // we have been connected for a while, check whether the working directory matches 'workPath'
                 {
                     // use the cache; in normal cases the path should be there
-                    ok = GetCurrentWorkingPath(parent, newPath, newPath.Size(), FALSE, &canRetry, retryMsgBuf, 300);
+                    ok = GetCurrentWorkingPath(parent, newPath, FALSE, &canRetry, &nextRetryMessage);
                     if (!ok && canRetry) // "retry" is allowed
                     {
                         run = TRUE;
-                        retryMsgAux = retryMsgBuf;
+                        retryMessageToUse = &nextRetryMessage;
                     }
-                    if (ok && strcmp(newPath, workPath) != 0) // the working directory on the server differs - change required
+                    if (ok && newPath != workPath) // the working directory on the server differs - change required
                         needChangeDir = TRUE;                 // (assumption: the server always returns the same working path string)
                 }
                 if (ok && needChangeDir) // if we need to change the working directory
@@ -700,14 +840,17 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                     // SendChangeWorkingPath() contains ReconnectIfNeeded() when the connection drops; luckily that
                     // does not matter, because the code preceding this call runs only if no reconnect happened
                     // - "if (!reconnected)" - if a reconnect occurs, both code paths are identical
-                    ok = SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, workPath,
-                                               userBuf, userBufSize, &success,
-                                               replyBuf, 700, NULL,
+                ok = SendChangeWorkingPath(notInPanel, panel == PANEL_LEFT, parent, workPath,
+                                           user, &success,
+                                               changePathReply, NULL,
                                                totalAttemptNum, NULL, TRUE, NULL);
                     if (ok && !success && workPath[0] != 0) // send succeeded but the server reports an error (+ignore errors with an empty path) -> file cannot be
                     {                                       // downloaded (it is on the current path in the panel)
-                        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_CHANGEWORKPATHERROR), workPath, replyBuf);
-                        SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                        std::wstring errorText;
+                        if (!FtpFormatServerReplyMessage(GetTextCodec(), LangStr(IDS_CHANGEWORKPATHERROR).c_str(),
+                                                         std::string_view(workPath), changePathReply, errorText))
+                            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                          MB_OK | MB_ICONEXCLAMATION);
                         ok = FALSE;
                     }
@@ -716,20 +859,18 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                 if (ok)
                 {
                     // send the "rename from" command first (later send the follow-up "rename to")
-                    PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                                      ftpcmdRenameFrom, NULL, fromNameForSrv); // cannot fail
                     int ftpReplyCode;
-                    if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                                       &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                                       retryMsgBuf, 300, NULL))
+                    if (PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdRenameFrom, NULL, fromNameForSrv) &&
+                        SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                                       &ftpReplyCode, &replyBuf, FALSE, FALSE, FALSE, &canRetry,
+                                       &nextRetryMessage, NULL))
                     {
                         if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_PARTIALSUCCESS) // 350 Requested file action pending further information
                         {                                                       // we need to send "rename to"
-                            PrepareFTPCommand(cmdBuf, cmdBuf.Size(), logBuf, logBuf.Size(),
-                                              ftpcmdRenameTo, NULL, newName); // cannot fail
-                            if (SendFTPCommand(parent, cmdBuf, logBuf, NULL, GetWaitTime(WAITWND_COMOPER), NULL,
-                                               &ftpReplyCode, replyBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                                               retryMsgBuf, 300, NULL))
+                            if (PrepareFTPCommand(cmdBuf, &logBuf, ftpcmdRenameTo, NULL, newName.c_str()) &&
+                                SendFTPCommand(parent, cmdBuf.c_str(), logBuf.c_str(), NULL, GetWaitTime(WAITWND_COMOPER), NULL,
+                                               &ftpReplyCode, &replyBuf, FALSE, FALSE, FALSE, &canRetry,
+                                               &nextRetryMessage, NULL))
                             {
                                 if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS) // success is returned (should be 250)
                                 {                                                // quick rename completed successfully - leave the new name in 'newName' so it can be focused after the refresh
@@ -737,18 +878,24 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                     if (workPath[0] != 0)
                                     {
                                         HANDLES(EnterCriticalSection(&SocketCritSect));
-                                        lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                                        lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                                        BOOL identityStored = FtpStoreWideText(User, userSnapshot) &&
+                                                              FtpStoreWideText(Host.c_str(), hostBuf);
                                         portBuf = Port;
                                         HANDLES(LeaveCriticalSection(&SocketCritSect));
-                                        UploadListingCache.ReportRename(hostBuf, userBuffer, portBuf, workPath,
-                                                                        pathType, fromName, newName, FALSE);
+                                        if (identityStored)
+                                            UploadListingCache.ReportRename(userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath,
+                                                                            pathType, fromName, newName.c_str(), FALSE);
+                                        else
+                                            TRACE_E(LOW_MEMORY);
                                     }
                                 }
                                 else // error
                                 {
-                                    _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_QUICKRENAMEERROR), fromName, newName, replyBuf);
-                                    SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                                    std::wstring errorText;
+                                    if (!FormatServerMessage3(GetTextCodec(), IDS_QUICKRENAMEERROR,
+                                                              fromName, newName, replyBuf, errorText))
+                                        errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                                    SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                                      MB_OK | MB_ICONEXCLAMATION);
                                 }
                             }
@@ -757,25 +904,32 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                 if (workPath[0] != 0)
                                 {
                                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                                    BOOL identityStored = FtpStoreWideText(User, userSnapshot) &&
+                                                          FtpStoreWideText(Host.c_str(), hostBuf);
                                     portBuf = Port;
                                     HANDLES(LeaveCriticalSection(&SocketCritSect));
-                                    UploadListingCache.ReportRename(hostBuf, userBuffer, portBuf, workPath,
-                                                                    pathType, fromName, newName, TRUE);
+                                    if (identityStored)
+                                        UploadListingCache.ReportRename(userSnapshot.c_str(), hostBuf.c_str(), portBuf, workPath,
+                                                                        pathType, fromName, newName.c_str(), TRUE);
+                                    else
+                                        TRACE_E(LOW_MEMORY);
                                 }
                                 if (canRetry) // "retry" is allowed
                                 {
                                     run = TRUE;
-                                    retryMsgAux = retryMsgBuf;
+                                    retryMessageToUse = &nextRetryMessage;
                                 }
                             }
-                            lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+                            if (!FtpStoreProtocolBytes(workPath, changedPath))
+                                TRACE_E(LOW_MEMORY);
                         }
                         else // error (including an unexpected reply)
                         {
-                            _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_QUICKRENAMEERROR), fromName, newName, replyBuf);
-                            SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                            std::wstring errorText;
+                            if (!FormatServerMessage3(GetTextCodec(), IDS_QUICKRENAMEERROR,
+                                                      fromName, newName, replyBuf, errorText))
+                                errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+                            SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                              MB_OK | MB_ICONEXCLAMATION);
                         }
                     }
@@ -784,7 +938,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                         if (canRetry) // "retry" is allowed
                         {
                             run = TRUE;
-                            retryMsgAux = retryMsgBuf;
+                            retryMessageToUse = &nextRetryMessage;
                         }
                     }
                 }
@@ -805,11 +959,12 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
     if (srcLocked || tgtLocked)
     {
         // display the message "Unable to rename file on server - src or tgt file is locked by another operation"
-        _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_QUICKRENAMEFILEERR), fromNameForSrv, newName);
-        int len = (int)strlen(errBuf);
-        _snprintf_s(errBuf + len, errBuf.Size() - len, _TRUNCATE,
-                    LoadStr(srcLocked ? IDS_QUICKRENAMEFILEERRSUF1 : IDS_QUICKRENAMEFILEERRSUF2));
-        SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+        std::wstring errorText;
+        if (!FormatServerMessage2WithSuffix(GetTextCodec(), IDS_QUICKRENAMEFILEERR,
+                                            srcLocked ? IDS_QUICKRENAMEFILEERRSUF1 : IDS_QUICKRENAMEFILEERRSUF2,
+                                            fromNameForSrv, newName, errorText))
+            errorText = LangStr(IDS_OPERDOPPR_LOWMEM);
+        SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
     }
     return retSuccess;
@@ -817,21 +972,18 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
 
 BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataConnectionSocket* dataConnection,
                                                              DWORD* listenOnIP, unsigned short* listenOnPort,
-                                                             BOOL* canRetry, char* retryMsg, int retryMsgBufSize,
-                                                             int waitWndTime, char* errBuf, int errBufSize)
+                                                             BOOL* canRetry, std::string* retryMessage, int waitWndTime)
 {
     CALL_STACK_MESSAGE1("CControlConnectionSocket::OpenForListeningAndWaitForRes()");
-
-    char buf[300];
 
     parent = FindPopupParent(parent);
     DWORD startTime = GetTickCount(); // operation start time
     *canRetry = FALSE;
-    if (retryMsgBufSize > 0)
-        retryMsg[0] = 0;
+    if (retryMessage != NULL)
+        retryMessage->clear();
 
     CWaitWindow waitWnd(parent, TRUE);
-    waitWnd.SetText(LoadStr(IDS_PREPARINGACTDATACON));
+    waitWnd.SetText(LangStr(IDS_PREPARINGACTDATACON).c_str());
 
     HWND focusedWnd = NULL;
     BOOL parentIsEnabled = IsWindowEnabled(parent);
@@ -906,13 +1058,13 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
             case ccsevESC:
             {
                 waitWnd.Show(FALSE);
-                BOOL esc = SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_PREPACTDATACONESC),
-                                                            LoadStr(IDS_FTPPLUGINTITLE),
+                BOOL esc = SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PREPACTDATACONESC).c_str(),
+                                                            SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                             MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_ICONQUESTION) == IDYES;
                 if (esc)
                 {
                     run = FALSE;
-                    Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGACTIONCANCELED), -1, TRUE); // ESC (cancel) into the log
+                    Logs.LogMessage(logUID, LangStr(IDS_LOGMSGACTIONCANCELED).c_str(), -1, TRUE); // ESC (cancel) into the log
                 }
                 else
                 {
@@ -924,14 +1076,17 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
 
             case ccsevTimeout:
             {
-                if (!dataConnection->GetProxyTimeoutDescr(buf, 300))
-                    lstrcpyn(buf, LoadStr(IDS_PREPACTDATACONTIMEOUT), 300);
-                if (retryMsgBufSize > 0)
+                std::string timeoutText;
+                if (!dataConnection->GetProxyTimeoutDescr(timeoutText) &&
+                    !FTPFormatString(timeoutText, "%s", LoadStr(IDS_PREPACTDATACONTIMEOUT)))
+                    timeoutText.clear();
+                if (retryMessage != NULL && FTPFormatString(*retryMessage, "%s\r\n", timeoutText.c_str()))
                 {
-                    _snprintf_s(retryMsg, retryMsgBufSize, _TRUNCATE, "%s\r\n", buf);
-                    Logs.LogMessage(logUID, retryMsg, -1, TRUE);
+                    Logs.LogMessage(logUID, retryMessage->c_str(), -1, TRUE);
+                    *canRetry = TRUE;
                 }
-                *canRetry = TRUE;
+                else
+                    TRACE_E(LOW_MEMORY);
                 run = FALSE;
                 break;
             }
@@ -942,14 +1097,18 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
                 {
                     if (!dataConnection->GetListenIPAndPort(listenOnIP, listenOnPort)) // "listen" error
                     {
-                        if (dataConnection->GetProxyError(buf, 300, NULL, 0, TRUE) &&
-                            errBufSize > 0)
+                        std::string proxyError;
+                        std::string logMessage;
+                        if (dataConnection->GetProxyError(proxyError, NULL, TRUE) &&
+                            FTPFormatString(logMessage, LoadStr(IDS_LOGMSGDATCONERROR), proxyError.c_str()))
                         { // write the error to the log
-                            _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), buf);
-                            Logs.LogMessage(logUID, errBuf, -1, TRUE);
+                            Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
                         }
-                        *canRetry = TRUE;
-                        lstrcpyn(retryMsg, LoadStr(IDS_PROXYERROPENACTDATA), retryMsgBufSize);
+                        if (retryMessage != NULL &&
+                            FtpStoreProtocolBytes(LoadStr(IDS_PROXYERROPENACTDATA), *retryMessage))
+                            *canRetry = TRUE;
+                        else
+                            TRACE_E(LOW_MEMORY);
                     }
                     else
                         ret = TRUE; // success, return the "listen" IP+port
@@ -988,12 +1147,24 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
     {
         if (listenError) // CSocket::OpenForListening() failed - "retry" makes no sense (it was a local operation)
         {
-            if (errBufSize > 0)
+            std::string localError;
+            if (err != NO_ERROR)
+                FTPGetErrorText(err, localError);
+            else
+                FTPFormatString(localError, "%s", LoadStr(IDS_UNKNOWNERROR));
+            std::wstring localErrorText;
+            if (!FtpDecodeLocalText(localError.c_str(), localErrorText))
+                localErrorText = L"<invalid local error text>";
+            try
             {
-                _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_OPENACTDATACONERROR),
-                            (err != NO_ERROR ? FTPGetErrorText(err, buf, 300) : LoadStr(IDS_UNKNOWNERROR)));
-                SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE),
+                const std::wstring errorMessage = SPLFormatStringOwned(
+                    LangStr(IDS_OPENACTDATACONERROR).c_str(), localErrorText.c_str());
+                SalamanderGeneral->SalMessageBox(parent, errorMessage.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
+            }
+            catch (...)
+            {
+                TRACE_E(LOW_MEMORY);
             }
             doNotCloseCon = TRUE;
         }
@@ -1003,19 +1174,29 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
             srvAddr.s_addr = auxServerIP;
             if (err != NO_ERROR)
             {
-                FTPGetErrorText(err, errBuf, errBufSize);
-                char* s = errBuf + strlen(errBuf);
-                while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                *s = 0; // trim newline characters from the error text
-                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOGMSGUNABLETOCONPRX2), inet_ntoa(srvAddr), proxyPort, errBuf);
+                std::string errorText;
+                std::string logMessage;
+                if (FTPGetErrorText(err, errorText))
+                {
+                    while (!errorText.empty() && (errorText.back() == '\n' || errorText.back() == '\r'))
+                        errorText.pop_back();
+                }
+                if (FTPFormatString(logMessage, LoadStr(IDS_LOGMSGUNABLETOCONPRX2),
+                                    inet_ntoa(srvAddr), proxyPort, errorText.c_str()))
+                    Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             }
             else
-                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOGMSGUNABLETOCONPRX), inet_ntoa(srvAddr), proxyPort);
-            Logs.LogMessage(logUID, buf, -1, TRUE);
+            {
+                std::string logMessage;
+                if (FTPFormatString(logMessage, LoadStr(IDS_LOGMSGUNABLETOCONPRX), inet_ntoa(srvAddr), proxyPort))
+                    Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
+            }
 
-            *canRetry = TRUE;
-            lstrcpyn(retryMsg, LoadStr(IDS_PROXYERRUNABLETOCON), retryMsgBufSize);
+            if (retryMessage != NULL &&
+                FtpStoreProtocolBytes(LoadStr(IDS_PROXYERRUNABLETOCON), *retryMessage))
+                *canRetry = TRUE;
+            else
+                TRACE_E(LOW_MEMORY);
         }
     }
 

@@ -10,7 +10,11 @@
 #include "precomp.h"
 #endif
 #include "IClipboard.h"
+#include "Win32TextCodec.h"
+#include "clipboard/ClipboardTextPayload.h"
 #include <shellapi.h>  // For HDROP, DragQueryFileW
+#include <cstring>
+#include <limits>
 
 // RAII wrapper for clipboard open/close
 class ClipboardSession
@@ -40,6 +44,25 @@ private:
     ClipboardSession& operator=(const ClipboardSession&);
 };
 
+class GlobalMemoryLock
+{
+public:
+    explicit GlobalMemoryLock(HANDLE memory) : Memory(memory), Address(::GlobalLock(memory)) {}
+    ~GlobalMemoryLock()
+    {
+        if (Address != nullptr)
+            ::GlobalUnlock(Memory);
+    }
+
+    void* Get() const { return Address; }
+
+private:
+    HANDLE Memory;
+    void* Address;
+    GlobalMemoryLock(const GlobalMemoryLock&);
+    GlobalMemoryLock& operator=(const GlobalMemoryLock&);
+};
+
 // Win32 implementation of IClipboard
 class Win32Clipboard : public IClipboard
 {
@@ -57,22 +80,29 @@ public:
             return ClipboardResult::Error(GetLastError());
 
         size_t len = wcslen(text);
+        if (len == (std::numeric_limits<size_t>::max)() ||
+            len + 1 > (std::numeric_limits<SIZE_T>::max)() / sizeof(wchar_t))
+        {
+            return ClipboardResult::Error(ERROR_ARITHMETIC_OVERFLOW);
+        }
         size_t size = (len + 1) * sizeof(wchar_t);
 
         HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size);
         if (hMem == NULL)
             return ClipboardResult::Error(GetLastError());
 
-        wchar_t* dest = (wchar_t*)GlobalLock(hMem);
-        if (dest == nullptr)
         {
-            DWORD err = GetLastError();
-            GlobalFree(hMem);
-            return ClipboardResult::Error(err);
-        }
+            GlobalMemoryLock lock(hMem);
+            wchar_t* dest = static_cast<wchar_t*>(lock.Get());
+            if (dest == nullptr)
+            {
+                DWORD err = GetLastError();
+                GlobalFree(hMem);
+                return ClipboardResult::Error(err);
+            }
 
-        wcscpy(dest, text);
-        GlobalUnlock(hMem);
+            memcpy(dest, text, size);
+        }
 
         if (::SetClipboardData(CF_UNICODETEXT, hMem) == NULL)
         {
@@ -89,8 +119,6 @@ public:
 
     ClipboardResult GetText(std::wstring& text) override
     {
-        text.clear();
-
         ClipboardSession session;
         if (!session.IsOpen())
             return ClipboardResult::Error(GetLastError());
@@ -99,12 +127,15 @@ public:
         HANDLE hData = ::GetClipboardData(CF_UNICODETEXT);
         if (hData != NULL)
         {
-            const wchar_t* src = (const wchar_t*)GlobalLock(hData);
+            const SIZE_T byteSize = GlobalSize(hData);
+            GlobalMemoryLock lock(hData);
+            const wchar_t* src = static_cast<const wchar_t*>(lock.Get());
             if (src != nullptr)
             {
-                text = src;
-                GlobalUnlock(hData);
-                return ClipboardResult::Ok();
+                const DWORD error = sally::clipboard::DecodeUnicodeClipboardPayload(
+                    src, byteSize, text);
+                return error == ERROR_SUCCESS ? ClipboardResult::Ok()
+                                              : ClipboardResult::Error(error);
             }
         }
 
@@ -112,18 +143,15 @@ public:
         hData = ::GetClipboardData(CF_TEXT);
         if (hData != NULL)
         {
-            const char* src = (const char*)GlobalLock(hData);
+            const SIZE_T byteSize = GlobalSize(hData);
+            GlobalMemoryLock lock(hData);
+            const char* src = static_cast<const char*>(lock.Get());
             if (src != nullptr)
             {
-                // Convert ANSI to Unicode
-                int len = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
-                if (len > 0)
-                {
-                    text.resize(len - 1);  // -1 to exclude null terminator
-                    MultiByteToWideChar(CP_ACP, 0, src, -1, &text[0], len);
-                }
-                GlobalUnlock(hData);
-                return ClipboardResult::Ok();
+                const DWORD error = sally::clipboard::DecodeAnsiClipboardPayload(
+                    src, byteSize, GetACP(), text);
+                return error == ERROR_SUCCESS ? ClipboardResult::Ok()
+                                              : ClipboardResult::Error(error);
             }
         }
 
@@ -143,8 +171,6 @@ public:
 
     ClipboardResult GetFilePaths(std::vector<std::wstring>& paths) override
     {
-        paths.clear();
-
         ClipboardSession session;
         if (!session.IsOpen())
             return ClipboardResult::Error(GetLastError());
@@ -156,16 +182,31 @@ public:
         HDROP hDrop = (HDROP)hData;
         UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, NULL, 0);
 
-        paths.reserve(count);
-        for (UINT i = 0; i < count; i++)
+        try
         {
-            UINT len = DragQueryFileW(hDrop, i, NULL, 0);
-            if (len > 0)
+            std::vector<std::wstring> candidate;
+            candidate.reserve(count);
+            for (UINT i = 0; i < count; i++)
             {
-                std::wstring path(len, L'\0');
-                DragQueryFileW(hDrop, i, &path[0], len + 1);
-                paths.push_back(std::move(path));
+                const UINT len = DragQueryFileW(hDrop, i, NULL, 0);
+                if (len == 0)
+                    return ClipboardResult::Error(ERROR_INVALID_DATA);
+                std::wstring path(static_cast<size_t>(len) + 1, L'\0');
+                const UINT written = DragQueryFileW(hDrop, i, path.data(), len + 1);
+                if (written != len)
+                    return ClipboardResult::Error(ERROR_INVALID_DATA);
+                path.resize(written);
+                candidate.push_back(std::move(path));
             }
+            paths.swap(candidate);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return ClipboardResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            return ClipboardResult::Error(ERROR_NOT_ENOUGH_MEMORY);
         }
 
         return ClipboardResult::Ok();
@@ -230,8 +271,6 @@ public:
 
     ClipboardResult GetRawData(uint32_t format, std::vector<uint8_t>& data) override
     {
-        data.clear();
-
         ClipboardSession session;
         if (!session.IsOpen())
             return ClipboardResult::Error(GetLastError());
@@ -241,15 +280,27 @@ public:
             return ClipboardResult::Error(ERROR_NOT_FOUND);
 
         SIZE_T size = GlobalSize(hData);
-        if (size > 0)
+        try
         {
-            const void* src = GlobalLock(hData);
-            if (src != nullptr)
+            std::vector<uint8_t> candidate;
+            if (size > 0)
             {
-                data.resize(size);
-                memcpy(data.data(), src, size);
-                GlobalUnlock(hData);
+                GlobalMemoryLock lock(hData);
+                const void* src = lock.Get();
+                if (src == nullptr)
+                    return ClipboardResult::Error(GetLastError());
+                candidate.resize(size);
+                memcpy(candidate.data(), src, size);
             }
+            data.swap(candidate);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return ClipboardResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            return ClipboardResult::Error(ERROR_NOT_ENOUGH_MEMORY);
         }
 
         return ClipboardResult::Ok();
@@ -289,7 +340,8 @@ private:
 
         if (size > 0)
         {
-            void* dest = GlobalLock(hMem);
+            GlobalMemoryLock lock(hMem);
+            void* dest = lock.Get();
             if (dest == nullptr)
             {
                 DWORD err = GetLastError();
@@ -297,7 +349,6 @@ private:
                 return ClipboardResult::Error(err);
             }
             memcpy(dest, data, size);
-            GlobalUnlock(hMem);
         }
 
         if (::SetClipboardData(format, hMem) == NULL)
@@ -312,24 +363,27 @@ private:
     void SetAnsiText(const wchar_t* text, size_t wideLen)
     {
         // Convert to ANSI and set CF_TEXT for compatibility
-        int ansiLen = WideCharToMultiByte(CP_ACP, 0, text, (int)wideLen, NULL, 0, NULL, NULL);
-        if (ansiLen <= 0)
+        std::string encoded;
+        if (!Win32EncodeTextLossy(GetACP(), text, wideLen, encoded))
             return;
 
-        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, ansiLen + 1);
+        HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, encoded.size() + 1);
         if (hMem == NULL)
             return;
 
-        char* dest = (char*)GlobalLock(hMem);
-        if (dest == nullptr)
         {
-            GlobalFree(hMem);
-            return;
-        }
+            GlobalMemoryLock lock(hMem);
+            char* dest = static_cast<char*>(lock.Get());
+            if (dest == nullptr)
+            {
+                GlobalFree(hMem);
+                return;
+            }
 
-        WideCharToMultiByte(CP_ACP, 0, text, (int)wideLen, dest, ansiLen, NULL, NULL);
-        dest[ansiLen] = '\0';
-        GlobalUnlock(hMem);
+            if (!encoded.empty())
+                memcpy(dest, encoded.data(), encoded.size());
+            dest[encoded.size()] = '\0';
+        }
 
         if (::SetClipboardData(CF_TEXT, hMem) == NULL)
             GlobalFree(hMem);

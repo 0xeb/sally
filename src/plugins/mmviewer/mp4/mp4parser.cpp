@@ -14,16 +14,14 @@
 #include "mp4head.h"
 #include "mp4tag.h"
 
-char* LoadStr(int resID);
-char* FStr(const char* format, ...);
-void FormatSize2(__int64 size, char* str_size, BOOL nozero = FALSE);
+std::wstring LangStr(int resID);
 
 CParserResultEnum
-CParserMP4::OpenFile(const char* fileName)
+CParserMP4::OpenFile(const wchar_t* fileName)
 {
     CloseFile();
 
-    f = fopen(fileName, "rb");
+    _wfopen_s(&f, fileName, L"rb");
 
     if (!f)
         return preOpenError;
@@ -51,55 +49,55 @@ CParserMP4::GetFileInfo(COutputInterface* output)
 
     if (ret)
     {
-        const char* object = "";
-        const char* header = "";
+        std::wstring object;
+        std::wstring header;
         switch (head.object_type)
         {
         case 0:
-            object = LoadStr(IDS_MP4_OBJTYPE_MAIN);
+            object = LangStr(IDS_MP4_OBJTYPE_MAIN);
             break;
         case 1:
-            object = LoadStr(IDS_MP4_OBJTYPE_LC);
+            object = LangStr(IDS_MP4_OBJTYPE_LC);
             break;
         case 2:
-            object = LoadStr(IDS_MP4_OBJTYPE_SSR);
+            object = LangStr(IDS_MP4_OBJTYPE_SSR);
             break;
         case 3:
-            object = LoadStr(IDS_MP4_OBJTYPE_LTP);
+            object = LangStr(IDS_MP4_OBJTYPE_LTP);
             break;
         }
 
         switch (head.header_type)
         {
         case 0:
-            header = LoadStr(IDS_MP4_HEADTYPE_RAW);
+            header = LangStr(IDS_MP4_HEADTYPE_RAW);
             break;
         case 1:
-            header = LoadStr(IDS_MP4_HEADTYPE_ADIF);
+            header = LangStr(IDS_MP4_HEADTYPE_ADIF);
             break;
         case 2:
-            header = LoadStr(IDS_MP4_HEADTYPE_ADTS);
+            header = LangStr(IDS_MP4_HEADTYPE_ADTS);
             break;
         }
 
-        output->AddHeader(LoadStr(IDS_MP4_AACINFO));
+        output->AddHeader(LangStr(IDS_MP4_AACINFO).c_str());
 
-        output->AddItem(LoadStr(IDS_MP4_MPEGVERSION), FStr("MPEG-%d (%s %s)", head.version, header, object));
-        output->AddItem(LoadStr(IDS_MP4_BITRATE), FStr("%d", head.bitrate));
+        output->AddItem(LangStr(IDS_MP4_MPEGVERSION).c_str(),
+                        FStrW(L"MPEG-%d (%ls %ls)", head.version, header.c_str(), object.c_str()).c_str());
+        output->AddItem(LangStr(IDS_MP4_BITRATE).c_str(), FStrW(L"%d", head.bitrate).c_str());
 
-        char size[64];
-        FormatSize2(head.sampling_rate, size);
-        output->AddItem(LoadStr(IDS_MP4_SAMPLINGRATE), size);
+        output->AddItem(LangStr(IDS_MP4_SAMPLINGRATE).c_str(),
+                        FormatSize2W(head.sampling_rate).c_str());
 
-        char str_time[64];
         DWORD length_sec = head.length / 1000;
-        if (length_sec / 3600)
-            lstrcpy(str_time, FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60));
-        else
-            lstrcpy(str_time, FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60));
-        output->AddItem(LoadStr(IDS_MP4_DURATION), FStr("%d", str_time));
+        const std::wstring duration = length_sec / 3600
+                                          ? FStrW(L"%02lu:%02lu:%02lu", length_sec / 3600,
+                                                  length_sec / 60 % 60, length_sec % 60)
+                                          : FStrW(L"%02lu:%02lu", length_sec / 60 % 60,
+                                                  length_sec % 60);
+        output->AddItem(LangStr(IDS_MP4_DURATION).c_str(), duration.c_str());
 
-        output->AddItem(LoadStr(IDS_MP4_CHANNELS), FStr("%d", head.channels));
+        output->AddItem(LangStr(IDS_MP4_CHANNELS).c_str(), FStrW(L"%d", head.channels).c_str());
 
         return preOK;
     }

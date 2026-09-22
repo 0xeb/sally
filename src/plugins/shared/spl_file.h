@@ -39,7 +39,7 @@
 struct SAFE_FILE
 {
     HANDLE HFile;                // handle of the opened file (note: managed by Salamander core HANDLES)
-    char* FileName;              // name of the opened file with full path
+    wchar_t* FileName;              // name of the opened file with full path
     HWND HParentWnd;             // hParent window handle from SafeFileOpen/SafeFileCreate call; used
                                  // when hParent in subsequent calls is set to HWND_STORED
     DWORD dwDesiredAccess;       // > backup of CreateFile API parameters
@@ -138,7 +138,7 @@ public:
     //   This method can be called from any thread.
     //
     virtual BOOL WINAPI SafeFileOpen(SAFE_FILE* file,
-                                     const char* fileName,
+                                     const wchar_t* fileName,
                                      DWORD dwDesiredAccess,
                                      DWORD dwShareMode,
                                      DWORD dwCreationDisposition,
@@ -278,18 +278,18 @@ public:
     //   This method can only be called from the main thread. (It may call FlashWindow(MainWindow) API,
     //   which must be called from the window's thread, otherwise it causes a deadlock)
     //
-    virtual HANDLE WINAPI SafeFileCreate(const char* fileName,
+    virtual HANDLE WINAPI SafeFileCreate(const wchar_t* fileName,
                                          DWORD dwDesiredAccess,
                                          DWORD dwShareMode,
                                          DWORD dwFlagsAndAttributes,
                                          BOOL isDir,
                                          HWND hParent,
-                                         const char* srcFileName,
-                                         const char* srcFileInfo,
+                                         const wchar_t* srcFileName,
+                                         const wchar_t* srcFileInfo,
                                          DWORD* silentMask,
                                          BOOL allowSkip,
                                          BOOL* skipped,
-                                         char* skipPath,
+                                         wchar_t* skipPath,
                                          int skipPathMax,
                                          CQuadWord* allocateWholeFile,
                                          SAFE_FILE* file) = 0;

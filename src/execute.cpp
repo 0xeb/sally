@@ -12,7 +12,9 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/unicode/WideVariableExpansion.h"
+#include "common/widepath.h"
 #include "common/IEnvironment.h"
+#include "common/IPathService.h"
 #include "common/fsutil.h"
 
 //******************************************************************************
@@ -27,14 +29,6 @@ CComboboxEdit::CComboboxEdit()
     SelEnd = -1;
 }
 
-#ifndef _UNICODE
-CComboboxEdit::CComboboxEdit(BOOL unicodeWnd)
-    : CWindow(ooAllocated, unicodeWnd)
-{
-    SelStart = 0;
-    SelEnd = -1;
-}
-#endif
 
 LRESULT
 CComboboxEdit::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -69,11 +63,11 @@ void CComboboxEdit::GetSel(DWORD* start, DWORD* end)
     }
 }
 
-void CComboboxEdit::ReplaceText(const char* text)
+void CComboboxEdit::ReplaceText(const wchar_t* text)
 {
     // we must refresh the selection because the dumb combobox forgot it
-    SendMessage(HWindow, EM_SETSEL, SelStart, SelEnd);
-    SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM)text);
+    SendMessageW(HWindow, EM_SETSEL, SelStart, SelEnd);
+    SendMessageW(HWindow, EM_REPLACESEL, TRUE, (LPARAM)text);
 }
 
 //******************************************************************************
@@ -81,105 +75,391 @@ void CComboboxEdit::ReplaceText(const char* text)
 // Keywords
 //
 
-const char* EXECUTE_DRIVE = "Drive";
-const char* EXECUTE_PATH = "Path";
-const char* EXECUTE_DOSPATH = "DOSPath";
-const char* EXECUTE_NAME = "Name";
-const char* EXECUTE_DOSNAME = "DOSName";
-const char* EXECUTE_FULLNAME = "FullName";
-const char* EXECUTE_DOSFULLNAME = "DOSFullName";
-const char* EXECUTE_FULLPATH = "FullPath";
-const char* EXECUTE_WINDIR = "WinDir";
-const char* EXECUTE_SYSDIR = "SysDir";
-const char* EXECUTE_SALDIR = "SalDir";
-const char* EXECUTE_DOSFULLPATH = "DOSFullPath";
-const char* EXECUTE_DOSWINDIR = "DOSWinDir";
-const char* EXECUTE_DOSSYSDIR = "DOSSysDir";
-const char* EXECUTE_NAMEPART = "NamePart";
-const char* EXECUTE_EXTPART = "ExtPart";
-const char* EXECUTE_DOSNAMEPART = "DOSNamePart";
-const char* EXECUTE_DOSEXTPART = "DOSExtPart";
-const char* EXECUTE_FULLPATHINACTIVE = "FullPathInactive";
-const char* EXECUTE_FULLPATHLEFT = "FullPathLeft";
-const char* EXECUTE_FULLPATHRIGHT = "FullPathRight";
-const char* EXECUTE_COMPAREDFILELEFT = "FileToCompareLeft";
-const char* EXECUTE_COMPAREDFILERIGHT = "FileToCompareRight";
-const char* EXECUTE_COMPAREDDIRLEFT = "DirToCompareLeft";
-const char* EXECUTE_COMPAREDDIRRIGHT = "DirToCompareRight";
-const char* EXECUTE_COMPAREDFILEACT = "FileToCompareActive";
-const char* EXECUTE_COMPAREDFILEINACT = "FileToCompareInactive";
-const char* EXECUTE_COMPAREDDIRACT = "DirToCompareActive";
-const char* EXECUTE_COMPAREDDIRINACT = "DirToCompareInactive";
-const char* EXECUTE_COMPAREDLEFT = "FileOrDirToCompareLeft";
-const char* EXECUTE_COMPAREDRIGHT = "FileOrDirToCompareRight";
-const char* EXECUTE_COMPAREDACT = "FileOrDirToCompareActive";
-const char* EXECUTE_COMPAREDINACT = "FileOrDirToCompareInactive";
-const char* EXECUTE_LISTOFSELNAMES = "ListOfSelectedNames";
-const char* EXECUTE_LISTOFSELFULLNAMES = "ListOfSelectedFullNames";
+const wchar_t* EXECUTE_DRIVE = L"Drive";
+const wchar_t* EXECUTE_PATH = L"Path";
+const wchar_t* EXECUTE_DOSPATH = L"DOSPath";
+const wchar_t* EXECUTE_NAME = L"Name";
+const wchar_t* EXECUTE_DOSNAME = L"DOSName";
+const wchar_t* EXECUTE_FULLNAME = L"FullName";
+const wchar_t* EXECUTE_DOSFULLNAME = L"DOSFullName";
+const wchar_t* EXECUTE_FULLPATH = L"FullPath";
+const wchar_t* EXECUTE_WINDIR = L"WinDir";
+const wchar_t* EXECUTE_SYSDIR = L"SysDir";
+const wchar_t* EXECUTE_SALDIR = L"SalDir";
+const wchar_t* EXECUTE_DOSFULLPATH = L"DOSFullPath";
+const wchar_t* EXECUTE_DOSWINDIR = L"DOSWinDir";
+const wchar_t* EXECUTE_DOSSYSDIR = L"DOSSysDir";
+const wchar_t* EXECUTE_NAMEPART = L"NamePart";
+const wchar_t* EXECUTE_EXTPART = L"ExtPart";
+const wchar_t* EXECUTE_DOSNAMEPART = L"DOSNamePart";
+const wchar_t* EXECUTE_DOSEXTPART = L"DOSExtPart";
+const wchar_t* EXECUTE_FULLPATHINACTIVE = L"FullPathInactive";
+const wchar_t* EXECUTE_FULLPATHLEFT = L"FullPathLeft";
+const wchar_t* EXECUTE_FULLPATHRIGHT = L"FullPathRight";
+const wchar_t* EXECUTE_COMPAREDFILELEFT = L"FileToCompareLeft";
+const wchar_t* EXECUTE_COMPAREDFILERIGHT = L"FileToCompareRight";
+const wchar_t* EXECUTE_COMPAREDDIRLEFT = L"DirToCompareLeft";
+const wchar_t* EXECUTE_COMPAREDDIRRIGHT = L"DirToCompareRight";
+const wchar_t* EXECUTE_COMPAREDFILEACT = L"FileToCompareActive";
+const wchar_t* EXECUTE_COMPAREDFILEINACT = L"FileToCompareInactive";
+const wchar_t* EXECUTE_COMPAREDDIRACT = L"DirToCompareActive";
+const wchar_t* EXECUTE_COMPAREDDIRINACT = L"DirToCompareInactive";
+const wchar_t* EXECUTE_COMPAREDLEFT = L"FileOrDirToCompareLeft";
+const wchar_t* EXECUTE_COMPAREDRIGHT = L"FileOrDirToCompareRight";
+const wchar_t* EXECUTE_COMPAREDACT = L"FileOrDirToCompareActive";
+const wchar_t* EXECUTE_COMPAREDINACT = L"FileOrDirToCompareInactive";
+const wchar_t* EXECUTE_LISTOFSELNAMES = L"ListOfSelectedNames";
+const wchar_t* EXECUTE_LISTOFSELFULLNAMES = L"ListOfSelectedFullNames";
 
-const char* EXECUTE_ENV = "$[]";
+const wchar_t* EXECUTE_ENV = L"$[]";
 
 // dummy strings
 // !!! strings must not have the same value because the release build
 // would redirect pointers to a single instance during optimizations
-const char* EXECUTE_SEPARATOR = "Separator";
-const char* EXECUTE_BROWSE = "Browse";       // directory browsing using the Open dialog
-const char* EXECUTE_BROWSEDIR = "BrowseDir"; // directory browsing using GetTargetDirectory
-const char* EXECUTE_HELP = "Help";
-const char* EXECUTE_TERMINATOR = "Terminator";
-const char* EXECUTE_SUBMENUSTART = "SubMenuStart";
-const char* EXECUTE_SUBMENUEND = "SubMenuEnd";
+const wchar_t* EXECUTE_SEPARATOR = L"Separator";
+const wchar_t* EXECUTE_BROWSE = L"Browse";       // directory browsing using the Open dialog
+const wchar_t* EXECUTE_BROWSEDIR = L"BrowseDir"; // directory browsing using GetTargetDirectory
+const wchar_t* EXECUTE_HELP = L"Help";
+const wchar_t* EXECUTE_TERMINATOR = L"Terminator";
+const wchar_t* EXECUTE_SUBMENUSTART = L"SubMenuStart";
+const wchar_t* EXECUTE_SUBMENUEND = L"SubMenuEnd";
+
+struct CExecuteWideExpData
+{
+    const wchar_t* Name;
+    const wchar_t* DosName;
+    BOOL* FileNameUsed;
+
+    CUserMenuAdvancedData* UserMenuAdvancedData; // applies only to User Menu, otherwise NULL here
+};
+
+void ExecuteMarkFileNameUsed(CExecuteWideExpData* data)
+{
+    if (data->FileNameUsed != NULL)
+        *data->FileNameUsed = TRUE;
+}
+
+std::wstring ExecutePathValueW(const wchar_t* name, BOOL trailingBackslash,
+                               const char* caller)
+{
+    if (name == NULL)
+    {
+        TRACE_E("Unexpected NULL value in " << caller << ".");
+        return L"\\";
+    }
+
+    std::wstring root = GetRootPath(name);
+    std::size_t rootLength = root.length();
+    if (rootLength > 0 && root[rootLength - 1] == L'\\')
+        --rootLength;
+    const std::wstring fullName(name);
+    if (rootLength > fullName.length())
+    {
+        TRACE_E("Unexpected root length in " << caller << ".");
+        return L"\\";
+    }
+
+    std::wstring path = fullName.substr(rootLength);
+    const std::size_t slash = path.find_last_of(L'\\');
+    if (slash == std::wstring::npos)
+    {
+        TRACE_E("Unexpected value in " << caller << ".");
+        return L"\\";
+    }
+    if (trailingBackslash)
+        path.resize(slash + 1);
+    else if (slash == 0)
+        path.resize(1); // root must retain its backslash
+    else
+        path.resize(slash);
+    return path;
+}
+
+std::wstring ExecuteNameValueW(const wchar_t* name, const char* caller)
+{
+    if (name == NULL)
+    {
+        TRACE_E("Unexpected NULL value in " << caller << ".");
+        return std::wstring();
+    }
+    const wchar_t* slash = wcsrchr(name, L'\\');
+    if (slash == NULL)
+    {
+        TRACE_E("Unexpected value in " << caller << ".");
+        return std::wstring();
+    }
+    return slash + 1;
+}
+
+std::wstring ExecuteFullNameValueW(const wchar_t* name)
+{
+    if (name == NULL)
+        return std::wstring();
+    const wchar_t* slash = wcsrchr(name, L'\\');
+    return slash != NULL && slash[1] == 0 ? std::wstring() : std::wstring(name);
+}
+
+std::wstring ExecuteNamePartValueW(const wchar_t* name, const char* caller)
+{
+    std::wstring value = ExecuteNameValueW(name, caller);
+    const std::size_t dot = value.find_last_of(L'.');
+    if (dot != std::wstring::npos)
+        value.resize(dot); // ".cvspass" is considered an extension in Windows
+    return value;
+}
+
+std::wstring ExecuteExtPartValueW(const wchar_t* name, const char* caller)
+{
+    const std::wstring value = ExecuteNameValueW(name, caller);
+    const std::size_t dot = value.find_last_of(L'.');
+    return dot != std::wstring::npos ? value.substr(dot + 1) : std::wstring();
+}
+
+std::wstring ExecuteFullPathValueW(const wchar_t* name, BOOL trailingBackslash,
+                                   const char* caller)
+{
+    if (name == NULL)
+    {
+        TRACE_E("Unexpected NULL value in " << caller << ".");
+        return L"C:\\";
+    }
+    std::wstring value(name);
+    const std::size_t slash = value.find_last_of(L'\\');
+    if (slash == std::wstring::npos)
+    {
+        TRACE_E("Unexpected value in " << caller << ".");
+        return L"C:\\";
+    }
+    if (trailingBackslash || (slash == 2 && value[1] == L':'))
+        value.resize(slash + 1);
+    else
+        value.resize(slash);
+    return value;
+}
+
+std::wstring ExecuteDirectoryValueW(BOOL windowsDirectory, BOOL trailingBackslash)
+{
+    std::wstring value;
+    if (gEnvironment == NULL)
+    {
+        TRACE_E("Unable to retrieve system directory for Execute expansion.");
+        return std::wstring();
+    }
+    const EnvResult result = windowsDirectory ? gEnvironment->GetWindowsDirectory(value)
+                                              : gEnvironment->GetSystemDirectory(value);
+    if (!result.success)
+    {
+        TRACE_E("Unable to retrieve system directory for Execute expansion.");
+        return std::wstring();
+    }
+    if (trailingBackslash && !value.empty() && value.back() != L'\\')
+        value.push_back(L'\\');
+    if (!trailingBackslash && !value.empty() && value.back() == L'\\')
+        value.pop_back();
+    return value;
+}
+
+std::wstring ExecuteShortDirectoryValueW(BOOL windowsDirectory)
+{
+    const std::wstring path = ExecuteDirectoryValueW(windowsDirectory, FALSE);
+    if (path.empty())
+        return path;
+    std::wstring shortPath = GetShortPathW(path.c_str());
+    if (!shortPath.empty() && shortPath.back() != L'\\')
+        shortPath.push_back(L'\\');
+    return shortPath;
+}
+
+std::wstring ExecuteSalDirValueW(BOOL trailingBackslash)
+{
+    std::wstring value;
+    if (gPathService == NULL || !gPathService->GetModuleFileName(HInstance, value).success)
+    {
+        TRACE_E("Unable to retrieve Sally module path for Execute expansion.");
+        return L"C:\\";
+    }
+    const std::size_t slash = value.find_last_of(L'\\');
+    if (slash == std::wstring::npos)
+    {
+        TRACE_E("Unexpected value in ExecuteSalDirValueW().");
+        return L"C:\\";
+    }
+    if (trailingBackslash || (slash == 2 && value[1] == L':'))
+        value.resize(slash + 1);
+    else
+        value.resize(slash);
+    return value;
+}
+
+std::wstring ExecuteExpDriveW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    std::wstring root = GetRootPath(data->Name);
+    if (!root.empty() && root.back() == L'\\')
+        root.pop_back();
+    return root;
+}
+
+std::wstring ExecuteExpPathW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecutePathValueW(data->Name, TRUE, "ExecuteExpPathW");
+}
+
+std::wstring ExecuteExpDOSPathW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecutePathValueW(data->DosName, TRUE, "ExecuteExpDOSPathW");
+}
+
+std::wstring ExecuteExpNameW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteNameValueW(data->Name, "ExecuteExpNameW");
+}
+
+std::wstring ExecuteExpDOSNameW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteNameValueW(data->DosName, "ExecuteExpDOSNameW");
+}
+
+std::wstring ExecuteExpPath2W(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecutePathValueW(data->Name, FALSE, "ExecuteExpPath2W");
+}
+
+std::wstring ExecuteExpFullNameW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteFullNameValueW(data->Name);
+}
+
+std::wstring ExecuteExpDOSFullNameW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteFullNameValueW(data->DosName);
+}
+
+std::wstring ExecuteExpNamePartW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteNamePartValueW(data->Name, "ExecuteExpNamePartW");
+}
+
+std::wstring ExecuteExpExtPartW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteExtPartValueW(data->Name, "ExecuteExpExtPartW");
+}
+
+std::wstring ExecuteExpDOSNamePartW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteNamePartValueW(data->DosName, "ExecuteExpDOSNamePartW");
+}
+
+std::wstring ExecuteExpDOSExtPartW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteExtPartValueW(data->DosName, "ExecuteExpDOSExtPartW");
+}
+
+std::wstring ExecuteExpFullPathW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteFullPathValueW(data->Name, TRUE, "ExecuteExpFullPathW");
+}
+
+std::wstring ExecuteExpWinDirW(void*) { return ExecuteDirectoryValueW(TRUE, TRUE); }
+std::wstring ExecuteExpSysDirW(void*) { return ExecuteDirectoryValueW(FALSE, TRUE); }
+std::wstring ExecuteExpSalDirW(void*) { return ExecuteSalDirValueW(TRUE); }
+
+std::wstring ExecuteExpDOSFullPathW(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteFullPathValueW(data->DosName, TRUE, "ExecuteExpDOSFullPathW");
+}
+
+std::wstring ExecuteExpDOSWinDirW(void*) { return ExecuteShortDirectoryValueW(TRUE); }
+std::wstring ExecuteExpDOSSysDirW(void*) { return ExecuteShortDirectoryValueW(FALSE); }
+
+std::wstring ExecuteExpFullPath2W(void* param)
+{
+    CExecuteWideExpData* data = (CExecuteWideExpData*)param;
+    ExecuteMarkFileNameUsed(data);
+    return ExecuteFullPathValueW(data->Name, FALSE, "ExecuteExpFullPath2W");
+}
+
+std::wstring ExecuteExpWinDir2W(void*) { return ExecuteDirectoryValueW(TRUE, FALSE); }
+std::wstring ExecuteExpSysDir2W(void*) { return ExecuteDirectoryValueW(FALSE, FALSE); }
+std::wstring ExecuteExpSalDir2W(void*) { return ExecuteSalDirValueW(FALSE); }
 
 // Information Line Content
-const char* FILEDATA_FILENAME = "FileName";
-const char* FILEDATA_FILESIZE = "FileSize";
-const char* FILEDATA_FILEDATE = "FileDate";
-const char* FILEDATA_FILETIME = "FileTime";
-const char* FILEDATA_FILEATTR = "FileAttributes";
-const char* FILEDATA_FILEDOSNAME = "FileDOSName";
+const wchar_t* FILEDATA_FILENAME = L"FileName";
+const wchar_t* FILEDATA_FILESIZE = L"FileSize";
+const wchar_t* FILEDATA_FILEDATE = L"FileDate";
+const wchar_t* FILEDATA_FILETIME = L"FileTime";
+const wchar_t* FILEDATA_FILEATTR = L"FileAttributes";
+const wchar_t* FILEDATA_FILEDOSNAME = L"FileDOSName";
 
 // for Make File List
-const char* FILEDATA_FILENAMEPART = "FileNamePart";
-const char* FILEDATA_FILEEXTENSION = "FileExtension";
+const wchar_t* FILEDATA_FILENAMEPART = L"FileNamePart";
+const wchar_t* FILEDATA_FILEEXTENSION = L"FileExtension";
 
 // text file delimiter
-const char* FILEDATA_LF = "LF";
-const char* FILEDATA_CR = "CR";
-const char* FILEDATA_CRLF = "CRLF";
-const char* FILEDATA_TAB = "TAB";
+const wchar_t* FILEDATA_LF = L"LF";
+const wchar_t* FILEDATA_CR = L"CR";
+const wchar_t* FILEDATA_CRLF = L"CRLF";
+const wchar_t* FILEDATA_TAB = L"TAB";
 
 // string displayed when no valid data exist for the requested variable
-const char* STR_FILE_DATA_NONE = "-";
+const wchar_t* STR_FILE_DATA_NONE = L"-";
 
 // strings for regular expressions
-const char* REGEXP_ANYCHAR = ".";
-const char* REGEXP_SETOFCHAR = "[]";
-const char* REGEXP_NOTSETOFCHAR = "[^]";
-const char* REGEXP_RANGEOFCHAR = "[-]";
-const char* REGEXP_BEGINOFLINE = "^";
-const char* REGEXP_ENDOFLINE = "$";
-const char* REGEXP_OR = "|";
-const char* REGEXP_0ORMORE = "*";
-const char* REGEXP_1ORMORE = "+";
-const char* REGEXP_0OR1 = "?";
+const wchar_t* REGEXP_ANYCHAR = L".";
+const wchar_t* REGEXP_SETOFCHAR = L"[]";
+const wchar_t* REGEXP_NOTSETOFCHAR = L"[^]";
+const wchar_t* REGEXP_RANGEOFCHAR = L"[-]";
+const wchar_t* REGEXP_BEGINOFLINE = L"^";
+const wchar_t* REGEXP_ENDOFLINE = L"$";
+const wchar_t* REGEXP_OR = L"|";
+const wchar_t* REGEXP_0ORMORE = L"*";
+const wchar_t* REGEXP_1ORMORE = L"+";
+const wchar_t* REGEXP_0OR1 = L"?";
 
-const char* REGEXP_PARENTHESIS_L_CHAR = "\\(";
-const char* REGEXP_PARENTHESIS_R_CHAR = "\\)";
-const char* REGEXP_DOT_CHAR = "\\.";
-const char* REGEXP_PLUS_CHAR = "\\+";
-const char* REGEXP_ASTERISK_CHAR = "\\*";
+const wchar_t* REGEXP_PARENTHESIS_L_CHAR = L"\\(";
+const wchar_t* REGEXP_PARENTHESIS_R_CHAR = L"\\)";
+const wchar_t* REGEXP_DOT_CHAR = L"\\.";
+const wchar_t* REGEXP_PLUS_CHAR = L"\\+";
+const wchar_t* REGEXP_ASTERISK_CHAR = L"\\*";
 
-const char* REGEXP_ALPHANUMERIC_CHAR = "[a-zA-Z0-9]";
-const char* REGEXP_ALPHABETIC_CHAR = "[a-zA-Z]";
-const char* REGEXP_DECIMAL_DIGIT = "[0-9]";
+const wchar_t* REGEXP_ALPHANUMERIC_CHAR = L"[a-zA-Z0-9]";
+const wchar_t* REGEXP_ALPHABETIC_CHAR = L"[a-zA-Z]";
+const wchar_t* REGEXP_DECIMAL_DIGIT = L"[0-9]";
 
-const char* REGEXP_DECIMAL_NUMBER = "([0-9]+)";
-const char* REGEXP_HEXADECIMAL_NUMBER = "([0-9a-fA-F]+)";
-const char* REGEXP_REAL_NUMBER = "(([0-9]+\\.[0-9]*)|([0-9]*\\.[0-9]+)|([0-9]+))";
+const wchar_t* REGEXP_DECIMAL_NUMBER = L"([0-9]+)";
+const wchar_t* REGEXP_HEXADECIMAL_NUMBER = L"([0-9a-fA-F]+)";
+const wchar_t* REGEXP_REAL_NUMBER = L"(([0-9]+\\.[0-9]*)|([0-9]*\\.[0-9]+)|([0-9]+))";
 
-const char* REGEXP_QUOTED_STRING = "((\"[^\"]*\")|('[^']*'))";
-const char* REGEXP_ALPHABETIC_STRING = "([a-zA-Z]+)";
-const char* REGEXP_IDENTIFIER = "([a-zA-Z_$][a-zA-Z0-9_$]*)";
+const wchar_t* REGEXP_QUOTED_STRING = L"((\"[^\"]*\")|('[^']*'))";
+const wchar_t* REGEXP_ALPHABETIC_STRING = L"([a-zA-Z]+)";
+const wchar_t* REGEXP_IDENTIFIER = L"([a-zA-Z_$][a-zA-Z0-9_$]*)";
 
 //******************************************************************************
 //
@@ -587,367 +867,6 @@ CExecuteItem RegularExpressionItems[] =
 // Custom functions
 //
 
-struct CExecuteExpData
-{
-    const char* Name;
-    const char* DosName;
-    CPathBuffer Buffer;
-    BOOL* FileNameUsed;
-
-    CUserMenuAdvancedData* UserMenuAdvancedData; // applies only to User Menu, otherwise NULL here
-};
-
-const char* WINAPI ExecuteExpDrive(HWND msgParent, void* param) // drive ("D:", "\\server\share") without backslash
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->Name);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        data->Buffer[l - 1] = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpPath(HWND msgParent, void* param) // full path ("\\", "\\path\\")
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->Name);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        l--;
-    strcpy(data->Buffer, data->Name + l);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpPath().");
-        return "\\";
-    }
-    *++s = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSPath(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->DosName);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        l--;
-    strcpy(data->Buffer, data->DosName + l);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpDOSPath().");
-        return "\\";
-    }
-    *++s = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpName(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->Name, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpName().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSName(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->DosName, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpName().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpPath2(HWND msgParent, void* param) // full path ("\\", "\\path")
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->Name);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        l--;
-    strcpy(data->Buffer, data->Name + l);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpPath2().");
-        return "\\";
-    }
-    if (s != data->Buffer)
-        *s = 0;
-    else
-        *++s = 0; // root must end with '\\'
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpFullName(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->Name, '\\');
-    if (s != NULL && *(s + 1) == 0)
-        return ""; // user-menu on "" or ".."
-    return data->Name;
-}
-
-const char* WINAPI ExecuteExpDOSFullName(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->DosName, '\\');
-    if (s != NULL && *(s + 1) == 0)
-        return ""; // user-menu on "" or ".."
-    return data->DosName;
-}
-
-const char* WINAPI ExecuteExpNamePart(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->Name, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpNamePart().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    char* ss = strrchr(data->Buffer, '.');
-    //  if (ss != NULL && ss != data->Buffer)   // extension is present ('.' not at the begining of the name, e.g. ".cvspass")
-    if (ss != NULL) // extension is present (".cvspass" is considered an extension in Windows)
-        *ss = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpExtPart(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->Name, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpNamePart().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    s = strrchr(data->Buffer, '.');
-    //  if (s != NULL && s != data->Buffer)   // extension is present ('.' not at the begining of the name, e.g. ".cvspass")
-    if (s != NULL) // extension is present (".cvspass" is considered an extension in Windows)
-        return s + 1;
-    return "";
-}
-
-const char* WINAPI ExecuteExpDOSNamePart(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->DosName, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpDOSNamePart().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    char* ss = strrchr(data->Buffer, '.');
-    //  if (ss != NULL && ss != data->Buffer)   // extension is present ('.' not at the begining of the name, e.g. ".cvspass")
-    if (ss != NULL) // extension is present (".cvspass" is considered an extension in Windows)
-        *ss = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSExtPart(HWND msgParent, void* param)
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    const char* s = strrchr(data->DosName, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpDOSNamePart().");
-        return "";
-    }
-    strcpy(data->Buffer, s + 1);
-    s = strrchr(data->Buffer, '.');
-    //  if (s != NULL && s != data->Buffer)   // extension is present ('.' not at the begining of the name, e.g. ".cvspass")
-    if (s != NULL) // extension is present (".cvspass" is considered an extension in Windows)
-        return s + 1;
-    return "";
-}
-
-const char* WINAPI ExecuteExpFullPath(HWND msgParent, void* param) // full path "c:\\long path\\"
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->Name);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpFullPath().");
-        return "C:\\";
-    }
-    *++s = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to the Windows directory
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpSysDir(HWND msgParent, void* param) // full path to the System directory
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpSalDir(HWND msgParent, void* param) // full path to the Salamander directory
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, data->Buffer.Size());
-    *(strrchr(data->Buffer, '\\') + 1) = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSFullPath(HWND msgParent, void* param) // DOS full path "c:\\sh_path\\"
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->DosName);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpDOSFullPath().");
-        return "C:\\";
-    }
-    *++s = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full path to the Windows directory
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    CPathBuffer path; // Heap-allocated for long path support
-    EnvGetWindowsDirectoryA(gEnvironment, path, path.Size());
-    GetShortPathName(path, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpDOSSysDir(HWND msgParent, void* param) // DOS full path to the System directory
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    CPathBuffer path; // Heap-allocated for long path support
-    EnvGetSystemDirectoryA(gEnvironment, path, path.Size());
-    GetShortPathName(path, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpFullPath2(HWND msgParent, void* param) // full path "c:\\long path"
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    if (data->FileNameUsed != NULL)
-        *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->Name);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpFullPath2().");
-        return "C:\\";
-    }
-    if (s - data->Buffer == 2 && data->Buffer[1] == ':') // not a UNC path
-    {
-        *(s + 1) = 0;
-    }
-    else
-    {
-        *s = 0;
-    }
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path to the Windows directory without trailing '\\'
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetWindowsDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) == '\\')
-        *(s - 1) = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpSysDir2(HWND msgParent, void* param) // full path to the System directory without trailing '\\'
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    EnvGetSystemDirectoryA(gEnvironment, data->Buffer, data->Buffer.Size());
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) == '\\')
-        *(s - 1) = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI ExecuteExpSalDir2(HWND msgParent, void* param) // full path to the Salamander directory without trailing '\\'
-{
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, data->Buffer.Size());
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
-    {
-        TRACE_E("Unexpected value in ExecuteExpSalDir2().");
-        return "C:\\";
-    }
-    if (s - data->Buffer == 2 && data->Buffer[1] == ':') // not a UNC path
-    {
-        *(s + 1) = 0;
-    }
-    else
-    {
-        *s = 0;
-    }
-    return data->Buffer;
-}
-
 // Information Line Content
 
 struct CFileDataExpData
@@ -956,338 +875,69 @@ struct CFileDataExpData
     const CFileData* FileData;
     BOOL IsDir;          // this is a file, not a directory
     DWORD ValidFileData; // mask of valid data in CFileData
-    CPathBuffer Path; // path to the current panel (only for Make File List)
-    char Buffer[2000];
+    // The only active file-data expansion route is wide. This keeps
+    // a Make File List path in the same representation that reaches its writer.
+    std::wstring PathW;
 };
-
-const char* WINAPI FileDataExpFileName(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    AlterFileName(data->Buffer, data->FileData->Name, -1, Configuration.FileNameFormat,
-                  0, data->IsDir);
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileNamePart(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    AlterFileName(data->Buffer, data->FileData->Name, -1, Configuration.FileNameFormat,
-                  0, data->IsDir);
-    if (!data->IsDir && data->FileData->Ext != NULL && *data->FileData->Ext != 0)
-    {
-        if (data->FileData->Ext > data->FileData->Name) // (always true)
-            data->Buffer[data->FileData->Ext - data->FileData->Name - 1] = 0;
-    }
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileExtension(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    AlterFileName(data->Buffer, data->FileData->Name, -1, Configuration.FileNameFormat,
-                  0, data->IsDir);
-    if (!data->IsDir && data->FileData->Ext != NULL && *data->FileData->Ext != 0)
-    {
-        memmove(data->Buffer, data->Buffer + (data->FileData->Ext - data->FileData->Name),
-                data->FileData->NameLen - (data->FileData->Ext - data->FileData->Name) + 1);
-    }
-    else
-        *data->Buffer = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileSize(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    BOOL sizeValid = FALSE;
-    CQuadWord plSize;
-    BOOL plSizeValid = FALSE;
-    if (data->ValidFileData & VALID_DATA_SIZE)
-        sizeValid = TRUE;
-    else
-    {
-        if ((data->ValidFileData & VALID_DATA_PL_SIZE) &&
-            data->PluginData->NotEmpty() &&
-            data->PluginData->GetByteSize(data->FileData, data->IsDir, &plSize))
-        {
-            plSizeValid = TRUE;
-        }
-    }
-    if (!sizeValid && !plSizeValid && !data->IsDir)
-    { // it's a file and size is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    if (!data->IsDir || sizeValid && data->FileData->SizeValid || plSizeValid)
-        NumberToStr(data->Buffer, plSizeValid ? plSize : data->FileData->Size);
-    else
-        CopyMemory(data->Buffer, DirColumnStr.c_str(), DirColumnStrLen + 1);
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileSizeNoSpaces(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    BOOL sizeValid = FALSE;
-    CQuadWord plSize;
-    BOOL plSizeValid = FALSE;
-    if (data->ValidFileData & VALID_DATA_SIZE)
-        sizeValid = TRUE;
-    else
-    {
-        if ((data->ValidFileData & VALID_DATA_PL_SIZE) &&
-            data->PluginData->NotEmpty() &&
-            data->PluginData->GetByteSize(data->FileData, data->IsDir, &plSize))
-        {
-            plSizeValid = TRUE;
-        }
-    }
-    if (!sizeValid && !plSizeValid && !data->IsDir)
-    { // it's a file and size is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    if (!data->IsDir || sizeValid && data->FileData->SizeValid || plSizeValid)
-    {
-        _ui64toa(plSizeValid ? plSize.Value : data->FileData->Size.Value, data->Buffer, 10);
-    }
-    else
-        CopyMemory(data->Buffer, DirColumnStr.c_str(), DirColumnStrLen + 1);
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileDate(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    SYSTEMTIME st;
-    FILETIME ft;
-    if ((data->ValidFileData & VALID_DATA_DATE) == 0 &&
-        ((data->ValidFileData & VALID_DATA_PL_DATE) == 0 ||
-         !data->PluginData->NotEmpty() ||
-         !data->PluginData->GetLastWriteDate(data->FileData, data->IsDir, &st)))
-    { // last-write is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    if ((data->ValidFileData & VALID_DATA_DATE) == 0) // date from the plugin - we need to validate the time part of the structure
-    {
-        st.wHour = 0;
-        st.wMinute = 0;
-        st.wSecond = 0;
-        st.wMilliseconds = 0;
-    }
-    if ((data->ValidFileData & VALID_DATA_DATE) == 0 ||
-        FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
-            FileTimeToSystemTime(&ft, &st))
-    {
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, data->Buffer, 50) == 0)
-            sprintf(data->Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    }
-    else
-        strcpy(data->Buffer, LoadStr(IDS_INVALID_DATEORTIME));
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileDateOnlyForDisk(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    SYSTEMTIME st;
-    FILETIME ft;
-    BOOL stIsReady = FALSE;
-    if (FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
-        FileTimeToSystemTime(&ft, &st) && (stIsReady = TRUE) != 0 &&
-        st.wYear == 1602 && st.wMonth == 1 && st.wDay == 1 && st.wHour == 0 &&
-        st.wMinute == 0 && st.wSecond == 0 && st.wMilliseconds == 0 &&
-        strcmp(data->FileData->Name, "..") == 0) // for UP-DIR 1.1.1602 0:00:00.000 is an "empty value"
-    {
-        return STR_FILE_DATA_NONE;
-    }
-    if (stIsReady)
-    {
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, data->Buffer, 50) == 0)
-            sprintf(data->Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    }
-    else
-        strcpy(data->Buffer, LoadStr(IDS_INVALID_DATEORTIME));
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileTime(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    SYSTEMTIME st;
-    FILETIME ft;
-    if ((data->ValidFileData & VALID_DATA_TIME) == 0 &&
-        ((data->ValidFileData & VALID_DATA_PL_TIME) == 0 ||
-         !data->PluginData->NotEmpty() ||
-         !data->PluginData->GetLastWriteTime(data->FileData, data->IsDir, &st)))
-    { // last-write is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    if ((data->ValidFileData & VALID_DATA_TIME) == 0) // time from the plugin - we need to validate the "date part" of the structure
-    {
-        st.wYear = 2000;
-        st.wMonth = 12;
-        st.wDay = 24;
-        st.wDayOfWeek = 0; // Sunday
-    }
-    if ((data->ValidFileData & VALID_DATA_TIME) == 0 ||
-        FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
-            FileTimeToSystemTime(&ft, &st))
-    {
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, data->Buffer, 50) == 0)
-            sprintf(data->Buffer, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    }
-    else
-        strcpy(data->Buffer, LoadStr(IDS_INVALID_DATEORTIME));
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileTimeOnlyForDisk(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    SYSTEMTIME st;
-    FILETIME ft;
-    BOOL stIsReady = FALSE;
-    if (FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
-        FileTimeToSystemTime(&ft, &st) && (stIsReady = TRUE) != 0 &&
-        st.wYear == 1602 && st.wMonth == 1 && st.wDay == 1 && st.wHour == 0 &&
-        st.wMinute == 0 && st.wSecond == 0 && st.wMilliseconds == 0 &&
-        strcmp(data->FileData->Name, "..") == 0) // for UP-DIR 1.1.1602 0:00:00.000 is an "empty value"
-    {
-        return STR_FILE_DATA_NONE;
-    }
-    if (stIsReady)
-    {
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, data->Buffer, 50) == 0)
-            sprintf(data->Buffer, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    }
-    else
-        strcpy(data->Buffer, LoadStr(IDS_INVALID_DATEORTIME));
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileAttr(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    if ((data->ValidFileData & VALID_DATA_ATTRIBUTES) == 0)
-    { // attr is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    char attr[20];
-    GetAttrsString(attr, data->FileData->Attr);
-    if (attr[0] == 0)
-    {
-        attr[0] = '-'; // no attribute
-        attr[1] = 0;
-    }
-    strcpy(data->Buffer, attr);
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpFileDOSName(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    if ((data->ValidFileData & VALID_DATA_DOSNAME) == 0)
-    { // DOS name is not valid -> nothing to show
-        return STR_FILE_DATA_NONE;
-    }
-    strcpy(data->Buffer, (data->FileData->DosName != NULL ? data->FileData->DosName : data->FileData->Name));
-    return data->Buffer;
-}
-
-const char* WINAPI MFLFileDataExpDrive(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    GetRootPath(data->Buffer, data->Path);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        data->Buffer[l - 1] = 0;
-    return data->Buffer;
-}
-
-const char* WINAPI MFLFileDataExpPath(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    GetRootPath(data->Buffer, data->Path);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        l--;
-    strcpy(data->Buffer, data->Path + l);
-    l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] != '\\')
-    {
-        data->Buffer[l] = '\\';
-        data->Buffer[l + 1] = 0;
-    }
-    return data->Buffer;
-}
-
-const char* WINAPI MFLFileDataExpDOSPath(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    CPathBuffer dosPath; // Heap-allocated for long path support
-    if (!GetShortPathName(data->Path, dosPath, dosPath.Size()))
-    {
-        TRACE_E("Unexpected situation in FileDataExpDOSPath().");
-        return MFLFileDataExpPath(msgParent, param);
-    }
-
-    GetRootPath(data->Buffer, dosPath);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
-        l--;
-    strcpy(data->Buffer, dosPath + l);
-    l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] != '\\')
-    {
-        data->Buffer[l] = '\\';
-        data->Buffer[l + 1] = 0;
-    }
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpLF(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    strcpy(data->Buffer, "\n");
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpCR(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    strcpy(data->Buffer, "\r");
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpCRLF(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    strcpy(data->Buffer, "\r\n");
-    return data->Buffer;
-}
-
-const char* WINAPI FileDataExpTAB(HWND msgParent, void* param)
-{
-    CFileDataExpData* data = (CFileDataExpData*)param;
-    strcpy(data->Buffer, "\t");
-    return data->Buffer;
-}
 
 std::wstring FileDataEffectiveNameW(const CFileData* file)
 {
-    if (file == NULL)
-        return std::wstring();
-    if (file->NameW != NULL && file->NameW[0] != 0)
-        return std::wstring(file->NameW);
-    return AnsiToWide(file->Name);
+    return file != NULL && file->Name != NULL ? std::wstring(file->Name) : std::wstring();
 }
 
 size_t FileDataExtensionOffsetW(const CFileData* file, const std::wstring& nameW, BOOL isDir)
 {
-    if (file == NULL || isDir || nameW.empty())
+    if (file == NULL || file->Name == NULL || file->Ext == NULL || isDir || nameW.empty())
         return std::wstring::npos;
-    if (file->NameW == NULL && file->Ext != NULL && file->Name != NULL)
-        return (size_t)(file->Ext - file->Name);
-    return sally::unicode::ExtensionOffsetAfterDotW(nameW, isDir != 0);
+
+    const size_t extOffset = (size_t)(file->Ext - file->Name);
+    return extOffset <= nameW.length() ? extOffset : sally::unicode::ExtensionOffsetAfterDotW(nameW, FALSE);
+}
+
+BOOL GetFileDataExpansionSizeW(CFileDataExpData* data, CQuadWord& size, BOOL& pluginSize)
+{
+    pluginSize = FALSE;
+    if (data->ValidFileData & VALID_DATA_SIZE)
+    {
+        size = data->FileData->Size;
+        return TRUE;
+    }
+    if ((data->ValidFileData & VALID_DATA_PL_SIZE) &&
+        data->PluginData->NotEmpty() &&
+        data->PluginData->GetByteSize(data->FileData, data->IsDir, &size))
+    {
+        pluginSize = TRUE;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+std::wstring FileDataDirectoryColumnW()
+{
+    return LoadStrW(IDS_DIRCOLUMN);
+}
+
+std::wstring FormatFileDateW(const SYSTEMTIME& st)
+{
+    wchar_t buffer[50];
+    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buffer, _countof(buffer)) == 0)
+        swprintf_s(buffer, _countof(buffer), L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+    return buffer;
+}
+
+std::wstring FormatFileTimeW(const SYSTEMTIME& st)
+{
+    wchar_t buffer[50];
+    if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, buffer, _countof(buffer)) == 0)
+        swprintf_s(buffer, _countof(buffer), L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+    return buffer;
+}
+
+BOOL IsEmptyUpDirectoryDateW(const CFileDataExpData* data, const SYSTEMTIME& st)
+{
+    return st.wYear == 1602 && st.wMonth == 1 && st.wDay == 1 && st.wHour == 0 &&
+           st.wMinute == 0 && st.wSecond == 0 && st.wMilliseconds == 0 &&
+           data->FileData->Name != NULL && wcscmp(data->FileData->Name, L"..") == 0;
 }
 
 std::wstring FileDataExpFileNameW(void* param)
@@ -1317,57 +967,189 @@ std::wstring FileDataExpFileExtensionW(void* param)
 
 std::wstring FileDataExpFileSizeW(void* param)
 {
-    return AnsiToWide(FileDataExpFileSize(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    CQuadWord size;
+    BOOL pluginSize = FALSE;
+    BOOL sizeValid = GetFileDataExpansionSizeW(data, size, pluginSize);
+    if (!sizeValid && !data->IsDir)
+        return STR_FILE_DATA_NONE;
+    if (!data->IsDir || ((data->ValidFileData & VALID_DATA_SIZE) && data->FileData->SizeValid) || pluginSize)
+    {
+        return NumberToStr(size);
+    }
+    return FileDataDirectoryColumnW();
 }
 
 std::wstring FileDataExpFileSizeNoSpacesW(void* param)
 {
-    return AnsiToWide(FileDataExpFileSizeNoSpaces(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    CQuadWord size;
+    BOOL pluginSize = FALSE;
+    BOOL sizeValid = GetFileDataExpansionSizeW(data, size, pluginSize);
+    if (!sizeValid && !data->IsDir)
+        return STR_FILE_DATA_NONE;
+    if (!data->IsDir || ((data->ValidFileData & VALID_DATA_SIZE) && data->FileData->SizeValid) || pluginSize)
+        return std::to_wstring(size.Value);
+    return FileDataDirectoryColumnW();
 }
 
 std::wstring FileDataExpFileDateW(void* param)
 {
-    return AnsiToWide(FileDataExpFileDate(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    SYSTEMTIME st;
+    FILETIME ft;
+    if ((data->ValidFileData & VALID_DATA_DATE) == 0 &&
+        ((data->ValidFileData & VALID_DATA_PL_DATE) == 0 ||
+         !data->PluginData->NotEmpty() ||
+         !data->PluginData->GetLastWriteDate(data->FileData, data->IsDir, &st)))
+    {
+        return STR_FILE_DATA_NONE;
+    }
+    if ((data->ValidFileData & VALID_DATA_DATE) == 0)
+    {
+        st.wHour = 0;
+        st.wMinute = 0;
+        st.wSecond = 0;
+        st.wMilliseconds = 0;
+    }
+    if ((data->ValidFileData & VALID_DATA_DATE) == 0 ||
+        FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
+            FileTimeToSystemTime(&ft, &st))
+    {
+        return FormatFileDateW(st);
+    }
+    return LoadStrW(IDS_INVALID_DATEORTIME);
 }
 
 std::wstring FileDataExpFileDateOnlyForDiskW(void* param)
 {
-    return AnsiToWide(FileDataExpFileDateOnlyForDisk(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    SYSTEMTIME st;
+    FILETIME ft;
+    if (!FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) ||
+        !FileTimeToSystemTime(&ft, &st))
+    {
+        return LoadStrW(IDS_INVALID_DATEORTIME);
+    }
+    if (IsEmptyUpDirectoryDateW(data, st))
+        return STR_FILE_DATA_NONE;
+    return FormatFileDateW(st);
 }
 
 std::wstring FileDataExpFileTimeW(void* param)
 {
-    return AnsiToWide(FileDataExpFileTime(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    SYSTEMTIME st;
+    FILETIME ft;
+    if ((data->ValidFileData & VALID_DATA_TIME) == 0 &&
+        ((data->ValidFileData & VALID_DATA_PL_TIME) == 0 ||
+         !data->PluginData->NotEmpty() ||
+         !data->PluginData->GetLastWriteTime(data->FileData, data->IsDir, &st)))
+    {
+        return STR_FILE_DATA_NONE;
+    }
+    if ((data->ValidFileData & VALID_DATA_TIME) == 0)
+    {
+        st.wYear = 2000;
+        st.wMonth = 12;
+        st.wDay = 24;
+        st.wDayOfWeek = 0;
+    }
+    if ((data->ValidFileData & VALID_DATA_TIME) == 0 ||
+        FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
+            FileTimeToSystemTime(&ft, &st))
+    {
+        return FormatFileTimeW(st);
+    }
+    return LoadStrW(IDS_INVALID_DATEORTIME);
 }
 
 std::wstring FileDataExpFileTimeOnlyForDiskW(void* param)
 {
-    return AnsiToWide(FileDataExpFileTimeOnlyForDisk(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    SYSTEMTIME st;
+    FILETIME ft;
+    if (!FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) ||
+        !FileTimeToSystemTime(&ft, &st))
+    {
+        return LoadStrW(IDS_INVALID_DATEORTIME);
+    }
+    if (IsEmptyUpDirectoryDateW(data, st))
+        return STR_FILE_DATA_NONE;
+    return FormatFileTimeW(st);
 }
 
 std::wstring FileDataExpFileAttrW(void* param)
 {
-    return AnsiToWide(FileDataExpFileAttr(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    if ((data->ValidFileData & VALID_DATA_ATTRIBUTES) == 0)
+        return STR_FILE_DATA_NONE;
+
+    std::wstring attributes;
+    if (data->FileData->Attr & FILE_ATTRIBUTE_READONLY)
+        attributes += L'R';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_HIDDEN)
+        attributes += L'H';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_SYSTEM)
+        attributes += L'S';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_ARCHIVE)
+        attributes += L'A';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_TEMPORARY)
+        attributes += L'T';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_COMPRESSED)
+        attributes += L'C';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_ENCRYPTED)
+        attributes += L'E';
+    if (data->FileData->Attr & FILE_ATTRIBUTE_OFFLINE)
+        attributes += L'O';
+    return attributes.empty() ? L"-" : attributes;
 }
 
 std::wstring FileDataExpFileDOSNameW(void* param)
 {
-    return AnsiToWide(FileDataExpFileDOSName(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    if ((data->ValidFileData & VALID_DATA_DOSNAME) == 0)
+        return STR_FILE_DATA_NONE;
+    return data->FileData->DosName != NULL ? data->FileData->DosName : data->FileData->Name;
+}
+
+std::wstring MFLFileDataPathW(const std::wstring& fullPath)
+{
+    std::wstring root = GetRootPath(fullPath.c_str());
+    size_t rootLength = root.length();
+    if (rootLength > 0 && root[rootLength - 1] == L'\\')
+        rootLength--;
+    std::wstring result = fullPath.length() >= rootLength ? fullPath.substr(rootLength) : std::wstring();
+    if (result.empty() || result.back() != L'\\')
+        result += L'\\';
+    return result;
 }
 
 std::wstring MFLFileDataExpDriveW(void* param)
 {
-    return AnsiToWide(MFLFileDataExpDrive(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    std::wstring root = GetRootPath(data->PathW.c_str());
+    if (!root.empty() && root.back() == L'\\')
+        root.pop_back();
+    return root;
 }
 
 std::wstring MFLFileDataExpPathW(void* param)
 {
-    return AnsiToWide(MFLFileDataExpPath(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    return MFLFileDataPathW(data->PathW);
 }
 
 std::wstring MFLFileDataExpDOSPathW(void* param)
 {
-    return AnsiToWide(MFLFileDataExpDOSPath(NULL, param));
+    CFileDataExpData* data = (CFileDataExpData*)param;
+    std::wstring shortPath = GetShortPathW(data->PathW.c_str());
+    if (shortPath.empty())
+    {
+        TRACE_E("Unexpected situation in MFLFileDataExpDOSPathW().");
+        return MFLFileDataExpPathW(param);
+    }
+    return MFLFileDataPathW(shortPath);
 }
 
 std::wstring FileDataExpLFW(void* param)
@@ -1619,198 +1401,187 @@ const char* WINAPI ExecuteValListOfSelFullNames(HWND msgParent, void* param)
     return "";
 }
 
-const char* WINAPI ExecuteExpFullPathInact(HWND msgParent, void* param) // full path "c:\\long path\\"
+std::wstring ExecuteValDummyW(void* param) { ExecuteValDummy(NULL, param); return std::wstring(); }
+std::wstring ExecuteValOneByOneW(void* param) { ExecuteValOneByOne(NULL, param); return std::wstring(); }
+std::wstring ExecuteValFullPathInactW(void* param) { ExecuteValFullPathInact(NULL, param); return std::wstring(); }
+std::wstring ExecuteValFullPathLeftW(void* param) { ExecuteValFullPathLeft(NULL, param); return std::wstring(); }
+std::wstring ExecuteValFullPathRightW(void* param) { ExecuteValFullPathRight(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompFileLeftW(void* param) { ExecuteValCompFileLeft(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompFileRightW(void* param) { ExecuteValCompFileRight(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompDirLeftW(void* param) { ExecuteValCompDirLeft(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompDirRightW(void* param) { ExecuteValCompDirRight(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompLeftW(void* param) { ExecuteValCompLeft(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompRightW(void* param) { ExecuteValCompRight(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompFileActiveW(void* param) { ExecuteValCompFileActive(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompFileInactW(void* param) { ExecuteValCompFileInact(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompDirActiveW(void* param) { ExecuteValCompDirActive(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompDirInactW(void* param) { ExecuteValCompDirInact(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompActiveW(void* param) { ExecuteValCompActive(NULL, param); return std::wstring(); }
+std::wstring ExecuteValCompInactW(void* param) { ExecuteValCompInact(NULL, param); return std::wstring(); }
+std::wstring ExecuteValListOfSelNamesW(void* param) { ExecuteValListOfSelNames(NULL, param); return std::wstring(); }
+std::wstring ExecuteValListOfSelFullNamesW(void* param) { ExecuteValListOfSelFullNames(NULL, param); return std::wstring(); }
+
+std::wstring ExecuteExpFullPathInactW(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->FullPathInactive;
+    const std::wstring* path = ((CExecuteWideExpData*)param)->UserMenuAdvancedData->FullPathInactive;
+    return path != nullptr ? *path : std::wstring();
 }
 
-const char* WINAPI ExecuteExpFullPathLeft(HWND msgParent, void* param) // full path "c:\\long path\\"
+std::wstring ExecuteExpFullPathLeftW(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->FullPathLeft;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->FullPathLeft;
 }
 
-const char* WINAPI ExecuteExpFullPathRight(HWND msgParent, void* param) // full path "c:\\long path\\"
+std::wstring ExecuteExpFullPathRightW(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->FullPathRight;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->FullPathRight;
 }
 
-const char* WINAPI ExecuteExpCompareName1(HWND msgParent, void* param) // full name of the file/directory to compare
+std::wstring ExecuteExpCompareName1W(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->CompareName1;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->CompareName1;
 }
 
-const char* WINAPI ExecuteExpCompareName2(HWND msgParent, void* param) // full name of the file/directory to compare
+std::wstring ExecuteExpCompareName2W(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->CompareName2;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->CompareName2;
 }
 
-const char* WINAPI ExecuteExpListOfSelNames(HWND msgParent, void* param) // list of names (without paths) separated by spaces
+std::wstring ExecuteExpListOfSelNamesW(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->ListOfSelNames;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->ListOfSelNames;
 }
 
-const char* WINAPI ExecuteExpListOfSelFullNames(HWND msgParent, void* param) // list of names (without paths) separated by spaces
+std::wstring ExecuteExpListOfSelFullNamesW(void* param)
 {
-    CExecuteExpData* data = (CExecuteExpData*)param;
-    return data->UserMenuAdvancedData->ListOfSelFullNames;
+    return ((CExecuteWideExpData*)param)->UserMenuAdvancedData->ListOfSelFullNames;
 }
 
 // Arrays
 
-CSalamanderVarStrEntry UserMenuArgsExpArray[] =
+sally::unicode::WideVarEntry UserMenuArgsExpArrayW[] =
     {
-        {EXECUTE_DRIVE, ExecuteExpDrive},
-        {EXECUTE_PATH, ExecuteExpPath},
-        {EXECUTE_NAME, ExecuteExpName},
-        {EXECUTE_DOSPATH, ExecuteExpDOSPath},
-        {EXECUTE_DOSNAME, ExecuteExpDOSName},
-        {EXECUTE_FULLNAME, ExecuteExpFullName},
-        {EXECUTE_DOSFULLNAME, ExecuteExpDOSFullName},
-        {EXECUTE_FULLPATH, ExecuteExpFullPath},
-        {EXECUTE_WINDIR, ExecuteExpWinDir},
-        {EXECUTE_SYSDIR, ExecuteExpSysDir},
-        {EXECUTE_DOSFULLPATH, ExecuteExpDOSFullPath},
-        {EXECUTE_DOSWINDIR, ExecuteExpDOSWinDir},
-        {EXECUTE_DOSSYSDIR, ExecuteExpDOSSysDir},
-        {EXECUTE_NAMEPART, ExecuteExpNamePart},
-        {EXECUTE_EXTPART, ExecuteExpExtPart},
-        {EXECUTE_DOSNAMEPART, ExecuteExpDOSNamePart},
-        {EXECUTE_DOSEXTPART, ExecuteExpDOSExtPart},
-        {EXECUTE_FULLPATHINACTIVE, ExecuteExpFullPathInact},
-        {EXECUTE_FULLPATHLEFT, ExecuteExpFullPathLeft},
-        {EXECUTE_FULLPATHRIGHT, ExecuteExpFullPathRight},
-        {EXECUTE_COMPAREDFILELEFT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDFILERIGHT, ExecuteExpCompareName2},
-        {EXECUTE_COMPAREDDIRLEFT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDDIRRIGHT, ExecuteExpCompareName2},
-        {EXECUTE_COMPAREDLEFT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDRIGHT, ExecuteExpCompareName2},
-        {EXECUTE_COMPAREDFILEACT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDFILEINACT, ExecuteExpCompareName2},
-        {EXECUTE_COMPAREDDIRACT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDDIRINACT, ExecuteExpCompareName2},
-        {EXECUTE_COMPAREDACT, ExecuteExpCompareName1},
-        {EXECUTE_COMPAREDINACT, ExecuteExpCompareName2},
-        {EXECUTE_LISTOFSELNAMES, ExecuteExpListOfSelNames},
-        {EXECUTE_LISTOFSELFULLNAMES, ExecuteExpListOfSelFullNames},
+        {EXECUTE_DRIVE, ExecuteExpDriveW},
+        {EXECUTE_PATH, ExecuteExpPathW},
+        {EXECUTE_NAME, ExecuteExpNameW},
+        {EXECUTE_DOSPATH, ExecuteExpDOSPathW},
+        {EXECUTE_DOSNAME, ExecuteExpDOSNameW},
+        {EXECUTE_FULLNAME, ExecuteExpFullNameW},
+        {EXECUTE_DOSFULLNAME, ExecuteExpDOSFullNameW},
+        {EXECUTE_FULLPATH, ExecuteExpFullPathW},
+        {EXECUTE_WINDIR, ExecuteExpWinDirW},
+        {EXECUTE_SYSDIR, ExecuteExpSysDirW},
+        {EXECUTE_DOSFULLPATH, ExecuteExpDOSFullPathW},
+        {EXECUTE_DOSWINDIR, ExecuteExpDOSWinDirW},
+        {EXECUTE_DOSSYSDIR, ExecuteExpDOSSysDirW},
+        {EXECUTE_NAMEPART, ExecuteExpNamePartW},
+        {EXECUTE_EXTPART, ExecuteExpExtPartW},
+        {EXECUTE_DOSNAMEPART, ExecuteExpDOSNamePartW},
+        {EXECUTE_DOSEXTPART, ExecuteExpDOSExtPartW},
+        {EXECUTE_FULLPATHINACTIVE, ExecuteExpFullPathInactW},
+        {EXECUTE_FULLPATHLEFT, ExecuteExpFullPathLeftW},
+        {EXECUTE_FULLPATHRIGHT, ExecuteExpFullPathRightW},
+        {EXECUTE_COMPAREDFILELEFT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDFILERIGHT, ExecuteExpCompareName2W},
+        {EXECUTE_COMPAREDDIRLEFT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDDIRRIGHT, ExecuteExpCompareName2W},
+        {EXECUTE_COMPAREDLEFT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDRIGHT, ExecuteExpCompareName2W},
+        {EXECUTE_COMPAREDFILEACT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDFILEINACT, ExecuteExpCompareName2W},
+        {EXECUTE_COMPAREDDIRACT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDDIRINACT, ExecuteExpCompareName2W},
+        {EXECUTE_COMPAREDACT, ExecuteExpCompareName1W},
+        {EXECUTE_COMPAREDINACT, ExecuteExpCompareName2W},
+        {EXECUTE_LISTOFSELNAMES, ExecuteExpListOfSelNamesW},
+        {EXECUTE_LISTOFSELFULLNAMES, ExecuteExpListOfSelFullNamesW},
         {NULL, NULL}};
 
-// only to detect which variables are used so we can check if the combinations are allowed
-CSalamanderVarStrEntry UserMenuArgsValidationArray[] =
+// Only detects variable use so incompatible user-menu combinations can be rejected.
+sally::unicode::WideVarEntry UserMenuArgsValidationArrayW[] =
     {
-        {EXECUTE_DRIVE, ExecuteValDummy},
-        {EXECUTE_PATH, ExecuteValDummy},
-        {EXECUTE_DOSPATH, ExecuteValDummy},
-        {EXECUTE_FULLPATH, ExecuteValDummy},
-        {EXECUTE_WINDIR, ExecuteValDummy},
-        {EXECUTE_SYSDIR, ExecuteValDummy},
-        {EXECUTE_DOSFULLPATH, ExecuteValDummy},
-        {EXECUTE_DOSWINDIR, ExecuteValDummy},
-        {EXECUTE_DOSSYSDIR, ExecuteValDummy},
-        {EXECUTE_NAME, ExecuteValOneByOne},
-        {EXECUTE_DOSNAME, ExecuteValOneByOne},
-        {EXECUTE_FULLNAME, ExecuteValOneByOne},
-        {EXECUTE_DOSFULLNAME, ExecuteValOneByOne},
-        {EXECUTE_NAMEPART, ExecuteValOneByOne},
-        {EXECUTE_EXTPART, ExecuteValOneByOne},
-        {EXECUTE_DOSNAMEPART, ExecuteValOneByOne},
-        {EXECUTE_DOSEXTPART, ExecuteValOneByOne},
-        {EXECUTE_FULLPATHINACTIVE, ExecuteValFullPathInact},
-        {EXECUTE_FULLPATHLEFT, ExecuteValFullPathLeft},
-        {EXECUTE_FULLPATHRIGHT, ExecuteValFullPathRight},
-        {EXECUTE_COMPAREDFILELEFT, ExecuteValCompFileLeft},
-        {EXECUTE_COMPAREDFILERIGHT, ExecuteValCompFileRight},
-        {EXECUTE_COMPAREDDIRLEFT, ExecuteValCompDirLeft},
-        {EXECUTE_COMPAREDDIRRIGHT, ExecuteValCompDirRight},
-        {EXECUTE_COMPAREDLEFT, ExecuteValCompLeft},
-        {EXECUTE_COMPAREDRIGHT, ExecuteValCompRight},
-        {EXECUTE_COMPAREDFILEACT, ExecuteValCompFileActive},
-        {EXECUTE_COMPAREDFILEINACT, ExecuteValCompFileInact},
-        {EXECUTE_COMPAREDDIRACT, ExecuteValCompDirActive},
-        {EXECUTE_COMPAREDDIRINACT, ExecuteValCompDirInact},
-        {EXECUTE_COMPAREDACT, ExecuteValCompActive},
-        {EXECUTE_COMPAREDINACT, ExecuteValCompInact},
-        {EXECUTE_LISTOFSELNAMES, ExecuteValListOfSelNames},
-        {EXECUTE_LISTOFSELFULLNAMES, ExecuteValListOfSelFullNames},
+        {EXECUTE_DRIVE, ExecuteValDummyW},
+        {EXECUTE_PATH, ExecuteValDummyW},
+        {EXECUTE_DOSPATH, ExecuteValDummyW},
+        {EXECUTE_FULLPATH, ExecuteValDummyW},
+        {EXECUTE_WINDIR, ExecuteValDummyW},
+        {EXECUTE_SYSDIR, ExecuteValDummyW},
+        {EXECUTE_DOSFULLPATH, ExecuteValDummyW},
+        {EXECUTE_DOSWINDIR, ExecuteValDummyW},
+        {EXECUTE_DOSSYSDIR, ExecuteValDummyW},
+        {EXECUTE_NAME, ExecuteValOneByOneW},
+        {EXECUTE_DOSNAME, ExecuteValOneByOneW},
+        {EXECUTE_FULLNAME, ExecuteValOneByOneW},
+        {EXECUTE_DOSFULLNAME, ExecuteValOneByOneW},
+        {EXECUTE_NAMEPART, ExecuteValOneByOneW},
+        {EXECUTE_EXTPART, ExecuteValOneByOneW},
+        {EXECUTE_DOSNAMEPART, ExecuteValOneByOneW},
+        {EXECUTE_DOSEXTPART, ExecuteValOneByOneW},
+        {EXECUTE_FULLPATHINACTIVE, ExecuteValFullPathInactW},
+        {EXECUTE_FULLPATHLEFT, ExecuteValFullPathLeftW},
+        {EXECUTE_FULLPATHRIGHT, ExecuteValFullPathRightW},
+        {EXECUTE_COMPAREDFILELEFT, ExecuteValCompFileLeftW},
+        {EXECUTE_COMPAREDFILERIGHT, ExecuteValCompFileRightW},
+        {EXECUTE_COMPAREDDIRLEFT, ExecuteValCompDirLeftW},
+        {EXECUTE_COMPAREDDIRRIGHT, ExecuteValCompDirRightW},
+        {EXECUTE_COMPAREDLEFT, ExecuteValCompLeftW},
+        {EXECUTE_COMPAREDRIGHT, ExecuteValCompRightW},
+        {EXECUTE_COMPAREDFILEACT, ExecuteValCompFileActiveW},
+        {EXECUTE_COMPAREDFILEINACT, ExecuteValCompFileInactW},
+        {EXECUTE_COMPAREDDIRACT, ExecuteValCompDirActiveW},
+        {EXECUTE_COMPAREDDIRINACT, ExecuteValCompDirInactW},
+        {EXECUTE_COMPAREDACT, ExecuteValCompActiveW},
+        {EXECUTE_COMPAREDINACT, ExecuteValCompInactW},
+        {EXECUTE_LISTOFSELNAMES, ExecuteValListOfSelNamesW},
+        {EXECUTE_LISTOFSELFULLNAMES, ExecuteValListOfSelFullNamesW},
         {NULL, NULL}};
 
-CSalamanderVarStrEntry CommandExpArray[] =
+sally::unicode::WideVarEntry CommandExpArrayW[] =
     {
-        {EXECUTE_WINDIR, ExecuteExpWinDir},
-        {EXECUTE_SYSDIR, ExecuteExpSysDir},
-        {EXECUTE_SALDIR, ExecuteExpSalDir},
+        {EXECUTE_WINDIR, ExecuteExpWinDirW},
+        {EXECUTE_SYSDIR, ExecuteExpSysDirW},
+        {EXECUTE_SALDIR, ExecuteExpSalDirW},
         {NULL, NULL}};
 
-CSalamanderVarStrEntry HotPathExpArray[] =
+sally::unicode::WideVarEntry HotPathExpArrayW[] =
     {
-        {EXECUTE_WINDIR, ExecuteExpWinDir},
-        {EXECUTE_SYSDIR, ExecuteExpSysDir},
-        {EXECUTE_SALDIR, ExecuteExpSalDir},
+        {EXECUTE_WINDIR, ExecuteExpWinDirW},
+        {EXECUTE_SYSDIR, ExecuteExpSysDirW},
+        {EXECUTE_SALDIR, ExecuteExpSalDirW},
         {NULL, NULL}};
 
-CSalamanderVarStrEntry ArgumentsExpArray[] =
+sally::unicode::WideVarEntry ArgumentsExpArrayW[] =
     {
-        {EXECUTE_DRIVE, ExecuteExpDrive},
-        {EXECUTE_PATH, ExecuteExpPath},
-        {EXECUTE_NAME, ExecuteExpName},
-        {EXECUTE_DOSPATH, ExecuteExpDOSPath},
-        {EXECUTE_DOSNAME, ExecuteExpDOSName},
-        {EXECUTE_FULLNAME, ExecuteExpFullName},
-        {EXECUTE_DOSFULLNAME, ExecuteExpDOSFullName},
-        {EXECUTE_FULLPATH, ExecuteExpFullPath},
-        {EXECUTE_WINDIR, ExecuteExpWinDir},
-        {EXECUTE_SYSDIR, ExecuteExpSysDir},
-        {EXECUTE_DOSFULLPATH, ExecuteExpDOSFullPath},
-        {EXECUTE_DOSWINDIR, ExecuteExpDOSWinDir},
-        {EXECUTE_DOSSYSDIR, ExecuteExpDOSSysDir},
-        {EXECUTE_NAMEPART, ExecuteExpNamePart},
-        {EXECUTE_EXTPART, ExecuteExpExtPart},
-        {EXECUTE_DOSNAMEPART, ExecuteExpDOSNamePart},
-        {EXECUTE_DOSEXTPART, ExecuteExpDOSExtPart},
+        {EXECUTE_DRIVE, ExecuteExpDriveW},
+        {EXECUTE_PATH, ExecuteExpPathW},
+        {EXECUTE_NAME, ExecuteExpNameW},
+        {EXECUTE_DOSPATH, ExecuteExpDOSPathW},
+        {EXECUTE_DOSNAME, ExecuteExpDOSNameW},
+        {EXECUTE_FULLNAME, ExecuteExpFullNameW},
+        {EXECUTE_DOSFULLNAME, ExecuteExpDOSFullNameW},
+        {EXECUTE_FULLPATH, ExecuteExpFullPathW},
+        {EXECUTE_WINDIR, ExecuteExpWinDirW},
+        {EXECUTE_SYSDIR, ExecuteExpSysDirW},
+        {EXECUTE_DOSFULLPATH, ExecuteExpDOSFullPathW},
+        {EXECUTE_DOSWINDIR, ExecuteExpDOSWinDirW},
+        {EXECUTE_DOSSYSDIR, ExecuteExpDOSSysDirW},
+        {EXECUTE_NAMEPART, ExecuteExpNamePartW},
+        {EXECUTE_EXTPART, ExecuteExpExtPartW},
+        {EXECUTE_DOSNAMEPART, ExecuteExpDOSNamePartW},
+        {EXECUTE_DOSEXTPART, ExecuteExpDOSExtPartW},
         {NULL, NULL}};
 
-CSalamanderVarStrEntry InitDirExpArray[] =
+sally::unicode::WideVarEntry InitDirExpArrayW[] =
     {
-        {EXECUTE_DRIVE, ExecuteExpDrive},
-        {EXECUTE_PATH, ExecuteExpPath2},         // j.r. I have no idea why the special versions of variables without
-        {EXECUTE_FULLPATH, ExecuteExpFullPath2}, // trailing backslashes are used; anyway, I added a call to
-        {EXECUTE_WINDIR, ExecuteExpWinDir2},     // RemoveDoubleBackslahesFromPath so we could probably switch to the
-        {EXECUTE_SYSDIR, ExecuteExpSysDir2},     // versions with backslashes at the end -- we would just trim the
-        {EXECUTE_SALDIR, ExecuteExpSalDir2},     // last backslash in ExpandInitDir() (unless it's the root)
+        {EXECUTE_DRIVE, ExecuteExpDriveW},
+        {EXECUTE_PATH, ExecuteExpPath2W},
+        {EXECUTE_FULLPATH, ExecuteExpFullPath2W},
+        {EXECUTE_WINDIR, ExecuteExpWinDir2W},
+        {EXECUTE_SYSDIR, ExecuteExpSysDir2W},
+        {EXECUTE_SALDIR, ExecuteExpSalDir2W},
         {NULL, NULL}};
 
-// !!! do not use InfoLineExpArray directly; use GetInfoLineExpArray()
-CSalamanderVarStrEntry InfoLineExpArray[] =
-    {
-        {FILEDATA_FILENAME, FileDataExpFileName},
-        {FILEDATA_FILESIZE, FileDataExpFileSize},
-        {FILEDATA_FILEDATE, NULL /* see below */},
-        {FILEDATA_FILETIME, NULL /* see below */},
-        {FILEDATA_FILEATTR, FileDataExpFileAttr},
-        {FILEDATA_FILEDOSNAME, FileDataExpFileDOSName},
-        {NULL, NULL}};
-
-CSalamanderVarStrEntry* GetInfoLineExpArray(BOOL isDisk)
-{
-    if (isDisk)
-    {
-        InfoLineExpArray[2].Execute = FileDataExpFileDateOnlyForDisk;
-        InfoLineExpArray[3].Execute = FileDataExpFileTimeOnlyForDisk;
-    }
-    else
-    {
-        InfoLineExpArray[2].Execute = FileDataExpFileDate;
-        InfoLineExpArray[3].Execute = FileDataExpFileTime;
-    }
-    return InfoLineExpArray;
-}
-
+// Information-line expansion has a single native-wide callback table.
 sally::unicode::WideVarEntry InfoLineExpArrayW[] =
     {
         {FILEDATA_FILENAME, FileDataExpFileNameW},
@@ -1836,25 +1607,7 @@ sally::unicode::WideVarEntry* GetInfoLineExpArrayW(BOOL isDisk)
     return InfoLineExpArrayW;
 }
 
-CSalamanderVarStrEntry MakeFileListExpArray[] =
-    {
-        {FILEDATA_FILENAME, FileDataExpFileName},
-        {FILEDATA_FILENAMEPART, FileDataExpFileNamePart},
-        {FILEDATA_FILEEXTENSION, FileDataExpFileExtension},
-        {FILEDATA_FILESIZE, FileDataExpFileSizeNoSpaces},
-        {FILEDATA_FILEDATE, FileDataExpFileDate},
-        {FILEDATA_FILETIME, FileDataExpFileTime},
-        {FILEDATA_FILEATTR, FileDataExpFileAttr},
-        {FILEDATA_FILEDOSNAME, FileDataExpFileDOSName},
-        {FILEDATA_LF, FileDataExpLF},
-        {FILEDATA_CR, FileDataExpCR},
-        {FILEDATA_CRLF, FileDataExpCRLF},
-        {FILEDATA_TAB, FileDataExpTAB},
-        {EXECUTE_DRIVE, MFLFileDataExpDrive},
-        {EXECUTE_PATH, MFLFileDataExpPath},
-        {EXECUTE_DOSPATH, MFLFileDataExpDOSPath},
-        {NULL, NULL}};
-
+// Make File List expansion has a single native-wide callback table.
 sally::unicode::WideVarEntry MakeFileListExpArrayW[] =
     {
         {FILEDATA_FILENAME, FileDataExpFileNameW},
@@ -1877,34 +1630,40 @@ sally::unicode::WideVarEntry MakeFileListExpArrayW[] =
 BOOL BrowseDirCommand(HWND hParent, int editlineResID, int filterResID)
 {
     CALL_STACK_MESSAGE2("BrowseDirCommand(, %d)", editlineResID);
-    CPathBuffer path; // Heap-allocated for long path support
-    SendMessage(GetDlgItem(hParent, editlineResID), WM_GETTEXT,
-                path.Size(), (LPARAM)path.Get());
+    // wide: GetTargetDirectory's browse dialog best-fit-narrows the chosen path -
+    // the same shape as the sibling dialog fixes. This function is reachable through exactly one
+    // caller/edit control (TrackExecuteMenu's EXECUTE_BROWSEDIR item, only present in
+    // HotPathItems, wired to IDC_HOTPATH_PATH with combobox=FALSE - a plain edit control), so
+    // the "verify every caller's edit control" concern raised earlier turned out to be
+    // a single, already-plain-edit site, not a real multi-dialog risk. GetDlgItemTextW/
+    // SetDlgItemTextW are safe regardless (standard child controls are always
+    // wide-registered by USER32).
+    const std::wstring initDirW = GetWindowTextStringW(GetDlgItem(hParent, editlineResID));
 
     CALL_STACK_MESSAGE1("BrowseDirCommand::GetOpenFileName");
-    if (GetTargetDirectory(hParent, hParent, LoadStr(IDS_BROWSEDIRECTORY_TITLE), LoadStr(IDS_BROWSEDIRECTORY_TEXT), path, FALSE, path))
+    std::wstring pathW;
+    if (GetTargetDirectoryW(hParent, hParent, LoadStrW(IDS_BROWSEDIRECTORY_TITLE), LoadStrW(IDS_BROWSEDIRECTORY_TEXT), pathW, FALSE, initDirW.c_str()))
     {
-        CALL_STACK_MESSAGE2("BrowseDirCommand::SendMessage( , , ,%s)", path.Get());
-        SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)path.Get());
+        SetDlgItemTextW(hParent, editlineResID, pathW.c_str());
         return TRUE;
     }
     return FALSE;
 }
 
-BOOL ValidateUserMenuArguments(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
+BOOL ValidateUserMenuArguments(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
                                CUserMenuValidationData* userMenuValidationData)
 {
-    CALL_STACK_MESSAGE2("ValidateUserMenuArguments(, %s, ,)", strlen(varText) > 300 ? "(too long)" : varText);
+    CALL_STACK_MESSAGE2("ValidateUserMenuArguments(, %ls, ,)", wcslen(varText) > 300 ? L"(too long)" : varText);
     CUserMenuValidationData dummyUserMenuValidationData;
     if (userMenuValidationData == NULL)
         userMenuValidationData = &dummyUserMenuValidationData; // the caller does not care about validation data
     memset(userMenuValidationData, 0, sizeof(CUserMenuValidationData));
-    if (!ValidateVarString(msgParent, varText, errorPos1, errorPos2, UserMenuArgsExpArray))
+    if (!ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, UserMenuArgsExpArrayW))
         return FALSE; // if this is a syntax error, report it here (including the edit position)
     errorPos1 = errorPos2 = 0;
-    char dummyBuffer[USRMNUARGS_MAXLEN];
-    ExpandVarString(msgParent, varText, dummyBuffer, USRMNUARGS_MAXLEN, UserMenuArgsValidationArray,
-                    userMenuValidationData, TRUE);
+    std::wstring ignoredExpansion;
+    ExpandWideVarStringW(msgParent, varText, ignoredExpansion,
+                         UserMenuArgsValidationArrayW, userMenuValidationData, TRUE);
 
     if (userMenuValidationData->MustHandleItemsAsGroup &&
         userMenuValidationData->MustHandleItemsOneByOne)
@@ -1927,26 +1686,25 @@ BOOL ValidateUserMenuArguments(HWND msgParent, const char* varText, int& errorPo
     return TRUE;
 }
 
-BOOL ExpandUserMenuArguments(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                             char* buffer, int bufferLen, BOOL* fileNameUsed,
+BOOL ExpandUserMenuArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                             std::wstring& output, BOOL* fileNameUsed,
                              CUserMenuAdvancedData* userMenuAdvancedData,
                              BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CALL_STACK_MESSAGE4("ExpandUserMenuArguments(, %s, %s, %s, , ,)", name, dosName,
-                        strlen(varText) > 300 ? "(too long)" : varText);
-
-    CExecuteExpData data;
+    CALL_STACK_MESSAGE4("ExpandUserMenuArguments(, %ls, %ls, %ls, ,)", name, dosName,
+                        wcslen(varText) > 300 ? L"(too long)" : varText);
+    CExecuteWideExpData data;
     data.Name = name;
     data.DosName = dosName;
     data.FileNameUsed = fileNameUsed;
     data.UserMenuAdvancedData = userMenuAdvancedData;
-    return ExpandVarString(msgParent, varText, buffer, bufferLen, UserMenuArgsExpArray,
-                           &data, ignoreEnvVarNotFoundOrTooLong);
+    return ExpandWideVarStringW(msgParent, varText, output, UserMenuArgsExpArrayW, &data,
+                                ignoreEnvVarNotFoundOrTooLong);
 }
 
-BOOL ValidateCommandFile(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateCommandFile(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateCommandFile(, %s, ,)", varText);
+    CALL_STACK_MESSAGE2("ValidateCommandFile(, %ls, ,)", varText);
 
     if (!ValidatePathIsNotEmpty(msgParent, varText))
     {
@@ -1956,12 +1714,12 @@ BOOL ValidateCommandFile(HWND msgParent, const char* varText, int& errorPos1, in
         return FALSE;
     }
 
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2, CommandExpArray);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, CommandExpArrayW);
 }
 
-BOOL ValidateHotPath(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateHotPath(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateHotPath(, %s, ,)", varText);
+    CALL_STACK_MESSAGE2("ValidateHotPath(, %ls, ,)", varText);
 
     if (!ValidatePathIsNotEmpty(msgParent, varText))
     {
@@ -1971,74 +1729,50 @@ BOOL ValidateHotPath(HWND msgParent, const char* varText, int& errorPos1, int& e
         return FALSE;
     }
 
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2, HotPathExpArray);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, HotPathExpArrayW);
 }
 
-BOOL ValidateArguments(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateArguments(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateArguments(, %s, ,)", varText);
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2, ArgumentsExpArray);
+    CALL_STACK_MESSAGE2("ValidateArguments(, %ls, ,)", varText);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, ArgumentsExpArrayW);
 }
 
-BOOL ExpandArguments(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                     char* buffer, int bufferLen, BOOL* fileNameUsed)
+BOOL ExpandArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                     std::wstring& output, BOOL* fileNameUsed)
 {
-    CALL_STACK_MESSAGE4("ExpandArguments(, %s, %s, %s, , ,)", name, dosName, varText);
-    CExecuteExpData data;
-    data.Name = name;
-    data.DosName = dosName;
-    data.FileNameUsed = fileNameUsed;
-    return ExpandVarString(msgParent, varText, buffer, bufferLen, ArgumentsExpArray, &data);
-}
-
-std::wstring ExpandArgumentsW(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                              BOOL* fileNameUsed)
-{
-    CExecuteExpData data;
+    CALL_STACK_MESSAGE4("ExpandArguments(, %ls, %ls, %ls, ,)", name, dosName, varText);
+    CExecuteWideExpData data;
     data.Name = name;
     data.DosName = dosName;
     data.FileNameUsed = fileNameUsed;
     data.UserMenuAdvancedData = NULL;
-    return ExpandVarStringW(msgParent, varText, ArgumentsExpArray, &data);
+    return ExpandWideVarStringW(msgParent, varText, output, ArgumentsExpArrayW, &data, FALSE);
 }
 
-BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateInitDir(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateInitDir(, %s, ,)", varText);
+    CALL_STACK_MESSAGE2("ValidateInitDir(, %ls, ,)", varText);
     if (*varText == 0)
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_EXP_EMPTYSTR));
         errorPos1 = errorPos2 = 0;
         return FALSE;
     }
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2, InitDirExpArray);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, InitDirExpArrayW);
 }
 
-BOOL ValidateInfoLineItems(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateInfoLineItems(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateInfoLineItems(, %s, ,)", varText);
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2,
-                             GetInfoLineExpArray(TRUE /* for validation there is no difference between TRUE and FALSE */));
+    CALL_STACK_MESSAGE2("ValidateInfoLineItems(, %ls, ,)", varText);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2,
+                                  GetInfoLineExpArrayW(TRUE /* for validation there is no difference between TRUE and FALSE */));
 }
 
-BOOL ExpandInfoLineItems(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                         CFileData* fData, BOOL isDir, char* buffer, int bufferLen, DWORD* varPlacements,
-                         int* varPlacementsCount, DWORD validFileData, BOOL isDisk)
-{
-    CALL_STACK_MESSAGE1("ExpandInfoLineItems()");
-    CFileDataExpData data;
-    data.PluginData = pluginData;
-    data.FileData = fData;
-    data.IsDir = isDir;
-    data.ValidFileData = validFileData;
-    data.Path[0] = 0;
-    return ExpandVarString(msgParent, varText, buffer, bufferLen, GetInfoLineExpArray(isDisk),
-                           &data, TRUE, varPlacements, varPlacementsCount);
-}
-
-BOOL ExpandInfoLineItemsW(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                          CFileData* fData, BOOL isDir, std::wstring& buffer, DWORD* varPlacements,
-                          int* varPlacementsCount, DWORD validFileData, BOOL isDisk)
+BOOL ExpandInfoLineItemsW(HWND msgParent, const wchar_t* varText, CPluginDataInterfaceEncapsulation* pluginData,
+                          CFileData* fData, BOOL isDir, std::wstring& buffer,
+                          std::vector<sally::unicode::WideTextRange>& varPlacements,
+                          DWORD validFileData, BOOL isDisk)
 {
     CALL_STACK_MESSAGE1("ExpandInfoLineItemsW()");
     CFileDataExpData data;
@@ -2046,37 +1780,21 @@ BOOL ExpandInfoLineItemsW(HWND msgParent, const char* varText, CPluginDataInterf
     data.FileData = fData;
     data.IsDir = isDir;
     data.ValidFileData = validFileData;
-    data.Path[0] = 0;
     return sally::unicode::ExpandWideVarString(varText, GetInfoLineExpArrayW(isDisk), &data,
-                                               &buffer, varPlacements, varPlacementsCount);
+                                               &buffer, &varPlacements);
 }
 
-BOOL ValidateMakeFileList(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2)
+BOOL ValidateMakeFileList(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2)
 {
-    CALL_STACK_MESSAGE2("ValidateMakeFileList(, %s, ,)", varText);
-    return ValidateVarString(msgParent, varText, errorPos1, errorPos2, MakeFileListExpArray);
+    CALL_STACK_MESSAGE2("ValidateMakeFileList(, %ls, ,)", varText);
+    return ValidateWideVarStringW(msgParent, varText, errorPos1, errorPos2, MakeFileListExpArrayW);
 }
 
-BOOL ExpandMakeFileList(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                        CFileData* fData, BOOL isDir, char* buffer, int bufferLen, BOOL detectMaxVarSizes,
-                        int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const char* path,
-                        BOOL ignoreEnvVarNotFoundOrTooLong)
-{
-    CALL_STACK_MESSAGE1("ExpandMakeFileList()");
-    CFileDataExpData data;
-    data.PluginData = pluginData;
-    data.FileData = fData;
-    data.IsDir = isDir;
-    data.ValidFileData = validFileData;
-    strcpy(data.Path, path);
-    return ExpandVarString(msgParent, varText, buffer, bufferLen, MakeFileListExpArray, &data,
-                           ignoreEnvVarNotFoundOrTooLong, NULL, NULL, detectMaxVarSizes,
-                           maxVarSizes, maxVarSizesCount);
-}
-
-BOOL ExpandMakeFileListW(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
+// The generated listing stays wide from the panel path through
+// variable expansion; there is no ANSI mirror or callback table in this route.
+BOOL ExpandMakeFileListW(HWND msgParent, const wchar_t* varText, CPluginDataInterfaceEncapsulation* pluginData,
                          CFileData* fData, BOOL isDir, std::wstring* buffer, BOOL detectMaxVarSizes,
-                         int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const char* path,
+                         int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const wchar_t* pathW,
                          BOOL ignoreEnvVarNotFoundOrTooLong)
 {
     CALL_STACK_MESSAGE1("ExpandMakeFileListW()");
@@ -2085,24 +1803,24 @@ BOOL ExpandMakeFileListW(HWND msgParent, const char* varText, CPluginDataInterfa
     data.FileData = fData;
     data.IsDir = isDir;
     data.ValidFileData = validFileData;
-    strcpy(data.Path, path);
+    data.PathW = pathW != NULL ? pathW : L"";
     return sally::unicode::ExpandWideVarString(varText, MakeFileListExpArrayW, &data,
-                                               buffer, NULL, NULL, detectMaxVarSizes,
+                                               buffer, NULL, detectMaxVarSizes,
                                                maxVarSizes, maxVarSizesCount);
 }
 
-BOOL RemoveDoubleBackslahesFromPath(char* text)
+BOOL RemoveDoubleBackslahesFromPath(wchar_t* text)
 {
     if (text == NULL)
     {
         TRACE_E("Unexpected situation in RemoveDoubleBackslahesFromPath().");
         return FALSE;
     }
-    int len = (int)strlen(text);
+    int len = (int)wcslen(text);
     if (len < 3)
         return TRUE;
-    char* s = text + 2; // UNC paths start with "\\"
-    char* d = s;
+    wchar_t* s = text + 2; // UNC paths start with "\\"
+    wchar_t* d = s;
     while (*s != 0)
     {
         if (*s == '\\' && *(s + 1) == '\\')
@@ -2115,53 +1833,48 @@ BOOL RemoveDoubleBackslahesFromPath(char* text)
     return TRUE;
 }
 
-BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                   char* buffer, int bufferLen, BOOL ignoreEnvVarNotFoundOrTooLong)
+static void RemoveDoubleBackslashesFromPath(std::wstring& text)
 {
-    CALL_STACK_MESSAGE4("ExpandInitDir(, %s, %s, %s, ,)", name, dosName, varText);
-    CExecuteExpData data;
-    data.Name = name;
-    data.DosName = dosName;
-    data.FileNameUsed = NULL;
-    if (ExpandVarString(msgParent, varText, buffer, bufferLen, InitDirExpArray,
-                        &data, ignoreEnvVarNotFoundOrTooLong))
+    if (text.length() < 3)
+        return;
+    size_t read = 2; // preserve the leading pair of a UNC path
+    size_t write = 2;
+    while (read < text.length())
     {
-        // variables $() from Initial Directory normally do not end with a backslash,
-        // but if they point to the root they do; then path "$(SalDir)\\Editor" becomes
-        // "C:\\Editor" and we get two backslashes
-        RemoveDoubleBackslahesFromPath(buffer); // collapse double backslashes into one
-        return TRUE;
+        if (text[read] == L'\\' && read + 1 < text.length() && text[read + 1] == L'\\')
+            ++read;
+        text[write++] = text[read++];
     }
-    else
-        return FALSE;
+    text.resize(write);
 }
 
-std::wstring ExpandInitDirW(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong)
+BOOL ExpandInitDir(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                   std::wstring& output, BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CExecuteExpData data;
+    CALL_STACK_MESSAGE4("ExpandInitDir(, %ls, %ls, %ls, ,)", name, dosName, varText);
+    CExecuteWideExpData data;
     data.Name = name;
     data.DosName = dosName;
     data.FileNameUsed = NULL;
     data.UserMenuAdvancedData = NULL;
-    std::wstring result = ExpandVarStringW(msgParent, varText, InitDirExpArray, &data,
-                                           ignoreEnvVarNotFoundOrTooLong);
-    if (!result.empty())
-        RemoveDoubleBackslashesW(result);
-    return result;
+    if (!ExpandWideVarStringW(msgParent, varText, output, InitDirExpArrayW, &data,
+                              ignoreEnvVarNotFoundOrTooLong))
+        return FALSE;
+    RemoveDoubleBackslashesFromPath(output);
+    return TRUE;
 }
 
-BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+BOOL ExpandCommand(HWND msgParent, const wchar_t* varText, wchar_t* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CALL_STACK_MESSAGE2("ExpandCommand(, %s, , ,)", varText);
-    CExecuteExpData data;
+    CALL_STACK_MESSAGE2("ExpandCommand(, %ls, , ,)", varText);
+    CExecuteWideExpData data;
     data.Name = NULL;
     data.DosName = NULL;
     data.FileNameUsed = NULL;
     data.UserMenuAdvancedData = NULL;
-    if (ExpandVarString(msgParent, varText, buffer, bufferLen, CommandExpArray, &data,
-                        ignoreEnvVarNotFoundOrTooLong))
+    if (ExpandWideVarStringW(msgParent, varText, buffer, bufferLen, CommandExpArrayW, &data,
+                             ignoreEnvVarNotFoundOrTooLong))
     {
         // the EXECUTE_WINDIR, EXECUTE_SYSDIR and EXECUTE_SALDIR variables end with a backslash
         // the user adds another one, so the path contains two of them
@@ -2172,55 +1885,52 @@ BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int buffer
         return FALSE;
 }
 
-std::wstring ExpandCommandW(HWND msgParent, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong)
-{
-    CExecuteExpData data;
-    data.Name = NULL;
-    data.DosName = NULL;
-    data.FileNameUsed = NULL;
-    data.UserMenuAdvancedData = NULL;
-    std::wstring result = ExpandVarStringW(msgParent, varText, CommandExpArray, &data,
-                                           ignoreEnvVarNotFoundOrTooLong);
-    if (!result.empty())
-        RemoveDoubleBackslashesW(result);
-    return result;
-}
-
-BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+BOOL ExpandCommand(HWND msgParent, const wchar_t* varText, std::wstring& output,
                    BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    CALL_STACK_MESSAGE2("ExpandHotPath(, %s, , ,)", varText);
-    CExecuteExpData data;
+    CALL_STACK_MESSAGE2("ExpandCommand(, %ls, ,)", varText);
+    CExecuteWideExpData data;
     data.Name = NULL;
     data.DosName = NULL;
     data.FileNameUsed = NULL;
     data.UserMenuAdvancedData = NULL;
-    if (ExpandVarString(msgParent, varText, buffer, bufferLen, HotPathExpArray, &data,
-                        ignoreEnvVarNotFoundOrTooLong))
+    if (!ExpandWideVarStringW(msgParent, varText, output, CommandExpArrayW, &data,
+                              ignoreEnvVarNotFoundOrTooLong))
+        return FALSE;
+    RemoveDoubleBackslashesFromPath(output);
+    return TRUE;
+}
+
+BOOL ExpandHotPath(HWND msgParent, const wchar_t* varText, wchar_t* buffer, int bufferLen,
+                   BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    std::wstring expanded;
+    if (!ExpandHotPath(msgParent, varText, expanded, ignoreEnvVarNotFoundOrTooLong) ||
+        buffer == NULL || bufferLen <= 0 || expanded.size() >= static_cast<size_t>(bufferLen))
+        return FALSE;
+    wcscpy_s(buffer, bufferLen, expanded.c_str());
+    return TRUE;
+}
+
+BOOL ExpandHotPath(HWND msgParent, const wchar_t* varText, std::wstring& output,
+                   BOOL ignoreEnvVarNotFoundOrTooLong)
+{
+    CALL_STACK_MESSAGE2("ExpandHotPath(, %ls, , ,)", varText);
+    CExecuteWideExpData data;
+    data.Name = NULL;
+    data.DosName = NULL;
+    data.FileNameUsed = NULL;
+    data.UserMenuAdvancedData = NULL;
+    if (ExpandWideVarStringW(msgParent, varText, output, HotPathExpArrayW, &data,
+                              ignoreEnvVarNotFoundOrTooLong))
     {
         // the EXECUTE_WINDIR, EXECUTE_SYSDIR and EXECUTE_SALDIR variables end with a backslash
         // the user adds another one, so the path contains two of them
-        RemoveDoubleBackslahesFromPath(buffer); // collapse double backslashes into one
+        RemoveDoubleBackslashesFromPath(output);
         return TRUE;
     }
     else
         return FALSE;
-}
-
-std::wstring ExpandHotPathW(HWND msgParent, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong)
-{
-    CExecuteExpData data;
-    data.Name = NULL;
-    data.DosName = NULL;
-    data.FileNameUsed = NULL;
-    data.UserMenuAdvancedData = NULL;
-    std::wstring result = ExpandVarStringW(msgParent, varText, HotPathExpArray, &data,
-                                           ignoreEnvVarNotFoundOrTooLong);
-    if (!result.empty())
-        RemoveDoubleBackslashesW(result);
-    return result;
 }
 
 const CExecuteItem*
@@ -2272,22 +1982,22 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
             while (item[i].Keyword != EXECUTE_SUBMENUEND && item[i].Keyword != EXECUTE_TERMINATOR)
             {
                 if (item[i].Keyword == EXECUTE_SEPARATOR)
-                    InsertMenu(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
+                    InsertMenuW(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
                 else
-                    InsertMenu(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
-                               LoadStr(item[i].NameResID));
+                    InsertMenuW(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
+                                LoadStrW(item[i].NameResID));
                 i++;
             }
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_POPUP, (UINT_PTR)hSubMenu,
-                       LoadStr(item[subMenuIndex].NameResID));
+            InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_POPUP, (UINT_PTR)hSubMenu,
+                        LoadStrW(item[subMenuIndex].NameResID));
         }
         else
         {
             if (item[i].Keyword == EXECUTE_SEPARATOR)
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
+                InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
             else
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
-                           LoadStr(item[i].NameResID));
+                InsertMenuW(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
+                            LoadStrW(item[i].NameResID));
         }
         i++;
     }
@@ -2302,7 +2012,7 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
     if (cmd != 0)
     {
         item = &executeItems[cmd - 1];
-        char buff[255];
+        wchar_t buff[255];
         if (item->Keyword == EXECUTE_BROWSE)
         {
             BrowseCommand(hParent, editlineResID, filterResID);
@@ -2317,21 +2027,21 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
             return item;
 
         if (item->Flags & EIF_VARIABLE)
-            sprintf(buff, "$(%s)", item->Keyword);
+            swprintf_s(buff, L"$(%ls)", item->Keyword);
         else
-            sprintf(buff, "%s", item->Keyword);
+            swprintf_s(buff, L"%ls", item->Keyword);
 
         if (item->Flags & EIF_REPLACE_ALL)
         {
-            SendMessage(hEdit, WM_SETTEXT, 0, (LPARAM)buff);
-            SendMessage(hEdit, EM_SETSEL, lstrlen(buff), lstrlen(buff));
+            SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)buff);
+            SendMessageW(hEdit, EM_SETSEL, lstrlenW(buff), lstrlenW(buff));
         }
         else
         {
             if (comboEdit != NULL)
                 comboEdit->ReplaceText(buff);
             else
-                SendMessage(hEdit, EM_REPLACESEL, TRUE, (LPARAM)buff);
+                SendMessageW(hEdit, EM_REPLACESEL, TRUE, (LPARAM)buff);
         }
         if ((item->Flags & EIF_DONT_FOCUS) == 0)
         {
@@ -2340,7 +2050,7 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
             DWORD end;
             if (comboEdit != NULL)
             {
-                SendMessage(hEdit, EM_GETSEL, (WPARAM)&start, (LPARAM)&end);
+                SendMessageW(hEdit, EM_GETSEL, (WPARAM)&start, (LPARAM)&end);
                 SetFocus(hEdit);
             }
             if (item->Flags & EIF_CURSOR_1 || item->Flags & EIF_CURSOR_2)
@@ -2348,21 +2058,21 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
                 int delta = 1;
                 if (item->Flags & EIF_CURSOR_2)
                     delta = 2;
-                if (delta > lstrlen(buff))
+                if (delta > lstrlenW(buff))
                 {
                     TRACE_E("delta > strlen(buff)");
-                    delta = (int)strlen(buff);
+                    delta = (int)wcslen(buff);
                 }
                 if (comboEdit == NULL)
-                    SendMessage(hEdit, EM_GETSEL, (WPARAM)&start, (LPARAM)&end);
-                SendMessage(hEdit, EM_SETSEL, end - delta, end - delta);
+                    SendMessageW(hEdit, EM_GETSEL, (WPARAM)&start, (LPARAM)&end);
+                SendMessageW(hEdit, EM_SETSEL, end - delta, end - delta);
             }
             else if (comboEdit != NULL)
-                SendMessage(hEdit, EM_SETSEL, end, end);
+                SendMessageW(hEdit, EM_SETSEL, end, end);
             if (comboEdit == NULL)
                 SetFocus(hEdit);
             // the default would remain with us -- give it back to the dialog
-            SendMessage(hButton, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
+            SendMessageW(hButton, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
             HWND hDialog = hParent;
             DWORD dlgStyle;
             do
@@ -2376,46 +2086,46 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
                     hDialog = hPar;
                 }
             } while (dlgStyle & DS_CONTROL);
-            DWORD defID = (DWORD)SendMessage(hDialog, DM_GETDEFID, 0, 0);
+            DWORD defID = (DWORD)SendMessageW(hDialog, DM_GETDEFID, 0, 0);
             if (HIWORD(defID) == DC_HASDEFID)
-                SendMessage(GetDlgItem(hDialog, LOWORD(defID)), BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
+                SendMessageW(GetDlgItem(hDialog, LOWORD(defID)), BM_SETSTYLE, BS_DEFPUSHBUTTON, TRUE);
         }
     }
     return item;
 }
 
+// Wide file picker: the edit control filled by WM_GETTEXT/WM_SETTEXT is a
+// standard USER32 EDIT control (Unicode-native by class registration regardless of the
+// parent dialog's own ANSI/Unicode nature - this same dialog already sends it wide text
+// via SetDlgItemTextW elsewhere), so SendMessageW round-trips correctly. GetOpenFileNameW
+// avoids narrowing the picked path (and the browsed-from starting path) through CP_ACP.
 BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
 {
     CALL_STACK_MESSAGE2("BrowseCommand(, %d)", editlineResID);
-    CPathBuffer file; // Heap-allocated for long path support
-    SendMessage(GetDlgItem(hParent, editlineResID), WM_GETTEXT,
-                file.Size(), (LPARAM)file.Get());
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    HWND hEdit = GetDlgItem(hParent, editlineResID);
+    std::wstring file = GetWindowTextStringW(hEdit);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(OPENFILENAMEW));
+    ofn.lStructSize = sizeof(OPENFILENAMEW);
     ofn.hwndOwner = hParent;
-    char* s = LoadStr(filterResID);
+    wchar_t* s = LoadStrW(filterResID);
     ofn.lpstrFilter = s;
     while (*s != 0) // create a double-null terminated list
     {
-        if (*s == '|')
+        if (*s == L'|')
             *s = 0;
         s++;
     }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
-    //  ofn.lpstrFileTitle = file;
-    //  ofn.nMaxFileTitle = MAX_PATH;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
     CALL_STACK_MESSAGE1("BrowseCommand::GetOpenFileName");
-    if (GetOpenFileName(&ofn))
+    if (SafeGetOpenFileNameOwnedW(&ofn, file))
     {
-        if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
+        if (SalGetFullNameW(file))
         {
-            CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", file.Get());
-            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());
+            CALL_STACK_MESSAGE1("BrowseCommand::SendMessage");
+            SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)file.c_str());
             return TRUE;
         }
     }
@@ -2424,7 +2134,7 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
         DWORD error = CommDlgExtendedError();
         if (error == FNERR_INVALIDFILENAME)
         {
-            std::wstring msg = FormatStrW(LoadStrW(IDS_COMDLG_INVALIDFILENAME), AnsiToWide(file).c_str());
+            std::wstring msg = FormatStrW(LoadStrW(IDS_COMDLG_INVALIDFILENAME), file.c_str());
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
         }
     }

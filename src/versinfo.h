@@ -10,11 +10,16 @@
 // linking Version.LIB/DLL, which we do not use for anything else.
 // WARNING: the module exists both in Salamander and in Translator.
 
+// Sally READS version resources and never writes them: SetString,
+// UpdateResource and WriteResourceToFile have no callers anywhere in the core tree.
+// The Translator does write them, and per the WARNING above it has its OWN copy of this
+// module - translator/versinfo.h defines both flags for itself. Leaving them off here
+// keeps sally free of ~200 lines of unreachable code without forking the shared body.
+//
 // If the following variable is defined, the module supports writing in addition to reading.
-#define VERSINFO_SUPPORT_WRITE
+//#define VERSINFO_SUPPORT_WRITE
 
 // Can save the resource to disk; used for module debugging purposes.
-#define VERSINFO_SUPPORT_DEBUG
 
 // VERSIONINFO
 typedef struct tagVsVersionInfo
@@ -79,24 +84,24 @@ public:
 
     // QueryValue extracts data from the resource.
     // 'block' - see FindBlock
-    BOOL QueryValue(const char* block, BYTE** buffer, DWORD* size);
+    BOOL QueryValue(const wchar_t* block, BYTE** buffer, DWORD* size);
 
     // Extracts a string from the StringFileInfo section and converts the Unicode string on the fly.
     // 'block' - see FindBlock.
-    BOOL QueryString(const char* block, char* buffer, DWORD maxSize, WCHAR* bufferW = NULL, DWORD maxSizeW = 0);
+    // One wide out-buffer. This used to take a narrow 'buffer' AND a
+    // bolted-on 'bufferW' mirror, filling the narrow one through a bare
+    // WideCharToMultiByte(CP_ACP, 0, ...) - best-fit on, return value ignored - so a
+    // translator's name or URL outside the code page was silently mangled.
+    BOOL QueryString(const wchar_t* block, WCHAR* buffer, DWORD maxSize);
 
 #ifdef VERSINFO_SUPPORT_WRITE
     // Sets the string into the 'block' block; returns TRUE on success, otherwise FALSE.
     // The block must already exist.
-    BOOL SetString(const char* block, const char* buffer);
+    BOOL SetString(const wchar_t* block, const wchar_t* buffer);
 
     // Allocates a block of memory, prepares the VERSIONINFO stream, and updates the resource.
     BOOL UpdateResource(HANDLE hUpdateRes, int resID);
 #endif //VERSINFO_SUPPORT_WRITE
-
-#ifdef VERSINFO_SUPPORT_DEBUG
-    BOOL WriteResourceToFile(HINSTANCE hInstance, int resID, const char* fileName);
-#endif //VERSINFO_SUPPORT_DEBUG
 
 private:
     // ptr: points into the VS_VERSIONINFO stream at the block to be loaded.
@@ -108,7 +113,7 @@ private:
     //   "\" returns a pointer to VS_FIXEDFILEINFO
     //   "\VarFileInfo\Translation" returns a pointer to a DWORD
     //   "\StringFileInfo\lang-codepage\string-name" returns a pointer to the value (UNICODE)
-    CVersionBlock* FindBlock(const char* block);
+    CVersionBlock* FindBlock(const wchar_t* block);
 
 #ifdef VERSINFO_SUPPORT_WRITE
     // Recursive helper for building the VERSIONINFO stream.

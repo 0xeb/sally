@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -23,7 +23,7 @@
 
 extern HINSTANCE g_hInstance;
 
-const TCHAR CSalamanderGuiForm::s_szClassName[] = _T("AutomationForm");
+const wchar_t CSalamanderGuiForm::s_szClassName[] = L"AutomationForm";
 LONG CSalamanderGuiForm::s_nClass;
 
 CSalamanderGuiForm::CSalamanderGuiForm(__in CScriptInfo* pScript, __in_opt VARIANT* text) : CSalamanderGuiContainerImpl<CSalamanderGuiForm, ISalamanderGuiForm>(text)
@@ -207,7 +207,7 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
         }
         else if (dwWait == WAIT_OBJECT_0 + 1)
         {
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 if (msg.message == WM_QUIT)
                 {
@@ -218,7 +218,7 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
                 if (!IsDialogMessage(m_hWnd, &msg))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
         }
@@ -261,7 +261,7 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
 {
     if (s_nClass == 0)
     {
-        WNDCLASSEX wc = {
+        WNDCLASSEXW wc = {
             0,
         };
 
@@ -274,7 +274,7 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
         wc.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
         wc.lpszClassName = s_szClassName;
 
-        if (!RegisterClassEx(&wc))
+        if (!RegisterClassExW(&wc))
         {
             _ASSERTE(0);
             return false;
@@ -290,7 +290,7 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
     _ASSERTE(s_nClass > 0);
     if (--s_nClass == 0)
     {
-        if (!UnregisterClass(s_szClassName, g_hInstance))
+        if (!UnregisterClassW(s_szClassName, g_hInstance))
             TRACE_E("UnregisterClass(s_szClassName) has failed");
     }
 }
@@ -315,10 +315,10 @@ HWND CSalamanderGuiForm::HwndNeeded()
         return NULL;
     }
 
-    hWnd = CreateWindowEx(
+    hWnd = CreateWindowExW(
         exStyle,
         s_szClassName,
-        m_strText ? OLE2T(m_strText) : _T("Form"),
+        m_strText ? m_strText : L"Form",
         style,
         0, 0, 0, 0,
         SalamanderGeneral->GetMainWindowHWND(), // parent
@@ -344,7 +344,7 @@ HWND CSalamanderGuiForm::HwndNeeded()
         lf.lfOutPrecision = OUT_DEFAULT_PRECIS;
         lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
         lf.lfQuality = DEFAULT_QUALITY;
-        StringCchCopy(lf.lfFaceName, _countof(lf.lfFaceName), _T("Segoe UI"));
+        StringCchCopy(lf.lfFaceName, _countof(lf.lfFaceName), L"Segoe UI");
 
         ReleaseDC(hWnd, hDC);
 

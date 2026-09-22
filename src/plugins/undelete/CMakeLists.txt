@@ -6,7 +6,6 @@ sal_add_plugin(NAME undelete
     # Shared sources (compiled with plugin's precomp.h from library/)
     "${SAL_SHARED}/auxtools.cpp"
     "${SAL_SHARED}/dbg.cpp"
-    "${SAL_SHARED}/mhandles.cpp"
     "${SAL_SHARED}/plugindarkmode.cpp"
     "${SAL_SRC}/combo_dark_paint.cpp"
     "${SAL_SHARED}/winliblt.cpp"

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -182,32 +182,32 @@ void CElasticLayout::LayoutCtrls()
 // CPropSheetPage
 //
 
-CPropSheetPage::CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID,
+CPropSheetPage::CPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                                DWORD flags, HICON icon, CObjectOrigin origin)
     : CDialog(modul, resID, NULL, origin)
 {
     Init(title, modul, resID, icon, flags, origin);
 }
 
-CPropSheetPage::CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+CPropSheetPage::CPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                                DWORD flags, HICON icon, CObjectOrigin origin)
     : CDialog(modul, resID, helpID, NULL, origin)
 {
     Init(title, modul, resID, icon, flags, origin);
 }
 
-void CPropSheetPage::Init(const TCHAR* title, HINSTANCE modul, int resID,
+void CPropSheetPage::Init(const wchar_t* title, HINSTANCE modul, int resID,
                           HICON icon, DWORD flags, CObjectOrigin origin)
 {
     Title = NULL;
     if (title != NULL)
     {
-        int len = (int)_tcslen(title);
-        Title = new TCHAR[len + 1];
+        int len = (int)wcslen(title);
+        Title = new wchar_t[len + 1];
         if (Title != NULL)
-            _tcscpy_s(Title, len + 1, title);
+            wcscpy_s(Title, len + 1, title);
         else
-            TRACE_ET(_T("Low memory!"));
+            TRACE_ET(L"Low memory!");
     }
     Flags = flags;
     Icon = icon;
@@ -461,7 +461,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
         dlg = (CPropSheetPage*)((PROPSHEETPAGE*)lParam)->lParam;
         if (dlg == NULL)
         {
-            TRACE_ET(_T("Unable to create dialog."));
+            TRACE_ET(L"Unable to create dialog.");
             return TRUE;
         }
         else
@@ -471,7 +471,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
             //--- insert window according to hwndDlg into the list of windows
             if (!WindowsManager.AddWindow(hwndDlg, dlg)) // error
             {
-                TRACE_ET(_T("Unable to create dialog."));
+                TRACE_ET(L"Unable to create dialog.");
                 return TRUE;
             }
             dlg->NotifDlgJustCreated(); // introduced as a place to modify dialog layout
@@ -506,7 +506,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
 #ifdef __DEBUG_WINLIB
         if (dlg != NULL && !dlg->Is(otPropSheetPage))
         {
-            TRACE_CT(_T("This should never happen."));
+            TRACE_CT(L"This should never happen.");
             dlg = NULL;
         }
 #endif
@@ -551,7 +551,7 @@ CPropertyDialog::Execute()
         HPROPSHEETPAGE* pages = new HPROPSHEETPAGE[Count];
         if (pages == NULL)
         {
-            TRACE_ET(_T("Low memory!"));
+            TRACE_ET(L"Low memory!");
             return -1;
         }
         psh.phpage = pages;
@@ -567,7 +567,7 @@ CPropertyDialog::Execute()
     }
     else
     {
-        TRACE_ET(_T("Incorrect call to CPropertyDialog::Execute."));
+        TRACE_ET(L"Incorrect call to CPropertyDialog::Execute.");
         return -1;
     }
 }
@@ -612,23 +612,23 @@ CTPHCaptionWindow::~CTPHCaptionWindow()
         free(Text);
 }
 
-void CTPHCaptionWindow::SetText(const TCHAR* text)
+void CTPHCaptionWindow::SetText(const WCHAR* text)
 {
-    int l = (int)_tcslen(text);
+    int l = (int)wcslen(text);
     if (Allocated < l + 2)
     {
         if (Text != NULL)
             free(Text);
-        Text = (TCHAR*)malloc((l + 2) * sizeof(TCHAR));
+        Text = (WCHAR*)malloc((l + 2) * sizeof(WCHAR));
         if (Text == NULL)
         {
-            TRACE_ET(_T("Low memory!"));
+            TRACE_ET(L"Low memory!");
             Allocated = 0;
             return;
         }
         Allocated = l + 2;
     }
-    _tcscpy_s(Text, Allocated, text);
+    wcscpy_s(Text, Allocated, text);
     InvalidateRect(HWindow, NULL, TRUE);
     UpdateWindow(HWindow);
 }
@@ -711,7 +711,7 @@ CTPHCaptionWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
                 oldColor = SetTextColor(hdc, GetSysColor(COLOR_CAPTIONTEXT));
             r.left += 8;
-            DrawText(hdc, Text, (int)_tcslen(Text), &r, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
+            DrawTextW(hdc, Text, (int)wcslen(Text), &r, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOPREFIX);
             SetTextColor(hdc, oldColor);
             SelectObject(hdc, hOldFont);
             SetBkMode(hdc, oldBkMode);
@@ -809,7 +809,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CaptionWindow = new CTPHCaptionWindow(HWindow, _TPD_IDC_CAPTION);
         if (CaptionWindow == NULL)
-            TRACE_ET(_T("Low memory!"));
+            TRACE_ET(L"Low memory!");
         TreeWidth = BuildAndMeasureTree() + 2 * treeIndent + treeIndent / 2 + GetSystemMetrics(SM_CXVSCROLL);
         if (TPD->StartPage < 0 || TPD->StartPage >= TPD->Count)
             TPD->StartPage = 0;
@@ -876,7 +876,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 WinLibHelp->OnHelp(HWindow, ChildDialog->HelpID, &hi, FALSE, FALSE);
             }
             else
-                TRACE_ET(_T("CTreePropHolderDlg::DialogProc(): ignoring _TPD_IDC_HELP: SetupWinLibHelp() was not called or ChildDialog is NULL or ChildDialog->HelpID is -1!"));
+                TRACE_ET(L"CTreePropHolderDlg::DialogProc(): ignoring _TPD_IDC_HELP: SetupWinLibHelp() was not called or ChildDialog is NULL or ChildDialog->HelpID is -1!");
             return TRUE;
         }
 
@@ -969,7 +969,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_NCHITTEST:
     {
         // Resize only in vertical direction
-        LRESULT ht = DefWindowProc(HWindow, uMsg, wParam, lParam);
+        LRESULT ht = DefWindowProcW(HWindow, uMsg, wParam, lParam);
         switch (ht)
         {
         case HTBOTTOMLEFT:
@@ -1134,14 +1134,15 @@ int CTreePropHolderDlg::BuildAndMeasureTree()
     int width = 0;
     for (int i = 0; i < TPD->Count; i++)
     {
-        TVINSERTSTRUCT tvis;
+        // Page titles have one UTF-16 owner and are inserted with the explicit wide message.
+        TVINSERTSTRUCTW tvis;
         tvis.hParent = NULL;
         if (TPD->At(i)->ParentPage != NULL)
             tvis.hParent = TPD->At(i)->ParentPage->HTreeItem;
         tvis.hInsertAfter = TVI_LAST;
         tvis.item.mask = TVIF_TEXT | TVIF_STATE | TVIF_PARAM;
         tvis.item.pszText = TPD->At(i)->Title;
-        tvis.item.cchTextMax = (int)_tcslen(TPD->At(i)->Title);
+        tvis.item.cchTextMax = (int)wcslen(TPD->At(i)->Title);
         tvis.item.state = 0;
         // WARNING: expandable items here must be expanded, otherwise TreeView_GetItemRect() will return FALSE
         // and random data in RECT r rectangle
@@ -1149,7 +1150,7 @@ int CTreePropHolderDlg::BuildAndMeasureTree()
             tvis.item.state |= TVIS_EXPANDED;
         tvis.item.stateMask = tvis.item.state;
         tvis.item.lParam = (LPARAM)TPD->At(i);
-        TPD->At(i)->HTreeItem = TreeView_InsertItem(HTreeView, &tvis);
+        TPD->At(i)->HTreeItem = (HTREEITEM)SendMessageW(HTreeView, TVM_INSERTITEMW, 0, (LPARAM)&tvis);
         RECT r;
         // Rather take the return value of TreeView_GetItemRect() into account
         if (TreeView_GetItemRect(HTreeView, TPD->At(i)->HTreeItem, &r, TRUE) && r.right - r.left > width)
@@ -1242,7 +1243,7 @@ int CTreePropHolderDlg::ExecuteIndirect(LPCDLGTEMPLATE hDialogTemplate)
     CreateDialogIndirectParam(Modul, hDialogTemplate, Parent,
                               (DLGPROC)CDialog::CDialogProc, (LPARAM)this);
     MSG msg;
-    while (ExitButton == -1 && GetMessage(&msg, NULL, 0, 0))
+    while (ExitButton == -1 && GetMessageW(&msg, NULL, 0, 0))
     {
         CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
         if ((msg.message == WM_KEYDOWN || msg.message == WM_KEYUP) &&
@@ -1254,7 +1255,7 @@ int CTreePropHolderDlg::ExecuteIndirect(LPCDLGTEMPLATE hDialogTemplate)
         else if (wnd == NULL || !wnd->Is(otDialog) || !IsDialogMessage(wnd->HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
     EnableWindow(Parent, TRUE);
@@ -1273,18 +1274,20 @@ WORD* CTreePropDialog::lpdwAlign(WORD* lpIn)
     return (WORD*)ul;
 }
 
-int WinLibCopyText(WCHAR* buf, const TCHAR* text, int bufLen)
+int WinLibCopyText(WCHAR* buf, const wchar_t* text, int bufLen)
 {
-#ifdef UNICODE
-    lstrcpyn(buf, text, bufLen);
+    lstrcpynW(buf, text, bufLen);
     return (int)wcslen(buf) + 1;
-#else  // UNICODE
-    return MultiByteToWideChar(CP_ACP, 0, text, -1, buf, bufLen);
-#endif // UNICODE
 }
 
-int CTreePropDialog::AddItemEx(LPWORD& lpw, const TCHAR* className, WORD id, int x, int y, int cx, int cy,
-                               UINT style, UINT exStyle, const TCHAR* text)
+// Wide-source overload: the DLGTEMPLATE control-text field is always UTF-16, so
+// a caller that already has the text wide (e.g. LoadStrW) can copy it straight in. Guarded out
+// under UNICODE builds (e.g. tserver.vcxproj): there wchar_t==WCHAR, so the wchar_t-based overload
+// above already takes its "lstrcpynW"/wide branch and this overload would be byte-identical to
+// it - a genuine ODR collision, not just redundant.
+
+int CTreePropDialog::AddItemEx(LPWORD& lpw, const wchar_t* className, WORD id, int x, int y, int cx, int cy,
+                               UINT style, UINT exStyle, const WCHAR* text)
 {
     lpw = lpdwAlign(lpw); // align DLGITEMTEMPLATEEX on DWORD boundary
     *(DWORD*)lpw = 0;     // helpID
@@ -1312,9 +1315,9 @@ int CTreePropDialog::AddItemEx(LPWORD& lpw, const TCHAR* className, WORD id, int
     return TRUE;
 }
 
-int CTreePropDialog::Execute(const TCHAR* buttonOK,
-                             const TCHAR* buttonCancel,
-                             const TCHAR* buttonHelp)
+int CTreePropDialog::Execute(const WCHAR* buttonOK,
+                             const WCHAR* buttonCancel,
+                             const WCHAR* buttonHelp)
 {
     if (Count > 0)
     {
@@ -1328,19 +1331,19 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
             HRSRC hrsrc = FindResource(Modul, MAKEINTRESOURCE(At(i)->ResID), RT_DIALOG);
             if (hrsrc == NULL)
             {
-                TRACE_ET(_T("Unable to find resource for page number: ") << i);
+                TRACE_ET(L"Unable to find resource for page number: " << i);
                 return 0;
             }
             HGLOBAL hglb = LoadResource(Modul, hrsrc);
             WORD* pageTemplate = (WORD*)LockResource(hglb);
             if (pageTemplate == NULL)
             {
-                TRACE_ET(_T("Unable to find resource for page number: ") << i);
+                TRACE_ET(L"Unable to find resource for page number: " << i);
                 return 0;
             }
             BOOL dlgEx = *pageTemplate /*dlgVer*/ == 1 && *(pageTemplate + 1) /*signature*/ == 0xffff; // DLGEX
             if (!dlgEx)
-                TRACE_CT(_T("CTreePropDialog::Execute(): DLG is no longer supported! PageResID=") << At(i)->ResID);
+                TRACE_CT(L"CTreePropDialog::Execute(): DLG is no longer supported! PageResID=" << At(i)->ResID);
             DWORD dlgStyle = 0;
             short dlgCX = 0;
             short dlgCY = 0;
@@ -1375,22 +1378,15 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
                 int len = 1;
                 if (dlgStyle & WS_CAPTION)
                 {
-#ifdef UNICODE
                     len += (int)wcslen(dlgTitle) + 1;
-#else  // UNICODE
-                    len += WideCharToMultiByte(CP_ACP, 0, dlgTitle, -1, NULL, 0, NULL, NULL);
-#endif // UNICODE
                 }
-                At(i)->Title = new TCHAR[len];
+                At(i)->Title = new wchar_t[len];
                 if (len > 1)
                 {
-#ifdef UNICODE
-                    lstrcpyn(At(i)->Title, dlgTitle, len);
-#else  // UNICODE
-                    WideCharToMultiByte(CP_ACP, 0, dlgTitle, -1, At(i)->Title, len, NULL, NULL);
-#endif // UNICODE
+                    lstrcpynW(At(i)->Title, dlgTitle, len);
                 }
                 At(i)->Title[len - 1] = 0;
+
             }
 
             if (dlgCX > maxPageRect.right)
@@ -1436,14 +1432,14 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
         *lpw++ = 0; // no menu
         *lpw++ = 0; // predefined dialog box class (by default)
         lpwsz = (LPWSTR)lpw;
-        lpw += WinLibCopyText(lpwsz, Caption, 100); // title
+        lpw += WinLibCopyText(lpwsz, CaptionW, 100); // title
         *lpw++ = 8;                                 // font size
         *lpw++ = FW_NORMAL;                         // font weight
         *(BYTE*)lpw = FALSE;                        // is font italic?
         *((BYTE*)lpw + 1) = ANSI_CHARSET;           // font charset
         lpw++;
         lpwsz = (LPWSTR)lpw; // font typeface
-        lpw += WinLibCopyText(lpwsz, _T("MS Shell Dlg 2"), 50);
+        lpw += WinLibCopyText(lpwsz, L"MS Shell Dlg 2", 50);
 
         BOOL appIsThemed = IsAppThemed();
 
@@ -1455,31 +1451,31 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
                       (appIsThemed ? TVS_FULLROWSELECT : TVS_HASLINES),
                   0, NULL);
         // Caption
-        AddItemEx(lpw, _T("static"), _TPD_IDC_CAPTION,
+        AddItemEx(lpw, L"static", _TPD_IDC_CAPTION,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE, 0, NULL);
         // Static, which is replaced by child dialog during init
-        AddItemEx(lpw, _T("static"), _TPD_IDC_RECT,
+        AddItemEx(lpw, L"static", _TPD_IDC_RECT,
                   0, 0, maxPageRect.right, maxPageRect.bottom,
                   WS_CHILD, 0, NULL);
         // Separator
-        AddItemEx(lpw, _T("static"), _TPD_IDC_SEP,
+        AddItemEx(lpw, L"static", _TPD_IDC_SEP,
                   0, 0, 0, 0,
                   WS_GROUP | WS_CHILD | WS_VISIBLE | SS_ETCHEDHORZ, 0, NULL);
         // Bottom row of buttons
-        AddItemEx(lpw, _T("button"), _TPD_IDC_OK,
+        AddItemEx(lpw, L"button", _TPD_IDC_OK,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON | WS_TABSTOP, 0, buttonOK);
-        AddItemEx(lpw, _T("button"), IDCANCEL,
+        AddItemEx(lpw, L"button", IDCANCEL,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonCancel);
-        AddItemEx(lpw, _T("button"), _TPD_IDC_HELP,
+        AddItemEx(lpw, L"button", _TPD_IDC_HELP,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON | WS_TABSTOP, 0, buttonHelp);
         // Grip (resize)
-        AddItemEx(lpw, _T("scrollbar"), _TPD_IDC_GRIP,
+        AddItemEx(lpw, L"scrollbar", _TPD_IDC_GRIP,
                   0, 0, 0, 0,
-                  WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | SBS_SIZEBOX | SBS_SIZEBOXBOTTOMRIGHTALIGN, 0, _T(""));
+                  WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | SBS_SIZEBOX | SBS_SIZEBOXBOTTOMRIGHTALIGN, 0, L"");
 
         GlobalUnlock(hgbl);
 
@@ -1487,7 +1483,7 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
     }
     else
     {
-        TRACE_ET(_T("Incorrect call to CPropertyDialog::Execute."));
+        TRACE_ET(L"Incorrect call to CPropertyDialog::Execute.");
         return -1;
     }
 }

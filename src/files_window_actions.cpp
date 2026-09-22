@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IChangeNotifier.h"
+#include "common/IFileSystem.h"
+#include "common/text/CaseFolding.h"
 
 #include "common/IEnvironment.h"
 #include "common/unicode/helpers.h"
@@ -50,10 +53,10 @@ void CFilesWindow::HandsOff(BOOL off)
         }
         else
         {
-            if (sally::unicode::HasWidePathW(GetPathW()))
-                ChangeDirectoryW((CFilesWindow*)this, GetPathW(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
-            else
-                ChangeDirectory((CFilesWindow*)this, GetPath(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
+            // Through IChangeNotifier, unconditionally wide; the removable-media
+            // flag now asks the wide path too instead of the CP_ACP mirror.
+            gChangeNotifier->ChangeWatch(this, GetPathW(),
+                                         MyGetDriveTypeW(GetPathW()) == DRIVE_REMOVABLE);
             HANDLES(EnterCriticalSection(&TimeCounterSection));
             int t1 = MyTimeCounter++;
             HANDLES(LeaveCriticalSection(&TimeCounterSection));
@@ -70,10 +73,9 @@ void CFilesWindow::Execute(int index)
     if (index < 0 || index >= Dirs->Count + Files->Count)
         return;
 
-    CPathBuffer path;
-    CPathBuffer fullName;
-    CPathBuffer doublePath;
-    WIN32_FIND_DATA data;
+    std::wstring path;
+    std::wstring fullName;
+    std::wstring doublePath;
 
     BeginStopRefresh();
 
@@ -89,21 +91,20 @@ void CFilesWindow::Execute(int index)
             }
 
             CFileData* file = &Files->At(index - Dirs->Count);
-            char* fileName = file->Name;
-            CPathBuffer fullPath;
-            CPathBuffer netFSName; // Heap-allocated for long path support
-            netFSName[0] = 0;
+            std::wstring fileName = file->Name;
+            std::wstring fullPath;
+            std::wstring netFSName;
             if (file->DosName != NULL)
             {
-                lstrcpy(fullPath, GetPath());
-                if (SalPathAppend(fullPath, file->Name, fullPath.Size()) &&
-                    GetFileAttributesW(AnsiToWide(fullPath).c_str()) == INVALID_FILE_ATTRIBUTES &&
+                fullPath = GetPathW();
+                SalPathAppendW(fullPath, file->Name);
+                if (gFileSystem->GetFileAttributes(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES &&
                     GetLastError() == ERROR_FILE_NOT_FOUND)
                 {
-                    lstrcpy(fullPath, GetPath());
-                    if (SalPathAppend(fullPath, file->DosName, fullPath.Size()) &&
-                        GetFileAttributesW(AnsiToWide(fullPath).c_str()) != INVALID_FILE_ATTRIBUTES)
-                    { // when full name is not available (problem converting from multibyte to UNICODE), we'll use DOS name
+                    fullPath = GetPathW();
+                    SalPathAppendW(fullPath, file->DosName);
+                    if (gFileSystem->GetFileAttributes(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+                    { // when the full name is inaccessible, use the DOS alias
                         fileName = file->DosName;
                     }
                 }
@@ -112,35 +113,34 @@ void CFilesWindow::Execute(int index)
             BOOL linkIsFile = FALSE; // TRUE -> shortcut to file -> test archive
             BOOL linkIsNet = FALSE;  // TRUE -> shortcut to network -> ChangePathToPluginFS
             DWORD err = ERROR_SUCCESS;
-            if (StrICmp(file->Ext, "lnk") == 0) // is it not a directory shortcut?
+            if (StrICmpW(file->Ext, L"lnk") == 0) // is it not a directory shortcut?
             {
-                strcpy(fullName, GetPath());
-                if (!SalPathAppend(fullName, fileName, fullName.Size()))
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-                    UpdateWindow(HWindow);
-                    EndStopRefresh();
-                    return;
-                }
-                CWidePathBuffer oleName;
-                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, oleName.Size());
-                oleName[oleName.Size() - 1] = 0;
+                fullName = GetPathW();
+                SalPathAppendW(fullName, fileName.c_str());
+                const std::wstring oleName = fullName;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-                IShellLink* link;
+                // wide: request the wide COM interface directly - link->GetPath()
+                // otherwise narrows the shortcut's resolved TARGET path via its own internal
+                // CP_ACP conversion, independent of the oleName fix above (audit A7, which only
+                // covers the shortcut FILE's own path). A target path with characters outside the
+                // current ANSI code page collapsed to a best-fit '?' string, breaking navigation
+                // and archive-opening for it.
+                IShellLinkW* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
-                        if (fileInt->Load(oleName, STGM_READ) == S_OK)
+                        if (fileInt->Load(oleName.c_str(), STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(fullName, fullName.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
+                            WIN32_FIND_DATAW data;
+                            if (GetShellLinkPathOwned(link, SLGP_UNCPRIORITY, fullName, &data))
                             {                                     // the obtained path will be used for accessibility test, after Resolve it may change
-                                err = CheckPath(FALSE, fullName); // fullName is a full path (shortcuts support no other)
-                                if (err != ERROR_USER_TERMINATED) // if user didn't press ESC, ignore the error
+                                err = CheckPath(FALSE, fullName.c_str()); // shortcut targets are full paths
+                                if (err != ERROR_USER_TERMINATED)   // if user didn't press ESC, ignore the error
                                 {
                                     err = ERROR_SUCCESS; // Resolve may change the path, then we check again
                                 }
@@ -149,13 +149,13 @@ void CFilesWindow::Execute(int index)
                             {
                                 if (link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE) == NOERROR)
                                 {
-                                    if (link->GetPath(fullName, fullName.Size(), &data, SLGP_UNCPRIORITY) == NOERROR)
+                                    if (GetShellLinkPathOwned(link, SLGP_UNCPRIORITY, fullName, &data))
                                     {
-                                        // final form of fullName - we verify if it is OK
-                                        err = CheckPath(TRUE, fullName); // fullName is a full path (links support no other)
+                                        // final form of fullName - verify that full path
+                                        err = CheckPath(TRUE, fullName.c_str());
                                         if (err == ERROR_SUCCESS)
                                         {
-                                            DWORD attr = GetFileAttributesW(AnsiToWide(fullName).c_str()); // obtained here because data.dwFileAttributes isn't filled
+                                            DWORD attr = gFileSystem->GetFileAttributes(fullName.c_str()); // data.dwFileAttributes is not filled here
                                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
                                             {
                                                 linkIsDir = TRUE; // OK we try change-path-to-disk
@@ -168,33 +168,30 @@ void CFilesWindow::Execute(int index)
                                     }
                                     else // links directly to servers, we can try to open them in Network plugin (Nethood)
                                     {
-                                        if (Plugins.GetFirstNethoodPluginFSName(netFSName))
+                                        if (Plugins.GetFirstNethoodPluginFSName(&netFSName))
                                         {
-                                            if (link->GetPath(fullName, fullName.Size(), NULL, SLGP_RAWPATH) != NOERROR)
+                                            if (!GetShellLinkPathOwned(link, SLGP_RAWPATH, fullName))
                                             { // path is not stored in the link as text, only as an ID list
-                                                fullName[0] = 0;
+                                                fullName.clear();
                                                 ITEMIDLIST* pidl;
                                                 if (link->GetIDList(&pidl) == S_OK && pidl != NULL)
                                                 { // get the ID list and ask for the name of its last item, expect "\\\\server"
                                                     IMalloc* alloc;
                                                     if (SUCCEEDED(CoGetMalloc(1, &alloc)))
                                                     {
-                                                        if (!GetSHObjectName(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName, fullName.Size(), alloc))
-                                                            fullName[0] = 0;
+                                                        if (!GetSHObjectNameOwned(pidl, SHGDN_FORPARSING | SHGDN_FORADDRESSBAR, fullName))
+                                                            fullName.clear();
                                                         if (alloc->DidAlloc(pidl) == 1)
                                                             alloc->Free(pidl);
                                                         alloc->Release();
                                                     }
                                                 }
                                             }
-                                            if (fullName[0] == '\\' && fullName[1] == '\\' && fullName[2] != '\\')
+                                            if (fullName.size() >= 2 && fullName[0] == L'\\' && fullName[1] == L'\\' &&
+                                                (fullName.size() == 2 || fullName[2] != L'\\'))
                                             { // we check if it's a link to a server (path contains "\\\\server")
-                                                char* backslash = fullName + 2;
-                                                while (*backslash != 0 && *backslash != '\\')
-                                                    backslash++;
-                                                if (*backslash == '\\')
-                                                    backslash++;
-                                                if (*backslash == 0)  // we accept only paths "\\\\", "\\\\server", "\\\\server\\"
+                                                const size_t backslash = fullName.find(L'\\', 2);
+                                                if (backslash == std::wstring::npos || backslash + 1 == fullName.size())
                                                     linkIsNet = TRUE; // OK let's try change-path-to-FS
                                             }
                                         }
@@ -219,47 +216,36 @@ void CFilesWindow::Execute(int index)
             {
                 TopIndexMem.Clear(); // long jump
                 if (linkIsDir)
-                    ChangePathToDisk(HWindow, fullName);
+                    ChangePathToDisk(HWindow, fullName.c_str());
                 else
-                    ChangePathToPluginFS(netFSName, fullName);
+                    ChangePathToPluginFS(netFSName.c_str(), fullName.c_str());
                 UpdateWindow(HWindow);
                 EndStopRefresh();
                 return;
             }
 
-            if (PackerFormatConfig.PackIsArchive(linkIsFile ? fullName : fileName)) // is it an archive?
+            const wchar_t* archiveName = linkIsFile ? fullName.c_str() : fileName.c_str();
+            if (PackerFormatConfig.PackIsArchive(archiveName)) // is it an archive?
             {
                 // backup data for TopIndexMem
-                strcpy(path, GetPath());
+                path = GetPathW();
                 int topIndex = ListBox->GetTopIndex();
                 std::wstring archiveNameW;
 
                 if (!linkIsFile)
                 {
                     // construction of full archive name for ChangePathToArchive
-                    archiveNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), fileName, file->NameW);
-                    if (archiveNameW.length() >= SAL_MAX_LONG_PATH - 2)
-                    {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-                        UpdateWindow(HWindow);
-                        EndStopRefresh();
-                        return;
-                    }
-                    std::string fullNameA;
-                    if (sally::unicode::TryExactAnsiFallback(archiveNameW, fullNameA))
-                        fullName.Assign(fullNameA.c_str());
-                    else
-                        fullName[0] = 0;
+                    archiveNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), fileName.c_str());
                 }
                 else
-                    archiveNameW = AnsiToWide(fullName);
+                    archiveNameW = fullName;
                 BOOL noChange;
-                if (ChangePathToArchiveW(archiveNameW.c_str(), L"", -1, NULL, FALSE, &noChange)) // entering the archive successfully
+                if (ChangePathToArchive(archiveNameW.c_str(), L"", -1, NULL, FALSE, &noChange)) // entering the archive successfully
                 {
                     if (linkIsFile)
                         TopIndexMem.Clear(); // long jump
                     else
-                        TopIndexMem.Push(path, topIndex); // remember top index for return
+                        TopIndexMem.Push(path.c_str(), topIndex); // remember top index for return
                 }
                 else // archive is not accessible
                 {
@@ -275,63 +261,49 @@ void CFilesWindow::Execute(int index)
 
             // the ExecuteAssociation below can change the panel path during recursive
             // calls (it contains a message loop), so we store the full file name here
-            lstrcpy(fullPath, GetPath());
-            if (!SalPathAppend(fullPath, fileName, fullPath.Size()))
-                fullPath.Get()[0] = 0;
+            fullPath = GetPathW();
+            SalPathAppendW(fullPath, fileName.c_str());
 
             // launch of the default context menu item (association)
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             MainWindow->SetDefaultDirectories(); // to ensure the launching process inherits the correct current directories
 
-            // Go wide when EITHER the file name or the panel path needs it. Testing only
-            // the name meant that inside a folder whose own path is outside the ANSI code
-            // page, every file took the legacy branch - including files with perfectly
-            // ordinary ASCII names, because NameW is NULL for those. That branch resolves
-            // the shell binding from the lossy CP_ACP directory, so it silently failed and
-            // Enter did nothing at all for every file in the folder.
-            //
-            // Same predicate CFilesWindow::RenameFile already uses (files_window_view_edit.cpp).
-            if (file->UseWideName() || sally::unicode::WidePathNeedsExactPreservation(GetPathW()))
-            {
-                std::wstring nameW = (file->NameW != NULL) ? std::wstring(file->NameW)
-                                                           : AnsiToWide(fileName);
-                ExecuteAssociationW(GetListBoxHWND(), GetPathW(), nameW.c_str());
-            }
-            else
-                ExecuteAssociation(GetListBoxHWND(), GetPath(), fileName);
+            ExecuteAssociationW(GetListBoxHWND(), GetPathW(), fileName.c_str());
 
             // we add the file to history
-            if (fullPath[0] != 0)
-                MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath);
+            if (!fullPath.empty())
+            {
+                // The wide twin built here was derived from file->NameW, which
+                // P1.3 removed; fullPath is already the wide full path.
+                MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath.c_str());
+            }
 
             SetCursor(oldCur);
         }
         else // directory
         {
-            strcpy(path, GetPath());
+            path = GetPathW();
+            std::wstring pathW = GetPathW(); // wide snapshot for the post-attempt same-path check below
             CFileData* dir = &Dirs->At(index);
-            if (index == 0 && strcmp(dir->Name, "..") == 0) // ".. <Up>"
+            if (index == 0 && wcscmp(dir->Name, L"..") == 0) // ".. <Up>"
             {
-                char* prevDir = NULL;
-                if (!CutDirectory(path, &prevDir))
+                std::wstring prevDir;
+                if (!CutDirectoryW(path, &prevDir))
                 {
-                    if (path[0] == '\\' && path[1] == '\\')
+                    if (path.size() >= 2 && path[0] == L'\\' && path[1] == L'\\')
                     {
-                        char* s = path + 2;
-                        while (*s != 0 && *s != '\\')
-                            s++;
+                        const size_t serverEnd = path.find(L'\\', 2);
                         CPluginData* nethoodPlugin = NULL;
-                        if (*s == '\\' && Plugins.GetFirstNethoodPluginFSName(doublePath, &nethoodPlugin))
+                        std::wstring nethoodFSName;
+                        if (serverEnd != std::wstring::npos &&
+                            Plugins.GetFirstNethoodPluginFSName(&nethoodFSName, &nethoodPlugin))
                         {
-                            *s++ = 0;
-                            char* focusName = s;
-                            while (*s != 0 && *s != '\\')
-                                s++;
-                            if (*s == '\\')
-                                *s = 0;
+                            const std::wstring serverPath = path.substr(0, serverEnd);
+                            const size_t focusEnd = path.find(L'\\', serverEnd + 1);
+                            const std::wstring focusName = path.substr(serverEnd + 1, focusEnd - (serverEnd + 1));
                             nethoodPlugin->EnsureShareExistsOnServer(HWindow, this == MainWindow->LeftPanel ? PANEL_LEFT : PANEL_RIGHT,
-                                                                     path + 2, focusName);
-                            ChangePathToPluginFS(doublePath, path, -1, focusName);
+                                                                     serverPath.c_str() + 2, focusName.c_str());
+                            ChangePathToPluginFS(nethoodFSName.c_str(), serverPath.c_str(), -1, focusName.c_str());
                             if (Is(ptPluginFS))
                             {
                                 TopIndexMem.Clear(); // if we didn't remain on a disk path (UNC root), it's a long jump
@@ -343,9 +315,9 @@ void CFilesWindow::Execute(int index)
                     return; // nothing to shorten or we're already on Nethood path
                 }
                 int topIndex; // next top index, -1 -> invalid
-                if (!TopIndexMem.FindAndPop(path, topIndex))
+                if (!TopIndexMem.FindAndPop(path.c_str(), topIndex))
                     topIndex = -1;
-                if (!ChangePathToDisk(HWindow, path, topIndex, prevDir))
+                if (!ChangePathToDisk(HWindow, path.c_str(), topIndex, prevDir.c_str()))
                 { // failed to shorten the path - long jump
                     TopIndexMem.Clear();
                 }
@@ -359,41 +331,29 @@ void CFilesWindow::Execute(int index)
                 int caretIndex = GetCaretIndex();
 
                 // new path
-                std::wstring fullNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), dir->Name, dir->NameW);
-                if (fullNameW.length() >= SAL_MAX_LONG_PATH - 2)
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-                    EndStopRefresh();
-                    return;
-                }
-                std::string fullNameA;
-                BOOL fullNameHasExactAnsi = sally::unicode::TryExactAnsiFallback(fullNameW, fullNameA) ? TRUE : FALSE;
-                if (fullNameHasExactAnsi)
-                    fullName.Assign(fullNameA.c_str());
-                else
-                    fullName[0] = 0;
+                std::wstring fullNameW = sally::unicode::BuildPanelChildPathW(GetPathW(), dir->Name);
+                fullName = fullNameW;
 
                 // Vista: we handle unlistable junction points: change path to junction point target
-                CPathBuffer junctTgtPath;
+                std::wstring junctTgtPath;
                 int repPointType;
-                if (fullNameHasExactAnsi &&
-                    GetPathDriveType() == DRIVE_FIXED && (dir->Attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
-                    GetReparsePointDestination(fullName, junctTgtPath, junctTgtPath.Size(), &repPointType, TRUE) &&
-                    repPointType == 2 /* JUNCTION POINT */ &&
-                    SalPathAppend(fullName, "*", fullName.Size()))
+                if (GetPathDriveType() == DRIVE_FIXED && (dir->Attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
+                    GetReparsePointDestinationOwnedW(fullName.c_str(), &junctTgtPath, &repPointType, TRUE) &&
+                    repPointType == 2 /* JUNCTION POINT */)
                 {
+                    std::wstring probe = fullName;
+                    SalPathAppendW(probe, L"*");
                     WIN32_FIND_DATAW fileData;
-                    HANDLE search = SalFindFirstFileHW(fullName, &fileData);
+                    HANDLE search = SalFindFirstFileHW(probe.c_str(), &fileData);
                     DWORD err = GetLastError();
-                    CutDirectory(fullName);
                     if (search != INVALID_HANDLE_VALUE)
-                        HANDLES(FindClose(search));
+                        SalLPFindClose(search);
                     else
                     {
                         if (err == ERROR_ACCESS_DENIED)
                         {
                             TopIndexMem.Clear(); // long jump
-                            ChangePathToDisk(HWindow, junctTgtPath);
+                            ChangePathToDisk(HWindow, junctTgtPath.c_str());
                             UpdateWindow(HWindow);
                             EndStopRefresh();
                             return;
@@ -403,13 +363,13 @@ void CFilesWindow::Execute(int index)
 
                 BOOL noChange;
                 BOOL refresh = TRUE;
-                if (ChangePathToDiskW(HWindow, fullNameW.c_str(), -1, NULL, &noChange, FALSE))
+                if (ChangePathToDisk(HWindow, fullNameW.c_str(), -1, NULL, &noChange, FALSE))
                 {
-                    TopIndexMem.Push(path, topIndex); // we remember top index for return
+                    TopIndexMem.Push(path.c_str(), topIndex); // we remember top index for return
                 }
                 else // failure
                 {
-                    if (!IsTheSamePath(path, GetPath())) // we're not on the original path -> long jump
+                    if (!IsTheSamePath(pathW.c_str(), GetPathW())) // we're not on the original path -> long jump
                     {                                    // the condition "!noChange" is not enough - it signals "path change or reload - access-denied-dir"
                         TopIndexMem.Clear();
                     }
@@ -441,24 +401,23 @@ void CFilesWindow::Execute(int index)
             else // directory
             {
                 CFileData* dir = &Dirs->At(index);
-                if (index == 0 && strcmp(dir->Name, "..") == 0) // ".. <Up>"
+                if (index == 0 && wcscmp(dir->Name, L"..") == 0) // ".. <Up>"
                 {
                     if (GetZIPPath()[0] == 0) // we exit the archive
                     {
-                        const char* s = strrchr(GetZIPArchive(), '\\'); // ZIP archive doesn't contain an extra '\\' at the end
+                        const wchar_t* s = wcsrchr(GetZIPArchive(), L'\\'); // ZIP archive doesn't contain an extra '\\' at the end
                         if (s != NULL)                                  // "always true"
                         {
-                            strcpy(path, s + 1); // prev-dir
+                            path = s + 1; // prev-dir
 
                             int topIndex; // next top index, -1 -> invalid
-                            if (!TopIndexMem.FindAndPop(GetPath(), topIndex))
+                            if (!TopIndexMem.FindAndPop(GetPathW(), topIndex))
                                 topIndex = -1;
 
                             // actual path change
                             BOOL noChange;
-                            BOOL exitedArchive = (sally::unicode::HasWidePathW(GetPathW()))
-                                                     ? ChangePathToDiskW(HWindow, GetPathW(), topIndex, path, &noChange)
-                                                     : ChangePathToDisk(HWindow, GetPath(), topIndex, path, &noChange);
+                            BOOL exitedArchive = ChangePathToDisk(HWindow, GetPathW(), topIndex, path.c_str(), &noChange,
+                                                                     TRUE, FALSE, FALSE, NULL, TRUE, FSTRYCLOSE_CHANGEPATH);
                             if (!exitedArchive)
                             { // failed to shorten the path - reject-close-archive or long jump
                                 if (!noChange)
@@ -467,7 +426,7 @@ void CFilesWindow::Execute(int index)
                                 {
                                     if (topIndex != -1) // if top index could be retrieved
                                     {
-                                        TopIndexMem.Push(GetPath(), topIndex); // we return top index for next time
+                                        TopIndexMem.Push(GetPathW(), topIndex); // we return top index for next time
                                     }
                                 }
                             }
@@ -476,37 +435,29 @@ void CFilesWindow::Execute(int index)
                     else // we're shortening path inside archive
                     {
                         // we split zip-path into new zip-path and prev-dir
-                        strcpy(path, GetZIPPath());
-                        char* prevDir;
-                        char* s = strrchr(path, '\\'); // zip-path has no redundant backslashes (start/end)
-                        if (s != NULL)                 // format: "beg-path\\dir"
+                        path = GetZIPPath();
+                        std::wstring prevDir;
+                        const size_t separator = path.find_last_of(L'\\'); // zip-path has no redundant backslashes (start/end)
+                        if (separator != std::wstring::npos) // format: "beg-path\\dir"
                         {
-                            *s = 0;
-                            prevDir = s + 1;
+                            prevDir = path.substr(separator + 1);
+                            path.resize(separator);
                         }
                         else // format: "dir"
                         {
-                            memmove(path + 1, path, strlen(path) + 1);
-                            *path = 0;
-                            prevDir = path + 1;
+                            prevDir = path;
+                            path.clear();
                         }
 
                         // we build shortened path to archive and obtain top index accordingly
-                        strcpy(doublePath, GetZIPArchive());
-                        SalPathAppend(doublePath, path, doublePath.Size());
+                        doublePath = GetZIPArchive();
+                        SalPathAppendW(doublePath, path.c_str());
                         int topIndex; // next top index, -1 -> invalid
-                        if (!TopIndexMem.FindAndPop(doublePath, topIndex))
+                        if (!TopIndexMem.FindAndPop(doublePath.c_str(), topIndex))
                             topIndex = -1;
 
                         // actual path change
-                        BOOL shortenedArchPath;
-                        if (sally::unicode::HasWidePathW(GetZIPArchiveW()))
-                        {
-                            std::wstring zipPathW = AnsiToWide(path);
-                            shortenedArchPath = ChangePathToArchiveW(GetZIPArchiveW(), zipPathW.c_str(), topIndex, prevDir);
-                        }
-                        else
-                            shortenedArchPath = ChangePathToArchive(GetZIPArchive(), path, topIndex, prevDir);
+                        BOOL shortenedArchPath = ChangePathToArchive(GetZIPArchive(), path.c_str(), topIndex, prevDir.c_str());
                         if (!shortenedArchPath) // "always false"
                         {                       // failed to shorten path - long jump
                             TopIndexMem.Clear();
@@ -516,30 +467,19 @@ void CFilesWindow::Execute(int index)
                 else // subdirectory
                 {
                     // backup data for TopIndexMem (doublePath + topIndex)
-                    strcpy(doublePath, GetZIPArchive());
-                    SalPathAppend(doublePath, GetZIPPath(), doublePath.Size());
+                    doublePath = GetZIPArchive();
+                    SalPathAppendW(doublePath, GetZIPPath());
                     int topIndex = ListBox->GetTopIndex();
 
                     // new path
-                    strcpy(fullName, GetZIPPath());
-                    if (!SalPathAppend(fullName, dir->Name, fullName.Size()))
-                    {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-                    }
-                    else
+                    fullName = GetZIPPath();
+                    SalPathAppendW(fullName, dir->Name);
                     {
                         BOOL noChange;
-                        BOOL enteredSubdir;
-                        if (sally::unicode::HasWidePathW(GetZIPArchiveW()))
-                        {
-                            std::wstring fullNameW = AnsiToWide(fullName);
-                            enteredSubdir = ChangePathToArchiveW(GetZIPArchiveW(), fullNameW.c_str(), -1, NULL, FALSE, &noChange);
-                        }
-                        else
-                            enteredSubdir = ChangePathToArchive(GetZIPArchive(), fullName, -1, NULL, FALSE, &noChange);
+                        BOOL enteredSubdir = ChangePathToArchive(GetZIPArchive(), fullName.c_str(), -1, NULL, FALSE, &noChange);
                         if (enteredSubdir) // "always true"
                         {
-                            TopIndexMem.Push(doublePath, topIndex); // we remember top index for return
+                            TopIndexMem.Push(doublePath.c_str(), topIndex); // we remember top index for return
                         }
                         else
                         {
@@ -555,14 +495,13 @@ void CFilesWindow::Execute(int index)
             if (Is(ptPluginFS))
             {
                 BOOL isDir = index < Dirs->Count ? 1 : 0;
-                if (isDir && index == 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+                if (isDir && index == 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
                     isDir = 2; // up-dir
                 CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
                 CPluginInterfaceForFSEncapsulation* ifaceForFS = GetPluginFS()->GetPluginInterfaceForFS();
-                CPathBuffer fsNameBuf; // GetPluginFS() may cease to exist, so we copy fsName to local buffer
-                lstrcpyn(fsNameBuf, GetPluginFS()->GetPluginFSName(), fsNameBuf.Size());
+                std::wstring fsName = GetPluginFS()->GetPluginFSName(); // GetPluginFS() may cease to exist below
                 ifaceForFS->ExecuteOnFS(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
-                                        GetPluginFS()->GetInterface(), fsNameBuf,
+                                        GetPluginFS()->GetInterface(), fsName.c_str(),
                                         GetPluginFS()->GetPluginFSNameIndex(), *file, isDir);
             }
         }
@@ -603,7 +542,6 @@ void CFilesWindow::ChangeSortType(CSortType newType, BOOL reverse, BOOL force)
     else
     {
         d1.Name = NULL;
-        d1.NameW = NULL;
     }
     //---  sorting
     if (UseSystemIcons || UseThumbnails)
@@ -656,9 +594,9 @@ void CFilesWindow::ChangeSortType(CSortType newType, BOOL reverse, BOOL force)
 
     if (d1.Name != NULL)
     {
-        if (i == 0 && Dirs->Count > 0 && strcmp(Dirs->At(0).Name, "..") == 0)
+        if (i == 0 && Dirs->Count > 0 && wcscmp(Dirs->At(0).Name, L"..") == 0)
         {
-            if (strcmp(d1.Name, "..") == 0)
+            if (wcscmp(d1.Name, L"..") == 0)
             {
                 focusIndex = 0;
                 i = count;
@@ -706,14 +644,21 @@ BOOL CFilesWindow::ChangeToRescuePathOrFixedDrive(HWND parent, BOOL* noChange, B
     CALL_STACK_MESSAGE4("CFilesWindow::ChangeToRescuePathOrFixedDrive(, , %d, %d, %d,)",
                         refreshListBox, canForce, tryCloseReason);
     BOOL noChangeUsed = FALSE;
-    CPathBuffer ifPathIsInaccessibleGoTo; // Heap-allocated for long path support
-    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
-    if (ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
-        ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':')
+    // Wide fetch and dispatch. GetIfPathIsInaccessibleGoToW already existed (it's
+    // the real implementation - the narrow form is a thin AnsiToWide/WideToAnsi wrapper over it)
+    // but had no callers here: IfPathIsInaccessibleGoToIsMyDocs defaults to TRUE, so on any
+    // account whose My Documents path CP_ACP cannot spell, the narrow round trip mangled the
+    // rescue path to something like "C:\Profiles\???\Documents" - ChangePathToDisk then failed to
+    // resolve it and the user landed on a fixed drive instead of their real rescue path.
+    std::wstring ifPathIsInaccessibleGoTo;
+    GetIfPathIsInaccessibleGoToW(ifPathIsInaccessibleGoTo);
+    if (ifPathIsInaccessibleGoTo.size() >= 2 &&
+        ((ifPathIsInaccessibleGoTo[0] == L'\\' && ifPathIsInaccessibleGoTo[1] == L'\\') ||
+         ifPathIsInaccessibleGoTo[1] == L':'))
     {
         int failReasonInt;
-        BOOL ret = ChangePathToDisk(parent, ifPathIsInaccessibleGoTo, -1, NULL, noChange, refreshListBox,
-                                    canForce, FALSE, &failReasonInt, TRUE, tryCloseReason);
+        BOOL ret = ChangePathToDisk(parent, ifPathIsInaccessibleGoTo.c_str(), -1, NULL, noChange, refreshListBox,
+                                     canForce, FALSE, &failReasonInt, TRUE, tryCloseReason);
         if (!ret && failReasonInt != CHPPFR_CANNOTCLOSEPATH)
             OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
         if (ret || failReasonInt == CHPPFR_SHORTERPATH)
@@ -749,12 +694,13 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
                         refreshListBox, canForce, tryCloseReason);
     if (noChange != NULL)
         *noChange = TRUE;
-    CPathBuffer sysDir; // Heap-allocated for long path support
-    char root[4] = " :\\";
-    if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, sysDir.Size()).success && sysDir[0] != 0 && sysDir[1] == ':')
+    wchar_t root[4] = L" :\\";
+    std::wstring sysDirW;
+    if (gEnvironment->GetWindowsDirectory(sysDirW).success &&
+        sysDirW.length() >= 2 && sysDirW[1] == L':')
     {
-        root[0] = sysDir[0];
-        if (GetDriveType(root) == DRIVE_FIXED)
+        root[0] = sysDirW[0];
+        if (GetDriveTypeW(root) == DRIVE_FIXED)
         {
             TopIndexMem.Clear(); // long jump
             return ChangePathToDisk(parent, root, -1, NULL, noChange, refreshListBox, canForce,
@@ -763,13 +709,13 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
     }
     DWORD disks = GetLogicalDrives();
     disks >>= 2; // skip A: and B:, during floppy formatting they sometimes become DRIVE_FIXED
-    char d = 'C';
+    wchar_t d = 'C';
     while (d <= 'Z')
     {
         if (disks & 1)
         {
             root[0] = d;
-            if (GetDriveType(root) == DRIVE_FIXED)
+            if (GetDriveTypeW(root) == DRIVE_FIXED)
             {
                 TopIndexMem.Clear(); // long jump
                 return ChangePathToDisk(parent, root, -1, NULL, noChange, refreshListBox, canForce,
@@ -784,10 +730,10 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
     return FALSE;
 }
 
-void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL changeToNewDrive,
-                              char* newlyMappedDrive)
+void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const wchar_t* netRootPath, BOOL changeToNewDrive,
+                              wchar_t* newlyMappedDrive)
 {
-    CALL_STACK_MESSAGE3("CFilesWindow::ConnectNet(%s, %d,)", netRootPath, changeToNewDrive);
+    CALL_STACK_MESSAGE3("CFilesWindow::ConnectNet(%ls, %d,)", netRootPath, changeToNewDrive);
 
     if (newlyMappedDrive != NULL)
         *newlyMappedDrive = 0;
@@ -804,22 +750,21 @@ void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL ch
     DWORD disks = changeToNewDrive || newlyMappedDrive != NULL ? GetLogicalDrives() : 0;
 
     BOOL success;
-    const char* netPath = netRootPath == NULL ? GetPath() : netRootPath;
-    if (netPath[0] == '\\' && netPath[1] == '\\') // UNC path
+    const wchar_t* netPath = netRootPath == NULL ? GetPathW() : netRootPath;
+    if (netPath[0] == L'\\' && netPath[1] == L'\\') // UNC path
     {
-        CONNECTDLGSTRUCT cs;
+        CONNECTDLGSTRUCTW cs;
         cs.cbStructure = sizeof(cs);
         cs.hwndOwner = HWindow;
-        NETRESOURCE nr;
+        NETRESOURCEW nr;
         memset(&nr, 0, sizeof(nr));
-        CPathBuffer root;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
-        GetRootPath(root, netPath);
-        root[strlen(root) - 1] = 0;
-        nr.lpRemoteName = root.Get();
+        std::wstring root = GetRootPath(netPath);
+        root.resize(root.length() - 1);
+        nr.lpRemoteName = const_cast<wchar_t*>(root.c_str());
         nr.dwType = RESOURCETYPE_DISK;
         cs.lpConnRes = &nr;
         cs.dwFlags = readOnlyUNC ? CONNDLG_RO_PATH : CONNDLG_USE_MRU;
-        success = WNetConnectionDialog1(&cs) == WN_SUCCESS;
+        success = WNetConnectionDialog1W(&cs) == WN_SUCCESS;
     }
     else
         success = WNetConnectionDialog(HWindow, RESOURCETYPE_DISK) == NO_ERROR;
@@ -829,17 +774,17 @@ void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL ch
         disks = (GetLogicalDrives() ^ disks);
         if (disks != 0)
         {
-            char d = 'A';
+            wchar_t d = L'A';
             while ((disks >>= 1) != 0)
                 d++;
             UpdateWindow(MainWindow->HWindow);
-            if (d >= 'A' && d <= 'Z') // always true
+            if (d >= L'A' && d <= L'Z') // always true
             {
                 if (newlyMappedDrive != NULL)
                     *newlyMappedDrive = d;
                 if (changeToNewDrive)
                 {
-                    char root[4] = " :\\";
+                    wchar_t root[4] = L" :\\";
                     root[0] = d;
                     ChangePathToDisk(HWindow, root, -1, NULL, NULL, TRUE, FALSE, FALSE, NULL, FALSE);
                 }
@@ -867,9 +812,9 @@ void CFilesWindow::DisconnectNet()
 
     // we disconnect from the mapped drive, otherwise it cannot be detached silently (system warns it's in use)
     BOOL releaseLeft = MainWindow->LeftPanel->GetNetworkDrive() &&    // network drive (ptDisk only)
-                       MainWindow->LeftPanel->GetPath()[0] != '\\';   // not UNC
+                       MainWindow->LeftPanel->GetPathW()[0] != '\\';   // not UNC
     BOOL releaseRight = MainWindow->RightPanel->GetNetworkDrive() &&  // network drive (ptDisk only)
-                        MainWindow->RightPanel->GetPath()[0] != '\\'; // not UNC
+                        MainWindow->RightPanel->GetPathW()[0] != '\\'; // not UNC
     if (releaseLeft)
         MainWindow->LeftPanel->HandsOff(TRUE);
     if (releaseRight)
@@ -910,7 +855,7 @@ void CFilesWindow::DriveInfo()
 
         BeginStopRefresh(); // snooper takes a break
 
-        CDriveInfo dlg(HWindow, GetPath());
+        CDriveInfo dlg(HWindow, GetPathW());
         dlg.Execute();
         UpdateWindow(MainWindow->HWindow);
 
@@ -944,7 +889,7 @@ void CFilesWindow::ToggleDirectoryLine()
     else // turn on
     {
         if (!DirectoryLine->Create(CWINDOW_CLASSNAME2,
-                                   "",
+                                   L"",
                                    WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                    0, 0, 0, 0,
                                    HWindow,
@@ -983,7 +928,7 @@ void CFilesWindow::ToggleStatusLine()
     else // turn on
     {
         if (!StatusLine->Create(CWINDOW_CLASSNAME2,
-                                "",
+                                L"",
                                 WS_CHILD | WS_CLIPSIBLINGS,
                                 0, 0, 0, 0,
                                 HWindow,
@@ -1048,7 +993,7 @@ int CFilesWindow::GetNextTemplateIndex(BOOL forward, BOOL wrap)
                     newIndex = oldIndex; // the edge item was empty; return to the last valid one
             }
         }
-    } while (Parent->ViewTemplates.Items[newIndex].Name[0] == 0 && newIndex != oldIndex);
+    } while (Parent->ViewTemplates.Items[newIndex].Name.empty() && newIndex != oldIndex);
     return newIndex;
 }
 
@@ -1058,7 +1003,7 @@ BOOL CFilesWindow::IsViewTemplateValid(int templateIndex)
     if (templateIndex < 1) // tree is not supported yet
         return FALSE;
     CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (lstrlen(newTemplate->Name) == 0)
+    if (newTemplate->Name.empty())
         return FALSE;
     return TRUE;
 }
@@ -1073,7 +1018,7 @@ BOOL CFilesWindow::SelectViewTemplate(int templateIndex, BOOL canRefreshPath,
     if (templateIndex == 0)
         return FALSE;
     CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (lstrlen(newTemplate->Name) == 0)
+    if (newTemplate->Name.empty())
     {
         // undefined view is not desired - we force the detailed view which always exists
         templateIndex = 2;
@@ -1190,43 +1135,36 @@ void CFilesWindow::ItemFocused(int index)
         LastFocus = index;
         CFileData* f = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
-        char buff[1000];
-        DWORD varPlacements[100];
-        int varPlacementsCount = 100;
+        std::wstring pluginBuff;
+        std::vector<sally::unicode::WideTextRange> varPlacements;
         BOOL done = FALSE;
         if (Is(ptZIPArchive) || Is(ptPluginFS))
         {
             if (PluginData.NotEmpty())
             {
                 if (PluginData.GetInfoLineContent(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
-                                                  f, index < Dirs->Count, 0, 0, TRUE, CQuadWord(0, 0), buff,
-                                                  varPlacements, varPlacementsCount))
+                                                  f, index < Dirs->Count, 0, 0, TRUE, CQuadWord(0, 0), pluginBuff,
+                                                  varPlacements))
                 {
                     done = TRUE;
                 }
-                else
-                    varPlacementsCount = 100; // might have been corrupted
             }
         }
 
-        if (!done && Is(ptDisk))
+        if (!done)
         {
             std::wstring buffW;
-            if (ExpandInfoLineItemsW(HWindow, Configuration.InfoLineContent, &PluginData, f,
+            if (ExpandInfoLineItemsW(HWindow, Configuration.InfoLineContent.c_str(), &PluginData, f,
                                      index < Dirs->Count, buffW,
-                                     varPlacements, &varPlacementsCount, ValidFileData, TRUE))
+                                     varPlacements, ValidFileData, Is(ptDisk)))
             {
-                if (StatusLine->SetTextW(buffW.c_str()))
-                    StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
+                if (StatusLine->SetText(buffW.c_str()))
+                    StatusLine->SetSubTexts(varPlacements.data(), varPlacements.size());
             }
         }
-        else if (done ||
-                 ExpandInfoLineItems(HWindow, Configuration.InfoLineContent, &PluginData, f,
-                                     index < Dirs->Count, buff, 1000,
-                                     varPlacements, &varPlacementsCount, ValidFileData, Is(ptDisk)))
+        else if (StatusLine->SetText(pluginBuff.c_str()))
         {
-            if (StatusLine->SetText(buff))
-                StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
+            StatusLine->SetSubTexts(varPlacements.data(), varPlacements.size());
         }
     }
     IdleRefreshStates = TRUE; // we force state-variables check on next Idle
@@ -1254,8 +1192,6 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
 {
     CALL_STACK_MESSAGE4("CFilesWindow::PrepareCloseCurrentPath(, %d, %d, , %d)",
                         canForce, canDetach, tryCloseReason);
-    CPathBuffer buf;
-
     if (Is(ptDisk))
     {
         detachFS = FALSE;
@@ -1272,7 +1208,11 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                 if (Configuration.CnfrmCloseArchive && !CriticalShutdown)
                 {
                     bool dontShow = !Configuration.CnfrmCloseArchive;
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVECLOSEEDIT), AnsiToWide(GetZIPArchive()).c_str());
+                    // GetZIPArchive() is the authoritative wide value.
+                    // (ZIPArchive is a lossy WideToAnsi derivative kept for narrow-ABI
+                    // plugin calls only); round-tripping through the narrow mirror here
+                    // and in 4 sibling sites mangled an archive name CP_ACP cannot spell.
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVECLOSEEDIT), GetZIPArchive());
                     gPrompter->ShowInfoWithCheckbox(LoadStrW(IDS_INFOTITLE), msg.c_str(),
                                                     LoadStrW(IDS_DONTSHOWAGAIN), &dontShow);
                     Configuration.CnfrmCloseArchive = !dontShow;
@@ -1295,10 +1235,15 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
             // in the other panel, we'll remove its cached files; it will unpack again next time it's opened
             // (the archive might be edited in the meantime)
             CFilesWindow* another = (MainWindow->LeftPanel == this) ? MainWindow->RightPanel : MainWindow->LeftPanel;
-            if (someFilesChanged || !another->Is(ptZIPArchive) || StrICmp(another->GetZIPArchive(), GetZIPArchive()) != 0)
+            // Wide difference test: GetZIPArchive() is authoritative on both panels, so the
+            // wide comparison replaces the narrow one outright
+            // rather than being AND'd onto it: two genuinely different archive paths whose CP_ACP
+            // mirrors collapse to the same '?'-filled string would otherwise falsely read as "same
+            // archive", wrongly skipping the disk-cache flush below and leaving stale cache entries.
+            if (someFilesChanged || !another->Is(ptZIPArchive) || StrICmpW(another->GetZIPArchive(), GetZIPArchive()) != 0)
             {
-                StrICpy(buf, GetZIPArchive()); // the disk cache stores the archive name in lowercase (allows case-insensitive comparison of the name from Windows file system)
-                DiskCache.FlushCache(buf);
+                const std::wstring cacheKey = sally::text::Fold(GetZIPArchive()); // the disk cache stores the archive name in lowercase (allows case-insensitive comparison of the name from Windows file system)
+                DiskCache.FlushCache(cacheKey.c_str());
             }
 
             // we call the plugin's CPluginInterfaceAbstract::CanCloseArchive
@@ -1321,7 +1266,7 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                             canclose = FALSE;
                             if (canForce) // we can ask the user whether to force it
                             {
-                                std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
+                                std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), GetZIPArchive());
                                 userAsked = TRUE;
                                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                                 {
@@ -1348,7 +1293,7 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                                     canclose = FALSE;
                                     if (canForce && !userAsked) // we can ask the user whether to force it
                                     {
-                                        std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), AnsiToWide(GetZIPArchive()).c_str());
+                                        std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEFORCECLOSE), GetZIPArchive());
                                         if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                                         {
                                             plugin->CanCloseArchive(this, GetZIPArchive(), TRUE);
@@ -1386,9 +1331,9 @@ BOOL CFilesWindow::PrepareCloseCurrentPath(HWND parent, BOOL canForce, BOOL canD
                     }
                     else // ask the user whether to close it against the FS's will
                     {
-                        CPathBuffer path;  // Heap-allocated for long path support
-                        GetGeneralPath(path, path.Size());
-                        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), AnsiToWide(path).c_str());
+                        std::wstring path;
+                        GetGeneralPath(path);
+                        std::wstring msg = FormatStrW(LoadStrW(IDS_FSFORCECLOSE), path.c_str());
                         if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kYes) // user chooses "Close"
                         {
                             GetPluginFS()->TryCloseOrDetach(TRUE, FALSE, detachFS, tryCloseReason);
@@ -1424,10 +1369,8 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
         {
             if (UserWorkedOnThisPath)
             {
-                const char* path = GetPath();
-                // HICON hIcon = GetFileOrPathIconAux(path, FALSE, TRUE); // we retrieve the icon
-                MainWindow->DirHistoryAddPathUnique(0, path, NULL, NULL /*hIcon*/, NULL, NULL,
-                                                    GetPathW(), nullptr);
+                // HICON hIcon = GetFileOrPathIconAuxW(path, FALSE, TRUE); // we retrieve the icon
+                MainWindow->DirHistoryAddPathUnique(0, GetPathW(), NULL, NULL /*hIcon*/, NULL, NULL);
                 if (!newPathIsTheSame)
                     UserWorkedOnThisPath = FALSE;
             }
@@ -1454,8 +1397,7 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
             {
                 if (UserWorkedOnThisPath)
                 {
-                    MainWindow->DirHistoryAddPathUnique(1, GetZIPArchive(), GetZIPPath(), NULL, NULL, NULL,
-                                                        GetZIPArchiveW(), GetZIPPathW());
+                    MainWindow->DirHistoryAddPathUnique(1, GetZIPArchive(), GetZIPPath(), NULL, NULL, NULL);
                     if (!newPathIsTheSame)
                         UserWorkedOnThisPath = FALSE;
                 }
@@ -1484,8 +1426,8 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
                 SetArchiveDir(NULL);
                 SetPluginIface(NULL);
                 // a couple more resets for better clarity
-                SetZIPArchive("");
-                SetZIPPath("");
+                SetZIPArchive(L"");
+                SetZIPPath(L"");
 
                 SetPanelType(ptDisk); // for security reasons (a disk has no PluginData, etc.)
                 SetValidFileData(VALID_DATA_ALL);
@@ -1500,12 +1442,12 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
                     BOOL sendDetachEvent = FALSE;
                     CPluginFSInterfaceEncapsulation* detachedFS = NULL;
 
-                    CPathBuffer buf; // Heap-allocated for long path support
-                    if (GetPluginFS()->GetCurrentPath(buf))
+                    std::wstring buf;
+                    if (GetPluginFS()->GetCurrentPathW(buf))
                     {
                         if (UserWorkedOnThisPath)
                         {
-                            MainWindow->DirHistoryAddPathUnique(2, GetPluginFS()->GetPluginFSName(), buf, NULL,
+                            MainWindow->DirHistoryAddPathUnique(2, GetPluginFS()->GetPluginFSName(), buf.c_str(), NULL,
                                                                 GetPluginFS()->GetInterface(), GetPluginFS());
                             if (!newPathIsTheSame)
                                 UserWorkedOnThisPath = FALSE;
@@ -1598,26 +1540,26 @@ void CFilesWindow::RefreshPathHistoryData()
         CFileData* file = index < Dirs->Count ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
 
         // we try to record a new top-index and focus-name
+        // wide: pass the focused item's wide name so ChangeData's "no change"
+        // shortcut can confirm against the genuine name instead of just its CP_ACP mirror.
         if (Is(ptZIPArchive))
         {
-            PathHistory->ChangeActualPathData(1, GetZIPArchive(), GetZIPPath(), NULL, NULL, topIndex, file->Name,
-                                              GetZIPArchiveW(), GetZIPPathW());
+            PathHistory->ChangeActualPathData(1, GetZIPArchive(), GetZIPPath(), NULL, NULL, topIndex, file->Name);
         }
         else
         {
             if (Is(ptDisk))
             {
-                PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, topIndex, file->Name,
-                                                  GetPathW(), nullptr);
+                PathHistory->ChangeActualPathData(0, GetPathW(), NULL, NULL, NULL, topIndex, file->Name);
             }
             else
             {
                 if (Is(ptPluginFS))
                 {
-                    CPathBuffer curPath; // Heap-allocated for long path support
-                    if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPath(curPath))
+                    std::wstring curPath;
+                    if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPathW(curPath))
                     {
-                        PathHistory->ChangeActualPathData(2, GetPluginFS()->GetPluginFSName(), curPath,
+                        PathHistory->ChangeActualPathData(2, GetPluginFS()->GetPluginFSName(), curPath.c_str(),
                                                           GetPluginFS()->GetInterface(), GetPluginFS(),
                                                           topIndex, file->Name);
                     }
@@ -1633,23 +1575,22 @@ void CFilesWindow::RemoveCurrentPathFromHistory()
 
     if (Is(ptZIPArchive))
     {
-        PathHistory->RemoveActualPath(1, GetZIPArchive(), GetZIPPath(), NULL, NULL,
-                                      GetZIPArchiveW(), GetZIPPathW());
+        PathHistory->RemoveActualPath(1, GetZIPArchive(), GetZIPPath(), NULL, NULL);
     }
     else
     {
         if (Is(ptDisk))
         {
-            PathHistory->RemoveActualPath(0, GetPath(), NULL, NULL, NULL, GetPathW(), nullptr);
+            PathHistory->RemoveActualPath(0, GetPathW(), NULL, NULL, NULL);
         }
         else
         {
             if (Is(ptPluginFS))
             {
-                CPathBuffer curPath; // Heap-allocated for long path support
-                if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPath(curPath))
+                std::wstring curPath;
+                if (GetPluginFS()->NotEmpty() && GetPluginFS()->GetCurrentPathW(curPath))
                 {
-                    PathHistory->RemoveActualPath(2, GetPluginFS()->GetPluginFSName(), curPath,
+                    PathHistory->RemoveActualPath(2, GetPluginFS()->GetPluginFSName(), curPath.c_str(),
                                                   GetPluginFS()->GetInterface(), GetPluginFS());
                 }
             }
@@ -1680,43 +1621,35 @@ void CFilesWindow::InvalidateChangesInPanelWeHaveNewListing()
     }
 }
 
-BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggestedTopIndex,
-                                    const char* suggestedFocusName, BOOL* noChange,
+BOOL CFilesWindow::ChangePathToDisk(HWND parent, const wchar_t* path, int suggestedTopIndex,
+                                    const wchar_t* suggestedFocusName, BOOL* noChange,
                                     BOOL refreshListBox, BOOL canForce, BOOL isRefresh, int* failReason,
                                     BOOL shorterPathWarning, int tryCloseReason)
 {
-    CALL_STACK_MESSAGE9("CFilesWindow::ChangePathToDisk(, %s, %d, %s, , %d, %d, %d, , %d, %d)", path,
+    std::wstring requestedPath = path != NULL ? path : L"";
+    CALL_STACK_MESSAGE9("CFilesWindow::ChangePathToDisk(, %ls, %d, %ls, , %d, %d, %d, , %d, %d)", requestedPath.c_str(),
                         suggestedTopIndex, suggestedFocusName, refreshListBox, canForce, isRefresh,
                         shorterPathWarning, tryCloseReason);
 
     //TRACE_I("change-to-disk: begin");
 
-    if (Is(ptDisk) && path != NULL)
-    {
-        std::wstring mappedWidePath = sally::unicode::MapRelatedAnsiPathToWidePath(path, GetPath(), GetPathW());
-        if (!mappedWidePath.empty() && mappedWidePath != AnsiToWide(path))
-        {
-            return ChangePathToDiskW(parent, mappedWidePath.c_str(), suggestedTopIndex, suggestedFocusName, noChange,
-                                     refreshListBox, canForce, isRefresh, failReason,
-                                     shorterPathWarning, tryCloseReason);
-        }
-    }
+    // A rebind step used to sit here: it matched a lossy 'path' against the
+    // panel's ANSI mirror and recovered the real prefix from the wide twin. The mirror is
+    // gone (the panel keeps one wide path now), so there is nothing left to match against -
+    // and nothing left that can hand us a mirror-derived path either.
+    //
+    // The header-first sweep left the inherited byte body behind as a different, undeclared
+    // overload. Keep its complete recovery policy in this W owner so callers through either
+    // public wide declaration share normalization, shortening, rescue, retry, focus, and
+    // failure state.
 
-    if (strlen(path) >= SAL_MAX_LONG_PATH - 2)
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-
-    // we make backup copies
-    CPathBuffer backup(path); // must be done before UpdateDefaultDir (it may point to DefaultDir[])
-    CPathBuffer backup2;
+    // Keep both inputs stable while UpdateDefaultDir may rewrite the per-drive default path.
+    std::wstring resolvedPath = requestedPath;
+    std::wstring focusName;
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup2, suggestedFocusName, backup2.Size());
-        suggestedFocusName = backup2;
+        focusName = suggestedFocusName;
+        suggestedFocusName = focusName.c_str();
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -1732,16 +1665,16 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
     // if it's a relative path convert it to absolute
     int errTextID;
-    //  if (!SalGetFullName(backup, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
-    //                      MainWindow->GetActivePanel()->GetPath() : NULL))
-    if (!SalGetFullName(backup, &errTextID, Is(ptDisk) ? GetPath() : NULL, NULL, NULL, backup.Size())) // for the FTP plugin - relative path in "target panel path" during connect
+    //  if (!SalGetFullNameW(resolvedPath, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
+    //                      MainWindow->GetActivePanel()->GetPathW() : NULL))
+    if (!SalGetFullNameW(resolvedPath, &errTextID, Is(ptDisk) ? GetPathW() : NULL)) // for the FTP plugin - relative path in "target panel path" during connect
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
         return FALSE;
     }
-    path = backup;
+    path = resolvedPath.c_str();
 
     // start the waiting cursor
     BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // is it already waiting?
@@ -1754,29 +1687,30 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     BOOL fixedDrive = FALSE;
     BOOL canTryUserRescuePath = FALSE; // allows using Configuration.IfPathIsInaccessibleGoTo right before the fixed-drive path
     BOOL openIfPathIsInaccessibleGoToCfg = FALSE;
-    CPathBuffer ifPathIsInaccessibleGoTo;
-    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
-    if ((ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
-         ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':') &&
-        !IsTheSamePath(path, ifPathIsInaccessibleGoTo))
+    std::wstring ifPathIsInaccessibleGoTo;
+    GetIfPathIsInaccessibleGoToW(ifPathIsInaccessibleGoTo);
+    if (ifPathIsInaccessibleGoTo.length() >= 2 &&
+        ((ifPathIsInaccessibleGoTo[0] == L'\\' && ifPathIsInaccessibleGoTo[1] == L'\\') ||
+         ifPathIsInaccessibleGoTo[1] == L':') &&
+        !IsTheSamePath(path, ifPathIsInaccessibleGoTo.c_str()))
     {
         canTryUserRescuePath = TRUE;
     }
     BOOL closeCalled = FALSE;
     // when changing within the same drive (archives included) we'll find a valid directory
     // even if it means switching to a "fixed-drive"
-    BOOL forceUpdateInt = (Is(ptDisk) || Is(ptZIPArchive)) && HasTheSameRootPath(GetPath(), path);
+    BOOL forceUpdateInt = (Is(ptDisk) || Is(ptZIPArchive)) && HasTheSameRootPath(GetPathW(), path);
     BOOL detachFS;
     if (PrepareCloseCurrentPath(parent, canForce, TRUE, detachFS, tryCloseReason))
     { // change within "ptDisk" or we can close the current path, we try to open a new one
-        CPathBuffer changedPath(path);
-        BOOL tryNet = !CriticalShutdown && ((!Is(ptDisk) && !Is(ptZIPArchive)) || !HasTheSameRootPath(path, GetPath()));
+        std::wstring changedPath(path);
+        BOOL tryNet = !CriticalShutdown && ((!Is(ptDisk) && !Is(ptZIPArchive)) || !HasTheSameRootPath(path, GetPathW()));
 
     _TRY_AGAIN:
 
         DWORD err, lastErr;
         BOOL pathInvalid, cut;
-        SalCheckAndRestorePathWithCut(parent, changedPath, tryNet, err, lastErr, pathInvalid, cut, FALSE);
+        SalCheckAndRestorePathWithCutW(parent, changedPath, tryNet, err, lastErr, pathInvalid, cut, FALSE);
         if (cut)
         { // invalidate proposed listbox settings (we'll list a different path)
             suggestedTopIndex = -1;
@@ -1786,12 +1720,12 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
         if (!pathInvalid && err == ERROR_SUCCESS)
         {
             /*    // commented optimization for cases when the new path matches the old one -> unusual for disks...
-      if (!forceUpdate && firstRun && Is(ptDisk) && IsTheSamePath(changedPath, GetPath()))
+      if (!forceUpdate && firstRun && Is(ptDisk) && IsTheSamePath(changedPath, GetPathW()))
       {  // no reason to change the path
         CloseCurrentPath(parent, TRUE, detachFS, FALSE, isRefresh, FALSE);  // "cancel" - remain on the current path
         EndStopRefresh();
         if (setWait) SetCursor(oldCur);
-        if (IsTheSamePath(path, GetPath()))
+        if (IsTheSamePath(path, GetPathW()))
         {
           return TRUE; // the new path matches the current path, nothing to do
         }
@@ -1807,15 +1741,15 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 */
             BOOL updateIcon;
             updateIcon = !Is(ptDisk) || // simple because forceUpdate is commented out
-                         !HasTheSameRootPath(changedPath, GetPath());
-            //      updateIcon = forceUpdate || !Is(ptDisk) || !HasTheSameRootPath(changedPath, GetPath());
+                         !HasTheSameRootPath(changedPath.c_str(), GetPathW());
+            //      updateIcon = forceUpdate || !Is(ptDisk) || !HasTheSameRootPath(changedPath.c_str(), GetPathW());
 
             if (UseSystemIcons || UseThumbnails)
                 SleepIconCacheThread();
 
             if (!closeCalled)
-            { // executed only during the first pass, so we can use "Is(ptDisk)" and "GetPath()"
-                BOOL samePath = (Is(ptDisk) && IsTheSamePath(GetPath(), changedPath));
+            { // executed only during the first pass, so we can use "Is(ptDisk)" and "GetPathW()"
+                BOOL samePath = (Is(ptDisk) && IsTheSamePath(GetPathW(), changedPath.c_str()));
                 BOOL oldCanAddToDirHistory;
                 if (samePath)
                 {
@@ -1840,7 +1774,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
             }
             //--- set the panel to a disk path
             SetPanelType(ptDisk);
-            SetPath(changedPath);
+            SetPath(changedPath.c_str());
             if (updateIcon ||
                 !GetNetworkDrive()) // to ensure icons display correctly when switching to a mounted-volume (doesn't slow on local, so hoppefully no issues)
             {
@@ -1865,14 +1799,14 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
             FIXED_DRIVE:
 
                 BOOL change = FALSE;
-                if (fixedDrive || !CutDirectory(changedPath)) // we attempt to shorten the path
+                if (fixedDrive || !CutDirectoryW(changedPath)) // we attempt to shorten the path
                 {
                     if (canTryUserRescuePath) // first we try the "rescue path" user wished for
                     {
                         canTryUserRescuePath = FALSE; // we won't try it more than once
                         openIfPathIsInaccessibleGoToCfg = TRUE;
                         fixedDrive = FALSE; // we'll allow switching to a fixed-drive (perhaps it was tried already but the user path had priority)
-                        GetIfPathIsInaccessibleGoTo(changedPath);
+                        GetIfPathIsInaccessibleGoToW(changedPath);
                         shorterPathWarning = TRUE; // we want to see errors for the "rescue" path
                         change = TRUE;
                     }
@@ -1882,26 +1816,26 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                             OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
 
                         // cannot shorten, we find the system or first fixed-drive (our "escape drive")
-                        CPathBuffer sysDir; // Heap-allocated for long path support
-                        char root[4] = " :\\";
+                        std::wstring sysDir;
+                        wchar_t root[4] = L" :\\";
                         BOOL done = FALSE;
-                        if (EnvGetWindowsDirectoryA(gEnvironment, sysDir, sysDir.Size()).success && sysDir[0] != 0 && sysDir[1] == ':')
+                        if (gEnvironment->GetWindowsDirectory(sysDir).success && sysDir.length() >= 2 && sysDir[1] == L':')
                         {
                             root[0] = sysDir[0];
-                            if (GetDriveType(root) == DRIVE_FIXED)
+                            if (GetDriveTypeW(root) == DRIVE_FIXED)
                                 done = TRUE;
                         }
                         if (!done)
                         {
                             DWORD disks = GetLogicalDrives();
                             disks >>= 2; // skip A: and B:, during floppy formatting they sometimes become DRIVE_FIXED
-                            char d = 'C';
+                            wchar_t d = 'C';
                             while (d <= 'Z')
                             {
                                 if (disks & 1)
                                 {
                                     root[0] = d;
-                                    if (GetDriveType(root) == DRIVE_FIXED)
+                                    if (GetDriveTypeW(root) == DRIVE_FIXED)
                                         break; // we have our "escape drive"
                                 }
                                 disks >>= 1;
@@ -1914,7 +1848,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         {
                             if (LowerCase[root[0]] != LowerCase[changedPath[0]]) // prevention againts an infinite loop
                             {                                                    // UNC or another disk (like "c:\")
-                                strcpy(changedPath, root);                       // we'll try our "escape drive"
+                                changedPath = root;                              // we'll try our "escape drive"
                                 change = TRUE;
                             }
                         }
@@ -1948,8 +1882,8 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         RefreshListBox(0, -1, -1, FALSE, FALSE);
                     }
                     // we report the error that caused the path to be shortened
-                    const char* pathForMsg = openIfPathIsInaccessibleGoToCfg ? ifPathIsInaccessibleGoTo : path;
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), AnsiToWide(pathForMsg).c_str(), GetErrorTextW(lastErr));
+                    const wchar_t* pathForMsg = openIfPathIsInaccessibleGoToCfg ? ifPathIsInaccessibleGoTo.c_str() : path;
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_PATHERRORFORMAT), pathForMsg, GetErrorTextOwned(lastErr).c_str());
                     gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), msg.c_str());
                     if (openIfPathIsInaccessibleGoToCfg)
                         OpenCfgToChangeIfPathIsInaccessibleGoTo = TRUE;
@@ -1964,40 +1898,42 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
         {
             if (err == ERROR_NOT_READY) // if the drive isn't ready (removable media)
             {
-                CPathBuffer text;  // Heap-allocated for long path support
-                CPathBuffer drive;  // Heap-allocated for long path support (UNC roots can exceed MAX_PATH)
+                std::wstring drive;
                 UINT drvType;
-                if (changedPath[0] == '\\' && changedPath[1] == '\\')
+                if (changedPath.length() >= 2 && changedPath[0] == L'\\' && changedPath[1] == L'\\')
                 {
                     drvType = DRIVE_REMOTE;
-                    GetRootPath(drive, changedPath);
-                    drive[strlen(drive) - 1] = 0; // drop the trailing '\\'
+                    drive = GetRootPath(changedPath.c_str());
+                    if (!drive.empty())
+                        drive.pop_back(); // drop the trailing '\\'
                 }
                 else
                 {
-                    drive[0] = changedPath[0];
-                    drive[1] = 0;
-                    drvType = MyGetDriveType(changedPath);
+                    drive.assign(1, changedPath[0]);
+                    drvType = MyGetDriveTypeW(changedPath.c_str());
                 }
                 if (drvType != DRIVE_REMOTE)
                 {
-                    GetCurrentLocalReparsePoint(changedPath, CheckPathRootWithRetryMsgBox);
-                    if (strlen(CheckPathRootWithRetryMsgBox) > 3)
+                    std::wstring currentReparsePoint;
+                    GetCurrentLocalReparsePointW(changedPath.c_str(), currentReparsePoint);
+                    CheckPathRootWithRetryMsgBox = currentReparsePoint;
+                    if (currentReparsePoint.length() > 3)
                     {
-                        lstrcpyn(drive, CheckPathRootWithRetryMsgBox, drive.Size());
-                        SalPathRemoveBackslash(drive);
+                        drive = currentReparsePoint;
+                        SalPathRemoveBackslashW(drive);
                     }
                 }
                 else
-                    GetRootPath(CheckPathRootWithRetryMsgBox, changedPath);
-                sprintf(text, LoadStr(IDS_NODISKINDRIVE), drive.Get());
-                int msgboxRes = (int)CDriveSelectErrDlg(parent, text, changedPath).Execute();
-                if (msgboxRes == IDCANCEL && CutDirectory(CheckPathRootWithRetryMsgBox))
+                    CheckPathRootWithRetryMsgBox = GetRootPath(changedPath.c_str());
+                std::wstring text = FormatStrW(LoadStrW(IDS_NODISKINDRIVE), drive.c_str());
+                int msgboxRes = (int)CDriveSelectErrDlg(parent, text.c_str(), changedPath.c_str()).Execute();
+                std::wstring retryRoot = CheckPathRootWithRetryMsgBox;
+                if (msgboxRes == IDCANCEL && CutDirectoryW(retryRoot))
                 { // to allow entering the root when a volume is mounted (F:\DRIVE_CD -> F:\)
-                    lstrcpyn(changedPath, CheckPathRootWithRetryMsgBox, changedPath.Size());
+                    changedPath = retryRoot;
                     msgboxRes = IDRETRY;
                 }
-                *CheckPathRootWithRetryMsgBox = 0;
+                CheckPathRootWithRetryMsgBox.clear();
                 UpdateWindow(MainWindow->HWindow);
                 if (msgboxRes == IDRETRY)
                     goto _TRY_AGAIN;
@@ -2007,7 +1943,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                 if (!pathInvalid &&               // the user already knows the UNC path couldn't be revived
                     err != ERROR_USER_TERMINATED) // the user also knows about the abort (ESC)
                 {
-                    CheckPath(TRUE, changedPath, err, TRUE, parent); // other errors - just display the message
+                    SalCheckPathW(TRUE, changedPath.c_str(), err, TRUE, parent); // other errors - just display the message
                 }
             }
 
@@ -2032,7 +1968,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     EndStopRefresh();
     if (setWait)
         SetCursor(oldCur);
-    BOOL ret = Is(ptDisk) && IsTheSamePath(GetPath(), path);
+    BOOL ret = Is(ptDisk) && IsTheSamePath(GetPathW(), path);
     if (!ret && failReason != NULL && *failReason == CHPPFR_SUCCESS)
     {
         *failReason = CHPPFR_SHORTERPATH;
@@ -2041,174 +1977,26 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     return ret;
 }
 
-BOOL CFilesWindow::ChangePathToDiskW(HWND parent, const wchar_t* path, int suggestedTopIndex,
-                                     const char* suggestedFocusName, BOOL* noChange,
-                                     BOOL refreshListBox, BOOL canForce, BOOL isRefresh, int* failReason,
-                                     BOOL shorterPathWarning, int tryCloseReason)
+BOOL CFilesWindow::ChangePathToArchive(const wchar_t* archive, const wchar_t* archivePath,
+                                        int suggestedTopIndex, const wchar_t* suggestedFocusName,
+                                        BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
+                                        int* failReason, BOOL isRefresh, BOOL canFocusFileName,
+                                        BOOL isHistory)
 {
-    (void)shorterPathWarning;
-
-    std::wstring requestedPath = path != NULL ? path : L"";
-    std::string tracePath = WideToAnsi(requestedPath);
-    CALL_STACK_MESSAGE9("CFilesWindow::ChangePathToDiskW(, %s, %d, %s, , %d, %d, %d, , %d, %d)", tracePath.c_str(),
-                        suggestedTopIndex, suggestedFocusName, refreshListBox, canForce, isRefresh,
-                        shorterPathWarning, tryCloseReason);
-
-    if (requestedPath.length() >= SAL_MAX_LONG_PATH - 2)
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_TOOLONGNAME));
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-
-    RefreshPathHistoryData();
-
-    if (noChange != NULL)
-        *noChange = TRUE;
-
-    if (!isRefresh)
-        MainWindow->CancelPanelsUI();
-    MainWindow->UpdateDefaultDir(TRUE);
-
-    int errTextID;
-    if (!SalGetFullNameW(requestedPath, &errTextID, Is(ptDisk) ? GetPathW() : NULL))
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-
-    std::wstring changedPath = requestedPath;
-    BOOL tryNet = !CriticalShutdown;
-    DWORD err, lastErr;
-    BOOL pathInvalid, cut;
-    if (!SalCheckAndRestorePathWithCutW(parent, changedPath, tryNet, err, lastErr, pathInvalid, cut, FALSE))
-    {
-        if (pathInvalid || err == ERROR_USER_TERMINATED)
-            return FALSE;
-        SalCheckPathW(TRUE, requestedPath.c_str(), lastErr != ERROR_SUCCESS ? lastErr : err, TRUE, parent);
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-    if (cut)
-    {
-        suggestedTopIndex = -1;
-        suggestedFocusName = NULL;
-    }
-
-    BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT));
-    HCURSOR oldCur = NULL;
-    if (setWait)
-        oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-    BeginStopRefresh();
-
-    BOOL detachFS;
-    if (!PrepareCloseCurrentPath(parent, canForce, TRUE, detachFS, tryCloseReason))
-    {
-        EndStopRefresh();
-        if (setWait)
-            SetCursor(oldCur);
-        if (failReason != NULL)
-            *failReason = CHPPFR_CANNOTCLOSEPATH;
-        return FALSE;
-    }
-
-    BOOL updateIcon = TRUE;
-    if (UseSystemIcons || UseThumbnails)
-        SleepIconCacheThread();
-
-    CloseCurrentPath(parent, FALSE, detachFS, FALSE, isRefresh, TRUE);
-
-    if (DirectoryLine != NULL)
-        DirectoryLine->HideThrobberAndSecurityIcon();
-
-    SetPanelType(ptDisk);
-    SetPathW(changedPath.c_str());
-
-    if (updateIcon || !GetNetworkDrive())
-        UpdateDriveIcon(FALSE);
-
-    if (noChange != NULL)
-        *noChange = FALSE;
-
-    BOOL cannotList = !CommonRefresh(parent, suggestedTopIndex, suggestedFocusName, refreshListBox, TRUE, isRefresh);
-    if (isRefresh && !cannotList && GetMonitorChanges() && !AutomaticRefresh)
-    {
-        Sleep(400);
-        cannotList = !CommonRefresh(parent, suggestedTopIndex, suggestedFocusName, refreshListBox, TRUE, isRefresh);
-    }
-
-    if (cannotList)
-    {
-        // Mirror ANSI ChangePathToDisk recovery: shorten to the nearest accessible parent;
-        // if no parent is reachable, fall back to the user-configured rescue path or the first fixed drive.
-        BOOL recovered = FALSE;
-        std::wstring tryPath = changedPath;
-        while (CutDirectoryW(tryPath))
-        {
-            DWORD probeErr = SalCheckPathW(FALSE, tryPath.c_str(), ERROR_SUCCESS, FALSE, parent);
-            if (probeErr != ERROR_SUCCESS)
-                continue;
-            SetPathW(tryPath.c_str());
-            BOOL stillCannot = !CommonRefresh(parent, -1, NULL, refreshListBox, TRUE, isRefresh);
-            if (!stillCannot)
-            {
-                recovered = TRUE;
-                break;
-            }
-        }
-
-        EndStopRefresh();
-        if (setWait)
-            SetCursor(oldCur);
-
-        if (recovered)
-        {
-            if (failReason != NULL)
-                *failReason = CHPPFR_SHORTERPATH;
-            return FALSE;
-        }
-
-        // No accessible parent was found within the same root; long-jump out via the rescue/fixed-drive helper.
-        TopIndexMem.Clear();
-        ChangeToRescuePathOrFixedDrive(parent, noChange, refreshListBox, canForce, tryCloseReason, failReason);
-        if (failReason != NULL && *failReason == CHPPFR_SUCCESS)
-            *failReason = CHPPFR_SHORTERPATH;
-        return FALSE;
-    }
-
-    EndStopRefresh();
-    if (setWait)
-        SetCursor(oldCur);
-
-    BOOL openedRequestedPath = IsTheSamePathW(GetPathW(), requestedPath.c_str());
-    if (failReason != NULL)
-        *failReason = openedRequestedPath ? CHPPFR_SUCCESS : CHPPFR_SHORTERPATH;
-    return openedRequestedPath;
-}
-
-BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archivePath,
-                                       int suggestedTopIndex, const char* suggestedFocusName,
-                                       BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
-                                       int* failReason, BOOL isRefresh, BOOL canFocusFileName,
-                                       BOOL isHistory)
-{
-    CALL_STACK_MESSAGE10("CFilesWindow::ChangePathToArchive(%s, %s, %d, %s, %d, , %d, , %d, %d, %d)",
-                         archive, archivePath, suggestedTopIndex, suggestedFocusName,
+    std::wstring requestedArchive = archive != NULL ? archive : L"";
+    std::wstring requestedArchivePath = archivePath != NULL ? archivePath : L"";
+    CALL_STACK_MESSAGE10("CFilesWindow::ChangePathToArchive(%ls, %ls, %d, %ls, %d, , %d, , %d, %d, %d)",
+                         requestedArchive.c_str(), requestedArchivePath.c_str(), suggestedTopIndex, suggestedFocusName,
                          forceUpdate, refreshListBox, isRefresh, canFocusFileName, isHistory);
 
-    // we make backup copies
-    CPathBuffer backup1(archive);
-    CPathBuffer backup2(archivePath);
-    archivePath = backup2;
-    CPathBuffer backup3;
+    // Keep input values stable while UpdateDefaultDir may rewrite a panel default path.
+    std::wstring archiveName = requestedArchive;
+    std::wstring pathInArchive = requestedArchivePath;
+    std::wstring focusName;
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, backup3.Size());
-        suggestedFocusName = backup3;
+        focusName = suggestedFocusName;
+        suggestedFocusName = focusName.c_str();
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -2225,16 +2013,17 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
 
     // if the archive path is relative, convert it to absolute
     int errTextID;
-    //  if (!SalGetFullName(backup1, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
-    //                      MainWindow->GetActivePanel()->GetPath() : NULL))
-    if (!SalGetFullName(backup1, &errTextID, Is(ptDisk) ? GetPath() : NULL, NULL, NULL, backup1.Size())) // consistent with ChangePathToDisk()
+    //  if (!SalGetFullNameW(archiveName, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ?
+    //                      MainWindow->GetActivePanel()->GetPathW() : NULL))
+    if (!SalGetFullNameW(archiveName, &errTextID, Is(ptDisk) ? GetPathW() : NULL)) // consistent with ChangePathToDisk()
     {
         gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
         return FALSE;
     }
-    archive = backup1;
+    archive = archiveName.c_str();
+    archivePath = pathInArchive.c_str();
 
     //---  start the waiting cursor
     BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // is it already waiting?
@@ -2247,13 +2036,13 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     FILETIME archiveDate;  // date and time of the archive file
     CQuadWord archiveSize; // size of the archive file
 
-    CPathBuffer text; // Heap-allocated for long path support (used for messages with paths)
-    CPathBuffer path; // Heap-allocated for long path support
+    std::wstring path;
     BOOL sameArch;
     BOOL checkPath = TRUE;
     BOOL forceUpdateInt = FALSE; // is path change required? (possibly even to disk)
     BOOL tryPathWithArchiveOnError = isHistory;
-    if (!Is(ptZIPArchive) || StrICmp(GetZIPArchive(), archive) != 0) // not the archive or a different archive
+    BOOL notCurrentArchive = StrICmpW(GetZIPArchive(), archive) != 0;
+    if (!Is(ptZIPArchive) || notCurrentArchive) // not the archive or a different archive
     {
 
     _REOPEN_ARCHIVE:
@@ -2263,8 +2052,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
         if (PrepareCloseCurrentPath(HWindow, FALSE, TRUE, detachFS, FSTRYCLOSE_CHANGEPATH))
         { // the current path can be closed, try to open a new one
             // verify accessibility of the path containing the archive
-            strcpy(path, archive);
-            if (!CutDirectory(path, NULL))
+            path = archive;
+            if (!CutDirectoryW(path))
             {
                 TRACE_E("Unexpected situation in CFilesWindow::ChangePathToArchive.");
                 if (failReason != NULL)
@@ -2278,15 +2067,12 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 if (forceUpdateInt) // a path change is required; opening the archive failed, go back to disk
                 {                   // we're certainly in an archive (it's a panel refresh of an archive)
                     // if possible, exit the archive (possibly all the way to the "fixed-drive")
-                    if (sally::unicode::HasWidePathW(GetPathW()))
-                        ChangePathToDiskW(HWindow, GetPathW(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
-                    else
-                        ChangePathToDisk(HWindow, GetPath(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
+                    ChangePathToDisk(HWindow, GetPathW(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
                 }
                 else
                 {
                     if (tryPathWithArchiveOnError) // try changing to a path as close to the archive as possible
-                        ChangePathToDisk(HWindow, path, -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
+                        ChangePathToDisk(HWindow, path.c_str(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
                 }
 
                 EndStopRefresh();
@@ -2297,10 +2083,10 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             }
 
             // we skip testing network paths if we just accessed them
-            BOOL tryNet = (!Is(ptDisk) && !Is(ptZIPArchive)) || !HasTheSameRootPath(path, GetPath());
+            BOOL tryNet = (!Is(ptDisk) && !Is(ptZIPArchive)) || !HasTheSameRootPath(path.c_str(), GetPathW());
             DWORD err, lastErr;
             BOOL pathInvalid, cut;
-            if (!SalCheckAndRestorePathWithCut(HWindow, path, tryNet, err, lastErr, pathInvalid, cut, FALSE) ||
+            if (!SalCheckAndRestorePathWithCutW(HWindow, path, tryNet, err, lastErr, pathInvalid, cut, FALSE) ||
                 cut)
             { // path isn't accessible or it is truncated (the archive cannot be opened)
                 if (failReason != NULL)
@@ -2309,8 +2095,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     tryPathWithArchiveOnError = (err == ERROR_SUCCESS && !pathInvalid); // shorter path is accessible, we'll try it
                 if (!isRefresh)                                                         // during refresh path-shortening messages are not displayed
                 {
-                    std::wstring archiveW = AnsiToWide(archive);
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveW + L": " + GetErrorTextW(lastErr)).c_str());
+                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveName + L": " + GetErrorTextOwned(lastErr).c_str()).c_str());
                 }
                 goto ERROR_1;
             }
@@ -2319,15 +2104,23 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             {
                 // retrieve file info (does it exist?, size, date & time)
                 DWORD err2 = NO_ERROR;
-                std::wstring archiveW = AnsiToWide(archive);
-                HANDLE file = HANDLES_Q(CreateFileW(archiveW.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                HANDLE file = gFileSystem->CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                      NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, GetLastError(), TRUE);
                 if (file != INVALID_HANDLE_VALUE)
                 {
-                    GetFileTime(file, NULL, NULL, &archiveDate);
-                    SalGetFileSize(file, archiveSize, err2); // does it return "success"? - ignore, 'err2' is checked later
+                    uint64_t size = 0;
+                    const FileResult timeResult = gFileSystem->GetHandleFileTime(file, NULL, NULL, &archiveDate);
+                    const FileResult sizeResult = gFileSystem->GetHandleFileSize(file, &size);
+                    if (!timeResult.success)
+                        err2 = timeResult.errorCode;
+                    else if (!sizeResult.success)
+                        err2 = sizeResult.errorCode;
+                    else
+                        archiveSize.SetUI64(size);
                     nullFile = archiveSize == CQuadWord(0, 0);
-                    HANDLES(CloseHandle(file));
+                    HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+                    gFileSystem->CloseFileHandle(file);
                 }
                 else
                     err2 = GetLastError();
@@ -2336,7 +2129,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 {
                     if (!isRefresh) // during refresh missing-path messages are not displayed
                     {
-                        gPrompter->ShowError(LoadStr(IDS_ERROROPENINGFILE), archive ? archive : GetErrorText(err2));
+                        gPrompter->ShowError(LoadStrW(IDS_ERROROPENINGFILE),
+                                             archive != NULL ? archive : GetErrorTextOwned(err2).c_str());
                     }
                     if (failReason != NULL)
                         *failReason = CHPPFR_INVALIDPATH;
@@ -2352,7 +2146,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 CPluginDataInterfaceAbstract* pluginData = NULL;
                 CPluginData* plugin = NULL;
                 if (!nullFile)
-                    CreateSafeWaitWindow(LoadStr(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
+                    CreateSafeWaitWindow(LoadStrW(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
                 if (nullFile || PackList(this, archive, *newArchiveDir, pluginData, plugin))
                 {
                     // free the cache so it does not linger in the object
@@ -2366,15 +2160,13 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                         SleepIconCacheThread();
 
                     BOOL isTheSamePath = FALSE; // TRUE = the path doesn't change
-                    if (Is(ptZIPArchive) && StrICmp(GetZIPArchive(), archive) == 0)
+                    if (Is(ptZIPArchive) && StrICmpW(GetZIPArchive(), archive) == 0)
                     {
-                        CPathBuffer buf; // Heap-allocated for long path support
-                        strcpy(buf, *archivePath == '\\' ? archivePath + 1 : archivePath);
-                        char* end = buf + strlen(buf);
-                        if (end > buf && *(end - 1) == '\\')
-                            *--end = 0;
+                        std::wstring pathForComparison = archivePath[0] == L'\\' ? archivePath + 1 : archivePath;
+                        if (!pathForComparison.empty() && pathForComparison.back() == L'\\')
+                            pathForComparison.pop_back();
 
-                        if (GetArchiveDir()->SalDirStrCmp(buf, GetZIPPath()) == 0)
+                        if (GetArchiveDir()->SalDirStrCmp(pathForComparison.c_str(), GetZIPPath()) == 0)
                             isTheSamePath = TRUE;
                     }
 
@@ -2391,7 +2183,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                         DirectoryLine->HideThrobberAndSecurityIcon();
 
                     SetPanelType(ptZIPArchive);
-                    SetPath(path);
+                    SetPath(path.c_str());
                     UpdateDriveIcon(FALSE);
                     SetArchiveDir(newArchiveDir);
                     SetPluginIface(plugin != NULL ? plugin->GetPluginInterface()->GetInterface() : NULL);
@@ -2417,7 +2209,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 {
                     DestroySafeWaitWindow(); // nullFile must be FALSE, so the check is omitted...
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-                    TRACE_I("Unable to open file " << archive << ".");
+                    TRACE_IW(L"Unable to open file " << archive << L".");
                     delete newArchiveDir;
                     if (failReason != NULL)
                         *failReason = CHPPFR_INVALIDARCHIVE;
@@ -2426,7 +2218,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             }
             else
             {
-                TRACE_I("File " << archive << " is no longer archive file.");
+                TRACE_IW(L"File " << archive << L" is no longer archive file.");
                 if (failReason != NULL)
                     *failReason = CHPPFR_INVALIDARCHIVE;
                 goto ERROR_1;
@@ -2449,25 +2241,35 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             DWORD err;
             if ((err = CheckPath(!isRefresh)) == ERROR_SUCCESS) // no need to restore network connections here ...
             {
-                HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(archive).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, 0, NULL));
+                HANDLE file = gFileSystem->CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                      NULL, OPEN_EXISTING, 0, NULL);
+                HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, GetLastError(), TRUE);
                 if (file != INVALID_HANDLE_VALUE)
                 {
-                    SalGetFileSize(file, archiveSize, err);
+                    uint64_t size = 0;
+                    const FileResult sizeResult = gFileSystem->GetHandleFileSize(file, &size);
+                    if (!sizeResult.success)
+                        err = sizeResult.errorCode;
+                    else
+                        archiveSize.SetUI64(size);
                     nullFile = archiveSize == CQuadWord(0, 0);
                     FILETIME zipArchiveDate = GetZIPArchiveDate();
+                    FILETIME currentArchiveDate = {};
+                    const FileResult timeResult = gFileSystem->GetHandleFileTime(file, NULL, NULL, &currentArchiveDate);
                     BOOL change = (err != NO_ERROR ||                                     // unable to retrieve size
-                                   !GetFileTime(file, NULL, NULL, &archiveDate) ||        // unable to get date & time
-                                   CompareFileTime(&archiveDate, &zipArchiveDate) != 0 || // date & time differ
+                                   !timeResult.success ||                                  // unable to get date & time
+                                   CompareFileTime(&currentArchiveDate, &zipArchiveDate) != 0 || // date & time differ
                                    !IsSameZIPArchiveSize(archiveSize));                   // file size differs
-                    HANDLES(CloseHandle(file));
+                    archiveDate = currentArchiveDate;
+                    HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+                    gFileSystem->CloseFileHandle(file);
 
                     if (change) // file changed
                     {
                         if (AssocUsed) // Is anything from the archive being edited?
                         {
                             // notify that there were changes and that editors should be closed
-                            std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEREFRESHEDIT), AnsiToWide(GetZIPArchive()).c_str());
+                            std::wstring msg = FormatStrW(LoadStrW(IDS_ARCHIVEREFRESHEDIT), GetZIPArchive());
                             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
                         }
                         forceUpdateInt = TRUE; // nowhere to return, path change required (possibly back to disk)
@@ -2479,8 +2281,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     err = GetLastError(); // unable to open the archive file
                     if (!isRefresh)       // during refresh missing-path messages are not displayed
                     {
-                        std::wstring archiveW = AnsiToWide(archive);
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveW + L": " + GetErrorTextW(err)).c_str());
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (archiveName + L": " + GetErrorTextOwned(err).c_str()).c_str());
                     }
                 }
             }
@@ -2489,10 +2290,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 if (err != ERROR_USER_TERMINATED)
                 {
                     // if possible, exit the archive (possibly all the way to the "fixed-drive")
-                    if (sally::unicode::HasWidePathW(GetPathW()))
-                        ChangePathToDiskW(HWindow, GetPathW(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
-                    else
-                        ChangePathToDisk(HWindow, GetPath(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
+                    ChangePathToDisk(HWindow, GetPathW(), -1, NULL, noChange, refreshListBox, FALSE, isRefresh);
                 }
                 else // user pressed ESC -> the path is probably inaccessible, we go straight to the "fixed-drive"
                 {
@@ -2513,12 +2311,11 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     }
 
     // we find a path in the archive that still exists (original or shortened)
-    strcpy(path, *archivePath == '\\' ? archivePath + 1 : archivePath);
-    char* end = path + strlen(path);
-    if (end > path && *(end - 1) == '\\')
-        *--end = 0;
+    path = archivePath[0] == L'\\' ? archivePath + 1 : archivePath;
+    if (!path.empty() && path.back() == L'\\')
+        path.pop_back();
 
-    if (sameArch && GetArchiveDir()->SalDirStrCmp(path, GetZIPPath()) == 0) // the new path matches the current one
+    if (sameArch && GetArchiveDir()->SalDirStrCmp(path.c_str(), GetZIPPath()) == 0) // the new path matches the current one
     {
         // call CommonRefresh so 'suggestedTopIndex' and 'suggestedFocusName' aren't ignored
         CommonRefresh(HWindow, suggestedTopIndex, suggestedFocusName, refreshListBox, FALSE, isRefresh);
@@ -2530,29 +2327,29 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     }
 
     // save the current path in the archive
-    CPathBuffer currentPath; // Heap-allocated for long path support
-    strcpy(currentPath, GetZIPPath());
+    std::wstring currentPath = GetZIPPath();
 
-    SetZIPPath(path);
+    SetZIPPath(path.c_str());
     BOOL ok = TRUE;
-    char* fileName = NULL;
+    std::wstring fileName;
+    BOOL haveFileName = FALSE;
     BOOL useFileName = FALSE;
     while (path[0] != 0 && GetArchiveDirFiles() == NULL)
     {
-        end = strrchr(path, '\\');
-        useFileName = (canFocusFileName && suggestedFocusName == NULL && fileName == NULL); // allow focusing the file + no external focus + only for the first shortening
-        if (end != NULL)
+        const std::wstring::size_type slash = path.find_last_of(L'\\');
+        useFileName = (canFocusFileName && suggestedFocusName == NULL && !haveFileName); // allow focusing the file + no external focus + only for the first shortening
+        if (slash != std::wstring::npos)
         {
-            *end = 0;
-            fileName = end + 1;
+            fileName = path.substr(slash + 1);
+            path.resize(slash);
         }
         else
         {
-            memmove(path + 1, path, strlen(path) + 1);
-            fileName = path + 1;
-            path[0] = 0;
+            fileName = path;
+            path.clear();
         }
-        SetZIPPath(path);
+        haveFileName = TRUE;
+        SetZIPPath(path.c_str());
         ok = FALSE;
 
         if (!sameArch)
@@ -2562,7 +2359,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
         }
     }
 
-    if (!useFileName && sameArch && GetArchiveDir()->SalDirStrCmp(currentPath, GetZIPPath()) == 0) // we're not focusing a file and the shortened path matches the current one
+    if (!useFileName && sameArch && GetArchiveDir()->SalDirStrCmp(currentPath.c_str(), GetZIPPath()) == 0) // we're not focusing a file and the shortened path matches the current one
     {                                                                                              // occurs for example when attempting to enter an inaccessible directory (immediate return)
         EndStopRefresh();
         if (setWait)
@@ -2582,7 +2379,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     }
 
     // must succeed (at least the archive root always exists)
-    CommonRefresh(HWindow, suggestedTopIndex, useFileName ? fileName : suggestedFocusName,
+    CommonRefresh(HWindow, suggestedTopIndex, useFileName ? fileName.c_str() : suggestedFocusName,
                   refreshListBox, TRUE, isRefresh);
 
     if (refreshListBox && !ok && useFileName && GetCaretIndex() == 0)
@@ -2598,18 +2395,11 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     // we add the path we just left (paths inside the archive don't close,
     // so DirHistoryAddPathUnique wasn't called yet) + only if it's not the current
     // path (happens only when focusing a file)
-    if (sameArch && GetArchiveDir()->SalDirStrCmp(currentPath, GetZIPPath()) != 0)
+    if (sameArch && GetArchiveDir()->SalDirStrCmp(currentPath.c_str(), GetZIPPath()) != 0)
     {
         if (UserWorkedOnThisPath)
         {
-            // Archive root is wide-correct via GetZIPArchiveW(); the internal path
-            // 'currentPath' is the saved ANSI from before the change so wide it
-            // through AnsiToWide (typical ZIP entries are ASCII; Unicode-only
-            // internal entries would still be lossy, matching the existing ANSI
-            // fidelity).
-            std::wstring currentPathW = AnsiToWide(currentPath);
-            MainWindow->DirHistoryAddPathUnique(1, GetZIPArchive(), currentPath, NULL, NULL, NULL,
-                                                GetZIPArchiveW(), currentPathW.c_str());
+            MainWindow->DirHistoryAddPathUnique(1, GetZIPArchive(), currentPath.c_str(), NULL, NULL, NULL);
             UserWorkedOnThisPath = FALSE;
         }
 
@@ -2621,81 +2411,29 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     return ok;
 }
 
-BOOL CFilesWindow::ChangePathToArchiveW(const wchar_t* archive, const wchar_t* archivePath,
-                                        int suggestedTopIndex, const char* suggestedFocusName,
-                                        BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
-                                        int* failReason, BOOL isRefresh, BOOL canFocusFileName,
-                                        BOOL isHistory)
-{
-    std::wstring archiveW = archive != NULL ? archive : L"";
-    std::wstring archivePathW = archivePath != NULL ? archivePath : L"";
-    int errTextID;
-    if (!SalGetFullNameW(archiveW, &errTextID, Is(ptDisk) ? GetPathW() : NULL))
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(errTextID));
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-
-    std::string archiveA;
-    if (!sally::unicode::TryExactAnsiFallback(archiveW, archiveA))
-    {
-        std::wstring shortArchiveW = GetShortPathW(archiveW.c_str());
-        if (shortArchiveW.empty() || !sally::unicode::TryExactAnsiFallback(shortArchiveW, archiveA))
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), archiveW.c_str());
-            if (failReason != NULL)
-                *failReason = CHPPFR_INVALIDPATH;
-            return FALSE;
-        }
-    }
-
-    std::string archivePathA;
-    if (!sally::unicode::TryExactAnsiFallback(archivePathW, archivePathA))
-    {
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), archivePathW.c_str());
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        return FALSE;
-    }
-
-    BOOL ret = ChangePathToArchive(archiveA.c_str(), archivePathA.c_str(), suggestedTopIndex,
-                                   suggestedFocusName, forceUpdate, noChange, refreshListBox,
-                                   failReason, isRefresh, canFocusFileName, isHistory);
-    if (ret && Is(ptZIPArchive))
-    {
-        SetZIPArchiveW(archiveW.c_str());
-        std::wstring archiveDirW = GetDirectoryW(archiveW.c_str());
-        if (!archiveDirW.empty())
-            SetPathW(archiveDirW.c_str());
-    }
-    return ret;
-}
-
-BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, const char* fsUserPart,
+BOOL CFilesWindow::ChangeAndListPathOnFS(const wchar_t* fsName, int fsNameIndex, const wchar_t* fsUserPart,
                                          CPluginFSInterfaceEncapsulation& pluginFS, CSalamanderDirectory* dir,
                                          CPluginDataInterfaceAbstract*& pluginData, BOOL& shorterPath,
                                          int& pluginIconsType, int mode, BOOL firstCall,
-                                         BOOL* cancel, const char* currentPath, int currentPathFSNameIndex,
-                                         BOOL forceUpdate, char* cutFileName, BOOL* keepOldListing)
+                                         BOOL* cancel, const wchar_t* currentPath, int currentPathFSNameIndex,
+                                         BOOL forceUpdate, std::wstring* cutFileName, BOOL* keepOldListing)
 {
-    CALL_STACK_MESSAGE10("CFilesWindow::ChangeAndListPathOnFS(%s, %d, %s, , , , , , %d, %d, , %s, %d, %d, , %d)",
+    CALL_STACK_MESSAGE10("CFilesWindow::ChangeAndListPathOnFS(%ls, %d, %ls, , , , , , %d, %d, , %ls, %d, %d, , %d)",
                          fsName, fsNameIndex, fsUserPart, mode, firstCall, currentPath, currentPathFSNameIndex,
                          forceUpdate, (keepOldListing != NULL && *keepOldListing));
     if (cutFileName != NULL)
-        *cutFileName = 0;
-    CPathBuffer bufFSUserPart; // Heap-allocated for long path support
-    const char* origUserPart; // user-part to which we switch the path to
+        cutFileName->clear();
+    std::wstring bufFSUserPart;
+    const wchar_t* origUserPart; // user-part to which we switch the path to
     int origFSNameIndex;
     if (fsUserPart == NULL) // detached FS, restoration of the listing...
     {
-        if (!pluginFS.GetCurrentPath(bufFSUserPart))
+        if (!pluginFS.GetCurrentPathW(bufFSUserPart))
         {
             TRACE_E("Unable to get current path from detached FS.");
             return FALSE;
         }
-        origUserPart = bufFSUserPart;
+        origUserPart = bufFSUserPart.c_str();
         origFSNameIndex = pluginFS.GetPluginFSNameIndex();
     }
     else
@@ -2741,36 +2479,34 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
     }
 
     BOOL ok = FALSE;
-    CPathBuffer user; // Heap-allocated for long path support
-    lstrcpyn(user, origUserPart, user.Size());
+    std::wstring user(origUserPart);
     pluginData = NULL;
     shorterPath = FALSE;
     if (cancel != NULL)
         *cancel = FALSE; // new data
     // we will try to read the directory contents (the path may shorten progressively)
     BOOL useCutFileName = TRUE;
-    CPathBuffer fsNameBuf; // Heap-allocated for long path support
-    fsNameBuf[0] = 0;
+    std::wstring fsNameBuf;
     while (1)
     {
-        if (cutFileName != NULL && *cutFileName != 0)
+        if (cutFileName != NULL && !cutFileName->empty())
             useCutFileName = FALSE;
         BOOL pathWasCut = FALSE;
 
-        CPathBuffer newFSName; // Heap-allocated for long path support
-        lstrcpyn(newFSName, fsName, newFSName.Size());
-        BOOL changePathRet = pluginFS.ChangePath(pluginFS.GetPluginFSNameIndex(), newFSName,
-                                                 fsNameIndex, user, cutFileName,
-                                                 cutFileName != NULL ? &pathWasCut : NULL,
-                                                 forceUpdate, mode);
+        std::wstring newFSName(fsName);
+        BOOL changePathRet = pluginFS.ChangePathW(pluginFS.GetPluginFSNameIndex(), newFSName,
+                                                  fsNameIndex, user,
+                                                  cutFileName,
+                                                  cutFileName != NULL ? &pathWasCut : NULL,
+                                                  forceUpdate, mode);
         if (changePathRet) // ChangePath doesn't return an error
         {
-            if (StrICmp(newFSName, fsName) != 0) // fs-name change, verify the new fs-name
+            if (StrICmpW(newFSName.c_str(), fsName) != 0) // fs-name change, verify the new fs-name
             {
                 BOOL ok2 = FALSE;
                 int index;
                 int newFSNameIndex;
-                if (Plugins.IsPluginFS(newFSName, index, newFSNameIndex))
+                if (Plugins.IsPluginFS(newFSName.c_str(), index, newFSNameIndex))
                 {
                     CPluginData* plugin = Plugins.Get(index);
                     if (plugin != NULL)
@@ -2778,21 +2514,21 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
                         if (plugin->GetPluginInterface()->GetInterface() == pluginFS.GetPluginInterface())
                             ok2 = TRUE;
                         else
-                            TRACE_E("CFilesWindow::ChangeAndListPathOnFS(): pluginFS.ChangePath() returned fs-name "
-                                    "("
-                                    << newFSName << ") from other plugin: " << plugin->DLLName.c_str());
+                            TRACE_EW(L"CFilesWindow::ChangeAndListPathOnFS(): pluginFS.ChangePath() returned fs-name "
+                                    L"("
+                                     << newFSName.c_str() << L") from other plugin: " << plugin->DLLName.c_str());
                     }
                     else
                         TRACE_E("Second unexpected situation in CFilesWindow::ChangeAndListPathOnFS()");
                 }
                 else
-                    TRACE_E("CFilesWindow::ChangeAndListPathOnFS(): pluginFS.ChangePath() returned unknown fs-name: " << newFSName);
+                    TRACE_EW(L"CFilesWindow::ChangeAndListPathOnFS(): pluginFS.ChangePath() returned unknown fs-name: " << newFSName.c_str());
                 if (!ok2)
                     changePathRet = FALSE; // fs-name change failed; simulate a fatal error on the FS
                 else                       // start using the new FS name (for the next loop pass)
                 {
-                    lstrcpyn(fsNameBuf, newFSName, fsNameBuf.Size());
-                    fsName = fsNameBuf;
+                    fsNameBuf = std::move(newFSName);
+                    fsName = fsNameBuf.c_str();
                     fsNameIndex = newFSNameIndex;
                 }
             }
@@ -2802,7 +2538,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
 
         if (changePathRet)
         { // the path looks OK
-            if (pathWasCut && cutFileName != NULL && *cutFileName == 0)
+            if (pathWasCut && cutFileName != NULL && cutFileName->empty())
                 useCutFileName = FALSE;
             if (firstCall) // path change within the FS, original listing is not released (would it suffice?)
             {
@@ -2882,7 +2618,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
             // we prepare dir for further use (release leftovers if the plugin left any)
             workDir->Clear(NULL);
             // path isn't o.k.; we'll try shortening it in the next cycle pass
-            if (!pluginFS.GetCurrentPath(user))
+            if (!pluginFS.GetCurrentPathW(user))
             {
                 TRACE_E("Unexpected situation in CFilesWindow::ChangeAndListPathOnFS()");
                 break;
@@ -2890,7 +2626,7 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
         }
         else // fatal error, abort
         {
-            TRACE_I("Unable to open FS path " << fsName << ":" << origUserPart);
+            TRACE_IW(L"Unable to open FS path " << fsName << L":" << origUserPart);
 
             if (firstCall && (keepOldListing == NULL || !*keepOldListing)) // not dead-code (used when allocating workDir fails)
             {
@@ -2922,47 +2658,47 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
     // be focused and the user won't know about this "error" - but it's probably
     // not really an error if the file does exist, so we ignore it (same as with
     // disk paths)...
-    if (ok && useCutFileName && cutFileName != NULL && *cutFileName != 0)
+    if (ok && useCutFileName && cutFileName != NULL && !cutFileName->empty())
     {
-        CFilesArray* files = dir->GetFiles("");
-        unsigned cutFileNameLen = (int)strlen(cutFileName);
+        CFilesArray* files = dir->GetFiles(L"");
+        unsigned cutFileNameLen = (unsigned)cutFileName->size();
         int count = files->Count;
         int i;
         for (i = 0; i < count; i++)
         {
             CFileData* f = &(files->At(i));
             if (cutFileNameLen == f->NameLen &&
-                StrICmpEx(f->Name, cutFileNameLen, cutFileName, cutFileNameLen) == 0)
+                StrICmpExW(f->Name, cutFileNameLen, cutFileName->c_str(), cutFileNameLen) == 0)
                 break;
         }
         if (i == count) // report error (the file to focus was not found)
         {
-            // TODO: Use wide format string when IDS_UNABLETOFOCUSFILEONFS supports %ls
-            std::wstring fileW = AnsiToWide(cutFileName);
-            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), (fileW + L" - " + LoadStrW(IDS_UNABLETOFOCUSFILEONFS)).c_str());
-            *cutFileName = 0;
+            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
+                                 (*cutFileName + L" - " + LoadStrW(IDS_UNABLETOFOCUSFILEONFS)).c_str());
+            cutFileName->clear();
         }
     }
 
     if (!useCutFileName && cutFileName != NULL)
-        *cutFileName = 0; // we do not want to use it -> reset the value
+        cutFileName->clear(); // we do not want to use it -> reset the value
     return ok;
 }
 
-BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPart, int suggestedTopIndex,
-                                        const char* suggestedFocusName, BOOL forceUpdate, int mode,
-                                        BOOL* noChange, BOOL refreshListBox, int* failReason, BOOL isRefresh,
-                                        BOOL canFocusFileName, BOOL convertPathToInternal)
+BOOL CFilesWindow::ChangePathToPluginFS(const wchar_t* fsName, const wchar_t* fsUserPart, int suggestedTopIndex,
+                                         const wchar_t* suggestedFocusName, BOOL forceUpdate, int mode,
+                                         BOOL* noChange, BOOL refreshListBox, int* failReason, BOOL isRefresh,
+                                         BOOL canFocusFileName, BOOL convertPathToInternal)
 {
-    CALL_STACK_MESSAGE11("CFilesWindow::ChangePathToPluginFS(%s, %s, %d, %s, %d, %d, , %d, , %d, %d, %d)",
-                         fsName, fsUserPart, suggestedTopIndex, suggestedFocusName, forceUpdate,
+    const wchar_t* requestedFSName = fsName != NULL ? fsName : L"";
+    const wchar_t* requestedFSUserPart = fsUserPart != NULL ? fsUserPart : L"";
+    CALL_STACK_MESSAGE11("CFilesWindow::ChangePathToPluginFS(%ls, %ls, %d, %ls, %d, %d, , %d, , %d, %d, %d)",
+                         requestedFSName, requestedFSUserPart, suggestedTopIndex, suggestedFocusName, forceUpdate,
                          mode, refreshListBox, isRefresh, canFocusFileName, convertPathToInternal);
     //TRACE_I("change-to-fs: begin");
 
-    // as a precaution if fsName points to an unchangeable string (GetPluginFS()->PluginFSName()), we create a backup copy
-    CPathBuffer backup; // Heap-allocated for long path support
-    lstrcpyn(backup, fsName, backup.Size());
-    fsName = backup;
+    // These arguments can alias the active FS object, which may be replaced below.
+    std::wstring fsNameOwner = requestedFSName;
+    fsName = fsNameOwner.c_str();
 
     if (noChange != NULL)
         *noChange = TRUE;
@@ -2972,23 +2708,14 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         canFocusFileName = FALSE;
     }
 
-    if (strlen(fsUserPart) >= SAL_MAX_LONG_PATH)
-    {
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        MessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-        return FALSE;
-    }
     // make backup copies
-    CPathBuffer backup2; // Heap-allocated for long path support
-    lstrcpyn(backup2, fsUserPart, backup2.Size());
-    fsUserPart = backup2;
-    char* fsUserPart2 = backup2;
-    CPathBuffer backup3; // Heap-allocated for long path support
+    std::wstring fsUserPartOwner = requestedFSUserPart;
+    fsUserPart = fsUserPartOwner.c_str();
+    std::wstring suggestedFocusNameOwner;
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, backup3.Size());
-        suggestedFocusName = backup3;
+        suggestedFocusNameOwner = suggestedFocusName;
+        suggestedFocusName = suggestedFocusNameOwner.c_str();
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -3006,9 +2733,9 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    CPathBuffer cutFileNameBuf; // Heap-allocated for long path support
+    std::wstring cutFileNameValue;
     int fsNameIndex;
-    if (!Is(ptPluginFS) || !IsPathFromActiveFS(fsName, fsUserPart2, fsNameIndex, convertPathToInternal))
+    if (!Is(ptPluginFS) || !IsPathFromActiveFS(fsName, fsUserPartOwner, fsNameIndex, convertPathToInternal))
     { // is not FS or the path is from a different FS (even within a single plug-in - one FS name)
         BOOL detachFS;
         if (PrepareCloseCurrentPath(HWindow, FALSE, TRUE, detachFS, FSTRYCLOSE_CHANGEPATH))
@@ -3033,14 +2760,14 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     {
                         Plugins.SetWorkingPluginFS(&pluginFS);
                         if (convertPathToInternal) // convert the path to internal format
-                            pluginFS.GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart2);
+                            pluginFS.GetPluginInterfaceForFS()->ConvertPathToInternalW(fsName, fsNameIndex, fsUserPartOwner);
                         // create a new object for the contents of the current file system path
                         CSalamanderDirectory* newFSDir = new CSalamanderDirectory(TRUE);
                         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                         CPluginDataInterfaceAbstract* pluginData;
                         int pluginIconsType;
-                        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
-                        if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPart2, pluginFS, newFSDir, pluginData,
+                        std::wstring* cutFileName = canFocusFileName && suggestedFocusName == NULL ? &cutFileNameValue : NULL; // focus the file only if no other focus is proposed
+                        if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPartOwner.c_str(), pluginFS, newFSDir, pluginData,
                                                   shorterPath, pluginIconsType, mode, FALSE, NULL, NULL, -1,
                                                   FALSE, cutFileName, NULL))
                         {                    // success, the path (or subpath) was listed
@@ -3048,13 +2775,13 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                             {
                                 // invalidate proposed listbox settings (we'll list a different path)
                                 suggestedTopIndex = -1;
-                                if (cutFileName != NULL && *cutFileName != 0)
-                                    suggestedFocusName = cutFileName; // focus the file
+                                if (cutFileName != NULL && !cutFileName->empty())
+                                    suggestedFocusName = cutFileName->c_str(); // focus the file
                                 else
                                     suggestedFocusName = NULL;
                                 if (failReason != NULL)
                                 {
-                                    *failReason = cutFileName != NULL && *cutFileName != 0 ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH;
+                                    *failReason = cutFileName != NULL && !cutFileName->empty() ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH;
                                 }
                             }
                             else
@@ -3076,7 +2803,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                                 DirectoryLine->HideThrobberAndSecurityIcon();
 
                             SetPanelType(ptPluginFS);
-                            SetPathW(GetPathW()); // detach the path from Snooper (stop monitoring changes on Path)
+                            SetPath(GetPathW()); // detach the path from Snooper (stop monitoring changes on Path)
                             SetPluginFS(pluginFS.GetInterface(), plugin->DLLName.c_str(), plugin->Version.c_str(),
                                         plugin->GetPluginInterfaceForFS()->GetInterface(),
                                         plugin->GetPluginInterface()->GetInterface(),
@@ -3119,7 +2846,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     TRACE_E("Unexpected situation in CFilesWindow::ChangePathToPluginFS()");
             }
             else
-                TRACE_I("Plugin containing file-system name " << fsName << " is no longer available.");
+                TRACE_IW(L"Plugin containing file-system name " << fsName << L" is no longer available.");
 
             if (!ok)
                 CloseCurrentPath(HWindow, TRUE, detachFS, FALSE, isRefresh, FALSE); // failure, stay on the original path
@@ -3146,8 +2873,8 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
     {
         // note: convertPathToInternal must already be FALSE (the path was converted in IsPathFromActiveFS())
 
-        // PluginFS matches fsName and the path fsUserPart2 can be verified on it
-        BOOL samePath = GetPluginFS()->IsCurrentPath(GetPluginFS()->GetPluginFSNameIndex(), fsNameIndex, fsUserPart2);
+        // PluginFS matches fsName and the path can be verified on it
+        BOOL samePath = GetPluginFS()->IsCurrentPath(GetPluginFS()->GetPluginFSNameIndex(), fsNameIndex, fsUserPartOwner.c_str());
         if (!forceUpdate && samePath) // the path is identical to the current path
         {
             // call CommonRefresh so 'suggestedTopIndex' and 'suggestedFocusName' aren't ignored
@@ -3165,16 +2892,14 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
         // back up the current FS path (we'll try to select it again if an error occurs)
         BOOL currentPathOK = TRUE;
-        CPathBuffer currentPath; // Heap-allocated for long path support
-        if (!GetPluginFS()->GetCurrentPath(currentPath))
+        std::wstring currentPath;
+        if (!GetPluginFS()->GetCurrentPathW(currentPath))
             currentPathOK = FALSE;
-        CPathBuffer currentPathFSName; // Heap-allocated for long path support
-        strcpy(currentPathFSName, GetPluginFS()->GetPluginFSName());
+        std::wstring currentPathFSName = GetPluginFS()->GetPluginFSName();
         int currentPathFSNameIndex = GetPluginFS()->GetPluginFSNameIndex();
 
         int originalTopIndex = ListBox->GetTopIndex();
-        CPathBuffer originalFocusName; // Heap-allocated for long path support
-        originalFocusName[0] = 0;
+        std::wstring originalFocusName;
         if (FocusedIndex >= 0)
         {
             CFileData* file = NULL;
@@ -3186,7 +2911,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     file = &Files->At(FocusedIndex - Dirs->Count);
             }
             if (file != NULL)
-                lstrcpyn(originalFocusName, file->Name, originalFocusName.Size());
+                originalFocusName = file->Name;
         }
 
         // attempt to change the path on the current FS
@@ -3196,15 +2921,15 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         int pluginIconsType;
         BOOL cancel;
         BOOL keepOldListing = TRUE;
-        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
-        if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPart2, *GetPluginFS(), GetPluginFSDir(),
+        std::wstring* cutFileName = canFocusFileName && suggestedFocusName == NULL ? &cutFileNameValue : NULL; // focus the file only if no other focus is proposed
+        if (ChangeAndListPathOnFS(fsName, fsNameIndex, fsUserPartOwner.c_str(), *GetPluginFS(), GetPluginFSDir(),
                                   pluginData, shorterPath, pluginIconsType, mode, TRUE, &cancel,
-                                  currentPathOK ? currentPath.Get() : NULL, currentPathFSNameIndex, forceUpdate,
+                                  currentPathOK ? currentPath.c_str() : NULL, currentPathFSNameIndex, forceUpdate,
                                   cutFileName, &keepOldListing))
         { // success, the path (or subpath) was listed
             if (failReason != NULL)
             {
-                *failReason = shorterPath ? (cutFileName != NULL && *cutFileName != 0 ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH) : CHPPFR_SUCCESS;
+                *failReason = shorterPath ? (cutFileName != NULL && !cutFileName->empty() ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH) : CHPPFR_SUCCESS;
             }
 
             if (!cancel) // only if new content was loaded (original content wasn't kept)
@@ -3222,7 +2947,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 {
                     if (UserWorkedOnThisPath)
                     {
-                        MainWindow->DirHistoryAddPathUnique(2, currentPathFSName, currentPath, NULL,
+                        MainWindow->DirHistoryAddPathUnique(2, currentPathFSName.c_str(), currentPath.c_str(), NULL,
                                                             GetPluginFS()->GetInterface(), GetPluginFS());
                         UserWorkedOnThisPath = FALSE;
                     }
@@ -3235,8 +2960,8 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 {
                     // invalidate proposed listbox settings (we'll list a different path)
                     suggestedTopIndex = -1;
-                    if (cutFileName != NULL && *cutFileName != 0)
-                        suggestedFocusName = cutFileName; // focus the file
+                    if (cutFileName != NULL && !cutFileName->empty())
+                        suggestedFocusName = cutFileName->c_str(); // focus the file
                     else
                     {
                         suggestedFocusName = NULL;
@@ -3245,10 +2970,10 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                         // keep topIndex and focusName from before the operation starts (so the user doesn't lose focus)
                         if (currentPathOK &&
                             GetPluginFS()->IsCurrentPath(GetPluginFS()->GetPluginFSNameIndex(),
-                                                         currentPathFSNameIndex, currentPath))
+                                                         currentPathFSNameIndex, currentPath.c_str()))
                         {
                             suggestedTopIndex = originalTopIndex;
-                            suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName.Get();
+                            suggestedFocusName = originalFocusName.empty() ? NULL : originalFocusName.c_str();
                         }
                     }
                 }
@@ -3272,7 +2997,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
                 // clean the message queue from buffered WM_USER_UPDATEPANEL
                 MSG msg2;
-                PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
+                PeekMessageW(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
 
                 // refresh the panel
                 UpdateDriveIcon(FALSE); // get the icon for the current path from the plugin
@@ -3283,7 +3008,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
             }
             else
             {
-                if (shorterPath && cutFileName != NULL && *cutFileName != 0 && refreshListBox) // the file needs to be focused
+                if (shorterPath && cutFileName != NULL && !cutFileName->empty() && refreshListBox) // the file needs to be focused
                 {
                     int focusIndexCase = -1;
                     int focusIndexIgnCase = -1;
@@ -3291,11 +3016,11 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     for (i = 0; i < Dirs->Count; i++)
                     { // for consistency with CommonRefresh we search directories first,
                         // then files (so it behaves the same in both cases)
-                        if (StrICmp(Dirs->At(i).Name, cutFileName) == 0)
+                        if (StrICmpW(Dirs->At(i).Name, cutFileName->c_str()) == 0)
                         {
                             if (focusIndexIgnCase == -1)
                                 focusIndexIgnCase = i;
-                            if (strcmp(Dirs->At(i).Name, cutFileName) == 0)
+                            if (wcscmp(Dirs->At(i).Name, cutFileName->c_str()) == 0)
                             {
                                 focusIndexCase = i;
                                 break;
@@ -3306,11 +3031,11 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     {
                         for (i = 0; i < Files->Count; i++)
                         {
-                            if (StrICmp(Files->At(i).Name, cutFileName) == 0)
+                            if (StrICmpW(Files->At(i).Name, cutFileName->c_str()) == 0)
                             {
                                 if (focusIndexIgnCase == -1)
                                     focusIndexIgnCase = i + Dirs->Count;
-                                if (strcmp(Files->At(i).Name, cutFileName) == 0)
+                                if (wcscmp(Files->At(i).Name, cutFileName->c_str()) == 0)
                                 {
                                     focusIndexCase = i + Dirs->Count;
                                     break;
@@ -3334,7 +3059,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 *noChange = FALSE; // the listing will be cleared or changed
             if (!samePath &&       // if this isn't a refresh (changing to the same path)
                 currentPathOK &&   // if the original path was retrieved successfully
-                ChangeAndListPathOnFS(currentPathFSName, currentPathFSNameIndex, currentPath,
+                ChangeAndListPathOnFS(currentPathFSName.c_str(), currentPathFSNameIndex, currentPath.c_str(),
                                       *GetPluginFS(), GetPluginFSDir(),
                                       pluginData, shorterPath, pluginIconsType, mode,
                                       FALSE, NULL, NULL, -1, FALSE, NULL, &keepOldListing))
@@ -3348,7 +3073,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 if (!shorterPath)
                 {
                     suggestedTopIndex = originalTopIndex;
-                    suggestedFocusName = originalFocusName[0] == 0 ? NULL : originalFocusName.Get();
+                    suggestedFocusName = originalFocusName.empty() ? NULL : originalFocusName.c_str();
                 }
 
                 // add the path we just left (paths inside the FS remain open,
@@ -3357,7 +3082,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 {
                     if (UserWorkedOnThisPath)
                     {
-                        MainWindow->DirHistoryAddPathUnique(2, currentPathFSName, currentPath, NULL,
+                        MainWindow->DirHistoryAddPathUnique(2, currentPathFSName.c_str(), currentPath.c_str(), NULL,
                                                             GetPluginFS()->GetInterface(), GetPluginFS());
                         UserWorkedOnThisPath = FALSE;
                     }
@@ -3390,7 +3115,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
                 // clean the message queue from buffered WM_USER_UPDATEPANEL
                 MSG msg2;
-                PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
+                PeekMessageW(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
 
                 // refresh the panel
                 UpdateDriveIcon(FALSE); // get the icon for the current path from the plugin
@@ -3417,7 +3142,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                 {
                     // clean the message queue from buffered WM_USER_UPDATEPANEL
                     MSG msg2;
-                    PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
+                    PeekMessageW(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
                 }
 
                 // we hide the throbber and security icon; because we're leaving the FS...
@@ -3458,58 +3183,37 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
     }
 }
 
-BOOL CFilesWindow::ChangePathToPluginFSW(const wchar_t* fsName, const wchar_t* fsUserPart, int suggestedTopIndex,
-                                         const char* suggestedFocusName, BOOL forceUpdate, int mode,
-                                         BOOL* noChange, BOOL refreshListBox, int* failReason, BOOL isRefresh,
-                                         BOOL canFocusFileName, BOOL convertPathToInternal)
-{
-    std::string fsNameA;
-    std::string fsUserPartA;
-    if (!sally::unicode::TryExactAnsiFallback(fsName != NULL ? fsName : L"", fsNameA) ||
-        !sally::unicode::TryExactAnsiFallback(fsUserPart != NULL ? fsUserPart : L"", fsUserPartA))
-    {
-        if (failReason != NULL)
-            *failReason = CHPPFR_INVALIDPATH;
-        gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), fsUserPart != NULL ? fsUserPart : L"");
-        return FALSE;
-    }
-
-    return ChangePathToPluginFS(fsNameA.c_str(), fsUserPartA.c_str(), suggestedTopIndex,
-                                suggestedFocusName, forceUpdate, mode, noChange, refreshListBox,
-                                failReason, isRefresh, canFocusFileName, convertPathToInternal);
-}
-
 BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
-                                          const char* suggestedFocusName, BOOL refreshListBox,
-                                          int* failReason, const char* newFSName,
-                                          const char* newUserPart, int mode, BOOL canFocusFileName)
+                                          const wchar_t* suggestedFocusName, BOOL refreshListBox,
+                                          int* failReason, const wchar_t* newFSName,
+                                          const wchar_t* newUserPart, int mode, BOOL canFocusFileName)
 {
-    CALL_STACK_MESSAGE9("CFilesWindow::ChangePathToDetachedFS(%d, %d, %s, %d, , %s, %s, %d, %d)", fsIndex,
+    CALL_STACK_MESSAGE9("CFilesWindow::ChangePathToDetachedFS(%d, %d, %ls, %d, , %ls, %ls, %d, %d)", fsIndex,
                         suggestedTopIndex, suggestedFocusName, refreshListBox, newFSName, newUserPart,
                         mode, canFocusFileName);
 
-    CPathBuffer backup; // Heap-allocated for long path support
+    std::wstring suggestedFocusNameOwner;
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, backup.Size());
-        suggestedFocusName = backup;
+        suggestedFocusNameOwner = suggestedFocusName;
+        suggestedFocusName = suggestedFocusNameOwner.c_str();
     }
     if (newUserPart == NULL || newFSName == NULL)
     {
         newUserPart = NULL;
         newFSName = NULL;
     }
-    CPathBuffer backup2; // Heap-allocated for long path support
+    std::wstring newUserPartOwner;
     if (newUserPart != NULL)
     {
-        lstrcpyn(backup2, newUserPart, backup2.Size());
-        newUserPart = backup2;
+        newUserPartOwner = newUserPart;
+        newUserPart = newUserPartOwner.c_str();
     }
-    CPathBuffer backup3; // Heap-allocated for long path support
+    std::wstring newFSNameOwner;
     if (newFSName != NULL)
     {
-        lstrcpyn(backup3, newFSName, backup3.Size());
-        newFSName = backup3;
+        newFSNameOwner = newFSName;
+        newFSName = newFSNameOwner.c_str();
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -3535,22 +3239,22 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
     CPluginFSInterfaceEncapsulation* pluginFS = MainWindow->DetachedFSList->At(fsIndex);
 
     // retrieve fs-name of the detached FS
-    CPathBuffer fsName; // Heap-allocated for long path support
+    std::wstring fsName;
     int fsNameIndex;
     if (newFSName != NULL) // if we must switch to a new fs-name, find out whether it exists and obtain its fs-name-index
     {
-        strcpy(fsName, newFSName);
+        fsName = newFSName;
         int i;
-        if (!Plugins.IsPluginFS(fsName, i, fsNameIndex)) // "always false" (the plugin was not unloaded; fs-name could not disappear)
+        if (!Plugins.IsPluginFS(fsName.c_str(), i, fsNameIndex)) // "always false" (the plugin was not unloaded; fs-name could not disappear)
         {
-            TRACE_E("CFilesWindow::ChangePathToDetachedFS(): unexpected situation: requested FS was not found! fs-name=" << newFSName);
+            TRACE_EW(L"CFilesWindow::ChangePathToDetachedFS(): unexpected situation: requested FS was not found! fs-name=" << newFSName);
             newUserPart = NULL;
             newFSName = NULL;
         }
     }
     if (newFSName == NULL)
     {
-        strcpy(fsName, pluginFS->GetPluginFSName());
+        fsName = pluginFS->GetPluginFSName();
         fsNameIndex = pluginFS->GetPluginFSNameIndex();
     }
     if (mode == -1)
@@ -3580,7 +3284,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    CPathBuffer cutFileNameBuf; // Heap-allocated for long path support
+    std::wstring cutFileNameValue;
 
     // not a FS path or the path is from another FS (even within the same plugin - one FS name)
     BOOL detachFS;
@@ -3592,22 +3296,23 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
         CPluginDataInterfaceAbstract* pluginData;
         int pluginIconsType;
-        char* cutFileName = canFocusFileName && suggestedFocusName == NULL ? cutFileNameBuf.Get() : NULL; // focus the file only if no other focus is proposed
-        if (ChangeAndListPathOnFS(fsName, fsNameIndex, newUserPart, *pluginFS, newFSDir, pluginData,
+        std::wstring* cutFileName = canFocusFileName && suggestedFocusName == NULL ? &cutFileNameValue : NULL; // focus the file only if no other focus is proposed
+        if (ChangeAndListPathOnFS(fsName.c_str(), fsNameIndex, newUserPart, *pluginFS, newFSDir, pluginData,
                                   shorterPath, pluginIconsType, mode,
-                                  FALSE, NULL, NULL, -1, FALSE, cutFileName, NULL))
+                                  FALSE, NULL, NULL, -1, FALSE, cutFileName,
+                                  NULL))
         {                    // success, the path (or subpath) was listed
             if (shorterPath) // subpath?
             {
                 // invalidate proposed listbox settings (we'll list a different path)
                 suggestedTopIndex = -1;
-                if (cutFileName != NULL && *cutFileName != 0)
-                    suggestedFocusName = cutFileName; // focus the file
+                if (cutFileName != NULL && !cutFileName->empty())
+                    suggestedFocusName = cutFileName->c_str(); // focus the file
                 else
                     suggestedFocusName = NULL;
                 if (failReason != NULL)
                 {
-                    *failReason = cutFileName != NULL && *cutFileName != 0 ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH;
+                    *failReason = cutFileName != NULL && !cutFileName->empty() ? CHPPFR_FILENAMEFOCUSED : CHPPFR_SHORTERPATH;
                 }
             }
             else
@@ -3629,7 +3334,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
                 DirectoryLine->HideThrobberAndSecurityIcon();
 
             SetPanelType(ptPluginFS);
-            SetPathW(GetPathW()); // detach the path from Snooper (stop monitoring changes on Path)
+            SetPath(GetPathW()); // detach the path from Snooper (stop monitoring changes on Path)
             SetPluginFS(pluginFS->GetInterface(), plugin->DLLName.c_str(), plugin->Version.c_str(),
                         plugin->GetPluginInterfaceForFS()->GetInterface(),
                         plugin->GetPluginInterface()->GetInterface(),
@@ -3715,7 +3420,12 @@ void CFilesWindow::RefreshDiskFreeSpace(BOOL check, BOOL doNotRefreshOtherPanel)
     {
         if (!check || CheckPath(FALSE) == ERROR_SUCCESS)
         { // only if the path is accessible
-            CQuadWord r = MyGetDiskFreeSpace(GetPath());
+            // wide - MyGetDiskFreeSpace resolves reparse points by walking
+            // the whole path, not just the drive root, so a non-ASCII directory anywhere
+            // along it (not only the root) mangled the free-space lookup via
+            // the removed ANSI mirror; GetPathW() is already used two lines below in this same
+            // function for exactly this reason.
+            CQuadWord r = MyGetDiskFreeSpaceW(GetPathW());
             DirectoryLine->SetSize(r);
 
             if (!doNotRefreshOtherPanel)
@@ -3725,7 +3435,11 @@ void CFilesWindow::RefreshDiskFreeSpace(BOOL check, BOOL doNotRefreshOtherPanel)
                 // test whether both paths are on the same volume, but that would be too slow;
                 // this simplification should be more than enough for normal use)
                 CFilesWindow* otherPanel = (MainWindow->LeftPanel == this) ? MainWindow->RightPanel : MainWindow->LeftPanel;
-                if (otherPanel->Is(ptDisk) && HasTheSameRootPath(GetPath(), otherPanel->GetPath()))
+                // Both sides are panel paths, so both have a wide form. Comparing the
+                // CP_ACP mirrors could report a FALSE MATCH: two different directories the code
+                // page cannot spell both narrow to '?'-strings that compare equal, and the other
+                // panel's free space was then refreshed for a volume it is not on.
+                if (otherPanel->Is(ptDisk) && HasTheSameRootPath(GetPathW(), otherPanel->GetPathW()))
                     otherPanel->RefreshDiskFreeSpace(TRUE, TRUE /* otherwise we'd recurse endlessly */);
             }
         }
@@ -3764,23 +3478,21 @@ void CFilesWindow::GetContextMenuPos(POINT* p)
     ClientToScreen(GetListBoxHWND(), p);
 }
 
-void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
+void GetCommonFileTypeStr(wchar_t* buf, int* resLen, const wchar_t* ext)
 {
-    CPathBuffer uppercaseExt;  // Heap-allocated for long path support
-    char* d = uppercaseExt;
-    char* end = uppercaseExt + uppercaseExt.Size() - 1;
-    while (d < end && *ext != 0 && *ext != ' ')
-        *d++ = UpperCase[*ext++];
-    *d = 0;
-    if (*ext == 0 && *uppercaseExt != 0)
-    { // we have the entire extension in uppercase (no spaces and shorter than MAX_PATH) + it is not empty
-        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2.c_str(), uppercaseExt.Get());
+    if (ext[0] != L'\0' && wcschr(ext, L' ') == NULL)
+    {
+        std::wstring uppercaseExt = ext;
+        CharUpperBuffW(uppercaseExt.data(), static_cast<DWORD>(uppercaseExt.length()));
+        // 'buf' is wchar_t* (see this function's signature) and the format is
+        // now wide, so this is the wide printf.
+        *resLen = _snwprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2.c_str(), uppercaseExt.c_str());
         if (*resLen < 0)
             *resLen = TRANSFER_BUFFER_MAX - 1; // _snprintf_s reports truncation to the buffer size
     }
     else
     {
-        memcpy(buf, CommonFileTypeName.c_str(), CommonFileTypeNameLen + 1);
+        wmemcpy(buf, CommonFileTypeName.c_str(), CommonFileTypeNameLen + 1); // CHARACTERS
         *resLen = CommonFileTypeNameLen;
     }
 }
@@ -3804,7 +3516,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
     HFONT of = (HFONT)SelectObject(dc, Font);
     SIZE act;
 
-    CPathBuffer formatedFileName;  // Heap-allocated for long path support
+    std::wstring formatedFileName;
     switch (GetViewMode())
     {
     case vmBrief:
@@ -3821,19 +3533,12 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     f->Name,
                     f->NameLen,
                     f->Ext,
-                    f->NameW,
                     true,
                     Configuration.SortDirsByExt != FALSE,
                     IsExtensionInSeparateColumn() != FALSE,
                     sally::unicode::NameColumnViewMode::Brief);
-            if (widthPlan.UseWide)
-                GetTextExtentPoint32W(dc, f->NameW, widthPlan.NameLength, &act);
-            else
-            {
-                AlterFileName(formatedFileName, f->Name, f->NameLen,
-                              Configuration.FileNameFormat, 0, TRUE);
-                GetTextExtentPoint32(dc, formatedFileName, widthPlan.NameLength, &act);
-            }
+            formatedFileName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, true);
+            GetTextExtentPoint32W(dc, formatedFileName.c_str(), widthPlan.NameLength, &act);
             if (max.cx < act.cx)
                 max.cx = act.cx;
         }
@@ -3845,19 +3550,12 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     f->Name,
                     f->NameLen,
                     f->Ext,
-                    f->NameW,
                     false,
                     Configuration.SortDirsByExt != FALSE,
                     IsExtensionInSeparateColumn() != FALSE,
                     sally::unicode::NameColumnViewMode::Brief);
-            if (widthPlan.UseWide)
-                GetTextExtentPoint32W(dc, f->NameW, widthPlan.NameLength, &act);
-            else
-            {
-                AlterFileName(formatedFileName, f->Name, f->NameLen,
-                              Configuration.FileNameFormat, 0, FALSE);
-                GetTextExtentPoint32(dc, formatedFileName, widthPlan.NameLength, &act);
-            }
+            formatedFileName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, false);
+            GetTextExtentPoint32W(dc, formatedFileName.c_str(), widthPlan.NameLength, &act);
             if (max.cx < act.cx)
                 max.cx = act.cx;
         }
@@ -3970,7 +3668,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         int totalCount = Files->Count + Dirs->Count;
         if (dirsCount > 0)
         {
-            GetTextExtentPoint32(dc, DirColumnStr.c_str(), DirColumnStrLen, &act);
+            GetTextExtentPoint32W(dc, DirColumnStrW.c_str(), DirColumnStrWLen, &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthSize < act.cx)
                 columnWidthSize = act.cx;
@@ -3978,7 +3676,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         else
             act.cx = act.cy = 0;
 
-        char text[50];
+        wchar_t text[100];
 
         DWORD attrSkipCache[10]; // optimization of attribute-width measurement
         int attrSkipCacheCount = 0;
@@ -3990,11 +3688,11 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         if (computeDate && (totalCount > 20))
         {
             // determine whether we can estimate the widths
-            if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, text, 50) != 0)
+            if (GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, text, 50) != 0)
             {
                 // check if the date format contains words (dddd || MMMM),
                 // which would be rendered as text: (Monday || May)
-                if (strstr(text, "dddd") == NULL && strstr(text, "MMMM") == NULL)
+                if (wcsstr(text, L"dddd") == NULL && wcsstr(text, L"MMMM") == NULL)
                 {
                     SYSTEMTIME st;
                     st.wMilliseconds = 0;
@@ -4005,9 +3703,9 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     st.wMonth = 12;
                     st.wDay = 24;
                     st.wDayOfWeek = 0; // Sunday
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) == 0)
-                        sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                    GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
+                    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) == 0)
+                        swprintf_s(text, _countof(text), L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                    GetTextExtentPoint32W(dc, text, (int)wcslen(text), &act);
                     act.cx += SPACE_WIDTH;
                     if (columnWidthDate < act.cx)
                         columnWidthDate = act.cx;
@@ -4034,53 +3732,32 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     f->Name,
                     f->NameLen,
                     f->Ext,
-                    f->NameW,
                     isDir != FALSE,
                     Configuration.SortDirsByExt != FALSE,
                     extIsInExtColumn != FALSE,
                     sally::unicode::NameColumnViewMode::Detailed);
+            formatedFileName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir != FALSE);
             if (Columns[0].FixedWidth == 0 || (autoWidthColumns & VIEW_SHOW_EXTENSION) && extIsInExtColumn)
             {
                 if (Columns[0].FixedWidth == 0)
                 {
-                    if (widthPlan.UseWide)
-                    {
-                        GetTextExtentPoint32W(dc, f->NameW, widthPlan.NameLength, &act);
-                    }
-                    else
-                    {
-                        AlterFileName(formatedFileName, f->Name, f->NameLen, // preparation of the formatted name to also compute the width of the separate Ext column
-                                      Configuration.FileNameFormat, 0, isDir);
-                        nameLen = widthPlan.NameLength;
-                        GetTextExtentPoint32(dc, formatedFileName, nameLen, &act);
-                    }
+                    nameLen = widthPlan.NameLength;
+                    GetTextExtentPoint32W(dc, formatedFileName.c_str(), nameLen, &act);
                     act.cx += 1 + IconSizes[ICONSIZE_16] + 1 + 2 + SPACE_WIDTH;
                     if (columnWidthName < act.cx)
                         columnWidthName = act.cx;
                     if (nameColWidths != NULL)
                         nameColWidths[i] = act.cx;
                 }
-                else if (!f->UseWideName())
-                {
-                    AlterFileName(formatedFileName, f->Name, f->NameLen, // preparation of the formatted name to also compute the width of the separate Ext column
-                                  Configuration.FileNameFormat, 0, isDir);
-                }
             }
             //--- extension
             if ((autoWidthColumns & VIEW_SHOW_EXTENSION) && extIsInExtColumn)
             {
-                if (widthPlan.UseWide)
-                {
-                    const wchar_t* extPosW = sally::unicode::GetWideExtensionStart(f->NameW);
-                    if (extPosW != NULL && widthPlan.ExtensionLength > 0)
-                        GetTextExtentPoint32W(dc, extPosW, widthPlan.ExtensionLength, &act);
-                    else
-                        act.cx = 0;
-                }
+                const wchar_t* extPosW = sally::unicode::GetWideExtensionStart(formatedFileName.c_str());
+                if (extPosW != NULL && widthPlan.ExtensionLength > 0)
+                    GetTextExtentPoint32W(dc, extPosW, widthPlan.ExtensionLength, &act);
                 else
-                {
-                    GetTextExtentPoint32(dc, formatedFileName + (int)(f->Ext - f->Name), widthPlan.ExtensionLength, &act);
-                }
+                    act.cx = 0;
                 act.cx += SPACE_WIDTH;
                 if (columnWidthExt < act.cx)
                     columnWidthExt = act.cx;
@@ -4088,7 +3765,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             //--- dosname
             if ((autoWidthColumns & VIEW_SHOW_DOSNAME) && f->DosName != NULL)
             {
-                GetTextExtentPoint32(dc, f->DosName, (int)strlen(f->DosName), &act);
+                GetTextExtentPoint32W(dc, f->DosName, (int)wcslen(f->DosName), &act);
                 act.cx += SPACE_WIDTH;
                 if (columnWidthDosName < act.cx)
                     columnWidthDosName = act.cx;
@@ -4109,15 +3786,15 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 if (!FileTimeToLocalFileTime(&f->LastWrite, &ft) ||
                     !FileTimeToSystemTime(&ft, &st))
                 {
-                    len = sprintf(text, LoadStr(IDS_INVALID_DATEORTIME));
+                    len = swprintf_s(text, _countof(text), L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
                 }
                 else
                 {
-                    len = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) - 1;
+                    len = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) - 1;
                     if (len < 0)
-                        len = sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                        len = swprintf_s(text, _countof(text), L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                 }
-                GetTextExtentPoint32(dc, text, len, &act);
+                GetTextExtentPoint32W(dc, text, len, &act);
                 act.cx += SPACE_WIDTH;
                 if (columnWidthDate < act.cx)
                     columnWidthDate = act.cx;
@@ -4139,9 +3816,9 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                         mask != attrSkipCache[6] && mask != attrSkipCache[7] &&
                         mask != attrSkipCache[8] && mask != attrSkipCache[9])
                     {
-                        GetAttrsString(text, f->Attr);
+                        GetAttrsStringW(text, f->Attr);
                         // this combination has not been measured yet
-                        GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
+                        GetTextExtentPoint32W(dc, text, (int)wcslen(text), &act);
                         act.cx += SPACE_WIDTH;
                         if (columnWidthAttr < act.cx)
                             columnWidthAttr = act.cx;
@@ -4162,14 +3839,33 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 //--- file-type
                 if (!isDir) // it is a file
                 {
-                    char buf[TRANSFER_BUFFER_MAX];
+                    wchar_t buf[TRANSFER_BUFFER_MAX];
                     BOOL commonFileType = TRUE;
                     if (f->Ext[0] != 0) // extension exists
                     {
-                        char* dst = buf;
-                        char* src = f->Ext;
-                        while (*src != 0)
-                            *dst++ = LowerCase[*src++];
+                        // The stored keys are folded with sally::text::Fold (LCMAP_UPPERCASE) -
+                        // see prepareExtension in icncache.cpp - and CAssociations::GetIndex
+                        // compares raw DWORDs, so it is case SENSITIVE and the lookup key has to
+                        // be folded exactly the same way. Folding per character with FoldCharW
+                        // (CharLowerW) built a lowercase key that matched nothing, so the Type
+                        // column was always measured from the generic "TXT File" while the cell
+                        // itself - which looks the extension up correctly - drew the registered
+                        // type and got clipped. The other two lookups (files_window_paint.cpp,
+                        // sally_text_templates.cpp) already use Fold.
+                        const std::wstring folded = sally::text::Fold(f->Ext);
+                        wchar_t* dst = buf;
+                        wchar_t* src;
+                        // Bounded against the folded extension's length - an unusually long
+                        // extension overflowed 'buf' past its TRANSFER_BUFFER_MAX bound (caught by
+                        // /RTCs stack-var corruption checking in CFilesWindow::RefreshListBox).
+                        // Leave room for the DWORD zero-write below (2 wchar_t units).
+                        wchar_t* dstEnd = buf + _countof(buf) - 2;
+                        for (wchar_t c : folded)
+                        {
+                            if (dst >= dstEnd)
+                                break;
+                            *dst++ = c;
+                        }
                         *((DWORD*)dst) = 0;
                         int index;
                         if (Associations.GetIndex(buf, index))
@@ -4178,7 +3874,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                             if (src != NULL) // if it is not an empty string
                             {
                                 commonFileType = FALSE;
-                                GetTextExtentPoint32(dc, src, (int)strlen(src), &act);
+                                GetTextExtentPoint32W(dc, src, (int)wcslen(src), &act);
                                 act.cx += SPACE_WIDTH;
                                 if (columnWidthType < act.cx)
                                     columnWidthType = act.cx;
@@ -4189,7 +3885,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     {
                         int resLen;
                         GetCommonFileTypeStr(buf, &resLen, f->Ext);
-                        GetTextExtentPoint32(dc, buf, resLen, &act);
+                        GetTextExtentPoint32W(dc, buf, resLen, &act);
                         act.cx += SPACE_WIDTH;
                         if (columnWidthType < act.cx)
                             columnWidthType = act.cx;
@@ -4199,14 +3895,14 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 {
                     if (!dirTypeDone) // only if we have not computed it yet
                     {
-                        if (i == 0 && isDir && strcmp(f->Name, "..") == 0)
+                        if (i == 0 && isDir && wcscmp(f->Name, L"..") == 0)
                         {
-                            GetTextExtentPoint32(dc, UpDirTypeName.c_str(), UpDirTypeNameLen, &act);
+                            GetTextExtentPoint32W(dc, UpDirTypeName.c_str(), UpDirTypeNameLen, &act);
                         }
                         else
                         {
                             dirTypeDone = TRUE;
-                            GetTextExtentPoint32(dc, FolderTypeName, FolderTypeNameLen, &act);
+                            GetTextExtentPoint32W(dc, FolderTypeName, FolderTypeNameLen, &act);
                         }
                         act.cx += SPACE_WIDTH;
                         if (columnWidthType < act.cx)
@@ -4220,29 +3916,34 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         if (autoWidthColumns & VIEW_SHOW_SIZE)
         {
             int numLen;
+            std::wstring ownedSizeText;
+            const wchar_t* sizeText = text;
             switch (Configuration.SizeFormat)
             {
             case SIZE_FORMAT_BYTES:
             {
-                numLen = NumberToStr2(text, maxSize);
+                ownedSizeText = NumberToStr(maxSize);
+                sizeText = ownedSizeText.c_str();
+                numLen = static_cast<int>(ownedSizeText.size());
                 break;
             }
 
             case SIZE_FORMAT_KB: // note: the same code appears elsewhere, search for this constant
             {
-                PrintDiskSize(text, maxSize, 3);
-                numLen = (int)strlen(text);
+                ownedSizeText = PrintDiskSize(maxSize, 3);
+                sizeText = ownedSizeText.c_str();
+                numLen = static_cast<int>(ownedSizeText.size());
                 break;
             }
 
             case SIZE_FORMAT_MIXED:
             {
-                sprintf(text, "1023 GB"); // worst case scenario
-                numLen = (int)strlen(text);
+                swprintf_s(text, _countof(text), L"1023 GB"); // worst case scenario
+                numLen = (int)wcslen(text);
                 break;
             }
             }
-            GetTextExtentPoint32(dc, text, numLen, &act);
+            GetTextExtentPoint32W(dc, sizeText, numLen, &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthSize < act.cx)
                 columnWidthSize = act.cx;
@@ -4259,16 +3960,16 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             st.wMinute = 59;
             st.wSecond = 59;
             st.wHour = 10; // morning (AM)
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
-                sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-            GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
+            if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
+                swprintf_s(text, _countof(text), L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            GetTextExtentPoint32W(dc, text, (int)wcslen(text), &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthTime < act.cx)
                 columnWidthTime = act.cx;
             st.wHour = 23; // afternoon (PM)
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
-                sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-            GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
+            if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
+                swprintf_s(text, _countof(text), L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            GetTextExtentPoint32W(dc, text, (int)wcslen(text), &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthTime < act.cx)
                 columnWidthTime = act.cx;
@@ -4337,7 +4038,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                         if (j < Dirs->Count)
                         {
                             TransferFileData = &Dirs->At(j);
-                            TransferIsDir = (j == 0 && strcmp(TransferFileData->Name, "..") == 0) ? 2 : 1;
+                            TransferIsDir = (j == 0 && wcscmp(TransferFileData->Name, L"..") == 0) ? 2 : 1;
                         }
                         else
                         {
@@ -4349,7 +4050,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                         column->GetText();
                         if (TransferLen > 0)
                         {
-                            GetTextExtentPoint32(dc, TransferBuffer, TransferLen, &act);
+                            GetTextExtentPoint32W(dc, TransferBuffer, TransferLen, &act);
                             act.cx += SPACE_WIDTH;
                             if (act.cx > columnMaxWidth)
                                 columnMaxWidth = act.cx;

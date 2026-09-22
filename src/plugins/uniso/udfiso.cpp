@@ -8,6 +8,8 @@
 #include "uniso.h"
 #include "isoimage.h"
 #include "udfiso.h"
+#include "udf_ostacompress.h"
+#include "uniso_text.h"
 
 #include "uniso.rh"
 #include "uniso.rh2"
@@ -80,14 +82,10 @@ BOOL CUDFISO::Open(BOOL quiet)
     return TRUE;
 }
 
-BOOL CUDFISO::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir,
+BOOL CUDFISO::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir,
                             CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE3("CUDFISO::ListDirectory(%s, %d, , )", path, session);
-
-    CPathBuffer partPath;
-    ZeroMemory(partPath.Get(), partPath.Size());
-    int pathLen = (int)strlen(path);
+    CALL_STACK_MESSAGE3("CUDFISO::ListDirectory(%ls, %d, , )", path.c_str(), session);
 
     if (ISO != NULL)
     {
@@ -97,81 +95,60 @@ BOOL CUDFISO::ListDirectory(char* path, int session, CSalamanderDirectoryAbstrac
         int i;
         for (i = 32; i > 0 && (volId[i] == ' ' || volId[i] == '\0'); i--)
             volId[i] = '\0';
-        if (strlen(volId) != 0)
-            sprintf(partPath, "\\ISO (%s)", volId);
-        else
-            strcpy(partPath, "\\ISO partition");
-
-        strcat(path, partPath);
+        std::wstring volumeId;
+        if (volId[0] != '\0')
+            DecodeUnisoLegacyText(volId, volumeId);
+        std::wstring partName = volumeId.empty() ? L"ISO partition" : L"ISO (" + volumeId + L")";
+        std::wstring partPath(path);
+        SPLSalPathAppendOwned(partPath, partName.c_str());
 
         // avoid creating virtual session folder
         // (we have created ISO virtual folder (for partition) and therefore virtual session folder is not needed)
         if (ISO->BootRecordInfo != NULL && session == -1)
             session = 1;
-        ISO->ListDirectory(path, session, dir, pluginData);
-
-        path[pathLen] = '\0';
+        ISO->ListDirectory(partPath, session, dir, pluginData);
     }
 
     if (UDF != NULL)
     {
-        char volId[130] = {0}; // logical volume identifier for UDF is 128 chars long
+        const BYTE identifierBytes = UDF->LVD.LogicalVolumeIdentifier[127];
+        std::wstring volumeId;
+        if (identifierBytes > 0 && identifierBytes <= 127)
+            DecodeOSTACompressedOwned(UDF->LVD.LogicalVolumeIdentifier, identifierBytes, volumeId);
 
-        BYTE len;
-        memcpy(&len, UDF->LVD.LogicalVolumeIdentifier, 1);
-
-        // very stupid detection if the name is encoded with 16bit chars or 8bit chars
-        // note: only very stupid sw use 8bit chars and violates the standard
-        if (UDF->LVD.LogicalVolumeIdentifier[3] == 0 &&
-            UDF->LVD.LogicalVolumeIdentifier[5] == 0)
-        {
-            // seems to be 16bit char
-            WideCharToMultiByte(CP_ACP, 0, (WCHAR*)(UDF->LVD.LogicalVolumeIdentifier + 2), 64, volId, sizeof(volId) - 1, 0, 0);
-            volId[sizeof(volId) - 1] = 0;
-        }
-        else
-        {
-            memcpy(volId, UDF->LVD.LogicalVolumeIdentifier + 1, len * 2);
-            volId[2 * len - 1] = 0;
-        }
-
-        if (volId[0] != 0)
-            sprintf(partPath, "\\UDF (%s)", volId);
-        else
-            strcpy(partPath, "\\UDF partition");
-
-        strcat(path, partPath);
-
-        UDF->ListDirectory(path, session, dir, pluginData);
-
-        path[pathLen] = '\0';
+        std::wstring partName = volumeId.empty() ? L"UDF partition" : L"UDF (" + volumeId + L")";
+        std::wstring partPath(path);
+        SPLSalPathAppendOwned(partPath, partName.c_str());
+        UDF->ListDirectory(partPath, session, dir, pluginData);
     }
 
     if (HFS != NULL)
     {
-        char rootName[128];
+        // HFS+ root names are real HFSUniStr255 Unicode strings (up to 255 UTF-16 code units),
+        // unlike the ISO9660/UDF-8bit volume identifiers above which are restricted-charset disk
+        // metadata - kept wide end-to-end so a non-ANSI HFS+ volume name isn't best-fit-
+        // substituted before it becomes the virtual "\HFS (name)" directory a user navigates
+        // into.
+        std::wstring rootName;
+        std::wstring partName;
 
-        if (HFS->GetRootName(rootName, SizeOf(rootName)))
-        {
-            sprintf(path, "\\HFS (%s)", rootName);
-        }
+        if (HFS->GetRootName(rootName))
+            partName = L"HFS (" + rootName + L")";
         else
-        {
-            strcat(path, "\\HFS");
-        }
+            partName = L"HFS";
 
-        HFS->ListDirectory(path, session, dir, pluginData);
-
-        path[pathLen] = '\0';
+        std::wstring partPath(path);
+        SPLSalPathAppendOwned(partPath, partName.c_str());
+        HFS->ListDirectory(partPath, session, dir, pluginData);
     }
 
     return TRUE;
 }
 
-int CUDFISO::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                        const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CUDFISO::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                        const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CUDFISO::UnpackFile( , %s, %s, %s, %p, %u, %d)", srcPath, path, nameInArc, fileData, silent, toSkip);
+    CALL_STACK_MESSAGE6("CUDFISO::UnpackFile( , %ls, %ls, %p, %u, %d)", path.c_str(), nameInArc.c_str(), fileData, silent, toSkip);
 
     if (fileData == NULL)
         return UNPACK_ERROR;
@@ -180,13 +157,13 @@ int CUDFISO::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
     switch (fp->Type)
     {
     case FS_TYPE_ISO9660:
-        return ISO->UnpackFile(salamander, srcPath, path, nameInArc, fileData, silent, toSkip);
+        return ISO->UnpackFile(salamander, path, nameInArc, fileData, silent, toSkip);
 
     case FS_TYPE_UDF:
-        return UDF->UnpackFile(salamander, srcPath, path, nameInArc, fileData, silent, toSkip);
+        return UDF->UnpackFile(salamander, path, nameInArc, fileData, silent, toSkip);
 
     case FS_TYPE_HFS:
-        return HFS->UnpackFile(salamander, srcPath, path, nameInArc, fileData, silent, toSkip);
+        return HFS->UnpackFile(salamander, path, nameInArc, fileData, silent, toSkip);
 
     default:
         return UNPACK_ERROR;

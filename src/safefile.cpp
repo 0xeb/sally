@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -13,77 +13,19 @@
 #include "zip.h"
 #include "spl_file.h"
 #include "common/IFileSystem.h"
+#include "common/fsutil.h"
 #include "common/SafeFilePathContext.h"
 #include "ui/IPrompter.h"
-#include "common/unicode/helpers.h"
 #include "common/widepath.h"
-
-#include <map>
 
 CSalamanderSafeFile SalSafeFile;
 
 namespace
 {
-class CSafeFileWideNameStore
+const wchar_t* SafeFileNameW(const SAFE_FILE* file)
 {
-public:
-    CSafeFileWideNameStore()
-    {
-        InitializeCriticalSection(&Lock);
-    }
-
-    ~CSafeFileWideNameStore()
-    {
-        DeleteCriticalSection(&Lock);
-    }
-
-    void Remember(SAFE_FILE* file, const sally::safe_file::PathContext& path)
-    {
-        if (file == NULL)
-            return;
-
-        EnterCriticalSection(&Lock);
-        if (path.HasExactWideName())
-            Names[file] = path.WideNameRef();
-        else
-            Names.erase(file);
-        LeaveCriticalSection(&Lock);
-    }
-
-    void Forget(SAFE_FILE* file)
-    {
-        if (file == NULL)
-            return;
-
-        EnterCriticalSection(&Lock);
-        Names.erase(file);
-        LeaveCriticalSection(&Lock);
-    }
-
-    std::wstring Resolve(const SAFE_FILE* file)
-    {
-        if (file == NULL)
-            return std::wstring();
-
-        EnterCriticalSection(&Lock);
-        auto it = Names.find(const_cast<SAFE_FILE*>(file));
-        if (it != Names.end())
-        {
-            std::wstring wide = it->second;
-            LeaveCriticalSection(&Lock);
-            return wide;
-        }
-        LeaveCriticalSection(&Lock);
-
-        return AnsiToWide(file->FileName);
-    }
-
-private:
-    CRITICAL_SECTION Lock;
-    std::map<SAFE_FILE*, std::wstring> Names;
-};
-
-CSafeFileWideNameStore SafeFileWideNames;
+    return file != NULL && file->FileName != NULL ? file->FileName : L"";
+}
 
 size_t GetSafeFileRootLengthW(const std::wstring& path)
 {
@@ -143,14 +85,14 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
                                   DWORD* silentMask,
                                   BOOL allowSkip,
                                   BOOL* skipped,
-                                  char* skipPath,
+                                  wchar_t* skipPath,
                                   int skipPathMax)
 {
     std::wstring target = isDir ? path.WideNameRef() : GetSafeFileParentPathW(path.WideNameRef());
     if (target.empty())
         return TRUE;
 
-    DWORD attrs = GetFileAttributesW(target.c_str());
+    DWORD attrs = gFileSystem->GetFileAttributes(target.c_str());
     if (attrs != INVALID_FILE_ATTRIBUTES)
         return (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
 
@@ -161,8 +103,8 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
         if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_CREATE) && allowSkip)
             ret = DIALOG_SKIP;
         else
-            ret = DialogError(hParent, allowSkip ? BUTTONS_SKIPCANCEL : BUTTONS_OK, path.DisplayNameA(),
-                              LoadStr(IDS_ERRORCREATINGROOTDIR), LoadStr(IDS_ERRORCREATINGDIR));
+            ret = DialogError(hParent, allowSkip ? BUTTONS_SKIPCANCEL : BUTTONS_OK, path.WideNameW(),
+                              LoadStrW(IDS_ERRORCREATINGROOTDIR), LoadStrW(IDS_ERRORCREATINGDIR));
         switch (ret)
         {
         case DIALOG_SKIPALL:
@@ -172,7 +114,7 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
             if (skipped != NULL)
                 *skipped = TRUE;
             if (skipPath != NULL)
-                lstrcpyn(skipPath, path.DisplayNameA(), skipPathMax);
+                lstrcpynW(skipPath, path.WideNameW(), skipPathMax);
         }
         return FALSE;
     }
@@ -195,19 +137,18 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
         BOOL invalidPath = !component.empty() && (component[component.size() - 1] <= L' ' || component[component.size() - 1] == L'.');
         while (TRUE)
         {
-            DWORD existingAttrs = GetFileAttributesW(current.c_str());
+            DWORD existingAttrs = gFileSystem->GetFileAttributes(current.c_str());
             if (existingAttrs != INVALID_FILE_ATTRIBUTES)
             {
                 if (existingAttrs & FILE_ATTRIBUTE_DIRECTORY)
                     break;
 
                 int ret;
-                std::string display = WideToAnsi(current);
                 if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_NAMEUSED) && allowSkip)
                     ret = DIALOG_SKIP;
                 else
                     ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                      display.c_str(), LoadStr(IDS_NAMEALREADYUSED), LoadStr(IDS_ERRORCREATINGDIR));
+                                      current.c_str(), LoadStrW(IDS_NAMEALREADYUSED), LoadStrW(IDS_ERRORCREATINGDIR));
                 switch (ret)
                 {
                 case DIALOG_SKIPALL:
@@ -217,7 +158,7 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
                     if (skipped != NULL)
                         *skipped = TRUE;
                     if (skipPath != NULL)
-                        lstrcpyn(skipPath, display.c_str(), skipPathMax);
+                        lstrcpynW(skipPath, current.c_str(), skipPathMax);
                     return FALSE;
                 case DIALOG_CANCEL:
                 case DIALOG_FAIL:
@@ -226,17 +167,19 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
                 continue;
             }
 
-            if (!invalidPath && CreateDirectoryW(current.c_str(), NULL))
+            FileResult createResult = invalidPath
+                                          ? FileResult::Error(ERROR_INVALID_NAME)
+                                          : gFileSystem->CreateDirectory(current.c_str());
+            if (createResult.success)
                 break;
 
-            DWORD err = invalidPath ? ERROR_INVALID_NAME : GetLastError();
+            DWORD err = createResult.errorCode;
             int ret;
-            std::string display = WideToAnsi(current);
             if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_CREATE) && allowSkip)
                 ret = DIALOG_SKIP;
             else
                 ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                  display.c_str(), ::GetErrorText(err), LoadStr(IDS_ERRORCREATINGDIR));
+                                  current.c_str(), ::GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORCREATINGDIR));
             switch (ret)
             {
             case DIALOG_SKIPALL:
@@ -246,7 +189,7 @@ BOOL EnsureSafeFileDirectoryPathW(const sally::safe_file::PathContext& path,
                 if (skipped != NULL)
                     *skipped = TRUE;
                 if (skipPath != NULL)
-                    lstrcpyn(skipPath, display.c_str(), skipPathMax);
+                    lstrcpynW(skipPath, current.c_str(), skipPathMax);
                 return FALSE;
             case DIALOG_CANCEL:
             case DIALOG_FAIL:
@@ -279,9 +222,8 @@ static BOOL SafeFileOpenWithContext(SAFE_FILE* file,
                                     DWORD* pressedButton,
                                     DWORD* silentMask)
 {
-    const char* fileName = path.DisplayNameA();
-    CALL_STACK_MESSAGE7("CSalamanderSafeFile::SafeFileOpen(, %s, %u, %u, %u, %u, , %u, ,)",
-                        fileName, dwDesiredAccess, dwShareMode, dwCreationDisposition,
+    CALL_STACK_MESSAGE7("CSalamanderSafeFile::SafeFileOpen(, %ls, %u, %u, %u, %u, , %u, ,)",
+                        path.DisplayNameW(), dwDesiredAccess, dwShareMode, dwCreationDisposition,
                         dwFlagsAndAttributes, flags);
 
     // for errors such as LOW_MEMORY we want the operation to abort entirely
@@ -291,7 +233,8 @@ static BOOL SafeFileOpenWithContext(SAFE_FILE* file,
     HANDLE hFile;
     do
     {
-        hFile = HANDLES_Q(CreateFileW(path.WideNameW(), dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL));
+        hFile = gFileSystem->CreateFile(path.WideNameW(), dwDesiredAccess, dwShareMode, NULL,
+                                        dwCreationDisposition, dwFlagsAndAttributes, NULL);
         if (hFile == INVALID_HANDLE_VALUE)
         {
             DWORD dlgRet;
@@ -300,8 +243,8 @@ static BOOL SafeFileOpenWithContext(SAFE_FILE* file,
             else
             {
                 DWORD lastError = GetLastError();
-                dlgRet = DialogError(hParent, (flags & BUTTONS_MASK), fileName,
-                                     GetErrorText(lastError), LoadStr(IDS_ERROROPENINGFILE));
+                dlgRet = DialogError(hParent, (flags & BUTTONS_MASK), path.WideNameW(),
+                                     GetErrorTextOwned(lastError).c_str(), LoadStrW(IDS_ERROROPENINGFILE));
             }
             switch (dlgRet)
             {
@@ -322,11 +265,11 @@ static BOOL SafeFileOpenWithContext(SAFE_FILE* file,
     } while (hFile == INVALID_HANDLE_VALUE);
 
     // everything is OK - populate the context structure
-    file->FileName = DupStr(fileName);
+    file->FileName = DupStr(path.WideNameW());
     if (file->FileName == NULL)
     {
         TRACE_E(LOW_MEMORY);
-        HANDLES(CloseHandle(hFile));
+        (void)gFileSystem->CloseFileHandle(hFile);
         return FALSE;
     }
     file->HFile = hFile;
@@ -336,12 +279,11 @@ static BOOL SafeFileOpenWithContext(SAFE_FILE* file,
     file->dwCreationDisposition = dwCreationDisposition;
     file->dwFlagsAndAttributes = dwFlagsAndAttributes;
     file->WholeFileAllocated = FALSE;
-    SafeFileWideNames.Remember(file, path);
     return TRUE;
 }
 
 BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
-                                       const char* fileName,
+                                       const wchar_t* fileName,
                                        DWORD dwDesiredAccess,
                                        DWORD dwShareMode,
                                        DWORD dwCreationDisposition,
@@ -352,7 +294,7 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
                                        DWORD* silentMask)
 {
     return SafeFileOpenWithContext(file,
-                                   sally::safe_file::PathContext::FromAnsi(fileName),
+                                   sally::safe_file::PathContext(fileName),
                                    dwDesiredAccess,
                                    dwShareMode,
                                    dwCreationDisposition,
@@ -365,7 +307,7 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
 
 BOOL CSalamanderSafeFile::SafeFileOpenW(SAFE_FILE* file,
                                         const wchar_t* fileName,
-                                        const char* displayFileName,
+                                        const wchar_t* displayFileName,
                                         DWORD dwDesiredAccess,
                                         DWORD dwShareMode,
                                         DWORD dwCreationDisposition,
@@ -376,7 +318,7 @@ BOOL CSalamanderSafeFile::SafeFileOpenW(SAFE_FILE* file,
                                         DWORD* silentMask)
 {
     return SafeFileOpenWithContext(file,
-                                   sally::safe_file::PathContext::FromWide(fileName, displayFileName),
+                                   sally::safe_file::PathContext(fileName, displayFileName),
                                    dwDesiredAccess,
                                    dwShareMode,
                                    dwCreationDisposition,
@@ -393,19 +335,18 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                                         DWORD dwFlagsAndAttributes,
                                         BOOL isDir,
                                         HWND hParent,
-                                        const char* srcFileName,
-                                        const char* srcFileInfo,
+                                        const wchar_t* srcFileName,
+                                        const wchar_t* srcFileInfo,
                                         DWORD* silentMask,
                                         BOOL allowSkip,
                                         BOOL* skipped,
-                                        char* skipPath,
+                                        wchar_t* skipPath,
                                         int skipPathMax,
                                         CQuadWord* allocateWholeFile,
                                         SAFE_FILE* file)
 {
-    const char* fileName = path.DisplayNameA();
-    CALL_STACK_MESSAGE7("CSalamanderGeneral::SafeFileCreate(%s, %u, %u, %u, %d, , , , %d)",
-                        fileName, dwDesiredAccess, dwShareMode, dwFlagsAndAttributes, isDir, allowSkip);
+    CALL_STACK_MESSAGE7("CSalamanderGeneral::SafeFileCreate(%ls, %u, %u, %u, %d, , , , %d)",
+                        path.DisplayNameW(), dwDesiredAccess, dwShareMode, dwFlagsAndAttributes, isDir, allowSkip);
     dwFlagsAndAttributes &= 0xFFFF0000 | FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
                             FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_DIRECTORY |
                             FILE_ATTRIBUTE_ARCHIVE;
@@ -435,41 +376,39 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
         if (!isDir)
         {
             WIN32_FIND_DATAW data;
-            HANDLE find = path.HasExactWideName() ? SalFindFirstFileWideH(path.WideNameW(), &data) : SalFindFirstFileHW(fileName, &data);
+            HANDLE find = SalFindFirstFileHW(path.WideNameW(), &data);
             if (find != INVALID_HANDLE_VALUE)
             {
-                HANDLES(FindClose(find));
-                const char* tgtName = SalPathFindFileName(fileName);
-                char cFileNameA[MAX_PATH], cAltNameA[14];
-                WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only for the DOS name
-                    StrICmp(tgtName, cFileNameA) != 0)      // (the full name is different)
+                SalLPFindClose(find);
+                const wchar_t* tgtNameW = SalPathFindFileNameW(path.WideNameW());
+                if (_wcsicmp(tgtNameW, data.cAlternateFileName) == 0 && // match only for the DOS name
+                    _wcsicmp(tgtNameW, data.cFileName) != 0)   // (the full name is different)
                 {
                     // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (which doesn't require an extra DOS name)
-                    CPathBuffer tmpName;       // Heap-allocated for long path support
-                    CPathBuffer origFullName;  // Heap-allocated for long path support
-                    lstrcpyn(tmpName, fileName, tmpName.Size());
-                    CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, tmpName.Size());
-                    char* tmpNamePart = tmpName + strlen(tmpName);
-                    if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
+                    std::wstring temporaryDirectory(path.WideNameW());
+                    const size_t separator = temporaryDirectory.find_last_of(L'\\');
+                    temporaryDirectory.resize(separator == std::wstring::npos ? 0 : separator + 1);
+                    // data.cFileName is the genuine wide name the collision was
+                    // detected against; use it directly rather than round-tripping through the
+                    // lossy narrow cFileNameA mirror.
+                    std::wstring origFullName = temporaryDirectory + data.cFileName;
+                    if (!origFullName.empty())
                     {
-                        strcpy(origFullName, tmpName);
                         DWORD num = (GetTickCount() / 10) % 0xFFF;
+                        std::wstring tmpName;
                         while (1)
                         {
-                            sprintf(tmpNamePart, "sal%03X", num++);
-                            if (::SalMoveFile(origFullName, tmpName))
+                            tmpName = temporaryDirectory + FormatStrW(L"sal%03X", num++);
+                            if (::SalMoveFile(origFullName.c_str(), tmpName.c_str()))
                                 break;
                             DWORD e = GetLastError();
                             if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                             {
-                                *tmpName = 0;
+                                tmpName.clear();
                                 break;
                             }
                         }
-                        if (*tmpName != 0) // if we managed to "clean up" the conflicting file/directory, try creating the target
+                        if (!tmpName.empty()) // if we managed to "clean up" the conflicting file/directory, try creating the target
                         {                    // file/directory and then restore the original name to the "cleaned" file/directory
                             hFile = INVALID_HANDLE_VALUE;
                             //              if (!isDir)   // file
@@ -481,20 +420,20 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                             //              {
                             //                if (CreateDirectory(fileName, NULL)) out = (void *)1;  // on success we must return something other than INVALID_HANDLE_VALUE
                             //              }
-                            if (!::SalMoveFile(tmpName, origFullName))
+                            if (!::SalMoveFile(tmpName.c_str(), origFullName.c_str()))
                             { // this can apparently happen; inexplicably, Windows creates a file named origFullName instead of 'fileName' (the DOS name)
-                                TRACE_I("Unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                TRACE_IW(L"Unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName.c_str());
 
                                 if (hFile != INVALID_HANDLE_VALUE)
                                 {
                                     //                  if (!isDir)
-                                    CloseHandle(hFile);
+                                    (void)gFileSystem->CloseFileHandle(hFile);
                                     hFile = INVALID_HANDLE_VALUE;
                                     //                  if (!isDir)
                                     gFileSystem->DeleteFile(path.WideNameW());
                                     //                  else RemoveDirectory(fileName);
-                                    if (!::SalMoveFile(tmpName, origFullName))
-                                        TRACE_E("Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    if (!::SalMoveFile(tmpName.c_str(), origFullName.c_str()))
+                                        TRACE_EW(L"Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName.c_str());
                                 }
                             }
                             if (hFile != INVALID_HANDLE_VALUE)
@@ -523,7 +462,7 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
             {
                 // ERROR: filename+error, buttons retry/skip/skip all/cancel
                 ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                  fileName, LoadStr(IDS_NAMEALREADYUSEDFORDIR), LoadStr(IDS_ERRORCREATINGFILE));
+                                  path.WideNameW(), LoadStrW(IDS_NAMEALREADYUSEDFORDIR), LoadStrW(IDS_ERRORCREATINGFILE));
             }
             switch (ret)
             {
@@ -553,7 +492,7 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                 {
                     // ERROR: filename+error, buttons retry/skip/skip all/cancel
                     ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                      fileName, LoadStr(IDS_NAMEALREADYUSED), LoadStr(IDS_ERRORCREATINGDIR));
+                                      path.WideNameW(), LoadStrW(IDS_NAMEALREADYUSED), LoadStrW(IDS_ERRORCREATINGDIR));
                 }
                 switch (ret)
                 {
@@ -565,7 +504,7 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                     if (skipped != NULL)
                         *skipped = TRUE;
                     if (skipPath != NULL)
-                        lstrcpyn(skipPath, fileName, skipPathMax); // the user wants to return the skipped path
+                        lstrcpynW(skipPath, path.WideNameW(), skipPathMax); // the user wants to return the skipped path
                     return INVALID_HANDLE_VALUE;
                 case DIALOG_CANCEL:
                 case DIALOG_FAIL:
@@ -582,27 +521,33 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                     ret = DIALOG_SKIP;
                 else
                 {
-                    char fibuffer[500];
-                    HANDLE file2 = HANDLES_Q(CreateFileW(path.WideNameW(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                    wchar_t fibuffer[500];
+                    HANDLE file2 = gFileSystem->CreateFile(path.WideNameW(), 0,
+                                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (file2 != INVALID_HANDLE_VALUE)
                     {
-                        GetFileOverwriteInfo(fibuffer, _countof(fibuffer), file2, fileName);
-                        HANDLES(CloseHandle(file2));
+                        GetFileOverwriteInfoW(fibuffer, _countof(fibuffer), file2, path.WideNameW());
+                        gFileSystem->CloseFileHandle(file2);
                     }
                     else
-                        strcpy(fibuffer, LoadStr(IDS_ERR_FILEOPEN));
+                        wcscpy_s(fibuffer, LoadStrW(IDS_ERR_FILEOPEN));
                     if (srcFileName != NULL)
                     {
                         // CONFIRM FILE OVERWRITE: filename1+filedata1+filename2+filedata2, buttons yes/all/skip/skip all/cancel
+                        // srcFileName/srcFileInfo are now wide at both
+                        // SafeFileCreate entry points (the earlier comment describing them as
+                        // "narrow BY CONSTRUCTION" is stale - both the ANSI and wide entry points
+                        // now supply wide directly).
                         ret = DialogOverwrite(hParent, allowSkip ? BUTTONS_YESALLSKIPCANCEL : BUTTONS_YESALLCANCEL,
-                                              fileName, fibuffer, srcFileName, srcFileInfo);
+                                              path.WideNameW(), fibuffer,
+                                              srcFileName, srcFileInfo);
                     }
                     else
                     {
                         // CONFIRM FILE OVERWRITE: filename1+filedata1+a newly created file, buttons yes/all/skip/skip all/cancel
                         ret = DialogQuestion(hParent, allowSkip ? BUTTONS_YESALLSKIPCANCEL : BUTTONS_YESNOCANCEL,
-                                             fileName, LoadStr(IDS_NEWLYCREATEDFILE), LoadStr(IDS_CONFIRMFILEOVERWRITING));
+                                             path.WideNameW(), LoadStrW(IDS_NEWLYCREATEDFILE), LoadStrW(IDS_CONFIRMFILEOVERWRITING));
                     }
                 }
                 switch (ret)
@@ -642,7 +587,7 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
                         else
                             // QUESTION: filename+question, buttons yes/all/skip/skip all/cancel
                             ret = DialogQuestion(hParent, allowSkip ? BUTTONS_YESALLSKIPCANCEL : BUTTONS_YESALLCANCEL,
-                                                 fileName, LoadStr(IDS_WANTOVERWRITESHFILE), LoadStr(IDS_CONFIRMFILEOVERWRITING));
+                                                 path.WideNameW(), LoadStrW(IDS_WANTOVERWRITESHFILE), LoadStrW(IDS_CONFIRMFILEOVERWRITING));
                         switch (ret)
                         {
                         case DIALOG_SKIPALL:
@@ -675,237 +620,11 @@ static HANDLE SafeFileCreateWithContext(const sally::safe_file::PathContext& pat
         }
     }
 
-    if (attrs == 0xFFFFFFFF)
+    if (attrs == 0xFFFFFFFF &&
+        !EnsureSafeFileDirectoryPathW(path, isDir, hParent, silentMask, allowSkip,
+                                      skipped, skipPath, skipPathMax))
     {
-        if (path.HasExactWideName())
-        {
-            if (!EnsureSafeFileDirectoryPathW(path, isDir, hParent, silentMask, allowSkip,
-                                              skipped, skipPath, skipPathMax))
-            {
-                return INVALID_HANDLE_VALUE;
-            }
-            goto CREATE_FILE;
-        }
-
-        CPathBuffer namecopy;  // Heap-allocated for long path support
-        lstrcpyn(namecopy, fileName, namecopy.Size());
-        // if it is a file, obtain the directory name
-        if (!isDir)
-        {
-            char* ptr = strrchr(namecopy, '\\');
-            // does a path exist that we could create?
-            if (ptr == NULL)
-                goto CREATE_FILE;
-            // if so, keep only the path
-            *ptr = '\0';
-            // does the path already exist?
-            while (1)
-            {
-                attrs = GetFileAttributesW(AnsiToWide(namecopy).c_str());
-                if (attrs != 0xFFFFFFFF)
-                {
-                    // yes - proceed to create the file
-                    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-                        goto CREATE_FILE;
-                    // no - there is a file with the same name - report an error
-                    int ret;
-                    if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_NAMEUSED) && allowSkip)
-                        ret = DIALOG_SKIP;
-                    else
-                    {
-                        // ERROR: filename+error, buttons retry/skip/skip all/cancel
-                        ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL, namecopy,
-                                          LoadStr(IDS_NAMEALREADYUSED), LoadStr(IDS_ERRORCREATINGDIR));
-                    }
-                    switch (ret)
-                    {
-                    case DIALOG_SKIPALL:
-                        if (silentMask != NULL)
-                            *silentMask |= SILENT_SKIP_DIR_NAMEUSED;
-                        // no break here
-                    case DIALOG_SKIP:
-                        if (skipped != NULL)
-                            *skipped = TRUE;
-                        if (skipPath != NULL)
-                            lstrcpyn(skipPath, namecopy, skipPathMax); // the user wants to return the skipped path
-                        return INVALID_HANDLE_VALUE;
-                    case DIALOG_CANCEL:
-                    case DIALOG_FAIL:
-                        return INVALID_HANDLE_VALUE;
-                        // else retry
-                    }
-                }
-                else
-                    break;
-            }
-        }
-        // create the directory path
-        CPathBuffer root;  // Heap-allocated for long path support
-        GetRootPath(root, namecopy);
-        // if the directory is the root directory, there is a problem
-        if (strlen(namecopy) <= strlen(root))
-        {
-            // root directory -> error
-            int ret;
-            if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_CREATE) && allowSkip)
-                ret = DIALOG_SKIP;
-            else
-                ret = DialogError(hParent, allowSkip ? BUTTONS_SKIPCANCEL : BUTTONS_OK, namecopy,
-                                  LoadStr(IDS_ERRORCREATINGROOTDIR), LoadStr(IDS_ERRORCREATINGDIR));
-            switch (ret)
-            {
-            case DIALOG_SKIPALL:
-                if (silentMask != NULL)
-                    *silentMask |= SILENT_SKIP_DIR_CREATE;
-                // no break here
-            case DIALOG_SKIP:
-                if (skipped != NULL)
-                    *skipped = TRUE;
-                if (skipPath != NULL)
-                    lstrcpyn(skipPath, namecopy, skipPathMax); // the user wants to return the skipped path
-            }
-            return INVALID_HANDLE_VALUE;
-        }
-        char* ptr;
-        CPathBuffer namecpy2;  // Heap-allocated for long path support
-        lstrcpyn(namecpy2, namecopy, namecpy2.Size());
-        // find the first existing directory
-        while (1)
-        {
-            ptr = strrchr(namecpy2, '\\');
-            if (ptr == NULL)
-            {
-                // root directory -> error
-                int ret;
-                if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_CREATE) && allowSkip)
-                    ret = DIALOG_SKIP;
-                else
-                    ret = DialogError(hParent, allowSkip ? BUTTONS_SKIPCANCEL : BUTTONS_OK, namecpy2,
-                                      LoadStr(IDS_ERRORCREATINGROOTDIR), LoadStr(IDS_ERRORCREATINGDIR));
-                switch (ret)
-                {
-                case DIALOG_SKIPALL:
-                    if (silentMask != NULL)
-                        *silentMask |= SILENT_SKIP_DIR_CREATE;
-                    // no break here
-                case DIALOG_SKIP:
-                    if (skipped != NULL)
-                        *skipped = TRUE;
-                    if (skipPath != NULL)
-                        lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to retrieve the skipped path
-                }
-                return INVALID_HANDLE_VALUE;
-            }
-            *ptr = '\0';
-            // are we already at the root directory?
-            if (ptr <= namecpy2 + strlen(root))
-                break;
-            while (1)
-            {
-                attrs = GetFileAttributesW(AnsiToWide(namecpy2).c_str());
-                if (attrs != 0xFFFFFFFF)
-                {
-                    // do we have a directory or a file?
-                    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-                        break;
-                    else
-                    {
-                        int ret;
-                        if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_NAMEUSED) && allowSkip)
-                            ret = DIALOG_SKIP;
-                        else
-                        {
-                            // ERROR: filename+error, buttons retry/skip/skip all/cancel
-                            ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                              namecpy2, LoadStr(IDS_NAMEALREADYUSED), LoadStr(IDS_ERRORCREATINGDIR));
-                        }
-                        switch (ret)
-                        {
-                        case DIALOG_SKIPALL:
-                            if (silentMask != NULL)
-                                *silentMask |= SILENT_SKIP_DIR_NAMEUSED;
-                            // no break here
-                        case DIALOG_SKIP:
-                            if (skipped != NULL)
-                                *skipped = TRUE;
-                            if (skipPath != NULL)
-                                lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to return the skipped path
-                            return INVALID_HANDLE_VALUE;
-                        case DIALOG_CANCEL:
-                        case DIALOG_FAIL:
-                            return INVALID_HANDLE_VALUE;
-                            // else retry
-                        }
-                    }
-                }
-                else
-                    break;
-            }
-            if (attrs != 0xFFFFFFFF && attrs & FILE_ATTRIBUTE_DIRECTORY)
-                break;
-        }
-        // we have the first working directory in namecopy
-        ptr = namecpy2 + strlen(namecpy2) - 1;
-        if (*ptr != '\\')
-        {
-            *++ptr = '\\';
-            *++ptr = '\0';
-        }
-        // add another one
-        const char* src = namecopy + strlen(namecpy2);
-        while (*src == '\\')
-            src++;
-        int len = (int)strlen(namecpy2);
-        // and now create them one after another
-        while (*src != 0)
-        {
-            BOOL invalidPath = FALSE; // *src != 0 && *src <= ' '; // a leading space in a directory name is allowed, but when creating directories manually, we do not allow it because it is confusing
-            const char* slash = strchr(src, '\\');
-            if (slash == NULL)
-                slash = src + strlen(src);
-            memcpy(namecpy2 + len, src, slash - src);
-            namecpy2[len += (int)(slash - src)] = '\0';
-            if (namecpy2[len - 1] <= ' ' || namecpy2[len - 1] == '.')
-                invalidPath = TRUE; // spaces and dots at the end of the directory name being created are undesirable
-            while (invalidPath || !SalLPCreateDirectory(namecpy2, NULL))
-            {
-                // failed to create the directory, display an error
-                int ret;
-                if (silentMask != NULL && (*silentMask & SILENT_SKIP_DIR_CREATE) && allowSkip)
-                    ret = DIALOG_SKIP;
-                else
-                {
-                    DWORD err = GetLastError();
-                    if (invalidPath)
-                        err = ERROR_INVALID_NAME;
-                    // ERROR: filename+error, buttons retry/skip/skip all/cancel
-                    ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL,
-                                      namecpy2, ::GetErrorText(err), LoadStr(IDS_ERRORCREATINGDIR));
-                }
-                switch (ret)
-                {
-                case DIALOG_SKIPALL:
-                    if (silentMask != NULL)
-                        *silentMask |= SILENT_SKIP_DIR_CREATE;
-                    // no break here
-                case DIALOG_SKIP:
-                    if (skipped != NULL)
-                        *skipped = TRUE;
-                    if (skipPath != NULL)
-                        lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to return the skipped path
-                    return INVALID_HANDLE_VALUE;
-
-                case DIALOG_CANCEL:
-                case DIALOG_FAIL:
-                    return INVALID_HANDLE_VALUE;
-                    // else retry
-                }
-            }
-            namecpy2[len++] = '\\';
-            while (*slash == '\\')
-                slash++;
-            src = slash;
-        }
+        return INVALID_HANDLE_VALUE;
     }
 
 CREATE_FILE:
@@ -938,8 +657,8 @@ CREATE_FILE:
             else
             {
                 // ERROR: filename+error, buttons retry/skip/skip all/cancel
-                ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL, fileName,
-                                  ::GetErrorText(err), LoadStr(IDS_ERRORCREATINGFILE));
+                ret = DialogError(hParent, allowSkip ? BUTTONS_RETRYSKIPCANCEL : BUTTONS_RETRYCANCEL, path.WideNameW(),
+                                  ::GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORCREATINGFILE));
             }
             switch (ret)
             {
@@ -966,28 +685,37 @@ CREATE_FILE:
         {
             BOOL fatal = TRUE;
             BOOL ignoreErr = FALSE;
+            DWORD allocateError = ERROR_SUCCESS;
             if (*allocateWholeFile < CQuadWord(2, 0))
                 TRACE_E("SafeFileCreate: (WARNING) allocateWholeFile less than 2");
 
         SET_SIZE_AGAIN:
-            CQuadWord off = *allocateWholeFile;
-            off.LoDWord = SetFilePointer(hFile, off.LoDWord, (LONG*)&(off.HiDWord), FILE_BEGIN);
-            if ((off.LoDWord != INVALID_SET_FILE_POINTER || GetLastError() == NO_ERROR) && off == *allocateWholeFile)
+            uint64_t newPosition = 0;
+            const FileResult allocateSeekResult = gFileSystem->SeekHandle(
+                hFile, static_cast<int64_t>(allocateWholeFile->Value), FILE_BEGIN,
+                &newPosition);
+            if (!allocateSeekResult.success)
+                allocateError = allocateSeekResult.errorCode;
+            else if (newPosition != allocateWholeFile->Value)
+                allocateError = ERROR_INVALID_FUNCTION;
+            if (allocateSeekResult.success && newPosition == allocateWholeFile->Value)
             {
-                if (SetEndOfFile(hFile))
+                const FileResult allocateResult = gFileSystem->SetHandleEnd(hFile);
+                if (allocateResult.success)
                 {
-                    if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) == 0)
+                    const FileResult rewindResult =
+                        gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, &newPosition);
+                    if (rewindResult.success && newPosition == 0)
                     {
                         if (needWholeAllocTest)
                         {
                             DWORD wr;
-                            if (WriteFile(hFile, "x", 1, &wr, NULL) && wr == 1)
+                            if (gFileSystem->WriteToHandle(hFile, "x", 1, &wr).success && wr == 1)
                             {
-                                if (SetEndOfFile(hFile)) // try truncating the file to one byte
+                                if (gFileSystem->SetHandleEnd(hFile).success) // try truncating the file to one byte
                                 {
-                                    CQuadWord size;
-                                    size.LoDWord = GetFileSize(hFile, &size.HiDWord);
-                                    if (size == CQuadWord(1, 0))
+                                    uint64_t size = 0;
+                                    if (gFileSystem->GetHandleFileSize(hFile, &size).success && size == 1)
                                     { // check whether the written byte was appended to the end of the file and whether we can truncate the file
                                         needWholeAllocTest = FALSE;
                                         goto SET_SIZE_AGAIN; // we have to set the full file size again
@@ -1004,7 +732,8 @@ CREATE_FILE:
                 }
                 else
                 {
-                    if (GetLastError() == ERROR_DISK_FULL)
+                    allocateError = allocateResult.errorCode;
+                    if (allocateError == ERROR_DISK_FULL)
                         ignoreErr = TRUE; // low disk space
                 }
             }
@@ -1012,19 +741,19 @@ CREATE_FILE:
             {
                 if (!ignoreErr)
                 {
-                    DWORD err = GetLastError();
-                    TRACE_E("SafeFileCreate(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorText(err));
+                    DWORD err = allocateError != ERROR_SUCCESS ? allocateError : GetLastError();
+                    TRACE_EW(L"SafeFileCreate(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorTextOwned(err).c_str());
                     *allocateWholeFile = CQuadWord(-1, 0); // skip further attempts on this target disk
                 }
                 else
                     *allocateWholeFile = CQuadWord(0, 0); // the file could not be prepared, but we will try again next time
 
                 // also try truncating the file to zero to avoid unnecessary writing when closing the file
-                SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
-                SetEndOfFile(hFile);
+                (void)gFileSystem->SeekHandle(hFile, 0, FILE_BEGIN, NULL);
+                (void)gFileSystem->SetHandleEnd(hFile);
 
-                CloseHandle(hFile);
-                ClearReadOnlyAttrW(path.WideNameW()); // in case it ended up read-only so we can handle it
+                (void)gFileSystem->CloseFileHandle(hFile);
+                ClearReadOnlyAttr(path.WideNameW()); // in case it ended up read-only so we can handle it
                 gFileSystem->DeleteFile(path.WideNameW());
 
                 allocateWholeFile = NULL; // next time we will no longer try to preallocate
@@ -1038,11 +767,11 @@ CREATE_FILE:
         return (void*)1; // for a directory, just return anything other than INVALID_HANDLE_VALUE
     if (file != NULL)    // our task is to initialize the SAFE_FILE structure
     {
-        file->FileName = DupStr(fileName);
+        file->FileName = DupStr(path.WideNameW());
         if (file->FileName == NULL)
         {
             TRACE_E(LOW_MEMORY);
-            CloseHandle(hFile);
+            (void)gFileSystem->CloseFileHandle(hFile);
             return FALSE;
         }
         file->HFile = hFile;
@@ -1052,30 +781,29 @@ CREATE_FILE:
         file->dwCreationDisposition = CREATE_ALWAYS;
         file->dwFlagsAndAttributes = dwFlagsAndAttributes;
         file->WholeFileAllocated = wholeFileAllocated;
-        SafeFileWideNames.Remember(file, path);
         HANDLES_ADD(__htFile, __hoCreateFile, hFile); // add handle hFile to HANDLES
     }
     return hFile;
 }
 
 HANDLE
-CSalamanderSafeFile::SafeFileCreate(const char* fileName,
+CSalamanderSafeFile::SafeFileCreate(const wchar_t* fileName,
                                     DWORD dwDesiredAccess,
                                     DWORD dwShareMode,
                                     DWORD dwFlagsAndAttributes,
                                     BOOL isDir,
                                     HWND hParent,
-                                    const char* srcFileName,
-                                    const char* srcFileInfo,
+                                    const wchar_t* srcFileName,
+                                    const wchar_t* srcFileInfo,
                                     DWORD* silentMask,
                                     BOOL allowSkip,
                                     BOOL* skipped,
-                                    char* skipPath,
+                                    wchar_t* skipPath,
                                     int skipPathMax,
                                     CQuadWord* allocateWholeFile,
                                     SAFE_FILE* file)
 {
-    return SafeFileCreateWithContext(sally::safe_file::PathContext::FromAnsi(fileName),
+    return SafeFileCreateWithContext(sally::safe_file::PathContext(fileName),
                                      dwDesiredAccess,
                                      dwShareMode,
                                      dwFlagsAndAttributes,
@@ -1094,23 +822,23 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
 
 HANDLE
 CSalamanderSafeFile::SafeFileCreateW(const wchar_t* fileName,
-                                     const char* displayFileName,
+                                     const wchar_t* displayFileName,
                                      DWORD dwDesiredAccess,
                                      DWORD dwShareMode,
                                      DWORD dwFlagsAndAttributes,
                                      BOOL isDir,
                                      HWND hParent,
-                                     const char* srcFileName,
-                                     const char* srcFileInfo,
+                                     const wchar_t* srcFileName,
+                                     const wchar_t* srcFileInfo,
                                      DWORD* silentMask,
                                      BOOL allowSkip,
                                      BOOL* skipped,
-                                     char* skipPath,
+                                     wchar_t* skipPath,
                                      int skipPathMax,
                                      CQuadWord* allocateWholeFile,
                                      SAFE_FILE* file)
 {
-    return SafeFileCreateWithContext(sally::safe_file::PathContext::FromWide(fileName, displayFileName),
+    return SafeFileCreateWithContext(sally::safe_file::PathContext(fileName, displayFileName),
                                      dwDesiredAccess,
                                      dwShareMode,
                                      dwFlagsAndAttributes,
@@ -1129,12 +857,11 @@ CSalamanderSafeFile::SafeFileCreateW(const wchar_t* fileName,
 
 void CSalamanderSafeFile::SafeFileClose(SAFE_FILE* file)
 {
-    SafeFileWideNames.Forget(file);
     if (file->HFile != NULL && file->HFile != INVALID_HANDLE_VALUE)
     {
         if (file->WholeFileAllocated)
-            SetEndOfFile(file->HFile); // otherwise the rest of the file would be written
-        HANDLES(CloseHandle(file->HFile));
+            (void)gFileSystem->SetHandleEnd(file->HFile); // otherwise the rest of the file would be written
+        (void)gFileSystem->CloseFileHandle(file->HFile);
     }
     if (file->FileName != NULL)
         free(file->FileName);
@@ -1151,24 +878,18 @@ BOOL CSalamanderSafeFile::SafeFileSeek(SAFE_FILE* file, CQuadWord* distance, DWO
         return FALSE;
     }
 
-    LARGE_INTEGER li;
-    li.QuadPart = distance->Value;
-
-    LONG lo = li.LowPart;
-    LONG hi = li.HighPart;
-
-    lo = SetFilePointer(file->HFile, lo, &hi, moveMethod);
-
-    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    uint64_t newPosition = 0;
+    const FileResult seekResult = gFileSystem->SeekHandle(
+        file->HFile, static_cast<int64_t>(distance->Value), moveMethod,
+        &newPosition);
+    if (!seekResult.success)
     {
         if (error != NULL)
-            *error = GetLastError();
+            *error = seekResult.errorCode;
         return FALSE;
     }
 
-    li.LowPart = lo;
-    li.HighPart = hi;
-    distance->Value = li.QuadPart;
+    distance->Value = newPosition;
     return TRUE;
 }
 
@@ -1193,8 +914,8 @@ SEEK_AGAIN:
         else
         {
             dlgRet = DialogError((hParent == HWND_STORED) ? file->HParentWnd : hParent, (flags & BUTTONS_MASK),
-                                 file->FileName, GetErrorText(lastError),
-                                 LoadStr(seekForRead ? IDS_ERRORREADINGFILE : IDS_ERRORWRITINGFILE));
+                                 SafeFileNameW(file), GetErrorTextOwned(lastError).c_str(),
+                                 LoadStrW(seekForRead ? IDS_ERRORREADINGFILE : IDS_ERRORWRITINGFILE));
         }
         switch (dlgRet)
         {
@@ -1218,11 +939,16 @@ BOOL CSalamanderSafeFile::SafeFileGetSize(SAFE_FILE* file, CQuadWord* fileSize, 
 {
     if (error != NULL)
         *error = NO_ERROR;
-    DWORD err;
-    BOOL ret = SalGetFileSize(file->HFile, *fileSize, err);
-    if (!ret && error != NULL)
-        *error = err;
-    return ret;
+    uint64_t size = 0;
+    const FileResult sizeResult = gFileSystem->GetHandleFileSize(file->HFile, &size);
+    if (!sizeResult.success)
+    {
+        if (error != NULL)
+            *error = sizeResult.errorCode;
+        return FALSE;
+    }
+    fileSize->Value = size;
+    return TRUE;
 }
 
 BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
@@ -1237,14 +963,21 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
     }
     std::wstring reopenName;
     // obtain the current seek position in the file
-    long currentSeekHi = 0;
-    DWORD currentSeekLo = SetFilePointer(file->HFile, 0, &currentSeekHi, FILE_CURRENT);
-    if (currentSeekLo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    uint64_t currentSeek = 0;
+    DWORD pendingIoError = ERROR_SUCCESS;
+    FileResult ioResult = gFileSystem->SeekHandle(
+        file->HFile, 0, FILE_CURRENT, &currentSeek);
+    if (!ioResult.success)
+    {
+        pendingIoError = ioResult.errorCode;
         goto READ_ERROR; // cannot set the offset, try again
+    }
 
     while (TRUE)
     {
-        if (ReadFile(file->HFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, NULL))
+        ioResult = gFileSystem->ReadFromHandle(
+            file->HFile, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead);
+        if (ioResult.success)
         {
             if ((flags & SAFE_FILE_CHECK_SIZE) && nNumberOfBytesToRead != *lpNumberOfBytesRead)
             {
@@ -1255,7 +988,7 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                 else
                 {
                     dlgRet = DialogError((hParent == HWND_STORED) ? file->HParentWnd : hParent, (flags & BUTTONS_MASK),
-                                         file->FileName, GetErrorText(ERROR_HANDLE_EOF), LoadStr(IDS_ERRORREADINGFILE));
+                                         SafeFileNameW(file), GetErrorTextOwned(ERROR_HANDLE_EOF).c_str(), LoadStrW(IDS_ERRORREADINGFILE));
                 }
                 switch (dlgRet)
                 {
@@ -1277,15 +1010,16 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
         else
         {
         READ_ERROR:
-            DWORD lastError;
+            DWORD lastError = pendingIoError != ERROR_SUCCESS ?
+                                  pendingIoError : ioResult.errorCode;
+            pendingIoError = ERROR_SUCCESS;
             DWORD dlgRet;
             if (silentMask != NULL && (*silentMask & SILENT_SKIP_FILE_READ) && ButtonsContainsSkip(flags))
-                dlgRet |= DIALOG_SKIP;
+                dlgRet = DIALOG_SKIP;
             else
             {
-                lastError = GetLastError();
                 dlgRet = DialogError((hParent == HWND_STORED) ? file->HParentWnd : hParent, (flags & BUTTONS_MASK),
-                                     file->FileName, GetErrorText(lastError), LoadStr(IDS_ERRORREADINGFILE));
+                                     SafeFileNameW(file), GetErrorTextOwned(lastError).c_str(), LoadStrW(IDS_ERRORREADINGFILE));
             }
             switch (dlgRet)
             {
@@ -1294,29 +1028,36 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                 if (file->HFile != NULL)
                 {
                     if (file->WholeFileAllocated)
-                        SetEndOfFile(file->HFile);     // otherwise the rest of the file would be written
-                    HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
+                        (void)gFileSystem->SetHandleEnd(file->HFile);     // otherwise the rest of the file would be written
+                    (void)gFileSystem->CloseFileHandle(file->HFile); // close the invalid handle because we could not read from it anyway
                 }
 
-                reopenName = SafeFileWideNames.Resolve(file);
-                file->HFile = HANDLES_Q(CreateFileW(reopenName.c_str(), file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                    file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                reopenName = SafeFileNameW(file);
+                file->HFile = gFileSystem->CreateFile(reopenName.c_str(), file->dwDesiredAccess,
+                                                      file->dwShareMode, NULL,
+                                                      file->dwCreationDisposition,
+                                                      file->dwFlagsAndAttributes, NULL);
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                 SEEK:
-                    LONG lo = currentSeekLo;
-                    LONG hi = currentSeekHi;
-                    lo = SetFilePointer(file->HFile, lo, &hi, FILE_BEGIN);
-                    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
-                        goto READ_ERROR; // cannot set the offset, try again
-                    if (lo != (long)currentSeekLo || hi != currentSeekHi)
+                    uint64_t restoredSeek = 0;
+                    ioResult = gFileSystem->SeekHandle(
+                        file->HFile, static_cast<int64_t>(currentSeek), FILE_BEGIN,
+                        &restoredSeek);
+                    if (!ioResult.success)
                     {
-                        SetLastError(ERROR_SEEK_ON_DEVICE);
+                        pendingIoError = ioResult.errorCode;
+                        goto READ_ERROR; // cannot set the offset, try again
+                    }
+                    if (restoredSeek != currentSeek)
+                    {
+                        pendingIoError = ERROR_SEEK_ON_DEVICE;
                         goto READ_ERROR; // cannot set the offset (the file may already be smaller), try again
                     }
                 }
                 else // cannot open it, the problem persists...
                 {
+                    pendingIoError = GetLastError();
                     file->HFile = NULL;
                     goto READ_ERROR;
                 }
@@ -1348,14 +1089,21 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
         return FALSE;
     }
     // obtain the current seek position in the file
-    long currentSeekHi = 0;
-    DWORD currentSeekLo = SetFilePointer(file->HFile, 0, &currentSeekHi, FILE_CURRENT);
-    if (currentSeekLo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    uint64_t currentSeek = 0;
+    DWORD pendingIoError = ERROR_SUCCESS;
+    FileResult ioResult = gFileSystem->SeekHandle(
+        file->HFile, 0, FILE_CURRENT, &currentSeek);
+    if (!ioResult.success)
+    {
+        pendingIoError = ioResult.errorCode;
         goto WRITE_ERROR; // cannot set the offset, try again
+    }
 
     while (TRUE)
     {
-        if (WriteFile(file->HFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, NULL) &&
+        ioResult = gFileSystem->WriteToHandle(
+            file->HFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten);
+        if (ioResult.success &&
             nNumberOfBytesToWrite == *lpNumberOfBytesWritten)
         {
             return TRUE;
@@ -1363,14 +1111,16 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
         else
         {
         WRITE_ERROR:
-            DWORD lastError = GetLastError();
+            DWORD lastError = pendingIoError != ERROR_SUCCESS ?
+                                  pendingIoError : ioResult.errorCode;
+            pendingIoError = ERROR_SUCCESS;
             DWORD dlgRet;
             if (silentMask != NULL && (*silentMask & SILENT_SKIP_FILE_WRITE) && ButtonsContainsSkip(flags))
-                dlgRet |= DIALOG_SKIP;
+                dlgRet = DIALOG_SKIP;
             else
             {
                 dlgRet = DialogError((hParent == HWND_STORED) ? file->HParentWnd : hParent, (flags & BUTTONS_MASK),
-                                     file->FileName, GetErrorText(lastError), LoadStr(IDS_ERRORWRITINGFILE));
+                                     SafeFileNameW(file), GetErrorTextOwned(lastError).c_str(), LoadStrW(IDS_ERRORWRITINGFILE));
             }
             switch (dlgRet)
             {
@@ -1379,29 +1129,36 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                 if (file->HFile != NULL)
                 {
                     if (file->WholeFileAllocated)
-                        SetEndOfFile(file->HFile);     // otherwise the rest of the file would be written
-                    HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
+                        (void)gFileSystem->SetHandleEnd(file->HFile);     // otherwise the rest of the file would be written
+                    (void)gFileSystem->CloseFileHandle(file->HFile); // close the invalid handle because we could not read from it anyway
                 }
 
-                std::wstring reopenName = SafeFileWideNames.Resolve(file);
-                file->HFile = HANDLES_Q(CreateFileW(reopenName.c_str(), file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                std::wstring reopenName = SafeFileNameW(file);
+                file->HFile = gFileSystem->CreateFile(reopenName.c_str(), file->dwDesiredAccess,
+                                                      file->dwShareMode, NULL,
+                                                      file->dwCreationDisposition,
+                                                      file->dwFlagsAndAttributes, NULL);
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                     //SEEK:
-                    LONG lo = currentSeekLo;
-                    LONG hi = currentSeekHi;
-                    lo = SetFilePointer(file->HFile, lo, &hi, FILE_BEGIN);
-                    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
-                        goto WRITE_ERROR; // cannot set the offset, try again
-                    if (lo != (long)currentSeekLo || hi != currentSeekHi)
+                    uint64_t restoredSeek = 0;
+                    ioResult = gFileSystem->SeekHandle(
+                        file->HFile, static_cast<int64_t>(currentSeek), FILE_BEGIN,
+                        &restoredSeek);
+                    if (!ioResult.success)
                     {
-                        SetLastError(ERROR_SEEK_ON_DEVICE);
+                        pendingIoError = ioResult.errorCode;
+                        goto WRITE_ERROR; // cannot set the offset, try again
+                    }
+                    if (restoredSeek != currentSeek)
+                    {
+                        pendingIoError = ERROR_SEEK_ON_DEVICE;
                         goto WRITE_ERROR; // cannot set the offset (the file may already be smaller), try again
                     }
                 }
                 else // cannot open it, the problem persists...
                 {
+                    pendingIoError = GetLastError();
                     file->HFile = NULL;
                     goto WRITE_ERROR;
                 }

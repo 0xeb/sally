@@ -19,7 +19,7 @@ extern HINSTANCE HLanguage;   // Handle to SLG - language-dependent resources
 // Salamander general interface - available from Salamander launch until the plugin shuts down
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
-char* LoadStr(int resID);
+std::wstring LoadStr(int resID);
 
 // Plugin menu commands
 #define MENUCMD_TESTCMD 1
@@ -62,7 +62,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };

@@ -36,10 +36,10 @@ HWND CSalamanderGuiCheckBox::CreateHwnd(HWND hWndParent)
 
     m_pParent->BoundsToPixels(&pxbounds);
 
-    hWnd = CreateWindowEx(
+    hWnd = CreateWindowExW(
         WS_EX_NOPARENTNOTIFY,
-        _T("button"),
-        OLE2T(m_strText),
+        L"button",
+        m_strText,
         WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX,
         pxbounds.x,
         pxbounds.y,

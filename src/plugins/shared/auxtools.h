@@ -12,6 +12,8 @@
 
 #pragma once
 
+#include <string>
+
 //
 // ****************************************************************************
 // CThreadQueue
@@ -115,12 +117,12 @@ public:
     HANDLE Thread;
 
 protected:
-    char Name[101]; // buffer for the thread name (used in TRACE and CALL-STACK to identify the thread)
-                    // WARNING: if thread data contains references to the stack or other temporary objects,
-                    //          it is necessary to ensure those references are used only while they are valid
+    std::wstring Name; // thread name used by TRACE and CALL-STACK
+                       // WARNING: if thread data contains references to the stack or other temporary objects,
+                       //          it is necessary to ensure those references are used only while they are valid
 
 public:
-    CThread(const char* name = NULL);
+    CThread(const wchar_t* name = NULL);
     virtual ~CThread() {} // aby se spravne volaly destruktory potomku
 
     // creation (start) of a thread in the 'queue' thread queue; 'stack_size' is the stack size
@@ -138,7 +140,7 @@ public:
     HANDLE GetHandle() { return Thread; }
 
     // returns thread name
-    const char* GetName() { return Name; }
+    const wchar_t* GetName() { return Name.c_str(); }
 
     // this method contains the thread body
     virtual unsigned Body() = 0;

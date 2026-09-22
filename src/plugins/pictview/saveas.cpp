@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -13,6 +13,7 @@
 #include "pictview.rh"
 #include "pictview.rh2"
 #include "lang\lang.rh"
+#include "plugin_narrow_compat.h"
 
 #define SAVEAS_GRAY_FLAG 0x40000000
 #define SAVEAS_GRAY_MASK 0x3FFFFFFF
@@ -61,20 +62,21 @@ static PVFS_FTYPE fs_comptypes[] = {
     {_T("Uncompressed"), PVCS_NO_COMPRESSION},
     {NULL, 0}};
 
-void GetMyDocumentsPath(LPTSTR initDir)
+BOOL GetMyDocumentsPath(std::wstring& initDir)
 {
-    initDir[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    PWSTR path = NULL;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &path)))
+        return FALSE;
+    try
     {
-        if (!SHGetPathFromIDList(pidl, initDir))
-            initDir[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+        initDir.assign(path);
+        CoTaskMemFree(path);
+        return TRUE;
+    }
+    catch (...)
+    {
+        CoTaskMemFree(path);
+        return FALSE;
     }
 }
 
@@ -157,7 +159,8 @@ void FillCombo(HWND hWnd, int controlID, TwoDWords* pData, DWORD value)
 
     while (pData[0][0])
     {
-        LRESULT index = SendMessage(hWnd, CB_ADDSTRING, 0, (LPARAM)LoadStr(pData[0][0]));
+        LRESULT index = SendMessageW(hWnd, CB_ADDSTRING, 0,
+                                     reinterpret_cast<LPARAM>(LoadStrW(pData[0][0]).c_str()));
         SendMessage(hWnd, CB_SETITEMDATA, index, pData[0][1]);
         if (!index || (pData[0][1] == value))
         {
@@ -264,7 +267,8 @@ void FillTypeFmt(HWND hDlg, OPENFILENAME* lpOFN, BOOL bUpdCompressions, BOOL bUp
                     if (PVW32DLL.PVIsOutCombSupported(format, compr, colorDepths[i][0],
                                                       colorDepths[i][1] != IDS_CLRS_256GR ? PVCM_RGB : PVCM_GRAYS) != -1)
                     {
-                        index = SendMessage(hCtrl, CB_ADDSTRING, 0, (LPARAM)LoadStr(colorDepths[i][1]));
+                        index = SendMessageW(hCtrl, CB_ADDSTRING, 0,
+                                             reinterpret_cast<LPARAM>(LoadStrW(colorDepths[i][1]).c_str()));
                         SendMessage(hCtrl, CB_SETITEMDATA, index, colorDepths[i][0] | (colorDepths[i][1] != IDS_CLRS_256GR ? 0 : SAVEAS_GRAY_FLAG));
                         if ((clrs == colorDepths[i][0]) && ((colorDepths[i][1] != IDS_CLRS_256GR) ^ (cm == PVCM_GRAYS)))
                         {
@@ -347,7 +351,8 @@ void FillTypeFmt(HWND hDlg, OPENFILENAME* lpOFN, BOOL bUpdCompressions, BOOL bUp
             if (cnt != 1)
             {
                 // Note: cnt is zero for formats not directly supporting this bit depth (i.e. saving TC img as GIF)
-                SendMessage(hCtrl, CB_INSERTSTRING, 0, (LPARAM)LoadStr(IDS_SAVE_DEFAULT));
+                SendMessageW(hCtrl, CB_INSERTSTRING, 0,
+                             reinterpret_cast<LPARAM>(LoadStrW(IDS_SAVE_DEFAULT).c_str()));
             }
             if (!bSelected)
             {
@@ -549,14 +554,14 @@ UINT_PTR CALLBACK SaveAsDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
     return FALSE;
 }
 
-const char* StrIStr(const char* txt, const char* pattern)
+const wchar_t* StrIStr(const wchar_t* txt, const wchar_t* pattern)
 {
     if (txt == NULL || pattern == NULL)
         return NULL;
 
-    const char* s = txt;
-    int len = (int)strlen(pattern);
-    int txtLen = (int)strlen(txt);
+    const wchar_t* s = txt;
+    int len = (int)wcslen(pattern);
+    int txtLen = (int)wcslen(txt);
     while (txtLen >= len)
     {
         if (SalamanderGeneral->StrNICmp(s, pattern, len) == 0)
@@ -574,13 +579,12 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
     static int cntScan = 1;
     static SAVEAS_INFO sai = {PVCS_DEFAULT, 0, 0, 0, 0, 0, ""};
     SAVEAS_INFO lsai;
-    TCHAR errBuff[1000];
-    CPathBuffer fileName;
-    LPTSTR s;
+    std::wstring fileName;
+    wchar_t* s;
     int* pCnt = NULL;
     struct
     {
-        OPENFILENAME ofn;
+        OPENFILENAMEW ofn;
 #if _WIN32_WINNT < 0x0500
         // Ver5 struct size needed for showing Favorites when template is used
         void* pvReserved;
@@ -590,7 +594,7 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
     } ofn;
     int ret;
     DWORD format;
-    CPathBuffer initDir;
+    std::wstring initDir;
 
     if (((pvii.Format == PVF_ICO) || (pvii.Format == PVF_PNG) || (pvii.Format == PVF_TGA) || (pvii.Format == PVF_TIFF) || (pvii.Format == PVF_ANI) || (pvii.Format == PVF_PSD)) && (pvii.Colors == PV_COLOR_TC32))
     {
@@ -624,31 +628,31 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
     lsai = sai;
     if (pInitDir)
     {
-        lstrcpyn(initDir, pInitDir, initDir.Size());
+        initDir = pInitDir;
     }
     else
     {
         if (FileName[0] == '<')
         {
-            lstrcpyn(initDir, G.Save.InitDir, initDir.Size());
+            initDir = SaveInitialDirectory;
         }
         else
         {
-            lstrcpyn(initDir, FileName, initDir.Size());
-            if (!SalamanderGeneral->CutDirectory(initDir))
-                initDir[0] = 0;
+            initDir = FileName;
+            if (!SPLCutDirectoryOwned(SalamanderGeneral, initDir))
+                initDir.clear();
         }
     }
 
-    if (initDir[0] == 0)
+    if (initDir.empty())
         GetMyDocumentsPath(initDir);
 
     // store the filename without path and suffix
-    s = (LPTSTR)_tcsrchr(FileName, '\\');
-    _tcscpy(fileName, s ? (s + 1) : _T(""));
-    s = (LPTSTR)_tcsrchr(fileName, '.');
-    if (s)
-        *s = 0; // ".cvspass" is extension in Windows
+    const wchar_t* sourceName = wcsrchr(FileName, L'\\');
+    fileName.assign(sourceName ? sourceName + 1 : L"");
+    const size_t sourceExtension = fileName.find_last_of(L'.');
+    if (sourceExtension != std::wstring::npos)
+        fileName.resize(sourceExtension); // ".cvspass" is extension in Windows
     if (FileName[0] == '<')
     {
         int nameID;
@@ -670,47 +674,44 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
         }
         else
         { // can only be deleted image -> no name provided
-            fileName[0] = 0;
+            fileName.clear();
             nameID = -1;
         }
         if (nameID != -1)
         {
-            _stprintf(fileName, _T("%s%d"), LoadStr(nameID), *pCnt);
+            fileName = SPLFormatStringOwned(L"%ls%d", ToWideArg(LoadStr(nameID)).c_str(), *pCnt);
         }
     }
 
     memset(&ofn, 0, sizeof(ofn));
-    ofn.ofn.lStructSize = sizeof(OPENFILENAME);
+    ofn.ofn.lStructSize = sizeof(OPENFILENAMEW);
     ofn.ofn.lStructSize = sizeof(ofn);
     ofn.ofn.hwndOwner = HWindow;
-    TCHAR filterStr[1000];
+    std::wstring filterStr;
     if (pvii.Colors == 2)
     {
         ofn.ofn.nFilterIndex = G.LastSaveAsFilterIndexMono;
-        lstrcpyn(filterStr, LoadStr(IDS_SAVEASFILTERMONO), 1000);
+        filterStr = ToWideArg(LoadStr(IDS_SAVEASFILTERMONO));
     }
     else
     {
         ofn.ofn.nFilterIndex = G.LastSaveAsFilterIndexColor;
-        lstrcpyn(filterStr, LoadStr(IDS_SAVEASFILTERCOLOR), 1000);
+        filterStr = ToWideArg(LoadStr(IDS_SAVEASFILTERCOLOR));
     }
-    s = filterStr;
-    ofn.ofn.lpstrFilter = s;
+    std::replace(filterStr.begin(), filterStr.end(), L'|', L'\0');
+    filterStr.push_back(L'\0');
+    s = filterStr.data();
+    ofn.ofn.lpstrFilter = filterStr.c_str();
     DWORD filtersDoubledCount = 0;
-    while (*s != 0)
+    while (s < filterStr.data() + filterStr.size() - 1)
     { // create a double-null-terminated list
-        if (*s == '|')
-        {
-            *s = 0;
+        if (*s == L'\0')
             filtersDoubledCount++;
-        }
         s++;
     }
     if (ofn.ofn.nFilterIndex > filtersDoubledCount / 2)
         ofn.ofn.nFilterIndex = filtersDoubledCount / 2;
-    ofn.ofn.lpstrFile = fileName;
-    ofn.ofn.nMaxFile = fileName.Size();
-    ofn.ofn.lpstrInitialDir = initDir;
+    ofn.ofn.lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
     ofn.ofn.lpfnHook = SaveAsDlgProc;
     ofn.ofn.lpTemplateName = MAKEINTRESOURCE(IDD_SAVEEX);
     ofn.ofn.hInstance = HLanguage;
@@ -722,10 +723,9 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
     CALL_STACK_MESSAGE2(_T("OnFileSaveAs: GSFN(%s)"), FileName);
     for (;;)
     {
-        LPTSTR s2;
         HANDLE hFile;
 
-        if (!SalamanderGeneral->SafeGetSaveFileName(&ofn.ofn))
+        if (!SPLSafeGetSaveFileNameOwned(SalamanderGeneral, &ofn.ofn, fileName))
         {
             // don't save options
             return FALSE;
@@ -741,89 +741,80 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
         {
             G.LastSaveAsFilterIndexColor = ofn.ofn.nFilterIndex;
         }
-        lstrcpyn(initDir, fileName, ofn.ofn.nFileOffset);
-        initDir[ofn.ofn.nFileOffset - 1] = 0;
+        initDir = fileName;
+        SPLCutDirectoryOwned(SalamanderGeneral, initDir);
         GetFormatInfo(&ofn.ofn, &format, &s);
-        if (_tcschr(s, '*') && (format == PVF_IRF))
+        std::wstring suffixes(s != NULL ? s : L"");
+        if (suffixes.find(L'*') != std::wstring::npos && (format == PVF_IRF))
         {
             // suffix depends on compression
             if ((lsai.Compression == PVCS_CCITT_4) || (lsai.Compression == PVCS_DEFAULT))
             {
-                static char buffCIT[] = ".cit";
-                s = _T(buffCIT);
+                suffixes = L".cit";
             }
             else
             {
-                static char buffDAT[] = ".dat";
-                s = _T(buffDAT);
+                suffixes = L".dat";
             }
         }
 
         if ((FileName[0] == '<') && G.Save.RememberPath)
-            lstrcpyn(G.Save.InitDir, initDir, SizeOf(G.Save.InitDir));
+            SaveInitialDirectory = initDir;
 
-        ret = (int)_tcslen(fileName);
-        if (fileName[ret - 1] == '.')
+        if (fileName.empty())
+            return FALSE;
+        if (fileName.back() == L'.')
         {
             // user doesn't want us to append any suffix
-            fileName[ret - 1] = 0;
+            fileName.pop_back();
         }
         else
         {
-            LPTSTR ext;
-
-            ext = (LPTSTR)_tcsrchr(fileName /* + ofn.nFileOffset*/, '.');
-            if (ext < fileName + ofn.ofn.nFileOffset)
-            { // ".cvspass" is extension in Windows
-                ext = fileName + ret;
-            }
-            if (StrIStr(s, ext))
-                s = (LPTSTR)StrIStr(s, ext);
+            size_t extOffset = fileName.find_last_of(L'.');
+            if (extOffset == std::wstring::npos || extOffset < ofn.ofn.nFileOffset)
+                extOffset = fileName.size(); // ".cvspass" is extension in Windows
+            const std::wstring currentExtension = fileName.substr(extOffset);
+            const wchar_t* matchingSuffix = StrIStr(suffixes.c_str(), currentExtension.c_str());
+            if (matchingSuffix != NULL)
+                suffixes.assign(matchingSuffix);
             // strip off additional suffixes, if present
-            s2 = (LPTSTR)_tcschr(s, ';');
-            if (s2)
-                *s2 = 0;
+            const size_t separator = suffixes.find(L';');
+            if (separator != std::wstring::npos)
+                suffixes.resize(separator);
 
-            if (_tcsicmp(ext, s))
+            if (_wcsicmp(currentExtension.c_str(), suffixes.c_str()) != 0)
             {
                 // not a default one
-                s2 = (LPTSTR)_tcsrchr(fileName + ofn.ofn.nFileOffset, '\\');
-                // find file name beginning
-                if (!s2)
-                {
-                    s2 = fileName + ofn.ofn.nFileOffset;
-                }
-                else
-                {
-                    s2++;
-                }
+                size_t nameOffset = fileName.find_last_of(L'\\');
+                nameOffset = nameOffset == std::wstring::npos ? ofn.ofn.nFileOffset : nameOffset + 1;
                 // check whether it consists just of upper-case letters & digits
-                while (((*s2 >= 'A') && (*s2 <= 'Z')) || ((*s2 >= '0') && (*s2 <= '9')) || (*s2 == '_'))
-                    s2++;
-                if (!*s2)
+                size_t upper = nameOffset;
+                while (upper < fileName.size() &&
+                       ((fileName[upper] >= L'A' && fileName[upper] <= L'Z') ||
+                        (fileName[upper] >= L'0' && fileName[upper] <= L'9') ||
+                        fileName[upper] == L'_'))
+                    upper++;
+                if (upper == fileName.size())
                 {
                     // yes, it does -> make it lower-case like extension
-                    _tcslwr(fileName + ofn.ofn.nFileOffset);
+                    std::transform(fileName.begin() + nameOffset, fileName.end(),
+                                   fileName.begin() + nameOffset,
+                                   [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
                 }
-                if ((ext - fileName) + strlen(s) < (size_t)fileName.Size())
-                    _tcscat(ext, s); // append the default suffix
-                else
-                {
-                    SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME),
-                                                     LoadStr(IDS_ERRORTITLE),
-                                                     MB_OK | MB_ICONEXCLAMATION);
-                    return FALSE;
-                }
+                fileName.resize(extOffset);
+                fileName += suffixes; // append the default suffix
             }
         }
-        hFile = CreateFile(fileName, GENERIC_READ | GENERIC_WRITE, 0, NULL,
-                           OPEN_EXISTING, 0, 0);
+        hFile = CreateFileW(fileName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                            OPEN_EXISTING, 0, 0);
         if (hFile != INVALID_HANDLE_VALUE)
         {
             CloseHandle(hFile);
-            _stprintf(errBuff, LoadStr(IDS_SAVE_ERR_EXISTS_OVERWRITE), (const char*)fileName);
-            ret = SalamanderGeneral->SalMessageBox(HWindow, errBuff,
-                                                   LoadStr(IDS_ERRORTITLE), MB_ICONEXCLAMATION | MB_YESNOCANCEL);
+            const std::wstring error = SPLFormatStringOwned(
+                ToWideArg(LoadStr(IDS_SAVE_ERR_EXISTS_OVERWRITE)).c_str(), fileName.c_str());
+            ret = SalamanderGeneral->SalMessageBox(
+                HWindow, error.c_str(), ToWideArg(LoadStr(IDS_ERRORTITLE)).c_str(),
+                MB_ICONEXCLAMATION | MB_YESNOCANCEL);
             if (ret == IDCANCEL)
             {
                 // store options
@@ -846,13 +837,15 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
             if (ret == ERROR_ACCESS_DENIED)
             {
                 // No rights or R/O attribute - check what is the case
-                ret = SalamanderGeneral->SalGetFileAttributes(fileName); // 0xFFFFFFFF on error
+                ret = SalamanderGeneral->SalGetFileAttributes(fileName.c_str()); // 0xFFFFFFFF on error
                 if ((ret != 0xFFFFFFFF) && (ret & FILE_ATTRIBUTE_READONLY))
                 {
                     // R/O attrib
-                    _stprintf(errBuff, LoadStr(IDS_READ_ONLY_REWRITE), (const char*)fileName);
-                    ret = SalamanderGeneral->SalMessageBox(HWindow, errBuff,
-                                                           LoadStr(IDS_ERRORTITLE), MB_ICONEXCLAMATION | MB_YESNOCANCEL);
+                    const std::wstring error = SPLFormatStringOwned(
+                        ToWideArg(LoadStr(IDS_READ_ONLY_REWRITE)).c_str(), fileName.c_str());
+                    ret = SalamanderGeneral->SalMessageBox(
+                        HWindow, error.c_str(), ToWideArg(LoadStr(IDS_ERRORTITLE)).c_str(),
+                        MB_ICONEXCLAMATION | MB_YESNOCANCEL);
                     if (ret == IDCANCEL)
                     {
                         sai = lsai; // store options
@@ -863,17 +856,18 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
                         // ask for a new name
                         continue;
                     }
-                    SalamanderGeneral->ClearReadOnlyAttr(fileName);
+                    SalamanderGeneral->ClearReadOnlyAttr(fileName.c_str());
                 }
                 // else: no rights: DeleteFile should also fail with ERROR_ACCESS_DENIED
             }
         }
-        if (!DeleteFile(fileName))
+        if (!DeleteFileW(fileName.c_str()))
         {
             ret = GetLastError();
-            SalamanderGeneral->GetErrorText(ret, errBuff, SizeOf(errBuff));
-            if (IDCANCEL == SalamanderGeneral->SalMessageBox(HWindow, errBuff,
-                                                             LoadStr(IDS_ERRORTITLE), MB_ICONEXCLAMATION | MB_OKCANCEL))
+            const std::wstring errorText = SPLGetErrorTextOwned(SalamanderGeneral, ret);
+            const std::wstring errorTitle = ToWideArg(LoadStr(IDS_ERRORTITLE));
+            if (IDCANCEL == SalamanderGeneral->SalMessageBox(HWindow, errorText.c_str(),
+                                                             errorTitle.c_str(), MB_ICONEXCLAMATION | MB_OKCANCEL))
             {
                 sai = lsai; // store options
                 return TRUE;
@@ -884,21 +878,23 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
             break; // file deleted successfully
         }
     }
-    ret = SaveImage(fileName, format, &lsai);
+    ret = SaveImage(fileName.c_str(), format, &lsai);
 
     // report the change on the path (our file has appeared)
-    CPathBuffer changedPath;
-    lstrcpyn(changedPath, fileName, changedPath.Size());
-    SalamanderGeneral->CutDirectory(changedPath);
-    SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
+    std::wstring changedPath = fileName;
+    SPLCutDirectoryOwned(SalamanderGeneral, changedPath);
+    SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
 
     if (ret != PVC_OK)
     {
         if (ret != PVC_CANCELED)
         {
-            _stprintf(errBuff, LoadStr(IDS_SAVEERROR), PVW32DLL.PVGetErrorText(ret)); //"Canceled (error example)");
-            SalamanderGeneral->SalMessageBox(HWindow, errBuff, LoadStr(IDS_ERRORTITLE),
-                                             MB_ICONEXCLAMATION | MB_OK);
+            const std::wstring error = SPLFormatStringOwned(
+                ToWideArg(LoadStr(IDS_SAVEERROR)).c_str(),
+                ToWideArg(PVW32DLL.PVGetErrorText(ret)).c_str());
+            SalamanderGeneral->SalMessageBox(
+                HWindow, error.c_str(), ToWideArg(LoadStr(IDS_ERRORTITLE)).c_str(),
+                MB_ICONEXCLAMATION | MB_OK);
         }
         else
         {
@@ -1031,11 +1027,11 @@ int CRendererWindow::SaveImage(LPCTSTR fileName, DWORD format, SAVEAS_INFO_PTR p
     pbi.pViewer = Viewer;
     pbi.lastCheckTicks = pbi.lastUpdateTicks = GetTickCount();
 #ifdef _UNICODE
-    CPathBuffer fileNameA;
-
-    WideCharToMultiByte(CP_ACP, 0, fileName, -1, fileNameA, fileNameA.Size(), NULL, NULL);
-    fileNameA[fileNameA.Size() - 1] = 0;
-    int saveRet = PVW32DLL.PVSaveImage(PVHandle, fileNameA, &sii, SaveProgressProcedure, &pbi, pvii.CurrentImage);
+    std::string fileNameBytes;
+    if (!WideToLegacyTextExact(fileName, fileNameBytes))
+        return PVC_ERROR_CREATING_FILE;
+    int saveRet = PVW32DLL.PVSaveImage(PVHandle, fileNameBytes.c_str(), &sii,
+                                       SaveProgressProcedure, &pbi, pvii.CurrentImage);
 #else
     int saveRet = PVW32DLL.PVSaveImage(PVHandle, fileName, &sii, SaveProgressProcedure, &pbi, pvii.CurrentImage);
 #endif

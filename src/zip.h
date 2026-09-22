@@ -21,28 +21,28 @@ class CStaticText;
 class CZIPUnpackProgress : public CCommonDialog
 {
 protected:
-    const char* RemapNameFrom; // mapping of names from the tmp directory
-    const char* RemapNameTo;   // to the name of the archive we are unpacking from
+    const wchar_t* RemapNameFrom; // mapping of names from the tmp directory
+    const wchar_t* RemapNameTo;   // to the name of the archive we are unpacking from
     BOOL FileProgress;         // for the single-progress variant: TRUE="File:", FALSE="Total:"
 
 public:
     CZIPUnpackProgress();
-    CZIPUnpackProgress(const char* title, HWND parent, const CQuadWord& totalSize, CITaskBarList3* taskBarList3);
+    CZIPUnpackProgress(const wchar_t* title, HWND parent, const CQuadWord& totalSize, CITaskBarList3* taskBarList3);
 
     void Init();
 
-    void Set(const char* title, HWND parent, const CQuadWord& totalSize, BOOL fileProgress);
-    void Set(const char* title, HWND parent, const CQuadWord& totalSize1, const CQuadWord& totalSize2);
+    void Set(const wchar_t* title, HWND parent, const CQuadWord& totalSize, BOOL fileProgress);
+    void Set(const wchar_t* title, HWND parent, const CQuadWord& totalSize1, const CQuadWord& totalSize2);
     void SetTotal(const CQuadWord& total1, const CQuadWord& total2); // CQuadWord(-1, -1) means do not set
 
     int AddSize(int size, BOOL delayedPaint);                                       // returns "continue?"
     int SetSize(const CQuadWord& size1, const CQuadWord& size2, BOOL delayedPaint); // returns "continue?"; size == CQuadWord(-1, -1) means "do not set"
 
-    void NewLine(const char* txt, BOOL delayedPaint);
+    void NewLine(const wchar_t* txt, BOOL delayedPaint);
     void EnableCancel(BOOL enable);
 
-    void SetRemapNames(const char* nameFrom, const char* nameTo);
-    void DoRemapNames(char* txt, int bufLen);
+    void SetRemapNames(const wchar_t* nameFrom, const wchar_t* nameTo);
+    void DoRemapNames(wchar_t* txt, int bufLen);
 
     void SetTaskBarList3(CITaskBarList3* taskBarList3);
 
@@ -55,7 +55,7 @@ protected:
 
     void FlushDataToControls(); // pushes dirty data into the controls (texts, progress bars)
 
-    const char* Title;   // caption - pointer inside the LoadStr buffer (do not keep for long)
+    const wchar_t* Title;   // caption - pointer inside the LoadStr buffer (do not keep for long)
     BOOL Cancel;         // user canceled the operation; the dialog should end as soon as possible
     DWORD LastTickCount; // used to detect when it is time to repaint the changed data
 
@@ -64,7 +64,7 @@ protected:
     CProgressBar* Summary2;
     CStaticText* Lines[ZIP_UNPACK_NUMLINES];
 
-    char LinesCache[ZIP_UNPACK_NUMLINES][300]; // queued texts waiting to be displayed later
+    wchar_t LinesCache[ZIP_UNPACK_NUMLINES][300]; // queued texts waiting to be displayed later
     int CacheIndex;                            // index to LinesCache array to be filled by the next line
     BOOL CacheIsDirty;                         // does the cache need to be sent to the screen?
 
@@ -103,9 +103,9 @@ public:
     // opens the progress dialog with the title 'title'; 'parent' is the parent window of the progress dialog (if
     // NULL, the main window is used); if it contains only one progress meter, it can be labeled
     // as "File" ('fileProgress' is TRUE) or "Total" ('fileProgress' is FALSE)
-    virtual void WINAPI OpenProgressDialog(const char* title, BOOL twoProgressBars, HWND parent, BOOL fileProgress);
+    virtual void WINAPI OpenProgressDialog(const wchar_t* title, BOOL twoProgressBars, HWND parent, BOOL fileProgress);
     // prints the text 'txt' (even multiple lines - splits to lines) into the progress dialog
-    virtual void WINAPI ProgressDialogAddText(const char* txt, BOOL delayedPaint);
+    virtual void WINAPI ProgressDialogAddText(const wchar_t* txt, BOOL delayedPaint);
     // if 'totalSize1' is not CQuadWord(-1, -1), sets 'totalSize1' as 100 percent of the first progress meter,
     // if 'totalSize2' is not CQuadWord(-1, -1), sets 'totalSize2' as 100 percent of the second progress meter
     // (for a progress dialog with a single progress meter, 'totalSize2' must be CQuadWord(-1, -1))
@@ -128,8 +128,8 @@ public:
     // moves all files from the 'source' directory to the 'target' directory,
     // additionally remaps the prefixes of displayed names ('remapNameFrom' -> 'remapNameTo')
     // returns whether the operation succeeded
-    virtual BOOL WINAPI MoveFiles(const char* source, const char* target, const char* remapNameFrom,
-                                  const char* remapNameTo);
+    virtual BOOL WINAPI MoveFiles(const wchar_t* source, const wchar_t* target, const wchar_t* remapNameFrom,
+                                  const wchar_t* remapNameTo);
 };
 
 //
@@ -143,8 +143,7 @@ class CSalamanderDirectory;
 // to CSalamanderDirectory (AddFile method)
 struct CSalamanderDirectoryAddCache
 {
-    int PathLen;               // number of valid characters in 'Path'
-    char Path[SAL_MAX_LONG_PATH]; // cached path
+    std::wstring Path;         // cached path
     CSalamanderDirectory* Dir; // pointer to the CSalamanderDirectory to which files and directories with the 'Path' path are being added
 };
 
@@ -161,6 +160,7 @@ protected:
 
 public:
     CSalamanderDirectory(BOOL isForFS, DWORD validData = VALID_DATA_ALL_FS_ARC, DWORD flags = -1 /* set according to isForFS */);
+
     ~CSalamanderDirectory();
 
     // *********************************************************************************
@@ -169,8 +169,8 @@ public:
     virtual void WINAPI Clear(CPluginDataInterfaceAbstract* pluginData);
     virtual void WINAPI SetValidData(DWORD validData);
     virtual void WINAPI SetFlags(DWORD flags);
-    virtual BOOL WINAPI AddFile(const char* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData);
-    virtual BOOL WINAPI AddDir(const char* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData);
+    virtual BOOL WINAPI AddFile(const wchar_t* path, CFileData& file, CPluginDataInterfaceAbstract* pluginData);
+    virtual BOOL WINAPI AddDir(const wchar_t* path, CFileData& dir, CPluginDataInterfaceAbstract* pluginData);
 
     virtual int WINAPI GetFilesCount() const;
     virtual int WINAPI GetDirsCount() const;
@@ -188,8 +188,8 @@ public:
     void FreeAddCache();
 
     // depending on Flags either StrICmp or strcmp (StrCmpEx) - selects case sensitive/insensitive comparison
-    int SalDirStrCmp(const char* s1, const char* s2);
-    int SalDirStrCmpEx(const char* s1, int l1, const char* s2, int l2);
+    int SalDirStrCmp(const wchar_t* s1, const wchar_t* s2);
+    int SalDirStrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2);
 
     // calls 'pluginData'.ReleaseFilesOrDirs (releasing plug-in data) for all files (if 'releaseFiles' is TRUE)
     // and all directories (if 'releaseDirs' is TRUE)
@@ -197,26 +197,26 @@ public:
                            BOOL releaseDirs);
 
     // returns directories from the specified path (relative to this Salamander directory)
-    CFilesArray* GetDirs(const char* path);
+    CFilesArray* GetDirs(const wchar_t* path);
     // returns files from the specified path (relative to this Salamander directory)
-    CFilesArray* GetFiles(const char* path);
+    CFilesArray* GetFiles(const wchar_t* path);
 
     // returns the parent directory for the path 'path' (returns NULL for root and unknown paths)
-    const CFileData* GetUpperDir(const char* path);
+    const CFileData* GetUpperDir(const wchar_t* path);
 
     // returns the sum of sizes of all contained files; note: counters must be reset beforehand
     CQuadWord GetSize(int* dirsCount = NULL, int* filesCount = NULL, TDirectArray<CQuadWord>* sizes = NULL);
     // returns the directory size - sum of all files in it; note: counters must be reset beforehand
-    CQuadWord GetDirSize(const char* path, const char* dirName, int* dirsCount = NULL,
+    CQuadWord GetDirSize(const wchar_t* path, const wchar_t* dirName, int* dirsCount = NULL,
                          int* filesCount = NULL, TDirectArray<CQuadWord>* sizes = NULL);
     // returns the salamander-dir for the specified directory; if 'readOnly' is TRUE,
     // the returned salamander-dir object must not be modified
-    CSalamanderDirectory* GetSalamanderDir(const char* path, BOOL readOnly);
+    CSalamanderDirectory* GetSalamanderDir(const wchar_t* path, BOOL readOnly);
     // returns the salamander-dir for the specified directory index;
     // the returned salamander-dir object must not be modified
     CSalamanderDirectory* GetSalamanderDir(int i);
     // returns the index of the directory specified by name
-    int GetIndex(const char* dir);
+    int GetIndex(const wchar_t* dir);
     // is there a directory at this index?
     BOOL IsDirectory(int i) { return i >= 0 && i < Dirs.Count; }
     // is there a file at this index?
@@ -247,21 +247,22 @@ protected:
     // returns a pointer to the object (or NULL on error)
     CSalamanderDirectory* AllocSalamDir(int index);
 
-    BOOL FindDir(const char* path, const char*& s, int& i, const CFileData& file,
-                 CPluginDataInterfaceAbstract* pluginData, const char* archivePath);
+    BOOL FindDir(const wchar_t* path, const wchar_t*& s, int& i, const CFileData& file,
+                 CPluginDataInterfaceAbstract* pluginData, const wchar_t* archivePath);
 
     // the AddFileInt and AddDirInt methods return a pointer to CSalamanderDirectory on success,
     // into which the item was added; otherwise they return NULL
-    CSalamanderDirectory* AddFileInt(const char* path, CFileData& file,
+    CSalamanderDirectory* AddFileInt(const wchar_t* path, CFileData& file,
                                      CPluginDataInterfaceAbstract* pluginData,
-                                     const char* archivePath);
-    CSalamanderDirectory* AddDirInt(const char* path, CFileData& dir,
+                                     const wchar_t* archivePath);
+    CSalamanderDirectory* AddDirInt(const wchar_t* path, CFileData& dir,
                                     CPluginDataInterfaceAbstract* pluginData,
-                                    const char* archivePath);
+                                    const wchar_t* archivePath);
 };
 
 // checks the free space at path 'path' and, if it is >= totalSize, asks the user whether to continue
-BOOL TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize, const char* messageTitle);
+// wide - the title's AnsiToWide is deleted, not moved.
+BOOL TestFreeSpace(HWND parent, const wchar_t* path, const CQuadWord& totalSize, const wchar_t* messageTitle);
 
 //
 // ****************************************************************************
@@ -271,24 +272,24 @@ BOOL TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize, co
 // item type in the custom packers table
 struct SPackCustomPacker
 {
-    const char* CopyArgs[2];
-    const char* MoveArgs[2];
+    const wchar_t* CopyArgs[2];
+    const wchar_t* MoveArgs[2];
     int Title[2];
-    const char* Ext;
+    const wchar_t* Ext;
     BOOL SupLN;
     BOOL Ansi;
-    const char* Exe;
+    const wchar_t* Exe;
 };
 
 // item type in the custom unpackers table
 struct SPackCustomUnpacker
 {
-    const char* Args;
+    const wchar_t* Args;
     int Title;
-    const char* Ext;
+    const wchar_t* Ext;
     BOOL SupLN;
     BOOL Ansi;
-    const char* Exe;
+    const wchar_t* Exe;
 };
 
 // custom packer tables
@@ -300,17 +301,17 @@ extern SPackCustomUnpacker CustomUnpackers[];
 class CPackerConfigData
 {
 public:
-    std::string Title; // name shown to the user
-    std::string Ext;   // standard extension (without the dot)
+    std::wstring Title; // name shown to the user
+    std::wstring Ext;   // standard extension (without the dot)
     int Type;          // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
                        // note: see OldType below
 
     // data for external packers
-    std::string CmdExecCopy;
-    std::string CmdArgsCopy;
+    std::wstring CmdExecCopy;
+    std::wstring CmdArgsCopy;
     BOOL SupportMove;
-    std::string CmdExecMove;
-    std::string CmdArgsMove;
+    std::wstring CmdExecMove;
+    std::wstring CmdArgsMove;
     BOOL SupportLongNames;
     BOOL NeedANSIListFile;
 
@@ -392,12 +393,12 @@ public:
 
     // sets attributes; if something goes wrong, removes the item from the array, destroys it, and returns FALSE
     // old == TRUE -> 'type' uses the old convention (0 ZIP, 1 external, 2 TAR, 3 PAK)
-    BOOL SetPacker(int index, int type, const char* title, const char* ext, BOOL old,
+    BOOL SetPacker(int index, int type, const wchar_t* title, const wchar_t* ext, BOOL old,
                    BOOL supportLongNames = FALSE, BOOL supportMove = FALSE,
-                   const char* cmdExecCopy = NULL, const char* cmdArgsCopy = NULL,
-                   const char* cmdExecMove = NULL, const char* cmdArgsMove = NULL,
+                   const wchar_t* cmdExecCopy = NULL, const wchar_t* cmdArgsCopy = NULL,
+                   const wchar_t* cmdExecMove = NULL, const wchar_t* cmdArgsMove = NULL,
                    BOOL needANSIListFile = FALSE);
-    BOOL SetPackerTitle(int index, const char* title);
+    BOOL SetPackerTitle(int index, const wchar_t* title);
     void SetPackerType(int index, int type) { Packers[index]->Type = type; }
     void SetPackerOldType(int index, BOOL oldType) { Packers[index]->OldType = oldType; }
     void SetPackerSupMove(int index, BOOL supMove) { Packers[index]->SupportMove = supMove; }
@@ -405,25 +406,25 @@ public:
                                                     //    BOOL SwapPackers(int index1, int index2);         // swaps two items in the array
     BOOL MovePacker(int srcIndex, int dstIndex);    // moves an item
     void DeletePacker(int index);
-    void SetPackerCmdExecCopy(int index, const char* cmd)
+    void SetPackerCmdExecCopy(int index, const wchar_t* cmd)
     {
         Packers[index]->CmdExecCopy = cmd;
     }
-    void SetPackerCmdExecMove(int index, const char* cmd)
+    void SetPackerCmdExecMove(int index, const wchar_t* cmd)
     {
         Packers[index]->CmdExecMove = cmd;
     }
 
     int GetPackerType(int index) { return Packers[index]->Type; }
     BOOL GetPackerOldType(int index) { return Packers[index]->OldType; }
-    const char* GetPackerTitle(int index) { return Packers[index]->Title.c_str(); }
-    const char* GetPackerExt(int index) { return Packers[index]->Ext.c_str(); }
+    const wchar_t* GetPackerTitle(int index) { return Packers[index]->Title.c_str(); }
+    const wchar_t* GetPackerExt(int index) { return Packers[index]->Ext.c_str(); }
     BOOL GetPackerSupLongNames(int index) { return Packers[index]->SupportLongNames; }
     BOOL GetPackerSupMove(int index) { return Packers[index]->SupportMove; }
-    const char* GetPackerCmdExecCopy(int index) { return Packers[index]->CmdExecCopy.c_str(); }
-    const char* GetPackerCmdArgsCopy(int index) { return Packers[index]->CmdArgsCopy.c_str(); }
-    const char* GetPackerCmdExecMove(int index) { return Packers[index]->CmdExecMove.c_str(); }
-    const char* GetPackerCmdArgsMove(int index) { return Packers[index]->CmdArgsMove.c_str(); }
+    const wchar_t* GetPackerCmdExecCopy(int index) { return Packers[index]->CmdExecCopy.c_str(); }
+    const wchar_t* GetPackerCmdArgsCopy(int index) { return Packers[index]->CmdArgsCopy.c_str(); }
+    const wchar_t* GetPackerCmdExecMove(int index) { return Packers[index]->CmdExecMove.c_str(); }
+    const wchar_t* GetPackerCmdArgsMove(int index) { return Packers[index]->CmdArgsMove.c_str(); }
     BOOL GetPackerNeedANSIListFile(int index) { return Packers[index]->NeedANSIListFile; }
 
     BOOL Save(int index, HKEY hKey);
@@ -435,8 +436,12 @@ public:
     }
     void SetPreferedPacker(int i) { PreferedPacker = i; }
 
-    BOOL ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL move,
-                       const char* sourcePath, SalEnumSelection2 next, void* param);
+    // 'lastNameW' gives the wide form of each name 'next' returns, or NULL when the
+    // caller has no wide names - see SalEnumLastNameW in pack.h. Repeating the typedef
+    // rather than including pack.h here keeps the header order as it was.
+    BOOL ExecutePacker(CFilesWindow* panel, const wchar_t* zipFile, BOOL move,
+                       const wchar_t* sourcePath, SalEnumSelection2 next, void* param,
+                       const wchar_t*(WINAPI* lastNameW)(void* param) = NULL);
 };
 
 //
@@ -449,14 +454,14 @@ public:
 class CUnpackerConfigData
 {
 public:
-    std::string Title; // name shown to the user
-    std::string Ext;   // list of standard extensions separated by semicolons
+    std::wstring Title; // name shown to the user
+    std::wstring Ext;   // list of standard extensions separated by semicolons
     int Type;          // internal (-1, -2, ...; see CPlugins for details) / external (0; additional fields apply)
                        // note: see OldType below
 
     // data for external packers
-    std::string CmdExecExtract;
-    std::string CmdArgsExtract;
+    std::wstring CmdExecExtract;
+    std::wstring CmdArgsExtract;
     BOOL SupportLongNames;
     BOOL NeedANSIListFile;
 
@@ -528,11 +533,11 @@ public:
 
     // sets attributes; if something goes wrong, removes the item from the array, destroys it, and returns FALSE
     // old == TRUE -> 'type' uses the old convention (0 ZIP, 1 external, 2 TAR, 3 PAK)
-    BOOL SetUnpacker(int index, int type, const char* title, const char* ext, BOOL old,
+    BOOL SetUnpacker(int index, int type, const wchar_t* title, const wchar_t* ext, BOOL old,
                      BOOL supportLongNames = FALSE,
-                     const char* cmdExecExtract = NULL, const char* cmdArgsExtract = NULL,
+                     const wchar_t* cmdExecExtract = NULL, const wchar_t* cmdArgsExtract = NULL,
                      BOOL needANSIListFile = FALSE);
-    BOOL SetUnpackerTitle(int index, const char* title);
+    BOOL SetUnpackerTitle(int index, const wchar_t* title);
     void SetUnpackerType(int index, int type) { Unpackers[index]->Type = type; }
     void SetUnpackerOldType(int index, BOOL oldType) { Unpackers[index]->OldType = oldType; }
     int GetUnpackersCount() { return Unpackers.Count; } // returns the number of items in the array
@@ -543,11 +548,11 @@ public:
 
     int GetUnpackerType(int index) { return Unpackers[index]->Type; }
     BOOL GetUnpackerOldType(int index) { return Unpackers[index]->OldType; }
-    const char* GetUnpackerTitle(int index) { return Unpackers[index]->Title.c_str(); }
-    const char* GetUnpackerExt(int index) { return Unpackers[index]->Ext.c_str(); }
+    const wchar_t* GetUnpackerTitle(int index) { return Unpackers[index]->Title.c_str(); }
+    const wchar_t* GetUnpackerExt(int index) { return Unpackers[index]->Ext.c_str(); }
     BOOL GetUnpackerSupLongNames(int index) { return Unpackers[index]->SupportLongNames; }
-    const char* GetUnpackerCmdExecExtract(int index) { return Unpackers[index]->CmdExecExtract.c_str(); }
-    const char* GetUnpackerCmdArgsExtract(int index) { return Unpackers[index]->CmdArgsExtract.c_str(); }
+    const wchar_t* GetUnpackerCmdExecExtract(int index) { return Unpackers[index]->CmdExecExtract.c_str(); }
+    const wchar_t* GetUnpackerCmdArgsExtract(int index) { return Unpackers[index]->CmdArgsExtract.c_str(); }
     BOOL GetUnpackerNeedANSIListFile(int index) { return Unpackers[index]->NeedANSIListFile; }
 
     BOOL Save(int index, HKEY hKey);
@@ -559,21 +564,30 @@ public:
     }
     void SetPreferedUnpacker(int i) { PreferedUnpacker = i; }
 
-    BOOL ExecuteUnpacker(HWND parent, CFilesWindow* panel, const char* zipFile, const char* mask,
-                         const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes);
+    BOOL ExecuteUnpacker(HWND parent, CFilesWindow* panel, const wchar_t* zipFile, const wchar_t* mask,
+                         const wchar_t* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes);
 };
 
 extern CPackerConfig PackerConfig;
 extern CUnpackerConfig UnpackerConfig;
 
-int DialogError(HWND parent, DWORD flags, const char* fileName,
-                const char* error, const char* title);
-int DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char* fileData1,
-                    const char* fileName2, const char* fileData2);
-int DialogQuestion(HWND parent, DWORD flags, const char* fileName,
-                   const char* question, const char* title);
+// error and title are WIDE - they come from LoadStrW, and the
+// dialog behind them shows a wide file name already.
+// fileName is wide too now; the ABI widened, so nothing narrows on
+// the way in. It is handed to CFileErrorDlg's 'fileW' slot, which that dialog
+// has always preferred over its narrow twin.
+int DialogError(HWND parent, DWORD flags, const wchar_t* fileName,
+                const wchar_t* error, const wchar_t* title);
+// all four are WIDE. The names go to COverwriteDlg's sourceNameW/
+// targetNameW slots, which it has always preferred over its narrow twins.
+int DialogOverwrite(HWND parent, DWORD flags, const wchar_t* fileName1, const wchar_t* fileData1,
+                    const wchar_t* fileName2, const wchar_t* fileData2);
+// fileName is WIDE too now - the ABI widened, so nothing narrows
+// on the way in any more.
+int DialogQuestion(HWND parent, DWORD flags, const wchar_t* fileName,
+                   const wchar_t* question, const wchar_t* title);
 
-BOOL ViewFileInPluginViewer(const char* pluginSPL,
-                            CSalamanderPluginViewerData* pluginData,
-                            BOOL useCache, const char* rootTmpPath,
-                            const char* fileNameInCache, int& error);
+BOOL ViewFileInPluginViewerW(const wchar_t* sourceFileName, const wchar_t* pluginSPL,
+                             CSalamanderPluginViewerData* pluginData,
+                             BOOL useCache, const wchar_t* rootTmpPath,
+                             const wchar_t* fileNameInCache, int& error);

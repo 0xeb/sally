@@ -10,9 +10,9 @@ protected:
 #ifndef OPENSAL_VERSION
 #pragma region LocaleAPIHandler
 #endif // OPENSAL_VERSION
-    UINT GroupingStrToUint(LPCTSTR szGrouping)
+    UINT GroupingStrToUint(PCWSTR szGrouping)
     {
-        LPCTSTR szCurr = szGrouping;
+        PCWSTR szCurr = szGrouping;
         UINT ret = 0;
 
         /*
@@ -25,13 +25,13 @@ protected:
         for (;;)
         {
             ret *= 10;
-            if (*szCurr == TEXT('\0'))
+            if (*szCurr == L'\0')
                 break; //end of the string due to terminating null
 
-            TCHAR* pch;
-            ret += _tcstol(szCurr, &pch, 10); //add the number
+            wchar_t* pch;
+            ret += wcstol(szCurr, &pch, 10); //add the number
 
-            if (_tcscmp(pch, TEXT(";0")) == 0)
+            if (wcscmp(pch, L";0") == 0)
                 break; //end
 
             szCurr = pch + 1; //pointer past the delimiter
@@ -42,35 +42,35 @@ protected:
     // Fills the default NUMBERFMT structure for a given locale.
     BOOL LoadDefaultFormat()
     {
-        TCHAR szBuf[80];
+        wchar_t szBuf[80];
 
-        int ret = ::GetLocaleInfo(this->_lcid, LOCALE_IDIGITS, szBuf, ARRAYSIZE(szBuf));
+        int ret = ::GetLocaleInfoW(this->_lcid, LOCALE_IDIGITS, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
-        this->_defformat.NumDigits = _tcstol(szBuf, NULL, 10);
+        this->_defformat.NumDigits = wcstol(szBuf, NULL, 10);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_ILZERO, szBuf, ARRAYSIZE(szBuf));
+        ret = ::GetLocaleInfoW(this->_lcid, LOCALE_ILZERO, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
-        this->_defformat.LeadingZero = _tcstol(szBuf, NULL, 10);
+        this->_defformat.LeadingZero = wcstol(szBuf, NULL, 10);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_SGROUPING, szBuf, ARRAYSIZE(szBuf));
+        ret = ::GetLocaleInfoW(this->_lcid, LOCALE_SGROUPING, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
         this->_defformat.Grouping = GroupingStrToUint(szBuf);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_SDECIMAL, this->_defformat.lpDecimalSep, 5);
+        ret = ::GetLocaleInfoW(this->_lcid, LOCALE_SDECIMAL, this->_defformat.lpDecimalSep, 5);
         if (ret == 0)
             return FALSE;
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_STHOUSAND, this->_defformat.lpThousandSep, 5);
+        ret = ::GetLocaleInfoW(this->_lcid, LOCALE_STHOUSAND, this->_defformat.lpThousandSep, 5);
         if (ret == 0)
             return FALSE;
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_INEGNUMBER, szBuf, ARRAYSIZE(szBuf));
+        ret = ::GetLocaleInfoW(this->_lcid, LOCALE_INEGNUMBER, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
-        this->_defformat.NegativeOrder = _tcstol(szBuf, NULL, 10);
+        this->_defformat.NegativeOrder = wcstol(szBuf, NULL, 10);
 
         return TRUE;
     }
@@ -79,11 +79,11 @@ protected:
 #endif // OPENSAL_VERSION
 
     LCID _lcid;
-    NUMBERFMT _defformat;
-    TCHAR _decimalSep[5];
-    TCHAR _thousandSep[5];
+    NUMBERFMTW _defformat;
+    wchar_t _decimalSep[5];
+    wchar_t _thousandSep[5];
 
-    NUMBERFMT _intformat;
+    NUMBERFMTW _intformat;
 
 public:
     CStringFormatter(LCID lcid)
@@ -97,15 +97,15 @@ public:
     ~CStringFormatter()
     {
     }
-    size_t FormatLongDate(TCHAR* s, size_t slen, SYSTEMTIME* st)
+    size_t FormatLongDate(wchar_t* s, size_t slen, SYSTEMTIME* st)
     {
         size_t len = 0;
-        size_t l = GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, st, NULL, s, (int)slen);
+        size_t l = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, st, NULL, s, (int)slen);
         if (l == 0)
         {
             if (slen >= 2 + 1 + 2 + 1 + 4)
             {
-                l = _stprintf(s, TEXT("%u.%u.%u"), st->wDay, st->wMonth, st->wYear);
+                l = swprintf(s, slen, L"%u.%u.%u", st->wDay, st->wMonth, st->wYear);
             }
             if (l > 0)
             {
@@ -122,15 +122,15 @@ public:
         }
         return len;
     }
-    size_t FormatTime(TCHAR* s, size_t slen, SYSTEMTIME* st)
+    size_t FormatTime(wchar_t* s, size_t slen, SYSTEMTIME* st)
     {
         size_t len = 0;
-        size_t l = GetTimeFormat(LOCALE_USER_DEFAULT, 0, st, NULL, s, (int)slen);
+        size_t l = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, st, NULL, s, (int)slen);
         if (l == 0)
         {
             if (slen >= 2 + 1 + 2 + 1 + 2)
             {
-                l = _stprintf(s, TEXT("%u:%02u:%02u"), st->wHour, st->wMinute, st->wSecond);
+                l = swprintf(s, slen, L"%u:%02u:%02u", st->wHour, st->wMinute, st->wSecond);
             }
             if (l > 0)
             {
@@ -147,7 +147,7 @@ public:
         }
         return len;
     }
-    size_t FormatLongFileDate(TCHAR* s, size_t slen, FILETIME* ft)
+    size_t FormatLongFileDate(wchar_t* s, size_t slen, FILETIME* ft)
     {
         SYSTEMTIME st;
         FILETIME lft;
@@ -159,11 +159,11 @@ public:
             {
                 s += l;
             }
-            *s++ = TEXT(',');
+            *s++ = L',';
             l++;
-            *s++ = TEXT(' ');
+            *s++ = L' ';
             l++;
-            *s = TEXT('\0'); //you never know when it might fail...
+            *s = L'\0'; //you never know when it might fail...
             len = l;
             slen -= len;
             l = FormatTime(s, slen, &st);
@@ -174,19 +174,19 @@ public:
         }
         return len;
     }
-    size_t FormatInteger(TCHAR* s, size_t slen, UINT64 val)
+    size_t FormatInteger(wchar_t* s, size_t slen, UINT64 val)
     {
         //%I64u -- 0 - 18446744073709551615
-        TCHAR buff[30];
+        wchar_t buff[30];
         size_t len = 0;
-        size_t l1 = _stprintf(buff, TEXT("%I64u"), val);
+        size_t l1 = swprintf(buff, 30, L"%I64u", val);
         this->_intformat.NumDigits = 0;
-        size_t l2 = GetNumberFormat(LOCALE_USER_DEFAULT, 0, buff, &this->_intformat, s, (int)slen);
+        size_t l2 = GetNumberFormatW(LOCALE_USER_DEFAULT, 0, buff, &this->_intformat, s, (int)slen);
         if (l2 == 0)
         {
             if (slen > l1)
             {
-                _tcscpy(s, buff);
+                wcscpy(s, buff);
                 len = l1;
             }
             else
@@ -200,19 +200,19 @@ public:
         }
         return len;
     }
-    size_t FormatReal(TCHAR* s, size_t slen, double val, int digits = 2)
+    size_t FormatReal(wchar_t* s, size_t slen, double val, int digits = 2)
     {
         //%1.3f --
-        TCHAR buff[30];
+        wchar_t buff[30];
         size_t len = 0;
-        size_t l1 = _stprintf(buff, TEXT("%1.3f"), val);
+        size_t l1 = swprintf(buff, 30, L"%1.3f", val);
         this->_intformat.NumDigits = digits;
-        size_t l2 = GetNumberFormat(LOCALE_USER_DEFAULT, 0, buff, &this->_intformat, s, (int)slen);
+        size_t l2 = GetNumberFormatW(LOCALE_USER_DEFAULT, 0, buff, &this->_intformat, s, (int)slen);
         if (l2 == 0)
         {
             if (slen > l1)
             {
-                _tcscpy(s, buff);
+                wcscpy(s, buff);
                 len = l1;
             }
             else
@@ -227,7 +227,7 @@ public:
         return len;
     }
 
-    size_t FormatLongFileSize(TCHAR* s, size_t slen, UINT64 size)
+    size_t FormatLongFileSize(wchar_t* s, size_t slen, UINT64 size)
     {
         size_t len = 0;
         size_t l = FormatInteger(s, slen, size);
@@ -252,24 +252,24 @@ public:
             size_t bytelen = CZResourceString::GetLength(bytestrid);
             if (slen > bytelen)
             {
-                *s++ = TEXT(' ');
+                *s++ = L' ';
                 l++;
-                TCHAR const* bytestr = CZResourceString::GetString(bytestrid);
+                wchar_t const* bytestr = CZResourceString::GetString(bytestrid);
                 while (bytelen-- > 0)
                 {
                     *s++ = *bytestr++;
                     l++;
                 }
             }
-            *s = TEXT('\0'); //TODO: verify we do not overwrite beyond the end
+            *s = L'\0'; //TODO: verify we do not overwrite beyond the end
             len += l;
         }
         return len;
     }
-    size_t FormatShortFileSize(TCHAR* s, size_t slen, UINT64 size)
+    size_t FormatShortFileSize(wchar_t* s, size_t slen, UINT64 size)
     {
-        static const TCHAR expch[] = TEXT(" KMGTPEZY");
-        static const int maxexp = sizeof(expch) / sizeof(TCHAR) - 2;
+        static const wchar_t expch[] = L" KMGTPEZY";
+        static const int maxexp = sizeof(expch) / sizeof(wchar_t) - 2;
         size_t len = 0;
         int exp = 0;
         //C4244 ok: we only need the first few digits because we compute the short form "1.45TB"
@@ -286,22 +286,22 @@ public:
         if (l > 0)
         {
             s += l;
-            *s++ = TEXT(' ');
+            *s++ = L' ';
             l++;
             if (exp > 0)
             {
                 *s++ = expch[exp];
                 l++;
             }
-            *s++ = TEXT('B');
+            *s++ = L'B';
             l++;
-            *s = TEXT('\0');
+            *s = L'\0';
 
             len = l;
         }
         return len;
     }
-    size_t FormatHumanFileSize(TCHAR* s, size_t slen, UINT64 size)
+    size_t FormatHumanFileSize(wchar_t* s, size_t slen, UINT64 size)
     {
         //%I64u -- 0 - 18446744073709551615
         size_t len = 0;
@@ -313,32 +313,32 @@ public:
             {
                 //large value, try to add the short notation
                 s += l;
-                TCHAR* si = s;
+                wchar_t* si = s;
                 len += l;
                 slen -= l;
                 l = 0;
                 if (slen > 5)
                 {
-                    *si++ = TEXT(' ');
+                    *si++ = L' ';
                     l++;
-                    *si++ = TEXT('(');
+                    *si++ = L'(';
                     l++;
-                    //*si = TEXT('\0'); //just in case
+                    //*si = L'\0'; //just in case
 
                     int li = (int)FormatShortFileSize(si, slen - 3, size);
                     if (li > 0)
                     {
                         l += li;
                         si += li;
-                        *si++ = TEXT(')');
+                        *si++ = L')';
                         l++;
-                        *si = TEXT('\0'); //end
+                        *si = L'\0'; //end
                         len += l;
                     }
                     else
                     {
                         //failed to append the inner text -> remove the parentheses
-                        *s = TEXT('\0');
+                        *s = L'\0';
                     }
                 }
             }
@@ -354,7 +354,7 @@ public:
         }
         return len;
     }
-    size_t FormatExplorerFileSize(TCHAR* s, size_t slen, UINT64 size)
+    size_t FormatExplorerFileSize(wchar_t* s, size_t slen, UINT64 size)
     {
         //%I64u -- 0 - 18446744073709551615
         size_t len = 0;
@@ -366,32 +366,32 @@ public:
             {
                 //large value, try to add the short notation
                 s += l;
-                TCHAR* si = s;
+                wchar_t* si = s;
                 len += l;
                 slen -= l;
                 l = 0;
                 if (slen > 5)
                 {
-                    *si++ = TEXT(' ');
+                    *si++ = L' ';
                     l++;
-                    *si++ = TEXT('(');
+                    *si++ = L'(';
                     l++;
-                    //*si = TEXT('\0'); //just in case
+                    //*si = L'\0'; //just in case
 
                     int li = (int)FormatLongFileSize(si, slen - 3, size);
                     if (li > 0)
                     {
                         l += li;
                         si += li;
-                        *si++ = TEXT(')');
+                        *si++ = L')';
                         l++;
-                        *si = TEXT('\0'); //end
+                        *si = L'\0'; //end
                         len += l;
                     }
                     else
                     {
                         //failed to append the inner text -> remove the parentheses
-                        *s = TEXT('\0');
+                        *s = L'\0';
                     }
                 }
             }

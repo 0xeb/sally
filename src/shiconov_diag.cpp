@@ -10,6 +10,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 CShellOverlayDiagLog ShellOverlayDiag;
 
@@ -22,9 +23,9 @@ ShellOverlayDiagRecord* CShellOverlayDiagLog::Add(const wchar_t* name, const wch
     *rec = ShellOverlayDiagRecord();
 
     if (name != NULL)
-        wcsncpy_s(rec->Name, name, _TRUNCATE);
+        rec->Name = name;
     if (clsid != NULL)
-        wcsncpy_s(rec->Clsid, clsid, _TRUNCATE);
+        rec->Clsid = clsid;
 
     return rec;
 }
@@ -38,7 +39,7 @@ ShellOverlayDiagRecord* CShellOverlayDiagLog::Find(const wchar_t* name)
     // the reporter's Tortoise keys differ from ordinary ones only by leading whitespace.
     for (int i = 0; i < Filled; i++)
     {
-        if (wcscmp(Records[i].Name, name) == 0)
+        if (Records[i].Name == name)
             return &Records[i];
     }
     return NULL;
@@ -96,80 +97,78 @@ const char* OverlayOutcomeText(OverlayOutcome outcome)
     }
 }
 
-int FormatShellOverlayDiagRecord(const ShellOverlayDiagRecord& record, char* buf, int bufSize)
+int FormatShellOverlayDiagRecord(const ShellOverlayDiagRecord& record, char* buf, int bufSize) noexcept
 {
     if (buf == NULL || bufSize <= 0)
         return 0;
 
     buf[0] = 0;
-    int written = 0;
-
-    char nameAcp[256];
-    nameAcp[0] = 0;
-    WideCharToMultiByte(CP_ACP, 0, record.Name, -1, nameAcp, (int)sizeof(nameAcp), NULL, NULL);
-    nameAcp[sizeof(nameAcp) - 1] = 0;
-
-    char clsidAcp[64];
-    clsidAcp[0] = 0;
-    WideCharToMultiByte(CP_ACP, 0, record.Clsid, -1, clsidAcp, (int)sizeof(clsidAcp), NULL, NULL);
-    clsidAcp[sizeof(clsidAcp) - 1] = 0;
-
-    written += sprintf_s(buf + written, bufSize - written,
-                         "\"%s\" %s %s", nameAcp, clsidAcp, OverlayOutcomeText(record.Outcome));
-
-    if (record.Outcome == OverlayOutcome::Loaded)
+    try
     {
-        written += sprintf_s(buf + written, bufSize - written,
-                            " idx=%d prio=%d icons=%s%s%s",
-                            record.LoadedIndex, record.Priority,
-                            (record.IconsOk & 1) ? "16/" : "-/",
-                            (record.IconsOk & 2) ? "32/" : "-/",
-                            (record.IconsOk & 4) ? "48" : "-");
+        const std::string nameAcp = ReportAcpBytesW(record.Name.c_str());
+        const std::string clsidAcp = ReportAcpBytesW(record.Clsid.c_str());
+        const std::string nameEsc = AsciiEscapedW(record.Name.c_str());
+        char fragment[512];
+        std::string report = "\"" + nameAcp + "\" " + clsidAcp + " " +
+                             OverlayOutcomeText(record.Outcome);
+
+        if (record.Outcome == OverlayOutcome::Loaded)
+        {
+            sprintf_s(fragment, " idx=%d prio=%d icons=%s%s%s",
+                      record.LoadedIndex, record.Priority,
+                      (record.IconsOk & 1) ? "16/" : "-/",
+                      (record.IconsOk & 2) ? "32/" : "-/",
+                      (record.IconsOk & 4) ? "48" : "-");
+            report += fragment;
+        }
+        else if (record.Hr != 0)
+        {
+            sprintf_s(fragment, " hr=0x%08X", static_cast<unsigned>(record.Hr));
+            report += fragment;
+        }
+
+        if (record.Outcome == OverlayOutcome::IconExtractFailed ||
+            record.Outcome == OverlayOutcome::NoIconFileFlag)
+        {
+            sprintf_s(fragment, " got=%s%s%s index=%d flags=0x%08X",
+                      (record.IconsOk & 1) ? "16 " : "- ",
+                      (record.IconsOk & 2) ? "32 " : "- ",
+                      (record.IconsOk & 4) ? "48" : "-",
+                      record.IconIndex, record.InfoFlags);
+            report += fragment;
+            const std::string iconAcp = ReportAcpBytesW(record.IconFile.c_str());
+            const std::string iconEsc = AsciiEscapedW(record.IconFile.c_str());
+            report += " iconFile=\"";
+            report += iconAcp;
+            report += '"';
+            if (iconAcp != iconEsc)
+                report += " iconFile(escaped)=\"" + iconEsc + '"';
+        }
+
+        if (record.ReaderFailures != 0)
+        {
+            sprintf_s(fragment, " readerFailures=%ld (last 0x%08X)",
+                      record.ReaderFailures, static_cast<unsigned>(record.ReaderLastHr));
+            report += fragment;
+        }
+
+        if (nameAcp != nameEsc)
+            report += " name(escaped)=\"" + nameEsc + '"';
+
+        const size_t copied = (std::min)(report.size(), static_cast<size_t>(bufSize - 1));
+        if (copied != 0)
+            memcpy(buf, report.data(), copied);
+        buf[copied] = 0;
+        return static_cast<int>(copied);
     }
-    else if (record.Hr != 0)
+    catch (...)
     {
-        written += sprintf_s(buf + written, bufSize - written, " hr=0x%08X", (unsigned)record.Hr);
+        buf[0] = 0;
+        return 0;
     }
-
-    // For an icon-extraction failure the icon file and which sizes actually came back are
-    // the whole diagnosis: Sally requires all three or it drops the handler, and the sizes
-    // it asks for are DPI-scaled rather than the 16/32/48 most icon files ship.
-    if (record.Outcome == OverlayOutcome::IconExtractFailed ||
-        record.Outcome == OverlayOutcome::NoIconFileFlag)
-    {
-        written += sprintf_s(buf + written, bufSize - written,
-                            " got=%s%s%s index=%d flags=0x%08X",
-                            (record.IconsOk & 1) ? "16 " : "- ",
-                            (record.IconsOk & 2) ? "32 " : "- ",
-                            (record.IconsOk & 4) ? "48" : "-",
-                            record.IconIndex, record.InfoFlags);
-
-        char iconAcp[MAX_PATH * 2];
-        iconAcp[0] = 0;
-        WideCharToMultiByte(CP_ACP, 0, record.IconFile, -1, iconAcp, (int)sizeof(iconAcp), NULL, NULL);
-        iconAcp[sizeof(iconAcp) - 1] = 0;
-        written += sprintf_s(buf + written, bufSize - written, " iconFile=\"%s\"", iconAcp);
-    }
-
-    if (record.ReaderFailures != 0)
-    {
-        written += sprintf_s(buf + written, bufSize - written,
-                            " readerFailures=%ld (last 0x%08X)",
-                            record.ReaderFailures, (unsigned)record.ReaderLastHr);
-    }
-
-    // Only worth the extra line when the ACP rendering actually lost something - which is
-    // precisely the case we would otherwise never see.
-    char nameEsc[512];
-    AppendAsciiEscapedW(record.Name, nameEsc, (int)sizeof(nameEsc));
-    if (strcmp(nameAcp, nameEsc) != 0)
-        written += sprintf_s(buf + written, bufSize - written, " name(escaped)=\"%s\"", nameEsc);
-
-    return written;
 }
 
-void SetOverlayDiagConfigRoot(ShellOverlayDiagHeader& header, const char* rootReg)
+void SetOverlayDiagConfigRoot(ShellOverlayDiagHeader& header, const wchar_t* rootReg)
 {
-    lstrcpynA(header.ConfigRoot, rootReg != NULL ? rootReg : "<none: first run>",
-              (int)sizeof(header.ConfigRoot));
+    header.ConfigRoot = rootReg != NULL ? rootReg : L"<none: first run>";
 }

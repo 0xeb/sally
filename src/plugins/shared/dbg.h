@@ -12,6 +12,10 @@
 
 #pragma once
 
+#include "compat/LegacyPrintfFormat.h"
+
+#include <string>
+
 // definitions of macros TRACE_I, TRACE_IW, TRACE_E, TRACE_EW, TRACE_C, TRACE_CW and CALL_STACK_MESSAGEXXX for plugins,
 // in the plugin you need to define variable SalamanderDebug (type see below) and
 // in SalamanderPluginEntry initialize this variable:
@@ -347,7 +351,8 @@ class CWStr
 {
 protected:
     BOOL IsOK;
-    WCHAR* AllocBuf;
+    BOOL OwnsStr;
+    std::wstring OwnedStr;
     const WCHAR* Str;
 
 public:
@@ -355,16 +360,12 @@ public:
     CWStr(const WCHAR* s)
     {
         IsOK = TRUE;
-        AllocBuf = NULL;
+        OwnsStr = FALSE;
         Str = s;
     }
-    ~CWStr()
-    {
-        if (AllocBuf != NULL)
-            free(AllocBuf);
-    }
+    ~CWStr() = default;
 
-    const WCHAR* c_str() { return IsOK ? (const WCHAR*)(AllocBuf != NULL ? AllocBuf : Str) : L"Error in CWStr()"; }
+    const WCHAR* c_str() const { return IsOK ? (OwnsStr ? OwnedStr.c_str() : Str) : L"Error in CWStr()"; }
 };
 
 //
@@ -410,21 +411,30 @@ inline void __TraceEmptyFunction() {}
 #define ConnectToTraceServer() __TraceEmptyFunction()
 #define SetTraceThreadName(name) __TraceEmptyFunction()
 #define SetTraceThreadNameW(name) __TraceEmptyFunction()
+// TRACE_I/TRACE_E etc. are no-ops here, so nothing actually reaches GetTrace() - kept callable
+// unconditionally so shared code (e.g. C__Handles::~C__Handles) doesn't need its own #ifdef.
+inline bool IsTraceAlive() { return false; }
 
 #else // TRACE_ENABLE
 
 // info-trace, manually specified position in the file
+// IsTraceAlive() guard - see common/trace.h's own copy of this comment for the
+// full rationale (a real, observed crash: GetTrace() torn down while something else - here,
+// potentially any thread in this plugin's own DLL - still calls TRACE_I/TRACE_E). Every real call
+// site discards the result already, so folding both branches to (void) is safe.
 #define TRACE_MI(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStream() << str, \
-     __Trace) \
-        .SetInfo(file, line) \
-        .SendMessageToServer(TRUE)
+    (IsTraceAlive() ? (void)((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStream() << str, \
+                             GetTrace()) \
+                                .SetInfo(file, line) \
+                                .SendMessageToServer(TRUE)) \
+                    : (void)0)
 
 #define TRACE_MIW(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStreamW() << str, \
-     __Trace) \
-        .SetInfoW(file, line) \
-        .SendMessageToServer(TRUE, TRUE)
+    (IsTraceAlive() ? (void)((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStreamW() << str, \
+                             GetTrace()) \
+                                .SetInfoW(file, line) \
+                                .SendMessageToServer(TRUE, TRUE)) \
+                    : (void)0)
 
 // info-trace
 #define TRACE_I(str) TRACE_MI(__FILE__, __LINE__, str)
@@ -435,17 +445,20 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_WW(str) TRACE_IW(str)
 
 // error-trace, manually specified position in the file
+// Same IsTraceAlive() guard as TRACE_MI/TRACE_MIW above.
 #define TRACE_ME(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStream() << str, \
-     __Trace) \
-        .SetInfo(file, line) \
-        .SendMessageToServer(FALSE)
+    (IsTraceAlive() ? (void)((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStream() << str, \
+                             GetTrace()) \
+                                .SetInfo(file, line) \
+                                .SendMessageToServer(FALSE)) \
+                    : (void)0)
 
 #define TRACE_MEW(file, line, str) \
-    (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStreamW() << str, \
-     __Trace) \
-        .SetInfoW(file, line) \
-        .SendMessageToServer(FALSE, TRUE)
+    (IsTraceAlive() ? (void)((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStreamW() << str, \
+                             GetTrace()) \
+                                .SetInfoW(file, line) \
+                                .SendMessageToServer(FALSE, TRUE)) \
+                    : (void)0)
 
 // error-trace
 #define TRACE_E(str) TRACE_ME(__FILE__, __LINE__, str)
@@ -461,15 +474,15 @@ inline void __TraceEmptyFunction() {}
 // and working with EBP/ESP (this depends on the compiler and optimization settings), so
 // for now we use the old primitive crash method by writing to NULL
 #define TRACE_MC(file, line, str) \
-    ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStream() << str, \
-      __Trace) \
+    ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStream() << str, \
+      GetTrace()) \
          .SetInfo(file, line) \
          .SendMessageToServer(FALSE, FALSE, TRUE), \
      *((int*)NULL) = 0x666)
 
 #define TRACE_MCW(file, line, str) \
-    ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStreamW() << str, \
-      __Trace) \
+    ((::EnterCriticalSection(&GetTrace().CriticalSection), GetTrace().OStreamW() << str, \
+      GetTrace()) \
          .SetInfoW(file, line) \
          .SendMessageToServer(FALSE, TRUE, TRUE), \
      *((int*)NULL) = 0x666)
@@ -481,7 +494,7 @@ inline void __TraceEmptyFunction() {}
 #define ConnectToTraceServer() SalamanderDebug->TraceConnectToServer()
 
 #define SetTraceThreadName(name) SalamanderDebug->TraceSetThreadName(name)
-#define SetTraceThreadNameW(name) SalamanderDebug->TraceSetThreadNameW(name)
+#define SetTraceThreadNameW(name) SalamanderDebug->TraceSetThreadName(name)
 
 class C__Trace
 {
@@ -509,7 +522,16 @@ public:
     void SendMessageToServer(BOOL information, BOOL unicode = FALSE, BOOL crash = FALSE);
 };
 
-extern C__Trace __Trace;
+// Function-local static (Meyer's singleton) - same rationale as common/trace.h's
+// GetTrace(). Independent per plugin DLL, each of which links this shared source separately.
+C__Trace& GetTrace();
+
+// True until ~C__Trace() runs - see common/trace.h's IsTraceAlive() for the full
+// rationale (a real, observed crash: C__Handles::~C__Handles() called TRACE_I() after GetTrace()
+// was already destroyed, entering an already-DeleteCriticalSection'd CRITICAL_SECTION). Function-
+// local statics have no guaranteed relative destruction order beyond reverse-of-construction,
+// which here is whatever each plugin's own runtime behavior happened to trigger first.
+bool IsTraceAlive();
 
 #endif // TRACE_ENABLE
 
@@ -542,10 +564,11 @@ public:
     {
         va_list args;
         va_start(args, format);
+        const std::wstring formatW = sally::compat::WidenLegacyPrintfFormat(format);
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
-        SalamanderDebug->Push(format, args, &CallStkMsgContext, doNotMeasureTimes);
+        SalamanderDebug->Push(format != NULL ? formatW.c_str() : NULL, args, &CallStkMsgContext, doNotMeasureTimes);
 #else  // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
-        SalamanderDebug->Push(format, args, NULL, TRUE);
+        SalamanderDebug->Push(format != NULL ? formatW.c_str() : NULL, args, NULL, TRUE);
 #endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
         va_end(args);
     }
@@ -824,4 +847,4 @@ extern BOOL __CallStk_T; // always TRUE - just to check format string and type o
 // or e.g. when starting a thread via CThreadQueue::StartThread)
 inline void TraceAttachCurrentThread() { SalamanderDebug->TraceAttachThread(GetCurrentThread(), GetCurrentThreadId()); }
 
-inline void SetThreadNameInVCAndTrace(const char* name) { SalamanderDebug->SetThreadNameInVCAndTrace(name); }
+inline void SetThreadNameInVCAndTrace(const wchar_t* name) { SalamanderDebug->SetThreadNameInVCAndTrace(name); }

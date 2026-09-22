@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "wmobile_path_core.h"
 
 // FS-name assigned by Salamander after loading the plugin
-char AssignedFSName[MAX_PATH] = "";
+std::wstring AssignedFSName;
 
 // global variables used to store pointers to Salamander's global variables
 // shared for both the archive and the FS
@@ -36,7 +37,7 @@ void ReleaseFS()
 //
 
 CPluginFSInterfaceAbstract* WINAPI
-CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
     if (!CRAPI::Init())
         return NULL;
@@ -65,17 +66,17 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
     CALL_STACK_MESSAGE2("CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(%d)", panel);
 
     //JR Start at the root
-    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName, "\\"); //JR x:
+    SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName.c_str(), L"\\"); //JR x:
 }
 
 BOOL WINAPI
 CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                       CPluginFSInterfaceAbstract* pluginFS,
-                                                      const char* pluginFSName, int pluginFSNameIndex,
+                                                      const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                       BOOL isDetachedFS, BOOL& refreshMenu,
                                                       BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
-    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %s, %d, %d, , , ,)",
+    CALL_STACK_MESSAGE7("CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(, %d, %d, %d, , %ls, %d, %d, , , ,)",
                         panel, x, y, pluginFSName, pluginFSNameIndex, isDetachedFS);
     // The Windows Mobile plugin has no context Change Drive menu
     return FALSE;
@@ -89,73 +90,64 @@ CPluginInterfaceForFS::ExecuteChangeDrivePostCommand(int panel, int postCmd, voi
 
 void WINAPI
 CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                   const char* pluginFSName, int pluginFSNameIndex,
+                                   const wchar_t* pluginFSName, int pluginFSNameIndex,
                                    CFileData& file, int isDir)
 {
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir) // subdirectory or up-dir
     {
-        CPathBuffer newPath; // Heap-allocated for long path support
-        strcpy(newPath, fs->Path);
+        std::wstring newPath = fs->Path;
 
         if (isDir == 2) // up-dir
         {
-            char* cutDir = NULL;
-            if (SalamanderGeneral->CutDirectory(newPath, &cutDir)) // shorten the path by the last component
+            std::wstring cutDir;
+            if (SPLCutDirectoryOwned(SalamanderGeneral, newPath, &cutDir)) // shorten the path by the last component
             {
                 int topIndex; // next top index, -1 -> invalid
-                if (!fs->TopIndexMem.FindAndPop(newPath, topIndex))
+                if (!fs->TopIndexMem.FindAndPop(newPath.c_str(), topIndex))
                     topIndex = -1;
                 // change the path in the panel
-                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath, NULL,
-                                                             topIndex, cutDir);
+                SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str(), NULL,
+                                                             topIndex, cutDir.c_str());
             }
         }
         else // subdirectory
         {
             // backup of data for TopIndexMem (backupPath + topIndex)
-            CPathBuffer backupPath;
-            strcpy(backupPath, newPath);
+            const std::wstring backupPath = newPath;
             int topIndex = SalamanderGeneral->GetPanelTopIndex(panel);
 
-            if (CRAPI::PathAppend(newPath, file.Name, newPath.Size()))
-            {
-                // change the path in the panel
-                if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath))
-                    fs->TopIndexMem.Push(backupPath, topIndex); // remember the top index for the return
-            }
+            wmobile::AppendDeviceComponent(newPath, file.Name);
+            if (SalamanderGeneral->ChangePanelPathToPluginFS(panel, pluginFSName, newPath.c_str()))
+                fs->TopIndexMem.Push(backupPath.c_str(), topIndex); // remember the top index for the return
         }
     }
     else
     {
-        CPathBuffer cmdLine;
-        char *command = NULL, *params = NULL;
-        strcpy(cmdLine, fs->Path);
-        if (!CRAPI::PathAppend(cmdLine, file.Name, cmdLine.Size()))
-        {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_NAMETOOLONG),
-                                              TitleWMobileError, MSGBOX_ERROR);
-            return;
-        }
+        std::wstring cmdLine = fs->Path;
+        wmobile::AppendDeviceComponent(cmdLine, file.Name);
+        wchar_t *command = NULL, *params = NULL;
 
-        int l = (int)strlen(cmdLine);
+        int l = (int)cmdLine.size();
         if (l > 4)
         {
-            if (SalamanderGeneral->StrICmp(cmdLine + l - 4, ".lnk") == 0)
+            if (SalamanderGeneral->StrICmp(cmdLine.c_str() + l - 4, L".lnk") == 0)
             {
-                if (CRAPI::SHGetShortcutTarget(cmdLine, cmdLine, cmdLine.Size()))
+                std::wstring target;
+                if (CRAPI::SHGetShortcutTargetWide(cmdLine.c_str(), target))
                 {
-                    command = cmdLine;
-                    if (*command == '"')
+                    cmdLine = std::move(target);
+                    command = cmdLine.data();
+                    if (*command == L'"')
                     {
                         command++;
-                        char* end = command + strlen(command) - 1;
-                        if (*end == '"')
+                        wchar_t* end = command + wcslen(command) - 1;
+                        if (*end == L'"')
                             *end = 0;
                     }
                     else
                     {
-                        params = strchr(command, ' ');
+                        params = wcschr(command, L' ');
                         if (params)
                         {
                             *params = 0;
@@ -164,15 +156,15 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
                     }
                 }
             }
-            else if (SalamanderGeneral->StrICmp(cmdLine + l - 4, ".exe") == 0)
-                command = cmdLine;
+            else if (SalamanderGeneral->StrICmp(cmdLine.c_str() + l - 4, L".exe") == 0)
+                command = cmdLine.data();
 
             if (command != 0 && command[0] != 0)
             {
-                if (!CRAPI::CreateProcess(command, params))
+                if (!CRAPI::CreateProcessWide(command, params))
                 {
                     DWORD err = CRAPI::GetLastError();
-                    SalamanderGeneral->ShowMessageBox(SalamanderGeneral->GetErrorText(err), TitleWMobileError, MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(), TitleWMobileError, MSGBOX_ERROR);
                 }
             }
         }
@@ -182,9 +174,9 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex);
     BOOL ret = FALSE;
     if (isInPanel)
@@ -204,81 +196,22 @@ CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
 // CTopIndexMem
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+// Salamander's case-insensitive comparison, adapted to the core's narrow
+// comparator. The wide length is derived from the narrow count exactly as the original code
+// derived it, so the folding semantics are unchanged - only the surrounding structure moved.
+static int TopIndexComparePrefix(const wchar_t* a, const wchar_t* b, size_t count)
 {
-    // determine whether the path follows Path (path==Path+"\\name")
-    const char* s = path + strlen(path);
-    if (s > path && *(s - 1) == '\\')
-        s--;
-    BOOL ok;
-    if (s == path)
-        ok = FALSE;
-    else
-    {
-        if (s > path && *s == '\\')
-            s--;
-        while (s > path && *s != '\\')
-            s--;
-
-        int l = (int)strlen(Path);
-        if (l > 0 && Path[l - 1] == '\\')
-            l--;
-        ok = s - path == l && SalamanderGeneral->StrNICmp(path, Path, l) == 0;
-    }
-
-    if (ok) // matches -> remember the next top index
-    {
-        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // need to discard the first top index from memory
-        {
-            int i;
-            for (i = 0; i < TOP_INDEX_MEM_SIZE - 1; i++)
-                TopIndexes[i] = TopIndexes[i + 1];
-            TopIndexesCount--;
-        }
-        strcpy(Path, path);
-        TopIndexes[TopIndexesCount++] = topIndex;
-    }
-    else // does not match -> first top index in the sequence
-    {
-        strcpy(Path, path);
-        TopIndexesCount = 1;
-        TopIndexes[0] = topIndex;
-    }
+    return SalamanderGeneral->StrNICmp(a, b, static_cast<int>(count));
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+CTopIndexMem::CTopIndexMem() : Memory(&TopIndexComparePrefix) {}
+
+void CTopIndexMem::Push(const wchar_t* path, int topIndex)
 {
-    // determine whether the path corresponds to Path (path==Path)
-    int l1 = (int)strlen(path);
-    if (l1 > 0 && path[l1 - 1] == '\\')
-        l1--;
-    int l2 = (int)strlen(Path);
-    if (l2 > 0 && Path[l2 - 1] == '\\')
-        l2--;
-    if (l1 == l2 && SalamanderGeneral->StrNICmp(path, Path, l1) == 0)
-    {
-        if (TopIndexesCount > 0)
-        {
-            char* s = Path + strlen(Path);
-            if (s > Path && *(s - 1) == '\\')
-                s--;
-            if (s > Path && *s == '\\')
-                s--;
-            while (s > Path && *s != '\\')
-                s--;
-            *s = 0;
-            topIndex = TopIndexes[--TopIndexesCount];
-            return TRUE;
-        }
-        else // value not stored anymore (never saved or low memory -> was discarded)
-        {
-            Clear();
-            return FALSE;
-        }
-    }
-    else // query for a different path -> clear memory, a long jump occurred
-    {
-        Clear();
-        return FALSE;
-    }
+    Memory.Push(path, topIndex);
+}
+
+BOOL CTopIndexMem::FindAndPop(const wchar_t* path, int& topIndex)
+{
+    return Memory.FindAndPop(path, topIndex) ? TRUE : FALSE;
 }

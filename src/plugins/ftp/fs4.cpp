@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -6,7 +6,7 @@
 
 //
 // ****************************************************************************
-// CPluginFSInterface
+// CFTPListingPluginDataInterface
 //
 
 void WINAPI GetTextFromGeneralTextColumn()
@@ -14,8 +14,20 @@ void WINAPI GetTextFromGeneralTextColumn()
     char* s = *(char**)(((char*)((*TransferFileData)->PluginData)) + (*TransferActCustomData));
     if (s != NULL)
     {
-        *TransferLen = (int)strlen(s);
-        memcpy(TransferBuffer, s, *TransferLen);
+        // The parser owns negotiated server bytes; the listing interface carries
+        // the matching codec to this presentation callback.
+        std::wstring text;
+        CFTPListingPluginDataInterface* data =
+            static_cast<CFTPListingPluginDataInterface*>(*TransferPluginDataIface);
+        if (data != NULL &&
+            data->DecodeTextForPresentation(std::string_view(s, strlen(s)), text))
+        {
+            *TransferLen = static_cast<int>((std::min)(
+                text.size(), static_cast<size_t>(TRANSFER_BUFFER_MAX)));
+            wmemcpy(TransferBuffer, text.c_str(), *TransferLen);
+        }
+        else
+            *TransferLen = 0;
     }
     else
         *TransferLen = 0;
@@ -32,11 +44,11 @@ void WINAPI GetTextFromGeneralDateColumn()
         GlobalGeneralDateTimeStruct.wMonth = date->Month;
         GlobalGeneralDateTimeStruct.wYear = date->Year;
         int len;
-        if ((len = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &GlobalGeneralDateTimeStruct,
-                                 NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
+        if ((len = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &GlobalGeneralDateTimeStruct,
+                                  NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
         {
-            len = 1 + sprintf(TransferBuffer, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
-                              GlobalGeneralDateTimeStruct.wMonth, GlobalGeneralDateTimeStruct.wYear);
+            len = 1 + swprintf(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
+                               GlobalGeneralDateTimeStruct.wMonth, GlobalGeneralDateTimeStruct.wYear);
         }
         *TransferLen = len - 1;
     }
@@ -54,11 +66,11 @@ void WINAPI GetTextFromGeneralTimeColumn()
         GlobalGeneralDateTimeStruct.wSecond = time->Second;
         GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
         int len;
-        if ((len = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &GlobalGeneralDateTimeStruct,
-                                 NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
+        if ((len = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &GlobalGeneralDateTimeStruct,
+                                  NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
         {
-            len = 1 + sprintf(TransferBuffer, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
-                              GlobalGeneralDateTimeStruct.wMinute, GlobalGeneralDateTimeStruct.wSecond);
+            len = 1 + swprintf(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
+                               GlobalGeneralDateTimeStruct.wMinute, GlobalGeneralDateTimeStruct.wSecond);
         }
         *TransferLen = len - 1;
     }
@@ -71,16 +83,20 @@ void WINAPI GetTextFromGeneralNumberColumn()
     __int64 int64Val = *(__int64*)(((char*)((*TransferFileData)->PluginData)) + (*TransferActCustomData));
     if (int64Val >= 0)
     {
-        SalamanderGeneral->NumberToStr(TransferBuffer, CQuadWord().SetUI64((unsigned __int64)int64Val));
-        *TransferLen = (int)strlen(TransferBuffer);
+        const std::wstring number = SPLNumberToStrOwned(
+            SalamanderGeneral, CQuadWord().SetUI64((unsigned __int64)int64Val));
+        *TransferLen = static_cast<int>((std::min<size_t>)(number.size(), TRANSFER_BUFFER_MAX));
+        wmemcpy(TransferBuffer, number.data(), static_cast<size_t>(*TransferLen));
     }
     else
     {
         if (int64Val != INT64_EMPTYNUMBER) // should not display ""
         {
-            TransferBuffer[0] = '-';
-            SalamanderGeneral->NumberToStr(TransferBuffer + 1, CQuadWord().SetUI64((unsigned __int64)(-int64Val)));
-            *TransferLen = (int)strlen(TransferBuffer);
+            std::wstring number(1, L'-');
+            number += SPLNumberToStrOwned(
+                SalamanderGeneral, CQuadWord().SetUI64((unsigned __int64)(-int64Val)));
+            *TransferLen = static_cast<int>((std::min<size_t>)(number.size(), TRANSFER_BUFFER_MAX));
+            wmemcpy(TransferBuffer, number.data(), static_cast<size_t>(*TransferLen));
         }
         else
             *TransferLen = 0;
@@ -88,7 +104,7 @@ void WINAPI GetTextFromGeneralNumberColumn()
 }
 
 void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
-                                               const char* archivePath, const CFileData* upperDir)
+                                               const wchar_t* archivePath, const CFileData* upperDir)
 {
     view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen,
                                TransferRowData, TransferPluginDataIface, TransferActCustomData);
@@ -102,8 +118,6 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
 
         view->SetViewMode(VIEW_MODE_DETAILED, VALID_DATA_NONE); // drop the other columns, keep only the Name column
 
-        char tmpName[COLUMN_NAME_MAX];
-        char tmpDescr[COLUMN_DESCRIPTION_MAX];
         int colCount = 1;
         int i;
         for (i = 0; i < Columns->Count; i++)
@@ -112,35 +126,28 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
 
             if (col->Visible) // show the column only when it is visible
             {
-                char bufName[STC_NAME_MAX_SIZE];
-                char* colName;
+                std::wstring colNameStorage;
                 if (col->NameID != -1)
-                {
-                    LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, col->NameID);
-                    colName = bufName;
-                }
+                    LoadStdColumnStrName(col->NameID, colNameStorage);
                 else
-                    colName = HandleNULLStr(col->NameStr);
+                    FtpDecodeLocalText(HandleNULLStr(col->NameStr), colNameStorage);
 
-                char bufDescr[STC_DESCR_MAX_SIZE];
-                char* colDescr;
+                std::wstring colDescrStorage;
                 if (col->DescrID != -1)
-                {
-                    LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, col->DescrID);
-                    colDescr = bufDescr;
-                }
+                    LoadStdColumnStrDescr(col->DescrID, colDescrStorage);
                 else
-                    colDescr = HandleNULLStr(col->DescrStr);
+                    FtpDecodeLocalText(HandleNULLStr(col->DescrStr), colDescrStorage);
+
+                // Server-type records remain explicitly encoded bytes; the panel header is UTF-16.
+                const wchar_t* colName = colNameStorage.c_str();
+                const wchar_t* colDescr = colDescrStorage.c_str();
 
                 switch (col->Type)
                 {
                 case stctName: // the Name column is already inserted (cannot be removed), just tweak the name+description
                 {
-                    lstrcpyn(tmpName, colName, COLUMN_NAME_MAX);
-                    SalamanderGeneral->AddStrToStr(tmpName, COLUMN_NAME_MAX, "a"); // dummy title of the "Ext" column (always needed because the "Name" column is currently the only one in the panel)
-                    lstrcpyn(tmpDescr, colDescr, COLUMN_DESCRIPTION_MAX);
-                    SalamanderGeneral->AddStrToStr(tmpDescr, COLUMN_DESCRIPTION_MAX, "a"); // dummy description of the "Ext" column (always needed because the "Name" column is currently the only one in the panel)
-                    view->SetColumnName(i, tmpName, tmpDescr);
+                    view->SetColumnName(i, colName, colDescr,
+                                        L"a", L"a"); // dummy title and description of the "Ext" column (always needed because the "Name" column is currently the only one in the panel)
 
                     CColumn* c = (CColumn*)(view->GetColumn(0));
 
@@ -157,11 +164,10 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
                     }
                     else // user prefers the name and extension in one column
                     {
-                        strcpy(tmpName, view->GetColumn(0)->Name);
-                        SalamanderGeneral->AddStrToStr(tmpName, COLUMN_NAME_MAX, colName);
-                        strcpy(tmpDescr, view->GetColumn(0)->Description);
-                        SalamanderGeneral->AddStrToStr(tmpDescr, COLUMN_DESCRIPTION_MAX, colDescr);
-                        view->SetColumnName(0, tmpName, tmpDescr);
+                        const CColumn* nameColumn = view->GetColumn(0);
+                        view->SetColumnName(0, nameColumn->Name,
+                                            nameColumn->Description,
+                                            colName, colDescr);
                     }
                     break;
                 }
@@ -204,8 +210,8 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
                 case stctGeneralNumber:
                 {
                     CColumn column;
-                    lstrcpyn(column.Name, colName, COLUMN_NAME_MAX);
-                    lstrcpyn(column.Description, colDescr, COLUMN_DESCRIPTION_MAX);
+                    lstrcpynW(column.Name, colName, COLUMN_NAME_MAX);
+                    lstrcpynW(column.Description, colDescr, COLUMN_DESCRIPTION_MAX);
                     switch (col->Type)
                     {
                     case stctGeneralText:
@@ -282,20 +288,47 @@ void CFTPListingPluginDataInterface::ColumnWidthWasChanged(BOOL leftPanel, const
     TRACE_E("CFTPListingPluginDataInterface::ColumnWidthWasChanged(): unexpected situation: column not found!");
 }
 
-void AddStrAux(char*& s, char* end, const char* text)
+static std::wstring FormatDateOwned(const SYSTEMTIME& value)
 {
-    while (s < end && *text != 0)
-        *s++ = *text++;
+    const int required = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                                        &value, NULL, NULL, 0);
+    if (required > 0)
+    {
+        std::vector<wchar_t> buffer(static_cast<size_t>(required), L'\0');
+        const int written = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
+                                           &value, NULL, buffer.data(), required);
+        if (written > 0)
+            return std::wstring(buffer.data(), static_cast<size_t>(written - 1));
+    }
+    return SPLFormatStringOwned(L"%u.%u.%u", value.wDay, value.wMonth,
+                                value.wYear);
+}
+
+static std::wstring FormatTimeOwned(const SYSTEMTIME& value)
+{
+    const int required = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value,
+                                        NULL, NULL, 0);
+    if (required > 0)
+    {
+        std::vector<wchar_t> buffer(static_cast<size_t>(required), L'\0');
+        const int written = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &value,
+                                           NULL, buffer.data(), required);
+        if (written > 0)
+            return std::wstring(buffer.data(), static_cast<size_t>(written - 1));
+    }
+    return SPLFormatStringOwned(L"%u:%02u:%02u", value.wHour, value.wMinute,
+                                value.wSecond);
 }
 
 BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileData* file, BOOL isDir,
                                                         int selectedFiles, int selectedDirs,
                                                         BOOL displaySize, const CQuadWord& selectedSize,
-                                                        char* buffer, DWORD* hotTexts, int& hotTextsCount)
+                                                        CSalamanderStringBuffer* buffer,
+                                                        CSalamanderTextRangeBuffer* hotTexts)
 {
-    char buf[1000];
-    char num1[50];
-    char num2[50];
+    if (buffer == NULL || hotTexts == NULL)
+        return FALSE;
+
     if (file == NULL)
     {
         if (selectedFiles == 0 && selectedDirs == 0)                                  // Information Line for an empty panel
@@ -322,28 +355,57 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
         if (BytesColumnOffset == -1) // size in blocks
         {
             params[1].Set(selectedFiles, 0);
-            SalamanderGeneral->NumberToStr(num1, params[0]);
-            SalamanderGeneral->NumberToStr(num2, params[1]);
-            SalamanderGeneral->ExpandPluralString(buf, 1000, LoadStr(IDS_PLSTR_BLOCKSINSELFILES), 2, params);
-            _snprintf_s(buffer, 1000, _TRUNCATE, buf, num1, num2);
+            const std::wstring num1Text = SPLNumberToStrOwned(SalamanderGeneral, params[0]);
+            const std::wstring num2Text = SPLNumberToStrOwned(SalamanderGeneral, params[1]);
+            const std::wstring format = SPLExpandPluralStringOwned(
+                SalamanderGeneral,
+                SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLSTR_BLOCKSINSELFILES).c_str(),
+                2, params);
+            std::wstring text = SPLFormatStringOwned(format.c_str(), num1Text.c_str(), num2Text.c_str());
+            std::vector<CSalamanderTextRange> ranges;
+            if (!SPLLookForSubTextsOwned(SalamanderGeneral, text, ranges))
+                return FALSE;
+            return sally::plugin_abi::WriteTextAndRanges(
+                       *buffer, *hotTexts, text, ranges)
+                       ? TRUE
+                       : FALSE;
         }
-        else // size in bytes
-            SalamanderGeneral->ExpandPluralBytesFilesDirs(buffer, 1000, params[0], selectedFiles, 0, TRUE);
-        return SalamanderGeneral->LookForSubTexts(buffer, hotTexts, &hotTextsCount);
+        std::wstring text = SPLExpandPluralBytesFilesDirsOwned(
+            SalamanderGeneral, params[0], selectedFiles, 0, TRUE);
+        std::vector<CSalamanderTextRange> ranges;
+        if (!SPLLookForSubTextsOwned(SalamanderGeneral, text, ranges))
+            return FALSE;
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, ranges)
+                   ? TRUE
+                   : FALSE;
     }
     else
     {
-        char* s = buffer;
-        char* end = buffer + 1000;
-        DWORD* hot = hotTexts;
-        DWORD* hotEnd = hotTexts + 100;
+        std::wstring text;
+        std::vector<CSalamanderTextRange> ranges;
         FILETIME ft;
         SYSTEMTIME st;
         BOOL stEmpty = TRUE;
         BOOL separate = FALSE;
-        char* beg;
-        int i;
-        for (i = 0; i < Columns->Count; i++)
+        const auto appendSeparator = [&]() {
+            if (separate)
+                text += L", ";
+            else
+                separate = TRUE;
+        };
+        const auto appendHotText = [&](const std::wstring& value) -> bool {
+            if (value.empty())
+                return true;
+            if (text.size() > (std::numeric_limits<DWORD>::max)() ||
+                value.size() > (std::numeric_limits<DWORD>::max)())
+                return false;
+            ranges.push_back({static_cast<DWORD>(text.size()),
+                              static_cast<DWORD>(value.size())});
+            text += value;
+            return true;
+        };
+        for (int i = 0; i < Columns->Count; i++)
         {
             switch (Columns->At(i)->Type)
             {
@@ -352,14 +414,13 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                 int fileNameFormat;
                 SalamanderGeneral->GetConfigParameter(SALCFG_FILENAMEFORMAT, &fileNameFormat,
                                                       sizeof(fileNameFormat), NULL);
-                CPathBuffer formatedFileName; // Heap-allocated for long path support
-                SalamanderGeneral->AlterFileName(formatedFileName, file->Name, fileNameFormat, 0, isDir);
-
-                beg = s;
-                AddStrAux(s, end, formatedFileName);
-                if (hot < hotEnd && beg < s)
-                    *hot++ = MAKELONG(beg - buffer, s - beg);
-                AddStrAux(s, end, ": ");
+                std::wstring formattedFileName;
+                SPLAlterFileNameOwned(SalamanderGeneral, file->Name,
+                                      fileNameFormat, 0, isDir,
+                                      formattedFileName);
+                if (!appendHotText(formattedFileName.c_str()))
+                    return FALSE;
+                text += L": ";
                 break;
             }
 
@@ -367,20 +428,16 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
 
             case stctSize:
             {
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
+                appendSeparator();
+                std::wstring value;
                 if (isDir)
-                    AddStrAux(s, end, LoadStr(IDS_SRVTYPE_SIZEISDIR));
+                    value = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SRVTYPE_SIZEISDIR).c_str();
                 else
                 {
-                    SalamanderGeneral->NumberToStr(num1, file->Size);
-                    AddStrAux(s, end, num1);
+                    value = SPLNumberToStrOwned(SalamanderGeneral, file->Size);
                 }
-                if (hot < hotEnd && beg < s)
-                    *hot++ = MAKELONG(beg - buffer, s - beg);
+                if (!appendHotText(value))
+                    return FALSE;
                 break;
             }
 
@@ -393,24 +450,10 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     FileTimeToSystemTime(&ft, &st);
                     stEmpty = FALSE;
                 }
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
-                if (Columns->At(i)->Type == stctDate)
-                {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 1000) == 0)
-                        sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                }
-                else
-                {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 1000) == 0)
-                        sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                }
-                AddStrAux(s, end, buf);
-                if (hot < hotEnd && beg < s)
-                    *hot++ = MAKELONG(beg - buffer, s - beg);
+                appendSeparator();
+                // NOTE: inherited behaviour - the Time column has always rendered the date here.
+                if (!appendHotText(FormatDateOwned(st)))
+                    return FALSE;
                 break;
             }
 
@@ -418,54 +461,36 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
 
             case stctGeneralText:
             {
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
+                appendSeparator();
                 char* txt = *(char**)(((char*)(file->PluginData)) + DataOffsets[i]);
                 if (txt != NULL)
                 {
-                    AddStrAux(s, end, txt);
-                    if (hot < hotEnd && beg < s)
-                        *hot++ = MAKELONG(beg - buffer, s - beg);
+                    std::wstring text;
+                    if (!DecodeTextForPresentation(std::string_view(txt, strlen(txt)), text) ||
+                        !appendHotText(text))
+                        return FALSE;
                 }
                 break;
             }
 
             case stctGeneralDate:
             {
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
+                appendSeparator();
                 CFTPDate* date = (CFTPDate*)(((char*)(file->PluginData)) + DataOffsets[i]);
                 if (date->Day != 0) // should not display ""
                 {
                     GlobalGeneralDateTimeStruct.wDay = date->Day;
                     GlobalGeneralDateTimeStruct.wMonth = date->Month;
                     GlobalGeneralDateTimeStruct.wYear = date->Year;
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &GlobalGeneralDateTimeStruct,
-                                      NULL, buf, 1000) == 0)
-                    {
-                        sprintf(buf, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
-                                GlobalGeneralDateTimeStruct.wMonth, GlobalGeneralDateTimeStruct.wYear);
-                    }
-                    AddStrAux(s, end, buf);
-                    if (hot < hotEnd && beg < s)
-                        *hot++ = MAKELONG(beg - buffer, s - beg);
+                    if (!appendHotText(FormatDateOwned(GlobalGeneralDateTimeStruct)))
+                        return FALSE;
                 }
                 break;
             }
 
             case stctGeneralTime:
             {
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
+                appendSeparator();
                 CFTPTime* time = (CFTPTime*)(((char*)(file->PluginData)) + DataOffsets[i]);
                 if (time->Hour != 24) // should not display ""
                 {
@@ -473,55 +498,40 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     GlobalGeneralDateTimeStruct.wMinute = time->Minute;
                     GlobalGeneralDateTimeStruct.wSecond = time->Second;
                     GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &GlobalGeneralDateTimeStruct,
-                                      NULL, buf, 1000) == 0)
-                    {
-                        sprintf(buf, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
-                                GlobalGeneralDateTimeStruct.wMinute, GlobalGeneralDateTimeStruct.wSecond);
-                    }
-                    AddStrAux(s, end, buf);
-                    if (hot < hotEnd && beg < s)
-                        *hot++ = MAKELONG(beg - buffer, s - beg);
+                    if (!appendHotText(FormatTimeOwned(GlobalGeneralDateTimeStruct)))
+                        return FALSE;
                 }
                 break;
             }
 
             case stctGeneralNumber:
             {
-                if (separate)
-                    AddStrAux(s, end, ", ");
-                else
-                    separate = TRUE;
-                beg = s;
+                appendSeparator();
                 __int64 int64Val = *(__int64*)(((char*)(file->PluginData)) + DataOffsets[i]);
+                std::wstring value;
                 if (int64Val >= 0)
                 {
-                    SalamanderGeneral->NumberToStr(buf, CQuadWord().SetUI64((unsigned __int64)int64Val));
-                    AddStrAux(s, end, buf);
-                    if (hot < hotEnd && beg < s)
-                        *hot++ = MAKELONG(beg - buffer, s - beg);
+                    value = SPLNumberToStrOwned(
+                        SalamanderGeneral, CQuadWord().SetUI64((unsigned __int64)int64Val));
                 }
-                else
+                else if (int64Val != INT64_EMPTYNUMBER) // should not display ""
                 {
-                    if (int64Val != INT64_EMPTYNUMBER) // should not display ""
-                    {
-                        buf[0] = '-';
-                        SalamanderGeneral->NumberToStr(buf + 1, CQuadWord().SetUI64((unsigned __int64)(-int64Val)));
-                        AddStrAux(s, end, buf);
-                        if (hot < hotEnd && beg < s)
-                            *hot++ = MAKELONG(beg - buffer, s - beg);
-                    }
+                    const std::wstring magnitude = SPLNumberToStrOwned(
+                        SalamanderGeneral, CQuadWord().SetUI64(
+                                              static_cast<unsigned __int64>(-(int64Val + 1)) + 1));
+                    value = L'-';
+                    value += magnitude;
                 }
+                if (!appendHotText(value))
+                    return FALSE;
                 break;
             }
             }
         }
-        hotTextsCount = (int)(hot - hotTexts);
-        if (s < end)
-            *s = 0;
-        else
-            *(s - 1) = 0;
-        return TRUE;
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, ranges)
+                   ? TRUE
+                   : FALSE;
     }
 }
 
@@ -607,11 +617,11 @@ CFTPQueueItem* CreateItemForDeleteOperation(const CFileData* f, BOOL isDir, int 
     return item;
 }
 
-BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
-                                int selectedFiles, int selectedDirs, BOOL& cancelOrError)
+BOOL CPluginFSInterface::Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
+                                int selectedFiles, int selectedDirs, BOOL& cancelOrError) try
 {
-    CALL_STACK_MESSAGE6("CPluginFSInterface::Delete(%s, %d, , %d, %d, %d, )",
-                        fsName, mode, panel, selectedFiles, selectedDirs);
+    CALL_STACK_MESSAGE5("CPluginFSInterface::Delete(, %d, , %d, %d, %d, )",
+                        mode, panel, selectedFiles, selectedDirs);
 
     if (ControlConnection == NULL)
     {
@@ -624,19 +634,21 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
     CFTPListingPluginDataInterface* dataIface = (CFTPListingPluginDataInterface*)SalamanderGeneral->GetPanelPluginData(panel);
     if (dataIface != NULL && (void*)dataIface == (void*)&SimpleListPluginDataInterface)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_NEEDPARSEDLISTING),
-                                         LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONINFORMATION);
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_NEEDPARSEDLISTING).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
         cancelOrError = TRUE; // cancel the operation
         return TRUE;
     }
 
     // prepare the text describing what we are working with ("file "test.txt"", etc.)
-    CPathBuffer subjectSrc;
-    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, subjectSrc.Size(), panel,
-                                                  selectedFiles, selectedDirs, NULL, FALSE, FALSE);
-    CPathBuffer dlgSubjectSrc;
-    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, dlgSubjectSrc.Size(), panel,
-                                                  selectedFiles, selectedDirs, NULL, FALSE, TRUE);
+    std::wstring subjectSrcW;
+    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles,
+                                       selectedDirs, NULL, FALSE, FALSE,
+                                       subjectSrcW);
+    std::wstring dlgSubjectSrcW;
+    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles,
+                                       selectedDirs, NULL, FALSE, TRUE,
+                                       dlgSubjectSrcW);
     cancelOrError = FALSE;
     if (mode == 1)
     {
@@ -646,13 +658,13 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
         if (CnfrmFileDirDel)
         {
             // build the delete prompt
-            CPathBuffer subject;
-            sprintf(subject, LoadStr(IDS_DELETEFROMFTP), subjectSrc.Get());
+            const std::wstring subject = SPLFormatStringOwned(
+                SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_DELETEFROMFTP).c_str(),
+                subjectSrcW.c_str());
 
             // open a message box asking about the delete
-            const char* Shell32DLLName = "shell32.dll";
             HINSTANCE Shell32DLL;
-            Shell32DLL = HANDLES(LoadLibraryEx(Shell32DLLName, NULL, LOAD_LIBRARY_AS_DATAFILE));
+            Shell32DLL = HANDLES(LoadLibraryExW(L"shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
             HICON hIcon = NULL;
             if (Shell32DLL != NULL)
             {
@@ -660,7 +672,7 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
                                                  IMAGE_ICON, 32, 32, SalamanderGeneral->GetIconLRFlags()));
                 HANDLES(FreeLibrary(Shell32DLL));
             }
-            INT_PTR res = CConfirmDeleteDlg(parent, subject, hIcon).Execute();
+            INT_PTR res = CConfirmDeleteDlg(parent, subject.c_str(), hIcon).Execute();
             UpdateWindow(SalamanderGeneral->GetMainWindowHWND()); // so the user does not have to watch the rest of the dialog for the whole operation
             if (hIcon != NULL)
                 HANDLES(DestroyIcon(hIcon));
@@ -693,22 +705,32 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
         oper->SetCompressData(ControlConnection->GetCompressData());
         if (ControlConnection->InitOperation(oper)) // initialize the server connection according to the "control connection"
         {
-            oper->SetBasicData(dlgSubjectSrc, (AutodetectSrvType ? NULL : LastServerType));
-            CPathBuffer path;
-            sprintf(path, "%s:", fsName);
-            int pathLen = (int)strlen(path);
-            MakeUserPart(path + pathLen, path.Size() - pathLen);
-            CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path);
-            oper->SetOperationDelete(path, FTPGetPathDelimiter(pathType), TRUE, selectedDirs > 0,
-                                     Config.OperationsNonemptyDirDel, Config.OperationsHiddenFileDel,
-                                     Config.OperationsHiddenDirDel);
+            if (!oper->SetBasicData(dlgSubjectSrcW.c_str(), (AutodetectSrvType ? NULL : LastServerType.c_str())))
+            {
+                delete oper;
+                return TRUE;
+            }
+            std::wstring pathText;
+            if (!BuildFullPathText(fsName, Path.c_str(), pathText))
+            {
+                delete oper;
+                return TRUE;
+            }
+            CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path.c_str());
+            if (!oper->SetOperationDelete(Path.c_str(), pathText.c_str(), FTPGetPathDelimiter(pathType), TRUE, selectedDirs > 0,
+                                          Config.OperationsNonemptyDirDel, Config.OperationsHiddenFileDel,
+                                          Config.OperationsHiddenDirDel))
+            {
+                delete oper;
+                return TRUE;
+            }
             int operUID;
             if (FTPOperationsList.AddOperation(oper, &operUID))
             {
                 BOOL ok = TRUE;
 
                 // build the queue of operation items
-                CFTPQueue* queue = new CFTPQueue;
+                CFTPQueue* queue = new CFTPQueue(ControlConnection->GetTextCodec());
                 if (queue != NULL)
                 {
                     if (dataIface != NULL && (void*)dataIface == (void*)&SimpleListPluginDataInterface)
@@ -742,8 +764,12 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
                                                                                &state, &problemID, &skippedItems, &uiNeededItems);
                             if (item != NULL)
                             {
+                                std::string itemNameBytes;
+                                if (ok && (dataIface == NULL ||
+                                           !dataIface->GetWireName(*f, ControlConnection->GetTextCodec(), itemNameBytes)))
+                                    ok = FALSE;
                                 if (ok)
-                                    item->SetItem(-1, type, state, problemID, Path, f->Name);
+                                    item->SetItem(-1, type, state, problemID, Path.c_str(), itemNameBytes.c_str());
                                 if (!ok || !queue->AddItem(item)) // add the operation to the queue
                                 {
                                     ok = FALSE;
@@ -801,28 +827,32 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
         TRACE_E(LOW_MEMORY);
     return TRUE;
 }
+catch (...)
+{
+    cancelOrError = TRUE;
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return TRUE;
+}
 
 CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, int rightsCol,
                                                 CFTPListingPluginDataInterface* dataIface,
                                                 CFTPQueueItemType* type, int transferMode,
-                                                CFTPOperation* oper, BOOL copy, const char* targetPath,
-                                                const char* targetName, CQuadWord* size,
+                                                CFTPOperation* oper, BOOL copy, const wchar_t* localTargetPath,
+                                                const wchar_t* localTargetName, CQuadWord* size,
                                                 BOOL* sizeInBytes, CQuadWord* totalSize)
 {
     CFTPQueueItem* item = NULL;
     *type = fqitNone;
 
-    char *name, *ext;               // helper variables for auto-detect transfer mode
+    const wchar_t *name, *ext;      // helper variables for auto-detect transfer mode
     BOOL asciiTransferMode = FALSE; // helper variable for auto-detect transfer mode
-    CPathBuffer buffer;             // Heap-allocated for long path support
+    std::wstring basicNameStorage;
     BOOL isLink = rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol));
     if (isLink || !isDir) // when 'asciiTransferMode' is used, calculate it
     {
         if (transferMode == trmAutodetect)
         {
-            if (dataIface != NULL) // on VMS we must trim the name to the base (the version number gets in the way when matching masks)
-                dataIface->GetBasicName(*f, &name, &ext, buffer);
-            else
+            if (dataIface == NULL || !dataIface->GetBasicName(*f, &name, &ext, basicNameStorage))
             {
                 name = f->Name;
                 ext = f->Ext;
@@ -850,7 +880,7 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
         item = new CFTPQueueItemCopyOrMove;
         if (item != NULL)
         {
-            ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(targetPath, targetName, CQuadWord(-1, -1) /* unknown size */, asciiTransferMode, TRUE, TGTFILESTATE_UNKNOWN, dateAndTimeValid, date, time);
+            ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(localTargetPath, localTargetName, CQuadWord(-1, -1) /* unknown size */, asciiTransferMode, TRUE, TGTFILESTATE_UNKNOWN, dateAndTimeValid, date, time);
         }
     }
     else
@@ -861,7 +891,7 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
             item = new CFTPQueueItemCopyMoveExplore;
             if (item != NULL)
             {
-                ((CFTPQueueItemCopyMoveExplore*)item)->SetItemCopyMoveExplore(targetPath, targetName, TGTDIRSTATE_UNKNOWN);
+                ((CFTPQueueItemCopyMoveExplore*)item)->SetItemCopyMoveExplore(localTargetPath, localTargetName, TGTDIRSTATE_UNKNOWN);
             }
         }
         else // file
@@ -886,20 +916,47 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
 
             if (item != NULL)
             {
-                ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(targetPath, targetName, *size, asciiTransferMode, *sizeInBytes, TGTFILESTATE_UNKNOWN, dateAndTimeValid, date, time);
+                ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(localTargetPath, localTargetName, *size, asciiTransferMode, *sizeInBytes, TGTFILESTATE_UNKNOWN, dateAndTimeValid, date, time);
             }
         }
     }
     return item;
 }
 
-BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                           int panel, int selectedFiles, int selectedDirs,
-                                          char* targetPath, BOOL& operationMask,
-                                          BOOL& cancelOrHandlePath, HWND dropTarget)
+                                          CSalamanderStringBuffer* targetPath, BOOL& operationMask,
+                                          BOOL& cancelOrHandlePath, HWND dropTarget) try
 {
-    CALL_STACK_MESSAGE7("CPluginFSInterface::CopyOrMoveFromFS(%d, %d, %s, , %d, %d, %d, , , ,)",
-                        copy, mode, fsName, panel, selectedFiles, selectedDirs);
+    std::wstring payload;
+    if (targetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*targetPath, payload))
+        return FALSE;
+    const size_t separator = payload.find(L'\0');
+    std::wstring path(payload.data(), separator);
+    std::wstring mask;
+    if (separator != std::wstring::npos)
+        mask.assign(payload.data() + separator + 1, payload.size() - separator - 1);
+    const BOOL result = CopyOrMoveFromFSOwned(
+        copy, mode, fsName, parent, panel, selectedFiles, selectedDirs,
+        path, mask, operationMask, cancelOrHandlePath, dropTarget);
+    return sally::plugin_abi::WriteStringBuffer(*targetPath, path) ? result : FALSE;
+}
+catch (...)
+{
+    cancelOrHandlePath = TRUE;
+    SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return FALSE;
+}
+
+BOOL CPluginFSInterface::CopyOrMoveFromFSOwned(
+    BOOL copy, int mode, const wchar_t* fsName, HWND parent, int panel,
+    int selectedFiles, int selectedDirs, std::wstring& targetPath,
+    const std::wstring& suppliedMask, BOOL& operationMask,
+    BOOL& cancelOrHandlePath, HWND dropTarget)
+{
+    CALL_STACK_MESSAGE6("CPluginFSInterface::CopyOrMoveFromFS(%d, %d, , , %d, %d, %d, , , ,)",
+                        copy, mode, panel, selectedFiles, selectedDirs);
 
     if (ControlConnection == NULL)
     {
@@ -912,34 +969,37 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
     CFTPListingPluginDataInterface* dataIface = (CFTPListingPluginDataInterface*)SalamanderGeneral->GetPanelPluginData(panel);
     if (dataIface != NULL && (void*)dataIface == (void*)&SimpleListPluginDataInterface)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_NEEDPARSEDLISTING),
-                                         LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONINFORMATION);
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_NEEDPARSEDLISTING).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
         cancelOrHandlePath = TRUE; // cancel the operation
         return TRUE;
     }
 
     // compose the edit line title with the copy/move destination
-    CPathBuffer subjectSrc;
-    SalamanderGeneral->GetCommonFSOperSourceDescr(subjectSrc, subjectSrc.Size(), panel,
-                                                  selectedFiles, selectedDirs, NULL, FALSE, FALSE);
-    CPathBuffer dlgSubjectSrc;
-    SalamanderGeneral->GetCommonFSOperSourceDescr(dlgSubjectSrc, dlgSubjectSrc.Size(), panel,
-                                                  selectedFiles, selectedDirs, NULL, FALSE, TRUE);
-    CPathBuffer subject;
-    sprintf(subject, LoadStr(copy ? IDS_COPYFROMFTP : IDS_MOVEFROMFTP), subjectSrc.Get());
+    std::wstring subjectSrcW;
+    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles,
+                                       selectedDirs, NULL, FALSE, FALSE,
+                                       subjectSrcW);
+    std::wstring dlgSubjectSrcW;
+    SPLGetCommonFSOperSourceDescrOwned(SalamanderGeneral, panel, selectedFiles,
+                                       selectedDirs, NULL, FALSE, TRUE,
+                                       dlgSubjectSrcW);
+    std::wstring subject = SPLFormatStringOwned(
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, copy ? IDS_COPYFROMFTP : IDS_MOVEFROMFTP).c_str(),
+        subjectSrcW.c_str());
 
-    if (mode == 1 && targetPath[0] != 0) // only when opening the dialog for the first time and the target path is selected
+    if (mode == 1 && !targetPath.empty()) // only when opening the dialog for the first time and the target path is selected
     {
-        SalamanderGeneral->SalPathAppend(targetPath, "*.*", 2 * MAX_PATH);
+        SPLSalPathAppendOwned(targetPath, L"*.*");
         SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_TARGET); // default action = work with the path in the target panel
     }
     if (mode != 3 && mode != 5)
     {
-        char** history;
+        wchar_t** history;
         int historyCount;
         SalamanderGeneral->GetStdHistoryValues(SALHIST_COPYMOVETGT, &history, &historyCount);
-        CCopyMoveDlg dlg(parent, targetPath, 2 * MAX_PATH, LoadStr(copy ? IDS_COPYTITLE : IDS_MOVETITLE),
-                         subject, history, historyCount, copy ? IDD_COPYMOVEDLG : IDH_MOVEDLG);
+        CCopyMoveDlg dlg(parent, targetPath, LangStr(copy ? IDS_COPYTITLE : IDS_MOVETITLE).c_str(),
+                         subject.c_str(), history, historyCount, copy ? IDD_COPYMOVEDLG : IDH_MOVEDLG);
         INT_PTR res = dlg.Execute();
         UpdateWindow(SalamanderGeneral->GetMainWindowHWND()); // so the user does not have to watch the rest of the dialog for the whole operation
         if (res == IDOK)
@@ -956,35 +1016,39 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
     }
     else
     {
-        const char* opMask = NULL; // operation mask
+        const wchar_t* opMask = NULL; // operation mask
         if (mode == 5)             // the operation target was provided via drag&drop
         {
             // if it is a disk path, just set the operation mask and continue (same as with 'mode'==3);
             // if it is a path to an archive or another FS, report a "not supported" error
 
             BOOL ok = FALSE;
-            opMask = "*.*";
+            opMask = L"*.*";
             int type;
-            char* secondPart;
+            size_t secondPartOffset = std::wstring::npos;
             BOOL isDir;
-            if (targetPath[0] != 0 && targetPath[1] == ':' ||   // disk path (C:\path)
-                targetPath[0] == '\\' && targetPath[1] == '\\') // UNC path (\\server\share\path)
+            if (targetPath.size() >= 2 &&
+                (targetPath[1] == L':' ||
+                 targetPath[0] == L'\\' && targetPath[1] == L'\\'))
             {                                                   // add a trailing backslash so it is a path in every case ('mode'==5 always provides a path)
-                SalamanderGeneral->SalPathAddBackslash(targetPath, MAX_PATH);
+                SPLSalPathAddBackslashOwned(targetPath);
             }
-            lstrcpyn(subject, LoadStr(IDS_FTPERRORTITLE), subject.Size());
-            if (SalamanderGeneral->SalParsePath(parent, targetPath, type, isDir, secondPart,
-                                                subject, NULL, FALSE,
-                                                NULL, NULL, NULL, 2 * MAX_PATH))
+            subject = SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str();
+            std::wstring parsedTarget(targetPath);
+            if (SPLSalParsePathOwned(SalamanderGeneral, parent, parsedTarget, type,
+                                     isDir, secondPartOffset, subject.c_str(), FALSE,
+                                     NULL, NULL))
             {
+                targetPath = parsedTarget;
+                const wchar_t* secondPart = targetPath.c_str() + secondPartOffset;
                 switch (type)
                 {
                 case PATH_TYPE_WINDOWS:
                 {
                     if (*secondPart != 0) // this should probably never happen
                     {
-                        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_DRAGDROP_TGTNOTEXIST),
-                                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_DRAGDROP_TGTNOTEXIST).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
                     }
                     else
                         ok = TRUE;
@@ -993,8 +1057,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
 
                 default: // archive or FS, just report "not supported"
                 {
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_DRAGDROP_TGTARCORFS),
-                                                     LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_DRAGDROP_TGTARCORFS).c_str(),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
                     break;
                 }
                 }
@@ -1017,12 +1081,10 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
         // find the operation mask (the target path is in 'targetPath')
         if (opMask == NULL)
         {
-            opMask = targetPath;
-            while (*opMask != 0)
-                opMask++;
-            opMask++;
+            opMask = suppliedMask.c_str();
         }
 
+        const std::wstring asciiFileMasksW = SPLGetMasksStringOwned(Config.ASCIIFileMasks);
         BOOL success = FALSE; // pre-set the cancel/error state of the operation
         // create the operation object
         CFTPOperation* oper = new CFTPOperation;
@@ -1037,19 +1099,23 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
             oper->SetCompressData(ControlConnection->GetCompressData());
             if (ControlConnection->InitOperation(oper)) // initialize the server connection according to the "control connection"
             {
-                oper->SetBasicData(dlgSubjectSrc, (AutodetectSrvType ? NULL : LastServerType));
-                CPathBuffer path;
-                sprintf(path, "%s:", fsName);
-                int pathLen = (int)strlen(path);
-                MakeUserPart(path + pathLen, path.Size() - pathLen);
-                char asciiFileMasks[MAX_GROUPMASK];
-                Config.ASCIIFileMasks->GetMasksString(asciiFileMasks);
-                CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path);
+                if (!oper->SetBasicData(dlgSubjectSrcW.c_str(), (AutodetectSrvType ? NULL : LastServerType.c_str())))
+                {
+                    delete oper;
+                    return TRUE;
+                }
+                std::wstring sourcePathText;
+                if (!BuildFullPathText(fsName, Path.c_str(), sourcePathText))
+                {
+                    delete oper;
+                    return TRUE;
+                }
+                CFTPServerPathType pathType = ControlConnection->GetFTPServerPathType(Path.c_str());
                 BOOL is_AS_400_QSYS_LIB_Path = pathType == ftpsptAS400 &&
-                                               FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", Path);
-                if (oper->SetOperationCopyMoveDownload(copy, path, FTPGetPathDelimiter(pathType),
+                                               FTPIsPrefixOfServerPath(ftpsptAS400, "/QSYS.LIB", Path.c_str());
+                if (oper->SetOperationCopyMoveDownload(copy, Path.c_str(), sourcePathText.c_str(), FTPGetPathDelimiter(pathType),
                                                        !copy, copy ? FALSE : (selectedDirs > 0),
-                                                       targetPath, '\\', TRUE, selectedDirs > 0, asciiFileMasks,
+                                                       targetPath.c_str(), '\\', TRUE, selectedDirs > 0, asciiFileMasksW.c_str(),
                                                        TransferMode == trmAutodetect, TransferMode == trmASCII,
                                                        Config.OperationsCannotCreateFile,
                                                        Config.OperationsCannotCreateDir,
@@ -1065,7 +1131,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                         BOOL ok = TRUE;
 
                         // build the queue of operation items
-                        CFTPQueue* queue = new CFTPQueue;
+                        CFTPQueue* queue = new CFTPQueue(ControlConnection->GetTextCodec());
                         if (queue != NULL)
                         {
                             if (dataIface != NULL && (void*)dataIface == (void*)&SimpleListPluginDataInterface)
@@ -1079,7 +1145,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                             const CFileData* f = NULL; // pointer to the file/directory/link in the panel to process
                             BOOL isDir = FALSE;        // TRUE if 'f' is a directory
                             BOOL focused = (selectedFiles == 0 && selectedDirs == 0);
-                            BOOL donotUseOpMask = strcmp(opMask, "*.*") == 0 || strcmp(opMask, "*") == 0;
+                            BOOL donotUseOpMask = wcscmp(opMask, L"*.*") == 0 || wcscmp(opMask, L"*") == 0;
                             int index = 0;
                             while (1)
                             {
@@ -1093,35 +1159,41 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                                 if (f != NULL)
                                 {
                                     // create the target name according to the operation mask
-                                    CPathBuffer targetName;
+                                    std::wstring targetNameW;
                                     if (!is_AS_400_QSYS_LIB_Path)
                                     {
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, f->Name, targetName.Size()); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            targetNameW = f->Name; // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
-                                            SalamanderGeneral->MaskName(targetName, targetName.Size(), f->Name, opMask);
+                                            targetNameW = SPLMaskNameOwned(SalamanderGeneral, f->Name, opMask);
                                     }
                                     else
                                     {
-                                        CPathBuffer mbrName; // Heap-allocated for long path support
-                                        FTPAS400CutFileNamePart(mbrName, f->Name);
+                                        const std::wstring mbrNameW = FTPAS400CutFileNamePartW(f->Name);
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, mbrName, targetName.Size()); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            targetNameW = mbrNameW; // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
-                                            SalamanderGeneral->MaskName(targetName, targetName.Size(), mbrName, opMask);
+                                            targetNameW = SPLMaskNameOwned(SalamanderGeneral, mbrNameW.c_str(), opMask);
                                     }
 
+                                    std::string itemNameBytes;
+                                    if (dataIface == NULL ||
+                                        !dataIface->GetWireName(*f, ControlConnection->GetTextCodec(), itemNameBytes))
+                                    {
+                                        ok = FALSE;
+                                        break;
+                                    }
                                     CFTPQueueItemType type;
                                     CFTPQueueItem* item = CreateItemForCopyOrMoveOperation(f, isDir, rightsCol,
                                                                                            dataIface, &type,
                                                                                            TransferMode, oper,
-                                                                                           copy, targetPath,
-                                                                                           targetName, &size,
+                                                                                           copy, targetPath.c_str(),
+                                                                                           targetNameW.c_str(), &size,
                                                                                            &sizeInBytes, &totalSize);
                                     if (item != NULL)
                                     {
                                         if (ok)
-                                            item->SetItem(-1, type, sqisWaiting, ITEMPR_OK, Path, f->Name);
+                                            item->SetItem(-1, type, sqisWaiting, ITEMPR_OK, Path.c_str(), itemNameBytes.c_str());
                                         if (!ok || !queue->AddItem(item)) // add the operation to the queue
                                         {
                                             ok = FALSE;
@@ -1185,7 +1257,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
         if (success)
         {
             cancelOrHandlePath = FALSE; // operation succeeded
-            targetPath[0] = 0;          // no name should receive focus (that would have to be a copy within the FTP server, which we do not support yet)
+            targetPath.clear();         // no name should receive focus (that would have to be a copy within the FTP server, which we do not support yet)
         }
         else
             cancelOrHandlePath = TRUE; // cancel the operation

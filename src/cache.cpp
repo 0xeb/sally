@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -10,6 +10,7 @@
 #include "dialogs.h"
 #include "common/IFileSystem.h"
 #include "ui/IPrompter.h"
+#include "common/fsutil.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
 #include "common/IEnvironment.h"
@@ -29,11 +30,11 @@ BOOL InitializeDiskCache()
 // CCacheData
 //
 
-CCacheData::CCacheData(const char* name, const char* tmpName, BOOL ownDelete,
+CCacheData::CCacheData(const wchar_t* name, const wchar_t* tmpName, BOOL ownDelete,
                        CPluginInterfaceAbstract* ownDeletePlugin) : LockObject(1, 2), LockObjOwner(1, 2)
 {
-    Name = name ? name : "";
-    TmpName = tmpName ? tmpName : "";
+    Name = name ? name : L"";
+    TmpName = tmpName ? tmpName : L"";
     Preparing = HANDLES(CreateMutex(NULL, TRUE, NULL));
     if (Preparing == NULL || Name.empty() || TmpName.empty())
     {
@@ -75,10 +76,10 @@ CCacheData::~CCacheData()
     else
     {
         if (!TmpName.empty())
-            TRACE_I("Tmp-file " << TmpName.c_str() << " stays on disk. It is still opened (in use).");
+            TRACE_IW(L"Tmp-file " << TmpName.c_str() << L" stays on disk. It is still opened (in use).");
     }
     if (NewCount != 0)
-        TRACE_E("Preliminary destruction of tmp-file " << TmpName.c_str());
+        TRACE_EW(L"Preliminary destruction of tmp-file " << TmpName.c_str());
     if (Preparing != NULL)
     {
         ReleaseMutex(Preparing); // just in case
@@ -99,25 +100,24 @@ BOOL CCacheData::CleanFromDisk()
     {
         if (!OwnDelete)
         {
-            std::wstring tmpNameW = AnsiToWide(TmpName.c_str());
-            DWORD attrs = GetFileAttributesW(tmpNameW.c_str());
+            DWORD attrs = gFileSystem->GetFileAttributes(TmpName.c_str());
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
             }
             if (attrs & FILE_ATTRIBUTE_DIRECTORY) // directory
             {
-                RemoveTemporaryDir(TmpName.c_str());
+                RemoveTemporaryDirW(TmpName.c_str());
             }
             else // file
             {
                 if (attrs & FILE_ATTRIBUTE_READONLY)
                 {
-                    SetFileAttributesW(tmpNameW.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+                    gFileSystem->SetFileAttributes(TmpName.c_str(), FILE_ATTRIBUTE_ARCHIVE);
                 }
-                gFileSystem->DeleteFile(tmpNameW.c_str());
+                gFileSystem->DeleteFile(TmpName.c_str());
             }
-            attrs = GetFileAttributesW(tmpNameW.c_str()); // check if the deletion was successful
+            attrs = gFileSystem->GetFileAttributes(TmpName.c_str()); // check if the deletion was successful
             if (attrs == 0xFFFFFFFF)
             {
                 return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -137,7 +137,7 @@ BOOL CCacheData::CleanFromDisk()
     return FALSE;
 }
 
-const char*
+const wchar_t*
 CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyAdd, int* errorCode)
 {
     CALL_STACK_MESSAGE3("CCacheData::GetName(, , %d, %d,)", canBlock, onlyAdd);
@@ -169,15 +169,15 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
     {
         if (Prepared) // tmp-file is ready
         {
-            DWORD attrs = GetFileAttributesW(AnsiToWide(TmpName.c_str()).c_str());
+            DWORD attrs = gFileSystem->GetFileAttributes(TmpName.c_str());
             if (attrs == 0xFFFFFFFF || OutOfDate)
             {
                 if (OutOfDate && attrs != 0xFFFFFFFF)
-                    TRACE_I("Updating tmp-file " << TmpName.c_str() << ", it was out-of-date.");
+                    TRACE_IW(L"Updating tmp-file " << TmpName.c_str() << L", it was out-of-date.");
                 else
-                    TRACE_I("Somebody has removed our tmp-file " << TmpName.c_str() << ", we must ask client to create it again.");
+                    TRACE_IW(L"Somebody has removed our tmp-file " << TmpName.c_str() << L", we must ask client to create it again.");
                 /*
-        char dir[MAX_PATH];
+        wchar_t dir[MAX_PATH];
         char *s = strrchr(TmpName, '\\');
         memcpy(dir, TmpName, s - TmpName);
         dir[s - TmpName] = 0;
@@ -323,16 +323,12 @@ void CCacheData::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 // CCacheDirData
 //
 
-CCacheDirData::CCacheDirData(const char* path) : Names(100, 50)
+CCacheDirData::CCacheDirData(const wchar_t* path) : Names(100, 50)
 {
-    int l = (int)strlen(path);
-    if (l > 0 && path[l - 1] == '\\')
-        l--;
-    memcpy(Path, path, l);
-    if (l > 0)
-        Path[l++] = '\\';
-    Path[l] = 0;
-    PathLength = l;
+    Path = path != NULL ? path : L"";
+    SalPathRemoveBackslashW(Path);
+    if (!Path.empty())
+        Path.push_back(L'\\');
 }
 
 CCacheDirData::~CCacheDirData()
@@ -343,59 +339,57 @@ CCacheDirData::~CCacheDirData()
         CCacheData* name = Names[i];
         delete name;
     }
-    if (PathLength > 0)
-        Path[PathLength - 1] = 0; // trimming a backslash
-    SetFileAttributes(Path, FILE_ATTRIBUTE_ARCHIVE);
-    RemoveDirectory(Path);
+    std::wstring directory = Path;
+    SalPathRemoveBackslashW(directory);
+    gFileSystem->SetFileAttributes(directory.c_str(), FILE_ATTRIBUTE_ARCHIVE);
+    gFileSystem->RemoveDirectory(directory.c_str());
 }
 
-BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
+BOOL CCacheDirData::ContainTmpName(const wchar_t* tmpName, const wchar_t* rootTmpPath,
                                    int rootTmpPathLen, BOOL* canContainThisName)
 {
-    CALL_STACK_MESSAGE2("CCacheDirData::ContainTmpName(%s, , ,)", tmpName);
+    CALL_STACK_MESSAGE2("CCacheDirData::ContainTmpName(%ls, , ,)", tmpName);
 
     *canContainThisName = FALSE;
-    if (rootTmpPathLen < PathLength &&
-        StrNICmp(Path, rootTmpPath, rootTmpPathLen) == 0)
+    if (rootTmpPathLen < static_cast<int>(Path.length()) &&
+        StrNICmpW(Path.c_str(), rootTmpPath, rootTmpPathLen) == 0)
     {
-        const char* s = Path + rootTmpPathLen;
-        if (*s == '\\')
+        const wchar_t* s = Path.c_str() + rootTmpPathLen;
+        if (*s == L'\\')
             s++;
-        while (*s != 0 && *s != '\\')
+        while (*s != 0 && *s != L'\\')
             s++;
         if (*s == 0 || *(s + 1) == 0) // // after the root-tmp-path, there's only one subdirectory name (possibly with '\\' at the end)
         {
             *canContainThisName = TRUE; // tmp-root matches, tmp-file can be placed here
 
-            CPathBuffer tmpFullName; // Heap-allocated for long path support
-            memcpy(tmpFullName.Get(), Path, PathLength);
-            if (PathLength + strlen(tmpName) + 1 <= tmpFullName.Size())
+            const std::wstring tmpFullName = Path + tmpName;
+            if (!tmpFullName.empty())
             {
-                strcpy(tmpFullName + PathLength, tmpName);
                 int i;
                 for (i = 0; i < Names.Count; i++)
                 {
-                    if (Names[i]->TmpNameEqual(tmpFullName))
+                    if (Names[i]->TmpNameEqual(tmpFullName.c_str()))
                         return TRUE;
                 }
 
                 WIN32_FIND_DATAW data;
-                HANDLE find = SalFindFirstFileHW(tmpFullName, &data);
+                HANDLE find = SalFindFirstFileHW(tmpFullName.c_str(), &data);
                 if (find != INVALID_HANDLE_VALUE)
                 {
-                    HANDLES(FindClose(find));
-                    char cFileNameA[MAX_PATH];
-                    WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                    if (StrICmp(tmpName, cFileNameA) == 0)
+                    SalLPFindClose(find);
+                    // wide: compare against the genuine wide name/dos-alias directly
+                    // instead of narrowing them first - narrowing via WC_NO_BEST_FIT_CHARS still
+                    // collapses distinct unmappable characters onto the same '?', so two different
+                    // on-disk names could falsely compare equal here.
+                    if (StrICmpW(tmpName, data.cFileName) == 0)
                     {
                         TRACE_E("CCacheDirData::ContainTmpName(): unexpected situation: tmp-directory contains unknown file!");
                         *canContainThisName = FALSE; // the file can't be placed here, a foreign file would be opened
                     }
                     else
                     {
-                        char cAltNameA[14];
-                        WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                        if (cAltNameA[0] != 0 && StrICmp(tmpName, cAltNameA) == 0)
+                        if (data.cAlternateFileName[0] != 0 && StrICmpW(tmpName, data.cAlternateFileName) == 0)
                         {
                             TRACE_I("CCacheDirData::ContainTmpName(): tmp-directory contains file whose dos-name conflicts with new tmp-file - different tmp-directory has to be choosen!");
                             *canContainThisName = FALSE; // the file can't be placed here, an existing file with the same dos-name would be opened
@@ -408,7 +402,7 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
     return FALSE;
 }
 
-BOOL CCacheDirData::GetNameIndex(const char* name, int& index)
+BOOL CCacheDirData::GetNameIndex(const wchar_t* name, int& index)
 {
     if (Names.Count == 0)
     {
@@ -420,7 +414,7 @@ BOOL CCacheDirData::GetNameIndex(const char* name, int& index)
     while (1)
     {
         m = (l + r) / 2;
-        int res = strcmp(name, Names[m]->GetName());
+        int res = wcscmp(name, Names[m]->GetName());
         if (res == 0) // found
         {
             index = m;
@@ -470,19 +464,17 @@ void CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()
 {
     CALL_STACK_MESSAGE1("CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()");
 
-    if (PathLength > 0)
-        Path[PathLength - 1] = 0; // backslash trimming
-    SetFileAttributes(Path, FILE_ATTRIBUTE_ARCHIVE);
+    std::wstring directory = Path;
+    SalPathRemoveBackslashW(directory);
+    gFileSystem->SetFileAttributes(directory.c_str(), FILE_ATTRIBUTE_ARCHIVE);
     // the system deletes our tmp-directory only if it's empty (in case of further need for a tmp-directory, we will create it in CCacheDirData::GetName())
-    RemoveDirectory(Path);
-    if (PathLength > 0)
-        Path[PathLength - 1] = '\\'; // restoring backslash
+    gFileSystem->RemoveDirectory(directory.c_str());
 }
 
-BOOL CCacheDirData::GetName(CDiskCache* monitor, const char* name, BOOL* exists, const char** tmpPath,
+BOOL CCacheDirData::GetName(CDiskCache* monitor, const wchar_t* name, BOOL* exists, const wchar_t** tmpPath,
                             BOOL canBlock, BOOL onlyAdd, int* errorCode)
 {
-    CALL_STACK_MESSAGE4("CCacheDirData::GetName(, %s, , , %d, %d,)", name, canBlock, onlyAdd);
+    CALL_STACK_MESSAGE4("CCacheDirData::GetName(, %ls, , , %d, %d,)", name, canBlock, onlyAdd);
     int i;
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
@@ -491,69 +483,56 @@ BOOL CCacheDirData::GetName(CDiskCache* monitor, const char* name, BOOL* exists,
         *tmpPath = Names[i]->GetName(monitor, exists, canBlock, onlyAdd, errorCode);
         if (*tmpPath != NULL) // not a fatal error nor an unprepared tmp-file
         {                     // nor a "file already exists" error (only if 'onlyAdd' is TRUE)
-            CheckAndCreateDirectory(Path, NULL, TRUE);
+            CheckAndCreateDirectoryOwnedW(Path.c_str(), NULL, TRUE);
         }
         return TRUE;
     }
     return FALSE;
 }
 
-const char*
-CCacheDirData::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL ownDelete,
+const wchar_t*
+CCacheDirData::GetName(const wchar_t* name, const wchar_t* tmpName, BOOL* exists, BOOL ownDelete,
                        CPluginInterfaceAbstract* ownDeletePlugin, int* errorCode)
 {
-    CALL_STACK_MESSAGE4("CCacheDirData::GetName(%s, %s, , %d, ,)", name, tmpName, ownDelete);
+    CALL_STACK_MESSAGE4("CCacheDirData::GetName(%ls, %ls, , %d, ,)", name, tmpName, ownDelete);
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
-    CPathBuffer tmpFullName; // Heap-allocated for long path support
-    memcpy(tmpFullName.Get(), Path, PathLength);
-    if (PathLength + strlen(tmpName) + 1 <= tmpFullName.Size())
+    const std::wstring tmpFullName = Path + tmpName;
+    CCacheData* newName = new CCacheData(name, tmpFullName.c_str(), ownDelete, ownDeletePlugin);
+    if (newName == NULL || !newName->IsGood())
     {
-        strcpy(tmpFullName + PathLength, tmpName);
-        CCacheData* newName = new CCacheData(name, tmpFullName, ownDelete, ownDeletePlugin);
-        if (newName == NULL || !newName->IsGood())
-        {
-            if (newName == NULL)
-                TRACE_E(LOW_MEMORY);
-            else
-                delete newName;
-            *exists = TRUE; // fatal error
-            if (errorCode != NULL)
-                *errorCode = DCGNE_LOWMEMORY;
-            return NULL;
-        }
-        int i;
-        if (GetNameIndex(name, i)) // error: inserted name is unique - it can't be in the array yet
-        {
-            TRACE_E("This should never happen!");
-        }
-        Names.Insert(i, newName);
-        if (!Names.IsGood())
-        {
-            Names.ResetState();
+        if (newName == NULL)
+            TRACE_E(LOW_MEMORY);
+        else
             delete newName;
-            *exists = TRUE; // fatal error
-            if (errorCode != NULL)
-                *errorCode = DCGNE_LOWMEMORY;
-            return NULL;
-        }
-        *exists = FALSE;
-        CheckAndCreateDirectory(Path, NULL, TRUE);
-        return newName->GetTmpName();
-    }
-    else
-    {
-        TRACE_I("CCacheDirData::GetName(): Too long name for tmp-file in Disk Cache.");
         *exists = TRUE; // fatal error
         if (errorCode != NULL)
-            *errorCode = DCGNE_TOOLONGNAME;
+            *errorCode = DCGNE_LOWMEMORY;
         return NULL;
     }
+    int i;
+    if (GetNameIndex(name, i)) // error: inserted name is unique - it can't be in the array yet
+    {
+        TRACE_E("This should never happen!");
+    }
+    Names.Insert(i, newName);
+    if (!Names.IsGood())
+    {
+        Names.ResetState();
+        delete newName;
+        *exists = TRUE; // fatal error
+        if (errorCode != NULL)
+            *errorCode = DCGNE_LOWMEMORY;
+        return NULL;
+    }
+    *exists = FALSE;
+    CheckAndCreateDirectoryOwnedW(Path.c_str(), NULL, TRUE);
+    return newName->GetTmpName();
 }
 
-BOOL CCacheDirData::NamePrepared(const char* name, const CQuadWord& size, BOOL* ret)
+BOOL CCacheDirData::NamePrepared(const wchar_t* name, const CQuadWord& size, BOOL* ret)
 {
-    CALL_STACK_MESSAGE3("CCacheDirData::NamePrepared(%s, %g, )", name, size.GetDouble());
+    CALL_STACK_MESSAGE3("CCacheDirData::NamePrepared(%ls, %g, )", name, size.GetDouble());
     int i;
     if (GetNameIndex(name, i)) // 'name' found at index 'i'
     {
@@ -563,10 +542,10 @@ BOOL CCacheDirData::NamePrepared(const char* name, const CQuadWord& size, BOOL* 
     return FALSE;
 }
 
-BOOL CCacheDirData::AssignName(CCacheHandles* handles, const char* name, HANDLE lock, BOOL lockOwner,
+BOOL CCacheDirData::AssignName(CCacheHandles* handles, const wchar_t* name, HANDLE lock, BOOL lockOwner,
                                CCacheRemoveType remove, BOOL* ret)
 {
-    CALL_STACK_MESSAGE4("CCacheDirData::AssignName(, %s, , %d, %d, )", name, lockOwner, remove);
+    CALL_STACK_MESSAGE4("CCacheDirData::AssignName(, %ls, , %d, %d, )", name, lockOwner, remove);
     int i;
     if (GetNameIndex(name, i)) // 'name' found at index 'i'
     {
@@ -576,9 +555,9 @@ BOOL CCacheDirData::AssignName(CCacheHandles* handles, const char* name, HANDLE 
     return FALSE;
 }
 
-BOOL CCacheDirData::ReleaseName(const char* name, BOOL* ret, BOOL* lastCached, BOOL storeInCache)
+BOOL CCacheDirData::ReleaseName(const wchar_t* name, BOOL* ret, BOOL* lastCached, BOOL storeInCache)
 {
-    CALL_STACK_MESSAGE3("CCacheDirData::ReleaseName(%s, , , %d)", name, storeInCache);
+    CALL_STACK_MESSAGE3("CCacheDirData::ReleaseName(%ls, , , %d)", name, storeInCache);
     int i;
     if (GetNameIndex(name, i)) // 'name' found at index 'i'
     {
@@ -614,7 +593,7 @@ BOOL CCacheDirData::Release(CCacheData* data)
         }
 #endif // _DEBUG
         Names.Delete(i);
-        TRACE_I("Tmp-file " << data->GetTmpName() << " was deleted.");
+        TRACE_IW(L"Tmp-file " << data->GetTmpName() << L" was deleted.");
         delete data;
         return TRUE;
     }
@@ -648,14 +627,16 @@ void CCacheDirData::AddVictimsToArray(TDirectArray<CCacheData*>& victArr)
     }
 }
 
-BOOL CCacheDirData::DetachTmpFile(const char* tmpName)
+BOOL CCacheDirData::DetachTmpFile(const wchar_t* tmpName)
 {
-    if (StrNICmp(tmpName, Path, PathLength) == 0) // if there's a chance that this is our tmp-file
+    const size_t pathLength = Path.length();
+    if (wcslen(tmpName) >= pathLength &&
+        _wcsnicmp(tmpName, Path.c_str(), pathLength) == 0) // if there's a chance that this is our tmp-file
     {
         int i;
         for (i = 0; i < Names.Count; i++)
         {
-            if (StrICmp(Names[i]->GetTmpName() + PathLength, tmpName + PathLength) == 0) // we've got it
+            if (StrICmpW(Names[i]->GetTmpName() + pathLength, tmpName + pathLength) == 0) // we've got it
             {
                 Names[i]->DetachTmpFile();
                 return TRUE;
@@ -665,21 +646,21 @@ BOOL CCacheDirData::DetachTmpFile(const char* tmpName)
     return FALSE;
 }
 
-void CCacheDirData::FlushCache(const char* name)
+void CCacheDirData::FlushCache(const wchar_t* name)
 {
-    int nameLen = (int)strlen(name);
+    size_t nameLen = wcslen(name);
     int i;
     GetNameIndex(name, i);       // we'll find the index (match/insertion) from which it makes sense to search for the same prefixes
     for (; i < Names.Count; i++) // names are sorted -> elements with the same prefix are continuously next to each other
     {
-        if (strncmp(Names[i]->GetName(), name, nameLen) == 0) // we have it
+        if (wcsncmp(Names[i]->GetName(), name, nameLen) == 0) // we have it
         {
             CCacheData* data = Names[i];
             if (data->IsLocked())
             {
                 // we will delete the found tmp-file
                 Names.Delete(i);
-                TRACE_I("Tmp-file " << data->GetTmpName() << " was deleted.");
+                TRACE_IW(L"Tmp-file " << data->GetTmpName() << L" was deleted.");
                 delete data;
                 i--;
             }
@@ -694,7 +675,7 @@ void CCacheDirData::FlushCache(const char* name)
     }
 }
 
-BOOL CCacheDirData::FlushOneFile(const char* name)
+BOOL CCacheDirData::FlushOneFile(const wchar_t* name)
 {
     int i;
     if (GetNameIndex(name, i)) // 'name' found at index 'i'
@@ -704,7 +685,7 @@ BOOL CCacheDirData::FlushOneFile(const char* name)
         {
             // we will delete the found tmp-file
             Names.Delete(i);
-            TRACE_I("Tmp-file " << data->GetTmpName() << " was deleted.");
+            TRACE_IW(L"Tmp-file " << data->GetTmpName() << L" was deleted.");
             delete data;
             i--;
         }
@@ -726,7 +707,7 @@ BOOL CCacheDirData::FlushOneFile(const char* name)
 unsigned ThreadCacheHandlesBody(void* param)
 {
     CALL_STACK_MESSAGE1("ThreadCacheHandlesBody()");
-    SetThreadNameInVCAndTrace("DiskCache");
+    SetThreadNameInVCAndTrace(L"DiskCache");
     TRACE_I("Begin");
 
     Sleep(300); // so that Salamander can start
@@ -946,9 +927,10 @@ void CCacheHandles::WaitForObjects(HANDLE* handle, CCacheData** owner, int* inde
             if (res == WAIT_FAILED)
             {
                 DWORD err = GetLastError();
-                TRACE_E("WaitForMultipleObjects() returned error: " << GetErrorText(err));
-                CALL_STACK_MESSAGE5("CCacheHandles::WaitForObjects::WaitForMultipleObjects_error: %s, %d, %d, %d",
-                                    GetErrorText(err), offset, count, Handles.Count);
+                const std::wstring errorText = GetErrorTextOwned(err).c_str();
+                TRACE_EW(L"WaitForMultipleObjects() returned error: " << errorText);
+                CALL_STACK_MESSAGE5("CCacheHandles::WaitForObjects::WaitForMultipleObjects_error: %ls, %d, %d, %d",
+                                    errorText.c_str(), offset, count, Handles.Count);
 #ifndef CALLSTK_DISABLE
                 int i;
                 for (i = 0; i < count; i++) // this is a little bit dirty ...
@@ -1114,12 +1096,12 @@ void CDiskCache::RemoveEmptyTmpDirsOnlyFromDisk()
     Leave();
 }
 
-const char*
-CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL onlyAdd,
-                    const char* rootTmpPath, BOOL ownDelete,
+const wchar_t*
+CDiskCache::GetName(const wchar_t* name, const wchar_t* tmpName, BOOL* exists, BOOL onlyAdd,
+                    const wchar_t* rootTmpPath, BOOL ownDelete,
                     CPluginInterfaceAbstract* ownDeletePlugin, int* errorCode)
 {
-    CALL_STACK_MESSAGE6("CDiskCache::GetName(%s, %s, , %d, %s, %d, ,)", name, tmpName, onlyAdd,
+    CALL_STACK_MESSAGE6("CDiskCache::GetName(%ls, %ls, , %d, %ls, %d, ,)", name, tmpName, onlyAdd,
                         rootTmpPath, ownDelete);
     Enter();
     if (errorCode != NULL)
@@ -1128,7 +1110,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     int i;
     for (i = 0; i < Dirs.Count; i++)
     {
-        const char* tmpPath;
+        const wchar_t* tmpPath;
         if (Dirs[i]->GetName(this, name, exists, &tmpPath,
                              tmpName != NULL && !onlyAdd, onlyAdd, errorCode))
         { // 'name' found; if 'tmpName' is NULL, it can be an unprepared tmp-file (it returns 'not found' error)
@@ -1148,17 +1130,17 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
         return NULL;
     }
 
-    CPathBuffer sysTmpDir; // Heap-allocated for long path support
-    const char* rootTmpPathExp;
+    std::wstring sysTmpDir;
+    const wchar_t* rootTmpPathExp;
     if (rootTmpPath == NULL) // if this is TEMP, we will find out its location
     {
-        if (!EnvGetTempPathA(gEnvironment, sysTmpDir, sysTmpDir.Size()).success)
-            sysTmpDir[0] = 0;
-        rootTmpPathExp = sysTmpDir;
+        if (gEnvironment != NULL)
+            gEnvironment->GetTempPath(sysTmpDir);
+        rootTmpPathExp = sysTmpDir.c_str();
     }
     else
         rootTmpPathExp = rootTmpPath;
-    int rootTmpPathExpLen = (int)strlen(rootTmpPathExp);
+    int rootTmpPathExpLen = static_cast<int>(std::wcslen(rootTmpPathExp));
     BOOL canContainThisName;
 
     // we will find a suitable tmp-directory for the added tmp-file
@@ -1167,19 +1149,25 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
         if (!Dirs[i]->ContainTmpName(tmpName, rootTmpPathExp, rootTmpPathExpLen, &canContainThisName) &&
             canContainThisName) // adding a new 'name'
         {
-            const char* ret = Dirs[i]->GetName(name, tmpName, exists, ownDelete, ownDeletePlugin, errorCode);
+            const wchar_t* ret = Dirs[i]->GetName(name, tmpName, exists, ownDelete, ownDeletePlugin, errorCode);
             Leave();
             return ret;
         }
     }
     // we need to create a new tmp-directory
+    BOOL rootReady = TRUE;
     if (rootTmpPath != NULL)
-        GetRootPath(sysTmpDir, rootTmpPath);
-    CPathBuffer newDirPath; // Heap-allocated for long path support
-    if (rootTmpPath != NULL &&
-            (SalCheckPath(TRUE, sysTmpDir, ERROR_SUCCESS, TRUE, MainWindow->HWindow) != ERROR_SUCCESS ||
-             !CheckAndCreateDirectory(rootTmpPath, NULL, TRUE)) || // if it's not TEMP, tmp-root must be verified and created, if needed
-        !SalGetTempFileName(rootTmpPath, "SAL", newDirPath, FALSE))
+    {
+        const std::wstring rootPath = GetRootPath(rootTmpPath);
+        rootReady = !rootPath.empty() &&
+                    SalCheckPathW(TRUE, rootPath.c_str(), ERROR_SUCCESS, TRUE,
+                                  MainWindow->HWindow) == ERROR_SUCCESS &&
+                    CheckAndCreateDirectoryOwnedW(rootTmpPath, NULL, TRUE);
+    }
+    std::wstring newDirPath;
+    if (rootReady)
+        newDirPath = SalGetTempFileNameW(rootTmpPath, L"SAL", false);
+    if (!rootReady || newDirPath.empty())
     {
         *exists = TRUE; // fatal error
         Leave();
@@ -1188,11 +1176,11 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
         return NULL;
     }
 
-    CCacheDirData* newDir = new CCacheDirData(newDirPath);
+    CCacheDirData* newDir = new CCacheDirData(newDirPath.c_str());
     if (newDir == NULL)
     {
         TRACE_E(LOW_MEMORY);
-        RemoveDirectory(newDirPath);
+        gFileSystem->RemoveDirectory(newDirPath.c_str());
         *exists = TRUE; // fatal error
         Leave();
         if (errorCode != NULL)
@@ -1204,7 +1192,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     {
         delete newDir;
         Dirs.ResetState();
-        RemoveDirectory(newDirPath);
+        gFileSystem->RemoveDirectory(newDirPath.c_str());
         *exists = TRUE; // fatal error
         Leave();
         if (errorCode != NULL)
@@ -1213,14 +1201,14 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     }
 
     // we will add 'name' to our new tmp-directory (index==Dirs.Count - 1)
-    const char* ret = newDir->GetName(name, tmpName, exists, ownDelete, ownDeletePlugin, errorCode);
+    const wchar_t* ret = newDir->GetName(name, tmpName, exists, ownDelete, ownDeletePlugin, errorCode);
     Leave();
     return ret;
 }
 
-BOOL CDiskCache::NamePrepared(const char* name, const CQuadWord& size)
+BOOL CDiskCache::NamePrepared(const wchar_t* name, const CQuadWord& size)
 {
-    CALL_STACK_MESSAGE3("CDiskCache::NamePrepared(%s, %g)", name, size.GetDouble());
+    CALL_STACK_MESSAGE3("CDiskCache::NamePrepared(%ls, %g)", name, size.GetDouble());
     Enter();
     int i;
     for (i = 0; i < Dirs.Count; i++)
@@ -1237,9 +1225,9 @@ BOOL CDiskCache::NamePrepared(const char* name, const CQuadWord& size)
     return FALSE;
 }
 
-BOOL CDiskCache::AssignName(const char* name, HANDLE lock, BOOL lockOwner, CCacheRemoveType remove)
+BOOL CDiskCache::AssignName(const wchar_t* name, HANDLE lock, BOOL lockOwner, CCacheRemoveType remove)
 {
-    CALL_STACK_MESSAGE4("CDiskCache::AssignName(%s, , %d, %d)", name, lockOwner, remove);
+    CALL_STACK_MESSAGE4("CDiskCache::AssignName(%ls, , %d, %d)", name, lockOwner, remove);
     Handles.WaitForBox(); // we will wait until we have a place for writing
 
     Enter();
@@ -1261,9 +1249,9 @@ BOOL CDiskCache::AssignName(const char* name, HANDLE lock, BOOL lockOwner, CCach
     return FALSE;
 }
 
-BOOL CDiskCache::ReleaseName(const char* name, BOOL storeInCache)
+BOOL CDiskCache::ReleaseName(const wchar_t* name, BOOL storeInCache)
 {
-    CALL_STACK_MESSAGE3("CDiskCache::ReleaseName(%s, %d)", name, storeInCache);
+    CALL_STACK_MESSAGE3("CDiskCache::ReleaseName(%ls, %d)", name, storeInCache);
     Enter();
     int i;
     for (i = 0; i < Dirs.Count; i++)
@@ -1389,9 +1377,9 @@ void CDiskCache::WaitSatisfied(HANDLE lock, CCacheData* owner)
     return; // an error in owner->WaitSatisfied()
 }
 
-BOOL CDiskCache::DetachTmpFile(const char* tmpName)
+BOOL CDiskCache::DetachTmpFile(const wchar_t* tmpName)
 {
-    CALL_STACK_MESSAGE2("CDiskCache::DetachTmpFile(%s)", tmpName);
+    CALL_STACK_MESSAGE2("CDiskCache::DetachTmpFile(%ls)", tmpName);
     BOOL ret = FALSE;
     Enter();
     int i;
@@ -1407,9 +1395,9 @@ BOOL CDiskCache::DetachTmpFile(const char* tmpName)
     return ret;
 }
 
-void CDiskCache::FlushCache(const char* name)
+void CDiskCache::FlushCache(const wchar_t* name)
 {
-    CALL_STACK_MESSAGE2("CDiskCache::FlushCache(%s)", name);
+    CALL_STACK_MESSAGE2("CDiskCache::FlushCache(%ls)", name);
     Enter();
     int i;
     for (i = 0; i < Dirs.Count; i++)
@@ -1419,9 +1407,9 @@ void CDiskCache::FlushCache(const char* name)
     Leave();
 }
 
-BOOL CDiskCache::FlushOneFile(const char* name)
+BOOL CDiskCache::FlushOneFile(const wchar_t* name)
 {
-    CALL_STACK_MESSAGE2("CDiskCache::FlushOneFile(%s)", name);
+    CALL_STACK_MESSAGE2("CDiskCache::FlushOneFile(%ls)", name);
     Enter();
     int i;
     for (i = 0; i < Dirs.Count; i++)
@@ -1460,77 +1448,75 @@ void CDiskCache::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 
 void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 {
-    CPathBuffer tmpDir;
-    if (EnvGetTempPathA(gEnvironment, tmpDir, tmpDir.Size()).success)
+    std::wstring tmpDir;
+    if (gEnvironment->GetTempPath(tmpDir).success)
     {
-        SalPathAddBackslash(tmpDir, tmpDir.Size());
-        char* tmpDirEnd = tmpDir + strlen(tmpDir);
-        if (SalPathAppend(tmpDir, "SAL*.tmp", tmpDir.Size())) // we will add a mask (it won't fit = no sense in searching anything)
+        SalPathAddBackslashW(tmpDir);
+        const std::wstring tempRoot = tmpDir;
+        SalPathAppendW(tmpDir, L"SAL*.tmp");
+        if (!tmpDir.empty())
         {
-            TIndirectArray<char> tmpDirs(10, 50);
+            TIndirectArray<std::wstring> tmpDirs(10, 50);
 
             WIN32_FIND_DATAW data;
-            HANDLE find = SalFindFirstFileHW(tmpDir, &data);
+            HANDLE find = SalFindFirstFileHW(tmpDir.c_str(), &data);
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 { // we will process all found directories (search errors are ignored)
                     if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     {
-                        char cFileNameA[MAX_PATH];
-                        WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                        char* s = cFileNameA + 3;
+                        const wchar_t* s = data.cFileName + 3;
                         while (*s != 0 && *s != '.' &&
-                               (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'f' || *s >= 'A' && *s <= 'F'))
+                               (*s >= L'0' && *s <= L'9' || *s >= L'a' && *s <= L'f' || *s >= L'A' && *s <= L'F'))
                             s++;
-                        if (StrICmp(s, ".tmp") == 0) // matches "SAL" + hex-number + ".tmp" = it's almost certainly our directory
+                        if (StrICmpW(s, L".tmp") == 0) // matches "SAL" + hex-number + ".tmp" = it's almost certainly our directory
                         {
-                            char* tmp = DupStr(cFileNameA);
+                            std::wstring* tmp = new std::wstring(data.cFileName);
                             if (tmp != NULL)
                             {
                                 tmpDirs.Add(tmp);
                                 if (!tmpDirs.IsGood())
                                 {
-                                    free(tmp);
+                                    delete tmp;
                                     tmpDirs.ResetState();
                                 }
                             }
                         }
                     }
                 } while (SalLPFindNextFile(find, &data));
-                HANDLES(FindClose(find));
+                SalLPFindClose(find);
             }
 
             if (tmpDirs.IsGood() && tmpDirs.Count > 0)
             {
-                char buf[300];
-                char buf2[300];
+                wchar_t format[300];
                 CQuadWord qwSize(tmpDirs.Count, 0);
-                ExpandPluralString(buf2, 300, LoadStr(IDS_DELETETMPSALDIRS),
-                                   1, &qwSize);
-                _snprintf_s(buf, _TRUNCATE, buf2, tmpDirs.Count);
-                char alias[200];
-                sprintf(alias, "%d\t%s\t%d\t%s\t%d\t%s",
-                        DIALOG_ABORT, LoadStr(IDS_DELETETMPSALDIRS_YES),
-                        DIALOG_RETRY, LoadStr(IDS_DELETETMPSALDIRS_NO),
-                        DIALOG_IGNORE, LoadStr(IDS_DELETETMPSALDIRS_FOCUS));
+                ExpandPluralStringW(format, _countof(format), LoadStrW(IDS_DELETETMPSALDIRS),
+                                    1, &qwSize);
+                const std::wstring text = FormatStrW(format, tmpDirs.Count);
+                const std::wstring alias = FormatStrW(L"%d\t%s\t%d\t%s\t%d\t%s",
+                                                      DIALOG_ABORT, LoadStrW(IDS_DELETETMPSALDIRS_YES),
+                                                      DIALOG_RETRY, LoadStrW(IDS_DELETETMPSALDIRS_NO),
+                                                      DIALOG_IGNORE, LoadStrW(IDS_DELETETMPSALDIRS_FOCUS));
                 int ret = CMessageBox(parent,
                                       MSGBOXEX_ABORTRETRYIGNORE | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON3,
-                                      LoadStr(IDS_QUESTION), buf, NULL, NULL, NULL,
-                                      0, NULL, alias, NULL, NULL)
+                                      LoadStrW(IDS_QUESTION), text.c_str(), NULL, NULL, NULL,
+                                      0, NULL, alias.c_str(), NULL, NULL)
                               .Execute();
                 if (ret == IDABORT)
                 {
                     for (int i = 0; i < tmpDirs.Count; i++)
                     {
-                        lstrcpyn(tmpDirEnd, tmpDirs[i], (int)(tmpDir.Size() - (tmpDirEnd - (char*)tmpDir)));
-                        RemoveTemporaryDir(tmpDir);
+                        const std::wstring path = tempRoot + *tmpDirs[i];
+                        RemoveTemporaryDirW(path.c_str());
                     }
                 }
                 if (ret == IDIGNORE) // focus
                 {
-                    lstrcpyn(tmpDirEnd, tmpDirs[0], (int)(tmpDir.Size() - (tmpDirEnd - (char*)tmpDir)));
-                    SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)(char*)tmpDir);
+                    const std::wstring path = tempRoot + *tmpDirs[0];
+                    CFocusFileDataW focus = {L"", path.c_str()};
+                    SendMessage(hActivePanel, WM_USER_FOCUSFILEW, (WPARAM)&focus, 0);
                 }
             }
         }
@@ -1544,9 +1530,9 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 // CDeleteManager
 //
 
-CDeleteManagerItem::CDeleteManagerItem(const char* fileName, CPluginInterfaceAbstract* plugin)
+CDeleteManagerItem::CDeleteManagerItem(const wchar_t* fileName, CPluginInterfaceAbstract* plugin)
 {
-    FileName = fileName ? fileName : "";
+    FileName = fileName ? fileName : L"";
     Plugin = plugin;
 }
 
@@ -1566,9 +1552,9 @@ CDeleteManager::~CDeleteManager()
     HANDLES(DeleteCriticalSection(&CS));
 }
 
-void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plugin)
+void CDeleteManager::AddFile(const wchar_t* fileName, CPluginInterfaceAbstract* plugin)
 {
-    CALL_STACK_MESSAGE2("CDeleteManager::AddFile(%s)", fileName);
+    CALL_STACK_MESSAGE2("CDeleteManager::AddFile(%ls)", fileName);
 
     CDeleteManagerItem* item = new CDeleteManagerItem(fileName, plugin);
     if (item != NULL && item->IsGood())
@@ -1590,7 +1576,7 @@ void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plu
         else
         {
             Data.ResetState();
-            TRACE_I("Unable to delete file " << fileName << ". Low memory!");
+            TRACE_IW(L"Unable to delete file " << fileName << L". Low memory!");
         }
         HANDLES(LeaveCriticalSection(&CS));
     }
@@ -1668,7 +1654,7 @@ void CDeleteManager::PluginMayBeUnloaded(HWND parent, CPluginData* plugin)
             {
                 // we will clean the message-queue from buffered WM_USER_PROCESSDELETEMAN
                 MSG msg;
-                PeekMessage(&msg, MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, WM_USER_PROCESSDELETEMAN, PM_REMOVE);
+                PeekMessageW(&msg, MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, WM_USER_PROCESSDELETEMAN, PM_REMOVE);
                 KillTimer(MainWindow->HWindow, IDT_DELETEMNGR_PROCESS); // timer for delayed data processing (it is posted in WM_USER_PROCESSDELETEMAN)
             }
         }

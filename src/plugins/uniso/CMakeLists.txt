@@ -20,6 +20,7 @@ sal_add_plugin(NAME uniso
     "${SAL_PLUGINS}/uniso/udf.cpp"
     "${SAL_PLUGINS}/uniso/udfiso.cpp"
     "${SAL_PLUGINS}/uniso/uniso.cpp"
+    "${SAL_PLUGINS}/uniso/uniso_text.cpp"
     "${SAL_PLUGINS}/uniso/viewer.cpp"
     "${SAL_PLUGINS}/uniso/xdvdfs.cpp"
   RC "${SAL_PLUGINS}/uniso/uniso.rc"

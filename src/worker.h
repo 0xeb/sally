@@ -13,6 +13,7 @@ class IWorkerObserver; // forward declaration for RunWorkerDirect
 #define MOVE_DIR_SIZE CQuadWord(5050, 0)
 #define DELETE_DIR_SIZE CQuadWord(2400, 0)
 #define DELETE_DIRLINK_SIZE CQuadWord(2400, 0)
+#define CREATE_DIRLINK_SIZE CQuadWord(2400, 0) // clone a dir link (junction/symlink)
 #define MOVE_FILE_SIZE CQuadWord(6500, 0)
 #define COPY_MIN_FILE_SIZE CQuadWord(4096, 0) // must be at least 1 (otherwise the DoCopyFile pre-copy space allocation test stops working)
 #define CONVERT_MIN_FILE_SIZE CQuadWord(4096, 0)
@@ -54,9 +55,28 @@ struct CChangeAttrsData
     FILETIME TimeAccessed;
 };
 
+// CONVERT IS BYTE-DOMAIN BY DESIGN — this is a boundary, not an
+// oversight, and it does not move with the rest of the Unicode work.
+//
+// The 256-entry table is a BYTE->BYTE mapping with two hard external contracts:
+//   * on disk, the shipped convert/*/convert.cfg tables users can edit, and
+//   * in the plugin ABI, GetConversionTable, which hands plugins that same
+//     256-byte shape.
+// Widening it would break both for no benefit: the operation's purpose is
+// re-mapping a single-byte code page, which is inherently a byte operation.
+//
+// What DID go wide: everything around it. The operation's path handling and
+// name parameters are wide (tasks 10 and 09), so a file whose NAME is Unicode
+// converts correctly - it was the name, not the content mapping, that was
+// broken. Content bytes are untouched deliberately.
+//
+// Encoding conversion proper (UTF-8 <-> UTF-16 <-> legacy) is a DIFFERENT
+// feature from code-page remapping and is post-program work; the pieces it
+// would need now exist in common/text (EncodingDetector, and the decoder the
+// viewer owns).
 struct CConvertData // data used by ocConvert
 {
-    char CodeTable[256];
+    char CodeTable[256]; // byte -> byte; see the note above before changing this
     int EOFType;
 };
 
@@ -66,7 +86,7 @@ struct CProgressDlgArrItem;
 struct CStartProgressDialogData
 {
     COperations* Script;
-    const char* Caption;
+    const wchar_t* Caption;
     CChangeAttrsData* AttrsData;
     CConvertData* ConvertData;
     CProgressDlgArrItem* NewDlg;
@@ -76,14 +96,14 @@ struct CStartProgressDialogData
     RECT MainWndRectByR;   // coordinates used to center the parentless progress dialog (background operations)
 };
 
+// All-wide (Operation/Preposition previously had no wide
+// field at all — the progress dialog rendered them CP_ACP-only).
 struct CProgressData
 {
-    const char *Operation,
+    const wchar_t *Operation,
         *Source,
         *Preposition,
         *Target;
-    const wchar_t *SourceW,
-        *TargetW;
 };
 
 //
@@ -204,11 +224,13 @@ enum COperationCode
     ocMoveDir,
     ocDeleteDir,
     ocDeleteDirLink,
-    ocChangeAttrs, // WARNING: requested attributes are stored in TargetName (applies to every type; treat it as a DWORD)
+    ocCreateDirLink, // copy-the-link: create dir at TargetName and clone the
+                     // source link's raw reparse buffer (never touches the link target)
+    ocChangeAttrs, // requested attributes are carried in the typed NewAttrs field
     ocCountSize,
     ocConvert,
-    ocLabelForSkipOfCreateDir, // label to jump to when the script skips on ocCreateDirXXX; WARNING: SourceName and TargetName store the LO- and HI-DWORD of the total file sizes (including ADS) contained in the skipped directory; WARNING: Attr stores the ocCreateDirXXX index in the COperations array for that directory
-    ocCopyDirTime,             // Move/Copy: when filterCriteria->PreserveDirTime==TRUE copy the directory timestamps; WARNING: lastWrite is stored in SourceName and Attr (applies to every type; just two DWORDs)
+    ocLabelForSkipOfCreateDir, // label to jump to when the script skips on ocCreateDirXXX; the total file sizes (including ADS) contained in the skipped directory are carried in the typed SkippedDirSize field; WARNING: Attr stores the ocCreateDirXXX index in the COperations array for that directory
+    ocCopyDirTime,             // Move/Copy: when filterCriteria->PreserveDirTime==TRUE copy the directory timestamps; lastWrite is carried in the typed DirTime field
 };
 
 #define OPFL_OVERWROLDERALRTESTED 0x00000001 // the "overwrite older, skip other existing" test has already been performed
@@ -225,90 +247,26 @@ struct COperation
     COperationCode Opcode;
     CQuadWord Size;
     CQuadWord FileSize; // file size, valid only for ocCopyFile and ocMoveFile
-    char *SourceName,
-        *TargetName;
-    std::wstring SourceNameW;  // Unicode source path (for long path and Unicode filename support)
-    std::wstring TargetNameW;  // Unicode target path (for long path and Unicode filename support)
-    bool SourceNameWExplicit = false;  // true when SetSourceNameW supplied a real wide path/name
-    bool TargetNameWExplicit = false;  // true when SetTargetNameW supplied a real wide path/name
+    std::wstring SourceNameW;  // THE source path (UTF-16; the char* legs are gone)
+    std::wstring TargetNameW;  // THE target path (UTF-16)
     DWORD Attr;
     DWORD OpFlags; // combination of OPFL_xxx, see above
 
-    // Ownership flags: true = this struct owns the pointer and should free it
-    // Set to false for special opcodes that repurpose pointer fields for non-pointer data
-    // (ocCopyDirTime stores timestamp in SourceName, ocLabelForSkipOfCreateDir stores size in both,
-    // ocChangeAttrs stores attributes in TargetName)
-    bool OwnsSourceName = true;
-    bool OwnsTargetName = true;
+    // Typed opcode payloads. These opcodes used to smuggle
+    // non-string data through the char* name pointers; they carry it here now.
+    DWORD NewAttrs = 0;                  // ocChangeAttrs: computed attributes to apply
+    FILETIME DirTime = {};               // ocCopyDirTime: directory lastWrite to restore
+    CQuadWord SkippedDirSize = CQuadWord(0, 0); // ocLabelForSkipOfCreateDir: total file bytes in the skipped dir
+    bool DeleteDirToRecycleBin = false;  // ocDeleteDir: never set today (vestige of the legacy TargetName==-1 marker)
 
-    // Default constructor - initializes pointers to NULL
-    COperation() : Opcode(ocCopyFile), Size(), FileSize(),
-                   SourceName(NULL), TargetName(NULL),
-                   Attr(0), OpFlags(0),
-                   OwnsSourceName(true), OwnsTargetName(true) {}
-
-    // Destructor - frees owned pointers
-    ~COperation()
-    {
-        if (OwnsSourceName && SourceName != NULL)
-            free(SourceName);
-        if (OwnsTargetName && TargetName != NULL)
-            free(TargetName);
-        // std::wstring members are automatically destructed
-    }
-
-    // No copy — ownership of malloc'd pointers transfers via move only
+    // With only std::wstring members the special member functions
+    // are all defaulted - move-only is retained to keep accidental copies out
+    // of hot paths.
+    COperation() : Opcode(ocCopyFile), Size(), FileSize(), Attr(0), OpFlags(0) {}
     COperation(const COperation&) = delete;
-
-    // Move constructor - transfer ownership
-    COperation(COperation&& other) noexcept
-        : Opcode(other.Opcode), Size(other.Size), FileSize(other.FileSize),
-          SourceName(other.SourceName), TargetName(other.TargetName),
-          SourceNameW(std::move(other.SourceNameW)), TargetNameW(std::move(other.TargetNameW)),
-          SourceNameWExplicit(other.SourceNameWExplicit), TargetNameWExplicit(other.TargetNameWExplicit),
-          Attr(other.Attr), OpFlags(other.OpFlags),
-          OwnsSourceName(other.OwnsSourceName), OwnsTargetName(other.OwnsTargetName)
-    {
-        // Null out source to prevent double-free
-        other.SourceName = NULL;
-        other.TargetName = NULL;
-    }
-
-    // No copy assignment — use move
     COperation& operator=(const COperation&) = delete;
-
-    // Move assignment - transfer ownership with proper cleanup
-    COperation& operator=(COperation&& other) noexcept
-    {
-        if (this != &other)
-        {
-            // Free existing owned pointers
-            if (OwnsSourceName && SourceName != NULL)
-                free(SourceName);
-            if (OwnsTargetName && TargetName != NULL)
-                free(TargetName);
-
-            // Move all members
-            Opcode = other.Opcode;
-            Size = other.Size;
-            FileSize = other.FileSize;
-            SourceName = other.SourceName;
-            TargetName = other.TargetName;
-            SourceNameW = std::move(other.SourceNameW);
-            TargetNameW = std::move(other.TargetNameW);
-            SourceNameWExplicit = other.SourceNameWExplicit;
-            TargetNameWExplicit = other.TargetNameWExplicit;
-            Attr = other.Attr;
-            OpFlags = other.OpFlags;
-            OwnsSourceName = other.OwnsSourceName;
-            OwnsTargetName = other.OwnsTargetName;
-
-            // Null out source to prevent double-free
-            other.SourceName = NULL;
-            other.TargetName = NULL;
-        }
-        return *this;
-    }
+    COperation(COperation&&) noexcept = default;
+    COperation& operator=(COperation&&) noexcept = default;
 
     // Helper methods for Unicode path access
     bool HasWideSource() const { return !SourceNameW.empty(); }
@@ -317,13 +275,10 @@ struct COperation
     // Populate wide paths from ANSI paths (for long path support)
     // Note: This just widens the ANSI string. For proper Unicode filename support,
     // the wide filename must be provided separately via SetSourceNameW/SetTargetNameW.
-    void PopulateWidePathsFromAnsi();
 
     // Set wide paths with proper Unicode filename
     // ansiPath: the directory path (ANSI)
     // wideFileName: the actual Unicode filename (from CFileData::NameW), or empty to widen ANSI
-    void SetSourceNameW(const char* ansiPath, const std::wstring& wideFileName);
-    void SetTargetNameW(const char* ansiPath, const std::wstring& wideFileName);
     void SetSourceNameW(const std::wstring& widePath, const std::wstring& wideFileName);
     void SetTargetNameW(const std::wstring& widePath, const std::wstring& wideFileName);
 
@@ -374,10 +329,22 @@ public:
     COperation& At(int index) { return m_ops[index]; }
     const COperation& At(int index) const { return m_ops[index]; }
 
+    // Name-carrying opcodes MUST arrive with an explicit wide
+    // name. The auto-widen that used to paper over a missing one is gone; a
+    // producer that forgets is a bug, not a mojibake path.
+    static bool OpcodeCarriesName(COperationCode opcode)
+    {
+        return opcode != ocLabelForSkipOfCreateDir && opcode != ocCountSize;
+    }
+
     int Add(COperation& op) {
+        if (OpcodeCarriesName(op.Opcode) && op.SourceNameW.empty() && op.TargetNameW.empty())
+        {
+            TRACE_E("COperations::Add(): name-carrying opcode without a wide name! opcode=" << op.Opcode);
+            _ASSERTE(!"COperations::Add(): op has no wide name");
+            return -1;
+        }
         m_ops.push_back(std::move(op));
-        // Automatically populate wide paths for long path support
-        m_ops.back().PopulateWidePathsFromAnsi();
         Count = (int)m_ops.size();
         return Count - 1;
     }
@@ -396,14 +363,6 @@ public:
         Count = 0;
     }
 
-    // Re-anchor auto-widened SourceNameW values so paths under `anchorAnsi`
-    // are rebound to `anchorWide`. Script builders increasingly call
-    // SetSourceNameW with the panel PathW and CFileData::NameW; those explicit
-    // values are already richer than SourceName and must not be overwritten.
-    //
-    // Matching is case-insensitive on the prefix bytes; ops whose SourceName
-    // does not start with `anchorAnsi` are left untouched.
-    void ReanchorWideSourcePaths(const char* anchorAnsi, const wchar_t* anchorWide);
 
 public:
     CQuadWord TotalSize;      // WARNING: not the byte size of the files (usable only for progress calculations)
@@ -422,9 +381,9 @@ public:
     int FilesCount;
     int DirsCount;
 
-    const char* RemapNameFrom; // for on-screen listings only:
+    const wchar_t* RemapNameFrom; // for on-screen listings only:
     int RemapNameFromLen;      // name mapping for MoveFiles (From -> To)
-    const char* RemapNameTo;
+    const wchar_t* RemapNameTo;
     int RemapNameToLen;
 
     BOOL RemovableTgtDisk;      // is this writing to removable media?
@@ -451,16 +410,14 @@ public:
 
     BOOL SkipAllCountSizeErrors; // should all subsequent count-size errors be skipped?
 
-    CPathBuffer WorkPath1;     // when non-empty string first path processed (used for change notifications)
     BOOL WorkPath1InclSubDirs; // TRUE/FALSE = with/without subdirectories (first path)
-    CPathBuffer WorkPath2;     // when non-empty string second path processed (used for change notifications)
     BOOL WorkPath2InclSubDirs; // TRUE/FALSE = with/without subdirectories (second path)
     std::wstring WorkPath1W;
     std::wstring WorkPath2W;
 
-    std::string WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
-    std::string WaitInQueueFrom;    // text for the "waiting in queue" state: top line (From)
-    std::string WaitInQueueTo;      // text for the "waiting in queue" state: bottom line (To)
+    std::wstring WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
+    std::wstring WaitInQueueFrom;    // text for the "waiting in queue" state: top line (From)
+    std::wstring WaitInQueueTo;      // text for the "waiting in queue" state: bottom line (To)
 
 private:
     // for the status line in the progress dialog (Copy and Move only)
@@ -486,20 +443,11 @@ private:
     DWORD LastFileStartTime;      // GetTickCount() from when we started copying the last file
 
 public:
-    COperations(int base, int delta, const char* waitInQueueSubject, const char* waitInQueueFrom, const char* waitInQueueTo);
+    COperations(int base, int delta, const wchar_t* waitInQueueSubject, const wchar_t* waitInQueueFrom,
+                const wchar_t* waitInQueueTo);
     ~COperations() { HANDLES(DeleteCriticalSection(&StatusCS)); }
 
-    void SetWorkPath1(const char* path, BOOL inclSubDirs)
-    {
-        lstrcpyn(WorkPath1.Get(), path, SAL_MAX_LONG_PATH);
-        WorkPath1InclSubDirs = inclSubDirs;
-    }
 
-    void SetWorkPath2(const char* path, BOOL inclSubDirs)
-    {
-        lstrcpyn(WorkPath2.Get(), path, SAL_MAX_LONG_PATH);
-        WorkPath2InclSubDirs = inclSubDirs;
-    }
 
     void SetWorkPath1W(const wchar_t* path, BOOL inclSubDirs)
     {
@@ -602,8 +550,8 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
 void FreeScript(COperations* script);
 
 BOOL ShouldWarnNotEnoughSpaceForCopyMove(const COperations* script,
-                                         const char* targetPath,
-                                         CQuadWord* requiredSpace);
+                                          const wchar_t* targetPath,
+                                          CQuadWord* requiredSpace);
 
 //
 // File information classes and Io Status block (see NTDDK.H)
@@ -660,15 +608,6 @@ typedef struct _IO_STATUS_BLOCK
     ULONG_PTR Information;
 } IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
 
-typedef NTSTATUS(__stdcall* NTQUERYINFORMATIONFILE)(
-    IN HANDLE FileHandle,
-    OUT PIO_STATUS_BLOCK IoStatusBlock,
-    OUT PVOID FileInformation,
-    IN ULONG Length,
-    IN FILE_INFORMATION_CLASS FileInformationClass);
-
-extern NTQUERYINFORMATIONFILE DynNtQueryInformationFile;
-
 typedef VOID(__stdcall* PIO_APC_ROUTINE)(
     IN PVOID ApcContext,
     IN PIO_STATUS_BLOCK IoStatusBlock,
@@ -688,36 +627,11 @@ typedef NTSTATUS(__stdcall* NTFSCONTROLFILE)(
 
 extern NTFSCONTROLFILE DynNtFsControlFile;
 
-//
-// MessageId: STATUS_BUFFER_OVERFLOW
-//
-// MessageText:
-//
-//  {Buffer Overflow}
-//  The data was too large to fit into the specified buffer.
-//
-#define STATUS_BUFFER_OVERFLOW ((NTSTATUS)0x80000005L)
-
-#pragma pack(4)
-typedef struct
-{
-    ULONG NextEntry;
-    ULONG NameLength;
-    LARGE_INTEGER Size;
-    LARGE_INTEGER AllocationSize;
-    USHORT Name[1];
-} FILE_STREAM_INFORMATION, *PFILE_STREAM_INFORMATION;
-#pragma pack()
-
-// enumerates alternate data streams (ADS) of a file/directory ('isDir' is FALSE/TRUE)
-// 'fileName'; meaningful only on NTFS disks; if 'adsSize' is not NULL it returns the
-// sum of the sizes of all ADS; if 'streamNames' is not NULL it returns an allocated array
-// of Unicode names of all ADS (except the default ADS) - the elements of the array are allocated
-// the caller must dealocate them and the array itself; the array of names is returned only
-// if no error occurred (see 'lowMemory' and 'winError') and ADS were found (the function
-// returns TRUE); if 'streamNamesCount' is not NULL it returns the number of elements
-// in 'streamNames'; if 'lowMemory' is not NULL it returns TRUE when an out-of-memory
-// error occurs (only possible when 'streamNames' is not NULL); if 'winError' is not NULL
+// Enumerates alternate data streams (ADS) of a file/directory ('isDir' is
+// FALSE/TRUE). Names remain dynamically owned UTF-16; stream contents remain
+// bytes. If 'adsSize' is not NULL it receives the sum of all ADS sizes; if
+// 'streamNames' is not NULL it receives all names except the default stream.
+// If 'lowMemory' is not NULL it returns TRUE when an allocation fails; if 'winError' is not NULL
 // it returns the Windows error code (NO_ERROR if none occurred - if a Windows error occurs,
 // the function always returns FALSE); the function returns TRUE if the file/directory
 // contains ADS, otherwise FALSE; 'bytesPerCluster' is the cluster size
@@ -725,8 +639,9 @@ typedef struct
 // in 'adsOccupiedSpace' (if not NULL) it returns the disk space occupied by the ADS;
 // in 'onlyDiscardableStreams' (if not NULL) it returns TRUE if only ADS
 // that can be discarded without prompting were found (currently only thumbnails from W2K)
-BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wchar_t*** streamNames,
-                       int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
+BOOL CheckFileOrDirADS(const std::wstring& fileNameW, BOOL isDir,
+                       CQuadWord* adsSize,
+                       std::vector<std::wstring>* streamNames,
+                       BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
-                       BOOL* onlyDiscardableStreams,
-                       const std::wstring& fileNameW = std::wstring());
+                       BOOL* onlyDiscardableStreams);

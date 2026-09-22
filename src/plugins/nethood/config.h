@@ -11,10 +11,15 @@
 	Open-source license goes here...
 */
 
-static const TCHAR SuggestedFSName[] = TEXT("net");
+// SuggestedFSName/HomePageUrl/SuggestedConfigKey are native-wide SDK metadata.
+static const wchar_t SuggestedFSName[] = L"net";
 
-static const TCHAR HomePageUrl[] = TEXT("https://github.com/0xeb/sally");
+static const wchar_t HomePageUrl[] = L"https://github.com/0xeb/sally";
 
-static const TCHAR PluginNameEN[] = TEXT("Network"); // do not translate - it's used before language module is loaded and for debugging purposes
+// Do not translate, per the original comment. The note that used to sit here -
+// "stays narrow, entry.cpp's InitializeWinLib is a genuine narrow consumer" - was already false
+// when written against a wchar_t[]: winlib's InitializeWinLib is wide, and TEXT() resolved to the
+// wide literal too. Both halves now agree.
+static const wchar_t PluginNameEN[] = L"Network";
 
-static const TCHAR SuggestedConfigKey[] = TEXT("nethood");
+static const wchar_t SuggestedConfigKey[] = L"nethood";

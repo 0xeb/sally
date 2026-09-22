@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <vector>
+
 #include "mmviewer.rh"
 #include "mmviewer.rh2"
 #include "lang\lang.rh"
@@ -12,6 +14,7 @@
 //#include "dialogs.h"
 #include "mmviewer.h"
 #include "parser.h"
+#include "unicode/helpers.h"
 
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
@@ -24,7 +27,7 @@
 CRendererWindow::CRendererWindow(int enumFilesSourceUID, int enumFilesCurrentIndex)
     : CWindow(ooStatic)
 {
-    FileName[0] = 0;
+    FileName.clear();
     Viewer = NULL;
     Creating = TRUE;
     EnumFilesSourceUID = enumFilesSourceUID;
@@ -37,32 +40,12 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::OnFileOpen()
 {
-    CPathBuffer file; // Heap-allocated for long path support
-    file[0] = 0;
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = HWindow;
-    char* s = LoadStr(IDS_VIEWERFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create a double-null terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = file.Size();
-    ofn.nFilterIndex = 1;
-    ofn.lpstrInitialDir = NULL;
-    ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if (SalGeneral->SafeGetOpenFileName(&ofn))
-    {
-        OpenFile(file);
-    }
+    std::wstring fileName;
+    if (ShowOpenFileDialog(HWindow, NULL, LangStr(IDS_VIEWERFILTER).c_str(), fileName, NULL, FALSE))
+        OpenFile(fileName.c_str());
 }
 
-BOOL CRendererWindow::OpenFile(const char* name)
+BOOL CRendererWindow::OpenFile(const wchar_t* name)
 {
     // if an error occurs during OpenFile, the background will be repainted
     InvalidateRect(HWindow, NULL, TRUE);
@@ -73,8 +56,8 @@ BOOL CRendererWindow::OpenFile(const char* name)
     CParserResultEnum result = CreateAppropriateParser(name, &parser);
     if (result == preOK)
     {
-        const char* oFName = name;
-        const char* tmp = strrchr(name, '\\');
+        const wchar_t* oFName = name;
+        const wchar_t* tmp = wcsrchr(name, L'\\');
         if (tmp)
             oFName = tmp + 1;
 
@@ -86,15 +69,15 @@ BOOL CRendererWindow::OpenFile(const char* name)
         delete (parser);
         Output.PrepareForRender(HWindow);
 
-        lstrcpy(FileName, name);
+        FileName = name;
     }
     else
     {
-        CPathBuffer buff; // Heap-allocated for long path support
-        sprintf(buff, LoadStr(IDS_ERROR_OPENING), name);
-        SalGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGIN_NAME), MB_ICONEXCLAMATION);
+        const std::wstring errorText = SPLFormatStringOwned(
+            SPLLoadStrOwned(SalGeneral, HLanguage, IDS_ERROR_OPENING).c_str(), name);
+        SalGeneral->SalMessageBox(HWindow, errorText.c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_ICONEXCLAMATION);
 
-        FileName[0] = 0;
+        FileName.clear();
     }
 
     SetViewerTitle();
@@ -150,13 +133,10 @@ void CRendererWindow::SetupScrollBars()
 
 void CRendererWindow::SetViewerTitle()
 {
-    CPathBuffer title; // Heap-allocated for long path support
-    if (FileName[0] != 0)
-        sprintf(title, "%s - %s", FileName.Get(), LoadStr(IDS_PLUGIN_NAME));
-    else
-        sprintf(title, "%s", LoadStr(IDS_PLUGIN_NAME));
-
-    SetWindowText(GetParent(HWindow), title);
+    const std::wstring title = FileName.empty()
+                                   ? LangStr(IDS_PLUGIN_NAME).c_str()
+                                   : FileName + L" - " + LangStr(IDS_PLUGIN_NAME).c_str();
+    SetWindowTextW(GetParent(HWindow), title.c_str());
 }
 
 LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
@@ -165,7 +145,6 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
     {
     case CM_COPY:
     {
-#ifndef _UNICODE
         TDirectArray<wchar_t> text(4096, 4096);
 
         int i;
@@ -175,48 +154,19 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
 
             if (item->Name)
             {
-                wchar_t* str = AnsiToWide(item->Name, (int)strlen(item->Name));
-                text.Add(str, (int)wcslen(str));
-
+                // The label is already wide - no conversion on this side.
+                text.Add(item->Name, (int)wcslen(item->Name));
                 if (item->Value)
                 {
                     text.Add('\t');
-                    if (item->Flags & OIF_UTF8)
-                        str = UTF8ToWide(item->Value, (int)strlen(item->Value));
-                    else
-                        str = AnsiToWide(item->Value, (int)strlen(item->Value));
-                    text.Add(str, (int)wcslen(str));
+                    text.Add(item->DisplayValue, (int)wcslen(item->DisplayValue));
                 }
             }
 
             text.Add(L"\r\n", 2);
         }
         text.Add('\0');
-        SalGeneral->CopyTextToClipboardW(&text[0], -1, FALSE, NULL);
-#else // _UNICODE
-        TDirectArray<TCHAR> text(4096, 4096);
-
-        int i;
-        for (i = 0; i < Output.GetCount(); i++)
-        {
-            const COutputItem* item = Output.GetItem(i);
-
-            if (item->Name)
-            {
-                text.Add(item->Name, _tcslen(item->Name));
-
-                if (item->Value)
-                {
-                    text.Add('\t');
-                    text.Add(item->Value, _tcslen(item->Value));
-                }
-            }
-
-            text.Add(_T("\r\n"), 2);
-        }
-        text.Add('\0');
         SalGeneral->CopyTextToClipboard(&text[0], -1, FALSE, NULL);
-#endif
     }
     break;
 
@@ -228,42 +178,39 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
         BOOL ok = FALSE;
         BOOL srcBusy = FALSE;
         BOOL noMoreFiles = FALSE;
-        CPathBuffer fileName; // Heap-allocated for long path support
-        fileName[0] = 0;
+        std::wstring fileName;
         int enumFilesCurrentIndex = EnumFilesCurrentIndex;
         if (LOWORD(wParam) == CM_FILE_PREV || LOWORD(wParam) == CM_FILE_LAST)
         {
             if (LOWORD(wParam) == CM_FILE_LAST)
                 enumFilesCurrentIndex = -1;
-            ok = SalGeneral->GetPreviousFileNameForViewer(EnumFilesSourceUID,
-                                                          &enumFilesCurrentIndex,
-                                                          FileName, FALSE, TRUE,
-                                                          fileName, &noMoreFiles,
-                                                          &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(SalGeneral, TRUE, EnumFilesSourceUID,
+                                                   &enumFilesCurrentIndex, FileName.c_str(),
+                                                   FALSE, TRUE,
+                                                   fileName, &noMoreFiles, &srcBusy);
         }
         else
         {
             if (LOWORD(wParam) == CM_FILE_FIRST)
                 enumFilesCurrentIndex = -1;
-            ok = SalGeneral->GetNextFileNameForViewer(EnumFilesSourceUID,
-                                                      &enumFilesCurrentIndex,
-                                                      FileName, FALSE, TRUE,
-                                                      fileName, &noMoreFiles,
-                                                      &srcBusy);
+            ok = SPLGetAdjacentFileNameForViewerOwned(SalGeneral, FALSE, EnumFilesSourceUID,
+                                                   &enumFilesCurrentIndex, FileName.c_str(),
+                                                   FALSE, TRUE,
+                                                   fileName, &noMoreFiles, &srcBusy);
         }
 
         if (ok) // we have a new name
         {
-            if (lstrcmpi(fileName, FileName) != 0)
+            if (lstrcmpiW(fileName.c_str(), FileName.c_str()) != 0)
             {
                 if (Viewer->Lock != NULL)
                 {
                     SetEvent(Viewer->Lock);
                     Viewer->Lock = NULL; // now it's just up to the disk cache
                 }
-                if (!OpenFile(fileName))
+                if (!OpenFile(fileName.c_str()))
                 {
-                    FileName[0] = 0;
+                    FileName.clear();
                 }
 
                 // set the index even if it fails so the user can move to the next/previous image
@@ -277,23 +224,21 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
 
     case CM_FILES_EXPORT_HTML:
     {
-        CPathBuffer fname; // Heap-allocated for long path support
-        char* ext = LoadStr(IDS_HTMLEXT);
-        lstrcpyn(fname, FileName, fname.Size());
-        char* b = strrchr(fname.Get(), '.'); // ".cvspass" is an extension in Windows
-        if (b)
-            *b = 0;
-        strcat(fname, ext);
+        std::wstring fname = FileName;
+        const std::wstring extOwner = LangStr(IDS_HTMLEXT);
+        const wchar_t* ext = extOwner.c_str();
+        const size_t dot = fname.find_last_of(L'.'); // ".cvspass" is an extension in Windows
+        if (dot != std::wstring::npos)
+            fname.resize(dot);
+        fname += ext;
 
-        char* s = LoadStr(IDS_HTMLEXPFILTER);
-
-        if (GetOpenFileName(HWindow, NULL, s, fname, ext, TRUE))
+        if (ShowOpenFileDialog(HWindow, NULL, LangStr(IDS_HTMLEXPFILTER).c_str(), fname, ext, TRUE))
         {
             int r;
-            if ((r = ExportToHTML(fname, Output)) > 0)
+            if ((r = ExportToHTML(fname.c_str(), Output)) > 0)
             {
-                if (SalGeneral->SalMessageBox(HWindow, LoadStr(IDS_EXPORTOPEN), LoadStr(IDS_PLUGIN_NAME), MB_YESNO | MB_ICONQUESTION) == DIALOG_YES)
-                    ExecuteFile(fname);
+                if (SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_EXPORTOPEN).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_YESNO | MB_ICONQUESTION) == DIALOG_YES)
+                    ExecuteFile(fname.c_str());
                 //SalGeneral->ExecuteAssociation(HWindow, NULL, fname);
             }
             else
@@ -303,7 +248,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
                 case -1:
                 case -2:
                 default: // for now treat all errors as write errors
-                    SalGeneral->SalMessageBox(HWindow, LoadStr(IDS_MMV_WRITE_ERROR), LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+                    SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_MMV_WRITE_ERROR).c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
                     break;
                 }
             }
@@ -313,12 +258,11 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
 
     case CM_FILES_EXPORT_XML:
     {
-        CPathBuffer fname; // Heap-allocated for long path support
-        lstrcpyn(fname, FileName, fname.Size());
-        char* b = strrchr(fname.Get(), '.'); // ".cvspass" is an extension in Windows
-        if (b)
-            *b = 0;
-        strcat(fname, ".xml");
+        std::wstring fname = FileName;
+        const size_t dot = fname.find_last_of(L'.'); // ".cvspass" is an extension in Windows
+        if (dot != std::wstring::npos)
+            fname.resize(dot);
+        fname += L".xml";
 
         //TODO
     }
@@ -349,7 +293,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam)
             wParam2 = SC_RESTORE;
         else
             wParam2 = SC_MAXIMIZE;
-        SendMessage(GetParent(HWindow), WM_SYSCOMMAND, wParam2, 0);
+        SendMessageW(GetParent(HWindow), WM_SYSCOMMAND, wParam2, 0);
         return 0;
     }
     }
@@ -396,8 +340,8 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
 
                 SetFocus(h);
-                SendMessage(h, EM_SETSEL, 0, -1);
-                SendMessage(h, WM_ENSUREVISIBLE, 0, 0);
+                SendMessageW(h, EM_SETSEL, 0, -1);
+                SendMessageW(h, WM_ENSUREVISIBLE, 0, 0);
                 TRACE_I("CRendererWindow::WindowProc: VK_TAB: " << h);
                 return 0;
             }
@@ -439,7 +383,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         if (wScrollNotify != -1)
-            SendMessage(HWindow, WM_VSCROLL, MAKELONG(wScrollNotify, 0), 0L);
+            SendMessageW(HWindow, WM_VSCROLL, MAKELONG(wScrollNotify, 0), 0L);
 
         wScrollNotify = -1;
 
@@ -460,7 +404,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         if (wScrollNotify != -1)
-            SendMessage(HWindow, WM_HSCROLL, MAKELONG(wScrollNotify, 0), 0L);
+            SendMessageW(HWindow, WM_HSCROLL, MAKELONG(wScrollNotify, 0), 0L);
 
         break;
     }

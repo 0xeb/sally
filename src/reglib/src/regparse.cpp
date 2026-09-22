@@ -4,32 +4,18 @@
 
 #include "precomp.h"
 
-#include <tchar.h>
-
 #include "regparse.h"
 
 #define SkipWS(s) \
     while ((*s == ' ') || (*s == 9)) \
     s++
 
-BOOL StrEndsWith(LPCTSTR txt, LPCTSTR pattern, size_t patternLen);
+BOOL StrEndsWith(const wchar_t* txt, const wchar_t* pattern, size_t patternLen);
 
-static LPTSTR SeparateStr(LPTSTR s)
+static wchar_t* SeparateStr(wchar_t* s)
 {
     while (*s)
     {
-#ifndef _UNICODE
-        if (IsDBCSLeadByte(*s))
-        {
-            s++;
-            if (!*s)
-            {
-                return NULL; // Invalid MBCS sequence
-            }
-            s++;
-            continue;
-        }
-#endif
         if (*s == '\\')
         {
             switch (s[1])
@@ -50,7 +36,7 @@ static LPTSTR SeparateStr(LPTSTR s)
             default:
                 return NULL;
             }
-            memmove(s, s + 1, _tcslen(s) * sizeof(s[0]));
+            memmove(s, s + 1, wcslen(s) * sizeof(s[0]));
         }
         else if (*s == '\"')
         {
@@ -66,23 +52,37 @@ static LPTSTR SeparateStr(LPTSTR s)
     return s;
 }
 
-eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNotDeleteHiddenKeysAndValues)
+eRPE_ERROR ParseRegistryFileW(wchar_t* buf, CSalamanderRegistryExAbstractW* pRegistry, BOOL doNotDeleteHiddenKeysAndValues)
 {
-    LPTSTR line;
+    if (buf == NULL || pRegistry == NULL)
+        return RPE_INVALID_FORMAT;
+
+    wchar_t* line;
+    wchar_t* tokenContext = NULL;
     HKEY hKey = NULL;
+    struct KeyGuard
+    {
+        CSalamanderRegistryExAbstractW* Registry;
+        HKEY& Key;
+        ~KeyGuard()
+        {
+            if (Key != NULL)
+                Registry->CloseKey(Key);
+        }
+    } keyGuard = {pRegistry, hKey};
     eRPE_ERROR ret = RPE_OK;
     BOOL bReg5File;
 
-    line = _tcstok(buf, _T("\r\n"));
+    line = wcstok_s(buf, L"\r\n", &tokenContext);
     if (!line)
     {
         return RPE_INVALID_FORMAT;
     }
-    if (*line != 0 && !_tcscmp(line + 1 /*skip BOM*/, _T("Windows Registry Editor Version 5.00")))
+    if (*line == 0xFEFF && !wcscmp(line + 1, L"Windows Registry Editor Version 5.00"))
     {
         bReg5File = TRUE;
     }
-    else if (!_tcscmp(line, _T("REGEDIT4")))
+    else if (!wcscmp(line, L"REGEDIT4"))
     {
         bReg5File = FALSE;
     }
@@ -90,13 +90,13 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
     {
         return RPE_NOT_REG_FILE;
     }
-    while (NULL != (line = _tcstok(NULL, _T("\r\n"))))
+    while (NULL != (line = wcstok_s(NULL, L"\r\n", &tokenContext)))
     {
         if (!*line)
             continue; // empty line
         if (*line == '[')
         { // First char on the line -> MBCS-safe
-            LPTSTR keyName;
+            wchar_t* keyName;
             HKEY hParentKey;
             BOOL bDelete = FALSE;
 
@@ -111,39 +111,39 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                 bDelete = TRUE;
                 line++;
             }
-            if (!_tcsnicmp(line, _T("HKEY_CURRENT_USER"), SizeOf(_T("HKEY_CURRENT_USER")) - 1))
+            if (!_wcsnicmp(line, L"HKEY_CURRENT_USER", SizeOf(L"HKEY_CURRENT_USER") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_CURRENT_USER")) - 1;
+                keyName = line + SizeOf(L"HKEY_CURRENT_USER") - 1;
                 hParentKey = HKEY_CURRENT_USER;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_CLASSES_ROOT"), SizeOf(_T("HKEY_CLASSES_ROOT")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_CLASSES_ROOT", SizeOf(L"HKEY_CLASSES_ROOT") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_CLASSES_ROOT")) - 1;
+                keyName = line + SizeOf(L"HKEY_CLASSES_ROOT") - 1;
                 hParentKey = HKEY_CLASSES_ROOT;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_LOCAL_MACHINE"), SizeOf(_T("HKEY_LOCAL_MACHINE")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_LOCAL_MACHINE", SizeOf(L"HKEY_LOCAL_MACHINE") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_LOCAL_MACHINE")) - 1;
+                keyName = line + SizeOf(L"HKEY_LOCAL_MACHINE") - 1;
                 hParentKey = HKEY_LOCAL_MACHINE;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_USERS"), SizeOf(_T("HKEY_USERS")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_USERS", SizeOf(L"HKEY_USERS") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_USERS")) - 1;
+                keyName = line + SizeOf(L"HKEY_USERS") - 1;
                 hParentKey = HKEY_USERS;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_CURRENT_CONFIG"), SizeOf(_T("HKEY_CURRENT_CONFIG")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_CURRENT_CONFIG", SizeOf(L"HKEY_CURRENT_CONFIG") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_CURRENT_CONFIG")) - 1;
+                keyName = line + SizeOf(L"HKEY_CURRENT_CONFIG") - 1;
                 hParentKey = HKEY_CURRENT_CONFIG;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_DYN_DATA"), SizeOf(_T("HKEY_DYN_DATA")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_DYN_DATA", SizeOf(L"HKEY_DYN_DATA") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_DYN_DATA")) - 1;
+                keyName = line + SizeOf(L"HKEY_DYN_DATA") - 1;
                 hParentKey = HKEY_DYN_DATA;
             }
-            else if (!_tcsnicmp(line, _T("HKEY_PERFORMANCE_DATA"), SizeOf(_T("HKEY_PERFORMANCE_DATA")) - 1))
+            else if (!_wcsnicmp(line, L"HKEY_PERFORMANCE_DATA", SizeOf(L"HKEY_PERFORMANCE_DATA") - 1))
             {
-                keyName = line + SizeOf(_T("HKEY_PERFORMANCE_DATA")) - 1;
+                keyName = line + SizeOf(L"HKEY_PERFORMANCE_DATA") - 1;
                 hParentKey = HKEY_PERFORMANCE_DATA;
             }
             else
@@ -162,23 +162,11 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                     return RPE_ROOT_INVALID_KEY;
                 }
             }
-            LPTSTR s = keyName;
+            wchar_t* s = keyName;
             int nBrackets = 1;
 
             while (*s && nBrackets)
             {
-#ifndef _UNICODE
-                if (IsDBCSLeadByte(*s))
-                {
-                    s++;
-                    if (!*s)
-                    {
-                        return RPE_INVALID_MBCS;
-                    }
-                    s++;
-                    continue;
-                }
-#endif
                 if (*s == '[')
                     nBrackets++;
                 else if (*s == ']')
@@ -202,7 +190,7 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                 else
                 {
                     if (!doNotDeleteHiddenKeysAndValues ||
-                        !StrEndsWith(keyName, _T(".hidden"), SizeOf(_T(".hidden")) - 1))
+                        !StrEndsWith(keyName, L".hidden", SizeOf(L".hidden") - 1))
                     {
                         // Delete entire subtree
                         if (pRegistry->OpenKey(hParentKey, keyName, hKey))
@@ -221,13 +209,13 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
         }
         if ((*line == '\"') || (*line == '@'))
         { // First char on the line -> MBCS-safe
-            LPTSTR s;
+            wchar_t* s;
 
             if (*line != '@')
             {
                 s = SeparateStr(++line);
 
-                if (!*s)
+                if (s == NULL)
                 {
                     ret = RPE_VALUE_MISSING_QUOTE;
                     break;
@@ -245,11 +233,11 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                 break;
             }
             SkipWS(s);
-            if (!_tcsnicmp(s, _T("dword:"), SizeOf(_T("dword:")) - 1))
+            if (!_wcsnicmp(s, L"dword:", SizeOf(L"dword:") - 1))
             {
                 DWORD val;
-                s += SizeOf(_T("dword:")) - 1;
-                if (1 == _stscanf(s, _T("%x"), &val))
+                s += SizeOf(L"dword:") - 1;
+                if (1 == swscanf_s(s, L"%x", &val))
                 {
                     if (pRegistry->SetValue(hKey, line, REG_DWORD, &val, sizeof(val)))
                     {
@@ -261,15 +249,15 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                 ret = RPE_VALUE_DWORD;
                 break;
             }
-            else if (!_tcsnicmp(s, _T("hex"), SizeOf(_T("hex")) - 1))
+            else if (!_wcsnicmp(s, L"hex", SizeOf(L"hex") - 1))
             {
                 LPBYTE val, val2;
                 int valType;
 
-                s += SizeOf(_T("hex")) - 1;
+                s += SizeOf(L"hex") - 1;
                 if (*s == ':')
                 {
-                    *s++;
+                    s++;
                     valType = REG_BINARY;
                 }
                 else
@@ -280,7 +268,7 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                         ret = RPE_VALUE_INVALID_TYPE;
                         break;
                     }
-                    LPTSTR s2 = ++s;
+                    wchar_t* s2 = ++s;
                     while (((*s2 >= '0') && (*s2 <= '9')) || ((*s2 >= 'a') && (*s2 <= 'f')) || ((*s2 >= 'A') && (*s2 <= 'F')))
                         s2++;
                     if ((*s2 != ')') || (s2[1] != ':'))
@@ -289,7 +277,11 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                         break;
                     }
                     *s2 = 0;
-                    _stscanf(s, _T("%x"), &valType);
+                    if (swscanf_s(s, L"%x", &valType) != 1)
+                    {
+                        ret = RPE_VALUE_INVALID_TYPE;
+                        break;
+                    }
                     s = s2 + 2;
                 }
                 val = val2 = (LPBYTE)s;
@@ -297,7 +289,7 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                 {
                     if (*s == '\\')
                     { // MBCS-safe
-                        s = _tcstok(NULL, _T("\r\n"));
+                        s = wcstok_s(NULL, L"\r\n", &tokenContext);
                         if (!s)
                         {
                             ret = RPE_VALUE_HEX;
@@ -348,7 +340,6 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                     break; // ret is non-OK
                 }
                 LPBYTE valTmp = NULL;
-#ifdef _UNICODE
                 if (!bReg5File && ((valType == REG_MULTI_SZ) || (valType == REG_EXPAND_SZ)))
                 {
                     size_t srcLen = val2 - val;
@@ -380,34 +371,6 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
                     }
                     val2 = val + len;
                 }
-#else
-                if (bReg5File && ((valType == REG_MULTI_SZ) || (valType == REG_EXPAND_SZ)))
-                {
-                    size_t srcLen = (val2 - val) / sizeof(WCHAR);
-                    LPWSTR srcVal = (LPWSTR)val;
-                    int len = WideCharToMultiByte(CP_ACP, 0, srcVal, (int)srcLen, NULL, 0, NULL, NULL);
-
-                    if (len > 0)
-                    {
-                        if (len > line - buf)
-                        {
-                            valTmp = (LPBYTE)malloc(len);
-                            if (!valTmp)
-                            {
-                                ret = RPE_OUT_OF_MEMORY;
-                                break;
-                            }
-                            val = valTmp;
-                        }
-                        else
-                        {
-                            val = (LPBYTE)buf;
-                        }
-                        WideCharToMultiByte(CP_ACP, 0, srcVal, (int)srcLen, (LPSTR)val, len, NULL, NULL);
-                    }
-                    val2 = val + max(len, 0);
-                }
-#endif
                 if (pRegistry->SetValue(hKey, line, valType, val, (DWORD)(val2 - val)))
                 {
                     if (valTmp)
@@ -421,11 +384,11 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
             }
             else if (*s == '\"')
             { // MBCS-safe
-                LPTSTR val = ++s;
+                wchar_t* val = ++s;
                 s = SeparateStr(s);
                 if (s)
                 {
-                    if (pRegistry->SetValue(hKey, line, REG_SZ, val, sizeof(TCHAR) * (DWORD)(_tcslen(val) + 1)))
+                    if (pRegistry->SetValue(hKey, line, REG_SZ, val, sizeof(wchar_t) * (DWORD)(wcslen(val) + 1)))
                     {
                         continue;
                     }
@@ -438,7 +401,7 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
             else if (*s == '-')
             {
                 if (!doNotDeleteHiddenKeysAndValues ||
-                    !StrEndsWith(line, _T(".hidden"), SizeOf(_T(".hidden")) - 1))
+                    !StrEndsWith(line, L".hidden", SizeOf(L".hidden") - 1))
                 {
                     // DeleteValue returns FALSE when the value did not exist
                     pRegistry->DeleteValue(hKey, line);
@@ -452,52 +415,47 @@ eRPE_ERROR Parse(LPTSTR buf, CSalamanderRegistryExAbstract* pRegistry, BOOL doNo
         }
     }
     if (hKey)
+    {
         pRegistry->CloseKey(hKey);
+        hKey = NULL;
+    }
     return ret;
 }
 
-DWORD ConvertIfNeeded(LPTSTR* pBuf, DWORD size)
+eRPE_ERROR ConvertRegistryFileToUtf16(wchar_t** pBuf, DWORD size, DWORD& utf16ByteSize)
 {
-    LPTSTR buf = *pBuf;
+    utf16ByteSize = 0;
+    if (pBuf == NULL || *pBuf == NULL)
+        return RPE_INVALID_FORMAT;
 
-#ifndef _UNICODE
-    if (size >= sizeof(WCHAR) &&
-        !wcsncmp(((LPWSTR)buf) + 1, L"Windows Registry Editor Version 5.00",
-                 SizeOf(L"Windows Registry Editor Version 5.00") - 1))
+    wchar_t* buf = *pBuf;
+
+    if (size >= sizeof("REGEDIT4") - 1 &&
+        !memcmp((const char*)buf, "REGEDIT4", sizeof("REGEDIT4") - 1))
     {
-        char* bufA;
-        int sizeA = WideCharToMultiByte(CP_ACP, 0, (LPWSTR)buf, size / sizeof(WCHAR), NULL, 0, NULL, NULL);
+        if (size > INT_MAX)
+            return RPE_INVALID_FORMAT;
+        const int sizeW = MultiByteToWideChar(CP_ACP, 0, (char*)buf, static_cast<int>(size), NULL, 0);
+        if (sizeW <= 0)
+            return RPE_INVALID_MBCS;
 
-        bufA = (char*)malloc(sizeA + 1);
-        if (!bufA)
-        {
-            return 0;
-        }
-        WideCharToMultiByte(CP_ACP, 0, (LPWSTR)buf, size / sizeof(WCHAR), bufA, sizeA, NULL, NULL);
-        free(buf);
-        buf = bufA;
-        size = sizeA;
-    }
-#else
-    if (!strncmp((char*)buf, "REGEDIT4", sizeof("REGEDIT4") - 1))
-    {
-        LPWSTR bufW;
-        int sizeW = MultiByteToWideChar(CP_ACP, 0, (char*)buf, size, NULL, 0);
-
-        sizeW *= sizeof(WCHAR);
-        bufW = (LPWSTR)malloc(sizeW + sizeof(WCHAR));
+        wchar_t* bufW = (wchar_t*)malloc((static_cast<size_t>(sizeW) + 1) * sizeof(wchar_t));
         if (!bufW)
+            return RPE_OUT_OF_MEMORY;
+        if (MultiByteToWideChar(CP_ACP, 0, (char*)buf, static_cast<int>(size), bufW, sizeW) != sizeW)
         {
-            return 0;
+            free(bufW);
+            return RPE_INVALID_MBCS;
         }
-        MultiByteToWideChar(CP_ACP, 0, (char*)buf, size, bufW, sizeW / sizeof(WCHAR));
         free(buf);
         buf = bufW;
-        size = sizeW;
+        size = static_cast<DWORD>(sizeW * sizeof(wchar_t));
     }
-#endif
+    else if (size % sizeof(wchar_t) != 0)
+        return RPE_INVALID_FORMAT;
 
-    buf[size / sizeof(TCHAR)] = 0; // force NUL termination
+    buf[size / sizeof(wchar_t)] = 0; // force NUL termination
     *pBuf = buf;
-    return size;
+    utf16ByteSize = size;
+    return RPE_OK;
 }

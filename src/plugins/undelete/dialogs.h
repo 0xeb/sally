@@ -27,15 +27,15 @@ protected:
     CGUIProgressBarAbstract *ProgressBar1, *ProgressBar2;
     CGUIStaticTextAbstract *Label1, *Label2;
     BOOL WantCancel;
-    CPathBuffer SrcName; // Heap-allocated for long path support
-    CPathBuffer DestName; // Heap-allocated for long path support
+    std::wstring SrcName;
+    std::wstring DestName;
     DWORD LastTick, FileProgress, TotalProgress;
     BOOL Changed[4];
 
 public:
     CCopyProgressDlg(HWND parent, CObjectOrigin origin = ooStandard);
-    void SetSourceFileName(const char* fileName);
-    void SetDestFileName(const char* fileName);
+    void SetSourceFileName(const wchar_t* fileName);
+    void SetDestFileName(const wchar_t* fileName);
     void SetFileProgress(DWORD progress);
     void SetTotalProgress(DWORD progress);
     BOOL GetWantCancel();
@@ -49,16 +49,16 @@ class CConnectDialog : public CDialog
 {
 public:
     CConnectDialog(HWND parent, int panel);
-    CPathBuffer Volume; // Heap-allocated for long path support
+    std::wstring Volume;
     int Panel;
 
 protected:
     HWND hList;
     HIMAGELIST hDrivesImg;
 
-    void AddVolumeDetails(const char* root, const char* volumeID, const char* volumeFS,
+    void AddVolumeDetails(const wchar_t* root, const wchar_t* volumeID, const wchar_t* volumeFS,
                           const CQuadWord& bytesTotal, const CQuadWord& bytesFree,
-                          const char* volumeName, int serial, BOOL selected);
+                          const wchar_t* volumeName, int serial, BOOL selected);
     void InitDrives();
     BOOL OnDialogOK();
     void OnImageBrowse();
@@ -71,11 +71,11 @@ public:
 class CFileNameDialog : public CDialog
 {
 public:
-    CFileNameDialog(HWND parent, char* filename);
+    CFileNameDialog(HWND parent, std::wstring& filename);
     BOOL AllPressed;
 
 protected:
-    char* FileName;
+    std::wstring& FileName;
 
     virtual void Transfer(CTransferInfo& ti);
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -96,7 +96,7 @@ class CRestoreDialog : public CDialog
 public:
     CRestoreDialog(HWND parent);
 
-    CPathBuffer TargetPath; // Heap-allocated for long path support
+    std::wstring TargetPath;
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

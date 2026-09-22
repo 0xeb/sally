@@ -52,7 +52,7 @@ HIMAGELIST WINAPI CWpdDeviceIcons::CreateImageList(int size)
     auto iconList = SalamanderGUI->CreateIconList();
     _ASSERTE(iconList != nullptr);
     _ASSERTE(size > 0 && size <= IMAGELIST_COUNT);
-    ok = iconList->CreateFromPNG(FxGetModuleInstance(), MAKEINTRESOURCE(IDR_DEVICEICONS16 + size - 1), pixelSize);
+    ok = iconList->CreateFromPNG(FxGetModuleInstance(), MAKEINTRESOURCEW(IDR_DEVICEICONS16 + size - 1), pixelSize);
     _ASSERTE(ok);
     himl = iconList->GetImageList();
     _ASSERTE(himl != nullptr);

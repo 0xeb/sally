@@ -29,10 +29,10 @@ public:
 
     virtual BOOL Open(BOOL quiet);
     virtual BOOL DumpInfo(FILE* outStream);
-    virtual BOOL ListDirectory(char* path, int session,
+    virtual BOOL ListDirectory(const std::wstring& path, int session,
                                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
-    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                           const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
+    virtual int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                           const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip);
 
 protected:
     BOOL ReadBlockPhys(DWORD lbNum, size_t blocks, unsigned char* data);

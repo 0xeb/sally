@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -18,7 +18,7 @@
 
 extern HINSTANCE g_hInstance;
 
-static const TCHAR WC_SCRATCH[] = _T("AutomationAbortableTarget");
+static const wchar_t WC_SCRATCH[] = L"AutomationAbortableTarget";
 #define ID_TIMER 1
 
 static bool g_bScratchWindowClassRegistered;
@@ -49,7 +49,7 @@ static LRESULT CALLBACK ScratchWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     {
     case WM_NCCREATE:
     {
-        CREATESTRUCT* pCreateStruct = reinterpret_cast<CREATESTRUCT*>(lParam);
+        CREATESTRUCTW* pCreateStruct = reinterpret_cast<CREATESTRUCTW*>(lParam);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
         break;
     }
@@ -67,21 +67,21 @@ static LRESULT CALLBACK ScratchWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, L
     }
     }
 
-    return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hWnd, uMsg, wParam, lParam);
 }
 
 static bool RegisterScratchWindowClass()
 {
-    WNDCLASSEX cls = {
+    WNDCLASSEXW cls = {
         0,
     };
 
-    cls.cbSize = sizeof(WNDCLASSEX);
+    cls.cbSize = sizeof(WNDCLASSEXW);
     cls.lpfnWndProc = ScratchWindowProc;
     cls.hInstance = g_hInstance;
     cls.lpszClassName = WC_SCRATCH;
 
-    return RegisterClassEx(&cls) != FALSE;
+    return RegisterClassExW(&cls) != FALSE;
 }
 
 HRESULT AbortableModalDialogWrapper(
@@ -110,7 +110,7 @@ HRESULT AbortableModalDialogWrapper(
         state.hwndReenable = hwndOwner;
     }
 
-    HWND hwndScratch = CreateWindowEx(0, WC_SCRATCH, NULL, WS_OVERLAPPED, 0, 0, 0, 0, NULL, NULL, g_hInstance, &state);
+    HWND hwndScratch = CreateWindowExW(0, WC_SCRATCH, NULL, WS_OVERLAPPED, 0, 0, 0, 0, NULL, NULL, g_hInstance, &state);
     _ASSERTE(hwndScratch != NULL);
     if (hwndScratch == NULL)
     {
@@ -132,13 +132,13 @@ HRESULT AbortableModalDialogWrapper(
         // Pump out the WM_QUIT we generated. The eventual messages
         // before WM_QUIT are lost.
         MSG msg;
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (msg.message == WM_QUIT)
             {
                 break;
             }
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -153,7 +153,7 @@ void UninitializeAbortableModalDialogWrapper()
 {
     if (g_bScratchWindowClassRegistered)
     {
-        if (!UnregisterClass(WC_SCRATCH, g_hInstance))
+        if (!UnregisterClassW(WC_SCRATCH, g_hInstance))
             TRACE_E("UnregisterClass(WC_SCRATCH) has failed");
     }
 }

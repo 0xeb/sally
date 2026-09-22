@@ -250,7 +250,8 @@ struct SCommonHeader
 
     // persistent fields
     CFileData FileInfo;
-    char* Path;
+    std::wstring FullName;
+    std::wstring Path;
     CQuadWord Checksum;
     BOOL IsDir;
     EArchiveFormat Format;
@@ -268,12 +269,12 @@ class CArchiveAbstract
 public:
     virtual ~CArchiveAbstract() {};
 
-    virtual BOOL ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir) = 0;
-    virtual BOOL UnpackOneFile(const char* nameInArchive, const CFileData* fileData,
-                               const char* targetPath, const char* newFileName) = 0;
-    virtual BOOL UnpackArchive(const char* targetPath, const char* archiveRoot,
+    virtual BOOL ListArchive(const wchar_t* prefix, CSalamanderDirectoryAbstract* dir) = 0;
+    virtual BOOL UnpackOneFile(const wchar_t* nameInArchive, const CFileData* fileData,
+                               const wchar_t* targetPath, const wchar_t* newFileName) = 0;
+    virtual BOOL UnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot,
                                SalEnumSelection nextName, void* param) = 0;
-    virtual BOOL UnpackWholeArchive(const char* mask, const char* targetPath) = 0;
+    virtual BOOL UnpackWholeArchive(const wchar_t* mask, const wchar_t* targetPath) = 0;
 
     virtual BOOL IsOk() = 0;
 };
@@ -288,13 +289,16 @@ private:
     DWORD Silent;
 
     BOOL ListStream(CSalamanderDirectoryAbstract* dir);
-    BOOL UnpackStream(const char* targetPath, BOOL doProgress,
-                      const char* nameInArchive, CNames* names, const char* newName);
+    BOOL UnpackStream(const wchar_t* targetPath, BOOL doProgress,
+                      const wchar_t* nameInArchive, CNames* names, const wchar_t* newName);
     BOOL GetStreamHeader(SCommonHeader& header);
 
     int ReadArchiveHeader(SCommonHeader& header, BOOL probe);
-    int WriteOutData(const SCommonHeader& header, const char* targetPath,
-                     const char* nameInArchive, BOOL simulate, BOOL doProgress);
+    // 'targetName' is the real OS-facing relative output name/path (already projected to
+    // wide by the caller, whether from the archive's own decoded name or an SDK-supplied
+    // rename) - not this plugin's byte-domain archive-internal text.
+    int WriteOutData(const SCommonHeader& header, const wchar_t* targetPath,
+                     const wchar_t* targetName, BOOL simulate, BOOL doProgress);
 
     int SkipBlockPadding(const SCommonHeader& header);
     void GetArchiveType(const unsigned char* buffer, const unsigned short preRead, SCommonHeader& header);
@@ -305,34 +309,24 @@ private:
     BOOL IsTarHeader(const unsigned char* buffer, BOOL& finished,
                      EArchiveFormat& format);
     int ReadCpioName(unsigned long namesize, SCommonHeader& header);
-    void MakeFileInfo(const SCommonHeader& header, char* arcfiledata, char* arcfilename);
+    void MakeFileInfo(const SCommonHeader& header, std::wstring& arcfiledata, std::wstring& arcfilename);
 
 public:
-    CArchive(LPCTSTR fileName, CSalamanderForOperationsAbstract* salamander, DWORD offset, CQuadWord inputSize);
+    CArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander, DWORD offset, CQuadWord inputSize);
     ~CArchive();
 
     BOOL IsOk() { return Ok; }
 
-    BOOL ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir);
-    BOOL UnpackOneFile(const char* nameInArchive, const CFileData* fileData,
-                       const char* targetPath, const char* newFileName);
-    BOOL UnpackArchive(const char* targetPath, const char* archiveRoot,
+    BOOL ListArchive(const wchar_t* prefix, CSalamanderDirectoryAbstract* dir);
+    BOOL UnpackOneFile(const wchar_t* nameInArchive, const CFileData* fileData,
+                       const wchar_t* targetPath, const wchar_t* newFileName);
+    BOOL UnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot,
                        SalEnumSelection nextName, void* param);
-    BOOL UnpackWholeArchive(const char* mask, const char* targetPath);
+    BOOL UnpackWholeArchive(const wchar_t* mask, const wchar_t* targetPath);
 
-    BOOL DoUnpackArchive(const char* targetPath, const char* archiveRoot, CNames& names);
+    BOOL DoUnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot, CNames& names);
 };
 
 BOOL FromOctalQ(const unsigned char* ptr, const int length, CQuadWord& result);
-void GetFileInfo(const CFileData* newfile, BOOL isDir, char* arcfiledata, char* arcfilename,
-                 const char* archiveFileName, const char* fullname);
-void namecpy(char* destName, const char* srcName, const unsigned int bufSize);
 
-int CpioDoUnpackArchive(CDecompressFile* stream, CSalamanderForOperationsAbstract* salamander,
-                        const char* archiveFileName, const char* targetPath,
-                        const char* archiveRoot, CNames& names);
-int CpioUnpackOneFile(CDecompressFile* stream, CSalamanderForOperationsAbstract* salamander,
-                      const char* archiveFileName, const char* nameInArchive,
-                      const char* targetPath);
-
-CArchiveAbstract* CreateArchive(LPCTSTR fileName, CSalamanderForOperationsAbstract* salamander);
+CArchiveAbstract* CreateArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander);

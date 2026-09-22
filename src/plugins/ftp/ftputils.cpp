@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "ftp_reply_parser.h"
 
 const char* FTP_ANONYMOUS = "anonymous"; // standard name for an anonymous user
 
@@ -39,7 +40,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            lstrcpynA(cutDir, lastSlash + 1, cutDirBufSize);
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "/somedir" or "/somedir/" -> "/"
@@ -63,7 +64,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/' || *(path + l - 1) == '\\')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            lstrcpynA(cutDir, lastSlash + 1, cutDirBufSize);
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "/somedir" or "/somedir/" -> "/"
@@ -86,7 +87,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/' || *(path + l - 1) == '\\')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            lstrcpynA(cutDir, lastSlash + 1, cutDirBufSize);
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "C:/somedir" or "C:/somedir/" -> "C:/"
@@ -105,7 +106,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             name++;
             if (cutDirBufSize > 0)
-                lstrcpyn(cutDir, name, cutDirBufSize);
+                lstrcpynA(cutDir, name, cutDirBufSize);
             *name = 0;
             return TRUE;
         }
@@ -126,7 +127,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                     {
                         *end = 0; // we remove the original closing ']'
                         if (cutDirBufSize > 0)
-                            lstrcpyn(cutDir, s + 1, cutDirBufSize);
+                            lstrcpynA(cutDir, s + 1, cutDirBufSize);
                         *s++ = ']';
                         *s = 0;
                         return TRUE;
@@ -137,8 +138,8 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                         {
                             *end = 0; // we remove the original closing ']'
                             if (cutDirBufSize > 0)
-                                lstrcpyn(cutDir, s + 1, cutDirBufSize);
-                            lstrcpyn(s + 1, "000000]", pathBufSize - (int)((s - path) + 1));
+                                lstrcpynA(cutDir, s + 1, cutDirBufSize);
+                            lstrcpynA(s + 1, "000000]", pathBufSize - (int)((s - path) + 1));
                             return TRUE;
                         }
                     }
@@ -165,7 +166,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                 {
                     *end = 0; // we remove the original closing '\''
                     if (cutDirBufSize > 0)
-                        lstrcpyn(cutDir, s + 1, cutDirBufSize);
+                        lstrcpynA(cutDir, s + 1, cutDirBufSize);
                     if (*s == '\'')
                         s++; // "'pub'" -> we must keep the first '\''
                     *s++ = '\'';
@@ -188,7 +189,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '.')
                 *(path + --l) = 0; // removal of trailing '.'
-            lstrcpyn(cutDir, lastDot + 1, cutDirBufSize);
+            lstrcpynA(cutDir, lastDot + 1, cutDirBufSize);
         }
         *lastDot = 0;
         return TRUE;
@@ -221,12 +222,62 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         else
             prevPeriod = lastPeriod;
         if (cutDirBufSize > 0)
-            lstrcpyn(cutDir, prevPeriod + 1, cutDirBufSize);
+            lstrcpynA(cutDir, prevPeriod + 1, cutDirBufSize);
         *(prevPeriod + (willBeRoot ? 1 : 0)) = 0;
         return TRUE;
     }
     }
     TRACE_E("Unknown path type in FTPCutDirectory()");
+    return FALSE;
+}
+
+BOOL FTPCutDirectory(CFTPServerPathType type, std::string& path,
+                     std::string* cutDir, BOOL* fileNameCouldBeCut) noexcept
+{
+    if (path.size() > static_cast<size_t>((std::numeric_limits<int>::max)() - 8))
+        return FALSE;
+
+    try
+    {
+        std::vector<char> mutablePath(path.size() + 8, 0);
+        memcpy(mutablePath.data(), path.c_str(), path.size() + 1);
+
+        std::vector<char> removed;
+        char* removedData = NULL;
+        int removedSize = 0;
+        if (cutDir != NULL)
+        {
+            removed.resize(path.size() + 1, 0);
+            removedData = removed.data();
+            removedSize = static_cast<int>(removed.size());
+        }
+
+        BOOL stagedFileNameCouldBeCut = FALSE;
+        if (!FTPCutDirectory(type, mutablePath.data(), static_cast<int>(mutablePath.size()),
+                             removedData, removedSize,
+                             fileNameCouldBeCut != NULL ? &stagedFileNameCouldBeCut : NULL))
+        {
+            return FALSE;
+        }
+
+        std::string stagedPath(mutablePath.data());
+        std::string stagedCutDir;
+        if (cutDir != NULL)
+            stagedCutDir.assign(removedData);
+
+        path.swap(stagedPath);
+        if (cutDir != NULL)
+            cutDir->swap(stagedCutDir);
+        if (fileNameCouldBeCut != NULL)
+            *fileNameCouldBeCut = stagedFileNameCouldBeCut;
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
+    catch (const std::length_error&)
+    {
+    }
     return FALSE;
 }
 
@@ -459,7 +510,25 @@ BOOL FTPIsValidAndNotRootPath(CFTPServerPathType type, const char* path)
     }
 }
 
-const char* FTPFindEndOfUserNameOrHostInURL(const char* url)
+template <typename TChar>
+static size_t FTPStringLength(const TChar* text)
+{
+    const TChar* end = text;
+    while (*end != 0)
+        end++;
+    return end - text;
+}
+
+template <typename TChar>
+static const TChar* FTPFindChar(const TChar* text, TChar character)
+{
+    while (*text != 0 && *text != character)
+        text++;
+    return *text == character ? text : NULL;
+}
+
+template <typename TChar>
+static const TChar* FTPFindEndOfUserNameOrHostInURLT(const TChar* url)
 {
     // path format: "user:password@host:port/path"
     // while parsing from the right it can handle:
@@ -467,10 +536,10 @@ const char* FTPFindEndOfUserNameOrHostInURL(const char* url)
     //  ftp://test.name@nas.server.cz@localhost:22/pub/test@bla
 
     // try to parse the URL from the right starting at the path separator ('/') or from the end of the URL
-    const char* p = strchr(url, '/');
+    const TChar* p = FTPFindChar(url, (TChar)'/');
     if (p == NULL)
-        p = url + strlen(url);
-    const char* hostEnd = p;
+        p = url + FTPStringLength(url);
+    const TChar* hostEnd = p;
     while (--p >= url && *p != '@' && *p != ':' && *p != '\\')
         ;
     if (p < url)
@@ -490,7 +559,7 @@ const char* FTPFindEndOfUserNameOrHostInURL(const char* url)
         }
         if (!skip) // only if we are not finishing the right-to-left parsing
         {          // *p is '@'; determine whether it ends the password or the user name
-            const char* userEnd = p;
+            const TChar* userEnd = p;
             BOOL invalidCharInPasswd = FALSE;
             while (1)
             {
@@ -524,8 +593,14 @@ const char* FTPFindEndOfUserNameOrHostInURL(const char* url)
     return p;
 }
 
-void FTPSplitPath(char* p, char** user, char** password, char** host, char** port, char** path,
-                  char* firstCharOfPath, int userLength)
+const char* FTPFindEndOfUserNameOrHostInURL(const char* url)
+{
+    return FTPFindEndOfUserNameOrHostInURLT(url);
+}
+
+template <typename TChar>
+static void FTPSplitPathT(TChar* p, TChar** user, TChar** password, TChar** host, TChar** port,
+                          TChar** path, TChar* firstCharOfPath, int userLength)
 {
     // path format: "//user:password@host:port/path" or just "user:password@host:port/path"
     if (user != NULL)
@@ -541,20 +616,20 @@ void FTPSplitPath(char* p, char** user, char** password, char** host, char** por
 
     if (*p == '/' && *(p + 1) == '/')
         p += 2; // skip an optional "//"
-    char* beg = p;
-    if (userLength > 0 && (int)strlen(p) > userLength &&
-        (p[userLength] == '@' || p[userLength] == ':' && strchr(p + userLength + 1, '@') != NULL))
+    TChar* beg = p;
+    if (userLength > 0 && (int)FTPStringLength(p) > userLength &&
+        (p[userLength] == '@' || p[userLength] == ':' && FTPFindChar(p + userLength + 1, (TChar)'@') != NULL))
     { // parse the username according to its expected length (introduced because the username may contain '@', '/' and '\\')
         p += userLength;
     }
     else
     {
-        p = (char*)FTPFindEndOfUserNameOrHostInURL(p);
+        p = (TChar*)FTPFindEndOfUserNameOrHostInURLT(p);
     }
     if (*p == '@' || *p == ':') // user
     {
         BOOL passwd = *p == ':';
-        char* passEnd = p + 1;
+        TChar* passEnd = p + 1;
         if (passwd) // only ':' - we must try to find '@' (if it is absent, the ':' comes from "host:port")
         {
             while (*passEnd != 0 && *passEnd != '@' && *passEnd != ':' &&
@@ -568,7 +643,7 @@ void FTPSplitPath(char* p, char** user, char** password, char** host, char** por
                 while (*beg <= ' ')
                     beg++; // skip spaces at beginning; there must be at least one '@' or ':'
                 *user = beg;
-                char* e = p - 1;
+                TChar* e = p - 1;
                 while (e >= beg && *e <= ' ')
                     *e-- = 0; // clip spaces at end
             }
@@ -592,7 +667,7 @@ void FTPSplitPath(char* p, char** user, char** password, char** host, char** por
         while (*beg != 0 && *beg <= ' ')
             beg++; // skip spaces at beginning
         *host = beg;
-        char* e = p - 1;
+        TChar* e = p - 1;
         while (e >= beg && *e <= ' ')
             *e-- = 0; // clip spaces at end
     }
@@ -607,7 +682,7 @@ void FTPSplitPath(char* p, char** user, char** password, char** host, char** por
             while (*beg != 0 && *beg <= ' ')
                 beg++; // skip spaces at beginning
             *port = beg;
-            char* e = p - 1;
+            TChar* e = p - 1;
             while (e >= beg && *e <= ' ')
                 *e-- = 0; // clip spaces at end
         }
@@ -622,11 +697,24 @@ void FTPSplitPath(char* p, char** user, char** password, char** host, char** por
     }
 }
 
-int FTPGetUserLength(const char* user)
+void FTPSplitPath(char* p, char** user, char** password, char** host, char** port, char** path,
+                  char* firstCharOfPath, int userLength)
+{
+    FTPSplitPathT(p, user, password, host, port, path, firstCharOfPath, userLength);
+}
+
+void FTPSplitPathW(wchar_t* p, wchar_t** user, wchar_t** password, wchar_t** host, wchar_t** port,
+                   wchar_t** path, wchar_t* firstCharOfPath, int userLength)
+{
+    FTPSplitPathT(p, user, password, host, port, path, firstCharOfPath, userLength);
+}
+
+template <typename TChar>
+static int FTPGetUserLengthT(const TChar* user)
 {
     if (user == NULL)
         return 0;
-    const char* s = user;
+    const TChar* s = user;
     while (*s != 0 && *s != '/' && *s != '\\' && *s != ':' && *s != '@')
         s++;
     if (*s == 0)
@@ -636,20 +724,31 @@ int FTPGetUserLength(const char* user)
     return (int)(s - user);
 }
 
-const char* FTPFindPath(const char* path, int userLength)
+int FTPGetUserLength(const char* user)
+{
+    return FTPGetUserLengthT(user);
+}
+
+int FTPGetUserLengthW(const wchar_t* user)
+{
+    return FTPGetUserLengthT(user);
+}
+
+template <typename TChar>
+static const TChar* FTPFindPathT(const TChar* path, int userLength)
 {
     // path format: "//user:password@host:port/path" or just "user:password@host:port/path"
-    const char* p = path;
+    const TChar* p = path;
     if (*p == '/' && *(p + 1) == '/')
         p += 2; // skip an optional "//"
-    if (userLength > 0 && (int)strlen(p) > userLength &&
-        (p[userLength] == '@' || p[userLength] == ':' && strchr(p + userLength + 1, '@') != NULL))
+    if (userLength > 0 && (int)FTPStringLength(p) > userLength &&
+        (p[userLength] == '@' || p[userLength] == ':' && FTPFindChar(p + userLength + 1, (TChar)'@') != NULL))
     { // parse the username according to its expected length (introduced because the username may contain '@', '/' and '\\')
         p += userLength;
     }
     else
     {
-        p = FTPFindEndOfUserNameOrHostInURL(p);
+        p = FTPFindEndOfUserNameOrHostInURLT(p);
     }
     if (*p == '@' || *p == ':') // user + password
     {
@@ -674,7 +773,18 @@ const char* FTPFindPath(const char* path, int userLength)
     return p;
 }
 
-const char* FTPGetLocalPath(const char* path, CFTPServerPathType type)
+const char* FTPFindPath(const char* path, int userLength)
+{
+    return FTPFindPathT(path, userLength);
+}
+
+const wchar_t* FTPFindPathW(const wchar_t* path, int userLength)
+{
+    return FTPFindPathT(path, userLength);
+}
+
+template <typename TChar>
+static const TChar* FTPGetLocalPathT(const TChar* path, CFTPServerPathType type)
 {
     switch (type)
     {
@@ -696,53 +806,137 @@ const char* FTPGetLocalPath(const char* path, CFTPServerPathType type)
     }
 }
 
+const char* FTPGetLocalPath(const char* path, CFTPServerPathType type)
+{
+    return FTPGetLocalPathT(path, type);
+}
+
+const wchar_t* FTPGetLocalPathW(const wchar_t* path, CFTPServerPathType type)
+{
+    return FTPGetLocalPathT(path, type);
+}
+
 BOOL FTPIsTheSameServerPath(CFTPServerPathType type, const char* p1, const char* p2)
 {
     return FTPIsPrefixOfServerPath(type, p1, p2, TRUE);
 }
 
-BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const char* path,
-                             BOOL mustBeSame)
+template <typename TChar>
+static BOOL FTPIsVMSEscapeSequenceT(const TChar* pathBeginning, const TChar* checkedChar);
+
+static int FTPCompareNoCaseN(const char* first, const char* second, int count)
+{
+    for (int i = 0; i < count; ++i)
+    {
+        unsigned char left = static_cast<unsigned char>(first[i]);
+        unsigned char right = static_cast<unsigned char>(second[i]);
+        if (left >= 'A' && left <= 'Z')
+            left = static_cast<unsigned char>(left + ('a' - 'A'));
+        if (right >= 'A' && right <= 'Z')
+            right = static_cast<unsigned char>(right + ('a' - 'A'));
+        if (left != right)
+            return left < right ? -1 : 1;
+        if (left == 0)
+            return 0;
+    }
+    return 0;
+}
+
+static int FTPCompareNoCaseN(const wchar_t* first, const wchar_t* second, int count)
+{
+    return SalamanderGeneral->StrNICmp(first, second, count);
+}
+
+static int FTPCompareNoCase(const char* first, const char* second)
+{
+    for (;; ++first, ++second)
+    {
+        unsigned char left = static_cast<unsigned char>(*first);
+        unsigned char right = static_cast<unsigned char>(*second);
+        if (left >= 'A' && left <= 'Z')
+            left = static_cast<unsigned char>(left + ('a' - 'A'));
+        if (right >= 'A' && right <= 'Z')
+            right = static_cast<unsigned char>(right + ('a' - 'A'));
+        if (left != right)
+            return left < right ? -1 : 1;
+        if (left == 0)
+            return 0;
+    }
+}
+
+static int FTPCompareNoCase(const wchar_t* first, const wchar_t* second)
+{
+    return SalamanderGeneral->StrICmp(first, second);
+}
+
+static BOOL FTPCharactersEqualNoCase(char first, char second)
+{
+    return LowerCase[first] == LowerCase[second];
+}
+
+static BOOL FTPCharactersEqualNoCase(wchar_t first, wchar_t second)
+{
+    const wchar_t firstText[] = {first, 0};
+    const wchar_t secondText[] = {second, 0};
+    return SalamanderGeneral->StrICmp(firstText, secondText) == 0;
+}
+
+template <typename TChar>
+static int FTPCompareExactN(const TChar* first, const TChar* second, int count)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (first[i] != second[i])
+            return first[i] < second[i] ? -1 : 1;
+    }
+    return 0;
+}
+
+template <typename TChar>
+static BOOL FTPIsPrefixOfServerPathT(CFTPServerPathType type, const TChar* prefix, const TChar* path,
+                                     BOOL mustBeSame)
 {
     switch (type)
     {
     case ftpsptOpenVMS: // case-insensitive + VMS path
     {
-        int l1 = (int)strlen(prefix);
-        int l2 = (int)strlen(path);
-        if (l1 > 1 && prefix[l1 - 1] == ']' && !FTPIsVMSEscapeSequence(prefix, prefix + (l1 - 1)))
+        int l1 = (int)FTPStringLength(prefix);
+        int l2 = (int)FTPStringLength(path);
+        if (l1 > 1 && prefix[l1 - 1] == ']' && !FTPIsVMSEscapeSequenceT(prefix, prefix + (l1 - 1)))
         {
             l1--;
-            if (prefix[l1 - 1] == '.' && !FTPIsVMSEscapeSequence(prefix, prefix + (l1 - 1)))
+            if (prefix[l1 - 1] == '.' && !FTPIsVMSEscapeSequenceT(prefix, prefix + (l1 - 1)))
                 l1--;
-            if (l1 >= 7 && strncmp(prefix + l1 - 7, "[000000", 7) == 0 &&
-                !FTPIsVMSEscapeSequence(prefix, prefix + (l1 - 7)))
+            const TChar root[] = {'[', '0', '0', '0', '0', '0', '0', 0};
+            if (l1 >= 7 && FTPCompareExactN(prefix + l1 - 7, root, 7) == 0 &&
+                !FTPIsVMSEscapeSequenceT(prefix, prefix + (l1 - 7)))
             {
                 l1 -= 6;
             }
         }
-        if (l2 > 1 && path[l2 - 1] == ']' && !FTPIsVMSEscapeSequence(path, path + (l2 - 1)))
+        if (l2 > 1 && path[l2 - 1] == ']' && !FTPIsVMSEscapeSequenceT(path, path + (l2 - 1)))
         {
             l2--;
-            if (path[l2 - 1] == '.' && !FTPIsVMSEscapeSequence(path, path + (l2 - 1)))
+            if (path[l2 - 1] == '.' && !FTPIsVMSEscapeSequenceT(path, path + (l2 - 1)))
                 l2--;
-            if (l2 >= 7 && strncmp(path + l2 - 7, "[000000", 7) == 0 &&
-                !FTPIsVMSEscapeSequence(path, path + (l2 - 7)))
+            const TChar root[] = {'[', '0', '0', '0', '0', '0', '0', 0};
+            if (l2 >= 7 && FTPCompareExactN(path + l2 - 7, root, 7) == 0 &&
+                !FTPIsVMSEscapeSequenceT(path, path + (l2 - 7)))
             {
                 l2 -= 6;
             }
         }
         return (l1 == l2 || !mustBeSame && l1 < l2) &&
-               SalamanderGeneral->StrNICmp(prefix, path, l1) == 0 &&
+               FTPCompareNoCaseN(prefix, path, l1) == 0 &&
                (l1 == l2 ||
-                prefix[l1 - 1] == '[' && !FTPIsVMSEscapeSequence(prefix, prefix + (l1 - 1)) ||
-                (path[l1] == '.' || path[l1] == ']') && !FTPIsVMSEscapeSequence(path, path + l1));
+                prefix[l1 - 1] == '[' && !FTPIsVMSEscapeSequenceT(prefix, prefix + (l1 - 1)) ||
+                (path[l1] == '.' || path[l1] == ']') && !FTPIsVMSEscapeSequenceT(path, path + l1));
     }
 
     case ftpsptMVS: // case-insensitive + MVS path
     {
-        int l1 = (int)strlen(prefix);
-        int l2 = (int)strlen(path);
+        int l1 = (int)FTPStringLength(prefix);
+        int l2 = (int)FTPStringLength(path);
         if (l1 > 1 && prefix[l1 - 1] == '\'')
         {
             l1--;
@@ -755,7 +949,7 @@ BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const 
             if (path[l2 - 1] == '.')
                 l2--;
         }
-        return (l1 == l2 || !mustBeSame && l1 < l2) && SalamanderGeneral->StrNICmp(prefix, path, l1) == 0 &&
+        return (l1 == l2 || !mustBeSame && l1 < l2) && FTPCompareNoCaseN(prefix, path, l1) == 0 &&
                (l1 == l2 || path[l1] == '.' || path[l1] == '\'');
     }
 
@@ -763,11 +957,11 @@ BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const 
     case ftpsptWindows:
     case ftpsptOS2: // case-insensitive + '/' is equivalent to '\\'
     {
-        const char* s1 = prefix;
-        const char* s2 = path;
+        const TChar* s1 = prefix;
+        const TChar* s2 = path;
         while (*s1 != 0 &&
                ((*s1 == '/' || *s1 == '\\') && (*s2 == '/' || *s2 == '\\') ||
-                LowerCase[*s1] == LowerCase[*s2]))
+                FTPCharactersEqualNoCase(*s1, *s2)))
         {
             s1++;
             s2++;
@@ -783,21 +977,21 @@ BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const 
     case ftpsptIBMz_VM: // case-insensitive + IBM_z/VM path
     case ftpsptTandem:  // case-insensitive + Tandem path
     {
-        int l1 = (int)strlen(prefix);
-        int l2 = (int)strlen(path);
+        int l1 = (int)FTPStringLength(prefix);
+        int l2 = (int)FTPStringLength(path);
         if (l1 > 1 && prefix[l1 - 1] == '.')
             l1--;
         if (l2 > 1 && path[l2 - 1] == '.')
             l2--;
-        return (l1 == l2 || !mustBeSame && l1 < l2) && SalamanderGeneral->StrNICmp(prefix, path, l1) == 0 &&
+        return (l1 == l2 || !mustBeSame && l1 < l2) && FTPCompareNoCaseN(prefix, path, l1) == 0 &&
                (l1 == l2 || path[l1] == '.');
     }
 
     case ftpsptAS400: // case-insensitive
     {
-        const char* s1 = prefix;
-        const char* s2 = path;
-        while (*s1 != 0 && LowerCase[*s1] == LowerCase[*s2])
+        const TChar* s1 = prefix;
+        const TChar* s2 = path;
+        while (*s1 != 0 && FTPCharactersEqualNoCase(*s1, *s2))
         {
             s1++;
             s2++;
@@ -812,256 +1006,265 @@ BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const 
 
     default: // unix + others
     {
-        int l1 = (int)strlen(prefix);
-        int l2 = (int)strlen(path);
+        int l1 = (int)FTPStringLength(prefix);
+        int l2 = (int)FTPStringLength(path);
         if (l1 > 0 && prefix[l1 - 1] == '/')
             l1--;
         if (l2 > 0 && path[l2 - 1] == '/')
             l2--;
-        return (l1 == l2 || !mustBeSame && l1 < l2) && strncmp(prefix, path, l1) == 0 &&
+        return (l1 == l2 || !mustBeSame && l1 < l2) && FTPCompareExactN(prefix, path, l1) == 0 &&
                (l1 == l2 || path[l1] == '/');
     }
     }
 }
 
-BOOL FTPIsTheSamePath(CFTPServerPathType type, const char* p1, const char* p2,
-                      BOOL sameIfPath2IsRelative, int userLength)
+BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const char* path,
+                             BOOL mustBeSame)
+{
+    return FTPIsPrefixOfServerPathT(type, prefix, path, mustBeSame);
+}
+
+BOOL FTPIsPrefixOfServerPathW(CFTPServerPathType type, const wchar_t* prefix, const wchar_t* path,
+                               BOOL mustBeSame)
+{
+    return FTPIsPrefixOfServerPathT(type, prefix, path, mustBeSame);
+}
+
+template <typename TChar>
+static BOOL FTPMakeMutableTextCopy(const TChar* source, std::vector<TChar>& copy) noexcept
+{
+    try
+    {
+        const size_t length = FTPStringLength(source);
+        std::vector<TChar> staged(source, source + length + 1);
+        copy.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+template <typename TChar>
+static void FTPWipeMutableTextCopy(std::vector<TChar>& copy) noexcept
+{
+    if (!copy.empty())
+        SecureZeroMemory(copy.data(), copy.size() * sizeof(TChar));
+    copy.clear();
+}
+
+template <typename TChar>
+static BOOL FTPStringsEqual(const TChar* first, const TChar* second)
+{
+    while (*first != 0 && *first == *second)
+    {
+        first++;
+        second++;
+    }
+    return *first == *second;
+}
+
+template <typename TChar>
+static BOOL FTPIsTheSamePathT(CFTPServerPathType type, const TChar* p1, const TChar* p2,
+                              BOOL sameIfPath2IsRelative, int userLength,
+                              const TChar* anonymousUser, const TChar* defaultPort)
 {
     // path format: "//user:password@host:port/path"
     if (*p1 == '/' && *(p1 + 1) == '/' && *p2 == '/' && *(p2 + 1) == '/') // this must be the user part of the path
     {
         p1 += 2;
         p2 += 2;
-        int l1 = (int)strlen(p1);
-        int l2 = (int)strlen(p2);
-        if (l1 < FTP_USERPART_SIZE && l2 < FTP_USERPART_SIZE)
+        std::vector<TChar> buf1;
+        std::vector<TChar> buf2;
+        if (FTPMakeMutableTextCopy(p1, buf1) && FTPMakeMutableTextCopy(p2, buf2))
         {
-            char buf1[FTP_USERPART_SIZE];
-            char buf2[FTP_USERPART_SIZE];
-            strcpy(buf1, p1);
-            strcpy(buf2, p2);
-            char *user1, *host1, *port1, *path1, *passwd1;
-            char *user2, *host2, *port2, *path2, *passwd2;
-            FTPSplitPath(buf1, &user1, &passwd1, &host1, &port1, &path1, NULL, userLength);
-            FTPSplitPath(buf2, &user2, &passwd2, &host2, &port2, &path2, NULL, userLength);
+            TChar *user1, *host1, *port1, *path1, *passwd1;
+            TChar *user2, *host2, *port2, *path2, *passwd2;
+            FTPSplitPathT<TChar>(buf1.data(), &user1, &passwd1, &host1, &port1, &path1, NULL, userLength);
+            FTPSplitPathT<TChar>(buf2.data(), &user2, &passwd2, &host2, &port2, &path2, NULL, userLength);
             if (passwd1 != NULL)
-                memset(passwd1, 0, strlen(passwd1)); // zero out the memory with the password
+                memset(passwd1, 0, FTPStringLength(passwd1) * sizeof(TChar));
             if (passwd2 != NULL)
-                memset(passwd2, 0, strlen(passwd2)); // zero out the memory with the password
+                memset(passwd2, 0, FTPStringLength(passwd2) * sizeof(TChar));
+            BOOL same = FALSE;
             if (user1 == NULL && user2 == NULL ||
-                user1 != NULL && user2 != NULL && strcmp(user1, user2) == 0 ||
-                user1 == NULL && user2 != NULL && strcmp(user2, FTP_ANONYMOUS) == 0 ||
-                user2 == NULL && user1 != NULL && strcmp(user1, FTP_ANONYMOUS) == 0)
+                user1 != NULL && user2 != NULL && FTPStringsEqual(user1, user2) ||
+                user1 == NULL && user2 != NULL && FTPStringsEqual(user2, anonymousUser) ||
+                user2 == NULL && user1 != NULL && FTPStringsEqual(user1, anonymousUser))
             { // match user names (case-sensitive - UNIX accounts)
                 if (host1 != NULL && host2 != NULL &&
-                    SalamanderGeneral->StrICmp(host1, host2) == 0)
+                    FTPCompareNoCase(host1, host2) == 0)
                 {                                // match host names (case-insensitive - Internet conventions - perhaps better to test IP addresses later)
-                    const char* ftp_port = "21"; // standard FTP port
                     if (port1 == NULL && port2 == NULL ||
-                        port1 != NULL && port2 != NULL && strcmp(port1, port2) == 0 ||
-                        port1 == NULL && port2 != NULL && strcmp(port2, ftp_port) == 0 ||
-                        port2 == NULL && port1 != NULL && strcmp(port1, ftp_port) == 0)
+                        port1 != NULL && port2 != NULL && FTPStringsEqual(port1, port2) ||
+                        port1 == NULL && port2 != NULL && FTPStringsEqual(port2, defaultPort) ||
+                        port2 == NULL && port1 != NULL && FTPStringsEqual(port1, defaultPort))
                     {                                       // matching port (case-sensitive; it should be just a number, so it hardly matters)
                         if (path1 != NULL && path2 != NULL) // paths without a leading slash
                         {
-                            return FTPIsTheSameServerPath(type, path1, path2);
+                            same = FTPIsPrefixOfServerPathT(type, path1, path2, TRUE);
                         }
                         else // at least one of the paths is missing
                         {
                             if (path1 == NULL && path2 == NULL ||
                                 path1 == NULL && path2 != NULL && *path2 == 0 ||
                                 path2 == NULL && path1 != NULL && *path1 == 0)
-                                return TRUE; // two root paths (with/without a slash)
+                                same = TRUE; // two root paths (with/without a slash)
                             else
                             {
                                 if (sameIfPath2IsRelative && path2 == NULL)
                                 { // 'p2' is relative + otherwise matches 'p1' (handles
                                     // "ftp://petr@localhost/path" == "ftp://petr@localhost" - needed for
                                     // Change Directory command)
-                                    return TRUE;
+                                    same = TRUE;
                                 }
                             }
                         }
                     }
                 }
             }
+            FTPWipeMutableTextCopy(buf1);
+            FTPWipeMutableTextCopy(buf2);
+            return same;
         }
-        else
-            TRACE_E("Too large paths in FTPIsTheSamePath!");
+        FTPWipeMutableTextCopy(buf1);
+        FTPWipeMutableTextCopy(buf2);
+        TRACE_E(LOW_MEMORY);
     }
     return FALSE;
 }
 
-BOOL FTPHasTheSameRootPath(const char* p1, const char* p2, int userLength)
+BOOL FTPIsTheSamePath(CFTPServerPathType type, const char* p1, const char* p2,
+                      BOOL sameIfPath2IsRelative, int userLength)
+{
+    return FTPIsTheSamePathT(type, p1, p2, sameIfPath2IsRelative, userLength,
+                             FTP_ANONYMOUS, "21");
+}
+
+BOOL FTPIsTheSamePathW(CFTPServerPathType type, const wchar_t* p1, const wchar_t* p2,
+                       BOOL sameIfPath2IsRelative, int userLength)
+{
+    return FTPIsTheSamePathT(type, p1, p2, sameIfPath2IsRelative, userLength,
+                             L"anonymous", L"21");
+}
+
+template <typename TChar>
+static BOOL FTPHasTheSameRootPathT(const TChar* p1, const TChar* p2, int userLength,
+                                   const TChar* anonymousUser, const TChar* defaultPort)
 {
     // root path format: "//user:password@host:port"
     if (*p1 == '/' && *(p1 + 1) == '/' && *p2 == '/' && *(p2 + 1) == '/') // this must be the user part of the path
     {
         p1 += 2;
         p2 += 2;
-        int l1 = (int)strlen(p1);
-        int l2 = (int)strlen(p2);
-        if (l1 < FTP_USERPART_SIZE && l2 < FTP_USERPART_SIZE)
+        std::vector<TChar> buf1;
+        std::vector<TChar> buf2;
+        if (FTPMakeMutableTextCopy(p1, buf1) && FTPMakeMutableTextCopy(p2, buf2))
         {
-            char buf1[FTP_USERPART_SIZE];
-            char buf2[FTP_USERPART_SIZE];
-            strcpy(buf1, p1);
-            strcpy(buf2, p2);
-            char *user1, *host1, *port1, *passwd1;
-            char *user2, *host2, *port2, *passwd2;
-            FTPSplitPath(buf1, &user1, &passwd1, &host1, &port1, NULL, NULL, userLength);
-            FTPSplitPath(buf2, &user2, &passwd2, &host2, &port2, NULL, NULL, userLength);
+            TChar *user1, *host1, *port1, *passwd1;
+            TChar *user2, *host2, *port2, *passwd2;
+            TChar** unusedPath = NULL;
+            TChar* unusedFirstCharOfPath = NULL;
+            FTPSplitPathT(buf1.data(), &user1, &passwd1, &host1, &port1, unusedPath, unusedFirstCharOfPath, userLength);
+            FTPSplitPathT(buf2.data(), &user2, &passwd2, &host2, &port2, unusedPath, unusedFirstCharOfPath, userLength);
             if (passwd1 != NULL)
-                memset(passwd1, 0, strlen(passwd1)); // zero out the memory with the password
+                memset(passwd1, 0, FTPStringLength(passwd1) * sizeof(TChar)); // zero out the memory with the password
             if (passwd2 != NULL)
-                memset(passwd2, 0, strlen(passwd2)); // zero out the memory with the password
+                memset(passwd2, 0, FTPStringLength(passwd2) * sizeof(TChar)); // zero out the memory with the password
+            BOOL same = FALSE;
             if (user1 == NULL && user2 == NULL ||
-                user1 != NULL && user2 != NULL && strcmp(user1, user2) == 0 ||
-                user1 == NULL && user2 != NULL && strcmp(user2, FTP_ANONYMOUS) == 0 ||
-                user2 == NULL && user1 != NULL && strcmp(user1, FTP_ANONYMOUS) == 0)
+                user1 != NULL && user2 != NULL && FTPStringsEqual(user1, user2) ||
+                user1 == NULL && user2 != NULL && FTPStringsEqual(user2, anonymousUser) ||
+                user2 == NULL && user1 != NULL && FTPStringsEqual(user1, anonymousUser))
             { // match user names (case-sensitive - UNIX accounts)
                 if (host1 != NULL && host2 != NULL &&
-                    SalamanderGeneral->StrICmp(host1, host2) == 0)
+                    FTPCompareNoCase(host1, host2) == 0)
                 {                                // match host names (case-insensitive - Internet conventions - perhaps better to test IP addresses later)
-                    const char* ftp_port = "21"; // standard FTP port
                     if (port1 == NULL && port2 == NULL ||
-                        port1 != NULL && port2 != NULL && strcmp(port1, port2) == 0 ||
-                        port1 == NULL && port2 != NULL && strcmp(port2, ftp_port) == 0 ||
-                        port2 == NULL && port1 != NULL && strcmp(port1, ftp_port) == 0)
+                        port1 != NULL && port2 != NULL && FTPStringsEqual(port1, port2) ||
+                        port1 == NULL && port2 != NULL && FTPStringsEqual(port2, defaultPort) ||
+                        port2 == NULL && port1 != NULL && FTPStringsEqual(port1, defaultPort))
                     {                // matching port (case-sensitive; it should be just a number, so it hardly matters)
-                        return TRUE; // roots match
+                        same = TRUE; // roots match
                     }
                 }
             }
+            FTPWipeMutableTextCopy(buf1);
+            FTPWipeMutableTextCopy(buf2);
+            return same;
         }
-        else
-            TRACE_E("Too large paths in FTPHasTheSameRootPath!");
+        FTPWipeMutableTextCopy(buf1);
+        FTPWipeMutableTextCopy(buf2);
+        TRACE_E(LOW_MEMORY);
     }
     return FALSE;
 }
 
-char* FTPGetErrorText(int err, char* buf, int bufSize)
+BOOL FTPHasTheSameRootPath(const char* p1, const char* p2, int userLength)
 {
-    int l = 0;
-    if (bufSize > 20)
-        l = sprintf(buf, "(%d) ", err);
-    if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                      NULL,
-                      err,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                      buf + l,
-                      bufSize - l,
-                      NULL) == 0 ||
-        bufSize > l && *(buf + l) == 0)
-    {
-        char txt[100];
-        sprintf(txt, "System error %d, text description is not available.", err);
-        lstrcpyn(buf, txt, bufSize);
-    }
-    return buf;
+    return FTPHasTheSameRootPathT(p1, p2, userLength, FTP_ANONYMOUS, "21");
+}
+
+BOOL FTPHasTheSameRootPathW(const wchar_t* p1, const wchar_t* p2, int userLength)
+{
+    return FTPHasTheSameRootPathT(p1, p2, userLength, L"anonymous", L"21");
+}
+
+BOOL FTPGetErrorText(int err, std::string& text) noexcept
+{
+    LPSTR systemText = NULL;
+    const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+                                        NULL, err,
+                                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                                        reinterpret_cast<LPSTR>(&systemText), 0, NULL);
+    BOOL result;
+    if (length != 0 && systemText != NULL && systemText[0] != 0)
+        result = FTPFormatString(text, "(%d) %s", err, systemText);
+    else
+        result = FTPFormatString(text, "System error %d, text description is not available.", err);
+    if (systemText != NULL)
+        LocalFree(systemText);
+    return result;
 }
 
 // determine whether the text 'text' contains the string 'sub' (letter case does not matter)
-BOOL HaveSubstring(const char* text, const char* sub)
+BOOL HaveSubstring(std::string_view text, std::string_view sub)
 {
-    const char* t = text;
-    while (*t != 0)
+    if (sub.empty())
+        return TRUE;
+    if (sub.size() > text.size())
+        return FALSE;
+    for (size_t offset = 0; offset <= text.size() - sub.size(); ++offset)
     {
-        if (LowerCase[*t] == LowerCase[*sub])
+        BOOL equal = TRUE;
+        for (size_t index = 0; index < sub.size(); ++index)
         {
-            const char* s = sub + 1;
-            const char* tt = t + 1;
-            while (*s != 0 && LowerCase[*tt] == LowerCase[*s])
+            const unsigned char textByte = static_cast<unsigned char>(text[offset + index]);
+            const unsigned char subByte = static_cast<unsigned char>(sub[index]);
+            if (LowerCase[textByte] != LowerCase[subByte])
             {
-                tt++;
-                s++;
+                equal = FALSE;
+                break;
             }
-            if (*s == 0)
-                return TRUE; // found
         }
-        t++;
-    }
-    return *sub == 0; // not found (exception: empty text and empty substring)
-}
-
-const char* KnownOSNames[] = {"UNIX", "Windows", "NETWARE", "TANDEM", "OS/2", "VMS", "MVS", "VM", "OS/400", NULL};
-
-BOOL IsKnownOSName(const char* sysBeg, const char* sysEnd)
-{
-    const char** os = KnownOSNames;
-    while (*os != NULL)
-    {
-        if (strlen(*os) == (DWORD)(sysEnd - sysBeg) &&
-            SalamanderGeneral->StrNICmp(*os, sysBeg, (int)(sysEnd - sysBeg)) == 0)
+        if (equal)
             return TRUE;
-        os++;
     }
     return FALSE;
 }
 
-void FTPGetServerSystem(const char* serverSystem, char* sysName)
+std::string_view FTPGetServerSystem(const char* serverSystem) noexcept
 {
-    sysName[0] = 0;
-    if (serverSystem != NULL)
-    {
-        int replyLen = (int)strlen(serverSystem);
-        if (*serverSystem == '2' && replyLen > 4) // FTP_D1_SUCCESS + there is a chance of the system name string
-        {
-            const char* sys;
-            if (serverSystem[3] == ' ')
-                sys = serverSystem + 4; // single-line response
-            else                        // multi-line reply, we must find the last line
-            {
-                sys = serverSystem + replyLen;
-                if (sys > serverSystem && *(sys - 1) == '\n')
-                    sys--;
-                if (sys > serverSystem && *(sys - 1) == '\r')
-                    sys--;
-                while (sys > serverSystem && *(sys - 1) != '\r' && *(sys - 1) != '\n')
-                    sys--;
-                sys += 4;
-                if (sys >= serverSystem + replyLen)
-                {
-                    TRACE_E("Unexpected format of SYST reply: " << serverSystem);
-                    sys = serverSystem + 4; // unexpected
-                }
-            }
-            while (*sys != 0 && *sys <= ' ')
-                sys++;
-            const char* sysBeg = sys;
-            while (*sys != 0 && *sys > ' ')
-                sys++;
-            if (!IsKnownOSName(sysBeg, sys))
-            {
-                const char* nextSys = sys;
-                while (*nextSys != 0)
-                {
-                    while (*nextSys != 0 && *nextSys <= ' ')
-                        nextSys++; // skip white-spaces
-                    const char* nextSysBeg = nextSys;
-                    while (*nextSys != 0 && *nextSys > ' ')
-                        nextSys++;
-                    if (IsKnownOSName(nextSysBeg, nextSys)) // we found the OS name only in one of the following words (translation error, e.g. "215 Betriebssystem OS/2")
-                    {
-                        sysBeg = nextSysBeg;
-                        sys = nextSys;
-                        break;
-                    }
-                }
-            }
-
-            int len = (int)(sys - sysBeg);
-            if (len > 200)
-                len = 200; // truncate to 200 characters
-            memcpy(sysName, sysBeg, len);
-            sysName[len] = 0;
-        }
-    }
+    return serverSystem != NULL ? FTPParseServerSystemReply(serverSystem) : std::string_view();
 }
 
-CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char* serverSystem, const char* path)
+template <typename TChar>
+static CFTPServerPathType GetFTPServerPathTypeT(const char* serverFirstReply,
+                                                const char* serverSystem,
+                                                const TChar* path)
 {
-    const char* s = path;
+    const TChar* s = path;
     int slash = 0;
     int slashAtBeg = 0;
     int backslash = 0;
@@ -1142,7 +1345,7 @@ CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char
 
             case ']':
             {
-                const char* name = s + 1; // try to skip the file name (e.g. "DKA0:[MYDIR.SUBDIR]MYFILE.TXT;1")
+                const TChar* name = s + 1; // try to skip the file name (e.g. "DKA0:[MYDIR.SUBDIR]MYFILE.TXT;1")
                 BOOL vmsEsc = FALSE;
                 while (*name != 0 && *name != '/' && *name != '\\')
                 {
@@ -1204,8 +1407,7 @@ CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char
     }
     int pathLen = (int)(s - path);
 
-    char sysName[201];
-    FTPGetServerSystem(serverSystem, sysName);
+    const std::string_view sysName = FTPGetServerSystem(serverSystem);
 
     if (slashAtBeg)
     {
@@ -1240,7 +1442,7 @@ CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char
         {
             if (slash == 0 && backslash == 0 &&
                 serverFirstReply != NULL && HaveSubstring(serverFirstReply, " TANDEM ") &&
-                (sysName[0] == 0 || HaveSubstring(sysName, "TANDEM")))
+                (sysName.empty() || HaveSubstring(sysName, "TANDEM")))
             {
                 return ftpsptTandem;
             }
@@ -1293,7 +1495,7 @@ CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char
         if (HaveSubstring(sysName, "VM"))
             return ftpsptIBMz_VM;
         if (serverFirstReply != NULL && HaveSubstring(serverFirstReply, " TANDEM ") &&
-            (sysName[0] == 0 || HaveSubstring(sysName, "TANDEM")))
+            (sysName.empty() || HaveSubstring(sysName, "TANDEM")))
         {
             return ftpsptTandem;
         }
@@ -1301,6 +1503,18 @@ CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char
     if (HaveSubstring(sysName, "OS/400"))
         return ftpsptAS400; // the first path that AS/400 returns is e.g. "QGPL" (reply to the first PWD: 257 "QGPL" is current library.)
     return ftpsptUnknown;
+}
+
+CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char* serverSystem,
+                                        const char* path)
+{
+    return GetFTPServerPathTypeT(serverFirstReply, serverSystem, path);
+}
+
+CFTPServerPathType GetFTPServerPathTypeW(const char* serverFirstReply, const char* serverSystem,
+                                         const wchar_t* path)
+{
+    return GetFTPServerPathTypeT(serverFirstReply, serverSystem, path);
 }
 
 char FTPGetPathDelimiter(CFTPServerPathType pathType)
@@ -1402,7 +1616,7 @@ BOOL FTPGetIBMz_VMRootPath(char* root, int rootSize, const char* path)
         if (*s != 0)
         {
             s++;
-            lstrcpyn(root, path, (int)min(s - path + 1, rootSize));
+            lstrcpynA(root, path, (int)min(s - path + 1, rootSize));
             return TRUE;
         }
     }
@@ -1426,6 +1640,51 @@ BOOL FTPGetOS2RootPath(char* root, int rootSize, const char* path)
     }
     if (rootSize > 0)
         root[0] = 0;
+    return FALSE;
+}
+
+BOOL FTPGetIBMz_VMRootPath(std::string& root, const char* path) noexcept
+{
+    if (path == NULL)
+        return FALSE;
+    const char* colon = strchr(path, ':');
+    const char* period = colon != NULL ? strchr(colon, '.') : NULL;
+    if (period == NULL)
+        return FALSE;
+    try
+    {
+        std::string staged(path, static_cast<size_t>(period - path + 1));
+        root.swap(staged);
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
+    catch (const std::length_error&)
+    {
+    }
+    return FALSE;
+}
+
+BOOL FTPGetOS2RootPath(std::string& root, const char* path) noexcept
+{
+    if (path == NULL || path[0] == 0 || path[1] != ':')
+        return FALSE;
+    try
+    {
+        std::string staged;
+        staged.push_back(path[0]);
+        staged.push_back(':');
+        staged.push_back(path[2] == '/' || path[2] == '\\' ? path[2] : '/');
+        root.swap(staged);
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
+    catch (const std::length_error&)
+    {
+    }
     return FALSE;
 }
 
@@ -1504,40 +1763,55 @@ BOOL IsUNIXLink(const char* rights)
             (rights[8] == 'w' || rights[8] == '-'));
 }
 
-void GetUNIXRightsStr(char* buf, int bufSize, DWORD attrs)
+BOOL FTPFormatIPv4Address(DWORD address, std::wstring& output) noexcept
 {
-    if (bufSize <= 0)
-        return;
-    char* end = buf + bufSize - 1;
-    char* s = buf;
-    if (s < end)
-        *s++ = (attrs & 0400) ? 'r' : '-';
-    if (s < end)
-        *s++ = (attrs & 0200) ? 'w' : '-';
-    if (s < end)
-        *s++ = (attrs & 0100) ? 'x' : '-';
-    if (s < end)
-        *s++ = (attrs & 0040) ? 'r' : '-';
-    if (s < end)
-        *s++ = (attrs & 0020) ? 'w' : '-';
-    if (s < end)
-        *s++ = (attrs & 0010) ? 'x' : '-';
-    if (s < end)
-        *s++ = (attrs & 0004) ? 'r' : '-';
-    if (s < end)
-        *s++ = (attrs & 0002) ? 'w' : '-';
-    if (s < end)
-        *s++ = (attrs & 0001) ? 'x' : '-';
-    *s = 0;
+    in_addr ipv4Address;
+    ipv4Address.s_addr = address;
+    wchar_t apiBuffer[INET_ADDRSTRLEN]; // RFC-defined maximum including NUL
+    if (InetNtopW(AF_INET, &ipv4Address, apiBuffer, _countof(apiBuffer)) == NULL)
+        return FALSE;
+    try
+    {
+        std::wstring staged(apiBuffer);
+        output.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
-void FTPGetErrorTextForLog(DWORD err, char* errBuf, int bufSize)
+BOOL FTPWindowHasClass(HWND window, const wchar_t* expectedClass) noexcept
 {
-    FTPGetErrorText(err, errBuf, bufSize - 2); // (bufSize-2) so there is room left for our CRLF
-    char* s = errBuf + strlen(errBuf);
-    while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-        s--;
-    strcpy(s, "\r\n"); // append our CRLF to the end of the line with the error text
+    if (window == NULL || expectedClass == NULL)
+        return FALSE;
+    try
+    {
+        std::vector<wchar_t> className(32);
+        while (className.size() <= static_cast<size_t>((std::numeric_limits<int>::max)()))
+        {
+            const int length = GetClassNameW(window, className.data(), static_cast<int>(className.size()));
+            if (length <= 0)
+                return FALSE;
+            if (static_cast<size_t>(length) + 1 < className.size())
+                return _wcsicmp(className.data(), expectedClass) == 0;
+            if (className.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) / 2)
+                return FALSE;
+            className.resize(className.size() * 2);
+        }
+    }
+    catch (...)
+    {
+    }
+    return FALSE;
+}
+
+BOOL FTPGetErrorTextForLog(DWORD err, std::string& text) noexcept
+{
+    if (!FTPGetErrorText(err, text))
+        return FALSE;
+    return FtpNormalizeLogLine(text);
 }
 
 BOOL FTPReadFTPReply(char* readBytes, int readBytesCount, int readBytesOffset,
@@ -1677,142 +1951,80 @@ BOOL FTPReadFTPReply(char* readBytes, int readBytesCount, int readBytesOffset,
     return ret;
 }
 
-BOOL FTPGetDirectoryFromReply(const char* reply, int replySize, char* dirBuf, int dirBufSize)
+BOOL FTPGetDirectoryFromReply(const char* reply, int replySize, std::string& directory)
 {
-    CALL_STACK_MESSAGE3("FTPGetDirectoryFromReply(, %d, , %d)", replySize, dirBufSize);
+    CALL_STACK_MESSAGE2("FTPGetDirectoryFromReply(, %d, )", replySize);
 
-    if (dirBufSize > 0)
-        dirBuf[0] = 0;
-    else
+    if (reply == NULL || replySize < 0)
     {
-        TRACE_E("Insufficient buffer space in FTPGetDirectoryFromReply().");
+        TRACE_E("Invalid input in FTPGetDirectoryFromReply().");
         return FALSE;
     }
-    BOOL ok = FALSE;
-    const char* end = reply + replySize;
-    const char* s = reply + 4;
+    return FTPGetDirectoryFromReply(
+        std::string_view(reply, static_cast<size_t>(replySize)), directory);
+}
 
-    // rfc 959 format: 257<space>"<directory-name>"<space><commentary>
-    // VxWorks FTP server returns: 257 Current directory is "mars:"
-    // German AIX returns for a'g'f: 257 '/projects/acaix3/iplus/lnttmp/a'g'f' ist das aktuelle Verzeichnis.
-    // German AIX returns for a"d: 257 '/projects/acaix3/iplus/lnttmp/a"d' ist das aktuelle Verzeichnis.
-
-    // solution for VxWorks: find the first '"'
-    // solution for German AIX: detect '\'' before '"'; the path reaches up to the last '\'', and there is no '"' after the last '\''
-
-    while (s < end && *s != '"' && *s != '\'')
-        s++;
-    if (*s == '\'') // German AIX
-    {
-        const char* lastQuote = strrchr(s + 1, '\'');
-        if (lastQuote != NULL && strchr(lastQuote, '"') == NULL)
-        {
-            int len = (int)(lastQuote - (s + 1));
-            if (len >= dirBufSize)
-                len = dirBufSize - 1;
-            memcpy(dirBuf, s + 1, len);
-            dirBuf[len] = 0;
-            return TRUE;
-        }
-        while (s < end && *s != '"')
-            s++;
-    }
-    if (s < end && *s == '"') // must start with '"'
-    {
-        char* d = dirBuf;
-        char* endDir = dirBuf + dirBufSize - 1; // we must leave space for the terminating null character
-        while (++s < end && d < endDir)
-        {
-            if (*s == '"')
-            {
-                if (s + 1 < end && *(s + 1) == '"')
-                    s++; // '""' = '"' (escape sequence)
-                else
-                {
-                    ok = TRUE; // end of the directory name
-                    break;
-                }
-            }
-            *d++ = *s;
-        }
-        *d = 0;
-    }
+BOOL FTPGetDirectoryFromReply(std::string_view reply, std::string& directory)
+{
+    const BOOL ok = FTPParseWorkingDirectoryReply(reply, directory) ? TRUE : FALSE;
     if (!ok)
         TRACE_E("Syntax error in get-directory reply (reply code 257) in FTPGetDirectoryFromReply().");
     return ok;
 }
 
+BOOL FTPPathAppend(CFTPServerPathType type, std::string& path,
+                   const char* name, BOOL isDir) noexcept
+{
+    if (name == NULL)
+        return FALSE;
+    const size_t nameLength = strlen(name);
+    if (path.size() > static_cast<size_t>((std::numeric_limits<int>::max)() - 16) ||
+        nameLength > static_cast<size_t>((std::numeric_limits<int>::max)() - 16) - path.size())
+    {
+        return FALSE;
+    }
+
+    try
+    {
+        std::vector<char> mutablePath(path.size() + nameLength + 16, 0);
+        memcpy(mutablePath.data(), path.c_str(), path.size() + 1);
+        if (!FTPPathAppend(type, mutablePath.data(), static_cast<int>(mutablePath.size()), name, isDir))
+            return FALSE;
+        std::string staged(mutablePath.data());
+        path.swap(staged);
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+    }
+    catch (const std::length_error&)
+    {
+    }
+    return FALSE;
+}
+
 BOOL FTPGetIPAndPortFromReply(const char* reply, int replySize, DWORD* ip, unsigned short* port)
 {
-    CALL_STACK_MESSAGE3("FTPGetIPAndPortFromReply(%s, %d, ,)", reply, replySize);
+    CALL_STACK_MESSAGE3("FTPGetIPAndPortFromReply(%s, %d, ,)", reply != NULL ? reply : "", replySize);
 
-    const char* end = reply + (replySize == -1 ? strlen(reply) : replySize);
-    const char* s = reply + 4;
-    int h1, h2, h3, h4;
-    int p1, p2;
-    while (s < end) // looking for a sequence of six numbers separated by ',' and whitespace
+    if (reply == NULL || replySize < -1)
+        return FALSE;
+    return FTPGetIPAndPortFromReply(
+        std::string_view(reply, replySize == -1 ? strlen(reply) : static_cast<size_t>(replySize)),
+        ip, port);
+}
+
+BOOL FTPGetIPAndPortFromReply(std::string_view reply, DWORD* ip, unsigned short* port)
+{
+    if (ip == NULL || port == NULL)
+        return FALSE;
+    std::uint32_t parsedIP = 0;
+    std::uint16_t parsedPort = 0;
+    if (FTPParsePassiveReply(reply, parsedIP, parsedPort))
     {
-        if (*s >= '0' && *s <= '9') // hope for the start of the sequence
-        {
-            int i;
-            for (i = 0; i < 6; i++)
-            {
-                // reading one number
-                int n = 0;
-                while (s < end && *s >= '0' && *s <= '9')
-                {
-                    n = n * 10 + (*s - '0');
-                    s++;
-                }
-
-                if (n < 256) // if it is a byte value, assign it to the appropriate variable
-                {
-                    switch (i)
-                    {
-                    case 0:
-                        h1 = n;
-                        break;
-                    case 1:
-                        h2 = n;
-                        break;
-                    case 2:
-                        h3 = n;
-                        break;
-                    case 3:
-                        h4 = n;
-                        break;
-                    case 4:
-                        p1 = n;
-                        break;
-                    case 5:
-                        p2 = n;
-                        break;
-                    }
-                }
-                else
-                    break; // number too large, cannot be the requested sextet
-
-                if (i == 5) // end of search, success
-                {
-                    *ip = (h4 << 24) + (h3 << 16) + (h2 << 8) + h1;
-                    *port = (p1 << 8) + p2;
-                    return TRUE;
-                }
-
-                BOOL delim = FALSE; // allow only one comma
-                while (s < end)
-                {
-                    if (*s > ' ' && (delim || *s != ','))
-                        break;
-                    if (*s == ',')
-                        delim = TRUE;
-                    s++;
-                }
-                if (s >= end || *s != ',' && (*s < '0' || *s > '9'))
-                    break; // unexpected format
-            }
-        }
-        s++;
+        *ip = static_cast<DWORD>(parsedIP);
+        *port = static_cast<unsigned short>(parsedPort);
+        return TRUE;
     }
     TRACE_E("FTPGetIPAndPortFromReply(): unexpected format of 'passive' reply!");
     return FALSE;
@@ -1867,15 +2079,49 @@ void FTPMakeVMSDirName(char* vmsDirNameBuf, int vmsDirNameBufSize, const char* d
     if (dirNameLen >= vmsDirNameBufSize)
         dirNameLen = vmsDirNameBufSize - 1;
     memcpy(vmsDirNameBuf, dirName, dirNameLen);
-    lstrcpyn(vmsDirNameBuf + dirNameLen, ".DIR;1", vmsDirNameBufSize - dirNameLen);
+    lstrcpynA(vmsDirNameBuf + dirNameLen, ".DIR;1", vmsDirNameBufSize - dirNameLen);
+}
+
+BOOL FTPMakeVMSDirName(std::string& vmsDirName, const char* dirName) noexcept
+{
+    if (dirName == NULL)
+        return FALSE;
+    size_t dirNameLen = strlen(dirName);
+    if (dirNameLen > 0 && dirName[dirNameLen - 1] == '.' &&
+        !FTPIsVMSEscapeSequence(dirName, dirName + dirNameLen - 1))
+    {
+        --dirNameLen;
+    }
+    try
+    {
+        std::string staged(dirName, dirNameLen);
+        staged.append(".DIR;1");
+        vmsDirName.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+template <typename TChar>
+static BOOL FTPIsVMSEscapeSequenceT(const TChar* pathBeginning, const TChar* checkedChar)
+{
+    const TChar* t = checkedChar;
+    while (--t >= pathBeginning && *t == '^')
+        ;
+    return (((checkedChar - t) - 1) & 1) != 0; // an odd number of '^' before a character = escaped character
 }
 
 BOOL FTPIsVMSEscapeSequence(const char* pathBeginning, const char* checkedChar)
 {
-    const char* t = checkedChar;
-    while (--t >= pathBeginning && *t == '^')
-        ;
-    return (((checkedChar - t) - 1) & 1) != 0; // an odd number of '^' before a character = escaped character
+    return FTPIsVMSEscapeSequenceT(pathBeginning, checkedChar);
+}
+
+BOOL FTPIsVMSEscapeSequenceW(const wchar_t* pathBeginning, const wchar_t* checkedChar)
+{
+    return FTPIsVMSEscapeSequenceT(pathBeginning, checkedChar);
 }
 
 BOOL FTPPathEndsWithDelimiter(CFTPServerPathType type, const char* path)
@@ -1952,19 +2198,45 @@ BOOL FTPIBMz_VmCutTwoDirectories(char* path, int pathBufSize, char* cutDir, int 
     else
         prevPrevPeriod = prevPeriod;
     if (cutDirBufSize > 0)
-        lstrcpyn(cutDir, prevPrevPeriod + 1, cutDirBufSize);
+        lstrcpynA(cutDir, prevPrevPeriod + 1, cutDirBufSize);
     *(prevPrevPeriod + (willBeRoot ? 1 : 0)) = 0;
     return TRUE;
 }
 
-BOOL FTPVMSCutFileVersion(char* name, int nameLen)
+BOOL FTPIBMz_VmCutTwoDirectories(std::string& path, std::string& cutDir) noexcept
+{
+    try
+    {
+        if (path.size() >= static_cast<size_t>(INT_MAX))
+            return FALSE;
+        std::vector<char> mutablePath(path.begin(), path.end());
+        mutablePath.push_back('\0');
+        std::vector<char> mutableCut(path.size() + 1, 0);
+        if (!FTPIBMz_VmCutTwoDirectories(mutablePath.data(),
+                                         static_cast<int>(mutablePath.size()),
+                                         mutableCut.data(),
+                                         static_cast<int>(mutableCut.size())))
+            return FALSE;
+        std::string stagedPath(mutablePath.data());
+        std::string stagedCut(mutableCut.data());
+        path.swap(stagedPath);
+        cutDir.swap(stagedCut);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL FTPVMSCutFileVersion(wchar_t* name, int nameLen)
 {
     if (nameLen == -1)
-        nameLen = (int)strlen(name);
-    char* s = name + nameLen;
-    while (--s > name && *s >= '0' && *s <= '9')
+        nameLen = (int)wcslen(name);
+    wchar_t* s = name + nameLen;
+    while (--s > name && *s >= L'0' && *s <= L'9')
         ;                      // skip the version number
-    if (s > name && *s == ';') // if trimming the version number succeeded (there is a ';' before the number) and at least one character of the name remains
+    if (s > name && *s == L';') // if trimming the version number succeeded (there is a ';' before the number) and at least one character of the name remains
     {
         *s = 0;
         return TRUE;
@@ -2024,14 +2296,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (s != NULL) // "aaa/bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             *path = 0;
         }
         return TRUE;
@@ -2046,14 +2318,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (*s != 0) // "aaa/bbb" or "aaa\\bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             *path = 0;
         }
         return TRUE;
@@ -2071,7 +2343,7 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
                 int l = (int)(s - (path + 2));
                 if (l >= cutBufSize)
                     l = cutBufSize - 1;
-                lstrcpyn(cut, path + 2, l + 1);
+                lstrcpynA(cut, path + 2, l + 1);
                 if (*s == '.')
                 {
                     s++;
@@ -2095,14 +2367,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
             if (s != NULL) // "aaa.bbb"
             {
                 *s = 0;
-                lstrcpyn(cut, path, cutBufSize);
+                lstrcpynA(cut, path, cutBufSize);
                 memmove(path, s + 1, strlen(s + 1) + 1);
             }
             else // "aaa"
             {
                 if (*path == 0)
                     return FALSE;
-                lstrcpyn(cut, path, cutBufSize);
+                lstrcpynA(cut, path, cutBufSize);
                 *path = 0;
             }
         }
@@ -2117,20 +2389,45 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (s != NULL) // "aaa.bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            lstrcpynA(cut, path, cutBufSize);
             *path = 0;
         }
         return TRUE;
     }
     }
     return FALSE;
+}
+
+BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, std::string& path,
+                                    std::string& cut) noexcept
+{
+    try
+    {
+        if (path.size() >= static_cast<size_t>(INT_MAX))
+            return FALSE;
+        std::vector<char> mutablePath(path.begin(), path.end());
+        mutablePath.push_back('\0');
+        std::vector<char> mutableCut(path.size() + 1, 0);
+        if (!FTPCutFirstDirFromRelativePath(pathType, mutablePath.data(), mutableCut.data(),
+                                            static_cast<int>(mutableCut.size())))
+            return FALSE;
+        std::string stagedPath(mutablePath.data());
+        std::string stagedCut(mutableCut.data());
+        path.swap(stagedPath);
+        cut.swap(stagedCut);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL FTPCompleteAbsolutePath(CFTPServerPathType pathType, char* path, int pathBufSize,
@@ -2188,6 +2485,44 @@ BOOL FTPCompleteAbsolutePath(CFTPServerPathType pathType, char* path, int pathBu
     }
     }
     return TRUE;
+}
+
+BOOL FTPCompleteAbsolutePath(CFTPServerPathType pathType, std::string& path,
+                             std::string_view workPath) noexcept
+{
+    try
+    {
+        std::string staged(path);
+        switch (pathType)
+        {
+        case ftpsptOS2:
+            if (!staged.empty() && (staged[0] == '/' || staged[0] == '\\'))
+            {
+                if (workPath.size() < 2 || workPath[1] != ':')
+                    return FALSE;
+                staged.insert(0, workPath.substr(0, 2));
+            }
+            break;
+
+        case ftpsptOpenVMS:
+            if (!staged.empty() && staged[0] == '[' &&
+                (staged.size() < 2 || staged[1] != '.'))
+            {
+                const size_t colon = workPath.find(':');
+                if (colon == std::string_view::npos || colon + 1 >= workPath.size() ||
+                    workPath[colon + 1] != '[')
+                    return FALSE;
+                staged.insert(0, workPath.substr(0, colon + 1));
+            }
+            break;
+        }
+        path.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL FTPRemovePointsFromPath(char* path, CFTPServerPathType pathType)
@@ -2255,6 +2590,24 @@ BOOL FTPRemovePointsFromPath(char* path, CFTPServerPathType pathType)
     }
     }
     return TRUE;
+}
+
+BOOL FTPRemovePointsFromPath(std::string& path, CFTPServerPathType pathType) noexcept
+{
+    try
+    {
+        std::vector<char> mutablePath(path.begin(), path.end());
+        mutablePath.push_back('\0');
+        if (!FTPRemovePointsFromPath(mutablePath.data(), pathType))
+            return FALSE;
+        std::string staged(mutablePath.data());
+        path.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL FTPIsCaseSensitive(CFTPServerPathType pathType)
@@ -2545,14 +2898,59 @@ BOOL FTPVMSIsSimpleName(const char* name, BOOL isDir)
     return TRUE;
 }
 
-void FTPGenerateNewName(int* phase, char* newName, int* index, const char* originalName,
-                        CFTPServerPathType pathType, BOOL isDir, BOOL alreadyRenamedFile)
+static BOOL FTPMakeValidFileNameComponent(const CFtpTextCodec& codec, char* name, size_t nameSize)
 {
-    char suffix[20];
-    int suffixLen;
-    BOOL firstCallInPhase = *index == 0;
-    switch (pathType)
+    if (name == NULL || nameSize <= 0)
+        return FALSE;
+
+    std::wstring nameW;
+    if (!codec.Decode(name, strlen(name), nameW))
+        return FALSE;
+    if (!SPLSalMakeValidFileNameComponentOwned(SalamanderGeneral, nameW))
+        return FALSE;
+
+    std::string encoded;
+    if (!codec.Encode(nameW.data(), nameW.size(), encoded) || encoded.size() >= nameSize)
+        return FALSE;
+    memcpy(name, encoded.c_str(), encoded.size() + 1);
+    return TRUE;
+}
+
+BOOL FTPGenerateNewName(const CFtpTextCodec& codec, int* phaseOut, std::string& output,
+                        int* indexOut, const char* originalName,
+                        CFTPServerPathType pathType, BOOL isDir, BOOL alreadyRenamedFile) noexcept
+{
+    if (phaseOut == NULL || indexOut == NULL || originalName == NULL)
+        return FALSE;
+    try
     {
+        const size_t sourceLength = strlen(originalName);
+        constexpr size_t maximumSuffixLength =
+            static_cast<size_t>((std::numeric_limits<int>::digits10) + 4);
+        if (sourceLength > (std::numeric_limits<size_t>::max)() - maximumSuffixLength - 2)
+            return FALSE;
+        std::vector<char> nameStorage(sourceLength + maximumSuffixLength + 2, 0);
+        char* newName = nameStorage.data();
+        const size_t newNameCapacity = nameStorage.size();
+        int stagedPhase = *phaseOut;
+        int stagedIndex = *indexOut;
+        if (stagedIndex < 0 || stagedIndex == INT_MAX)
+            return FALSE;
+        int* phase = &stagedPhase;
+        int* index = &stagedIndex;
+        std::string suffix;
+        int suffixLen;
+        auto formatSuffix = [&](const char* format) -> BOOL
+        {
+            if (!FTPFormatString(suffix, format, *index + 1) ||
+                suffix.size() > static_cast<size_t>((std::numeric_limits<int>::max)()))
+                return FALSE;
+            suffixLen = static_cast<int>(suffix.size());
+            return TRUE;
+        };
+        BOOL firstCallInPhase = *index == 0;
+        switch (pathType)
+        {
     case ftpsptNetware:
     case ftpsptWindows:
     case ftpsptOS2:
@@ -2565,7 +2963,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             const char* s = originalName;
             char* n = newName;
             char* dot = NULL;    // files only: the first period from the right that is not at the beginning of the name
-            char* end = n + 255; // MAX_PATH==260, so the 'newName' buffer is large enough
+            char* end = n + (sourceLength < 255 ? sourceLength : 255); // classic UNIX component limit
             BOOL containsSlash = FALSE;
             while (*s != 0 && n < end)
             {
@@ -2596,27 +2994,26 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
                     {
                         char* end2 = s2 + 1;
                         int num = 0;
-                        int digit = 1;
-                        while (--s2 >= newName && *s2 >= '0' && *s2 <= '9')
+                        size_t digitsBegin = 0;
+                        if (FtpParseTrailingPositiveIndex(
+                                std::string_view(newName, static_cast<size_t>(s2 - newName)),
+                                digitsBegin, num) &&
+                            digitsBegin > 1 && newName[digitsBegin - 1] == '(' && newName[digitsBegin - 2] == ' ')
                         {
-                            num += digit * (*s2 - '0');
-                            digit *= 10;
-                        }
-                        if (s2 > newName && *s2 == '(' && *(s2 - 1) == ' ')
-                        {
-                            memmove(s2 - 1, end2, (n - end2) + 1);
+                            char* suffixBegin = newName + digitsBegin - 2;
+                            memmove(suffixBegin, end2, (n - end2) + 1);
                             if (num < 1)
                                 num = 1;
                             if (firstCallInPhase)
                                 *index = num;
-                            n -= end2 - (s2 - 1);
+                            n -= end2 - suffixBegin;
                             if (dot != NULL)
-                                dot -= end2 - (s2 - 1);
+                                dot -= end2 - suffixBegin;
                         }
                     }
                 }
-                sprintf(suffix, n > newName ? " (%d)" : "(%d)", (*index + 1));
-                suffixLen = (int)strlen(suffix);
+                if (!formatSuffix(n > newName ? " (%d)" : "(%d)"))
+                    return FALSE;
                 if (255 - (n - newName) < suffixLen)
                 {
                     int cut = (int)(suffixLen - (255 - (n - newName)));
@@ -2632,28 +3029,31 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
                         if (dot == n - 1)
                             n--; // if a '.' would remain at the end of the name, trim it as well
                         *n = 0;
-                        if (dot >= n)
+                        if (dot != NULL && dot >= n)
                             dot = NULL;
                     }
                 }
                 if (dot == NULL)
-                    memcpy(n, suffix, suffixLen + 1);
+                    memcpy(n, suffix.c_str(), suffixLen + 1);
                 else
                 {
                     memmove(dot + suffixLen, dot, (n - dot) + 1);
-                    memcpy(dot, suffix, suffixLen);
+                    memcpy(dot, suffix.data(), suffixLen);
                 }
             }
             (*index)++;
-            if (!SalamanderGeneral->SalIsValidFileNameComponent(newName))
+            std::wstring localName;
+            if (!codec.Decode(newName, strlen(newName), localName) ||
+                !SalamanderGeneral->SalIsValidFileNameComponent(localName.c_str()))
                 *phase = 1;
             else
                 *phase = -1;
         }
         else // at this stage the names will be valid on Windows (for FTP servers on Windows pretending to be UNIX) + ftpsptNetware + ftpsptWindows + ftpsptOS2
         {
-            lstrcpyn(newName, originalName, MAX_PATH);
-            SalamanderGeneral->SalMakeValidFileNameComponent(newName);
+            memcpy(newName, originalName, sourceLength + 1);
+            if (!FTPMakeValidFileNameComponent(codec, newName, newNameCapacity))
+                return FALSE;
             if (*index == 0 && strcmp(newName, originalName) == 0)
                 *index = 1;  // newName is identical to originalName, we must adjust newName
             if (*index != 0) // append " (number)" after the name
@@ -2669,54 +3069,35 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
                     {
                         char* end = s + 1;
                         int num = 0;
-                        int digit = 1;
-                        while (--s >= newName && *s >= '0' && *s <= '9')
+                        size_t digitsBegin = 0;
+                        if (FtpParseTrailingPositiveIndex(
+                                std::string_view(newName, static_cast<size_t>(s - newName)),
+                                digitsBegin, num) &&
+                            digitsBegin > 1 && newName[digitsBegin - 1] == '(' && newName[digitsBegin - 2] == ' ')
                         {
-                            num += digit * (*s - '0');
-                            digit *= 10;
-                        }
-                        if (s > newName && *s == '(' && *(s - 1) == ' ')
-                        {
-                            memmove(s - 1, end, (n - end) + 1);
+                            char* suffixBegin = newName + digitsBegin - 2;
+                            memmove(suffixBegin, end, (n - end) + 1);
                             if (num < 1)
                                 num = 1;
                             if (firstCallInPhase)
                                 *index = num;
-                            n -= end - (s - 1);
+                            n -= end - suffixBegin;
                             if (dot != NULL)
-                                dot -= end - (s - 1);
+                                dot -= end - suffixBegin;
                         }
                     }
                 }
-                sprintf(suffix, " (%d)", (*index + 1));
-                suffixLen = (int)strlen(suffix);
-                if (MAX_PATH - 4 - (n - newName) < suffixLen)
-                {
-                    int cut = (int)(suffixLen - (MAX_PATH - 4 - (n - newName)));
-                    if (dot != NULL && dot - newName > cut) // shortening in the name
-                    {
-                        memmove(dot - cut, dot, (n - dot) + 1);
-                        dot -= cut;
-                        n -= cut;
-                    }
-                    else // just trim the end
-                    {
-                        n = newName + MAX_PATH - 4 - suffixLen;
-                        if (dot == n - 1)
-                            n--; // if a '.' would remain at the end of the name, trim it as well
-                        *n = 0;
-                        if (dot >= n)
-                            dot = NULL;
-                    }
-                }
+                if (!formatSuffix(" (%d)"))
+                    return FALSE;
                 if (dot == NULL)
-                    memcpy(n, suffix, suffixLen + 1);
+                    memcpy(n, suffix.c_str(), suffixLen + 1);
                 else
                 {
                     memmove(dot + suffixLen, dot, (n - dot) + 1);
-                    memcpy(dot, suffix, suffixLen);
+                    memcpy(dot, suffix.data(), suffixLen);
                 }
-                SalamanderGeneral->SalMakeValidFileNameComponent(newName); // an invalid name might have been produced, so let it be corrected if needed
+                if (!FTPMakeValidFileNameComponent(codec, newName, newNameCapacity)) // an invalid name might have been produced, so let it be corrected if needed
+                    return FALSE;
             }
             (*index)++;
             *phase = -1; // there is no further phase of name generation
@@ -2736,7 +3117,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             char* n = newName;
             char* dot = NULL;     // first period (extension)
             char* semicol = NULL; // ';' separating the file version
-            char* end = n + MAX_PATH - 4;
+            char* end = n + sourceLength;
             BOOL changed = FALSE;
             while (*s != 0 && n < end)
             {
@@ -2787,79 +3168,38 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             {
                 if (alreadyRenamedFile) // ensure "name_2"->"name_3" instead of ->"name_2_2"
                 {
-                    char* s2 = dot == NULL ? (semicol == NULL ? n : semicol) : dot;
-                    if (s2 > newName)
+                    char* end2 = dot == NULL ? (semicol == NULL ? n : semicol) : dot;
+                    if (end2 > newName)
                     {
-                        s2--;
-                        if (*s2 >= '0' && *s2 <= '9') // searching backwards for "_number"
+                        size_t digitsBegin = 0;
+                        int num = 0;
+                        if (FtpParseTrailingPositiveIndex(
+                                std::string_view(newName, static_cast<size_t>(end2 - newName)),
+                                digitsBegin, num) &&
+                            digitsBegin > 0 && newName[digitsBegin - 1] == '_')
                         {
-                            char* end2 = s2 + 1;
-                            int num = 0;
-                            int digit = 1;
-                            do
-                            {
-                                num += digit * (*s2 - '0');
-                                digit *= 10;
-                                s2--;
-                            } while (s2 >= newName && *s2 >= '0' && *s2 <= '9');
-                            if (s2 >= newName && *s2 == '_')
-                            {
-                                memmove(s2, end2, (n - end2) + 1);
-                                if (num < 1)
-                                    num = 1;
-                                if (firstCallInPhase)
-                                    *index = num;
-                                n -= end2 - s2;
-                                if (dot != NULL)
-                                    dot -= end2 - s2;
-                            }
+                            char* suffixBegin = newName + digitsBegin - 1;
+                            memmove(suffixBegin, end2, (n - end2) + 1);
+                            if (num < 1)
+                                num = 1;
+                            if (firstCallInPhase)
+                                *index = num;
+                            n -= end2 - suffixBegin;
+                            if (dot != NULL)
+                                dot -= end2 - suffixBegin;
                         }
                     }
                 }
-                sprintf(suffix, "_%d", (*index + 1));
-                suffixLen = (int)strlen(suffix);
-                if (MAX_PATH - 4 - (n - newName) < suffixLen)
-                {
-                    int cut = (int)(suffixLen - (MAX_PATH - 4 - (n - newName)));
-                    if (dot != NULL && dot - newName > cut) // shortening in the name
-                    {
-                        memmove(dot - cut, dot, (n - dot) + 1);
-                        dot -= cut;
-                        if (semicol != NULL)
-                            semicol -= cut;
-                        n -= cut;
-                    }
-                    else
-                    {
-                        if (semicol != NULL && semicol - newName > cut) // shortening in the extension
-                        {
-                            memmove(semicol - cut, semicol, (n - semicol) + 1);
-                            if (dot != NULL && dot >= semicol - cut)
-                                dot = NULL;
-                            semicol -= cut;
-                            n -= cut;
-                        }
-                        else // just trim the end
-                        {
-                            n = newName + MAX_PATH - 4 - suffixLen;
-                            if (semicol == n - 1)
-                                n--; // if a ';' would remain at the end of the name, trim it as well
-                            *n = 0;
-                            if (dot >= n)
-                                dot = NULL;
-                            if (semicol >= n)
-                                semicol = NULL;
-                        }
-                    }
-                }
+                if (!formatSuffix("_%d"))
+                    return FALSE;
                 if (dot == NULL && semicol != NULL)
                     dot = semicol;
                 if (isDir || dot == NULL)
-                    memcpy(n, suffix, suffixLen + 1);
+                    memcpy(n, suffix.c_str(), suffixLen + 1);
                 else
                 {
                     memmove(dot + suffixLen, dot, (n - dot) + 1);
-                    memcpy(dot, suffix, suffixLen);
+                    memcpy(dot, suffix.data(), suffixLen);
                 }
             }
             (*index)++;
@@ -2879,7 +3219,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             char* n = newName;
             char* dot = NULL;     // first period (extension)
             char* semicol = NULL; // first semicolon (file version)
-            char* end = n + MAX_PATH - 4;
+            char* end = n + sourceLength;
             BOOL changed = FALSE;
             while (*s != 0 && n < end)
             {
@@ -2991,46 +3331,39 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             {
                 if (alreadyRenamedFile) // ensure "name_2"->"name_3" instead of ->"name_2_2"
                 {
-                    char* s2 = dot == NULL ? (semicol == NULL ? n : semicol) : dot;
-                    if (s2 > newName)
+                    char* end2 = dot == NULL ? (semicol == NULL ? n : semicol) : dot;
+                    if (end2 > newName)
                     {
-                        s2--;
-                        if (*s2 >= '0' && *s2 <= '9') // searching backwards for "_number"
+                        size_t digitsBegin = 0;
+                        int num = 0;
+                        if (FtpParseTrailingPositiveIndex(
+                                std::string_view(newName, static_cast<size_t>(end2 - newName)),
+                                digitsBegin, num) &&
+                            digitsBegin > 0 && newName[digitsBegin - 1] == '_')
                         {
-                            char* end2 = s2 + 1;
-                            int num = 0;
-                            int digit = 1;
-                            do
-                            {
-                                num += digit * (*s2 - '0');
-                                digit *= 10;
-                                s2--;
-                            } while (s2 >= newName && *s2 >= '0' && *s2 <= '9');
-                            if (s2 >= newName && *s2 == '_')
-                            {
-                                memmove(s2, end2, (n - end2) + 1);
-                                if (num < 1)
-                                    num = 1;
-                                if (firstCallInPhase)
-                                    *index = num;
-                                n -= end2 - s2;
-                                if (dot != NULL)
-                                    dot -= end2 - s2;
-                                if (semicol != NULL)
-                                    semicol -= end2 - s2;
-                            }
+                            char* suffixBegin = newName + digitsBegin - 1;
+                            memmove(suffixBegin, end2, (n - end2) + 1);
+                            if (num < 1)
+                                num = 1;
+                            if (firstCallInPhase)
+                                *index = num;
+                            n -= end2 - suffixBegin;
+                            if (dot != NULL)
+                                dot -= end2 - suffixBegin;
+                            if (semicol != NULL)
+                                semicol -= end2 - suffixBegin;
                         }
                     }
                 }
-                sprintf(suffix, "_%d", (*index + 1));
-                suffixLen = (int)strlen(suffix);
+                if (!formatSuffix("_%d"))
+                    return FALSE;
                 if (dot == NULL)
                 {
                     if (semicol == NULL)
                     {
                         if ((n - newName) + suffixLen > MAX_VMS_COMP_LEN)
                             n = newName + MAX_VMS_COMP_LEN - suffixLen;
-                        memcpy(n, suffix, suffixLen + 1);
+                        memcpy(n, suffix.c_str(), suffixLen + 1);
                     }
                     else
                         dot = semicol;
@@ -3044,7 +3377,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
                         dot = newName + MAX_VMS_COMP_LEN - suffixLen;
                     }
                     memmove(dot + suffixLen, dot, (n - dot) + 1);
-                    memcpy(dot, suffix, suffixLen);
+                    memcpy(dot, suffix.data(), suffixLen);
                 }
             }
             (*index)++;
@@ -3098,8 +3431,8 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             *index = 1;
         if (*index != 0) // append "number" after the name
         {
-            sprintf(suffix, "%d", (*index + 1));
-            suffixLen = (int)strlen(suffix);
+            if (!formatSuffix("%d"))
+                return FALSE;
             if (suffixLen > 7)
             {
                 TRACE_E("FTPGenerateNewName(): file number is too high!");
@@ -3107,7 +3440,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             }
             if (8 - (n - newName) < suffixLen)
                 n = newName + 8 - suffixLen;
-            memcpy(n, suffix, suffixLen + 1);
+            memcpy(n, suffix.c_str(), suffixLen + 1);
         }
         (*index)++;
         *phase = -1;
@@ -3125,7 +3458,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
         // for now remove '\'' and optionally append "#number" to the end
         const char* s = originalName;
         char* n = newName;
-        char* end = n + MAX_PATH - 4;
+        char* end = n + sourceLength;
         BOOL change = FALSE;
         while (*s != 0 && n < end)
         {
@@ -3143,11 +3476,9 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
             *index = 1;                        // also handles the reserved names "." and ".."
         if (*index != 0)                       // append "#number" after the name
         {
-            sprintf(suffix, "#%d", (*index + 1));
-            suffixLen = (int)strlen(suffix);
-            if (MAX_PATH - 4 - (n - newName) < suffixLen)
-                n = newName + MAX_PATH - 4 - suffixLen;
-            memcpy(n, suffix, suffixLen + 1);
+            if (!formatSuffix("#%d"))
+                return FALSE;
+            memcpy(n, suffix.c_str(), suffixLen + 1);
         }
         (*index)++;
         *phase = -1;
@@ -3168,7 +3499,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
         const char* ext = isDir ? NULL : strrchr(originalName, '.');
         char* n = newName;
         char* dot = NULL;
-        char* end = n + MAX_PATH - 4;
+        char* end = n + sourceLength;
         BOOL change = FALSE;
         while (*s != 0 && n < end)
         {
@@ -3196,128 +3527,91 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
         {
             if (alreadyRenamedFile) // ensure "name_2"->"name_3" instead of ->"name_2_2"
             {
-                char* s2 = dot == NULL ? n : dot;
-                if (s2 > newName)
+                char* end2 = dot == NULL ? n : dot;
+                if (end2 > newName)
                 {
-                    s2--;
-                    if (*s2 >= '0' && *s2 <= '9') // searching backwards for "_number"
+                    size_t digitsBegin = 0;
+                    int num = 0;
+                    if (FtpParseTrailingPositiveIndex(
+                            std::string_view(newName, static_cast<size_t>(end2 - newName)),
+                            digitsBegin, num) &&
+                        digitsBegin > 0 && newName[digitsBegin - 1] == '_')
                     {
-                        char* end2 = s2 + 1;
-                        int num = 0;
-                        int digit = 1;
-                        do
-                        {
-                            num += digit * (*s2 - '0');
-                            digit *= 10;
-                            s2--;
-                        } while (s2 >= newName && *s2 >= '0' && *s2 <= '9');
-                        if (s2 >= newName && *s2 == '_')
-                        {
-                            memmove(s2, end2, (n - end2) + 1);
-                            if (num < 1)
-                                num = 1;
-                            if (firstCallInPhase)
-                                *index = num;
-                            n -= end2 - s2;
-                            if (dot != NULL)
-                                dot -= end2 - s2;
-                        }
+                        char* suffixBegin = newName + digitsBegin - 1;
+                        memmove(suffixBegin, end2, (n - end2) + 1);
+                        if (num < 1)
+                            num = 1;
+                        if (firstCallInPhase)
+                            *index = num;
+                        n -= end2 - suffixBegin;
+                        if (dot != NULL)
+                            dot -= end2 - suffixBegin;
                     }
                 }
             }
-            sprintf(suffix, "_%d", (*index + 1));
-            suffixLen = (int)strlen(suffix);
-            if (MAX_PATH - 4 - (n - newName) < suffixLen)
-            {
-                int cut = (int)(suffixLen - (MAX_PATH - 4 - (n - newName)));
-                if (dot != NULL && dot - newName > cut) // shortening in the name
-                {
-                    memmove(dot - cut, dot, (n - dot) + 1);
-                    dot -= cut;
-                    n -= cut;
-                }
-                else // just trim the end
-                {
-                    n = newName + MAX_PATH - 4 - suffixLen;
-                    if (dot == n - 1)
-                        n--; // if a '.' would remain at the end of the name, trim it as well
-                    *n = 0;
-                    if (dot >= n)
-                        dot = NULL;
-                }
-            }
+            if (!formatSuffix("_%d"))
+                return FALSE;
             if (dot == NULL)
-                memcpy(n, suffix, suffixLen + 1);
+                memcpy(n, suffix.c_str(), suffixLen + 1);
             else
             {
                 memmove(dot + suffixLen, dot, (n - dot) + 1);
-                memcpy(dot, suffix, suffixLen);
+                memcpy(dot, suffix.data(), suffixLen);
             }
         }
         (*index)++;
         *phase = -1;
         break;
     }
+        }
+        std::string stagedName(newName);
+        output.swap(stagedName);
+        *phaseOut = stagedPhase;
+        *indexOut = stagedIndex;
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
     }
 }
 
-void FTPAS400CutFileNamePart(char* mbrName, const char* name)
+std::wstring FTPAS400CutFileNamePartW(const wchar_t* name)
 {
-    mbrName[0] = 0;
-    const char* fileBeg = name;
-    const char* fileEnd = fileBeg;
-    while (*fileEnd != 0 && *fileEnd != '.')
+    const wchar_t* fileBeg = name;
+    const wchar_t* fileEnd = fileBeg;
+    while (*fileEnd != 0 && *fileEnd != L'.')
         fileEnd++;
-    if (_strnicmp(fileEnd, ".file/", 6) == 0)
+    if (_wcsnicmp(fileEnd, L".file/", 6) == 0)
     {
-        const char* mbrBeg = fileEnd + 6;
-        const char* mbrEnd = mbrBeg;
-        while (*mbrEnd != 0 && *mbrEnd != '.')
+        const wchar_t* mbrBeg = fileEnd + 6;
+        const wchar_t* mbrEnd = mbrBeg;
+        while (*mbrEnd != 0 && *mbrEnd != L'.')
             mbrEnd++;
-        if (_stricmp(mbrEnd, ".mbr") == 0)
+        if (_wcsicmp(mbrEnd, L".mbr") == 0)
         {
             if (mbrEnd - mbrBeg == fileEnd - fileBeg &&
-                _strnicmp(fileBeg, mbrBeg, fileEnd - fileBeg) == 0) // if the names before ".file" and before ".mbr" match, this is the case we are looking for and it will be shortened
-            {
-                lstrcpyn(mbrName, mbrBeg, MAX_PATH);
-            }
-            else // "a.file/b.mbr" -> "a.b.mbr"
-            {
-                if ((fileEnd - fileBeg) + 1 < MAX_PATH)
-                {
-                    memcpy(mbrName, fileBeg, (fileEnd - fileBeg) + 1);
-                    lstrcpyn(mbrName + (fileEnd - fileBeg) + 1, mbrBeg, (int)(MAX_PATH - ((fileEnd - fileBeg) + 1)));
-                }
-            }
+                _wcsnicmp(fileBeg, mbrBeg, fileEnd - fileBeg) == 0)
+                return mbrBeg;
+            return std::wstring(fileBeg, fileEnd + 1) + mbrBeg;
         }
     }
-    if (mbrName[0] == 0)
-        lstrcpyn(mbrName, name, MAX_PATH);
+    return name;
 }
 
-void FTPAS400AddFileNamePart(char* name)
+void FTPAS400AddFileNamePart(std::string& name)
 {
-    char* mbrEnd = name;
-    while (*mbrEnd != 0 && *mbrEnd != '.')
-        mbrEnd++;
-    if (*mbrEnd != 0 && _stricmp(mbrEnd, ".mbr") != 0) // "a.b.mbr" -> "a.file/b.mbr"
+    const std::string::size_type firstDot = name.find('.');
+    if (firstDot == std::string::npos)
+        return;
+    if (_stricmp(name.c_str() + firstDot, ".mbr") != 0) // "a.b.mbr" -> "a.file/b.mbr"
     {
-        char* fileEnd = ++mbrEnd;
-        while (*mbrEnd != 0 && *mbrEnd != '.')
-            mbrEnd++;
-        if (_stricmp(mbrEnd, ".mbr") == 0 &&
-            (mbrEnd - name) + 5 /* "file/" */ + 4 /* ".mbr" */ + 1 <= 2 * MAX_PATH)
-        {
-            memmove(fileEnd + 5, fileEnd, (mbrEnd - fileEnd) + 5);
-            memcpy(fileEnd, "FILE/", 5);
-        }
+        const std::string::size_type memberDot = name.find('.', firstDot + 1);
+        if (memberDot != std::string::npos &&
+            _stricmp(name.c_str() + memberDot, ".mbr") == 0)
+            name.insert(firstDot + 1, "FILE/");
         return;
     }
-    if (_stricmp(mbrEnd, ".mbr") == 0 && // "a.mbr" -> "a.file/a.mbr"
-        2 * (mbrEnd - name) + 6 /* ".file/" */ + 4 /* ".mbr" */ + 1 <= 2 * MAX_PATH)
-    {
-        memmove(mbrEnd + 6 + (mbrEnd - name), mbrEnd, 5);
-        memmove(mbrEnd + 6, name, mbrEnd - name);
-        memcpy(mbrEnd + 1, "FILE/", 5);
-    }
+    const std::string base = name.substr(0, firstDot);
+    name = base + ".FILE/" + name;
 }

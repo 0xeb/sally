@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -14,7 +14,7 @@ using namespace std;
 HCURSOR HIbeamCursor;
 HCURSOR HArrowCursor;
 
-const char* FILEVIEWWINDOW_CLASSNAME = "SFC File View Window Class";
+LPCWSTR FILEVIEWWINDOW_CLASSNAME = L"SFC File View Window Class";
 
 // ****************************************************************************
 //
@@ -143,7 +143,7 @@ void CFileViewWindow::ReloadConfiguration(DWORD flags, BOOL updateWindow)
         SelectObject(hdc, oldFont);
         ReleaseDC(NULL, hdc);
 
-        MappedASCII8TextOut.FontHasChanged(&Configuration.FileViewLogFont, HFont, FontWidth, FontHeight);
+        MappedByteCellTextOut.FontHasChanged(&Configuration.FileViewLogFont, HFont, FontWidth, FontHeight);
 
         LineNumWidth = (LineNumDigits + 1) * FontWidth + BORDER_WIDTH;
 
@@ -696,10 +696,10 @@ BOOL CTextFileViewWindowBase::RebuildScript(
             if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
             {
                 MSG msg; // discard the queued ESC
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
                 cancel = TRUE;
-                //SG->SalMessageBox(GetParent(HWindow), LoadStr(IDS_CANCELED), LoadStr(IDS_DIFF), MB_ICONINFORMATION);
+                //SG->SalMessageBox(GetParent(HWindow), LangStr(IDS_CANCELED), LangStr(IDS_DIFF), MB_ICONINFORMATION);
                 return FALSE;
             }
         }
@@ -721,10 +721,10 @@ BOOL CTextFileViewWindowBase::RebuildScript(
             if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == GetParent(HWindow))
             {
                 MSG msg; // discard the queued ESC
-                while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                     ;
                 cancel = TRUE;
-                //SG->SalMessageBox(GetParent(HWindow), LoadStr(IDS_CANCELED), LoadStr(IDS_DIFF), MB_ICONINFORMATION);
+                //SG->SalMessageBox(GetParent(HWindow), LangStr(IDS_CANCELED), LangStr(IDS_DIFF), MB_ICONINFORMATION);
                 return FALSE;
             }
             counter = 1000;

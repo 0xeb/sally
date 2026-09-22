@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include <string>
+
 /**
 	General Salamander services.
 */
@@ -47,7 +49,7 @@ extern CNethoodPluginInterfaceForFS g_oNethoodFS;
 	Name of the filesystem assigned to us by Salamander
 	(need not to be the same as suggested name).
 */
-extern TCHAR g_szAssignedFSName[MAX_PATH];
+extern std::wstring g_assignedFSName;
 extern size_t g_cchAssignedFSName;
 
 /**
@@ -66,16 +68,15 @@ extern HIMAGELIST g_himlSimpleIcons;
 // global Salamander variables shared between FS and archiver
 extern const CFileData** g_transferFileData;
 extern int* g_transferIsDir;
-extern char* g_transferBuffer;
+extern wchar_t* g_transferBuffer;
 extern int* g_transferLen;
 extern DWORD* g_transferRowData;
 extern CPluginDataInterfaceAbstract** g_transferPluginDataIface;
 extern DWORD* g_transferActCustomData;
 
-extern TCHAR g_aszRedirectPath[2][MAX_PATH];
+extern std::wstring g_redirectPaths[2];
 
-#define MAX_SHARE_NAME 16
-extern TCHAR g_aszFocusShareName[2][MAX_SHARE_NAME];
+extern std::wstring g_focusShareNames[2];
 extern int g_iFocusSharePanel;
 
 #define POSTED_THROBBER_QUEUE_LEN 8

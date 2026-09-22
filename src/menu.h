@@ -4,7 +4,7 @@
 
 #pragma once
 
-extern const char* WC_POPUPMENU;
+extern const wchar_t* WC_POPUPMENU;
 
 #define UPDOWN_ARROW_WIDTH 9
 #define UPDOWN_ARROW_HEIGHT 5
@@ -146,7 +146,9 @@ protected:
     HBITMAP HBmpChecked;
     HBITMAP HBmpUnchecked;
     HBITMAP HBmpItem;
-    char* String;
+    // The live v108 menu contract is UTF-16. The frozen sdk107 ABI belongs at the
+    // plugin boundary; the core model therefore owns only the exact wide text.
+    wchar_t* String;
     int ImageIndex;
     HICON HIcon;
     HICON HOverlay;
@@ -164,16 +166,17 @@ protected:
     int MinWidth;
     int YOffset;
 
-    const char* ColumnL1; // first column text
-    int ColumnL1Len;      // character count
+    // Spans of String. The lengths are wide-character counts.
+    const wchar_t* ColumnL1; // first column text
+    int ColumnL1Len;         // character count
     int ColumnL1Width;
     int ColumnL1X;
-    const char* ColumnL2; // second column text (can be NULL)
-    int ColumnL2Len;      // character count
+    const wchar_t* ColumnL2; // second column text (can be NULL)
+    int ColumnL2Len;         // character count
     int ColumnL2Width;
     int ColumnL2X;
-    const char* ColumnR; // right column text (can be NULL)
-    int ColumnRLen;      // character count
+    const wchar_t* ColumnR; // right column text (can be NULL)
+    int ColumnRLen;         // character count
     int ColumnRWidth;
     int ColumnRX;
 
@@ -181,7 +184,7 @@ public:
     CMenuItem();
     ~CMenuItem();
 
-    BOOL SetText(const char* text, int len = -1);
+    BOOL SetText(const wchar_t* text, int len = -1);
 
     // traverses TypeData string and according to separators and threeCol variable
     // sets variables ColumnL1 - ColumnR, ColumnL1Len - ColumnRLen,
@@ -272,6 +275,10 @@ public:
 
     CMenuPopup(DWORD id = 0);
     BOOL LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM* menuTemplate, DWORD* enablersOffset, HIMAGELIST hImageList, HIMAGELIST hHotImageList, int* addedRows);
+
+    // Updates an already-inserted item's UTF-16 text. This is an internal Sally helper,
+    // not part of CGUIMenuPopupAbstract or the plugin ABI.
+    BOOL SetItemTextW(DWORD position, BOOL byPosition, const wchar_t* text);
 
     //
     // Implementation of CGUIMenuPopupAbstract methods
@@ -426,8 +433,8 @@ protected:
 
     void OnKeyRight(BOOL* leaveMenu);
     void OnKeyReturn(BOOL* leaveMenu, DWORD* retValue);
-    void OnChar(char key, BOOL* leaveMenu, DWORD* retValue);
-    int FindNextItemIndex(int firstIndex, char key);
+    void OnChar(wchar_t key, BOOL* leaveMenu, DWORD* retValue);
+    int FindNextItemIndex(int firstIndex, wchar_t key);
 
     // for navigation using PgDn/PgUp, searches for index of first item
     // after separator; if 'down' is TRUE, searches downward
@@ -547,7 +554,7 @@ protected:
 
     // searches inserted submenus and returns TRUE if it finds any with hot
     // key 'hotKey'; also returns its index
-    BOOL HotKeyIndexLookup(char hotKey, int& itemIndex);
+    BOOL HotKeyIndexLookup(wchar_t hotKey, int& itemIndex);
 
     friend class CMenuPopup;
 };

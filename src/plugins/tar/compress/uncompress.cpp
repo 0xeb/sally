@@ -15,9 +15,9 @@
 #define MAXCODE(n) (1L << (n))
 
 // class constructor
-CCompress::CCompress(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read, CQuadWord inputSize) : CZippedFile(filename, file, buffer, 0, read, inputSize), PrefixTab(NULL), SuffixTab(NULL), DecoStack(NULL)
+CCompress::CCompress(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read, CQuadWord inputSize) : CZippedFile(filename, file, buffer, 0, read, inputSize), PrefixTab(NULL), SuffixTab(NULL), DecoStack(NULL)
 {
-    CALL_STACK_MESSAGE2("CCompress::CCompress(%s, , , )", filename);
+    CALL_STACK_MESSAGE2("CCompress::CCompress(%ls, , , )", filename);
 
     // if the parent constructor failed, bail out immediately
     if (!Ok)

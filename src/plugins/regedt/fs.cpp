@@ -7,18 +7,18 @@
 // image list for simple FS icons
 HIMAGELIST ImageList = NULL;
 
-const char* Str_REG_BINARY = "BINARY";
-const char* Str_REG_DWORD = "DWORD";
-const char* Str_REG_DWORD_BIG_ENDIAN = "DWORD_BIG_ENDIAN";
-const char* Str_REG_EXPAND_SZ = "EXPAND_SZ";
-const char* Str_REG_LINK = "LINK";
-const char* Str_REG_MULTI_SZ = "MULTI_SZ";
-const char* Str_REG_NONE = "NONE";
-const char* Str_REG_QWORD = "QWORD";
-const char* Str_REG_RESOURCE_LIST = "RESOURCE_LIST";
-const char* Str_REG_SZ = "SZ";
-const char* Str_REG_FULL_RESOURCE_DESCRIPTOR = "FULL_RESOURCE_DESCRIPTOR";
-const char* Str_REG_RESOURCE_REQUIREMENTS_LIST = "RESOURCE_REQUIREMENTS_LIST";
+const wchar_t* Str_REG_BINARY = L"BINARY";
+const wchar_t* Str_REG_DWORD = L"DWORD";
+const wchar_t* Str_REG_DWORD_BIG_ENDIAN = L"DWORD_BIG_ENDIAN";
+const wchar_t* Str_REG_EXPAND_SZ = L"EXPAND_SZ";
+const wchar_t* Str_REG_LINK = L"LINK";
+const wchar_t* Str_REG_MULTI_SZ = L"MULTI_SZ";
+const wchar_t* Str_REG_NONE = L"NONE";
+const wchar_t* Str_REG_QWORD = L"QWORD";
+const wchar_t* Str_REG_RESOURCE_LIST = L"RESOURCE_LIST";
+const wchar_t* Str_REG_SZ = L"SZ";
+const wchar_t* Str_REG_FULL_RESOURCE_DESCRIPTOR = L"FULL_RESOURCE_DESCRIPTOR";
+const wchar_t* Str_REG_RESOURCE_REQUIREMENTS_LIST = L"RESOURCE_REQUIREMENTS_LIST";
 
 int Len_REG_BINARY;
 int Len_REG_DWORD;
@@ -50,8 +50,7 @@ CRegTypeText RegTypeTexts[] =
         {Str_REG_NONE, REG_NONE, 0, 0},
         {NULL, 0, 0, 0}};
 
-char KeyText[10];
-int KeyTextLen = 10;
+std::wstring KeyText;
 
 CPredefinedHKey PredefinedHKeys[] =
     {
@@ -66,7 +65,7 @@ CPredefinedHKey PredefinedHKeys[] =
         HKEY_USERS, L"HKEY_USERS",
         NULL, NULL};
 
-WCHAR RecentFullPath[MAX_FULL_KEYNAME];
+std::wstring RecentFullPath;
 
 BOOL InitFS()
 {
@@ -93,20 +92,19 @@ BOOL InitFS()
     ImageList_ReplaceIcon(ImageList, 2, LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_BIN)));
     ImageList_ReplaceIcon(ImageList, 3, LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_UNKNOWN)));
 
-    Len_REG_BINARY = (int)strlen(Str_REG_BINARY);
-    Len_REG_DWORD = (int)strlen(Str_REG_DWORD);
-    Len_REG_DWORD_BIG_ENDIAN = (int)strlen(Str_REG_DWORD_BIG_ENDIAN);
-    Len_REG_EXPAND_SZ = (int)strlen(Str_REG_EXPAND_SZ);
-    Len_REG_LINK = (int)strlen(Str_REG_LINK);
-    Len_REG_MULTI_SZ = (int)strlen(Str_REG_MULTI_SZ);
-    Len_REG_NONE = (int)strlen(Str_REG_NONE);
-    Len_REG_QWORD = (int)strlen(Str_REG_QWORD);
-    Len_REG_RESOURCE_LIST = (int)strlen(Str_REG_RESOURCE_LIST);
-    Len_REG_SZ = (int)strlen(Str_REG_SZ);
-    Len_REG_FULL_RESOURCE_DESCRIPTOR = (int)strlen(Str_REG_FULL_RESOURCE_DESCRIPTOR);
-    Len_REG_RESOURCE_REQUIREMENTS_LIST = (int)strlen(Str_REG_RESOURCE_REQUIREMENTS_LIST);
-    lstrcpyn(KeyText, LoadStr(IDS_KEY), 10);
-    KeyTextLen = (int)strlen(KeyText);
+    Len_REG_BINARY = (int)wcslen(Str_REG_BINARY);
+    Len_REG_DWORD = (int)wcslen(Str_REG_DWORD);
+    Len_REG_DWORD_BIG_ENDIAN = (int)wcslen(Str_REG_DWORD_BIG_ENDIAN);
+    Len_REG_EXPAND_SZ = (int)wcslen(Str_REG_EXPAND_SZ);
+    Len_REG_LINK = (int)wcslen(Str_REG_LINK);
+    Len_REG_MULTI_SZ = (int)wcslen(Str_REG_MULTI_SZ);
+    Len_REG_NONE = (int)wcslen(Str_REG_NONE);
+    Len_REG_QWORD = (int)wcslen(Str_REG_QWORD);
+    Len_REG_RESOURCE_LIST = (int)wcslen(Str_REG_RESOURCE_LIST);
+    Len_REG_SZ = (int)wcslen(Str_REG_SZ);
+    Len_REG_FULL_RESOURCE_DESCRIPTOR = (int)wcslen(Str_REG_FULL_RESOURCE_DESCRIPTOR);
+    Len_REG_RESOURCE_REQUIREMENTS_LIST = (int)wcslen(Str_REG_RESOURCE_REQUIREMENTS_LIST);
+    KeyText = LoadStrW(IDS_KEY);
 
     return TRUE;
 }
@@ -140,11 +138,11 @@ void CTopIndexMem::Push(LPCWSTR path, int topIndex)
         while (s > path && *s != L'\\')
             s--;
 
-        int l = (int)wcslen(Path);
-        if (l > 0 && Path[l - 1] == L'\\')
+        int l = static_cast<int>(Path.size());
+        if (l > 0 && Path[static_cast<size_t>(l - 1)] == L'\\')
             l--;
         ok = s - path == l &&
-             CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, path, l, Path, l) == CSTR_EQUAL;
+             CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, path, l, Path.c_str(), l) == CSTR_EQUAL;
     }
 
     if (ok) // continues -> remember the next top index
@@ -156,12 +154,12 @@ void CTopIndexMem::Push(LPCWSTR path, int topIndex)
                 TopIndexes[i] = TopIndexes[i + 1];
             TopIndexesCount--;
         }
-        wcscpy(Path, path);
+        Path = path;
         TopIndexes[TopIndexesCount++] = topIndex;
     }
     else // does not continue -> first top index in the sequence
     {
-        wcscpy(Path, path);
+        Path = path;
         TopIndexesCount = 1;
         TopIndexes[0] = topIndex;
     }
@@ -174,22 +172,18 @@ BOOL CTopIndexMem::FindAndPop(LPCWSTR path, int& topIndex)
     int l1 = (int)wcslen(path);
     if (l1 > 0 && path[l1 - 1] == L'\\')
         l1--;
-    int l2 = (int)wcslen(Path);
-    if (l2 > 0 && Path[l2 - 1] == L'\\')
+    int l2 = (int)Path.size();
+    if (l2 > 0 && Path[static_cast<size_t>(l2 - 1)] == L'\\')
         l2--;
     if (l1 == l2 &&
-        CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, path, l1, Path, l1) == CSTR_EQUAL)
+        CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, path, l1, Path.c_str(), l1) == CSTR_EQUAL)
     {
         if (TopIndexesCount > 0)
         {
-            LPWSTR s = Path + wcslen(Path);
-            if (s > Path && *(s - 1) == L'\\')
-                s--;
-            if (s > Path && *s == L'\\')
-                s--;
-            while (s > Path && *s != L'\\')
-                s--;
-            *s = L'\0';
+            if (!Path.empty() && Path.back() == L'\\')
+                Path.pop_back();
+            const size_t slash = Path.find_last_of(L'\\');
+            Path.resize(slash == std::wstring::npos ? 0 : slash);
             topIndex = TopIndexes[--TopIndexesCount];
             return TRUE;
         }
@@ -213,9 +207,9 @@ BOOL CTopIndexMem::FindAndPop(LPCWSTR path, int& topIndex)
 //
 
 CPluginFSInterfaceAbstract*
-CPluginInterfaceForFS::OpenFS(const char* fsName, int fsNameIndex)
+CPluginInterfaceForFS::OpenFS(const wchar_t* fsName, int fsNameIndex)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForFS::OpenFS(%s, %d)", fsName, fsNameIndex);
+    CALL_STACK_MESSAGE3("CPluginInterfaceForFS::OpenFS(%ls, %d)", fsName, fsNameIndex);
     CPluginFSInterface* ret = new CPluginFSInterface();
     if (ret->IsGood())
         return ret;
@@ -234,7 +228,7 @@ void CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(%d)", panel);
     // change the path in the active panel to AssignedFSName:ConnectPath
-    SG->ChangePanelPathToPluginFS(panel, AssignedFSName, "", NULL);
+    SG->ChangePanelPathToPluginFS(panel, AssignedFSName.c_str(), L"", NULL);
 }
 
 void EditValue(int root, LPWSTR key, LPWSTR name, BOOL rawEdit)
@@ -368,17 +362,20 @@ void EditValue(int root, LPWSTR key, LPWSTR name, BOOL rawEdit)
         }
     }
 
+    std::wstring dialogName = name != NULL && *name != L'\0'
+                                  ? name
+                                  : LoadStrW(IDS_DEFAULTVALUE);
     if (rawEdit)
     {
         ret = (int)CRawEditValDialog(SG->GetMainWindowHWND(),
-                                     name != NULL && *name != '\0' ? name : LoadStrW(IDS_DEFAULTVALUE),
+                                     dialogName,
                                      &type, data, size, name == NULL || *name == '\0')
                   .Execute();
     }
     else
     {
         ret = (int)CEditValDialog(SG->GetMainWindowHWND(),
-                                  name != NULL && *name != '\0' ? name : LoadStrW(IDS_DEFAULTVALUE),
+                                  dialogName,
                                   &type, data, size, name == NULL || *name == '\0')
                   .Execute();
     }
@@ -404,70 +401,66 @@ void EditValue(int root, LPWSTR key, LPWSTR name, BOOL rawEdit)
 }
 
 void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                        const char* pluginFSName, int pluginFSNameIndex,
+                                        const wchar_t* pluginFSName, int pluginFSNameIndex,
                                         CFileData& file, int isDir)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::ExecuteOnFS(%d, , %s, %d, , %d)", panel,
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::ExecuteOnFS(%d, , %ls, %d, , %d)", panel,
                         pluginFSName, pluginFSNameIndex, isDir);
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     CPluginData* pluginData = (CPluginData*)file.PluginData;
 
     if (isDir)
     {
-        WCHAR newPath[MAX_FULL_KEYNAME];
-        WCHAR cutDir[MAX_KEYNAME];
-        char cutDirA[MAX_KEYNAME];
-        char* focus = NULL;
-
-        fs->GetCurrentPathW(newPath, MAX_FULL_KEYNAME);
+        std::wstring newPath = fs->GetCurrentPathOwned();
+        std::wstring cutDir;
         if (isDir == 2) // up-dir
         {
-            if (CutDirectory(newPath, cutDir, MAX_KEYNAME)) // shorten the path by the last component
+            const size_t separator = newPath.find_last_of(L'\\');
+            if (separator != std::wstring::npos)
             {
-                if (WStrToStr(cutDirA, MAX_KEYNAME, cutDir) > 0)
-                    focus = cutDirA;
+                cutDir = newPath.substr(separator + 1);
+                newPath.resize(separator == 0 ? 1 : separator);
                 // update the path in the panel
-                if (fs->SetNewPath(newPath))
+                if (fs->SetNewPath(newPath.c_str()))
                 {
                     int topIndex; // next top index, -1 -> invalid
-                    if (!fs->TopIndexMem.FindAndPop(newPath, topIndex))
+                    if (!fs->TopIndexMem.FindAndPop(newPath.c_str(), topIndex))
                         topIndex = -1;
 
-                    SG->ChangePanelPathToPluginFS(panel, pluginFSName, "?", NULL,
-                                                  topIndex, focus);
+                    SG->ChangePanelPathToPluginFS(panel, pluginFSName, L"?", NULL,
+                                                  topIndex, cutDir.c_str());
                 }
             }
         }
         else // subdirectory
         {
             // backup of the data for TopIndexMem (backupPath + topIndex)
-            WCHAR backupPath[MAX_FULL_KEYNAME];
-            wcscpy(backupPath, newPath);
+            const std::wstring backupPath(newPath);
             int topIndex = SG->GetPanelTopIndex(panel);
 
-            if (PathAppend(newPath, pluginData->Name, MAX_FULL_KEYNAME)) // set the path
+            if (!newPath.empty() && newPath.back() != L'\\')
+                newPath.push_back(L'\\');
+            newPath.append(pluginData->Name);
+            // update the path in the panel
+            if (fs->SetNewPath(newPath.c_str()))
             {
-                // update the path in the panel
-                if (fs->SetNewPath(newPath))
+                if (SG->ChangePanelPathToPluginFS(panel, pluginFSName, L"?"))
                 {
-                    if (SG->ChangePanelPathToPluginFS(panel, pluginFSName, "?"))
-                    {
-                        fs->TopIndexMem.Push(backupPath, topIndex); // remember the top index for return
-                    }
+                    fs->TopIndexMem.Push(backupPath.c_str(), topIndex); // remember the top index for return
                 }
             }
         }
     }
     else
-        EditValue(fs->CurrentKeyRoot, fs->CurrentKeyName, pluginData->Name, FALSE);
+        EditValue(fs->CurrentKeyRoot, fs->CurrentKeyName.data(), pluginData->Name, FALSE);
 }
 
 BOOL WINAPI
 CPluginInterfaceForFS::DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                     CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex)
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex);
     BOOL ret = FALSE;
     if (isInPanel)

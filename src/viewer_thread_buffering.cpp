@@ -2,8 +2,20 @@
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+// WIDE-WINDOW: the CViewerWindow this file writes captions into is created wide,
+// so its SetWindowTextW(HWindow, ...) calls reach the screen intact and are NOT
+// re-narrowed by USER32. Evidence, all in the non-_UNICODE branch that this build
+// takes:
+//   viewer.cpp registers CVIEWERWINDOW_CLASSNAMEW through CWindow's wide-only adapter.
+//   This unit creates it through the same wide-only adapter.
+//   viewer.cpp:555   CViewerWindow ctor passes CWindow(origin, TRUE)
+// gtest_window_width_probe already proves the chain itself: a window created with
+// CreateWindowExW on a RegisterClassW class reports IsWindowUnicode == TRUE.
+
 #include "precomp.h"
+#include "common/text/EncodingDetector.h"
 #include "viewer_line_index.h"
+#include "viewer_find_seed.h"
 
 #include "viewer.h"
 #include "codetbl.h"
@@ -13,17 +25,19 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 
+#include <new>
+#include <stdexcept>
+
 // ****************************************************************************
 
 struct CTVData
 {
     int Left, Top, Width, Height;
     CViewerWindow* View;
-    const char* Name;
-    const wchar_t* NameW;
+    const wchar_t* Name; // was a narrow/wide pair
     UINT ShowCmd;
     BOOL Success;
-    const char* Caption;
+    const wchar_t* Caption;
     BOOL WholeCaption;
 };
 
@@ -45,26 +59,20 @@ void ThreadViewerMessageLoopBodyAux()
 unsigned ThreadViewerMessageLoopBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("ThreadViewerMessageLoopBody(): (text/hex viewer)");
-    SetThreadNameInVCAndTrace("Viewer");
+    SetThreadNameInVCAndTrace(L"Viewer");
     TRACE_I("Begin");
     //  TRACE_I("MoresStanislav: ThreadViewerMessageLoopBody 1");
     CTVData* data = (CTVData*)parameter;
     CViewerWindow* view = data->View;
-    CPathBuffer name;
-    if (data->Name != NULL)
-        strcpy(name, data->Name);
-    else
-        name[0] = 0;
     std::wstring nameW;
-    if (data->NameW != NULL && data->NameW[0] != L'\0')
-        nameW = data->NameW;
-    CPathBuffer captionBuf;
-    const char* caption = NULL;
+    if (data->Name != NULL && data->Name[0] != 0)
+        nameW = data->Name;
+    std::wstring caption;
+    const bool hasCaption = data->Caption != NULL;
     BOOL wholeCaption = FALSE;
-    if (data->Caption != NULL)
+    if (hasCaption)
     {
-        lstrcpyn(captionBuf, data->Caption, captionBuf.Size());
-        caption = captionBuf;
+        caption = data->Caption;
         wholeCaption = data->WholeCaption;
     }
     UINT showCmd = data->ShowCmd;
@@ -75,23 +83,18 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     //  TRACE_I("MoresStanislav: ThreadViewerMessageLoopBody 3 succes="<<data->Success);
     //  CALL_STACK_MESSAGE1("MoresStanislav: ThreadViewerMessageLoopBody 3");
 
+    // This used to fork on _UNICODE with the branches genuinely backwards (narrow
+    // calls under #ifdef _UNICODE, wide under #else) - since _UNICODE is undefined in the real
+    // build, the #else (wide) branch is the ONLY one that has ever actually run; the #ifdef
+    // _UNICODE branch was dead code, never compiled until the canary. Removing the fork changes
+    // no real-build behavior (it already always took this path) and fixes the canary, which
+    // would otherwise take the dead, genuinely-broken narrow branch. CVIEWERWINDOW_CLASSNAMEW
+    // is itself #ifndef _UNICODE-only - a redundant narrow-build-only duplicate of the already-
+    // unconditional, already-wide CVIEWERWINDOW_CLASSNAME (identical string, see viewer.cpp) -
+    // so this uses the always-available one instead of adding a third redundant constant.
     if (data->Success &&
-#ifdef _UNICODE
         view->CreateEx(Configuration.AlwaysOnTop ? WS_EX_TOPMOST : 0,
-                       CVIEWERWINDOW_CLASSNAME,
-                       LoadStr(IDS_VIEWERTITLE),
-                       WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_HSCROLL,
-                       data->Left,
-                       data->Top,
-                       data->Width,
-                       data->Height,
-                       NULL,
-                       ViewerMenu,
-                       HInstance,
-                       view) != NULL)
-#else  // _UNICODE
-        view->CreateExW(Configuration.AlwaysOnTop ? WS_EX_TOPMOST : 0,
-                        CVIEWERWINDOW_CLASSNAMEW,
+                        CVIEWERWINDOW_CLASSNAME,
                         LoadStrW(IDS_VIEWERTITLE),
                         WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_HSCROLL,
                         data->Left,
@@ -102,7 +105,6 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
                         ViewerMenu,
                         HInstance,
                         view) != NULL)
-#endif // _UNICODE
     {
         //    TRACE_I("MoresStanislav: ThreadViewerMessageLoopBody 4");
         //    CALL_STACK_MESSAGE1("MoresStanislav: ThreadViewerMessageLoopBody 4");
@@ -135,22 +137,19 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     if (ok) // if the window was created, run the application loop
     {
         CALL_STACK_MESSAGE1("ThreadViewerMessageLoopBody::message_loop");
-        if (!nameW.empty())
-        {
-            if (SalGetFullNameW(nameW))
-                view->OpenFileW(nameW.c_str(), caption, wholeCaption);
-        }
-        else if (SalGetFullName(name, NULL, NULL, NULL, NULL, name.Size()))
-            view->OpenFile(name, caption, wholeCaption);
+        // the SalGetFullName/OpenFile fallback is gone with the narrow half
+        // it read from; nameW is the only representation CTVData carries now.
+        if (SalGetFullNameW(nameW))
+            view->OpenFile(nameW.c_str(), hasCaption ? caption.c_str() : NULL, wholeCaption);
 
         MSG msg;
         HWND viewHWindow = view->HWindow; // because WM_QUIT leaves the window object unallocated
-        while (GetMessage(&msg, NULL, 0, 0))
+        while (GetMessageW(&msg, NULL, 0, 0))
         {
             if (!TranslateAccelerator(viewHWindow, ViewerTable, &msg))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
         }
     }
@@ -186,23 +185,15 @@ DWORD WINAPI ThreadViewerMessageLoop(void* param)
     return ThreadViewerMessageLoopEH(param);
 }
 
-BOOL OpenViewer(const char* name, CViewType mode, int left, int top, int width, int height,
-                UINT showCmd, BOOL returnLock, HANDLE* lock, BOOL* lockOwner,
-                CSalamanderPluginViewerData* viewerData, int enumFileNamesSourceUID,
-                int enumFileNamesLastFileIndex)
+// was a narrow OpenViewer wrapper around OpenViewerW(nameW, nameA, ...).
+// viewer.h had already declared this wide; the narrow definition and the W twin are gone.
+BOOL OpenViewer(const wchar_t* name, CViewType mode, int left, int top,
+                int width, int height, UINT showCmd, BOOL returnLock, HANDLE* lock,
+                BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
+                int enumFileNamesSourceUID, int enumFileNamesLastFileIndex)
 {
-    return OpenViewerW(NULL, name, mode, left, top, width, height, showCmd, returnLock,
-                       lock, lockOwner, viewerData, enumFileNamesSourceUID,
-                       enumFileNamesLastFileIndex);
-}
-
-BOOL OpenViewerW(const wchar_t* nameW, const char* nameA, CViewType mode, int left, int top,
-                 int width, int height, UINT showCmd, BOOL returnLock, HANDLE* lock,
-                 BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
-                 int enumFileNamesSourceUID, int enumFileNamesLastFileIndex)
-{
-    CALL_STACK_MESSAGE11("OpenViewer(%s, %d, %d, %d, %d, %d, %u, %d, , , , %d, %d)",
-                         nameA != NULL ? nameA : "", mode, left, top, width, height, showCmd, returnLock,
+    CALL_STACK_MESSAGE11("OpenViewer(%ls, %d, %d, %d, %d, %d, %u, %d, , , , %d, %d)",
+                         name != NULL ? name : L"", mode, left, top, width, height, showCmd, returnLock,
                          enumFileNamesSourceUID, enumFileNamesLastFileIndex);
     CSalamanderPluginInternalViewerData* intViewerData = NULL;
     if (viewerData != NULL && viewerData->Size == sizeof(CSalamanderPluginInternalViewerData))
@@ -229,8 +220,7 @@ BOOL OpenViewerW(const wchar_t* nameW, const char* nameA, CViewType mode, int le
         data.Top = top;
         data.Width = width;
         data.Height = height;
-        data.Name = nameA;
-        data.NameW = nameW;
+        data.Name = name;
         data.ShowCmd = showCmd;
         data.Caption = intViewerData != NULL ? intViewerData->Caption : NULL;
         data.WholeCaption = intViewerData != NULL ? intViewerData->WholeCaption : FALSE;
@@ -275,37 +265,29 @@ BOOL OpenViewerW(const wchar_t* nameW, const char* nameA, CViewType mode, int le
 
 const char* RegExpErrorText(CRegExpErrors err)
 {
-    switch (err)
-    {
-    case reeNoError:
-        return LoadStr(IDS_REGEXPERROR1);
-    case reeLowMemory:
-        return LoadStr(IDS_REGEXPERROR2);
-    case reeEmpty:
-        return LoadStr(IDS_REGEXPERROR3);
-    case reeTooBig:
-        return LoadStr(IDS_REGEXPERROR4);
-    case reeTooManyParenthesises:
-        return LoadStr(IDS_REGEXPERROR5);
-    case reeUnmatchedParenthesis:
-        return LoadStr(IDS_REGEXPERROR6);
-    case reeOperandCouldBeEmpty:
-        return LoadStr(IDS_REGEXPERROR7);
-    case reeNested:
-        return LoadStr(IDS_REGEXPERROR8);
-    case reeInvalidRange:
-        return LoadStr(IDS_REGEXPERROR9);
-    case reeUnmatchedBracket:
-        return LoadStr(IDS_REGEXPERROR10);
-    case reeFollowsNothing:
-        return LoadStr(IDS_REGEXPERROR11);
-    case reeTrailingBackslash:
-        return LoadStr(IDS_REGEXPERROR12);
-    case reeInternalDisaster:
-        return LoadStr(IDS_REGEXPERROR13);
-    default:
+    if (err < reeNoError || err > reeInternalDisaster)
         return "";
+
+    // The Spencer engine and frozen v107 facade expose byte error pointers. Own
+    // those projections here, refresh them when the language module changes, and
+    // reject lossy ACP text rather than leaking narrow resource ownership to core.
+    static const int resourceIds[] = {
+        IDS_REGEXPERROR1, IDS_REGEXPERROR2, IDS_REGEXPERROR3, IDS_REGEXPERROR4,
+        IDS_REGEXPERROR5, IDS_REGEXPERROR6, IDS_REGEXPERROR7, IDS_REGEXPERROR8,
+        IDS_REGEXPERROR9, IDS_REGEXPERROR10, IDS_REGEXPERROR11, IDS_REGEXPERROR12,
+        IDS_REGEXPERROR13};
+    static thread_local HINSTANCE loadedLanguage = NULL;
+    static thread_local std::string errorTexts[_countof(resourceIds)];
+    if (loadedLanguage != HLanguage)
+    {
+        for (size_t i = 0; i < _countof(resourceIds); ++i)
+        {
+            if (!Win32EncodeAcpExact(LoadStrOwned(resourceIds[i]), errorTexts[i]))
+                errorTexts[i] = "Regular expression error.";
+        }
+        loadedLanguage = HLanguage;
     }
+    return errorTexts[static_cast<size_t>(err)].c_str();
 }
 
 //
@@ -392,7 +374,7 @@ void CViewerWindow::CodeCharacters(unsigned char* start, unsigned char* end)
 BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::LoadBefore()");
-    if (FileName.empty() && FileNameW.empty())
+    if (FileNameW.empty())
         return FALSE;
 
     HANDLE file;
@@ -454,8 +436,8 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
                 {
                     InvalidateRect(HWindow, NULL, FALSE);
                     Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-                    kill = SalMessageBoxViewerPaintBlocked(HWindow, LoadStr(IDS_VIEWER_UNKNOWNERR),
-                                                           LoadStr(IDS_ERRORREADINGFILE),
+                    kill = SalMessageBoxViewerPaintBlocked(HWindow, LoadStrW(IDS_VIEWER_UNKNOWNERR),
+                                                           LoadStrW(IDS_ERRORREADINGFILE),
                                                            MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
                     ret = FALSE;
                     Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -472,7 +454,7 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
                 DWORD err2 = GetLastError();
                 InvalidateRect(HWindow, NULL, FALSE);
                 Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-                kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err2), LoadStr(IDS_ERRORREADINGFILE),
+                kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err2).c_str(), LoadStrW(IDS_ERRORREADINGFILE),
                                                        MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
                 ret = FALSE;
                 Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -482,7 +464,7 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
         {
             InvalidateRect(HWindow, NULL, FALSE);
             Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-            kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err), LoadStr(IDS_ERRORREADINGFILE),
+            kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORREADINGFILE),
                                                    MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
             ret = FALSE;
             Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -503,7 +485,7 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
                 SetEvent(Lock);
                 Lock = NULL; // from now on it is up to the disk cache
             }
-            SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+            SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
             InvalidateRect(HWindow, NULL, FALSE);
         }
 
@@ -524,9 +506,9 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
             SetEvent(Lock);
             Lock = NULL; // from now on it is up to the disk cache
         }
-        SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+        SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
         InvalidateRect(HWindow, NULL, FALSE);
-        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err), LoadStr(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
+        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
 }
@@ -534,7 +516,7 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
 BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::LoadBehind()");
-    if (FileName.empty() && FileNameW.empty())
+    if (FileNameW.empty())
         return FALSE;
 
     HANDLE file;
@@ -605,7 +587,7 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
                     TRACE_I("CViewerWindow::LoadBehind(): ReadFile returned " << (DWORD)readed << " instead of " << (DWORD)read);
                     InvalidateRect(HWindow, NULL, FALSE);
                     Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-                    kill = SalMessageBoxViewerPaintBlocked(HWindow, LoadStr(IDS_VIEWER_UNKNOWNERR), LoadStr(IDS_ERRORREADINGFILE),
+                    kill = SalMessageBoxViewerPaintBlocked(HWindow, LoadStrW(IDS_VIEWER_UNKNOWNERR), LoadStrW(IDS_ERRORREADINGFILE),
                                                            MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
                     ret = FALSE;
                     Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -622,7 +604,7 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
                 DWORD err2 = GetLastError();
                 InvalidateRect(HWindow, NULL, FALSE);
                 Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-                kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err2), LoadStr(IDS_ERRORREADINGFILE),
+                kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err2).c_str(), LoadStrW(IDS_ERRORREADINGFILE),
                                                        MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
                 ret = FALSE;
                 Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -633,7 +615,7 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
             DWORD err2 = GetLastError();
             InvalidateRect(HWindow, NULL, FALSE);
             Seek = Loaded = 0; // data in Buffer may be corrupted; invalidate them so nothing uses them while the message box is shown
-            kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err2), LoadStr(IDS_ERRORREADINGFILE),
+            kill = SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err2).c_str(), LoadStrW(IDS_ERRORREADINGFILE),
                                                    MB_RETRYCANCEL | MB_ICONEXCLAMATION) == IDCANCEL;
             ret = FALSE;
             Seek = Loaded = 0; // some data might have been loaded while the message box was shown, so invalidate Buffer again
@@ -654,7 +636,7 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
                 SetEvent(Lock);
                 Lock = NULL; // from now on it is up to the disk cache
             }
-            SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+            SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
             InvalidateRect(HWindow, NULL, FALSE);
         }
 
@@ -675,9 +657,9 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
             SetEvent(Lock);
             Lock = NULL; // from now on it is up to the disk cache
         }
-        SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+        SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
         InvalidateRect(HWindow, NULL, FALSE);
-        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err), LoadStr(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
+        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
 }
@@ -710,11 +692,9 @@ void CViewerWindow::HeightChanged(BOOL& fatalErr)
     }
 }
 
-void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCaption)
+void CViewerWindow::OpenFile(const wchar_t* file, const wchar_t* caption, BOOL wholeCaption)
 {
-    CALL_STACK_MESSAGE3("CViewerWindow::OpenFile(%s, %s)", file, caption);
-    CPathBuffer fileName;
-    strcpy(fileName, file);
+    CALL_STACK_MESSAGE3("CViewerWindow::OpenFile(%S, %S)", file != NULL ? file : L"", caption != NULL ? caption : L"");
 
     Caption.clear();
     if (caption != NULL)
@@ -724,52 +704,7 @@ void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCa
     }
     else
         WholeCaption = FALSE;
-    FileName = (const char*)fileName;
-    FileNameW = AnsiToWide(fileName);
-    TooBigSelAction = 0;
-    CanSwitchToHex = TRUE;
-    CanSwitchQuietlyToHex = TRUE;
-    OriginX = 0;
-    SeekY = 0;
-    ExitTextMode = FALSE;
-    ForceTextMode = FALSE;
-    CodeType = 0;
-    UseCodeTable = FALSE;
-    TextEncoding = Sally::Unicode::BomEncoding::LegacyBytes;
-    TextContentOffset = 0;
-    BOOL fatalErr = FALSE;
-    FileChanged(NULL, FALSE, fatalErr, TRUE);
-    if (fatalErr)
-        FatalFileErrorOccured();
-    if (fatalErr || ExitTextMode)
-    {
-        CanSwitchQuietlyToHex = FALSE;
-        return;
-    }
-    if (FileName.empty())
-        SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
-    else
-        SetViewerCaption();
-    InvalidateRect(HWindow, NULL, FALSE);
-    UpdateWindow(HWindow);
-    CanSwitchQuietlyToHex = FALSE;
-}
-
-void CViewerWindow::OpenFileW(const wchar_t* file, const char* caption, BOOL wholeCaption)
-{
-    std::wstring fileNameW = file != NULL ? std::wstring(file) : std::wstring();
-    CALL_STACK_MESSAGE3("CViewerWindow::OpenFileW(%S, %s)", fileNameW.c_str(), caption);
-
-    Caption.clear();
-    if (caption != NULL)
-    {
-        Caption = caption;
-        WholeCaption = wholeCaption;
-    }
-    else
-        WholeCaption = FALSE;
-    FileNameW = fileNameW;
-    FileName = WideToAnsi(FileNameW);
+    FileNameW = file != NULL ? std::wstring(file) : std::wstring();
     TooBigSelAction = 0;
     CanSwitchToHex = TRUE;
     CanSwitchQuietlyToHex = TRUE;
@@ -791,7 +726,7 @@ void CViewerWindow::OpenFileW(const wchar_t* file, const char* caption, BOOL who
         return;
     }
     if (FileNameW.empty())
-        SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+        SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
     else
         SetViewerCaption();
     InvalidateRect(HWindow, NULL, FALSE);
@@ -801,21 +736,15 @@ void CViewerWindow::OpenFileW(const wchar_t* file, const char* caption, BOOL who
 
 HANDLE CViewerWindow::OpenViewedFile(DWORD flags) const
 {
-    if (!FileNameW.empty())
-    {
-        return SalCreateFileWideH(FileNameW.c_str(), GENERIC_READ,
-                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                  OPEN_EXISTING, flags, NULL);
-    }
-
-    return SalCreateFileH(FileName.c_str(), GENERIC_READ,
-                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                          OPEN_EXISTING, flags, NULL);
+    if (FileNameW.empty())
+        return INVALID_HANDLE_VALUE;
+    return SalCreateFileH(FileNameW.c_str(), GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, flags, NULL);
 }
 
 void CViewerWindow::ClearViewedFile()
 {
-    FileName.clear();
     FileNameW.clear();
 }
 
@@ -830,7 +759,7 @@ void CViewerWindow::ReleaseMouseDrag()
     }
 }
 
-int CViewerWindow::SalMessageBoxViewerPaintBlocked(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
+int CViewerWindow::SalMessageBoxViewerPaintBlocked(HWND hParent, const wchar_t* lpText, const wchar_t* lpCaption, UINT uType)
 {
     BOOL oldEnablePaint = EnablePaint;
     // showing a message box triggers Paint = reading the file = more errors,
@@ -838,8 +767,9 @@ int CViewerWindow::SalMessageBoxViewerPaintBlocked(HWND hParent, LPCTSTR lpText,
     EnablePaint = FALSE;
 
     int res;
-    std::wstring textW = AnsiToWide(lpText);
-    std::wstring captionW = AnsiToWide(lpCaption);
+    // The arguments ARE wide now - these two conversions are gone.
+    const std::wstring textW = lpText != NULL ? lpText : L"";
+    const std::wstring captionW = lpCaption != NULL ? lpCaption : L"";
 
     UINT buttons = uType & MB_TYPEMASK;
     if (buttons == MB_RETRYCANCEL)
@@ -881,7 +811,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     fatalErr = FALSE;
     if (calledHeightChanged != NULL)
         *calledHeightChanged = FALSE;
-    if (FileName.empty() && FileNameW.empty())
+    if (FileNameW.empty())
         return;
 
     // The cached line scan describes the previous contents. The validity key would catch a
@@ -889,16 +819,8 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
     // viewer reloads rather than relying on the key alone.
     ResetDecodedLineIndex();
 
-    const char* s = strrchr(FileName.c_str(), '\\');
-    const char* namePart = FileName.c_str();
-    if (s != NULL)
-    {
-        namePart = s + 1;
-        memcpy(CurrentDir, FileName.c_str(), (s - FileName.c_str()) + 1);
-        CurrentDir[(s - FileName.c_str()) + 1] = 0;
-    }
-    else
-        CurrentDir[0] = 0;
+    const wchar_t* sW = wcsrchr(FileNameW.c_str(), L'\\');
+    const wchar_t* namePartW = sW != NULL ? sW + 1 : FileNameW.c_str();
 
     BOOL close;
     if (file == NULL)
@@ -938,10 +860,10 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                 SetEvent(Lock);
                 Lock = NULL; // from now on it is up to the disk cache
             }
-            SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+            SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
             InvalidateRect(HWindow, NULL, FALSE);
-            SalMessageBoxViewerPaintBlocked(HWindow, err == NO_ERROR ? LoadStr(IDS_UNABLETOVIEWFILENT) : GetErrorText(err),
-                                            LoadStr(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
+            SalMessageBoxViewerPaintBlocked(HWindow, err == NO_ERROR ? LoadStrW(IDS_UNABLETOVIEWFILENT) : GetErrorTextOwned(err).c_str(),
+                                            LoadStrW(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
             fatalErr = TRUE;
         }
         else
@@ -961,18 +883,30 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
 
                 if (FileSize > 0)
                 {
-                    BYTE bom[3] = {0, 0, 0};
+                    // Read a real head window, not just three bytes:
+                    // the viewer used to decode ONLY BOM-marked files, so a
+                    // BOM-less UTF-8 or UTF-16 file - which is the common case
+                    // outside Windows tooling - rendered through the 256-entry
+                    // legacy table as mojibake. EncodingDetector answers from the
+                    // window, and a real BOM still wins inside it.
+                    BYTE head[4096] = {};
                     DWORD read = 0;
                     CQuadWord bomSeek;
                     bomSeek.SetUI64(0);
                     bomSeek.LoDWord = SetFilePointer(file, bomSeek.LoDWord, (PLONG)&bomSeek.HiDWord, FILE_BEGIN);
                     DWORD seekErr = GetLastError();
                     if ((bomSeek.LoDWord != INVALID_SET_FILE_POINTER || seekErr == NO_ERROR) &&
-                        ReadFile(file, bom, (DWORD)min((__int64)sizeof(bom), FileSize), &read, NULL))
+                        ReadFile(file, head, (DWORD)min((__int64)sizeof(head), FileSize), &read, NULL))
                     {
-                        Sally::Unicode::BomInfo bomInfo = Sally::Unicode::DetectBom(bom, read);
-                        TextEncoding = bomInfo.Encoding;
-                        TextContentOffset = bomInfo.TextOffset;
+                        sally::text::DetectionOptions detectOptions;
+                        detectOptions.scanBudget = read;
+                        // The window legitimately ends mid-character for any file
+                        // larger than the buffer.
+                        detectOptions.windowMayEndMidCharacter = true;
+                        const sally::text::DetectionResult detected =
+                            sally::text::Detect(head, read, detectOptions);
+                        TextEncoding = detected.encoding;
+                        TextContentOffset = detected.textOffset;
                     }
                 }
 
@@ -982,12 +916,12 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                     if (defViewMode == 0)
                     {
                         // the exceptions apply only when Auto-Select is active
-                        if (Configuration.TextModeMasks.AgreeMasks(namePart, NULL))
+                        if (Configuration.TextModeMasks.AgreeMasks(namePartW, NULL))
                         {
                             defViewMode = 1;               // Text
                             CanSwitchQuietlyToHex = FALSE; // if we force Text mode, prompt before switching to Hex
                         }
-                        else if (Configuration.HexModeMasks.AgreeMasks(namePart, NULL))
+                        else if (Configuration.HexModeMasks.AgreeMasks(namePartW, NULL))
                             defViewMode = 2; // Hex
                     }
                     else
@@ -1021,7 +955,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                         if (len > 0 && (defViewMode == 0 || CodePageAutoSelect))
                         {
                             BOOL isText;
-                            char codePage[101];
+                            std::wstring codePage;
                             char recBuf[RECOGNIZE_FILE_TYPE_BUFFER_LEN]; // to be safe, copy the data from Buffer into recBuf
                             int recLen = min(len, RECOGNIZE_FILE_TYPE_BUFFER_LEN);
                             memcpy(recBuf, (char*)Buffer, recLen);
@@ -1029,7 +963,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                             // displaying a message box triggers Paint = reads the file = produces more errors,
                             // so disable Paint, which only clears the viewer background (e.g., the parts already displayed)
                             EnablePaint = FALSE;
-                            RecognizeFileType(HWindow, recBuf, recLen, FALSE, &isText, codePage);
+                            RecognizeFileType(HWindow, recBuf, recLen, FALSE, &isText, &codePage);
                             EnablePaint = oldEnablePaint;
                             if (defViewMode == 0)
                             {
@@ -1042,7 +976,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                             {
                                 if (isText && defViewMode != 2)
                                 {
-                                    int c = CodeTables.GetConversionToWinCodePage(codePage);
+                                    int c = CodeTables.GetConversionToWinCodePage(codePage.c_str());
                                     if (CodeTables.Valid(c))
                                         SetCodeType(c);
                                     else // conversion "none"
@@ -1065,7 +999,7 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
                         if (!bomTextMode && !CodePageAutoSelect)
                         {
                             int defCodeType;
-                            if (!CodeTables.GetCodeType(DefaultConvert, defCodeType))
+                            if (!CodeTables.GetCodeType(DefaultConvert.c_str(), defCodeType))
                                 defCodeType = 0;
                             if (CodeTables.Valid(defCodeType))
                                 SetCodeType(defCodeType);
@@ -1121,10 +1055,10 @@ void CViewerWindow::FileChanged(HANDLE file, BOOL testOnlyFileSize, BOOL& fatalE
             SetEvent(Lock);
             Lock = NULL; // from now on it is up to the disk cache
         }
-        SetWindowText(HWindow, LoadStr(IDS_VIEWERTITLE));
+        SetWindowTextW(HWindow, LoadStrW(IDS_VIEWERTITLE));
         InvalidateRect(HWindow, NULL, FALSE);
         if (IsWindowVisible(HWindow)) // safeguard against a message box when closing the viewer while the viewed file is being overwritten
-            SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(err), LoadStr(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
+            SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(err).c_str(), LoadStrW(IDS_ERRORREADINGFILE), MB_OK | MB_ICONEXCLAMATION);
         fatalErr = TRUE;
     }
 }
@@ -1367,7 +1301,7 @@ BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek
             if (!CanSwitchQuietlyToHex)
                 CanSwitchToHex = FALSE;
             if (CanSwitchQuietlyToHex ||
-                SalMessageBoxViewerPaintBlocked(HWindow, LoadStr(IDS_VIEWER_BINFILE), LoadStr(IDS_VIEWERTITLE),
+                SalMessageBoxViewerPaintBlocked(HWindow, LoadStrW(IDS_VIEWER_BINFILE), LoadStrW(IDS_VIEWERTITLE),
                                                 MB_YESNO | MB_ICONQUESTION) == IDYES)
             {
                 CanSwitchQuietlyToHex = FALSE;
@@ -2160,43 +2094,75 @@ void CViewerWindow::SetScrollBar()
     }
 }
 
-BOOL CViewerWindow::GetFindText(char* buf, int& len)
+// How much of the selection the Find dialog's auto-fill is allowed to read.
+// The rules, and why the seed is bounded while the pattern is not, live in
+// viewer_find_seed.h so a headless test can compile them.
+
+// The WIDE selection getter.
+//
+// The retired fixed-capacity byte getter decoded this selection and then narrowed
+// it again, so a CJK word selected in a decoded view could not become the Find
+// needle shown on screen. This returns the decoded text as it is.
+//
+// Only meaningful in a decoded view; a byte-mode selection has no wide form and
+// returns FALSE so the caller keeps its byte path.
+BOOL CViewerWindow::GetFindTextW(std::wstring& out)
 {
-    CALL_STACK_MESSAGE1("CViewerWindow::GetFindText()");
-    len = 0;
+    CALL_STACK_MESSAGE1("CViewerWindow::GetFindTextW()");
+    out.clear();
+    if (StartSelection == EndSelection || !HasDecodedTextMode())
+        return FALSE;
+
+    __int64 startSel = min(StartSelection, EndSelection);
+    __int64 endSel = max(StartSelection, EndSelection);
+    startSel = max(startSel, TextStartOffset());
+    endSel = max(endSel, startSel);
+    endSel = Sally::Viewer::ClampFindSeedRange(startSel, endSel);
+
+    BOOL fatalErr = FALSE;
+    Sally::Unicode::DecodedRun run;
+    if (!DecodeTextRange(NULL, startSel, endSel, run, fatalErr) || fatalErr)
+    {
+        if (fatalErr)
+            FatalFileErrorOccured();
+        return FALSE;
+    }
+    out = run.Text;
+    Sally::Viewer::ClampFindSeedText(out);
+    return !out.empty();
+}
+
+BOOL CViewerWindow::GetFindBytes(std::string& bytes)
+{
+    CALL_STACK_MESSAGE1("CViewerWindow::GetFindBytes()");
     if (StartSelection == EndSelection)
         return FALSE;
 
     __int64 startSel = min(StartSelection, EndSelection);
-    // if (startSel == -1) startSel = 0; // cannot occur (both can be -1 only together, and we never reach this)
     __int64 endSel = max(StartSelection, EndSelection);
-    // if (endSel == -1) endSel = 0; // cannot occur (both can be -1 only together, and we never reach this)
-    BOOL fatalErr = FALSE;
+    if (startSel < 0 || endSel < startSel ||
+        static_cast<unsigned __int64>(endSel - startSel) >
+            static_cast<unsigned __int64>(std::string().max_size()))
+        return FALSE;
+    // Seed only - see viewer_find_seed.h. Without this the hex Find box is filled
+    // with three characters per selected byte, for the whole selection.
+    endSel = Sally::Viewer::ClampFindSeedRange(startSel, endSel);
 
-    if (HasDecodedTextMode())
+    std::string candidate;
+    try
     {
-        startSel = max(startSel, TextStartOffset());
-        endSel = max(endSel, startSel);
-        Sally::Unicode::DecodedRun run;
-        if (!DecodeTextRange(NULL, startSel, endSel, run, fatalErr) || fatalErr)
-        {
-            if (fatalErr)
-                FatalFileErrorOccured();
-            return FALSE;
-        }
-        int written = WideCharToMultiByte(CP_ACP, 0, run.Text.c_str(), (int)run.Text.size(),
-                                          buf, FIND_TEXT_LEN - 1, NULL, NULL);
-        if (written <= 0)
-            return FALSE;
-        buf[written] = 0;
-        len = written;
-        return TRUE;
+        candidate.resize(static_cast<size_t>(endSel - startSel));
+    }
+    catch (const std::bad_alloc&)
+    {
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        return FALSE;
     }
 
-    if (endSel - startSel > FIND_TEXT_LEN - 1)
-        endSel = startSel + FIND_TEXT_LEN - 1;
-
-    char* s = buf;
+    BOOL fatalErr = FALSE;
     __int64 off = startSel;
     while (off < endSel)
     {
@@ -2205,11 +2171,10 @@ BOOL CViewerWindow::GetFindText(char* buf, int& len)
             break;
         if (l == 0)
             return FALSE;
-        memcpy(s, Buffer + (off - Seek), l);
-        s += l;
+        memcpy(candidate.data() + static_cast<size_t>(off - startSel),
+               Buffer + (off - Seek), static_cast<size_t>(l));
         off += l;
     }
-    *s = 0;
 
     if (fatalErr)
     {
@@ -2218,7 +2183,7 @@ BOOL CViewerWindow::GetFindText(char* buf, int& len)
     }
     else
     {
-        len = (int)(endSel - startSel);
+        bytes.swap(candidate);
         return TRUE;
     }
 }
@@ -2308,7 +2273,7 @@ CViewerWindow::GetSelectedText(BOOL& fatalErr)
 #endif // _WIN64
     if (lowMem)
     {
-        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(ERROR_NOT_ENOUGH_MEMORY), LoadStr(IDS_ERRORTITLE),
+        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(ERROR_NOT_ENOUGH_MEMORY).c_str(), LoadStrW(IDS_ERRORTITLE),
                                         MB_OK | MB_ICONEXCLAMATION);
     }
     return NULL;
@@ -2340,7 +2305,7 @@ CViewerWindow::GetSelectedTextW(BOOL& fatalErr, int* textLen)
     HGLOBAL h = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, bytes));
     if (h == NULL)
     {
-        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorText(ERROR_NOT_ENOUGH_MEMORY), LoadStr(IDS_ERRORTITLE),
+        SalMessageBoxViewerPaintBlocked(HWindow, GetErrorTextOwned(ERROR_NOT_ENOUGH_MEMORY).c_str(), LoadStrW(IDS_ERRORTITLE),
                                         MB_OK | MB_ICONEXCLAMATION);
         return NULL;
     }
@@ -2363,10 +2328,10 @@ BOOL CViewerWindow::FindDecodedLiteral(HANDLE* hFile, BOOL forward, WORD flags, 
 {
     foundMatch = FALSE;
     fatalErr = FALSE;
-    if (!HasDecodedTextMode() || FindDialog.Text[0] == 0)
+    if (!HasDecodedTextMode() || FindDialog.Text.empty())
         return FALSE;
 
-    std::wstring pattern = AnsiToWide(FindDialog.Text);
+    const std::wstring& pattern = FindDialog.Text;
     std::size_t patternCells = Sally::Unicode::CountPatternCells(pattern);
     if (patternCells == 0)
         return TRUE;

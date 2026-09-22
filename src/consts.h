@@ -1,11 +1,13 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
 #include <string>
+#include <vector>
 
+#include "common/unicode/WideTextRange.h"
 #include "registry_names.h"
 
 // current configuration version (see main_window_config_persistence.cpp for description)
@@ -56,7 +58,7 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime);
 // 'parent' is the parent for any error message box; 'command' is the HTML Help command, see HHCDisplayXXX;
 // 'dwData' is the parameter for the HTML Help command, see HHCDisplayXXX. Can be called from any thread.
 // If 'quiet' is TRUE, no error message is shown. Returns TRUE on success, otherwise FALSE.
-BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet);
+BOOL OpenHtmlHelp(const wchar_t* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet);
 
 extern CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 
@@ -95,24 +97,24 @@ public:
     }
 };
 
-// Because Windows GetTempFileName doesn't work properly, we wrote our own clone:
-// Creates a file/directory (based on 'file') at path 'path' (NULL -> Windows TEMP dir),
-// with prefix 'prefix', returns the name of the created file in 'tmpName' (min size MAX_PATH),
-// returns "success?" (on failure returns Windows error code via SetLastError - for compatibility)
-BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file);
+// Because Windows GetTempFileName doesn't work properly, we wrote our own clone.
+// 2026-08-25: the narrow SalGetTempFileName(char*, ...) was deleted -
+// confirmed-dead (zero callers; the legacy v107 ABI shim forwards to WideGeneral.SalGetTempFileName,
+// never to the free narrow function). Creates a file/directory (based on 'file') at path 'path'
+// (empty -> Windows TEMP dir), with prefix 'prefix', returns the path of the created file/directory,
+// or an empty string on failure (SetLastError carries the Windows error code, for compatibility).
 std::wstring SalGetTempFileNameW(const wchar_t* path, const wchar_t* prefix, bool file);
 
 // Because Windows MoveFile can't rename files with read-only attribute on Novell,
 // we wrote our own (if an error occurs during MoveFile, it tries to clear read-only, perform the operation,
 // and then set it back)
-BOOL SalMoveFile(const char* srcName, const char* destName);
-BOOL SalMoveFileW(const wchar_t* srcName, const wchar_t* destName);
+BOOL SalMoveFile(const wchar_t* srcName, const wchar_t* destName);
 
 // Variant of Windows GetFileSize (has simpler error handling); 'file' is an open
 // file for calling GetFileSize(); returns the obtained file size in 'size'; returns success,
 // on FALSE (error) 'err' contains Windows error code and 'size' is zero
 BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err);
-BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err); // 'err' can be NULL if we don't care
+BOOL SalGetFileSize2(const wchar_t* fileName, CQuadWord& size, DWORD* err); // 'err' can be NULL if we don't care
 
 struct COperation;
 
@@ -126,7 +128,7 @@ struct COperation;
 // if 'ignoreAll' is TRUE, the window is not shown, no button press is awaited, behaves as if
 // user pressed Ignore; on error and pressing Cancel in the error window returns FALSE and
 // 'cancel' returns TRUE
-BOOL GetLinkTgtFileSize(HWND parent, const char* fileName, COperation* op, CQuadWord* size,
+BOOL GetLinkTgtFileSize(HWND parent, const wchar_t* fileName, COperation* op, CQuadWord* size, // wide
                         BOOL* cancel, BOOL* ignoreAll);
 
 // Because Windows GetFileAttributes can't work with names ending in space/dot,
@@ -134,7 +136,7 @@ BOOL GetLinkTgtFileSize(HWND parent, const char* fileName, COperation* op, CQuad
 // GetFileAttributes work correctly, but only for directories, for files with space/dot at
 // the end we have no solution, but at least it doesn't get info from a different file - Windows version
 // trims spaces/dots and thus works with a different file/directory)
-DWORD SalGetFileAttributes(const char* fileName);
+DWORD SalGetFileAttributes(const wchar_t* fileName);
 
 // If file/directory 'name' has read-only attribute, we try to clear it
 // (reason: e.g. so it can be deleted via DeleteFile); if we already have 'name' attributes
@@ -143,41 +145,45 @@ DWORD SalGetFileAttributes(const char* fileName);
 // NOTE: only clears read-only attribute, so that in case of multiple hardlinks there's no
 // unnecessarily large attribute change on remaining hardlinks of the file (attributes
 // are shared by all hardlinks)
-BOOL ClearReadOnlyAttr(const char* name, DWORD attr = -1);
-// Wide version of ClearReadOnlyAttr for Unicode paths
-BOOL ClearReadOnlyAttrW(const wchar_t* name, DWORD attr = -1);
+BOOL ClearReadOnlyAttr(const wchar_t* name, DWORD attr = -1);
 
 // Deletes a directory link (junction point, symbolic link, mount point); on success
 // returns TRUE; on error returns FALSE and if 'err' is not NULL, returns error code in 'err'
-BOOL DeleteDirLink(const char* name, DWORD* err);
+BOOL DeleteDirLink(const wchar_t* name, DWORD* err);
 
 // Returns TRUE if path 'path' is on a NOVELL volume (used to detect whether
 // fast-directory-move can be used)
-BOOL IsNOVELLDrive(const char* path);
+// The W form is the real one - it matches against the WIDE network
+// enumeration. The ANSI form re-widens its argument, which is honest only because a
+// path that reached an ANSI caller was already spellable.
+BOOL IsNOVELLDriveW(const wchar_t* path);
 
 // Returns TRUE if path 'path' is on a LANTASTIC volume (used to detect whether
 // file size needs to be checked after copying); for optimization purposes
 // 'lastLantasticCheckRoot' is used (for first call "", then don't change)
 // and 'lastIsLantasticPath' (result for 'lastLantasticCheckRoot')
-BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& lastIsLantasticPath);
-
-// Returns TRUE for network paths
-BOOL IsNetworkPath(const char* path);
+// Wide only - its one caller (worker.cpp) has wide target paths.
+BOOL IsLantasticDriveW(const wchar_t* path, std::wstring& lastLantasticCheckRoot,
+                       BOOL& lastIsLantasticPath);
 
 // Returns TRUE if 'path' is on a volume that supports ADS (or an error occurred while
 // determining the file system type) and we're on NT/W2K/XP; if 'isFAT32' is not NULL,
 // returns TRUE in it if 'path' is on a FAT32 volume; returns FALSE only if it's
 // certain that FS doesn't support ADS
-BOOL IsPathOnVolumeSupADS(const char* path, BOOL* isFAT32);
+// 2026-08-26: the narrow IsPathOnVolumeSupADS(char*, ...) was deleted -
+// confirmed-dead (zero callers anywhere). IsPathOnVolumeSupADSW is the real, widely-used
+// implementation.
+BOOL IsPathOnVolumeSupADSW(const wchar_t* path, BOOL* isFAT32); // wide sibling
 
 // Test if this is Samba (Linux support for disk sharing with Windows)
-BOOL IsSambaDrivePath(const char* path);
+// 2026-08-26: the narrow IsSambaDrivePath(char*) thin wrapper was deleted -
+// confirmed-dead (zero callers anywhere). IsSambaDrivePathW is the real implementation.
+BOOL IsSambaDrivePathW(const wchar_t* path);
 
 // Test if this is a UNC path (detects both formats: \\server\share and \\?\UNC\server\share)
-BOOL IsUNCPath(const char* path);
 
-// Test if this is a UNC root (detects only format: \\server\share)
-BOOL IsUNCRootPath(const char* path);
+// 2026-08-25: the narrow IsUNCRootPath(char*) was deleted - confirmed-dead (zero
+// callers anywhere). IsUNCRootPathW (common/fsutil.h) is the real, widely-used implementation.
 
 // Creates a file named 'fileName' via classic Win32 API call
 // CreateFile (lpSecurityAttributes==NULL, dwCreationDisposition==CREATE_NEW,
@@ -191,51 +197,41 @@ BOOL IsUNCRootPath(const char* path);
 // attribute, tries to open without Encrypted attribute, if that succeeds,
 // file is deleted and TRUE is written to 'encryptionNotSupported' - return value
 // and GetLastError() contain the "original" error (opening with Encrypted attribute)
-HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
+HANDLE SalCreateFileEx(const wchar_t* fileName, DWORD desiredAccess, // wide
                        DWORD shareMode, DWORD flagsAndAttributes,
                        BOOL* encryptionNotSupported);
 
-// Checks the last component of the name in path 'path', if it contains
-// a space at the beginning or end or a dot at the end, returns TRUE, otherwise FALSE
-BOOL FileNameInvalidForManualCreate(const char* path);
-
 // Trims spaces from beginning and end of name (CutWS or StripWS or CutWhiteSpace or StripWhiteSpace)
 // returns TRUE if trimming occurred
-BOOL CutSpacesFromBothSides(char* path);
+// 2026-08-26: the narrow CutSpacesFromBothSides(char*) was deleted - confirmed-dead
+// (zero callers anywhere). CutSpacesFromBothSidesW is the real, widely-used implementation.
 BOOL CutSpacesFromBothSidesW(wchar_t* path);
 
 // Trims spaces from beginning and spaces and dots from end of name, Explorer does this
 // and people insisted they want it too, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
 // and https://forum.altap.cz/viewtopic.php?f=2&t=4210
 // returns TRUE if contents of 'path' change
-BOOL MakeValidFileName(char* path);
-
-// If 'name' ends with space/dot, makes a copy of 'name' to 'nameCopy' and appends
-// '\\' at the end, then redirects 'name' to 'nameCopy'; common API functions
-// silently trim spaces/dots from end of path and then work with different files/directories
-// than we want, appended '\\' at the end solves this
-void MakeCopyWithBackslashIfNeeded(const char*& name, char (&nameCopy)[3 * MAX_PATH]);
-
-// Overload for CPathBuffer - works the same way but with heap buffer
-class CPathBuffer; // forward declaration
-void MakeCopyWithBackslashIfNeeded(const char*& name, CPathBuffer& nameCopy);
+// 2026-08-26: the narrow MakeValidFileName(char*) was deleted - confirmed-dead
+// (zero callers anywhere). MakeValidFileNameW is the real, widely-used implementation.
 
 // Returns TRUE if name ends with backslash ('\\' added at end solves invalid names)
-BOOL NameEndsWithBackslash(const char* name);
+// 2026-08-26: the narrow NameEndsWithBackslash(char*) was deleted - confirmed-dead
+// (zero callers anywhere). NameEndsWithBackslashW is the real implementation.
 std::wstring MakeCopyWithBackslashIfNeededW(const wchar_t* name);
 BOOL NameEndsWithBackslashW(const wchar_t* name);
 
 // If 'name' ends with space/dot or contains ':' (collision with ADS), returns TRUE, otherwise FALSE,
 // if 'ignInvalidName' is TRUE, returns TRUE only if 'name' contains ':' (collision with ADS)
-BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName = FALSE);
+// 2026-08-26: the narrow FileNameIsInvalid(char*, ...) was deleted - confirmed-dead
+// (zero callers anywhere). FileNameIsInvalidW below is the real, widely-used implementation
+// (shellib.cpp, worker.cpp).
 // Wide version of FileNameIsInvalid for Unicode paths
 BOOL FileNameIsInvalidW(const wchar_t* name, BOOL isFullName, BOOL ignInvalidName = FALSE);
 
 // Returns FALSE if contained path components end with space/dot
 // and if 'cutPath' is TRUE, also shortens path to the first invalid component
 // (for error message), otherwise returns TRUE
-BOOL PathContainsValidComponents(char* path, BOOL cutPath);
-BOOL PathContainsValidComponentsW(const wchar_t* path);
+BOOL PathContainsValidComponents(const wchar_t* path);
 
 // Creates a directory named 'name' via classic Win32 API call
 // CreateDirectory(lpSecurityAttributes==NULL); this method resolves collision of 'name'
@@ -246,103 +242,87 @@ BOOL PathContainsValidComponentsW(const wchar_t* path);
 // (can create them, unlike CreateDirectory which silently trims spaces and thus creates
 // a different directory); returns TRUE on success, FALSE on error (returns Windows
 // error code in 'err' if not NULL)
-BOOL SalCreateDirectoryEx(const char* name, DWORD* err);
+// 2026-08-25: the narrow SalCreateDirectoryEx(char*, ...) was deleted -
+// confirmed-dead (zero callers; the legacy v107 ABI shim forwards to
+// WideGeneral.SalCreateDirectoryEx). SalCreateDirectoryExW (common/CreateDirectoryFlow.h) is the
+// sole surviving implementation.
 
-void InitLocales();                                       // must be called before using NumberToStr and PrintDiskSize
-char* NumberToStr(char* buffer, const CQuadWord& number); // int -> readable string conversion, !char buffer[50]!
-int NumberToStr2(char* buffer, const CQuadWord& number);  // int -> readable string conversion, !char buffer[50]!, returns number of chars copied to buffer
-char* GetErrorText(DWORD error);                          // converts error number to string
-WCHAR* GetErrorTextW(DWORD error);                        // converts error number to string
+void InitLocales(); // must be called before using NumberToStr and PrintDiskSize
+std::wstring NumberToStr(const CQuadWord& number);
+// 2026-08-25: NumberToStr2 (an alternate int-returning, thousands-separator-
+// inserting variant) was deleted - confirmed-dead (zero callers anywhere; not the same function
+// as NumberToStr above, which is genuinely still used).
+std::wstring GetErrorTextOwned(DWORD error);
 BOOL IsDirError(DWORD err);                               // is the error related to directory operations?
 
 // Normal and UNC paths: do they have the same root?
-BOOL HasTheSameRootPath(const char* path1, const char* path2);
-BOOL HasTheSameRootPathW(const wchar_t* path1, const wchar_t* path2);
+BOOL HasTheSameRootPath(const wchar_t* path1, const wchar_t* path2);
 
 // Checks if both paths have the same root and are on the same volume (handles
 // paths containing reparse points and substs)
 // WARNING: this is a quite SLOW function (up to 200ms)
-BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2);
+BOOL HasTheSameRootPathAndVolume(const wchar_t* p1, const wchar_t* p2);
 
 // Returns TRUE if paths 'path1' and 'path2' are on the same volume; in 'resIsOnlyEstimation'
 // (if not NULL) returns TRUE if the result is not certain (certain only when "volume name"
 // (GUID) was successfully obtained for both paths, which is only possible for local
 // paths on W2K or newer NT systems)
 // WARNING: this is a quite SLOW function (up to 200ms)
-BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOnlyEstimation);
+// The narrow form was deleted (2026-08-22): zero remaining callers once every
+// call site moved to this wide sibling, which is a genuinely separate, already-existing
+// implementation (not a signature twin) - two DIFFERENT Unicode directories could collapse to
+// the same '?'-bearing path under the narrow form, so the narrow form could answer "same
+// volume" for paths it never distinguished.
+BOOL PathsAreOnTheSameVolumeW(const wchar_t* path1, const wchar_t* path2, BOOL* resIsOnlyEstimation);
 
 // Compares two paths: case-insensitive, also ignores one backslash at start and end of paths
-BOOL IsTheSamePath(const char* path1, const char* path2);
+BOOL IsTheSamePath(const wchar_t* path1, const wchar_t* path2);
 
+// consts.h was THE LAGGING HEADER at scale. Twenty-three free
+// functions below had their .cpp bodies swept wide earlier while
+// the declaration here stayed narrow. A free function's decl/def width
+// disagreement is not diagnosed - it makes two overloads - so each narrow
+// declaration was a promise with no body: narrow callers compiled into a link
+// failure and wide callers errored. Every signature in this sweep was copied
+// from its definition, which is the sole implementation in each case.
 // Checks if the path is a plugin FS type, 'path' is the path being checked, 'fsName' is
-// a buffer of MAX_PATH chars for FS name (or NULL), returns 'userPart' (if != NULL) - pointer
+// an owned FS name (or NULL), returns 'userPart' (if != NULL) - pointer
 // into 'path' to first char of plugin-defined path (after the first ':')
-BOOL IsPluginFSPath(const char* path, char* fsName = NULL, const char** userPart = NULL);
-BOOL IsPluginFSPath(char* path, char* fsName = NULL, char** userPart = NULL);
+BOOL IsPluginFSPath(const wchar_t* path, std::wstring* fsName = NULL, const wchar_t** userPart = NULL);
+BOOL IsPluginFSPath(wchar_t* path, std::wstring* fsName = NULL, wchar_t** userPart = NULL);
 
 // Test if this is a URL path, e.g. "file:///c|/WINDOWS/clock.avi" = "c:\\WINDOWS\\clock.avi"
-BOOL IsFileURLPath(const char* path);
+BOOL IsFileURLPath(const wchar_t* path);
 
 // Determines by file extension if it's a link (.lnk, .pif or .url); if so, returns 1,
 // otherwise returns 0
-int IsFileLink(const char* fileExtension);
-
-// Gets UNC and normal root path from 'path', returns path in 'root' in format 'C:\' or '\\SERVER\SHARE\',
-// returns number of chars in root path (without null-terminator); 'root' is buffer of at least MAX_PATH chars,
-// for longer UNC root path it's truncated to MAX_PATH-2 chars and backslash is appended (it's not a root path anyway)
-int GetRootPath(char* root, const char* path);
-
-// Returns pointer past root (more precisely to backslash right after root) of UNC and normal path 'path'
-const char* SkipRoot(const char* path);
+int IsFileLink(const wchar_t* fileExtension);
 
 // Returns TRUE if 'path' (UNC and normal path) can be shortened by the last directory
 // (cut at last backslash - in the cut path backslash remains at end only for 'c:\'),
 // 'cutDir' returns pointer to the last directory (the cut part)
 // replacement for PathRemoveFileSpec
-BOOL CutDirectory(char* path, char** cutDir = NULL);
+BOOL CutDirectory(wchar_t* path, wchar_t** cutDir = NULL);
 // CutDirectoryW + SalPath*W wide helpers live in common/SalPathWide.h (shared
 // with the private tests); included below next to the other SalPath declarations.
 
-// Joins 'path' and 'name' into 'path', ensures joining with backslash, 'path' is buffer of at least 'pathSize' chars
-// returns TRUE if 'name' fits after 'path'; if 'path' or 'name' is empty,
-// joining (leading/trailing) backslash won't be added (e.g. "c:\" + "" -> "c:")
-BOOL SalPathAppend(char* path, const char* name, int pathSize);
-
-// If 'path' doesn't end with backslash yet, adds it at end of 'path'; 'path' is buffer of at least 'pathSize'
-// chars; returns TRUE if backslash fits after 'path'; if 'path' is empty, backslash is not added
-BOOL SalPathAddBackslash(char* path, int pathSize);
 #include "common/SalPathWide.h" // SalPath*W + CutDirectoryW wide helpers
 
-// If 'path' ends with backslash, removes it
-void SalPathRemoveBackslash(char* path);
+// 2026-08-25: the narrow SalPathRemoveBackslash/SalPathStripPath/
+// SalPathRemoveExtension/SalPathAddExtension/SalPathRenameExtension(char*, ...) were deleted -
+// confirmed-dead (zero callers anywhere; the legacy v107 ABI shim forwards each to the
+// corresponding WideGeneral.SalPath...W method, never to these free narrow functions). The wide
+// SalPath...W siblings in common/SalPathWide.h above are the sole surviving implementations.
 
 // Converts all '/' to '\\' and also if there are two or more '\\' in a row,
 // keeps only one (except two '\\' at string start, which denotes UNC path)
-void SlashesToBackslashesAndRemoveDups(char* path);
-
-// Makes name from full path ("c:\path\file" -> "file")
-void SalPathStripPath(char* path);
-
-// If there's an extension in the name, removes it
-void SalPathRemoveExtension(char* path);
-
-// If there's no extension in name 'path' yet, adds extension 'extension' (e.g. ".txt"), 'path' is buffer
-// of at least 'pathSize' chars, returns FALSE if buffer 'path' is not big enough for result path
-BOOL SalPathAddExtension(char* path, const char* extension, int pathSize);
-
-// Changes/adds extension 'extension' (e.g. ".txt") in name 'path', 'path' is buffer
-// of at least 'pathSize' chars, returns FALSE if buffer 'path' is not big enough for result path
-BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize);
-
-// Returns pointer into 'path' to file/directory name (ignores backslash at end of 'path'),
-// if name doesn't contain other backslashes than at end of string, returns 'path'
-const char* SalPathFindFileName(const char* path);
+void SlashesToBackslashesAndRemoveDups(std::wstring& path);
 
 // Works for normal and UNC paths.
 // Returns number of chars of common path. On normal path root must be terminated with backslash,
 // otherwise function returns 0. ("C:\"+"C:"->0, "C:\A\B"+"C:\"->3, "C:\A\B\"+"C:\A"->4,
 // "C:\AA\BB"+"C:\AA\CC"->5)
-int CommonPrefixLength(const char* path1, const char* path2);
+int CommonPrefixLength(const wchar_t* path1, const wchar_t* path2);
 
 // Returns TRUE if path 'prefix' is the base of path 'path'. Otherwise returns FALSE.
 // "C:\aa","C:\Aa\BB"->TRUE
@@ -350,32 +330,17 @@ int CommonPrefixLength(const char* path1, const char* path2);
 // "C:\aa\","C:\Aa"->TRUE
 // "\\server\share","\\server\share\aaa"->TRUE
 // Works for normal and UNC paths.
-BOOL SalPathIsPrefix(const char* prefix, const char* path);
+BOOL SalPathIsPrefix(const wchar_t* prefix, const wchar_t* path);
 
 // Removes ".." (skips ".." together with one subdirectory to the left) and "." (skips just ".")
 // from path; backslash as subdirectory separator is required; 'afterRoot' points past root
 // of the processed path (path changes happen only after 'afterRoot'); returns TRUE if changes
 // succeeded, FALSE if ".." cannot be removed (root is already on the left)
-BOOL SalRemovePointsFromPath(char* afterRoot);
+// The narrow overload that used to sit above this line was the
+// stale half of an A/W overload PAIR - the WCHAR form below already matched the
+// wide definition in common/SalGetFullName.cpp. Deleted rather than widened,
+// which would only have declared the same signature twice.
 BOOL SalRemovePointsFromPath(WCHAR* afterRoot);
-
-// Adjusts relative or absolute path to absolute without '.', '..' and trailing backslash (except
-// "X:\"); if 'curDir' is NULL, relative paths like "\path" and "path" return error (indeterminate), otherwise
-// 'curDir' is valid adjusted current path (UNC and normal); current paths of other drives (except
-// 'curDir'; only normal, not UNC) are in DefaultDir (it's good to call CMainWindow::UpdateDefaultDir
-// before use); 'name' - in/out buffer of at least MAX_PATH chars (its size is in 'nameBufSize');
-// if 'nextFocus' is not NULL and given relative path doesn't contain backslash - strcpy(nextFocus, name)
-// returns TRUE - name 'name' is ready for use, otherwise if 'errTextID' is not NULL it contains
-// error (constants for LoadStr - IDS_SERVERNAMEMISSING, IDS_SHARENAMEMISSING, IDS_TOOLONGPATH,
-// IDS_INVALIDDRIVE, IDS_INCOMLETEFILENAME, IDS_EMPTYNAMENOTALLOWED and IDS_PATHISINVALID);
-// in 'callNethood' (if not NULL) returns TRUE if Nethood plugin should be called on errors
-// IDS_SERVERNAMEMISSING and IDS_SHARENAMEMISSING, if 'allowRelPathWithSpaces' is TRUE, doesn't trim
-// spaces from beginning of relative path (normally does, so people don't accidentally create names with spaces
-// at beginning, Windows trims spaces and dots at end)
-// returns TRUE if there's no error in path, otherwise returns FALSE (e.g. "\\\" or "\\server\\")
-BOOL SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL,
-                    char* nextFocus = NULL, BOOL* callNethood = NULL, int nameBufSize = MAX_PATH,
-                    BOOL allowRelPathWithSpaces = FALSE);
 
 // Wide version of SalGetFullName + SalRemovePointsFromPath live in
 // common/SalGetFullName.h (shared with the private tests).
@@ -389,14 +354,12 @@ BOOL SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL
 // 'parent' is parent of messagebox; returns ERROR_SUCCESS if path is OK,
 // otherwise returns standard Windows error code or ERROR_USER_TERMINATED if user
 // used ESC key to interrupt the test
-DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent);
 DWORD SalCheckPathW(BOOL echo, const wchar_t* path, DWORD err, BOOL postRefresh, HWND parent);
 
 // Tries if path 'path' is accessible, optionally restores network connections using functions
 // CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath; returns TRUE if
 // path is accessible; 'parent' is parent of messagebox; 'tryNet' is TRUE if it makes sense
 // to try to restore network connections
-BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet);
 BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet);
 
 // Tries if path 'path' is accessible, optionally shortens it; if 'tryNet' is TRUE, optionally restores
@@ -406,8 +369,6 @@ BOOL SalCheckAndRestorePathW(HWND parent, const wchar_t* path, BOOL tryNet);
 // path shortening), 'pathInvalid' (TRUE if network connection restore was attempted without success),
 // 'cut' (TRUE if resulting path is shortened); 'parent' is parent of messagebox; returns TRUE
 // if resulting path 'path' is accessible
-BOOL SalCheckAndRestorePathWithCut(HWND parent, char* path, BOOL& tryNet, DWORD& err, DWORD& lastErr,
-                                   BOOL& pathInvalid, BOOL& cut, BOOL donotReconnect);
 BOOL SalCheckAndRestorePathWithCutW(HWND parent, std::wstring& path, BOOL& tryNet, DWORD& err, DWORD& lastErr,
                                     BOOL& pathInvalid, BOOL& cut, BOOL donotReconnect);
 
@@ -438,10 +399,11 @@ BOOL SalCheckAndRestorePathWithCutW(HWND parent, std::wstring& path, BOOL& tryNe
 // that occurred during recognition (if 'error' is not NULL, one of SPP_XXX constants is returned in it);
 // 'errorTitle' is title of error messagebox; if 'nextFocus' != NULL and windows/archive path
 // doesn't contain '\\' or only ends with '\\', path is copied to 'nextFocus' (see SalGetFullName)
-BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
-                  const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
-                  const char* curPath, const char* curArchivePath, int* error,
-                  int pathBufSize);
+//
+// 2026-08-25: the narrow SalParsePath free function (and its SalSplitWindowsPath/
+// SalSplitGeneralPath siblings below) was deleted - confirmed exhaustively dead (zero callers
+// anywhere in core, plugins, or the legacy ABI bridge; every real caller already goes through
+// this wide form, either directly or via CSalamanderGeneral::SalParsePath in zip.cpp).
 BOOL SalParsePathW(HWND parent, std::wstring& path, int& type, BOOL& isDir, wchar_t*& secondPart,
                    const wchar_t* errorTitle, std::wstring* nextFocus, BOOL curPathIsDiskOrArchive,
                    const wchar_t* curPath, const wchar_t* curArchivePath, int* error);
@@ -455,17 +417,18 @@ BOOL SalParsePathW(HWND parent, std::wstring& path, int& type, BOOL& isDir, wcha
 // chars) existing target path; 'secondPart' points into 'path' at position past existing path
 // (past '\\' or at end of string; if there's a file in path, points past path to this file);
 // 'pathIsDir' is TRUE/FALSE if existing path part is directory/file; 'backslashAtEnd' is TRUE
-// if there was backslash at end of 'path' before "parse" (e.g. SalParsePath removes such backslash);
+// if there was backslash at end of 'path' before "parse" (e.g. SalParsePathW removes such backslash);
 // 'dirName' + 'curDiskPath' are not NULL if max one file/directory is selected (its name without
 // path is in 'dirName'; if nothing is selected, focus is taken) and current path is windows
 // (path is in 'curDiskPath'); 'mask' is on output pointer to operation mask in 'path' buffer;
 // if there's error in path, method returns FALSE, problem was already reported to user
-BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                         char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curDiskPath, char*& mask);
-BOOL SalSplitWindowsPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
-                          wchar_t* path, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                          const wchar_t* dirName, const wchar_t* curDiskPath, wchar_t*& mask);
+//
+// 2026-08-25: the narrow SalSplitWindowsPath free function was deleted -
+// confirmed exhaustively dead (zero callers).
+BOOL SalSplitWindowsPathOwnedW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                               std::wstring& path, size_t secondPartOffset, BOOL pathIsDir,
+                               BOOL backslashAtEnd, const wchar_t* dirName, const wchar_t* curDiskPath,
+                               std::wstring& mask);
 
 // Gets existing part and operation mask from target path; recognizes non-existing part; on
 // success returns TRUE, relative path to create (in 'newDirs'), existing target path (in 'path';
@@ -488,22 +451,25 @@ BOOL SalSplitWindowsPathW(HWND parent, const wchar_t* title, const wchar_t* erro
 // needs to be created, only error is displayed; 'isTheSamePathF' is function for comparing two paths
 // (needed only if 'curPath' is not NULL), if NULL then IsTheSamePath is used;
 // if there's error in path, method returns FALSE, problem was already reported to user
-BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                         char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curPath, char*& mask, char* newDirs,
-                         SGP_IsTheSamePathF isTheSamePathF);
-
-typedef BOOL(WINAPI* SGP_IsTheSamePathWF)(const wchar_t* path1, const wchar_t* path2);
-BOOL SalSplitGeneralPathW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
-                           wchar_t* path, wchar_t* afterRoot, wchar_t* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                           const wchar_t* dirName, const wchar_t* curPath, wchar_t*& mask, wchar_t* newDirs,
-                           SGP_IsTheSamePathWF isTheSamePathF);
+//
+// 2026-08-25: the narrow SalSplitGeneralPath free function (and its
+// SGP_IsTheSamePathAF callback typedef, used only by that declaration) was deleted - confirmed
+// exhaustively dead (zero callers).
+BOOL SalSplitGeneralPathOwnedW(HWND parent, const wchar_t* title, const wchar_t* errorTitle, int selCount,
+                              std::wstring& path, size_t afterRootOffset, size_t secondPartOffset,
+                              BOOL pathIsDir, BOOL backslashAtEnd, const wchar_t* dirName,
+                              const wchar_t* curPath, std::wstring& mask, std::wstring* newDirs,
+                              SGP_IsTheSamePathF isTheSamePathF);
 
 // Checks if string 'fileNameComponent' can be used as a name component
 // on Windows filesystem (handles strings longer than MAX_PATH-4 (4 = "C:\"
 // + null-terminator), empty string, strings of '.' chars, whitespace strings,
 // chars "*?\\/<>|\":" and simple names like "prn" and "prn  .txt")
-BOOL SalIsValidFileNameComponent(const char* fileNameComponent);
+// Wide sibling. Prefer it whenever a wide name is available: '?' is a reject character
+// here and also the CP_ACP substitute, so the ANSI form rejects every name the code page
+// cannot spell (audit C5). It validates syntax only; the destination filesystem decides
+// its actual per-component limit.
+BOOL SalIsValidFileNameComponentW(const wchar_t* fileNameComponent);
 
 // Transforms string 'fileNameComponent' so it can be used as a name component
 // on Windows filesystem (handles strings longer than MAX_PATH-4 (4 = "C:\"
@@ -512,54 +478,45 @@ BOOL SalIsValidFileNameComponent(const char* fileNameComponent);
 // and "prn  .txt" get '_' appended at end of name); 'fileNameComponent' must be
 // extendable by at least one char (but at most MAX_PATH bytes from 'fileNameComponent'
 // are used)
-void SalMakeValidFileNameComponent(char* fileNameComponent);
+// Wide sibling: same syntax rules, applied to the true wide name and returned as a new,
+// untruncated string. The destination filesystem enforces its own component limit.
+std::wstring SalMakeValidFileNameComponentW(const wchar_t* fileNameComponent);
 
 // Prints disk space size, mode==0 "1.23 MB", mode==1 "1 230 000 bytes, 1.23 MB",
 // mode==2 "1 230 000 bytes", mode==3 (always in whole KB), mode==4 (like mode==0, but always
 // at least 3 significant digits, e.g. "2.00 MB")
-char* PrintDiskSize(char* buf, const CQuadWord& size, int mode);
+// The definition (sally_viewer_enumeration.cpp:456) has been wchar_t* all
+// along; this narrow declaration had NO definition anywhere, so it was a pure link-error
+// lie - invisible while Phase 1 never links. plugins.h:2005 already agrees.
+std::wstring PrintDiskSize(const CQuadWord& size, int mode);
 
 // Converts number of seconds to string ("5 sec", "1 hr 34 min", etc.); 'buf' is
 // buffer for resulting text, must be at least 100 chars; 'secs' is number of seconds;
 // returns 'buf'
-char* PrintTimeLeft(char* buf, CQuadWord const& secs);
+std::wstring PrintTimeLeft(CQuadWord const& secs);
 
 // Duplicates '&' - useful for paths displayed in menu ('&&' is displayed as '&');
-// 'buffer' is input/output string, 'bufferSize' is size of 'buffer' in bytes;
+// 'buffer' is input/output string, 'bufferSize' is size of 'buffer' in CHARACTERS;
 // returns TRUE if duplication didn't cause loss of chars from end of string (buffer was big
 // enough)
-BOOL DuplicateAmpersands(char* buffer, int bufferSize, BOOL skipFirstAmpersand = FALSE);
+BOOL DuplicateAmpersands(wchar_t* buffer, int bufferSize, BOOL skipFirstAmpersand = FALSE);
 
 // Removes '&' - useful for menu commands we need to display without hotkeys;
 // if it finds pair "&&", replaces it with single '&' char
 // 'text' is input/output string
-void RemoveAmpersands(char* text);
+void RemoveAmpersands(wchar_t* text);
 
-// Duplicates '\\' - useful for texts sent to LookForSubTexts, which reduces '\\\\'
-// back to '\\'; 'buffer' is input/output string, 'bufferSize' is size of 'buffer'
-// in bytes; returns TRUE if duplication didn't cause loss of chars from end of string
-// (buffer was big enough)
-BOOL DuplicateBackslashes(char* buffer, int bufferSize);
+// Duplicates '\\' for texts sent to LookForSubTexts, which reduces '\\\\' back to '\\'.
+BOOL DuplicateBackslashes(std::wstring& text) noexcept;
 
 // Duplicates '$' - used for importing old paths (hotpaths), which may contain $(SalDir)
 // and newly supports Sal/Env variables like $(SalDir) or $(WinDir)
 // during implementation I found that 2.5RC1, where we added support for these variables for editors,
 // viewers, archivers, this expansion wasn't done; I'm not fixing it retroactively, only introducing
 // conversion for HotPaths
-// 'buffer' is input/output string, 'bufferSize' is size of 'buffer' in bytes;
-// returns TRUE if duplication didn't cause loss of chars from end of string (buffer was big
-// enough)
-BOOL DuplicateDollars(char* buffer, int bufferSize);
-
-// Finds name in 'buf' (skips spaces at beginning and end) and if it exists ('buf'
-// doesn't contain only spaces), is not in quotes and contains at least one space, puts it in
-// quotes; returns FALSE if there's not enough space to add quotes ('bufSize' is
-// size of 'buf')
-BOOL AddDoubleQuotesIfNeeded(char* buf, int bufSize);
-
 // Trims '"' from beginning and end of 'path' (CutDoubleQuotes or StripDoubleQuotes or CutQuotes or StripQuotes)
 // returns TRUE if trimming occurred
-BOOL CutDoubleQuotesFromBothSides(char* path);
+BOOL CutDoubleQuotesFromBothSides(wchar_t* path);
 
 // Wait up to 1/5 second for ESC release (so that after ESC in dialog, for example
 // reading listing in panel isn't immediately interrupted)
@@ -577,24 +534,12 @@ void CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid = 0);
 
 // Returns displayable form of file/directory attributes; 'text' is buffer of at least 10 chars;
 // 'attrs' are file/directory attributes
-void GetAttrsString(char* text, DWORD attrs);
-
-// Copies string 'srcStr' after string 'dstStr' (after its terminating null);
-// 'dstStr' is buffer of size 'dstBufSize' (must be at least 2);
-// if both strings don't fit in buffer, they are shortened (always so that
-// as many chars as possible from both strings fit)
-void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr);
+void GetAttrsStringW(wchar_t* text, DWORD attrs);
 
 // Creates full file name (allocated); if 'dosName' is not NULL and 'path'+'name' is too
 // long name, tries to join 'path'+'dosName'; if 'skip', 'skipAll' and 'sourcePath' are not
 // NULL and "too long name" error occurs, allows user to skip this name (in this case
 // returns NULL and TRUE in 'skip'), if user chooses "Skip All", sets 'skipAll' to TRUE
-// 'sourcePath' is used for Focus button (in panel we show too long component in source
-// path that would cause problem in target path).
-char* BuildName(char* path, char* name, char* dosName = NULL, BOOL* skip = NULL, BOOL* skipAll = NULL,
-                const char* sourcePath = NULL);
-wchar_t* BuildNameW(const wchar_t* path, const wchar_t* name = NULL, BOOL* skip = NULL, BOOL* skipAll = NULL,
-                     const wchar_t* sourcePath = NULL);
 
 // Returns date+time from panel for file/directory 'f' (also handles dates+times provided by plugins - may not
 // be valid)
@@ -620,7 +565,9 @@ void InitDefaultDir();        // initialization of DefaultDir array (last visite
 // 'showCloseButton' indicates whether the window will contain Close button
 // 'hForegroundWnd' specifies window that must be active for the window to be shown
 // and also specifies window that will be activated when clicking the wait window
-void CreateSafeWaitWindow(const char* message, const char* caption, int delay,
+// Both text inputs are copied into wide cross-thread storage before this call
+// returns; the caption then becomes the title of a Unicode CWaitWindow.
+void CreateSafeWaitWindow(const wchar_t* message, const wchar_t* caption, int delay,
                           BOOL showCloseButton, HWND hForegroundWnd);
 void DestroySafeWaitWindow(BOOL killThread = FALSE);
 // Hides with 'show'==FALSE and then shows with 'show'==TRUE created window
@@ -644,17 +591,20 @@ BOOL UserWantsToCancelSafeWaitWindow();
 // Used for additional text change in window
 // WARNING: no window relayout occurs and if text stretches more,
 // it will be clipped; use for example for countdown: 60s, 55s, 50s, ...
-void SetSafeWaitWindowText(const char* message);
+void SetSafeWaitWindowText(const wchar_t* message);
 
 // Returns TRUE if Salamander is active (foreground window PID == current PID)
 BOOL SalamanderActive();
 
 // Removes directory including its contents (SHFileOperation is terribly slow)
-void RemoveTemporaryDir(const char* dir);
+// 2026-08-25: the narrow RemoveTemporaryDir(char*) thin adapter was deleted -
+// confirmed-dead (zero callers; the legacy v107 ABI shim forwards to WideGeneral.RemoveTemporaryDir).
+// Wide primary. The recursion is wide-native: the find result is used exactly as
+// Windows returns it, so a temp file whose name the active code page cannot spell is deleted
+// rather than leaked (and best-fit mapping can no longer aim the delete at a different file).
+void RemoveTemporaryDirW(const wchar_t* dir);
 
 // Helper function for adding name to list of names (separated by space), returns success
-BOOL AddToListOfNames(char** list, char* listEnd, const char* name, int nameLen);
-
 // If directory doesn't exist, allows creating it,
 // if directory exists or is successfully created returns TRUE
 // parent is parent of error messageboxes, NULL = main Salamander window
@@ -665,26 +615,40 @@ BOOL AddToListOfNames(char** list, char* listEnd, const char* name, int nameLen)
 // noRetryButton = TRUE - error dialogs should not contain Retry/Cancel buttons, only OK button
 // manualCrDir = TRUE - don't allow creating directory with space at beginning (when manually creating
 // directory, otherwise Windows doesn't mind spaces at beginning)
-BOOL CheckAndCreateDirectory(const char* dir, HWND parent = NULL, BOOL quiet = FALSE, char* errBuf = NULL,
-                             int errBufSize = 0, char* newDir = NULL, BOOL noRetryButton = FALSE,
-                             BOOL manualCrDir = FALSE);
+// 2026-08-25: the narrow CheckAndCreateDirectory(char*, ...) thin adapter was
+// deleted - confirmed-dead (zero callers; the legacy v107 ABI shim forwards to
+// WideGeneral.CheckAndCreateDirectory).
+// Wide primary; 'newDirSize' and 'errBufSize' count WCHARs.
+BOOL CheckAndCreateDirectoryW(const wchar_t* dir, HWND parent = NULL, BOOL quiet = FALSE,
+                              wchar_t* errBuf = NULL, int errBufSize = 0, wchar_t* newDir = NULL,
+                              int newDirSize = 0, BOOL noRetryButton = FALSE, BOOL manualCrDir = FALSE);
+BOOL CheckAndCreateDirectoryOwnedW(const wchar_t* dir, HWND parent = NULL, BOOL quiet = FALSE,
+                                   std::wstring* errorText = NULL, std::wstring* firstCreatedDir = NULL,
+                                   BOOL noRetryButton = FALSE, BOOL manualCrDir = FALSE);
 
 // Deletes empty subdirectories in 'dir' from disk and if 'dir' is empty after subdirectory deletion,
 // it is also deleted
-void RemoveEmptyDirs(const char* dir);
+// 2026-08-25: the narrow RemoveEmptyDirs(char*) thin adapter was deleted -
+// confirmed-dead (zero callers anywhere; unlike its neighbors this one was never part of the
+// plugin SDK/ABI at all, purely a core-internal helper superseded by RemoveEmptyDirsW).
+// Wide primary, same shape as RemoveTemporaryDirW above it: the recursion is
+// wide-native, so a subdirectory name the active code page cannot spell is walked and removed
+// correctly instead of being narrowed to '?' first (which could also collide with an unrelated
+// real directory name under WC_NO_BEST_FIT_CHARS).
+void RemoveEmptyDirsW(const wchar_t* dir);
 
 // Executes routine for opening viewer - used in CFilesWindow::ViewFile and
 // CSalamanderForViewFileOnFS::OpenViewer; further use is not expected, therefore parameters
 // and return values are not described
-BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, BOOL returnLock,
+BOOL ViewFileInt(HWND parent, const wchar_t* name, BOOL altView, DWORD handlerID, BOOL returnLock,
                  HANDLE& lock, BOOL& lockOwner, BOOL addToHistory, int enumFileNamesSourceUID,
-                 int enumFileNamesLastFileIndex, const wchar_t* nameW = NULL);
+                 int enumFileNamesLastFileIndex);
 
 // Converts string ('str' of length 'len') to unsigned __int64 (can be preceded by
 // '+' sign; ignores white-spaces at beginning and end of string);
 // if 'isNum' is not NULL, TRUE is returned in it if the entire string
 // 'str' represents a number
-unsigned __int64 StrToUInt64(const char* str, int len, BOOL* isNum = NULL);
+unsigned __int64 StrToUInt64W(const wchar_t* str, int len, BOOL* isNum = NULL);
 
 // Runs exception handler for "in-page-error" and "access violation - read/write on XXX" (tests
 // if exception relates to file - 'fileMem' is start address, 'fileMemSize' is size of
@@ -693,6 +657,11 @@ unsigned __int64 StrToUInt64(const char* str, int len, BOOL* isNum = NULL);
 int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize);
 
 struct CSalamanderVarStrEntry;
+struct CSalamanderStringBuffer;
+namespace sally::unicode
+{
+struct WideVarEntry;
+}
 
 // ValidateVarString and ExpandVarString:
 // methods for validating and expanding strings with variables in format "$(var_name)", "$(var_name:num)"
@@ -706,21 +675,26 @@ struct CSalamanderVarStrEntry;
 // position is placed in 'errorPos1' (offset of error start) and 'errorPos2' (offset of error end);
 // 'variables' is array of CSalamanderVarStrEntry structures, terminated by structure with
 // Name==NULL; 'msgParent' is parent of error message-box, if NULL, errors are not displayed
-BOOL ValidateVarString(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
-                       const CSalamanderVarStrEntry* variables);
+// Variable names are UTF-16 and validation never calls CSalamanderVarStrEntry::Execute.
+// errorPos1/errorPos2 are offsets in WCHARs into 'varText'.
+BOOL ValidateVarStringW(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
+                        const CSalamanderVarStrEntry* variables);
 
-// Fills 'buffer' with result of 'varText' expansion (string with variables), returns FALSE if
-// 'buffer' is small (assumes string validation via ValidateVarString, otherwise
-// returns FALSE also on syntax error) or user clicked Cancel on environment-variable error
-// (not found or too large); 'bufferLen' is size of 'buffer';
+// Native counterpart for core-owned callbacks that return std::wstring values.
+BOOL ValidateWideVarStringW(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
+                            const sally::unicode::WideVarEntry* variables);
+
+// Fills caller-owned 'buffer' with result of 'varText' expansion (string with variables),
+// growing it through its Reserve callback. Returns FALSE on invalid storage, growth failure,
+// syntax/callback error, or if the user cancels an environment-variable error;
 // 'variables' is array of CSalamanderVarStrEntry structures, terminated by structure
 // with Name==NULL; 'param' is pointer passed to CSalamanderVarStrEntry::Execute
 // when expanding found variable; 'msgParent' is parent of error message-box, if NULL,
 // errors are not displayed; if 'ignoreEnvVarNotFoundOrTooLong' is TRUE, environment-variable
 // errors are ignored (not found or too large), if FALSE, messagebox with error is shown;
 // if 'varPlacements' is not NULL, points to DWORD array with '*varPlacementsCount' items,
-// which will be filled with DWORDs composed of variable position in output buffer (low WORD)
-// and variable char count (high WORD); if 'varPlacementsCount' is not NULL, number of
+// which will be filled with DWORDs composed of variable WCHAR position in output buffer (low WORD)
+// and variable WCHAR count (high WORD); if 'varPlacementsCount' is not NULL, number of
 // filled items in 'varPlacements' array is returned in it (essentially the count of variables
 // in input string);
 // if this method is used only for expanding string for one 'param' value, 'detectMaxVarWidths'
@@ -736,31 +710,35 @@ BOOL ValidateVarString(HWND msgParent, const char* varText, int& errorPos1, int&
 // of calling ExpandVarString, in second cycle parameter 'detectMaxVarWidths' has value FALSE and
 // array 'maxVarWidths' with 'maxVarWidthsCount' items contains pre-computed largest widths
 // (from first cycle)
-BOOL ExpandVarString(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+// :num and maxVarWidths use UTF-16 code-unit widths.
+BOOL ExpandVarString(HWND msgParent, const wchar_t* varText, CSalamanderStringBuffer* buffer,
                      const CSalamanderVarStrEntry* variables, void* param,
                      BOOL ignoreEnvVarNotFoundOrTooLong = FALSE,
-                     DWORD* varPlacements = NULL, int* varPlacementsCount = NULL,
+                     CSalamanderTextRangeBuffer* varPlacements = NULL,
                      BOOL detectMaxVarWidths = FALSE, int* maxVarWidths = NULL,
                      int maxVarWidthsCount = 0);
 
-// Wide version of ExpandVarString — returns expanded string or empty on failure.
-// Uses GetEnvironmentVariableW directly for correct Unicode environment variable support.
-// Variable callbacks (CSalamanderVarStrEntry::Execute) still return ANSI and are
-// converted via AnsiToWide; this will improve when the plugin API is widened.
-// Does not support varPlacements/maxVarWidths (use ANSI version for InfoLine/MakeFileList).
-std::wstring ExpandVarStringW(HWND msgParent, const char* varText,
-                               const CSalamanderVarStrEntry* variables, void* param,
-                               BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+// Expands native Sally UTF-16 callbacks with the same UI/environment-error policy
+// as ExpandVarString. Widths and output capacity are measured in WCHARs.
+BOOL ExpandWideVarStringW(HWND msgParent, const wchar_t* varText, wchar_t* buffer, int bufferLen,
+                          const sally::unicode::WideVarEntry* variables, void* param,
+                          BOOL ignoreEnvVarNotFoundOrTooLong = FALSE,
+                          std::vector<sally::unicode::WideTextRange>* varPlacements = NULL,
+                          BOOL detectMaxVarWidths = FALSE, int* maxVarWidths = NULL,
+                          int maxVarWidthsCount = 0);
+BOOL ExpandWideVarStringW(HWND msgParent, const wchar_t* varText, std::wstring& output,
+                          const sally::unicode::WideVarEntry* variables, void* param,
+                          BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
 
-// Saves Unicode version of text str with length len chars to clipboard
+// Clipboard adapters for explicitly ACP-encoded byte text.
 // returns ERROR_SUCCESS or GetLastError
-DWORD AddUnicodeToClipboard(const char* str, int len);
+DWORD AddAcpTextToClipboard(const char* bytes, int byteCount);
 
 // Puts text on clipboard; if showEcho, shows message box that it's OK
 // if textLen==-1, calculates length itself
-BOOL CopyTextToClipboard(const char* text, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
+BOOL CopyAcpTextToClipboard(const char* bytes, int byteCount = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
 BOOL CopyTextToClipboardW(const wchar_t* text, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
-BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
+BOOL CopyAcpHTextToClipboard(HGLOBAL hGlobalBytes, int byteCount = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
 BOOL CopyHTextToClipboardW(HGLOBAL hGlobalText, int textLen = -1);
 
 // Determines from buffer 'pattern' of length 'patternLen' if it's text (there's a code page
@@ -770,13 +748,13 @@ BOOL CopyHTextToClipboardW(HGLOBAL hGlobalText, int textLen = -1);
 // if 'isText' is not NULL, TRUE is returned in it if it's text; if 'codePage' is not NULL, it's
 // a buffer (min. 101 chars) for code page name (most probable)
 void RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL forceText,
-                       BOOL* isText, char* codePage);
+                       BOOL* isText, std::wstring* codePage);
 
 // Sets name of calling thread in VC debugger
-void SetThreadNameInVC(LPCSTR szThreadName);
+void SetThreadNameInVC(const wchar_t* threadName);
 
 // Sets name of calling thread in VC debugger and Trace Server
-void SetThreadNameInVCAndTrace(const char* name);
+void SetThreadNameInVCAndTrace(const wchar_t* name);
 
 // configuration loading
 class CEditorMasks;
@@ -801,14 +779,18 @@ enum CShellAction
 class CCopyMoveData;
 struct CDragDropOperData;
 
-const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, BOOL& tgtFile,
-                          DWORD keyState, int& tgtType, int srcType);
-const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL rButton,
-                                   BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
-BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param);
-void DoDragDropOper(BOOL copy, BOOL toArchive, const char* archiveOrFSName, const char* archivePathOrUserPart,
+// Both lagged their own definitions (shellsup.cpp:289/:682), which
+// already return const wchar_t* - and so does the CGetCurDir callback typedef these
+// are handed to (shellib.h:298). Only these two declarations disagreed, and the
+// resulting C2556 pair was invisible until shellsup.cpp came off the 100-error cap.
+const wchar_t* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, BOOL& tgtFile,
+                             DWORD keyState, int& tgtType, int srcType);
+const wchar_t* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL rButton,
+                                      BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
+BOOL DoCopyMove(BOOL copy, const wchar_t* targetDir, CCopyMoveData* data, void* param);
+void DoDragDropOper(BOOL copy, BOOL toArchive, const wchar_t* archiveOrFSName, const wchar_t* archivePathOrUserPart,
                     CDragDropOperData* data, void* param);
-void DoGetFSToFSDropEffect(const char* srcFSPath, const char* tgtFSPath,
+void DoGetFSToFSDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                            DWORD allowedEffects, DWORD keyState,
                            DWORD* dropEffect, void* param);
 BOOL UseOwnRutine(IDataObject* pDataObject);
@@ -821,13 +803,14 @@ BOOL SetClipCutCopyInfo(HWND hwnd, BOOL copy, BOOL salObject);
 
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection = TRUE,
                  BOOL posByMouse = TRUE, BOOL onlyPanelMenu = FALSE);
-void ExecuteAssociation(HWND hWindow, const char* path, const char* name);
-// Wide sibling of ExecuteAssociation. BOTH the directory and the name are wide: a folder
-// whose own path is outside the ANSI code page must reach the shell intact even when the
-// file inside it has a perfectly ordinary ASCII name.
+// 2026-08-25: the narrow ExecuteAssociation(char*, char*) was deleted -
+// confirmed-dead (zero callers anywhere; a stale comment claimed files_window_copy_move.cpp
+// still called it directly, but that file calls ExecuteAssociationW). BOTH the directory and
+// the name are wide: a folder whose own path is outside the ANSI code page must reach the
+// shell intact even when the file inside it has a perfectly ordinary ASCII name.
 void ExecuteAssociationW(HWND hWindow, const wchar_t* pathW, const wchar_t* nameW);
 
-BOOL CanUseShellExecuteWndAsParent(const char* cmdName);
+BOOL CanUseShellExecuteWndAsParent(const wchar_t* cmdName);
 
 // Determines if file is placeholder (online file in OneDrive folder),
 // see http://msdn.microsoft.com/en-us/library/windows/desktop/dn323738%28v=vs.85%29.aspx
@@ -841,9 +824,11 @@ BOOL IsFilePlaceholder(WIN32_FIND_DATA const* findData);
 // before finishing sets thread priority back to original value
 BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici);
 
-// If 'hInstance' is NULL, reads from HLanguage; otherwise from 'hInstance'
-char* LoadStr(int resID, HINSTANCE hInstance = NULL);   // pulls string from resources
-WCHAR* LoadStrW(int resID, HINSTANCE hInstance = NULL); // pulls wide-string from resources
+// If 'hInstance' is NULL, reads from HLanguage; otherwise from 'hInstance'.
+// LoadStrOwned is the native owner; LoadStrW remains a transitional pointer-returning
+// compatibility surface for callers not yet migrated to explicit ownership.
+std::wstring LoadStrOwned(int resID, HINSTANCE hInstance = NULL);
+WCHAR* LoadStrW(int resID, HINSTANCE hInstance = NULL);
 
 // Support for creating parameterized texts (handling singular and plural forms
 // in texts); 'lpFmt' is format string for result text - its format description
@@ -882,8 +867,10 @@ WCHAR* LoadStrW(int resID, HINSTANCE hInstance = NULL); // pulls wide-string fro
 //   - "{!}file{s|0||1|s|4|s}" for parameter value 0 will be "files",
 //     for 1 will be "file", for 2 to 4 (inclusive) will be "files" and from 5
 //     to "infinity" will be "files"
-int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCount,
-                       const CQuadWord* lpParArray);
+int ExpandPluralStringW(wchar_t* lpOut, int nOutMax, const wchar_t* lpFmt, int nParCount,
+                        const CQuadWord* lpParArray);
+std::wstring ExpandPluralStringOwnedW(const wchar_t* format, int parameterCount,
+                                      const CQuadWord* parameters);
 
 //
 // Writes string to lpOut depending on variables files and dirs:
@@ -900,10 +887,13 @@ int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCoun
 // Returns count of copied chars without terminator.
 //
 // description of epfdmXXX constants see spl_gen.h
-int ExpandPluralFilesDirs(char* lpOut, int nOutMax, int files, int dirs,
-                          int mode, BOOL forDlgCaption);
-int ExpandPluralBytesFilesDirs(char* lpOut, int nOutMax, const CQuadWord& selectedBytes,
-                               int files, int dirs, BOOL useSubTexts);
+int ExpandPluralFilesDirsW(wchar_t* lpOut, int nOutMax, int files, int dirs,
+                           int mode, BOOL forDlgCaption);
+std::wstring ExpandPluralFilesDirsTextW(int files, int dirs, int mode, BOOL forDlgCaption);
+int ExpandPluralBytesFilesDirsW(wchar_t* lpOut, int nOutMax, const CQuadWord& selectedBytes,
+                                int files, int dirs, BOOL useSubTexts);
+std::wstring ExpandPluralBytesFilesDirsTextW(const CQuadWord& selectedBytes, int files, int dirs,
+                                             BOOL useSubTexts);
 
 // Finds pairs '<' '>' in text, removes them from buffer and adds references to
 // their content to 'varPlacements'. 'varPlacements' is array of DWORDs with '*varPlacementsCount'
@@ -912,20 +902,22 @@ int ExpandPluralBytesFilesDirs(char* lpOut, int nOutMax, const CQuadWord& select
 // as escape sequences and will be replaced with chars '<', '>' and '\\'.
 // Returns TRUE on success, otherwise FALSE; always sets 'varPlacementsCount' to
 // count of processed variables.
-BOOL LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount);
+BOOL LookForSubTexts(std::wstring& text,
+                     std::vector<sally::unicode::WideTextRange>& varPlacements);
 
 void MinimizeApp(HWND mainWnd);             // minimize app
 void RestoreApp(HWND mainWnd, HWND dlgWnd); // restore from minimized state of app
-                                            // changes name format (letter case), filename must always be null-terminated
-void AlterFileName(char* tgtName, const char* filename, int filenameLen, int format, int change, BOOL dir);
+// 2026-08-25: the narrow AlterFileName(char*, ...) was deleted - confirmed-dead
+// (zero callers; the legacy v107 ABI shim forwards to WideGeneral.AlterFileName, never to this
+// free function). AlterFileNameW below is the sole surviving implementation.
 std::wstring AlterFileNameW(const wchar_t* filename, int format, int change, bool isDir);
 
 // Returns string with file size and times; Returns time in 'fileTime', variable can be NULL;
 // if 'getTimeFailed' is not NULL, TRUE is written to it on file time retrieval error
-void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime = NULL, BOOL* getTimeFailed = NULL);
+void GetFileOverwriteInfoW(wchar_t* buff, int buffLen, HANDLE file, const wchar_t* fileName, FILETIME* fileTime = NULL, BOOL* getTimeFailed = NULL);
 
 void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons);                // call after color change
-HICON GetDriveIcon(const char* root, UINT type, BOOL accessible, BOOL large = FALSE); // drive icon
+HICON GetDriveIconW(const wchar_t* root, UINT type, BOOL accessible, BOOL large = FALSE); // drive icon
 HICON SalLoadIcon(HINSTANCE hDLL, int id, int iconSize);
 
 // SetCurrentDirectory(system directory) - disconnect from directory in panel
@@ -933,51 +925,49 @@ void SetCurrentDirectoryToSystem();
 
 // Replaces substs in path 'resPath' with their target paths (conversion to path without SUBST drive-letters);
 // returns FALSE on error
-BOOL ResolveSubsts(char* resPath, int resPathSize);
-BOOL ResolveSubsts(char* resPath); // backward compat — uses MAX_PATH
-BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize);
+// Wide-native — it queries QueryDosDeviceW, so a SUBST whose
+// TARGET the code page cannot spell now resolves correctly. It was previously a
+// wrapper that narrowed its argument and called the ANSI implementation, which
+// destroyed exactly the paths it existed to handle.
+BOOL ResolveSubstsW(std::wstring& resPath); // no length cap — prefer this one
 
-// Resolves subst and reparse points for path 'path', then for mount-point path
-// (if missing then for root path) tries to get GUID path. Returns FALSE on failure. On
-// success, returns TRUE and sets 'mountPoint' and 'guidPath' (if not NULL, must
-// point to buffers of at least MAX_PATH size; strings will be terminated with backslash).
-BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath);
+// Wide sibling. Outputs are std::wstring, so unlike the SDK method
+// of the same name it has no out-buffer problem; pass NULL for what you do not
+// want.
+BOOL GetResolvedPathMountPointAndGUIDW(const wchar_t* path, std::wstring* mountPoint, std::wstring* guidPath);
 
 // Attempt to return correct values (handles reparse points too - full path is given instead of root)
-CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total = NULL);
+CQuadWord MyGetDiskFreeSpaceW(const wchar_t* path, CQuadWord* total = NULL); // wide sibling
 // WARNING: don't use return values 'lpNumberOfFreeClusters' and 'lpTotalNumberOfClusters', because for larger
 //          disks they contain nonsense (DWORD may not be enough for total cluster count), solve via
-//          MyGetDiskFreeSpace(path, total), which returns 64-bit numbers
-BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
-                        LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
-                        LPDWORD lpTotalNumberOfClusters);
+//          MyGetDiskFreeSpaceW(path, total), which returns 64-bit numbers
+BOOL MyGetDiskFreeSpaceW(const wchar_t* path, LPDWORD lpSectorsPerCluster,
+                         LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
+                         LPDWORD lpTotalNumberOfClusters); // wide sibling
 
-// Improved GetVolumeInformation: works with path (traverses reparse points and substs);
-// in 'rootOrCurReparsePoint' (if not NULL, must be at least MAX_PATH chars) returns either
-// root or path to current (last) local reparse point on path 'path'
-// (WARNING: doesn't work if no medium in drive, GetCurrentLocalReparsePoint() doesn't suffer from this);
-// in 'junctionOrSymlinkTgt' (if not NULL, must be at least MAX_PATH chars) returns
+// Improved GetVolumeInformation: works with path (traverses reparse points and substs).
+// In 'rootOrCurReparsePoint' (if not NULL) returns either root or the current
+// (last) local reparse point on 'path'. In 'junctionOrSymlinkTgt' (if not NULL) returns
 // target of current reparse point or empty string (if no reparse point exists or
 // is of unknown type or is volume mount point); in 'linkType' (if not NULL) returns type of current
 // reparse point: 0 (unknown or doesn't exist), 1 (MOUNT POINT), 2 (JUNCTION POINT), 3 (SYMBOLIC LINK)
-BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char* junctionOrSymlinkTgt, int* linkType,
-                            LPTSTR lpVolumeNameBuffer, DWORD nVolumeNameSize, LPDWORD lpVolumeSerialNumber,
-                            LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
-                            LPTSTR lpFileSystemNameBuffer, DWORD nFileSystemNameSize);
-
+// String outputs are dynamically owned; pass NULL for what you do not want.
+BOOL MyGetVolumeInformationW(const wchar_t* path, std::wstring* rootOrCurReparsePoint,
+                             std::wstring* junctionOrSymlinkTgt, int* linkType,
+                             std::wstring* volumeName, LPDWORD lpVolumeSerialNumber,
+                             LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
+                             std::wstring* fileSystemName);
 // Returns target path of reparse point 'repPointDir' in buffer 'repPointDstBuf' (if not NULL)
 // of size 'repPointDstBufSize'; 'repPointDir' and 'repPointDstBuf' can point
 // to same buffer (IN/OUT buffer); if 'makeRelPathAbs' is TRUE and it's a relative
 // symbolic link, converts link target path to absolute;
 // returns TRUE on success + in 'repPointType' (if not NULL) returns reparse point type:
 // 1 (MOUNT POINT), 2 (JUNCTION POINT), 3 (SYMBOLIC LINK)
-BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, DWORD repPointDstBufSize,
-                                int* repPointType, BOOL makeRelPathAbs);
-
-// In 'currentReparsePoint' (at least MAX_PATH chars) returns current (last) local
-// reparse point, on failure returns classic root; on failure returns FALSE; if
-// 'error' is not NULL, TRUE is written to it on error
-BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BOOL* error = NULL);
+// The destination is dynamically owned UTF-16; no fixed-capacity core wrapper exists.
+BOOL GetReparsePointDestinationOwnedW(const wchar_t* repPointDir, std::wstring* repPointDst,
+                                      int* repPointType, BOOL makeRelPathAbs);
+// The dynamically-owned current-reparse-point API is declared in
+// common/LocalPathResolution.h (included below).
 
 // Call only for paths 'path' whose root (after removing subst) is DRIVE_FIXED (elsewhere it makes no sense to look for
 // reparse points); we look for path without reparse points leading to same volume as 'path'; for path
@@ -998,32 +988,28 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
 // junction or symlink) is returned in 'junctionOrSymlinkTgt' (if not NULL) + type is returned in 'linkType':
 // 2 (JUNCTION POINT), 3 (SYMBOLIC LINK); in 'netPath' (if not NULL) we return network path to which
 // current (last) local symlink in path leads - in this situation network path root is returned in 'resPath'
-void ResolveLocalPathWithReparsePoints(char* resPath, int resPathSize, const char* path, BOOL* cutResPathIsPossible,
-                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
-                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath);
-void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
-                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
-                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath); // backward compat — uses MAX_PATH
+// The wide walk + its result struct live in their own header so consumers can
+// reach them without the whole-app header.
+#include "common/LocalPathResolution.h"
 
 // Improved GetDriveType: works with path (traverses reparse points and substs)
-UINT MyGetDriveType(const char* path);
+UINT MyGetDriveTypeW(const wchar_t* path); // wide sibling
 
-// Our own QueryDosDevice
-// 'driveNum' is 0-based (0=A: 2=C: ...)
-BOOL MyQueryDosDevice(BYTE driveNum, char* target, int maxTarget);
+// Our dynamically-owned QueryDosDevice wrapper. 'driveNum' is 0-based (0=A: 2=C: ...).
+BOOL MyQueryDosDeviceW(BYTE driveNum, std::wstring& target);
 
 // Detects if 'driveNum' (0=A: 2=C: ...) is substed and if so, where it's connected to
 // if drive is not substed, returns FALSE
 // if substed, returns TRUE and stores path where subst is connected
-// in variable 'path' (with maximum length 'pathMax')
-// if 'path' is NULL, path won't be returned
+// in the owned UTF-16 string 'path'
 // can return path in UNC format
-BOOL GetSubstInformation(BYTE driveNum, char* path, int pathMax);
+// The parse itself lives in common/SubstResolution.h
+// so it is testable without real SUBST drives; this pairs it with the live
+// QueryDosDeviceW query.
+BOOL GetSubstInformationW(BYTE driveNum, std::wstring& path);
 
-// Replaces last '.' char in string with decimal separator obtained from system LOCALE_SDECIMAL
-// string length can grow because separator can have up to 4 chars according to MSDN
-// returns TRUE if buffer was large enough and operation completed successfully, otherwise returns FALSE
-BOOL PointToLocalDecimalSeparator(char* buffer, int bufferSize);
+// Replaces the last '.' in text with the decimal separator from LOCALE_SDECIMAL.
+BOOL PointToLocalDecimalSeparator(std::wstring& text) noexcept;
 
 typedef WINBASEAPI LONG(WINAPI* MY_FMExtensionProc)(HWND hwnd,
                                                     WORD wMsg,
@@ -1032,7 +1018,7 @@ void GetMessagePos(POINT& p);
 
 // Returns icon handle obtained via SHGetFileInfo or NULL on failure.
 // Caller is responsible for icon destruction. Icon is assigned to HANDLES.
-HICON GetFileOrPathIconAux(const char* path, BOOL large, BOOL isDir);
+HICON GetFileOrPathIconAuxW(const wchar_t* path, BOOL large, BOOL isDir);
 
 // If root of UNCPath is inaccessible (for listing), tries to establish network connection,
 // asks for username and password itself, returns TRUE if connection was established,
@@ -1041,8 +1027,8 @@ HICON GetFileOrPathIconAux(const char* path, BOOL large, BOOL isDir);
 // username+password dialog or we unsuccessfully tried to establish connection (e.g.
 // "credentials conflict"); if 'donotReconnect' is TRUE, doesn't try to establish network
 // connection, returns immediately that it didn't work
-BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathInvalid,
-                                   BOOL donotReconnect);
+BOOL CheckAndConnectUNCNetworkPathW(HWND parent, const wchar_t* UNCPath, BOOL& pathInvalid,
+                                    BOOL donotReconnect);
 
 // Tries to restore network connection (if it existed) on 'drive:', parent - dialog parent,
 // returns TRUE if connection restore succeeded (network drive is mapped again)
@@ -1055,11 +1041,13 @@ BOOL CheckAndRestoreNetworkConnection(HWND parent, const char drive, BOOL& pathI
 void AddAuxThread(HANDLE view, BOOL testIfFinished = FALSE);
 void TerminateAuxThreads();
 
-// Returns TRUE if specified file exists; otherwise returns FALSE
-extern "C" BOOL FileExists(const char* fileName);
+// Returns TRUE if specified file exists; otherwise returns FALSE.
+BOOL FileExistsW(const wchar_t* fileName); // wide primary
 
 // Returns TRUE if specified directory exists; otherwise returns FALSE
-BOOL DirExists(const char* dirName);
+// 2026-08-25: the narrow DirExists(char*) thin adapter was deleted -
+// confirmed-dead (zero callers anywhere in core).
+BOOL DirExistsW(const wchar_t* dirName); // wide primary
 
 // tool tip
 void SetCurrentToolTip(HWND hNotifyWindow, DWORD id, int showDelay = 0); // description in tooltip.h
@@ -1074,13 +1062,32 @@ BOOL InstallWordBreakProc(HWND hWindow);
 // Clears all items from dropdown listbox of combobox
 // used when clearing histories
 void ClearComboboxListbox(HWND hCombo);
+std::wstring GetWindowTextStringW(HWND window);
 
 // structure for WM_USER_VIEWFILE and WM_USER_VIEWFILEWITH
 struct COpenViewerData
 {
-    char* FileName;
+    // FileName IS the exact wide name. It used to be a char* that could be
+    // a lossy structural (backslash/extension) mirror, with a FileNameW twin beside it for
+    // senders that had the real thing; there is nothing left for the twin to correct.
+    const wchar_t* FileName;
     int EnumFileNamesSourceUID;
     int EnumFileNamesLastFileIndex;
+};
+
+// structure for WM_USER_EDITFILE and WM_USER_EDITFILEWITH. Replaces the bare 'char* name'
+// wParam; the wide twin it was introduced to carry is now the only member.
+struct CEditFileData
+{
+    const wchar_t* FileName;
+};
+
+// structure for WM_USER_FOCUSFILEW; both members are the exact wide forms,
+// never a re-widened mirror. Owned by the sender for the duration of the SendMessage.
+struct CFocusFileDataW
+{
+    const wchar_t* Name;
+    const wchar_t* Path;
 };
 
 //
@@ -1120,8 +1127,13 @@ struct COpenViewerData
 #define WM_USER_FLASHWINDOW WM_APP + 118    // [0, 0] flashes the window
 #define WM_USER_SHOWWINDOW WM_APP + 119     // [0, 0] brings window to foreground (restores if needed)
 #define WM_USER_DROPCOPYMOVE WM_APP + 120   // [CTmpDropData *, 0]
-#define WM_USER_CHANGEDIR WM_APP + 121      // [convertFSPathToInternal, newDir] - panel changes its path (calls ChangeDir)
+// Posted only by CTextDropTarget. Ownership of newDirW transfers to the receiver
+// when PostMessage succeeds; the receiver deletes it after calling ChangeDir.
+#define WM_USER_CHANGEDIRW WM_APP + 127 // [postProcessUserText, std::wstring *newDirW]
 #define WM_USER_FOCUSFILE WM_APP + 122      // [fileName, newPath] - panel changes its path and selects the corresponding file
+// Wide form of WM_USER_FOCUSFILE. Sent with a CFocusFileDataW*, valid only
+// for the duration of the SendMessage.
+#define WM_USER_FOCUSFILEW WM_APP + 125 // [CFocusFileDataW *, 0]
 #define WM_USER_CLOSEFIND WM_APP + 123      // [0, 0] - calls DestroyWindow from find window thread
 #define WM_USER_SELCHANGED WM_APP + 124     // [0, 0] - notification about selection change
 #define WM_USER_MOUSEHWHEEL WM_APP + 126    // [wParam, lParam] z WM_MOUSEHWHEEL
@@ -1192,9 +1204,11 @@ struct COpenViewerData
 
 // commands for main thread (cannot be executed in other thread) - used by Find dialog (runs in its own thread)
 #define WM_USER_VIEWFILE WM_APP + 190     // [COpenViewerData *, altView] - opening file in (alternate) viewer
-#define WM_USER_EDITFILE WM_APP + 191     // [name, 0] - opening file in editor
+// wParam is a CEditFileData* (was a bare 'char* name'; that couldn't
+// carry an exact wide twin alongside it, see COpenViewerData::FileNameW above)
+#define WM_USER_EDITFILE WM_APP + 191     // [CEditFileData *, 0] - opening file in editor
 #define WM_USER_VIEWFILEWITH WM_APP + 192 // [COpenViewerData *, handlerID] - opening file in selected viewer
-#define WM_USER_EDITFILEWITH WM_APP + 193 // [name, handlerID] - opening file in selected editor
+#define WM_USER_EDITFILEWITH WM_APP + 193 // [CEditFileData *, handlerID] - opening file in selected editor
 
 #define WM_USER_DISPACHCHANGENOTIF WM_APP + 194 // [0, time] - request to dispatch messages about path changes
 
@@ -1357,19 +1371,27 @@ extern DWORD CCVerMajor; // common controls DLL version
 extern DWORD CCVerMinor;
 
 extern const char* SALAMANDER_TEXT_VERSION; // text application label including version
+// Native UTF-16 application label built directly from wide version literals.
+const wchar_t* SALAMANDER_TEXT_VERSIONW();
 
-extern const char *LOW_MEMORY,
-    *MAINWINDOW_NAME,
-    *CMAINWINDOW_CLASSNAME,
-    *CFILESBOX_CLASSNAME,
-    *SAVEBITS_CLASSNAME,
-    *SHELLEXECUTE_CLASSNAME;
+extern const char* LOW_MEMORY;
+extern const wchar_t* MAINWINDOW_NAME;
+// wchar_t-generic: registered through CWindow::RegisterUniversalClass's own
+// LPCWSTR parameter (CExecuteWindow paints itself directly via DrawTextW regardless of the
+// class's own ANSI/Unicode registration, so this has no deeper runtime dependency - see the
+// comment at CExecuteWindow's declaration).
+extern const wchar_t* SAVEBITS_CLASSNAME;
 
-extern const wchar_t* CMAINWINDOW_CLASSNAMEW;
+extern const wchar_t* CFILESBOX_CLASSNAME;
+extern const wchar_t* CMAINWINDOW_CLASSNAME;
+extern const wchar_t* SAFEWAIT_CLASSNAMEW;
+extern const wchar_t* SHELLEXECUTE_CLASSNAMEW;
 
-extern const char* STR_NONE; // "(none)" - plug-ins: for DLLName and Version if they are unknown
+extern const wchar_t* STR_NONE; // "(none)" - plug-ins: for DLLName and Version if they are unknown
 
-extern char DefaultDir['z' - 'a' + 1][SAL_MAX_LONG_PATH]; // where to go on drive change
+extern std::wstring DefaultDir['Z' - 'A' + 1]; // where to go on drive change
+// This said `char` while sally_entry_lifecycle.cpp defines it wchar_t, and
+// the bound said 'z'-'a' against a definition indexed by 'A'. Both now match the definition.
 
 extern int MyTimeCounter;                   // increment after each use !
 extern CRITICAL_SECTION TimeCounterSection; // for synchronization of access to ^
@@ -1379,7 +1401,7 @@ extern HINSTANCE Shell32DLL;          // handle to shell32.dll (icons)
 extern HINSTANCE ImageResDLL;         // handle to imageres.dll (icons - Vista+)
 extern HINSTANCE User32DLL;           // handle to user32.dll (DisableProcessWindowsGhosting)
 extern HINSTANCE HLanguage;           // handle to language-dependent resources (path: Configuration.LoadedSLGName)
-extern CPathBuffer CurrentHelpDir; // after first use of help contains path to help directory (location of all .chm files)
+extern std::wstring CurrentHelpDir; // after first use of help contains path to help directory (location of all .chm files)
 extern WORD LanguageID;               // language-id of language-dependent resources (.SLG file)
 
 extern BOOL UseCustomPanelFont; // if TRUE, Font and FontUL come from LogFont structure; otherwise from system font (default)
@@ -1523,81 +1545,79 @@ extern BOOL DragFullWindows; // if TRUE, change panel size realtime, otherwise a
 #define SIZE_FORMAT_MIXED 2 // bytes, KB, MB, GB, ...
 
 // registry key names
-extern const char* SALAMANDER_ROOT_REG;
+extern const wchar_t* SALAMANDER_ROOT_REG;
 
-// Publishes SALAMANDER_ROOT_REG into this process's environment (SAL_ENV_CONFIG_ROOT_A) so
+// Publishes SALAMANDER_ROOT_REG into this process's environment (SAL_ENV_CONFIG_ROOT_*) so
 // in-process plugins read the same configuration key the core does. Call after every change to
 // SALAMANDER_ROOT_REG, including when it becomes NULL.
 void PublishConfigRootToEnvironment();
-extern const char* SALAMANDER_SAVE_IN_PROGRESS;
-extern const char* SALAMANDER_COPY_IS_OK;
-extern const char* SALAMANDER_AUTO_IMPORT_CONFIG;
-extern const char* SALAMANDER_CONFIG_REG;
-extern const char* SALAMANDER_VERSION_REG;
-extern const char* SALAMANDER_VERSIONREG_REG;
-extern const char* CONFIG_ONLYONEINSTANCE_REG;
-extern const char* CONFIG_LANGUAGE_REG;
-extern const char* CONFIG_ALTLANGFORPLUGINS_REG;
-extern const char* CONFIG_LANGUAGECHANGED_REG;
-extern const char* CONFIG_USEALTLANGFORPLUGINS_REG;
-extern const char* CONFIG_STATUSAREA_REG;
-extern const char* CONFIG_SHOWSPLASHSCREEN_REG;
-extern const char* CONFIG_ENABLECUSTICOVRLS_REG;
-extern const char* CONFIG_DISABLEDCUSTICOVRLS_REG;
-extern const char* VIEWERS_MASKS_REG;
-extern const char* VIEWERS_COMMAND_REG;
-extern const char* VIEWERS_ARGUMENTS_REG;
-extern const char* VIEWERS_INITDIR_REG;
-extern const char* VIEWERS_TYPE_REG;
-extern const char* EDITORS_MASKS_REG;
-extern const char* EDITORS_COMMAND_REG;
-extern const char* EDITORS_ARGUMENTS_REG;
-extern const char* EDITORS_INITDIR_REG;
-extern const char* SALAMANDER_PLUGINSCONFIG;
-extern const char* SALAMANDER_PLUGINS_NAME;
-extern const char* SALAMANDER_PLUGINS_DLLNAME;
-extern const char* SALAMANDER_PLUGINS_VERSION;
-extern const char* SALAMANDER_PLUGINS_COPYRIGHT;
-extern const char* SALAMANDER_PLUGINS_EXTENSIONS;
-extern const char* SALAMANDER_PLUGINS_DESCRIPTION;
-extern const char* SALAMANDER_PLUGINS_LASTSLGNAME;
-extern const char* SALAMANDER_PLUGINS_HOMEPAGE;
+extern const wchar_t* SALAMANDER_SAVE_IN_PROGRESS;
+extern const wchar_t* SALAMANDER_CONFIG_REG;
+extern const wchar_t* SALAMANDER_VERSION_REG;
+extern const wchar_t* SALAMANDER_VERSIONREG_REG;
+extern const wchar_t* CONFIG_ONLYONEINSTANCE_REG;
+extern const wchar_t* CONFIG_LANGUAGE_REG;
+extern const wchar_t* CONFIG_ALTLANGFORPLUGINS_REG;
+extern const wchar_t* CONFIG_LANGUAGECHANGED_REG;
+extern const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG;
+extern const wchar_t* CONFIG_STATUSAREA_REG;
+extern const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG;
+extern const wchar_t* CONFIG_ENABLECUSTICOVRLS_REG;
+extern const wchar_t* CONFIG_DISABLEDCUSTICOVRLS_REG;
+extern const wchar_t* VIEWERS_MASKS_REG;
+extern const wchar_t* VIEWERS_COMMAND_REG;
+extern const wchar_t* VIEWERS_ARGUMENTS_REG;
+extern const wchar_t* VIEWERS_INITDIR_REG;
+extern const wchar_t* VIEWERS_TYPE_REG;
+extern const wchar_t* EDITORS_MASKS_REG;
+extern const wchar_t* EDITORS_COMMAND_REG;
+extern const wchar_t* EDITORS_ARGUMENTS_REG;
+extern const wchar_t* EDITORS_INITDIR_REG;
+extern const wchar_t* SALAMANDER_PLUGINSCONFIG;
+extern const wchar_t* SALAMANDER_PLUGINS_NAME;
+extern const wchar_t* SALAMANDER_PLUGINS_DLLNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_VERSION;
+extern const wchar_t* SALAMANDER_PLUGINS_COPYRIGHT;
+extern const wchar_t* SALAMANDER_PLUGINS_EXTENSIONS;
+extern const wchar_t* SALAMANDER_PLUGINS_DESCRIPTION;
+extern const wchar_t* SALAMANDER_PLUGINS_LASTSLGNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_HOMEPAGE;
 //extern const char *SALAMANDER_PLUGINS_PLGICONS;
-extern const char* SALAMANDER_PLUGINS_PLGICONLIST;
-extern const char* SALAMANDER_PLUGINS_PLGICONINDEX;
-extern const char* SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX;
-extern const char* SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR;
-extern const char* SALAMANDER_PLUGINS_THUMBMASKS;
-extern const char* SALAMANDER_PLUGINS_REGKEYNAME;
-extern const char* SALAMANDER_PLUGINS_FSNAME;
-extern const char* SALAMANDER_PLUGINS_FUNCTIONS;
-extern const char* SALAMANDER_PLUGINS_LOADONSTART;
-extern const char* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED;
-extern const char* SALAMANDER_PLUGINS_MENU;
-extern const char* SALAMANDER_PLUGINS_MENUITEMNAME;
-extern const char* SALAMANDER_PLUGINS_MENUITEMHOTKEY;
-extern const char* SALAMANDER_PLUGINS_MENUITEMSTATE;
-extern const char* SALAMANDER_PLUGINS_MENUITEMID;
-extern const char* SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL;
-extern const char* SALAMANDER_PLUGINS_MENUITEMICONINDEX;
-extern const char* SALAMANDER_PLUGINS_MENUITEMTYPE;
-extern const char* SALAMANDER_PLUGINS_FSCMDNAME;
-extern const char* SALAMANDER_PLUGINS_FSCMDICON;
-extern const char* SALAMANDER_PLUGINS_FSCMDVISIBLE;
-extern const char* SALAMANDER_PLUGINSORDER_SHOW;
-extern const char* SALAMANDER_PLUGINS_ISNETHOOD;
-extern const char* SALAMANDER_PLUGINS_USESPASSWDMAN;
+extern const wchar_t* SALAMANDER_PLUGINS_PLGICONLIST;
+extern const wchar_t* SALAMANDER_PLUGINS_PLGICONINDEX;
+extern const wchar_t* SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX;
+extern const wchar_t* SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR;
+extern const wchar_t* SALAMANDER_PLUGINS_THUMBMASKS;
+extern const wchar_t* SALAMANDER_PLUGINS_REGKEYNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_FSNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_FUNCTIONS;
+extern const wchar_t* SALAMANDER_PLUGINS_LOADONSTART;
+extern const wchar_t* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED;
+extern const wchar_t* SALAMANDER_PLUGINS_MENU;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMHOTKEY;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMSTATE;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMID;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMICONINDEX;
+extern const wchar_t* SALAMANDER_PLUGINS_MENUITEMTYPE;
+extern const wchar_t* SALAMANDER_PLUGINS_FSCMDNAME;
+extern const wchar_t* SALAMANDER_PLUGINS_FSCMDICON;
+extern const wchar_t* SALAMANDER_PLUGINS_FSCMDVISIBLE;
+extern const wchar_t* SALAMANDER_PLUGINSORDER_SHOW;
+extern const wchar_t* SALAMANDER_PLUGINS_ISNETHOOD;
+extern const wchar_t* SALAMANDER_PLUGINS_USESPASSWDMAN;
 
 // following 8 strings are only for loading config version 6 and lower, newer versions
 // already use SALAMANDER_PLUGINS_FUNCTIONS (stored in bits of DWORD function mask)
-extern const char* SALAMANDER_PLUGINS_PANELVIEW;
-extern const char* SALAMANDER_PLUGINS_PANELEDIT;
-extern const char* SALAMANDER_PLUGINS_CUSTPACK;
-extern const char* SALAMANDER_PLUGINS_CUSTUNPACK;
-extern const char* SALAMANDER_PLUGINS_CONFIG;
-extern const char* SALAMANDER_PLUGINS_LOADSAVE;
-extern const char* SALAMANDER_PLUGINS_VIEWER;
-extern const char* SALAMANDER_PLUGINS_FS;
+extern const wchar_t* SALAMANDER_PLUGINS_PANELVIEW;
+extern const wchar_t* SALAMANDER_PLUGINS_PANELEDIT;
+extern const wchar_t* SALAMANDER_PLUGINS_CUSTPACK;
+extern const wchar_t* SALAMANDER_PLUGINS_CUSTUNPACK;
+extern const wchar_t* SALAMANDER_PLUGINS_CONFIG;
+extern const wchar_t* SALAMANDER_PLUGINS_LOADSAVE;
+extern const wchar_t* SALAMANDER_PLUGINS_VIEWER;
+extern const wchar_t* SALAMANDER_PLUGINS_FS;
 
 // clipboard format for SalIDataObject (mark of our IDataObject on clipboard)
 extern const char* SALCF_IDATAOBJECT;
@@ -1651,7 +1671,9 @@ void BeginStopStatusbarRepaint();
 void EndStopStatusbarRepaint();
 
 // in msgbox.cpp module - centered messagebox according to real parent of hParent
-int SalMessageBox(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType);
+// Core message-box presentation is native-wide. Frozen v107 and transitional v108 byte
+// projections live in their respective plug-in adapters rather than in this core surface.
+int SalMessageBoxW(HWND hParent, const wchar_t* lpText, const wchar_t* lpCaption, UINT uType);
 int SalMessageBoxEx(const MSGBOXEX_PARAMS* params);
 
 // draws icons from imagelist with set styles
@@ -1674,11 +1696,14 @@ DWORD GetImageListColorFlags(); // returns ILC_COLOR??? according to Windows ver
 // dialog for Documents or Desktop.
 BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn);
 BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn);
+BOOL SafeGetOpenFileNameW(LPOPENFILENAMEW lpofn);
+BOOL SafeGetSaveFileNameW(LPOPENFILENAMEW lpofn);
+BOOL SafeGetOpenFileNameOwnedW(LPOPENFILENAMEW lpofn, std::wstring& fileName);
+BOOL SafeGetSaveFileNameOwnedW(LPOPENFILENAMEW lpofn, std::wstring& fileName);
+BOOL SafeGetOpenFileNamesOwnedW(LPOPENFILENAMEW lpofn, std::vector<std::wstring>& fileNames);
 
-extern char DecimalSeparator[5]; // "characters" (max. 4 characters) retrieved from system
-extern int DecimalSeparatorLen;  // length in characters without null terminator
-extern char ThousandsSeparator[5];
-extern int ThousandsSeparatorLen;
+extern std::wstring DecimalSeparator;
+extern std::wstring ThousandsSeparator;
 
 extern DWORD SalamanderStartTime;     // Salamander start time (GetTickCount)
 extern DWORD SalamanderExceptionTime; // exception time in Salamander (GetTickCount) or time of last Bug Report dialog invocation
@@ -1701,25 +1726,36 @@ extern int PasteLinkIsRunning; // if greater than zero, Paste Shortcuts command 
 
 extern BOOL CannotCloseSalMainWnd; // TRUE = main window must not be closed
 
-extern std::string DirColumnStr;      // LoadStr(IDS_DIRCOLUMN) - used too often, we cache it
-extern int DirColumnStrLen;           // string length
-extern std::string ColExtStr;         // LoadStr(IDS_COLUMN_NAME_EXT) - used too often, we cache it
-extern int ColExtStrLen;              // string length
+// One cache per string, wide. The narrow DirColumnStr/ColExtStr used to sit
+// beside these, and BOTH of their only consumers immediately did AnsiToWide() on them - so the
+// pair existed to push a LOCALIZED column heading through CP_ACP and back at every use. A
+// heading outside the machine's code page came out corrupted for no reason at all.
+extern std::wstring DirColumnStrW; // LoadStrW(IDS_DIRCOLUMN), used by UTF-16 panel columns
+extern int DirColumnStrWLen;       // string length in WCHARs
+extern std::wstring ColExtStrW;    // LoadStrW(IDS_COLUMN_NAME_EXT) - used too often, we cache it
+extern int ColExtStrWLen;          // string length in WCHARs
 extern int TextEllipsisWidth;         // width of "..." string displayed with 'Font' font
 extern int TextEllipsisWidthEnv;      // width of "..." string displayed with 'FontEnv' font
-extern std::string ProgDlgHoursStr;   // LoadStr(IDS_PROGDLGHOURS) - used too often, we cache it
-extern std::string ProgDlgMinutesStr; // LoadStr(IDS_PROGDLGMINUTES) - used too often, we cache it
-extern std::string ProgDlgSecsStr;    // LoadStr(IDS_PROGDLGSECS) - used too often, we cache it
+// These three were already wide and initialised from LoadStrW; only their comments
+// still said LoadStr. That is why the KB counted this "family" as five narrow globals when it
+// was two - the count was taken from the comments rather than the types.
+extern std::wstring ProgDlgHoursStr;   // LoadStrW(IDS_PROGDLGHOURS) - used too often, we cache it
+extern std::wstring ProgDlgMinutesStr; // LoadStrW(IDS_PROGDLGMINUTES) - used too often, we cache it
+extern std::wstring ProgDlgSecsStr;    // LoadStrW(IDS_PROGDLGSECS) - used too often, we cache it
 
-extern char FolderTypeName[80];         // file-type for all directories (retrieved from system directory)
-extern int FolderTypeNameLen;           // FolderTypeName string length
-extern std::string UpDirTypeName;       // LoadStr(IDS_UPDIRTYPENAME) - used too often, we cache it
-extern int UpDirTypeNameLen;            // string length
-extern std::string CommonFileTypeName;  // LoadStr(IDS_COMMONFILETYPE) - used too often, we cache it
-extern int CommonFileTypeNameLen;       // CommonFileTypeName string length
-extern std::string CommonFileTypeName2; // LoadStr(IDS_COMMONFILETYPE2) - used too often, we cache it
+// All four are consumed by the panel's Type column, whose buffer
+// (sally.h:320 TransferBuffer) and formatter (GetCommonFileTypeStr) are already wide. The
+// declaration of FolderTypeName used to say 'char' while its definition said 'wchar_t' - a
+// C2371, and the reason every consumer TU was reading a 160-byte object as 80 narrow chars.
+extern wchar_t FolderTypeName[80];       // file-type for all directories (retrieved from system directory)
+extern int FolderTypeNameLen;            // FolderTypeName length in CHARACTERS
+extern std::wstring UpDirTypeName;       // LoadStrW(IDS_UPDIRTYPENAME) - used too often, we cache it
+extern int UpDirTypeNameLen;             // length in CHARACTERS
+extern std::wstring CommonFileTypeName;  // LoadStrW(IDS_COMMONFILETYPE) - used too often, we cache it
+extern int CommonFileTypeNameLen;        // CommonFileTypeName length in CHARACTERS
+extern std::wstring CommonFileTypeName2; // LoadStrW(IDS_COMMONFILETYPE2) - used too often, we cache it
 
-extern CPathBuffer WindowsDirectory; // cached result of GetWindowsDirectory (heap-allocated)
+extern std::wstring WindowsDirectory; // cached result of GetWindowsDirectory
 
 //#ifdef MSVC_RUNTIME_CHECKS
 #define RTC_ERROR_DESCRIPTION_SIZE 2000 // buffer for run-time check error description
@@ -1727,11 +1763,8 @@ extern char RTCErrorDescription[RTC_ERROR_DESCRIPTION_SIZE];
 //#endif // MSVC_RUNTIME_CHECKS
 
 // path where we create bug report and minidump, location: up to Vista near sally.exe, in Vista (and later) in CSIDL_APPDATA + "\\Open Salamander"
-extern CPathBuffer BugReportPath; // Heap-allocated for long path support
-
 // file name that will be imported (if exists) to registry
-extern CPathBuffer ConfigurationName;     // ANSI mirror (lossy for non-ASCII install paths)
-extern std::wstring ConfigurationNameW;   // authoritative wide path (use this for file I/O)
+extern std::wstring ConfigurationNameW;
 extern BOOL ConfigurationNameIgnoreIfNotExists;
 
 extern HWND PluginProgressDialog; // if plug-in opens progress dialog, its HWND is here, otherwise NULL
@@ -1788,34 +1821,53 @@ DWORD CfgSkillLevelToMenu(BYTE cfgSkillLevel);
 //          error messages on failure, which makes them unsuitable for regular Registry access,
 //          for solution see functions at the beginning of regwork.h: OpenKeyAux, CreateKeyAux, etc.
 BOOL ClearKey(HKEY key);
-BOOL CreateKey(HKEY hKey, const char* name, HKEY& createdKey);
-BOOL OpenKey(HKEY hKey, const char* name, HKEY& openedKey);
-void CloseKey(HKEY key);
-BOOL DeleteKey(HKEY hKey, const char* name);
-BOOL DeleteValue(HKEY hKey, const char* name);
-// for dataSize = -1 function calculates string length via strlen
-BOOL SetValue(HKEY hKey, const char* name, DWORD type,
-              const void* data, DWORD dataSize);
-BOOL GetValue(HKEY hKey, const char* name, DWORD type, void* buffer, DWORD bufferSize);
-BOOL GetSize(HKEY hKey, const char* name, DWORD type, DWORD& bufferSize);
-BOOL LoadRGB(HKEY hKey, const char* name, COLORREF& color);
-BOOL SaveRGB(HKEY hKey, const char* name, COLORREF color);
-BOOL LoadRGBF(HKEY hKey, const char* name, SALCOLOR& color);
-BOOL SaveRGBF(HKEY hKey, const char* name, SALCOLOR color);
-BOOL LoadLogFont(HKEY hKey, const char* name, LOGFONT* logFont);
-BOOL SaveLogFont(HKEY hKey, const char* name, LOGFONT* logFont);
-BOOL LoadHistory(HKEY hKey, const char* name, char* history[], int maxCount);
-BOOL SaveHistory(HKEY hKey, const char* name, char* history[], int maxCount, BOOL onlyClear = FALSE);
-BOOL LoadHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount);
-BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount, BOOL onlyClear = FALSE);
-BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks);
-BOOL SaveViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks);
-BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks);
-BOOL SaveEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks);
+// ****************************************************************************
+// Direct, quiet registry facades used outside the configuration worker flow.
+// Registry key/value names are always UTF-16. The raw value overloads preserve
+// REG_BINARY and other explicitly encoded payload bytes unchanged.
+BOOL CreateKeyW(HKEY hKey, const wchar_t* name, HKEY& createdKey);
+BOOL OpenKeyW(HKEY hKey, const wchar_t* name, HKEY& openedKey);
+BOOL DeleteKeyW(HKEY hKey, const wchar_t* name);
+BOOL DeleteValueW(HKEY hKey, const wchar_t* name);
+BOOL SetValueW(HKEY hKey, const wchar_t* name, DWORD type, const void* data, DWORD dataSize);
+BOOL GetValueW(HKEY hKey, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize);
+BOOL GetStringValueW(HKEY hKey, const wchar_t* name, std::wstring& value);
+BOOL GetSizeW(HKEY hKey, const wchar_t* name, DWORD type, DWORD& bufferSize);
 
-BOOL ExportConfiguration(HWND hParent, const char* fileName, BOOL clearKeyBeforeImport);
-BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExists,
-                         BOOL autoImportConfig, BOOL* importCfgFromFileWasSkipped);
+void CloseKey(HKEY key);
+// Configuration load/save facades retain the worker-thread/message-pump behavior,
+// but no longer accept or convert ACP key/value names.
+BOOL CreateKey(HKEY hKey, const wchar_t* name, HKEY& createdKey);
+BOOL OpenKey(HKEY hKey, const wchar_t* name, HKEY& openedKey);
+BOOL DeleteKey(HKEY hKey, const wchar_t* name);
+BOOL DeleteValue(HKEY hKey, const wchar_t* name);
+BOOL SetValue(HKEY hKey, const wchar_t* name, DWORD type,
+              const void* data, DWORD dataSize);
+BOOL GetValue(HKEY hKey, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize);
+BOOL GetSize(HKEY hKey, const wchar_t* name, DWORD type, DWORD& bufferSize);
+BOOL GetValue2(HKEY hKey, const wchar_t* name, DWORD type1, DWORD type2,
+               DWORD* returnedType, void* buffer, DWORD bufferSize);
+// The value NAME is wide; the stored DATA is not. LoadLogFont/SaveLogFont read and
+// write a comma-separated REG_SZ that existing installations already have, and LoadRGB still
+// understands the pre-2.53 "r,g,b" string spelling - those are on-disk formats, not text this
+// campaign gets to widen.
+BOOL LoadRGB(HKEY hKey, const wchar_t* name, COLORREF& color);
+BOOL SaveRGB(HKEY hKey, const wchar_t* name, COLORREF color);
+BOOL LoadRGBF(HKEY hKey, const wchar_t* name, SALCOLOR& color);
+BOOL SaveRGBF(HKEY hKey, const wchar_t* name, SALCOLOR color);
+BOOL LoadLogFont(HKEY hKey, const wchar_t* name, LOGFONT* logFont);
+BOOL SaveLogFont(HKEY hKey, const wchar_t* name, LOGFONT* logFont);
+// Imports the malformed process-ACP REG_SZ payload written by pre-Unicode releases and publishes
+// only dynamically allocated UTF-16 entries. Current history values use LoadHistory instead.
+BOOL LoadLegacyHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount);
+BOOL LoadHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount);
+BOOL SaveHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount, BOOL onlyClear = FALSE);
+BOOL LoadViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks);
+BOOL SaveViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks);
+BOOL LoadEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks);
+BOOL SaveEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks);
+
+BOOL ExportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL clearKeyBeforeImport);
 BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNotExists,
                           BOOL autoImportConfig, BOOL* importCfgFromFileWasSkipped);
 
@@ -1851,7 +1903,9 @@ HCURSOR SetHandCursor();
 struct CSVGIcon
 {
     int ImageIndex;
-    const char* SVGName;
+    // wide, matching CButtonData::SVGName which feeds it and svg.h's
+    // RenderSVGImage declaration which consumes it. These are ASCII asset stems.
+    const wchar_t* SVGName;
 };
 
 BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, COLORREF bkColorForAlpha,
@@ -2078,22 +2132,6 @@ extern DWORD EnablerPermissions;          // focus|select is on files|directorie
 #define OPENSAL_EXCEPTION_BREAK 0xE0EA4322 // we raise in case of break (from another Salamander or via salbreak)
 
 //******************************************************************************
-//
-// Set of variables and functions for opening associations via SalOpen.exe
-//
-
-// shared memory
-extern HANDLE SalOpenFileMapping;
-extern void* SalOpenSharedMem;
-
-// service release
-void ReleaseSalOpen();
-
-// launches salopen.exe and passes 'fileName' via shared memory
-// returns TRUE if successful, otherwise FALSE (association should be launched differently)
-BOOL SalOpenExecute(HWND hWindow, const char* fileName);
-
-//******************************************************************************
 
 // mapping salCmd (Salamander command number launched from plug-in, see SALCMD_XXX)
 // to command number for WM_COMMAND
@@ -2130,7 +2168,8 @@ BOOL Use256ColorsBitmap();
 void RestoreFocusInSourcePanel();
 
 #define ISSLGINCOMPLETE_SIZE 200
-extern char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE];
+extern wchar_t IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // matched forward to its
+                                                      // wide definition (sally_entry_lifecycle.cpp)
 
 //******************************************************************************
 // file name enumeration from panel/Find for viewers
@@ -2154,15 +2193,15 @@ struct CFileNamesEnumData
     CFileNamesEnumRequestType RequestType; // request type
     int SrcUID;
     int LastFileIndex;
-    char LastFileName[MAX_PATH];
+    std::wstring LastFileName;
     BOOL PreferSelected;
     BOOL OnlyAssociatedExtensions;
     CPluginInterfaceAbstract* Plugin; // used when 'OnlyAssociatedExtensions'==TRUE, specifies for which plugin to filter file names ('Plugin'==NULL = internal viewer)
-    char FileName[MAX_PATH];
     BOOL Select;
     BOOL TimedOut; // TRUE if no one is waiting for result anymore (unnecessary to perform name search)
 
     // result:
+    std::wstring FileNameW;
     BOOL Found; // TRUE if requested file name was found
     BOOL NoMoreFiles;
     BOOL SrcBusy;
@@ -2193,15 +2232,15 @@ BOOL IsFileEnumSourcePanel(int srcUID, int* panel);
 // name is selected, selected names will be returned; if 'onlyAssociatedExtensions'
 // is TRUE, returns only files with extension associated with this plugin's viewer (F3 on this
 // file would attempt to open this plugin's viewer + ignores possible shadowing
-// by another plugin's viewer); 'fileName' is buffer for obtained name (size at least
-// MAX_PATH); returns TRUE if name is obtained successfully; returns FALSE on error: no
+// by another plugin's viewer); 'fileName' receives the dynamically owned UTF-16
+// result; returns TRUE if name is obtained successfully; returns FALSE on error: no
 // more file names in source (if 'noMoreFiles' is not NULL, TRUE is returned in it),
 // source is busy (not processing messages; if 'srcBusy' is not NULL, TRUE is returned in it),
 // otherwise source ceased to exist (path change in panel, sort change, etc.)
-BOOL GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
-                              BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                              char* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
-                              CPluginInterfaceAbstract* plugin);
+BOOL GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                               BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                               std::wstring* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
+                               CPluginInterfaceAbstract* plugin);
 
 // returns previous file name for viewer from source (left/right panel or Finds);
 // 'srcUID' is unique source identifier (passed as parameter when opening
@@ -2213,15 +2252,15 @@ BOOL GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFi
 // name is selected, selected names will be returned; if 'onlyAssociatedExtensions' is TRUE,
 // returns only files with extension associated with this plugin's viewer (F3 on this
 // file would attempt to open this plugin's viewer + ignores possible shadowing
-// by another plugin's viewer); 'fileName' is buffer for obtained name (size at least
-// MAX_PATH); returns TRUE if name is obtained successfully; returns FALSE on error: no
+// by another plugin's viewer); 'fileName' receives the dynamically owned UTF-16
+// result; returns TRUE if name is obtained successfully; returns FALSE on error: no
 // previous file name in source (if 'noMoreFiles' is not NULL, TRUE is returned in it),
 // source is busy (not processing messages; if 'srcBusy' is not NULL, TRUE is returned
 // in it), otherwise source ceased to exist (path change in panel, sort change, etc.)
-BOOL GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
-                                  BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                  char* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
-                                  CPluginInterfaceAbstract* plugin);
+BOOL GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                                   BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                                   std::wstring* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
+                                   CPluginInterfaceAbstract* plugin);
 
 // checks if current file from viewer is selected in source (left/right
 // panel or Finds); 'srcUID' is unique source identifier (passed as parameter
@@ -2233,7 +2272,7 @@ BOOL GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const char* la
 // 'lastFileName' is no longer in source (for these two errors, if 'srcBusy' is not NULL,
 // FALSE is returned in it), source is busy (not processing messages; for this error,
 // if 'srcBusy' is not NULL, TRUE is returned in it)
-BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* lastFileName,
+BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
                                  BOOL* isFileSelected, BOOL* srcBusy);
 
 // sets selection on current file from viewer in source (left/right
@@ -2246,7 +2285,7 @@ BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* last
 // longer in source (for these two errors, if 'srcBusy' is not NULL, FALSE is returned in it),
 // source is busy (not processing messages; for this error, if 'srcBusy' is not NULL,
 // TRUE is returned in it)
-BOOL SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex, const char* lastFileName,
+BOOL SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
                                      BOOL select, BOOL* srcBusy);
 
 // changes source (panel or Find) UID (generates new one, updates
@@ -2265,7 +2304,7 @@ void EnumFileNamesRemoveSourceUID(HWND hWnd);
 
 extern CRITICAL_SECTION ReadCDVolNameCS;   // critical section for data access
 extern UINT_PTR ReadCDVolNameReqUID;       // request UID (to identify if someone is still waiting for result)
-extern char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH]; // IN/OUT buffer (root/volume_name)
+extern std::wstring ReadCDVolNameBuffer; // IN/OUT value (root/volume name), protected by ReadCDVolNameCS
 
 //******************************************************************************
 // functions for working with histories of recently used values in comboboxes
@@ -2274,14 +2313,17 @@ extern char ReadCDVolNameBuffer[SAL_MAX_LONG_PATH]; // IN/OUT buffer (root/volum
 // if 'caseSensitiveValue' is TRUE, value (string) is searched in history array using
 // case-sensitive comparison (FALSE = case-insensitive comparison),
 // found value is only moved to first position in history array
-void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
-                                const char* value, BOOL caseSensitiveValue);
-void AddValueToStdHistoryValuesW(wchar_t** historyArr, int historyItemsCount,
-                                 const wchar_t* value, BOOL caseSensitiveValue);
+void AddValueToStdHistoryValues(wchar_t** historyArr, int historyItemsCount,
+                                const wchar_t* value, BOOL caseSensitiveValue);
 
 // adds texts from shared history ('historyArr'+'historyItemsCount') to combobox ('combo');
 // performs reset of combobox content before adding (see CB_RESETCONTENT)
-void LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount);
+void LoadComboFromStdHistoryValues(HWND combo, wchar_t** historyArr, int historyItemsCount);
+
+// Re-selects the combo's font with DEFAULT_CHARSET when 'text' needs
+// glyphs the current lfCharSet cannot supply. Returns an HFONT the CALLER owns and
+// must DeleteObject, or NULL if no change was needed.
+HFONT EnsureComboFontCanRenderW(HWND combo, const wchar_t* text);
 
 //******************************************************************************
 
@@ -2290,23 +2332,18 @@ void AddNewlyLoadedModulesToGlobalModulesStore();
 
 //******************************************************************************
 
-// quicksort with comparison via StrICmp
-void SortNames(char* files[], int left, int right);
+// quicksort with comparison via StrICmpW
+void SortNames(wchar_t* files[], int left, int right);
 
-// searches for string 'name' in 'usedNames' array (array is sorted using StrICmp);
+// searches for string 'name' in 'usedNames' array (array is sorted using StrICmpW);
 // returns TRUE if found + found index in 'index' (if not NULL); returns
 // FALSE if element was not found + index for insertion in 'index' (if not NULL)
-BOOL ContainsString(TIndirectArray<char>* usedNames, const char* name, int* index = NULL);
+BOOL ContainsString(TIndirectArray<wchar_t>* usedNames, const wchar_t* name, int* index = NULL);
 
 //******************************************************************************
 
 // on success returns TRUE and path to "Documents", or "Desktop"
 // on failure returns FALSE
-// 'pathLen' specifies size of 'path' buffer; function ensures string termination even
-// in case of truncation
-BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen);
-
-// Wide version - no MAX_PATH limitation
 BOOL GetMyDocumentsOrDesktopPathW(std::wstring& path);
 
 // To optimize performance, it is good practice for applications to detect whether they
@@ -2335,7 +2372,7 @@ extern BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo; // TRUE = in idle opens con
 
 // drive root (including UNC), for which "drive not ready" messagebox with Retry+Cancel
 // buttons is displayed (used for automatic Retry after inserting media into drive)
-extern CPathBuffer CheckPathRootWithRetryMsgBox; // Heap-allocated for long path support
+extern std::wstring CheckPathRootWithRetryMsgBox;
 // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after
 // inserting media into drive)
 extern HWND LastDriveSelectErrDlgHWnd;
@@ -2367,7 +2404,7 @@ int GetIndexForDrvText(CPluginFSInterfaceEncapsulation** fsList, int count,
 BOOL GetShortcutOverlay();
 
 // returns text form of 'hotKey' (LOBYTE=vk, HIBYTE=mods), 'buff' must have at least 50 characters
-void GetHotKeyText(WORD hotKey, char* buff);
+std::wstring GetHotKeyText(WORD hotKey);
 
 // returns bits per pixel of display
 int GetCurrentBPP(HDC hDC = NULL);
@@ -2396,7 +2433,7 @@ struct CTmpEnumData
     CFilesWindow* Panel;
 };
 
-const char* EnumFileNames(int index, void* param);
+const wchar_t* EnumFileNames(int index, void* param);
 
 // Both return the HRESULT from the wrapped shell call, or E_UNEXPECTED if it raised an
 // exception. Callers may ignore it, but it is the only evidence we get when a shell
@@ -2407,27 +2444,23 @@ void ShellActionAux6(CFilesWindow* panel);
 
 //******************************************************************************
 
-// returns Configuration.IfPathIsInaccessibleGoTo path in 'path' (buffer at least MAX_PATH characters);
-// takes into account Configuration.IfPathIsInaccessibleGoToIsMyDocs setting
-void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs = FALSE);
-
-// Wide version - no MAX_PATH limitation
+// Returns Configuration.IfPathIsInaccessibleGoTo, honoring the My Documents setting.
 void GetIfPathIsInaccessibleGoToW(std::wstring& path, BOOL forceIsMyDocs = FALSE);
 
 // loads icon overlay handler configuration from registry
-void LoadIconOvrlsInfo(const char* root);
+void LoadIconOvrlsInfo(const wchar_t* root);
 
 // returns TRUE if icon overlay handler is disabled (or all are disabled)
-BOOL IsDisabledCustomIconOverlays(const char* name);
+BOOL IsDisabledCustomIconOverlays(const wchar_t* name);
 
 // returns TRUE if icon overlay handler is in the list of disabled icon overlay handlers
-BOOL IsNameInListOfDisabledCustomIconOverlays(const char* name);
+BOOL IsNameInListOfDisabledCustomIconOverlays(const wchar_t* name);
 
 // clears the list of disabled icon overlay handlers
 void ClearListOfDisabledCustomIconOverlays();
 
 // adds 'name' to the list of disabled icon overlay handlers
-BOOL AddToListOfDisabledCustomIconOverlays(const char* name);
+BOOL AddToListOfDisabledCustomIconOverlays(const wchar_t* name);
 
 // loads icon from ImageResDLL
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags);
@@ -2436,35 +2469,29 @@ HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags);
 HICON LoadArchiveIcon(int cx, int cy, UINT flags);
 
 // obtains credentials for the given network path and optionally restores its mapping
-BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteName, DWORD* retErr = NULL,
-                              LPNETRESOURCE lpNetResource = NULL);
+BOOL RestoreNetworkConnectionW(HWND parent, const wchar_t* name, const wchar_t* remoteName, DWORD* retErr = NULL,
+                               LPNETRESOURCEW lpNetResource = NULL);
 
 // builds text for the Type column for an unassociated file (e.g., "AAA File" or just "File")
-void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext);
+void GetCommonFileTypeStr(wchar_t* buf, int* resLen, const wchar_t* ext);
 
 // finds duplicate separators and removes the redundant ones (on Vista duplicate
 // separators appeared in the context menu for .bar files)
 void RemoveUselessSeparatorsFromMenu(HMENU h);
 
-// returns the "Open Salamander" directory under CSIDL_APPDATA into 'buf' (buffer of size MAX_PATH)
-BOOL GetOurPathInRoamingAPPDATA(char* buf);
-
-// creates the "Open Salamander" directory under CSIDL_APPDATA; returns TRUE if the path
-// fits into MAX_PATH (its existence is not guaranteed; CreateDirectory result is not checked);
-// if 'buf' is not NULL, it is a buffer of size MAX_PATH where the path is returned
-// NOTE: Vista+ only
-BOOL CreateOurPathInRoamingAPPDATA(char* buf);
+// Creates and returns Sally's application-data directory as dynamically-owned UTF-16.
+BOOL CreateOurPathInRoamingAPPDATAW(std::wstring& path);
 
 #ifndef _WIN64
 
 // 32-bit build on Win64 only: checks whether the path is redirected by the file system redirector
 // to SysWOW64 or back to System32
-BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists);
+BOOL IsWin64RedirectedDir(const wchar_t* path, std::wstring* completedPath, BOOL failIfDirWithSameNameExists);
 
 // 32-bit build on Win64 only: checks whether the selection contains a pseudo-directory that the
 // redirector maps to SysWOW64 or back to System32, and that there is no real directory with the
 // same name on disk (pseudo-directory added only via AddWin64RedirectedDir)
-BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir,
+BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, std::wstring& redirectedDir,
                                 BOOL onlyAdded);
 
 #endif // _WIN64
@@ -2476,9 +2503,15 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
 extern "C"
 {
     LONG SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData);
-    LONG SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved,
-                            LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
+    // Wide sibling. 'lpcbData' stays a BYTE count on both sides.
+    LONG SalRegQueryValueW(HKEY hKey, LPCWSTR lpSubKey, LPWSTR lpData, PLONG lpcbData);
 }
+
+// Wide core overload. The existing implementation and all data
+// counts stay byte-domain; only the registry value name is UTF-16. Keeping it
+// as a wide-only core function keeps byte counts explicit without a fixed ANSI mirror.
+LONG SalRegQueryValueEx(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved,
+                        LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
 
 // Win7 and newer OS: taskbar notification that a button has been created for a window
 // set during Salamander startup; check if it is nonzero

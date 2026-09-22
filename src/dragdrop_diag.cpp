@@ -6,8 +6,10 @@
 #endif
 
 #include "dragdrop_diag.h"
+#include "common/DiagnosticTextEncoding.h"
 
 #include <stdio.h>
+#include <string>
 
 // MK_ALT is a valid IDropTarget grfKeyState flag but is not in every SDK's MK_* set.
 #ifndef MK_ALT
@@ -27,43 +29,54 @@ namespace
 // Default log location. Derived from %TEMP% rather than hardcoded: an absolute path to one
 // developer machine has no business in shipped source, and the sibling diagnostic in the
 // webviewer plugin already does it this way.
-const char* DefaultDiagPath()
+const wchar_t* DefaultDiagPath()
 {
-    static char path[MAX_PATH];
-    if (path[0] == 0)
+    static std::wstring path;
+    if (path.empty())
     {
-        if (GetTempPathA(MAX_PATH, path) == 0)
+        const DWORD required = GetTempPathW(0, NULL);
+        if (required == 0)
             return NULL;
-        lstrcatA(path, "sally-dragdrop.log");
+        path.assign(required, L'\0');
+        const DWORD written = GetTempPathW(required, &path[0]);
+        if (written == 0 || written >= required)
+        {
+            path.clear();
+            return NULL;
+        }
+        path.resize(written);
+        path.append(L"sally-dragdrop.log");
     }
-    return path;
+    return path.c_str();
 }
 
-const char* DiagPath()
+const wchar_t* DiagPath()
 {
-    static char path[MAX_PATH];
+    static std::wstring path;
     static int state = 0; // 0 = unchecked, 1 = enabled, -1 = disabled
     if (state == 0)
     {
-        char value[MAX_PATH];
-        DWORD len = GetEnvironmentVariableA("SALLY_DRAGDROP_LOG", value, (DWORD)sizeof(value));
-        if (len > 0 && len < sizeof(value))
+        const DWORD required = GetEnvironmentVariableW(L"SALLY_DRAGDROP_LOG", NULL, 0);
+        if (required > 0)
         {
-            if (strcmp(value, "0") == 0)
+            std::wstring value(required, L'\0');
+            const DWORD written = GetEnvironmentVariableW(L"SALLY_DRAGDROP_LOG", &value[0], required);
+            if (written == 0 || written >= required)
+                return NULL;
+            value.resize(written);
+            if (value == L"0")
                 state = -1; // explicit opt-out wins in either configuration
             else
             {
-                if (strcmp(value, "1") == 0)
+                if (value == L"1")
                 {
-                    const char* def = DefaultDiagPath();
+                    const wchar_t* def = DefaultDiagPath();
                     if (def == NULL)
                         return NULL; // no %TEMP% - stay disabled rather than guess a path
-                    lstrcpynA(path, def, (int)sizeof(path));
+                    path = def;
                 }
                 else
-                {
-                    lstrcpynA(path, value, (int)sizeof(path));
-                }
+                    path = value;
                 state = 1;
             }
         }
@@ -81,7 +94,17 @@ const char* DiagPath()
             state = -1;
         }
     }
-    return state == 1 ? path : NULL;
+    return state == 1 ? path.c_str() : NULL;
+}
+
+std::string Utf8ForLog(const wchar_t* text)
+{
+    if (text == NULL)
+        return "(null)";
+    std::string bytes;
+    if (!sally::diagnostic::EncodeUtf8(text, bytes))
+        bytes.clear();
+    return bytes;
 }
 
 void AppendEffect(char* buf, int bufSize, DWORD effect)
@@ -109,7 +132,7 @@ bool DragDropDiagEnabled()
 void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWORD effectOut,
                         int tgtType, bool haveShellTarget, bool ownFolderDrop, bool tgtFile)
 {
-    const char* path = DiagPath();
+    const wchar_t* path = DiagPath();
     if (path == NULL)
         return;
 
@@ -129,7 +152,7 @@ void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWOR
     AppendEffect(in, (int)sizeof(in), effectIn);
     AppendEffect(out, (int)sizeof(out), effectOut);
 
-    FILE* f = fopen(path, "at");
+    FILE* f = _wfopen(path, L"at");
     if (f == NULL)
         return;
     fprintf(f, "branch=%-12s key=0x%04X%s%s%s tgtType=%d shellTgt=%d ownFolder=%d tgtFile=%d "
@@ -143,17 +166,18 @@ void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWOR
     fclose(f);
 }
 
-void DragDropDiagDataObject(IDataObject* dataObject, const char* curDir)
+void DragDropDiagDataObject(IDataObject* dataObject, const wchar_t* curDir)
 {
-    const char* path = DiagPath();
+    const wchar_t* path = DiagPath();
     if (path == NULL)
         return;
 
-    FILE* f = fopen(path, "at");
+    FILE* f = _wfopen(path, L"at");
     if (f == NULL)
         return;
 
-    fprintf(f, "--- drag start: curDir=[%s] dataObject=%p\n", curDir != NULL ? curDir : "(null)",
+    const std::string curDirUtf8 = Utf8ForLog(curDir);
+    fprintf(f, "--- drag start: curDir=[%s] dataObject=%p\n", curDirUtf8.c_str(),
             (void*)dataObject);
 
     if (dataObject != NULL)
@@ -231,7 +255,7 @@ void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWOR
     UNREFERENCED_PARAMETER(tgtFile);
 }
 
-void DragDropDiagDataObject(IDataObject* dataObject, const char* curDir)
+void DragDropDiagDataObject(IDataObject* dataObject, const wchar_t* curDir)
 {
     UNREFERENCED_PARAMETER(dataObject);
     UNREFERENCED_PARAMETER(curDir);

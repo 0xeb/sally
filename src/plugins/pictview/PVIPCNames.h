@@ -53,6 +53,7 @@ inline void BuildPictViewImageMapName(char* dest, int destSize, const wchar_t* m
     char narrowMutexName[64];
     narrowMutexName[0] = 0;
     if (mutexName != NULL)
+        // [narrow-ok: ascii-by-construction] an IPC mutex name this plugin composes itself
         WideCharToMultiByte(CP_ACP, 0, mutexName, -1, narrowMutexName, (int)sizeof(narrowMutexName), NULL, NULL);
 
     BuildPictViewImageMapName(dest, destSize, narrowMutexName, imageMapId);

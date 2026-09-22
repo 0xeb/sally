@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -55,8 +55,9 @@ LRESULT CScriptAbortPaletteWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM l
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABORTTIP));
-        SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
+        StringCchCopyW(tt->Buffer, TOOLTIP_TEXT_MAX, SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ABORTTIP).c_str());
+        SPLPrepareToolTipTextForAbiBuffer(SalamanderGUI, tt->Buffer,
+                                          TOOLTIP_TEXT_MAX, FALSE);
         return 0;
     }
 
@@ -116,7 +117,9 @@ void CScriptAbortPaletteWindow::OnCreate()
     tii.Mask = TLBI_MASK_ID | TLBI_MASK_TEXT | TLBI_MASK_STYLE | TLBI_MASK_IMAGEINDEX;
     tii.ID = ToolCmdAbort;
     tii.Style = TLBI_STYLE_SHOWTEXT;
-    tii.Text = SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABORTCAPTION);
+    const std::wstring abortCaption =
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_ABORTCAPTION);
+    tii.Text = const_cast<wchar_t*>(abortCaption.c_str());
     tii.ImageIndex = PluginIconStop;
     m_pToolBar->InsertItem2(0xFFFFFFFF, TRUE, &tii);
 
@@ -188,7 +191,7 @@ void CScriptAbortPaletteWindow::CheckForegroundApp()
         {
             // pump the message out of the queue
             MSG msg;
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
             {
             }
 
@@ -235,11 +238,11 @@ POINT CScriptAbortPaletteWindow::FindPlacement(int cx, int cy)
 ////////////////////////////////////////////////////////////////////////////////
 
 CScriptAbortPaletteThread::CScriptAbortPaletteThread(CScriptInfo* pScriptInfo)
+    : CThread(L"AutomationAbortPalette")
 {
     m_pPalette = NULL;
     m_hWindowCreatedEvt = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
     m_pScriptInfo = pScriptInfo;
-    StringCchCopy(Name, _countof(Name), _T("AutomationAbortPalette"));
 }
 
 CScriptAbortPaletteThread::~CScriptAbortPaletteThread()
@@ -262,10 +265,12 @@ unsigned CScriptAbortPaletteThread::Body()
     // WS_SYSMENU is required on Vista+ with Aero active, otherwise
     // window manager draws thick and awful border around a tool window.
     m_pPalette = new CScriptAbortPaletteWindow(m_pScriptInfo);
+    const std::wstring windowTitle =
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME);
     hwndPalette = m_pPalette->CreateEx(
         WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
         CWINDOW_CLASSNAME2,
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME),
+        windowTitle.c_str(),
         WS_OVERLAPPED | WS_CAPTION | WS_CLIPCHILDREN | WS_SYSMENU,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
@@ -307,10 +312,10 @@ unsigned CScriptAbortPaletteThread::Body()
         }
     }
 
-    while (GetMessage(&msg, NULL, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageW(&msg);
     }
 
     m_pPalette = NULL;

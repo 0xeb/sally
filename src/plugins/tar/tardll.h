@@ -12,49 +12,49 @@
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 public:
-    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData);
-    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                      const char* archiveRoot, SalEnumSelection next, void* nextParam);
-    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                                      const CFileData* fileData, const char* targetDir,
-                                      const char* newFileName, BOOL* renamingNotSupported);
-    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      const char* archiveRoot, BOOL move, const char* sourcePath,
+    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                      const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam);
+    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                                      const CFileData* fileData, const wchar_t* targetDir,
+                                      const wchar_t* newFileName, BOOL* renamingNotSupported);
+    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                                       SalEnumSelection2 next, void* nextParam)
     {
         return FALSE;
     }
-    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                          CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                          CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                           SalEnumSelection next, void* nextParam)
     {
         return FALSE;
     }
-    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                           const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                           const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                            CDynamicString* archiveVolumes);
-    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                         BOOL force, int panel)
     {
         return TRUE;
     }
-    virtual BOOL WINAPI GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
-    virtual void WINAPI DeleteTmpCopy(const char* fileName, BOOL firstFile) {}
+    virtual BOOL WINAPI GetCacheInfo(CSalamanderStringBuffer* tempPath, BOOL* ownDelete, BOOL* cacheCopies) { return FALSE; }
+    virtual void WINAPI DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile) {}
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 };
 
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
-    virtual BOOL WINAPI ViewFile(const char* name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnUnlock, HANDLE* unlock,
                                  BOOL* unlockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex);
-    virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name) { return TRUE; }
 };
 
 class CPluginInterface : public CPluginInterfaceAbstract
@@ -86,7 +86,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };

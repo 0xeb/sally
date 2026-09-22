@@ -33,7 +33,7 @@
  *              to see whether the file was open successfully
  *              Can only open existing file.
  */
-cDBF::cDBF(const char* filename, BOOL readOnly) : fields(NULL), status(DBFE_OK),
+cDBF::cDBF(const wchar_t* filename, BOOL readOnly) : fields(NULL), status(DBFE_OK),
                                                   f(NULL), fmemo(NULL), updated(FALSE)
 {
     /* Info: GetStatus should be called after constructing the object to verify success */
@@ -51,14 +51,13 @@ cDBF::cDBF(const char* filename, BOOL readOnly) : fields(NULL), status(DBFE_OK),
     };
     U32 nBytesRead, pos;
     int i;
-    char memo[_MAX_PATH], *s;
 
     /* Ensure we have a proper structure alignment */
     _ASSERT(sizeof(DBFFILE_HDR) == 32);
     _ASSERT(sizeof(DBFFILE_FIELD) == 32);
     _ASSERT(sizeof(DBF7FILE_HDR) == 68);
 
-    f = fopen(filename, readOnly ? "rb" : "rb+");
+    f = _wfopen(filename, readOnly ? L"rb" : L"rb+");
     if (!f)
     {
         status = DBFE_FILE_NOT_FOUND;
@@ -322,16 +321,17 @@ cDBF::cDBF(const char* filename, BOOL readOnly) : fields(NULL), status(DBFE_OK),
     currField = -1; /* to force seek on first GetRecord */
 
     /* Look for memo file */
-    strcpy(memo, filename);
-    s = strrchr(memo, '.');
-    if (!s)
-        s = strend(memo);
+    std::wstring memo(filename);
+    const size_t extension = memo.find_last_of(L'.');
+    const size_t separator = memo.find_last_of(L"\\/");
+    if (extension != std::wstring::npos && (separator == std::wstring::npos || extension > separator))
+        memo.resize(extension);
 
     switch (hdr.version)
     {
     case DBF_FOXPRO:
-        strcpy(s, ".fpt");
-        fmemo = fopen(memo, "rb");
+        memo += L".fpt";
+        fmemo = _wfopen(memo.c_str(), L"rb");
         if (fmemo)
         {
             U8 tmp[2];
@@ -360,8 +360,8 @@ cDBF::cDBF(const char* filename, BOOL readOnly) : fields(NULL), status(DBFE_OK),
     case DBF_DBASE4:
     case DBF_DBASE5:
         memoBlockSize = 512;
-        strcpy(s, ".dbt");
-        fmemo = fopen(memo, "rb");
+        memo += L".dbt";
+        fmemo = _wfopen(memo.c_str(), L"rb");
         if (fmemo)
         {
             U8 tmp;

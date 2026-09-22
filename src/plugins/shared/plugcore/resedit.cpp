@@ -63,17 +63,17 @@ BOOL CResEditRoot::Write(void* buffer, DWORD size)
 // CResEdit
 //
 
-BOOL CResEdit::BeginUpdateResource(LPCSTR pFileName, BOOL bDeleteExistingResources)
+BOOL CResEdit::BeginUpdateResource(LPCWSTR pFileName, BOOL bDeleteExistingResources)
 {
-    CALL_STACK_MESSAGE3("CResEdit::BeginUpdateResource(%s, %d)", pFileName,
+    CALL_STACK_MESSAGE3("CResEdit::BeginUpdateResource(%ls, %d)", pFileName,
                         bDeleteExistingResources);
     if (File)
         return FALSE;
     int num_of_retries = 0;
 
 try_again:
-    File = CreateFile(pFileName, GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING,
-                      FILE_ATTRIBUTE_NORMAL, NULL);
+    File = CreateFileW(pFileName, GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (!File)
         return FALSE;
@@ -177,7 +177,7 @@ error:
     return FALSE;
 }
 
-BOOL CResEdit::UpdateResource(LPCSTR lpType, LPCSTR lpName, WORD wLanguage, LPVOID lpData, DWORD cbData)
+BOOL CResEdit::UpdateResource(LPCWSTR lpType, LPCWSTR lpName, WORD wLanguage, LPVOID lpData, DWORD cbData)
 {
     CALL_STACK_MESSAGE3("CResEdit::UpdateResource(, , 0x%X, , 0x%X)", wLanguage, cbData);
     if (!lpData || !File)
@@ -763,24 +763,22 @@ void CResDir::AddSize(CSaveRes* save)
     }
 }
 
-BOOL CResDir::AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, DWORD size)
+BOOL CResDir::AddResource(LPCWSTR type, LPCWSTR name, WORD language, void* data, DWORD size)
 {
     CALL_STACK_MESSAGE3("CResDir::AddResource(, , 0x%X, , 0x%X)", language, size);
     WCHAR* buf = NULL;
 
-    const char* n = type ? type : name;
+    const wchar_t* n = type ? type : name;
 
-    if ((DWORD)(DWORD_PTR)n & 0xFFFF0000)
+    if (!IS_INTRESOURCE(n))
     {
-        int len = lstrlen(n);
-        buf = (WCHAR*)malloc(2 * len + 2);
+        const size_t len = wcslen(n);
+        if (len > (SIZE_MAX / sizeof(wchar_t)) - 1)
+            return FALSE;
+        buf = static_cast<WCHAR*>(malloc((len + 1) * sizeof(wchar_t)));
         if (!buf)
             return FALSE;
-        if (!MultiByteToWideChar(CP_ACP, 0, n, -1, buf, len + 1))
-        {
-            free(buf);
-            return FALSE;
-        }
+        wmemcpy(buf, n, len + 1);
     }
 
     CDirEntry* entry;
@@ -790,7 +788,7 @@ BOOL CResDir::AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, D
     {
         entry = DirEntries[i];
 
-        if ((DWORD)(DWORD_PTR)n & 0xFFFF0000 && entry->ID == -1)
+        if (!IS_INTRESOURCE(n) && entry->ID == -1)
         {
             if (lstrcmpiW(buf, entry->Name) == 0)
             {
@@ -838,7 +836,7 @@ BOOL CResDir::AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, D
         }
     }
 
-    if (!entry->Node->AddResource(0, name, language, data, size))
+    if (!entry->Node->AddResource(NULL, name, language, data, size))
         return FALSE;
 
     return TRUE;
@@ -980,7 +978,7 @@ void CResTreeLeaf::AddSize(CSaveRes* save)
     save->AddDataDescrSize();
 }
 
-BOOL CResTreeLeaf::AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, DWORD size)
+BOOL CResTreeLeaf::AddResource(LPCWSTR type, LPCWSTR name, WORD language, void* data, DWORD size)
 {
     CALL_STACK_MESSAGE3("CResTreeLeaf::AddResource(, , 0x%X, , 0x%X)", language, size);
     if (Data)

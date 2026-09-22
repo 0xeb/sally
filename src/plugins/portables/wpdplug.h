@@ -19,7 +19,7 @@
 class CWpdPluginInterface : public CFxPluginInterface
 {
 private:
-    static const TCHAR c_szEnglishName[];
+    static const wchar_t c_szEnglishName[];
 
 public:
     CWpdPluginInterface()

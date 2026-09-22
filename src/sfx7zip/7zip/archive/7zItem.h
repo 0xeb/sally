@@ -57,7 +57,7 @@ typedef struct _CFileItem
   */
   CFileSize Size;
   UInt32 FileCRC;
-  char *Name;
+  wchar_t *Name;
 
   Byte IsFileCRCDefined;
   Byte HasStream;

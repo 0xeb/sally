@@ -1,4 +1,5 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -11,32 +12,39 @@
 
 #ifdef ENABLE_SH_MENU_EXT
 
-DWORD SalGetFileAttributes(const char* fileName)
+DWORD SalGetFileAttributesOwned(const wchar_t* fileName)
 {
-    int fileNameLen = (int)strlen(fileName);
-    char fileNameCopy[3 * MAX_PATH];
+    SIZE_T fileNameLen = (SIZE_T)lstrlenW(fileName);
     // if the path ends with a space/period we must append '\\', otherwise GetFileAttributes
     // trims the spaces/periods and works with a different path; with files it still does not
     // work, but it is better than retrieving attributes of another file/directory (for
     // "c:\\file.txt   " it works with the name "c:\\file.txt")
-    if (fileNameLen > 0 && (fileName[fileNameLen - 1] <= ' ' || fileName[fileNameLen - 1] == '.') &&
-        fileNameLen + 1 < _countof(fileNameCopy))
+    if (fileNameLen > 0 && (fileName[fileNameLen - 1] <= L' ' || fileName[fileNameLen - 1] == L'.') &&
+        fileNameLen <= (((SIZE_T)-1) / sizeof(wchar_t)) - 2)
     {
-        memcpy(fileNameCopy, fileName, fileNameLen);
-        fileNameCopy[fileNameLen] = '\\';
+        DWORD result;
+        wchar_t* fileNameCopy = (wchar_t*)GlobalAlloc(GMEM_FIXED, (fileNameLen + 2) * sizeof(wchar_t));
+        SIZE_T i;
+        if (fileNameCopy == NULL)
+            return INVALID_FILE_ATTRIBUTES;
+        for (i = 0; i < fileNameLen; i++)
+            fileNameCopy[i] = fileName[i];
+        fileNameCopy[fileNameLen] = L'\\';
         fileNameCopy[fileNameLen + 1] = 0;
-        return GetFileAttributes(fileNameCopy);
+        result = GetFileAttributesW(fileNameCopy);
+        GlobalFree(fileNameCopy);
+        return result;
     }
     else // a regular path, nothing to solve, just call the Windows GetFileAttributes
     {
-        return GetFileAttributes(fileName);
+        return GetFileAttributesW(fileName);
     }
 }
 
-BOOL IncFilesDirs(const char* path, int* files, int* dirs)
+BOOL IncFilesDirs(const wchar_t* path, int* files, int* dirs)
 {
-    DWORD attrs = SalGetFileAttributes(path);
-    if (attrs == 0xFFFFFFFF)
+    DWORD attrs = SalGetFileAttributesOwned(path);
+    if (attrs == INVALID_FILE_ATTRIBUTES)
         return FALSE;
 
     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
@@ -55,8 +63,6 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
                                  UINT uFlags)
 {
     UINT idCmd = idCmdFirst;
-
-    char buff[MAX_PATH];
 
     /*
   char buff1[1000];
@@ -84,8 +90,6 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
 
         FORMATETC formatEtc;
         STGMEDIUM stgMedium;
-        char path[MAX_PATH];
-
         formatEtc.cfFormat = CF_HDROP;
         formatEtc.ptd = NULL;
         formatEtc.dwAspect = DVASPECT_CONTENT;
@@ -103,34 +107,22 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
         {
             if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
             {
-                DROPFILES* data = (DROPFILES*)GlobalLock(stgMedium.hGlobal);
-                if (data != NULL)
+                HDROP drop = (HDROP)stgMedium.hGlobal;
+                UINT count = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0);
+                UINT itemIndex;
+                for (itemIndex = 0; itemIndex < count; itemIndex++)
                 {
-                    int l;
-                    if (data->fWide)
+                    UINT length = DragQueryFileW(drop, itemIndex, NULL, 0);
+                    if ((SIZE_T)length <= (((SIZE_T)-1) / sizeof(wchar_t)) - 1)
                     {
-                        const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        do
+                        wchar_t* path = (wchar_t*)GlobalAlloc(GMEM_FIXED, ((SIZE_T)length + 1) * sizeof(wchar_t));
+                        if (path != NULL)
                         {
-                            l = lstrlenW(fileW);
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            IncFilesDirs(path, &filesCount, &dirsCount);
-                            fileW += l + 1;
-                        } while (*fileW != 0);
+                            if (DragQueryFileW(drop, itemIndex, path, length + 1) == length)
+                                IncFilesDirs(path, &filesCount, &dirsCount);
+                            GlobalFree(path);
+                        }
                     }
-                    else
-                    {
-                        const char* fileA = ((char*)data) + data->pFiles;
-                        do
-                        {
-                            l = lstrlen(fileA);
-                            IncFilesDirs(fileA, &filesCount, &dirsCount);
-                            fileA += l + 1;
-                            filesCount++;
-                        } while (*fileA != 0);
-                    }
-                    GlobalUnlock(stgMedium.hGlobal);
                 }
             }
             ReleaseStgMedium(&stgMedium);
@@ -158,12 +150,11 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
                 (!iterator->LogicalAnd && ((iterator->OneFile == of) || (iterator->MoreFiles == mf) ||
                                            (iterator->OneDirectory == od) || (iterator->MoreDirectories == md))))
             {
-                lstrcpy(buff, iterator->Name);
-                InsertMenu(hTmpMenu,
-                           indexMenu++,
-                           MF_STRING | MF_BYPOSITION,
-                           idCmd++,
-                           buff);
+                InsertMenuW(hTmpMenu,
+                            indexMenu++,
+                            MF_STRING | MF_BYPOSITION,
+                            idCmd++,
+                            iterator->Name);
                 iterator->Cmd = index;
                 index++;
                 itemsCount++;
@@ -177,11 +168,11 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
         {
             if (itemsCount > 0)
             {
-                InsertMenu(hMenu,
-                           indexMenu,
-                           MF_POPUP | MF_BYPOSITION,
-                           (UINT_PTR)hTmpMenu,
-                           ShellExtConfigSubmenuName);
+                InsertMenuW(hMenu,
+                            indexMenu,
+                            MF_POPUP | MF_BYPOSITION,
+                            (UINT_PTR)hTmpMenu,
+                            ShellExtConfigSubmenuName);
             }
             else
             {

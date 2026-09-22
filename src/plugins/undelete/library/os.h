@@ -99,7 +99,9 @@ public:
     // volume mount point query
     static BOOL OS_GetVolumeNameForVolumeMountPointExists();
     static BOOL OS_GetVolumeNameForVolumeMountPoint(const CHAR* VolumeMountPoint,
-                                                    CHAR* VolumeName, DWORD BufferLength);
+                                                     CHAR* VolumeName, DWORD BufferLength);
+    static BOOL OS_GetVolumeNameForVolumeMountPointOwned(
+        const CHAR* volumeMountPoint, std::basic_string<CHAR>& volumeName);
 
     // volume enumeration
     static BOOL OS_VolumeEnumExists();
@@ -132,7 +134,6 @@ public:
     static DWORD OS_GetDriveFormFactor(const CHAR* drive);
 
     static void OS_GetDisplayNameFromSystem(const CHAR* root, CHAR* volumeName, int volumeNameBufSize);
-    static void OS_GetVolumeName(const CHAR* root, CHAR* volumeName);
     static BOOL OS_GetVolumeInfo(const CHAR* rootPathName, CHAR* volumeNameBuffer,
                                  DWORD volumeNameSize, DWORD* volumeSerialNumber,
                                  DWORD* maximumComponentLength, DWORD* fileSystemFlags,
@@ -159,19 +160,12 @@ BOOL OS<CHAR>::OS_InitLibraryData()
         return FALSE;
     OS_LoadImageResModule();
 
-    if (!String<char>::InitStr())
-        return FALSE;
-    if (!String<wchar_t>::InitStr())
-        return FALSE;
-
     return TRUE;
 }
 
 template <typename CHAR>
 void OS<CHAR>::OS_ReleaseLibraryData()
 {
-    String<char>::ReleaseStr();
-    String<wchar_t>::ReleaseStr();
     OS_FreeImageResModule();
     OS<CHAR>::OS_ReleaseShell32Bindings();
 }
@@ -180,7 +174,7 @@ template <typename CHAR>
 void OS<CHAR>::OS_LoadImageResModule()
 {
     if (IsWindowsVistaAndLater)
-        ImageResDLL = LoadLibraryExA("imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
+        ImageResDLL = LoadLibraryExW(L"imageres.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
 }
 
 template <typename CHAR>
@@ -195,12 +189,36 @@ void OS<CHAR>::OS_FreeImageResModule()
 
 template <typename CHAR>
 BOOL OS<CHAR>::OS_GetVolumeNameForVolumeMountPoint(const CHAR* VolumeMountPoint,
-                                                   CHAR* VolumeName, DWORD BufferLength)
+                                                    CHAR* VolumeName, DWORD BufferLength)
 {
     if (F_GetVolumeNameForVolumeMountPoint)
         return F_GetVolumeNameForVolumeMountPoint(VolumeMountPoint, VolumeName, BufferLength);
     else
         return FALSE;
+}
+
+template <typename CHAR>
+BOOL OS<CHAR>::OS_GetVolumeNameForVolumeMountPointOwned(
+    const CHAR* volumeMountPoint, std::basic_string<CHAR>& volumeName)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+    for (;;)
+    {
+        std::vector<CHAR> buffer(capacity, 0);
+        if (OS_GetVolumeNameForVolumeMountPoint(
+                volumeMountPoint, buffer.data(), static_cast<DWORD>(buffer.size())))
+        {
+            volumeName.assign(buffer.data());
+            return TRUE;
+        }
+        if (GetLastError() != ERROR_FILENAME_EXCED_RANGE || capacity > limit / 2)
+        {
+            volumeName.clear();
+            return FALSE;
+        }
+        capacity *= 2;
+    }
 }
 
 template <typename CHAR>
@@ -287,77 +305,9 @@ BOOL OS<CHAR>::OS_GetVolumePathNamesForVolumeName(const CHAR* VolumeName, CHAR* 
 }
 
 template <typename CHAR>
-void OS<CHAR>::OS_GetVolumeName(const CHAR* root, CHAR* volumeName)
-{
-    CALL_STACK_MESSAGE1("GetVolumeName(, )");
-    volumeName[0] = 0;
-    switch (OS_GetVolumeType(root))
-    {
-    case VT_DRIVE_REMOVABLE: // floppy disks, we will detect 3.5", 5.25", 8", or unknown
-    {
-        DWORD medium = OS_GetDriveFormFactor(root);
-        switch (medium)
-        {
-        case 350:
-            String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_FLOPPY350));
-            break;
-        case 525:
-            String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_FLOPPY525));
-            break;
-        case 800:
-            String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_FLOPPY800));
-            break;
-        default:
-        {
-            OS_GetDisplayNameFromSystem(root, volumeName, MAX_PATH);
-            if (volumeName[0] == 0)
-                String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_REMOVABLE_DISK));
-            else
-                SalamanderGeneral->DuplicateAmpersands(volumeName, MAX_PATH);
-            break;
-        }
-        }
-        break;
-    }
-
-    case VT_DRIVE_FIXED:
-    case VT_DRIVE_RAMDISK:
-    {
-        DWORD dummy;
-        CHAR fsName[MAX_PATH];
-        if (OS_GetVolumeInfo(root, volumeName, MAX_PATH, NULL, &dummy,
-                             &dummy, fsName, MAX_PATH))
-        {
-            // escape '&', so it doesn't display as underline
-            SalamanderGeneral->DuplicateAmpersands(volumeName, MAX_PATH);
-            if (volumeName[0] == 0)
-                String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_LOCAL_DISK));
-        }
-        else
-        {
-            volumeName[0] = 0;
-        }
-        break;
-    }
-
-    case VT_DRIVE_CDROM:
-    {
-        DWORD dummy;
-        CHAR fileSystem[11];
-        if (!OS_GetVolumeInfo(root, volumeName, MAX_PATH, NULL, &dummy, &dummy, fileSystem, 10))
-            volumeName[0] = 0; // error GetVolumeInformation
-        if (volumeName[0] == 0)
-            OS_GetDisplayNameFromSystem(root, volumeName, MAX_PATH);
-        if (volumeName[0] == 0)
-            String<CHAR>::StrCpy(volumeName, String<CHAR>::LoadStr(IDS_COMPACT_DISK));
-    }
-    }
-}
-
-template <typename CHAR>
 HICON OS<CHAR>::OS_GetDriveIcon(const CHAR* root, UINT type, BOOL accessible, BOOL large)
 {
-    CALL_STACK_MESSAGE5("GetDriveIcon(%s, %u, %d, %d)", root, type, accessible, large);
+    CALL_STACK_MESSAGE4("GetDriveIcon(, %u, %d, %d)", type, accessible, large);
     int id;
     if (IsWindowsVistaAndLater && ImageResDLL != NULL)
     {
@@ -385,11 +335,18 @@ HICON OS<CHAR>::OS_GetDriveIcon(const CHAR* root, UINT type, BOOL accessible, BO
         default:
         {
             id = 32;
-            if (type == DRIVE_FIXED && root[1] == TEXT(':'))
+            if (type == DRIVE_FIXED && root[1] == CHAR(':'))
             {
-                CPathBuffer win;
-                if (GetWindowsDirectoryA(win, win.Size()) && win[1] == ':' && CHAR(win[0]) == root[0])
-                    id = 36;
+                const UINT required = GetWindowsDirectoryW(NULL, 0);
+                if (required != 0)
+                {
+                    std::vector<wchar_t> win(static_cast<size_t>(required) + 1, L'\0');
+                    const UINT length = GetWindowsDirectoryW(win.data(),
+                                                             static_cast<UINT>(win.size()));
+                    if (length > 1 && length < win.size() && win[1] == L':' &&
+                        CHAR(win[0]) == root[0])
+                        id = 36;
+                }
             }
             break;
         }
@@ -426,7 +383,7 @@ HICON OS<CHAR>::OS_GetDriveIcon(const CHAR* root, UINT type, BOOL accessible, BO
             id = 9;
             break;
         }
-        return (HICON)LoadImage(GetModuleHandle(TEXT("shell32.dll")),
+        return (HICON)LoadImage(GetModuleHandleW(L"shell32.dll"),
                                 MAKEINTRESOURCE(id), IMAGE_ICON,
                                 large ? 32 : 16, //ICON_CX,
                                 large ? 32 : 16, //ICON_CY,
@@ -448,7 +405,7 @@ HICON OS<CHAR>::OS_GetEmptyRecycleBinIcon(BOOL large)
     }
     else
     {
-        return (HICON)LoadImage(GetModuleHandle(TEXT("shell32.dll")),
+        return (HICON)LoadImage(GetModuleHandleW(L"shell32.dll"),
                                 MAKEINTRESOURCE(32), IMAGE_ICON,
                                 large ? 32 : 16, //ICON_CX,
                                 large ? 32 : 16, //ICON_CY,
@@ -519,7 +476,7 @@ typedef struct _DOSDPB
 template <typename CHAR>
 DWORD OS<CHAR>::OS_GetDriveFormFactor(const CHAR* drive)
 {
-    CALL_STACK_MESSAGE2("GetDriveFormFactor(%s)", drive);
+    CALL_STACK_MESSAGE1("GetDriveFormFactor()");
     HANDLE h;
     DWORD dwRc = 0;
 
@@ -537,7 +494,7 @@ DWORD OS<CHAR>::OS_GetDriveFormFactor(const CHAR* drive)
         else if (letter >= 'A' && letter <= 'Z')
             iDrive = letter - 'A' + 1;
 
-        h = CreateFileA("\\\\.\\VWIN32", 0, 0, 0, 0, FILE_FLAG_DELETE_ON_CLOSE, 0);
+        h = CreateFileW(L"\\\\.\\VWIN32", 0, 0, 0, 0, FILE_FLAG_DELETE_ON_CLOSE, 0);
 
         if (h != INVALID_HANDLE_VALUE)
         {
@@ -586,17 +543,17 @@ DWORD OS<CHAR>::OS_GetDriveFormFactor(const CHAR* drive)
         // Base article Q115828 and in the "FLOPPY" SDK sample.
         if ((char)(drive[1]) == ':' && (char)(drive[2]) == '\\')
         {
-            char tsz[8];
-            sprintf(tsz, "\\\\.\\%c:", (char)(drive[0]));
-            h = HANDLES_Q(CreateFileA(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
+            std::wstring devicePath = L"\\\\.\\";
+            devicePath.push_back(static_cast<wchar_t>(drive[0]));
+            devicePath.push_back(L':');
+            h = HANDLES_Q(CreateFileW(devicePath.c_str(), 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
         }
         else
         {
-            CHAR tsz[100];
-            String<CHAR>::StrCpy(tsz, drive);
-            if ((char)(tsz[String<CHAR>::StrLen(tsz) - 1]) == '\\')
-                tsz[String<CHAR>::StrLen(tsz) - 1] = 0;
-            h = OS_CreateFile(const_cast<CHAR*>(drive), 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
+            std::basic_string<CHAR> devicePath(drive);
+            if (!devicePath.empty() && devicePath.back() == CHAR('\\'))
+                devicePath.pop_back();
+            h = OS_CreateFile(devicePath.c_str(), 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0);
         }
 
         if (h != INVALID_HANDLE_VALUE)

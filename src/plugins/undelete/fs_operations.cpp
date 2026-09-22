@@ -1,8 +1,10 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include "unicode/helpers.h" // step 12: WideToAnsi/AnsiToWide
 
 #include "undelete.rh"
 #include "undelete.rh2"
@@ -57,8 +59,8 @@ CPluginFSInterface::GetSupportedServices()
 CPluginFSInterface::CPluginFSInterface()
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::CPluginFSInterface()");
-    Path[0] = 0;
-    Root[0] = 0;
+    Path.clear();
+    Root.clear();
     CurrentDir = NULL;
     FatalError = FALSE;
     IsSnapshotValid = FALSE;
@@ -97,132 +99,178 @@ CPluginFSInterface::ReleaseObject(HWND parent)
         Volume.Close();
 }
 
-BOOL CPluginFSInterface::RootPathFromFull(const char* pluginFullPath, char* rootPath, size_t bufferSize)
+BOOL CPluginFSInterface::RootPathFromFull(const wchar_t* pluginFullPath, std::wstring& rootPath)
 {
-    CALL_STACK_MESSAGE2("CPluginFSInterface::SplitPluginPath(%s, , )", pluginFullPath);
+    CALL_STACK_MESSAGE1("CPluginFSInterface::SplitPluginPath(, , )");
 
-    strncpy_s(rootPath, bufferSize, pluginFullPath, _TRUNCATE);
+    if (pluginFullPath == NULL)
+        return FALSE;
+
+    rootPath.assign(pluginFullPath);
 
     // try looking for image file
     while (1)
     {
-        DWORD attribs = SalamanderGeneral->SalGetFileAttributes(rootPath);
+        DWORD attribs = SalamanderGeneral->SalGetFileAttributes(rootPath.c_str());
         if (INVALID_FILE_ATTRIBUTES != attribs &&
             !(attribs & FILE_ATTRIBUTE_DIRECTORY))
             // it's an existing file, use it as an image
             return TRUE;
 
         // strip one more part from the path
-        char* sep = strrchr(rootPath, '\\');
-        if (!sep)
+        const size_t separator = rootPath.find_last_of(L'\\');
+        if (separator == std::wstring::npos)
             break;
-        *sep = 0;
+        rootPath.erase(separator);
     }
 
     // now determine volume root
-    BOOL ret = GetVolumePathName(pluginFullPath, rootPath, (DWORD)bufferSize);
-    if (ret)
+    size_t capacity = wcslen(pluginFullPath) + 2;
+    for (;;)
     {
-        size_t len = strlen(rootPath);
-        if ('\\' != rootPath[len - 1])
+        if (capacity > (std::numeric_limits<DWORD>::max)())
         {
-            rootPath[len - 1] = '\\';
-            rootPath[len] = 0;
+            SetLastError(ERROR_FILENAME_EXCED_RANGE);
+            return FALSE;
         }
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        if (GetVolumePathNameW(pluginFullPath, buffer.data(), static_cast<DWORD>(buffer.size())))
+        {
+            std::wstring staged(buffer.data());
+            if (!staged.empty() && staged.back() != L'\\')
+                staged.push_back(L'\\');
+            rootPath.swap(staged);
+            return TRUE;
+        }
+        const DWORD error = GetLastError();
+        if (error != ERROR_INSUFFICIENT_BUFFER && error != ERROR_MORE_DATA &&
+            error != ERROR_FILENAME_EXCED_RANGE)
+            return FALSE;
+        if (capacity > (std::numeric_limits<size_t>::max)() / 2)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+        capacity *= 2;
     }
-    return ret;
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetRootPath(char* userPart)
+CPluginFSInterface::GetRootPath(CSalamanderStringBuffer* userPart)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::GetRootPath()");
-    lstrcpy(userPart, Root);
-    return TRUE;
+    return userPart != NULL && sally::plugin_abi::WriteStringBuffer(*userPart, Root);
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetCurrentPath(char* userPart)
+CPluginFSInterface::GetCurrentPath(CSalamanderStringBuffer* userPart)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::GetCurrentPath()");
-    strcpy(userPart, Path);
-    return TRUE;
+    return userPart != NULL && sally::plugin_abi::WriteStringBuffer(*userPart, Path);
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
+CPluginFSInterface::GetFullName(CFileData& file, int isDir,
+                                CSalamanderStringBuffer* fullNameBuffer)
 {
-    CALL_STACK_MESSAGE3("CPluginFSInterface::GetFullName(, %d, , %d)", isDir, bufSize);
-    lstrcpyn(buf, Path, bufSize); // if path doesn't fit, name doesn't fit too (report error)
+    CALL_STACK_MESSAGE2("CPluginFSInterface::GetFullName(, %d, )", isDir);
+    std::wstring fullName(Path);
     if (isDir == 2)
-        return SalamanderGeneral->CutDirectory(buf, NULL); // up-dir
+    {
+        const size_t separator = fullName.find_last_of(L'\\');
+        if (separator == std::wstring::npos)
+            return FALSE;
+        fullName.erase(separator);
+    }
     else
-        return SalamanderGeneral->SalPathAppend(buf, file.Name, bufSize);
+    {
+        if (!fullName.empty() && fullName.back() != L'\\')
+            fullName.push_back(L'\\');
+        fullName.append(file.Name);
+    }
+    return fullNameBuffer != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*fullNameBuffer, fullName);
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success)
+CPluginFSInterface::GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                  CSalamanderStringBuffer* path, BOOL& success)
 {
+    success = FALSE;
     return FALSE;
 }
 
 BOOL WINAPI
-CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                  const wchar_t* userPart)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterface::IsCurrentPath(%d, %d, %s)",
-                        currentFSNameIndex, fsNameIndex, userPart);
-    return currentFSNameIndex == fsNameIndex && SalamanderGeneral->IsTheSamePath(Path, userPart);
+    CALL_STACK_MESSAGE3("CPluginFSInterface::IsCurrentPath(%d, %d, )",
+                        currentFSNameIndex, fsNameIndex);
+    return currentFSNameIndex == fsNameIndex &&
+           SalamanderGeneral->IsTheSamePath(Path.c_str(), userPart);
 }
 
 extern BOOL WantReconnect; // defined in fs1.cpp
 
 BOOL WINAPI
-CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+CPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                              const wchar_t* userPart)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterface::IsOurPath(%d, %d, %s)",
-                        currentFSNameIndex, fsNameIndex, userPart);
+    CALL_STACK_MESSAGE3("CPluginFSInterface::IsOurPath(%d, %d, )",
+                        currentFSNameIndex, fsNameIndex);
     if (WantReconnect)
         return FALSE; // user wants new connection
-    CPathBuffer buffer; // Heap-allocated for long path support
-    if (!RootPathFromFull(userPart, buffer, buffer.Size()))
+    std::wstring rootPath;
+    if (!RootPathFromFull(userPart, rootPath))
         return FALSE;
-    if (SalamanderGeneral->IsTheSamePath(Root, buffer))
+    if (SalamanderGeneral->IsTheSamePath(Root.c_str(), rootPath.c_str()))
         return TRUE;
     return FALSE;
 }
 
 // function for comparing file names (initial '$' equals to 0xE5)
-int namecmp(char* name1, char* name2)
+int namecmp(const wchar_t* name1, const wchar_t* name2)
 {
     CALL_STACK_MESSAGE_NONE
     // CALL_STACK_MESSAGE1("namecmp(, )");
-    if ((name1[0] == '$' && name2[0] == 0xE5) || (name1[0] == 0xE5 && name2[0] == '$'))
-        return _stricmp(name1 + 1, name2 + 1);
-    return _stricmp(name1, name2);
+    if ((name1[0] == L'$' && name2[0] == 0xE5) || (name1[0] == 0xE5 && name2[0] == L'$'))
+        return _wcsicmp(name1 + 1, name2 + 1);
+    return _wcsicmp(name1, name2);
 }
 
-void CPluginFSInterface::Replace0xE5(char* filename)
+void CPluginFSInterface::Replace0xE5(wchar_t* filename)
 {
     CALL_STACK_MESSAGE_NONE
     // CALL_STACK_MESSAGE1("CPluginFSInterface::Replace0xE5()");
+    // step 12: identical byte-0xE5/0x05-marker convention as the
+    // char version (see gtest_undelete_fat_engine_narrowing_bug.cpp's step-6/7 analysis) -
+    // this is a numeric marker at index 0, not a text-encoding operation, so it applies
+    // unchanged to a wchar_t buffer.
     if (filename[0] == 0xE5)
-        filename[0] = '$';
+        filename[0] = L'$';
     else if (filename[0] == 0x05)
         filename[0] = 0xE5; // there is E5 support in Kanji
 }
 
 #define PATHSEP "\\/"
+#define PATHSEPW L"\\/"
 
 HWND HProgressDlg = NULL;
 
 BOOL WINAPI
-CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                               const char* userPart, char* cutFileName, BOOL* pathWasCut,
+CPluginFSInterface::ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                               int fsNameIndex, const wchar_t* userPart,
+                               CSalamanderStringBuffer* cutFileName, BOOL* pathWasCut,
                                BOOL forceRefresh, int mode)
 {
-    CALL_STACK_MESSAGE6("CPluginFSInterface::ChangePath(%d, , %d, %s, , , %d, %d)",
-                        currentFSNameIndex, fsNameIndex, userPart, forceRefresh,
+    CALL_STACK_MESSAGE5("CPluginFSInterface::ChangePath(%d, , %d, , , , %d, %d)",
+                        currentFSNameIndex, fsNameIndex, forceRefresh,
                         mode);
+
+    std::wstring fsNameValue;
+    if (fsName == NULL || !sally::plugin_abi::ReadStringBuffer(*fsName, fsNameValue))
+        return FALSE;
+    (void)fsNameValue;
 
     if (forceRefresh)
         IsSnapshotValid = FALSE;
@@ -235,8 +283,9 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
     if (pathWasCut != NULL)
         *pathWasCut = FALSE;
-    if (cutFileName != NULL)
-        *cutFileName = 0;
+    if (cutFileName != NULL &&
+        !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+        return FALSE;
     if (FatalError)
     {
         FatalError = FALSE;
@@ -244,9 +293,9 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     }
 
     // determine the device to open
-    if (!RootPathFromFull(userPart, Root, Root.Size()))
-        return String<char>::Error(IDS_UNDELETE, IDS_PATHDISK);
-    strcpy(Path, Root);
+    if (!RootPathFromFull(userPart, Root))
+        return String<wchar_t>::Error(IDS_UNDELETE, IDS_PATHDISK);
+    Path = Root;
     CurrentDir = NULL;
 
     // read snapshot
@@ -257,7 +306,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         HWND mainwnd = SalamanderGeneral->GetMainWindowHWND();
         CSnapshotProgressDlg dlg(mainwnd, ooStatic);
         if (dlg.Create() == NULL)
-            return String<char>::SysError(IDS_UNDELETE, IDS_ERROROPENINGPROGRESS);
+            return String<wchar_t>::SysError(IDS_UNDELETE, IDS_ERROROPENINGPROGRESS);
         EnableWindow(mainwnd, FALSE);
         HProgressDlg = dlg.HWindow; // redirect message box parent
         SetForegroundWindow(dlg.HWindow);
@@ -265,7 +314,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         if (!Volume.IsOpen())
         {
             dlg.SetProgressText(IDS_OPENINGVOLUME);
-            ret = Volume.Open(Root);
+            ret = Volume.Open(Root.c_str());
         }
 
 #ifdef TRACE_ENABLE
@@ -279,13 +328,13 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                 switch (Volume.Type)
                 {
                 case vtNTFS:
-                    Snapshot = new CMFTSnapshot<char>(&Volume);
+                    Snapshot = new CMFTSnapshot<wchar_t>(&Volume);
                     break;
                 case vtFAT:
-                    Snapshot = new CFATSnapshot<char>(&Volume);
+                    Snapshot = new CFATSnapshot<wchar_t>(&Volume);
                     break;
                 case vtExFAT:
-                    Snapshot = new CExFATSnapshot<char>(&Volume);
+                    Snapshot = new CExFATSnapshot<wchar_t>(&Volume);
                     break;
                 default:
                     ret = FALSE;
@@ -294,7 +343,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             if (ret)
             {
                 if (Snapshot == NULL)
-                    ret = String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+                    ret = String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
                 else
                 {
                     // invalidate original state of the snapshot and release it, calling Update() will destroy snapshot data,
@@ -325,34 +374,38 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
 
     // walk through all path components, also moving in directories structure
     CurrentDir = Snapshot->Root;
-    // we will cut path to individual parts
-    CPathBuffer temp; // Heap-allocated for long path support
-    if (strlen(userPart) > strlen(Root))
-        lstrcpyn(temp, userPart + strlen(Root), temp.Size());
-    else
-        *temp = 0;
-    char* component = strtok(temp, PATHSEP);
-    while (component != NULL)
+    const size_t rootLength = Root.size();
+    const std::wstring remaining = wcslen(userPart) > rootLength ?
+                                       std::wstring(userPart + rootLength) :
+                                       std::wstring();
+    size_t componentStart = remaining.find_first_not_of(PATHSEPW);
+    while (componentStart != std::wstring::npos)
     {
+        const size_t componentEnd = remaining.find_first_of(PATHSEPW, componentStart);
+        const std::wstring component = remaining.substr(
+            componentStart, componentEnd == std::wstring::npos ? std::wstring::npos :
+                                                               componentEnd - componentStart);
         // is on current path object with given name?
         int numitems = CurrentDir->NumDirItems;
         int i;
         for (i = 0; i < numitems; i++)
         {
-            DIR_ITEM_I<char>* di = &CurrentDir->DirItems[i];
-            if (!namecmp(di->FileName->FNName, component))
+            DIR_ITEM_I<wchar_t>* di = &CurrentDir->DirItems[i];
+            if (!namecmp(di->FileName->FNName, component.c_str()))
             {
                 if (di->Record->IsDir) // yes, it is direcotry
                 {
-                    SalamanderGeneral->SalPathAppend(Path, component, Path.Size());
+                    SPLSalPathAppendOwned(Path, component.c_str());
                     CurrentDir = di->Record;
                 }
                 else // it is file
                 {
-                    if (cutFileName != NULL)
-                        lstrcpyn(cutFileName, di->FileName->FNName, MAX_PATH);
+                    if (cutFileName != NULL &&
+                        !sally::plugin_abi::WriteStringBuffer(
+                            *cutFileName, std::wstring(di->FileName->FNName)))
+                        return FALSE;
                     if (mode < 3)
-                        return !String<char>::Error(IDS_UNDELETE, IDS_PATHFILE);
+                        return !String<wchar_t>::Error(IDS_UNDELETE, IDS_PATHFILE);
                 }
                 break;
             }
@@ -365,12 +418,12 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             // originally here was mode > 1 but I received messages when connecting from directory
             // where are no deleted files (so path doesn't point there)
             if (mode == 3)
-                String<char>::Error(IDS_UNDELETE, IDS_PATHNOTFOUND);
+                String<wchar_t>::Error(IDS_UNDELETE, IDS_PATHNOTFOUND);
             return mode != 3;
         }
 
-        // nect component
-        component = strtok(NULL, PATHSEP);
+        componentStart = componentEnd == std::wstring::npos ? std::wstring::npos :
+                                                               remaining.find_first_not_of(PATHSEPW, componentEnd);
     }
 
     return TRUE;
@@ -425,7 +478,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
     {
         fd.Attr = FILE_ATTRIBUTE_DIRECTORY;
         fd.LastWrite = CurrentDir->TimeLastWrite;
-        fd.Name = SalamanderGeneral->DupStr("..");
+        fd.Name = SalamanderGeneral->DupStr(L"..");
         fd.NameLen = 2;
         fd.Ext = fd.Name + fd.NameLen;
         fd.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
@@ -439,12 +492,12 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
     // list all files on path where points CurrentDir
     for (i = 0; i < CurrentDir->NumDirItems; i++)
     {
-        DIR_ITEM_I<char>* di = &CurrentDir->DirItems[i];
+        DIR_ITEM_I<wchar_t>* di = &CurrentDir->DirItems[i];
         fd.Attr = di->Record->Attr;
         fd.LastWrite = di->Record->TimeLastWrite;
 
         fd.Size = CQuadWord(0, 0);
-        DATA_STREAM_I<char>* stream = di->Record->Streams;
+        DATA_STREAM_I<wchar_t>* stream = di->Record->Streams;
         while (stream != NULL && stream->DSName != NULL)
             stream = stream->DSNext; // find default stream
         if (stream != NULL)
@@ -454,10 +507,10 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
         if (fd.Name == NULL)
         {
             FatalError = TRUE;
-            return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+            return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
         }
         Replace0xE5(fd.Name);
-        fd.NameLen = strlen(fd.Name);
+        fd.NameLen = (int)wcslen(fd.Name);
         fd.Ext = fd.Name + fd.NameLen;
 
         if (di->FileName->DOSName)
@@ -466,7 +519,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
             if (fd.DosName == NULL)
             {
                 FatalError = TRUE;
-                return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+                return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
             }
             Replace0xE5(fd.DosName);
         }
@@ -477,7 +530,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
 
         if (sortByExtDirsAsFiles || !di->Record->IsDir)
         {
-            char* s = strrchr(fd.Name, '.');
+            wchar_t* s = wcsrchr(fd.Name, L'.');
             if (s != NULL)
                 fd.Ext = s + 1; // ".cvspass" is extension in Windows
         }
@@ -528,23 +581,23 @@ CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
 }
 
 BOOL WINAPI
-CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+CPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterface::GetNextDirectoryLineHotPath(%s, %d, "
+    CALL_STACK_MESSAGE3("CPluginFSInterface::GetNextDirectoryLineHotPath(, %d, "
                         "%d)",
-                        text, pathLen, offset);
+                        pathLen, offset);
     if (offset == 0)
     {
-        while (offset < pathLen && text[offset] != ':')
+        while (offset < pathLen && text[offset] != L':')
             offset++;                                                      // skip FS name
-        if (offset < pathLen && offset + 1 + (int)strlen(Root) <= pathLen) // always true
-            offset = offset + 1 + (int)strlen(Root);
+        if (offset < pathLen && offset + 1 + (int)Root.size() <= pathLen) // always true
+            offset = offset + 1 + (int)Root.size();
     }
     else
     {
-        while (offset < pathLen && text[offset] != '\\')
+        while (offset < pathLen && text[offset] != L'\\')
             offset++;
-        if (offset > 0 && text[offset - 1] == ':')
+        if (offset > 0 && text[offset - 1] == L':')
             offset++;
     }
     return offset < pathLen;
@@ -557,8 +610,8 @@ CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, i
 
 struct FL_ITEM
 {
-    char* Name;
-    FILE_RECORD_I<char>* Record;
+    wchar_t* Name;
+    FILE_RECORD_I<wchar_t>* Record;
 
     FL_ITEM()
     {
@@ -572,20 +625,20 @@ class CFileList : public TIndirectArray<FL_ITEM>
 {
 public:
     CFileList() : TIndirectArray<FL_ITEM>(256, 256, dtDelete) {}
-    BOOL AddFile(DIR_ITEM_I<char>* di);
+    BOOL AddFile(DIR_ITEM_I<wchar_t>* di);
     BOOL RenameDuplicateFiles();
 };
 
-BOOL CFileList::AddFile(DIR_ITEM_I<char>* di)
+BOOL CFileList::AddFile(DIR_ITEM_I<wchar_t>* di)
 {
     CALL_STACK_MESSAGE1("CFileList::AddFile( )");
 
     FL_ITEM* item = new FL_ITEM;
     if (item == NULL)
-        return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+        return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
     item->Name = SalamanderGeneral->DupStr(di->FileName->FNName);
     if (item->Name == NULL)
-        return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+        return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
     item->Record = di->Record;
 
     Add(item);
@@ -594,7 +647,7 @@ BOOL CFileList::AddFile(DIR_ITEM_I<char>* di)
 
 static int compare_items(const void* elem1, const void* elem2)
 {
-    return _stricmp((*((FL_ITEM**)elem1))->Name, (*((FL_ITEM**)elem2))->Name);
+    return _wcsicmp((*((FL_ITEM**)elem1))->Name, (*((FL_ITEM**)elem2))->Name);
 }
 
 BOOL CFileList::RenameDuplicateFiles()
@@ -608,7 +661,7 @@ BOOL CFileList::RenameDuplicateFiles()
     for (int i = 0; i < Count - 1; i++)
     {
         int j = i;
-        while (j + 1 < Count && !_stricmp(operator[](i)->Name, operator[](j + 1)->Name))
+        while (j + 1 < Count && !_wcsicmp(operator[](i)->Name, operator[](j + 1)->Name))
             j++;
 
         if (j > i)
@@ -616,9 +669,9 @@ BOOL CFileList::RenameDuplicateFiles()
             for (int k = i, n = 1; k <= j; k++)
             {
                 FL_ITEM* item = operator[](k);
-                char* newname = String<char>::AddNumberSuffix(item->Name, n++);
+                wchar_t* newname = String<wchar_t>::AddNumberSuffix(item->Name, n++);
                 if (newname == NULL)
-                    return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+                    return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
                 delete[] item->Name;
                 item->Name = newname;
             }
@@ -634,56 +687,44 @@ BOOL CFileList::RenameDuplicateFiles()
 //  CopyOrMoveFromFS
 //
 
-BOOL CPluginFSInterface::AppendPath(char* buffer, char* path, char* name, BOOL* ret)
+BOOL CPluginFSInterface::AppendPath(std::wstring& buffer, const wchar_t* path, const wchar_t* name, BOOL* ret)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::AppendPath(, , , )");
-    // join the path and name and check the length
-    lstrcpyn(buffer, path, MAX_PATH);
-    if (!SalamanderGeneral->SalPathAppend(buffer, name, MAX_PATH))
-    {
-        *ret = TRUE;
-        if (!SkipAllLongPaths)
-        {
-            switch (SalamanderGeneral->DialogError(hErrParent, BUTTONS_SKIPCANCEL, name,
-                                                   String<char>::LoadStr(IDS_PATHTOOLONG), NULL))
-            {
-            case DIALOG_SKIPALL:
-                SkipAllLongPaths = TRUE;
-            case DIALOG_SKIP:
-                break;
-            case DIALOG_CANCEL:
-                *ret = FALSE;
-            }
-        }
-        return FALSE;
-    }
+    buffer = path != NULL ? path : L"";
+    SPLSalPathAppendOwned(buffer, name);
     return TRUE;
 }
 
-char* CPluginFSInterface::FixDamagedName(char* name)
+const wchar_t* CPluginFSInterface::FixDamagedName(wchar_t* name)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::FixDamagedName()");
 
     if (name[0] != 0xE5)
         return name;
 
-    static CPathBuffer buffer;
-    lstrcpyn(buffer, name, buffer.Size());
+    try
+    {
+        DamagedName = name;
+    }
+    catch (...)
+    {
+        return NULL;
+    }
     if (AllSubstChar)
     {
-        buffer[0] = AllSubstChar;
-        return buffer;
+        DamagedName[0] = AllSubstChar;
+        return DamagedName.c_str();
     }
 
-    Replace0xE5(buffer);
+    Replace0xE5(DamagedName.data());
     if (Progress)
-        Progress->SetSourceFileName(buffer);
-    CFileNameDialog dlg(hErrParent, buffer);
+        Progress->SetSourceFileName(DamagedName.c_str());
+    CFileNameDialog dlg(hErrParent, DamagedName);
     if (dlg.Execute())
     {
-        if (dlg.AllPressed && !strcmp(buffer + 1, name + 1))
-            AllSubstChar = buffer[0];
-        return buffer;
+        if (dlg.AllPressed && !wcscmp(DamagedName.c_str() + 1, name + 1))
+            AllSubstChar = DamagedName[0];
+        return DamagedName.c_str();
     }
     else
     {
@@ -704,7 +745,14 @@ static BOOL WINAPI EncryptedProgress(int inc, void* ctx)
         return SalamanderGeneral->GetSafeWaitWindowClosePressed();
 }
 
-char* GetSCFData(FILETIME* lastWrite, CQuadWord& size)
+// widened: this is a pure display-string formatter (date/time/
+// size for a SafeFileCreate progress prompt), not part of the raw FAT-recovery byte
+// engine below - no dependency on the retired narrow record instantiation or on-disk bytes. Widened so
+// restore.cpp's RestoreFile can feed it straight to SafeFileCreate's wide-only
+// srcFileInfo parameter without a lossy narrow round-trip. fs_operations.cpp's own
+// (still-narrow, untouched) CopyFile caller at its SafeFileCreate call site remains
+// blocked by its other narrow arguments regardless of this function's return type.
+std::wstring GetSCFData(FILETIME* lastWrite, const CQuadWord& size)
 {
     CALL_STACK_MESSAGE1("GetSCFData( , )");
     SYSTEMTIME st;
@@ -712,60 +760,59 @@ char* GetSCFData(FILETIME* lastWrite, CQuadWord& size)
     FileTimeToLocalFileTime(lastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    static char buffer[200];
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
-
-    return buffer;
+    wchar_t date[50], time[50];
+    if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+        swprintf(time, 50, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+        swprintf(date, 50, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, size);
+    return SPLFormatStringOwned(L"%ls, %ls, %ls", number.c_str(), date, time);
 }
 
-BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, char* targetPath, BOOL view, int* incompleteFileAnswer)
+BOOL CPluginFSInterface::CopyFileRecord(FILE_RECORD_I<wchar_t>* record, wchar_t* filename, const wchar_t* targetPath, BOOL view, int* incompleteFileAnswer)
 {
-    CALL_STACK_MESSAGE2("CPluginFSInterface::CopyFile(, , %d)", view);
+    CALL_STACK_MESSAGE2("CPluginFSInterface::CopyFileRecord(, , %d)", view);
 
     BOOL ret;
-    CPathBuffer path; // Heap-allocated for long path support
-    int oldlen;
+    std::wstring path;
+    size_t oldlen;
 
     if (!view)
     {
         // print source path to dialog box
-        oldlen = (int)strlen(SourcePath);
-        SalamanderGeneral->SalPathAddBackslash(SourcePath, SourcePath.Size());
-        char* namepos = SourcePath + strlen(SourcePath);
-        SalamanderGeneral->SalPathAppend(SourcePath, filename, SourcePath.Size());
-        Replace0xE5(namepos);
-        Progress->SetSourceFileName(SourcePath);
+        oldlen = SourcePath.size();
+        SPLSalPathAddBackslashOwned(SourcePath);
+        const size_t namepos = SourcePath.size();
+        SPLSalPathAppendOwned(SourcePath, filename);
+        Replace0xE5(SourcePath.data() + namepos);
+        Progress->SetSourceFileName(SourcePath.c_str());
 
         // fix name if needed
-        char* name = FixDamagedName(filename);
+        const wchar_t* name = FixDamagedName(filename);
         if (name == NULL)
             return FALSE;
-        lstrcpyn(namepos, name, SourcePath.Size() - (int)(namepos - (char*)SourcePath));
+        SourcePath.resize(namepos);
+        SourcePath.append(name);
 
         // make target path
         if (!AppendPath(path, targetPath, name, &ret))
         {
-            SourcePath[oldlen] = 0;
+            SourcePath.resize(oldlen);
             return ret;
         }
     }
     else
     {
         // for view it is simple
-        lstrcpyn(path, targetPath, path.Size());
-        lstrcpyn(SourcePath, filename, SourcePath.Size());
+        path = targetPath;
+        SourcePath = filename;
         oldlen = 0;
     }
 
     // allocate buffer
     BYTE* buffer = new BYTE[COPY_BUFFER];
     if (buffer == NULL)
-        return String<char>::Error(IDS_UNDELETE, IDS_LOWMEM);
+        return String<wchar_t>::Error(IDS_UNDELETE, IDS_LOWMEM);
     int bufclusters = COPY_BUFFER / Volume.BytesPerCluster;
 
     // init progress
@@ -774,15 +821,15 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     TotalProgress++;
     UpdateProgress();
     if (Progress)
-        Progress->SetDestFileName(path);
+        Progress->SetDestFileName(path.c_str());
 
     // extract all streams
-    char* pathend = path + strlen(path);
+    const size_t pathend = path.size();
 
     // we want to copy file stream (no ADS streams) first
     // otherwise file overwrite test will be broken beacuse with ADS will be also created base file
-    TDirectArray<DATA_STREAM_I<char>*> copyStreams(10, 10);
-    DATA_STREAM_I<char>* stream = record->Streams;
+    TDirectArray<DATA_STREAM_I<wchar_t>*> copyStreams(10, 10);
+    DATA_STREAM_I<wchar_t>* stream = record->Streams;
     while (stream != NULL)
     {
         if (stream->DSName != NULL)
@@ -798,13 +845,14 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     for (int streamIndex = 0; streamIndex < copyStreams.Count && ret; streamIndex++)
     {
         stream = copyStreams[streamIndex];
+        path.resize(pathend);
         if (encrypted)
         {
             // append .bak when backuping encrypted files
             if (BackupEncryptedFiles)
             {
-                lstrcpyn(pathend, ".bak", MAX_PATH);
-                strcat(SourcePath, ".bak");
+                path.append(L".bak");
+                SourcePath.append(L".bak");
             }
         }
         else
@@ -812,11 +860,9 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
             // append stream names
             if (stream->DSName != NULL)
             {
-                *pathend = ':';
-                lstrcpyn(pathend + 1, stream->DSName, MAX_PATH - 1);
+                path.push_back(L':');
+                path.append(stream->DSName);
             }
-            else
-                *pathend = 0;
         }
 
         // create file
@@ -825,10 +871,12 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
         DWORD attr = record->Attr;
         if (view || encrypted)
             attr &= FILE_ATTRIBUTE_NORMAL;
+        const std::wstring sourceInfo = GetSCFData(
+            &record->TimeLastWrite, CQuadWord().SetUI64(stream->DSSize));
         HANDLE result = SalamanderSafeFile->SafeFileCreate(
-            path, GENERIC_WRITE, FILE_SHARE_READ,
-            attr, FALSE, hErrParent, SourcePath,
-            GetSCFData(&record->TimeLastWrite, CQuadWord().SetUI64(stream->DSSize)),
+            path.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+            attr, FALSE, hErrParent, SourcePath.c_str(),
+            sourceInfo.c_str(),
             &SilentMask, TRUE, &skipped, NULL, 0, NULL, &file);
         if (skipped)
         {
@@ -849,7 +897,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
         // extract data
         if (encrypted) // encrypted file
         {
-            EFIC_CONTEXT<char> ctx(&Volume, record->Streams, buffer, COPY_BUFFER, EncryptedProgress, (void*)this);
+            EFIC_CONTEXT<wchar_t> ctx(&Volume, record->Streams, buffer, COPY_BUFFER, EncryptedProgress, (void*)this);
 
             if (BackupEncryptedFiles)
             {
@@ -860,13 +908,13 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
                 {
                     length = 5000;
                     DWORD result2;
-                    if ((result2 = EFIC_CONTEXT<char>::EncryptedFileImportCallback(buffer2, (PVOID)&ctx, &length)) != ERROR_SUCCESS ||
+                    if ((result2 = EFIC_CONTEXT<wchar_t>::EncryptedFileImportCallback(buffer2, (PVOID)&ctx, &length)) != ERROR_SUCCESS ||
                         length && !SalamanderSafeFile->SafeFileWrite(&file, buffer2, length, &numw, hErrParent, BUTTONS_RETRYCANCEL, NULL, NULL))
                     {
                         if (result2 != ERROR_SUCCESS)
                         {
                             SetLastError(result2);
-                            String<char>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED);
+                            String<wchar_t>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED);
                         }
                         ret = FALSE;
                         break;
@@ -882,14 +930,14 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
 
                 PVOID context;
                 DWORD result2;
-                if ((result2 = OpenEncryptedFileRaw(path, CREATE_FOR_IMPORT, &context)) != ERROR_SUCCESS ||
-                    (result2 = WriteEncryptedFileRaw((PFE_IMPORT_FUNC)(EFIC_CONTEXT<char>::EncryptedFileImportCallback), (PVOID)&ctx, context)) != ERROR_SUCCESS)
+                if ((result2 = OpenEncryptedFileRawW(path.c_str(), CREATE_FOR_IMPORT, &context)) != ERROR_SUCCESS ||
+                    (result2 = WriteEncryptedFileRaw((PFE_IMPORT_FUNC)(EFIC_CONTEXT<wchar_t>::EncryptedFileImportCallback), (PVOID)&ctx, context)) != ERROR_SUCCESS)
                 // WriteEncryptedFileRaw is SLOOOOOW!!!
                 {
                     if (result2 != ERROR_INVALID_PARAMETER) // return on user cancel
                     {
                         SetLastError(result2);
-                        String<char>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED);
+                        String<wchar_t>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED);
                     }
                     ret = FALSE;
                 }
@@ -899,13 +947,13 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
             // set time and attributes
             if (ret)
             {
-                HANDLE hf = CreateFile(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+                HANDLE hf = CreateFileW(path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
                 if (hf != INVALID_HANDLE_VALUE)
                 {
                     SetFileTime(hf, &record->TimeCreation, &record->TimeLastAccess, &record->TimeLastWrite);
                     CloseHandle(hf);
                 }
-                SetFileAttributes(path, view ? FILE_ATTRIBUTE_ENCRYPTED : record->Attr);
+                SetFileAttributesW(path.c_str(), view ? FILE_ATTRIBUTE_ENCRYPTED : record->Attr);
             }
         }
         else
@@ -913,7 +961,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
             if (stream->DSSize != 0) // ordinary file
             {
                 DWORD numw;
-                CStreamReader<char> reader;
+                CStreamReader<wchar_t> reader;
                 reader.Init(&Volume, stream); // fixme: return value
                 QWORD bytesleft = stream->DSSize;
                 QWORD clustersleft = (bytesleft - 1) / Volume.BytesPerCluster + 1;
@@ -934,8 +982,8 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
                             if (*incompleteFileAnswer == -1)
                             {
                                 BOOL sameAnswerNextTime = FALSE;
-                                dlgRet = String<char>::PartialRestore(view ? -1 : IDS_PARTIALRECOVER_DONTASK, view ? NULL : &sameAnswerNextTime,
-                                                                      IDS_UNDELETE, IDS_PARTIALRECOVER, filename);
+                                dlgRet = String<wchar_t>::PartialRestore(view ? -1 : IDS_PARTIALRECOVER_DONTASK, view ? NULL : &sameAnswerNextTime,
+                                                                        IDS_UNDELETE, IDS_PARTIALRECOVER, filename);
                                 if (!view && sameAnswerNextTime && (dlgRet == DIALOG_YES || dlgRet == DIALOG_NO))
                                     *incompleteFileAnswer = dlgRet;
                             }
@@ -951,7 +999,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
                         }
                         else
                         {
-                            String<char>::Error(IDS_UNDELETE, IDS_ERRORRECOVER, filename);
+                            String<wchar_t>::Error(IDS_UNDELETE, IDS_ERRORRECOVER, filename);
                             ret = FALSE;
                             break;
                         }
@@ -992,39 +1040,39 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     // remove file on error
     if (!ret && deleteTargetOnError)
     {
-        *pathend = 0;
-        SalamanderGeneral->ClearReadOnlyAttr(path);
-        DeleteFile(path);
+        path.resize(pathend);
+        SalamanderGeneral->ClearReadOnlyAttr(path.c_str());
+        DeleteFileW(path.c_str());
     }
 
-    SourcePath[oldlen] = 0;
+    SourcePath.resize(oldlen);
     delete[] buffer;
     return ret;
 }
 
-BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<char>* record, char* filename, char* targetPath)
+BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<wchar_t>* record, wchar_t* filename, const wchar_t* targetPath)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::CopyDir(, )");
 
     // print source path to the dialog box
-    int oldlen = (int)strlen(SourcePath);
-    SalamanderGeneral->SalPathAddBackslash(SourcePath, SourcePath.Size());
-    char* namepos = SourcePath + strlen(SourcePath);
-    SalamanderGeneral->SalPathAppend(SourcePath, filename, SourcePath.Size());
-    Replace0xE5(namepos);
-    Progress->SetSourceFileName(SourcePath);
+    const size_t oldlen = SourcePath.size();
+    SPLSalPathAddBackslashOwned(SourcePath);
+    const size_t namepos = SourcePath.size();
+    SPLSalPathAppendOwned(SourcePath, filename);
+    Replace0xE5(SourcePath.data() + namepos);
+    Progress->SetSourceFileName(SourcePath.c_str());
 
     // fix name if needed
-    char* name = FixDamagedName(filename);
+    const wchar_t* name = FixDamagedName(filename);
     if (name == NULL)
         return FALSE;
 
     // make target path
-    CPathBuffer path; // Heap-allocated for long path support
+    std::wstring path;
     BOOL ret;
     if (!AppendPath(path, targetPath, name, &ret))
     {
-        SourcePath[oldlen] = 0;
+        SourcePath.resize(oldlen);
         return ret;
     }
 
@@ -1034,11 +1082,11 @@ BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<char>* record, char* filename, ch
     FileTotal = 1;
     TotalProgress++;
     UpdateProgress();
-    Progress->SetDestFileName(path);
-    if (SalamanderSafeFile->SafeFileCreate(path, 0, 0, 0, TRUE, hErrParent, NULL, NULL,
+    Progress->SetDestFileName(path.c_str());
+    if (SalamanderSafeFile->SafeFileCreate(path.c_str(), 0, 0, 0, TRUE, hErrParent, NULL, NULL,
                                            &SilentMask, TRUE, &skipped, NULL, 0, NULL, NULL) == INVALID_HANDLE_VALUE)
     {
-        SourcePath[oldlen] = 0;
+        SourcePath.resize(oldlen);
         return skipped;
     }
 
@@ -1049,17 +1097,17 @@ BOOL CPluginFSInterface::CopyDir(FILE_RECORD_I<char>* record, char* filename, ch
         ret = list.AddFile(record->DirItems + i);
 
     // copy list
-    ret = ret && CopyFileList(list, path);
+    ret = ret && CopyFileList(list, path.c_str());
 
-    SourcePath[oldlen] = 0;
+    SourcePath.resize(oldlen);
     return ret;
 }
 
-QWORD CPluginFSInterface::GetFileSize(FILE_RECORD_I<char>* record, BOOL* encrypted)
+QWORD CPluginFSInterface::GetFileSize(FILE_RECORD_I<wchar_t>* record, BOOL* encrypted)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::GetFileSize()");
     QWORD size = 0;
-    DATA_STREAM_I<char>* stream = record->Streams;
+    DATA_STREAM_I<wchar_t>* stream = record->Streams;
     while (stream != NULL)
     {
         size += stream->DSSize;
@@ -1070,13 +1118,13 @@ QWORD CPluginFSInterface::GetFileSize(FILE_RECORD_I<char>* record, BOOL* encrypt
     return size;
 }
 
-QWORD CPluginFSInterface::GetDirSize(FILE_RECORD_I<char>* record, int plus, BOOL* encrypted)
+QWORD CPluginFSInterface::GetDirSize(FILE_RECORD_I<wchar_t>* record, int plus, BOOL* encrypted)
 {
     CALL_STACK_MESSAGE2("CPluginFSInterface::GetDirSize(, %d)", plus);
     QWORD size = 0;
     for (DWORD i = 0; i < record->NumDirItems; i++)
     {
-        FILE_RECORD_I<char>* r = record->DirItems[i].Record;
+        FILE_RECORD_I<wchar_t>* r = record->DirItems[i].Record;
         if (r->IsDir)
             size += GetDirSize(r, plus, encrypted);
         else
@@ -1102,7 +1150,7 @@ QWORD CPluginFSInterface::GetTotalProgress(int panel, BOOL focused, int plus, BO
             fd = SalamanderGeneral->GetPanelSelectedItem(panel, &index, NULL);
         if (fd == NULL)
             break;
-        DIR_ITEM_I<char>* di = (DIR_ITEM_I<char>*)fd->PluginData; // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
+        DIR_ITEM_I<wchar_t>* di = (DIR_ITEM_I<wchar_t>*)fd->PluginData; // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
 
         if (di->Record->IsDir)
             total += GetDirSize(di->Record, plus, encrypted);
@@ -1127,9 +1175,9 @@ void CPluginFSInterface::UpdateProgress()
         Progress->SetTotalProgress((DWORD)(TotalProgress * 1000 / GrandTotal));
 }
 
-BOOL CPluginFSInterface::CopyFileList(CFileList& list, char* targetPath)
+BOOL CPluginFSInterface::CopyFileList(CFileList& list, const wchar_t* targetPath)
 {
-    CALL_STACK_MESSAGE2("CPluginFSInterface::CopyFileList( , %s)", targetPath);
+    CALL_STACK_MESSAGE1("CPluginFSInterface::CopyFileList( , )");
 
     if (!list.RenameDuplicateFiles())
         return FALSE;
@@ -1143,45 +1191,50 @@ BOOL CPluginFSInterface::CopyFileList(CFileList& list, char* targetPath)
         if (item->Record->IsDir)
             ret = CopyDir(item->Record, item->Name, targetPath);
         else
-            ret = CopyFile(item->Record, item->Name, targetPath, FALSE, &incompleteFileAnswer);
+            ret = CopyFileRecord(item->Record, item->Name, targetPath, FALSE, &incompleteFileAnswer);
     }
 
     return TRUE;
 }
 
-void UndeleteGetResolvedRootPath(const char* path, char* resolvedPath)
+void UndeleteGetResolvedRootPath(const wchar_t* path, std::wstring& resolvedPath)
 {
-    strcpy(resolvedPath, path);
-    SalamanderGeneral->ResolveSubsts(resolvedPath);
-    CPathBuffer rootPath; // Heap-allocated for long path support
-    SalamanderGeneral->GetRootPath(rootPath, resolvedPath);
-    if (!SalamanderGeneral->IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points exist only on fixed drives
+    resolvedPath = path != NULL ? path : L"";
+    SPLResolveSubstsOwned(SalamanderGeneral, resolvedPath);
+    std::wstring rootPath;
+    SPLGetRootPathOwned(SalamanderGeneral, resolvedPath.c_str(), rootPath);
+    if (!SalamanderGeneral->IsUNCPath(rootPath.c_str()) && GetDriveTypeW(rootPath.c_str()) == DRIVE_FIXED)
     {
         BOOL cutPathIsPossible = TRUE;
-        SalamanderGeneral->ResolveLocalPathWithReparsePoints(resolvedPath, path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
+        std::wstring reparsePath;
+        if (SPLResolveLocalPathWithReparsePointsOwned(
+                SalamanderGeneral, path, reparsePath, &cutPathIsPossible) &&
+            !reparsePath.empty())
+            resolvedPath = reparsePath;
         // we need root for GetVolumeInformation
         if (cutPathIsPossible)
         {
-            SalamanderGeneral->GetRootPath(rootPath, resolvedPath);
-            strcpy(resolvedPath, rootPath);
+            // GetRootPath is wide; rootSize counts WCHARs.
+            SPLGetRootPathOwned(SalamanderGeneral, resolvedPath.c_str(), rootPath);
+            resolvedPath = rootPath;
         }
     }
     else
     {
-        strcpy(resolvedPath, rootPath);
+        resolvedPath = rootPath;
     }
-    SalamanderGeneral->SalPathAddBackslash(resolvedPath, MAX_PATH);
+    SPLSalPathAddBackslashOwned(resolvedPath);
 }
 
-BOOL CPluginFSInterface::PrepareRawAPI(char* targetPath, BOOL allowBackup)
+BOOL CPluginFSInterface::PrepareRawAPI(wchar_t* targetPath, BOOL allowBackup)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::PrepareRawAPI()");
 
-    CPathBuffer resolvedPath; // Heap-allocated for long path support
+    std::wstring resolvedPath;
     UndeleteGetResolvedRootPath(targetPath, resolvedPath);
 
     DWORD flags;
-    if (!GetVolumeInformation(resolvedPath, NULL, 0, NULL, NULL, &flags, NULL, 0) ||
+    if (!GetVolumeInformationW(resolvedPath.c_str(), NULL, 0, NULL, NULL, &flags, NULL, 0) ||
         !(flags & FILE_SUPPORTS_ENCRYPTION))
     {
         if (allowBackup)
@@ -1189,15 +1242,18 @@ BOOL CPluginFSInterface::PrepareRawAPI(char* targetPath, BOOL allowBackup)
             // info we are going to copy backups
             if (!ConfigDontShowEncryptedWarning)
             {
+                const std::wstring warning = String<wchar_t>::LangStr(IDS_ENCRYPTEDWARNING);
+                const std::wstring caption = String<wchar_t>::LangStr(IDS_UNDELETE);
+                const std::wstring checkBox = String<wchar_t>::LangStr(IDS_DONTSHOWAGAIN);
                 MSGBOXEX_PARAMS mbep;
                 memset(&mbep, 0, sizeof(mbep));
                 mbep.HParent = SalamanderGeneral->GetMsgBoxParent();
-                mbep.Text = String<char>::LoadStr(IDS_ENCRYPTEDWARNING);
-                mbep.Caption = String<char>::LoadStr(IDS_UNDELETE);
+                mbep.Text = warning.c_str();
+                mbep.Caption = caption.c_str();
                 mbep.Flags = MSGBOXEX_OKCANCEL | MB_ICONWARNING;
                 mbep.HIcon = NULL;
                 mbep.HelpCallback = NULL;
-                mbep.CheckBoxText = String<char>::LoadStr(IDS_DONTSHOWAGAIN);
+                mbep.CheckBoxText = checkBox.c_str();
                 mbep.CheckBoxValue = &ConfigDontShowEncryptedWarning;
                 mbep.AliasBtnNames = NULL;
                 if (SalamanderGeneral->SalMessageBoxEx(&mbep) == DIALOG_CANCEL)
@@ -1209,7 +1265,7 @@ BOOL CPluginFSInterface::PrepareRawAPI(char* targetPath, BOOL allowBackup)
         }
         else
         {
-            String<char>::Error(IDS_UNDELETE, IDS_CANNOTVIEW);
+            String<wchar_t>::Error(IDS_UNDELETE, IDS_CANNOTVIEW);
             return FALSE;
         }
     }
@@ -1221,14 +1277,21 @@ BOOL CPluginFSInterface::PrepareRawAPI(char* targetPath, BOOL allowBackup)
 }
 
 BOOL WINAPI
-CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                      int panel, int selectedFiles, int selectedDirs,
-                                     char* targetPath, BOOL& operationMask,
+                                     CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                      BOOL& cancelOrHandlePath, HWND dropTarget)
 {
-    CALL_STACK_MESSAGE9("CPluginFSInterface::CopyOrMoveFromFS(%d, %d, %s, , %d, "
+    std::wstring targetPathValue;
+    if (targetPath == NULL ||
+        !sally::plugin_abi::ReadStringBuffer(*targetPath, targetPathValue))
+        return FALSE;
+    const size_t targetSeparator = targetPathValue.find(L'\0');
+    if (targetSeparator != std::wstring::npos)
+        targetPathValue.resize(targetSeparator);
+    CALL_STACK_MESSAGE8("CPluginFSInterface::CopyOrMoveFromFS(%d, %d, , , %d, "
                         "%d, %d, , %d, %d, )",
-                        copy, mode, fsName, panel,
+                        copy, mode, panel,
                         selectedFiles, selectedDirs, operationMask,
                         cancelOrHandlePath);
 
@@ -1247,32 +1310,42 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     // drag & drop
     if (mode == 5)
     {
-        if (targetPath[0] != 0 && targetPath[1] == ':' ||   // disk path (C:\path)
-            targetPath[0] == '\\' && targetPath[1] == '\\') // UNC path (\\server\share\path)
+        if (targetPathValue.size() >= 2 &&
+            (targetPathValue[1] == L':' ||
+             targetPathValue[0] == L'\\' && targetPathValue[1] == L'\\'))
         {                                                   // append backslash to ensure it is path (in 'mode'==5 it is always path)
-            SalamanderGeneral->SalPathAddBackslash(targetPath, MAX_PATH);
+            SPLSalPathAddBackslashOwned(targetPathValue);
         }
 
         BOOL ok = TRUE;
         int type;
-        char* secondPart;
+        size_t secondPartOffset = std::wstring::npos;
         BOOL isDir;
-        if (SalamanderGeneral->SalParsePath(parent, targetPath, type, isDir, secondPart,
-                                            String<char>::LoadStr(IDS_ERROR), NULL, FALSE,
-                                            NULL, NULL, NULL, 2 * MAX_PATH))
+        std::wstring parsedTarget(targetPathValue);
+        if (SPLSalParsePathOwned(SalamanderGeneral, parent, parsedTarget, type,
+                                 isDir, secondPartOffset,
+                                 String<wchar_t>::LangStr(IDS_ERROR).c_str(), FALSE,
+                                 NULL, NULL))
         {
+            targetPathValue = parsedTarget;
             if (type != PATH_TYPE_WINDOWS)
             {
-                SalamanderGeneral->SalMessageBox(parent, String<char>::LoadStr(IDS_BADPATH),
-                                                 String<char>::LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+                SalamanderGeneral->SalMessageBox(parent, String<wchar_t>::LangStr(IDS_BADPATH).c_str(),
+                                                 String<wchar_t>::LangStr(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
                 ok = FALSE;
             }
         }
         if (!ok)
         {
+            if (!sally::plugin_abi::WriteStringBuffer(*targetPath,
+                                                       targetPathValue))
+                return FALSE;
             cancelOrHandlePath = TRUE;
             return TRUE;
         }
+        if (!sally::plugin_abi::WriteStringBuffer(*targetPath,
+                                                   targetPathValue))
+            return FALSE;
     }
 
     // init
@@ -1283,23 +1356,27 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     BOOL encrypted;
     SkipAllLongPaths = FALSE;
     SilentMask = 0;
-    strcpy(SourcePath, Path);
+    SourcePath = Path;
     AllSubstChar = 0;
 
     // fixme: test if Volume is open and valid?
 
     // don't undelete to the same volume
-    if (!ConfigDontShowSamePartitionWarning && !Volume.IsImage && SalamanderGeneral->PathsAreOnTheSameVolume(targetPath, Root, NULL))
+    if (!ConfigDontShowSamePartitionWarning && !Volume.IsImage &&
+        SalamanderGeneral->PathsAreOnTheSameVolume(targetPathValue.c_str(), Root.c_str(), NULL))
     {
+        const std::wstring warning = String<wchar_t>::LangStr(IDS_SAMEPARTITION);
+        const std::wstring caption = String<wchar_t>::LangStr(IDS_UNDELETE);
+        const std::wstring checkBox = String<wchar_t>::LangStr(IDS_DONTSHOWAGAIN);
         MSGBOXEX_PARAMS mbep;
         memset(&mbep, 0, sizeof(mbep));
         mbep.HParent = parent;
-        mbep.Text = String<char>::LoadStr(IDS_SAMEPARTITION);
-        mbep.Caption = String<char>::LoadStr(IDS_UNDELETE);
+        mbep.Text = warning.c_str();
+        mbep.Caption = caption.c_str();
         mbep.Flags = MSGBOXEX_OKCANCEL | MB_ICONWARNING | MSGBOXEX_DEFBUTTON2;
         mbep.HIcon = NULL;
         mbep.HelpCallback = NULL;
-        mbep.CheckBoxText = String<char>::LoadStr(IDS_DONTSHOWAGAIN);
+        mbep.CheckBoxText = checkBox.c_str();
         mbep.CheckBoxValue = &ConfigDontShowSamePartitionWarning;
         mbep.AliasBtnNames = NULL;
         if (SalamanderGeneral->SalMessageBoxEx(&mbep) == DIALOG_CANCEL)
@@ -1310,9 +1387,9 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     }
 
     // test free space
-    if (!SalamanderGeneral->TestFreeSpace(parent, targetPath,
+    if (!SalamanderGeneral->TestFreeSpace(parent, targetPathValue.c_str(),
                                           CQuadWord().SetUI64(GetTotalProgress(panel, focused, 0, &encrypted)),
-                                          String<char>::LoadStr(IDS_UNDELETE)))
+                                          String<wchar_t>::LangStr(IDS_UNDELETE).c_str()))
     {
         cancelOrHandlePath = TRUE;
         return TRUE;
@@ -1321,7 +1398,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     // prepare for encrypted files recovery
     if (encrypted)
     {
-        if (!PrepareRawAPI(targetPath, TRUE))
+        if (!PrepareRawAPI(targetPathValue.data(), TRUE))
         {
             cancelOrHandlePath = TRUE;
             return TRUE;
@@ -1332,7 +1409,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
     HWND mainwnd = SalamanderGeneral->GetMainWindowHWND();
     CCopyProgressDlg dlg(mainwnd, ooStatic);
     if (dlg.Create() == NULL)
-        return String<char>::SysError(IDS_UNDELETE, IDS_ERROROPENINGPROGRESS);
+        return String<wchar_t>::SysError(IDS_UNDELETE, IDS_ERROROPENINGPROGRESS);
     EnableWindow(mainwnd, FALSE);
     HProgressDlg = dlg.HWindow; // redirect message box parent
     SetForegroundWindow(dlg.HWindow);
@@ -1351,13 +1428,13 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
             fd = SalamanderGeneral->GetPanelSelectedItem(panel, &index, NULL);
         if (fd == NULL)
             break;
-        ret = list.AddFile((DIR_ITEM_I<char>*)fd->PluginData); // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
+        ret = list.AddFile((DIR_ITEM_I<wchar_t>*)fd->PluginData); // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
         if (focused)
             break;
     }
 
     // copy stream
-    ret = ret && CopyFileList(list, targetPath);
+    ret = ret && CopyFileList(list, targetPathValue.c_str());
 
     // close progress
     EnableWindow(mainwnd, TRUE);
@@ -1366,7 +1443,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 
     // report changes on target path
     if (ret)
-        SalamanderGeneral->PostChangeOnPathNotification(targetPath, FALSE);
+        SalamanderGeneral->PostChangeOnPathNotification(targetPathValue.c_str(), FALSE);
 
     if (!ret)
         cancelOrHandlePath = TRUE;
@@ -1378,57 +1455,78 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
 //  ViewFile
 //
 
-BOOL CPluginFSInterface::GetTempDirOutsideRoot(HWND parent, char* buffer, char** ret)
+static BOOL GetSystemTempPathOwned(std::wstring& output)
 {
-    char* tempdir = NULL; // return NULL for system TEMP
-    CPathBuffer path; // Heap-allocated for long path support
-    GetTempPath(path.Size(), path); // get system TEMP
-    if (!Volume.IsImage && SalamanderGeneral->PathsAreOnTheSameVolume(Root, path, NULL))
+    std::vector<wchar_t> buffer(1, L'\0');
+    for (;;)
     {
-        while (*ConfigTempPath == 0 || SalamanderGeneral->PathsAreOnTheSameVolume(Root, ConfigTempPath, NULL))
+        const DWORD length = GetTempPathW(static_cast<DWORD>(buffer.size()), buffer.data());
+        if (length == 0)
+            return FALSE;
+        if (length < buffer.size())
         {
-            char text[200];
-            sprintf(text, String<char>::LoadStr(IDS_TEMPDIR), path[0], path[0]);
-            if (!SalamanderGeneral->GetTargetDirectory(parent, parent, String<char>::LoadStr(IDS_VIEW),
-                                                       text, ConfigTempPath, FALSE, NULL))
+            output.assign(buffer.data(), length);
+            return TRUE;
+        }
+        if (length == (std::numeric_limits<DWORD>::max)())
+            return FALSE;
+        buffer.assign(static_cast<size_t>(length) + 1, L'\0');
+    }
+}
+
+BOOL CPluginFSInterface::GetTempDirOutsideRoot(HWND parent, const wchar_t** ret)
+{
+    *ret = NULL; // NULL selects the system TEMP in the disk cache API
+    std::wstring path;
+    if (!GetSystemTempPathOwned(path))
+        return FALSE;
+    if (!Volume.IsImage && SalamanderGeneral->PathsAreOnTheSameVolume(Root.c_str(), path.c_str(), NULL))
+    {
+        while (ConfigTempPath.empty() || SalamanderGeneral->PathsAreOnTheSameVolume(Root.c_str(), ConfigTempPath.c_str(), NULL))
+        {
+            // Wide format, wide printf: a wchar_t* format handed to sprintf compiles and
+            // prints garbage, because varargs are unchecked.
+            const std::wstring text = SPLFormatStringOwned(
+                String<wchar_t>::LangStr(IDS_TEMPDIR).c_str(), path[0], path[0]);
+            std::wstring selected;
+            if (!SPLGetTargetDirectoryOwned(SalamanderGeneral, parent, parent,
+                                            String<wchar_t>::LangStr(IDS_VIEW).c_str(),
+                                            text.c_str(), selected, FALSE,
+                                            ConfigTempPath.c_str()))
             {
                 return FALSE;
             }
+            ConfigTempPath.swap(selected);
         }
-        tempdir = ConfigTempPath;
+        *ret = ConfigTempPath.c_str();
     }
-    *ret = tempdir;
     return TRUE;
 }
 
 void WINAPI
-CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
+CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
                              CSalamanderForViewFileOnFSAbstract* salamander,
                              CFileData& file)
 {
-    CALL_STACK_MESSAGE2("CPluginFSInterface::ViewFile(%s, , , )", fsName);
+    CALL_STACK_MESSAGE1("CPluginFSInterface::ViewFile(, , , )");
 
     // chose different TEMP dir when we have opened same volume as volume where disk-cache is
-    CPathBuffer buff; // Heap-allocated for long path support
-    char* tempdir;
-    if (!GetTempDirOutsideRoot(parent, buff, &tempdir))
+    const wchar_t* tempdir;
+    if (!GetTempDirOutsideRoot(parent, &tempdir))
         return;
 
     // prepare unique file name for disk-cache (standard Salamander path format)
-    CPathBuffer uniqueFileName; // Heap-allocated for long path support
-    sprintf(uniqueFileName, "%IX", file.PluginData); // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
-    strcat(uniqueFileName, ":");
-    strcat(uniqueFileName, fsName);
-    strcat(uniqueFileName, ":");
-    strcat(uniqueFileName, Path);
-    SalamanderGeneral->SalPathAppend(uniqueFileName + strlen(fsName) + 1, file.Name, uniqueFileName.Size());
+    std::wstring cachePath = Path;
+    SPLSalPathAppendOwned(cachePath, file.Name);
+    std::wstring uniqueFileName = SPLFormatStringOwned(
+        L"%IX:%ls:%ls", file.PluginData, fsName, cachePath.c_str());
     // name on disk are case-insensitive, disk-cache is case-sensitive, we will convert
     // to lowercase so disk-cache will behave as case-insensitive
-    SalamanderGeneral->ToLowerCase(uniqueFileName);
+    SPLToLowerCaseOwned(SalamanderGeneral, uniqueFileName);
 
     // get name of file copy in disk-cache
     BOOL fileExists;
-    const char* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName, file.Name, tempdir, fileExists);
+    const wchar_t* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName.c_str(), file.Name, tempdir, fileExists);
     if (tmpFileName == NULL)
         return; // fatal error
 
@@ -1441,25 +1539,25 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         SilentMask = SILENT_OVERWRITE_FILE_EXIST | SILENT_OVERWRITE_FILE_SYSHID;
         hErrParent = parent;
 
-        DIR_ITEM_I<char>* di = (DIR_ITEM_I<char>*)file.PluginData; // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
+        DIR_ITEM_I<wchar_t>* di = (DIR_ITEM_I<wchar_t>*)file.PluginData; // we don't need to test snapshot state, during CPluginFSInterface::CopyOrMoveFromFS() it is valid
         BOOL encrypted = (di->Record->Attr & FILE_ATTRIBUTE_ENCRYPTED) ? TRUE : FALSE;
 
         if (encrypted)
         {
-            if (!PrepareRawAPI((char*)tmpFileName, FALSE))
+            if (!PrepareRawAPI((wchar_t*)tmpFileName, FALSE))
                 return;
         }
 
-        SalamanderGeneral->CreateSafeWaitWindow(String<char>::LoadStr(IDS_WAIT), String<char>::LoadStr(IDS_UNDELETE),
+        SalamanderGeneral->CreateSafeWaitWindow(String<wchar_t>::LangStr(IDS_WAIT).c_str(), String<wchar_t>::LangStr(IDS_UNDELETE).c_str(),
                                                 1500, TRUE, NULL);
         int incompleteFileAnswer = -1;
-        newFileOK = CopyFile(di->Record, file.Name, (char*)tmpFileName, TRUE, &incompleteFileAnswer);
+        newFileOK = CopyFileRecord(di->Record, file.Name, (wchar_t*)tmpFileName, TRUE, &incompleteFileAnswer);
         SalamanderGeneral->DestroySafeWaitWindow();
 
         if (newFileOK)
         {
-            HANDLE hFile = HANDLES_Q(CreateFile(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                NULL, OPEN_EXISTING, 0, NULL));
+            HANDLE hFile = HANDLES_Q(CreateFileW(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                 NULL, OPEN_EXISTING, 0, NULL));
             if (hFile != INVALID_HANDLE_VALUE)
             { // ignore error, file size doesn't matter so much
                 DWORD err;
@@ -1480,7 +1578,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     }
 
     // we must call FreeFileNameInCache in pair to AllocFileNameInCache  (connect viewer and disk-cache)
-    salamander->FreeFileNameInCache(uniqueFileName, fileExists, newFileOK,
+    salamander->FreeFileNameInCache(uniqueFileName.c_str(), fileExists, newFileOK,
                                     newFileSize, fileLock, fileLockOwner, FALSE);
 }
 
@@ -1489,7 +1587,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
 //  ContextMenu
 //
 
-void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+void CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                      int panel, int selectedFiles, int selectedDirs)
 {
     if (type != fscmItemsInPanel)
@@ -1497,7 +1595,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
 
     BOOL focusIsDir;
     const CFileData* fd = SalamanderGeneral->GetPanelFocusedItem(panel, &focusIsDir);
-    DIR_ITEM_I<char>* di = (DIR_ITEM_I<char>*)fd->PluginData;
+    DIR_ITEM_I<wchar_t>* di = (DIR_ITEM_I<wchar_t>*)fd->PluginData;
 
     // create the menu
     CGUIMenuPopupAbstract* ctxMenu = SalamanderGUI->CreateMenuPopup();
@@ -1505,14 +1603,15 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
         return;
 
     // insert Salamander commands
-    char cmdName[300];
+    std::wstring cmdName;
     int salIndex = 0;
     int index = 0;
     int salCmd;
     BOOL enabled;
     int type2;
     int lastType = sctyUnknown;
-    while (SalamanderGeneral->EnumSalamanderCommands(&salIndex, &salCmd, cmdName, _countof(cmdName), &enabled, &type2))
+    while (SPLEnumSalamanderCommandsOwned(
+        SalamanderGeneral, &salIndex, &salCmd, cmdName, &enabled, &type2))
     {
         if (!enabled || salCmd == SALCMD_OPEN || salCmd == SALCMD_REFRESH || salCmd == SALCMD_DISCONNECT)
             continue;
@@ -1521,7 +1620,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
         mi.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING;
         mi.Type = MENU_TYPE_STRING;
         mi.ID = salCmd + CMD_SALCMD_OFFSET;
-        mi.String = cmdName;
+        mi.String = cmdName.data();
         ctxMenu->InsertItem(index++, TRUE, &mi);
     }
 #if defined(_DEBUG) && _WIN32_WINNT >= 0x0501
@@ -1535,30 +1634,30 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
     mi.Mask = MENU_MASK_TYPE | MENU_MASK_STATE | MENU_MASK_ID | MENU_MASK_STRING;
     mi.Type = MENU_TYPE_STRING;
     mi.State = 0;
-    char strbuff[300];
+    wchar_t strbuff[300];
     mi.String = strbuff;
     if (!focusIsDir)
     {
         mi.ID = CMD_VIEWINFO;
-        strcpy(strbuff, "DBG View Underlying File System Data");
+        wcscpy(strbuff, L"DBG View Underlying File System Data");
         ctxMenu->InsertItem(index++, TRUE, &mi);
         mi.ID = CMD_FRAGMENTFILE;
-        strcpy(strbuff, "DBG Fragment File");
+        wcscpy(strbuff, L"DBG Fragment File");
         ctxMenu->InsertItem(index++, TRUE, &mi);
         mi.ID = CMD_SETVALIDDATAFILE;
-        strcpy(strbuff, "DBG Zero End of File with SetFileValidData");
+        wcscpy(strbuff, L"DBG Zero End of File with SetFileValidData");
         ctxMenu->InsertItem(index++, TRUE, &mi);
         mi.ID = CMD_SETSPARSEFILE;
-        strcpy(strbuff, "DBG Zero Middle of File with FSCTL_SET_ZERO_DATA");
+        wcscpy(strbuff, L"DBG Zero Middle of File with FSCTL_SET_ZERO_DATA");
         ctxMenu->InsertItem(index++, TRUE, &mi);
         // ----
         ctxMenu->InsertItem(index++, TRUE, &mis);
     }
     mi.ID = CMD_DUMPFILES;
-    strcpy(strbuff, "DBG Dump Specified Files");
+    wcscpy(strbuff, L"DBG Dump Specified Files");
     ctxMenu->InsertItem(index++, TRUE, &mi);
     mi.ID = CMD_COMPAREFILES;
-    strcpy(strbuff, "DBG Test Undelete on All Existing Files");
+    wcscpy(strbuff, L"DBG Test Undelete on All Existing Files");
     ctxMenu->InsertItem(index++, TRUE, &mi);
 #endif //_DEBUG
 
@@ -1573,25 +1672,27 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
         DumpDebugInformation(parent, di, cmd);
     if (cmd == CMD_FRAGMENTFILE || cmd == CMD_SETVALIDDATAFILE || cmd == CMD_SETSPARSEFILE)
     {
-        CPathBuffer fullPath; // Heap-allocated for long path support
-        char* archiveOrFS = NULL;
+        std::wstring fullPath;
+        size_t archiveOrFSOffset = std::wstring::npos;
         int type;
-        if (SalamanderGeneral->GetPanelPath(panel, fullPath, fullPath.Size(), &type, &archiveOrFS, NULL) && archiveOrFS != NULL)
+        if (SPLGetPanelPathOwned(SalamanderGeneral, panel, fullPath, &type,
+                                 &archiveOrFSOffset) &&
+            archiveOrFSOffset != std::wstring::npos)
         {
-            archiveOrFS++;
-            SalamanderGeneral->SalPathAppend(archiveOrFS, di->FileName->FNName, fullPath.Size());
+            std::wstring diskPath = fullPath.substr(archiveOrFSOffset + 1);
+            SPLSalPathAppendOwned(diskPath, di->FileName->FNName);
             if (cmd == CMD_FRAGMENTFILE)
-                FragmentFile(parent, di, archiveOrFS);
+                FragmentFile(parent, di, diskPath.c_str());
             if (cmd == CMD_SETVALIDDATAFILE || cmd == CMD_SETSPARSEFILE)
             {
-                int confirm = SalamanderGeneral->SalMessageBox(parent, "!!!WARNING!!!\n\nPart of file will be overwritten with zeros. Do you want to continue?",
-                                                               String<char>::LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONEXCLAMATION | MB_DEFBUTTON2);
+                int confirm = SalamanderGeneral->SalMessageBox(parent, L"!!!WARNING!!!\n\nPart of file will be overwritten with zeros. Do you want to continue?",
+                                                               String<wchar_t>::LangStr(IDS_QUESTION).c_str(), MB_YESNO | MB_ICONEXCLAMATION | MB_DEFBUTTON2);
                 if (confirm == IDYES)
                 {
                     if (cmd == CMD_SETVALIDDATAFILE)
-                        SetFileValidData(parent, di, archiveOrFS);
+                        SetFileValidData(parent, di, diskPath.c_str());
                     if (cmd == CMD_SETSPARSEFILE)
-                        SetFileSparse(parent, di, archiveOrFS);
+                        SetFileSparse(parent, di, diskPath.c_str());
                 }
             }
         }
@@ -1600,9 +1701,9 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
 }
 
 #if defined(_DEBUG) && _WIN32_WINNT >= 0x0501
-void DumpExistingFileLayout(FILE* file, const char* fileName, CVolume<char>* volume)
+void DumpExistingFileLayout(FILE* file, const wchar_t* fileName, CVolume<wchar_t>* volume)
 {
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hFile = HANDLES_Q(CreateFileW(fileName, FILE_READ_ATTRIBUTES, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL));
     if (hFile == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -1612,11 +1713,11 @@ void DumpExistingFileLayout(FILE* file, const char* fileName, CVolume<char>* vol
     DWORD hiSize = 0;
     DWORD loSize = ::GetFileSize(hFile, &hiSize);
     if (loSize == INVALID_FILE_SIZE)
-        TRACE_E("GetFileSize() failed on " << fileName);
+        TRACE_EW(L"GetFileSize() failed on " << fileName);
     LONGLONG fileSize = MAKEQWORD(loSize, hiSize);
 
     fprintf(file, "\n");
-    fprintf(file, "Query existing file %s\n", fileName);
+    fprintf(file, "Query existing file %ls\n", fileName);
     fprintf(file, "FSCTL_GET_RETRIEVAL_POINTERS\n");
     if (volume->Type == vtFAT || volume->Type == vtExFAT)
         fprintf(file, "NOTE: LCNs on FAT and exFAT are zero based in this listing\n");
@@ -1654,15 +1755,15 @@ void DumpExistingFileLayout(FILE* file, const char* fileName, CVolume<char>* vol
     HANDLES(CloseHandle(hFile));
 }
 
-void CPluginFSInterface::DumpDirItemInfo(FILE* file, const DIR_ITEM_I<char>* di)
+void CPluginFSInterface::DumpDirItemInfo(FILE* file, const DIR_ITEM_I<wchar_t>* di)
 {
     if (di->Record == NULL)
         return;
-    DATA_STREAM_I<char>* stream = di->Record->Streams;
+    DATA_STREAM_I<wchar_t>* stream = di->Record->Streams;
     while (stream != NULL)
     {
         if (stream->DSName != NULL)
-            fprintf(file, "Stream: %s\n", stream->DSName);
+            fprintf(file, "Stream: %ls\n", stream->DSName);
         else
             fprintf(file, "Stream\n");
         if (stream->DSSize != stream->DSValidSize)
@@ -1673,7 +1774,7 @@ void CPluginFSInterface::DumpDirItemInfo(FILE* file, const DIR_ITEM_I<char>* di)
         if (stream->Ptrs != NULL)
         {
             fprintf(file, "LCN,LENGTH,SEEK,FLAGS\n");
-            CRunsWalker<CHAR> runsWalker(stream->Ptrs);
+            CRunsWalker<wchar_t> runsWalker(stream->Ptrs);
             QWORD lcn = 0;
             QWORD seek = 0;
             CRunsWalkerQuery query;
@@ -1732,19 +1833,19 @@ void InspectDataRuns(const DATA_POINTERS* dp, int* depth, int* sparseCnt)
         InspectDataRuns(dp->DPNext, depth, sparseCnt);
 }
 
-void CPluginFSInterface::DumpSpecifiedFiles(FILE* file, FILE_RECORD_I<char>* dir, char* path, int pathSize)
+void CPluginFSInterface::DumpSpecifiedFiles(FILE* file, FILE_RECORD_I<wchar_t>* dir, std::wstring& path)
 {
-    size_t pathLen = strlen(path);
+    const size_t pathLen = path.size();
     for (DWORD i = 0; i < dir->NumDirItems; i++)
     {
-        FILE_RECORD_I<CHAR>* r = dir->DirItems[i].Record;
-        path[pathLen] = 0;
-        SalamanderGeneral->SalPathAppend(path, r->FileNames->FNName, pathSize);
+        FILE_RECORD_I<wchar_t>* r = dir->DirItems[i].Record;
+        path.resize(pathLen);
+        SPLSalPathAppendOwned(path, r->FileNames->FNName);
         if ((r->Flags & FR_FLAGS_DELETED) != 0)
             continue;
         if (r->IsDir)
         {
-            DumpSpecifiedFiles(file, r, path, pathSize);
+            DumpSpecifiedFiles(file, r, path);
         }
         else
         {
@@ -1762,13 +1863,13 @@ void CPluginFSInterface::DumpSpecifiedFiles(FILE* file, FILE_RECORD_I<char>* dir
             if (depth <= 1)
                 continue;
             //      if (sparseCnt == 0) continue;
-            fprintf(file, "%s\n", path);
+            fprintf(file, "%ls\n", path.c_str());
         }
     }
-    path[pathLen] = 0;
+    path.resize(pathLen);
 }
 
-BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<char>* record, char* path, int pathSize)
+BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<wchar_t>* record, std::wstring& path)
 {
     BOOL ret;
 
@@ -1778,39 +1879,38 @@ BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<ch
     int bufclusters = COPY_BUFFER / Volume.BytesPerCluster;
 
     // extract all streams
-    char* pathend = path + strlen(path);
-    DATA_STREAM_I<char>* stream = record->Streams;
+    const size_t pathend = path.size();
+    DATA_STREAM_I<wchar_t>* stream = record->Streams;
     BOOL encrypted = (record->Attr & FILE_ATTRIBUTE_ENCRYPTED) != 0;
     ret = TRUE;
     while (stream != NULL && ret)
     {
+        path.resize(pathend);
         if (!encrypted)
         {
             // append stream names
             if (stream->DSName != NULL)
             {
-                *pathend = ':';
-                lstrcpyn(pathend + 1, stream->DSName, MAX_PATH - 1);
+                path.push_back(L':');
+                path.append(stream->DSName);
             }
-            else
-                *pathend = 0;
         }
-        Progress->SetSourceFileName(path);
+        Progress->SetSourceFileName(path.c_str());
 
-        FILE* orgFile = fopen(path, "rb");
+        FILE* orgFile = _wfopen(path.c_str(), L"rb");
         if (orgFile != NULL)
         {
             // extract data
             if (encrypted) // encrypted file
             {
-                TRACE_I("Ignorting encrypted file (test it using copy and compare): " << path);
-                fprintf(file, "Ignorting encrypted file (test it using copy and compare): %s\n", path);
+                TRACE_IW(L"Ignorting encrypted file (test it using copy and compare): " << path.c_str());
+                fprintf(file, "Ignorting encrypted file (test it using copy and compare): %ls\n", path.c_str());
             }
             else
             {
                 if (stream->DSSize != 0) // ordinary file
                 {
-                    CStreamReader<char> reader;
+                    CStreamReader<wchar_t> reader;
                     reader.Init(&Volume, stream); // fixme: return value
                     QWORD bytesleft = stream->DSSize;
                     QWORD clustersleft = (bytesleft - 1) / Volume.BytesPerCluster + 1;
@@ -1824,13 +1924,13 @@ BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<ch
 
                         QWORD clustersRead; // number of read clusters
                         if (!reader.GetClusters(buffer, nc, &clustersRead))
-                            TRACE_E("reader.GetClusters() failed on " << path);
+                            TRACE_EW(L"reader.GetClusters() failed on " << path.c_str());
                         if (fread(orgBuffer, (size_t)nb, 1, orgFile) != 1)
-                            TRACE_E("fread() failed on " << path);
+                            TRACE_EW(L"fread() failed on " << path.c_str());
                         if (memcmp(buffer, orgBuffer, (size_t)nb) != 0)
                         {
-                            TRACE_E("Undeleted file doesn't match original on " << path);
-                            fprintf(file, "Undeleted file doesn't match original: %s\n", path);
+                            TRACE_EW(L"Undeleted file doesn't match original on " << path.c_str());
+                            fprintf(file, "Undeleted file doesn't match original: %ls\n", path.c_str());
                         }
 
                         if (clustersRead < nc)
@@ -1848,7 +1948,7 @@ BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<ch
         }
         else
         {
-            TRACE_I("fopen() failed on " << path);
+            TRACE_IW(L"fopen() failed on " << path.c_str());
         }
         if (encrypted)
             break; // we don't walk through all streams for encrypted files
@@ -1864,73 +1964,72 @@ BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<ch
     return ret;
 }
 
-void CPluginFSInterface::TestUndeleteOnExistingFiles(FILE* file, FILE_RECORD_I<char>* dir, char* path, int pathSize, DWORD* count)
+void CPluginFSInterface::TestUndeleteOnExistingFiles(FILE* file, FILE_RECORD_I<wchar_t>* dir, std::wstring& path, DWORD* count)
 {
     DWORD cnt = 0;
-    size_t pathLen = strlen(path);
+    const size_t pathLen = path.size();
     for (DWORD i = 0; i < dir->NumDirItems; i++)
     {
-        FILE_RECORD_I<char>* r = dir->DirItems[i].Record;
-        path[pathLen] = 0;
+        FILE_RECORD_I<wchar_t>* r = dir->DirItems[i].Record;
+        path.resize(pathLen);
         // ignore deleted items and metafiles
         if ((r->Flags & FR_FLAGS_DELETED) != 0)
             continue;
         if ((r->Flags & FR_FLAGS_METAFILE) != 0)
             continue;
-        SalamanderGeneral->SalPathAppend(path, r->FileNames->FNName, pathSize);
+        SPLSalPathAppendOwned(path, r->FileNames->FNName);
         if (r->IsDir)
         {
-            TestUndeleteOnExistingFiles(file, r, path, pathSize, count);
+            TestUndeleteOnExistingFiles(file, r, path, count);
         }
         else
         {
             if (count == NULL)
-                TestUndeleteOnExistingFile(file, r, path, pathSize);
+                TestUndeleteOnExistingFile(file, r, path);
             cnt++;
         }
     }
-    path[pathLen] = 0;
+    path.resize(pathLen);
     if (count != NULL)
         (*count) += cnt;
 }
 
-void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char>* di, DWORD mode)
+void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<wchar_t>* di, DWORD mode)
 {
     // chose different TEMP dir when we have opened same volume as volume where disk-cache is
-    CPathBuffer buff; // Heap-allocated for long path support
-    char* tempdir;
-    if (!GetTempDirOutsideRoot(parent, buff, &tempdir))
+    const wchar_t* tempdir;
+    if (!GetTempDirOutsideRoot(parent, &tempdir))
         return;
 
     DWORD error;
-    CPathBuffer fileNameBuf; // Heap-allocated for long path support
-    if (SalamanderGeneral->SalGetTempFileName(tempdir, "view", fileNameBuf, TRUE, &error))
+    std::wstring fileName;
+    if (SPLSalGetTempFileNameOwned(SalamanderGeneral, tempdir, L"view", fileName, TRUE, &error))
     {
-        FILE* file = fopen(fileNameBuf, "w");
+        FILE* file = _wfopen(fileName.c_str(), L"w");
         if (file != NULL)
         {
-            CPathBuffer path; // Heap-allocated for long path support
+            std::wstring path;
             if (mode == CMD_VIEWINFO)
             {
                 DumpDirItemInfo(file, di);
-                strcpy(path, Path);
-                SalamanderGeneral->SalPathAppend(path, di->FileName->FNName, path.Size());
-                DumpExistingFileLayout(file, path, &Volume);
+                path = Path;
+                SPLSalPathAppendOwned(path, di->FileName->FNName);
+                DumpExistingFileLayout(file, path.c_str(), &Volume);
             }
 
             if (mode == CMD_DUMPFILES)
             {
                 fprintf(file, "Existing files, see DumpSpecifiedFiles() for filter\n");
-                strcpy(path, Root);
-                DumpSpecifiedFiles(file, Snapshot->Root, path, path.Size());
+                path = Root;
+                DumpSpecifiedFiles(file, Snapshot->Root, path);
             }
 
             if (mode == CMD_COMPAREFILES)
             {
                 fprintf(file, "Test Undelete on Existing files\n");
-                strcpy(path, Root);
+                path = Root;
                 DWORD totalCount = 0;
-                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, path.Size(), &totalCount);
+                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, &totalCount);
 
                 // open progress
                 HWND mainwnd = SalamanderGeneral->GetMainWindowHWND();
@@ -1944,7 +2043,7 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
                 TotalProgress = FileProgress = 0;
                 GrandTotal = totalCount;
 
-                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, path.Size(), NULL);
+                TestUndeleteOnExistingFiles(file, Snapshot->Root, path, NULL);
 
                 // close progress
                 EnableWindow(mainwnd, TRUE);
@@ -1957,12 +2056,12 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
 
             CSalamanderPluginInternalViewerData viewerData;
             viewerData.Size = sizeof(viewerData);
-            viewerData.FileName = fileNameBuf;
+            viewerData.FileName = fileName.c_str();
             viewerData.Mode = 0; // text mode
-            viewerData.Caption = "Output";
+            viewerData.Caption = L"Output";
             viewerData.WholeCaption = FALSE;
             int err;
-            BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, TRUE, tempdir, "test.txt", err);
+            BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, TRUE, tempdir, L"test.txt", err);
         }
         else
         {
@@ -1971,26 +2070,27 @@ void CPluginFSInterface::DumpDebugInformation(HWND parent, const DIR_ITEM_I<char
     }
 }
 
-void CPluginFSInterface::FragmentFile(HWND parent, const DIR_ITEM_I<char>* di, const char* fullPath)
+void CPluginFSInterface::FragmentFile(HWND parent, const DIR_ITEM_I<wchar_t>* di, const wchar_t* fullPath)
 {
     HANDLE hVolume = NULL;
     HANDLE hFile = NULL;
     // get volume GUID
-    CPathBuffer sourcePanelGUIDPath; // Heap-allocated for long path support
-    *sourcePanelGUIDPath = 0;
-    if (!SalamanderGeneral->GetResolvedPathMountPointAndGUID(Root, NULL, sourcePanelGUIDPath))
+    // wide; out-buffer sizes count WCHARs. Only the GUID path is wanted here.
+    std::wstring guidPath;
+    if (!SPLGetResolvedPathMountPointAndGUIDOwned(
+            SalamanderGeneral, Root.c_str(), NULL, &guidPath))
     {
-        TRACE_E("GetResolvedPathMountPointAndGUID() failed on " << Root);
+        TRACE_EW(L"GetResolvedPathMountPointAndGUID() failed on " << Root);
         return;
     }
-    SalamanderGeneral->SalPathRemoveBackslash(sourcePanelGUIDPath);
+    SPLSalPathRemoveBackslashOwned(SalamanderGeneral, guidPath);
 
     // open volume
-    hVolume = CreateFile(sourcePanelGUIDPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    hVolume = CreateFileW(guidPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hVolume == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
-        TRACE_E("Cannot open volume " << Root);
+        TRACE_EW(L"Cannot open volume " << Root);
         return;
     }
 
@@ -2052,7 +2152,7 @@ void CPluginFSInterface::FragmentFile(HWND parent, const DIR_ITEM_I<char>* di, c
     // fragment required file: move first cluster of file to freeLCN cluster
 
     // open volume
-    hFile = CreateFile(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    hFile = CreateFileW(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == NULL)
     {
         TRACE_E("Cannot open file " << hFile);
@@ -2075,7 +2175,7 @@ void CPluginFSInterface::FragmentFile(HWND parent, const DIR_ITEM_I<char>* di, c
         goto exit;
     }
 
-    TRACE_I("SUCCESS, file was fragmented: " << fullPath);
+    TRACE_IW(L"SUCCESS, file was fragmented: " << fullPath);
 
 exit:
     if (hFile != NULL)
@@ -2106,7 +2206,7 @@ BOOL EnablePrivileges()
     return TRUE;
 }
 
-void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* di, const char* fullPath)
+void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<wchar_t>* di, const wchar_t* fullPath)
 {
     // enable SE_MANAGE_VOLUME_NAME privilege for SetFileValidData()
     if (!EnablePrivileges())
@@ -2117,23 +2217,23 @@ void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* d
     LONGLONG size{};
     DWORD loSize{};
 
-    HANDLE hFile = CreateFile(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileW(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == NULL)
     {
-        TRACE_E("CreateFile() failed on " << fullPath);
+        TRACE_EW(L"CreateFile() failed on " << fullPath);
         goto exit;
     }
     DWORD hiSize;
     loSize = ::GetFileSize(hFile, &hiSize);
     if (loSize == INVALID_FILE_SIZE)
     {
-        TRACE_E("GetFileSize() failed on " << fullPath);
+        TRACE_EW(L"GetFileSize() failed on " << fullPath);
         goto exit;
     }
     size = MAKEQWORD(loSize, hiSize);
     if (size < 2)
     {
-        TRACE_E("File is too small for SetFileValidData() test " << fullPath);
+        TRACE_EW(L"File is too small for SetFileValidData() test " << fullPath);
         goto exit;
     }
 
@@ -2141,13 +2241,13 @@ void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* d
     offset.QuadPart = enlarge;
     if (!SetFilePointerEx(hFile, offset, NULL, FILE_END))
     {
-        TRACE_E("SetFilePointerEx() failed " << fullPath);
+        TRACE_EW(L"SetFilePointerEx() failed " << fullPath);
         goto exit;
     }
 
     if (!SetEndOfFile(hFile))
     {
-        TRACE_E("SetEndOfFile() failed " << fullPath);
+        TRACE_EW(L"SetEndOfFile() failed " << fullPath);
         goto exit;
     }
 
@@ -2155,7 +2255,7 @@ void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* d
     if (!ret)
     {
         DWORD err = GetLastError();
-        TRACE_E("SetFileValidData() failed on " << fullPath << " err=" << err);
+        TRACE_EW(L"SetFileValidData() failed on " << fullPath << L" err=" << err);
         goto exit;
     }
 
@@ -2164,16 +2264,16 @@ exit:
         CloseHandle(hFile);
 }
 
-void CPluginFSInterface::SetFileSparse(HWND parent, const DIR_ITEM_I<char>* di, const char* fullPath)
+void CPluginFSInterface::SetFileSparse(HWND parent, const DIR_ITEM_I<wchar_t>* di, const wchar_t* fullPath)
 {
-    HANDLE hFile = CreateFile(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileW(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     DWORD hiSize{};
     DWORD loSize{};
     LONGLONG size{};
     BOOL ret = false;
     if (hFile == NULL)
     {
-        TRACE_E("CreateFile() failed on " << fullPath);
+        TRACE_EW(L"CreateFile() failed on " << fullPath);
         goto exit;
     }
 
@@ -2189,13 +2289,13 @@ void CPluginFSInterface::SetFileSparse(HWND parent, const DIR_ITEM_I<char>* di, 
     loSize = ::GetFileSize(hFile, &hiSize);
     if (loSize == INVALID_FILE_SIZE)
     {
-        TRACE_E("GetFileSize() failed on " << fullPath);
+        TRACE_EW(L"GetFileSize() failed on " << fullPath);
         goto exit;
     }
     size = MAKEQWORD(loSize, hiSize);
     if (size < 70000)
     {
-        TRACE_E("File is too small for sparse test " << fullPath);
+        TRACE_EW(L"File is too small for sparse test " << fullPath);
         goto exit;
     }
 

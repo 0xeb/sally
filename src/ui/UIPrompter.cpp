@@ -70,9 +70,7 @@ public:
 
     void ShowError(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        SalMessageBoxW(ResolveParentHWND(parent), message, title,
                       MB_OK | MB_ICONEXCLAMATION);
     }
 
@@ -83,9 +81,7 @@ public:
 
     void ShowInfo(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        SalMessageBoxW(ResolveParentHWND(parent), message, title,
                       MB_OK | MB_ICONINFORMATION);
     }
 
@@ -97,9 +93,7 @@ public:
 
     PromptResult ConfirmError(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        int res = SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        int res = SalMessageBoxW(ResolveParentHWND(parent), message, title,
                                 MB_OKCANCEL | MB_ICONEXCLAMATION);
         return res == IDOK ? PromptResult{PromptResult::kOk} : PromptResult{PromptResult::kCancel};
     }
@@ -112,9 +106,7 @@ public:
 
     PromptResult AskYesNo(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        int res = SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        int res = SalMessageBoxW(ResolveParentHWND(parent), message, title,
                                 MB_YESNO | MB_ICONQUESTION);
         return res == IDYES ? PromptResult{PromptResult::kYes} : PromptResult{PromptResult::kNo};
     }
@@ -131,9 +123,7 @@ public:
 
     PromptResult AskYesNoCancel(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        int res = SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        int res = SalMessageBoxW(ResolveParentHWND(parent), message, title,
                                 MB_YESNOCANCEL | MB_ICONQUESTION);
         if (res == IDYES)
             return {PromptResult::kYes};
@@ -145,17 +135,14 @@ public:
     PromptResult AskYesNoWithCheckbox(const wchar_t* title, const wchar_t* message,
                                       const wchar_t* checkboxText, bool* checkboxValue) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        std::string cbTextA = WideToAnsi(checkboxText);
 
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT | MSGBOXEX_HINT;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        params.CheckBoxText = cbTextA.c_str();
+        params.Caption = title;
+        params.Text = message;
+        params.CheckBoxText = checkboxText;
         BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
         params.CheckBoxValue = &cbVal;
         int res = SalMessageBoxEx(&params);
@@ -167,17 +154,14 @@ public:
     void ShowInfoWithCheckbox(const wchar_t* title, const wchar_t* message,
                               const wchar_t* checkboxText, bool* checkboxValue) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        std::string cbTextA = WideToAnsi(checkboxText);
 
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MB_OK | MB_ICONINFORMATION | MSGBOXEX_HINT;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        params.CheckBoxText = cbTextA.c_str();
+        params.Caption = title;
+        params.Text = message;
+        params.CheckBoxText = checkboxText;
         BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
         params.CheckBoxValue = &cbVal;
         SalMessageBoxEx(&params);
@@ -188,17 +172,14 @@ public:
     void ShowErrorWithCheckbox(const wchar_t* title, const wchar_t* message,
                                const wchar_t* checkboxText, bool* checkboxValue) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        std::string cbTextA = WideToAnsi(checkboxText);
 
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MB_OK | MB_ICONERROR;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        params.CheckBoxText = cbTextA.c_str();
+        params.Caption = title;
+        params.Text = message;
+        params.CheckBoxText = checkboxText;
         BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
         params.CheckBoxValue = &cbVal;
         SalMessageBoxEx(&params);
@@ -209,17 +190,14 @@ public:
     PromptResult ConfirmWithCheckbox(const wchar_t* title, const wchar_t* message,
                                      const wchar_t* checkboxText, bool* checkboxValue) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        std::string cbTextA = WideToAnsi(checkboxText);
 
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_HINT;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        params.CheckBoxText = cbTextA.c_str();
+        params.Caption = title;
+        params.Text = message;
+        params.CheckBoxText = checkboxText;
         BOOL cbVal = checkboxValue ? (*checkboxValue ? TRUE : FALSE) : FALSE;
         params.CheckBoxValue = &cbVal;
         int res = SalMessageBoxEx(&params);
@@ -230,20 +208,17 @@ public:
 
     PromptResult AskSkipSkipAllFocus(const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MSGBOXEX_YESNOOKCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        char aliasBtnNames[200];
-        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL),
-                DIALOG_OK, LoadStr(IDS_MSGBOXBTN_FOCUS));
+        params.Caption = title;
+        params.Text = message;
+        wchar_t aliasBtnNames[200];
+        swprintf_s(aliasBtnNames, L"%d\t%s\t%d\t%s\t%d\t%s",
+                DIALOG_YES, LoadStrW(IDS_MSGBOXBTN_SKIP),
+                DIALOG_NO, LoadStrW(IDS_MSGBOXBTN_SKIPALL),
+                DIALOG_OK, LoadStrW(IDS_MSGBOXBTN_FOCUS));
         params.AliasBtnNames = aliasBtnNames;
         int res = SalMessageBoxEx(&params);
         if (res == DIALOG_YES)
@@ -255,19 +230,16 @@ public:
 
     PromptResult AskSkipSkipAllCancel(const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MB_YESNOCANCEL | MB_ICONEXCLAMATION | MSGBOXEX_DEFBUTTON3 | MSGBOXEX_SILENT;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
-        char aliasBtnNames[200];
-        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                DIALOG_YES, LoadStr(IDS_MSGBOXBTN_SKIP),
-                DIALOG_NO, LoadStr(IDS_MSGBOXBTN_SKIPALL));
+        params.Caption = title;
+        params.Text = message;
+        wchar_t aliasBtnNames[200];
+        swprintf_s(aliasBtnNames, L"%d\t%s\t%d\t%s",
+                DIALOG_YES, LoadStrW(IDS_MSGBOXBTN_SKIP),
+                DIALOG_NO, LoadStrW(IDS_MSGBOXBTN_SKIPALL));
         params.AliasBtnNames = aliasBtnNames;
         int res = SalMessageBoxEx(&params);
         if (res == DIALOG_YES)
@@ -279,33 +251,26 @@ public:
 
     PromptResult AskRetryCancel(const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        int res = SalMessageBox(GetDefaultParentHWND(), msgA.c_str(), titleA.c_str(),
+        int res = SalMessageBoxW(GetDefaultParentHWND(), message, title,
                                 MB_RETRYCANCEL | MB_ICONEXCLAMATION);
         return {res == IDRETRY ? PromptResult::kRetry : PromptResult::kCancel};
     }
 
     PromptResult AskRetryCancel(HWND parent, const wchar_t* title, const wchar_t* message) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-        int res = SalMessageBox(ResolveParentHWND(parent), msgA.c_str(), titleA.c_str(),
+        int res = SalMessageBoxW(ResolveParentHWND(parent), message, title,
                                 MB_RETRYCANCEL | MB_ICONEXCLAMATION);
         return {res == IDRETRY ? PromptResult::kRetry : PromptResult::kCancel};
     }
 
     void ShowErrorWithHelp(const wchar_t* title, const wchar_t* message, uint32_t helpId) override
     {
-        std::string titleA = WideToAnsi(title);
-        std::string msgA = WideToAnsi(message);
-
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = GetDefaultParentHWND();
         params.Flags = MSGBOXEX_OK | MSGBOXEX_HELP | MSGBOXEX_ICONEXCLAMATION;
-        params.Caption = titleA.c_str();
-        params.Text = msgA.c_str();
+        params.Caption = title;
+        params.Text = message;
         params.ContextHelpId = helpId;
         params.HelpCallback = MessageBoxHelpCallback;
         SalMessageBoxEx(&params);
@@ -319,37 +284,6 @@ IPrompter* GetUIPrompter()
 }
 
 // Non-virtual ANSI convenience overloads — convert and forward to wide versions.
-void IPrompter::ShowError(const char* title, const char* message)
-{
-    ShowError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
-}
-
-void IPrompter::ShowInfo(const char* title, const char* message)
-{
-    ShowInfo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
-}
-
-PromptResult IPrompter::ConfirmError(const char* title, const char* message)
-{
-    return ConfirmError(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
-}
-
-PromptResult IPrompter::ConfirmDelete(const char* path, bool recycleBin)
-{
-    return ConfirmDelete(AnsiToWide(path).c_str(), recycleBin);
-}
-
-PromptResult IPrompter::ConfirmOverwrite(const char* path, const char* existingInfo)
-{
-    return ConfirmOverwrite(path ? AnsiToWide(path).c_str() : nullptr,
-                            existingInfo ? AnsiToWide(existingInfo).c_str() : nullptr);
-}
-
-PromptResult IPrompter::AskYesNo(const char* title, const char* message)
-{
-    return AskYesNo(AnsiToWide(title).c_str(), AnsiToWide(message).c_str());
-}
-
 void IPrompter::ShowError(HWND parent, const wchar_t* title, const wchar_t* message)
 {
     (void)parent;

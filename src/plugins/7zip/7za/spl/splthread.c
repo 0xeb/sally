@@ -27,7 +27,7 @@ RunThreadWithCallStackObject(LPTHREAD_START_ROUTINE startAddress, LPVOID paramet
     HMODULE module = NULL;
     FThreadBody addCallStackObject = NULL;
 
-    if ((module = GetModuleHandle("sal7zip.dll")) != NULL &&
+    if ((module = GetModuleHandleW(L"sal7zip.dll")) != NULL &&
         (addCallStackObject = (FThreadBody)GetProcAddress(module, "AddCallStackObject")) != NULL)
     {
         // successfully obtained AddCallStackObject from sal7zip.dll

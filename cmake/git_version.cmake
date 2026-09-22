@@ -31,10 +31,10 @@ find_package(Git QUIET)
 #     -D, so sibling build trees (the private test suite configures Sally sub-builds of its
 #     own) silently kept their old value.
 #
-# The second one bites harder than it looks, because configure_file below writes into the
-# SOURCE tree: every build directory shares one src/git_version.h, so whichever configured
-# last decides the version for all of them. Making this line unconditional means they all
-# agree, and the shared header stops being a race.
+# The second one bit harder when generation still happened in the source tree:
+# sibling build directories could stamp different cached versions into one shared
+# header. Generation is now build-local, and this unconditional value also keeps
+# each independently configured tree current.
 #
 # If you genuinely need a different value, pass -DSALLY_VERSION_OVERRIDE=x.y.z. That is a
 # distinct name, so it cannot be confused with a leftover cache entry.
@@ -135,9 +135,13 @@ if(NOT GIT_VERSION_AVAILABLE)
     message(STATUS "Git version: not available (using static version)")
 endif()
 
-# Configure the header file
+# Configure the header in this build tree. Multiple test and production builds
+# may configure Sally concurrently, so generated files must never be shared
+# through the source checkout.
+set(SALLY_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(MAKE_DIRECTORY "${SALLY_GENERATED_INCLUDE_DIR}")
 configure_file(
     "${CMAKE_SOURCE_DIR}/src/git_version.h.in"
-    "${CMAKE_SOURCE_DIR}/src/git_version.h"
+    "${SALLY_GENERATED_INCLUDE_DIR}/git_version.h"
     @ONLY
 )

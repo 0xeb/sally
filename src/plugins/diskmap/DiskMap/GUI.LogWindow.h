@@ -9,7 +9,7 @@
 
 #include "System.CLogger.h"
 
-const TCHAR szLogWindowClass[] = TEXT("Zar.DM.LogWin.WC");
+const wchar_t szLogWindowClass[] = L"Zar.DM.LogWin.WC";
 
 #define LV_MARGIN 4
 
@@ -51,9 +51,9 @@ protected:
         RECT rct;
         GetClientRect(this->_hWnd, &rct);
 
-        this->_hWndListView = CreateWindowEx(
+        this->_hWndListView = CreateWindowExW(
             WS_EX_CLIENTEDGE | WS_EX_NOPARENTNOTIFY,
-            WC_LISTVIEW, TEXT(""),
+            WC_LISTVIEWW, L"",
             WS_CHILDWINDOW | WS_GROUP | WS_TABSTOP | WS_VISIBLE |
                 LVS_SHOWSELALWAYS | LVS_REPORT | LVS_SINGLESEL | LVS_NOSORTHEADER | LVS_OWNERDATA,
 
@@ -92,24 +92,24 @@ protected:
             ListView_SetImageList(this->_hWndListView, imglistl, LVSIL_NORMAL);
             ListView_SetImageList(this->_hWndListView, imglists, LVSIL_SMALL);
 
-            LVCOLUMN lvc;
+            LVCOLUMNW lvc;
             lvc.mask = LVCF_FMT | LVCF_WIDTH | LVCF_TEXT | LVCF_SUBITEM;
             lvc.fmt = LVCFMT_LEFT;
 
             lvc.cx = 90;
-            lvc.pszText = const_cast<TCHAR*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HTYPE));
+            lvc.pszText = const_cast<wchar_t*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HTYPE));
             lvc.iSubItem = 0;
-            ListView_InsertColumn(this->_hWndListView, 0, &lvc);
+            SendMessageW(this->_hWndListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
             lvc.cx = 125;
-            lvc.pszText = const_cast<TCHAR*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HTEXT));
+            lvc.pszText = const_cast<wchar_t*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HTEXT));
             lvc.iSubItem = 1;
-            ListView_InsertColumn(this->_hWndListView, 1, &lvc);
+            SendMessageW(this->_hWndListView, LVM_INSERTCOLUMNW, 1, (LPARAM)&lvc);
 
             lvc.cx = 250;
-            lvc.pszText = const_cast<TCHAR*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HFILE));
+            lvc.pszText = const_cast<wchar_t*>(CZResourceString::GetString(IDS_DISKMAP_LOG_HFILE));
             lvc.iSubItem = 2;
-            ListView_InsertColumn(this->_hWndListView, 2, &lvc);
+            SendMessageW(this->_hWndListView, LVM_INSERTCOLUMNW, 2, (LPARAM)&lvc);
 
             ListView_SetItemCountEx(this->_hWndListView, 0, LVSICF_NOINVALIDATEALL);
         }
@@ -182,7 +182,7 @@ public:
 
     LRESULT OnNotify(int idFrom, NMHDR* pnmhdr)
     {
-        NMLVDISPINFO* plvdi;
+        NMLVDISPINFOW* plvdi;
         NMLVKEYDOWN* plvkd;
         int il;
         switch (pnmhdr->code)
@@ -195,7 +195,7 @@ public:
             }
             return 0;
         case LVN_GETDISPINFO:
-            plvdi = (NMLVDISPINFO*)pnmhdr;
+            plvdi = (NMLVDISPINFOW*)pnmhdr;
             CLogItemBase* lgi = this->_logger->GetLogItem(plvdi->item.iItem);
             switch (plvdi->item.iSubItem)
             {
@@ -203,15 +203,15 @@ public:
                 il = lgi->GetLevel();
                 plvdi->item.iImage = il;
                 plvdi->item.iIndent = 0;
-                plvdi->item.pszText = const_cast<TCHAR*>(this->_logLevels[il]->GetString());
+                plvdi->item.pszText = const_cast<wchar_t*>(this->_logLevels[il]->GetString());
                 break;
 
             case 1:
-                plvdi->item.pszText = const_cast<TCHAR*>(lgi->GetText());
+                plvdi->item.pszText = const_cast<wchar_t*>(lgi->GetText());
                 break;
 
             case 2:
-                plvdi->item.pszText = const_cast<TCHAR*>(lgi->GetPath());
+                plvdi->item.pszText = const_cast<wchar_t*>(lgi->GetPath());
                 break;
 
             default:
@@ -219,12 +219,12 @@ public:
             }
             if (plvdi->item.pszText == NULL)
             {
-                static TCHAR emptyBuff[] = TEXT("");
+                static wchar_t emptyBuff[] = L"";
                 plvdi->item.pszText = emptyBuff;
             }
             return 0;
         }
-        return DefWindowProc(this->_hWnd, WM_NOTIFY, (WPARAM)(int)(idFrom), (LPARAM)(NMHDR*)(pnmhdr));
+        return DefWindowProcW(this->_hWnd, WM_NOTIFY, (WPARAM)(int)(idFrom), (LPARAM)(NMHDR*)(pnmhdr));
     }
     BOOL OnKey(UINT vkey, BOOL fDown, int cRepeat, UINT flags)
     {
@@ -246,7 +246,7 @@ public:
         case WM_KEYDOWN:
             return this->OnKey((UINT)(wParam), TRUE, (int)(short)LOWORD(lParam), (UINT)HIWORD(lParam))
                        ? 0
-                       : DefWindowProc(hWnd, message, wParam, lParam);
+                       : DefWindowProcW(hWnd, message, wParam, lParam);
 
         case WM_NOTIFY:
             return this->OnNotify((int)(wParam), (NMHDR*)(lParam));
@@ -265,7 +265,7 @@ public:
         case WM_DESTROY:
             return this->OnDestroy(), 0;
         }
-        return DefWindowProc(hWnd, message, wParam, lParam);
+        return DefWindowProcW(hWnd, message, wParam, lParam);
     }
 
     static BOOL RegisterClass()
@@ -273,9 +273,9 @@ public:
         static ATOM a = NULL;
         if (!a)
         {
-            WNDCLASSEX wcex;
+            WNDCLASSEXW wcex;
 
-            wcex.cbSize = sizeof(WNDCLASSEX);
+            wcex.cbSize = sizeof(WNDCLASSEXW);
 
             wcex.style = 0;
             wcex.lpfnWndProc = CLogWindow::s_WndProc;
@@ -286,17 +286,17 @@ public:
             wcex.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
             wcex.lpszMenuName = NULL;
             wcex.lpszClassName = szLogWindowClass;
-            wcex.hIcon = (HICON)LoadImage(CWindow::s_hInstance, MAKEINTRESOURCE(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 32, 32, LR_CREATEDIBSECTION);
-            wcex.hIconSm = (HICON)LoadImage(CWindow::s_hInstance, MAKEINTRESOURCE(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 16, 16, LR_CREATEDIBSECTION);
+            wcex.hIcon = (HICON)LoadImageW(CWindow::s_hInstance, MAKEINTRESOURCEW(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 32, 32, LR_CREATEDIBSECTION);
+            wcex.hIconSm = (HICON)LoadImageW(CWindow::s_hInstance, MAKEINTRESOURCEW(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 16, 16, LR_CREATEDIBSECTION);
 
-            a = ::RegisterClassEx(&wcex);
+            a = ::RegisterClassExW(&wcex);
         }
         BOOL ret = (a != NULL);
         return ret;
     }
     static BOOL UnregisterClass()
     {
-        BOOL ret = ::UnregisterClass(szLogWindowClass, CWindow::s_hInstance);
+        BOOL ret = ::UnregisterClassW(szLogWindowClass, CWindow::s_hInstance);
         if (!ret)
             TRACE_E("UnregisterClass(szLogWindowClass) has failed");
         return ret;

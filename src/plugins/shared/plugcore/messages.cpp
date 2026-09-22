@@ -16,14 +16,14 @@
 // CMessageCenter
 //
 
-const char* CMessageCenter::Version = "1";
+const char* CMessageCenter::Version = "2";
 
 CMessageCenter::CMessageCenter(const char* name, BOOL sender)
 {
     CALL_STACK_MESSAGE3("CMessageCenter::CMessageCenter(%s, %d)", name, sender);
-    lstrcpy(Name = new char[lstrlen(name) + 1], name);
-    ObjectName = new char[lstrlen(name) + 130];
-    sally::plugcore::BuildMessageCenterObjectNameForCurrentProcess(ObjectName, lstrlen(name) + 130, name);
+    lstrcpyA(Name = new char[lstrlenA(name) + 1], name);
+    ObjectName = new char[lstrlenA(name) + 130];
+    sally::plugcore::BuildMessageCenterObjectNameForCurrentProcess(ObjectName, lstrlenA(name) + 130, name);
     Sender = sender;
 
     StartupMutex = NULL;
@@ -226,7 +226,7 @@ BOOL CMessageCenter::Init()
         if (Sender)
         {
             // sender can activate only if the receiver is running
-            StartupMutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, str);
+            StartupMutex = OpenMutexA(MUTEX_ALL_ACCESS, FALSE, str);
             if (!StartupMutex)
             {
                 TRACE_I("Unable to open starting mutex -- server is probably not yet running.");
@@ -237,7 +237,7 @@ BOOL CMessageCenter::Init()
         }
         else
         {
-            StartupMutex = CreateMutex(NULL, TRUE, str);
+            StartupMutex = CreateMutexA(NULL, TRUE, str);
             if (!StartupMutex)
             {
                 TRACE_E("Unable to create starting mutex.");
@@ -253,7 +253,7 @@ BOOL CMessageCenter::Init()
 
         // create synchronization objects
         str = Concatenate(ObjectName, " - Data Mutex");
-        DataMutex = Sender ? OpenMutex(MUTEX_ALL_ACCESS, FALSE, str) : CreateMutex(NULL, FALSE, str);
+        DataMutex = Sender ? OpenMutexA(MUTEX_ALL_ACCESS, FALSE, str) : CreateMutexA(NULL, FALSE, str);
         if (!DataMutex)
         {
             TRACE_E("Unable to create data mutex.");
@@ -261,9 +261,9 @@ BOOL CMessageCenter::Init()
         }
 
         str = Concatenate(ObjectName, " - Buffer Full");
-        BufferFree = Sender ? OpenEvent(EVENT_ALL_ACCESS, FALSE, str) : CreateEvent(NULL, TRUE, FALSE, str);
+        BufferFree = Sender ? OpenEventA(EVENT_ALL_ACCESS, FALSE, str) : CreateEventA(NULL, TRUE, FALSE, str);
         str = Concatenate(ObjectName, " - Have Message");
-        HaveMessage = Sender ? OpenEvent(EVENT_ALL_ACCESS, FALSE, str) : CreateEvent(NULL, TRUE, FALSE, str);
+        HaveMessage = Sender ? OpenEventA(EVENT_ALL_ACCESS, FALSE, str) : CreateEventA(NULL, TRUE, FALSE, str);
         if (!BufferFree || !HaveMessage)
         {
             TRACE_E("Unable to create event.");
@@ -273,7 +273,7 @@ BOOL CMessageCenter::Init()
         // create shared memory segment
         const char* mapname = Concatenate(
             Concatenate(ObjectName, " - Buffer v"), Version);
-        FileMapping = Sender ? OpenFileMapping(FILE_MAP_WRITE, FALSE, mapname) : CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 are we passing x86/x64-incompatible data?
+        FileMapping = Sender ? OpenFileMappingA(FILE_MAP_WRITE, FALSE, mapname) : CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 are we passing x86/x64-incompatible data?
                                                                                                    BufferSize, mapname);
         if (!FileMapping)
         {

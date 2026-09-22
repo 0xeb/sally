@@ -44,18 +44,16 @@
 
 #define E_STOPEXTRACTION (HRESULT)0x8000FEDC
 
-#define MAX_PATH_LEN 1024
-
 typedef UINT32(WINAPI* TCreateObjectFunc)(const GUID* clsID, const GUID* interfaceID, void** outObject);
 
 // used to pass the items that will be extracted
 struct CArchiveItemInfo
 {
-    CSysString NameInArchive; // in the archive (i.e. including the path)
+    UString NameInArchive; // in the archive (i.e. including the path)
     const CFileData* FileData;
     bool IsDir;
 
-    CArchiveItemInfo(CSysString name, const CFileData* fd, bool isDir)
+    CArchiveItemInfo(const wchar_t* name, const CFileData* fd, bool isDir)
     {
         NameInArchive = name;
         FileData = fd;
@@ -76,11 +74,11 @@ public:
         UINT32 Idx;
         BOOL Encrypted;
         UINT64 PackedSize;
-        char* Method;
+        UString Method;
 
         CItemData();
         ~CItemData();
-        void SetMethod(const char* method);
+        void SetMethod(const wchar_t* method);
     };
 
 protected:
@@ -90,26 +88,26 @@ public:
     C7zClient();
     ~C7zClient();
 
-    BOOL ListArchive(const char* fileName, CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData, UString& password);
+    BOOL ListArchive(const wchar_t* fileName, CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData, UString& password);
 
-    int Decompress(CSalamanderForOperationsAbstract* salamander, const char* archiveName, const char* outDir,
+    int Decompress(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName, const wchar_t* outDir,
                    TIndirectArray<CArchiveItemInfo>* itemList, UString& password, BOOL silentDelete = FALSE);
 
-    int TestArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName);
+    int TestArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName);
 
-    int Update(CSalamanderForOperationsAbstract* salamander, const char* archiveName, const char* srcPath, BOOL isNewArchive,
+    int Update(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName, const wchar_t* srcPath, BOOL isNewArchive,
                TIndirectArray<CFileItem>* fileList, CCompressParams* compressParams, bool passwordIsDefined, UString password);
 
-    int Delete(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
+    int Delete(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName,
                TIndirectArray<CArchiveItemInfo>* archiveList, bool passwordIsDefined, UString& password);
 
 protected:
-    BOOL OpenArchive(const char* fileName, IInArchive** archive, UString& password, BOOL quiet = FALSE);
+    BOOL OpenArchive(const wchar_t* fileName, IInArchive** archive, UString& password, BOOL quiet = FALSE);
 
     BOOL FillItemData(IInArchive* archive, UINT32 index, C7zClient::CItemData* itemData);
     BOOL AddFileDir(IInArchive* archive, UINT32 idx,
                     CSalamanderDirectoryAbstract* dir, CPluginDataInterface*& pluginData,
-                    BOOL* reportTooLongPathErr, const char* archiveName);
+                    const wchar_t* archiveName);
 
     int GetArchiveItemList(IInArchive* archive, TIndirectArray<CArchiveItem>** archiveItems, UINT32* numItems);
 

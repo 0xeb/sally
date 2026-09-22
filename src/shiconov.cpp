@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -8,6 +8,13 @@
 #include "geticon.h"
 #include "shiconov.h"
 #include "common/widepath.h"
+#include "common/unicode/helpers.h" // WideToAnsi for the narrow-only handler-name log/heuristic bridge
+#include "common/IRegistry.h"
+#include "common/IFileSystem.h"
+#include "common/IPathService.h"
+#include "common/IShell.h"
+#include "common/SalPathWide.h"
+#include "common/Win32TextCodec.h"
 #include "plugins\shared\sqlite\sqlite3.h"
 #include "shiconov_limits.h"
 #include "shiconov_diag.h"
@@ -24,15 +31,44 @@ TIndirectArray<CShellIconOverlayItem2> ListOfShellIconOverlays(15, 5); // list o
 //
 // *****************************************************************************
 
-BOOL GetSQLitePath(char* path, int pathSize)
+BOOL GetSQLitePath(std::wstring& path)
 {
-    if (!GetModuleFileName(NULL, path, pathSize))
+    if (gPathService == NULL || !gPathService->GetModuleFileName(NULL, path).success)
         return FALSE;
-    char* ptr = strrchr(path, '\\');
-    if (ptr == NULL)
+    const size_t slash = path.find_last_of(L'\\');
+    if (slash == std::wstring::npos)
         return FALSE;
-    *ptr = 0;
-    return SalPathAppend(path, "utils\\sqlite.dll", pathSize);
+    path.resize(slash + 1);
+    path += L"utils\\sqlite.dll";
+    return TRUE;
+}
+
+// IShellIconOverlayIdentifier exposes only a caller-owned output buffer. Keep that
+// capacity negotiation at this COM boundary and return an exact UTF-16 owner.
+HRESULT GetOverlayInfoDynamic(IShellIconOverlayIdentifier* identifier, std::wstring& iconFile,
+                              int* iconIndex, DWORD* flags)
+{
+    iconFile.clear();
+    size_t capacity = 512;
+    for (;;)
+    {
+        std::vector<wchar_t> buffer(capacity);
+        const HRESULT hr = identifier->GetOverlayInfo(buffer.data(), static_cast<int>(capacity), iconIndex, flags);
+        size_t length = 0;
+        while (length < capacity && buffer[length] != 0)
+            ++length;
+        if (hr == S_OK && length < capacity)
+        {
+            iconFile.assign(buffer.data(), length);
+            return hr;
+        }
+        if (capacity > static_cast<size_t>(INT_MAX) / 2)
+            return hr == S_OK ? HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER) : hr;
+        if (hr != S_OK && hr != HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER) &&
+            hr != HRESULT_FROM_WIN32(ERROR_MORE_DATA))
+            return hr;
+        capacity *= 2;
+    }
 }
 
 typedef int (*FT_sqlite3_open_v2)(const char* filename, sqlite3** ppDb, int flags, const char* zVfs);
@@ -58,10 +94,10 @@ struct CSQLite3DynLoad : public CSQLite3DynLoadBase
 
 CSQLite3DynLoad::CSQLite3DynLoad()
 {
-    CPathBuffer sqlitePath; // Heap-allocated for long path support
-    if (GetSQLitePath(sqlitePath, sqlitePath.Size()))
+    std::wstring sqlitePath;
+    if (GetSQLitePath(sqlitePath))
     {
-        SQLite3DLL = HANDLES(LoadLibrary(sqlitePath));
+        SQLite3DLL = HANDLES(LoadLibraryW(sqlitePath.c_str()));
         if (SQLite3DLL != NULL)
         {
             open_v2 = (FT_sqlite3_open_v2)GetProcAddress(SQLite3DLL, "sqlite3_open_v2");
@@ -84,26 +120,30 @@ CSQLite3DynLoad::CSQLite3DynLoad()
         TRACE_E("Cannot find path with sqlite.dll!");
 }
 
-BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlite3_Dyn_InOut, BOOL* pathIsFromConfig)
+BOOL GetGoogleDrivePath(std::wstring& gdPath, CSQLite3DynLoadBase** sqlite3_Dyn_InOut, BOOL* pathIsFromConfig)
 {
     BOOL ret = FALSE;
     *pathIsFromConfig = FALSE;
 
-    CWidePathBuffer widePath;
-    CPathBuffer mbPath; // Heap-allocated for long path support
-    CPathBuffer sDbPath; // Heap-allocated for long path support
-    if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+    // 'mbPath' used to be one buffer doing TWO width jobs - the UTF-8 byte
+    // string for sqlite3 down in the query branch, and a genuine wide path in the fallback
+    // branch at the bottom. Split, because no single width can be right for both.
+    std::wstring widePath;
+    std::wstring fallbackPath;
+    std::wstring sDbPath;
+    IShell* shell = gShell != NULL ? gShell : GetWin32Shell();
+    if (shell != NULL && shell->GetKnownFolderPath(FOLDERID_LocalAppData, sDbPath).success)
     {
         BOOL pathOK = FALSE;
-        char* sDbPathEnd = sDbPath + strlen(sDbPath);
-        if (SalPathAppend(sDbPath, "Google\\Drive\\user_default\\sync_config.db", sDbPath.Size()) &&
-            FileExists(sDbPath))
+        const std::wstring localAppData = sDbPath;
+        SalPathAppendW(sDbPath, L"Google\\Drive\\user_default\\sync_config.db");
+        if (gFileSystem->FileExists(sDbPath.c_str()))
             pathOK = TRUE;
         if (!pathOK)
         {
-            *sDbPathEnd = 0;
-            if (SalPathAppend(sDbPath, "Google\\Drive\\sync_config.db", sDbPath.Size()) &&
-                FileExists(sDbPath))
+            sDbPath = localAppData;
+            SalPathAppendW(sDbPath, L"Google\\Drive\\sync_config.db");
+            if (gFileSystem->FileExists(sDbPath.c_str()))
                 pathOK = TRUE;
         }
         if (pathOK)
@@ -112,15 +152,22 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
             CSQLite3DynLoad* sqlite3_Dyn = sqlite3_Dyn_InOut == NULL || *sqlite3_Dyn_InOut == NULL ? new CSQLite3DynLoad() : (CSQLite3DynLoad*)*sqlite3_Dyn_InOut;
             if (sqlite3_Dyn->OK)
             {
-                sqlite3* pDb;
+                sqlite3* pDb = NULL;
                 sqlite3_stmt* pStmt;
+                // REVERTED to char. sqlite3_prepare_v2 takes 'const char* zSql'
+                // and this text is UTF-8 by that library's contract - the variable is even named
+                // utf8Select. An earlier sweep widened it, which is a hard C2440 against its own
+                // narrow initialiser. Byte domain, and it stays that way.
                 char utf8Select[] = "SELECT data_value FROM data WHERE entry_key = 'local_sync_root_path';"; // UTF8 string (if any extra character were to be inserted, it would need to be converted from ANSI->UTF8)
 
-                // sqlite3_open_v2 requires UTF8 path, so we will convert it from ANSI to UTF8
-                if (ConvertA2U(sDbPath, -1, widePath, widePath.Size()) &&
-                    ConvertU2A(widePath, -1, mbPath, mbPath.Size(), FALSE, CP_UTF8))
+                // sqlite3_open_v2's filename is UTF-8 BYTES, so this is a
+                // std::string and not a path buffer. sDbPath is ALREADY UTF-16, so ONE conversion
+                // does it - the old code read that wide buffer as ANSI first and converted back
+                // out. Sized from the source: UTF-8 needs at most 3 bytes per UTF-16 code unit.
+                std::string utf8DbPath;
+                if (Win32EncodeText(CP_UTF8, sDbPath, utf8DbPath))
                 {
-                    int iSts = sqlite3_Dyn->open_v2(mbPath, &pDb, SQLITE_OPEN_READONLY, NULL);
+                    int iSts = sqlite3_Dyn->open_v2(utf8DbPath.c_str(), &pDb, SQLITE_OPEN_READONLY, NULL);
                     if (!iSts)
                     {
                         iSts = sqlite3_Dyn->prepare_v2(pDb, utf8Select, -1, &pStmt, NULL);
@@ -131,36 +178,42 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                             {
                                 const unsigned char* utf8Path = sqlite3_Dyn->column_text(pStmt, 0);
                                 int utf8PathLen = sqlite3_Dyn->column_bytes(pStmt, 0);
+                                // utf8Path is UTF-8 BYTES from sqlite3, so the
+                                // cast is (const char*) - it used to say (const wchar_t*).
+                                // The former narrow round trip defaulted to CP_ACP purely to
+                                // strip a "\\?\" prefix in narrow, corrupting any non-ASCII path.
+                                // widePath already holds the correct UTF-16, so strip it there.
                                 if (utf8Path != NULL && utf8PathLen > 0 &&
-                                    ConvertA2U((const char*)utf8Path, utf8PathLen, widePath, widePath.Size(), CP_UTF8) &&
-                                    ConvertU2A(widePath, -1, mbPath, mbPath.Size()) &&
-                                    (int)strlen(mbPath) < gdPathMax)
+                                    Win32DecodeText(CP_UTF8, reinterpret_cast<const char*>(utf8Path),
+                                                    static_cast<size_t>(utf8PathLen), widePath) &&
+                                    widePath.find(L'\0') == std::wstring::npos)
                                 {
-                                    if (strnicmp(mbPath, "\\\\?\\UNC\\", 8) == 0)
-                                        memmove(mbPath + 1, mbPath + 7, strlen(mbPath + 7) + 1);
+                                    if (widePath.length() >= 8 && _wcsnicmp(widePath.c_str(), L"\\\\?\\UNC\\", 8) == 0)
+                                        widePath.replace(0, 8, L"\\\\");
                                     else
                                     {
-                                        if (strncmp(mbPath, "\\\\?\\", 4) == 0)
-                                            memmove(mbPath, mbPath + 4, strlen(mbPath + 4) + 1);
+                                        if (widePath.length() >= 4 && wcsncmp(widePath.c_str(), L"\\\\?\\", 4) == 0)
+                                            widePath.erase(0, 4);
                                     }
-                                    strcpy_s(gdPath, gdPathMax, mbPath);
-                                    TRACE_I("Google Drive path: " << gdPath);
+                                    gdPath = widePath;
+                                    TRACE_IW(L"Google Drive path: " << gdPath);
                                     ret = TRUE;
                                     *pathIsFromConfig = TRUE;
                                 }
                                 else
-                                    TRACE_E("SQLite: cannot get value (or value too big or not convertible to ANSI string) from " << sDbPath);
+                                    TRACE_EW(L"SQLite: cannot decode the UTF-8 path value from " << sDbPath);
                             }
                             else
-                                TRACE_E("SQLite: cannot step " << sDbPath);
+                                TRACE_EW(L"SQLite: cannot step " << sDbPath);
                             sqlite3_Dyn->finalize(pStmt);
                         }
                         else
-                            TRACE_I("SQLite: cannot prepare " << sDbPath); // this is hit when GD is installed but "not signed in"
+                            TRACE_IW(L"SQLite: cannot prepare " << sDbPath); // this is hit when GD is installed but "not signed in"
                     }
                     else
-                        TRACE_E("SQLite: cannot open " << sDbPath);
-                    sqlite3_Dyn->close(pDb);
+                        TRACE_EW(L"SQLite: cannot open " << sDbPath);
+                    if (pDb != NULL)
+                        sqlite3_Dyn->close(pDb);
                 }
             }
             if (sqlite3_Dyn_InOut != NULL)
@@ -169,20 +222,19 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                 delete sqlite3_Dyn; // release sqlite.dll, nobody is waiting for it
         }
         else
-            TRACE_I("Cannot find Google Drive's configuration file: " << sDbPath);
+            TRACE_IW(L"Cannot find Google Drive's configuration file: " << sDbPath);
     }
     else
         TRACE_E("Cannot get value of CSIDL_LOCAL_APPDATA!");
 
     if (!ret)
     {
-        if (SHGetFolderPath(NULL, WindowsVistaAndLater ? CSIDL_PROFILE : CSIDL_MYDOCUMENTS,
-                            NULL, 0 /* SHGFP_TYPE_CURRENT */, mbPath) == S_OK &&
-            SalPathAppend(mbPath, "Google Drive", mbPath.Size()) &&
-            (int)strlen(mbPath) < gdPathMax)
+        const GUID& fallbackFolder = WindowsVistaAndLater ? FOLDERID_Profile : FOLDERID_Documents;
+        if (shell != NULL && shell->GetKnownFolderPath(fallbackFolder, fallbackPath).success)
         {
-            TRACE_I("Using default Google Drive path instead: " << mbPath);
-            strcpy_s(gdPath, gdPathMax, mbPath);
+            SalPathAppendW(fallbackPath, L"Google Drive");
+            TRACE_IW(L"Using default Google Drive path instead: " << fallbackPath);
+            gdPath = std::move(fallbackPath);
             ret = TRUE;
         }
     }
@@ -209,7 +261,7 @@ HMODULE GetModuleByAddress(void *address)
 }
 */
 
-void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDiagRecord* diag)
+void InitShellIconOverlaysAuxAux(CLSID* clsid, const wchar_t* name, ShellOverlayDiagRecord* diag)
 {
     IShellIconOverlayIdentifier* iconOverlayIdentifier;
     // Assign the HRESULT rather than comparing inline: it is the only evidence we get when
@@ -220,16 +272,16 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
     if (coCreateHr == S_OK &&
         iconOverlayIdentifier != NULL) // probably unnecessary test, just to be safe
     {
-        CWidePathBuffer iconFile;
+        std::wstring iconFile;
         int iconIndex;
         DWORD flags;
         // NOTE: strict == S_OK, so a handler returning S_FALSE is dropped exactly like one
         // that failed. Recording the value is what will let us tell those apart (issue #90).
-        HRESULT overlayInfoHr = iconOverlayIdentifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags);
+        HRESULT overlayInfoHr = GetOverlayInfoDynamic(iconOverlayIdentifier, iconFile, &iconIndex, &flags);
         if (diag != NULL)
         {
             diag->Hr = overlayInfoHr;
-            wcsncpy_s(diag->IconFile, iconFile.Get(), _TRUNCATE);
+            diag->IconFile = iconFile;
         }
         if (overlayInfoHr == S_OK)
         {
@@ -244,7 +296,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
                 if (iconOverlayIdentifier->GetPriority(&priority) != S_OK)
                 {
                     priority = 100; // lowest priority
-                    TRACE_E("InitShellIconOverlays(): GetPriority method returns error for: " << name);
+                    TRACE_EW(L"InitShellIconOverlays(): GetPriority method returns error for: " << name);
                 }
                 if (diag != NULL)
                     diag->Priority = priority;
@@ -252,15 +304,13 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
                 if ((flags & ISIOI_ICONINDEX) == 0)
                     iconIndex = 0;
 
-                CPathBuffer iconFileMB; // Heap-allocated for long path support
-                WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, iconFileMB.Size(), NULL, NULL);
-                iconFileMB[iconFileMB.Size() - 1] = 0;
-
+                // wide: iconFile is already the genuine wide path from
+                // GetOverlayInfo - use it directly instead of narrowing it first.
                 // Load this overlay's icon at all three sizes (issue #90 - see
                 // shiconov_icons.h for why this must not be a single packed call).
                 HICON iconOverlay[ICONSIZE_COUNT] = {0};
-                LoadShellOverlayIcons(iconFileMB, iconIndex, IconSizes, ICONSIZE_COUNT,
-                                      iconOverlay);
+                LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, IconSizes, ICONSIZE_COUNT,
+                                       iconOverlay);
 
                 int x;
                 for (x = 0; x < ICONSIZE_COUNT; x++)
@@ -278,26 +328,26 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
                 if (iconOverlay[ICONSIZE_16] != NULL && iconOverlay[ICONSIZE_32] != NULL && iconOverlay[ICONSIZE_48] != NULL)
                 {
                     BOOL isGoogleDrive = FALSE;
-                    const char* nameSkipWS = name;
+                    const wchar_t* nameSkipWS = name;
                     while (*nameSkipWS != 0 && *nameSkipWS == ' ')
                         nameSkipWS++;
-                    if (stricmp(name, "GDriveBlacklistedOverlay") == 0 ||
-                        stricmp(name, "GDriveSharedEditOverlay") == 0 ||
-                        stricmp(name, "GDriveSharedOverlay") == 0 ||
-                        stricmp(name, "GDriveSharedViewOverlay") == 0 ||
-                        stricmp(name, "GDriveSyncedOverlay") == 0 ||
-                        stricmp(name, "GDriveSyncingOverlay") == 0 ||
-                        stricmp(nameSkipWS, "GoogleDriveBlacklisted") == 0 ||
-                        stricmp(nameSkipWS, "GoogleDriveSynced") == 0 ||
-                        stricmp(nameSkipWS, "GoogleDriveSyncing") == 0)
+                    if (_wcsicmp(name, L"GDriveBlacklistedOverlay") == 0 ||
+                        _wcsicmp(name, L"GDriveSharedEditOverlay") == 0 ||
+                        _wcsicmp(name, L"GDriveSharedOverlay") == 0 ||
+                        _wcsicmp(name, L"GDriveSharedViewOverlay") == 0 ||
+                        _wcsicmp(name, L"GDriveSyncedOverlay") == 0 ||
+                        _wcsicmp(name, L"GDriveSyncingOverlay") == 0 ||
+                        _wcsicmp(nameSkipWS, L"GoogleDriveBlacklisted") == 0 ||
+                        _wcsicmp(nameSkipWS, L"GoogleDriveSynced") == 0 ||
+                        _wcsicmp(nameSkipWS, L"GoogleDriveSyncing") == 0)
                     {
                         isGoogleDrive = TRUE;
                         // Google Drive handlers are called only for subdirectories of the path where Google Drive resides
                         ShellIconOverlays.InitGoogleDrivePath(NULL, FALSE /* icon overlays not yet loaded */);
                     }
 #ifdef _DEBUG
-                    if (!isGoogleDrive && (StrIStr(name, "GDrive") != NULL || StrIStr(name, "GoogleDrive") != NULL))
-                        TRACE_E("It seems Google Drive again changed names of Icon Overlays in registry. New name: " << name);
+                    if (!isGoogleDrive && (StrIStr(name, L"GDrive") != NULL || StrIStr(name, L"GoogleDrive") != NULL))
+                        TRACE_EW(L"It seems Google Drive again changed names of Icon Overlays in registry. New name: " << name);
 #endif // _DEBUG
 
                     CShellIconOverlayItem* item = new CShellIconOverlayItem;
@@ -308,7 +358,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
                             item->Priority = priority;
                             item->Identifier = iconOverlayIdentifier;
                             item->IconOverlayIdCLSID = *clsid;
-                            lstrcpyn(item->IconOverlayName, name, item->IconOverlayName.Size());
+                            item->IconOverlayName = name;
                             item->GoogleDriveOverlay = isGoogleDrive;
                             iconOverlayIdentifier = NULL;
                             for (x = 0; x < ICONSIZE_COUNT; x++)
@@ -341,7 +391,7 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
                 {
                     if (diag != NULL)
                         diag->Outcome = OverlayOutcome::IconExtractFailed;
-                    TRACE_E("InitShellIconOverlays(): unable to get icons of all sizes for: " << name);
+                    TRACE_EW(L"InitShellIconOverlays(): unable to get icons of all sizes for: " << name);
                 }
 
                 for (x = 0; x < ICONSIZE_COUNT; x++)
@@ -352,14 +402,14 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
             {
                 if (diag != NULL)
                     diag->Outcome = OverlayOutcome::NoIconFileFlag;
-                TRACE_I("InitShellIconOverlays(): unable to get icon overlay location for: " << name);
+                TRACE_IW(L"InitShellIconOverlays(): unable to get icon overlay location for: " << name);
             }
         }
         else
         {
             if (diag != NULL)
                 diag->Outcome = OverlayOutcome::GetOverlayInfoFailed;
-            TRACE_I("InitShellIconOverlays(): GetOverlayInfo method returns error for: " << name); // Tortoise does this when more than 12 handlers are registered
+            TRACE_IW(L"InitShellIconOverlays(): GetOverlayInfo method returns error for: " << name); // Tortoise does this when more than 12 handlers are registered
         }
         if (iconOverlayIdentifier != NULL)
             iconOverlayIdentifier->Release();
@@ -371,11 +421,11 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name, ShellOverlayDia
             diag->Outcome = OverlayOutcome::CoCreateFailed;
             diag->Hr = coCreateHr;
         }
-        TRACE_I("InitShellIconOverlays(): unable to create object for: " << name); // e.g., "Offline Files" reports this on clean XP
+        TRACE_IW(L"InitShellIconOverlays(): unable to create object for: " << name); // e.g., "Offline Files" reports this on clean XP
     }
 }
 
-void InitShellIconOverlaysAux(CLSID* clsid, const char* name, ShellOverlayDiagRecord* diag)
+void InitShellIconOverlaysAux(CLSID* clsid, const wchar_t* name, ShellOverlayDiagRecord* diag)
 {
     __try
     {
@@ -407,48 +457,38 @@ void InitShellIconOverlays()
     ShellOverlayDiag.Header.EnableCustomIconOverlays = Configuration.EnableCustomIconOverlays != FALSE;
     SetOverlayDiagConfigRoot(ShellOverlayDiag.Header, SALAMANDER_ROOT_REG);
     if (Configuration.DisabledCustomIconOverlays != NULL)
-    {
-        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, Configuration.DisabledCustomIconOverlays, -1,
-                            ShellOverlayDiag.Header.DisabledList, 1024);
-        ShellOverlayDiag.Header.DisabledList[1023] = 0;
-    }
+        ShellOverlayDiag.Header.DisabledList = Configuration.DisabledCustomIconOverlays;
 
-    HKEY clsIDKey;
+    HKEY clsIDKey = NULL;
     LONG errRet;
-    if ((errRet = HANDLES_Q(RegOpenKeyEx(HKEY_CLASSES_ROOT, SAL_REG_KEY_CLASSES_ROOT_CLSID_A,
-                                         0, KEY_QUERY_VALUE, &clsIDKey))) != ERROR_SUCCESS)
+    RegistryResult registryResult = gRegistry->OpenKeyRead(
+        HKEY_CLASSES_ROOT, SAL_REG_KEY_CLASSES_ROOT_CLSID_W, clsIDKey);
+    if (!registryResult.success)
     {
-        TRACE_I("InitShellIconOverlays(): error opening HKEY_CLASSES_ROOT\\CLSID key: " << GetErrorText(errRet));
-        clsIDKey = NULL;
+        errRet = registryResult.errorCode;
+        TRACE_IW(L"InitShellIconOverlays(): error opening HKEY_CLASSES_ROOT\\CLSID key: " << GetErrorTextOwned(errRet).c_str());
     }
 
-    HKEY key;
-    if ((errRet = HANDLES_Q(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                                         SAL_REG_KEY_SHELL_ICON_OVERLAY_IDENTIFIERS_A,
-                                         0, KEY_ENUMERATE_SUB_KEYS, &key))) == ERROR_SUCCESS)
+    HKEY key = NULL;
+    registryResult = gRegistry->OpenKeyRead(
+        HKEY_LOCAL_MACHINE, SAL_REG_KEY_SHELL_ICON_OVERLAY_IDENTIFIERS_W, key);
+    if (registryResult.success)
     {
-        TIndirectArray<char> keyNames(15, 5);
-        CPathBuffer name; // Heap-allocated for long path support
-        DWORD i = 0;
-        while (1)
-        { // enumerate all icon-overlay-handlers sequentially
-            FILETIME dummy;
-            DWORD nameLen = name.Size() - 1; // RegEnumKeyEx expects size excluding null terminator
-            if ((errRet = RegEnumKeyEx(key, i, name, &nameLen, NULL, NULL, NULL, &dummy)) == ERROR_SUCCESS)
+        TIndirectArray<wchar_t> keyNames(15, 5);
+        std::vector<std::wstring> registeredNames;
+        registryResult = gRegistry->EnumSubKeys(key, registeredNames);
+        if (registryResult.success)
+        {
+            for (const std::wstring& name : registeredNames)
             {
                 int s = 0; // insert new name, there are about 15 of them, so we don't need any quick-sort
-                for (; s < keyNames.Count && stricmp(name, keyNames[s]) >= 0; s++)
+                for (; s < keyNames.Count && _wcsicmp(name.c_str(), keyNames[s]) >= 0; s++)
                     ;
-                keyNames.Insert(s, DupStr(name));
+                keyNames.Insert(s, DupStr(name.c_str()));
             }
-            else
-            {
-                if (errRet != ERROR_NO_MORE_ITEMS)
-                    TRACE_E("InitShellIconOverlays(): error enumerating ShellIconOverlayIdentifiers key: " << GetErrorText(errRet));
-                break;
-            }
-            i++;
         }
+        else
+            TRACE_EW(L"InitShellIconOverlays(): error enumerating ShellIconOverlayIdentifiers key: " << GetErrorTextOwned(registryResult.errorCode).c_str());
         // go through sorted list of icon-overlay-handlers (Explorer defines handler priority alphabetically)
         // handlers past MAX_SHELL_ICON_OVERLAYS are rejected in CShellIconOverlays::Add(); Explorer itself shows only ~11-15
         for (int s = 0; s < keyNames.Count; s++)
@@ -458,63 +498,72 @@ void InitShellIconOverlays()
             // bug report instead of vanishing without trace (see shiconov_diag.h).
             wchar_t diagName[128];
             diagName[0] = 0;
-            MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, keyNames[s], -1, diagName, 128);
+            lstrcpynW(diagName, keyNames[s], 128);
             diagName[127] = 0;
             ShellOverlayDiagRecord* diag = ShellOverlayDiag.Add(diagName, L"");
             ShellOverlayDiag.Header.Registered++;
 
-            HKEY handler;
-            if ((errRet = HANDLES_Q(RegOpenKeyEx(key, keyNames[s], 0, KEY_QUERY_VALUE, &handler))) == ERROR_SUCCESS)
+            HKEY handler = NULL;
+            registryResult = gRegistry->OpenKeyRead(key, keyNames[s], handler);
+            if (registryResult.success)
             {
-                char txtClsId[100];
-                DWORD size = 100;
-                DWORD type;
-                if ((errRet = SalRegQueryValueEx(handler, NULL, NULL, &type, (BYTE*)txtClsId, &size)) == ERROR_SUCCESS)
+                wchar_t txtClsId[100];
+                // lpcbData counts BYTES; this buffer is wchar_t, so a bare 100
+                // would declare half of it and truncate any CLSID string past 49 characters.
+                DWORD size = (DWORD)sizeof(txtClsId);
+                RegValueType type = RegValueType::None;
+                registryResult = gRegistry->ReadValue(handler, NULL, type, txtClsId, size);
+                if (registryResult.success)
                 {
-                    if (type == REG_SZ)
+                    if (type == RegValueType::String)
                     {
                         txtClsId[99] = 0; // just to be safe
-                        OLECHAR oleTxtClsId[100];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, txtClsId, -1, oleTxtClsId, 100);
-                        oleTxtClsId[99] = 0; // just to be safe
-
+                        // txtClsId is already wchar_t, so this CP_ACP round trip
+                        // converted data that was never narrow. CLSIDFromString takes LPCOLESTR
+                        // and consumes it directly, which retires the whole scratch buffer.
                         CLSID clsid;
-                        if (CLSIDFromString(oleTxtClsId, &clsid) == NOERROR)
+                        if (CLSIDFromString(txtClsId, &clsid) == NOERROR)
                         {
-                            char descr[1000];
+                            wchar_t descr[1000];
                             descr[0] = 0;
                             if (clsIDKey != NULL)
                             {
-                                HKEY classKey;
-                                if ((errRet = HANDLES_Q(RegOpenKeyEx(clsIDKey, txtClsId, 0, KEY_QUERY_VALUE, &classKey))) == ERROR_SUCCESS)
+                                HKEY classKey = NULL;
+                                // txtClsId is wide, so the unsuffixed form resolved
+                                // to RegOpenKeyExA. Needle-for-needle - the win32 count is unchanged.
+                                registryResult = gRegistry->OpenKeyRead(clsIDKey, txtClsId, classKey);
+                                if (registryResult.success)
                                 {
-                                    DWORD descrSize = 1000;
-                                    DWORD descrType;
-                                    if ((errRet = SalRegQueryValueEx(classKey, NULL, NULL, &descrType, (BYTE*)descr, &descrSize)) == ERROR_SUCCESS)
+                                    DWORD descrSize = (DWORD)sizeof(descr); // BYTES, not characters
+                                    RegValueType descrType = RegValueType::None;
+                                    registryResult = gRegistry->ReadValue(classKey, NULL, descrType, descr, descrSize);
+                                    if (registryResult.success)
                                     {
-                                        if (descrType != REG_SZ)
+                                        if (descrType != RegValueType::String)
                                         {
-                                            TRACE_E("InitShellIconOverlays(): default value from CLSID\\" << txtClsId << " key in not REG_SZ!");
+                                            TRACE_EW(L"InitShellIconOverlays(): default value from CLSID\\" << txtClsId << L" key in not REG_SZ!");
                                             descr[0] = 0;
                                         }
                                     }
                                     else
                                     {
+                                        errRet = registryResult.errorCode;
                                         if (errRet != ERROR_FILE_NOT_FOUND) // reports this error when handler has no description (which is apparently not an error, because on Vista it applies to e.g., Offline Files)
                                         {
-                                            TRACE_E("InitShellIconOverlays(): error reading default value from CLSID\\" << txtClsId << " key: " << GetErrorText(errRet));
+                                            TRACE_EW(L"InitShellIconOverlays(): error reading default value from CLSID\\" << txtClsId << L" key: " << GetErrorTextOwned(errRet).c_str());
                                         }
                                         descr[0] = 0;
                                     }
-                                    HANDLES(RegCloseKey(classKey));
+                                    gRegistry->CloseKey(classKey);
                                 }
                                 else
                                 {
+                                    errRet = registryResult.errorCode;
                                     // Petr: after Google Drive update on 30.8.2015, the key for GDriveSharedOverlay was missing
                                     //       under CLSID in registry, I found no difference in overlay display compared to Explorer,
                                     //       so I bypassed this annoying message by removing the
                                     //       GDriveSharedOverlay key from ShellIconOverlayIdentifiers list
-                                    TRACE_E("InitShellIconOverlays(): error opening CLSID\\" << txtClsId << " key: " << GetErrorText(errRet));
+                                    TRACE_EW(L"InitShellIconOverlays(): error opening CLSID\\" << txtClsId << L" key: " << GetErrorTextOwned(errRet).c_str());
                                 }
                             }
 
@@ -524,8 +573,8 @@ void InitShellIconOverlays()
                                 ListOfShellIconOverlays.Add(item2);
                                 if (ListOfShellIconOverlays.IsGood())
                                 {
-                                    lstrcpyn(item2->IconOverlayName, keyNames[s], item2->IconOverlayName.Size());
-                                    lstrcpyn(item2->IconOverlayDescr, descr, item2->IconOverlayDescr.Size());
+                                    item2->IconOverlayName = keyNames[s];
+                                    item2->IconOverlayDescr = descr;
                                 }
                                 else
                                 {
@@ -535,7 +584,7 @@ void InitShellIconOverlays()
                             }
 
                             if (diag != NULL)
-                                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, txtClsId, -1, diag->Clsid, 48);
+                                diag->Clsid = txtClsId;
 
                             // This gate is the only drop in the whole subsystem that logs
                             // nothing in any build, and it is permanent: a handler lands in
@@ -557,45 +606,50 @@ void InitShellIconOverlays()
                         {
                             if (diag != NULL)
                                 diag->Outcome = OverlayOutcome::InvalidClsid;
-                            TRACE_E("InitShellIconOverlays(): invalid CLSID: " << txtClsId);
+                            TRACE_EW(L"InitShellIconOverlays(): invalid CLSID: " << txtClsId);
                         }
                     }
                     else
                     {
                         if (diag != NULL)
                             diag->Outcome = OverlayOutcome::RegValueNotSz;
-                        TRACE_E("InitShellIconOverlays(): default value from ShellIconOverlayIdentifiers\\" << keyNames[s] << " key in not REG_SZ!");
+                        TRACE_EW(L"InitShellIconOverlays(): default value from ShellIconOverlayIdentifiers\\" << keyNames[s] << L" key in not REG_SZ!");
                     }
                 }
                 else
                 {
+                    errRet = registryResult.errorCode;
                     if (diag != NULL)
                     {
                         diag->Outcome = OverlayOutcome::RegValueMissing;
                         diag->Hr = HRESULT_FROM_WIN32(errRet);
                     }
-                    TRACE_E("InitShellIconOverlays(): error reading default value from ShellIconOverlayIdentifiers\\" << keyNames[s] << " key: " << GetErrorText(errRet));
+                    TRACE_EW(L"InitShellIconOverlays(): error reading default value from ShellIconOverlayIdentifiers\\" << keyNames[s] << L" key: " << GetErrorTextOwned(errRet).c_str());
                 }
 
-                HANDLES(RegCloseKey(handler));
+                gRegistry->CloseKey(handler);
             }
             else
             {
+                errRet = registryResult.errorCode;
                 if (diag != NULL)
                 {
                     diag->Outcome = OverlayOutcome::RegKeyOpenFailed;
                     diag->Hr = HRESULT_FROM_WIN32(errRet);
                 }
-                TRACE_E("InitShellIconOverlays(): error opening ShellIconOverlayIdentifiers\\" << keyNames[s] << " key: " << GetErrorText(errRet));
+                TRACE_EW(L"InitShellIconOverlays(): error opening ShellIconOverlayIdentifiers\\" << keyNames[s] << L" key: " << GetErrorTextOwned(errRet).c_str());
             }
         }
-        HANDLES(RegCloseKey(key));
+        gRegistry->CloseKey(key);
     }
     else
-        TRACE_I("InitShellIconOverlays(): error opening ShellIconOverlayIdentifiers key: " << GetErrorText(errRet));
+    {
+        errRet = registryResult.errorCode;
+        TRACE_IW(L"InitShellIconOverlays(): error opening ShellIconOverlayIdentifiers key: " << GetErrorTextOwned(errRet).c_str());
+    }
 
     if (clsIDKey != NULL)
-        HANDLES(RegCloseKey(clsIDKey));
+        gRegistry->CloseKey(clsIDKey);
 }
 
 void ReleaseShellIconOverlays()
@@ -609,50 +663,41 @@ void ReleaseShellIconOverlays()
 //
 // *****************************************************************************
 
-BOOL IsNameInListOfDisabledCustomIconOverlays(const char* name)
+BOOL IsNameInListOfDisabledCustomIconOverlays(const wchar_t* name)
 {
     if (Configuration.DisabledCustomIconOverlays != NULL)
     {
-        static char buf[SAL_MAX_LONG_PATH]; // called also from Bug Report - we don't want to burden the stack
-        const char* s = Configuration.DisabledCustomIconOverlays;
-        char* d = buf;
-        char* end = buf + SAL_MAX_LONG_PATH;
+        const wchar_t* s = Configuration.DisabledCustomIconOverlays;
+        std::wstring entry;
         while (*s != 0)
         {
             if (*s == ';')
             {
                 if (*(s + 1) == ';')
                 {
-                    *d++ = ';';
+                    entry.push_back(L';');
                     s += 2;
                 }
                 else
                 {
-                    *d = 0;
-                    if (stricmp(name, buf) == 0)
+                    if (_wcsicmp(name, entry.c_str()) == 0)
                         return TRUE; // is disabled
 
                     // go to next name
                     s++;
-                    d = buf;
+                    entry.clear();
                 }
             }
             else
-                *d++ = *s++;
-            if (d >= end)
-            {
-                d = end - 1; // for longer names (should not happen), we will overwrite the last character (null-terminator)
-                TRACE_E("IsNameInListOfDisabledCustomIconOverlays(): unexpected situation: too long name in list of disabled icon overlay handlers!");
-            }
+                entry.push_back(*s++);
         }
-        *d = 0;
-        if (stricmp(name, buf) == 0)
+        if (_wcsicmp(name, entry.c_str()) == 0)
             return TRUE; // is disabled
     }
     return FALSE; // is not in list
 }
 
-BOOL IsDisabledCustomIconOverlays(const char* name)
+BOOL IsDisabledCustomIconOverlays(const wchar_t* name)
 {
     if (!Configuration.EnableCustomIconOverlays ||
         IsNameInListOfDisabledCustomIconOverlays(name))
@@ -671,36 +716,33 @@ void ClearListOfDisabledCustomIconOverlays()
     }
 }
 
-BOOL AddToListOfDisabledCustomIconOverlays(const char* name)
+BOOL AddToListOfDisabledCustomIconOverlays(const wchar_t* name)
 {
     if (*name == 0)
     {
         TRACE_E("AddToListOfDisabledCustomIconOverlays(): empty name is unexpected here!");
         return TRUE; // nothing to do
     }
-    static char n[2 * MAX_PATH]; // called also from Bug Report - we don't want to burden the stack
-    char* d = n;
-    const char* s = name;
+    std::wstring escapedName;
+    const wchar_t* s = name;
     while (*s != 0)
     {
         if (*s == ';')
         {
-            *d++ = ';';
-            *d++ = ';';
+            escapedName += L";;";
             s++;
         }
         else
-            *d++ = *s++;
+            escapedName.push_back(*s++);
     }
-    *d = 0;
-    char* m = Configuration.DisabledCustomIconOverlays;
-    int mLen = (m != NULL ? (int)strlen(m) : 0);
-    m = (char*)realloc(m, mLen + 1 + strlen(n) + 1);
+    wchar_t* m = Configuration.DisabledCustomIconOverlays;
+    int mLen = (m != NULL ? (int)wcslen(m) : 0);
+    m = (wchar_t*)realloc(m, (mLen + 1 + escapedName.length() + 1) * sizeof(wchar_t));
     if (m != NULL)
     {
         if (mLen > 0)
-            strcpy(m + mLen++, ";");
-        strcpy(m + mLen, n);
+            wcscpy(m + mLen++, L";");
+        wcscpy(m + mLen, escapedName.c_str());
         Configuration.DisabledCustomIconOverlays = m;
         return TRUE;
     }
@@ -736,7 +778,7 @@ void CShellIconOverlayItem::Cleanup()
         {
             Identifier->Release();
         }
-        __except (CCallStack::HandleException(GetExceptionInformation(), -1, IconOverlayName))
+        __except (CCallStack::HandleException(GetExceptionInformation(), -1, IconOverlayName.c_str()))
         {
             TRACE_I("CShellIconOverlayItem::~CShellIconOverlayItem(): calling ExitProcess(1).");
             //      ExitProcess(1);
@@ -788,7 +830,7 @@ BOOL CShellIconOverlays::Add(CShellIconOverlayItem* item /*, int priority*/)
     return ok;
 }
 
-void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const char* name, IShellIconOverlayIdentifier** ids, int i)
+void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const wchar_t* name, IShellIconOverlayIdentifier** ids, int i)
 {
     IShellIconOverlayIdentifier* iconOverlayIdentifier;
     HRESULT coCreateHr = CoCreateInstance(*clsid, NULL, CLSCTX_INPROC_SERVER, IID_IShellIconOverlayIdentifier,
@@ -797,10 +839,10 @@ void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const char* name, IShel
         iconOverlayIdentifier != NULL) // probably unnecessary test, just to be safe
     {
         // just for form's sake, call the usual methods (as if we were Explorer and wanted to show those overlays)
-        CWidePathBuffer iconFile;
+        std::wstring iconFile;
         int iconIndex;
         DWORD flags;
-        iconOverlayIdentifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags);
+        GetOverlayInfoDynamic(iconOverlayIdentifier, iconFile, &iconIndex, &flags);
         int priority;
         iconOverlayIdentifier->GetPriority(&priority);
 
@@ -813,7 +855,7 @@ void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const char* name, IShel
         // Configuration page, which still shows the handler as loaded and enabled.
         wchar_t diagName[128];
         diagName[0] = 0;
-        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, diagName, 128);
+        lstrcpynW(diagName, name, 128);
         diagName[127] = 0;
         ShellOverlayDiagRecord* diag = ShellOverlayDiag.Find(diagName);
         if (diag != NULL)
@@ -823,11 +865,11 @@ void CreateIconReadersIconOverlayIdsAuxAux(CLSID* clsid, const char* name, IShel
             InterlockedIncrement(&diag->ReaderFailures);
             diag->ReaderLastHr = coCreateHr;
         }
-        TRACE_I("CreateIconReadersIconOverlayIdsAuxAux(): unable to create object for icon-overlay handler: " << name << "!");
+        TRACE_IW(L"CreateIconReadersIconOverlayIdsAuxAux(): unable to create object for icon-overlay handler: " << name << L"!");
     }
 }
 
-void CreateIconReadersIconOverlayIdsAux(CLSID* clsid, const char* name, IShellIconOverlayIdentifier** ids, int i)
+void CreateIconReadersIconOverlayIdsAux(CLSID* clsid, const wchar_t* name, IShellIconOverlayIdentifier** ids, int i)
 {
     __try
     {
@@ -857,7 +899,7 @@ CShellIconOverlays::CreateIconReadersIconOverlayIds()
             for (i = 0; i < Overlays.Count; i++)
             {
                 CreateIconReadersIconOverlayIdsAux(&Overlays[i]->IconOverlayIdCLSID,
-                                                   Overlays[i]->IconOverlayName, ids, i);
+                                                   Overlays[i]->IconOverlayName.c_str(), ids, i);
             }
         }
         else
@@ -882,7 +924,7 @@ void CShellIconOverlays::ReleaseIconReadersIconOverlayIds(IShellIconOverlayIdent
                     iconReadersIconOverlayIds[i]->Release();
                     iconReadersIconOverlayIds[i] = NULL;
                 }
-                __except (CCallStack::HandleException(GetExceptionInformation(), -1, Overlays[i]->IconOverlayName))
+                __except (CCallStack::HandleException(GetExceptionInformation(), -1, Overlays[i]->IconOverlayName.c_str()))
                 {
                     TRACE_I("CShellIconOverlays::ReleaseIconReadersIconOverlayIds: calling ExitProcess(1).");
                     //          ExitProcess(1);
@@ -895,28 +937,28 @@ void CShellIconOverlays::ReleaseIconReadersIconOverlayIds(IShellIconOverlayIdent
 }
 
 BOOL GetIconOverlayIndexAuxAux(IShellIconOverlayIdentifier** iconReadersIconOverlayIds,
-                               int i, WCHAR* wPath, const char* name, DWORD shAttrs)
+                               int i, const wchar_t* path, const wchar_t* name, DWORD shAttrs)
 {
     HRESULT res;
     if (iconReadersIconOverlayIds[i] != NULL &&
-        (res = iconReadersIconOverlayIds[i]->IsMemberOf(wPath, shAttrs)) == S_OK)
+        (res = iconReadersIconOverlayIds[i]->IsMemberOf(path, shAttrs)) == S_OK)
     {
         return TRUE; // found
     }
     else
     {
         if (res != S_FALSE && res != 0x80070002) // 0x80070002 is "file not found", returned by "Offline Files" for everything that is not offline-available
-            TRACE_I("CShellIconOverlays::GetIconOverlayIndex(): overlay " << name << ": IsMemberOf() returns error: 0x" << std::hex << res << std::dec);
+            TRACE_IW(L"CShellIconOverlays::GetIconOverlayIndex(): overlay " << name << L": IsMemberOf() returns error: 0x" << std::hex << res << std::dec);
     }
     return FALSE;
 }
 
 BOOL GetIconOverlayIndexAux(IShellIconOverlayIdentifier** iconReadersIconOverlayIds,
-                            int i, WCHAR* wPath, const char* name, DWORD shAttrs)
+                            int i, const wchar_t* path, const wchar_t* name, DWORD shAttrs)
 {
     __try
     {
-        return GetIconOverlayIndexAuxAux(iconReadersIconOverlayIds, i, wPath, name, shAttrs);
+        return GetIconOverlayIndexAuxAux(iconReadersIconOverlayIds, i, path, name, shAttrs);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), -1, name))
     {
@@ -927,12 +969,12 @@ BOOL GetIconOverlayIndexAux(IShellIconOverlayIdentifier** iconReadersIconOverlay
     return FALSE; // just for the compiler
 }
 
-DWORD_PTR SHGetFileInfoAux(LPCTSTR pszPath, DWORD dwFileAttributes, SHFILEINFO* psfi,
+DWORD_PTR SHGetFileInfoAux(LPCWSTR pszPath, DWORD dwFileAttributes, SHFILEINFOW* psfi,
                            UINT cbFileInfo, UINT uFlags)
 {
     __try
     {
-        return SHGetFileInfo(pszPath, dwFileAttributes, psfi, cbFileInfo, uFlags);
+        return SHGetFileInfoW(pszPath, dwFileAttributes, psfi, cbFileInfo, uFlags);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 23))
     {
@@ -942,21 +984,20 @@ DWORD_PTR SHGetFileInfoAux(LPCTSTR pszPath, DWORD dwFileAttributes, SHFILEINFO* 
 }
 
 DWORD
-CShellIconOverlays::GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath, char* aName,
-                                        char* name, DWORD fileAttrs, int minPriority,
+CShellIconOverlays::GetIconOverlayIndex(const wchar_t* path, const wchar_t* name,
+                                        DWORD fileAttrs, int minPriority,
                                         IShellIconOverlayIdentifier** iconReadersIconOverlayIds,
                                         BOOL isGoogleDrivePath)
 {
     CALL_STACK_MESSAGE_NONE // call-stack would only slow things down here
 
-        if ((wName - wPath) + strlen(name) >= MAX_PATH)
-    {
-        TRACE_I("CShellIconOverlays::GetIconOverlayIndex(): too long file name: " << name);
+    if (path == NULL || name == NULL)
         return ICONOVERLAYINDEX_NOTUSED;
-    }
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, wName, MAX_PATH - (int)(wName - wPath));
-    wPath[MAX_PATH - 1] = 0; // just to be safe
-    strcpy(aName, name);
+
+    std::wstring fullPath(path);
+    if (!fullPath.empty() && fullPath.back() != L'\\')
+        fullPath.push_back(L'\\');
+    fullPath += name;
 
     //  SHFILEINFO fi;
     //  if (SHGetFileInfoAux(aPath, 0, &fi, sizeof(fi), SHGFI_ATTRIBUTES))
@@ -982,7 +1023,7 @@ CShellIconOverlays::GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath,
                 isGD_CS_entered = TRUE;
             }
         }
-        if (GetIconOverlayIndexAux(iconReadersIconOverlayIds, i, wPath, overlay->IconOverlayName, fileAttrs))
+        if (GetIconOverlayIndexAux(iconReadersIconOverlayIds, i, fullPath.c_str(), overlay->IconOverlayName.c_str(), fileAttrs))
         {
             if (isGD_CS_entered)
                 HANDLES(LeaveCriticalSection(&GD_CS));
@@ -998,25 +1039,23 @@ CShellIconOverlays::GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath,
 
 void ColorsChangedAuxAux(CShellIconOverlayItem* item)
 {
-    CWidePathBuffer iconFile;
+    std::wstring iconFile;
     int iconIndex;
     DWORD flags;
-    if (item->Identifier->GetOverlayInfo(iconFile, iconFile.Size(), &iconIndex, &flags) == S_OK)
+    if (GetOverlayInfoDynamic(item->Identifier, iconFile, &iconIndex, &flags) == S_OK)
     {
         if (flags & ISIOI_ICONFILE)
         {
             if ((flags & ISIOI_ICONINDEX) == 0)
                 iconIndex = 0;
 
-            CPathBuffer iconFileMB; // Heap-allocated for long path support
-            WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, iconFileMB.Size(), NULL, NULL);
-            iconFileMB[iconFileMB.Size() - 1] = 0;
-
+            // wide: iconFile is already the genuine wide path from
+            // GetOverlayInfo - use it directly instead of narrowing it first.
             // Same loader as at startup. Getting this wrong here would re-drop every
             // overlay the moment the display colour depth changed (issue #90).
             HICON iconOverlay[ICONSIZE_COUNT] = {0};
-            LoadShellOverlayIcons(iconFileMB, iconIndex, IconSizes, ICONSIZE_COUNT,
-                                  iconOverlay);
+            LoadShellOverlayIconsW(iconFile.c_str(), iconIndex, IconSizes, ICONSIZE_COUNT,
+                                   iconOverlay);
 
             int x;
             for (x = 0; x < ICONSIZE_COUNT; x++)
@@ -1053,7 +1092,7 @@ void ColorsChangedAux(CShellIconOverlayItem* item)
     {
         ColorsChangedAuxAux(item);
     }
-    __except (CCallStack::HandleException(GetExceptionInformation(), -1, item->IconOverlayName))
+    __except (CCallStack::HandleException(GetExceptionInformation(), -1, item->IconOverlayName.c_str()))
     {
         TRACE_I("ColorsChangedAux: calling ExitProcess(1).");
         //    ExitProcess(1);
@@ -1075,9 +1114,9 @@ void CShellIconOverlays::InitGoogleDrivePath(CSQLite3DynLoadBase** sqlite3_Dyn_I
 
     if (!GetGDAlreadyCalled)
     {
-        CPathBuffer gdPath; // Heap-allocated for long path support
+        std::wstring gdPath;
         BOOL pathIsFromConfig;
-        if (GetGoogleDrivePath(gdPath, gdPath.Size(), sqlite3_Dyn_InOut, &pathIsFromConfig))
+        if (GetGoogleDrivePath(gdPath, sqlite3_Dyn_InOut, &pathIsFromConfig))
             SetGoogleDrivePath(gdPath, pathIsFromConfig);
         GetGDAlreadyCalled = TRUE;
     }
@@ -1116,9 +1155,9 @@ void CShellIconOverlays::InitGoogleDrivePath(CSQLite3DynLoadBase** sqlite3_Dyn_I
 BOOL CShellIconOverlays::HasGoogleDrivePath()
 {
     CALL_STACK_MESSAGE_NONE;
-    if (GoogleDrivePathIsFromCfg && GoogleDrivePath[0] != 0)
+    if (GoogleDrivePathIsFromCfg && !GoogleDrivePath.empty())
     {
-        if (!GoogleDrivePathExists && DirExists(GoogleDrivePath))
+        if (!GoogleDrivePathExists && gFileSystem->DirectoryExists(GoogleDrivePath.c_str()))
             GoogleDrivePathExists = TRUE;
         return GoogleDrivePathExists;
     }

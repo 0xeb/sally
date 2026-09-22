@@ -1,16 +1,16 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include <ntddscsi.h>
-
 #include "cfgdlg.h"
 #include "plugins.h"
 #include "fileswnd.h"
 #include "mainwnd.h"
 #include "salinflt.h"
 #include "common/unicode/helpers.h"
+#include "common/fsutil.h" // GetRootPathW / IsUNCPathW
+#include "common/IFileSystem.h"
 
 // ************************************************************************************************************************
 //
@@ -71,8 +71,8 @@ BOOL RegenerateUserEnvironment()
 
 struct CEnvVariable
 {
-    char* Name;        // allocated variable, originally NAME=VAL\0 rewritten to NAME\0VAL\0
-    const char* Value; // non-allocated variable, just a pointer into Name buffer to value VAL (after original equals sign)
+    wchar_t* Name;        // allocated variable, originally NAME=VAL\0 rewritten to NAME\0VAL\0
+    const wchar_t* Value; // non-allocated variable, just a pointer into Name buffer to value VAL (after original equals sign)
     DWORD Type;        // 0
 };
 
@@ -117,7 +117,7 @@ protected:
 
     // if item 'name' is found in array, returns its index; otherwise returns -1;
     // assumes array is alphabetically sorted, uses binary search
-    int FindItemIndex(const char* name);
+    int FindItemIndex(const wchar_t* name);
 
     // adds copy of item to array, sets Type
     void AddVarCopy(const CEnvVariable* var, DWORD type);
@@ -126,13 +126,13 @@ protected:
 void CEnvVariables::QuickSort(int left, int right)
 {
     int i = left, j = right;
-    const char* pivot = Variables[(i + j) / 2].Name;
+    const wchar_t* pivot = Variables[(i + j) / 2].Name;
 
     do
     {
-        while (StrICmp(Variables[i].Name, pivot) < 0 && i < right)
+        while (StrICmpW(Variables[i].Name, pivot) < 0 && i < right)
             i++;
-        while (StrICmp(pivot, Variables[j].Name) < 0 && j > left)
+        while (StrICmpW(pivot, Variables[j].Name) < 0 && j > left)
             j--;
 
         if (i <= j)
@@ -153,7 +153,7 @@ void CEnvVariables::QuickSort(int left, int right)
     Sorted = TRUE;
 }
 
-int CEnvVariables::FindItemIndex(const char* name)
+int CEnvVariables::FindItemIndex(const wchar_t* name)
 {
     if (!Sorted)
     {
@@ -166,7 +166,7 @@ int CEnvVariables::FindItemIndex(const char* name)
     while (left < right)
     {
         int index = (left + right) / 2;
-        int cmp = StrICmp(Variables[index].Name, name);
+        int cmp = StrICmpW(Variables[index].Name, name);
         if (cmp == 0)
             return index;
         else if (cmp > 0)
@@ -180,11 +180,11 @@ int CEnvVariables::FindItemIndex(const char* name)
 void CEnvVariables::AddVarCopy(const CEnvVariable* var, DWORD type)
 {
     CEnvVariable newVar;
-    int len = (int)strlen(var->Name) + 1 + (int)strlen(var->Value) + 1;
-    newVar.Name = (char*)malloc(len);
-    strcpy(newVar.Name, var->Name);
-    strcpy(newVar.Name + strlen(newVar.Name) + 1, var->Value);
-    newVar.Value = newVar.Name + strlen(newVar.Name) + 1;
+    int len = (int)wcslen(var->Name) + 1 + (int)wcslen(var->Value) + 1;
+    newVar.Name = (wchar_t*)malloc(len * sizeof(wchar_t));
+    wcscpy(newVar.Name, var->Name);
+    wcscpy(newVar.Name + wcslen(newVar.Name) + 1, var->Value);
+    newVar.Value = newVar.Name + wcslen(newVar.Name) + 1;
     newVar.Type = type;
     Variables.Add(newVar);
 }
@@ -196,11 +196,11 @@ void CEnvVariables::LoadFromProcess()
     // discard current elements in array
     Clean();
 
-    char* vars = GetEnvironmentStrings();
-    char* p = vars;
+    wchar_t* vars = GetEnvironmentStringsW();
+    wchar_t* p = vars;
     while (*p != 0)
     {
-        char* begin = p;
+        wchar_t* begin = p;
         while (*p != 0)
             p++;
         // if this is not current dir for drives, save found item to array
@@ -213,7 +213,7 @@ void CEnvVariables::LoadFromProcess()
             CEnvVariable envVar;
             ZeroMemory(&envVar, sizeof(envVar));
             envVar.Name = DupStr(begin);
-            char* value = envVar.Name;
+            wchar_t* value = envVar.Name;
             while (*value != 0 && *value != '=')
                 value++;
             if (*value == '=')
@@ -227,7 +227,7 @@ void CEnvVariables::LoadFromProcess()
         p++;
     }
 
-    FreeEnvironmentStrings(vars);
+    FreeEnvironmentStringsW(vars);
 
     // note: array returned from GetEnvironmentStrings() looks sorted, but when setting env. variables new variables are added to the end,
     // so we sort to be able to compare and search
@@ -259,7 +259,7 @@ void CEnvVariables::FindDifferences(CEnvVariables* oldVars, CEnvVariables* newVa
         const CEnvVariable* oldVar = oldIndex < oldVars->Variables.Count ? &oldVars->Variables[oldIndex] : NULL;
         const CEnvVariable* newVar = newIndex < newVars->Variables.Count ? &newVars->Variables[newIndex] : NULL;
         int cmp = oldVar == NULL ? 1 : newVar == NULL ? -1
-                                                      : StrICmp(oldVar->Name, newVar->Name);
+                                                      : StrICmpW(oldVar->Name, newVar->Name);
         if (cmp < 0)
         {
             AddVarCopy(oldVar, ENVVARTYPE_ADD);
@@ -294,12 +294,12 @@ void CEnvVariables::ApplyDifferencesToCurrentProcess(CEnvVariables* diffVars)
     {
         const CEnvVariable* var = &diffVars->Variables[i];
         if (FindItemIndex(var->Name) == -1)
-            SetEnvironmentVariable(var->Name, var->Type == ENVVARTYPE_ADD ? var->Value : NULL);
+            SetEnvironmentVariableW(var->Name, var->Type == ENVVARTYPE_ADD ? var->Value : NULL);
     }
 #ifndef _WIN64
     // HACK: working around a bug that MS made and haven't fixed yet (according to some statement on the web)
     // occurs with x86 processes running on x64 Windows, where reload incorrectly sets the value to AMD64
-    SetEnvironmentVariable("PROCESSOR_ARCHITECTURE", "x86");
+    SetEnvironmentVariableW(L"PROCESSOR_ARCHITECTURE", L"x86");
 #endif // _WIN64
 }
 
@@ -358,196 +358,124 @@ void RegenEnvironmentVariables()
 //              http://nyaruru.hatenablog.com/entry/2012/09/29/063829
 //
 
-// does not require administrator rights
-BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
+// Wide-native, on top of the ported reparse walk.
+//
+// The narrow form's INPUT is what was lossy: the path is narrowed on the way to
+// GetResolvedPathMountPointAndGUID, so for a directory the code page cannot
+// spell the GUID lookup resolved the wrong path — or none — and Sally reported
+// "not an SSD" for a perfectly ordinary SSD. The GUID path it works with
+// afterwards is ASCII either way.
+BOOL IsPathOnSSDW(const wchar_t* path)
 {
-    BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES(CreateFile(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-    if (hVolume != INVALID_HANDLE_VALUE)
+    std::wstring guidPath;
+    if (!GetResolvedPathMountPointAndGUIDW(path, NULL, &guidPath))
+        return FALSE;
+
+    SalPathRemoveBackslashW(guidPath); // the following CreateFile was bothered by the backslash after volume
+
+    bool trim = false;
+    const FileResult trimResult = gFileSystem->QueryVolumeTrim(guidPath.c_str(), &trim);
+    if (trimResult.success)
+        TRACE_I("QueryVolumeTRIM: " << trim);
+    else
+        TRACE_I("QueryVolumeTRIM failed. Err=" << trimResult.errorCode);
+
+    bool seekPenalty = true;
+    const FileResult seekResult = gFileSystem->QueryVolumeSeekPenalty(guidPath.c_str(), &seekPenalty);
+    if (seekResult.success)
+        TRACE_I("QueryVolumeSeekPenalty: " << seekPenalty);
+    else
+        TRACE_I("QueryVolumeSeekPenalty failed. Err=" << seekResult.errorCode);
+
+    WORD rpm = 0;
+    if (RunningAsAdmin)
     {
-        STORAGE_PROPERTY_QUERY spqTrim;
-        spqTrim.PropertyId = (STORAGE_PROPERTY_ID)StorageDeviceTrimProperty;
-        spqTrim.QueryType = PropertyStandardQuery;
-        DWORD bytesReturned = 0;
-        DEVICE_TRIM_DESCRIPTOR dtd = {0};
-        if (DeviceIoControl(hVolume, IOCTL_STORAGE_QUERY_PROPERTY,
-                            &spqTrim, sizeof(spqTrim), &dtd, sizeof(dtd), &bytesReturned, NULL) &&
-            bytesReturned == sizeof(dtd))
-        {
-            *trim = (dtd.TrimEnabled != 0);
-            ret = TRUE;
-        }
+        const FileResult rotationResult = gFileSystem->QueryVolumeRotationRate(guidPath.c_str(), &rpm);
+        if (rotationResult.success)
+            TRACE_I("QueryVolumeATARPM: " << rpm);
         else
-        {
-            int err = ::GetLastError();
-            TRACE_I("QueryVolumeTRIM(): DeviceIoControl failed. Err=" << err);
-        }
-        HANDLES(CloseHandle(hVolume));
+            TRACE_I("QueryVolumeATARPM failed. Err=" << rotationResult.errorCode);
     }
-    return ret;
+    return trim || !seekPenalty || rpm == 1;
 }
 
-// does not require administrator rights
-BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
+// The narrow IsPathOnSSD is DELETED, not kept as a wrapper: its
+// only caller was the SDK forwarder in zip.cpp, which is wide now. A wrapper
+// would have added an AnsiToWide to serve nobody.
+
+// Wide-native. Outputs are std::wstring rather than caller-supplied
+// buffers, which is why this one could widen while the SDK method of the same
+// name cannot — an out-buffer whose width changes has no compatible shim, so
+// that one waits for its callers.
+static BOOL GetVolumeGuidPathW(const wchar_t* mountPoint, std::wstring& guidPath)
 {
-    BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES(CreateFile(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-    if (hVolume != INVALID_HANDLE_VALUE)
+    DWORD capacity = 64;
+    for (;;)
     {
-        STORAGE_PROPERTY_QUERY spqSeekP;
-        spqSeekP.PropertyId = (STORAGE_PROPERTY_ID)StorageDeviceSeekPenaltyProperty;
-        spqSeekP.QueryType = PropertyStandardQuery;
-        DWORD bytesReturned = 0;
-        DEVICE_SEEK_PENALTY_DESCRIPTOR dspd = {0};
-        if (DeviceIoControl(hVolume, IOCTL_STORAGE_QUERY_PROPERTY,
-                            &spqSeekP, sizeof(spqSeekP), &dspd, sizeof(dspd), &bytesReturned, NULL) &&
-            bytesReturned == sizeof(dspd))
+        std::vector<wchar_t> buffer(capacity);
+        if (GetVolumeNameForVolumeMountPointW(mountPoint, buffer.data(), capacity))
         {
-            *seekPenalty = (dspd.IncursSeekPenalty != 0);
-            ret = TRUE;
+            guidPath.assign(buffer.data());
+            return TRUE;
         }
-        else
+
+        const DWORD error = GetLastError();
+        if (error != ERROR_FILENAME_EXCED_RANGE && error != ERROR_MORE_DATA)
+            return FALSE;
+        if (capacity > (MAXDWORD / 2))
         {
-            int err = ::GetLastError();
-            TRACE_I("QueryVolumeSeekPenalty(): DeviceIoControl failed. Err=" << err);
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
         }
-        HANDLES(CloseHandle(hVolume));
+        capacity *= 2;
     }
-    return ret;
 }
-
-// requires admin rights to run
-// for SSD should return value *rpm == 1
-BOOL QueryVolumeATARPM(const char* volume, WORD* rpm)
+BOOL GetResolvedPathMountPointAndGUIDW(const wchar_t* path, std::wstring* mountPoint, std::wstring* guidPath)
 {
-    BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES_Q(CreateFileW(AnsiToWide(volume).c_str(), GENERIC_READ | GENERIC_WRITE,
-                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                          OPEN_EXISTING, 0, NULL));
-    if (hVolume != INVALID_HANDLE_VALUE)
-    {
-        struct ATAIdentifyDeviceQuery
-        {
-            ATA_PASS_THROUGH_EX header;
-            WORD data[256];
-        };
+    std::wstring resolvedPath(path);
+    ResolveSubstsW(resolvedPath);
+    std::wstring rootPath = GetRootPath(resolvedPath.c_str());
 
-        ATAIdentifyDeviceQuery id_query = {};
-        memset(&id_query, 0, sizeof(id_query));
-
-        id_query.header.Length = sizeof(id_query.header);
-        id_query.header.AtaFlags = ATA_FLAGS_DATA_IN;
-        id_query.header.DataTransferLength = sizeof(id_query.data);
-        id_query.header.TimeOutValue = 3;                                                     // timeout in seconds
-        id_query.header.DataBufferOffset = (DWORD)((BYTE*)&id_query.data - (BYTE*)&id_query); //offsetof(ATAIdentifyDeviceQuery, data[0]);
-        id_query.header.CurrentTaskFile[6] = 0xec;                                            // ATA IDENTIFY DEVICE command
-        DWORD bytesReturned = 0;
-        if (DeviceIoControl(hVolume, IOCTL_ATA_PASS_THROUGH,
-                            &id_query, sizeof(id_query), &id_query, sizeof(id_query), &bytesReturned, NULL) &&
-            bytesReturned == sizeof(id_query))
-        {
-//Index of nominal media rotation rate
-//SOURCE: http://www.t13.org/documents/UploadedDocuments/docs2009/d2015r1a-ATAATAPI_Command_Set_-_2_ACS-2.pdf
-//          7.18.7.81 Word 217
-//QUOTE: Word 217 indicates the nominal media rotation rate of the device and is defined in table:
-//          Value           Description
-//          --------------------------------
-//          0000h           Rate not reported
-//          0001h           Non-rotating media (e.g., solid state device)
-//          0002h-0400h     Reserved
-//          0401h-FFFEh     Nominal media rotation rate in rotations per minute (rpm)
-//                                  (e.g., 7 200 rpm = 1C20h)
-//          FFFFh           Reserved
-#define NominalMediaRotRateWordIndex 217
-            *rpm = id_query.data[NominalMediaRotRateWordIndex];
-            ret = TRUE;
-        }
-        else
-        {
-            int err = ::GetLastError();
-            TRACE_I("QueryVolumeATARPM(): DeviceIoControl failed. Err=" << err);
-        }
-        HANDLES(CloseHandle(hVolume));
-    }
-    return ret;
-}
-
-BOOL IsPathOnSSD(const char* path)
-{
-    BOOL isSSD = FALSE;
-
-    CPathBuffer guidPath; // Heap-allocated for long path support
-    guidPath[0] = 0;
-    if (GetResolvedPathMountPointAndGUID(path, NULL, guidPath))
-    {
-        SalPathRemoveBackslash(guidPath); // the following CreateFile was bothered by the backslash after volume
-        BOOL trim = FALSE;
-        if (QueryVolumeTRIM(guidPath, &trim))
-            TRACE_I("QueryVolumeTRIM: " << trim);
-        BOOL seekPenalty = TRUE;
-        if (QueryVolumeSeekPenalty(guidPath, &seekPenalty))
-            TRACE_I("QueryVolumeSeekPenalty: " << seekPenalty);
-        WORD rpm = 0;
-        if (RunningAsAdmin)
-        {
-            if (QueryVolumeATARPM(guidPath, &rpm))
-                TRACE_I("QueryVolumeATARPM: " << rpm);
-        }
-        return trim || !seekPenalty || rpm == 1;
-    }
-    return FALSE;
-}
-
-BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath)
-{
-    CPathBuffer resolvedPath; // Heap-allocated for long path support
-    strcpy(resolvedPath, path);
-    ResolveSubsts(resolvedPath, resolvedPath.Size());
-    CPathBuffer rootPath; // Heap-allocated for long path support
-    GetRootPath(rootPath, resolvedPath);
     BOOL remotePath = TRUE;
-    if (!IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points make sense to look for only on fixed disks
+    if (!IsUNCPathW(rootPath.c_str()) && GetDriveTypeW(rootPath.c_str()) == DRIVE_FIXED) // reparse points make sense to look for only on fixed disks
     {
-        BOOL cutPathIsPossible = TRUE;
-        CPathBuffer netPath; // Heap-allocated for long path support
-        netPath[0] = 0;
-        ResolveLocalPathWithReparsePoints(resolvedPath, resolvedPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, netPath);
-        remotePath = netPath[0] != 0;
+        CLocalPathResolutionW res;
+        ResolveLocalPathWithReparsePointsW(path, res);
+        resolvedPath = res.ResPath;
+        remotePath = !res.NetPath.empty();
 
         // for GetVolumeNameForVolumeMountPoint we need root
-        if (cutPathIsPossible)
-        {
-            GetRootPath(rootPath, resolvedPath);
-            strcpy(resolvedPath, rootPath);
-        }
+        if (res.CutResPathIsPossible)
+            resolvedPath = GetRootPath(resolvedPath.c_str());
     }
     else
-        strcpy(resolvedPath, rootPath); // for non-DRIVE_FIXED disks we take root path, GetVolumeNameForVolumeMountPoint needs mount point and searching for it by gradually shortening the path seems too time-consuming for now (at least for network paths + for cards there shouldn't be mount points in subdirectories, right?)
+    {
+        // for non-DRIVE_FIXED disks we take the root path: GetVolumeNameForVolumeMountPoint
+        // needs a mount point, and hunting for one by gradually shortening the path is too
+        // expensive here (network paths; cards should not have mount points in subdirectories)
+        resolvedPath = rootPath;
+    }
+
     // GUID can be obtained even for non-DRIVE_FIXED disks, for example card readers
-    // according to https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx there is no support for DRIVE_REMOTE yet,
-    // but that could potentially come too
-    CPathBuffer guidP; // Heap-allocated for long path support
-    SalPathAddBackslash(resolvedPath, resolvedPath.Size()); // GetVolumeNameForVolumeMountPoint requires backslash at the end
-    if (GetVolumeNameForVolumeMountPoint(resolvedPath, guidP, guidP.Size()))
+    SalPathAddBackslashW(resolvedPath); // GetVolumeNameForVolumeMountPoint requires backslash at the end
+
+    std::wstring guid;
+    if (GetVolumeGuidPathW(resolvedPath.c_str(), guid))
     {
         if (mountPoint != NULL)
-            strcpy(mountPoint, resolvedPath);
+            *mountPoint = resolvedPath;
         if (guidPath != NULL)
         {
-            SalPathAddBackslash(guidP, guidP.Size());
-            strcpy(guidPath, guidP);
+            SalPathAddBackslashW(guid);
+            *guidPath = std::move(guid);
         }
         return TRUE;
     }
-    else
+
+    if (!remotePath) // for network paths it currently returns errors normally = we won't report it, we won't annoy users
     {
-        if (!remotePath) // for network paths it currently returns errors normally = we won't report it, we won't annoy users
-        {
-            DWORD err = GetLastError();
-            TRACE_E("GetResolvedPathMountPointAndGUID(): GetVolumeNameForVolumeMountPoint() failed: " << GetErrorText(err));
-        }
+        DWORD err = GetLastError();
+        TRACE_EW(L"GetResolvedPathMountPointAndGUIDW(): GetVolumeNameForVolumeMountPoint() failed: " << GetErrorTextOwned(err).c_str());
     }
     return FALSE;
 }

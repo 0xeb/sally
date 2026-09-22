@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "wmobile_treewalk_core.h"
 
 #define COPY_BUFFER_SIZE (32 * 1024)
 
@@ -99,7 +100,7 @@ public:
         // Load the library
         UINT fuError;
         fuError = SetErrorMode(SEM_NOOPENFILEERRORBOX);
-        m_hLib = LoadLibrary("rapi.dll");
+        m_hLib = LoadLibraryW(L"rapi.dll");
         SetErrorMode(fuError);
 
         if (m_hLib == NULL)
@@ -186,7 +187,7 @@ BOOL CRAPI::Init()
 
         CDynRapi::Unload();
 
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_CONNECTION), TitleWMobileError, MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_CONNECTION).c_str(), TitleWMobileError, MSGBOX_ERROR);
     }
 
     return initialized;
@@ -213,7 +214,7 @@ BOOL CRAPI::ReInit()
     }
 
     //JR REVIEW: Should we show a "Please wait" dialog with a Cancel button?
-    SalamanderGeneral->CreateSafeWaitWindow(LoadStr(IDS_CONNECTING), TitleWMobile,
+    SalamanderGeneral->CreateSafeWaitWindow(LangStr(IDS_CONNECTING).c_str(), TitleWMobile,
                                             500, FALSE, SalamanderGeneral->GetMainWindowHWND());
 
     //  Sleep(500); // JR REVIEW: Why was this needed?
@@ -233,34 +234,6 @@ BOOL CRAPI::ReInit()
 /////////////////////////////////////////////////////////////////////////////
 //RAPI
 
-BOOL CRAPI::FindAllFiles(LPCTSTR szPath, DWORD dwFlags, LPDWORD lpdwFoundCount,
-                         RapiNS::LPLPCE_FIND_DATA ppFindDataArray, BOOL tryReinit)
-{
-    OLECHAR olePath[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, szPath, -1, olePath, MAX_PATH - 1);
-    olePath[MAX_PATH - 1] = 0;
-
-    BOOL ret = CDynRapi::CeFindAllFiles(olePath, dwFlags, lpdwFoundCount, ppFindDataArray);
-    if (!ret && tryReinit && GetLastError() != ERROR_NO_MORE_FILES && ReInit())
-        ret = CDynRapi::CeFindAllFiles(olePath, dwFlags, lpdwFoundCount, ppFindDataArray);
-
-    return ret;
-}
-
-HANDLE
-CRAPI::FindFirstFile(LPCTSTR lpFileName, RapiNS::LPCE_FIND_DATA lpFindFileData, BOOL tryReinit)
-{
-    OLECHAR oleFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpFileName, -1, oleFileName, MAX_PATH - 1);
-    oleFileName[MAX_PATH - 1] = 0;
-
-    HANDLE hFindFile = CDynRapi::CeFindFirstFile(oleFileName, lpFindFileData);
-    if (hFindFile == INVALID_HANDLE_VALUE && tryReinit && GetLastError() != ERROR_NO_MORE_FILES && ReInit())
-        hFindFile = CDynRapi::CeFindFirstFile(oleFileName, lpFindFileData);
-
-    return hFindFile;
-}
-
 BOOL CRAPI::FindNextFile(HANDLE hFindFile, RapiNS::LPCE_FIND_DATA lpFindFileData)
 {
     return CDynRapi::CeFindNextFile(hFindFile, lpFindFileData);
@@ -271,27 +244,49 @@ BOOL CRAPI::FindClose(HANDLE hFindFile)
     return CDynRapi::CeFindClose(hFindFile);
 }
 
-DWORD
-CRAPI::GetFileAttributes(LPCTSTR lpFileName, BOOL tryReinit)
+HANDLE
+CRAPI::FindFirstFileWide(const wchar_t* lpFileName, RapiNS::LPCE_FIND_DATA lpFindFileData, BOOL tryReinit)
 {
-    OLECHAR oleFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpFileName, -1, oleFileName, MAX_PATH - 1);
-    oleFileName[MAX_PATH - 1] = 0;
+    if (lpFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return INVALID_HANDLE_VALUE;
+    }
 
-    DWORD attr = CDynRapi::CeGetFileAttributes(oleFileName);
+    HANDLE hFindFile = CDynRapi::CeFindFirstFile(lpFileName, lpFindFileData);
+    if (hFindFile == INVALID_HANDLE_VALUE && tryReinit && GetLastError() != ERROR_NO_MORE_FILES && ReInit())
+        hFindFile = CDynRapi::CeFindFirstFile(lpFileName, lpFindFileData);
+
+    return hFindFile;
+}
+
+// Windows CE is Unicode-native; semantic device paths stay UTF-16 through CRAPI.
+DWORD
+CRAPI::GetFileAttributesWide(const wchar_t* lpFileName, BOOL tryReinit)
+{
+    if (lpFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return 0xFFFFFFFF;
+    }
+
+    DWORD attr = CDynRapi::CeGetFileAttributes(lpFileName);
     if (attr == 0xFFFFFFFF && tryReinit && GetLastError() != ERROR_FILE_NOT_FOUND && ReInit())
-        attr = CDynRapi::CeGetFileAttributes(oleFileName);
+        attr = CDynRapi::CeGetFileAttributes(lpFileName);
 
     return attr;
 }
 
-BOOL CRAPI::SetFileAttributes(LPCTSTR lpFileName, DWORD dwFileAttributes)
+HANDLE
+CRAPI::CreateFileWide(const wchar_t* lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
 {
-    OLECHAR oleFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpFileName, -1, oleFileName, MAX_PATH - 1);
-    oleFileName[MAX_PATH - 1] = 0;
+    if (lpFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return INVALID_HANDLE_VALUE;
+    }
 
-    return CDynRapi::CeSetFileAttributes(oleFileName, dwFileAttributes);
+    return CDynRapi::CeCreateFile(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
 }
 
 BOOL CRAPI::GetFileTime(HANDLE hFile, LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, LPFILETIME lpLastWriteTime)
@@ -315,16 +310,6 @@ BOOL CRAPI::GetStoreInformation(RapiNS::LPSTORE_INFORMATION lpsi)
     return CDynRapi::CeGetStoreInformation(lpsi);
 }
 
-HANDLE
-CRAPI::CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
-{
-    OLECHAR oleFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpFileName, -1, oleFileName, MAX_PATH - 1);
-    oleFileName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeCreateFile(oleFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
-}
-
 BOOL CRAPI::CloseHandle(HANDLE hObject)
 {
     return CDynRapi::CeCloseHandle(hObject);
@@ -340,81 +325,101 @@ BOOL CRAPI::WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrit
     return CDynRapi::CeWriteFile(hFile, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, lpOverlapped);
 }
 
-BOOL CRAPI::CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists)
+// The wide delete path. No conversion at all: the caller's UTF-16 path goes
+// straight to CE, which is what it has always wanted. A device file whose name is outside the
+// machine's code page can now be deleted - previously the narrow wrapper refused it, so such a
+// file was visible but not removable.
+BOOL CRAPI::CreateDirectoryWide(const wchar_t* lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes)
 {
-    OLECHAR oleExistingFileName[MAX_PATH], oleNewFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpExistingFileName, -1, oleExistingFileName, MAX_PATH - 1);
-    oleExistingFileName[MAX_PATH - 1] = 0;
-    MultiByteToWideChar(CP_ACP, 0, lpNewFileName, -1, oleNewFileName, MAX_PATH - 1);
-    oleNewFileName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeCopyFile(oleExistingFileName, oleNewFileName, bFailIfExists);
-}
-
-BOOL CRAPI::MoveFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName)
-{
-    OLECHAR oleExistingFileName[MAX_PATH], oleNewFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpExistingFileName, -1, oleExistingFileName, MAX_PATH - 1);
-    oleExistingFileName[MAX_PATH - 1] = 0;
-    MultiByteToWideChar(CP_ACP, 0, lpNewFileName, -1, oleNewFileName, MAX_PATH - 1);
-    oleNewFileName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeMoveFile(oleExistingFileName, oleNewFileName);
-}
-
-BOOL CRAPI::DeleteFile(LPCTSTR lpFileName)
-{
-    OLECHAR oleFileName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpFileName, -1, oleFileName, MAX_PATH - 1);
-    oleFileName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeDeleteFile(oleFileName);
-}
-
-BOOL CRAPI::CreateDirectory(LPCTSTR lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes)
-{
-    OLECHAR olePathName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpPathName, -1, olePathName, MAX_PATH - 1);
-    olePathName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeCreateDirectory(olePathName, lpSecurityAttributes);
-}
-
-BOOL CRAPI::RemoveDirectory(LPCTSTR lpPathName)
-{
-    OLECHAR olePathName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpPathName, -1, olePathName, MAX_PATH - 1);
-    olePathName[MAX_PATH - 1] = 0;
-
-    return CDynRapi::CeRemoveDirectory(olePathName);
-}
-
-BOOL CRAPI::CreateProcess(LPCTSTR lpApplicationName, LPCTSTR lpCommandLine)
-{
-    OLECHAR oleApplicationName[MAX_PATH], oleCommandLine[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpApplicationName, -1, oleApplicationName, MAX_PATH - 1);
-    oleApplicationName[MAX_PATH - 1] = 0;
-    if (lpCommandLine)
+    if (lpPathName == NULL)
     {
-        MultiByteToWideChar(CP_ACP, 0, lpCommandLine, -1, oleCommandLine, MAX_PATH - 1);
-        oleCommandLine[MAX_PATH - 1] = 0;
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeCreateDirectory(lpPathName, lpSecurityAttributes);
+}
+
+BOOL CRAPI::MoveFileWide(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName)
+{
+    if (lpExistingFileName == NULL || lpNewFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeMoveFile(lpExistingFileName, lpNewFileName);
+}
+
+BOOL CRAPI::DeleteFileWide(const wchar_t* lpFileName)
+{
+    if (lpFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeDeleteFile(lpFileName);
+}
+
+BOOL CRAPI::RemoveDirectoryWide(const wchar_t* lpPathName)
+{
+    if (lpPathName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeRemoveDirectory(lpPathName);
+}
+
+BOOL CRAPI::SetFileAttributesWide(const wchar_t* lpFileName, DWORD dwFileAttributes)
+{
+    if (lpFileName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeSetFileAttributes(lpFileName, dwFileAttributes);
+}
+BOOL CRAPI::FindAllFilesWide(const wchar_t* path, DWORD flags, LPDWORD foundCount,
+                             RapiNS::LPLPCE_FIND_DATA findData, BOOL tryReinit)
+{
+    if (path == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    BOOL ret = CDynRapi::CeFindAllFiles(path, flags, foundCount, findData);
+    if (!ret && tryReinit && GetLastError() != ERROR_NO_MORE_FILES && ReInit())
+        ret = CDynRapi::CeFindAllFiles(path, flags, foundCount, findData);
+    return ret;
+}
+
+BOOL CRAPI::CreateProcessWide(const wchar_t* lpApplicationName, const wchar_t* lpCommandLine)
+{
+    if (lpApplicationName == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+    return CDynRapi::CeCreateProcess(lpApplicationName, lpCommandLine, NULL, NULL, FALSE, 0,
+                                     NULL, NULL, NULL, NULL);
+}
+
+BOOL CRAPI::SHGetShortcutTargetWide(const wchar_t* shortcut, std::wstring& target)
+{
+    // CeSHGetShortcutTarget has no sizing query. Its Windows CE API contract writes at most
+    // 260 WCHARs; keep that fixed storage entirely inside this adapter.
+    static constexpr size_t WindowsCeShortcutTargetCapacity = 260;
+    target.clear();
+    if (shortcut == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
     }
 
-    return CDynRapi::CeCreateProcess(oleApplicationName, lpCommandLine ? oleCommandLine : NULL, NULL, NULL, FALSE, 0, NULL, NULL, NULL, NULL);
-}
-
-BOOL CRAPI::SHGetShortcutTarget(LPCTSTR lpszShortcut, LPTSTR lpszTarget, int cbMax)
-{
-    OLECHAR oleShortcut[MAX_PATH], oleTarget[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lpszShortcut, -1, oleShortcut, MAX_PATH - 1);
-    oleShortcut[MAX_PATH - 1] = 0;
-
-    if (!CDynRapi::CeSHGetShortcutTarget(oleShortcut, oleTarget, cbMax))
+    std::vector<wchar_t> shortcutBuffer(shortcut, shortcut + wcslen(shortcut) + 1);
+    wchar_t targetBuffer[WindowsCeShortcutTargetCapacity] = {};
+    if (!CDynRapi::CeSHGetShortcutTarget(shortcutBuffer.data(), targetBuffer, _countof(targetBuffer)))
         return FALSE;
-
-    WideCharToMultiByte(CP_ACP, 0, oleTarget, -1, lpszTarget, cbMax, NULL, NULL);
-    if (cbMax > 0)
-        lpszTarget[cbMax - 1] = 0;
+    target.assign(targetBuffer);
     return TRUE;
 }
 
@@ -443,45 +448,88 @@ CRAPI::RapiGetError(void)
 /////////////////////////////////////////////////////////////////////////////
 // Helpers
 
-// SalPathAppend does not quite match our needs
-// SalPathAppend("\\", "dir") returns "dir"; this version returns "\dir"
-BOOL CRAPI::PathAppend(char* path, const char* name, int pathSize)
+// The device enumerator behind the tested walk (wmobile_treewalk_core).
+//
+// It calls CDynRapi's Ce* functions DIRECTLY rather than going through CRAPI's narrow
+// wrappers. Those functions have always been wide - Windows CE has no ANSI code page at all -
+// so the wrapper's narrow signatures were a Win32-shaped convenience, and skipping them here
+// makes the walk Unicode-clean without widening the rest of CRAPI first.
+//
+// What that fixes: the previous recursion carried its directory path in a narrow buffer and
+// said so in its own comment - a directory whose name could not survive a CP_ACP round trip
+// was listed but never entered, making its entire contents invisible to listing, copy and
+// delete. See DescendsIntoNamesOutsideTheAnsiCodePage in gtest_wmobile_treewalk_core.
+class CRapiDeviceEnumerator : public wmobile::DeviceEnumerator
 {
-    if (path == NULL || name == NULL)
+public:
+    bool Enumerate(const wchar_t* searchPath, std::vector<wmobile::DeviceEntry>& out) override
     {
-        TRACE_E("CRAPI::PathAppend()");
+        RapiNS::CE_FIND_DATA data;
+        HANDLE find = CDynRapi::CeFindFirstFile(searchPath, &data);
+        if (find == INVALID_HANDLE_VALUE)
+        {
+            // An empty directory is not a failure. Some storage implementations report
+            // ERROR_FILE_NOT_FOUND where others report ERROR_NO_MORE_FILES; both mean 'nothing
+            // here', and the original code already had to accept the pair.
+            const int err = CDynRapi::CeGetLastError();
+            return err == ERROR_NO_MORE_FILES || err == ERROR_FILE_NOT_FOUND;
+        }
+
+        for (;;)
+        {
+            wmobile::DeviceEntry entry;
+            entry.name = data.cFileName; // CE is Unicode-native; no conversion, no refusal
+            entry.isDirectory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+            entry.sizeLow = data.nFileSizeLow;
+            entry.attributes = data.dwFileAttributes; // the device's real attributes, not a synthetic pair
+            out.push_back(entry);
+
+            if (!CDynRapi::CeFindNextFile(find, &data))
+            {
+                const int err = CDynRapi::CeGetLastError();
+                CDynRapi::CeFindClose(find);
+                return err == ERROR_NO_MORE_FILES;
+            }
+        }
+    }
+};
+
+BOOL CRAPI::FindAllFilesInTreeWide(const wchar_t* rootPath, const wchar_t* fileName,
+                                   CFileInfoArray& array, int block, BOOL dirFirst)
+{
+    if (rootPath == NULL || fileName == NULL)
+        return FALSE;
+
+    wmobile::WalkOptions options;
+    options.directoriesFirst = dirFirst ? true : false;
+    CRapiDeviceEnumerator device;
+    std::vector<wmobile::FoundItem> found;
+    if (!wmobile::WalkDeviceTree(device, rootPath, fileName, options, found))
+    {
+        const DWORD err = GetLastError();
+        SalamanderGeneral->ShowMessageBox(SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(),
+                                          TitleWMobileError, MSGBOX_ERROR);
         return FALSE;
     }
-    if (*name == '\\')
-        name++;
-    int l = (int)strlen(path);
-    if (l > 0 && path[l - 1] != '\\')
-    {
-        if (l >= pathSize)
-            return FALSE;
 
-        path[l++] = '\\';
-    }
-    if (*name != 0)
+    for (const wmobile::FoundItem& item : found)
     {
-        int n = (int)strlen(name);
-        if (l + 1 + n < pathSize) // do we still fit including the terminating null?
-            memcpy(path + l, name, n + 1);
-        else
+        // A directory recorded BEFORE its contents is the 'create it first' marker the copy
+        // path looks for; the post-order copy of that same directory carries the caller's
+        // block, which is what drives source-directory removal on a Move
+        // (fs_operations.cpp's `fi.block != -1` arm). Pass the device's REAL attributes:
+        // that arm also clears read-only/hidden/system before removing, and the delete
+        // confirmations key off them, so a synthetic DIRECTORY/NORMAL pair disabled both.
+        if (!array.AddOwned(item.relativePath.c_str(), item.attributes,
+                            item.sizeLow, item.isPreOrderMarker ? -1 : block))
+        {
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORYLOW).c_str(),
+                                              TitleWMobileError, MSGBOX_ERROR);
+            TRACE_E("Low memory");
             return FALSE;
+        }
     }
-    else
-        path[l] = 0;
-
     return TRUE;
-}
-
-BOOL CRAPI::FindAllFilesInTree(const char* rootPath, const char* fileName, CFileInfoArray& array, int block, BOOL dirFirst)
-{
-    char path[MAX_PATH]; // NOTE: Cannot use CPathBuffer — callee expects char(&)[MAX_PATH] reference
-    path[0] = 0;
-
-    return FindAllFilesInTree(rootPath, path, fileName, array, block, dirFirst);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -518,11 +566,11 @@ CRAPI::WaitAndDispatch(DWORD nCount, HANDLE* phWait, DWORD dwTimeout, BOOL bOnly
         MSG msg;
 
         if (bOnlySendMessage)
-            PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE);
+            PeekMessageW(&msg, NULL, 0, 0, PM_NOREMOVE);
         else
         {
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-                DispatchMessage(&msg);
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
+                DispatchMessageW(&msg);
         }
 
         if (INFINITE != dwTimeout)
@@ -574,120 +622,27 @@ CRAPI::InitRapi(HANDLE hExit, DWORD dwTimeout)
     return E_FAIL;
 }
 
-BOOL CRAPI::FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR fileName, CFileInfoArray& array, int block, BOOL dirFirst)
-{
-    HANDLE find = INVALID_HANDLE_VALUE;
-
-    RapiNS::CE_FIND_DATA data;
-    CPathBuffer fullPath; // Heap-allocated for long path support
-    strcpy(fullPath, rootPath);
-    if (!PathAppend(fullPath, path, fullPath.Size()) || !PathAppend(fullPath, fileName, fullPath.Size()))
-        goto ONERROR_TOOLONG;
-
-    find = FindFirstFile(fullPath, &data);
-    if (find == INVALID_HANDLE_VALUE)
-    {
-        // JR Some storage implementations return ERROR_FILE_NOT_FOUND instead of ERROR_NO_MORE_FILES
-        int nError = CDynRapi::CeGetLastError();
-        if (nError == ERROR_NO_MORE_FILES || nError == ERROR_FILE_NOT_FOUND)
-            return TRUE; // JR empty directory, stop
-
-        CPathBuffer buf; // Heap-allocated for long path support
-        DWORD err = GetLastError();
-        sprintf(buf, LoadStr(IDS_PATH_ERROR), fullPath.Get(), SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(buf, TitleWMobileError, MSGBOX_ERROR);
-        return FALSE;
-    }
-
-    for (;;)
-    {
-        // JR TODO: This does not work!
-        if (SalamanderGeneral->GetSafeWaitWindowClosePressed())
-        {
-            if (SalamanderGeneral->ShowMessageBox(LoadStr(IDS_YESNO_CANCEL), TitleWMobileQuestion,
-                                                  MSGBOX_QUESTION) == IDYES)
-                goto ONERROR;
-        }
-
-        if (data.cFileName[0] != 0 &&
-            (data.cFileName[0] != '.' || // JR Windows Mobile does not return "." and ".." paths, but handle it just in case
-             (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
-        {
-            CPathBuffer cFileName;
-            WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileName, cFileName.Size(), NULL, NULL);
-            cFileName[cFileName.Size() - 1] = 0;
-
-            CFileInfo fi;
-            strcpy(fi.cFileName, path);
-            if (!PathAppend(fi.cFileName, cFileName, MAX_PATH))
-                goto ONERROR_TOOLONG;
-
-            fi.dwFileAttributes = data.dwFileAttributes;
-
-            if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-            {
-                fi.size = 0;
-
-                if (dirFirst)
-                {
-                    fi.block = -1;
-                    array.Add(fi);
-                    if (array.State != etNone)
-                    {
-                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
-                        TRACE_E("Low memory");
-                        goto ONERROR;
-                    }
-                }
-
-                int len = (int)strlen(path);
-                if (!PathAppend(path, cFileName, MAX_PATH))
-                    goto ONERROR_TOOLONG;
-
-                if (!FindAllFilesInTree(rootPath, path, "*", array, block, dirFirst))
-                    goto ONERROR; // JR The error has already been reported
-
-                path[len] = 0;
-            }
-            else
-                fi.size = data.nFileSizeLow;
-
-            fi.block = block;
-            array.Add(fi);
-            if (array.State != etNone)
-            {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORYLOW), TitleWMobileError, MSGBOX_ERROR);
-                TRACE_E("Low memory");
-                goto ONERROR;
-            }
-        }
-
-        if (!FindNextFile(find, &data))
-        {
-            if (CDynRapi::CeGetLastError() == ERROR_NO_MORE_FILES)
-                break; // JR Everything is fine, stop
-
-            DWORD err = GetLastError();
-            SalamanderGeneral->ShowMessageBox(SalamanderGeneral->GetErrorText(err), TitleWMobileError, MSGBOX_ERROR);
-            FindClose(find);
-            return FALSE;
-        }
-    }
-
-    FindClose(find);
-    return TRUE;
-
-ONERROR_TOOLONG:
-    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_PATHTOOLONG),
-                                      TitleWMobileError, MSGBOX_ERROR);
-ONERROR:
-    if (find != INVALID_HANDLE_VALUE)
-        FindClose(find);
-    return FALSE;
-}
-
+// The three copy functions below are wide. They had only four call sites, all in
+// the two copy loops being converted with them, so they were widened outright rather than given
+// siblings - there is no narrow caller left to keep a wrapper for.
+//
+// READ THESE CAREFULLY: each one straddles the phone and the PC, and in the narrow originals the
+// only thing distinguishing the two was a leading "::". An unqualified GetFileAttributes/
+// CreateFile/DeleteFile inside CRAPI:: is the DEVICE (a CRAPI static); a "::"-qualified one is the
+// PC (Win32). Getting that backwards would compile and would silently operate on the wrong
+// machine. The wide forms make it visible: device calls now end in "Wide", PC calls in "W".
+//
+//   CopyFileToPC   source = device, target = PC
+//   CopyFileToCE   source = PC,     target = device
+//   CopyFile       both = device
+//
+// The three are deliberately NOT unified. They differ in more than which side is which - notably
+// CopyFileToCE reads its source attributes through the Salamander SDK rather than Win32, and both
+// it and CopyFile set the target attributes twice while CopyFileToPC sets them once. Folding
+// those into one parameterised function would mean deciding which asymmetries are bugs, which is
+// a behaviour change wearing a widening's clothes.
 DWORD
-CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName)
+CRAPI::CopyFileToPC(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName)
 {
     DWORD err = 0;
 
@@ -695,11 +650,11 @@ CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     FILETIME creationTime, accessedTime, writeTime;
     DWORD size, copied = 0;
 
-    DWORD attr = GetFileAttributes(lpExistingFileName);
+    DWORD attr = GetFileAttributesWide(lpExistingFileName); // device
     if (attr == 0xFFFFFFFF)
         goto ONERROR_SRC;
 
-    srcHandle = CreateFile(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    srcHandle = CreateFileWide(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL); // device
     if (srcHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_SRC;
 
@@ -713,7 +668,7 @@ CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     if (!GetFileTime(srcHandle, &creationTime, &accessedTime, &writeTime))
         goto ONERROR_SRC;
 
-    dstHandle = ::CreateFile(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    dstHandle = ::CreateFileW(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL); // PC
     if (dstHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_DST;
 
@@ -743,14 +698,14 @@ CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
                 err = -1;
                 ::CloseHandle(dstHandle);
                 dstHandle = INVALID_HANDLE_VALUE;
-                ::DeleteFile(lpNewFileName);
+                ::DeleteFileW(lpNewFileName); // PC
                 goto RETURN;
             }
         }
     } while (read >= sizeof(buffer));
 
     ::SetFileTime(dstHandle, &creationTime, &accessedTime, &writeTime); // JR REVIEW: should we ignore potential errors?
-    ::SetFileAttributes(lpNewFileName, attr);
+    ::SetFileAttributesW(lpNewFileName, attr); // PC
 
 RETURN:
     if (srcHandle != INVALID_HANDLE_VALUE)
@@ -778,7 +733,7 @@ ONERROR_DST:
 }
 
 DWORD
-CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName)
+CRAPI::CopyFileToCE(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName)
 {
     DWORD err = 0;
 
@@ -786,11 +741,11 @@ CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     FILETIME creationTime, accessedTime, writeTime;
     DWORD size, copied = 0;
 
-    DWORD attr = SalamanderGeneral->SalGetFileAttributes(lpExistingFileName);
+    DWORD attr = SalamanderGeneral->SalGetFileAttributes(lpExistingFileName); // PC, via the SDK
     if (attr == 0xFFFFFFFF)
         goto ONERROR_SRC;
 
-    srcHandle = ::CreateFile(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    srcHandle = ::CreateFileW(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL); // PC
     if (srcHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_SRC;
 
@@ -804,7 +759,7 @@ CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     if (!::GetFileTime(srcHandle, &creationTime, &accessedTime, &writeTime))
         goto ONERROR_SRC;
 
-    dstHandle = CreateFile(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    dstHandle = CreateFileWide(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL); // device
     if (dstHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_DST;
 
@@ -834,14 +789,14 @@ CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
                 err = -1;
                 CloseHandle(dstHandle);
                 dstHandle = INVALID_HANDLE_VALUE;
-                DeleteFile(lpNewFileName);
+                DeleteFileWide(lpNewFileName); // device
                 goto RETURN;
             }
         }
     } while (read >= sizeof(buffer));
 
     SetFileTime(dstHandle, &creationTime, &accessedTime, &writeTime); // JR REVIEW: should we ignore potential errors?
-    SetFileAttributes(lpNewFileName, attr);
+    SetFileAttributesWide(lpNewFileName, attr); // device
 
 RETURN:
     if (dstHandle != INVALID_HANDLE_VALUE)
@@ -850,7 +805,7 @@ RETURN:
         ::CloseHandle(srcHandle);
 
     if (err == 0)
-        SetFileAttributes(lpNewFileName, attr);
+        SetFileAttributesWide(lpNewFileName, attr); // device
 
     return err;
 
@@ -872,7 +827,7 @@ ONERROR_DST:
 }
 
 DWORD
-CRAPI::CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, LPCTSTR* errorFileName)
+CRAPI::CopyFileWide(const wchar_t* lpExistingFileName, const wchar_t* lpNewFileName, BOOL bFailIfExists, CProgressDlg* dlg, INT64 totalCopied, INT64 totalSize, const wchar_t** errorFileName)
 {
     DWORD err = 0;
 
@@ -880,11 +835,11 @@ CRAPI::CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfE
     FILETIME creationTime, accessedTime, writeTime;
     DWORD size, copied = 0;
 
-    DWORD attr = GetFileAttributes(lpExistingFileName);
+    DWORD attr = GetFileAttributesWide(lpExistingFileName); // device
     if (attr == 0xFFFFFFFF)
         goto ONERROR_SRC;
 
-    srcHandle = CreateFile(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    srcHandle = CreateFileWide(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL); // device
     if (srcHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_SRC;
 
@@ -898,7 +853,7 @@ CRAPI::CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfE
     if (!GetFileTime(srcHandle, &creationTime, &accessedTime, &writeTime))
         goto ONERROR_SRC;
 
-    dstHandle = CreateFile(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    dstHandle = CreateFileWide(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL); // device
     if (dstHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_DST;
 
@@ -928,14 +883,14 @@ CRAPI::CopyFile(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFailIfE
                 err = -1;
                 CloseHandle(dstHandle);
                 dstHandle = INVALID_HANDLE_VALUE;
-                DeleteFile(lpNewFileName);
+                DeleteFileWide(lpNewFileName); // device
                 goto RETURN;
             }
         }
     } while (read >= sizeof(buffer));
 
     SetFileTime(dstHandle, &creationTime, &accessedTime, &writeTime); // JR REVIEW: should we ignore potential errors?
-    SetFileAttributes(lpNewFileName, attr);
+    SetFileAttributesWide(lpNewFileName, attr); // device
 
 RETURN:
     if (dstHandle != INVALID_HANDLE_VALUE)
@@ -944,7 +899,7 @@ RETURN:
         CloseHandle(srcHandle);
 
     if (err == 0)
-        SetFileAttributes(lpNewFileName, attr);
+        SetFileAttributesWide(lpNewFileName, attr); // device
 
     return err;
 
@@ -965,189 +920,133 @@ ONERROR_DST:
     goto RETURN;
 }
 
-DWORD
-CRAPI::SetFileTime(LPCTSTR lpFileName, const SYSTEMTIME* lpCreationTime,
-                   const SYSTEMTIME* lpLastAccessTime, const SYSTEMTIME* lpLastWriteTime)
+DWORD CRAPI::SetFileTimeWide(const wchar_t* fileName, const SYSTEMTIME* creationTime,
+                             const SYSTEMTIME* lastAccessTime, const SYSTEMTIME* lastWriteTime)
 {
-    if (lpCreationTime == NULL && lpLastAccessTime == NULL && lpLastWriteTime == NULL)
+    if (creationTime == NULL && lastAccessTime == NULL && lastWriteTime == NULL)
         return 0;
 
-    HANDLE ceHandle = INVALID_HANDLE_VALUE;
-
-    DWORD attr = GetFileAttributes(lpFileName);
+    HANDLE handle = INVALID_HANDLE_VALUE;
+    DWORD attr = GetFileAttributesWide(fileName);
     if (attr == 0xFFFFFFFF)
-        goto ONERROR_CE;
+        goto ONERROR_CE_WIDE;
+    if ((attr & FILE_ATTRIBUTE_READONLY) &&
+        !SetFileAttributesWide(fileName, attr & ~FILE_ATTRIBUTE_READONLY))
+        goto ONERROR_CE_WIDE;
 
+    handle = CreateFileWide(fileName, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (handle == INVALID_HANDLE_VALUE)
+        goto ONERROR_CE_WIDE;
+
+    FILETIME time, created, accessed, modified;
+    if (creationTime)
+    {
+        SystemTimeToFileTime(creationTime, &time);
+        LocalFileTimeToFileTime(&time, &created);
+    }
+    if (lastAccessTime)
+    {
+        SystemTimeToFileTime(lastAccessTime, &time);
+        LocalFileTimeToFileTime(&time, &accessed);
+    }
+    if (lastWriteTime)
+    {
+        SystemTimeToFileTime(lastWriteTime, &time);
+        LocalFileTimeToFileTime(&time, &modified);
+    }
+    if (!SetFileTime(handle, creationTime ? &created : NULL,
+                     lastAccessTime ? &accessed : NULL, lastWriteTime ? &modified : NULL))
+        goto ONERROR_CE_WIDE;
+
+    CloseHandle(handle);
     if (attr & FILE_ATTRIBUTE_READONLY)
-    {
-        if (!SetFileAttributes(lpFileName, attr & (~FILE_ATTRIBUTE_READONLY)))
-            goto ONERROR_CE;
-    }
-
-    ceHandle = CreateFile(lpFileName, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (ceHandle == INVALID_HANDLE_VALUE)
-        goto ONERROR_CE;
-
-    FILETIME time, timeCreated, timeAccessed, timeModified;
-    if (lpCreationTime)
-    {
-        SystemTimeToFileTime(lpCreationTime, &time);
-        LocalFileTimeToFileTime(&time, &timeCreated);
-    }
-    if (lpLastAccessTime)
-    {
-        SystemTimeToFileTime(lpLastAccessTime, &time);
-        LocalFileTimeToFileTime(&time, &timeAccessed);
-    }
-    if (lpLastWriteTime)
-    {
-        SystemTimeToFileTime(lpLastWriteTime, &time);
-        LocalFileTimeToFileTime(&time, &timeModified);
-    }
-
-    if (!SetFileTime(ceHandle, lpCreationTime ? &timeCreated : NULL,
-                     lpLastAccessTime ? &timeAccessed : NULL, lpLastWriteTime ? &timeModified : NULL))
-        goto ONERROR_CE;
-
-    CloseHandle(ceHandle);
-    if (attr & FILE_ATTRIBUTE_READONLY)
-        SetFileAttributes(lpFileName, attr);
-
+        SetFileAttributesWide(fileName, attr);
     return 0;
 
-ONERROR_CE:
+ONERROR_CE_WIDE:
     DWORD err = GetLastError();
-
-    if (ceHandle != INVALID_HANDLE_VALUE)
-        CloseHandle(ceHandle);
-    if (attr & FILE_ATTRIBUTE_READONLY)
-        SetFileAttributes(lpFileName, attr);
-
+    if (handle != INVALID_HANDLE_VALUE)
+        CloseHandle(handle);
+    if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
+        SetFileAttributesWide(fileName, attr);
     return err;
 }
 
-BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, char* errBuf,
-                                    int errBufSize, char* newDir)
+BOOL CRAPI::CheckAndCreateDirectory(const wchar_t* dir, HWND parent, BOOL quiet)
 {
-    CALL_STACK_MESSAGE2("CheckAndCreateDirectory(%s)", dir);
+    CALL_STACK_MESSAGE2("CheckAndCreateDirectory(%ls)", dir);
 
-    DWORD attrs = GetFileAttributes(dir);
-    CPathBuffer buf; // Heap-allocated for long path support
-    CPathBuffer name;
-    if (newDir != NULL)
-        newDir[0] = 0;
-    //  if (parent == NULL) parent = MainWindow->HWindow;
+    DWORD attrs = GetFileAttributesWide(dir);
+    std::wstring name;
+    const std::wstring root = L"\\";
+    const auto reportError = [&](const wchar_t* format, const wchar_t* subject)
+    {
+        const std::wstring message = SPLFormatStringOwned(format, subject);
+        SalamanderGeneral->SalMessageBox(parent, message.c_str(), TitleWMobileError,
+                                         MB_OK | MB_ICONEXCLAMATION);
+    };
+
     if (attrs == 0xFFFFFFFF) // probably does not exist; allow creation
     {
-        CPathBuffer root("\\");      // GetRootPath(root, dir);
-        if (strlen(dir) <= strlen(root)) // dir is the root directory
+        if (wcslen(dir) <= root.size()) // dir is the root directory
         {
-            sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), dir);
-            if (errBuf != NULL)
-            {
-                int l = (int)lstrlen(buf);
-                l = min(l + 1, errBufSize);
-                memcpy(errBuf, buf, l);
-                errBuf[errBufSize - 1] = 0;
-            }
-            else
-                SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+            reportError(LangStr(IDS_ERR_CREATEDIR).c_str(), dir);
             return FALSE;
         }
-        sprintf(buf, LoadStr(IDS_YESNO_CREATEDIR), dir);
-        if (quiet || SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileQuestion,
-                                                      MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES)
+        const std::wstring question = SPLFormatStringOwned(LangStr(IDS_YESNO_CREATEDIR).c_str(), dir);
+        if (quiet || SalamanderGeneral->SalMessageBox(parent, question.c_str(), TitleWMobileQuestion,
+                                                       MB_YESNOCANCEL | MB_ICONQUESTION) == IDYES)
         {
-            strcpy(name, dir);
-            char* s;
+            name = dir;
             while (1) // find the first existing directory
             {
-                s = strrchr(name, '\\');
-                if (s == NULL)
+                const size_t slash = name.find_last_of(L'\\');
+                if (slash == std::wstring::npos)
                 {
-                    sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), dir);
-                    if (errBuf != NULL)
-                    {
-                        int l = (int)lstrlen(buf);
-                        l = min(l + 1, errBufSize);
-                        memcpy(errBuf, buf, l);
-                        errBuf[errBufSize - 1] = 0;
-                    }
-                    else
-                        SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+                    reportError(LangStr(IDS_ERR_CREATEDIR).c_str(), dir);
                     return FALSE;
                 }
-                if (s - name > (int)strlen(root))
-                    *s = 0;
+                if (slash > root.size())
+                    name.resize(slash);
                 else
                 {
-                    strcpy(name, root);
+                    name = root;
                     break; // already at the root directory
                 }
-                attrs = GetFileAttributes(name);
+                attrs = GetFileAttributesWide(name.c_str());
                 if (attrs != 0xFFFFFFFF) // the name exists
                 {
                     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
                         break; // we will build from this directory
                     else       // it is a file, that would not work...
                     {
-                        sprintf(buf, LoadStr(IDS_ERR_DIRNAMEISFILE), name.Get());
-                        if (errBuf != NULL)
-                        {
-                            int l = (int)lstrlen(buf);
-                            l = min(l + 1, errBufSize);
-                            memcpy(errBuf, buf, l);
-                            errBuf[errBufSize - 1] = 0;
-                        }
-                        else
-                            SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+                        reportError(LangStr(IDS_ERR_DIRNAMEISFILE).c_str(), name.c_str());
                         return FALSE;
                     }
                 }
             }
-            s = name + strlen(name) - 1;
-            if (*s != '\\')
+            if (name.back() != L'\\')
+                name.push_back(L'\\');
+            size_t start = name.size();
+            const std::wstring requested(dir);
+            if (start < requested.size() && requested[start] == L'\\')
+                ++start;
+            while (start < requested.size())
             {
-                *++s = '\\';
-                *++s = 0;
-            }
-            const char* st = dir + strlen(name);
-            if (*st == '\\')
-                st++;
-            int len = (int)strlen(name);
-            BOOL first = TRUE;
-            while (*st != 0)
-            {
-                const char* slash = strchr(st, '\\');
-                if (slash == NULL)
-                    slash = st + strlen(st);
-                memcpy(name + len, st, slash - st);
-                name[len += (int)(slash - st)] = 0;
-                if (!CreateDirectory(name, NULL))
+                size_t slash = requested.find(L'\\', start);
+                if (slash == std::wstring::npos)
+                    slash = requested.size();
+                name.append(requested, start, slash - start);
+                if (!CreateDirectoryWide(name.c_str(), NULL)) // device
                 {
-                    sprintf(buf, LoadStr(IDS_ERR_CREATEDIR), name.Get());
-                    if (errBuf != NULL)
-                    {
-                        int l = (int)lstrlen(buf);
-                        l = min(l + 1, errBufSize);
-                        memcpy(errBuf, buf, l);
-                        errBuf[errBufSize - 1] = 0;
-                    }
-                    else
-                        SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+                    reportError(LangStr(IDS_ERR_CREATEDIR).c_str(), name.c_str());
                     return FALSE;
                 }
-                else
-                {
-                    if (first && newDir != NULL)
-                        strcpy(newDir, name);
-                    first = FALSE;
-                }
-                name[len++] = '\\';
-                if (*slash == '\\')
-                    slash++;
-                st = slash;
+                if (slash == requested.size())
+                    break;
+                name.push_back(L'\\');
+                start = slash + 1;
             }
             return TRUE;
         }
@@ -1157,53 +1056,53 @@ BOOL CRAPI::CheckAndCreateDirectory(const char* dir, HWND parent, BOOL quiet, ch
         return TRUE;
     else // file, that would not work...
     {
-        sprintf(buf, LoadStr(IDS_ERR_DIRNAMEISFILE), dir);
-        if (errBuf != NULL)
-        {
-            int l = (int)lstrlen(buf);
-            l = min(l + 1, errBufSize);
-            memcpy(errBuf, buf, l);
-            errBuf[errBufSize - 1] = 0;
-        }
-        else
-            SalamanderGeneral->SalMessageBox(parent, buf, TitleWMobileError, MB_OK | MB_ICONEXCLAMATION);
+        reportError(LangStr(IDS_ERR_DIRNAMEISFILE).c_str(), dir);
         return FALSE;
     }
 }
 
-void CRAPI::GetFileData(const char* name, char (&buf)[100])
+std::wstring CRAPI::GetFileDataWide(const wchar_t* name)
 {
-    buf[0] = '?';
-    buf[1] = 0;
-    char tmp[50];
-
     RapiNS::CE_FIND_DATA data;
 
-    HANDLE find = FindFirstFile(name, &data);
+    HANDLE find = FindFirstFileWide(name, &data);
     if (find == INVALID_HANDLE_VALUE)
-        return;
+        return L"?";
 
     CQuadWord size(data.nFileSizeLow, data.nFileSizeHigh);
-    SalamanderGeneral->NumberToStr(buf, size);
+    std::wstring result = SPLNumberToStrOwned(SalamanderGeneral, size);
 
     FILETIME time;
     SYSTEMTIME st;
     FileTimeToLocalFileTime(&data.ftLastWriteTime, &time);
     FileTimeToSystemTime(&time, &st);
 
-    if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, tmp, 50))
-        sprintf(tmp, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+    int dateLength = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, NULL, 0);
+    std::wstring date;
+    if (dateLength > 0)
+    {
+        std::vector<wchar_t> value(static_cast<size_t>(dateLength));
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, value.data(), dateLength))
+            date.assign(value.data());
+    }
+    if (date.empty())
+        date = SPLFormatStringOwned(L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
-    strcat(buf, ", ");
-    strcat(buf, tmp);
+    int timeLength = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
+    std::wstring timeText;
+    if (timeLength > 0)
+    {
+        std::vector<wchar_t> value(static_cast<size_t>(timeLength));
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, value.data(), timeLength))
+            timeText.assign(value.data());
+    }
+    if (timeText.empty())
+        timeText = SPLFormatStringOwned(L"%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
 
-    if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, tmp, 50))
-        sprintf(tmp, "%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
-
-    strcat(buf, ", ");
-    strcat(buf, tmp);
+    result += L", " + date + L", " + timeText;
 
     FindClose(find);
+    return result;
 }
 
 BOOL CRAPI::CheckConnection()

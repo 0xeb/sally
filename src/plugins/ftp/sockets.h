@@ -140,11 +140,12 @@ protected:
     CSocketState SocketState; // socket state
 
     // data for connecting through proxy servers (firewalls)
-    char* HostAddress;       // name address of the target machine we want to connect to
+    std::wstring HostAddress; // semantic address of the target machine we want to connect to
+    std::string HostAddressWire; // explicit ASCII/IDNA bytes for SOCKS and HTTP proxy requests
     DWORD HostIP;            // IP address of 'HostAddress' (==INADDR_NONE until the IP is known)
     unsigned short HostPort; // port of the target machine we want to connect to
-    char* ProxyUser;         // username for the proxy server
-    char* ProxyPassword;     // password for the proxy server
+    std::string ProxyUserBytes;     // adapter-owned ACP bytes for the proxy protocol
+    std::string ProxyPasswordBytes; // adapter-owned ACP bytes for the proxy protocol
     DWORD ProxyIP;           // IP address of the proxy server (used only for LISTEN - otherwise ==INADDR_NONE)
 
     CProxyErrorCode ProxyErrorCode; // error code that occurred when connecting to the FTP server through the proxy server
@@ -152,7 +153,7 @@ protected:
 
     BOOL ShouldPostFD_WRITE; // TRUE = FD_WRITE arrived while connecting through the proxy server, so after the FTP connection is established we will have to forward it to ReceiveNetEvent()
 
-    char* HTTP11_FirstLineOfReply;    // if not NULL, contains the first line of the reply from the HTTP 1.1 proxy server (to the CONNECT request)
+    std::string HTTP11_FirstLineOfReply; // explicit response bytes from the HTTP 1.1 proxy CONNECT first line
     int HTTP11_EmptyRowCharsReceived; // the server response ends with CRLFCRLF, here we store how many characters of that sequence have already arrived
 
     DWORD IsSocketConnectedLastCallTime; // 0 if CSocketsThread::IsSocketConnected() has not yet been called for this socket, otherwise the GetTickCount() of the last call
@@ -223,7 +224,7 @@ public:
     // WARNING: this method cannot be called from the SocketCritSect critical section (the method uses
     //          SocketsThread); the exception is when we are already inside the CSocketsThread::CritSect critical section
     // callable from any thread
-    BOOL GetHostByAddress(const char* address, int hostUID = 0);
+    BOOL GetHostByAddress(const wchar_t* address, int hostUID = 0);
 
     // connects to a SOCKS 4/4A/5 or HTTP 1.1 (the proxy type is in 'proxyType') proxy server
     // 'serverIP' on port 'serverPort' + if it is not one of these proxy servers, it works the same as
@@ -239,8 +240,8 @@ public:
     //          SocketsThread)
     // callable from any thread
     BOOL ConnectWithProxy(DWORD serverIP, unsigned short serverPort, CFTPProxyServerType proxyType,
-                          DWORD* err, const char* host, unsigned short port, const char* proxyUser,
-                          const char* proxyPassword, DWORD hostIP);
+                          DWORD* err, const wchar_t* host, unsigned short port,
+                          const wchar_t* proxyUser, const wchar_t* proxyPassword, DWORD hostIP);
 
     // connects to IP address 'ip' on port 'port'; creates a Windows socket and sets it as non-blocking -
     // it sends messages to the SocketsThread object, which based on these messages calls the
@@ -260,13 +261,13 @@ public:
     // (with a length of at least 'formatBufSize' characters) for the formatting string (for sprintf)
     // describing when the error occurred; if 'oneLineText' is TRUE, only 'errBuf' is filled
     // and only with a single line of text (without CR+LF)
-    BOOL GetProxyError(char* errBuf, int errBufSize, char* formatBuf, int formatBufSize,
-                       BOOL oneLineText);
+    BOOL GetProxyError(std::string& errorText, std::string* formatText,
+                       BOOL oneLineText) noexcept;
 
     // returns a description of the timeout that occurred when connecting through the proxy server; returns FALSE
     // if it is a timeout while connecting to the FTP server; 'buf' is a buffer for the timeout description
     // with a length of at least 'bufSize' characters
-    BOOL GetProxyTimeoutDescr(char* buf, int bufSize);
+    BOOL GetProxyTimeoutDescr(std::string& text) noexcept;
 
     // returns TRUE if the socket is not closed (INVALID_SOCKET)
     BOOL IsConnected();
@@ -290,17 +291,17 @@ public:
     // is NULL, it returns failure and SSLCONERR_UNVERIFIEDCERT in 'sslErrorOccured'; if
     // 'unverifiedCert' is not NULL, it returns success and the server certificate in 'unverifiedCert',
     // the caller is responsible for releasing it by calling unverifiedCert->Release() and
-    // returns the reason why the certificate cannot be verified in 'errorBuf' (of size 'errorBufLen',
-    // if it is 0, 'errorBuf' can be NULL); in 'errorID' (if not NULL) it returns the resource-id
+    // returns the reason why the certificate cannot be verified in dynamic 'errorText'
+    // (which may be NULL); in 'errorID' (if not NULL) it returns the resource-id
     // of the error text or -1 if no error should be displayed; for other errors
     // (except an untrusted certificate): it returns NULL in 'unverifiedCert', returns supplementary
-    // text for the error in 'errorBuf' (of size 'errorBufLen', if it is 0, 'errorBuf' can be NULL) (it is inserted
+    // text for the error in 'errorText' (if non-NULL) (it is inserted
     // into 'errorID' at position %s via sprintf); in 'sslErrorOccured' (if not NULL) it returns the error code (one of SSLCONERR_XXX);
     // 'logUID' is the log UID; 'conForReuse' (if not NULL) is the socket whose SSL session should be reused (called
     // "SSL session reuse", see for example http://vincent.bernat.im/en/blog/2011-ssl-session-reuse-rfc5077.html
     // and it is used from the control connection for all its data connections)
     BOOL EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unverifiedCert,
-                       int* errorID, char* errorBuf, int errorBufLen, CSocket* conForReuse);
+                       int* errorID, std::string* errorText, CSocket* conForReuse);
 
     // connects to a SOCKS 4/4A/5 or HTTP 1.1 (the proxy type is in 'proxyType') proxy server
     // 'proxyIP' on port 'proxyPort' and opens a port for "listen" on it; the IP+port where it
@@ -328,10 +329,10 @@ public:
     //          SocketsThread)
     // callable from any thread
     BOOL OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenOnPort,
-                                   const char* host, DWORD hostIP, unsigned short hostPort,
+                                   const wchar_t* host, DWORD hostIP, unsigned short hostPort,
                                    CFTPProxyServerType proxyType, DWORD proxyIP,
-                                   unsigned short proxyPort, const char* proxyUser,
-                                   const char* proxyPassword, BOOL* listenError, DWORD* err);
+                                   unsigned short proxyPort, const wchar_t* proxyUser,
+                                   const wchar_t* proxyPassword, BOOL* listenError, DWORD* err);
 
     // opens a socket and waits for a connection on it (listens); 'listenOnIP' (must not be NULL) is on
     // input the IP of this machine (when binding the socket on multi-home machines the IP may not be detectable,
@@ -409,8 +410,9 @@ public:
 protected:
     // helper method for setting data for connecting through a proxy server
     // WARNING: call only from the SocketCritSect section
-    BOOL SetProxyData(const char* hostAddress, unsigned short hostPort,
-                      const char* proxyUser, const char* proxyPassword,
+    BOOL SetProxyData(const wchar_t* hostAddress, unsigned short hostPort,
+                      CFTPProxyServerType proxyType,
+                      const wchar_t* proxyUser, const wchar_t* proxyPassword,
                       DWORD hostIP, DWORD* error, DWORD proxyIP);
 
     // helper method: sends bytes from 'buf' to the socket; 'index' is the socket index in the
@@ -419,6 +421,7 @@ protected:
     // 'isConnect' is TRUE/FALSE for CONNECT/LISTEN
     // WARNING: call only with a single nesting level in the SocketCritSect section
     void ProxySendBytes(const char* buf, int bufLen, int index, BOOL* csLeft, BOOL isConnect);
+    void ProxyRequestBuildFailed(int index, BOOL* csLeft, BOOL isConnect, DWORD error);
 
     // helper methods: 'index' is the socket index in the SocketsThread->Sockets array (used
     // when calling ReceiveNetEvent()); inside the method the SocketCritSect critical section may be left,

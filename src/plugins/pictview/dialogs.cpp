@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_narrow_compat.h"
+#include "common/Win32TextCodec.h"
 
 #include <string>
 
@@ -16,15 +18,6 @@
 #include "exif/exif.h"
 #include "exif/libexif/exif-tag.h"
 #include "utils.h"
-
-// Enforces ANSI variant
-#define ListView_SetItemTextA(hwndLV, i, iSubItem_, pszText_) \
-    { \
-        LV_ITEMA _ms_lvi; \
-        _ms_lvi.iSubItem = iSubItem_; \
-        _ms_lvi.pszText = pszText_; \
-        SendMessageA((hwndLV), LVM_SETITEMTEXTA, (WPARAM)i, (LPARAM)(LV_ITEM FAR*)&_ms_lvi); \
-    }
 
 #define ListView_SetItemTextW(hwndLV, i, iSubItem_, pszText_) \
     { \
@@ -169,7 +162,6 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         TCHAR buffer[96];
         const TCHAR* s;
-        TCHAR fmt[32];
 
         if (nFrames > 0)
         {
@@ -182,12 +174,13 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         SetDlgItemText(HWindow, IDC_IMGPROP_PAGENUM, buffer);
         CQuadWord qW(PVII->Width, 0);
-        SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_PIXELS), 1, &qW);
-        _stprintf(buffer, fmt, PVII->Width);
+        std::wstring fmt = SPLExpandPluralStringOwned(
+            SalamanderGeneral, LoadStr(IDS_PIXELS), 1, &qW);
+        _stprintf(buffer, fmt.c_str(), PVII->Width);
         SetDlgItemText(HWindow, IDC_IMGPROP_WIDTH, buffer);
         CQuadWord qH(PVII->Height, 0);
-        SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_PIXELS), 1, &qH);
-        _stprintf(buffer, fmt, PVII->Height);
+        fmt = SPLExpandPluralStringOwned(SalamanderGeneral, LoadStr(IDS_PIXELS), 1, &qH);
+        _stprintf(buffer, fmt.c_str(), PVII->Height);
         SetDlgItemText(HWindow, IDC_IMGPROP_HEIGHT, buffer);
 
         if (PVII->TotalBitDepth > 0)
@@ -232,12 +225,12 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_COLORS), s);
 
         CQuadWord q1(PVII->BytesPerLine * PVII->Height, 0);
-        SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BYTES), 1, &q1);
-        _stprintf(buffer, fmt, PVII->BytesPerLine * PVII->Height);
+        fmt = SPLExpandPluralStringOwned(SalamanderGeneral, LoadStr(IDS_BYTES), 1, &q1);
+        _stprintf(buffer, fmt.c_str(), PVII->BytesPerLine * PVII->Height);
         Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_SIZE), buffer);
         CQuadWord qFS(PVII->FileSize, 0);
-        SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BYTES), 1, &qFS);
-        _stprintf(buffer, fmt, PVII->FileSize);
+        fmt = SPLExpandPluralStringOwned(SalamanderGeneral, LoadStr(IDS_BYTES), 1, &qFS);
+        _stprintf(buffer, fmt.c_str(), PVII->FileSize);
         Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_FSIZE), buffer);
 
         if (PVII->VerDPI)
@@ -251,16 +244,18 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         SetDlgItemText(HWindow, IDC_IMGPROP_DPI, s);
 
-        SetDlgItemTextA(HWindow, IDC_IMGPROP_FMT, PVII->Info1); //PVW32DLL.PVGetErrorText(PVII->Format));
-        SetDlgItemTextA(HWindow, IDC_IMGPROP_COMPR, PVW32DLL.PVGetErrorText(PVII->Compression));
+        SetDlgItemTextW(HWindow, IDC_IMGPROP_FMT,
+                        ToWideArg(PVII->Info1).c_str()); //PVW32DLL.PVGetErrorText(PVII->Format));
+        SetDlgItemTextW(HWindow, IDC_IMGPROP_COMPR,
+                        ToWideArg(PVW32DLL.PVGetErrorText(PVII->Compression)).c_str());
         if (Comment)
         {
             std::string s2 = std::string(PVII->Info2) + (*PVII->Info2 ? "\r\n" : "") + Comment;
-            SetDlgItemTextA(HWindow, IDC_IMGPROP_COMMENT, s2.c_str());
+            SetDlgItemTextW(HWindow, IDC_IMGPROP_COMMENT, ToWideArg(s2.c_str()).c_str());
         }
         else
         {
-            SetDlgItemTextA(HWindow, IDC_IMGPROP_COMMENT, PVII->Info2);
+            SetDlgItemTextW(HWindow, IDC_IMGPROP_COMMENT, ToWideArg(PVII->Info2).c_str());
         }
 
         break;
@@ -1112,18 +1107,16 @@ CCaptureDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CRenameDialog
 //
 
-CRenameDialog::CRenameDialog(HWND hParent, LPTSTR path, int pathBufSize)
-    : CCommonDialog(HLanguage, IDD_RENAMEDIALOG, hParent)
+CRenameDialog::CRenameDialog(HWND hParent, std::wstring& path)
+    : CCommonDialog(HLanguage, IDD_RENAMEDIALOG, hParent), Path(path)
 {
-    Path = path;
-    PathBufSize = pathBufSize;
     bFirstShow = TRUE;
 }
 
 void CRenameDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CRenameDialog::Transfer()");
-    ti.EditLine(IDE_PATH, Path, PathBufSize);
+    ti.EditLine(IDE_PATH, Path);
 }
 
 INT_PTR
@@ -1134,7 +1127,7 @@ CRenameDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(HWindow, IDS_SUBJECT), LoadStr(IDS_RENAME_TO),
-                                               Path, FALSE, FALSE);
+                                               Path.c_str(), FALSE, FALSE);
         break;
     }
 
@@ -1144,10 +1137,11 @@ CRenameDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // Select only base filename part, if configured
             if (!G.bSelectWhole)
             {
-                LPCTSTR ext = _tcsrchr(Path, '.');
-                if (ext == Path)
+                const wchar_t* ext = wcsrchr(Path.c_str(), L'.');
+                if (ext == Path.c_str())
                     ext = NULL; // ".cvspass" is extension in Windows, but Explorer selects whole name in such cases, so we do the same
-                SendDlgItemMessage(HWindow, IDE_PATH, EM_SETSEL, 0, _tcsclen(Path) - (ext ? _tcsclen(ext) : 0));
+                SendDlgItemMessage(HWindow, IDE_PATH, EM_SETSEL, 0,
+                                   Path.size() - (ext ? wcslen(ext) : 0));
             }
             bFirstShow = FALSE;
         }
@@ -1236,26 +1230,50 @@ CExifDialog::~CExifDialog()
 BOOL CALLBACK ExifEnumProc(DWORD tagNum, const char* tagTitle, const char* tagDescription,
                            const char* value, LPARAM lParam)
 {
-    CExifDialog* dlg = (CExifDialog*)lParam;
-    CExifItem item;
-
-    item.Tag = tagNum;
-    item.TagTitle = SalamanderGeneral->DupStr(tagTitle);
-    item.TagDescription = SalamanderGeneral->DupStr(tagDescription);
-    item.Value = SalamanderGeneral->DupStr(value);
-    if (item.TagTitle != NULL &&
-        item.TagDescription != NULL &&
-        item.Value != NULL)
+    try
     {
-        return dlg->AddItem(&item);
+        std::wstring titleW;
+        std::wstring descriptionW;
+        std::wstring valueW;
+        if (!LegacyTextToWide(tagTitle, titleW) ||
+            !LegacyTextToWide(tagDescription, descriptionW))
+            return FALSE;
+
+        const bool valueIsUtf8 =
+            tagNum >= EXIF_TAG_XP_TITLE && tagNum <= EXIF_TAG_XP_SUBJECT;
+        if (valueIsUtf8)
+        {
+            if (!Win32DecodeText(CP_UTF8, value, strlen(value), valueW))
+                return FALSE;
+        }
+        else if (!LegacyTextToWide(value, valueW))
+            return FALSE;
+
+        CExifDialog* dlg = reinterpret_cast<CExifDialog*>(lParam);
+        CExifItem item{};
+        item.Tag = tagNum;
+        item.TagTitle = SalamanderGeneral->DupStr(titleW.c_str());
+        item.TagDescription = SalamanderGeneral->DupStr(descriptionW.c_str());
+        item.Value = SalamanderGeneral->DupStr(valueW.c_str());
+        if (item.TagTitle != NULL &&
+            item.TagDescription != NULL &&
+            item.Value != NULL)
+        {
+            if (dlg->AddItem(&item))
+                return TRUE;
+        }
+        if (item.TagTitle != NULL)
+            SalamanderGeneral->Free(item.TagTitle);
+        if (item.TagDescription != NULL)
+            SalamanderGeneral->Free(item.TagDescription);
+        if (item.Value != NULL)
+            SalamanderGeneral->Free(item.Value);
+        return FALSE;
     }
-    if (item.TagTitle != NULL)
-        SalamanderGeneral->Free(item.TagTitle);
-    if (item.TagDescription != NULL)
-        SalamanderGeneral->Free(item.TagDescription);
-    if (item.Value != NULL)
-        SalamanderGeneral->Free(item.Value);
-    return TRUE;
+    catch (...)
+    {
+        return FALSE;
+    }
 }
 
 BOOL CExifDialog::AddItem(CExifItem* item)
@@ -1395,28 +1413,8 @@ void CExifDialog::FillListView()
                 lvi.iSubItem = 0;
                 lvi.lParam = i;
                 ListView_InsertItem(HListView, &lvi);
-                ListView_SetItemTextA(HListView, index, 0, item->TagTitle);
-                if ((item->Tag >= EXIF_TAG_XP_TITLE) && (item->Tag <= EXIF_TAG_XP_SUBJECT))
-                {
-                    wchar_t translW[1024];
-                    static CONVERTUTF8TOUCS2 ConvertUTF8ToUCS2 = NULL;
-
-                    if (!ConvertUTF8ToUCS2)
-                    {
-                        ConvertUTF8ToUCS2 = (CONVERTUTF8TOUCS2)GetProcAddress(EXIFLibrary, "ConvertUTF8ToUCS2");
-                    }
-                    if (ConvertUTF8ToUCS2)
-                    {
-                        ConvertUTF8ToUCS2(item->Value, translW);
-                        // Note: MBCS is never longer than UTF8 representation -> result always fits & is NULL-terminated
-                        //              WideCharToMultiByte(CP_ACP, 0, translW, -1, transl, BUF_SIZE, NULL, NULL);
-                        ListView_SetItemTextW(HListView, index, 1, translW);
-                    }
-                }
-                else
-                {
-                    ListView_SetItemTextA(HListView, index, 1, item->Value);
-                }
+                ListView_SetItemTextW(HListView, index, 0, item->TagTitle);
+                ListView_SetItemTextW(HListView, index, 1, item->Value);
 
                 if (lvi.lParam == lastIndex)
                 {
@@ -1623,11 +1621,11 @@ CExifDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
             {
 #ifdef _UNICODE
-                CPathBuffer FileNameA;
-
-                WideCharToMultiByte(CP_ACP, 0, FileName, -1, FileNameA, FileNameA.Size(), NULL, NULL);
-                FileNameA[FileNameA.Size() - 1] = 0;
-                getInfo(FileNameA, 0, ExifEnumProc, (LPARAM)this);
+                std::string fileNameBytes;
+                if (WideToLegacyTextExact(FileName, fileNameBytes))
+                    getInfo(fileNameBytes.c_str(), 0, ExifEnumProc, (LPARAM)this);
+                else
+                    TRACE_E("EXIF.DLL cannot represent the UTF-16 file name exactly");
 #else
                 getInfo(FileName, 0, ExifEnumProc, (LPARAM)this);
 #endif
@@ -1693,8 +1691,8 @@ CExifDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case IDC_IMGEXIF_COPY:
             {
-                const char* text = Items[(int)GetFocusedItemLParam()].Value;
-                SalamanderGeneral->CopyTextToClipboard(text, (int)strlen(text), FALSE, HWindow);
+                const wchar_t* text = Items[(int)GetFocusedItemLParam()].Value;
+                SalamanderGeneral->CopyTextToClipboard(text, -1, FALSE, HWindow);
                 return 0;
             }
             }
@@ -1751,7 +1749,8 @@ CExifDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int index = (int)GetFocusedItemLParam();
                     if (index >= 0 && index < Items.Count)
                     {
-                        SetDlgItemTextA(HWindow, IDC_IMGEXIF_INFO, Items[index].TagDescription);
+                        SetDlgItemTextW(HWindow, IDC_IMGEXIF_INFO,
+                                        Items[index].TagDescription);
                         BOOL highlighted = GetHighlightIndex(Items[index].Tag) != -1;
                         CheckDlgButton(HWindow, IDC_IMGEXIF_HIGHLIGHT, highlighted ? BST_CHECKED : BST_UNCHECKED);
                     }
@@ -1813,11 +1812,10 @@ int COPYTO_EL_ID[COPYTO_LINES] = {IDC_COPYTO_EL_1, IDC_COPYTO_EL_2, IDC_COPYTO_E
 // BRowse
 int COPYTO_BR_ID[COPYTO_LINES] = {IDC_COPYTO_BR_1, IDC_COPYTO_BR_2, IDC_COPYTO_BR_3, IDC_COPYTO_BR_4, IDC_COPYTO_BR_5};
 
-CCopyToDlg::CCopyToDlg(HWND hParent, LPCTSTR srcName, LPTSTR dstName)
-    : CCommonDialog(HLanguage, IDD_COPYTO, IDD_COPYTO, hParent)
+CCopyToDlg::CCopyToDlg(HWND hParent, const wchar_t* srcName, std::wstring& dstName)
+    : CCommonDialog(HLanguage, IDD_COPYTO, IDD_COPYTO, hParent), DstName(dstName)
 {
     SrcName = srcName;
-    DstName = dstName;
 }
 
 void CCopyToDlg::Validate(CTransferInfo& ti)
@@ -1827,34 +1825,31 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
     for (i = 0; i < COPYTO_LINES; i++)
         ti.RadioButton(COPYTO_RB_ID[i], i, line);
 
-    CPathBuffer buff;
-    ti.EditLine(COPYTO_EL_ID[line], buff, buff.Size());
-
-    CPathBuffer path;
-    _tcscpy(path, buff);
+    std::wstring path;
+    ti.EditLine(COPYTO_EL_ID[line], path);
 
     // put the full path of the viewed file into srcDir and trim off the name
-    CPathBuffer srcDir;
-    lstrcpyn(srcDir, SrcName, srcDir.Size());
-    LPTSTR namePart = (LPTSTR)_tcsrchr(srcDir, '\\');
-    if (namePart == NULL)
+    std::wstring srcDir = SrcName != NULL ? SrcName : L"";
+    const size_t nameOffset = srcDir.find_last_of(L'\\');
+    if (nameOffset == std::wstring::npos)
     {
         TRACE_E("Unexpected situation: cannot find the file name!");
         ti.ErrorOn(COPYTO_EL_ID[line]);
         return;
     }
-    *namePart = 0;
-    namePart++;
+    const std::wstring namePart = srcDir.substr(nameOffset + 1);
+    srcDir.resize(nameOffset);
 
     int errTextID;
-    if (!SalGetFullName(path, &errTextID, srcDir))
+    if (!SPLSalGetFullNameOwned(SalamanderGeneral, path, &errTextID, srcDir.c_str()))
     {
-        CPathBuffer errBuf;
+        std::wstring errText;
         if (errTextID == GFN_EMPTYNAMENOTALLOWED)
-            _tcscpy(errBuf, LoadStr(IDS_SPECIFYPATH)); // provide a more intuitive message for an empty string
+            errText = ToWideArg(LoadStr(IDS_SPECIFYPATH)); // provide a more intuitive message for an empty string
         else
-            SalamanderGeneral->GetGFNErrorText(errTextID, errBuf, errBuf.Size());
-        SalamanderGeneral->SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORTITLE),
+            SPLGetGFNErrorTextOwned(SalamanderGeneral, errTextID, errText);
+        const std::wstring title = ToWideArg(LoadStr(IDS_ERRORTITLE));
+        SalamanderGeneral->SalMessageBox(HWindow, errText.c_str(), title.c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(COPYTO_EL_ID[line]);
     }
@@ -1862,8 +1857,9 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
     // prepare the return buffer
     if (ti.IsGood())
     {
-        SalamanderGeneral->SalPathAppend(path, namePart, path.Size());
-        _tcscpy(DstName, path);
+        std::wstring destination = path;
+        SPLSalPathAppendOwned(destination, namePart.c_str());
+        DstName = std::move(destination);
     }
 }
 
@@ -1874,15 +1870,13 @@ void CCopyToDlg::Transfer(CTransferInfo& ti)
     {
         ti.RadioButton(COPYTO_RB_ID[i], i, G.CopyToLastIndex);
 
-        CPathBuffer buff;
+        std::wstring buff;
         if (ti.Type == ttDataToWindow)
         {
             if (G.CopyToDestinations[i] != NULL)
-                lstrcpyn(buff, G.CopyToDestinations[i], buff.Size());
-            else
-                buff[0] = 0;
+                buff = G.CopyToDestinations[i];
         }
-        ti.EditLine(COPYTO_EL_ID[i], buff, buff.Size());
+        ti.EditLine(COPYTO_EL_ID[i], buff);
         if (ti.Type == ttDataFromWindow)
         {
             if (G.CopyToDestinations[i] != NULL)
@@ -1890,8 +1884,8 @@ void CCopyToDlg::Transfer(CTransferInfo& ti)
                 SalamanderGeneral->Free(G.CopyToDestinations[i]);
                 G.CopyToDestinations[i] = NULL;
             }
-            if (buff[0] != 0)
-                G.CopyToDestinations[i] = SalamanderGeneral->DupStr(buff);
+            if (!buff.empty())
+                G.CopyToDestinations[i] = SalamanderGeneral->DupStr(buff.c_str());
         }
     }
 
@@ -1925,13 +1919,14 @@ CCopyToDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (LOWORD(wParam) == COPYTO_BR_ID[i])
             {
-                CPathBuffer path;
-                GetDlgItemText(HWindow, COPYTO_EL_ID[i], path, path.Size());
-                if (SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, path,
-                                                          LoadStr(IDS_SELECTTARGETDIR), path,
-                                                          FALSE, path))
+                const std::wstring initial = SPLGetDlgItemTextOwned(HWindow, COPYTO_EL_ID[i]);
+                const std::wstring comment = ToWideArg(LoadStr(IDS_SELECTTARGETDIR));
+                std::wstring path;
+                if (SPLGetTargetDirectoryOwned(SalamanderGeneral, HWindow, HWindow,
+                                               initial.c_str(), comment.c_str(), path,
+                                               FALSE, initial.c_str()))
                 {
-                    SetDlgItemText(HWindow, COPYTO_EL_ID[i], path);
+                    SetDlgItemTextW(HWindow, COPYTO_EL_ID[i], path.c_str());
                 }
             }
         }

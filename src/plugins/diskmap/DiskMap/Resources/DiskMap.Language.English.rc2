@@ -180,5 +180,8 @@ BEGIN
     IDS_DISKMAP_FORMAT_BYTE0,        "bytes"
     IDS_DISKMAP_FORMAT_BYTE1,        "byte"
     IDS_DISKMAP_FORMAT_BYTEN,        "bytes"
+
+    IDS_DISKMAP_EMPTY_TITLE,         "Nothing to display..."
+    IDS_DISKMAP_EMPTY_FOOTER,        "...this folder contains no files to map"
 END
 

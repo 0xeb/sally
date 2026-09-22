@@ -1,8 +1,10 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <utility>
 
 WSADATA WinSocketsData; // information about the Windows Sockets implementation
 
@@ -11,7 +13,7 @@ CThreadQueue SocketsThreadQueue("FTP Sockets"); // queue of all threads used in 
 CSocketsThread* SocketsThread = NULL;   // handler thread for all sockets
 CRITICAL_SECTION SocketsThreadCritSect; // for synchronizing the termination of the SocketsThread thread
 
-const char* SOCKETSWINDOW_CLASSNAME = "SocketsHiddenWindowClass";
+LPCWSTR SOCKETSWINDOW_CLASSNAME = L"SocketsHiddenWindowClass";
 
 int CSocket::NextSocketUID = 0;                  // global counter for socket objects
 CRITICAL_SECTION CSocket::NextSocketUIDCritSect; // critical section of the counter (sockets are created in different threads)
@@ -30,10 +32,31 @@ BOOL InitSockets(HWND parent)
     int err;
     if ((err = WSAStartup(MAKEWORD(1, 1), &WinSocketsData)) != 0) // error
     {
-        char buf[500];
-        char errBuf[300];
-        sprintf(buf, LoadStr(IDS_WINSOCKETSERROR), FTPGetErrorText(err, errBuf, 300));
-        MessageBox(parent, buf, LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONERROR);
+        try
+        {
+            std::string errorBytes;
+            std::wstring errorText;
+            std::wstring message;
+            if (FTPGetErrorText(err, errorBytes) &&
+                FtpDecodeLocalText(errorBytes, errorText) &&
+                FtpFormatWideText(LangStr(IDS_WINSOCKETSERROR).c_str(), errorText,
+                                  message))
+            {
+                SalamanderGeneral->ShowMessageBox(
+                    message.c_str(), LangStr(IDS_FTPPLUGINTITLE).c_str(), MSGBOX_ERROR);
+            }
+            else
+            {
+                SalamanderGeneral->ShowMessageBox(
+                    LangStr(IDS_OPERDOPPR_LOWMEM).c_str(),
+                    LangStr(IDS_FTPPLUGINTITLE).c_str(), MSGBOX_ERROR);
+            }
+        }
+        catch (...)
+        {
+            MessageBoxW(parent, L"Windows Sockets initialization failed.", L"FTP Client",
+                        MB_OK | MB_ICONERROR);
+        }
         return FALSE;
     }
 
@@ -94,9 +117,10 @@ void ReleaseSockets()
     if (WSACleanup() == SOCKET_ERROR)
     {
         int err = WSAGetLastError();
-#ifdef _DEBUG // otherwise the compiler reports warning "errBuf - unreferenced local variable"
-        char errBuf[300];
-        TRACE_E("Unable to release Windows Sockets: " << FTPGetErrorText(err, errBuf, 300));
+#ifdef _DEBUG
+        std::string errorText;
+        FTPGetErrorText(err, errorText);
+        TRACE_E("Unable to release Windows Sockets: " << errorText.c_str());
 #endif
     }
 }
@@ -138,16 +162,17 @@ CSocket::CSocket()
     OurShutdown = FALSE;
     IsDataConnection = FALSE;
     SocketState = ssNotOpened;
-    HostAddress = NULL;
+    HostAddress.clear();
+    HostAddressWire.clear();
     HostIP = INADDR_NONE;
     HostPort = -1;
-    ProxyUser = NULL;
-    ProxyPassword = NULL;
+    ProxyUserBytes.clear();
+    ProxyPasswordBytes.clear();
     ProxyIP = INADDR_NONE;
     ProxyErrorCode = pecNoError;
     ProxyWinError = NO_ERROR;
     ShouldPostFD_WRITE = FALSE;
-    HTTP11_FirstLineOfReply = NULL;
+    HTTP11_FirstLineOfReply.clear();
     HTTP11_EmptyRowCharsReceived = 0;
     IsSocketConnectedLastCallTime = 0;
 }
@@ -163,14 +188,7 @@ CSocket::~CSocket()
     if (!InDeleteSocket)
         TRACE_E("CSocket::~CSocket(): Incorrect use of operator delete, use DeleteSocket() instead.");
 #endif
-    if (HostAddress != NULL)
-        SalamanderGeneral->Free(HostAddress);
-    if (ProxyUser != NULL)
-        SalamanderGeneral->Free(ProxyUser);
-    if (ProxyPassword != NULL)
-        SalamanderGeneral->Free(ProxyPassword);
-    if (HTTP11_FirstLineOfReply != NULL)
-        free(HTTP11_FirstLineOfReply);
+    FTPSecureWipe(ProxyPasswordBytes);
     if (pCertificate)
         pCertificate->Release();
 }
@@ -261,10 +279,10 @@ BOOL CSocket::IsConnected()
 }
 
 BOOL CSocket::ConnectWithProxy(DWORD serverIP, unsigned short serverPort, CFTPProxyServerType proxyType,
-                               DWORD* err, const char* host, unsigned short port, const char* proxyUser,
-                               const char* proxyPassword, DWORD hostIP)
+                               DWORD* err, const wchar_t* host, unsigned short port,
+                               const wchar_t* proxyUser, const wchar_t* proxyPassword, DWORD hostIP)
 {
-    CALL_STACK_MESSAGE8("CSocket::ConnectWithProxy(0x%X, %u, %d, , %s, %u, %s, , 0x%X)",
+    CALL_STACK_MESSAGE8("CSocket::ConnectWithProxy(0x%X, %u, %d, , %ls, %u, %ls, , 0x%X)",
                         serverIP, serverPort, proxyType, host, port, proxyUser, hostIP);
     switch (proxyType)
     {
@@ -279,7 +297,7 @@ BOOL CSocket::ConnectWithProxy(DWORD serverIP, unsigned short serverPort, CFTPPr
             *err = NO_ERROR;
         BOOL ret = FALSE;
         if (SocketState != ssNotOpened ||
-            !SetProxyData(host, port, proxyUser, proxyPassword, hostIP, err, INADDR_NONE))
+            !SetProxyData(host, port, proxyType, proxyUser, proxyPassword, hostIP, err, INADDR_NONE))
         {
             if (SocketState != ssNotOpened)
                 TRACE_E("CSocket::ConnectWithProxy(): SocketState != ssNotOpened");
@@ -312,10 +330,18 @@ BOOL CSocket::ConnectWithProxy(DWORD serverIP, unsigned short serverPort, CFTPPr
     }
 
     default:
-        if (!HostAddress)
-        { // Needed by Certificate verification
-            HostAddress = SalamanderGeneral->DupStr(host);
+        std::wstring stagedHost;
+        std::string stagedWireHost;
+        if (host == NULL || *host == 0 ||
+            !FtpStoreWideText(host, stagedHost) ||
+            !FtpEncodeNetworkHost(stagedHost.c_str(), stagedWireHost))
+        {
+            if (err != NULL)
+                *err = ERROR_INVALID_NAME;
+            return FALSE;
         }
+        HostAddress.swap(stagedHost); // Needed by certificate verification.
+        HostAddressWire.swap(stagedWireHost);
         return Connect(serverIP, serverPort, err);
     }
 }
@@ -491,29 +517,50 @@ BOOL CSocket::Connect(DWORD ip, unsigned short port, DWORD* error, BOOL calledFr
     return ret;
 }
 
-BOOL CSocket::SetProxyData(const char* hostAddress, unsigned short hostPort,
-                           const char* proxyUser, const char* proxyPassword,
+BOOL CSocket::SetProxyData(const wchar_t* hostAddress, unsigned short hostPort,
+                           CFTPProxyServerType proxyType,
+                           const wchar_t* proxyUser, const wchar_t* proxyPassword,
                            DWORD hostIP, DWORD* error, DWORD proxyIP)
 {
-    if (HostAddress != NULL)
-        SalamanderGeneral->Free(HostAddress);
-    if (ProxyUser != NULL)
-        SalamanderGeneral->Free(ProxyUser);
-    if (ProxyPassword != NULL)
-        SalamanderGeneral->Free(ProxyPassword);
-
-    BOOL err = GetStrOrNULL(hostAddress) == NULL;
-    if (err)
+    DWORD failure = NO_ERROR;
+    if (hostAddress == NULL || *hostAddress == 0)
+    {
         TRACE_E("CSocket::SetProxyData(): hostAddress cannot be empty!");
-    HostAddress = SalamanderGeneral->DupStr(GetStrOrNULL(hostAddress));
+        failure = ERROR_INVALID_NAME;
+    }
+    std::wstring stagedHost;
+    std::string stagedWireHost;
+    if (failure == NO_ERROR && !FtpStoreWideText(hostAddress, stagedHost))
+        failure = ERROR_NOT_ENOUGH_MEMORY;
+    if (failure == NO_ERROR && !FtpEncodeNetworkHost(stagedHost.c_str(), stagedWireHost))
+        failure = ERROR_INVALID_NAME;
+
+    std::string stagedUserBytes;
+    std::string stagedPasswordBytes;
+    DWORD credentialError = NO_ERROR;
+    if (failure == NO_ERROR &&
+        !FtpEncodeProxyCredentials(proxyUser, proxyPassword,
+                                   proxyType == fpstSocks5,
+                                   stagedUserBytes, stagedPasswordBytes,
+                                   credentialError))
+        failure = credentialError;
+    if (failure != NO_ERROR)
+    {
+        FTPSecureWipe(stagedPasswordBytes);
+        if (error != NULL)
+            *error = failure;
+        return FALSE;
+    }
+
+    HostAddress.swap(stagedHost);
+    HostAddressWire.swap(stagedWireHost);
     HostIP = hostIP;
     HostPort = hostPort;
-    ProxyUser = SalamanderGeneral->DupStr(GetStrOrNULL(proxyUser));
-    ProxyPassword = SalamanderGeneral->DupStr(GetStrOrNULL(proxyPassword));
+    ProxyUserBytes.swap(stagedUserBytes);
+    ProxyPasswordBytes.swap(stagedPasswordBytes);
     ProxyIP = proxyIP;
-    if (err && error != NULL)
-        *error = ERROR_NOT_ENOUGH_MEMORY;
-    return !err;
+    FTPSecureWipe(stagedPasswordBytes);
+    return TRUE;
 }
 
 BOOL CSocket::GetLocalIP(DWORD* ip, DWORD* error)
@@ -641,12 +688,12 @@ BOOL CSocket::OpenForListening(DWORD* listenOnIP, unsigned short* listenOnPort, 
 }
 
 BOOL CSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenOnPort,
-                                        const char* host, DWORD hostIP, unsigned short hostPort,
+                                        const wchar_t* host, DWORD hostIP, unsigned short hostPort,
                                         CFTPProxyServerType proxyType, DWORD proxyIP,
-                                        unsigned short proxyPort, const char* proxyUser,
-                                        const char* proxyPassword, BOOL* listenError, DWORD* err)
+                                        unsigned short proxyPort, const wchar_t* proxyUser,
+                                        const wchar_t* proxyPassword, BOOL* listenError, DWORD* err)
 {
-    CALL_STACK_MESSAGE10("CSocket::OpenForListeningWithProxy(0x%X, %u, %s, 0x%X, %u, %d, 0x%X, %u, %s, , ,)",
+    CALL_STACK_MESSAGE10("CSocket::OpenForListeningWithProxy(0x%X, %u, %ls, 0x%X, %u, %d, 0x%X, %u, %ls, , ,)",
                          listenOnIP, listenOnPort, host, hostIP, hostPort,
                          (int)proxyType, proxyIP, proxyPort, proxyUser);
 
@@ -665,7 +712,7 @@ BOOL CSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenO
             *err = NO_ERROR;
         BOOL ret = FALSE;
         if (SocketState != ssNotOpened ||
-            !SetProxyData(host, hostPort, proxyUser, proxyPassword, hostIP, err, proxyIP))
+            !SetProxyData(host, hostPort, proxyType, proxyUser, proxyPassword, hostIP, err, proxyIP))
         {
             if (SocketState != ssNotOpened)
                 TRACE_E("CSocket::OpenForListeningWithProxy(): SocketState != ssNotOpened");
@@ -712,16 +759,15 @@ BOOL CSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenO
 class CGetHostByNameThread : public CThread
 {
 protected:
-    std::string Address; // address being looked up
+    std::wstring Address; // address being looked up
     int HostUID;   // hostUID from the GetHostByAddress call that created this thread
     int SocketMsg; // Msg from the socket object that should receive the result
     int SocketUID; // UID from the socket object that should receive the result
 
 public:
-    CGetHostByNameThread(const char* address, int hostUID, int socketMsg,
-                         int socketUID) : CThread("GetHostByName")
+    CGetHostByNameThread(std::wstring&& address, int hostUID, int socketMsg,
+                         int socketUID) : CThread(L"GetHostByName"), Address(std::move(address))
     {
-        Address = address != NULL ? address : "";
         HostUID = hostUID;
         SocketMsg = socketMsg;
         SocketUID = socketUID;
@@ -733,18 +779,22 @@ public:
 
     virtual unsigned Body()
     {
-        CALL_STACK_MESSAGE2("CGetHostByNameThread::Body(%s)", Address.c_str());
-        // obtain the IP address by calling gethostbyname
-        HOSTENT* host = NULL;
+        CALL_STACK_MESSAGE2("CGetHostByNameThread::Body(%ls)", Address.c_str());
         int err = 0;
         DWORD ip = INADDR_NONE; // error
         if (!Address.empty())
         {
-            host = gethostbyname(Address.c_str());
-            if (host == NULL)
-                err = WSAGetLastError();
-            else
-                ip = *(DWORD*)(host->h_addr);
+            ADDRINFOW hints = {};
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_STREAM;
+            ADDRINFOW* result = NULL;
+            const int lookupResult = GetAddrInfoW(Address.c_str(), NULL, &hints, &result);
+            if (lookupResult != 0)
+                err = lookupResult;
+            else if (result != NULL && result->ai_addrlen >= sizeof(SOCKADDR_IN))
+                ip = reinterpret_cast<SOCKADDR_IN*>(result->ai_addr)->sin_addr.s_addr;
+            if (result != NULL)
+                FreeAddrInfoW(result);
         }
         // send the result to the "sockets" thread
         HANDLES(EnterCriticalSection(&SocketsThreadCritSect));
@@ -757,9 +807,9 @@ public:
     }
 };
 
-BOOL CSocket::GetHostByAddress(const char* address, int hostUID)
+BOOL CSocket::GetHostByAddress(const wchar_t* address, int hostUID)
 {
-    CALL_STACK_MESSAGE3("CSocket::GetHostByAddress(%s, %d)", address, hostUID);
+    CALL_STACK_MESSAGE3("CSocket::GetHostByAddress(%ls, %d)", address, hostUID);
 
     SocketsThread->LockSocketsThread();
     HANDLES(EnterCriticalSection(&SocketCritSect));
@@ -788,19 +838,32 @@ BOOL CSocket::GetHostByAddress(const char* address, int hostUID)
     int postErr = 0;
 
     BOOL maybeOK = FALSE;
-    DWORD ip = inet_addr(address);
-    if (ip == INADDR_NONE) // not an IP string (aa.bb.cc.dd), try gethostbyname
+    IN_ADDR numericAddress = {};
+    const int numericResult = InetPtonW(AF_INET, address, &numericAddress);
+    DWORD ip = numericResult == 1 ? numericAddress.s_addr : INADDR_NONE;
+    if (numericResult != 1) // not an IPv4 string, resolve the Unicode DNS name
     {
-        CGetHostByNameThread* t = new CGetHostByNameThread(address, hostUID, Msg, UID);
+        std::wstring ownedAddress;
+        CGetHostByNameThread* t = NULL;
+        if (FtpStoreWideText(address != NULL ? address : L"", ownedAddress))
+            t = new CGetHostByNameThread(std::move(ownedAddress), hostUID, Msg, UID);
         if (t != NULL)
         {
             if (t->Create(SocketsThreadQueue) == NULL)
+            {
+                postErr = GetLastError();
+                if (postErr == NO_ERROR)
+                    postErr = ERROR_NOT_ENOUGH_MEMORY;
                 delete t; // the thread did not start, error
+            }
             else
                 maybeOK = TRUE; // the thread is running, the address lookup may succeed
         }
         else
+        {
             TRACE_E(LOW_MEMORY); // low memory, error
+            postErr = ERROR_NOT_ENOUGH_MEMORY;
+        }
         if (!maybeOK)
         {
             postMsg = TRUE; // post the error to the object
@@ -838,10 +901,9 @@ void CSocket::ReceiveHostByAddress(DWORD ip, int hostUID, int err)
   }
   else
   {
-    char buf[300];
-    if (err != 0) FTPGetErrorText(err, buf, 300);
-    else buf[0] = 0;
-    TRACE_I("CSocket::ReceiveHostByAddress(): error: " << buf);
+    std::string errorText;
+    if (err != 0) FTPGetErrorText(err, errorText);
+    TRACE_I("CSocket::ReceiveHostByAddress(): error: " << errorText.c_str());
   }
 */
 }
@@ -878,145 +940,118 @@ void CSocket::ReceiveHostByAddressInt(DWORD ip, int hostUID, int err, int index)
     }
 }
 
-BOOL CSocket::GetProxyError(char* errBuf, int errBufSize, char* formatBuf, int formatBufSize, BOOL oneLineText)
+BOOL CSocket::GetProxyError(std::string& errorText, std::string* formatText,
+                            BOOL oneLineText) noexcept
 {
-    CALL_STACK_MESSAGE1("CSocket::GetProxyError(, , ,)");
+    CALL_STACK_MESSAGE1("CSocket::GetProxyError(dynamic)");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    BOOL ret = FALSE; // FALSE = it is not an error reported by the proxy server (but for example an error connecting to the proxy server)
+    BOOL ret = FALSE;
     if (ProxyErrorCode != pecNoError)
     {
-        ret = TRUE;
-        char errText[300];
+        std::string detail;
+        BOOL formatted = TRUE;
         if (ProxyErrorCode != pecUnexpectedReply && ProxyErrorCode != pecProxySrvError &&
             ProxyErrorCode != pecNoAuthUnsup && ProxyErrorCode != pecUserPassAuthUnsup &&
             ProxyErrorCode != pecUserPassAuthFail && ProxyErrorCode != pecListenUnsup &&
             ProxyErrorCode != pecHTTPProxySrvError)
         {
             if (ProxyWinError == NO_ERROR)
-                lstrcpyn(errText, LoadStr(ProxyErrorCode == pecReceivingBytes ? IDS_CONNECTIONLOSTERROR : IDS_UNKNOWNERROR), 300);
-            else
+                formatted = FTPFormatString(detail, "%s", LoadStr(ProxyErrorCode == pecReceivingBytes ? IDS_CONNECTIONLOSTERROR : IDS_UNKNOWNERROR));
+            else if (FTPGetErrorText(ProxyWinError, detail))
             {
-                FTPGetErrorText(ProxyWinError, errText, 300);
-                char* s = errText + strlen(errText);
-                while (s > errText && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                *s = 0; // trim newline characters from the error text
-            }
-        }
-        else
-        {
-            if (ProxyErrorCode == pecHTTPProxySrvError && HTTP11_FirstLineOfReply != NULL)
-            {
-                char* s = HTTP11_FirstLineOfReply;
-                while (*s != 0 && *s > ' ')
-                    s++;
-                while (*s != 0 && *s <= ' ')
-                    s++;
-                if (*s != 0)
-                {
-                    int len = (int)strlen(s);
-                    if (len > 0 && s[len - 1] == '\n')
-                        len--;
-                    if (len > 0 && s[len - 1] == '\r')
-                        len--;
-                    if (len > 299)
-                        len = 299;
-                    memcpy(errText, s, len);
-                    errText[len] = 0;
-                }
-                else
-                    errText[0] = 0;
+                while (!detail.empty() && (detail.back() == '\n' || detail.back() == '\r'))
+                    detail.pop_back();
             }
             else
+                formatted = FALSE;
+        }
+        else if (ProxyErrorCode == pecHTTPProxySrvError && !HTTP11_FirstLineOfReply.empty())
+        {
+            const char* text = HTTP11_FirstLineOfReply.c_str();
+            while (*text != 0 && *text > ' ')
+                ++text;
+            while (*text != 0 && *text <= ' ')
+                ++text;
+            formatted = FTPFormatString(detail, "%s", text);
+            while (!detail.empty() && (detail.back() == '\n' || detail.back() == '\r'))
+                detail.pop_back();
+        }
+        else if (ProxyErrorCode == pecProxySrvError)
+            formatted = FTPFormatString(detail, "%s", LoadStr(ProxyWinError));
+
+        std::string stagedError;
+        std::string stagedFormat;
+        if (formatted && oneLineText)
+        {
+            switch (ProxyErrorCode)
             {
-                if (ProxyErrorCode == pecProxySrvError)
-                    lstrcpyn(errText, LoadStr(ProxyWinError), 300);
-                else
-                    errText[0] = 0;
+            case pecGettingHostIP:
+            case pecUnexpectedReply:
+                formatted = FTPFormatString(stagedError,
+                                            LoadStr(ProxyErrorCode == pecUnexpectedReply ? IDS_PROXYUNEXPECTEDREPLY : IDS_PROXYERRGETIP),
+                                            HostAddressWire.c_str(), detail.c_str());
+                break;
+            case pecSendingBytes:
+            case pecReceivingBytes:
+                formatted = FTPFormatString(stagedError,
+                                            LoadStr(ProxyErrorCode == pecSendingBytes ? IDS_PROXYERRSENDREQ : IDS_PROXYERRRECVREP),
+                                            detail.c_str());
+                break;
+            case pecConPrxSrvError:
+                formatted = FTPFormatString(stagedError, LoadStr(IDS_PROXYERRUNABLETOCON2), detail.c_str());
+                break;
+            case pecNoAuthUnsup:
+                formatted = FTPFormatString(stagedError, "%s", LoadStr(IDS_PROXYERRNOAUTHUNSUP));
+                break;
+            case pecUserPassAuthUnsup:
+                formatted = FTPFormatString(stagedError, "%s", LoadStr(IDS_PROXYERRUSERPASSAUTHUNSUP));
+                break;
+            case pecUserPassAuthFail:
+                formatted = FTPFormatString(stagedError, "%s", LoadStr(IDS_PROXYERRUSERPASSFAIL));
+                break;
+            case pecListenUnsup:
+                formatted = FTPFormatString(stagedError, "%s", LoadStr(IDS_PROXYERRLISTENUNSUP));
+                break;
+            default:
+                formatted = FTPFormatString(stagedError, LoadStr(IDS_PROXYERROPENCON), HostAddressWire.c_str(), HostPort, detail.c_str());
+                break;
             }
         }
-        if (oneLineText)
+        else if (formatted)
         {
-            if (formatBufSize > 0)
-                formatBuf[0] = 0;
-            if (errBufSize > 0)
-            {
-                switch (ProxyErrorCode)
-                {
-                case pecGettingHostIP:
-                case pecUnexpectedReply:
-                {
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE,
-                                LoadStr(ProxyErrorCode == pecUnexpectedReply ? IDS_PROXYUNEXPECTEDREPLY : IDS_PROXYERRGETIP), HostAddress, errText);
-                    break;
-                }
-
-                case pecSendingBytes:
-                case pecReceivingBytes:
-                {
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE,
-                                LoadStr(ProxyErrorCode == pecSendingBytes ? IDS_PROXYERRSENDREQ : IDS_PROXYERRRECVREP), errText);
-                    break;
-                }
-
-                case pecConPrxSrvError:
-                {
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON2), errText);
-                    break;
-                }
-
-                case pecNoAuthUnsup:
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERRNOAUTHUNSUP));
-                    break;
-                case pecUserPassAuthUnsup:
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERRUSERPASSAUTHUNSUP));
-                    break;
-                case pecUserPassAuthFail:
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERRUSERPASSFAIL));
-                    break;
-                case pecListenUnsup:
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERRLISTENUNSUP));
-                    break;
-
-                default: // pecProxySrvError, pecHTTPProxySrvError
-                {
-                    _snprintf_s(errBuf, errBufSize, _TRUNCATE, LoadStr(IDS_PROXYERROPENCON), HostAddress, HostPort, errText);
-                    break;
-                }
-                }
-            }
+            if (formatText != NULL)
+                formatted = FTPFormatString(stagedFormat,
+                                            LoadStr(ProxyErrorCode == pecGettingHostIP       ? IDS_GETIPERROR
+                                                    : ProxyErrorCode == pecSendingBytes    ? IDS_PROXYSENDREQERROR
+                                                    : ProxyErrorCode == pecReceivingBytes  ? IDS_PROXYRECVREPERROR
+                                                    : ProxyErrorCode == pecUnexpectedReply ? IDS_PROXYUNEXPECTEDREPLY
+                                                    : ProxyErrorCode == pecNoAuthUnsup      ? IDS_PROXYERRNOAUTHUNSUP
+                                                    : ProxyErrorCode == pecUserPassAuthUnsup ? IDS_PROXYERRUSERPASSAUTHUNSUP
+                                                    : ProxyErrorCode == pecUserPassAuthFail ? IDS_PROXYERRUSERPASSFAIL
+                                                    : ProxyErrorCode == pecListenUnsup       ? IDS_PROXYERRLISTENUNSUP
+                                                                                             : IDS_PROXYOPENCONERROR),
+                                            HostAddressWire.c_str(), HostPort);
+            stagedError.swap(detail);
         }
-        else
+        if (formatted)
         {
-            if (ProxyErrorCode == pecConPrxSrvError)
-                TRACE_E("CSocket::GetProxyError(): unexpected value of ProxyErrorCode: pecConPrxSrvError!");
-            if (formatBufSize > 0)
-            {
-                _snprintf_s(formatBuf, formatBufSize, _TRUNCATE,
-                            LoadStr(ProxyErrorCode == pecGettingHostIP ? IDS_GETIPERROR : ProxyErrorCode == pecSendingBytes    ? IDS_PROXYSENDREQERROR
-                                                                                      : ProxyErrorCode == pecReceivingBytes    ? IDS_PROXYRECVREPERROR
-                                                                                      : ProxyErrorCode == pecUnexpectedReply   ? IDS_PROXYUNEXPECTEDREPLY
-                                                                                      : ProxyErrorCode == pecNoAuthUnsup       ? IDS_PROXYERRNOAUTHUNSUP
-                                                                                      : ProxyErrorCode == pecUserPassAuthUnsup ? IDS_PROXYERRUSERPASSAUTHUNSUP
-                                                                                      : ProxyErrorCode == pecUserPassAuthFail  ? IDS_PROXYERRUSERPASSFAIL
-                                                                                      : ProxyErrorCode == pecListenUnsup       ? IDS_PROXYERRLISTENUNSUP
-                                                                                                                               : IDS_PROXYOPENCONERROR), // ProxyErrorCode == pecProxySrvError or pecHTTPProxySrvError
-                            HostAddress, HostPort);
-            }
-            lstrcpyn(errBuf, errText, errBufSize);
+            errorText.swap(stagedError);
+            if (formatText != NULL)
+                formatText->swap(stagedFormat);
+            ret = TRUE;
         }
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
 }
 
-BOOL CSocket::GetProxyTimeoutDescr(char* buf, int bufSize)
+BOOL CSocket::GetProxyTimeoutDescr(std::string& text) noexcept
 {
-    CALL_STACK_MESSAGE1("CSocket::GetProxyTimeoutDescr(,)");
+    CALL_STACK_MESSAGE1("CSocket::GetProxyTimeoutDescr(dynamic)");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    BOOL ret = FALSE; // FALSE = connection to the FTP server timed out
+    BOOL ret = FALSE;
     switch (SocketState)
     {
     case ssSocks4_Connect:
@@ -1031,18 +1066,11 @@ BOOL CSocket::GetProxyTimeoutDescr(char* buf, int bufSize)
     case ssSocks5_ListenWaitForMeth:
     case ssSocks5_ListenWaitForLogin:
     case ssHTTP1_1_Listen:
-    {
-        lstrcpyn(buf, LoadStr(IDS_OPENPROXYSRVCONTIMEOUT), bufSize);
-        ret = TRUE;
+        ret = FTPFormatString(text, "%s", LoadStr(IDS_OPENPROXYSRVCONTIMEOUT));
         break;
-    }
-
     case ssSocks4_WaitForIP:
-    {
-        lstrcpyn(buf, LoadStr(IDS_GETIPTIMEOUT), bufSize);
-        ret = TRUE;
+        ret = FTPFormatString(text, "%s", LoadStr(IDS_GETIPTIMEOUT));
         break;
-    }
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
@@ -1113,41 +1141,34 @@ void CSocket::ProxySendBytes(const char* buf, int bufLen, int index, BOOL* csLef
     }
 }
 
+void CSocket::ProxyRequestBuildFailed(int index, BOOL* csLeft, BOOL isConnect, DWORD error)
+{
+    ProxyErrorCode = pecSendingBytes;
+    ProxyWinError = error;
+    SocketState = isConnect ? ssConnectFailed : ssListenFailed;
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+    if (isConnect)
+        ReceiveNetEvent(MAKELPARAM(FD_CONNECT, ERROR_INVALID_FUNCTION), index);
+    else
+        ListeningForConnection(INADDR_NONE, 0, TRUE);
+    *csLeft = TRUE;
+}
+
 void CSocket::Socks4SendRequest(int request, int index, BOOL* csLeft, BOOL isConnect, BOOL isSocks4A)
 {
     *csLeft = FALSE;
-    char buf[300 + HOST_MAX_SIZE];
-    buf[0] = 4; // 4 = version
-    buf[1] = request;
-    *(unsigned short*)(buf + 2) = htons(HostPort); // port
     if (isSocks4A && HostIP == INADDR_NONE)
-        HostIP = inet_addr(HostAddress); // if it is an IP string, obtain the IP (some proxy servers cannot perform this conversion)
-    if (isSocks4A && HostIP == INADDR_NONE)
-        *(DWORD*)(buf + 4) = 0x01000000; // SOCKS 4A "IP address": 0.0.0.x (x must be non-zero, so for example 1)
-    else
-        *(DWORD*)(buf + 4) = HostIP; // IP address
-    int len = 8;
-    if (ProxyUser != NULL)
+        HostIP = inet_addr(HostAddressWire.c_str()); // some proxy servers cannot resolve names
+    std::string requestBytes;
+    if (!FtpBuildSocks4Request(static_cast<BYTE>(request), HostIP, HostPort,
+                               HostAddressWire, ProxyUserBytes, isSocks4A,
+                               requestBytes))
     {
-        int sl = (int)strlen(ProxyUser);
-        if (sl + len + 1 <= 300)
-        {
-            memcpy(buf + len, ProxyUser, sl);
-            len += sl;
-        }
+        ProxyRequestBuildFailed(index, csLeft, isConnect, ERROR_INVALID_DATA);
+        return;
     }
-    buf[len++] = 0; // terminating zero
-    if (isSocks4A && HostIP == INADDR_NONE)
-    {
-        int sl = (int)strlen(HostAddress);
-        if (sl + len + 1 <= 300 + HOST_MAX_SIZE)
-        {
-            memcpy(buf + len, HostAddress, sl);
-            len += sl;
-        }
-        buf[len++] = 0; // terminating zero for SOCKS 4A
-    }
-    ProxySendBytes(buf, len, index, csLeft, isConnect);
+    ProxySendBytes(requestBytes.data(), static_cast<int>(requestBytes.size()), index, csLeft, isConnect);
+    FTPSecureWipe(requestBytes);
 }
 
 void CSocket::Socks5SendMethods(int index, BOOL* csLeft, BOOL isConnect)
@@ -1155,9 +1176,9 @@ void CSocket::Socks5SendMethods(int index, BOOL* csLeft, BOOL isConnect)
     *csLeft = FALSE;
     char buf[10];
     buf[0] = 5;                         // 5 = version
-    buf[1] = ProxyUser == NULL ? 1 : 2; // number of methods
+    buf[1] = ProxyUserBytes.empty() ? 1 : 2; // number of methods
     int off = 2;
-    if (ProxyUser != NULL)
+    if (!ProxyUserBytes.empty())
         buf[off++] = 2; // "user+password"
     buf[off] = 0;       // "none" (anonymous access)
     ProxySendBytes(buf, off + 1, index, csLeft, isConnect);
@@ -1166,107 +1187,45 @@ void CSocket::Socks5SendMethods(int index, BOOL* csLeft, BOOL isConnect)
 void CSocket::Socks5SendLogin(int index, BOOL* csLeft, BOOL isConnect)
 {
     *csLeft = FALSE;
-    char buf[600];
-    buf[0] = 1; // 1 = version
-    int userLen = (int)strlen(HandleNULLStr(ProxyUser));
-    if (userLen > 255)
-        userLen = 255; // longer names simply cannot be entered in a SOCKS 5 request
-    int passLen = (int)strlen(HandleNULLStr(ProxyPassword));
-    if (passLen > 255)
-        passLen = 255; // longer passwords simply cannot be entered in a SOCKS 5 request
-    buf[1] = userLen;
-    memcpy(buf + 2, HandleNULLStr(ProxyUser), userLen);
-    buf[2 + userLen] = passLen;
-    memcpy(buf + 3 + userLen, HandleNULLStr(ProxyPassword), passLen);
-    ProxySendBytes(buf, 3 + userLen + passLen, index, csLeft, isConnect);
+    std::string requestBytes;
+    if (!FtpBuildSocks5Login(ProxyUserBytes, ProxyPasswordBytes, requestBytes))
+    {
+        ProxyRequestBuildFailed(index, csLeft, isConnect, ERROR_INVALID_DATA);
+        return;
+    }
+    ProxySendBytes(requestBytes.data(), static_cast<int>(requestBytes.size()), index, csLeft, isConnect);
+    FTPSecureWipe(requestBytes);
 }
 
 void CSocket::Socks5SendRequest(int request, int index, BOOL* csLeft, BOOL isConnect)
 {
     *csLeft = FALSE;
-    char buf[300];
-    buf[0] = 5; // 5 = version
-    buf[1] = request;
-    buf[2] = 0; // reserved
     if (HostIP == INADDR_NONE)
-        HostIP = inet_addr(HostAddress); // if it is an IP string, obtain the IP (some proxy servers cannot perform this conversion)
-    buf[3] = HostIP == INADDR_NONE ? 3 /* name address */ : 1 /* IP address */;
-    int len;
-    if (HostIP == INADDR_NONE) // we do not have an IP address, use the named address
+        HostIP = inet_addr(HostAddressWire.c_str()); // some proxy servers cannot resolve names
+    std::string requestBytes;
+    if (!FtpBuildSocks5Request(static_cast<BYTE>(request), HostIP, HostPort,
+                               HostAddressWire, requestBytes))
     {
-        len = (int)strlen(HostAddress);
-        if (len > 255)
-            len = 255; // longer named addresses simply cannot be entered in a SOCKS 5 request
-        buf[4] = (unsigned char)len;
-        memcpy(buf + 5, HostAddress, len);
-        len++; // for the byte with the address length
+        ProxyRequestBuildFailed(index, csLeft, isConnect, ERROR_INVALID_DATA);
+        return;
     }
-    else
-    {
-        len = 4;
-        *(DWORD*)(buf + 4) = HostIP; // IP address
-    }
-    *(unsigned short*)(buf + 4 + len) = htons(HostPort); // port
-    ProxySendBytes(buf, 6 + len, index, csLeft, isConnect);
-}
-
-const char Base64Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-void EncodeToBase64(char* buf, const char* txt)
-{
-    const unsigned char* str = (const unsigned char*)txt;
-    int len = (int)strlen(txt);
-    char* b = buf;
-    //  int eol = 0;
-    while (len > 2)
-    {
-        *b++ = Base64Table[str[0] >> 2];
-        *b++ = Base64Table[((str[0] & 0x03) << 4) + (str[1] >> 4)];
-        *b++ = Base64Table[((str[1] & 0x0F) << 2) + (str[2] >> 6)];
-        *b++ = Base64Table[(str[2] & 0x3F)];
-        /*  // commented out because, for example, WinGate cannot handle user+pass split across multiple lines
-    if (len > 3 && ++eol % 18 == 0)  // 72 characters per line
-    {
-      *b++ = '\r';
-      *b++ = '\n';
-    }
-*/
-        str += 3;
-        len -= 3;
-    }
-    if (len != 0)
-    {
-        *b++ = Base64Table[str[0] >> 2];
-        *b++ = Base64Table[((str[0] & 0x03) << 4) + (str[1] >> 4)];
-        if (len == 1)
-            *b++ = '=';
-        else
-            *b++ = Base64Table[((str[1] & 0x0f) << 2)];
-        *b++ = '=';
-    }
-    *b = 0;
+    ProxySendBytes(requestBytes.data(), static_cast<int>(requestBytes.size()), index, csLeft, isConnect);
+    FTPSecureWipe(requestBytes);
 }
 
 void CSocket::HTTP11SendRequest(int index, BOOL* csLeft)
 {
     *csLeft = FALSE;
-    char buf[2200];
-    char passwordPart[1500];
-    if (ProxyUser != NULL || ProxyPassword != NULL)
+    std::string requestBytes;
+    if (!FtpBuildHttpConnectRequest(HostAddressWire, HostPort,
+                                    ProxyUserBytes, ProxyPasswordBytes,
+                                    !ProxyUserBytes.empty() || !ProxyPasswordBytes.empty(), requestBytes))
     {
-        char login[500];
-        _snprintf_s(login, _TRUNCATE, "%s:%s", HandleNULLStr(ProxyUser), HandleNULLStr(ProxyPassword));
-        char loginInBase64[700]; // 4/3 * 500 + ((4/3 * 500) / 72) * 2 = 686 (increase is 4/3 + EOL every 72 characters)
-        EncodeToBase64(loginInBase64, login);
-
-        _snprintf_s(passwordPart, _TRUNCATE, "Authorization: Basic %s\r\nProxy-Authorization: Basic %s\r\n\r\n",
-                    loginInBase64, loginInBase64);
+        ProxyRequestBuildFailed(index, csLeft, TRUE, ERROR_INVALID_DATA);
+        return;
     }
-    else
-        strcpy(passwordPart, "\r\n");
-    _snprintf_s(buf, _TRUNCATE, "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\n%s",
-                HostAddress, HostPort, HostAddress, HostPort, passwordPart);
-    ProxySendBytes(buf, (int)strlen(buf), index, csLeft, TRUE /* connect */);
+    ProxySendBytes(requestBytes.data(), static_cast<int>(requestBytes.size()), index, csLeft, TRUE);
+    FTPSecureWipe(requestBytes);
 }
 
 BOOL CSocket::ProxyReceiveBytes(LPARAM lParam, char* buf, int* read, int index, BOOL isConnect,
@@ -1416,6 +1375,12 @@ DWORD GetSOCKS5ErrDescr(char replyCode)
     }
 }
 
+// Capacity of the proxy-reply buffer in ReceiveNetEventInt below, and the cap on
+// every read into it. The HTTP 1.1 CONNECT arm reads a whole response line, which
+// is far longer than any fixed SOCKS reply, so this is sized for the largest
+// reader rather than the smallest.
+static const int PROXY_REPLY_BUF_SIZE = 200;
+
 void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
 {
     //  CALL_STACK_MESSAGE3("CSocket::ReceiveNetEventInt(0x%IX, %d)", lParam, index);
@@ -1428,7 +1393,14 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
     }
     else
     {
-        char buf[200];
+        // One constant for the buffer AND for every read into it, so the two can
+        // no longer disagree. They did: this was shrunk to char buf[10] to fit
+        // "the largest fixed SOCKS reply", but the ssHTTP1_1_WaitForCon arm below
+        // reads up to PROXY_REPLY_BUF_SIZE bytes into the same buffer, one byte
+        // at a time until LF. Any real proxy response line overran it
+        // ("HTTP/1.1 200 Connection established\r\n" is 37 bytes) using bytes
+        // that come straight off the network.
+        char buf[PROXY_REPLY_BUF_SIZE];
         DWORD err = WSAGETSELECTERROR(lParam);
         DWORD event = WSAGETSELECTEVENT(lParam);
         if (event == FD_WRITE)
@@ -1487,7 +1459,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                             else // first translate the host address to an IP address
                             {
                                 // we are already inside CSocketsThread::CritSect, so it is possible to call this method even from SocketCritSect
-                                if (!GetHostByAddress(HostAddress, 0)) // error obtaining the IP => done: connect failed
+                                if (!GetHostByAddress(HostAddress.c_str(), 0)) // error obtaining the IP => done: connect failed
                                 {
                                     ProxyErrorCode = pecGettingHostIP;
                                     ProxyWinError = NO_ERROR;
@@ -1587,7 +1559,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                     }
                     else
                     {
-                        if (buf[1] == 2 /* user+password */ && ProxyUser != NULL)
+                        if (buf[1] == 2 /* user+password */ && !ProxyUserBytes.empty())
                         {
                             SocketState = ssSocks5_WaitForLogin;
                             BOOL csLeft;
@@ -1599,7 +1571,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                         {
                             // WinGate does not send 0xFF, but always 0/2 depending on whether it wants user+password,
                             // so skip this test: if (buf[1] == 0xFF)  // no acceptable method
-                            ProxyErrorCode = ProxyUser == NULL ? pecNoAuthUnsup : pecUserPassAuthUnsup;
+                            ProxyErrorCode = ProxyUserBytes.empty() ? pecNoAuthUnsup : pecUserPassAuthUnsup;
                             SocketState = ssConnectFailed;
                             HANDLES(LeaveCriticalSection(&SocketCritSect));
                             ReceiveNetEvent(MAKELPARAM(FD_CONNECT, ERROR_INVALID_FUNCTION /* it just must not be NO_ERROR */), index);
@@ -1764,7 +1736,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                     }
                     else
                     {
-                        if (buf[1] == 2 /* user+password */ && ProxyUser != NULL)
+                        if (buf[1] == 2 /* user+password */ && !ProxyUserBytes.empty())
                         {
                             SocketState = ssSocks5_ListenWaitForLogin;
                             BOOL csLeft;
@@ -1775,7 +1747,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                         else // error
                         {
                             if (buf[1] == 0xFF) // no acceptable method
-                                ProxyErrorCode = ProxyUser == NULL ? pecNoAuthUnsup : pecUserPassAuthUnsup;
+                                ProxyErrorCode = ProxyUserBytes.empty() ? pecNoAuthUnsup : pecUserPassAuthUnsup;
                             else
                                 ProxyErrorCode = pecUnexpectedReply; // unexpected response (the server selected a different method than we requested)
                             SocketState = ssListenFailed;
@@ -2013,11 +1985,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                 else // we are connected to the proxy server
                 {
                     SocketState = ssHTTP1_1_WaitForCon;
-                    if (HTTP11_FirstLineOfReply != NULL)
-                    {
-                        free(HTTP11_FirstLineOfReply);
-                        HTTP11_FirstLineOfReply = NULL;
-                    }
+                    HTTP11_FirstLineOfReply.clear();
                     HTTP11_EmptyRowCharsReceived = 0;
                     BOOL csLeft;
                     HTTP11SendRequest(index, &csLeft);
@@ -2032,7 +2000,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
 
         case ssHTTP1_1_WaitForCon: // HTTP 1.1 - CONNECT: waiting for the result of the request to connect to the FTP server
         {
-            int read = 200;
+            int read = PROXY_REPLY_BUF_SIZE;
             if (ProxyReceiveBytes(lParam, buf, &read, index, TRUE /* connect */, FALSE,
                                   TRUE /* read only to first LF */) &&
                 read > 0)
@@ -2063,22 +2031,15 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                         HTTP11_EmptyRowCharsReceived = 2;
                 }
                 BOOL unexpReply = FALSE;
-                int len = HTTP11_FirstLineOfReply != NULL ? (int)strlen(HTTP11_FirstLineOfReply) : 0;
-                if (len == 0 || HTTP11_FirstLineOfReply[len - 1] != '\n') // only if the entire first line has not been read yet
+                size_t len = HTTP11_FirstLineOfReply.size();
+                if (len == 0 || HTTP11_FirstLineOfReply.back() != '\n') // only if the entire first line has not been read yet
                 {
-                    char* newStr = (char*)malloc(len + read + 1);
-                    if (newStr != NULL)
+                    try
                     {
-                        if (len > 0)
-                            memcpy(newStr, HTTP11_FirstLineOfReply, len);
-                        memcpy(newStr + len, buf, read);
-                        newStr[len + read] = 0;
-                        len = len + read;
-                        if (HTTP11_FirstLineOfReply != NULL)
-                            free(HTTP11_FirstLineOfReply);
-                        HTTP11_FirstLineOfReply = newStr;
+                        HTTP11_FirstLineOfReply.append(buf, static_cast<size_t>(read));
+                        len = HTTP11_FirstLineOfReply.size();
                     }
-                    else
+                    catch (...)
                     {
                         TRACE_E(LOW_MEMORY);
                         unexpReply = TRUE; // low probability of an error, simulate a bad server response...
@@ -2086,11 +2047,11 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                 }
 
                 BOOL csLeft = FALSE;
-                if (!unexpReply && len > 0 && HTTP11_FirstLineOfReply[len - 1] == '\n')
+                if (!unexpReply && len > 0 && HTTP11_FirstLineOfReply.back() == '\n')
                 { // if the entire first response line has already been read
-                    if (_strnicmp("HTTP/", HTTP11_FirstLineOfReply, 5) == 0)
+                    if (_strnicmp("HTTP/", HTTP11_FirstLineOfReply.c_str(), 5) == 0)
                     {
-                        char* s = HTTP11_FirstLineOfReply + 5;
+                        const char* s = HTTP11_FirstLineOfReply.c_str() + 5;
                         while (*s != 0 && *s > ' ')
                             s++;
                         while (*s != 0 && *s <= ' ')
@@ -2102,11 +2063,7 @@ void CSocket::ReceiveNetEventInt(LPARAM lParam, int index)
                                 if (HTTP11_EmptyRowCharsReceived == 4) // we have also read the end of the response (an empty line)
                                 {
                                     // upon successful connection discard the text of the first response line, it is no longer useful
-                                    if (HTTP11_FirstLineOfReply != NULL)
-                                    {
-                                        free(HTTP11_FirstLineOfReply);
-                                        HTTP11_FirstLineOfReply = NULL;
-                                    }
+                                    HTTP11_FirstLineOfReply.clear();
 
                                     SocketState = ssNoProxyOrConnected;
                                     if (ShouldPostFD_WRITE) // to ensure ReceiveNetEvent() also receives FD_WRITE (FD_READ is generated on its own, so we do not have to post it)
@@ -2402,21 +2359,16 @@ void CSocket::SwapSockets(CSocket* sock)
     CSocketState swapSocketState = SocketState;
     SocketState = sock->SocketState;
     sock->SocketState = swapSocketState;
-    char* swapHostAddress = HostAddress;
-    HostAddress = sock->HostAddress;
-    sock->HostAddress = swapHostAddress;
+    HostAddress.swap(sock->HostAddress);
+    HostAddressWire.swap(sock->HostAddressWire);
     DWORD swapHostIP = HostIP;
     HostIP = sock->HostIP;
     sock->HostIP = swapHostIP;
     unsigned short swapHostPort = HostPort;
     HostPort = sock->HostPort;
     sock->HostPort = swapHostPort;
-    char* swapProxyUser = ProxyUser;
-    ProxyUser = sock->ProxyUser;
-    sock->ProxyUser = swapProxyUser;
-    char* swapProxyPassword = ProxyPassword;
-    ProxyPassword = sock->ProxyPassword;
-    sock->ProxyPassword = swapProxyPassword;
+    ProxyUserBytes.swap(sock->ProxyUserBytes);
+    ProxyPasswordBytes.swap(sock->ProxyPasswordBytes);
     DWORD swapProxyIP = ProxyIP;
     ProxyIP = sock->ProxyIP;
     sock->ProxyIP = swapProxyIP;
@@ -2458,7 +2410,7 @@ void CSocket::SetIsSocketConnectedLastCallTime()
 //
 
 CSocketsThread::CSocketsThread()
-    : CThread("Sockets"), Sockets(100, 100), MsgData(10, 10), Timers(50, 100), PostMsgs(50, 100)
+    : CThread(L"Sockets"), Sockets(100, 100), MsgData(10, 10), Timers(50, 100), PostMsgs(50, 100)
 {
     HANDLES(InitializeCriticalSection(&CritSect));
     RunningEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL)); // manual, non-signaled
@@ -3096,7 +3048,7 @@ CSocketsThread::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         }
     }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 BOOL CSocketsThread::IsRunning()
@@ -3113,17 +3065,17 @@ CSocketsThread::Body()
 {
     TRACE_I("Begin");
 
-    WNDCLASS hiddenWinCls;
+    WNDCLASSW hiddenWinCls;
     memset(&hiddenWinCls, 0, sizeof(hiddenWinCls));
     hiddenWinCls.lpfnWndProc = CSocketsThread::WindowProc;
     hiddenWinCls.hInstance = DLLInstance;
     hiddenWinCls.hCursor = LoadCursor(NULL, IDC_ARROW);
     hiddenWinCls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     hiddenWinCls.lpszClassName = SOCKETSWINDOW_CLASSNAME;
-    if (RegisterClass(&hiddenWinCls) != 0)
+    if (RegisterClassW(&hiddenWinCls) != 0)
     {
-        HWindow = CreateWindow(SOCKETSWINDOW_CLASSNAME, "HiddenSocketsWindow", 0, CW_USEDEFAULT,
-                               CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, DLLInstance, 0);
+        HWindow = CreateWindowW(SOCKETSWINDOW_CLASSNAME, L"HiddenSocketsWindow", 0, CW_USEDEFAULT,
+                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, DLLInstance, 0);
         if (HWindow != NULL)
         {
             // announce successful thread startup and initialization
@@ -3134,10 +3086,10 @@ CSocketsThread::Body()
 
             // message loop
             MSG msg;
-            while (GetMessage(&msg, NULL, 0, 0))
+            while (GetMessageW(&msg, NULL, 0, 0))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
 
             // clear the window handle - there is no point sending messages anymore
@@ -3146,7 +3098,7 @@ CSocketsThread::Body()
             HANDLES(LeaveCriticalSection(&CritSect));
         }
 
-        if (!UnregisterClass(SOCKETSWINDOW_CLASSNAME, DLLInstance))
+        if (!UnregisterClassW(SOCKETSWINDOW_CLASSNAME, DLLInstance))
             TRACE_E("UnregisterClass(SOCKETSWINDOW_CLASSNAME) has failed");
     }
     if (!Running)

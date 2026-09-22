@@ -3,8 +3,46 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "regedt_registry_enum.h"
 
 BOOL ExportStringsForViewerInASCII = TRUE;
+
+namespace
+{
+class RegistryKeyOwner
+{
+public:
+    explicit RegistryKeyOwner(HKEY key = nullptr) noexcept : Key(key) {}
+    ~RegistryKeyOwner() { Close(); }
+
+    void Close() noexcept
+    {
+        if (Key != nullptr)
+        {
+            RegCloseKey(Key);
+            Key = nullptr;
+        }
+    }
+
+private:
+    HKEY Key;
+};
+
+class SafeWaitWindowOwner
+{
+public:
+    ~SafeWaitWindowOwner()
+    {
+        if (Active)
+            SG->DestroySafeWaitWindow();
+    }
+
+    void Activate() noexcept { Active = true; }
+
+private:
+    bool Active = false;
+};
+} // namespace
 
 // ****************************************************************************
 //
@@ -33,14 +71,14 @@ CPluginFSInterface::GetFSIcon(BOOL& destroyIcon)
                             16, 16, SG->GetIconLRFlags());
 }
 
-BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterface::GetNextDirectoryLineHotPath(%s, %d, "
+    CALL_STACK_MESSAGE4("CPluginFSInterface::GetNextDirectoryLineHotPath(%ls, %d, "
                         "%d)",
                         text, pathLen, offset);
-    if (text[offset] == '\\')
+    if (text[offset] == L'\\')
         offset++;
-    char* ret = (char*)memchr(text + offset, '\\', pathLen - offset);
+    const wchar_t* ret = wmemchr(text + offset, L'\\', pathLen - offset);
     if (ret)
     {
         if (offset == 0)
@@ -53,7 +91,7 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
         return FALSE;
 }
 
-BOOL TestKey(int root, LPWSTR key)
+BOOL TestKey(int root, const wchar_t* key)
 {
     CALL_STACK_MESSAGE2("TestKey(%d, )", root);
     while (1)
@@ -71,17 +109,37 @@ BOOL TestKey(int root, LPWSTR key)
         }
         else
         {
-            SG->SalMessageBox(GetParent(), LoadStr(IDS_CANNOTRENAME), LoadStr(IDS_RENAMEKEY), MB_OK);
+            RegCloseKey(hKey);
+            SG->SalMessageBox(GetParent(), LoadStrW(IDS_CANNOTRENAME).c_str(), LoadStrW(IDS_RENAMEKEY).c_str(), MB_OK);
             return FALSE;
         }
     }
     return TRUE;
 }
 
-BOOL CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                                     char* newName, BOOL& cancel)
+BOOL CPluginFSInterface::QuickRename(const wchar_t* fsName, int mode, HWND parent,
+                                     CFileData& file, BOOL isDir,
+                                     CSalamanderStringBuffer* newName, BOOL& cancel)
 {
-    CALL_STACK_MESSAGE5("CPluginFSInterface::QuickRename(%s, %d, , , %d, , %d)",
+    try
+    {
+        std::wstring value;
+        if (newName == NULL || !sally::plugin_abi::ReadStringBuffer(*newName, value))
+            return FALSE;
+        const BOOL result = QuickRenameOwned(fsName, mode, parent, file, isDir, value, cancel);
+        return sally::plugin_abi::WriteStringBuffer(*newName, value) ? result : FALSE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+BOOL CPluginFSInterface::QuickRenameOwned(const wchar_t* fsName, int mode, HWND parent,
+                                          CFileData& file, BOOL isDir,
+                                          std::wstring& newName, BOOL& cancel)
+{
+    CALL_STACK_MESSAGE5("CPluginFSInterface::QuickRename(%ls, %d, , , %d, , %d)",
                         fsName, mode, isDir, cancel);
     PARENT(parent);
 
@@ -105,76 +163,71 @@ BOOL CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, 
         return TRUE;
     }
 
-    WCHAR keyName[MAX_FULL_KEYNAME];
-    keyName[0] = 0;
-    if (pluginData->Name)
-        wcscpy(keyName, pluginData->Name);
-    WCHAR text[MAX_KEYNAME + 100];
-    swprintf_s(text, LoadStrW(isDir ? IDS_QUICKRENAMEKEY : IDS_QUICKRENAMEVAL), keyName);
-    CNewKeyDialog dlg(parent, keyName, NULL, text, LoadStrW(IDS_QUICKRENAME), IDD_RENAME);
+    std::wstring keyName = pluginData->Name ? pluginData->Name : L"";
+    const std::wstring text = SPLFormatStringOwned(LoadStrW(isDir ? IDS_QUICKRENAMEKEY : IDS_QUICKRENAMEVAL).c_str(), keyName.c_str());
+    CNewKeyDialog dlg(parent, keyName, NULL, text.c_str(), LoadStrW(IDS_QUICKRENAME).c_str(), IDD_RENAME);
     if (dlg.Execute() != IDOK)
         return FALSE;
 
     if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
                        pluginData->Name, -1,
-                       keyName, -1) == CSTR_EQUAL)
+                       keyName.c_str(), -1) == CSTR_EQUAL)
     {
-        SG->SalMessageBox(GetParent(), LoadStr(isDir ? IDS_SAMECASEKEY : IDS_SAMECASEVAL),
-                          LoadStr(isDir ? IDS_RENAMEKEY : IDS_RENAMEVAL), MB_OK);
+        SG->SalMessageBox(GetParent(), LoadStrW(isDir ? IDS_SAMECASEKEY : IDS_SAMECASEVAL).c_str(),
+                          LoadStrW(isDir ? IDS_RENAMEKEY : IDS_RENAMEVAL).c_str(), MB_OK);
         return FALSE;
     }
 
     BOOL skip, success;
     BOOL skipAllErrors = FALSE; // skip all errors
     BOOL skipAllOverwrites = FALSE;
-    BOOL skipAllLongNames = FALSE;
     BOOL skipAllClassNames = FALSE;
     BOOL overwriteAll = FALSE;
+    SafeWaitWindowOwner waitWindow;
     if (isDir)
     {
         // ensure the path does not contain disallowed characters
-        if (keyName[wcscspn(keyName, L"\\")] != L'\0')
+        if (keyName.find(L'\\') != std::wstring::npos)
         {
-            SG->SalMessageBox(GetParent(), LoadStr(IDS_SYNTAX), LoadStr(IDS_RENAMEKEY), MB_OK);
+            SG->SalMessageBox(GetParent(), LoadStrW(IDS_SYNTAX).c_str(), LoadStrW(IDS_RENAMEKEY).c_str(), MB_OK);
             return FALSE;
         }
 
-        WCHAR sourceKey[MAX_KEYNAME];
-        WCHAR targetKey[MAX_KEYNAME];
-        PathAppend(wcscpy(sourceKey, CurrentKeyName), pluginData->Name, MAX_KEYNAME);
-        PathAppend(wcscpy(targetKey, CurrentKeyName), keyName, MAX_KEYNAME);
+        std::wstring sourceKey = CurrentKeyName;
+        SPLSalPathAppendOwned(sourceKey, pluginData->Name);
+        std::wstring targetKey = CurrentKeyName;
+        SPLSalPathAppendOwned(targetKey, keyName.c_str());
 
         // ensure that the target name does not exist
-        if (!TestKey(CurrentKeyRoot, targetKey))
+        if (!TestKey(CurrentKeyRoot, targetKey.c_str()))
             return FALSE;
 
         GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see the help
-        SG->CreateSafeWaitWindow(LoadStr(IDS_MOVEPROGRESS), LoadStr(IDS_PLUGINNAME), 500, TRUE, SG->GetMainWindowHWND());
+        SG->CreateSafeWaitWindow(LoadStrW(IDS_MOVEPROGRESS).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), 500, TRUE, SG->GetMainWindowHWND());
+        waitWindow.Activate();
 
         // stack for enumerated subkey names
         // (subkeys must be enumerated all at once
         // before they can be deleted during a move)
-        TIndirectArray<WCHAR> stack(100, 100);
-        WCHAR nameBuffer[MAX_KEYNAME];
+        std::vector<std::wstring> stack;
         success = CopyOrMoveKey(CurrentKeyRoot, sourceKey, CurrentKeyRoot, targetKey, TRUE,
-                                skip, skipAllErrors, skipAllLongNames,
+                                skip, skipAllErrors,
                                 skipAllOverwrites, overwriteAll,
-                                skipAllClassNames, nameBuffer, stack);
+                                skipAllClassNames, stack);
     }
     else
     {
-        SG->CreateSafeWaitWindow(LoadStr(IDS_MOVEPROGRESS), LoadStr(IDS_PLUGINNAME), 500, TRUE, SG->GetMainWindowHWND());
+        SG->CreateSafeWaitWindow(LoadStrW(IDS_MOVEPROGRESS).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), 500, TRUE, SG->GetMainWindowHWND());
+        waitWindow.Activate();
 
-        success = CopyOrMoveValue(CurrentKeyRoot, CurrentKeyName, pluginData->Name,
-                                  CurrentKeyRoot, CurrentKeyName, keyName, TRUE,
+        success = CopyOrMoveValue(CurrentKeyRoot, CurrentKeyName.c_str(), pluginData->Name,
+                                  CurrentKeyRoot, CurrentKeyName.c_str(), keyName.c_str(), TRUE,
                                   NULL, NULL, NULL, NULL);
     }
 
-    SG->DestroySafeWaitWindow();
-
     if (success)
     {
-        WStrToStr(newName, MAX_PATH, keyName);
+        newName = keyName;
         cancel = FALSE;
         return TRUE;
     }
@@ -182,28 +235,27 @@ BOOL CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, 
         return FALSE;
 }
 
-void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs)
+void CPluginFSInterface::AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs)
 {
-    CALL_STACK_MESSAGE4("CPluginFSInterface::AcceptChangeOnPathNotification(%s, %s, %d)",
+    CALL_STACK_MESSAGE4("CPluginFSInterface::AcceptChangeOnPathNotification(%ls, %ls, %d)",
                         fsName, path, includingSubdirs);
     if (CurrentKeyRoot != -1)
     {
         // compare paths or at least their prefixes (only paths on our FS have a chance;
         // disk paths and paths on other FS types in 'path' are filtered out automatically
         // because they can never match 'fsName'+':' at the beginning of 'path2' below)
-        CPathBuffer path1; // Heap-allocated for long path support
-        CPathBuffer path2; // Heap-allocated for long path support
-        char root[MAX_PREDEF_KEYNAME];
-        char key[MAX_KEYNAME];
-        lstrcpyn(path1, path, path1.Size());
-        WStrToStr(root, MAX_PREDEF_KEYNAME, PredefinedHKeys[CurrentKeyRoot].KeyName);
-        WStrToStr(key, MAX_KEYNAME, CurrentKeyName);
-        SalPrintf(path2.Get(), path2.Size(), "%s:\\%s\\%s", fsName, root, key);
-        RemoveTrailingSlashes(path1);
-        RemoveTrailingSlashes(path2);
-        int len1 = (int)strlen(path1);
-        BOOL refresh = SG->StrNICmp(path1, path2, len1) == 0 &&
-                       (path2[len1] == 0 || includingSubdirs && path2[len1] == '\\');
+        std::wstring path1 = path;
+        std::wstring path2 = std::wstring(fsName) + L":\\" +
+                             PredefinedHKeys[CurrentKeyRoot].KeyName + L"\\" + CurrentKeyName;
+        while (!path1.empty() && path1.back() == L'\\')
+            path1.pop_back();
+        while (!path2.empty() && path2.back() == L'\\')
+            path2.pop_back();
+        const int len1 = static_cast<int>(path1.size());
+        BOOL refresh = path1.size() <= path2.size() &&
+                       SG->StrNICmp(path1.c_str(), path2.c_str(), len1) == 0 &&
+                       (path2.size() == path1.size() ||
+                        includingSubdirs && path2[path1.size()] == L'\\');
         if (refresh)
         {
             SG->PostRefreshPanelFS(this, FocusFirstNewItem); // refresh if this FS is displayed in a panel
@@ -211,7 +263,18 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
     }
 }
 
-BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel)
+BOOL CPluginFSInterface::CreateDir(const wchar_t* fsName, int mode, HWND parent,
+                                   CSalamanderStringBuffer* newName, BOOL& cancel)
+{
+    std::wstring value;
+    if (newName == NULL || !sally::plugin_abi::ReadStringBuffer(*newName, value))
+        return FALSE;
+    const BOOL result = CreateDirOwned(fsName, mode, parent, value, cancel);
+    return sally::plugin_abi::WriteStringBuffer(*newName, value) ? result : FALSE;
+}
+
+BOOL CPluginFSInterface::CreateDirOwned(const wchar_t* fsName, int mode, HWND parent,
+                                        std::wstring& newName, BOOL& cancel)
 {
     CALL_STACK_MESSAGE3("CPluginFSInterface::CreateDir(%d, , , %d)", mode, cancel);
     PARENT(parent);
@@ -226,17 +289,16 @@ BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, ch
     if (CurrentKeyRoot == -1)
         return FALSE; //Error(IDS_NEWKEYINROOT);
 
-    WCHAR enteredKeyName[MAX_KEYNAME];
-    enteredKeyName[0] = 0;
+    std::wstring enteredKeyName;
     while (1)
     {
-        WCHAR keyName[MAX_KEYNAME], fullName[MAX_FULL_KEYNAME];
+        std::wstring keyName;
         BOOL direct = FALSE;
         CNewKeyDialog dlg(parent, enteredKeyName, &direct);
         if (dlg.Execute() != IDOK)
             return FALSE;
 
-        wcscpy(keyName, enteredKeyName);
+        keyName = enteredKeyName;
 
         // extract the user portion from the FS path
         if (!direct)
@@ -246,7 +308,8 @@ BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, ch
                 Error(IDS_NOTREGEDTPATH);
                 continue;
             }
-            if (!wcslen(keyName))
+            keyName.resize(wcslen(keyName.c_str()));
+            if (keyName.empty())
             {
                 Error(IDS_BADPATH);
                 continue;
@@ -254,14 +317,13 @@ BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, ch
         }
 
         BOOL success;
-        wcscpy(fullName, keyName);
-        GetFullFSPathW(fullName, MAX_FULL_KEYNAME, success);
+        std::wstring resolvedFullName(keyName);
+        ResolveFullFSPath(resolvedFullName, success);
         if (!success)
             continue;
-
         WCHAR* key;
         int root;
-        if (!ParseFullPath(fullName, key, root))
+        if (!ParseFullPath(resolvedFullName.data(), key, root))
         {
             Error(IDS_BADPATH);
             continue;
@@ -278,13 +340,12 @@ BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, ch
 
         if (disp == REG_OPENED_EXISTING_KEY)
         {
-            SG->SalMessageBox(parent, LoadStr(IDS_KEYEXISTS), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
+            SG->SalMessageBox(parent, LoadStrW(IDS_KEYEXISTS).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), MB_ICONINFORMATION);
             RegCloseKey(hKey);
             continue;
         }
 
-        if (WStrToStr(newName, 2 * MAX_PATH, keyName) <= 0)
-            *newName = 0;
+        newName = keyName;
 
         RegCloseKey(hKey);
 
@@ -295,82 +356,57 @@ BOOL CPluginFSInterface::CreateDir(const char* fsName, int mode, HWND parent, ch
     return TRUE;
 }
 
-BOOL ExportValueData(int root, LPCWSTR key, LPCWSTR value, const char* tmpFileName, CQuadWord* newFileSize)
+BOOL ExportValueData(int root, LPCWSTR key, LPCWSTR value, LPCWSTR tmpFileName, CQuadWord* newFileSize)
 {
-    CALL_STACK_MESSAGE3("ExportValueData(%d, , , %s, )", root, tmpFileName);
-    HKEY hKey;
+    CALL_STACK_MESSAGE3("ExportValueData(%d, , , %ls, )", root, tmpFileName);
+    HKEY hKey = nullptr;
     int ret = RegOpenKeyExW(PredefinedHKeys[root].HKey, key, 0, KEY_QUERY_VALUE, &hKey);
     if (ret != ERROR_SUCCESS)
-        ErrorL(ret, IDS_QUERYVAL);
+        return ErrorL(ret, IDS_QUERYVAL);
+    RegistryKeyOwner keyOwner(hKey);
 
-    DWORD type;
-    LPBYTE data, translated;
-    DWORD size;
-
-    // determine the data size
-    ret = RegQueryValueExW(hKey, value, 0, &type, NULL, &size);
+    DWORD type = 0;
+    std::vector<BYTE> registryData;
+    ret = RegedtQueryValueOwned(hKey, value, 0, type, registryData);
     if (ret != ERROR_SUCCESS)
     {
-        RegCloseKey(hKey);
         return ErrorL(ret, IDS_QUERYVAL);
     }
 
-    // allocate a buffer for the data
-    int extra = 0;
-    if (ExportStringsForViewerInASCII &&
-        (type == REG_SZ || type == REG_EXPAND_SZ || type == REG_MULTI_SZ))
-        extra = size / 2;
-    translated = data = (LPBYTE)malloc(size + extra);
-    if (!data)
-    {
-        RegCloseKey(hKey);
+    // The viewer preference is an explicit ACP byte projection. If the
+    // registry text is malformed or not exactly representable, retain its
+    // original UTF-16 bytes instead of silently substituting characters.
+    std::vector<BYTE> viewerData;
+    if (!RegedtPrepareViewerBytes(type, registryData,
+                                  ExportStringsForViewerInASCII != FALSE,
+                                  CP_ACP, viewerData))
         return Error(IDS_LOWMEM);
-    }
-
-    // read the data
-    ret = RegQueryValueExW(hKey, value, 0, &type, data, &size);
-    if (ret != ERROR_SUCCESS)
-    {
-        RegCloseKey(hKey);
-        free(data);
-        return ErrorL(ret, IDS_QUERYVAL);
-    }
-
-    // if needed, convert the data to ASCII
-    if (extra)
-    {
-        WStrToStr((char*)data + size, size / 2, (LPWSTR)data, size / 2);
-        translated = data + size;
-        size /= 2;
-    }
 
     // create or open the temporary file
-    HANDLE file = CreateFile(tmpFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                             CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE file = CreateFileW(tmpFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
-    {
-        RegCloseKey(hKey);
-        free(data);
         return Error(IDS_CREATETEMP);
-    }
 
-    DWORD written;
-    BOOL b = WriteFile(file, translated, size, &written, NULL) || written != size;
+    DWORD written = 0;
+    const DWORD size = static_cast<DWORD>(viewerData.size());
+    const BOOL writeOK = WriteFile(file,
+                                   viewerData.empty() ? nullptr : viewerData.data(),
+                                   size, &written, NULL) &&
+                         written == size;
 
     DWORD err;
     SG->SalGetFileSize(file, *newFileSize, err); // ignore errors
     CloseHandle(file);
-    RegCloseKey(hKey);
-    free(data);
 
-    return b || Error(IDS_WRITETEMP);
+    return writeOK || Error(IDS_WRITETEMP);
 }
 
-void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
+void CPluginFSInterface::ViewFile(const wchar_t* fsName, HWND parent,
                                   CSalamanderForViewFileOnFSAbstract* salamander,
                                   CFileData& file)
 {
-    CALL_STACK_MESSAGE2("CPluginFSInterface::ViewFile(%s, , , )", fsName);
+    CALL_STACK_MESSAGE2("CPluginFSInterface::ViewFile(%ls, , , )", fsName);
     PARENT(parent);
 
     CPluginData* pluginData = (CPluginData*)file.PluginData;
@@ -381,32 +417,30 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         return;
 
     // build a unique file name for the disk cache (standard Salamander path format)
-    CPathBuffer uniqueFileName; // Heap-allocated for long path support
-    SalPrintf(uniqueFileName.Get(), uniqueFileName.Size(), "%s:\\%ls\\%ls", fsName,
-              PredefinedHKeys[CurrentKeyRoot].KeyName, CurrentKeyName);
-    SG->SalPathAppend(uniqueFileName, file.Name, uniqueFileName.Size());
+    std::wstring uniqueFileName = std::wstring(fsName) + L":\\" +
+                                  PredefinedHKeys[CurrentKeyRoot].KeyName + L"\\" + CurrentKeyName;
+    SPLSalPathAppendOwned(uniqueFileName, file.Name);
 
     // disk names are case-insensitive, the disk cache is case-sensitive; converting
     // to lowercase makes the cache behave case-insensitively as well
-    SG->ToLowerCase(uniqueFileName);
+    SPLToLowerCaseOwned(SG, uniqueFileName);
 
     // create a file name that Windows can handle
-    CPathBuffer fileName; // Heap-allocated for long path support
-    *fileName = '_';
-    lstrcpyn(fileName.Get() + 1, file.Name, fileName.Size() - 1);
+    std::wstring fileName = L"_" + std::wstring(file.Name);
+    ReplaceUnsafeCharacters(fileName.data());
 
     // obtain the copy name in the disk cache
     BOOL fileExists;
-    const char* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName,
-                                                               ReplaceUnsafeCharacters(fileName),
-                                                               NULL, fileExists);
+    const wchar_t* tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName.c_str(),
+                                                                  fileName.c_str(),
+                                                                  NULL, fileExists);
     if (tmpFileName == NULL)
         return; // fatal error
 
     // prepare or refresh the key data copy in the disk cache
     BOOL newFileOK = FALSE;
     CQuadWord newFileSize(0, 0);
-    if (ExportValueData(CurrentKeyRoot, CurrentKeyName,
+    if (ExportValueData(CurrentKeyRoot, CurrentKeyName.data(),
                         pluginData->Name ? pluginData->Name : L"",
                         tmpFileName, &newFileSize)) // the copy succeeded
     {
@@ -424,12 +458,13 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     }
 
     // call FreeFileNameInCache to pair with AllocFileNameInCache (linking the viewer and disk cache)
-    salamander->FreeFileNameInCache(uniqueFileName, fileExists, newFileOK,
+    salamander->FreeFileNameInCache(uniqueFileName.c_str(), fileExists, newFileOK,
                                     newFileSize, fileLock, fileLockOwner, TRUE);
 }
 
-BOOL CPluginFSInterface::DeleteKey(WCHAR* keyName, BOOL& skip,
-                                   BOOL& skipAllErrors, TIndirectArray<WCHAR>& stack)
+BOOL CPluginFSInterface::DeleteKey(const std::wstring& keyName, BOOL& skip,
+                                   BOOL& skipAllErrors,
+                                   std::vector<std::wstring>& stack)
 {
     CALL_STACK_MESSAGE3("CPluginFSInterface::DeleteKey(, %d, %d, )", skip,
                         skipAllErrors);
@@ -438,102 +473,103 @@ BOOL CPluginFSInterface::DeleteKey(WCHAR* keyName, BOOL& skip,
         return skip = FALSE;
 
     skip = FALSE;
-    HKEY key;
+    HKEY key = nullptr;
     while (1)
     {
-        int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey, keyName, 0, KEY_ENUMERATE_SUB_KEYS, &key);
+        int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey,
+                                keyName.c_str(), 0, KEY_ENUMERATE_SUB_KEYS, &key);
         if (ret != ERROR_SUCCESS)
         {
-            if (!RegOperationError(ret, IDS_OPEN, IDS_DELKEY, CurrentKeyRoot, keyName, &skip, &skipAllErrors))
+            if (!RegOperationError(ret, IDS_OPEN, IDS_DELKEY, CurrentKeyRoot,
+                                   keyName.c_str(), &skip, &skipAllErrors))
                 return FALSE;
         }
         else
             break;
     }
+    RegistryKeyOwner keyOwner(key);
 
     DWORD i = 0;
-    WCHAR name[MAX_KEYNAME];
-    DWORD nameLen;
     BOOL success = TRUE;
-    int top = stack.Count;
+    const size_t top = stack.size();
     while (success)
     {
-        nameLen = MAX_KEYNAME;
-        int ret = RegEnumKeyExW(key, i, name, &nameLen, 0, NULL, NULL, NULL);
+        std::wstring name;
+        FILETIME ignoredTime{};
+        const LONG ret = RegedtEnumerateSubKeyOwned(key, i, 64, name, ignoredTime);
         if (ret == ERROR_NO_MORE_ITEMS)
             break;
-        if (ret != ERROR_SUCCESS && ret != ERROR_MORE_DATA)
+        if (ret != ERROR_SUCCESS)
         {
-            success = RegOperationError(ret, IDS_ACCESS2, IDS_DELKEY, CurrentKeyRoot, keyName, &skip, &skipAllErrors);
+            success = RegOperationError(ret, IDS_ACCESS2, IDS_DELKEY,
+                                        CurrentKeyRoot, keyName.c_str(),
+                                        &skip, &skipAllErrors);
             continue;
         }
 
-        WCHAR* ptr = new WCHAR[wcslen(name) + 1];
-        if (!ptr || stack.Add(ptr) == ULONG_MAX)
-        {
-            if (ptr)
-                delete[] ptr;
-            return Error(IDS_LOWMEM);
-        }
-        wcscpy(ptr, name);
-
-        i++;
+        stack.push_back(std::move(name));
+        ++i;
     }
 
-    RegCloseKey(key);
+    keyOwner.Close();
 
-    int j;
-    for (j = stack.Count - 1; j >= top; j--)
+    for (size_t j = stack.size(); success && j-- > top;)
     {
-        if (stack[j] && success)
+        std::wstring subKey = keyName;
+        SPLSalPathAppendOwned(subKey, stack[j].c_str());
+
+        BOOL childSkip = FALSE;
+        if (!DeleteKey(subKey, childSkip, skipAllErrors, stack))
         {
-            WCHAR subKey[MAX_KEYNAME];
-            wcscpy(subKey, keyName);
-            if (!PathAppend(subKey, stack[j], MAX_KEYNAME))
-            {
-                TRACE_E("name is too long");
+            if (childSkip)
                 skip = TRUE;
-                success = FALSE;
-            }
             else
-            {
-                BOOL _skip;
-                if (!DeleteKey(subKey, _skip, skipAllErrors, stack))
-                {
-                    skip = _skip;
-                    if (!skip)
-                        success = FALSE;
-                }
-            }
+                success = FALSE;
         }
-        stack.Delete(j);
+        stack.erase(stack.begin() + j);
     }
 
-    if (!success)
+    stack.resize(top);
+    if (!success || skip)
         return FALSE;
 
-    // no subkey was skipped
-    if (!skip)
+    while (success)
     {
-        while (success)
+        int ret = RegDeleteKeyW(PredefinedHKeys[CurrentKeyRoot].HKey,
+                                keyName.c_str());
+        if (ret != ERROR_SUCCESS)
         {
-            int ret = RegDeleteKeyW(PredefinedHKeys[CurrentKeyRoot].HKey, keyName);
-            if (ret != ERROR_SUCCESS)
-            {
-                success = RegOperationError(ret, IDS_DELETE, IDS_DELKEY, CurrentKeyRoot, keyName, &skip, &skipAllErrors);
-            }
-            else
-                break; // delete succeeded
+            success = RegOperationError(ret, IDS_DELETE, IDS_DELKEY,
+                                        CurrentKeyRoot, keyName.c_str(),
+                                        &skip, &skipAllErrors);
         }
+        else
+            break; // delete succeeded
     }
 
     return success;
 }
 
-BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
+BOOL CPluginFSInterface::Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                                 int selectedFiles, int selectedDirs, BOOL& cancelOrError)
 {
-    CALL_STACK_MESSAGE7("CPluginFSInterface::Delete(%s, %d, , %d, %d, %d, %d)", fsName, mode,
+    try
+    {
+        return DeleteCore(fsName, mode, parent, panel, selectedFiles,
+                          selectedDirs, cancelOrError);
+    }
+    catch (...)
+    {
+        cancelOrError = TRUE;
+        return FALSE;
+    }
+}
+
+BOOL CPluginFSInterface::DeleteCore(const wchar_t* fsName, int mode, HWND parent,
+                                    int panel, int selectedFiles, int selectedDirs,
+                                    BOOL& cancelOrError)
+{
+    CALL_STACK_MESSAGE7("CPluginFSInterface::Delete(%ls, %d, , %d, %d, %d, %d)", fsName, mode,
                         panel, selectedFiles, selectedDirs, cancelOrError);
     PARENT(parent);
 
@@ -552,20 +588,6 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
     if (!SG->GetConfigParameter(SALCFG_CNFRMNEDIRDEL, &ConfirmOnNotEmptyDirDelete, sizeof(BOOL), NULL))
         ConfirmOnNotEmptyDirDelete = TRUE;
 
-    char buf[MAX_KEYNAME * 2]; // buffer for error texts
-
-    WCHAR keyName[MAX_KEYNAME]; // buffer for the full name
-    wcscpy(keyName, CurrentKeyName);
-    WCHAR* end = keyName + wcslen(keyName); // space for names from the panel
-    WCHAR* backslash = NULL;
-    if (end > keyName && *(end - 1) != L'\\')
-    {
-        backslash = end;
-        *end++ = L'\\';
-        *end = L'\0';
-    }
-    int endSize = MAX_KEYNAME - (int)(end - keyName); // maximum number of characters for a panel name
-
     const CFileData* f = NULL; // pointer to the panel file/directory being processed
     BOOL isDir = FALSE;        // TRUE if 'f' is a directory
     BOOL focused = (selectedFiles == 0 && selectedDirs == 0);
@@ -574,7 +596,9 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
     BOOL skipAllErrors = FALSE; // skip all errors
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see the help
-    SG->CreateSafeWaitWindow(LoadStr(IDS_DELETEPROGRESS), LoadStr(IDS_PLUGINNAME), 500, TRUE, SG->GetMainWindowHWND());
+    SG->CreateSafeWaitWindow(LoadStrW(IDS_DELETEPROGRESS).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), 500, TRUE, SG->GetMainWindowHWND());
+    SafeWaitWindowOwner waitWindow;
+    waitWindow.Activate();
 
     while (1)
     {
@@ -592,13 +616,15 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
 
             if (isDir)
             {
-                lstrcpynW(end, pd->Name, endSize);
+                std::wstring keyName = CurrentKeyName;
+                SPLSalPathAppendOwned(keyName, pd->Name);
 
-                BOOL empty;
-                HKEY key;
+                BOOL empty = FALSE;
                 while (success)
                 {
-                    int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey, keyName, 0, KEY_QUERY_VALUE, &key);
+                    HKEY key = nullptr;
+                    int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey,
+                                            keyName.c_str(), 0, KEY_QUERY_VALUE, &key);
                     if (ret == ERROR_SUCCESS)
                     {
                         DWORD subKeys;
@@ -610,7 +636,9 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
                     }
                     if (ret != ERROR_SUCCESS)
                     {
-                        if (!RegOperationError(ret, IDS_ACCESS2, IDS_DELKEY, CurrentKeyRoot, keyName, &skip, &skipAllErrors))
+                        if (!RegOperationError(ret, IDS_ACCESS2, IDS_DELKEY,
+                                               CurrentKeyRoot, keyName.c_str(),
+                                               &skip, &skipAllErrors))
                         {
                             if (!skip)
                                 success = FALSE;
@@ -623,8 +651,11 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
 
                 if (success && !skip && ConfirmOnNotEmptyDirDelete && !empty)
                 {
-                    sprintf(buf, LoadStr(IDS_CONFIRNNONEMPTYDELETE), f->Name);
-                    switch (SG->SalMessageBox(parent, buf, LoadStr(IDS_QUESTION), MB_ICONQUESTION | MB_YESNOCANCEL))
+                    const std::wstring question = SPLFormatStringOwned(
+                        LoadStrW(IDS_CONFIRNNONEMPTYDELETE).c_str(), pd->Name);
+                    switch (SG->SalMessageBox(parent, question.c_str(),
+                                               LoadStrW(IDS_QUESTION).c_str(),
+                                               MB_ICONQUESTION | MB_YESNOCANCEL))
                     {
                     case IDYES:
                         break;
@@ -640,7 +671,7 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
 
                 if (success && !skip)
                 {
-                    TIndirectArray<WCHAR> stack(1, 128);
+                    std::vector<std::wstring> stack;
                     if (!DeleteKey(keyName, skip, skipAllErrors, stack) && !skip)
                         success = FALSE;
                 }
@@ -652,9 +683,10 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
                 {
                     while (1)
                     {
-                        *end = L'\0';
                         HKEY key;
-                        int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey, keyName, 0, KEY_SET_VALUE, &key);
+                        int ret = RegOpenKeyExW(PredefinedHKeys[CurrentKeyRoot].HKey,
+                                                CurrentKeyName.c_str(), 0,
+                                                KEY_SET_VALUE, &key);
                         if (ret == ERROR_SUCCESS)
                         {
                             ret = RegDeleteValueW(key, pd->Name);
@@ -664,12 +696,11 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
                         {
                             if (!skipAllErrors)
                             {
-                                char fullName[MAX_FULL_KEYNAME + 30]; // buffer for the full REG name shown in an error dialog
-                                int l = sprintf(fullName, "%s:\\", fsName);
-                                GetCurrentPath(fullName + l);
-                                SG->SalPathAppend(fullName, f->Name, MAX_FULL_KEYNAME + 30);
-                                int res = SG->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fullName,
-                                                          SG->GetErrorText(ret), LoadStr(IDS_DELVAL));
+                                std::wstring fullName = std::wstring(fsName) + L":" +
+                                                        GetCurrentPathOwned();
+                                SPLSalPathAppendOwned(fullName, f->Name);
+                                int res = SG->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fullName.c_str(),
+                                                          SPLGetErrorTextOwned(SG, ret).c_str(), LoadStrW(IDS_DELVAL).c_str());
                                 switch (res)
                                 {
                                 case DIALOG_RETRY:
@@ -704,15 +735,13 @@ BOOL CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int p
             break;
     }
 
-    SG->DestroySafeWaitWindow();
-
     return success;
 }
 
-void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+void CPluginFSInterface::ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                      int panel, int selectedFiles, int selectedDirs)
 {
-    CALL_STACK_MESSAGE7("CPluginFSInterface::ContextMenu(%s, , %d, %d, , %d, %d, %d)",
+    CALL_STACK_MESSAGE7("CPluginFSInterface::ContextMenu(%ls, , %d, %d, , %d, %d, %d)",
                         fsName, menuX, menuY, panel, selectedFiles, selectedDirs);
     PARENT(parent);
 
@@ -728,7 +757,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
     BOOL targetIsReg = SG->GetPanelPluginFS(PANEL_TARGET) != NULL;
 
     int i = 0;
-    char name[256];
+    std::wstring name;
     if (type == fscmItemsInPanel)
     {
         if (!pd)
@@ -747,22 +776,18 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
         mi.Type = MENU_TYPE_STRING;
         mi.State = rawEdit ? MENU_STATE_GRAYED : MENU_STATE_DEFAULT;
         mi.ID = SALCMD_OPEN + 1;
-        SG->GetSalamanderCommand(SALCMD_OPEN, name, 256, NULL, NULL);
+        SPLGetSalamanderCommandOwned(SG, SALCMD_OPEN, name, NULL, NULL);
         if (!focusIsDir)
         {
             // append Salamander's shortcut to the command name
-            const char* str = LoadStr(IDS_EDIT);
-            int len = (int)strlen(str);
-            char* tab = strrchr(name, '\t');
-            if (!rawEdit && tab)
-            {
-                memmove(name + len, tab, strlen(tab) + 1);
-                memmove(name, str, len);
-            }
+            const std::wstring text = LoadStrW(IDS_EDIT);
+            const size_t tab = name.rfind(L'\t');
+            if (!rawEdit && tab != std::wstring::npos)
+                name = text + name.substr(tab);
             else
-                strcpy(name, str);
+                name = text;
         }
-        mi.String = name;
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         /* used by the export_mnu.py script that generates salmenu.mnu for Translator
@@ -785,60 +810,57 @@ MENU_TEMPLATE_ITEM ItemsInPanelMenu[] =
         {
             mi.ID = SALCMD_OPEN + 1;
             mi.State |= MENU_STATE_DEFAULT;
-            SG->GetSalamanderCommand(SALCMD_OPEN, name, 256, NULL, NULL);
+            SPLGetSalamanderCommandOwned(SG, SALCMD_OPEN, name, NULL, NULL);
 
             // append Salamander's shortcut to the command name
-            const char* str = LoadStr(IDS_RAWEDIT);
-            int len = (int)strlen(str);
-            char* tab = strrchr(name, '\t');
-            if (rawEdit && tab)
-            {
-                memmove(name + len, tab, strlen(tab) + 1);
-                memmove(name, str, len);
-            }
+            const std::wstring text = LoadStrW(IDS_RAWEDIT);
+            const size_t tab = name.rfind(L'\t');
+            if (rawEdit && tab != std::wstring::npos)
+                name = text + name.substr(tab);
             else
-                strcpy(name, str);
-            mi.String = name;
+                name = text;
+            mi.String = name.data();
         }
         else
         {
             mi.ID = rawEdit ? SALCMD_OPEN + 1 : CMD_RAWEDIT;
-            mi.String = LoadStr(IDS_RAWEDIT);
+            name = LoadStrW(IDS_RAWEDIT);
+            mi.String = name.data();
         }
         menu->InsertItem(i++, TRUE, &mi);
 
         // rename
         mi.State = CurrentKeyRoot == -1 ? MENU_STATE_GRAYED : 0;
         mi.ID = SALCMD_QUICKRENAME + 1;
-        SG->GetSalamanderCommand(SALCMD_QUICKRENAME, name, 256, NULL, NULL);
-        mi.String = name;
+        SPLGetSalamanderCommandOwned(SG, SALCMD_QUICKRENAME, name, NULL, NULL);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // view
         mi.State = focusIsDir ? MENU_STATE_GRAYED : 0;
         mi.ID = SALCMD_VIEW + 1;
-        SG->GetSalamanderCommand(SALCMD_VIEW, name, 256, NULL, NULL);
-        mi.String = name;
+        SPLGetSalamanderCommandOwned(SG, SALCMD_VIEW, name, NULL, NULL);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // copy
         mi.State = CurrentKeyRoot == -1 /*|| !targetIsReg*/ ? MENU_STATE_GRAYED : 0;
         mi.ID = SALCMD_COPY + 1;
-        SG->GetSalamanderCommand(SALCMD_COPY, name, 256, NULL, NULL);
-        mi.String = name;
+        SPLGetSalamanderCommandOwned(SG, SALCMD_COPY, name, NULL, NULL);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // delete
         mi.State = CurrentKeyRoot == -1 ? MENU_STATE_GRAYED : 0;
         mi.ID = SALCMD_DELETE + 1;
-        SG->GetSalamanderCommand(SALCMD_DELETE, name, 256, NULL, NULL);
-        mi.String = name;
+        SPLGetSalamanderCommandOwned(SG, SALCMD_DELETE, name, NULL, NULL);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // separator
         mi.Mask = MENU_MASK_TYPE;
         mi.Type = MENU_TYPE_SEPARATOR;
-        mi.String = name;
+        mi.String = NULL;
         menu->InsertItem(i++, TRUE, &mi);
 
         // export
@@ -846,7 +868,8 @@ MENU_TEMPLATE_ITEM ItemsInPanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = !focusIsDir ? MENU_STATE_GRAYED : 0;
         mi.ID = CMD_EXPORT;
-        mi.String = LoadStr(IDS_EXPORT);
+        name = LoadStrW(IDS_EXPORT);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // search
@@ -854,13 +877,14 @@ MENU_TEMPLATE_ITEM ItemsInPanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = !focusIsDir ? MENU_STATE_GRAYED : 0;
         mi.ID = CMD_SEARCH;
-        mi.String = LoadStr(IDS_SEARCH);
+        name = LoadStrW(IDS_SEARCH);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // separator
         mi.Mask = MENU_MASK_TYPE;
         mi.Type = MENU_TYPE_SEPARATOR;
-        mi.String = name;
+        mi.String = NULL;
         menu->InsertItem(i++, TRUE, &mi);
 
         // copy full name
@@ -868,7 +892,8 @@ MENU_TEMPLATE_ITEM ItemsInPanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = 0;
         mi.ID = CMD_COPYFULLNAME;
-        mi.String = LoadStr(IDS_COPYFULLNAME);
+        name = LoadStrW(IDS_COPYFULLNAME);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // copy name
@@ -876,7 +901,8 @@ MENU_TEMPLATE_ITEM ItemsInPanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = 0;
         mi.ID = CMD_COPYNAME;
-        mi.String = LoadStr(IDS_COPYNAME);
+        name = LoadStrW(IDS_COPYNAME);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
     }
     if (type == fscmPathInPanel || type == fscmPanel)
@@ -902,30 +928,27 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
         mi.State = CurrentKeyRoot == -1 ? MENU_STATE_GRAYED : 0;
         mi.ID = SALCMD_CREATEDIRECTORY + 1;
         // append Salamander's shortcut to the command name
-        SG->GetSalamanderCommand(SALCMD_CREATEDIRECTORY, name, 256, NULL, NULL);
-        const char* str = LoadStr(IDS_MENUNEWKEY);
-        int len = (int)strlen(str);
-        char* tab = strrchr(name, '\t');
-        if (tab)
-        {
-            memmove(name + len, tab, strlen(tab) + 1);
-            memmove(name, str, len);
-        }
+        SPLGetSalamanderCommandOwned(SG, SALCMD_CREATEDIRECTORY, name, NULL, NULL);
+        const std::wstring text = LoadStrW(IDS_MENUNEWKEY);
+        const size_t tab = name.rfind(L'\t');
+        if (tab != std::wstring::npos)
+            name = text + name.substr(tab);
         else
-            strcpy(name, str);
-        mi.String = name;
+            name = text;
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // new value
         mi.State = CurrentKeyRoot == -1 ? MENU_STATE_GRAYED : 0;
         mi.ID = CMD_NEWVALUE;
-        mi.String = LoadStr(IDS_MENUNEWVAL);
+        name = LoadStrW(IDS_MENUNEWVAL);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // separator
         mi.Mask = MENU_MASK_TYPE;
         mi.Type = MENU_TYPE_SEPARATOR;
-        mi.String = name;
+        mi.String = NULL;
         menu->InsertItem(i++, TRUE, &mi);
 
         // export
@@ -933,19 +956,21 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = 0;
         mi.ID = CMD_EXPORT;
-        mi.String = LoadStr(IDS_EXPORT);
+        name = LoadStrW(IDS_EXPORT);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // search
         mi.State = 0;
         mi.ID = CMD_SEARCH;
-        mi.String = LoadStr(IDS_SEARCH);
+        name = LoadStrW(IDS_SEARCH);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
 
         // separator
         mi.Mask = MENU_MASK_TYPE;
         mi.Type = MENU_TYPE_SEPARATOR;
-        mi.String = name;
+        mi.String = NULL;
         menu->InsertItem(i++, TRUE, &mi);
 
         // copy full path
@@ -953,7 +978,8 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
         mi.Type = MENU_TYPE_STRING;
         mi.State = 0;
         mi.ID = CMD_COPYPATH;
-        mi.String = LoadStr(IDS_COPYPATH);
+        name = LoadStrW(IDS_COPYPATH);
+        mi.String = name.data();
         menu->InsertItem(i++, TRUE, &mi);
     }
 
@@ -964,42 +990,26 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
     switch (cmd)
     {
     case CMD_RAWEDIT:
-        EditValue(CurrentKeyRoot, CurrentKeyName, pd->Name, TRUE);
+        EditValue(CurrentKeyRoot, CurrentKeyName.data(), pd->Name, TRUE);
         break;
     case CMD_NEWVALUE:
         EditNewFile();
         break;
     case CMD_EXPORT:
     {
-        WCHAR path[MAX_FULL_KEYNAME];
-        int len = StrToWStr(path, MAX_FULL_KEYNAME, AssignedFSName);
-        path[len - 1] = L':';
-        if (!GetCurrentPathW(path + len, MAX_FULL_KEYNAME - len))
-        {
-            wcscpy(path + len, L"\\");
-        }
+        std::wstring path = AssignedFSName + L":" + GetCurrentPathOwned();
         if (type == fscmItemsInPanel && focusIsDir)
-        {
-            PathAppend(path, pd->Name, MAX_FULL_KEYNAME);
-        }
-        ExportKey(path);
+            SPLSalPathAppendOwned(path, pd->Name);
+        ExportKey(path.data());
         break;
     }
 
     case CMD_SEARCH:
     {
-        WCHAR path[MAX_FULL_KEYNAME];
-        int len = StrToWStr(path, MAX_FULL_KEYNAME, AssignedFSName);
-        path[len - 1] = L':';
-        if (!GetCurrentPathW(path + len, MAX_FULL_KEYNAME))
-        {
-            wcscpy(path + len, L"\\");
-        }
+        std::wstring path = AssignedFSName + L":" + GetCurrentPathOwned();
         if (type == fscmItemsInPanel)
-        {
-            PathAppend(path, pd->Name, MAX_FULL_KEYNAME);
-        }
-        CFindDialogThread* t = new CFindDialogThread(path);
+            SPLSalPathAppendOwned(path, pd->Name);
+        CFindDialogThread* t = new CFindDialogThread(path.c_str());
         if (t)
         {
             if (!t->Create(ThreadQueue))
@@ -1018,23 +1028,18 @@ MENU_TEMPLATE_ITEM PanelMenu[] =
 
     case CMD_COPYFULLNAME:
     {
-        CPathBuffer path; // Heap-allocated for long path support
-        if (GetCurrentPath(path) && SG->SalPathAppend(path, fd->Name, path.Size()))
-        {
-            SG->CopyTextToClipboard(*path.Get() == '\\' ? path.Get() + 1 : path, -1,
-                                    FALSE, NULL);
-        }
+        std::wstring path = GetCurrentPathOwned();
+        SPLSalPathAppendOwned(path, fd->Name);
+        SG->CopyTextToClipboard(!path.empty() && path.front() == L'\\' ? path.c_str() + 1 : path.c_str(),
+                                -1, FALSE, NULL);
         break;
     }
 
     case CMD_COPYPATH:
     {
-        CPathBuffer path; // Heap-allocated for long path support
-        if (GetCurrentPath(path))
-        {
-            SG->CopyTextToClipboard(*path.Get() == '\\' ? path.Get() + 1 : path, -1,
-                                    FALSE, NULL);
-        }
+        const std::wstring path = GetCurrentPathOwned();
+        SG->CopyTextToClipboard(!path.empty() && path.front() == L'\\' ? path.c_str() + 1 : path.c_str(),
+                                -1, FALSE, NULL);
         break;
     }
 
@@ -1052,18 +1057,17 @@ BOOL CPluginFSInterface::EditNewFile()
     if (CurrentKeyRoot == -1)
         return TRUE; //Error(IDS_NEWKEYINROOT);
 
-    WCHAR enteredPathName[MAX_KEYNAME];
-    enteredPathName[0] = 0;
+    std::wstring enteredPathName;
     while (1)
     {
-        WCHAR relativePathName[MAX_KEYNAME], valName[MAX_KEYNAME], fullName[MAX_FULL_KEYNAME];
+        std::wstring relativePathName;
         DWORD type = REG_SZ;
         BOOL direct = FALSE;
         CNewValDialog dlg(GetParent(), enteredPathName, &type, &direct);
         if (dlg.Execute() != IDOK)
             return FALSE;
 
-        wcscpy(relativePathName, enteredPathName);
+        relativePathName = enteredPathName;
 
         // extract the user portion from the FS path
         if (!direct)
@@ -1073,7 +1077,8 @@ BOOL CPluginFSInterface::EditNewFile()
                 Error(IDS_NOTREGEDTPATH);
                 continue;
             }
-            if (!wcslen(relativePathName))
+            relativePathName.resize(wcslen(relativePathName.c_str()));
+            if (relativePathName.empty())
             {
                 Error(IDS_BADPATH);
                 continue;
@@ -1081,21 +1086,37 @@ BOOL CPluginFSInterface::EditNewFile()
         }
 
         BOOL success;
-        wcscpy(fullName, relativePathName);
-        GetFullFSPathW(fullName, MAX_FULL_KEYNAME, success);
+        std::wstring resolvedFullName(relativePathName);
+        ResolveFullFSPath(resolvedFullName, success);
         if (!success)
             continue;
-
         WCHAR* key;
         int root;
-        if (!ParseFullPath(fullName, key, root) || !CutDirectory(key, valName, MAX_KEYNAME))
+        if (!ParseFullPath(resolvedFullName.data(), key, root))
+        {
+            Error(IDS_BADPATH);
+            continue;
+        }
+        std::wstring keyName = key;
+        std::wstring valName;
+        const size_t slash = keyName.find_last_of(L'\\');
+        if (slash == std::wstring::npos)
+        {
+            valName.swap(keyName);
+        }
+        else
+        {
+            valName = keyName.substr(slash + 1);
+            keyName.resize(slash == 0 ? 1 : slash);
+        }
+        if (valName.empty())
         {
             Error(IDS_BADPATH);
             continue;
         }
 
         HKEY hKey;
-        int ret = RegOpenKeyExW(PredefinedHKeys[root].HKey, key,
+        int ret = RegOpenKeyExW(PredefinedHKeys[root].HKey, keyName.c_str(),
                                 0, KEY_QUERY_VALUE | KEY_SET_VALUE, &hKey);
         if (ret != ERROR_SUCCESS)
         {
@@ -1103,19 +1124,14 @@ BOOL CPluginFSInterface::EditNewFile()
             continue;
         }
 
-        char fullNameA[MAX_FULL_KEYNAME];
-        if (WStrToStr(fullNameA, MAX_KEYNAME, fullName) <= 0)
-            *fullNameA = 0;
-
         // check whether it exists
         DWORD existType;
-        ret = RegQueryValueExW(hKey, valName, 0, &existType, NULL, 0);
+        ret = RegQueryValueExW(hKey, valName.c_str(), 0, &existType, NULL, 0);
         if (ret == ERROR_SUCCESS)
         {
-            char buf[MAX_FULL_KEYNAME * 2];
-            sprintf(buf, LoadStr(IDS_REPLACEVAL), fullNameA);
+            const std::wstring message = SPLFormatStringOwned(LoadStrW(IDS_REPLACEVAL).c_str(), resolvedFullName.c_str());
 
-            if (SG->SalMessageBox(GetParent(), buf, LoadStr(IDS_QUESTION), MB_ICONQUESTION | MB_YESNOCANCEL) != IDYES)
+            if (SG->SalMessageBox(GetParent(), message.c_str(), LoadStrW(IDS_QUESTION).c_str(), MB_ICONQUESTION | MB_YESNOCANCEL) != IDYES)
             {
                 RegCloseKey(hKey);
                 continue;
@@ -1126,29 +1142,29 @@ BOOL CPluginFSInterface::EditNewFile()
         {
         case REG_SZ:
         case REG_EXPAND_SZ:
-            ret = RegSetValueExW(hKey, valName, 0, type, (CONST BYTE*)L"", 2);
+            ret = RegSetValueExW(hKey, valName.c_str(), 0, type, (CONST BYTE*)L"", 2);
             break;
         case REG_MULTI_SZ:
-            ret = RegSetValueExW(hKey, valName, 0, type, (CONST BYTE*)L"\0", 4);
+            ret = RegSetValueExW(hKey, valName.c_str(), 0, type, (CONST BYTE*)L"\0", 4);
             break;
 
         case REG_DWORD_BIG_ENDIAN:
         case REG_DWORD:
         {
             DWORD d = 0;
-            ret = RegSetValueExW(hKey, valName, 0, type, (CONST BYTE*)&d, 4);
+            ret = RegSetValueExW(hKey, valName.c_str(), 0, type, (CONST BYTE*)&d, 4);
             break;
         }
 
         case REG_QWORD:
         {
             QWORD d = 0;
-            ret = RegSetValueExW(hKey, valName, 0, type, (CONST BYTE*)&d, 8);
+            ret = RegSetValueExW(hKey, valName.c_str(), 0, type, (CONST BYTE*)&d, 8);
             break;
         }
 
         default:
-            ret = RegSetValueExW(hKey, valName, 0, type, (CONST BYTE*)L"", 0);
+            ret = RegSetValueExW(hKey, valName.c_str(), 0, type, (CONST BYTE*)L"", 0);
             break;
         }
 

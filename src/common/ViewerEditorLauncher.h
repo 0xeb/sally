@@ -5,36 +5,22 @@
 #include "ExternalToolRunner.h"
 #include "IShell.h"
 
+#include <string>
 #include <windows.h>
 
 struct ViewerEditorProcessLaunchRequest
 {
-    const wchar_t* commandLine;
-    const wchar_t* workingDirectory;
-    DWORD creationFlags;
-    bool useShowWindow;
-    WORD showWindow;
-    bool usePosition;
-    DWORD x;
-    DWORD y;
-    bool useSize;
-    DWORD width;
-    DWORD height;
-
-    ViewerEditorProcessLaunchRequest()
-        : commandLine(nullptr)
-        , workingDirectory(nullptr)
-        , creationFlags(NORMAL_PRIORITY_CLASS)
-        , useShowWindow(false)
-        , showWindow(SW_SHOWNORMAL)
-        , usePosition(false)
-        , x(0)
-        , y(0)
-        , useSize(false)
-        , width(0)
-        , height(0)
-    {
-    }
+    std::wstring commandLine;
+    std::wstring workingDirectory;
+    DWORD creationFlags = NORMAL_PRIORITY_CLASS;
+    bool useShowWindow = false;
+    WORD showWindow = SW_SHOWNORMAL;
+    bool usePosition = false;
+    DWORD x = 0;
+    DWORD y = 0;
+    bool useSize = false;
+    DWORD width = 0;
+    DWORD height = 0;
 };
 
 class IViewerEditorLauncher

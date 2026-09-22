@@ -44,16 +44,16 @@ BOOL CRawFS::Open(BOOL quiet)
     return TRUE;
 }
 
-BOOL CRawFS::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir,
+BOOL CRawFS::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir,
                            CPluginDataInterfaceAbstract*& pluginData)
 {
     return TRUE;
 }
 
-int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                       const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                       const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CRawFS::UnpackFile(, %s, %s, %s, %p, %u, %d)", srcPath, path, nameInArc, fileData, silent, toSkip);
+    CALL_STACK_MESSAGE6("CRawFS::UnpackFile(, %ls, %ls, %p, %u, %d)", path.c_str(), nameInArc.c_str(), fileData, silent, toSkip);
 
     if (fileData == NULL)
         return UNPACK_ERROR;
@@ -72,22 +72,16 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
             throw UNPACK_ERROR;
         }
 
-        CPathBuffer name; // Heap-allocated for long path support
-        lstrcpyn(name, path, name.Size());
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-        {
-            Error(IDS_ERR_TOO_LONG_NAME);
-            throw UNPACK_ERROR;
-        }
+        std::wstring name(path);
+        SPLSalPathAppendOwned(name, fileData->Name);
 
-        char fileInfo[100];
         FILETIME ft = fileData->LastWrite;
-        GetInfo(fileInfo, &ft, fileData->Size);
+        const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
 
         DWORD attrs = fileData->Attr;
 
-        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                           &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
 
         CBufferedFile file(hFile, GENERIC_WRITE);
@@ -127,10 +121,9 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
             {
                 if (silent == 0)
                 {
-                    char error[1024];
-                    sprintf(error, LoadStr(IDS_ERROR_READING_SECTOR), block);
+                    const std::wstring error = SPLFormatStringOwned(LangStr(IDS_ERROR_READING_SECTOR).c_str(), block);
                     int userAction = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL,
-                                                                    fileData->Name, error, LoadStr(IDS_READERROR));
+                                                                    fileData->Name, error.c_str(), LangStr(IDS_READERROR).c_str());
 
                     switch (userAction)
                     {
@@ -153,7 +146,7 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
 
             if (!salamander->ProgressAddSize(nbytes, TRUE)) // delayedPaint==TRUE, so we do not slow things down
             {
-                salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+                salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
                 salamander->ProgressEnableCancel(FALSE);
 
                 ret = UNPACK_CANCEL;
@@ -162,7 +155,7 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
             }
 
             ULONG written;
-            if (!file.Write(sector, nbytes, &written, name, NULL))
+            if (!file.Write(sector, nbytes, &written, name.c_str(), NULL))
             {
                 // Error message was already displayed by SafeWriteFile()
                 ret = UNPACK_CANCEL;
@@ -174,7 +167,7 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
             block++;
         } // while
 
-        if (!file.Close(name, NULL))
+        if (!file.Close(name.c_str(), NULL))
         {
             // Flushing cache may fail
             ret = UNPACK_CANCEL;
@@ -186,16 +179,16 @@ int CRawFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char*
             // because it was created with the read-only attribute, we must clear
             // the R attribute so the file can be deleted
             attrs &= ~FILE_ATTRIBUTE_READONLY;
-            if (!SetFileAttributes(name, attrs))
-                Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+            if (!SetFileAttributesW(name.c_str(), attrs))
+                Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 
             // the user cancelled the operation
             // delete the incomplete file afterwards
-            if (!DeleteFile(name))
-                Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError());
+            if (!DeleteFileW(name.c_str()))
+                Error(LangStr(IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError());
         }
         else
-            SetFileAttrs(name, attrs);
+            SetFileAttrs(name.c_str(), attrs);
     }
     catch (int e)
     {

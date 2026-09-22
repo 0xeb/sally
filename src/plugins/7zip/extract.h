@@ -62,8 +62,8 @@ private:
     CMyComPtr<IInArchive> ArchiveHandler;
     ItemsToExtractMap& ItemsToExtract;
 
-    const char* TargetDir;
-    CPathBuffer TargetFileName;
+    const wchar_t* TargetDir;
+    std::wstring TargetFileName;
 
     bool ExtractMode;
     struct CProcessedFileInfo
@@ -74,7 +74,7 @@ private:
         UINT32 Attributes;
         UINT64 Size;
         UString FileName;
-        CSysString Name;
+        UString Name;
     } ProcessedFileInfo;
 
     CRetryableOutFileStream* OutFileStreamSpec;
@@ -119,18 +119,18 @@ public:
     CExtractCallbackImp(HWND _hProgWnd, UString& password, ItemsToExtractMap& itemsToExtract);
     ~CExtractCallbackImp();
 
-    BOOL Init(IInArchive* archive, const char* outDir,
+    BOOL Init(IInArchive* archive, const wchar_t* outDir,
               const FILETIME& utcLastWriteTimeDefault, DWORD attributesDefault,
               BOOL silentDelete = FALSE);
     BOOL InitTest();
 
     int NumErrors;
 
-    const char* GetFileName() { return TargetFileName; }
+    const wchar_t* GetFileName() { return TargetFileName.c_str(); }
     FILETIME GetLastWrite() { return ProcessedFileInfo.LastWrite; }
     DWORD GetAttr() { return ProcessedFileInfo.Attributes; }
     UINT64 GetSize() { return ProcessedFileInfo.Size; }
-    const char* GetName() { return ProcessedFileInfo.Name; }
+    const wchar_t* GetName() { return ProcessedFileInfo.Name; }
 
     BOOL* GetOverwriteSkip() { return &OverwriteSkip; }
     DWORD* GetOverwriteSilent() { return &OverwriteSilent; }

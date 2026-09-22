@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -7,10 +7,9 @@
 #pragma pack(push, enter_include_operats_h_dt) // so that all structures are as small as possible (speed is not needed, we mainly save space)
 #pragma pack(1)
 
-// returns a pointer to the textual description of the 'error'; if 'error' is NO_ERROR, returns
-// a text like "unknown, maybe insufficient system resources", otherwise returns the standard
-// Windows description of the error (it uses the buffer 'errBuf'+'errBufSize' to store it)
-const char* GetWorkerErrorTxt(int error, char* errBuf, int errBufSize);
+// Returns a pointer to the textual description of 'error'. Dynamic storage is owned by
+// 'errorText'; NO_ERROR returns the static unknown-error resource text.
+const char* GetWorkerErrorTxt(int error, std::string& errorText) noexcept;
 
 //
 // ****************************************************************************
@@ -178,8 +177,10 @@ public:
 
     CFTPQueueItemAction ForceAction; // action forced by the user (for example an autorename entered from the Solve Error dialog)
 
-    char* Path; // path to the processed file/directory (local path on the server or a Windows path)
-    char* Name; // name of the processed file/directory (name without the path)
+    char* Path; // remote FTP bytes; NULL for local upload items
+    char* Name; // remote FTP bytes; NULL for local upload items
+    wchar_t* LocalPath; // authoritative local upload-source path; NULL for remote items
+    wchar_t* LocalName; // authoritative local upload-source name; NULL for remote items
 
 public:
     CFTPQueueItem();
@@ -204,15 +205,20 @@ public:
     void SetItem(int parentUID, CFTPQueueItemType type, CFTPQueueItemState state,
                  DWORD problemID, const char* path, const char* name);
 
+    // Sets a local filesystem item for upload. Local paths never pass through the FTP codec.
+    void SetLocalItem(int parentUID, CFTPQueueItemType type, CFTPQueueItemState state,
+                      DWORD problemID, const wchar_t* path, const wchar_t* name);
+
     // enabler for buttons in the operation dialog: returns TRUE if the "Solve Error" button makes sense;
     // in 'canSkip' (if not NULL) it returns TRUE if the "Skip" button makes sense;
     // in 'canRetry' (if not NULL) it returns TRUE if the "Retry" button makes sense
     // CAUTION: call only from the queue critical section
     BOOL HasErrorToSolve(BOOL* canSkip, BOOL* canRetry);
 
-    // returns a textual description of the problem expressed by ProblemID + WinError + ErrAllocDescr
+    // returns a dynamically owned semantic description of ProblemID + WinError + ErrAllocDescr;
+    // local diagnostic bytes and negotiated server-reply bytes cross distinct adapters
     // CAUTION: call only from the queue critical section
-    void GetProblemDescr(char* buf, int bufSize);
+    BOOL GetProblemDescr(const CFtpTextCodec& codec, std::wstring& description) noexcept;
 };
 
 //
@@ -304,8 +310,8 @@ public:
 class CFTPQueueItemCopyOrMove : public CFTPQueueItem
 {
 public:
-    char* TgtPath; // path to the target file (Windows path)
-    char* TgtName; // name of the target file (name without the path)
+    wchar_t* LocalTgtPath;
+    wchar_t* LocalTgtName;
 
     CQuadWord Size; // file size (CQuadWord(-1, -1) = size is unknown - e.g. links)
 
@@ -326,7 +332,8 @@ public:
     // CAUTION: does not use a critical section for data access (can only be called before
     //          adding the item to the queue) + it must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    void SetItemCopyOrMove(const char* tgtPath, const char* tgtName, const CQuadWord& size,
+    void SetItemCopyOrMove(const wchar_t* localTgtPath, const wchar_t* localTgtName,
+                           const CQuadWord& size,
                            int asciiTransferMode, int sizeInBytes, int tgtFileState,
                            BOOL dateAndTimeValid, const CFTPDate& date, const CFTPTime& time);
 };
@@ -383,8 +390,8 @@ public:
 class CFTPQueueItemCopyMoveExplore : public CFTPQueueItem
 {
 public:
-    char* TgtPath; // path to the target directory (Windows path)
-    char* TgtName; // name of the target directory (name without the path)
+    wchar_t* LocalTgtPath;
+    wchar_t* LocalTgtName;
 
     unsigned TgtDirState : 1; // see the TGTDIRSTATE_XXX constants
 
@@ -396,7 +403,8 @@ public:
     // CAUTION: does not use a critical section for data access (can only be called before
     //          adding the item to the queue) + it must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    void SetItemCopyMoveExplore(const char* tgtPath, const char* tgtName, int tgtDirState);
+    void SetItemCopyMoveExplore(const wchar_t* localTgtPath, const wchar_t* localTgtName,
+                                int tgtDirState);
 };
 
 //
@@ -509,6 +517,7 @@ protected:
     CRITICAL_SECTION QueueCritSect;
 
     TIndirectArray<CFTPQueueItem> Items; // queue items
+    CFtpTextCodec TextCodec;             // decodes remote identity only for Unicode presentation
 
     // single-entry cache for speeding up FindItemWithUID() - beware: it may not be valid:
     int LastFoundUID;   // UID of the last found item
@@ -534,8 +543,11 @@ protected:
     DWORD LastFoundErrorOccurenceTime; // "time" of the last found item with an error or the "time" before which no item with an error exists anymore
 
 public:
-    CFTPQueue();
+    explicit CFTPQueue(const CFtpTextCodec& textCodec);
     ~CFTPQueue();
+
+    // Decode remote protocol identity only when presenting it to the user.
+    std::wstring DecodeRemoteText(const char* bytes) const;
 
     // adds a new item to the queue; returns TRUE on success
     BOOL AddItem(CFTPQueueItem* newItem);
@@ -588,10 +600,10 @@ public:
     int GetItemIndex(int itemUID);
 
     // returns data for displaying the operation item with index 'index' in the list view in the operation dialog;
-    // 'buf'+'bufSize' is a buffer for the text returned in 'lvdi' (it changes three cyclically
+    // 'text' owns the text returned in 'lvdi' (the caller changes three strings cyclically
     // to satisfy the requirements of LVN_GETDISPINFO); if the index is not
     // valid, it does nothing (the list view refresh is already on the way)
-    void GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* buf, int bufSize);
+    void GetListViewDataForW(int index, NMLVDISPINFO* lvdi, std::wstring& text) noexcept;
 
     // button enabler in the operation dialog for the item at index 'index':
     // returns TRUE if "Solve Error" makes sense; returns FALSE for an invalid index;
@@ -636,14 +648,12 @@ public:
     // assigns RenamedName to TgtName of item 'item' (releases the previous value of TgtName)
     void ChangeTgtNameToRenamedName(CFTPQueueItemCopyOrMoveUpload* item);
 
-    // assigns 'tgtName' to TgtName of item 'item' (releases the previous value of TgtName)
-    void UpdateTgtName(CFTPQueueItemCopyMoveExplore* item, char* tgtName);
+    BOOL UpdateLocalTgtName(CFTPQueueItemCopyMoveExplore* item, const wchar_t* tgtName);
 
     // assigns 'tgtName' to TgtName of item 'item' (releases the previous value of TgtName)
     void UpdateTgtName(CFTPQueueItemCopyMoveUploadExplore* item, char* tgtName);
 
-    // assigns 'tgtName' to TgtName of item 'item' (releases the previous value of TgtName)
-    void UpdateTgtName(CFTPQueueItemCopyOrMove* item, char* tgtName);
+    BOOL UpdateLocalTgtName(CFTPQueueItemCopyOrMove* item, const wchar_t* tgtName);
 
     // assigns 'tgtDirState' to TgtDirState of item 'item'
     void UpdateTgtDirState(CFTPQueueItemCopyMoveExplore* item, unsigned tgtDirState);
@@ -775,11 +785,11 @@ enum CFTPDiskWorkType
 
 struct CDiskListingItem
 {
-    char* Name;     // file/directory name
+    wchar_t* Name;  // file/directory name
     BOOL IsDir;     // TRUE for a directory, FALSE for a file
     CQuadWord Size; // files only: size (in bytes)
 
-    CDiskListingItem(const char* name, BOOL isDir, const CQuadWord& size);
+    CDiskListingItem(const wchar_t* name, BOOL isDir, const CQuadWord& size);
     ~CDiskListingItem()
     {
         if (Name != NULL)
@@ -796,8 +806,9 @@ struct CFTPDiskWork
 
     CFTPDiskWorkType Type; // type of disk work
 
-    CPathBuffer Path; // target path (e.g. fdwtCheckOrWriteFile and fdwtCreateAndWriteFile do not use it = "")
-    CPathBuffer Name; // IN/OUT target name (the name may change during autorename) (e.g. fdwtCheckOrWriteFile does not use it = "") (for fdwtCreateAndWriteFile this holds the tgt-full-file-name)
+    std::wstring Path; // local filesystem path (unused by fdwtCheckOrWriteFile and fdwtCreateAndWriteFile)
+    std::wstring Name; // IN/OUT local name (may change during autorename)
+    std::wstring DirectFileName; // full local path used only by fdwtCreateAndWriteFile
 
     CFTPQueueItemAction ForceAction; // action forced by the user (for example an autorename entered from the Solve Error dialog)
 
@@ -834,7 +845,7 @@ struct CFTPDiskWork
     DWORD ProblemID;                               // if not ITEMPR_OK, this is the error that occurred
     DWORD WinError;                                // complements some ProblemID values (ignored when ITEMPR_OK)
     CFTPQueueItemState State;                      // if not sqisNone, this is the desired new state of the item
-    char* NewTgtName;                              // if not NULL, this is an allocated new name (must be deallocated)
+    wchar_t* NewTgtName;                           // if not NULL, this is an allocated new local name (must be deallocated)
     HANDLE OpenedFile;                             // if not NULL, this is a newly opened file handle (must be closed)
     CQuadWord FileSize;                            // file size (for a new or overwritten file it is zero)
     BOOL CanOverwrite;                             // TRUE if the file can be overwritten (used to distinguish "resume" and "resume or overwrite")
@@ -842,13 +853,17 @@ struct CFTPDiskWork
     TIndirectArray<CDiskListingItem>* DiskListing; // if not NULL (only when Type == fdwtListDir), this is an allocated listing
 
     CFTPDiskWork();
-    void Reset();
-    void CopyFrom(CFTPDiskWork* work); // copies values from 'work' into 'this'
+    void Reset() noexcept;
+    BOOL CopyFrom(const CFTPDiskWork& work) noexcept; // snapshots work transactionally
+    void MoveFrom(CFTPDiskWork& work) noexcept; // publishes completed work without allocation
+
+private:
+    void CopyScalarStateFrom(const CFTPDiskWork& work) noexcept;
 };
 
 struct CFTPFileToClose
 {
-    CPathBuffer FileName; // file name
+    std::wstring FileName;    // file name
     HANDLE File;             // file handle we should close
     BOOL DeleteIfEmpty;      // TRUE = if the file being closed is empty, delete it
     BOOL SetDateAndTime;     // TRUE = set 'Date'+'Time' before closing the file
@@ -857,7 +872,7 @@ struct CFTPFileToClose
     BOOL AlwaysDeleteFile;   // TRUE = delete the file after closing
     CQuadWord EndOfFile;     // if not CQuadWord(-1, -1), this is the offset at which the file will be truncated
 
-    CFTPFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
+    CFTPFileToClose(const wchar_t* path, const wchar_t* name, HANDLE file, BOOL deleteIfEmpty,
                     BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
                     BOOL deleteFile, CQuadWord* setEndOfFile);
 };
@@ -909,7 +924,7 @@ public:
     // to the offset 'setEndOfFile' after closing; if 'fileCloseIndex' is not NULL, it returns
     // the sequence number of the file close (you can wait for this closure later,
     // see WaitForFileClose)
-    BOOL AddFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
+    BOOL AddFileToClose(const wchar_t* path, const wchar_t* name, HANDLE file, BOOL deleteIfEmpty,
                         BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
                         BOOL deleteFile, CQuadWord* setEndOfFile, int* fileCloseIndex);
 
@@ -972,6 +987,8 @@ enum CFTPWorkerSubState // substates for individual states from CFTPWorkerState
     fwssConWaitForPROTCmdRes,   // wait for response to PROT
     fwssConSendNextScriptCmd,   // send the next command from the login script
     fwssConWaitForScriptCmdRes, // wait for the result of the command from the login script
+    fwssConSendOptsUtf8,        // request UTF-8 for this session after login
+    fwssConWaitForOptsUtf8Res,  // wait for the optional UTF-8 negotiation result
     fwssConSendMODEZ,           // send MODE Z after login script to enable compression
     fwssConWaitForMODEZCmdRes,  // wait for response to MODE Z
     fwssConSendInitCmds,        // send another initialization command (user-defined, see CFTPOperation::InitFTPCommands) - CAUTION: set NextInitCmd=0 before the first call
@@ -1205,7 +1222,6 @@ enum CUploadType
     utOnlyTestFileSize,      // tests whether the file is fully uploaded (based on matching file size)
 };
 
-#define FTPWORKER_ERRDESCR_BUFSIZE 200             // buffer size of CFTPWorker::ErrorDescr
 #define FTPWORKER_BYTESTOWRITEONSOCKETPREALLOC 512 // how many bytes to preallocate for writing (so that another write does not allocate unnecessarily due to a 1-byte overflow)
 #define FTPWORKER_BYTESTOREADONSOCKET 1024         // minimum number of bytes to read from the socket at once (also allocate the buffer for read data)
 #define FTPWORKER_BYTESTOREADONSOCKETPREALLOC 512  // how many bytes to preallocate for reading (so that another read does not immediately allocate again)
@@ -1254,8 +1270,9 @@ protected:
     int ControlConnectionUID; // if the worker has a connection from the panel, this stores the UID of the panel socket object (otherwise -1)
 
     BOOL HaveWorkingPath;                     // TRUE if WorkingPath is valid
-    CPathBuffer WorkingPath;           // current working path on the FTP server (it may be only the last string sent via CWD with a "success" return value - for performance reasons we do not run PWD after every CWD)
+    alignas(std::string) std::string WorkingPath; // current working path on the FTP server in encoded session bytes (it may be only the last string sent via CWD with a "success" return value - for performance reasons we do not run PWD after every CWD)
     CCurrentTransferMode CurrentTransferMode; // current transfer mode on the FTP server (only stores the last FTP command "TYPE")
+    CFtpSessionTextPolicy TextPolicy;          // byte/text boundary selected for this FTP session
 
     BOOL EventConnectSent; // TRUE only if the fwseConnect event has already been generated (handles FD_READ arriving before FD_CONNECT)
 
@@ -1284,7 +1301,7 @@ protected:
     CFTPWorkerState State;                       // worker state, see CFTPWorkerState
     CFTPWorkerSubState SubState;                 // state inside the worker state (substate for the processing steps of each State), see CFTPWorkerSubState
     CFTPQueueItem* CurItem;                      // read-only data: processed item (in state sqisProcessing), NULL=worker has no work; write via Queue and CurItem->UID
-    char ErrorDescr[FTPWORKER_ERRDESCR_BUFSIZE]; // textual description of the error, contains no CR or LF and does not end with a period; ensuring these conditions see CorrectErrorDescr(); displayed for fwsWaitingForReconnect and fwsConnectionError, filled on errors see CFTPWorkerEvent
+    alignas(std::wstring) std::wstring ErrorDescr; // semantic UTF-16 error text; contains no CR or LF and does not end with a period; ensuring these conditions see CorrectErrorDescr(); displayed for fwsWaitingForReconnect and fwsConnectionError, filled on errors see CFTPWorkerEvent
     int ConnectAttemptNumber;                    // number of the current attempt to establish the connection; before the very first attempt this is zero (set to one when the connection is established)
     CCertificate* UnverifiedCertificate;         // SSL: if the attempt to connect fails due to an unknown untrusted certificate, the connection is closed and the certificate is stored here (we show it to the user in the Solve Error dialog)
 
@@ -1334,7 +1351,7 @@ protected:
     SYSTEMTIME StartTimeOfListing; // time when we started retrieving the listing (just before allocating the data connection)
     DWORD StartLstTimeOfListing;   // IncListingCounter() from the moment we started retrieving the listing (just before allocating the data connection)
     int ListCmdReplyCode;          // result of the "LIST"/"RETR" command stored for later processing (see fwssWorkExplProcessLISTRes/fwssWorkCopyProcessRETRRes)
-    char* ListCmdReplyText;        // result of the "LIST"/"RETR" command stored for later processing (see fwssWorkExplProcessLISTRes/fwssWorkCopyProcessRETRRes)
+    alignas(std::string) std::string ListCmdReplyText; // encoded result of the "LIST"/"RETR" command stored for later processing (see fwssWorkExplProcessLISTRes/fwssWorkCopyProcessRETRRes)
 
     CWorkerStatusType StatusType;   // type of status information stored in the worker (shown in the operation dialog in the Connections list view)
     DWORD StatusConnectionIdleTime; // for StatusType == wstDownloadStatus/wstUploadStatus: time in seconds since the last data reception
@@ -1350,7 +1367,7 @@ protected:
     BOOL UploadDirGetTgtPathListing; // only when processing upload-dir-explore or upload-file items: TRUE = the target path listing should be fetched
 
     int UploadAutorenamePhase;              // upload: current phase of generating names for the target directory/file (see FTPGenerateNewName()); 0 = beginning of the autorename process; -1 = it was the last generation phase, we simply cannot generate another name of that type
-    CPathBuffer UploadAutorenameNewName; // upload: buffer for the last generated name for the target directory/file
+    alignas(std::string) std::string UploadAutorenameNewName; // upload: encoded last generated name for the target directory/file
 
     CUploadType UploadType; // type of upload (according to the state of the target file): new, resume, resume or overwrite, overwrite, autorename
 
@@ -1368,8 +1385,8 @@ protected:
     CFTPDiskWork DiskWork; // work data submitted to the FTPDiskThread object (thread performing disk operations)
 
 public:
-    CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host, unsigned short port,
-               const char* user);
+    CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const wchar_t* host, unsigned short port,
+               const wchar_t* user);
     ~CFTPWorker();
 
     // returns ID (in the WorkerCritSect critical section)
@@ -1405,7 +1422,7 @@ public:
     BOOL GetShouldStop();
 
     // returns data for the Connections list view in the operation dialog
-    void GetListViewData(LVITEM* itemData, char* buf, int bufSize);
+    void GetListViewData(LVITEM* itemData, std::wstring& text) noexcept;
 
     // returns TRUE if it is possible that the worker needs the user to resolve an error (states
     // fwsConnectionError (error must be resolved) and fwsWaitingForReconnect (login parameters
@@ -1420,7 +1437,7 @@ public:
     // in 'unverifiedCertificate' (if not NULL; the caller is responsible for releasing
     // the certificate using its Release() method); if it is necessary to post
     // fweActivate after calling the method, it returns TRUE in 'postActivate';
-    BOOL GetErrorDescr(char* buf, int bufSize, BOOL* postActivate,
+    BOOL GetErrorDescr(std::wstring& errorText, BOOL* postActivate,
                        CCertificate** unverifiedCertificate);
 
     // used to query whether the worker can be cancelled from the CReturningConnections methods (only
@@ -1582,44 +1599,44 @@ protected:
 
     // helper method solely to make HandleEvent() easier to follow
     void HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                      BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                      BOOL& reportWorkerChange, std::string& buf, std::string& errBuf, std::wstring& host,
                                       int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
                                       int replyCode, BOOL& operStatusMaybeChanged);
 
     // helper method solely to make HandleEvent() easier to follow
     void HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                   BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                   BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                    int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
                                    int replyCode);
 
     // helper method solely to make HandleEventInWorkingState and HandleEvent() easier to follow
     void HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                    BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                    BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                     int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
-                                    int replyCode, CPathBuffer& ftpPath, CPathBuffer& errText,
+                                    int replyCode, std::string& ftpPath, std::string& errText,
                                     BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                     BOOL& handleShouldStop, BOOL* listingNotAccessible);
 
     // helper method solely to make HandleEventInWorkingState and HandleEvent() easier to follow
     void HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                    CPathBuffer& buf, CPathBuffer& errBuf, int& cmdLen, BOOL& sendCmd,
-                                    char* reply, int replySize, int replyCode, CPathBuffer& errText,
+                                    std::string& buf, std::string& errBuf, int& cmdLen, BOOL& sendCmd,
+                                    char* reply, int replySize, int replyCode, std::string& errText,
                                     BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                     BOOL& handleShouldStop);
 
     // helper method solely to make HandleEventInWorkingState and HandleEvent() easier to follow
     void HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                    BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                    BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                     int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
-                                    int replyCode, CPathBuffer& ftpPath, CPathBuffer& errText,
+                                    int replyCode, std::string& ftpPath, std::string& errText,
                                     BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                     BOOL& handleShouldStop, BOOL& quitCmdWasSent);
 
     // helper method solely to make HandleEventInWorkingState and HandleEvent() easier to follow
     void HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                    BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                    BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                     int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
-                                    int replyCode, CPathBuffer& ftpPath, CPathBuffer& errText,
+                                    int replyCode, std::string& ftpPath, std::string& errText,
                                     BOOL& conClosedRetryItem, BOOL& lookForNewWork,
                                     BOOL& handleShouldStop, BOOL& quitCmdWasSent);
 
@@ -1634,12 +1651,12 @@ protected:
                                 int operationsHiddenFileDel, int operationsHiddenDirDel);
 
     // helper method solely to make HandleEventInWorkingState2() easier to follow
-    void OpenActDataCon(CFTPWorkerSubState waitForListen, CPathBuffer& errBuf,
+    void OpenActDataCon(CFTPWorkerSubState waitForListen, std::string& errBuf,
                         BOOL& conClosedRetryItem, BOOL& lookForNewWork);
 
     // helper method solely to make HandleEventInWorkingState2() easier to follow
-    void WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, CPathBuffer& errBuf,
-                       CPathBuffer& buf, int& cmdLen, BOOL& sendCmd, BOOL& conClosedRetryItem,
+    void WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, std::string& errBuf,
+                       std::string& buf, int& cmdLen, BOOL& sendCmd, BOOL& conClosedRetryItem,
                        CFTPWorkerSubState waitForPORTRes);
 
     // helper method solely to make HandleEventInWorkingState2() easier to follow
@@ -1652,7 +1669,7 @@ protected:
                         CFTPWorkerSubState setType);
 
     // helper method solely to make HandleEventInWorkingState2() easier to follow
-    void SetTypeA(BOOL& handleShouldStop, CPathBuffer& errBuf, CPathBuffer& buf, int& cmdLen,
+    void SetTypeA(BOOL& handleShouldStop, std::string& errBuf, std::string& buf, int& cmdLen,
                   BOOL& sendCmd, BOOL& nextLoop, CCurrentTransferMode trMode,
                   BOOL asciiTrMode, CFTPWorkerSubState waitForTYPERes,
                   CFTPWorkerSubState trModeAlreadySet);
@@ -1661,18 +1678,25 @@ protected:
     void WaitForTYPERes(CFTPWorkerEvent event, int replyCode, BOOL& nextLoop, BOOL& conClosedRetryItem,
                         CCurrentTransferMode trMode, CFTPWorkerSubState trModeAlreadySet);
 
-    // adjusts the text in the ErrorDescr buffer so that it contains no CR or LF and has no period at the end
+    // adjusts ErrorDescr so that it contains no CR or LF and has no period at the end
     // WARNING: call only inside the WorkerCritSect critical section !!!
     void CorrectErrorDescr();
+    void SetLocalErrorDescr(std::string_view text) noexcept;
+    void SetServerErrorDescr(std::string_view text) noexcept;
+    void SetFormattedWideErrorDescr(int formatID, std::wstring_view argument) noexcept;
+    void SetFormattedLocalErrorDescr(int formatID, std::string_view argument) noexcept;
+    void SetFormattedServerErrorDescr(int formatID, std::string_view argument) noexcept;
+    void EnsureErrorDescr(BOOL success) noexcept;
+    void LogErrorDescr();
 
     // initializes the items of the 'DiskWork' structure
     // WARNING: call only inside the CSocket::SocketCritSect critical section + enters the
     //          CFTPOperation::OperCritSect section !!!
-    void InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* path, const char* name,
+    BOOL InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const wchar_t* path, const wchar_t* name,
                       CFTPQueueItemAction forceAction, BOOL alreadyRenamedName,
                       char* flushDataBuffer, CQuadWord const* checkFromOffset,
                       CQuadWord const* writeOrReadFromOffset, int validBytesInFlushDataBuffer,
-                      HANDLE workFile);
+                      HANDLE workFile) noexcept;
 
     // returns the processed 'CurItem' back to the queue (returns it to the "waiting" state so another
     // worker can process it)
@@ -1798,10 +1822,10 @@ public:
     int GetWorkerIndex(int workerID);
 
     // returns the data for displaying the worker at index 'index' in the listview in the operation dialog;
-    // 'buf'+'bufSize' is a buffer for the text returned in 'lvdi' (changes in three cycles
+    // 'text' owns the text returned in 'lvdi' (the caller changes three strings cyclically
     // to meet the LVN_GETDISPINFO requirements); if the index is not
     // valid, does nothing (listview refresh is already on the way)
-    void GetListViewDataFor(int index, NMLVDISPINFO* lvdi, char* buf, int bufSize);
+    void GetListViewDataFor(int index, NMLVDISPINFO* lvdi, std::wstring& text) noexcept;
 
     // returns the worker ID at index 'index'; -1 = invalid index
     int GetWorkerID(int index);
@@ -1827,11 +1851,11 @@ public:
     // returns TRUE if the worker at index 'index' needs the user to resolve an error
     // (see HaveError()); if this worker is in the fwsWaitingForReconnect state, it changes
     // to the fwsConnectionError state; if it returns TRUE, it also returns the error text in 'buf' (buffer
-    // of size 'bufSize') and, if the error is caused by an untrusted server certificate,
+    // into dynamically owned 'errorText' and, if the error is caused by an untrusted server certificate,
     // returns it in 'unverifiedCertificate' (if not NULL; the caller is responsible for releasing
     // the certificate using its Release() method); returns FALSE for an invalid index
     // WARNING: enters the CSocketsThread::CritSect section !!!
-    BOOL GetErrorDescr(int index, char* buf, int bufSize, CCertificate** unverifiedCertificate);
+    BOOL GetErrorDescr(int index, std::wstring& errorText, CCertificate** unverifiedCertificate);
 
     // activates all workers (posts WORKER_ACTIVATE to the worker socket)
     // WARNING: does not fully lock the WorkersListCritSect, it may not be executed for a worker
@@ -2094,17 +2118,18 @@ protected:
     HANDLE OperationDlgThread;   // handle of the thread in which the last opened operation dialog ran/is running
 
     CFTPProxyServer* ProxyServer;          // NULL = "not used (direct connection)"
-    const char* ProxyScriptText;           // proxy script text (exists even when the proxy server is not used); WARNING: may point to ProxyServer->ProxyScript (i.e. the text is valid only until ProxyServer is deallocated)
+    std::string ProxyScriptText;           // owned encoded proxy script; execution pointers remain valid because it is immutable after setup
     const char* ProxyScriptStartExecPoint; // line with the first command (the line after the line with "connect to:")
-    char* ConnectToHost;                   // "host" according to the proxy script
+    std::wstring ConnectToHost;            // semantic connection host according to the proxy script
     unsigned short ConnectToPort;          // "port" according to the proxy script
     DWORD HostIP;                          // IP address of the FTP server 'Host' (==INADDR_NONE if the IP is unknown) (used only for SOCKS4 proxy server)
 
-    char* Host;                   // host (FTP server) (NULL = unknown)
+    std::wstring Host;            // semantic FTP server host (empty = unknown)
     unsigned short Port;          // port on which the FTP server runs (-1 = unknown)
-    char* User;                   // user (NULL = unknown) WARNING: anonymous is already part of the string here
-    char* Password;               // password (NULL = unknown) WARNING: anonymous password (email) is already part of the string here
-    char* Account;                // account info (see FTP command "ACCT") (NULL = unknown)
+    CFtpTextCodec IdentityCodec;  // codec for the operation's encoded remote path/name bytes
+    std::wstring User;            // semantic user; anonymous is already expanded here
+    std::wstring Password;        // semantic password; anonymous email is already expanded here
+    std::wstring Account;         // semantic FTP ACCT value
     BOOL RetryLoginWithoutAsking; // TRUE = the worker should try to reconnect even for "error" server replies (code "5xx"); FALSE = reconnect only for "transient-error" replies (code "4xx"); set later by the user when resolving the worker connection problem
     std::string InitFTPCommands;  // list of FTP commands to send to the server immediately after connecting (empty = no commands)
     BOOL UsePassiveMode;          // TRUE/FALSE = passive/active data connection mode
@@ -2114,7 +2139,7 @@ protected:
     std::string ServerSystem;     // server system (reply to the SYST command) - may also be empty
     std::string ServerFirstReply; // first server reply (often contains the FTP server version) - may also be empty
     BOOL UseListingsCache;        // TRUE = the user wants to store listings in the cache for this connection
-    char* ListingServerType;      // server type for parsing listings: NULL = autodetect; otherwise the server type name (without the optional leading '*'; if it stops existing, it switches to autodetect)
+    alignas(std::string) std::string ListingServerType; // local-config bytes; empty = autodetect
     BOOL EncryptControlConnection;
     BOOL EncryptDataConnection;
     int CompressData;
@@ -2134,14 +2159,15 @@ protected:
     DWORD OperationEnd;   // GetTickCount() from the moment the operation finished (even with errors) (-1 = invalid - operation still running)
 
     CFTPOperationType Type; // operation type
-    char* OperationSubject; // what the operation works with ("file "test.txt"", "3 files and 1 directory", etc.)
+    std::wstring OperationSubject; // what the operation works with (file name or item summary)
 
     int ChildItemsNotDone;  // number of unfinished "child" items (except type sqisDone)
     int ChildItemsSkipped;  // number of skipped "child" items (type sqisSkipped)
     int ChildItemsFailed;   // number of failed "child" items (types sqisFailed and sqisForcedToFail)
     int ChildItemsUINeeded; // number of user-input-needed "child" items (types sqisFailed and sqisForcedToFail)
 
-    char* SourcePath;                 // operation source path (full path, possibly including fs-name)
+    char* RemoteSourcePath;           // encoded FTP server path; NULL when the source is local
+    wchar_t* SourcePath;              // source path for local ownership, notifications, and display
     char SrcPathSeparator;            // most frequently used source path separator ('/', '.', etc.)
     BOOL SrcPathCanChange;            // TRUE if changes on the source path should be reported after the operation finishes
     BOOL SrcPathCanChangeInclSubdirs; // if SrcPathCanChange is TRUE, this stores whether the changes also cover subdirectories of the given path
@@ -2159,7 +2185,8 @@ protected:
     // for Copy and Move (download and upload):
     // ****************************************************************************
 
-    char* TargetPath;                 // operation target path (full path, possibly including fs-name)
+    char* RemoteTargetPath;           // encoded FTP server path; NULL when the target is local
+    wchar_t* TargetPath;              // target path for local ownership, notifications, and display
     char TgtPathSeparator;            // most frequently used target path separator ('/', '.', etc.)
     BOOL TgtPathCanChange;            // TRUE if changes on the target path should be reported after the operation finishes
     BOOL TgtPathCanChangeInclSubdirs; // if TgtPathCanChange is TRUE, this stores whether the changes also cover subdirectories of the given path
@@ -2245,25 +2272,26 @@ public:
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    BOOL SetConnection(CFTPProxyServer* proxyServer, const char* host, unsigned short port,
-                       const char* user, const char* password, const char* account,
+    BOOL SetConnection(CFTPProxyServer* proxyServer, const wchar_t* host, unsigned short port,
+                       const CFtpTextCodec& identityCodec,
+                       const wchar_t* user, const wchar_t* password, const wchar_t* account,
                        const char* initFTPCommands, BOOL usePassiveMode,
                        const char* listCommand, DWORD serverIP,
                        const char* serverSystem, const char* serverFirstReply,
-                       BOOL useListingsCache, DWORD hostIP);
+                       BOOL useListingsCache, DWORD hostIP) noexcept;
 
     // sets the basic operation data - used by all operations
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    void SetBasicData(char* operationSubject, const char* listingServerType);
+    BOOL SetBasicData(const wchar_t* operationSubject, const char* listingServerType);
 
     // configures this object for the Delete operation (used only after calling SetConnection() and
     // SetBasicData())
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    void SetOperationDelete(const char* sourcePath, char srcPathSeparator,
+    BOOL SetOperationDelete(const char* remoteSourcePath, const wchar_t* sourcePath, char srcPathSeparator,
                             BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
                             int confirmDelOnNonEmptyDir, int confirmDelOnHiddenFile,
                             int confirmDelOnHiddenDir);
@@ -2273,11 +2301,12 @@ public:
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    BOOL SetOperationCopyMoveDownload(BOOL isCopy, const char* sourcePath, char srcPathSeparator,
+    BOOL SetOperationCopyMoveDownload(BOOL isCopy, const char* remoteSourcePath,
+                                      const wchar_t* sourcePath, char srcPathSeparator,
                                       BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
-                                      const char* targetPath, char tgtPathSeparator,
+                                      const wchar_t* targetPath, char tgtPathSeparator,
                                       BOOL tgtPathCanChange, BOOL tgtPathCanChangeInclSubdirs,
-                                      const char* asciiFileMasks, int autodetectTrMode,
+                                      const wchar_t* asciiFileMasks, int autodetectTrMode,
                                       int useAsciiTransferMode, int cannotCreateFile, int cannotCreateDir,
                                       int fileAlreadyExists, int dirAlreadyExists, int retryOnCreatedFile,
                                       int retryOnResumedFile, int asciiTrModeButBinFile);
@@ -2287,7 +2316,7 @@ public:
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    void SetOperationChAttr(const char* sourcePath, char srcPathSeparator,
+    BOOL SetOperationChAttr(const char* remoteSourcePath, const wchar_t* sourcePath, char srcPathSeparator,
                             BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
                             WORD attrAnd, WORD attrOr, int chAttrOfFiles, int chAttrOfDirs,
                             int unknownAttrs);
@@ -2297,11 +2326,11 @@ public:
     // WARNING: does not use the critical section for accessing data (can be called only before
     //          adding the operation to FTPOperationsList) + must not be called repeatedly (expects
     //          initialized attribute values of the object)
-    BOOL SetOperationCopyMoveUpload(BOOL isCopy, const char* sourcePath, char srcPathSeparator,
+    BOOL SetOperationCopyMoveUpload(BOOL isCopy, const wchar_t* sourcePath, char srcPathSeparator,
                                     BOOL srcPathCanChange, BOOL srcPathCanChangeInclSubdirs,
-                                    const char* targetPath, char tgtPathSeparator,
+                                    const char* remoteTargetPath, const wchar_t* targetPath, char tgtPathSeparator,
                                     BOOL tgtPathCanChange, BOOL tgtPathCanChangeInclSubdirs,
-                                    const char* asciiFileMasks, int autodetectTrMode,
+                                    const wchar_t* asciiFileMasks, int autodetectTrMode,
                                     int useAsciiTransferMode, int uploadCannotCreateFile,
                                     int uploadCannotCreateDir, int uploadFileAlreadyExists,
                                     int uploadDirAlreadyExists, int uploadRetryOnCreatedFile,
@@ -2334,7 +2363,7 @@ public:
     // determines whether the name matches the aggregate ASCIIFileMasks mask; 'name'+'ext' are pointers
     // to the name and extension (or the end of the name), both placed in a single buffer; returns TRUE if
     // the name matches the aggregate mask
-    BOOL IsASCIIFile(const char* name, const char* ext);
+    BOOL IsASCIIFile(const wchar_t* name, const wchar_t* ext);
 
     // adds/subtracts 'size' to/from 'TotalSizeInBytes' (if 'sizeInBytes' is TRUE) or to/from 'TotalSizeInBlocks'
     // (if 'sizeInBytes' is FALSE); the total size of the operation is the sum of the sizes in bytes
@@ -2385,48 +2414,44 @@ public:
     BOOL DeleteWorkers(int workerInd, CFTPWorker** victims, int maxVictims, int* foundVictims,
                        CUploadWaitingWorker** uploadFirstWaitingWorker);
 
-    // returns TRUE if the IP address of the FTP/proxy server is known (returned in 'serverIP'; 'host'+'hostBufSize'
-    // are ignored in this case); returns FALSE if the server IP address is not known yet; in that
-    // case it returns the hostname of the FTP/proxy server in the 'host' buffer of size 'hostBufSize'
-    BOOL GetServerAddress(DWORD* serverIP, char* host, int hostBufSize);
+    // Returns TRUE if the IP address is known. Otherwise returns FALSE and transactionally publishes
+    // the semantic hostname used for asynchronous resolution.
+    BOOL GetServerAddress(DWORD* serverIP, std::wstring& host, BOOL* hostReady) noexcept;
 
     // sets 'ServerIP' (in the critical section)
     void SetServerIP(DWORD serverIP);
 
     // returns the FTP/proxy server IP in 'serverIP', the FTP/proxy server port in 'port', the hostname
-    // of the FTP server in the 'host' buffer (minimum size HOST_MAX_SIZE), the proxy server type in 'proxyType',
+    // of the FTP server in the dynamic semantic 'host' owner, the proxy server type in 'proxyType',
     // the FTP server IP in 'hostIP' (used only for SOCKS4, otherwise INADDR_NONE), the FTP server port
-    // in 'hostPort'; username and password for the proxy server in 'proxyUser' (minimum size USER_MAX_SIZE)
-    // and 'proxyPassword' (minimum size PASSWORD_MAX_SIZE)
-    void GetConnectInfo(DWORD* serverIP, unsigned short* port, char* host,
+    // in 'hostPort'; proxy credentials are encoded only here for the SOCKS/HTTP wire adapter.
+    BOOL GetConnectInfo(DWORD* serverIP, unsigned short* port, std::wstring& host,
                         CFTPProxyServerType* proxyType, DWORD* hostIP, unsigned short* hostPort,
-                        char* proxyUser, char* proxyPassword);
+                        std::wstring& proxyUser, std::wstring& proxyPassword) noexcept;
 
-    // stores the log message in the 'buf' buffer (of size 'bufSize')
-    void GetConnectLogMsg(BOOL isReconnect, char* buf, int bufSize, int attemptNumber, const char* dateTime);
+    // Stores the complete encoded log message transactionally.
+    BOOL GetConnectLogMsg(BOOL isReconnect, std::string& text, int attemptNumber, const char* dateTime);
 
-    // if ServerSystem is empty, sets ServerSystem to the string 'reply'
-    // of length 'replySize'
-    void SetServerSystem(const char* reply, int replySize);
+    // If ServerSystem is empty, transactionally stores the complete reply.
+    BOOL SetServerSystem(const char* reply, int replySize) noexcept;
 
-    // if ServerFirstReply is empty, sets ServerFirstReply to the string 'reply'
-    // of length 'replySize'
-    void SetServerFirstReply(const char* reply, int replySize);
+    // If ServerFirstReply is empty, transactionally stores the complete reply.
+    BOOL SetServerFirstReply(const char* reply, int replySize) noexcept;
 
     // prepares the text of the next command from the proxy script for the server and for the Log (wraps
-    // ProcessProxyScript); 'errDescrBuf' is a 300-character buffer for the error description; return values:
+    // ProcessProxyScript); 'errorDescription' owns the complete error description; return values:
     // - script error: the function returns FALSE + the error position is returned in '*proxyScriptExecPoint' + the
-    //   error description is in 'errDescrBuf'
+    //   error description is in 'errorDescription'
     // - missing variable value: the function returns TRUE and also TRUE in 'needUserInput'; the description
-    //   of the missing variable is in 'errDescrBuf' (the value of '*proxyScriptExecPoint' does not change)
+    //   of the missing variable is in 'errorDescription' (the value of '*proxyScriptExecPoint' does not change)
     // - successful determination of which command to send to the server: returns TRUE and 'buf' contains the command (including
     //   CRLF at the end), 'logBuf' contains the text for the log (the password is replaced with the word "(hidden)");
     //   '*proxyScriptExecPoint' points to the start of the next script line
     // - end of script: returns TRUE and 'buf' is an empty string, '*proxyScriptExecPoint' points
     //   to the end of the script
-    BOOL PrepareNextScriptCmd(char* buf, int bufSize, char* logBuf, int logBufSize, int* cmdLen,
+    BOOL PrepareNextScriptCmd(std::string& command, std::string& logCommand, int* cmdLen,
                               const char** proxyScriptExecPoint, int proxyScriptLastCmdReply,
-                              char* errDescrBuf, BOOL* needUserInput);
+                              std::string& errorDescription, BOOL* needUserInput);
 
     // creates the CFTPProxyForDataCon structure (is NULL if 'ProxyServer' == NULL); returns FALSE if
     // memory is insufficient
@@ -2435,18 +2460,19 @@ public:
     // returns the value of RetryLoginWithoutAsking (in the critical section)
     BOOL GetRetryLoginWithoutAsking();
 
-    // returns the contents of the InitFTPCommands string in 'buf' of size 'bufSize' (in the critical section)
-    void GetInitFTPCommands(char* buf, int bufSize);
+    // Returns the complete encoded InitFTPCommands value transactionally.
+    BOOL GetInitFTPCommands(std::string& commands);
 
     // gets info for the Login Error dialog (opened via the "Solve Error" button in the Connections listview)
-    void GetLoginErrorDlgInfo(char* user, int userBufSize, char* password, int passwordBufSize,
-                              char* account, int accountBufSize, BOOL* retryLoginWithoutAsking,
-                              BOOL* proxyUsed, char* proxyUser, int proxyUserBufSize,
-                              char* proxyPassword, int proxyPasswordBufSize);
+    BOOL GetLoginErrorDlgInfo(std::wstring& user, std::wstring& password,
+                              std::wstring& account, BOOL* retryLoginWithoutAsking,
+                              BOOL* proxyUsed, std::wstring& proxyUser,
+                              std::wstring& proxyPassword) noexcept;
 
     // stores new values from the Login Error dialog (opened via the "Solve Error" button in the Connections listview)
-    void SetLoginErrorDlgInfo(const char* password, const char* account, BOOL retryLoginWithoutAsking,
-                              BOOL proxyUsed, const char* proxyUser, const char* proxyPassword);
+    BOOL SetLoginErrorDlgInfo(const wchar_t* password, const wchar_t* account,
+                              BOOL retryLoginWithoutAsking, BOOL proxyUsed,
+                              const wchar_t* proxyUser, const wchar_t* proxyPassword) noexcept;
 
     // called to report a change in a worker (only changes that affect the worker display in the Connections listview
     // in the operation dialog are reported - the worker variables are ShouldStop, State and CurItem);
@@ -2594,6 +2620,7 @@ public:
     // determines the path type on the FTP server (calls ::GetFTPServerPathType() in the critical section
     // with parameters 'ServerSystem' and 'ServerFirstReply')
     CFTPServerPathType GetFTPServerPathType(const char* path);
+    CFtpTextCodec GetPathTextCodec();
 
     // determines whether 'ServerSystem' contains the name 'systemName'
     BOOL IsServerSystem(const char* systemName);
@@ -2624,15 +2651,14 @@ public:
     // sets SizeCmdIsSupported (in the critical section)
     void SetSizeCmdIsSupported(BOOL sizeCmdIsSupported);
 
-    // returns the listing command (if ListCommand is empty, returns "LIST\r\n"), the command already has
-    // CRLF at the end; 'buf' (must not be NULL) is a buffer of size 'bufSize'
-    void GetListCommand(char* buf, int bufSize);
+    // Returns the complete listing command ("LIST\r\n" by default).
+    BOOL GetListCommand(std::string& command);
 
     // returns UseListingsCache (in the critical section)
     BOOL GetUseListingsCache();
 
-    // returns User (in the critical section); if User == NULL, FTP_ANONYMOUS is returned
-    void GetUser(char* buf, int bufSize);
+    // returns the encoded User adapter (in the critical section); empty means anonymous
+    const std::wstring& GetUserIdentity() const noexcept { return User; }
 
     // returns (in the critical section) an allocated string with the server's reply to the SYST command
     // (attribute 'ServerSystemReply'); returns NULL if allocation fails
@@ -2642,10 +2668,9 @@ public:
     // (attribute 'ServerFirstReply'); returns NULL if allocation fails
     char* AllocServerFirstReply();
 
-    // returns (in the critical section) the server type used for parsing listings: returns FALSE if
-    // the server type should be autodetected (returns an empty string in 'buf'); if it returns TRUE,
-    // 'buf' (with size at least SERVERTYPE_MAX_SIZE) contains the requested server type name
-    BOOL GetListingServerType(char* buf);
+    // Transactionally copies the local-config server-type name under the critical section.
+    // An empty result means autodetect; FALSE means allocation failure.
+    BOOL GetListingServerType(std::string& type) noexcept;
 
     // returns (in the critical section) the transfer mode reconstructed from AutodetectTrMode
     // and UseAsciiTransferMode
@@ -2741,8 +2766,8 @@ public:
     // returns TRUE if there was any activity on worker data connections during the last WORKER_STATUSUPDATETIMEOUT milliseconds (applies to listing and download)
     BOOL GetDataActivityInLastPeriod();
 
-    // returns TargetPath in 'buf' of size 'bufSize'
-    void GetTargetPath(char* buf, int bufSize);
+    // copies the complete local download TargetPath into dynamically owned UTF-16
+    BOOL GetTargetPath(std::wstring& path) noexcept;
 
     // increments LastErrorOccurenceTime by one and returns the new LastErrorOccurenceTime value
     DWORD GiveLastErrorOccurenceTime();
@@ -2756,20 +2781,17 @@ public:
     // the server 'user'+'host'+'port'; 'userLength' is zero if we do not know how long the username is
     // or if it does not contain "forbidden" characters, otherwise it is the expected
     // username length
-    BOOL CanMakeChangesOnPath(const char* user, const char* host, unsigned short port,
-                              const char* path, CFTPServerPathType pathType,
-                              int userLength);
+    BOOL CanMakeChangesOnPath(const wchar_t* user, const wchar_t* host, unsigned short port,
+                              const char* path, CFTPServerPathType pathType);
 
     // determines whether among the operations there is an upload to the server 'user'+'host'+'port';
     // 'user' is NULL for anonymous connections; 'userLength' is zero if we do not know how long the username is
     // or if it does not contain "forbidden" characters, otherwise it is the expected username length
-    BOOL IsUploadingToServer(const char* user, const char* host, unsigned short port,
-                             int userLength);
+    BOOL IsUploadingToServer(const wchar_t* user, const wchar_t* host, unsigned short port);
 
-    // returns 'Host'+'User'+'Port'; 'host' (if not NULL) is a buffer for 'Host' of size
-    // HOST_MAX_SIZE; 'user' (if not NULL) is a buffer for 'User' of size USER_MAX_SIZE;
-    // 'port' (if not NULL) returns 'Port'
-    void GetUserHostPort(char* user, char* host, unsigned short* port);
+    // Returns immutable semantic identity pointers. They remain valid for the operation lifetime
+    // because connection identity is immutable after setup.
+    void GetUserHostPort(const wchar_t** user, const wchar_t*& host, unsigned short* port) noexcept;
 };
 
 //
@@ -2843,11 +2865,11 @@ public:
     // determines whether any of the operations can make changes on path 'path' of type 'pathType' on
     // the server 'user'+'host'+'port'; if 'ignoreOperUID' is not -1, it is the UID of an operation that
     // should be ignored (an upload operation we have just created)
-    BOOL CanMakeChangesOnPath(const char* user, const char* host, unsigned short port,
+    BOOL CanMakeChangesOnPath(const wchar_t* user, const wchar_t* host, unsigned short port,
                               const char* path, CFTPServerPathType pathType, int ignoreOperUID);
 
     // determines whether there is an upload to the server 'user'+'host'+'port' among the operations
-    BOOL IsUploadingToServer(const char* user, const char* host, unsigned short port);
+    BOOL IsUploadingToServer(const wchar_t* user, const wchar_t* host, unsigned short port);
 
     // ***************************************************************************************
     // helper methods for calling methods of CFTPOperation objects; the objects are identified
@@ -2964,9 +2986,11 @@ struct CUploadListingItem // data of a single file/directory/link in the listing
     // access to the object's data in the CUploadListingCache::UploadLstCacheCritSect critical section
     // NOTE: before adding to CUploadListingCache the access is without a critical section
 
-    CUploadListingItemType ItemType; // file/directory/link
-    char* Name;                      // item name
-    CQuadWord ByteSize;              // for files only: item size in bytes, special values see UPLOADSIZE_XXX
+    CUploadListingItemType ItemType;        // file/directory/link
+    alignas(std::string) std::string Name;  // item name, encoded server bytes
+    alignas(std::wstring) std::wstring NameText; // decoded semantic comparison key
+    BOOL NameTextValid;                     // FALSE for undecodable server bytes
+    CQuadWord ByteSize;                     // for files only: item size in bytes, special values see UPLOADSIZE_XXX
 };
 
 enum CUploadListingChangeType
@@ -2983,13 +3007,13 @@ struct CUploadListingChange // change in the listing (so we do not fetch the lis
     CUploadListingChangeType Type;    // change type
     DWORD ChangeTime;                 // IncListingCounter() from the moment of the change (the moment the server reply to the listing-changing command was received)
 
-    char* Name;         // ulctDelete: name of the deleted file/link/directory; ulctCreateDir: name of the created directory; ulctStoreFile+ulctFileUploaded: name of the uploaded file
+    alignas(std::string) std::string Name; // encoded server bytes; meaning depends on Type
     CQuadWord FileSize; // ulctFileUploaded: size of the uploaded file
+    BOOL Valid;
 
     CUploadListingChange(DWORD changeTime, CUploadListingChangeType type, const char* name,
                          const CQuadWord* fileSize = NULL);
-    ~CUploadListingChange(); // releases data, but WARNING: must not release NextChange
-    BOOL IsGood() { return Name != NULL; }
+    BOOL IsGood() { return Valid; }
 };
 
 struct CUploadWaitingWorker // list of workers waiting for a path listing to finish (or fail)
@@ -3014,8 +3038,10 @@ public:
     // access to the object's data in the CUploadListingCache::UploadLstCacheCritSect critical section
     // NOTE: before adding to CUploadListingCache the access is without a critical section
 
-    char* Path;                  // cached path (local on the server)
+    alignas(std::string) std::string Path; // cached path, encoded server bytes
+    CFtpTextCodec TextCodec;               // codec captured for this listing's names
     CFTPServerPathType PathType; // type of the cached path
+    BOOL Valid;
 
     CUploadListingState ListingState;         // listing state
     DWORD ListingStartTime;                   // IncListingCounter() from the moment the LIST command was sent to the server (listing started)
@@ -3028,11 +3054,11 @@ public:
     TIndirectArray<CUploadListingItem> ListingItem; // array of listing items
 
 public:
-    CUploadPathListing(const char* path, CFTPServerPathType pathType,
+    CUploadPathListing(const CFtpTextCodec& textCodec, const char* path, CFTPServerPathType pathType,
                        CUploadListingState listingState, DWORD listingStartTime,
                        BOOL fromPanel);
     ~CUploadPathListing();
-    BOOL IsGood() { return Path != NULL; }
+    BOOL IsGood() { return Valid; }
 
     // releases the listing stored in ListingItem
     void ClearListingItems();
@@ -3041,9 +3067,9 @@ public:
     void ClearListingChanges();
 
     // finds an item with CUploadListingItem::Name == 'name'; returns TRUE on success and 'index'
-    // is the index of the found item; returns FALSE on failure and 'index' is the place where
-    // a possible new item with CUploadListingItem::Name == 'name' should be inserted
-    BOOL FindItem(const char* name, int& index);
+    // is the index of the found item; returns FALSE when absent and 'index' is the place where
+    // a possible new item should be inserted. Conversion/storage failure is reported separately.
+    BOOL FindItem(const char* name, int& index, BOOL* lowMemory) noexcept;
 
     // parses the listing 'pathListing'+'pathListingLen'+'pathListingDate'; 'welcomeReply' (must not
     // be NULL) is the first server reply (often contains the FTP server version);
@@ -3054,7 +3080,8 @@ public:
     // returns TRUE if the entire listing was successfully parsed and the object is filled with new items
     BOOL ParseListing(const char* pathListing, int pathListingLen, const CFTPDate& pathListingDate,
                       CFTPServerPathType pathType, const char* welcomeReply, const char* systReply,
-                      const char* suggestedListingServerType, BOOL* lowMemory);
+                      const char* suggestedListingServerType, BOOL* lowMemory,
+                      const CFtpTextCodec& textCodec);
 
     // reporting a change: creating a directory; 'newDir' is just a single directory name;
     // returns TRUE in 'lowMem' (must not be NULL) if memory is low (the listing becomes invalid);
@@ -3103,7 +3130,8 @@ private:
 
     // helper method for ParseListing()
     BOOL ParseListingToArray(const char* pathListing, int pathListingLen, const CFTPDate& pathListingDate,
-                             CServerType* serverType, BOOL* lowMem, BOOL isVMS);
+                             CServerType* serverType, BOOL* lowMem, BOOL isVMS,
+                             const CFtpTextCodec& textCodec);
 
     // adds 'ch' to the list of changes
     void AddChange(CUploadListingChange* ch);
@@ -3119,9 +3147,11 @@ public:
     // access to the object's data in the CUploadListingCache::UploadLstCacheCritSect critical section
     // NOTE: before adding to CUploadListingCache the access is without a critical section
 
-    char* User;          // user name, NULL == anonymous
-    char* Host;          // host address (must not be NULL)
+    alignas(std::wstring) std::wstring User; // local user text; empty is valid when not anonymous
+    alignas(std::wstring) std::wstring Host; // local host text
     unsigned short Port; // port on which the FTP server runs
+    BOOL Anonymous;
+    BOOL Valid;
 
     TIndirectArray<CUploadPathListing> Listing; // array of path listings on the server
 
@@ -3135,9 +3165,9 @@ protected:
     int FoundPathIndexes[FOUND_PATH_IND_CACHE_SIZE];
 
 public:
-    CUploadListingsOnServer(const char* user, const char* host, unsigned short port);
+    CUploadListingsOnServer(const wchar_t* user, const wchar_t* host, unsigned short port);
     ~CUploadListingsOnServer();
-    BOOL IsGood() { return Host != NULL; }
+    BOOL IsGood() { return Valid; }
 
     // see CUploadListingCache::AddOrUpdateListing();
     // WARNING: do not call directly, called through CUploadListingCache::AddOrUpdateListing()
@@ -3145,7 +3175,8 @@ public:
                             const char* pathListing, int pathListingLen,
                             const CFTPDate& pathListingDate, DWORD listingStartTime,
                             BOOL onlyUpdate, const char* welcomeReply,
-                            const char* systReply, const char* suggestedListingServerType);
+                            const char* systReply, const char* suggestedListingServerType,
+                            const CFtpTextCodec& textCodec);
 
     // see CUploadListingCache::RemoveNotAccessibleListings();
     void RemoveNotAccessibleListings();
@@ -3163,7 +3194,8 @@ public:
     CUploadPathListing* AddEmptyListing(const char* path, const char* dirName,
                                         CFTPServerPathType pathType,
                                         CUploadListingState listingState,
-                                        BOOL doNotCheckIfPathIsKnown);
+                                        BOOL doNotCheckIfPathIsKnown,
+                                        const CFtpTextCodec& textCodec);
 
     // finds an item with CUploadPathListing::Path == 'path'; returns TRUE on success and 'index'
     // is the index of the found item; returns FALSE on failure
@@ -3205,7 +3237,7 @@ public:
     BOOL GetListing(const char* path, CFTPServerPathType pathType, int workerMsg,
                     int workerUID, BOOL* listingInProgress, BOOL* notAccessible,
                     BOOL* getListing, const char* name, CUploadListingItem** existingItem,
-                    BOOL* nameExists);
+                    BOOL* nameExists, const CFtpTextCodec& textCodec);
 
     // see CUploadListingCache::ListingFailed()
     // WARNING: do not call directly, called through CUploadListingCache::ListingFailed()
@@ -3221,7 +3253,8 @@ public:
     BOOL ListingFinished(const char* path, CFTPServerPathType pathType,
                          const char* pathListing, int pathListingLen,
                          const CFTPDate& pathListingDate, const char* welcomeReply,
-                         const char* systReply, const char* suggestedListingServerType);
+                         const char* systReply, const char* suggestedListingServerType,
+                         const CFtpTextCodec& textCodec);
 };
 
 class CUploadListingCache
@@ -3247,35 +3280,36 @@ public:
     // it switches to autodetect); returns FALSE if the listing cannot be parsed or if memory is low or parameters are invalid;
     // returns TRUE if the listing was added or updated or was not updated because 'onlyUpdate'==TRUE or because
     // an update is not needed (i.e. returns TRUE if the cached path listing can be used)
-    BOOL AddOrUpdateListing(const char* user, const char* host, unsigned short port,
+    BOOL AddOrUpdateListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                             const char* path, CFTPServerPathType pathType,
                             const char* pathListing, int pathListingLen,
                             const CFTPDate& pathListingDate, DWORD listingStartTime,
                             BOOL onlyUpdate, const char* welcomeReply,
-                            const char* systReply, const char* suggestedListingServerType);
+                            const char* systReply, const char* suggestedListingServerType,
+                            const CFtpTextCodec& textCodec);
 
     // removes listings for server 'user'+'host'+'port' from the cache
-    void RemoveServer(const char* user, const char* host, unsigned short port);
+    void RemoveServer(const wchar_t* user, const wchar_t* host, unsigned short port);
 
     // invalidates the listing of the path - on the next attempt to obtain the listing, the path will be listed
     // on the server; 'user'+'host'+'port' describes the server; 'path' is the path of type 'pathType' being invalidated
-    void InvalidatePathListing(const char* user, const char* host, unsigned short port,
+    void InvalidatePathListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                                const char* path, CFTPServerPathType pathType);
 
     // determines whether the path listing was taken from the panel (returns TRUE in that case);
     // 'user'+'host'+'port' describes the server; 'path' is the sought path of type 'pathType'
-    BOOL IsListingFromPanel(const char* user, const char* host, unsigned short port,
+    BOOL IsListingFromPanel(const wchar_t* user, const wchar_t* host, unsigned short port,
                             const char* path, CFTPServerPathType pathType);
 
     // removes "unobtainable" listings for server 'user'+'host'+'port' from the cache
-    void RemoveNotAccessibleListings(const char* user, const char* host, unsigned short port);
+    void RemoveNotAccessibleListings(const wchar_t* user, const wchar_t* host, unsigned short port);
 
     // change notification: creating directories (e.g. on VMS multiple directories can be created at once);
     // 'user'+'host'+'port' describes the server; 'workPath' is the working path of type 'pathType';
     // 'newDirs' is the command parameter for creating directories (may be one or more directories
     // relative or with an absolute path); 'unknownResult' is FALSE if the directories were created,
     // TRUE if the result is unknown (the relevant listings must be invalidated)
-    void ReportCreateDirs(const char* user, const char* host, unsigned short port,
+    void ReportCreateDirs(const wchar_t* user, const wchar_t* host, unsigned short port,
                           const char* workPath, CFTPServerPathType pathType, const char* newDirs,
                           BOOL unknownResult);
 
@@ -3284,7 +3318,7 @@ public:
     // 'fromName' is the name (without path) of the file/directory/link being renamed; 'newName'
     // is the target name (provided by the user - may be relative or include a path); 'unknownResult'
     // is FALSE if the rename completed normally, TRUE if the result is unknown (the relevant listings must be invalidated)
-    void ReportRename(const char* user, const char* host, unsigned short port,
+    void ReportRename(const wchar_t* user, const wchar_t* host, unsigned short port,
                       const char* workPath, CFTPServerPathType pathType,
                       const char* fromName, const char* newName, BOOL unknownResult);
 
@@ -3292,7 +3326,7 @@ public:
     // 'user'+'host'+'port' describes the server; 'workPath' is the working path of type 'pathType';
     // 'name' is the delete command parameter (just the name without path); 'unknownResult' is FALSE
     // if the deletion succeeded, TRUE if the result is unknown (the relevant listing must be invalidated)
-    void ReportDelete(const char* user, const char* host, unsigned short port,
+    void ReportDelete(const wchar_t* user, const wchar_t* host, unsigned short port,
                       const char* workPath, CFTPServerPathType pathType, const char* name,
                       BOOL unknownResult);
 
@@ -3300,7 +3334,7 @@ public:
     // or link does not yet exist, a file with name 'name' is created; the file size is
     // set to UPLOADSIZE_NEEDUPDATE; 'user'+'host'+'port' describes the server; 'workPath' is
     // the working path of type 'pathType'; 'name' is the file/link name (just the name without path)
-    void ReportStoreFile(const char* user, const char* host, unsigned short port,
+    void ReportStoreFile(const wchar_t* user, const wchar_t* host, unsigned short port,
                          const char* workPath, CFTPServerPathType pathType, const char* name);
 
     // change notification: file upload finished (may also overwrite/append(resume) a file/link) - sets
@@ -3309,13 +3343,13 @@ public:
     // 'name' is the file/link name (just the name without path); 'fileSize' is the file size;
     // 'unknownResult' is FALSE if the upload succeeded, TRUE if the result is unknown
     // (the relevant listing must be invalidated)
-    void ReportFileUploaded(const char* user, const char* host, unsigned short port,
+    void ReportFileUploaded(const wchar_t* user, const wchar_t* host, unsigned short port,
                             const char* workPath, CFTPServerPathType pathType, const char* name,
                             const CQuadWord& fileSize, BOOL unknownResult);
 
     // change notification: unknown change (used after sending a custom command to the server), the working path listing must be invalidated;
     // 'user'+'host'+'port' describes the server; 'workPath' is the working path of type 'pathType'
-    void ReportUnknownChange(const char* user, const char* host, unsigned short port,
+    void ReportUnknownChange(const wchar_t* user, const wchar_t* host, unsigned short port,
                              const char* workPath, CFTPServerPathType pathType);
 
     // obtaining the listing of path 'path' (of type 'pathType') on server 'user'+'host'+'port'
@@ -3331,11 +3365,11 @@ public:
     // structure 'existingItem' (NULL if an item with that name was not found),
     // and TRUE/FALSE in 'nameExists' depending on whether an item named 'name' was found;
     // returns FALSE only when memory is low
-    BOOL GetListing(const char* user, const char* host, unsigned short port,
+    BOOL GetListing(const wchar_t* user, const wchar_t* host, unsigned short port,
                     const char* path, CFTPServerPathType pathType, int workerMsg,
                     int workerUID, BOOL* listingInProgress, BOOL* notAccessible,
                     BOOL* getListing, const char* name, CUploadListingItem** existingItem,
-                    BOOL* nameExists);
+                    BOOL* nameExists, const CFtpTextCodec& textCodec);
 
     // reports to the cache an error while obtaining the listing of path 'path' (of type 'pathType') on
     // server 'user'+'host'+'port' from a worker; 'listingIsNotAccessible' is TRUE
@@ -3346,7 +3380,7 @@ public:
     // 'listingOKErrorIgnored' (if not NULL) returns TRUE if the listing
     // was obtained in another way and this error can therefore be ignored
     // WARNING: if 'uploadFirstWaitingWorker' is NULL, must be called inside CSocketsThread::CritSect!
-    void ListingFailed(const char* user, const char* host, unsigned short port,
+    void ListingFailed(const wchar_t* user, const wchar_t* host, unsigned short port,
                        const char* path, CFTPServerPathType pathType,
                        BOOL listingIsNotAccessible,
                        CUploadWaitingWorker** uploadFirstWaitingWorker,
@@ -3361,17 +3395,18 @@ public:
     // NULL = autodetect, otherwise the server type name (without the optional leading '*'; if it stops existing,
     // it switches to autodetect); returns FALSE only when memory is low
     // WARNING: must be called inside CSocketsThread::CritSect!
-    BOOL ListingFinished(const char* user, const char* host, unsigned short port,
+    BOOL ListingFinished(const wchar_t* user, const wchar_t* host, unsigned short port,
                          const char* path, CFTPServerPathType pathType,
                          const char* pathListing, int pathListingLen,
                          const CFTPDate& pathListingDate, const char* welcomeReply,
-                         const char* systReply, const char* suggestedListingServerType);
+                         const char* systReply, const char* suggestedListingServerType,
+                         const CFtpTextCodec& textCodec);
 
 protected:
     // call only from the UploadLstCacheCritSect critical section; returns the server from ListingsOnServer
     // or NULL if the server was not found; if 'index' is not NULL, the index
     // of the found server is returned (not found - returns -1)
-    CUploadListingsOnServer* FindServer(const char* user, const char* host,
+    CUploadListingsOnServer* FindServer(const wchar_t* user, const wchar_t* host,
                                         unsigned short port, int* index);
 };
 
@@ -3399,27 +3434,26 @@ protected:
 
     CFTPFileAccessType AccessType; // why the file is open (locked)
 
-    char User[USER_MAX_SIZE];    // user-name
-    char Host[HOST_MAX_SIZE];    // host-address
-    unsigned short Port;         // port on which the FTP server runs
-    char Path[FTP_MAX_PATH];     // path to the opened file (local on the server)
-    CFTPServerPathType PathType; // type of the cached path
-    CPathBuffer Name;         // name of the opened file
+    alignas(std::wstring) std::wstring User; // local user-name text
+    alignas(std::wstring) std::wstring Host; // local host-address text
+    unsigned short Port;                     // port on which the FTP server runs
+    alignas(std::wstring) std::wstring Path; // semantic path to the opened file on the server
+    CFTPServerPathType PathType;              // type of the cached path
+    alignas(std::wstring) std::wstring Name; // semantic name of the opened file
 
 public:
-    CFTPOpenedFile(int myUID, const char* user, const char* host, unsigned short port,
-                   const char* path, CFTPServerPathType pathType, const char* name,
-                   CFTPFileAccessType accessType);
+    CFTPOpenedFile() = default;
 
-    // sets data into the object
-    void Set(int myUID, const char* user, const char* host, unsigned short port,
-             const char* path, CFTPServerPathType pathType, const char* name,
-             CFTPFileAccessType accessType);
+    // Decodes and transactionally sets data into the object.
+    BOOL Set(const CFtpTextCodec& codec, int myUID, const wchar_t* user, const wchar_t* host,
+             unsigned short port, const char* path, CFTPServerPathType pathType,
+             const char* name, CFTPFileAccessType accessType) noexcept;
 
     // compares this opened file with the file specified by the method parameters; returns TRUE if
     // it is the same file
-    BOOL IsSameFile(const char* user, const char* host, unsigned short port,
-                    const char* path, CFTPServerPathType pathType, const char* name);
+    BOOL IsSameFile(const CFtpTextCodec& codec, const wchar_t* user, const wchar_t* host,
+                    unsigned short port, const char* path,
+                    CFTPServerPathType pathType, const char* name) noexcept;
 
     BOOL IsUID(int uid) { return uid == UID; }
 
@@ -3445,7 +3479,7 @@ public:
     // checks whether the file can be opened with access 'accessType'; if so,
     // adds it among the opened files, returns TRUE, and stores the new file UID in 'newUID'; otherwise
     // (even when memory is low) returns FALSE
-    BOOL OpenFile(const char* user, const char* host, unsigned short port,
+    BOOL OpenFile(const CFtpTextCodec& codec, const wchar_t* user, const wchar_t* host, unsigned short port,
                   const char* path, CFTPServerPathType pathType, const char* name,
                   int* newUID, CFTPFileAccessType accessType);
 
@@ -3468,8 +3502,8 @@ CFTPQueueItem* CreateItemForDeleteOperation(const CFileData* f, BOOL isDir, int 
 CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, int rightsCol,
                                                 CFTPListingPluginDataInterface* dataIface,
                                                 CFTPQueueItemType* type, int transferMode,
-                                                CFTPOperation* oper, BOOL copy, const char* targetPath,
-                                                const char* targetName, CQuadWord* size,
+                                                CFTPOperation* oper, BOOL copy, const wchar_t* localTargetPath,
+                                                const wchar_t* localTargetName, CQuadWord* size,
                                                 BOOL* sizeInBytes, CQuadWord* totalSize);
 
 // creates an item for the Change Attributes operation for file/directory 'f'
@@ -3484,7 +3518,7 @@ CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir,
                                                  int operationsUnknownAttrs);
 
 // creates an item for Copy or Move from disk to the file system for file/directory 'name'
-CFTPQueueItem* CreateItemForCopyOrMoveUploadOperation(const char* name, BOOL isDir, const CQuadWord* size,
+CFTPQueueItem* CreateItemForCopyOrMoveUploadOperation(const wchar_t* name, BOOL isDir, const CQuadWord* size,
                                                       CFTPQueueItemType* type, int transferMode,
                                                       CFTPOperation* oper, BOOL copy, const char* targetPath,
                                                       const char* targetName, CQuadWord* totalSize,

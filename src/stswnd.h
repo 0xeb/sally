@@ -5,6 +5,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+#include "common/CumulativeTextWidth.h"
+#include "common/unicode/WideTextRange.h"
 
 //
 // ****************************************************************************
@@ -53,10 +57,10 @@ enum
 
 struct CHotTrackItem
 {
-    WORD Offset;       // offset of the first character in characters
-    WORD Chars;        // number of characters
-    WORD PixelsOffset; // offset of the first character in pixels
-    WORD Pixels;       // length in pixels
+    int Offset;       // offset of the first character in characters
+    int Chars;        // number of characters
+    int PixelsOffset; // offset of the first character in pixels
+    int Pixels;       // length in pixels
 };
 
 class CStatusWindow : public CWindow
@@ -70,11 +74,19 @@ protected:
     BOOL HotTrackItemsMeasured;
 
     int Border; // separator line at top/bottom
-    char* Text;
+    // One representation. A `char* Text` mirror used to sit here, maintained by
+    // the wide SetText path via WideToAnsi and selected by a UseWideText flag - but SetText set that flag
+    // TRUE in the same breath as writing the mirror, so every narrow arm in this file was
+    // unreachable and the mirror was written and never read.
     std::wstring TextW;
-    BOOL UseWideText;
-    int TextLen; // number of characters in 'Text' without terminator
-    char* Size;
+    // Whether SetText has ever been called. This is NOT `!TextW.empty()`: the old code tested
+    // `Text != NULL`, and SetText(L"") allocated a 1-byte buffer, so a deliberately blank
+    // status line still counted as assigned. Paint() relies on that - it draws the throbber,
+    // zoom, hidden and security chrome inside the same guard.
+    BOOL TextAssigned;
+    int TextLen; // number of characters in 'TextW' without terminator
+    std::wstring Size;
+    BOOL SizeAssigned;
     int PathLen;          // -1 (path is the whole Text), otherwise path length in Text (rest is filter)
     BOOL History;         // show arrow between text and size?
     BOOL Hidden;          // show filter symbol?
@@ -87,15 +99,24 @@ protected:
     DWORD DelayedThrobberShowTime; // GetTickCount() value when delayed throbber should be shown (0 = not delayed)
     BOOL Throbber;                 // show 'progress' throbber after text/hidden filter? (TRUE only if window exists)
     int ThrobberFrame;             // index aktualniho policka animace
-    std::string ThrobberTooltip;   // if empty, it will not be shown
+    std::wstring ThrobberTooltip;  // if empty, it will not be shown
     int ThrobberID;                // throbber identification number (-1 = invalid)
 
     CSecurityIconState Security;
-    std::string SecurityTooltip; // if empty, it will not be shown
+    std::wstring SecurityTooltip; // if empty, it will not be shown
 
-    int Allocated;      // Text allocation, including terminator
-    int AlpDXAllocated; // AlpDX allocation, in int elements
-    int* AlpDX; // array of lengths (from 0th to Xth character in the string)
+    std::vector<int> AlpDX; // cumulative pixel lengths for the UTF-16 text
+
+    // Pixel width of the first 'chars' characters, i.e. the x offset at which character 'chars'
+    // starts. 'chars' is legitimately 0 - empty status text, or a hot-track item with no
+    // characters of its own (see the item.Pixels assignments in SetText) - and AlpDX[0 - 1] on a
+    // std::vector is an out-of-range index, not the harmless read-before-the-buffer it was when
+    // AlpDX was a raw int array. Every caller must go through here rather than index AlpDX.
+    int TextWidthBefore(int chars) const
+    {
+        return sally::text::CumulativeWidthBefore(AlpDX, chars);
+    }
+
     BOOL Left;
 
     int ToolBarWidth; // current toolbar width
@@ -129,8 +150,7 @@ protected:
 
     BOOL NeedToInvalidate; // for SetAutomatic() - change occurred, need to repaint?
 
-    DWORD* SubTexts;     // DWORD array: LOWORD position, HIWORD length
-    DWORD SubTextsCount; // number of items in SubTexts array
+    std::vector<sally::unicode::WideTextRange> SubTexts;
 
     IDropTarget* IDropTargetPtr;
 
@@ -138,17 +158,17 @@ public:
     CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigin origin = ooAllocated);
     ~CStatusWindow();
 
-    BOOL SetSubTexts(DWORD* subTexts, DWORD subTextsCount);
+    BOOL SetSubTexts(const sally::unicode::WideTextRange* subTexts,
+                     size_t subTextsCount);
     // sets 'text' in the status line, 'pathLen' defines the path length (rest is filter),
     // if 'pathLen' is not used (path is the full 'text') it equals -1
-    BOOL SetText(const char* text, int pathLen = -1);
-    BOOL SetTextW(const wchar_t* text, int pathLen = -1);
+    BOOL SetText(const wchar_t* text, int pathLen = -1);
 
     // builds HotTrackItems array: for disks and archivers based on backslashes
     // and for FS it asks the plugin
     void BuildHotTrackItems();
 
-    void GetHotText(char* buffer, int bufSize);
+    void GetHotTextW(std::wstring& buffer);
 
     void DestroyWindow();
 
@@ -161,13 +181,13 @@ public:
     void SetThrobber(BOOL show, int delay = 0, BOOL calledFromDestroyWindow = FALSE); // call only from the main (GUI) thread, same as other methods
     // sets text shown as tooltip when hovering the throbber, the object makes a copy
     // if NULL, the tooltip will not be shown
-    void SetThrobberTooltip(const char* throbberTooltip);
+    void SetThrobberTooltipW(const wchar_t* throbberTooltip);
     int ChangeThrobberID(); // changes ThrobberID and returns its new value
     BOOL IsThrobberVisible(int throbberID) { return ShowThrobber && ThrobberID == throbberID; }
     void HideThrobberAndSecurityIcon();
 
     void SetSecurity(CSecurityIconState iconState);
-    void SetSecurityTooltip(const char* tooltip);
+    void SetSecurityTooltipW(const wchar_t* tooltip);
 
     void InvalidateIfNeeded();
 
@@ -204,7 +224,7 @@ protected:
     // creates imagelist with one item, used for displaying drag progress
     // after drag ends this imagelist must be released
     // input is a point for which dxHotspot and dyHotspot offsets are computed
-    HIMAGELIST CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight);
+    HIMAGELIST CreateDragImage(const wchar_t* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight);
 
     void PaintThrobber(HDC hDC);
     //    void RepaintThrobber();

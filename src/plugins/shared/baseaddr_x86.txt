@@ -93,7 +93,6 @@ fcremote        0x29200000
 sqlite          0x29300000
 salpvenv        0x29400000      ; dummy - x86 version doesn't exist
 zip2sfx         0x29500000
-salopen         0x29600000
 salspawn        0x29700000
 tblmaker        0x29800000
 salbreak        0x29900000

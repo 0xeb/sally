@@ -8,22 +8,9 @@
 #endif
 
 #include "Win32Utf8.h"
+#include "Win32TextCodec.h"
 
 bool Win32StrictUtf8ToWide(const char* text, size_t length, std::wstring& wide)
 {
-    wide.clear();
-    if (text == nullptr)
-        return false;
-    if (length == 0)
-        return true;
-    if (length > static_cast<size_t>(INT_MAX))
-        return false;
-
-    int required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text,
-                                       static_cast<int>(length), nullptr, 0);
-    if (required <= 0)
-        return false;
-    wide.resize(required);
-    return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text,
-                               static_cast<int>(length), &wide[0], required) == required;
+    return Win32DecodeText(CP_UTF8, text, length, wide).Succeeded();
 }

@@ -5,8 +5,10 @@
 #include "precomp.h"
 
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/IClipboard.h"
 #include "common/Win32ClipboardFileDropSource.h"
+#include "common/Win32TextCodec.h"
 #include "common/clipboard/ClipboardCopyMoveBridge.h"
 #include "common/clipboard/ClipboardPasteService.h"
 #include "common/unicode/helpers.h"
@@ -21,7 +23,6 @@
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
-#include "paste_path_policy.h"
 #include "stswnd.h"
 #include "filesbox.h"
 #include "dialogs.h"
@@ -55,16 +56,6 @@ static void CutDoubleQuotesFromBothSidesW(std::wstring& path)
         path = path.substr(1, path.length() - 2);
 }
 
-static BOOL ContainsNonAsciiW(const std::wstring& text)
-{
-    for (wchar_t ch : text)
-    {
-        if (ch > 0x7f)
-            return TRUE;
-    }
-    return FALSE;
-}
-
 static BOOL IsFileURLPathW(const std::wstring& path)
 {
     const wchar_t* s = path.c_str();
@@ -78,25 +69,27 @@ static BOOL IsFileURLPathW(const std::wstring& path)
     return *s == L':' && s - name == 4 && _wcsnicmp(name, L"file", 4) == 0;
 }
 
-static BOOL PostProcessPathFromUserW(HWND parent, std::wstring& path)
+BOOL PostProcessPathFromUserW(HWND parent, std::wstring& path)
 {
-    (void)parent;
+    if (!IsFileURLPathW(path) && IsPluginFSPath(path.c_str()))
+        return TRUE;
 
     TrimSpacesFromBothSidesW(path);
     CutDoubleQuotesFromBothSidesW(path);
 
     if (IsFileURLPathW(path))
     {
-        DWORD pathLen = SAL_MAX_LONG_PATH;
-        std::wstring urlPath(pathLen, L'\0');
-        if (PathCreateFromUrlW(path.c_str(), &urlPath[0], &pathLen, 0) == S_OK)
-            path.assign(urlPath.c_str());
-        else
+        PWSTR urlPath = NULL;
+        if (PathCreateFromUrlAlloc(path.c_str(), &urlPath, 0) != S_OK || urlPath == NULL)
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_THEPATHISINVALID));
             return FALSE;
         }
+        path.assign(urlPath);
+        LocalFree(urlPath);
     }
+    else if (IsPluginFSPath(path.c_str()))
+        return TRUE;
 
     DWORD expandedLen = ExpandEnvironmentStringsW(path.c_str(), NULL, 0);
     if (expandedLen == 0)
@@ -144,35 +137,17 @@ CColumDataItem* GetStdColumn(int i, BOOL isDisk)
     return &StdColumnsPrivate[i];
 }
 
-BOOL CFilesWindow::ParsePath(char* path, int& type, BOOL& isDir, char*& secondPart,
-                             const char* errorTitle, char* nextFocus, int* error, int pathBufSize)
-{
-    CALL_STACK_MESSAGE3("CFilesWindow::ParsePath(%s, , , , %s, ,)", path, errorTitle);
-
-    const char* curArchivePath = NULL;
-    CPathBuffer curPath;  // Heap-allocated for long path support
-    GetGeneralPath(curPath, curPath.Size());
-    if (Is(ptZIPArchive))
-    {
-        SalPathAddBackslash(curPath, curPath.Size());
-        curArchivePath = GetZIPArchive();
-    }
-
-    return SalParsePath(HWindow, path, type, isDir, secondPart, errorTitle, nextFocus,
-                        Is(ptDisk) || Is(ptZIPArchive), curPath, curArchivePath, error, pathBufSize);
-}
-
 BOOL CFilesWindow::ParsePathW(std::wstring& path, int& type, BOOL& isDir, wchar_t*& secondPart,
                               const wchar_t* errorTitle, std::wstring* nextFocus, int* error)
 {
     CALL_STACK_MESSAGE_NONE
     std::wstring curPath;
     const wchar_t* curArchivePath = NULL;
-    GetGeneralPathW(curPath);
+    GetGeneralPath(curPath);
     if (Is(ptZIPArchive))
     {
         SalPathAddBackslashW(curPath);
-        curArchivePath = GetZIPArchiveW();
+        curArchivePath = GetZIPArchive();
     }
     return SalParsePathW(HWindow, path, type, isDir, secondPart, errorTitle, nextFocus,
                          Is(ptDisk) || Is(ptZIPArchive), curPath.c_str(), curArchivePath, error);
@@ -230,20 +205,16 @@ static DWORD GetPreferredClipboardDropEffect(DWORD defaultEffect = 0)
 class CPanelClipboardPasteExecutor : public sally::clipboard::IClipboardPasteExecutor
 {
 public:
-    CPanelClipboardPasteExecutor(CFilesWindow& panel, const char* pastePath)
+    // 'pastePath', when supplied, is the caller's exact UTF-16 target
+    // (e.g. shellsup.cpp's context-menu Paste builds it from the real wide subdir name).
+    CPanelClipboardPasteExecutor(CFilesWindow& panel, const wchar_t* pastePath)
         : Panel(panel)
     {
-        const BOOL haveExplicitPath = pastePath != NULL && pastePath[0] != '\0';
+        const BOOL haveExplicitPath = pastePath != NULL && pastePath[0] != L'\0';
         if (haveExplicitPath)
-        {
-            lstrcpyn(TargetPath, pastePath, TargetPath.Size());
-            TargetPathW = AnsiToWide(pastePath);
-        }
+            TargetPath = pastePath;
         else
-        {
-            lstrcpyn(TargetPath, panel.GetPath(), TargetPath.Size());
-            TargetPathW = panel.GetPathW();
-        }
+            TargetPath = panel.GetPathW();
     }
 
     bool Execute(const sally::clipboard::ClipboardFileTransfer& transfer) override
@@ -253,22 +224,19 @@ public:
             return false;
 
         const BOOL copy = transfer.Effect == sally::clipboard::ClipboardFileEffect::Copy;
-        const BOOL started = Panel.DropCopyMove(copy, TargetPath,
-                                                TargetPathW.empty() ? NULL : TargetPathW.c_str(),
-                                                data);
+        const BOOL started = Panel.DropCopyMove(copy, TargetPath.c_str(), data);
         DestroyCopyMoveData(data);
         return started != FALSE;
     }
 
 private:
     CFilesWindow& Panel;
-    CPathBuffer TargetPath;
-    std::wstring TargetPathW;
+    std::wstring TargetPath;
 };
 
-BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pastePath)
+BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const wchar_t* pastePath)
 {
-    CALL_STACK_MESSAGE4("CFilesWindow::ClipboardPaste(%d, %d, %s)", onlyLinks, onlyTest, pastePath);
+    CALL_STACK_MESSAGE3("CFilesWindow::ClipboardPaste(%d, %d)", onlyLinks, onlyTest);
     IDataObject* dataObj;
     BOOL files = FALSE;       // check whether the clipboard data are files at all
     BOOL filesOnClip = FALSE; // check if there is our data on the clipboard for pasting files/directories
@@ -276,11 +244,11 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
                               //          (onlyTest ? "test " : "") << (pastePath != NULL ? pastePath : "(null)"));
     if (gClipboard->GetDataObject(&dataObj).success && dataObj != NULL)
     {
-        if (!onlyLinks && !onlyTest && IsFakeDataObject(dataObj, NULL, NULL, 0) && SalShExtSharedMemView != NULL)
+        if (!onlyLinks && !onlyTest && IsFakeDataObject(dataObj, NULL, NULL) && SalShExtSharedMemView != NULL)
         { // Salamander "fake" data object on the clipboard -> paste files/directories from the archive
             BOOL pasteFromOurData = FALSE;
             WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-            if (SalShExtSharedMemView->DoPasteFromSalamander &&
+            if ((SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_PASTE_ACTIVE) != 0 &&
                 SalShExtSharedMemView->SalamanderMainWndPID == GetCurrentProcessId() &&
                 SalShExtSharedMemView->SalamanderMainWndTID == GetCurrentThreadId() &&
                 SalShExtSharedMemView->PastedDataID == SalShExtPastedData.GetDataID())
@@ -305,7 +273,7 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
 
                     // perform the actual Paste operation
                     SalShExtPastedData.DoPasteOperation(pasteEffect == DROPEFFECT_COPY,
-                                                        pastePath != NULL ? pastePath : GetPath());
+                                                        pastePath != NULL ? pastePath : GetPathW());
 
                     FocusFirstNewItem = TRUE; // if it will be a single new file, let the focus find it
                     if (pasteEffect != DROPEFFECT_COPY)
@@ -395,10 +363,8 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
 
         if (ownRutine) // execute our own routine - copy or move
         {
-            if (pastePath != NULL)
-                lstrcpyn(DropPath, pastePath, DropPath.Size());
-            else
-                lstrcpyn(DropPath, GetPath(), DropPath.Size());
+            DropPathW = (pastePath != NULL && pastePath[0] != 0) ? std::wstring(pastePath)
+                                                                     : std::wstring(GetPathW());
             CImpDropTarget* dropTarget = new CImpDropTarget(MainWindow->HWindow, DoCopyMove, this,
                                                             GetCurrentDirClipboard, this,
                                                             DropEnd, this, NULL, NULL, NULL, NULL,
@@ -438,21 +404,41 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
             {
                 //        MainWindow->ReleaseMenuNew();  // Windows are not designed for multiple context menus
 
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, GetPath());
+                // This is the branch a foreign clipboard takes - anything not tagged
+                // SalIDataObject, which is every Ctrl+V from Explorer or another app -
+                // and the only branch Paste Shortcut ever takes (audit A8/A9). Both were
+                // bound and invoked entirely through the CP_ACP mirror, so in a folder
+                // the code page cannot spell nothing happened at all: the guarded block
+                // has no else, so there was not even an error.
+                IContextMenu2* menu = NULL;
+                if (Is(ptDisk))
+                    menu = CreateIContextMenu2W(MainWindow->HWindow, GetPathW());
+                if (menu == NULL)
+                    menu = CreateIContextMenu2W(MainWindow->HWindow, GetPathW());
                 if (menu != NULL)
                 {
                     OurClipDataObject = ourClipDataObject;
                     CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
-                    ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CFilesWindow::ClipboardPaste onlyLinks=%d", onlyLinks);
+                    CMINVOKECOMMANDINFOEX ici;
+                    ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
+                    ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
+                    ici.fMask = CMIC_MASK_UNICODE;
+                    ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, L"SEW: CFilesWindow::ClipboardPaste onlyLinks=%d", onlyLinks);
                     if (onlyLinks)
+                    {
                         ici.lpVerb = "pastelink";
+                        ici.lpVerbW = L"pastelink";
+                    }
                     else
+                    {
                         ici.lpVerb = "paste";
+                        ici.lpVerbW = L"paste";
+                    }
                     ici.lpParameters = NULL;
-                    ici.lpDirectory = GetPath();
+                    const std::wstring pasteDirW = GetPathW();
+                    std::string pasteDirA;
+                    ici.lpDirectory = Win32EncodeAcpExact(pasteDirW, pasteDirA) ? pasteDirA.c_str() : NULL;
+                    ici.lpDirectoryW = pasteDirW.c_str();
                     ici.nShow = SW_SHOWNORMAL;
                     ici.dwHotKey = 0;
                     ici.hIcon = 0;
@@ -460,7 +446,7 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
                     if (onlyLinks)
                         PasteLinkIsRunning++; // better to handle possible concurrency with multiple threads
 
-                    BOOL invoked = SafeInvokeCommand(menu, ici);
+                    BOOL invoked = SafeInvokeCommand(menu, *(CMINVOKECOMMANDINFO*)&ici);
 
                     if (onlyLinks && PasteLinkIsRunning > 0)
                         PasteLinkIsRunning--;
@@ -485,7 +471,7 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
                 // 1/10 of a second to execute the operation or at least part of it
                 Sleep(100);
                 // announce a change in the target directory and its subdirectories
-                MainWindow->PostChangeOnPathNotification(GetPath(), TRUE);
+                MainWindow->PostChangeOnPathNotificationW(GetPathW(), TRUE);
                 // post refreshes to both panels (unless they auto-refresh - it won't reach FS panels)
                 if (!MainWindow->LeftPanel->AutomaticRefresh || !MainWindow->RightPanel->AutomaticRefresh)
                 {
@@ -597,11 +583,11 @@ BOOL CFilesWindow::ClipboardPasteToArcOrFS(BOOL onlyTest, DWORD* pasteDefEffect)
                         }
                         if (dropEffect != 0)
                         {
-                            CPathBuffer userPart; // Heap-allocated for long path support
-                            if (GetPluginFS()->GetCurrentPath(userPart))
+                            std::wstring userPart;
+                            if (GetPluginFS()->GetCurrentPathW(userPart))
                             {
                                 DoDragDropOper(dropEffect == DROPEFFECT_COPY, FALSE, GetPluginFS()->GetPluginFSName(),
-                                               userPart, namesList, this);
+                                               userPart.c_str(), namesList, this);
                                 namesList = NULL;         // DoDragDropOper will deallocate it, so no need to do it here
                                 FocusFirstNewItem = TRUE; // if it will be a single new file, let the focus find it
                                 moveOper = dropEffect == DROPEFFECT_MOVE;
@@ -652,53 +638,6 @@ BOOL CFilesWindow::IsTextOnClipboard()
     return gClipboard->HasText() ? TRUE : FALSE;
 }
 
-BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, CPathBuffer& buff)
-{
-    if (!IsFileURLPath(buff) && IsPluginFSPath(buff))
-        return TRUE; // let the FS plugin handle the processing
-
-    // trim spaces at the beginning and the end
-    CutSpacesFromBothSides(buff);
-
-    // trim quotes, see https://forum.altap.cz/viewtopic.php?t=4160
-    CutDoubleQuotesFromBothSides(buff);
-
-    if (IsFileURLPath(buff)) // it is a URL: convert URL (file://) to a Windows path
-    {
-        CPathBuffer path; // Heap-allocated for long path support
-        DWORD pathLen = path.Size();
-        if (PathCreateFromUrl(buff, path, &pathLen, 0) == S_OK)
-            lstrcpyn(buff, path, buff.Size());
-        else
-        {
-            gPrompter->ShowError(LoadStrW(IDS_ERRORCHANGINGDIR), LoadStrW(IDS_THEPATHISINVALID));
-            return FALSE;
-        }
-        return TRUE;
-    }
-    else
-    {
-        if (IsPluginFSPath(buff))
-            return TRUE; // let the FS plugin handle the processing
-    }
-
-    // expand ENV variables (as frequently requested on the forum and for internal use)
-    // if an ENV variable does not exist, a directory with the same name gets a chance to be expanded
-    CPathBuffer expandedBuff;  // Heap-allocated for long path support
-    DWORD auxRes = ExpandEnvironmentStrings(buff, expandedBuff, expandedBuff.Size());
-    if (auxRes == 0 || auxRes > (DWORD)buff.Size())
-    {
-        TRACE_E("ExpandEnvironmentStrings failed.");
-        return FALSE;
-    }
-    else
-    {
-        lstrcpyn(buff, expandedBuff, buff.Size());
-    }
-
-    return TRUE;
-}
-
 void CFilesWindow::ClipboardPastePath()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::ClipboardPastePath()");
@@ -716,47 +655,9 @@ void CFilesWindow::ClipboardPastePath()
     if (pathW.empty())
         return;
 
-    std::string ansiPath;
-    if (!ContainsNonAsciiW(pathW) &&
-        sally::unicode::TryExactAnsiFallback(pathW, ansiPath))
-    {
-        CPathBuffer buff; // Heap-allocated for long path support
-        lstrcpyn(buff, ansiPath.c_str(), buff.Size());
-
-        if (PostProcessPathFromUser(HWindow, buff))
-            ChangeDir(buff); // change path
-        return;
-    }
-
     if (!PostProcessPathFromUserW(HWindow, pathW) || pathW.empty())
         return;
-
-    if (!ContainsNonAsciiW(pathW) &&
-        sally::unicode::TryExactAnsiFallback(pathW, ansiPath))
-    {
-        CPathBuffer buff; // Heap-allocated for long path support
-        lstrcpyn(buff, ansiPath.c_str(), buff.Size());
-        ChangeDir(buff); // change path
-    }
-    else
-    {
-        // A pasted path that names a FILE lists its directory and focuses the file. The ANSI
-        // branch above gets this from ChangeDir(); ChangePathToDiskW() has no such split, so
-        // without this the whole file path was handed to the directory-listing code and came
-        // back as "(267) The directory name is invalid." (see paste_path_policy.h).
-        std::wstring directoryW;
-        std::string focusNameA;
-        if (sally::ResolvePastedFilePathW(pathW.c_str(), GetFileAttributesW(pathW.c_str()),
-                                          directoryW, focusNameA))
-        {
-            // Focus is matched against CFileData::Name, which is ANSI; PanelAnsiNameFromWideW
-            // spells it exactly as the panel does, so a non-ANSI name still lands on its row.
-            ChangePathToDiskW(HWindow, directoryW.c_str(), -1,
-                              focusNameA.empty() ? NULL : focusNameA.c_str());
-        }
-        else
-            ChangePathToDiskW(HWindow, pathW.c_str()); // change path
-    }
+    ChangeDir(pathW.c_str());
 }
 
 void CFilesWindow::ChangeFilter(BOOL disable)
@@ -863,7 +764,7 @@ BOOL CFilesWindow::OnLButtonDown(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
                 }
                 PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
             }
-            if (index == 0 && index < Dirs->Count && strcmp(Dirs->At(0).Name, "..") == 0)
+            if (index == 0 && index < Dirs->Count && wcscmp(Dirs->At(0).Name, L"..") == 0)
             {
                 // hack for UpDir where we want to allow box dragging (d&d does not make sense here anyway)
                 if (GetFocus() != GetListBoxHWND())
@@ -1061,7 +962,7 @@ BOOL CFilesWindow::OnRButtonDown(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
             }
             else
             {
-                if (index == 0 && index < Dirs->Count && strcmp(Dirs->At(0).Name, "..") == 0)
+                if (index == 0 && index < Dirs->Count && wcscmp(Dirs->At(0).Name, L"..") == 0)
                 {
                     // hack for UpDir where we want to allow box dragging (drag&drop does not make sense here anyway)
                     if (GetFocus() != GetListBoxHWND())
@@ -1202,7 +1103,11 @@ void CFilesWindow::OfferArchiveUpdateIfNeededAux(HWND parent, int textID, BOOL* 
     if (AssocUsed) // if the user edited files from the archive we must update them before archive operations, otherwise we would be working with outdated versions of the edited files stored directly inside the archive
     {
         // show info about the need to update the archive that contains edited files
-        std::wstring msg = FormatStrW(LoadStrW(textID), AnsiToWide(GetZIPArchive()).c_str());
+        // GetZIPArchive() is the authoritative wide value.
+        // lossy WideToAnsi derivative kept for narrow-ABI plugin calls only); round-tripping
+        // through the narrow mirror here mangled an archive name CP_ACP cannot spell in
+        // this and 4 sibling message dialogs (files_window_actions.cpp).
+        std::wstring msg = FormatStrW(LoadStrW(textID), GetZIPArchive());
         gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
         // package the changed files, prepare them for further use
         BOOL someFilesChanged;
@@ -1214,9 +1119,9 @@ void CFilesWindow::OfferArchiveUpdateIfNeededAux(HWND parent, int textID, BOOL* 
         // if edited files might be in the disk cache, drop them to ensure they are re-extracted when accessed again
         if (someFilesChanged)
         {
-            CPathBuffer buf; // Heap-allocated for long path support
-            StrICpy(buf, GetZIPArchive()); // in the disk cache the archive name is in lowercase (allows case-insensitive comparison with Windows file system name)
-            DiskCache.FlushCache(buf);
+            std::wstring cacheName = GetZIPArchive();
+            sally::unicode::LowerCaseInPlaceW(cacheName.data());
+            DiskCache.FlushCache(cacheName.c_str());
         }
         AssocUsed = FALSE;
     }
@@ -1230,7 +1135,11 @@ void CFilesWindow::OfferArchiveUpdateIfNeeded(HWND parent, int textID, BOOL* arc
 
     CFilesWindow* otherPanel = MainWindow->LeftPanel == this ? MainWindow->RightPanel : MainWindow->LeftPanel;
     BOOL otherPanelArchMaybeUpdated = FALSE;
-    if (otherPanel->Is(ptZIPArchive) && StrICmp(GetZIPArchive(), otherPanel->GetZIPArchive()) == 0)
+    // wide: StrICmp alone can declare two different non-ASCII archive names
+    // "equal" when their CP_ACP mirrors collide, wrongly firing an update on the wrong panel's
+    // archive. Both panels expose the authoritative wide GetZIPArchive(), so confirm directly.
+    if (otherPanel->Is(ptZIPArchive) && StrICmpW(GetZIPArchive(), otherPanel->GetZIPArchive()) == 0 &&
+        _wcsicmp(GetZIPArchive(), otherPanel->GetZIPArchive()) == 0)
     { // the same archive is in the other panel, we must update it as well
         otherPanel->OfferArchiveUpdateIfNeededAux(parent, textID, &otherPanelArchMaybeUpdated);
         if (otherPanelArchMaybeUpdated)
@@ -1634,7 +1543,7 @@ HIMAGELIST
 CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
 {
     CALL_STACK_MESSAGE3("CFilesWindow::CreateDragImage(%d, %d, , , )", cursorX, cursorY);
-    CPathBuffer buff; // Heap-allocated for long path support
+    std::wstring buff;
     int selCount = GetSelCount();
     int iconWidth = 0;
     int itemIndex = 0;
@@ -1649,7 +1558,7 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
         {
             BOOL isDir = i < Dirs->Count;
             CFileData* f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-            if (i == 0 && isDir && strcmp(Dirs->At(0).Name, "..") == 0)
+            if (i == 0 && isDir && wcscmp(Dirs->At(0).Name, L"..") == 0)
                 continue;
             if (f->Selected == 1)
             {
@@ -1659,7 +1568,7 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
                     files++;
             }
         }
-        ExpandPluralFilesDirs(buff, MAX_PATH, files, dirs, epfdmSelected, FALSE);
+        buff = ExpandPluralFilesDirsTextW(files, dirs, epfdmSelected, FALSE);
     }
     else
     {
@@ -1673,17 +1582,18 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
         {
             iconWidth = 1 + IconSizes[ICONSIZE_16] + 1 + 2;
             CFileData* f = (itemIndex < Dirs->Count) ? &Dirs->At(itemIndex) : &Files->At(itemIndex - Dirs->Count);
-            AlterFileName(buff, f->Name, -1, Configuration.FileNameFormat, 0, itemIndex < Dirs->Count);
+            std::wstring altered = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, itemIndex < Dirs->Count);
+            buff = std::move(altered);
             trimWidth = TRUE;
         }
         else
         {
             // Icons || Thumbnails
             iconWidth = ListBox->ItemWidth;
-            buff[0] = 0;
+            buff.clear();
         }
     }
-    int buffLen = lstrlen(buff);
+    int buffLen = static_cast<int>(buff.length());
 
     int width;
     int height = ListBox->ItemHeight;
@@ -1691,7 +1601,7 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
     ;
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;
-    GetTextExtentPoint32(hDC, buff, buffLen, &sz);
+    GetTextExtentPoint32W(hDC, buff.c_str(), buffLen, &sz);
     width = iconWidth + sz.cx;
     if (GetViewMode() == vmDetailed && trimWidth)
         width = Columns[0].Width; // if the column is shortened, we do not want other columns to bleed into the dragged image
@@ -1736,13 +1646,13 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
         int oldTextColor = SetTextColor(hDC, GetCOLORREF(CurrentColors[ITEM_FG_FOCUSED]));
         int oldBkColor = SetBkColor(hDC, ResolveDarkBaseColor(ITEM_BK_FOCUSED, GetCOLORREF(CurrentColors[ITEM_BK_FOCUSED]), DarkMode_ShouldUseDark()));
         r.left = iconWidth;
-        DrawText(hDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
+        DrawTextW(hDC, buff.c_str(), buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
         SetTextColor(hDC, oldTextColor);
         SelectObject(hDC, hOldFont);
         hOldFont = (HFONT)SelectObject(hMaskDC, Font);
         SetTextColor(hMaskDC, RGB(0, 0, 0));
         SetBkColor(hMaskDC, RGB(0, 0, 0));
-        DrawText(hMaskDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
+        DrawTextW(hMaskDC, buff.c_str(), buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
         SelectObject(hMaskDC, hOldFont);
         SetTextColor(hDC, oldTextColor);
         SetBkColor(hDC, oldBkColor);
@@ -1845,71 +1755,99 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
     return himl;
 }
 
-BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND hMessageParent, int nestingLevel)
+// Wide throughout, and there is no ANSI form any more.
+//
+// This used to resolve in ANSI and carry only the LEAF wide, swapping the mirror back out
+// at the end (FinishUNCCopy, now deleted). That workaround existed because of a comment
+// claiming CShares, WNetGetConnection, GetSubstInformation and SalGetFullName were all
+// ANSI-only. All four were wrong: the first three have wide forms - CShares was never ANSI
+// at all, NetShareEnum being Unicode-only - and SalGetFullNameW already existed.
+//
+// The leaf-swap is gone because there is nothing left to swap: every step below resolves on
+// the real path. What used to be "\\server\share\???.txt" for an unspellable FILENAME, or a
+// mirror-vs-mirror match on an unspellable DIRECTORY producing a UNC path that names
+// something else, is now simply the right answer.
+//
+// Both callers hand in a wide path (CFilesWindow::GetGeneralPath, CFoundFilesData::PathW),
+// so no re-widening happens anywhere in this chain.
+BOOL CopyUNCPathToClipboardW(const wchar_t* path, const wchar_t* name, BOOL isDir,
+                             HWND hMessageParent, int nestingLevel)
 {
-    CPathBuffer buff;     // Heap-allocated for long path support
-    CPathBuffer uncPath;  // Heap-allocated for long path support
-
     nestingLevel++; // note: also controls error messaging, we must increment it here
 
-    lstrcpyn(buff, path, buff.Size());
-    SalPathAddBackslash(buff, buff.Size());
+    std::wstring buff(path != NULL ? path : L"");
+    SalPathAddBackslashW(buff);
+    const std::wstring leaf(name != NULL ? name : L"");
 
-    if (buff[0] == '\\' && buff[1] == '\\')
+    if (buff.length() >= 2 && buff[0] == L'\\' && buff[1] == L'\\')
     {
-        // path is already in UNC form
-        strcat(buff, name); // append the focused item's name
-        return CopyTextToClipboard(buff);
+        // path is already in UNC form - append the focused item's name
+        buff += leaf;
+        return CopyTextToClipboardW(buff.c_str());
     }
 
     // if it is a directory, append it to the path
     if (isDir)
-        strcat(buff, name);
+        buff += leaf;
 
     // try to convert the local path to UNC
 
     // look for shared directories to see if any of them is part of the path
-    if (Shares.GetUNCPath(buff, uncPath, uncPath.Size()))
+    std::wstring uncPath;
+    if (Shares.GetUNCPathW(buff.c_str(), uncPath))
     {
+        // for a directory the leaf is already inside uncPath - it was appended above so
+        // the share lookup could see it
         if (!isDir)
         {
-            // append the file name
-            SalPathAddBackslash(uncPath, uncPath.Size()); // we want a backslash at the end
-            strcat(uncPath, name);
+            SalPathAddBackslashW(uncPath);
+            uncPath += leaf;
         }
-        return CopyTextToClipboard(uncPath);
+        return CopyTextToClipboardW(uncPath.c_str());
     }
 
     // it might be a mapped drive
-    char localRoot[3];
-    localRoot[0] = buff[0];
-    localRoot[1] = ':';
-    localRoot[2] = 0;
-    DWORD uncPathSize = uncPath.Size();
-    if (WNetGetConnection(localRoot, uncPath, &uncPathSize) == NO_ERROR)
+    if (buff.length() >= 2 && buff[1] == L':')
     {
-        SalPathAddBackslash(uncPath, uncPath.Size());
-        if (strlen(buff) > 3)
+        wchar_t localRoot[3] = {buff[0], L':', 0};
+        std::vector<wchar_t> remote(1024);
+        DWORD remoteSize = (DWORD)remote.size();
+        DWORD err = WNetGetConnectionW(localRoot, remote.data(), &remoteSize);
+        if (err == ERROR_MORE_DATA && remoteSize > remote.size())
         {
-            strcat(uncPath, buff + 3);
-            SalPathAddBackslash(uncPath, uncPath.Size());
+            remote.resize(remoteSize);
+            remoteSize = (DWORD)remote.size();
+            err = WNetGetConnectionW(localRoot, remote.data(), &remoteSize);
         }
-        if (!isDir)
-            strcat(uncPath, name);
-        if (SalGetFullName(uncPath, NULL, NULL, NULL, NULL, uncPath.Size())) // root "c:\\", others without '\\' at the end
-            return CopyTextToClipboard(uncPath);
+        if (err == NO_ERROR)
+        {
+            std::wstring mapped(remote.data());
+            SalPathAddBackslashW(mapped);
+            if (buff.length() > 3)
+            {
+                mapped += buff.substr(3);
+                SalPathAddBackslashW(mapped);
+            }
+            if (!isDir)
+                mapped += leaf;
+            if (SalGetFullNameW(mapped)) // root "c:\\", others without '\\' at the end
+                return CopyTextToClipboardW(mapped.c_str());
+        }
     }
 
     // if the path is not UNC, it might be a SUBST drive
     // 10 levels of nesting must be enough even for extreme cases
-    if (nestingLevel < 10 && buff[0] != '\\' && buff[1] == ':')
+    if (nestingLevel < 10 && buff.length() >= 2 && buff[0] != L'\\' && buff[1] == L':')
     {
-        CPathBuffer target; // Heap-allocated for long path support
-        if (GetSubstInformation(toupper(buff[0]) - 'A', target, target.Size()))
+        std::wstring target;
+        if (GetSubstInformationW(static_cast<BYTE>(towupper(buff[0]) - L'A'), target))
         {
-            SalPathAddBackslash(target, target.Size());
-            strcat(target, path + 3);
-            if (CopyUNCPathToClipboard(target, name, isDir, hMessageParent, nestingLevel))
+            std::wstring resolved(target);
+            SalPathAddBackslashW(resolved);
+            const std::wstring original(path != NULL ? path : L"");
+            if (original.length() > 3)
+                resolved += original.substr(3);
+            if (CopyUNCPathToClipboardW(resolved.c_str(), name, isDir, hMessageParent, nestingLevel))
                 return TRUE;
         }
     }
@@ -1920,24 +1858,22 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
         // look for hidden shares to see if any of them is part of the path
         CShares allShares(FALSE);
         allShares.Refresh();
-        if (allShares.GetUNCPath(buff, uncPath, 2 * MAX_PATH))
+        if (allShares.GetUNCPathW(buff.c_str(), uncPath))
         {
             if (!isDir)
             {
-                // append the file's name
-                SalPathAddBackslash(uncPath, 2 * MAX_PATH); // we want a backslash at the end
-                strcat(uncPath, name);
+                SalPathAddBackslashW(uncPath);
+                uncPath += leaf;
             }
-            return CopyTextToClipboard(uncPath);
+            return CopyTextToClipboardW(uncPath.c_str());
         }
 
         // all attempts failed -- give up and show an error message
         // the path cannot be converted to UNC; it's neither shared nor mapped drive
-        strcpy(buff, path);
-        SalPathAddBackslash(buff, 2 * MAX_PATH);
-        strcat(buff, name);
-
-        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOT_CREATE_UNC_NAME), AnsiToWide(buff).c_str());
+        std::wstring failed(path != NULL ? path : L"");
+        SalPathAddBackslashW(failed);
+        failed += leaf;
+        std::wstring msg = FormatStrW(LoadStrW(IDS_CANNOT_CREATE_UNC_NAME), failed.c_str());
         gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
     }
     return FALSE;
@@ -1948,13 +1884,12 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
     CALL_STACK_MESSAGE2("CFilesWindow::CopyFocusedNameToClipboard(%d)", mode);
 
     if (FocusedIndex == 0 && FocusedIndex < Dirs->Count &&
-        strcmp(Dirs->At(0).Name, "..") == 0)
+        wcscmp(Dirs->At(0).Name, L"..") == 0)
         return FALSE; // do not accept up-directory entries
     if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
         return FALSE; // ignore an invalid index
 
-    CPathBuffer buff; // Heap-allocated for long path support
-    *buff = 0;
+    std::wstring buff;
 
     if (mode == cfnmUNC)
     {
@@ -1962,15 +1897,19 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         // try to convert the ordinary name to UNC form
         if (Is(ptDisk) || Is(ptZIPArchive))
         {
-            // obtain the current path in the panel
-            GetGeneralPath(buff, buff.Size());
-            SalPathAddBackslash(buff, buff.Size());
+            // Path and leaf both wide, so the whole resolution runs on the real
+            // names - no mirror is built here and none is swapped back out at the end.
+            std::wstring pathW;
+            GetGeneralPath(pathW);
+            SalPathAddBackslashW(pathW);
 
             CFileData* item = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
-            CPathBuffer itemName; // Heap-allocated for long path support
-            AlterFileName(itemName, item->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
+            const std::wstring itemNameW = AlterFileNameW(
+                item->Name,
+                Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
 
-            if (CopyUNCPathToClipboard(buff, itemName, FocusedIndex < Dirs->Count, MainWindow->HWindow))
+            if (CopyUNCPathToClipboardW(pathW.c_str(), itemNameW.c_str(),
+                                        FocusedIndex < Dirs->Count, MainWindow->HWindow, 0))
                 return TRUE;
         }
         return FALSE;
@@ -1981,45 +1920,38 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         // full name
         if (Is(ptDisk) || Is(ptZIPArchive))
         {
-            GetGeneralPath(buff, buff.Size());
-            SalPathAddBackslash(buff, buff.Size());
+            GetGeneralPath(buff);
+            SalPathAddBackslashW(buff);
         }
     }
 
     CFileData* file = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
     if (Is(ptDisk) || Is(ptZIPArchive) || Is(ptPluginFS) && mode == cfnmShort)
     {
-        // For Unicode filenames, use wide path to preserve non-ANSI characters
-        if (file->UseWideName())
-        {
-            CWidePathBuffer buffW; // Heap-allocated for long path support
-            // Convert path to wide
-            MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, buffW.Size());
-            int l = (int)wcslen(buffW);
-            // Append wide filename (no AlterFileName for wide yet - TODO)
-            lstrcpynW(buffW + l, file->NameW, 2 * MAX_PATH - l);
-            return CopyTextToClipboardW(buffW, -1, FALSE, NULL);
-        }
-
-        CPathBuffer fileName; // Heap-allocated for long path support
-        AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
-        int l = (int)strlen(buff);
-        lstrcpyn(buff + l, fileName, 2 * MAX_PATH - l);
-        return CopyTextToClipboard(buff);
+        // Go wide when either half of the name needs it. Keying only off the leaf missed
+        // the case that hurts most: an ASCII file inside a folder the code page cannot
+        // spell took the legacy branch and the clipboard got "C:\???\readme.txt" - the
+        // filename perfectly correct, the directory nonsense (audit A14).
+        // UseWideName() is gone - CFileData::Name is unconditionally wide
+        // now, so only the DIRECTORY prefix can still be lossy.
+        std::wstring fileName = AlterFileNameW(file->Name, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
+        buff += fileName;
+        return CopyTextToClipboardW(buff.c_str());
     }
     else
     {
         if (mode == cfnmFull && Is(ptPluginFS) && GetPluginFS()->NotEmpty())
         {
-            strcpy(buff, GetPluginFS()->GetPluginFSName());
-            strcat(buff, ":");
-            int l = (int)strlen(buff);
-            if (GetPluginFS()->GetFullName(*file, FocusedIndex < Dirs->Count ? 1 : 0, buff + l, 2 * MAX_PATH - l))
+            std::wstring fullNameW;
+            if (GetPluginFS()->GetFullNameW(*file, FocusedIndex < Dirs->Count ? 1 : 0, fullNameW))
             {
-                GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternal(GetPluginFS()->GetPluginFSName(),
-                                                                                GetPluginFS()->GetPluginFSNameIndex(),
-                                                                                buff + l);
-                return CopyTextToClipboard(buff);
+                if (!GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternalW(
+                        GetPluginFS()->GetPluginFSName(), GetPluginFS()->GetPluginFSNameIndex(), fullNameW))
+                    return FALSE;
+                std::wstring clipText = GetPluginFS()->GetPluginFSName();
+                clipText += L":";
+                clipText += fullNameW;
+                return CopyTextToClipboardW(clipText.c_str());
             }
         }
     }
@@ -2030,34 +1962,47 @@ BOOL CFilesWindow::CopyCurrentPathToClipboard()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::CopyCurrentPathToClipboard()");
 
-    CPathBuffer buff; // Heap-allocated for long path support
-    *buff = 0;
-    GetGeneralPath(buff, buff.Size(), TRUE);
-    return CopyTextToClipboard(buff);
+    // GetGeneralPath returns the exact path without a CP_ACP round trip
+    // trip. Copying the mirror put "C:\???" on the clipboard - a string that names
+    // nothing, pasted into a shell or a dialog by someone who had no reason to doubt it
+    // (audit A15).
+    std::wstring buffW;
+    if (GetGeneralPath(buffW, TRUE))
+        return CopyTextToClipboardW(buffW.c_str());
+
+    return FALSE;
 }
 
-void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr)
+// CColumn is a cross-module ABI record with frozen inline arrays. Keep its
+// capacity/truncation policy at this publication adapter; ordinary text owners
+// remain dynamic.
+static void WriteColumnTextPairToAbiRecord(wchar_t* output, int outputCapacity,
+                                           const wchar_t* first,
+                                           const wchar_t* second)
 {
-    int l = (int)strlen(srcStr);
-    int dstStrLen = (int)strlen(dstStr);
-    if (dstStrLen + 1 + l + 1 > dstBufSize)
+    std::wstring firstText = first != NULL ? first : L"";
+    std::wstring secondText = second != NULL ? second : L"";
+    if (firstText.size() + 1 + secondText.size() + 1 >
+        static_cast<std::size_t>(outputCapacity))
     {
-        int half = dstBufSize / 2 - 1;
-        if (l <= half)
-            dstStrLen = dstBufSize - 2 - l;
+        const std::size_t half = static_cast<std::size_t>(outputCapacity / 2 - 1);
+        if (secondText.size() <= half)
+            firstText.resize(static_cast<std::size_t>(outputCapacity) - 2 - secondText.size());
         else
         {
-            if (dstStrLen <= half)
-                l = dstBufSize - 2 - dstStrLen;
+            if (firstText.size() <= half)
+                secondText.resize(static_cast<std::size_t>(outputCapacity) - 2 - firstText.size());
             else
             {
-                l = half;
-                dstStrLen = half;
+                firstText.resize(half);
+                secondText.resize(half);
             }
         }
     }
-    dstStr[dstStrLen] = 0;
-    lstrcpyn(dstStr + dstStrLen + 1, srcStr, l + 1);
+    wmemcpy(output, firstText.data(), firstText.size());
+    output[firstText.size()] = L'\0';
+    wmemcpy(output + firstText.size() + 1, secondText.data(), secondText.size());
+    output[firstText.size() + 1 + secondText.size()] = L'\0';
 }
 
 // prepare a template for the 'Columns' variable
@@ -2076,10 +2021,10 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         // so that tests like CFilesWindow::IsExtensionInSeparateColumn work correctly
         CColumn column;
         column.CustomData = 0;
-        lstrcpy(column.Name, LoadStr(IDS_COLUMN_NAME_NAME));
-        column.Name[strlen(column.Name) + 1] = 0; // two nulls at the end (the text "Ext" is after the name, avoid trouble if searched there)
-        lstrcpy(column.Description, LoadStr(IDS_COLUMN_DESC_NAME));
-        column.Description[strlen(column.Description) + 1] = 0; // two nulls at the end (the description "Ext" is after the name, avoid trouble if searched there)
+        lstrcpyW(column.Name, LoadStrW(IDS_COLUMN_NAME_NAME));
+        column.Name[wcslen(column.Name) + 1] = 0; // two nulls at the end (the text "Ext" is after the name, avoid trouble if searched there)
+        lstrcpyW(column.Description, LoadStrW(IDS_COLUMN_DESC_NAME));
+        column.Description[wcslen(column.Description) + 1] = 0; // two nulls at the end (the description "Ext" is after the name, avoid trouble if searched there)
         column.GetText = NULL;
         column.SupportSorting = 1;
         column.LeftAlignment = 1;
@@ -2114,19 +2059,21 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         // the Name column (i==0) is always visible
         if (i == 0 || ViewTemplate->Flags & item->Flag)
         {
-            lstrcpy(column.Name, LoadStr(item->NameResID));
-            lstrcpy(column.Description, LoadStr(item->DescResID));
+            lstrcpyW(column.Name, LoadStrW(item->NameResID));
+            lstrcpyW(column.Description, LoadStrW(item->DescResID));
             if (i == 0) // column "Name"
             {
                 if ((ViewTemplate->Flags & VIEW_SHOW_EXTENSION) == 0) // "Ext" is part of the "Name" column, the name and description of the "Ext" column are after the terminating null of the name and description
                 {
-                    AddStrToStr(column.Name, COLUMN_NAME_MAX, ColExtStr.c_str());
-                    AddStrToStr(column.Description, COLUMN_DESCRIPTION_MAX, LoadStr(IDS_COLUMN_DESC_EXT));
+                    WriteColumnTextPairToAbiRecord(column.Name, _countof(column.Name),
+                                                   column.Name, ColExtStrW.c_str());
+                    WriteColumnTextPairToAbiRecord(column.Description, _countof(column.Description),
+                                                   column.Description, LoadStrW(IDS_COLUMN_DESC_EXT));
                 }
                 else // to be safe, create double-null-terminated strings
                 {
-                    column.Name[strlen(column.Name) + 1] = 0;
-                    column.Description[strlen(column.Description) + 1] = 0;
+                    column.Name[wcslen(column.Name) + 1] = 0;
+                    column.Description[wcslen(column.Description) + 1] = 0;
                 }
             }
             column.GetText = item->GetText;

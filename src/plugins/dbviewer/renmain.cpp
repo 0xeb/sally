@@ -12,6 +12,8 @@
 #include "renderer.h"
 #include "dialogs.h"
 #include "dbviewer.h"
+#include "widefind.h"
+#include "display_text.h"
 
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
@@ -184,9 +186,9 @@ CRendererWindow::CRendererWindow(int enumFilesSourceUID, int enumFilesCurrentInd
     DragColumn = -1;
 
     AutoSelect = CfgAutoSelect;
-    lstrcpy(DefaultCoding, CfgDefaultCoding);
+    DefaultCoding = CfgDefaultCoding;
     UseCodeTable = FALSE;
-    Coding[0] = 0;
+    Coding.clear();
 
     Creating = TRUE;
 
@@ -213,29 +215,36 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::OnFileOpen()
 {
-    CPathBuffer file; // Heap-allocated for long path support
-    file[0] = 0;
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = HWindow;
-    char* s = LoadStr(IDS_VIEWERFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create a double-null-terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = file.Size();
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = NULL;
     ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if (SalGeneral->SafeGetOpenFileName(&ofn))
+
+    const std::wstring filterOwner = LangStr(IDS_VIEWERFILTER);
+    const wchar_t* filter = filterOwner.c_str();
+    std::wstring filterW;
+    for (const wchar_t* s = filter;; s++)
+    {
+        if (*s == L'|')
+            filterW.push_back(L'\0');
+        else if (*s == 0)
+        {
+            filterW.push_back(L'\0');
+            break;
+        }
+        else
+            filterW.push_back(*s);
+    }
+    filterW.push_back(L'\0');
+    std::vector<std::wstring> files{std::wstring()};
+    ofn.lpstrFilter = filterW.c_str();
+    if (SPLSafeGetOpenFileNamesOwned(SalGeneral, &ofn, files))
     {
         EnumFilesSourceUID = -1;
-        OpenFile(file, TRUE);
+        OpenFile(files[0].c_str(), TRUE);
     }
 }
 
@@ -244,9 +253,8 @@ void CRendererWindow::OnFileReOpen()
     if (!Database.IsOpened())
         return;
 
-    CPathBuffer path; // Heap-allocated for long path support
-    lstrcpyn(path, Database.GetFileName(), path.Size());
-    OpenFile(path, FALSE);
+    const std::wstring path = Database.GetFileName();
+    OpenFile(path.c_str(), FALSE);
 }
 
 void CRendererWindow::OnGoto()
@@ -270,22 +278,28 @@ void CRendererWindow::OnGoto()
 
 void CRendererWindow::SetViewerTitle()
 {
-    CPathBuffer title;
+    std::wstring title;
     if (Database.IsOpened())
     {
-        sprintf(title, "%s - %s", Database.GetFileName(), LoadStr(IDS_PLUGINNAME));
+        title = Database.GetFileName();
+        title += L" - ";
+        title += LangStr(IDS_PLUGINNAME).c_str();
         if (UseCodeTable || Database.GetIsUnicode())
-            sprintf(title + strlen(title), " - [%s]", Coding);
+        {
+            title += L" - [";
+            title += Coding;
+            title += L"]";
+        }
     }
     else
-        sprintf(title, "%s", LoadStr(IDS_PLUGINNAME));
+        title = LangStr(IDS_PLUGINNAME).c_str();
 
-    SetWindowText(GetParent(HWindow), title);
+    SetWindowTextW(GetParent(HWindow), title.c_str());
 }
 
-BOOL CRendererWindow::OpenFile(const char* name, BOOL useDefaultConfig)
+BOOL CRendererWindow::OpenFile(const wchar_t* name, BOOL useDefaultConfig)
 {
-    CALL_STACK_MESSAGE3("CRendererWindow::OpenFile(%s, %d)", name, useDefaultConfig);
+    CALL_STACK_MESSAGE3("CRendererWindow::OpenFile(%ls, %d)", name, useDefaultConfig);
 
     if (useDefaultConfig)
         Viewer->CfgCSV = CfgDefaultCSV;
@@ -303,15 +317,15 @@ BOOL CRendererWindow::OpenFile(const char* name, BOOL useDefaultConfig)
         else
         {
             UseCodeTable = FALSE;
-            Coding[0] = 0;
-            if (DefaultCoding[0] != 0)
+            Coding.clear();
+            if (!DefaultCoding.empty())
             {
                 char codeTable[256];
-                if (SalGeneral->GetConversionTable(HWindow, codeTable, DefaultCoding))
+                if (SalGeneral->GetConversionTable(HWindow, codeTable, DefaultCoding.c_str()))
                 {
                     memcpy(CodeTable, codeTable, 256);
                     UseCodeTable = TRUE;
-                    strcpy(Coding, DefaultCoding);
+                    Coding = DefaultCoding;
                 }
             }
         }
@@ -375,15 +389,15 @@ void CRendererWindow::RecognizeCodePage()
 
     if (Database.GetIsUnicode())
     {
-        strcpy(Coding, Database.GetIsUTF8() ? "UTF-8" : "UTF-16");
+        Coding = Database.GetIsUTF8() ? L"UTF-8" : L"UTF-16";
         return;
     }
 
-    Coding[0] = 0;
+    Coding.clear();
 
-    char winCodePage[101];
-    SalGeneral->GetWindowsCodePage(HWindow, winCodePage);
-    if (winCodePage[0] != 0) // only if WindowsCodePage is known
+    std::wstring winCodePage;
+    SPLGetWindowsCodePageOwned(SalGeneral, HWindow, winCodePage);
+    if (!winCodePage.empty()) // only if WindowsCodePage is known
     {
         char pattern[10000];
         size_t spaceLeft = 9999;
@@ -414,21 +428,25 @@ void CRendererWindow::RecognizeCodePage()
         if (iter > pattern)
         {
             *iter = 0;
-            char codePage[101];
-            SalGeneral->RecognizeFileType(HWindow, pattern, (int)(iter - pattern), TRUE, NULL, codePage);
-            if (codePage[0] != 0)
+            std::wstring codePage;
+            SPLRecognizeFileTypeOwned(SalGeneral, HWindow, pattern,
+                                      static_cast<int>(iter - pattern), TRUE,
+                                      NULL, &codePage);
+            if (!codePage.empty())
             {
-                char conversion[205];
-                lstrcpy(conversion, codePage);
-                lstrcat(conversion, winCodePage);
+                std::wstring conversion = codePage;
+                conversion += L" - ";
+                conversion += winCodePage;
 
                 char codeTable[256];
-                if (lstrcmp(codePage, winCodePage) != 0 &&
-                    SalGeneral->GetConversionTable(HWindow, codeTable, conversion))
+                if (lstrcmpW(codePage.c_str(), winCodePage.c_str()) != 0 &&
+                    SalGeneral->GetConversionTable(HWindow, codeTable, conversion.c_str()))
                 {
+                    Coding = codePage;
+                    Coding += L" - ";
+                    Coding += winCodePage;
                     memcpy(CodeTable, codeTable, 256);
                     UseCodeTable = TRUE;
-                    sprintf(Coding, "%s - %s", codePage, winCodePage);
                 }
             }
         }
@@ -447,12 +465,12 @@ void CRendererWindow::CodeCharacters(char* text, size_t textLen)
     }
 }
 
-void CRendererWindow::SelectConversion(const char* conversion)
+void CRendererWindow::SelectConversion(const wchar_t* conversion)
 {
     if (conversion == NULL)
     {
         UseCodeTable = FALSE;
-        Coding[0] = 0;
+        Coding.clear();
     }
     else
     {
@@ -461,19 +479,41 @@ void CRendererWindow::SelectConversion(const char* conversion)
         {
             memcpy(CodeTable, codeTable, 256);
             UseCodeTable = TRUE;
-            lstrcpy(Coding, conversion);
+            Coding = conversion;
         }
     }
     InvalidateRect(HWindow, NULL, TRUE);
     SetViewerTitle();
 }
 
-void CRendererWindow::Find(BOOL forward, BOOL wholeWords,
+// In UTF-8 every byte of a multi-byte character is >= 0x80, so they must all count as
+// word bytes - otherwise a whole-word match could be declared in the middle of a
+// character. The ANSI table cannot answer this, because the same byte value means
+// different things in the two encodings.
+static bool IsWordByte(unsigned char b, bool utf8)
+{
+    if (utf8 && sally::dbviewer::IsUtf8WordByte(b))
+        return true;
+    return IsAlphaNumeric[b] != FALSE;
+}
+
+void CRendererWindow::Find(BOOL forward, BOOL wholeWords, BOOL caseSensitive,
+                           FindMode mode, const std::wstring& pattern,
                            CSalamanderBMSearchData* bmSearchData,
                            CSalamanderREGEXPSearchData* regexpSearchData)
 {
-    if ((bmSearchData == NULL && regexpSearchData == NULL) ||
-        (bmSearchData != NULL && regexpSearchData != NULL))
+    const bool wideLiteral = mode == FindMode::WideLiteral;
+    const bool encodedLiteral = mode == FindMode::EncodedLiteral;
+    const bool utf8Regexp = mode == FindMode::Utf8RegularExpression;
+    const bool encodedRegexp = mode == FindMode::EncodedRegularExpression || utf8Regexp;
+    // Cells of a Unicode database are encoded through this code page before the byte
+    // engine sees them. UTF-8 is lossless, so the "cannot be represented" refusal below
+    // can only ever trigger on the ANSI path.
+    const UINT cellCodePage = utf8Regexp ? CP_UTF8 : CP_ACP;
+    if (pattern.empty() ||
+        (wideLiteral && (bmSearchData != NULL || regexpSearchData != NULL)) ||
+        (encodedLiteral && (bmSearchData == NULL || regexpSearchData != NULL)) ||
+        (encodedRegexp && (bmSearchData != NULL || regexpSearchData == NULL)))
     {
         TRACE_E("Parameters mismatch");
         return;
@@ -483,25 +523,11 @@ void CRendererWindow::Find(BOOL forward, BOOL wholeWords,
 
     int row;
     int col;
-    char* buf = NULL;
     BOOL skip = TRUE; // skip the first match
-    int patLen = bmSearchData ? bmSearchData->GetLength() : 0;
+    const size_t patLen = wideLiteral ? pattern.size() :
+                                        encodedLiteral ? static_cast<size_t>(bmSearchData->GetLength()) : 0;
     Selection.GetFocus(&col, &row);
-    int bufSize = 0;
-
-    if (UseCodeTable || Database.GetIsUnicode())
-    {
-        // we must do code-page conversion on the fly
-        // first we determine the maximum column width
-        // and then allocate appropriate memory block
-        int i;
-        for (i = 0; i < Database.GetVisibleColumnCount(); i++)
-        {
-            const CDatabaseColumn* column = Database.GetVisibleColumn(i);
-            bufSize = max(bufSize, column->Length);
-        }
-        buf = (char*)malloc(bufSize);
-    }
+    std::string encodedCell;
     do
     {
         if (!Database.FetchRecord(HWindow, row))
@@ -520,53 +546,90 @@ void CRendererWindow::Find(BOOL forward, BOOL wholeWords,
                 // other possible optimizations: do not search DBF_FTYPE_INT_V7,
                 // DBF_FTYPE_TSTAMP, DBF_FTYPE_AUTOINC & DBF_FTYPE_DOUBLE columns if
                 // the search pattern contains non-numeric characters
-                if (!bmSearchData || (column->Length >= patLen))
+                if (!encodedLiteral || static_cast<size_t>(column->Length) >= patLen)
                 {
                     int found; // -1=not found
                     size_t textLen;
-                    const char* text;
                     int offset = 0;
 
-                    if (!Database.GetIsUnicode())
+                    if (wideLiteral)
                     {
-                        text = Database.GetCellText(column, &textLen);
-
-                        if (UseCodeTable)
-                        {
-                            memcpy(buf, text, textLen);
-                            CodeCharacters(buf, textLen);
-                            text = buf;
-                        }
+                        LPCWSTR textW = Database.GetCellTextW(column, &textLen);
+                        found = sally::dbviewer::FindWideSubstring(textW, textLen, pattern.data(), pattern.size(),
+                                                                   caseSensitive != FALSE, wholeWords != FALSE, offset);
                     }
                     else
                     {
-                        LPCWSTR textW = Database.GetCellTextW(column, &textLen);
-                        textLen = WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, textW, (int)textLen, buf, bufSize, NULL, NULL);
-                        if (textLen < 0)
-                            textLen = 0; // Error - swallow it ;-)
-                        text = buf;
-                    }
-                    do
-                    {
-                        int foundLen;
-                        if (bmSearchData != NULL)
+                        const char* text;
+                        // Both 'continue' below used to jump to this outer
+                        // do-while's condition, which skips the col++/col--
+                        // advance at the bottom of the loop entirely - so an
+                        // unrepresentable or oversized cell made Find re-search
+                        // the SAME column forever. This flag lets a cell that
+                        // cannot be searched fall through as "not found" and
+                        // still reach the advance step, like every other miss.
+                        bool cellUnsearchable = false;
+                        if (!Database.GetIsUnicode())
                         {
-                            found = bmSearchData->SearchForward(text, (int)textLen, offset);
+                            text = Database.GetCellText(column, &textLen);
+
+                            if (UseCodeTable)
+                            {
+                                encodedCell.assign(text, textLen);
+                                CodeCharacters(encodedCell.data(), static_cast<int>(textLen));
+                                text = encodedCell.data();
+                            }
                         }
                         else
                         {
-                            regexpSearchData->SetLine(text, text + textLen);
-                            found = regexpSearchData->SearchForward(offset, foundLen);
+                            LPCWSTR textW = Database.GetCellTextW(column, &textLen);
+                            // On the UTF-8 path this always succeeds, so every cell is
+                            // searchable. On the ANSI path the engine is an encoded-byte
+                            // interface: keep that compatibility boundary explicit and
+                            // refuse substitution, since an unrepresentable Unicode cell
+                            // cannot be searched faithfully and is skipped rather than
+                            // collapsed to '?'.
+                            if (!Win32EncodeText(cellCodePage, textW, textLen, encodedCell))
+                                cellUnsearchable = true;
+                            else
+                            {
+                                text = encodedCell.data();
+                                textLen = encodedCell.size();
+                            }
                         }
-                        if (found == -1 || !wholeWords)
-                            break;
-                        if (bmSearchData != NULL)
-                            foundLen = bmSearchData->GetLength();
-                        if ((found == 0 || !IsAlphaNumeric[*(text + found - 1)]) &&
-                            (found + foundLen >= (int)textLen || !IsAlphaNumeric[*(text + found + foundLen)]))
-                            break;
-                        offset++;
-                    } while (1);
+                        if (!cellUnsearchable &&
+                            textLen > static_cast<size_t>((std::numeric_limits<int>::max)()))
+                        {
+                            cellUnsearchable = true;
+                        }
+                        if (cellUnsearchable)
+                            found = -1;
+                        else
+                        {
+                            do
+                            {
+                                int foundLen;
+                                if (bmSearchData != NULL)
+                                {
+                                    found = bmSearchData->SearchForward(text, (int)textLen, offset);
+                                }
+                                else
+                                {
+                                    regexpSearchData->SetLine(text, text + textLen);
+                                    found = regexpSearchData->SearchForward(offset, foundLen);
+                                }
+                                if (found == -1 || !wholeWords)
+                                    break;
+                                if (bmSearchData != NULL)
+                                    foundLen = bmSearchData->GetLength();
+                                if ((found == 0 || !IsWordByte(static_cast<unsigned char>(text[found - 1]), utf8Regexp)) &&
+                                    (found + foundLen >= (int)textLen ||
+                                     !IsWordByte(static_cast<unsigned char>(text[found + foundLen]), utf8Regexp)))
+                                    break;
+                                offset++;
+                            } while (1);
+                        }
+                    }
                     if (found != -1)
                     {
                         SetCursor(hOldCursor);
@@ -576,10 +639,6 @@ void CRendererWindow::Find(BOOL forward, BOOL wholeWords,
                         EnsureRowIsVisible(row);
                         EnsureColumnIsVisible(col);
                         Paint(NULL, NULL, FALSE);
-                        if (buf)
-                        {
-                            free(buf);
-                        }
                         return;
                     }
                 } // of if (!bmSearchData || (column->Length >= patLen))
@@ -616,19 +675,12 @@ void CRendererWindow::Find(BOOL forward, BOOL wholeWords,
         }
     } while (1);
 
-    if (buf)
-    {
-        free(buf);
-    }
-
     SetCursor(hOldCursor);
 
-    char text[1000];
-    if (bmSearchData != NULL)
-        sprintf(text, LoadStr(IDS_FIND_NOMATCH), bmSearchData->GetPattern());
-    else
-        sprintf(text, LoadStr(IDS_FIND_NOREGEXPMATCH), regexpSearchData->GetPattern());
-    SalGeneral->SalMessageBox(HWindow, text, LoadStr(IDS_FIND), MB_ICONINFORMATION);
+    const int messageID = encodedRegexp ? IDS_FIND_NOREGEXPMATCH : IDS_FIND_NOMATCH;
+    const std::wstring text = SPLFormatStringOwned(
+        SPLLoadStrOwned(SalGeneral, HLanguage, messageID).c_str(), pattern.c_str());
+    SalGeneral->SalMessageBox(HWindow, text.c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_FIND).c_str(), MB_ICONINFORMATION);
 } /* CRendererWindow::Find */
 
 void CRendererWindow::CreateGraphics()
@@ -649,8 +701,8 @@ void CRendererWindow::CreateGraphics()
     LeftTextMargin = 3;
 
     SIZE sz;
-    GetTextExtentPoint32(hDC, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-                         52, &sz);
+    GetTextExtentPoint32W(hDC, L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+                          52, &sz);
     CharAvgWidth = (sz.cx / 26 + 1) / 2;
 
     SelectObject(hDC, oldFont);
@@ -1225,100 +1277,74 @@ void CRendererWindow::OnHScroll(int scrollCode, int pos)
 
 void CRendererWindow::CopySelectionToClipboard()
 {
-    // calculate the memory required to store the data
-    DWORD size = 0;
     RECT r;
-    BOOL bUnicode = Database.GetIsUnicode();
+    const BOOL bUnicode = Database.GetIsUnicode();
     Selection.GetNormalizedSelection(&r);
 
-    int i;
-    for (i = r.top; i <= r.bottom; i++)
+    try
     {
-        if (!Database.FetchRecord(HWindow, i))
-            return;
-        int j;
-        for (j = r.left; j <= r.right; j++)
+        std::string encoded;
+        std::wstring text;
+        for (int row = r.top; row <= r.bottom; ++row)
         {
-            const CDatabaseColumn* column = Database.GetVisibleColumn(j);
-            size_t textLen;
-            if (!bUnicode)
-                Database.GetCellText(column, &textLen);
-            else
-                Database.GetCellTextW(column, &textLen);
-            size += (DWORD)textLen;
-            if (j < r.right)
-                size++; // separator
-        }
-        if (i < r.bottom)
-            size += 2; // eol
-    }
-
-    // allocate the required space
-    char* buff = (char*)malloc(size * (!bUnicode ? 1 : 2));
-    if (buff == NULL)
-    {
-        SalGeneral->SalMessageBox(HWindow, LoadStr(IDS_DBFE_OOM),
-                                  LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONEXCLAMATION);
-        return;
-    }
-    // naladujeme do nej data
-    char* iter = buff;
-    LPWSTR iterW = (LPWSTR)buff;
-    int k;
-    for (k = r.top; k <= r.bottom; k++)
-    {
-        if (!Database.FetchRecord(HWindow, k))
-        {
-            free(buff);
-            return;
-        }
-        int j;
-        for (j = r.left; j <= r.right; j++)
-        {
-            const CDatabaseColumn* column = Database.GetVisibleColumn(j);
-            size_t textLen;
-            if (!bUnicode)
+            if (!Database.FetchRecord(HWindow, row))
+                return;
+            for (int columnIndex = r.left; columnIndex <= r.right; ++columnIndex)
             {
-                const char* text = Database.GetCellText(column, &textLen);
-                memcpy(iter, text, textLen);
-                CodeCharacters(iter, textLen);
-                iter += textLen;
-                if (j < r.right)
+                const CDatabaseColumn* column = Database.GetVisibleColumn(columnIndex);
+                size_t cellLength = 0;
+                if (bUnicode)
                 {
-                    *iter++ = '\t'; // separator
+                    const wchar_t* cell = Database.GetCellTextW(column, &cellLength);
+                    if (cell != NULL)
+                        text.append(cell, cellLength);
+                    if (columnIndex < r.right)
+                        text.push_back(L'\t');
+                }
+                else
+                {
+                    const char* cell = Database.GetCellText(column, &cellLength);
+                    if (cell != NULL)
+                    {
+                        const size_t begin = encoded.size();
+                        encoded.append(cell, cellLength);
+                        CodeCharacters(encoded.data() + begin, cellLength);
+                    }
+                    if (columnIndex < r.right)
+                        encoded.push_back('\t');
                 }
             }
-            else
+            if (row < r.bottom)
             {
-                LPCWSTR textW = Database.GetCellTextW(column, &textLen);
-                memcpy(iterW, textW, textLen * sizeof(WCHAR));
-                iterW += textLen;
-                if (j < r.right)
-                {
-                    *iterW++ = '\t'; // separator
-                }
+                if (bUnicode)
+                    text.append(L"\r\n");
+                else
+                    encoded.append("\r\n");
             }
         }
-        if (k < r.bottom)
-        {
-            if (!bUnicode)
-            {
-                *iter++ = '\r'; // eol
-                *iter++ = '\n';
-            }
-            else
-            {
-                *iterW++ = '\r'; // eol
-                *iterW++ = '\n';
-            }
-        }
-    }
 
-    if (!bUnicode)
-        SalGeneral->CopyTextToClipboard(buff, size, FALSE, HWindow);
-    else
-        SalGeneral->CopyTextToClipboardW((LPWSTR)buff, size, FALSE, HWindow);
-    free(buff);
+        if (!bUnicode && !sally::dbviewer::DecodeLegacyDisplayText(
+                             encoded.data(), encoded.size(), nullptr, text))
+        {
+            SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_DBFE_OOM).c_str(),
+                                      SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+            return;
+        }
+
+        if (text.size() > static_cast<size_t>(INT_MAX))
+            throw std::length_error("clipboard text exceeds host contract");
+        SalGeneral->CopyTextToClipboard(text.c_str(), static_cast<int>(text.size()), FALSE, HWindow);
+    }
+    catch (const std::bad_alloc&)
+    {
+        SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_DBFE_OOM).c_str(),
+                                  SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+    }
+    catch (const std::length_error&)
+    {
+        SalGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalGeneral, HLanguage, IDS_DBFE_OOM).c_str(),
+                                  SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+    }
 } /* CRendererWindow::CopySelectionToClipboard */
 
 void CRendererWindow::SelectAll()
@@ -1540,16 +1566,16 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DROPFILES:
     {
-        UINT drag;
-        CPathBuffer path; // Heap-allocated for long path support
-
-        drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped
+        const HDROP drop = (HDROP)wParam;
+        const UINT drag = DragQueryFileW(drop, 0xFFFFFFFF, NULL, 0); // how many files were dropped
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, path.Size());
-            OpenFile(path, TRUE);
+            const UINT length = DragQueryFileW(drop, 0, NULL, 0);
+            std::vector<wchar_t> path(static_cast<size_t>(length) + 1, L'\0');
+            if (DragQueryFileW(drop, 0, path.data(), static_cast<UINT>(path.size())) != 0)
+                OpenFile(path.data(), TRUE);
         }
-        DragFinish((HDROP)wParam);
+        DragFinish(drop);
         break;
     }
 

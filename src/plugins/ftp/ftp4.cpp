@@ -12,24 +12,48 @@ char* HandleNULLStr(char* str)
     return str == NULL ? emptyBuff : str;
 }
 
-void GetMyDocumentsPath(char* initDir)
+BOOL GetMyDocumentsPathW(std::wstring& initDir) noexcept
 {
-    initDir[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    initDir.clear();
+    PWSTR path = NULL;
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &path)))
+        return FALSE;
+
+    BOOL result = FALSE;
+    try
     {
-        if (!SHGetPathFromIDList(pidl, initDir))
-            initDir[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+        std::wstring staged(path);
+        initDir.swap(staged);
+        result = !initDir.empty();
+    }
+    catch (...)
+    {
+        initDir.clear();
+    }
+    CoTaskMemFree(path);
+    return result;
+}
+
+void FTPShowSystemError(HWND parent, int formatResID, DWORD error) noexcept
+{
+    try
+    {
+        const std::wstring errorText = SPLFormatStringOwned(
+            LangStr(formatResID).c_str(),
+            SPLGetErrorTextOwned(SalamanderGeneral, error).c_str());
+        SalamanderGeneral->SalMessageBox(
+            parent, errorText.c_str(),
+            SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+            MB_OK | MB_ICONEXCLAMATION);
+    }
+    catch (...)
+    {
+        SalamanderGeneral->SalMessageBox(parent, L"Not enough memory.", L"FTP",
+                                         MB_OK | MB_ICONEXCLAMATION);
     }
 }
 
-BOOL LoadStdColumnStrName(char* buf, int bufSize, int id)
+BOOL LoadStdColumnStrName(int id, std::wstring& text) noexcept
 {
     int resID = -1;
     switch (id)
@@ -148,20 +172,27 @@ BOOL LoadStdColumnStrName(char* buf, int bufSize, int id)
 
         // when adding items, it is necessary to increase the value of the STC_STD_NAMES_COUNT constant!!!
     }
-    if (bufSize > 0)
+    try
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            text = LangStr(resID).c_str();
         else
         {
             TRACE_E("LoadStdColumnStrName: unknown ID: " << id);
-            _snprintf_s(buf, bufSize, _TRUNCATE, "Unknown (%d)", id);
+            text = L"Unknown (";
+            text += std::to_wstring(id);
+            text += L")";
         }
+    }
+    catch (...)
+    {
+        text.clear();
+        return FALSE;
     }
     return resID != -1;
 }
 
-BOOL LoadStdColumnStrDescr(char* buf, int bufSize, int id)
+BOOL LoadStdColumnStrDescr(int id, std::wstring& text) noexcept
 {
     int resID = -1;
     switch (id)
@@ -280,20 +311,27 @@ BOOL LoadStdColumnStrDescr(char* buf, int bufSize, int id)
 
         // when adding items, it is necessary to increase the value of the STC_STD_NAMES_COUNT constant!!!
     }
-    if (bufSize > 0)
+    try
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            text = LangStr(resID).c_str();
         else
         {
             TRACE_E("LoadStdColumnStrDescr: unknown ID: " << id);
-            _snprintf_s(buf, bufSize, _TRUNCATE, "Unknown (%d)", id);
+            text = L"Unknown (";
+            text += std::to_wstring(id);
+            text += L")";
         }
+    }
+    catch (...)
+    {
+        text.clear();
+        return FALSE;
     }
     return resID != -1;
 }
 
-BOOL GetColumnTypeName(char* buf, int bufSize, CSrvTypeColumnTypes type)
+BOOL GetColumnTypeName(CSrvTypeColumnTypes type, std::wstring& text) noexcept
 {
     int resID = -1;
     switch (type)
@@ -329,22 +367,29 @@ BOOL GetColumnTypeName(char* buf, int bufSize, CSrvTypeColumnTypes type)
         resID = IDS_STC_TYPE_ANYNUM;
         break;
     }
-    if (bufSize > 0)
+    try
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            text = LangStr(resID).c_str();
         else
         {
             TRACE_E("GetColumnTypeName: unknown type: " << (int)type);
-            _snprintf_s(buf, bufSize, _TRUNCATE, "Unknown (%d)", (int)type);
+            text = L"Unknown (";
+            text += std::to_wstring((int)type);
+            text += L")";
         }
+    }
+    catch (...)
+    {
+        text.clear();
+        return FALSE;
     }
     return resID != -1;
 }
 
-BOOL GetColumnEmptyValueForType(char* buf, int bufSize, CSrvTypeColumnTypes type)
+BOOL GetColumnEmptyValueForType(CSrvTypeColumnTypes type, std::wstring& text) noexcept
 {
-    const char* s = NULL;
+    const wchar_t* value = NULL;
     switch (type)
     {
     case stctName:
@@ -354,32 +399,39 @@ BOOL GetColumnEmptyValueForType(char* buf, int bufSize, CSrvTypeColumnTypes type
     case stctGeneralDate:
     case stctGeneralTime:
     case stctGeneralNumber:
-        s = "";
+        value = L"";
         break;
 
     case stctSize:
-        s = "0";
+        value = L"0";
         break;
 
     case stctDate:
-        s = "1.1.1602";
+        value = L"1.1.1602";
         break;
 
     case stctTime:
-        s = "0:00:00";
+        value = L"0:00:00";
         break;
     }
-    if (bufSize > 0)
+    try
     {
-        if (s != NULL)
-            lstrcpyn(buf, s, bufSize);
+        if (value != NULL)
+            text = value;
         else
         {
             TRACE_E("GetColumnEmptyValueForType: unknown type: " << (int)type);
-            _snprintf_s(buf, bufSize, _TRUNCATE, "Unknown (%d)", (int)type);
+            text = L"Unknown (";
+            text += std::to_wstring((int)type);
+            text += L")";
         }
     }
-    return s != NULL;
+    catch (...)
+    {
+        text.clear();
+        return FALSE;
+    }
+    return value != NULL;
 }
 
 BOOL GetColumnEmptyValue(const char* empty, CSrvTypeColumnTypes type, CQuadWord* qwVal,

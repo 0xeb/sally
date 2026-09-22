@@ -26,9 +26,9 @@ BOOL CheckEntries(DWORD dirOffs, DWORD totalEntries)
     {
         dummy = 0;
         if (SetFilePointer(ZipFile, offs, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
-            return Error(STR_ERRACCESS, ZipName);
+            return ErrorPath(STR_ERRACCESS, ZipName.c_str());
         if (!Read(ZipFile, &header, sizeof(CFileHeader)))
-            return Error(STR_ERRREAD, ZipName);
+            return ErrorPath(STR_ERRREAD, ZipName.c_str());
         if (header.Signature != SIG_CENTRFH)
             return Error(STR_BADFORMAT);
         if (header.Flag & GPF_ENCRYPTED)
@@ -55,7 +55,7 @@ BOOL CheckZip()
     DWORD toRead;
     DWORD offs;
     if (ArcSize == 0xFFFFFFFF)
-        return Error(STR_ERRACCESS, ZipName);
+        return ErrorPath(STR_ERRACCESS, ZipName.c_str());
     if (ArcSize < 22)
         return Error(STR_BADFORMAT);
     if (ArcSize > 0xFFFF)
@@ -71,9 +71,9 @@ BOOL CheckZip()
     LONG dummy;
     dummy = 0;
     if (SetFilePointer(ZipFile, offs, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
-        return Error(STR_ERRACCESS, ZipName);
+        return ErrorPath(STR_ERRACCESS, ZipName.c_str());
     if (!Read(ZipFile, IOBuffer, toRead))
-        return Error(STR_ERRREAD, ZipName);
+        return ErrorPath(STR_ERRREAD, ZipName.c_str());
     for (char* ptr = IOBuffer + toRead - 22; ptr > IOBuffer; ptr--)
     {
         if (*(__UINT32*)ptr == SIG_EOCENTRDIR)
@@ -85,7 +85,7 @@ BOOL CheckZip()
             if (eocdr->TotalEntries == 0)
                 return Error(STR_EMPTYARCHIVE);
             if (EOCentrDirOffs > eocdr->CentrDirOffs + eocdr->CentrDirSize)
-                return Error(STR_BADFORMAT, ZipName);
+                return ErrorPath(STR_BADFORMAT, ZipName.c_str());
             return CheckEntries(eocdr->CentrDirOffs, eocdr->TotalEntries);
         }
     }

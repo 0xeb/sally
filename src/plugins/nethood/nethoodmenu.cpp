@@ -65,9 +65,11 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
             SalamanderGeneral->RemoveCurrentPathFromHistory(iPanel);
         }
 
+        // The redirect path is wide now - the narrow bridge this
+        // comment used to describe is obsolete.
         if (!SalamanderGeneral->ChangePanelPath(
                 iPanel,
-                g_aszRedirectPath[id - MENUCMD_REDIRECT_BASE]))
+                g_redirectPaths[id - MENUCMD_REDIRECT_BASE].c_str()))
         {
             // FIXME: Go back to last cache path
             assert(0);
@@ -82,7 +84,7 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
         int iPop;
         CNethoodCache::Node node;
         CNethoodFSInterface *pNethoodLeft, *pNethoodRight;
-        TCHAR* pszTooltip;
+        std::wstring toolTip;
 
         g_oNethoodCache.LockCache();
 
@@ -102,15 +104,16 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
 
         if (pNethoodLeft || pNethoodRight)
         {
-            pszTooltip = SalamanderGeneral->LoadStr(
-                GetLangInstance(),
-                IDS_REFRESHING);
+            // LoadStr is wide-native; the narrow LoadStrNarrow ->
+            // ToWideArg round-trip this used to do was pure unmigrated debt (same shape
+            // as the SetRedirectPath chain fixed earlier), not narrow-by-design.
+            toolTip = SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_REFRESHING);
 
             if (pNethoodLeft)
             {
                 SalamanderGeneral->StartThrobber(
                     PANEL_LEFT,
-                    pszTooltip,
+                    toolTip.c_str(),
                     THROBBER_GRACE_PERIOD);
             }
 
@@ -118,7 +121,7 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
             {
                 SalamanderGeneral->StartThrobber(
                     PANEL_RIGHT,
-                    pszTooltip,
+                    toolTip.c_str(),
                     THROBBER_GRACE_PERIOD);
             }
         }
@@ -131,7 +134,7 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
     {
         int iPanel;
         int iName;
-        TCHAR szTrueDisplayName[128];
+        wchar_t szTrueDisplayName[128];
         CTsClientName oClientName(&g_oNethoodCache);
         CTsNameFormatter oFormatter;
         CNethoodCache::TSCDisplayMode displayMode;
@@ -140,21 +143,24 @@ CNethoodPluginInterfaceForMenuExt::ExecuteMenuItem(
         iPanel = iName + PANEL_LEFT;
         assert(iPanel == PANEL_LEFT || iPanel == PANEL_RIGHT);
 
-        if (g_aszFocusShareName[iName][0] != TEXT('\0'))
+        if (!g_focusShareNames[iName].empty())
         {
             displayMode = g_oNethoodCache.GetDisplayTSClientVolumes();
             assert(displayMode != CNethoodCache::TSCDisplayNone);
 
             oFormatter.Format(
                 displayMode,
-                g_aszFocusShareName[iName],
+                g_focusShareNames[iName].c_str(),
                 &oClientName,
                 szTrueDisplayName,
                 COUNTOF(szTrueDisplayName));
 
+            // szTrueDisplayName is wide now (CTsNameFormatter::Format
+            // widened along with cache.h) - the narrow-bridge this comment used to describe
+            // is obsolete, pass it straight through.
             FocusItemInPanel(iPanel, szTrueDisplayName);
 
-            g_aszFocusShareName[iName][0] = TEXT('\0');
+            g_focusShareNames[iName].clear();
         }
 
         return FALSE;
@@ -208,14 +214,14 @@ CNethoodFSInterface* CNethoodPluginInterfaceForMenuExt::CheckThrobberForPanel(
 
 bool CNethoodPluginInterfaceForMenuExt::FocusItemInPanel(
     __in int iPanel,
-    __in PCTSTR pszItemName)
+    __in const wchar_t* pszItemName)
 {
     const CFileData* pFile;
     int iFile = 0;
 
     while ((pFile = SalamanderGeneral->GetPanelItem(iPanel, &iFile, NULL)) != NULL)
     {
-        if (_tcscmp(pFile->Name, pszItemName) == 0)
+        if (wcscmp(pFile->Name, pszItemName) == 0)
         {
             SalamanderGeneral->SetPanelFocusedItem(iPanel, pFile, FALSE);
             return true;

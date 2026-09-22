@@ -26,13 +26,20 @@
 //
 
 // Used messages:
-// WM_USER_TTGETTEXT - used to request text for a specific ID
+// WM_USER_TTGETTEXTW - used to request text for a specific ID (preferred form)
 //   wParam = ID passed to SetCurrentToolTip
-//   lParam = buffer (points to tooltip buffer) maximum character count is TOOLTIP_TEXT_MAX
+//   lParam = wchar_t buffer (points to tooltip buffer) maximum character count is TOOLTIP_TEXT_MAX
 //            before calling this message, a terminator is placed at index zero
 //            text may contain \n for a new line and \t for a tab
 // if the window writes a null-terminated string into the buffer, it will be shown in the tooltip
-// otherwise the tooltip will not be shown
+//
+// WM_USER_TTGETTEXTW is asked first; if the window leaves the buffer empty we retry with the
+// narrow WM_USER_TTGETTEXT and convert the answer. That fallback is what keeps v107 plugins
+// (loaded through compat/sdk107) showing tooltips without a source change. It is also why the
+// wide form had to be a new message number instead of a redefinition of the old lParam -- see
+// the note on WM_USER_TTGETTEXTW in spl_gui.h.
+//
+// If neither message yields text, the tooltip is not shown.
 //
 
 class CToolTip : public CWindow
@@ -46,7 +53,7 @@ class CToolTip : public CWindow
     };
 
 protected:
-    char Text[TOOLTIP_TEXT_MAX];
+    wchar_t Text[TOOLTIP_TEXT_MAX];
     int TextLen;
     HWND HNotifyWindow;
     DWORD LastID;

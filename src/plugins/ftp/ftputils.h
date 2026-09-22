@@ -1,10 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
+#include <string>
+#include <string_view>
+
 extern const char* FTP_ANONYMOUS; // standard name for an anonymous user
+class CFtpTextCodec;
 // standard FTP port (21) is defined in the constant: IPPORT_FTP
 
 // path type constants on an FTP server for function GetFTPServerPathType
@@ -28,11 +32,12 @@ enum CFTPServerPathType
 // is the FTP server response to the SYST command (our ftpcmdSystem); 'path' is the path on the FTP
 CFTPServerPathType GetFTPServerPathType(const char* serverFirstReply, const char* serverSystem,
                                         const char* path);
+CFTPServerPathType GetFTPServerPathTypeW(const char* serverFirstReply, const char* serverSystem,
+                                         const wchar_t* path);
 
-// parses the system name from the server response to the SYST command stored in 'serverSystem'
-// and stores it into 'sysName' (a buffer of at least 201 characters); if it is not possible to
-// obtain the system name from this response, returns an empty string
-void FTPGetServerSystem(const char* serverSystem, char* sysName);
+// Parses the system name from an encoded SYST reply. The returned view aliases
+// 'serverSystem' and is empty when the reply has no usable system token.
+std::string_view FTPGetServerSystem(const char* serverSystem) noexcept;
 
 // shortens the FTP server path by the last directory/file (directory separators depend on the
 // path type - 'type'), 'path' is an in/out buffer (min. size 'pathBufSize' bytes; note that with
@@ -45,12 +50,22 @@ void FTPGetServerSystem(const char* serverSystem, char* sysName);
 BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                      char* cutDir, int cutDirBufSize, BOOL* fileNameCouldBeCut);
 
+// Dynamic owner overload for encoded FTP server paths. Both outputs remain
+// unchanged if the path cannot be shortened or storage cannot be allocated.
+BOOL FTPCutDirectory(CFTPServerPathType type, std::string& path,
+                     std::string* cutDir, BOOL* fileNameCouldBeCut) noexcept;
+
 // concatenates the path 'path' and 'name' (file/directory name - 'isDir' is FALSE/TRUE) into
 // 'path', performing the concatenation according to the path type - 'type'; 'path' is a buffer of
 // at least 'pathSize' characters; returns TRUE if 'name' fits into 'path'; if 'path' or 'name' is
 // empty, no concatenation occurs (the 'path' path may be adjusted - truncated to the minimal length - e.g.
 // "/pub/" + "" = "/pub")
 BOOL FTPPathAppend(CFTPServerPathType type, char* path, int pathSize, const char* name, BOOL isDir);
+
+// Dynamic owner overload for encoded FTP server paths. The input remains
+// unchanged if concatenation fails or storage cannot be allocated.
+BOOL FTPPathAppend(CFTPServerPathType type, std::string& path,
+                   const char* name, BOOL isDir) noexcept;
 
 // determines whether the FTP server path (not a user-part path) 'path' is valid and whether it is
 // not a root path (detection is based on the path type - 'type'); returns TRUE if 'path' is valid
@@ -63,6 +78,9 @@ void FTPConvertHexEscapeSequences(char* txt);
 // ASCII characters (e.g. "%20" = "%2520"); 'txtSize' is the size of the 'txt' buffer; returns
 // FALSE if the buffer is too small for a successful conversion
 BOOL FTPAddHexEscapeSequences(char* txt, int txtSize);
+// The wide semantic-text counterparts of both live in ftp_text_codec.h: escape RUNS are bytes
+// and decode through the local-text boundary declared there, while the literal text around them
+// is UTF-16 and must not be narrowed at all.
 
 // splits the user-part path into individual components (user name, host, port, and path (without
 // '/' or '\\' at the beginning)); inserts zero terminators into the path string 'p' so each
@@ -77,11 +95,14 @@ BOOL FTPAddHexEscapeSequences(char* txt, int txtSize);
 // "/path" can also be "\path") + "user:password@", ":password", and ":port" can be omitted
 void FTPSplitPath(char* p, char** user, char** password, char** host, char** port,
                   char** path, char* firstCharOfPath, int userLength);
+void FTPSplitPathW(wchar_t* p, wchar_t** user, wchar_t** password, wchar_t** host,
+                   wchar_t** port, wchar_t** path, wchar_t* firstCharOfPath, int userLength);
 
 // returns the length of the username for use in the "userLength" parameters (FTPSplitPath,
 // FTPFindPath, etc.); for an anonymous user and other usernames without special characters
 // ('@', '/', '\', ':') returns zero; 'user' can also be NULL
 int FTPGetUserLength(const char* user);
+int FTPGetUserLengthW(const wchar_t* user);
 
 // returns a pointer to the remote path in an FTP path (a pointer into the 'path' buffer); 'path'
 // is in the format "//user:password@host:port/remotepath" or just
@@ -90,12 +111,14 @@ int FTPGetUserLength(const char* user);
 // contain "forbidden" characters, otherwise it is the expected length of the user name; if the
 // remote path is not found, returns a pointer to the end of the 'path' string
 const char* FTPFindPath(const char* path, int userLength);
+const wchar_t* FTPFindPathW(const wchar_t* path, int userLength);
 
 // based on the path type returns a pointer to the remote path in the path (a pointer into the
 // 'path' buffer); used to skip/keep the leading slash/backslash in the path; 'path' is of the form
 // "/remotepath" or "\remotepath" (the part of the path after the host in the user-part path); 'type' is
 // the path type
 const char* FTPGetLocalPath(const char* path, CFTPServerPathType type);
+const wchar_t* FTPGetLocalPathW(const wchar_t* path, CFTPServerPathType type);
 
 // compares two paths on the FTP server (not user-part paths), returns TRUE if they are the same;
 // 'type' is the type of at least one of the paths
@@ -106,6 +129,8 @@ BOOL FTPIsTheSameServerPath(CFTPServerPathType type, const char* p1, const char*
 // paths; if 'mustBeSame' is TRUE, 'prefix' and 'path' must match (same function as
 BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const char* path,
                              BOOL mustBeSame = FALSE);
+BOOL FTPIsPrefixOfServerPathW(CFTPServerPathType type, const wchar_t* prefix, const wchar_t* path,
+                              BOOL mustBeSame = FALSE);
 
 // compares two user-part paths on FTP, returns TRUE if they are the same; if
 // 'sameIfPath2IsRelative' is TRUE, returns TRUE even if 'p1' and 'p2' match only in user+host+port
@@ -114,14 +139,17 @@ BOOL FTPIsPrefixOfServerPath(CFTPServerPathType type, const char* prefix, const 
 // characters, otherwise it is the expected length of the user name
 BOOL FTPIsTheSamePath(CFTPServerPathType type, const char* p1, const char* p2,
                       BOOL sameIfPath2IsRelative, int userLength);
+BOOL FTPIsTheSamePathW(CFTPServerPathType type, const wchar_t* p1, const wchar_t* p2,
+                       BOOL sameIfPath2IsRelative, int userLength);
 
 // compares the roots of two user-part FTP paths, returns TRUE if they are the same;
 // 'userLength' is zero if we do not know how long the user name is or if it does not contain "forbidden"
 // characters, otherwise it is the expected length of the user name
 BOOL FTPHasTheSameRootPath(const char* p1, const char* p2, int userLength);
+BOOL FTPHasTheSameRootPathW(const wchar_t* p1, const wchar_t* p2, int userLength);
 
-// returns an error description
-char* FTPGetErrorText(int err, char* buf, int bufSize);
+// returns a dynamically owned error description
+BOOL FTPGetErrorText(int err, std::string& text) noexcept;
 
 // returns, based on the path type, the character used to separate path components (subdirectories)
 char FTPGetPathDelimiter(CFTPServerPathType pathType);
@@ -129,10 +157,12 @@ char FTPGetPathDelimiter(CFTPServerPathType pathType);
 // only for the ftpsptIBMz_VM path type: obtains the root path from the path 'path';
 // 'root'+'rootSize' is the buffer for the result; returns success
 BOOL FTPGetIBMz_VMRootPath(char* root, int rootSize, const char* path);
+BOOL FTPGetIBMz_VMRootPath(std::string& root, const char* path) noexcept;
 
 // only for the ftpsptOS2 path type: obtains the root path from the path 'path';
 // 'root'+'rootSize' is the buffer for the result; returns success
 BOOL FTPGetOS2RootPath(char* root, int rootSize, const char* path);
+BOOL FTPGetOS2RootPath(std::string& root, const char* path) noexcept;
 
 // obtains the numeric value from the UNIX rights string 'rights'; returns the value in actAttr
 // (must not be NULL); if it finds permissions that cannot be set via "site chmod" ('s', 't', etc.),
@@ -140,18 +170,20 @@ BOOL FTPGetOS2RootPath(char* root, int rootSize, const char* path);
 // returns TRUE, otherwise it returns FALSE (unknown rights string or e.g. ACL rights on UNIX (such
 BOOL GetAttrsFromUNIXRights(DWORD* actAttr, DWORD* attrDiff, const char* rights);
 
-// converts 'attrs' (numeric rights on UNIX) to a UNIX rights string (without the first letter)
-// into the 'buf' buffer of size 'bufSize'
-void GetUNIXRightsStr(char* buf, int bufSize, DWORD attrs);
+// Isolates InetNtopW's documented IPv4 caller-storage contract and publishes
+// dynamically owned presentation text only after the complete address exists.
+BOOL FTPFormatIPv4Address(DWORD address, std::wstring& output) noexcept;
+
+// Dynamically queries a window class and compares the complete result.
+BOOL FTPWindowHasClass(HWND window, const wchar_t* expectedClass) noexcept;
 
 // returns TRUE if 'rights' represents UNIX link rights; UNIX rights = must have 10 characters or 11
 // if it ends with '+' (ACL rights); link rights format: 'lrw?rw?rw?' + instead of 'r' and 'w'
 // there may be '-'
 BOOL IsUNIXLink(const char* rights);
 
-// same function as FTPGetErrorText, only ensures CRLF at the end of the string;
-// NOTE: 'bufSize' must be greater than 2
-void FTPGetErrorTextForLog(DWORD err, char* errBuf, int bufSize);
+// same function as FTPGetErrorText, only ensures CRLF at the end of the string
+BOOL FTPGetErrorTextForLog(DWORD err, std::string& text) noexcept;
 
 // method for detecting whether the buffer 'readBytes' (with 'readBytesCount' valid bytes, reading
 // from position 'readBytesOffset') already contains the entire response from the FTP server;
@@ -166,7 +198,8 @@ BOOL FTPReadFTPReply(char* readBytes, int readBytesCount, int readBytesOffset,
 // does not strictly require "257" at the beginning of the string (handle if necessary before
 // calling); returns TRUE if the directory was obtained successfully
 // can be called from any thread
-BOOL FTPGetDirectoryFromReply(const char* reply, int replySize, char* dirBuf, int dirBufSize);
+BOOL FTPGetDirectoryFromReply(const char* reply, int replySize, std::string& directory);
+BOOL FTPGetDirectoryFromReply(std::string_view reply, std::string& directory);
 
 // parses IP+port from the string 'reply' of length 'replySize' (-1 == use 'strlen(reply)') (returns
 // it in 'ip'+'port' (must not be NULL); rules see RFC 959 - FTP response number 227);
@@ -174,6 +207,7 @@ BOOL FTPGetDirectoryFromReply(const char* reply, int replySize, char* dirBuf, in
 // calling); returns TRUE if obtaining IP+port succeeded
 // can be called from any thread
 BOOL FTPGetIPAndPortFromReply(const char* reply, int replySize, DWORD* ip, unsigned short* port);
+BOOL FTPGetIPAndPortFromReply(std::string_view reply, DWORD* ip, unsigned short* port);
 
 // parses the data size from the string 'reply' of length 'replySize' and returns it in 'size';
 // on success returns TRUE, otherwise FALSE and 'size' is set arbitrarily
@@ -181,11 +215,13 @@ BOOL FTPGetDataSizeInfoFromSrvReply(CQuadWord& size, const char* reply, int repl
 
 // creates a VMS directory name (adds ".DIR;1")
 void FTPMakeVMSDirName(char* vmsDirNameBuf, int vmsDirNameBufSize, const char* dirName);
+BOOL FTPMakeVMSDirName(std::string& vmsDirName, const char* dirName) noexcept;
 
 // checks whether there is an escape sequence before the character 'checkedChar' in the path
 // 'pathBeginning' (e.g. "^." is '.', which VMS does not consider a path or extension separator,
 // etc.); returns TRUE if there is an escape sequence before the character (meaning the character
 BOOL FTPIsVMSEscapeSequence(const char* pathBeginning, const char* checkedChar);
+BOOL FTPIsVMSEscapeSequenceW(const wchar_t* pathBeginning, const wchar_t* checkedChar);
 
 // returns TRUE if the path 'path' of type 'type' ends with a path component delimiter
 // (e.g. "/pub/dir/" or "PUB$DEVICE:[PUB.VMS.]")
@@ -197,10 +233,13 @@ BOOL FTPPathEndsWithDelimiter(CFTPServerPathType type, const char* path);
 // does not fit into the buffer, it is truncated); returns TRUE if shortening occurred
 BOOL FTPIBMz_VmCutTwoDirectories(char* path, int pathBufSize, char* cutDir, int cutDirBufSize);
 
+// Dynamic encoded-byte owner overload. Both outputs remain unchanged on failure.
+BOOL FTPIBMz_VmCutTwoDirectories(std::string& path, std::string& cutDir) noexcept;
+
 // trims the file version number from an OpenVMS file name (e.g. "a.txt;1" -> "a.txt");
-// 'name' is the name; 'nameLen' is the length of 'name' (-1 = length unknown, use strlen(name));
+// 'name' is the name; 'nameLen' is the length of 'name' in characters (-1 = length unknown, use wcslen(name));
 // returns TRUE if trimming occurred
-BOOL FTPVMSCutFileVersion(char* name, int nameLen);
+BOOL FTPVMSCutFileVersion(wchar_t* name, int nameLen);
 
 // returns TRUE if 'path' is a relative path on a path of type 'pathType';
 // NOTE: e.g. "[pub]" on VMS or "/dir" on OS/2 are considered absolute paths for this function,
@@ -217,6 +256,10 @@ BOOL FTPIsPathRelative(CFTPServerPathType pathType, const char* path);
 BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path,
                                     char* cut, int cutBufSize);
 
+// Dynamic encoded-byte owner overload. Both outputs are unchanged on failure.
+BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, std::string& path,
+                                    std::string& cut) noexcept;
+
 // completes an absolute path to a full absolute path (for VMS the volume is added - e.g.
 // "PUB$DEVICE:", for OS/2 the drive - e.g. "C:"); 'pathType' is the path type; 'path' is an
 // absolute path; 'path' (a buffer of at least 'pathBufSize' characters) returns the full
@@ -226,10 +269,17 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path,
 BOOL FTPCompleteAbsolutePath(CFTPServerPathType pathType, char* path, int pathBufSize,
                              const char* workPath);
 
+// Completes an encoded server path without an application capacity ceiling.
+BOOL FTPCompleteAbsolutePath(CFTPServerPathType pathType, std::string& path,
+                             std::string_view workPath) noexcept;
+
 // removes "." and ".." from the path 'path' of type 'pathType' (applies only to selected path
 // types; for example on VMS this function does nothing); returns FALSE only if ".." cannot be
 // removed (the path is invalid: e.g. "/..")
 BOOL FTPRemovePointsFromPath(char* path, CFTPServerPathType pathType);
+
+// Removes dot components from a dynamic encoded server path transactionally.
+BOOL FTPRemovePointsFromPath(std::string& path, CFTPServerPathType pathType) noexcept;
 
 // returns TRUE if the file system with path type 'pathType' is case-sensitive (unix),
 // otherwise it is case-insensitive (windows)
@@ -254,23 +304,24 @@ BOOL FTPMayBeValidNameComponent(const char* name, const char* path, BOOL isDir,
 void FTPAddOperationMask(CFTPServerPathType pathType, char* targetPath, int targetPathBufSize,
                          BOOL noFilesSelected);
 
-// generates a new name for the name 'originalName' (it is a file/directory if 'isDir' is
-// FALSE/TRUE) on a path of type 'pathType'; 'phase' is the IN/OUT generation phase (0 = initial
+// generates a new name for the encoded name 'originalName' using the session 'codec' (it is a
+// file/directory if 'isDir' is FALSE/TRUE) on a path of type 'pathType'; 'phase' is the IN/OUT generation phase (0 = initial
 // phase, returns -1 if there is no next phase, otherwise returns the number of the next phase -
-// used for possible subsequent calls of this function); 'newName' is the buffer for the generated
-// name (buffer size is MAX_PATH); 'index' is the IN/OUT name index within phase 'phase'
+// used for possible subsequent calls of this function); 'newName' transactionally receives the
+// complete encoded name; 'index' is the IN/OUT name index within phase 'phase'
 // (used for generating additional names in a single phase), zero on the first call within one
 // phase; 'alreadyRenamedFile' is TRUE only if it is a file that has most likely
-// already been renamed (we ensure "name (2)"->"name (3)" instead of ->"name (2) (2)")
-void FTPGenerateNewName(int* phase, char* newName, int* index, const char* originalName,
-                        CFTPServerPathType pathType, BOOL isDir, BOOL alreadyRenamedFile);
+// already been renamed (we ensure "name (2)"->"name (3)" instead of ->"name (2) (2)"); returns
+// FALSE without changing any output if storage or exact local encoding fails
+BOOL FTPGenerateNewName(const CFtpTextCodec& codec, int* phase, std::string& newName,
+                        int* index, const char* originalName,
+                        CFTPServerPathType pathType, BOOL isDir, BOOL alreadyRenamedFile) noexcept;
 
 // for AS/400: if the name is in the form "???1.file/???2.mbr" (both names ???1 and ???2 are the
-// same), copies "???2.mbr" into 'mbrName' (a buffer of size MAX_PATH), otherwise copies
-// "???1.???2.mbr"
-void FTPAS400CutFileNamePart(char* mbrName, const char* name);
+// same), returns "???2.mbr", otherwise returns "???1.???2.mbr"
+std::wstring FTPAS400CutFileNamePartW(const wchar_t* name);
 
-// for AS/400: if the name is in the form "???.mbr", rewrites 'name' (a buffer of size at least
-// 2*MAX_PATH) to "???.file/???.mbr" (both names ??? are the same); if the name is in the form
-// "???1.???2.mbr", writes "???1.file.???2.mbr" into 'name'
-void FTPAS400AddFileNamePart(char* name);
+// for AS/400: if the encoded name is in the form "???.mbr", rewrites it to
+// "???.file/???.mbr" (both names ??? are the same); if it is in the form
+// "???1.???2.mbr", rewrites it to "???1.file/???2.mbr".
+void FTPAS400AddFileNamePart(std::string& name);

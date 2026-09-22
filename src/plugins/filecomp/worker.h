@@ -191,7 +191,7 @@ struct CBinaryCompareResults
 {
     struct
     {
-        const char* Name;
+        const wchar_t* Name;
         QWORD Size;
     } Files[2];
     CCompareOptions& Options;
@@ -219,11 +219,11 @@ struct CTextCompareResults
     typedef std::vector<CChar*> CLineBuffer;
     struct CFiles
     {
-        const char* Name;
+        const wchar_t* Name;
         CChar* Text;
         CLineBuffer Lines;
         CLineScript LineScript;
-        char Encoding[100];
+        std::wstring Encoding;
     } Files[2];
     CCompareOptions& Options;
     CIntIndexes ChangesToLines;
@@ -259,8 +259,7 @@ protected:
 
 struct CWorkerFileData
 {
-    std::string Name;
-    std::wstring NameW; // Wide path for Unicode/long path filenames
+    std::wstring Name;
     HANDLE File;
     QWORD Size;
 
@@ -277,11 +276,15 @@ struct CWorkerFileData
 class CFilecompWorker : public CThread
 {
 public:
-    // generic failure
+    // Generic failure. The message remains UTF-16 from the worker through the
+    // synchronous WN_ERROR handoff to the UI thread.
     class CException : public std::exception
     {
+        std::wstring Message;
+
     public:
-        CException(const char* s = "Unspecified Error.") : exception(s) {}
+        CException(const wchar_t* s = L"Unspecified Error.") : Message(s != NULL ? s : L"") {}
+        const wchar_t* WhatW() const { return Message.c_str(); }
         static void Raise(int error, int lastError, ...);
     };
     // aborted by the user
@@ -303,9 +306,9 @@ public:
         CAllDiffsIgnoredException() : exception("") {}
     };
 
-    CFilecompWorker(HWND parent, HWND mainWindow, const char* name0, const char* name1,
-                    const CCompareOptions& options, const int& cancelFlag, HANDLE event,
-                    const wchar_t* name0W = NULL, const wchar_t* name1W = NULL);
+    CFilecompWorker(HWND parent, HWND mainWindow, const wchar_t* name0,
+                    const wchar_t* name1, const CCompareOptions& options,
+                    const int& cancelFlag, HANDLE event);
 
 protected:
     HWND Parent;

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <limits>
+
 // Error codes returned by SSL_get_error()
 #define SSL_ERROR_NONE 0
 #define SSL_ERROR_SSL 1
@@ -31,8 +33,6 @@
 #define SSL_OP_ALL 0x80000BFFL
 
 #define SSL_OP_NO_SSLv2 0x01000000L
-
-#define MAX_DER_CERT_SIZE 5120 // Is 5KB enough?
 
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
 
@@ -66,6 +66,128 @@
 sSSLLib SSLLib;
 
 static bool bSSLInited = false;
+
+// OpenSSL 0.9.x exposes diagnostic strings as library-owned narrow bytes. Keep
+// that legacy encoding decision at this adapter instead of widening ad hoc at
+// every log call.
+static BOOL DecodeSSLLibraryText(const char* bytes, std::wstring& text) noexcept
+{
+    return FtpDecodeLocalText(bytes != NULL ? bytes : "", text);
+}
+
+static BOOL GetOpenSSLNameOneLine(X509_NAME* name, std::string& text) noexcept
+{
+    if (name == NULL)
+        return FALSE;
+    try
+    {
+        size_t capacity = 256;
+        for (;;)
+        {
+            if (capacity > static_cast<size_t>((std::numeric_limits<int>::max)()))
+                return FALSE;
+            std::string staged(capacity, '\0');
+            if (SSLLib.X509_NAME_oneline(name, staged.data(),
+                                         static_cast<int>(staged.size())) == NULL)
+                return FALSE;
+            const size_t length = strnlen_s(staged.data(), staged.size());
+            if (length + 1 < staged.size())
+            {
+                staged.resize(length);
+                text.swap(staged);
+                return TRUE;
+            }
+            if (capacity > static_cast<size_t>((std::numeric_limits<int>::max)()) / 2)
+                return FALSE;
+            capacity *= 2;
+        }
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+static BOOL GetOpenSSLErrorText(unsigned long errorCode, std::string& text) noexcept
+{
+    // ERR_error_string's frozen OpenSSL 0.9 ABI requires caller storage of at
+    // least 256 bytes. Keep that contract inside this adapter and publish an
+    // exact dynamically owned byte string to the rest of the plugin.
+    constexpr size_t OpenSSLErrorStringStorage = 256;
+    try
+    {
+        std::string staged(OpenSSLErrorStringStorage, '\0');
+        const char* result = SSLLib.ERR_error_string(errorCode, staged.data());
+        if (result == NULL)
+            return FALSE;
+        staged.resize(strnlen_s(staged.data(), staged.size()));
+        text.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+static void LogSSLFormatted(int logUID, BOOL addTime, const wchar_t* format, ...) noexcept
+{
+    va_list args;
+    va_start(args, format);
+    try
+    {
+        std::wstring message = SPLFormatStringOwnedV(format, args);
+        if (!message.empty())
+            Logs.LogMessage(logUID, message.c_str(), -1, addTime);
+    }
+    catch (...)
+    {
+        // Diagnostics are best effort and must never escape a socket callback.
+    }
+    va_end(args);
+}
+
+static void LogSSLResource(int logUID, int resourceID, BOOL addTime, ...) noexcept
+{
+    va_list args;
+    va_start(args, addTime);
+    try
+    {
+        const std::wstring format = LangStr(resourceID);
+        std::wstring message = SPLFormatStringOwnedV(format.c_str(), args);
+        if (!message.empty())
+            Logs.LogMessage(logUID, message.c_str(), -1, addTime);
+    }
+    catch (...)
+    {
+        // Diagnostics are best effort and must never escape a socket callback.
+    }
+    va_end(args);
+}
+
+static void LogSSLLibraryText(int logUID, const char* bytes, BOOL addTime = FALSE) noexcept
+{
+    try
+    {
+        std::wstring text;
+        if (DecodeSSLLibraryText(bytes, text))
+            Logs.LogMessage(logUID, text.c_str(), -1, addTime);
+    }
+    catch (...)
+    {
+        // Diagnostics are best effort and must never escape a socket callback.
+    }
+}
+
+static void LogSSLAlgorithm(int logUID, const char* versionBytes, const char* cipherBytes,
+                            int bits) noexcept
+{
+    std::wstring version;
+    std::wstring cipher;
+    DecodeSSLLibraryText(versionBytes, version);
+    DecodeSSLLibraryText(cipherBytes, cipher);
+    LogSSLResource(logUID, IDS_SSL_LOG_ALGO, FALSE, version.c_str(), cipher.c_str(), bits);
+}
 
 BYTE hex(char c)
 {
@@ -161,22 +283,28 @@ static TSymbolInfo SSLUtilSymbols[] = {
                                             IMP_SYMBOL(CRYPTO_set_locking_callback)
                                                 IMP_SYMBOL(RAND_seed){NULL, NULL}};
 
-static bool LoadSymbols(LPCTSTR libName, LPCTSTR altLibName, HINSTANCE& hLib, PSymbolInfo pSymbols, int logUID)
+static bool LoadSymbols(LPCWSTR libName, LPCWSTR altLibName, HINSTANCE& hLib, PSymbolInfo pSymbols, int logUID)
 {
-    hLib = LoadLibrary(libName);
+    hLib = LoadLibraryW(libName);
     if (!hLib && altLibName)
     {
-        hLib = LoadLibrary(altLibName);
+        hLib = LoadLibraryW(altLibName);
         if (hLib)
             libName = altLibName;
     }
+    const DWORD loadError = hLib ? ERROR_SUCCESS : GetLastError();
     if (hLib)
         SalamanderDebug->AddModuleWithPossibleMemoryLeaks(libName);
-    CPathBuffer buf;
+
+    std::string libNameBytes;
+    const char* libNameForLog = FtpEncodeLocalText(libName, libNameBytes)
+                                    ? libNameBytes.c_str()
+                                    : "<Unicode library path>";
+    std::string message;
     if (!hLib)
     {
-        sprintf(buf, "Err %u: Unable to load %s\r\n", GetLastError(), libName);
-        Logs.LogMessage(logUID, buf, -1);
+        if (FTPFormatString(message, "Err %u: Unable to load %s\r\n", loadError, libNameForLog))
+            Logs.LogMessage(logUID, message.c_str(), -1);
         return false;
     }
     while (pSymbols->Addr)
@@ -184,8 +312,8 @@ static bool LoadSymbols(LPCTSTR libName, LPCTSTR altLibName, HINSTANCE& hLib, PS
         *pSymbols->Addr = GetProcAddress(hLib, pSymbols->Name);
         if (!*pSymbols->Addr)
         {
-            sprintf(buf, "Err %u: Unable to find %s in %s\r\n", GetLastError(), pSymbols->Name, libName);
-            Logs.LogMessage(logUID, buf, -1);
+            if (FTPFormatString(message, "Err %u: Unable to find %s in %s\r\n", GetLastError(), pSymbols->Name, libNameForLog))
+                Logs.LogMessage(logUID, message.c_str(), -1);
             return false;
         }
         pSymbols++;
@@ -193,39 +321,31 @@ static bool LoadSymbols(LPCTSTR libName, LPCTSTR altLibName, HINSTANCE& hLib, PS
     return true;
 } /* LoadSymbols */
 
-static void AddNewLine(char*& buf, int& maxlen)
+static void AddNewLine(std::wstring& text)
 {
-    if (maxlen > 0 && buf[0])
-    {
-        int len = (int)_tcslen(buf);
-        maxlen -= len;
-        buf += len;
-        if (maxlen && (buf[-1] != '\n') && (buf[-1] != '\r'))
-        {
-            _tcscpy(buf, _T("\n"));
-            maxlen--;
-            buf++;
-        }
-    }
+    if (!text.empty() && text.back() != L'\n' && text.back() != L'\r')
+        text += L'\n';
 } /* AddNewLine */
 
-static bool CheckCertificate(BYTE* pCert, int certLen, LPTSTR buf, int maxlen, const char* host,
-                             LPCWSTR hostW)
+static void CopyCertificatePolicyError(std::wstring& text, DWORD error)
 {
-    CALL_STACK_MESSAGE5("CheckCertificate(0x%p, %d, %s, %ls)", pCert, certLen, host, hostW);
+    text = SPLGetErrorTextOwned(SalamanderGeneral, error);
+}
+
+static bool CheckCertificate(BYTE* pCert, int certLen, std::wstring& errorText,
+                             const wchar_t* host)
+{
+    CALL_STACK_MESSAGE4("CheckCertificate(0x%p, %d, %ls)", pCert, certLen, host);
     CERT_CHAIN_PARA ChainPara;
     PCCERT_CHAIN_CONTEXT pChainContext = NULL;
     CERT_CHAIN_POLICY_PARA PolicyPara;
     CERT_CHAIN_POLICY_STATUS PolicyStatus;
     HTTPSPolicyCallbackData polHttps;
     PCCERT_CONTEXT pCertContext = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, pCert, certLen);
-    WCHAR PeerName[128];
-
-    if (maxlen > 0)
-        buf[0] = 0;
+    errorText.clear();
     if (!pCertContext)
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        CopyCertificatePolicyError(errorText, GetLastError());
         return false;
     }
 
@@ -246,7 +366,7 @@ CHECK_CERT_AGAIN:
                                  NULL,
                                  &pChainContext))
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        CopyCertificatePolicyError(errorText, GetLastError());
         CertFreeCertificateContext(pCertContext);
         return false;
     }
@@ -254,14 +374,7 @@ CHECK_CERT_AGAIN:
     polHttps.cbStruct = sizeof(HTTPSPolicyCallbackData);
     polHttps.dwAuthType = AUTHTYPE_SERVER;
     polHttps.fdwChecks = 0;
-    if (host != NULL)
-        MultiByteToWideChar(CP_ACP, 0, host, -1, PeerName, SizeOf(PeerName));
-    else
-    {
-        if (hostW != NULL)
-            lstrcpynW(PeerName, hostW, SizeOf(PeerName));
-    }
-    polHttps.pwszServerName = PeerName;
+    polHttps.pwszServerName = const_cast<wchar_t*>(host != NULL ? host : L"");
 
     memset(&PolicyPara, 0, sizeof(PolicyPara));
     PolicyPara.cbSize = sizeof(PolicyPara);
@@ -273,7 +386,7 @@ CHECK_CERT_AGAIN:
     if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL,
                                           pChainContext, &PolicyPara, &PolicyStatus))
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        CopyCertificatePolicyError(errorText, GetLastError());
         CertFreeCertificateChain(pChainContext);
         CertFreeCertificateContext(pCertContext);
         return false;
@@ -293,15 +406,15 @@ CHECK_CERT_AGAIN:
         else
         {
             ok = false;
-            lstrcpyn(buf, SalamanderGeneral->GetErrorText(PolicyStatus.dwError), maxlen);
+            CopyCertificatePolicyError(errorText, PolicyStatus.dwError);
         }
     }
     int res = CertVerifyTimeValidity(NULL, pCertContext->pCertInfo);
     if (res != 0)
     {
         ok = false;
-        AddNewLine(buf, maxlen);
-        lstrcpyn(buf, LoadStr((res < 0) ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED), maxlen);
+        AddNewLine(errorText);
+        errorText += LangStr((res < 0) ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED).c_str();
     }
     // Whatever flag is used, revokation check fails on most servers :-/
     /*int i;
@@ -322,7 +435,7 @@ CHECK_CERT_AGAIN:
     {
       ok = false;
       AddNewLine(buf, maxlen);
-      lstrcpyn(buf, SalamanderGeneral->GetErrorText(revStat.dwError), maxlen);
+      CopyCertificatePolicyError(buf, maxlen, revStat.dwError);
       break;
     }
   }*/
@@ -339,8 +452,9 @@ static bool ViewCertificate(HWND hParent, BYTE* pCertData, int CertDataLen, BYTE
     PCCERT_CONTEXT pCertContext = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, pCertData, CertDataLen);
     if (!pCertContext)
     {
-        const char* errStr = SalamanderGeneral->GetErrorText(GetLastError());
-        SalamanderGeneral->SalMessageBox(hParent, errStr, LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONSTOP);
+        const std::wstring errText = SPLGetErrorTextOwned(SalamanderGeneral, GetLastError());
+        const wchar_t* errStr = errText.c_str();
+        SalamanderGeneral->SalMessageBox(hParent, errStr, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONSTOP);
         return false;
     }
 
@@ -365,11 +479,12 @@ static bool ViewCertificate(HWND hParent, BYTE* pCertData, int CertDataLen, BYTE
         DWORD err = GetLastError();
         if (ERROR_CANCELLED != err)
         {
-            const char* errStr = SalamanderGeneral->GetErrorText(err);
+            const std::wstring errText = SPLGetErrorTextOwned(SalamanderGeneral, err);
+            const wchar_t* errStr = errText.c_str();
             CertFreeCertificateContext(pCertContext);
             if (hCertStore)
                 CertCloseStore(hCertStore, CERT_CLOSE_STORE_FORCE_FLAG);
-            SalamanderGeneral->SalMessageBox(hParent, errStr, LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONSTOP);
+            SalamanderGeneral->SalMessageBox(hParent, errStr, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONSTOP);
             return false;
         }
     }
@@ -380,14 +495,13 @@ static bool ViewCertificate(HWND hParent, BYTE* pCertData, int CertDataLen, BYTE
 } /* ViewCertificate */
 
 #ifdef _DEBUG
-static void InfoCallback(const SSL* s, int where, int ret)
+static void InfoCallback(const SSL* s, int where, int ret) noexcept
 {
     const char* str;
     int w;
-    char buf[512];
+    std::string message;
 
     w = where & ~SSL_ST_MASK;
-    buf[0] = 0;
 
     if (w & SSL_ST_CONNECT)
         str = "SSL_connect";
@@ -398,62 +512,64 @@ static void InfoCallback(const SSL* s, int where, int ret)
 
     if (where & SSL_CB_LOOP)
     {
-        sprintf(buf, "%s:%s\n", str, SSLLib.SSL_state_string_long(s));
+        FTPFormatString(message, "%s:%s\n", str, SSLLib.SSL_state_string_long(s));
     }
     else if (where & SSL_CB_ALERT)
     {
         str = (where & SSL_CB_READ) ? "read" : "write";
-        sprintf(buf, "SSL3 alert %s:%s:%s\n", str,
-                SSLLib.SSL_alert_type_string_long(ret),
-                SSLLib.SSL_alert_desc_string_long(ret));
+        FTPFormatString(message, "SSL3 alert %s:%s:%s\n", str,
+                        SSLLib.SSL_alert_type_string_long(ret),
+                        SSLLib.SSL_alert_desc_string_long(ret));
     }
     else if (where & SSL_CB_EXIT)
     {
         if (ret == 0)
         {
-            sprintf(buf, "%s:failed in %s\n", str, SSLLib.SSL_state_string_long(s));
+            FTPFormatString(message, "%s:failed in %s\n", str,
+                            SSLLib.SSL_state_string_long(s));
         }
         else if (ret < 0)
         {
-            sprintf(buf, "%s:error %d in %s\n", str, ret, SSLLib.SSL_state_string_long(s));
+            FTPFormatString(message, "%s:error %d in %s\n", str, ret,
+                            SSLLib.SSL_state_string_long(s));
         }
     }
-    if (buf[0])
+    if (!message.empty())
     {
-        OutputDebugString(buf);
-        TRACE_I(buf);
+        OutputDebugStringA(message.c_str());
+        TRACE_I(message.c_str());
     }
 }
 #endif
 
-void WriteSSLErrorStackToLog(int logUID, const char* errSrc)
+void WriteSSLErrorStackToLog(int logUID, const char* errSrc) noexcept
 {
     // log OpenSSL error stack
     int err2;
-    char buffer[256]; // they say: at least 120 bytes
     while ((err2 = SSLLib.ERR_get_error()) != 0)
     {
-        SSLLib.ERR_error_string(err2, buffer);
-        Logs.LogMessage(logUID, "SSL ERROR: ", -1);
-        Logs.LogMessage(logUID, errSrc, -1);
-        Logs.LogMessage(logUID, ": ", -1);
-        Logs.LogMessage(logUID, buffer, -1);
-        Logs.LogMessage(logUID, "\r\n", -1);
+        std::string errorBytes;
+        std::wstring source;
+        std::wstring error;
+        if (GetOpenSSLErrorText(err2, errorBytes) &&
+            DecodeSSLLibraryText(errSrc, source) &&
+            DecodeSSLLibraryText(errorBytes.c_str(), error))
+            LogSSLFormatted(logUID, FALSE, L"SSL ERROR: %s: %s\r\n",
+                            source.c_str(), error.c_str());
     }
 }
 
 BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unverifiedCert,
-                            int* errorID, char* errorBuf, int errorBufLen, CSocket* conForReuse)
+                            int* errorID, std::string* errorText, CSocket* conForReuse)
 {
     int err;
     SSL* Conn;
-    char buffer[256], name[200];
 
     CALL_STACK_MESSAGE3("CSocket::EncryptSocket(%d, , , , , , 0x%p)", logUID, conForReuse);
     if (errorID != NULL)
         *errorID = -1;
-    if (errorBufLen > 0)
-        errorBuf[0] = 0;
+    if (errorText != NULL)
+        errorText->clear();
     if (unverifiedCert != NULL)
         *unverifiedCert = NULL;
     if (sslErrorOccured != NULL)
@@ -486,7 +602,7 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
 
 #ifdef _DEBUG
         SSLLib.SSL_set_info_callback(Conn, InfoCallback);
-        Logs.LogMessage(logUID, "SSL DEBUG INFO: See Trace Server for messages from information callback for this SSL connection.\r\n", -1);
+        Logs.LogMessage(logUID, L"SSL DEBUG INFO: See Trace Server for messages from information callback for this SSL connection.\r\n", -1);
 #endif
 
         BOOL testReuseSSLSession = FALSE;
@@ -494,7 +610,7 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
         {
             SSL_SESSION* ssl_sessionid = SSLLib.SSL_get1_session(conForReuse->SSLConn); // sessionid.addref()
             if (ssl_sessionid == NULL)
-                Logs.LogMessage(logUID, "SSL ERROR: SSL_get1_session returns NULL!\r\n", -1);
+                Logs.LogMessage(logUID, L"SSL ERROR: SSL_get1_session returns NULL!\r\n", -1);
             else
             {
                 if (!SSLLib.SSL_set_session(Conn, ssl_sessionid))
@@ -518,7 +634,7 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             {
                 if (SSLLib.SSL_session_reused(Conn))
                 {
-                    Logs.LogMessage(logUID, "SSL INFO: SSL session reused for data-connection\r\n", -1);
+                    Logs.LogMessage(logUID, L"SSL INFO: SSL session reused for data-connection\r\n", -1);
                     if (conForReuse->ReuseSSLSession == 0 /* try */)
                         conForReuse->ReuseSSLSession = 1 /* yes */;
                 }
@@ -526,12 +642,12 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
                 {
                     if (conForReuse->ReuseSSLSession == 0 /* try */) // do not try again for future data-connections (or it will fail)
                     {
-                        Logs.LogMessage(logUID, "SSL INFO: SSL session was NOT reused, will not try for future data-connections...\r\n", -1);
+                        Logs.LogMessage(logUID, L"SSL INFO: SSL session was NOT reused, will not try for future data-connections...\r\n", -1);
                         conForReuse->ReuseSSLSession = 2 /* no */;
                     }
                     else // try for all future data-cons to set ReuseSSLSessionFailed to TRUE and so reconnect ctrl-con (except if this is keep-alive data-con)
                     {
-                        Logs.LogMessage(logUID, "SSL INFO: SSL session was NOT reused, it has expired in server session cache, reconnect of control connection is needed...\r\n", -1);
+                        Logs.LogMessage(logUID, L"SSL INFO: SSL session was NOT reused, it has expired in server session cache, reconnect of control connection is needed...\r\n", -1);
                         conForReuse->ReuseSSLSessionFailed = TRUE; // To open the data connection, reuse is probably necessary, but it reports an error; the only solution is to reconnect the control connection.
                     }
                 }
@@ -547,19 +663,22 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             int DERCertLen, PKCS7CertLen;
             int verRes = SSLLib.SSL_get_verify_result(Conn);
 
-            wsprintf(buffer, LoadStr(IDS_SSL_LOG_OSSL_CERT_VERIFY), verRes);
-            Logs.LogMessage(logUID, buffer, -1);
+            LogSSLResource(logUID, IDS_SSL_LOG_OSSL_CERT_VERIFY, FALSE, verRes);
 #ifdef _DEBUG
             const char* str = SSLLib.X509_verify_cert_error_string(verRes);
 #endif
 
             peerCert = SSLLib.SSL_get_peer_certificate(Conn);
-            SSLLib.X509_NAME_oneline(peerCert->cert_info->subject, name, sizeof(name));
-            wsprintf(buffer, LoadStr(IDS_SSL_LOG_SUBJECT), name);
-            Logs.LogMessage(logUID, buffer, -1);
-            SSLLib.X509_NAME_oneline(peerCert->cert_info->issuer, name, sizeof(name));
-            wsprintf(buffer, LoadStr(IDS_SSL_LOG_ISSUER), name);
-            Logs.LogMessage(logUID, buffer, -1);
+            std::string subjectBytes;
+            std::wstring subject;
+            if (GetOpenSSLNameOneLine(peerCert->cert_info->subject, subjectBytes) &&
+                DecodeSSLLibraryText(subjectBytes.c_str(), subject))
+                LogSSLResource(logUID, IDS_SSL_LOG_SUBJECT, FALSE, subject.c_str());
+            std::string issuerBytes;
+            std::wstring issuer;
+            if (GetOpenSSLNameOneLine(peerCert->cert_info->issuer, issuerBytes) &&
+                DecodeSSLLibraryText(issuerBytes.c_str(), issuer))
+                LogSSLResource(logUID, IDS_SSL_LOG_ISSUER, FALSE, issuer.c_str());
 
             // Obtain entire certificate chain upto root certificate
             certStack = SSLLib.SSL_get_peer_cert_chain(Conn);
@@ -595,41 +714,46 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             ssl_cipher = SSLLib.SSL_get_current_cipher(Conn);
             SSLLib.SSL_CIPHER_get_bits(ssl_cipher, &ssl_bits);
             cipher_name = SSLLib.SSL_CIPHER_get_name(ssl_cipher);
-            wsprintf(buffer, LoadStr(IDS_SSL_LOG_ALGO), ssl_version, cipher_name, ssl_bits);
-            Logs.LogMessage(logUID, buffer, -1);
+            LogSSLAlgorithm(logUID, ssl_version, cipher_name, ssl_bits);
 
             BOOL certAcceptedOrVerified = FALSE;
             if (pCertificate)
             {
                 if (pCertificate->IsSame(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen))
                 {
-                    Logs.LogMessage(logUID, LoadStr(pCertificate->IsVerified() ? IDS_SSL_LOG_CERTVERIFIED : IDS_SSL_LOG_CERTACCEPTED), -1, TRUE);
+                    Logs.LogMessage(logUID, LangStr(pCertificate->IsVerified() ? IDS_SSL_LOG_CERTVERIFIED : IDS_SSL_LOG_CERTACCEPTED).c_str(), -1, TRUE);
                     certAcceptedOrVerified = TRUE;
                 }
                 else // Huh! The certificate has changed?????
                 {
-                    Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTCHANGED), -1, TRUE);
+                    Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTCHANGED).c_str(), -1, TRUE);
                     pCertificate->Release();
                     pCertificate = NULL;
                 }
             }
             if (!certAcceptedOrVerified)
             {
-                if (CheckCertificate(DERCert, DERCertLen, errorBuf, errorBufLen, HostAddress, NULL))
+                std::wstring certificateError;
+                if (CheckCertificate(DERCert, DERCertLen, certificateError, HostAddress.c_str()))
                 {
-                    Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTVERIFIED), -1, TRUE);
-                    pCertificate = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, true, HostAddress);
+                    Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTVERIFIED).c_str(), -1, TRUE);
+                    pCertificate = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, true, HostAddress.c_str());
                     certAcceptedOrVerified = TRUE; // Passed
                 }
                 else
-                    Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTNOTVERIFIED), -1, TRUE);
+                {
+                    if (errorText != NULL &&
+                        !FtpEncodeLocalText(certificateError.c_str(), *errorText))
+                        errorText->clear();
+                    Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTNOTVERIFIED).c_str(), -1, TRUE);
+                }
             }
             if (!certAcceptedOrVerified)
             {
                 // The certificate was not verified nor previously accepted by user, so user should accept
                 // it before further using of this socket.
                 if (unverifiedCert != NULL)
-                    *unverifiedCert = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, false, HostAddress);
+                    *unverifiedCert = new CCertificate(DERCert, DERCertLen, PKCS7Cert, PKCS7CertLen, false, HostAddress.c_str());
                 else
                 {
                     SSLLib.SSL_shutdown(Conn);
@@ -663,14 +787,24 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
             //      err = SSLLib.ERR_get_error();
             //      err = GetLastError();
 
-            sprintf(buffer, LoadStr(IDS_SSL_ERR_CONNECT_LOG), err, SSLLib.ERR_error_string(err, name));
-            Logs.LogMessage(logUID, buffer, -1, TRUE);
+            std::string sslErrorBytes;
+            std::wstring errorTextW;
+            if (GetOpenSSLErrorText(err, sslErrorBytes) &&
+                DecodeSSLLibraryText(sslErrorBytes.c_str(), errorTextW))
+                LogSSLResource(logUID, IDS_SSL_ERR_CONNECT_LOG, TRUE, err,
+                               errorTextW.c_str());
             WriteSSLErrorStackToLog(logUID, "SSL_connect");
 
             if (errorID != NULL)
                 *errorID = IDS_SSL_ERR_CONNECT;
-            if (errorBufLen > 0)
-                _snprintf_s(errorBuf, errorBufLen, _TRUNCATE, LoadStr(IDS_SSL_ERR_CONNECT_ERR), err, name);
+            if (errorText != NULL)
+            {
+                if (sslErrorBytes.empty() && !GetOpenSSLErrorText(err, sslErrorBytes))
+                    sslErrorBytes = "OpenSSL error";
+                if (!FTPFormatString(*errorText, LoadStr(IDS_SSL_ERR_CONNECT_ERR), err,
+                                     sslErrorBytes.c_str()))
+                    errorText->clear();
+            }
             SSLLib.SSL_free(Conn);
             if (sslErrorOccured != NULL)
                 *sslErrorOccured = SSLCONERR_CANRETRY;
@@ -678,7 +812,7 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     }
     else
     {
-        Logs.LogMessage(logUID, LoadStr(IDS_SSL_ERR_NEW_LOG), -1, TRUE);
+        Logs.LogMessage(logUID, LangStr(IDS_SSL_ERR_NEW_LOG).c_str(), -1, TRUE);
         if (errorID != NULL)
             *errorID = IDS_SSL_ERR_NEW;
         WriteSSLErrorStackToLog(logUID, "SSL_new");
@@ -764,23 +898,22 @@ bool InitSSL(int logUID, int* errorID)
     memset(&SSLLib, 0, sizeof(SSLLib));
 
     bool ret = false;
-    CPathBuffer dir; // Heap-allocated for long path support
+    std::wstring dir;
     int loadStatus = 1;
-    if (GetModuleFileName(NULL, dir, dir.Size()) &&
-        SalamanderGeneral->CutDirectory(dir) &&
-        SalamanderGeneral->SalPathAppend(dir, "utils", dir.Size()))
+    if (SPLGetModuleFileNameOwned(NULL, dir) &&
+        SPLCutDirectoryOwned(SalamanderGeneral, dir))
     {
+        SPLSalPathAppendOwned(dir, L"utils");
         ret = true;
-        char* s = dir.Get() + strlen(dir);
-        if (!SalamanderGeneral->SalPathAppend(dir, "libeay32.dll", dir.Size()) ||
-            !LoadSymbols(dir, NULL, SSLLib.hSSLUtilLib, SSLUtilSymbols, logUID))
+        const std::wstring utilDirectory = dir;
+        SPLSalPathAppendOwned(dir, L"libeay32.dll");
+        if (!LoadSymbols(dir.c_str(), NULL, SSLLib.hSSLUtilLib, SSLUtilSymbols, logUID))
         {
             ret = false;
         }
-        *s = 0;
-        if (!ret ||
-            !SalamanderGeneral->SalPathAppend(dir, "ssleay32.dll", dir.Size()) ||
-            !LoadSymbols(dir, NULL /*_T("libssl32.dll")*/, SSLLib.hSSLLib, SSLSymbols, logUID))
+        dir = utilDirectory;
+        SPLSalPathAppendOwned(dir, L"ssleay32.dll");
+        if (!ret || !LoadSymbols(dir.c_str(), NULL /*L"libssl32.dll"*/, SSLLib.hSSLLib, SSLSymbols, logUID))
         {
             ret = false;
         }
@@ -789,10 +922,13 @@ bool InitSSL(int logUID, int* errorID)
     if (ret)
     {
         loadStatus = 2;
-        sprintf(dir, "SSL INFO: Version: %s \r\nSSL INFO: Compile flags: ", SSLLib.SSLeay_version(SSLEAY_VERSION));
-        Logs.LogMessage(logUID, dir, -1);
-        Logs.LogMessage(logUID, SSLLib.SSLeay_version(SSLEAY_CFLAGS), -1);
-        Logs.LogMessage(logUID, "\r\n", -1);
+        std::wstring version;
+        if (DecodeSSLLibraryText(SSLLib.SSLeay_version(SSLEAY_VERSION), version))
+            LogSSLFormatted(logUID, FALSE,
+                            L"SSL INFO: Version: %s \r\nSSL INFO: Compile flags: ",
+                            version.c_str());
+        LogSSLLibraryText(logUID, SSLLib.SSLeay_version(SSLEAY_CFLAGS));
+        Logs.LogMessage(logUID, L"\r\n", -1);
         // NOTE: There are no unload counterparts for SSL_library_init & SSL_load_error_strings
         SSLLib.SSL_library_init();
         SSLLib.SSL_load_error_strings();
@@ -813,8 +949,8 @@ bool InitSSL(int logUID, int* errorID)
             ret = false;
         if (!ret)
         {
-            sprintf(dir, "SSL Err: Unable to alloc %d locks\r\n", locksCount);
-            Logs.LogMessage(logUID, dir, -1);
+            LogSSLFormatted(logUID, FALSE, L"SSL Err: Unable to alloc %d locks\r\n",
+                            locksCount);
         }
 
         if (ret)
@@ -848,7 +984,7 @@ bool InitSSL(int logUID, int* errorID)
     memset(&SSLLib, 0, sizeof(SSLLib)); // clean up, everything is freed
     if (errorID != NULL)
         *errorID = IDS_SSL_ERR_OPENSSLNOTFOUND;
-    Logs.LogMessage(logUID, LoadStr(IDS_SSL_ERR_OPENSSLNOTFOUND), -1);
+    Logs.LogMessage(logUID, LangStr(IDS_SSL_ERR_OPENSSLNOTFOUND).c_str(), -1);
     Logs.LogMessage(logUID, "\r\n", -1);
     return false;
 } /* InitSSL */
@@ -869,7 +1005,7 @@ int SSLtoWS2Error(int err)
 }
 
 //////////////////////// CCertificateErrDialog ////////////////////////
-CCertificateErrDialog::CCertificateErrDialog(HWND hParent, const char* errorStr)
+CCertificateErrDialog::CCertificateErrDialog(HWND hParent, const wchar_t* errorStr)
     : CCenteredDialog(HLanguage, IDD_CERTIFICATE, hParent), ErrorStr(errorStr)
 {
 }
@@ -880,7 +1016,7 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
     switch (uMsg)
     {
     case WM_INITDIALOG:
-        SetDlgItemText(HWindow, IDT_CERTIFICATE_ERROR, ErrorStr);
+        SetDlgItemTextW(HWindow, IDT_CERTIFICATE_ERROR, ErrorStr);
         break;
     case WM_COMMAND:
         switch (LOWORD(wParam))
@@ -897,9 +1033,9 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
 }
 
 //////////////////////// CCertificate ////////////////////////
-CCertificate::CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, LPCSTR host)
+CCertificate::CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, const wchar_t* host)
 {
-    CALL_STACK_MESSAGE7("CCertificate::ctor(0x%p, %d, 0x%p, %d, %d, %s)", pDERCert, DERCertLen, pPKCS7Cert, PKCS7CertLen, bValid, host);
+    CALL_STACK_MESSAGE7("CCertificate::ctor(0x%p, %d, 0x%p, %d, %d, %ls)", pDERCert, DERCertLen, pPKCS7Cert, PKCS7CertLen, bValid, host);
     bVerified = bValid;
     pDERData = (BYTE*)malloc(DERCertLen);
     if (pDERData)
@@ -921,28 +1057,12 @@ CCertificate::CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int
     {
         nPKCS7DataLen = 0;
     }
-    if (host)
-    {
-        Host = (LPWSTR)malloc(sizeof(WCHAR) * (strlen(host) + 1));
-        if (Host)
-        {
-            LPWSTR out = Host;
-            while (*host)
-                *out++ = *host++;
-            *out = 0;
-        }
-    }
-    else
-    {
-        Host = NULL;
-    }
+    FtpStoreWideText(host != NULL ? host : L"", Host);
     nRefCount = 1;
 }
 
 CCertificate::~CCertificate()
 {
-    if (Host)
-        free(Host);
     if (pDERData)
         free(pDERData);
     if (pPKCS7Data)
@@ -965,12 +1085,12 @@ LONG CCertificate::Release()
 
 void CCertificate::ShowCertificate(HWND hParent)
 {
-    ViewCertificate(hParent, pDERData, nDERDataLen, pPKCS7Data, nPKCS7DataLen, Host);
+    ViewCertificate(hParent, pDERData, nDERDataLen, pPKCS7Data, nPKCS7DataLen, Host.c_str());
 }
 
-bool CCertificate::CheckCertificate(LPTSTR buf, int maxlen)
+bool CCertificate::CheckCertificate(std::wstring& errorText)
 {
-    return ::CheckCertificate(pDERData, nDERDataLen, buf, maxlen, NULL, Host);
+    return ::CheckCertificate(pDERData, nDERDataLen, errorText, Host.c_str());
 }
 
 bool CCertificate::IsSame(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen)

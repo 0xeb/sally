@@ -11,9 +11,9 @@
 #include "../bzip/bzip.h"
 #include "rpm.h"
 
-CRPM::CRPM(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read, FILE* fContents) : CDecompressFile(filename, file, buffer, 0, read, CQuadWord(0, 0)), Stream(NULL)
+CRPM::CRPM(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read, FILE* fContents) : CDecompressFile(filename, file, buffer, 0, read, CQuadWord(0, 0)), Stream(NULL)
 {
-    CALL_STACK_MESSAGE2("CRPM::CRPM(%s, , , , )", filename);
+    CALL_STACK_MESSAGE2("CRPM::CRPM(%ls, , , , )", filename);
 
     // if the parent constructor failed, bail out immediately
     if (!Ok)

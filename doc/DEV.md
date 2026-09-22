@@ -16,11 +16,9 @@
 \src\reglib      Access to Windows Registry files
 \src\res         Image resources
 \src\salmon      Crash detecting and reporting
-\src\salopen     Open files helper
 \src\salspawn    Process spawning helper
 \src\sfx7zip     Self-extractor based on 7-Zip
 \src\shellext    Shell extension DLL
-\src\translator  Translate Sally UI to other languages
 \src\tserver     Trace Server to display info and error messages
 \tools           Minor utilities
 \translations    Translations into other languages
@@ -53,9 +51,19 @@ cmake --build build --config Debug --target utfnames salbreak regparser
 ```
 
 The resulting executables are written under `build/out/sally/<Config>_<Arch>/devtools/`.
+Because these maintenance targets are `EXCLUDE_FROM_ALL`, a normal CMake build or `ALL_BUILD`
+does not compile them. Before handing off a change that affects the generated Visual Studio
+solution, verify the complete target set in both configurations:
+
+```bash
+cmake --build build --config Debug   --target ALL_BUILD utfnames salbreak regparser
+cmake --build build --config Release --target ALL_BUILD utfnames salbreak regparser
+```
 
 The old Portables plugin Visual Studio project was removed without a separate dev-tool replacement because the normal CMake plugin build already covers `plugin_portables` and its English language file. `packages.config` is still used by `cmake/sal_nuget.cmake` to restore the WebView2 SDK for the CMake build.
 
 ## Localization
 
-For the supported Translator workflow, generated workspaces, and contribution steps, see `doc/LOCALIZATION.md`.
+Translation source archives live under `translations/`. Contributors can submit
+updates to those `.slt` files; release-time validation and language-pack
+generation are maintained outside this repository.

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //*****************************************************************************
 //
 // CToolBarItem
@@ -18,7 +20,7 @@ protected:
     DWORD Style;    // TLBI_STYLE_xxx
     DWORD State;    // TLBI_STATE_xxx
     DWORD ID;       // command id
-    char* Text;     // allocated string
+    wchar_t* Text;     // allocated string
     int TextLen;    // length of string
     int ImageIndex; // Image index of the item. Set this member to -1 to
                     // indicate that the button does not have an image.
@@ -29,7 +31,7 @@ protected:
     DWORD CustomData; // FIXME_X64 - too small for a pointer, is it ever needed?
     int Width;        // width of item (computed if TLBI_STYLE_AUTOSIZE is set)
 
-    char* Name; // name in customize dialog (valid during custimize session)
+    wchar_t* Name; // name in customize dialog (valid during custimize session)
 
     // these values are used for optimized access to item states
     DWORD* Enabler; // points to variable that drives the item state.
@@ -49,7 +51,7 @@ public:
     CToolBarItem();
     ~CToolBarItem();
 
-    BOOL SetText(const char* text, int len = -1);
+    BOOL SetText(const wchar_t* text, int len = -1);
 
     friend class CToolBar;
     friend class CTBCustomizeDialog;
@@ -272,8 +274,8 @@ protected:
 public:
     CMainToolBar(HWND hNotifyWindow, CMainToolBarType type, CObjectOrigin origin = ooStatic);
 
-    BOOL Load(const char* data);
-    BOOL Save(char* data);
+    BOOL Load(const wchar_t* data);
+    BOOL Save(std::wstring& data);
 
     // needs to return tooltip
     void OnGetToolTip(LPARAM lParam);
@@ -412,8 +414,8 @@ protected:
     BOOL FromContextMenu;
     CDrivesList* List;
 
-    // cache: contains ?: or \\ for UNC or empty string
-    char CheckedDrive[3];
+    // cache: contains ?: for a disk/archive or is empty for a plugin FS
+    std::wstring CheckedDrive;
 
 public:
     // we want to display plugin icons in monochrome, so we keep them in image lists
@@ -496,6 +498,8 @@ public:
     //    virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-extern void PrepareToolTipText(char* buff, BOOL stripHotKey);
+BOOL PrepareToolTipText(std::wstring& text, BOOL stripHotKey) noexcept;
+BOOL PrepareToolTipTextForAbiBuffer(wchar_t* buffer, size_t capacity,
+                                    BOOL stripHotKey) noexcept;
 
 extern void GetSVGIconsMainToolbar(CSVGIcon** svgIcons, int* svgIconsCount);

@@ -135,13 +135,13 @@ public:
         return ::EnableWindow(hCtl, fEnable) != FALSE;
     }
 
-    bool SetDlgItemText(int nId, LPCTSTR pszText)
+    bool SetDlgItemText(int nId, LPCWSTR pszText)
     {
         ASSERT(m_hWnd);
         return ::SetDlgItemText(m_hWnd, nId, pszText) != FALSE;
     }
 
-    UINT GetDlgItemText(int nId, LPTSTR pszText, int nMaxCount)
+    UINT GetDlgItemText(int nId, LPWSTR pszText, int nMaxCount)
     {
         ASSERT(m_hWnd);
         return ::GetDlgItemText(m_hWnd, nId, pszText, nMaxCount);

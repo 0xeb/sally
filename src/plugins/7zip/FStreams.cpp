@@ -14,24 +14,25 @@
 
 BOOL ShowRetryAbortBox(HWND hParentWnd, int resID, DWORD err, ...)
 {
-    TCHAR msg[1024];
     va_list arglist;
     va_start(arglist, err);
-
-    msg[0] = 0;
-    vsprintf(msg, LoadStr(resID), arglist);
+    std::wstring msg = SPLFormatStringOwnedV(SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID).c_str(), arglist);
     va_end(arglist);
 
-    if (!_tcsncmp(msg, _T("{!}"), 3))
+    if (msg.compare(0, 3, L"{!}") == 0)
     {
-        TCHAR fmt[1024];
-        SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), msg, 1, &CQuadWord().SetUI64(((int*)&err)[1]));
-        strcpy(msg, fmt);
-    }
-    TCHAR buf[2048 + 4];
-    _stprintf(buf, _T("%s\n\n%s"), msg, SalamanderGeneral->GetErrorText(err));
+        va_list pluralArgs;
+        va_start(pluralArgs, err);
+        CQuadWord pluralValue;
+        pluralValue.SetUI64(va_arg(pluralArgs, unsigned int));
+        va_end(pluralArgs);
 
-    TCHAR btnBuffer[128];
+        msg = SPLExpandPluralStringOwned(SalamanderGeneral, msg.c_str(), 1,
+                                         &pluralValue);
+    }
+    const std::wstring errorText = SPLGetErrorTextOwned(SalamanderGeneral, err);
+    const std::wstring text = SPLFormatStringOwned(L"%ls\n\n%ls", msg.c_str(),
+                                                   errorText.c_str());
     /* used by the export_mnu.py script, which generates salmenu.mnu for the Translator
    let the message box buttons handle hotkey collisions by simulating a menu
 MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
@@ -42,17 +43,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-    _stprintf(btnBuffer, _T("%d\t%s\t%d\t%s"),
-              DIALOG_RETRY, LoadStr(IDS_BTN_RETRY),
-              DIALOG_CANCEL, LoadStr(IDS_BTN_ABORT));
+    const std::wstring btnBuffer = SPLFormatStringOwned(
+        L"%d\t%s\t%d\t%s", DIALOG_RETRY, LangStr(IDS_BTN_RETRY).c_str(),
+        DIALOG_CANCEL, LangStr(IDS_BTN_ABORT).c_str());
 
     MSGBOXEX_PARAMS mbep;
+    const std::wstring caption = LangStr(IDS_PLUGINNAME).c_str();
     ZeroMemory(&mbep, sizeof(mbep));
     mbep.HParent = hParentWnd;
-    mbep.Caption = LoadStr(IDS_PLUGINNAME);
-    mbep.Text = buf;
+    mbep.Caption = caption.c_str();
+    mbep.Text = text.c_str();
     mbep.Flags = MSGBOXEX_RETRYCANCEL | MSGBOXEX_ICONEXCLAMATION;
-    mbep.AliasBtnNames = btnBuffer;
+    mbep.AliasBtnNames = btnBuffer.c_str();
     if (hParentWnd)
     {
         return SendMessage(hParentWnd, WM_7ZIP, WM_7ZIP_SHOWMBOXEX, (LPARAM)&mbep) == DIALOG_RETRY;

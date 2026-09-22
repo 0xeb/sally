@@ -8,6 +8,7 @@ sal_add_plugin(NAME pak
     "${SAL_PLUGINS}/pak/dll/pak_dll.cpp"
     "${SAL_PLUGINS}/pak/spl/pak.cpp"
     "${SAL_PLUGINS}/pak/spl/pak2.cpp"
+    "${SAL_PLUGINS}/pak/spl/pak_text.cpp"
     "${SAL_PLUGINS}/pak/spl/precomp.cpp"
   RC "${SAL_PLUGINS}/pak/spl/pak.rc"
   DEF "${SAL_PLUGINS}/pak/pak.def"

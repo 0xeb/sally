@@ -23,6 +23,7 @@
 class CSalamanderDirectoryAbstract;
 class CSalamanderForOperationsAbstract;
 class CPluginDataInterfaceAbstract;
+struct CSalamanderStringBuffer;
 
 //
 // ****************************************************************************
@@ -49,7 +50,7 @@ public:
     // ListArchive is not called for zero-length files, they automatically have empty contents,
     // when packing into such files, the file is deleted before calling PackToArchive (for
     // compatibility with external packers)
-    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData) = 0;
 
@@ -62,9 +63,9 @@ public:
     // used, Skip could have been used) - the source of the operation in the panel is deselected, otherwise returns
     // FALSE (deselection is not performed); 'salamander' is a set of useful methods exported from
     // Salamander
-    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                      const char* archiveRoot, SalEnumSelection next,
+    virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                      const wchar_t* archiveRoot, SalEnumSelection next,
                                       void* nextParam) = 0;
 
     // function for "panel archiver view", called when extracting a single file for view/edit
@@ -79,10 +80,10 @@ public:
     // "renaming not supported" will be displayed from Salamander); returns TRUE on successful file extraction
     // (the file is at the specified path, neither Cancel nor Skip was used), 'salamander' is a set of useful methods
     // exported from Salamander
-    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                                      const CFileData* fileData, const char* targetDir,
-                                      const char* newFileName, BOOL* renamingNotSupported) = 0;
+    virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                                      const CFileData* fileData, const wchar_t* targetDir,
+                                      const wchar_t* newFileName, BOOL* renamingNotSupported) = 0;
 
     // function for "panel archiver edit" and "custom archiver pack", called when packing
     // files/directories into archive 'fileName' at path 'archiveRoot', files/directories are specified by
@@ -91,8 +92,8 @@ public:
     // if all files/directories are successfully packed/removed (Cancel was not used, Skip could have been
     // used) - the source of the operation in the panel is deselected, otherwise returns FALSE (deselection is not performed),
     // 'salamander' is a set of useful methods exported from Salamander
-    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                      const char* archiveRoot, BOOL move, const char* sourcePath,
+    virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                      const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                                       SalEnumSelection2 next, void* nextParam) = 0;
 
     // function for "panel archiver edit", called when deleting files/directories from archive
@@ -103,8 +104,8 @@ public:
     // all files/directories are successfully deleted (Cancel was not used, Skip could have been used) - the source
     // of the operation in the panel is deselected, otherwise returns FALSE (deselection is not performed); 'salamander' is a set
     // of useful methods exported from Salamander
-    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                          CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                          CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                                           SalEnumSelection next, void* nextParam) = 0;
 
     // function for "custom archiver unpack"; called when requested to extract files/directories from archive
@@ -114,8 +115,8 @@ public:
     // (including the null-terminator; if not multi-volume, only 'fileName' will be there), if this function
     // returns TRUE (successful extraction), all files from 'archiveVolumes' will be subsequently deleted;
     // 'salamander' is a set of useful methods exported from Salamander
-    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                           const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+    virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                           const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                            CDynamicString* archiveVolumes) = 0;
 
     // function for "panel archiver view/edit", called before closing the panel with the archive
@@ -130,7 +131,7 @@ public:
     // returns TRUE if closing is possible, if 'force' is TRUE, always returns TRUE; if
     // critical shutdown is in progress (see CSalamanderGeneralAbstract::IsCriticalShutdown for more info),
     // there is no point in asking the user anything
-    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                         BOOL force, int panel) = 0;
 
     // retrieves the required disk-cache settings (disk-cache is used for temporary copies
@@ -141,7 +142,7 @@ public:
     // settings are used (files in TEMP directory, copies are deleted using Win32
     // API function DeleteFile() when exceeding the cache size limit or when closing the archive)
     // and all other return values are ignored; if it returns TRUE, the following
-    // return values are used: if 'tempPath' (buffer of size MAX_PATH) is not an empty string, all
+    // return values are used: if 'tempPath' is not an empty string, all
     // temporary copies extracted by the plugin from the archive will be stored in subdirectories of this path
     // (these subdirectories are removed by disk-cache when Salamander exits, but nothing prevents the plugin
     // from deleting them earlier, e.g., during its unload; also it is recommended during the load of the first instance
@@ -151,7 +152,7 @@ public:
     // 'cacheCopies' is FALSE, copies will be deleted as soon as they are released (e.g., when the
     // viewer is closed), if 'cacheCopies' is TRUE, copies will be deleted when exceeding the cache size
     // limit or when closing the archive
-    virtual BOOL WINAPI GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies) = 0;
+    virtual BOOL WINAPI GetCacheInfo(CSalamanderStringBuffer* tempPath, BOOL* ownDelete, BOOL* cacheCopies) = 0;
 
     // used only if the GetCacheInfo method returns TRUE in parameter 'ownDelete':
     // deletes the temporary copy extracted from this archive (beware of read-only files,
@@ -169,7 +170,7 @@ public:
     // (if the message is distributed by a message-loop inside the plugin), further entry into DeleteTmpCopy
     // is excluded, because until the DeleteTmpCopy call ends, disk-cache does not send any further
     // messages
-    virtual void WINAPI DeleteTmpCopy(const char* fileName, BOOL firstFile) = 0;
+    virtual void WINAPI DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile) = 0;
 
     // used only if the GetCacheInfo method returns TRUE in parameter 'ownDelete':
     // during plugin unload determines whether DeleteTmpCopy should be called for copies that are

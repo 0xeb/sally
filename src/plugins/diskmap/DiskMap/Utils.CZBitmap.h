@@ -239,7 +239,7 @@ public:
 			{
 				res = BitBlt(hdc, x, y, this->_width, this->_height, dc, 0, 0, SRCCOPY);
 #ifdef _DEBUG
-				TextOut(hdc, 8, 30, TEXT("BitBlt"), 6);
+				TextOut(hdc, 8, 30, L"BitBlt", 6);
 #endif
 				this->DeleteDC();
 			}
@@ -256,8 +256,12 @@ public:
             {
                 SetStretchBltMode(hdc, STRETCH_DELETESCANS);
                 res = StretchBlt(hdc, x, y, w, h, dc, 0, 0, this->_width, this->_height, SRCCOPY);
-#ifdef _DEBUG
-                TextOut(hdc, 8, 30, TEXT("StretchBlt"), 10);
+#ifdef TIMINGTEST
+                // Opt-in, not #ifdef _DEBUG: this scribbles over whatever the caller just drew,
+                // and CZBitmap is a general-purpose surface, so every Debug user of it paid for
+                // one developer's blit instrumentation. TIMINGTEST is the plug-in's existing
+                // switch for paint measurement - see the blocks in TreeMap.CDiskMap.h.
+                TextOutW(hdc, 8, 30, L"StretchBlt", 10);
 #endif
                 this->DeleteDC();
             }

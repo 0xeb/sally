@@ -225,32 +225,33 @@ BOOL CVolume<CHAR>::Open(const CHAR* rootPath)
         IsImage = FALSE;
         if (IsWindowsNT)
         {
-            CHAR diskVolume[MAX_PATH];
+            std::basic_string<CHAR> diskVolume;
             if (rootPath[1] == CHAR_COLON && rootPath[2] == CHAR_BSLASH)
             {
-                CHAR guidPath[MAX_PATH];
+                std::basic_string<CHAR> guidPath;
                 if (OS<CHAR>::OS_GetVolumeNameForVolumeMountPointExists() &&
-                    OS<CHAR>::OS_GetVolumeNameForVolumeMountPoint(rootPath, guidPath, MAX_PATH))
+                    OS<CHAR>::OS_GetVolumeNameForVolumeMountPointOwned(rootPath, guidPath))
                 {
-                    String<CHAR>::StrCpy(diskVolume, guidPath);
+                    diskVolume = guidPath;
                 }
                 else
                 {
                     // Windows NT didn't support GUID paths
                     // for old disk syntax (c:\), we need to transform it to volume path
-                    String<CHAR>::StrCpy(diskVolume, STRING_VOLUME_NT);
-                    String<CHAR>::StrCat(diskVolume, rootPath);
+                    diskVolume.assign(STRING_VOLUME_NT);
+                    diskVolume.append(rootPath);
                 }
             }
             else
             {
                 // otherwise try it as it is
-                String<CHAR>::StrCpy(diskVolume, rootPath);
+                diskVolume.assign(rootPath);
             }
             // and remove the backslash at the end
-            diskVolume[String<CHAR>::StrLen(diskVolume) - 1] = 0;
+            if (!diskVolume.empty() && diskVolume.back() == CHAR_BSLASH)
+                diskVolume.pop_back();
 
-            HVolume = OS<CHAR>::OS_CreateFile(diskVolume,
+            HVolume = OS<CHAR>::OS_CreateFile(diskVolume.c_str(),
                                               GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                               NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         }

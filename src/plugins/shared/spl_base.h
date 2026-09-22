@@ -31,6 +31,17 @@ extern "C"
     void* _sal_safe_memcpy(void* dest, const void* src, size_t count);
 #ifdef __cplusplus
 }
+// The #define above is a blind textual substitution, so an explicitly-qualified
+// std::memcpy(...) call site becomes std::_sal_safe_memcpy(...) - a name that does not exist,
+// since _sal_safe_memcpy above is declared only in the global namespace (it must be, being
+// extern "C"). Redeclare the same extern "C" function inside std:: too, so qualified call
+// sites resolve to the same overlap-checking function as unqualified ones, without having to
+// touch every std::memcpy(...) call site across the compat/ adapter layer - extern "C"
+// functions share one link-time symbol no matter which C++ namespace declares them.
+namespace std
+{
+extern "C" void* _sal_safe_memcpy(void* dest, const void* src, size_t count);
+}
 #endif
 #endif // defined(_DEBUG) && defined(TRACE_ENABLE)
 
@@ -107,12 +118,10 @@ class CSalamanderDebugAbstract
 {
 public:
     // outputs 'file'+'line'+'str' TRACE_I to TRACE SERVER - only in DEBUG/SDK/PB version of Salamander
-    virtual void WINAPI TraceI(const char* file, int line, const char* str) = 0;
-    virtual void WINAPI TraceIW(const WCHAR* file, int line, const WCHAR* str) = 0;
+    virtual void WINAPI TraceI(const wchar_t* file, int line, const wchar_t* str) = 0;
 
     // outputs 'file'+'line'+'str' TRACE_E to TRACE SERVER - only in DEBUG/SDK/PB version of Salamander
-    virtual void WINAPI TraceE(const char* file, int line, const char* str) = 0;
-    virtual void WINAPI TraceEW(const WCHAR* file, int line, const WCHAR* str) = 0;
+    virtual void WINAPI TraceE(const wchar_t* file, int line, const wchar_t* str) = 0;
 
     // registers a new thread with TRACE (assigns Unique ID), 'thread'+'tid' are returned by
     // _beginthreadex and CreateThread, optional (UID is then -1)
@@ -120,8 +129,7 @@ public:
 
     // sets the name of the active thread for TRACE, optional (thread is marked as "unknown")
     // WARNING: requires thread registration with TRACE (see TraceAttachThread), otherwise does nothing
-    virtual void WINAPI TraceSetThreadName(const char* name) = 0;
-    virtual void WINAPI TraceSetThreadNameW(const WCHAR* name) = 0;
+    virtual void WINAPI TraceSetThreadName(const wchar_t* name) = 0;
 
     // introduces things needed for CALL-STACK methods into the thread (see Push and Pop below),
     // in all called plugin methods it is possible to use CALL_STACK methods directly,
@@ -131,17 +139,17 @@ public:
 
     // stores a message on CALL-STACK ('format'+'args' see vsprintf), on application crash
     // the CALL-STACK contents are displayed in the Bug Report window reporting the crash
-    virtual void WINAPI Push(const char* format, va_list args, CCallStackMsgContext* callStackMsgContext,
+    virtual void WINAPI Push(const wchar_t* format, va_list args, CCallStackMsgContext* callStackMsgContext,
                              BOOL doNotMeasureTimes) = 0;
 
     // removes the last message from CALL-STACK, call must be paired with Push
     virtual void WINAPI Pop(CCallStackMsgContext* callStackMsgContext) = 0;
 
     // sets the name of the active thread for VC debugger
-    virtual void WINAPI SetThreadNameInVC(const char* name) = 0;
+    virtual void WINAPI SetThreadNameInVC(const wchar_t* name) = 0;
 
     // calls TraceSetThreadName and SetThreadNameInVC for 'name' (description see these two methods)
-    virtual void WINAPI SetThreadNameInVCAndTrace(const char* name) = 0;
+    virtual void WINAPI SetThreadNameInVCAndTrace(const wchar_t* name) = 0;
 
     // If we are not already connected to Trace Server, tries to establish connection (server
     // must be running). SDK version of Salamander only (including Preview Builds): if server
@@ -154,7 +162,7 @@ public:
     // memory leak check these modules are already unloaded), and only then memory leaks are
     // displayed = .cpp module names are visible instead of "#File Error#"
     // can be called from any thread
-    virtual void WINAPI AddModuleWithPossibleMemoryLeaks(const char* fileName) = 0;
+    virtual void WINAPI AddModuleWithPossibleMemoryLeaks(const wchar_t* fileName) = 0;
 };
 
 //
@@ -173,31 +181,31 @@ public:
 
     // creates or opens existing subkey 'name' of key 'key', returns 'createdKey' and success;
     // obtained key ('createdKey') must be closed by calling CloseKey
-    virtual BOOL WINAPI CreateKey(HKEY key, const char* name, HKEY& createdKey) = 0;
+    virtual BOOL WINAPI CreateKey(HKEY key, const wchar_t* name, HKEY& createdKey) = 0;
 
     // opens existing subkey 'name' of key 'key', returns 'openedKey' and success
     // obtained key ('openedKey') must be closed by calling CloseKey
-    virtual BOOL WINAPI OpenKey(HKEY key, const char* name, HKEY& openedKey) = 0;
+    virtual BOOL WINAPI OpenKey(HKEY key, const wchar_t* name, HKEY& openedKey) = 0;
 
     // closes key opened via OpenKey or CreateKey
     virtual void WINAPI CloseKey(HKEY key) = 0;
 
     // deletes subkey 'name' of key 'key', returns success
-    virtual BOOL WINAPI DeleteKey(HKEY key, const char* name) = 0;
+    virtual BOOL WINAPI DeleteKey(HKEY key, const wchar_t* name) = 0;
 
     // loads value 'name'+'type'+'buffer'+'bufferSize' from key 'key', returns success
-    virtual BOOL WINAPI GetValue(HKEY key, const char* name, DWORD type, void* buffer, DWORD bufferSize) = 0;
+    virtual BOOL WINAPI GetValue(HKEY key, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize) = 0;
 
     // saves value 'name'+'type'+'data'+'dataSize' to key 'key', for strings it is possible
     // to specify 'dataSize' == -1 -> string length calculation using strlen function,
     // returns success
-    virtual BOOL WINAPI SetValue(HKEY key, const char* name, DWORD type, const void* data, DWORD dataSize) = 0;
+    virtual BOOL WINAPI SetValue(HKEY key, const wchar_t* name, DWORD type, const void* data, DWORD dataSize) = 0;
 
     // deletes value 'name' of key 'key', returns success
-    virtual BOOL WINAPI DeleteValue(HKEY key, const char* name) = 0;
+    virtual BOOL WINAPI DeleteValue(HKEY key, const wchar_t* name) = 0;
 
     // retrieves into 'bufferSize' the required size for value 'name'+'type' from key 'key', returns success
-    virtual BOOL WINAPI GetSize(HKEY key, const char* name, DWORD type, DWORD& bufferSize) = 0;
+    virtual BOOL WINAPI GetSize(HKEY key, const wchar_t* name, DWORD type, DWORD& bufferSize) = 0;
 };
 
 //
@@ -254,7 +262,7 @@ public:
     // 'update' is FALSE, the call is ignored; if 'update' is TRUE, settings are overwritten with
     // new values 'title' and 'defaultExtension' - prevention against repeated 'update'==TRUE
     // (constant overwriting of settings) is necessary
-    virtual void WINAPI AddCustomPacker(const char* title, const char* defaultExtension, BOOL update) = 0;
+    virtual void WINAPI AddCustomPacker(const wchar_t* title, const wchar_t* defaultExtension, BOOL update) = 0;
 
     // adds plugin to list for "custom archiver unpack",
     // 'title' is the name of custom unpacker for the user, 'masks' are archive file masks (used
@@ -263,7 +271,7 @@ public:
     // "custom unpack" (or adding the entire plugin) and 'update' is FALSE the call is ignored;
     // if 'update' is TRUE, settings are overwritten with new values 'title' and 'masks' - prevention
     // against repeated 'update'==TRUE (constant overwriting of settings) is necessary
-    virtual void WINAPI AddCustomUnpacker(const char* title, const char* masks, BOOL update) = 0;
+    virtual void WINAPI AddCustomUnpacker(const wchar_t* title, const wchar_t* masks, BOOL update) = 0;
 
     // adds plugin to list for "panel archiver view/edit",
     // 'extensions' are archive extensions to be processed by this plugin
@@ -273,12 +281,12 @@ public:
     // entire plugin) and 'updateExts' is FALSE the call is ignored; if 'updateExts' is TRUE,
     // it adds new archive extensions (ensures presence of all extensions from 'extensions') - prevention
     // against repeated 'updateExts'==TRUE (constant revival of extensions from 'extensions') is necessary
-    virtual void WINAPI AddPanelArchiver(const char* extensions, BOOL edit, BOOL updateExts) = 0;
+    virtual void WINAPI AddPanelArchiver(const wchar_t* extensions, BOOL edit, BOOL updateExts) = 0;
 
     // removes extension from list for "panel archiver view/edit" (only from items related to
     // this plugin), 'extension' is the archive extension (single; wildcard '#' for '0'..'9' is used),
     // prevention against repeated calls (constant deletion of 'extension') is necessary
-    virtual void WINAPI ForceRemovePanelArchiver(const char* extension) = 0;
+    virtual void WINAPI ForceRemovePanelArchiver(const wchar_t* extension) = 0;
 
     // adds plugin to list for "file viewer",
     // 'masks' are viewer extensions to be processed by this plugin
@@ -287,12 +295,12 @@ public:
     // if not upgrading "file viewer" (or adding the entire plugin) and 'force' is FALSE,
     // the call is ignored; if 'force' is TRUE, 'masks' are always added (if not already on the
     // list) - prevention against repeated 'force'==TRUE (constant adding of 'masks') is necessary
-    virtual void WINAPI AddViewer(const char* masks, BOOL force) = 0;
+    virtual void WINAPI AddViewer(const wchar_t* masks, BOOL force) = 0;
 
     // removes mask from list for "file viewer" (only from items related to this plugin),
     // 'mask' is the viewer extension (single; wildcards '*' and '?' are used), prevention
     // against repeated calls (constant deletion of 'mask') is necessary
-    virtual void WINAPI ForceRemoveViewer(const char* mask) = 0;
+    virtual void WINAPI ForceRemoveViewer(const wchar_t* mask) = 0;
 
     // adds items to menu Plugins/"plugin name" in Salamander, 'iconIndex' is the index
     // of item icon (-1=no icon; bitmap with icons specification see
@@ -314,7 +322,7 @@ public:
     // will be displayed; value contains one or more (ORed) MENU_SKILLLEVEL_XXX constants;
     // menu items are updated on each plugin load (possible change of items according to configuration)
     // WARNING: for "dynamic menu extension" use CSalamanderBuildMenuAbstract::AddMenuItem
-    virtual void WINAPI AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+    virtual void WINAPI AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState, // wide name; DEBT, narrowed again in CPluginData::AddMenuItemsToSubmenuAux (MENU_ITEM_INFO::String is a struct field, not shimmable)
                                     DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
     // adds submenu to menu Plugins/"plugin name" in Salamander, 'iconIndex'
@@ -332,7 +340,7 @@ public:
     // CSalamanderConnectAbstract::AddSubmenuEnd();
     // menu items are updated on each plugin load (possible change of items according to configuration)
     // WARNING: for "dynamic menu extension" use CSalamanderBuildMenuAbstract::AddSubmenuStart
-    virtual void WINAPI AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+    virtual void WINAPI AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState, // wide name; see AddMenuItem's DEBT note above
                                         DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
     // terminates submenu in menu Plugins/"plugin name" in Salamander, next items will be
@@ -347,13 +355,13 @@ public:
     // separated by '\t' (see Alt+F1/F2 menu); item visibility can be set
     // from Plugins Manager or directly from plugin using method
     // CSalamanderGeneralAbstract::SetChangeDriveMenuItemVisibility
-    virtual void WINAPI SetChangeDriveMenuItem(const char* title, int iconIndex) = 0;
+    virtual void WINAPI SetChangeDriveMenuItem(const wchar_t* title, int iconIndex) = 0;
 
     // informs Salamander that plugin can load thumbnails from files matching
     // group mask 'masks' (separator is ';' (escape sequence for ';' is ";;") and
     // wildcards '*' and '?' are used); to load thumbnail
     // CPluginInterfaceForThumbLoaderAbstract::LoadThumbnail is called
-    virtual void WINAPI SetThumbnailLoader(const char* masks) = 0;
+    virtual void WINAPI SetThumbnailLoader(const wchar_t* masks) = 0;
 
     // sets bitmap with plugin icons; Salamander copies bitmap contents to internal
     // structures, plugin is responsible for bitmap destruction (from Salamander side
@@ -406,7 +414,7 @@ public:
     // returns TRUE if string 'str' of length 'len' was successfully added; if 'len' is -1,
     // 'len' is determined as "strlen(str)" (adding without null terminator); if 'len' is -2,
     // 'len' is determined as "strlen(str)+1" (adding including null terminator)
-    virtual BOOL WINAPI Add(const char* str, int len = -1) = 0;
+    virtual BOOL WINAPI Add(const wchar_t* str, int len = -1) = 0;
 };
 
 //
@@ -687,7 +695,7 @@ public:
     // also includes change in subdirectories of 'path'); this method can be used e.g.
     // for invalidating/cleaning file/directory cache; NOTE: for plugin file-systems (FS)
     // there is method CPluginFSInterfaceAbstract::AcceptChangeOnPathNotification()
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) = 0;
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) = 0;
 
     // this method is called only for plugins that use Password Manager (see
     // CSalamanderGeneralAbstract::SetPluginUsesPasswordManager()):
@@ -742,10 +750,10 @@ public:
     // allowed characters are 'a-zA-Z0-9_+-', min. length 2 characters), if plugin needs
     // more file system names, it can use method CSalamanderPluginEntryAbstract::AddFSName;
     // returns TRUE on successful data acceptance
-    virtual BOOL WINAPI SetBasicPluginData(const char* pluginName, DWORD functions,
-                                           const char* version, const char* copyright,
-                                           const char* description, const char* regKeyName = NULL,
-                                           const char* extensions = NULL, const char* fsName = NULL) = 0;
+    virtual BOOL WINAPI SetBasicPluginData(const wchar_t* pluginName, DWORD functions,
+                                           const wchar_t* version, const wchar_t* copyright,
+                                           const wchar_t* description, const wchar_t* regKeyName = NULL,
+                                           const wchar_t* extensions = NULL, const wchar_t* fsName = NULL) = 0;
 
     // returns pointer to interface for generally usable Salamander functions,
     // interface is valid for the entire lifetime of the plugin (not just within
@@ -767,7 +775,7 @@ public:
     // is involved in error message or alternative language module selection)
     // WARNING: this method can only be called once; obtained language module handle
     //          is released automatically on plugin unload
-    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const char* pluginName) = 0;
+    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const wchar_t* pluginName) = 0;
 
     // returns ID of current language selected for Salamander environment (e.g. english.slg =
     // English (US) = 0x409, czech.slg = Czech = 0x405)
@@ -787,7 +795,7 @@ public:
     // Salamander maintains the value until next plugin load (URL is displayed also for
     // unloaded plugins); on each plugin load the URL must be set again, otherwise
     // no URL is displayed (protection against holding invalid home-page URL)
-    virtual void WINAPI SetPluginHomePageURL(const char* url) = 0;
+    virtual void WINAPI SetPluginHomePageURL(const wchar_t* url) = 0;
 
     // adds another file system name; without FUNCTION_FILESYSTEM in 'functions' parameter
     // when calling SetBasicPluginData method, this method always returns only error;
@@ -797,7 +805,7 @@ public:
     // the index of newly added file system name is returned; returns TRUE on success;
     // returns FALSE on fatal error - in this case 'newFSNameIndex' is ignored
     // restriction: must not be called before SetBasicPluginData method
-    virtual BOOL WINAPI AddFSName(const char* fsName, int* newFSNameIndex) = 0;
+    virtual BOOL WINAPI AddFSName(const wchar_t* fsName, int* newFSNameIndex) = 0;
 };
 
 //
@@ -892,6 +900,25 @@ inline BOOL SalIsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion,
 #define M1xA_FV_GREAT 1
 #define M1xA_FV_MIN_VALUE 0
 #define M1xA_FV_MINOR_VERSION_MAX_VALUE 16
+
+// M1xA_testValue/M1xA_findPart{DWORD,WORD,BYTE} are private implementation
+// details of SalGetVersionEx below - not called anywhere else in the tree - so an unnamed
+// namespace is a safe, no-behavior-change fix for a real ambiguity: compat/sdk107/spl_base.h
+// (the frozen v107 SDK snapshot, immutable and hash-pinned - see compat/sdk107.h - never to be
+// edited) is a byte-for-byte copy of this section wrapped in `namespace sdk107`, and both
+// headers are meant to coexist in one translation unit (the adapter's own documented usage
+// pattern). An unqualified call to M1xA_testValue from inside the frozen copy's own
+// namespace-sdk107-scoped SalGetVersionEx finds sdk107::M1xA_testValue via ordinary lookup, but
+// argument-dependent lookup (from the OSVERSIONINFOEX* parameter, a global-namespace type) also
+// finds this live, unnamespaced copy - two equally-viable candidates, ambiguous call. Moving
+// these helpers into an unnamed namespace removes them from ADL's associated namespaces (ADL
+// follows the argument type's own declaring namespace, not every namespace containing a
+// same-signature function), leaving each copy's own internal calls to resolve unambiguously.
+// SalGetVersionEx itself stays in the global namespace unchanged - it has external callers
+// (bugreprt.cpp, plugins/automation/salamanderaut.cpp) that only the live SDK serves.
+namespace
+{
+
 inline int M1xA_testValue(OSVERSIONINFOEX* value, DWORD verPart, DWORDLONG eq, DWORDLONG gt)
 {
     if (VerifyVersionInfo(value, verPart, eq) == FALSE)
@@ -957,6 +984,8 @@ inline int M1xA_testValue(OSVERSIONINFOEX* value, DWORD verPart, DWORDLONG eq, D
 M1xA_findPartTemplate(DWORD)
     M1xA_findPartTemplate(WORD)
         M1xA_findPartTemplate(BYTE)
+
+} // namespace
 
             inline BOOL SalGetVersionEx(OSVERSIONINFOEX* osVer, BOOL versionOnly)
 {

@@ -3,9 +3,8 @@
 
 #include "WorkdirsHistorySerializer.h"
 
-#include "common/unicode/helpers.h"
-
 #include <cstdio>
+#include <utility>
 
 namespace sally::path::history
 {
@@ -32,7 +31,7 @@ std::wstring SerializeEntry(const Entry& entry)
     return payload;
 }
 
-bool ParseEntry(const std::wstring& payloadW, Entry& outEntry, PluginFSPathDetectorA detector)
+bool ParseEntry(const std::wstring& payloadW, Entry& outEntry, PluginFSPathDetector detector)
 {
     if (payloadW.size() < 2)
         return false;
@@ -64,15 +63,14 @@ bool ParseEntry(const std::wstring& payloadW, Entry& outEntry, PluginFSPathDetec
     if (detector == nullptr)
         return false;
 
-    std::string payloadA = WideToAnsi(payloadW);
-    std::string fsName;
-    std::string userPart;
-    if (!detector(payloadA.c_str(), fsName, userPart))
+    std::wstring fsName;
+    std::wstring userPart;
+    if (!detector(payloadW.c_str(), fsName, userPart))
         return false;
 
     outEntry.kind = EntryKind::PluginFS;
-    outEntry.nameW = AnsiToWide(fsName.c_str());
-    outEntry.userPartW = AnsiToWide(userPart.c_str());
+    outEntry.nameW = std::move(fsName);
+    outEntry.userPartW = std::move(userPart);
     return true;
 }
 
@@ -90,7 +88,7 @@ void WriteEntries(IRegistry* reg, HKEY historyKey, const std::vector<Entry>& ent
 }
 
 void ReadEntries(IRegistry* reg, HKEY historyKey, std::vector<Entry>& outEntries,
-                 PluginFSPathDetectorA detector)
+                 PluginFSPathDetector detector)
 {
     outEntries.clear();
     if (reg == nullptr || historyKey == nullptr)

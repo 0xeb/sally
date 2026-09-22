@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -11,8 +11,13 @@
 #include "salinflt.h"
 #include "ui/IPrompter.h"
 #include "common/IClipboard.h"
+#include "common/IPathService.h"
+#include "common/text/PluralExpander.h"
+#include "common/text/CaseFolding.h"
+#include "common/Win32TextCodec.h"
 #include "common/ExternalToolRunner.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/WideTextRange.h"
 
 //****************************************************************************
 //
@@ -26,7 +31,6 @@ CTruncatedString::CTruncatedString()
     SubStrIndex = -1;
     SubStrLen = 0;
     HasTruncated = FALSE;
-    UseWideText = FALSE;
 }
 
 CTruncatedString::~CTruncatedString()
@@ -35,88 +39,16 @@ CTruncatedString::~CTruncatedString()
 
 BOOL CTruncatedString::CopyFrom(const CTruncatedString* src)
 {
-    Text = src->Text;
     TextW = src->TextW;
     SubStrIndex = src->SubStrIndex;
     SubStrLen = src->SubStrLen;
-    TruncatedText = src->TruncatedText;
     TruncatedTextW = src->TruncatedTextW;
     HasTruncated = src->HasTruncated;
-    UseWideText = src->UseWideText;
-    return TRUE;
-}
-
-BOOL CTruncatedString::Set(const char* str, const char* subStr)
-{
-    UseWideText = FALSE;
-    TextW.clear();
-    TruncatedTextW.clear();
-    HasTruncated = FALSE;
-
-    int len = (int)strlen(str);
-    int subStrIndex = -1;
-    int subStrLen = 0;
-    if (subStr != NULL)
-    {
-        const char* p = str;
-        int doubles = 0;
-        while (*p != 0)
-        {
-            if (*p == '%')
-            {
-                if (*(p + 1) == '%')
-                {
-                    p++;
-                    doubles++; // "%%" will be shortened by sprintf to "%"
-                }
-                else
-                {
-                    if (*(p + 1) == 's')
-                    {
-                        subStrIndex = (int)(p - str - doubles);
-                        break;
-                    }
-                    else
-                    {
-                        TRACE_E("CTruncatedString::Set: unknown format specifier in str:" << str);
-                        break;
-                    }
-                }
-            }
-            p++;
-        }
-        if (subStrIndex == -1)
-        {
-            TRACE_E("CTruncatedString::Set: %s was not found in str:" << str);
-        }
-        else
-        {
-            len -= 2; // subtract the %s that will be removed
-            subStrLen = (int)strlen(subStr);
-            len += subStrLen;
-        }
-    }
-    Text.resize(len);
-    if (subStrIndex != -1)
-    {
-        sprintf(Text.data(), str, subStr);
-        SubStrIndex = subStrIndex;
-        SubStrLen = subStrLen;
-    }
-    else
-    {
-        strcpy(Text.data(), str);
-        SubStrIndex = -1;
-        SubStrLen = 0;
-    }
-
     return TRUE;
 }
 
 BOOL CTruncatedString::SetW(const wchar_t* str, const wchar_t* subStr)
 {
-    UseWideText = TRUE;
-    TruncatedText.clear();
     TruncatedTextW.clear();
     HasTruncated = FALSE;
 
@@ -177,37 +109,35 @@ BOOL CTruncatedString::SetW(const wchar_t* str, const wchar_t* subStr)
         SubStrLen = 0;
     }
 
-    Text = WideToAnsi(TextW.c_str());
     return TRUE;
 }
 
-const char*
+const wchar_t*
 CTruncatedString::Get()
 {
     if (SubStrIndex == -1 || !HasTruncated)
     {
-        if (Text.empty())
+        if (TextW.empty())
         {
             TRACE_E("Text == NULL");
-            return "";
+            return L"";
         }
         else
-            return Text.c_str();
+            return TextW.c_str();
     }
     else
     {
-        return TruncatedText.c_str();
+        return TruncatedTextW.c_str();
     }
 }
 
+// GetW() and Get() are the same function now - GetW's only difference was
+// returning L"" when UseWideText was FALSE, a state the only setter never produced. Kept as a
+// forwarder rather than renamed, because both names have callers and neither is wrong.
 const wchar_t*
 CTruncatedString::GetW()
 {
-    if (!UseWideText)
-        return L"";
-    if (SubStrIndex == -1 || !HasTruncated)
-        return TextW.c_str();
-    return TruncatedTextW.c_str();
+    return Get();
 }
 
 BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
@@ -222,7 +152,8 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
     HFONT hFont = (HFONT)SendMessage(hWindow, WM_GETFONT, 0, 0);
     HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
 
-    if (UseWideText)
+    // Was `if (UseWideText)`. There is one representation now, so the scope is
+    // kept only to bound the measuring locals.
     {
         int fitChars;
         int alpDx[8000];
@@ -286,80 +217,12 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
             }
         }
 
-        TruncatedText = WideToAnsi(TruncatedTextW.c_str());
-        SelectObject(hDC, hOldFont);
-        HANDLES(ReleaseDC(hWindow, hDC));
-        return ret;
     }
 
-    int fitChars;
-    int alpDx[8000]; // for measuring widths
-    int textLen = (int)Text.length();
-    TruncatedText.resize(textLen + 3); // 3: reserve for an ellipsis in the extreme case
-    HasTruncated = TRUE;
-    {
-        if (forMessageBox)
-        {
-            // for message boxes -- we just ensure that the substring is not larger than 400 points (so it fits even on 640x480)
-            int chars = SubStrLen;
-            int maxWidth = 400;
-            SIZE sz;
-            GetTextExtentExPoint(hDC, Text.c_str() + SubStrIndex, SubStrLen, maxWidth, &fitChars, alpDx, &sz);
-            if (fitChars < SubStrLen)
-            {
-                // first part with the truncated substring
-                memcpy(TruncatedText.data(), Text.c_str(), SubStrIndex + fitChars);
-                // ellipsis
-                memcpy(TruncatedText.data() + SubStrIndex + fitChars, "...", 3);
-                // the rest
-                strcpy(TruncatedText.data() + SubStrIndex + fitChars + 3, Text.c_str() + SubStrIndex + SubStrLen);
-            }
-            else
-                memcpy(TruncatedText.data(), Text.c_str(), textLen + 1); // just copy -— we still fit
-        }
-        else
-        {
-            // single-line layout for dialogs
-            // determine the maximum width we can afford
-            RECT r;
-            GetClientRect(hWindow, &r);
-            int maxWidth = r.right;
-
-            SIZE sz;
-            if (textLen > 8000)
-            {
-                TRACE_E("Text was truncated (to 7999 characters)");
-                Text.resize(7999);
-                textLen = 7999;
-            }
-            GetTextExtentExPoint(hDC, Text.c_str(), textLen, 0, NULL, alpDx, &sz);
-            if (sz.cx > maxWidth)
-            {
-                int width = sz.cx;
-
-                GetTextExtentPoint32(hDC, "...", 3, &sz);
-                int ellipsisWidth = sz.cx;
-
-                // we will subtract from the part that can be shortened
-                int index = SubStrIndex + SubStrLen - 1;
-                maxWidth -= ellipsisWidth;
-                while (width > maxWidth && index >= SubStrIndex)
-                {
-                    width -= (alpDx[index] - alpDx[index - 1]);
-                    index--;
-                }
-                // the first part with the shortened substring
-                memcpy(TruncatedText.data(), Text.c_str(), index);
-                // ellipsis
-                memcpy(TruncatedText.data() + index, "...", 3);
-                // the rest
-                strcpy(TruncatedText.data() + index + 3, Text.c_str() + SubStrIndex + SubStrLen);
-            }
-            else
-                memcpy(TruncatedText.data(), Text.c_str(), textLen + 1); // just copy -— we still fit
-        }
-    }
-
+    // The narrow arm that used to follow here is deleted. It measured with
+    // GetTextExtentExPointA and spliced with byte memcpy/strcpy against the `Text` mirror -
+    // reachable only when UseWideText was FALSE, which the only setter (SetW) never left it.
+    // 73 lines of code that had not run since the mirror was introduced.
     SelectObject(hDC, hOldFont);
     HANDLES(ReleaseDC(hWindow, hDC));
     return ret;
@@ -368,258 +231,8 @@ BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
 //****************************************************************************
 //
 // StrToUInt64
-//
-// Converts a number (it may begin with a '+' character) to unsigned __int64.
-// The len variable specifies the maximum count of processed characters.
-// If 'isNum' is not NULL, it returns TRUE when the entire string
-// 'str' represents a number.
-//
-
-unsigned __int64
-StrToUInt64(const char* str, int len, BOOL* isNum)
-{
-    const char* end = str + len;
-    const char* s = str;
-    while (s < end && *s <= ' ')
-        s++;
-    if (s < end && *s == '+')
-        s++;
-
-    unsigned __int64 total = 0;
-    const char* begNum = s;
-    while (s < end && *s >= '0' && *s <= '9')
-    {
-        unsigned __int64 new_total = total * 10 + (*s - '0');
-        if (new_total >= total)
-        {
-            total = total * 10 + (*s - '0');
-            s++;
-        }
-        else
-        {
-            total = 0xffffffffffffffff;
-            while (s < end && *s >= '0' && *s <= '9')
-                s++;
-            break;
-        }
-    }
-    BOOL hasDigits = begNum != s;
-    while (s < end && *s <= ' ')
-        s++;
-    if (isNum != NULL)
-        *isNum = (hasDigits && s == end);
-    return total;
-}
 
 //****************************************************************************
-//
-// ExpandPluralString
-//
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// WARNING: whenever ExpandPluralString is modified it is also necessary to update
-//          ValidatePluralStrings in the TRANSLATOR project
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCount,
-                       const CQuadWord* lpParArray)
-{
-    const char* input = lpFmt;
-    char* output = lpOut;
-    char* outputNullTerm = lpOut + nOutMax - 1;
-    int actParIndex = 0;
-
-    struct CAuxParUsed
-    {
-        BOOL StackArr[20];
-        BOOL* Arr;
-        CAuxParUsed(int nParCount)
-        {
-            Arr = nParCount <= sizeof(StackArr) / sizeof(StackArr[0]) ? StackArr : new BOOL[nParCount];
-            memset(Arr, 0, nParCount * sizeof(BOOL));
-        }
-        ~CAuxParUsed()
-        {
-            if (Arr != StackArr)
-                delete[] (Arr);
-        }
-    } parUsedArr(max(0, nParCount));
-
-    if (nOutMax > 0 && lpOut != NULL)
-        *lpOut = 0;
-
-    // check and skip the {!} signature
-    if (input != NULL && *input++ == '{' && *input++ == '!' && *input++ == '}' && nOutMax > 0)
-    {
-        while (*input != 0)
-        {
-            if (*input == '\\' &&
-                (*(input + 1) == '|' || *(input + 1) == '\\' || *(input + 1) == ':' ||
-                 *(input + 1) == '{' || *(input + 1) == '}')) // escape sequence
-            {
-                input++;
-                if (output >= outputNullTerm) // the buffer must also fit the terminating zero
-                {
-                    lpOut[nOutMax - 1] = 0;
-                    TRACE_E("ExpandPluralString: truncated output string.");
-                    return nOutMax - 1;
-                }
-                *output++ = *input++;
-            }
-            else
-            {
-                if (*input == '{') // perform expansion of the curly brace
-                {
-                    input++;
-
-                    // fetch the corresponding parameter value from the array
-                    unsigned __int64 arg;
-                    const char* parInd = input;
-                    int parIndVal = 0;
-                    while (*parInd >= '0' && *parInd <= '9')
-                        parIndVal = 10 * parIndVal + *parInd++ - '0';
-                    if (*parInd == ':' && parInd > input) // an index was assigned, use it
-                    {
-                        if (parIndVal >= 1 && parIndVal <= nParCount)
-                        {
-                            input = parInd + 1;
-                            parUsedArr.Arr[parIndVal - 1] = TRUE;
-                            arg = lpParArray[parIndVal - 1].Value;
-                        }
-                        else
-                        {
-                            TRACE_E("ExpandPluralString: specified index of parameter is out of range: " << parIndVal);
-                            *output = 0;
-                            return (int)(output - lpOut);
-                        }
-                    }
-                    else // use the next parameter in order
-                    {
-                        if (actParIndex < nParCount)
-                        {
-                            parUsedArr.Arr[actParIndex] = TRUE;
-                            arg = lpParArray[actParIndex++].Value;
-                        }
-                        else
-                        {
-                            TRACE_E("ExpandPluralString: few parameters in array.");
-                            *output = 0;
-                            return (int)(output - lpOut);
-                        }
-                    }
-
-                    while (*input != '}' && *input != 0)
-                    {
-                        const char* subStr = input;
-                        int subStrLen = 0;
-
-                        while (*input != '}' && *input != 0 && *input != '|')
-                        {
-                            if (*input == '\\' &&
-                                (*(input + 1) == '|' || *(input + 1) == '\\' || *(input + 1) == ':' ||
-                                 *(input + 1) == '{' || *(input + 1) == '}')) // escape sequence
-                                input++;
-                            subStrLen++;
-                            input++;
-                        }
-
-                        if (*input == '|')
-                            input++;
-
-                        const char* numStr = input;
-                        int numStrLen = 0;
-
-                        while (*input != '}' && *input != 0 && *input != '|')
-                        {
-                            if (*input == '\\' &&
-                                (*(input + 1) == '|' || *(input + 1) == '\\' || *(input + 1) == ':' ||
-                                 *(input + 1) == '{' || *(input + 1) == '}')) // escape sequence
-                                input++;
-                            numStrLen++;
-                            input++;
-                        }
-
-                        if (*input == '|')
-                            input++;
-
-                        if (numStrLen == 0 && *input != '}')
-                        {
-                            TRACE_E("ExpandPluralString: syntax error: " << lpFmt);
-                        }
-
-                        unsigned __int64 num = 0;
-                        if (numStrLen > 0)
-                        {
-                            BOOL isNum;
-                            num = StrToUInt64(numStr, numStrLen, &isNum);
-                            if (!isNum)
-                                TRACE_E("ExpandPluralString: contains limit that is not a number: " << lpFmt);
-                        }
-
-                        // if this is the last string without interval limitation,
-                        // or the value of arg is less than or equal to the interval boundary
-                        if (numStrLen == 0 || arg <= num)
-                        {
-                            // insert the relevant substring into the output string
-                            int i;
-                            for (i = 0; i < subStrLen; i++)
-                            {
-                                if (*subStr == '\\' &&
-                                    (*(subStr + 1) == '|' || *(subStr + 1) == '\\' || *(subStr + 1) == ':' ||
-                                     *(subStr + 1) == '{' || *(subStr + 1) == '}')) // escape sequence
-                                    subStr++;
-                                if (output >= outputNullTerm) // the buffer must also fit the terminating zero
-                                {
-                                    lpOut[nOutMax - 1] = 0;
-                                    TRACE_E("ExpandPluralString: truncated output string.");
-                                    return nOutMax - 1;
-                                }
-                                *output++ = *subStr++;
-                            }
-
-                            // and stop searching
-                            while (*input != '}' && *input != 0)
-                            {
-                                if (*input == '\\' &&
-                                    (*(input + 1) == '|' || *(input + 1) == '\\' || *(input + 1) == ':' ||
-                                     *(input + 1) == '{' || *(input + 1) == '}')) // escape sequence
-                                    input++;
-                                input++;
-                            }
-                        }
-                    }
-                    if (*input == '}')
-                        input++;
-                }
-                else
-                {
-                    if (output >= outputNullTerm) // the buffer must also fit the terminating zero
-                    {
-                        lpOut[nOutMax - 1] = 0;
-                        TRACE_E("ExpandPluralString: truncated output string.");
-                        return nOutMax - 1;
-                    }
-                    *output++ = *input++;
-                }
-            }
-        }
-        *output = 0; // insert the terminator
-    }
-    else
-        TRACE_E("ExpandPluralString: format string does not contain {!} signature or output buffer is too short.");
-
-    int i;
-    for (i = 0; i < nParCount; i++)
-        if (!parUsedArr.Arr[i])
-        {
-            TRACE_E("ExpandPluralString: warning: some parameters from array were not used, zero-based index "
-                    "of first unused parameter is "
-                    << i);
-            break;
-        }
-
-    return (int)(output - lpOut);
-}
 
 //****************************************************************************
 //
@@ -639,7 +252,7 @@ int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCoun
 // Returns the number of copied characters without the terminator.
 //
 
-int ExpandPluralFilesDirs(char* lpOut, int nOutMax, int files, int dirs, int mode, BOOL forDlgCaption)
+int ExpandPluralFilesDirsW(wchar_t* lpOut, int nOutMax, int files, int dirs, int mode, BOOL forDlgCaption)
 {
     static int form[2][3][3] =
         {
@@ -652,7 +265,7 @@ int ExpandPluralFilesDirs(char* lpOut, int nOutMax, int files, int dirs, int mod
              {IDS_DLG_PLURAL_X_HID_FILES, IDS_DLG_PLURAL_X_HID_DIRS, IDS_DLG_PLURAL_X_HID_FILES_Y_HID_DIRS}},
         };
     int indDlgCaption = forDlgCaption ? 1 : 0;
-    char expanded[200];
+    wchar_t expanded[200];
     if (nOutMax > 200)
         nOutMax = 200;
     nOutMax -= 20; // make room for the numbers of files and dirs
@@ -662,31 +275,63 @@ int ExpandPluralFilesDirs(char* lpOut, int nOutMax, int files, int dirs, int mod
     if (files > 0 && dirs == 0)
     {
         CQuadWord qwFiles(files, 0);
-        ExpandPluralString(expanded, nOutMax, LoadStr(form[indDlgCaption][mode][0]), 1, &qwFiles);
-        ret = sprintf(lpOut, expanded, files);
+        ExpandPluralStringW(expanded, nOutMax, LoadStrW(form[indDlgCaption][mode][0]), 1, &qwFiles);
+        ret = swprintf(lpOut, (size_t)nOutMax + 20, expanded, files);
     }
     else
     {
         if (files == 0 && dirs > 0)
         {
             CQuadWord qwDirs(dirs, 0);
-            ExpandPluralString(expanded, nOutMax, LoadStr(form[indDlgCaption][mode][1]), 1, &qwDirs);
-            ret = sprintf(lpOut, expanded, dirs);
+            ExpandPluralStringW(expanded, nOutMax, LoadStrW(form[indDlgCaption][mode][1]), 1, &qwDirs);
+            ret = swprintf(lpOut, (size_t)nOutMax + 20, expanded, dirs);
         }
         else
         {
             CQuadWord qwPars[2] = {CQuadWord(files, 0), CQuadWord(dirs, 0)};
-            ExpandPluralString(expanded, nOutMax, LoadStr(form[indDlgCaption][mode][2]), 2, qwPars);
-            ret = sprintf(lpOut, expanded, files, dirs);
+            ExpandPluralStringW(expanded, nOutMax, LoadStrW(form[indDlgCaption][mode][2]), 2, qwPars);
+            ret = swprintf(lpOut, (size_t)nOutMax + 20, expanded, files, dirs);
         }
     }
     return ret;
 }
 
-int ExpandPluralBytesFilesDirs(char* lpOut, int nOutMax, const CQuadWord& selectedBytes, int files, int dirs, BOOL useSubTexts)
+std::wstring ExpandPluralFilesDirsTextW(int files, int dirs, int mode, BOOL forDlgCaption)
 {
-    char expanded[200];
-    char number[50];
+    static int form[2][3][3] =
+        {
+            {{IDS_PLURAL_X_FILES, IDS_PLURAL_X_DIRS, IDS_PLURAL_X_FILES_Y_DIRS},
+             {IDS_PLURAL_X_SEL_FILES, IDS_PLURAL_X_SEL_DIRS, IDS_PLURAL_X_SEL_FILES_Y_SEL_DIRS},
+             {IDS_PLURAL_X_HID_FILES, IDS_PLURAL_X_HID_DIRS, IDS_PLURAL_X_HID_FILES_Y_HID_DIRS}},
+
+            {{IDS_DLG_PLURAL_X_FILES, IDS_DLG_PLURAL_X_DIRS, IDS_DLG_PLURAL_X_FILES_Y_DIRS},
+             {IDS_DLG_PLURAL_X_SEL_FILES, IDS_DLG_PLURAL_X_SEL_DIRS, IDS_DLG_PLURAL_X_SEL_FILES_Y_SEL_DIRS},
+             {IDS_DLG_PLURAL_X_HID_FILES, IDS_DLG_PLURAL_X_HID_DIRS, IDS_DLG_PLURAL_X_HID_FILES_Y_HID_DIRS}},
+        };
+    const int captionIndex = forDlgCaption ? 1 : 0;
+
+    if (files > 0 && dirs == 0)
+    {
+        const CQuadWord parameters[] = {CQuadWord(files, 0)};
+        const std::wstring expanded = ExpandPluralStringOwnedW(LoadStrW(form[captionIndex][mode][0]), 1, parameters);
+        return FormatStrW(expanded.c_str(), files);
+    }
+    if (files == 0 && dirs > 0)
+    {
+        const CQuadWord parameters[] = {CQuadWord(dirs, 0)};
+        const std::wstring expanded = ExpandPluralStringOwnedW(LoadStrW(form[captionIndex][mode][1]), 1, parameters);
+        return FormatStrW(expanded.c_str(), dirs);
+    }
+
+    const CQuadWord parameters[] = {CQuadWord(files, 0), CQuadWord(dirs, 0)};
+    const std::wstring expanded = ExpandPluralStringOwnedW(LoadStrW(form[captionIndex][mode][2]), 2, parameters);
+    return FormatStrW(expanded.c_str(), files, dirs);
+}
+
+int ExpandPluralBytesFilesDirsW(wchar_t* lpOut, int nOutMax, const CQuadWord& selectedBytes, int files, int dirs, BOOL useSubTexts)
+{
+    wchar_t expanded[200];
+    const std::wstring number = NumberToStr(selectedBytes);
     if (nOutMax > 200)
         nOutMax = 200;
     nOutMax -= 30; // make room for the numbers of files and dirs
@@ -696,99 +341,125 @@ int ExpandPluralBytesFilesDirs(char* lpOut, int nOutMax, const CQuadWord& select
     if (files > 0 && dirs == 0)
     {
         CQuadWord qwPars[2] = {selectedBytes, CQuadWord(files, 0)};
-        ExpandPluralString(expanded, nOutMax,
-                           LoadStr(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES),
+        ExpandPluralStringW(expanded, nOutMax,
+                           LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES),
                            2, qwPars);
-        ret = sprintf(lpOut, expanded, NumberToStr(number, selectedBytes), files);
+        ret = swprintf(lpOut, (size_t)nOutMax + 30, expanded, number.c_str(), files);
     }
     else
     {
         if (files == 0 && dirs > 0)
         {
             CQuadWord qwPars[2] = {selectedBytes, CQuadWord(dirs, 0)};
-            ExpandPluralString(expanded, nOutMax,
-                               LoadStr(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_DIRS),
+            ExpandPluralStringW(expanded, nOutMax,
+                               LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_DIRS),
                                2, qwPars);
-            ret = sprintf(lpOut, expanded, NumberToStr(number, selectedBytes), dirs);
+            ret = swprintf(lpOut, (size_t)nOutMax + 30, expanded, number.c_str(), dirs);
         }
         else
         {
             CQuadWord qwPars[3] = {selectedBytes, CQuadWord(files, 0), CQuadWord(dirs, 0)};
-            ExpandPluralString(expanded, nOutMax,
-                               LoadStr(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS),
+            ExpandPluralStringW(expanded, nOutMax,
+                               LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS),
                                3, qwPars);
-            ret = sprintf(lpOut, expanded, NumberToStr(number, selectedBytes), files, dirs);
+            ret = swprintf(lpOut, (size_t)nOutMax + 30, expanded, number.c_str(), files, dirs);
         }
     }
     return ret;
 }
 
-BOOL LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount)
+std::wstring ExpandPluralBytesFilesDirsTextW(const CQuadWord& selectedBytes, int files, int dirs,
+                                             BOOL useSubTexts)
 {
-    int maxVars = *varPlacementsCount;
-    *varPlacementsCount = 0;
+    const std::wstring number = NumberToStr(selectedBytes);
 
-    const char* src = text; // we read characters from this pointer
-    char* dst = text;       // we write the result to this pointer
-    char* var = NULL;       // pointer to the first character of the variable
-
-    while (*src != 0)
+    if (files > 0 && dirs == 0)
     {
-        switch (*src)
-        {
-        case '\\':
-        {
-            if (*(src + 1) == '<' || *(src + 1) == '>' || *(src + 1) == '\\')
-                src++; // escape sequence
-            break;
-        }
-
-        case '<':
-        {
-            if (var != NULL)
-            {
-                TRACE_E("LookForSubTexts: syntax error in (already changed): " << text);
-                return FALSE;
-            }
-            src++;
-            var = dst;
-            continue;
-        }
-
-        case '>':
-        {
-            if (var == NULL)
-            {
-                TRACE_E("LookForSubTexts: syntax error in (already changed): " << text);
-                return FALSE;
-            }
-            if (*varPlacementsCount >= maxVars)
-            {
-                TRACE_E("LookForSubTexts: too many variables in: " << text);
-                return FALSE;
-            }
-            *varPlacements = MAKELPARAM(var - text, dst - var);
-            varPlacements++;
-            (*varPlacementsCount)++;
-            src++;
-            var = NULL;
-            continue;
-        }
-        }
-
-        *dst = *src;
-        src++;
-        dst++;
+        const CQuadWord parameters[] = {selectedBytes, CQuadWord(files, 0)};
+        const std::wstring expanded = ExpandPluralStringOwnedW(
+            LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES),
+            2, parameters);
+        return FormatStrW(expanded.c_str(), number.c_str(), files);
     }
-    // write the terminator
-    *dst = 0;
-    if (var != NULL)
+    if (files == 0 && dirs > 0)
     {
-        TRACE_E("LookForSubTexts: syntax error in (already changed): " << text);
+        const CQuadWord parameters[] = {selectedBytes, CQuadWord(dirs, 0)};
+        const std::wstring expanded = ExpandPluralStringOwnedW(
+            LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_DIRS),
+            2, parameters);
+        return FormatStrW(expanded.c_str(), number.c_str(), dirs);
+    }
+
+    const CQuadWord parameters[] = {selectedBytes, CQuadWord(files, 0), CQuadWord(dirs, 0)};
+    const std::wstring expanded = ExpandPluralStringOwnedW(
+        LoadStrW(useSubTexts ? IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS2 : IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS),
+        3, parameters);
+    return FormatStrW(expanded.c_str(), number.c_str(), files, dirs);
+}
+
+BOOL LookForSubTexts(std::wstring& text,
+                     std::vector<sally::unicode::WideTextRange>& varPlacements)
+{
+    try
+    {
+        std::wstring parsed;
+        parsed.reserve(text.size());
+        std::vector<sally::unicode::WideTextRange> parsedPlacements;
+        std::size_t variableStart = std::wstring::npos;
+
+        for (std::size_t source = 0; source < text.size(); ++source)
+        {
+            wchar_t character = text[source];
+            if (character == L'\\' && source + 1 < text.size() &&
+                (text[source + 1] == L'<' || text[source + 1] == L'>' ||
+                 text[source + 1] == L'\\'))
+            {
+                character = text[++source];
+            }
+            else if (character == L'<')
+            {
+                if (variableStart != std::wstring::npos)
+                {
+                    TRACE_E("LookForSubTexts: nested opening marker");
+                    return FALSE;
+                }
+                variableStart = parsed.size();
+                continue;
+            }
+            else if (character == L'>')
+            {
+                if (variableStart == std::wstring::npos)
+                {
+                    TRACE_E("LookForSubTexts: unmatched closing marker");
+                    return FALSE;
+                }
+                parsedPlacements.push_back(
+                    {variableStart, parsed.size() - variableStart});
+                variableStart = std::wstring::npos;
+                continue;
+            }
+            parsed.push_back(character);
+        }
+
+        if (variableStart != std::wstring::npos)
+        {
+            TRACE_E("LookForSubTexts: unmatched opening marker");
+            return FALSE;
+        }
+        text.swap(parsed);
+        varPlacements.swap(parsedPlacements);
+        return TRUE;
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
         return FALSE;
     }
-
-    return TRUE;
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
 }
 
 //****************************************************************************
@@ -796,41 +467,40 @@ BOOL LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount)
 // CViewTemplates
 //
 
-const char* SALAMANDER_VIEWTEMPLATE_NAME = "Name";
-const char* SALAMANDER_VIEWTEMPLATE_FLAGS = "Flags";
-const char* SALAMANDER_VIEWTEMPLATE_COLUMNS = "Columns";
-const char* SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE = "Left Smart Mode";
-const char* SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE = "Right Smart Mode";
+// Registry VALUE NAMES are form-agnostic: the wide API addresses the same values.
+const wchar_t* SALAMANDER_VIEWTEMPLATE_NAME = L"Name";
+const wchar_t* SALAMANDER_VIEWTEMPLATE_FLAGS = L"Flags";
+const wchar_t* SALAMANDER_VIEWTEMPLATE_COLUMNS = L"Columns";
+const wchar_t* SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE = L"Left Smart Mode";
+const wchar_t* SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE = L"Right Smart Mode";
 
 CViewTemplates::CViewTemplates()
 {
     // default values
-    Set(0, VIEW_MODE_TREE, LoadStr(IDS_TREE_VIEW), 0, TRUE, TRUE);
-    Set(1, VIEW_MODE_BRIEF, LoadStr(IDS_BRIEF_VIEW), 0, TRUE, TRUE);
-    Set(2, VIEW_MODE_DETAILED, LoadStr(IDS_DETAILED_VIEW), VIEW_SHOW_SIZE | VIEW_SHOW_DATE | VIEW_SHOW_TIME | VIEW_SHOW_ATTRIBUTES, TRUE, TRUE);
-    Set(3, VIEW_MODE_ICONS, LoadStr(IDS_ICONS_VIEW), 0, TRUE, TRUE);
-    Set(4, VIEW_MODE_THUMBNAILS, LoadStr(IDS_THUMBNAILS_VIEW), 0, TRUE, TRUE);
-    Set(5, VIEW_MODE_TILES, LoadStr(IDS_TILES_VIEW), 0, TRUE, TRUE);
-    Set(6, VIEW_MODE_DETAILED, LoadStr(IDS_TYPES_VIEW), VIEW_SHOW_SIZE | VIEW_SHOW_TYPE | VIEW_SHOW_DATE | VIEW_SHOW_TIME | VIEW_SHOW_ATTRIBUTES, TRUE, TRUE);
+    Set(0, VIEW_MODE_TREE, LoadStrW(IDS_TREE_VIEW), 0, TRUE, TRUE);
+    Set(1, VIEW_MODE_BRIEF, LoadStrW(IDS_BRIEF_VIEW), 0, TRUE, TRUE);
+    Set(2, VIEW_MODE_DETAILED, LoadStrW(IDS_DETAILED_VIEW), VIEW_SHOW_SIZE | VIEW_SHOW_DATE | VIEW_SHOW_TIME | VIEW_SHOW_ATTRIBUTES, TRUE, TRUE);
+    Set(3, VIEW_MODE_ICONS, LoadStrW(IDS_ICONS_VIEW), 0, TRUE, TRUE);
+    Set(4, VIEW_MODE_THUMBNAILS, LoadStrW(IDS_THUMBNAILS_VIEW), 0, TRUE, TRUE);
+    Set(5, VIEW_MODE_TILES, LoadStrW(IDS_TILES_VIEW), 0, TRUE, TRUE);
+    Set(6, VIEW_MODE_DETAILED, LoadStrW(IDS_TYPES_VIEW), VIEW_SHOW_SIZE | VIEW_SHOW_TYPE | VIEW_SHOW_DATE | VIEW_SHOW_TIME | VIEW_SHOW_ATTRIBUTES, TRUE, TRUE);
     //  Set(4, VIEW_MODE_DETAILED, LoadStr(IDS_DESCRIPTIONS_VIEW), VIEW_SHOW_SIZE | VIEW_SHOW_DESCRIPTION, TRUE, TRUE);
     int i;
     for (i = 7; i < VIEW_TEMPLATES_COUNT; i++)
-        Set(i, VIEW_MODE_DETAILED, "", 0, TRUE, TRUE);
+        Set(i, VIEW_MODE_DETAILED, L"", 0, TRUE, TRUE);
     for (i = 0; i < VIEW_TEMPLATES_COUNT; i++)
         ZeroMemory(Items[i].Columns, sizeof(Items[i].Columns));
 }
 
-void CViewTemplates::Set(DWORD index, const char* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
+void CViewTemplates::Set(DWORD index, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
 {
-    if (lstrlen(name) >= VIEW_NAME_MAX)
-        TRACE_E("String is too long");
-    lstrcpyn(Items[index].Name, name, VIEW_NAME_MAX);
+    Items[index].Name = name != NULL ? name : L"";
     Items[index].Flags = flags;
     Items[index].LeftSmartMode = leftSmartMode;
     Items[index].RightSmartMode = rightSmartMode;
 }
 
-void CViewTemplates::Set(DWORD index, DWORD viewMode, const char* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
+void CViewTemplates::Set(DWORD index, DWORD viewMode, const wchar_t* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
 {
     Items[index].Mode = viewMode;
     Set(index, name, flags, leftSmartMode, rightSmartMode);
@@ -856,103 +526,100 @@ BOOL CViewTemplates::SwapItems(int index1, int index2)
     return TRUE;
 }
 
-BOOL CViewTemplates::CleanName(char* name)
+BOOL CViewTemplates::CleanName(std::wstring& name)
 {
-    char* start = name;
-    char* end = name + strlen(name) - 1;
-    while (*start != 0 && *start == ' ')
-        start++;
-    while (end >= name && *end == ' ')
-        end--;
-    end++;
-    *end = 0;
-    if (start > name && start < end)
-        memmove(name, start, end - start + 1);
-    return strlen(name) > 0;
+    const size_t first = name.find_first_not_of(L' ');
+    if (first == std::wstring::npos)
+    {
+        name.clear();
+        return FALSE;
+    }
+    const size_t last = name.find_last_not_of(L' ');
+    name = name.substr(first, last - first + 1);
+    return TRUE;
 }
 
-int CViewTemplates::SaveColumns(CColumnConfig* columns, char* buffer)
+std::wstring CViewTemplates::SaveColumns(const CColumnConfig* columns)
 {
-    char* s = buffer;
+    std::wstring value;
     int i;
     for (i = 0; i < STANDARD_COLUMNS_COUNT; i++)
     {
-        CColumnConfig* column = &columns[i];
+        const CColumnConfig* column = &columns[i];
         if (i > 0)
-        {
-            *s = ',';
-            s++;
-        }
-        DWORD data = column->LeftWidth | column->LeftFixedWidth << 16;
-        s += sprintf(s, "%lx", data);
+            value.push_back(L',');
+        const DWORD data = column->LeftWidth | column->LeftFixedWidth << 16;
+        value += FormatStrW(L"%lx", data);
     }
-    *s++ = ',';
+    value.push_back(L',');
     for (i = 0; i < STANDARD_COLUMNS_COUNT; i++)
     {
-        CColumnConfig* column = &columns[i];
+        const CColumnConfig* column = &columns[i];
         if (i > 0)
-        {
-            *s = ',';
-            s++;
-        }
-        DWORD data = column->RightWidth | column->RightFixedWidth << 16;
-        s += sprintf(s, "%lx", data);
+            value.push_back(L',');
+        const DWORD data = column->RightWidth | column->RightFixedWidth << 16;
+        value += FormatStrW(L"%lx", data);
     }
-    *s = 0;
-    return (int)(s - buffer);
+    return value;
 }
 
-void CViewTemplates::LoadColumns(CColumnConfig* columns, char* buffer)
+void CViewTemplates::LoadColumns(CColumnConfig* columns, const std::wstring& value)
 {
-    CColumnConfig* firstColumn = columns;
-    char* p = strtok(buffer, ",");
-    while (p != NULL)
+    size_t start = 0;
+    int token = 0;
+    while (start <= value.size() && token < 2 * STANDARD_COLUMNS_COUNT)
     {
-        DWORD data;
-        int i = sscanf(p, "%xl", &data);
-        columns->LeftWidth = data & 0x0000ffff;
-        columns->LeftFixedWidth = (data & 0x00010000) >> 16;
-        if (columns->LeftWidth > 2000)
-            columns->LeftWidth = 2000;
-        columns->RightWidth = columns->LeftWidth;
-        columns->RightFixedWidth = columns->LeftFixedWidth;
-        p = strtok(NULL, ",");
-        columns++;
-        if (columns - firstColumn >= STANDARD_COLUMNS_COUNT)
+        const size_t separator = value.find(L',', start);
+        const std::wstring field = value.substr(start, separator - start);
+        wchar_t* end = NULL;
+        const unsigned long parsed = wcstoul(field.c_str(), &end, 16);
+        if (end != field.c_str() && *end == 0)
+        {
+            const DWORD data = (DWORD)parsed;
+            CColumnConfig& column = columns[token % STANDARD_COLUMNS_COUNT];
+            unsigned width = data & 0x0000ffff;
+            if (width > 2000)
+                width = 2000;
+            const unsigned fixedWidth = (data & 0x00010000) >> 16;
+            if (token < STANDARD_COLUMNS_COUNT)
+            {
+                column.LeftWidth = width;
+                column.LeftFixedWidth = fixedWidth;
+                column.RightWidth = width;
+                column.RightFixedWidth = fixedWidth;
+            }
+            else
+            {
+                column.RightWidth = width;
+                column.RightFixedWidth = fixedWidth;
+            }
+        }
+        ++token;
+        if (separator == std::wstring::npos)
             break;
-    }
-    columns = firstColumn;
-    while (p != NULL)
-    {
-        DWORD data;
-        int i = sscanf(p, "%xl", &data);
-        columns->RightWidth = data & 0x0000ffff;
-        columns->RightFixedWidth = (data & 0x00010000) >> 16;
-        if (columns->RightWidth > 2000)
-            columns->RightWidth = 2000;
-        p = strtok(NULL, ",");
-        columns++;
-        if (columns - firstColumn >= STANDARD_COLUMNS_COUNT)
-            break;
+        start = separator + 1;
     }
 }
 
 BOOL CViewTemplates::Save(HKEY hKey)
 {
-    char buff[512];
-    char keyName[5];
     int i;
     for (i = 0; i < VIEW_TEMPLATES_COUNT; i++)
     {
-        itoa(i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0, keyName, 10);
+        const std::wstring keyName = std::to_wstring(i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
         HKEY actKey;
-        if (CreateKey(hKey, keyName, actKey))
+        if (CreateKeyW(hKey, keyName.c_str(), actKey))
         {
-            SetValue(actKey, SALAMANDER_VIEWTEMPLATE_NAME, REG_SZ, Items[i].Name, -1);
-            SetValue(actKey, SALAMANDER_VIEWTEMPLATE_FLAGS, REG_DWORD, &Items[i].Flags, sizeof(DWORD));
-            SetValue(actKey, SALAMANDER_VIEWTEMPLATE_COLUMNS, REG_SZ, buff, SaveColumns(Items[i].Columns, buff));
-            SetValue(actKey, SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE, REG_DWORD, &Items[i].LeftSmartMode, sizeof(DWORD));
-            SetValue(actKey, SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE, REG_DWORD, &Items[i].RightSmartMode, sizeof(DWORD));
+            SetValueW(actKey, SALAMANDER_VIEWTEMPLATE_NAME, REG_SZ, Items[i].Name.c_str(), -1);
+            SetValueW(actKey, SALAMANDER_VIEWTEMPLATE_FLAGS, REG_DWORD, &Items[i].Flags, sizeof(DWORD));
+            // SaveColumns hoisted out of the argument list: it returns a
+            // wchar_t COUNT, which used to be passed as 'dataSize'. SetValueW ignores
+            // dataSize for REG_SZ (it takes the NUL-terminated wide string), so spelling
+            // that -1 says what actually happens instead of implying a byte size.
+            const std::wstring columns = SaveColumns(Items[i].Columns);
+            SetValueW(actKey, SALAMANDER_VIEWTEMPLATE_COLUMNS, REG_SZ, columns.c_str(), -1);
+            SetValueW(actKey, SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE, REG_DWORD, &Items[i].LeftSmartMode, sizeof(DWORD));
+            SetValueW(actKey, SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE, REG_DWORD, &Items[i].RightSmartMode, sizeof(DWORD));
             CloseKey(actKey);
         }
     }
@@ -961,31 +628,28 @@ BOOL CViewTemplates::Save(HKEY hKey)
 
 BOOL CViewTemplates::Load(HKEY hKey)
 {
-    char buff[512];
-    char keyName[5];
     int i;
     for (i = 0; i < VIEW_TEMPLATES_COUNT; i++)
     {
-        itoa(i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0, keyName, 10);
+        const std::wstring keyName = std::to_wstring(i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
         if (i == 6 && Configuration.ConfigVersion < 23)
             continue; // for the IDS_TYPES_VIEW view we want default columns
         HKEY actKey;
-        if (OpenKey(hKey, keyName, actKey))
+        if (OpenKeyW(hKey, keyName.c_str(), actKey))
         {
-            CPathBuffer name;
+            std::wstring name;
+            std::wstring columns;
             DWORD flags;
-            name[0] = 0;
             flags = 0;
-            buff[0] = 0;
             DWORD leftSM = TRUE;
             DWORD rightSM = TRUE;
-            GetValue(actKey, SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE, REG_DWORD, &leftSM, sizeof(DWORD));
-            GetValue(actKey, SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE, REG_DWORD, &rightSM, sizeof(DWORD));
-            if (GetValue(actKey, SALAMANDER_VIEWTEMPLATE_NAME, REG_SZ, name, VIEW_NAME_MAX) &&
-                GetValue(actKey, SALAMANDER_VIEWTEMPLATE_FLAGS, REG_DWORD, &flags, sizeof(DWORD)) &&
-                GetValue(actKey, SALAMANDER_VIEWTEMPLATE_COLUMNS, REG_SZ, buff, 512))
+            GetValueW(actKey, SALAMANDER_VIEWTEMPLATE_LEFTSMARTMODE, REG_DWORD, &leftSM, sizeof(DWORD));
+            GetValueW(actKey, SALAMANDER_VIEWTEMPLATE_RIGHTSMARTMODE, REG_DWORD, &rightSM, sizeof(DWORD));
+            if (GetStringValueW(actKey, SALAMANDER_VIEWTEMPLATE_NAME, name) &&
+                GetValueW(actKey, SALAMANDER_VIEWTEMPLATE_FLAGS, REG_DWORD, &flags, sizeof(DWORD)) &&
+                GetStringValueW(actKey, SALAMANDER_VIEWTEMPLATE_COLUMNS, columns))
             {
-                LoadColumns(Items[i].Columns, buff);
+                LoadColumns(Items[i].Columns, columns);
                 CleanName(name);
 
                 // overwrite file names the user could not change anyway
@@ -1015,9 +679,9 @@ BOOL CViewTemplates::Load(HKEY hKey)
                     break;
                 }
                 if (resID != -1)
-                    strcpy(name, LoadStr(resID));
+                    name = LoadStrW(resID);
 
-                Set(i, name, flags, leftSM, rightSM);
+                Set(i, name.c_str(), flags, leftSM, rightSM);
             }
             CloseKey(actKey);
         }
@@ -1027,27 +691,22 @@ BOOL CViewTemplates::Load(HKEY hKey)
 
 // ****************************************************************************
 
-DWORD AddUnicodeToClipboard(const char* str, int textLen)
+DWORD AddAcpTextToClipboard(const char* bytes, int byteCount)
 {
-    DWORD err = ERROR_SUCCESS;
-    int unicodeLen = 0;
-    if (textLen > 0)
-    {
-        unicodeLen = MultiByteToWideChar(CP_ACP, 0, str, textLen, NULL, 0);
-        if (unicodeLen == 0)
-            err = GetLastError();
-    }
+    std::wstring text;
+    const Win32TextConversionResult conversion =
+        Win32DecodeText(CP_ACP, bytes, static_cast<size_t>(byteCount), text);
+    DWORD err = conversion.Succeeded() ? ERROR_SUCCESS : conversion.Win32Error;
     if (err == ERROR_SUCCESS)
     {
-        HGLOBAL unicode = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, sizeof(WCHAR) * (unicodeLen + 1)));
+        HGLOBAL unicode = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE,
+                                                sizeof(WCHAR) * (text.size() + 1)));
         if (unicode != NULL)
         {
             WCHAR* unicodeStr = (WCHAR*)HANDLES(GlobalLock(unicode));
             if (unicodeStr != NULL)
             {
-                if (textLen > 0 && MultiByteToWideChar(CP_ACP, 0, str, textLen, unicodeStr, unicodeLen + 1) == 0)
-                    err = GetLastError();
-                unicodeStr[unicodeLen] = 0; // terminating zero
+                memcpy(unicodeStr, text.c_str(), sizeof(WCHAR) * (text.size() + 1));
                 HANDLES(GlobalUnlock(unicode));
                 if (err == ERROR_SUCCESS && SetClipboardData(CF_UNICODETEXT, unicode) == NULL)
                     err = GetLastError();
@@ -1061,48 +720,9 @@ DWORD AddUnicodeToClipboard(const char* str, int textLen)
             err = GetLastError();
     }
     if (err != ERROR_SUCCESS)
-        TRACE_E("SetClipboardData failed for Unicode version of text. Error: " << GetErrorText(err));
+        TRACE_EW(L"SetClipboardData failed for Unicode version of text. Error: " << GetErrorTextOwned(err).c_str());
     return err;
 }
-
-// ****************************************************************************
-
-DWORD AddMultibyteToClipboard(const wchar_t* str, int textLen)
-{
-    DWORD err = ERROR_SUCCESS;
-    int mbLen = textLen == 0 ? 0 : WideCharToMultiByte(CP_ACP, 0, str, textLen, NULL, 0, NULL, NULL);
-    if (mbLen > 0 || textLen == 0)
-    {
-        HGLOBAL multibyte = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, mbLen + 1));
-        if (multibyte != NULL)
-        {
-            char* multibyteStr = (char*)HANDLES(GlobalLock(multibyte));
-            if (multibyteStr != NULL)
-            {
-                if (textLen > 0 && WideCharToMultiByte(CP_ACP, 0, str, textLen, multibyteStr, mbLen + 1, NULL, NULL) == 0)
-                    err = GetLastError();
-                multibyteStr[mbLen] = 0; // terminating zero
-                HANDLES(GlobalUnlock(multibyte));
-                if (err == ERROR_SUCCESS && SetClipboardData(CF_TEXT, multibyte) == NULL)
-                    err = GetLastError();
-            }
-            else
-                err = GetLastError();
-            if (err != ERROR_SUCCESS)
-                NOHANDLES(GlobalFree(multibyte));
-        }
-        else
-            err = GetLastError();
-    }
-    else
-        err = GetLastError();
-
-    if (err != ERROR_SUCCESS)
-        TRACE_E("SetClipboardData failed for multibyte version of text. Error: " << GetErrorText(err));
-    return err;
-}
-
-// ****************************************************************************
 
 BOOL CopyHTextToClipboardW(HGLOBAL hGlobalText, int textLen)
 {
@@ -1118,18 +738,8 @@ BOOL CopyHTextToClipboardW(HGLOBAL hGlobalText, int textLen)
     {
         if (EmptyClipboard())
         {
-            wchar_t* text = (wchar_t*)HANDLES(GlobalLock(hGlobalText));
-            if (text != NULL)
-            {
-                if (textLen == -1)
-                    textLen = (int)wcslen(text);
-                err = AddMultibyteToClipboard(text, textLen); // store the text in multibyte first
-                HANDLES(GlobalUnlock(hGlobalText));
-            }
-            else
-                err = GetLastError();
-
-            if (SetClipboardData(CF_UNICODETEXT, hGlobalText) == NULL) // then store the multibyte text
+            // CF_UNICODETEXT is authoritative. Windows synthesizes CF_TEXT for legacy consumers.
+            if (SetClipboardData(CF_UNICODETEXT, hGlobalText) == NULL)
                 err = GetLastError();
         }
         else
@@ -1172,7 +782,7 @@ BOOL CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND 
     if (showEcho)
     {
         if (!result.success)
-            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(result.errorCode));
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextOwned(result.errorCode).c_str());
         else
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
@@ -1181,24 +791,27 @@ BOOL CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND 
 
 // ****************************************************************************
 
-BOOL CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND hEchoParent)
+BOOL CopyAcpTextToClipboard(const char* bytes, int byteCount, BOOL showEcho, HWND hEchoParent)
 {
-    if (text == NULL)
+    if (bytes == NULL)
     {
         TRACE_E("text == NULL");
         return FALSE;
     }
-    // Convert ANSI to Wide and delegate to wide version
-    std::string ansiText(text, textLen == -1 ? strlen(text) : textLen);
-    std::wstring wideText = AnsiToWide(ansiText.c_str());
+    // Decode the explicitly ACP-encoded byte span and delegate to the native-wide owner.
+    const size_t length = byteCount == -1 ? strlen(bytes) : static_cast<size_t>(byteCount);
+    std::wstring wideText;
+    const Win32TextConversionResult conversion = Win32DecodeText(CP_ACP, bytes, length, wideText);
+    if (!conversion.Succeeded())
+        return FALSE;
     return CopyTextToClipboardW(wideText.c_str(), -1, showEcho, hEchoParent);
 }
 
 // ****************************************************************************
 
-BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND hEchoParent)
+BOOL CopyAcpHTextToClipboard(HGLOBAL hGlobalBytes, int byteCount, BOOL showEcho, HWND hEchoParent)
 {
-    if (hGlobalText == NULL)
+    if (hGlobalBytes == NULL)
     {
         TRACE_E("hGlobalText == NULL");
         return FALSE;
@@ -1210,18 +823,18 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND 
     {
         if (EmptyClipboard())
         {
-            char* text = (char*)HANDLES(GlobalLock(hGlobalText));
-            if (text != NULL)
+            char* bytes = (char*)HANDLES(GlobalLock(hGlobalBytes));
+            if (bytes != NULL)
             {
-                if (textLen == -1)
-                    textLen = lstrlen(text);
-                err = AddUnicodeToClipboard(text, textLen); // store the text in Unicode first
-                HANDLES(GlobalUnlock(hGlobalText));
+                if (byteCount == -1)
+                    byteCount = lstrlenA(bytes);
+                err = AddAcpTextToClipboard(bytes, byteCount);
+                HANDLES(GlobalUnlock(hGlobalBytes));
             }
             else
                 err = GetLastError();
 
-            if (SetClipboardData(CF_TEXT, hGlobalText) == NULL) // then store the multibyte text
+            if (SetClipboardData(CF_TEXT, hGlobalBytes) == NULL) // then publish the original ACP bytes
                 err = GetLastError();
         }
         else
@@ -1240,7 +853,7 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND 
     if (showEcho)
     {
         if (err != ERROR_SUCCESS)
-            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextW(err));
+            gPrompter->ShowError(LoadStrW(IDS_COPYTOCLIPBOARD), GetErrorTextOwned(err).c_str());
         else
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_TEXTCOPIED));
     }
@@ -1255,7 +868,7 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND 
 // initialized in the drawing routine before calling the callback
 const CFileData* TransferFileData;
 int TransferIsDir;
-char TransferBuffer[TRANSFER_BUFFER_MAX];
+wchar_t TransferBuffer[TRANSFER_BUFFER_MAX];
 int TransferLen;
 DWORD TransferRowData;
 CPluginDataInterfaceAbstract* TransferPluginDataIface;
@@ -1267,8 +880,11 @@ void WINAPI InternalGetDosName()
 {
     if (TransferFileData->DosName != NULL)
     {
-        TransferLen = lstrlen(TransferFileData->DosName);
-        CopyMemory(TransferBuffer, TransferFileData->DosName, TransferLen);
+        TransferLen = lstrlenW(TransferFileData->DosName);
+        // wmemcpy: TransferLen came from lstrlenW so it counts CHARACTERS
+        // (sally.h:321 says so), and both buffers are wchar_t. CopyMemory counts bytes, so
+        // this copied half the DOS name into the panel column.
+        wmemcpy(TransferBuffer, TransferFileData->DosName, TransferLen);
     }
     else
         TransferLen = 0;
@@ -1278,8 +894,8 @@ void WINAPI InternalGetSize()
 {
     if (TransferIsDir && !TransferFileData->SizeValid) // only directories without a known size
     {
-        memmove(TransferBuffer, DirColumnStr.c_str(), DirColumnStrLen);
-        TransferLen = DirColumnStrLen;
+        wmemcpy(TransferBuffer, DirColumnStrW.c_str(), DirColumnStrWLen);
+        TransferLen = DirColumnStrWLen;
     }
     else
     {
@@ -1287,38 +903,42 @@ void WINAPI InternalGetSize()
         {
         case SIZE_FORMAT_BYTES:
         {
-            TransferLen = NumberToStr2(TransferBuffer, TransferFileData->Size);
+            const std::wstring value = NumberToStr(TransferFileData->Size);
+            const size_t copyLength = value.size() < static_cast<size_t>(TRANSFER_BUFFER_MAX)
+                                          ? value.size()
+                                          : static_cast<size_t>(TRANSFER_BUFFER_MAX);
+            TransferLen = static_cast<int>(copyLength);
+            wmemcpy(TransferBuffer, value.data(), static_cast<size_t>(TransferLen));
             break;
         }
 
         case SIZE_FORMAT_KB: // WARNING: the same code is elsewhere, search for this constant
         {
-            PrintDiskSize(TransferBuffer, TransferFileData->Size, 3);
-            TransferLen = (int)strlen(TransferBuffer);
+            const std::wstring value = PrintDiskSize(TransferFileData->Size, 3);
+            TransferLen = static_cast<int>((std::min<size_t>)(value.size(), TRANSFER_BUFFER_MAX));
+            wmemcpy(TransferBuffer, value.data(), static_cast<size_t>(TransferLen));
             break;
         }
 
         case SIZE_FORMAT_MIXED:
         {
-            PrintDiskSize(TransferBuffer, TransferFileData->Size, 0);
-            TransferLen = (int)strlen(TransferBuffer);
+            const std::wstring value = PrintDiskSize(TransferFileData->Size, 0);
+            TransferLen = static_cast<int>((std::min<size_t>)(value.size(), TRANSFER_BUFFER_MAX));
+            wmemcpy(TransferBuffer, value.data(), static_cast<size_t>(TransferLen));
             break;
         }
         }
     }
 }
 
-// helper globals for InternalGetType()
-char* InternalGetTypeAux1;
-char* InternalGetTypeAux2;
-char InternalGetTypeAux3[MAX_PATH + 4]; // extension in lowercase, aligned to DWORDs
-
 void WINAPI InternalGetType()
 {
     if (TransferIsDir) // we will have to handle directories differently
     {
         TransferLen = TransferIsDir == 1 ? FolderTypeNameLen : UpDirTypeNameLen;
-        memcpy(TransferBuffer, TransferIsDir == 1 ? FolderTypeName : UpDirTypeName.c_str(), TransferLen);
+        // TransferLen counts CHARACTERS and TransferBuffer is wchar_t, so this
+        // must be wmemcpy - memcpy with a character count copied half the text, silently.
+        wmemcpy(TransferBuffer, TransferIsDir == 1 ? FolderTypeName : UpDirTypeName.c_str(), TransferLen);
     }
     else
     {
@@ -1326,12 +946,8 @@ void WINAPI InternalGetType()
         {
             if (TransferFileData->Ext[0] != 0)
             {
-                InternalGetTypeAux1 = InternalGetTypeAux3;
-                InternalGetTypeAux2 = TransferFileData->Ext;
-                while (*InternalGetTypeAux2 != 0)
-                    *InternalGetTypeAux1++ = LowerCase[*InternalGetTypeAux2++];
-                *((DWORD*)InternalGetTypeAux1) = 0;
-                if (!Associations.GetIndex(InternalGetTypeAux3, TransferAssocIndex))
+                const std::wstring foldedExtension = sally::text::Fold(TransferFileData->Ext);
+                if (!Associations.GetIndex(foldedExtension.c_str(), TransferAssocIndex))
                     TransferAssocIndex = -1; // not found
             }
             else
@@ -1342,11 +958,11 @@ void WINAPI InternalGetType()
             GetCommonFileTypeStr(TransferBuffer, &TransferLen, TransferFileData->Ext);
         else
         {
-            InternalGetTypeAux1 = Associations[TransferAssocIndex].Type;
-            if (InternalGetTypeAux1 != NULL) // valid file type
+            const wchar_t* type = Associations[TransferAssocIndex].Type;
+            if (type != NULL) // valid file type
             {
-                TransferLen = (int)strlen(InternalGetTypeAux1);
-                memcpy(TransferBuffer, InternalGetTypeAux1, TransferLen);
+                TransferLen = (int)wcslen(type);
+                wmemcpy(TransferBuffer, type, TransferLen);
             }
             else
                 GetCommonFileTypeStr(TransferBuffer, &TransferLen, TransferFileData->Ext);
@@ -1358,6 +974,12 @@ void WINAPI InternalGetType()
 static SYSTEMTIME InternalColumnST;
 static FILETIME InternalColumnFT;
 
+// The four formatters below all write TransferBuffer, which sally.h:320
+// declares 'wchar_t[TRANSFER_BUFFER_MAX]' with TransferLen counting CHARACTERS. Every one of
+// their twelve producers was narrow: GetDateFormatA/GetTimeFormatA on the primary paths (a
+// visible error), and sprintf() on the invalid-date and format-failure fallbacks - which
+// wrote NARROW BYTES into the wide buffer and returned a BYTE count, SILENTLY. The fallback
+// LoadStr() was also being used AS THE FORMAT STRING; it is now passed as data via L"%s".
 void WINAPI InternalGetDate()
 {
     if ((TransferRowData & 0x00000001) == 0)
@@ -1365,14 +987,14 @@ void WINAPI InternalGetDate()
         if (!FileTimeToLocalFileTime(&TransferFileData->LastWrite, &InternalColumnFT) ||
             !FileTimeToSystemTime(&InternalColumnFT, &InternalColumnST))
         {
-            TransferLen = sprintf(TransferBuffer, LoadStr(IDS_INVALID_DATEORTIME));
+            TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
             return;
         }
         TransferRowData |= 0x00000001;
     }
-    TransferLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
     if (TransferLen < 0)
-        TransferLen = sprintf(TransferBuffer, "%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
+        TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
 }
 
 void WINAPI InternalGetDateOnlyForDisk()
@@ -1382,7 +1004,7 @@ void WINAPI InternalGetDateOnlyForDisk()
         if (!FileTimeToLocalFileTime(&TransferFileData->LastWrite, &InternalColumnFT) ||
             !FileTimeToSystemTime(&InternalColumnFT, &InternalColumnST))
         {
-            TransferLen = sprintf(TransferBuffer, LoadStr(IDS_INVALID_DATEORTIME));
+            TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
             return;
         }
         TransferRowData |= 0x00000001;
@@ -1395,9 +1017,9 @@ void WINAPI InternalGetDateOnlyForDisk()
         TransferLen = 0;
         return;
     }
-    TransferLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
     if (TransferLen < 0)
-        TransferLen = sprintf(TransferBuffer, "%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
+        TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
 }
 
 void WINAPI InternalGetTime()
@@ -1407,14 +1029,14 @@ void WINAPI InternalGetTime()
         if (!FileTimeToLocalFileTime(&TransferFileData->LastWrite, &InternalColumnFT) ||
             !FileTimeToSystemTime(&InternalColumnFT, &InternalColumnST))
         {
-            TransferLen = sprintf(TransferBuffer, LoadStr(IDS_INVALID_DATEORTIME));
+            TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
             return;
         }
         TransferRowData |= 0x00000001;
     }
-    TransferLen = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
     if (TransferLen < 0)
-        TransferLen = sprintf(TransferBuffer, "%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
+        TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
 }
 
 void WINAPI InternalGetTimeOnlyForDisk()
@@ -1424,7 +1046,7 @@ void WINAPI InternalGetTimeOnlyForDisk()
         if (!FileTimeToLocalFileTime(&TransferFileData->LastWrite, &InternalColumnFT) ||
             !FileTimeToSystemTime(&InternalColumnFT, &InternalColumnST))
         {
-            TransferLen = sprintf(TransferBuffer, LoadStr(IDS_INVALID_DATEORTIME));
+            TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
             return;
         }
         TransferRowData |= 0x00000001;
@@ -1437,15 +1059,15 @@ void WINAPI InternalGetTimeOnlyForDisk()
         TransferLen = 0;
         return;
     }
-    TransferLen = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
     if (TransferLen < 0)
-        TransferLen = sprintf(TransferBuffer, "%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
+        TransferLen = swprintf_s(TransferBuffer, TRANSFER_BUFFER_MAX, L"%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
 }
 
 void WINAPI InternalGetAttr()
 {
     TransferLen = 0;
-    // WARNING: if we want to display more attributes, we must rework GetAttrsString() and the DISPLAYED_ATTRIBUTES mask!!!
+    // WARNING: if we want to display more attributes, we must rework GetAttrsStringW() and the DISPLAYED_ATTRIBUTES mask!!!
     if (TransferFileData->Attr & FILE_ATTRIBUTE_READONLY)
         TransferBuffer[TransferLen++] = 'R';
     if (TransferFileData->Attr & FILE_ATTRIBUTE_HIDDEN)
@@ -1604,8 +1226,8 @@ BOOL CSalamanderView::InsertStandardColumn(int index, DWORD id)
     {
         CColumn column;
         column.CustomData = 0;
-        lstrcpy(column.Name, LoadStr(item->NameResID));
-        lstrcpy(column.Description, LoadStr(item->DescResID));
+        lstrcpyW(column.Name, LoadStrW(item->NameResID));
+        lstrcpyW(column.Description, LoadStrW(item->DescResID));
         column.GetText = item->GetText;
         column.SupportSorting = item->SupportSorting;
         column.LeftAlignment = item->LeftAlignment;
@@ -1632,7 +1254,34 @@ BOOL CSalamanderView::InsertStandardColumn(int index, DWORD id)
     }
 }
 
-BOOL CSalamanderView::SetColumnName(int index, const char* name, const char* description)
+static void WriteColumnTextPairToAbiRecord(wchar_t* output,
+                                           std::size_t outputCapacity,
+                                           const wchar_t* first,
+                                           const wchar_t* second)
+{
+    std::size_t firstLength = std::wcslen(first);
+    std::size_t secondLength = std::wcslen(second);
+    if (firstLength + 1 + secondLength + 1 > outputCapacity)
+    {
+        const std::size_t payloadCapacity = outputCapacity - 2;
+        const std::size_t half = outputCapacity / 2 - 1;
+        if (secondLength <= half)
+            firstLength = payloadCapacity - secondLength;
+        else if (firstLength <= half)
+            secondLength = payloadCapacity - firstLength;
+        else
+            firstLength = secondLength = half;
+    }
+    std::wmemcpy(output, first, firstLength);
+    output[firstLength] = L'\0';
+    std::wmemcpy(output + firstLength + 1, second, secondLength);
+    output[firstLength + 1 + secondLength] = L'\0';
+}
+
+BOOL CSalamanderView::SetColumnName(int index, const wchar_t* name,
+                                    const wchar_t* description,
+                                    const wchar_t* extensionName,
+                                    const wchar_t* extensionDescription)
 {
     if (index < 0 || index >= Panel->Columns.Count)
     {
@@ -1645,49 +1294,27 @@ BOOL CSalamanderView::SetColumnName(int index, const char* name, const char* des
         return FALSE;
     }
     if (index == 0 && !Panel->IsExtensionInSeparateColumn() && (Panel->ValidFileData & VALID_DATA_EXTENSION))
-    { // check double (twice null-terminated) strings + the non-emptiness of the second one + and their copy
-        const char* s = name + strlen(name) + 1;
-        const char* beg = s;
-        while (s < name + COLUMN_NAME_MAX && *s != 0)
-            s++;
-        if (s == name + COLUMN_NAME_MAX || beg == s)
+    {
+        if (extensionName == NULL || *extensionName == 0)
         {
-            TRACE_E("CSalamanderView::SetColumnName(): name is not double string (names of Name.c_str() and Ext columns are expected) or second string is empty.");
+            TRACE_E("CSalamanderView::SetColumnName(): extension name is NULL or empty.");
             return FALSE;
         }
-        const char* s2 = description + strlen(description) + 1;
-        beg = s2;
-        while (s2 < description + COLUMN_DESCRIPTION_MAX && *s2 != 0)
-            s2++;
-        if (s2 == description + COLUMN_DESCRIPTION_MAX || beg == s2)
+        if (extensionDescription == NULL || *extensionDescription == 0)
         {
-            TRACE_E("CSalamanderView::SetColumnName(): description is not double string (descriptions of Name.c_str() and Ext columns are expected) or second string is empty.");
+            TRACE_E("CSalamanderView::SetColumnName(): extension description is NULL or empty.");
             return FALSE;
         }
-        // copy the double strings
-        int l = (int)(s - name);
-        if (l >= COLUMN_NAME_MAX)
-        {
-            TRACE_E("CSalamanderView::SetColumnName(): name is too long! (index=" << index << ")");
-            l = COLUMN_NAME_MAX - 1;
-        }
-        char* txt = Panel->Columns[index].Name;
-        memcpy(txt, name, l);
-        txt[l] = 0;
-        l = (int)(s2 - description);
-        if (l >= COLUMN_DESCRIPTION_MAX)
-        {
-            TRACE_E("CSalamanderView::SetColumnName(): desription is too long! (index=" << index << ")");
-            l = COLUMN_DESCRIPTION_MAX - 1;
-        }
-        txt = Panel->Columns[index].Description;
-        memcpy(txt, description, l);
-        txt[l] = 0;
+        WriteColumnTextPairToAbiRecord(Panel->Columns[index].Name,
+                                       COLUMN_NAME_MAX, name, extensionName);
+        WriteColumnTextPairToAbiRecord(Panel->Columns[index].Description,
+                                       COLUMN_DESCRIPTION_MAX, description,
+                                       extensionDescription);
     }
     else
     {
-        lstrcpyn(Panel->Columns[index].Name, name, COLUMN_NAME_MAX);
-        lstrcpyn(Panel->Columns[index].Description, description, COLUMN_DESCRIPTION_MAX);
+        lstrcpynW(Panel->Columns[index].Name, name, COLUMN_NAME_MAX);
+        lstrcpynW(Panel->Columns[index].Description, description, COLUMN_DESCRIPTION_MAX);
     }
     return TRUE;
 }
@@ -1701,13 +1328,19 @@ BOOL CSalamanderView::DeleteColumn(int index)
     }
     if (index == 0)
     {
-        TRACE_E("CSalamanderView::DeleteColumn(): index=" << index << " Name.c_str() column can't be deleted.");
+        TRACE_E("CSalamanderView::DeleteColumn(): index=" << index << " Name column can't be deleted.");
         return FALSE;
     }
     Panel->Columns.Delete(index);
     if (!Panel->Columns.IsGood())
         Panel->Columns.ResetState(); // cannot fail; the array just was not shrunk
     return TRUE;
+}
+
+BOOL CSalamanderView::IsNameColumnExtensionMerged()
+{
+    return !Panel->IsExtensionInSeparateColumn() &&
+           (Panel->ValidFileData & VALID_DATA_EXTENSION) != 0;
 }
 
 //*****************************************************************************
@@ -1717,7 +1350,7 @@ BOOL CSalamanderView::DeleteColumn(int index)
 // Holds a list of files on which the user invoked View or Edit.
 //
 
-CFileHistoryItem::CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName)
+CFileHistoryItem::CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerID, const wchar_t* fileName)
 {
     Type = type;
     HandlerID = handlerID;
@@ -1726,8 +1359,7 @@ CFileHistoryItem::CFileHistoryItem(CFileHistoryItemTypeEnum type, DWORD handlerI
     if (FileName.empty())
         return;
 
-    // try to pull the icon from the system
-    HIcon = GetFileOrPathIconAux(FileName.c_str(), FALSE, FALSE);
+    HIcon = GetFileOrPathIconAuxW(FileName.c_str(), FALSE, FALSE);
 }
 
 CFileHistoryItem::~CFileHistoryItem()
@@ -1736,34 +1368,36 @@ CFileHistoryItem::~CFileHistoryItem()
         HANDLES(DestroyIcon(HIcon));
 }
 
-BOOL CFileHistoryItem::Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName)
+BOOL CFileHistoryItem::Equal(CFileHistoryItemTypeEnum type, DWORD handlerID, const wchar_t* fileName)
 {
-    return (Type == type && HandlerID == handlerID && lstrcmp(FileName.c_str(), fileName) == 0);
+    // wcscmp, case-SENSITIVE, matching the lstrcmp it replaces. The wide confirmation that used
+    // to be ANDed on was already case-sensitive for exactly the same reason.
+    return Type == type && HandlerID == handlerID && wcscmp(FileName.c_str(), fileName) == 0;
 }
 
 BOOL CFileHistoryItem::Execute()
 {
     CALL_STACK_MESSAGE1("CFileHistoryItem::Execute()");
     CFilesWindow* panel = MainWindow->GetActivePanel();
+    // FileName IS the wide name now, so there is nothing to re-resolve.
+    const wchar_t* fileNameW = FileName.empty() ? NULL : FileName.c_str();
     switch (Type)
     {
     case fhitView:
-        panel->ViewFile(const_cast<char*>(FileName.c_str()), FALSE, HandlerID, -1, -1);
+        panel->ViewFile(fileNameW, FALSE, HandlerID, -1, -1);
         break;
     case fhitEdit:
-        panel->EditFile(const_cast<char*>(FileName.c_str()), HandlerID);
+        panel->EditFile(fileNameW, HandlerID);
         break;
     case fhitOpen:
     {
-        CPathBuffer buff; // Heap-allocated for long path support
-        lstrcpyn(buff, FileName.c_str(), buff.Size());
-        char* ptr = strrchr(buff.Get(), '\\');
-        if (ptr != NULL)
+        const size_t separator = FileName.find_last_of(L'\\');
+        if (separator != std::wstring::npos)
         {
-            *ptr = 0; // split the path into the path part and the file name
             HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             MainWindow->SetDefaultDirectories(); // so the starting process inherits the correct current directories
-            ExecuteAssociation(panel->GetListBoxHWND(), buff, ptr + 1);
+            const std::wstring directory = FileName.substr(0, separator);
+            ExecuteAssociationW(panel->GetListBoxHWND(), directory.c_str(), FileName.c_str() + separator + 1);
             SetCursor(hOldCur);
         }
         break;
@@ -1776,147 +1410,60 @@ BOOL CFileHistoryItem::Execute()
     return TRUE;
 }
 
-//****************************************************************************
-//
-// A set of functions for opening associations using SalOpen.exe
-//
-
-BOOL SalOpenInit()
-{
-    // allocate shared space in pagefile.sys
-    SalOpenFileMapping = HANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 are we passing x86/x64 incompatible data?
-                                                   MAX_PATH + 200, NULL));
-    if (SalOpenFileMapping != NULL)
-    {
-        SalOpenSharedMem = HANDLES(MapViewOfFile(SalOpenFileMapping, FILE_MAP_WRITE, 0, 0, 0)); // FIXME_X64 are we passing x86/x64 incompatible data?
-        if (SalOpenSharedMem == NULL)
-            TRACE_E("Unable to allocate shared memory (map view of file) for SalOpen.");
-        else
-            return TRUE;
-    }
-    else
-        TRACE_E("Unable to allocate shared memory (create file mapping) for SalOpen.");
-    return FALSE;
-}
-
-BOOL SalOpenExecute(HWND hWindow, const char* fileName)
-{
-    CALL_STACK_MESSAGE2("SalOpenExecute(, %s)", fileName);
-
-    // initialization required for launching SalOpen
-    static BOOL initCalled = FALSE;
-    if (!initCalled)
-    {
-        initCalled = TRUE;
-        SalOpenInit();
-    }
-
-    if (SalOpenSharedMem != NULL)
-    {
-        lstrcpyn((char*)SalOpenSharedMem, fileName, MAX_PATH + 200);
-
-        CPathBuffer cmdline;
-        cmdline[0] = '"';
-        if (GetModuleFileName(NULL, cmdline + 1, cmdline.Size() - 1) == 0)
-            return FALSE;
-        char* ptr = strrchr(cmdline, '\\');
-        if (ptr == NULL)
-            return FALSE;
-        *ptr = 0;
-        SalPathAppend(cmdline + 1, "utils\\salopen.exe", cmdline.Size() - 1);
-        char add[100];
-        RECT r;
-        MultiMonGetClipRectByWindow(GetTopVisibleParent(hWindow), &r, NULL);
-        sprintf(add, "\" %u %Iu %u", GetCurrentProcessId(), (DWORD_PTR)SalOpenFileMapping, (DWORD)MAKELPARAM(r.left, r.top));
-        if (strlen(cmdline) + strlen(add) >= (size_t)cmdline.Size())
-            return FALSE;
-        strcat(cmdline, add);
-
-        // start the salopen.exe process
-        {
-            CALL_STACK_MESSAGE1("SalOpenExecute::create-process");
-            std::wstring cmdlineW = AnsiToWide(cmdline);
-            ExternalToolRequest request;
-            request.commandLine = cmdlineW.c_str();
-            request.creationFlags = CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS;
-
-            ExternalToolResult result = gExternalToolRunner != NULL
-                                            ? gExternalToolRunner->Launch(request)
-                                            : ExternalToolResult::Error(ERROR_INVALID_PARAMETER);
-            if (!result.success)
-            {
-                DWORD err = result.errorCode;
-                TRACE_E("SalOpenExecute failed: \"" << cmdline << "\", " << GetErrorText(err));
-                return FALSE;
-            }
-            else
-            {
-                { // when waiting, DDE associations (.html, .h, .cpp, etc.) do not work
-                    //          CALL_STACK_MESSAGE1("SalOpenExecute::wait-for-process");
-                    //          result.processOwner->WaitForProcess(result.process, INFINITE);
-                }
-                result.CloseProcess();
-            }
-        }
-
-        return TRUE;
-    }
-    return FALSE;
-}
-
-void ReleaseSalOpen()
-{
-    if (SalOpenSharedMem != NULL)
-        HANDLES(UnmapViewOfFile(SalOpenSharedMem));
-    if (SalOpenFileMapping != NULL)
-        HANDLES(CloseHandle(SalOpenFileMapping));
-    SalOpenSharedMem = NULL;
-    SalOpenFileMapping = NULL;
-}
-
-BOOL IsFileURLPath(const char* path)
+BOOL IsFileURLPath(const wchar_t* path)
 {
     if (path == NULL)
         return FALSE;
     // skip whitespaces at the beginning of the string
-    const char* s = path;
+    const wchar_t* s = path;
     while (*s != 0 && *s <= ' ')
         s++;
     // find the FS name
-    const char* name = s;
+    const wchar_t* name = s;
     while (*s != 0 && *s != ':' && s - name < 4)
         s++;
-    return *s == ':' && s - name == 4 && StrNICmp(name, "file", 4) == 0;
+    return *s == ':' && s - name == 4 && StrNICmpW(name, L"file", 4) == 0;
 }
 
-BOOL IsPluginFSPath(char* path, char* fsName, char** userPart)
+BOOL IsPluginFSPath(wchar_t* path, std::wstring* fsName, wchar_t** userPart)
 {
-    return IsPluginFSPath((const char*)path, fsName, (const char**)userPart);
+    const wchar_t* constUserPart = NULL;
+    const BOOL result = IsPluginFSPath(
+        static_cast<const wchar_t*>(path), fsName,
+        userPart != NULL ? &constUserPart : NULL);
+    if (result && userPart != NULL)
+        *userPart = const_cast<wchar_t*>(constUserPart);
+    return result;
 }
 
-BOOL IsPluginFSPath(const char* path, char* fsName, const char** userPart)
+BOOL IsPluginFSPath(const wchar_t* path, std::wstring* fsName, const wchar_t** userPart)
 {
-    CALL_STACK_MESSAGE2("IsPluginFSPath(%s, ,)", path);
+    CALL_STACK_MESSAGE_NONE
 
     if (path == NULL)
         return FALSE;
-    const char* start = path;
+    const wchar_t* start = path;
     // skip whitespaces at the beginning of the string
     while (*start >= 1 && *start <= ' ')
         start++;
     // find the FS name
-    const char* name = start;
-    while (LowerCase[*name] >= 'a' && LowerCase[*name] <= 'z' ||
-           *name >= '0' && *name <= '9' || *name == '_' || *name == '-' || *name == '+')
-        name++;
+    const wchar_t* name = start;
+    while (*name != L'\0')
+    {
+        const wchar_t folded = sally::unicode::FoldCharW(*name);
+        if (!((folded >= L'a' && folded <= L'z') ||
+              (*name >= L'0' && *name <= L'9') || *name == L'_' ||
+              *name == L'-' || *name == L'+'))
+            break;
+        ++name;
+    }
     // test whether the FS name meets all conditions (a ':' follows and length >= 2 characters)
-    if (*name == ':' && name - start >= 2 && name - start < MAX_PATH)
+    if (*name == L':' && name - start >= 2)
     {
         // copy the FS name
         if (fsName != NULL)
         {
-            memmove(fsName, start, name - start);
-            fsName[name - start] = 0;
+            fsName->assign(start, static_cast<size_t>(name - start));
         }
         // pointer into 'path' to the first character of the plugin-defined path (after the first ':')
         if (userPart != NULL)

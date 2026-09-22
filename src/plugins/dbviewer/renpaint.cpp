@@ -13,6 +13,7 @@
 #include "dbviewer.h"
 #include "plugindarkmode.h"
 #include "common/PanelTextPainter.h"
+#include "display_text.h"
 
 //****************************************************************************
 //
@@ -24,8 +25,6 @@ void CRendererWindow::PaintTopMargin(HDC hDC, HRGN hUpdateRgn, const RECT* clipR
     RECT r;
     r.top = 0;
     r.bottom = RowHeight - 1;
-
-    char textBuffer[10000];
 
     PluginDarkModeColors colors;
     PluginDarkMode_GetColors(&colors);
@@ -47,8 +46,8 @@ void CRendererWindow::PaintTopMargin(HDC hDC, HRGN hUpdateRgn, const RECT* clipR
             SelectClipRgn(hDC, hUpdateRgn);
             r.left = x;
             r.right = x + RowHeight - 1;
-            sally::ui::DrawPanelTextA(hDC, x + LeftTextMargin, TopTextMargin, ETO_OPAQUE,
-                                      &r, "", 0, NULL);
+            sally::ui::DrawPanelTextW(hDC, x + LeftTextMargin, TopTextMargin, ETO_OPAQUE,
+                                      &r, L"", 0, NULL);
             // draw separator lines
             MoveToEx(hDC, r.left, r.bottom, NULL);
             LineTo(hDC, r.right, r.bottom);
@@ -92,16 +91,13 @@ void CRendererWindow::PaintTopMargin(HDC hDC, HRGN hUpdateRgn, const RECT* clipR
 
                     if (!Database.GetIsUnicode())
                     {
-                        size_t textLen = strlen(column->Name);
-                        if (textLen > 0)
-                        {
-                            memcpy(textBuffer, column->Name, min(textLen, 9999));
-                            textBuffer[9999] = 0;
-                            CodeCharacters(textBuffer, textLen);
-                        }
-
-                        sally::ui::DrawPanelTextA(hDC, x + LeftTextMargin, TopTextMargin, ETO_OPAQUE,
-                                                  &r, textBuffer, (UINT)textLen, NULL);
+                        std::wstring text;
+                        sally::dbviewer::DecodeLegacyDisplayText(
+                            column->Name, strlen(column->Name),
+                            UseCodeTable ? reinterpret_cast<const unsigned char*>(CodeTable) : nullptr,
+                            text);
+                        sally::ui::DrawPanelTextW(hDC, x + LeftTextMargin, TopTextMargin, ETO_OPAQUE,
+                                                  &r, text.c_str(), static_cast<UINT>(text.size()), NULL);
                     }
                     else
                     {
@@ -135,7 +131,7 @@ void CRendererWindow::PaintTopMargin(HDC hDC, HRGN hUpdateRgn, const RECT* clipR
         r.right = Width;
         r.bottom++;
         SetBkColor(hDC, colors.InputBackground);
-        sally::ui::DrawPanelTextA(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+        sally::ui::DrawPanelTextW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
     }
 
     SelectObject(hDC, hOldPen);
@@ -152,8 +148,6 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
     COLORREF selectionBkColor = colors.InactiveSelection;
     COLORREF oldBkColor = SetBkColor(hDC, normalBkColor);
     HPEN hOldPen = (HPEN)GetCurrentObject(hDC, OBJ_PEN);
-
-    char textBuffer[10000];
 
     RECT r;
     r.top = RowHeight;
@@ -190,7 +184,7 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
                     SelectClipRgn(hDC, hUpdateRgn);
                     r.left = 0;
                     r.right = RowHeight - 1;
-                    sally::ui::DrawPanelTextA(hDC, 0, r.top, ETO_OPAQUE, &r, "", 0, NULL);
+                    sally::ui::DrawPanelTextW(hDC, 0, r.top, ETO_OPAQUE, &r, L"", 0, NULL);
                     if (fetchedIndex != i)
                     {
                         if (!Database.FetchRecord(HWindow, i))
@@ -255,29 +249,30 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
 
                             size_t textLen;
                             SIZE sz;
-                            LPCSTR text;
-                            LPCWSTR textW;
+                            LPCWSTR textW = L"";
+                            std::wstring decodedText;
+                            std::wstring localizedText;
 
-                            if (!Database.GetIsUnicode())
+                            if (Database.TryGetLocalizedCellText(column, localizedText))
                             {
-                                text = Database.GetCellText(column, &textLen);
-                                textLen = min(textLen, 9999);
-
-                                if (textLen > 0)
-                                {
-                                    memcpy(textBuffer, text, textLen);
-                                    textBuffer[textLen] = 0;
-                                    CodeCharacters(textBuffer, textLen);
-                                }
-
-                                // measure the text width
-                                GetTextExtentPoint32A(hDC, textBuffer, (int)textLen, &sz);
+                                textW = localizedText.c_str();
+                                textLen = localizedText.size();
+                            }
+                            else if (!Database.GetIsUnicode())
+                            {
+                                const char* text = Database.GetCellText(column, &textLen);
+                                sally::dbviewer::DecodeLegacyDisplayText(
+                                    text, textLen,
+                                    UseCodeTable ? reinterpret_cast<const unsigned char*>(CodeTable) : nullptr,
+                                    decodedText);
+                                textW = decodedText.c_str();
+                                textLen = decodedText.size();
                             }
                             else
                             {
                                 textW = Database.GetCellTextW(column, &textLen);
-                                GetTextExtentPoint32W(hDC, textW, (int)textLen, &sz);
                             }
+                            GetTextExtentPoint32W(hDC, textW, static_cast<int>(textLen), &sz);
 
                             // draw the text
                             int xOffset = 0;
@@ -290,12 +285,8 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
                                 SetBkColor(hDC, selectionBkColor);
                                 inSelection = TRUE;
                             }
-                            if (!Database.GetIsUnicode())
-                                sally::ui::DrawPanelTextA(hDC, x + LeftTextMargin + xOffset, r.top + TopTextMargin,
-                                                          ETO_OPAQUE, &r, textBuffer, (UINT)textLen, NULL);
-                            else
-                                sally::ui::DrawPanelTextW(hDC, x + LeftTextMargin + xOffset, r.top + TopTextMargin,
-                                                          ETO_OPAQUE, &r, textW, (UINT)textLen, NULL);
+                            sally::ui::DrawPanelTextW(hDC, x + LeftTextMargin + xOffset, r.top + TopTextMargin,
+                                                      ETO_OPAQUE, &r, textW, static_cast<UINT>(textLen), NULL);
                             if (Bookmarks.IsMarked(visibleIndex, i))
                             {
                                 if (HMarkedIcon == NULL)
@@ -339,7 +330,7 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
                 r2.left = x;
                 r2.right = Width;
                 r2.bottom++;
-                sally::ui::DrawPanelTextA(hDC, 0, 0, ETO_OPAQUE, &r2, "", 0, NULL);
+                sally::ui::DrawPanelTextW(hDC, 0, 0, ETO_OPAQUE, &r2, L"", 0, NULL);
             }
         }
 
@@ -357,7 +348,7 @@ void CRendererWindow::PaintBody(HDC hDC, HRGN hUpdateRgn, const RECT* clipRect, 
         r.left = 0;
         r.right = Width;
         r.bottom = Height;
-        sally::ui::DrawPanelTextA(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+        sally::ui::DrawPanelTextW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
     }
 
     SelectObject(hDC, hOldPen);

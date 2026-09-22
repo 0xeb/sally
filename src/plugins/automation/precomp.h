@@ -106,7 +106,5 @@ ICanHandleException : public IUnknown
 /// The specified path is invalid.
 #define SALAUT_E_INVALIDPATH MAKE_HRESULT(SEVERITY_ERROR, FACILITY_ITF, 5)
 
-#include "strconv.h"
-
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;

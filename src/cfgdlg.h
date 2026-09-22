@@ -32,7 +32,7 @@ struct CHighlightMasksItem
     CHighlightMasksItem(CHighlightMasksItem& item);
     ~CHighlightMasksItem();
 
-    BOOL Set(const char* masks);
+    BOOL Set(const wchar_t* masks);
     BOOL IsGood();
 };
 
@@ -51,7 +51,7 @@ public:
 
     // searches all masks and if it finds a matching item, it returns a pointer to it
     // otherwise returns NULL; 'fileExt' is NULL for directories (the extension must be resolved)
-    inline CHighlightMasksItem* AgreeMasks(const char* fileName, const char* fileExt, DWORD fileAttr)
+    inline CHighlightMasksItem* AgreeMasks(const wchar_t* fileName, const wchar_t* fileExt, DWORD fileAttr)
     {
         int i;
         for (i = 0; i < Count; i++)
@@ -63,6 +63,7 @@ public:
         }
         return NULL;
     }
+
 };
 
 //****************************************************************************
@@ -76,9 +77,10 @@ public:
 struct CViewerMasksItem
 {
     CMaskGroup* Masks;
-    std::string Command;
-    std::string Arguments;
-    std::string InitDir;
+    // The persistence path and all stored values are wide on both sides.
+    std::wstring Command;
+    std::wstring Arguments;
+    std::wstring InitDir;
 
     int ViewerType;
 
@@ -88,14 +90,14 @@ struct CViewerMasksItem
     // helper variable for determining the type of data - TRUE = old -> 'Type' (0 viewer, 1 IE viewer, 2 external)
     BOOL OldType;
 
-    CViewerMasksItem(const char* masks, const char* command, const char* arguments, const char* initDir,
+    CViewerMasksItem(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir,
                      int viewerType, BOOL oldType);
 
     CViewerMasksItem();
     CViewerMasksItem(CViewerMasksItem& item);
     ~CViewerMasksItem();
 
-    BOOL Set(const char* masks, const char* command, const char* arguments, const char* initDir);
+    BOOL Set(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir);
     BOOL IsGood();
 };
 
@@ -121,19 +123,20 @@ public:
 struct CEditorMasksItem
 {
     CMaskGroup* Masks;
-    std::string Command;
-    std::string Arguments;
-    std::string InitDir;
+    // The persistence path and all stored values are wide on both sides.
+    std::wstring Command;
+    std::wstring Arguments;
+    std::wstring InitDir;
 
     DWORD HandlerID; // unique ID (valid during the Salamander session)
                      // used to identify the editor when selecting from the history of the file - CFileHistory
 
-    CEditorMasksItem(char* masks, char* command, char* arguments, char* initDir);
+    CEditorMasksItem(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir);
     CEditorMasksItem();
     CEditorMasksItem(CEditorMasksItem& item);
     ~CEditorMasksItem();
 
-    BOOL Set(const char* masks, const char* command, const char* arguments, const char* initDir);
+    BOOL Set(const wchar_t* masks, const wchar_t* command, const wchar_t* arguments, const wchar_t* initDir);
     BOOL IsGood();
 };
 
@@ -154,10 +157,10 @@ public:
 //
 // ****************************************************************************
 
-extern const char* DefTopToolBar; // default values
-extern const char* DefMiddleToolBar;
-extern const char* DefLeftToolBar;
-extern const char* DefRightToolBar;
+extern const wchar_t* DefTopToolBar; // default values
+extern const wchar_t* DefMiddleToolBar;
+extern const wchar_t* DefLeftToolBar;
+extern const wchar_t* DefRightToolBar;
 
 #define TITLE_BAR_MODE_DIRECTORY 0 // must correspond to the array {IDS_TITLEBAR_DIRECTORY, IDS_TITLEBAR_COMPOSITE, IDS_TITLEBAR_FULLPATH}
 #define TITLE_BAR_MODE_COMPOSITE 1
@@ -214,7 +217,6 @@ struct CConfiguration
         HotPathsBarVisible,     // toolbar visibility
         DriveBarVisible,        // drive bar visibility
         DriveBar2Visible,       // second drive bar visibility
-        UseSalOpen,             // should salopen.exe be used (otherwise association runs directly)
         NetwareFastDirMove,     // should fast-dir-move (rename directories) be used on the Novell Netware? (otherwise rename files only, directories are created + old empty ones deleted) (REASON: for some users, fast-dir-move works on Novell and they don’t want to wait)
         UseAsyncCopyAlg,        // Win7+ only (older OS: always FALSE): should asynchronous file copy algorithm be used on network drives?
         ReloadEnvVariables,     // should we perform regeneration when environment variables change??
@@ -284,7 +286,7 @@ struct CConfiguration
     CMaskGroup CompareIgnoreDirsMasks;
 
     BOOL IfPathIsInaccessibleGoToIsMyDocs;   // TRUE = ignore IfPathIsInaccessibleGoTo and fetch Documents from the system directly
-    CPathBuffer IfPathIsInaccessibleGoTo; // path used when the current one becomes inaccessible (network outage, media removed from the removable drive, ...)
+    std::wstring IfPathIsInaccessibleGoTo; // path used when the current one becomes inaccessible (network outage, media removed from the removable drive, ...)
 
     DWORD LastUsedSpeedLimit; // remembers the last used speed limit (users often repeat one number)
 
@@ -297,7 +299,7 @@ struct CConfiguration
     int ShowPanelCaption; // should the panel caption be shown in color in the directory line?
     int ShowPanelZoom;    // should the Zoom button be shown in the directory line?
 
-    char InfoLineContent[200];
+    std::wstring InfoLineContent;
 
     int FileNameFormat; // how to adjust filename after reading from disk
 
@@ -314,10 +316,10 @@ struct CConfiguration
 
     int HotPathAutoConfig; // automatically open configuration after assigning from a panel
 
-    char TopToolBar[400]; // ToolBar contents
-    char MiddleToolBar[400];
-    char LeftToolBar[200];
-    char RightToolBar[200];
+    std::wstring TopToolBar; // ToolBar contents
+    std::wstring MiddleToolBar;
+    std::wstring LeftToolBar;
+    std::wstring RightToolBar;
 
     int UseRecycleBin;       // 0 - do not use, 1 - for all, 2 - for RecycleMasks
     CMaskGroup RecycleMasks; // mask array determining what is sent to the Recycle Bin
@@ -326,22 +328,18 @@ struct CConfiguration
     BOOL SkillLevel; // SKILL_LEVEL_BEGINNER, SKILL_LEVEL_INTERMEDIATE, SKILL_LEVEL_ADVANCED
 
     // the history arrays are destroyed in the ClearHistory() method
-    char* SelectHistory[SELECT_HISTORY_SIZE];
-    char* CopyHistory[COPY_HISTORY_SIZE];
-    wchar_t* CopyHistoryW[COPY_HISTORY_SIZE];
-    char* EditHistory[EDIT_HISTORY_SIZE];
-    char* ChangeDirHistory[CHANGEDIR_HISTORY_SIZE];
-    char* FileListHistory[FILELIST_HISTORY_SIZE];
-    char* CreateDirHistory[CREATEDIR_HISTORY_SIZE];
-    char* QuickRenameHistory[QUICKRENAME_HISTORY_SIZE];
-    char* EditNewHistory[EDITNEW_HISTORY_SIZE];
-    wchar_t* CreateDirHistoryW[CREATEDIR_HISTORY_SIZE];
-    wchar_t* QuickRenameHistoryW[QUICKRENAME_HISTORY_SIZE];
-    wchar_t* EditNewHistoryW[EDITNEW_HISTORY_SIZE];
-    char* ConvertHistory[CONVERT_HISTORY_SIZE];
-    char* FilterHistory[FILTER_HISTORY_SIZE];
+    wchar_t* SelectHistory[SELECT_HISTORY_SIZE];
+    wchar_t* CopyHistory[COPY_HISTORY_SIZE];
+    wchar_t* EditHistory[EDIT_HISTORY_SIZE];
+    wchar_t* ChangeDirHistory[CHANGEDIR_HISTORY_SIZE];
+    wchar_t* FileListHistory[FILELIST_HISTORY_SIZE];
+    wchar_t* CreateDirHistory[CREATEDIR_HISTORY_SIZE];
+    wchar_t* QuickRenameHistory[QUICKRENAME_HISTORY_SIZE];
+    wchar_t* EditNewHistory[EDITNEW_HISTORY_SIZE];
+    wchar_t* ConvertHistory[CONVERT_HISTORY_SIZE];
+    wchar_t* FilterHistory[FILTER_HISTORY_SIZE];
 
-    CPathBuffer FileListName; // file name
+    std::wstring FileListName; // file name
     BOOL FileListAppend;
     int FileListDestination; // 0=Clipboard 1=Viewer 2=File
 
@@ -365,7 +363,7 @@ struct CConfiguration
     BOOL WrapText; // text wrapping set via menu (here only for saving)
 
     BOOL CodePageAutoSelect;  // automatically detect the code page
-    char DefaultConvert[200]; // encoding name the user wants to use by default
+    std::wstring DefaultConvert; // encoding name the user wants to use by default
 
     BOOL AutoCopySelection; // automatically copy selection to the clipboard
 
@@ -406,7 +404,7 @@ struct CConfiguration
     int UseSimpleIconsInArchives;
 
     BOOL UseEditNewFileDefault;        // should the EditNewFileDefault value be used? (if not, it is loaded from resources, thus language switching works)
-    CPathBuffer EditNewFileDefault; // used as the default for the EditNewFile command when UseEditNewFileDefault is enabled
+    std::wstring EditNewFileDefault; // used as the default for the EditNewFile command when UseEditNewFileDefault is enabled
 
     // Tip of the Day
     //  int  ShowTipOfTheDay;         // display Tip of the Day at program startup
@@ -422,7 +420,7 @@ struct CConfiguration
 
     // custom icon overlays
     BOOL EnableCustomIconOverlays;    // TRUE = icon overlays are used (see ShellIconOverlays)
-    char* DisabledCustomIconOverlays; // allocated list of disabled icon overlay handlers (separator is ';', escape - sequence for ';' is ';;')
+    wchar_t* DisabledCustomIconOverlays; // allocated list of disabled icon overlay handlers (separator is ';', escape - sequence for ';' is ';;')
 
 #ifndef _WIN64
     // FIXME_X64_WINSCP - this approach is not ideal. Find a better one (split x86 and x64 versions and share data)
@@ -437,7 +435,7 @@ struct CConfiguration
     int GetMainWindowIconIndex(); // returns a valid index in the MainWindowIcons array
 
     BOOL PrepareRecycleMasks(int& errorPos); // prepare recycle-bin masks for use
-    BOOL AgreeRecycleMasks(const char* fileName, const char* fileExt);
+    BOOL AgreeRecycleMasks(const wchar_t* fileName, const wchar_t* fileExt);
 
     DWORD LastFocusedPage;          // last visited page in the dialog
     DWORD ConfigurationHeight;      // height of the configuration dialog in points
@@ -450,26 +448,26 @@ struct CConfiguration
     int FindColNameWidth; // width of the Name column in the Find dialog
 
     // Language
-    CPathBuffer LoadedSLGName;       // xxxxx.slg that was loaded at Salamander start
-    CPathBuffer SLGName;             // xxxxx.slg to use next time Salamander starts
+    std::wstring LoadedSLGName;       // xxxxx.slg that was loaded at Salamander start
+    std::wstring SLGName;             // xxxxx.slg to use next time Salamander starts
     int DoNotDispCantLoadPluginSLG;  // TRUE = suppress warning that an SLG with the same name cannot be loaded into the plugin as in Salamander
     int DoNotDispCantLoadPluginSLG2; // TRUE = suppress warning that the SLG plugin used last time (either user-selected or auto-selected) cannot be loaded
     int UseAsAltSLGInOtherPlugins;   // TRUE = try to use AltSLGName for plugins
-    CPathBuffer AltPluginSLGName; // only if UseAsAltSLGInOtherPlugins is TRUE: fallback SLG module for plugins (if LoadedSLGName for plugin does not exist)
+    std::wstring AltPluginSLGName; // fallback SLG module for plugins
 
     // Directory name convert\\XXX\\convert.cfg from which convert.cfg is loaded
-    CPathBuffer ConversionTable;
+    std::wstring ConversionTable;
 
     int ThemeMode;                              // dark mode behavior (THEME_MODE_* from darkmode.h)
     int CommandShellTargetKind; // ShellTargetKind persisted as a DWORD
-    wchar_t CommandShellProfileGuid[COMMAND_SHELL_PROFILE_GUID_MAX];
-    wchar_t CommandShellProfileName[COMMAND_SHELL_PROFILE_NAME_MAX];
+    std::wstring CommandShellProfileGuid;
+    std::wstring CommandShellProfileName;
     int TitleBarShowPath;                        // will we display the path in the title bar?
     int TitleBarMode;                            // title bar display mode (TITLE_BAR_MODE_xxx)
     int UseTitleBarPrefix;                       // should prefix be shown in the title bar?
-    char TitleBarPrefix[TITLE_PREFIX_MAX];       // prefix for the title bar
+    std::wstring TitleBarPrefix;                    // prefix for the title bar
     int UseTitleBarPrefixForced;                 // command-line variant has priority and is not saved
-    char TitleBarPrefixForced[TITLE_PREFIX_MAX]; // command-line variant has priority and is not saved
+    std::wstring TitleBarPrefixForced;              // command-line variant has priority and is not saved
     int MainWindowIconIndex;                     // index of the icon in MainWindowIcons[], 0=default
     int MainWindowIconIndexForced;               // command-line variant, has priority and is not saved; -1 -- unset
 
@@ -527,8 +525,8 @@ protected:
 class CCfgPageRegional : public CCommonPropSheetPage
 {
 public:
-    CPathBuffer SLGName;
-    CPathBuffer DirName;
+    std::wstring SLGName;
+    std::wstring DirName;
 
 public:
     CCfgPageRegional();
@@ -1218,6 +1216,6 @@ protected:
 //
 // ****************************************************************************
 
-BOOL ValidatePathIsNotEmpty(HWND hParent, const char* path);
+BOOL ValidatePathIsNotEmpty(HWND hParent, const wchar_t* path);
 
 extern CConfiguration Configuration;

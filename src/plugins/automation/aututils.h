@@ -56,11 +56,11 @@ void FreeException(EXCEPINFO& ei);
 /// Formats textual description of the system error code.
 void FormatErrorText(
     HRESULT hrCode,
-    TCHAR* pszBuffer,
+    wchar_t* pszBuffer,
     UINT cchMax);
 
 /// For the given string computes SDBM hash value.
-UINT HashString(__in_z PCTSTR s);
+UINT HashString(__in_z PCWSTR s);
 
 /// Converts 64b integer to proper OLE automation data type.
 /// The function selects appropriate data type (either I4 or R8) to

@@ -87,7 +87,7 @@ LRESULT CALLBACK EditControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         return TRUE;
     }
     }
-    return CallWindowProc(OrigEditControlProc, hWnd, uMsg, wParam, lParam);
+    return CallWindowProcW(OrigEditControlProc, hWnd, uMsg, wParam, lParam);
 }
 
 INT_PTR WINAPI CommentDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -179,12 +179,13 @@ BOOL CCommentDialog::OnInit(WPARAM wParam, LPARAM lParam)
 
     OrigEditControlProc = (WNDPROC)SetWindowLongPtr(CommentHWnd, GWLP_WNDPROC, (LONG_PTR)EditControlProc);
 
-    SetDlgItemText(Dlg, IDC_COMMENT, PackObject->Comment);
-    SendDlgItemMessage(Dlg, IDC_COMMENT, EM_SETLIMITTEXT, MAX_ZIPCOMMENT - 1, 0);
+    SetDlgItemZipLegacyText(Dlg, IDC_COMMENT, PackObject->Comment);
+    SendDlgItemMessage(Dlg, IDC_COMMENT, EM_SETLIMITTEXT, MAX_ZIPCOMMENT, 0);
 
-    CPathBuffer title;
-    sprintf(title, LoadStr(IDS_COMMENTDLGTITLE), PackObject->ZipName.Get());
-    SetWindowText(Dlg, title);
+    // The archive path is an application-owned UTF-16 filesystem identity.
+    const std::wstring title = SPLFormatStringOwned(
+        LangStr(IDS_COMMENTDLGTITLE).c_str(), PackObject->ZipName.c_str());
+    SetWindowTextW(Dlg, title.c_str());
     SendMessage(Dlg, WM_SETICON, ICON_SMALL, (WPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_COMMENT)));
 
     // disable the 'save' item
@@ -225,7 +226,7 @@ BOOL CCommentDialog::OnCancel()
     CALL_STACK_MESSAGE1("CCommentDialog::OnCancel()");
     if (!PackObject->MultiVol && SendMessage(CommentHWnd, EM_GETMODIFY, 0, 0))
     {
-        switch (SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_COMMENTMODIFIED), LoadStr(IDS_PLUGINNAME), MB_YESNOCANCEL | MB_ICONEXCLAMATION))
+        switch (SalamanderGeneral->SalMessageBox(Dlg, LoadStrW(IDS_COMMENTMODIFIED).c_str(), LoadStrW(IDS_PLUGINNAME).c_str(), MB_YESNOCANCEL | MB_ICONEXCLAMATION))
         {
         case IDYES:
             if (!Save())
@@ -246,15 +247,19 @@ BOOL CCommentDialog::Save()
     CALL_STACK_MESSAGE1("CCommentDialog::Save()");
     if (PackObject->MultiVol)
         return FALSE;
-    if (GetDlgItemText(Dlg, IDC_COMMENT, PackObject->Comment, MAX_ZIPCOMMENT - 1) <= 0)
+    std::string staged;
+    if (!ReadDlgItemZipLegacyTextExact(Dlg, IDC_COMMENT, staged) ||
+        staged.size() > MAX_ZIPCOMMENT)
     {
-        PackObject->Comment[0] = 0;
+        SalamanderGeneral->SalMessageBox(Dlg, LoadStrW(IDS_LOWMEM).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
     }
+    std::memcpy(PackObject->Comment, staged.c_str(), staged.size() + 1);
     int ret = PackObject->SaveComment();
     if (ret)
     {
         if (ret != IDS_NODISPLAY)
-            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(ret), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            SalamanderGeneral->SalMessageBox(Dlg, LoadStrW(ret).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
     SendMessage(CommentHWnd, EM_SETMODIFY, FALSE, 0);
@@ -331,8 +336,8 @@ CWaitForDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CWaitForDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CWaitForDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
-    SetDlgItemText(Dlg, IDC_FILENAME, WaitFor);
-    SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
+    SetDlgItemTextW(Dlg, IDC_FILENAME, WaitFor.c_str());
+    SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, 0, 0);
 
     CenterDlgToParent();
     return TRUE;
@@ -341,16 +346,24 @@ BOOL CWaitForDialog::OnInit(WPARAM wParam, LPARAM lParam)
 BOOL CWaitForDialog::OnOK()
 {
     CALL_STACK_MESSAGE1("CWaitForDialog::OnOK()");
-    GetDlgItemText(Dlg, IDC_FILENAME, WaitFor, MAX_PATH - 1);
+    WaitFor = SPLGetDlgItemTextOwned(Dlg, IDC_FILENAME);
+    std::string encoded;
+    if (!TryWideToZipText(WaitFor.c_str(), encoded) || encoded.size() >= EncodedCapacity)
+    {
+        SalamanderGeneral->SalMessageBox(Dlg, LoadStrW(IDS_TOOLONGNAME).c_str(), LoadStrW(IDS_ERROR).c_str(),
+                                         MB_OK | MB_ICONEXCLAMATION);
+        return TRUE;
+    }
+    memcpy(EncodedOutput, encoded.c_str(), encoded.size() + 1);
     EndDialog(Dlg, IDOK);
     return TRUE;
 }
 
 INT_PTR
-WaitForDialog(HWND parent, char* waitFor)
+WaitForDialog(HWND parent, char* waitFor, size_t waitForCapacity)
 {
     CALL_STACK_MESSAGE1("WaitForDialog(, )");
-    CWaitForDialog dlg(parent, waitFor);
+    CWaitForDialog dlg(parent, waitFor, waitForCapacity);
     return dlg.Proceed();
 }
 
@@ -449,7 +462,7 @@ ChangeTextsDialog(HWND parent, int* changeLangReaction)
 // other functions
 //
 
-BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
+BOOL LoadSfxLangs(HWND dlg, const wchar_t* selectedSfxFile, bool isConfig)
 {
     CALL_STACK_MESSAGE2("LoadSfxLangs(, , %d)", isConfig);
     if (!SfxLanguages)
@@ -460,36 +473,40 @@ BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
 
     CSfxLang* lang;
     int index;
-    char langName[128];
-    char selLang[128];
+    // W - the names go into the combo through CB_ADDSTRING/CB_SELECTSTRING, which
+    // resolve to the wide messages under UNICODE.
+    wchar_t langName[128];
+    wchar_t selLang[128];
     selLang[0] = 0;
 
     int i;
     for (i = 0; i < SfxLanguages->Count; i++)
     {
         lang = (*SfxLanguages)[i];
-        if (GetLocaleInfo(MAKELCID(MAKELANGID(lang->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+        if (GetLocaleInfoW(MAKELCID(MAKELANGID(lang->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
         {
-            char* c = strchr(langName, ' ');
+            wchar_t* c = wcschr(langName, L' ');
             if (c)
                 *c = 0;
-            index = (int)SendDlgItemMessage(dlg, IDC_LANGUAGE, CB_ADDSTRING, 0, (LPARAM)langName);
+            index = (int)SendDlgItemMessageW(dlg, IDC_LANGUAGE, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(langName));
             if (index != CB_ERR && index != CB_ERRSPACE)
             {
-                SendDlgItemMessage(dlg, IDC_LANGUAGE, CB_SETITEMDATA, index, (LPARAM)lang);
+                SendDlgItemMessageW(dlg, IDC_LANGUAGE, CB_SETITEMDATA, index, (LPARAM)lang);
 
-                if (lstrcmpi(lang->FileName, selectedSfxFile) == 0)
+                const std::wstring fileName = ZipTextToWide(lang->FileName.c_str());
+                if (selectedSfxFile != NULL &&
+                    CompareStringOrdinal(fileName.c_str(), -1, selectedSfxFile, -1, TRUE) == CSTR_EQUAL)
                 {
-                    lstrcpy(selLang, langName);
+                    lstrcpyW(selLang, langName);
                 }
             }
         }
     }
 
     if (!*selLang ||
-        SendDlgItemMessage(dlg, IDC_LANGUAGE, CB_SELECTSTRING, -1, (LPARAM)selLang) == CB_ERR)
+        SendDlgItemMessageW(dlg, IDC_LANGUAGE, CB_SELECTSTRING, -1, reinterpret_cast<LPARAM>(selLang)) == CB_ERR)
     {
-        SendDlgItemMessage(dlg, IDC_LANGUAGE, CB_SETCURSEL, 0, 0);
+        SendDlgItemMessageW(dlg, IDC_LANGUAGE, CB_SETCURSEL, 0, 0);
     }
 
     return TRUE;
@@ -498,28 +515,35 @@ BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
 BOOL LoadLangChache(HWND parent)
 {
     CALL_STACK_MESSAGE1("LoadLangChache()");
-    CPathBuffer path; // Heap-allocated for long path support
-    char* file;
-    GetModuleFileName(DLLInstance, path, path.Size());
-    SalamanderGeneral->CutDirectory(path);
-    SalamanderGeneral->SalPathAppend(path, "sfx\\*.sfx", path.Size());
-    WIN32_FIND_DATA fd;
-    HANDLE find = FindFirstFile(path, &fd);
+    const auto showDirectoryError = [parent](DWORD error) {
+        std::wstring message = LangStr(IDS_UNABLEREADSFXDIR).c_str();
+        message += SPLGetErrorTextOwned(SalamanderGeneral, error);
+        SalamanderGeneral->SalMessageBox(parent, message.c_str(), LoadStrW(IDS_ERROR).c_str(),
+                                         MB_OK | MB_ICONEXCLAMATION);
+    };
+
+    std::wstring modulePath;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, modulePath))
+    {
+        showDirectoryError(GetLastError());
+        return FALSE;
+    }
+    std::wstring directory = modulePath;
+    SPLCutDirectoryOwned(SalamanderGeneral, directory);
+    std::wstring pattern = directory;
+    SPLSalPathAppendOwned(pattern, L"sfx\\*.sfx");
+    WIN32_FIND_DATAW fd;
+    HANDLE find = FindFirstFileW(pattern.c_str(), &fd);
     if (find == INVALID_HANDLE_VALUE)
     {
         int le = GetLastError();
         if (le == ERROR_FILE_NOT_FOUND || le == ERROR_NO_MORE_FILES)
         {
-            SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_NOSFXINSTALLED), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            SalamanderGeneral->SalMessageBox(parent, LoadStrW(IDS_NOSFXINSTALLED).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
         }
         else
         {
-            char buffer[512];
-            lstrcpy(buffer, LoadStr(IDS_UNABLEREADSFXDIR));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, le,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                          512 - lstrlen(buffer), NULL);
-            SalamanderGeneral->SalMessageBox(parent, buffer, LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            showDirectoryError(le);
         }
         return FALSE;
     }
@@ -527,13 +551,11 @@ BOOL LoadLangChache(HWND parent)
     SfxLanguages = new TIndirectArray2<CSfxLang>(8);
     if (!SfxLanguages)
     {
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+        SalamanderGeneral->SalMessageBox(parent, LoadStrW(IDS_LOWMEM).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
 
-    SalamanderGeneral->CutDirectory(path);
-    SalamanderGeneral->SalPathAddBackslash(path, path.Size());
-    file = path + lstrlen(path);
+    SPLSalPathAppendOwned(directory, L"sfx");
 
     CSfxLang* lang;
     BOOL ret;
@@ -542,8 +564,9 @@ BOOL LoadLangChache(HWND parent)
     {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
         {
-            lstrcpy(file, fd.cFileName);
-            int r = LoadSfxFileData(path, &lang);
+            std::wstring candidate = directory;
+            SPLSalPathAppendOwned(candidate, fd.cFileName);
+            int r = LoadSfxFileData(candidate.c_str(), &lang);
             if (r || !SfxLanguages->Add(lang))
             {
                 if (!r)
@@ -554,14 +577,13 @@ BOOL LoadLangChache(HWND parent)
                 if (r == IDS_LOWMEM)
                 {
                     SfxLanguages->Destroy();
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+                    SalamanderGeneral->SalMessageBox(parent, LoadStrW(IDS_LOWMEM).c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OK | MB_ICONEXCLAMATION);
                     break;
                 }
                 else
                 {
-                    char err[512];
-                    sprintf(err, LoadStr(r), file);
-                    if (SalamanderGeneral->SalMessageBox(parent, err, LoadStr(IDS_ERROR), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK)
+                    const std::wstring errorText = SPLFormatStringOwned(LangStr(r).c_str(), fd.cFileName);
+                    if (SalamanderGeneral->SalMessageBox(parent, errorText.c_str(), LoadStrW(IDS_ERROR).c_str(), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK)
                     {
                         SfxLanguages->Destroy();
                         break;
@@ -570,16 +592,11 @@ BOOL LoadLangChache(HWND parent)
             }
         }
 
-        ret = FindNextFile(find, &fd);
+        ret = FindNextFileW(find, &fd);
         le = GetLastError();
         if (!ret && le != ERROR_NO_MORE_FILES)
         {
-            char buffer[512];
-            lstrcpy(buffer, LoadStr(IDS_UNABLEREADSFXDIR));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, le,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                          512 - lstrlen(buffer), NULL);
-            SalamanderGeneral->SalMessageBox(parent, buffer, LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            showDirectoryError(le);
             break;
         }
     } while (ret);
@@ -589,20 +606,20 @@ BOOL LoadLangChache(HWND parent)
     {
         delete SfxLanguages;
         SfxLanguages = NULL;
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_UNABLEREADALLSFX), LoadStr(IDS_ERROR),
+        SalamanderGeneral->SalMessageBox(parent, LoadStrW(IDS_UNABLEREADALLSFX).c_str(), LoadStrW(IDS_ERROR).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         return FALSE;
     }
     return TRUE;
 }
 
-int FormatNumber(__UINT64 number, char* buffer, const char* text)
+int FormatNumber(__UINT64 number, wchar_t* buffer, const wchar_t* text)
 {
-    CALL_STACK_MESSAGE3("FormatNumber(0x%I64X, , %s)", number, text);
+    CALL_STACK_MESSAGE3("FormatNumber(0x%I64X, , %ls)", number, text);
     __UINT64 i;
-    char buf1[32];
-    char* dest;
-    char* dest2;
+    wchar_t buf1[32];
+    wchar_t* dest;
+    wchar_t* dest2;
     int digits = 0;
 
     dest = buf1;
@@ -612,8 +629,8 @@ int FormatNumber(__UINT64 number, char* buffer, const char* text)
     while (i)
     {
         if (!((digits) % 3) && digits)
-            *dest++ = ' ';
-        *dest++ = (char)(i % 10 + 0x30);
+            *dest++ = L' ';
+        *dest++ = (wchar_t)(i % 10 + 0x30);
         digits++;
         i /= 10;
     }
@@ -621,7 +638,7 @@ int FormatNumber(__UINT64 number, char* buffer, const char* text)
     dest--;
     while (dest >= buf1)
         *dest2++ = *dest--;
-    *dest2++ = ' ';
-    lstrcpy(dest2, text);
-    return lstrlen(buffer);
+    *dest2++ = L' ';
+    lstrcpyW(dest2, text);
+    return lstrlenW(buffer);
 }

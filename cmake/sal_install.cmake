@@ -105,6 +105,10 @@ function(sal_generate_plugins_ver)
 
   # Install where the loader searches for it.
   install(FILES "${CMAKE_BINARY_DIR}/plugins.ver" DESTINATION plugins)
+
+  # Version 1 was installed at the runtime root. Incremental populate must remove that obsolete
+  # copy so a shipping tree has one authoritative manifest in the location the loader reads.
+  install(CODE "file(REMOVE \"\${CMAKE_INSTALL_PREFIX}/plugins.ver\")")
 endfunction()
 
 # Install resource files (toolbars, convert tables, etc.)

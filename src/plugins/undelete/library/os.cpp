@@ -27,18 +27,18 @@ static HINSTANCE NTShell32DLLInstance = NULL;
 //
 //  Static members
 //
-OS<char>::TFindFirstVolumeMountPoint OS<char>::F_FindFirstVolumeMountPoint = NULL;
-OS<char>::TFindNextVolumeMountPoint OS<char>::F_FindNextVolumeMountPoint = NULL;
-OS<char>::TFindVolumeMountPointClose OS<char>::F_FindVolumeMountPointClose = NULL;
-OS<char>::TGetVolumeNameForVolumeMountPoint OS<char>::F_GetVolumeNameForVolumeMountPoint = NULL;
-OS<char>::TGetDiskFreeSpaceEx OS<char>::F_GetDiskFreeSpaceEx = NULL;
-OS<char>::TFindFirstVolume OS<char>::F_FindFirstVolume = NULL;
-OS<char>::TFindNextVolume OS<char>::F_FindNextVolume = NULL;
-OS<char>::TFindVolumeClose OS<char>::F_FindVolumeClose = NULL;
-OS<char>::TGetVolumePathNamesForVolumeName OS<char>::F_GetVolumePathNamesForVolumeName = NULL;
-OS<char>::TGetLogicalDriveStrings OS<char>::F_GetLogicalDriveStrings = NULL;
-OS<char>::TSHGetFileInfo OS<char>::F_SHGetFileInfo = NULL;
-HMODULE OS<char>::ImageResDLL = NULL;
+OS<wchar_t>::TFindFirstVolumeMountPoint OS<wchar_t>::F_FindFirstVolumeMountPoint = NULL;
+OS<wchar_t>::TFindNextVolumeMountPoint OS<wchar_t>::F_FindNextVolumeMountPoint = NULL;
+OS<wchar_t>::TFindVolumeMountPointClose OS<wchar_t>::F_FindVolumeMountPointClose = NULL;
+OS<wchar_t>::TGetVolumeNameForVolumeMountPoint OS<wchar_t>::F_GetVolumeNameForVolumeMountPoint = NULL;
+OS<wchar_t>::TGetDiskFreeSpaceEx OS<wchar_t>::F_GetDiskFreeSpaceEx = NULL;
+OS<wchar_t>::TFindFirstVolume OS<wchar_t>::F_FindFirstVolume = NULL;
+OS<wchar_t>::TFindNextVolume OS<wchar_t>::F_FindNextVolume = NULL;
+OS<wchar_t>::TFindVolumeClose OS<wchar_t>::F_FindVolumeClose = NULL;
+OS<wchar_t>::TGetVolumePathNamesForVolumeName OS<wchar_t>::F_GetVolumePathNamesForVolumeName = NULL;
+OS<wchar_t>::TGetLogicalDriveStrings OS<wchar_t>::F_GetLogicalDriveStrings = NULL;
+OS<wchar_t>::TSHGetFileInfo OS<wchar_t>::F_SHGetFileInfo = NULL;
+HMODULE OS<wchar_t>::ImageResDLL = NULL;
 
 // ***************************************************************************
 //
@@ -51,10 +51,10 @@ BOOL OS_InitOSVersion()
         OSVersionDetected = TRUE;
 
         // To run under W9x we must use the A-version of GetVersionEx().
-        OSVERSIONINFOA osvi;
+        OSVERSIONINFOW osvi;
         ZeroMemory(&osvi, sizeof(osvi));
         osvi.dwOSVersionInfoSize = sizeof(osvi);
-        if (!GetVersionExA(&osvi))
+        if (!GetVersionExW(&osvi))
         {
             DWORD err = GetLastError();
             TRACE_E("GetVersionEx() failed, GetLastError()=" << err);
@@ -79,21 +79,22 @@ BOOL OS_InitOSVersion()
 
 // ****************************************************************************
 //
-// ANSI versions
+// Native-wide versions. FindVolumeClose and
+// FindVolumeMountPointClose take no A/W suffix - Win32 has one implementation
+// operating on a HANDLE rather than a string.
 //
 
-BOOL OS<char>::OS_GetVolumeNameForVolumeMountPointExists()
+BOOL OS<wchar_t>::OS_GetVolumeNameForVolumeMountPointExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
-            F_GetVolumeNameForVolumeMountPoint = (TGetVolumeNameForVolumeMountPoint)GetProcAddress(KernelModule, "GetVolumeNameForVolumeMountPointA");
+            F_GetVolumeNameForVolumeMountPoint = (TGetVolumeNameForVolumeMountPoint)GetProcAddress(KernelModule, "GetVolumeNameForVolumeMountPointW");
 
         functionsDetected = TRUE;
     }
@@ -101,20 +102,19 @@ BOOL OS<char>::OS_GetVolumeNameForVolumeMountPointExists()
     return (F_GetVolumeNameForVolumeMountPoint != NULL);
 }
 
-BOOL OS<char>::OS_VolumeEnumExists()
+BOOL OS<wchar_t>::OS_VolumeEnumExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
         {
-            F_FindFirstVolume = (TFindFirstVolume)GetProcAddress(KernelModule, "FindFirstVolumeA");
-            F_FindNextVolume = (TFindNextVolume)GetProcAddress(KernelModule, "FindNextVolumeA");
+            F_FindFirstVolume = (TFindFirstVolume)GetProcAddress(KernelModule, "FindFirstVolumeW");
+            F_FindNextVolume = (TFindNextVolume)GetProcAddress(KernelModule, "FindNextVolumeW");
             F_FindVolumeClose = (TFindVolumeClose)GetProcAddress(KernelModule, "FindVolumeClose");
         }
         if (!F_FindFirstVolume || !F_FindNextVolume || !F_FindVolumeClose)
@@ -129,20 +129,19 @@ BOOL OS<char>::OS_VolumeEnumExists()
     return (F_FindFirstVolume != NULL);
 }
 
-BOOL OS<char>::OS_VolumeMountPointEnumExists()
+BOOL OS<wchar_t>::OS_VolumeMountPointEnumExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
         {
-            F_FindFirstVolumeMountPoint = (TFindFirstVolumeMountPoint)GetProcAddress(KernelModule, "FindFirstVolumeMountPointA");
-            F_FindNextVolumeMountPoint = (TFindNextVolumeMountPoint)GetProcAddress(KernelModule, "FindNextVolumeMountPointA");
+            F_FindFirstVolumeMountPoint = (TFindFirstVolumeMountPoint)GetProcAddress(KernelModule, "FindFirstVolumeMountPointW");
+            F_FindNextVolumeMountPoint = (TFindNextVolumeMountPoint)GetProcAddress(KernelModule, "FindNextVolumeMountPointW");
             F_FindVolumeMountPointClose = (TFindVolumeMountPointClose)GetProcAddress(KernelModule, "FindVolumeMountPointClose");
         }
         if (!F_FindFirstVolumeMountPoint || !F_FindNextVolumeMountPoint || !F_FindVolumeMountPointClose)
@@ -157,18 +156,17 @@ BOOL OS<char>::OS_VolumeMountPointEnumExists()
     return (F_FindFirstVolumeMountPoint != NULL);
 }
 
-BOOL OS<char>::OS_GetLogicalDriveStringsExists()
+BOOL OS<wchar_t>::OS_GetLogicalDriveStringsExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
-            F_GetLogicalDriveStrings = (TGetLogicalDriveStrings)GetProcAddress(KernelModule, "GetLogicalDriveStringsA");
+            F_GetLogicalDriveStrings = (TGetLogicalDriveStrings)GetProcAddress(KernelModule, "GetLogicalDriveStringsW");
 
         functionsDetected = TRUE;
     }
@@ -176,18 +174,17 @@ BOOL OS<char>::OS_GetLogicalDriveStringsExists()
     return (F_GetLogicalDriveStrings != NULL);
 }
 
-BOOL OS<char>::OS_GetDiskFreeSpaceExExists()
+BOOL OS<wchar_t>::OS_GetDiskFreeSpaceExExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
-            F_GetDiskFreeSpaceEx = (TGetDiskFreeSpaceEx)GetProcAddress(KernelModule, "GetDiskFreeSpaceExA");
+            F_GetDiskFreeSpaceEx = (TGetDiskFreeSpaceEx)GetProcAddress(KernelModule, "GetDiskFreeSpaceExW");
 
         functionsDetected = TRUE;
     }
@@ -195,18 +192,17 @@ BOOL OS<char>::OS_GetDiskFreeSpaceExExists()
     return (F_GetDiskFreeSpaceEx != NULL);
 }
 
-BOOL OS<char>::OS_GetVolumePathNamesForVolumeNameExists()
+BOOL OS<wchar_t>::OS_GetVolumePathNamesForVolumeNameExists()
 {
     static BOOL functionsDetected = FALSE;
 
-    // check for required functions, but just once
     if (!functionsDetected)
     {
         if (!KernelModule)
-            KernelModule = GetModuleHandleA("kernel32.dll");
+            KernelModule = GetModuleHandleW(L"kernel32.dll");
 
         if (KernelModule)
-            F_GetVolumePathNamesForVolumeName = (TGetVolumePathNamesForVolumeName)GetProcAddress(KernelModule, "GetVolumePathNamesForVolumeNameA");
+            F_GetVolumePathNamesForVolumeName = (TGetVolumePathNamesForVolumeName)GetProcAddress(KernelModule, "GetVolumePathNamesForVolumeNameW");
 
         functionsDetected = TRUE;
     }
@@ -214,34 +210,34 @@ BOOL OS<char>::OS_GetVolumePathNamesForVolumeNameExists()
     return (F_GetVolumePathNamesForVolumeName != NULL);
 }
 
-BOOL OS<char>::OS_InitShell32Bindings()
+BOOL OS<wchar_t>::OS_InitShell32Bindings()
 {
     return TRUE;
 }
 
-void OS<char>::OS_ReleaseShell32Bindings()
+void OS<wchar_t>::OS_ReleaseShell32Bindings()
 {
 }
 
 template <>
-VolumeType OS<char>::OS_GetVolumeType(const char* root)
+VolumeType OS<wchar_t>::OS_GetVolumeType(const wchar_t* root)
 {
-    return static_cast<VolumeType>(::GetDriveTypeA(root));
+    return static_cast<VolumeType>(::GetDriveTypeW(root));
 }
 
 template <>
-void OS<char>::OS_GetDisplayNameFromSystem(const char* root, char* volumeName, int volumeNameBufSize)
+void OS<wchar_t>::OS_GetDisplayNameFromSystem(const wchar_t* root, wchar_t* volumeName, int volumeNameBufSize)
 {
-    CALL_STACK_MESSAGE2("GetDisplayNameFromSystem(%s)", root);
+    CALL_STACK_MESSAGE2("GetDisplayNameFromSystem(%ls)", root);
 
-    SHFILEINFOA fi = {0};
-    if (SHGetFileInfoA(root, 0, &fi, sizeof(fi), SHGFI_DISPLAYNAME))
+    SHFILEINFOW fi = {0};
+    if (SHGetFileInfoW(root, 0, &fi, sizeof(fi), SHGFI_DISPLAYNAME))
     {
-        lstrcpynA(volumeName, fi.szDisplayName, volumeNameBufSize);
-        char* s = strrchr(volumeName, '(');
+        lstrcpynW(volumeName, fi.szDisplayName, volumeNameBufSize);
+        wchar_t* s = wcsrchr(volumeName, L'(');
         if (s != NULL)
         {
-            while (s > volumeName && *(s - 1) == ' ')
+            while (s > volumeName && *(s - 1) == L' ')
                 s--;
             *s = 0;
         }
@@ -251,36 +247,31 @@ void OS<char>::OS_GetDisplayNameFromSystem(const char* root, char* volumeName, i
 }
 
 template <>
-BOOL OS<char>::OS_GetVolumeInfo(const char* rootPathName, char* volumeNameBuffer, DWORD volumeNameSize,
-                                DWORD* volumeSerialNumber, DWORD* maximumComponentLength,
-                                DWORD* fileSystemFlags, char* fileSystemNameBuffer, DWORD fileSystemNameSize)
+BOOL OS<wchar_t>::OS_GetVolumeInfo(const wchar_t* rootPathName, wchar_t* volumeNameBuffer, DWORD volumeNameSize,
+                                   DWORD* volumeSerialNumber, DWORD* maximumComponentLength,
+                                   DWORD* fileSystemFlags, wchar_t* fileSystemNameBuffer, DWORD fileSystemNameSize)
 {
-    return ::GetVolumeInformationA(rootPathName, volumeNameBuffer, volumeNameSize, volumeSerialNumber,
+    return ::GetVolumeInformationW(rootPathName, volumeNameBuffer, volumeNameSize, volumeSerialNumber,
                                    maximumComponentLength, fileSystemFlags, fileSystemNameBuffer, fileSystemNameSize);
 }
 
 template <>
-HANDLE OS<char>::OS_CreateFile(const char* fileName, DWORD desiredAccess, DWORD shareMode,
-                               SECURITY_ATTRIBUTES* securityAttributes, DWORD creationDisposition,
-                               DWORD flagsAndAttributes, HANDLE templateFile)
+HANDLE OS<wchar_t>::OS_CreateFile(const wchar_t* fileName, DWORD desiredAccess, DWORD shareMode,
+                                  SECURITY_ATTRIBUTES* securityAttributes, DWORD creationDisposition,
+                                  DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    return HANDLES_Q(CreateFileA(fileName, desiredAccess, shareMode, securityAttributes,
+    return HANDLES_Q(CreateFileW(fileName, desiredAccess, shareMode, securityAttributes,
                                  creationDisposition, flagsAndAttributes, templateFile));
 }
 
-// ****************************************************************************
-//
-// get drives icons
-//
-
 template <>
-HICON OS<char>::OS_GetFileOrPathIconAux(const char* path, BOOL large)
+HICON OS<wchar_t>::OS_GetFileOrPathIconAux(const wchar_t* path, BOOL large)
 {
     __try
     {
-        SHFILEINFOA shi;
+        SHFILEINFOW shi;
         shi.hIcon = NULL;
-        SHGetFileInfoA(path, 0, &shi, sizeof(shi),
+        SHGetFileInfoW(path, 0, &shi, sizeof(shi),
                        SHGFI_ICON | SHGFI_SHELLICONSIZE | (large ? 0 : SHGFI_SMALLICON));
         return shi.hIcon;
     }

@@ -20,7 +20,7 @@ Open Salamander became loved because it made serious file work feel direct: two 
 - **Built for real file names**: Unicode and Windows long paths work through copy, move, delete, rename, drag/drop, panel state, directory history, Find, viewers, editors, startup paths, and network/UNC navigation.
 - **Classic workflow, current polish**: the dense dual-panel interface remains, now with `Light`, `Dark`, and `System` theme modes across the core UI and first-party plugins.
 - **Small project, fast movement**: user reports have turned into fixes for ARM64 FTP, Unicode context menus, viewer edge cases, Windows 11 automation changes, network long paths, release packaging, and language packs.
-- **Open and actively shipped**: runtime zips, symbols, translator workspaces, and x64/x86/ARM64 builds are published through GitHub Releases.
+- **Open and actively shipped**: runtime zips, symbols, and x64/x86/ARM64 builds are published through GitHub Releases.
 - **AI-assisted development velocity**: AI helps grind through modernization work, tests, translations, and release plumbing while the project stays open source and user-driven.
 
 ## Feature Highlights
@@ -90,10 +90,9 @@ Sally is not a one-off binary drop. The release machinery is part of the product
 
 - Runtime zips for x64, x86, and ARM64, including Windows on ARM.
 - Separate debug-symbol zips for crash dump investigation.
-- Translator workspace artifacts for localization contributors.
 - GitHub release updater over HTTPS through the Check Version plugin.
 - [Wine compatibility work](#running-on-linux-with-wine) makes Sally run under Wine (10.0 and newer) by avoiding hard dependency on `imageres.dll` and falling back to `shell32.dll` resources where needed.
-- Modern CMake build covers Sally, bundled plugins, trace server, translator, shell extension, helper tools, language files, and release population.
+- Modern CMake build covers Sally, bundled plugins, trace server, shell extension, helper tools, English language resources, and release population.
 - Clang-CL/xwin toolchains support Windows x64 and ARM64 cross-compilation with the MSVC ABI.
 
 ### Localization Is Alive
@@ -102,7 +101,9 @@ Sally ships 10 maintained UI languages across supported release packages:
 
 Chinese (Simplified), Czech, Dutch, French, German, Hungarian, Romanian, Russian, Slovak, and Spanish.
 
-The localization pipeline includes committed `.slt` archives, generated Translator workspaces, headless validation/export support, and release artifacts that make translation work possible without hidden legacy assets.
+Translation source archives remain committed under `translations/`. Translation
+updates are welcome as pull requests; the maintainer validates them and builds
+the shipping language packs before each release.
 
 ## Downloads
 
@@ -112,7 +113,6 @@ Pre-built binaries are available on the [Releases](https://github.com/0xeb/sally
 - Pick `Sally-<version>-ARM64.zip` for native Windows on ARM.
 - Pick `Sally-<version>-x86.zip` for 32-bit systems.
 - Download `Sally-<version>-pdb.zip` only if you need symbols for debugging.
-- Download `Sally-<version>-translator-workspace.zip` if you want to help with language packs.
 
 ## Running on Linux with Wine
 
@@ -166,7 +166,8 @@ When you run Sally from `build/out`, rebuild and repopulate that exact configura
 
 Contributions are welcome. See the [Developer Guide](doc/DEV.md) for repository structure, build targets, and internals.
 
-If you want to help with UI translations and language packs, see the [Localization Guide](doc/LOCALIZATION.md).
+If you want to help with UI translations, update the relevant `.slt` archives
+under `translations/` and open a pull request.
 
 Good issue reports include the Sally version, architecture, exact path or filename shape when relevant, steps to reproduce, and whether the bug happens with the latest release.
 

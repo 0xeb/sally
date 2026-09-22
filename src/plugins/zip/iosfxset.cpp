@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -74,6 +74,11 @@ const char* SFX_VENDOR = "vendor";
 const char* SFX_WWW = "link";
 const char* SFX_ICONFILE = "icon_file";
 const char* SFX_ICONINDEX = "icon_index";
+// A mechanical .c_str() rewrite edited the inside of this quoted literal, which
+// left the token as "$(Temp).c_str()" and broke the SFX "extract to the Temp
+// directory" setting: nothing writes that string, so no .set file ever matched
+// it. Same scar as the one recorded in main_window_commands_help.cpp
+// ("Extensions.c_str()"); this was the other one.
 const char* SFX_TDTEMP = "$(Temp)";
 const char* SFX_TDPROGFILES = "$(ProgFiles)";
 const char* SFX_TDWINDIR = "$(WinDir)";
@@ -109,13 +114,13 @@ const char* SFX_PROGFILES_REGVAL =
 int StrNICmp(const char* str1, const char* str2, int max)
 {
     CALL_STACK_MESSAGE_NONE
-    int l1 = lstrlen(str1);
+    int l1 = lstrlenA(str1);
     if (l1 > max)
         l1 = max;
-    int l2 = lstrlen(str2);
+    int l2 = lstrlenA(str2);
     if (l2 > max)
         l2 = max;
-    return CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, str1, max, str2, max) - 2;
+    return CompareStringA(LOCALE_USER_DEFAULT, NORM_IGNORECASE, str1, max, str2, max) - 2;
 }
 
 const char*
@@ -260,7 +265,7 @@ GetStringAlloc(std::string& buffer, const char* textData)
     return sour;
 }
 
-int GetRootPath(char* root, const char* path)
+std::string GetRootPath(const char* path)
 {
     if (path[0] == '\\' && path[1] == '\\') // UNC
     {
@@ -271,38 +276,25 @@ int GetRootPath(char* root, const char* path)
             s++; // '\\'
         while (*s != 0 && *s != '\\')
             s++;
-        int len = (int)(s - path);
-        memcpy(root, path, len);
-        root[len] = '\\';
-        root[len + 1] = 0;
-        return len + 1;
+        std::string root(path, s);
+        root.push_back('\\');
+        return root;
     }
-    else
-    {
-        root[0] = path[0];
-        root[1] = ':';
-        root[2] = '\\';
-        root[3] = 0;
-        return 3;
-    }
+    return std::string(path, path + (std::min<size_t>)(2, strlen(path))) + "\\";
 }
 
-void HandlePathRelativeToZip2Sfx(char* path, const char* zip2sfxDir)
+template <size_t N>
+void HandlePathRelativeToZip2Sfx(char (&path)[N], const char* zip2sfxDir)
 {
     if (zip2sfxDir[0] != 0 &&
         !(path[0] != 0 && path[1] == ':' || path[0] == '\\' && path[1] == '\\'))
     { // relative path and we know the path to zip2sfx.exe
-        CPathBuffer joinedPath; // Heap-allocated for long path support
-        if (path[0] == '\\')
-            GetRootPath(joinedPath, zip2sfxDir);
-        else
-            lstrcpyn(joinedPath, zip2sfxDir, joinedPath.Size());
-        int len = (int)strlen(joinedPath);
+        std::string joinedPath = path[0] == '\\' ? GetRootPath(zip2sfxDir) : zip2sfxDir;
         const char* pathAux = path[0] == '\\' ? path + 1 : path;
-        if (strlen(pathAux) + len < MAX_PATH)
+        joinedPath += pathAux;
+        if (joinedPath.size() < N)
         {
-            strcpy(joinedPath.Get() + len, pathAux);
-            strcpy(path, joinedPath);
+            memcpy(path, joinedPath.c_str(), joinedPath.size() + 1);
         }
         else
             path[0] = 0; // error, better clear it...
@@ -333,19 +325,19 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
     unsigned mbType = 0;
     while (*(sour = GetValue(buf1, 128, sour)))
     {
-        if (lstrcmpi(buf1, SFX_VERSION) == 0)
+        if (lstrcmpiA(buf1, SFX_VERSION) == 0)
         {
             sour = GetNumber(&version, sour);
             if (version != SFX_SET_CURRENTVERSION)
                 return 6;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_TARGETDIR) == 0)
+        if (lstrcmpiA(buf1, SFX_TARGETDIR) == 0)
         {
-            sour = GetString(settings->TargetDir, MAX_PATH, sour);
+            sour = GetString(settings->TargetDir, _countof(settings->TargetDir), sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_ALLOWCHANGE) == 0)
+        if (lstrcmpiA(buf1, SFX_ALLOWCHANGE) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -354,7 +346,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags |= SE_NOTALLOWCHANGE;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_REMOVETEMP) == 0)
+        if (lstrcmpiA(buf1, SFX_REMOVETEMP) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -363,12 +355,12 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_REMOVEAFTER;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_WAITFOR) == 0)
+        if (lstrcmpiA(buf1, SFX_WAITFOR) == 0)
         {
-            sour = GetString(settings->WaitFor, MAX_PATH, sour);
+            sour = GetString(settings->WaitFor, _countof(settings->WaitFor), sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_AUTOSTART) == 0)
+        if (lstrcmpiA(buf1, SFX_AUTOSTART) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -377,7 +369,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_AUTO;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_SHOWSUMARY) == 0)
+        if (lstrcmpiA(buf1, SFX_SHOWSUMARY) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -386,7 +378,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_SHOWSUMARY;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_HIDEMAINDLG) == 0)
+        if (lstrcmpiA(buf1, SFX_HIDEMAINDLG) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -395,7 +387,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_HIDEMAINDLG;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_OVEWRITEALL) == 0)
+        if (lstrcmpiA(buf1, SFX_OVEWRITEALL) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -404,7 +396,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_OVEWRITEALL;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_AUTODIR) == 0)
+        if (lstrcmpiA(buf1, SFX_AUTODIR) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -413,119 +405,119 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
                 settings->Flags &= ~SE_AUTODIR;
             continue;
         }
-        if (lstrcmpi(buf1, SFX_COMMAND) == 0)
+        if (lstrcmpiA(buf1, SFX_COMMAND) == 0)
         {
             sour = GetString(settings->Command, SE_MAX_COMMANDLINE, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_PACKAGE) == 0)
+        if (lstrcmpiA(buf1, SFX_PACKAGE) == 0)
         {
-            sour = GetString(settings->SfxFile, MAX_PATH, sour);
+            sour = GetString(settings->SfxFile, _countof(settings->SfxFile), sour);
             HandlePathRelativeToZip2Sfx(settings->SfxFile, zip2sfxDir);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_MBOXBUTTONS) == 0)
+        if (lstrcmpiA(buf1, SFX_MBOXBUTTONS) == 0)
         {
             char buf[50];
             sour = GetString(buf, 50, sour);
-            if (lstrcmpi(buf, SFX_MBOK) == 0)
+            if (lstrcmpiA(buf, SFX_MBOK) == 0)
             {
                 mbButtons = 0;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBOKCANCEL) == 0)
+            if (lstrcmpiA(buf, SFX_MBOKCANCEL) == 0)
             {
                 mbButtons = 1;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBYESNO) == 0)
+            if (lstrcmpiA(buf, SFX_MBYESNO) == 0)
             {
                 mbButtons = 2;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_AGREEDISAGREE) == 0)
+            if (lstrcmpiA(buf, SFX_AGREEDISAGREE) == 0)
             {
                 mbButtons = 3;
                 continue;
             }
         }
-        if (lstrcmpi(buf1, SFX_MBOXICON) == 0 || lstrcmpi(buf1, SFX_MBOXTYPE) == 0)
+        if (lstrcmpiA(buf1, SFX_MBOXICON) == 0 || lstrcmpiA(buf1, SFX_MBOXTYPE) == 0)
         {
             char buf[50];
             sour = GetString(buf, 50, sour);
-            if (lstrcmpi(buf, SFX_MBNOICON) == 0 || lstrcmpi(buf, SFX_MBSIMPLEMBOX) == 0)
+            if (lstrcmpiA(buf, SFX_MBNOICON) == 0 || lstrcmpiA(buf, SFX_MBSIMPLEMBOX) == 0)
             {
                 mbType = 0;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBEXCLAMATION) == 0)
+            if (lstrcmpiA(buf, SFX_MBEXCLAMATION) == 0)
             {
                 mbType = 1;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBINFORMATION) == 0)
+            if (lstrcmpiA(buf, SFX_MBINFORMATION) == 0)
             {
                 mbType = 2;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBQUESTION) == 0)
+            if (lstrcmpiA(buf, SFX_MBQUESTION) == 0)
             {
                 mbType = 3;
                 continue;
             }
-            if (lstrcmpi(buf, SFX_MBLONGMESSAGE) == 0)
+            if (lstrcmpiA(buf, SFX_MBLONGMESSAGE) == 0)
             {
                 mbType = 4;
                 continue;
             }
         }
-        if (lstrcmpi(buf1, SFX_MBOXTEXT) == 0)
+        if (lstrcmpiA(buf1, SFX_MBOXTEXT) == 0)
         {
             sour = GetStringAlloc(settings->MBoxText, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_MBOXTITLE) == 0)
+        if (lstrcmpiA(buf1, SFX_MBOXTITLE) == 0)
         {
             sour = GetString(settings->MBoxTitle, SE_MAX_TITLE, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_TEXT) == 0)
+        if (lstrcmpiA(buf1, SFX_TEXT) == 0)
         {
             sour = GetString(settings->Text, SE_MAX_TEXT, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_TITLE) == 0)
+        if (lstrcmpiA(buf1, SFX_TITLE) == 0)
         {
             sour = GetString(settings->Title, SE_MAX_TITLE, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_EXTRBTNTEXT) == 0)
+        if (lstrcmpiA(buf1, SFX_EXTRBTNTEXT) == 0)
         {
             sour = GetString(settings->ExtractBtnText, SE_MAX_EXTRBTN, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_VENDOR) == 0)
+        if (lstrcmpiA(buf1, SFX_VENDOR) == 0)
         {
             sour = GetString(settings->Vendor, SE_MAX_VENDOR, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_WWW) == 0)
+        if (lstrcmpiA(buf1, SFX_WWW) == 0)
         {
             sour = GetString(settings->WWW, SE_MAX_WWW, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_ICONFILE) == 0)
+        if (lstrcmpiA(buf1, SFX_ICONFILE) == 0)
         {
-            sour = GetString(settings->IconFile, MAX_PATH, sour);
+            sour = GetString(settings->IconFile, _countof(settings->IconFile), sour);
             HandlePathRelativeToZip2Sfx(settings->IconFile, zip2sfxDir);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_ICONINDEX) == 0)
+        if (lstrcmpiA(buf1, SFX_ICONINDEX) == 0)
         {
             sour = GetNumber((int*)&settings->IconIndex, sour);
             continue;
         }
-        if (lstrcmpi(buf1, SFX_REQUIRESADMIN) == 0)
+        if (lstrcmpiA(buf1, SFX_REQUIRESADMIN) == 0)
         {
             sour = GetNumber(&i, sour);
             if (i)
@@ -593,7 +585,7 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
         }
     }
     // trim trailing spaces
-    char* iterator = settings->TargetDir + lstrlen(settings->TargetDir);
+    char* iterator = settings->TargetDir + lstrlenA(settings->TargetDir);
     while (--iterator >= settings->TargetDir && *iterator == ' ')
         ;
     iterator[1] = 0;
@@ -703,7 +695,7 @@ ParseTargetDir(const char* path, unsigned* targetDir, const char** subDir,
                     if (dirSpecLeft)
                         *dirSpecLeft = SFX_PROGFILES_REGVAL;
                     if (dirSpecRight)
-                        *dirSpecRight = SFX_PROGFILES_REGVAL + lstrlen(SFX_PROGFILES_REGVAL);
+                        *dirSpecRight = SFX_PROGFILES_REGVAL + lstrlenA(SFX_PROGFILES_REGVAL);
                     goto L_KEYS_OK;
                 }
                 if (StrNICmp(path, SFX_TDWINDIR, (int)(iterator - path)) == 0)
@@ -738,7 +730,7 @@ ParseTargetDir(const char* path, unsigned* targetDir, const char** subDir,
                     int i, l;
                     for (i = 0; HKeys[i].Name; i++)
                     {
-                        l = lstrlen(HKeys[i].Name);
+                        l = lstrlenA(HKeys[i].Name);
                         if (StrNICmp(path, HKeys[i].Name, l) == 0 &&
                             (path[l] == '>' || path[l] == '\\'))
                             break;
@@ -810,114 +802,119 @@ BOOL CZipPack::ExportLongString(CFile* outFile, const char* string)
 
 BOOL CZipPack::WriteSFXComment(CFile* outFile, CSfxSettingsComments comment)
 {
+    // Narrow on purpose, and not a shortcut: every branch below appends to a
+    // buffer that leaves this function as raw bytes -
+    //     Write(outFile, (void*)buf, strlen(buf), NULL)
+    // - into the SFX script, which the extractor stub then parses as bytes. The width here is
+    // the FILE FORMAT's, not ours, so the localized text narrows as it enters.
     char buf[3000];
     buf[0] = 0;
     switch (comment)
     {
     case SFX_COMMENT_HEAD:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_HEAD1));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_HEAD2));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_HEAD3));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_HEAD4));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_HEAD1).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_HEAD2).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_HEAD3).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_HEAD4).c_str()).c_str());
         break;
 
     case SFX_COMMENT_VERSION:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_VERSION));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_VERSION).c_str()).c_str());
         break;
 
     case SFX_COMMENT_TARGDIR:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TARGDIR1));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TARGDIR2));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TARGDIR3));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TARGDIR4));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TARGDIR5));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TARGDIR1).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TARGDIR2).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TARGDIR3).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TARGDIR4).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TARGDIR5).c_str()).c_str());
         break;
 
     case SFX_COMMENT_ALLOWCHANGE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_ALLOWCHANGE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_ALLOWCHANGE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_REMOVE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_REMOVE1));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_REMOVE2));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_REMOVE1).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_REMOVE2).c_str()).c_str());
         break;
 
     case SFX_COMMENT_AUTO:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_AUTO));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_AUTO).c_str()).c_str());
         break;
 
     case SFX_COMMENT_SUMMARY:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_SUMMARY));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_SUMMARY).c_str()).c_str());
         break;
 
     case SFX_COMMENT_HIDE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_HIDE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_HIDE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_OVERWRITE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_OVERWRITE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_OVERWRITE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_AUTODIR:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_AUTODIR));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_AUTODIR).c_str()).c_str());
         break;
 
     case SFX_COMMENT_COMMAND:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_COMMAND));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_COMMAND).c_str()).c_str());
         break;
 
     case SFX_COMMENT_PACKAGE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_PACKAGE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_PACKAGE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_MBUT:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_MBUT));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_MBUT).c_str()).c_str());
         break;
 
     case SFX_COMMENT_MICO:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_MICO));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_MICO).c_str()).c_str());
         break;
 
     case SFX_COMMENT_MBOX:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_MBOX));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_MBOX).c_str()).c_str());
         break;
 
     case SFX_COMMENT_TEXT:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TEXT));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TEXT).c_str()).c_str());
         break;
 
     case SFX_COMMENT_TITLE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_TITLE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_TITLE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_BUTTON:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_BUTTON));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_BUTTON).c_str()).c_str());
         break;
 
     case SFX_COMMENT_VENDOR:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_VENDOR));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_VENDOR).c_str()).c_str());
         break;
 
     case SFX_COMMENT_WWW:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_WWW));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_WWW).c_str()).c_str());
         break;
 
     case SFX_COMMENT_ICOFILE:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_ICOFILE));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_ICOFILE).c_str()).c_str());
         break;
 
     case SFX_COMMENT_ICOINDEX:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_ICOINDEX));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_ICOINDEX).c_str()).c_str());
         break;
 
     case SFX_COMMENT_WAITFOR:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_WAITFOR1));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_WAITFOR2));
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_WAITFOR3));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_WAITFOR1).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_WAITFOR2).c_str()).c_str());
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_WAITFOR3).c_str()).c_str());
         break;
 
     case SFX_COMMENT_REQUIRESADMIN:
-        strcat(buf, LoadStr(IDS_SFX_COMMENT_REQUIRESADMIN));
+        strcat(buf, ZipLegacyFormatBytes(LangStr(IDS_SFX_COMMENT_REQUIRESADMIN).c_str()).c_str());
         break;
     }
 
@@ -936,73 +933,73 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
     if (WriteSFXComment(outFile, SFX_COMMENT_VERSION))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_VERSION, SFX_SET_CURRENTVERSION);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TARGDIR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TARGETDIR, ExportString(buf2, settings->TargetDir));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ALLOWCHANGE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_ALLOWCHANGE, settings->Flags & SE_NOTALLOWCHANGE ? 0 : 1);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_REMOVE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_REMOVETEMP, settings->Flags & SE_REMOVEAFTER ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_WAITFOR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_WAITFOR, ExportString(buf2, settings->WaitFor));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_AUTO))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_AUTOSTART, settings->Flags & SE_AUTO ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_SUMMARY))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_SHOWSUMARY, settings->Flags & SE_SHOWSUMARY ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_HIDE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_HIDEMAINDLG, settings->Flags & SE_HIDEMAINDLG ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_OVERWRITE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_OVEWRITEALL, settings->Flags & SE_OVEWRITEALL ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_AUTODIR))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_AUTODIR, settings->Flags & SE_AUTODIR ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_COMMAND))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_COMMAND, ExportString(buf2, settings->Command));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_PACKAGE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_PACKAGE, ExportString(buf2, settings->SfxFile));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MBUT))
@@ -1043,7 +1040,7 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
             break;
         }
     }
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MICO))
@@ -1073,69 +1070,69 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
             break;
         }
     }
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MBOX))
         return FALSE;
     const char* str = settings->MBoxText.c_str();
     sprintf(buf1, "%s=\"", SFX_MBOXTEXT);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
     if (!ExportLongString(outFile, str))
         return FALSE;
-    if (Write(outFile, "\"\r\n", lstrlen("\"\r\n"), NULL))
+    if (Write(outFile, "\"\r\n", lstrlenA("\"\r\n"), NULL))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_MBOXTITLE, ExportString(buf2, settings->MBoxTitle));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TEXT))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TEXT, ExportString(buf2, settings->Text));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TITLE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TITLE, ExportString(buf2, settings->Title));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_BUTTON))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_EXTRBTNTEXT, ExportString(buf2, settings->ExtractBtnText));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_VENDOR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_VENDOR, ExportString(buf2, settings->Vendor));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_WWW))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_WWW, ExportString(buf2, settings->WWW));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ICOFILE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_ICONFILE, ExportString(buf2, settings->IconFile));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ICOINDEX))
         return FALSE;
     sprintf(buf1, "%s=%u\r\n", SFX_ICONINDEX, settings->IconIndex);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_REQUIRESADMIN))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_REQUIRESADMIN, settings->Flags & SE_REQUIRESADMIN ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (Write(outFile, buf1, lstrlenA(buf1), NULL))
         return FALSE;
 
     if (Flush(outFile, outFile->OutputBuffer, outFile->BufferPosition, NULL))

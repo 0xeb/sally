@@ -35,7 +35,7 @@
 #include "GUI.DiskMapView.h"
 #include "GUI.ViewConnectorBase.h"
 
-const TCHAR szMainWindowWindowClass[] = TEXT("Zar.DM.MainWin.WC");
+const wchar_t szMainWindowWindowClass[] = L"Zar.DM.MainWin.WC";
 
 class CDiskMapViewConnector : public CViewConnectorBase
 {
@@ -106,7 +106,7 @@ protected:
 
     HWND DoCreate(int left, int top, int width, int height, BOOL isTopmost)
     {
-        HMENU hMenu = LoadMenu(CWindow::s_hResInstance, MAKEINTRESOURCE(IDC_ZAREVAKDISKMAP));
+        HMENU hMenu = LoadMenuW(CWindow::s_hResInstance, MAKEINTRESOURCEW(IDC_ZAREVAKDISKMAP));
         return MyCreateWindow(
             isTopmost ? WS_EX_TOPMOST : 0,
             szMainWindowWindowClass,
@@ -169,11 +169,9 @@ protected:
 #ifdef SALAMANDER
             if (this->_callback != NULL)
             {
-                CPathBuffer buff;
-                if (this->_diskMap->GetSelectedFileName(buff, buff.Size()) <= MAX_PATH)
-                {
-                    this->_callback->FocusFile(buff);
-                }
+                std::wstring path;
+                if (this->_diskMap->GetSelectedFileName(path))
+                    this->_callback->FocusFile(path.c_str());
             }
 #endif
             return TRUE;
@@ -376,11 +374,13 @@ protected:
             this->_tooltip->SetPathFormat((ETooltipPathFormat)(this->_callback->GetPathFormat()));
         }
 #else
-        CPathBuffer buff;
-        int len = GetCurrentDirectory(buff.Size(), buff);
-        if (len > 0)
+        const DWORD required = GetCurrentDirectoryW(0, NULL);
+        if (required > 0)
         {
-            this->SetPath(buff, TRUE);
+            std::vector<wchar_t> buffer(static_cast<size_t>(required) + 1, L'\0');
+            const DWORD length = GetCurrentDirectoryW(static_cast<DWORD>(buffer.size()), buffer.data());
+            if (length > 0 && length < buffer.size())
+                this->SetPath(buffer.data(), TRUE);
         }
 #endif
 
@@ -478,7 +478,7 @@ public:
         return TRUE;
     }
 
-    BOOL SetPath(TCHAR const* path, BOOL fStartEnum = TRUE)
+    BOOL SetPath(wchar_t const* path, BOOL fStartEnum = TRUE)
     {
         if (this->_path)
             delete this->_path;
@@ -492,7 +492,7 @@ public:
         CZStringBuffer* title = new CZStringBuffer(16 + this->_path->GetLength());
         title->Append(titleprefix.GetString(), titleprefix.GetLength());
         title->Append(this->_path);
-        SetWindowText(this->_hWnd, title->GetString());
+        SetWindowTextW(this->_hWnd, title->GetString());
         delete title;
 
         if (this->_dirLine)
@@ -526,9 +526,9 @@ public:
         static ATOM a = NULL;
         if (!a)
         {
-            WNDCLASSEX wcex;
+            WNDCLASSEXW wcex;
 
-            wcex.cbSize = sizeof(WNDCLASSEX);
+            wcex.cbSize = sizeof(WNDCLASSEXW);
 
             wcex.style = CS_HREDRAW | CS_VREDRAW;
             wcex.lpfnWndProc = CWindow::s_WndProc;
@@ -539,9 +539,9 @@ public:
             wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
             wcex.lpszMenuName = NULL;
             wcex.lpszClassName = szMainWindowWindowClass;
-            wcex.hIcon = (HICON)LoadImage(CWindow::s_hInstance, MAKEINTRESOURCE(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 32, 32, LR_CREATEDIBSECTION);
-            wcex.hIconSm = (HICON)LoadImage(CWindow::s_hInstance, MAKEINTRESOURCE(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 16, 16, LR_CREATEDIBSECTION);
-            a = ::RegisterClassEx(&wcex);
+            wcex.hIcon = (HICON)LoadImageW(CWindow::s_hInstance, MAKEINTRESOURCEW(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 32, 32, LR_CREATEDIBSECTION);
+            wcex.hIconSm = (HICON)LoadImageW(CWindow::s_hInstance, MAKEINTRESOURCEW(IDI_ZAREVAKDISKMAP), IMAGE_ICON, 16, 16, LR_CREATEDIBSECTION);
+            a = ::RegisterClassExW(&wcex);
         }
         BOOL ret = (a != NULL);
         ret &= CDiskMapView::RegisterClass();
@@ -552,7 +552,7 @@ public:
     }
     static BOOL UnregisterClass()
     {
-        BOOL ret = ::UnregisterClass(szMainWindowWindowClass, CWindow::s_hInstance);
+        BOOL ret = ::UnregisterClassW(szMainWindowWindowClass, CWindow::s_hInstance);
         if (!ret)
             TRACE_E("UnregisterClass(szMainWindowWindowClass) has failed");
         ret = CDiskMapView::UnregisterClass() & ret;

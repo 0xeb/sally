@@ -6,6 +6,7 @@
 #include "dbg.h"
 
 #include "isoimage.h"
+#include "uniso_text.h"
 #include "audio.h"
 
 #include "uniso.h"
@@ -257,7 +258,11 @@ readCDTX(CFile& file, NRGHeader* header, CISOImage* iso)
     CALL_STACK_MESSAGE3("readCDTX(, %p, %p)", header, iso);
 
     DWORD read;
-    char* data = new char[header->Size + (1 + iso->GetTrackCount())];
+    const size_t terminatorCount = 1 + static_cast<size_t>(iso->GetTrackCount());
+    if (static_cast<size_t>(header->Size) > static_cast<size_t>(-1) - terminatorCount)
+        return FALSE;
+    const size_t allocationSize = static_cast<size_t>(header->Size) + terminatorCount;
+    char* data = new char[allocationSize];
 
     if (!file.Read(data, header->Size, &read, NULL, NULL))
     {
@@ -265,26 +270,55 @@ readCDTX(CFile& file, NRGHeader* header, CISOImage* iso)
         return FALSE;
     }
 
-    char *src, *dst;
+    const char* src;
+    char* dst;
+    if (header->Size < 4)
+    {
+        delete[] data;
+        return FALSE;
+    }
+
     src = data + 4; // Skip unknown 4 bytes (flags)
     dst = data;
-    int i;
-    for (i = header->Size; i > 0; i -= 12 + 6)
+    size_t remaining = static_cast<size_t>(header->Size) - 4;
+    while (remaining > 0)
     { // Remove some unknown data (there are blocks of 12 bytes of labels followed by unkown 6 bytes)
-        memmove(dst, src, min(12, i));
-        dst += 12;
-        src += 12 + 6;
+        const size_t labelBytes = min(static_cast<size_t>(12), remaining);
+        memmove(dst, src, labelBytes);
+        dst += labelBytes;
+        const size_t blockBytes = min(static_cast<size_t>(18), remaining);
+        src += blockBytes;
+        remaining -= blockBytes;
     }
     // Make our life easier by adding as many safety terminators as may be needed
-    memset(dst, 0, 1 + iso->GetTrackCount());
+    memset(dst, 0, terminatorCount);
     src = data;
-    iso->SetLabel(src);
-    src += strlen(src) + 1; // Skip volume label
+    const char* const end = dst + terminatorCount;
+    const auto nextLabel = [&src, end](std::wstring& label) {
+        const void* terminator = memchr(src, 0, static_cast<size_t>(end - src));
+        if (terminator == nullptr)
+            return false;
+        const char* nul = static_cast<const char*>(terminator);
+        if (!DecodeUnisoLegacyText(std::string_view(src, static_cast<size_t>(nul - src)), label))
+            return false;
+        src = nul + 1;
+        return true;
+    };
+
+    std::wstring label;
+    if (!nextLabel(label) || !iso->SetLabel(label))
+    {
+        delete[] data;
+        return FALSE;
+    }
     int j;
     for (j = 0; j < iso->GetTrackCount(); j++)
     {
-        iso->GetTrack(j)->SetLabel(src);
-        src += strlen(src) + 1;
+        if (!nextLabel(label) || !iso->GetTrack(j)->SetLabel(label))
+        {
+            delete[] data;
+            return FALSE;
+        }
     }
 
     delete[] data;

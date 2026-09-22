@@ -16,7 +16,8 @@ extern "C"
 #include "shexreg.h"
 }
 #include "salshlib.h"
-#include "common/widepath.h"
+#include "common/clipboard/HDropSelection.h"
+#include "ui/UnicodeHistoryUtils.h"
 
 //****************************************************************************
 //
@@ -30,7 +31,7 @@ private:
     IDataObject* DataObject;   // IDataObject that entered the drag
     CUserMenuBar* UserMenuBar; // bar we are associated with
     IDropTarget* DropTarget;
-    CPathBuffer DropTargetFileName;
+    std::wstring DropTargetFileName;
 
 public:
     CUMDropTarget(CUserMenuBar* userMenuBar)
@@ -39,7 +40,7 @@ public:
         DataObject = NULL;
         UserMenuBar = userMenuBar;
         DropTarget = NULL;
-        DropTargetFileName[0] = 0;
+        DropTargetFileName.clear();
     }
 
     virtual ~CUMDropTarget()
@@ -77,8 +78,10 @@ public:
         return RefCount;
     }
 
-    void HitTest(POINTL pt, int& insertIndex, BOOL& after, int& pasteIndex, char* fileName, BOOL insert) // fileName buffer has length MAX_PATH
+    void HitTest(POINTL pt, int& insertIndex, BOOL& after, int& pasteIndex,
+                 std::wstring& fileName, BOOL insert)
     {
+        fileName.clear();
         POINT p;
         p.x = pt.x;
         p.y = pt.y;
@@ -124,11 +127,13 @@ public:
             if (UserMenuBar->GetItemInfo2(pasteIndex, TRUE, &tii))
             {
                 CUserMenuItem* item = MainWindow->UserMenuItems->At(tii.ID - CM_USERMENU_MIN);
-                if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, MAX_PATH, TRUE))
+                if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), fileName, TRUE))
                 {
-                    if (!HasDropTarget(fileName))
+                    if (!HasDropTarget(fileName.c_str()))
                         pasteIndex = -1;
                 }
+                else
+                    pasteIndex = -1;
             }
         }
 
@@ -136,9 +141,10 @@ public:
         UserMenuBar->SetHotItem(pasteIndex);
     }
 
-    BOOL GetPathFromDataObject(IDataObject* pDataObject, char* path)
+    BOOL GetPathFromDataObject(IDataObject* pDataObject, std::wstring& path)
     {
-        if (IsFakeDataObject(pDataObject, NULL, NULL, 0))
+        path.clear();
+        if (IsFakeDataObject(pDataObject, NULL, NULL))
             return FALSE;
 
         FORMATETC formatEtc;
@@ -161,26 +167,10 @@ public:
                 DROPFILES* data = (DROPFILES*)HANDLES(GlobalLock(stgMedium.hGlobal));
                 if (data != NULL)
                 {
-                    if (data->fWide)
+                    if (sally::clipboard::TryGetSingleHDropPath(
+                            data, GlobalSize(stgMedium.hGlobal), path))
                     {
-                        const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
-                        if (*(fileW + l + 1) == 0)
-                        {
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            ret = TRUE;
-                        }
-                    }
-                    else
-                    {
-                        const char* fileA = ((char*)data) + data->pFiles;
-                        int l = (int)strlen(fileA);
-                        if (*(fileA + l + 1) == 0)
-                        {
-                            strcpy(path, fileA);
-                            ret = TRUE;
-                        }
+                        ret = TRUE;
                     }
 
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
@@ -188,7 +178,7 @@ public:
             }
             ReleaseStgMedium(&stgMedium);
         }
-        if (ret && !FileExists(path))
+        if (ret && !FileExistsW(path.c_str()))
             ret = FALSE;
         return ret;
     }
@@ -210,9 +200,8 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            CPathBuffer fileName; // Heap-allocated for long path support
-
-            CPathBuffer buff; // Heap-allocated for long path support
+            std::wstring fileName;
+            std::wstring buff;
             BOOL insert = GetPathFromDataObject(pDataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -228,18 +217,18 @@ public:
             {
                 if (pasteIndex != -1)
                 {
-                    if (strcmp(fileName, DropTargetFileName) != 0 &&
-                        !IsFakeDataObject(pDataObject, NULL, NULL, 0))
+                    if (fileName != DropTargetFileName &&
+                        !IsFakeDataObject(pDataObject, NULL, NULL))
                     {
                         if (DropTarget != NULL)
                         {
                             DropTarget->DragLeave();
                             DropTarget->Release();
-                            DropTargetFileName[0] = 0;
+                            DropTargetFileName.clear();
                         }
-                        DropTarget = CreateIDropTarget(UserMenuBar->HWindow, fileName);
+                        DropTarget = CreateIDropTargetW(UserMenuBar->HWindow, fileName.c_str());
                         if (DropTarget != NULL)
-                            strcpy(DropTargetFileName, fileName);
+                            DropTargetFileName = fileName;
                     }
                     if (DropTarget != NULL)
                     {
@@ -263,9 +252,8 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            CPathBuffer fileName; // Heap-allocated for long path support
-
-            CPathBuffer buff; // Heap-allocated for long path support
+            std::wstring fileName;
+            std::wstring buff;
             BOOL insert = GetPathFromDataObject(DataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -281,19 +269,19 @@ public:
             {
                 if (pasteIndex != -1)
                 {
-                    if (strcmp(fileName, DropTargetFileName) != 0 &&
-                        !IsFakeDataObject(DataObject, NULL, NULL, 0))
+                    if (fileName != DropTargetFileName &&
+                        !IsFakeDataObject(DataObject, NULL, NULL))
                     {
                         if (DropTarget != NULL)
                         {
                             DropTarget->DragLeave();
                             DropTarget->Release();
-                            DropTargetFileName[0] = 0;
+                            DropTargetFileName.clear();
                         }
-                        DropTarget = CreateIDropTarget(UserMenuBar->HWindow, fileName);
+                        DropTarget = CreateIDropTargetW(UserMenuBar->HWindow, fileName.c_str());
                         if (DropTarget != NULL)
                         {
-                            strcpy(DropTargetFileName, fileName);
+                            DropTargetFileName = fileName;
                             DropTarget->DragEnter(DataObject, grfKeyState, pt, pdwEffect);
                         }
                     }
@@ -318,7 +306,7 @@ public:
             DropTarget->DragLeave();
             DropTarget->Release();
             DropTarget = NULL;
-            DropTargetFileName[0] = 0;
+            DropTargetFileName.clear();
         }
         if (DataObject != NULL)
         {
@@ -348,9 +336,8 @@ public:
             int insertIndex = -1;
             BOOL after;
             int pasteIndex = -1;
-            CPathBuffer fileName; // Heap-allocated for long path support
-
-            CPathBuffer buff; // Heap-allocated for long path support
+            std::wstring fileName;
+            std::wstring buff;
             BOOL insert = GetPathFromDataObject(pDataObject, buff);
 
             HitTest(pt, insertIndex, after, pasteIndex, fileName, insert);
@@ -363,15 +350,8 @@ public:
                 if (insert)
                 {
                     *pdwEffect = DROPEFFECT_LINK;
-                    CPathBuffer name; // Heap-allocated for long path support
-                    char* p = buff + strlen(buff);
-                    while (p > buff && *p != '\\')
-                        p--;
-                    if (*p == '\\')
-                        p++;
-                    strcpy(name, p);
-
-                    CPathBuffer tmp; // Heap-allocated for long path support
+                    const size_t slash = buff.find_last_of(L"\\/");
+                    const std::wstring name = slash == std::wstring::npos ? buff : buff.substr(slash + 1);
                     BOOL shell = FALSE;
 
                     // CMainWindow::UserMenu was changed so that if it does not launch via Shell,
@@ -379,7 +359,7 @@ public:
                     /*
             // if it is not an executable file (.exe, .com, .bat, .pif),
             // wrap the name in quotes and run it through the shell
-            char *dot = strrchr(buff, '.');
+            wchar_t *dot = strrchr(buff, '.');
             if (dot != NULL && *(dot + 1) != 0)
             {
               dot++;
@@ -399,26 +379,11 @@ public:
             }
 */
 
-                    // if the path contains $, I must replace it with $$
-                    strcpy(tmp, buff);
-                    char* iterS = tmp;
-                    char* iterT = buff;
-                    while (*iterS != 0)
-                    {
-                        *iterT = *iterS;
-                        if (*iterS == '$')
-                        {
-                            iterT++;
-                            *iterT = '$';
-                        }
-                        iterT++;
-                        iterS++;
-                    }
-                    *iterT = 0;
+                    EscapeHotPathDollars(buff);
 
-                    static char emptyBuffer[] = "";
-                    static char fullPathBuffer[] = "$(FullPath)";
-                    CUserMenuItem* item = new CUserMenuItem(name, buff, emptyBuffer, fullPathBuffer, emptyBuffer,
+                    static wchar_t emptyBuffer[] = L"";
+                    static wchar_t fullPathBuffer[] = L"$(FullPath)";
+                    CUserMenuItem* item = new CUserMenuItem(name.c_str(), buff.c_str(), emptyBuffer, fullPathBuffer, emptyBuffer,
                                                             shell, FALSE, FALSE, TRUE, umitItem, NULL);
 
                     // find the place where the item should be inserted
@@ -459,18 +424,18 @@ public:
             {
                 if (pasteIndex != -1)
                 {
-                    if (strcmp(fileName, DropTargetFileName) != 0 &&
-                        !IsFakeDataObject(pDataObject, NULL, NULL, 0))
+                    if (fileName != DropTargetFileName &&
+                        !IsFakeDataObject(pDataObject, NULL, NULL))
                     {
                         if (DropTarget != NULL)
                         {
                             DropTarget->DragLeave();
                             DropTarget->Release();
-                            DropTargetFileName[0] = 0;
+                            DropTargetFileName.clear();
                         }
-                        DropTarget = CreateIDropTarget(UserMenuBar->HWindow, fileName);
+                        DropTarget = CreateIDropTargetW(UserMenuBar->HWindow, fileName.c_str());
                         if (DropTarget != NULL)
-                            strcpy(DropTargetFileName, fileName);
+                            DropTargetFileName = fileName;
                     }
                     if (DropTarget != NULL)
                     {
@@ -490,7 +455,7 @@ public:
         {
             DropTarget->Release();
             DropTarget = NULL;
-            DropTargetFileName[0] = 0;
+            DropTargetFileName.clear();
         }
 
         return ret;
@@ -552,10 +517,10 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
                 tii.Style = TLBI_STYLE_SHOWTEXT | TLBI_STYLE_NOPREFIX;
                 if (item->Type == umitSubmenuBegin)
                     tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
-                char buff[80];
-                lstrcpyn(buff, item->ItemName.c_str(), 80);
-                RemoveAmpersands(buff);
-                tii.Text = buff;
+                std::wstring text = item->ItemName;
+                RemoveAmpersands(text.data());
+                text.resize(wcslen(text.c_str()));
+                tii.Text = text.data();
                 tii.HIcon = item->UMIcon;
                 tii.ID = CM_USERMENU_MIN + i;
                 tii.Enabler = &EnablerOnDisk;
@@ -640,12 +605,12 @@ void CUserMenuBar::OnGetToolTip(LPARAM lParam)
         CUserMenuItem* item = MainWindow->UserMenuItems->At(tt->ID - CM_USERMENU_MIN);
         if (Configuration.UserMenuToolbarLabels)
         {
-            CPathBuffer umCommand; // Heap-allocated for long path support
-            if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), umCommand, umCommand.Size(), TRUE))
-                lstrcpy(tt->Buffer, umCommand);
+            std::wstring umCommand;
+            if (ExpandCommand(MainWindow->HWindow, item->UMCommand.c_str(), umCommand, TRUE))
+                lstrcpynW(tt->Buffer, umCommand.c_str(), TOOLTIP_TEXT_MAX);
         }
         else
-            lstrcpy(tt->Buffer, item->ItemName.c_str());
+            lstrcpynW(tt->Buffer, item->ItemName.c_str(), TOOLTIP_TEXT_MAX);
     }
 }
 

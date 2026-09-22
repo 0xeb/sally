@@ -77,7 +77,7 @@ void CConfigPageFirst::Validate(CTransferInfo& ti)
     ti.EditLine(IDC_TESTNUMBER, dummy); // check whether it is a number
     if (ti.IsGood() && dummy >= 10)     // ensure the number is not greater than or equal to 10
     {
-        SalamanderGeneral->SalMessageBox(HWindow, "Number must be less then 10.", "Error",
+        SalamanderGeneral->SalMessageBox(HWindow, L"Number must be less then 10.", L"Error",
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_TESTNUMBER);
         // PostMessage(GetDlgItem(HWindow, IDC_TESTNUMBER), EM_SETSEL, errorPos1, errorPos2);  // highlight the error position
@@ -86,7 +86,15 @@ void CConfigPageFirst::Validate(CTransferInfo& ti)
 
 void CConfigPageFirst::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDC_TESTSTRING, Str, MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+    {
+        HWND edit = GetDlgItem(HWindow, IDC_TESTSTRING);
+        SendMessageW(edit, EM_LIMITTEXT, 0x7ffffffe, 0);
+        SetWindowTextW(edit, Str.c_str());
+        SendMessageW(edit, EM_SETSEL, 0, -1);
+    }
+    else
+        Str = SPLGetDlgItemTextOwned(HWindow, IDC_TESTSTRING);
     ti.EditLine(IDC_TESTNUMBER, Number);
 
     HWND hWnd;
@@ -94,11 +102,11 @@ void CConfigPageFirst::Transfer(CTransferInfo& ti)
     {
         if (ti.Type == ttDataToWindow) // Transfer() called when opening the window (data -> window)
         {
-            SendMessage(hWnd, CB_RESETCONTENT, 0, 0);
-            SendMessage(hWnd, CB_ADDSTRING, 0, (LPARAM) "first");
-            SendMessage(hWnd, CB_ADDSTRING, 0, (LPARAM) "second");
-            SendMessage(hWnd, CB_ADDSTRING, 0, (LPARAM) "third");
-            SendMessage(hWnd, CB_SETCURSEL, Selection, 0);
+            SendMessageW(hWnd, CB_RESETCONTENT, 0, 0);
+            SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)L"first");
+            SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)L"second");
+            SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)L"third");
+            SendMessageW(hWnd, CB_SETCURSEL, Selection, 0);
         }
         else // ttDataFromWindow; Transfer() called when OK is pressed (window -> data)
         {
@@ -225,7 +233,7 @@ int CALLBACK CenterCallback(HWND HWindow, UINT uMsg, LPARAM lParam)
 }
 
 CConfigDialog::CConfigDialog(HWND parent)
-    : CPropertyDialog(parent, HLanguage, LoadStr(IDS_CFG_TITLE),
+    : CPropertyDialog(parent, HLanguage, LangStr(IDS_CFG_TITLE).c_str(),
                       LastCfgPage, PSH_USECALLBACK | PSH_NOAPPLYNOW | PSH_HASHELP,
                       NULL, &LastCfgPage, CenterCallback)
 {
@@ -239,16 +247,24 @@ CConfigDialog::CConfigDialog(HWND parent)
 // CPathDialog
 //
 
-CPathDialog::CPathDialog(HWND parent, char* path, BOOL* filePath)
+CPathDialog::CPathDialog(HWND parent, std::wstring& path, BOOL* filePath)
     : CCommonDialog(HLanguage, IDD_PATHDLG, IDD_PATHDLG, parent)
 {
-    Path = path;
+    Path = &path;
     FilePath = filePath;
 }
 
 void CPathDialog::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDC_PATHSTRING, Path, MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+    {
+        HWND edit = GetDlgItem(HWindow, IDC_PATHSTRING);
+        SendMessageW(edit, EM_LIMITTEXT, 0x7ffffffe, 0);
+        SetWindowTextW(edit, Path->c_str());
+        SendMessageW(edit, EM_SETSEL, 0, -1);
+    }
+    else
+        *Path = SPLGetDlgItemTextOwned(HWindow, IDC_PATHSTRING);
     ti.CheckBox(IDC_FILECHECK, *FilePath);
 }
 
@@ -319,11 +335,11 @@ protected:
             break;
         }
 
-        case WM_USER_TTGETTEXT:
+        case WM_USER_TTGETTEXTW:
         {
             DWORD id = (DWORD)wParam;
-            char* text = (char*)lParam;
-            lstrcpyn(text, "ToolTip", TOOLTIP_TEXT_MAX);
+            wchar_t* text = (wchar_t*)lParam;
+            lstrcpynW(text, L"ToolTip", TOOLTIP_TEXT_MAX);
             return 0;
         }
         }
@@ -340,7 +356,7 @@ CCtrlExampleDialog::CCtrlExampleDialog(HWND hParent)
     : CCommonDialog(HLanguage, IDD_CTRLEXAMPLE, hParent)
 {
     TimerStarted = FALSE;
-    StringTemplate[0] = 0;
+    StringTemplate.clear();
     Text = NULL;
     CachedText = NULL;
     Progress = NULL;
@@ -387,7 +403,7 @@ BOOL CCtrlExampleDialog::CreateChilds()
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLOPEN, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)
         return FALSE;
-    hl->SetActionOpen("https://github.com/0xeb/sally");
+    hl->SetActionOpen(L"https://github.com/0xeb/sally");
 
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLCOMMAND, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)
@@ -397,7 +413,7 @@ BOOL CCtrlExampleDialog::CreateChilds()
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLHINT, STF_DOTUNDERLINE);
     if (hl == NULL)
         return FALSE;
-    hl->SetActionShowHint("text 1 text 1 text 1 text 1\ntext 2 text 2 text 2 ");
+    hl->SetActionShowHint(L"text 1 text 1 text 1 text 1\ntext 2 text 2 text 2 ");
 
     Progress = SalamanderGUI->AttachProgressBar(HWindow, IDC_CE_PROGRESS);
     if (Progress == NULL)
@@ -452,7 +468,7 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             DestroyWindow(HWindow); // error -> do not open the dialog
             return FALSE;           // stop processing
         }
-        GetDlgItemText(HWindow, IDC_CE_ST, StringTemplate, 300);
+        StringTemplate = SPLGetDlgItemTextOwned(HWindow, IDC_CE_ST);
         TimerStarted = SetTimer(HWindow, 1, 20, NULL) != 0;
         //Progress2->SetProgress(450, NULL);
 
@@ -469,15 +485,14 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_TIMER:
     {
         Progress2->SetProgress(-1, NULL);
-        char buff[300];
         DWORD ticks = GetTickCount();
-        wsprintf(buff, StringTemplate, ticks);
+        const std::wstring text = SPLFormatStringOwned(StringTemplate.c_str(), ticks);
         int i;
         for (i = 0; i < 50; i++) // emphasize the blinking effect
         {
-            SetDlgItemText(HWindow, IDC_CE_ST, buff);
-            Text->SetText(buff);
-            CachedText->SetText(buff);
+            SetDlgItemTextW(HWindow, IDC_CE_ST, text.c_str());
+            Text->SetText(text.c_str());
+            CachedText->SetText(text.c_str());
         }
 
         ProgressNumber += 1;
@@ -553,12 +568,12 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
             mii.Type = MENU_TYPE_STRING;
 
-            char buffDrop[] = "Drop";
+            wchar_t buffDrop[] = L"Drop";
             mii.String = buffDrop;
             mii.ID = 1;
             popup->InsertItem(-1, TRUE, &mii);
 
-            char buffDropSpecial[] = "Drop Special";
+            wchar_t buffDropSpecial[] = L"Drop Special";
             mii.String = buffDropSpecial;
             mii.ID = 2;
             popup->InsertItem(-1, TRUE, &mii);
@@ -593,7 +608,7 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case CM_POSTEDCOMMAND:
         {
-            SalamanderGeneral->SalMessageBox(HWindow, "SOMETHING", "Demo plugin",
+            SalamanderGeneral->SalMessageBox(HWindow, L"SOMETHING", L"Demo plugin",
                                              MB_OK | MB_ICONINFORMATION);
             return 0;
         }
@@ -610,17 +625,17 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
                 mii.Type = MENU_TYPE_STRING;
 
-                char buffItem1[] = "Item 1";
+                wchar_t buffItem1[] = L"Item 1";
                 mii.String = buffItem1;
                 mii.ID = 1;
                 popup->InsertItem(-1, TRUE, &mii);
 
-                char buffItem2[] = "Item xxxxx 2";
+                wchar_t buffItem2[] = L"Item xxxxx 2";
                 mii.String = buffItem2;
                 mii.ID = 2;
                 popup->InsertItem(-1, TRUE, &mii);
 
-                char buffItem3[] = "Item 3";
+                wchar_t buffItem3[] = L"Item 3";
                 mii.String = buffItem3;
                 mii.ID = 3;
                 popup->InsertItem(-1, TRUE, &mii);
@@ -671,13 +686,13 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (HIWORD(wParam))
             {
             case TLBHDR_MODIFY:
-                MessageBox(HWindow, "Modify", "ToolbarHeader", MB_OK);
+                MessageBoxW(HWindow, L"Modify", L"ToolbarHeader", MB_OK);
                 break;
             case TLBHDR_UP:
-                MessageBox(HWindow, "Up", "ToolbarHeader", MB_OK);
+                MessageBoxW(HWindow, L"Up", L"ToolbarHeader", MB_OK);
                 break;
             case TLBHDR_DOWN:
-                MessageBox(HWindow, "Down", "ToolbarHeader", MB_OK);
+                MessageBoxW(HWindow, L"Down", L"ToolbarHeader", MB_OK);
                 break;
             }
             return 0;

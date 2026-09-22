@@ -4,9 +4,15 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common/unicode/WideTextRange.h"
+#include "compat/legacy_host_api.h"
+
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
-#define PLUGIN_LEGACY_REQVER 102 // ("4.0") legacy commercial plugins; requires explicit user approval per plugin path
 
 //
 // ****************************************************************************
@@ -41,7 +47,7 @@ public:
 
     // methods of the CPluginInterfaceForArchiverAbstract interface without "virtual" (would be unnecessary and slower)
 
-    BOOL ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    BOOL ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                      CSalamanderDirectoryAbstract* dir,
                      CPluginDataInterfaceAbstract*& pluginData)
     {
@@ -51,9 +57,9 @@ public:
         return r;
     }
 
-    BOOL UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                       CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                       const char* archiveRoot, SalEnumSelection next, void* nextParam)
+    BOOL UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                       CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                       const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam)
     {
         EnterPlugin();
         BOOL r = Interface->UnpackArchive(salamander, fileName, pluginData, targetDir, archiveRoot, next, nextParam);
@@ -61,10 +67,10 @@ public:
         return r;
     }
 
-    BOOL UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                       CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                       const CFileData* fileData, const char* targetDir,
-                       const char* newFileName, BOOL* renamingNotSupported)
+    BOOL UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                       CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                       const CFileData* fileData, const wchar_t* targetDir,
+                       const wchar_t* newFileName, BOOL* renamingNotSupported)
     {
         EnterPlugin();
         BOOL r = Interface->UnpackOneFile(salamander, fileName, pluginData, nameInArchive,
@@ -73,8 +79,8 @@ public:
         return r;
     }
 
-    BOOL PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                       const char* archiveRoot, BOOL move, const char* sourcePath,
+    BOOL PackToArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                       const wchar_t* archiveRoot, BOOL move, const wchar_t* sourcePath,
                        SalEnumSelection2 next, void* nextParam)
     {
         EnterPlugin();
@@ -84,8 +90,8 @@ public:
         return r;
     }
 
-    BOOL DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                           CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    BOOL DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                           CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                            SalEnumSelection next, void* nextParam)
     {
         EnterPlugin();
@@ -95,8 +101,8 @@ public:
         return r;
     }
 
-    BOOL UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                            const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+    BOOL UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                            const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                             CDynamicString* archiveVolumes)
     {
         EnterPlugin();
@@ -106,7 +112,7 @@ public:
         return r;
     }
 
-    BOOL CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+    BOOL CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                          BOOL force, int panel)
     {
         EnterPlugin();
@@ -115,15 +121,29 @@ public:
         return r;
     }
 
-    BOOL GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies)
+    BOOL GetCacheInfo(std::wstring& tempPath, BOOL* ownDelete, BOOL* cacheCopies)
     {
+        CSalamanderStringBufferOwner owner;
+        if (!owner.IsValid())
+            return FALSE;
+        BOOL stagedOwnDelete = ownDelete != NULL ? *ownDelete : FALSE;
+        BOOL stagedCacheCopies = cacheCopies != NULL ? *cacheCopies : FALSE;
         EnterPlugin();
-        BOOL r = Interface->GetCacheInfo(tempPath, ownDelete, cacheCopies);
+        BOOL r = Interface->GetCacheInfo(owner.Buffer(), &stagedOwnDelete, &stagedCacheCopies);
         LeavePlugin();
-        return r;
+        if (!r || !owner.GetValue(tempPath))
+        {
+            tempPath.clear();
+            return FALSE;
+        }
+        if (ownDelete != NULL)
+            *ownDelete = stagedOwnDelete;
+        if (cacheCopies != NULL)
+            *cacheCopies = stagedCacheCopies;
+        return TRUE;
     }
 
-    void DeleteTmpCopy(const char* fileName, BOOL firstFile)
+    void DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile)
     {
         EnterPlugin();
         Interface->DeleteTmpCopy(fileName, firstFile);
@@ -161,7 +181,7 @@ public:
 
     // methods of the CPluginInterfaceForViewerAbstract interface without 'virtual' (unnecessary — it would only slow things down)
 
-    BOOL ViewFile(const char* name, int left, int top, int width, int height,
+    BOOL ViewFile(const wchar_t* name, int left, int top, int width, int height,
                   UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                   BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                   int enumFilesSourceUID, int enumFilesCurrentIndex)
@@ -174,7 +194,7 @@ public:
         return r;
     }
 
-    BOOL CanViewFile(const char* name)
+    BOOL CanViewFile(const wchar_t* name)
     {
         EnterPlugin();
         BOOL r = Interface->CanViewFile(name);
@@ -279,7 +299,7 @@ public:
 
     // methods of the CPluginInterfaceForFSAbstract interface without 'virtual' (unnecessary — it would only slow things down)
 
-    CPluginFSInterfaceAbstract* OpenFS(const char* fsName, int fsNameIndex)
+    CPluginFSInterfaceAbstract* OpenFS(const wchar_t* fsName, int fsNameIndex)
     {
         EnterPlugin();
         CPluginFSInterfaceAbstract* r = Interface->OpenFS(fsName, fsNameIndex);
@@ -294,7 +314,7 @@ public:
 
     BOOL ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                         CPluginFSInterfaceAbstract* pluginFS,
-                                        const char* pluginFSName, int pluginFSNameIndex,
+                                        const wchar_t* pluginFSName, int pluginFSNameIndex,
                                         BOOL isDetachedFS, BOOL& refreshMenu,
                                         BOOL& closeMenu, int& postCmd, void*& postCmdParam);
 
@@ -305,24 +325,24 @@ public:
     // direct interface call (does not go through CPluginData + InitDLL), call-stack-message is created;
     // called only when 'pluginFS' is in a panel - the plugin is definitely loaded
     void ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                     const char* pluginFSName, int pluginFSNameIndex,
+                     const wchar_t* pluginFSName, int pluginFSNameIndex,
                      CFileData& file, int isDir);
 
     // direct interface call (does not go through CPluginData + InitDLL), call-stack-message is created;
     // called only when 'pluginFS' exists (either in a panel or detached) - the plugin is definitely loaded
     BOOL DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                       CPluginFSInterfaceAbstract* pluginFS,
-                      const char* pluginFSName, int pluginFSNameIndex);
+                      const wchar_t* pluginFSName, int pluginFSNameIndex);
 
     // direct interface call (does not go through CPluginData + InitDLL), call-stack-message is created;
     // called only when the plugin is loaded (its FS is open)
-    void ConvertPathToInternal(const char* fsName, int fsNameIndex, char* fsUserPart);
+    BOOL ConvertPathToInternalW(const wchar_t* fsName, int fsNameIndex, std::wstring& fsUserPart);
 
     // direct interface call (does not go through CPluginData + InitDLL), call-stack-message is created;
     // called only when the plugin is loaded (its FS is open)
-    void ConvertPathToExternal(const char* fsName, int fsNameIndex, char* fsUserPart);
+    BOOL ConvertPathToExternalW(const wchar_t* fsName, int fsNameIndex, std::wstring& fsUserPart);
 
-    void EnsureShareExistsOnServer(int panel, const char* server, const char* share)
+    void EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share)
     {
         EnterPlugin();
         Interface->EnsureShareExistsOnServer(panel, server, share);
@@ -335,12 +355,12 @@ class CPluginInterfaceForThumbLoaderEncapsulation
 protected:
     CPluginInterfaceForThumbLoaderAbstract* Interface; // encapsulated interface
 
-    const char* DLLName; // reference to the string from CPluginData of the plugin that created this interface
-    const char* Version; // reference to the string from CPluginData of the plugin that created this interface
+    const wchar_t* DLLName; // reference to the string from CPluginData of the plugin that created this interface
+    const wchar_t* Version; // reference to the string from CPluginData of the plugin that created this interface
 
 public:
     CPluginInterfaceForThumbLoaderEncapsulation(CPluginInterfaceForThumbLoaderAbstract* iface = NULL,
-                                                const char* dllName = NULL, const char* version = NULL)
+                                                const wchar_t* dllName = NULL, const wchar_t* version = NULL)
     {
         Interface = iface;
         DLLName = dllName;
@@ -351,7 +371,7 @@ public:
     BOOL NotEmpty() { return Interface != NULL; }
 
     // initialization of the encapsulation
-    void Init(CPluginInterfaceForThumbLoaderAbstract* iface, const char* dllName, const char* version)
+    void Init(CPluginInterfaceForThumbLoaderAbstract* iface, const wchar_t* dllName, const wchar_t* version)
     {
         Interface = iface;
         DLLName = dllName;
@@ -367,10 +387,10 @@ public:
 
     // does not need Enter/LeavePlugin because it may use only sal-general methods
     // that can be called from any thread (unlike panel operations)
-    BOOL LoadThumbnail(const char* filename, int thumbWidth, int thumbHeight,
+    BOOL LoadThumbnail(const wchar_t* filename, int thumbWidth, int thumbHeight,
                        CSalamanderThumbnailMakerAbstract* thumbMaker, BOOL fastThumbnail)
     {
-        CALL_STACK_MESSAGE7("CPluginInterfaceForThumbLoaderEncapsulation::LoadThumbnail(%s, %d, %d, , %d) (%s v. %s)",
+        CALL_STACK_MESSAGE7("CPluginInterfaceForThumbLoaderEncapsulation::LoadThumbnail(%ls, %d, %d, , %d) (%ls v. %ls)",
                             filename, thumbWidth, thumbHeight, fastThumbnail, DLLName, Version);
         return Interface->LoadThumbnail(filename, thumbWidth, thumbHeight, thumbMaker, fastThumbnail);
     }
@@ -508,7 +528,7 @@ public:
         LeavePlugin();
     }
 
-    void AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+    void AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
     {
         EnterPlugin();
         Interface->AcceptChangeOnPathNotification(path, includingSubdirs);
@@ -540,8 +560,8 @@ protected:
     CPluginDataInterfaceAbstract* Interface; // encapsulated interface
     int BuiltForVersion;                     // valid only while 'Interface' is active: Salamander version this plugin was compiled for (see the list of versions under LAST_VERSION_OF_SALAMANDER in spl_vers.h)
 
-    const char* DLLName;              // string reference from the CPluginData of the plugin that created this interface
-    const char* Version;              // string reference from the CPluginData of the plugin that created this interface
+    const wchar_t* DLLName;              // string reference from the CPluginData of the plugin that created this interface
+    const wchar_t* Version;              // string reference from the CPluginData of the plugin that created this interface
     CPluginInterfaceAbstract* Plugin; // plugin that created this interface
 
 public:
@@ -554,8 +574,8 @@ public:
         BuiltForVersion = 0;
     }
 
-    CPluginDataInterfaceEncapsulation(CPluginDataInterfaceAbstract* iface, const char* dllName,
-                                      const char* version, CPluginInterfaceAbstract* plugin,
+    CPluginDataInterfaceEncapsulation(CPluginDataInterfaceAbstract* iface, const wchar_t* dllName,
+                                      const wchar_t* version, CPluginInterfaceAbstract* plugin,
                                       int builtForVersion)
     {
         Interface = iface;
@@ -569,7 +589,7 @@ public:
     BOOL NotEmpty() { return Interface != NULL; }
 
     // initialization of the encapsulation
-    void Init(CPluginDataInterfaceAbstract* iface, const char* dllName, const char* version,
+    void Init(CPluginDataInterfaceAbstract* iface, const wchar_t* dllName, const wchar_t* version,
               CPluginInterfaceAbstract* plugin, int builtForVersion)
     {
         Interface = iface;
@@ -586,10 +606,10 @@ public:
     CPluginDataInterfaceAbstract* GetInterface() { return Interface; }
 
     // returns a reference to the string from the CPluginData of the plugin that created this interface
-    const char* GetDLLName() { return DLLName; }
+    const wchar_t* GetDLLName() { return DLLName; }
 
     // returns a reference to the string from the CPluginData of the plugin that created this interface
-    const char* GetVersion() { return Version; }
+    const wchar_t* GetVersion() { return Version; }
 
     // returns the plugin interface that created the PluginData interface
     CPluginInterfaceAbstract* GetPluginInterface() { return Plugin; }
@@ -603,7 +623,7 @@ public:
     // Same as ReleasePluginData but renamed to highlight the ReleaseFilesOrDirs call
     void ReleasePluginData2(CFileData& file, BOOL isDir)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::ReleasePluginData2(, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::ReleasePluginData2(, %d) (%ls v. %ls)",
                             isDir, DLLName, Version);
         EnterPlugin();
         Interface->ReleasePluginData(file, isDir);
@@ -614,7 +634,7 @@ public:
 
     BOOL CallReleaseForFiles()
     {
-        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CallReleaseForFiles() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CallReleaseForFiles() (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->CallReleaseForFiles();
@@ -624,7 +644,7 @@ public:
 
     BOOL CallReleaseForDirs()
     {
-        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CallReleaseForDirs() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CallReleaseForDirs() (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->CallReleaseForDirs();
@@ -632,18 +652,18 @@ public:
         return r;
     }
 
-    void GetFileDataForUpDir(const char* archivePath, CFileData& upDir)
+    void GetFileDataForUpDir(const wchar_t* archivePath, CFileData& upDir)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetFileDataForUpDir(%s,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetFileDataForUpDir(%ls,) (%ls v. %ls)",
                             archivePath, DLLName, Version);
         EnterPlugin();
         Interface->GetFileDataForUpDir(archivePath, upDir);
         LeavePlugin();
     }
 
-    BOOL GetFileDataForNewDir(const char* dirName, CFileData& dir)
+    BOOL GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir)
     {
-        SLOW_CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetFileDataForNewDir(%s,) (%s v. %s)",
+        SLOW_CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetFileDataForNewDir(%ls,) (%ls v. %ls)",
                                  dirName, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->GetFileDataForNewDir(dirName, dir);
@@ -653,7 +673,7 @@ public:
 
     CIconList* GetSimplePluginIcons(CIconSizeEnum iconSize)
     {
-        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::GetSimplePluginIcons() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::GetSimplePluginIcons() (%ls v. %ls)",
                             DLLName, Version);
 
         int size;
@@ -699,7 +719,7 @@ public:
 
     void ColumnFixedWidthShouldChange(BOOL leftPanel, const CColumn* column, int newFixedWidth)
     {
-        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::ColumnFixedWidthShouldChange(%d, , %d) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::ColumnFixedWidthShouldChange(%d, , %d) (%ls v. %ls)",
                             leftPanel, newFixedWidth, DLLName, Version);
         EnterPlugin();
         Interface->ColumnFixedWidthShouldChange(leftPanel, column, newFixedWidth);
@@ -708,7 +728,7 @@ public:
 
     void ColumnWidthWasChanged(BOOL leftPanel, const CColumn* column, int newWidth)
     {
-        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::ColumnWidthWasChanged(%d, , %d) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::ColumnWidthWasChanged(%d, , %d) (%ls v. %ls)",
                             leftPanel, newWidth, DLLName, Version);
         EnterPlugin();
         Interface->ColumnWidthWasChanged(leftPanel, column, newWidth);
@@ -717,22 +737,60 @@ public:
 
     BOOL GetInfoLineContent(int panel, const CFileData* file, BOOL isDir, int selectedFiles,
                             int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
-                            char* buffer, DWORD* hotTexts, int& hotTextsCount)
+                            std::wstring& buffer,
+                            std::vector<sally::unicode::WideTextRange>& hotTexts)
     {
-        CALL_STACK_MESSAGE9("CPluginDataInterfaceEncapsulation::GetInfoLineContent(%d, , %d, %d, %d, %d, %I64u, , ,) (%s v. %s)",
+        CALL_STACK_MESSAGE9("CPluginDataInterfaceEncapsulation::GetInfoLineContent(%d, , %d, %d, %d, %d, %I64u, , ,) (%ls v. %ls)",
                             panel, isDir, selectedFiles, selectedDirs, displaySize,
                             selectedSize.Value, DLLName, Version);
         EnterPlugin();
+        CSalamanderStringBufferOwner bufferOwner;
+        CSalamanderTextRangeBufferOwner hotTextOwner;
+        if (!bufferOwner.IsValid() || !hotTextOwner.IsValid())
+        {
+            LeavePlugin();
+            return FALSE;
+        }
         BOOL r = Interface->GetInfoLineContent(panel, file, isDir, selectedFiles, selectedDirs,
-                                               displaySize, selectedSize, buffer,
-                                               hotTexts, hotTextsCount);
+                                               displaySize, selectedSize, bufferOwner.Buffer(),
+                                               hotTextOwner.Buffer());
         LeavePlugin();
+        if (r != FALSE)
+        {
+            std::wstring stagedText;
+            std::vector<CSalamanderTextRange> stagedRanges;
+            if (!bufferOwner.GetValue(stagedText) ||
+                !hotTextOwner.GetValue(stagedRanges))
+                return FALSE;
+            try
+            {
+                std::vector<sally::unicode::WideTextRange> converted;
+                converted.reserve(stagedRanges.size());
+                for (const CSalamanderTextRange& range : stagedRanges)
+                {
+                    if (range.Offset > stagedText.size() ||
+                        range.Length > stagedText.size() - range.Offset)
+                        return FALSE;
+                    converted.push_back({range.Offset, range.Length});
+                }
+                buffer.swap(stagedText);
+                hotTexts.swap(converted);
+            }
+            catch (const std::bad_alloc&)
+            {
+                return FALSE;
+            }
+            catch (const std::length_error&)
+            {
+                return FALSE;
+            }
+        }
         return r;
     }
 
     BOOL CanBeCopiedToClipboard()
     {
-        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CanBeCopiedToClipboard() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginDataInterfaceEncapsulation::CanBeCopiedToClipboard() (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->CanBeCopiedToClipboard();
@@ -742,7 +800,7 @@ public:
 
     BOOL GetByteSize(const CFileData* file, BOOL isDir, CQuadWord* size)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetByteSize(, %d,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetByteSize(, %d,) (%ls v. %ls)",
                             isDir, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->GetByteSize(file, isDir, size);
@@ -752,7 +810,7 @@ public:
 
     BOOL GetLastWriteDate(const CFileData* file, BOOL isDir, SYSTEMTIME* date)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetLastWriteDate(, %d,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetLastWriteDate(, %d,) (%ls v. %ls)",
                             isDir, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->GetLastWriteDate(file, isDir, date);
@@ -762,7 +820,7 @@ public:
 
     BOOL GetLastWriteTime(const CFileData* file, BOOL isDir, SYSTEMTIME* time)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetLastWriteTime(, %d,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetLastWriteTime(, %d,) (%ls v. %ls)",
                             isDir, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->GetLastWriteTime(file, isDir, time);
@@ -775,7 +833,7 @@ public:
     BOOL HasSimplePluginIcon(CFileData& file, BOOL isDir)
     {
         // called for all files and directories; CALL_STACK_MESSAGE slows it down here (40ms for 3000 calls)
-        //      CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::HasSimplePluginIcon(%s, %d) (%s v. %s)",
+        //      CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::HasSimplePluginIcon(%ls, %d) (%ls v. %ls)",
         //                          file.Name, isDir, DLLName, Version);
         return Interface->HasSimplePluginIcon(file, isDir);
     }
@@ -784,7 +842,7 @@ public:
     // that can be called from any thread (unlike panel operations)
     HICON GetPluginIcon(const CFileData* file, CIconSizeEnum iconSize, BOOL& destroyIcon)
     {
-        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetPluginIcon(%s,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginDataInterfaceEncapsulation::GetPluginIcon(%ls,) (%ls v. %ls)",
                             file->Name, DLLName, Version);
         int size;
         switch (iconSize)
@@ -814,17 +872,17 @@ public:
     {
         CALL_STACK_MESSAGE_NONE
         // no call-stack here for speed reasons
-        //      CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::CompareFilesFromFS(%s, %s) (%s v. %s)",
+        //      CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::CompareFilesFromFS(%ls, %ls) (%ls v. %ls)",
         //                          file1->Name, file2->Name, DLLName, Version);
         return Interface->CompareFilesFromFS(file1, file2);
     }
 
     // does not need Enter/LeavePlugin because it may use only sal-general methods
     // that can be called from any thread (unlike panel operations)
-    void SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+    void SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                    const CFileData* upperDir)
     {
-        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::SetupView(%d, , %s,) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginDataInterfaceEncapsulation::SetupView(%d, , %ls,) (%ls v. %ls)",
                             leftPanel, archivePath, DLLName, Version);
         Interface->SetupView(leftPanel, view, archivePath, upperDir);
     }
@@ -864,11 +922,11 @@ public:
         }
     }
 
-    virtual const char* WINAPI AllocFileNameInCache(HWND parent, const char* uniqueFileName, const char* nameInCache,
-                                                    const char* rootTmpPath, BOOL& fileExists);
-    virtual BOOL WINAPI OpenViewer(HWND parent, const char* fileName, HANDLE* fileLock,
+    virtual const wchar_t* WINAPI AllocFileNameInCache(HWND parent, const wchar_t* uniqueFileName, const wchar_t* nameInCache,
+                                                    const wchar_t* rootTmpPath, BOOL& fileExists);
+    virtual BOOL WINAPI OpenViewer(HWND parent, const wchar_t* fileName, HANDLE* fileLock,
                                    BOOL* fileLockOwner);
-    virtual void WINAPI FreeFileNameInCache(const char* uniqueFileName, BOOL fileExists, BOOL newFileOK,
+    virtual void WINAPI FreeFileNameInCache(const wchar_t* uniqueFileName, BOOL fileExists, BOOL newFileOK,
                                             const CQuadWord& newFileSize, HANDLE fileLock,
                                             BOOL fileLockOwner, BOOL removeAsSoonAsPossible);
 };
@@ -888,12 +946,17 @@ protected:
     CPluginFSInterfaceAbstract* Interface; // encapsulated interface
     int BuiltForVersion;                   // valid only when the plugin is loaded: Salamander version the plugin was compiled for (see the list of versions under LAST_VERSION_OF_SALAMANDER in spl_vers.h)
 
-    const char* DLLName;                           // reference to the string from CPluginData of the plugin that created this interface
-    const char* Version;                           // reference to the string from CPluginData of the plugin that created this interface
+    const wchar_t* DLLName;                           // reference to the string from CPluginData of the plugin that created this interface
+    const wchar_t* Version;                           // reference to the string from CPluginData of the plugin that created this interface
     CPluginInterfaceForFSEncapsulation IfaceForFS; // plugin that created this interface (FS part)
     CPluginInterfaceAbstract* Iface;               // plugin that created this interface (base)
     DWORD SupportedServices;                       // last value returned by the Interface->GetSupportedServices() method
-    CPathBuffer PluginFSName;                      // name of the opened FS
+    // The FS name arrives wide from the now-wide SDK, and this class is held in a
+    // TIndirectArray - which stores POINTERS, so the object is never memmove'd and a
+    // non-POD member is safe here. That is NOT true of CFileData, which lives in a
+    // TDirectArray and must stay memmove-able; the distinction is why one gets
+    // std::wstring and the other keeps raw WCHAR*.
+    std::wstring PluginFSName;                     // name of the opened FS
     int PluginFSNameIndex;                         // index of the opened FS name
 
     static DWORD PluginFSTime; // global "time" (counter) used to obtain the creation time of a FS
@@ -910,15 +973,15 @@ public:
         Version = NULL;
         Iface = NULL;
         SupportedServices = 0;
-        PluginFSName[0] = 0;
+        PluginFSName.clear();
         PluginFSNameIndex = -1;
         PluginFSCreateTime = 0;
         ChngDrvDuplicateItemIndex = 0;
     }
 
-    CPluginFSInterfaceEncapsulation(CPluginFSInterfaceAbstract* fsIface, const char* dllName,
-                                    const char* version, CPluginInterfaceForFSAbstract* ifaceForFS,
-                                    CPluginInterfaceAbstract* iface, const char* pluginFSName,
+    CPluginFSInterfaceEncapsulation(CPluginFSInterfaceAbstract* fsIface, const wchar_t* dllName,
+                                    const wchar_t* version, CPluginInterfaceForFSAbstract* ifaceForFS,
+                                    CPluginInterfaceAbstract* iface, const wchar_t* pluginFSName,
                                     int pluginFSNameIndex, DWORD pluginFSCreateTime,
                                     int chngDrvDuplicateItemIndex, int builtForVersion)
         : IfaceForFS(ifaceForFS, builtForVersion)
@@ -933,9 +996,9 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName.Get(), pluginFSName, SAL_MAX_LONG_PATH);
+            PluginFSName = pluginFSName;
         else
-            PluginFSName[0] = 0;
+            PluginFSName.clear();
         PluginFSNameIndex = pluginFSNameIndex;
         if (pluginFSCreateTime == -1)
             PluginFSCreateTime = PluginFSTime++;
@@ -948,9 +1011,9 @@ public:
     BOOL NotEmpty() { return Interface != NULL; }
 
     // initialization of the encapsulation
-    void Init(CPluginFSInterfaceAbstract* fsIface, const char* dllName, const char* version,
+    void Init(CPluginFSInterfaceAbstract* fsIface, const wchar_t* dllName, const wchar_t* version,
               CPluginInterfaceForFSAbstract* ifaceForFS, CPluginInterfaceAbstract* iface,
-              const char* pluginFSName, int pluginFSNameIndex, DWORD pluginFSCreateTime,
+              const wchar_t* pluginFSName, int pluginFSNameIndex, DWORD pluginFSCreateTime,
               int chngDrvDuplicateItemIndex, int builtForVersion)
     {
         Interface = fsIface;
@@ -964,9 +1027,9 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName.Get(), pluginFSName, SAL_MAX_LONG_PATH);
+            PluginFSName = pluginFSName;
         else
-            PluginFSName[0] = 0;
+            PluginFSName.clear();
         PluginFSNameIndex = pluginFSNameIndex;
         if (pluginFSCreateTime == -1)
             PluginFSCreateTime = PluginFSTime++;
@@ -986,10 +1049,10 @@ public:
     int GetBuiltForVersion() { return BuiltForVersion; }
 
     // returns a reference to the string from the CPluginData of the plugin that created this interface
-    const char* GetDLLName() { return DLLName; }
+    const wchar_t* GetDLLName() { return DLLName; }
 
     // returns a reference to the string from the CPluginData of the plugin that created this interface
-    const char* GetVersion() { return Version; }
+    const wchar_t* GetVersion() { return Version; }
 
     // returns the plug-in interface that created the FS interface (FS part)
     CPluginInterfaceForFSEncapsulation* GetPluginInterfaceForFS() { return &IfaceForFS; }
@@ -998,15 +1061,15 @@ public:
     CPluginInterfaceAbstract* GetPluginInterface() { return Iface; }
 
     // returns the name of the opened FS
-    const char* GetPluginFSName() { return PluginFSName; }
+    const wchar_t* GetPluginFSName() { return PluginFSName.c_str(); }
 
     // returns the index name of the opened FS
     int GetPluginFSNameIndex() { return PluginFSNameIndex; }
 
     // change the FS name
-    void SetPluginFS(const char* fsName, int fsNameIndex)
+    void SetPluginFS(const wchar_t* fsName, int fsNameIndex)
     {
-        lstrcpyn(PluginFSName.Get(), fsName, SAL_MAX_LONG_PATH);
+        PluginFSName = fsName;
         PluginFSNameIndex = fsNameIndex;
     }
 
@@ -1017,60 +1080,20 @@ public:
 
     // returns TRUE if 'fsName' belongs to the same plugin as this FS; if it returns TRUE,
     // it also returns the index 'fsNameIndex' of the plugin FS name 'fsName'
-    BOOL IsFSNameFromSamePluginAsThisFS(const char* fsName, int& fsNameIndex);
+    BOOL IsFSNameFromSamePluginAsThisFS(const wchar_t* fsName, int& fsNameIndex);
 
     // returns TRUE if the path 'fsName':'fsUserPart' is from this FS ('fsName' is from the same plugin
     // as this FS and IsOurPath('fsName', 'fsUserPart') returns TRUE)
-    BOOL IsPathFromThisFS(const char* fsName, const char* fsUserPart);
+    BOOL IsPathFromThisFS(const wchar_t* fsName, const wchar_t* fsUserPart);
 
     // returns TRUE if the service on the FS is supported
     BOOL IsServiceSupported(DWORD s) { return (SupportedServices & s) != 0; }
 
     // methods of the CPluginFSInterfaceAbstract interface without 'virtual' (unnecessary — it would only slow things down)
 
-    BOOL GetCurrentPath(char* userPart)
+    BOOL IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetCurrentPath() (%s v. %s)",
-                            DLLName, Version);
-        EnterPlugin();
-        BOOL r = Interface->GetCurrentPath(userPart);
-        LeavePlugin();
-        return r;
-    }
-
-    BOOL GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
-    {
-        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::GetFullName(, %d, , %d) (%s v. %s)",
-                            isDir, bufSize, DLLName, Version);
-        EnterPlugin();
-        BOOL r = Interface->GetFullName(file, isDir, buf, bufSize);
-        LeavePlugin();
-        return r;
-    }
-
-    BOOL GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success)
-    {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetFullFSPath(, %s, %s, %d,) (%s v. %s)",
-                            fsName, path, pathSize, DLLName, Version);
-        EnterPlugin();
-        BOOL r = Interface->GetFullFSPath(parent, fsName, path, pathSize, success);
-        LeavePlugin();
-        return r;
-    }
-
-    BOOL GetRootPath(char* userPart)
-    {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetRootPath() (%s v. %s)",
-                            DLLName, Version);
-        EnterPlugin();
-        BOOL r = Interface->GetRootPath(userPart);
-        LeavePlugin();
-        return r;
-    }
-
-    BOOL IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
-    {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::IsCurrentPath(%d, %d, %s) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::IsCurrentPath(%d, %d, %ls) (%ls v. %ls)",
                             currentFSNameIndex, fsNameIndex, userPart, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->IsCurrentPath(currentFSNameIndex, fsNameIndex, userPart);
@@ -1078,27 +1101,12 @@ public:
         return r;
     }
 
-    BOOL IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+    BOOL IsOurPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::IsOurPath(%d, %d, %s) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::IsOurPath(%d, %d, %ls) (%ls v. %ls)",
                             currentFSNameIndex, fsNameIndex, userPart, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->IsOurPath(currentFSNameIndex, fsNameIndex, userPart);
-        LeavePlugin();
-        return r;
-    }
-
-    BOOL ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex,
-                    const char* userPart, char* cutFileName,
-                    BOOL* pathWasCut, BOOL forceRefresh, int mode)
-    {
-        CALL_STACK_MESSAGE9("CPluginFSInterfaceEncapsulation::ChangePath(%d, %s, %d, %s, , , %d, %d) (%s v. %s)",
-                            currentFSNameIndex, fsName, fsNameIndex, userPart, forceRefresh, mode, DLLName, Version);
-        EnterPlugin();
-        BOOL r = Interface->ChangePath(currentFSNameIndex, fsName, fsNameIndex, userPart,
-                                       cutFileName, pathWasCut, forceRefresh, mode);
-        CALL_STACK_MESSAGE1("CPluginFSInterface::GetSupportedServices()");
-        SupportedServices = Interface->GetSupportedServices();
         LeavePlugin();
         return r;
     }
@@ -1120,7 +1128,7 @@ public:
 
     BOOL TryCloseOrDetach(BOOL forceClose, BOOL canDetach, BOOL& detach, int reason)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::TryCloseOrDetach(%d, %d, , %d) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::TryCloseOrDetach(%d, %d, , %d) (%ls v. %ls)",
                             forceClose, canDetach, reason, DLLName, Version);
         EnterPlugin();
         BOOL r = Interface->TryCloseOrDetach(forceClose, canDetach, detach, reason);
@@ -1130,7 +1138,7 @@ public:
 
     void ReleaseObject(HWND parent)
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::ReleaseObject() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::ReleaseObject() (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         Interface->ReleaseObject(parent);
@@ -1139,21 +1147,21 @@ public:
 
     void Event(int event, DWORD param) // FIXME_X64 - shouldn't 'param' be able to hold an x64 value?
     {
-        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::Event(%d, 0x%X) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::Event(%d, 0x%X) (%ls v. %ls)",
                             (int)event, param, DLLName, Version);
         EnterPlugin();
         Interface->Event(event, param);
         LeavePlugin();
     }
 
-    BOOL GetChangeDriveOrDisconnectItem(const char* fsName, char*& title, HICON& icon, BOOL& destroyIcon);
+    BOOL GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title, HICON& icon, BOOL& destroyIcon);
 
     HICON GetFSIcon(BOOL& destroyIcon);
 
-    void GetDropEffect(const char* srcFSPath, const char* tgtFSPath, DWORD allowedEffects,
+    void GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath, DWORD allowedEffects,
                        DWORD keyState, DWORD* dropEffect)
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetDropEffect(, , , ,) (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetDropEffect(, , , ,) (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         Interface->GetDropEffect(srcFSPath, tgtFSPath, allowedEffects, keyState, dropEffect);
@@ -1162,7 +1170,7 @@ public:
 
     void GetFSFreeSpace(CQuadWord* retValue)
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFreeSpace() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetFreeSpace() (%ls v. %ls)",
                             DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_GETFREESPACE))
         {
@@ -1174,9 +1182,9 @@ public:
             *retValue = CQuadWord(-1, -1);
     }
 
-    BOOL GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+    BOOL GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetNextDirectoryLineHotPath(%s, %d, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetNextDirectoryLineHotPath(%ls, %d, %d) (%ls v. %ls)",
                             text, pathLen, offset, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_GETNEXTDIRLINEHOTPATH))
         {
@@ -1189,36 +1197,12 @@ public:
             return FALSE;
     }
 
-    void CompleteDirectoryLineHotPath(char* path, int pathBufSize)
-    {
-        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::CompleteDirectoryLineHotPath(%s, %d) (%s v. %s)",
-                            path, pathBufSize, DLLName, Version);
-        if (IsServiceSupported(FS_SERVICE_GETNEXTDIRLINEHOTPATH))
-        {
-            EnterPlugin();
-            Interface->CompleteDirectoryLineHotPath(path, pathBufSize);
-            LeavePlugin();
-        }
-    }
+    BOOL CompleteDirectoryLineHotPathW(std::wstring& path);
+    BOOL GetPathForMainWindowTitleW(const wchar_t* fsName, int mode, std::wstring& path);
 
-    BOOL GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize)
+    void ShowInfoDialog(const wchar_t* fsName, HWND parent)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetPathForMainWindowTitle(%s, %d, , %d) (%s v. %s)",
-                            fsName, mode, bufSize, DLLName, Version);
-        if (IsServiceSupported(FS_SERVICE_GETPATHFORMAINWNDTITLE))
-        {
-            EnterPlugin();
-            BOOL r = Interface->GetPathForMainWindowTitle(fsName, mode, buf, bufSize);
-            LeavePlugin();
-            return r;
-        }
-        else
-            return FALSE;
-    }
-
-    void ShowInfoDialog(const char* fsName, HWND parent)
-    {
-        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ShowInfoDialog(%s,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ShowInfoDialog(%ls,) (%ls v. %ls)",
                             fsName, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_SHOWINFO))
         {
@@ -1228,31 +1212,45 @@ public:
         }
     }
 
-    BOOL ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo)
+    BOOL ExecuteCommandLine(HWND parent, std::wstring& command, int& selFrom, int& selTo)
     {
-        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ExecuteCommandLine(, %s, ,) (%s v. %s)",
-                            command, DLLName, Version);
+        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ExecuteCommandLine(, %ls, ,) (%ls v. %ls)",
+                            command.c_str(), DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_COMMANDLINE))
         {
+            CSalamanderStringBufferOwner owner(command);
+            if (!owner.IsValid())
+                return FALSE;
             EnterPlugin();
-            BOOL r = Interface->ExecuteCommandLine(parent, command, selFrom, selTo);
+            BOOL r = Interface->ExecuteCommandLine(parent, owner.Buffer(), selFrom, selTo);
             LeavePlugin();
+            std::wstring staged;
+            if (!r || !owner.GetValue(staged))
+                return FALSE;
+            command.swap(staged);
             return r;
         }
         else
             return FALSE;
     }
 
-    BOOL QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                     char* newName, BOOL& cancel)
+    BOOL QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
+                     std::wstring& newName, BOOL& cancel)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::QuickRename(%s, %d, , , %d, ,) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::QuickRename(%ls, %d, , , %d, ,) (%ls v. %ls)",
                             fsName, mode, isDir, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_QUICKRENAME))
         {
+            CSalamanderStringBufferOwner owner(newName);
+            if (!owner.IsValid())
+                return FALSE;
             EnterPlugin();
-            BOOL r = Interface->QuickRename(fsName, mode, parent, file, isDir, newName, cancel);
+            BOOL r = Interface->QuickRename(fsName, mode, parent, file, isDir, owner.Buffer(), cancel);
             LeavePlugin();
+            std::wstring staged;
+            if (!owner.GetValue(staged))
+                return FALSE;
+            newName.swap(staged);
             return r;
         }
         else
@@ -1263,9 +1261,9 @@ public:
     }
 
     // WARNING: used exclusively within the EnterPlugin+LeavePlugin section, do not call outside this section!
-    void AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs)
+    void AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::AcceptChangeOnPathNotification(%s, %s, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::AcceptChangeOnPathNotification(%ls, %ls, %d) (%ls v. %ls)",
                             fsName, path, includingSubdirs, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_ACCEPTSCHANGENOTIF))
         {
@@ -1273,15 +1271,22 @@ public:
         }
     }
 
-    BOOL CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel)
+    BOOL CreateDir(const wchar_t* fsName, int mode, HWND parent, std::wstring& newName, BOOL& cancel)
     {
-        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::CreateDir(%s, %d, , ,) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::CreateDir(%ls, %d, , ,) (%ls v. %ls)",
                             fsName, mode, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_CREATEDIR))
         {
+            CSalamanderStringBufferOwner owner(newName);
+            if (!owner.IsValid())
+                return FALSE;
             EnterPlugin();
-            BOOL r = Interface->CreateDir(fsName, mode, parent, newName, cancel);
+            BOOL r = Interface->CreateDir(fsName, mode, parent, owner.Buffer(), cancel);
             LeavePlugin();
+            std::wstring staged;
+            if (!owner.GetValue(staged))
+                return FALSE;
+            newName.swap(staged);
             return r;
         }
         else
@@ -1291,10 +1296,10 @@ public:
         }
     }
 
-    void ViewFile(const char* fsName, HWND parent,
+    void ViewFile(const wchar_t* fsName, HWND parent,
                   CSalamanderForViewFileOnFSAbstract* salamander, CFileData& file)
     {
-        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ViewFile(%s, , ,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ViewFile(%ls, , ,) (%ls v. %ls)",
                             fsName, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_VIEWFILE))
         {
@@ -1304,10 +1309,10 @@ public:
         }
     }
 
-    BOOL Delete(const char* fsName, int mode, HWND parent, int panel,
+    BOOL Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                 int selectedFiles, int selectedDirs, BOOL& cancelOrError)
     {
-        CALL_STACK_MESSAGE8("CPluginFSInterfaceEncapsulation::Delete(%s, %d, , %d, %d, %d,) (%s v. %s)",
+        CALL_STACK_MESSAGE8("CPluginFSInterfaceEncapsulation::Delete(%ls, %d, , %d, %d, %d,) (%ls v. %ls)",
                             fsName, mode, panel, selectedFiles, selectedDirs, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_DELETE))
         {
@@ -1323,65 +1328,23 @@ public:
         }
     }
 
-    BOOL CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+    // The live SDK carries the path and optional mask in an owned UTF-16 record.
+    // For mode 3 the record length includes the embedded separator NUL; its final
+    // terminator therefore preserves the historical double-NUL representation.
+    BOOL CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                           int panel, int selectedFiles, int selectedDirs,
-                          char* targetPath, BOOL& operationMask,
-                          BOOL& cancelOrHandlePath, HWND dropTarget)
-    {
-        CALL_STACK_MESSAGE10("CPluginFSInterfaceEncapsulation::CopyOrMoveFromFS(%d, %d, %s, , %d, %d, %d, %s, , ,) (%s v. %s)",
-                             copy, mode, fsName, panel, selectedFiles, selectedDirs, targetPath, DLLName, Version);
-        if (copy && IsServiceSupported(FS_SERVICE_COPYFROMFS) ||
-            !copy && IsServiceSupported(FS_SERVICE_MOVEFROMFS))
-        {
-            EnterPlugin();
-            BOOL r = Interface->CopyOrMoveFromFS(copy, mode, fsName, parent, panel, selectedFiles,
-                                                 selectedDirs, targetPath, operationMask,
-                                                 cancelOrHandlePath, dropTarget);
-            LeavePlugin();
-            return r;
-        }
-        else
-        {
-            cancelOrHandlePath = TRUE;
-            return TRUE; // cancel
-        }
-    }
+                          std::wstring& targetPath, const std::wstring* targetMask,
+                          BOOL& operationMask, BOOL& cancelOrHandlePath, HWND dropTarget);
 
-    BOOL CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                const char* sourcePath, SalEnumSelection2 next,
+    BOOL CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                const wchar_t* sourcePath, SalEnumSelection2 next,
                                 void* nextParam, int sourceFiles, int sourceDirs,
-                                char* targetPath, BOOL* invalidPathOrCancel)
-    {
-        CALL_STACK_MESSAGE9("CPluginFSInterfaceEncapsulation::CopyOrMoveFromDiskToFS(%d, %d, %s, , %s, , , %d, %d, ,) (%s v. %s)",
-                            copy, mode, fsName, sourcePath, sourceFiles, sourceDirs, DLLName, Version);
-        if (copy && IsServiceSupported(FS_SERVICE_COPYFROMDISKTOFS) ||
-            !copy && IsServiceSupported(FS_SERVICE_MOVEFROMDISKTOFS))
-        {
-            EnterPlugin();
-            BOOL r = Interface->CopyOrMoveFromDiskToFS(copy, mode, fsName, parent, sourcePath, next, nextParam,
-                                                       sourceFiles, sourceDirs, targetPath, invalidPathOrCancel);
-            LeavePlugin();
-            return r;
-        }
-        else
-        { // cancel
-            if (mode == 1)
-                return FALSE;
-            else
-            {
-                SalMessageBox(parent, LoadStr(IDS_FSCOPYMOVE_TOFS_NOTSUP),
-                              LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-                if (invalidPathOrCancel != NULL)
-                    *invalidPathOrCancel = TRUE;
-                return FALSE; // let the user fix the target path (copy/move to this path is not supported)
-            }
-        }
-    }
+                                std::wstring& targetPath, BOOL* invalidPathOrCancel);
 
-    BOOL ChangeAttributes(const char* fsName, HWND parent, int panel,
+    BOOL ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                           int selectedFiles, int selectedDirs)
     {
-        CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ChangeAttributes(%s, , %d, %d, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ChangeAttributes(%ls, , %d, %d, %d) (%ls v. %ls)",
                             fsName, panel, selectedFiles, selectedDirs, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_CHANGEATTRS))
         {
@@ -1394,9 +1357,9 @@ public:
             return FALSE; // cancel
     }
 
-    void ShowProperties(const char* fsName, HWND parent, int panel, int selectedFiles, int selectedDirs)
+    void ShowProperties(const wchar_t* fsName, HWND parent, int panel, int selectedFiles, int selectedDirs)
     {
-        CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ShowProperties(%s, , %d, %d, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE7("CPluginFSInterfaceEncapsulation::ShowProperties(%ls, , %d, %d, %d) (%ls v. %ls)",
                             fsName, panel, selectedFiles, selectedDirs, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_SHOWPROPERTIES))
         {
@@ -1406,10 +1369,10 @@ public:
         }
     }
 
-    void ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+    void ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                      int panel, int selectedFiles, int selectedDirs)
     {
-        CALL_STACK_MESSAGE10("CPluginFSInterfaceEncapsulation::ContextMenu(%s, , %d, %d, %d, %d, %d, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE10("CPluginFSInterfaceEncapsulation::ContextMenu(%ls, , %d, %d, %d, %d, %d, %d) (%ls v. %ls)",
                              fsName, menuX, menuY, (int)type, panel, selectedFiles, selectedDirs, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_CONTEXTMENU))
         {
@@ -1421,7 +1384,7 @@ public:
 
     BOOL HandleMenuMsg(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT* plResult)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::HandleMenuMsg(%u, 0x%IX, 0x%IX,) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::HandleMenuMsg(%u, 0x%IX, 0x%IX,) (%ls v. %ls)",
                             uMsg, wParam, lParam, DLLName, Version);
         BOOL ret = FALSE;
         if (IsServiceSupported(FS_SERVICE_CONTEXTMENU))
@@ -1433,9 +1396,9 @@ public:
         return ret;
     }
 
-    BOOL OpenFindDialog(const char* fsName, int panel)
+    BOOL OpenFindDialog(const wchar_t* fsName, int panel)
     {
-        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::OpenFindDialog(%s, %d) (%s v. %s)",
+        CALL_STACK_MESSAGE5("CPluginFSInterfaceEncapsulation::OpenFindDialog(%ls, %d) (%ls v. %ls)",
                             fsName, panel, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_OPENFINDDLG))
         {
@@ -1448,9 +1411,9 @@ public:
             return FALSE;
     }
 
-    void OpenActiveFolder(const char* fsName, HWND parent)
+    void OpenActiveFolder(const wchar_t* fsName, HWND parent)
     {
-        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::OpenActiveFolder(%s, ,) (%s v. %s)",
+        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::OpenActiveFolder(%ls, ,) (%ls v. %ls)",
                             fsName, DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_OPENACTIVEFOLDER))
         {
@@ -1460,9 +1423,9 @@ public:
         }
     }
 
-    void GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects)
+    void GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects)
     {
-        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetAllowedDropEffects(%d, %s, %u) (%s v. %s)",
+        CALL_STACK_MESSAGE6("CPluginFSInterfaceEncapsulation::GetAllowedDropEffects(%d, %ls, %u) (%ls v. %ls)",
                             mode, tgtFSPath, (allowedEffects == NULL ? 0 : *allowedEffects), DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_MOVEFROMFS) || IsServiceSupported(FS_SERVICE_COPYFROMFS))
         {
@@ -1472,19 +1435,11 @@ public:
         }
     }
 
-    BOOL GetNoItemsInPanelText(char* textBuf, int textBufSize)
-    {
-        CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::GetNoItemsInPanelText(, %d) (%s v. %s)",
-                            textBufSize, DLLName, Version);
-        EnterPlugin();
-        BOOL ret = Interface->GetNoItemsInPanelText(textBuf, textBufSize);
-        LeavePlugin();
-        return ret;
-    }
+    BOOL GetNoItemsInPanelText(std::wstring& text);
 
     void ShowSecurityInfo(HWND parent)
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::ShowSecurityInfo() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::ShowSecurityInfo() (%ls v. %ls)",
                             DLLName, Version);
         if (IsServiceSupported(FS_SERVICE_SHOWSECURITYINFO))
         {
@@ -1502,7 +1457,7 @@ private:
     // prefer calling IsServiceSupported() - SupportedServices is cached
     DWORD GetSupportedServices()
     {
-        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetSupportedServices() (%s v. %s)",
+        CALL_STACK_MESSAGE3("CPluginFSInterfaceEncapsulation::GetSupportedServices() (%ls v. %ls)",
                             DLLName, Version);
         EnterPlugin();
         SupportedServices = Interface->GetSupportedServices();
@@ -1552,7 +1507,7 @@ public:
     virtual void WINAPI SetViewMode(DWORD viewMode, DWORD validFileData);
     virtual void WINAPI GetTransferVariables(const CFileData**& transferFileData,
                                              int*& transferIsDir,
-                                             char*& transferBuffer,
+                                             wchar_t*& transferBuffer,
                                              int*& transferLen,
                                              DWORD*& transferRowData,
                                              CPluginDataInterfaceAbstract**& transferPluginDataIface,
@@ -1574,8 +1529,12 @@ public:
     virtual const CColumn* WINAPI GetColumn(int index);
     virtual BOOL WINAPI InsertColumn(int index, const CColumn* column);
     virtual BOOL WINAPI InsertStandardColumn(int index, DWORD id);
-    virtual BOOL WINAPI SetColumnName(int index, const char* name, const char* description);
+    virtual BOOL WINAPI SetColumnName(int index, const wchar_t* name,
+                                      const wchar_t* description,
+                                      const wchar_t* extensionName,
+                                      const wchar_t* extensionDescription);
     virtual BOOL WINAPI DeleteColumn(int index);
+    virtual BOOL WINAPI IsNameColumnExtensionMerged();
 };
 
 //
@@ -1588,8 +1547,8 @@ struct CPluginData;
 class CSalamanderDebug : public CSalamanderDebugAbstract
 {
 protected:
-    const char* DLLName; // reference to the string from CPluginData used by this interface
-    const char* Version; // reference to the string from CPluginData used by this interface
+    const wchar_t* DLLName; // reference to the string from CPluginData used by this interface
+    const wchar_t* Version; // reference to the string from CPluginData used by this interface
 
 public:
     CSalamanderDebug()
@@ -1599,7 +1558,7 @@ public:
     }
 
     // must be called during SetBasicPluginData when strings change
-    void Init(const char* dllName, const char* version)
+    void Init(const wchar_t* dllName, const wchar_t* version)
     {
         DLLName = dllName;
         Version = version;
@@ -1607,29 +1566,26 @@ public:
 
     // Implementation of CSalamanderDebugAbstract methods:
 
-    virtual void WINAPI TraceI(const char* file, int line, const char* str);
-    virtual void WINAPI TraceIW(const WCHAR* file, int line, const WCHAR* str);
-    virtual void WINAPI TraceE(const char* file, int line, const char* str);
-    virtual void WINAPI TraceEW(const WCHAR* file, int line, const WCHAR* str);
+    virtual void WINAPI TraceI(const wchar_t* file, int line, const wchar_t* str);
+    virtual void WINAPI TraceE(const wchar_t* file, int line, const wchar_t* str);
 
     virtual void WINAPI TraceAttachThread(HANDLE thread, unsigned tid);
 
-    virtual void WINAPI TraceSetThreadName(const char* name);
-    virtual void WINAPI TraceSetThreadNameW(const WCHAR* name);
+    virtual void WINAPI TraceSetThreadName(const wchar_t* name);
 
     virtual unsigned WINAPI CallWithCallStack(unsigned(WINAPI* threadBody)(void*), void* param);
     unsigned CallWithCallStackEH(unsigned(WINAPI* threadBody)(void*), void* param);
 
-    virtual void WINAPI Push(const char* format, va_list args, CCallStackMsgContext* callStackMsgContext,
+    virtual void WINAPI Push(const wchar_t* format, va_list args, CCallStackMsgContext* callStackMsgContext,
                              BOOL doNotMeasureTimes);
     virtual void WINAPI Pop(CCallStackMsgContext* callStackMsgContext);
 
-    virtual void WINAPI SetThreadNameInVC(const char* name);
-    virtual void WINAPI SetThreadNameInVCAndTrace(const char* name);
+    virtual void WINAPI SetThreadNameInVC(const wchar_t* name);
+    virtual void WINAPI SetThreadNameInVCAndTrace(const wchar_t* name);
 
     virtual void WINAPI TraceConnectToServer();
 
-    virtual void WINAPI AddModuleWithPossibleMemoryLeaks(const char* fileName);
+    virtual void WINAPI AddModuleWithPossibleMemoryLeaks(const wchar_t* fileName);
 };
 
 //
@@ -1651,12 +1607,12 @@ public:
     void SetControl(CProgressBar* control) { Control = control; }
 
     // Implementation of CGUIProgressBarAbstract methods:
-    virtual void WINAPI SetProgress(DWORD progress, const char* text);
+    virtual void WINAPI SetProgress(DWORD progress, const wchar_t* text);
     virtual void WINAPI SetSelfMoveTime(DWORD time);
     virtual void WINAPI SetSelfMoveSpeed(DWORD moveTime);
     virtual void WINAPI Stop();
     virtual void WINAPI SetProgress2(const CQuadWord& progressCurrent, const CQuadWord& progressTotal,
-                                     const char* text);
+                                     const wchar_t* text);
 };
 
 //
@@ -1678,10 +1634,10 @@ public:
     void SetControl(CStaticText* control) { Control = control; }
 
     // Implementation of CGUIStaticTextAbstract methods:
-    virtual BOOL WINAPI SetText(const char* text);
-    virtual const char* WINAPI GetText();
-    virtual void WINAPI SetPathSeparator(char separator);
-    virtual BOOL WINAPI SetToolTipText(const char* text);
+    virtual BOOL WINAPI SetText(const wchar_t* text);
+    virtual const wchar_t* WINAPI GetText();
+    virtual void WINAPI SetPathSeparator(wchar_t separator);
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text);
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id);
 };
 
@@ -1704,12 +1660,12 @@ public:
     void SetControl(CHyperLink* control) { Control = control; }
 
     // Implementation of CGUIHyperLinkAbstract methods:
-    virtual BOOL WINAPI SetText(const char* text);
-    virtual const char* WINAPI GetText();
-    virtual void WINAPI SetActionOpen(const char* file);
+    virtual BOOL WINAPI SetText(const wchar_t* text);
+    virtual const wchar_t* WINAPI GetText();
+    virtual void WINAPI SetActionOpen(const wchar_t* file);
     virtual void WINAPI SetActionPostCommand(WORD command);
-    virtual BOOL WINAPI SetActionShowHint(const char* text);
-    virtual BOOL WINAPI SetToolTipText(const char* text);
+    virtual BOOL WINAPI SetActionShowHint(const wchar_t* text);
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text);
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id);
 };
 
@@ -1732,7 +1688,7 @@ public:
     void SetControl(CButton* control) { Control = control; }
 
     // Implementation of CGUIButtonAbstract methods:
-    virtual BOOL WINAPI SetToolTipText(const char* text);
+    virtual BOOL WINAPI SetToolTipText(const wchar_t* text);
     virtual void WINAPI SetToolTip(HWND hNotifyWindow, DWORD id);
 };
 
@@ -1816,9 +1772,10 @@ public:
     virtual BOOL WINAPI DisableWindowVisualStyles(HWND hWindow);
     virtual CGUIIconListAbstract* WINAPI CreateIconList();
     virtual BOOL WINAPI DestroyIconList(CGUIIconListAbstract* iconList);
-    virtual void WINAPI PrepareToolTipText(char* buf, BOOL stripHotKey);
-    virtual void WINAPI SetSubjectTruncatedText(HWND subjectWnd, const char* subjectFormatString,
-                                                const char* fileName, BOOL isDir, BOOL duplicateAmpersands);
+    virtual BOOL WINAPI PrepareToolTipText(CSalamanderStringBuffer* text,
+                                           BOOL stripHotKey);
+    virtual void WINAPI SetSubjectTruncatedText(HWND subjectWnd, const wchar_t* subjectFormatString,
+                                                const wchar_t* fileName, BOOL isDir, BOOL duplicateAmpersands);
     virtual CGUIToolbarHeaderAbstract* WINAPI AttachToolbarHeader(HWND hParent, int ctrlID, HWND hAlignWindow, DWORD buttonMask);
     virtual void WINAPI ArrangeHorizontalLines(HWND hWindow);
     virtual int WINAPI GetWindowFontHeight(HWND hWindow);
@@ -1832,7 +1789,7 @@ protected:
 class CSalamanderPasswordManager : public CSalamanderPasswordManagerAbstract
 {
 private:
-    const char* DLLName; // reference to the string from the CPluginData plugin used by this interface
+    const wchar_t* DLLName; // reference to the string from the CPluginData plugin used by this interface
 
 public:
     CSalamanderPasswordManager()
@@ -1841,7 +1798,7 @@ public:
     }
 
     // must be called during SetBasicPluginData when strings change
-    void Init(const char* dllName)
+    void Init(const wchar_t* dllName)
     {
         DLLName = dllName;
     }
@@ -1851,8 +1808,8 @@ public:
     virtual BOOL WINAPI IsMasterPasswordSet();
     virtual BOOL WINAPI AskForMasterPassword(HWND hParent);
 
-    virtual BOOL WINAPI EncryptPassword(const char* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt);
-    virtual BOOL WINAPI DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, char** plainPassword);
+    virtual BOOL WINAPI EncryptPassword(const wchar_t* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt);
+    virtual BOOL WINAPI DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, CSalamanderStringBuffer* plainPassword);
     virtual BOOL WINAPI IsPasswordEncrypted(const BYTE* encyptedPassword, int encyptedPasswordSize);
 };
 
@@ -1867,7 +1824,7 @@ protected:
     CPluginInterfaceAbstract* Plugin; // plug-in used by this iface; !!! note: may be NULL
                                       // (plugin not loaded) or -1 (during the plugin's entry point)
 
-    CPathBuffer HelpFileName; // if not empty, this is the name (without path) of the .chm help file used by this plugin (optimization only, not stored anywhere)
+    std::wstring HelpFileName; // if not empty, this is the name (without path) of the .chm help file used by this plugin (optimization only, not stored anywhere)
 
 public:
     HINSTANCE LanguageModule; // if not NULL, it is the handle to the plugin's .SLG language module
@@ -1887,76 +1844,83 @@ public:
 
     // Implementation of CSalamanderGeneralAbstract methods:
 
-    virtual int WINAPI ShowMessageBox(const char* text, const char* title, int type);
-    virtual int WINAPI SalMessageBox(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType);
+    virtual int WINAPI ShowMessageBox(const wchar_t* text, const wchar_t* title, int type);
+    virtual int WINAPI SalMessageBox(HWND hParent, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
     virtual int WINAPI SalMessageBoxEx(const MSGBOXEX_PARAMS* params);
 
     virtual HWND WINAPI GetMsgBoxParent();
     virtual HWND WINAPI GetMainWindowHWND();
     virtual void WINAPI RestoreFocusInSourcePanel();
 
-    virtual int WINAPI DialogError(HWND parent, DWORD flags, const char* fileName, const char* error, const char* title);
-    virtual int WINAPI DialogOverwrite(HWND parent, DWORD flags, const char* fileName1, const char* fileData1,
-                                       const char* fileName2, const char* fileData2);
-    virtual int WINAPI DialogQuestion(HWND parent, DWORD flags, const char* fileName, const char* question, const char* title);
+    virtual int WINAPI DialogError(HWND parent, DWORD flags, const wchar_t* fileName, const wchar_t* error, const wchar_t* title);
+    virtual int WINAPI DialogOverwrite(HWND parent, DWORD flags, const wchar_t* fileName1, const wchar_t* fileData1,
+                                       const wchar_t* fileName2, const wchar_t* fileData2);
+    virtual int WINAPI DialogQuestion(HWND parent, DWORD flags, const wchar_t* fileName, const wchar_t* question, const wchar_t* title);
 
-    virtual BOOL WINAPI CheckAndCreateDirectory(const char* dir, HWND parent = NULL, BOOL quiet = TRUE,
-                                                char* errBuf = NULL, int errBufSize = 0,
-                                                char* firstCreatedDir = NULL, BOOL manualCrDir = FALSE);
-    virtual BOOL WINAPI TestFreeSpace(HWND parent, const char* path, const CQuadWord& totalSize,
-                                      const char* messageTitle);
+    virtual BOOL WINAPI CheckAndCreateDirectory(const wchar_t* dir, HWND parent = NULL, BOOL quiet = TRUE,
+                                                CSalamanderStringBuffer* errorText = NULL,
+                                                CSalamanderStringBuffer* firstCreatedDir = NULL,
+                                                BOOL manualCrDir = FALSE);
+    virtual BOOL WINAPI TestFreeSpace(HWND parent, const wchar_t* path, const CQuadWord& totalSize,
+                                      const wchar_t* messageTitle);
 
-    virtual void WINAPI GetDiskFreeSpace(CQuadWord* retValue, const char* path, CQuadWord* total);
-    virtual BOOL WINAPI SalGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
+    virtual void WINAPI GetDiskFreeSpace(CQuadWord* retValue, const wchar_t* path, CQuadWord* total);
+    virtual BOOL WINAPI SalGetDiskFreeSpace(const wchar_t* path, LPDWORD lpSectorsPerCluster,
                                             LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
                                             LPDWORD lpTotalNumberOfClusters);
-    virtual BOOL WINAPI SalGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, LPTSTR lpVolumeNameBuffer,
-                                                DWORD nVolumeNameSize, LPDWORD lpVolumeSerialNumber,
+    virtual BOOL WINAPI SalGetVolumeInformation(const wchar_t* path, CSalamanderStringBuffer* rootOrCurReparsePoint,
+                                                CSalamanderStringBuffer* volumeName, LPDWORD lpVolumeSerialNumber,
                                                 LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
-                                                LPTSTR lpFileSystemNameBuffer, DWORD nFileSystemNameSize);
-    virtual UINT WINAPI SalGetDriveType(const char* path);
+                                                CSalamanderStringBuffer* fileSystemName);
+    virtual UINT WINAPI SalGetDriveType(const wchar_t* path);
 
-    virtual BOOL WINAPI SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file, DWORD* err);
-    virtual void WINAPI RemoveTemporaryDir(const char* dir);
-    virtual BOOL WINAPI SalMoveFile(const char* srcName, const char* destName, DWORD* err);
+    virtual BOOL WINAPI SalGetTempFileName(const wchar_t* path, const wchar_t* prefix,
+                                           CSalamanderStringBuffer* tmpName, BOOL file, DWORD* err);
+    virtual void WINAPI RemoveTemporaryDir(const wchar_t* dir);
+    virtual BOOL WINAPI SalMoveFile(const wchar_t* srcName, const wchar_t* destName, DWORD* err);
     virtual BOOL WINAPI SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err);
-    virtual void WINAPI ExecuteAssociation(HWND parent, const char* path, const char* name);
-    virtual BOOL WINAPI GetTargetDirectory(HWND parent, HWND hCenterWindow, const char* title,
-                                           const char* comment, char* path, BOOL onlyNet,
-                                           const char* initDir);
+    virtual void WINAPI ExecuteAssociation(HWND parent, const wchar_t* path, const wchar_t* name);
+    virtual BOOL WINAPI GetTargetDirectory(HWND parent, HWND hCenterWindow, const wchar_t* title,
+                                           const wchar_t* comment, CSalamanderStringBuffer* path,
+                                           BOOL onlyNet, const wchar_t* initDir);
 
-    virtual void WINAPI PrepareMask(char* mask, const char* src);
-    virtual BOOL WINAPI AgreeMask(const char* filename, const char* mask, BOOL hasExtension);
-    virtual char* WINAPI MaskName(char* buffer, int bufSize, const char* name, const char* mask);
-    virtual void WINAPI PrepareExtMask(char* mask, const char* src);
-    virtual BOOL WINAPI AgreeExtMask(const char* filename, const char* mask, BOOL hasExtension);
+    virtual BOOL WINAPI PrepareMask(const wchar_t* src, CSalamanderStringBuffer* mask);
+    virtual BOOL WINAPI AgreeMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension);
+    virtual BOOL WINAPI MaskName(const wchar_t* name, const wchar_t* mask,
+                                 CSalamanderStringBuffer* maskedName);
+    virtual BOOL WINAPI PrepareExtMask(const wchar_t* src, CSalamanderStringBuffer* mask);
+    virtual BOOL WINAPI AgreeExtMask(const wchar_t* filename, const wchar_t* mask, BOOL hasExtension);
     virtual CSalamanderMaskGroup* WINAPI AllocSalamanderMaskGroup();
     virtual void WINAPI FreeSalamanderMaskGroup(CSalamanderMaskGroup* maskGroup);
 
     virtual void* WINAPI Alloc(int size);
     virtual void WINAPI Free(void* ptr);
-    virtual char* WINAPI DupStr(const char* str);
+    virtual wchar_t* WINAPI DupStr(const wchar_t* str);
 
-    virtual void WINAPI GetLowerAndUpperCase(unsigned char** lowerCase, unsigned char** upperCase);
-    virtual void WINAPI ToLowerCase(char* str);
-    virtual void WINAPI ToUpperCase(char* str);
+    virtual void WINAPI GetLowerAndUpperCase(unsigned char** lowerCase, unsigned char** upperCase); // FLOOR: 256-entry byte table
+    virtual BOOL WINAPI ToLowerCase(CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI ToUpperCase(CSalamanderStringBuffer* text);
 
-    virtual int WINAPI StrCmpEx(const char* s1, int l1, const char* s2, int l2);
-    virtual int WINAPI StrICpy(char* dest, const char* src);
-    virtual int WINAPI StrICmp(const char* s1, const char* s2);
-    virtual int WINAPI StrICmpEx(const char* s1, int l1, const char* s2, int l2);
-    virtual int WINAPI StrNICmp(const char* s1, const char* s2, int n);
+    virtual int WINAPI StrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2);
+    virtual BOOL WINAPI StrICpy(const wchar_t* src,
+                                CSalamanderStringBuffer* dest);
+    virtual int WINAPI StrICmp(const wchar_t* s1, const wchar_t* s2);
+    virtual int WINAPI StrICmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2);
+    virtual int WINAPI StrNICmp(const wchar_t* s1, const wchar_t* s2, int n);
     virtual int WINAPI MemICmp(const void* buf1, const void* buf2, int n);
 
-    virtual int WINAPI RegSetStrICmp(const char* s1, const char* s2);
-    virtual int WINAPI RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);
-    virtual int WINAPI RegSetStrCmp(const char* s1, const char* s2);
-    virtual int WINAPI RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);
+    virtual int WINAPI RegSetStrICmp(const wchar_t* s1, const wchar_t* s2);
+    virtual int WINAPI RegSetStrICmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual);
+    virtual int WINAPI RegSetStrCmp(const wchar_t* s1, const wchar_t* s2);
+    virtual int WINAPI RegSetStrCmpEx(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual);
 
-    virtual BOOL WINAPI GetPanelPath(int panel, char* buffer, int bufferSize, int* type,
-                                     char** archiveOrFS, BOOL convertFSPathToExternal);
-    virtual BOOL WINAPI GetLastWindowsPanelPath(int panel, char* buffer, int bufferSize);
-    virtual void WINAPI GetPluginFSName(char* buf, int fsNameIndex);
+    virtual BOOL WINAPI GetPanelPath(int panel, CSalamanderStringBuffer* path,
+                                     int* type, DWORD* archiveOrFSOffset,
+                                     BOOL convertFSPathToExternal);
+    virtual BOOL WINAPI GetLastWindowsPanelPath(int panel,
+                                                CSalamanderStringBuffer* path);
+    virtual BOOL WINAPI GetPluginFSName(CSalamanderStringBuffer* name,
+                                        int fsNameIndex);
     virtual CPluginFSInterfaceAbstract* WINAPI GetPanelPluginFS(int panel);
     virtual CPluginDataInterfaceAbstract* WINAPI GetPanelPluginData(int panel);
     virtual const CFileData* WINAPI GetPanelFocusedItem(int panel, BOOL* isDir);
@@ -1972,59 +1936,62 @@ public:
     virtual void WINAPI SelectAllPanelItems(int panel, BOOL select, BOOL repaint);
     virtual void WINAPI SetPanelFocusedItem(int panel, const CFileData* file, BOOL partVis);
 
-    virtual BOOL WINAPI GetFilterFromPanel(int panel, char* masks, int masksBufSize);
+    virtual BOOL WINAPI GetFilterFromPanel(int panel,
+                                           CSalamanderStringBuffer* masks);
 
     virtual int WINAPI GetSourcePanel();
     virtual BOOL WINAPI GetPanelWithPluginFS(CPluginFSInterfaceAbstract* pluginFS, int& panel);
     virtual void WINAPI ChangePanel();
 
-    virtual char* WINAPI NumberToStr(char* buffer, const CQuadWord& number);
-    virtual char* WINAPI PrintDiskSize(char* buf, const CQuadWord& size, int mode);
-    virtual char* WINAPI PrintTimeLeft(char* buf, const CQuadWord& secs);
+    virtual BOOL WINAPI NumberToStr(const CQuadWord& number, CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI PrintDiskSize(const CQuadWord& size, int mode, CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI PrintTimeLeft(const CQuadWord& secs, CSalamanderStringBuffer* text);
 
-    virtual BOOL WINAPI HasTheSameRootPath(const char* path1, const char* path2);
-    virtual int WINAPI CommonPrefixLength(const char* path1, const char* path2);
-    virtual BOOL WINAPI PathIsPrefix(const char* prefix, const char* path);
-    virtual BOOL WINAPI IsTheSamePath(const char* path1, const char* path2);
-    virtual int WINAPI GetRootPath(char* root, const char* path);
-    virtual BOOL WINAPI CutDirectory(char* path, char** cutDir = NULL);
-    virtual BOOL WINAPI SalPathAppend(char* path, const char* name, int pathSize);
-    virtual BOOL WINAPI SalPathAddBackslash(char* path, int pathSize);
-    virtual void WINAPI SalPathRemoveBackslash(char* path);
-    virtual void WINAPI SalPathStripPath(char* path);
-    virtual void WINAPI SalPathRemoveExtension(char* path);
-    virtual BOOL WINAPI SalPathAddExtension(char* path, const char* extension, int pathSize);
-    virtual BOOL WINAPI SalPathRenameExtension(char* path, const char* extension, int pathSize);
-    virtual const char* WINAPI SalPathFindFileName(const char* path);
+    virtual BOOL WINAPI HasTheSameRootPath(const wchar_t* path1, const wchar_t* path2);
+    virtual int WINAPI CommonPrefixLength(const wchar_t* path1, const wchar_t* path2);
+    virtual BOOL WINAPI PathIsPrefix(const wchar_t* prefix, const wchar_t* path);
+    virtual BOOL WINAPI IsTheSamePath(const wchar_t* path1, const wchar_t* path2);
+    virtual BOOL WINAPI GetRootPath(const wchar_t* path, CSalamanderStringBuffer* root);
+    virtual BOOL WINAPI CutDirectory(CSalamanderStringBuffer* path,
+                                     CSalamanderStringBuffer* cutDir = NULL);
+    virtual BOOL WINAPI SalPathAppend(CSalamanderStringBuffer* path, const wchar_t* name);
+    virtual BOOL WINAPI SalPathAddBackslash(CSalamanderStringBuffer* path);
+    virtual BOOL WINAPI SalPathRemoveBackslash(CSalamanderStringBuffer* path);
+    virtual BOOL WINAPI SalPathStripPath(CSalamanderStringBuffer* path);
+    virtual BOOL WINAPI SalPathRemoveExtension(CSalamanderStringBuffer* path);
+    virtual BOOL WINAPI SalPathAddExtension(CSalamanderStringBuffer* path, const wchar_t* extension);
+    virtual BOOL WINAPI SalPathRenameExtension(CSalamanderStringBuffer* path, const wchar_t* extension);
+    virtual const wchar_t* WINAPI SalPathFindFileName(const wchar_t* path);
 
-    virtual BOOL WINAPI SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL,
-                                       char* nextFocus = NULL, int nameBufSize = MAX_PATH);
+    virtual BOOL WINAPI SalGetFullName(CSalamanderStringBuffer* name, int* errTextID = NULL,
+                                       const wchar_t* curDir = NULL,
+                                       CSalamanderStringBuffer* nextFocus = NULL);
     virtual void WINAPI SalUpdateDefaultDir(BOOL activePrefered);
-    virtual char* WINAPI GetGFNErrorText(int GFN, char* buf, int bufSize);
+    virtual BOOL WINAPI GetGFNErrorText(int GFN, CSalamanderStringBuffer* text);
 
-    virtual char* WINAPI GetErrorText(int err, char* buf, int bufSize);
+    virtual BOOL WINAPI GetErrorText(int err, CSalamanderStringBuffer* text);
 
     virtual COLORREF WINAPI GetCurrentColor(int color);
 
-    virtual void WINAPI FocusNameInPanel(int panel, const char* path, const char* name);
-    virtual BOOL WINAPI ChangePanelPath(int panel, const char* path, int* failReason = NULL,
+    virtual void WINAPI FocusNameInPanel(int panel, const wchar_t* path, const wchar_t* name);
+    virtual BOOL WINAPI ChangePanelPath(int panel, const wchar_t* path, int* failReason = NULL,
                                         int suggestedTopIndex = -1,
-                                        const char* suggestedFocusName = NULL,
+                                        const wchar_t* suggestedFocusName = NULL,
                                         BOOL convertFSPathToInternal = TRUE);
-    virtual BOOL WINAPI ChangePanelPathToDisk(int panel, const char* path, int* failReason = NULL,
+    virtual BOOL WINAPI ChangePanelPathToDisk(int panel, const wchar_t* path, int* failReason = NULL,
                                               int suggestedTopIndex = -1,
-                                              const char* suggestedFocusName = NULL);
-    virtual BOOL WINAPI ChangePanelPathToArchive(int panel, const char* archive, const char* archivePath,
+                                              const wchar_t* suggestedFocusName = NULL);
+    virtual BOOL WINAPI ChangePanelPathToArchive(int panel, const wchar_t* archive, const wchar_t* archivePath,
                                                  int* failReason = NULL, int suggestedTopIndex = -1,
-                                                 const char* suggestedFocusName = NULL,
+                                                 const wchar_t* suggestedFocusName = NULL,
                                                  BOOL forceUpdate = FALSE);
-    virtual BOOL WINAPI ChangePanelPathToPluginFS(int panel, const char* fsName, const char* fsUserPart,
+    virtual BOOL WINAPI ChangePanelPathToPluginFS(int panel, const wchar_t* fsName, const wchar_t* fsUserPart,
                                                   int* failReason = NULL, int suggestedTopIndex = -1,
-                                                  const char* suggestedFocusName = NULL,
+                                                  const wchar_t* suggestedFocusName = NULL,
                                                   BOOL forceUpdate = FALSE, BOOL convertPathToInternal = FALSE);
     virtual BOOL WINAPI ChangePanelPathToDetachedFS(int panel, CPluginFSInterfaceAbstract* detachedFS,
                                                     int* failReason = NULL, int suggestedTopIndex = -1,
-                                                    const char* suggestedFocusName = NULL);
+                                                    const wchar_t* suggestedFocusName = NULL);
     virtual BOOL WINAPI ChangePanelPathToFixedDrive(int panel, int* failReason = NULL);
 
     virtual void WINAPI RefreshPanelPath(int panel, BOOL forceRefresh = FALSE,
@@ -2035,15 +2002,15 @@ public:
 
     virtual BOOL WINAPI CloseDetachedFS(HWND parent, CPluginFSInterfaceAbstract* detachedFS);
 
-    virtual BOOL WINAPI DuplicateAmpersands(char* buffer, int bufferSize);
-    virtual void WINAPI RemoveAmpersands(char* text);
+    virtual BOOL WINAPI DuplicateAmpersands(CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI RemoveAmpersands(CSalamanderStringBuffer* text);
 
-    virtual BOOL WINAPI ValidateVarString(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
+    virtual BOOL WINAPI ValidateVarString(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
                                           const CSalamanderVarStrEntry* variables);
-    virtual BOOL WINAPI ExpandVarString(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+    virtual BOOL WINAPI ExpandVarString(HWND msgParent, const wchar_t* varText, CSalamanderStringBuffer* buffer,
                                         const CSalamanderVarStrEntry* variables, void* param,
                                         BOOL ignoreEnvVarNotFoundOrTooLong = FALSE,
-                                        DWORD* varPlacements = NULL, int* varPlacementsCount = NULL,
+                                        CSalamanderTextRangeBuffer* varPlacements = NULL,
                                         BOOL detectMaxVarWidths = FALSE, int* maxVarWidths = NULL,
                                         int maxVarWidthsCount = 0);
 
@@ -2051,75 +2018,84 @@ public:
 
     virtual void WINAPI PostUnloadThisPlugin();
 
-    virtual BOOL WINAPI EnumInstalledModules(int* index, char* module, char* version);
+    virtual BOOL WINAPI EnumInstalledModules(int* index,
+                                             CSalamanderStringBuffer* module,
+                                             CSalamanderStringBuffer* version);
 
     virtual void WINAPI CallLoadOrSaveConfiguration(BOOL load, FSalLoadOrSaveConfiguration loadOrSaveFunc,
                                                     void* param);
 
-    virtual BOOL WINAPI CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND echoParent);
-    virtual BOOL WINAPI CopyTextToClipboardW(const wchar_t* text, int textLen, BOOL showEcho, HWND echoParent);
+    virtual BOOL WINAPI CopyTextToClipboard(const wchar_t* text, int textLen, BOOL showEcho, HWND echoParent); // wide primary; W folded in
 
     virtual void WINAPI PostMenuExtCommand(int id, BOOL waitForSalIdle);
 
     virtual BOOL WINAPI SalamanderIsNotBusy(DWORD* lastIdleTime);
 
-    virtual void WINAPI SetPluginBugReportInfo(const char* message, const char* email);
+    virtual void WINAPI SetPluginBugReportInfo(const wchar_t* message, const wchar_t* email);
 
-    virtual BOOL WINAPI IsPluginInstalled(const char* pluginSPL);
+    virtual BOOL WINAPI IsPluginInstalled(const wchar_t* pluginSPL);
 
-    virtual BOOL WINAPI ViewFileInPluginViewer(const char* pluginSPL,
+    virtual BOOL WINAPI ViewFileInPluginViewer(const wchar_t* pluginSPL,
                                                CSalamanderPluginViewerData* pluginData,
-                                               BOOL useCache, const char* rootTmpPath,
-                                               const char* fileNameInCache, int& error);
+                                               BOOL useCache, const wchar_t* rootTmpPath,
+                                               const wchar_t* fileNameInCache, int& error);
 
-    virtual void WINAPI PostChangeOnPathNotification(const char* path, BOOL includingSubdirs);
+    virtual void WINAPI PostChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs);
 
-    virtual DWORD WINAPI SalCheckPath(BOOL echo, const char* path, DWORD err, HWND parent);
-    virtual BOOL WINAPI SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet);
-    virtual BOOL WINAPI SalCheckAndRestorePathWithCut(HWND parent, char* path, BOOL& tryNet, DWORD& err,
+    virtual DWORD WINAPI SalCheckPath(BOOL echo, const wchar_t* path, DWORD err, HWND parent);
+    virtual BOOL WINAPI SalCheckAndRestorePath(HWND parent, const wchar_t* path, BOOL tryNet);
+    virtual BOOL WINAPI SalCheckAndRestorePathWithCut(HWND parent, std::wstring& path, BOOL& tryNet, DWORD& err,
                                                       DWORD& lastErr, BOOL& pathInvalid, BOOL& cut,
                                                       BOOL donotReconnect);
-    virtual BOOL WINAPI SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
-                                     const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
-                                     const char* curPath, const char* curArchivePath, int* error,
-                                     int pathBufSize);
-    virtual BOOL WINAPI SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                                            char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                                            const char* dirName, const char* curDiskPath, char*& mask);
-    virtual BOOL WINAPI SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
-                                            int selCount, char* path, char* afterRoot, char* secondPart,
-                                            BOOL pathIsDir, BOOL backslashAtEnd, const char* dirName,
-                                            const char* curPath, char*& mask, char* newDirs,
+    virtual BOOL WINAPI SalParsePath(HWND parent, CSalamanderStringBuffer* path, int& type,
+                                     BOOL& isDir, DWORD& secondPartOffset,
+                                     const wchar_t* errorTitle, CSalamanderStringBuffer* nextFocus,
+                                     BOOL curPathIsDiskOrArchive, const wchar_t* curPath,
+                                     const wchar_t* curArchivePath, int* error);
+    virtual BOOL WINAPI SalSplitWindowsPath(HWND parent, const wchar_t* title,
+                                            const wchar_t* errorTitle, int selCount,
+                                            CSalamanderStringBuffer* path, DWORD secondPartOffset,
+                                            BOOL pathIsDir, BOOL backslashAtEnd,
+                                            const wchar_t* dirName, const wchar_t* curDiskPath,
+                                            CSalamanderStringBuffer* mask);
+    virtual BOOL WINAPI SalSplitGeneralPath(HWND parent, const wchar_t* title,
+                                            const wchar_t* errorTitle, int selCount,
+                                            CSalamanderStringBuffer* path, DWORD afterRootOffset,
+                                            DWORD secondPartOffset, BOOL pathIsDir,
+                                            BOOL backslashAtEnd, const wchar_t* dirName,
+                                            const wchar_t* curPath, CSalamanderStringBuffer* mask,
+                                            CSalamanderStringBuffer* newDirs,
                                             SGP_IsTheSamePathF isTheSamePathF);
-    virtual BOOL WINAPI SalRemovePointsFromPath(char* afterRoot);
+    virtual BOOL WINAPI SalRemovePointsFromPath(CSalamanderStringBuffer* afterRoot);
 
     virtual BOOL WINAPI GetConfigParameter(int paramID, void* buffer, int bufferSize, int* type);
 
-    virtual void WINAPI AlterFileName(char* tgtName, char* srcName, int format, int changedParts,
-                                      BOOL isDir);
+    virtual BOOL WINAPI AlterFileName(const wchar_t* srcName, int format, int changedParts,
+                                      BOOL isDir, CSalamanderStringBuffer* targetName);
 
-    virtual void WINAPI CreateSafeWaitWindow(const char* message, const char* caption,
+    virtual void WINAPI CreateSafeWaitWindow(const wchar_t* message, const wchar_t* caption,
                                              int delay, BOOL showCloseButton, HWND hForegroundWnd);
     virtual void WINAPI DestroySafeWaitWindow();
     virtual void WINAPI ShowSafeWaitWindow(BOOL show);
     virtual BOOL WINAPI GetSafeWaitWindowClosePressed();
-    virtual void WINAPI SetSafeWaitWindowText(const char* message);
+    virtual void WINAPI SetSafeWaitWindowText(const wchar_t* message);
 
-    virtual BOOL WINAPI GetFileFromCache(const char* uniqueFileName, const char*& tmpName,
+    virtual BOOL WINAPI GetFileFromCache(const wchar_t* uniqueFileName, const wchar_t*& tmpName,
                                          HANDLE fileLock);
     virtual void WINAPI UnlockFileInCache(HANDLE fileLock);
-    virtual BOOL WINAPI MoveFileToCache(const char* uniqueFileName, const char* nameInCache,
-                                        const char* rootTmpPath, const char* newFileName,
+    virtual BOOL WINAPI MoveFileToCache(const wchar_t* uniqueFileName, const wchar_t* nameInCache,
+                                        const wchar_t* rootTmpPath, const wchar_t* newFileName,
                                         const CQuadWord& newFileSize, BOOL* alreadyExists);
-    virtual void WINAPI RemoveOneFileFromCache(const char* uniqueFileName);
-    virtual void WINAPI RemoveFilesFromCache(const char* fileNamesRoot);
+    virtual void WINAPI RemoveOneFileFromCache(const wchar_t* uniqueFileName);
+    virtual void WINAPI RemoveFilesFromCache(const wchar_t* fileNamesRoot);
 
-    virtual BOOL WINAPI EnumConversionTables(HWND parent, int* index, const char** name, const char** table);
-    virtual BOOL WINAPI GetConversionTable(HWND parent, char* table, const char* conversion);
-    virtual void WINAPI GetWindowsCodePage(HWND parent, char* codePage);
+    virtual BOOL WINAPI EnumConversionTables(HWND parent, int* index, const wchar_t** name, const char** table);
+    virtual BOOL WINAPI GetConversionTable(HWND parent, char* table, const wchar_t* conversion);
+    virtual BOOL WINAPI GetWindowsCodePage(HWND parent,
+                                           CSalamanderStringBuffer* codePage);
     virtual void WINAPI RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL forceText,
-                                          BOOL* isText, char* codePage);
-    virtual BOOL WINAPI IsANSIText(const char* text, int textLen);
+                                          BOOL* isText, CSalamanderStringBuffer* codePage);
+    virtual BOOL WINAPI IsANSIText(const char* text, int textLen); // FLOOR: byte-domain by definition
 
     virtual void WINAPI CallPluginOperationFromDisk(int panel, SalPluginOperationFromDisk callback,
                                                     void* param);
@@ -2131,10 +2107,12 @@ public:
     virtual CSalamanderREGEXPSearchData* WINAPI AllocSalamanderREGEXPSearchData();
     virtual void WINAPI FreeSalamanderREGEXPSearchData(CSalamanderREGEXPSearchData* data);
 
-    virtual BOOL WINAPI EnumSalamanderCommands(int* index, int* salCmd, char* nameBuf, int nameBufSize,
+    virtual BOOL WINAPI EnumSalamanderCommands(int* index, int* salCmd,
+                                               CSalamanderStringBuffer* name,
                                                BOOL* enabled, int* type);
-    virtual BOOL WINAPI GetSalamanderCommand(int salCmd, char* nameBuf, int nameBufSize, BOOL* enabled,
-                                             int* type);
+    virtual BOOL WINAPI GetSalamanderCommand(int salCmd,
+                                             CSalamanderStringBuffer* name,
+                                             BOOL* enabled, int* type);
     virtual void WINAPI PostSalamanderCommand(int salCmd);
 
     virtual void WINAPI SetUserWorkedOnPanelPath(int panel);
@@ -2142,7 +2120,8 @@ public:
     virtual DWORD WINAPI UpdateCrc32(const void* buffer, DWORD count, DWORD crcVal);
     virtual CSalamanderMD5* WINAPI AllocSalamanderMD5();
     virtual void WINAPI FreeSalamanderMD5(CSalamanderMD5* md5);
-    virtual BOOL WINAPI LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount);
+    virtual BOOL WINAPI LookForSubTexts(CSalamanderStringBuffer* text,
+                                        CSalamanderTextRangeBuffer* varPlacements);
     virtual void WINAPI WaitForESCRelease();
 
     virtual DWORD WINAPI GetMouseWheelScrollLines();
@@ -2159,41 +2138,43 @@ public:
 
     virtual BOOL WINAPI IsFirstInstance3OrLater();
 
-    virtual int WINAPI ExpandPluralString(char* buffer, int bufferSize, const char* format,
-                                          int parametersCount, const CQuadWord* parametersArray);
-    virtual int WINAPI ExpandPluralFilesDirs(char* buffer, int bufferSize, int files, int dirs,
-                                             int mode, BOOL forDlgCaption);
-    virtual int WINAPI ExpandPluralBytesFilesDirs(char* buffer, int bufferSize,
-                                                  const CQuadWord& selectedBytes, int files, int dirs,
-                                                  BOOL useSubTexts);
+    virtual BOOL WINAPI ExpandPluralString(const wchar_t* format, int parametersCount,
+                                           const CQuadWord* parametersArray,
+                                           CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI ExpandPluralFilesDirs(int files, int dirs, int mode,
+                                              BOOL forDlgCaption,
+                                              CSalamanderStringBuffer* text);
+    virtual BOOL WINAPI ExpandPluralBytesFilesDirs(const CQuadWord& selectedBytes,
+                                                   int files, int dirs, BOOL useSubTexts,
+                                                   CSalamanderStringBuffer* text);
 
-    virtual void WINAPI GetCommonFSOperSourceDescr(char* sourceDescr, int sourceDescrSize,
-                                                   int panel, int selectedFiles, int selectedDirs,
-                                                   const char* fileOrDirName, BOOL isDir,
-                                                   BOOL forDlgCaption);
+    virtual BOOL WINAPI GetCommonFSOperSourceDescr(
+        int panel, int selectedFiles, int selectedDirs,
+        const wchar_t* fileOrDirName, BOOL isDir, BOOL forDlgCaption,
+        CSalamanderStringBuffer* sourceDescr);
 
-    virtual void WINAPI AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr);
+    virtual BOOL WINAPI AddStrToStr(CSalamanderStringBuffer* dstText, const wchar_t* srcStr);
 
-    virtual BOOL WINAPI SalIsValidFileNameComponent(const char* fileNameComponent);
-    virtual void WINAPI SalMakeValidFileNameComponent(char* fileNameComponent);
+    virtual BOOL WINAPI SalIsValidFileNameComponent(const wchar_t* fileNameComponent);
+    virtual BOOL WINAPI SalMakeValidFileNameComponent(CSalamanderStringBuffer* fileNameComponent);
 
     virtual BOOL WINAPI IsFileEnumSourcePanel(int srcUID, int* panel);
-    virtual BOOL WINAPI GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
+    virtual BOOL WINAPI GetNextFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
                                                  BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                                 char* fileName, BOOL* noMoreFiles, BOOL* srcBusy);
-    virtual BOOL WINAPI GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const char* lastFileName,
+                                                 CSalamanderStringBuffer* fileName, BOOL* noMoreFiles, BOOL* srcBusy);
+    virtual BOOL WINAPI GetPreviousFileNameForViewer(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
                                                      BOOL preferSelected, BOOL onlyAssociatedExtensions,
-                                                     char* fileName, BOOL* noMoreFiles, BOOL* srcBusy);
-    virtual BOOL WINAPI IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* lastFileName,
+                                                     CSalamanderStringBuffer* fileName, BOOL* noMoreFiles, BOOL* srcBusy);
+    virtual BOOL WINAPI IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
                                                     BOOL* isFileSelected, BOOL* srcBusy);
     virtual BOOL WINAPI SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex,
-                                                        const char* lastFileName, BOOL select,
+                                                        const wchar_t* lastFileName, BOOL select,
                                                         BOOL* srcBusy);
 
-    virtual BOOL WINAPI GetStdHistoryValues(int historyID, char*** historyArr, int* historyItemsCount);
-    virtual void WINAPI AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
-                                                   const char* value, BOOL caseSensitiveValue);
-    virtual void WINAPI LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount);
+    virtual BOOL WINAPI GetStdHistoryValues(int historyID, wchar_t*** historyArr, int* historyItemsCount);
+    virtual void WINAPI AddValueToStdHistoryValues(wchar_t** historyArr, int historyItemsCount,
+                                                   const wchar_t* value, BOOL caseSensitiveValue);
+    virtual void WINAPI LoadComboFromStdHistoryValues(HWND combo, wchar_t** historyArr, int historyItemsCount);
 
     virtual BOOL WINAPI CanUse256ColorsBitmap();
 
@@ -2202,11 +2183,11 @@ public:
     virtual void WINAPI ActivateDropTarget(HWND dropTarget, HWND progressWnd);
 
     virtual void WINAPI PostOpenPackDlgForThisPlugin(int delFilesAfterPacking);
-    virtual void WINAPI PostOpenUnpackDlgForThisPlugin(const char* unpackMask);
+    virtual void WINAPI PostOpenUnpackDlgForThisPlugin(const wchar_t* unpackMask);
 
-    virtual HANDLE WINAPI SalCreateFileEx(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+    virtual HANDLE WINAPI SalCreateFileEx(const wchar_t* fileName, DWORD desiredAccess, DWORD shareMode,
                                           DWORD flagsAndAttributes, DWORD* err);
-    virtual BOOL WINAPI SalCreateDirectoryEx(const char* name, DWORD* err);
+    virtual BOOL WINAPI SalCreateDirectoryEx(const wchar_t* name, DWORD* err);
 
     virtual void WINAPI PanelStopMonitoring(int panel, BOOL stopMonitoring);
 
@@ -2225,28 +2206,31 @@ public:
 
     virtual HICON WINAPI GetSalamanderIcon(int icon, int iconSize);
 
-    virtual BOOL WINAPI GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* hIcon, int iconSize,
+    virtual BOOL WINAPI GetFileIcon(const wchar_t* path, HICON* hIcon, int iconSize,
                                     BOOL fallbackToDefIcon, BOOL defIconIsDir);
+    virtual BOOL WINAPI GetFileIconFromPIDL(LPCITEMIDLIST pidl, HICON* hIcon,
+                                            int iconSize, BOOL fallbackToDefIcon,
+                                            BOOL defIconIsDir);
 
-    virtual BOOL WINAPI FileExists(const char* fileName);
+    virtual BOOL WINAPI FileExists(const wchar_t* fileName);
 
     virtual void WINAPI DisconnectFSFromPanel(HWND parent, int panel);
 
-    virtual BOOL WINAPI IsArchiveHandledByThisPlugin(const char* name);
+    virtual BOOL WINAPI IsArchiveHandledByThisPlugin(const wchar_t* name);
 
     virtual DWORD WINAPI GetIconLRFlags();
 
-    virtual int WINAPI IsFileLink(const char* fileExtension);
+    virtual int WINAPI IsFileLink(const wchar_t* fileExtension);
 
     virtual DWORD WINAPI GetImageListColorFlags();
 
     virtual BOOL WINAPI SafeGetOpenFileName(LPOPENFILENAME lpofn);
     virtual BOOL WINAPI SafeGetSaveFileName(LPOPENFILENAME lpofn);
 
-    virtual void WINAPI SetHelpFileName(const char* chmName);
+    virtual void WINAPI SetHelpFileName(const wchar_t* chmName);
     virtual BOOL WINAPI OpenHtmlHelp(HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet);
 
-    virtual BOOL WINAPI PathsAreOnTheSameVolume(const char* path1, const char* path2,
+    virtual BOOL WINAPI PathsAreOnTheSameVolume(const wchar_t* path1, const wchar_t* path2,
                                                 BOOL* resIsOnlyEstimation);
 
     virtual void* WINAPI Realloc(void* ptr, int size);
@@ -2257,23 +2241,23 @@ public:
     virtual BOOL WINAPI PostRefreshPanelFS2(CPluginFSInterfaceAbstract* modifiedFS,
                                             BOOL focusFirstNewItem = FALSE);
 
-    virtual char* WINAPI LoadStr(HINSTANCE module, int resID);
-    virtual WCHAR* WINAPI LoadStrW(HINSTANCE module, int resID);
+    virtual BOOL WINAPI LoadStr(HINSTANCE module, int resID,
+                                CSalamanderStringBuffer* text);
 
     virtual BOOL WINAPI ChangePanelPathToRescuePathOrFixedDrive(int panel, int* failReason = NULL);
 
     virtual void WINAPI SetPluginIsNethood();
 
     virtual void WINAPI OpenNetworkContextMenu(HWND parent, int panel, BOOL forItems, int menuX,
-                                               int menuY, const char* netPath, char* newlyMappedDrive);
+                                               int menuY, const wchar_t* netPath, wchar_t* newlyMappedDrive);
 
-    virtual BOOL WINAPI DuplicateBackslashes(char* buffer, int bufferSize);
+    virtual BOOL WINAPI DuplicateBackslashes(CSalamanderStringBuffer* text);
 
-    virtual int WINAPI StartThrobber(int panel, const char* tooltip, int delay);
+    virtual int WINAPI StartThrobber(int panel, const wchar_t* tooltip, int delay);
     virtual BOOL WINAPI StopThrobber(int id);
 
     virtual void WINAPI ShowSecurityIcon(int panel, BOOL showIcon, BOOL isLocked,
-                                         const char* tooltip);
+                                         const wchar_t* tooltip);
 
     virtual void WINAPI RemoveCurrentPathFromHistory(int panel);
 
@@ -2299,51 +2283,55 @@ public:
 
     virtual void WINAPI GetFocusedItemMenuPos(POINT* pos);
 
-    virtual void WINAPI LockMainWindow(BOOL lock, HWND hToolWnd, const char* lockReason);
+    virtual void WINAPI LockMainWindow(BOOL lock, HWND hToolWnd, const wchar_t* lockReason);
 
     virtual void WINAPI PostPluginMenuChanged();
 
-    virtual BOOL WINAPI GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int hotKeyTextSize);
+    virtual BOOL WINAPI GetMenuItemHotKey(int id, WORD* hotKey, CSalamanderStringBuffer* hotKeyText);
 
-    virtual LONG WINAPI SalRegQueryValue(HKEY hKey, LPCSTR lpSubKey, LPSTR lpData, PLONG lpcbData);
-    virtual LONG WINAPI SalRegQueryValueEx(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved,
+    virtual LONG WINAPI SalRegQueryValue(HKEY hKey, LPCWSTR lpSubKey, LPWSTR lpData, PLONG lpcbData);
+    virtual LONG WINAPI SalRegQueryValueEx(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved,
                                            LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
 
-    virtual DWORD WINAPI SalGetFileAttributes(const char* fileName);
+    virtual DWORD WINAPI SalGetFileAttributes(const wchar_t* fileName);
 
-    virtual BOOL WINAPI IsPathOnSSD(const char* path);
+    virtual BOOL WINAPI IsPathOnSSD(const wchar_t* path);
 
-    virtual BOOL WINAPI IsUNCPath(const char* path);
+    virtual BOOL WINAPI IsUNCPath(const wchar_t* path);
 
-    virtual BOOL WINAPI ResolveSubsts(char* resPath);
+    virtual BOOL WINAPI ResolveSubsts(CSalamanderStringBuffer* resPath);
 
-    virtual void WINAPI ResolveLocalPathWithReparsePoints(char* resPath, const char* path,
-                                                          BOOL* cutResPathIsPossible,
-                                                          BOOL* rootOrCurReparsePointSet,
-                                                          char* rootOrCurReparsePoint,
-                                                          char* junctionOrSymlinkTgt, int* linkType,
-                                                          char* netPath);
+    virtual BOOL WINAPI ResolveLocalPathWithReparsePoints(
+        const wchar_t* path, CSalamanderStringBuffer* resPath,
+        BOOL* cutResPathIsPossible, BOOL* rootOrCurReparsePointSet,
+        CSalamanderStringBuffer* rootOrCurReparsePoint,
+        CSalamanderStringBuffer* junctionOrSymlinkTgt, int* linkType,
+        CSalamanderStringBuffer* netPath);
 
-    virtual BOOL WINAPI GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath);
+    virtual BOOL WINAPI GetResolvedPathMountPointAndGUID(
+        const wchar_t* path, CSalamanderStringBuffer* mountPoint,
+        CSalamanderStringBuffer* guidPath);
 
-    virtual BOOL WINAPI PointToLocalDecimalSeparator(char* buffer, int bufferSize);
+    virtual BOOL WINAPI PointToLocalDecimalSeparator(CSalamanderStringBuffer* text);
 
     virtual void WINAPI SetPluginIconOverlays(int iconOverlaysCount, HICON* iconOverlays);
 
-    virtual BOOL WINAPI SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err);
+    virtual BOOL WINAPI SalGetFileSize2(const wchar_t* fileName, CQuadWord& size, DWORD* err);
 
-    virtual BOOL WINAPI GetLinkTgtFileSize(HWND parent, const char* fileName, CQuadWord* size,
+    virtual BOOL WINAPI GetLinkTgtFileSize(HWND parent, const wchar_t* fileName, CQuadWord* size,
                                            BOOL* cancel, BOOL* ignoreAll);
 
-    virtual BOOL WINAPI DeleteDirLink(const char* name, DWORD* err);
+    virtual BOOL WINAPI DeleteDirLink(const wchar_t* name, DWORD* err);
 
-    virtual BOOL WINAPI ClearReadOnlyAttr(const char* name, DWORD attr = -1);
+    virtual BOOL WINAPI ClearReadOnlyAttr(const wchar_t* name, DWORD attr = -1);
 
     virtual BOOL WINAPI IsCriticalShutdown();
 
     virtual void WINAPI CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid = 0);
 
     virtual BOOL WINAPI GetThemeInfo(CSalamanderThemeInfo* info);
+    virtual BOOL WINAPI GetConfigParameterString(int paramID,
+                                                 CSalamanderStringBuffer* value);
 };
 
 //
@@ -2371,7 +2359,7 @@ struct CPluginMenuItem
 public:
     CPluginMenuItemType Type; // item type, see description in CPluginMenuItemType
     int IconIndex;            // icon index in the plugin icon bitmap; -1 = no icon; WARNING: index is unchecked (may be invalid)
-    std::string Name;          // name of the menu item; if empty, it represents a separator
+    std::wstring Name;         // name of the menu item; if empty, it represents a separator
     DWORD StateMask;          // hiword is an OR mask, loword is an AND mask; if it is -1,
                               // CPluginInterfaceAbstract::GetMenuItemState is used
     DWORD SkillLevel;         // which user levels should see this item MENU_SKILLLEVEL_XXX
@@ -2382,7 +2370,7 @@ public:
     int SUID; // Salamander-UID - unique number within Salamander, computed when filling the menu
 
 public:
-    CPluginMenuItem(int iconIndex, const char* name, DWORD hotKey, DWORD stateMask, int id, DWORD skillLevel,
+    CPluginMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, DWORD stateMask, int id, DWORD skillLevel,
                     CPluginMenuItemType type);
     ~CPluginMenuItem() {}
 };
@@ -2395,9 +2383,9 @@ struct CPluginData
 {
 public:
     int BuiltForVersion;       // valid only when the plugin is loaded: Salamander version the plugin was compiled for (see the list of versions under LAST_VERSION_OF_SALAMANDER in spl_vers.h)
-    std::string Name;              // plugin name shown in Extensions/C.Packers/C.Unpackers dialogs
+    std::wstring Name;             // plugin name shown in Extensions/C.Packers/C.Unpackers dialogs
                                // max. length of the name MAX_PATH - 1
-    std::string DLLName;           // DLL file name, relative to "plugins" or absolute
+    std::wstring DLLName;          // DLL file name, relative to "plugins" or absolute
                                // max. length of the name MAX_PATH - 1
     BOOL SupportPanelView;     // TRUE => supports ListArchive, UnpackArchive, UnpackOneFile (panel archiver/view)
     BOOL SupportPanelEdit;     // TRUE => supports PackToArchive, DeleteFromArchive (panel archiver/edit)
@@ -2412,32 +2400,35 @@ public:
     BOOL LoadOnStart; // should the plugin load at every Salamander start?
     BOOL LegacyCompatApproved; // TRUE => user approved loading a req==102 plugin for this plugin path
 
-    std::string Version;              // plugin version (max length MAX_PATH - 1)
-    std::string Copyright;            // manufacturer's copyright (max length MAX_PATH - 1)
-    std::string Description;          // short plugin description (max length MAX_PATH - 1)
-    std::string RegKeyName;           // registry key name for configuration (max length MAX_PATH - 1)
-    std::string Extensions;           // archive extensions separated by ';' (max length MAX_PATH - 1)
-    std::vector<std::string> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
+    std::wstring Version;             // plugin version (max length MAX_PATH - 1)
+    std::wstring Copyright;           // manufacturer's copyright (max length MAX_PATH - 1)
+    std::wstring Description;         // short plugin description (max length MAX_PATH - 1)
+    std::wstring RegKeyName;          // registry key name for configuration (max length MAX_PATH - 1)
+    std::wstring Extensions;          // archive extensions separated by ';' (max length MAX_PATH - 1)
+    std::vector<std::wstring> FSNames; // array of plugin filesystem names (each max length MAX_PATH - 1)
 
-    std::string LastSLGName; // name of the last used .SLG file (empty = none yet or same language as Salamander)
+    std::wstring LastSLGName; // name of the last used .SLG file (empty = none yet or same language as Salamander)
 
-    std::string PluginHomePageURL; // URL of the plugin home page (empty == no home page exists)
+    std::wstring PluginHomePageURL; // URL of the plugin home page (empty == no home page exists)
 
-    std::string ChDrvMenuFSItemName;  // filesystem command in the change-drive menu: name (max length MAX_PATH - 1)
+    std::wstring ChDrvMenuFSItemName; // filesystem command in the change-drive menu: name (max length MAX_PATH - 1)
     int ChDrvMenuFSItemIconIndex; // filesystem command in the change-drive menu: icon index (in PluginIcons; -1=no icon; the index is not checked – it may be invalid)
     BOOL ChDrvMenuFSItemVisible;  // filesystem command in the change-drive menu: is it visible? (users can hide it from Plugins Manager)
 
     TIndirectArray<CPluginMenuItem> MenuItems; // array of items in the menu
     BOOL DynMenuWasAlreadyBuild;               // TRUE if BuildMenu() was already called; further calls are ignored
 
-    std::string BugReportMessage; // message to be displayed by the Bug Report dialog when a plugin exception occurs
-    std::string BugReportEMail;   // e-mail to be displayed by the Bug Report dialog when a plugin exception occurs
+    // Wide storage. Nothing outside the setter reads these today,
+    // so widening them had no consumer fallout - the Bug Report dialog formats
+    // them when it is next touched.
+    std::wstring BugReportMessage; // message to be displayed by the Bug Report dialog when a plugin exception occurs
+    std::wstring BugReportEMail;   // e-mail to be displayed by the Bug Report dialog when a plugin exception occurs
 
     CMaskGroup ThumbnailMasks;   // masks determining files for which the plugin can create thumbnails (max length MAX_GROUPMASK - 1); NULL == the plugin does not generate any thumbnails
     BOOL ThumbnailMasksDisabled; // TRUE only when the plugin is unloading/removing
 
     BOOL ArcCacheHaveInfo;    // TRUE == information about the use of disk cache in the archive plugin is already available (CPluginInterfaceForArchiverAbstract::GetCacheInfo has been called)
-    char* ArcCacheTmpPath;    // location of copies of files extracted from the archive: NULL = TEMP, otherwise a path (root directory of the cache)
+    std::wstring ArcCacheTmpPath; // location of copies of files extracted from the archive: empty = TEMP, otherwise the cache root
     BOOL ArcCacheOwnDelete;   // TRUE = call CPluginInterfaceForArchiverAbstract::DeleteTmpCopy() to delete cached copies
     BOOL ArcCacheCacheCopies; // TRUE = crtCache (delete when closing the archive or when cache limit is reached), FALSE = crtDirect (delete immediately when not needed)
 
@@ -2475,7 +2466,7 @@ public:
     BOOL OpenPackDlg;                // TRUE = open the Pack dialog for this plugin
     int PackDlgDelFilesAfterPacking; // Pack dialog: "Delete files after packing" checkbox: 0=default, 1=on, 2=off
     BOOL OpenUnpackDlg;              // TRUE = open the Unpack dialog for this plugin
-    std::string UnpackDlgUnpackMask;     // Unpack dialog: "Unpack files" mask; empty=default, otherwise mask text
+    std::wstring UnpackDlgUnpackMask; // Unpack dialog: "Unpack files" mask; empty=default, otherwise mask text
 
 #ifdef _DEBUG
     int OpenedFSCounter; // count of open FS interfaces
@@ -2484,6 +2475,7 @@ public:
 
 protected:
     HINSTANCE DLL;                                                         // handle of the plug-in’s DLL file
+    sally::compat::CLegacyPluginHostPtr LegacyHost;                        // legacy facade graph retained for this DLL's lifetime
     CPluginInterfaceEncapsulation PluginIface;                             // plugin interface (set to -1 during the entry point call)
     CPluginInterfaceForArchiverEncapsulation PluginIfaceForArchiver;       // plugin interface: archiver
     CPluginInterfaceForViewerEncapsulation PluginIfaceForViewer;           // plugin interface: viewer
@@ -2492,13 +2484,13 @@ protected:
     CPluginInterfaceForThumbLoaderEncapsulation PluginIfaceForThumbLoader; // plugin interface: thumbnail loader
 
 public:
-    CPluginData(const char* name, const char* dllName, BOOL supportPanelView,
+    CPluginData(const wchar_t* name, const wchar_t* dllName, BOOL supportPanelView,
                 BOOL supportPanelEdit, BOOL supportCustomPack, BOOL supportCustomUnpack,
                 BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
-                BOOL supportFS, BOOL supportDynMenuExt, const char* version,
-                const char* copyright, const char* description, const char* regKeyName,
-                const char* extensions, const std::vector<std::string>* fsNames, BOOL loadOnStart,
-                char* lastSLGName, const char* pluginHomePageURL);
+                BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
+                const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
+                const wchar_t* extensions, const std::vector<std::wstring>* fsNames, BOOL loadOnStart,
+                const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL);
     ~CPluginData();
 
     // returns the plugin interface
@@ -2525,7 +2517,7 @@ public:
 
     // returns the plugin name extended with "(Plugin)"; used where it's not clear that it is a plugin
     // (e.g. in combo boxes within Archivers/Extensions, etc.)
-    void GetDisplayName(char* buf, int bufSize);
+    std::wstring GetDisplayName() const;
 
     // plugin call: save its configuration; 'parent' is the parent window for message boxes
     void Save(HWND parent, HKEY regKeyConfig);
@@ -2551,12 +2543,12 @@ public:
     BOOL Remove(HWND parent, int index, BOOL canDelPluginRegKey);
 
     // adds a menu item to MenuItems
-    void AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState, DWORD state_or,
+    void AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState, DWORD state_or,
                      DWORD state_and, DWORD skillLevel, CPluginMenuItemType type);
 
     // searches the plugin menu items for a command with 'id'; if it is found, sets
     // 'hotKey' (may be NULL) and 'hotKeyText' (may be NULL) and returns TRUE; otherwise FALSE
-    BOOL GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int hotKeyTextSize);
+    BOOL GetMenuItemHotKey(int id, WORD* hotKey, std::wstring* hotKeyText);
 
     // initializes menu items for this plugin; 'parent' is the parent message box window,
     // 'index' is this plugin index in Plugins, 'menu' is the submenu for this plugin
@@ -2596,50 +2588,50 @@ public:
     BOOL BuildMenu(HWND parent, BOOL force);
 
     // plugin call: ListArchive
-    BOOL ListArchive(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
+    BOOL ListArchive(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDirectory& dir,
                      CPluginDataInterfaceAbstract*& pluginData);
 
     // plugin call: UnpackArchive
-    BOOL UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
+    BOOL UnpackArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
                        CPluginDataInterfaceAbstract* pluginData,
-                       const char* targetDir, const char* archiveRoot,
+                       const wchar_t* targetDir, const wchar_t* archiveRoot,
                        SalEnumSelection nextName, void* param);
 
     // plugin call: UnpackOneFile
-    BOOL UnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
-                       CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                       const CFileData* fileData, const char* targetDir,
-                       const char* newFileName, BOOL* renamingNotSupported);
+    BOOL UnpackOneFile(CFilesWindow* panel, const wchar_t* archiveFileName,
+                       CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                       const CFileData* fileData, const wchar_t* targetDir,
+                       const wchar_t* newFileName, BOOL* renamingNotSupported);
 
     // plugin call: PackToArchive
-    BOOL PackToArchive(CFilesWindow* panel, const char* archiveFileName,
-                       const char* archiveRoot, BOOL move, const char* sourceDir,
+    BOOL PackToArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
+                       const wchar_t* archiveRoot, BOOL move, const wchar_t* sourceDir,
                        SalEnumSelection2 nextName, void* param);
 
     // plugin call: DeleteFromArchive
-    BOOL DeleteFromArchive(CFilesWindow* panel, const char* archiveFileName,
-                           CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
+    BOOL DeleteFromArchive(CFilesWindow* panel, const wchar_t* archiveFileName,
+                           CPluginDataInterfaceAbstract* pluginData, const wchar_t* archiveRoot,
                            SalEnumSelection nextName, void* param);
 
     // plugin call: UnpackWholeArchive
-    BOOL UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
-                            const char* targetDir, BOOL delArchiveWhenDone,
+    BOOL UnpackWholeArchive(CFilesWindow* panel, const wchar_t* archiveFileName, const wchar_t* mask,
+                            const wchar_t* targetDir, BOOL delArchiveWhenDone,
                             CDynamicString* archiveVolumes);
 
     // plugin call: CanCloseArchive
-    BOOL CanCloseArchive(CFilesWindow* panel, const char* archiveFileName, BOOL force);
+    BOOL CanCloseArchive(CFilesWindow* panel, const wchar_t* archiveFileName, BOOL force);
 
     // plugin call: CanViewFile
-    BOOL CanViewFile(const char* name);
+    BOOL CanViewFile(const wchar_t* name);
 
     // plugin call: ViewFile
-    BOOL ViewFile(const char* name, int left, int top, int width, int height,
+    BOOL ViewFile(const wchar_t* name, int left, int top, int width, int height,
                   UINT showCmd, BOOL alwaysOnTop, BOOL returnLock,
                   HANDLE* lock, BOOL* lockOwner,
                   int enumFilesSourceUID, int enumFilesCurrentIndex);
 
     // plugin call: OpenFS
-    CPluginFSInterfaceAbstract* OpenFS(const char* fsName, int fsNameIndex);
+    CPluginFSInterfaceAbstract* OpenFS(const wchar_t* fsName, int fsNameIndex);
 
     // plugin call: ExecuteChangeDriveMenuItem
     void ExecuteChangeDriveMenuItem(int panel);
@@ -2647,12 +2639,12 @@ public:
     // plugin call: ChangeDriveMenuItemContextMenu
     BOOL ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                         CPluginFSInterfaceAbstract* pluginFS,
-                                        const char* pluginFSName, int pluginFSNameIndex,
+                                        const wchar_t* pluginFSName, int pluginFSNameIndex,
                                         BOOL isDetachedFS, BOOL& refreshMenu,
                                         BOOL& closeMenu, int& postCmd, void*& postCmdParam);
 
     // plugin call: EnsureShareExistsOnServer
-    void EnsureShareExistsOnServer(HWND parent, int panel, const char* server, const char* share);
+    void EnsureShareExistsOnServer(HWND parent, int panel, const wchar_t* server, const wchar_t* share);
 
     // if the plugin is loaded, plugin call: Event
     void Event(int event, DWORD param);
@@ -2661,16 +2653,16 @@ public:
     void ClearHistory(HWND parent);
 
     // if the plugin is loaded, plugin call: AcceptChangeOnPathNotification
-    void AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs);
+    void AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs);
 
     // plugin call: PasswordManagerEvent
     void PasswordManagerEvent(HWND parent, int event);
 
     // obtain the disk-cache settings from the archiver - uses a plugin call
-    void GetCacheInfo(char* arcCacheTmpPath, BOOL* arcCacheOwnDelete, BOOL* arcCacheCacheCopies);
+    void GetCacheInfo(std::wstring& arcCacheTmpPath, BOOL* arcCacheOwnDelete, BOOL* arcCacheCacheCopies);
 
     // plugin call: DeleteTmpCopy
-    void DeleteTmpCopy(const char* fileName, BOOL firstFile);
+    void DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile);
 
     // plugin call: PrematureDeleteTmpCopy
     BOOL PrematureDeleteTmpCopy(HWND parent, int copiesCount);
@@ -2764,7 +2756,7 @@ struct CPluginsStateCache
 // CPluginOrder specifies the order in which plugins are displayed (menu, plugin bar, ...)
 struct CPluginOrder
 {
-    std::string DLLName; // DLL file name, relative to "plugins" or absolute
+    std::wstring DLLName; // DLL file name, relative to "plugins" or absolute
 
     // temporary variables, not stored in the registry
     BOOL ShowInBar; // used only when converting the old configuration
@@ -2806,7 +2798,7 @@ protected:
 
     // LastPlgCmdXXX keep information about the last executed command from the Plugins menu
     // if LastPlgCmdPlugin is empty, LastPlgCmdID is meaningless and the menu item will be disabled with the default text
-    std::string LastPlgCmdPlugin; // path to the plugin whose command was executed (CPluginData::DLLName)
+    std::wstring LastPlgCmdPlugin; // path to the plugin whose command was executed (CPluginData::DLLName)
     int LastPlgCmdID;       // internal ID of the command (CPluginMenuItem::ID)
 
 public:                     // helper variables for handling menu items coming from plugins:
@@ -2878,7 +2870,7 @@ public:
     // to a new Salamander version and all plugins should be loaded; those that fail and still
     // have the configuration in the registryare should be stored in 'notLoadedPluginNames'
     void RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadAllPlugins = FALSE,
-                                       char* notLoadedPluginNames = NULL,
+                                       wchar_t* notLoadedPluginNames = NULL,
                                        int notLoadedPluginNamesSize = 0,
                                        int maxNotLoadedPluginNames = 0,
                                        int* numOfSkippedNotLoadedPluginNames = NULL,
@@ -2916,20 +2908,20 @@ public:
 
     // returns, one by one, sally.exe and all plugins including their versions; index counts from zero (in/out)
     // returns TRUE if the result is valid
-    BOOL EnumInstalledModules(int* index, char* module, char* version);
+    BOOL EnumInstalledModules(int* index, std::wstring& module, std::wstring& version);
 
     // adds a plugin, returns on success
-    BOOL AddPlugin(const char* name, const char* dllName, BOOL supportPanelView,
+    BOOL AddPlugin(const wchar_t* name, const wchar_t* dllName, BOOL supportPanelView,
                    BOOL supportPanelEdit, BOOL supportCustomPack, BOOL supportCustomUnpack,
                    BOOL supportConfiguration, BOOL supportLoadSave, BOOL supportViewer,
-                   BOOL supportFS, BOOL supportDynMenuExt, const char* version,
-                   const char* copyright, const char* description, const char* regKeyName,
-                   const char* extensions, std::vector<std::string>* fsNames, BOOL loadOnStart,
-                   char* lastSLGName, const char* pluginHomePageURL);
+                   BOOL supportFS, BOOL supportDynMenuExt, const wchar_t* version,
+                   const wchar_t* copyright, const wchar_t* description, const wchar_t* regKeyName,
+                   const wchar_t* extensions, std::vector<std::wstring>* fsNames, BOOL loadOnStart,
+                   const wchar_t* lastSLGName, const wchar_t* pluginHomePageURL);
 
     // adds a plugin; 'parent' is the parent message box window, 'fileName' is the DLL file name
     // of the plugin, returns TRUE if the plugin is added
-    BOOL AddPlugin(HWND parent, const char* fileName);
+    BOOL AddPlugin(HWND parent, const wchar_t* fileName);
 
     // removes a plugin; 'parent' is the parent message box window, maintains data consistency,
     // returns success
@@ -2938,18 +2930,17 @@ public:
     // Salamander is exiting; plugins should exit as well, returns success (TRUE = plugins unloaded)
     BOOL UnloadAll(HWND parent);
 
-    // it stores a unique registry key name for plugin private data in 'uniqueKeyName',
-    // the name is based on 'regKeyName'
-    void GetUniqueRegKeyName(char* uniqueKeyName, const char* regKeyName);
+    // Returns a unique registry key name for plugin private data.
+    std::wstring GetUniqueRegKeyName(const wchar_t* regKeyName);
 
     // it stores a unique FS name based on 'fsName' in 'uniqueFSName';
     // 'uniqueFSNames' (if not NULL) is an array of names to which the resulting
     // 'uniqueFSName' must also be unique; 'oldFSNames' (if not NULL) is an array of old
     // fs names from previous plugin loads from which a unique name is preferably selected
     // and removed (so the user's FS name doesn't change with each plugin load)
-    void GetUniqueFSName(char* uniqueFSName, const char* fsName,
-                         std::vector<std::string>* uniqueFSNames,
-                         std::vector<std::string>* oldFSNames);
+    std::wstring GetUniqueFSName(const wchar_t* fsName,
+                                 std::vector<std::wstring>* uniqueFSNames,
+                                 std::vector<std::wstring>* oldFSNames);
 
     // returns the number of plugins
     int GetCount() { return Data.Count; }
@@ -2985,11 +2976,11 @@ public:
     // returns the CPluginData whose DLLName equals dllName (DLLName is allocated only once -> unique
     // plugin identifier). Returns NULL if not found.
     // NOTE: the pointer is valid only until the number of plugins changes (the array expands or shrinks)
-    CPluginData* GetPluginData(const char* dllName);
+    CPluginData* GetPluginData(const wchar_t* dllName);
 
     // returns the CPluginData containing DLLName that ends with 'dllSuffix'; returns NULL if it does not exist
     // NOTE: the pointer is valid only until the number of plugins changes (the array expands or shrinks)
-    CPluginData* GetPluginDataFromSuffix(const char* dllSuffix);
+    CPluginData* GetPluginDataFromSuffix(const wchar_t* dllSuffix);
 
     // creates an image list (colorful, if gray == FALSE, otherwise grayscale)
     // each plugin is represented by a single icon in the imagelist
@@ -3052,19 +3043,19 @@ public:
     // 'view' and 'edit' are the indexes of the found archivers (following the PackerIndex and UnpackerIndex
     // conventions from CPackerFormatConfig, see above), 'viewFound' and 'editFound' say whether 'view'
     // and 'edit' are valid
-    void FindViewEdit(const char* extensions, int exclude, BOOL& viewFound, int& view,
+    void FindViewEdit(const wchar_t* extensions, int exclude, BOOL& viewFound, int& view,
                       BOOL& editFound, int& edit);
 
     // searches for a DLL file among plugin DLL files; if it exists, returns TRUE and the plugin index
-    BOOL FindDLL(const char* dllName, int& index);
+    BOOL FindDLL(const wchar_t* dllName, int& index);
 
     // returns TRUE if fsName is a known plugin file system; if TRUE, it also returns 'index'
     // of the FS plugin and the 'fsNameIndex' index of the plugin's file system name
-    BOOL IsPluginFS(const char* fsName, int& index, int& fsNameIndex);
+    BOOL IsPluginFS(const wchar_t* fsName, int& index, int& fsNameIndex);
 
     // returns TRUE if 'fsName1' and 'fsName2' are from the same plugin; if TRUE,
     // it also returns the 'fsName2Index' index of the file system name 'fsName2' within that plugin
-    BOOL AreFSNamesFromSamePlugin(const char* fsName1, const char* fsName2, int& fsName2Index);
+    BOOL AreFSNamesFromSamePlugin(const wchar_t* fsName1, const wchar_t* fsName2, int& fsName2Index);
 
     // returns the index of the plugin for "custom pack" that is the 'count'-th in order (from zero),
     // returns -1 if such plugin does not exist
@@ -3115,7 +3106,7 @@ public:
     void Event(int event, DWORD param);
 
     // calls AcceptChangeOnPathNotification method for all plugins (delivering the message to loaded plugins)
-    void AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs);
+    void AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs);
 
     // reaction to the Plugins/Last Command -- if a Last Command exists, it is executed
     // 'parent' is the parent window for message boxes; returns TRUE if the panel selection should be cleared
@@ -3182,7 +3173,7 @@ public:
     BOOL HandleKeyDown(WPARAM wParam, LPARAM lParam, CFilesWindow* activePanel, HWND hParent);
 
     // sets the LastPlgCmdPlugin and LastPlgCmdID variables
-    void SetLastPlgCmd(const char* dllName, int id);
+    void SetLastPlgCmd(const wchar_t* dllName, int id);
 
     // returns the number of loaded plugins that will save their configuration
     int GetPluginSaveCount();
@@ -3197,7 +3188,7 @@ public:
     // returns the FS name of the first plugin that adds a file system and at the same time, has PluginIsNethood
     // set to TRUE; if 'fsName' is not NULL, the found FS name is copied there; if 'nethoodPlugin'
     // is not NULL, it receives the found plugin. Returns success (FALSE if no such plugin exists)
-    BOOL GetFirstNethoodPluginFSName(char* fsName = NULL, CPluginData** nethoodPlugin = NULL);
+    BOOL GetFirstNethoodPluginFSName(std::wstring* fsName = NULL, CPluginData** nethoodPlugin = NULL);
 
     // invokes PasswordManagerEvent method for all plugins using the Password Manager.
     // See CSalamanderGeneralAbstract::SetPluginUsesPasswordManager (loads unloaded plug-ins if necessary)
@@ -3222,13 +3213,13 @@ protected:
     void CalculateStateCache();
 
     // adds a record to the Order array; returns the index in the array on success, otherwise returns -1
-    int AddPluginToOrder(const char* dllName, BOOL showInBar);
+    int AddPluginToOrder(const wchar_t* dllName, BOOL showInBar);
 
     // Sorts the Orders array by plugin name (used for newly added plug-ins to ensure alphabetical order)
     void QuickSortPluginsByName(int left, int right);
 
     // used only for the conversion from the old configuration (the visibility variable has been moved to CPluginData)
-    BOOL PluginVisibleInBar(const char* dllName);
+    BOOL PluginVisibleInBar(const wchar_t* dllName);
 
     // helper function: finds the index position for inserting a timer with 'timeoutAbs' into the PluginFSTimers array
     int FindIndexForNewPluginFSTimer(DWORD timeoutAbs);
@@ -3247,7 +3238,7 @@ protected:
     BOOL Valid;                      // TRUE if SetBasicPluginData was called successfully
     BOOL Error;                      // has an error already been displayed?
     DWORD LoadInfo;                  // DWORD value returned by GetLoadInformation()
-    std::vector<std::string> OldFSNames; // array of old fs-names (names from the registry, replaced during plug-in loading)
+    std::vector<std::wstring> OldFSNames; // array of old fs-names (names from the registry, replaced during plug-in loading)
 
 public:
     CSalamanderPluginEntry(HWND parent, CPluginData* plugin)
@@ -3271,24 +3262,24 @@ public:
 
     virtual CSalamanderDebugAbstract* WINAPI GetSalamanderDebug() { return &Plugin->SalamanderDebug; }
 
-    virtual BOOL WINAPI SetBasicPluginData(const char* pluginName, DWORD functions,
-                                           const char* version, const char* copyright,
-                                           const char* description, const char* regKeyName = NULL,
-                                           const char* extensions = NULL, const char* fsName = NULL);
+    virtual BOOL WINAPI SetBasicPluginData(const wchar_t* pluginName, DWORD functions,
+                                           const wchar_t* version, const wchar_t* copyright,
+                                           const wchar_t* description, const wchar_t* regKeyName = NULL,
+                                           const wchar_t* extensions = NULL, const wchar_t* fsName = NULL);
 
     virtual CSalamanderGeneralAbstract* WINAPI GetSalamanderGeneral() { return &Plugin->SalamanderGeneral; }
 
     virtual DWORD WINAPI GetLoadInformation() { return LoadInfo; }
 
-    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const char* pluginName);
+    virtual HINSTANCE WINAPI LoadLanguageModule(HWND parent, const wchar_t* pluginName);
     virtual WORD WINAPI GetCurrentSalamanderLanguageID() { return (WORD)LanguageID; }
 
     virtual CSalamanderGUIAbstract* WINAPI GetSalamanderGUI() { return &Plugin->SalamanderGUI; }
     virtual CSalamanderSafeFileAbstract* WINAPI GetSalamanderSafeFile() { return &SalSafeFile; }
 
-    virtual void WINAPI SetPluginHomePageURL(const char* url);
+    virtual void WINAPI SetPluginHomePageURL(const wchar_t* url);
 
-    virtual BOOL WINAPI AddFSName(const char* fsName, int* newFSNameIndex);
+    virtual BOOL WINAPI AddFSName(const wchar_t* fsName, int* newFSNameIndex);
 };
 
 //
@@ -3303,30 +3294,30 @@ public:
     virtual BOOL WINAPI ClearKey(HKEY key);
 
     // creates or opens an existing subkey 'name' of key 'key'; returns 'createdKey' and success
-    virtual BOOL WINAPI CreateKey(HKEY key, const char* name, HKEY& createdKey);
+    virtual BOOL WINAPI CreateKey(HKEY key, const wchar_t* name, HKEY& createdKey);
 
     // opens an existing subkey 'name' of key 'key'; returns 'openedKey' and success
-    virtual BOOL WINAPI OpenKey(HKEY key, const char* name, HKEY& openedKey);
+    virtual BOOL WINAPI OpenKey(HKEY key, const wchar_t* name, HKEY& openedKey);
 
     // closes a key opened via OpenKey or CreateKey
     virtual void WINAPI CloseKey(HKEY key);
 
     // deletes the subkey 'name' of the key 'key'; returns success
-    virtual BOOL WINAPI DeleteKey(HKEY key, const char* name);
+    virtual BOOL WINAPI DeleteKey(HKEY key, const wchar_t* name);
 
     // loads the value 'name'+'type'+'buffer'+'bufferSize' from key 'key'; returns success
-    virtual BOOL WINAPI GetValue(HKEY key, const char* name, DWORD type, void* buffer, DWORD bufferSize);
+    virtual BOOL WINAPI GetValue(HKEY key, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize);
 
     // stores the value 'name'+'type'+'data'+'dataSize' to key 'key'; for strings you may
     // specify 'dataSize' == -1 -> the string length is calculated using the strlen function;
     // returns success
-    virtual BOOL WINAPI SetValue(HKEY key, const char* name, DWORD type, const void* data, DWORD dataSize);
+    virtual BOOL WINAPI SetValue(HKEY key, const wchar_t* name, DWORD type, const void* data, DWORD dataSize);
 
     // deletes the value 'name' of the key 'key'; returns success
-    virtual BOOL WINAPI DeleteValue(HKEY key, const char* name);
+    virtual BOOL WINAPI DeleteValue(HKEY key, const wchar_t* name);
 
     // retrieves into 'bufferSize' the required size for the value of 'name' + 'type' from the key 'key'; returns success
-    virtual BOOL WINAPI GetSize(HKEY key, const char* name, DWORD type, DWORD& bufferSize);
+    virtual BOOL WINAPI GetSize(HKEY key, const wchar_t* name, DWORD type, DWORD& bufferSize);
 };
 
 //
@@ -3366,22 +3357,22 @@ public:
             TRACE_E("CSalamanderConnect::~CSalamanderConnect(): missing end of submenu (see CSalamanderConnect::AddSubmenuEnd())!");
     }
 
-    virtual void WINAPI AddCustomPacker(const char* title, const char* defaultExtension, BOOL update);
-    virtual void WINAPI AddCustomUnpacker(const char* title, const char* masks, BOOL update);
+    virtual void WINAPI AddCustomPacker(const wchar_t* title, const wchar_t* defaultExtension, BOOL update);
+    virtual void WINAPI AddCustomUnpacker(const wchar_t* title, const wchar_t* masks, BOOL update);
 
-    virtual void WINAPI AddPanelArchiver(const char* extensions, BOOL edit, BOOL updateExts);
-    virtual void WINAPI ForceRemovePanelArchiver(const char* extension);
+    virtual void WINAPI AddPanelArchiver(const wchar_t* extensions, BOOL edit, BOOL updateExts);
+    virtual void WINAPI ForceRemovePanelArchiver(const wchar_t* extension);
 
-    virtual void WINAPI AddViewer(const char* masks, BOOL force);
-    virtual void WINAPI ForceRemoveViewer(const char* mask);
+    virtual void WINAPI AddViewer(const wchar_t* masks, BOOL force);
+    virtual void WINAPI ForceRemoveViewer(const wchar_t* mask);
 
-    virtual void WINAPI AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+    virtual void WINAPI AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState,
                                     DWORD state_or, DWORD state_and, DWORD skillLevel);
-    virtual void WINAPI AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+    virtual void WINAPI AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState,
                                         DWORD state_or, DWORD state_and, DWORD skillLevel);
     virtual void WINAPI AddSubmenuEnd();
-    virtual void WINAPI SetChangeDriveMenuItem(const char* title, int iconIndex);
-    virtual void WINAPI SetThumbnailLoader(const char* masks);
+    virtual void WINAPI SetChangeDriveMenuItem(const wchar_t* title, int iconIndex);
+    virtual void WINAPI SetThumbnailLoader(const wchar_t* masks);
 
     virtual void WINAPI SetBitmapWithIcons(HBITMAP bitmap);
     virtual void WINAPI SetPluginIcon(int iconIndex);
@@ -3413,9 +3404,9 @@ public:
             TRACE_E("CSalamanderBuildMenu::~CSalamanderBuildMenu(): missing end of submenu (see CSalamanderBuildMenu::AddSubmenuEnd())!");
     }
 
-    virtual void WINAPI AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+    virtual void WINAPI AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState,
                                     DWORD state_or, DWORD state_and, DWORD skillLevel);
-    virtual void WINAPI AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+    virtual void WINAPI AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState,
                                         DWORD state_or, DWORD state_and, DWORD skillLevel);
     virtual void WINAPI AddSubmenuEnd();
 
@@ -3431,5 +3422,4 @@ BOOL CreateGrayscaleDIB(HBITMAP hSource, COLORREF transparent, HBITMAP& hGraysca
 
 // executes the conversion of a path to the external format (calls the corresponding plugin method)
 // CPluginInterfaceForFSAbstract::ConvertPathToExternal())
-void PluginFSConvertPathToExternal(char* path);
-
+void PluginFSConvertPathToExternal(std::wstring& path);

@@ -13,6 +13,7 @@
 #include "tar.rh"
 #include "tar.rh2"
 #include "lang\lang.rh"
+#include "../shared/plugin_local_path.h"
 
 // TODO: resolve case sensitivity
 // TODO: handle multiple files with the same name in one archive
@@ -44,7 +45,7 @@
 
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 5
-const char* CONFIG_VERSION = "Version";
+const wchar_t* CONFIG_VERSION = L"Version";
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -74,19 +75,21 @@ HINSTANCE HLanguage = NULL;   // handle to the SLG - language-dependent resource
 //
 
 // loads a string from the DLL
-char* LoadStr(int resID)
+// SalamanderGeneral->LoadStr returns UTF-16 in the live v108 interface. Keep the
+// resource text dynamically owned so callers never borrow mutable SDK scratch.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 // combines a resource string with an optional error string
-char* LoadErr(int resID, DWORD LastError)
+const wchar_t* LoadErr(int resID, DWORD LastError)
 {
-    static char buffer[1000];
-    strcpy(buffer, LoadStr(resID));
+    static std::wstring buffer;
+    buffer = LangStr(resID).c_str();
     if (LastError != 0)
-        strcat(buffer, SalamanderGeneral->GetErrorText(LastError));
-    return buffer;
+        buffer += SPLGetErrorTextOwned(SalamanderGeneral, LastError);
+    return buffer.c_str();
 }
 
 //
@@ -133,14 +136,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (salamander->GetVersion() < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "TAR" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-219).
+        MessageBoxW(salamander->GetParentWindow(),
+                    _CRT_WIDE(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"TAR" /* do not translate! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // let Salamander load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "TAR" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"TAR" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -152,29 +157,26 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     TRACE_I("SalamanderPluginEntry called, Salamander version " << salamander->GetVersion());
 
     // set basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_LOADSAVECONFIGURATION |
                                        FUNCTION_PANELARCHIVERVIEW | FUNCTION_CUSTOMARCHIVERUNPACK |
                                        FUNCTION_VIEWER,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "TAR" /* do not translate! */, "tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio;deb");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"TAR" /* do not translate! */, L"tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio;deb");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\nbzip2 library Copyright © 1996-2010 Julian R Seward\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = LangStr(IDS_PLUGINNAME) + L" " _CRT_WIDE(VERSINFO_VERSION) L"\n\n" _CRT_WIDE(VERSINFO_COPYRIGHT)
+                                                        L"\nbzip2 library Copyright © 1996-2010 Julian R Seward\n\n" +
+                              LangStr(IDS_PLUGIN_DESCRIPTION);
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
@@ -206,27 +208,27 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     CALL_STACK_MESSAGE1("CPluginInterface::Connect()");
 
     // base part:
-    salamander->AddCustomUnpacker("TAR (Plugin)",
-                                  "*.tar;*.tgz;*.tbz;*.taz;"
-                                  "*.tar.gz;*.tar.bz;*.tar.bz2;*.tar.z;"
-                                  "*_tar.gz;*_tar.bz;*_tar.bz2;*_tar.z;"
-                                  "*_tar_gz;*_tar_bz;*_tar_bz2;*_tar_z;"
-                                  "*.tar_gz;*.tar_bz;*.tar_bz2;*.tar_z;"
-                                  "*.gz;*.bz;*.bz2;*.z;"
-                                  "*.rpm;*.cpio;*.deb",
-                                  ConfigVersion < 5);                                       // ignored during upgrades except when upgrading to version 4 - required update because of "*.z" and others
-    salamander->AddPanelArchiver("tgz;tbz;taz;tar;gz;bz;bz2;z;rpm;cpio;deb", FALSE, FALSE); // ignored when upgrading the plugin
-    salamander->AddViewer("*.rpm", FALSE);                                                  // ignored when upgrading the plugin except when upgrading from a version without the viewer (the version shipped with SS 2.0)
+    salamander->AddCustomUnpacker(L"TAR (Plugin)",
+                                  L"*.tar;*.tgz;*.tbz;*.taz;"
+                                  L"*.tar.gz;*.tar.bz;*.tar.bz2;*.tar.z;"
+                                  L"*_tar.gz;*_tar.bz;*_tar.bz2;*_tar.z;"
+                                  L"*_tar_gz;*_tar_bz;*_tar_bz2;*_tar_z;"
+                                  L"*.tar_gz;*.tar_bz;*.tar_bz2;*.tar_z;"
+                                  L"*.gz;*.bz;*.bz2;*.z;"
+                                  L"*.rpm;*.cpio;*.deb",
+                                  ConfigVersion < 5);                                        // ignored during upgrades except when upgrading to version 4 - required update because of "*.z" and others
+    salamander->AddPanelArchiver(L"tgz;tbz;taz;tar;gz;bz;bz2;z;rpm;cpio;deb", FALSE, FALSE); // ignored when upgrading the plugin
+    salamander->AddViewer(L"*.rpm", FALSE);                                                  // ignored when upgrading the plugin except when upgrading from a version without the viewer (the version shipped with SS 2.0)
 
     // section for upgrades:
     if (ConfigVersion < 1) // 1 - work-in-progress version before Servant Salamander 2.5 beta 1, added tbz, bz, bz2, and rpm
     {
-        salamander->AddPanelArchiver("tbz;bz;bz2;rpm", FALSE, TRUE);
+        salamander->AddPanelArchiver(L"tbz;bz;bz2;rpm", FALSE, TRUE);
     }
 
     if (ConfigVersion < 2) // 2 - work-in-progress version before Servant Salamander 2.5 beta 1, added cpio (including the *.cpio viewer - that was a mistake)
     {
-        salamander->AddPanelArchiver("cpio", FALSE, TRUE);
+        salamander->AddPanelArchiver(L"cpio", FALSE, TRUE);
 
         // adding *.cpio was a mistake, version 3 removes it again
         //salamander->AddViewer("*.cpio", TRUE);
@@ -241,11 +243,11 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
 
     if (ConfigVersion < 4) // 4 - work-in-progress version before Servant Salamander 2.5 beta 1, added .z archives
     {
-        salamander->AddPanelArchiver("taz;z", FALSE, TRUE);
+        salamander->AddPanelArchiver(L"taz;z", FALSE, TRUE);
     }
     if (ConfigVersion < 5) // 5 - work-in-progress version before Servant Salamander 2.52 beta 2, added .deb archives
     {
-        salamander->AddPanelArchiver("deb", FALSE, TRUE);
+        salamander->AddPanelArchiver(L"deb", FALSE, TRUE);
     }
 }
 
@@ -270,11 +272,11 @@ CPluginInterface::GetInterfaceForViewer()
 //
 
 BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander,
-                                              const char* fileName,
+                                              const wchar_t* fileName,
                                               CSalamanderDirectoryAbstract* dir,
                                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %ls, ,)", fileName);
     pluginData = NULL;
 
     // create the archive object
@@ -290,11 +292,11 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const char* targetDir, const char* archiveRoot,
+                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                                const wchar_t* targetDir, const wchar_t* archiveRoot,
                                                 SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, , %s, %s,,,)",
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, , %ls, %ls,,,)",
                         fileName, targetDir, archiveRoot);
 
     // create the archive object
@@ -310,12 +312,12 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const char* nameInArchive, const CFileData* fileData,
-                                                const char* targetDir, const char* newFileName,
+                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                                const wchar_t* nameInArchive, const CFileData* fileData,
+                                                const wchar_t* targetDir, const wchar_t* newFileName,
                                                 BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, , %s, , %s, ,)",
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, , %ls, , %ls, ,)",
                         fileName, nameInArchive, targetDir);
 
     // create the archive object
@@ -331,11 +333,11 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander,
-                                                     const char* fileName, const char* mask,
-                                                     const char* targetDir, BOOL delArchiveWhenDone,
+                                                     const wchar_t* fileName, const wchar_t* mask,
+                                                     const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                                      CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
     // create the archive object
@@ -388,12 +390,12 @@ CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbstract 
 // 'viewerData' is not NULL, it passes extended parameters to the viewer (see
 // CSalamanderGeneralAbstract::ViewFileInPluginViewer). Returns TRUE on success
 // (FALSE indicates failure; 'unlock' and 'unlockOwner' have no meaning in that case)
-BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, int width, int height,
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                          UINT showCmd, BOOL alwaysOnTop, BOOL returnUnlock, HANDLE* unlock,
                                          BOOL* unlockOwner, CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
 {
-    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%s, %d, %d, %d, %d, "
+    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%ls, %d, %d, %d, %d, "
                          "0x%X, %d, %d, , , , %d, %d)",
                          name, left, top, width, height,
                          showCmd, alwaysOnTop, returnUnlock, enumFilesSourceUID, enumFilesCurrentIndex);
@@ -406,14 +408,16 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
     // open the input file
-    HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                             FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    std::wstring ioPath;
+    HANDLE file = PreparePluginLocalPathForIo(name, ioPath)
+                      ? CreateFileW(ioPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                    FILE_FLAG_SEQUENTIAL_SCAN, NULL)
+                      : INVALID_HANDLE_VALUE;
     if (file == INVALID_HANDLE_VALUE)
     {
         int err = GetLastError();
         SetCursor(hOldCur);
-        SalamanderGeneral->ShowMessageBox(LoadErr(IDS_GZERR_FOPEN, err),
-                                          LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(IDS_GZERR_FOPEN, err), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // allocate a buffer for reading the file
@@ -421,7 +425,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     if (buffer == NULL)
     {
         SetCursor(hOldCur);
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
         CloseHandle(file);
         return FALSE;
@@ -435,32 +439,36 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
         SetCursor(hOldCur);
         free(buffer);
         CloseHandle(file);
-        SalamanderGeneral->ShowMessageBox(LoadErr(IDS_ERR_FREAD, err), LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LoadErr(IDS_ERR_FREAD, err), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // obtain a name for the temporary text file with the results
-    CPathBuffer tempFileName; // Heap-allocated for long path support
-    if (!SalamanderGeneral->SalGetTempFileName(NULL, "RPV", tempFileName, TRUE, NULL))
+    std::wstring tempFileName;
+    if (!SPLSalGetTempFileNameOwned(SalamanderGeneral, NULL, L"RPV",
+                                    tempFileName, TRUE, NULL))
     {
         SetCursor(hOldCur);
         free(buffer);
         CloseHandle(file);
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_RPMERR_TMPNAME), LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_RPMERR_TMPNAME).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
 
     // create the temporary file
-    FILE* fContents = fopen(tempFileName, "wt");
+    FILE* fContents = NULL;
+    _wfopen_s(&fContents, tempFileName.c_str(), L"wt");
     if (fContents == NULL)
     {
-        char buff[500];
         SetCursor(hOldCur);
         free(buffer);
         CloseHandle(file);
-        buff[499] = '\0';
-        strcpy(buff, LoadStr(IDS_RPMERR_TMPFILE));
-        strncat(buff, name, 499 - strlen(buff));
-        SalamanderGeneral->ShowMessageBox(buff, LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
+        // Built WIDE. The old form composed into char[500] and narrowed
+        // the archive name through ACP purely to widen the result again for the
+        // message box - so a non-ANSI archive name was mangled in a path that never
+        // needed a narrow form at all.
+        std::wstring msg(LangStr(IDS_RPMERR_TMPFILE).c_str());
+        msg += name;
+        SalamanderGeneral->ShowMessageBox(msg.c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // create the RPM object and fill the temporary file with information
@@ -469,10 +477,10 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     {
         SetCursor(hOldCur);
         fclose(fContents);
-        DeleteFile(tempFileName);
+        DeleteFileW(tempFileName.c_str());
         free(buffer);
         CloseHandle(file);
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(), MSGBOX_ERROR);
         return FALSE;
     }
     // TODO: probably make sure errors are not reported inside and only a flag is set according to the error
@@ -480,14 +488,13 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     {
         SetCursor(hOldCur);
         fclose(fContents);
-        DeleteFile(tempFileName);
+        DeleteFileW(tempFileName.c_str());
         free(buffer);
         CloseHandle(file);
         if (archive->GetErrorCode() == 0)
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_NORPM), LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_NORPM).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(), MSGBOX_ERROR);
         else
-            SalamanderGeneral->ShowMessageBox(LoadStr(archive->GetErrorCode()),
-                                              LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LangStr(archive->GetErrorCode()).c_str(), LangStr(IDS_ERR_RPMTITLE).c_str(), MSGBOX_ERROR);
         delete archive;
         return FALSE;
     }
@@ -500,17 +507,16 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     // prepare the structure for Salamander's text viewer
     CSalamanderPluginInternalViewerData textViewerData;
     textViewerData.Size = sizeof(textViewerData);
-    textViewerData.FileName = tempFileName;
+    textViewerData.FileName = tempFileName.c_str();
     textViewerData.Mode = 0; // text mode
-    char caption[500];
-    strncpy_s(caption, 451, name, _TRUNCATE);
-    strcat(caption, " - ");
-    strcat(caption, LoadStr(IDS_RPM_VIEWTITLE));
-    textViewerData.Caption = caption;
+    std::wstring caption = name;
+    caption += L" - ";
+    caption += LangStr(IDS_RPM_VIEWTITLE);
+    textViewerData.Caption = caption.c_str();
     textViewerData.WholeCaption = TRUE;
     // show the file in Salamander's text viewer and delete it afterwards
     int err;
-    SalamanderGeneral->ViewFileInPluginViewer(NULL, &textViewerData, TRUE, NULL, "rpm_dump.txt", err);
+    SalamanderGeneral->ViewFileInPluginViewer(NULL, &textViewerData, TRUE, NULL, L"rpm_dump.txt", err);
 
     // and finally clean up
     SetCursor(hOldCur);

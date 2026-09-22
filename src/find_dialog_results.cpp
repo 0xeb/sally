@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include "ui/UnicodeHistoryUtils.h"
 #include "combo_dark_paint.h"
 
 #include <vector>
@@ -11,11 +13,14 @@
 #include "find_dialog_theme_ids.h"
 #include "ui/IPrompter.h"
 #include "common/IFileSystem.h"
+#include "common/PathDisplayUtils.h" // MakeCompactPathBuffer
 #include "common/unicode/ComboSyncPolicy.h"
+#include "common/unicode/PanelPathPolicy.h"
 #include "common/unicode/helpers.h"
 #include "common/find/FindDialogSeed.h"
 #include "common/find/FindResultPersistence.h"
-#include "common/find/FindRowPolicy.h"
+#include "common/find/FindActionPaths.h"
+#include "common/text/LegacySearchTextEncoding.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -32,8 +37,10 @@
 #include <shlwapi.h>
 #include <uxtheme.h>
 
-const char* MINIMIZED_FINDING_CAPTION = "(%d) %s [%s %s]";
-const char* NORMAL_FINDING_CAPTION = "%s [%s %s]";
+// wide - the window title is built from a wide LoadStrW/GetMasksString
+// pair below; a narrow format string would force a lossy round trip on every use.
+const wchar_t* MINIMIZED_FINDING_CAPTION = L"(%d) %s [%s %s]";
+const wchar_t* NORMAL_FINDING_CAPTION = L"%s [%s %s]";
 
 BOOL FindManageInUse = FALSE;
 BOOL FindIgnoreInUse = FALSE;
@@ -43,10 +50,7 @@ static const UINT_PTR FIND_COMBO_EDIT_SKIN_SUBCLASS_ID = 2;
 static const UINT_PTR FIND_ADVANCED_TEXT_SKIN_SUBCLASS_ID = 3;
 static const UINT_PTR FIND_STATUS_SKIN_SUBCLASS_ID = 1;
 static const UINT WM_USER_FIND_DELAYED_THEME = WM_APP + 500;
-// Replace the "Look in" combo with a Unicode combo after the framework's
-// TransferData(ttDataToWindow) runs. The legacy Transfer path is ANSI and may
-// already have populated the combo with lossy text such as "zz??"; by posting
-// this work we can copy that history and then make the wide seed visible.
+// Reapply the active-panel seed after the framework's initial transfer.
 static const UINT WM_USER_FIND_LOOKIN_W_OVERRIDE = WM_APP + 501;
 static const COLORREF FIND_DARK_LINE = RGB(55, 55, 58);
 static const COLORREF FIND_DARK_FRAME = RGB(62, 62, 66);
@@ -79,32 +83,6 @@ static LRESULT CALLBACK FindAdvancedTextSkinSubclassProc(HWND hwnd, UINT uMsg, W
 static LRESULT CALLBACK FindStatusSkinSubclassProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 static void ApplyFindComboEditSkin(HWND hEdit, BOOL useDark);
 
-static void CopyWideLookInToAnsiMirror(const std::wstring& textW, CPathBuffer& textA)
-{
-    int bufferSize = (int)textA.Size();
-    if (bufferSize <= 0)
-        return;
-
-    BOOL usedDefaultChar = FALSE;
-    int copied = WideCharToMultiByte(CP_ACP, 0, textW.c_str(), -1,
-                                     textA.Get(), bufferSize, "?", &usedDefaultChar);
-    if (copied <= 0)
-        textA[0] = 0;
-    textA[bufferSize - 1] = 0;
-}
-
-static BOOL IsFindLookInFocus(HWND hFocus, HWND hCombo)
-{
-    if (hFocus == NULL || hCombo == NULL)
-        return FALSE;
-    if (hFocus == hCombo)
-        return TRUE;
-
-    COMBOBOXINFO cbi = {0};
-    cbi.cbSize = sizeof(cbi);
-    return GetComboBoxInfo(hCombo, &cbi) && hFocus == cbi.hwndItem;
-}
-
 static void EscapeFindLookInPathSeparatorsW(std::wstring& text)
 {
     for (size_t pos = 0; pos < text.length(); pos++)
@@ -117,11 +95,61 @@ static void EscapeFindLookInPathSeparatorsW(std::wstring& text)
     }
 }
 
-static void ReplaceFindLookInSelectionW(CUnicodeNameInputController& input,
+// Read a control's text wide. Replaces
+// CUnicodeNameInputController::GetText() now that the Look-in combo is the
+// dialog's own control rather than a replacement the controller owned.
+static std::wstring GetWindowTextWide(HWND hWnd)
+{
+    if (hWnd == NULL)
+        return std::wstring();
+    const int len = GetWindowTextLengthW(hWnd);
+    if (len <= 0)
+        return std::wstring();
+    std::vector<wchar_t> buffer((size_t)len + 1, 0);
+    GetWindowTextW(hWnd, buffer.data(), len + 1);
+    return std::wstring(buffer.data());
+}
+
+// Takes the combo HWND directly; it used to take the controller by
+// reference, which was the last thing tying this helper to that class.
+// Puts the Look-in combo into wide mode. Replaces
+// CUnicodeNameInputController::EnableForCombo, which used to hide this combo and
+// build a Unicode replacement; since P0.5a the native control keeps wide text with
+// the word-break subclass installed, so only seeding and the font remain.
+// Keeps at most one font clone; the caller frees it on WM_DESTROY.
+static void ActivateWideLookInCombo(HWND hDlg, const std::wstring& textW, HFONT& ownedFont)
+{
+    HWND hCombo = GetDlgItem(hDlg, IDC_FIND_LOOKIN);
+    if (hCombo == NULL)
+        return;
+
+    // Never free the font while the combo still has it selected.
+    //
+    // Freeing first and asking afterwards was not merely a window in which a paint
+    // could touch freed GDI memory. EnsureComboFontCanRenderW returns NULL whenever
+    // the combo's CURRENT font already copes - which is exactly the case once our own
+    // clone (created with DEFAULT_CHARSET) is installed - so on the second call the
+    // old code deleted that clone, got NULL back, and left the control holding a dead
+    // handle indefinitely.
+    HFONT replacement = EnsureComboFontCanRenderW(hCombo, textW.c_str());
+    if (replacement != NULL)
+    {
+        // A new clone is selected now, so nothing points at the previous one.
+        if (ownedFont != NULL)
+            DeleteObject(ownedFont);
+        ownedFont = replacement;
+    }
+    // Otherwise the font in place already renders this text - often because it IS
+    // the clone we own - so keep it selected and keep owning it.
+
+    SendMessageW(hCombo, WM_SETTEXT, 0, (LPARAM)textW.c_str());
+}
+
+static void ReplaceFindLookInSelectionW(HWND hCombo,
                                         const std::wstring& replacement,
                                         DWORD start, DWORD end)
 {
-    std::wstring text = input.GetText();
+    std::wstring text = GetWindowTextWide(hCombo);
     size_t startPos = start;
     size_t endPos = end;
     if (startPos > text.length())
@@ -158,11 +186,11 @@ static void ReplaceFindLookInSelectionW(CUnicodeNameInputController& input,
     }
 
     text.replace(startPos, endPos - startPos, insert);
-    input.SetText(text);
+    SendMessageW(hCombo, WM_SETTEXT, 0, (LPARAM)text.c_str());
 
     DWORD caret = (DWORD)(startPos + insert.length());
-    SendMessage(input.GetControlHandle(), CB_SETEDITSEL, 0, MAKELPARAM(caret, caret));
-    SetFocus(input.GetControlHandle());
+    SendMessage(hCombo, CB_SETEDITSEL, 0, MAKELPARAM(caret, caret));
+    SetFocus(hCombo);
 }
 
 static int CompareFindTextW(const std::wstring& left, const std::wstring& right)
@@ -278,27 +306,6 @@ static std::wstring LoadFindResultsFilterW()
     return filter;
 }
 
-static BOOL SafeFindResultsFileDialogW(OPENFILENAMEW* ofn, BOOL save)
-{
-    BOOL ret = save ? GetSaveFileNameW(ofn) : GetOpenFileNameW(ofn);
-    if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
-    {
-        std::wstring initDir;
-        const wchar_t* oldInitDir = ofn->lpstrInitialDir;
-        if (!GetMyDocumentsOrDesktopPathW(initDir))
-            initDir.clear();
-        ofn->lpstrInitialDir = initDir.empty() ? NULL : initDir.c_str();
-        if (ofn->lpstrFile != NULL && ofn->nMaxFile > 0)
-            ofn->lpstrFile[0] = L'\0';
-        ret = save ? GetSaveFileNameW(ofn) : GetOpenFileNameW(ofn);
-        ofn->lpstrInitialDir = oldInitDir;
-    }
-    DWORD dlgError = CommDlgExtendedError();
-    if (!ret && dlgError != 0)
-        TRACE_E("Cannot open Find results file dialog. CommDlgExtendedError()=" << dlgError);
-    return ret;
-}
-
 static bool FindResultsPathHasExtensionW(const std::wstring& fileName)
 {
     size_t slash = fileName.find_last_of(L"\\/");
@@ -324,15 +331,12 @@ static bool ConfirmFindResultsOverwriteIfNeeded(const std::wstring& fileName, bo
 static bool BrowseFindResultsFileNameW(HWND owner, BOOL save, std::wstring& fileName,
                                        sally::find::FindResultsFormat& format)
 {
-    std::vector<wchar_t> fileBuffer(32768, L'\0');
     std::wstring filter = LoadFindResultsFilterW();
 
     OPENFILENAMEW ofn = {};
     ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = owner;
     ofn.lpstrFilter = filter.c_str();
-    ofn.lpstrFile = fileBuffer.data();
-    ofn.nMaxFile = (DWORD)fileBuffer.size();
     ofn.nFilterIndex = 1;
     ofn.lpstrTitle = LoadStrW(save ? IDS_FIND_RESULTS_SAVE_TITLE : IDS_FIND_RESULTS_LOAD_TITLE);
     ofn.Flags = OFN_EXPLORER | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
@@ -341,10 +345,10 @@ static bool BrowseFindResultsFileNameW(HWND owner, BOOL save, std::wstring& file
     else
         ofn.Flags |= OFN_FILEMUSTEXIST;
 
-    if (!SafeFindResultsFileDialogW(&ofn, save))
+    const BOOL selected = save ? SafeGetSaveFileNameOwnedW(&ofn, fileName)
+                               : SafeGetOpenFileNameOwnedW(&ofn, fileName);
+    if (!selected)
         return false;
-
-    fileName = fileBuffer.data();
     if (!sally::find::TryFindResultsFormatFromPathOrFilter(fileName, ofn.nFilterIndex, &format))
     {
         if (gPrompter != NULL)
@@ -1175,7 +1179,7 @@ void CFindOptions::InitMenu(CMenuPopup* popup, BOOL enabled, int originalCount)
             if (Items[i]->AutoLoad)
                 mii.State |= MENU_STATE_DEFAULT;
             mii.ID = CM_FIND_OPTIONS_FIRST + i;
-            mii.String = Items[i]->ItemName;
+            mii.String = const_cast<wchar_t*>(Items[i]->ItemName.c_str());
             popup->InsertItem(-1, TRUE, &mii);
         }
     }
@@ -1186,89 +1190,20 @@ void CFindOptions::InitMenu(CMenuPopup* popup, BOOL enabled, int originalCount)
 // CFoundFilesData
 //
 
-BOOL CFoundFilesData::Set(const char* path, const char* name, const CQuadWord& size, DWORD attr,
+BOOL CFoundFilesData::Set(const wchar_t* path, const wchar_t* name, const CQuadWord& size, DWORD attr,
                           const FILETIME* lastWrite, BOOL isDir)
 {
-    return Set(path, name, NULL, NULL, size, attr, lastWrite, isDir);
-}
-
-BOOL CFoundFilesData::Set(const char* path, const char* name, const wchar_t* pathW, const wchar_t* nameW,
-                          const CQuadWord& size, DWORD attr, const FILETIME* lastWrite, BOOL isDir)
-{
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE5("CFoundFilesData::Set(%s, %s, %g, 0x%X, )", path, name, size.GetDouble(), attr);
-    Path = path;
-    Name = name;
-    PathW = pathW != NULL && pathW[0] != L'\0' ? pathW : AnsiToWide(path);
-    NameW = nameW != NULL && nameW[0] != L'\0' ? nameW : AnsiToWide(name);
+    //  CALL_STACK_MESSAGE5("CFoundFilesData::Set(%ls, %ls, %g, 0x%X, )", path, name, size.GetDouble(), attr);
+    // was a four-argument mirror: narrow path/name stored as-is, wide halves
+    // taken from the caller when supplied and AnsiToWide()d from the narrow half otherwise.
+    PathW = path != NULL ? path : L"";
+    NameW = name != NULL ? name : L"";
     Size = size;
     Attr = attr;
     LastWrite = *lastWrite;
     IsDir = isDir ? 1 : 0;
     return TRUE;
-}
-
-char* CFoundFilesData::GetText(int i, char* text, int fileNameFormat)
-{
-    // several FIND windows may run in parallel, which could overwrite this static buffer
-    //  static char text[50];
-    switch (i)
-    {
-    case 0:
-    {
-        AlterFileName(text, Name.c_str(), -1, fileNameFormat, 0, IsDir);
-        return text;
-    }
-
-    case 1:
-        return const_cast<char*>(Path.c_str());
-
-    case 2:
-    {
-        if (IsDir)
-            CopyMemory(text, DirColumnStr.c_str(), DirColumnStrLen + 1);
-        else
-            NumberToStr(text, Size);
-        break;
-    }
-
-    case 3:
-    {
-        SYSTEMTIME st;
-        FILETIME ft;
-        if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
-            FileTimeToSystemTime(&ft, &st))
-        {
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) == 0)
-                sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        }
-        else
-            strcpy(text, LoadStr(IDS_INVALID_DATEORTIME));
-        break;
-    }
-
-    case 4:
-    {
-        SYSTEMTIME st;
-        FILETIME ft;
-        if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
-            FileTimeToSystemTime(&ft, &st))
-        {
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
-                sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        }
-        else
-            strcpy(text, LoadStr(IDS_INVALID_DATEORTIME));
-        break;
-    }
-
-    default:
-    {
-        GetAttrsString(text, Attr);
-        break;
-    }
-    }
-    return text;
 }
 
 std::wstring CFoundFilesData::GetNameTextW(int fileNameFormat) const
@@ -1307,11 +1242,9 @@ std::wstring CFoundFilesData::GetTextW(int i, int fileNameFormat) const
     case 2:
     {
         if (IsDir)
-            return AnsiToWide(DirColumnStr.c_str());
+            return DirColumnStrW.c_str();
 
-        char number[50];
-        NumberToStr(number, Size);
-        return AnsiToWide(number);
+        return NumberToStr(Size);
     }
 
     case 3:
@@ -1348,9 +1281,9 @@ std::wstring CFoundFilesData::GetTextW(int i, int fileNameFormat) const
 
     default:
     {
-        char attrs[20];
-        GetAttrsString(attrs, Attr);
-        return AnsiToWide(attrs);
+        wchar_t attrs[20];
+        GetAttrsStringW(attrs, Attr);
+        return attrs;
     }
     }
 }
@@ -1457,11 +1390,10 @@ CFoundFilesListView::GetDataForRefine(int index)
     return ptr;
 }
 
-DWORD
-CFoundFilesListView::GetSelectedListSize()
+void CFoundFilesListView::GetSelectedPaths(std::vector<std::wstring>& paths)
 {
     // this method is invoked only from the main thread
-    DWORD size = 0;
+    paths.clear();
     int index = -1;
     do
     {
@@ -1469,76 +1401,10 @@ CFoundFilesListView::GetSelectedListSize()
         if (index != -1)
         {
             CFoundFilesData* ptr = Data[index];
-            int pathLen = (int)ptr->PathW.length();
-            if (pathLen == 0 || ptr->PathW.back() != L'\\')
-                pathLen++; // if the path does not end with a backslash, reserve space for it
-            int nameLen = (int)ptr->NameW.length();
-            size += pathLen + nameLen + 1; // reserve space for the terminator
+            paths.push_back(sally::unicode::BuildPanelChildPathW(
+                ptr->PathW.c_str(), ptr->NameW.c_str()));
         }
     } while (index != -1);
-    if (size == 0)
-        size = 2;
-    else
-        size++;
-
-    return size;
-}
-
-BOOL CFoundFilesListView::GetSelectedList(wchar_t* list, DWORD maxSize)
-{
-    DWORD size = 0;
-    int index = -1;
-    do
-    {
-        index = ListView_GetNextItem(HWindow, index, LVIS_SELECTED);
-        if (index != -1)
-        {
-            CFoundFilesData* ptr = Data[index];
-            int pathLen = (int)ptr->PathW.length();
-            BOOL needsSlash = pathLen == 0 || ptr->PathW.back() != L'\\';
-            if (needsSlash)
-                size++; // if the path does not end with a backslash, reserve space for it
-            size += pathLen;
-            if (size > maxSize)
-            {
-                TRACE_E("Buffer is too short");
-                return FALSE;
-            }
-            memmove(list, ptr->PathW.c_str(), pathLen * sizeof(wchar_t));
-            list += pathLen;
-            if (needsSlash)
-                *list++ = L'\\';
-            int nameLen = (int)ptr->NameW.length();
-            size += nameLen + 1; // reserve space for the terminator
-            if (size > maxSize)
-            {
-                TRACE_E("Buffer is too short");
-                return FALSE;
-            }
-            memmove(list, ptr->NameW.c_str(), (nameLen + 1) * sizeof(wchar_t));
-            list += nameLen + 1;
-        }
-    } while (index != -1);
-    if (size == 0)
-    {
-        if (size + 2 > maxSize)
-        {
-            TRACE_E("Buffer is too short");
-            return FALSE;
-        }
-        *list++ = L'\0';
-        *list++ = L'\0';
-    }
-    else
-    {
-        if (size + 1 > maxSize)
-        {
-            TRACE_E("Buffer is too short");
-            return FALSE;
-        }
-        *list++ = L'\0';
-    }
-    return TRUE;
 }
 
 void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int lastFocusedIndex, const CFoundFilesData* lastFocusedItem)
@@ -1556,7 +1422,8 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
             if (!forceRemove)
             {
                 std::wstring fullPath = ptr->GetFullNameW();
-                remove = (GetFileAttributesW(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES);
+                IFileSystem* fs = gFileSystem != NULL ? gFileSystem : GetWin32FileSystem();
+                remove = (fs->GetFileAttributes(fullPath.c_str()) == INVALID_FILE_ATTRIBUTES);
             }
             if (remove)
             {
@@ -2022,7 +1889,7 @@ struct CUMDataFromFind
 };
 
 // description -- see mainwnd.h
-BOOL GetNextItemFromFind(int index, char* path, char* name, void* param)
+BOOL GetNextItemFromFind(int index, std::wstring& path, std::wstring& name, void* param)
 {
     CALL_STACK_MESSAGE2("GetNextItemFromFind(%d, , ,)", index);
     CUMDataFromFind* data = (CUMDataFromFind*)param;
@@ -2057,8 +1924,8 @@ BOOL GetNextItemFromFind(int index, char* path, char* name, void* param)
     if (index >= 0 && index < data->Count)
     {
         CFoundFilesData* file = listView->At(data->Index[index]);
-        strcpy(path, file->Path.c_str());
-        strcpy(name, file->Name.c_str());
+        path = file->PathW;
+        name = file->NameW;
         return TRUE;
     }
     if (data->Index != NULL)
@@ -2069,17 +1936,19 @@ BOOL GetNextItemFromFind(int index, char* path, char* name, void* param)
     return FALSE;
 }
 
-static void ApplyInitialFindLookInSeed(HWND hCombo, const sally::find::LookInSeed& seed, CPathBuffer& textA)
+static void ApplyInitialFindLookInSeed(HWND hCombo, const sally::find::LookInSeed& seed,
+                                      std::wstring& text)
 {
     if (hCombo == NULL || !sally::find::HasInitialLookInSeed(seed))
         return;
 
-    std::string initialLookIn = sally::find::BuildInitialLookInText(seed, textA.Get());
-    if (initialLookIn.empty())
+    std::wstring initialLookInW = seed.wide;
+    EscapeFindLookInPathSeparatorsW(initialLookInW);
+    if (initialLookInW.empty())
         return;
 
-    SendMessageA(hCombo, WM_SETTEXT, 0, (LPARAM)initialLookIn.c_str());
-    lstrcpyn(textA, initialLookIn.c_str(), textA.Size());
+    SendMessageW(hCombo, WM_SETTEXT, 0, (LPARAM)initialLookInW.c_str());
+    text = initialLookInW;
 }
 
 LRESULT
@@ -2147,10 +2016,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         BOOL nextIsButton;
         if (next != NULL)
         {
-            char className[30];
+            wchar_t className[30];
             WORD wl = LOWORD(GetWindowLongPtr(next, GWL_STYLE)); // only BS_ styles
-            nextIsButton = (GetClassName(next, className, 30) != 0 &&
-                            StrICmp(className, "BUTTON") == 0 &&
+            nextIsButton = (GetClassNameW(next, className, 30) != 0 &&
+                            StrICmpW(className, L"BUTTON") == 0 &&
                             (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON));
         }
         else
@@ -2202,16 +2071,14 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             else
             {
-                if (FileNamesEnumData.LastFileName[0] != 0) // the full name at 'index' is known; check for shifts and search for a new index if needed
+                if (!FileNamesEnumData.LastFileName.empty()) // the full name at 'index' is known; check for shifts and search for a new index if needed
                 {
                     BOOL ok = FALSE;
                     CFoundFilesData* f = (index >= 0 && index < count) ? Data[index] : NULL;
-                    CPathBuffer fileName; // Heap-allocated for long path support
-                    if (f != NULL && !f->Path.empty() && !f->Name.empty())
+                    if (f != NULL && !f->PathW.empty() && !f->NameW.empty())
                     {
-                        lstrcpyn(fileName, f->Path.c_str(), fileName.Size());
-                        SalPathAppend(fileName, f->Name.c_str(), fileName.Size());
-                        if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
+                        const std::wstring fileName = f->GetFullNameW();
+                        if (StrICmpW(fileName.c_str(), FileNamesEnumData.LastFileName.c_str()) == 0)
                         {
                             ok = TRUE;
                             indexNotFound = FALSE;
@@ -2223,11 +2090,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         for (i = 0; i < count; i++)
                         {
                             f = Data[i];
-                            if (!f->Path.empty() && !f->Name.empty())
+                            if (!f->PathW.empty() && !f->NameW.empty())
                             {
-                                lstrcpyn(fileName, f->Path.c_str(), fileName.Size());
-                                SalPathAppend(fileName, f->Name.c_str(), fileName.Size());
-                                if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
+                                const std::wstring fileName = f->GetFullNameW();
+                                if (StrICmpW(fileName.c_str(), FileNamesEnumData.LastFileName.c_str()) == 0)
                                     break;
                             }
                         }
@@ -2290,11 +2156,9 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 if (i != -1)
                                 {
                                     index = i;
-                                    if (!Data[index]->IsDir && // we only search for files
-                                        // the result goes out as an ANSI path — lossy rows are not enumerable
-                                        sally::find::RowActionableViaAnsi(Data[index]->PathW, Data[index]->NameW))
+                                    if (!Data[index]->IsDir) // we only search for files
                                     {
-                                        if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
+                                        if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->NameW.c_str(), NULL))
                                         {
                                             FileNamesEnumData.Found = TRUE;
                                             break;
@@ -2306,11 +2170,9 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                             else
                             {
-                                if (!Data[index]->IsDir &&
-                                    // the result goes out as an ANSI path — lossy rows are not enumerable
-                                    sally::find::RowActionableViaAnsi(Data[index]->PathW, Data[index]->NameW))
+                                if (!Data[index]->IsDir)
                                 {
-                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
+                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->NameW.c_str(), NULL))
                                     {
                                         FileNamesEnumData.Found = TRUE;
                                         break;
@@ -2338,12 +2200,10 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         {
                             index--;
                             if (!Data[index]->IsDir &&
-                                // the result goes out as an ANSI path — lossy rows are not enumerable
-                                sally::find::RowActionableViaAnsi(Data[index]->PathW, Data[index]->NameW) &&
                                 (!preferSelected ||
                                  (ListView_GetItemState(HWindow, index, LVIS_SELECTED) & LVIS_SELECTED)))
                             {
-                                if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->Name.c_str(), NULL))
+                                if (!onlyAssociatedExtensions || masks.AgreeMasks(Data[index]->NameW.c_str(), NULL))
                                 {
                                     FileNamesEnumData.Found = TRUE;
                                     break;
@@ -2381,10 +2241,11 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (FileNamesEnumData.Found)
             {
                 CFoundFilesData* f = Data[index];
-                if (!f->Path.empty() && !f->Name.empty())
+                if (!f->PathW.empty() && !f->NameW.empty())
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, f->Path.c_str(), MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, f->Name.c_str(), MAX_PATH);
+                    // wide result first, narrow FileName stays the mirror.
+                    FileNamesEnumData.FileNameW = f->PathW;
+                    SalPathAppendW(FileNamesEnumData.FileNameW, f->NameW.c_str());
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else // should never happen
@@ -2410,7 +2271,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CFoundFilesListView::InitColumns()
 {
     CALL_STACK_MESSAGE1("CFoundFilesListView::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[] = {IDS_FOUNDFILESCOLUMN1, IDS_FOUNDFILESCOLUMN2,
                     IDS_FOUNDFILESCOLUMN3, IDS_FOUNDFILESCOLUMN4,
                     IDS_FOUNDFILESCOLUMN5, IDS_FOUNDFILESCOLUMN6,
@@ -2423,19 +2284,24 @@ BOOL CFoundFilesListView::InitColumns()
     {
         if (i == 2)
             lvc.fmt = LVCFMT_RIGHT;
-        lvc.pszText = LoadStr(header[i]);
+        lvc.pszText = LoadStrW(header[i]);
         lvc.iSubItem = i;
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        if ((int)SendMessageW(HWindow, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc) == -1)
             return FALSE;
     }
+
+    auto getStringWidth = [this](const wchar_t* text) -> int
+    {
+        return (int)SendMessageW(HWindow, LVM_GETSTRINGWIDTHW, 0, (LPARAM)text);
+    };
 
     RECT r;
     GetClientRect(HWindow, &r);
     DWORD cx = r.right - r.left - 1;
-    ListView_SetColumnWidth(HWindow, 5, ListView_GetStringWidth(HWindow, "ARH") + 20);
+    ListView_SetColumnWidth(HWindow, 5, getStringWidth(L"ARH") + 20);
 
-    char format1[200];
-    char format2[200];
+    wchar_t format1[200];
+    wchar_t format2[200];
     SYSTEMTIME st;
     ZeroMemory(&st, sizeof(st));
     st.wYear = 2000; // the longest possible value
@@ -2444,28 +2310,28 @@ BOOL CFoundFilesListView::InitColumns()
     st.wHour = 10;   // morning (not sure whether AM or PM will be shorter, so try both)
     st.wMinute = 59; // the longest possible value
     st.wSecond = 59; // the longest possible value
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, format1, 200) == 0)
-        sprintf(format1, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+    if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, format1, 200) == 0)
+        _snwprintf_s(format1, _countof(format1), _TRUNCATE, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     st.wHour = 20; // afternoon
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, format2, 200) == 0)
-        sprintf(format2, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+    if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, format2, 200) == 0)
+        _snwprintf_s(format2, _countof(format2), _TRUNCATE, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
 
-    int maxWidth = ListView_GetStringWidth(HWindow, format1);
-    int w = ListView_GetStringWidth(HWindow, format2);
+    int maxWidth = getStringWidth(format1);
+    int w = getStringWidth(format2);
     if (w > maxWidth)
         maxWidth = w;
     ListView_SetColumnWidth(HWindow, 4, maxWidth + 20);
 
     maxWidth = 0;
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) == 0)
-        sprintf(format1, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) == 0)
+        _snwprintf_s(format1, _countof(format1), _TRUNCATE, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     else
     {
         // verify that the short date format does not contain alphabetic characters
-        const char* p = format1;
-        while (*p != 0 && !IsAlpha[*p])
+        const wchar_t* p = format1;
+        while (*p != 0 && !IsCharAlphaW(*p))
             p++;
-        if (IsAlpha[*p])
+        if (IsCharAlphaW(*p))
         {
             // contains alphabetic characters -- we must find the longest month and day text
             int maxMonth = 0;
@@ -2475,9 +2341,9 @@ BOOL CFoundFilesListView::InitColumns()
             {
                 st.wDay = sats[mo];
                 st.wMonth = 1 + mo;
-                if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
+                if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
                 {
-                    w = ListView_GetStringWidth(HWindow, format1);
+                    w = getStringWidth(format1);
                     if (w > maxWidth)
                     {
                         maxWidth = w;
@@ -2490,9 +2356,9 @@ BOOL CFoundFilesListView::InitColumns()
                 st.wMonth = maxMonth;
                 for (st.wDay = 21; st.wDay < 28; st.wDay++) // all possible weekdays (doesn't have to start on Monday)
                 {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
+                    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
                     {
-                        w = ListView_GetStringWidth(HWindow, format1);
+                        w = getStringWidth(format1);
                         if (w > maxWidth)
                         {
                             maxWidth = w;
@@ -2503,13 +2369,13 @@ BOOL CFoundFilesListView::InitColumns()
         }
     }
 
-    ListView_SetColumnWidth(HWindow, 3, (maxWidth > 0 ? maxWidth : ListView_GetStringWidth(HWindow, format1)) + 20);
-    ListView_SetColumnWidth(HWindow, 2, ListView_GetStringWidth(HWindow, "000 000 000 000") + 20); // up to 1TB fits here
+    ListView_SetColumnWidth(HWindow, 3, (maxWidth > 0 ? maxWidth : getStringWidth(format1)) + 20);
+    ListView_SetColumnWidth(HWindow, 2, getStringWidth(L"000 000 000 000") + 20); // up to 1TB fits here
     int width;
     if (Configuration.FindColNameWidth != -1)
         width = Configuration.FindColNameWidth;
     else
-        width = 20 + ListView_GetStringWidth(HWindow, "XXXXXXXX.XXX") + 20;
+        width = 20 + getStringWidth(L"XXXXXXXX.XXX") + 20;
     ListView_SetColumnWidth(HWindow, 0, width);
     cx -= ListView_GetColumnWidth(HWindow, 0) + ListView_GetColumnWidth(HWindow, 2) +
           ListView_GetColumnWidth(HWindow, 3) + ListView_GetColumnWidth(HWindow, 4) +
@@ -2525,17 +2391,10 @@ BOOL CFoundFilesListView::InitColumns()
 // CFindDialog
 //
 
-CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_t* initPathW)
+CFindDialog::CFindDialog(HWND hCenterAgainst, const wchar_t* initPath)
     : CCommonDialog(HLanguage, IDD_FIND, NULL, ooStandard, hCenterAgainst),
       SearchForData(50, 10)
 {
-#ifndef _UNICODE
-    // Open as a Unicode dialog so the dialog template parses W and child
-    // controls are registered Unicode. Without this, CDialog::Execute uses
-    // DialogBoxParam (ANSI) and the Look-in replacement combo starts life
-    // behind an ANSI dialog boundary.
-    UnicodeWnd = TRUE;
-#endif
 
     // data needed to lay out the dialog
     FirstWMSize = TRUE;
@@ -2575,22 +2434,15 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_
     StateOfFindCloseQuery = sofcqNotUsed;
     CanClose = TRUE;
     GrepThread = NULL;
-    char buf[100];
-    sprintf(buf, "%s ", LoadStr(IDS_FF_SEARCHING));
+    wchar_t buf[100];
+    // was sprintf() into a wchar_t buffer with a narrow format and LoadStr.
+    _snwprintf_s(buf, _TRUNCATE, L"%ls ", LoadStrW(IDS_FF_SEARCHING));
     SearchingText.SetBase(buf);
     UpdateStatusBar = FALSE;
     ContextMenu = NULL;
     ZeroOnDestroy = NULL;
     OleInitialized = FALSE;
     ProcessingEscape = FALSE;
-#ifndef _UNICODE
-    // Keep the legacy edit subclass Unicode-capable for the fallback path.
-    // The non-CP_ACP Look-in case now uses CUnicodeNameInputController so it
-    // does not depend on this subclass for visible Unicode text.
-    EditLine = new CComboboxEdit(TRUE);
-#else
-    EditLine = new CComboboxEdit();
-#endif
     OKButton = NULL;
 
     FileNameFormat = Configuration.FileNameFormat;
@@ -2599,7 +2451,7 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_
     CacheBitmap = NULL;
     FlashIconsOnActivation = FALSE;
 
-    FindNowText[0] = 0;
+    FindNowText.clear();
 
     // if any option has AutoLoad set, load it now
     int i;
@@ -2621,18 +2473,18 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath, const wchar_
 
     // data for controls
     //
-    // The seed is stashed (not consumed here) so the deferred
-    // WM_USER_FIND_LOOKIN_W_OVERRIDE handler can decide whether to enable the
-    // Unicode edit control. We deliberately do NOT plant the wide form into
-    // LookInTextW from the constructor: LookInTextW is authoritative only
-    // when the Unicode control is enabled, and the override handler is the
-    // sole site that flips both states together.
-    InitialLookInSeed = sally::find::BuildLookInSeed(initPath, initPathW);
-    if (Data.NamedText[0] == 0)
-        lstrcpy(Data.NamedText, "*.*");
+    // The seed is reapplied by the deferred handler after initial history transfer.
+    InitialLookInSeed = sally::find::BuildLookInSeed(initPath);
+    LookInUnicodeFont = NULL;  // made only if the dialog font cannot render
+    if (Data.NamedText.empty())
+        Data.NamedText = L"*.*";
 
-    std::string initialLookIn = sally::find::BuildInitialLookInText(InitialLookInSeed, Data.LookInText.Get());
-    lstrcpyn(Data.LookInText, initialLookIn.c_str(), Data.LookInText.Size());
+    if (sally::find::HasInitialLookInSeed(InitialLookInSeed))
+    {
+        std::wstring initialLookIn = InitialLookInSeed.wide;
+        EscapeFindLookInPathSeparatorsW(initialLookIn);
+        Data.LookInText = initialLookIn;
+    }
 }
 
 CFindDialog::~CFindDialog()
@@ -2717,7 +2569,7 @@ void CFindDialog::SetTwoStatusParts(BOOL two, BOOL force)
         progressWidth = 104; // 100 plus the frame
         if (HProgressBar == NULL)
         {
-            HProgressBar = CreateWindowEx(0, PROGRESS_CLASS, NULL,
+            HProgressBar = CreateWindowExW(0, PROGRESS_CLASSW, NULL,
                                           WS_CHILD | PBS_SMOOTH,
                                           0, 0,
                                           progressWidth, r.bottom - 2,
@@ -2749,8 +2601,8 @@ void CFindDialog::SetTwoStatusParts(BOOL two, BOOL force)
         TwoParts = two;
         SendMessage(HStatusBar, WM_SETREDRAW, FALSE, 0); // when redraw is enabled, the status bar ends up with a stray frame
         SendMessage(HStatusBar, SB_SETPARTS, 3, (LPARAM)parts);
-        SendMessage(HStatusBar, SB_SETTEXT, 0 | SBT_NOBORDERS, (LPARAM) "");
-        SendMessage(HStatusBar, SB_SETTEXT, 2 | SBT_NOBORDERS, (LPARAM) "");
+        SendMessageW(HStatusBar, SB_SETTEXTW, 0 | SBT_NOBORDERS, (LPARAM)L"");
+        SendMessageW(HStatusBar, SB_SETTEXTW, 2 | SBT_NOBORDERS, (LPARAM)L"");
         SendMessage(HStatusBar, WM_SETREDRAW, TRUE, 0);
         InvalidateRect(HStatusBar, NULL, TRUE);
     }
@@ -2928,15 +2780,14 @@ void CFindDialog::Validate(CTransferInfo& ti)
         ti.GetControl(hLookInWnd, IDC_FIND_LOOKIN))
     {
         // back up the data
-        CPathBuffer bufNamed;
-        CPathBuffer bufLookIn;
-        strcpy(bufNamed, Data.NamedText);
-        strcpy(bufLookIn, Data.LookInText);
+        const std::wstring bufNamed = Data.NamedText;
+        const std::wstring bufLookIn = Data.LookInText;
 
-        SendMessage(hNamesWnd, WM_GETTEXT, Data.NamedText.Size(), (LPARAM)Data.NamedText.Get());
-        CMaskGroup mask(Data.NamedText);
+        Data.NamedText = GetWindowTextStringW(hNamesWnd);
+
+        CMaskGroup mask;
         int errorPos;
-        if (!mask.PrepareMasks(errorPos))
+        if (!mask.PrepareMasks(errorPos, Data.NamedText.c_str()))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_INCORRECTSYNTAX));
             SetFocus(hNamesWnd); // ensure the CB_SETEDITSEL message works correctly
@@ -2946,10 +2797,7 @@ void CFindDialog::Validate(CTransferInfo& ti)
 
         if (ti.IsGood())
         {
-            if (LookInUnicodeInput.IsEnabled())
-                CopyWideLookInToAnsiMirror(LookInUnicodeInput.GetText(), Data.LookInText);
-            else
-                SendMessage(hLookInWnd, WM_GETTEXT, Data.LookInText.Size(), (LPARAM)Data.LookInText.Get());
+            Data.LookInText = GetWindowTextWide(hLookInWnd);
 
             BuildSerchForData();
             if (SearchForData.Count == 0)
@@ -2960,54 +2808,20 @@ void CFindDialog::Validate(CTransferInfo& ti)
         }
 
         // restore data from the backup
-        strcpy(Data.LookInText, bufLookIn);
-        strcpy(Data.NamedText, bufNamed);
+        Data.LookInText = bufLookIn;
+        Data.NamedText = bufNamed;
     }
 }
 
 void CFindDialog::Transfer(CTransferInfo& ti)
 {
-    HistoryComboBox(HWindow, ti, IDC_FIND_NAMED, Data.NamedText, Data.NamedText.Size(),
+    HistoryComboBox(HWindow, ti, IDC_FIND_NAMED, Data.NamedText,
                     FALSE, FIND_NAMED_HISTORY_SIZE, FindNamedHistory);
-    if (LookInUnicodeInput.IsEnabled())
+    HistoryComboBox(HWindow, ti, IDC_FIND_LOOKIN, Data.LookInText,
+                    FALSE, FIND_LOOKIN_HISTORY_SIZE, FindLookInHistory);
+    if (ti.Type == ttDataToWindow)
     {
-        if (ti.Type == ttDataToWindow)
-        {
-            SendMessage(LookInUnicodeInput.GetControlHandle(), CB_LIMITTEXT,
-                        Data.LookInText.Size() - 1, 0);
-            LookInUnicodeInput.SetText(LookInTextW.empty()
-                                           ? AnsiToWide(Data.LookInText.Get())
-                                           : LookInTextW);
-        }
-        else
-        {
-            LookInTextW = LookInUnicodeInput.GetText();
-            CopyWideLookInToAnsiMirror(LookInTextW, Data.LookInText);
-            // Persist the wide twin into the DTO only when it can't round-trip
-            // CP_ACP, so presets saved from Data carry the real Unicode path
-            // (kb/unicode P0-a). ASCII paths leave Data.LookInTextW empty.
-            std::string ansiProbe;
-            Data.LookInTextW =
-                sally::unicode::TryWideToAnsiRoundTripExact(LookInTextW, ansiProbe)
-                    ? std::wstring()
-                    : LookInTextW;
-            if (ti.IsGood() && Data.LookInText[0] != 0)
-                AddValueToStdHistoryValues(FindLookInHistory, FIND_LOOKIN_HISTORY_SIZE,
-                                           Data.LookInText.Get(), FALSE);
-        }
-    }
-    else
-    {
-        HistoryComboBox(HWindow, ti, IDC_FIND_LOOKIN, Data.LookInText, Data.LookInText.Size(),
-                        FALSE, FIND_LOOKIN_HISTORY_SIZE, FindLookInHistory);
-        // When the Unicode edit control is not active, the wide cache must
-        // not outlive its authoritative window: drop it on the way out so
-        // any unguarded future reader cannot pick up a stale seed.
-        if (ti.Type == ttDataFromWindow)
-        {
-            LookInTextW.clear();
-            Data.LookInTextW.clear();
-        }
+        ActivateWideLookInCombo(HWindow, Data.LookInText, LookInUnicodeFont);
     }
 
     ti.CheckBox(IDC_FIND_INCLUDE_SUBDIR, Data.SubDirectories);
@@ -3022,7 +2836,7 @@ void CFindDialog::Transfer(CTransferInfo& ti)
         Data.FileTypeMode = sally::find::NormalizeFindFileTypeMode(mode);
         Configuration.FindFileTypeMode = Data.FileTypeMode;
     }
-    HistoryComboBox(HWindow, ti, IDC_FIND_CONTAINING, Data.GrepText, GREP_TEXT_LEN,
+    HistoryComboBox(HWindow, ti, IDC_FIND_CONTAINING, Data.GrepText,
                     !Data.RegularExpresions && Data.HexMode, FIND_GREP_HISTORY_SIZE,
                     FindGrepHistory);
     ti.CheckBox(IDC_FIND_HEX, Data.HexMode);
@@ -3033,10 +2847,9 @@ void CFindDialog::Transfer(CTransferInfo& ti)
 
 void CFindDialog::UpdateAdvancedText()
 {
-    char buff[200];
     BOOL dirty;
-    Data.Criteria.GetAdvancedDescription(buff, 200, dirty);
-    SetDlgItemText(HWindow, IDC_FIND_ADVANCED_TEXT, buff);
+    const std::wstring description = Data.Criteria.GetAdvancedDescription(dirty);
+    SetDlgItemTextW(HWindow, IDC_FIND_ADVANCED_TEXT, description.c_str());
     EnableWindow(GetDlgItem(HWindow, IDC_FIND_ADVANCED_TEXT), dirty);
 }
 
@@ -3044,53 +2857,24 @@ void CFindDialog::LoadControls(int index)
 {
     CALL_STACK_MESSAGE2("CFindDialog::LoadControls(0x%X)", index);
     Data = *FindOptions.At(index);
-    BOOL keepCurrentLookIn = Data.LookInText[0] == 0;
+    BOOL keepCurrentLookIn = Data.LookInText.empty();
 
     // if any edit line is empty, keep its previous value
-    if (Data.NamedText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_NAMED, Data.NamedText, Data.NamedText.Size());
+    if (Data.NamedText.empty())
+    {
+        Data.NamedText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_FIND_NAMED));
+    }
     if (keepCurrentLookIn)
     {
-        if (LookInUnicodeInput.IsEnabled())
-        {
-            LookInTextW = LookInUnicodeInput.GetText();
-            CopyWideLookInToAnsiMirror(LookInTextW, Data.LookInText);
-        }
-        else
-        {
-            GetDlgItemText(HWindow, IDC_FIND_LOOKIN, Data.LookInText, Data.LookInText.Size());
-            LookInTextW.clear();
-        }
+        Data.LookInText = GetWindowTextWide(GetDlgItem(HWindow, IDC_FIND_LOOKIN));
     }
-    else
-    {
-        // The preset supplies the "Look in" value. Adopt its wide twin when the
-        // preset carried one (a Unicode path that could not round-trip CP_ACP);
-        // otherwise the ANSI mirror is authoritative (kb/unicode P0-a).
-        LookInTextW = Data.LookInTextW;
-    }
-    if (Data.GrepText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_CONTAINING, Data.GrepText, GREP_TEXT_LEN);
-
-    // If the (preset or kept) wide value cannot round-trip CP_ACP, the ANSI
-    // combo would render it as '?'. Make the Unicode edit control live BEFORE
-    // Transfer so ttDataToWindow plants the real wide text (same enable path as
-    // the construction-time seed override).
-    if (!LookInTextW.empty() && !LookInUnicodeInput.IsEnabled())
-    {
-        std::string ansiProbe;
-        if (!sally::unicode::TryWideToAnsiRoundTripExact(LookInTextW, ansiProbe))
-        {
-            if (LookInUnicodeInput.EnableForCombo(HWindow, IDC_FIND_LOOKIN, LookInTextW,
-                                                  NULL, 0, Data.LookInText.Size(), -1))
-                ApplyFindComboSkin(LookInUnicodeInput.GetControlHandle());
-        }
-    }
+    if (Data.GrepText.empty())
+        Data.GrepText = GetWindowTextStringW(GetDlgItem(HWindow, IDC_FIND_CONTAINING));
 
     TransferData(ttDataToWindow);
 
     // if Grep contains text and the dialog isn't expanded, expand it
-    if (Data.GrepText[0] != 0 && !Expanded)
+    if (!Data.GrepText.empty() && !Expanded)
     {
         CheckDlgButton(HWindow, IDC_FIND_GREP, TRUE);
         SetContentVisible(TRUE);
@@ -3102,85 +2886,12 @@ void CFindDialog::LoadControls(int index)
 
 void CFindDialog::BuildSerchForData()
 {
-    CPathBuffer named;
-    char* begin;
-    char* end;
-
-    // Users often want to enter just "i_am_dummy" to find files "*i_am_dummy*".
-    // Therefore, we must inspect each item from the mask group and, if it lacks
-    // any wildcard or '.', surround it with asterisks.
-    char* iterator = named;
-    begin = Data.NamedText;
-    while (1)
-    {
-        end = begin;
-        while (*end != 0)
-        {
-            if (*end == '|')
-                break;
-            if (*end == ';')
-            {
-                if (*(end + 1) != ';')
-                    break;
-                else
-                    end++;
-            }
-            end++;
-        }
-        while (*begin != 0 && *begin <= ' ')
-            begin++; // skip spaces at the beginning
-        char* tmpEnd = end;
-        while (tmpEnd > begin && *(tmpEnd - 1) <= ' ')
-            tmpEnd--; // skip spaces at the end
-        if (tmpEnd > begin)
-        {
-            // check whether the substring contains a wildcard '*', '?', or '.'
-            BOOL wildcard = FALSE;
-            char* tmp = begin;
-            while (tmp < tmpEnd)
-            {
-                if (*tmp == '*' || *tmp == '?' || *tmp == '.')
-                {
-                    wildcard = TRUE;
-                    break;
-                }
-                tmp++;
-            }
-
-            if (!wildcard)
-                *iterator++ = '*'; // no wildcard - prepend an asterisk
-
-            memcpy(iterator, begin, tmpEnd - begin);
-            iterator += tmpEnd - begin;
-
-            if (!wildcard)
-                *iterator++ = '*'; // no wildcard - append an asterisk
-        }
-        *iterator++ = *end;
-        if (*end != 0)
-            begin = end + 1;
-        else
-            break;
-    }
-
-    if (named[0] == 0)
-        strcpy(named, "*"); // replace empty string with '*'
+    // Users often enter a bare fragment and expect substring matching.
+    const std::wstring named = sally::find::NormalizeFindMasksForSearch(Data.NamedText);
 
     SearchForData.DestroyMembers();
 
-    // LookInTextW is authoritative only while the Unicode edit control is
-    // active. When that control is disabled, the ANSI combo (Data.LookInText,
-    // just refreshed from the control by Validate via WM_GETTEXT) is the
-    // source of truth; consulting LookInTextW here would prefer the
-    // constructor-seeded panel path over the user's edited target.
-    std::wstring lookInTextW;
-    if (LookInUnicodeInput.IsEnabled())
-    {
-        lookInTextW = LookInUnicodeInput.GetText();
-        LookInTextW = lookInTextW;
-    }
-    else
-        lookInTextW = AnsiToWide(Data.LookInText.Get());
+    const std::wstring lookInTextW = Data.LookInText;
 
     std::vector<std::wstring> paths = sally::find::SplitLookInPathsW(lookInTextW);
     for (size_t i = 0; i < paths.size(); i++)
@@ -3188,11 +2899,9 @@ void CFindDialog::BuildSerchForData()
         if (paths[i].empty())
             continue;
 
-        std::string pathA = WideToAnsi(paths[i]);
-        if (pathA.empty())
-            pathA = "?";
-
-        CSearchForData* item = new CSearchForData(pathA.c_str(), paths[i].c_str(), named, Data.SubDirectories);
+        // was WideToAnsi(paths[i]) with a literal "?" substituted when the path
+        // had no CP_ACP form, handed in beside the wide path CSearchForData now keeps.
+        CSearchForData* item = new CSearchForData(paths[i].c_str(), named.c_str(), Data.SubDirectories);
         if (item != NULL)
         {
             SearchForData.Add(item);
@@ -3290,7 +2999,7 @@ void CFindDialog::StartSearch(WORD command)
     }
     UpdateListViewItems();
 
-    if (Data.GrepText[0] == 0)
+    if (Data.GrepText.empty())
         GrepData.Grep = FALSE;
     else
     {
@@ -3302,34 +3011,104 @@ void CFindDialog::StartSearch(WORD command)
         GrepData.WholeWords = Data.WholeWords;
         if (Data.RegularExpresions)
         {
-            if (!GrepData.RegExp.Set(Data.GrepText, (WORD)(sfForward |
-                                                           (Data.CaseSensitive ? sfCaseSensitive : 0))))
+            const WORD regexpFlags = static_cast<WORD>(
+                sfForward | (Data.CaseSensitive ? sfCaseSensitive : 0));
+            GrepData.RegExp.Clear();
+            GrepData.RegExpUtf8.Clear();
+            // RegExpUtf8's pattern and subject are both UTF-8, so it must not fold case
+            // through the ACP byte table - see CRegularExpression::FoldEncoding. Set
+            // before Set(), which compiles the folded pattern.
+            GrepData.RegExpUtf8.SetFoldEncoding(CRegularExpression::FoldEncoding::Utf8);
+
+            const auto reportRegexError = [&](const std::wstring& error)
             {
-                std::wstring msg;
-                if (GrepData.RegExp.GetPattern() != NULL)
-                    msg = FormatStrW(LoadStrW(IDS_INVALIDREGEXP), AnsiToWide(GrepData.RegExp.GetPattern()).c_str(), AnsiToWide(GrepData.RegExp.GetLastErrorText()).c_str());
-                else
-                    msg = AnsiToWide(GrepData.RegExp.GetLastErrorText());
+                const std::wstring msg = FormatStrW(
+                    LoadStrW(IDS_INVALIDREGEXP), Data.GrepText.c_str(), error.c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
                 if (GrepData.Refine != 0)
                     FoundFilesListView->DestroyDataForRefine();
-                return; // error
+            };
+
+            std::string utf8Pattern;
+            const Win32TextConversionResult utf8Result =
+                sally::legacy_search::EncodePatternUtf8(Data.GrepText, utf8Pattern);
+            if (!utf8Result)
+            {
+                reportRegexError(
+                    utf8Result.Error == Win32TextConversionError::OutOfMemory
+                        ? sally::legacy_search::DecodeEngineAcp(LOW_MEMORY)
+                        : GetErrorTextOwned(utf8Result.Win32Error));
+                return;
             }
+            if (!GrepData.RegExpUtf8.Set(utf8Pattern.c_str(), regexpFlags))
+            {
+                reportRegexError(sally::legacy_search::DecodeEngineAcp(
+                    GrepData.RegExpUtf8.GetLastErrorText()));
+                return;
+            }
+
+            std::string acpPattern;
+            const Win32TextConversionResult acpResult =
+                sally::legacy_search::EncodePatternAcpExact(Data.GrepText, acpPattern);
+            if (acpResult)
+            {
+                if (!GrepData.RegExp.Set(acpPattern.c_str(), regexpFlags))
+                {
+                    reportRegexError(sally::legacy_search::DecodeEngineAcp(
+                        GrepData.RegExp.GetLastErrorText()));
+                    return;
+                }
+            }
+            else if (acpResult.Error != Win32TextConversionError::UnrepresentableCharacter)
+            {
+                reportRegexError(
+                    acpResult.Error == Win32TextConversionError::OutOfMemory
+                        ? sally::legacy_search::DecodeEngineAcp(LOW_MEMORY)
+                        : GetErrorTextOwned(acpResult.Win32Error));
+                return;
+            }
+
+            // UTF-8 is the authoritative regexp representation. The exact ACP twin is optional
+            // and is used only for legacy byte content; an unrepresentable Unicode expression
+            // correctly cannot match such a file, but remains searchable in UTF-8/UTF-16 files.
             GrepData.Grep = TRUE;
         }
         else
         {
             if (Data.HexMode)
             {
-                char hex[GREP_TEXT_LEN];
-                int len;
-                ConvertHexToString(Data.GrepText, hex, len);
-                GrepData.SearchData.Set(hex, len, (WORD)(sfForward | (Data.CaseSensitive ? sfCaseSensitive : 0)));
+                // Hex mode is the byte-domain escape hatch. Literal hex stays byte-exact;
+                // quoted Unicode text has the explicit, portable UTF-8 representation.
+                std::vector<std::uint8_t> bytes;
+                if (!Sally::Unicode::ParseHexPattern(Data.GrepText.c_str(), bytes))
+                {
+                    // Say so. DestroyMembers/TakeDataForRefine has already run above, so a
+                    // bare return left the results list emptied and Find Now looking like a
+                    // no-op. Pre-unicode's ConvertHexToString could not fail at all, so the
+                    // silent refusal is new; the live DoHexValidation filter keeps typed
+                    // input clean, but a pattern restored from history or from a saved Find
+                    // Options entry reaches here unfiltered.
+                    if (gPrompter != NULL)
+                    {
+                        const std::wstring msg =
+                            FormatStrW(LoadStrW(IDS_FIND_HEX_INVALID), Data.GrepText.c_str());
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORFINDINGFILE), msg.c_str());
+                    }
+                    if (GrepData.Refine != 0)
+                        FoundFilesListView->DestroyDataForRefine();
+                    return;
+                }
+                GrepData.SearchData.Set(bytes.empty() ? "" : reinterpret_cast<const char*>(bytes.data()),
+                                        static_cast<int>(bytes.size()),
+                                        (WORD)(sfForward | (Data.CaseSensitive ? sfCaseSensitive : 0)));
             }
             else
-                GrepData.SearchData.Set(Data.GrepText, (WORD)(sfForward |
-                                                              (Data.CaseSensitive ? sfCaseSensitive : 0)));
-            GrepData.Grep = GrepData.SearchData.IsGood();
+                GrepData.SearchData.Clear();
+            // Literal text is owned and searched as UTF-16. Hex mode alone stays on the byte
+            // engine because its input denotes byte values rather than text.
+            GrepData.GrepCaseSensitive = Data.CaseSensitive;
+            GrepData.GrepText = Data.HexMode ? std::wstring() : Data.GrepText;
+            GrepData.Grep = Data.HexMode ? GrepData.SearchData.IsGood() : TRUE;
         }
     }
     SetFocus(FoundFilesListView->HWindow);
@@ -3366,7 +3145,7 @@ void CFindDialog::StartSearch(WORD command)
         flags &= ~BTF_DROPDOWN;
         OKButton->SetFlags(flags, FALSE);
     }
-    SetDlgItemText(HWindow, IDOK, LoadStr(IDS_FF_STOP));
+    SetDlgItemTextW(HWindow, IDOK, LoadStrW(IDS_FF_STOP));
 
     SearchInProgress = TRUE;
 
@@ -3377,9 +3156,9 @@ void CFindDialog::StartSearch(WORD command)
     SearchingText.SetDirty(TRUE);
     PostMessage(HWindow, WM_TIMER, IDT_REPAINT, 0);
 
-    CPathBuffer buff;
-    _snprintf_s(buff, buff.Size(), _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
-    SetWindowText(HWindow, buff);
+    const std::wstring caption = FormatStrW(NORMAL_FINDING_CAPTION, LoadStrW(IDS_FF_NAME),
+                                            LoadStrW(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
+    SetWindowTextW(HWindow, caption.c_str());
 
     EnableControls();
 }
@@ -3394,10 +3173,10 @@ void CFindDialog::StopSearch()
         BOOL oldCanClose = CanClose;
         CanClose = FALSE; // don't allow closing while we are inside this method
 
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         { // message loop for messages from the grep thread
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
 
         CanClose = oldCanClose;
@@ -3417,7 +3196,7 @@ void CFindDialog::StopSearch()
         flags |= BTF_DROPDOWN;
         OKButton->SetFlags(flags, FALSE);
     }
-    SetDlgItemText(HWindow, IDOK, FindNowText);
+    SetDlgItemTextW(HWindow, IDOK, FindNowText.c_str());
 
     // stop the timer used for updating the text
     KillTimer(HWindow, IDT_REPAINT);
@@ -3425,11 +3204,11 @@ void CFindDialog::StopSearch()
     // if the second text appeared during search, it's time to hide it
     if (TwoParts)
     {
-        SearchingText2.Set("");
+        SearchingText2.Set(L"");
         SetTwoStatusParts(FALSE);
     }
 
-    SearchingText.Set("");
+    SearchingText.Set(L"");
     UpdateStatusBar = FALSE;
     if (!GrepData.SearchStopped)
     {
@@ -3437,7 +3216,7 @@ void CFindDialog::StopSearch()
         if (items == 0)
         {
             int msgID = GrepData.FindDuplicates ? IDS_FIND_NO_DUPS_FOUND : IDS_FIND_NO_FILES_FOUND;
-            SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(msgID));
+            SendMessageW(HStatusBar, SB_SETTEXTW, 1 | SBT_NOBORDERS, (LPARAM)LoadStrW(msgID));
         }
         else
             UpdateStatusBar = TRUE;
@@ -3447,10 +3226,10 @@ void CFindDialog::StopSearch()
     }
     else
     {
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(IDS_STOPPED));
+        SendMessageW(HStatusBar, SB_SETTEXTW, 1 | SBT_NOBORDERS, (LPARAM)LoadStrW(IDS_STOPPED));
     }
 
-    SetWindowText(HWindow, LoadStr(IDS_FF_NAME));
+    SetWindowTextW(HWindow, LoadStrW(IDS_FF_NAME));
     if (GrepData.Refine != 0)
         FoundFilesListView->DestroyDataForRefine();
     UpdateListViewItems();
@@ -3591,10 +3370,10 @@ void CFindDialog::EnableControls(BOOL nextIsButton)
         // the following code caused the Find Now button to flicker during search
         // when the mouse focus rested on it; removing it doesn't seem to break anything, we'll see...
         /*
-    char className[30];
+    wchar_t className[30];
     WORD wl = LOWORD(GetWindowLongPtr(focus, GWL_STYLE));  // only BS_ styles
     if (GetClassName(focus, className, 30) != 0 &&
-        StrICmp(className, "BUTTON") == 0 &&
+        StrICmpW(className, "BUTTON") == 0 &&
         (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON))
     {
       nextIsButton = TRUE;
@@ -3633,15 +3412,15 @@ void CFindDialog::UpdateListViewItems()
         // when minimized, display the item count in the title
         if (IsIconic(HWindow))
         {
-            CPathBuffer buf;
+            std::wstring caption;
             if (SearchInProgress)
             {
-                _snprintf_s(buf, buf.Size(), _TRUNCATE, MINIMIZED_FINDING_CAPTION, FoundFilesListView->GetCount(),
-                            LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
+                caption = FormatStrW(MINIMIZED_FINDING_CAPTION, FoundFilesListView->GetCount(),
+                                     LoadStrW(IDS_FF_NAME), LoadStrW(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
             }
             else
-                lstrcpy(buf, LoadStr(IDS_FF_NAME));
-            SetWindowText(HWindow, buf);
+                caption = LoadStrW(IDS_FF_NAME);
+            SetWindowTextW(HWindow, caption.c_str());
         }
 
         // used by the search thread to know when to notify us next
@@ -3671,8 +3450,8 @@ void CFindDialog::OnSaveResults()
             continue;
 
         sally::find::FindResultRecord record;
-        record.Path = !data->PathW.empty() ? data->PathW : AnsiToWide(data->Path.c_str());
-        record.Name = !data->NameW.empty() ? data->NameW : AnsiToWide(data->Name.c_str());
+        record.Path = data->PathW;
+        record.Name = data->NameW;
         record.Size = data->Size.Value;
         record.LastWrite = data->LastWrite;
         record.Attr = data->Attr;
@@ -3760,11 +3539,9 @@ void CFindDialog::OnLoadResults()
     for (const sally::find::FindResultRecord& record : records)
     {
         CFoundFilesData* item = new CFoundFilesData;
-        std::string pathA = WideToAnsi(record.Path);
-        std::string nameA = WideToAnsi(record.Name);
         CQuadWord size;
         size.SetUI64(record.Size);
-        item->Set(pathA.c_str(), nameA.c_str(), record.Path.c_str(), record.Name.c_str(),
+        item->Set(record.Path.c_str(), record.Name.c_str(),
                   size, record.Attr, &record.LastWrite, record.IsDir ? TRUE : FALSE);
         FoundFilesListView->Add(item);
         if (!FoundFilesListView->IsGood())
@@ -3773,7 +3550,13 @@ void CFindDialog::OnLoadResults()
             FoundFilesListView->ResetState();
             UpdateListViewItems();
             if (gPrompter != NULL)
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(LOW_MEMORY).c_str());
+            {
+                // The guard used to cover only the declaration, so the ShowError beside
+                // it ran unconditionally - dereferencing gPrompter exactly in the
+                // out-of-memory case the guard exists for.
+                const std::wstring error = sally::legacy_search::DecodeEngineAcp(LOW_MEMORY);
+                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), error.c_str());
+            }
             return;
         }
     }
@@ -3790,15 +3573,6 @@ void CFindDialog::OnLoadResults()
                                       (unsigned)records.size(), (unsigned)skippedRows);
         gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), msg.c_str());
     }
-}
-
-BOOL CFindDialog::EnsureRowActionableViaAnsi(const CFoundFilesData* data)
-{
-    if (sally::find::RowActionableViaAnsi(data->PathW, data->NameW))
-        return TRUE;
-    if (gPrompter != NULL)
-        gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_FIND_RESULTS_ANSI_ONLY));
-    return FALSE;
 }
 
 void CFindDialog::OnFocusFile()
@@ -3819,12 +3593,14 @@ void CFindDialog::OnFocusFile()
         }
     }
     CFoundFilesData* data = FoundFilesListView->At(index);
-    if (!EnsureRowActionableViaAnsi(data))
-        return;
-    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)data->Name.c_str(), (LPARAM)data->Path.c_str());
+
+    CFocusFileDataW focus;
+    focus.Name = data->NameW.c_str();
+    focus.Path = data->PathW.c_str();
+    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILEW, (WPARAM)&focus, 0);
 }
 
-BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
+BOOL CFindDialog::GetFocusedFile(std::wstring& fullName, int* viewedIndex)
 {
     int index = ListView_GetNextItem(FoundFilesListView->HWindow, -1, LVNI_FOCUSED);
     if (index < 0)
@@ -3836,16 +3612,8 @@ BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
     CFoundFilesData* data = FoundFilesListView->At(index);
     if (data->IsDir)
         return FALSE;
-    if (!EnsureRowActionableViaAnsi(data))
-        return FALSE;
-    CPathBuffer longName; // Heap-allocated for long path support
-    int len = (int)data->Path.size();
-    memmove(longName, data->Path.c_str(), len);
-    if (len > 0 && data->Path[len - 1] != '\\')
-        longName[len++] = '\\';
-    strcpy(longName + len, data->Name.c_str());
 
-    lstrcpyn(buffer, longName, bufferLen);
+    fullName = data->GetFullNameW();
     return TRUE;
 }
 
@@ -3862,10 +3630,9 @@ void CFindDialog::UpdateInternalViewerData()
         dummyTI.CheckBox(IDC_FIND_CASE, GlobalFindDialog.CaseSensitive);
         dummyTI.CheckBox(IDC_FIND_HEX, GlobalFindDialog.HexMode);
         dummyTI.CheckBox(IDC_FIND_REGULAR, GlobalFindDialog.Regular);
-        dummyTI.EditLine(IDC_FIND_CONTAINING, GlobalFindDialog.Text, FIND_TEXT_LEN);
+        dummyTI.EditLineW(IDC_FIND_CONTAINING, GlobalFindDialog.Text);
 
         HistoryComboBox(NULL, dummyTI, 0, GlobalFindDialog.Text,
-                        (int)strlen(GlobalFindDialog.Text),
                         !GlobalFindDialog.Regular && GlobalFindDialog.HexMode,
                         VIEWER_HISTORY_SIZE,
                         ViewerHistory, TRUE);
@@ -3877,9 +3644,9 @@ void CFindDialog::UpdateInternalViewerData()
 void CFindDialog::OnViewFile(BOOL alternate)
 {
     CALL_STACK_MESSAGE2("CFindDialog::OnViewFile(%d)", alternate);
-    CPathBuffer longName; // Heap-allocated for long path support
+    std::wstring longName;
     int viewedIndex = 0;
-    if (!GetFocusedFile(longName, longName.Size(), &viewedIndex))
+    if (!GetFocusedFile(longName, &viewedIndex))
         return;
 
     if (SalamanderBusy)
@@ -3894,7 +3661,7 @@ void CFindDialog::OnViewFile(BOOL alternate)
     }
     UpdateInternalViewerData();
     COpenViewerData openData;
-    openData.FileName = longName;
+    openData.FileName = longName.c_str();
     openData.EnumFileNamesSourceUID = FoundFilesListView->EnumFileNamesSourceUID;
     openData.EnumFileNamesLastFileIndex = viewedIndex;
     SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_VIEWFILE, (WPARAM)(&openData), (LPARAM)alternate);
@@ -3903,8 +3670,8 @@ void CFindDialog::OnViewFile(BOOL alternate)
 void CFindDialog::OnEditFile()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnEditFile()");
-    CPathBuffer longName; // Heap-allocated for long path support
-    if (!GetFocusedFile(longName, longName.Size(), NULL))
+    std::wstring longName;
+    if (!GetFocusedFile(longName, NULL))
         return;
 
     if (SalamanderBusy)
@@ -3917,15 +3684,17 @@ void CFindDialog::OnEditFile()
             return;
         }
     }
-    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILE, (WPARAM)longName.Get(), 0);
+    CEditFileData editData;
+    editData.FileName = longName.c_str();
+    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILE, (WPARAM)(&editData), 0);
 }
 
 void CFindDialog::OnViewFileWith()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnViewFileWith()");
-    CPathBuffer longName; // Heap-allocated for long path support
+    std::wstring longName;
     int viewedIndex = 0;
-    if (!GetFocusedFile(longName, longName.Size(), &viewedIndex))
+    if (!GetFocusedFile(longName, &viewedIndex))
         return;
 
     if (SalamanderBusy)
@@ -3945,7 +3714,7 @@ void CFindDialog::OnViewFileWith()
     // this call isn't entirely correct because ViewFileWith lacks critical sections
     // for working with the configuration. the assumption for proper functioning is that the user does only one thing
     // (doesn't edit configuration while working in the Find window) -- hopefully almost always true
-    MainWindow->GetActivePanel()->ViewFileWith(longName, FoundFilesListView->HWindow, &menuPoint, &handlerID, -1, -1);
+    MainWindow->GetActivePanel()->ViewFileWith(longName.c_str(), FoundFilesListView->HWindow, &menuPoint, &handlerID, -1, -1);
     if (handlerID != 0xFFFFFFFF)
     {
         if (SalamanderBusy) // almost impossible, but Salamander could be busy
@@ -3959,7 +3728,7 @@ void CFindDialog::OnViewFileWith()
             }
         }
         COpenViewerData openData;
-        openData.FileName = longName;
+        openData.FileName = longName.c_str();
         openData.EnumFileNamesSourceUID = FoundFilesListView->EnumFileNamesSourceUID;
         openData.EnumFileNamesLastFileIndex = viewedIndex;
         SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_VIEWFILEWITH,
@@ -3970,8 +3739,8 @@ void CFindDialog::OnViewFileWith()
 void CFindDialog::OnEditFileWith()
 {
     CALL_STACK_MESSAGE1("CFindDialog::OnEditFileWith()");
-    CPathBuffer longName; // Heap-allocated for long path support
-    if (!GetFocusedFile(longName, longName.Size(), NULL))
+    std::wstring longName;
+    if (!GetFocusedFile(longName, NULL))
         return;
 
     if (SalamanderBusy)
@@ -3990,7 +3759,7 @@ void CFindDialog::OnEditFileWith()
     // this call isn't entirely correct because EditFileWith lacks critical sections
     // for working with the configuration. the assumption for proper functioning is that the user does only one thing
     // (doesn't change configuration while using the Find window) -- hopefully almost always true
-    MainWindow->GetActivePanel()->EditFileWith(longName, FoundFilesListView->HWindow, &menuPoint, &handlerID);
+    MainWindow->GetActivePanel()->EditFileWith(longName.c_str(), FoundFilesListView->HWindow, &menuPoint, &handlerID);
     if (handlerID != 0xFFFFFFFF)
     {
         if (SalamanderBusy) // almost impossible, but Salamander could be busy
@@ -4003,8 +3772,10 @@ void CFindDialog::OnEditFileWith()
                 return;
             }
         }
+        CEditFileData editData;
+        editData.FileName = longName.c_str();
         SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_EDITFILEWITH,
-                    (WPARAM)longName.Get(), (LPARAM)handlerID);
+                    (WPARAM)(&editData), (LPARAM)handlerID);
     }
 }
 
@@ -4015,15 +3786,19 @@ void CFindDialog::OnUserMenu()
     if (selectedCount < 1)
         return;
 
-    // user menu commands receive the rows' ANSI names as arguments
-    // (ListOfSelNames, CompareName1/2, GetNextItemFromFind) — refuse lossy rows
-    int guardItem = -1;
-    for (DWORD gi = 0; gi < selectedCount; gi++)
-    {
-        guardItem = ListView_GetNextItem(FoundFilesListView->HWindow, guardItem, LVNI_SELECTED);
-        if (guardItem != -1 && !EnsureRowActionableViaAnsi(FoundFilesListView->At(guardItem)))
-            return;
-    }
+    // This was the fourth (and last) of Find's ANSI-mirror refusal guards.
+    // It refused whenever a selected row's name could not
+    // round-trip CP_ACP exactly, because user menu commands used to receive the rows'
+    // ANSI names as arguments. That is no longer true: ListOfSelNames/ListOfSelFullNames,
+    // CompareName1/CompareName2, and the GetNextItemFromFind callback below all consume
+    // file->NameW/PathW directly, and the expansion pipeline they feed
+    // (ExpandCommand2/ExpandUserMenuArguments/ExpandInitDir, execute.cpp's
+    // sally::unicode::WideVarEntry tables) is wide end to end. CFoundFilesData itself no
+    // longer has a narrow half to fall back to (find.h's own comment: NameW/
+    // PathW "are the only representation"), so there is nothing left for this guard to
+    // protect - refusing here only blocked the whole User Menu action for a selection
+    // containing a non-ASCII-named row, same shape already retired for
+    // View/Edit/ViewWith/EditWith and Focus.
 
     UserMenuIconBkgndReader.BeginUserMenuIconsInUse();
     CMenuPopup menu;
@@ -4040,8 +3815,7 @@ void CFindDialog::OnUserMenu()
     {
         CUserMenuAdvancedData userMenuAdvancedData;
 
-        char* list = userMenuAdvancedData.ListOfSelNames;
-        char* listEnd = list + USRMNUARGS_MAXLEN - 1;
+        std::wstring& list = userMenuAdvancedData.ListOfSelNames;
         int findItem = -1;
         DWORD i;
         for (i = 0; i < selectedCount; i++) // fill the list of selected names
@@ -4049,56 +3823,36 @@ void CFindDialog::OnUserMenu()
             findItem = ListView_GetNextItem(FoundFilesListView->HWindow, findItem, LVNI_SELECTED);
             if (findItem != -1)
             {
-                if (list > userMenuAdvancedData.ListOfSelNames)
-                {
-                    if (list < listEnd)
-                        *list++ = ' ';
-                    else
-                        break;
-                }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
-                if (!AddToListOfNames(&list, listEnd, file->Name.c_str(), (int)strlen(file->Name.c_str())))
+                if (!AppendUserMenuArgument(list, file->NameW.c_str(), file->NameW.length(), USRMNUARGS_MAXLEN - 1))
                     break;
             }
         }
         if (i < selectedCount)
-            userMenuAdvancedData.ListOfSelNames[0] = 0; // small buffer for the list of selected names
-        else
-            *list = 0;
+            list.clear(); // the expanded command cannot carry the complete selection
         userMenuAdvancedData.ListOfSelNamesIsEmpty = FALSE; // not a concern for Find (otherwise the User Menu would not open)
 
-        char* listFull = userMenuAdvancedData.ListOfSelFullNames;
-        char* listFullEnd = listFull + USRMNUARGS_MAXLEN - 1;
+        std::wstring& listFull = userMenuAdvancedData.ListOfSelFullNames;
         findItem = -1;
         for (i = 0; i < selectedCount; i++) // fill the list of selected names
         {
             findItem = ListView_GetNextItem(FoundFilesListView->HWindow, findItem, LVNI_SELECTED);
             if (findItem != -1)
             {
-                if (listFull > userMenuAdvancedData.ListOfSelFullNames)
-                {
-                    if (listFull < listFullEnd)
-                        *listFull++ = ' ';
-                    else
-                        break;
-                }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
-                CPathBuffer fullName; // Heap-allocated for long path support
-                lstrcpyn(fullName, file->Path.c_str(), fullName.Size());
-                if (!SalPathAppend(fullName, file->Name.c_str(), fullName.Size()) ||
-                    !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                std::wstring fullName = file->PathW;
+                SalPathAppendW(fullName, file->NameW.c_str());
+                if (!AppendUserMenuArgument(listFull, fullName.c_str(), fullName.size(), USRMNUARGS_MAXLEN - 1))
                     break;
             }
         }
         if (i < selectedCount)
-            userMenuAdvancedData.ListOfSelFullNames[0] = 0; // small buffer for the list of selected full names
-        else
-            *listFull = 0;
+            listFull.clear(); // the expanded command cannot carry the complete selection
         userMenuAdvancedData.ListOfSelFullNamesIsEmpty = FALSE; // not a concern for Find (otherwise the User Menu would not open)
 
-        userMenuAdvancedData.FullPathLeft[0] = 0;
-        userMenuAdvancedData.FullPathRight[0] = 0;
-        userMenuAdvancedData.FullPathInactive = userMenuAdvancedData.FullPathLeft;
+        userMenuAdvancedData.FullPathLeft.clear();
+        userMenuAdvancedData.FullPathRight.clear();
+        userMenuAdvancedData.FullPathInactive = &userMenuAdvancedData.FullPathLeft;
 
         int comp1 = -1;
         int comp2 = -1;
@@ -4121,24 +3875,22 @@ void CFindDialog::OnUserMenu()
             comp2 = -1;
         }
         if (comp1 == -1)
-            userMenuAdvancedData.CompareName1[0] = 0;
+            userMenuAdvancedData.CompareName1.clear();
         else
         {
             CFoundFilesData* file = FoundFilesListView->At(comp1);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path.c_str(), userMenuAdvancedData.CompareName1.Size());
-            if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name.c_str(), userMenuAdvancedData.CompareName1.Size()))
-                userMenuAdvancedData.CompareName1[0] = 0;
+            userMenuAdvancedData.CompareName1 = file->PathW;
+            SalPathAppendW(userMenuAdvancedData.CompareName1, file->NameW.c_str());
         }
         if (comp2 == -1)
-            userMenuAdvancedData.CompareName2[0] = 0;
+            userMenuAdvancedData.CompareName2.clear();
         else
         {
             CFoundFilesData* file = FoundFilesListView->At(comp2);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path.c_str(), userMenuAdvancedData.CompareName2.Size());
-            if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name.c_str(), userMenuAdvancedData.CompareName2.Size()))
-                userMenuAdvancedData.CompareName2[0] = 0;
+            userMenuAdvancedData.CompareName2 = file->PathW;
+            SalPathAppendW(userMenuAdvancedData.CompareName2, file->NameW.c_str());
         }
 
         CUMDataFromFind data(FoundFilesListView->HWindow);
@@ -4181,9 +3933,10 @@ void CFindDialog::OnCopyNameToClipboard(CCopyNameToClipboardModeEnum mode)
 
     case cntcmUNCName:
     {
-        CPathBuffer buff;
-        AlterFileName(buff, data->Name.c_str(), -1, FileNameFormat, 0, data->IsDir);
-        CopyUNCPathToClipboard(data->Path.c_str(), buff, data->IsDir, HWindow);
+        // PathW is the same source cntcmFullPath above already uses; the
+        // narrow Path/Name pair only ever named the file when the code page could spell it.
+        CopyUNCPathToClipboardW(data->PathW.c_str(), data->GetNameTextW(FileNameFormat).c_str(),
+                                data->IsDir, HWindow);
         return;
     }
     }
@@ -4202,10 +3955,10 @@ BOOL CFindDialog::IsMenuBarMessage(CONST MSG* lpMsg)
 void CFindDialog::InsertDrives(HWND hEdit, BOOL network)
 {
     CALL_STACK_MESSAGE_NONE
-    char drives[200];
-    char* iterator = drives;
-    char root[4] = " :\\";
-    char drive = 'A';
+    wchar_t drives[200];
+    wchar_t* iterator = drives;
+    wchar_t root[4] = L" :\\";
+    wchar_t drive = L'A';
     DWORD mask = GetLogicalDrives();
     int i = 1;
     while (i != 0)
@@ -4213,24 +3966,24 @@ void CFindDialog::InsertDrives(HWND hEdit, BOOL network)
         if (mask & i) // the drive is accessible
         {
             root[0] = drive;
-            DWORD driveType = GetDriveType(root);
+            DWORD driveType = GetDriveTypeW(root);
             if (driveType == DRIVE_FIXED || network && driveType == DRIVE_REMOTE)
             {
                 if (iterator > drives)
                 {
-                    *iterator++ = ';';
+                    *iterator++ = L';';
                 }
-                memmove(iterator, root, 3);
+                memmove(iterator, root, 3 * sizeof(wchar_t));
                 iterator += 3;
             }
         }
         i <<= 1;
         drive++;
     }
-    *iterator = '\0';
+    *iterator = L'\0';
 
-    SetWindowText(hEdit, drives);
-    SendMessage(hEdit, EM_SETSEL, lstrlen(drives), lstrlen(drives));
+    SetWindowTextW(hEdit, drives);
+    SendMessageW(hEdit, EM_SETSEL, lstrlenW(drives), lstrlenW(drives));
 }
 
 BOOL CFindDialog::CanCloseWindow()
@@ -4242,19 +3995,18 @@ BOOL CFindDialog::CanCloseWindow()
         return FALSE;
 
     // if CShellExecuteWnd windows exist, we offer to cancel closing or send a bug report and terminate
-    char reason[BUG_REPORT_REASON_MAX]; // cause of the problem + list of windows (multiline)
-    strcpy(reason, "Some faulty shell extension has locked our find window.");
-    if (EnumCShellExecuteWnd(HWindow, reason + (int)strlen(reason), BUG_REPORT_REASON_MAX - ((int)strlen(reason) + 1)) > 0)
+    std::wstring reason = L"Some faulty shell extension has locked our find window.";
+    if (EnumCShellExecuteWnd(HWindow, reason) > 0)
     {
         // ask whether Salamander should continue or generate a bug report
-        if (SalMessageBox(HWindow, LoadStr(IDS_SHELLEXTBREAK3), SALAMANDER_TEXT_VERSION,
-                          MSGBOXEX_CONTINUEABORT | MB_ICONINFORMATION | MSGBOXEX_SETFOREGROUND) != IDABORT)
+        if (SalMessageBoxW(HWindow, LoadStrW(IDS_SHELLEXTBREAK3), SALAMANDER_TEXT_VERSIONW(),
+                           MSGBOXEX_CONTINUEABORT | MB_ICONINFORMATION | MSGBOXEX_SETFOREGROUND) != IDABORT)
         {
             return FALSE; // continue
         }
 
         // break into the debugger
-        strcpy(BugReportReasonBreak, reason);
+        SetBugReportReasonBreak(std::move(reason));
         TaskList.FireEvent(TASKLIST_TODO_BREAK, GetCurrentProcessId());
         // freeze this thread
         while (1)
@@ -4278,16 +4030,18 @@ BOOL CFindDialog::DoYouWantToStopSearching()
 
 // pull the text from the control and search for a hot key;
 // if found, return its character (uppercase), otherwise return 0
-char GetControlHotKey(HWND hWnd, int resID)
+wchar_t GetControlHotKey(HWND hWnd, int resID)
 {
-    char buff[500];
-    if (!GetDlgItemText(hWnd, resID, buff, 500))
+    wchar_t buff[500];
+    if (!GetDlgItemTextW(hWnd, resID, buff, 500))
         return 0;
-    const char* p = buff;
+    const wchar_t* p = buff;
     while (*p != 0)
     {
-        if (*p == '&' && *(p + 1) != '&')
-            return UpperCase[*(p + 1)];
+        if (*p == L'&' && *(p + 1) != L'&' && *(p + 1) != 0)
+            // UpperCase is a 256-entry byte table; a non-Latin-1 mnemonic (a
+            // translated "&X" accelerator) falls outside it, so compare as-is.
+            return *(p + 1) < 256 ? (wchar_t)UpperCase[(unsigned char)*(p + 1)] : *(p + 1);
         p++;
     }
     return 0;
@@ -4311,7 +4065,7 @@ BOOL CFindDialog::ManageHiddenShortcuts(const MSG* msg)
                 int i;
                 for (i = 0; resID[i] != -1; i++)
                 {
-                    char key = GetControlHotKey(HWindow, resID[i]);
+                    wchar_t key = GetControlHotKey(HWindow, resID[i]);
                     if (key != 0 && (WPARAM)key == msg->wParam)
                     {
                         // expand the Options section
@@ -4358,7 +4112,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         FindDialogQueue.Add(new CWindowQueueItem(HWindow));
 
-        GetDlgItemText(HWindow, IDOK, FindNowText, 100);
+        FindNowText = GetWindowTextStringW(GetDlgItem(HWindow, IDOK));
 
         UpdateAdvancedText();
 
@@ -4400,9 +4154,9 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         TBHeader = new CFindTBHeader(HWindow, IDC_FIND_FOUND_FILES);
 
         // create the status bar
-        HStatusBar = CreateWindowEx(0,
-                                    STATUSCLASSNAME,
-                                    (LPCTSTR)NULL,
+        HStatusBar = CreateWindowExW(0,
+                                    STATUSCLASSNAMEW,
+                                    (LPCWSTR)NULL,
                                     SBARS_SIZEGRIP | WS_CHILD | CCS_BOTTOM | WS_VISIBLE,
                                     0, 0, 0, 0,
                                     HWindow,
@@ -4418,7 +4172,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         SetTwoStatusParts(FALSE, TRUE);
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(IDS_FIND_INIT_HINT));
+        SendMessageW(HStatusBar, SB_SETTEXTW, 1 | SBT_NOBORDERS, (LPARAM)LoadStrW(IDS_FIND_INIT_HINT));
 
         // assign a menu to the window
         MainMenu = new CMenuPopup;
@@ -4460,23 +4214,21 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         ListView_SetItemCount(FoundFilesListView->HWindow, 0);
 
-        SetDlgItemText(HWindow, IDOK, FindNowText);
+        SetDlgItemTextW(HWindow, IDOK, FindNowText.c_str());
         TBHeader->SetFoundCount(0);
 
-        SetWindowText(HWindow, LoadStr(IDS_FF_NAME));
+        SetWindowTextW(HWindow, LoadStrW(IDS_FF_NAME));
 
         int i;
         for (i = 0; i < FindOptions.GetCount(); i++)
             if (FindOptions.At(i)->AutoLoad)
             {
-                char buff[1024];
-                sprintf(buff, LoadStr(IDS_FF_AUTOLOAD), FindOptions.At(i)->ItemName.Get());
-                SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)buff);
+                const std::wstring text = FormatStrW(LoadStrW(IDS_FF_AUTOLOAD),
+                                                     FindOptions.At(i)->ItemName.c_str());
+                SendMessageW(HStatusBar, SB_SETTEXTW, 1 | SBT_NOBORDERS,
+                             (LPARAM)text.c_str());
                 break;
             }
-
-        HWND hCombo = GetDlgItem(HWindow, IDC_FIND_LOOKIN);
-        EditLine->AttachToWindow(GetWindow(hCombo, GW_CHILD));
 
         // Not supported yet: keep IDC_FIND_INCLUDE_ARCHIVES for code compatibility while IDC_FIND_FILETYPE reuses its layout slot.
         ShowWindow(GetDlgItem(HWindow, IDC_FIND_INCLUDE_ARCHIVES), FALSE);
@@ -4484,7 +4236,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         EnableControls();
         ApplyFindDialogTheme(HWindow, HStatusBar);
         PostMessage(HWindow, WM_USER_FIND_DELAYED_THEME, 0, 0);
-        // Defer the wide "Look in" override past the framework's ANSI Transfer.
+        // Defer the active-panel override past the framework's initial transfer.
         PostMessage(HWindow, WM_USER_FIND_LOOKIN_W_OVERRIDE, 0, 0);
         break;
     }
@@ -4493,7 +4245,6 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (wParam == IDT_REPAINT)
         {
-            CPathBuffer buf;
             if (SearchingText.GetDirty())
             {
                 SearchingText.SetDirty(FALSE); // already being redrawn - Get will be called; better to refresh twice than not at all
@@ -4511,8 +4262,8 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!TwoParts)
                     SetTwoStatusParts(TRUE);
                 SearchingText2.SetDirty(FALSE); // already being redrawn - Get will be called; better to refresh twice than not at all
-                SearchingText2.Get(buf, buf.Size());
-                int pos = buf[0]; // extract the value directly instead of the string
+                const std::wstring progress = SearchingText2.GetWString();
+                int pos = progress.empty() ? 0 : progress[0]; // numeric value, not display text
                 SendMessage(HProgressBar, PBM_SETPOS, pos, 0);
                 RedrawWindow(HStatusBar, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
             }
@@ -4546,30 +4297,17 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_FIND_LOOKIN_W_OVERRIDE:
     {
         // Re-apply the construction-time active-panel path after the framework's
-        // ANSI Transfer has finished touching controls. This keeps new Find
+        // initial transfer has finished touching controls. This keeps new Find
         // windows anchored to the active panel even when saved/autoloaded data
         // or combo history left a stale value in the edit control. Explicit
         // later preset loads can still replace the field through LoadControls.
         const sally::find::LookInSeed& seed = InitialLookInSeed;
         HWND hLegacyCombo = GetDlgItem(HWindow, IDC_FIND_LOOKIN);
         ApplyInitialFindLookInSeed(hLegacyCombo, seed, Data.LookInText);
-        if (sally::find::ShouldApplyInitialLookInWideOverride(seed, Data.LookInText.Get()))
+        if (sally::find::HasInitialLookInSeed(seed))
         {
-            HWND hFocus = GetFocus();
-            BOOL focusWasLookIn = IsFindLookInFocus(hFocus, hLegacyCombo);
-            if (LookInUnicodeInput.EnableForCombo(HWindow, IDC_FIND_LOOKIN, seed.wide,
-                                                  NULL, 0, Data.LookInText.Size(), -1))
-            {
-                ApplyFindComboSkin(LookInUnicodeInput.GetControlHandle());
-                if (!focusWasLookIn && hFocus != NULL && IsWindow(hFocus))
-                    SetFocus(hFocus);
-                // Plant the wide cache only now that the Unicode control is
-                // live: the cache must be authoritative iff the control is
-                // active, so the two are populated in the same step.
-                LookInTextW = seed.wide;
-            }
-            else
-                SetDlgItemTextW(HWindow, IDC_FIND_LOOKIN, seed.wide.c_str());
+            ActivateWideLookInCombo(HWindow, Data.LookInText, LookInUnicodeFont);
+            ApplyFindComboSkin(GetDlgItem(HWindow, IDC_FIND_LOOKIN));
         }
         return TRUE;
     }
@@ -4592,14 +4330,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_CLEARHISTORY:
     {
         ClearComboboxListbox(GetDlgItem(HWindow, IDC_FIND_NAMED));
-        if (LookInUnicodeInput.IsEnabled())
-        {
-            std::wstring lookInText = LookInUnicodeInput.GetText();
-            SendMessageW(LookInUnicodeInput.GetControlHandle(), CB_RESETCONTENT, 0, 0);
-            LookInUnicodeInput.SetText(lookInText);
-        }
-        else
-            ClearComboboxListbox(GetDlgItem(HWindow, IDC_FIND_LOOKIN));
+        ClearComboboxListbox(GetDlgItem(HWindow, IDC_FIND_LOOKIN));
         ClearComboboxListbox(GetDlgItem(HWindow, IDC_FIND_CONTAINING));
         return TRUE;
     }
@@ -4767,10 +4498,9 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // when restoring, refresh the window title
         if (SearchInProgress && (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)) // restore
         {
-            CPathBuffer buff;
-            _snprintf_s(buff, buff.Size(), _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED),
-                        SearchForData[0]->MasksGroup.GetMasksString());
-            SetWindowText(HWindow, buff);
+            const std::wstring caption = FormatStrW(NORMAL_FINDING_CAPTION, LoadStrW(IDS_FF_NAME),
+                                                    LoadStrW(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
+            SetWindowTextW(HWindow, caption.c_str());
         }
 
         //      if (FirstWMSize)
@@ -4798,16 +4528,10 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (FoundFilesListView != NULL && ListView_GetEditControl(FoundFilesListView->HWindow) != NULL)
             return 0; // the list view sends some commands while editing
-        if (LOWORD(wParam) == IDC_FIND_LOOKIN && LookInUnicodeInput.IsEnabled())
-        {
-            HWND hCombo = (HWND)lParam;
-            if (hCombo == LookInUnicodeInput.GetControlHandle())
-            {
-                BOOL isDropdownOpen = (BOOL)SendMessage(hCombo, CB_GETDROPPEDSTATE, 0, 0);
-                if (sally::unicode::ShouldSyncUnicodeComboSelection(HIWORD(wParam), isDropdownOpen))
-                    LookInUnicodeInput.SyncSelectionToEdit();
-            }
-        }
+        // The selection-sync block that stood here copied the wide item
+        // chosen in the drop-down into the replacement combo's edit, because the list and
+        // the edit lived in two different controls. The native combo puts its own
+        // selection into its own edit; there is nothing to synchronise.
         if (LOWORD(wParam) >= CM_FIND_OPTIONS_FIRST && LOWORD(wParam) <= CM_FIND_OPTIONS_LAST)
         {
             LoadControls(LOWORD(wParam) - CM_FIND_OPTIONS_FIRST);
@@ -4821,7 +4545,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (!Configuration.SearchFileContent)
             {
                 // grab the actual content of hidden elements
-                SetDlgItemText(HWindow, IDC_FIND_CONTAINING, "");
+                SetDlgItemTextW(HWindow, IDC_FIND_CONTAINING, L"");
                 CheckDlgButton(HWindow, IDC_FIND_HEX, FALSE);
                 CheckDlgButton(HWindow, IDC_FIND_CASE, FALSE);
                 CheckDlgButton(HWindow, IDC_FIND_WHOLE, FALSE);
@@ -4987,7 +4711,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (!Data.RegularExpresions && Data.HexMode && HIWORD(wParam) == CBN_EDITUPDATE)
             {
-                DoHexValidation((HWND)lParam, GREP_TEXT_LEN);
+                DoHexValidation((HWND)lParam);
                 return TRUE;
             }
             break;
@@ -5077,7 +4801,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                 else
                 {
                     mii.Type = MENU_TYPE_STRING;
-                    mii.String = LoadStr(ids[i]);
+                    mii.String = LoadStrW(ids[i]);
                     mii.ID = i + 1;
                 }
                 menu.InsertItem(-1, TRUE, &mii);
@@ -5090,88 +4814,31 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                 if (cmd == 1)
                 {
                     // Browse...
-                    if (LookInUnicodeInput.IsEnabled())
-                    {
-                        HWND hCombo = LookInUnicodeInput.GetControlHandle();
-                        std::wstring current = LookInUnicodeInput.GetText();
-                        DWORD start = 0;
-                        DWORD end = 0;
-                        SendMessage(hCombo, CB_GETEDITSEL, (WPARAM)&start, (LPARAM)&end);
+                    HWND hCombo = GetDlgItem(HWindow, IDC_FIND_LOOKIN);
+                    std::wstring current = GetWindowTextWide(hCombo);
+                    DWORD start = 0;
+                    DWORD end = 0;
+                    SendMessage(hCombo, CB_GETEDITSEL, (WPARAM)&start, (LPARAM)&end);
 
-                        std::wstring pathW;
-                        size_t startPos = start;
-                        size_t endPos = end;
-                        if (startPos > current.length())
-                            startPos = current.length();
-                        if (endPos > current.length())
-                            endPos = current.length();
-                        if (endPos > startPos)
-                            pathW.assign(current, startPos, endPos - startPos);
+                    std::wstring pathW;
+                    size_t startPos = start;
+                    size_t endPos = end;
+                    if (startPos > current.length())
+                        startPos = current.length();
+                    if (endPos > current.length())
+                        endPos = current.length();
+                    if (endPos > startPos)
+                        pathW.assign(current, startPos, endPos - startPos);
 
-                        if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_CHANGE_DIRECTORY),
-                                                LoadStrW(IDS_BROWSECHANGEDIRTEXT), pathW, FALSE, pathW.c_str()))
-                        {
-                            ReplaceFindLookInSelectionW(LookInUnicodeInput, pathW, start, end);
-                            LookInTextW = LookInUnicodeInput.GetText();
-                        }
-                        return TRUE;
-                    }
-
-                    CPathBuffer path;
-                    char buff[1024];
-                    DWORD start, end;
-                    EditLine->GetSel(&start, &end);
-                    SendMessage(EditLine->HWindow, WM_GETTEXT, (WPARAM)1024, (LPARAM)buff);
-                    path[0] = 0;
-                    if (start < end)
-                        lstrcpyn(path, buff + start, end - start + 1);
-                    if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_CHANGE_DIRECTORY),
-                                           LoadStr(IDS_BROWSECHANGEDIRTEXT), path, FALSE, path))
-                    {
-                        char* s = path;
-                        while (*s != 0) // duplicate ';' characters (escape sequence for ';' is ';;')
-                        {
-                            if (*s == ';')
-                            {
-                                memmove(s + 1, s, strlen(s) + 1);
-                                s++;
-                            }
-                            s++;
-                        }
-
-                        int leftIndex = -1;  // last character after which the text will be inserted
-                        int rightIndex = -1; // first character after the inserted text
-                        if (start > 0)
-                            leftIndex = start - 1;
-                        if (end < (DWORD)lstrlen(buff))
-                            rightIndex = end;
-                        if (leftIndex != -1)
-                        {
-                            s = buff + leftIndex;
-                            while (s >= buff && *s == ';')
-                                s--;
-                            if ((((buff + leftIndex) - s) & 1) == 0)
-                            {
-                                memmove(path + 2, path, lstrlen(path) + 1);
-                                path[0] = ';';
-                                path[1] = ' ';
-                            }
-                        }
-                        if (rightIndex != -1 && (buff[rightIndex] != ';' || buff[rightIndex + 1] == ';'))
-                            lstrcat(path, "; ");
-
-                        EditLine->ReplaceText(path);
-                    }
+                    if (GetTargetDirectoryW(HWindow, HWindow, LoadStrW(IDS_CHANGE_DIRECTORY),
+                                            LoadStrW(IDS_BROWSECHANGEDIRTEXT), pathW, FALSE, pathW.c_str()))
+                        ReplaceFindLookInSelectionW(hCombo, pathW, start, end);
                     return TRUE;
                 }
                 if (cmd == 3 || cmd == 4)
                 {
-                    HWND hLookIn = LookInUnicodeInput.IsEnabled()
-                                       ? LookInUnicodeInput.GetControlHandle()
-                                       : EditLine->HWindow;
-                    InsertDrives(hLookIn, cmd == 4); // local drives (3) || all drives (4)
-                    if (LookInUnicodeInput.IsEnabled())
-                        LookInTextW = LookInUnicodeInput.GetText();
+                    InsertDrives(GetDlgItem(HWindow, IDC_FIND_LOOKIN),
+                                 cmd == 4); // local drives (3) || all drives (4)
                 }
             }
             return 0;
@@ -5628,9 +5295,9 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
 
                         if (r2.right > r2.left)
                         {
-                            CWidePathBuffer buff(item->PathW.c_str());
-                            PathCompactPathW(CacheBitmap->HMemDC, buff, (UINT)(r2.right - r2.left));
-                            DrawTextW(CacheBitmap->HMemDC, buff, -1, &r2,
+                            std::vector<wchar_t> compactPath = MakeCompactPathBuffer(item->PathW);
+                            PathCompactPathW(CacheBitmap->HMemDC, compactPath.data(), (UINT)(r2.right - r2.left));
+                            DrawTextW(CacheBitmap->HMemDC, compactPath.data(), -1, &r2,
                                       DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE);
                         }
 
@@ -5671,72 +5338,6 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                 break;
             }
 
-#ifndef _UNICODE
-            case LVN_ODFINDITEM:
-            {
-                // assist the list view with quick search
-                NMLVFINDITEM* pFindInfo = (NMLVFINDITEM*)lParam;
-                int iStart = pFindInfo->iStart;
-                LVFINDINFO* fi = &pFindInfo->lvfi;
-                int ret = -1; // not found
-
-                if (fi->flags & LVFI_STRING || fi->flags & LVFI_PARTIAL)
-                {
-                    //              BOOL partial = fi->flags & LVFI_PARTIAL != 0;
-                    // the documentation says LVFI_PARTIAL and LVFI_STRING should arrive,
-                    // but only LVFI_STRING comes through. Some guy complained about it
-                    // on the newsgroups, but no reply. So we'll force it here.
-                    BOOL partial = TRUE;
-                    int i;
-                    for (i = iStart; i < FoundFilesListView->GetCount(); i++)
-                    {
-                        const CFoundFilesData* item = FoundFilesListView->At(i);
-                        if (partial)
-                        {
-                            if (StrNICmp(item->Name.c_str(), fi->psz, (int)strlen(fi->psz)) == 0)
-                            {
-                                ret = i;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            if (StrICmp(item->Name.c_str(), fi->psz) == 0)
-                            {
-                                ret = i;
-                                break;
-                            }
-                        }
-                    }
-                    if (ret == -1 && fi->flags & LVFI_WRAP)
-                    {
-                        for (i = 0; i < iStart; i++)
-                        {
-                            const CFoundFilesData* item = FoundFilesListView->At(i);
-                            if (partial)
-                            {
-                                if (StrNICmp(item->Name.c_str(), fi->psz, (int)strlen(fi->psz)) == 0)
-                                {
-                                    ret = i;
-                                    break;
-                                }
-                            }
-                            else
-                            {
-                                if (StrICmp(item->Name.c_str(), fi->psz) == 0)
-                                {
-                                    ret = i;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                SetWindowLongPtr(HWindow, DWLP_MSGRESULT, ret);
-                return TRUE;
-            }
-#endif
 
             case LVN_ODFINDITEMW:
             {
@@ -5756,18 +5357,6 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                 break;
             }
 
-#ifndef _UNICODE
-            case LVN_GETDISPINFO:
-            {
-                LV_DISPINFO* info = (LV_DISPINFO*)lParam;
-                CFoundFilesData* item = FoundFilesListView->At(info->item.iItem);
-                if (info->item.mask & LVIF_IMAGE)
-                    info->item.iImage = item->IsDir ? 0 : 1;
-                if (info->item.mask & LVIF_TEXT)
-                    info->item.pszText = item->GetText(info->item.iSubItem, FoundFilesDataTextBuffer, FileNameFormat);
-                break;
-            }
-#endif
 
             case LVN_GETDISPINFOW:
             {
@@ -6007,7 +5596,11 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
         if (SearchInProgress)
             StopSearch();
 
-        LookInUnicodeInput.Reset();
+        if (LookInUnicodeFont != NULL)
+        {
+            DeleteObject(LookInUnicodeFont);
+            LookInUnicodeFont = NULL;
+        }
 
         if (!DlgFailed)
         {
@@ -6038,12 +5631,6 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
             DestroyWindow(TBHeader->HWindow);
             TBHeader = NULL;
         }
-        if (EditLine->HWindow == NULL)
-        {
-            delete EditLine;
-            EditLine = NULL;
-        }
-
         FindDialogQueue.Remove(HWindow);
 
         // if the user copies the search results to the clipboard (Ctrl+C), switches to the main window
@@ -6061,10 +5648,10 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
         while (PasteLinkIsRunning > 0)
         {
             MSG msg;
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
             if (PasteLinkIsRunning > 0)
                 Sleep(50); // active waiting; slow the thread down a bit

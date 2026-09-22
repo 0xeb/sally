@@ -19,7 +19,7 @@ public:
     int OriginalIndex; // column position according to the database
     int Length;        // maximum number of characters shown in the column
     int FieldLen;      // # of bytes in the file used by this field/column
-    char* Type;        // allocated description of the column type
+    wchar_t* Type;     // allocated UTF-16 description of the column type
     int Decimals;      // number of digits after the decimal point or -1 if unknown
 };
 
@@ -40,7 +40,7 @@ class CDatabase
 {
 private:
     // allocated name of the currently opened database
-    char* FileName; // name of the opened file or NULL
+    wchar_t* FileName; // name of the opened file or NULL
     CParserInterfaceAbstract* Parser;
     CRendererWindow* Renderer; // pointer to the owner
 
@@ -63,7 +63,7 @@ public:
     void SetRenderer(CRendererWindow* renderer) { Renderer = renderer; }
 
     // open a file and return TRUE on success
-    BOOL Open(const char* fileName);
+    BOOL Open(const wchar_t* fileName);
     void Close();
 
     // return TRUE if the database is open and all variables are initialized
@@ -73,7 +73,7 @@ public:
     const char* GetParserName();
 
     // return the opened database name or NULL
-    const char* GetFileName() { return FileName; }
+    const wchar_t* GetFileName() { return FileName; }
 
     // fill the supplied edit control with database information
     BOOL GetFileInfo(HWND hEdit);
@@ -125,4 +125,5 @@ public:
     // len is set to the row length
     const char* GetCellText(const CDatabaseColumn* column, size_t* textLen);
     const wchar_t* GetCellTextW(const CDatabaseColumn* column, size_t* textLen);
+    bool TryGetLocalizedCellText(const CDatabaseColumn* column, std::wstring& text);
 };

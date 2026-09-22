@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "DiagnosticTextEncoding.h"
 
 #include <windows.h>
 #include <tchar.h>
@@ -73,7 +74,14 @@ void Initialize__Handles()
 #error "macro MULTITHREADED_MESSAGES_ENABLE not defined"
 #endif // defined(MULTITHREADED_HANDLES_ENABLE) && !defined(MULTITHREADED_MESSAGES_ENABLE)
 
-C__Handles __Handles;
+// See the comment on GetHandles()'s declaration in handles.h - function-local
+// static, not a plain global, so it cannot lose a static-initialization-order race against any
+// other global object that calls a HANDLES()-wrapped function from its own constructor.
+C__Handles& GetHandles()
+{
+    static C__Handles handles;
+    return handles;
+}
 
 #ifndef MULTITHREADED_HANDLES_ENABLE
 DWORD __HandlesMainThreadID = 0;
@@ -86,6 +94,7 @@ const WCHAR* __HandlesMessageSpaceW = L" ";
 const char* __HandlesMessageLineEnd = ":\n\n";
 const WCHAR* __HandlesMessageLineEndW = L":\n\n";
 const char* __HandlesMessageNumberOpened = "Number of opened handles: ";
+const WCHAR* __HandlesMessageNumberOpenedW = L"Number of opened handles: ";
 
 const char* __HandlesMessageBadType = "Error in function %s:\n"
                                       "Bad type of handle: %s.\n"
@@ -103,6 +112,9 @@ const WCHAR* __HandlesMessageReturnErrorParamsW = L"Error in function %S.\n\nFun
 const char* __HandlesMessageAlreadyExists = "Error in function %s:\n"
                                             "Named kernel object already exists.\n"
                                             "Type: %s, Name: %s";
+const WCHAR* __HandlesMessageAlreadyExistsW = L"Error in function %S:\n"
+                                              L"Named kernel object already exists.\n"
+                                              L"Type: %S, Name: %s";
 const char* __HandlesMessageNotMultiThreaded = "Incorrect use of modul HANDLES.\n"
                                                "Multithreaded application must "
                                                "use multithreaded version of module.";
@@ -563,11 +575,23 @@ C__Handles::~C__Handles()
                   __LINE__,
 #endif // MESSAGES_DEBUG
                   __HandlesMessageNumberOpened, Handles.Count);
+        // wide: __MessagesTitleW/__HandlesMessageNumberOpenedW already exist as
+        // maintained siblings of the narrow versions above; msgBuf itself stays narrow because it
+        // is reused below for TRACE_I diagnostics, so this dialog gets its own wide buffer instead.
+        WCHAR msgBufW[1000];
+        _snwprintf_s(msgBufW, _TRUNCATE,
+                     L"Some monitored handles remained opened.\n%ls%d"
+                     L"\nDo you want to list opened handles to Trace Server (ensure it is running) ?",
+                     __HandlesMessageNumberOpenedW, Handles.Count);
         HWND parent = __MessagesParent;
         if (!IsWindow(parent))
             parent = NULL;
-        if (MessageBoxA(parent, msgBuf, __MessagesTitle,
-                        MB_ICONEXCLAMATION | MB_YESNO | MB_SETFOREGROUND) == IDYES)
+        // via the messages.h choke point, NOT ::MessageBoxW directly: in a
+        // headless test nothing dismisses this and the run hangs forever at exit. Under
+        // SALLY_E2E_HOST it prints to stderr and answers IDNO (decline the Trace Server
+        // listing), so a genuine leak is still REPORTED but never blocks automation.
+        if (__MessagesShowW(parent, msgBufW, __MessagesTitleW,
+                            MB_ICONEXCLAMATION | MB_YESNO | MB_SETFOREGROUND) == IDYES)
         /*
     if (MESSAGE_E(NULL, "Some monitored handles remained opened.\n" <<
                         __HandlesMessageNumberOpened << Handles.Count <<
@@ -575,25 +599,56 @@ C__Handles::~C__Handles()
                   MB_YESNO | MB_SETFOREGROUND) == IDYES)
 */
         {
-            ConnectToTraceServer(); // in case the server was not started
-            TRACE_I("List of opened handles:");
-            for (int i = 0; i < Handles.Count; i++)
+            // see the sibling call below - never wait on the Trace
+            // Server pipe during static destruction in an automated process.
+            // ...and never touch GetTrace() at all once it has already been
+            // destroyed - see IsTraceAlive()'s declaration in trace.h. C__Handles and C__Trace
+            // are both Meyer's singletons with no guaranteed relative destruction order; this
+            // destructor running after GetTrace() is already torn down is a real, observed case
+            // (crash dump on process exit), not a hypothetical one.
+            if (IsTraceAlive())
             {
-                // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
-                sprintf_s(msgBuf, "%p", Handles[i].Handle.Handle);
-                TRACE_MI(Handles[i].File, Handles[i].Line,
-                         __GetHandlesTypeName(Handles[i].Handle.Type) << " - " << __GetHandlesOrigin(Handles[i].Handle.Origin) << " - " << msgBuf);
+                if (!__MessagesIsNonInteractive())
+                    ConnectToTraceServer(); // in case the server was not started
+                TRACE_I("List of opened handles:");
+                for (int i = 0; i < Handles.Count; i++)
+                {
+                    // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
+                    sprintf_s(msgBuf, "%p", Handles[i].Handle.Handle);
+                    TRACE_MI(Handles[i].File, Handles[i].Line,
+                             __GetHandlesTypeName(Handles[i].Handle.Type) << " - " << __GetHandlesOrigin(Handles[i].Handle.Origin) << " - " << msgBuf);
+                }
             }
         }
         else
         {
-            ConnectToTraceServer();
-            // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
-            sprintf_s(msgBuf, "%d", Handles.Count);
-            TRACE_I(__HandlesMessageNumberOpened << msgBuf);
+            // Do NOT reach for the Trace Server under automation.
+            //
+            // This is the SECOND blocking path in this destructor, and P0.1 is what
+            // made it reachable. P0.1 answers the box above non-interactively with
+            // IDNO, which lands here - and ConnectToTraceServer() waits on a named
+            // pipe during static destruction, after other statics are already gone.
+            // Caught as an intermittent 20-minute hang of gtest_get_file_attributes_wide
+            // under `ctest -j 8`; cdb showed thread 0 parked in
+            // C__Trace::Connect -> RtlEnterCriticalSection, below
+            // C__Handles::~C__Handles, below the atexit dispatcher. It reproduces only
+            // under parallel load, which is exactly the shape that wastes a gate run.
+            //
+            // Same lesson as P0.1 itself: fixing ONE blocking path in a hazard class
+            // leaves the class open. The diagnostic is still emitted, via TRACE_I to
+            // stderr; only the pipe connection is skipped.
+            // same IsTraceAlive() guard as above - see the comment there.
+            if (IsTraceAlive())
+            {
+                if (!__MessagesIsNonInteractive())
+                    ConnectToTraceServer();
+                // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
+                sprintf_s(msgBuf, "%d", Handles.Count);
+                TRACE_I(__HandlesMessageNumberOpened << msgBuf);
+            }
         }
     }
-    else
+    else if (IsTraceAlive())
         TRACE_I("All monitored handles were closed.");
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::DeleteCriticalSection(&CriticalSection);
@@ -752,13 +807,23 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
 // Auxiliary functions:
 //
 
+static const wchar_t* GetHandleSourceFileW(const char* sourceFile) noexcept
+{
+    thread_local std::wstring fileName;
+    if (sally::diagnostic::DecodeAcp(sourceFile, fileName))
+    {
+        return fileName.c_str();
+    }
+    fileName.clear();
+    return L"<source file unavailable>";
+}
+
 void C__Handles::CheckCreate(BOOL success, C__HandlesType type,
                              C__HandlesOrigin origin, const HANDLE handle, DWORD error,
-                             BOOL synchronize, const TCHAR* params, const char* paramsA,
+                             BOOL synchronize, const wchar_t* params, const char* paramsA,
                              const WCHAR* paramsW)
 {
     DWORD old_error = GetLastError();
-    WCHAR fileNameW[MAX_PATH];
 #ifndef MULTITHREADED_HANDLES_ENABLE
     if (__HandlesMainThreadID != ::GetCurrentThreadId())
     {
@@ -768,13 +833,8 @@ void C__Handles::CheckCreate(BOOL success, C__HandlesType type,
     }
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-#ifdef _UNICODE
     if (params != NULL)
         paramsW = params;
-#else  // _UNICODE
-    if (params != NULL)
-        paramsA = params;
-#endif // _UNICODE
     params = NULL;
 
     if (success)
@@ -791,8 +851,7 @@ void C__Handles::CheckCreate(BOOL success, C__HandlesType type,
             {
                 if (paramsW != NULL)
                 {
-                    _snwprintf_s(fileNameW, _TRUNCATE, L"%S", TemporaryHandle.File);
-                    MESSAGE_TEW(__HandlesMessageCallFromW << fileNameW << __HandlesMessageSpaceW << TemporaryHandle.Line << __HandlesMessageLineEndW << spfW(__HandlesMessageReturnErrorMessageParamsW, __GetHandlesOrigin(origin), errW(error), paramsW), MB_OK);
+                    MESSAGE_TEW(__HandlesMessageCallFromW << GetHandleSourceFileW(TemporaryHandle.File) << __HandlesMessageSpaceW << TemporaryHandle.Line << __HandlesMessageLineEndW << spfW(__HandlesMessageReturnErrorMessageParamsW, __GetHandlesOrigin(origin), errW(error), paramsW), MB_OK);
                 }
                 else
                 {
@@ -813,8 +872,7 @@ void C__Handles::CheckCreate(BOOL success, C__HandlesType type,
             {
                 if (paramsW != NULL)
                 {
-                    _snwprintf_s(fileNameW, _TRUNCATE, L"%S", TemporaryHandle.File);
-                    MESSAGE_TEW(__HandlesMessageCallFromW << fileNameW << __HandlesMessageSpaceW << TemporaryHandle.Line << __HandlesMessageLineEndW << spfW(__HandlesMessageReturnErrorParamsW, __GetHandlesOrigin(origin), paramsW), MB_OK);
+                    MESSAGE_TEW(__HandlesMessageCallFromW << GetHandleSourceFileW(TemporaryHandle.File) << __HandlesMessageSpaceW << TemporaryHandle.Line << __HandlesMessageLineEndW << spfW(__HandlesMessageReturnErrorParamsW, __GetHandlesOrigin(origin), paramsW), MB_OK);
                 }
                 else
                 {
@@ -922,18 +980,28 @@ C__Handles::CreateFileA(LPCSTR lpFileName, DWORD dwDesiredAccess,
     HANDLE ret = ::CreateFileA(lpFileName, dwDesiredAccess, dwShareMode,
                                lpSecurityAttributes, dwCreationDisposition,
                                dwFlagsAndAttributes, hTemplateFile);
-    char paramsBuf[MAX_PATH + 200];
-    const char* params = NULL;
+    std::string params;
     if (ret == INVALID_HANDLE_VALUE) // parameters to buffer only when error occurs (can be displayed)
     {
         DWORD err = GetLastError();
-        _snprintf_s(paramsBuf, _TRUNCATE,
-                    "%s,\ndwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X",
-                    lpFileName, dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes);
-        params = paramsBuf;
+        try
+        {
+            char details[256];
+            _snprintf_s(details, _TRUNCATE,
+                        ",\ndwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X",
+                        dwDesiredAccess, dwShareMode, dwCreationDisposition,
+                        dwFlagsAndAttributes);
+            params = lpFileName != NULL ? lpFileName : "<null>";
+            params += details;
+        }
+        catch (...)
+        {
+            params.clear();
+        }
         SetLastError(err);
     }
-    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, GetLastError(), TRUE, NULL, params);
+    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, GetLastError(), TRUE,
+                NULL, params.empty() ? NULL : params.c_str());
     return ret;
 }
 
@@ -1101,15 +1169,15 @@ C__Handles::CreateBitmapIndirect(CONST BITMAP* lpbm)
     return ret;
 }
 
-HDC C__Handles::CreateMetaFile(LPCTSTR lpszFile)
+HDC C__Handles::CreateMetaFile(LPCWSTR lpszFile)
 {
     HDC ret = ::CreateMetaFile(lpszFile);
     CheckCreate(ret != NULL, __htDC, __hoCreateMetaFile, ret);
     return ret;
 }
 
-HDC C__Handles::CreateEnhMetaFile(HDC hdcRef, LPCTSTR lpFilename,
-                                  CONST RECT* lpRect, LPCTSTR lpDescription)
+HDC C__Handles::CreateEnhMetaFile(HDC hdcRef, LPCWSTR lpFilename,
+                                  CONST RECT* lpRect, LPCWSTR lpDescription)
 {
     HDC ret = ::CreateEnhMetaFile(hdcRef, lpFilename, lpRect, lpDescription);
     CheckCreate(ret != NULL, __htDC, __hoCreateEnhMetaFile, ret, ERROR_SUCCESS, TRUE, lpFilename);
@@ -1150,7 +1218,7 @@ C__Handles::CloseEnhMetaFile(HDC hdc)
 }
 
 HMETAFILE
-C__Handles::CopyMetaFile(HMETAFILE hmfSrc, LPCTSTR lpszFile)
+C__Handles::CopyMetaFile(HMETAFILE hmfSrc, LPCWSTR lpszFile)
 {
     HMETAFILE ret = ::CopyMetaFile(hmfSrc, lpszFile);
     CheckCreate(ret != NULL, __htMetaFile, __hoCopyMetaFile, ret);
@@ -1158,7 +1226,7 @@ C__Handles::CopyMetaFile(HMETAFILE hmfSrc, LPCTSTR lpszFile)
 }
 
 HENHMETAFILE
-C__Handles::CopyEnhMetaFile(HENHMETAFILE hemfSrc, LPCTSTR lpszFile)
+C__Handles::CopyEnhMetaFile(HENHMETAFILE hemfSrc, LPCWSTR lpszFile)
 {
     HENHMETAFILE ret = ::CopyEnhMetaFile(hemfSrc, lpszFile);
     CheckCreate(ret != NULL, __htEnhMetaFile, __hoCopyEnhMetaFile, ret);
@@ -1166,7 +1234,7 @@ C__Handles::CopyEnhMetaFile(HENHMETAFILE hemfSrc, LPCTSTR lpszFile)
 }
 
 HENHMETAFILE
-C__Handles::GetEnhMetaFile(LPCTSTR lpszMetaFile)
+C__Handles::GetEnhMetaFile(LPCWSTR lpszMetaFile)
 {
     HENHMETAFILE ret = ::GetEnhMetaFile(lpszMetaFile);
     CheckCreate(ret != NULL, __htEnhMetaFile, __hoGetEnhMetaFile, ret);
@@ -1255,7 +1323,7 @@ C__Handles::CreateFont(int nHeight, int nWidth, int nEscapement, int nOrientatio
                        int fnWeight, DWORD fdwItalic, DWORD fdwUnderline,
                        DWORD fdwStrikeOut, DWORD fdwCharSet,
                        DWORD fdwOutputPrecision, DWORD fdwClipPrecision,
-                       DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCTSTR lpszFace)
+                       DWORD fdwQuality, DWORD fdwPitchAndFamily, LPCWSTR lpszFace)
 {
     HFONT ret = ::CreateFont(nHeight, nWidth, nEscapement, nOrientation, fnWeight,
                              fdwItalic, fdwUnderline, fdwStrikeOut, fdwCharSet,
@@ -1281,7 +1349,7 @@ C__Handles::CreateFontIndirectW(CONST LOGFONTW* lplf)
     return ret;
 }
 
-HDC C__Handles::CreateDC(LPCTSTR lpszDriver, LPCTSTR lpszDevice, LPCTSTR lpszOutput,
+HDC C__Handles::CreateDC(LPCWSTR lpszDriver, LPCWSTR lpszDevice, LPCWSTR lpszOutput,
                          CONST DEVMODE* lpInitData)
 {
     HDC ret = ::CreateDC(lpszDriver, lpszDevice, lpszOutput, lpInitData);
@@ -1343,7 +1411,7 @@ BOOL C__Handles::DestroyCursor(HCURSOR hCursor)
     return ret;
 }
 
-LONG C__Handles::RegCreateKey(HKEY hKey, LPCTSTR lpSubKey, PHKEY phkResult)
+LONG C__Handles::RegCreateKey(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult)
 {
     LONG ret = ::RegCreateKey(hKey, lpSubKey, phkResult);
     CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegCreateKey,
@@ -1351,12 +1419,12 @@ LONG C__Handles::RegCreateKey(HKEY hKey, LPCTSTR lpSubKey, PHKEY phkResult)
     return ret;
 }
 
-LONG C__Handles::RegCreateKeyEx(HKEY hKey, LPCTSTR lpSubKey, DWORD Reserved,
-                                LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired,
+LONG C__Handles::RegCreateKeyExW(HKEY hKey, LPCWSTR lpSubKey, DWORD Reserved,
+                                LPWSTR lpClass, DWORD dwOptions, REGSAM samDesired,
                                 LPSECURITY_ATTRIBUTES lpSecurityAttributes,
                                 PHKEY phkResult, LPDWORD lpdwDisposition)
 {
-    LONG ret = ::RegCreateKeyEx(hKey, lpSubKey, Reserved, lpClass, dwOptions,
+    LONG ret = ::RegCreateKeyExW(hKey, lpSubKey, Reserved, lpClass, dwOptions,
                                 samDesired, lpSecurityAttributes, phkResult,
                                 lpdwDisposition);
     CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegCreateKeyEx,
@@ -1364,24 +1432,57 @@ LONG C__Handles::RegCreateKeyEx(HKEY hKey, LPCTSTR lpSubKey, DWORD Reserved,
     return ret;
 }
 
-LONG C__Handles::RegOpenKey(HKEY hKey, LPCTSTR lpSubKey, PHKEY phkResult)
+
+LONG C__Handles::RegCreateKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD Reserved,
+                                 LPSTR lpClass, DWORD dwOptions, REGSAM samDesired,
+                                 LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                                 PHKEY phkResult, LPDWORD lpdwDisposition)
 {
-    LONG ret = ::RegOpenKey(hKey, lpSubKey, phkResult);
+    LONG ret = ::RegCreateKeyExA(hKey, lpSubKey, Reserved, lpClass, dwOptions,
+                                 samDesired, lpSecurityAttributes, phkResult,
+                                 lpdwDisposition);
+    CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegCreateKeyEx,
+                (phkResult != NULL) ? *phkResult : NULL, ret);
+    return ret;
+}
+
+LONG C__Handles::RegOpenKeyW(HKEY hKey, LPCWSTR lpSubKey, PHKEY phkResult)
+{
+    LONG ret = ::RegOpenKeyW(hKey, lpSubKey, phkResult);
     CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegOpenKey,
                 (phkResult != NULL) ? *phkResult : NULL, ret);
     return ret;
 }
 
-LONG C__Handles::RegOpenKeyEx(HKEY hKey, LPCTSTR lpSubKey, DWORD ulOptions,
+
+LONG C__Handles::RegOpenKeyA(HKEY hKey, LPCSTR lpSubKey, PHKEY phkResult)
+{
+    LONG ret = ::RegOpenKeyA(hKey, lpSubKey, phkResult);
+    CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegOpenKey,
+                (phkResult != NULL) ? *phkResult : NULL, ret);
+    return ret;
+}
+
+LONG C__Handles::RegOpenKeyExW(HKEY hKey, LPCWSTR lpSubKey, DWORD ulOptions,
                               REGSAM samDesired, PHKEY phkResult)
 {
-    LONG ret = ::RegOpenKeyEx(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+    LONG ret = ::RegOpenKeyExW(hKey, lpSubKey, ulOptions, samDesired, phkResult);
     CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegOpenKeyEx,
                 (phkResult != NULL) ? *phkResult : NULL, ret);
     return ret;
 }
 
-LONG C__Handles::RegConnectRegistry(LPTSTR lpMachineName, HKEY hKey, PHKEY phkResult)
+
+LONG C__Handles::RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions,
+                               REGSAM samDesired, PHKEY phkResult)
+{
+    LONG ret = ::RegOpenKeyExA(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+    CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegOpenKeyEx,
+                (phkResult != NULL) ? *phkResult : NULL, ret);
+    return ret;
+}
+
+LONG C__Handles::RegConnectRegistry(LPWSTR lpMachineName, HKEY hKey, PHKEY phkResult)
 {
     LONG ret = ::RegConnectRegistry(lpMachineName, hKey, phkResult);
     CheckCreate(ret == ERROR_SUCCESS, __htKey, __hoRegConnectRegistry,
@@ -1396,7 +1497,7 @@ LONG C__Handles::RegCloseKey(HKEY hKey)
     return ret;
 }
 
-HDC C__Handles::CreateIC(LPCTSTR lpszDriver, LPCTSTR lpszDevice, LPCTSTR lpszOutput,
+HDC C__Handles::CreateIC(LPCWSTR lpszDriver, LPCWSTR lpszDevice, LPCWSTR lpszOutput,
                          CONST DEVMODE* lpdvmInit)
 {
     HDC ret = ::CreateIC(lpszDriver, lpszDevice, lpszOutput, lpdvmInit);
@@ -1483,7 +1584,7 @@ C__Handles::CreateMappedBitmap(HINSTANCE hInstance, int idBitmap, UINT wFlags,
 }
 
 HBITMAP
-C__Handles::LoadBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName)
+C__Handles::LoadBitmap(HINSTANCE hInstance, LPCWSTR lpBitmapName)
 {
     HBITMAP ret = ::LoadBitmap(hInstance, lpBitmapName);
     CheckCreate(ret != NULL, __htBitmap, __hoLoadBitmap, ret);
@@ -1588,11 +1689,11 @@ C__Handles::CreateRemoteThread(HANDLE hProcess,
     return ret;
 }
 
-BOOL C__Handles::CreateProcess(LPCTSTR lpApplicationName, LPTSTR lpCommandLine,
+BOOL C__Handles::CreateProcess(LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
                                LPSECURITY_ATTRIBUTES lpProcessAttributes,
                                LPSECURITY_ATTRIBUTES lpThreadAttributes,
                                BOOL bInheritHandles, DWORD dwCreationFlags,
-                               LPVOID lpEnvironment, LPCTSTR lpCurrentDirectory,
+                               LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory,
                                LPSTARTUPINFO lpStartupInfo,
                                LPPROCESS_INFORMATION lpProcessInformation)
 {
@@ -1601,6 +1702,50 @@ BOOL C__Handles::CreateProcess(LPCTSTR lpApplicationName, LPTSTR lpCommandLine,
                                bInheritHandles, dwCreationFlags, lpEnvironment,
                                lpCurrentDirectory, lpStartupInfo,
                                lpProcessInformation);
+    if (ret)
+    {
+        if (lpProcessInformation != NULL)
+        {
+            if (lpProcessInformation->hProcess != NULL)
+                CheckCreate(TRUE, __htProcess, __hoCreateProcess,
+                            lpProcessInformation->hProcess, ERROR_SUCCESS, FALSE);
+            if (lpProcessInformation->hThread != NULL)
+                CheckCreate(TRUE, __htThread, __hoCreateProcess,
+                            lpProcessInformation->hThread);
+#ifdef MULTITHREADED_HANDLES_ENABLE
+            else
+            {
+                ::LeaveCriticalSection(&CriticalSection);
+            }
+#endif // MULTITHREADED_HANDLES_ENABLE
+        }
+#ifdef MULTITHREADED_HANDLES_ENABLE
+        else
+        {
+            ::LeaveCriticalSection(&CriticalSection);
+        }
+#endif // MULTITHREADED_HANDLES_ENABLE
+    }
+    else
+    {
+        CheckCreate(FALSE, __htProcess, __hoCreateProcess, NULL, GetLastError());
+    }
+    return ret;
+}
+
+BOOL C__Handles::CreateProcessA(LPCSTR lpApplicationName, LPSTR lpCommandLine,
+                                LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                                LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                                BOOL bInheritHandles, DWORD dwCreationFlags,
+                                LPVOID lpEnvironment, LPCSTR lpCurrentDirectory,
+                                LPSTARTUPINFOA lpStartupInfo,
+                                LPPROCESS_INFORMATION lpProcessInformation)
+{
+    BOOL ret = ::CreateProcessA(lpApplicationName, lpCommandLine,
+                                lpProcessAttributes, lpThreadAttributes,
+                                bInheritHandles, dwCreationFlags, lpEnvironment,
+                                lpCurrentDirectory, lpStartupInfo,
+                                lpProcessInformation);
     if (ret)
     {
         if (lpProcessInformation != NULL)
@@ -1642,10 +1787,36 @@ C__Handles::OpenProcess(DWORD dwDesiredAccess, BOOL bInheritHandle,
 }
 
 HANDLE
-C__Handles::CreateMutex(LPSECURITY_ATTRIBUTES lpMutexAttributes,
-                        BOOL bInitialOwner, LPCTSTR lpName)
+C__Handles::CreateMutexW(LPSECURITY_ATTRIBUTES lpMutexAttributes,
+                        BOOL bInitialOwner, LPCWSTR lpName)
 {
-    HANDLE ret = ::CreateMutex(lpMutexAttributes, bInitialOwner, lpName);
+    HANDLE ret = ::CreateMutexW(lpMutexAttributes, bInitialOwner, lpName);
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        DWORD err = GetLastError();
+        switch (OutputType)
+        {
+        case __otMessages:
+        {
+            MESSAGE_TI(__HandlesMessageCallFrom << TemporaryHandle.File << __HandlesMessageSpace << TemporaryHandle.Line << __HandlesMessageLineEnd << spf(__HandlesMessageAlreadyExists, __GetHandlesOrigin(__hoCreateMutex), __GetHandlesTypeName(__htMutex), lpName), MB_OK);
+            break;
+        }
+
+        case __otQuiet:
+            break;
+        }
+        SetLastError(err);
+    }
+    CheckCreate(ret != NULL, __htMutex, __hoCreateMutex, ret, GetLastError());
+    return ret;
+}
+
+
+HANDLE
+C__Handles::CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes,
+                         BOOL bInitialOwner, LPCSTR lpName)
+{
+    HANDLE ret = ::CreateMutexA(lpMutexAttributes, bInitialOwner, lpName);
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
         DWORD err = GetLastError();
@@ -1667,17 +1838,27 @@ C__Handles::CreateMutex(LPSECURITY_ATTRIBUTES lpMutexAttributes,
 }
 
 HANDLE
-C__Handles::OpenMutex(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                      LPCTSTR lpName)
+C__Handles::OpenMutexW(DWORD dwDesiredAccess, BOOL bInheritHandle,
+                      LPCWSTR lpName)
 {
-    HANDLE ret = ::OpenMutex(dwDesiredAccess, bInheritHandle, lpName);
+    HANDLE ret = ::OpenMutexW(dwDesiredAccess, bInheritHandle, lpName);
+    CheckCreate(ret != NULL, __htMutex, __hoOpenMutex, ret, GetLastError());
+    return ret;
+}
+
+
+HANDLE
+C__Handles::OpenMutexA(DWORD dwDesiredAccess, BOOL bInheritHandle,
+                       LPCSTR lpName)
+{
+    HANDLE ret = ::OpenMutexA(dwDesiredAccess, bInheritHandle, lpName);
     CheckCreate(ret != NULL, __htMutex, __hoOpenMutex, ret, GetLastError());
     return ret;
 }
 
 HANDLE
 C__Handles::CreateEvent(LPSECURITY_ATTRIBUTES lpEventAttributes,
-                        BOOL bManualReset, BOOL bInitialState, LPCTSTR lpName)
+                        BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName)
 {
     HANDLE ret = ::CreateEvent(lpEventAttributes, bManualReset, bInitialState,
                                lpName);
@@ -1702,7 +1883,7 @@ C__Handles::CreateEvent(LPSECURITY_ATTRIBUTES lpEventAttributes,
 }
 
 HANDLE
-C__Handles::OpenEvent(DWORD dwDesiredAccess, BOOL bInheritHandle, LPCTSTR lpName)
+C__Handles::OpenEvent(DWORD dwDesiredAccess, BOOL bInheritHandle, LPCWSTR lpName)
 {
     HANDLE ret = ::OpenEvent(dwDesiredAccess, bInheritHandle, lpName);
     CheckCreate(ret != NULL, __htEvent, __hoOpenEvent, ret, GetLastError());
@@ -1712,7 +1893,7 @@ C__Handles::OpenEvent(DWORD dwDesiredAccess, BOOL bInheritHandle, LPCTSTR lpName
 HANDLE
 C__Handles::CreateSemaphore(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes,
                             LONG lInitialCount, LONG lMaximumCount,
-                            LPCTSTR lpName)
+                            LPCWSTR lpName)
 {
     HANDLE ret = ::CreateSemaphore(lpSemaphoreAttributes, lInitialCount,
                                    lMaximumCount, lpName);
@@ -1738,7 +1919,7 @@ C__Handles::CreateSemaphore(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes,
 
 HANDLE
 C__Handles::OpenSemaphore(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                          LPCTSTR lpName)
+                          LPCWSTR lpName)
 {
     HANDLE ret = ::OpenSemaphore(dwDesiredAccess, bInheritHandle, lpName);
     CheckCreate(ret != NULL, __htSemaphore, __hoOpenSemaphore, ret, GetLastError());
@@ -1748,7 +1929,7 @@ C__Handles::OpenSemaphore(DWORD dwDesiredAccess, BOOL bInheritHandle,
 #if (_WIN32_WINNT >= 0x0400)
 HANDLE
 C__Handles::CreateWaitableTimer(LPSECURITY_ATTRIBUTES lpTimerAttributes,
-                                BOOL bManualReset, LPCTSTR lpTimerName)
+                                BOOL bManualReset, LPCWSTR lpTimerName)
 {
     HANDLE ret = ::CreateWaitableTimer(lpTimerAttributes, bManualReset,
                                        lpTimerName);
@@ -1774,7 +1955,7 @@ C__Handles::CreateWaitableTimer(LPSECURITY_ATTRIBUTES lpTimerAttributes,
 
 HANDLE
 C__Handles::OpenWaitableTimer(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                              LPCTSTR lpTimerName)
+                              LPCWSTR lpTimerName)
 {
     HANDLE ret = ::OpenWaitableTimer(dwDesiredAccess, bInheritHandle,
                                      lpTimerName);
@@ -1785,12 +1966,12 @@ C__Handles::OpenWaitableTimer(DWORD dwDesiredAccess, BOOL bInheritHandle,
 #endif // (_WIN32_WINNT >= 0x0400)
 
 HANDLE
-C__Handles::CreateFileMapping(HANDLE hFile,
+C__Handles::CreateFileMappingW(HANDLE hFile,
                               LPSECURITY_ATTRIBUTES lpFileMappingAttributes,
                               DWORD flProtect, DWORD dwMaximumSizeHigh,
-                              DWORD dwMaximumSizeLow, LPCTSTR lpName)
+                              DWORD dwMaximumSizeLow, LPCWSTR lpName)
 {
-    HANDLE ret = ::CreateFileMapping(hFile, lpFileMappingAttributes, flProtect,
+    HANDLE ret = ::CreateFileMappingW(hFile, lpFileMappingAttributes, flProtect,
                                      dwMaximumSizeHigh, dwMaximumSizeLow, lpName);
     if (GetLastError() == ERROR_ALREADY_EXISTS)
     {
@@ -1812,18 +1993,20 @@ C__Handles::CreateFileMapping(HANDLE hFile,
     return ret;
 }
 
+
 HANDLE
-C__Handles::OpenFileMapping(DWORD dwDesiredAccess, BOOL bInheritHandle,
-                            LPCTSTR lpName)
+C__Handles::OpenFileMappingW(DWORD dwDesiredAccess, BOOL bInheritHandle,
+                            LPCWSTR lpName)
 {
-    HANDLE ret = ::OpenFileMapping(dwDesiredAccess, bInheritHandle, lpName);
+    HANDLE ret = ::OpenFileMappingW(dwDesiredAccess, bInheritHandle, lpName);
     CheckCreate(ret != NULL, __htFileMapping, __hoOpenFileMapping, ret,
                 GetLastError());
     return ret;
 }
 
+
 HANDLE
-C__Handles::CreateMailslot(LPCTSTR lpName, DWORD nMaxMessageSize,
+C__Handles::CreateMailslot(LPCWSTR lpName, DWORD nMaxMessageSize,
                            DWORD lReadTimeout,
                            LPSECURITY_ATTRIBUTES lpSecurityAttributes)
 {
@@ -1849,7 +2032,7 @@ BOOL C__Handles::CreatePipe(PHANDLE hReadPipe, PHANDLE hWritePipe,
 }
 
 HANDLE
-C__Handles::CreateNamedPipe(LPCTSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
+C__Handles::CreateNamedPipe(LPCWSTR lpName, DWORD dwOpenMode, DWORD dwPipeMode,
                             DWORD nMaxInstances, DWORD nOutBufferSize,
                             DWORD nInBufferSize, DWORD nDefaultTimeOut,
                             LPSECURITY_ATTRIBUTES lpSecurityAttributes)
@@ -1963,7 +2146,7 @@ C__Handles::CreateAcceleratorTable(LPACCEL lpaccl, int cEntries)
 }
 
 HACCEL
-C__Handles::LoadAccelerators(HINSTANCE hInstance, LPCTSTR lpTableName)
+C__Handles::LoadAccelerators(HINSTANCE hInstance, LPCWSTR lpTableName)
 {
     HACCEL ret = ::LoadAccelerators(hInstance, lpTableName);
     CheckCreate(ret != NULL, __htAccel, __hoLoadAccelerators, ret);
@@ -2093,28 +2276,36 @@ BOOL C__Handles::TlsFree(DWORD dwTlsIndex)
 }
 
 HINSTANCE
-C__Handles::LoadLibrary(LPCTSTR lpLibFileName)
+C__Handles::LoadLibrary(LPCWSTR lpLibFileName)
 {
     HINSTANCE ret = ::LoadLibrary(lpLibFileName);
     CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, GetLastError(), TRUE, lpLibFileName);
     return ret;
 }
 
-#ifndef UNICODE
-HINSTANCE
-C__Handles::LoadLibraryW(LPCWSTR lpLibFileName)
-{
-    HINSTANCE ret = ::LoadLibraryW(lpLibFileName);
-    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, GetLastError(), TRUE, NULL, NULL, lpLibFileName);
-    return ret;
-}
-#endif // UNICODE
 
 HINSTANCE
-C__Handles::LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+C__Handles::LoadLibraryA(LPCSTR lpLibFileName)
 {
-    HINSTANCE ret = ::LoadLibraryEx(lpLibFileName, hFile, dwFlags);
+    HINSTANCE ret = ::LoadLibraryA(lpLibFileName);
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, GetLastError(), TRUE, NULL, lpLibFileName, NULL);
+    return ret;
+}
+
+HINSTANCE
+C__Handles::LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    HINSTANCE ret = ::LoadLibraryExW(lpLibFileName, hFile, dwFlags);
     CheckCreate(ret != NULL, __htLibrary, __hoLoadLibraryEx, ret, GetLastError(), TRUE, lpLibFileName);
+    return ret;
+}
+
+
+HINSTANCE
+C__Handles::LoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
+{
+    HINSTANCE ret = ::LoadLibraryExA(lpLibFileName, hFile, dwFlags);
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibraryEx, ret, GetLastError(), TRUE, NULL, lpLibFileName, NULL);
     return ret;
 }
 
@@ -2264,7 +2455,7 @@ C__Handles::GetEnvironmentStrings(VOID)
     return ret;
 }
 
-BOOL C__Handles::FreeEnvironmentStrings(LPTSTR lpszEnvironmentBlock)
+BOOL C__Handles::FreeEnvironmentStrings(LPWSTR lpszEnvironmentBlock)
 {
     BOOL ret = ::FreeEnvironmentStrings(lpszEnvironmentBlock);
     CheckClose(ret, lpszEnvironmentBlock, __htEnvStrings,
@@ -2329,7 +2520,7 @@ BOOL C__Handles::LocalUnlock(HLOCAL hMem)
 }
 
 HANDLE
-C__Handles::LoadImage(HINSTANCE hinst, LPCTSTR lpszName, UINT uType,
+C__Handles::LoadImage(HINSTANCE hinst, LPCWSTR lpszName, UINT uType,
                       int cxDesired, int cyDesired, UINT fuLoad)
 {
     HANDLE ret = ::LoadImage(hinst, lpszName, uType, cxDesired, cyDesired, fuLoad);
@@ -2351,7 +2542,7 @@ C__Handles::LoadImage(HINSTANCE hinst, LPCTSTR lpszName, UINT uType,
 }
 
 HICON
-C__Handles::LoadIcon(HINSTANCE hInstance, LPCTSTR lpIconName)
+C__Handles::LoadIcon(HINSTANCE hInstance, LPCWSTR lpIconName)
 {
     HICON ret = ::LoadIcon(hInstance, lpIconName);
     CheckCreate(ret != NULL, __htIcon, __hoLoadIcon, ret, GetLastError());

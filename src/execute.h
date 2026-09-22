@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <vector>
+
+#include "common/unicode/WideTextRange.h"
+
 //******************************************************************************
 //
 // CComboboxEdit
@@ -20,19 +24,10 @@ protected:
 
 public:
     CComboboxEdit();
-#ifndef _UNICODE
-    // Subclass the combo's edit child as a Unicode window. Required when the
-    // combo lives inside a Unicode dialog and the dialog issues
-    // SetDlgItemTextW into it: the combo control itself is Unicode, but
-    // AttachToWindow's default ANSI subclass would flip the edit child's
-    // WindowProc to ANSI, and WM_SETTEXT W→A would convert through CP_ACP
-    // on its way to the edit. Unicode subclass keeps the W path intact.
-    explicit CComboboxEdit(BOOL unicodeWnd);
-#endif
 
     void GetSel(DWORD* start, DWORD* end);
 
-    void ReplaceText(const char* text);
+    void ReplaceText(const wchar_t* text);
 
 protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -43,20 +38,20 @@ protected:
 // Keywords
 //
 
-extern const char* EXECUTE_DRIVE;
-extern const char* EXECUTE_PATH;
-extern const char* EXECUTE_DOSPATH;
-extern const char* EXECUTE_NAME;
-extern const char* EXECUTE_DOSNAME;
+extern const wchar_t* EXECUTE_DRIVE;
+extern const wchar_t* EXECUTE_PATH;
+extern const wchar_t* EXECUTE_DOSPATH;
+extern const wchar_t* EXECUTE_NAME;
+extern const wchar_t* EXECUTE_DOSNAME;
 
-extern const char* EXECUTE_ENV; // Environment Variable
+extern const wchar_t* EXECUTE_ENV; // Environment Variable
 
-extern const char* EXECUTE_SEPARATOR;    // to insert a separator into the menu
-extern const char* EXECUTE_BROWSE;       // to insert a Browse command into the menu
-extern const char* EXECUTE_HELP;         // to call help
-extern const char* EXECUTE_TERMINATOR;   // to end menu
-extern const char* EXECUTE_SUBMENUSTART; // start of a submenu (only one level supported)
-extern const char* EXECUTE_SUBMENUEND;   // end of a submenu (only one level supported)
+extern const wchar_t* EXECUTE_SEPARATOR;    // to insert a separator into the menu
+extern const wchar_t* EXECUTE_BROWSE;       // to insert a Browse command into the menu
+extern const wchar_t* EXECUTE_HELP;         // to call help
+extern const wchar_t* EXECUTE_TERMINATOR;   // to end menu
+extern const wchar_t* EXECUTE_SUBMENUSTART; // start of a submenu (only one level supported)
+extern const wchar_t* EXECUTE_SUBMENUEND;   // end of a submenu (only one level supported)
 
 //******************************************************************************
 //
@@ -75,7 +70,7 @@ extern const char* EXECUTE_SUBMENUEND;   // end of a submenu (only one level sup
 
 struct CExecuteItem
 {
-    const char* Keyword; // string inserted into the edit line
+    const wchar_t* Keyword; // string inserted into the edit line
     int NameResID;       // resource string displayed in the menu
     BYTE Flags;          // EIF_xxxx
 };
@@ -117,15 +112,15 @@ struct CUserMenuValidationData // additional data used to validate User Menu: ar
 struct CUserMenuAdvancedData // additional data used only for the User Menu: array Arguments
 {
     // precompute values of some parameters:
-    char ListOfSelNames[USRMNUARGS_MAXLEN];     // empty string = empty or too long list (longer than USRMNUARGS_MAXLEN); see ListOfSelNamesIsEmpty
-    BOOL ListOfSelNamesIsEmpty;                 // TRUE = ListOfSelNames is empty
-    char ListOfSelFullNames[USRMNUARGS_MAXLEN]; // empty string = empty or too long list (longer than USRMNUARGS_MAXLEN); see ListOfSelFullNamesIsEmpty
-    BOOL ListOfSelFullNamesIsEmpty;             // TRUE = ListOfSelFullNames is empty
-    CPathBuffer FullPathLeft;                   // empty string = not defined (we are in Find or the panel shows archive/FS)
-    CPathBuffer FullPathRight;                  // empty string = not defined (we are in Find or the panel shows archive/FS)
-    const char* FullPathInactive;               // points to FullPathLeft or FullPathRight: empty string = not defined (we are in Find or the panel shows archive/FS)
-    CPathBuffer CompareName1;                   // first full name for compare (file or directory)
-    CPathBuffer CompareName2;                   // second full name for compare (file or directory)
+    std::wstring ListOfSelNames;         // empty = empty or beyond the execution limit; see ListOfSelNamesIsEmpty
+    BOOL ListOfSelNamesIsEmpty;          // TRUE = ListOfSelNames is empty
+    std::wstring ListOfSelFullNames;     // empty = empty or beyond the execution limit; see ListOfSelFullNamesIsEmpty
+    BOOL ListOfSelFullNamesIsEmpty;      // TRUE = ListOfSelFullNames is empty
+    std::wstring FullPathLeft;             // empty string = not defined (we are in Find or the panel shows archive/FS)
+    std::wstring FullPathRight;            // empty string = not defined (we are in Find or the panel shows archive/FS)
+    const std::wstring* FullPathInactive;  // points to FullPathLeft or FullPathRight
+    std::wstring CompareName1;             // first full name for compare (file or directory)
+    std::wstring CompareName2;             // second full name for compare (file or directory)
     BOOL CompareNamesAreDirs;                   // TRUE = CompareName1 and CompareName2 are directories (otherwise they're files)
     BOOL CompareNamesReversed;                  // TRUE = names for compare come from different panels + CompareName1 is from the right panel
 };
@@ -155,103 +150,82 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID);
 
 // validates varText containing variables from the UserMenuArgsExecutes array
 // msgParent - parent message box for errors; if NULL, errors are not shown
-BOOL ValidateUserMenuArguments(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
+BOOL ValidateUserMenuArguments(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2,
                                CUserMenuValidationData* userMenuValidationData);
 
 // Expands varText containing variables from UserMenuArgsExecutes and stores the result in buffer
 // msgParent - parent message box for errors; if NULL, errors are not shown
 // if 'fileNameUsed' is not NULL it is set to TRUE when a path or file name is used
-BOOL ExpandUserMenuArguments(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                             char* buffer, int bufferLen, BOOL* fileNameUsed,
+BOOL ExpandUserMenuArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                             std::wstring& output, BOOL* fileNameUsed,
                              CUserMenuAdvancedData* userMenuAdvancedData,
                              BOOL ignoreEnvVarNotFoundOrTooLong);
 
 // validates varText containing variables from the Command array
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ValidateCommandFile(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateCommandFile(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
 // validates varText containing variables from the HotPath array
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ValidateHotPath(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateHotPath(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
 // validates varText containing variables from the ArgumentsExecutes array
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ValidateArguments(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateArguments(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
 // expands varText containing variables from the ArgumentsExecutes array and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 // if 'fileNameUsed' is not NULL it is set to TRUE when a path or file name is used
-BOOL ExpandArguments(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                     char* buffer, int bufferLen, BOOL* fileNameUsed);
-
-// Wide version of ExpandArguments — returns expanded string or empty on failure
-std::wstring ExpandArgumentsW(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                              BOOL* fileNameUsed = NULL);
+BOOL ExpandArguments(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                     std::wstring& output, BOOL* fileNameUsed);
 
 // validates varText containing variables from the InfoLineContentItems array
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ValidateInfoLineItems(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateInfoLineItems(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
 // expands varText containing variables from the InfoLineContentItems array and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-// varPlacements: array with [varPlacementsCount] items; filled with positions of variables
-//                in the output buffer (LOWORD) and their lengths (HIWORD)
+// varPlacements: dynamically owned UTF-16 offset/length ranges.
 
-BOOL ExpandInfoLineItems(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                         CFileData* fData, BOOL isDir, char* buffer, int bufferLen, DWORD* varPlacements,
-                         int* varPlacementsCount, DWORD validFileData, BOOL isDisk);
-
-BOOL ExpandInfoLineItemsW(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                          CFileData* fData, BOOL isDir, std::wstring& buffer, DWORD* varPlacements,
-                          int* varPlacementsCount, DWORD validFileData, BOOL isDisk);
+BOOL ExpandInfoLineItemsW(HWND msgParent, const wchar_t* varText, CPluginDataInterfaceEncapsulation* pluginData,
+                          CFileData* fData, BOOL isDir, std::wstring& buffer,
+                          std::vector<sally::unicode::WideTextRange>& varPlacements,
+                          DWORD validFileData, BOOL isDisk);
 
 // validates varText containing variables from the MakeFileListItems array
 // msgParent - parent of themessage box for errors; if NULL, errors are not shown
-BOOL ValidateMakeFileList(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateMakeFileList(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
-// expands varText containing variables from MakeFileListItems and stores the result in buffer
+// Expands varText containing variables from MakeFileListItems into a wide result.
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
 // maxVarSizes: array with [maxVarSizesCount] items. If the corresponding variable
 //              uses the ":max" modifier and its length exceeds the array item,
 //              the array is updated with that length.
 //              When detectMaxVarSizes == TRUE, the maximum length is used for column formatting
-BOOL ExpandMakeFileList(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
-                        CFileData* fData, BOOL isDir, char* buffer, int bufferLen, BOOL detectMaxVarSizes,
-                        int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const char* path,
-                        BOOL ignoreEnvVarNotFoundOrTooLong);
-
-BOOL ExpandMakeFileListW(HWND msgParent, const char* varText, CPluginDataInterfaceEncapsulation* pluginData,
+BOOL ExpandMakeFileListW(HWND msgParent, const wchar_t* varText, CPluginDataInterfaceEncapsulation* pluginData,
                          CFileData* fData, BOOL isDir, std::wstring* buffer, BOOL detectMaxVarSizes,
-                         int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const char* path,
+                         int* maxVarSizes, int maxVarSizesCount, DWORD validFileData, const wchar_t* pathW,
                          BOOL ignoreEnvVarNotFoundOrTooLong);
 
 // validates varText containing variables from the InitDirExecutes array
 // msgParent - parent message box for errors; if NULL, errors are not shown
-BOOL ValidateInitDir(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2);
+BOOL ValidateInitDir(HWND msgParent, const wchar_t* varText, int& errorPos1, int& errorPos2);
 
 // expands varText containing variables from the InitDirExecutes array and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ExpandInitDir(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                   char* buffer, int bufferLen, BOOL ignoreEnvVarNotFoundOrTooLong);
-
-// Wide version of ExpandInitDir — returns expanded string or empty on failure
-std::wstring ExpandInitDirW(HWND msgParent, const char* name, const char* dosName, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+BOOL ExpandInitDir(HWND msgParent, const wchar_t* name, const wchar_t* dosName, const wchar_t* varText,
+                   std::wstring& output, BOOL ignoreEnvVarNotFoundOrTooLong);
 
 // Expands varText containing environment variables and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ExpandCommand(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+BOOL ExpandCommand(HWND msgParent, const wchar_t* varText, wchar_t* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong);
-
-// Wide version of ExpandCommand — returns expanded string or empty on failure
-std::wstring ExpandCommandW(HWND msgParent, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+BOOL ExpandCommand(HWND msgParent, const wchar_t* varText, std::wstring& output,
+                   BOOL ignoreEnvVarNotFoundOrTooLong);
 
 // Expands varText containing environment variables and stores the result in buffer
 // msgParent - parent of the message box for errors; if NULL, errors are not shown
-BOOL ExpandHotPath(HWND msgParent, const char* varText, char* buffer, int bufferLen,
+BOOL ExpandHotPath(HWND msgParent, const wchar_t* varText, wchar_t* buffer, int bufferLen,
                    BOOL ignoreEnvVarNotFoundOrTooLong);
-
-// Wide version of ExpandHotPath — returns expanded string or empty on failure
-std::wstring ExpandHotPathW(HWND msgParent, const char* varText,
-                            BOOL ignoreEnvVarNotFoundOrTooLong = FALSE);
+BOOL ExpandHotPath(HWND msgParent, const wchar_t* varText, std::wstring& output,
+                   BOOL ignoreEnvVarNotFoundOrTooLong);

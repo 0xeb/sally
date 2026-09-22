@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 class CVarString
 {
 public:
@@ -35,6 +37,7 @@ public:
                  CVariableEntry* variables);
 
     int Execute(char* buffer, int max, LPVOID param);
+    BOOL ExecuteOwned(std::string& value, LPVOID param);
 
 protected:
     TIndirectArray<CVariable> Stack;

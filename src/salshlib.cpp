@@ -1,11 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
+#include "common/clipboard/FakeRealPathPayload.h"
+
 #include "dialogs.h"
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -27,6 +30,12 @@ HANDLE SalShExtSharedMem = NULL;
 HANDLE SalShExtDoPasteEvent = NULL;
 // mapped shared memory - see CSalShExtSharedMem structure
 CSalShExtSharedMem* SalShExtSharedMemView = NULL;
+
+static HANDLE SalShExtRequestPayload = NULL;
+static UINT64 SalShExtNextRequestId = 0;
+static std::wstring SalShExtCapturedTarget;
+static UINT64 SalShExtCapturedRequestId = 0;
+static UINT64 SalShExtCapturedGeneration = 0;
 
 // TRUE if SalShExt/SalamExt/SalExtX86/SalExtX64.DLL was successfully registered or was already
 // registered (also checks file)
@@ -50,29 +59,33 @@ CSalShExtPastedData SalShExtPastedData;
 void InitSalShLib()
 {
     CALL_STACK_MESSAGE1("InitSalShLib()");
-    char sharedMemMutexName[256];
-    char sharedMemName[256];
-    const char* mutexName = SALSHEXT_GetSharedMemMutexName(sharedMemMutexName, _countof(sharedMemMutexName));
-    const char* mappingName = SALSHEXT_GetSharedMemName(sharedMemName, _countof(sharedMemName));
+    wchar_t sharedMemMutexName[256];
+    wchar_t sharedMemName[256];
+    const wchar_t* mutexName = SALSHEXT_GetSharedMemMutexName(sharedMemMutexName, _countof(sharedMemMutexName));
+    const wchar_t* mappingName = SALSHEXT_GetSharedMemName(sharedMemName, _countof(sharedMemName));
     PSID psidEveryone;
     PACL paclNewDacl;
     SECURITY_ATTRIBUTES sa;
     SECURITY_DESCRIPTOR sd;
     SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, GENERIC_ALL, &psidEveryone, &paclNewDacl);
 
-    SalShExtSharedMemMutex = HANDLES_Q(CreateMutex(saPtr, FALSE, mutexName));
+    // W-suffixed explicitly. mutexName/mappingName are wide (the IPC-name
+    // helpers went wide in shexreg_ipc_names.h), and this build does not define UNICODE, so
+    // the unsuffixed macros resolve to CreateMutexA/OpenMutexA and would read a wchar_t*
+    // as char* - a garbage object name, with no compile error to say so.
+    SalShExtSharedMemMutex = HANDLES_Q(CreateMutexW(saPtr, FALSE, mutexName));
     if (SalShExtSharedMemMutex == NULL)
-        SalShExtSharedMemMutex = HANDLES_Q(OpenMutex(SYNCHRONIZE, FALSE, mutexName));
+        SalShExtSharedMemMutex = HANDLES_Q(OpenMutexW(SYNCHRONIZE, FALSE, mutexName));
     if (SalShExtSharedMemMutex != NULL)
     {
         WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-        SalShExtSharedMem = HANDLES_Q(CreateFileMapping(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
+        SalShExtSharedMem = HANDLES_Q(CreateFileMappingW(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
                                                         0, sizeof(CSalShExtSharedMem),
                                                         mappingName));
         BOOL created;
         if (SalShExtSharedMem == NULL)
         {
-            SalShExtSharedMem = HANDLES_Q(OpenFileMapping(FILE_MAP_WRITE, FALSE, mappingName));
+            SalShExtSharedMem = HANDLES_Q(OpenFileMappingW(FILE_MAP_WRITE, FALSE, mappingName));
             created = FALSE;
         }
         else
@@ -82,14 +95,22 @@ void InitSalShLib()
 
         if (SalShExtSharedMem != NULL)
         {
-            SalShExtSharedMemView = (CSalShExtSharedMem*)HANDLES(MapViewOfFile(SalShExtSharedMem, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
-                                                                               FILE_MAP_WRITE, 0, 0, 0));
+            SalShExtSharedMemView = (CSalShExtSharedMem*)HANDLES(MapViewOfFile(
+                SalShExtSharedMem, FILE_MAP_WRITE, 0, 0, sizeof(CSalShExtSharedMem)));
             if (SalShExtSharedMemView != NULL)
             {
                 if (created)
                 {
-                    memset(SalShExtSharedMemView, 0, sizeof(CSalShExtSharedMem)); // should be zeroed, but we don't rely on it
+                    memset(SalShExtSharedMemView, 0, sizeof(CSalShExtSharedMem));
+                    SalShExtSharedMemView->Magic = SALSHEXT_CONTROL_MAGIC;
+                    SalShExtSharedMemView->Version = SALSHEXT_CONTROL_VERSION;
                     SalShExtSharedMemView->Size = sizeof(CSalShExtSharedMem);
+                }
+                else if (!SALSHEXT_IsCompatibleControl(SalShExtSharedMemView))
+                {
+                    TRACE_E("InitSalShLib(): shell-extension IPC v7 control record is incompatible; handoff disabled");
+                    HANDLES(UnmapViewOfFile(SalShExtSharedMemView));
+                    SalShExtSharedMemView = NULL;
                 }
             }
             else
@@ -116,6 +137,9 @@ void ReleaseSalShLib()
         OleSetClipboard(NULL);      // remove our data-object from clipboard
         OurDataOnClipboard = FALSE; // theoretically unnecessary (should be set in Release() of fakeDataObject)
     }
+    if (SalShExtRequestPayload != NULL)
+        HANDLES(CloseHandle(SalShExtRequestPayload));
+    SalShExtRequestPayload = NULL;
     if (SalShExtSharedMemView != NULL)
         HANDLES(UnmapViewOfFile(SalShExtSharedMemView));
     SalShExtSharedMemView = NULL;
@@ -127,16 +151,220 @@ void ReleaseSalShLib()
     SalShExtSharedMemMutex = NULL;
 }
 
-BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBuf, int srcFSPathBufSize)
+static UINT64 SalShExtAllocateRequestId()
+{
+    if (SalShExtNextRequestId == 0)
+        SalShExtNextRequestId = ((UINT64)GetCurrentProcessId() << 32) | GetTickCount();
+    return ++SalShExtNextRequestId;
+}
+
+static BOOL SalShExtBeginRequestLocked(DWORD stateFlag, const SALSHEXT_PAYLOAD_INPUT* fields,
+                                       DWORD fieldCount)
+{
+    DWORD byteSize;
+    wchar_t payloadName[256];
+    HANDLE mapping;
+    void* view;
+    UINT64 requestId;
+    UINT64 generation;
+    PSID everyoneSid;
+    PACL payloadAcl;
+    SECURITY_ATTRIBUTES securityAttributes;
+    SECURITY_DESCRIPTOR securityDescriptor;
+    SECURITY_ATTRIBUTES* security;
+
+    if (SalShExtSharedMemView == NULL || !SALSHEXT_IsCompatibleControl(SalShExtSharedMemView) ||
+        !SALSHEXT_CalculatePayloadBytes(fields, fieldCount, &byteSize))
+        return FALSE;
+
+    requestId = SalShExtAllocateRequestId();
+    generation = SalShExtSharedMemView->Generation + 1;
+    if (generation == 0)
+        generation = 1;
+    if (SALSHEXT_GetPayloadName(GetCurrentProcessId(), requestId, generation,
+                                SALSHEXT_PAYLOAD_KEY_REQUEST, payloadName,
+                                _countof(payloadName)) == NULL)
+        return FALSE;
+
+    security = CreateAccessableSecurityAttributes(&securityAttributes, &securityDescriptor,
+                                                  GENERIC_ALL, &everyoneSid, &payloadAcl);
+    mapping = HANDLES_Q(CreateFileMappingW(INVALID_HANDLE_VALUE, security, PAGE_READWRITE, 0,
+                                           byteSize, payloadName));
+    if (everyoneSid != NULL)
+        FreeSid(everyoneSid);
+    if (payloadAcl != NULL)
+        LocalFree(payloadAcl);
+    if (mapping == NULL || GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        if (mapping != NULL)
+            HANDLES(CloseHandle(mapping));
+        TRACE_E("SalShExtBeginRequestLocked(): unable to create a unique v7 payload mapping");
+        return FALSE;
+    }
+    view = HANDLES(MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0, byteSize));
+    if (view == NULL || !SALSHEXT_WritePayload(view, byteSize, requestId, generation,
+                                               fields, fieldCount))
+    {
+        if (view != NULL)
+            HANDLES(UnmapViewOfFile(view));
+        HANDLES(CloseHandle(mapping));
+        return FALSE;
+    }
+    HANDLES(UnmapViewOfFile(view));
+
+    if (SalShExtRequestPayload != NULL)
+        HANDLES(CloseHandle(SalShExtRequestPayload));
+    SalShExtRequestPayload = mapping;
+    SalShExtCapturedTarget.clear();
+    SalShExtCapturedRequestId = 0;
+    SalShExtCapturedGeneration = 0;
+    SalShExtSharedMemView->StateFlags = stateFlag;
+    SalShExtSharedMemView->RequestId = requestId;
+    SalShExtSharedMemView->Generation = generation;
+    SalShExtSharedMemView->Operation = SALSHEXT_NONE;
+    SalShExtSharedMemView->SalamanderMainWndPID = GetCurrentProcessId();
+    SalShExtSharedMemView->SalamanderMainWndTID = GetCurrentThreadId();
+    ProcessIdToSessionId(GetCurrentProcessId(), &SalShExtSharedMemView->SessionId);
+    SalShExtSharedMemView->InitiatorIntegrityRid = 0;
+    GetProcessIntegrityLevel(&SalShExtSharedMemView->InitiatorIntegrityRid);
+    SalShExtSharedMemView->ReceiverProcessId = 0;
+    SalShExtSharedMemView->ReservedIdentity = 0;
+    SalShExtSharedMemView->SalamanderMainWnd =
+        MainWindow != NULL ? (UINT64)(DWORD_PTR)MainWindow->HWindow : 0;
+    SalShExtSharedMemView->ResponseConsumedGeneration = 0;
+    memset(&SalShExtSharedMemView->ResponsePayload, 0,
+           sizeof(SalShExtSharedMemView->ResponsePayload));
+    SalShExtSharedMemView->RequestPayload.SenderProcessId = GetCurrentProcessId();
+    SalShExtSharedMemView->RequestPayload.ByteSize = byteSize;
+    SalShExtSharedMemView->RequestPayload.RequestId = requestId;
+    SalShExtSharedMemView->RequestPayload.Generation = generation;
+    SalShExtSharedMemView->RequestPayload.Key = SALSHEXT_PAYLOAD_KEY_REQUEST;
+    SalShExtSharedMemView->RequestPayload.Reserved = 0;
+    return TRUE;
+}
+
+BOOL SalShExtBeginDragRequestLocked(const std::wstring& fakeDirectory)
+{
+    SALSHEXT_PAYLOAD_INPUT field = {SALSHEXT_FIELD_DRAG_FAKE_DIR, fakeDirectory.c_str(),
+                                    (UINT64)fakeDirectory.size()};
+    return SalShExtBeginRequestLocked(SALSHEXT_STATE_DRAG_ACTIVE, &field, 1);
+}
+
+BOOL SalShExtBeginPasteRequestLocked(const std::wstring& fakeDirectory,
+                                     const std::wstring& sameThreadMessage,
+                                     const std::wstring& busyMessage)
+{
+    SALSHEXT_PAYLOAD_INPUT fields[3] = {
+        {SALSHEXT_FIELD_PASTE_FAKE_DIR, fakeDirectory.c_str(), (UINT64)fakeDirectory.size()},
+        {SALSHEXT_FIELD_UNABLE_TO_PASTE_SAME_THREAD, sameThreadMessage.c_str(),
+         (UINT64)sameThreadMessage.size()},
+        {SALSHEXT_FIELD_UNABLE_TO_PASTE_BUSY, busyMessage.c_str(),
+         (UINT64)busyMessage.size()}};
+    return SalShExtBeginRequestLocked(SALSHEXT_STATE_PASTE_ACTIVE, fields, 3);
+}
+
+void SalShExtEndRequestLocked(DWORD stateFlag)
+{
+    if (SalShExtSharedMemView != NULL)
+    {
+        SalShExtSharedMemView->StateFlags &= ~stateFlag;
+        if ((SalShExtSharedMemView->StateFlags &
+             (SALSHEXT_STATE_DRAG_ACTIVE | SALSHEXT_STATE_PASTE_ACTIVE)) == 0)
+        {
+            memset(&SalShExtSharedMemView->RequestPayload, 0,
+                   sizeof(SalShExtSharedMemView->RequestPayload));
+            memset(&SalShExtSharedMemView->ResponsePayload, 0,
+                   sizeof(SalShExtSharedMemView->ResponsePayload));
+            if (SalShExtRequestPayload != NULL)
+                HANDLES(CloseHandle(SalShExtRequestPayload));
+            SalShExtRequestPayload = NULL;
+        }
+    }
+}
+
+BOOL SalShExtReadResponseLocked(std::wstring& targetPath)
+{
+    if (SalShExtSharedMemView != NULL &&
+        SalShExtCapturedRequestId == SalShExtSharedMemView->RequestId &&
+        SalShExtCapturedGeneration == SalShExtSharedMemView->Generation)
+    {
+        targetPath = SalShExtCapturedTarget;
+        return TRUE;
+    }
+    const SALSHEXT_PAYLOAD_REF ref = SalShExtSharedMemView != NULL
+                                        ? SalShExtSharedMemView->ResponsePayload
+                                        : SALSHEXT_PAYLOAD_REF{};
+    wchar_t payloadName[256];
+    HANDLE mapping;
+    const void* view;
+    const wchar_t* text;
+    UINT64 length;
+    BOOL ok = FALSE;
+
+    targetPath.clear();
+    if (SalShExtSharedMemView == NULL || ref.Key != SALSHEXT_PAYLOAD_KEY_RESPONSE ||
+        ref.Reserved != 0 || ref.ByteSize == 0 || ref.RequestId != SalShExtSharedMemView->RequestId ||
+        ref.Generation != SalShExtSharedMemView->Generation ||
+        SALSHEXT_GetPayloadName(ref.SenderProcessId, ref.RequestId, ref.Generation, ref.Key,
+                                payloadName, _countof(payloadName)) == NULL)
+        return FALSE;
+    mapping = HANDLES_Q(OpenFileMappingW(FILE_MAP_READ, FALSE, payloadName));
+    if (mapping == NULL)
+        return FALSE;
+    view = HANDLES(MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, ref.ByteSize));
+    if (view != NULL)
+    {
+        if (SALSHEXT_GetPayloadField(view, ref.ByteSize, ref.RequestId, ref.Generation,
+                                     SALSHEXT_FIELD_TARGET_PATH, &text, &length) &&
+            length <= (UINT64)targetPath.max_size())
+        {
+            targetPath.assign(text, (size_t)length);
+            SalShExtSharedMemView->ResponseConsumedGeneration = ref.Generation;
+            ok = TRUE;
+        }
+        HANDLES(UnmapViewOfFile(view));
+    }
+    HANDLES(CloseHandle(mapping));
+    return ok;
+}
+
+BOOL SalShExtPublishLocalResponseLocked(const std::wstring& targetPath)
+{
+    if (SalShExtSharedMemView == NULL ||
+        (SalShExtSharedMemView->StateFlags & SALSHEXT_STATE_DRAG_ACTIVE) == 0)
+        return FALSE;
+    SalShExtCapturedTarget = targetPath;
+    SalShExtCapturedRequestId = SalShExtSharedMemView->RequestId;
+    SalShExtCapturedGeneration = SalShExtSharedMemView->Generation;
+    SalShExtSharedMemView->ResponseConsumedGeneration = SalShExtSharedMemView->Generation;
+    return TRUE;
+}
+
+void SalShExtCaptureResponse()
+{
+    if (SalShExtSharedMemMutex == NULL || SalShExtSharedMemView == NULL)
+        return;
+    WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
+    std::wstring target;
+    if (SalShExtReadResponseLocked(target))
+    {
+        SalShExtCapturedTarget = std::move(target);
+        SalShExtCapturedRequestId = SalShExtSharedMemView->RequestId;
+        SalShExtCapturedGeneration = SalShExtSharedMemView->Generation;
+    }
+    ReleaseMutex(SalShExtSharedMemMutex);
+}
+
+BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, std::wstring* srcFSPath)
 {
     CALL_STACK_MESSAGE1("IsFakeDataObject()");
     if (fakeType != NULL)
         *fakeType = 0;
-    if (srcFSPathBuf != NULL && srcFSPathBufSize > 0)
-        srcFSPathBuf[0] = 0;
+    if (srcFSPath != NULL)
+        srcFSPath->clear();
 
     FORMATETC formatEtc;
-    formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
+    formatEtc.cfFormat = RegisterClipboardFormatA(SALCF_FAKE_REALPATH);
     formatEtc.ptd = NULL;
     formatEtc.dwAspect = DVASPECT_CONTENT;
     formatEtc.lindex = -1;
@@ -152,9 +380,9 @@ BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBu
         if (stgMedium.tymed != TYMED_HGLOBAL || stgMedium.hGlobal != NULL)
             ReleaseStgMedium(&stgMedium);
 
-        if (fakeType != NULL || srcFSPathBuf != NULL && srcFSPathBufSize > 0)
+        if (fakeType != NULL || srcFSPath != NULL)
         {
-            formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_SRCTYPE);
+            formatEtc.cfFormat = RegisterClipboardFormatA(SALCF_FAKE_SRCTYPE);
             formatEtc.ptd = NULL;
             formatEtc.dwAspect = DVASPECT_CONTENT;
             formatEtc.lindex = -1;
@@ -182,9 +410,9 @@ BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBu
                     ReleaseStgMedium(&stgMedium);
             }
 
-            if (isFS && srcFSPathBuf != NULL && srcFSPathBufSize > 0)
+            if (isFS && srcFSPath != NULL)
             {
-                formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_SRCFSPATH);
+                formatEtc.cfFormat = RegisterClipboardFormatA(SALCF_FAKE_SRCFSPATH);
                 formatEtc.ptd = NULL;
                 formatEtc.dwAspect = DVASPECT_CONTENT;
                 formatEtc.lindex = -1;
@@ -197,10 +425,14 @@ BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBu
                 {
                     if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
                     {
-                        char* data = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
+                        wchar_t* data = (wchar_t*)HANDLES(GlobalLock(stgMedium.hGlobal));
                         if (data != NULL)
                         {
-                            lstrcpyn(srcFSPathBuf, data, srcFSPathBufSize);
+                            const size_t maxChars = GlobalSize(stgMedium.hGlobal) / sizeof(wchar_t);
+                            size_t length = 0;
+                            while (length < maxChars && data[length] != 0)
+                                ++length;
+                            srcFSPath->assign(data, length);
                             HANDLES(GlobalUnlock(stgMedium.hGlobal));
                         }
                     }
@@ -212,6 +444,47 @@ BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBu
         return TRUE;
     }
     return FALSE;
+}
+
+BOOL GetFakeDataObjectRealPath(IDataObject* pDataObject, std::wstring& realPath, wchar_t* itemKind,
+                               BOOL* formatPresent)
+{
+    realPath.clear();
+    if (itemKind != NULL)
+        *itemKind = L'\0';
+    if (formatPresent != NULL)
+        *formatPresent = FALSE;
+    if (pDataObject == NULL)
+        return FALSE;
+
+    FORMATETC formatEtc = {};
+    formatEtc.cfFormat = RegisterClipboardFormatA(SALCF_FAKE_REALPATH);
+    formatEtc.dwAspect = DVASPECT_CONTENT;
+    formatEtc.lindex = -1;
+    formatEtc.tymed = TYMED_HGLOBAL;
+
+    STGMEDIUM medium = {};
+    if (pDataObject->GetData(&formatEtc, &medium) != S_OK)
+        return FALSE;
+
+    if (formatPresent != NULL)
+        *formatPresent = TRUE;
+
+    BOOL result = FALSE;
+    if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal != NULL)
+    {
+        const SIZE_T bytes = GlobalSize(medium.hGlobal);
+        const wchar_t* payload = static_cast<const wchar_t*>(HANDLES(GlobalLock(medium.hGlobal)));
+        if (payload != NULL)
+        {
+            const size_t capacity = bytes / sizeof(wchar_t);
+            result = sally::clipboard::TryParseFakeRealPath(payload, capacity,
+                                                             realPath, itemKind);
+            HANDLES(GlobalUnlock(medium.hGlobal));
+        }
+    }
+    ReleaseStgMedium(&medium);
+    return result;
 }
 
 //
@@ -248,14 +521,14 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
     if (formatEtc->cfFormat == CFSalFakeRealPath && (formatEtc->tymed & TYMED_HGLOBAL))
     {
         HGLOBAL dataDup = NULL; // create copy of RealPath
-        int size = (int)strlen(RealPath) + 1;
+        const SIZE_T size = (RealPath.length() + 1) * sizeof(wchar_t);
         dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
         if (dataDup != NULL)
         {
             void* ptr1 = HANDLES(GlobalLock(dataDup));
             if (ptr1 != NULL)
             {
-                memcpy(ptr1, RealPath, size);
+                memcpy(ptr1, RealPath.c_str(), size);
                 HANDLES(GlobalUnlock(dataDup));
             }
             else
@@ -312,14 +585,14 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
             if (formatEtc->cfFormat == CFSalFakeSrcFSPath && (formatEtc->tymed & TYMED_HGLOBAL))
             {
                 HGLOBAL dataDup = NULL; // create copy of SrcFSPath
-                int size = (int)strlen(SrcFSPath) + 1;
+                const SIZE_T size = (SrcFSPath.length() + 1) * sizeof(wchar_t);
                 dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
                 if (dataDup != NULL)
                 {
                     void* ptr1 = HANDLES(GlobalLock(dataDup));
                     if (ptr1 != NULL)
                     {
-                        memcpy(ptr1, SrcFSPath, size);
+                        memcpy(ptr1, SrcFSPath.c_str(), size);
                         HANDLES(GlobalUnlock(dataDup));
                     }
                     else
@@ -383,17 +656,15 @@ CFakeCopyPasteDataObject::Release(void)
             {
                 //        TRACE_I("CFakeCopyPasteDataObject::Release(): DoPasteFromSalamander = FALSE");
                 WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
-                SalShExtSharedMemView->DoPasteFromSalamander = FALSE;
-                SalShExtSharedMemView->PasteFakeDirName[0] = 0;
+                SalShExtEndRequestLocked(SALSHEXT_STATE_PASTE_ACTIVE);
                 ReleaseMutex(SalShExtSharedMemMutex);
             }
-            CPathBuffer dir;
-            lstrcpyn(dir, FakeDir, dir.Size());
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): removedir");
-            char* cutDir;
-            if (CutDirectory(dir, &cutDir) && cutDir != NULL && strcmp(cutDir, "CLIPFAKE") == 0)
+            const size_t slash = FakeDir.find_last_of(L'\\');
+            if (slash != std::wstring::npos && FakeDir.compare(slash + 1, std::wstring::npos, L"CLIPFAKE") == 0)
             { // just to be safe, check that we really delete only fake-dir
-                RemoveTemporaryDir(dir);
+                const std::wstring dir = FakeDir.substr(0, slash);
+                RemoveTemporaryDirW(dir.c_str());
             }
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): posting WM_USER_SALSHEXT_TRYRELDATA");
             if (MainWindow != NULL)
@@ -455,8 +726,8 @@ CSalShExtPastedData::CSalShExtPastedData()
 {
     DataID = -1;
     Lock = FALSE;
-    ArchiveFileName[0] = 0;
-    PathInArchive[0] = 0;
+    ArchiveFileNameW.clear();
+    PathInArchive.clear();
     StoredArchiveDir = NULL;
     memset(&StoredArchiveDate, 0, sizeof(StoredArchiveDate));
     StoredArchiveSize.Set(0, 0);
@@ -469,7 +740,7 @@ CSalShExtPastedData::~CSalShExtPastedData()
     Clear();
 }
 
-BOOL CSalShExtPastedData::SetData(const char* archiveFileName, const char* pathInArchive, CFilesArray* files,
+BOOL CSalShExtPastedData::SetData(const wchar_t* archiveFileName, const wchar_t* pathInArchive, CFilesArray* files,
                                   CFilesArray* dirs, BOOL namesAreCaseSensitive, int* selIndexes,
                                   int selIndexesCount)
 {
@@ -479,8 +750,8 @@ BOOL CSalShExtPastedData::SetData(const char* archiveFileName, const char* pathI
 
     LastWndFromPasteGetData = NULL; // for first Paste we null it here
 
-    lstrcpyn(ArchiveFileName, archiveFileName, MAX_PATH);
-    lstrcpyn(PathInArchive, pathInArchive, MAX_PATH);
+    ArchiveFileNameW = archiveFileName != NULL ? archiveFileName : L"";
+    PathInArchive = pathInArchive != NULL ? pathInArchive : L"";
     SelFilesAndDirs.SetCaseSensitive(namesAreCaseSensitive);
     int i;
     for (i = 0; i < selIndexesCount; i++)
@@ -511,8 +782,8 @@ void CSalShExtPastedData::Clear()
     CALL_STACK_MESSAGE1("CSalShExtPastedData::Clear()");
     //  TRACE_I("CSalShExtPastedData::Clear()");
     DataID = -1;
-    ArchiveFileName[0] = 0;
-    PathInArchive[0] = 0;
+    ArchiveFileNameW.clear();
+    PathInArchive.clear();
     SelFilesAndDirs.Clear();
     ReleaseStoredArchiveData();
 }
@@ -542,14 +813,14 @@ void CSalShExtPastedData::ReleaseStoredArchiveData()
     StoredPluginData.Init(NULL, NULL, NULL, NULL, 0);
 }
 
-BOOL CSalShExtPastedData::WantData(const char* archiveFileName, CSalamanderDirectory* archiveDir,
+BOOL CSalShExtPastedData::WantData(const wchar_t* archiveFileName, CSalamanderDirectory* archiveDir,
                                    CPluginDataInterfaceEncapsulation pluginData,
                                    FILETIME archiveDate, CQuadWord archiveSize)
 {
     CALL_STACK_MESSAGE1("CSalShExtPastedData::WantData()");
 
     if (!Lock /* shouldn't happen, but we protect ourselves */ &&
-        StrICmp(ArchiveFileName, archiveFileName) == 0 &&
+        archiveFileName != NULL && _wcsicmp(ArchiveFileNameW.c_str(), archiveFileName) == 0 &&
         archiveSize != CQuadWord(-1, -1) && // corrupted date&time stamp indicates archive that needs to be reloaded
         (!pluginData.NotEmpty() || pluginData.CanBeCopiedToClipboard()))
     {
@@ -572,12 +843,12 @@ BOOL CSalShExtPastedData::CanUnloadPlugin(HWND parent, CPluginInterfaceAbstract*
         used = TRUE;
     else
     {
-        if (ArchiveFileName[0] != 0)
+        if (!ArchiveFileNameW.empty())
         {
             // check if the unloaded plugin has anything to do with our archive,
             // plugin could easily unload during archiver usage (every archiver function
             // loads the plugin), but let's not overdo it, so we'll discard any archive listing
-            int format = PackerFormatConfig.PackIsArchive(ArchiveFileName);
+            int format = PackerFormatConfig.PackIsArchive(ArchiveFileNameW.c_str());
             if (format != 0) // we found a supported archive
             {
                 format--;
@@ -608,10 +879,40 @@ BOOL CSalShExtPastedData::CanUnloadPlugin(HWND parent, CPluginInterfaceAbstract*
     return TRUE;                    // plugin unload is possible
 }
 
-void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
+static BOOL GetArchiveFileState(const wchar_t* path, FILETIME& writeTime, CQuadWord& size, DWORD& error)
+{
+    HANDLE file = gFileSystem->CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                          NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    const DWORD openError = GetLastError();
+    HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openError, TRUE);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        error = openError;
+        size.Set(0, 0);
+        return FALSE;
+    }
+
+    const FileResult timeResult = gFileSystem->GetHandleFileTime(file, NULL, NULL, &writeTime);
+    uint64_t sizeValue = 0;
+    const FileResult sizeResult = gFileSystem->GetHandleFileSize(file, &sizeValue);
+    HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+    gFileSystem->CloseFileHandle(file);
+
+    if (!timeResult.success || !sizeResult.success)
+    {
+        error = !timeResult.success ? timeResult.errorCode : sizeResult.errorCode;
+        size.Set(0, 0);
+        return FALSE;
+    }
+    size.Set((DWORD)sizeValue, (DWORD)(sizeValue >> 32));
+    error = ERROR_SUCCESS;
+    return TRUE;
+}
+
+void CSalShExtPastedData::DoPasteOperation(BOOL copy, const wchar_t* tgtPath)
 {
     CALL_STACK_MESSAGE1("CSalShExtPastedData::DoPasteOperation()");
-    if (ArchiveFileName[0] == 0 || SelFilesAndDirs.GetCount() == 0)
+    if (ArchiveFileNameW.empty() || SelFilesAndDirs.GetCount() == 0)
     {
         TRACE_E("CSalShExtPastedData::DoPasteOperation(): empty data, nothing to do!");
         return;
@@ -629,7 +930,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
     for (int j = 0; j < 2; j++)
     {
         CFilesWindow* panel = j == 0 ? MainWindow->GetActivePanel() : MainWindow->GetNonActivePanel();
-        if (panel->Is(ptZIPArchive) && StrICmp(ArchiveFileName, panel->GetZIPArchive()) == 0)
+        if (panel->Is(ptZIPArchive) &&
+            _wcsicmp(ArchiveFileNameW.c_str(), panel->GetZIPArchive()) == 0)
         { // panel contains our archive
             BOOL archMaybeUpdated;
             panel->OfferArchiveUpdateIfNeeded(MainWindow->HWindow, IDS_ARCHIVECLOSEEDIT2, &archMaybeUpdated);
@@ -654,21 +956,12 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             BOOL canUseData = FALSE;
             FILETIME archiveDate;  // archive file date&time
             CQuadWord archiveSize; // archive file size
-            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(ArchiveFileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-            if (file != INVALID_HANDLE_VALUE)
+            DWORD err = NO_ERROR;
+            if (GetArchiveFileState(ArchiveFileNameW.c_str(), archiveDate, archiveSize, err) &&
+                CompareFileTime(&archiveDate, &StoredArchiveDate) == 0 && // date doesn't differ and
+                archiveSize == StoredArchiveSize)                         // size doesn't differ either
             {
-                GetFileTime(file, NULL, NULL, &archiveDate);
-                DWORD err = NO_ERROR;
-                SalGetFileSize(file, archiveSize, err); // returns "success?" - ignoring, testing 'err' later
-                HANDLES(CloseHandle(file));
-
-                if (err == NO_ERROR &&                                        // we got size&date and
-                    CompareFileTime(&archiveDate, &StoredArchiveDate) == 0 && // date doesn't differ and
-                    archiveSize == StoredArchiveSize)                         // size doesn't differ either
-                {
-                    canUseData = TRUE;
-                }
+                canUseData = TRUE;
             }
             if (canUseData)
             {
@@ -691,20 +984,11 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             DWORD err = NO_ERROR;
             FILETIME archiveDate;  // archive file date&time
             CQuadWord archiveSize; // archive file size
-            HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(ArchiveFileName).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                               NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-            if (file != INVALID_HANDLE_VALUE)
-            {
-                GetFileTime(file, NULL, NULL, &archiveDate);
-                SalGetFileSize(file, archiveSize, err); // returns "success?" - ignoring, testing 'err' later
-                HANDLES(CloseHandle(file));
-            }
-            else
-                err = GetLastError();
+            GetArchiveFileState(ArchiveFileNameW.c_str(), archiveDate, archiveSize, err);
 
             if (err != NO_ERROR)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), AnsiToWide(ArchiveFileName).c_str(), GetErrorTextW(err));
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEERRORFORMAT), ArchiveFileNameW.c_str(), GetErrorTextOwned(err).c_str());
                 gPrompter->ShowError(LoadStrW(IDS_ERRORUNPACK), msg.c_str());
             }
             else
@@ -715,8 +999,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                 CPluginDataInterfaceAbstract* pluginDataAbs = NULL;
                 CPluginData* plugin = NULL;
-                CreateSafeWaitWindow(LoadStr(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
-                BOOL haveList = PackList(MainWindow->GetActivePanel(), ArchiveFileName, *newArchiveDir, pluginDataAbs, plugin);
+                CreateSafeWaitWindow(LoadStrW(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
+                BOOL haveList = PackList(MainWindow->GetActivePanel(), ArchiveFileNameW.c_str(), *newArchiveDir, pluginDataAbs, plugin);
                 DestroySafeWaitWindow();
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
@@ -767,8 +1051,8 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
         }
         else
         {
-            CFilesArray* files = archiveDir->GetFiles(PathInArchive);
-            CFilesArray* dirs = archiveDir->GetDirs(PathInArchive);
+            CFilesArray* files = archiveDir->GetFiles(PathInArchive.c_str());
+            CFilesArray* dirs = archiveDir->GetDirs(PathInArchive.c_str());
             int actIndex = 0;
             int foundOnIndex;
             if (dirs != NULL && SelFilesAndDirs.GetDirsCount() > 0)
@@ -816,23 +1100,21 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                 if (unpack)
                 {
                     data.CurrentIndex = 0;
-                    data.ZIPPath = PathInArchive;
+                    data.ZIPPath = PathInArchive.c_str();
                     data.Dirs = dirs;
                     data.Files = files;
                     data.ArchiveDir = archiveDir;
                     data.EnumLastDir = NULL;
                     data.EnumLastIndex = -1;
 
-                    CPathBuffer pathBuf;
-                    lstrcpyn(pathBuf, tgtPath, pathBuf.Size());
-                    int l = (int)strlen(pathBuf);
-                    if (l > 3 && pathBuf[l - 1] == '\\')
-                        pathBuf[l - 1] = 0; // except "c:\" we remove trailing backslash
+                    std::wstring targetPath = tgtPath;
+                    if (targetPath.length() > 3 && targetPath.back() == L'\\')
+                        targetPath.pop_back(); // except "c:\" we remove trailing backslash
 
                     // actual unpacking
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-                    PackUncompress(MainWindow->HWindow, MainWindow->GetActivePanel(), ArchiveFileName,
-                                   pluginData, pathBuf, PathInArchive, PanelSalEnumSelection, &data);
+                    PackUncompress(MainWindow->HWindow, MainWindow->GetActivePanel(), ArchiveFileNameW.c_str(),
+                                   pluginData, targetPath.c_str(), PathInArchive.c_str(), PanelSalEnumSelection, &data);
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
                     //if (GetForegroundWindow() == MainWindow->HWindow)  // for incomprehensible reasons focus disappears from panel during drag&drop to Explorer, restore it there
@@ -841,11 +1123,12 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                     // refresh non-auto-refreshed directories
                     // change on target path and its subdirectories (creating new directories and unpacking
                     // files/directories)
-                    MainWindow->PostChangeOnPathNotification(pathBuf, TRUE);
+                    MainWindow->PostChangeOnPathNotificationW(targetPath.c_str(), TRUE);
                     // change in directory where archive is located (shouldn't happen during unpack, but better refresh)
-                    lstrcpyn(pathBuf, ArchiveFileName, pathBuf.Size());
-                    CutDirectory(pathBuf);
-                    MainWindow->PostChangeOnPathNotification(pathBuf, FALSE);
+                    // Notify the archive's containing directory from the sole UTF-16 owner.
+                    std::wstring archiveDirW = ArchiveFileNameW;
+                    CutDirectoryW(archiveDirW);
+                    MainWindow->PostChangeOnPathNotificationW(archiveDirW.c_str(), FALSE);
 
                     UpdateWindow(MainWindow->HWindow);
                 }

@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "tree.h"
 
 class CNethoodCache;
@@ -193,19 +195,19 @@ protected:
     unsigned m_cInternalConsumers;
 
     /// Node name.
-    PTSTR m_pszName;
+    PWSTR m_pszName;
 
     /// Display name.
-    PTSTR m_pszDisplayName;
+    PWSTR m_pszDisplayName;
 
     /// Node comment.
-    PTSTR m_pszComment;
+    PWSTR m_pszComment;
 
     /// Network provider.
-    PTSTR m_pszProvider;
+    PWSTR m_pszProvider;
 
     /// Manually formed display name.
-    PTSTR m_pszExplicitDisplayName;
+    PWSTR m_pszExplicitDisplayName;
 
     /// Hint for this node.
     Hint m_hint;
@@ -213,8 +215,8 @@ protected:
     /// Parent cache.
     CNethoodCache* m_pCache;
 
-    /// The NETRESOURCE structure identifying this node.
-    NETRESOURCE m_sNetResource;
+    /// The NETRESOURCEW structure identifying this node.
+    NETRESOURCEW m_sNetResource;
 
     /// If true, the m_sNetResource member is valid.
     bool m_bNetResourceValid;
@@ -285,21 +287,21 @@ public:
 
     void RemoveInternalConsumer(__in CNethoodCacheEventConsumer* pConsumer);
 
-    void SetName(__in PCTSTR pszName, __in int nLen = -1);
+    void SetName(__in PCWSTR pszName, __in int nLen = -1);
 
-    PCTSTR GetName() const
+    PCWSTR GetName() const
     {
         return m_pszName;
     }
 
-    PCTSTR GetDisplayName() const
+    PCWSTR GetDisplayName() const
     {
         return m_pszDisplayName;
     }
 
-    void SetNetResource(__in const NETRESOURCE* pNetResource);
+    void SetNetResource(__in const NETRESOURCEW* pNetResource);
 
-    bool GetNetResource(__out NETRESOURCE& sNetResource)
+    bool GetNetResource(__out NETRESOURCEW& sNetResource)
     {
         sNetResource = m_sNetResource;
         return m_bNetResourceValid;
@@ -357,9 +359,9 @@ public:
 
     void RevertStatus();
 
-    void SetComment(__in PCTSTR pszComment);
+    void SetComment(__in PCWSTR pszComment);
 
-    PCTSTR GetComment() const
+    PCWSTR GetComment() const
     {
         return (m_pszComment != m_pszDisplayName) ? m_pszComment : NULL;
     }
@@ -381,9 +383,9 @@ public:
         return m_dwLastEnumerationResult;
     }
 
-    void SetProvider(__in PCTSTR pszProvider);
+    void SetProvider(__in PCWSTR pszProvider);
 
-    PCTSTR GetProvider() const
+    PCWSTR GetProvider() const
     {
         return m_pszProvider;
     }
@@ -398,31 +400,31 @@ public:
         return m_myIterator;
     }
 
-    static PCTSTR GetDisplayNameFromNetResource(
-        __in const NETRESOURCE* pNetResource);
+    static PCWSTR GetDisplayNameFromNetResource(
+        __in const NETRESOURCEW* pNetResource);
 
-    static PCTSTR GetDisplayName(
-        __in PCTSTR pszName,
-        __in PCTSTR pszComment);
+    static PCWSTR GetDisplayName(
+        __in PCWSTR pszName,
+        __in PCWSTR pszComment);
 
-    int Compare(__in const PCTSTR pszDisplayName) const
+    int Compare(__in const PCWSTR pszDisplayName) const
     {
-        return _tcsicmp(m_pszDisplayName, pszDisplayName);
+        return _wcsicmp(m_pszDisplayName, pszDisplayName);
     }
 
-    int Compare(__in const PCTSTR pszDisplayName, size_t cchLen) const
+    int Compare(__in const PCWSTR pszDisplayName, size_t cchLen) const
     {
-        size_t nLen1 = (m_pszDisplayName == NULL) ? 0 : _tcslen(m_pszDisplayName);
+        size_t nLen1 = (m_pszDisplayName == NULL) ? 0 : wcslen(m_pszDisplayName);
 
         if (nLen1 == cchLen)
         {
-            return _tcsnicmp(m_pszDisplayName, pszDisplayName, nLen1);
+            return _wcsnicmp(m_pszDisplayName, pszDisplayName, nLen1);
         }
 
         return (nLen1 > cchLen) ? 1 : -1;
     }
 
-    int Compare(__in const NETRESOURCE* pNetResource) const
+    int Compare(__in const NETRESOURCEW* pNetResource) const
     {
         return Compare(GetDisplayNameFromNetResource(pNetResource));
     }
@@ -479,7 +481,7 @@ public:
         m_bShortcut = bShortcut;
     }
 
-    void SetDisplayName(__in PCTSTR pszDisplayName);
+    void SetDisplayName(__in PCWSTR pszDisplayName);
 
     LONG AddRef()
     {
@@ -492,7 +494,7 @@ public:
             //     filling the panel during refresh
             // (number of references may double if the path is
             // displayed in the second panel as well)
-            TRACE_E("Suspicious increase of references to node " << (m_pszDisplayName ? m_pszDisplayName : "(null)") << " [" << m_myIterator << "], cRef=" << m_cRef);
+            TRACE_EW(L"Suspicious increase of references to node " << (m_pszDisplayName ? m_pszDisplayName : L"(null)") << L" [" << m_myIterator << L"], cRef=" << m_cRef);
         }
         return ++m_cRef;
     }
@@ -532,17 +534,17 @@ public:
 
 private:
     /// UNC path.
-    PCTSTR m_pszPath;
+    PCWSTR m_pszPath;
 
     /// Token data.
-    const TCHAR* m_pchData;
+    const wchar_t* m_pchData;
 
     /// Token length.
     size_t m_nLength;
 
     /// Points right after the last character (at the zero terminator)
     /// of the path being parsed.
-    const TCHAR* m_pchMax;
+    const wchar_t* m_pchMax;
 
     /// Classification of the token. This can be combination of one or
     /// more values from the TokenClassification enumeration.
@@ -554,12 +556,12 @@ private:
 public:
     /// Constructor.
     /// \param pszUncPath Path to be analyzed. This parameter is optional.
-    CUncPathParser(__in_opt PCTSTR pszUncPath = NULL);
+    CUncPathParser(__in_opt PCWSTR pszUncPath = NULL);
 
     /// Initializes the parser with the new path. This can be called to
     /// reuse the same instance of the parser.
     /// \param pszUncPath Path to be analyzed.
-    void Initialize(__in PCTSTR pszUncPath);
+    void Initialize(__in PCWSTR pszUncPath);
 
     /// Moves to the next path token.
     /// \return If the method succeeds, the return value is true.
@@ -573,7 +575,7 @@ public:
     /// \note The string is NOT explicitly terminated with the nul
     ///       character. Instead the length of the token should be
     ///       retrieved with the GetTokenLength method.
-    const TCHAR* GetTokenData() const
+    const wchar_t* GetTokenData() const
     {
         assert(m_pchData != NULL);
         return m_pchData;
@@ -625,15 +627,13 @@ public:
     /// \param cchMax Size of the buffer, in characters.
     /// \return If the method succeeds, the return values is true.
     ///         Otherwise the return value is false.
-    bool GetPathUpToCurrentToken(
-        __out_ecount(cchMax) PTSTR pszPath,
-        __in size_t cchMax) const;
+    std::wstring GetPathUpToCurrentToken() const;
 
     /// This is the static method for validating the path.
     /// \param pszUncPath The path to be validated.
     /// \return For the list of the possible return values see description
     ///         of the non-static Validate method.
-    static UINT Validate(__in PCTSTR pszUncPath);
+    static UINT Validate(__in PCWSTR pszUncPath);
 };
 
 /// Error codes are 32-bit values (bit 31 is the most significant bit).
@@ -771,7 +771,7 @@ private:
 
     Node FindNextSiblingNode(
         __in Node startNode,
-        __in PCTSTR pszDisplayName);
+        __in PCWSTR pszDisplayName);
 
     Node NewNode(
         __in Node parentNode,
@@ -783,7 +783,7 @@ private:
 
     int CompareNode(
         __in Node node,
-        __in PCTSTR pszDisplayName);
+        __in PCWSTR pszDisplayName);
 
     bool ScheduleEnumeration(
         __in Node node,
@@ -816,8 +816,7 @@ private:
     /// Worker method for the GetFullPath and GetUncPath methods.
     bool GetPathWorker(
         __in Node node,
-        __out_ecount(cchMax) PTSTR pszPath,
-        __in size_t cchMax,
+        __out std::wstring& path,
         __in PathAssemblyType type);
 
     bool CreateMgmtThread();
@@ -902,12 +901,11 @@ public:
     ///       Therefore the consumer should return as fast as possible
     ///       to prevent overall nethood cache performance degradation.
     UINT GetPathStatus(
-        __in PCTSTR pszPath,
+        __in PCWSTR pszPath,
         __in_opt CNethoodCacheEventConsumer* pEventConsumer,
         __out_opt Node* node,
         __in unsigned uFlags = 0,
-        __out_ecount_opt(cchMax) PTSTR pszTargetPath = NULL,
-        __in_opt size_t cchMax = 0);
+        __out_opt std::wstring* targetPath = NULL);
 
     /// Unregisters event consumer from the specific node.
     /// \param node Node, whose consumer is to be detached.
@@ -987,7 +985,7 @@ public:
     {
         if (m_oTree.GetAt(node).GetStatus() == CNethoodCacheNode::StatusDead)
         {
-            TRACE_I("Accessing dead node " << DbgGetNodeName(node) << "[" << node << "]");
+            TRACE_IW(L"Accessing dead node " << DbgGetNodeName(node) << L"[" << node << L"]");
         }
         return m_oTree.GetAt(node);
     }
@@ -1014,10 +1012,9 @@ public:
     /// \return If the method succeeds, the return value is true.
     bool GetFullPath(
         __in Node node,
-        __out_ecount(cchMax) PTSTR pszPath,
-        __in size_t cchMax)
+        __out std::wstring& path)
     {
-        return GetPathWorker(node, pszPath, cchMax, PathFull);
+        return GetPathWorker(node, path, PathFull);
     }
 
     /// For the specified node returns the UNC path.
@@ -1028,10 +1025,9 @@ public:
     /// \return If the method succeeds, the return value is true.
     bool GetUncPath(
         __in Node node,
-        __out_ecount(cchMax) PTSTR pszPath,
-        __in size_t cchMax)
+        __out std::wstring& path)
     {
-        return GetPathWorker(node, pszPath, cchMax, PathUnc);
+        return GetPathWorker(node, path, PathUnc);
     }
 
     /// Given a node finds valid higher level node.
@@ -1051,8 +1047,7 @@ public:
 
     bool FindAccessiblePath(
         __in Node node,
-        __out_ecount(cchMax) PTSTR pszPath,
-        __in size_t cchMax);
+        __out std::wstring& path);
 
     /// Creates the path if it does not exist yet.
     /// \param pszPath Path to create if needed. The path has to have the
@@ -1060,7 +1055,7 @@ public:
     /// \return If the method succeeds, the return value is \c NO_ERROR.
     ///         Otherwise the return value is one of the Windows system
     ///         error code.
-    UINT EnsurePathExists(__in PCTSTR pszPath);
+    UINT EnsurePathExists(__in PCWSTR pszPath);
 
     void AddRefNode(__in Node node);
     void ReleaseNode(__in Node node);
@@ -1099,15 +1094,15 @@ public:
     bool AreTSAvailable();
 
 #if defined(_DEBUG) || defined(TRACE_ENABLE)
-    PCTSTR DbgGetNodeName(__in Node node)
+    PCWSTR DbgGetNodeName(__in Node node)
     {
-        PCTSTR pszName = m_oTree.GetAt(node).GetDisplayName();
+        PCWSTR pszName = m_oTree.GetAt(node).GetDisplayName();
         if (pszName == NULL)
-            return TEXT("\\");
+            return L"\\";
         return pszName;
     }
 #else
-    /*PCTSTR DbgGetNodeName(__in Node)
+    /*PCWSTR DbgGetNodeName(__in Node)
 	{	
 		return NULL;
 	}*/
@@ -1118,7 +1113,7 @@ public:
 class CTsClientName
 {
 private:
-    PTSTR m_pszClientName;
+    PWSTR m_pszClientName;
     int m_cchClientName;
     CNethoodCache* m_pCache;
 
@@ -1126,7 +1121,7 @@ public:
     CTsClientName(CNethoodCache* pCache);
     ~CTsClientName();
 
-    operator PCTSTR() const
+    operator PCWSTR() const
     {
         return m_pszClientName;
     }
@@ -1141,7 +1136,7 @@ public:
 class CTsNameFormatter
 {
 private:
-    PCTSTR m_pszFormat;
+    std::wstring m_format;
 
 public:
     CTsNameFormatter();
@@ -1154,9 +1149,9 @@ public:
 
     void Format(
         __in CNethoodCache::TSCDisplayMode displayMode,
-        __in PCTSTR pszVolumeName,
+        __in PCWSTR pszVolumeName,
         __in_opt const CTsClientName* poClientName,
-        __out_ecount(cchMax) PTSTR pszDisplayName,
+        __out_ecount(cchMax) PWSTR pszDisplayName,
         __in size_t cchMax);
 };
 
@@ -1232,13 +1227,6 @@ private:
     /// Defines base class of this class.
     typedef CThread _baseClass;
 
-    enum
-    {
-        /// Size (in bytes) of the enumeration buffer (for the
-        /// EnumResource method).
-        ENUM_BUFFER_SIZE = 4 * 1024
-    };
-
     /// Flags for the ProcessEnumeration method.
     enum ProcessEnumerationFlags
     {
@@ -1270,14 +1258,14 @@ private:
 
     void ProcessEnumeration(
         __in CNethoodCache::Node nodeParent,
-        __in const NETRESOURCE* pNetResource,
+        __in const NETRESOURCEW* pNetResource,
         __in DWORD cElements,
         __in UINT uFlags,
         __in_opt const CTsClientName* poClientName);
 
-    /// Updates cache with the array of the NETRESOURCE structures.
+    /// Updates cache with the array of the NETRESOURCEW structures.
     /// \param pNetResource Pointer to the first element in the array
-    ///        of the NETRESOURCE structures.
+    ///        of the NETRESOURCEW structures.
     /// \param cElements Number of elements in the array.
     /// \param uFlags Additional flags that control the way how the
     ///        elements are processed. This can be combination of one
@@ -1286,7 +1274,7 @@ private:
     ///        flag then this parameter should specify the client's name.
     ///        Otherwise this parameter is ignored.
     void ProcessEnumeration(
-        __in const NETRESOURCE* pNetResource,
+        __in const NETRESOURCEW* pNetResource,
         __in DWORD cElements,
         __in UINT uFlags,
         __in_opt const CTsClientName* poClientName = NULL)
@@ -1296,14 +1284,14 @@ private:
     }
 
     void ProcessShareInfo(
-        __in PCTSTR pszServerName,
+        __in PCWSTR pszServerName,
         __in const SHARE_INFO_1& sShareInfo);
 
     void Invalidate();
 
     CNethoodCache::Node FindNode(
         __in CNethoodCache::Node nodeParent,
-        __in const NETRESOURCE* pNetResource);
+        __in const NETRESOURCEW* pNetResource);
 
     void InvalidateNetResources(
         __in CNethoodCache::Node nodeParent,
@@ -1328,7 +1316,7 @@ private:
         __in DWORD dwScope,
         __in DWORD dwType,
         __in DWORD dwUsage,
-        __in NETRESOURCE* pNetResource,
+        __in NETRESOURCEW* pNetResource,
         __out HANDLE* phEnum);
 
     static DWORD CloseEnum(__in HANDLE hEnum)
@@ -1337,21 +1325,15 @@ private:
         return WNetCloseEnum(hEnum);
     }
 
-    static DWORD EnumResource(
-        __in HANDLE hEnum,
-        __out DWORD& cEntries,
-        __inout NETRESOURCE* pBuffer,
-        __in DWORD cbBuffer);
-
     /// Enumerates hidden system shares (C$ etc).
     /// \param pszServerName UNC server name.
     /// \return If succeeded, returns NO_ERROR. Otherwise returns one of
     ///         the system defined error code.
-    DWORD EnumHiddenShares(__in PCTSTR pszServerName);
+    DWORD EnumHiddenShares(__in PCWSTR pszServerName);
 
     /// Workhorse for the EnumHiddenShares method on the NT platform.
     /// \see EnumHiddenShares
-    DWORD EnumHiddenSharesNt(__in PCTSTR pszServerName);
+    DWORD EnumHiddenSharesNt(__in PCWSTR pszServerName);
 
     /// Enumerates network shortcuts.
     /// \return If succeeded, returns NO_ERROR. Otherwise returns one of
@@ -1366,8 +1348,8 @@ private:
     /// \param pszName Display name of the shortcut.
     /// \param pszDir Path to the directory where the shortcut is stored.
     BOOL AddNetworkShortcut(
-        __in PCTSTR pszName,
-        __in PTSTR pszDir);
+        __in PCWSTR pszName,
+        __in PCWSTR pszDir);
 
     /// Finds out whether the caller may recover from the error
     /// by providing user credentials.
@@ -1387,10 +1369,10 @@ private:
     /// Returns path to the user's network places folder.
     /// \return If the method succeeds, the return value is nonzero.
     ///         Otherwise the return value is zero.
-    static BOOL GetShortcutsDir(__out PTSTR pszPath);
+    static BOOL GetShortcutsDir(std::wstring& path);
 
     ///
-    static BOOL ResolveNetShortcut(__inout_ecount(MAX_PATH) PTSTR path);
+    static BOOL ResolveNetShortcut(std::wstring& path);
 
 public:
     CNethoodCacheEnumerationThread(

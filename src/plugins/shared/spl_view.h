@@ -53,7 +53,7 @@ public:
     // of the file being opened in the source (panel or Find window), if -1, the source or index is
     // unknown; returns TRUE on success (FALSE means failure, 'lock' and 'lockOwner' have no meaning
     // in this case)
-    virtual BOOL WINAPI ViewFile(const char* name, int left, int top, int width, int height,
+    virtual BOOL WINAPI ViewFile(const wchar_t* name, int left, int top, int width, int height,
                                  UINT showCmd, BOOL alwaysOnTop, BOOL returnLock, HANDLE* lock,
                                  BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                  int enumFilesSourceUID, int enumFilesCurrentIndex) = 0;
@@ -64,7 +64,7 @@ public:
     // file 'name' can be displayed (e.g. the file has a matching signature) in the viewer, and if so,
     // returns TRUE; if it returns FALSE, Salamander will try to find another viewer for 'name'
     // (in the priority list of viewers, see the Viewers configuration page)
-    virtual BOOL WINAPI CanViewFile(const char* name) = 0;
+    virtual BOOL WINAPI CanViewFile(const wchar_t* name) = 0;
 };
 
 #ifdef _MSC_VER

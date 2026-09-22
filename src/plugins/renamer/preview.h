@@ -5,7 +5,7 @@
 #pragma once
 
 extern HIMAGELIST HSymbolsImageList;
-extern char DirText[100];
+extern std::wstring DirText;
 
 // icon indexes in the image list
 #define ILS_DIRECTORY 0
@@ -30,16 +30,15 @@ protected:
     CRenamer Renamer;
 
     // data for rename operation
-    CPathBuffer& Root;
-    int& RootLen;
+    std::wstring& Root;
     TIndirectArray<CSourceFile>& SourceFiles;
     BOOL& SourceFilesValid;
 
     BOOL TransferError;
     BOOL Dirty;
-    CPathBuffer TextBuffer; // Heap-allocated for long path support
+    std::wstring TextBuffer;
     int CachedItem;
-    CPathBuffer NewNameCache; // Heap-allocated for long path support
+    std::wstring NewNameCache;
     BOOL NewNameValid;
 
     HWND Static;
@@ -52,8 +51,8 @@ public:
 
     void SetDirty() { Dirty = TRUE; }
     void Update(BOOL force = FALSE);
-    void GetDispInfo(LV_DISPINFO* info);
-    char* GetItemText(int index, int subItem);
+    void GetDispInfo(NMLVDISPINFOW* info);
+    const wchar_t* GetItemText(int index, int subItem);
     BOOL CustomDraw(LPNMLVCUSTOMDRAW cd, LRESULT& result);
 
     int CompareFunc(CSourceFile* f1, CSourceFile* f2, int sortBy);

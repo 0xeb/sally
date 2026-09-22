@@ -13,9 +13,9 @@
 #include "..\lang\lang.rh"
 
 // class constructor
-CLZH::CLZH(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read) : CZippedFile(filename, file, buffer, 0, read, CQuadWord(0, 0))
+CLZH::CLZH(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read) : CZippedFile(filename, file, buffer, 0, read, CQuadWord(0, 0))
 {
-    CALL_STACK_MESSAGE2("CLZH::CLZH(%s, , , )", filename);
+    CALL_STACK_MESSAGE2("CLZH::CLZH(%ls, , , )", filename);
 
     // if the parent constructor failed, bail out immediately
     if (!Ok)

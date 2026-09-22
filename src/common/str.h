@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 //*****************************************************************************
 //
 // 20.1.2003
@@ -38,6 +40,17 @@ extern BYTE UpperCase[256]; // remapping of all characters to uppercase; generat
 //   The StrICpy returns the number of bytes stored in buffer, not counting
 //   the terminating null character.
 //
+// These three are the ANSI-BOUND forms this program removes -
+// see the block above StrICmpW in str.cpp: they fold through LowerCase[], a
+// 256-entry table filled from CharLower under the ACTIVE CODE PAGE, so two
+// characters differing only outside CP_ACP compare equal. The correct wide
+// behaviour is StrICpyW / StrICmpExW / StrCmpExW, which delegate to
+// sally::text::CompareFolded. The declarations had been widened over the still-
+// narrow bodies, so every wide caller was binding to a promise with no
+// definition - invisible until link time. Callers retargeted to the W twins.
+// StrIStr's and StrNCat's wide twins were both written earlier
+// (str.cpp) - the declarations below were already correct, only the bodies
+// were missing.
 int StrICpy(char* dest, const char* src);
 
 //*****************************************************************************
@@ -56,6 +69,11 @@ int StrICpy(char* dest, const char* src);
 //    0 if s1 = s2 (if the strings are equal)
 //   +1 if s1 > s2 (if string pointed to by s1 is greater than the string pointed to by s2)
 //
+// Reverted to match the narrow bodies in str.cpp (:152 x86-ASM /
+// :167 C++, selected by _WIN64). Both fold through LowerCase[], the 256-entry table
+// str.cpp's own prose calls "exactly the ANSI binding this program removes" - so the
+// WIDE callers belong on StrICmpW (:693), not here. The scanner hid this pair until
+// P1.7q: salopen's own wide StrICmp satisfied the wide declaration.
 int StrICmp(const char* s1, const char* s2);
 
 //*****************************************************************************
@@ -148,23 +166,25 @@ int MemICmp(const void* buf1, const void* buf2, int n);
 // int StrLen(const char *str);    // only 2x faster, unnecessary risk of accessing unaligned memory
 
 // copies text into newly allocated space, NULL = insufficient memory
+wchar_t* DupStr(const wchar_t* txt);
+
+// narrow sibling: for the few legacy narrow-byte-packed callers that must stay
+// char* by design (e.g. drivelst.h's CDriveData::DriveText - stored in a
+// TDirectArray via memmove, and byte-indexed for its own packed format).
+// Bridge with WideToAnsi() at the call site rather than widening the field.
 char* DupStr(const char* txt);
 
-// copies text into newly allocated space, NULL = insufficient memory,
-// additionally on insufficient memory sets 'err' to TRUE
-char* DupStrEx(const char* str, BOOL& err);
+// returns first occurrence of 'pattern' in 'txt' or NULL, is case-insensitive
+const wchar_t* StrIStr(const wchar_t* txt, const wchar_t* pattern);
 
 // returns first occurrence of 'pattern' in 'txt' or NULL, is case-insensitive
-const char* StrIStr(const char* txt, const char* pattern);
-
-// returns first occurrence of 'pattern' in 'txt' or NULL, is case-insensitive
-const char* StrIStr(const char* txtStart, const char* txtEnd,
-                    const char* patternStart, const char* patternEnd);
+const wchar_t* StrIStr(const wchar_t* txtStart, const wchar_t* txtEnd,
+                    const wchar_t* patternStart, const wchar_t* patternEnd);
 
 // appends string 'src' after string 'dest', but does not exceed length 'dstSize'
 // terminates string with zero, which is included in length 'dstSize'
 // returns 'dst'
-char* StrNCat(char* dst, const char* src, int dstSize);
+wchar_t* StrNCat(wchar_t* dst, const wchar_t* src, int dstSize);
 
 // this historical code is not used by anyone
 /*
@@ -178,7 +198,7 @@ class CConvertTab
 
   public:
     CConvertTab();
-    void Convert(char *str);
+    void Convert(wchar_t *str);
 };
 
 extern CConvertTab ConvertTab;
@@ -213,6 +233,11 @@ inline int SWPrintFToEnd_s(WCHAR* _Dst, size_t _SizeInWords, const WCHAR* _Forma
 //
 // the only difference from swprintf_s is that it writes after the text placed in the buffer
 
+// NARROW ON PURPOSE - this is the A half of an A/W pair whose wide twin,
+// SWPrintFToEnd_s, is declared 20 lines above and has 27 callers. Sweep a754591d widened
+// these two signatures while their bodies kept strlen/vsprintf_s, producing 336 errors from
+// two lines. The only remaining caller is translator/dialogs.cpp, and translator/ is a
+// separate tool that stays narrow. Wide callers want SWPrintFToEnd_s.
 template <size_t _Size>
 inline int SPrintFToEnd_s(char (&_Dst)[_Size], const char* _Format, ...)
 {
@@ -230,8 +255,23 @@ inline int SPrintFToEnd_s(char* _Dst, size_t _Size, const char* _Format, ...)
     return vsprintf_s(_Dst + len, _Size - len, _Format, _ArgList);
 }
 
-#ifdef UNICODE
-#define STPrintFToEnd_s SWPrintFToEnd_s
-#else // UNICODE
-#define STPrintFToEnd_s SPrintFToEnd_s
-#endif // UNICODE
+// Wide siblings. These fold via sally::text::CompareFolded instead
+// of the CP_ACP LowerCase[] table, so characters outside the active code page no
+// longer collapse together. StrCmpExW is case-sensitive and does not fold.
+int StrICmpW(const wchar_t* s1, const wchar_t* s2);
+int StrNICmpW(const wchar_t* s1, const wchar_t* s2, int n);
+int StrICmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2); // l1/l2 accept -1 = wcslen
+int StrCmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2); // l1/l2 accept -1 = wcslen
+// dest must be caller-sized to hold src (same contract as the narrow StrICpy - no
+// length check). Folds via sally::text::Fold, not the CP_ACP LowerCase[] table, so
+// a character outside the active code page keeps its identity instead of folding
+// into whatever '?' happens to collide with.
+bool StrICpyW(std::wstring& dest, const wchar_t* src) noexcept;
+//
+// LATENT LINK RISK, recorded rather than discovered later: str.cpp is compiled
+// into the PLUGINS too (the INSIDE_SPL branch), and the folding forms above pull
+// in sally::text::CompareFolded from common/text/CaseFolding.cpp. No plugin calls
+// them yet, so nothing needs that object today and the tree links. The first
+// plugin to call StrICmpW/StrNICmpW/StrICmpExW will fail to link until
+// CaseFolding.cpp is added to that plugin build. StrCmpExW is safe - it folds
+// nothing and has no such dependency.

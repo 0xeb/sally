@@ -370,6 +370,7 @@ STRINGTABLE
  IDS_FIND_RESULTS_LOAD_EMPTY, "No find results were loaded."
  IDS_FIND_RESULTS_LOAD_REPORT, "Loaded %u find result(s). Skipped %u missing or invalid path(s)."
  IDS_FIND_RESULTS_ANSI_ONLY, "The name of this item cannot be represented in the system code page, and this command does not support Unicode names yet.\nDelete and Save Results do support it."
+ IDS_FIND_HEX_INVALID, "The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes."
 
  IDS_SEARCHFORCOLUMN1, "Mask"
  IDS_SEARCHFORCOLUMN2, "Path"
@@ -906,6 +907,8 @@ STRINGTABLE
  IDS_NEW_ARCHIVE, "archive."
 
  IDS_UNPACKARCHIVE, "Unpack archive ""%s"" to"
+
+ IDS_UNPACK_ANSI_ONLY, "The name ""%s"" cannot be represented in the system code page, and this volume offers no short (8.3) alternative.\n\nThe selected unpacker accepts only such names, so the operation was cancelled. Continuing could have unpacked a different archive."
 
  IDS_CREATEDIRECTORY, "The directory ""%s"" doesn't exist.\n\nDo you want to create it?"
  IDS_NAMEUSEDFORFILE, "The name ""%s"" has already been used for a file."
@@ -1860,6 +1863,7 @@ IDS_BROKENFSPLUGINVERSION2, "The plugin (%s) targets broken Sally SDK version 10
  IDS_MASTERPASSWORD_REMOVED, "You have deleted your Master Password. Your stored passwords (for example FTP and WinSCP) will not be protected."
  IDS_MASTERPASSWORD_SET, "Master Password successfully changed. Your stored passwords (for example FTP and WinSCP) are secured by AES cipher now."
  IDS_WRONG_MASTERPASSWORD, "You did not enter the correct current Master Password. Please try again."
+ IDS_MASTERPASSWORD_TOO_LONG, "The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password."
 
  IDS_BROWSEDIRECTORY_TITLE, "Browse Directory"
  IDS_BROWSEDIRECTORY_TEXT, "Choose the directory you want to use."

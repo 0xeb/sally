@@ -64,6 +64,8 @@ extern "C"
 #ifdef PPC_BSTR
     /* RWE 6/12/2003 */
     struct chmFile* chm_open(BSTR filename);
+#elif defined(WIN32)
+struct chmFile* chm_open_w(const wchar_t* filename);
 #else
 struct chmFile* chm_open(const char* filename);
 #endif

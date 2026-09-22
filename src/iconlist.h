@@ -126,7 +126,7 @@ public:
 
     virtual BOOL WINAPI Create(int imageWidth, int imageHeight, int imageCount);
     virtual BOOL WINAPI CreateFromImageList(HIMAGELIST hIL, int requiredImageSize = -1);          // if 'requiredImageSize' is -1, geometry from hIL will be used
-    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth); // loads from PNG resource, must be a long strip one row high
+    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCWSTR lpBitmapName, int imageWidth); // loads from PNG resource, must be a long strip one row high
     virtual BOOL WINAPI CreateFromRawPNG(const void* rawPNG, DWORD rawPNGSize, int imageWidth);
     virtual BOOL WINAPI CreateFromBitmap(HBITMAP hBitmap, int imageCount, COLORREF transparentClr); // loads bitmap (maximum 256 colors), must be a long strip one row high
     virtual BOOL WINAPI CreateAsCopy(const CIconList* iconList, BOOL grayscale);
@@ -201,7 +201,7 @@ private:
     BOOL CopyFromBitmapIternal(int dstIndex, HBITMAP hSrcBitmap, int srcIndex, int imageCount, COLORREF transparentClr);
 };
 
-HBITMAP LoadPNGBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName, DWORD flags);
+HBITMAP LoadPNGBitmap(HINSTANCE hInstance, LPCWSTR lpBitmapName, DWORD flags);
 HBITMAP LoadRawPNGBitmap(const void* rawPNG, DWORD rawPNGSize, DWORD flags);
 
 inline BYTE GetGrayscaleFromRGB(int red, int green, int blue)

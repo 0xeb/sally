@@ -48,7 +48,7 @@ public:
     ~CTextFileReader();
 
     // 'size' must not exceed numeric_limits<size_t>::max - 1
-    void Set(const char* name, HANDLE file, size_t size, int eolConversions,
+    void Set(const wchar_t* name, HANDLE file, size_t size, int eolConversions,
              eEncoding encoding, eEndian endians, int performASCII8InputEnc,
              const char* parASCII8InputEncTableName, BOOL normalizationForm, bool needMD5);
     void Reset();
@@ -60,7 +60,7 @@ public:
     void EstimateFileType();
     int GetType();
     int GetEncoding();
-    void GetEncodingName(char* encoding);
+    void GetEncodingName(std::wstring& encoding) noexcept;
     void ForceType(eFileType type) { Type = type; }
     void ForceEncoding(eEncoding encoding, eEndian endian) { Encoding = encoding; }
     bool HasSurrogates()
@@ -69,7 +69,7 @@ public:
         return false;
     }
 
-    const char* GetName() { return Name; }
+    const wchar_t* GetName() { return Name.c_str(); }
     void Get(char*& buffer, size_t& size, const int& cancel);    // allocates via malloc
     void Get(wchar_t*& buffer, size_t& size, const int& cancel); // allocates via malloc
     bool HasMD5() { return MD5 != NULL; }
@@ -83,7 +83,7 @@ protected:
     class CByteReader
     {
     public:
-        CByteReader(const char* name, HANDLE file, size_t size, char* buffer,
+        CByteReader(const wchar_t* name, HANDLE file, size_t size, char* buffer,
                     int bufferSize, int bufferedCharacters, const int& cancel,
                     CSalamanderMD5* md5);
         ~CByteReader();
@@ -96,7 +96,7 @@ protected:
         }
 
     private:
-        const char* Name;
+        const wchar_t* Name;
         HANDLE File;
         char* Buffer;
         int BufferSize;
@@ -113,7 +113,7 @@ protected:
     {
         BufferSize = 64 * 1024
     };
-    const char* Name;
+    std::wstring Name;
     HANDLE File;
     size_t Size;
     int EolConversions;

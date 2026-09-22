@@ -32,31 +32,25 @@ __int64 FileSeek(HANDLE hf, __int64 distance, DWORD moveMethod)
     return li.QuadPart;
 }
 
-BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent)
+BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent)
 {
     while (!ReadFile(hFile, lpBuffer, nBytesToRead, pnBytesRead, NULL))
     {
         int lastErr = GetLastError();
-        char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
         if (SalamanderGeneral->DialogError(parent == NULL ? SalamanderGeneral->GetMsgBoxParent() : parent, BUTTONS_RETRYCANCEL,
-                                           fileName, error, LoadStr(IDS_READERROR)) != DIALOG_RETRY)
+                                           fileName, SPLGetErrorTextOwned(SalamanderGeneral, lastErr).c_str(), LangStr(IDS_READERROR).c_str()) != DIALOG_RETRY)
             return FALSE;
     }
     return TRUE;
 }
 
-BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, LPCTSTR fileName, HWND parent)
+BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent)
 {
     while (!WriteFile(hFile, lpBuffer, nBytesToWrite, pnBytesWritten, NULL))
     {
         int lastErr = GetLastError();
-        char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
         if (SalamanderGeneral->DialogError(parent == NULL ? SalamanderGeneral->GetMsgBoxParent() : parent, BUTTONS_RETRYCANCEL,
-                                           fileName, error, LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
+                                           fileName, SPLGetErrorTextOwned(SalamanderGeneral, lastErr).c_str(), LangStr(IDS_WRITEERROR).c_str()) != DIALOG_RETRY)
             return FALSE;
     }
     return TRUE;
@@ -96,7 +90,7 @@ CBufferedFile::~CBufferedFile()
     //  ::DeleteCriticalSection(&CS);
 
     if (File != NULL)
-        this->Close("", SalamanderGeneral->GetMainWindowHWND());
+        this->Close(L"", SalamanderGeneral->GetMainWindowHWND());
 
     delete[] Buffer;
 }
@@ -109,9 +103,9 @@ void CBufferedFile::Unlock() {
   ::LeaveCriticalSection(&CS);
 }*/
 
-BOOL CBufferedFile::Create(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDispostion, DWORD dwFlagsAndAttributes)
+BOOL CBufferedFile::Create(const wchar_t* lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDispostion, DWORD dwFlagsAndAttributes)
 {
-    File = CreateFile(lpFileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDispostion, dwFlagsAndAttributes, NULL);
+    File = CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDispostion, dwFlagsAndAttributes, NULL);
     if (File == INVALID_HANDLE_VALUE)
     {
         File = NULL;
@@ -164,7 +158,7 @@ BOOL CBufferedFile::EmptyCache()
     return TRUE;
 }
 
-BOOL CBufferedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent)
+BOOL CBufferedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent)
 {
     DWORD nRemain = nBytesToRead;
     BYTE* lpDest = (BYTE*)lpBuffer;
@@ -215,7 +209,7 @@ BOOL CBufferedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead
     return ret;
 }
 
-BOOL CBufferedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent)
+BOOL CBufferedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent)
 {
     DWORD nRemain = nBytesToWrite;
     BYTE* lpSrc = (BYTE*)lpBuffer;
@@ -253,7 +247,7 @@ BOOL CBufferedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesW
     return TRUE;
 }
 
-BOOL CBufferedFile::Close(LPCTSTR fileName, HWND parent)
+BOOL CBufferedFile::Close(const wchar_t* fileName, HWND parent)
 {
     // flush buffers
     if ((Access & GENERIC_WRITE) && Buffer != NULL && BufferPos > 0)

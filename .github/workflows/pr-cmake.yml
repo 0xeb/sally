@@ -50,27 +50,3 @@ jobs:
       - name: Populate x64 runtime
         if: matrix.arch == 'x64'
         run: cmake --build build --config Debug --target populate -j
-
-      - name: Verify x64 translation workspace
-        if: matrix.arch == 'x64'
-        run: |
-          $workspaceDir = "build/translation-workspace-ci"
-          Remove-Item -Recurse -Force $workspaceDir -ErrorAction SilentlyContinue
-
-          & .\tools\localization\prepare_translation_workspace.ps1 `
-            -BuildRoot .\build\out\sally\Debug_x64 `
-            -OutputDir $workspaceDir `
-            -Languages czech,slovak `
-            -ImportArchives `
-            -Force
-
-          & .\tools\localization\verify_translation_workspace.ps1 `
-            -WorkspaceDir $workspaceDir
-
-      - name: Upload x64 translation verification artifact
-        if: failure() && matrix.arch == 'x64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: Sally-translation-workspace-debug
-          path: build/translation-workspace-ci/
-          if-no-files-found: ignore

@@ -5,6 +5,7 @@
 #pragma once
 
 #include "shexreg_ipc_names.h"
+#include "shexreg_ipc_protocol.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -127,7 +128,7 @@ extern "C"
     // these entries are stored in a singly linked list
     struct CShellExtConfigItem
     {
-        char Name[SEC_NAMEMAX]; // caption shown for the item in the context menu
+        wchar_t Name[SEC_NAMEMAX]; // caption shown for the item in the context menu
         // conditions that determine whether the item appears in the context menu
         BOOL OneFile;
         BOOL OneDirectory;
@@ -148,7 +149,7 @@ extern "C"
 
     // configuration flags
     extern BOOL ShellExtConfigSubmenu;
-    extern char ShellExtConfigSubmenuName[SEC_SUBMENUNAME_MAX];
+    extern wchar_t ShellExtConfigSubmenuName[SEC_SUBMENUNAME_MAX];
 
     // current configuration version
     // increase this number by one when saving a new revision
@@ -164,7 +165,7 @@ extern "C"
     BOOL SECLoadRegistry();
 
     // retrieves the item name
-    const char* SECGetName(int index);
+    const wchar_t* SECGetName(int index);
 
     // removes all items from the list
     void SECDeleteAllItems();
@@ -182,48 +183,14 @@ extern "C"
 // IMPORTANT: do not change these constants; older versions rely on them
 #define WM_USER_SALSHEXT_PASTE WM_APP + 139      // [postMsgIndex, 0] - SalamExt requests execution of the Paste command
 #define WM_USER_SALSHEXT_TRYRELDATA WM_APP + 143 // [0, 0] - SalamExt reports that paste data were unlocked (see CSalShExtSharedMem::BlockPasteDataRelease); if nothing else protects the data we let them be released
+#define WM_USER_SALSHEXT_CAPTUREPAYLOAD WM_APP + 144 // [0, 0] - copy hook asks Sally to capture a v7 response payload while its exact-size mapping is alive
 
 #define SALSHEXT_NONE 0
 #define SALSHEXT_COPY 1
 #define SALSHEXT_MOVE 2
 
-// Shared-memory structure exchanged between Salamander (any bitness) and
-// the shell-extension DLL loaded into Explorer.  Both sides map the same
-// named section, so every field MUST have a fixed, compile-time size.
-// Do NOT replace char[N] members with std::string, std::wstring, or any
-// other dynamically-sized type — that would corrupt the shared mapping.
-#pragma pack(push)
-#pragma pack(4)
-    struct CSalShExtSharedMem
-    {
-        int Size; // structure size (used to determine the version and prevent overwriting memory)
-
-        // drag-and-drop section
-        BOOL DoDragDropFromSalamander;      // TRUE when drag & drop originated in Salamander (only with the "fake" directory)
-        char DragDropFakeDirName[MAX_PATH]; // full name of the "fake" directory used for drag & drop (fixed-size: shared memory)
-        BOOL DropDone;                      // TRUE once the drop occurred; TargetPath and Operation contain valid values
-
-        // copy/cut + paste section
-        BOOL DoPasteFromSalamander;       // TRUE when the clipboard data object comes from Salamander (only with the "fake" directory)
-        DWORD ClipDataObjLastGetDataTime; // timestamp of the last GetData call on the clipboard data object
-        char PasteFakeDirName[MAX_PATH];  // full name of the "fake" directory used for paste (fixed-size: shared memory)
-        DWORD SalamanderMainWndPID;       // process ID of Salamander's main window that placed the data object on the clipboard (SalamExt must request the paste operation from it)
-        DWORD SalamanderMainWndTID;       // thread ID of the same main window (SalamExt must request the paste operation from it)
-        UINT64 SalamanderMainWnd;         // handle of the main window that placed the data object on the clipboard; HWND is 64-bit on x64 (even if only the lower 32 bits are used), and the x86 build zeroes the upper 32 bits
-        int PostMsgIndex;                 // index of the WM_USER_SALSHEXT_PASTE message SalamExt is waiting for; after a timeout the index increases so Salamander skips the stale message when it arrives
-        BOOL BlockPasteDataRelease;       // probably obsolete since W2K+: when TRUE, fakedataobj->Release() will not discard Salamander's paste data
-        int SalBusyState;                 // 0 = checking whether Salamander is "busy"; 1 = Salamander is idle and already waiting for the paste command; 2 = Salamander is busy so paste is postponed
-        DWORD PastedDataID;               // identifier of the pasted data (Salamander alone knows what to paste; only the ID is stored here)
-        BOOL PasteDone;                   // TRUE once the paste operation has started; TargetPath and Operation are valid
-        char ArcUnableToPaste1[300];      // prepared copy-hook message for a paste failure (see IDS_ARCUNABLETOPASTE1)
-        char ArcUnableToPaste2[300];      // prepared copy-hook message for a paste failure (see IDS_ARCUNABLETOPASTE2)
-
-        // resulting operation
-        char TargetPath[2 * MAX_PATH]; // destination path (fixed-size: shared memory)
-        int Operation;                 // SALSHEXT_COPY or SALSHEXT_MOVE (or SALSHEXT_NONE immediately after the structure is initialized)
-    };
-    typedef struct CSalShExtSharedMem CSalShExtSharedMem;
-#pragma pack(pop)
+// v7's fixed cross-bitness control record is declared in shexreg_ipc_protocol.h. Semantic
+// UTF-16 strings live only in exact-size payload mappings referenced by numeric metadata.
 
     //
     // ============================================= Altap Salamander only
@@ -234,7 +201,7 @@ extern "C"
     // writes the registry entries required by the library
     // parameters: path to the library, whether to skip loading the DLL when verifying its version,
     // and the registry view (0, 32-bit, or 64-bit) that should be updated
-    BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView);
+    BOOL SECRegisterToRegistry(const wchar_t* shellExtensionPath, BOOL doNotLoadDLL, REGSAM regView);
 
 #ifdef __cplusplus
 } // extern "C"
@@ -255,7 +222,7 @@ BOOL SECDeleteItem(int index);
 BOOL SECSwapItems(int index1, int index2);
 
 // sets an item name
-BOOL SECSetName(int index, const char* name);
+BOOL SECSetName(int index, const wchar_t* name);
 
 #endif // ENABLE_SH_MENU_EXT
 

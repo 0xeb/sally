@@ -12,6 +12,8 @@
 */
 
 #include "precomp.h"
+#include <string>
+#include <vector>
 #include "../../registry_names.h"
 #include "icons.h"
 #include "nethood.h"
@@ -22,13 +24,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconSimpleFileInfo[] =
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             1,
             SIID_DOCNOASSOC,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             0,
             SIID_INVALID,
         },
@@ -43,13 +45,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconSimpleDirectoryInfo[]
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             3,
             SIID_FOLDER,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             3,
             SIID_INVALID,
         },
@@ -64,7 +66,7 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconDomainOrGroupInfo[] =
     {
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             18,
             SIID_INVALID,
         },
@@ -79,13 +81,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconServerInfo[] =
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             103,
             SIID_SERVER,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             15,
             SIID_INVALID,
         },
@@ -100,13 +102,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconShareInfo[] =
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             136,
             SIID_SERVERSHARE,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             85,
             SIID_INVALID,
         },
@@ -121,7 +123,7 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconNetworkInfo[] =
     {
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             14,
             SIID_INVALID,
         },
@@ -136,13 +138,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconEntireNetworkInfo[] =
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             145,
             SIID_WORLD,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             13,
             SIID_INVALID,
         },
@@ -157,19 +159,19 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconMainInfo[] =
     {
         {
             OSSPECIFIC_7,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             17,
             SIID_INVALID,
         },
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             145,
             SIID_WORLD,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             17,
             SIID_INVALID,
         },
@@ -184,13 +186,13 @@ const CNethoodIcons::OSLOADICONINFO CNethoodIcons::s_asIconNetDriveInfo[] =
     {
         {
             OSSPECIFIC_VISTA,
-            TEXT("imageres.dll"),
+            L"imageres.dll",
             27,
             SIID_DRIVENET,
         },
         {
             OSSPECIFIC_ANY,
-            TEXT("shell32.dll"),
+            L"shell32.dll",
             9,
             SIID_INVALID,
         },
@@ -311,11 +313,39 @@ bool CNethoodIcons::CreateImageLists()
            (m_himlTile != NULL);
 }
 
+static bool QueryRegistryStringOwned(CSalamanderGeneralAbstract* general, HKEY key,
+                                     const wchar_t* valueName, std::wstring& value)
+{
+    for (int attempt = 0; attempt < 8; attempt++)
+    {
+        DWORD bytes = 0;
+        DWORD type = 0;
+        LONG error = general->SalRegQueryValueEx(key, valueName, NULL, &type, NULL, &bytes);
+        if (error != NO_ERROR || (type != REG_SZ && type != REG_EXPAND_SZ) ||
+            bytes % sizeof(wchar_t) != 0 || bytes > MAXDWORD - sizeof(wchar_t))
+            return false;
+
+        std::vector<wchar_t> buffer(bytes / sizeof(wchar_t) + 1, L'\0');
+        DWORD capacityBytes = static_cast<DWORD>(buffer.size() * sizeof(wchar_t));
+        error = general->SalRegQueryValueEx(key, valueName, NULL, &type,
+                                            reinterpret_cast<LPBYTE>(buffer.data()),
+                                            &capacityBytes);
+        if (error == ERROR_MORE_DATA)
+            continue;
+        if (error != NO_ERROR || (type != REG_SZ && type != REG_EXPAND_SZ) ||
+            capacityBytes % sizeof(wchar_t) != 0 || capacityBytes > bytes)
+            return false;
+        buffer[capacityBytes / sizeof(wchar_t)] = L'\0';
+        value.assign(buffer.data());
+        return true;
+    }
+    return false;
+}
+
 bool CNethoodIcons::LoadSystemIcons()
 {
     int iIcon;
-    CPathBuffer szIconLocation;
-    PCTSTR pszFileName;
+    PCWSTR pszFileName;
     HKEY hkeyShellIcons;
     LONG err;
     const LOADICONINFO* pLoadInfo;
@@ -323,7 +353,7 @@ bool CNethoodIcons::LoadSystemIcons()
 
     err = HANDLES_Q(RegOpenKeyEx(
         HKEY_LOCAL_MACHINE,
-        SAL_REG_KEY_EXPLORER_SHELL_ICONS_T,
+        SAL_REG_KEY_EXPLORER_SHELL_ICONS_W,
         0,
         KEY_READ,
         &hkeyShellIcons));
@@ -335,6 +365,7 @@ bool CNethoodIcons::LoadSystemIcons()
     int i;
     for (i = 0; i < _IconLast; i++)
     {
+        std::wstring iconLocation;
         pLoadInfo = GetOsSpecificData(s_apLoadIconInfo[i]);
         assert(pLoadInfo != NULL);
 
@@ -358,26 +389,16 @@ bool CNethoodIcons::LoadSystemIcons()
                             SHGSI_ICONLOCATION,
                             &sStockIcon)))
                     {
-#ifdef _UNICODE
-                                                if (SUCCEEDED(StringCchCopy(
-							szIconLocation,
-							szIconLocation.Size(),
-							sStockIcon.szPath))
-#else
-                        if (WideCharToMultiByte(CP_ACP,
-                                                0, sStockIcon.szPath,
-                                                -1, szIconLocation,
-                                                szIconLocation.Size(),
-                                                NULL, NULL) > 0)
-#endif
-						{
+                        iconLocation = sStockIcon.szPath;
+                        if (!iconLocation.empty())
+                        {
                             iIcon = sStockIcon.iIcon;
-                            pszFileName = szIconLocation;
-						}
-						else
-						{
+                            pszFileName = iconLocation.c_str();
+                        }
+                        else
+                        {
                             --nRetries;
-						}
+                        }
                     }
                     else
                     {
@@ -386,23 +407,16 @@ bool CNethoodIcons::LoadSystemIcons()
                 }
                 else if (hkeyShellIcons != NULL)
                 {
-                    DWORD cbData;
-                    DWORD dwType;
-                    TCHAR szValueName[16];
+                    wchar_t szValueName[16];
 
-                    StringCchPrintf(szValueName, COUNTOF(szValueName),
-                                    TEXT("%d"), iIcon);
+                    StringCchPrintfW(szValueName, COUNTOF(szValueName),
+                                     L"%d", iIcon);
 
-                    memset(szIconLocation.Get(), 0, szIconLocation.Size());
-                    cbData = szIconLocation.Size() - sizeof(TCHAR);
-                    err = SalamanderGeneral->SalRegQueryValueEx(hkeyShellIcons, szValueName,
-                                                                NULL, &dwType, reinterpret_cast<LPBYTE>(szIconLocation.Get()),
-                                                                &cbData);
-
-                    if (err == NO_ERROR)
+                    if (QueryRegistryStringOwned(SalamanderGeneral, hkeyShellIcons,
+                                                 szValueName, iconLocation))
                     {
-                        iIcon = PathParseIconLocation(szIconLocation);
-                        pszFileName = szIconLocation;
+                        iIcon = PathParseIconLocationW(iconLocation.data());
+                        pszFileName = iconLocation.c_str();
                     }
                     else
                     {
@@ -446,12 +460,12 @@ HIMAGELIST CNethoodIcons::GetImageList(int nSize) const
 
 HICON CNethoodIcons::ExtractLowColorSmallIcon(
     __in HMODULE hModule,
-    __in PCTSTR pszIconId)
+    __in PCWSTR pszIconId)
 {
     HICON hIcon = NULL;
     HRSRC hRsrcInfo;
 
-    hRsrcInfo = FindResource(hModule, pszIconId, RT_GROUP_ICON);
+    hRsrcInfo = FindResourceW(hModule, pszIconId, MAKEINTRESOURCEW((ULONG_PTR)RT_GROUP_ICON));
     if (hRsrcInfo != NULL)
     {
         HGLOBAL hRsrc;
@@ -473,7 +487,7 @@ HICON CNethoodIcons::ExtractLowColorSmallIcon(
     return hIcon;
 }
 
-PCTSTR CNethoodIcons::IconIndexToIconId(__in HMODULE hModule, __in int iIcon)
+PCWSTR CNethoodIcons::IconIndexToIconId(__in HMODULE hModule, __in int iIcon)
 {
     ENUMICONRESINFO eiri = {
         0,
@@ -482,7 +496,7 @@ PCTSTR CNethoodIcons::IconIndexToIconId(__in HMODULE hModule, __in int iIcon)
     assert(iIcon >= 0);
     eiri.iIcon = iIcon;
 
-    EnumResourceNames(hModule, RT_GROUP_ICON,
+    EnumResourceNamesW(hModule, MAKEINTRESOURCEW((ULONG_PTR)RT_GROUP_ICON),
                       EnumIconResourceProc, reinterpret_cast<LONG_PTR>(&eiri));
 
     return eiri.pszId;
@@ -521,7 +535,7 @@ HICON CNethoodIcons::FindBestLowColorSmallIcon(
     {
         HRSRC hRsrcInfo;
 
-        hRsrcInfo = FindResource(hModule, MAKEINTRESOURCE(iIcon), RT_ICON);
+        hRsrcInfo = FindResourceW(hModule, MAKEINTRESOURCEW(iIcon), MAKEINTRESOURCEW((ULONG_PTR)RT_ICON));
         if (hRsrcInfo != NULL)
         {
             HGLOBAL hRsrc;
@@ -554,8 +568,8 @@ HICON CNethoodIcons::FindBestLowColorSmallIcon(
 
 BOOL CALLBACK CNethoodIcons::EnumIconResourceProc(
     __in HMODULE hModule,
-    __in PCTSTR pszType,
-    __in PTSTR pszName,
+    __in PCWSTR pszType,
+    __in PWSTR pszName,
     __in LONG_PTR lParam)
 {
     ENUMICONRESINFO* peiri;
@@ -570,9 +584,9 @@ BOOL CALLBACK CNethoodIcons::EnumIconResourceProc(
         }
         else
         {
-            size_t len = _tcslen(pszName) + 1;
-            peiri->pszId = new TCHAR[len];
-            StringCchCopy(peiri->pszId, len, pszName);
+            size_t len = wcslen(pszName) + 1;
+            peiri->pszId = new wchar_t[len];
+            StringCchCopyW(peiri->pszId, len, pszName);
         }
         return FALSE;
     }
@@ -629,11 +643,11 @@ int CNethoodIcons::GetScoreForIcon(
 
 bool CNethoodIcons::MyExtractIcon(
     __in Icon icon,
-    __in PCTSTR pszFileName,
+    __in PCWSTR pszFileName,
     __in int iIconIndex)
 {
     HMODULE hModule;
-    PCTSTR pszIconId;
+    PCWSTR pszIconId;
     int cIconsLoaded = 0;
     UINT uLoadFlags;
     HICON hicoSmall = NULL;
@@ -642,12 +656,12 @@ bool CNethoodIcons::MyExtractIcon(
 
     uLoadFlags = SalamanderGeneral->GetIconLRFlags();
 
-    hModule = HANDLES_Q(LoadLibraryEx(pszFileName, NULL, LOAD_LIBRARY_AS_DATAFILE));
+    hModule = HANDLES_Q(LoadLibraryExW(pszFileName, NULL, LOAD_LIBRARY_AS_DATAFILE));
     if (hModule != NULL)
     {
         if (iIconIndex < 0)
         {
-            pszIconId = MAKEINTRESOURCE(-iIconIndex);
+            pszIconId = MAKEINTRESOURCEW(-iIconIndex);
         }
         else
         {
@@ -660,7 +674,7 @@ bool CNethoodIcons::MyExtractIcon(
 
         if (!IS_INTRESOURCE(pszIconId))
         {
-            delete[] const_cast<PTSTR>(pszIconId);
+            delete[] const_cast<PWSTR>(pszIconId);
         }
 
         HANDLES(FreeLibrary(hModule));
@@ -700,22 +714,22 @@ bool CNethoodIcons::MyExtractIcon(
 
 HICON CNethoodIcons::LoadIconFromModule(
     __in HMODULE hModule,
-    __in PCTSTR pszIconId,
+    __in PCWSTR pszIconId,
     __in int nWidth,
     __in int nHeight,
     __in UINT uFlags)
 {
-    return static_cast<HICON>(HANDLES_Q(LoadImage(hModule, pszIconId,
+    return static_cast<HICON>(HANDLES_Q(LoadImageW(hModule, pszIconId,
                                                   IMAGE_ICON, nWidth, nHeight, uFlags)));
 }
 
 HICON CNethoodIcons::LoadIconFromFile(
-    __in PCTSTR pszFileName,
+    __in PCWSTR pszFileName,
     __in int nWidth,
     __in int nHeight,
     __in UINT uFlags)
 {
-    return static_cast<HICON>(HANDLES_Q(LoadImage(NULL, pszFileName,
+    return static_cast<HICON>(HANDLES_Q(LoadImageW(NULL, pszFileName,
                                                   IMAGE_ICON, nWidth, nHeight, uFlags | LR_LOADFROMFILE)));
 }
 
@@ -733,7 +747,7 @@ HRESULT CNethoodIcons::GetStockIconInfo(
 
         HMODULE hShell32;
 
-        hShell32 = GetModuleHandle(TEXT("shell32.dll"));
+        hShell32 = GetModuleHandleW(L"shell32.dll");
         if (hShell32 != NULL)
         {
             PFN_SHGetStockIconInfo pfnSHGetStockIconInfo;

@@ -64,15 +64,16 @@ CZipRepair::RepeairArchive()
 {
   CALL_STACK_MESSAGE1("CZipRepair::RepeairArchive()");
 
-  CPathBuffer targetName; // Heap-allocated for long path support
-
-  lstrcpy(targetName, ZipName);
-  PathRemoveExtension(targetName);
-  lstrcat(targetName, "_.zip");
+  std::string targetName = ZipName;
+  const size_t slash = targetName.find_last_of("\\/");
+  const size_t dot = targetName.find_last_of('.');
+  if (dot != std::string::npos && (slash == std::string::npos || dot > slash))
+    targetName.erase(dot);
+  targetName += "_.zip";
   CCreateSFXDialog dlg(SalCalls->GetMainWindowHWND(), ZipName, targetName, NULL, NULL);
   if (dlg.Proceed() != IDOK) return ErrorID = IDS_NODISPLAY;
 
-  int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+  int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL);
   if (ret)
   {
@@ -80,9 +81,9 @@ CZipRepair::RepeairArchive()
     else ErrorID = IDS_NODISPLAY;
   }
 
-  if (TestIfExist(targetName)) return ErrorID;
+  if (TestIfExist(targetName.c_str())) return ErrorID;
 
-  ret = CreateCFile(&TargetFile, targetName, GENERIC_WRITE, FILE_SHARE_READ,
+  ret = CreateCFile(&TargetFile, targetName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                      CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL);
   if (ret)
   {
@@ -105,8 +106,8 @@ CZipRepair::RepeairArchive()
   LocalHeader = (CLocalFileHeader *) malloc( MAX_HEADER_SIZE);
   if (LocalHeader ) return IDS_LOWMEM;
 
-  SalCalls->OpenProgressDialog(LoadStr(IDS_EXTRPROGTITLE), TRUE, NULL, FALSE);
-  SalCalls->ProgressDialogAddText(LoadStr(IDS_REPAIRING));
+  SalCalls->OpenProgressDialog(LangStr(IDS_EXTRPROGTITLE).c_str(), TRUE, NULL, FALSE);
+  SalCalls->ProgressDialogAddText(LangStr(IDS_REPAIRING).c_str());
 
   ErrorID = DoRepairFiles();
   if (ErrorID) DeleteFile(TempFile);
@@ -122,7 +123,7 @@ CZipRepair::DoRepairFiles()
 {
   CALL_STACK_MESSAGE1("CZipRepair::DoRepairFiles()");
   DWORD offs;
-  CPathBuffer dummy; // Heap-allocated for long path support
+  std::wstring dummy;
   dummy[0] = 0;
   CFileInfo info;
   int ret;
@@ -167,7 +168,7 @@ CZipRepair::DoRepairFiles()
       {
         CheckCentrDir(info);
         BOOL ok;
-        ret = ExtractSingleFile(dummy, 0, &info, &ok);
+        ret = ExtractSingleFile(dummy, &info, &ok);
         if (ret || UserBreak) return ret;
         if (ok)
         {

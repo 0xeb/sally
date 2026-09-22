@@ -6,6 +6,7 @@ sal_add_plugin(NAME uncab
     "${SAL_PLUGINS}/uncab/dialogs.cpp"
     "${SAL_PLUGINS}/uncab/precomp.cpp"
     "${SAL_PLUGINS}/uncab/uncab.cpp"
+    "${SAL_PLUGINS}/uncab/uncab_text.cpp"
   RC "${SAL_PLUGINS}/uncab/uncab.rc"
   DEF "${SAL_PLUGINS}/uncab/uncab.def"
   INCLUDES "${SAL_SHARED}/plugcore"

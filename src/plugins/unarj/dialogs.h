@@ -22,18 +22,13 @@ public:
 
 class CNextVolumeDialog : public CDlgRoot
 {
-    char* VolumeName;
-    char* PrevName;
-    CPathBuffer CurrentPath;
+    std::wstring& OutputVolumeName;
+    std::wstring VolumeNameW;
+    std::wstring PrevNameW;
+    std::wstring CurrentPath;
 
 public:
-    CNextVolumeDialog(HWND parent, char* volumeName, char* prevName) : CDlgRoot(parent)
-    {
-        VolumeName = volumeName;
-        PrevName = prevName;
-        lstrcpyn(CurrentPath, VolumeName, CurrentPath.Size());
-        SalamanderGeneral->CutDirectory(CurrentPath);
-    }
+    CNextVolumeDialog(HWND parent, std::wstring& volumeName, const wchar_t* prevName);
     INT_PTR Proceed();
 
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -42,14 +37,14 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR NextVolumeDialog(HWND parent, char* volumeName, char* prevName);
+INT_PTR NextVolumeDialog(HWND parent, std::wstring& volumeName, const wchar_t* prevName);
 
 class CContinuedFileDialog : public CDlgRoot
 {
-    const char* File;
+    const wchar_t* File;
 
 public:
-    CContinuedFileDialog(HWND parent, const char* file) : CDlgRoot(parent)
+    CContinuedFileDialog(HWND parent, const wchar_t* file) : CDlgRoot(parent)
     {
         File = file;
     }
@@ -60,7 +55,7 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR ContinuedFileDialog(HWND parent, const char* file);
+INT_PTR ContinuedFileDialog(HWND parent, const wchar_t* file);
 
 class CConfigDialog : public CDlgRoot
 {

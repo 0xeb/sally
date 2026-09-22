@@ -42,7 +42,7 @@ CExtractCallbackImp::~CExtractCallbackImp()
 
 // silent - if TRUE and a DataError occurs during extraction (usually an incorrect password), the file is deleted
 // automatically and the user is not asked anything (used when extracting a single file for preview - F3)
-BOOL CExtractCallbackImp::Init(IInArchive* archive, const char* outDir,
+BOOL CExtractCallbackImp::Init(IInArchive* archive, const wchar_t* outDir,
                                const FILETIME& utcLastWriteTimeDefault, DWORD attributesDefault, BOOL silentDelete /* = FALSE*/)
 {
     NumErrors = 0;
@@ -56,7 +56,7 @@ BOOL CExtractCallbackImp::Init(IInArchive* archive, const char* outDir,
 
     PasswordIsDefined = !Password.IsEmpty();
 
-    TargetFileName[0] = '\0';
+    TargetFileName.clear();
 
     // initialize variables for interacting with the user
     SilentDelete = silentDelete;
@@ -86,7 +86,7 @@ BOOL CExtractCallbackImp::Init(IInArchive* archive, const char* outDir,
 BOOL CExtractCallbackImp::InitTest()
 {
     NumErrors = 0;
-    TargetFileName[0] = '\0';
+    TargetFileName.clear();
 
     OverwriteCancel = FALSE;
     PasswordIsDefined = !Password.IsEmpty();
@@ -103,7 +103,7 @@ void CExtractCallbackImp::Cleanup()
         OutFileStream.Release();
 
         BOOL silent = FALSE;
-        SafeDeleteFile(GetAnsiString(ProcessedFileInfo.FileName), silent);
+        SafeDeleteFile(ProcessedFileInfo.FileName, silent);
     }
 }
 
@@ -184,10 +184,9 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
 
             // TODO: check for free space
 
-            _tcscpy(TargetFileName, TargetDir);
-            if (SalamanderGeneral->SalPathAppend(TargetFileName, aii->NameInArchive, TargetFileName.Size()))
-            {
-                ProcessedFileInfo.FileName = GetUnicodeString((const char*)TargetFileName);
+            TargetFileName = TargetDir;
+            SPLSalPathAppendOwned(TargetFileName, aii->NameInArchive);
+            ProcessedFileInfo.FileName = TargetFileName.c_str();
 
                 // Show file name in the progress dialog
                 SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_ADDTEXT, (LPARAM)GetName());
@@ -195,18 +194,16 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
                 if (ProcessedFileInfo.IsDirectory)
                 {
                     // create the directory if it does not already exist
-                    SalamanderGeneral->CheckAndCreateDirectory(TargetFileName);
+                    SalamanderGeneral->CheckAndCreateDirectory(TargetFileName.c_str());
                     throw S_OK;
                 }
                 else
                 {
                     // WARNING! This performs the overwrite test
                     CCreateFileParams cfp;
-                    char fileInfo[100];
-
                     FILETIME ftLW(GetLastWrite());
-                    GetInfo(fileInfo, &ftLW, GetSize());
-                    cfp.FileInfo = fileInfo;
+                    const std::wstring fileInfo = GetInfoW(&ftLW, GetSize());
+                    cfp.FileInfo = fileInfo.c_str();
                     cfp.FileName = GetFileName();
                     cfp.Name = GetName();
                     cfp.pSilent = GetOverwriteSilent();
@@ -230,16 +227,16 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
                     // it is the result of the overwrite test - see above
 
                     // if the path we are extracting to does not exist -> create it
-                    LPTSTR lastComp = _tcsrchr(TargetFileName, '\\');
-                    if (lastComp != NULL)
+                    const size_t lastComp = TargetFileName.find_last_of(L'\\');
+                    if (lastComp != std::wstring::npos)
                     {
-                        *lastComp = '\0';
-                        SalamanderGeneral->CheckAndCreateDirectory(TargetFileName);
+                        const std::wstring targetDirectory = TargetFileName.substr(0, lastComp);
+                        SalamanderGeneral->CheckAndCreateDirectory(targetDirectory.c_str());
                     } // if
 
                     OutFileStreamSpec = new CRetryableOutFileStream(hProgWnd);
                     CMyComPtr<ISequentialOutStream> outStreamLoc(OutFileStreamSpec);
-                    if (!OutFileStreamSpec->Open(GetAnsiString(ProcessedFileInfo.FileName), OPEN_ALWAYS))
+                    if (!OutFileStreamSpec->Open(ProcessedFileInfo.FileName, OPEN_ALWAYS))
                     {
                         SysError(IDS_ERROR, ::GetLastError());
                         NumErrors++;
@@ -248,15 +245,6 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
                     OutFileStream = outStreamLoc;
                     *outStream = outStreamLoc.Detach();
                 }
-            }
-            else
-            {
-                *outStream = NULL;
-
-                char errText[1000];
-                _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), (const char*)(aii->NameInArchive), (const char*)TargetFileName);
-                SalamanderGeneral->ShowMessageBox(errText, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
-            }
         }
         else
         {
@@ -311,7 +299,6 @@ BOOL CExtractCallbackImp::OnDataError()
 
     if (DataErrorMode == Ask)
     {
-        TCHAR btnBuffer[1024];
         /* used by the export_mnu.py script that generates salmenu.mnu for Translator
            we let the message box buttons resolve hotkey collisions by simulating a menu
 MENU_TEMPLATE_ITEM MsgBoxButtons[] =
@@ -322,26 +309,27 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-        _stprintf(btnBuffer, _T("%d\t%s\t%d\t%s"),
-                  DIALOG_YES, LoadStr(IDS_BTN_DELETE),
-                  //      DIALOG_ALL, LoadStr(IDS_BTN_DELETE_ALL),
-                  DIALOG_NO, LoadStr(IDS_BTN_KEEP)
-                  //      DIALOG_SKIPALL, LoadStr(IDS_BTN_KEEP_ALL)
-                  //  DIALOG_CANCEL, LoadStr(IDS_BTN_)
-        );
+        const std::wstring btnBuffer = SPLFormatStringOwned(
+            L"%d\t%s\t%d\t%s", DIALOG_YES, LangStr(IDS_BTN_DELETE).c_str(),
+            DIALOG_NO, LangStr(IDS_BTN_KEEP).c_str());
         //buffer: "1\t&Start\t2\tE&xit"
 
-        TCHAR msg[1024];
-        _stprintf(msg, LoadStr(PasswordIsDefined ? IDS_ERROR_PROCESSING_FILE_PWD : IDS_ERROR_PROCESSING_FILE),
-                  (LPCTSTR)GetAnsiString(ProcessedFileInfo.Name));
+        // ProcessedFileInfo.Name is a UString - wide at the source. It was
+        // being flattened through CP_ACP by GetAnsiString for no reason other than the
+        // struct's narrowness, which meant this dialog could not name the very file it was
+        // reporting an error about. Wide end to end now.
+        const std::wstring msg = SPLFormatStringOwned(
+            LangStr(PasswordIsDefined ? IDS_ERROR_PROCESSING_FILE_PWD : IDS_ERROR_PROCESSING_FILE).c_str(),
+            (const wchar_t*)ProcessedFileInfo.Name);
 
         MSGBOXEX_PARAMS mbep;
+        const std::wstring caption = LangStr(IDS_PLUGINNAME);
         ZeroMemory(&mbep, sizeof(mbep));
         mbep.HParent = hProgWnd;
-        mbep.Caption = LoadStr(IDS_PLUGINNAME);
-        mbep.Text = msg;
+        mbep.Caption = caption.c_str();
+        mbep.Text = msg.c_str();
         mbep.Flags = MSGBOXEX_ICONEXCLAMATION | MSGBOXEX_YESNOCANCEL;
-        mbep.AliasBtnNames = btnBuffer;
+        mbep.AliasBtnNames = btnBuffer.c_str();
 
         int mbRet = (int)SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_SHOWMBOXEX, (LPARAM)&mbep);
 
@@ -373,22 +361,19 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     switch (mode)
     {
     case Cancel:
-        SafeDeleteFile(GetAnsiString(ProcessedFileInfo.FileName), DataErrorDeleteSilent);
+        SafeDeleteFile(ProcessedFileInfo.FileName, DataErrorDeleteSilent);
         return FALSE;
 
     case Delete:
         // if cancel, bail out
-        if (!SafeDeleteFile(GetAnsiString(ProcessedFileInfo.FileName), DataErrorDeleteSilent))
+        if (!SafeDeleteFile(ProcessedFileInfo.FileName, DataErrorDeleteSilent))
             return FALSE;
         break;
 
     case Keep:
         // keep the file, so set its attributes
         if (ExtractMode && ProcessedFileInfo.AttributesAreDefined)
-            {
-                CWidePath wPath(GetAnsiString(ProcessedFileInfo.FileName));
-                SetFileAttributesW(wPath, ProcessedFileInfo.Attributes);
-            }
+            SetFileAttributesW(ProcessedFileInfo.FileName, ProcessedFileInfo.Attributes);
         break;
     }
 
@@ -402,17 +387,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 LRESULT CExtractCallbackImp::Error(int resID, ...)
 {
     MSGBOXEX_PARAMS mbep;
-    char msg[1024];
+    const std::wstring caption = LangStr(IDS_PLUGINNAME);
     va_list arglist;
 
     va_start(arglist, resID);
-    vsprintf(msg, LoadStr(resID), arglist);
+    const std::wstring msg = SPLFormatStringOwnedV(LangStr(resID).c_str(), arglist);
     va_end(arglist);
 
     ZeroMemory(&mbep, sizeof(mbep));
     mbep.HParent = hProgWnd;
-    mbep.Caption = LoadStr(IDS_PLUGINNAME);
-    mbep.Text = msg;
+    mbep.Caption = caption.c_str();
+    mbep.Text = msg.c_str();
     mbep.Flags = MSGBOXEX_ICONHAND | MSGBOXEX_OK;
 
     return SendMessage(hProgWnd, WM_7ZIP, WM_7ZIP_SHOWMBOXEX, (LPARAM)&mbep);
@@ -456,7 +441,14 @@ STDMETHODIMP CExtractCallbackImp::SetOperationResult(INT32 resultEOperationResul
                 // an error occurred during extraction; delete the file (handled by the function above) and finish
                 if (SilentDelete)
                 {
-                    Error(PasswordIsDefined ? IDS_DATA_ERROR_PWD : IDS_DATA_ERROR, (LPCTSTR)ProcessedFileInfo.Name);
+                    // Error() is BOOL Error(int resID, BOOL quiet = FALSE, ...),
+                    // so the name was landing in 'quiet' - a non-null pointer made
+                    // it TRUE and the message box was never shown at all, while
+                    // the %s in the resource had no argument behind it. Pass the
+                    // wide name as a real vararg, with quiet spelled out, matching
+                    // the wide formatting already used for this same Name above.
+                    Error(PasswordIsDefined ? IDS_DATA_ERROR_PWD : IDS_DATA_ERROR, FALSE,
+                          (const wchar_t*)ProcessedFileInfo.Name);
                     if (PasswordIsDefined)
                         Password = L""; // Allow entering another password
                     return E_ABORT;
@@ -480,8 +472,7 @@ STDMETHODIMP CExtractCallbackImp::SetOperationResult(INT32 resultEOperationResul
 
     if (ExtractMode && ProcessedFileInfo.AttributesAreDefined)
     {
-        CWidePath wPath2(GetAnsiString(ProcessedFileInfo.FileName));
-        SetFileAttributesW(wPath2, ProcessedFileInfo.Attributes);
+        SetFileAttributesW(ProcessedFileInfo.FileName, ProcessedFileInfo.Attributes);
     }
 
     if (TargetDir && !ItemsToExtract.size())

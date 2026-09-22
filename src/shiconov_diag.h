@@ -4,6 +4,7 @@
 #pragma once
 
 #include <windows.h>
+#include <string>
 
 // Bounded, always-on ledger of what happened to every registered shell icon-overlay
 // handler during InitShellIconOverlays().
@@ -51,9 +52,9 @@ enum class OverlayOutcome
 // One registered handler.
 struct ShellOverlayDiagRecord
 {
-    wchar_t Name[128] = {};      // registry key name verbatim - leading spaces are significant
-    wchar_t Clsid[48] = {};
-    wchar_t IconFile[MAX_PATH] = {};
+    std::wstring Name;           // registry key name verbatim - leading spaces are significant
+    std::wstring Clsid;
+    std::wstring IconFile;
 
     OverlayOutcome Outcome = OverlayOutcome::NotAttempted;
     HRESULT Hr = 0;              // the HRESULT that produced Outcome, when there was one
@@ -80,11 +81,11 @@ struct ShellOverlayDiagRecord
 // or force EnableCustomIconOverlays off outright.
 struct ShellOverlayDiagHeader
 {
-    char ConfigRoot[256] = {};     // the resolved SALAMANDER_ROOT_REG
+    std::wstring ConfigRoot;       // the resolved SALAMANDER_ROOT_REG
     DWORD ConfigVersion = 0;
     bool ValuePairPresent = false; // were both overlay values actually found in that root?
     bool EnableCustomIconOverlays = false;
-    wchar_t DisabledList[1024] = {};
+    std::wstring DisabledList;
     UINT AnsiCodePage = 0;         // GetACP() - the overlay lookup is bounded by it
     int Registered = 0;
     int Loaded = 0;
@@ -130,10 +131,10 @@ const char* OverlayOutcomeText(OverlayOutcome outcome);
 
 // Renders one record as a single ASCII line into 'buf'. Wide names are emitted both as the
 // lossy ACP rendering and \uXXXX-escaped when the two differ. Returns characters written.
-int FormatShellOverlayDiagRecord(const ShellOverlayDiagRecord& record, char* buf, int bufSize);
+int FormatShellOverlayDiagRecord(const ShellOverlayDiagRecord& record, char* buf, int bufSize) noexcept;
 
 // Records which configuration root this run resolved. SALAMANDER_ROOT_REG is legitimately
 // NULL on a first run (no configuration exists in the registry yet); copying it raw faults,
 // so render that state as a legible token instead. The field is only ever printed into the
 // Bug Report, so the token also disambiguates "first run" from "the copy failed".
-void SetOverlayDiagConfigRoot(ShellOverlayDiagHeader& header, const char* rootReg);
+void SetOverlayDiagConfigRoot(ShellOverlayDiagHeader& header, const wchar_t* rootReg);

@@ -1,11 +1,21 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/IRegistry.h" // wide facades
+#include "common/reg_sz_safe_length.h" // SetValueW REG_SZ scan bound
+#include "common/HistoryValueIo.h" // history value shapes
+#include "common/SubstResolution.h" // wide SUBST resolution
+#include "common/fsutil.h" // GetRootPathW / SkipRootW / IsUNCPathW
+#include "common/IFileSystem.h"
+#include "common/IPathService.h"
+#include "common/DiagnosticTextEncoding.h"
+#include "common/LegacyConfigTextEncoding.h"
 
 #include <cwctype>
+#include <vector>
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "dialogs.h"
@@ -15,38 +25,28 @@
 #include "reglib\src\regparse.h"
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
+#include "common/unicode/WideVariableExpansion.h"
+#include "common/unicode/AnsiToolPathPolicy.h"
 
 static BOOL BuildModuleRelativePathW(HINSTANCE module, const wchar_t* relativePath, std::wstring& path)
 {
-    DWORD capacity = MAX_PATH;
-    for (;;)
-    {
-        std::wstring modulePath;
-        modulePath.resize(capacity);
+    std::wstring modulePath;
+    if (gPathService == NULL || !gPathService->GetModuleFileName(module, modulePath).success)
+        return FALSE;
+    const size_t slash = modulePath.find_last_of(L"\\/");
+    if (slash == std::wstring::npos)
+        return FALSE;
+    path.assign(modulePath, 0, slash + 1);
+    path.append(relativePath);
+    return TRUE;
+}
 
-        SetLastError(ERROR_SUCCESS);
-        DWORD len = GetModuleFileNameW(module, &modulePath[0], capacity);
-        if (len == 0)
-            return FALSE;
-
-        DWORD err = GetLastError();
-        // Some Windows versions report truncation as capacity - 1 plus ERROR_INSUFFICIENT_BUFFER.
-        BOOL truncated = len >= capacity || (len == capacity - 1 && err == ERROR_INSUFFICIENT_BUFFER);
-        if (!truncated)
-        {
-            modulePath.resize(len);
-            size_t slash = modulePath.find_last_of(L"\\/");
-            if (slash == std::wstring::npos)
-                return FALSE;
-            path.assign(modulePath, 0, slash + 1);
-            path.append(relativePath);
-            return TRUE;
-        }
-
-        if (capacity >= SAL_MAX_LONG_PATH)
-            return FALSE;
-        capacity = capacity > SAL_MAX_LONG_PATH / 2 ? SAL_MAX_LONG_PATH : capacity * 2;
-    }
+static std::wstring GetModuleFileNameForTrace(HMODULE module)
+{
+    std::wstring path;
+    if (gPathService != NULL && gPathService->GetModuleFileName(module, path).success)
+        return path;
+    return L"(unknown module)";
 }
 
 // ****************************************************************************
@@ -71,59 +71,26 @@ public:
 #pragma warning(disable : 4073)
 #pragma init_seg(lib)
 C__StrCriticalSection __StrCriticalSection;
-C__StrCriticalSection __StrCriticalSection2;
 
 // ****************************************************************************
 
-char* LoadStr(int resID, HINSTANCE hInstance)
+std::wstring LoadStrOwned(int resID, HINSTANCE hInstance)
 {
-    static char buffer[10000]; // buffer for many strings
-    static char* act = buffer;
-
-    HANDLES(EnterCriticalSection(&__StrCriticalSection.cs));
-
-    if (10000 - (act - buffer) < 200)
-        act = buffer;
-
     if (hInstance == NULL)
         hInstance = HLanguage;
 #ifdef _DEBUG
-    // better make sure no one calls us before the resource handle is initialized
     if (hInstance == NULL)
-        TRACE_E("LoadStr: hInstance == NULL");
+        TRACE_E("LoadStrOwned: hInstance == NULL");
 #endif // _DEBUG
 
-RELOAD:
-    int size = LoadString(hInstance, resID, act, 10000 - (int)(act - buffer));
-    // size contains the number of copied characters without the terminator
-    //  DWORD error = GetLastError();
-    char* ret;
-    if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even if the string does not exist - useless
-    {
-        if ((10000 - (act - buffer) == size + 1) && (act > buffer))
-        {
-            // if the string was exactly at the end of the buffer, it may
-            // have been truncated -- if we can move the window
-            // to the beginning of the buffer, load the string once more
-            act = buffer;
-            goto RELOAD;
-        }
-        else
-        {
-            ret = act;
-            act += size + 1;
-        }
-    }
-    else
-    {
-        TRACE_E("Error in LoadStr(" << resID << ")." /*"): " << GetErrorText(error)*/);
-        static char bufferError[] = "ERROR LOADING STRING";
-        ret = bufferError;
-    }
+    const wchar_t* resourceText = NULL;
+    const int size = LoadStringW(hInstance, resID,
+                                 reinterpret_cast<LPWSTR>(&resourceText), 0);
+    if (size > 0 && resourceText != NULL)
+        return std::wstring(resourceText, static_cast<size_t>(size));
 
-    HANDLES(LeaveCriticalSection(&__StrCriticalSection.cs));
-
-    return ret;
+    TRACE_E("Error in LoadStrOwned(" << resID << ").");
+    return L"ERROR LOADING STRING";
 }
 
 WCHAR* LoadStrW(int resID, HINSTANCE hInstance)
@@ -167,7 +134,7 @@ RELOAD:
     }
     else
     {
-        TRACE_E("Error in LoadStrW(" << resID << ")." /*"): " << GetErrorText(error)*/);
+        TRACE_E("Error in LoadStrW(" << resID << ")." /*"): " << GetErrorTextOwned(error).c_str()*/);
         static wchar_t bufferError[] = L"ERROR LOADING WIDE STRING";
         ret = bufferError;
     }
@@ -180,82 +147,41 @@ RELOAD:
 //*****************************************************************************
 //
 // GetErrorText
-//
-// with at least 10 concurrently reported errors at once this should certainly work,
-// we do not expect more than 10 threads at the same time ;-)
 
-char* GetErrorText(DWORD error)
+std::wstring GetErrorTextOwned(DWORD error)
 {
-    static char buffer[10 * MAX_PATH]; // buffer for many strings
-    static char* act = buffer;
+    wchar_t prefix[32];
+    swprintf_s(prefix, (static_cast<int>(error) < 0 ? L"(%08X) " : L"(%u) "), error);
 
-    HANDLES(EnterCriticalSection(&__StrCriticalSection2.cs));
-
-    if (10 * MAX_PATH - (act - buffer) < MAX_PATH + 20)
-        act = buffer;
-
-    char* ret = act;
-    // NOTE: sprintf_s fills the entire buffer in the debug build, so we cannot pass it the whole buffer (it contains
-    // other strings as well); either handle it via _CrtSetDebugFillThreshold or provide a smaller size)
-    int l = sprintf(act, ((int)error < 0 ? "(%08X) " : "(%d) "), error);
-    int fl;
-    if ((fl = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                            NULL,
-                            error,
-                            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                            act + l,
-                            MAX_PATH + 20 - l,
-                            NULL)) == 0 ||
-        *(act + l) == 0)
-    {
-        if ((int)error < 0)
-            act += sprintf(act, "System error %08X, text description is not available.", error) + 1;
-        else
-            act += sprintf(act, "System error %u, text description is not available.", error) + 1;
-    }
+    wchar_t* systemText = NULL;
+    const DWORD length = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM |
+                                            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                                            FORMAT_MESSAGE_IGNORE_INSERTS,
+                                        NULL, error,
+                                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                                        reinterpret_cast<wchar_t*>(&systemText), 0, NULL);
+    std::wstring result(prefix);
+    if (length != 0 && systemText != NULL && *systemText != 0)
+        result.append(systemText, length);
+    else if (static_cast<int>(error) < 0)
+        result = FormatStrW(L"System error %08X, text description is not available.", error);
     else
-        act += l + fl + 1;
-
-    HANDLES(LeaveCriticalSection(&__StrCriticalSection2.cs));
-
-    return ret;
+        result = FormatStrW(L"System error %u, text description is not available.", error);
+    if (systemText != NULL)
+        LocalFree(systemText);
+    return result;
 }
 
-WCHAR* GetErrorTextW(DWORD error)
+std::wstring GetWindowTextStringW(HWND window)
 {
-    static WCHAR buffer[10 * MAX_PATH]; // buffer for many strings
-    static WCHAR* act = buffer;
+    const int length = GetWindowTextLengthW(window);
+    if (length <= 0)
+        return {};
 
-    HANDLES(EnterCriticalSection(&__StrCriticalSection2.cs));
-
-    if (10 * MAX_PATH - (act - buffer) < MAX_PATH + 20)
-        act = buffer;
-
-    WCHAR* ret = act;
-    // NOTE: swprintf_s fills the entire buffer in the debug build, so we cannot pass it the whole buffer (it contains
-    // other strings as well); either handle it via _CrtSetDebugFillThreshold or provide a smaller size)
-    int l = swprintf(act, _countof(buffer) - (act - buffer), ((int)error < 0 ? L"(%08X) " : L"(%d) "), error);
-    int fl;
-    if ((fl = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
-                             NULL,
-                             error,
-                             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                             act + l,
-                             MAX_PATH + 20 - l,
-                             NULL)) == 0 ||
-        *(act + l) == 0)
-    {
-        if ((int)error < 0)
-            act += swprintf(act, _countof(buffer) - (act - buffer), L"System error %08X, text description is not available.", error) + 1;
-        else
-            act += swprintf(act, _countof(buffer) - (act - buffer), L"System error %u, text description is not available.", error) + 1;
-    }
-    else
-        act += l + fl + 1;
-
-    HANDLES(LeaveCriticalSection(&__StrCriticalSection2.cs));
-
-    return ret;
+    std::wstring text((size_t)length, L'\0');
+    const int copied = GetWindowTextW(window, text.data(), length + 1);
+    text.resize(copied > 0 ? (size_t)copied : 0);
+    return text;
 }
 
 // ****************************************************************************
@@ -263,10 +189,11 @@ WCHAR* GetErrorTextW(DWORD error)
 void ClearComboboxListbox(HWND hCombo)
 {
     // keep the current text; clear the listbox
-    char buff[3000];
-    GetWindowText(hCombo, buff, 3000);
-    SendMessage(hCombo, CB_RESETCONTENT, 0, 0);
-    SetWindowText(hCombo, buff);
+    const int length = GetWindowTextLengthW(hCombo);
+    std::vector<wchar_t> text((size_t)(length > 0 ? length : 0) + 1, L'\0');
+    GetWindowTextW(hCombo, text.data(), (int)text.size());
+    SendMessageW(hCombo, CB_RESETCONTENT, 0, 0);
+    SetWindowTextW(hCombo, text.data());
 }
 
 // ****************************************************************************
@@ -286,8 +213,9 @@ BOOL SalamanderActive()
 
 BOOL SafeWaitMessageThreadStarted = FALSE;
 DWORD SafeWaitMessageThreadID = 0;
-std::string SafeWaitMessageText;
-std::string SafeWaitMessageCaption;
+// wide, matching CWaitWindow::Text
+std::wstring SafeWaitMessageText;
+std::wstring SafeWaitMessageCaption;
 CRITICAL_SECTION SafeWaitMessageTextSection; // for synchronizing access to SafeWaitMessageText
 BOOL SafeWaitMessageCallerSet = FALSE;
 unsigned SafeWaitMessageCallerID = 0;
@@ -310,7 +238,7 @@ C__SafeWaitMessageCallerSetSection SafeWaitMessageCallerSetSection;
 void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
 {
     CALL_STACK_MESSAGE1("ThreadSafeWaitWindowFBody()");
-    SetThreadNameInVCAndTrace("SafeWaitWindow");
+    SetThreadNameInVCAndTrace(L"SafeWaitWindow");
     TRACE_I("Begin");
 
     CWaitWindow waitWnd(NULL, 0, showCloseButton, ooStatic);
@@ -318,7 +246,7 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
     UINT_PTR timer = 0;
     BOOL run = TRUE;
     HWND hForegroundWnd = NULL;
-    while (run && GetMessage(&msg, NULL, 0, 0))
+    while (run && GetMessageW(&msg, NULL, 0, 0))
     {
         switch (msg.message)
         {
@@ -333,7 +261,7 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
                     KillTimer(NULL, timer);
                     // clear the message queue of any WM_TIMER messages
                     MSG msg2;
-                    while (PeekMessage(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
+                    while (PeekMessageW(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
                         ;
                     timer = 0;
                 }
@@ -352,7 +280,7 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
                     KillTimer(NULL, timer);
                     // clear the message queue of any WM_TIMER messages
                     MSG msg2;
-                    while (PeekMessage(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
+                    while (PeekMessageW(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
                         ;
                     timer = 0;
                 }
@@ -450,7 +378,7 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
                 KillTimer(NULL, timer);
                 // clear the message queue of any WM_TIMER messages
                 MSG msg2;
-                while (PeekMessage(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
+                while (PeekMessageW(&msg2, NULL, WM_TIMER, WM_TIMER, PM_REMOVE))
                     ;
                 timer = 0;
             }
@@ -468,7 +396,7 @@ void ThreadSafeWaitWindowFBody(BOOL showCloseButton)
         default:
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
             break;
         }
         }
@@ -508,7 +436,7 @@ DWORD WINAPI ThreadSafeWaitWindowF(void* param)
     return 0;
 }
 
-void CreateSafeWaitWindow(const char* message, const char* caption,
+void CreateSafeWaitWindow(const wchar_t* message, const wchar_t* caption,
                           int delay, BOOL showCloseButton, HWND hForegroundWnd)
 {
     HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
@@ -534,8 +462,8 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
         }
 
         HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-        SafeWaitMessageText = message ? message : "";
-        SafeWaitMessageCaption = caption ? caption : "";
+        SafeWaitMessageText = message ? message : L"";
+        SafeWaitMessageCaption = caption ? caption : L"";
         HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
 
         while (PostThreadMessage(SafeWaitMessageThreadID, WM_USER_CREATEWAITWND, (WPARAM)hForegroundWnd, delay) == 0)
@@ -621,7 +549,7 @@ void ShowSafeWaitWindow(BOOL show)
         HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
 }
 
-void SetSafeWaitWindowText(const char* message)
+void SetSafeWaitWindowText(const wchar_t* message)
 {
     HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
     if (SafeWaitMessageCallerSet &&                      // the window is created
@@ -631,7 +559,7 @@ void SetSafeWaitWindowText(const char* message)
         if (SafeWaitMessageThreadStarted) // the thread is running; send a command to show or hide
         {
             HANDLES(EnterCriticalSection(&SafeWaitMessageTextSection));
-            SafeWaitMessageText = message ? message : "";
+            SafeWaitMessageText = message ? message : L"";
             HANDLES(LeaveCriticalSection(&SafeWaitMessageTextSection));
             PostThreadMessage(SafeWaitMessageThreadID, WM_USER_SETWAITMSG, 0, 0);
         }
@@ -642,637 +570,402 @@ void SetSafeWaitWindowText(const char* message)
 
 // ****************************************************************************
 
-BOOL FileExists(const char* fileName)
+// WIDE PRIMARY. The narrow form above always did
+// GetFileAttributesW(AnsiToWide(...)), so the wide one is not a new
+// implementation - it is the old one with the conversion REMOVED. A caller that
+// already holds a wide path no longer round-trips through CP_ACP to reach it.
+BOOL FileExistsW(const wchar_t* fileName)
 {
-    /*
-  // beware of GENERIC_READ: it would return FALSE for files that have all permissions removed
-  // j.r. note: without GENERIC_READ (with value 0) NT4 always returns TRUE for files on UNC paths
-  // the solution would probably be to set GENERIC_READ and check what error occurred via GetLastError()
-  HANDLE hFile = SalCreateFileH(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                      NULL, OPEN_EXISTING, 0, NULL);
-  if (hFile == INVALID_HANDLE_VALUE)
-  {
-    return FALSE;
-  }
-  else
-  {
-    HANDLES(CloseHandle(hFile));
-    return TRUE;
-  }
-  */
-    // forget that; we will do it via attributes
-    //
-    // j.r. FIXME: discuss with Petr; I tried removing the file's right to read
-    // attributes, but SalGetFileAttributes() still does not report an error. How is that possible?
-    DWORD attr = GetFileAttributesW(AnsiToWide(fileName).c_str());
+    const DWORD attr = gFileSystem->GetFileAttributes(fileName);
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
-BOOL DirExists(const char* dirName)
+// 2026-08-25: the narrow DirExists(char*) thin adapter was deleted -
+// confirmed-dead (zero callers anywhere in core; gtest_win32_isolation already asserted the
+// wide DirExistsW sibling is used at the one call site that could have used either).
+//
+// WIDE PRIMARY, same reasoning as FileExistsW above.
+BOOL DirExistsW(const wchar_t* dirName)
 {
-    // j.r. FIXME: discuss with Petr; I tried removing the file's right to read
-    // attributes, but GetFileAttributesW() still does not report an error. How is that possible?
-    DWORD attr = GetFileAttributesW(AnsiToWide(dirName).c_str());
+    const DWORD attr = gFileSystem->GetFileAttributes(dirName);
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) != 0);
 }
 
 // ****************************************************************************
 
-BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, int& errorPos1,
-                       int& errorPos2, char* buffer, int bufferLen, const CSalamanderVarStrEntry* variables,
-                       void* param, DWORD* varPlacements, int* varPlacementsCount,
-                       BOOL detectMaxVarWidths, int* maxVarWidths, int maxVarWidthsCount,
-                       BOOL ignoreEnvVarNotFoundOrTooLong)
+int WideVarErrorResourceID(sally::unicode::WideVarErrorKind kind)
 {
-    CPathBuffer buf; // Heap-allocated for long path support
-    const char* s = varText;
-    char* out = buffer;
-    char* outEnd = buffer + bufferLen;
-    int varPlacementIndex = 0;
-    int varPlacementIndexCount = (varPlacementsCount != NULL) ? *varPlacementsCount : 0;
-    int currentMaxVarIndex = 0;
-
-    if (varPlacementIndexCount > 0 && varPlacements == NULL)
+    using sally::unicode::WideVarErrorKind;
+    switch (kind)
     {
-        TRACE_E("DoExpandVarString(): *varPlacementsCount is greater than 0 and varPlacements is NULL!");
-        return FALSE;
+    case WideVarErrorKind::UnmatchedParenthesis:
+        return IDS_EXP_UNMATCHEDPAR;
+    case WideVarErrorKind::InvalidVariableWidth:
+        return IDS_EXP_INVALIDVARWIDTH;
+    case WideVarErrorKind::VariableNotFound:
+        return IDS_EXP_VARNOTFOUND;
+    case WideVarErrorKind::VariableCallbackFailed:
+        return IDS_EXP_INTERNALERR;
+    case WideVarErrorKind::UnmatchedBracket:
+        return IDS_EXP_UNMATCHEDBRACKET;
+    case WideVarErrorKind::EnvironmentNotFound:
+        return IDS_EXP_ENVVARNOTFOUND;
+    case WideVarErrorKind::EnvironmentTooLarge:
+        return IDS_EXP_ENVVARTOOLARGE;
+    case WideVarErrorKind::UnexpectedCharacter:
+        return IDS_EXP_UNEXPECTEDCHAR;
+    case WideVarErrorKind::TrailingDollar:
+        return IDS_EXP_TRAILINGDOLLAR;
+    case WideVarErrorKind::OutputTooSmall:
+        return IDS_EXP_SMALLBUFFER;
+    default:
+        return 0;
     }
-    if (maxVarWidthsCount > 0 && maxVarWidths == NULL)
-    {
-        TRACE_E("DoExpandVarString(): maxVarWidthsCount is greater than 0 and maxVarWidths is NULL!");
-        return FALSE;
-    }
+}
 
-    while (*s != 0)
+std::wstring WideVarErrorText(const sally::unicode::WideVarError& error)
+{
+    const int resourceID = WideVarErrorResourceID(error.Kind);
+    if (resourceID == 0)
+        return std::wstring();
+    if (error.Kind == sally::unicode::WideVarErrorKind::VariableNotFound ||
+        error.Kind == sally::unicode::WideVarErrorKind::EnvironmentNotFound ||
+        error.Kind == sally::unicode::WideVarErrorKind::EnvironmentTooLarge)
     {
-        if (*s == '$')
+        return FormatStrW(LoadStrW(resourceID), error.Argument.c_str());
+    }
+    return LoadStrW(resourceID);
+}
+
+void ReportWideVarError(HWND msgParent, const sally::unicode::WideVarError& error)
+{
+    const int resourceID = WideVarErrorResourceID(error.Kind);
+    if (resourceID == 0)
+        return;
+    if (msgParent == NULL)
+        TRACE_IW(WideVarErrorText(error).c_str());
+    else
+        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), WideVarErrorText(error).c_str());
+}
+
+const CSalamanderVarStrEntry* FindVarEntryW(
+    const CSalamanderVarStrEntry* variables, const wchar_t* name, int nameLength)
+{
+    if (variables == NULL)
+        return NULL;
+    for (const CSalamanderVarStrEntry* entry = variables;
+         entry->Name != NULL; ++entry)
+    {
+        if (sally::unicode::SegmentEqualsNoCase(name, nameLength, entry->Name))
+            return entry;
+    }
+    return NULL;
+}
+
+BOOL ValidateVarStringW(HWND msgParent, const wchar_t* varText, int& errorPos1,
+                        int& errorPos2, const CSalamanderVarStrEntry* variables)
+{
+    if (varText == NULL || variables == NULL)
+        return FALSE;
+
+    const auto resolve = [&](const wchar_t* name, int nameLength, bool,
+                             int, std::wstring&, int&) {
+        return FindVarEntryW(variables, name, nameLength) != NULL
+                   ? sally::unicode::WideVarResolveResult::Found
+                   : sally::unicode::WideVarResolveResult::NotFound;
+    };
+    const auto ignoreEnvironmentError =
+        [](const sally::unicode::WideVarError&) { return true; };
+
+    sally::unicode::WideVarError error;
+    if (sally::unicode::ExpandWideVarStringCore(
+            varText, true, resolve, NULL, NULL, false, NULL, 0,
+            (std::numeric_limits<std::size_t>::max)(), &error,
+            ignoreEnvironmentError))
+        return TRUE;
+
+    ReportWideVarError(msgParent, error);
+    errorPos1 = error.Position1;
+    errorPos2 = error.Position2;
+    return FALSE;
+}
+
+BOOL ValidateWideVarStringW(HWND msgParent, const wchar_t* varText, int& errorPos1,
+                            int& errorPos2, const sally::unicode::WideVarEntry* variables)
+{
+    if (varText == NULL || variables == NULL)
+        return FALSE;
+
+    const auto resolve = [&](const wchar_t* name, int nameLength, bool,
+                             int, std::wstring&, int&) {
+        return sally::unicode::FindWideVarEntry(variables, name, nameLength) != NULL
+                   ? sally::unicode::WideVarResolveResult::Found
+                   : sally::unicode::WideVarResolveResult::NotFound;
+    };
+    const auto ignoreEnvironmentError =
+        [](const sally::unicode::WideVarError&) { return true; };
+
+    sally::unicode::WideVarError error;
+    if (sally::unicode::ExpandWideVarStringCore(
+            varText, true, resolve, NULL, NULL, false, NULL, 0,
+            (std::numeric_limits<std::size_t>::max)(), &error,
+            ignoreEnvironmentError))
+        return TRUE;
+
+    ReportWideVarError(msgParent, error);
+    errorPos1 = error.Position1;
+    errorPos2 = error.Position2;
+    return FALSE;
+}
+
+// 2026-08-26: RESTORED - a prior tick's "confirmed dead" claim for this function
+// was wrong. tests/sally/varstring_validate/gtest_varstring_validate.cpp directly calls
+// ValidateVarString (via consts.h's declaration) as a real, dedicated behavioral test comparing
+// narrow-adapter offset projection against ValidateVarStringW - that file's own header comment
+// explains the test's exact purpose ("verifies offset projection rather than comparing two
+// parser implementations"). The caller-search that declared this dead never covered the tests/
+// directory, only src/ (core, plugins, .c files) - a gap distinct from, and found after, the
+// earlier .c-file gap. See memory.md's 2026-08-26 entry.
+BOOL ExpandVarString(HWND msgParent, const wchar_t* varText,
+                     CSalamanderStringBuffer* buffer,
+                     const CSalamanderVarStrEntry* variables,
+                     void* param, BOOL ignoreEnvVarNotFoundOrTooLong,
+                     CSalamanderTextRangeBuffer* varPlacements,
+                     BOOL detectMaxVarWidths, int* maxVarWidths,
+                     int maxVarWidthsCount)
+{
+    if (buffer == NULL ||
+        !sally::plugin_abi::IsValidStringBuffer(*buffer) ||
+        (varPlacements != NULL &&
+         !sally::plugin_abi::IsValidTextRangeBuffer(*varPlacements)) ||
+        varText == NULL || variables == NULL)
+        return FALSE;
+
+    const auto resolve = [&](const wchar_t* name, int nameLength, bool execute,
+                             int requestedWidth, std::wstring& value,
+                             int& measurementWidth) {
+        const CSalamanderVarStrEntry* entry =
+            FindVarEntryW(variables, name, nameLength);
+        if (entry == NULL)
+            return sally::unicode::WideVarResolveResult::NotFound;
+        if (!execute)
+            return sally::unicode::WideVarResolveResult::Found;
+        if (entry->Execute == NULL)
+            return sally::unicode::WideVarResolveResult::Failed;
+
+        const wchar_t* rawValue = entry->Execute(msgParent, param);
+        if (rawValue == NULL)
+            return sally::unicode::WideVarResolveResult::Failed;
+
+        value.assign(rawValue);
+        if (value.size() >
+            static_cast<std::size_t>((std::numeric_limits<int>::max)()))
+            return sally::unicode::WideVarResolveResult::Failed;
+        measurementWidth = static_cast<int>(value.size());
+
+        if (requestedWidth < 0)
+            return sally::unicode::WideVarResolveResult::Failed;
+        if (requestedWidth > 0)
         {
-            if (*++s != 0)
+            const std::size_t width = static_cast<std::size_t>(requestedWidth);
+            if (value.size() > width)
+                value.resize(width);
+            else if (value.size() < width)
+                value.append(width - value.size(), L' ');
+        }
+        return sally::unicode::WideVarResolveResult::Found;
+    };
+
+    const auto handleEnvironmentError =
+        [&](const sally::unicode::WideVarError& environmentError) {
+            if (msgParent == NULL)
             {
-                const char* value;
-                DWORD valueOutLen = 0; // output width of the variable (0 = normal width)
-                BOOL detectMax = FALSE;
-                switch (*s)
-                {
-                case '$':
-                {
-                    value = "$";
-                    s++;
-                    break;
-                }
-
-                case '(':
-                {
-                    const char* var = s + 1;
-                    while (*s != ')' && *s != 0)
-                        s++;
-                    if (*s == 0)
-                    {
-                        const char* text = LoadStr(IDS_EXP_UNMATCHEDPAR);
-                        if (msgParent == NULL)
-                            TRACE_I(text);
-                        else
-                        {
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                        }
-                        errorPos1 = (int)(var - varText - 2);
-                        errorPos2 = (int)(s - varText);
-                        return FALSE;
-                    }
-                    else
-                    {
-                        int varLen = (int)(s - var);
-                        // check the variable width
-                        const char* s2 = var;
-                        int varWidth = 0;
-                        while (s2 < s)
-                        {
-                            if (*s2 == ':')
-                            {
-                                if (*++s2 != ':')
-                                {
-                                    int tmpLen = (int)(s - s2);
-                                    BOOL validMax = tmpLen == 3 && (StrNICmp(s2, "max", 3) == 0);
-                                    detectMax = (validMax && detectMaxVarWidths);
-                                    BOOL validNum = FALSE;
-                                    if (!validMax)
-                                    {
-                                        if (tmpLen > 0 && tmpLen <= 4)
-                                        {
-                                            const char* s3 = s2;
-                                            while (s3 < s && *s3 >= '0' && *s3 <= '9')
-                                                s3++;
-                                            if (s3 == s) // only digits
-                                            {
-                                                char widthBuff[5];
-                                                lstrcpyn(widthBuff, s2, tmpLen + 1);
-                                                varWidth = atoi(widthBuff);
-                                                validNum = (varWidth >= 1);
-                                            }
-                                        }
-                                    }
-                                    if (!validMax && !validNum)
-                                    {
-                                        const char* text = LoadStr(IDS_EXP_INVALIDVARWIDTH);
-                                        if (msgParent == NULL)
-                                            TRACE_I(text);
-                                        else
-                                        {
-                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                                        }
-                                        errorPos1 = (int)(s2 - varText);
-                                        errorPos2 = (int)(s - varText);
-                                        return FALSE;
-                                    }
-                                    else
-                                    {
-                                        if (!validateOnly && validMax && !detectMax) // phase of using precomputed values
-                                        {
-                                            if (currentMaxVarIndex < maxVarWidthsCount)
-                                            {
-                                                valueOutLen = maxVarWidths[currentMaxVarIndex];
-                                                currentMaxVarIndex++;
-                                            }
-                                            else
-                                                TRACE_E("Buffer maxVarWidths is small");
-                                        }
-                                        if (validNum)
-                                            valueOutLen = varWidth;
-                                        varLen -= (int)(s - s2) + 1; // the colon and the variable width
-                                    }
-                                    break;
-                                }
-                            }
-                            s2++;
-                        }
-
-                        const CSalamanderVarStrEntry* entry = variables;
-                        while (entry->Name != NULL)
-                        {
-                            if (StrICmpEx(var, varLen, entry->Name, (int)strlen(entry->Name)) == 0)
-                            {
-                                if (!validateOnly)
-                                {
-                                    value = entry->Execute(msgParent, param);
-                                    if (value == NULL)
-                                    {
-                                        const char* text = LoadStr(IDS_EXP_INTERNALERR);
-                                        if (msgParent == NULL)
-                                            TRACE_I(text);
-                                        else
-                                        {
-                                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                                        }
-                                        errorPos1 = (int)(var - varText - 2);
-                                        errorPos2 = (int)(s - varText + 1);
-                                        return FALSE;
-                                    }
-                                }
-                                else
-                                    value = "";
-                                break;
-                            }
-                            entry++;
-                        }
-                        if (entry->Name == NULL)
-                        {
-                            if (varLen >= MAX_PATH)
-                                varLen = MAX_PATH - 1;
-                            memcpy(buf, var, varLen);
-                            buf[varLen] = 0;
-                            char text[200];
-                            sprintf(text, LoadStr(IDS_EXP_VARNOTFOUND), buf.Get());
-                            if (msgParent == NULL)
-                                TRACE_I(text);
-                            else
-                            {
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                            }
-                            errorPos1 = (int)(var - varText - 2);
-                            errorPos2 = (int)(s - varText + 1);
-                            return FALSE;
-                        }
-                        s++;
-                        break;
-                    }
-                }
-
-                case '[':
-                {
-                    const char* var = s + 1;
-                    while (*s != ']' && *s != 0)
-                        s++;
-                    if (*s == 0)
-                    {
-                        const char* text = LoadStr(IDS_EXP_UNMATCHEDBRACKET);
-                        if (msgParent == NULL)
-                            TRACE_I(text);
-                        else
-                        {
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                        }
-                        errorPos1 = (int)(var - varText - 2);
-                        errorPos2 = (int)(s - varText);
-                        return FALSE;
-                    }
-                    else
-                    {
-                        if (!validateOnly)
-                        {
-                            int varLen = (int)(s - var);
-                            CPathBuffer envVar; // Heap-allocated for long path support
-                            if (varLen >= envVar.Size())
-                                varLen = envVar.Size() - 1;
-                            memcpy(envVar, var, varLen);
-                            envVar[varLen] = 0;
-                            DWORD bufSize = (DWORD)buf.Size();
-                            DWORD res = GetEnvironmentVariable(envVar, buf, bufSize);
-                            if (res == 0 || res >= bufSize)
-                            {
-                                CPathBuffer text;
-                                if (res == 0)
-                                    sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envVar.Get());
-                                else
-                                    sprintf(text, LoadStr(IDS_EXP_ENVVARTOOLARGE), envVar.Get());
-                                if (msgParent == NULL)
-                                    TRACE_I(text);
-                                else
-                                {
-                                    if (!ignoreEnvVarNotFoundOrTooLong)
-                                    {
-                                        // OK = Ignore the error and continue, Cancel = abort
-                                        if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str()).type == PromptResult::kCancel)
-                                        {
-                                            errorPos1 = (int)(var - varText);
-                                            errorPos2 = (int)(s - varText);
-                                            return FALSE;
-                                        }
-                                    }
-                                }
-                                buf[0] = 0;
-                            }
-                            value = buf;
-                        }
-                        s++;
-                        break;
-                    }
-                }
-
-                default:
-                {
-                    const char* text = LoadStr(IDS_EXP_UNEXPECTEDCHAR);
-                    if (msgParent == NULL)
-                        TRACE_I(text);
-                    else
-                    {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                    }
-                    errorPos1 = (int)(s - varText);
-                    errorPos2 = (int)(s - varText + 1);
-                    return FALSE;
-                }
-                }
-
-                if (!validateOnly)
-                {
-                    int len = (int)strlen(value);
-                    if (detectMax)
-                    {
-                        if (currentMaxVarIndex < maxVarWidthsCount)
-                        {
-                            if (maxVarWidths[currentMaxVarIndex] < len)
-                                maxVarWidths[currentMaxVarIndex] = len;
-                            currentMaxVarIndex++;
-                        }
-                        else
-                            TRACE_E("Buffer maxVarWidths is small");
-                    }
-                    if (buffer != NULL)
-                    {
-                        int totalLen = (valueOutLen > 0) ? valueOutLen : len;
-                        if (out + totalLen + 1 <= outEnd) // it must still be possible to null-terminate it
-                        {
-                            if (varPlacementIndex < varPlacementIndexCount)
-                            {
-                                varPlacements[varPlacementIndex] = MAKELPARAM(out - buffer, totalLen);
-                                varPlacementIndex++;
-                            }
-                            else
-                            {
-                                if (varPlacements != NULL)
-                                    TRACE_E("Buffer varPlacements is small");
-                            }
-                            memcpy(out, value, min(totalLen, len));
-                            if (len < totalLen)
-                                memset(out + len, ' ', totalLen - len);
-                            out += totalLen;
-                        }
-                        else
-                        {
-                            const char* text = LoadStr(IDS_EXP_SMALLBUFFER);
-                            if (msgParent == NULL)
-                                TRACE_I(text);
-                            else
-                            {
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                            }
-                            errorPos1 = (int)(s - varText);
-                            errorPos2 = (int)(s - varText);
-                            return FALSE;
-                        }
-                    }
-                }
+                ReportWideVarError(NULL, environmentError);
+                return true;
             }
-            else
+            if (ignoreEnvVarNotFoundOrTooLong)
+                return true;
+            return gPrompter
+                       ->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                                      WideVarErrorText(environmentError).c_str())
+                       .type != PromptResult::kCancel;
+        };
+
+    std::wstring expanded;
+    std::vector<sally::unicode::WideTextRange> expandedRanges;
+    sally::unicode::WideVarError error;
+    if (!sally::unicode::ExpandWideVarStringCore(
+            varText, false, resolve, &expanded,
+            varPlacements != NULL ? &expandedRanges : NULL,
+            detectMaxVarWidths != FALSE, maxVarWidths,
+            maxVarWidthsCount, (std::numeric_limits<std::size_t>::max)(), &error,
+            handleEnvironmentError))
+    {
+        if (error.Kind != sally::unicode::WideVarErrorKind::EnvironmentNotFound &&
+            error.Kind != sally::unicode::WideVarErrorKind::EnvironmentTooLarge)
+            ReportWideVarError(msgParent, error);
+        return FALSE;
+    }
+
+    if (varPlacements == NULL)
+        return sally::plugin_abi::WriteStringBuffer(*buffer, expanded) ? TRUE : FALSE;
+
+    try
+    {
+        std::vector<CSalamanderTextRange> publishedRanges;
+        publishedRanges.reserve(expandedRanges.size());
+        for (const sally::unicode::WideTextRange& range : expandedRanges)
+        {
+            if (range.Offset > (std::numeric_limits<DWORD>::max)() ||
+                range.Length > (std::numeric_limits<DWORD>::max)())
             {
-                const char* text = LoadStr(IDS_EXP_TRAILINGDOLLAR);
-                if (msgParent == NULL)
-                    TRACE_I(text);
-                else
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                }
-                errorPos1 = (int)(s - varText - 1);
-                errorPos2 = (int)(s - varText);
+                SetLastError(ERROR_FILENAME_EXCED_RANGE);
                 return FALSE;
             }
+            publishedRanges.push_back(
+                {static_cast<DWORD>(range.Offset), static_cast<DWORD>(range.Length)});
         }
-        else
-        {
-            if (!validateOnly && buffer != NULL)
-            {
-                if (out + 2 <= outEnd)
-                    *out++ = *s; // it must still be possible to null-terminate it
-                else
-                {
-                    const char* text = LoadStr(IDS_EXP_SMALLBUFFER);
-                    if (msgParent == NULL)
-                        TRACE_I(text);
-                    else
-                    {
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                    }
-                    errorPos1 = (int)(s - varText);
-                    errorPos2 = (int)(s - varText + 1);
-                    return FALSE;
-                }
-            }
-            s++;
-        }
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *varPlacements, expanded, publishedRanges)
+                   ? TRUE
+                   : FALSE;
     }
-    if (!validateOnly && buffer != NULL)
+    catch (const std::bad_alloc&)
     {
-        if (out < outEnd)
-            *out = 0;
-        else
-        {
-            const char* text = LoadStr(IDS_EXP_SMALLBUFFER);
-            if (msgParent == NULL)
-                TRACE_I(text);
-            else
-            {
-                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-            }
-            errorPos1 = (int)(s - varText);
-            errorPos2 = (int)(s - varText);
-            return FALSE;
-        }
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
     }
-    if (varPlacementsCount != NULL)
-        *varPlacementsCount = varPlacementIndex;
+    catch (const std::length_error&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
+    }
+}
+
+static BOOL ExpandWideVarStringToOwnerW(HWND msgParent, const wchar_t* varText,
+                                        std::wstring& expanded, std::size_t outputCapacity,
+                                        const sally::unicode::WideVarEntry* variables,
+                                        void* param, BOOL ignoreEnvVarNotFoundOrTooLong,
+                                        std::vector<sally::unicode::WideTextRange>* varPlacements,
+                                        BOOL detectMaxVarWidths, int* maxVarWidths,
+                                        int maxVarWidthsCount)
+{
+    expanded.clear();
+    if (varText == NULL || variables == NULL)
+        return FALSE;
+
+    const auto resolve = [&](const wchar_t* name, int nameLength, bool execute,
+                             int requestedWidth, std::wstring& value,
+                             int& measurementWidth) {
+        const sally::unicode::WideVarEntry* entry =
+            sally::unicode::FindWideVarEntry(variables, name, nameLength);
+        if (entry == NULL)
+            return sally::unicode::WideVarResolveResult::NotFound;
+        if (!execute)
+            return sally::unicode::WideVarResolveResult::Found;
+        if (entry->Execute == NULL)
+            return sally::unicode::WideVarResolveResult::Failed;
+
+        value = entry->Execute(param);
+        if (value.size() > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
+            return sally::unicode::WideVarResolveResult::Failed;
+        measurementWidth = static_cast<int>(value.size());
+
+        if (requestedWidth < 0)
+            return sally::unicode::WideVarResolveResult::Failed;
+        if (requestedWidth > 0)
+        {
+            const std::size_t width = static_cast<std::size_t>(requestedWidth);
+            if (value.size() > width)
+                value.resize(width);
+            else if (value.size() < width)
+                value.append(width - value.size(), L' ');
+        }
+        return sally::unicode::WideVarResolveResult::Found;
+    };
+
+    const auto handleEnvironmentError =
+        [&](const sally::unicode::WideVarError& environmentError) {
+            if (msgParent == NULL)
+            {
+                ReportWideVarError(NULL, environmentError);
+                return true;
+            }
+            if (ignoreEnvVarNotFoundOrTooLong)
+                return true;
+            return gPrompter
+                       ->ConfirmError(LoadStrW(IDS_ERRORTITLE),
+                                      WideVarErrorText(environmentError).c_str())
+                       .type != PromptResult::kCancel;
+        };
+
+    sally::unicode::WideVarError error;
+    if (!sally::unicode::ExpandWideVarStringCore(
+            varText, false, resolve, &expanded, varPlacements,
+            detectMaxVarWidths != FALSE, maxVarWidths,
+            maxVarWidthsCount, outputCapacity, &error,
+            handleEnvironmentError))
+    {
+        if (error.Kind != sally::unicode::WideVarErrorKind::EnvironmentNotFound &&
+            error.Kind != sally::unicode::WideVarErrorKind::EnvironmentTooLarge)
+            ReportWideVarError(msgParent, error);
+        return FALSE;
+    }
+
     return TRUE;
 }
 
-BOOL ValidateVarString(HWND msgParent, const char* varText, int& errorPos1, int& errorPos2,
-                       const CSalamanderVarStrEntry* variables)
+BOOL ExpandWideVarStringW(HWND msgParent, const wchar_t* varText, wchar_t* buffer,
+                          int bufferLen, const sally::unicode::WideVarEntry* variables,
+                          void* param, BOOL ignoreEnvVarNotFoundOrTooLong,
+                          std::vector<sally::unicode::WideTextRange>* varPlacements,
+                          BOOL detectMaxVarWidths, int* maxVarWidths,
+                          int maxVarWidthsCount)
 {
-    return DoExpandVarString(msgParent, varText, TRUE, errorPos1, errorPos2, NULL, 0, variables, NULL,
-                             NULL, NULL, FALSE, NULL, 0, TRUE);
+    if (buffer == NULL || bufferLen <= 0)
+        return FALSE;
+    std::wstring expanded;
+    if (!ExpandWideVarStringToOwnerW(msgParent, varText, expanded,
+                                     static_cast<std::size_t>(bufferLen), variables, param,
+                                     ignoreEnvVarNotFoundOrTooLong, varPlacements,
+                                     detectMaxVarWidths, maxVarWidths,
+                                     maxVarWidthsCount))
+        return FALSE;
+    std::wmemcpy(buffer, expanded.c_str(), expanded.size() + 1);
+    return TRUE;
 }
 
-BOOL ExpandVarString(HWND msgParent, const char* varText, char* buffer, int bufferLen,
-                     const CSalamanderVarStrEntry* variables, void* param,
-                     BOOL ignoreEnvVarNotFoundOrTooLong, DWORD* varPlacements,
-                     int* varPlacementsCount, BOOL detectMaxVarWidths, int* maxVarWidths,
-                     int maxVarWidthsCount)
+BOOL ExpandWideVarStringW(HWND msgParent, const wchar_t* varText, std::wstring& output,
+                          const sally::unicode::WideVarEntry* variables, void* param,
+                          BOOL ignoreEnvVarNotFoundOrTooLong)
 {
-    int errorPos1, errorPos2;
-    return DoExpandVarString(msgParent, varText, FALSE, errorPos1, errorPos2, buffer,
-                             bufferLen, variables, param,
-                             varPlacements, varPlacementsCount,
-                             detectMaxVarWidths, maxVarWidths, maxVarWidthsCount,
-                             ignoreEnvVarNotFoundOrTooLong);
+    return ExpandWideVarStringToOwnerW(
+        msgParent, varText, output, (std::numeric_limits<std::size_t>::max)(),
+        variables, param, ignoreEnvVarNotFoundOrTooLong,
+        NULL, FALSE, NULL, 0);
 }
-
-std::wstring ExpandVarStringW(HWND msgParent, const char* varText,
-                               const CSalamanderVarStrEntry* variables, void* param,
-                               BOOL ignoreEnvVarNotFoundOrTooLong)
-{
-    const char* s = varText;
-    std::wstring result;
-
-    while (*s != 0)
-    {
-        if (*s == '$')
-        {
-            if (*++s != 0)
-            {
-                switch (*s)
-                {
-                case '$':
-                {
-                    result += L'$';
-                    s++;
-                    break;
-                }
-
-                case '(':
-                {
-                    const char* var = s + 1;
-                    while (*s != ')' && *s != 0)
-                        s++;
-                    if (*s == 0)
-                    {
-                        if (msgParent == NULL)
-                            TRACE_I(LoadStr(IDS_EXP_UNMATCHEDPAR));
-                        else
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                                 AnsiToWide(LoadStr(IDS_EXP_UNMATCHEDPAR)).c_str());
-                        return L"";
-                    }
-                    else
-                    {
-                        int varLen = (int)(s - var);
-                        // Strip width suffix (":num" or ":max") for name lookup
-                        int nameLen = varLen;
-                        const char* s2 = var;
-                        while (s2 < s)
-                        {
-                            if (*s2 == ':')
-                            {
-                                if (s2 + 1 < s && *(s2 + 1) != ':') // not escaped "::"
-                                {
-                                    nameLen = (int)(s2 - var);
-                                    break;
-                                }
-                            }
-                            s2++;
-                        }
-
-                        const CSalamanderVarStrEntry* entry = variables;
-                        while (entry->Name != NULL)
-                        {
-                            if (StrICmpEx(var, nameLen, entry->Name, (int)strlen(entry->Name)) == 0)
-                            {
-                                const char* value = entry->Execute(msgParent, param);
-                                if (value == NULL)
-                                {
-                                    if (msgParent == NULL)
-                                        TRACE_I(LoadStr(IDS_EXP_INTERNALERR));
-                                    else
-                                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                                             AnsiToWide(LoadStr(IDS_EXP_INTERNALERR)).c_str());
-                                    return L"";
-                                }
-                                result += AnsiToWide(value);
-                                break;
-                            }
-                            entry++;
-                        }
-                        if (entry->Name == NULL)
-                        {
-                            char nameBuf[200];
-                            int copyLen = min(nameLen, 199);
-                            memcpy(nameBuf, var, copyLen);
-                            nameBuf[copyLen] = 0;
-                            char text[400];
-                            sprintf(text, LoadStr(IDS_EXP_VARNOTFOUND), nameBuf);
-                            if (msgParent == NULL)
-                                TRACE_I(text);
-                            else
-                                gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), AnsiToWide(text).c_str());
-                            return L"";
-                        }
-                        s++;
-                        break;
-                    }
-                }
-
-                case '[':
-                {
-                    const char* var = s + 1;
-                    while (*s != ']' && *s != 0)
-                        s++;
-                    if (*s == 0)
-                    {
-                        if (msgParent == NULL)
-                            TRACE_I(LoadStr(IDS_EXP_UNMATCHEDBRACKET));
-                        else
-                            gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                                 AnsiToWide(LoadStr(IDS_EXP_UNMATCHEDBRACKET)).c_str());
-                        return L"";
-                    }
-                    else
-                    {
-                        int varLen = (int)(s - var);
-                        // Convert env var name to wide (variable names are ASCII)
-                        std::wstring envName(varLen, L'\0');
-                        for (int i = 0; i < varLen; i++)
-                            envName[i] = (wchar_t)(unsigned char)var[i];
-
-                        // Use GetEnvironmentVariableW for correct Unicode support
-                        DWORD needed = GetEnvironmentVariableW(envName.c_str(), NULL, 0);
-                        if (needed > 0)
-                        {
-                            std::wstring envValue(needed - 1, L'\0');
-                            DWORD res = GetEnvironmentVariableW(envName.c_str(), envValue.data(), needed);
-                            if (res > 0 && res < needed)
-                            {
-                                result += envValue;
-                                s++;
-                                break;
-                            }
-                        }
-                        // Not found or error
-                        char envNameA[200];
-                        int copyLen = min(varLen, 199);
-                        memcpy(envNameA, var, copyLen);
-                        envNameA[copyLen] = 0;
-                        char text[400];
-                        if (needed == 0)
-                            sprintf(text, LoadStr(IDS_EXP_ENVVARNOTFOUND), envNameA);
-                        else
-                            sprintf(text, LoadStr(IDS_EXP_ENVVARTOOLARGE), envNameA);
-                        if (msgParent == NULL)
-                            TRACE_I(text);
-                        else
-                        {
-                            if (!ignoreEnvVarNotFoundOrTooLong)
-                            {
-                                if (gPrompter->ConfirmError(LoadStrW(IDS_ERRORTITLE),
-                                                            AnsiToWide(text).c_str())
-                                        .type == PromptResult::kCancel)
-                                    return L"";
-                            }
-                        }
-                        // Continue with empty expansion for this variable
-                        s++;
-                        break;
-                    }
-                }
-
-                default:
-                {
-                    if (msgParent == NULL)
-                        TRACE_I(LoadStr(IDS_EXP_UNEXPECTEDCHAR));
-                    else
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                             AnsiToWide(LoadStr(IDS_EXP_UNEXPECTEDCHAR)).c_str());
-                    return L"";
-                }
-                }
-            }
-            else
-            {
-                if (msgParent == NULL)
-                    TRACE_I(LoadStr(IDS_EXP_TRAILINGDOLLAR));
-                else
-                    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE),
-                                         AnsiToWide(LoadStr(IDS_EXP_TRAILINGDOLLAR)).c_str());
-                return L"";
-            }
-        }
-        else
-        {
-            result += (wchar_t)(unsigned char)*s;
-            s++;
-        }
-    }
-    return result;
-}
-
 // ****************************************************************************
 
-CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total)
+// Wide sibling. Sits on MyGetDiskFreeSpaceW, ported earlier in this
+// task, so the SUBST + reparse-point walk underneath is already wide.
+CQuadWord MyGetDiskFreeSpaceW(const wchar_t* path, CQuadWord* total)
 {
-    CALL_STACK_MESSAGE2("MyGetDiskFreeSpace(%s, )", path);
     CQuadWord ret = CQuadWord(-1, -1);
     if (total != NULL)
         *total = CQuadWord(-1, -1);
     ULARGE_INTEGER availBytes, totalBytes, freeBytes;
-    CPathBuffer ourPath;
-    lstrcpyn(ourPath, path, ourPath.Size());
-    SalPathAddBackslash(ourPath, ourPath.Size());
-    if (GetDiskFreeSpaceEx(ourPath, &availBytes, &totalBytes, &freeBytes))
+    std::wstring ourPath(path);
+    SalPathAddBackslashW(ourPath);
+    if (GetDiskFreeSpaceExW(ourPath.c_str(), &availBytes, &totalBytes, &freeBytes))
     {
-        ret.Value = (unsigned __int64)availBytes /*freeBytes*/.QuadPart; // I used availBytes instead of freeBytes because a user Jan Kobr <jan.kobr@pvk.cz> reported that we were showing 35GB instead of 2GB of free space (it was a Novell network disk with quotas under XP)
+        ret.Value = (unsigned __int64)availBytes.QuadPart; // availBytes, not freeBytes - see the narrow twin
         if (total != NULL)
             total->Value = (unsigned __int64)totalBytes.QuadPart;
     }
     if (ret == CQuadWord(-1, -1))
     {
         DWORD a, b, c, d;
-        if (MyGetDiskFreeSpace(path, &a, &b, &c, &d))
+        if (MyGetDiskFreeSpaceW(path, &a, &b, &c, &d))
         {
             ret = CQuadWord(a, 0) * CQuadWord(b, 0) * CQuadWord(c, 0);
             if (total != NULL)
@@ -1284,330 +977,352 @@ CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total)
     return ret;
 }
 
-UINT GetDriveTypeForDriveLetterPath(const char* path)
+// Wide sibling. Only the drive letter is consulted, so this one was
+// never lossy — it is widened so that wide callers need no narrowing step to
+// reach it, which is the actual defect its narrow form was causing upstream.
+UINT GetDriveTypeForDriveLetterPathW(const wchar_t* path)
 {
-    char root[4] = " :\\";
+    wchar_t root[4] = L" :\\";
     root[0] = path[0];
-    return GetDriveType(root);
+    return GetDriveTypeW(root);
 }
 
-BOOL IsUNCPath(const char* path)
+// 2026-08-25: the narrow IsUNCRootPath(char*) was deleted - confirmed-dead (zero
+// callers anywhere; its only apparent uses in main_window_ui_basics.cpp are inside comments).
+// IsUNCRootPathW (common/fsutil.cpp) is the real, widely-used implementation.
+
+// Wide-native. The previous implementation narrowed 'resPath' to
+// ANSI, called the narrow ResolveSubsts and widened the result back — so a SUBST
+// under a Unicode path was destroyed twice over: once at the argument, once
+// inside QueryDosDeviceA. Both CP_ACP round trips are gone; the loop is the
+// shared one in common/SubstResolution.cpp and the query is the wide API.
+// The live SUBST query — the one piece of ResolveSubstsW that touches the OS.
+static sally::paths::SubstQueryW LiveSubstQueryW()
 {
-    const char* server = NULL;
-    if (path[0] == '\\' && path[1] == '\\' && path[2] != '?')
-        server = path + 2;
-    else if (_strnicmp(path, "\\\\?\\UNC\\", 8) == 0)
-        server = path + 8;
-    if (server != NULL)
+    return [](wchar_t driveLetter, std::wstring& outTarget) -> bool
     {
-        const char* share = strchr(server, '\\');
-        if (share != NULL && *(share + 1) != 0)
-        {
-            const char* end = strchr(share + 1, '\\');
-            if (end == NULL)
-                end = share + strlen(share);
-            if (end - path + 1 < MAX_PATH)
-                return TRUE; // above MAX_PATH it would no longer be a UNC root path (+1 for the trailing backslash)
-        }
-    }
-    return FALSE;
+        return GetSubstInformationW(static_cast<BYTE>(driveLetter - L'A'), outTarget) != FALSE;
+    };
 }
 
-BOOL IsUNCRootPath(const char* path)
+BOOL ResolveSubstsW(std::wstring& resPath)
 {
-    if (path[0] == '\\' && path[1] == '\\' && path[2] != '?' &&
-        (path[2] != '.' || path[3] != '\\' || path[4] == 0 || path[5] != ':')) // not paths like "\\.\C:\"
+    auto result = sally::paths::ResolveSubstChainW(resPath, LiveSubstQueryW());
+    if (result == sally::paths::SubstResolveResult::CycleGuard)
+        TRACE_E("ResolveSubstsW(): infinite loop found!");
+    return result == sally::paths::SubstResolveResult::Resolved;
+}
+
+// Wide sibling. Same walk as the narrow form; the differences are
+// all consequences of the types:
+//
+//  - the narrow form calls GetReparsePointDestination with the SAME buffer as
+//    source AND destination, which is the "return value aliases an argument"
+//    hazard class. Here they are separate strings, which is both safer and
+//    clearer about what is being read versus written.
+//  - the narrow form uses 'resPath' itself as scratch while computing
+//    RootOrCurReparsePoint and relies on overwriting it immediately afterwards.
+//    That scratch is a named local here; the behaviour is identical because the
+//    narrow code unconditionally overwrites resPath on the next line.
+//  - the "too long path" arms disappear: they were fixed-buffer failures.
+void ResolveLocalPathWithReparsePointsW(const wchar_t* path, CLocalPathResolutionW& res)
+{
+    res.ResPath.assign(path);
+    ResolveSubstsW(res.ResPath);
+    SalPathAddBackslashW(res.ResPath);
+
+    if (res.ResPath.size() <= 3)
+        return; // a root path has nothing to walk
+
+    int allowedDepth = 50;
+    BOOL firstRepPoint = TRUE;
+    std::wstring repPointPath;
+    while (GetCurrentLocalReparsePointW(res.ResPath.c_str(), repPointPath))
     {
-        const char* s = path + 2;
-        while (*s != 0 && *s != '\\')
-            s++;
-        if (*s == '\\')
-            s++;
-        while (*s != 0 && *s != '\\')
-            s++;
-        if (*s == '\\')
-            s++;
-        return *s == 0;
-    }
-    return FALSE;
-}
-
-BOOL ResolveSubsts(char* resPath, int resPathSize)
-{
-    BOOL ret = TRUE;
-    int cycle = 0;
-    while ((resPath[0] >= 'a' && resPath[0] <= 'z' || resPath[0] >= 'A' && resPath[0] <= 'Z') &&
-           resPath[1] == ':')
-    {
-        if (cycle++ == 50)
+        if (!res.RootOrCurReparsePointSet)
         {
-            TRACE_E("ResolveSubsts(): infinite loop found!");
-            ret = FALSE;
-            break;
-        }
-        CPathBuffer tgt; // Heap-allocated for long path support
-        if (GetSubstInformation(LowerCase[resPath[0]] - 'a', tgt, tgt.Size()) && tgt[0] != '\\' /* mapped network disks handled elsewhere */)
-        {
-            if (!SalPathAppend(tgt, resPath + 2, tgt.Size()))
+            // Where the SUBST resolution of the ORIGINAL path's root lands. If
+            // the reparse point sits deeper than that, the extra components have
+            // to be re-appended after the substituted root.
+            std::wstring substRoot = GetRootPath(path);
+            ResolveSubstsW(substRoot);
+            res.RootOrCurReparsePoint = GetRootPath(path);
+            if (substRoot.size() < repPointPath.size())
             {
-                TRACE_E("ResolveSubsts(): too long path!");
-                ret = FALSE;
-                break;
-            }
-            if (tgt[0] != 0 && tgt[1] == ':' && tgt[2] == 0) // "C:" -> "C:\\"
-            {
-                tgt[2] = '\\';
-                tgt[3] = 0;
-            }
-            lstrcpyn(resPath, tgt, resPathSize);
-        }
-        else
-            break;
-    }
-    return ret;
-}
-
-BOOL ResolveSubsts(char* resPath)
-{
-    return ResolveSubsts(resPath, MAX_PATH);
-}
-
-// Wide wrapper: converts to ANSI, calls ResolveSubsts, converts back.
-// GetSubstInformation/MyQueryDosDevice are ANSI internally.
-BOOL ResolveSubstsW(wchar_t* resPath, int resPathSize)
-{
-    std::string pathA = WideToAnsi(resPath);
-    CPathBuffer buf;
-    lstrcpyn(buf, pathA.c_str(), buf.Size());
-    BOOL ret = ResolveSubsts(buf, buf.Size());
-    std::wstring result = AnsiToWide(buf.Get());
-    lstrcpynW(resPath, result.c_str(), resPathSize);
-    return ret;
-}
-
-void ResolveLocalPathWithReparsePoints(char* resPath, int resPathSize, const char* path, BOOL* cutResPathIsPossible,
-                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
-                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath)
-{
-    lstrcpyn(resPath, path, resPathSize);
-    ResolveSubsts(resPath, resPathSize);
-    if (!SalPathAddBackslash(resPath, resPathSize))
-        TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
-    else
-    {
-        if (strlen(resPath) > 3)
-        {
-            CPathBuffer repPointPath; // Heap-allocated for long path support
-            int allowedDepth = 50;
-            BOOL firstRepPoint = TRUE;
-            while (GetCurrentLocalReparsePoint(resPath, repPointPath))
-            {
-                if (rootOrCurReparsePointSet != NULL && !*rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
+                if (_wcsnicmp(substRoot.c_str(), repPointPath.c_str(), substRoot.size()) == 0) // always true
                 {
-                    GetRootPath(resPath, path);
-                    ResolveSubsts(resPath, resPathSize);
-                    GetRootPath(rootOrCurReparsePoint, path);
-                    if (strlen(resPath) < strlen(repPointPath)) // if the path to the current reparse point is longer than the path obtained by resolving the subst, we must append this part of the path after the subst root
-                    {
-                        if (_strnicmp(resPath, repPointPath, strlen(resPath)) == 0) // always true
-                        {
-                            if (!SalPathAppend(rootOrCurReparsePoint, repPointPath + strlen(resPath), MAX_PATH))
-                            {
-                                TRACE_E("ResolveLocalPathWithReparsePoints(): unexpected situation: too long path for substed path");
-                                lstrcpyn(rootOrCurReparsePoint, repPointPath, MAX_PATH);
-                            }
-                            else
-                                SalPathAddBackslash(rootOrCurReparsePoint, MAX_PATH);
-                        }
-                        else
-                        {
-                            TRACE_E("ResolveLocalPathWithReparsePoints(): unexpected prefix of resolved path");
-                            lstrcpyn(rootOrCurReparsePoint, repPointPath, MAX_PATH);
-                        }
-                    }
-                    *rootOrCurReparsePointSet = TRUE;
-                }
-                lstrcpyn(resPath, repPointPath, resPathSize);
-                if (!SalPathAddBackslash(resPath, resPathSize))
-                    TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
-                int repPointType;
-                BOOL getRepPointDestRes = GetReparsePointDestination(repPointPath, repPointPath, repPointPath.Size(), &repPointType, TRUE);
-                if (getRepPointDestRes && (repPointType == 2 /* JUNCTION POINT */ || repPointType == 3 /* SYMBOLIC LINK */))
-                {
-                    if (firstRepPoint)
-                    {
-                        if (junctionOrSymlinkTgt != NULL)
-                            lstrcpyn(junctionOrSymlinkTgt, repPointPath, MAX_PATH);
-                        if (linkType != NULL)
-                            *linkType = repPointType;
-                    }
-                    ResolveSubsts(repPointPath, repPointPath.Size());
-                }
-                firstRepPoint = FALSE;
-                UINT drvType = getRepPointDestRes && repPointPath[0] != 0 && repPointPath[1] == ':' ? GetDriveTypeForDriveLetterPath(repPointPath) : DRIVE_UNKNOWN;
-                if (getRepPointDestRes && (IsUNCPath(repPointPath) || drvType == DRIVE_REMOTE)) // symlink to a UNC or mapped network path (available since Vista)
-                {                                                                               // it only makes sense to look for reparse points on fixed disks, so stop here (network paths are a problem because their reparse points will return "local paths" (C:\...), which, if used on this machine (instead of the remote one they come from), it will lead to nonsensical results)
-                    if (netPath != NULL)
-                        lstrcpyn(netPath, repPointPath, MAX_PATH);
-                    GetRootPath(resPath, repPointPath);
-                    break;
-                }
-                if (!getRepPointDestRes || repPointPath[0] == 0 || repPointPath[1] != ':')
-                { // unknown reparse point or volume mount point; in any case do not traverse it, let the system try + the path must not be shortened or it may refer to another volume
-                    *cutResPathIsPossible = FALSE;
-                    break;
-                }
-                if (allowedDepth-- == 0) // looks like an endless loop
-                {
-                    lstrcpyn(resPath, path, resPathSize); // let the system handle it on its own
-                    ResolveSubsts(resPath, resPathSize);
-                    if (!SalPathAddBackslash(resPath, resPathSize))
-                        TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
-                    if (rootOrCurReparsePointSet != NULL)
-                        *rootOrCurReparsePointSet = FALSE;
-                    if (junctionOrSymlinkTgt != NULL)
-                        *junctionOrSymlinkTgt = 0;
-                    if (linkType != NULL)
-                        *linkType = 0 /* UNKNOWN */;
-                    break;
-                }
-                lstrcpyn(resPath, repPointPath, resPathSize);
-                if (!SalPathAddBackslash(resPath, resPathSize))
-                {
-                    TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
-                    break;
-                }
-                if (drvType != DRIVE_FIXED)
-                    break; // reparse points only make sense to look for on fixed disks
-            }
-        }
-    }
-}
-
-void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cutResPathIsPossible,
-                                       BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
-                                       char* junctionOrSymlinkTgt, int* linkType, char* netPath)
-{
-    ResolveLocalPathWithReparsePoints(resPath, MAX_PATH, path, cutResPathIsPossible,
-                                     rootOrCurReparsePointSet, rootOrCurReparsePoint,
-                                     junctionOrSymlinkTgt, linkType, netPath);
-}
-
-BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
-                        LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
-                        LPDWORD lpTotalNumberOfClusters)
-{
-    CALL_STACK_MESSAGE2("MyGetDiskFreeSpace(%s, , , , )", path);
-    CPathBuffer ourPath; // Heap-allocated for long path support
-    CPathBuffer resPath; // Heap-allocated for long path support
-    lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath, resPath.Size());
-    GetRootPath(ourPath, resPath);
-    if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
-    {                                                                // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
-        // if it is not a root path, try traversing the reparse points as well
-        BOOL cutPathIsPossible = TRUE;
-        ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
-
-        while (!GetDiskFreeSpace(ourPath, lpSectorsPerCluster, lpBytesPerSector,
-                                 lpNumberOfFreeClusters, lpTotalNumberOfClusters))
-        {
-            if (!cutPathIsPossible || !CutDirectory(ourPath))
-                return FALSE; // we must not cut it or even the root did not succeed; abort with error
-            SalPathAddBackslash(ourPath, ourPath.Size());
-        }
-        return TRUE;
-    }
-    else
-    {
-        return GetDiskFreeSpace(ourPath, lpSectorsPerCluster, lpBytesPerSector,
-                                lpNumberOfFreeClusters, lpTotalNumberOfClusters);
-    }
-}
-
-BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char* junctionOrSymlinkTgt, int* linkType,
-                            LPTSTR lpVolumeNameBuffer, DWORD nVolumeNameSize, LPDWORD lpVolumeSerialNumber,
-                            LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
-                            LPTSTR lpFileSystemNameBuffer, DWORD nFileSystemNameSize)
-{
-    CPathBuffer ourPath; // Heap-allocated for long path support
-    BOOL ret = TRUE;
-    if (junctionOrSymlinkTgt != NULL)
-        *junctionOrSymlinkTgt = 0;
-    if (linkType != NULL)
-        *linkType = 0;
-    CPathBuffer resPath; // Heap-allocated for long path support
-    lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath, resPath.Size());
-    GetRootPath(ourPath, resPath);
-    if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
-    {                                                                // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
-        // if it is not a root path, try traversing the reparse points as well
-        BOOL rootOrCurReparsePointSet = FALSE;
-        BOOL cutPathIsPossible = TRUE;
-        ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, &rootOrCurReparsePointSet,
-                                          rootOrCurReparsePoint, junctionOrSymlinkTgt, linkType, NULL);
-
-        while (!GetVolumeInformation(ourPath, lpVolumeNameBuffer, nVolumeNameSize,
-                                     lpVolumeSerialNumber, lpMaximumComponentLength,
-                                     lpFileSystemFlags, lpFileSystemNameBuffer,
-                                     nFileSystemNameSize))
-        {
-            if (!cutPathIsPossible || !CutDirectory(ourPath))
-            {
-                ret = FALSE; // we must not cut it or even the root did not succeed; abort with error
-                break;
-            }
-            SalPathAddBackslash(ourPath, ourPath.Size());
-        }
-        if (!rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
-        { // ourPath is ResolveSubsts(path) or a shortened version of ResolveSubsts(path)
-            GetRootPath(resPath, path);
-            ResolveSubsts(resPath, resPath.Size());
-            GetRootPath(rootOrCurReparsePoint, path);
-            if (strlen(resPath) < strlen(ourPath)) // if the path we return volume info for is longer than the path obtained by resolving the subst, we must append this part of the path after the subst root
-            {
-                if (_strnicmp(resPath, ourPath, strlen(resPath)) == 0) // always true
-                {
-                    if (!SalPathAppend(rootOrCurReparsePoint, ourPath + strlen(resPath), MAX_PATH))
-                    {
-                        TRACE_E("MyGetVolumeInformation(): unexpected situation: too long path for substed path");
-                        lstrcpyn(rootOrCurReparsePoint, ourPath, MAX_PATH);
-                    }
-                    else
-                        SalPathAddBackslash(rootOrCurReparsePoint, MAX_PATH);
+                    SalPathAppendW(res.RootOrCurReparsePoint, repPointPath.c_str() + substRoot.size());
+                    SalPathAddBackslashW(res.RootOrCurReparsePoint);
                 }
                 else
                 {
-                    TRACE_E("MyGetVolumeInformation(): unexpected prefix of resolved path");
-                    lstrcpyn(rootOrCurReparsePoint, ourPath, MAX_PATH);
+                    TRACE_E("ResolveLocalPathWithReparsePointsW(): unexpected prefix of resolved path");
+                    res.RootOrCurReparsePoint = repPointPath;
                 }
             }
-            int l = (int)strlen(rootOrCurReparsePoint);
-            if (l > 3 && rootOrCurReparsePoint[l - 1] == '\\')
-                rootOrCurReparsePoint[l - 1] = 0; // remove the trailing backslash except for "c:\"
+            res.RootOrCurReparsePointSet = TRUE;
+        }
+
+        res.ResPath = repPointPath;
+        SalPathAddBackslashW(res.ResPath);
+
+        int repPointType = 0;
+        std::wstring dst;
+        BOOL getRepPointDestRes = GetReparsePointDestinationOwnedW(repPointPath.c_str(), &dst,
+                                                                   &repPointType, TRUE);
+        if (getRepPointDestRes && (repPointType == 2 /* JUNCTION POINT */ || repPointType == 3 /* SYMBOLIC LINK */))
+        {
+            if (firstRepPoint)
+            {
+                res.JunctionOrSymlinkTgt = dst;
+                res.LinkType = repPointType;
+            }
+            ResolveSubstsW(dst);
+        }
+        firstRepPoint = FALSE;
+
+        UINT drvType = getRepPointDestRes && dst.size() >= 2 && dst[1] == L':'
+                           ? GetDriveTypeForDriveLetterPathW(dst.c_str())
+                           : DRIVE_UNKNOWN;
+
+        // symlink to a UNC or mapped network path (available since Vista): stop
+        // here, because reparse points only make sense to chase on fixed disks —
+        // a remote one would return paths meaningful on the OTHER machine.
+        if (getRepPointDestRes && (IsUNCPathW(dst.c_str()) || drvType == DRIVE_REMOTE))
+        {
+            res.NetPath = dst;
+            res.ResPath = GetRootPath(dst.c_str());
+            break;
+        }
+
+        if (!getRepPointDestRes || dst.size() < 2 || dst[1] != L':')
+        { // unknown reparse point or volume mount point; do not traverse it, and
+          // the path must not be shortened or it may refer to another volume
+            res.CutResPathIsPossible = FALSE;
+            break;
+        }
+
+        if (allowedDepth-- == 0) // looks like an endless loop
+        {
+            res.ResPath.assign(path); // let the system handle it on its own
+            ResolveSubstsW(res.ResPath);
+            SalPathAddBackslashW(res.ResPath);
+            res.RootOrCurReparsePointSet = FALSE;
+            res.JunctionOrSymlinkTgt.clear();
+            res.LinkType = 0 /* UNKNOWN */;
+            break;
+        }
+
+        res.ResPath = dst;
+        SalPathAddBackslashW(res.ResPath);
+        if (drvType != DRIVE_FIXED)
+            break; // reparse points only make sense to look for on fixed disks
+    }
+}
+
+// Wide sibling — same shape as MyGetDriveTypeW above.
+BOOL MyGetDiskFreeSpaceW(const wchar_t* path, LPDWORD lpSectorsPerCluster,
+                         LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
+                         LPDWORD lpTotalNumberOfClusters)
+{
+    std::wstring resPath(path);
+    ResolveSubstsW(resPath);
+    std::wstring ourPath = GetRootPath(resPath.c_str());
+
+    if (!IsUNCPathW(ourPath.c_str()) && GetDriveTypeW(ourPath.c_str()) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
+    {                                                                                  // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
+        CLocalPathResolutionW res;
+        ResolveLocalPathWithReparsePointsW(path, res);
+        ourPath = res.ResPath;
+
+        while (!GetDiskFreeSpaceW(ourPath.c_str(), lpSectorsPerCluster, lpBytesPerSector,
+                                  lpNumberOfFreeClusters, lpTotalNumberOfClusters))
+        {
+            if (!res.CutResPathIsPossible || !CutDirectoryW(ourPath))
+                return FALSE; // we must not cut it or even the root did not succeed
+            SalPathAddBackslashW(ourPath);
+        }
+        return TRUE;
+    }
+    return GetDiskFreeSpaceW(ourPath.c_str(), lpSectorsPerCluster, lpBytesPerSector,
+                             lpNumberOfFreeClusters, lpTotalNumberOfClusters);
+}
+
+// Wide sibling. Same shape as the two above, plus the
+// rootOrCurReparsePoint / junctionOrSymlinkTgt / linkType outputs the reparse
+// walk fills — which is why this one had to wait for the walk to go wide.
+// Outputs are std::wstring* rather than caller buffers; pass NULL for what you
+// do not want.
+static BOOL QueryVolumeInformationOwnedW(const wchar_t* root,
+                                         std::wstring* volumeName,
+                                         LPDWORD volumeSerialNumber,
+                                         LPDWORD maximumComponentLength,
+                                         LPDWORD fileSystemFlags,
+                                         std::wstring* fileSystemName)
+{
+    DWORD capacity = 64;
+    for (;;)
+    {
+        try
+        {
+            std::vector<wchar_t> volumeStorage(
+                volumeName != NULL ? capacity : 0, L'\0');
+            std::vector<wchar_t> fileSystemStorage(
+                fileSystemName != NULL ? capacity : 0, L'\0');
+            DWORD stagedSerial = 0;
+            DWORD stagedMaximumComponentLength = 0;
+            DWORD stagedFlags = 0;
+            if (GetVolumeInformationW(
+                    root,
+                    volumeStorage.empty() ? NULL : volumeStorage.data(),
+                    volumeStorage.empty() ? 0 : capacity,
+                    volumeSerialNumber != NULL ? &stagedSerial : NULL,
+                    maximumComponentLength != NULL
+                        ? &stagedMaximumComponentLength
+                        : NULL,
+                    fileSystemFlags != NULL ? &stagedFlags : NULL,
+                    fileSystemStorage.empty() ? NULL
+                                              : fileSystemStorage.data(),
+                    fileSystemStorage.empty() ? 0 : capacity))
+            {
+                std::wstring stagedVolume;
+                std::wstring stagedFileSystem;
+                if (!volumeStorage.empty())
+                {
+                    const size_t length = wcsnlen_s(volumeStorage.data(), capacity);
+                    if (length == capacity)
+                    {
+                        SetLastError(ERROR_INVALID_DATA);
+                        return FALSE;
+                    }
+                    stagedVolume.assign(volumeStorage.data(), length);
+                }
+                if (!fileSystemStorage.empty())
+                {
+                    const size_t length = wcsnlen_s(fileSystemStorage.data(), capacity);
+                    if (length == capacity)
+                    {
+                        SetLastError(ERROR_INVALID_DATA);
+                        return FALSE;
+                    }
+                    stagedFileSystem.assign(fileSystemStorage.data(), length);
+                }
+                if (volumeName != NULL)
+                    volumeName->swap(stagedVolume);
+                if (fileSystemName != NULL)
+                    fileSystemName->swap(stagedFileSystem);
+                if (volumeSerialNumber != NULL)
+                    *volumeSerialNumber = stagedSerial;
+                if (maximumComponentLength != NULL)
+                    *maximumComponentLength = stagedMaximumComponentLength;
+                if (fileSystemFlags != NULL)
+                    *fileSystemFlags = stagedFlags;
+                return TRUE;
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+        catch (const std::length_error&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+
+        const DWORD error = GetLastError();
+        if ((error != ERROR_MORE_DATA && error != ERROR_INSUFFICIENT_BUFFER) ||
+            (volumeName == NULL && fileSystemName == NULL) ||
+            capacity > (std::numeric_limits<DWORD>::max)() / 2)
+            return FALSE;
+        capacity *= 2;
+    }
+}
+
+BOOL MyGetVolumeInformationW(const wchar_t* path, std::wstring* rootOrCurReparsePoint,
+                             std::wstring* junctionOrSymlinkTgt, int* linkType,
+                             std::wstring* volumeName, LPDWORD lpVolumeSerialNumber,
+                             LPDWORD lpMaximumComponentLength, LPDWORD lpFileSystemFlags,
+                             std::wstring* fileSystemName)
+{
+    BOOL ret = TRUE;
+    if (volumeName != NULL)
+        volumeName->clear();
+    if (fileSystemName != NULL)
+        fileSystemName->clear();
+    if (junctionOrSymlinkTgt != NULL)
+        junctionOrSymlinkTgt->clear();
+    if (linkType != NULL)
+        *linkType = 0;
+
+    std::wstring resPath(path);
+    ResolveSubstsW(resPath);
+    std::wstring ourPath = GetRootPath(resPath.c_str());
+
+    if (!IsUNCPathW(ourPath.c_str()) && GetDriveTypeW(ourPath.c_str()) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
+    {                                                                                  // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
+        CLocalPathResolutionW res;
+        ResolveLocalPathWithReparsePointsW(path, res);
+        ourPath = res.ResPath;
+        if (junctionOrSymlinkTgt != NULL)
+            *junctionOrSymlinkTgt = res.JunctionOrSymlinkTgt;
+        if (linkType != NULL)
+            *linkType = res.LinkType;
+        if (res.RootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
+            *rootOrCurReparsePoint = res.RootOrCurReparsePoint;
+
+        while (!QueryVolumeInformationOwnedW(
+            ourPath.c_str(), volumeName, lpVolumeSerialNumber,
+            lpMaximumComponentLength, lpFileSystemFlags, fileSystemName))
+        {
+            if (!res.CutResPathIsPossible || !CutDirectoryW(ourPath))
+            {
+                ret = FALSE; // we must not cut it or even the root did not succeed
+                break;
+            }
+            SalPathAddBackslashW(ourPath);
+        }
+
+        if (!res.RootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
+        { // ourPath is ResolveSubsts(path) or a shortened version of it
+            std::wstring substRoot = GetRootPath(path);
+            ResolveSubstsW(substRoot);
+            *rootOrCurReparsePoint = GetRootPath(path);
+            if (substRoot.size() < ourPath.size()) // the reported path is deeper than the substituted root, so re-append the remainder
+            {
+                if (_wcsnicmp(substRoot.c_str(), ourPath.c_str(), substRoot.size()) == 0) // always true
+                {
+                    SalPathAppendW(*rootOrCurReparsePoint, ourPath.c_str() + substRoot.size());
+                    SalPathAddBackslashW(*rootOrCurReparsePoint);
+                }
+                else
+                {
+                    TRACE_E("MyGetVolumeInformationW(): unexpected prefix of resolved path");
+                    *rootOrCurReparsePoint = ourPath;
+                }
+            }
+            // remove the trailing backslash except for "c:\"
+            if (rootOrCurReparsePoint->size() > 3 && rootOrCurReparsePoint->back() == L'\\')
+                rootOrCurReparsePoint->pop_back();
         }
     }
     else
     {
-        ret = GetVolumeInformation(ourPath, lpVolumeNameBuffer, nVolumeNameSize,
-                                   lpVolumeSerialNumber, lpMaximumComponentLength,
-                                   lpFileSystemFlags, lpFileSystemNameBuffer,
-                                   nFileSystemNameSize);
+        ret = QueryVolumeInformationOwnedW(
+            ourPath.c_str(), volumeName, lpVolumeSerialNumber,
+            lpMaximumComponentLength, lpFileSystemFlags, fileSystemName);
         if (rootOrCurReparsePoint != NULL)
         {
-            GetRootPath(rootOrCurReparsePoint, path);
-            int l = (int)strlen(rootOrCurReparsePoint);
-            if (l > 3 && rootOrCurReparsePoint[l - 1] == '\\')
-                rootOrCurReparsePoint[l - 1] = 0; // remove the trailing backslash except for "c:\"
+            *rootOrCurReparsePoint = GetRootPath(path);
+            if (rootOrCurReparsePoint->size() > 3 && rootOrCurReparsePoint->back() == L'\\')
+                rootOrCurReparsePoint->pop_back();
         }
     }
     return ret;
 }
 
-// Structure for FSCTL_SET_REPARSE_POINT, FSCTL_GET_REPARSE_POINT, and
-// FSCTL_DELETE_REPARSE_POINT.
-// This version of the reparse data buffer is only for Microsoft tags.
+// Header used to interpret the opaque Microsoft-tag reparse blob returned by IFileSystem.
 
 struct TMN_REPARSE_DATA_BUFFER
 {
@@ -1621,218 +1336,219 @@ struct TMN_REPARSE_DATA_BUFFER
     WCHAR PathBuffer[1];
 };
 
-#define FSCTL_GET_REPARSE_POINT CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS) // REPARSE_DATA_BUFFER
 #define IO_REPARSE_TAG_SYMLINK (0xA000000CL)
 
-BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, DWORD repPointDstBufSize,
-                                int* repPointType, BOOL makeRelPathAbs)
+// Wide is the real implementation; the ANSI entry point below is a thin wrapper.
+//
+// The body was already wide internally - it did AnsiToWide() on its own argument before
+// every Win32 call - so the only lossy step was the caller's narrow path coming in. That
+// mattered: a junction whose name the code page cannot spell arrived as '?', the
+// attribute query below failed, and the function reported "not a reparse point". The
+// delete confirmation then called a junction a directory (audit A25).
+BOOL GetReparsePointDestinationOwnedW(const wchar_t* repPointDir, std::wstring* repPointDst,
+                                      int* repPointType, BOOL makeRelPathAbs)
 {
     if (repPointType != NULL)
         *repPointType = 0 /* UNKNOWN */;
 
     // if the path ends with a space/dot we must append '\\', otherwise GetFileAttributes
     // and CreateFile will trim spaces/dots and operate on a different path
-    const char* repPointDirCrFile = repPointDir;
-    CPathBuffer repPointDirCrFileCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(repPointDirCrFile, repPointDirCrFileCopy);
+    const std::wstring repPointDirCrFile = MakeCopyWithBackslashIfNeededW(repPointDir);
 
-    DWORD attrs = GetFileAttributesW(AnsiToWide(repPointDirCrFile).c_str());
-    if (attrs == 0xffffffff || (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
+    std::vector<BYTE> reparseData;
+    const FileResult reparseResult = gFileSystem->GetReparseData(repPointDirCrFile.c_str(), reparseData);
+    if (!reparseResult.success || reparseData.size() < offsetof(TMN_REPARSE_DATA_BUFFER, PathBuffer))
     {
-        //    TRACE_I("GetReparsePointDestination(): Reparse point not found: " << repPointDir);
+        TRACE_EW(L"GetReparsePointDestinationW(): Unable to get data of reparse point: " << repPointDir);
         return FALSE;
     }
-
-    HANDLE file = HANDLES_Q(CreateFileW(AnsiToWide(repPointDirCrFile).c_str(), 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
-                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
-    if (file == INVALID_HANDLE_VALUE)
-    {
-        DWORD err = GetLastError();
-        TRACE_E("GetReparsePointDestination(): Unable to open reparse point: " << repPointDir << ", error: " << err);
-        return FALSE;
-    }
-    DWORD dummy;
-    char buf[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-    TMN_REPARSE_DATA_BUFFER* juncData = (TMN_REPARSE_DATA_BUFFER*)buf;
-    if (DeviceIoControl(file, FSCTL_GET_REPARSE_POINT, NULL, 0, juncData,
-                        MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dummy, NULL) == 0 ||
+    TMN_REPARSE_DATA_BUFFER* juncData = (TMN_REPARSE_DATA_BUFFER*)reparseData.data();
+    if (
         juncData->ReparseTag != IO_REPARSE_TAG_MOUNT_POINT &&
             juncData->ReparseTag != IO_REPARSE_TAG_SYMLINK)
     {
-        HANDLES(CloseHandle(file));
-        TRACE_E("GetReparsePointDestination(): Unable to get data of reparse point: " << repPointDir);
+        TRACE_EW(L"GetReparsePointDestinationW(): Unable to get data of reparse point: " << repPointDir);
         return FALSE;
     }
-    HANDLES(CloseHandle(file));
 
-    WCHAR substName[1000];
-    WCHAR printName[1000];
+    std::wstring substName;
+    std::wstring printName;
+    const auto copyReparseName = [&](std::wstring& destination, size_t pathOffset,
+                                     WORD nameOffset, WORD nameLength) -> bool
+    {
+        const size_t begin = pathOffset + nameOffset;
+        if ((nameOffset & 1) != 0 || (nameLength & 1) != 0 ||
+            begin > reparseData.size() || nameLength > reparseData.size() - begin)
+            return false;
+        const size_t chars = nameLength / sizeof(WCHAR);
+        destination.resize(chars);
+        if (chars != 0)
+            memcpy(destination.data(), reparseData.data() + begin, chars * sizeof(WCHAR));
+        return true;
+    };
     int myType = 0;
     if (juncData->ReparseTag == IO_REPARSE_TAG_MOUNT_POINT)
     {
-        lstrcpynW(substName, (WCHAR*)((char*)juncData->PathBuffer + juncData->SubstituteNameOffset),
-                  min(juncData->SubstituteNameLength / sizeof(WCHAR) + 1, 1000));
-        lstrcpynW(printName, (WCHAR*)((char*)juncData->PathBuffer + juncData->PrintNameOffset),
-                  min(juncData->PrintNameLength / sizeof(WCHAR) + 1, 1000));
-        myType = _wcsnicmp(substName, L"\\??\\Volume", 10) == 0 ? 1 /* MOUNT POINT */ : 2 /* JUNCTION POINT */;
+        const size_t pathOffset = offsetof(TMN_REPARSE_DATA_BUFFER, PathBuffer);
+        if (!copyReparseName(substName, pathOffset, juncData->SubstituteNameOffset, juncData->SubstituteNameLength) ||
+            !copyReparseName(printName, pathOffset, juncData->PrintNameOffset, juncData->PrintNameLength))
+            return FALSE;
+        myType = substName.size() >= 10 && _wcsnicmp(substName.c_str(), L"\\??\\Volume", 10) == 0 ? 1 /* MOUNT POINT */ : 2 /* JUNCTION POINT */;
     }
     else
     {
         if (juncData->ReparseTag == IO_REPARSE_TAG_SYMLINK)
         {
-            lstrcpynW(substName, (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->SubstituteNameOffset),
-                      min(juncData->SubstituteNameLength / sizeof(WCHAR) + 1, 1000));
-            lstrcpynW(printName, (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->PrintNameOffset),
-                      min(juncData->PrintNameLength / sizeof(WCHAR) + 1, 1000));
+            const size_t pathOffset = offsetof(TMN_REPARSE_DATA_BUFFER, PathBuffer) + sizeof(ULONG);
+            if (!copyReparseName(substName, pathOffset, juncData->SubstituteNameOffset, juncData->SubstituteNameLength) ||
+                !copyReparseName(printName, pathOffset, juncData->PrintNameOffset, juncData->PrintNameLength))
+                return FALSE;
             myType = 3 /* SYMBOLIC LINK */;
         }
         else
         {
-            TRACE_E("GetReparsePointDestination(): Unknown type of reparse point: " << repPointDir);
+            TRACE_EW(L"GetReparsePointDestinationW(): Unknown type of reparse point: " << repPointDir);
             return FALSE;
         }
     }
     if (repPointType != NULL)
         *repPointType = myType;
-    if (repPointDstBuf != NULL)
+    if (repPointDst != NULL)
     {
-        WCHAR* s = printName;
-        if (*s == 0)
+        std::wstring destination = printName;
+        if (destination.empty())
         {
-            s = substName;
-            if (_wcsnicmp(s, L"\\??\\", 4) == 0)
-                s = substName + 4; // skip "\\??\\" in substName
+            destination = substName;
+            if (destination.size() >= 4 && _wcsnicmp(destination.c_str(), L"\\??\\", 4) == 0)
+                destination.erase(0, 4); // skip "\\??\\" in substName
         }
-        if (myType == 2 /* JUNCTION POINT */ && (*s == 0 || *(s + 1) != L':' || *(s + 2) != L'\\'))
+        if (myType == 2 /* JUNCTION POINT */ &&
+            (destination.size() < 3 || destination[1] != L':' || destination[2] != L'\\'))
         {
-            TRACE_E("GetReparsePointDestination(): Unexpected format of junction point (relative path): " << repPointDir);
+            TRACE_EW(L"GetReparsePointDestinationW(): Unexpected format of junction point (relative path): " << repPointDir);
             return FALSE;
         }
-        WCHAR symlinkAbsPath[1000];
         if (makeRelPathAbs && myType == 3 /* SYMBOLIC LINK */ &&
-            !(*s != 0 && *(s + 1) == L':' && *(s + 2) == L'\\' || *s == L'\\' && *(s + 1) == L'\\'))
+            !(destination.size() >= 3 && destination[1] == L':' && destination[2] == L'\\' ||
+              destination.size() >= 2 && destination[0] == L'\\' && destination[1] == L'\\'))
         { // the symlink is relative; try converting it to an absolute path
             if (repPointDir[0] == 0 || repPointDir[1] != ':')
             {
-                TRACE_E("GetReparsePointDestination(): Unexpected format of symbolic link name (it is not a local path): " << repPointDir);
+                TRACE_EW(L"GetReparsePointDestinationW(): Unexpected format of symbolic link name (it is not a local path): " << repPointDir);
                 return FALSE;
             }
-            symlinkAbsPath[0] = (WCHAR)(unsigned char)repPointDir[0]; // a bit of a hack (we rely on a fact that 'a-zA-Z' convert to Unicode 1:1)
-            symlinkAbsPath[1] = L':';
-            if (*s == L'\\')
-                lstrcpynW(symlinkAbsPath + 2, s, 1000 - 2);
+            // The drive letter no longer needs the "'a-zA-Z' convert 1:1" hack the ANSI
+            // version relied on, and the tail no longer needs a conversion at all - it was
+            // only ever converting the function's own argument back to the width it had
+            // already been widened from.
+            if (!destination.empty() && destination[0] == L'\\')
+                destination = std::wstring(repPointDir, 2) + destination;
             else
             {
-                if (MultiByteToWideChar(CP_ACP, 0, repPointDir + 2, -1, symlinkAbsPath + 2, 1000 - 2) == 0)
+                std::wstring absolutePath = repPointDir;
+                SalPathRemoveBackslashW(absolutePath);
+                const size_t lastComp = absolutePath.find_last_of(L'\\');
+                if (lastComp == std::wstring::npos)
                 {
-                    DWORD err = GetLastError();
-                    TRACE_E("GetReparsePointDestination(): MultiByteToWideChar error: " << err);
+                    TRACE_EW(L"GetReparsePointDestinationW(): Unexpected format of symbolic link name (it does not contain backslash): " << repPointDir);
                     return FALSE;
                 }
-                symlinkAbsPath[1000 - 1] = 0;
-                int len = lstrlenW(symlinkAbsPath);
-                if (symlinkAbsPath[len - 1] == L'\\')
-                    symlinkAbsPath[len - 1] = 0;
-                WCHAR* lastComp = wcsrchr(symlinkAbsPath, L'\\');
-                if (lastComp == NULL)
-                {
-                    TRACE_E("GetReparsePointDestination(): Unexpected format of symbolic link name (it does not contain backslash): " << repPointDir);
-                    return FALSE;
-                }
-                lstrcpynW(lastComp + 1, s, (int)(1000 - ((lastComp + 1) - symlinkAbsPath)));
+                absolutePath.resize(lastComp + 1);
+                absolutePath += destination;
+                destination = std::move(absolutePath);
             }
-            s = symlinkAbsPath;
         }
-        if (myType == 3 /* SYMBOLIC LINK */ && *s != 0 && *(s + 1) == L':' && *(s + 2) == L'\\')
-            SalRemovePointsFromPath(s + 3);
-        if (WideCharToMultiByte(CP_ACP, 0, s, -1, repPointDstBuf, repPointDstBufSize, NULL, NULL) == 0)
+        if (myType == 3 /* SYMBOLIC LINK */ && destination.size() >= 3 &&
+            destination[1] == L':' && destination[2] == L'\\')
         {
-            DWORD err = GetLastError();
-            TRACE_I("WideCharToMultiByte error: " << err);
-            return FALSE;
+            SalRemovePointsFromPath(destination.data() + 3);
+            destination.resize(wcslen(destination.c_str()));
         }
-        if (repPointDstBufSize > 0)
-            repPointDstBuf[repPointDstBufSize - 1] = 0;
+        *repPointDst = std::move(destination);
     }
     return TRUE;
 }
-
-BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BOOL* error)
+// Walk components by index in an owned string so no mutable-buffer pointer can outlive
+// a reallocation.
+BOOL GetCurrentLocalReparsePointW(const wchar_t* path, std::wstring& currentReparsePoint)
 {
     BOOL ret = TRUE;
-    lstrcpyn(currentReparsePoint, path, MAX_PATH);
-    if (!SalPathAddBackslash(currentReparsePoint, MAX_PATH))
+
+    currentReparsePoint.assign(path);
+    SalPathAddBackslashW(currentReparsePoint);
+
+    // Walk reparse points from the start of the path to its end, or to the first
+    // symlink leading to a network path.
+    size_t lastRepPointEnd = std::wstring::npos;
+    const wchar_t* rootEnd = SkipRootW(currentReparsePoint.c_str());
+    size_t pos = static_cast<size_t>(rootEnd - currentReparsePoint.c_str()) + 1; // always ends with a backslash
+    while (pos <= currentReparsePoint.size())
     {
-        TRACE_E("GetCurrentLocalReparsePoint(): too long path");
-        if (error != NULL)
-            *error = TRUE;
-        ret = FALSE;
-    }
-    else
-    {
-        // walk through reparse points from the beginning of the path to the end or to the first symlink leading to a network path
-        CPathBuffer repPointPath; // Heap-allocated for long path support
-        char* end = (char*)SkipRoot(currentReparsePoint) + 1; // currentReparsePoint always ends with a backslash
-        char* lastRepPointEnd = NULL;
-        while (1)
+        size_t sep = currentReparsePoint.find(L'\\', pos);
+        if (sep == std::wstring::npos)
+            break; // that was the last component of the path, stop here
+        pos = sep + 1;
+
+        // Probe the path truncated at this component.
+        const std::wstring probe = currentReparsePoint.substr(0, pos);
+        std::wstring repPointPath;
+        if (GetReparsePointDestinationOwnedW(probe.c_str(), &repPointPath, NULL, TRUE))
         {
-            end = strchr(end, '\\');
-            if (end == NULL)
-                break; // that was the last component of the path, stop here
-            end++;
-            char backup = *end;
-            *end = 0;
-            if (GetReparsePointDestination(currentReparsePoint, repPointPath, repPointPath.Size(), NULL, TRUE))
+            lastRepPointEnd = pos;
+            if (IsUNCPathW(repPointPath.c_str()) ||
+                repPointPath.size() >= 2 && repPointPath[1] == L':' &&
+                    GetDriveTypeForDriveLetterPathW(repPointPath.c_str()) == DRIVE_REMOTE) // symlink to a UNC or mapped network path (available since Vista)
             {
-                lastRepPointEnd = end;
-                if (IsUNCPath(repPointPath) ||
-                    repPointPath[0] != 0 && repPointPath[1] == ':' &&
-                        GetDriveTypeForDriveLetterPath(repPointPath) == DRIVE_REMOTE) // symlink to a UNC or mapped network path (available since Vista)
-                {
-                    break;
-                }
+                break;
             }
-            *end = backup;
         }
-        if (lastRepPointEnd != NULL)
-            *lastRepPointEnd = 0;
-        else
-            ret = FALSE; // no reparse point found
     }
+
+    if (lastRepPointEnd != std::wstring::npos)
+        currentReparsePoint.resize(lastRepPointEnd);
+    else
+        ret = FALSE; // no reparse point found
+
     if (!ret)
-        GetRootPath(currentReparsePoint, path);
+        currentReparsePoint = GetRootPath(path);
     return ret;
 }
 
-UINT MyGetDriveType(const char* path)
+// Wide sibling. One of three volume queries that share the same
+// shape: resolve SUBSTs, take the root, and on a fixed disk walk the reparse
+// points before asking Windows — shortening the path until the API answers.
+// All of it now runs on the wide family ported in this task, so the narrow
+// round trip is gone rather than relocated.
+UINT MyGetDriveTypeW(const wchar_t* path)
 {
-    CPathBuffer ourPath; // Heap-allocated for long path support
-    CPathBuffer resPath; // Heap-allocated for long path support
-    lstrcpyn(resPath, path, resPath.Size());
-    ResolveSubsts(resPath, resPath.Size());
-    GetRootPath(ourPath, resPath);
-    UINT ret = DRIVE_UNKNOWN;
-    if (!IsUNCPath(ourPath))
-    {
-        UINT drvType = GetDriveType(ourPath);
-        if (drvType == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
-        {                           // gradually try shortening the path; on a mounted directory it can return the mounted disk parameters
-            // if it is not a root path, try traversing the reparse points as well
-            BOOL cutPathIsPossible = TRUE;
-            ResolveLocalPathWithReparsePoints(ourPath, ourPath.Size(), path, &cutPathIsPossible, NULL, NULL, NULL, NULL, NULL);
+    std::wstring resPath(path);
+    ResolveSubstsW(resPath);
+    std::wstring ourPath = GetRootPath(resPath.c_str());
 
-            while ((ret = GetDriveType(ourPath)) == DRIVE_UNKNOWN)
-            { // NOTE: differs from MyGetVolumeInformation because GetDriveType returns success for any path (not just root + mounted volume)
-                if (!cutPathIsPossible || !CutDirectory(ourPath))
-                    break; // we must not cut it or even the root did not succeed; end with error
-                SalPathAddBackslash(ourPath, ourPath.Size());
+    UINT ret = DRIVE_UNKNOWN;
+    if (!IsUNCPathW(ourPath.c_str()))
+    {
+        UINT drvType = GetDriveTypeW(ourPath.c_str());
+        if (drvType == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
+        {
+            CLocalPathResolutionW res;
+            ResolveLocalPathWithReparsePointsW(path, res);
+            ourPath = res.ResPath;
+
+            // NOTE: differs from MyGetVolumeInformation because GetDriveType returns
+            // success for any path (not just root + mounted volume)
+            while ((ret = GetDriveTypeW(ourPath.c_str())) == DRIVE_UNKNOWN)
+            {
+                if (!res.CutResPathIsPossible || !CutDirectoryW(ourPath))
+                    break; // we must not cut it or even the root did not succeed
+                SalPathAddBackslashW(ourPath);
             }
         }
         else
             ret = drvType;
     }
     else
-        ret = GetDriveType(ourPath);
+        ret = GetDriveTypeW(ourPath.c_str());
     return ret;
 }
 
@@ -1841,46 +1557,38 @@ UINT MyGetDriveType(const char* path)
 // GetSubstInformation
 //
 
-BOOL MyQueryDosDevice(BYTE driveNum, char* target, int maxTarget)
+BOOL MyQueryDosDeviceW(BYTE driveNum, std::wstring& target)
 {
-    char deviceName[3];
-    deviceName[0] = driveNum + 'A';
-    deviceName[1] = ':';
-    deviceName[2] = 0;
-    return QueryDosDevice(deviceName, target, MAX_PATH);
+    const wchar_t deviceName[3] = {static_cast<wchar_t>(driveNum + L'A'), L':', 0};
+    DWORD capacity = 256;
+    for (;;)
+    {
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        const DWORD length = QueryDosDeviceW(deviceName, buffer.data(), capacity);
+        if (length != 0)
+        {
+            target.assign(buffer.data(), wcslen(buffer.data()));
+            return TRUE;
+        }
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER ||
+            capacity > static_cast<DWORD>((std::numeric_limits<int>::max)() / 2))
+            return FALSE;
+        capacity *= 2;
+    }
 }
 
-BOOL GetSubstInformation(BYTE driveNum, char* path, int pathMax)
+BOOL GetSubstInformationW(BYTE driveNum, std::wstring& path)
 {
-    CPathBuffer target; // Heap-allocated for long path support
-    if (MyQueryDosDevice(driveNum, target, target.Size()))
-    {
-        //  A (floppy)                          \Device\Floppy0
-        //  C (fixed disk)                      \Device\HarddiskVolume1
-        //  D (fixed disk)                      \Device\HarddiskVolume2
-        //  U -> V:                             \??\V:
-        //  V (mapped \\drak\share)           \Device\LanmanRedirector\;V:00000000000fdf1\drak\share
-        //  W -> \\drak\share:                  \??\UNC\drak\share
-        //  X -> D:                             \??\D:
-        //  Y -> C:\Windows                     \??\C:\Windows
-        if (memcmp(target, "\\??\\", 4) == 0)
-        {
-            if (((target[4] >= 'a' && target[4] <= 'z') || (target[4] >= 'A' && target[4] <= 'Z')) &&
-                target[5] == ':')
-            {
-                lstrcpyn(path, target + 4, pathMax);
-                return TRUE;
-            }
-            if (memcmp(target + 4, "UNC\\", 4) == 0)
-            {
-                lstrcpyn(path, "\\", pathMax);
-                if (pathMax > 2)
-                    lstrcpyn(path + 1, target + 7, pathMax - 1);
-                return TRUE;
-            }
-        }
-    }
-    return FALSE;
+    std::wstring target;
+    if (!MyQueryDosDeviceW(driveNum, target))
+        return FALSE;
+
+    std::wstring resolved;
+    if (sally::paths::ParseDosDeviceTargetW(target.c_str(), resolved) ==
+        sally::paths::DosDeviceKind::Unresolvable)
+        return FALSE;
+    path.swap(resolved);
+    return TRUE;
 }
 
 //****************************************************************************
@@ -1895,214 +1603,10 @@ void GetMessagePos(POINT& p)
     p.y = ((int)(short)HIWORD(w));
 }
 
-//
-// ****************************************************************************
-// AlterFileName
-//  - changes the format of the file name (letter casing)
-//
-//   tgtName - buffer for the result (at least as large as filename)
-//
-//   filename - input file name
-//   filenameLen - length of the filename string; if it is -1, the function determines it itself
-//                 optimization for CFilesWindow::RefreshListBox(), which
-//                 calls this function extensively; in random cases -1 is sufficient
-//
-//   format - 1 - capitalized words
-//            2 - all lowercase letters
-//            3 - all uppercase letters
-//            4 - unchanged
-//            5 - if it is a DOS name (8.3) -> capitalized words
-//            6 - file lowercase, directory uppercase
-//            7 - capitalized name and lowercase extension
-//
-//   change - 0 - change both the name and the extension
-//            1 - change only the name (possible only with format == 1, 2, 3, 4)
-//            2 - change only the extension (possible only with format == 1, 2, 3, 4)
-//
-//   dir    - is it a directory?
-
-void AlterFileName(char* tgtName, const char* filename, int filenameLen, int format, int change, BOOL dir)
-{
-    // j.r. I disabled the macro because AlterFileName is called heavily from RefreshListBox()
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE6("AlterFileName(, %s, %d, %d, %d, %d)", filename, filenameLen, format, change, dir);
-    if (format == 6)
-        format = dir ? 3 : 2; // VC display style
-    if (format == 7 && change != 0)
-        format = (change == 1) ? 1 : 2; // convert to mixed/lower case
-
-    const char* ext = NULL; // points past the last dot or is NULL (no extension)
-    char* extW = NULL;     // writable ext pointer (for change==1 post-processing, points into tgtName)
-    if (change != 0 && format != 5 && format != 7)
-    {
-        // Copy filename into tgtName so we can modify it safely
-        strcpy(tgtName, filename);
-        char* ws = tgtName;
-        char* wext = NULL;
-        while (*ws != 0)
-            if (*ws++ == '.')
-                wext = ws;
-        if (change == 1) // change only the name
-        {
-            if (wext != NULL)
-                *(wext - 1) = 0; // overwrite '.' with end of string
-            extW = wext;
-        }
-        else // change only the extension
-        {
-            if (wext == NULL || *wext == 0) // no extension
-                return; // tgtName already has the full copy
-            tgtName += wext - tgtName;
-            filename = wext;
-        }
-        filename = tgtName; // now filename points to the truncated copy
-    }
-
-    switch (format)
-    {
-    case 5: // explorer style
-    {
-        const char* s = filename;
-        int c = 8;
-        while (c-- && *s != 0 && *s == UpperCase[*s] && *s != '.')
-            s++; // name
-        if (*s == '.')
-            s++;
-        else if (*s != 0)
-        {
-            strcpy(tgtName, filename);
-            break;
-        }
-        c = 3;
-        while (c-- && *s != 0 && *s != '.' && *s == UpperCase[*s])
-            s++; // ext
-        if (*s != 0)
-        {
-            strcpy(tgtName, filename);
-            break;
-        }
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        const char* name = filename;
-        while (*name != 0)
-        {
-            if (!capital)
-            {
-                *tgt++ = LowerCase[*name];
-                if (*name++ == ' ')
-                    capital = TRUE;
-            }
-            else
-            {
-                *tgt++ = UpperCase[*name];
-                if (*name++ != ' ')
-                    capital = FALSE;
-            }
-        }
-        *tgt = 0;
-        break;
-    }
-
-    case 1: // capitalize
-    {
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        const char* name = filename;
-        while (*name != 0)
-        {
-            if (!capital)
-            {
-                *tgt++ = LowerCase[*name];
-                if (*name == ' ' || *name == '.')
-                    capital = TRUE;
-            }
-            else
-            {
-                *tgt++ = UpperCase[*name];
-                if (*name != ' ' || *name == '.')
-                    capital = FALSE;
-            }
-            name++;
-        }
-        *tgt = 0;
-        break;
-    }
-
-    case 2: // lower case
-    {
-        char* tgt = tgtName;
-        const char* name = filename;
-        while (*name != 0)
-            *tgt++ = LowerCase[*name++];
-        *tgt = 0;
-        break;
-    }
-
-    case 3: // upper case
-    {
-        char* tgt = tgtName;
-        const char* name = filename;
-        while (*name != 0)
-            *tgt++ = UpperCase[*name++];
-        *tgt = 0;
-        break;
-    }
-
-    case 7: // name mixed case, extension lower case
-    {
-        const char* s = filename;
-        while (*s != 0) // searching for the last dot (file extension)
-            if (*s++ == '.')
-                ext = s;
-        //    if (ext == NULL || ext <= filename + 1) ext = s;  // ".cvspass" in Windows is considered an extension ...
-        if (ext == NULL)
-            ext = s;
-
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        const char* name = filename;
-        while (name < ext) // name mixed case
-        {
-            if (!capital)
-            {
-                *tgt++ = LowerCase[*name];
-                if (*name++ == ' ')
-                    capital = TRUE;
-            }
-            else
-            {
-                *tgt++ = UpperCase[*name];
-                if (*name++ != ' ')
-                    capital = FALSE;
-            }
-        }
-        while (*name != 0)
-            *tgt++ = LowerCase[*name++]; // extension lower case
-        *tgt = 0;
-        break;
-    }
-
-    default:
-    {
-        if (filenameLen == -1)
-            strcpy(tgtName, filename);
-        else
-            memcpy(tgtName, filename, filenameLen + 1);
-        break;
-    }
-    }
-
-    if (change == 1 && format != 5 && format != 7) // change only the name
-    {
-        if (extW != NULL)
-        {
-            *--extW = '.';                               // restore '.' in the name
-            strcpy(tgtName + (extW - filename), extW);   // append the extension
-        }
-    }
-}
-
-// AlterFileNameW moved to common/PathDisplayUtils.cpp (shared with private tests).
+// 2026-08-25: the narrow AlterFileName(char*, ...) was deleted - confirmed-dead
+// (zero callers; the legacy v107 ABI shim forwards to WideGeneral.AlterFileName, never to this
+// free function). AlterFileNameW (common/PathDisplayUtils.cpp, doc-commented in its own header)
+// is the sole surviving implementation.
 
 // ****************************************************************************
 
@@ -2129,19 +1633,19 @@ void MinimizeApp(HWND mainWnd)
 }
 
 // ****************************************************************************
-BOOL CheckOnlyOneInstance(const CCommandLineParams* cmdLineParams)
+BOOL CheckOnlyOneInstance(const sally::cmdline::CommandLineRequest* request)
 {
     // :-) a small gift for the transition to the text config :-))))
     // load even if ForceOnlyOneInstance == TRUE
     LoadSaveToRegistryMutex.Enter();
     HKEY salamander;
     if (SALAMANDER_ROOT_REG != NULL &&
-        OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
+        OpenKeyW(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
     {
         HKEY actKey;
-        if (OpenKey(salamander, SALAMANDER_CONFIG_REG, actKey))
+        if (OpenKeyW(salamander, SALAMANDER_CONFIG_REG, actKey))
         {
-            GetValue(actKey, CONFIG_ONLYONEINSTANCE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_ONLYONEINSTANCE_REG, REG_DWORD,
                      &Configuration.OnlyOneInstance, sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -2151,7 +1655,7 @@ BOOL CheckOnlyOneInstance(const CCommandLineParams* cmdLineParams)
 
     if (Configuration.ForceOnlyOneInstance || Configuration.OnlyOneInstance)
     {
-        return TaskList.ActivateRunningInstance(cmdLineParams);
+        return TaskList.ActivateRunningInstance(request);
     }
     return FALSE;
 }
@@ -2182,7 +1686,7 @@ BOOL CheckOnlyOneInstance(const char *leftPath, const char *rightPath, const cha
     int c = 100;   // wait up to five seconds to find the predecessor (it may not have opened the main window yet)
     while (c--)
     {
-      wnd = FindWindow(CMAINWINDOW_CLASSNAME, NULL);
+      wnd = FindWindowW(CMAINWINDOW_CLASSNAME, NULL);
       if (wnd == NULL && !FirstLocalInstance_252b1_or_later) 
         Sleep(50);
       else 
@@ -2239,8 +1743,9 @@ BOOL CheckOnlyOneInstance(const char *leftPath, const char *rightPath, const cha
         if (c == 0)
         {
           TRACE_I("Target process is not responding.");
-          return SalMessageBox(NULL, LoadStr(IDS_SALAMANDBUSY), LoadStr(IDS_QUESTION),
-                               MB_YESNOCANCEL | MB_ICONQUESTION) != IDYES;
+          return SalMessageBoxW(NULL, LoadStrOwned(IDS_SALAMANDBUSY).c_str(),
+                                LoadStrOwned(IDS_QUESTION).c_str(),
+                                MB_YESNOCANCEL | MB_ICONQUESTION) != IDYES;
         }
       }
       return TRUE;
@@ -2310,26 +1815,117 @@ void DrawSplitLine(HWND HWindow, int newDragSplitX, int oldDragSplitX, RECT clie
 
 // ****************************************************************************
 
-BOOL CreateKey(HKEY hKey, const char* name, HKEY& createdKey)
+// ****************************************************************************
+// Wide facades. See consts.h for why the worker-thread marshaling
+// stays: it keeps the UI responsive during a slow-hive read and guards against
+// re-entrant deadlock. These widen the NAME, nothing else.
+//
+// gRegistry is the wide implementation; where the worker thread is usable we go
+// through it exactly as the ANSI path does, so the two behave identically apart
+// from the name's encoding.
+
+BOOL CreateKeyW(HKEY hKey, const wchar_t* name, HKEY& createdKey)
 {
-    return RegistryWorkerThread.CreateKey(hKey, name, createdKey);
+    return gRegistry->CreateKey(hKey, name, createdKey).success;
 }
 
-// ****************************************************************************
-
-BOOL SetValue(HKEY hKey, const char* name, DWORD type, const void* data, DWORD dataSize)
+BOOL OpenKeyW(HKEY hKey, const wchar_t* name, HKEY& openedKey)
 {
-    return RegistryWorkerThread.SetValue(hKey, name, type, data, dataSize);
+    return gRegistry->OpenKeyReadWrite(hKey, name, openedKey).success;
 }
 
-// ****************************************************************************
-
-BOOL OpenKey(HKEY hKey, const char* name, HKEY& openedKey)
+BOOL DeleteKeyW(HKEY hKey, const wchar_t* name)
 {
-    return RegistryWorkerThread.OpenKey(hKey, name, openedKey);
+    return gRegistry->DeleteKey(hKey, name).success;
 }
 
-// ****************************************************************************
+BOOL DeleteValueW(HKEY hKey, const wchar_t* name)
+{
+    return gRegistry->DeleteValue(hKey, name).success;
+}
+
+BOOL SetValueW(HKEY hKey, const wchar_t* name, DWORD type, const void* data, DWORD dataSize)
+{
+    // IRegistry is typed rather than raw on the write side, so dispatch on the
+    // caller's REG_* type. REG_SZ takes the wide string as-is: that is the whole
+    // point of this facade, and it is what makes the value readable by any other
+    // tool (unlike the legacy history shape - see LoadHistoryW's contract note).
+    //
+    // REG_SZ's length ignores 'dataSize' entirely and derives it from
+    // 'data' itself, so this branch has always required 'data' to genuinely be a
+    // wchar_t* string. A caller that instead passes a narrow char* (found live in
+    // several plugins' registry-persisted fields; see 24-intree-plugins-wide.md's
+    // registry-corruption sub-campaign) gets its buffer scanned for a two-byte-
+    // aligned zero code unit, which can run past the buffer's real end looking for
+    // one - an out-of-bounds read, not just wrong data. ComputeRegSzSafeLength
+    // bounds that scan and refuses (rather than reads further out of bounds or
+    // writes a bogus-length value) once no terminator turns up within the cap.
+    switch (type)
+    {
+    case REG_SZ:
+    {
+        const wchar_t* wideData = (const wchar_t*)data;
+        size_t len;
+        if (!ComputeRegSzSafeLength(wideData, len))
+        {
+            TRACE_EW(L"SetValueW: REG_SZ value '" << name << L"' has no wide NUL terminator within "
+                     L"the safe scan bound - refusing to write (narrow data passed where a wide "
+                     L"string was required?)");
+            return FALSE;
+        }
+        return gRegistry->SetString(hKey, name, wideData).success;
+    }
+    case REG_DWORD:
+        return gRegistry->SetDWord(hKey, name, *(const DWORD*)data).success;
+    case REG_QWORD:
+        return gRegistry->SetQWord(hKey, name, *(const uint64_t*)data).success;
+    default:
+        // Everything else - REG_BINARY, but also REG_EXPAND_SZ and REG_MULTI_SZ, which v107
+        // plugins do write - is bytes. Write them under the TYPE THE CALLER ASKED FOR: SetBinary
+        // hard-codes REG_BINARY, and the read side refuses a type mismatch, so stamping the wrong
+        // type here makes the value unreadable forever after. The worker path (regwork.cpp) has
+        // always preserved the type; this facade must too.
+        return gRegistry->WriteValue(hKey, name, (RegValueType)type, data, dataSize).success;
+    }
+}
+
+BOOL GetValueW(HKEY hKey, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize)
+{
+    RegValueType actualType = RegValueType::None;
+    std::vector<uint8_t> data;
+    if (!gRegistry->GetValue(hKey, name, actualType, data).success)
+        return FALSE;
+    // The ANSI facade refuses a type mismatch rather than handing back bytes the
+    // caller will misread; keep that contract exactly.
+    if ((DWORD)actualType != type)
+        return FALSE;
+    if (data.size() > bufferSize)
+        return FALSE;
+    if (!data.empty())
+        memcpy(buffer, data.data(), data.size());
+    return TRUE;
+}
+
+BOOL GetStringValueW(HKEY hKey, const wchar_t* name, std::wstring& value)
+{
+    std::wstring loaded;
+    if (!gRegistry->GetString(hKey, name, loaded).success)
+        return FALSE;
+    value = std::move(loaded);
+    return TRUE;
+}
+
+BOOL GetSizeW(HKEY hKey, const wchar_t* name, DWORD type, DWORD& bufferSize)
+{
+    RegValueType actualType = RegValueType::None;
+    std::vector<uint8_t> data;
+    if (!gRegistry->GetValue(hKey, name, actualType, data).success)
+        return FALSE;
+    if ((DWORD)actualType != type)
+        return FALSE;
+    bufferSize = (DWORD)data.size();
+    return TRUE;
+}
 
 void CloseKey(HKEY hKey)
 {
@@ -2338,33 +1934,48 @@ void CloseKey(HKEY hKey)
 
 // ****************************************************************************
 
-BOOL DeleteKey(HKEY hKey, const char* name)
-{
-    return RegistryWorkerThread.DeleteKey(hKey, name);
-}
-
-// ****************************************************************************
-
-BOOL DeleteValue(HKEY hKey, const char* name)
-{
-    return RegistryWorkerThread.DeleteValue(hKey, name);
-}
-
-// ****************************************************************************
-
-BOOL GetValue(HKEY hKey, const char* name, DWORD type, void* buffer, DWORD bufferSize)
-{
-    return RegistryWorkerThread.GetValue(hKey, name, type, buffer, bufferSize);
-}
-
-BOOL GetValue2(HKEY hKey, const char* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
+BOOL GetValue2(HKEY hKey, const wchar_t* name, DWORD type1, DWORD type2, DWORD* returnedType, void* buffer, DWORD bufferSize)
 {
     return RegistryWorkerThread.GetValue2(hKey, name, type1, type2, returnedType, buffer, bufferSize);
 }
 
-// ****************************************************************************
+// Configuration operations route through RegistryWorkerThread rather than the
+// direct gRegistry/*W facades. Those two
+// paths are not interchangeable: RegistryWorkerThread pumps the message loop
+// (MsgWaitForMultipleObjects) so a slow/network-backed hive cannot freeze the UI
+// during config load/save and preserves the established error reporting.
 
-BOOL GetSize(HKEY hKey, const char* name, DWORD type, DWORD& bufferSize)
+BOOL CreateKey(HKEY hKey, const wchar_t* name, HKEY& createdKey)
+{
+    return RegistryWorkerThread.CreateKey(hKey, name, createdKey);
+}
+
+BOOL OpenKey(HKEY hKey, const wchar_t* name, HKEY& openedKey)
+{
+    return RegistryWorkerThread.OpenKey(hKey, name, openedKey);
+}
+
+BOOL DeleteKey(HKEY hKey, const wchar_t* name)
+{
+    return RegistryWorkerThread.DeleteKey(hKey, name);
+}
+
+BOOL DeleteValue(HKEY hKey, const wchar_t* name)
+{
+    return RegistryWorkerThread.DeleteValue(hKey, name);
+}
+
+BOOL SetValue(HKEY hKey, const wchar_t* name, DWORD type, const void* data, DWORD dataSize)
+{
+    return RegistryWorkerThread.SetValue(hKey, name, type, data, dataSize);
+}
+
+BOOL GetValue(HKEY hKey, const wchar_t* name, DWORD type, void* buffer, DWORD bufferSize)
+{
+    return RegistryWorkerThread.GetValue(hKey, name, type, buffer, bufferSize);
+}
+
+BOOL GetSize(HKEY hKey, const wchar_t* name, DWORD type, DWORD& bufferSize)
 {
     return RegistryWorkerThread.GetSize(hKey, name, type, bufferSize);
 }
@@ -2378,33 +1989,50 @@ BOOL ClearKey(HKEY key)
 
 // ****************************************************************************
 
-BOOL LoadRGB(HKEY hKey, const char* name, COLORREF& color)
+// The pre-2.53 REG_SZ spelling of a colour - "r,g,b" for LoadRGB, "r,g,b,f" for LoadRGBF - parsed
+// out of the value as it comes back from the registry.
+//
+// THE PAYLOAD IS UTF-16, and always has been. The old build wrote it with the ANSI value API, and
+// RegSetValueExA transcodes its buffer CP_ACP -> UTF-16 before storing; reading it back through
+// RegQueryValueExA reversed that transcode, which is why a narrow scan was correct THEN. The wide
+// facade hands the stored bytes over unconverted, so the same scan finds a NUL one byte into the
+// first digit and every legacy colour loads as near-black. Same family as the REG_SZ corruption
+// reg_sz_narrow_bridge.h fixes on the plugin side.
+//
+// 'maxChars' bounds the scan: GetValue2 copies whatever byte count the value carries, and a
+// truncated or unterminated one must not send the parser past the buffer.
+static void ParseLegacyRegSzColor(const wchar_t* text, size_t maxChars, BYTE* components, int count)
 {
-    char buf[50];
+    size_t pos = 0;
+    for (int i = 0; i < count; i++)
+    {
+        const size_t start = pos;
+        while (pos < maxChars && text[pos] != L'\0' && text[pos] != L',')
+            pos++;
+        const std::wstring field(text + start, text + pos);
+        components[i] = (BYTE)(DWORD)_wtoi(field.c_str());
+        if (pos >= maxChars || text[pos] == L'\0')
+            break;
+        pos++; // step over the separator
+    }
+}
+
+// The NAME is wide and so is the DATA - see ParseLegacyRegSzColor. LoadRGB still accepts the
+// pre-2.53 REG_SZ "r,g,b" spelling as well as the binary REG_DWORD one, and that is an on-disk
+// format existing users already have.
+BOOL LoadRGB(HKEY hKey, const wchar_t* name, COLORREF& color)
+{
+    // alignas: the REG_DWORD alternative is read out of this same buffer.
+    alignas(DWORD) wchar_t buf[50];
     DWORD returnedType;
     // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Altap\Altap Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
     // the representation as a string and the more efficient binary one
-    if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, 50))
+    if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, sizeof(buf)))
     {
         if (returnedType == REG_SZ)
         {
-            BOOL end;
-            char *s, *st;
-            BYTE c[3];
-            c[0] = c[1] = c[2] = 0;
-            s = st = buf;
-            int i;
-            for (i = 0; i < 3; i++)
-            {
-                while (*s != 0 && *s != ',')
-                    s++;
-                end = (*s == 0);
-                *s = 0;
-                c[i] = (BYTE)(DWORD)atoi(st);
-                if (end)
-                    break;
-                st = ++s;
-            }
+            BYTE c[3] = {0, 0, 0};
+            ParseLegacyRegSzColor(buf, _countof(buf), c, 3);
             color = RGB(c[0], c[1], c[2]);
         }
         else
@@ -2418,7 +2046,7 @@ BOOL LoadRGB(HKEY hKey, const char* name, COLORREF& color)
 
 // ****************************************************************************
 
-BOOL SaveRGB(HKEY hKey, const char* name, COLORREF color)
+BOOL SaveRGB(HKEY hKey, const wchar_t* name, COLORREF color)
 {
     //  char buf[50];
     //  sprintf(buf, "%d, %d, %d", GetRValue(color), GetGValue(color), GetBValue(color));
@@ -2429,33 +2057,20 @@ BOOL SaveRGB(HKEY hKey, const char* name, COLORREF color)
 
 // ****************************************************************************
 
-BOOL LoadRGBF(HKEY hKey, const char* name, SALCOLOR& color)
+// ****************************************************************************
+
+BOOL LoadRGBF(HKEY hKey, const wchar_t* name, SALCOLOR& color)
 {
-    char buf[50];
+    alignas(DWORD) wchar_t buf[50];
     DWORD returnedType;
     // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Altap\Altap Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
     // the representation as a string and the more efficient binary one
-    if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, 50))
+    if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, sizeof(buf)))
     {
         if (returnedType == REG_SZ)
         {
-            BOOL end;
-            char *s, *st;
-            BYTE c[4];
-            c[0] = c[1] = c[2] = c[3] = 0;
-            s = st = buf;
-            int i;
-            for (i = 0; i < 4; i++)
-            {
-                while (*s != 0 && *s != ',')
-                    s++;
-                end = (*s == 0);
-                *s = 0;
-                c[i] = (BYTE)(DWORD)atoi(st);
-                if (end)
-                    break;
-                st = ++s;
-            }
+            BYTE c[4] = {0, 0, 0, 0};
+            ParseLegacyRegSzColor(buf, _countof(buf), c, 4);
             color = RGBF(c[0], c[1], c[2], c[3]);
         }
         else
@@ -2469,7 +2084,7 @@ BOOL LoadRGBF(HKEY hKey, const char* name, SALCOLOR& color)
 
 // ****************************************************************************
 
-BOOL SaveRGBF(HKEY hKey, const char* name, SALCOLOR color)
+BOOL SaveRGBF(HKEY hKey, const wchar_t* name, SALCOLOR color)
 {
     //  char buf[50];
     //  sprintf(buf, "%d, %d, %d, %d", GetRValue(color), GetGValue(color), GetBValue(color), GetFValue(color));
@@ -2479,146 +2094,190 @@ BOOL SaveRGBF(HKEY hKey, const char* name, SALCOLOR color)
 
 // ****************************************************************************
 
-BOOL LoadLogFont(HKEY hKey, const char* name, LOGFONT* logFont)
+static bool ReadConfigurationValueBytes(HKEY key, const wchar_t* name, DWORD type,
+                                        std::vector<BYTE>& bytes) noexcept
 {
-    char buf[200];
-    if (logFont != NULL && GetValue(hKey, name, REG_SZ, buf, 200))
+    DWORD byteCount = 0;
+    if (!GetSize(key, name, type, byteCount))
+        return false;
+    try
     {
-        logFont->lfHeight = -10;
-        logFont->lfWidth = 0;
-        logFont->lfEscapement = 0;
-        logFont->lfOrientation = 0;
-        logFont->lfWeight = FW_NORMAL;
-        logFont->lfItalic = 0;
-        logFont->lfUnderline = 0;
-        logFont->lfStrikeOut = 0;
-        logFont->lfCharSet = UserCharset;
-        logFont->lfOutPrecision = OUT_DEFAULT_PRECIS;
-        logFont->lfClipPrecision = CLIP_DEFAULT_PRECIS;
-        logFont->lfQuality = DEFAULT_QUALITY;
-        logFont->lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
-        strcpy(logFont->lfFaceName, "MS Shell Dlg 2");
+        std::vector<BYTE> candidate(byteCount);
+        if (byteCount != 0 && !GetValue(key, name, type, candidate.data(), byteCount))
+            return false;
+        bytes.swap(candidate);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 
-        char *s, *st;
-        BOOL end;
-        st = buf;
-        s = buf;
-        int i;
-        for (i = 0; i < 9; i++)
+// Reads a REG_SZ configuration value and hands back its text.
+//
+// BOTH shapes this file reads are UTF-16 on disk. The honest "<name> W" values are written wide by
+// SaveLogFont; the historical unsuffixed ones were written narrow, but through the ANSI value API,
+// and RegSetValueExA transcodes CP_ACP -> UTF-16 before storing. So there is nothing left to
+// decode on the way back in - a second ACP decode over these bytes stops at the NUL that follows
+// the first character's low byte, which is how a whole font spec used to collapse to one letter.
+//
+// (The one genuinely byte-shaped legacy value is the wide history written by pre-2.53 SaveHistoryW,
+// which pushed raw UTF-16 through the same ANSI API. That shape is NOT read here; it has its own
+// named importer with its own reasoning - see common/HistoryValueIo.h.)
+static bool ReadConfigurationString(HKEY key, const wchar_t* name, std::wstring& text) noexcept
+{
+    std::vector<BYTE> bytes;
+    if (!ReadConfigurationValueBytes(key, name, REG_SZ, bytes) ||
+        bytes.size() < sizeof(wchar_t) || bytes.size() % sizeof(wchar_t) != 0)
+    {
+        return false;
+    }
+    try
+    {
+        std::wstring candidate(bytes.size() / sizeof(wchar_t), L'\0');
+        memcpy(candidate.data(), bytes.data(), bytes.size());
+        const size_t terminator = candidate.find(L'\0');
+        if (terminator == std::wstring::npos)
+            return false; // unterminated value - refuse rather than invent an end
+        candidate.resize(terminator);
+        text.swap(candidate);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+// Current font persistence is UTF-16 under "<legacy name> W". The unsuffixed value remains a
+// read-only import of the historical payload; it no longer owns current font text.
+BOOL LoadLogFont(HKEY hKey, const wchar_t* name, LOGFONT* logFont)
+{
+    if (name == NULL || logFont == NULL)
+        return FALSE;
+
+    try
+    {
+        std::wstring wideName(name);
+        wideName += L" W";
+        std::wstring text;
+        if (ReadConfigurationString(hKey, wideName.c_str(), text) &&
+            sally::legacy_config::ParseLogFont(text, *logFont))
         {
-            while (*s != 0 && *s != ',')
-                s++;
-            end = (*s == 0);
-            *s = 0;
-
-            switch (i)
-            {
-            case 0: // lfFaceName
-            {
-                int l = (int)(s - st);
-                if (l >= LF_FACESIZE)
-                    l = LF_FACESIZE - 1;
-                if (l > 0)
-                {
-                    memmove(logFont->lfFaceName, st, l);
-                    logFont->lfFaceName[l] = 0;
-                }
-                break;
-            }
-            case 1:
-                logFont->lfHeight = atoi(st);
-                break;
-            case 2:
-                logFont->lfWeight = atoi(st);
-                break;
-            case 3:
-                logFont->lfItalic = (BYTE)atoi(st);
-                break;
-            case 4:
-                logFont->lfCharSet = (BYTE)atoi(st);
-                break;
-            case 5:
-                logFont->lfOutPrecision = (BYTE)atoi(st);
-                break;
-            case 6:
-                logFont->lfClipPrecision = (BYTE)atoi(st);
-                break;
-            case 7:
-                logFont->lfQuality = (BYTE)atoi(st);
-                break;
-            case 8:
-                logFont->lfPitchAndFamily = (BYTE)atoi(st);
-                break;
-            }
-
-            if (end)
-                break;
-            s++;
-            st = s;
+            return TRUE;
         }
+
+        if (!ReadConfigurationString(hKey, name, text))
+            return FALSE;
+        return sally::legacy_config::ParseLogFont(text, *logFont) ? TRUE : FALSE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+// ****************************************************************************
+
+BOOL SaveLogFont(HKEY hKey, const wchar_t* name, LOGFONT* logFont)
+{
+    if (name == NULL || logFont == NULL)
+        return FALSE;
+    std::wstring text;
+    if (!sally::legacy_config::FormatLogFont(*logFont, text))
+        return FALSE;
+    try
+    {
+        std::wstring wideName(name);
+        wideName += L" W";
+        if (text.size() >= MAXDWORD / sizeof(wchar_t))
+            return FALSE;
+        const DWORD bytes = static_cast<DWORD>((text.size() + 1) * sizeof(wchar_t));
+        return SetValue(hKey, wideName.c_str(), REG_SZ, text.c_str(), bytes);
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+// ****************************************************************************
+
+// ****************************************************************************
+
+// Read-only import of the history keys pre-2.53 wrote with the NARROW SaveHistory (the unsuffixed
+// "Named History", "Select History", ... names). Those entries are honest text - see
+// ReadConfigurationString for why they arrive as UTF-16 and must not be decoded a second time.
+// Current histories live under the "* W" keys and are read by LoadHistory.
+BOOL LoadLegacyHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount)
+{
+    if (history == NULL || maxCount < 0)
+        return FALSE;
+
+    HKEY historyKey = NULL;
+    if (!OpenKey(hKey, name, historyKey))
         return TRUE;
-    }
-    else
-        return FALSE;
-}
 
-// ****************************************************************************
-
-BOOL SaveLogFont(HKEY hKey, const char* name, LOGFONT* logFont)
-{
-    char buf[200];
-    if (logFont != NULL)
+    std::vector<wchar_t*> loaded;
+    try
     {
-        char* s = buf;
-        int i;
-        for (i = 0; i < 9; i++)
-        {
-            switch (i)
-            {
-            case 0:
-                strcpy(s, logFont->lfFaceName);
-                break;
-            case 1:
-                itoa(logFont->lfHeight, s, 10);
-                break;
-            case 2:
-                itoa(logFont->lfWeight, s, 10);
-                break;
-            case 3:
-                itoa(logFont->lfItalic, s, 10);
-                break;
-            case 4:
-                itoa(logFont->lfCharSet, s, 10);
-                break;
-            case 5:
-                itoa(logFont->lfOutPrecision, s, 10);
-                break;
-            case 6:
-                itoa(logFont->lfClipPrecision, s, 10);
-                break;
-            case 7:
-                itoa(logFont->lfQuality, s, 10);
-                break;
-            case 8:
-                itoa(logFont->lfPitchAndFamily, s, 10);
-                break;
-            }
-            if (i < 8)
-            {
-                s += strlen(s);
-                *s++ = ',';
-                *s = 0;
-            }
-        }
-        return SetValue(hKey, name, REG_SZ, buf, (int)(strlen(buf) + 1));
+        loaded.assign(static_cast<size_t>(maxCount), nullptr);
     }
-    else
+    catch (...)
+    {
+        CloseKey(historyKey);
         return FALSE;
+    }
+    BOOL ok = TRUE;
+    for (int i = 0; i < maxCount; ++i)
+    {
+        wchar_t valueName[16];
+        _itow_s(i + 1, valueName, _countof(valueName), 10);
+        std::wstring text;
+        if (!ReadConfigurationString(historyKey, valueName, text))
+            continue;
+
+        loaded[i] = static_cast<wchar_t*>(malloc((text.size() + 1) * sizeof(wchar_t)));
+        if (loaded[i] == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            ok = FALSE;
+            break;
+        }
+        memcpy(loaded[i], text.c_str(), (text.size() + 1) * sizeof(wchar_t));
+    }
+    CloseKey(historyKey);
+
+    if (ok)
+    {
+        for (int i = 0; i < maxCount; ++i)
+        {
+            free(history[i]);
+            history[i] = loaded[i];
+            loaded[i] = NULL;
+        }
+    }
+    for (wchar_t* text : loaded)
+        free(text);
+    return ok;
 }
 
 // ****************************************************************************
 
-BOOL LoadHistory(HKEY hKey, const char* name, char* history[], int maxCount)
+// ENCODING CONTRACT — read this before touching either function.
+//
+// These used to store UTF-16 entries by handing their raw bytes to the ANSI value
+// API under REG_SZ, which put the wide bytes on disk REINTERPRETED as ANSI
+// characters. That round-trips only on a single-byte code page; on DBCS or a
+// UTF-8 active code page it corrupts the entry. The full explanation, and why the
+// honest value gets its own name instead of overwriting the legacy one, is in
+// common/HistoryValueIo.h — the decision lives with the code that implements it.
+//
+// Both functions now delegate per entry, so the shape rules exist in exactly one
+// place and are unit-tested there (gtest_history_value_io) rather than being
+// duplicated between a reader and a writer that must agree.
+BOOL LoadHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount)
 {
     HKEY historyKey;
     int i;
@@ -2630,22 +2289,19 @@ BOOL LoadHistory(HKEY hKey, const char* name, char* history[], int maxCount)
         }
     if (OpenKey(hKey, name, historyKey))
     {
-        char buf[10];
         for (i = 0; i < maxCount; i++)
         {
-            itoa(i + 1, buf, 10);
-            DWORD bufferSize;
-            if (GetSize(historyKey, buf, REG_SZ, bufferSize))
+            if (!sally::registry::HistoryEntryExists(historyKey, i + 1))
+                continue; // absent slot: leave it NULL, as this loop always has
+
+            const std::wstring value = sally::registry::ReadHistoryEntry(historyKey, i + 1);
+            history[i] = (wchar_t*)malloc((value.size() + 1) * sizeof(wchar_t));
+            if (history[i] == NULL)
             {
-                history[i] = (char*)malloc(bufferSize);
-                if (history[i] == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    break;
-                }
-                if (!GetValue(historyKey, buf, REG_SZ, history[i], bufferSize))
-                    break;
+                TRACE_E(LOW_MEMORY);
+                break;
             }
+            memcpy(history[i], value.c_str(), (value.size() + 1) * sizeof(wchar_t));
         }
         CloseKey(historyKey);
     }
@@ -2654,72 +2310,7 @@ BOOL LoadHistory(HKEY hKey, const char* name, char* history[], int maxCount)
 
 // ****************************************************************************
 
-BOOL SaveHistory(HKEY hKey, const char* name, char* history[], int maxCount, BOOL onlyClear)
-{
-    HKEY historyKey;
-    if (CreateKey(hKey, name, historyKey))
-    {
-        ClearKey(historyKey);
-
-        if (!onlyClear) // if the key should not only be cleared, store the values from history
-        {
-            char buf[10];
-            int i;
-            for (i = 0; i < maxCount; i++)
-            {
-                if (history[i] != NULL)
-                {
-                    itoa(i + 1, buf, 10);
-                    SetValue(historyKey, buf, REG_SZ, history[i], (int)strlen(history[i]) + 1);
-                }
-                else
-                    break;
-            }
-        }
-        CloseKey(historyKey);
-    }
-    return TRUE;
-}
-
-// ****************************************************************************
-
-BOOL LoadHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount)
-{
-    HKEY historyKey;
-    int i;
-    for (i = 0; i < maxCount; i++)
-        if (history[i] != NULL)
-        {
-            free(history[i]);
-            history[i] = NULL;
-        }
-    if (OpenKey(hKey, name, historyKey))
-    {
-        char buf[10];
-        for (i = 0; i < maxCount; i++)
-        {
-            itoa(i + 1, buf, 10);
-            DWORD bufferSize;
-            if (GetSize(historyKey, buf, REG_SZ, bufferSize))
-            {
-                history[i] = (wchar_t*)malloc(bufferSize);
-                if (history[i] == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    break;
-                }
-                if (!GetValue(historyKey, buf, REG_SZ, history[i], bufferSize))
-                    break;
-            }
-        }
-        CloseKey(historyKey);
-    }
-    return TRUE;
-}
-
-// ****************************************************************************
-
-BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount, BOOL onlyClear)
+BOOL SaveHistory(HKEY hKey, const wchar_t* name, wchar_t* history[], int maxCount, BOOL onlyClear)
 {
     HKEY historyKey;
     if (CreateKey(hKey, name, historyKey))
@@ -2728,15 +2319,11 @@ BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount,
 
         if (!onlyClear)
         {
-            char buf[10];
             int i;
             for (i = 0; i < maxCount; i++)
             {
                 if (history[i] != NULL)
-                {
-                    itoa(i + 1, buf, 10);
-                    SetValue(historyKey, buf, REG_SZ, history[i], (DWORD)((wcslen(history[i]) + 1) * sizeof(wchar_t)));
-                }
+                    sally::registry::WriteHistoryEntry(historyKey, i + 1, history[i]);
                 else
                     break;
             }
@@ -2748,43 +2335,42 @@ BOOL SaveHistoryW(HKEY hKey, const char* name, wchar_t* history[], int maxCount,
 
 // ****************************************************************************
 
-BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
+BOOL LoadViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks)
 {
     HKEY viewersKey;
     if (OpenKey(hKey, name, viewersKey))
     {
         HKEY subKey;
-        char buf[30];
-        strcpy(buf, "1");
-        CPathBuffer masks; // Heap-allocated for long path support
-        CPathBuffer command; // Heap-allocated for long path support
-        CPathBuffer arguments; // Heap-allocated for long path support
-        CPathBuffer initDir; // Heap-allocated for long path support
+        wchar_t buf[30];
+        wcscpy_s(buf, L"1");
+        std::wstring masks;
+        std::wstring command;
+        std::wstring arguments;
+        std::wstring initDir;
         int type;
         int i = 1;
         viewerMasks->DestroyMembers();
 
         while (OpenKey(viewersKey, buf, subKey))
         {
-            if (GetValue(subKey, VIEWERS_MASKS_REG, REG_SZ, masks, masks.Size()) &&
-                strchr(masks, '|') == NULL &&
-                GetValue(subKey, VIEWERS_TYPE_REG, REG_DWORD, &type, sizeof(DWORD)))
+            if (GetStringValueW(subKey, VIEWERS_MASKS_REG, masks) &&
+                wcschr(masks.c_str(), L'|') == NULL &&
+                GetValueW(subKey, VIEWERS_TYPE_REG, REG_DWORD, &type, sizeof(DWORD)))
             {
-                if (!GetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, command, command.Size()))
-                    *command = 0;
-                if (!GetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, arguments, arguments.Size()))
-                    *arguments = 0;
-                if (!GetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, initDir, initDir.Size()))
-                    *initDir = 0;
+                if (!GetStringValueW(subKey, VIEWERS_COMMAND_REG, command))
+                    command.clear();
+                if (!GetStringValueW(subKey, VIEWERS_ARGUMENTS_REG, arguments))
+                    arguments.clear();
+                if (!GetStringValueW(subKey, VIEWERS_INITDIR_REG, initDir))
+                    initDir.clear();
 
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
-                    CPathBuffer masksAux; // Heap-allocated for long path support
-                    lstrcpyn(masksAux, masks, masksAux.Size());
-                    StrICpy(masks, masksAux);
+                    const std::wstring masksAux = masks;
+                    StrICpyW(masks, masksAux.c_str());
                 }
-                CViewerMasksItem* item = new CViewerMasksItem(masks, command, arguments,
-                                                              initDir, type, Configuration.ConfigVersion < 6);
+                CViewerMasksItem* item = new CViewerMasksItem(masks.c_str(), command.c_str(), arguments.c_str(),
+                                                              initDir.c_str(), type, Configuration.ConfigVersion < 6);
                 if (item != NULL && item->IsGood())
                 {
                     viewerMasks->Add(item);
@@ -2805,7 +2391,7 @@ BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
             }
             else
                 break;
-            itoa(++i, buf, 10);
+            _itow_s(++i, buf, _countof(buf), 10);
             CloseKey(subKey);
         }
         CloseKey(viewersKey);
@@ -2815,28 +2401,28 @@ BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
 
 // ****************************************************************************
 
-BOOL SaveViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
+BOOL SaveViewers(HKEY hKey, const wchar_t* name, CViewerMasks* viewerMasks)
 {
     HKEY viewersKey;
     if (CreateKey(hKey, name, viewersKey))
     {
         ClearKey(viewersKey);
         HKEY subKey;
-        char buf[30];
+        wchar_t buf[30];
         int i;
         for (i = 0; i < viewerMasks->Count; i++)
         {
-            itoa(i + 1, buf, 10);
+            _itow_s(i + 1, buf, _countof(buf), 10);
             if (CreateKey(viewersKey, buf, subKey))
             {
-                SetValue(subKey, VIEWERS_MASKS_REG, REG_SZ, viewerMasks->At(i)->Masks->GetMasksString(), -1);
+                SetValueW(subKey, VIEWERS_MASKS_REG, REG_SZ, viewerMasks->At(i)->Masks->GetMasksString(), -1);
                 if (!viewerMasks->At(i)->Command.empty())
-                    SetValue(subKey, VIEWERS_COMMAND_REG, REG_SZ, viewerMasks->At(i)->Command.c_str(), -1);
+                    SetValueW(subKey, VIEWERS_COMMAND_REG, REG_SZ, viewerMasks->At(i)->Command.c_str(), -1);
                 if (!viewerMasks->At(i)->Arguments.empty())
-                    SetValue(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, viewerMasks->At(i)->Arguments.c_str(), -1);
+                    SetValueW(subKey, VIEWERS_ARGUMENTS_REG, REG_SZ, viewerMasks->At(i)->Arguments.c_str(), -1);
                 if (!viewerMasks->At(i)->InitDir.empty())
-                    SetValue(subKey, VIEWERS_INITDIR_REG, REG_SZ, viewerMasks->At(i)->InitDir.c_str(), -1);
-                SetValue(subKey, VIEWERS_TYPE_REG, REG_DWORD,
+                    SetValueW(subKey, VIEWERS_INITDIR_REG, REG_SZ, viewerMasks->At(i)->InitDir.c_str(), -1);
+                SetValueW(subKey, VIEWERS_TYPE_REG, REG_DWORD,
                          &viewerMasks->At(i)->ViewerType, sizeof(DWORD));
                 CloseKey(subKey);
             }
@@ -2850,39 +2436,38 @@ BOOL SaveViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
 
 // ****************************************************************************
 
-BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
+BOOL LoadEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks)
 {
     HKEY editorKey;
     if (OpenKey(hKey, name, editorKey))
     {
         HKEY subKey;
-        char buf[30];
-        strcpy(buf, "1");
-        CPathBuffer masks; // Heap-allocated for long path support
-        CPathBuffer command; // Heap-allocated for long path support
-        CPathBuffer arguments; // Heap-allocated for long path support
-        CPathBuffer initDir; // Heap-allocated for long path support
+        wchar_t buf[30];
+        wcscpy_s(buf, L"1");
+        std::wstring masks;
+        std::wstring command;
+        std::wstring arguments;
+        std::wstring initDir;
         int i = 1;
         editorMasks->DestroyMembers();
 
         while (OpenKey(editorKey, buf, subKey))
         {
-            if (GetValue(subKey, EDITORS_MASKS_REG, REG_SZ, masks, masks.Size()))
+            if (GetStringValueW(subKey, EDITORS_MASKS_REG, masks))
             {
-                if (!GetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, command, command.Size()))
-                    *command = 0;
-                if (!GetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, arguments, arguments.Size()))
-                    *arguments = 0;
-                if (!GetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, initDir, initDir.Size()))
-                    *initDir = 0;
+                if (!GetStringValueW(subKey, EDITORS_COMMAND_REG, command))
+                    command.clear();
+                if (!GetStringValueW(subKey, EDITORS_ARGUMENTS_REG, arguments))
+                    arguments.clear();
+                if (!GetStringValueW(subKey, EDITORS_INITDIR_REG, initDir))
+                    initDir.clear();
 
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
-                    CPathBuffer masksAux; // Heap-allocated for long path support
-                    lstrcpyn(masksAux, masks, masksAux.Size());
-                    StrICpy(masks, masksAux);
+                    const std::wstring masksAux = masks;
+                    StrICpyW(masks, masksAux.c_str());
                 }
-                CEditorMasksItem* item = new CEditorMasksItem(masks, command, arguments, initDir);
+                CEditorMasksItem* item = new CEditorMasksItem(masks.c_str(), command.c_str(), arguments.c_str(), initDir.c_str());
                 if (item != NULL && item->IsGood())
                 {
                     editorMasks->Add(item);
@@ -2903,7 +2488,7 @@ BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
             }
             else
                 break;
-            itoa(++i, buf, 10);
+            _itow_s(++i, buf, _countof(buf), 10);
             CloseKey(subKey);
         }
         CloseKey(editorKey);
@@ -2913,24 +2498,24 @@ BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
 
 // ****************************************************************************
 
-BOOL SaveEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
+BOOL SaveEditors(HKEY hKey, const wchar_t* name, CEditorMasks* editorMasks)
 {
     HKEY editorKey;
     if (CreateKey(hKey, name, editorKey))
     {
         ClearKey(editorKey);
         HKEY subKey;
-        char buf[30];
+        wchar_t buf[30];
         int i;
         for (i = 0; i < editorMasks->Count; i++)
         {
-            itoa(i + 1, buf, 10);
+            _itow_s(i + 1, buf, _countof(buf), 10);
             if (CreateKey(editorKey, buf, subKey))
             {
-                SetValue(subKey, EDITORS_MASKS_REG, REG_SZ, editorMasks->At(i)->Masks->GetMasksString(), -1);
-                SetValue(subKey, EDITORS_COMMAND_REG, REG_SZ, editorMasks->At(i)->Command.c_str(), -1);
-                SetValue(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, editorMasks->At(i)->Arguments.c_str(), -1);
-                SetValue(subKey, EDITORS_INITDIR_REG, REG_SZ, editorMasks->At(i)->InitDir.c_str(), -1);
+                SetValueW(subKey, EDITORS_MASKS_REG, REG_SZ, editorMasks->At(i)->Masks->GetMasksString(), -1);
+                SetValueW(subKey, EDITORS_COMMAND_REG, REG_SZ, editorMasks->At(i)->Command.c_str(), -1);
+                SetValueW(subKey, EDITORS_ARGUMENTS_REG, REG_SZ, editorMasks->At(i)->Arguments.c_str(), -1);
+                SetValueW(subKey, EDITORS_INITDIR_REG, REG_SZ, editorMasks->At(i)->InitDir.c_str(), -1);
                 CloseKey(subKey);
             }
             else
@@ -2943,46 +2528,68 @@ BOOL SaveEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
 
 // ****************************************************************************
 
-void ShowFileError(HWND hParent, int errTextID, const char* fileName, DWORD err)
-{
-    std::wstring msg = FormatStrW(LoadStrW(errTextID), AnsiToWide(fileName).c_str(), GetErrorTextW(err));
-    gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
-}
-
 static void ShowFileErrorW(HWND hParent, int errTextID, const wchar_t* fileName, DWORD err)
 {
-    std::wstring msg = FormatStrW(LoadStrW(errTextID), fileName, GetErrorTextW(err));
+    const std::wstring errorText = GetErrorTextOwned(err).c_str();
+    std::wstring msg = FormatStrW(LoadStrW(errTextID), fileName, errorText.c_str());
     gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
 }
 
-BOOL ExportConfiguration(HWND hParent, const char* fileName, BOOL clearKeyBeforeImport)
+// Wide: the export target file path can carry any Unicode component - a non-ANSI
+// Windows account name puts one in CreateOurPathInRoamingAPPDATAW's own suggested directory. The
+// narrow ExportConfiguration(const char*, ...) this replaced had zero remaining callers once
+// CM_EXPORTCONFIG (main_window_commands_help.cpp) was switched to this one - deleted rather than
+// kept as an unused wrapper.
+//
+// The ANSI floor this function was written around is GONE. reglib is separately
+// compiled and follows the target's UNICODE define; before P4.2 that define was absent, so
+// CopyBranch/Dump were the char* half and the file path had to be resolved to an
+// exact-or-8.3-alias-or-refuse ANSI designator (ResolveAnsiToolPath) at their boundary, while the
+// registry root went through TryWideToAnsiRoundTripExact. UNICODE is unconditional now, both
+// resolve wide-native, and the whole narrowing apparatus was the dead arm of an #ifdef. Nothing
+// in this path converts any more - the wchar_t* argument reaches Dump unchanged.
+BOOL ExportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL clearKeyBeforeImport)
 {
     if (SALAMANDER_ROOT_REG == NULL)
     {
-        TRACE_E("ExportConfiguration(): SALAMANDER_ROOT_REG == NULL");
+        TRACE_E("ExportConfigurationW(): SALAMANDER_ROOT_REG == NULL");
         return FALSE;
     }
 
+    std::wstring keyName = L"HKEY_CURRENT_USER\\";
+    keyName += SALAMANDER_ROOT_REG;
+    const wchar_t* dumpFileName = fileName;
+    const wchar_t* dumpKeyNameForClear = clearKeyBeforeImport ? keyName.c_str() : NULL;
+
     BOOL ret = FALSE;
-    CPathBuffer keyName; // Heap-allocated for long path support
-    _snprintf_s(keyName, keyName.Size(), _TRUNCATE, "HKEY_CURRENT_USER\\%s", SALAMANDER_ROOT_REG);
-    CSalamanderRegistryExAbstract* sysReg = REG_SysRegistryFactory();
-    CSalamanderRegistryExAbstract* memReg = REG_MemRegistryFactory();
+    CSalamanderRegistryExAbstractW* sysReg = REG_SysRegistryFactoryW();
+    CSalamanderRegistryExAbstractW* memReg = REG_MemRegistryFactoryW();
     if (sysReg != NULL && memReg != NULL)
     {
         LoadSaveToRegistryMutex.Enter();
-        eRPE_ERROR regerr = CopyBranch(keyName, sysReg, memReg);
+        eRPE_ERROR regerr = CopyRegistryBranchW(keyName.c_str(), sysReg, memReg);
         LoadSaveToRegistryMutex.Leave();
         if (RPE_OK == regerr)
         {
             memReg->RemoveHiddenKeysAndValues(); // cut out keys and values that should not be exported
-            if (!memReg->Dump(fileName, clearKeyBeforeImport ? keyName.Get() : NULL))
-                ShowFileError(hParent, IDS_EXPORTCFG_FILEERR, fileName, 0 /* not used */);
+            HANDLE dumpFile = gFileSystem->CreateFile(dumpFileName, GENERIC_WRITE, 0, NULL,
+                                                      CREATE_ALWAYS, 0, 0);
+            const DWORD createError = GetLastError();
+            HANDLES_ADD_EX(__otQuiet, dumpFile != INVALID_HANDLE_VALUE, __htFile,
+                           __hoCreateFile, dumpFile, createError, TRUE);
+            if (dumpFile == INVALID_HANDLE_VALUE)
+                ShowFileErrorW(hParent, IDS_EXPORTCFG_FILEERR, fileName, 0 /* not used */);
             else
-                ret = TRUE;
+            {
+                ret = memReg->Dump(dumpFile, dumpKeyNameForClear);
+                HANDLES_REMOVE(dumpFile, __htFile, "IFileSystem::CloseHandle");
+                gFileSystem->CloseFileHandle(dumpFile);
+                if (!ret)
+                    ShowFileErrorW(hParent, IDS_EXPORTCFG_FILEERR, fileName, 0 /* not used */);
+            }
         }
         else
-            ShowFileError(hParent, IDS_EXPORTCFG_REGERR, fileName, 0 /* not used */);
+            ShowFileErrorW(hParent, IDS_EXPORTCFG_REGERR, fileName, 0 /* not used */);
     }
     if (sysReg != NULL)
         sysReg->Release();
@@ -2999,11 +2606,13 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
 {
     TRACE_I("ImportConfigurationW(): begin");
     DWORD err = 0;
-    HANDLE file = HANDLES_Q(CreateFileW(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                        OPEN_EXISTING, 0, 0));
+    HANDLE file = gFileSystem->CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                          OPEN_EXISTING, 0, 0);
+    const DWORD openError = GetLastError();
+    HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openError, TRUE);
     if (file == INVALID_HANDLE_VALUE)
     {
-        err = GetLastError();
+        err = openError;
         if (!ignoreIfNotExists || err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND)
             ShowFileErrorW(hParent, IDS_IMPORTCFG_OPENERR, fileName, err);
         TRACE_I("ImportConfigurationW(): end");
@@ -3012,28 +2621,33 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
 
     if (autoImportConfig)
     {
-        HANDLES(CloseHandle(file));
+        HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+        gFileSystem->CloseFileHandle(file);
         *importCfgFromFileWasSkipped = TRUE;
         TRACE_I("ImportConfigurationW(): end");
         return FALSE;
     }
 
-    IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_IMPORT_CONFIG));
+    IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_IMPORT_CONFIG));
 
     BOOL ret = FALSE;
-    LPTSTR buf = NULL;
+    LPWSTR buf = NULL;
     CQuadWord size;
-    if (SalGetFileSize(file, size, err))
+    uint64_t sizeValue = 0;
+    const FileResult sizeResult = gFileSystem->GetHandleFileSize(file, &sizeValue);
+    if (sizeResult.success)
     {
+        size.Set((DWORD)sizeValue, (DWORD)(sizeValue >> 32));
         if (size <= CQuadWord(10000000, 0)) // above 10MB it is 100% nonsense...
         {
-            buf = (LPTSTR)malloc((DWORD)size.Value + sizeof(WCHAR));
+            buf = (LPWSTR)malloc((DWORD)size.Value + sizeof(WCHAR));
             if (buf != NULL) // "always true" (in case of an error we just don’t crash; the user dismissed the out-of-memory message)
             {
                 DWORD bytesRead;
-                if (!ReadFile(file, buf, (DWORD)size.Value, &bytesRead, NULL))
+                const FileResult readResult = gFileSystem->ReadFromHandle(file, buf, (DWORD)size.Value, &bytesRead);
+                if (!readResult.success)
                 {
-                    ShowFileErrorW(hParent, IDS_IMPORTCFG_OPENERR, fileName, GetLastError());
+                    ShowFileErrorW(hParent, IDS_IMPORTCFG_OPENERR, fileName, readResult.errorCode);
                     free(buf);
                     buf = NULL;
                 }
@@ -3042,7 +2656,7 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
                     if ((DWORD)size.Value > bytesRead)
                     {
                         size.Set(bytesRead, 0);
-                        TRACE_E("ImportConfigurationW(): reading only " << bytesRead << " bytes from configuration file (" << WideToAnsi(fileName) << ")");
+                        TRACE_EW(L"ImportConfigurationW(): reading only " << bytesRead << L" bytes from configuration file (" << fileName << L")");
                     }
                 }
             }
@@ -3051,27 +2665,35 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
             ShowFileErrorW(hParent, IDS_IMPORTCFG_TOOBIG, fileName, 0 /* not used */);
     }
     else
-        ShowFileErrorW(hParent, IDS_IMPORTCFG_OPENERR, fileName, GetLastError());
+        ShowFileErrorW(hParent, IDS_IMPORTCFG_OPENERR, fileName, sizeResult.errorCode);
 
-    HANDLES(CloseHandle(file));
+    HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseHandle");
+    gFileSystem->CloseFileHandle(file);
 
-    if (buf != NULL && (DWORD)size.Value > 0)
+    if (buf != NULL)
     {
         *(WCHAR*)((LPBYTE)buf + (DWORD)size.Value) = 0; // safety net for too short file
-        if (ConvertIfNeeded(&buf, (DWORD)size.Value) == 0)
-        { // "always false" (in case of an error we just don’t crash; the user dismissed the out-of-memory message)
+        DWORD utf16ByteSize = 0;
+        const eRPE_ERROR conversionError = ConvertRegistryFileToUtf16(&buf, (DWORD)size.Value, utf16ByteSize);
+        if (conversionError != RPE_OK)
+        {
+            ShowFileErrorW(hParent,
+                           conversionError == RPE_OUT_OF_MEMORY ? IDS_IMPORTCFG_REGERR : IDS_IMPORTCFG_INVALIDFORMAT,
+                           fileName, 0 /* not used */);
             free(buf);
             buf = NULL;
         }
+        else
+            size.Set(utf16ByteSize, 0);
     }
 
     if (buf != NULL)
     {
         // first try to parse it into memory; if it contains format errors we will not shove it into the registry at all
-        CSalamanderRegistryExAbstract* memReg = REG_MemRegistryFactory();
-        LPTSTR bufMem = _tcsdup(buf); // the Parse call changes the buffer, so we must keep the original for the next Parse
+        CSalamanderRegistryExAbstractW* memReg = REG_MemRegistryFactoryW();
+        LPWSTR bufMem = _wcsdup(buf); // parsing changes the buffer, so keep the original for the next pass
         TRACE_I("ImportConfigurationW(): Parse to memory: begin");
-        eRPE_ERROR regerr = bufMem != NULL ? Parse(bufMem, memReg, TRUE) : RPE_OUT_OF_MEMORY; // dirty hack: when deleting the configuration key, we do not remove .hidden keys and values (because of the trial version + checkver)
+        eRPE_ERROR regerr = bufMem != NULL && memReg != NULL ? ParseRegistryFileW(bufMem, memReg, TRUE) : RPE_OUT_OF_MEMORY; // dirty hack: when deleting the configuration key, we do not remove .hidden keys and values (because of the trial version + checkver)
         TRACE_I("ImportConfigurationW(): Parse to memory: end");
         free(bufMem);
         BOOL verIsOK = RPE_OK == regerr; // verify whether the file even contains our configuration version
@@ -3089,21 +2711,27 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
                 }
             }
         }
-        memReg->Release();
+        if (memReg != NULL)
+            memReg->Release();
         if (verIsOK && RPE_OK == regerr) // both the config version and the file itself look OK; import it into the registry
         {
-            CSalamanderRegistryExAbstract* sysReg = REG_SysRegistryFactory();
+            CSalamanderRegistryExAbstractW* sysReg = REG_SysRegistryFactoryW();
 
-            LoadSaveToRegistryMutex.Enter();
-            TRACE_I("ImportConfigurationW(): Parse to registry: begin");
-            regerr = Parse(buf, sysReg, TRUE); // dirty hack: when deleting the configuration key, we do not remove .hidden keys and values (because of the trial version + checkver)
-            TRACE_I("ImportConfigurationW(): Parse to registry: end");
-            if (RPE_OK == regerr)
-                ret = TRUE; // success
-            LoadSaveToRegistryMutex.Leave();
+            if (sysReg != NULL)
+            {
+                LoadSaveToRegistryMutex.Enter();
+                TRACE_I("ImportConfigurationW(): Parse to registry: begin");
+                regerr = ParseRegistryFileW(buf, sysReg, TRUE); // dirty hack: when deleting the configuration key, we do not remove .hidden keys and values (because of the trial version + checkver)
+                TRACE_I("ImportConfigurationW(): Parse to registry: end");
+                if (RPE_OK == regerr)
+                    ret = TRUE; // success
+                LoadSaveToRegistryMutex.Leave();
 
-            Configuration.ConfigWasImported = TRUE;
-            sysReg->Release();
+                Configuration.ConfigWasImported = TRUE;
+                sysReg->Release();
+            }
+            else
+                regerr = RPE_OUT_OF_MEMORY;
         }
         if (RPE_OK != regerr)
         {
@@ -3143,12 +2771,10 @@ BOOL ImportConfigurationW(HWND hParent, const wchar_t* fileName, BOOL ignoreIfNo
     return ret;
 }
 
-BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExists,
-                         BOOL autoImportConfig, BOOL* importCfgFromFileWasSkipped)
-{
-    return ImportConfigurationW(hParent, AnsiToWide(fileName).c_str(), ignoreIfNotExists,
-                                autoImportConfig, importCfgFromFileWasSkipped);
-}
+// 2026-08-26: the narrow ImportConfiguration(char*, ...) thin wrapper was deleted -
+// confirmed-dead (zero callers anywhere: CM_IMPORTCONFIG only shows an info message, and the real
+// caller, sally_entry_lifecycle.cpp's startup auto-import, already calls ImportConfigurationW
+// directly).
 
 //****************************************************************************
 //
@@ -3183,8 +2809,8 @@ void CLanguage::Free()
     HelpDir = NULL;
 }
 
-BOOL CLanguage::Init(const char* fileName, WORD languageID, const WCHAR* authorW,
-                     const char* web, const WCHAR* commentW, const char* helpdir)
+BOOL CLanguage::Init(const wchar_t* fileName, WORD languageID, const WCHAR* authorW,
+                     const wchar_t* web, const WCHAR* commentW, const wchar_t* helpdir)
 {
     Free();
     LanguageID = languageID;
@@ -3238,69 +2864,62 @@ BOOL LoadSLGData(HINSTANCE hModule, const char *resName, LPVOID buff, int buffSi
 }
 */
 
-BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* isIncomplete)
+BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, wchar_t* isIncomplete)
 {
     // compare the SLG VERSIONINFO version against Salamander's and return TRUE if they match,
     // otherwise FALSE; in case of a match also extract \\VarFileInfo\\Translation and set 'langID'
     CVersionInfo slgVer;
     CVersionInfo moduleVer;
 
-    CPathBuffer path; // Heap-allocated for long path support
     BYTE *slgBuf, *moduleBuf;
     DWORD slgSize, moduleSize;
 
     if (!slgVer.ReadResource(hSLG, VS_VERSION_INFO))
     {
-        GetModuleFileName(hSLG, path, path.Size());
-        TRACE_E("Unable to load VERSIONINFO resource from SLG module: " << path);
+        TRACE_EW(L"Unable to load VERSIONINFO resource from SLG module: " << GetModuleFileNameForTrace(hSLG));
         return FALSE;
     }
     if (!moduleVer.ReadResource(hModule, VS_VERSION_INFO))
     {
-        GetModuleFileName(hModule, path, path.Size());
-        TRACE_E("Unable to load VERSIONINFO resource from plugin: " << path);
+        TRACE_EW(L"Unable to load VERSIONINFO resource from plugin: " << GetModuleFileNameForTrace(hModule));
         return FALSE;
     }
 
     // retrieve pointers to the VS_FIXEDFILEINFO structures
-    if (!slgVer.QueryValue("\\", &slgBuf, &slgSize))
+    if (!slgVer.QueryValue(L"\\", &slgBuf, &slgSize))
         return FALSE;
-    if (!moduleVer.QueryValue("\\", &moduleBuf, &moduleSize))
+    if (!moduleVer.QueryValue(L"\\", &moduleBuf, &moduleSize))
         return FALSE;
 
     // the SLG version must be identical to our version
     if (((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS != ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionMS ||
         ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS != ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionLS)
     {
-        char ver1[20];
-        sprintf(ver1, "%08X%08X", ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionMS,
-                ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionLS);
-        char ver2[20];
-        sprintf(ver2, "%08X%08X", ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS,
-                ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS);
-        GetModuleFileName(hModule, path, path.Size());
-        TRACE_E("Plugin and SLG module are not of the same version (0x" << ver1 << " != 0x" << ver2 << "). Plugin: " << path);
-        GetModuleFileName(hSLG, path, path.Size());
-        TRACE_E("... SLG module: " << path);
+        wchar_t ver1[20];
+        swprintf_s(ver1, _countof(ver1), L"%08X%08X", ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionMS,
+                   ((VS_FIXEDFILEINFO*)moduleBuf)->dwFileVersionLS);
+        wchar_t ver2[20];
+        swprintf_s(ver2, _countof(ver2), L"%08X%08X", ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionMS,
+                   ((VS_FIXEDFILEINFO*)slgBuf)->dwFileVersionLS);
+        TRACE_EW(L"Plugin and SLG module are not of the same version (0x" << ver1 << L" != 0x" << ver2 << L"). Plugin: " << GetModuleFileNameForTrace(hModule));
+        TRACE_EW(L"... SLG module: " << GetModuleFileNameForTrace(hSLG));
         return FALSE;
     }
 
     if (isIncomplete != NULL)
     {
         isIncomplete[0] = 0;
-        if (!slgVer.QueryString("\\StringFileInfo\\040904b0\\SLGIncomplete", isIncomplete, ISSLGINCOMPLETE_SIZE))
+        if (!slgVer.QueryString(L"\\StringFileInfo\\040904b0\\SLGIncomplete", isIncomplete, ISSLGINCOMPLETE_SIZE))
         {
-            GetModuleFileName(hSLG, path, path.Size());
-            TRACE_E("Missing SLGIncomplete value in VERSIONINFO resource in SLG module: " << path);
+            TRACE_EW(L"Missing SLGIncomplete value in VERSIONINFO resource in SLG module: " << GetModuleFileNameForTrace(hSLG));
             return FALSE;
         }
     }
 
     // extract the language in which the SLG is written
-    if (!slgVer.QueryValue("\\VarFileInfo\\Translation", &slgBuf, &slgSize))
+    if (!slgVer.QueryValue(L"\\VarFileInfo\\Translation", &slgBuf, &slgSize))
     {
-        GetModuleFileName(hSLG, path, path.Size());
-        TRACE_E("Missing Translation value in VERSIONINFO resource in SLG module: " << path);
+        TRACE_EW(L"Missing Translation value in VERSIONINFO resource in SLG module: " << GetModuleFileNameForTrace(hSLG));
         return FALSE;
     }
 
@@ -3309,19 +2928,20 @@ BOOL IsSLGFileValid(HINSTANCE hModule, HINSTANCE hSLG, WORD& slgLangID, char* is
     return TRUE;
 }
 
-BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
+BOOL CLanguage::Init(const wchar_t* fileName, HINSTANCE modul)
 {
     BOOL ret = FALSE;
     if (modul == NULL)
         modul = HInstance;
     std::wstring pathW;
-    std::wstring slgNameW = AnsiToWide(fileName);
-    std::string pathA;
+    // sally.h:637 always declared this wide and all three callers already
+    // passed wide names; only the definition lagged, so AnsiToWide(fileName) was recovering
+    // bytes it had just been handed.
+    std::wstring slgNameW = fileName;
 
     HINSTANCE hLib = NULL;
     if (BuildModuleRelativePathW(modul, (L"lang\\" + slgNameW).c_str(), pathW))
     {
-        pathA = WideToAnsi(pathW);
         hLib = HANDLES(LoadLibraryW(pathW.c_str()));
     }
     if (hLib != NULL)
@@ -3331,46 +2951,46 @@ BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
         {
             CVersionInfo ver;
             WCHAR slg_athorW[500] = {0};
-            char slg_web[500] = {0};
+            WCHAR slg_web[500] = {0};
             WCHAR slg_commentW[500] = {0};
-            char slg_helpdir[100] = {0};
-            char slg_incomplete[200] = {0};
+            WCHAR slg_helpdir[100] = {0};
+            WCHAR slg_incomplete[200] = {0};
 
             BOOL ok = TRUE;
             if (ok)
             {
                 ok &= ver.ReadResource(hLib, VS_VERSION_INFO);
                 if (!ok)
-                    TRACE_E("Missing VERSIONINFO resource in language file " << pathA.c_str());
+                    TRACE_EW(L"Missing VERSIONINFO resource in language file " << pathW);
             }
             if (ok)
             {
-                ok &= ver.QueryString("\\StringFileInfo\\040904b0\\SLGAuthor", NULL, 0, slg_athorW, _countof(slg_athorW));
+                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGAuthor", slg_athorW, _countof(slg_athorW));
                 if (!ok)
-                    TRACE_E("Missing SLGAuthor in VERSIONINFO resource in language file " << pathA.c_str());
+                    TRACE_EW(L"Missing SLGAuthor in VERSIONINFO resource in language file " << pathW);
             }
             if (ok)
             {
-                ok &= ver.QueryString("\\StringFileInfo\\040904b0\\SLGWeb", slg_web, _countof(slg_web));
+                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGWeb", slg_web, _countof(slg_web));
                 if (!ok)
-                    TRACE_E("Missing SLGWeb in VERSIONINFO resource in language file " << pathA.c_str());
+                    TRACE_EW(L"Missing SLGWeb in VERSIONINFO resource in language file " << pathW);
             }
             if (ok)
             {
-                ok &= ver.QueryString("\\StringFileInfo\\040904b0\\SLGComment", NULL, 0, slg_commentW, _countof(slg_commentW));
+                ok &= ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGComment", slg_commentW, _countof(slg_commentW));
                 if (!ok)
-                    TRACE_E("Missing SLGComment in VERSIONINFO resource in language file " << pathA.c_str());
+                    TRACE_EW(L"Missing SLGComment in VERSIONINFO resource in language file " << pathW);
             }
             if (ok)
             {
-                if (!ver.QueryString("\\StringFileInfo\\040904b0\\SLGHelpDir", slg_helpdir, _countof(slg_helpdir)))
+                if (!ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGHelpDir", slg_helpdir, _countof(slg_helpdir)))
                 {
                     slg_helpdir[0] = 0; // plugins do not have SLGHelpDir defined (used only in Salamander's .slg)
                     if (modul == HInstance)
                         ok = FALSE; // however this variable cannot be missing in Salamander
                 }
                 // read only to test that the item exists
-                if (!ver.QueryString("\\StringFileInfo\\040904b0\\SLGIncomplete", slg_incomplete, _countof(slg_incomplete)))
+                if (!ver.QueryString(L"\\StringFileInfo\\040904b0\\SLGIncomplete", slg_incomplete, _countof(slg_incomplete)))
                 {
                     slg_incomplete[0] = 0; // plugins do not have SLGIncomplete defined (used only in Salamander's .slg)
                     if (modul == HInstance)
@@ -3383,20 +3003,20 @@ BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
                 ret = TRUE;
         }
         else
-            TRACE_E("SLG is not valid (or plugin's VERSIONINFO resource is not set properly): " << pathA.c_str());
+            TRACE_EW(L"SLG is not valid (or plugin's VERSIONINFO resource is not set properly): " << pathW);
 
         HANDLES(FreeLibrary(hLib));
     }
     else
-        TRACE_E("Cannot load SLG module " << pathA.c_str());
+        TRACE_EW(L"Cannot load SLG module " << pathW);
     return ret;
 }
 
-BOOL CLanguage::GetLanguageName(char* buffer, int bufferSize)
+BOOL CLanguage::GetLanguageName(wchar_t* buffer, int bufferSize)
 {
-    if (GetLocaleInfo(MAKELCID(LanguageID, SORT_DEFAULT), LOCALE_SLANGUAGE, buffer, bufferSize) == 0)
+    if (GetLocaleInfoW(MAKELCID(LanguageID, SORT_DEFAULT), LOCALE_SLANGUAGE, buffer, bufferSize) == 0)
     {
-        lstrcpyn(buffer, "?", bufferSize);
+        lstrcpynW(buffer, L"?", bufferSize);
     }
     return TRUE;
 }

@@ -8,6 +8,7 @@ sal_add_plugin(NAME mmviewer
     "${SAL_PLUGINS}/mmviewer/exporthtml.cpp"
     "${SAL_PLUGINS}/mmviewer/exportxml.cpp"
     "${SAL_PLUGINS}/mmviewer/mmviewer.cpp"
+    "${SAL_PLUGINS}/mmviewer/number_text.cpp"
     "${SAL_PLUGINS}/mmviewer/output.cpp"
     "${SAL_PLUGINS}/mmviewer/parser.cpp"
     "${SAL_PLUGINS}/mmviewer/precomp.cpp"

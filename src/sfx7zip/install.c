@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -616,7 +616,7 @@ int MyWinMain(struct SCabinet* cabinet)
         RemoveTemporaryDir(tmpName);
         return 1;
     }
-    while (GetMessage(&msg, NULL, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         if (msg.message == WM_USER_THREADEXIT)
         {
@@ -656,12 +656,12 @@ int MyWinMain(struct SCabinet* cabinet)
             ShowWindow(GetDlgItem(DlgWin, IDC_STATUS), SW_SHOW);
 
             // process messages (so the IDS_STATUS_STARTSETUP text appears even on XP)
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 if (DlgWin == NULL || !IsWindow(DlgWin) || !IsDialogMessage(DlgWin, &msg))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
 
@@ -736,12 +736,12 @@ int MyWinMain(struct SCabinet* cabinet)
                     if (res != WAIT_OBJECT_0 + 1)
                         break;
                     // process messages
-                    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                     {
                         if (DlgWin == NULL || !IsWindow(DlgWin) || !IsDialogMessage(DlgWin, &msg))
                         {
                             TranslateMessage(&msg);
-                            DispatchMessage(&msg);
+                            DispatchMessageW(&msg);
                         }
                     }
                 }
@@ -771,12 +771,12 @@ int MyWinMain(struct SCabinet* cabinet)
                         ShowWindow(DlgWin, SW_SHOW); // just to be safe
                     do
                     {
-                        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                         {
                             if (DlgWin == NULL || !IsWindow(DlgWin) || !IsDialogMessage(DlgWin, &msg))
                             {
                                 TranslateMessage(&msg);
-                                DispatchMessage(&msg);
+                                DispatchMessageW(&msg);
                             }
                         }
                         Sleep(100);
@@ -792,7 +792,7 @@ int MyWinMain(struct SCabinet* cabinet)
         if (DlgWin == NULL || !IsWindow(DlgWin) || !IsDialogMessage(DlgWin, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 

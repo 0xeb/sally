@@ -6,6 +6,7 @@
 #include <crtdbg.h>
 #include <ostream>
 #include <stdio.h>
+#include <vector>
 #include <commctrl.h>
 #include <tchar.h>
 
@@ -21,11 +22,14 @@
 #include "selfextr/comdefs.h"
 #include "config.h"
 #include "typecons.h"
+#include "zip_name_normalize.h"
+#include "zip_ext_info_compare.h"
 #include "chicon.h"
 #include "common.h"
 #include "add_del.h"
 #include "sfxmake/sfxmake.h"
 #include "inflate.h"
+#include "../shared/plugin_local_path.h"
 
 #ifndef SSZIP
 #include "zip.rh"
@@ -51,8 +55,8 @@ const CConfiguration DefConfig =
         true,                         //automatic volume size last used
         false,                        //automatically expand multi-volume archives on non-removable disks
         0,                            //config version (0 - default; 1 - beta 3; 2 - beta 4)
-        "english.sfx",                //default sfx package
-        "",                           //default path to export sfx settings to
+        L"english.sfx",               //default sfx package
+        L"",                          //default path to export sfx settings to
         0,                            //current version of Altap Salamander, will be set elsewhere
         CLR_ASK,                      // ChangeLangReaction, viz CLR_xxx
         TRUE,                         // winzip compatible multi-volume archive names
@@ -81,87 +85,22 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 }
 #endif //SSZIP
 
-char* LoadStr(int resID)
+// Wide - SalamanderGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
-WCHAR* LoadStrW(int resID)
+std::wstring LoadStrW(int resID)
 {
-    return SalamanderGeneral->LoadStrW(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID); // LoadStrW folded into the wide primary
 }
-
-/*
-BOOL SalGetTempFileName(const char *path, const char *prefix, char *tmpName, BOOL file)
-{
-  CALL_STACK_MESSAGE4("SalGetTempFileName(%s, %s, , %d)", path, prefix, file);
-  char tmpDir[MAX_PATH + 10];
-  char *end = tmpDir + MAX_PATH + 10;
-  if (path == NULL)
-  {
-    if (!GetTempPath(MAX_PATH, tmpDir))
-    {
-      DWORD err = GetLastError();
-      TRACE_E("Unable to get TEMP directory.");
-      SetLastError(err);
-      return FALSE;
-    }
-  }
-  else strcpy(tmpDir, path);
-
-  char *s = tmpDir + strlen(tmpDir);
-  if (s > tmpDir && *(s - 1) != '\\') *s++ = '\\';
-  while (s < end && *prefix != 0) *s++ = *prefix++;
-
-  if (s - tmpDir < MAX_PATH - 10)  // enough room to append "XXXX.tmp"
-  {
-    DWORD randNum = (GetTickCount() & 0xFFF);
-    while (1)
-    {
-      sprintf(s, "%X.tmp", randNum++);
-      if (file)  // file
-      {
-        HANDLE h = CreateFile(tmpDir, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                              FILE_ATTRIBUTE_NORMAL, NULL);
-        if (h != INVALID_HANDLE_VALUE)
-        {
-          CloseHandle(h);
-          strcpy(tmpName, tmpDir);   // copy the result
-          return TRUE;
-        }
-      }
-      else  // directory
-      {
-        if (CreateDirectory(tmpDir, NULL))
-        {
-          strcpy(tmpName, tmpDir);   // copy the result
-          return TRUE;
-        }
-      }
-      DWORD err = GetLastError();
-      if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
-      {
-        TRACE_E("Unable to create temporary " << (file ? "file" : "directory") <<
-                ": " << err);
-        SetLastError(err);
-        return FALSE;
-      }
-    }
-  }
-  else
-  {
-    TRACE_E("Too long file name in SalGetTempFileName().");
-    SetLastError(ERROR_BUFFER_OVERFLOW);
-    return FALSE;
-  }
-}
-*/
 
 //CExtInfo
-CExtInfo::CExtInfo(LPCTSTR pName, bool isDir, int nItem)
+CExtInfo::CExtInfo(const wchar_t* pName, bool isDir, int nItem)
 {
     CALL_STACK_MESSAGE_NONE
-    Name = _tcsdup(pName);
+    Name = _wcsdup(pName);
     IsDir = isDir;
     ItemNumber = nItem;
 }
@@ -243,16 +182,16 @@ bool IsUTF8Encoded(const char* s, int len)
 
 //CZipCommon
 
-CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
+CZipCommon::CZipCommon(const wchar_t* zipName, const char* zipRoot,
                        CSalamanderForOperationsAbstract* salamander,
-                       TIndirectArray2<char>* archiveVolumes)
+                       std::vector<std::wstring>* archiveVolumes)
 {
-    CALL_STACK_MESSAGE3("CZipCommon::CZipCommon(%s, %s, )", zipName, zipRoot);
+    CALL_STACK_MESSAGE3("CZipCommon::CZipCommon(%ls, %s, )", zipName, zipRoot);
     Config = ::Config;
     ZipFile = 0;
-    lstrcpyn(ZipName, zipName, ZipName.Size());
+    ZipName = zipName != NULL ? zipName : L"";
     ZipRoot = zipRoot;
-    RootLen = lstrlen(ZipRoot);
+    RootLen = lstrlenA(ZipRoot);
     ZeroZip = false;
     Zip64 = false;
     Salamander = salamander;
@@ -263,9 +202,6 @@ CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
     Unix = FALSE;
     ArchiveVolumes = archiveVolumes;
 
-    DWORD ret = GetCurrentDirectory(OriginalCurrentDir.Size(), OriginalCurrentDir);
-    if (!ret || ret > (DWORD)OriginalCurrentDir.Size())
-        *OriginalCurrentDir = 0;
 }
 
 CZipCommon::~CZipCommon()
@@ -274,8 +210,6 @@ CZipCommon::~CZipCommon()
 
     if (ZipFile)
         CloseCFile(ZipFile);
-    if (*OriginalCurrentDir)
-        SetCurrentDirectory(OriginalCurrentDir);
     if (Comment)
         free(Comment);
 }
@@ -286,10 +220,10 @@ int CZipCommon::CheckZip()
 
     /*
   if (writeAcess)
-    ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+    ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
                       OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL);
   else
-    ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL);
   if (ret)
     if (ret == ERR_LOWMEM)
@@ -339,7 +273,7 @@ int CZipCommon::Read(CFile* file, void* buffer, unsigned bytesToRead,
     else
         toRead = 0;
     if (toRead != bytesToRead && !bytesRead)
-        return ProcessError(IDS_EOF, 0, file->FileName, file->Flags | PE_NORETRY, skipAll);
+        return ProcessError(IDS_EOF, 0, file->FileName.c_str(), file->Flags | PE_NORETRY, skipAll);
     if (toRead)
     {
         if (file->InputBuffer != NULL && toRead <= INPUT_BUFFER_SIZE)
@@ -391,7 +325,7 @@ int CZipCommon::Read(CFile* file, void* buffer, unsigned bytesToRead,
                     errorID = IDS_ERRACCESS;
 
                 lastError = GetLastError();
-                result = ProcessError(errorID, lastError, file->FileName, file->Flags, skipAll);
+                result = ProcessError(errorID, lastError, file->FileName.c_str(), file->Flags, skipAll);
                 if (result != ERR_RETRY)
                     return result;
             }
@@ -425,7 +359,7 @@ int CZipCommon::Read(CFile* file, void* buffer, unsigned bytesToRead,
                     errorID = IDS_ERRACCESS;
 
                 lastError = GetLastError();
-                result = ProcessError(errorID, lastError, file->FileName, file->Flags, skipAll);
+                result = ProcessError(errorID, lastError, file->FileName.c_str(), file->Flags, skipAll);
                 if (result != ERR_RETRY)
                     return result;
             }
@@ -459,7 +393,7 @@ int CZipCommon::Write(CFile* file, const void* buffer, unsigned bytesToWrite,
             if (SetFilePointer(file->File, LODWORD((DWORD)(file->FilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) == 0xFFFFFFFF &&
                 GetLastError() != NO_ERROR)
             {
-                result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName, file->Flags, skipAll);
+                result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName.c_str(), file->Flags, skipAll);
                 if (result != ERR_RETRY)
                     return result;
             }
@@ -501,7 +435,7 @@ int CZipCommon::Write(CFile* file, const void* buffer, unsigned bytesToWrite,
     if (!file->BigFile &&
         file->FilePointer + bytesToWrite > 0xFFFFFFFF)
     {
-        return ProcessError(IDS_TOOBIG2, 0, file->FileName, file->Flags | PE_NORETRY, skipAll);
+        return ProcessError(IDS_TOOBIG2, 0, file->FileName.c_str(), file->Flags | PE_NORETRY, skipAll);
     }
     file->FilePointer += bytesToWrite;
     return 0;
@@ -510,7 +444,7 @@ int CZipCommon::Write(CFile* file, const void* buffer, unsigned bytesToWrite,
 int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
                       bool* skipAll)
 {
-    CALL_STACK_MESSAGE3("CZipCommon::Flush(, , 0x%X, ) file: %s", bytesToWrite, file->FileName);
+    CALL_STACK_MESSAGE3("CZipCommon::Flush(, , 0x%X, ) file: %ls", bytesToWrite, file->FileName.c_str());
     unsigned long bytesWritten; //number of butes read by ReadFile()
     int result;                 //temp variable
     int errorID = 0;            //error string identifier
@@ -520,7 +454,7 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
     if (!file->BigFile &&
         file->RealFilePointer + bytesToWrite > 0xFFFFFFFF)
     {
-        return ProcessError(IDS_TOOBIG2, 0, file->FileName, file->Flags | PE_NORETRY, skipAll);
+        return ProcessError(IDS_TOOBIG2, 0, file->FileName.c_str(), file->Flags | PE_NORETRY, skipAll);
     }
     while (1)
     {
@@ -528,7 +462,7 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
         if (SetFilePointer(file->File, LODWORD((DWORD)(file->RealFilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) == 0xFFFFFFFF &&
             GetLastError() != NO_ERROR)
         {
-            result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName, file->Flags, skipAll);
+            result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName.c_str(), file->Flags, skipAll);
             if (result != ERR_RETRY)
                 return result;
         }
@@ -541,7 +475,7 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
             }
             else
             {
-                result = ProcessError(IDS_ERRWRITE, GetLastError(), file->FileName, file->Flags, skipAll);
+                result = ProcessError(IDS_ERRWRITE, GetLastError(), file->FileName.c_str(), file->Flags, skipAll);
                 if (result != ERR_RETRY)
                     return result;
             }
@@ -549,11 +483,11 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
     }
 }
 
-int CZipCommon::CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
+int CZipCommon::CreateCFile(CFile** file, const wchar_t* fileName, unsigned int access,
                             unsigned int share, unsigned int creation, unsigned int attributes,
                             int flags, bool* skipAll, bool bigFile, bool useReadCache)
 {
-    CALL_STACK_MESSAGE8("CZipCommon::CreateCFile(, %s, 0x%X, 0x%X, 0x%X, 0x%X, "
+    CALL_STACK_MESSAGE8("CZipCommon::CreateCFile(, %ls, 0x%X, 0x%X, 0x%X, 0x%X, "
                         "%d, , %d)",
                         fileName, access, share, creation, attributes,
                         flags, useReadCache);
@@ -563,14 +497,24 @@ int CZipCommon::CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
     int flagsNoRetry;
     CQuadWord size;
 
-    if ((*file = (CFile*)malloc(sizeof(CFile))) == NULL ||
-        ((*file)->FileName = _tcsdup(fileName)) == NULL)
+    *file = NULL;
+    std::wstring ioPath;
+    if (!PreparePluginLocalPathForIo(fileName, ioPath))
     {
-        if (*file)
-        {
-            free(*file);
-            *file = NULL;
-        }
+        const DWORD error = GetLastError();
+        if (error == ERROR_NOT_ENOUGH_MEMORY)
+            return ERR_LOWMEM;
+        return ProcessError(IDS_ERRCREATE, error, fileName, flags | PE_NORETRY, skipAll);
+    }
+    try
+    {
+        *file = new CFile;
+        (*file)->FileName = fileName != NULL ? fileName : L"";
+    }
+    catch (...)
+    {
+        delete *file;
+        *file = NULL;
         return ERR_LOWMEM;
     }
     (*file)->OutputBuffer = NULL;
@@ -578,8 +522,7 @@ int CZipCommon::CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
     if (access & GENERIC_WRITE &&
         ((*file)->OutputBuffer = (char*)malloc(OUTPUT_BUFFER_SIZE)) == NULL)
     {
-        free((*file)->FileName);
-        free(*file);
+        delete *file;
         *file = NULL;
         return ERR_LOWMEM;
     }
@@ -597,7 +540,8 @@ int CZipCommon::CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
         for (;;)
         {
             flagsNoRetry = 0;
-            (*file)->File = CreateFile(fileName, access, share, NULL, creation, attributes, NULL);
+            (*file)->File = CreateFileW(ioPath.c_str(), access, share, NULL,
+                                        creation, attributes, NULL);
             if ((*file)->File != INVALID_HANDLE_VALUE)
             {
                 (*file)->FilePointer = 0;
@@ -630,12 +574,11 @@ int CZipCommon::CreateCFile(CFile** file, LPCTSTR fileName, unsigned int access,
             result = ProcessError(errorID, lastError, fileName, flags | flagsNoRetry, skipAll);
             if (result != ERR_RETRY)
             {
-                free((*file)->FileName);
                 if (access & GENERIC_WRITE)
                     free((*file)->OutputBuffer);
                 if ((*file)->InputBuffer != NULL)
                     free((*file)->InputBuffer);
-                free(*file);
+                delete *file;
                 *file = NULL;
                 return result;
             }
@@ -647,21 +590,19 @@ int CZipCommon::CloseCFile(CFile* file)
 {
     CALL_STACK_MESSAGE1("CZipCommon::CloseCFile()");
     CloseHandle(file->File);
-    free(file->FileName);
     if (file->OutputBuffer)
         free(file->OutputBuffer);
     if (file->InputBuffer)
         free(file->InputBuffer);
-    free(file);
+    delete file;
     return 0;
 }
 
-int CZipCommon::ProcessError(int errorID, int lastError, const char* fileName,
-                             int flags, bool* skipAll, char* extText)
+int CZipCommon::ProcessError(int errorID, int lastError, const wchar_t* fileName,
+                             int flags, bool* skipAll, const wchar_t* extText)
 {
-    CALL_STACK_MESSAGE5("CZipCommon::ProcessError(%d, %d, %s, %d, , )", errorID,
+    CALL_STACK_MESSAGE5("CZipCommon::ProcessError(%d, %d, %ls, %d, , )", errorID,
                         lastError, fileName, flags);
-    char errorBuf[1024]; //error text to display
     int exitCode;
     int result; //temp variable
 
@@ -669,26 +610,16 @@ int CZipCommon::ProcessError(int errorID, int lastError, const char* fileName,
         exitCode = ERR_SKIP;
     else
     { //process error and display proper dialog
+        std::wstring errorText = LangStr(errorID);
         if (lastError)
         {
-            char lastErrorBuf[1024]; //temp variable
-            *lastErrorBuf = 0;
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-                              FORMAT_MESSAGE_IGNORE_INSERTS,
-                          NULL, lastError,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-                          lastErrorBuf, 1024, NULL);
-            if (extText)
-                sprintf(errorBuf, "%s\n%s\n%s", LoadStr(errorID), lastErrorBuf, extText);
-            else
-                sprintf(errorBuf, "%s\n%s", LoadStr(errorID), lastErrorBuf);
+            errorText.push_back(L'\n');
+            errorText += SPLGetErrorTextOwned(SalamanderGeneral, lastError);
         }
-        else
+        if (extText != NULL && *extText != 0)
         {
-            if (extText)
-                sprintf(errorBuf, "%s\n%s", LoadStr(errorID), extText);
-            else
-                sprintf(errorBuf, "%s", LoadStr(errorID));
+            errorText.push_back(L'\n');
+            errorText += extText;
         }
 
         if (flags & PE_QUIET)
@@ -697,15 +628,15 @@ int CZipCommon::ProcessError(int errorID, int lastError, const char* fileName,
             if (flags & PE_NORETRY)
                 if (flags & PE_NOSKIP)
                 {
-                    SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_OK, fileName, errorBuf, NULL);
+                    SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_OK, fileName, errorText.c_str(), NULL);
                     result = DIALOG_CANCEL;
                 }
                 else
-                    result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, fileName, errorBuf, NULL);
+                    result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL, fileName, errorText.c_str(), NULL);
             else if (flags & PE_NOSKIP)
-                result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, fileName, errorBuf, NULL);
+                result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, fileName, errorText.c_str(), NULL);
             else
-                result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, fileName, errorBuf, NULL);
+                result = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, fileName, errorText.c_str(), NULL);
 
         switch (result)
         {
@@ -789,7 +720,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
     QWORD i;
     unsigned size;
     bool retry;
-    CPathBuffer lastFile; // Heap-allocated for long path support
+    std::wstring lastFile;
 
     do
     {
@@ -846,9 +777,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                             ZipFile->FilePointer = EOCentrDirOffs + sizeof(CEOCentrDirRecord);
                             if (Read(ZipFile, Comment, EOCentrDir.CommentLen, NULL, NULL))
                             {
-                                if (SalamanderGeneral->ShowMessageBox(
-                                        LoadStr(IDS_ERRREADCOMMENT),
-                                        LoadStr(IDS_PLUGINNAME),
+                                if (SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERRREADCOMMENT).c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                         MSGBOX_EX_ERROR) != IDOK)
                                 {
                                     error = IDS_NODISPLAY;
@@ -914,8 +843,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                                 bool skipAll = true;
                                 if (Read(ZipFile, Comment, EOCentrDir.CommentLen, NULL, &skipAll))
                                 {
-                                    if (SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERRREADCOMMENT),
-                                                                          LoadStr(IDS_PLUGINNAME), MSGBOX_EX_ERROR) != IDOK)
+                                    if (SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERRREADCOMMENT).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_EX_ERROR) != IDOK)
                                     {
                                         error = IDS_NODISPLAY;
                                     }
@@ -939,12 +867,11 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                 DetectRemovable();
                 if (!Removable)
                 {
-                    FindLastFile(lastFile);
-                    if (*lastFile &&
-                        CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                                      lastFile, -1, ZipName, -1) != CSTR_EQUAL)
+                    lastFile = FindLastFile();
+                    if (!lastFile.empty() &&
+                        CompareStringOrdinal(lastFile.c_str(), -1, ZipName.c_str(), -1, TRUE) != CSTR_EQUAL)
                     {
-                        lstrcpy(ZipName, lastFile);
+                        ZipName = lastFile;
                     }
                     else
                         Config.AutoExpandMV = false;
@@ -961,7 +888,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                     bool bigFile = ZipFile->BigFile != 0;
                     CloseCFile(ZipFile);
                     ZipFile = NULL;
-                    ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+                    ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                                       bigFile, useReadCache);
                     if (ret)
@@ -1013,17 +940,17 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                 CHDiskFlags = CHD_FIRST | (Removable ? 0 : CHD_SEQNAMES);
 
                 // small heuristic to see if this might be a WinZip-style name
-                LPCTSTR arcName = _tcsrchr(ZipFile->FileName, '\\');
+                const wchar_t* arcName = wcsrchr(ZipFile->FileName.c_str(), L'\\');
                 if (arcName != NULL)
                     arcName++;
                 else
-                    arcName = ZipFile->FileName;
-                LPCTSTR ext = _tcsrchr(arcName, '.');
-                if (ext != NULL && lstrcmpi(ext, ".zip") == 0) // in Windows ".cvspass" is treated as an extension
+                    arcName = ZipFile->FileName.c_str();
+                const wchar_t* ext = wcsrchr(arcName, L'.');
+                if (ext != NULL && lstrcmpiW(ext, L".zip") == 0) // in Windows ".cvspass" is treated as an extension
                 {
-                    while (ext - 1 > arcName && isdigit(ext[-1]))
+                    while (ext - 1 > arcName && iswdigit(ext[-1]))
                         ext--;
-                    if (!isdigit(*ext) || atoi(ext) != DiskNum + 1)
+                    if (!iswdigit(*ext) || _wtoi(ext) != DiskNum + 1)
                         CHDiskFlags |= CHD_WINZIP;
                 }
 
@@ -1395,111 +1322,76 @@ int CZipCommon::ProcessName(CFileHeader* fileHeader, char* outputName)
     sour = (char*)fileHeader + sizeof(CFileHeader);
     size_t len = fileHeader->NameLen;
 
-    char* sourLocEnc = NULL;
-    // If the file is originating on Unix (or Mac), we check if it is a true UTF8 string
-    // if yes, then we convert it to local encoding
-    if (((fileHeader->Version >> 8 == HS_UNIX) || (fileHeader->Flag & GPF_UTF8)))
-    {
-        void* zero = memchr(sour, 0, len);
-        if (zero)
-        {
-            len = (char*)zero - sour + 1;
-        }
-        if (IsUTF8Encoded(sour, (int)len))
-        {
-            LPWSTR wsour = (LPWSTR)malloc(len * sizeof(WCHAR));
-            if (wsour)
-            {
-                // CodePage 65001 is UTF8 and is supported since W2K (or WNT4?)
-                int wlen = (int)MultiByteToWideChar(CP_UTF8, 0, sour, (int)len, wsour, (int)len);
+    void* zero = memchr(sour, 0, len);
+    if (zero)
+        len = (char*)zero - sour;
 
-                if (wlen > 0)
-                {
-                    // Convert back to local encoding, convert composite chars to precomposed (e.g. accents from Mac)
-                    int lenLocEnc = WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, wsour, wlen, NULL, 0, NULL, NULL);
-                    if (lenLocEnc > 0)
-                    {
-                        sourLocEnc = (char*)malloc(lenLocEnc);
-                        if (sourLocEnc)
-                        {
-                            len = WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, wsour, wlen, sourLocEnc, lenLocEnc, NULL, NULL);
-                            sour = sourLocEnc;
-                        }
-                    }
-                }
-                free(wsour);
-            }
-        }
-    }
+    const bool utf8Flag = (fileHeader->Flag & GPF_UTF8) != 0;
+    const bool unixOrigin = (fileHeader->Version >> 8) == HS_UNIX;
+    std::wstring decodedName;
+    const bool validUtf8 = DecodeZipBytes(CP_UTF8, sour, len, decodedName);
+    // A header that claims UTF-8 but does not carry it is a known archiver bug, not a reason to
+    // drop the entry: pre-unicode simply used the stored bytes. Disbelieve the flag and fall
+    // through to the legacy byte path, which can no longer fail either.
+    const bool nameIsUtf8 = validUtf8 && (utf8Flag || unixOrigin);
 
     char* end = sour + len;
     dest = outputName;
 
-    // remove leading slashes
-    while ((sour < end) && (*sour == '/' || *sour == '\\'))
-        sour++;
-    // replace leading spaces with underscores
-    while ((sour < end) && *sour == ' ')
-    {
-        *dest++ = '_';
-        sour++;
-    }
-    while ((sour < end) && *sour != 0)
-    {
-        if (*sour == '/' || *sour == '\\')
-        {
-            sour++;
-            // remove multiple slashes
-            while ((sour < end) && (*sour == '/' || *sour == '\\'))
-                sour++;
-            // replace trailing spaces in the last filename component with underscores
-            char* iter = dest - 1;
-            while ((iter >= outputName) && *iter == ' ')
-                *iter-- = '_';
-            *dest++ = '\\';
-            // replace leading spaces in the current filename component with underscores
-            while ((sour < end) && *sour == ' ')
-            {
-                *dest++ = '_';
-                sour++;
-            }
-        }
-        else if (((unsigned char)*sour < 32) || strchr("*?<>|\":", *sour))
-        { // Replace illegal char with underscore
-            *dest++ = '_';
-            sour++;
-        }
-        else
-        {
-            *dest++ = *sour++;
-        }
-    }
-    if (dest > outputName && *(dest - 1) == '\\') //skip last slash if name specifies a directory
-    {
-        dest--;
+    bool wasDirBySlash = false;
+    size_t written = NormalizeZipEntryName<char>(sour, end, dest, &wasDirBySlash);
+    dest = outputName + written;
+    if (wasDirBySlash)
         // set the directory attribute; some archivers do not set attributes
         // so that it would appear as a file
         fileHeader->ExternAttr |= FILE_ATTRIBUTE_DIRECTORY;
-    }
-    // replace trailing spaces with underscores
-    char* iter = dest - 1;
-    while ((iter >= outputName) && *iter == ' ')
-        *iter-- = '_';
 
-    if (sourLocEnc)
-        free(sourLocEnc);
-
-    *dest = 0;
-    if (!(fileHeader->Flag & GPF_UTF8) && ((fileHeader->Version >> 8 == HS_FAT /*0*/) ||
+    if (!nameIsUtf8 && !utf8Flag && ((fileHeader->Version >> 8 == HS_FAT /*0*/) ||
                                            (fileHeader->Version >> 8 == HS_HPFS /*6*/) ||
                                            //       ((fileHeader->Version >> 8 == HS_NTFS/*11*/) && ((fileHeader->Version & 0x0F) == 0x50)) // Patera 2010.03.30: This doesn't make sense -> disabled
                                            // The following line got inspiration in MultiArc plugin of FAR
                                            ((fileHeader->Version >> 8 == HS_NTFS /*11*/) && (((fileHeader->Version & 0xFF) <= 20) || ((fileHeader->Version & 0xFF) >= 25)))))
         // ZIP built-in to WinXP writes Version 0x0b14 and uses OEM
         // AS writes version 0x0016 and uses OEM
-        OemToChar(outputName, outputName);
-    //  TRACE_I("Processed name " << outputName);
-    return (int)(dest - outputName);
+        OemToCharA(outputName, outputName);
+
+    int result = (int)(dest - outputName);
+    if (!nameIsUtf8)
+    {
+        // Lenient by design: these bytes carry no declared encoding, and refusing them removed
+        // the entry from the listing and made it unextractable (list.cpp ignores -1, extract.cpp
+        // and del.cpp skip it). pre-unicode had no failure mode here at all.
+        std::wstring wide;
+        DecodeZipNameBytes(ZIP_LEGACY_CODE_PAGE, outputName, static_cast<size_t>(result), wide);
+        const std::string utf8 = WideToZipText(wide.c_str(), (int)wide.size());
+        if (utf8.size() >= MAX_HEADER_SIZE)
+        {
+            outputName[0] = 0;
+            return -1;
+        }
+        memcpy(outputName, utf8.data(), utf8.size());
+        outputName[utf8.size()] = 0;
+        result = (int)utf8.size();
+    }
+    return result;
+}
+
+// Wide presentation twin. ProcessName owns the one archive-byte decoding policy and always
+// returns normalized UTF-8 application text, so listing must not independently reinterpret
+// the same header.
+int CZipCommon::ProcessNameW(CFileHeader* fileHeader, wchar_t* outputName)
+{
+    CALL_STACK_MESSAGE_NONE // time-critical method
+    std::vector<char> narrowBuf(MAX_HEADER_SIZE);
+    const int narrowLen = ProcessName(fileHeader, narrowBuf.data());
+    if (narrowLen < 0)
+    {
+        outputName[0] = 0;
+        return -1;
+    }
+    const std::wstring wide = ZipTextToWide(narrowBuf.data(), narrowLen);
+    memcpy(outputName, wide.c_str(), sizeof(wchar_t) * (wide.size() + 1));
+    return (int)wide.size();
 }
 
 int CZipCommon::ReadLocalHeader(CLocalFileHeader* fileHeader, QWORD offset)
@@ -1581,7 +1473,7 @@ void CZipCommon::SplitPath(char** path, char** name, const char* pathToSplit)
 
     strcpy(dest, pathToSplit);
     // _tcsrchr (or _mbcsrchr) correctly handles MBCS
-    lastSlash = _tcsrchr(dest, '\\');
+    lastSlash = strrchr(dest, '\\');
     /*  while (*pathToSplit)
   {
    if (*pathToSplit == '\\')
@@ -1668,22 +1560,29 @@ LABEL_QuickSortHeaders:
 int CZipCommon::EnumFiles(TIndirectArray2<CExtInfo>& namesArray, int& dirs, SalEnumSelection next, void* param)
 {
     CALL_STACK_MESSAGE1("CZipCommon::EnumFiles(, , )");
-    const char* nextName;
+    const wchar_t* nextNameW;
     CExtInfo* info;
     BOOL isDir;
     int errorID = 0;
     const CFileData* fileData;
 
     dirs = 0;
-    while ((nextName = next(NULL, 0, &isDir, NULL, &fileData, param, NULL)) != NULL)
+    while ((nextNameW = next(NULL, 0, &isDir, NULL, &fileData, param, NULL)) != NULL)
     {
+        // CExtInfo::Name is wide (was narrow): this used to CP_ACP-narrow
+        // nextNameW here and REFUSE (abort the whole batch operation via errorID/break) the
+        // moment any single selected file's name couldn't survive that round trip - a
+        // coarser failure mode than it looks: one unrepresentable name in a multi-file
+        // selection killed matching/extraction for every OTHER file too, even ones with
+        // perfectly representable names. Storing nextNameW directly removes both the
+        // narrowing and the refusal.
         CZIPFileData* zipFileData = (CZIPFileData*)fileData->PluginData;
 
         // NOTE: zipFileData is NULL for dirs that are not present in the ZIP as such but only with subitems
         // Then Salamander creates CFileData for us
         Unix = Unix || (zipFileData ? zipFileData->Unix : 0);
 
-        info = new CExtInfo(nextName, isDir ? true : false, zipFileData ? zipFileData->ItemNumber : -1);
+        info = new CExtInfo(nextNameW, isDir ? true : false, zipFileData ? zipFileData->ItemNumber : -1);
         if (!info || !info->Name)
         {
             if (info)
@@ -1706,21 +1605,10 @@ int CZipCommon::EnumFiles(TIndirectArray2<CExtInfo>& namesArray, int& dirs, SalE
 int CompareExtInfos(const CExtInfo* left, const CExtInfo* right, bool unix)
 {
     CALL_STACK_MESSAGE_NONE
-    if (left->IsDir)
-    {
-        if (right->IsDir)
-        {
-            int ret = unix ? _tcscmp(left->Name, right->Name) : SalamanderGeneral->StrICmp(left->Name, right->Name);
-            return ret ? ret : (left->ItemNumber < right->ItemNumber ? -1 : (left->ItemNumber == right->ItemNumber ? 0 : 1));
-        }
-        return -1;
-    }
-
-    if (right->IsDir)
-        return 1;
-
-    int ret = _tcscmp(left->Name, right->Name);
-    return ret ? ret : (left->ItemNumber < right->ItemNumber ? -1 : (left->ItemNumber == right->ItemNumber ? 0 : 1));
+    return CompareExtInfoNames(left->Name, left->IsDir, left->ItemNumber,
+                               right->Name, right->IsDir, right->ItemNumber, unix,
+                               [](const wchar_t* a, const wchar_t* b)
+                               { return SalamanderGeneral->StrICmp(a, b); });
 }
 
 void QuickSortNames(int left, int right, TIndirectArray2<CExtInfo>& names, bool unix)
@@ -1784,15 +1672,19 @@ LABEL_QuickSortNames:
     }
 }
 
-bool BSearchName(LPCTSTR name, int ItemNumber, int left, int right, TIndirectArray2<CExtInfo>& names, bool respectCase)
+bool BSearchName(const char* name, int ItemNumber, int left, int right, TIndirectArray2<CExtInfo>& names, bool respectCase)
 {
     CALL_STACK_MESSAGE5("BSearchName(%s, %d, %d, , %d)", name, left, right,
                         respectCase);
+    // ProcessName returns normalized UTF-8; panel selections are UTF-16.
+    const std::wstring nameW = ZipTextToWide(name);
     int c, mid;
     while (left < right)
     {
         mid = (left + right) >> 1;
-        c = respectCase ? _tcscmp(name, names[mid]->Name) : SalamanderGeneral->StrICmp(name, names[mid]->Name);
+        c = CompareSearchName(nameW.c_str(), names[mid]->Name, respectCase,
+                              [](const wchar_t* a, const wchar_t* b)
+                              { return SalamanderGeneral->StrICmp(a, b); });
         // Files are matched only when the ItemNumber also matches
         if (c == 0)
         {
@@ -1874,13 +1766,17 @@ int CZipCommon::MatchFiles(TIndirectArray2<CFileInfo>& files, TIndirectArray2<CE
         readSize += s;
         tempNameLen = ProcessName(centralHeader, tempName);
 
+        // tempNameLen is signed and RootLen is always >= 0, so ProcessName's -1
+        // failure return (invalid UTF-8 on a UTF-8-flagged entry) already satisfies
+        // "tempNameLen < RootLen" below and skips this entry via the existing prefix-mismatch
+        // continue - no separate check needed here.
         // test the prefix of the name
         if (tempNameLen < RootLen || RootLen && tempName[RootLen] != '\\' ||
             (Unix ? memcmp(tempName, ZipRoot, RootLen) : SalamanderGeneral->MemICmp(tempName, ZipRoot, RootLen)))
             continue;
 
         name = tempName + (RootLen ? RootLen + 1 : 0);
-        LPTSTR slash = _tcschr(name, '\\');
+        char* slash = strchr(name, '\\');
         if (slash) // tempName + RootLen + 1, contains a slash
         {
             // look for the path component in the list of directories; case sensitivity depends
@@ -1917,7 +1813,7 @@ int CZipCommon::MatchFiles(TIndirectArray2<CFileInfo>& files, TIndirectArray2<CE
         }
         ProcessHeader(centralHeader, fileInfo);
         fileInfo->NameLen = tempNameLen;
-        fileInfo->Name = _tcsdup(tempName);
+        fileInfo->Name = _strdup(tempName);
         if (!fileInfo->Name)
         {
             delete fileInfo;
@@ -1947,36 +1843,14 @@ int CZipCommon::MatchFiles(TIndirectArray2<CFileInfo>& files, TIndirectArray2<CE
 void CZipCommon::DetectRemovable()
 {
     CALL_STACK_MESSAGE1("CZipCommon::DetectRemovable()");
-    CPathBuffer pathRoot; // Heap-allocated for long path support
-    const char* sour = ZipName;
-    char* dest = pathRoot.Get();
-
-    while (*sour && *sour != '\\')
-        *dest++ = *sour++;
-    *dest = 0;
-
-    if (GetDriveType(pathRoot) == DRIVE_REMOVABLE)
-        Removable = true;
-    else
-        Removable = false;
+    std::wstring root;
+    Removable = SPLGetRootPathOwned(SalamanderGeneral, ZipName.c_str(), root) &&
+                GetDriveTypeW(root.c_str()) == DRIVE_REMOVABLE;
 }
 
-/*
-void CZipCommon::SetCurrentDirToZipPath()
+int CZipCommon::TestIfExist(const wchar_t* name)
 {
-  char   buf[MAX_PATH + 1];
-  char * path;
-  char * dummy;
-
-  path = buf;
-  SplitPath(&path, &dummy, ZipName);
-  if (*path) SetCurrentDirectory(path);
-}
-*/
-
-int CZipCommon::TestIfExist(const char* name)
-{
-    CALL_STACK_MESSAGE2("CZipCommon::TestIfExist(%s)", name);
+    CALL_STACK_MESSAGE2("CZipCommon::TestIfExist(%ls)", name);
     DWORD fattr = SalamanderGeneral->SalGetFileAttributes(name);
     if (fattr == 0xFFFFFFFF)
     {
@@ -1989,7 +1863,6 @@ int CZipCommon::TestIfExist(const char* name)
     }
     else
     {
-        char attr[101];
         FILETIME ft;
         CFile* file;
 
@@ -2004,11 +1877,11 @@ int CZipCommon::TestIfExist(const char* name)
                 return ErrorID = IDS_NODISPLAY;
         }
         GetFileTime(file->File, NULL, NULL, &ft);
-        GetInfo(attr, &ft, file->Size);
+        const std::wstring attr = GetInfo(&ft, file->Size);
         CloseCFile(file);
-        if (OverwriteDialog2(SalamanderGeneral->GetMsgBoxParent(), name, attr) != IDC_YES)
+        if (OverwriteDialog2(SalamanderGeneral->GetMsgBoxParent(), name, attr.c_str()) != IDC_YES)
             return ErrorID = IDS_NODISPLAY;
-        SetFileAttributes(name, FILE_ATTRIBUTE_NORMAL);
+        SetFileAttributesW(name, FILE_ATTRIBUTE_NORMAL);
     }
     return 0;
 }
@@ -2106,10 +1979,11 @@ FAIL:
     return ret;
 }
 
-int LoadSfxFileData(char* fileName, CSfxLang** lang)
+int LoadSfxFileData(const wchar_t* fileName, CSfxLang** lang)
 {
     CALL_STACK_MESSAGE1("LoadSfxFileData(, )");
-    HANDLE file = CreateFile(fileName, GENERIC_READ, NULL, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE file = CreateFileW(fileName, GENERIC_READ, 0, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return IDS_UNABLEREADSFX;
 
@@ -2204,13 +2078,11 @@ int LoadSfxFileData(char* fileName, CSfxLang** lang)
     ptr += header.TextLen[WWWLEN];
 
     (*lang)->LangID = header.LangID;
-    char* c;
-    c = strrchr(fileName, '\\');
-    if (c)
-        c++;
-    else
-        c = fileName;
-    lstrcpy((*lang)->FileName, c);
+    {
+        const wchar_t* c = wcsrchr(fileName, L'\\');
+        if (!TryWideToZipText(c != NULL ? c + 1 : fileName, (*lang)->FileName))
+            goto FAIL;
+    }
     ret = 0;
 
 FAIL:
@@ -2229,7 +2101,7 @@ FAIL:
     return ret;
 }
 
-void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size)
+std::wstring GetInfo(FILETIME* lastWrite, QWORD size)
 {
     CALL_STACK_MESSAGE1("GetInfo(, , )");
     SYSTEMTIME st;
@@ -2237,48 +2109,34 @@ void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size)
     FileTimeToLocalFileTime(lastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord().SetUI64(size)), date, time);
-}
-
-int MakeFileName(int number, bool seqNames, const char* archive,
-                 char* name, BOOL winZipNames)
-{
-    CALL_STACK_MESSAGE5("MakeFileName(%d, %d, %s, , %d)", number, seqNames, archive, winZipNames);
-
-    if (!seqNames)
-        return (int)strlen(strcpy(name, archive));
-
-    const char* arcName = strrchr(archive, '\\');
-    if (arcName != NULL)
-        arcName++;
-    else
-        arcName = archive;
-    const char* ext = strrchr(arcName, '.');
-    if (ext == NULL)
-        ext = archive + strlen(archive); // ".cvspass" is extension in Windows
-    int namelen = (int)(ext - archive);
-
-    CPathBuffer buf;    memcpy(buf, archive, namelen);
-
-    if (winZipNames)
-        sprintf(buf + namelen, ".z%02d", number);
-    else
-        sprintf(buf + namelen, ext > archive && isdigit(ext[-1]) ? "_%02d%s" : "%02d%s", number, ext);
-
-    int ret = (int)strlen(buf);
-    if (ret > MAX_PATH)
+    std::wstring time;
+    int needed = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, NULL, 0);
+    if (needed > 0)
     {
-        TRACE_I("archive name is too long to add file numbers:" << buf);
-        return (int)strlen(strcpy(name, archive));
+        std::vector<wchar_t> buffer(static_cast<size_t>(needed));
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, buffer.data(), needed) > 0)
+            time.assign(buffer.data());
     }
+    if (time.empty())
+        time = std::to_wstring(st.wHour) + L":" +
+               (st.wMinute < 10 ? L"0" : L"") + std::to_wstring(st.wMinute) + L":" +
+               (st.wSecond < 10 ? L"0" : L"") + std::to_wstring(st.wSecond);
 
-    strcpy(name, buf);
-    return ret;
+    std::wstring date;
+    needed = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, NULL, 0);
+    if (needed > 0)
+    {
+        std::vector<wchar_t> buffer(static_cast<size_t>(needed));
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buffer.data(), needed) > 0)
+            date.assign(buffer.data());
+    }
+    if (date.empty())
+        date = std::to_wstring(st.wDay) + L"." + std::to_wstring(st.wMonth) + L"." +
+               std::to_wstring(st.wYear);
+
+    const std::wstring number = SPLNumberToStrOwned(
+        SalamanderGeneral, CQuadWord().SetUI64(size));
+    return number + L", " + date + L", " + time;
 }
 
 bool Atod(const char* string, char* decSep, double* val)
@@ -2403,12 +2261,14 @@ DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
     {
         // add default values
         CSfxLang* lang = NULL;
-        CPathBuffer file; // Heap-allocated for long path support
-        GetModuleFileName(DLLInstance, file, file.Size());
-        SalamanderGeneral->CutDirectory(file);
-        SalamanderGeneral->SalPathAppend(file, "sfx", file.Size());
-        SalamanderGeneral->SalPathAppend(file, settings->SfxFile, file.Size());
-        if (LoadSfxFileData(file, &lang) == 0)
+        std::wstring fileW;
+        if (!SPLGetModuleFileNameOwned(DLLInstance, fileW))
+            return -1;
+        SPLCutDirectoryOwned(SalamanderGeneral, fileW);
+        SPLSalPathAppendOwned(fileW, L"sfx");
+        const std::wstring sfxFileW = ZipTextToWide(settings->SfxFile);
+        SPLSalPathAppendOwned(fileW, sfxFileW.c_str());
+        if (LoadSfxFileData(fileW.c_str(), &lang) == 0)
         {
             strcpy(settings->Vendor, lang->Vendor);
             strcpy(settings->WWW, lang->WWW);
@@ -2428,7 +2288,7 @@ DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
     }
 #define PUT_STRING(str) \
     { \
-        DWORD s = lstrlen(str); \
+        DWORD s = lstrlenA(str); \
         PUT_DWORD(s); \
         if (stored + s > size) \
             buffer = (char*)realloc(buffer, (size = max(size * 2, size + s))); \
@@ -2458,55 +2318,53 @@ DWORD PackSfxSettings(CSfxSettings* settings, char*& buffer, DWORD& size)
     return stored;
 }
 
-char* FormatMessage(char* buffer, int errorID, int lastError)
+std::wstring FormatZipErrorMessage(int errorID, int lastError)
 {
-    CALL_STACK_MESSAGE3("FormatMessage(, %d, %d)", errorID, lastError);
-    lstrcpy(buffer, LoadStr(errorID));
+    CALL_STACK_MESSAGE3("FormatZipErrorMessage(%d, %d)", errorID, lastError);
+    std::wstring result = LangStr(errorID);
     if (lastError)
-        ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                        512 - lstrlen(buffer), NULL);
-    return buffer;
+        result += SPLGetErrorTextOwned(SalamanderGeneral, lastError);
+    return result;
 }
 
-LPTSTR
-StrNChr(LPCTSTR lpStart, int nChar, char wMatch)
+char*
+StrNChr(const char* lpStart, int nChar, char wMatch)
 {
     CALL_STACK_MESSAGE_NONE
     if (lpStart == NULL)
         return NULL;
-    int i = lstrlen(lpStart);
+    int i = lstrlenA(lpStart);
     if (i > nChar)
         i = nChar;
-    LPCTSTR lpEnd = lpStart + nChar;
+    const char* lpEnd = lpStart + nChar;
     while (lpStart < lpEnd)
     {
         if (*lpStart == wMatch)
-            return (LPTSTR)lpStart;
+            return (char*)lpStart;
         lpStart++;
     }
     return NULL;
 }
 
-LPTSTR StrRChr(LPCTSTR lpStart, LPCTSTR lpEnd, char wMatch)
+char* StrRChr(const char* lpStart, const char* lpEnd, char wMatch)
 {
     CALL_STACK_MESSAGE_NONE
     lpEnd--;
     while (lpEnd >= lpStart)
     {
         if (*lpEnd == wMatch)
-            return (LPTSTR)lpEnd;
+            return (char*)lpEnd;
         lpEnd--;
     }
     return NULL;
 }
 
-LPTSTR TrimTralingSpaces(LPTSTR lpString)
+char* TrimTralingSpaces(char* lpString)
 {
     CALL_STACK_MESSAGE_NONE
     if (lpString)
     {
-        char* sour = lpString + lstrlen(lpString);
+        char* sour = lpString + lstrlenA(lpString);
         while (--sour >= lpString && *sour == ' ')
             ;
         sour[1] = 0;

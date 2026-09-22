@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cwctype>
+#include <new>
 #include <set>
 
 namespace
@@ -236,7 +237,7 @@ bool CWindowsTerminalService::ReadSettingsFile(const std::wstring& path,
     if (!sizeResult.success || size > kMaximumSettingsSize)
     {
         errorCode = sizeResult.success ? ERROR_FILE_TOO_LARGE : sizeResult.errorCode;
-        fileSystem->CloseHandle(file);
+        fileSystem->CloseFileHandle(file);
         return false;
     }
 
@@ -250,14 +251,14 @@ bool CWindowsTerminalService::ReadSettingsFile(const std::wstring& path,
         if (!readResult.success || read == 0)
         {
             errorCode = readResult.success ? ERROR_HANDLE_EOF : readResult.errorCode;
-            fileSystem->CloseHandle(file);
+            fileSystem->CloseFileHandle(file);
             bytes.clear();
             return false;
         }
         offset += read;
     }
 
-    fileSystem->CloseHandle(file);
+    fileSystem->CloseFileHandle(file);
     errorCode = ERROR_SUCCESS;
     return true;
 }
@@ -467,7 +468,7 @@ std::wstring CWindowsTerminalService::BuildCommandLine(
             commandLine.append(QuoteArgument(selector));
         }
     }
-    if (request.workingDirectory != nullptr && request.workingDirectory[0] != L'\0')
+    if (!request.workingDirectory.empty())
     {
         commandLine.append(L" -d ");
         commandLine.append(QuoteArgument(request.workingDirectory));
@@ -477,6 +478,7 @@ std::wstring CWindowsTerminalService::BuildCommandLine(
 
 CommandShellResult CWindowsTerminalService::Launch(
     const ShellTarget& target, const WindowsTerminalLaunchRequest& request)
+try
 {
     const WindowsTerminalCatalog& catalog = Refresh(false);
     if (!catalog.installed)
@@ -492,8 +494,8 @@ CommandShellResult CWindowsTerminalService::Launch(
 
     std::wstring commandLine = BuildCommandLine(catalog.executablePath, resolved, request);
     ProcessStartInfo info;
-    info.applicationName = catalog.executablePath.c_str();
-    info.commandLine = commandLine.c_str();
+    info.applicationName = catalog.executablePath;
+    info.commandLine = commandLine;
     info.workingDirectory = request.workingDirectory;
     info.creationFlags = CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS;
     HPROCESS launched = process->CreateProcess(info);
@@ -503,6 +505,10 @@ CommandShellResult CWindowsTerminalService::Launch(
         return CommandShellResult::Error(errorCode != ERROR_SUCCESS ? errorCode : ERROR_GEN_FAILURE);
     }
     return CommandShellResult::Ok(launched, process->GetProcessId(launched), process);
+}
+catch (const std::bad_alloc&)
+{
+    return CommandShellResult::Error(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 static CWindowsTerminalService g_defaultWindowsTerminalService;

@@ -2754,6 +2754,9 @@
 #define IDS_SHELL_COMSPEC               14224
 #define IDS_SHELL_WT_DEFAULT            14225
 #define IDS_SHELL_TARGET_UNAVAILABLE    14226
+#define IDS_UNPACK_ANSI_ONLY            14227
+#define IDS_MASTERPASSWORD_TOO_LONG     14228
+#define IDS_FIND_HEX_INVALID            14229
 
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 

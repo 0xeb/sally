@@ -14,4 +14,4 @@
 
 #pragma once
 
-static const TCHAR SuggestedFSName[] = TEXT("pd");
+static const wchar_t SuggestedFSName[] = L"pd";

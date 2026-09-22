@@ -6,26 +6,23 @@
 #include "worker.h"
 #include "common/BuildScript.h"
 
-BOOL BuildScriptLegacyADSProbe(const char* sourceNameA,
-                               const wchar_t* sourceNameW,
+BOOL BuildScriptLegacyADSProbe(const wchar_t* sourceName,
                                BOOL isDir,
                                DWORD bytesPerCluster,
                                CBuildADSProbeResult* result,
                                void* context)
 {
     (void)context;
-    if (sourceNameA == NULL || result == NULL)
+    if (sourceName == NULL || result == NULL)
         return FALSE;
 
     CQuadWord adsSize(0, 0);
     CQuadWord adsOccupiedSpace(0, 0);
     DWORD winError = NO_ERROR;
     BOOL onlyDiscardableStreams = FALSE;
-    const std::wstring sourceWide = sourceNameW != NULL ? sourceNameW : L"";
-    const BOOL hasADS = CheckFileOrDirADS(sourceNameA, isDir, &adsSize, NULL, NULL, NULL,
-                                          &winError, bytesPerCluster,
-                                          &adsOccupiedSpace, &onlyDiscardableStreams,
-                                          sourceWide);
+    const BOOL hasADS = CheckFileOrDirADS(
+        sourceName, isDir, &adsSize, NULL, NULL, &winError,
+        bytesPerCluster, &adsOccupiedSpace, &onlyDiscardableStreams);
 
     result->HasADS = hasADS != FALSE;
     result->HasProbeError = winError != NO_ERROR;

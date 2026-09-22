@@ -15,7 +15,7 @@ HANDLE CRemoteComparator::RemoteComparatorThread = NULL;
 HANDLE CRemoteComparator::TerminateEvent = NULL;
 
 CRemoteComparator::CRemoteComparator()
-    : CThread("Remote Comparator"),
+    : CThread(L"Remote Comparator"),
       MessageCenter(MessageCenterName, FALSE){
           CALL_STACK_MESSAGE_NONE}
 
@@ -88,7 +88,7 @@ CRemoteComparator::Body()
     BOOL ret;
     char startedEventName[128];
     sally::filecomp::BuildFileCompStartedEventNameForCurrentProcess(startedEventName, (int)sizeof(startedEventName));
-    HANDLE started = CreateEvent(NULL, TRUE, FALSE, startedEventName);
+    HANDLE started = CreateEventA(NULL, TRUE, FALSE, startedEventName);
     SetEvent(started);
     while (1)
     {
@@ -114,17 +114,16 @@ void CRemoteComparator::RecieveMessage(const CMessage* message)
         return;
     CRCMessage* msg = (CRCMessage*)message;
 
-    CPathBuffer Path1; // Heap-allocated for long path support
-    CPathBuffer Path2;
-    strcpy(Path1, msg->Path1);
-    strcpy(Path2, msg->Path2);
+    std::wstring path1(msg->Path1);
+    std::wstring path2(msg->Path2);
 
     int errID;
-    SalGetFullName(Path1, &errID, msg->CurrentDirectory);
-    SalGetFullName(Path2, &errID, msg->CurrentDirectory);
+    SPLSalGetFullNameOwned(SG, path1, &errID, msg->CurrentDirectory);
+    SPLSalGetFullNameOwned(SG, path2, &errID, msg->CurrentDirectory);
 
     BOOL ok = FALSE;
-    CFilecompThread* d = new CFilecompThread(Path1, Path2, TRUE, msg->ReleaseEvent);
+    CFilecompThread* d = new CFilecompThread(
+        path1.c_str(), path2.c_str(), TRUE, msg->ReleaseEvent);
     if (!d)
     {
         Error((HWND)NULL, IDS_LOWMEM);
@@ -139,7 +138,7 @@ void CRemoteComparator::RecieveMessage(const CMessage* message)
     if (!ok && *msg->ReleaseEvent)
     {
         // allow filecomp.exe to continue
-        HANDLE event = OpenEvent(EVENT_MODIFY_STATE, FALSE, msg->ReleaseEvent);
+        HANDLE event = OpenEventA(EVENT_MODIFY_STATE, FALSE, msg->ReleaseEvent);
         SetEvent(event);
         CloseHandle(event);
     }

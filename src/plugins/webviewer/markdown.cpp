@@ -14,16 +14,16 @@
 
 #include "markdown.h"
 #include "markdown_document.h"
+#include "webviewer_text.h"
 
 static std::string LoadMarkdownCSS()
 {
-    wchar_t pathBuf[MAX_PATH];
-    if (GetModuleFileNameW(DLLInstance, pathBuf, MAX_PATH) == 0)
+    std::wstring path;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, path))
     {
         TRACE_E("GetModuleFileNameW() failed");
         return {};
     }
-    std::wstring path(pathBuf);
     auto pos = path.rfind(L'\\');
     if (pos == std::wstring::npos)
     {
@@ -34,11 +34,11 @@ static std::string LoadMarkdownCSS()
 
     // Try custom.css first, fall back to githubmd.css
     std::wstring cssPath = dir + L"css\\custom.css";
-    FILE* fp = _wfopen(cssPath.c_str(), L"r");
+    FILE* fp = _wfopen(cssPath.c_str(), L"rb");
     if (fp == nullptr)
     {
         cssPath = dir + L"css\\githubmd.css";
-        fp = _wfopen(cssPath.c_str(), L"r");
+        fp = _wfopen(cssPath.c_str(), L"rb");
         if (fp == nullptr)
             return {};
     }
@@ -50,35 +50,6 @@ static std::string LoadMarkdownCSS()
         css.append(buffer, bytes);
     fclose(fp);
     return css;
-}
-
-static std::wstring GetDirectoryFromPath(const std::wstring& filePath)
-{
-    auto pos = filePath.rfind(L'\\');
-    if (pos == std::wstring::npos)
-        pos = filePath.rfind(L'/');
-    if (pos != std::wstring::npos)
-        return filePath.substr(0, pos + 1);
-    return L".\\";
-}
-
-// Convert a directory path to a file:// URL for the <base> tag.
-// Backslashes become forward slashes, and the URL is properly formatted.
-static std::string MakeBaseHref(const std::wstring& dir)
-{
-    // Convert wide to UTF-8
-    int len = WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), nullptr, 0, nullptr, nullptr);
-    std::string utf8(len, '\0');
-    WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), (int)dir.size(), utf8.data(), len, nullptr, nullptr);
-
-    // Replace backslashes with forward slashes
-    for (char& c : utf8)
-    {
-        if (c == '\\')
-            c = '/';
-    }
-
-    return "file:///" + utf8;
 }
 
 static const char* extension_names[] = {
@@ -110,7 +81,7 @@ std::string ConvertMarkdownToHTML(const std::wstring& filePath)
         cmark_parser_attach_syntax_extension(parser, syntax_extension);
     }
 
-    FILE* fp = _wfopen(filePath.c_str(), L"r");
+    FILE* fp = _wfopen(filePath.c_str(), L"rb");
     if (fp == nullptr)
     {
         TRACE_E("_wfopen failed");
@@ -135,10 +106,21 @@ std::string ConvertMarkdownToHTML(const std::wstring& filePath)
     cmark_node_free(doc);
     cmark_parser_free(parser);
 
+    if (html == nullptr)
+    {
+        cmark_release_plugins();
+        return {};
+    }
+
     // Build the complete HTML document
     std::string css = LoadMarkdownCSS();
-    std::wstring dir = GetDirectoryFromPath(filePath);
-    std::string baseHref = MakeBaseHref(dir);
+    std::string baseHref;
+    if (!WebViewerBuildMarkdownBaseHref(filePath, baseHref))
+    {
+        free(html);
+        cmark_release_plugins();
+        return {};
+    }
     bool useDarkTheme = PluginDarkMode_ShouldUseDark() != FALSE;
 
     std::string result = BuildMarkdownHtmlDocument(baseHref, css, html, useDarkTheme);

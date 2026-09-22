@@ -15,15 +15,11 @@
 
 #include "fat.h"
 #include "unfat.h"
+#include "unfat_text.h"
 
 #include "unfat.rh"
 #include "unfat.rh2"
 #include "lang\lang.rh"
-
-//*****************************************************************************
-//
-// CFATImage
-//
 
 CFATImage::CFATImage()
 {
@@ -42,7 +38,7 @@ void CFATImage::Close()
     SalamanderSafeFile->SafeFileClose(&File);
 }
 
-BOOL CFATImage::Open(const char* fileName, BOOL quiet, HWND hParent)
+BOOL CFATImage::Open(const wchar_t* fileName, BOOL quiet, HWND hParent)
 {
     VolumeStart.Set(0, 0);
 
@@ -101,7 +97,7 @@ restart:
         {
             id = IDS_ERROR_MBR_UNSUPPORTED;
         }
-        Error(id, quiet, fileName, LoadStr(IDS_ERROR_BS_CORRUPTED));
+        Error(id, quiet, fileName, LangStr(IDS_ERROR_BS_CORRUPTED).c_str());
         Close();
         return FALSE;
     }
@@ -192,8 +188,7 @@ BOOL CFATImage::ListImage(CSalamanderDirectoryAbstract* dir, HWND hParent)
     }
 
     // the recursive AddDirectory function loads a directory and all of its subdirectories
-    CPathBuffer root;
-    root[0] = 0;
+    std::wstring root;
     return AddDirectory(root, &rootDirFAT, dir, FirstRootDirSecNum, hParent);
 }
 
@@ -246,11 +241,11 @@ BOOL ConvertFATName(const char* fatName, char* name)
 // temporary storage for directory names; used to optimize AddFile/AddDir calls
 struct CDirStore
 {
-    char* Name;
+    wchar_t* Name;
     DWORD Cluster;
 };
 
-BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
+BOOL CFATImage::AddDirectory(std::wstring& root, TDirectArray<DWORD>* fat,
                              CSalamanderDirectoryAbstract* dir, DWORD sector,
                              HWND hParent)
 {
@@ -397,7 +392,7 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
         if (name8_3[0] == '.' && (name8_3[1] == 0 || (name8_3[1] == '.' && name8_3[2] == 0)))
         {
             longNameOrd = 0;
-            if (*root == 0)
+            if (root.empty())
                 TRACE_E("CFATImage::AddDirectory: . and .. in the root directory. offset=0x" << _i64toa(seek.Value, seekStr, 16)); // the root directory must not contain . and ..
             continue;
         }
@@ -424,18 +419,28 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
 
         if (longNameLen > 0)
         {
-            file.Name = (char*)SalamanderGeneral->Alloc(longNameLen + 1);
+            // VFAT long-name directory entries are already native UTF-16 on disk (per the
+            // VFAT spec), so this is a lossless DupStr, not a conversion - the old code path
+            // downconverted 'longName' through CP_ACP first, which corrupted any character
+            // outside the process's ANSI code page. See [[tests-that-pass-for-the-wrong-reason]].
+            file.Name = SalamanderGeneral->DupStr(longName);
             if (file.Name == NULL)
             {
                 TRACE_E(LOW_MEMORY);
                 ok = FALSE;
                 break;
             }
-            // Convert the UNICODE string to ANSI
-            WideCharToMultiByte(CP_ACP, 0, longName, longNameLen + 1,
-                                file.Name, longNameLen + 1, NULL, NULL);
-            file.Name[longNameLen] = 0;
-            file.DosName = SalamanderGeneral->DupStr(name8_3);
+            // The short 8.3 name is on-disk OEM-code-page bytes per the FAT spec (matches
+            // 7-Zip's own FatHandler.cpp precedent for this exact conversion).
+            std::wstring shortName;
+            if (!DecodeFatOemName(name8_3, shortName))
+            { // the decode degrades rather than refuses; only an allocation can get here
+                TRACE_E(LOW_MEMORY);
+                SalamanderGeneral->Free(file.Name);
+                ok = FALSE;
+                break;
+            }
+            file.DosName = SalamanderGeneral->DupStr(shortName.c_str());
             if (file.DosName == NULL)
             {
                 TRACE_E(LOW_MEMORY);
@@ -448,7 +453,14 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
         {
             if ((dirEnt.Short.NTRes & 0x08) != 0)
                 _strlwr(name8_3);
-            file.Name = SalamanderGeneral->DupStr(name8_3);
+            std::wstring shortName;
+            if (!DecodeFatOemName(name8_3, shortName))
+            { // the decode degrades rather than refuses; only an allocation can get here
+                TRACE_E(LOW_MEMORY);
+                ok = FALSE;
+                break;
+            }
+            file.Name = SalamanderGeneral->DupStr(shortName.c_str());
             if (file.Name == NULL)
             {
                 TRACE_E(LOW_MEMORY);
@@ -458,7 +470,7 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
             file.DosName = NULL;
         }
 
-        file.NameLen = strlen(file.Name);
+        file.NameLen = wcslen(file.Name);
         if (!SortByExtDirsAsFiles && (dirEnt.Short.Attr & ATTR_DIRECTORY))
         {
             // directories have no extension
@@ -467,7 +479,7 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
         else
         {
             // for files the extension is behind the last dot
-            char* s = strrchr(file.Name, '.');
+            wchar_t* s = wcsrchr(file.Name, L'.');
             if (s != NULL)
                 file.Ext = s + 1; // ".cvspass" is an extension in Windows
             else
@@ -498,7 +510,7 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
 
             // add to the listing
             file.IsLink = 0;
-            if (!dir->AddDir(root, file, NULL))
+            if (!dir->AddDir(root.c_str(), file, NULL))
             {
                 SalamanderGeneral->Free(file.Name);
                 if (file.DosName != NULL)
@@ -531,7 +543,7 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
         {
             // add the file to the listing
             file.IsLink = SalamanderGeneral->IsFileLink(file.Ext);
-            if (!dir->AddFile(root, file, NULL))
+            if (!dir->AddFile(root.c_str(), file, NULL))
             {
                 SalamanderGeneral->Free(file.Name);
                 if (file.DosName != NULL)
@@ -545,34 +557,30 @@ BOOL CFATImage::AddDirectory(char* root, TDirectArray<DWORD>* fat,
     // finally call ourselves for all stored directories
     if (ok && dirStore.Count > 0)
     {
-        char* rootEnd = root + strlen(root);
         int i;
         for (i = 0; i < dirStore.Count; i++)
         {
             CDirStore* ds = &dirStore[i];
-
-            if (rootEnd - root + strlen(ds->Name) + 2 >= SAL_MAX_LONG_PATH)
-            {
-                // we must not allow exceeding the buffer size
-                TRACE_E("The path len exceeds SAL_MAX_LONG_PATH. Skipping directory: " << ds->Name);
-                continue;
-            }
-
-            sprintf(rootEnd, "%s\\", ds->Name);
+            const size_t parentLength = root.size();
+            root.append(ds->Name);
+            root.push_back(L'\\');
 
             // firstSectorOfCluster = FirstDataSec + (N - 2) * SecPerClus
             DWORD newSector = FirstDataSec + (ds->Cluster - 2) * BS.SecPerClus;
             // we no longer need the FAT entries; we can use our own array
             if (!LoadFAT(ds->Cluster, fat, hParent, BUTTONS_RETRYCANCEL, NULL, NULL))
             {
+                root.resize(parentLength);
                 ok = FALSE;
                 break;
             }
             if (!AddDirectory(root, fat, dir, newSector, hParent))
             {
+                root.resize(parentLength);
                 ok = FALSE;
                 break;
             }
+            root.resize(parentLength);
         }
     }
 
@@ -687,31 +695,48 @@ BOOL CFATImage::LoadFAT(DWORD cluster, TDirectArray<DWORD>* fat, HWND hParent,
     return TRUE;
 }
 
-// prepare a string for error messages; it contains the size, date, and time
-void GetFileInfo(char* buffer, int bufferLen, const CFileData* fileData)
+static std::wstring FormatLocalDateOrTime(const SYSTEMTIME& time, bool date)
 {
-    CALL_STACK_MESSAGE2("GetFileInfo(, %d, , )", bufferLen);
+    const int required = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, NULL, 0)
+                              : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL, NULL, 0);
+    if (required > 1)
+    {
+        std::wstring result(static_cast<size_t>(required), L'\0');
+        const int written = date ? GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time, NULL, result.data(), required)
+                                 : GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &time, NULL, result.data(), required);
+        if (written == required)
+        {
+            result.resize(static_cast<size_t>(written - 1));
+            return result;
+        }
+    }
+    if (date)
+        return std::to_wstring(time.wDay) + L"." + std::to_wstring(time.wMonth) + L"." + std::to_wstring(time.wYear);
+    return std::to_wstring(time.wHour) + L":" + (time.wMinute < 10 ? L"0" : L"") + std::to_wstring(time.wMinute) +
+           L":" + (time.wSecond < 10 ? L"0" : L"") + std::to_wstring(time.wSecond);
+}
+
+// prepare a string for error messages; it contains the size, date, and time
+std::wstring GetFileInfo(const CFileData* fileData)
+{
+    CALL_STACK_MESSAGE1("GetFileInfo()");
     SYSTEMTIME st;
     FILETIME ft;
     FileTimeToLocalFileTime(&fileData->LastWrite, &ft);
     FileTimeToSystemTime(&ft, &st);
 
-    char date[100], time[100], number[100];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-    int len = _snprintf_s(buffer, bufferLen, _TRUNCATE, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, fileData->Size), date, time);
-    if (len < 0)
-        TRACE_E("GetFileInfo: small buffer. bufferLen=" << bufferLen);
+    const std::wstring date = FormatLocalDateOrTime(st, true);
+    const std::wstring time = FormatLocalDateOrTime(st, false);
+    const std::wstring number = SPLNumberToStrOwned(SalamanderGeneral, fileData->Size);
+    return number + L", " + date + L", " + time;
 }
 
 #define COPY_MIN_FILE_SIZE CQuadWord(1024, 0) // must not be less than 1 (otherwise the allocation test for required file space before copying in DoCopyFile would fail)
 
-BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* archiveName,
-                           const char* nameInArchive, const CFileData* fileData,
-                           const char* targetDir, DWORD* silentMask, BOOL allowSkip,
-                           BOOL* skipped, char* skipPath, int skipPathMax, HWND hParent,
+BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const wchar_t* archiveName,
+                           const wchar_t* nameInArchive, const CFileData* fileData,
+                           const wchar_t* targetDir, DWORD* silentMask, BOOL allowSkip,
+                           BOOL* skipped, std::wstring* skipPath, HWND hParent,
                            CAllocWholeFileEnum* allocWholeFileOnStart)
 {
     if (skipped != NULL)
@@ -733,15 +758,8 @@ BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const c
         return FALSE;
     }
 
-    CPathBuffer targetName;
-    strcpy(targetName, targetDir);
-    if (!SalamanderGeneral->SalPathAppend(targetName, fileData->Name, targetName.Size()))
-    {
-        TRACE_E("Name is too long, skipping");
-        if (allowSkip)
-            *skipped = TRUE;
-        return FALSE;
-    }
+    std::wstring targetName(targetDir);
+    SPLSalPathAppendOwned(targetName, fileData->Name);
 
     // for copying we will need a buffer the size of a cluster
     DWORD clusterSize = 1 * BS.SecPerClus * BS.BytsPerSec;
@@ -753,23 +771,14 @@ BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const c
     }
 
     // "extracting: %s..."
-    CPathBuffer progressText;
-    sprintf(progressText, LoadStr(IDS_EXTRACTING), nameInArchive);
-    salamander->ProgressDialogAddText(progressText, TRUE);
+    const std::wstring progressText =
+        SPLFormatStringOwned(LangStr(IDS_EXTRACTING).c_str(), nameInArchive);
+    salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
 
-    char fileInfo[200];
-    GetFileInfo(fileInfo, 200, fileData);
+    const std::wstring fileInfo = GetFileInfo(fileData);
 
-    CPathBuffer currentImgPath;
-    strcpy(currentImgPath, archiveName);
-    if (!SalamanderGeneral->SalPathAppend(currentImgPath, nameInArchive, currentImgPath.Size()))
-    {
-        TRACE_E("Name is too long, skipping");
-        if (allowSkip)
-            *skipped = TRUE;
-        free(clusterBuffer);
-        return FALSE;
-    }
+    std::wstring currentImgPath(archiveName);
+    SPLSalPathAppendOwned(currentImgPath, nameInArchive);
 
     // support for minimizing disk fragmentation
     CQuadWord minAllocFileSize = max(COPY_MIN_FILE_SIZE, CQuadWord(clusterSize, 0)); // files below this size will not be preallocated
@@ -785,12 +794,12 @@ BOOL CFATImage::UnpackFile(CSalamanderForOperationsAbstract* salamander, const c
     }
 
     SAFE_FILE outFile;
-    HANDLE hFile = SalamanderSafeFile->SafeFileCreate(targetName, GENERIC_WRITE, FILE_SHARE_READ,
-                                                      0, FALSE, hParent, currentImgPath,
-                                                      fileInfo, silentMask,
-                                                      allowSkip, skipped, skipPath, skipPathMax,
-                                                      allocateWholeFile ? &allocFileSize : NULL,
-                                                      &outFile);
+    HANDLE hFile = SafeFileCreateWithOwnedSkipPath(targetName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+                                                    0, FALSE, hParent, currentImgPath.c_str(),
+                                                    fileInfo.c_str(), silentMask,
+                                                    allowSkip, skipped, skipPath,
+                                                    allocateWholeFile ? &allocFileSize : NULL,
+                                                    &outFile);
     if (hFile == INVALID_HANDLE_VALUE)
     {
         free(clusterBuffer);
@@ -876,8 +885,8 @@ EXIT:
     if (!ok)
     {
         // the file may have received a read-only attribute and DeleteFile would not be able to remove it
-        SalamanderGeneral->ClearReadOnlyAttr(targetName);
-        if (!DeleteFile(targetName))
+        SalamanderGeneral->ClearReadOnlyAttr(targetName.c_str());
+        if (!DeleteFileW(targetName.c_str()))
             TRACE_E("DeleteFile failed");
     }
     else
@@ -887,7 +896,7 @@ EXIT:
         // this guarantees an exact copy, but it is not compatible with Salamander's Copy command
         // every plugin behaves differently; it is a mess
 
-        if (!SetFileAttributes(targetName, fileData->Attr))
+        if (!SetFileAttributesW(targetName.c_str(), fileData->Attr))
             TRACE_E("SetFileAttributes failed");
     }
     free(clusterBuffer);

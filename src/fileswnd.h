@@ -6,10 +6,11 @@
 
 #include "common/widepath.h"
 #include "common/CSelectionSnapshot.h"
+#include "common/SurrogateAssembler.h"
 
 #include <string>
+#include <vector>
 
-#define NUM_OF_CHECKTHREADS 30                   // maximum number of threads for "non-blocking" path accessibility tests
 #define ICONOVR_REFRESH_PERIOD 2000              // minimum interval between icon-overlay refreshes in the panel (see IconOverlaysChangedOnPath)
 #define MIN_DELAY_BETWEENINACTIVEREFRESHES 2000  // minimum refresh interval when the main window is inactive
 #define MAX_DELAY_BETWEENINACTIVEREFRESHES 10000 // maximum refresh interval when the main window is inactive
@@ -29,13 +30,48 @@ enum CActionType
 // Snapshot-builder routing-gate predicate (defined in files_window_copy_move.cpp):
 // TRUE when a snapshot selection carries ADS the snapshot builder cannot yet
 // handle and must fall back to the legacy builder. Public so the private tests
-// exercise the real gate (kb/unicode/TODO.md T4-a).
+// exercise the real gate.
 struct CSelectionSnapshot;
 BOOL SnapshotSelectionNeedsLegacyADS(CActionType type, BOOL sourceSupADS,
                                      BOOL targetSupADS,
                                      const CSelectionSnapshot& snapshot,
-                                     const char* sourcePath,
-                                     const wchar_t* sourcePathW);
+                                     const wchar_t* sourcePath);
+
+// The snapshot-builder routing gate itself (files_window_copy_move.cpp):
+// TRUE when the selection routes to BuildScriptFromSnapshot. Public for the
+// same reason as the predicate above — the gate-acceptance tests must drive
+// the real production policy, not a copy.
+struct CAttrsData;
+struct CChangeCaseData;
+class CCriteriaData;
+BOOL CanBuildFirstTrancheFromSnapshot(BOOL isDiskPanel, CActionType type,
+                                      const wchar_t* targetPath, const wchar_t* mask,
+                                      CAttrsData* attrsData,
+                                      CChangeCaseData* chCaseData,
+                                      BOOL onlySize,
+                                      BOOL sourceSupADS,
+                                      BOOL targetSupADS,
+                                      const wchar_t* sourcePath,
+                                      const wchar_t* sourcePathW,
+                                      CCriteriaData* filterCriteria,
+                                      const CSelectionSnapshot& snapshot);
+
+// The drop-flow twin, public for the same reason: gate-acceptance
+// tests pin what routes to the snapshot builder (incl. the absorbed Main2
+// specials: multi-directory drops, MapName rename-maps).
+class CCopyMoveData;
+struct CBuildConfig;
+class COperations;
+BOOL CanBuildMain2FromSnapshot(BOOL isDiskPanel,
+                               BOOL copy,
+                               const wchar_t* targetDir,
+                               const std::wstring& targetPathWithSlash,
+                               BOOL targetSupADS,
+                               BOOL targetIsFAT32,
+                               CCopyMoveData* data,
+                               CSelectionSnapshot& snapshot,
+                               CBuildConfig& config,
+                               COperations* script);
 
 enum CPluginFSActionType
 {
@@ -73,8 +109,9 @@ class CCopyMoveData;
 struct CTmpDropData
 {
     BOOL Copy;
-    CPathBuffer TargetPath;
-    std::wstring TargetPathW;
+    // DoCopyMove is the final A/W producer boundary. The
+    // posted payload and every consumer after it own one UTF-16 target.
+    std::wstring TargetPath;
     CCopyMoveData* Data;
 };
 
@@ -82,8 +119,8 @@ struct CTmpDragDropOperData
 {
     BOOL Copy;      // copy/move
     BOOL ToArchive; // archive/FS
-    CPathBuffer ArchiveOrFSName;
-    CPathBuffer ArchivePathOrUserPart;
+    std::wstring ArchiveOrFSName;
+    std::wstring ArchivePathOrUserPart;
     CDragDropOperData* Data;
 };
 
@@ -119,7 +156,6 @@ public:
     // NOTE: masks must be prepared beforehand
     // NOTE: advanced criteria must also be prepared
     BOOL AgreeMasksAndAdvanced(const CFileData* file);
-    BOOL AgreeMasksAndAdvanced(const WIN32_FIND_DATA* file);
     BOOL AgreeMasksAndAdvanced(const WIN32_FIND_DATAW* file);
 
     // save/load to/from the Windows Registry
@@ -291,10 +327,13 @@ public:
 
 struct CFileTimeStampsItem
 {
-    std::string ZIPRoot;
-    std::string SourcePath;
-    std::string FileName;
-    std::string DosFileName;
+    std::wstring ZIPRoot;
+    std::wstring SourcePath;
+    // FileName is wide, so the FileNameW twin that used to sit beside it
+    // is gone: it existed only to disambiguate two entries whose CP_ACP mirrors collided,
+    // and there is no mirror to collide any more.
+    std::wstring FileName;
+    std::wstring DosFileName;
     FILETIME LastWrite;
     CQuadWord FileSize;
     DWORD Attr;
@@ -302,8 +341,8 @@ struct CFileTimeStampsItem
     CFileTimeStampsItem();
     ~CFileTimeStampsItem();
 
-    BOOL Set(const char* zipRoot, const char* sourcePath, const char* fileName,
-             const char* dosFileName, const FILETIME& lastWrite, const CQuadWord& fileSize,
+    BOOL Set(const wchar_t* zipRoot, const wchar_t* sourcePath, const wchar_t* fileName,
+             const wchar_t* dosFileName, const FILETIME& lastWrite, const CQuadWord& fileSize,
              DWORD attr);
 };
 
@@ -312,26 +351,26 @@ class CFilesWindow;
 class CFileTimeStamps
 {
 protected:
-    CPathBuffer ZIPFile;                      // name of the archive that stores all monitored files
+    std::wstring ZIPFile;                     // name of the archive that stores all monitored files
     TIndirectArray<CFileTimeStampsItem> List; // list of files with data needed for their update
     CFilesWindow* Panel;                      // panel we work for
 
 public:
     CFileTimeStamps() : List(10, 5)
     {
-        ZIPFile[0] = 0;
+        ZIPFile.clear();
         Panel = NULL;
     }
     ~CFileTimeStamps()
     {
-        if (ZIPFile[0] != 0 ||
+        if (!ZIPFile.empty() ||
             List.Count > 0)
         {
             TRACE_E("Invalid work with CFileTimeStamps.");
         }
     }
 
-    const char* GetZIPFile() { return ZIPFile; }
+    const wchar_t* GetZIPFile() { return ZIPFile.c_str(); }
 
     void SetPanel(CFilesWindow* panel) { Panel = panel; }
 
@@ -348,8 +387,8 @@ public:
     // attr        - file attributes
     //
     // return value TRUE - the file was added; FALSE - it was not added (an error occurred or it already exists)
-    BOOL AddFile(const char* zipFile, const char* zipRoot, const char* sourcePath,
-                 const char* fileName, const char* dosFileName,
+    BOOL AddFile(const wchar_t* zipFile, const wchar_t* zipRoot, const wchar_t* sourcePath,
+                 const wchar_t* fileName, const wchar_t* dosFileName,
                  const FILETIME& lastWrite, const CQuadWord& fileSize, DWORD attr);
 
     // it verifies time stamps, updates if necessary and prepares the object for further use
@@ -363,7 +402,7 @@ public:
 
     // it allows copying files from all given indexes; 'indexes' is an array of indexes, 'count' is
     // the number of them; 'parent' is the parent dialog; 'initPath' is the suggested target path
-    void CopyFilesTo(HWND parent, int* indexes, int count, const char* initPath);
+    void CopyFilesTo(HWND parent, int* indexes, int count, const wchar_t* initPath);
 };
 
 //****************************************************************************
@@ -376,8 +415,7 @@ public:
 class CTopIndexMem
 {
 protected:
-    // path for the last remembered top index; the longest is archive + archive-path so 2 * MAX_PATH
-    CPathBuffer Path;
+    std::wstring Path; // path for the last remembered top index
     int TopIndexes[TOP_INDEX_MEM_SIZE]; // stored top indexes
     int TopIndexesCount;                // number of stored top indexes
 
@@ -385,82 +423,11 @@ public:
     CTopIndexMem() { Clear(); }
     void Clear()
     {
-        Path[0] = 0;
+        Path.clear();
         TopIndexesCount = 0;
     } // clears memory
-    void Push(const char* path, int topIndex);        // stores the top index for the given path
-    BOOL FindAndPop(const char* path, int& topIndex); // looks for the top index of the path, FALSE -> not found
-};
-
-//******************************************************************************
-//
-// CDirectorySizes
-//
-
-class CDirectorySizes
-{
-protected:
-    std::string Path;              // full path to the directory whose subdirectory names and sizes are stored by us
-    TDirectArray<char*> Names; // names of subdirectories
-    BOOL CaseSensitive;
-    BOOL NeedSort; // guard ensuring that the class is used correctly
-
-public:
-    CDirectorySizes(const char* path, BOOL caseSensitive);
-    ~CDirectorySizes();
-
-    // destroys all held data
-    void Clean();
-
-    BOOL IsGood() { return !Path.empty(); }
-
-    BOOL Add(const char* name, const CQuadWord* size);
-
-    // if it finds the name 'name' in the Name array, it returns a pointer to its size
-    // if the name is not found it returns NULL
-    const CQuadWord* GetSize(const char* name);
-
-    void Sort();
-
-protected:
-    int GetIndex(const char* name);
-
-    friend class CDirectorySizesHolder;
-};
-
-//******************************************************************************
-//
-// CDirectorySizesHolder
-//
-
-#define DIRECOTRY_SIZES_COUNT 20
-
-class CDirectorySizesHolder
-{
-protected:
-    CDirectorySizes* Items[DIRECOTRY_SIZES_COUNT];
-    int ItemsCount; // number of valid items in the Items array
-
-public:
-    CDirectorySizesHolder();
-    ~CDirectorySizesHolder();
-
-    // destroys all held data except for Path
-    void Clean();
-
-    BOOL Store(CFilesWindow* panel);
-
-    void Restore(CFilesWindow* panel);
-
-    // returns NULL if no item with the same path is found
-    CDirectorySizes* Get(const char* path);
-
-protected:
-    // returns the index of the item whose Path matches 'path'
-    // returns -1 if no such item is found
-    int GetIndex(const char* path);
-
-    CDirectorySizes* Add(const char* path);
+    void Push(const wchar_t* path, int topIndex);        // stores the top index for the given path
+    BOOL FindAndPop(const wchar_t* path, int& topIndex); // looks for the top index of the path, FALSE -> not found
 };
 
 //****************************************************************************
@@ -493,8 +460,13 @@ public:
 class CFilesWindowAncestor : public CWindow // the real object core - everything private ;-)
 {
 private:
-    CPathBuffer Path; // path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path")
-    std::wstring PathW; // wide source of truth for disk paths; Path is the ANSI compatibility cache
+    // The path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path").
+    // This is the single source of truth; there is no second, narrower copy.
+    std::wstring PathW;
+    // TRUE when CP_ACP could NOT represent PathW exactly - the panel is somewhere the
+    // system code page cannot name. Computed once by SetPath so callers can ask cheaply
+    // instead of each re-deriving it; see IsPathLossy().
+    BOOL PathIsLossy;
     BOOL SuppressAutoRefresh;     // TRUE if the user canceled directory listing during reading and chose temporary auto-refresh suppression
     BOOL HeadlessPanel;           // TRUE for test/headless panels without a CMainWindow parent
 
@@ -505,10 +477,8 @@ private:
 
     // when we are inside an archive:
     CSalamanderDirectory* ArchiveDir;   // content of the open archive; basic data - array of CFileData
-    CPathBuffer ZIPArchive; // path to the open archive
-    CPathBuffer ZIPPath;    // path inside the open archive
-    std::wstring ZIPArchiveW;
-    std::wstring ZIPPathW;
+    std::wstring ZIPArchiveW; // path to the open archive
+    std::wstring ZIPPathW;    // path inside the open archive
     FILETIME ZIPArchiveDate;            // archive date (used for the ".." date and during refresh)
     CQuadWord ZIPArchiveSize;           // archive size - used to detect archive changes
 
@@ -552,7 +522,7 @@ public:
 
     // NULL -> Path; echo && err != ERROR_SUCCESS -> only report the error
     // 'parent' is the parent of the message box (NULL == HWindow)
-    DWORD CheckPath(BOOL echo, const char* path = NULL, DWORD err = ERROR_SUCCESS,
+    DWORD CheckPath(BOOL echo, const wchar_t* path = NULL, DWORD err = ERROR_SUCCESS,
                     BOOL postRefresh = TRUE, HWND parent = NULL);
 
     // destroys PluginData and with it all plugin data (CFileData::PluginData in
@@ -567,42 +537,53 @@ public:
     // if convertFSPathToExternal is TRUE and the panel holds an FS path,
     // CPluginInterfaceForFSAbstract::ConvertPathToExternal() is called
     // it returns TRUE if the path fits into the buffer completely, otherwise a truncated path is returned
-    BOOL GetGeneralPath(char* buf, int bufSize, BOOL convertFSPathToExternal = FALSE);
-    BOOL GetGeneralPathW(std::wstring& buf, BOOL convertFSPathToExternal = FALSE);
+    BOOL GetGeneralPath(std::wstring& buf, BOOL convertFSPathToExternal = FALSE);
 
-    const char* GetPath() { return Path; }
+    // The panel path, and the only copy of it.
+    //
+    // There used to be a second member here, a CP_ACP rendering produced with best-fit
+    // mapping and no failure check, exposed as the removed ANSI mirror. It was reached for as
+    // if it were the obvious accessor - an audit found 53 places where that mirror was
+    // handed to the shell, to a process, to an archiver or to Sally's own operations,
+    // each failing silently, because for a path outside the code page it does not merely
+    // look wrong, it names a different path or none. The mirror is now gone.
+    //
+    // If you need an ANSI form for something that will act on it, resolve it through
+    // sally::unicode::ResolveAnsiToolPath() - it can tell you when no ANSI string names
+    // the path at all, which is the answer the old mirror could never give.
     const wchar_t* GetPathW() { return PathW.c_str(); }
+
+    // TRUE when CP_ACP cannot name GetPathW() exactly. Nothing routes on this to pick a
+    // narrower path any more; it exists so code that must hand an ANSI string to a
+    // char*-only consumer can tell in advance that it is about to be wrong, and so the
+    // condition is computed once at SetPath() rather than re-derived at every call site.
+    BOOL IsPathLossy() { return PathIsLossy; }
     BOOL Is(CPanelType type) { return type == PanelType; }
     CPanelType GetPanelType() { return PanelType; }
     BOOL GetMonitorChanges() { return MonitorChanges; }
     BOOL GetNetworkDrive() { return DriveType == DRIVE_REMOTE; }
     UINT GetPathDriveType() { return DriveType; }
     CSalamanderDirectory* GetArchiveDir() { return ArchiveDir; }
-    const char* GetZIPArchive() { return ZIPArchive; }
-    const char* GetZIPPath() { return ZIPPath; }
-    const wchar_t* GetZIPArchiveW() { return ZIPArchiveW.c_str(); }
-    const wchar_t* GetZIPPathW() { return ZIPPathW.c_str(); }
+    const wchar_t* GetZIPArchive() { return ZIPArchiveW.c_str(); }
+    const wchar_t* GetZIPPath() { return ZIPPathW.c_str(); }
     FILETIME GetZIPArchiveDate() { return ZIPArchiveDate; }
     BOOL IsSameZIPArchiveSize(const CQuadWord& size) { return ZIPArchiveSize == size; }
     CQuadWord GetZIPArchiveSize() { return ZIPArchiveSize; }
     BOOL GetSuppressAutoRefresh() { return SuppressAutoRefresh; }
 
-    void SetPath(const char* path);
-    void SetPathW(const wchar_t* path);
+    void SetPath(const wchar_t* path);
     void SetMonitorChanges(BOOL monitorChanges) { MonitorChanges = monitorChanges; }
     void SetPanelType(CPanelType type) { PanelType = type; }
-    void SetZIPPath(const char* path);
-    void SetZIPPathW(const wchar_t* path);
-    void SetZIPArchive(const char* archive);
-    void SetZIPArchiveW(const wchar_t* archive);
+    void SetZIPPath(const wchar_t* path);
+    void SetZIPArchive(const wchar_t* archive);
     void SetArchiveDir(CSalamanderDirectory* dir) { ArchiveDir = dir; }
     void SetZIPArchiveDate(FILETIME& time) { ZIPArchiveDate = time; }
     void SetZIPArchiveSize(const CQuadWord& size) { ZIPArchiveSize = size; }
     void SetSuppressAutoRefresh(BOOL suppress) { SuppressAutoRefresh = suppress; }
 
     // if the 'zipPath' parameter is NULL, the path ZIPPath is used
-    CFilesArray* GetArchiveDirFiles(const char* zipPath = NULL);
-    CFilesArray* GetArchiveDirDirs(const char* zipPath = NULL);
+    CFilesArray* GetArchiveDirFiles(const wchar_t* zipPath = NULL);
+    CFilesArray* GetArchiveDirDirs(const wchar_t* zipPath = NULL);
 
     // compares this object's Path with that of 'other' to work around change-notify issues (see snooper)
     BOOL SamePath(CFilesWindowAncestor* other);
@@ -612,7 +593,7 @@ public:
     // if 'convertPathToInternal' is TRUE,'fsUserPart' (buffer of at least MAX_PATH characters) is converted to the
     // internal format before testing and 'convertPathToInternal' is set to FALSE;
     // if the method returns TRUE, it also returns the index 'fsNameIndex' of the plugin FS name "fsName" of the plugin
-    BOOL IsPathFromActiveFS(const char* fsName, char* fsUserPart, int& fsNameIndex,
+    BOOL IsPathFromActiveFS(const wchar_t* fsName, std::wstring& fsUserPart, int& fsNameIndex,
                             BOOL& convertPathToInternal);
 
     CPluginFSInterfaceEncapsulation* GetPluginFS() { return &PluginFS; }
@@ -622,9 +603,9 @@ public:
     CFilesArray* GetFSFiles();
     CFilesArray* GetFSDirs();
 
-    void SetPluginFS(CPluginFSInterfaceAbstract* fsIface, const char* dllName,
-                     const char* version, CPluginInterfaceForFSAbstract* ifaceForFS,
-                     CPluginInterfaceAbstract* iface, const char* pluginFSName,
+    void SetPluginFS(CPluginFSInterfaceAbstract* fsIface, const wchar_t* dllName,
+                     const wchar_t* version, CPluginInterfaceForFSAbstract* ifaceForFS,
+                     CPluginInterfaceAbstract* iface, const wchar_t* pluginFSName,
                      int pluginFSNameIndex, DWORD pluginFSCreateTime,
                      int chngDrvDuplicateItemIndex, int builtForVersion)
     {
@@ -676,7 +657,7 @@ protected:
     int ArrVersionNum; // version of the array
     BOOL ArrIsValid;   // is the array filled and valid?
 
-    char** ArrNames;       // allocated array of names that are currently visible in the panel (names are only references into Files+Dirs in the (CFileData: :Name) panel)
+    wchar_t** ArrNames;       // allocated array of names that are currently visible in the panel (names are only references into Files+Dirs in the (CFileData: :Name) panel)
     int ArrNamesCount;     // number of names in ArrNames
     int ArrNamesAllocated; // number of allocated namesfor ArrNames
 
@@ -705,7 +686,7 @@ public:
     // If the array is filled and valid and contains 'name', it returns TRUE; it also
     // returns TRUE in 'isArrValid' if the array is filled and valid and in 'versionNum' the number of the array version
     // called only by the icon reader
-    BOOL ArrContains(const char* name, BOOL* isArrValid, int* versionNum);
+    BOOL ArrContains(const wchar_t* name, BOOL* isArrValid, int* versionNum);
 
     // If the array is filled and valid and contains the given index 'index', it returns
     // TRUE; moreover, in 'isArrValid', it returns TRUE if the array is filled and valid and in 'versionNum' the number of the array version
@@ -723,7 +704,7 @@ enum CTargetPathState // state of the target path when building the operation sc
 };
 
 // helper function determining the state of the target path based on the state of the parent directory and the target path
-CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* targetPath);
+CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const wchar_t* targetPath);
 
 #ifndef HDEVNOTIFY
 typedef PVOID HDEVNOTIFY;
@@ -796,9 +777,8 @@ public:
     BOOL SortedWithRegSet;    // used to monitor changes of the global variable Configuration.SortUsesLocale
     BOOL SortedWithDetectNum; // used to monitor changes of the global variable Configuration.SortDetectNumbers
 
-    CPathBuffer DropPath;  // buffer for the current directory used in a drop operation
-    CPathBuffer NextFocusName; // the name that will receive focus on the next refresh
-    std::wstring NextFocusNameW; // exact UTF-16 focus target when ANSI cache is lossy
+    std::wstring DropPathW; // current directory used in a drop operation
+    std::wstring NextFocusNameW; // exact UTF-16 name that receives focus on the next refresh
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)
     CTopIndexMem TopIndexMem;     // memory of top index for Execute()
@@ -859,8 +839,12 @@ public:
 
     BOOL QuickSearchMode;           // Quick Search mode?
     short CaretHeight;              // it is set when measuring the font in CFilesWindow
-    CPathBuffer QuickSearch;     // name of the file that was sought via Quick Search
-    CPathBuffer QuickSearchMask; // quick search mask (may contain '/' after any number of characters)
+    std::wstring QuickSearch;     // name of the file that was sought via Quick Search
+    std::wstring QuickSearchMask; // quick search mask (may contain '/' after any number of characters)
+    // Joins the two WM_CHAR messages a non-BMP character arrives as, and admits every printable
+    // code unit rather than only those below 256. Reset whenever quick search ends so a
+    // half-typed character cannot pair with a keystroke minutes later.
+    sally::input::SurrogateAssembler QuickSearchAssembler;
     int SearchIndex;                // position of the cursor during Quick Search
 
     int FocusedIndex;  // current caret position
@@ -950,16 +934,15 @@ public:
 
     // called to inform the panel about changes on 'path'; when 'includingSubdirs' is TRUE,
     // changes may also occur in subdirectories
-    void AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs);
-    void AcceptChangeOnPathNotificationW(const wchar_t* path, BOOL includingSubdirs);
+    void AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs);
 
     // called to notify the panel about icon overlay changes on 'path' (mainly from Tortoise SVN)
-    void IconOverlaysChangedOnPath(const char* path);
+    void IconOverlaysChangedOnPath(const wchar_t* path);
 
     // tries whether the path is accessible, restoring network connections using
     // CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath if needed;
     // returns TRUE if the path is accessible
-    BOOL CheckAndRestorePath(const char* path);
+    BOOL CheckAndRestorePath(const wchar_t* path);
 
     // recognizes the path type (FS/Windows/archive) and splits it into components:
     // for FS paths it's fs-name and fs-user-part; for archives it's path-to-archive and
@@ -967,22 +950,18 @@ public:
     // for Windows (normal/UNC) paths, it checks how far the path exists (possibly restore network paths),
     // for archives, it checks whether the archive file exists (determined by extension);
     // 'path' is a full or relative path (for relative paths, the path in the active panel is used as the base for evaluating the full path). The resulting full path is
-    // stored back into 'path' (buffer must be at least 'pathBufSize' characters). Returns TRUE
+    // stored back into the dynamically owned 'path'. Returns TRUE
     // when recognized successfully, setting 'type' to PATH_TYPE_XXX and 'pathPart' as follows:
     // - for Windows paths, pointer just after the existing path (after '\\' or at the end of string);
-    //   if a file exists in the path, it points after the path to this file, WARNING: the returned part length is not
-    //   checked and may exceed MAX_PATH.
-    // - for archive paths, pointer past the archive file; WARNING: again the length inside the archive is not checked and can
-    //   exceed MAX_PATH.
+    //   if a file exists in the path, it points after the path to this file.
+    // - for archive paths, pointer past the archive file.
     // - for FS paths, pointer after ':' following the file-system name (user - part of the path);
-    //   WARNING: length of user - part path isn't checked and may exceed MAX_PATH.
+    //   the user-part remains owned by 'path' without an artificial path-sized limit.
     // On success, 'isDir' is TRUE if the first part of the path up to 'pathPart' is a directory,
     // FALSE if it's a file (Windows paths). For archive and FS paths, 'isDir' is FALSE.
     // If it returns FALSE, an error that occurred during recognition was already displayed to the user, 'errorTitle' is the message box title with the error.
     // If 'nextFocus' is not NULL and the Windows/archive path doesn't contain '\\' or ends with
     // it, the path is copied to 'nextFocus' (see SalGetFullName)
-    BOOL ParsePath(char* path, int& type, BOOL& isDir, char*& secondPart, const char* errorTitle,
-                   char* nextFocus, int* error, int pathBufSize);
     BOOL ParsePathW(std::wstring& path, int& type, BOOL& isDir, wchar_t*& secondPart,
                     const wchar_t* errorTitle, std::wstring* nextFocus, int* error);
 
@@ -996,7 +975,7 @@ public:
 
     // change drive to DefaultDir[drive], optionally offering a drive menu;
     // when 0, a dialog is shown, the change is applied immediately
-    void ChangeDrive(char drive = 0);
+    void ChangeDrive(wchar_t drive = 0);
 
     // it finds the first fixed drive and switches to it;
     // 'parent' is the parent of message boxes;
@@ -1069,13 +1048,13 @@ public:
     // directly into 'dir') and moved (just pointer swap) into 'dir' only after successful loading. If allocation of the
     // temporary object fails, 'keepOldListing' is set to FALSE and the original listing may be
     // deleted if the path changes to an FS; otherwise the original listing is kept unchanged.
-    BOOL ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, const char* fsUserPart,
+    BOOL ChangeAndListPathOnFS(const wchar_t* fsName, int fsNameIndex, const wchar_t* fsUserPart,
                                CPluginFSInterfaceEncapsulation& pluginFS, CSalamanderDirectory* dir,
                                CPluginDataInterfaceAbstract*& pluginData, BOOL& shorterPath,
                                int& pluginIconsType, int mode, BOOL firstCall,
-                               BOOL* cancel, const char* currentPath,
+                               BOOL* cancel, const wchar_t* currentPath,
                                int currentPathFSNameIndex, BOOL forceUpdate,
-                               char* cutFileName, BOOL* keepOldListing);
+                               std::wstring* cutFileName, BOOL* keepOldListing);
 
     // path change-handles both relative and absolute paths to Windows form (UNC and C:\path);
     // shortens the path if needed. When changing within the same drive (including archives)
@@ -1094,16 +1073,11 @@ public:
     // (only when it is not a refresh);
     // only for FS in the panel: 'tryCloseReason' is the reason passed to CPluginFSInterfaceAbstract::TryCloseOrDetach()
     // returns TRUE if the requested path was listed successfully
-    BOOL ChangePathToDisk(HWND parent, const char* path, int suggestedTopIndex = -1,
-                          const char* suggestedFocusName = NULL, BOOL* noChange = NULL,
+    BOOL ChangePathToDisk(HWND parent, const wchar_t* path, int suggestedTopIndex = -1,
+                          const wchar_t* suggestedFocusName = NULL, BOOL* noChange = NULL,
                           BOOL refreshListBox = TRUE, BOOL canForce = FALSE, BOOL isRefresh = FALSE,
                           int* failReason = NULL, BOOL shorterPathWarning = TRUE,
                           int tryCloseReason = FSTRYCLOSE_CHANGEPATH);
-    BOOL ChangePathToDiskW(HWND parent, const wchar_t* path, int suggestedTopIndex = -1,
-                           const char* suggestedFocusName = NULL, BOOL* noChange = NULL,
-                           BOOL refreshListBox = TRUE, BOOL canForce = FALSE, BOOL isRefresh = FALSE,
-                           int* failReason = NULL, BOOL shorterPathWarning = TRUE,
-                           int tryCloseReason = FSTRYCLOSE_CHANGEPATH);
     // changes to an archive path; only absolute Windows paths are allowed (archive is UNC or C:\path\archive)
     // if suggestedTopIndex != -1, the top index will be set;
     // if suggestedFocusName != NULL, and present in the new list, it will be focused;
@@ -1119,14 +1093,10 @@ public:
     //   be opened (or does not exist), the panel opens at least the path to the archive
     //   (optionally shortened, on path error it does not switch to a fixed drive);
     // returns TRUE if the requested path was uccessfully listed
-    BOOL ChangePathToArchive(const char* archive, const char* archivePath, int suggestedTopIndex = -1,
-                             const char* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
+    BOOL ChangePathToArchive(const wchar_t* archive, const wchar_t* archivePath = L"", int suggestedTopIndex = -1,
+                             const wchar_t* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
                              BOOL* noChange = NULL, BOOL refreshListBox = TRUE, int* failReason = NULL,
                              BOOL isRefresh = FALSE, BOOL canFocusFileName = FALSE, BOOL isHistory = FALSE);
-    BOOL ChangePathToArchiveW(const wchar_t* archive, const wchar_t* archivePath = L"", int suggestedTopIndex = -1,
-                              const char* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
-                              BOOL* noChange = NULL, BOOL refreshListBox = TRUE, int* failReason = NULL,
-                              BOOL isRefresh = FALSE, BOOL canFocusFileName = FALSE, BOOL isHistory = FALSE);
     // change path to the plug-in FS;
     // if suggestedTopIndex != -1 the top index will be set;
     // if suggestedFocusName != NULL and present in the new list, it will be focused;
@@ -1148,16 +1118,11 @@ public:
     //   (returns FALSE because the path was shortened);
     // if 'convertPathToInternal' is TRUE, CPluginInterfaceForFSAbstract::ConvertPathToInternal() is called;
     // returns TRUE if the requested path was listed successfully
-    BOOL ChangePathToPluginFS(const char* fsName, const char* fsUserPart, int suggestedTopIndex = -1,
-                              const char* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
+    BOOL ChangePathToPluginFS(const wchar_t* fsName, const wchar_t* fsUserPart, int suggestedTopIndex = -1,
+                              const wchar_t* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
                               int mode = 2, BOOL* noChange = NULL, BOOL refreshListBox = TRUE,
                               int* failReason = NULL, BOOL isRefresh = FALSE,
                               BOOL canFocusFileName = FALSE, BOOL convertPathToInternal = FALSE);
-    BOOL ChangePathToPluginFSW(const wchar_t* fsName, const wchar_t* fsUserPart, int suggestedTopIndex = -1,
-                               const char* suggestedFocusName = NULL, BOOL forceUpdate = FALSE,
-                               int mode = 2, BOOL* noChange = NULL, BOOL refreshListBox = TRUE,
-                               int* failReason = NULL, BOOL isRefresh = FALSE,
-                               BOOL canFocusFileName = FALSE, BOOL convertPathToInternal = FALSE);
     // change path to a detached plug-in FS (in MainWindow->DetachedFSList at index 'fsIndex');
     // if suggestedTopIndex != -1, the top index will be set;
     // if suggestedFocusName != NULL and present in the new list, it will be selected;
@@ -1171,9 +1136,9 @@ public:
     //   (returns FALSE because the path was shortened);
     // returns TRUE if the requested path was successfully listed
     BOOL ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex = -1,
-                                const char* suggestedFocusName = NULL, BOOL refreshListBox = TRUE,
-                                int* failReason = NULL, const char* newFSName = NULL,
-                                const char* newUserPart = NULL, int mode = -1,
+                                const wchar_t* suggestedFocusName = NULL, BOOL refreshListBox = TRUE,
+                                int* failReason = NULL, const wchar_t* newFSName = NULL,
+                                const wchar_t* newUserPart = NULL, int mode = -1,
                                 BOOL canFocusFileName = FALSE);
     // changes the panel path; the input may be an absolute or relative Windows path or an archive path
     // or an FS path (absolute/relative is handled directly by the plug-in). If the input path points to a file,
@@ -1188,16 +1153,16 @@ public:
     // 'showNewDirPathInErrBoxes' exists only for paths taken from links (disk paths only)
     // the entire path from the link should be shown, not just the part where the error was detected (otherwise the user won’t get the full path from the link);
     // returns TRUE if the requested path was successfully listed
-    BOOL ChangeDir(const char* newDir = NULL, int suggestedTopIndex = -1,
-                   const char* suggestedFocusName = NULL, int mode = 3 /*change-dir*/,
+    BOOL ChangeDir(const wchar_t* newDir = NULL, int suggestedTopIndex = -1,
+                   const wchar_t* suggestedFocusName = NULL, int mode = 3 /*change-dir*/,
                    int* failReason = NULL, BOOL convertFSPathToInternal = TRUE,
                    BOOL showNewDirPathInErrBoxes = FALSE);
 
     // less orthodox version of ChangeDir: returns TRUE even when ChangeDir returns FALSE and
     // 'failReason' is CHPPFR_SHORTERPATH or CHPPFR_FILENAMEFOCUSED
-    BOOL ChangeDirLite(const char* newDir);
+    BOOL ChangeDirLite(const wchar_t* newDir);
 
-    BOOL ChangePathToDrvType(HWND parent, int driveType, const char* displayName = NULL);
+    BOOL ChangePathToDrvType(HWND parent, int driveType, const wchar_t* displayName = NULL);
 
     // called after a new listing is obtained ... change notifications collected for the old
     // listing must be invalidated
@@ -1291,7 +1256,7 @@ public:
     void ToggleDirectoryLine();
     void ToggleHeaderLine();
 
-    void ConnectNet(BOOL readOnlyUNC, const char* netRootPath = NULL, BOOL changeToNewDrive = TRUE, char* newlyMappedDrive = NULL);
+    void ConnectNet(BOOL readOnlyUNC, const wchar_t* netRootPath = NULL, BOOL changeToNewDrive = TRUE, wchar_t* newlyMappedDrive = NULL);
     void DisconnectNet();
 
     // in detailed mode returns: min((panel width) - (width of all visible columns except NAME column), (width of the NAME column)
@@ -1302,9 +1267,12 @@ public:
                     BOOL setEncryption = FALSE, BOOL encrypted = FALSE);
     void Convert(); // converts character sets and line endings
     // handlerID specifies which viewer/editor should open the file; 0xFFFFFFFF = no preference
-    void ViewFile(char* name, BOOL altView, DWORD handlerID, int enumFileNamesSourceUID,
-                  int enumFileNamesLastFileIndex);           // name == NULL -> item under the cursor in the panel
-    void EditFile(char* name, DWORD handlerID = 0xFFFFFFFF); // name == NULL -> item under the cursor in the panel
+    // 'name' is the exact wide name. The 'nameW' twin these four used to take
+    // existed because 'name' could be a lossy structural mirror of an unspellable row; it no
+    // longer can be, so there is nothing for a twin to correct.
+    void ViewFile(const wchar_t* name, BOOL altView, DWORD handlerID, int enumFileNamesSourceUID,
+                  int enumFileNamesLastFileIndex); // name == NULL -> item under the cursor in the panel
+    void EditFile(const wchar_t* name, DWORD handlerID = 0xFFFFFFFF); // name == NULL -> item under the cursor in the panel
     void EditNewFile();
     // fills a popup based on available viewers
     void FillViewWithMenu(CMenuPopup* popup);
@@ -1315,7 +1283,7 @@ public:
     // view-file-with: opens a menu to choose a viewer; name == NULL -> item under the cursor in the panel;
     // if handlerID != NULL, only the selected handler ID is returned (the viewer is not opened);
     // on error returns 0xFFFFFFFF
-    void ViewFileWith(char* name, HWND hMenuParent, const POINT* menuPos, DWORD* handlerID,
+    void ViewFileWith(const wchar_t* name, HWND hMenuParent, const POINT* menuPos, DWORD* handlerID,
                       int enumFileNamesSourceUID, int enumFileNamesLastFileIndex);
 
     // fills a popup based on available editors
@@ -1325,7 +1293,7 @@ public:
     // edit-file-with: opens a menu to choose an editor; name == NULL -> item under the cursor in the panel;
     // if handlerID != NULL, only the selected handler ID is returned (the editor is not opened),
     // on error returns 0xFFFFFFFF
-    void EditFileWith(char* name, HWND hMenuParent, const POINT* menuPos, DWORD* handlerID = NULL);
+    void EditFileWith(const wchar_t* name, HWND hMenuParent, const POINT* menuPos, DWORD* handlerID = NULL);
     void FindFile();
     void DriveInfo();
     void OpenActiveFolder();
@@ -1339,9 +1307,8 @@ public:
     void PluginFSFilesAction(CPluginFSActionType type);
     void CreateDir(CFilesWindow* target);
     void RenameFile(int specialIndex = -1);
-    void RenameFileInternal(CFileData* f, const char* formatedFileName, BOOL* mayChange, BOOL* tryAgain);
-    void RenameFileInternalW(CFileData* f, const std::wstring& newName, BOOL* mayChange, BOOL* tryAgain);
-    BOOL DropCopyMove(BOOL copy, char* targetPath, const wchar_t* targetPathW, CCopyMoveData* data);
+    void RenameFileInternal(CFileData* f, const std::wstring& newName, BOOL* mayChange, BOOL* tryAgain);
+    BOOL DropCopyMove(BOOL copy, const wchar_t* targetPath, CCopyMoveData* data);
 
     // performs deletion using the SHFileOperation API function (only when deleting to the Recycle Bin)
     BOOL DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile);
@@ -1349,31 +1316,14 @@ public:
     CSelectionSnapshot TakeSnapshot(CActionType type, int selCount, int* selection,
                                     CFileData* oneFile);
 
-    BOOL BuildScriptMain(COperations* script, CActionType type, char* targetPath,
-                         char* mask, int selCount, int* selection,
+    BOOL BuildScriptMain(COperations* script, CActionType type, const wchar_t* targetPath,
+                         const wchar_t* mask, int selCount, int* selection,
                          CFileData* oneFile, CAttrsData* attrsData,
                          CChangeCaseData* chCaseData, BOOL onlySize,
                          CCriteriaData* filterCriteria,
                          const wchar_t* targetPathW = NULL);
-    BOOL BuildScriptDir(COperations* script, CActionType type, char* sourcePath,
-                        BOOL sourcePathSupADS, char* targetPath, CTargetPathState targetPathState,
-                        BOOL targetPathSupADS, BOOL targetPathIsFAT32, char* mask, char* dirName,
-                        char* dirDOSName, CAttrsData* attrsData, char* mapName,
-                        DWORD sourceDirAttr, CChangeCaseData* chCaseData, BOOL firstLevelDir,
-                        BOOL onlySize, BOOL fastDirectoryMove, CCriteriaData* filterCriteria,
-                        BOOL* canDelUpperDirAfterMove, FILETIME* sourceDirTime,
-                        DWORD srcAndTgtPathsFlags, const wchar_t* sourcePathW = NULL,
-                        wchar_t* dirNameW = NULL, const wchar_t* targetPathW = NULL);
-    BOOL BuildScriptFile(COperations* script, CActionType type, char* sourcePath,
-                         BOOL sourcePathSupADS, char* targetPath, CTargetPathState targetPathState,
-                         BOOL targetPathSupADS, BOOL targetPathIsFAT32, char* mask, char* fileName,
-                         char* fileDOSName, const CQuadWord& fileSize, CAttrsData* attrsData,
-                         char* mapName, DWORD sourceFileAttr, CChangeCaseData* chCaseData,
-                         BOOL onlySize, FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags,
-                         wchar_t* fileNameW = NULL, const wchar_t* sourcePathW = NULL,
-                         const wchar_t* mapNameW = NULL, const wchar_t* targetPathW = NULL);
-    BOOL BuildScriptMain2(COperations* script, BOOL copy, char* targetDir,
-                          const wchar_t* targetDirW, CCopyMoveData* data);
+    BOOL BuildScriptMain2(COperations* script, BOOL copy, const wchar_t* targetDir,
+                          CCopyMoveData* data);
 
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -1411,8 +1361,10 @@ public:
     // if readDirectory is FALSE, ReadDirectory is not called
     // if isRefresh is TRUE, the path in the panel is refreshed by this
     // returns TRUE if ReadDirectory succeeded
+    // suggestedFocusNameW is GONE - see ChangePathToDisk above. The row match is
+    // a single wide comparison now that CFileData::Name is wide.
     BOOL CommonRefresh(HWND parent, int suggestedTopIndex = -1,
-                       const char* suggestedFocusName = NULL, BOOL refreshListBox = TRUE,
+                       const wchar_t* suggestedFocusName = NULL, BOOL refreshListBox = TRUE,
                        BOOL readDirectory = TRUE, BOOL isRefresh = FALSE);
 
     // ensures a panel refresh after configuration change (for archives updates the timestamp so a refresh occurs)
@@ -1425,13 +1377,13 @@ public:
     // unpacking or deleting from archives (not only ZIP); 'target' may be NULL
     // if 'tgtPath' is not NULL; when 'tgtPath' is not NULL, the unpacking is done
     // to that path without asking the user
-    void UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp = FALSE, const char* tgtPath = NULL);
+    void UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp = FALSE, const wchar_t* tgtPath = NULL);
     // deleting from archives (not only ZIP) - simply calls UnpackZIPArchive
     void DeleteFromZIPArchive();
     // moves all files from the source directory to the target directory,
     // remapping displayed names as well
-    BOOL MoveFiles(const char* source, const char* target, const char* remapNameFrom,
-                   const char* remapNameTo);
+    BOOL MoveFiles(const wchar_t* source, const wchar_t* target, const wchar_t* remapNameFrom,
+                   const wchar_t* remapNameTo);
 
     // helper function: before executing a command or drag&drop it offers archive update
     void OfferArchiveUpdateIfNeeded(HWND parent, int textID, BOOL* archMaybeUpdated);
@@ -1440,8 +1392,8 @@ public:
     // writes the list of selected files to the file hFile
     BOOL MakeFileList(HANDLE hFile);
 
-    void Pack(CFilesWindow* target, int pluginIndex = -1, const char* pluginName = NULL, int delFilesAfterPacking = 0);
-    void Unpack(CFilesWindow* target, int pluginIndex = -1, const char* pluginName = NULL, const char* unpackMask = NULL);
+    void Pack(CFilesWindow* target, int pluginIndex = -1, const wchar_t* pluginName = NULL, int delFilesAfterPacking = 0);
+    void Unpack(CFilesWindow* target, int pluginIndex = -1, const wchar_t* pluginName = NULL, const wchar_t* unpackMask = NULL);
 
     void CalculateOccupiedZIPSpace(int countSizeMode = 0);
 
@@ -1483,16 +1435,13 @@ public:
     // Operation Ball Lightning: moved from FILESBOX.H
     void ClipboardCopy();
     void ClipboardCut();
-    BOOL ClipboardPaste(BOOL onlyLinks = FALSE, BOOL onlyTest = FALSE, const char* pastePath = NULL);
+    // 'pastePath', when supplied, is the exact UTF-16 destination (a drop onto a subdirectory
+    // row, say), so a Paste aimed at a folder outside the code page cannot target "...\???".
+    BOOL ClipboardPaste(BOOL onlyLinks = FALSE, BOOL onlyTest = FALSE, const wchar_t* pastePath = NULL);
     BOOL ClipboardPasteToArcOrFS(BOOL onlyTest, DWORD* pasteDefEffect); // 'pasteDefEffect' may be NULL
     BOOL ClipboardPasteLinks(BOOL onlyTest = FALSE);
     BOOL IsTextOnClipboard();
     void ClipboardPastePath(); // for changing the current directory
-
-    // postprocesses of the user provided path: trims surrounding white spaces and quotes, removes file:// and
-    // expands environment variables; returns FALSE on error (processing should stop); 'parent' is
-    // the parent for error message boxes
-    BOOL PostProcessPathFromUser(HWND parent, CPathBuffer& buff);
 
     // if disable==FALSE, opens a dialog with selection options
     // if disable==TRUE, the filter is turned off
@@ -1501,7 +1450,7 @@ public:
     void EndQuickSearch(); // ends Quick Search mode
 
     // QuickRenameWindow
-    void AdjustQuickRenameRect(const char* text, RECT* r); // adjusts 'r' so it doesn't exceed the panel and is large enough at the same time
+    void AdjustQuickRenameRectW(const wchar_t* text, RECT* r); // adjusts 'r' so it doesn't exceed the panel and is large enough at the same time
     void AdjustQuickRenameWindow();
     //    void QuickRenameOnIndex(int index); // calls QuickRenameBegin for the given index
     void QuickRenameBegin(int index, const RECT* labelRect); // opens QuickRenameWindow
@@ -1521,7 +1470,11 @@ public:
     // if newChar != 0,it is appended to QuickSearchMask
     // if wholeString == TRUE, the entire item must match, not just its start
     // returns TRUE when a directory/file is found and also sets the index
-    BOOL QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, char newChar, int& index);
+    BOOL QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, wchar_t newChar, int& index);
+    // 'newText' is one whole typed character, which is two code units when it is a surrogate
+    // pair. Appending it as a unit keeps the search mask from ever holding half a character.
+    BOOL QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString,
+                    const std::wstring& newText, int& index);
 
     // Searches for the next/previous selected item. If skip = TRUE, the current item is skipped
     BOOL SelectFindNext(int currentIndex, BOOL next, BOOL skip, int& index);
@@ -1568,8 +1521,8 @@ public:
 
     int GetSelCount(); // returns the number of selected items
 
-    void SelectFocusedItemAndGetName(char* name, int nameMax);
-    void UnselectItemWithName(const char* name);
+    std::wstring SelectFocusedItemAndGetName();
+    void UnselectItemWithName(const std::wstring& name);
 
     // returns PANEL_LEFT or PANEL_RIGHT depending on which side this panel is on
     int GetPanelCode();
@@ -1684,7 +1637,7 @@ struct CPanelTmpEnumData
     int* Indexes;
     int CurrentIndex;
     int IndexesCount;
-    const char* ZIPPath;              // archive root for the entire operation
+    const wchar_t* ZIPPath;              // archive root for the entire operation
     CFilesArray* Dirs;                // current list of directories pointed to by the selected indexes from Indexes
     CFilesArray* Files;               // current list of files rpointed by the selected indexes
     CSalamanderDirectory* ArchiveDir; // archive directory of the current archive
@@ -1692,15 +1645,20 @@ struct CPanelTmpEnumData
     // for enum-zip-selection, enumFiles > 0
     CSalamanderDirectory* EnumLastDir;
     int EnumLastIndex;
-    char EnumLastPath[SAL_MAX_LONG_PATH];
-    CPathBuffer EnumTmpFileName; // filename only, not full path
+    std::wstring EnumLastPath;
+    std::wstring EnumTmpFileName; // filename only, not full path
 
     // for disk enumeration, enumFiles > 0
-    char WorkPath[SAL_MAX_LONG_PATH];        // path where Files and Dirs reside, used only when browsing disk (not archives)
+    std::wstring WorkPathW; // path where Files and Dirs reside when browsing disk
     CSalamanderDirectory* DiskDirectoryTree; // replacement for Panel->ArchiveDir
-    CPathBuffer EnumLastDosPath;          // DOS name of EnumLastPath (8.3 format, always short)
-    CPathBuffer EnumTmpDosFileName;       // DOS name of EnumTmpFileName (8.3 format)
+    std::wstring EnumLastDosPath;          // DOS name of EnumLastPath (8.3 components)
+    std::wstring EnumTmpDosFileName;       // DOS name of EnumTmpFileName (8.3 components)
     int FilesCountReturnedFromWP;            // number of files already returned by the enumerator directly from WorkPath (i.e. from Files)
+
+    // The directory components mirror the logical relative path for callers that need the
+    // most recently returned name without retaining a pointer into mutable enumeration state.
+    std::vector<std::wstring> EnumWideDirStack; // components below the archive root
+    std::wstring LastNameW;                     // wide form of the last returned name, empty if none
 
     CPanelTmpEnumData();
     ~CPanelTmpEnumData();
@@ -1708,9 +1666,18 @@ struct CPanelTmpEnumData
     void Reset(); // sets the object to the initial enumeration state
 };
 
-const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char** dosName, BOOL* isDir,
+const wchar_t* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const wchar_t** dosName, BOOL* isDir,
                                           CQuadWord* size, DWORD* attr, FILETIME* lastWrite, void* param,
                                           int* errorOccured);
+
+// The wide form of the name PanelEnumDiskSelection just returned, or NULL if there is
+// none. Handed back beside the enumerator rather than through it because the enumerator
+// matches SalEnumSelection2, a published typedef whose return type is char*.
+//
+// 'param' must be the same CPanelTmpEnumData the enumerator was called with; a caller
+// holding an opaque void* and a foreign enumerator must pass NULL for the accessor rather
+// than guess, which is why PackUniversalCompress takes the two together.
+const wchar_t* WINAPI PanelEnumLastNameW(void* param);
 
 //****************************************************************************
 //
@@ -1719,19 +1686,17 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
 
 extern CNames GlobalSelection; // stored selection shared by both panels
 
-extern CDirectorySizesHolder DirectorySizesHolder; // holds the list of directory names and sizes with known size
-
 extern CFilesWindow* DropSourcePanel; // prevents drag&drop from/to the same panel
 extern BOOL OurClipDataObject;        // TRUE when pasting our IDataObject
                                       // (detects our copy/move routine with foreign data)
 
 // enumeration of selected files and directories from the panel
-const char* WINAPI PanelSalEnumSelection(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
+const wchar_t* WINAPI PanelSalEnumSelection(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
                                          const CFileData** fileData, void* param, int* errorOccured);
 
 //****************************************************************************
 //
-// SplitText
+// SplitTextW
 //
 // Uses the array 'DrawItemAlpDx'
 //
@@ -1748,9 +1713,10 @@ const char* WINAPI PanelSalEnumSelection(HWND parent, int enumFiles, BOOL* isDir
 // out2Width
 //
 
-void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
-               char* out1, int* out1Len, int* out1Width,
-               char* out2, int* out2Len, int* out2Width);
+// wide sibling of CFilesWindow::PostProcessPathFromUser: trims surrounding white spaces and
+// quotes, removes file://, expands environment variables, all in place on 'path'; returns FALSE
+// on error (processing should stop). Defined in files_window_clipboard_paths.cpp.
+BOOL PostProcessPathFromUserW(HWND parent, std::wstring& path);
 
 void SplitTextW(HDC hDC, const wchar_t* text, int textLen, int* maxWidth,
                 wchar_t* out1, int* out1Len, int* out1Width,
@@ -1768,15 +1734,22 @@ void SplitTextW(HDC hDC, const wchar_t* text, int textLen, int* maxWidth,
 // This function can be called from any thread.
 //
 
-BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND hMessageParent, int nestingLevel = 0);
+// Resolves 'path' to its UNC form and puts it on the clipboard with 'name' attached.
+//
+// Wide-only; the ANSI entry point and its leaf-swap workaround are gone. The
+// workaround existed because of a comment claiming CShares, WNetGetConnection and
+// GetSubstInformation "have no wide siblings" - all three claims were false, and CShares was
+// never ANSI at all. See the note above the definition.
+BOOL CopyUNCPathToClipboardW(const wchar_t* path, const wchar_t* name, BOOL isDir,
+                             HWND hMessageParent, int nestingLevel = 0);
 
 // From the file/directory 'f' creates three lines of text and fills out0/out0Len to out2/out2Len;
 // 'validFileData' specifies which parts of 'f' are valid
 void GetTileTexts(CFileData* f, int isDir,
                   HDC hDC, int maxTextWidth, int* widthNeeded,
-                  char* out0, int* out0Len,
-                  char* out1, int* out1Len,
-                  char* out2, int* out2Len,
+                  wchar_t* out0, int* out0Len,
+                  wchar_t* out1, int* out1Len,
+                  wchar_t* out2, int* out2Len,
                   DWORD validFileData,
                   CPluginDataInterfaceEncapsulation* pluginData,
                   BOOL isDisk);

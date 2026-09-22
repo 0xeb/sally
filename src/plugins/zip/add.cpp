@@ -6,6 +6,7 @@
 #include <winioctl.h>
 #include <crtdbg.h>
 #include <ostream>
+#include <vector>
 #include <commctrl.h>
 #include <stdio.h>
 
@@ -63,7 +64,7 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
 {
     CALL_STACK_MESSAGE1("CZipPack::PackNormal( , )");
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           true, false);
     if (ret)
@@ -71,10 +72,11 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
             return ErrorID = IDS_LOWMEM;
         else
             return ErrorID = IDS_NODISPLAY;
-    char title[1024];
-    sprintf(title, LoadStr(IDS_ADDPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_ADDPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     ErrorID = CheckZip();
     if (ZeroZip)
     {
@@ -109,8 +111,7 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
                     int addCount;
                     ErrorID = MatchFiles(addCount);
                     if (!ErrorID && addCount > 0xFFFF &&
-                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOTFILES),
-                                                          LoadStr(IDS_PLUGINNAME), MSGBOX_EX_QUESTION) != IDYES)
+                        SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOTFILES).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_EX_QUESTION) != IDYES)
                     {
                         ErrorID = IDS_NODISPLAY;
                         UserBreak = TRUE;
@@ -163,7 +164,7 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
                 if (ErrorID || UserBreak || NothingToDo)
                 {
                     CloseCFile(TempFile);
-                    DeleteFile(TempName);
+                    DeleteFileW(TempName.c_str());
                 }
                 else
                 {
@@ -180,11 +181,11 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
                         SetFileTime(TempFile->File, NULL, NULL, &NewestFileTime);
 
                     CloseCFile(TempFile);
-                    SalamanderGeneral->ClearReadOnlyAttr(ZipName);
-                    if (!DeleteFile(ZipName) ||
-                        !MoveFile(TempName, ZipName))
+                    SalamanderGeneral->ClearReadOnlyAttr(ZipName.c_str());
+                    if (!DeleteFileW(ZipName.c_str()) ||
+                        !MoveFileW(TempName.c_str(), ZipName.c_str()))
                         ErrorID = IDS_ERRRESTORE;
-                    SetFileAttributes(ZipName, ZipAttr | FILE_ATTRIBUTE_ARCHIVE);
+                    SetFileAttributesW(ZipName.c_str(), ZipAttr | FILE_ATTRIBUTE_ARCHIVE);
                 }
             }
             else
@@ -193,7 +194,7 @@ int CZipPack::PackNormal(SalEnumSelection2 next, void* param)
                 {
                     CloseCFile(ZipFile);
                     ZipFile = NULL;
-                    DeleteFile(ZipName);
+                    DeleteFileW(ZipName.c_str());
                 }
                 else
                 {
@@ -230,29 +231,24 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
     NewCentrDir = NULL;
     EONewCentrDir = EOCentrDir;
 
-    char title[1024];
-    sprintf(title, LoadStr(IDS_ADDPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_ADDPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
 
     if (Options.Action & PA_SELFEXTRACT)
     {
-        Salamander->ProgressDialogAddText(LoadStr(IDS_WRITINGEXE), FALSE);
+        Salamander->ProgressDialogAddText(LoadStrW(IDS_WRITINGEXE).c_str(), FALSE);
 
-        CPathBuffer name; // Heap-allocated for long path support
-        lstrcpy(name, ZipName);
-        if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", name.Size()))
-        {
-            Salamander->CloseProgressDialog();
-            return IDS_TOOLONGZIPNAME;
-        }
+        const std::wstring name = ReplaceZipPathExtension(ZipName, L".exe");
 
-        if (TestIfExist(name))
+        if (TestIfExist(name.c_str()))
         {
             Salamander->CloseProgressDialog();
             return ErrorID;
         }
 
-        int ret = CreateCFile(&TempFile, name, GENERIC_WRITE, FILE_SHARE_READ,
+        int ret = CreateCFile(&TempFile, name.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                               false, false);
         if (ret)
@@ -265,16 +261,19 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
             return ErrorID;
         }
 
-        ErrorID = WriteSfxExecutable(name, Options.SfxSettings.SfxFile, FALSE, 0);
+        ErrorID = WriteSfxExecutable(name.c_str(), Options.SfxSettings.SfxFile, FALSE, 0);
         if (!ErrorID)
         {
-            CPathBuffer archName; // Heap-allocated for long path support
-            MakeFileName(1, Options.SeqNames, SalamanderGeneral->SalPathFindFileName(ZipName), archName,
-                         false);
-            CharToOem(archName, archName);
-            if (!WriteSFXHeader(archName, 0, 0) ||
+            const wchar_t* zipBaseName = wcsrchr(ZipName.c_str(), L'\\');
+            zipBaseName = zipBaseName != NULL ? zipBaseName + 1 : ZipName.c_str();
+            const std::wstring archiveVolumeName = MakeZipVolumeFileName(
+                1, Options.SeqNames, zipBaseName, false);
+            std::string archName;
+            if (!EncodeZipBytes(CP_OEMCP, archiveVolumeName.data(), archiveVolumeName.size(), archName))
+                ErrorID = IDS_TOOLONGZIPNAME;
+            if (!ErrorID && (!WriteSFXHeader(archName.c_str(), 0, 0) ||
                 Write(TempFile, &EONewCentrDir, sizeof(CEOCentrDirRecord), NULL) || // just as a placeholder, we update it later
-                Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL))
+                Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL)))
             {
                 ErrorID = IDS_NODISPLAY;
             }
@@ -290,12 +289,13 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
             return ErrorID;
         }
 
-        SalamanderGeneral->CutDirectory(name);
+        std::wstring nameDirectoryW = name;
+        SPLCutDirectoryOwned(SalamanderGeneral, nameDirectoryW);
         CQuadWord free;
-        SalamanderGeneral->GetDiskFreeSpace(&free, name, NULL);
+        SalamanderGeneral->GetDiskFreeSpace(&free, nameDirectoryW.c_str(), NULL);
         if (free == CQuadWord(-1, -1))
         {
-            ProcessError(IDS_ERRGETDISKFREESP, 0, name, PE_NOSKIP | PE_NORETRY, NULL);
+            ProcessError(IDS_ERRGETDISKFREESP, 0, name.c_str(), PE_NOSKIP | PE_NORETRY, NULL);
             ErrorID = IDS_NODISPLAY;
             Salamander->CloseProgressDialog();
             return ErrorID;
@@ -308,8 +308,8 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
         {
             if (Removable)
             {
-                char buf[256];
-                sprintf(buf, LoadStr(IDS_CHDISKTEXT), 1, 2);
+                wchar_t buf[256];
+                swprintf_s(buf, LangStr(IDS_CHDISKTEXT).c_str(), 1, 2);
                 if (ChangeDiskDialog(SalamanderGeneral->GetMsgBoxParent(), buf) != IDOK)
                 {
                     Salamander->CloseProgressDialog();
@@ -322,7 +322,7 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
             firstSfxDisk = true;
     }
 
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     ErrorID = CreateNextFile(firstSfxDisk);
     if (!ErrorID)
     {
@@ -334,14 +334,13 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
             {
                 if (Options.Action & PA_SELFEXTRACT)
                 {
-                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOTFILESSFX), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOTFILESSFX).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                     ErrorID = IDS_NODISPLAY;
                     UserBreak = TRUE;
                 }
                 else
                 {
-                    if (SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOTFILES),
-                                                          LoadStr(IDS_PLUGINNAME), MSGBOX_EX_QUESTION) != IDYES)
+                    if (SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOTFILES).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_EX_QUESTION) != IDYES)
                     {
                         ErrorID = IDS_NODISPLAY;
                         UserBreak = TRUE;
@@ -383,11 +382,10 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
                                 {
                                     if (TempFile)
                                     {
-                                        CPathBuffer name; // Heap-allocated for long path support
-                                        strcpy(name, TempFile->FileName);
+                                        const std::wstring name = TempFile->FileName;
                                         CloseCFile(TempFile);
                                         TempFile = NULL;
-                                        MoveFile(name, ZipName);
+                                        MoveFileW(name.c_str(), ZipName.c_str());
                                     }
                                 }
                             }
@@ -423,7 +421,7 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
             CloseCFile(TempFile);
         }
         if (ErrorID || UserBreak || NothingToDo)
-            DeleteFile(TempName);
+            DeleteFileW(TempName.c_str());
     }
     Salamander->CloseProgressDialog();
     return ErrorID;
@@ -434,13 +432,12 @@ int CZipPack::PackSelfExtract(SalEnumSelection2 next, void* param)
     CALL_STACK_MESSAGE1("CZipPack::PackSelfExtract( , )");
     int ret;
 
-    if (!SalamanderGeneral->SalPathRenameExtension(ZipName, ".exe", ZipName.Size()))
-        return IDS_TOOLONGZIPNAME;
+    ZipName = ReplaceZipPathExtension(ZipName, L".exe");
 
-    if (TestIfExist(ZipName))
+    if (TestIfExist(ZipName.c_str()))
         return ErrorID;
 
-    ret = CreateCFile(&TempFile, ZipName, GENERIC_WRITE, FILE_SHARE_READ,
+    ret = CreateCFile(&TempFile, ZipName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                       CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                       false, false);
     if (ret)
@@ -462,10 +459,11 @@ int CZipPack::PackSelfExtract(SalEnumSelection2 next, void* param)
     EOCentrDir.CommentLen = 0;
     NewCentrDir = NULL;
     EONewCentrDir = EOCentrDir;
-    char title[1024];
-    sprintf(title, LoadStr(IDS_ADDPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_ADDPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     if (!ErrorID)
     {
         ErrorID = EnumFiles2(next, param);
@@ -474,14 +472,13 @@ int CZipPack::PackSelfExtract(SalEnumSelection2 next, void* param)
             MatchAll();
             if (AddFiles.Count > 0xFFFF)
             {
-                SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOTFILESSFX),
-                                                  LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                SalamanderGeneral->ShowMessageBox(LangStr(IDS_LOTFILESSFX).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                 ErrorID = IDS_NODISPLAY;
                 UserBreak = TRUE;
             }
             if (!NothingToDo && !ErrorID)
             {
-                ErrorID = WriteSfxExecutable(ZipName, Options.SfxSettings.SfxFile, FALSE, 0);
+                ErrorID = WriteSfxExecutable(ZipName.c_str(), Options.SfxSettings.SfxFile, FALSE, 0);
                 if (!ErrorID)
                 {
 
@@ -505,7 +502,7 @@ int CZipPack::PackSelfExtract(SalEnumSelection2 next, void* param)
         }
         if (ErrorID || UserBreak || NothingToDo)
         {
-            DeleteFile(ZipName);
+            DeleteFileW(ZipName.c_str());
         }
     }
     Salamander->CloseProgressDialog();
@@ -860,7 +857,16 @@ int CZipPack::ExportName(char* name, CFileInfo* fileInfo)
 {
     CALL_STACK_MESSAGE1("CZipPack::ExportName(, )");
 
-    char* sour = fileInfo->Name;
+    std::string encodedName;
+    const char* sour = fileInfo->Name;
+    if (!(fileInfo->Flag & GPF_UTF8))
+    {
+        const std::wstring wide = ZipTextToWide(fileInfo->Name);
+        if (EncodeZipBytes(CP_OEMCP, wide.data(), wide.size(), encodedName))
+        {
+            sour = encodedName.c_str();
+        }
+    }
     char* dest = name;
 
     while (*sour)
@@ -875,8 +881,6 @@ int CZipPack::ExportName(char* name, CFileInfo* fileInfo)
         *dest++ = '/';
     *dest = 0;
 
-    CharToOem(name, name);
-
     //*dest = NULL;
     return (int)(dest - name);
 }
@@ -884,19 +888,22 @@ int CZipPack::ExportName(char* name, CFileInfo* fileInfo)
 int CZipPack::CreateTempFile()
 {
     CALL_STACK_MESSAGE1("CZipPack::CreateTempFile()");
-    CPathBuffer pathBuf;
-    char* path = pathBuf;
-    char* name;
+    const size_t slash = ZipName.find_last_of(L'\\');
+    const std::wstring path = slash != std::wstring::npos ? ZipName.substr(0, slash) : std::wstring();
     DWORD lastError; //value returned by GetLastError()
     int ret;
 
-    SplitPath(&path, &name, ZipName);
-    TempName[0] = 0;
+    TempName.clear();
     while (1)
     {
-        if (SalamanderGeneral->SalGetTempFileName(path, "Sal", TempName, TRUE, &lastError))
+        std::wstring tempNameW;
+        const BOOL created = SPLSalGetTempFileNameOwned(
+            SalamanderGeneral, path.c_str(), L"Sal",
+            tempNameW, TRUE, &lastError);
+        if (created)
         {
-            ret = CreateCFile(&TempFile, TempName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+            TempName = std::move(tempNameW);
+            ret = CreateCFile(&TempFile, TempName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                               true, false);
             switch (ret)
@@ -904,17 +911,19 @@ int CZipPack::CreateTempFile()
             case ERR_NOERROR:
                 return 0;
             case ERR_LOWMEM:
-                *TempName = 0;
+                TempName.clear();
                 return IDS_LOWMEM;
             default:
-                *TempName = 0;
+                TempName.clear();
                 return IDS_NODISPLAY;
             }
         }
-        ret = ProcessError(IDS_ERRTEMP, lastError, TempName, PE_NOSKIP, NULL);
+        if (created)
+            DeleteFileW(tempNameW.c_str());
+        ret = ProcessError(IDS_ERRTEMP, lastError, TempName.c_str(), PE_NOSKIP, NULL);
         if (ret != ERR_RETRY)
         {
-            *TempName = 0;
+            TempName.clear();
             return IDS_NODISPLAY;
         }
     }
@@ -934,21 +943,30 @@ int CZipPack::EnumFiles2(SalEnumSelection2 next, void* param)
 {
     CALL_STACK_MESSAGE1("CZipPack::EnumFiles2( , )");
     CAddInfo* newFile;
-    const char* nextName;
+    const wchar_t* nextNameW;
+    std::string nextName;
     BOOL isDir;
     CQuadWord size;
     int errorID = 0;
     int errorOccured;
 
-    while ((nextName = next(SalamanderGeneral->GetMsgBoxParent(), 3, NULL, &isDir, &size, NULL, NULL, param, &errorOccured)) != NULL)
+    while ((nextNameW = next(SalamanderGeneral->GetMsgBoxParent(), 3, NULL, &isDir, &size, NULL, NULL, param, &errorOccured)) != NULL)
     {
+        // CAddInfo is the mature byte engine's UTF-8 owner. Skip only a name that cannot be
+        // encoded or fit instead of aborting selections already collected.
+        if (!TryWideToZipText(nextNameW, nextName))
+        {
+            TRACE_E("CZipPack::EnumFiles2(): skipping a selected file whose UTF-8 name is too long or invalid.");
+            continue;
+        }
         newFile = new CAddInfo;
         if (!newFile)
         {
             errorID = IDS_LOWMEM;
             break;
         }
-        newFile->NameLen = lstrlen(nextName) + SourceLen + 1;
+        newFile->LocalPath = JoinZipLocalPath(SourcePath.c_str(), nextNameW);
+        newFile->NameLen = static_cast<int>(nextName.size()) + SourceLen + 1;
         newFile->Name = (char*)malloc(newFile->NameLen + 1);
         if (!newFile->Name)
         {
@@ -956,14 +974,15 @@ int CZipPack::EnumFiles2(SalEnumSelection2 next, void* param)
             errorID = IDS_LOWMEM;
             break;
         }
-        lstrcpy(newFile->Name, SourcePath);
+        memcpy(newFile->Name, ArchiveSourcePrefix.data(), static_cast<size_t>(SourceLen));
+        newFile->Name[SourceLen] = '\0';
         *(newFile->Name + SourceLen) = '\\';
-        lstrcpy(newFile->Name + SourceLen + 1, nextName);
+        lstrcpyA(newFile->Name + SourceLen + 1, nextName.c_str());
         newFile->IsDir = isDir ? true : false;
         newFile->Size = size;
         newFile->Action = AF_ADD;
         if (Config.NoEmptyDirs && newFile->IsDir)
-            if (IsDirectoryEmpty(newFile->Name))
+            if (IsDirectoryEmpty(newFile->LocalPath.c_str()))
             {
                 //newFile->FreeDir = true;
                 newFile->Action = AF_NOADD;
@@ -1061,7 +1080,7 @@ int CZipPack::MatchFiles(int& count)
     }
     if (RootLen)
     {
-        lstrcpy(destNameBuf, ZipRoot);
+        lstrcpyA(destNameBuf, ZipRoot);
         *(destNameBuf + RootLen) = '\\';
         destName = destNameBuf + RootLen + 1;
     }
@@ -1115,7 +1134,16 @@ int CZipPack::MatchFiles(int& count)
             Fatal = true;
             break;
         }
-        inZipLen = ProcessName(centralHeader, inZip);
+        int inZipLenSigned = ProcessName(centralHeader, inZip);
+        // ProcessName returns -1 (a name that can't round-trip the system
+        // codepage) rather than a corrupted name - inZipLen is unsigned, so storing -1 there
+        // directly would wrap to UINT_MAX and make every "inZipLen >= destLen" check below
+        // vacuously true against inZip's now-empty buffer. Skip this one existing entry
+        // entirely (treat it as not conflicting with anything being added) rather than compare
+        // added files against a name we can't determine.
+        if (inZipLenSigned < 0)
+            continue;
+        inZipLen = (unsigned)inZipLenSigned;
         for (j = 0; j < AddFiles.Count; j++)
         {
             next = AddFiles[j];
@@ -1128,17 +1156,15 @@ int CZipPack::MatchFiles(int& count)
                 if (!Unix || next->Action != AF_NOADD)
                     continue;
             }
-            lstrcpy(destName, next->Name + SourceLen + 1);
+            lstrcpyA(destName, next->Name + SourceLen + 1);
             destLen = RootLen + next->NameLen - SourceLen - (RootLen ? 0 : 1);
             if (next->Action == AF_NOADD && next->IsDir) // this may already apply to directories; files are skipped above
                 if (Move)
                 {
                     if (inZipLen >= destLen &&
-                        CompareString(LOCALE_USER_DEFAULT, pathFlag,
-                                      destNameBuf, RootLen, inZip, RootLen) == CSTR_EQUAL &&
-                        CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                                      destNameBuf + RootLen, destLen - RootLen,
-                                      inZip + RootLen, destLen - RootLen) == CSTR_EQUAL &&
+                        CompareZipText(destNameBuf, RootLen, inZip, RootLen, pathFlag) == CSTR_EQUAL &&
+                        CompareZipText(destNameBuf + RootLen, destLen - RootLen,
+                                       inZip + RootLen, destLen - RootLen, NORM_IGNORECASE) == CSTR_EQUAL &&
                         (*(inZip + destLen) == '\\' || *(inZip + destLen) == 0))
                     {
                         next->Action = AF_DEL;
@@ -1148,10 +1174,9 @@ int CZipPack::MatchFiles(int& count)
                 else
                     continue;
             if (inZipLen == destLen &&
-                CompareString(LOCALE_USER_DEFAULT, pathFlag,
-                              destNameBuf, RootLen, inZip, RootLen) == CSTR_EQUAL &&
-                CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                              destNameBuf + RootLen, -1, inZip + RootLen, -1) == CSTR_EQUAL)
+                CompareZipText(destNameBuf, RootLen, inZip, RootLen, pathFlag) == CSTR_EQUAL &&
+                CompareZipText(destNameBuf + RootLen, -1, inZip + RootLen, -1,
+                               NORM_IGNORECASE) == CSTR_EQUAL)
             {
                 ProcessHeader(centralHeader, &file);
                 if (file.IsDir && next->IsDir)
@@ -1176,31 +1201,22 @@ int CZipPack::MatchFiles(int& count)
                         CFile* sourFile;
                         int ret;
 
-                        ret = CreateCFile(&sourFile, next->Name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0, 0, &SkipAllIOErrors,
+                        ret = CreateCFile(&sourFile, next->LocalPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0, 0, &SkipAllIOErrors,
                                           false, false);
                         switch (ret)
                         {
                         case ERR_NOERROR:
                         {
-                            char attr1[101], attr2[101];
                             FILETIME ft;
-                            char* buffer;
-                            int len;
-
-                            len = lstrlen(ZipFile->FileName);
-                            buffer = (char*)malloc(len + 1 + inZipLen + 1);
-                            if (!buffer)
-                                errorID = IDS_LOWMEM;
-                            else
+                            const std::wstring archiveEntry =
+                                JoinZipLocalPath(ZipFile->FileName.c_str(), ZipTextToWide(inZip).c_str());
+                            if (!archiveEntry.empty())
                             {
-                                lstrcpy(buffer, ZipFile->FileName);
-                                *(buffer + len) = '\\';
-                                lstrcpy(buffer + len + 1, inZip);
-                                GetInfo(attr1, &file.LastWrite, file.Size);
+                                const std::wstring attr1 = GetInfo(&file.LastWrite, file.Size);
                                 GetFileTime(sourFile->File, NULL, NULL, &ft);
-                                GetInfo(attr2, &ft, sourFile->Size);
+                                const std::wstring attr2 = GetInfo(&ft, sourFile->Size);
                                 switch (SalamanderGeneral->DialogOverwrite(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_YESALLSKIPCANCEL,
-                                                                           buffer, attr1, next->Name, attr2))
+                                                                           archiveEntry.c_str(), attr1.c_str(), next->LocalPath.c_str(), attr2.c_str()))
                                 {
                                 case DIALOG_ALL:
                                     overwriteAll = true;
@@ -1216,7 +1232,6 @@ int CZipPack::MatchFiles(int& count)
                                 default:
                                     errorID = IDS_NODISPLAY;
                                 }
-                                free(buffer);
                             }
                             CloseCFile(sourFile);
                             break;
@@ -1249,7 +1264,7 @@ int CZipPack::MatchFiles(int& count)
                             errorID = IDS_LOWMEM;
                             break;
                         }
-                        lstrcpy(newFile->Name, inZip);
+                        lstrcpyA(newFile->Name, inZip);
                         MatchedTotalSize += CQuadWord().SetUI64(newFile->CompSize);
                         DelFiles.Add(newFile);
 
@@ -1293,7 +1308,7 @@ int CZipPack::BackupZip()
     buffer = (char*)malloc(DECOMPRESS_INBUFFER_SIZE);
     if (!buffer)
         return IDS_LOWMEM;
-    Salamander->ProgressDialogAddText(LoadStr(IDS_BACKUPING), TRUE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_BACKUPING).c_str(), TRUE);
     Salamander->ProgressSetTotalSize(CQuadWord().SetUI64(CentrDirOffs), ProgressTotalSize);
     int ret = MoveData(0, 0, /*EOCentrDir.*/ CentrDirOffs, buffer);
     free(buffer);
@@ -1394,10 +1409,7 @@ int CZipPack::PackFiles()
     __UINT64 writePos;
     CDeflate* defObj = new CDeflate();
     int errorID = 0;
-    CPathBuffer progrTextBuf;
-    char* progrText;
-    int progrPrefixLen; //"adding: "
-    char* sour;
+    std::wstring progressPrefix;
     unsigned locHeadSize;
 #pragma pack(push)
 #pragma pack(1)
@@ -1423,12 +1435,8 @@ int CZipPack::PackFiles()
             delete defObj;
         return IDS_LOWMEM;
     }
-    sour = LoadStr(IDS_ADDING);
-    progrText = progrTextBuf;
-    while (*sour)
-        *progrText++ = *sour++;
-    progrPrefixLen = (int)(progrText - progrTextBuf);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_ADDFILES), FALSE);
+    progressPrefix = LoadStrW(IDS_ADDING).c_str();
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_ADDFILES).c_str(), FALSE);
     if ((Options.Action & (PA_SELFEXTRACT | PA_MULTIVOL)) == PA_SELFEXTRACT)
         writePos = ArchiveDataOffs;
     else
@@ -1439,8 +1447,9 @@ int CZipPack::PackFiles()
         if (next->Action != AF_ADD && next->Action != AF_OVERWRITE)
             continue;
         //TRACE_I("Packing file: " << next->Name);
-        lstrcpyn(progrText, next->Name + SourceLen + 1, progrTextBuf.Size() - progrPrefixLen);
-        Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
+        const std::wstring entryNameW = ZipTextToWide(next->Name + SourceLen + 1);
+        const std::wstring progressText = progressPrefix + entryNameW;
+        Salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
         if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
         {
             UserBreak = true;
@@ -1456,13 +1465,13 @@ int CZipPack::PackFiles()
         }
         if (RootLen)
         {
-            lstrcpy(file.Name, ZipRoot);
+            lstrcpyA(file.Name, ZipRoot);
             *(file.Name + RootLen) = '\\';
         }
-        lstrcpy(file.Name + RootLen + (RootLen ? 1 : 0), next->Name + SourceLen + 1);
+        lstrcpyA(file.Name + RootLen + (RootLen ? 1 : 0), next->Name + SourceLen + 1);
         if (next->IsDir)
         {
-            ret = GetDirInfo(next->Name, &next->FileAttr, &next->LastWrite);
+            ret = GetDirInfo(next->LocalPath.c_str(), &next->FileAttr, &next->LastWrite);
             if (ret)
             {
                 free(file.Name);
@@ -1482,7 +1491,7 @@ int CZipPack::PackFiles()
             file.FileAttr = next->FileAttr;
             file.LastWrite = next->LastWrite;
             file.IsDir = next->IsDir;
-            file.Flag = next->Flag = 0;
+            file.Flag = next->Flag = GPF_UTF8;
             file.InterAttr = next->InterAttr = 0;
             file.Method = next->Method = CM_STORED;
             file.Crc = next->Crc = Crc = INIT_CRC;
@@ -1520,7 +1529,7 @@ int CZipPack::PackFiles()
         }
         else
         {
-            ret = CreateCFile(&SourFile, next->Name, GENERIC_READ, FILE_SHARE_READ,
+            ret = CreateCFile(&SourFile, next->LocalPath.c_str(), GENERIC_READ, FILE_SHARE_READ,
                               OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0, &SkipAllIOErrors,
                               // Do not allow files over 4GB in SFX files, the SFX module probably doesn't support them
                               (Options.Action & PA_SELFEXTRACT) ? false : true, false);
@@ -1542,7 +1551,7 @@ int CZipPack::PackFiles()
                 }
                 break;
             }
-            file.FileAttr = next->FileAttr = SalamanderGeneral->SalGetFileAttributes(next->Name) & FILE_ATTTRIBUTE_MASK;
+            file.FileAttr = next->FileAttr = SalamanderGeneral->SalGetFileAttributes(next->LocalPath.c_str()) & FILE_ATTTRIBUTE_MASK;
             GetFileTime(SourFile->File, NULL, NULL, &file.LastWrite);
             next->LastWrite = file.LastWrite;
             file.IsDir = next->IsDir;
@@ -1550,10 +1559,10 @@ int CZipPack::PackFiles()
             file.Method = next->Method = Config.Level && SourFile->Size
                                              ? ((Options.Encrypt && (Config.EncryptMethod >= EM_AES128)) ? CM_AES : CM_DEFLATED)
                                              : CM_STORED;
-            file.Flag = next->Flag = (Options.Action & PA_MULTIVOL || Removable) &&
+            file.Flag = next->Flag = GPF_UTF8 | ((Options.Action & PA_MULTIVOL || Removable) &&
                                              SourFile->Size
                                          ? GPF_DATADESCR
-                                         : 0;
+                                         : 0);
             file.InternalFlags = next->InternalFlags = 0;
             file.Crc = Crc = INIT_CRC;
             file.CompSize = 0;
@@ -1918,16 +1927,16 @@ int CZipPack::FinishPack(int reason)
     return errorID;
 }
 
-int CZipPack::GetDirInfo(const char* name, DWORD* attr, FILETIME* lastWrite)
+int CZipPack::GetDirInfo(const wchar_t* name, DWORD* attr, FILETIME* lastWrite)
 {
-    CALL_STACK_MESSAGE2("CZipPack::GetDirInfo(%s, , )", name);
-    WIN32_FIND_DATA data;
+    CALL_STACK_MESSAGE2("CZipPack::GetDirInfo(%ls, , )", name);
+    WIN32_FIND_DATAW data;
     HANDLE search;
     int ret;
 
     while (1)
     {
-        search = FindFirstFile(name, &data);
+        search = FindFirstFileW(name, &data);
         if (search == INVALID_HANDLE_VALUE)
         {
             ret = ProcessError(IDS_ERRACCESDIR, GetLastError(), name, 0, &SkipAllIOErrors);
@@ -1944,20 +1953,19 @@ int CZipPack::GetDirInfo(const char* name, DWORD* attr, FILETIME* lastWrite)
     }
 }
 
-int CZipPack::IsDirectoryEmpty(const char* name)
+int CZipPack::IsDirectoryEmpty(const wchar_t* name)
 {
-    CALL_STACK_MESSAGE2("CZipPack::IsDirectoryEmpty(%s)", name);
-    CPathBuffer buf;
-    int len;
+    CALL_STACK_MESSAGE2("CZipPack::IsDirectoryEmpty(%ls)", name);
+    std::wstring pattern = name != NULL ? name : L"";
     HANDLE search;
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     int lastError;
     BOOL ret;
 
-    lstrcpyn(buf, name, buf.Size());
-    len = lstrlen(buf);
-    lstrcpyn(buf + len, "\\*.*", buf.Size() - len);
-    search = FindFirstFile(buf, &data);
+    if (!pattern.empty() && pattern.back() != L'\\')
+        pattern.push_back(L'\\');
+    pattern += L"*.*";
+    search = FindFirstFileW(pattern.c_str(), &data);
     if (search == INVALID_HANDLE_VALUE)
     {
         ProcessError(IDS_ERRACCESDIR, GetLastError(), name, PE_NORETRY | PE_NOSKIP, NULL);
@@ -1966,12 +1974,12 @@ int CZipPack::IsDirectoryEmpty(const char* name)
     ret = TRUE;
     do
     {
-        if (data.cFileName[0] != 0 && strcmp(data.cFileName, ".") && strcmp(data.cFileName, ".."))
+        if (data.cFileName[0] != 0 && wcscmp(data.cFileName, L".") && wcscmp(data.cFileName, L".."))
         {
             ret = FALSE;
             break;
         }
-    } while (FindNextFile(search, &data));
+    } while (FindNextFileW(search, &data));
     if (ret) // treat any error as if directory is empty
     {
         lastError = GetLastError();
@@ -1982,38 +1990,23 @@ int CZipPack::IsDirectoryEmpty(const char* name)
     return ret;
 }
 
-int CZipPack::InsertDir(char* dir, TIndirectArray2<TIndirectArray2_char_>& table)
+int CZipPack::InsertDir(const std::wstring& dir, std::vector<std::vector<std::wstring>>& table)
 {
     CALL_STACK_MESSAGE1("CZipPack::InsertDir( , )");
-    int level;
-    const char* sour;
-
-    level = 0;
-    sour = dir + SourceLen + 1;
-    while (*sour)
+    size_t relativeStart = SourcePath.size();
+    if (relativeStart < dir.size() && dir[relativeStart] == L'\\')
+        ++relativeStart;
+    const int level = static_cast<int>(std::count(dir.begin() + relativeStart, dir.end(), L'\\'));
+    try
     {
-        if (*sour == '\\')
-            level++;
-        sour++;
+        if (table.size() <= static_cast<size_t>(level))
+            table.resize(static_cast<size_t>(level) + 1);
+        table[static_cast<size_t>(level)].push_back(dir);
     }
-    if (level + 1 > table.Count)
+    catch (...)
     {
-        //increase table size
-        int i = level + 1 - table.Count;
-        TIndirectArray2<char>* temp;
-
-        while (i)
-        {
-            temp = new TIndirectArray2<char>(16, FALSE);
-            if (!temp)
-                return IDS_LOWMEM;
-            if (!table.Add(temp))
-                return IDS_LOWMEM;
-            i--;
-        }
-    }
-    if (!table[level]->Add(dir))
         return IDS_LOWMEM;
+    }
     return 0;
 }
 
@@ -2021,8 +2014,7 @@ int CZipPack::CleanUpSource()
 {
     CALL_STACK_MESSAGE1("CZipPack::CleanUpSource()");
     CAddInfo* next;
-    TIndirectArray2<TIndirectArray2_char_> table(8);
-    int l; //directory level
+    std::vector<std::vector<std::wstring>> table;
     int i;
     int errorID = 0;
 
@@ -2032,8 +2024,8 @@ int CZipPack::CleanUpSource()
         next = AddFiles[i];
         if (next->Action != AF_ADD && next->Action != AF_OVERWRITE || next->IsDir)
             continue;
-        SalamanderGeneral->ClearReadOnlyAttr(next->Name);
-        DeleteFile(next->Name);
+        SalamanderGeneral->ClearReadOnlyAttr(next->LocalPath.c_str());
+        DeleteFileW(next->LocalPath.c_str());
     }
     //remove directories
     //sort directories by level
@@ -2042,20 +2034,20 @@ int CZipPack::CleanUpSource()
         next = AddFiles[i];
         if (!next->IsDir || next->Action == AF_NOADD)
             continue;
-        errorID = InsertDir(next->Name, table);
+        errorID = InsertDir(next->LocalPath, table);
         if (errorID)
             return errorID;
     }
     if (!errorID)
     {
-        l = table.Count;
-        while (l)
+        size_t level = table.size();
+        while (level)
         {
-            l--;
-            for (i = 0; i < table[l]->Count; i++)
+            --level;
+            for (const std::wstring& directory : table[level])
             {
-                SalamanderGeneral->ClearReadOnlyAttr((*table[l])[i]);
-                if (!RemoveDirectory((*table[l])[i]))
+                SalamanderGeneral->ClearReadOnlyAttr(directory.c_str());
+                if (!RemoveDirectoryW(directory.c_str()))
                     TRACE_I("error on RemoveDirectory " << GetLastError());
             }
         }
@@ -2071,7 +2063,7 @@ int CZipPack::LoadExPackOptions(unsigned flags)
   if (Config.ShowExOptions)
   {
     CPackDialog dlg(SalamanderGeneral->GetMainWindowHWND(), this, &Config, &Options,
-                    ZipName, flags);
+                    ZipName.c_str(), flags);
     if (dlg.Proceed() == IDOK) ::Config = Config;
     else return ErrorID = IDS_NODISPLAY;
   }
@@ -2133,24 +2125,29 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
 {
     CALL_STACK_MESSAGE2("CZipPack::CreateNextFile(%d)", firstSfxDisk);
 
-    char buf[128];
     bool overwrite = false;
     int error = 0;
     CQuadWord freesp;
     int lastErr;
-    const char* text;
+    // textStorageW owns whatever 'text' points at. Every assignment below used
+    // LangStr(...).c_str() directly, and LangStr returns by value - so 'text'
+    // dangled from the end of its own assignment statement until
+    // LowDiskSpaceDialog read it, roughly forty lines later.
+    std::wstring textStorageW;
+    const wchar_t* text;
     int flags;
     bool retry;
-    CPathBuffer pathBuf;
-    char* zipPath;
-    char* dummy;
+    const size_t zipSlash = ZipName.find_last_of(L'\\');
+    const std::wstring zipPath = zipSlash != std::wstring::npos
+                                    ? ZipName.substr(0, zipSlash)
+                                    : std::wstring();
     bool testSpace = true;
 
-    MakeFileName(DiskNum + 1, Options.SeqNames, ZipName, TempName,
-                 Config.WinZipNames && !(Options.Action & PA_SELFEXTRACT));
+    TempName = MakeZipVolumeFileName(DiskNum + 1, Options.SeqNames, ZipName.c_str(),
+                                     Config.WinZipNames && !(Options.Action & PA_SELFEXTRACT));
     if (SeccondPass)
     {
-        switch (CreateCFile(&TempFile, TempName, GENERIC_WRITE, FILE_SHARE_READ,
+        switch (CreateCFile(&TempFile, TempName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                             false, false))
         {
@@ -2162,30 +2159,35 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
             return IDS_NODISPLAY;
         }
     }
-    if ((TempFile = (CFile*)malloc(sizeof(CFile))) == NULL ||
-        (TempFile->FileName = (char*)malloc(lstrlen(TempName) + 1)) == NULL ||
-        (TempFile->OutputBuffer = (char*)malloc(OUTPUT_BUFFER_SIZE)) == NULL)
+    TempFile = NULL;
+    try
     {
-        if (TempFile)
-        {
-            if (TempFile->FileName)
-                free(TempFile->FileName);
-            if (TempFile->OutputBuffer)
-                free(TempFile->OutputBuffer);
-            free(TempFile);
-            TempFile = NULL;
-        }
+        TempFile = new CFile;
+        TempFile->FileName = TempName;
+    }
+    catch (...)
+    {
+        delete TempFile;
+        TempFile = NULL;
         return IDS_LOWMEM;
     }
-    TempFile->InputBuffer = NULL;
-    zipPath = pathBuf;
-    SplitPath(&zipPath, &dummy, ZipName);
+    TempFile->OutputBuffer = (char*)malloc(OUTPUT_BUFFER_SIZE);
+    if (TempFile->OutputBuffer == NULL)
+    {
+        delete TempFile;
+        TempFile = NULL;
+        return IDS_LOWMEM;
+    }
     do
     {
         retry = false;
-        if (!SalamanderGeneral->CheckAndCreateDirectory(zipPath, NULL, TRUE, buf, 128))
+        std::wstring directoryError;
+        if (!SPLCheckAndCreateDirectoryOwned(
+                SalamanderGeneral, zipPath.c_str(),
+                NULL, TRUE, &directoryError))
         {
-            switch (ProcessError(IDS_ERRCREATEDIR, 0, zipPath, PE_NOSKIP, NULL, buf))
+            switch (ProcessError(IDS_ERRCREATEDIR, 0, zipPath.c_str(),
+                                 PE_NOSKIP, NULL, directoryError.c_str()))
             {
             case ERR_RETRY:
                 retry = true;
@@ -2196,10 +2198,10 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
         }
         else
         {
-            SalamanderGeneral->GetDiskFreeSpace(&freesp, zipPath, NULL);
+            SalamanderGeneral->GetDiskFreeSpace(&freesp, zipPath.c_str(), NULL);
             if (freesp == CQuadWord(-1, -1))
             {
-                switch (ProcessError(IDS_ERRGETDISKFREESP, 0, zipPath, PE_NOSKIP, NULL))
+                switch (ProcessError(IDS_ERRGETDISKFREESP, 0, zipPath.c_str(), PE_NOSKIP, NULL))
                 {
                 case ERR_RETRY:
                     retry = true;
@@ -2214,7 +2216,8 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                 text = NULL;
                 if (freesp < CQuadWord(MIN_VOLSIZE, 0))
                 {
-                    text = LoadStr(IDS_TOOLOWSPACE);
+                    textStorageW = LangStr(IDS_TOOLOWSPACE);
+                    text = textStorageW.c_str();
                     flags |= LSD_NOIGNORE;
                 }
                 else
@@ -2227,7 +2230,8 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                             DiskSize = 0xFFFFFFFF;
                         if (freesp < CQuadWord(SMALL_VOLSIZE, 0) && !firstSfxDisk && testSpace)
                         {
-                            text = LoadStr(IDS_LOWSPACE2);
+                            textStorageW = LangStr(IDS_LOWSPACE2);
+                            text = textStorageW.c_str();
                         }
                     }
                     else
@@ -2245,14 +2249,16 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                         }
                         if ((freesp.Value < DiskSize) && testSpace)
                         {
-                            text = LoadStr(IDS_LOWSPACE);
+                            textStorageW = LangStr(IDS_LOWSPACE);
+                            text = textStorageW.c_str();
                         }
                     }
                 }
                 testSpace = true;
                 if (((flags & LSD_NOIGNORE) || !IgnoreAllFreeSp) && text)
                 {
-                    switch (LowDiskSpaceDialog(SalamanderGeneral->GetMsgBoxParent(), text, zipPath, freesp.Value,
+                    switch (LowDiskSpaceDialog(SalamanderGeneral->GetMsgBoxParent(), text,
+                                               zipPath.c_str(), freesp.Value,
                                                Options.VolumeSize, flags))
                     {
                     case IDC_ALL:
@@ -2272,12 +2278,11 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                 {
                     if (OverwriteAll)
                         overwrite = true;
-                    TempFile->File = CreateFile(TempName, GENERIC_WRITE, /*FILE_SHARE_READ*/ NULL, NULL,
+                    TempFile->File = CreateFileW(TempName.c_str(), GENERIC_WRITE, /*FILE_SHARE_READ*/ 0, NULL,
                                                 overwrite ? CREATE_ALWAYS : CREATE_NEW,
                                                 FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     if (TempFile->File != INVALID_HANDLE_VALUE)
                     {
-                        lstrcpy(TempFile->FileName, TempName);
                         TempFile->FilePointer = 0;
                         TempFile->Flags = PE_NOSKIP;
                         TempFile->RealFilePointer = 0;
@@ -2291,18 +2296,17 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                         CFile* file;
                         int ret;
 
-                        ret = CreateCFile(&file, TempName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0, PE_NOSKIP, &SkipAllIOErrors,
+                        ret = CreateCFile(&file, TempName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0, PE_NOSKIP, &SkipAllIOErrors,
                                           false, false);
                         switch (ret)
                         {
                         case ERR_NOERROR:
                         {
-                            char attr[101];
                             FILETIME ft;
 
                             GetFileTime(file->File, NULL, NULL, &ft);
-                            GetInfo(attr, &ft, file->Size);
-                            switch (OverwriteDialog(SalamanderGeneral->GetMsgBoxParent(), TempName, attr))
+                            const std::wstring attr = GetInfo(&ft, file->Size);
+                            switch (OverwriteDialog(SalamanderGeneral->GetMsgBoxParent(), TempName.c_str(), attr.c_str()))
                             {
                             case IDC_ALL:
                                 OverwriteAll = true;
@@ -2328,7 +2332,7 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                     }
                     else
                     {
-                        switch (ProcessError(IDS_ERRCREATE, lastErr, zipPath, PE_NOSKIP, NULL))
+                        switch (ProcessError(IDS_ERRCREATE, lastErr, zipPath.c_str(), PE_NOSKIP, NULL))
                         {
                         case ERR_RETRY:
                             retry = true;
@@ -2341,9 +2345,8 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
             }
         }
     } while (retry);
-    free(TempFile->FileName);
     free(TempFile->OutputBuffer);
-    free(TempFile);
+    delete TempFile;
     TempFile = NULL;
     return error;
 }
@@ -2369,7 +2372,7 @@ int CZipPack::MatchAll()
 int CZipPack::NextDisk()
 {
     CALL_STACK_MESSAGE1("CZipPack::NextDisk()");
-    char buf[256];
+    wchar_t buf[256];
     INT_PTR i;
 
     if (TempFile)
@@ -2386,9 +2389,9 @@ int CZipPack::NextDisk()
     if (Removable)
     {
         if (SeccondPass)
-            sprintf(buf, LoadStr(IDS_CHDISKTEXT3), DiskNum + 1);
+            swprintf_s(buf, LangStr(IDS_CHDISKTEXT3).c_str(), DiskNum + 1);
         else
-            sprintf(buf, LoadStr(IDS_CHDISKTEXT), DiskNum, DiskNum + 1);
+            swprintf_s(buf, LangStr(IDS_CHDISKTEXT).c_str(), DiskNum, DiskNum + 1);
         i = ChangeDiskDialog(SalamanderGeneral->GetMsgBoxParent(), buf);
     }
     else
@@ -2409,9 +2412,9 @@ int CZipPack::NextDisk()
     return 0;
 }
 
-int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BOOL preview, int progressMode)
+int CZipPack::WriteSfxExecutable(const wchar_t* sfxFile, const char* sfxPackage, BOOL preview, int progressMode)
 {
-    CALL_STACK_MESSAGE5("CZipPack::WriteSfxExecutable(%s, %s, %d, %d)", sfxFile,
+    CALL_STACK_MESSAGE5("CZipPack::WriteSfxExecutable(%ls, %s, %d, %d)", sfxFile,
                         sfxPackage, preview, progressMode);
     CFile* sfx;
     char* buffer;
@@ -2421,12 +2424,14 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     CSfxFileHeader sfxHead;
 
     //copy exetutable
-    CPathBuffer package; // Heap-allocated for long path support
-    GetModuleFileName(DLLInstance, package, package.Size());
-    SalamanderGeneral->CutDirectory(package);
-    SalamanderGeneral->SalPathAppend(package, "sfx", package.Size());
-    SalamanderGeneral->SalPathAppend(package, sfxPackage, package.Size());
-    ret = CreateCFile(&sfx, package, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+    std::wstring packageW;
+    if (!SPLGetModuleFileNameOwned(DLLInstance, packageW))
+        return ErrorID = IDS_NODISPLAY;
+    SPLCutDirectoryOwned(SalamanderGeneral, packageW);
+    SPLSalPathAppendOwned(packageW, L"sfx");
+    const std::wstring sfxPackageW = ZipTextToWide(sfxPackage);
+    SPLSalPathAppendOwned(packageW, sfxPackageW.c_str());
+    ret = CreateCFile(&sfx, packageW.c_str(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
                       FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, PE_NOSKIP, NULL,
                       false, false);
     if (ret)
@@ -2469,7 +2474,7 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     if (!preview && !(Options.Action & PA_MULTIVOL))
     {
         ProgressTotalSize += CQuadWord(size, 0);
-        Salamander->ProgressDialogAddText(LoadStr(IDS_WRITINGEXE), FALSE);
+        Salamander->ProgressDialogAddText(LoadStrW(IDS_WRITINGEXE).c_str(), FALSE);
         if (progressMode == 1)
         {
             Salamander->ProgressSetTotalSize(ProgressTotalSize, CQuadWord(-1, -1));
@@ -2528,7 +2533,7 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
                         if (!Salamander->ProgressAddSize(size, TRUE))
                         {
                             UserBreak = true;
-                            Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING), FALSE);
+                            Salamander->ProgressDialogAddText(LoadStrW(IDS_CANCELING).c_str(), FALSE);
                             Salamander->ProgressEnableCancel(FALSE);
                         }
                     }
@@ -2581,11 +2586,11 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     //compute data offset
     ArchiveHeaderOffs = (unsigned)TempFile->Size;
     ArchiveDataOffs = ArchiveHeaderOffs + sizeof(CSelfExtrHeader);
-    int l = lstrlen(Options.SfxSettings.Command);
+    int l = lstrlenA(Options.SfxSettings.Command);
     ArchiveDataOffs += l ? ++l : 0;
-    l = lstrlen(Options.SfxSettings.Text);
+    l = lstrlenA(Options.SfxSettings.Text);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.Title);
+    l = lstrlenA(Options.SfxSettings.Title);
     ArchiveDataOffs += ++l;
 
     unsigned td;
@@ -2594,18 +2599,18 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     const char* sdr;
     // we do not recheck the return value; it was already verified earlier
     ParseTargetDir(Options.SfxSettings.TargetDir, &td, &sd, &sdl, &sdr, NULL);
-    l = lstrlen(sd);
+    l = lstrlenA(sd);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.About);
+    l = lstrlenA(Options.About);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.ExtractBtnText);
+    l = lstrlenA(Options.SfxSettings.ExtractBtnText);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.Vendor);
+    l = lstrlenA(Options.SfxSettings.Vendor);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.WWW);
+    l = lstrlenA(Options.SfxSettings.WWW);
     ArchiveDataOffs += ++l;
 
-    ArchiveDataOffs++; // we assume ArchiveName is ""; if it differs, lstrlen(ArchiveName) is added later
+    ArchiveDataOffs++; // we assume ArchiveName is ""; if it differs, lstrlenA(ArchiveName) is added later
 
     ArchiveDataOffs += (sdr - sdl) + 1;
     if (td == SE_REGVALUE)
@@ -2615,51 +2620,17 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
         if (!bs)
             ArchiveDataOffs += 1; // add a character to separate the subkey and value
     }
-    l = lstrlen(Options.SfxSettings.MBoxTitle);
+    l = lstrlenA(Options.SfxSettings.MBoxTitle);
     ArchiveDataOffs += ++l;
     if (!Options.SfxSettings.MBoxText.empty())
     {
-        l = lstrlen(Options.SfxSettings.MBoxText.c_str());
+        l = lstrlenA(Options.SfxSettings.MBoxText.c_str());
         ArchiveDataOffs += ++l;
     }
     else
         ArchiveDataOffs++;
-    l = lstrlen(Options.SfxSettings.WaitFor);
+    l = lstrlenA(Options.SfxSettings.WaitFor);
     ArchiveDataOffs += Options.SfxSettings.Flags & SE_REMOVEAFTER ? ++l : 1;
-    /*
-  if (Options.Action & PA_MULTIVOL)
-  {
-    CSelfExtrHeader header;
-    char archname[MAX_PATH];
-
-    MakeFileName(1, Options.SeqNames, PathFindFileName(ZipName), archname);
-    header.ArchiveNameLen = lstrlen(archname) + 1;
-    ArchiveDataOffs += header.ArchiveNameLen;
-    header.Signature = SELFEXTR_SIG;
-    header.HeaderSize = ArchiveDataOffs - ArchiveHeaderOffs;
-    header.Flags = Options.SfxSettings.Flags | SE_MULTVOL | (Options.SeqNames ? SE_SEQNAMES : 0);
-    header.EOCentrDirOffs = 0;
-    header.ArchiveSize = 0;
-    header.CommandLen = lstrlen(Options.SfxSettings.Command);
-    if (header.CommandLen) header.CommandLen++;
-    header.TextLen = lstrlen(Options.SfxSettings.Text) + 1;
-    //if (header.TextLen) header.QuestionLen++;
-    header.TitleLen = lstrlen(Options.SfxSettings.Title) + 1;
-    header.SubDirLen = lstrlen(Options.SfxSettings.SubDir) + 1;
-    header.AboutLen = lstrlen(Options.About) + 1;
-    header.ExtractBtnTextLen = lstrlen(Options.SfxSettings.ExtractBtnText) + 1;
-    TempFile->FilePointer = ArchiveHeaderOffs;
-    if (Write(TempFile, &header, sizeof(CSelfExtrHeader), NULL)) return IDS_NODISPLAY;
-    if (header.CommandLen &&
-        Write(TempFile, Options.SfxSettings.Command, header.CommandLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, Options.SfxSettings.Text, header.TextLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, Options.SfxSettings.Title, header.TitleLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, Options.SfxSettings.SubDir, header.SubDirLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, Options.About, header.AboutLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, Options.SfxSettings.ExtractBtnText, header.ExtractBtnTextLen, NULL)) return IDS_NODISPLAY;
-    if (Write(TempFile, archname, header.ArchiveNameLen, NULL)) return IDS_NODISPLAY;
-    if (Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL)) return IDS_NODISPLAY;
-  }*/
     return ErrorID;
 }
 
@@ -2671,7 +2642,7 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     CSelfExtrHeader header;
     int offs = sizeof(CSelfExtrHeader);
 
-    int l = lstrlen(Options.SfxSettings.Command);
+    int l = lstrlenA(Options.SfxSettings.Command);
     if (l)
     {
         header.CommandOffs = offs;
@@ -2680,10 +2651,10 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     else
         header.CommandOffs = 0;
     header.TextOffs = offs;
-    l = lstrlen(Options.SfxSettings.Text);
+    l = lstrlenA(Options.SfxSettings.Text);
     offs += ++l;
     header.TitleOffs = offs;
-    l = lstrlen(Options.SfxSettings.Title);
+    l = lstrlenA(Options.SfxSettings.Title);
     offs += ++l;
     header.SubDirOffs = offs;
 
@@ -2694,22 +2665,22 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     HKEY key;
     // we do not recheck the return value; it was already verified earlier
     ParseTargetDir(Options.SfxSettings.TargetDir, &td, &sd, &sdl, &sdr, &key);
-    l = lstrlen(sd);
+    l = lstrlenA(sd);
     offs += ++l;
     header.AboutOffs = offs;
-    l = lstrlen(Options.About);
+    l = lstrlenA(Options.About);
     offs += ++l;
     header.ExtractBtnTextOffs = offs;
-    l = lstrlen(Options.SfxSettings.ExtractBtnText);
+    l = lstrlenA(Options.SfxSettings.ExtractBtnText);
     offs += ++l;
     header.VendorOffs = offs;
-    l = lstrlen(Options.SfxSettings.Vendor);
+    l = lstrlenA(Options.SfxSettings.Vendor);
     offs += ++l;
     header.WWWOffs = offs;
-    l = lstrlen(Options.SfxSettings.WWW);
+    l = lstrlenA(Options.SfxSettings.WWW);
     offs += ++l;
     header.ArchiveNameOffs = offs;
-    l = lstrlen(archName);
+    l = lstrlenA(archName);
     ArchiveDataOffs += l; // we did not count this earlier
     offs += ++l;
     header.TargetDirSpecOffs = offs;
@@ -2721,23 +2692,23 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
         if (!bs)
             offs += 1; // add a character to separate the subkey and value
     }
-    header.MBoxStyle = (lstrlen(Options.SfxSettings.MBoxTitle) ||
-                        !Options.SfxSettings.MBoxText.empty() && lstrlen(Options.SfxSettings.MBoxText.c_str()))
+    header.MBoxStyle = (lstrlenA(Options.SfxSettings.MBoxTitle) ||
+                        !Options.SfxSettings.MBoxText.empty() && lstrlenA(Options.SfxSettings.MBoxText.c_str()))
                            ? Options.SfxSettings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
-    l = lstrlen(Options.SfxSettings.MBoxTitle);
+    l = lstrlenA(Options.SfxSettings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
     if (!Options.SfxSettings.MBoxText.empty())
     {
-        l = lstrlen(Options.SfxSettings.MBoxText.c_str());
+        l = lstrlenA(Options.SfxSettings.MBoxText.c_str());
         offs += ++l;
     }
     else
         offs++;
     header.WaitForOffs = offs;
-    l = lstrlen(Options.SfxSettings.WaitFor);
+    l = lstrlenA(Options.SfxSettings.WaitFor);
     offs += Options.SfxSettings.Flags & SE_REMOVEAFTER ? ++l : 1;
 
     header.Signature = SELFEXTR_SIG;
@@ -2753,25 +2724,25 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     TempFile->FilePointer = ArchiveHeaderOffs;
     if (Write(TempFile, &header, sizeof(CSelfExtrHeader), NULL))
         return FALSE;
-    l = lstrlen(Options.SfxSettings.Command);
+    l = lstrlenA(Options.SfxSettings.Command);
     if (l &&
         Write(TempFile, Options.SfxSettings.Command, ++l, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Text, lstrlen(Options.SfxSettings.Text) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Text, lstrlenA(Options.SfxSettings.Text) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Title, lstrlen(Options.SfxSettings.Title) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Title, lstrlenA(Options.SfxSettings.Title) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, (void*)sd, lstrlen(sd) + 1, NULL))
+    if (Write(TempFile, (void*)sd, lstrlenA(sd) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.About, lstrlen(Options.About) + 1, NULL))
+    if (Write(TempFile, Options.About, lstrlenA(Options.About) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.ExtractBtnText, lstrlen(Options.SfxSettings.ExtractBtnText) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.ExtractBtnText, lstrlenA(Options.SfxSettings.ExtractBtnText) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Vendor, lstrlen(Options.SfxSettings.Vendor) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Vendor, lstrlenA(Options.SfxSettings.Vendor) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.WWW, lstrlen(Options.SfxSettings.WWW) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.WWW, lstrlenA(Options.SfxSettings.WWW) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, archName, lstrlen(archName) + 1, NULL))
+    if (Write(TempFile, archName, lstrlenA(archName) + 1, NULL))
         return FALSE;
     if (td == SE_REGVALUE)
     {
@@ -2812,76 +2783,16 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
         if (Write(TempFile, "", 1, NULL))
             return FALSE;
     }
-    if (Write(TempFile, Options.SfxSettings.MBoxTitle, lstrlen(Options.SfxSettings.MBoxTitle) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.MBoxTitle, lstrlenA(Options.SfxSettings.MBoxTitle) + 1, NULL))
         return FALSE;
     const char* str = Options.SfxSettings.MBoxText.c_str();
-    if (Write(TempFile, str, lstrlen(str) + 1, NULL))
+    if (Write(TempFile, str, lstrlenA(str) + 1, NULL))
         return FALSE;
     str = Options.SfxSettings.Flags & SE_REMOVEAFTER ? Options.SfxSettings.WaitFor : "";
-    if (Write(TempFile, str, lstrlen(str) + 1, NULL))
+    if (Write(TempFile, str, lstrlenA(str) + 1, NULL))
         return FALSE;
     return TRUE;
 }
-
-/*
-BOOL CZipPack::LoadDefaults()
-{
-  Options = DefOptions;
-
-  // Config->DefSfxFile is "" when we do not find any *.sfx, so we cannot package SFX
-  if (Config.DefSfxFile)
-  {
-    char file[MAX_PATH];
-    GetModuleFileName(DLLInstance, file, MAX_PATH);
-    PathRemoveFileSpec(file);
-    PathAppend(file, "sfx");
-    PathAppend(file, Config.DefSfxFile);
-    if (DefLanguage && lstrcmp(DefLanguage->FileName, file))
-    {
-      delete DefLanguage;
-      DefLanguage = NULL;
-    }
-    lstrcpy(Options.SfxSettings.SfxFile, file);
-    if (!DefLanguage && LoadSfxFileData(file, &DefLanguage))
-    {
-      char err[512];
-      sprintf(err, LoadStr(IDS_UNABLEREADSFX2), file);
-      SalamanderGeneral->ShowMessageBox(err, LoadStr(IDS_ERROR), MSGBOX_ERROR);
-      lstrcpy(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT));
-      lstrcpy(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
-      lstrcpy(Options.About, "Version 1.0 beta, Personal Edition\r\n\r\n"
-                                  "Coded by Lukas Cerman\r\n"
-                                  "Issues: https://github.com/0xeb/sally/issues\r\n\r\n"
-                                  "ATTENTION: This selfextractor edition is licenced only for "
-                                  "personal use and may not be used in business or for programs "
-                                  "distribution.");
-      lstrcpy(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
-    }
-    else
-    {
-      lstrcpy(Options.SfxSettings.Text, DefLanguage->DlgText);
-      lstrcpy(Options.SfxSettings.Title, DefLanguage->DlgTitle);
-      lstrcpy(Options.About, DefLanguage->AboutFree);
-      lstrcpy(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
-    }
-    lstrcpy(Options.SfxSettings.SubDir, "");
-
-    GetModuleFileName(DLLInstance, Options.SfxSettings.IconFile, MAX_PATH);
-    Options.SfxSettings.IconIndex = -IDI_SFXICON;
-    int ret = LoadIcons(Options.SfxSettings.IconFile, Options.SfxSettings.IconIndex,
-                                    &Options.Icons, &Options.IconsCount);
-    if (ret)
-    {
-      char buffer[1024];
-      SalamanderGeneral->ShowMessageBox(FormatMessage(buffer, ret, GetLastError()),
-                                        LoadStr(IDS_ERROR), MSGBOX_ERROR);
-      return FALSE;
-    }
-  }
-
-  return TRUE;
-}
-*/
 
 int CZipPack::CheckArchiveForSFXCompatibility()
 {
@@ -2938,7 +2849,7 @@ int CZipPack::SaveComment()
     // open it for writing
     CloseCFile(ZipFile);
     ZipFile = NULL;
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           true, false);
     if (ret)
@@ -3007,8 +2918,8 @@ int CZipPack::WriteSFXECRec(QWORD offset)
     CALL_STACK_MESSAGE2("CZipPack::WriteSFXECRec(0x%I64X)", offset);
     if (Removable && DiskNum != 0)
     {
-        char buf[256];
-        sprintf(buf, LoadStr(IDS_CHDISKTEXT3), 1);
+        wchar_t buf[256];
+        swprintf_s(buf, LangStr(IDS_CHDISKTEXT3).c_str(), 1);
         if (ChangeDiskDialog(SalamanderGeneral->GetMsgBoxParent(), buf) != IDOK)
         {
             return IDS_NODISPLAY;
@@ -3016,16 +2927,10 @@ int CZipPack::WriteSFXECRec(QWORD offset)
     }
     DiskNum = 0;
 
-    CPathBuffer name; // Heap-allocated for long path support
-    lstrcpy(name, ZipName);
-    if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", name.Size()))
-    {
-        Salamander->CloseProgressDialog();
-        return IDS_TOOLONGZIPNAME;
-    }
+    const std::wstring name = ReplaceZipPathExtension(ZipName, L".exe");
 
     CFile* file;
-    int ret = CreateCFile(&file, name, GENERIC_WRITE, FILE_SHARE_READ,
+    int ret = CreateCFile(&file, name.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           false, false);
     if (ret)
@@ -3052,8 +2957,8 @@ int CZipPack::WriteSFXCentralDir()
     CALL_STACK_MESSAGE1("CZipPack::WriteSFXCentralDir()");
     if (Removable && DiskNum != EONewCentrDir.StartDisk)
     {
-        char buf[256];
-        sprintf(buf, LoadStr(IDS_CHDISKTEXT3), EONewCentrDir.StartDisk + 1);
+        wchar_t buf[256];
+        swprintf_s(buf, LangStr(IDS_CHDISKTEXT3).c_str(), EONewCentrDir.StartDisk + 1);
         if (ChangeDiskDialog(SalamanderGeneral->GetMsgBoxParent(), buf) != IDOK)
         {
             return IDS_NODISPLAY;

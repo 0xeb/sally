@@ -8,6 +8,7 @@
 #include "uniso.h"
 #include "isoimage.h"
 #include "xdvdfs.h"
+#include "uniso_text.h"
 
 #include "uniso.rh"
 #include "uniso.rh2"
@@ -79,7 +80,7 @@ BOOL CXDVDFS::Open(BOOL quiet)
     return ret;
 }
 
-BOOL CXDVDFS::AddFileDir(const char* path, char* fileName, CDirectoryEntry* de,
+BOOL CXDVDFS::AddFileDir(const wchar_t* path, const wchar_t* fileName, CDirectoryEntry* de,
                          CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     CFileData fd;
@@ -95,8 +96,8 @@ BOOL CXDVDFS::AddFileDir(const char* path, char* fileName, CDirectoryEntry* de,
             throw FALSE;
         } // if
 
-        fd.NameLen = strlen(fd.Name);
-        char* s = strrchr(fd.Name, '.');
+        fd.NameLen = (int)wcslen(fd.Name);
+        wchar_t* s = wcsrchr(fd.Name, L'.');
         if (s != NULL)
             fd.Ext = s + 1; // ".cvspass" is extension in Windows
         else
@@ -170,15 +171,15 @@ BOOL CXDVDFS::AddFileDir(const char* path, char* fileName, CDirectoryEntry* de,
     return ret;
 }
 
-BOOL CXDVDFS::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir,
+BOOL CXDVDFS::ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir,
                             CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE3("CXDVDFS::ListDirectory(%s, %d, , )", path, session);
+    CALL_STACK_MESSAGE3("CXDVDFS::ListDirectory(%ls, %d, , )", path.c_str(), session);
 
     return ScanDir(VD.RootSector, VD.RootDirectorySize, path, dir, pluginData) != ERR_TERMINATE;
 }
 
-int CXDVDFS::ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
+int CXDVDFS::ScanDir(DWORD sector, DWORD size, const std::wstring& path, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
 {
     BYTE* data = new BYTE[size];
     if (data == NULL)
@@ -224,10 +225,18 @@ int CXDVDFS::ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryA
 
         // get filename
         BYTE len = GET_BYTE(data, offset + 0x000D);
-        CPathBuffer fileName;
-        strncpy_s(fileName.Get(), fileName.Size(), (char*)data + offset + 0x000E, len);
+        if (offset + 0x000E + len > size)
+            break;
+        const std::string fileName((char*)data + offset + 0x000E, len);
+        std::wstring fileNameW;
+        if (!DecodeUnisoLegacyText(fileName, fileNameW))
+        { // the decode degrades rather than refuses, so the only way here is a failed allocation
+            delete[] data;
+            Error(IDS_INSUFFICIENT_MEMORY);
+            return ERR_TERMINATE;
+        }
 
-        if (!AddFileDir(path, fileName, &de, dir, pluginData))
+        if (!AddFileDir(path.c_str(), fileNameW.c_str(), &de, dir, pluginData))
         {
             delete[] data;
             return ERR_CONTINUE;
@@ -235,19 +244,17 @@ int CXDVDFS::ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryA
 
         if ((de.Attr & XBOX_DIRECTORY) && de.FileSize != 0 && de.StartSector != 0)
         {
-            int pathLen = (int)strlen(path);
-            strcat(path, "\\");
-            strcat(path, fileName);
+            std::wstring childPath(path);
+            SPLSalPathAppendOwned(childPath, fileNameW.c_str());
 
             // descend only when everything is OK
             if (ret == ERR_OK)
             {
-                ret = ScanDir(de.StartSector, de.FileSize, path, dir, pluginData);
+                ret = ScanDir(de.StartSector, de.FileSize, childPath, dir, pluginData);
                 // if we surface with a termination error, keep processing as much as possible
                 if (ret == ERR_TERMINATE)
                     ret = ERR_CONTINUE;
             }
-            path[pathLen] = '\0';
         }
 
         offset += 0x000E + len;
@@ -260,10 +267,10 @@ int CXDVDFS::ScanDir(DWORD sector, DWORD size, char* path, CSalamanderDirectoryA
     return ret;
 }
 
-int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* path,
-                        const char* nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
+int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& path,
+                        const std::wstring& nameInArc, const CFileData* fileData, DWORD& silent, BOOL& toSkip)
 {
-    CALL_STACK_MESSAGE7("CXDVDFS::UnpackFile(, %s, %s, %s, %p, %u, %d)", srcPath, path, nameInArc, fileData, silent, toSkip);
+    CALL_STACK_MESSAGE6("CXDVDFS::UnpackFile(, %ls, %ls, %p, %u, %d)", path.c_str(), nameInArc.c_str(), fileData, silent, toSkip);
 
     if (fileData == NULL)
         return UNPACK_ERROR;
@@ -282,22 +289,16 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
             throw UNPACK_ERROR;
         }
 
-        CPathBuffer name; // Heap-allocated for long path support
-        lstrcpyn(name, path, name.Size());
-        if (!SalamanderGeneral->SalPathAppend(name, fileData->Name, name.Size()))
-        {
-            Error(IDS_ERR_TOO_LONG_NAME);
-            throw UNPACK_ERROR;
-        }
+        std::wstring name(path);
+        SPLSalPathAppendOwned(name, fileData->Name);
 
-        char fileInfo[100];
         FILETIME ft = fileData->LastWrite;
-        GetInfo(fileInfo, &ft, fileData->Size);
+        const std::wstring fileInfo = GetInfo(&ft, fileData->Size);
 
         DWORD attrs = fileData->Attr;
 
-        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name, GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
-                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc, fileInfo,
+        HANDLE hFile = SalamanderSafeFile->SafeFileCreate(name.c_str(), GENERIC_WRITE, FILE_SHARE_READ, attrs, FALSE,
+                                                          SalamanderGeneral->GetMainWindowHWND(), nameInArc.c_str(), fileInfo.c_str(),
                                                           &silent, TRUE, &toSkip, NULL, 0, NULL, NULL);
 
         CBufferedFile file(hFile, GENERIC_WRITE);
@@ -335,10 +336,9 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
             {
                 if (silent == 0)
                 {
-                    char error[1024];
-                    sprintf(error, LoadStr(IDS_ERROR_READING_SECTOR), block);
+                    const std::wstring error = SPLFormatStringOwned(LangStr(IDS_ERROR_READING_SECTOR).c_str(), block);
                     int userAction = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_SKIPCANCEL,
-                                                                    fileData->Name, error, LoadStr(IDS_READERROR));
+                                                                    fileData->Name, error.c_str(), LangStr(IDS_READERROR).c_str());
 
                     switch (userAction)
                     {
@@ -361,7 +361,7 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
 
             if (!salamander->ProgressAddSize(nbytes, TRUE)) // delayedPaint==TRUE, so we do not slow things down
             {
-                salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+                salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
                 salamander->ProgressEnableCancel(FALSE);
 
                 ret = UNPACK_CANCEL;
@@ -370,7 +370,7 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
             }
 
             ULONG written;
-            if (!file.Write(sector, nbytes, &written, name, NULL))
+            if (!file.Write(sector, nbytes, &written, name.c_str(), NULL))
             {
                 // Error message was already displayed by SafeWriteFile()
                 ret = UNPACK_CANCEL;
@@ -386,7 +386,7 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
         //    sprintf(u, "CISOImage::UnpackFile(): ret: %d, bFileComplete: %d", ret, bFileComplete);
         //    TRACE_I(u);
 
-        if (!file.Close(name, NULL))
+        if (!file.Close(name.c_str(), NULL))
         {
             // Flushing cache may fail
             ret = UNPACK_CANCEL;
@@ -398,16 +398,16 @@ int CXDVDFS::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char
             // because it was created with the read-only attribute, we must clear
             // the R attribute so the file can be deleted
             attrs &= ~FILE_ATTRIBUTE_READONLY;
-            if (!SetFileAttributes(name, attrs))
-                Error(LoadStr(IDS_CANT_SET_ATTRS), GetLastError());
+            if (!SetFileAttributesW(name.c_str(), attrs))
+                Error(LangStr(IDS_CANT_SET_ATTRS).c_str(), GetLastError());
 
             // the user cancelled the operation
             // delete the incomplete file afterwards
-            if (!DeleteFile(name))
-                Error(LoadStr(IDS_CANT_DELETE_TEMP_FILE), GetLastError());
+            if (!DeleteFileW(name.c_str()))
+                Error(LangStr(IDS_CANT_DELETE_TEMP_FILE).c_str(), GetLastError());
         }
         else
-            SetFileAttrs(name, attrs);
+            SetFileAttrs(name.c_str(), attrs);
     }
     catch (int e)
     {
@@ -425,7 +425,9 @@ BOOL CXDVDFS::DumpInfo(FILE* outStream)
 
     SYSTEMTIME st;
     FileTimeToSystemTime(&VD.CreationTime, &st);
-    fprintf(outStream, "    Creation Date:                %s\n", ViewerPrintSystemTime(&st));
+    std::string formatted;
+    if (!FormatUnisoReportSystemTime(st, formatted) || fprintf(outStream, "    Creation Date:                %s\n", formatted.c_str()) < 0)
+        return FALSE;
 
     return TRUE;
 }

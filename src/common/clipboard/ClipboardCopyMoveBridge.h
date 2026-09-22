@@ -12,6 +12,6 @@ namespace sally
         struct ClipboardFileTransfer;
 
         bool CreateCopyMoveData(const ClipboardFileTransfer& transfer,
-                                CCopyMoveData** data);
+                                CCopyMoveData** data) noexcept;
     } // namespace clipboard
 } // namespace sally

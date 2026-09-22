@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -11,8 +11,10 @@
 #include "../DiskMap/GUI.MainWindow.h"
 
 //for plugin registration... not translatable?
-#define PLUGIN_NAME_EN "DiskMap" //non-translated plugin name, used before loading the language module + for debug purposes
-#define PLUGIN_FILE "DISKMAP"    //registry key
+#define DISKMAP_WIDEN_IMPL(value) L##value
+#define DISKMAP_WIDEN(value) DISKMAP_WIDEN_IMPL(value)
+#define PLUGIN_NAME_EN L"DiskMap" //non-translated plugin name, used before loading the language module + for debug purposes
+#define PLUGIN_FILE L"DISKMAP"    //registry key
 
 int SalamanderVersion;
 
@@ -25,14 +27,14 @@ BOOL Config_CloseConfirmation = TRUE;
 BOOL Config_ShowFolders = TRUE;
 BOOL Config_ShowTooltip = TRUE;
 int Config_PathFormat = 2;
-const char* CONFIG_CLOSECONFIRMATION = "Confirm ESC Close";
-const char* CONFIG_SHOWFOLDERS = "Highlight Folders";
-const char* CONFIG_SHOWTOOLTIP = "Display Tooltip";
-const char* CONFIG_PATHFORMAT = "Tooltip Path Format";
+const wchar_t* CONFIG_CLOSECONFIRMATION = L"Confirm ESC Close";
+const wchar_t* CONFIG_SHOWFOLDERS = L"Highlight Folders";
+const wchar_t* CONFIG_SHOWTOOLTIP = L"Display Tooltip";
+const wchar_t* CONFIG_PATHFORMAT = L"Tooltip Path Format";
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
-TCHAR szPluginWebsite[] = TEXT("https://github.com/0xeb/sally"); // original domain not running: http://salamander.diskmap.net
+const wchar_t szPluginWebsite[] = L"https://github.com/0xeb/sally"; // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
@@ -67,17 +69,17 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 
 class CSalamanderCallback : public CSalamanderCallbackAbstract
 {
-    CPathBuffer FocusPathBuf;
+    std::wstring FocusPathBuf;
 
 public:
-    BOOL FocusFile(TCHAR const* fileName)
+    BOOL FocusFile(wchar_t const* fileName)
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, fileName, FocusPathBuf.Size());
+            FocusPathBuf.assign(fileName != NULL ? fileName : L"");
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_FOCUS, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
-            FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
+            FocusPathBuf.clear(); // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
             return TRUE;
         }
         //TODO Error reporting
@@ -85,16 +87,16 @@ public:
     }
     BOOL DoFocusFile()
     {
-        CPathBuffer focusPath; // Heap-allocated for long path support
-        lstrcpyn(focusPath, FocusPathBuf, focusPath.Size());
-        FocusPathBuf[0] = 0;
-        if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
+        // focusPath is wide throughout now (TreeMap engine widened).
+        std::wstring focusPath = FocusPathBuf;
+        FocusPathBuf.clear();
+        if (!focusPath.empty()) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
-            LPTSTR name;
-            if (SalamanderGeneral->CutDirectory(focusPath, &name))
+            std::wstring name;
+            if (SPLCutDirectoryOwned(SalamanderGeneral, focusPath, &name))
             {
                 SalamanderGeneral->SkipOneActivateRefresh(); // the main window will not refresh when switching from the viewer
-                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath, name);
+                SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath.c_str(), name.c_str());
                 return TRUE;
             }
         }
@@ -102,26 +104,25 @@ public:
     }
     BOOL DoOpenFolder()
     {
-        CPathBuffer focusPath; // Heap-allocated for long path support
-        lstrcpyn(focusPath, FocusPathBuf, focusPath.Size());
-        FocusPathBuf[0] = 0;
-        if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
+        std::wstring focusPath = FocusPathBuf;
+        FocusPathBuf.clear();
+        if (!focusPath.empty()) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
             SalamanderGeneral->SkipOneActivateRefresh(); // the main window will not refresh when switching from the viewer
             //SalamanderGeneral->ChangePanelPath(PANEL_SOURCE, focusPath);
-            SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath, "");
+            SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, focusPath.c_str(), L"");
             return TRUE;
         }
         return FALSE;
     }
-    BOOL OpenFolder(TCHAR const* path)
+    BOOL OpenFolder(wchar_t const* path)
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, path, FocusPathBuf.Size());
+            FocusPathBuf.assign(path != NULL ? path : L"");
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_OPEN, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
-            FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
+            FocusPathBuf.clear(); // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
             return TRUE;
         }
         return FALSE;
@@ -150,15 +151,18 @@ public:
 
         BOOL checkstate = FALSE;
         MSGBOXEX_PARAMS msgpars;
+        const std::wstring caption = LangStr(IDS_PLUGIN_NAME);
+        const std::wstring text = LangStr(IDS_CLOSE_CONFIRMATION);
+        const std::wstring checkBoxText = LangStr(IDS_CLOSE_CONFIRMATION_CHECKBOX);
         memset(&msgpars, 0, sizeof(msgpars));
         msgpars.HParent = parent;
-        msgpars.Caption = LoadStr(IDS_PLUGIN_NAME);
-        msgpars.Text = LoadStr(IDS_CLOSE_CONFIRMATION);
+        msgpars.Caption = caption.c_str();
+        msgpars.Text = text.c_str();
         msgpars.Flags = MSGBOXEX_YESNO | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON1 | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT;
         msgpars.HIcon = NULL;
         msgpars.ContextHelpId = 0;
         msgpars.HelpCallback = NULL;
-        msgpars.CheckBoxText = LoadStr(IDS_CLOSE_CONFIRMATION_CHECKBOX);
+        msgpars.CheckBoxText = checkBoxText.c_str();
         msgpars.CheckBoxValue = &checkstate;
         msgpars.AliasBtnNames = NULL; //TODO: better buttons texts
         BOOL ret = (SalamanderGeneral->SalMessageBoxEx(&msgpars) == DIALOG_YES);
@@ -176,7 +180,7 @@ public:
     {
         PluginInterface.About(hWndParent);
     }
-    int GetClusterSize(TCHAR const* path)
+    int GetClusterSize(wchar_t const* path)
     {
         DWORD SectorsPerCluster = 0;
         DWORD BytesPerSector = 0;
@@ -193,47 +197,10 @@ public:
 CSalamanderCallback SalamanderCallback;
 // ****************************************************************************
 
-char* LoadStr(int resID)
+// Resource text remains owned by each call instead of sharing a fixed cyclic buffer.
+std::wstring LangStr(int resID)
 {
-    static char buffer[5000]; // buffer for many strings
-    static char* act = buffer;
-
-    //HANDLES(EnterCriticalSection(&__StrCriticalSection.cs));
-
-    if (5000 - (act - buffer) < 200)
-        act = buffer;
-
-RELOAD:
-    int size = LoadString(HLanguage, resID, act, 5000 - (int)(act - buffer));
-    // size contains the number of copied characters without the terminator
-    //  DWORD error = GetLastError();
-    char* ret;
-    if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even when the string does not exist - unusable
-    {
-        if ((5000 - (act - buffer) == size + 1) && (act > buffer))
-        {
-            // if the string was exactly at the end of the buffer, it could
-            // be a truncated string -- if we can move the window
-            // to the beginning of the buffer, load the string once again
-            act = buffer;
-            goto RELOAD;
-        }
-        else
-        {
-            ret = act;
-            act += size + 1;
-        }
-    }
-    else
-    {
-        //TRACE_E("Error in LoadStr(" << resID << ")." /*"): " << GetErrorText(error)*/);
-        static char errorBuff[] = "ERROR LOADING STRING";
-        ret = errorBuff;
-    }
-
-    //HANDLES(LeaveCriticalSection(&__StrCriticalSection.cs));
-
-    return ret;
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 int WINAPI SalamanderPluginGetReqVer()
@@ -263,19 +230,26 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is made for the current Salamander version and higher - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(), REQUIRE_LAST_VERSION_OF_SALAMANDER, PLUGIN_NAME_EN, MB_OK | MB_ICONERROR);
+        MessageBoxW(salamander->GetParentWindow(), DISKMAP_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER), PLUGIN_NAME_EN, MB_OK | MB_ICONERROR);
         return NULL;
     }
 #else  // OPENSAL_VERSION
        // this plugin is made for Salamander 4.0 and higher - perform a check
     if (SalamanderVersion < SALSDK_COMPATIBLE_WITH_VER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(), REQUIRE_COMPATIBLE_SAL_VERSION, PLUGIN_NAME_EN, MB_OK | MB_ICONERROR);
+        // wide: PLUGIN_NAME_EN is a fixed "DiskMap" narrow macro consumed at
+        // several other call sites (LoadLanguageModule, SetThreadNameInVCAndTrace, ...) -
+        // inlined the known wide literal here rather than widening the shared macro.
+        MessageBoxW(salamander->GetParentWindow(), REQUIRE_COMPATIBLE_SAL_VERSION, L"DiskMap", MB_OK | MB_ICONERROR);
         return NULL;
     }
 #endif // OPENSAL_VERSION
 
     //TODO: let the language module (.slg) load
+    // wide: PLUGIN_NAME_EN is a fixed "DiskMap" narrow macro consumed at
+    // several other call sites (SalamanderPluginEntry's own version check, DllMain-adjacent
+    // trace naming) - inlined the known wide literal here rather than widening the shared macro,
+    // matching the file's existing precedent.
     HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), PLUGIN_NAME_EN);
     if (HLanguage == NULL)
     {
@@ -289,15 +263,20 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGUI = salamander->GetSalamanderGUI();
 
     // set the name of the help file
-    SalamanderGeneral->SetHelpFileName("diskmap.chm");
+    SalamanderGeneral->SetHelpFileName(L"diskmap.chm");
 
     CWindow::SetHInstance(DLLInstance, HLanguage);
 
     if (!CMainWindow::RegisterClass())
     {
-        MessageBox(salamander->GetParentWindow(),
-                   TEXT("RegisterClassEx() failed"),
-                   LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONERROR);
+        // This used to call the SDK's LoadStr specifically to AVOID this file's
+        // own, which was a narrow LoadStringA wrapper. That reason is gone - LangStr() below is
+        // wide - but the SDK call stays: it is reached before CMainWindow::RegisterClass has
+        // succeeded, and reaching for local infrastructure on a failure path is how a diagnostic
+        // turns into a second fault.
+        MessageBoxW(salamander->GetParentWindow(),
+                    L"RegisterClassEx() failed",
+                    SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONERROR);
         return NULL;
     }
 
@@ -305,11 +284,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
     // set basic information about the plugin
     salamander->SetBasicPluginData(
-        LoadStr(IDS_PLUGIN_NAME),
+        LangStr(IDS_PLUGIN_NAME).c_str(),
         FUNCTION_LOADSAVECONFIGURATION, //no functions :-P
-        VERSINFO_VERSION_NO_PLATFORM, VERSINFO_COPYRIGHT,
-        LoadStr(IDS_PLUGIN_DESCRIPTION),
-        PLUGIN_FILE, //regKeyName
+        DISKMAP_WIDEN(VERSINFO_VERSION_NO_PLATFORM), DISKMAP_WIDEN(VERSINFO_COPYRIGHT),
+        LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+        L"DISKMAP", //regKeyName
         NULL,        //extensions
         NULL         //fsName
     );
@@ -325,14 +304,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void WINAPI CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _sntprintf(buf, 1000,
-               "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-               "%s",
-               LoadStr(IDS_PLUGIN_NAME),
-               LoadStr(IDS_PLUGIN_DESCRIPTION));
-    buf[999] = TEXT('\0');
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_PLUGIN_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%s %s\n\n%s\n\n%s", LangStr(IDS_PLUGIN_NAME).c_str(),
+        DISKMAP_WIDEN(VERSINFO_VERSION), DISKMAP_WIDEN(VERSINFO_COPYRIGHT),
+        LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(), LangStr(IDS_PLUGIN_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 void WINAPI CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
@@ -367,7 +343,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
     //('eventMask' & 'state_or') != 0 && ('eventMask' & 'state_and') == 'state_and',
     salamander->AddMenuItem(
         -1,                                              //icon
-        LoadStr(IDS_PLUGIN_MENU),                        //text
+        LangStr(IDS_PLUGIN_MENU).c_str(),                        //text
         SALHOTKEY('D', HOTKEYF_CONTROL | HOTKEYF_SHIFT), //hotkey
         MENUCMD_OPEN,                                    //id
         FALSE,                                           //callGetState
@@ -425,7 +401,7 @@ TThreadInfoItem* FirstThreadItem = &BaseThreadItem;
 struct CTVData
 {
     BOOL AlwaysOnTop;
-    const char* Name;
+    const wchar_t* Name;
     int Left, Top, Width, Height;
     UINT ShowCmd;
     TThreadInfoItem* ThreadInfo;
@@ -440,7 +416,7 @@ unsigned int WINAPI WindowThreadBody(void* param)
 {
     CALL_STACK_MESSAGE1("WindowThreadBody()");
     TraceAttachCurrentThread();
-    SetThreadNameInVCAndTrace(PLUGIN_NAME_EN);
+    SetThreadNameInVCAndTrace(L"DiskMap");
     TRACE_I("Begin");
 
     // example of an application crash
@@ -464,7 +440,10 @@ unsigned int WINAPI WindowThreadBody(void* param)
     if (window->Create(data->Left, data->Top, data->Width, data->Height, data->AlwaysOnTop) == NULL)
     {
         //TRACE_I("Notcreated");
-        MessageBoxA(NULL, "DiskMap window could not be created", PLUGIN_NAME_EN, 0);
+        // wide: same treatment as PLUGIN_NAME_EN elsewhere in this file (213) -
+        // it's consumed narrow at several other call sites, so inline the known wide literal
+        // here rather than widening the shared macro.
+        MessageBoxW(NULL, L"DiskMap window could not be created", L"DiskMap", 0);
 
         // free the window memory
         delete window;
@@ -500,13 +479,13 @@ unsigned int WINAPI WindowThreadBody(void* param)
     //TRACE_I("MsgLoop");
     // message loop
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         //if (!window->IsMenuBarMessage(&msg))
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -529,7 +508,7 @@ DWORD WINAPI WindowThreadBodyTrace(void* param)
     return SalamanderDebug->CallWithCallStack(WindowThreadBody, param);
 }
 
-BOOL OpenDiskMapWindow(HWND parent, char* name)
+BOOL OpenDiskMapWindow(HWND parent, const wchar_t* name)
 {
     TThreadInfoItem* NewThreadInfo = NULL;
     TThreadInfoItem* tmpThreadInfo = FirstThreadItem;
@@ -645,7 +624,7 @@ BOOL OpenDiskMapWindow(HWND parent, char* name)
 
 BOOL WINAPI CPluginInterface::Release(HWND parent, BOOL force)
 {
-    //SalamanderGeneral->ShowMessageBox("CPluginInterface::Release", PLUGIN_NAME_EN, MSGBOX_INFO);
+    //SalamanderGeneral->ShowMessageBox(L"CPluginInterface::Release", PLUGIN_NAME_EN, MSGBOX_INFO);
     TThreadInfoItem* curThreadInfo = FirstThreadItem;
     while (curThreadInfo != NULL)
     {
@@ -677,7 +656,7 @@ BOOL WINAPI CPluginInterface::Release(HWND parent, BOOL force)
     CMainWindow::UnloadResourceStrings();
     if (!CMainWindow::UnregisterClass())
     {
-        //SalamanderGeneral->ShowMessageBox("CPluginInterface::Release failed", PLUGIN_NAME_EN, MSGBOX_INFO);
+        //SalamanderGeneral->ShowMessageBox(L"CPluginInterface::Release failed", PLUGIN_NAME_EN, MSGBOX_INFO);
     }
     return TRUE;
 }
@@ -704,13 +683,10 @@ BOOL WINAPI CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperations
         // the current path is needed to convert relative paths to absolute ones
         int type;
         BOOL curPathIsDisk = FALSE;
-        CPathBuffer curPath; // Heap-allocated for long path support
-        curPath[0] = 0;
-        if (SalamanderGeneral->GetPanelPath(PANEL_SOURCE, curPath, curPath.Size(), &type, NULL))
+        std::wstring wideCurPath;
+        if (SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, wideCurPath, &type))
         {
-            if (type != PATH_TYPE_WINDOWS)
-                curPath[0] = 0; // we take only disk paths
-            else
+            if (type == PATH_TYPE_WINDOWS) // we take only disk paths
                 curPathIsDisk = TRUE;
         }
 
@@ -718,8 +694,8 @@ BOOL WINAPI CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperations
 
         if (curPathIsDisk) // 'path' is the path to a file/directory, perform the requested action with it
         {
-            //TRACE_I("Opening(" << curPath << ")." /*"): " << GetErrorText(error)*/);
-            OpenDiskMapWindow(parent, curPath);
+            //TRACE_I("Opening(" << wideCurPath << ")." /*"): " << GetErrorText(error)*/);
+            OpenDiskMapWindow(parent, wideCurPath.c_str());
         }
         else
         {
@@ -729,7 +705,7 @@ BOOL WINAPI CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperations
         return FALSE; // do not unselect items in the panel
     }
     default:
-        SalamanderGeneral->ShowMessageBox("Unknown command.", "DEMOPLUG", MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(L"Unknown command.", L"DISKMAP", MSGBOX_ERROR);
         break;
     }
     return FALSE;

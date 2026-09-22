@@ -5,8 +5,10 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "menu_item_text.h"
+#include "common/unicode/helpers.h"
 
-const char* WC_POPUPMENU = "PopupMenuClass";
+const wchar_t* WC_POPUPMENU = L"PopupMenuClass";
 
 CMenuWindowQueue MenuWindowQueue;
 COldMenuHookTlsAllocator OldMenuHookTlsAllocator;
@@ -182,9 +184,13 @@ BOOL InitializeMenu()
     CALL_STACK_MESSAGE1("InitializeMenu()");
 #define CS_DROPSHADOW 0x00020000
     DWORD styles = CS_OWNDC | CS_DBLCLKS | CS_SAVEBITS | CS_DROPSHADOW;
+    // Registered wide so the popup is a Unicode window: TranslateMessage then yields a
+    // wide WM_CHAR, which is what lets an item whose text the code page cannot hold be
+    // reached by typing its first letter. CMenuPopup uses winlib's wide-only window class and
+    // fires "Incompatible windows procedure" if the two disagree.
     if (!CWindow::RegisterUniversalClass(styles,
-                                         0, 0, NULL, LoadCursor(NULL, IDC_ARROW), (HBRUSH)NULL,
-                                         NULL, WC_POPUPMENU, NULL))
+                                          0, 0, NULL, LoadCursor(NULL, IDC_ARROW), (HBRUSH)NULL,
+                                          NULL, WC_POPUPMENU, NULL))
         return FALSE;
     return TRUE;
 }
@@ -233,37 +239,32 @@ CMenuItem::~CMenuItem()
         delete[] String;
 }
 
-BOOL CMenuItem::SetText(const char* text, int len)
+BOOL CMenuItem::SetText(const wchar_t* text, int len)
 {
     CALL_STACK_MESSAGE_NONE
-    if (text != NULL && len == -1)
-        len = lstrlen(text);
-
-    char* newString = NULL;
+    wchar_t* newString = NULL;
     if (text != NULL)
     {
-        newString = new char[len + 1];
+        if (len == -1)
+            len = lstrlenW(text);
+        newString = new wchar_t[len + 1];
         if (newString == NULL)
         {
             TRACE_E(LOW_MEMORY);
             return FALSE;
         }
         if (len > 0)
-            memmove(newString, text, len);
+            memmove(newString, text, len * sizeof(wchar_t));
         newString[len] = 0;
     }
 
     if (String != NULL)
-    {
         delete[] String;
-        String = NULL;
-        ColumnL1Len = 0;
-    }
-    if (newString != NULL)
-    {
-        String = newString;
-        ColumnL1Len = len;
-    }
+    String = newString;
+    ColumnL1Len = (newString != NULL) ? len : 0;
+    ColumnL1 = NULL;
+    ColumnL2 = NULL;
+    ColumnR = NULL;
     return TRUE;
 }
 
@@ -275,48 +276,16 @@ void CMenuItem::DecodeSubTextLenghtsAndWidths(CMenuSharedResources* sharedRes, B
         TRACE_E("Incorrect call to CMenuItem::DecodeText");
         return;
     }
-    char* str = String;
-    char* iterator = str;
-    char* begin = str;
-    int column = 0;
-    BOOL inifiniteLoop = TRUE;
-    ColumnL1 = NULL;
-    ColumnL2 = NULL;
-    ColumnR = NULL;
 
     // set column pointers and character counts
-    while (inifiniteLoop)
-    {
-        if (*iterator == '\t' || *iterator == 0)
-        {
-            if (column == 0)
-            {
-                ColumnL1 = begin;
-                ColumnL1Len = (int)(iterator - begin);
-                if (*iterator == 0)
-                    break;
-                begin = iterator + 1;
-            }
-            else if (column == 1 && threeCol)
-            {
-                ColumnL2 = begin;
-                ColumnL2Len = (int)(iterator - begin);
-                if (*iterator == 0)
-                    break;
-                begin = iterator + 1;
-            }
-            else
-            {
-                ColumnR = begin;
-                ColumnRLen = (int)(iterator - begin);
-                if (*iterator == 0)
-                    break;
-                begin = iterator + 1;
-            }
-            column++;
-        }
-        iterator++;
-    }
+    CMenuItemColumnsW columns;
+    SplitMenuItemColumnsW(String, threeCol, columns);
+    ColumnL1 = columns.L1;
+    ColumnL1Len = columns.L1Len;
+    ColumnL2 = columns.L2;
+    ColumnL2Len = columns.L2Len;
+    ColumnR = columns.R;
+    ColumnRLen = columns.RLen;
 
     // calculate text widths
     HFONT hOldFont;
@@ -328,21 +297,21 @@ void CMenuItem::DecodeSubTextLenghtsAndWidths(CMenuSharedResources* sharedRes, B
     if (ColumnL1 != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnL1, ColumnL1Len,
+        DrawTextW(sharedRes->HTempMemDC, ColumnL1, ColumnL1Len,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnL1Width = size.right;
     }
     if (ColumnL2 != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnL2, ColumnL2Len,
+        DrawTextW(sharedRes->HTempMemDC, ColumnL2, ColumnL2Len,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnL2Width = size.right;
     }
     if (ColumnR != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnR, ColumnRLen,
+        DrawTextW(sharedRes->HTempMemDC, ColumnR, ColumnRLen,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnRWidth = size.right;
     }

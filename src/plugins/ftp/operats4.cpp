@@ -1,8 +1,19 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static char* DupSimpleCommandError(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
 
 //
 // ****************************************************************************
@@ -10,15 +21,15 @@
 //
 
 void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
-                                           BOOL& reportWorkerChange, CPathBuffer& buf, CPathBuffer& errBuf, char* host,
+                                           BOOL& reportWorkerChange, std::string& buf, std::string& errBuf,
                                            int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
                                            int replyCode)
 {
-    CPathBuffer ftpPath;
-    CPathBuffer errText;
-    char hostBuf[HOST_MAX_SIZE];
+    std::string ftpPath;
+    std::string errText;
+    const wchar_t* hostBuf = NULL;
     unsigned short port;
-    char userBuf[USER_MAX_SIZE];
+    const wchar_t* userBuf = NULL;
     if (SubState != fwssWorkStopped)
     {
         BOOL conClosedRetryItem = FALSE;
@@ -31,10 +42,10 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
 
             if (CurItem->Type == fqitUploadCopyExploreDir || CurItem->Type == fqitUploadMoveExploreDir)
             {
-                _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_LOGMSGEXPLORINGDIR),
-                            ((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtName,
-                            ((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtPath);
-                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                if (FTPFormatString(errText, LoadStr(IDS_LOGMSGEXPLORINGDIR),
+                                    ((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtName,
+                                    ((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtPath))
+                    Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
             }
 
             if (ShouldStop)
@@ -238,7 +249,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                 case fqitChAttrsExploreDir:     // explore a directory for changing attributes (also adds an item for changing directory attributes) (CFTPQueueItemChAttrExplore object)
                 case fqitChAttrsExploreDirLink: // explore a directory link for changing attributes (CFTPQueueItem object)
                 {
-                    HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf, host,
+                    HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf,
                                                cmdLen, sendCmd, reply, replySize, replyCode, ftpPath, errText,
                                                conClosedRetryItem, lookForNewWork, handleShouldStop, NULL);
                     break;
@@ -250,13 +261,13 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                     if (UploadDirGetTgtPathListing) // list the target path into the upload listing cache
                     {
                         BOOL listingNotAccessible;
-                        HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf, host,
+                        HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf,
                                                    cmdLen, sendCmd, reply, replySize, replyCode, ftpPath, errText,
                                                    conClosedRetryItem, lookForNewWork, handleShouldStop, &listingNotAccessible);
                         if (handleShouldStop || conClosedRetryItem || lookForNewWork)
                         { // listing failed, inform any waiting workers about it
                             UploadDirGetTgtPathListing = FALSE;
-                            Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                            Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                             CFTPServerPathType pathType = Oper->GetFTPServerPathType(((CFTPQueueItemCopyMoveUploadExplore*)CurItem)->TgtPath);
                             BOOL listingOKErrorIgnored;
                             // calling UploadListingCache.ListingFailed() is possible only because we are inside CSocketsThread::CritSect
@@ -281,7 +292,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                     }
                     else // the remaining work goes here
                     {
-                        HandleEventInWorkingState4(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf, host,
+                        HandleEventInWorkingState4(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf,
                                                    cmdLen, sendCmd, reply, replySize, replyCode, ftpPath, errText,
                                                    conClosedRetryItem, lookForNewWork, handleShouldStop, quitCmdWasSent);
                     }
@@ -304,19 +315,29 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                             Oper->GetGlobalTransferSpeedMeter()->JustConnected();
                         }
 
-                        lstrcpyn(ftpPath, CurItem->Path, ftpPath.Size());
-                        CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
-                        if (FTPPathAppend(type, ftpPath, ftpPath.Size(), CurItem->Name, TRUE))
+                        if (FTPFormatString(ftpPath, "%s", CurItem->Path))
                         { // we have the path, send CWD to the examined directory on the server
-                            _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath.Get());
-                            Logs.LogMessage(LogUID, errText, -1, TRUE);
+                            CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath.c_str());
+                            if (!FTPPathAppend(type, ftpPath, CurItem->Name, TRUE))
+                            {
+                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_INVALIDPATHTOLINK, NO_ERROR, NULL, Oper);
+                                lookForNewWork = TRUE;
+                                break;
+                            }
+                            if (FTPFormatString(errText, LoadStr(IDS_LOGMSGRESOLVINGLINK), ftpPath.c_str()))
+                                Logs.LogMessage(LogUID, errText.c_str(), -1, TRUE);
 
-                            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                              ftpcmdChangeWorkingPath, &cmdLen, ftpPath.Get()); // cannot report an error
-                            sendCmd = TRUE;
-                            SubState = fwssWorkResLnkWaitForCWDRes;
-
-                            HaveWorkingPath = FALSE; // we are changing the current working path on the server
+                            if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, ftpPath.c_str()))
+                            {
+                                sendCmd = TRUE;
+                                SubState = fwssWorkResLnkWaitForCWDRes;
+                                HaveWorkingPath = FALSE; // we are changing the current working path on the server
+                            }
+                            else
+                            {
+                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                lookForNewWork = TRUE;
+                            }
                         }
                         else // path syntax error or the path would become too long
                         {
@@ -350,7 +371,8 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                         item = new CFTPQueueItemCopyMoveExplore;
                                         if (item != NULL)
                                         {
-                                            ((CFTPQueueItemCopyMoveExplore*)item)->SetItemCopyMoveExplore(((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath, ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName, TGTDIRSTATE_UNKNOWN);
+                                            ((CFTPQueueItemCopyMoveExplore*)item)->SetItemCopyMoveExplore(((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtPath, ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName,
+                                                                                                        TGTDIRSTATE_UNKNOWN);
                                             item->SetItem(CurItem->ParentUID,
                                                           CurItem->Type == fqitCopyResolveLink ? fqitCopyExploreDir : fqitMoveExploreDirLink,
                                                           sqisWaiting, ITEMPR_OK, CurItem->Path, CurItem->Name);
@@ -390,7 +412,8 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                         item = new CFTPQueueItemCopyOrMove;
                                         if (item != NULL)
                                         {
-                                            ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath, ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName, CQuadWord(-1, -1), ((CFTPQueueItemCopyOrMove*)CurItem)->AsciiTransferMode, TRUE, TGTFILESTATE_UNKNOWN, ((CFTPQueueItemCopyOrMove*)CurItem)->DateAndTimeValid, ((CFTPQueueItemCopyOrMove*)CurItem)->Date, ((CFTPQueueItemCopyOrMove*)CurItem)->Time);
+                                            ((CFTPQueueItemCopyOrMove*)item)->SetItemCopyOrMove(((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtPath, ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName,
+                                                                                              CQuadWord(-1, -1), ((CFTPQueueItemCopyOrMove*)CurItem)->AsciiTransferMode, TRUE, TGTFILESTATE_UNKNOWN, ((CFTPQueueItemCopyOrMove*)CurItem)->DateAndTimeValid, ((CFTPQueueItemCopyOrMove*)CurItem)->Date, ((CFTPQueueItemCopyOrMove*)CurItem)->Time);
                                             item->SetItem(CurItem->ParentUID,
                                                           CurItem->Type == fqitCopyResolveLink ? fqitCopyFileOrFileLink : fqitMoveFileOrFileLink,
                                                           sqisWaiting, ITEMPR_OK, CurItem->Path, CurItem->Name);
@@ -458,9 +481,9 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                             }
                             else // an error occurred; report it to the user and process the next queue item
                             {
-                                CopyStr(errText, errText.Size(), reply, replySize);
+                                CopyStr(errText, reply, replySize);
                                 Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETORESOLVELNK, NO_ERROR,
-                                                       SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
+                                                       DupSimpleCommandError(errText.c_str()) /* low memory = the error will have no details */,
                                                        Oper);
                                 lookForNewWork = TRUE;
                             }
@@ -516,7 +539,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                             {
                                 // first log which work we are about to perform
                                 int opDescrResID = 0;
-                                const char* tgtName = NULL;
+                                const wchar_t* tgtName = NULL;
                                 switch (CurItem->Type)
                                 {
                                 case fqitDeleteLink:
@@ -534,10 +557,11 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                 case fqitCopyFileOrFileLink: // copy a file or a link to a file (CFTPQueueItemCopyOrMove object)
                                 case fqitMoveFileOrFileLink: // move a file or a link to a file (CFTPQueueItemCopyOrMove object)
                                 {
-                                    if (strcmp(CurItem->Name, ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName) != 0)
+                                    const std::wstring sourceName = Queue->DecodeRemoteText(CurItem->Name);
+                                    if (sourceName != ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName)
                                     {
                                         opDescrResID = IDS_LOGMSGDOWNLOADFILE2;
-                                        tgtName = ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName;
+                                        tgtName = ((CFTPQueueItemCopyOrMove*)CurItem)->LocalTgtName;
                                     }
                                     else
                                         opDescrResID = IDS_LOGMSGDOWNLOADFILE;
@@ -554,16 +578,25 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     opDescrResID = IDS_LOGMSGCHATTRSDIR;
                                     break; // change directory attributes (CFTPQueueItemChAttrDir object)
                                 }
-                                _snprintf_s(errText, _TRUNCATE, LoadStr(opDescrResID), CurItem->Name, tgtName);
-                                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                                const std::wstring sourceName = Queue->DecodeRemoteText(CurItem->Name);
+                                try
+                                {
+                                    const std::wstring logText = SPLFormatStringOwned(
+                                        LangStr(opDescrResID).c_str(), sourceName.c_str(), tgtName);
+                                    Logs.LogMessage(LogUID, logText.c_str(), -1, TRUE);
+                                }
+                                catch (...)
+                                {
+                                    // Logging is best effort; never publish a truncated description.
+                                }
 
                                 BOOL canContinue = TRUE;
                                 if (CurItem->Type == fqitDeleteFile || CurItem->Type == fqitDeleteLink)
                                 {
-                                    Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                                    Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                                     if (LockedFileUID != 0)
                                         TRACE_E("Unexpected situation in CFTPWorker::HandleEventInWorkingState(): LockedFileUID != 0!");
-                                    if (!FTPOpenedFiles.OpenFile(userBuf, hostBuf, port, CurItem->Path,
+                                    if (!FTPOpenedFiles.OpenFile(TextPolicy.GetCodec(), userBuf, hostBuf, port, CurItem->Path,
                                                                  Oper->GetFTPServerPathType(CurItem->Path),
                                                                  CurItem->Name, &LockedFileUID, ffatDelete))
                                     { // another operation is already running on this file; let the user try again later
@@ -576,14 +609,20 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                 }
                                 if (canContinue)
                                 {
-                                    if (!HaveWorkingPath || strcmp(WorkingPath, CurItem->Path) != 0)
+                                    if (!HaveWorkingPath || WorkingPath != CurItem->Path)
                                     { // we need to change the working path (assumption: the server keeps returning the same path string - the one
                                         // that reached the item during explore-dir or from the panel, in both cases it was the path returned
                                         // by the server in response to the PWD command)
-                                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                          ftpcmdChangeWorkingPath, &cmdLen, CurItem->Path); // cannot report an error
-                                        sendCmd = TRUE;
-                                        SubState = fwssWorkSimpleCmdWaitForCWDRes;
+                                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeWorkingPath, &cmdLen, CurItem->Path))
+                                        {
+                                            sendCmd = TRUE;
+                                            SubState = fwssWorkSimpleCmdWaitForCWDRes;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
 
                                         HaveWorkingPath = FALSE; // we are changing the current working path on the server
                                     }
@@ -607,16 +646,23 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     { // we successfully changed the working path; because this path was "once" returned
                                         // from the server in response to PWD, we assume that PWD would now return this path again
                                         // and therefore we will not send it (optimization with hopefully low risk)
-                                        HaveWorkingPath = TRUE;
-                                        lstrcpyn(WorkingPath, CurItem->Path, WorkingPath.Size());
-                                        SubState = fwssWorkSimpleCmdStartWork;
-                                        nextLoop = TRUE;
+                                        if (FTPFormatString(WorkingPath, "%s", CurItem->Path))
+                                        {
+                                            HaveWorkingPath = TRUE;
+                                            SubState = fwssWorkSimpleCmdStartWork;
+                                            nextLoop = TRUE;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
                                     }
                                     else // an error occurred; report it to the user and process the next queue item
                                     {
-                                        CopyStr(errText, errText.Size(), reply, replySize);
+                                        CopyStr(errText, reply, replySize);
                                         Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCWDONLYPATH, NO_ERROR,
-                                                               SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
+                                                               DupSimpleCommandError(errText.c_str()) /* low memory = the error will have no details */,
                                                                Oper);
                                         lookForNewWork = TRUE;
                                     }
@@ -644,28 +690,45 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     case fqitDeleteLink:        // delete for a link (CFTPQueueItemDel object)
                                     case fqitMoveDeleteDirLink: // delete a link to a directory after moving its contents (CFTPQueueItemDir object)
                                     {
-                                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                          ftpcmdDeleteFile, &cmdLen, CurItem->Name); // cannot report an error
-                                        sendCmd = TRUE;
-                                        SubState = fwssWorkDelFileWaitForDELERes;
+                                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdDeleteFile, &cmdLen, CurItem->Name))
+                                        {
+                                            sendCmd = TRUE;
+                                            SubState = fwssWorkDelFileWaitForDELERes;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
                                         break;
                                     }
 
                                     case fqitDeleteDir:     // delete for a directory (CFTPQueueItemDir object)
                                     case fqitMoveDeleteDir: // delete a directory after moving its contents (CFTPQueueItemDir object)
                                     {
-                                        CPathBuffer vmsDirName;
-                                        char* dirName = CurItem->Name;
+                                        std::string vmsDirName;
+                                        const char* dirName = CurItem->Name;
                                         BOOL isVMS = Oper->GetFTPServerPathType(CurItem->Path) == ftpsptOpenVMS;
                                         if (isVMS)
                                         {
-                                            FTPMakeVMSDirName(vmsDirName, vmsDirName.Size(), CurItem->Name);
-                                            dirName = vmsDirName;
+                                            if (!FTPMakeVMSDirName(vmsDirName, CurItem->Name))
+                                            {
+                                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                                lookForNewWork = TRUE;
+                                                break;
+                                            }
+                                            dirName = vmsDirName.c_str();
                                         }
-                                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                          ftpcmdDeleteDir, &cmdLen, dirName); // cannot report an error
-                                        sendCmd = TRUE;
-                                        SubState = fwssWorkDelDirWaitForRMDRes;
+                                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdDeleteDir, &cmdLen, dirName))
+                                        {
+                                            sendCmd = TRUE;
+                                            SubState = fwssWorkDelDirWaitForRMDRes;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
                                         break;
                                     }
 
@@ -673,10 +736,16 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     case fqitChAttrsDir:  // change directory attributes (CFTPQueueItemChAttrDir object)
                                     {
                                         DWORD attr = CurItem->Type == fqitChAttrsFile ? ((CFTPQueueItemChAttr*)CurItem)->Attr : ((CFTPQueueItemChAttrDir*)CurItem)->Attr;
-                                        PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                          ftpcmdChangeAttrs, &cmdLen, attr, CurItem->Name); // cannot report an error
-                                        sendCmd = TRUE;
-                                        SubState = fwssWorkChAttrWaitForCHMODRes;
+                                        if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeAttrs, &cmdLen, attr, CurItem->Name))
+                                        {
+                                            sendCmd = TRUE;
+                                            SubState = fwssWorkChAttrWaitForCHMODRes;
+                                        }
+                                        else
+                                        {
+                                            Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                            lookForNewWork = TRUE;
+                                        }
                                         break;
                                     }
                                     }
@@ -698,7 +767,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                         lookForNewWork = TRUE;
 
                                         // if the file/link was deleted, update the listing in the cache
-                                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                                         UploadListingCache.ReportDelete(userBuf, hostBuf, port, CurItem->Path,
                                                                         Oper->GetFTPServerPathType(CurItem->Path),
                                                                         CurItem->Name, FALSE);
@@ -707,9 +776,9 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     {
                                         if (CurItem->Type == fqitDeleteFile)
                                         { // report the error to the user and process the next queue item
-                                            CopyStr(errText, errText.Size(), reply, replySize);
+                                            CopyStr(errText, reply, replySize);
                                             Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETODELETEFILE, NO_ERROR,
-                                                                   SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
+                                                                   DupSimpleCommandError(errText.c_str()) /* low memory = the error will have no details */,
                                                                    Oper);
                                             lookForNewWork = TRUE;
                                         }
@@ -719,19 +788,30 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                                 handleShouldStop = TRUE; // check whether the worker should stop
                                             else
                                             {
-                                                CPathBuffer vmsDirName;
-                                                char* dirName = CurItem->Name;
+                                                std::string vmsDirName;
+                                                const char* dirName = CurItem->Name;
                                                 BOOL isVMS = Oper->GetFTPServerPathType(CurItem->Path) == ftpsptOpenVMS;
                                                 if (isVMS)
                                                 {
-                                                    FTPMakeVMSDirName(vmsDirName, vmsDirName.Size(), CurItem->Name);
-                                                    dirName = vmsDirName;
+                                                    if (!FTPMakeVMSDirName(vmsDirName, CurItem->Name))
+                                                    {
+                                                        Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                                        lookForNewWork = TRUE;
+                                                        break;
+                                                    }
+                                                    dirName = vmsDirName.c_str();
                                                 }
-                                                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                                  ftpcmdDeleteDir, &cmdLen, dirName); // cannot report an error
-                                                sendCmd = TRUE;
-                                                SubState = fwssWorkDelDirWaitForRMDRes;
-                                                finished = FALSE;
+                                                if (PrepareFTPCommand(buf, &errBuf, ftpcmdDeleteDir, &cmdLen, dirName))
+                                                {
+                                                    sendCmd = TRUE;
+                                                    SubState = fwssWorkDelDirWaitForRMDRes;
+                                                    finished = FALSE;
+                                                }
+                                                else
+                                                {
+                                                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                                    lookForNewWork = TRUE;
+                                                }
                                             }
                                         }
                                     }
@@ -746,7 +826,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                 case fweCmdConClosed: // the connection closed/timed out (see ErrorDescr for details) -> try to restore it
                                 {
                                     // if we do not know how the file/link deletion ended, invalidate the listing cache
-                                    Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                                    Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                                     UploadListingCache.ReportDelete(userBuf, hostBuf, port, CurItem->Path,
                                                                     Oper->GetFTPServerPathType(CurItem->Path),
                                                                     CurItem->Name, TRUE);
@@ -774,18 +854,18 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                         lookForNewWork = TRUE;
 
                                         // if the directory/link was deleted, update the listing in the cache
-                                        Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                                        Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                                         UploadListingCache.ReportDelete(userBuf, hostBuf, port, CurItem->Path,
                                                                         Oper->GetFTPServerPathType(CurItem->Path),
                                                                         CurItem->Name, FALSE);
                                     }
                                     else // an error occurred; report it to the user and process the next queue item
                                     {    // CurItem->Type is fqitDeleteLink / fqitMoveDeleteDirLink or fqitDeleteDir / fqitMoveDeleteDir
-                                        CopyStr(errText, errText.Size(), reply, replySize);
+                                        CopyStr(errText, reply, replySize);
                                         Queue->UpdateItemState(CurItem, sqisFailed,
                                                                (CurItem->Type == fqitDeleteLink || CurItem->Type == fqitMoveDeleteDirLink) ? ITEMPR_UNABLETODELETEFILE : ITEMPR_UNABLETODELETEDIR,
                                                                NO_ERROR,
-                                                               SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
+                                                               DupSimpleCommandError(errText.c_str()) /* low memory = the error will have no details */,
                                                                Oper);
                                         lookForNewWork = TRUE;
                                     }
@@ -795,7 +875,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                 case fweCmdConClosed: // the connection closed/timed out (see ErrorDescr for details) -> try to restore it
                                 {
                                     // if we do not know how the directory/link deletion ended, invalidate the listing cache
-                                    Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                                    Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                                     UploadListingCache.ReportDelete(userBuf, hostBuf, port, CurItem->Path,
                                                                     Oper->GetFTPServerPathType(CurItem->Path),
                                                                     CurItem->Name, TRUE);
@@ -833,29 +913,30 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                             else
                                             {
                                                 DWORD attr = CurItem->Type == fqitChAttrsFile ? ((CFTPQueueItemChAttr*)CurItem)->Attr : ((CFTPQueueItemChAttrDir*)CurItem)->Attr;
-                                                s = CurItem->Name;
-                                                CPathBuffer nameToQuotes; // in the name we must insert the escape char '\\' before '"'
-                                                char* d = nameToQuotes;
-                                                char* end = nameToQuotes + nameToQuotes.Size() - 1;
-                                                while (*s != 0 && d < end)
+                                                std::string nameToQuotes;
+                                                if (!FTPEscapeQuotedCommandArgument(nameToQuotes, CurItem->Name))
                                                 {
-                                                    if (*s == '"')
-                                                        *d++ = '\\';
-                                                    *d++ = *s++;
+                                                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                                    lookForNewWork = TRUE;
                                                 }
-                                                *d = 0;
-                                                PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(),
-                                                                  ftpcmdChangeAttrsQuoted, &cmdLen, attr, nameToQuotes.Get()); // cannot report an error
-                                                sendCmd = TRUE;
-                                                SubState = fwssWorkChAttrWaitForCHMODQuotedRes;
-                                                finished = FALSE;
+                                                else if (PrepareFTPCommand(buf, &errBuf, ftpcmdChangeAttrsQuoted, &cmdLen, attr, nameToQuotes.c_str()))
+                                                {
+                                                    sendCmd = TRUE;
+                                                    SubState = fwssWorkChAttrWaitForCHMODQuotedRes;
+                                                    finished = FALSE;
+                                                }
+                                                else
+                                                {
+                                                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_LOWMEM, NO_ERROR, NULL, Oper);
+                                                    lookForNewWork = TRUE;
+                                                }
                                             }
                                         }
                                         else // an error occurred; report it to the user and process the next queue item
                                         {
-                                            CopyStr(errText, errText.Size(), reply, replySize);
+                                            CopyStr(errText, reply, replySize);
                                             Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_UNABLETOCHATTRS, NO_ERROR,
-                                                                   SalamanderGeneral->DupStr(errText) /* low memory = the error will have no details */,
+                                                                   DupSimpleCommandError(errText.c_str()) /* low memory = the error will have no details */,
                                                                    Oper);
                                             lookForNewWork = TRUE;
                                         }
@@ -890,13 +971,13 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                     if (UploadDirGetTgtPathListing) // list the target path into the upload listing cache
                     {
                         BOOL listingNotAccessible;
-                        HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf, host,
+                        HandleEventInWorkingState2(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf,
                                                    cmdLen, sendCmd, reply, replySize, replyCode, ftpPath, errText,
                                                    conClosedRetryItem, lookForNewWork, handleShouldStop, &listingNotAccessible);
                         if (handleShouldStop || conClosedRetryItem || lookForNewWork)
                         { // listing failed; inform any waiting workers about it
                             UploadDirGetTgtPathListing = FALSE;
-                            Oper->GetUserHostPort(userBuf, hostBuf, &port);
+                            Oper->GetUserHostPort(&userBuf, hostBuf, &port);
                             CFTPServerPathType pathType = Oper->GetFTPServerPathType(((CFTPQueueItemCopyOrMoveUpload*)CurItem)->TgtPath);
                             BOOL listingOKErrorIgnored;
                             // calling UploadListingCache.ListingFailed() is possible only because we are inside CSocketsThread::CritSect
@@ -921,7 +1002,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                     }
                     else // the remaining work goes here
                     {
-                        HandleEventInWorkingState5(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf, host,
+                        HandleEventInWorkingState5(event, sendQuitCmd, postActivate, reportWorkerChange, buf, errBuf,
                                                    cmdLen, sendCmd, reply, replySize, replyCode, ftpPath, errText,
                                                    conClosedRetryItem, lookForNewWork, handleShouldStop, quitCmdWasSent);
                     }
@@ -1024,9 +1105,10 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
 {
     CALL_STACK_MESSAGE3("CFTPWorker::HandleEvent(%d, , , %d)", (int)event, replyCode);
 
-    CPathBuffer buf;
-    CPathBuffer errBuf;
-    char host[HOST_MAX_SIZE];
+    std::string buf;
+    CFTPSecureByteStringGuard commandGuard(buf);
+    std::string errBuf;
+    std::wstring host;
 
     BOOL sendQuitCmd = FALSE;  // TRUE = an FTP command "QUIT" should be sent
     BOOL postActivate = FALSE; // TRUE = WORKER_ACTIVATE (fweActivate) should be posted
@@ -1167,8 +1249,8 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
         {
             if (event == fweNewLoginParams)
             {
-                Logs.LogMessage(LogUID, LoadStr(IDS_WORKERLOGPARCHANGED), -1);
-                ErrorDescr[0] = 0; // do not report the error from this point on (the user is trying to fix it)
+                Logs.LogMessage(LogUID, LangStr(IDS_WORKERLOGPARCHANGED).c_str(), -1);
+                ErrorDescr.clear(); // do not report the error from this point on (the user is trying to fix it)
                 if (UnverifiedCertificate != NULL)
                     UnverifiedCertificate->Release();
                 UnverifiedCertificate = NULL;
@@ -1186,7 +1268,7 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
     case fwsWorking:
     {
         HandleEventInWorkingState(event, sendQuitCmd, postActivate, reportWorkerChange, buf,
-                                  errBuf, host, cmdLen, sendCmd, reply, replySize, replyCode);
+                                  errBuf, cmdLen, sendCmd, reply, replySize, replyCode);
         break;
     }
 
@@ -1263,15 +1345,14 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
 
         if (sendQuitCmd) // we are not handing the socket from the worker back to the panel; send "QUIT"
         {
-            Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGDISCONNECT), -1, TRUE);
+            Logs.LogMessage(logUID, LangStr(IDS_LOGMSGDISCONNECT).c_str(), -1, TRUE);
 
-            PrepareFTPCommand(buf, buf.Size(), errBuf, errBuf.Size(), ftpcmdQuit, &cmdLen); // cannot report an error
-            sendCmd = TRUE;
+            sendCmd = PrepareFTPCommand(buf, &errBuf, ftpcmdQuit, &cmdLen);
         }
         else // the connection will be handed over; simulate closing the worker's socket (to end waiting for socket closure when stopping the worker)
         {
             SocketClosed = TRUE;
-            ErrorDescr[0] = 0; // this is not an error (and it should no longer be displayed anywhere)
+            ErrorDescr.clear(); // this is not an error (and it should no longer be displayed anywhere)
             CommandReplyTimeout = FALSE;
 
             HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -1291,9 +1372,9 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
 
         DWORD error = NO_ERROR;
         BOOL allBytesWritten;
-        if (Write(buf, cmdLen, &error, &allBytesWritten))
+        if (Write(buf.c_str(), cmdLen, &error, &allBytesWritten))
         {
-            Logs.LogMessage(logUID, errBuf, -1); // record the sent command in the log
+            Logs.LogMessage(logUID, errBuf.c_str(), -1); // record the sent command in the log
             // set up a new timeout timer
             int serverTimeout = Config.GetServerRepliesTimeout() * 1000;
             if (serverTimeout < 1000)

@@ -39,11 +39,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}

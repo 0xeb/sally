@@ -12,55 +12,59 @@
 BOOL CompresBugReports(CCompressParams* compressParams)
 {
     BOOL ret = FALSE;
-    compressParams->ErrorMessage[0] = 0;
-    const char* WRAPPER_DLL = "..\\plugins\\7zip\\7zwrapper.dll";
-    HINSTANCE h7zwrapper = LoadLibrary(WRAPPER_DLL);
+    compressParams->ErrorMessage.clear();
+    const wchar_t* WRAPPER_DLL = L"..\\plugins\\7zip\\7zwrapper.dll";
+    HINSTANCE h7zwrapper = LoadLibraryW(WRAPPER_DLL);
     if (h7zwrapper != NULL)
     {
-        typedef BOOL(WINAPI * CompressFiles_t)(const char* archiveName7z, const char* sourceDir, const char* filter, char* errorMessage, int errorMessageSize);
-        CompressFiles_t CompressFiles;
-        CompressFiles = (CompressFiles_t)GetProcAddress(h7zwrapper, "CompressFiles");
-        if (CompressFiles != NULL)
+        typedef BOOL(WINAPI * CompressFilesW_t)(const wchar_t* archiveName7z, const wchar_t* sourceDir,
+                                                const wchar_t* filter, wchar_t** errorMessage);
+        CompressFilesW_t CompressFilesW;
+        CompressFilesW = (CompressFilesW_t)GetProcAddress(h7zwrapper, "CompressFilesW");
+        if (CompressFilesW != NULL)
         {
-            char oldCurrentDir[MAX_PATH];
-            GetCurrentDirectory(MAX_PATH, oldCurrentDir);
-
             ret = TRUE;
-
-            char error[10000];
-            for (int i = 0; i < BugReports.Count; i++)
+            for (const CBugReport& report : BugReports)
             {
-                SetCurrentDirectory(BugReportPath);
+                // Fully qualified on purpose. The 7-Zip wrapper globs this mask
+                // with a bare FindFirstFileW(filter, ...), which resolves against
+                // the PROCESS CURRENT DIRECTORY - its 'sourceDir' argument is only
+                // used afterwards to rebuild full paths from cFileName, and does
+                // not scope the search. pre-unicode made that work by calling
+                // SetCurrentDirectory(BugReportPath) first; the wide port dropped
+                // that call but kept the bare mask, so the glob matched nothing
+                // wherever salmon happened to be running and every bug-report
+                // archive came out empty, silently. Qualifying the mask fixes it
+                // without reintroducing a process-global directory change.
+                std::wstring mask = BugReportPath;
+                if (!mask.empty() && mask.back() != L'\\')
+                    mask += L'\\';
+                mask += report.Name + L".*";
+                std::wstring archive = BugReportPath;
+                if (!archive.empty() && archive.back() != L'\\')
+                    archive += L'\\';
+                archive += report.Name + L".7Z";
+                DeleteFileW(archive.c_str()); // so the subsequent compression does not fail
 
-                char mask[MAX_PATH];
-                strcpy(mask, BugReports[i].Name);
-                strcat(mask, ".*");
-
-                char archive[MAX_PATH];
-                strcpy(archive, BugReports[i].Name);
-                strcat(archive, ".7Z");
-                DeleteFile(archive); // so the subsequent compression does not fail
-
-                error[0] = 0;
-                BOOL res = CompressFiles(archive, BugReportPath, mask, error, 10000);
+                wchar_t* error = NULL;
+                BOOL res = CompressFilesW(archive.c_str(), BugReportPath.c_str(), mask.c_str(), &error);
                 if (!res)
-                    lstrcpyn(compressParams->ErrorMessage, error, 2 * MAX_PATH - 1);
+                    compressParams->ErrorMessage = error != NULL ? error : L"The 7-Zip wrapper could not create the archive.";
+                CoTaskMemFree(error);
                 ret &= res;
                 if (!ReportOldBugs)
                     break;
             }
-
-            SetCurrentDirectory(oldCurrentDir);
         }
         else
         {
-            sprintf(compressParams->ErrorMessage, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), WRAPPER_DLL);
+            compressParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage).c_str(), WRAPPER_DLL);
         }
         FreeLibrary(h7zwrapper);
     }
     else
     {
-        sprintf(compressParams->ErrorMessage, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), WRAPPER_DLL);
+        compressParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage).c_str(), WRAPPER_DLL);
     }
     return ret;
 }
@@ -68,7 +72,22 @@ BOOL CompresBugReports(CCompressParams* compressParams)
 DWORD WINAPI CompressThreadF(void* param)
 {
     CCompressParams* compressParams = (CCompressParams*)param;
-    compressParams->Result = CompresBugReports(compressParams);
+    try
+    {
+        compressParams->Result = CompresBugReports(compressParams);
+    }
+    catch (const std::bad_alloc&)
+    {
+        compressParams->Result = FALSE;
+        try { compressParams->ErrorMessage = L"Not enough memory to prepare the bug report archive."; }
+        catch (...) {}
+    }
+    catch (...)
+    {
+        compressParams->Result = FALSE;
+        try { compressParams->ErrorMessage = L"Unexpected failure while preparing the bug report archive."; }
+        catch (...) {}
+    }
     return EXIT_SUCCESS;
 }
 

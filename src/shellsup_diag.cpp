@@ -6,9 +6,11 @@
 #endif
 
 #include "shellsup_diag.h"
+#include "common/DiagnosticTextEncoding.h"
 
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 CShellMenuDiagLog ShellMenuDiag;
 
@@ -25,10 +27,7 @@ ShellMenuDiagRecord* CShellMenuDiagLog::Begin(const wchar_t* dirPathW, int selCo
     rec->SelCount = selCount;
     rec->Background = background;
     if (dirPathW != NULL)
-    {
-        // Truncation is fine here; the record is diagnostic, never a path we act on.
-        wcsncpy_s(rec->DirPathW, dirPathW, _TRUNCATE);
-    }
+        rec->DirPathW = dirPathW;
 
     Open = true;
     return rec;
@@ -52,7 +51,55 @@ void CShellMenuDiagLog::Reset()
     Open = false;
 }
 
-int AppendAsciiEscapedW(const wchar_t* text, char* buf, int bufSize)
+namespace
+{
+
+int CopyReportBytes(const std::string& text, char* buf, int bufSize) noexcept
+{
+    if (buf == NULL || bufSize <= 0)
+        return 0;
+
+    const size_t copied = (std::min)(text.size(), static_cast<size_t>(bufSize - 1));
+    if (copied != 0)
+        memcpy(buf, text.data(), copied);
+    buf[copied] = 0;
+    return static_cast<int>(copied);
+}
+
+} // namespace
+
+std::string ReportAcpBytesW(const wchar_t* text)
+{
+    if (text == NULL || *text == L'\0')
+        return {};
+
+    std::string bytes;
+    if (!sally::diagnostic::EncodeAcpLossy(text, bytes))
+        bytes.clear();
+    return bytes;
+}
+
+std::string AsciiEscapedW(const wchar_t* text)
+{
+    std::string escaped;
+    if (text == NULL)
+        return escaped;
+
+    for (const wchar_t* s = text; *s != 0; s++)
+    {
+        if (*s >= 0x20 && *s < 0x7f)
+            escaped.push_back(static_cast<char>(*s));
+        else
+        {
+            char fragment[7];
+            sprintf_s(fragment, "\\u%04X", static_cast<unsigned>(*s));
+            escaped += fragment;
+        }
+    }
+    return escaped;
+}
+
+int AppendAsciiEscapedW(const wchar_t* text, char* buf, int bufSize) noexcept
 {
     if (buf == NULL || bufSize <= 0)
         return 0;
@@ -64,18 +111,14 @@ int AppendAsciiEscapedW(const wchar_t* text, char* buf, int bufSize)
 
     for (const wchar_t* s = text; *s != 0; s++)
     {
-        // Six characters for the widest escape plus the terminator.
         if (written + 7 > bufSize)
             break;
 
         if (*s >= 0x20 && *s < 0x7f)
-        {
-            buf[written++] = (char)*s;
-        }
+            buf[written++] = static_cast<char>(*s);
         else
-        {
-            written += sprintf_s(buf + written, bufSize - written, "\\u%04X", (unsigned)*s);
-        }
+            written += sprintf_s(buf + written, bufSize - written, "\\u%04X",
+                                 static_cast<unsigned>(*s));
         buf[written] = 0;
     }
     return written;
@@ -103,47 +146,54 @@ const char* OwnerText(ShellMenuOwner owner)
 
 } // namespace
 
-int FormatShellMenuDiagRecord(const ShellMenuDiagRecord& record, char* buf, int bufSize)
+int FormatShellMenuDiagRecord(const ShellMenuDiagRecord& record, char* buf, int bufSize) noexcept
 {
     if (buf == NULL || bufSize <= 0)
         return 0;
 
     buf[0] = 0;
-    int written = 0;
+    try
+    {
+        const std::string pathAcp = ReportAcpBytesW(record.DirPathW.c_str());
+        const std::string pathEsc = AsciiEscapedW(record.DirPathW.c_str());
+        const std::string verbEsc = AsciiEscapedW(record.Verb.c_str());
+        char fragment[512];
+        std::string report;
 
-    // The ACP rendering is what the user recognizes; the escaped form is what we can
-    // actually reason about when the ACP mangled it.
-    char pathAcp[MAX_PATH * 2];
-    pathAcp[0] = 0;
-    WideCharToMultiByte(CP_ACP, 0, record.DirPathW, -1, pathAcp, (int)sizeof(pathAcp), NULL, NULL);
-    pathAcp[sizeof(pathAcp) - 1] = 0;
+        sprintf_s(fragment, "tick=%u dir=\"", record.Tick);
+        report += fragment;
+        report += pathAcp;
+        sprintf_s(fragment, "\" sel=%d bg=%s wideNames=%s\n", record.SelCount,
+                  record.Background ? "yes" : "no",
+                  record.AnyNameNeedsWide ? "yes" : "no");
+        report += fragment;
 
-    char pathEsc[MAX_PATH * 6];
-    AppendAsciiEscapedW(record.DirPathW, pathEsc, (int)sizeof(pathEsc));
+        if (pathAcp != pathEsc)
+            report += "    dir(escaped)=\"" + pathEsc + "\"\n";
 
-    written += sprintf_s(buf + written, bufSize - written,
-                         "tick=%u dir=\"%s\" sel=%d bg=%s wideNames=%s\n",
-                         record.Tick, pathAcp, record.SelCount,
-                         record.Background ? "yes" : "no",
-                         record.AnyNameNeedsWide ? "yes" : "no");
+        sprintf_s(fragment, "    QueryContextMenu=0x%08X items=%d\n",
+                  static_cast<unsigned>(record.QueryContextMenuHr), record.MenuItemCount);
+        report += fragment;
 
-    if (strcmp(pathAcp, pathEsc) != 0)
-        written += sprintf_s(buf + written, bufSize - written, "    dir(escaped)=\"%s\"\n", pathEsc);
+        sprintf_s(fragment, "    cmd=%u topLevel=%s verb=\"", record.TrackedCmd,
+                  record.TopLevel ? "yes" : "no");
+        report += fragment;
+        report += verbEsc;
+        sprintf_s(fragment, "\" (GetCommandString=0x%08X)\n",
+                  static_cast<unsigned>(record.VerbHr));
+        report += fragment;
 
-    written += sprintf_s(buf + written, bufSize - written,
-                         "    QueryContextMenu=0x%08X items=%d\n",
-                         (unsigned)record.QueryContextMenuHr, record.MenuItemCount);
-
-    written += sprintf_s(buf + written, bufSize - written,
-                         "    cmd=%u topLevel=%s verb=\"%s\" (GetCommandString=0x%08X)\n",
-                         record.TrackedCmd, record.TopLevel ? "yes" : "no",
-                         record.Verb, (unsigned)record.VerbHr);
-
-    written += sprintf_s(buf + written, bufSize - written,
-                         "    owner=%s InvokeCommand=0x%08X parent=%s aliveAfter=%s\n",
-                         OwnerText(record.Owner), (unsigned)record.InvokeHr,
-                         record.ParentWasTransient ? "transient" : "durable",
-                         record.ParentAliveAfter ? "yes" : "no");
-
-    return written;
+        sprintf_s(fragment,
+                  "    owner=%s InvokeCommand=0x%08X parent=%s aliveAfter=%s\n",
+                  OwnerText(record.Owner), static_cast<unsigned>(record.InvokeHr),
+                  record.ParentWasTransient ? "transient" : "durable",
+                  record.ParentAliveAfter ? "yes" : "no");
+        report += fragment;
+        return CopyReportBytes(report, buf, bufSize);
+    }
+    catch (...)
+    {
+        buf[0] = 0;
+        return 0;
+    }
 }

@@ -1,7 +1,7 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\czech\sally.atp"
-TEXTVERSION,"1.0 (x64)"
-VERSION,"1,0,0,188"
+TEXTVERSION,"1.0.27 (x64)"
+VERSION,"1,0,27,188"
 
 [TRANSLATION]
 LANGID,1029
@@ -317,12 +317,11 @@ SLGINCOMPLETE,""
 313,184,68,28,12,1,""
 1151,216,70,6,8,1,"s"
 316,1,81,256,12,1,"Po&rovnání adresářů: ignorovat časové rozdíly přesně jedné nebo dvou hodin"
-597,1,94,238,12,1,"O&tevírat soubory pomocí salopen.exe (obchází chyby v rozšíření prostředí)"
-603,1,107,243,12,1,"Vy&brat i příponu souboru v příkazech Rychle přejmenovat a Komprimovat"
-623,1,120,202,12,1,"Vybr&at i příponu souboru v příkazu Upravit nový soubor"
-622,1,133,156,12,1,"Použít rychlý přesun adresářů na Novell Net&Ware"
-624,1,146,282,12,1,"Kopírování &souborů: na síti používat rychlejší asynchronní algoritmus (Windows 7 a novější)"
-625,1,159,193,12,1,"U&držovat proměnné prostředí aktualizované na systémové hodnoty"
+603,1,94,243,12,1,"Vy&brat i příponu souboru v příkazech Rychle přejmenovat a Komprimovat"
+623,1,107,202,12,1,"Vybr&at i příponu souboru v příkazu Upravit nový soubor"
+622,1,120,156,12,1,"Použít rychlý přesun adresářů na Novell Net&Ware"
+624,1,133,282,12,1,"Kopírování &souborů: na síti používat rychlejší asynchronní algoritmus (Windows 7 a novější)"
+625,1,146,193,12,1,"U&držovat proměnné prostředí aktualizované na systémové hodnoty"
 
 [DIALOG 320]
 299,231,1,"Zobrazení"
@@ -3495,3 +3494,6 @@ SLGINCOMPLETE,""
 14224,1,"Systémové příkazové prostředí (%COMSPEC%)"
 14225,1,"Výchozí profil aplikace Windows Terminal"
 14226,1,"Preferované prostředí již není k dispozici. Zvolte jiné výchozí prostředí."
+14227,1,"Název "%s" nelze vyjádřit v systémové kódové stránce a tento svazek nenabízí žádnou krátkou (8.3) alternativu.\n\nZvolený rozbalovací program přijímá pouze takové názvy, proto byla operace zrušena. Pokračování mohlo rozbalit jiný archiv."
+14228,0,"The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password."
+14229,0,"The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes."

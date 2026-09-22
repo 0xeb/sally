@@ -5,7 +5,6 @@
 #pragma once
 
 #include <string>
-#include "ui/UnicodeNameInputController.h"
 
 //
 // ****************************************************************************
@@ -13,9 +12,9 @@
 class CSelectDialog : public CCommonDialog
 {
 public:
-    CSelectDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent, char* mask,
+    CSelectDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent, std::wstring& mask,
                   CObjectOrigin origin = ooStandard)
-        : CCommonDialog(modul, resID, helpID, parent, origin) { Mask = mask; }
+        : CCommonDialog(modul, resID, helpID, parent, origin), Mask(mask) {}
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -24,7 +23,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 protected:
-    char* Mask;
+    std::wstring& Mask;
 };
 
 //
@@ -33,36 +32,30 @@ protected:
 class CCopyMoveDialog : public CCommonDialog
 {
 protected:
-    char *Title,
-        *Path;
+    const wchar_t* Title;
+    std::wstring& Path;
     CTruncatedString* Subject;
-    int PathBufSize;
-    char** History;
+    wchar_t** History;
     int HistoryCount;
-    wchar_t** HistoryW;
-    int HistoryWCount;
     BOOL DirectoryHelper;
     int SelectionEnd;
 
-    // Unicode support for filenames that cannot be represented in ANSI
-    BOOL UseUnicodeInput;       // latch Unicode input mode across dialog retries
-    std::wstring PathW;         // Unicode input path (set via SetUnicodePath)
-    std::wstring ResultW;       // Unicode result (populated on OK)
-    CUnicodeNameInputController UnicodeInput;
+    // Owned; freed on WM_DESTROY. The caller-owned std::wstring is the sole path state.
+    HFONT UnicodeFont;
 
 public:
     // 'history' determines whether the dialog will contain a combobox (TRUE) or an editline (FALSE)
     // 'directoryHelper' specifies if a resource with a button behind the editline will be used to select a directory
     // 'selectionEnd' specifies up to which character the name is selected (used for quick rename), -1 == all
-    CCopyMoveDialog(HWND parent, char* path, int pathBufSize, char* title,
+    // 'titleW' is GONE - 'title' is wide itself now. No caller ever supplied
+    // titleW, so the caption was taking the SetWindowTextA fallback and narrowing through
+    // CP_ACP on a window created unicodeWnd=TRUE. It is SetWindowTextW unconditionally now.
+    //
+    CCopyMoveDialog(HWND parent, std::wstring& path, const wchar_t* title,
                     CTruncatedString* subject, DWORD helpID,
-                    char* history[], int historyCount, BOOL directoryHelper,
-                    wchar_t* historyW[] = NULL, int historyWCount = 0);
+                    wchar_t* history[], int historyCount, BOOL directoryHelper);
 
     void SetSelectionEnd(int selectionEnd);
-    void SetUnicodePath(const std::wstring& pathW);
-    const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return UseUnicodeInput; }
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
@@ -72,8 +65,8 @@ protected:
 class CEditNewFileDialog : public CCopyMoveDialog
 {
 public:
-    CEditNewFileDialog(HWND parent, char* path, int pathBufSize, CTruncatedString* subject,
-                       char* history[], int historyCount, wchar_t* historyW[] = NULL, int historyWCount = 0);
+    CEditNewFileDialog(HWND parent, std::wstring& path, CTruncatedString* subject,
+                       wchar_t* history[], int historyCount);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -88,14 +81,11 @@ class CButton;
 class CCopyMoveMoreDialog : public CCommonDialog
 {
 protected:
-    char *Title,
-        *Path;
+    const wchar_t* Title;
+    std::wstring& Path;
     CTruncatedString* Subject;
-    int PathBufSize;
-    char** History;
+    wchar_t** History;
     int HistoryCount;
-    wchar_t** HistoryW;
-    int HistoryWCount;
     CCriteriaData* CriteriaInOut; // used to transfer data in and out of the dialog (on OK)
     CCriteriaData* Criteria;      // allocated because static declaration would require juggling headers
     BOOL HavePermissions;
@@ -109,25 +99,17 @@ protected:
 
     CButton* MoreButton;
 
-    // Unicode support for filenames that cannot be represented in ANSI
-    BOOL UseUnicodeInput;
-    std::wstring PathW;         // Unicode input path (set via SetUnicodePath)
-    std::wstring ResultW;       // Unicode result (populated on OK)
-    CUnicodeNameInputController UnicodeInput;
+    // Owned; freed on WM_DESTROY. The caller-owned std::wstring is the sole path state.
+    HFONT UnicodeFont;
 
 public:
     // 'history' determines whether the dialog will contain a combobox (TRUE) or an editline (FALSE)
     // 'directoryHelper' specifies if a resource with a button behind the editline will be used to select a directory
-    CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSize, char* title,
+    CCopyMoveMoreDialog(HWND parent, std::wstring& path, const wchar_t* title,
                         CTruncatedString* subject, DWORD helpID,
-                        char* history[], int historyCount, CCriteriaData* criteriaInOut,
-                        BOOL havePermissions, BOOL supportsADS,
-                        wchar_t* historyW[] = NULL, int historyWCount = 0);
+                        wchar_t* history[], int historyCount, CCriteriaData* criteriaInOut,
+                        BOOL havePermissions, BOOL supportsADS);
     ~CCopyMoveMoreDialog();
-
-    void SetUnicodePath(const std::wstring& pathW);
-    const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return UseUnicodeInput; }
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -151,30 +133,32 @@ protected:
 class CMessageBox : public CCommonDialog
 {
 protected:
+    // wide-primary: every string the box renders is UTF-16 and the
+    // dialog itself is created wide, so nothing narrows on the way to the screen.
     DWORD Flags;
-    std::string Title;
-    std::string CheckText;
+    std::wstring Title;
+    std::wstring CheckText;
     CTruncatedString Text;
     BOOL* Check;
     HICON HOwnIcon;
     MSGBOXEX_CALLBACK HelpCallback;
-    std::string AliasBtnNames;
-    std::string URL;
-    std::string URLText;
+    std::wstring AliasBtnNames;
+    std::wstring URL;
+    std::wstring URLText;
     // for WM_COPY:
     int ButtonsID[MESSAGEBOX_MAXBUTTONS]; // IDs of the buttons after remapping
     int BackgroundSeparator;              // Y offset dividing white/gray (Vista+)
 
 public:
-    CMessageBox(HWND parent, DWORD flags, const char* title, const char* text,
-                const char* checkText, BOOL* check, HICON hOwnIcon,
+    CMessageBox(HWND parent, DWORD flags, const wchar_t* title, const wchar_t* text,
+                const wchar_t* checkText, BOOL* check, HICON hOwnIcon,
                 DWORD contextHelpId, MSGBOXEX_CALLBACK helpCallback,
-                const char* aliasBtnNames, const char* url, const char* urlText);
+                const wchar_t* aliasBtnNames, const wchar_t* url, const wchar_t* urlText);
 
-    CMessageBox(HWND parent, DWORD flags, const char* title, CTruncatedString* text,
-                const char* checkText, BOOL* check, HICON hOwnIcon,
+    CMessageBox(HWND parent, DWORD flags, const wchar_t* title, CTruncatedString* text,
+                const wchar_t* checkText, BOOL* check, HICON hOwnIcon,
                 DWORD contextHelpId, MSGBOXEX_CALLBACK helpCallback,
-                const char* aliasBtnNames, const char* url, const char* urlText);
+                const wchar_t* aliasBtnNames, const wchar_t* url, const wchar_t* urlText);
 
     ~CMessageBox();
 
@@ -331,13 +315,13 @@ struct CStartProgressDialogData;
 // if starting an operation in the worker thread failed in this dialog; when FALSE
 // is returned the caller must free the script 'script' manually (otherwise the script
 // is freed after the operation in the worker thread finishes)
-BOOL StartProgressDialog(COperations* script, const char* caption,
+BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
                          CChangeAttrsData* attrsData, CConvertData* convertData);
 
 class CProgressDialog : public CCommonDialog
 {
 public:
-    CProgressDialog(HWND parent, COperations* script, const char* caption,
+    CProgressDialog(HWND parent, COperations* script, const wchar_t* caption,
                     CChangeAttrsData* attrsData, CConvertData* convertData,
                     BOOL runningInOwnThread, CStartProgressDialogData* progrDlgData);
     ~CProgressDialog();
@@ -375,7 +359,7 @@ protected:
         *Target,
         *Status;
     COperations* Script;
-    char Caption[50];
+    std::wstring Caption;
     CChangeAttrsData* AttrsData;
     CConvertData* ConvertData;
     BOOL AcceptCommands;
@@ -394,10 +378,8 @@ protected:
 
     // texts are stored in a cache and drawn when the timer fires
     BOOL CacheIsDirty;
-    char OperationCache[100];
-    char PrepositionCache[100];
-    CPathBuffer SourceCache;
-    CPathBuffer TargetCache;
+    std::wstring OperationCache;
+    std::wstring PrepositionCache;
     std::wstring SourceCacheW;
     std::wstring TargetCacheW;
 
@@ -414,16 +396,21 @@ protected:
 class CFileErrorDlg : public CCommonDialog
 {
 public:
-    CFileErrorDlg(HWND parent, const char* caption, const char* file, const char* error,
-                  BOOL noSkip = FALSE, int altRes = 0, const wchar_t* fileW = NULL);
+    // Caption and error are WIDE. The file name already was (fileW),
+    // so this dialog could show a Unicode file name correctly while narrowing the
+    // error text describing it - the two halves are consistent now.
+    // 'file' is wide, and the fileW duplicate is GONE. It existed only
+    // because 'file' could not represent every filename; two wide names cannot
+    // usefully disagree. Same reasoning that deleted CFileData::NameW in P1.3.
+    CFileErrorDlg(HWND parent, const wchar_t* caption, const wchar_t* file, const wchar_t* error,
+                  BOOL noSkip = FALSE, int altRes = 0);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char *Caption,
-        *File,
-        *Error;
-    const wchar_t* FileW;
+    const wchar_t* Caption;
+    const wchar_t* File;
+    const wchar_t* Error;
 };
 
 //
@@ -432,16 +419,18 @@ protected:
 class CErrorReadingADSDlg : public CCommonDialog
 {
 public:
-    CErrorReadingADSDlg(HWND parent, const char* file, const char* error,
-                        const char* title = NULL, const wchar_t* fileW = NULL);
+    // The fileW/titleW/errorW duplicates are GONE - file, error and title
+    // are wide themselves now, and two wide strings cannot usefully disagree.
+    // unicodeWnd=TRUE is still required for the text to reach the screen intact.
+    CErrorReadingADSDlg(HWND parent, const wchar_t* file, const wchar_t* error,
+                        const wchar_t* title = NULL);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char *File,
+    const wchar_t *File,
         *Error,
         *Title;
-    const wchar_t* FileW;
 };
 
 //
@@ -450,12 +439,12 @@ protected:
 class CErrorSettingAttrsDlg : public CCommonDialog
 {
 public:
-    CErrorSettingAttrsDlg(HWND parent, const char* file, DWORD neededAttrs, DWORD currentAttrs);
+    CErrorSettingAttrsDlg(HWND parent, const wchar_t* file, DWORD neededAttrs, DWORD currentAttrs);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* File;
+    const wchar_t* File;
     DWORD NeededAttrs;
     DWORD CurrentAttrs;
 };
@@ -466,17 +455,14 @@ protected:
 class CErrorCopyingPermissionsDlg : public CCommonDialog
 {
 public:
-    CErrorCopyingPermissionsDlg(HWND parent, const char* sourceFile,
-                                const char* targetFile, DWORD error,
-                                const wchar_t* sourceFileW = NULL, const wchar_t* targetFileW = NULL);
+    CErrorCopyingPermissionsDlg(HWND parent, const wchar_t* sourceFile,
+                                const wchar_t* targetFile, DWORD error);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* SourceFile;
-    const char* TargetFile;
-    const wchar_t* SourceFileW;
-    const wchar_t* TargetFileW;
+    const wchar_t* SourceFile;
+    const wchar_t* TargetFile;
     DWORD Error;
 };
 
@@ -486,14 +472,12 @@ protected:
 class CErrorCopyingDirTimeDlg : public CCommonDialog
 {
 public:
-    CErrorCopyingDirTimeDlg(HWND parent, const char* targetFile, DWORD error,
-                            const wchar_t* targetFileW = NULL);
+    CErrorCopyingDirTimeDlg(HWND parent, const wchar_t* targetFile, DWORD error);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* TargetFile;
-    const wchar_t* TargetFileW;
+    const wchar_t* TargetFile;
     DWORD Error;
 };
 
@@ -503,20 +487,22 @@ protected:
 class COverwriteDlg : public CCommonDialog
 {
 public:
-    COverwriteDlg(HWND parent, const char* sourceName, const char* sourceAttr,
-                  const char* targetName, const char* targetAttr, BOOL yesnocancel = FALSE,
-                  BOOL dirOverwrite = FALSE, const wchar_t* sourceNameW = NULL,
-                  const wchar_t* targetNameW = NULL);
+    // The ATTR strings are wide (shown with SetWindowTextW, which is
+    // not class-bound). The NAMES stay narrow: they pass through RemapNames, an
+    // ANSI remap table that is genuinely narrow for now.
+    // The sourceNameW/targetNameW duplicates are GONE - the names are
+    // wide themselves now. unicodeWnd=TRUE remains required for them to reach the screen.
+    COverwriteDlg(HWND parent, const wchar_t* sourceName, const wchar_t* sourceAttr,
+                  const wchar_t* targetName, const wchar_t* targetAttr, BOOL yesnocancel = FALSE,
+                  BOOL dirOverwrite = FALSE);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char *SourceName,
-        *SourceAttr,
-        *TargetName,
-        *TargetAttr;
-    const wchar_t *SourceNameW,
-        *TargetNameW;
+    const wchar_t* SourceName;
+    const wchar_t* SourceAttr;
+    const wchar_t* TargetName;
+    const wchar_t* TargetAttr;
 };
 
 //
@@ -525,15 +511,18 @@ protected:
 class CHiddenOrSystemDlg : public CCommonDialog
 {
 public:
-    CHiddenOrSystemDlg(HWND parent, const char* caption, const char* name,
-                       const char* error, BOOL yesnocancel = FALSE, BOOL yesallcancel = FALSE);
+    // Caption and error wide, matching its sibling CFileErrorDlg.
+    // 'name' is WIDE. It is a file name shown next to a wide
+    // question, so narrowing it was the one lossy half of this dialog.
+    CHiddenOrSystemDlg(HWND parent, const wchar_t* caption, const wchar_t* name,
+                       const wchar_t* error, BOOL yesnocancel = FALSE, BOOL yesallcancel = FALSE);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char *Caption,
-        *Name,
-        *Error;
+    const wchar_t* Caption;
+    const wchar_t* Name;
+    const wchar_t* Error;
 };
 
 //
@@ -542,15 +531,14 @@ protected:
 class CConfirmADSLossDlg : public CCommonDialog
 {
 public:
-    CConfirmADSLossDlg(HWND parent, BOOL isFile, const char* name, const char* streams,
-                       BOOL isMove, const wchar_t* nameW = NULL);
+    CConfirmADSLossDlg(HWND parent, BOOL isFile, const wchar_t* name, const wchar_t* streams,
+                       BOOL isMove);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* Name;
-    const wchar_t* NameW;
-    const char* Streams;
+    const wchar_t* Name;
+    const wchar_t* Streams;
     BOOL IsFile;
     BOOL IsMove;
 };
@@ -561,13 +549,13 @@ protected:
 class CConfirmLinkTgtCopyDlg : public CCommonDialog
 {
 public:
-    CConfirmLinkTgtCopyDlg(HWND parent, const char* name, const char* details);
+    CConfirmLinkTgtCopyDlg(HWND parent, const wchar_t* name, const wchar_t* details);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* Name;
-    const char* Details;
+    const wchar_t* Name;
+    const wchar_t* Details;
 };
 
 //
@@ -576,12 +564,12 @@ protected:
 class CConfirmEncryptionLossDlg : public CCommonDialog
 {
 public:
-    CConfirmEncryptionLossDlg(HWND parent, BOOL isFile, const char* name, BOOL isMove);
+    CConfirmEncryptionLossDlg(HWND parent, BOOL isFile, const wchar_t* name, BOOL isMove);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* Name;
+    const wchar_t* Name;
     BOOL IsFile;
     BOOL IsMove;
 };
@@ -592,18 +580,18 @@ protected:
 class CCannotMoveDlg : public CCommonDialog
 {
 public:
-    CCannotMoveDlg(HWND parent, int resID, char* sourceName, char* targetName,
-                   char* error, const wchar_t* sourceNameW = NULL,
-                   const wchar_t* targetNameW = NULL);
+    // All three W duplicates are gone; the names and the error are wide.
+    // IDS_ERROR is a child static control (always Unicode-native regardless of the
+    // dialog's own window class), so no unicodeWnd opt-in is needed here.
+    CCannotMoveDlg(HWND parent, int resID, wchar_t* sourceName, wchar_t* targetName,
+                   wchar_t* error);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    char *SourceName,
+    wchar_t *SourceName,
         *TargetName,
         *Error;
-    const wchar_t *SourceNameW,
-        *TargetNameW;
 };
 
 //
@@ -624,7 +612,7 @@ protected:
     CQuadWord Size, Compressed, Occupied;
     int Files, Dirs;
     TDirectArray<CQuadWord>* Sizes;
-    char UnknownText[100];
+    std::wstring UnknownText;
 };
 
 //
@@ -635,13 +623,13 @@ class CColorGraph;
 class CDriveInfo : public CCommonDialog
 {
 protected:
-    CPathBuffer VolumePath; // which drive information should be shown (either the root or a junction point)
-    char OldVolumeName[1000];  // for change detection
+    std::wstring VolumePath; // which drive information should be shown (either the root or a junction point)
+    std::wstring OldVolumeName; // for change detection
     CColorGraph* Graph;
     HICON HDriveIcon;
 
 public:
-    CDriveInfo(HWND parent, const char* path, CObjectOrigin origin = ooStandard);
+    CDriveInfo(HWND parent, const wchar_t* path, CObjectOrigin origin = ooStandard);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -679,7 +667,7 @@ private:
     BOOL SelectionContainsDirectory;
 
 public:
-    CPathBuffer Mask; // which files will be converted?
+    std::wstring Mask; // which files will be converted?
     int Change;          // which conversion should be performed?
     BOOL SubDirs;        // include subdirectories?
     int CodeType;        // selected encoding (0 = none)
@@ -709,10 +697,10 @@ protected:
     CMaskGroup* Filter;
     BOOL* UseFilter;
     //    BOOL       *Inverse;
-    char** FilterHistory;
+    wchar_t** FilterHistory;
 
 public:
-    CFilterDialog(HWND parent, CMaskGroup* filter, char** filterHistory,
+    CFilterDialog(HWND parent, CMaskGroup* filter, wchar_t** filterHistory,
                   BOOL* use /*, BOOL *inverse*/);
 
     virtual void Validate(CTransferInfo& ti);
@@ -755,10 +743,10 @@ protected:
 class CEnterPasswdDialog : public CCommonDialog
 {
 public:
-    char Passwd[PASSWORD_MAXLEN];
-    char User[USERNAME_MAXLEN];
+    std::wstring Passwd;
+    std::wstring User;
 
-    CEnterPasswdDialog(HWND parent, const char* path, const char* user, CObjectOrigin origin = ooStandard);
+    CEnterPasswdDialog(HWND parent, const wchar_t* path, const wchar_t* user, CObjectOrigin origin = ooStandard);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -766,7 +754,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    const char* Path;
+    const wchar_t* Path;
 };
 
 //
@@ -775,25 +763,15 @@ protected:
 class CChangeDirDlg : public CCommonDialog
 {
 public:
-    CChangeDirDlg(HWND parent, char* path, int pathBufSize, BOOL* sendDirectlyToPlugin);
-
-    void SetUnicodePath(const std::wstring& pathW);
-    const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return !PathW.empty(); }
+    CChangeDirDlg(HWND parent, std::wstring& path, BOOL* sendDirectlyToPlugin);
 
     virtual void Transfer(CTransferInfo& ti);
 
 protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    char* Path;
-    int PathBufSize;
+    std::wstring& Path;
     BOOL* SendDirectlyToPlugin;
-
-    // Unicode support
-    std::wstring PathW;
-    std::wstring ResultW;
-    HWND HUnicodeEdit;
 };
 
 //
@@ -804,28 +782,23 @@ class CPackerConfig;
 class CPackDialog : public CCommonDialog
 {
 public:
-    CPackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt,
+    CPackDialog(HWND parent, std::wstring& path, const std::wstring& pathAlt,
                 CTruncatedString* subject, CPackerConfig* config);
 
     virtual void Transfer(CTransferInfo& ti);
 
     void SetSelectionEnd(int selectionEnd);
-    void SetUnicodePath(const std::wstring& pathW);
-    const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return !PathW.empty(); }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    // changes the extension in buffer 'name' to 'ext'; returns TRUE on success
-    BOOL ChangeExtension(char* name, const char* ext);
+    // changes the extension in 'name' to 'ext'; returns TRUE on success
+    BOOL ChangeExtension(std::wstring& name, const wchar_t* ext);
 
-    char* Path;
-    int PathBufSize;
-    std::wstring PathW;         // Unicode input path
-    std::wstring ResultW;       // Unicode result
-    HWND HUnicodeEdit;          // Overlay Unicode edit control
-    const char* PathAlt;
+    std::wstring& Path;
+    // HWND HUnicodeEdit removed - P0.5a keeps the native IDE_PATH
+    // combo's edit child Unicode, so there is nothing left to overlay.
+    const std::wstring& PathAlt;
     CTruncatedString* Subject;
     CPackerConfig* PackerConfig;
     int SelectionEnd;
@@ -839,28 +812,20 @@ class CUnpackerConfig;
 class CUnpackDialog : public CCommonDialog
 {
 public:
-    CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
+    CUnpackDialog(HWND parent, std::wstring& path, const std::wstring& pathAlt, std::wstring& mask,
                   CTruncatedString* subject, CUnpackerConfig* config,
                   BOOL* delArchiveWhenDone);
 
     virtual void Transfer(CTransferInfo& ti);
-
-    void SetUnicodePath(const std::wstring& pathW);
-    const std::wstring& GetUnicodeResult() const { return ResultW; }
-    BOOL IsUnicodeMode() const { return !PathW.empty(); }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
     void EnableDelArcCheckbox();
 
-    char *Mask,
-        *Path;
-    int PathBufSize;
-    std::wstring PathW;         // Unicode input path
-    std::wstring ResultW;       // Unicode result
-    HWND HUnicodeEdit;          // Overlay Unicode edit control
-    const char* PathAlt;
+    std::wstring& Mask;
+    std::wstring& Path;
+    const std::wstring& PathAlt;
     CTruncatedString* Subject;
     CUnpackerConfig* UnpackerConfig;
     BOOL* DelArchiveWhenDone;
@@ -890,8 +855,8 @@ public:
     CSplashScreen();
     ~CSplashScreen();
 
-    BOOL PaintText(const char* text, int x, int y, BOOL bold, COLORREF clr);
-    void SetText(const char* text);
+    BOOL PaintText(const wchar_t* text, int x, int y, BOOL bold, COLORREF clr); // wide (DrawTextW)
+    void SetText(const wchar_t* text); // wide
     int GetWidth() { return Width; }
     int GetHeight() { return Height; }
 
@@ -966,7 +931,7 @@ class CBetaExpiredDialog : public CCommonDialog
 {
 protected:
     int Count;
-    char OldOK[30];
+    std::wstring OldOK;
 
 public:
     CBetaExpiredDialog(HWND parent);
@@ -1004,14 +969,14 @@ class CChangeIconDialog : public CCommonDialog
 {
 protected:
     // for transferring data to and from the dialog
-    char* IconFile;
+    std::wstring* IconFile;
     int* IconIndex;
     BOOL Dirty;
     HICON* Icons;     // array of enumerated icon handles
     DWORD IconsCount; // number of icons in the array
 
 public:
-    CChangeIconDialog(HWND hParent, char* iconFile, int* iconIndex);
+    CChangeIconDialog(HWND hParent, std::wstring& iconFile, int* iconIndex);
     ~CChangeIconDialog();
 
     virtual void Transfer(CTransferInfo& ti);
@@ -1019,7 +984,7 @@ public:
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    void GetShell32(char* fileName, int fileNameSize);
+    void GetShell32(std::wstring& fileName);
 
     BOOL LoadIcons();    // enumerates icons and fills the Icons array
     void DestroyIcons(); // clears the Icons array
@@ -1040,11 +1005,11 @@ protected:
     HIMAGELIST HImageList;      // image list for the listview
     BOOL RefreshPanels;         // should the panels be refreshed after closing the dialog?
     BOOL DrivesBarChange;       // should the Drives bars be refreshed after closing the dialog?
-    CPathBuffer FocusPlugin; // empty if no plugin should get focus; otherwise contains its path
+    std::wstring FocusPlugin; // empty if no plugin should get focus; otherwise contains its path
     CHyperLink* Url;
-    char ShowInBarText[200];        // text taken from the checkbox when the dialog opens
-    char ShowInChDrvText[200];      // text taken from the checkbox when the dialog opens
-    char InstalledPluginsText[200]; // text taken from the listview caption when the dialog opens
+    std::wstring ShowInBarText;        // text taken from the checkbox when the dialog opens
+    std::wstring ShowInChDrvText;      // text taken from the checkbox when the dialog opens
+    std::wstring InstalledPluginsText; // text taken from the listview caption when the dialog opens
 
 public:
     CPluginsDlg(HWND hParent);
@@ -1052,7 +1017,7 @@ public:
     // dialog return values:
     BOOL GetRefreshPanels() { return RefreshPanels; }
     BOOL GetDrivesBarChange() { return DrivesBarChange; }
-    const char* GetFocusPlugin() { return FocusPlugin; }
+    const wchar_t* GetFocusPlugin() { return FocusPlugin.c_str(); }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -1138,8 +1103,12 @@ protected:
 class CWaitWindow : public CWindow
 {
 protected:
-    std::string Caption;
-    std::string Text;
+    // The caption is a window title, so its storage, the registered class, and
+    // the CWindow::CreateEx call must remain an explicitly wide adapter as one unit.
+    std::wstring Caption;
+    // Text is wide: it is only ever drawn with DrawText, a GDI call that is NOT
+    // class-bound, so the wide form works today.
+    std::wstring Text;
     SIZE TextSize;
     HWND HParent;
     HWND HForegroundWnd;
@@ -1157,9 +1126,8 @@ public:
     CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObjectOrigin origin = ooAllocated, BOOL showProgressBar = FALSE);
     ~CWaitWindow();
 
-    void SetCaption(const char* text); // if not called, the caption will be "Open Salamander"
-    void SetText(const char* text);
-
+    void SetCaption(const wchar_t* text); // if not called, the caption will be "Open Salamander"
+    void SetText(const wchar_t* text); // wide - see the Text member
     void SetProgressMax(DWORD max);
     void SetProgressPos(DWORD pos);
 
@@ -1232,8 +1200,8 @@ class CTipOfTheDayDialog: public CCommonDialog
 
 struct CImportOldKey
 {
-    char* SalamanderVersion;
-    char* SalamanderPath;
+    wchar_t* SalamanderVersion;
+    wchar_t* SalamanderPath;
 };
 
 class CImportConfigDialog : public CCommonDialog
@@ -1268,25 +1236,25 @@ class CLanguageSelectorDialog : public CCommonDialog
 protected:
     TDirectArray<CLanguage> Items;
     CHyperLink* Web;
-    char* SLGName;
+    std::wstring& SLGName;
     BOOL OpenedFromConfiguration;
     BOOL OpenedForPlugin;
     HWND HListView;
-    const char* PluginName;
-    char ExitButtonLabel[100];
+    const wchar_t* PluginName;
+    std::wstring ExitButtonLabel;
 
 public:
-    CLanguageSelectorDialog(HWND hParent, char* slgName, const char* pluginName);
+    CLanguageSelectorDialog(HWND hParent, std::wstring& slgName, const wchar_t* pluginName);
     ~CLanguageSelectorDialog();
 
     int Execute();
 
     // scans the 'lang' directory and adds all valid SLG files to the array
-    BOOL Initialize(const char* slgSearchPath = NULL, HINSTANCE pluginDLL = NULL);
+    BOOL Initialize(const wchar_t* slgSearchPath = NULL, HINSTANCE pluginDLL = NULL);
 
     int GetLanguagesCount() { return Items.Count; }
-    BOOL GetSLGName(char* path, int index = 0); // returns xxxx.slg of the item at index 'index'
-    BOOL SLGNameExists(const char* slgName);    // checks whether 'slgName' exists in 'Items'
+    BOOL GetSLGName(std::wstring& path, int index = 0); // returns xxxx.slg of the item at index 'index'
+    BOOL SLGNameExists(const wchar_t* slgName);    // checks whether 'slgName' exists in 'Items'
 
     void FillControls();
 
@@ -1298,7 +1266,7 @@ public:
     // the Windows setting, and if 'exactMatch' is FALSE then english.slg or otherwise the first
     // found .slg; if 'exactMatch' is TRUE, it returns the index of 'selectSLGName' (if not NULL)
     // or the Windows setting or -1 (nothing found)
-    int GetPreferredLanguageIndex(const char* selectSLGName, BOOL exactMatch = FALSE);
+    int GetPreferredLanguageIndex(const wchar_t* selectSLGName, BOOL exactMatch = FALSE);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -1313,10 +1281,10 @@ class CConversionTablesDialog : public CCommonDialog
 {
 protected:
     HWND HListView;
-    char* DirName;
+    std::wstring& DirName;
 
 public:
-    CConversionTablesDialog(HWND parent, char* dirName);
+    CConversionTablesDialog(HWND parent, std::wstring& dirName);
     ~CConversionTablesDialog();
 
     void Transfer(CTransferInfo& ti);
@@ -1358,9 +1326,9 @@ protected:
 public:
     CSharesDialog(HWND hParent);
 
-    const char* GetFocusedPath(); // returns the path of the selected share; call only after the dialog returns
-                                  // returns NULL if "Focus" wasn't clicked and the dialog returned IDOK
-                                  // from Execute()
+    const wchar_t* GetFocusedPathW(); // returns the path of the selected share, the exact wide form from
+                                      // NetShareEnum; call only after the dialog returns. Returns NULL if
+                                      // "Focus" wasn't clicked and the dialog returned IDOK from Execute()
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -1370,9 +1338,10 @@ protected:
     void InitColumns(); // add columns to the ListView
     void Refresh();     // loads shared folders and adds them to the listview
     static int CALLBACK SortFunc(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort);
-    void SortItems();                        // sorts items based on the SortBy variable
-    int GetFocusedIndex();                   // returns index to SharetDirs array or -1 if no item is selected
-    void DeleteShare(const char* shareName); // request the system to remove the share
+    void SortItems();                          // sorts items based on the SortBy variable
+    int GetFocusedIndex();                     // returns index to SharetDirs array or -1 if no item is selected
+    void DeleteShare(const wchar_t* shareName); // request the system to remove the share; takes
+                                                // the exact wide share name now, no ANSI round trip before NetShareDel
     void OnContextMenu(int x, int y);        // shows the context menu for the selected item at coordinates x, y
     void EnableControls();                   // button enabler
 };
@@ -1400,8 +1369,8 @@ struct CConnectionItem
 {
     CConnectionItemType Type;
     int IconIndex; // icon index in HImageList (CONNECTION_ICON_xxx)
-    char* Name;    // Name column
-    char* Path;    // Path column
+    wchar_t* Name;    // Name column
+    wchar_t* Path;    // Path column
     BOOL Default;  // if TRUE, the item is FOCUSED+SELECTED after the listview is filled; only one item in the array should have Default == TRUE
 
     // only for Type == citPlugin: FS interface (might not be valid, verify)
@@ -1421,7 +1390,7 @@ public:
     CDisconnectDialog(CFilesWindow* panel);
     ~CDisconnectDialog();
 
-    const char* GetFocusedPath();                 // returns the path of the selected share; call only after the dialog returns
+    const wchar_t* GetFocusedPath();                 // returns the path of the selected share; call only after the dialog returns
                                                   // returns NULL if "Focus" wasn't clicked and the dialog returned IDOK
                                                   // from Execute()
     BOOL NoConnection() { return NoConncection; } // returns TRUE if the dialog wasn't opened because there was no connection
@@ -1447,7 +1416,7 @@ protected:
     // if index == -1 the item is appended to the end of the list
     // if ignoreDuplicate is set, the array is searched first and the item is skipped if already present
     BOOL InsertItem(int index, BOOL ignoreDuplicate, CConnectionItemType type, int iconIndex,
-                    const char* name, const char* path, BOOL defaultItem,
+                    const wchar_t* name, const wchar_t* path, BOOL defaultItem,
                     CPluginFSInterfaceAbstract* pluginFS);
 
     void DestroyConnections(); // empties/frees the Connections array
@@ -1554,8 +1523,8 @@ protected:
     CProgressBar* Progress;
     CProgressBar* TotalProgress;
 
-    CPathBuffer DelayedSource; // text displayed later
-    CPathBuffer DelayedTarget; // text displayed later
+    std::wstring DelayedSource; // text displayed later
+    std::wstring DelayedTarget; // text displayed later
     BOOL DelayedSourceDirty;
     BOOL DelayedTargetDirty;
 
@@ -1574,8 +1543,11 @@ public:
     CCmpDirProgressDialog(HWND hParent, BOOL hasProgress, CITaskBarList3* taskBarList3); // if 'hasProgress' is TRUE, the dialog shows a progress bar
 
     // text setup
-    void SetSource(const char* text);
-    void SetTarget(const char* text);
+    // One wide parameter. The old narrow/wide pair mirrored the same text twice -
+    // the narrow half was a CP_ACP round trip that the paint never read, because
+    // the paint preferred the wide one.
+    void SetSource(const wchar_t* text);
+    void SetTarget(const wchar_t* text);
 
     // the following three methods are relevant only when the progress bar is shown
 
@@ -1624,14 +1596,14 @@ protected:
 class CDriveSelectErrDlg : public CCommonDialog
 {
 public:
-    CDriveSelectErrDlg(HWND parent, const char* errText, const char* drvPath);
+    CDriveSelectErrDlg(HWND parent, const wchar_t* errText, const wchar_t* drvPath);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 protected:
-    const char* ErrText;
-    CPathBuffer DrvPath;
+    const wchar_t* ErrText;
+    std::wstring DrvPath;
     int CounterForAllowedUseOfTimer;
 };
 
@@ -1641,8 +1613,8 @@ protected:
 class CCompareArgsDlg : public CCommonDialog
 {
 public:
-    CCompareArgsDlg(HWND parent, BOOL comparingFiles, char* compareName1,
-                    char* compareName2, int* cnfrmShowNamesToCompare);
+    CCompareArgsDlg(HWND parent, BOOL comparingFiles, std::wstring& compareName1,
+                    std::wstring& compareName2, int* cnfrmShowNamesToCompare);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -1652,8 +1624,8 @@ protected:
 
 protected:
     BOOL ComparingFiles;
-    char* CompareName1;
-    char* CompareName2;
+    std::wstring& CompareName1;
+    std::wstring& CompareName2;
     int* CnfrmShowNamesToCompare;
 };
 

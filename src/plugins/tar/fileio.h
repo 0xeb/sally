@@ -11,10 +11,10 @@ class CDecompressFile
 {
 public:
     // detects the archive type and returns a properly initialized object
-    static CDecompressFile* CreateInstance(LPCTSTR filename, DWORD offset, CQuadWord inputSize);
+    static CDecompressFile* CreateInstance(const wchar_t* filename, DWORD offset, CQuadWord inputSize);
 
     // constructor and destructor
-    CDecompressFile(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord size);
+    CDecompressFile(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord size);
     virtual ~CDecompressFile();
 
     virtual BOOL IsCompressed() { return FALSE; }
@@ -32,8 +32,9 @@ public:
     CQuadWord GetStreamPos() { return StreamPos; }
     // returns the original file name stored in the archive (the tar name in gzip, etc.)
     const char* GetOldName();
+    std::wstring GetOldNameW() const;
     // returns the name of the file it works with (the archive name)
-    const char* GetArchiveName() { return FileName; }
+    const wchar_t* GetArchiveName() { return FileName.c_str(); }
 
     // returns part or all of the last read block for further use
     virtual void Rewind(unsigned short size);
@@ -47,12 +48,12 @@ protected:
     // reads a byte from the file
     unsigned char FReadByte();
     // sets the original file name (if it was stored in the archive)
-    void SetOldName(char* oldName);
+    void SetOldName(const char* oldName);
 
     BOOL FreeBufAndFile;      // TRUE = we took over the file and buffer, release them in the destructor
     BOOL Ok;                  // state flag
     unsigned int ErrorCode;   // if an error occurred, it is specified here
-    const char* FileName;     // archive name we are working with
+    std::wstring FileName;    // local archive path
     char* OldName;            // original file name before packing
     CQuadWord InputSize;      // archive size
     CQuadWord StreamPos;      // position in the archive (for progress)
@@ -67,7 +68,7 @@ class CZippedFile : public CDecompressFile
 {
 public:
     // constructor and destructor
-    CZippedFile(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize);
+    CZippedFile(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize);
     virtual ~CZippedFile();
 
     virtual BOOL IsCompressed() { return TRUE; }

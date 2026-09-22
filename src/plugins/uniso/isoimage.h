@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <string_view>
+
 #include "file.h"
 #include "hfs.h"
 
@@ -26,8 +29,6 @@ class CUnISOFSAbstract;
 #define FS_TYPE_ISO9660 1
 #define FS_TYPE_UDF 2
 #define FS_TYPE_HFS 3
-
-#define ISO_MAX_PATH_LEN 1024
 
 // ****************************************************************************
 //
@@ -81,8 +82,8 @@ public:
 
         Track();
         virtual ~Track();
-        virtual const char* GetLabel();
-        virtual void SetLabel(const char* label);
+        virtual const wchar_t* GetLabel();
+        virtual bool SetLabel(std::wstring_view label) noexcept;
     };
 
     struct CFilePos
@@ -129,7 +130,7 @@ protected:
 
     FILETIME LastWrite;
 
-    char* Label;
+    std::wstring Label;
 
     //
     TIndirectArray<Track> Tracks; // tracks
@@ -140,25 +141,27 @@ public:
 
     // Opens the ISO image named 'fileName'. The 'quiet' parameter determines whether
     // message boxes with errors will pop up
-    BOOL Open(const char* fileName, BOOL quiet = FALSE);
+    BOOL Open(const wchar_t* fileName, BOOL quiet = FALSE);
     BOOL OpenTrack(int track, BOOL quiet = FALSE);
     BOOL DetectTrackFS(int track);
 
     BOOL ListImage(CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
     // returns one of the UNPACK_XXX constants
-    int UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* srcPath, const char* name, const CFileData* fileData,
+    int UnpackFile(CSalamanderForOperationsAbstract* salamander, const std::wstring& archivePath,
+                   const std::wstring& targetPath, const CFileData* fileData,
                    DWORD& silent, BOOL& toSkip);
     // returns one of the UNPACK_XXX constants
-    int UnpackDir(const char* dirName, const CFileData* fileData);
+    int UnpackDir(const wchar_t* dirName, const CFileData* fileData);
 
     // returns one of the UNPACK_XXX constants
-    int ExtractAllItems(CSalamanderForOperationsAbstract* salamander, char* srcPath, CSalamanderDirectoryAbstract const* dir,
-                        const char* mask, char* path, int pathBufSize, DWORD& silent, BOOL& toSkip);
+    int ExtractAllItems(CSalamanderForOperationsAbstract* salamander, const std::wstring& archivePath,
+                        CSalamanderDirectoryAbstract const* dir, const wchar_t* mask,
+                        const std::wstring& targetPath, DWORD& silent, BOOL& toSkip);
 
     BOOL DumpInfo(FILE* outStream);
 
-    void SetLabel(const char* label);
-    const char* GetLabel();
+    bool SetLabel(std::wstring_view label) noexcept;
+    const wchar_t* GetLabel() const;
 
     // track things
     void AddTrack(Track* track);
@@ -176,7 +179,7 @@ public:
 
 protected:
     DWORD ReadDataByPos(LONGLONG position, DWORD size, void* data);
-    BOOL ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
+    BOOL ListDirectory(const std::wstring& path, int session, CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
 
     // support
     void DetectSectorType();
@@ -200,13 +203,13 @@ protected:
 
     BOOL ReadSessionInfo(BOOL quiet = FALSE);
     BOOL ReadSessionNRG(BOOL quiet = FALSE);
-    BOOL ReadSessionCCD(char* fileName, BOOL quiet = FALSE);
+    BOOL ReadSessionCCD(const wchar_t* fileName, BOOL quiet = FALSE);
     //    BOOL ProcessReadSessionCCD(char *fileName, BOOL quiet = FALSE);
 
     void SetTrackParams(int trackno);
     //    void SetTrackFromMode(ETrackMode mode);
 
-    char* FileName;
+    wchar_t* FileName;
 
     friend class CUDF;
     friend class CHFS;
@@ -218,9 +221,5 @@ public:
 // helpers
 void ISODateTimeToFileTime(BYTE isodt[], FILETIME* ft);
 void ISODateTimeStrToSystemTime(BYTE isodt[], SYSTEMTIME* st);
-void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size);
-void SetFileAttrs(const char* name, DWORD attrs, BOOL quiet = FALSE);
-
-// viewer
-char* ViewerPrintSystemTime(SYSTEMTIME* st);
-char* ViewerStrNcpy(char data[], int count);
+std::wstring GetInfo(FILETIME* lastWrite, CQuadWord size);
+void SetFileAttrs(const wchar_t* name, DWORD attrs, BOOL quiet = FALSE);

@@ -11,11 +11,11 @@
 #include "plugins.h"
 #include "fileswnd.h"
 
-int CPlugins::AddPluginToOrder(const char* dllName, BOOL showInBar)
+int CPlugins::AddPluginToOrder(const wchar_t* dllName, BOOL showInBar)
 {
     int index = -1;
     CPluginOrder o;
-    o.DLLName = dllName ? dllName : "";
+    o.DLLName = dllName ? dllName : L"";
     o.ShowInBar = showInBar;
     o.Index = -1;
     o.Flags = 0;
@@ -30,13 +30,13 @@ int CPlugins::AddPluginToOrder(const char* dllName, BOOL showInBar)
 void CPlugins::QuickSortPluginsByName(int left, int right)
 {
     int i = left, j = right;
-    const char* pivot = Data[Order[(i + j) / 2].Index]->Name.c_str();
+    const wchar_t* pivot = Data[Order[(i + j) / 2].Index]->Name.c_str();
 
     do
     {
-        while (strcmp(Data[Order[i].Index]->Name.c_str(), pivot) < 0 && i < right)
+        while (wcscmp(Data[Order[i].Index]->Name.c_str(), pivot) < 0 && i < right)
             i++;
-        while (strcmp(pivot, Data[Order[j].Index]->Name.c_str()) < 0 && j > left)
+        while (wcscmp(pivot, Data[Order[j].Index]->Name.c_str()) < 0 && j > left)
             j--;
 
         if (i <= j)
@@ -55,13 +55,13 @@ void CPlugins::QuickSortPluginsByName(int left, int right)
         QuickSortPluginsByName(i, right);
 }
 
-BOOL CPlugins::PluginVisibleInBar(const char* dllName)
+BOOL CPlugins::PluginVisibleInBar(const wchar_t* dllName)
 {
     int i;
     for (i = 0; i < (int)Order.size(); i++)
     {
         CPluginOrder* order = &Order[i];
-        if (stricmp(dllName, order->DLLName.c_str()) == 0)
+        if (_wcsicmp(dllName, order->DLLName.c_str()) == 0)
         {
             return order->ShowInBar;
         }
@@ -87,7 +87,7 @@ void CPlugins::UpdatePluginsOrder(BOOL sortByName)
         for (j = 0; j < (int)Order.size(); j++)
         {
             CPluginOrder* order = &Order[j];
-            if (order->Flags == 0 && stricmp(pluginData->DLLName.c_str(), order->DLLName.c_str()) == 0)
+            if (order->Flags == 0 && _wcsicmp(pluginData->DLLName.c_str(), order->DLLName.c_str()) == 0)
             {
                 foundIndex = j;
                 break;

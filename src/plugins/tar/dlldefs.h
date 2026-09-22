@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 typedef unsigned int uint32_t;
 typedef unsigned short uint16_t;
 typedef signed int int32_t;
@@ -15,6 +17,6 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 // interface for convenient work with files
 extern CSalamanderSafeFileAbstract* SalamanderSafeFile;
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
-char* LoadErr(int resID, DWORD LastError);
+const wchar_t* LoadErr(int resID, DWORD LastError);

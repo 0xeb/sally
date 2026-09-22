@@ -14,13 +14,13 @@
 
 struct CUserMenuIconData
 {
-    CPathBuffer FileName;     // file name from which we read icon at IconIndex (via ExtractIconEx())
-    DWORD IconIndex;          // see comment for FileName
-    CPathBuffer UMCommand;    // file name from which we read icon (via GetFileOrPathIconAux())
+    std::wstring FileName; // file name from which we read icon at IconIndex (via ExtractIconEx())
+    DWORD IconIndex;       // see comment for FileName
+    std::wstring UMCommand; // file name from which we read icon (via GetFileOrPathIconAuxW())
 
     HICON LoadedIcon; // NULL = icon not loaded, otherwise handle of loaded icon
 
-    CUserMenuIconData(const char* fileName, DWORD iconIndex, const char* umCommand);
+    CUserMenuIconData(const wchar_t* fileName, DWORD iconIndex, const wchar_t* umCommand);
     ~CUserMenuIconData();
 
     void Clear();
@@ -37,7 +37,7 @@ public:
     void SetIRThreadID(DWORD id) { IRThreadID = id; }
     DWORD GetIRThreadID() { return IRThreadID; }
 
-    HICON GiveIconForUMI(const char* fileName, DWORD iconIndex, const char* umCommand);
+    HICON GiveIconForUMI(const wchar_t* fileName, DWORD iconIndex, const wchar_t* umCommand);
 };
 
 class CUserMenuIconBkgndReader
@@ -107,7 +107,10 @@ enum CUserMenuItemType
 
 struct CUserMenuItem
 {
-    std::string ItemName,
+    // Wide, together with the five registry values that persist them:
+    // the narrow SetValue turns dataSize -1 into strlen(), which on a wide string
+    // measures one character and would have written one-letter user-menu entries.
+    std::wstring ItemName,
         UMCommand,
         Arguments,
         InitDir,
@@ -122,7 +125,7 @@ struct CUserMenuItem
 
     HICON UMIcon;
 
-    CUserMenuItem(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon,
+    CUserMenuItem(const wchar_t* name, const wchar_t* umCommand, const wchar_t* arguments, const wchar_t* initDir, const wchar_t* icon,
                   int throughShell, int closeShell, int useWindow, int showInToolbar,
                   CUserMenuItemType type, CUserMenuIconDataArr* bkgndReaderData);
 
@@ -143,9 +146,9 @@ struct CUserMenuItem
     BOOL GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL getIconsFromReader);
 
     // searches ItemName for & and returns HotKey and TRUE when found
-    BOOL GetHotKey(char* key);
+    BOOL GetHotKey(wchar_t* key);
 
-    BOOL Set(const char* name, const char* umCommand, const char* arguments, const char* initDir, const char* icon);
+    BOOL Set(const wchar_t* name, const wchar_t* umCommand, const wchar_t* arguments, const wchar_t* initDir, const wchar_t* icon);
     void SetType(CUserMenuItemType type);
     BOOL IsGood() { return TRUE; }
 };

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -23,6 +23,7 @@
 #endif // ENABLE_TWAIN32
 #include "exif/exif.h"
 #include "PixelAccess.h"
+#include "plugin_narrow_compat.h"
 
 inline int sgn(int x)
 {
@@ -50,7 +51,7 @@ void NormalizeRect(RECT* r)
 }
 
 // Path to focus, used by menu File/Focus
-TCHAR Focus_Path[32768];
+std::wstring Focus_Path;
 
 // Used by SaveAs dlg to get the current path in the source(=active) panel
 HWND ghSaveAsWindow = NULL;
@@ -118,12 +119,12 @@ CRendererWindow::~CRendererWindow()
 
 void CRendererWindow::SetTitle()
 {
-    TCHAR buff[32768 + 100];
+    std::wstring title;
 
     if (PVHandle != NULL)
     {
-        TCHAR colors[30];
-        LPTSTR fname = FileName;
+        std::wstring colors;
+        const wchar_t* fname = FileName;
         int width, height, id, nColors;
         ;
 
@@ -164,55 +165,53 @@ void CRendererWindow::SetTitle()
         }
         if (IDS_NCOLORS == id)
         {
-            TCHAR fmt[32];
             CQuadWord clrs(nColors, 0);
-            SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(id), 1, &clrs);
-            _stprintf(colors, fmt, nColors);
+            const std::wstring fmt = SPLExpandPluralStringOwned(
+                SalamanderGeneral, LoadStr(id), 1, &clrs);
+            colors = SPLFormatStringOwned(fmt.c_str(), nColors);
         }
         else
         {
-            _stprintf(colors, LoadStr(id), nColors);
+            colors = SPLFormatStringOwned(ToWideArg(LoadStr(id)).c_str(), nColors);
         }
         if (pvii.NumOfImages == 1)
-            _stprintf(buff, LoadStr(IDS_TITLE), fname, width, height,
-                      colors, (int)(ZoomFactor / (ZOOM_SCALE_FACTOR / 100)), LoadStr(IDS_PLUGINNAME));
+            title = SPLFormatStringOwned(ToWideArg(LoadStr(IDS_TITLE)).c_str(), fname, width,
+                                         height, colors.c_str(),
+                                         (int)(ZoomFactor / (ZOOM_SCALE_FACTOR / 100)),
+                                         ToWideArg(LoadStr(IDS_PLUGINNAME)).c_str());
         else
-            _stprintf(buff, LoadStr(IDS_TITLE_MULTI), fname, width, height,
-                      colors, pvii.CurrentImage + 1, pvii.NumOfImages, (int)(ZoomFactor / (ZOOM_SCALE_FACTOR / 100)), LoadStr(IDS_PLUGINNAME));
+            title = SPLFormatStringOwned(ToWideArg(LoadStr(IDS_TITLE_MULTI)).c_str(), fname,
+                                         width, height, colors.c_str(), pvii.CurrentImage + 1,
+                                         pvii.NumOfImages,
+                                         (int)(ZoomFactor / (ZOOM_SCALE_FACTOR / 100)),
+                                         ToWideArg(LoadStr(IDS_PLUGINNAME)).c_str());
     }
     else
-        _tcscpy(buff, LoadStr(IDS_PLUGINNAME));
-    SetWindowText(Viewer->HWindow, buff);
+        title = ToWideArg(LoadStr(IDS_PLUGINNAME));
+    SetWindowTextW(Viewer->HWindow, title.c_str());
 }
 
 BOOL CRendererWindow::OnFileOpen(LPCTSTR defaultDirectory)
 {
-    TCHAR file[32768] = _T("");
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = HWindow;
     // I tried stuffing all extensions into the filter, but the filter stopped working.
     // MSDN mentions no limit. IrfanView handles it like this.
-    TCHAR filterStr[1000];
-    lstrcpyn(filterStr, LoadStr(IDS_OPENFILTER), SizeOf(filterStr));
-    LPTSTR s = filterStr;
-    ofn.lpstrFilter = s;
-    while (*s != 0) // create a double-null-terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = SizeOf(file);
+    std::wstring filter = ToWideArg(LoadStr(IDS_OPENFILTER));
+    std::replace(filter.begin(), filter.end(), L'|', L'\0');
+    filter.push_back(L'\0');
+    ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
     ofn.lpstrInitialDir = defaultDirectory;
     ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+    std::vector<std::wstring> selectedFiles;
+    if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn, selectedFiles) &&
+        selectedFiles.size() == 1)
     {
         EnumFilesSourceUID = -1;
-        OpenFile(file, -1, NULL);
+        OpenFile(selectedFiles[0].c_str(), -1, NULL);
     }
     return TRUE;
 } /* CRendererWindow::OnFileOpen */
@@ -225,7 +224,7 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     LPPVHandle OldPVHandle = PVHandle;
     PVOpenImageExInfo oiei;
 #ifdef _UNICODE
-    CPathBuffer nameA;
+    std::string nameBytes;
 #endif
 
     if (showCmd != -1)
@@ -253,9 +252,12 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     else
     {
 #ifdef _UNICODE
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, nameA.Size(), NULL, NULL);
-        nameA[nameA.Size() - 1] = 0;
-        oiei.FileName = nameA;
+        if (!WideToLegacyTextExact(name, nameBytes))
+        {
+            TRACE_E("PVW32Cnv cannot represent the UTF-16 file name exactly");
+            return FALSE;
+        }
+        oiei.FileName = nameBytes.c_str();
 #else
         oiei.FileName = name;
 #endif
@@ -349,9 +351,12 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
 
     if (code != PVC_OK)
     {
-        TCHAR errText[32768 + 100];
-        _stprintf(errText, LoadStr(IDS_ERROR_OPENING), name, PVW32DLL.PVGetErrorText(code));
-        SalamanderGeneral->SalMessageBox(HWindow, errText, LoadStr(IDS_ERRORTITLE), MB_ICONEXCLAMATION);
+        const std::wstring errText = SPLFormatStringOwned(
+            ToWideArg(LoadStr(IDS_ERROR_OPENING)).c_str(), name,
+            ToWideArg(PVW32DLL.PVGetErrorText(code)).c_str());
+        SalamanderGeneral->SalMessageBox(HWindow, errText.c_str(),
+                                         ToWideArg(LoadStr(IDS_ERRORTITLE)).c_str(),
+                                         MB_ICONEXCLAMATION);
         // In case the new file is not recognized, we keep the old one
         if (PVHandle != NULL)
             PVW32DLL.PVCloseImage(PVHandle);
@@ -404,22 +409,16 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
 
     if ((code == PVC_OK) && (hBmp == NULL))
     {
-        CPathBuffer path;
-
-        _tcscpy(path, name);
+        std::wstring path(name);
         // we must not pass 'name' directly to AddToHistory, because it may already come from history
         // and that would lead to a conflict when moving entries
-        AddToHistory(TRUE, path);
-        LPTSTR s = _tcsrchr(path, '\\');
-        if (s != NULL)
+        AddToHistory(TRUE, path.c_str());
+        const size_t slash = path.find_last_of(L'\\');
+        if (slash != std::wstring::npos)
         {
-            if (s == path + 2) // drives C:\, D:\, ... keep the slash and terminate just after it
-                s++;
-            *s = 0;
-            if (path[0] != 0)
-            {
-                AddToHistory(FALSE, path);
-            }
+            path.resize(slash == 2 ? slash + 1 : slash);
+            if (!path.empty())
+                AddToHistory(FALSE, path.c_str());
         }
     }
 
@@ -2049,8 +2048,6 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DROPFILES:
     {
         UINT drag;
-        CPathBuffer path;
-
         drag = DragQueryFile((HDROP)wParam, 0xFFFFFFFF, NULL, 0); // how many files were dropped on us
         // this code opens all files - it comes from the text editor
         // that Petr and I wrote
@@ -2058,7 +2055,13 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // and ignore the rest
         if (drag > 0)
         {
-            DragQueryFile((HDROP)wParam, 0, path, path.Size());
+            const UINT length = DragQueryFileW((HDROP)wParam, 0, NULL, 0);
+            std::wstring path(length, L'\0');
+            if (DragQueryFileW((HDROP)wParam, 0, path.data(), length + 1) != length)
+            {
+                DragFinish((HDROP)wParam);
+                break;
+            }
             EnumFilesSourceUID = -1;
             // If the original image is still loading we are now called from ProgressProcedure
             // and therefore cannot start a new load
@@ -2067,12 +2070,12 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 Canceled = TRUE;
                 SalamanderGeneral->Free(FileName);
-                FileName = SalamanderGeneral->DupStr(path);
+                FileName = SalamanderGeneral->DupStr(path.c_str());
                 PostMessage(HWindow, WM_COMMAND, CMD_RELOAD, 0);
             }
             else
             {
-                OpenFile(path, -1, NULL);
+                OpenFile(path.c_str(), -1, NULL);
             }
         }
         DragFinish((HDROP)wParam);
@@ -2697,7 +2700,7 @@ LRESULT CALLBACK ToolTipWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     }
     }
 
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
 void GetInfo(LPTSTR buffer, HANDLE file)
@@ -2715,15 +2718,13 @@ void GetInfo(LPTSTR buffer, HANDLE file)
     if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
         _stprintf(date, _T("%u.%u.%u"), st.wDay, st.wMonth, st.wYear);
 
-    TCHAR number[50];
+    std::wstring number;
     CQuadWord size;
     DWORD err;
     if (SalamanderGeneral->SalGetFileSize(file, size, err))
-        SalamanderGeneral->NumberToStr(number, size);
-    else
-        number[0] = 0; // error - size unknown
+        number = SPLNumberToStrOwned(SalamanderGeneral, size);
 
-    _stprintf(buffer, _T("%s, %s, %s"), number, date, time);
+    _stprintf(buffer, _T("%s, %s, %s"), number.c_str(), date, time);
 }
 
 void MakeValidFileName(TCHAR* path)
@@ -2742,50 +2743,37 @@ void MakeValidFileName(TCHAR* path)
     *n = 0;
 }
 
-BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR* newName, int newNameSize, BOOL* tryAgain)
+BOOL CRendererWindow::RenameFileInternal(const wchar_t* oldPath, const wchar_t* oldName,
+                                         std::wstring& newName, BOOL* tryAgain)
 {
     BOOL renamed = FALSE;
     *tryAgain = TRUE;
-    LPCTSTR s = newName;
+    const wchar_t* s = newName.c_str();
     while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
            *s >= 32 && *s != '<' && *s != '>' && *s != '|' && *s != '"')
         s++;
-    if (newName[0] != 0 && *s == 0)
+    if (!newName.empty() && *s == 0)
     {
-        CPathBuffer myOldName;
-        _tcscpy(myOldName, oldName);
-        TCHAR finalName[32768];
-        SalamanderGeneral->MaskName(finalName, SizeOf(finalName), myOldName, newName);
+        std::wstring finalName;
+        if (!SPLMaskNameOwned(SalamanderGeneral, oldName, newName.c_str(), finalName))
+            return FALSE;
 
         // strip unwanted characters from the beginning and end of the name
-        MakeValidFileName(finalName);
-        // trim to newNameSize before copying to newName; the code a few lines below reports the error
-        if ((int)_tcslen(finalName) >= newNameSize)
-            finalName[newNameSize - 1] = 0;
-        // update 'newName' with the new file name
-        _tcscpy(newName, finalName);
+        MakeValidFileName(finalName.data());
+        finalName.resize(_tcslen(finalName.c_str()));
+        newName = finalName;
 
-        int l = (int)_tcslen(oldPath);
-        CPathBuffer tgtPath;
-        memcpy(tgtPath, oldPath, l * sizeof(TCHAR));
-        if (oldPath[l - 1] != '\\')
-            tgtPath[l++] = '\\';
-        if ((int)_tcslen(finalName) + l < tgtPath.Size())
+        std::wstring tgtPath(oldPath);
+        SPLSalPathAppendOwned(tgtPath, finalName.c_str());
+        std::wstring path(oldPath);
+        SPLSalPathAppendOwned(path, oldName);
         {
-            _tcscpy(tgtPath + l, finalName);
-            CPathBuffer path;
-            _tcscpy(path, oldPath);
-            LPTSTR end = path + l;
-            if (*(end - 1) != '\\')
-                *--end = '\\';
-            _tcscpy(path + l, oldName);
-
             BOOL ret = FALSE;
 
             // try renaming first using the long name and if that fails
             // fall back to the DOS name (handles files/directories reachable only via Unicode or DOS names)
             DWORD err = 0;
-            BOOL moveRet = SalamanderGeneral->SalMoveFile(path, tgtPath, &err);
+            BOOL moveRet = SalamanderGeneral->SalMoveFile(path.c_str(), tgtPath.c_str(), &err);
             if (!moveRet)
             {
                 //err = GetLastError();
@@ -2802,10 +2790,9 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
             }
 
             // report the change on the path (renamed file)
-            CPathBuffer changedPath;
-            lstrcpyn(changedPath, path, changedPath.Size());
-            SalamanderGeneral->CutDirectory(changedPath);
-            SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
+            std::wstring changedPath = path;
+            SPLCutDirectoryOwned(SalamanderGeneral, changedPath);
+            SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
 
             if (moveRet)
             {
@@ -2816,20 +2803,18 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
             {
                 if ((err == ERROR_ALREADY_EXISTS ||
                      err == ERROR_FILE_EXISTS) &&
-                    SalamanderGeneral->StrICmp(path, tgtPath) != 0) // overwrite the file?
+                    SalamanderGeneral->StrICmp(path.c_str(), tgtPath.c_str()) != 0) // overwrite the file?
                 {
-                    DWORD inAttr = SalamanderGeneral->SalGetFileAttributes(path);
-                    DWORD outAttr = SalamanderGeneral->SalGetFileAttributes(tgtPath);
+                    DWORD inAttr = SalamanderGeneral->SalGetFileAttributes(path.c_str());
+                    DWORD outAttr = SalamanderGeneral->SalGetFileAttributes(tgtPath.c_str());
 
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both files are present
-                        HANDLE in = CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                               NULL);
-                        HANDLE out = CreateFile(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
-                                                NULL);
+                        HANDLE in = CreateFileW(path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                        HANDLE out = CreateFileW(tgtPath.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                                 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
                         {
                             TCHAR iAttr[101], oAttr[101];
@@ -2838,7 +2823,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
                             CloseHandle(in);
                             CloseHandle(out);
 
-                            COverwriteDlg dlg(HWindow, tgtPath, oAttr, path, iAttr);
+                            COverwriteDlg dlg(HWindow, tgtPath.c_str(), oAttr, path.c_str(), iAttr);
                             int res = (int)dlg.Execute();
 
                             switch (res)
@@ -2851,8 +2836,9 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
 
                             case IDYES:
                             {
-                                SalamanderGeneral->ClearReadOnlyAttr(tgtPath); // to allow it to be deleted ...
-                                if (!DeleteFile(tgtPath) || !SalamanderGeneral->SalMoveFile(path, tgtPath, &err))
+                                SalamanderGeneral->ClearReadOnlyAttr(tgtPath.c_str()); // to allow it to be deleted ...
+                                if (!DeleteFileW(tgtPath.c_str()) ||
+                                    !SalamanderGeneral->SalMoveFile(path.c_str(), tgtPath.c_str(), &err))
                                 {
                                     //err = GetLastError();
                                 }
@@ -2863,7 +2849,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
                                     ret = TRUE;
                                 }
                                 // report the change on the path (renamed file)
-                                SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
+                                SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
                                 break;
                             }
                             }
@@ -2883,20 +2869,16 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
                 }
 
                 if (err != ERROR_SUCCESS)
-                    SalamanderGeneral->SalMessageBox(HWindow, SalamanderGeneral->GetErrorText(err),
-                                                     LoadStr(IDS_ERRORRENAMINGFILE),
+                    SalamanderGeneral->SalMessageBox(HWindow, SPLGetErrorTextOwned(SalamanderGeneral, err).c_str(),
+                                                     ToWideArg(LoadStr(IDS_ERRORRENAMINGFILE)).c_str(),
                                                      MB_OK | MB_ICONEXCLAMATION);
             }
             *tryAgain = !ret;
         }
-        else
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME),
-                                             LoadStr(IDS_ERRORRENAMINGFILE),
-                                             MB_OK | MB_ICONEXCLAMATION);
     }
     else
-        SalamanderGeneral->SalMessageBox(HWindow, SalamanderGeneral->GetErrorText(ERROR_INVALID_NAME),
-                                         LoadStr(IDS_ERRORRENAMINGFILE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLGetErrorTextOwned(SalamanderGeneral, ERROR_INVALID_NAME).c_str(),
+                                         ToWideArg(LoadStr(IDS_ERRORRENAMINGFILE)).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
     return renamed;
 }
@@ -2904,52 +2886,37 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
 void CRendererWindow::OnCopyTo()
 {
     CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo()");
-    CPathBuffer dstName;
+    std::wstring dstName;
     CCopyToDlg dlg(HWindow, FileName, dstName);
     if (dlg.Execute() == IDOK)
     {
         // SHFileOperation works with multiple paths which must be NULL-separated
         // Thus extra terminating NULL is needed
 
-        int srcListSize = (int)_tcslen(FileName) + 2;
-        LPTSTR srcList = (LPTSTR)malloc(srcListSize * sizeof(TCHAR));
-        if (srcList == NULL)
-            return;
-        memcpy(srcList, FileName, (srcListSize - 1) * sizeof(TCHAR));
-        srcList[srcListSize - 1] = 0;
+        std::vector<wchar_t> srcList(FileName, FileName + wcslen(FileName) + 1);
+        srcList.push_back(L'\0');
+        std::vector<wchar_t> dstList(dstName.begin(), dstName.end());
+        dstList.push_back(L'\0');
+        dstList.push_back(L'\0');
 
-        int dstListSize = (int)_tcslen(dstName) + 2;
-        LPTSTR dstList = (LPTSTR)malloc(dstListSize * sizeof(TCHAR));
-        if (dstList == NULL)
-        {
-            free(srcList);
-            return;
-        }
-        memcpy(dstList, dstName, (dstListSize - 1) * sizeof(TCHAR));
-        dstList[dstListSize - 1] = 0;
-
-        SHFILEOPSTRUCT fo;
+        SHFILEOPSTRUCTW fo;
         fo.hwnd = HWindow;
         fo.wFunc = FO_COPY;
-        fo.pFrom = srcList;
-        fo.pTo = dstList;
+        fo.pFrom = srcList.data();
+        fo.pTo = dstList.data();
         fo.fFlags = 0;
         fo.fAnyOperationsAborted = FALSE;
         fo.hNameMappings = NULL;
-        fo.lpszProgressTitle = _T("");
+        fo.lpszProgressTitle = L"";
         // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
         CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo::SHFileOperation");
-        CPathBuffer changedPath;
-        lstrcpyn(changedPath, FileName, changedPath.Size());
-        if (SHFileOperation(&fo) == 0)
+        std::wstring changedPath = ToWideArg(FileName);
+        if (SHFileOperationW(&fo) == 0)
         {
             // report the change on the path (renamed file)
-            SalamanderGeneral->CutDirectory(changedPath);
-            SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
+            SPLCutDirectoryOwned(SalamanderGeneral, changedPath);
+            SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
         }
-
-        free(srcList);
-        free(dstList);
     }
 }
 
@@ -2979,13 +2946,12 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
     fo.lpszProgressTitle = _T("");
     // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
     CALL_STACK_MESSAGE1("CRendererWindow::OnDelete::SHFileOperation");
-    CPathBuffer changedPath;
-    lstrcpyn(changedPath, FileName, changedPath.Size());
+    std::wstring changedPath = ToWideArg(FileName);
     if (SHFileOperation(&fo) == 0)
     {
         // from the return values we cannot tell whether the file was deleted or
         // the user merely pressed Cancel in the confirmation dialog
-        if (!SalamanderGeneral->FileExists(FileName))
+        if (!SalamanderGeneral->FileExists(ToWideArg(FileName).c_str()))
         {
             SalamanderGeneral->Free(FileName);
             FileName = SalamanderGeneral->DupStr(LoadStr(IDS_DELETED_TITLE));
@@ -2993,8 +2959,8 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
         }
     }
     // report the change on the path (renamed file)
-    SalamanderGeneral->CutDirectory(changedPath);
-    SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
+    SPLCutDirectoryOwned(SalamanderGeneral, changedPath);
+    SalamanderGeneral->PostChangeOnPathNotification(changedPath.c_str(), FALSE);
 
     free(list);
 }
@@ -3041,9 +3007,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
 
         if (!Loading)
         {
-            CPathBuffer path;
-
-            *path = 0;
+            std::wstring path;
             if (FileName && (*FileName != '<'))
             {
                 // not clipboard, capture, scanned image
@@ -3054,10 +3018,10 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                     {
                         s++; // root dir -> keep the backslash
                     }
-                    lstrcpyn(path, FileName, (int)min(s - FileName + 1, path.Size()));
+                    path.assign(FileName, s - FileName + 1);
                 }
             }
-            OnFileOpen(path);
+            OnFileOpen(path.c_str());
         }
         CanHideCursor = oldCanHideCursor;
         return 0;
@@ -3119,7 +3083,8 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             BOOL ok = FALSE;
             BOOL srcBusy = FALSE;
             BOOL noMoreFiles = FALSE;
-            CPathBuffer fileName;
+            std::wstring fileNameW;
+            std::string fileName;
             LPCTSTR reallyOpenedFileName, openedFileName = FileName;
             BOOL deletedFile = FileName != NULL && _tcscmp(FileName, LoadStr(IDS_DELETED_TITLE)) == 0;
             if (deletedFile)
@@ -3129,22 +3094,23 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             reallyOpenedFileName = openedFileName;
             do
             {
+                const std::wstring reallyOpenedFileNameW =
+                    ToWideArg(reallyOpenedFileName);
                 if ((what == CMD_FILE_PREV) || (what == CMD_FILE_LAST) || (what == CMD_FILE_PREVSELFILE))
                 {
                     if (what == CMD_FILE_LAST)
                         enumFilesCurrentIndex = -1;
-                    ok = SalamanderGeneral->GetPreviousFileNameForViewer(EnumFilesSourceUID,
-                                                                         &enumFilesCurrentIndex,
-                                                                         reallyOpenedFileName,
-                                                                         what == CMD_FILE_PREVSELFILE,
-                                                                         TRUE, fileName,
-                                                                         &noMoreFiles, &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalamanderGeneral, TRUE, EnumFilesSourceUID,
+                        &enumFilesCurrentIndex, reallyOpenedFileNameW.c_str(),
+                        what == CMD_FILE_PREVSELFILE, TRUE, fileNameW,
+                        &noMoreFiles, &srcBusy);
                     if (ok && (what == CMD_FILE_PREVSELFILE)) // process only selected files
                     {
                         BOOL isSrcFileSel = FALSE;
                         ok = SalamanderGeneral->IsFileNameForViewerSelected(EnumFilesSourceUID,
                                                                             enumFilesCurrentIndex,
-                                                                            fileName, &isSrcFileSel,
+                                                                            fileNameW.c_str(), &isSrcFileSel,
                                                                             &srcBusy);
                         if (ok && !isSrcFileSel)
                             ok = FALSE;
@@ -3161,30 +3127,31 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                         if (deletedFile && enumFilesCurrentIndex >= 0)
                             enumFilesCurrentIndex--; // ensure that after deleting a file with Space (next-file) we do not skip the next file due to panel shifts
                     }
-                    ok = SalamanderGeneral->GetNextFileNameForViewer(EnumFilesSourceUID,
-                                                                     &enumFilesCurrentIndex,
-                                                                     reallyOpenedFileName,
-                                                                     what == CMD_FILE_NEXTSELFILE,
-                                                                     TRUE, fileName,
-                                                                     &noMoreFiles, &srcBusy);
+                    ok = SPLGetAdjacentFileNameForViewerOwned(
+                        SalamanderGeneral, FALSE, EnumFilesSourceUID,
+                        &enumFilesCurrentIndex, reallyOpenedFileNameW.c_str(),
+                        what == CMD_FILE_NEXTSELFILE, TRUE, fileNameW,
+                        &noMoreFiles, &srcBusy);
                     if (ok && (what == CMD_FILE_NEXTSELFILE)) // process only selected files
                     {
                         BOOL isSrcFileSel = FALSE;
                         ok = SalamanderGeneral->IsFileNameForViewerSelected(EnumFilesSourceUID,
                                                                             enumFilesCurrentIndex,
-                                                                            fileName, &isSrcFileSel,
+                                                                            fileNameW.c_str(), &isSrcFileSel,
                                                                             &srcBusy);
                         if (ok && !isSrcFileSel)
                             ok = FALSE;
                     }
                 }
+                if (ok && !WideToLegacyTextExact(fileNameW.c_str(), fileName))
+                    ok = FALSE;
                 // repeat the search file if the found one is not supported by us
-                reallyOpenedFileName = fileName;
-            } while (ok && (!Loading && !InterfaceForViewer.CanViewFile(fileName)) && (what != CMD_FILE_FIRST) && (what != CMD_FILE_LAST));
+                reallyOpenedFileName = fileName.c_str();
+            } while (ok && (!Loading && !InterfaceForViewer.CanViewFile(fileName.c_str())) && (what != CMD_FILE_FIRST) && (what != CMD_FILE_LAST));
 
             if (ok) // we have a new name
             {
-                if (openedFileName == NULL || SalamanderGeneral->StrICmp(fileName, openedFileName) != 0)
+                if (openedFileName == NULL || _tcsicmp(fileName.c_str(), openedFileName) != 0)
                 {
                     if (Loading)
                     {
@@ -3199,7 +3166,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                         SetEvent(Viewer->Lock);
                         Viewer->Lock = NULL; // from now on only the disk cache handles it
                     }
-                    if (!OpenFile(fileName, -1, NULL))
+                    if (!OpenFile(fileName.c_str(), -1, NULL))
                     {
                         // the image is corrupted, close the current one
                         if (PVHandle != NULL)
@@ -3245,10 +3212,10 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             if (Viewer->IsFullScreen())
                 Viewer->ToggleFullScreen();
 
-            lstrcpyn(Focus_Path, FileName, SizeOf(Focus_Path));
+            Focus_Path = FileName;
             SalamanderGeneral->PostMenuExtCommand(CMD_INTERNAL_FOCUS, TRUE);
             Sleep(500);        // switching to another window occurs, so in theory this Sleep should not hurt anything
-            Focus_Path[0] = 0; // after 0.5 seconds we no longer want the focus (handles hitting the beginning of Salamander's BUSY mode)
+            Focus_Path.clear(); // after 0.5 seconds we no longer want the focus (handles hitting the beginning of Salamander's BUSY mode)
         }
         else
             SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_SAL_IS_BUSY), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
@@ -3274,21 +3241,16 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
         BOOL oldCanHideCursor = CanHideCursor;
         CanHideCursor = FALSE;
 
-        CPathBuffer oldPath;
-        CPathBuffer oldName;
-        memcpy(oldPath, FileName, (s - FileName) * sizeof(TCHAR));
-        oldPath[s - FileName] = 0;
-        _tcscpy(oldName, s + 1);
-
-        TCHAR newName[32768];
-        _tcscpy(newName, s + 1);
-        CRenameDialog dlg(HWindow, newName, SizeOf(newName));
+        const std::wstring oldPath(FileName, s - FileName);
+        const std::wstring oldName(s + 1);
+        std::wstring newName = oldName;
+        CRenameDialog dlg(HWindow, newName);
         while (1)
         {
             if (dlg.Execute() == IDOK)
             {
                 BOOL tryAgain;
-                BOOL renamed = RenameFileInternal(oldPath, oldName, newName, SizeOf(newName), &tryAgain);
+                BOOL renamed = RenameFileInternal(oldPath.c_str(), oldName.c_str(), newName, &tryAgain);
                 /*  // Petr: I commented out this heavy refresh because it is obsolete - refresh happens even in Salamander's inactive main window
           int sourcePanel;
 
@@ -3303,13 +3265,9 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                         FileName = NULL;
                     }
 
-                    CPathBuffer newFileName;
-                    int l = (int)_tcslen(oldPath);
-                    memcpy(newFileName, oldPath, l * sizeof(TCHAR));
-                    if (oldPath[l - 1] != '\\')
-                        newFileName[l++] = '\\';
-                    _tcscpy(newFileName + l, newName);
-                    FileName = SalamanderGeneral->DupStr(newFileName);
+                    std::wstring newFileName = oldPath;
+                    SPLSalPathAppendOwned(newFileName, newName.c_str());
+                    FileName = SalamanderGeneral->DupStr(newFileName.c_str());
                     SetTitle();
                     break;
                 }
@@ -3580,20 +3538,18 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                 Viewer->SetStatusBarTexts();
                 if (!bSuccess)
                 {
-                    TCHAR errTmp[32768 + 20];
-                    TCHAR errBuff[164];
-
+                    std::wstring errorText;
                     if (LastError)
-                    {
-                        SalamanderGeneral->GetErrorText(LastError, errTmp, SizeOf(errTmp));
-                    }
+                        errorText = SPLGetErrorTextOwned(SalamanderGeneral, LastError);
                     else
                     {
-                        _tcscpy(errTmp, LoadStr(IDS_UNKNOWN_ERROR));
-                        _tcscat(errTmp, LoadStr(IDS_CHECK_EVENTLOG));
+                        errorText = ToWideArg(LoadStr(IDS_UNKNOWN_ERROR));
+                        errorText += ToWideArg(LoadStr(IDS_CHECK_EVENTLOG));
                     }
-                    _stprintf(errBuff, LoadStr(IDS_PRINTING_FAILED), errTmp);
-                    SalamanderGeneral->SalMessageBox(HWindow, errBuff, LoadStr(IDS_ERRORTITLE), MB_ICONSTOP);
+                    const std::wstring message = SPLFormatStringOwned(
+                        ToWideArg(LoadStr(IDS_PRINTING_FAILED)).c_str(), errorText.c_str());
+                    SalamanderGeneral->SalMessageBox(
+                        HWindow, message.c_str(), ToWideArg(LoadStr(IDS_ERRORTITLE)).c_str(), MB_ICONSTOP);
                 }
             }
         }
@@ -4343,7 +4299,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
         //          GetTextExtentPoint32(dc, toolTipText, _tcslen(toolTipText), &size);
         //          ReleaseDC(HWindow, dc);
 
-        PipWindow = CreateWindow(TIP_WINDOW_CLASSNAME, _T(""), WS_POPUP,
+        PipWindow = CreateWindowW(TIP_WINDOW_CLASSNAME, L"", WS_POPUP,
                                  pos.x + 2, pos.y + 2, /*size.cx+*/ 7, /*size.cy+*/ 3,
                                  HWindow, NULL, DLLInstance, (LPVOID)toolTipText); //lParam
         ShowWindow(PipWindow, SW_SHOW /*show*/);

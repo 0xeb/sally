@@ -438,7 +438,8 @@ void FillUnits(HWND hDlg, int cbResID, CUnitsEnum select, double value)
     int i;
     for (i = 0; UnitsIDs[i] != -1; i++)
     {
-        LRESULT index = SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(UnitsIDs[i]));
+        LRESULT index = SendMessageW(hCombo, CB_ADDSTRING, 0,
+                                     reinterpret_cast<LPARAM>(LoadStrW(UnitsIDs[i]).c_str()));
         SendMessage(hCombo, CB_SETITEMDATA, index, (LPARAM)Units[i]);
         if (select == Units[i])
             selectIndex = i;

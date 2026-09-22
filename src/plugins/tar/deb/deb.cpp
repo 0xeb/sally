@@ -13,29 +13,32 @@
 #include "../dlldefs.h"
 #include "../fileio.h"
 #include "deb.h"
+#include "../../shared/plugin_local_path.h"
 
-#define DEB_STREAM_NAME_CONTROL "control"
-#define DEB_STREAM_NAME_DATA "data"
+#define DEB_STREAM_NAME_CONTROL_W L"control"
+#define DEB_STREAM_NAME_DATA_W L"data"
 
 void ShowError(int errorID)
 {
-    char txtbuf[1000];
     int err = GetLastError();
-    strcpy(txtbuf, LoadStr(errorID));
-    strcat(txtbuf, SalamanderGeneral->GetErrorText(err));
-    SalamanderGeneral->ShowMessageBox(txtbuf, LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+    std::wstring txtbuf = LangStr(errorID).c_str();
+    txtbuf += SPLGetErrorTextOwned(SalamanderGeneral, err);
+    SalamanderGeneral->ShowMessageBox(txtbuf.c_str(), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
 }
 
-CDEBArchive::CDEBArchive(const char* fileName, CSalamanderForOperationsAbstract* salamander)
+CDEBArchive::CDEBArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander)
 {
-    CALL_STACK_MESSAGE2("CDEBArchive::CDEBArchive(%s)", fileName);
+    CALL_STACK_MESSAGE2("CDEBArchive::CDEBArchive(%ls)", fileName);
 
     controlArchive = dataArchive = NULL;
     bOK = FALSE;
 
     // Open input file
-    HANDLE file = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                             FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    std::wstring ioPath;
+    HANDLE file = PreparePluginLocalPathForIo(fileName, ioPath)
+                      ? CreateFileW(ioPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                    FILE_FLAG_SEQUENTIAL_SCAN, NULL)
+                      : INVALID_HANDLE_VALUE;
     if (file == INVALID_HANDLE_VALUE)
     {
         ShowError(IDS_GZERR_FOPEN);
@@ -145,47 +148,51 @@ CDEBArchive::~CDEBArchive(void)
     delete dataArchive;
 }
 
-BOOL CDEBArchive::ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir)
+BOOL CDEBArchive::ListArchive(const wchar_t* prefix, CSalamanderDirectoryAbstract* dir)
 {
-    BOOL ret = controlArchive->ListArchive(DEB_STREAM_NAME_CONTROL "\\", dir);
+    BOOL ret = controlArchive->ListArchive(DEB_STREAM_NAME_CONTROL_W L"\\", dir);
     if (!dataArchive)
         return ret;
-    return ret | dataArchive->ListArchive(DEB_STREAM_NAME_DATA "\\", dir);
+    return ret | dataArchive->ListArchive(DEB_STREAM_NAME_DATA_W L"\\", dir);
 }
 
-BOOL CDEBArchive::UnpackOneFile(const char* nameInArchive, const CFileData* fileData,
-                                const char* targetPath, const char* newFileName)
+BOOL CDEBArchive::UnpackOneFile(const wchar_t* nameInArchive, const CFileData* fileData,
+                                const wchar_t* targetPath, const wchar_t* newFileName)
 {
-    CALL_STACK_MESSAGE4("CDEBArchive::UnpackOneFile(%s, , %s, , %s)", nameInArchive, targetPath, newFileName);
-    if (!strncmp(nameInArchive, DEB_STREAM_NAME_CONTROL "\\", sizeof(DEB_STREAM_NAME_CONTROL "\\") - 1))
+    CALL_STACK_MESSAGE4("CDEBArchive::UnpackOneFile(%ls, , %ls, , %ls)", nameInArchive, targetPath, newFileName);
+    const size_t controlPrefix = wcslen(DEB_STREAM_NAME_CONTROL_W L"\\");
+    const size_t dataPrefix = wcslen(DEB_STREAM_NAME_DATA_W L"\\");
+    if (!wcsncmp(nameInArchive, DEB_STREAM_NAME_CONTROL_W L"\\", controlPrefix))
     {
-        nameInArchive += sizeof(DEB_STREAM_NAME_CONTROL "\\") - 1;
+        nameInArchive += controlPrefix;
         return controlArchive->UnpackOneFile(nameInArchive, fileData, targetPath, newFileName);
     }
-    if (!strncmp(nameInArchive, DEB_STREAM_NAME_DATA "\\", sizeof(DEB_STREAM_NAME_DATA "\\") - 1))
+    if (!wcsncmp(nameInArchive, DEB_STREAM_NAME_DATA_W L"\\", dataPrefix))
     {
-        nameInArchive += sizeof(DEB_STREAM_NAME_DATA "\\") - 1;
+        nameInArchive += dataPrefix;
         return dataArchive->UnpackOneFile(nameInArchive, fileData, targetPath, newFileName);
     }
     _ASSERT(0);
     return FALSE;
 }
 
-BOOL CDEBArchive::UnpackArchive(const char* targetPath, const char* archiveRoot,
+BOOL CDEBArchive::UnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot,
                                 SalEnumSelection next, void* param)
 {
-    CALL_STACK_MESSAGE3("CDEBArchive::UnpackArchive(%s, %s, , )", targetPath, archiveRoot);
-    if (!strncmp(archiveRoot, DEB_STREAM_NAME_CONTROL, sizeof(DEB_STREAM_NAME_CONTROL) - 1))
+    CALL_STACK_MESSAGE3("CDEBArchive::UnpackArchive(%ls, %ls, , )", targetPath, archiveRoot);
+    const size_t controlPrefix = wcslen(DEB_STREAM_NAME_CONTROL_W);
+    const size_t dataPrefix = wcslen(DEB_STREAM_NAME_DATA_W);
+    if (!wcsncmp(archiveRoot, DEB_STREAM_NAME_CONTROL_W, controlPrefix))
     {
-        archiveRoot += sizeof(DEB_STREAM_NAME_CONTROL) - 1;
-        if (archiveRoot[0] == '\\')
+        archiveRoot += controlPrefix;
+        if (archiveRoot[0] == L'\\')
             archiveRoot++;
         return controlArchive->UnpackArchive(targetPath, archiveRoot, next, param);
     }
-    if (!strncmp(archiveRoot, DEB_STREAM_NAME_DATA, sizeof(DEB_STREAM_NAME_DATA) - 1))
+    if (!wcsncmp(archiveRoot, DEB_STREAM_NAME_DATA_W, dataPrefix))
     {
-        archiveRoot += sizeof(DEB_STREAM_NAME_DATA) - 1;
-        if (archiveRoot[0] == '\\')
+        archiveRoot += dataPrefix;
+        if (archiveRoot[0] == L'\\')
             archiveRoot++;
         return dataArchive->UnpackArchive(targetPath, archiveRoot, next, param);
     }
@@ -193,27 +200,28 @@ BOOL CDEBArchive::UnpackArchive(const char* targetPath, const char* archiveRoot,
 
     // Looks like either entire control or entire data or both folders are to be extracted
     // Split names according the 2 subarchives
-    const char* curName;
+    const wchar_t* curNameW;
     BOOL isDir, isData, isControl;
     CQuadWord size;
     CQuadWord totalSize(0, 0);
     CNames dataNames, controlNames;
     isData = isControl = FALSE;
-    while ((curName = next(NULL, 0, &isDir, &size, NULL, param, NULL)) != NULL)
+    while ((curNameW = next(NULL, 0, &isDir, &size, NULL, param, NULL)) != NULL)
     {
-        if (!strncmp(curName, DEB_STREAM_NAME_CONTROL, sizeof(DEB_STREAM_NAME_CONTROL) - 1))
+        const wchar_t* curName = curNameW;
+        if (!wcsncmp(curName, DEB_STREAM_NAME_CONTROL_W, controlPrefix))
         {
-            curName += sizeof(DEB_STREAM_NAME_CONTROL) - 1;
+            curName += controlPrefix;
             if (!*curName)
-                curName = "*";
+                curName = L"*";
             controlNames.AddName(curName, isDir, NULL, NULL);
             isControl = TRUE;
         }
-        else if (!strncmp(curName, DEB_STREAM_NAME_DATA, sizeof(DEB_STREAM_NAME_DATA) - 1))
+        else if (!wcsncmp(curName, DEB_STREAM_NAME_DATA_W, dataPrefix))
         {
-            curName += sizeof(DEB_STREAM_NAME_DATA) - 1;
+            curName += dataPrefix;
             if (!*curName)
-                curName = "*";
+                curName = L"*";
             dataNames.AddName(curName, isDir, NULL, NULL);
             isData = TRUE;
         }
@@ -224,50 +232,52 @@ BOOL CDEBArchive::UnpackArchive(const char* targetPath, const char* archiveRoot,
     }
     // check free space; assume TestFreeSpace reports an appropriate message
     if (!SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                          targetPath, totalSize, LoadStr(IDS_TARERR_HEADER)))
+                                          targetPath, totalSize, LangStr(IDS_TARERR_HEADER).c_str()))
         return FALSE;
 
     // and perform the actual extraction by name
     BOOL ret = FALSE;
     {
-        std::string path;
+        std::wstring path;
         if (isControl)
         {
             path = targetPath;
-            if (!path.empty() && path.back() != '\\')
-                path += '\\';
-            path += DEB_STREAM_NAME_CONTROL;
+            if (!path.empty() && path.back() != L'\\')
+                path += L'\\';
+            path += DEB_STREAM_NAME_CONTROL_W;
             ret = controlArchive->DoUnpackArchive(path.c_str(), archiveRoot, controlNames);
         }
 
         if (isData)
         {
             path = targetPath;
-            if (!path.empty() && path.back() != '\\')
-                path += '\\';
-            path += DEB_STREAM_NAME_DATA;
+            if (!path.empty() && path.back() != L'\\')
+                path += L'\\';
+            path += DEB_STREAM_NAME_DATA_W;
             ret = dataArchive->DoUnpackArchive(path.c_str(), archiveRoot, dataNames) && (isControl ? ret : TRUE);
         }
     }
     return ret;
 }
 
-BOOL CDEBArchive::UnpackWholeArchive(const char* mask, const char* targetPath)
+BOOL CDEBArchive::UnpackWholeArchive(const wchar_t* mask, const wchar_t* targetPath)
 {
     BOOL isData = FALSE, isControl = FALSE;
     if (mask)
     {
-        if (!_strnicmp(mask, DEB_STREAM_NAME_CONTROL "\\", sizeof(DEB_STREAM_NAME_CONTROL "\\") - 1))
+        const size_t controlPrefix = wcslen(DEB_STREAM_NAME_CONTROL_W L"\\");
+        const size_t dataPrefix = wcslen(DEB_STREAM_NAME_DATA_W L"\\");
+        if (!_wcsnicmp(mask, DEB_STREAM_NAME_CONTROL_W L"\\", controlPrefix))
         {
-            mask += sizeof(DEB_STREAM_NAME_CONTROL "\\") - 1;
+            mask += controlPrefix;
             isControl = TRUE;
         }
-        else if (!_strnicmp(mask, DEB_STREAM_NAME_DATA "\\", sizeof(DEB_STREAM_NAME_DATA "\\") - 1))
+        else if (!_wcsnicmp(mask, DEB_STREAM_NAME_DATA_W L"\\", dataPrefix))
         {
-            mask += sizeof(DEB_STREAM_NAME_DATA "\\") - 1;
+            mask += dataPrefix;
             isData = TRUE;
         }
-        else if (mask[0] == '*')
+        else if (mask[0] == L'*')
         {
             isControl = isData = TRUE;
         }
@@ -283,23 +293,23 @@ BOOL CDEBArchive::UnpackWholeArchive(const char* mask, const char* targetPath)
 
     BOOL ret = FALSE;
     {
-        std::string path;
+        std::wstring path;
         // controlArchive is always present
         if (isControl)
         {
             path = targetPath;
-            if (!path.empty() && path.back() != '\\')
-                path += '\\';
-            path += DEB_STREAM_NAME_CONTROL;
+            if (!path.empty() && path.back() != L'\\')
+                path += L'\\';
+            path += DEB_STREAM_NAME_CONTROL_W;
             ret = controlArchive->UnpackWholeArchive(mask, path.c_str());
         }
 
         if (isData && dataArchive)
         {
             path = targetPath;
-            if (!path.empty() && path.back() != '\\')
-                path += '\\';
-            path += DEB_STREAM_NAME_DATA;
+            if (!path.empty() && path.back() != L'\\')
+                path += L'\\';
+            path += DEB_STREAM_NAME_DATA_W;
             ret = dataArchive->UnpackWholeArchive(mask, path.c_str()) && (isControl ? ret : TRUE);
         }
     }

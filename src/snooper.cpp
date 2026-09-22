@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -8,6 +8,8 @@
 #include "fileswnd.h"
 #include "mainwnd.h"
 #include "snooper.h"
+#include "common/IRegistry.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 
 CWindowArray WindowArray(10, 5);
@@ -48,25 +50,28 @@ void DoWantDataEvent()
 unsigned ThreadSnooperBody(void* /*param*/) // do not call main thread functions (not even TRACE) !!!
 {
     CALL_STACK_MESSAGE1("ThreadSnooperBody()");
-    SetThreadNameInVCAndTrace("Snooper");
+    SetThreadNameInVCAndTrace(L"Snooper");
     TRACE_I("Begin");
 
     DWORD res;
+    IRegistry* registry = gRegistry != NULL ? gRegistry : GetWin32Registry();
     HKEY sharesKey;
-    res = HANDLES_Q(RegOpenKeyEx(HKEY_LOCAL_MACHINE,
-                                 "system\\currentcontrolset\\services\\lanmanserver\\shares",
-                                 0, KEY_NOTIFY, &sharesKey));
+    RegistryResult registryResult = registry->OpenKeyNotify(
+        HKEY_LOCAL_MACHINE, L"system\\currentcontrolset\\services\\lanmanserver\\shares", sharesKey);
+    res = registryResult.errorCode;
     if (res != ERROR_SUCCESS)
     {
         sharesKey = NULL;
-        TRACE_E("Unable to open key in registry (LanMan Shares). error: " << GetErrorText(res));
+        TRACE_EW(L"Unable to open key in registry (LanMan Shares). error: " << GetErrorTextOwned(res).c_str());
     }
     else // key is o.k., set up notifications (without this RegNotifyChangeKeyValue won't be called again)
     {
-        if ((res = RegNotifyChangeKeyValue(sharesKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, SharesEvent,
-                                           TRUE)) != ERROR_SUCCESS)
+        registryResult = registry->NotifyChange(sharesKey, true,
+                                                REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET,
+                                                SharesEvent, true);
+        if ((res = registryResult.errorCode) != ERROR_SUCCESS)
         {
-            TRACE_E("Unable to monitor registry (LanMan Shares). error: " << GetErrorText(res));
+            TRACE_EW(L"Unable to monitor registry (LanMan Shares). error: " << GetErrorTextOwned(res).c_str());
         }
     }
 
@@ -233,7 +238,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // do not call main thread functions
                     if ((res = RegNotifyChangeKeyValue(sharesKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, SharesEvent,
                                                        TRUE)) != ERROR_SUCCESS)
                     {
-                        TRACE_E("Unable to monitor registry (LanMan Shares). error: " << GetErrorText(res));
+                        TRACE_EW(L"Unable to monitor registry (LanMan Shares). error: " << GetErrorTextOwned(res).c_str());
                     }
                 }
 
@@ -286,7 +291,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // do not call main thread functions
                 if ((res = RegNotifyChangeKeyValue(sharesKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, SharesEvent,
                                                    TRUE)) != ERROR_SUCCESS)
                 {
-                    TRACE_E("Unable to monitor registry (LanMan Shares). error: " << GetErrorText(res));
+                    TRACE_EW(L"Unable to monitor registry (LanMan Shares). error: " << GetErrorTextOwned(res).c_str());
                 }
                 break;
             }
@@ -396,7 +401,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // do not call main thread functions
         ReleaseMutex(DataUsageMutex);
     }
     if (sharesKey != NULL)
-        HANDLES(RegCloseKey(sharesKey));
+        registry->CloseKey(sharesKey);
     TRACE_I("End");
     return 0;
 }
@@ -567,7 +572,7 @@ void TerminateThread()
 
 void AddDirectoryW(CFilesWindow* win, const wchar_t* pathW, BOOL registerDevNotification)
 {
-    std::string tracePath = WideToAnsi(pathW != nullptr ? pathW : L"");
+    std::string tracePath = sally::diagnostic::EncodeAcpLossy(pathW != nullptr ? pathW : L"");
     CALL_STACK_MESSAGE3("AddDirectoryW(, %s, %d)", tracePath.c_str(), registerDevNotification);
     SetEvent(WantDataEvent);
     WaitForSingleObject(DataUsageMutex, INFINITE);
@@ -613,60 +618,12 @@ void AddDirectoryW(CFilesWindow* win, const wchar_t* pathW, BOOL registerDevNoti
     WaitForSingleObject(ContinueEvent, INFINITE);
 }
 
-void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification)
-{
-    CALL_STACK_MESSAGE3("AddDirectory(, %s, %d)", path, registerDevNotification);
-    SetEvent(WantDataEvent);                       // ask snooper to release DataUsageMutex
-    WaitForSingleObject(DataUsageMutex, INFINITE); // wait for it
-    SetEvent(WantDataEvent);                       // snooper can start waiting for DataUsageMutex again
-                                                   //---  now data belongs to main thread, snooper is waiting
-    // if the path ends with space/dot, we must append '\\', otherwise FindFirstChangeNotification
-    // trims spaces/dots and thus works with a different path
-    CPathBuffer pathCopy; // Heap-allocated for long path support
-    MakeCopyWithBackslashIfNeeded(path, pathCopy);
-    HANDLE h = HANDLES_Q(FindFirstChangeNotification(pathCopy, FALSE,
-                                                     FILE_NOTIFY_CHANGE_FILE_NAME |
-                                                         FILE_NOTIFY_CHANGE_DIR_NAME |
-                                                         FILE_NOTIFY_CHANGE_ATTRIBUTES |
-                                                         FILE_NOTIFY_CHANGE_SIZE |
-                                                         FILE_NOTIFY_CHANGE_LAST_WRITE));
-    if (h != INVALID_HANDLE_VALUE)
-    {
-        win->SetAutomaticRefresh(TRUE);
-        WindowArray.Add(win);
-        ObjectArray.Add(h);
-
-        if (registerDevNotification)
-        {
-            // register the panel window to receive media change messages (removal, etc.)
-            DEV_BROADCAST_HANDLE dbh;
-            memset(&dbh, 0, sizeof(dbh));
-            dbh.dbch_size = sizeof(dbh);
-            dbh.dbch_devicetype = DBT_DEVTYP_HANDLE;
-            dbh.dbch_handle = h;
-            if (win->DeviceNotification != NULL)
-            {
-                TRACE_E("AddDirectory(): unexpected situation: win->DeviceNotification != NULL");
-                UnregisterDeviceNotification(win->DeviceNotification);
-            }
-            win->DeviceNotification = RegisterDeviceNotificationA(win->HWindow, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
-        }
-    }
-    else
-    {
-        win->SetAutomaticRefresh(FALSE);
-        TRACE_W("Unable to receive change notifications for directory '" << path << "' (auto-refresh will not work).");
-    }
-    //---
-    ReleaseMutex(DataUsageMutex);                 // release DataUsageMutex to the snooper
-    WaitForSingleObject(ContinueEvent, INFINITE); // and wait until it takes it
-}
 
 // thread where we close handles to "disconnected" network devices (long wait)
 unsigned ThreadFindCloseChangeNotificationBody(void* param)
 {
     CALL_STACK_MESSAGE1("ThreadFindCloseChangeNotificationBody()");
-    SetThreadNameInVCAndTrace("SafeHandleKiller");
+    SetThreadNameInVCAndTrace(L"SafeHandleKiller");
     //  TRACE_I("Begin");
 
     while (!SafeFindCloseTerminate)
@@ -734,7 +691,7 @@ DWORD WINAPI ThreadFindCloseChangeNotification(void* param)
 
 void ChangeDirectoryW(CFilesWindow* win, const wchar_t* newPathW, BOOL registerDevNotification)
 {
-    std::string tracePath = WideToAnsi(newPathW != nullptr ? newPathW : L"");
+    std::string tracePath = sally::diagnostic::EncodeAcpLossy(newPathW != nullptr ? newPathW : L"");
     CALL_STACK_MESSAGE3("ChangeDirectoryW(, %s, %d)", tracePath.c_str(), registerDevNotification);
     SetEvent(WantDataEvent);
     WaitForSingleObject(DataUsageMutex, INFINITE);
@@ -821,107 +778,6 @@ void ChangeDirectoryW(CFilesWindow* win, const wchar_t* newPathW, BOOL registerD
     WaitForSingleObject(ContinueEvent, INFINITE);
 }
 
-void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification)
-{
-    CALL_STACK_MESSAGE3("ChangeDirectory(, %s, %d)", newPath, registerDevNotification);
-    SetEvent(WantDataEvent);                       // ask the snooper to release DataUsageMutex
-    WaitForSingleObject(DataUsageMutex, INFINITE); // wait for it
-    SetEvent(WantDataEvent);                       // snooper can start waiting for DataUsageMutex again
-    BOOL registerDevNot = FALSE;
-    HANDLE registerDevNotHandle = NULL;
-    //---  data are now owned by the main thread, snooper waits
-    if (win->DeviceNotification != NULL)
-    {
-        UnregisterDeviceNotification(win->DeviceNotification);
-        win->DeviceNotification = NULL;
-    }
-
-    int i;
-    for (i = 0; i < WindowArray.Count; i++)
-        if (win == WindowArray[i])
-        {
-            // if the change notification is on a disconnected network drive
-            // we cannot afford to wait ... let another thread close it
-            HANDLES(EnterCriticalSection(&SafeFindCloseCS));
-            SafeFindCloseCNArr.Add(ObjectArray[i]);
-            if (!SafeFindCloseCNArr.IsGood())
-                SafeFindCloseCNArr.ResetState(); // ignore errors
-            HANDLES(LeaveCriticalSection(&SafeFindCloseCS));
-            ResetEvent(SafeFindCloseFinished);               // we will wait for it to signal...
-            SetEvent(SafeFindCloseStart);                    // start cleanup
-            WaitForSingleObject(SafeFindCloseFinished, 200); // 200 ms timeout for handle close
-
-            // if the path ends with a space/dot, we must append '\\', otherwise FindFirstChangeNotification
-            // trims spaces/dots and works with a different path
-            CPathBuffer newPathCopy; // Heap-allocated for long path support
-            MakeCopyWithBackslashIfNeeded(newPath, newPathCopy);
-            ObjectArray[i] = HANDLES_Q(FindFirstChangeNotification(newPathCopy, FALSE,
-                                                                   FILE_NOTIFY_CHANGE_FILE_NAME |
-                                                                       FILE_NOTIFY_CHANGE_DIR_NAME |
-                                                                       FILE_NOTIFY_CHANGE_ATTRIBUTES |
-                                                                       FILE_NOTIFY_CHANGE_SIZE |
-                                                                       FILE_NOTIFY_CHANGE_LAST_WRITE));
-            if ((HANDLE)ObjectArray[i] == INVALID_HANDLE_VALUE)
-            {
-                win->SetAutomaticRefresh(FALSE);
-                ObjectArray.Delete(i); // remove it from the list
-                WindowArray.Delete(i);
-                TRACE_W("Unable to receive change notifications for directory '" << newPath << "' (auto-refresh will not work).");
-            }
-            else
-            {
-                if (registerDevNotification)
-                {
-                    registerDevNot = TRUE;
-                    registerDevNotHandle = (HANDLE)ObjectArray[i];
-                }
-            }
-            break;
-        }
-    //---  not found -> add
-    if (i == WindowArray.Count)
-    {
-        // if the path ends with a space/dot, we must append '\\', otherwise FindFirstChangeNotification
-        // trims spaces/dots and works with a different path
-        CPathBuffer newPathCopy; // Heap-allocated for long path support
-        MakeCopyWithBackslashIfNeeded(newPath, newPathCopy);
-        HANDLE h = HANDLES_Q(FindFirstChangeNotification(newPathCopy, FALSE,
-                                                         FILE_NOTIFY_CHANGE_FILE_NAME |
-                                                             FILE_NOTIFY_CHANGE_DIR_NAME |
-                                                             FILE_NOTIFY_CHANGE_ATTRIBUTES |
-                                                             FILE_NOTIFY_CHANGE_SIZE |
-                                                             FILE_NOTIFY_CHANGE_LAST_WRITE));
-        if (h != INVALID_HANDLE_VALUE)
-        {
-            win->SetAutomaticRefresh(TRUE);
-            WindowArray.Add(win);
-            ObjectArray.Add(h);
-            if (registerDevNotification)
-            {
-                registerDevNot = TRUE;
-                registerDevNotHandle = h;
-            }
-        }
-        else
-        {
-            win->SetAutomaticRefresh(FALSE);
-            TRACE_W("Unable to receive change notifications for directory '" << newPath << "' (auto-refresh will not work).");
-        }
-    }
-    if (registerDevNot)
-    {
-        // register the panel window to receive media change messages (removal, etc.)
-        DEV_BROADCAST_HANDLE dbh;
-        memset(&dbh, 0, sizeof(dbh));
-        dbh.dbch_size = sizeof(dbh);
-        dbh.dbch_devicetype = DBT_DEVTYP_HANDLE;
-        dbh.dbch_handle = registerDevNotHandle;
-        win->DeviceNotification = RegisterDeviceNotificationA(win->HWindow, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
-    }
-    //---
-    ReleaseMutex(DataUsageMutex);                 // release DataUsageMutex to the snooper
-    WaitForSingleObject(ContinueEvent, INFINITE); // and wait until it takes it
-}
 
 void DetachDirectory(CFilesWindow* win, BOOL waitForHandleClosure, BOOL closeDevNotifification)
 {
@@ -1044,12 +900,12 @@ void BeginSuspendMode(BOOL debugDoNotTestCaller)
   DWORD called_from, caller_called_from;
   __try
   {
-    called_from = *(DWORD*)((char*)register_ebp + 4);
+    called_from = *(DWORD*)((wchar_t*)register_ebp + 4);
 
 if this code ever needs to be revived, note that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
-    caller_called_from = *(DWORD*)((char*)(*register_ebp) + 4);
+    caller_called_from = *(DWORD*)((wchar_t*)(*register_ebp) + 4);
   }
   __except (EXCEPTION_EXECUTE_HANDLER)
   {
@@ -1101,12 +957,12 @@ void EndSuspendMode(BOOL debugDoNotTestCaller)
   DWORD called_from, caller_called_from;
   __try
   {
-    called_from = *(DWORD*)((char*)register_ebp + 4);
+    called_from = *(DWORD*)((wchar_t*)register_ebp + 4);
 
 if this code ever needs to be revived, note that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
-    caller_called_from = *(DWORD*)((char*)(*register_ebp) + 4);
+    caller_called_from = *(DWORD*)((wchar_t*)(*register_ebp) + 4);
   }
   __except (EXCEPTION_EXECUTE_HANDLER)
   {

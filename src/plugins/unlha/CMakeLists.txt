@@ -6,6 +6,7 @@ sal_add_plugin(NAME unlha
     "${SAL_PLUGINS}/unlha/lha.cpp"
     "${SAL_PLUGINS}/unlha/precomp.cpp"
     "${SAL_PLUGINS}/unlha/unlha.cpp"
+    "${SAL_PLUGINS}/unlha/unlha_text.cpp"
   RC "${SAL_PLUGINS}/unlha/unlha.rc"
   DEF "${SAL_PLUGINS}/unlha/unlha.def"
 )

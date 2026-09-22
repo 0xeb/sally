@@ -11,7 +11,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 
 // FS name assigned by Salamander after the plugin is loaded
-extern CPathBuffer AssignedFSName; // Heap-allocated for long path support
+extern std::wstring AssignedFSName;
 
 BOOL InitFS();
 void ReleaseFS();
@@ -30,27 +30,27 @@ public:
     CPluginInterfaceForFS() { ActiveFSCount = 0; }
     int GetActiveFSCount() { return ActiveFSCount; }
 
-    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const char* fsName, int fsNameIndex);
+    virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const wchar_t* fsName, int fsNameIndex);
     virtual void WINAPI CloseFS(CPluginFSInterfaceAbstract* fs);
 
     virtual void WINAPI ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* pluginFS,
-                                    const char* pluginFSName, int pluginFSNameIndex,
+                                    const wchar_t* pluginFSName, int pluginFSNameIndex,
                                     CFileData& file, int isDir);
     virtual BOOL WINAPI DisconnectFS(HWND parent, BOOL isInPanel, int panel,
                                      CPluginFSInterfaceAbstract* pluginFS,
-                                     const char* pluginFSName, int pluginFSNameIndex);
+                                     const wchar_t* pluginFSName, int pluginFSNameIndex);
 
-    virtual void WINAPI ConvertPathToInternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
-    virtual void WINAPI ConvertPathToExternal(const char* fsName, int fsNameIndex,
-                                              char* fsUserPart) {}
+    virtual BOOL WINAPI ConvertPathToInternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) { return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart); }
+    virtual BOOL WINAPI ConvertPathToExternal(const wchar_t* fsName, int fsNameIndex,
+                                              CSalamanderStringBuffer* fsUserPart) { return fsUserPart != NULL && sally::plugin_abi::IsValidStringBuffer(*fsUserPart); }
 
-    virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server, const char* share) {}
+    virtual void WINAPI EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share) {}
 
     virtual void WINAPI ExecuteChangeDriveMenuItem(int panel);
     virtual BOOL WINAPI ChangeDriveMenuItemContextMenu(HWND parent, int panel, int x, int y,
                                                        CPluginFSInterfaceAbstract* pluginFS,
-                                                       const char* pluginFSName, int pluginFSNameIndex,
+                                                       const wchar_t* pluginFSName, int pluginFSNameIndex,
                                                        BOOL isDetachedFS, BOOL& refreshMenu,
                                                        BOOL& closeMenu, int& postCmd, void*& postCmdParam)
     {
@@ -82,7 +82,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -95,7 +95,7 @@ public:
 // column retrieved from the current folder; it may not actually be shown
 struct CShellColumn
 {
-    char Name[COLUMN_NAME_MAX];
+    wchar_t Name[COLUMN_NAME_MAX];
     int Fmt;           // Alignment of the column heading and the subitem text in the column. (DETAILSINFO::fmt)
     int Char;          // Number of average-sized characters in the heading. (DETAILSINFO::cxChar)
     SHCOLSTATEF Flags; // Default column state (SHCOLSTATEF)
@@ -130,22 +130,22 @@ public:
 
     virtual void WINAPI ReleasePluginData(CFileData& file, BOOL isDir);
 
-    virtual void WINAPI GetFileDataForUpDir(const char* archivePath, CFileData& upDir) {}
-    virtual BOOL WINAPI GetFileDataForNewDir(const char* dirName, CFileData& dir) { return FALSE; }
+    virtual void WINAPI GetFileDataForUpDir(const wchar_t* archivePath, CFileData& upDir) {}
+    virtual BOOL WINAPI GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir) { return FALSE; }
 
     virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize);
     virtual BOOL WINAPI HasSimplePluginIcon(CFileData& file, BOOL isDir) { return FALSE; }
     virtual HICON WINAPI GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon);
     virtual int WINAPI CompareFilesFromFS(const CFileData* file1, const CFileData* file2);
 
-    virtual void WINAPI SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+    virtual void WINAPI SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                   const CFileData* upperDir);
     virtual void WINAPI ColumnFixedWidthShouldChange(BOOL leftPanel, const CColumn* column, int newFixedWidth) {}
     virtual void WINAPI ColumnWidthWasChanged(BOOL leftPanel, const CColumn* column, int newWidth) {}
 
     virtual BOOL WINAPI GetInfoLineContent(int panel, const CFileData* file, BOOL isDir, int selectedFiles,
                                            int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
-                                           char* buffer, DWORD* hotTexts, int& hotTextsCount);
+                                           CSalamanderStringBuffer* buffer, CSalamanderTextRangeBuffer* hotTexts);
 
     virtual BOOL WINAPI CanBeCopiedToClipboard() { return TRUE; }
 
@@ -205,16 +205,22 @@ public:
     IContextMenu* GetContextMenu(HWND hParent, LPCITEMIDLIST* pidlArray, int itemsInArray);
     IContextMenu2* GetContextMenu2(HWND hParent, LPCITEMIDLIST* pidlArray, int itemsInArray);
 
-    virtual BOOL WINAPI GetCurrentPath(char* userPart);
-    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir, char* buf, int bufSize);
-    virtual BOOL WINAPI GetFullFSPath(HWND parent, const char* fsName, char* path, int pathSize, BOOL& success);
-    virtual BOOL WINAPI GetRootPath(char* userPart);
+    virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* userPart) override;
+    virtual BOOL WINAPI GetFullName(CFileData& file, int isDir,
+                                    CSalamanderStringBuffer* fullName) override;
+    virtual BOOL WINAPI GetFullFSPath(HWND parent, const wchar_t* fsName,
+                                      CSalamanderStringBuffer* path, BOOL& success) override;
+    virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart) override;
 
-    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
-    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart);
+    virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                      const wchar_t* userPart) override;
+    virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                                  const wchar_t* userPart) override;
 
-    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, char* fsName, int fsNameIndex, const char* userPart,
-                                   char* cutFileName, BOOL* pathWasCut, BOOL forceRefresh, int mode);
+    virtual BOOL WINAPI ChangePath(int currentFSNameIndex, CSalamanderStringBuffer* fsName,
+                                   int fsNameIndex, const wchar_t* userPart,
+                                   CSalamanderStringBuffer* cutFileName,
+                                   BOOL* pathWasCut, BOOL forceRefresh, int mode) override;
     virtual BOOL WINAPI ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                         CPluginDataInterfaceAbstract*& pluginData,
                                         int& iconsType, BOOL forceRefresh);
@@ -227,51 +233,51 @@ public:
 
     virtual DWORD WINAPI GetSupportedServices();
 
-    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const char* fsName, char*& title, HICON& icon, BOOL& destroyIcon);
+    virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(const wchar_t* fsName, wchar_t*& title, HICON& icon, BOOL& destroyIcon);
     virtual HICON WINAPI GetFSIcon(BOOL& destroyIcon);
-    virtual void WINAPI GetDropEffect(const char* srcFSPath, const char* tgtFSPath,
+    virtual void WINAPI GetDropEffect(const wchar_t* srcFSPath, const wchar_t* tgtFSPath,
                                       DWORD allowedEffects, DWORD keyState,
                                       DWORD* dropEffect) {}
     virtual void WINAPI GetFSFreeSpace(CQuadWord* retValue);
-    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset);
-    virtual void WINAPI CompleteDirectoryLineHotPath(char* path, int pathBufSize) {}
-    virtual BOOL WINAPI GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize) { return FALSE; }
-    virtual void WINAPI ShowInfoDialog(const char* fsName, HWND parent);
-    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo);
-    virtual BOOL WINAPI QuickRename(const char* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
-                                    char* newName, BOOL& cancel);
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* fsName, const char* path, BOOL includingSubdirs);
-    virtual BOOL WINAPI CreateDir(const char* fsName, int mode, HWND parent, char* newName, BOOL& cancel);
-    virtual void WINAPI ViewFile(const char* fsName, HWND parent,
+    virtual BOOL WINAPI GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset);
+    virtual BOOL WINAPI CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path) { return TRUE; }
+    virtual BOOL WINAPI GetPathForMainWindowTitle(const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf) { return FALSE; }
+    virtual void WINAPI ShowInfoDialog(const wchar_t* fsName, HWND parent);
+    virtual BOOL WINAPI ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo);
+    virtual BOOL WINAPI QuickRename(const wchar_t* fsName, int mode, HWND parent, CFileData& file, BOOL isDir,
+                                    CSalamanderStringBuffer* newName, BOOL& cancel);
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* fsName, const wchar_t* path, BOOL includingSubdirs);
+    virtual BOOL WINAPI CreateDir(const wchar_t* fsName, int mode, HWND parent, CSalamanderStringBuffer* newName, BOOL& cancel);
+    virtual void WINAPI ViewFile(const wchar_t* fsName, HWND parent,
                                  CSalamanderForViewFileOnFSAbstract* salamander,
                                  CFileData& file);
-    virtual BOOL WINAPI Delete(const char* fsName, int mode, HWND parent, int panel,
+    virtual BOOL WINAPI Delete(const wchar_t* fsName, int mode, HWND parent, int panel,
                                int selectedFiles, int selectedDirs, BOOL& cancelOrError);
-    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HWND parent,
+    virtual BOOL WINAPI CopyOrMoveFromFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
                                          int panel, int selectedFiles, int selectedDirs,
-                                         char* targetPath, BOOL& operationMask,
+                                         CSalamanderStringBuffer* targetPath, BOOL& operationMask,
                                          BOOL& cancelOrHandlePath, HWND dropTarget);
-    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsName, HWND parent,
-                                               const char* sourcePath, SalEnumSelection2 next,
+    virtual BOOL WINAPI CopyOrMoveFromDiskToFS(BOOL copy, int mode, const wchar_t* fsName, HWND parent,
+                                               const wchar_t* sourcePath, SalEnumSelection2 next,
                                                void* nextParam, int sourceFiles, int sourceDirs,
-                                               char* targetPath, BOOL* invalidPathOrCancel);
-    virtual BOOL WINAPI ChangeAttributes(const char* fsName, HWND parent, int panel,
+                                               CSalamanderStringBuffer* targetPath, BOOL* invalidPathOrCancel);
+    virtual BOOL WINAPI ChangeAttributes(const wchar_t* fsName, HWND parent, int panel,
                                          int selectedFiles, int selectedDirs);
-    virtual void WINAPI ShowProperties(const char* fsName, HWND parent, int panel,
+    virtual void WINAPI ShowProperties(const wchar_t* fsName, HWND parent, int panel,
                                        int selectedFiles, int selectedDirs);
-    virtual void WINAPI ContextMenu(const char* fsName, HWND parent, int menuX, int menuY, int type,
+    virtual void WINAPI ContextMenu(const wchar_t* fsName, HWND parent, int menuX, int menuY, int type,
                                     int panel, int selectedFiles, int selectedDirs);
-    virtual BOOL WINAPI OpenFindDialog(const char* fsName, int panel) { return FALSE; }
-    virtual void WINAPI OpenActiveFolder(const char* fsName, HWND parent);
-    virtual void WINAPI GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects) {}
+    virtual BOOL WINAPI OpenFindDialog(const wchar_t* fsName, int panel) { return FALSE; }
+    virtual void WINAPI OpenActiveFolder(const wchar_t* fsName, HWND parent);
+    virtual void WINAPI GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects) {}
     virtual BOOL WINAPI HandleMenuMsg(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT* plResult);
-    virtual BOOL WINAPI GetNoItemsInPanelText(char* textBuf, int textBufSize) { return FALSE; }
+    virtual BOOL WINAPI GetNoItemsInPanelText(CSalamanderStringBuffer* textBuf) { return FALSE; }
     virtual void WINAPI ShowSecurityInfo(HWND parent) {}
 };
 
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
 
-char* LoadStr(int resID);
+std::wstring LangStr(int resID);
 
 #define SAL_ARRAYSIZE(x) (sizeof(x) / sizeof(x[0]))

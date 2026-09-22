@@ -22,23 +22,17 @@ public:
 
 class CNextVolumeDialog : public CDlgRoot
 {
-    char* VolumeName;
-    char* VolumePath;
-    char* DiskName;
+    std::wstring* VolumePath;
+    std::wstring VolumeNameW;
+    std::wstring InitialVolumePathW;
+    std::wstring DiskNameW;
     int CabNumber;
-    CPathBuffer CurrentPath;
+    std::wstring CurrentPath;
 
 public:
-    CNextVolumeDialog(HWND parent, char* volumeName, char* volumePath, char* diskName,
-                      int cabNumber) : CDlgRoot(parent)
-    {
-        VolumeName = volumeName;
-        VolumePath = volumePath;
-        DiskName = diskName;
-        CabNumber = cabNumber;
-        lstrcpyn(CurrentPath, VolumeName, CurrentPath.Size());
-        SalamanderGeneral->CutDirectory(CurrentPath);
-    }
+    CNextVolumeDialog(HWND parent, const std::wstring& volumeName, std::wstring* volumePath,
+                      const std::wstring& initialVolumePath, const std::wstring& diskName,
+                      int cabNumber);
     INT_PTR Proceed();
 
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -47,14 +41,16 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR NextVolumeDialog(HWND parent, char* volumeName, char* volumePath, char* diskName, int cabNumber);
+// volumePath is both the directory to offer and where the user's choice lands;
+// it stays UTF-16 so the browse result is never squeezed through the CAB bytes.
+INT_PTR NextVolumeDialog(HWND parent, char* volumeName, std::wstring& volumePath, char* diskName, int cabNumber);
 
 class CContinuedFileDialog : public CDlgRoot
 {
-    const char* File;
+    std::wstring File;
 
 public:
-    CContinuedFileDialog(HWND parent, const char* file) : CDlgRoot(parent)
+    CContinuedFileDialog(HWND parent, const std::wstring& file) : CDlgRoot(parent)
     {
         File = file;
     }
@@ -65,7 +61,7 @@ public:
     //    BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
-INT_PTR ContinuedFileDialog(HWND parent, const char* file);
+INT_PTR ContinuedFileDialog(HWND parent, const std::wstring& file);
 
 class CConfigDialog : public CDlgRoot
 {

@@ -11,10 +11,10 @@
 // CFilesWindow::ChangeDir() has always done this for ANSI paths
 // (files_window_directory_read.cpp: `if (*end == 0 && CutDirectory(shortenedPath, &name))`
 // -> ChangePathToDisk(..., name) + CHPPFR_FILENAMEFOCUSED). ClipboardPastePath() routes a
-// non-ANSI path to ChangePathToDiskW() instead, which has no such split, so the full file
+// non-ANSI path to ChangePathToDisk() instead, which has no such split, so the full file
 // path reached the directory-listing code and produced
 //   "(267) The directory name is invalid."
-// Confirmed from a live dump: ClipboardPastePath -> ChangePathToDiskW -> ShowError.
+// Confirmed from a live dump: ClipboardPastePath -> ChangePathToDisk -> ShowError.
 //
 // These are the pure decisions behind that split, kept UI-free and FS-free so the headless
 // test can drive them directly. The caller supplies the attributes it already queried.
@@ -34,14 +34,14 @@ namespace sally
 // wide names can therefore share one ANSI spelling; focus then lands on the first match,
 // which is a cosmetic ambiguity rather than an error. Returns "" when conversion fails
 // entirely (the panel stores an empty Name in that case too).
-std::string PanelAnsiNameFromWideW(const wchar_t* wideName);
+
 
 // TRUE when 'fullPath' (whose attributes are 'attrs') names an existing non-directory and can
-// be split, i.e. the paste should list 'directoryOut' and focus 'focusNameAnsiOut'.
+// be split, i.e. the paste should list 'directoryOut' and focus 'focusNameOut'.
 //
 // FALSE - caller keeps its current behaviour - when the path does not exist, is a directory,
 // or has no parent to fall back to ("C:\", "\server\share").
 bool ResolvePastedFilePathW(const wchar_t* fullPath, DWORD attrs,
-                            std::wstring& directoryOut, std::string& focusNameAnsiOut);
+                            std::wstring& directoryOut, std::wstring& focusNameOut);
 
 } // namespace sally

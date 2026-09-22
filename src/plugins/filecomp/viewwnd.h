@@ -50,7 +50,7 @@ enum CFileViewType
 extern HCURSOR HIbeamCursor;
 extern HCURSOR HArrowCursor;
 
-extern const char* FILEVIEWWINDOW_CLASSNAME;
+extern LPCWSTR FILEVIEWWINDOW_CLASSNAME;
 
 // proportional to the window width; edges are ignored, this is just an "estimate"
 #define FAST_LEFTRIGHT __max(1, width / FontWidth / 6)
@@ -74,7 +74,8 @@ protected:
     CFileViewWindow* Siblink;
     LONG SiblinkWidth;
     CFileViewMode ViewMode;
-    TMappedTextOut<char> MappedASCII8TextOut;
+    // The hex pane deliberately presents one UTF-16 cell per source byte.
+    TMappedTextOut<char> MappedByteCellTextOut;
     BOOL Tracking;
 
     // accumulates micro-steps while the mouse wheel turns, see
@@ -243,7 +244,7 @@ protected:
 
 __inline __int64 Abs64(__int64 n) { return n >= 0 ? n : -n; }
 
-char* QWord2Ascii(QWORD qw, char* buffer, int digits);
+wchar_t* QWordToHexText(QWORD value, wchar_t* buffer, int digits);
 int ComputeAddressCharWidth(QWORD size1, QWORD size2);
 
 class CHexFileViewWindow : public CFileViewWindow
@@ -255,7 +256,7 @@ protected:
     int BytesPerLine;
     QWORD ViewOffset;
     QWORD SiblinkSize;
-    CPathBuffer Path; // Heap-allocated for long path support
+    std::wstring Path;
     BOOL PaintEnabled;
     int HScrollOffs;
     QWORD FocusedDiffOffset;
@@ -272,13 +273,13 @@ public:
     virtual void DestroyData();
     virtual void SetSiblink(CFileViewWindow* wnd);
     virtual void UpdateScrollBars(BOOL repaint = TRUE);
-    virtual BOOL SetData(QWORD firstDiff, const char* path, QWORD siblinkSize);
+    virtual BOOL SetData(QWORD firstDiff, const wchar_t* path, QWORD siblinkSize);
     virtual void Paint();
     void EnablePaint() { PaintEnabled = TRUE; }
     void DisablePaint() { PaintEnabled = FALSE; }
-    const char* GetPath() { return Path; }
+    const wchar_t* GetPath() { return Path.c_str(); }
     int HandleFileException(EXCEPTION_POINTERS* e);
-    void HandleFileError(const char* path, int error);
+    void HandleFileError(const wchar_t* path, int error);
     QWORD FindDifference(int cmd, QWORD* pOffset);
     void SelectDifference(QWORD offset, QWORD length, BOOL center);
     QWORD GetFocusedDifference(QWORD* length)

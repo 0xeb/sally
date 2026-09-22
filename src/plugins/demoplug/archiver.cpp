@@ -30,15 +30,17 @@ void WINAPI GetSzText()
 {
     if (*TransferIsDir && !(*TransferFileData)->SizeValid)
     {
-        CopyMemory(TransferBuffer, "Dir", 3);
+        // TransferBuffer is wide; CopyMemory silently accepted the mismatched
+        // narrow literal (void* args), a latent bug matching fs_init.cpp's column.Name fix.
+        CopyMemory(TransferBuffer, L"Dir", 3 * sizeof(wchar_t));
         *TransferLen = 3;
     }
     else
-        *TransferLen = sprintf(TransferBuffer, "%I64d", (*TransferFileData)->Size.Value);
+        *TransferLen = swprintf_s(TransferBuffer, 50, L"%I64d", (*TransferFileData)->Size.Value);
 }
 
 void WINAPI
-CArcPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+CArcPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                    const CFileData* upperDir)
 {
     view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen, TransferRowData,
@@ -59,8 +61,8 @@ CArcPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view
             }
 
         CColumn column;
-        lstrcpy(column.Name, "Size2");
-        lstrcpy(column.Description, "Size v jinem provedeni");
+        lstrcpyW(column.Name, L"Size2");
+        lstrcpyW(column.Description, L"Size v jinem provedeni");
         column.GetText = GetSzText;
         column.SupportSorting = 1;
         column.LeftAlignment = 0;
@@ -92,13 +94,13 @@ CArcPluginDataInterface::ColumnWidthWasChanged(BOOL leftPanel, const CColumn* co
 }
 
 BOOL WINAPI
-CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
+CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
                                          CSalamanderDirectoryAbstract* dir,
                                          CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, , ,)", fileName);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %ls, , ,)", fileName);
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::ListArchive", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::ListArchive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     // define which data fields in 'file' are valid
@@ -118,14 +120,14 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
 
     CFileData file;
 
-    file.Name = SalamanderGeneral->DupStr("test.dop");
+    file.Name = SalamanderGeneral->DupStr(L"test.dop");
     if (file.Name == NULL)
     {
         dir->Clear(pluginData);
         return FALSE;
     }
-    file.NameLen = strlen(file.Name);
-    char* s = strrchr(file.Name, '.');
+    file.NameLen = (int)wcslen(file.Name);
+    wchar_t* s = wcsrchr(file.Name, L'.');
     if (s != NULL)
         file.Ext = s + 1; // ".cvspass" is a Windows extension...
     else
@@ -164,7 +166,7 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
 
     // automatically adds two directories "test" and "path" (because they do not yet exist)
     // so that it can add 'file'
-    if (!dir->AddFile("test\\path", file, pluginData))
+    if (!dir->AddFile(L"test\\path", file, pluginData))
     {
         SalamanderGeneral->Free(file.Name);
         dir->Clear(pluginData);
@@ -172,14 +174,14 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
     }
 
     // add two more files
-    file.Name = SalamanderGeneral->DupStr("test2.txt");
+    file.Name = SalamanderGeneral->DupStr(L"test2.txt");
     if (file.Name == NULL)
     {
         dir->Clear(pluginData);
         return FALSE;
     }
-    file.NameLen = strlen(file.Name);
-    s = strrchr(file.Name, '.');
+    file.NameLen = (int)wcslen(file.Name);
+    s = wcsrchr(file.Name, L'.');
     if (s != NULL)
         file.Ext = s + 1; // ".cvspass" is a Windows extension...
     else
@@ -187,20 +189,20 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
     file.Size = CQuadWord(555, 0);
     file.IsLink = SalamanderGeneral->IsFileLink(file.Ext);
     file.IconOverlayIndex = 0; // icon-overlay: shared
-    if (!dir->AddFile("test\\path", file, pluginData))
+    if (!dir->AddFile(L"test\\path", file, pluginData))
     {
         SalamanderGeneral->Free(file.Name);
         dir->Clear(pluginData);
         return FALSE;
     }
-    file.Name = SalamanderGeneral->DupStr("test3.txt");
+    file.Name = SalamanderGeneral->DupStr(L"test3.txt");
     if (file.Name == NULL)
     {
         dir->Clear(pluginData);
         return FALSE;
     }
-    file.NameLen = strlen(file.Name);
-    s = strrchr(file.Name, '.');
+    file.NameLen = (int)wcslen(file.Name);
+    s = wcsrchr(file.Name, L'.');
     if (s != NULL)
         file.Ext = s + 1; // ".cvspass" is a Windows extension...
     else
@@ -209,7 +211,7 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
     file.Attr |= FILE_ATTRIBUTE_ENCRYPTED;
     file.IsLink = SalamanderGeneral->IsFileLink(file.Ext);
     file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED; // no icon overlay
-    if (!dir->AddFile("test\\path", file, pluginData))
+    if (!dir->AddFile(L"test\\path", file, pluginData))
     {
         SalamanderGeneral->Free(file.Name);
         dir->Clear(pluginData);
@@ -219,18 +221,18 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
     int sortByExtDirsAsFiles;
     SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &sortByExtDirsAsFiles,
                                           sizeof(sortByExtDirsAsFiles), NULL);
-    file.Name = SalamanderGeneral->DupStr("test");
+    file.Name = SalamanderGeneral->DupStr(L"test");
     if (file.Name == NULL)
     {
         dir->Clear(pluginData);
         return FALSE;
     }
-    file.NameLen = strlen(file.Name);
+    file.NameLen = (int)wcslen(file.Name);
     if (!sortByExtDirsAsFiles)
         file.Ext = file.Name + file.NameLen; // directories have no extension
     else
     {
-        s = strrchr(file.Name, '.');
+        s = wcsrchr(file.Name, L'.');
         if (s != NULL)
             file.Ext = s + 1; // ".cvspass" is a Windows extension...
         else
@@ -244,7 +246,7 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
     file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED; // no icon overlay
 
     // change the data of the "test" directory (created automatically, see the previous AddFile) to 'file'
-    if (!dir->AddDir("", file, pluginData))
+    if (!dir->AddDir(L"", file, pluginData))
     {
         SalamanderGeneral->Free(file.Name);
         dir->Clear(pluginData);
@@ -256,14 +258,14 @@ CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salam
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander,
-                                           const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                           const char* targetDir, const char* archiveRoot,
+                                           const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                           const wchar_t* targetDir, const wchar_t* archiveRoot,
                                            SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, , %s, %s, ,)", fileName,
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, , %ls, %ls, ,)", fileName,
                         targetDir, archiveRoot);
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::UnpackArchive", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::UnpackArchive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     // internal packers will probably use salCalls->SafeCreateFile for direct
@@ -272,20 +274,20 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
     //   moves the files to the correct location on disk (handles overwriting files, etc.):
 
     BOOL ret = FALSE;
-    CPathBuffer tmpExtractDir;
     DWORD err;
-    if (!SalamanderGeneral->SalGetTempFileName(targetDir, "Sal", tmpExtractDir, FALSE, &err))
+    // SalGetTempFileName is wide; tmpNameSize counts WCHARs. targetDir/tmpExtractDir
+    // are real on-disk paths now, so this stays wide throughout - no narrow round-trip needed.
+    std::wstring tmpExtractDir;
+    if (!SPLSalGetTempFileNameOwned(SalamanderGeneral, targetDir, L"Sal", tmpExtractDir, FALSE, &err))
     {
-        char buf[100];
-        sprintf(buf, "SalGetTempFileName() error: %u", err);
-        TRACE_E(buf);
+        TRACE_E("SalGetTempFileName() error: " << err);
     }
     else
     {
         BOOL isDir;
         CQuadWord size;
         CQuadWord totalSize(0, 0);
-        const char* name;
+        const wchar_t* name;
         const CFileData* fileData;
         while ((name = next(NULL, 0, &isDir, &size, &fileData, nextParam, NULL)) != NULL)
         {
@@ -307,7 +309,7 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
 
         BOOL delTempDir = TRUE;
         if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                             tmpExtractDir, totalSize, "Unpacking DemoPlug Archive"))
+                                             tmpExtractDir.c_str(), totalSize, L"Unpacking DemoPlug Archive"))
         {
             /*
       // demonstration of a progress dialog with a single progress bar
@@ -336,16 +338,16 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
 */
 
             // demonstration of a progress dialog with two progress bars
-            salamander->OpenProgressDialog("Unpacking DemoPlug Archive", TRUE, NULL, FALSE);
+            salamander->OpenProgressDialog(L"Unpacking DemoPlug Archive", TRUE, NULL, FALSE);
             salamander->ProgressSetTotalSize(CQuadWord(30, 0), CQuadWord(90, 0));
             // performing the extraction - the following methods are called repeatedly:
-            salamander->ProgressDialogAddText("preparing data...", FALSE); // delayedPaint==FALSE because we do not want to wait for the timer and we are not going to call ProgressAddSize
+            salamander->ProgressDialogAddText(L"preparing data...", FALSE); // delayedPaint==FALSE because we do not want to wait for the timer and we are not going to call ProgressAddSize
             Sleep(1000);                                                   // activity simulation
             ret = TRUE;
             int c = 90;
             while (c--)
             {
-                salamander->ProgressDialogAddText("test text", TRUE); // delayedPaint==TRUE so that we do not slow the UI down
+                salamander->ProgressDialogAddText(L"test text", TRUE); // delayedPaint==TRUE so that we do not slow the UI down
                 Sleep(50);                                            // activity simulation
                 if ((c + 1) % 30 == 0)                                // simulating "another file"
                 {
@@ -354,7 +356,7 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
                 }
                 if (!salamander->ProgressAddSize(1, TRUE)) // delayedPaint==TRUE so that we do not slow the UI down
                 {
-                    salamander->ProgressDialogAddText("canceling operation, please wait...", FALSE);
+                    salamander->ProgressDialogAddText(L"canceling operation, please wait...", FALSE);
                     salamander->ProgressEnableCancel(FALSE);
                     Sleep(1000); // cleanup simulation
                     ret = FALSE;
@@ -368,13 +370,13 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
             if (ret)
             {
                 // the files are unpacked in the temporary directory and must be placed
-                if (!salamander->MoveFiles(tmpExtractDir, targetDir, tmpExtractDir, fileName))
+                if (!salamander->MoveFiles(tmpExtractDir.c_str(), targetDir, tmpExtractDir.c_str(), fileName))
                     delTempDir = FALSE;
             }
         }
 
         if (delTempDir)
-            SalamanderGeneral->RemoveTemporaryDir(tmpExtractDir);
+            SalamanderGeneral->RemoveTemporaryDir(tmpExtractDir.c_str());
     }
 
     return ret;
@@ -382,15 +384,15 @@ CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* sal
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                           const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                           const char* nameInArchive, const CFileData* fileData,
-                                           const char* targetDir, const char* newFileName,
+                                           const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                           const wchar_t* nameInArchive, const CFileData* fileData,
+                                           const wchar_t* targetDir, const wchar_t* newFileName,
                                            BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, , %s, , %s, ,)", fileName,
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, , %ls, , %ls, ,)", fileName,
                         nameInArchive, targetDir);
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::UnpackOneFile", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::UnpackOneFile", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     if (newFileName != NULL)
@@ -402,20 +404,21 @@ CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* sal
     // unpacking without a progress dialog
 
     // instead of unpacking we only create a test file
-    CPathBuffer name;
-    strcpy(name, targetDir);
-    const char* lastComp = strrchr(nameInArchive, '\\');
+    // real on-disk target path - stays wide throughout, CreateFileW explicitly
+    // (UNICODE is not defined in this build, so plain CreateFile still resolves narrow).
+    std::wstring name(targetDir != NULL ? targetDir : L"");
+    const wchar_t* lastComp = wcsrchr(nameInArchive, L'\\');
     if (lastComp != NULL)
         lastComp++;
     else
         lastComp = nameInArchive;
-    if (SalamanderGeneral->SalPathAppend(name, lastComp, name.Size()))
+    SPLSalPathAppendOwned(name, lastComp);
     {
-        HANDLE file = HANDLES_Q(CreateFile(name, GENERIC_WRITE,
-                                           FILE_SHARE_READ, NULL,
-                                           CREATE_ALWAYS,
-                                           FILE_FLAG_SEQUENTIAL_SCAN,
-                                           NULL));
+        HANDLE file = HANDLES_Q(CreateFileW(name.c_str(), GENERIC_WRITE,
+                                            FILE_SHARE_READ, NULL,
+                                            CREATE_ALWAYS,
+                                            FILE_FLAG_SEQUENTIAL_SCAN,
+                                            NULL));
         if (file != INVALID_HANDLE_VALUE)
         {
             ULONG written;
@@ -430,20 +433,20 @@ CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* sal
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* salamander,
-                                           const char* fileName, const char* archiveRoot,
-                                           BOOL move, const char* sourcePath,
+                                           const wchar_t* fileName, const wchar_t* archiveRoot,
+                                           BOOL move, const wchar_t* sourcePath,
                                            SalEnumSelection2 next, void* nextParam)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::PackToArchive(, %s, %s, %d, %s, ,)", fileName,
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::PackToArchive(, %ls, %ls, %d, %ls, ,)", fileName,
                         archiveRoot, move, sourcePath);
 
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::PackToArchive", LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::PackToArchive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     BOOL isDir;
-    const char* name;
-    const char* dosName; // dummy
+    const wchar_t* name;
+    const wchar_t* dosName; // dummy
     CQuadWord size;
     DWORD attr;
     FILETIME lastWrite;
@@ -451,8 +454,8 @@ CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* sal
     int errorOccured;
 
     // open progress dialog
-    salamander->OpenProgressDialog("Packing DemoPlug Archive", FALSE, NULL, FALSE);
-    salamander->ProgressDialogAddText("reading directory tree...", FALSE);
+    salamander->OpenProgressDialog(L"Packing DemoPlug Archive", FALSE, NULL, FALSE);
+    salamander->ProgressDialogAddText(L"reading directory tree...", FALSE);
 
     while ((name = next(SalamanderGeneral->GetMsgBoxParent(), 3, &dosName, &isDir, &size,
                         &attr, &lastWrite, nextParam, &errorOccured)) != NULL)
@@ -475,31 +478,26 @@ CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* sal
         }
     }
 
-    CPathBuffer archivePath;
-    char* s = (char*)strrchr(fileName, '\\');
-    if (s != NULL)
-    {
-        memcpy(archivePath, fileName, s - fileName);
-        archivePath[s - fileName] = 0;
-    }
-    else
-        archivePath[0] = 0;
+    // real archive-file directory path (for TestFreeSpace) - stays wide, no
+    // narrow round-trip needed now that fileName is wide.
+    const wchar_t* s = wcsrchr(fileName, L'\\');
+    const std::wstring archivePath = s != NULL ? std::wstring(fileName, s) : std::wstring();
 
     BOOL ret = FALSE;
-    if (archivePath[0] == 0 ||
+    if (archivePath.empty() ||
         SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                         archivePath, totalSize, "Unpacking DemoPlug Archive"))
+                                         archivePath.c_str(), totalSize, L"Unpacking DemoPlug Archive"))
     {
         salamander->ProgressSetTotalSize(CQuadWord(100, 0) /*totalSize*/, CQuadWord(-1, -1));
 
         // perform the packing
-        salamander->ProgressDialogAddText("test text 1", FALSE);
+        salamander->ProgressDialogAddText(L"test text 1", FALSE);
         Sleep(500); // activity simulation
         if (!salamander->ProgressAddSize(50, FALSE))
             ret = FALSE; // cancel the action
         else
         {
-            salamander->ProgressDialogAddText("test text 2", FALSE);
+            salamander->ProgressDialogAddText(L"test text 2", FALSE);
             Sleep(500); // activity simulation
             if (!salamander->ProgressAddSize(50, FALSE))
                 ret = FALSE; // cancel the action
@@ -517,24 +515,23 @@ CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract* sal
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbstract* salamander,
-                                               const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                               const char* archiveRoot, SalEnumSelection next, void* nextParam)
+                                               const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                               const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteFromArchive(, %s, , %s, ,)",
+    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteFromArchive(, %ls, , %ls, ,)",
                         fileName, archiveRoot);
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::DeleteFromArchive",
-                                      LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::DeleteFromArchive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
-    salamander->OpenProgressDialog("Deleting DemoPlug Archive Entries", FALSE, NULL, FALSE);
-    salamander->ProgressDialogAddText("reading directory tree...", FALSE);
+    salamander->OpenProgressDialog(L"Deleting DemoPlug Archive Entries", FALSE, NULL, FALSE);
+    salamander->ProgressDialogAddText(L"reading directory tree...", FALSE);
 
     BOOL ret = FALSE;
     BOOL isDir;
     CQuadWord size;
     CQuadWord totalSize(0, 0);
-    const char* name;
+    const wchar_t* name;
     const CFileData* fileData;
     while ((name = next(NULL, 0, &isDir, &size, &fileData, nextParam, NULL)) != NULL)
     {
@@ -546,13 +543,13 @@ CPluginInterfaceForArchiver::DeleteFromArchive(CSalamanderForOperationsAbstract*
     salamander->ProgressSetTotalSize(CQuadWord(100, 0) /*totalSize*/, CQuadWord(-1, -1));
 
     // perform the deletion
-    salamander->ProgressDialogAddText("test text 1", FALSE);
+    salamander->ProgressDialogAddText(L"test text 1", FALSE);
     Sleep(500); // activity simulation
     if (!salamander->ProgressAddSize(50, FALSE))
         ret = FALSE; // cancel the action
     else
     {
-        salamander->ProgressDialogAddText("test text 2", FALSE);
+        salamander->ProgressDialogAddText(L"test text 2", FALSE);
         Sleep(500); // activity simulation
         if (!salamander->ProgressAddSize(50, FALSE))
             ret = FALSE; // cancel the action
@@ -584,7 +581,7 @@ void EnumAllItems(CSalamanderDirectoryAbstract const *dir, char *path, int pathB
   {
     CFileData const *file = dir->GetDir(i);
     TRACE_I("EnumAllItems(): directory: " << path << (path[0] != 0 ? "\\" : "") << file->Name);
-    SalamanderGeneral->SalPathAppend(path, file->Name, pathBufSize);
+    // SPLSalPathAppendOwned(path, file->Name); // use an owned std::wstring in live code
     CSalamanderDirectoryAbstract const *subDir = dir->GetSalDir(i);
     EnumAllItems(subDir, path, pathBufSize);
     path[pathLen] = 0;
@@ -594,15 +591,14 @@ void EnumAllItems(CSalamanderDirectoryAbstract const *dir, char *path, int pathB
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, const char* mask,
-                                                const char* targetDir, BOOL delArchiveWhenDone,
+                                                const wchar_t* fileName, const wchar_t* mask,
+                                                const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                                 CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)", fileName,
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)", fileName,
                         mask, targetDir, delArchiveWhenDone);
 #ifndef DEMOPLUG_QUIET
-    SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::UnpackWholeArchive",
-                                      LoadStr(IDS_PLUGINNAME), MSGBOX_INFO);
+    SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::UnpackWholeArchive", LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_INFO);
 #endif // DEMOPLUG_QUIET
 
     /*
@@ -612,7 +608,7 @@ CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract
     CPluginDataInterfaceAbstract *pluginData = NULL;
     if (ListArchive(salamander, fileName, dir, pluginData))
     {
-      CPathBuffer path;
+      std::wstring path;
       path[0] = 0;
       EnumAllItems(dir, path, path.Size());
       dir->Clear(pluginData);
@@ -625,17 +621,17 @@ CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract
     BOOL ret = FALSE;
     if (delArchiveWhenDone)
         archiveVolumes->Add(fileName, -2); // FIXME: once the plugin learns multi-volume archives we must add all archive volumes here (to delete the entire archive)
-    salamander->OpenProgressDialog("Unpacking DemoPlug Archive", FALSE, NULL, FALSE);
+    salamander->OpenProgressDialog(L"Unpacking DemoPlug Archive", FALSE, NULL, FALSE);
     salamander->ProgressSetTotalSize(CQuadWord(100, 0), CQuadWord(-1, -1));
 
     // perform the unpacking
-    salamander->ProgressDialogAddText("test text 1", FALSE);
+    salamander->ProgressDialogAddText(L"test text 1", FALSE);
     Sleep(500); // activity simulation
     if (!salamander->ProgressAddSize(50, FALSE))
         ret = FALSE; // cancel the action
     else
     {
-        salamander->ProgressDialogAddText("test text 2", FALSE);
+        salamander->ProgressDialogAddText(L"test text 2", FALSE);
         Sleep(500); // activity simulation
         if (!salamander->ProgressAddSize(50, FALSE))
             ret = FALSE; // cancel the action
@@ -651,9 +647,9 @@ CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract
 
 BOOL WINAPI
 CPluginInterfaceForArchiver::CanCloseArchive(CSalamanderForOperationsAbstract* salamander,
-                                             const char* fileName, BOOL force, int panel)
+                                             const wchar_t* fileName, BOOL force, int panel)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::CanCloseArchive(, %s, %d, %d)",
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::CanCloseArchive(, %ls, %d, %d)",
                         fileName, force, panel);
 #ifdef DEMOPLUG_QUIET
     return TRUE;
@@ -662,44 +658,39 @@ CPluginInterfaceForArchiver::CanCloseArchive(CSalamanderForOperationsAbstract* s
     if (SalamanderGeneral->IsCriticalShutdown())
         return TRUE; // during a critical shutdown we do not ask any questions
 
-    return force && SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::CanCloseArchive (can close).\n"
-                                                      "Return is forced to TRUE.",
-                                                      LoadStr(IDS_PLUGINNAME),
+    return force && SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::CanCloseArchive (can close).\n"
+                                                      L"Return is forced to TRUE.", LangStr(IDS_PLUGINNAME).c_str(),
                                                       MSGBOX_INFO) == IDOK ||
-           SalamanderGeneral->ShowMessageBox("CPluginInterfaceForArchiver::CanCloseArchive (can close).\n"
-                                             "What should it return?",
-                                             LoadStr(IDS_PLUGINNAME),
+           SalamanderGeneral->ShowMessageBox(L"CPluginInterfaceForArchiver::CanCloseArchive (can close).\n"
+                                             L"What should it return?", LangStr(IDS_PLUGINNAME).c_str(),
                                              MSGBOX_QUESTION) == IDYES;
 #endif // DEMOPLUG_QUIET
 }
 
-void GetMyDocumentsPath(char* path)
+static std::wstring GetMyDocumentsPath()
 {
-    path[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    PWSTR knownPath = NULL;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &knownPath)))
     {
-        if (!SHGetPathFromIDList(pidl, path))
-            path[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+        std::wstring path(knownPath);
+        CoTaskMemFree(knownPath);
+        return path;
     }
+    return std::wstring();
 }
 
 BOOL WINAPI
-CPluginInterfaceForArchiver::GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies)
+CPluginInterfaceForArchiver::GetCacheInfo(CSalamanderStringBuffer* tempPath, BOOL* ownDelete, BOOL* cacheCopies)
 {
     CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::GetCacheInfo()");
-    GetMyDocumentsPath(tempPath);
-    if (tempPath[0] == 0 ||
-        !SalamanderGeneral->SalPathAppend(tempPath, "DemoPlug Temporary Copies", MAX_PATH))
-    {
-        tempPath[0] = 0; // error -> fall back to the system TEMP
-    }
+    if (tempPath == NULL || ownDelete == NULL || cacheCopies == NULL)
+        return FALSE;
+    std::wstring path = GetMyDocumentsPath();
+    SPLSalPathAppendOwned(path, L"DemoPlug Temporary Copies");
+    if (path.empty())
+        path.clear(); // error -> fall back to the system TEMP
+    if (!sally::plugin_abi::WriteStringBuffer(*tempPath, path))
+        return FALSE;
     *ownDelete = TRUE;
     *cacheCopies = FALSE;
     return TRUE;
@@ -707,33 +698,30 @@ CPluginInterfaceForArchiver::GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL*
 
 void ClearTEMPIfNeeded(HWND parent)
 {
-    CPathBuffer tmpDir;
-    GetMyDocumentsPath(tmpDir);
-    if (tmpDir[0] != 0 &&
-        SalamanderGeneral->SalPathAppend(tmpDir, "DemoPlug Temporary Copies", tmpDir.Size()))
+    std::wstring tempRoot = GetMyDocumentsPath();
+    if (!tempRoot.empty())
     {
-        SalamanderGeneral->SalPathAddBackslash(tmpDir, tmpDir.Size());
-        char* tmpDirEnd = tmpDir + strlen(tmpDir);
-        // add the mask (if it does not fit, there is no point in searching)
-        if (SalamanderGeneral->SalPathAppend(tmpDir, "SAL*.tmp", tmpDir.Size()))
+        SPLSalPathAppendOwned(tempRoot, L"DemoPlug Temporary Copies");
+        std::wstring searchPath(tempRoot);
+        SPLSalPathAppendOwned(searchPath, L"SAL*.tmp");
         {
-            TIndirectArray<char> tmpDirs(10, 50);
+            TIndirectArray<wchar_t> tmpDirs(10, 50);
 
-            WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(tmpDir, &data));
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(searchPath.c_str(), &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 { // process all found directories (ignore search errors)
-                    if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && strlen(data.cFileName) > 3)
+                    if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && wcslen(data.cFileName) > 3)
                     {
-                        char* s = data.cFileName + 3;
+                        wchar_t* s = data.cFileName + 3;
                         while (*s != 0 && *s != '.' &&
                                (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'f' || *s >= 'A' && *s <= 'F'))
                             s++;
-                        if (SalamanderGeneral->StrICmp(s, ".tmp") == 0) // matches "SAL" + hex number + ".tmp" = almost certainly our directory
+                        if (SalamanderGeneral->StrICmp(s, L".tmp") == 0) // matches "SAL" + hex number + ".tmp" = almost certainly our directory
                         {
-                            char* tmp = SalamanderGeneral->DupStr(data.cFileName);
+                            wchar_t* tmp = SalamanderGeneral->DupStr(data.cFileName);
                             if (tmp != NULL)
                             {
                                 tmpDirs.Add(tmp);
@@ -745,45 +733,45 @@ void ClearTEMPIfNeeded(HWND parent)
                             }
                         }
                     }
-                } while (FindNextFile(find, &data));
+                } while (FindNextFileW(find, &data));
                 HANDLES(FindClose(find));
             }
 
             if (tmpDirs.IsGood() && tmpDirs.Count > 0)
             {
                 MSGBOXEX_PARAMS params;
+                const std::wstring caption = LangStr(IDS_PLUGINNAME);
                 memset(&params, 0, sizeof(params));
                 params.HParent = parent;
                 params.Flags = MSGBOXEX_ABORTRETRYIGNORE | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON3;
-                params.Caption = LoadStr(IDS_PLUGINNAME);
-                char buf[300];
-                char buf2[300];
+                params.Caption = caption.c_str();
                 CQuadWord qwCount(tmpDirs.Count, 0);
-                SalamanderGeneral->ExpandPluralString(buf2, 300,
-                                                      "{!}Do you want to delete %d temporary director{y|1|ies} used "
-                                                      "by previous instances of DemoPlug plugin?",
-                                                      1, &qwCount);
-                _snprintf_s(buf, _TRUNCATE, buf2, tmpDirs.Count);
-                params.Text = buf;
-                char aliasBtnNames[300];
-                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                        DIALOG_ABORT, "&Yes",
-                        DIALOG_RETRY, "&No",
-                        DIALOG_IGNORE, "&Focus");
-                params.AliasBtnNames = aliasBtnNames;
+                const std::wstring plural = SPLExpandPluralStringOwned(
+                    SalamanderGeneral,
+                    L"{!}Do you want to delete %d temporary director{y|1|ies} used "
+                    L"by previous instances of DemoPlug plugin?",
+                    1, &qwCount);
+                const std::wstring text = SPLFormatStringOwned(plural.c_str(), tmpDirs.Count);
+                params.Text = text.c_str();
+                const std::wstring aliasBtnNames = SPLFormatStringOwned(
+                    L"%d\t%s\t%d\t%s\t%d\t%s", DIALOG_ABORT, L"&Yes",
+                    DIALOG_RETRY, L"&No", DIALOG_IGNORE, L"&Focus");
+                params.AliasBtnNames = aliasBtnNames.c_str();
                 int ret = SalamanderGeneral->SalMessageBoxEx(&params);
                 if (ret == DIALOG_ABORT) // yes
                 {
                     for (int i = 0; i < tmpDirs.Count; i++)
                     {
-                        lstrcpyn(tmpDirEnd, tmpDirs[i], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir));
-                        SalamanderGeneral->RemoveTemporaryDir(tmpDir);
+                        std::wstring tmpDir(tempRoot);
+                        SPLSalPathAppendOwned(tmpDir, tmpDirs[i]);
+                        SalamanderGeneral->RemoveTemporaryDir(tmpDir.c_str());
                     }
                 }
                 if (ret == IDIGNORE) // focus
                 {
-                    lstrcpyn(tmpDirEnd, tmpDirs[0], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir));
-                    SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, tmpDir, "");
+                    std::wstring tmpDir(tempRoot);
+                    SPLSalPathAppendOwned(tmpDir, tmpDirs[0]);
+                    SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, tmpDir.c_str(), L"");
                 }
             }
         }
@@ -793,9 +781,9 @@ void ClearTEMPIfNeeded(HWND parent)
 }
 
 void WINAPI
-CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
+CPluginInterfaceForArchiver::DeleteTmpCopy(const wchar_t* fileName, BOOL firstFile)
 {
-    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteTmpCopy(%s, %d)", fileName, firstFile);
+    CALL_STACK_MESSAGE3("CPluginInterfaceForArchiver::DeleteTmpCopy(%ls, %d)", fileName, firstFile);
 
     /*
   // message box test (message boxes should be used only in an extreme situation) - it makes a mess
@@ -804,7 +792,7 @@ CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
   char buf[500];
   sprintf(buf, "File \"%s\" will be deleted.", fileName);
   SalamanderGeneral->SalMessageBox(SalamanderGeneral->GetMsgBoxParent(),
-                                   buf, LoadStr(IDS_PLUGINNAME),
+                                   buf, LangStr(IDS_PLUGINNAME).c_str(),
                                    MB_OK | MB_ICONINFORMATION);
 */
 
@@ -827,8 +815,8 @@ CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
         else
             showTime = 0;
     }
-    SalamanderGeneral->CreateSafeWaitWindow("Deleting temporary file unpacked from archive, please wait...",
-                                            LoadStr(IDS_PLUGINNAME), showTime, FALSE /* TRUE if we can cancel the operation */,
+    SalamanderGeneral->CreateSafeWaitWindow(L"Deleting temporary file unpacked from archive, please wait...",
+                                            LangStr(IDS_PLUGINNAME).c_str(), showTime, FALSE /* TRUE if we can cancel the operation */,
                                             SalamanderGeneral->GetMsgBoxParent());
     // activity simulation (the window becomes visible after one second)
     Sleep(2000);
@@ -836,10 +824,10 @@ CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
     // regular file deletion
     SalamanderGeneral->ClearReadOnlyAttr(fileName);
 
-    if (DeleteFile(fileName))
-        TRACE_I("Temporary copy from disk-cache (" << fileName << ") was deleted.");
+    if (DeleteFileW(fileName))
+        TRACE_IW(L"Temporary copy from disk-cache (" << fileName << L") was deleted.");
     else
-        TRACE_I("Unable to delete temporary copy from disk-cache (" << fileName << ").");
+        TRACE_IW(L"Unable to delete temporary copy from disk-cache (" << fileName << L").");
 
     // close the wait window; the action finished
     SalamanderGeneral->DestroySafeWaitWindow();
@@ -856,10 +844,10 @@ CPluginInterfaceForArchiver::PrematureDeleteTmpCopy(HWND parent, int copiesCount
     if (SalamanderGeneral->IsCriticalShutdown())
         return FALSE; // during a critical shutdown we do not ask any questions
 
-    char buf[500];
-    sprintf(buf, "%d temporary file(s) extracted from archive are still in use.\n"
-                 "Do you want to delete them anyway?",
-            copiesCount);
-    return SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_PLUGINNAME),
+    const std::wstring message = SPLFormatStringOwned(
+        L"%d temporary file(s) extracted from archive are still in use.\n"
+        L"Do you want to delete them anyway?",
+        copiesCount);
+    return SalamanderGeneral->SalMessageBox(parent, message.c_str(), LangStr(IDS_PLUGINNAME).c_str(),
                                             MB_YESNO | MB_ICONQUESTION) == IDYES;
 }

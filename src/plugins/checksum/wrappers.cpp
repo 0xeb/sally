@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include "checksum.h"
 #include "wrappers.h"
+#include "digest_parser.h"
 #include "misc.h"
 #include "tomcrypt\tomcrypt.h"
 
@@ -19,7 +20,7 @@ public:
     virtual bool Update(const char* buf, DWORD size);
     virtual bool Finalize();
     virtual int GetDigest(char* buf, DWORD bufsize); // Returns # of copied binary bytes
-    virtual bool ParseDigest(char* buf, char* fileName, int fileNameLen, char* digest);
+    virtual bool ParseDigest(char* buf, std::string& fileName, char* digest);
 
 private:
     DWORD crc;
@@ -28,7 +29,7 @@ private:
 class CGenericHashAlgo : public CHashAlgo
 {
 public:
-    virtual bool ParseDigest(char* buf, char* fileName, int fileNameLen, char* digest);
+    virtual bool ParseDigest(char* buf, std::string& fileName, char* digest);
 
 protected:
     virtual const char* GetID() = 0;
@@ -235,80 +236,17 @@ int CCRCAlgo::GetDigest(char* buf, DWORD bufsize)
     return 0;
 }
 
-bool CCRCAlgo::ParseDigest(char* buf, char* fileName, int fileNameLen, char* digest)
+bool CCRCAlgo::ParseDigest(char* buf, std::string& fileName, char* digest)
 {
-    int pos, len;
-
-    // WARNING: the following code must match CVerifyDialog::AnalyzeSourceFile() !!!
-    // checksum at the end (after ' ')
-
-    GetLastWord(buf, pos, len);
-    for (int i = 0; i < 4; i++) // digest length and hex characters are checked in CVerifyDialog::AnalyzeSourceFile()
-        digest[i] = (hex(buf[pos + 2 * i]) << 4) + hex(buf[pos + 2 * i + 1]);
-    while (pos > 0 && (buf[pos - 1] == ' ' || buf[pos - 1] == '\t'))
-        pos--;
-    buf[pos] = 0;
-    if ((int)strlen(buf) >= fileNameLen)
-        return false; // too long name
-    strcpy_s(fileName, fileNameLen, buf);
+    checksum::ParseCrcDigest(buf, fileName, digest);
     return true;
 }
 
 //////////////////////////// Generic HASH algorithm /////////////////////////
 
-bool CGenericHashAlgo::ParseDigest(char* buf, char* fileName, int fileNameLen, char* digest)
+bool CGenericHashAlgo::ParseDigest(char* buf, std::string& fileName, char* digest)
 {
-    int pos, len;
-
-    // WARNING: the following code must match CVerifyDialog::AnalyzeSourceFile() !!!
-    // checksum at the beginning (before ' ') or checksum at the end (after ' ' or '=') and at the same time
-    // the hash name at the beginning (before '(' or ' ')
-
-    GetFirstWord(buf, pos, len, '(');
-    if (len == GetIDLen())
-    {
-        // MD5 (apache_2.0.46-win32-x86-symbols.zip) = eb5ba72b4164d765a79a7e06cee4eead
-        GetLastWord(buf, pos, len, '=');
-        for (int i = 0; i < GetDigestLen(); i++) // digest length and hex characters are checked in CVerifyDialog::AnalyzeSourceFile()
-            digest[i] = (hex(buf[pos + 2 * i]) << 4) + hex(buf[pos + 2 * i + 1]);
-        // trim the equals sign and checksum to simplify extracting the file name
-        while (pos > 0 && (buf[pos - 1] == ' ' || buf[pos - 1] == '\t'))
-            pos--;
-        if (pos > 0 && buf[pos - 1] == '=')
-            pos--;
-        while (pos > 0 && (buf[pos - 1] == ' ' || buf[pos - 1] == '\t'))
-            pos--;
-        buf[pos] = 0;
-        // extract the file name
-        pos = GetIDLen();
-        while ((buf[pos] == ' ') || (buf[pos] == '\t'))
-            pos++;
-        if (buf[pos] == '(')
-        {
-            pos++;
-            // What if filename contains ')'???
-            // "openssl md5 file().txt" produces: "MD5(file().txt)= 636e5618c32f05ac9f2623169527cd3c"
-            len = (int)strlen(buf);
-            if (len > 0 && buf[len - 1] == ')')
-                buf[len - 1] = 0; // cut off the matching ')'
-            else
-                pos--; // parentheses do not match, so the opening parenthesis was accidental; put it back into the file name
-        }
-    }
-    else
-    {
-        // aa8b248510531ff91a48e04c5d7ca939 *apache_2.0.44-win9x-x86-apr-patch.zip
-        for (int i = 0; i < GetDigestLen(); i++) // digest length and hex characters are checked in CVerifyDialog::AnalyzeSourceFile()
-            digest[i] = (hex(buf[pos + 2 * i]) << 4) + hex(buf[pos + 2 * i + 1]);
-        pos += len;
-        while (buf[pos] && (buf[pos] == ' ' || buf[pos] == '\t'))
-            pos++;
-        if (buf[pos] == '*')
-            pos++; // skip the asterisk indicating a binary file
-    }
-    if ((int)strlen(buf + pos) >= fileNameLen)
-        return false; // too long name
-    strcpy_s(fileName, fileNameLen, buf + pos);
+    checksum::ParseGenericDigest(buf, GetIDLen(), GetDigestLen(), fileName, digest);
     return true;
 }
 

@@ -92,6 +92,9 @@ void OpenFileInMSVC(const WCHAR* filename, int line)
     }
     catch (std::exception& e)
     {
+        // std::exception::what() is always narrow (const char*) - a hard standard
+        // library contract, not something to widen. TRACE_E (narrow) already matches, same as
+        // the _com_error catch below correctly pairs its WCHAR* message with TRACE_EW.
         const char* msg = e.what();
         TRACE_E("OpenFileInMSVC(): std::exception occurred: " << msg);
     }

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -8,6 +8,11 @@
 #include "ui/IPrompter.h"
 #include "common/unicode/helpers.h"
 #include "common/IRegistry.h"
+#include "common/IFileSystem.h"
+#include "common/IShell.h"
+#include "common/SalPathWide.h"
+#include "common/Win32TextCodec.h"
+#include "common/fsutil.h"
 #include "drivelst.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -18,63 +23,47 @@
 #include "toolbar.h"
 #include "shiconov.h"
 #include "common/widepath.h"
+#include "drivelst_network_drive_entry.h"
 
 CNBWNetAC3Thread NBWNetAC3Thread;
 
-void GetNetworkDrives(DWORD& netDrives, char (*netRemotePath)[MAX_PATH])
+void GetNetworkDrives(DWORD& netDrives, std::wstring* netRemotePaths)
 {
-    char buffer[10000];
-    GetNetworkDrivesBody(netDrives, netRemotePath, buffer);
+    BYTE buffer[10000];
+    GetNetworkDrivesBody(netDrives, netRemotePaths, buffer, sizeof(buffer));
 }
 
-void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], char* buffer)
+void GetNetworkDrivesBody(DWORD& netDrives, std::wstring* netRemotePaths, BYTE* buffer, DWORD bufferSize)
 {
     CALL_STACK_MESSAGE1("GetNetworkDrives(,)");
     netDrives = 0; // bit array of network drives
 
     HANDLE hEnumNet;
-    DWORD err = WNetOpenEnum(RESOURCE_REMEMBERED, RESOURCETYPE_DISK,
-                             RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
+    DWORD err = WNetOpenEnumW(RESOURCE_REMEMBERED, RESOURCETYPE_DISK,
+                              RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
     if (err == ERROR_SUCCESS)
     {
-        DWORD bufSize;
-        DWORD entries = 0;
-        NETRESOURCE* netSources = (NETRESOURCE*)buffer;
+        NETRESOURCEW* netSources = reinterpret_cast<NETRESOURCEW*>(buffer);
         while (1)
         {
             DWORD e = 0xFFFFFFFF; // as many as possible
-            bufSize = 10000;
-            err = WNetEnumResource(hEnumNet, &e, netSources, &bufSize);
+            DWORD bufSize = bufferSize;
+            err = WNetEnumResourceW(hEnumNet, &e, netSources, &bufSize);
             if (err == ERROR_SUCCESS && e > 0)
             {
-                int i;
-                for (i = 0; i < (int)e; i++) // we will process new data
+                for (DWORD i = 0; i < e; i++)
                 {
-                    char* name = netSources[i].lpLocalName;
-                    if (name != NULL)
+                    int driveIndex = -1;
+                    std::wstring remotePath;
+                    if (ExtractNetworkDriveEntryW(netSources[i].lpLocalName,
+                                                  netSources[i].lpRemoteName,
+                                                  driveIndex, remotePath))
                     {
-                        char drv = LowerCase[name[0]];
-                        if (drv >= 'a' && drv <= 'z' && name[1] == ':')
-                        {
-                            netDrives |= (1 << (drv - 'a'));
-                            if (netRemotePath != NULL)
-                            {
-                                name = netSources[i].lpRemoteName;
-                                if (name != NULL)
-                                {
-                                    int l = (int)strlen(name);
-                                    if (l >= MAX_PATH)
-                                        l = MAX_PATH - 1;
-                                    memmove(netRemotePath[drv - 'a'], name, l);
-                                    netRemotePath[drv - 'a'][l] = 0;
-                                }
-                                else
-                                    netRemotePath[drv - 'a'][0] = 0;
-                            }
-                        }
+                        netDrives |= (1 << driveIndex);
+                        if (netRemotePaths != NULL)
+                            netRemotePaths[driveIndex] = std::move(remotePath);
                     }
                 }
-                entries += e;
             }
             else
                 break;
@@ -84,14 +73,19 @@ void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], cha
     else
     {
         if (err != ERROR_NO_NETWORK)
-            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextOwned(err).c_str());
     }
 }
 
-BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWORD userBufSize,
-                 char* providerBuf, DWORD providerBufSize)
+BOOL GetUserNameW(const wchar_t* drive, const wchar_t* remoteName,
+                  std::wstring& userName, std::wstring& providerName)
 {
-    CALL_STACK_MESSAGE5("GetUserName(%s, %s, , %u, , %u)", drive, remoteName, userBufSize, providerBufSize);
+    CALL_STACK_MESSAGE3("GetUserNameW(%ls, %ls, ,)", drive, remoteName);
+    if (drive == NULL || remoteName == NULL)
+        return FALSE;
+
+    userName.clear();
+    providerName.clear();
     IRegistry* registry = gRegistry;
     if (registry == NULL)
         registry = GetWin32Registry();
@@ -99,31 +93,32 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
         return FALSE; // well, nothing ...
 
     HKEY network;
-    if (!OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_NETWORK_A, network).success)
+    if (!registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_NETWORK_W, network).success)
         return FALSE; // well, nothing ...
 
     BOOL ret = FALSE;
-    CPathBuffer keyName; // Heap-allocated for long path support
     HKEY driveKey;
 
-    keyName[0] = drive[0];
-    keyName[1] = 0;
-    if (OpenKeyReadA(registry, network, keyName, driveKey).success)
+    const std::wstring keyName(1, drive[0]);
+    if (registry->OpenKeyRead(network, keyName.c_str(), driveKey).success)
     {
-        RegistryResult res = GetStringA(registry, driveKey, SAL_REG_VALUE_REMOTE_PATH_A, keyName.Get(), keyName.Size());
-        if (res.success && IsTheSamePath(keyName, remoteName))
+        std::wstring remotePath;
+        RegistryResult res = registry->GetString(driveKey, SAL_REG_VALUE_REMOTE_PATH_W, remotePath);
+        if (res.success && IsTheSamePath(remotePath.c_str(), remoteName))
         {
             ret = TRUE; // we will announce success, even if the user name is not defined (the current user should be used)
 
-            res = GetStringA(registry, driveKey, SAL_REG_VALUE_USER_NAME_A, userName, userBufSize);
-            if (res.success && userName[0] != 0) // do we have a user?
-                TRACE_I("Found user name: " << keyName << ", " << userName);
-            else
-                userName[0] = 0;
+            std::wstring savedUserName;
+            res = registry->GetString(driveKey, SAL_REG_VALUE_USER_NAME_W, savedUserName);
+            if (res.success)
+                userName = std::move(savedUserName);
+            if (!userName.empty()) // do we have a user?
+                TRACE_I("Found saved user name for network drive.");
 
-            res = GetStringA(registry, driveKey, SAL_REG_VALUE_PROVIDER_NAME_A, providerBuf, providerBufSize);
-            if (!res.success) // if we do not have a provider, we will reset the buffer
-                providerBuf[0] = 0;
+            std::wstring savedProviderName;
+            res = registry->GetString(driveKey, SAL_REG_VALUE_PROVIDER_NAME_W, savedProviderName);
+            if (res.success)
+                providerName = std::move(savedProviderName);
         }
         registry->CloseKey(driveKey);
     }
@@ -135,45 +130,80 @@ BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWOR
 struct CNBWNetAC3ThreadFParams
 {
     DWORD err;
-    NETRESOURCE netResource;
-    LPTSTR lpPassword;
-    LPTSTR lpUserName;
+    NETRESOURCEW netResource;
+    LPWSTR lpPassword;
+    LPWSTR lpUserName;
     DWORD dwFlags;
 
-    char bufUserName[USERNAME_MAXLEN];
-    char bufPassword[PASSWORD_MAXLEN];
-    CPathBuffer bufLocalName;
-    CPathBuffer bufRemoteName;
+    std::wstring userName;
+    std::wstring password;
+    std::wstring localName;
+    std::wstring remoteName;
+    std::wstring comment;
+    std::wstring provider;
 
     DWORD errProviderCode;
-    char errBuf[300];
-    char errProviderName[200];
+    std::wstring errBuf;
+    std::wstring errProviderName;
 };
 
 CNBWNetAC3ThreadFParams NBWNetAC3ThreadFParams;
+
+static void ClearNetworkPassword(std::wstring& password)
+{
+    if (!password.empty())
+        SecureZeroMemory(password.data(), password.size() * sizeof(wchar_t));
+    password.clear();
+}
+
+static bool GetLastNetworkErrorW(DWORD& providerCode, std::wstring& errorText,
+                                 std::wstring& providerName)
+{
+    std::vector<wchar_t> errorBuffer(256, L'\0');
+    std::vector<wchar_t> providerBuffer(256, L'\0');
+    for (;;)
+    {
+        const DWORD result = WNetGetLastErrorW(&providerCode,
+                                               errorBuffer.data(), (DWORD)errorBuffer.size(),
+                                               providerBuffer.data(), (DWORD)providerBuffer.size());
+        if (result == NO_ERROR)
+        {
+            errorText.assign(errorBuffer.data());
+            providerName.assign(providerBuffer.data());
+            return true;
+        }
+        if (result != ERROR_MORE_DATA)
+        {
+            providerCode = 0;
+            errorText.clear();
+            providerName.clear();
+            return false;
+        }
+        errorBuffer.resize(errorBuffer.size() * 2, L'\0');
+        providerBuffer.resize(providerBuffer.size() * 2, L'\0');
+    }
+}
 
 DWORD WINAPI NBWNetAC3ThreadF(void* param)
 {
     CALL_STACK_MESSAGE_NONE
     CNBWNetAC3ThreadFParams* data = &NBWNetAC3ThreadFParams;
-    data->err = WNetAddConnection3(NULL /* we're not using CONNECT_INTERACTIVE, we're in another thread */,
-                                   &data->netResource, data->lpPassword, data->lpUserName, data->dwFlags);
-    memset(data->bufPassword, 0, sizeof(data->bufPassword));
+    data->err = WNetAddConnection3W(NULL /* we're not using CONNECT_INTERACTIVE, we're in another thread */,
+                                    &data->netResource, data->lpPassword, data->lpUserName, data->dwFlags);
+    ClearNetworkPassword(data->password);
+    data->lpPassword = NULL;
     if (data->err == ERROR_EXTENDED_ERROR &&
-        WNetGetLastError(&data->errProviderCode, data->errBuf, 300, data->errProviderName, 200) != NO_ERROR)
-    {
+        !GetLastNetworkErrorW(data->errProviderCode, data->errBuf, data->errProviderName))
         data->errProviderCode = 0;
-        data->errBuf[0] = 0;
-        data->errProviderName[0] = 0;
-    }
     return 0;
 }
 
-BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
-                                   LPTSTR lpPassword, LPTSTR lpUserName, DWORD dwFlags,
-                                   DWORD* errProviderCode, char* errBuf, char* errProviderName)
+BOOL NonBlockingWNetAddConnection3W(DWORD& err, LPNETRESOURCEW lpNetResource,
+                                    const wchar_t* lpPassword, const wchar_t* lpUserName, DWORD dwFlags,
+                                    DWORD* errProviderCode, std::wstring* errBuf,
+                                    std::wstring* errProviderName)
 {
-    CALL_STACK_MESSAGE3("NonBlockingWNetAddConnection3(0x%X, , , , 0x%X, , ,)", err, dwFlags);
+    CALL_STACK_MESSAGE3("NonBlockingWNetAddConnection3W(0x%X, , , , 0x%X, , ,)", err, dwFlags);
 
     // Prevent re-entrance
     static CCriticalSection cs;
@@ -183,9 +213,9 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     if (errProviderCode != NULL)
         *errProviderCode = 0;
     if (errBuf != NULL)
-        errBuf[0] = 0;
+        errBuf->clear();
     if (errProviderName != NULL)
-        errProviderName[0] = 0;
+        errProviderName->clear();
 
     // first all we will wait for the previous "calculation" to finish
     GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
@@ -211,40 +241,69 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     // then we will set the parameters and try to start a new thread
     if (lpUserName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufUserName, lpUserName, USERNAME_MAXLEN);
-        NBWNetAC3ThreadFParams.lpUserName = NBWNetAC3ThreadFParams.bufUserName;
+        NBWNetAC3ThreadFParams.userName = lpUserName;
+        NBWNetAC3ThreadFParams.lpUserName = NBWNetAC3ThreadFParams.userName.data();
     }
     else
+    {
+        NBWNetAC3ThreadFParams.userName.clear();
         NBWNetAC3ThreadFParams.lpUserName = NULL;
+    }
     if (lpPassword != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufPassword, lpPassword, PASSWORD_MAXLEN);
-        NBWNetAC3ThreadFParams.lpPassword = NBWNetAC3ThreadFParams.bufPassword;
+        NBWNetAC3ThreadFParams.password = lpPassword;
+        NBWNetAC3ThreadFParams.lpPassword = NBWNetAC3ThreadFParams.password.data();
     }
     else
+    {
+        ClearNetworkPassword(NBWNetAC3ThreadFParams.password);
         NBWNetAC3ThreadFParams.lpPassword = NULL;
+    }
     NBWNetAC3ThreadFParams.netResource = *lpNetResource;
     if (lpNetResource->lpLocalName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufLocalName, lpNetResource->lpLocalName, NBWNetAC3ThreadFParams.bufLocalName.Size());
-        NBWNetAC3ThreadFParams.netResource.lpLocalName = NBWNetAC3ThreadFParams.bufLocalName;
+        NBWNetAC3ThreadFParams.localName = lpNetResource->lpLocalName;
+        NBWNetAC3ThreadFParams.netResource.lpLocalName =
+            const_cast<wchar_t*>(NBWNetAC3ThreadFParams.localName.c_str());
     }
+    else
+        NBWNetAC3ThreadFParams.localName.clear();
     if (lpNetResource->lpRemoteName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufRemoteName, lpNetResource->lpRemoteName, NBWNetAC3ThreadFParams.bufRemoteName.Size());
-        NBWNetAC3ThreadFParams.netResource.lpRemoteName = NBWNetAC3ThreadFParams.bufRemoteName;
+        NBWNetAC3ThreadFParams.remoteName = lpNetResource->lpRemoteName;
+        NBWNetAC3ThreadFParams.netResource.lpRemoteName =
+            const_cast<wchar_t*>(NBWNetAC3ThreadFParams.remoteName.c_str());
     }
+    else
+        NBWNetAC3ThreadFParams.remoteName.clear();
+    if (lpNetResource->lpComment != NULL)
+    {
+        NBWNetAC3ThreadFParams.comment = lpNetResource->lpComment;
+        NBWNetAC3ThreadFParams.netResource.lpComment =
+            const_cast<wchar_t*>(NBWNetAC3ThreadFParams.comment.c_str());
+    }
+    else
+        NBWNetAC3ThreadFParams.comment.clear();
+    if (lpNetResource->lpProvider != NULL)
+    {
+        NBWNetAC3ThreadFParams.provider = lpNetResource->lpProvider;
+        NBWNetAC3ThreadFParams.netResource.lpProvider =
+            const_cast<wchar_t*>(NBWNetAC3ThreadFParams.provider.c_str());
+    }
+    else
+        NBWNetAC3ThreadFParams.provider.clear();
     NBWNetAC3ThreadFParams.err = 0;
     NBWNetAC3ThreadFParams.dwFlags = dwFlags;
     NBWNetAC3ThreadFParams.errProviderCode = 0;
-    NBWNetAC3ThreadFParams.errBuf[0] = 0;
-    NBWNetAC3ThreadFParams.errProviderName[0] = 0;
+    NBWNetAC3ThreadFParams.errBuf.clear();
+    NBWNetAC3ThreadFParams.errProviderName.clear();
 
     DWORD ThreadID;
     NBWNetAC3Thread.Set(HANDLES(CreateThread(NULL, 0, NBWNetAC3ThreadF, NULL, 0, &ThreadID)));
     if (NBWNetAC3Thread.Thread == NULL)
     {
-        memset(NBWNetAC3ThreadFParams.bufPassword, 0, sizeof(NBWNetAC3ThreadFParams.bufPassword));
+        ClearNetworkPassword(NBWNetAC3ThreadFParams.password);
+        NBWNetAC3ThreadFParams.lpPassword = NULL;
         TRACE_E("Unable to start add-net-connection-3 thread.");
         return FALSE; // error (simulation of ESC)
     }
@@ -267,9 +326,9 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     if (errProviderCode != NULL)
         *errProviderCode = NBWNetAC3ThreadFParams.errProviderCode;
     if (errBuf != NULL)
-        lstrcpyn(errBuf, NBWNetAC3ThreadFParams.errBuf, 300);
+        *errBuf = NBWNetAC3ThreadFParams.errBuf;
     if (errProviderName != NULL)
-        lstrcpyn(errProviderName, NBWNetAC3ThreadFParams.errProviderName, 200);
+        *errProviderName = NBWNetAC3ThreadFParams.errProviderName;
     err = NBWNetAC3ThreadFParams.err;
     return TRUE;
 }
@@ -306,7 +365,7 @@ BOOL IsBadUserNameOrPasswdErr(DWORD err)
            err == ERROR_NO_SUCH_USER;
 }
 
-BOOL CharIsAllowedInServerName(char c)
+BOOL CharIsAllowedInServerName(wchar_t c)
 {
     switch (c)
     {
@@ -348,51 +407,52 @@ BOOL CharIsAllowedInServerName(char c)
     }
 }
 
-BOOL IsAdminShareExtraLogonFailureErr(DWORD err, const char* root)
+BOOL IsAdminShareExtraLogonFailureErrW(DWORD err, const wchar_t* root)
 {
-    if (err == ERROR_INVALID_NAME && root[0] == '\\' && root[1] == '\\')
+    if (err == ERROR_INVALID_NAME && root[0] == L'\\' && root[1] == L'\\')
     {
-        const char* server = root + 2;
+        const wchar_t* server = root + 2;
         root++;
-        while (*++root != 0 && *root != '\\' && CharIsAllowedInServerName(*root))
+        while (*++root != 0 && *root != L'\\' && CharIsAllowedInServerName(*root))
             ;             // skip server name + simple test (incomplete, e.g. forbids dots in IPv4 and IPv6), whether it is really an invalid name (in that case we will not ask for username+password)
-        if (*root == '.') // we will take care of IPv4 adresses (let's ignore IPv6)
+        if (*root == L'.') // we will take care of IPv4 adresses (let's ignore IPv6)
         {
-            const char* r = root;
-            while (*++r != 0 && *r != '\\')
+            const wchar_t* r = root;
+            while (*++r != 0 && *r != L'\\')
                 ;
             if (r - server < 50)
             {
-                char ip[51];
-                lstrcpyn(ip, server, (int)((r - server) + 1));
-                if (inet_addr(ip) != INADDR_NONE)
+                const std::wstring ip(server, r);
+                std::string ipA;
+                if (Win32EncodeAcpExact(ip.c_str(), ipA) &&
+                    inet_addr(ipA.c_str()) != INADDR_NONE)
                     root = r; // this is an IP string (aa.bb.cc.dd)
             }
         }
-        if (*root == '\\')
+        if (*root == L'\\')
         {
-            while (*++root != 0 && *root != '\\')
+            while (*++root != 0 && *root != L'\\')
                 ;
-            if (*(root - 1) == '$')
+            if (*(root - 1) == L'$')
                 return TRUE; // admin share (\\server\share$ or \\server\share$\...)
         }
         else
         {
             if (*root != 0)
-                TRACE_I("IsAdminShareExtraLogonFailureErr: invalid char: '" << *root << "'");
+                TRACE_I("IsAdminShareExtraLogonFailureErrW: invalid character in server name.");
         }
     }
     return FALSE;
 }
 
-typedef struct _CREDUI_INFOA
+typedef struct _CREDUI_INFOW
 {
     DWORD cbSize;
     HWND hwndParent;
-    PCSTR pszMessageText;
-    PCSTR pszCaptionText;
+    PCWSTR pszMessageText;
+    PCWSTR pszCaptionText;
     HBITMAP hbmBanner;
-} CREDUI_INFOA, *PCREDUI_INFOA;
+} CREDUI_INFOW, *PCREDUI_INFOW;
 
 #ifndef __SECHANDLE_DEFINED__
 typedef struct _SecHandle
@@ -406,68 +466,62 @@ typedef struct _SecHandle
 
 typedef PSecHandle PCtxtHandle;
 
-typedef WINADVAPI DWORD(WINAPI* FT_CredUIPromptForCredentialsA)(
-    PCREDUI_INFOA pUiInfo,
-    PCSTR pszTargetName,
+typedef WINADVAPI DWORD(WINAPI* FT_CredUIPromptForCredentialsW)(
+    PCREDUI_INFOW pUiInfo,
+    PCWSTR pszTargetName,
     PCtxtHandle pContext,
     DWORD dwAuthError,
-    PSTR pszUserName,
+    PWSTR pszUserName,
     ULONG ulUserNameBufferSize,
-    PSTR pszPassword,
+    PWSTR pszPassword,
     ULONG ulPasswordBufferSize,
     BOOL* save,
     DWORD dwFlags);
 
-typedef WINADVAPI DWORD(WINAPI* FT_CredUIConfirmCredentialsA)(
-    PCSTR pszTargetName,
+typedef WINADVAPI DWORD(WINAPI* FT_CredUIConfirmCredentialsW)(
+    PCWSTR pszTargetName,
     BOOL bConfirm);
-
-/*
-typedef WINADVAPI DWORD (WINAPI *FT_CredUIParseUserNameA)(
-    CONST CHAR *userName,
-    CHAR *user,
-    ULONG userBufferSize,
-    CHAR *domain,
-    ULONG domainBufferSize);
-*/
 
 #define CREDUI_FLAGS_DO_NOT_PERSIST 0x00002      // Do not show "Save" checkbox, and do not persist credentials
 #define CREDUI_FLAGS_EXPECT_CONFIRMATION 0x20000 // do not persist unless caller later confirms credential via CredUIConfirmCredential() api
 #define CREDUI_FLAGS_GENERIC_CREDENTIALS 0x40000 // Credential is a generic credential
 
-BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteName, DWORD* retErr, LPNETRESOURCE lpNetResource)
+BOOL RestoreNetworkConnectionW(HWND parent, const wchar_t* name, const wchar_t* remoteName, DWORD* retErr,
+                               LPNETRESOURCEW lpNetResource)
 {
-    CALL_STACK_MESSAGE3("RestoreNetworkConnection(, %s, %s, ,)", name, remoteName);
+    CALL_STACK_MESSAGE3("RestoreNetworkConnectionW(, %ls, %ls, ,)", name, remoteName);
 
     BOOL ret = TRUE;
-    CPathBuffer serverName; // Heap-allocated for long path support
-    serverName[0] = 0;
-    NETRESOURCE nsBuf;
-    NETRESOURCE* ns = NULL;
-    char userNameBuf[USERNAME_MAXLEN];
-    char* userName = NULL;
-    CPathBuffer providerBuf; // Heap-allocated for long path support
+    std::wstring serverName;
+    NETRESOURCEW nsBuf = {0};
+    NETRESOURCEW* ns = NULL;
+    std::wstring userNameStorage;
+    const wchar_t* userName = NULL;
+    std::wstring providerName;
 
     if (lpNetResource != NULL)
     {
         if (!Windows7AndLater &&
-            lpNetResource->lpRemoteName != NULL && lpNetResource->lpRemoteName[0] == '\\' &&
-            lpNetResource->lpRemoteName[1] == '\\' && lpNetResource->lpRemoteName[2] != '\\' &&
+            lpNetResource->lpRemoteName != NULL && lpNetResource->lpRemoteName[0] == L'\\' &&
+            lpNetResource->lpRemoteName[1] == L'\\' && lpNetResource->lpRemoteName[2] != L'\\' &&
             lpNetResource->lpRemoteName[2] != 0)
         {
-            char* end = strchr(lpNetResource->lpRemoteName + 2, '\\');
+            wchar_t* end = wcschr(lpNetResource->lpRemoteName + 2, L'\\');
             if (end == NULL || *(end + 1) == 0)
             {
                 if (end == NULL)
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, serverName.Size());
+                    serverName = lpNetResource->lpRemoteName + 2;
                 else
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, (int)min((int)serverName.Size(), (end - (lpNetResource->lpRemoteName + 2)) + 1));
+                    serverName.assign(lpNetResource->lpRemoteName + 2,
+                                      end - (lpNetResource->lpRemoteName + 2));
             }
         }
-        if (serverName[0] == 0) // this is not a \\server or \\server\ variant, we will solve it by calling the original code
+        if (serverName.empty())
         {
-            *retErr = WNetAddConnection2(lpNetResource, NULL, NULL, CONNECT_INTERACTIVE);
-            return *retErr == NO_ERROR;
+            DWORD err = WNetAddConnection2W(lpNetResource, NULL, NULL, CONNECT_INTERACTIVE);
+            if (retErr != NULL)
+                *retErr = err;
+            return err == NO_ERROR;
         }
         ns = lpNetResource;
         remoteName = ns->lpRemoteName;
@@ -475,159 +529,151 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
     else
     {
         nsBuf.dwType = RESOURCETYPE_DISK;
-        nsBuf.lpLocalName = (char*)name;
-        nsBuf.lpRemoteName = (char*)remoteName;
-        nsBuf.lpProvider = NULL;
+        nsBuf.lpLocalName = const_cast<wchar_t*>(name);
+        nsBuf.lpRemoteName = const_cast<wchar_t*>(remoteName);
         ns = &nsBuf;
 
-        if (remoteName[0] == '\\' && remoteName[1] == '\\' && remoteName[2] != '\\')
+        if (remoteName != NULL && remoteName[0] == L'\\' && remoteName[1] == L'\\' && remoteName[2] != L'\\')
         {
-            const char* end = strchr(remoteName + 2, '\\');
-            if (end != NULL && *(end + 1) != '\\' && *(end + 1) != 0)
+            const wchar_t* end = wcschr(remoteName + 2, L'\\');
+            if (end != NULL && *(end + 1) != L'\\' && *(end + 1) != 0)
             {
-                const char* last = strchr(end + 2, '\\');
-                if (last == NULL || *(last + 1) == 0) // the own dialog under XP+Vista will be only shown for simple UNC paths: "\\server\share" and "\\server\\share\\"
-                    lstrcpyn(serverName, remoteName + 2, (int)min(MAX_PATH, (end - (remoteName + 2)) + 1));
+                const wchar_t* last = wcschr(end + 2, L'\\');
+                if (last == NULL || *(last + 1) == 0)
+                    serverName.assign(remoteName + 2, end - (remoteName + 2));
             }
         }
 
-        if (name != NULL &&                                                                     // mapped paths only (for the drive letter)
-            GetUserName(name, remoteName, userNameBuf, USERNAME_MAXLEN, providerBuf, MAX_PATH)) // unknown user name for the restored connection
+        std::wstring savedUserName;
+        if (name != NULL && GetUserNameW(name, remoteName, savedUserName, providerName))
         {
-            if (userNameBuf[0] != 0)
-                userName = userNameBuf;
-            if (providerBuf[0] != 0)
-                nsBuf.lpProvider = providerBuf; // knowledge of the provider greatly speeds up the network response (at least on XP)
+            if (!savedUserName.empty())
+            {
+                userNameStorage = savedUserName;
+                userName = userNameStorage.c_str();
+            }
+            if (!providerName.empty())
+                nsBuf.lpProvider = const_cast<wchar_t*>(providerName.c_str());
         }
+    }
+
+    if (remoteName == NULL)
+    {
+        if (retErr != NULL)
+            *retErr = ERROR_INVALID_PARAMETER;
+        return FALSE;
     }
 
     CEnterPasswdDialog dlg(parent, remoteName, userName);
+    DWORD err = ERROR_SUCCESS;
+    const wchar_t* passwd = NULL;
 
-    DWORD err;
-    char* passwd = NULL;
-
-    // XP+Vista: we will dynamically extract functions for getting username+password in the standard dialog (including the option to save to Credential Manager - see "Manage your network passwords" in User Accounts in Control Panel)
-    // Windows 7: there is a new dialog again and I have not yet discovered the interface for it
-    HMODULE credUIDLL = !Windows7AndLater ? HANDLES(LoadLibrary("CREDUI.DLL")) : NULL;
-    FT_CredUIPromptForCredentialsA credUIPromptForCredentialsA = NULL;
-    FT_CredUIConfirmCredentialsA credUIConfirmCredentialsA = NULL;
-    //  FT_CredUIParseUserNameA credUIParseUserNameA = NULL;
+    HMODULE credUIDLL = !Windows7AndLater ? HANDLES(LoadLibraryW(L"CREDUI.DLL")) : NULL;
+    FT_CredUIPromptForCredentialsW credUIPromptForCredentialsW = NULL;
+    FT_CredUIConfirmCredentialsW credUIConfirmCredentialsW = NULL;
     if (credUIDLL != NULL)
     {
-        credUIPromptForCredentialsA = (FT_CredUIPromptForCredentialsA)GetProcAddress(credUIDLL, "CredUIPromptForCredentialsA"); // Min: XP
-        credUIConfirmCredentialsA = (FT_CredUIConfirmCredentialsA)GetProcAddress(credUIDLL, "CredUIConfirmCredentialsA");       // Min: XP
-                                                                                                                                //    credUIParseUserNameA = (FT_CredUIParseUserNameA)GetProcAddress(credUIDLL, "CredUIParseUserNameA"); // Min: XP
+        credUIPromptForCredentialsW = (FT_CredUIPromptForCredentialsW)GetProcAddress(credUIDLL, "CredUIPromptForCredentialsW");
+        credUIConfirmCredentialsW = (FT_CredUIConfirmCredentialsW)GetProcAddress(credUIDLL, "CredUIConfirmCredentialsW");
     }
     if (!Windows7AndLater &&
-        (credUIPromptForCredentialsA == NULL || credUIConfirmCredentialsA == NULL /*||
-       credUIParseUserNameA == NULL*/
-         ))
+        (credUIPromptForCredentialsW == NULL || credUIConfirmCredentialsW == NULL))
     {
-        //    TRACE_E("RestoreNetworkConnection(): unable to use CredUIPromptForCredentialsA, CredUIConfirmCredentialsA, or credUIParseUserNameA function");
-        TRACE_E("RestoreNetworkConnection(): unable to use CredUIPromptForCredentialsA or CredUIConfirmCredentialsAfunction");
+        TRACE_E("RestoreNetworkConnectionW(): unable to use CredUIPromptForCredentialsW or CredUIConfirmCredentialsW");
     }
 
-    BOOL connectInteractive = FALSE; // TRUE: Windows 7 always, XP+Vista only if CREDUI.DLL is not available or it is not a simple UNC path: we will use the CONNECT_INTERACTIVE flag (can do with "network passwords") and therefore the blocking call WNetAddConnection3 (must be in the same thread with the parent)
-    BOOL confirmCred = FALSE;        // TRUE: calling CredUIConfirmCredentialsA is needed
-
-    //  char domain[DOMAIN_MAXLEN];
-    CREDUI_INFOA uiInfo = {0};
+    BOOL connectInteractive = FALSE;
+    BOOL confirmCred = FALSE;
+    CREDUI_INFOW uiInfo = {0};
     uiInfo.cbSize = sizeof(uiInfo);
     uiInfo.hwndParent = parent;
+    std::wstring caption;
+    std::wstring message;
+    auto clearPassword = [&dlg]() {
+        if (dlg.Passwd.capacity() != 0)
+        {
+            dlg.Passwd.resize(dlg.Passwd.capacity());
+            SecureZeroMemory(dlg.Passwd.data(), dlg.Passwd.size() * sizeof(wchar_t));
+            dlg.Passwd.clear();
+        }
+    };
+    auto promptForCredentials = [&](BOOL* save, DWORD flags) {
+        std::wstring userBuffer(USERNAME_MAXLEN, L'\0');
+        std::wstring passwordBuffer(PASSWORD_MAXLEN, L'\0');
+        lstrcpynW(userBuffer.data(), dlg.User.c_str(), USERNAME_MAXLEN);
+        lstrcpynW(passwordBuffer.data(), dlg.Passwd.c_str(), PASSWORD_MAXLEN);
+        clearPassword();
+        const DWORD result = credUIPromptForCredentialsW(
+            &uiInfo, serverName.c_str(), NULL, 0, userBuffer.data(), USERNAME_MAXLEN,
+            passwordBuffer.data(), PASSWORD_MAXLEN, save, flags);
+        if (result == NO_ERROR)
+        {
+            dlg.User = userBuffer.c_str();
+            dlg.Passwd = passwordBuffer.c_str();
+        }
+        SecureZeroMemory(passwordBuffer.data(), passwordBuffer.size() * sizeof(wchar_t));
+        return result;
+    };
 
-    CPathBuffer captionBuf;
-    captionBuf[0] = 0;
-    CPathBuffer messageBuf;
-    messageBuf[0] = 0;
-
-    if (name == NULL) // mapping UNC paths to "none"
+    if (name == NULL)
     {
-        if (!Windows7AndLater && // there's a new dialog again on Windows 7 and I haven't found the interface for it yet
-            credUIPromptForCredentialsA != NULL && credUIConfirmCredentialsA != NULL /*&& credUIParseUserNameA != NULL*/ &&
-            serverName[0] != 0) // own dialog for entering username+password we will show only for simple UNC paths (\\server\share), we will leave DFS and others to the system
+        if (!Windows7AndLater && credUIPromptForCredentialsW != NULL &&
+            credUIConfirmCredentialsW != NULL && !serverName.empty())
         {
             BOOL save = FALSE;
-
-            err = credUIPromptForCredentialsA(&uiInfo, serverName, NULL, 0, dlg.User, sizeof(dlg.User),
-                                              dlg.Passwd, sizeof(dlg.Passwd), &save,
-                                              CREDUI_FLAGS_EXPECT_CONFIRMATION);
+            err = promptForCredentials(&save, CREDUI_FLAGS_EXPECT_CONFIRMATION);
             if (err == ERROR_CANCELLED)
-                ret = FALSE; // user Canceled
+                ret = FALSE;
             else
             {
-                if (lpNetResource == NULL)
-                    UpdateWindow(MainWindow->HWindow); // doesn't make sense to use from nethood
-                if (err == NO_ERROR)                   // user confirmed with OK
+                if (lpNetResource == NULL && MainWindow != NULL)
+                    UpdateWindow(MainWindow->HWindow);
+                if (err == NO_ERROR)
                 {
                     confirmCred = TRUE;
-                    lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
-                    userName = userNameBuf;
-                    passwd = dlg.Passwd;
-                    /* // there was a problem with trimming the domain from the username, they just couldn't log in because we made their domain name local
-          if (credUIParseUserNameA(dlg.User, userNameBuf, USERNAME_MAXLEN, domain, DOMAIN_MAXLEN) == NO_ERROR)
-          {
-            confirmCred = TRUE;
-            userName = userNameBuf;
-            passwd = dlg.Passwd;
-          }
-          else
-          {
-            TRACE_E("RestoreNetworkConnection(): CredUIParseUserNameA failed for: " << dlg.User);
-            userNameBuf[0] = 0;
-            userName = NULL;
-            credUIConfirmCredentialsA(serverName, FALSE);
-            connectInteractive = TRUE;  // another error, let the system variant deal with it
-            err = ERROR_BAD_USERNAME;
-          }
-*/
+                    userNameStorage = dlg.User;
+                    userName = userNameStorage.c_str();
+                    passwd = dlg.Passwd.c_str();
                 }
                 else
-                    connectInteractive = TRUE; // another error, let the system variant deal with it
+                    connectInteractive = TRUE;
             }
             if (!confirmCred)
-                memset(dlg.Passwd, 0, sizeof(dlg.Passwd));
+                clearPassword();
         }
         else
             connectInteractive = TRUE;
     }
-    else
+    else if (!Windows7AndLater)
     {
-        if (!Windows7AndLater)
-        {
-            _snprintf_s(captionBuf, captionBuf.Size(), _TRUNCATE, LoadStr(IDS_RECONNET_TITLE), remoteName);
-            _snprintf_s(messageBuf, messageBuf.Size(), _TRUNCATE, LoadStr(IDS_RECONNET_TEXT), remoteName);
-            uiInfo.pszMessageText = messageBuf;
-            uiInfo.pszCaptionText = captionBuf;
-        }
+        caption = FormatStrW(LoadStrW(IDS_RECONNET_TITLE), remoteName);
+        message = FormatStrW(LoadStrW(IDS_RECONNET_TEXT), remoteName);
+        uiInfo.pszMessageText = message.c_str();
+        uiInfo.pszCaptionText = caption.c_str();
     }
 
     while (ret)
     {
-        err = 0;
+        err = ERROR_SUCCESS;
         DWORD errProviderCode = 0;
-        char errBuf[300];
-        errBuf[0] = 0;
-        char errProviderName[200];
-        errProviderName[0] = 0;
+        std::wstring errBuf;
+        std::wstring errProviderName;
 
-        if (connectInteractive) // let's WNetAddConnection3 show the standard window for entering user+password (also solves the Credential Manager)
+        if (connectInteractive)
         {
-            err = WNetAddConnection3(parent, ns, passwd, userName, CONNECT_INTERACTIVE | (name != NULL ? CONNECT_UPDATE_PROFILE : 0)); // we will remember the non-anonymous
-            memset(dlg.Passwd, 0, sizeof(dlg.Passwd));
+            err = WNetAddConnection3W(parent, ns, passwd, userName,
+                                      CONNECT_INTERACTIVE | (name != NULL ? CONNECT_UPDATE_PROFILE : 0));
+            clearPassword();
             passwd = NULL;
 
-            if (err == ERROR_CANCELLED) // cancel
+            if (err == ERROR_CANCELLED)
             {
                 ret = FALSE;
                 break;
             }
             if (err == ERROR_EXTENDED_ERROR &&
-                WNetGetLastError(&errProviderCode, errBuf, 300, errProviderName, 200) != NO_ERROR)
-            {
+                !GetLastNetworkErrorW(errProviderCode, errBuf, errProviderName))
                 errProviderCode = 0;
-                errBuf[0] = 0;
-                errProviderName[0] = 0;
-            }
         }
         else
         {
@@ -635,40 +681,33 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
             if (lpNetResource != NULL)
             {
-                err = WNetAddConnection2(ns, passwd, userName, 0);
-
+                err = WNetAddConnection2W(ns, passwd, userName, 0);
                 if (err == ERROR_EXTENDED_ERROR &&
-                    WNetGetLastError(&errProviderCode, errBuf, 300, errProviderName, 200) != NO_ERROR)
-                {
+                    !GetLastNetworkErrorW(errProviderCode, errBuf, errProviderName))
                     errProviderCode = 0;
-                    errBuf[0] = 0;
-                    errProviderName[0] = 0;
-                }
             }
             else
             {
-                CreateSafeWaitWindow(LoadStr(IDS_TRYINGRECONNECTESC), NULL, 3000, TRUE, NULL);
-
-                brk = !NonBlockingWNetAddConnection3(err, ns, passwd, userName,
-                                                     name != NULL ? CONNECT_UPDATE_PROFILE : 0, // we will remember the non-anonymous
-                                                     &errProviderCode, errBuf, errProviderName);
-
+                CreateSafeWaitWindow(LoadStrW(IDS_TRYINGRECONNECTESC), NULL, 3000, TRUE, NULL);
+                brk = !NonBlockingWNetAddConnection3W(err, ns, passwd, userName,
+                                                       name != NULL ? CONNECT_UPDATE_PROFILE : 0,
+                                                       &errProviderCode, &errBuf, &errProviderName);
                 DestroySafeWaitWindow();
             }
             SetCursor(oldCur);
 
-            memset(dlg.Passwd, 0, sizeof(dlg.Passwd));
+            clearPassword();
             passwd = NULL;
 
-            if (confirmCred) // we will report the result of the password verification (according to this, it will or will not be saved in the Credential Manager)
+            if (confirmCred)
             {
-                credUIConfirmCredentialsA(serverName, err == ERROR_SUCCESS);
+                credUIConfirmCredentialsW(serverName.c_str(), err == ERROR_SUCCESS);
                 confirmCred = FALSE;
             }
 
             if (brk)
             {
-                ret = FALSE; // ESC in NonBlockingWNetAddConnection3()
+                ret = FALSE;
                 err = ERROR_CANCELLED;
                 break;
             }
@@ -676,92 +715,58 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
 
         if (err == ERROR_SESSION_CREDENTIAL_CONFLICT)
         {
-            if (lpNetResource == NULL) // the error will be shown in nethood, we will not show it here
-            {
+            if (lpNetResource == NULL)
                 gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), LoadStrW(IDS_CREDENTIALCONFLICT));
-            }
             ret = FALSE;
             break;
         }
 
         if (err == ERROR_ALREADY_ASSIGNED)
         {
-            // probably a mistake - we are showing that the drive is not connected and yet it is connected -> let
-            // rebuild drive bar and change drive menu
             if (MainWindow != NULL && MainWindow->HWindow != NULL)
                 PostMessage(MainWindow->HWindow, WM_USER_DRIVES_CHANGE, 0, 0);
-
-            break; // return TRUE
+            break;
         }
 
         if (IsLogonFailureErr(err))
         {
-            if (err == ERROR_EXTENDED_ERROR && errBuf[0] != 0)
+            if (err == ERROR_EXTENDED_ERROR && !errBuf.empty())
             {
-                std::wstring msg = FormatStrW(L"%s%s(%u) %s", AnsiToWide(errProviderName).c_str(),
-                                              (errProviderName[0] != 0 ? L": " : L""), errProviderCode, AnsiToWide(errBuf).c_str());
+                std::wstring msg = FormatStrW(L"%s%s(%u) %s", errProviderName.c_str(),
+                                              (!errProviderName.empty() ? L": " : L""), errProviderCode, errBuf.c_str());
                 gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), msg.c_str());
             }
-            else
+            else if (name == NULL || !IsBadUserNameOrPasswdErr(err))
             {
-                if (name == NULL || !IsBadUserNameOrPasswdErr(err))
-                {
-                    gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
-                }
+                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextOwned(err).c_str());
             }
 
             BOOL newConnectInteractive = FALSE;
-            if (!Windows7AndLater && // there's a new dialog again on Windows 7 and I haven't found the interface for it yet
-                credUIPromptForCredentialsA != NULL && credUIConfirmCredentialsA != NULL /*&& credUIParseUserNameA != NULL*/ &&
-                serverName[0] != 0) // own dialog for entering username+password we will show only for simple UNC paths (\\server\share), we will leave DFS and others to the system
+            if (!Windows7AndLater && credUIPromptForCredentialsW != NULL &&
+                credUIConfirmCredentialsW != NULL && !serverName.empty())
             {
                 BOOL save = FALSE;
-                err = credUIPromptForCredentialsA(&uiInfo, serverName, NULL, 0, dlg.User, sizeof(dlg.User),
-                                                  dlg.Passwd, sizeof(dlg.Passwd), &save,
-                                                  (name != NULL ? CREDUI_FLAGS_DO_NOT_PERSIST | CREDUI_FLAGS_GENERIC_CREDENTIALS : CREDUI_FLAGS_EXPECT_CONFIRMATION));
+                err = promptForCredentials(
+                    &save, name != NULL ? CREDUI_FLAGS_DO_NOT_PERSIST | CREDUI_FLAGS_GENERIC_CREDENTIALS
+                                        : CREDUI_FLAGS_EXPECT_CONFIRMATION);
                 if (err == ERROR_CANCELLED)
                 {
-                    ret = FALSE; // user Canceled
+                    ret = FALSE;
                     break;
                 }
-                else
+                if (lpNetResource == NULL && MainWindow != NULL)
+                    UpdateWindow(MainWindow->HWindow);
+                if (err == NO_ERROR)
                 {
-                    if (lpNetResource == NULL)
-                        UpdateWindow(MainWindow->HWindow); // doesn't make sense to use from nethood
-                    if (err == NO_ERROR)                   // user confirmed with OK
-                    {
-                        if (name == NULL)
-                            confirmCred = TRUE;
-                        lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
-                        userName = name != NULL && dlg.User[0] == 0 ? NULL : userNameBuf;
-                        passwd = name != NULL && dlg.User[0] == 0 && dlg.Passwd[0] == 0 ? NULL : dlg.Passwd;
-                        continue;
-                        /*  // there was a problem with trimming the domain from the username, they just couldn't log in because we made their domain name local
-            BOOL onlyUserName = name != NULL && strchr(dlg.User, '\\') == NULL && strchr(dlg.User, '@') == NULL;
-            if (name != NULL && dlg.User[0] == 0 || onlyUserName ||
-                credUIParseUserNameA(dlg.User, userNameBuf, USERNAME_MAXLEN, domain, DOMAIN_MAXLEN) == NO_ERROR)
-            {
-              if (name == NULL) confirmCred = TRUE;
-              if (onlyUserName) lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
-              userName = name != NULL && dlg.User[0] == 0 ? NULL : userNameBuf;
-              passwd = name != NULL && dlg.User[0] == 0 && dlg.Passwd[0] == 0 ? NULL : dlg.Passwd;
-              continue;
-            }
-            else
-            {
-              TRACE_E("RestoreNetworkConnection(): CredUIParseUserNameA failed for: " << dlg.User);
-              userNameBuf[0] = 0;
-              userName = NULL;
-              if (name == NULL) credUIConfirmCredentialsA(serverName, FALSE);
-              newConnectInteractive = TRUE;  // other error, let the system variant deal with it
-              err = ERROR_BAD_USERNAME;
-            }
-*/
-                    }
-                    else
-                        newConnectInteractive = TRUE; // other error, let the system variant deal with it
+                    if (name == NULL)
+                        confirmCred = TRUE;
+                    userNameStorage = dlg.User;
+                    userName = name != NULL && dlg.User.empty() ? NULL : userNameStorage.c_str();
+                    passwd = name != NULL && dlg.User.empty() && dlg.Passwd.empty() ? NULL : dlg.Passwd.c_str();
+                    continue;
                 }
-                memset(dlg.Passwd, 0, sizeof(dlg.Passwd));
+                newConnectInteractive = TRUE;
+                clearPassword();
                 passwd = NULL;
             }
             else
@@ -769,41 +774,30 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
 
             if (newConnectInteractive)
             {
-                if (!connectInteractive) // let's try an interactive mode only if we haven't used it already (a defense against an infinite cycle)
+                if (!connectInteractive)
                 {
                     connectInteractive = TRUE;
                     continue;
                 }
-                else
-                {
-                    ret = FALSE;
-                    break;
-                }
+                ret = FALSE;
+                break;
             }
         }
 
         if (err != ERROR_SUCCESS && err != ERROR_DEVICE_ALREADY_REMEMBERED)
         {
-            if (lpNetResource == NULL) // the error will be shown in nethood, we will not show it here
-            {
-                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
-            }
+            if (lpNetResource == NULL)
+                gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextOwned(err).c_str());
             ret = FALSE;
             break;
         }
-        else
-        {
-            // At Tomas Jelinek, after connecting to a non-accessible UNC drive, no notification
-            // was sent and therefore the DriveBar was not rebuilt and the drive remained crossed out
-            // at me on W2K, notification comes only after two seconds
-            // why not to force it right away:
-            if (MainWindow != NULL && MainWindow->HWindow != NULL)
-                PostMessage(MainWindow->HWindow, WM_USER_DRIVES_CHANGE, 0, 0);
 
-            break; // returning TRUE
-        }
+        if (MainWindow != NULL && MainWindow->HWindow != NULL)
+            PostMessage(MainWindow->HWindow, WM_USER_DRIVES_CHANGE, 0, 0);
+        break;
     }
-    memset(dlg.Passwd, 0, sizeof(dlg.Passwd));
+
+    clearPassword();
     if (credUIDLL != NULL)
         HANDLES(FreeLibrary(credUIDLL));
     if (retErr != NULL)
@@ -817,24 +811,21 @@ BOOL CheckAndRestoreNetworkConnection(HWND parent, const char drive, BOOL& pathI
     pathInvalid = FALSE;
 
     DWORD netDrives; // bit array of network drives
-    char netRemotePath['z' - 'a' + 1][MAX_PATH];
-
-    GetNetworkDrives(netDrives, netRemotePath);
+    std::wstring netRemotePaths['z' - 'a' + 1];
+    GetNetworkDrives(netDrives, netRemotePaths);
 
     if (netDrives & (1 << (LowerCase[drive] - 'a'))) // disk existed, try to restore
     {
-        char name[4] = " :";
-        name[0] = drive;
         if (GetLogicalDrives() & (1 << (LowerCase[drive] - 'a'))) // theoretically there is nothing to do, it is accessible ... but on Vista after hibernation, the mapped disk can return the same error over and over again (e.g. "(31) device attached to system is not functioning"), we will discuss it only by accessing the UNC path, probably some MS error, but in Explorer it works, who knows what they are doing there
         {
-            name[2] = '\\';
-            name[3] = 0;
+            const std::wstring nameW = {(wchar_t)(unsigned char)drive, L':', L'\\'};
             DWORD err = NO_ERROR;
-            char* netPath = netRemotePath[LowerCase[drive] - 'a'];
-            if (netPath[0] == '\\' && netPath[1] == '\\' && strchr(netPath + 2, '\\') != NULL &&                                   // at least a primitive test of a valid UNC path
-                (err = SalCheckPath(FALSE, name, ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS && err != ERROR_USER_TERMINATED && // mapped disk is not accessible
-                (err = SalCheckPath(FALSE, netPath, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS &&                              // UNC is accessible
-                (err = SalCheckPath(FALSE, name, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)                                   // now the mapped disk is accessible again
+            const std::wstring& netPath = netRemotePaths[LowerCase[drive] - 'a'];
+            if ((netPath.size() > 2 && netPath[0] == L'\\' && netPath[1] == L'\\' &&
+                 netPath.find(L'\\', 2) != std::wstring::npos) && // at least a primitive test of a valid UNC path
+                (err = SalCheckPathW(FALSE, nameW.c_str(), ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS && err != ERROR_USER_TERMINATED && // mapped disk is not accessible
+                (err = SalCheckPathW(FALSE, netPath.c_str(), ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS && // UNC is accessible
+                (err = SalCheckPathW(FALSE, nameW.c_str(), ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)                           // now the mapped disk is accessible again
             {
                 return TRUE;
             }
@@ -843,29 +834,29 @@ BOOL CheckAndRestoreNetworkConnection(HWND parent, const char drive, BOOL& pathI
         }
         else
         {
-            pathInvalid = !RestoreNetworkConnection(parent, name, netRemotePath[LowerCase[drive] - 'a']);
+            const std::wstring nameW = {(wchar_t)(unsigned char)drive, L':'}; // matches 'name' below exactly - no trailing backslash
+            const std::wstring& netPath = netRemotePaths[LowerCase[drive] - 'a'];
+            pathInvalid = !RestoreNetworkConnectionW(parent, nameW.c_str(), netPath.c_str());
             return !pathInvalid;
         }
     }
     return FALSE;
 }
 
-DWORD_PTR SHGetFileInfoAux(LPCTSTR pszPath, DWORD dwFileAttributes, SHFILEINFO* psfi,
-                           UINT cbFileInfo, UINT uFlags);
-
-BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathInvalid,
-                                   BOOL donotReconnect)
+BOOL CheckAndConnectUNCNetworkPathW(HWND parent, const wchar_t* UNCPath, BOOL& pathInvalid,
+                                    BOOL donotReconnect)
 {
-    CALL_STACK_MESSAGE3("CheckAndConnectUNCNetworkPath(, %s, , %d)", UNCPath, donotReconnect);
+    CALL_STACK_MESSAGE3("CheckAndConnectUNCNetworkPathW(, %ls, , %d)", UNCPath, donotReconnect);
     pathInvalid = FALSE;
-    if (!IsUNCPath(UNCPath) || UNCPath[2] == '?')
+    if (!IsUNCPathW(UNCPath) || UNCPath[2] == L'?')
         return FALSE; // no basic format UNC path
 
-    CPathBuffer root;
-    char* s = root + GetRootPath(root, UNCPath);
-    *(s - 1) = 0; // trim the trailing backslash at the end of the root path
+    std::wstring root = GetRootPath(UNCPath);
+    if (root.empty())
+        return FALSE;
+    root.resize(root.length() - 1); // trim the trailing backslash at the end of the root path
 
-    DWORD err = SalCheckPath(FALSE, root, ERROR_SUCCESS, TRUE, parent);
+    DWORD err = SalCheckPathW(FALSE, root.c_str(), ERROR_SUCCESS, TRUE, parent);
     if (err == ERROR_SUCCESS)
     { // UNC root path is accessible, we will not do anything
     }
@@ -880,14 +871,14 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
         if (!donotReconnect &&
             (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)) // on XP, this error is returned if the user does not have access to the server or the share does not exist on the server, to distinguish these two errors, we call WNetAddConnection3
         {
-            NETRESOURCE ns;
+            NETRESOURCEW ns = {0};
             ns.dwType = RESOURCETYPE_DISK;
             ns.lpLocalName = NULL;
-            ns.lpRemoteName = root;
+            ns.lpRemoteName = const_cast<wchar_t*>(root.c_str());
             ns.lpProvider = NULL;
             HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-            CreateSafeWaitWindow(LoadStr(IDS_TRYINGRECONNECTESC), NULL, 3000, TRUE, NULL);
-            BOOL connected = NonBlockingWNetAddConnection3(err, &ns, NULL, NULL, 0, NULL, NULL, NULL);
+            CreateSafeWaitWindow(LoadStrW(IDS_TRYINGRECONNECTESC), NULL, 3000, TRUE, NULL);
+            BOOL connected = NonBlockingWNetAddConnection3W(err, &ns, NULL, NULL, 0, NULL, NULL, NULL);
             DestroySafeWaitWindow();
             SetCursor(oldCur);
             if (!connected)
@@ -895,7 +886,7 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
         }
 
         if (IsLogonFailureErr(err) || // a defense against e.g. "no files found"
-            IsAdminShareExtraLogonFailureErr(err, root))
+            IsAdminShareExtraLogonFailureErrW(err, root.c_str()))
         {
             if (donotReconnect)
                 pathInvalid = TRUE; // we report the error directly
@@ -903,10 +894,10 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
             {
                 // Petr: I commented out, Explorer or TC do not show any error before displaying the dialog for entering user + password; besides
                 //       we now show a new error after trying to establish a connection (so that the user finds out that he has an expired password, etc.)
-                //          SalMessageBox(parent, GetErrorText(err), LoadStr(IDS_NETWORKERROR),
+                //          SalMessageBoxW(parent, GetErrorTextOwned(err).c_str(), LoadStrW(IDS_NETWORKERROR),
                 //                        MB_OK | MB_ICONEXCLAMATION);
 
-                pathInvalid = !RestoreNetworkConnection(parent, NULL, root);
+                pathInvalid = !RestoreNetworkConnectionW(parent, NULL, root.c_str());
                 return !pathInvalid;
             }
         }
@@ -914,8 +905,8 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
         {
             if (trySharepoint) // we will try to call shell when error 67 occurs, so that it can make the path accessible
             {
-                SHFILEINFO fi;
-                if (SHGetFileInfoAux(UNCPath, 0, &fi, sizeof(fi), SHGFI_ATTRIBUTES))
+                SHFILEINFOW fi;
+                if (SHGetFileInfoW(UNCPath, 0, &fi, sizeof(fi), SHGFI_ATTRIBUTES))
                     return TRUE;
             }
         }
@@ -942,24 +933,17 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
 DWORD GetDriveFormFactor(int iDrive)
 {
     CALL_STACK_MESSAGE2("GetDriveFormFactor(%d)", iDrive);
-    HANDLE h;
-    char tsz[8];
     DWORD dwRc = 0;
 
     /*
      On Windows NT, use the technique described in the Knowledge
      Base article Q115828 and in the "FLOPPY" SDK sample.
   */
-    sprintf(tsz, "\\\\.\\%c:", '@' + iDrive);
-    h = HANDLES_Q(CreateFileW(AnsiToWide(tsz).c_str(), 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
-    if (h != INVALID_HANDLE_VALUE)
+    DWORD mediaType = 0;
+    if (gFileSystem->QueryDriveMediaType((wchar_t)(L'@' + iDrive), &mediaType).success)
     {
-        DISK_GEOMETRY Geom[20];
-        DWORD cb;
-        if (DeviceIoControl(h, IOCTL_STORAGE_GET_MEDIA_TYPES, 0, 0, Geom, sizeof(Geom), &cb, 0) && cb > 0)
+        switch ((MEDIA_TYPE)mediaType)
         {
-            switch (Geom[0].MediaType)
-            {
             case F5_160_512:    // 5.25 160K  floppy
             case F5_180_512:    // 5.25 180K  floppy
             case F5_320_512:    // 5.25 320K  floppy
@@ -995,9 +979,7 @@ DWORD GetDriveFormFactor(int iDrive)
             case RemovableMedia: // removable media other than a floppy disk
                 dwRc = 1;
                 break;
-            }
         }
-        HANDLES(CloseHandle(h));
     }
     return dwRc;
 }
@@ -1057,7 +1039,7 @@ void DisplayMenuAux2(IContextMenu2* contextMenu, HMENU h)
 // CDrivesList
 //
 
-CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
+CDrivesList::CDrivesList(CFilesWindow* filesWindow, const wchar_t* currentPath,
                          CDriveTypeEnum* driveType, DWORD_PTR* driveTypeParam,
                          int* postCmd, void** postCmdParam, BOOL* fromContextMenu)
 {
@@ -1067,7 +1049,7 @@ CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
     FilesWindow = filesWindow;
     DriveType = driveType;
     DriveTypeParam = driveTypeParam;
-    lstrcpy(CurrentPath, currentPath);
+    CurrentPath = currentPath != NULL ? currentPath : L"";
     PostCmd = postCmd;
     PostCmdParam = postCmdParam;
     FromContextMenu = fromContextMenu;
@@ -1081,10 +1063,10 @@ CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
 }
 
 CDriveTypeEnum
-CDrivesList::OwnGetDriveType(const char* rootPath)
+CDrivesList::OwnGetDriveType(const wchar_t* rootPath)
 {
     CALL_STACK_MESSAGE_NONE
-    UINT dt = GetDriveType(rootPath);
+    UINT dt = GetDriveTypeW(rootPath);
     CDriveTypeEnum ret = drvtUnknow;
     switch (dt)
     {
@@ -1108,21 +1090,90 @@ CDrivesList::OwnGetDriveType(const char* rootPath)
     return ret;
 }
 
-void GetDisplayNameFromSystem(const char* root, char* volumeName, int volumeNameBufSize)
+void GetDisplayNameFromSystem(const wchar_t* root, std::wstring& volumeName)
 {
-    CALL_STACK_MESSAGE2("GetDisplayNameFromSystem(%s)", root);
+    CALL_STACK_MESSAGE2("GetDisplayNameFromSystem(%ls)", root);
 
-    SHFILEINFO fi;
-    if (SHGetFileInfo(root, 0, &fi, sizeof(fi), SHGFI_DISPLAYNAME))
+    SHFILEINFOW fi;
+    if (SHGetFileInfoW(root, 0, &fi, sizeof(fi), SHGFI_DISPLAYNAME))
     {
-        lstrcpyn(volumeName, fi.szDisplayName, volumeNameBufSize);
-        char* s = strrchr(volumeName, '(');
-        if (s != NULL)
+        volumeName = fi.szDisplayName;
+        const size_t openParen = volumeName.rfind(L'(');
+        if (openParen != std::wstring::npos)
         {
-            while (s > volumeName && *(s - 1) == ' ')
-                s--;
-            *s = 0;
+            size_t end = openParen;
+            while (end > 0 && volumeName[end - 1] == L' ')
+                --end;
+            volumeName.resize(end);
         }
+    }
+}
+
+static bool GetVolumeLabelW(const wchar_t* root, std::wstring& volumeName, DWORD* flags = NULL)
+{
+    DWORD capacity = 256;
+    for (;;)
+    {
+        volumeName.assign(capacity, L'\0');
+        DWORD ignored = 0;
+        DWORD localFlags = 0;
+        if (GetVolumeInformationW(root, volumeName.data(), capacity, NULL, &ignored,
+                                  &localFlags, NULL, 0))
+        {
+            volumeName.resize(wcslen(volumeName.c_str()));
+            if (flags != NULL)
+                *flags = localFlags;
+            return true;
+        }
+        const DWORD error = GetLastError();
+        if (error != ERROR_MORE_DATA && error != ERROR_INSUFFICIENT_BUFFER &&
+            error != ERROR_FILENAME_EXCED_RANGE)
+        {
+            volumeName.clear();
+            return false;
+        }
+        if (capacity > (std::numeric_limits<DWORD>::max)() / 2)
+        {
+            volumeName.clear();
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return false;
+        }
+        capacity *= 2;
+    }
+}
+
+static void DuplicateAmpersands(std::wstring& text)
+{
+    std::wstring escaped;
+    escaped.reserve(text.size());
+    for (const wchar_t ch : text)
+    {
+        escaped.push_back(ch);
+        if (ch == L'&')
+            escaped.push_back(ch);
+    }
+    text.swap(escaped);
+}
+
+static bool GetNetworkConnectionPathW(const wchar_t* device, std::wstring& remotePath)
+{
+    DWORD capacity = 256;
+    for (;;)
+    {
+        remotePath.assign(capacity, L'\0');
+        DWORD length = capacity;
+        const DWORD result = WNetGetConnectionW(device, remotePath.data(), &length);
+        if (result == NO_ERROR)
+        {
+            remotePath.resize(wcslen(remotePath.c_str()));
+            return true;
+        }
+        if (result != ERROR_MORE_DATA)
+        {
+            remotePath.clear();
+            return false;
+        }
+        capacity = length > capacity ? length : capacity * 2;
     }
 }
 
@@ -1130,34 +1181,28 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
 {
     CALL_STACK_MESSAGE1("ReadCDVolNameThreadFBody()");
     UINT_PTR uid = (UINT_PTR)param;
-    CPathBuffer root;  // Heap-allocated for long path support
-    root[0] = 0;
-    CPathBuffer buf;
-    buf[0] = 0;
+    std::wstring root;
+    std::wstring volumeName;
 
     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
     BOOL run = FALSE;
     if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
     {
-        lstrcpyn(root, ReadCDVolNameBuffer, root.Size());
+        root = ReadCDVolNameBuffer;
         run = TRUE;
     }
     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
     if (run)
     {
-        DWORD dummy;
-        char fileSystem[11];
-        // NOTE: pass MAX_PATH, not buf.Size() — GetVolumeInformationA has a 16-bit arithmetic
-        // overflow bug when nVolumeNameSize >= 32767: it computes (size+1)*2 in 16-bit, overflowing to 0.
-        if (!GetVolumeInformation(root, buf, MAX_PATH, NULL, &dummy, &dummy, fileSystem, 10))
-            buf[0] = 0; // error GetVolumeInformation
-        if (buf[0] == 0)
-            GetDisplayNameFromSystem(root, buf, buf.Size());
+        if (!GetVolumeLabelW(root.c_str(), volumeName))
+            volumeName.clear();
+        if (volumeName.empty())
+            GetDisplayNameFromSystem(root.c_str(), volumeName);
 
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
-            lstrcpyn(ReadCDVolNameBuffer, buf, buf.Size());
+            ReadCDVolNameBuffer = volumeName;
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
     }
     return 0;
@@ -1220,20 +1265,27 @@ void SortPluginFSTimes(CPluginFSInterfaceEncapsulation** list, int left, int rig
         SortPluginFSTimes(list, i, right);
 }
 
-char* CreateIndexedDrvText(const char* driveText, int index)
+wchar_t* CreateIndexedDrvText(const wchar_t* driveText, int index)
 {
-    char* newText = (char*)malloc(strlen(driveText) + 15); // reserve 14 characters (" [-1234567890]")
+    const size_t capacity = wcslen(driveText) + 15; // reserve 14 characters (" [-1234567890]")
+    wchar_t* newText = (wchar_t*)malloc(capacity * sizeof(wchar_t));
     if (newText != NULL)
     {
-        const char* s = driveText;
-        while (*s != 0 && *s != '\t')
+        const wchar_t* s = driveText;
+        while (*s != 0 && *s != L'\t')
             s++;
-        if (*s == '\t')
+        if (*s == L'\t')
             s++;
-        while (*s != 0 && *s != '\t')
+        while (*s != 0 && *s != L'\t')
             s++;
-        memcpy(newText, driveText, s - driveText);
-        sprintf(newText + (s - driveText), " [%d]%s", index, s);
+        wmemcpy(newText, driveText, s - driveText);
+        // The count is what is LEFT of the allocation from this offset, not the 15
+        // extra characters the index needs: the tail 's' is appended here too, and
+        // passing 15 truncated (or emptied) every drive whose remaining columns ran
+        // past ten characters. Pre-unicode used an unbounded sprintf into the same
+        // allocation, so the size is right and only the count was wrong.
+        swprintf(newText + (s - driveText), capacity - (size_t)(s - driveText),
+                 L" [%d]%s", index, s);
     }
     return newText;
 }
@@ -1303,10 +1355,10 @@ BOOL base64_decode(char* data, int input_length, int* output_length, const char*
 
     for (int i = 0, j = 0; i < input_length;)
     {
-        DWORD sextet_a = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
-        DWORD sextet_b = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
-        DWORD sextet_c = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
-        DWORD sextet_d = data[i] == '=' ? 0 & i++ : decoding_table[data[i++]];
+        DWORD sextet_a = data[i] == '=' ? 0 & i++ : decoding_table[(unsigned char)data[i++]];
+        DWORD sextet_b = data[i] == '=' ? 0 & i++ : decoding_table[(unsigned char)data[i++]];
+        DWORD sextet_c = data[i] == '=' ? 0 & i++ : decoding_table[(unsigned char)data[i++]];
+        DWORD sextet_d = data[i] == '=' ? 0 & i++ : decoding_table[(unsigned char)data[i++]];
 
         if (sextet_a == 0xFF || sextet_b == 0xFF || sextet_c == 0xFF || sextet_d == 0xFF)
         {
@@ -1328,42 +1380,50 @@ BOOL base64_decode(char* data, int input_length, int* output_length, const char*
 }
 
 // a path to the local Dropbox directory
-CPathBuffer DropboxPath; // Heap-allocated for long path support
+std::wstring DropboxPath;
 
 void InitDropboxPath()
 {
     static BOOL alreadyCalled = FALSE;
     if (!alreadyCalled) // it makes sense to find the path only once, then we just ignore it
     {
-        *DropboxPath = 0;
-        CPathBuffer sDbPath; // Heap-allocated for long path support
+        DropboxPath.clear();
+        std::wstring sDbPath;
         BOOL cfgAlreadyFound = FALSE;
-        if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+        IShell* shell = gShell != NULL ? gShell : GetWin32Shell();
+        if (shell != NULL && shell->GetKnownFolderPath(FOLDERID_RoamingAppData, sDbPath).success)
         {
-            if (SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
+            SalPathAppendW(sDbPath, L"Dropbox\\host.db");
+            if (gFileSystem->FileExists(sDbPath.c_str()))
                 cfgAlreadyFound = TRUE;
         }
         else
             TRACE_E("Cannot get value of CSIDL_APPDATA!");
-        if (cfgAlreadyFound ||
-            SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+        if (cfgAlreadyFound || (shell != NULL &&
+                                shell->GetKnownFolderPath(FOLDERID_LocalAppData, sDbPath).success))
         {
-            if (cfgAlreadyFound ||
-                SalPathAppend(sDbPath, "Dropbox\\host.db", sDbPath.Size()) && FileExists(sDbPath))
+            if (!cfgAlreadyFound)
+                SalPathAppendW(sDbPath, L"Dropbox\\host.db");
+            if (cfgAlreadyFound || gFileSystem->FileExists(sDbPath.c_str()))
             {
-                HANDLE hFile = HANDLES_Q(CreateFileW(AnsiToWide(sDbPath).c_str(), GENERIC_READ,
-                                                    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                    OPEN_EXISTING,
-                                                    FILE_FLAG_SEQUENTIAL_SCAN,
-                                                    NULL));
+                HANDLE hFile = gFileSystem->CreateFile(sDbPath.c_str(), GENERIC_READ,
+                                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                                       OPEN_EXISTING,
+                                                       FILE_FLAG_SEQUENTIAL_SCAN,
+                                                       NULL);
+                const DWORD openError = GetLastError();
+                HANDLES_ADD_EX(__otQuiet, hFile != INVALID_HANDLE_VALUE, __htFile,
+                               __hoCreateFile, hFile, openError, TRUE);
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
-                    LARGE_INTEGER size;
-                    if (GetFileSizeEx(hFile, &size) && size.QuadPart < 100000) // 100KB is enough for a stupid config file
+                    uint64_t size = 0;
+                    if (gFileSystem->GetHandleFileSize(hFile, &size).success && size < 100000) // 100KB is enough for a stupid config file
                     {
-                        char* buf = (char*)malloc(size.LowPart);
-                        DWORD read;
-                        if (ReadFile(hFile, buf, size.LowPart, &read, NULL) && read == size.LowPart)
+                        char* buf = (char*)malloc((size_t)size);
+                        DWORD read = 0;
+                        if (buf != NULL &&
+                            gFileSystem->ReadFromHandle(hFile, buf, (DWORD)size, &read).success &&
+                            read == size)
                         {
                             char* secRow = buf;
                             char* end = buf + read;
@@ -1381,32 +1441,31 @@ void InitDropboxPath()
                                 int pathLen;
                                 if (base64_decode(secRow, (int)(secRowEnd - secRow), &pathLen, "Dropbox path: "))
                                 {
-                                    WCHAR widePath[SAL_MAX_LONG_PATH]; // wide path buffer for long path support
-                                    CPathBuffer mbPath; // Heap-allocated for long path support; ANSI or UTF8 path
-                                    if (ConvertA2U(secRow, -1, widePath, _countof(widePath), CP_UTF8) &&
-                                        ConvertU2A(widePath, -1, mbPath, mbPath.Size()))
+                                    std::wstring widePath;
+                                    if (Win32DecodeText(CP_UTF8, secRow, static_cast<size_t>(pathLen), widePath))
                                     {
-                                        TRACE_I("Dropbox path: " << mbPath);
-                                        strcpy_s(DropboxPath.Get(), DropboxPath.Size(), mbPath);
+                                        DropboxPath = std::move(widePath);
+                                        TRACE_IW(L"Dropbox path: " << DropboxPath);
                                     }
                                     else
-                                        TRACE_E("Dropbox path is too big or not convertible to ANSI string.");
+                                        TRACE_E("Dropbox path is not valid UTF-8.");
                                 }
                             }
                         }
                         else
-                            TRACE_E("Unable to read Dropbox's configuration file: " << sDbPath);
+                            TRACE_EW(L"Unable to read Dropbox's configuration file: " << sDbPath);
                         free(buf);
                     }
                     else
-                        TRACE_E("Dropbox's configuration file is too large: " << sDbPath);
-                    HANDLES(CloseHandle(hFile));
+                        TRACE_EW(L"Dropbox's configuration file is too large: " << sDbPath);
+                    HANDLES_REMOVE(hFile, __htFile, "IFileSystem::CloseHandle");
+                    gFileSystem->CloseFileHandle(hFile);
                 }
                 else
-                    TRACE_E("Cannot open Dropbox's configuration file: " << sDbPath);
+                    TRACE_EW(L"Cannot open Dropbox's configuration file: " << sDbPath);
             }
             else
-                TRACE_I("Cannot find Dropbox's configuration file: " << sDbPath);
+                TRACE_IW(L"Cannot find Dropbox's configuration file: " << sDbPath);
         }
         else
             TRACE_E("Cannot get value of CSIDL_LOCAL_APPDATA!");
@@ -1421,7 +1480,7 @@ void InitDropboxPath()
 my_DEFINE_KNOWN_FOLDER(my_FOLDERID_SkyDrive, 0xa52bba46, 0xe9e1, 0x435f, 0xb3, 0xd9, 0x28, 0xda, 0xa6, 0x48, 0xc0, 0xf6);
 
 // the path to the local OneDrive folder - Personal (only for personal accounts, for business accounts we have OneDriveBusinessStorages)
-CPathBuffer OneDrivePath; // Heap-allocated for long path support
+std::wstring OneDrivePath;
 
 // the paths to local OneDrive folders - Business (only for business accounts, for personal accounts we have OneDrivePath)
 COneDriveBusinessStorages OneDriveBusinessStorages;
@@ -1432,7 +1491,8 @@ void COneDriveBusinessStorages::SortIn(COneDriveBusinessStorage* s)
     {
         for (int i = 0; i < Count; i++)
         {
-            if (StrICmp(s->DisplayName.c_str(), At(i)->DisplayName.c_str()) <= 0)
+            int cmp = _wcsicmp(s->DisplayName.c_str(), At(i)->DisplayName.c_str());
+            if (cmp <= 0)
             {
                 Insert(i, s);
                 return;
@@ -1442,16 +1502,16 @@ void COneDriveBusinessStorages::SortIn(COneDriveBusinessStorage* s)
     }
 }
 
-BOOL COneDriveBusinessStorages::Find(const char* displayName, const char** userFolder)
+BOOL COneDriveBusinessStorages::Find(const wchar_t* displayName, const std::wstring** userFolder)
 {
     if (displayName != NULL)
     {
         for (int i = 0; i < Count; i++)
         {
-            if (StrICmp(displayName, At(i)->DisplayName.c_str()) == 0)
+            if (_wcsicmp(displayName, At(i)->DisplayName.c_str()) == 0)
             {
                 if (userFolder != NULL)
-                    *userFolder = At(i)->UserFolder.c_str();
+                    *userFolder = &At(i)->UserFolder;
                 return TRUE;
             }
         }
@@ -1463,30 +1523,19 @@ BOOL COneDriveBusinessStorages::Find(const char* displayName, const char** userF
 
 void InitOneDrivePath()
 {
-    *OneDrivePath = 0; // we find out the path to OneDrive over and over again, because after the commend "Unlink OneDrive" (from OneDrive) we should stop showing it
+    OneDrivePath.clear(); // we find out the path to OneDrive over and over again, because after the commend "Unlink OneDrive" (from OneDrive) we should stop showing it
 
     BOOL done = FALSE;
     if (WindowsVistaAndLater) // SHGetKnownFolderPath has existed since Vista
     {
-        typedef HRESULT(WINAPI * FSHGetKnownFolderPath)(REFKNOWNFOLDERID rfid,
-                                                        DWORD /* KNOWN_FOLDER_FLAG */ dwFlags,
-                                                        HANDLE hToken,
-                                                        PWSTR * ppszPath); // free *ppszPath with CoTaskMemFree
-        FSHGetKnownFolderPath DynSHGetKnownFolderPath = (FSHGetKnownFolderPath)GetProcAddress(GetModuleHandle("shell32.dll"),
-                                                                                              "SHGetKnownFolderPath");
-        if (DynSHGetKnownFolderPath != NULL)
+        IShell* shell = gShell != NULL ? gShell : GetWin32Shell();
+        std::wstring path;
+        if (shell != NULL && shell->GetKnownFolderPath(my_FOLDERID_SkyDrive, path).success)
         {
-            PWSTR path = NULL;
-            if (DynSHGetKnownFolderPath(my_FOLDERID_SkyDrive, 0, NULL, &path) == S_OK && path != NULL)
+            if (!path.empty()) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
             {
-                if (path[0] != 0) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
-                {
-                    done = ConvertU2A(path, -1, OneDrivePath, OneDrivePath.Size()) != 0;
-                    if (!done)
-                        *OneDrivePath = 0; // just for sync
-                                             //else TRACE_I("OneDrive path (FOLDERID_SkyDrive): " << OneDrivePath);
-                }
-                CoTaskMemFree(path);
+                OneDrivePath = std::move(path);
+                done = TRUE;
             }
         }
     }
@@ -1496,22 +1545,21 @@ void InitOneDrivePath()
         registry = GetWin32Registry();
 
     HKEY hKey;
-    CPathBuffer path; // Heap-allocated for long path support
     if (registry != NULL)
     {
         for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
         {
-            const char* oneDriveKey = Windows8_1AndLater && !Windows10AndLater
-                                          ? (i == 0 ? SAL_REG_KEY_WIN81_ONEDRIVE_A : // jen Win 8.1
-                                                 SAL_REG_KEY_WIN81_SKYDRIVE_A)
-                                          : (i == 0 ? SAL_REG_KEY_ONEDRIVE_A : SAL_REG_KEY_SKYDRIVE_A); // krom Win 8.1
-            if (OpenKeyReadA(registry, HKEY_CURRENT_USER, oneDriveKey, hKey).success)
+            const wchar_t* oneDriveKey = Windows8_1AndLater && !Windows10AndLater
+                                             ? (i == 0 ? SAL_REG_KEY_WIN81_ONEDRIVE_W :
+                                                    SAL_REG_KEY_WIN81_SKYDRIVE_W)
+                                             : (i == 0 ? SAL_REG_KEY_ONEDRIVE_W : SAL_REG_KEY_SKYDRIVE_W);
+            if (registry->OpenKeyRead(HKEY_CURRENT_USER, oneDriveKey, hKey).success)
             {
-                RegistryResult result = GetStringA(registry, hKey, SAL_REG_VALUE_USER_FOLDER_A, path.Get(), path.Size());
-                if (result.success && path[0] != 0)
+                std::wstring path;
+                RegistryResult result = registry->GetString(hKey, SAL_REG_VALUE_USER_FOLDER_W, path);
+                if (result.success && !path.empty())
                 {
-                    //TRACE_I("OneDrive path (UserFolder): " << path);
-                    strcpy_s(OneDrivePath.Get(), OneDrivePath.Size(), path); // we have needed path
+                    OneDrivePath = std::move(path);
                     done = TRUE;
                 }
                 registry->CloseKey(hKey);
@@ -1522,7 +1570,7 @@ void InitOneDrivePath()
     // we will load OneDrive Business storages from the registry
     OneDriveBusinessStorages.DestroyMembers();
     if (registry != NULL &&
-        OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_ONEDRIVE_ACCOUNTS_A, hKey).success)
+        registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_ONEDRIVE_ACCOUNTS_W, hKey).success)
     {
         std::vector<std::wstring> accountKeys;
         if (registry->EnumSubKeys(hKey, accountKeys).success)
@@ -1535,15 +1583,17 @@ void InitOneDrivePath()
                     HKEY hAccount;
                     if (registry->OpenKeyRead(hKey, keyName.c_str(), hAccount).success)
                     {
-                        char disp[ONEDRIVE_MAXBUSINESSDISPLAYNAME];
-                        RegistryResult result = GetStringA(registry, hAccount, SAL_REG_VALUE_DISPLAY_NAME_A, disp, sizeof(disp));
-                        if (result.success && disp[0] != 0)
+                        std::wstring displayName;
+                        RegistryResult result = registry->GetString(
+                            hAccount, SAL_REG_VALUE_DISPLAY_NAME_W, displayName);
+                        if (result.success && !displayName.empty())
                         {
-                            result = GetStringA(registry, hAccount, SAL_REG_VALUE_USER_FOLDER_A, path.Get(), path.Size());
-                            if (result.success && path[0] != 0)
+                            std::wstring pathW;
+                            result = registry->GetString(hAccount, SAL_REG_VALUE_USER_FOLDER_W, pathW);
+                            if (result.success && !pathW.empty())
                             { // we will collect everything that has DisplayName and UserFolder, no matter what it is, we will offer it to the user under "OneDrive"
-                                //TRACE_I("OneDrive Business: DisplayName: " << disp << ", UserFolder: " << path);
-                                OneDriveBusinessStorages.SortIn(new COneDriveBusinessStorage(disp, path));
+                                OneDriveBusinessStorages.SortIn(
+                                    new COneDriveBusinessStorage(displayName.c_str(), pathW.c_str()));
                             }
                         }
                         registry->CloseKey(hAccount);
@@ -1557,21 +1607,22 @@ void InitOneDrivePath()
 
 int GetOneDriveStorages()
 {
-    return (*OneDrivePath != 0 ? 1 : 0) + OneDriveBusinessStorages.Count;
+    return (!OneDrivePath.empty() ? 1 : 0) + OneDriveBusinessStorages.Count;
 }
 
-void CDrivesList::AddToDrives(CDriveData& drv, int textResId, char hotkey, CDriveTypeEnum driveType,
-                              BOOL getGrayIcons, HICON icon, BOOL destroyIcon, const char* itemText)
+void CDrivesList::AddToDrives(CDriveData& drv, int textResId, wchar_t hotkey, CDriveTypeEnum driveType,
+                              BOOL getGrayIcons, HICON icon, BOOL destroyIcon, const wchar_t* itemText,
+                              const wchar_t* oneDriveDisplayName)
 {
-    const char* s = itemText != NULL ? itemText : LoadStr(textResId);
-    // WARNING: for drvtOneDriveBus, DisplayName is later taken from drv.DriveText, when changing the text format, change it !!!
-    char* txt = (char*)malloc(1 + (hotkey == 0 ? 0 : 1) + strlen(s) + 1);
-    strcpy(txt, hotkey == 0 ? "\t" : " \t");
+    const wchar_t* s = itemText != NULL ? itemText : LoadStrW(textResId);
+    wchar_t* txt = (wchar_t*)malloc((1 + (hotkey == 0 ? 0 : 1) + wcslen(s) + 1) * sizeof(wchar_t));
+    wcscpy(txt, hotkey == 0 ? L"\t" : L" \t");
     if (hotkey != 0)
         *txt = hotkey;
-    strcat(txt, s);
+    wcscat(txt, s);
     drv.DriveType = driveType;
     drv.DriveText = txt;
+    drv.OneDriveDisplayName = oneDriveDisplayName != NULL ? DupStr(oneDriveDisplayName) : NULL;
     drv.Param = 0;
     drv.Accessible = TRUE;
     drv.DestroyIcon = destroyIcon;
@@ -1607,6 +1658,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     drv.DestroyIcon = TRUE; // these icons are allocated
     drv.PluginFS = NULL;    // just for sure
     drv.DLLName = NULL;     // just for sure
+    drv.OneDriveDisplayName = NULL;
     drv.HGrayIcon = NULL;
 
     CDriveData drvSeparator;
@@ -1640,7 +1692,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 drv.Param = driveData->Param;
                 drv.Accessible = driveData->Accessible;
                 drv.Shared = driveData->Shared;
-                root[0] = drv.DriveText[0];
+                root[0] = (char)drv.DriveText[0];
                 if (root[0] >= 'A' && root[0] <= 'Z')
                     i = 1 << (root[0] - 'A');
                 else
@@ -1648,12 +1700,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                     i = -1;
                     TRACE_E("CDrivesList::BuildData(): unexpected value of drv.DriveText");
                 }
-                int driveType = (mask & i) ? GetDriveType(root) : DRIVE_REMOTE;
-                drv.HIcon = GetDriveIcon(root, driveType, drv.Accessible);
+                int driveType = (mask & i) ? GetDriveTypeA(root) : DRIVE_REMOTE;
+                const std::wstring rootW = {(wchar_t)root[0], L':', L'\\'};
+                drv.HIcon = GetDriveIconW(rootW.c_str(), driveType, drv.Accessible);
                 drv.HGrayIcon = NULL;
 
                 int index = Drives->Add(drv);
-                if (LowerCase[Drives->At(index).DriveText[0]] == LowerCase[(char)*DriveTypeParam])
+                if (LowerCase[(char)Drives->At(index).DriveText[0]] == LowerCase[(char)*DriveTypeParam])
                     currentDiskIndex = index;
             }
         }
@@ -1662,8 +1715,12 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     {
         // remembered and not refreshed network drives will not be returned from GetLogicalDrives()
         DWORD netDrives; // bit array of network disks
-        char netRemotePath['z' - 'a' + 1][MAX_PATH];
-        GetNetworkDrives(netDrives, netRemotePath);
+        // Wide: this table feeds real display text (volumeName below) - the narrow
+        // GetNetworkDrives/WNetEnumResourceA would have Windows itself best-fit-substitute a
+        // remote share name outside CP_ACP before this code ever saw it, permanently losing the
+        // real character before any re-widening could recover it.
+        std::wstring netRemotePaths['z' - 'a' + 1];
+        GetNetworkDrives(netDrives, netRemotePaths);
 
         CachedDrivesMask = mask | netDrives; // a cache for a simple test of whether a disk has been added / disappeared
 
@@ -1675,7 +1732,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
         CQuadWord freeSpace; // how much space we have on the disk
 
-        Shares.PrepareSearch(""); // now we will search for drives roots
+        Shares.PrepareSearchW(L""); // now we will search for drives roots
 
         BOOL separateNextDrive = FALSE; // before we insert drive, should we insert separator?
 
@@ -1685,11 +1742,15 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             if (!(noDrivesPolicy & i) && ((mask & i) || (netDrives & i))) // disk is accessible
             {
                 root[0] = drive;
+                // rootW mirrors 'root' for the wide-only APIs below; 'root' itself stays
+                // narrow per the scoping note above - a drive root is
+                // always ASCII, so this mirror is exact, not a lossy conversion.
+                const std::wstring rootW = {(wchar_t)root[0], L':', L'\\'};
                 int driveType;
                 if (mask & i)
                 {
-                    drv.DriveType = OwnGetDriveType(root);
-                    driveType = GetDriveType(root);
+                    drv.DriveType = OwnGetDriveType(rootW.c_str());
+                    driveType = GetDriveTypeA(root);
                 }
                 else
                 {
@@ -1698,14 +1759,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 }
                 drv.Shared = FALSE;
                 drv.Accessible = (mask & i) != 0;
-                CPathBuffer volumeName;
-                DWORD dummy;
+                std::wstring volumeName;
                 freeSpace = CQuadWord(-1, -1);
                 switch (drv.DriveType)
                 {
                 case drvtRemovable: // diskettes, we will find out if it is 3.5 ", 5.25", 8" or unknown
                 {
-                    volumeName[0] = 0;
+                    volumeName.clear();
                     int drvIndex = drive - 'A' + 1;
                     if (drvIndex >= 1 && drvIndex <= 26) // we will do "range-check" for sure
                     {
@@ -1713,21 +1773,21 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                         switch (medium)
                         {
                         case 350:
-                            strcpy(volumeName, LoadStr(IDS_FLOPPY350));
+                            volumeName = LoadStrW(IDS_FLOPPY350);
                             break;
                         case 525:
-                            strcpy(volumeName, LoadStr(IDS_FLOPPY525));
+                            volumeName = LoadStrW(IDS_FLOPPY525);
                             break;
                         case 800:
-                            strcpy(volumeName, LoadStr(IDS_FLOPPY800));
+                            volumeName = LoadStrW(IDS_FLOPPY800);
                             break;
                         default:
                         {
-                            GetDisplayNameFromSystem(root, volumeName, volumeName.Size());
-                            if (volumeName[0] == 0)
-                                strcpy(volumeName, LoadStr(IDS_REMOVABLE_DISK));
+                            GetDisplayNameFromSystem(rootW.c_str(), volumeName);
+                            if (volumeName.empty())
+                                volumeName = LoadStrW(IDS_REMOVABLE_DISK);
                             else
-                                DuplicateAmpersands(volumeName, volumeName.Size());
+                                DuplicateAmpersands(volumeName);
                             break;
                         }
                         }
@@ -1739,18 +1799,18 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 case drvtRAMDisk:
                 {
                     DWORD flags;
-                    if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
+                    if (GetVolumeLabelW(rootW.c_str(), volumeName, &flags))
                     {
-                        CQuadWord t;                              // total disk space
-                        freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
+                        CQuadWord t;                                // total disk space
+                        freeSpace = MyGetDiskFreeSpaceW(rootW.c_str(), &t); // free disk space
                         // double '&' so that it is not displayed as an underline
-                        DuplicateAmpersands(volumeName, volumeName.Size());
-                        if (volumeName[0] == 0)
-                            strcpy(volumeName, LoadStr(IDS_LOCAL_DISK));
+                        DuplicateAmpersands(volumeName);
+                        if (volumeName.empty())
+                            volumeName = LoadStrW(IDS_LOCAL_DISK);
                     }
                     else
                     {
-                        volumeName[0] = 0;
+                        volumeName.clear();
                         freeSpace = CQuadWord(-1, -1);
                     }
                     break;
@@ -1758,24 +1818,21 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
                 case drvtRemote:
                 {
-                    DWORD size = volumeName.Size();
-                    char device[3] = " :";
-                    device[0] = drive;
+                    const std::wstring device = {(wchar_t)drive, L':'};
                     if (netDrives & i)
                     {
-                        int l = (int)strlen(netRemotePath[drive - 'A']);
-                        l = min(l, (int)volumeName.Size() - 1);
-                        memmove(volumeName, netRemotePath[drive - 'A'], l);
-                        volumeName[l] = 0;
+                        // The remembered remote path comes straight from WNetEnumResourceW;
+                        // no ANSI mirror or fixed path capacity exists in between.
+                        volumeName = netRemotePaths[drive - 'A'];
                     }
                     else if (!drv.Accessible ||
-                             WNetGetConnection(device, volumeName, &size) != NO_ERROR)
+                             !GetNetworkConnectionPathW(device.c_str(), volumeName))
                     {
-                        if (!GetSubstInformation(drive - 'A', volumeName, volumeName.Size()))
-                            volumeName[0] = 0;
+                        if (!GetSubstInformationW(drive - 'A', volumeName))
+                            volumeName.clear();
                     }
                     // double '&' so that it is not displayed as an underline
-                    DuplicateAmpersands(volumeName, volumeName.Size());
+                    DuplicateAmpersands(volumeName);
                     break;
                 }
 
@@ -1783,7 +1840,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 {
                     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
                     UINT_PTR uid = ++ReadCDVolNameReqUID;
-                    lstrcpyn(ReadCDVolNameBuffer, root, SAL_MAX_LONG_PATH);
+                    ReadCDVolNameBuffer = rootW;
                     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
                     // create a thread in which we will find out the volume_name of the CD drive
@@ -1794,63 +1851,63 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
                     { // give it 500ms to find out the volume-name
                         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-                        lstrcpyn(volumeName, ReadCDVolNameBuffer, volumeName.Size());
+                        volumeName = ReadCDVolNameBuffer;
                         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
                     }
                     else
-                        volumeName[0] = 0;
+                        volumeName.clear();
                     if (thread != NULL)
                         AddAuxThread(thread, TRUE); // if the thread is not finished, we will kill it before closing the software
-                    if (volumeName[0] == 0)
-                        strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
+                    if (volumeName.empty())
+                        volumeName = LoadStrW(IDS_COMPACT_DISK);
                     else
                     {
                         // double '&' so that it is not displayed as an underline
-                        DuplicateAmpersands(volumeName, volumeName.Size());
+                        DuplicateAmpersands(volumeName);
                     }
                     break;
                 }
 
                 default:
-                    volumeName[0] = 0;
+                    volumeName.clear();
                 }
                 if (freeSpace != CQuadWord(-1, -1))
                 {
-                    char* p = volumeName + lstrlen(volumeName);
-                    if (p == volumeName)
-                        *p++ = '\t';
-                    *p++ = '\t';
-                    PrintDiskSize(p, freeSpace, 0);
+                    if (volumeName.empty())
+                        volumeName.push_back(L'\t');
+                    volumeName.push_back(L'\t');
+                    volumeName += PrintDiskSize(freeSpace, 0);
                 }
-                if (volumeName[0] != 0)
+                if (!volumeName.empty())
                 { // 'c: ' + volume + 0
-                    drv.DriveText = (char*)malloc(2 + strlen(volumeName) + 1);
+                    drv.DriveText = (wchar_t*)malloc((2 + volumeName.size() + 1) * sizeof(wchar_t));
                     if (drv.DriveText == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
                         return FALSE;
                     }
-                    strcpy(drv.DriveText, " \t");
-                    drv.DriveText[0] = drive;
-                    strcat(drv.DriveText, volumeName);
+                    wcscpy(drv.DriveText, L" \t");
+                    drv.DriveText[0] = (wchar_t)drive;
+                    wcscat(drv.DriveText, volumeName.c_str());
                 }
                 else
                 {
-                    drv.DriveText = (char*)malloc(2);
+                    drv.DriveText = (wchar_t*)malloc(2 * sizeof(wchar_t));
                     if (drv.DriveText == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
                         return FALSE;
                     }
-                    strcpy(drv.DriveText, " ");
-                    drv.DriveText[0] = drive;
+                    wcscpy(drv.DriveText, L" ");
+                    drv.DriveText[0] = (wchar_t)drive;
                 }
-                drv.HIcon = GetDriveIcon(root, driveType, drv.Accessible);
+                drv.HIcon = GetDriveIconW(rootW.c_str(), driveType, drv.Accessible);
                 drv.HGrayIcon = NULL;
 
                 if (drv.DriveType != drvtRemote)
                 {
-                    drv.Shared = Shares.Search(root);
+                    // rootW (built above, next to root[0] = drive) mirrors 'root' exactly.
+                    drv.Shared = Shares.SearchW(rootW.c_str());
                 }
 
                 // we separate drives that the user wanted to separate
@@ -1861,7 +1918,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 separateNextDrive = FALSE;
 
                 int index = Drives->Add(drv);
-                if (LowerCase[Drives->At(index).DriveText[0]] == LowerCase[(char)*DriveTypeParam])
+                if (LowerCase[(char)Drives->At(index).DriveText[0]] == LowerCase[(char)*DriveTypeParam])
                     currentDiskIndex = index;
             }
             drive++;
@@ -1904,12 +1961,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             for (i = 0; i < count; i++)
             {
                 CPluginFSInterfaceEncapsulation* fs = fsList[i];
-                char* txt = NULL;
+                wchar_t* txt = NULL;
                 HICON icon = NULL;
                 BOOL destroyIcon = FALSE;
                 if (fs->GetChangeDriveOrDisconnectItem(fs->GetPluginFSName(), txt, icon, destroyIcon))
                 {
-                    drv.DriveText = txt; // take ownership of malloc'd string
+                    drv.DriveText = DupStr(txt);
+                    free(txt);
                     drv.HIcon = icon;
                     drv.HGrayIcon = NULL;
                     drv.DestroyIcon = destroyIcon;
@@ -1924,13 +1982,13 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
             for (i = firstFSIndex; i < Drives->Count; i++)
             {
                 BOOL freeDriveText = FALSE;
-                char* driveText = Drives->At(i).DriveText;
+                wchar_t* driveText = Drives->At(i).DriveText;
                 int currentIndex = 1;
                 int x;
                 for (x = i + 1; x < Drives->Count; x++)
                 {
-                    char* testedDrvText = Drives->At(x).DriveText;
-                    if (StrICmp(driveText, testedDrvText) == 0) // a match -> we have to index the item
+                    wchar_t* testedDrvText = Drives->At(x).DriveText;
+                    if (StrICmpW(driveText, testedDrvText) == 0) // a match -> we have to index the item
                     {
                         if (!freeDriveText) // first match found, we have to index the first occurrence of a duplicate item as well
                         {
@@ -1984,7 +2042,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
         }
 
         InitDropboxPath();
-        if (*DropboxPath != 0)
+        if (!DropboxPath.empty())
         {
             CachedCloudStoragesMask |= 0x02 /* Dropbox */;
             AddToDrives(drv, IDS_DROPBOX, 0, drvtDropbox, getGrayIcons,
@@ -1993,36 +2051,37 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
 
         InitOneDrivePath();
         int c = GetOneDriveStorages();
-        if (c == 1 && *OneDrivePath != 0)
+        if (c == 1 && !OneDrivePath.empty())
             CachedCloudStoragesMask |= 0x04 /* only one OneDrive storage - Personal */;
-        if (c == 1 && *OneDrivePath == 0)
+        if (c == 1 && OneDrivePath.empty())
             CachedCloudStoragesMask |= 0x08 /* only one OneDrive storage - Business */;
         if (c > 1)
             CachedCloudStoragesMask |= 0x10 /* more OneDrive storages - drop down menu on drive-bar */;
-        char itemText[200 + ONEDRIVE_MAXBUSINESSDISPLAYNAME];
         HICON oneDriveIco = c == 0 ? NULL : SalLoadIcon(HInstance, IDI_ONEDRIVE, iconSize);
         BOOL destroyOneDriveIco = oneDriveIco != NULL;
         if (forDriveBar && c > 1) // data for drive-bar && more storages = let the user choose from the menu (drop down)
         {
-            strcpy_s(itemText, LoadStr(IDS_ONEDRIVE));
-            AddToDrives(drv, 0, 0, drvtOneDriveMenu, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText);
+            const std::wstring itemText = LoadStrW(IDS_ONEDRIVE);
+            AddToDrives(drv, 0, 0, drvtOneDriveMenu, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText.c_str());
             destroyOneDriveIco = FALSE;
         }
         else // data for change drive menu || drive-bar && the only storage (we give a simple button on the drive-bar)
         {
-            if (*OneDrivePath != 0) // personal
+            if (!OneDrivePath.empty()) // personal
             {
+                std::wstring itemText;
                 if (c == 1)
-                    strcpy_s(itemText, LoadStr(IDS_ONEDRIVE)); // the only personal storage = we write only: OneDrive
+                    itemText = LoadStrW(IDS_ONEDRIVE); // the only personal storage = we write only: OneDrive
                 else
-                    sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), LoadStr(IDS_ONEDRIVEPERSONAL));
-                AddToDrives(drv, 0, 0, drvtOneDrive, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText);
+                    itemText = FormatStrW(L"%s - %s", LoadStrW(IDS_ONEDRIVE), LoadStrW(IDS_ONEDRIVEPERSONAL));
+                AddToDrives(drv, 0, 0, drvtOneDrive, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText.c_str());
                 destroyOneDriveIco = FALSE;
             }
             for (int i = 0; i < OneDriveBusinessStorages.Count; i++) // business
-            {                                                        // WARNING: for drvtOneDriveBus, DisplayName is later taken from drv.DriveText, when changing the text format, change it !!!
-                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
-                AddToDrives(drv, 0, 0, drvtOneDriveBus, getGrayIcons, oneDriveIco, destroyOneDriveIco, itemText);
+            {
+                const std::wstring itemText = FormatStrW(L"%s - %s", LoadStrW(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
+                AddToDrives(drv, 0, 0, drvtOneDriveBus, getGrayIcons, oneDriveIco, destroyOneDriveIco,
+                            itemText.c_str(), OneDriveBusinessStorages[i]->DisplayName.c_str());
                 destroyOneDriveIco = FALSE;
             }
         }
@@ -2076,7 +2135,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     }
     else
     {
-        if (CurrentPath[0] != 0) // only if we have a path (it's not ptPluginFS)
+        if (!CurrentPath.empty()) // only if we have a path (it's not ptPluginFS)
         {
             if (currentDiskIndex != -1)
                 FocusIndex = currentDiskIndex;
@@ -2089,26 +2148,29 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     if (Configuration.ChangeDriveShowAnother)
     {
         // a variant with a string 'Another Panel Path' ('As Another Panel'?)
-        char* s = LoadStr(IDS_ANOTHERPANEL);
+        const wchar_t* s = LoadStrW(IDS_ANOTHERPANEL);
         {
             drv.DriveType = drvtOtherPanel;
-            drv.DriveText = (char*)malloc(2 + strlen(s) + 1);
+            drv.DriveText = (wchar_t*)malloc((2 + wcslen(s) + 1) * sizeof(wchar_t));
             if (drv.DriveText == NULL)
             {
                 TRACE_E(LOW_MEMORY);
                 return FALSE;
             }
-            strcpy(drv.DriveText, ".\t");
-            strcat(drv.DriveText, s);
+            wcscpy(drv.DriveText, L".\t");
+            wcscat(drv.DriveText, s);
             drv.Accessible = TRUE;
 
             CFilesWindow* panel = MainWindow->GetNonActivePanel();
             if (panel->Is(ptDisk))
             {
-                UINT type = MyGetDriveType(panel->GetPath());
-                CPathBuffer root2; // Heap-allocated for long path support
-                GetRootPath(root2, panel->GetPath());
-                drv.HIcon = GetDriveIcon(root2, type, TRUE);
+                // From the panel's wide path. GetDriveType inspects the ROOT, and for
+                // a UNC path that root is "\\server\share" - a name the active code page may not be
+                // able to spell, in which case the narrow mirror asked about a path that does not
+                // exist and the drive came back DRIVE_NO_ROOT_DIR.
+                UINT type = MyGetDriveTypeW(panel->GetPathW());
+                const std::wstring root2 = GetRootPath(panel->GetPathW());
+                drv.HIcon = GetDriveIconW(root2.c_str(), type, TRUE);
                 drv.HGrayIcon = NULL;
                 drv.DestroyIcon = TRUE; // these icons are allocated
             }
@@ -2155,9 +2217,8 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
     {
         if (MainWindow->HotPaths.GetVisible(i))
         {
-            CPathBuffer srcName; // Heap-allocated for long path support
-            MainWindow->HotPaths.GetName(i, srcName, srcName.Size());
-            if (srcName[0] != 0 && MainWindow->HotPaths.GetPathLen(i) > 0)
+            const std::wstring srcName = MainWindow->HotPaths.GetNameW(i);
+            if (!srcName.empty() && MainWindow->HotPaths.GetPathLen(i) > 0)
             {
                 if (addSeparator)
                 {
@@ -2165,17 +2226,17 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                     Drives->Add(drvSeparator);
                     addSeparator = FALSE;
                 }
-                CPathBuffer text;
+                std::wstring text;
                 if (i < 10)
-                    sprintf(text, "%d\t%s", i == 9 ? 0 : i + 1, srcName.Get());
+                    text = std::to_wstring(i == 9 ? 0 : i + 1) + L"\t" + srcName;
                 else
-                    sprintf(text, "\t%s", srcName.Get());
+                    text = L"\t" + srcName;
                 // double '&' so that it is not displayed as an underline
-                DuplicateAmpersands(text + 2, text.Size() - 2);
+                DuplicateAmpersands(text);
 
                 drv.DriveType = drvtHotPath;
                 drv.Param = i;
-                drv.DriveText = DupStr((const char*)text);
+                drv.DriveText = DupStr(text.c_str());
                 drv.Accessible = TRUE;
                 drv.Shared = FALSE;
                 Drives->Add(drv);
@@ -2205,6 +2266,11 @@ void CDrivesList::DestroyDrives(TDirectArray<CDriveData>* drives)
         {
             free(drives->At(i).DriveText);
             drives->At(i).DriveText = NULL;
+            if (drives->At(i).DriveType == drvtOneDriveBus)
+            {
+                free(drives->At(i).OneDriveDisplayName);
+                drives->At(i).OneDriveDisplayName = NULL;
+            }
             if (drives->At(i).DestroyIcon && drives->At(i).HIcon != NULL)
             {
                 HANDLES(DestroyIcon(drives->At(i).HIcon)); // via GetDriveIcon
@@ -2279,18 +2345,13 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
     {
     case drvtOneDriveBus:
     {
-        // WARNING: for drvtOneDriveBus, DisplayName is taken from drv.DriveText here, when changing the text format, change it !!!
-        const char* s = item->DriveText;
-        const char* end = s + strlen(s);
-        if (*s != '\t' && *s != 0)
-            s++; // hot key
-        if (*s == '\t')
-            s++;
-        s += strlen(LoadStr(IDS_ONEDRIVE)) + 3 /* " - " */;
-        if (s <= end)
-            *DriveTypeParam = (DWORD_PTR)DupStr(s); // DisplayName
+        if (item->OneDriveDisplayName != NULL)
+            *DriveTypeParam = (DWORD_PTR)DupStr(item->OneDriveDisplayName);
         else
-            TRACE_C("CDrivesList::ExecuteItem(): Unexpected format of drv.DriveText");
+        {
+            TRACE_C("CDrivesList::ExecuteItem(): OneDrive identity is missing");
+            ret = FALSE;
+        }
         break;
     }
 
@@ -2313,18 +2374,17 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
             mii.Type = MENU_TYPE_STRING;
 
-            char itemText[200 + ONEDRIVE_MAXBUSINESSDISPLAYNAME];
-            if (*OneDrivePath != 0) // personal
+            if (!OneDrivePath.empty()) // personal
             {
-                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), LoadStr(IDS_ONEDRIVEPERSONAL));
-                mii.String = itemText;
+                const std::wstring itemText = FormatStrW(L"%s - %s", LoadStrW(IDS_ONEDRIVE), LoadStrW(IDS_ONEDRIVEPERSONAL));
+                mii.String = const_cast<wchar_t*>(itemText.c_str());
                 mii.ID = 1;
                 menu.InsertItem(-1, TRUE, &mii);
             }
             for (int i = 0; i < OneDriveBusinessStorages.Count; i++) // business
             {
-                sprintf_s(itemText, "%s - %s", LoadStr(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
-                mii.String = itemText;
+                const std::wstring itemText = FormatStrW(L"%s - %s", LoadStrW(IDS_ONEDRIVE), OneDriveBusinessStorages[i]->DisplayName.c_str());
+                mii.String = const_cast<wchar_t*>(itemText.c_str());
                 mii.ID = i + 2;
                 menu.InsertItem(-1, TRUE, &mii);
             }
@@ -2336,21 +2396,11 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
                     *DriveType = drvtOneDrive;
                 else
                 {
-                    mii.Mask = MENU_MASK_STRING;
-                    mii.String = itemText;
-                    mii.StringLen = _countof(itemText);
-                    if (menu.GetItemInfo(cmd, FALSE, &mii))
+                    const int storageIndex = cmd - 2;
+                    if (storageIndex >= 0 && storageIndex < OneDriveBusinessStorages.Count)
                     {
-                        const char* s = mii.String;
-                        const char* end = s + strlen(s);
-                        s += strlen(LoadStr(IDS_ONEDRIVE)) + 3 /* " - " */;
-                        if (s <= end)
-                        {
-                            *DriveType = drvtOneDriveBus;
-                            *DriveTypeParam = (DWORD_PTR)DupStr(s); // DisplayName
-                        }
-                        else
-                            TRACE_C("CDrivesList::ExecuteItem(): Unexpected format of mii.String");
+                        *DriveType = drvtOneDriveBus;
+                        *DriveTypeParam = (DWORD_PTR)DupStr(OneDriveBusinessStorages[storageIndex]->DisplayName.c_str());
                     }
                     else
                         ret = FALSE;
@@ -2374,17 +2424,13 @@ BOOL CDrivesList::ExecuteItem(int index, HWND hwnd, const RECT* exclude, BOOL* f
     case drvtCDROM:
     case drvtRAMDisk:
     {
-        *DriveTypeParam = item->DriveText[0];
+        *DriveTypeParam = (DWORD_PTR)item->DriveText[0];
 
         // try to revive
         if (!item->Accessible)
         {
-            char name[3] = " :";
-            CPathBuffer remoteName; // Heap-allocated for long path support
-            strcpy(remoteName, item->DriveText + 2);
-            name[0] = item->DriveText[0];
-
-            if (!RestoreNetworkConnection(FilesWindow->HWindow, name, remoteName))
+            const std::wstring name = {item->DriveText[0], L':'};
+            if (!RestoreNetworkConnectionW(FilesWindow->HWindow, name.c_str(), item->DriveText + 2))
                 ret = FALSE;
         }
 
@@ -2521,7 +2567,7 @@ BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
             insertSeparator = FALSE;
         }
 
-        char buff[80];
+        std::wstring text;
         TLBI_ITEM_INFO2 tii;
         tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_IMAGEINDEX | TLBI_MASK_OVERLAY | TLBI_MASK_ID;
         tii.Style = item->DriveType == drvtOneDriveMenu ? TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN : TLBI_STYLE_NOPREFIX;
@@ -2531,9 +2577,8 @@ BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
         {
             tii.Mask |= TLBI_MASK_TEXT;
             tii.Style |= TLBI_STYLE_SHOWTEXT;
-            buff[0] = item->DriveText[0];
-            buff[1] = 0;
-            tii.Text = buff;
+            text.assign(1, item->DriveText[0]);
+            tii.Text = text.data();
         }
         ImageList_AddIcon(driveBar->HDrivesIcons, item->HIcon);
         ImageList_AddIcon(driveBar->HDrivesIconsGray, item->HGrayIcon == NULL ? item->HIcon : item->HGrayIcon);
@@ -2551,7 +2596,7 @@ BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
     return TRUE;
 }
 
-BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
+BOOL CDrivesList::GetDriveBarToolTip(int index, wchar_t* text)
 {
     if (index < 0 || index >= Drives->Count)
     {
@@ -2562,18 +2607,21 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
 
     text[0] = 0;
 
-    CPathBuffer volumeName;
+    std::wstring volumeName;
     CQuadWord freeSpace;
-    char freeSpaceText[100];
     char root[10] = " :\\";
+    // rootW mirrors 'root' for the wide-only APIs below, same idiom as BuildData()
+    // above - a drive root is always ASCII, so this mirror is exact.
+    std::wstring rootW;
 
     CDriveData* item = &Drives->At(index);
     switch (item->DriveType)
     {
     case drvtRemovable: // diskettes, we will find out if it is 3.5", 5.25", 8" or unknown
     {
-        root[0] = item->DriveText[0];
-        volumeName[0] = 0;
+        root[0] = (char)item->DriveText[0];
+        rootW = {(wchar_t)root[0], L':', L'\\'};
+        volumeName.clear();
         int drv = item->DriveText[0] - 'A' + 1;
         if (drv >= 1 && drv <= 26) // we will do "range-check" for sure
         {
@@ -2581,51 +2629,54 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
             switch (medium)
             {
             case 350:
-                strcpy(volumeName, LoadStr(IDS_FLOPPY350));
+                volumeName = LoadStrW(IDS_FLOPPY350);
                 break;
             case 525:
-                strcpy(volumeName, LoadStr(IDS_FLOPPY525));
+                volumeName = LoadStrW(IDS_FLOPPY525);
                 break;
             case 800:
-                strcpy(volumeName, LoadStr(IDS_FLOPPY800));
+                volumeName = LoadStrW(IDS_FLOPPY800);
                 break;
             default:
             {
-                GetDisplayNameFromSystem(root, volumeName, volumeName.Size());
-                if (volumeName[0] == 0)
-                    strcpy(volumeName, LoadStr(IDS_REMOVABLE_DISK));
+                GetDisplayNameFromSystem(rootW.c_str(), volumeName);
+                if (volumeName.empty())
+                    volumeName = LoadStrW(IDS_REMOVABLE_DISK);
 
                 break;
             }
             }
         }
-        strcpy(text, volumeName);
+        lstrcpynW(text, volumeName.c_str(), TOOLTIP_TEXT_MAX);
         break;
     }
 
     case drvtFixed:
     case drvtRAMDisk:
     {
-        root[0] = item->DriveText[0];
-        DWORD dummy, flags;
-        if (GetVolumeInformation(root, volumeName, MAX_PATH, NULL, &dummy, &flags, NULL, 0))
+        root[0] = (char)item->DriveText[0];
+        rootW = {(wchar_t)root[0], L':', L'\\'};
+        DWORD flags;
+        if (GetVolumeLabelW(rootW.c_str(), volumeName, &flags))
         {
-            CQuadWord t;                              // total disk space
-            freeSpace = MyGetDiskFreeSpace(root, &t); // free disk space
-            PrintDiskSize(freeSpaceText, freeSpace, 0);
-            if (volumeName[0] == 0)
-                strcpy(volumeName, LoadStr(IDS_LOCAL_DISK));
-            sprintf(text, "%s (%s)", (char*)volumeName, freeSpaceText);
+            CQuadWord t;                                // total disk space
+            freeSpace = MyGetDiskFreeSpaceW(rootW.c_str(), &t); // free disk space
+            const std::wstring freeSpaceText = PrintDiskSize(freeSpace, 0);
+            if (volumeName.empty())
+                volumeName = LoadStrW(IDS_LOCAL_DISK);
+            const std::wstring tooltip = FormatStrW(L"%s (%s)", volumeName.c_str(), freeSpaceText.c_str());
+            lstrcpynW(text, tooltip.c_str(), TOOLTIP_TEXT_MAX);
         }
         break;
     }
 
     case drvtCDROM:
     {
-        root[0] = item->DriveText[0];
+        root[0] = (char)item->DriveText[0];
+        rootW = {(wchar_t)root[0], L':', L'\\'};
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         UINT_PTR uid = ++ReadCDVolNameReqUID;
-        lstrcpyn(ReadCDVolNameBuffer, root, SAL_MAX_LONG_PATH);
+        ReadCDVolNameBuffer = rootW;
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
         // create thread, in which we will find out the volume_name of the CD drive
@@ -2635,70 +2686,71 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
         if (thread != NULL && WaitForSingleObject(thread, 500) == WAIT_OBJECT_0)
         { // give it 500ms to find out the volume-name
             HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-            lstrcpyn(volumeName, ReadCDVolNameBuffer, volumeName.Size());
+            volumeName = ReadCDVolNameBuffer;
             HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
         }
         else
-            volumeName[0] = 0;
+            volumeName.clear();
         if (thread != NULL)
             AddAuxThread(thread, TRUE); // if the thread is still running, we will kill it before closing the program
-        if (volumeName[0] == 0)
-            strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
+        if (volumeName.empty())
+            volumeName = LoadStrW(IDS_COMPACT_DISK);
 
-        strcpy(text, volumeName);
+        lstrcpynW(text, volumeName.c_str(), TOOLTIP_TEXT_MAX);
         break;
     }
 
     case drvtRemote:
     {
-        if (strlen(item->DriveText) > 2)
+        if (wcslen(item->DriveText) > 2)
         {
-            strcpy(text, item->DriveText + 2);
+            lstrcpynW(text, item->DriveText + 2, TOOLTIP_TEXT_MAX);
             RemoveAmpersands(text);
         }
         break;
     }
 
     case drvtMyDocuments:
-        strcpy(text, LoadStr(IDS_MYDOCUMENTS));
+        lstrcpyW(text, LoadStrW(IDS_MYDOCUMENTS));
         break;
     case drvtGoogleDrive:
-        strcpy(text, LoadStr(IDS_GOOGLEDRIVE));
+        lstrcpyW(text, LoadStrW(IDS_GOOGLEDRIVE));
         break;
     case drvtDropbox:
-        strcpy(text, LoadStr(IDS_DROPBOX));
+        lstrcpyW(text, LoadStrW(IDS_DROPBOX));
         break;
     case drvtOneDrive:
     case drvtOneDriveMenu:
-        strcpy(text, LoadStr(IDS_ONEDRIVE));
+        lstrcpyW(text, LoadStrW(IDS_ONEDRIVE));
         break;
     case drvtNeighborhood:
-        strcpy(text, LoadStr(IDS_NETWORKDRIVE));
+        lstrcpyW(text, LoadStrW(IDS_NETWORKDRIVE));
         break;
 
     case drvtOneDriveBus:
     {
-        const char* s = item->DriveText;
-        if (*s != '\t' && *s != 0)
+        const wchar_t* s = item->DriveText;
+        if (*s != L'\t' && *s != 0)
             s++; // hot key
-        if (*s == '\t')
+        if (*s == L'\t')
             s++;
-        lstrcpyn(text, s, TOOLTIP_TEXT_MAX);
+        lstrcpynW(text, s, TOOLTIP_TEXT_MAX);
         break;
     }
 
     case drvtPluginCmd:
     {
         // trim the first column in the item name
-        const char* p = item->DriveText;
-        while (*p != 0 && *p != '\t')
+        const wchar_t* p = item->DriveText;
+        while (*p != 0 && *p != L'\t')
             p++;
-        if (*p == '\t')
+        if (*p == L'\t')
         {
-            const char* e = p + 1; // trim the potential third column in the item name (can be after the second TAB)
-            while (*e != 0 && *e != '\t')
+            const wchar_t* e = p + 1; // trim the potential third column in the item name (can be after the second TAB)
+            while (*e != 0 && *e != L'\t')
                 e++;
-            lstrcpyn(text, p + 1, (int)(e - (p + 1) + 1));
+            std::wstring segment(p + 1, e);
+            lstrcpynW(text, segment.c_str(), (int)segment.size() + 1);
         }
         break;
     }
@@ -2706,7 +2758,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
     return TRUE;
 }
 
-BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const char** pluginFSDLLName)
+BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const wchar_t** pluginFSDLLName)
 {
     CALL_STACK_MESSAGE4("CDrivesList::DisplayMenu(%d, %d, %d)", posByMouse, itemIndex, panel);
 
@@ -2737,7 +2789,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
     RECT selectedIndexRect = {0};
     if (MenuPopup != NULL)
         MenuPopup->GetItemRect(selectedIndex, &selectedIndexRect);
-    CPathBuffer path;
+    std::wstring path;
     CDriveTypeEnum dt = Drives->At(selectedIndex).DriveType;
     switch (dt)
     {
@@ -2748,24 +2800,24 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
     case drvtCDROM:
     case drvtRAMDisk:
     {
-        strcpy(path, " :\\");
+        path = L" :\\";
         path[0] = Drives->At(selectedIndex).DriveText[0];
         break;
     }
 
     case drvtHotPath:
     {
-        if (!MainWindow->GetExpandedHotPath(MainWindow->HWindow, Drives->At(selectedIndex).Param, path, path.Size()))
+        if (!MainWindow->GetExpandedHotPath(MainWindow->HWindow, Drives->At(selectedIndex).Param, path))
             return FALSE;
-        if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' && path[1] == ':' && (path[2] == '\\' || path[2] == '/') ||
-            (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/'))
+        if (path.size() >= 3 && LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' && path[1] == ':' && (path[2] == '\\' || path[2] == '/') ||
+            path.size() >= 2 && (path[0] == '\\' || path[0] == '/') && (path[1] == '\\' || path[1] == '/'))
         { // absolute path on disk or network (UNC)
             SlashesToBackslashesAndRemoveDups(path);
             int type;
             BOOL isDir;
-            char* secondPart;
-            if (!SalParsePath(MainWindow->HWindow, path, type, isDir, secondPart, LoadStr(IDS_ERRORTITLE),
-                              NULL, FALSE, NULL, NULL, NULL, path.Size()) ||
+            wchar_t* secondPart;
+            if (!SalParsePathW(MainWindow->HWindow, path, type, isDir, secondPart, LoadStrW(IDS_ERRORTITLE),
+                               NULL, FALSE, NULL, NULL, NULL) ||
                 type != PATH_TYPE_WINDOWS || // not a windows path
                 !isDir || *secondPart != 0)  // the path to a file (not a directory) or a part of the path does not exist
             {
@@ -2781,7 +2833,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
     case drvtPluginCmd:
     {
         CPluginFSInterfaceAbstract* pluginFS = NULL;
-        const char* pluginFSName = NULL;
+        const wchar_t* pluginFSName = NULL;
         int pluginFSNameIndex = -1;
         BOOL isDetachedFS = FALSE;
         BOOL refreshMenu;
@@ -2842,11 +2894,11 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
                 p.y = selectedIndexRect.bottom;
             }
 
-            CPathBuffer pluginFSNameBuf; // 'pluginFS' may cease to exist, so we put 'fsName' into a local buffer
-            if (pluginFSName != NULL)
-                lstrcpyn(pluginFSNameBuf, pluginFSName, pluginFSNameBuf.Size());
+            // 'pluginFS' may cease to exist while the callback is running, so keep the
+            // selected file-system name in independent dynamic storage.
+            const std::wstring pluginFSNameBuf = pluginFSName != NULL ? pluginFSName : L"";
             if (pluginData->ChangeDriveMenuItemContextMenu(MainWindow->HWindow, panel, p.x, p.y, pluginFS,
-                                                           pluginFSName != NULL ? pluginFSNameBuf.Get() : NULL,
+                                                           pluginFSName != NULL ? pluginFSNameBuf.c_str() : NULL,
                                                            pluginFSName != NULL ? pluginFSNameIndex : -1,
                                                            isDetachedFS, refreshMenu,
                                                            closeMenu, postCmd, postCmdParam))
@@ -2941,7 +2993,7 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
         MainWindow->ContextMenuChngDrv->Release();
         MainWindow->ContextMenuChngDrv = NULL;
     }
-    MainWindow->ContextMenuChngDrv = CreateIContextMenu2(MainWindow->HWindow, path);
+    MainWindow->ContextMenuChngDrv = CreateIContextMenu2W(MainWindow->HWindow, path.c_str());
     HMENU h = CreatePopupMenu();
     if (MainWindow->ContextMenuChngDrv != NULL && h != NULL)
     {
@@ -2974,23 +3026,20 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
             BOOL releaseLeft = FALSE;  // disconnect left panel from disk?
             BOOL releaseRight = FALSE; // disconnect right panel from disk?
 
-            char cmdName[2000]; // we have 2000 instead of 200 on purpose, shell extensions sometimes write double (consideration: unicode = 2 * "number of characters"), etc.
-            if (AuxGetCommandString(MainWindow->ContextMenuChngDrv, cmd, GCS_VERB, NULL, cmdName, 200) != NOERROR)
-            {
-                cmdName[0] = 0;
-            }
-            if (stricmp(cmdName, "properties") != 0 && // not mandatory for properties
-                stricmp(cmdName, "find") != 0 &&       // not mandatory for find
-                stricmp(cmdName, "open") != 0 &&       // not mandatory for open
-                stricmp(cmdName, "explore") != 0 &&    // not mandatory for explore
-                stricmp(cmdName, "link") != 0)         // not mandatory for create-short-cut
+            std::wstring cmdName;
+            AuxGetCommandString(MainWindow->ContextMenuChngDrv, cmd, GCS_VERBW, NULL, cmdName);
+            if (_wcsicmp(cmdName.c_str(), L"properties") != 0 && // not mandatory for properties
+                _wcsicmp(cmdName.c_str(), L"find") != 0 &&       // not mandatory for find
+                _wcsicmp(cmdName.c_str(), L"open") != 0 &&       // not mandatory for open
+                _wcsicmp(cmdName.c_str(), L"explore") != 0 &&    // not mandatory for explore
+                _wcsicmp(cmdName.c_str(), L"link") != 0)         // not mandatory for create-short-cut
             {
                 CFilesWindow* win;
                 int i;
                 for (i = 0; i < 2; i++)
                 {
                     win = i == 0 ? MainWindow->LeftPanel : MainWindow->RightPanel;
-                    if (HasTheSameRootPath(win->GetPath(), path)) // identical disk (both normal and UNC)
+                    if (HasTheSameRootPath(win->GetPathW(), path.c_str())) // identical disk (both normal and UNC)
                     {
                         if (i == 0)
                             releaseLeft = TRUE;
@@ -3007,10 +3056,18 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
             CMINVOKECOMMANDINFOEX ici;
             ZeroMemory(&ici, sizeof(CMINVOKECOMMANDINFOEX));
             ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
-            ici.fMask = CMIC_MASK_PTINVOKE;
-            ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CDrivesList::OnContextMenu cmd=%d cmdName=%s", cmd, cmdName);
-            ici.lpVerb = MAKEINTRESOURCE(cmd);
-            ici.lpDirectory = path;
+            // CMIC_MASK_UNICODE + lpDirectoryW, same as the shell-verb-invoke sites
+            // elsewhere in this codebase - without it only the narrow
+            // lpDirectory reaches the handler, and for a non-ANSI path that is a working
+            // directory that does not exist.
+            ici.fMask = CMIC_MASK_PTINVOKE | CMIC_MASK_UNICODE;
+            ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, L"SEW: CDrivesList::OnContextMenu cmd=%d cmdName=%s", cmd, cmdName.c_str());
+            // lpVerb (inherited from CMINVOKECOMMANDINFO) is always LPCSTR regardless of the
+            // Ex/wide fields alongside it - a genuine, permanent Windows Shell API contract.
+            ici.lpVerb = MAKEINTRESOURCEA(cmd);
+            std::string pathA;
+            ici.lpDirectory = Win32EncodeAcpExact(path, pathA) ? pathA.c_str() : NULL;
+            ici.lpDirectoryW = path.c_str();
             ici.nShow = SW_SHOWNORMAL;
             if (MenuPopup != NULL)
             {
@@ -3129,7 +3186,7 @@ BOOL CDrivesList::FindPanelPathIndex(CFilesWindow* panel, DWORD* index)
     }
     else
     {
-        const char* path = panel->GetPath();
+        const wchar_t* path = panel->GetPathW();
         if (path[0] == '\\' && path[1] == '\\')
         {
             if (path[2] == '.' && path[3] == '\\' && path[4] != 0 && path[5] == ':')
@@ -3174,7 +3231,7 @@ BOOL CDrivesList::FindPanelPathIndex(CFilesWindow* panel, DWORD* index)
                 case drvtCDROM:
                 case drvtRAMDisk:
                 {
-                    if (LowerCase[path[0]] == LowerCase[item->DriveText[0]])
+                    if (LowerCase[path[0]] == LowerCase[(char)item->DriveText[0]])
                     {
                         *index = i;
                         return TRUE;

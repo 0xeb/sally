@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <windows.h>
 #include <shellapi.h>
+#include <shlobj.h>
 
 // Result of shell operations
 struct ShellResult
@@ -71,6 +72,21 @@ struct ShellExecInfo
     }
 };
 
+struct FolderPickerOptions
+{
+    HWND owner = nullptr;
+    const wchar_t* title = nullptr;
+    const wchar_t* instruction = nullptr;
+    const wchar_t* initialDirectory = nullptr;
+    // Start the picker AT Network (the drive bar's Network Neighborhood button). It biases where
+    // the dialog opens; it does not restrict what the user may pick. The BIF_RETURNONLYFSDIRS
+    // browse tree it replaces was ROOTED at Network so navigating out was impossible, and an
+    // IFileOpenDialog cannot be rooted that way - rejecting a non-UNC choice afterwards only made
+    // the Select button behave like Cancel, with nothing shown. Every caller navigates the panel
+    // to whatever comes back, and a local path is perfectly valid there.
+    bool networkOnly = false;
+};
+
 // Abstract interface for shell operations
 // Enables mocking for tests and centralized shell interaction
 class IShell
@@ -81,13 +97,11 @@ public:
     // Execute a file/URL using shell
     virtual ShellExecResult Execute(const ShellExecInfo& info) = 0;
 
-    // Perform file operations (copy, move, delete, rename) with shell UI
-    // sourcePaths: Double-null terminated list of source paths
-    // destPath: Destination path (for copy/move/rename)
-    // Returns true if operation completed without errors
+    // Perform file operations with typed shell items. Semantic paths stay dynamically owned;
+    // the adapter creates the shell items and owns all COM lifetimes.
     virtual ShellResult FileOperation(ShellFileOp operation,
-                                      const wchar_t* sourcePaths,
-                                      const wchar_t* destPath,
+                                      const std::vector<std::wstring>& sourcePaths,
+                                      const std::wstring& destPath,
                                       DWORD flags,
                                       HWND hwnd = nullptr) = 0;
 
@@ -97,22 +111,32 @@ public:
                                     SHFILEINFOW& info,
                                     UINT flags) = 0;
 
-    // Browse for folder dialog
-    virtual bool BrowseForFolder(HWND hwnd,
-                                 const wchar_t* title,
-                                 UINT flags,
-                                 std::wstring& selectedPath) = 0;
+    // Pick a filesystem folder with IFileDialog/IShellItem. The selected value is published only
+    // after the shell returns a complete filesystem path.
+    virtual ShellResult PickFolder(const FolderPickerOptions& options,
+                                   std::wstring& selectedPath) = 0;
 
-    // Get special folder path (CSIDL_* constants)
-    virtual ShellResult GetSpecialFolderPath(int csidl,
-                                             std::wstring& path,
-                                             bool create = false) = 0;
+    // Resolve a KNOWNFOLDERID into its dynamically allocated filesystem path. The default keeps
+    // existing test/fake shells source-compatible; the Win32 adapter loads the Vista API at
+    // runtime so this interface does not raise Sally's minimum-OS import floor.
+    virtual ShellResult GetKnownFolderPath(const GUID& folderId, std::wstring& path)
+    { (void)folderId; (void)path; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 
-    // Move files/dirs to the Recycle Bin (P2-a). Silent (no shell UI/confirm);
-    // the caller owns confirmation. Default fails with CALL_NOT_IMPLEMENTED so
-    // mocks need not override.
-    virtual ShellResult MoveToRecycleBin(const std::vector<std::wstring>& paths)
-    { (void)paths; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+    // Resolves a shell item identifier to its exact filesystem path. The owner is
+    // dynamic because PIDLs can identify paths beyond the legacy MAX_PATH contract.
+    virtual ShellResult GetFileSystemPathFromIdList(LPCITEMIDLIST itemId, std::wstring& path)
+    { (void)itemId; (void)path; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
+    // Move files/dirs to the Recycle Bin. Silent (no shell UI/confirm);
+    // the caller owns confirmation and error display. parentWnd parents any
+    // shell-internal window (the worker passes its CShellExecuteWnd).
+    // On failure errorCode may be a shell DE_* code (0x71-0x88) rather than a
+    // Win32 error - display-only; do not feed it to FormatMessage-style APIs.
+    // A user abort maps to ERROR_CANCELLED.
+    // Default fails with CALL_NOT_IMPLEMENTED so mocks need not override.
+    virtual ShellResult MoveToRecycleBin(const std::vector<std::wstring>& paths,
+                                         HWND parentWnd = NULL)
+    { (void)paths; (void)parentWnd; return ShellResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
 };
 
 // Global shell interface - default is Win32 implementation
@@ -120,37 +144,3 @@ extern IShell* gShell;
 
 // Returns the default Win32 implementation
 IShell* GetWin32Shell();
-
-// ANSI helpers for migration
-inline std::wstring AnsiShellToWide(const char* str)
-{
-    if (!str || !*str) return L"";
-    int len = MultiByteToWideChar(CP_ACP, 0, str, -1, nullptr, 0);
-    if (len == 0) return L"";
-    std::wstring wide;
-    wide.resize(len);
-    MultiByteToWideChar(CP_ACP, 0, str, -1, &wide[0], len);
-    wide.resize(len - 1);
-    return wide;
-}
-
-// ANSI helper: Execute file
-inline ShellExecResult ShellExecuteA(IShell* shell, HWND hwnd, const char* verb,
-                                     const char* file, const char* params,
-                                     const char* dir, int showCmd)
-{
-    ShellExecInfo info;
-    std::wstring wideVerb = verb ? AnsiShellToWide(verb) : L"";
-    std::wstring wideFile = file ? AnsiShellToWide(file) : L"";
-    std::wstring wideParams = params ? AnsiShellToWide(params) : L"";
-    std::wstring wideDir = dir ? AnsiShellToWide(dir) : L"";
-
-    info.verb = wideVerb.empty() ? nullptr : wideVerb.c_str();
-    info.file = wideFile.empty() ? nullptr : wideFile.c_str();
-    info.parameters = wideParams.empty() ? nullptr : wideParams.c_str();
-    info.directory = wideDir.empty() ? nullptr : wideDir.c_str();
-    info.showCommand = showCmd;
-    info.hwnd = hwnd;
-
-    return shell->Execute(info);
-}

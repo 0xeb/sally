@@ -379,18 +379,19 @@ BOOL CMFTSnapshot<CHAR>::ParseRecord(BYTE* data, QWORD index)
             //TRACE_I("Found data/stream.");
 
             // do we have already stream with same name?
-            CHAR streamname[MAX_PATH];
-            if (!String<CHAR>::CopyFromUnicode(streamname, (WCHAR*)(data + offset + aheader->NameOffset), aheader->NameLength, MAX_PATH))
+            std::unique_ptr<CHAR[]> streamname(String<CHAR>::NewFromUnicode(
+                (WCHAR*)(data + offset + aheader->NameOffset), aheader->NameLength));
+            if (!streamname)
                 return String<CHAR>::Error(IDS_UNDELETE, IDS_READINGMFT);
 
             // for attribute $LOGGED_UTILITY_STREAM we are interested only in these related to EFS
-            if (aheader->Type == $LOGGED_UTILITY_STREAM && String<CHAR>::StrICmp(streamname, STRING_EFS))
+            if (aheader->Type == $LOGGED_UTILITY_STREAM && String<CHAR>::StrICmp(streamname.get(), STRING_EFS))
                 break;
             DATA_STREAM_I<CHAR>* stream = record->Streams;
             DATA_STREAM_I<CHAR>** lastptr = &record->Streams;
             while (stream != NULL)
             {
-                if (!String<CHAR>::StrICmp(streamname, (stream->DSName == NULL) ? STRING_EMPTY : stream->DSName))
+                if (!String<CHAR>::StrICmp(streamname.get(), (stream->DSName == NULL) ? STRING_EMPTY : stream->DSName))
                     break;
                 lastptr = &stream->DSNext;
                 stream = stream->DSNext;
@@ -404,7 +405,7 @@ BOOL CMFTSnapshot<CHAR>::ParseRecord(BYTE* data, QWORD index)
                     return String<CHAR>::Error(IDS_UNDELETE, IDS_LOWMEM);
                 if (aheader->NameLength)
                 {
-                    stream->DSName = String<CHAR>::NewStr(streamname);
+                    stream->DSName = String<CHAR>::NewStr(streamname.get());
                     if (stream->DSName == NULL)
                         return String<CHAR>::Error(IDS_UNDELETE, IDS_LOWMEM);
                 }
@@ -693,8 +694,8 @@ BOOL CMFTSnapshot<CHAR>::Update(CSnapshotProgressDlg* progress, DWORD udFlags, C
     // we ended with error but if we have something, don't throw it away
     if (!ret && !canceled && i > MAX_METAFILES && i < MFTItems)
     {
-        if (SalamanderGeneral->SalMessageBox(progress->HWindow, String<char>::LoadStr(IDS_INCOMPLETEMFT),
-                                             String<char>::LoadStr(IDS_UNDELETE), MB_YESNO | MB_ICONQUESTION) == IDYES)
+        if (SalamanderGeneral->SalMessageBox(progress->HWindow, String<wchar_t>::LangStr(IDS_INCOMPLETEMFT).c_str(),
+                                             String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MB_YESNO | MB_ICONQUESTION) == IDYES)
         {
             TRACE_I("i = " << i << ", user wants partial results");
             ret = TRUE;
@@ -808,7 +809,7 @@ FILE_RECORD_I<CHAR>* CMFTSnapshot<CHAR>::GetVirtualDirectory(DWORD ref, int resI
     if (vd->FileNames == NULL)
         return NULL;
     CHAR text[100];
-    String<CHAR>::SPrintF(text, String<CHAR>::LoadStr(resID), ref);
+    String<CHAR>::SPrintF(text, String<CHAR>::LangStr(resID).c_str(), ref);
     vd->FileNames->FNName = String<CHAR>::NewStr(text);
     if (vd->FileNames->FNName == NULL)
         return NULL;

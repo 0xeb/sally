@@ -21,5 +21,5 @@ SIZE CalcBottomBarKeyCapSize(HDC hDC, HFONT hFont);
 // Draws one key cap: 'fill' background, a 1px 'outline' frame, and 'textColor' text centred.
 // The reference build draws a cap only slightly lighter than the bar with a dark outline and
 // light text - deliberately NOT an inverted white block.
-void DrawBottomBarKeyCap(HDC hDC, const RECT* rect, const char* keyText,
+void DrawBottomBarKeyCap(HDC hDC, const RECT* rect, const wchar_t* keyText,
                          COLORREF fill, COLORREF textColor, COLORREF outline);

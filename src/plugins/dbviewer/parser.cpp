@@ -4,6 +4,10 @@
 
 #include "precomp.h"
 
+#include "unicode/helpers.h"
+#include "const.h"
+#include "display_text.h"
+
 #include "csvlib/csvlib.h"
 #include "dbflib/dbflib.h"
 #include "parser.h"
@@ -106,7 +110,7 @@ void CParserInterfaceAbstract::ShowParserError(HWND hParent, CParserStatusEnum s
     }
 
     int strID = -1;
-    const char* text;
+    std::wstring text;
 
     switch (status)
     {
@@ -139,21 +143,21 @@ void CParserInterfaceAbstract::ShowParserError(HWND hParent, CParserStatusEnum s
     }
     if (strID == -1)
     {
-        text = "Unknown error"; // default
+        text = L"Unknown error"; // default
 
         if ((status & psMask) == psSystemError)
         {
             // try to get error description from the system
 
             status = (CParserStatusEnum)(status & ~psMask);
-            text = SalGeneral->GetErrorText(status);
+            text = SPLGetErrorTextOwned(SalGeneral, status);
         }
     }
     else
     {
-        text = LoadStr(strID);
+        text = SPLLoadStrOwned(SalGeneral, HLanguage, strID).c_str();
     }
-    SalGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONEXCLAMATION);
+    SalGeneral->SalMessageBox(hParent, text.c_str(), SPLLoadStrOwned(SalGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
     if (this != NULL)
         bShowingError = false;
 }
@@ -169,11 +173,11 @@ CParserInterfaceDBF::CParserInterfaceDBF()
     DbfHdr = NULL;
     DbfFields = NULL;
     Record = NULL;
-    FileName[0] = 0;
+    FileName.clear();
 }
 
 CParserStatusEnum
-CParserInterfaceDBF::OpenFile(const char* fileName)
+CParserInterfaceDBF::OpenFile(const wchar_t* fileName)
 {
     CParserStatusEnum status = psOK;
 
@@ -218,7 +222,7 @@ CParserInterfaceDBF::OpenFile(const char* fileName)
     }
 
     if (status == psOK)
-        lstrcpyn(FileName, fileName, MAX_PATH);
+        FileName = fileName;
 
     return status;
 }
@@ -237,8 +241,66 @@ void CParserInterfaceDBF::CloseFile()
     }
     DbfHdr = NULL;
     DbfFields = NULL;
-    FileName[0] = 0;
+    FileName.clear();
 }
+
+namespace
+{
+void AppendFileInfoText(HWND edit, const std::wstring& text)
+{
+    SendMessageW(edit, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(text.c_str()));
+}
+
+bool FormatFileTimestamp(const FILETIME& utc, std::wstring& text)
+{
+    FILETIME local;
+    SYSTEMTIME system;
+    if (!FileTimeToLocalFileTime(&utc, &local) || !FileTimeToSystemTime(&local, &system))
+        return false;
+
+    const int dateLength = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &system, NULL, NULL, 0);
+    const int timeLength = GetTimeFormatW(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &system, NULL, NULL, 0);
+    if (dateLength <= 0 || timeLength <= 0)
+        return false;
+
+    std::wstring date(static_cast<size_t>(dateLength), L'\0');
+    std::wstring clock(static_cast<size_t>(timeLength), L'\0');
+    if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &system, NULL, date.data(), dateLength) <= 0 ||
+        GetTimeFormatW(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &system, NULL, clock.data(), timeLength) <= 0)
+        return false;
+    date.resize(static_cast<size_t>(dateLength - 1));
+    clock.resize(static_cast<size_t>(timeLength - 1));
+    text = date + L", " + clock;
+    return true;
+}
+
+void AppendCommonFileInfo(HWND edit, const std::wstring& fileName)
+{
+    AppendFileInfoText(edit, fileName + L"\r\n\r\n");
+
+    HANDLE file = CreateFileW(fileName.c_str(), GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return;
+
+    FILETIME fileTime = {};
+    CQuadWord fileSize(0, 0);
+    GetFileTime(file, NULL, NULL, &fileTime);
+    DWORD err;
+    const BOOL haveSize = SalGeneral->SalGetFileSize(file, fileSize, err);
+    CloseHandle(file);
+
+    std::wstring timestamp;
+    if (FormatFileTimestamp(fileTime, timestamp))
+        AppendFileInfoText(edit, SPLFormatStringOwned(L"%ls:\t%ls\r\n", LangStr(IDS_FINFO_MODIFIED).c_str(), timestamp.c_str()));
+    if (haveSize)
+    {
+        const std::wstring size = SPLPrintDiskSizeOwned(SalGeneral, fileSize, 1);
+        AppendFileInfoText(edit, SPLFormatStringOwned(L"%ls:\t%ls\r\n", LangStr(IDS_FINFO_SIZE).c_str(), size.c_str()));
+    }
+}
+} // namespace
 
 BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
 {
@@ -248,43 +310,10 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
         return FALSE;
     }
 
-    char buff[1000];
-    char buff2[1000];
-
-    SetWindowText(hEdit, "");
+    SetWindowTextW(hEdit, L"");
     DWORD tab = 80;
     SendMessage(hEdit, EM_SETTABSTOPS, 1, (LPARAM)&tab);
-    sprintf(buff, "%s\r\n\r\n", FileName);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    // obtain file information (size, date & time)
-    HANDLE file = CreateFile(FileName, GENERIC_READ,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE,
-                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (file != INVALID_HANDLE_VALUE)
-    {
-        FILETIME fileTime;
-        CQuadWord fileSize;
-        GetFileTime(file, NULL, NULL, &fileTime);
-        DWORD err;
-        SalGeneral->SalGetFileSize(file, fileSize, err); // ignore errors
-        CloseHandle(file);
-
-        SYSTEMTIME st;
-        FILETIME ft;
-        FileTimeToLocalFileTime(&fileTime, &ft);
-        FileTimeToSystemTime(&ft, &st);
-
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, buff2, 100);
-        strcat(buff2, ", ");
-        GetTimeFormat(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &st, NULL, buff2 + strlen(buff2), 100);
-        sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
-        SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-        SalGeneral->PrintDiskSize(buff2, fileSize, 1);
-        sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_SIZE), buff2);
-        SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-    }
+    AppendCommonFileInfo(hEdit, FileName);
 
     int verStrID;
     switch (DbfHdr->version)
@@ -312,28 +341,16 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
         break;
     }
 
-    sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_VERSION), LoadStr(verStrID));
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%ls\r\n", LangStr(IDS_FINFO_VERSION).c_str(), LangStr(verStrID).c_str()));
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_RECCOUNT).c_str(), DbfHdr->recordsCnt));
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_FIELDCOUNT).c_str(), DbfHdr->fieldsCnt));
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_MEMOCOUNT).c_str(), DbfHdr->memoFieldsCnt));
 
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_RECCOUNT), DbfHdr->recordsCnt);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_FIELDCOUNT), DbfHdr->fieldsCnt);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_MEMOCOUNT), DbfHdr->memoFieldsCnt);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    SalGeneral->PrintDiskSize(buff2, CQuadWord(DbfHdr->headerSize, 0), 2);
-    sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_HDRSIZE), buff2);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    SalGeneral->PrintDiskSize(buff2, CQuadWord(DbfHdr->recordSize, 0), 2);
-    sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_RECSIZE), buff2);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_CODEPAGE), DbfHdr->codePage);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
+    std::wstring sizeText = SPLPrintDiskSizeOwned(SalGeneral, CQuadWord(DbfHdr->headerSize, 0), 2);
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%ls\r\n", LangStr(IDS_FINFO_HDRSIZE).c_str(), sizeText.c_str()));
+    sizeText = SPLPrintDiskSizeOwned(SalGeneral, CQuadWord(DbfHdr->recordSize, 0), 2);
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%ls\r\n", LangStr(IDS_FINFO_RECSIZE).c_str(), sizeText.c_str()));
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_CODEPAGE).c_str(), DbfHdr->codePage));
 
     return TRUE;
 }
@@ -373,7 +390,7 @@ BOOL CParserInterfaceDBF::GetFieldInfo(DWORD index, CFieldInfo* info)
     if (info->Name == NULL)
         info->NameMax = (int)strlen((char*)field->name) + 1;
     else
-        lstrcpyn(info->Name, (char*)field->name, info->NameMax);
+        lstrcpynA(info->Name, (char*)field->name, info->NameMax);
     if (field->type == DBF_FTYPE_NUM ||
         field->type == DBF_FTYPE_DATE ||
         field->type == DBF_FTYPE_FLOAT ||
@@ -388,7 +405,8 @@ BOOL CParserInterfaceDBF::GetFieldInfo(DWORD index, CFieldInfo* info)
     info->TextMax = info->FieldLen = field->len;
     if (field->type == DBF_FTYPE_LOGIC)
     {
-        info->TextMax = (int)max(strlen(LoadStr(IDS_TRUE)), strlen(LoadStr(IDS_FALSE)));
+        // A character count for column sizing - wide length is the correct measure.
+        info->TextMax = (int)max(wcslen(LangStr(IDS_TRUE).c_str()), wcslen(LangStr(IDS_FALSE).c_str()));
     }
     else if (field->type == DBF_FTYPE_DATE)
     {
@@ -459,7 +477,7 @@ BOOL CParserInterfaceDBF::GetFieldInfo(DWORD index, CFieldInfo* info)
             textResID = IDS_FTYPE_UNKOWN;
             break;
         }
-        lstrcpyn(info->Type, LoadStr(textResID), 100);
+        *info->Type = LangStr(textResID);
     }
 
     if (field->type == DBF_FTYPE_NUM)
@@ -505,7 +523,7 @@ char* Int64ToCurrency(char* buffer, __int64 number)
     char DecimalSeparator[1] = {'.'};
 
     _i64toa(number, buffer, 10);
-    int l = lstrlen(buffer);
+    int l = lstrlenA(buffer);
     if (l > 4)
     {
         char* s = buffer + l - 4;
@@ -579,15 +597,15 @@ CParserInterfaceDBF::GetCellText(DWORD index, size_t* textLen)
         size_t buffLen = 0;
         SYSTEMTIME st;
         ZeroMemory(&st, sizeof(st));
-        lstrcpyn(Buffer, text, 5);
+        lstrcpynA(Buffer, text, 5);
         st.wYear = atoi(Buffer);
-        lstrcpyn(Buffer, text + 4, 3);
+        lstrcpynA(Buffer, text + 4, 3);
         st.wMonth = atoi(Buffer);
-        lstrcpyn(Buffer, text + 6, 3);
+        lstrcpynA(Buffer, text + 6, 3);
         st.wDay = atoi(Buffer);
         if (st.wYear != 0 && st.wMonth != 0 && st.wDay != 0)
         {
-            buffLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, Buffer, 99);
+            buffLen = GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, Buffer, 99);
             if (buffLen == 0)
             {
                 sprintf(Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
@@ -602,16 +620,26 @@ CParserInterfaceDBF::GetCellText(DWORD index, size_t* textLen)
 
     case DBF_FTYPE_LOGIC:
     {
-        if (*text == 'T' || *text == 't' || *text == 'Y' || *text == 'y')
+        // The localized word, not an English literal. Painting takes the wide
+        // TryGetLocalizedCellText path, but Find (renmain.cpp) and Copy-to-clipboard read the cell
+        // through HERE, so hardcoding "True"/"False" meant search no longer matched what the user
+        // could see and Copy pasted a different word than the panel showed. GetFieldInfo already
+        // sizes the column from LangStr(IDS_TRUE)/LangStr(IDS_FALSE).
+        //
+        // This is the byte-oriented interface, so the word is projected onto the active code page
+        // the way the narrow LoadStr used to hand it over. Lossy, because a degraded word still
+        // lets the cell be searched and copied, where a refusal would blank it.
+        const sally::dbviewer::LogicalCellValue value =
+            sally::dbviewer::ClassifyLogicalCellByte(*text);
+        Buffer[0] = 0; // Not initialised (default)
+        if (value != sally::dbviewer::LogicalCellValue::Unknown)
         {
-            lstrcpy(Buffer, LoadStr(IDS_TRUE));
+            std::string encoded;
+            if (Win32EncodeAcpLossy(LangStr(value == sally::dbviewer::LogicalCellValue::True ? IDS_TRUE : IDS_FALSE),
+                                    encoded)
+                    .Succeeded())
+                lstrcpynA(Buffer, encoded.c_str(), (int)sizeof(Buffer));
         }
-        else if (*text == 'F' || *text == 'f' || *text == 'N' || *text == 'n' || *text == '0')
-        {
-            lstrcpy(Buffer, LoadStr(IDS_FALSE));
-        }
-        else
-            Buffer[0] = 0; // Not initialised (default)
         *textLen = strlen(Buffer);
         return Buffer;
     }
@@ -747,6 +775,36 @@ CParserInterfaceDBF::GetCellTextW(DWORD index, size_t* textLen)
     return L"";
 }
 
+bool CParserInterfaceDBF::TryGetLocalizedCellText(DWORD index,
+                                                  std::wstring& text)
+{
+    if (Dbf == NULL || index >= DbfHdr->fieldsCnt || Record == NULL)
+        return false;
+    const _dbf_field* field = DbfFields + index;
+    if (field->type != DBF_FTYPE_LOGIC)
+        return false;
+
+    const sally::dbviewer::LogicalCellValue value =
+        sally::dbviewer::ClassifyLogicalCellByte(Record[field->posInRecord]);
+    int resource = 0;
+    if (value == sally::dbviewer::LogicalCellValue::True)
+        resource = IDS_TRUE;
+    else if (value == sally::dbviewer::LogicalCellValue::False)
+        resource = IDS_FALSE;
+    else
+        return false;
+    try
+    {
+        std::wstring staged = LangStr(resource);
+        text.swap(staged);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
 CParserStatusEnum
 CParserInterfaceDBF::TranslateDBFStatus(eDBFStatus status)
 {
@@ -802,13 +860,13 @@ BOOL CParserInterfaceDBF::IsRecordDeleted()
 CParserInterfaceCSV::CParserInterfaceCSV(CCSVConfig* config)
 {
     Csv = NULL;
-    FileName[0] = 0;
+    FileName.clear();
     Config = config;
     IsUTF8 = IsUnicode = FALSE;
 }
 
 CParserStatusEnum
-CParserInterfaceCSV::OpenFile(const char* fileName)
+CParserInterfaceCSV::OpenFile(const wchar_t* fileName)
 {
     CParserStatusEnum status = psOK;
 
@@ -873,7 +931,7 @@ CParserInterfaceCSV::OpenFile(const char* fileName)
         break;
     }
 
-    FILE* f = fopen(fileName, "r");
+    FILE* f = _wfopen(fileName, L"r");
     if (f)
     {
         WORD w;
@@ -909,7 +967,9 @@ CParserInterfaceCSV::OpenFile(const char* fileName)
     else
     {
         WCHAR separatorW = separator;
-        MultiByteToWideChar(CP_ACP, 0, &separator, 1, &separatorW, 1);
+        std::wstring decodedSeparator;
+        if (Win32DecodeText(CP_ACP, &separator, 1, decodedSeparator) && decodedSeparator.size() == 1)
+            separatorW = decodedSeparator.front();
         if (IsUTF8)
             Csv = new CCSVParserUTF8(fileName,
                                      autoSeparator, separator,
@@ -935,7 +995,7 @@ CParserInterfaceCSV::OpenFile(const char* fileName)
     }
 
     if (status == psOK)
-        lstrcpyn(FileName, fileName, MAX_PATH);
+        FileName = fileName;
 
     return status;
 }
@@ -947,7 +1007,7 @@ void CParserInterfaceCSV::CloseFile()
         delete Csv;
         Csv = NULL;
     }
-    FileName[0] = 0;
+    FileName.clear();
 }
 
 BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
@@ -958,49 +1018,12 @@ BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
         return FALSE;
     }
 
-    char buff[1000];
-    char buff2[1000];
-
-    SetWindowText(hEdit, "");
+    SetWindowTextW(hEdit, L"");
     DWORD tab = 80;
     SendMessage(hEdit, EM_SETTABSTOPS, 1, (LPARAM)&tab);
-    sprintf(buff, "%s\r\n\r\n", FileName);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    // obtain file information (size, date & time)
-    HANDLE file = CreateFile(FileName, GENERIC_READ,
-                             FILE_SHARE_READ | FILE_SHARE_WRITE,
-                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (file != INVALID_HANDLE_VALUE)
-    {
-        FILETIME fileTime;
-        CQuadWord fileSize;
-        GetFileTime(file, NULL, NULL, &fileTime);
-        DWORD err;
-        SalGeneral->SalGetFileSize(file, fileSize, err); // ignore errors
-        CloseHandle(file);
-
-        SYSTEMTIME st;
-        FILETIME ft;
-        FileTimeToLocalFileTime(&fileTime, &ft);
-        FileTimeToSystemTime(&ft, &st);
-
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, buff2, 100);
-        strcat(buff2, ", ");
-        GetTimeFormat(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &st, NULL, buff2 + strlen(buff2), 100);
-        sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
-        SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-        SalGeneral->PrintDiskSize(buff2, fileSize, 1);
-        sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_SIZE), buff2);
-        SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-    }
-
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_RECCOUNT), GetRecordCount());
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
-
-    sprintf(buff, "%s:\t%u\r\n", LoadStr(IDS_FINFO_FIELDCOUNT), GetFieldCount());
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
+    AppendCommonFileInfo(hEdit, FileName);
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_RECCOUNT).c_str(), GetRecordCount()));
+    AppendFileInfoText(hEdit, SPLFormatStringOwned(L"%ls:\t%u\r\n", LangStr(IDS_FINFO_FIELDCOUNT).c_str(), GetFieldCount()));
 
     return TRUE;
 }
@@ -1075,7 +1098,7 @@ BOOL CParserInterfaceCSV::GetFieldInfo(DWORD index, CFieldInfo* info)
     info->TextMax = Csv->GetColumnMaxLen(index);
 
     if (info->Type != NULL)
-        lstrcpyn(info->Type, LoadStr(IDS_FTYPE_CHAR), 100);
+        *info->Type = LangStr(IDS_FTYPE_CHAR);
 
     info->FieldLen = info->Decimals = -1;
 

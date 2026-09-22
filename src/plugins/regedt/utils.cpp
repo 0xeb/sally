@@ -1,59 +1,8 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
-BOOL PathAppend(WCHAR* path, WCHAR* more, int pathSize)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE2("PathAppend(, , %d)", pathSize);
-    if (more[0] == L'\0')
-    {
-        return TRUE;
-    }
-
-    int len1 = (int)wcslen(path);
-    int len2 = (int)wcslen(more);
-
-    if (len1 && path[len1 - 1] != L'\\' && *more != L'\\')
-    {
-        if (len1 + 1 >= pathSize)
-            return FALSE;
-        path[len1++] = L'\\';
-        path[len1] = L'\0';
-    }
-    if (len1 + len2 >= pathSize)
-        return FALSE;
-    wcscpy(path + len1, more);
-    return TRUE;
-}
-
-BOOL CutDirectory(WCHAR* path, WCHAR* cutDir, int size)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE2("CutDirectory(, , %d)", size);
-    WCHAR* slash = wcsrchr(path, L'\\');
-    if (!slash)
-    {
-        // path not starting with a slash
-        if (*path == L'\0')
-            return FALSE; // nothing left to shorten
-        if (cutDir)
-            lstrcpynW(cutDir, path, size);
-        *path = L'\0';
-    }
-    else
-    {
-        if (cutDir)
-            lstrcpynW(cutDir, slash + 1, size);
-        if (slash != path)
-            *slash = L'\0';
-        else
-            slash[1] = L'\0';
-    }
-    return TRUE;
-}
 
 WCHAR*
 DupStr(const WCHAR* str)
@@ -68,63 +17,8 @@ DupStr(const WCHAR* str)
     return ret;
 }
 
-char* DupStrA(const WCHAR* str)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("DupStrA()");
-    char* ret;
-    int len = (int)wcslen(str);
-    ret = (char*)SG->Alloc(len + 1);
-    if (ret)
-    {
-        if (WStrToStr(ret, len + 1, str, len + 1) <= 0)
-        {
-            TRACE_E("Unable to convert Unicode to char, GetLastError()=" << ret);
-            free(ret);
-            ret = SG->DupStr("?");
-        }
-    }
-
-    return ret;
-}
-
-char* StrNCat(char* dest, const char* sour, int destSize)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE3("StrNCat(, %s, %d)", sour, destSize);
-    if (destSize == 0)
-        return dest;
-    char* start = dest;
-    while (*dest)
-        dest++;
-    destSize -= (int)(dest - start);
-    while (*sour && --destSize)
-        *dest++ = *sour++;
-    *dest = NULL;
-    return start;
-}
-
-void RemoveTrailingSlashes(char* path)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("RemoveTrailingSlashes()");
-    char* end = path + strlen(path);
-    while (end > path && end[-1] == '\\')
-        end--;
-    *end = 0;
-}
-
-void RemoveTrailingSlashes(LPWSTR path)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("RemoveTrailingSlashes()");
-    LPWSTR end = path + wcslen(path);
-    while (end > path && end[-1] == L'\\')
-        end--;
-    *end = L'\0';
-}
-
-BOOL RegOperationError(int lastError, int error, int title, int keyRoot, LPWSTR keyName,
+BOOL RegOperationError(int lastError, int error, int title, int keyRoot,
+                       const wchar_t* keyName,
                        LPBOOL skip, LPBOOL skipAllErrors)
 {
     CALL_STACK_MESSAGE5("RegOperationError(%d, %d, %d, %d, , , )", lastError,
@@ -136,13 +30,14 @@ BOOL RegOperationError(int lastError, int error, int title, int keyRoot, LPWSTR 
         return FALSE;
     }
 
-    char buf[1024];
-    int l = (int)strlen(strcpy(buf, LoadStr(error)));
-    SG->GetErrorText(lastError, buf + l, 1024 - l);
+    std::wstring errorText = LoadStrW(error).c_str();
+    errorText += SPLGetErrorTextOwned(SG, lastError);
 
-    std::string fullName = WideToLocal(PredefinedHKeys[keyRoot].KeyName) + "\\" + WideToLocal(keyName);
+    std::wstring fullName = PredefinedHKeys[keyRoot].KeyName;
+    fullName += L'\\';
+    fullName += keyName;
 
-    int res = skip ? SG->DialogError(GetParent(), BUTTONS_RETRYSKIPCANCEL, fullName.c_str(), buf, LoadStr(title)) : SG->DialogError(GetParent(), BUTTONS_RETRYCANCEL, fullName.c_str(), buf, LoadStr(title));
+    int res = skip ? SG->DialogError(GetParent(), BUTTONS_RETRYSKIPCANCEL, fullName.c_str(), errorText.c_str(), LoadStrW(title).c_str()) : SG->DialogError(GetParent(), BUTTONS_RETRYCANCEL, fullName.c_str(), errorText.c_str(), LoadStrW(title).c_str());
     switch (res)
     {
     case DIALOG_RETRY:
@@ -163,38 +58,44 @@ BOOL RegOperationError(int lastError, int error, int title, int keyRoot, LPWSTR 
 
 // ****************************************************************************
 
-void LoadHistory(HKEY regKey, const char* keyPattern, LPWSTR* history,
-                 LPWSTR buffer, int bufferSize, CSalamanderRegistryAbstract* registry)
+void LoadHistory(HKEY regKey, const wchar_t* keyPattern, std::vector<std::wstring>& history,
+                 CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE3("LoadHistory(, %s, , , %d, )", keyPattern, bufferSize);
-    char buf[32];
+    history.clear();
     int i;
     for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
     {
-        SalPrintf(buf, 32, keyPattern, i);
-        if (!registry->GetValue(regKey, buf, REG_BINARY, buffer, bufferSize * 2))
+        const std::wstring valueName = SPLFormatStringOwned(keyPattern, i);
+        DWORD bytes = 0;
+        if (!registry->GetSize(regKey, valueName.c_str(), REG_BINARY, bytes) ||
+            bytes < sizeof(wchar_t) || bytes % sizeof(wchar_t) != 0)
             break;
-        LPWSTR ptr = new WCHAR[wcslen(buffer) + 1];
-        if (!ptr)
+        std::vector<wchar_t> buffer(bytes / sizeof(wchar_t) + 1, L'\0');
+        if (!registry->GetValue(regKey, valueName.c_str(), REG_BINARY,
+                                buffer.data(), bytes))
             break;
-        wcscpy(ptr, buffer);
-        history[i] = ptr;
+        const size_t capacity = bytes / sizeof(wchar_t);
+        const size_t length = wcsnlen(buffer.data(), capacity);
+        if (length == capacity)
+            break;
+        history.emplace_back(buffer.data(), length);
     }
 }
 
-void SaveHistory(HKEY regKey, const char* keyPattern, LPWSTR* history, CSalamanderRegistryAbstract* registry)
+void SaveHistory(HKEY regKey, const wchar_t* keyPattern, const std::vector<std::wstring>& history, CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE2("SaveHistory(, %s, , )", keyPattern);
-    char buf[32];
+    //  CALL_STACK_MESSAGE2("SaveHistory(, %ls, , )", keyPattern);
     int i;
-    for (i = 0; i < MAX_HISTORY_ENTRIES; i++)
+    for (i = 0; i < static_cast<int>(history.size()) && i < MAX_HISTORY_ENTRIES; i++)
     {
-        if (history[i] == NULL)
+        const std::wstring valueName = SPLFormatStringOwned(keyPattern, i);
+        const size_t length = history[i].size();
+        if (length >= MAXDWORD / sizeof(wchar_t))
             break;
-        SalPrintf(buf, 32, keyPattern, i);
-        registry->SetValue(regKey, buf, REG_BINARY, history[i], (int)wcslen(history[i]) * 2 + 2);
+        registry->SetValue(regKey, valueName.c_str(), REG_BINARY, history[i].c_str(),
+                           static_cast<DWORD>((length + 1) * sizeof(wchar_t)));
     }
 }
 
@@ -212,7 +113,7 @@ BOOL TestForCancel()
     if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) && GetForegroundWindow() == SG->GetMainWindowHWND())
     {
         MSG msg; // discard the buffered ESC
-        while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
             ;
         cancel = TRUE;
     }
@@ -222,75 +123,12 @@ BOOL TestForCancel()
     }
 
     cancel = cancel && SG->SalMessageBox(SG->GetMsgBoxParent(),
-                                         LoadStr(IDS_CANCEL), LoadStr(IDS_QUESTION),
+                                         LoadStrW(IDS_CANCEL).c_str(), LoadStrW(IDS_QUESTION).c_str(),
                                          MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES;
     UpdateWindow(SG->GetMainWindowHWND());
     nextTest = GetTickCount() + 150;
     SG->WaitForESCRelease();
     return cancel;
-}
-
-BOOL DuplicateChar(WCHAR dup, LPWSTR buffer, int bufferSize)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE2("DuplicateChar(, , %d)", bufferSize);
-    if (buffer == NULL)
-    {
-        TRACE_E("1. unexpected situation in DuplicateChar()");
-        return FALSE;
-    }
-    LPWSTR s = buffer;
-    int l = (int)wcslen(buffer);
-    if (l >= bufferSize)
-    {
-        TRACE_E("2. unexpected situation in DuplicateChar()");
-        return FALSE;
-    }
-    BOOL ret = TRUE;
-    while (*s != L'\0')
-    {
-        if (*s == dup)
-        {
-            if (l + 1 < bufferSize)
-            {
-                memmove(s + 1, s, (l - (s - buffer) + 1) * 2); // duplicate the quote
-                l++;
-                s++;
-            }
-            else // doesn't fit, trim the buffer
-            {
-                ret = FALSE;
-                memmove(s + 1, s, (l - (s - buffer)) * 2); // duplicate the quote, trim by one char
-                buffer[l] = L'\0';
-                s++;
-            }
-        }
-        s++;
-    }
-    return ret;
-}
-
-LPWSTR
-UnDuplicateChar(WCHAR dup, LPWSTR buffer)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("UnDuplicateChar(, )");
-    if (buffer == NULL)
-    {
-        TRACE_E("1. unexpected situation in UnDuplicateChar()");
-        return FALSE;
-    }
-    LPWSTR s = buffer;
-    BOOL ret = TRUE;
-    while (*s != L'\0')
-    {
-        if (s[0] == dup && s[1] == dup)
-        {
-            MoveMemory(s, s + 1, (wcslen(s + 1) + 1) * 2);
-        }
-        s++;
-    }
-    return buffer;
 }
 
 BOOL ParseFullPath(WCHAR* path, WCHAR*& keyName, int& keyRoot)
@@ -334,83 +172,6 @@ inline BOOL IsXdigit(WCHAR c)
 {
     CALL_STACK_MESSAGE_NONE
     return c >= L'0' && c <= L'9' || towlower(c) >= L'a' && towlower(c) <= L'f';
-}
-
-void ConvertHexToString(LPWSTR text, char* hex, int& len)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE2("ConvertHexToString(, , %d)", len);
-    len = 0;
-    LPWSTR s = text; //, st = text;
-    BYTE value = 0;
-    BOOL openedQuotesASCII = FALSE;
-    BOOL openedQuotesUnicode = FALSE;
-    while (1)
-    {
-        if (*s == L'"' && !openedQuotesASCII)
-        {
-            s++;
-            openedQuotesUnicode = !openedQuotesUnicode;
-            continue;
-        }
-        if (*s == L'\'' && !openedQuotesUnicode)
-        {
-            s++;
-            openedQuotesASCII = !openedQuotesASCII;
-            continue;
-        }
-        if (openedQuotesUnicode)
-        {
-            if (*s == 0)
-                break;
-            else
-            {
-                *(LPWSTR)(hex + len) = *s++;
-                len += 2;
-            }
-        }
-        else
-        {
-            if (openedQuotesASCII)
-            {
-                if (*s == 0)
-                    break;
-                else
-                {
-                    WStrToStr(hex + len, 1, s++, 1);
-                    len += 1;
-                }
-            }
-            else
-            {
-                if (IsXdigit(*s))
-                {
-                    if (*s >= L'0' && *s <= L'9')
-                        value = (BYTE)(*s - L'0'); // first digit
-                    else
-                        value = (BYTE)(10 + (towlower(*s) - L'a'));
-                    s++;
-                    if (IsXdigit(*s)) // second digit
-                    {
-                        value <<= 4;
-                        if (*s >= L'0' && *s <= L'9')
-                            value |= (BYTE)(*s - '0');
-                        else
-                            value |= (BYTE)(10 + (towlower(*s) - L'a'));
-                        s++;
-                    }
-                    hex[len++] = value;
-                }
-                else
-                {
-                    if (*s == L'\0')
-                        break; // end of string
-                    else
-                        s++; // skip the space
-                }
-            }
-        }
-    }
 }
 
 BOOL ValidateHexString(LPWSTR text)
@@ -522,45 +283,53 @@ char* Replace(char* string, char s, char d)
     return string;
 }
 
-BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* buffer, BOOL save)
+BOOL ShowOpenFileDialog(HWND parent, const wchar_t* title, const wchar_t* filter,
+                        std::wstring& selectedPath, BOOL save)
 {
-    CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
-    OPENFILENAME ofn;
-    char buf[200];
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(buf, filter, 200);
-    Replace(buf, '\t', '\0');
-
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    CALL_STACK_MESSAGE4("ShowOpenFileDialog(, %ls, %ls, , %d)", title, filter, save);
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = parent;
-    ofn.lpstrFilter = buf;
-    DWORD attr = SG->SalGetFileAttributes(buffer);
-    if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
+    ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+
+    std::vector<wchar_t> packedFilter(filter, filter + wcslen(filter));
+    packedFilter.push_back(L'\0');
+    packedFilter.push_back(L'\0');
+    for (wchar_t& character : packedFilter)
+        if (character == L'\t')
+            character = L'\0';
+
+    std::wstring fileName;
+    std::wstring initialDirectory;
+    const DWORD attr = SG->SalGetFileAttributes(selectedPath.c_str());
+    if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
     {
-        fileName[0] = 0;
-        ofn.lpstrInitialDir = buffer;
+        initialDirectory = selectedPath;
+        ofn.lpstrInitialDir = initialDirectory.c_str();
     }
     else
-        lstrcpyn(fileName, buffer, fileName.Size());
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrTitle = title;
-    //ofn.lpfnHook = OFNHookProc;
-    ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
+        fileName = selectedPath;
 
-    BOOL ret;
+    ofn.lpstrFilter = packedFilter.data();
+    ofn.lpstrTitle = title;
+
+    BOOL ret = FALSE;
     if (save)
-        ret = SG->SafeGetSaveFileName(&ofn);
+        ret = SPLSafeGetSaveFileNameOwned(SG, &ofn, fileName);
     else
     {
         ofn.Flags |= OFN_FILEMUSTEXIST;
-        ret = SG->SafeGetOpenFileName(&ofn);
+        std::vector<std::wstring> fileNames;
+        fileNames.push_back(fileName);
+        ret = SPLSafeGetOpenFileNamesOwned(SG, &ofn, fileNames);
+        if (ret && fileNames.size() == 1)
+            fileName = std::move(fileNames[0]);
+        else if (ret)
+            ret = FALSE;
     }
-
     if (ret)
-        strcpy(buffer, fileName);
-
+        selectedPath = std::move(fileName);
     return ret;
 }
 
@@ -573,11 +342,11 @@ BOOL RemoveFSNameFromPath(LPWSTR path)
     {
         if (*iterator == L':')
         {
-            CPathBuffer fsName; // Heap-allocated for long path support
             if (iterator - path)
             {
-                int len = (int)WStrToStr(fsName, fsName.Size(), path, (int)(iterator - path));
-                if (len == (int)strlen(AssignedFSName) && SG->StrNICmp(fsName, AssignedFSName, len) == 0)
+                int len = (int)(iterator - path);
+                if (len == static_cast<int>(AssignedFSName.size()) &&
+                    SG->StrNICmp(path, AssignedFSName.c_str(), len) == 0)
                 {
                     memmove(path, iterator + 1, (wcslen(iterator + 1) + 1) * 2);
                     return TRUE;
@@ -593,83 +362,27 @@ BOOL RemoveFSNameFromPath(LPWSTR path)
     return TRUE;
 }
 
-BOOL DecStringToNumber(char* string, QWORD& qw)
+BOOL RemoveFSNameFromPath(std::wstring& path)
 {
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("DecStringToNumber(, )");
-    QWORD ret = 0;
-
-    // trim leading whitespace
-    while (isspace(*string))
-        string++;
-
-    if (*string == 0)
+    if (path.empty())
+        return RemoveFSNameFromPath(const_cast<LPWSTR>(L""));
+    if (!RemoveFSNameFromPath(path.data()))
         return FALSE;
-
-    while (isdigit(*string))
-    {
-        if (ret > (((QWORD)-1) - (*string - '0')) / 10)
-            return FALSE; // overflow
-        ret = ret * 10 + *string - '0';
-        string++;
-    }
-
-    // trim trailing whitespace
-    while (*string)
-    {
-        if (!isspace(*string))
-            return FALSE;
-        string++;
-    }
-
-    qw = ret;
+    // Re-sync the owner with the shortened C string the raw form just produced.
+    path.resize(wcslen(path.c_str()));
     return TRUE;
 }
 
-BOOL HexStringToNumber(char* string, QWORD& qw)
-{
-    CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("HexStringToNumber(, )");
-    QWORD ret = 0;
-
-    // trim leading whitespace
-    while (isspace(*string))
-        string++;
-
-    if (string[0] == 0)
-        return FALSE;
-
-    while (isxdigit(*string))
-    {
-        if (ret >
-            (((QWORD)-1) - (isdigit(*string) ? *string - '0' : tolower(*string) - 'a' + 10)) / 10)
-            return FALSE; // overflow
-        ret = (ret << 4) + (isdigit(*string) ? *string - '0' : tolower(*string) - 'a' + 10);
-        string++;
-    }
-
-    // trim trailing whitespace
-    while (*string)
-    {
-        if (!isspace(*string))
-            return FALSE;
-        string++;
-    }
-
-    qw = ret;
-    return TRUE;
-}
-
-char* ReplaceUnsafeCharacters(char* string)
+wchar_t* ReplaceUnsafeCharacters(wchar_t* string)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE1("ReplaceUnsafeCharacters()");
-    char* iterator = string;
+    wchar_t* iterator = string;
     while (*iterator)
     {
         if (*iterator > 0 && *iterator <= 31 ||
-            strchr("*?<>:\"/\\|", *iterator))
-            *iterator = '_';
+            wcschr(L"*?<>:\"/\\|", *iterator))
+            *iterator = L'_';
         iterator++;
     }
     return string;

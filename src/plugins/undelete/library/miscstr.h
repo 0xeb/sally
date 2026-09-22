@@ -15,6 +15,8 @@ inline void __TraceXEmptyFunction() {};
 #define TRACE_XW(x) TRACE_IW(x)
 #endif
 
+extern CSalamanderGeneralAbstract* SalamanderGeneral;
+
 // ***************************************************************************
 //
 //  Auxiliary functions
@@ -23,16 +25,7 @@ inline void __TraceXEmptyFunction() {};
 template <typename CHAR>
 class String
 {
-private:
-    static const unsigned short STRBUFSIZE;
-    static CHAR* StringBuffer;
-    static CHAR* StrAct;
-
 public:
-    // initialization
-    static BOOL InitStr();
-    static void ReleaseStr();
-
     // string functions
     static void SPrintF(CHAR* buffer, const CHAR* pattern, ...);
     static void VSPrintF(CHAR* buffer, const CHAR* pattern, va_list& marker);
@@ -50,7 +43,7 @@ public:
     static CHAR* CopyFromUnicode(CHAR* dest, const wchar_t* src, unsigned long srclen, unsigned long destlen);
     static wchar_t* CopyToUnicode(wchar_t* dest, const CHAR* src, unsigned long srclen, unsigned long destlen);
 
-    static CHAR* LoadStr(int resID);
+    static std::wstring LangStr(int resID);
     static CHAR* AddNumberSuffix(CHAR* filename, int n);
 
     static BOOL SysError(int title, int error, ...);
@@ -63,29 +56,6 @@ public:
 //
 //  Template methods implementation
 //
-
-template <typename CHAR>
-BOOL String<CHAR>::InitStr()
-{
-    if (!StringBuffer)
-    {
-        StringBuffer = new CHAR[STRBUFSIZE];
-        StrAct = StringBuffer;
-    }
-    if (!StringBuffer)
-    {
-        MessageBoxA(NULL, "Insufficient memory", "Undelete", MB_OK | MB_ICONWARNING);
-        return FALSE;
-    }
-    return TRUE;
-}
-
-template <typename CHAR>
-void String<CHAR>::ReleaseStr()
-{
-    delete[] StringBuffer;
-    StringBuffer = NULL;
-}
 
 template <typename CHAR>
 void String<CHAR>::SPrintF(CHAR* buffer, const CHAR* pattern, ...)

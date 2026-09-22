@@ -9,7 +9,8 @@
 #define PWALG_SIMPLE_FLAG 0xFF
 AnsiString EncryptPassword(AnsiString Password, AnsiString Key, Integer Algorithm = PWALG_SIMPLE);
 AnsiString DecryptPassword(AnsiString Password, AnsiString Key, Integer Algorithm = PWALG_SIMPLE);
-AnsiString SetExternalEncryptedPassword(AnsiString Password);
-bool GetExternalEncryptedPassword(AnsiString Encrypted, AnsiString & Password);
+AnsiString SetExternalEncryptedPassword(AnsiString Password, bool HasPasswordManagerSignature = false);
+bool GetExternalEncryptedPassword(AnsiString Encrypted, AnsiString & Password,
+                                  bool * HasPasswordManagerSignature = NULL);
 //---------------------------------------------------------------------------
 #endif

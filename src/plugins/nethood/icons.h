@@ -57,11 +57,16 @@ private:
 
     struct SHSTOCKICONINFO
     {
+        // Frozen Windows SDK structure layout for pre-Vista compilation only.
+        enum
+        {
+            PathCapacity = 260
+        };
         DWORD cbSize;
         HICON hIcon;
         int iSysImageIndex;
         int iIcon;
-        WCHAR szPath[MAX_PATH];
+        WCHAR szPath[PathCapacity];
     };
 
     enum _SHSTOCKICONFLAG
@@ -84,14 +89,14 @@ private:
         /// Identifier of the icon. If IS_INTRESOURCE(pszId) is true
         /// pszId is allocated dynamically and should be deleted when
         /// no longer needed.
-        PTSTR pszId;
+        PWSTR pszId;
     };
 
     /// This structure contains info for the icon loading.
     struct LOADICONINFO
     {
         /// Path to the file containing the icon.
-        PCTSTR pszFileName;
+        PCWSTR pszFileName;
 
         /// Index of the icon. Negative indices indicate icon
         /// identifiers.
@@ -161,15 +166,15 @@ private:
 
     static HICON ExtractLowColorSmallIcon(
         __in HMODULE hModule,
-        __in PCTSTR pszIconId);
+        __in PCWSTR pszIconId);
 
     static BOOL CALLBACK EnumIconResourceProc(
         __in HMODULE hModule,
-        __in PCTSTR pszType,
-        __in PTSTR pszName,
+        __in PCWSTR pszType,
+        __in PWSTR pszName,
         __in LONG_PTR lParam);
 
-    static PCTSTR IconIndexToIconId(__in HMODULE hModule, __in int iIcon);
+    static PCWSTR IconIndexToIconId(__in HMODULE hModule, __in int iIcon);
 
     static HICON FindBestLowColorSmallIcon(
         __in HMODULE hModule,
@@ -198,18 +203,18 @@ private:
 
     bool MyExtractIcon(
         __in Icon icon,
-        __in PCTSTR pszFileName,
+        __in PCWSTR pszFileName,
         __in int iIconIndex);
 
     static HICON LoadIconFromModule(
         __in HMODULE hModule,
-        __in PCTSTR pszIconId,
+        __in PCWSTR pszIconId,
         __in int nWidth,
         __in int nHeight,
         __in UINT uFlags);
 
     static HICON LoadIconFromFile(
-        __in PCTSTR pszFileName,
+        __in PCWSTR pszFileName,
         __in int nWidth,
         __in int nHeight,
         __in UINT uFlags);

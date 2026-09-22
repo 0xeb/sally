@@ -3,6 +3,65 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/Win32TextCodec.h"
+
+static bool BuildEncodingDescription(int encoding, int endian, BOOL performInputConversion,
+                                     const char* conversionTableName,
+                                     std::wstring& description) noexcept
+{
+    try
+    {
+        std::wstring staged;
+        switch (encoding)
+        {
+        case CTextFileReader::encUnknown:
+            staged = LangStr(IDS_ENCMENU_AUTO);
+            break;
+
+        case CTextFileReader::encASCII8:
+            staged = L"ASCII-8";
+            if (performInputConversion)
+            {
+                if (conversionTableName != nullptr && conversionTableName[0] != 0)
+                {
+                    std::wstring tableName;
+                    if (!DecodeFileCompLegacyText(conversionTableName,
+                                                  strlen(conversionTableName), tableName))
+                        tableName = L"?";
+                    staged += L", ";
+                    staged += tableName;
+                }
+                else
+                    staged += LangStr(IDS_AUTOINPUTENC);
+            }
+            else
+                staged += LangStr(IDS_NOINPUTENC);
+            break;
+
+        case CTextFileReader::encUTF8:
+            staged = L"UTF-8";
+            break;
+
+        case CTextFileReader::encUTF16:
+            staged = L"UTF-16";
+            if (endian == CTextFileReader::endianBig)
+                staged += L", big endian";
+            break;
+
+        case CTextFileReader::encUTF32:
+            staged = L"UTF-32";
+            if (endian == CTextFileReader::endianBig)
+                staged += L", big endian";
+            break;
+        }
+        description.swap(staged);
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
 
 bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file)
 {
@@ -53,7 +112,7 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
     CGUIMenuPopupAbstract* menuASCII8 = menu->GetSubMenu(idASCII8, FALSE);
 
     int index = 0;
-    const char* name;
+    const wchar_t* name;
     while (SG->EnumConversionTables(wnd, &index, &name, NULL))
     {
         MENU_ITEM_INFO mii;
@@ -63,8 +122,8 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = idFirstASCII8InputEnc + index - 1;
-            mii.String = (char*)name;
-            mii.StringLen = int(strlen(name));
+            mii.String = const_cast<wchar_t*>(name);
+            mii.StringLen = (int)wcslen(name);
         }
         else
         {
@@ -130,10 +189,21 @@ bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file
         options.Encoding[file] = CTextFileReader::encASCII8;
         options.PerformASCII8InputEnc[file] = 1;
         MENU_ITEM_INFO mii;
+        wchar_t selectedName[101];
+        selectedName[0] = 0;
         mii.Mask = MENU_MASK_STRING;
-        mii.String = options.ASCII8InputEncTableName[file];
-        mii.StringLen = sizeof(options.ASCII8InputEncTableName[file]);
+        mii.String = selectedName;
+        mii.StringLen = _countof(selectedName);
         menuASCII8->GetItemInfo(id, FALSE, &mii);
+        std::string encodedName;
+        if (!EncodeFileCompLegacyText(selectedName, wcslen(selectedName), encodedName) ||
+            encodedName.size() >= _countof(options.ASCII8InputEncTableName[file]))
+            options.ASCII8InputEncTableName[file][0] = 0;
+        else
+        {
+            memcpy(options.ASCII8InputEncTableName[file], encodedName.data(), encodedName.size());
+            options.ASCII8InputEncTableName[file][encodedName.size()] = 0;
+        }
     }
     }
 
@@ -249,7 +319,6 @@ void CAdvancedOptionsDialog::Transfer(CTransferInfo& ti)
 
 void CAdvancedOptionsDialog::UpdateEncodingInfo()
 {
-    char buffer[200];
     /*  bool forceText = 
     SendDlgItemMessage(HWindow, IDR_ALWAYSTEXT, BM_GETCHECK, 0, 0) == BST_CHECKED;
   bool forceBinary = 
@@ -258,52 +327,15 @@ void CAdvancedOptionsDialog::UpdateEncodingInfo()
     for (f = 0; f < 2; ++f)
     {
         /*    if (!forceText && !forceBinary)
-      strcpy(buffer, LoadStr(IDS_ENCMENU_AUTO));
+      wcscpy(buffer, LangStr(IDS_ENCMENU_AUTO).c_str());
     elif (forceBinary)
       buffer[0] = 0;
     else*/
-        {
-            switch (Options.Encoding[f])
-            {
-            case CTextFileReader::encUnknown:
-                strcpy(buffer, LoadStr(IDS_ENCMENU_AUTO));
-                break;
-
-            case CTextFileReader::encASCII8:
-                strcpy(buffer, "ASCII-8");
-                if (Options.PerformASCII8InputEnc[f])
-                {
-                    if (Options.ASCII8InputEncTableName[f][0])
-                    {
-                        strcat(buffer, ", ");
-                        strcat(buffer, Options.ASCII8InputEncTableName[f]);
-                    }
-                    else
-                        strcat(buffer, LoadStr(IDS_AUTOINPUTENC));
-                }
-                else
-                    strcat(buffer, LoadStr(IDS_NOINPUTENC));
-
-                break;
-
-            case CTextFileReader::encUTF8:
-                strcpy(buffer, "UTF-8");
-                break;
-
-            case CTextFileReader::encUTF16:
-                strcpy(buffer, "UTF-16");
-                if (Options.Endians[f] == CTextFileReader::endianBig)
-                    strcat(buffer, ", big endian");
-                break;
-
-            case CTextFileReader::encUTF32:
-                strcpy(buffer, "UTF-32");
-                if (Options.Endians[f] == CTextFileReader::endianBig)
-                    strcat(buffer, ", big endian");
-                break;
-            }
-        }
-        SetDlgItemText(HWindow, IDE_LEFTENC + f, buffer);
+        std::wstring description;
+        BuildEncodingDescription(Options.Encoding[f], Options.Endians[f],
+                                 Options.PerformASCII8InputEnc[f],
+                                 Options.ASCII8InputEncTableName[f], description);
+        SetDlgItemTextW(HWindow, IDE_LEFTENC + f, description.c_str());
     }
 }
 
@@ -447,50 +479,14 @@ void CPropPageDefaultOptions::Transfer(CTransferInfo& ti)
 
 void CPropPageDefaultOptions::UpdateEncodingInfo()
 {
-    char buffer[200];
     int f;
     for (f = 0; f < 2; ++f)
     {
-        switch (Options.Encoding[f])
-        {
-        case CTextFileReader::encUnknown:
-            strcpy(buffer, LoadStr(IDS_ENCMENU_AUTO));
-            break;
-
-        case CTextFileReader::encASCII8:
-            strcpy(buffer, "ASCII-8");
-            if (Options.PerformASCII8InputEnc[f])
-            {
-                if (Options.ASCII8InputEncTableName[f][0])
-                {
-                    strcat(buffer, ", ");
-                    strcat(buffer, Options.ASCII8InputEncTableName[f]);
-                }
-                else
-                    strcat(buffer, LoadStr(IDS_AUTOINPUTENC));
-            }
-            else
-                strcat(buffer, LoadStr(IDS_NOINPUTENC));
-
-            break;
-
-        case CTextFileReader::encUTF8:
-            strcpy(buffer, "UTF-8");
-            break;
-
-        case CTextFileReader::encUTF16:
-            strcpy(buffer, "UTF-16");
-            if (Options.Endians[f] == CTextFileReader::endianBig)
-                strcat(buffer, ", big endian");
-            break;
-
-        case CTextFileReader::encUTF32:
-            strcpy(buffer, "UTF-32");
-            if (Options.Endians[f] == CTextFileReader::endianBig)
-                strcat(buffer, ", big endian");
-            break;
-        }
-        SetDlgItemText(HWindow, IDE_LEFTENC + f, buffer);
+        std::wstring description;
+        BuildEncodingDescription(Options.Encoding[f], Options.Endians[f],
+                                 Options.PerformASCII8InputEnc[f],
+                                 Options.ASCII8InputEncTableName[f], description);
+        SetDlgItemTextW(HWindow, IDE_LEFTENC + f, description.c_str());
     }
 }
 

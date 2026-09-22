@@ -36,12 +36,12 @@ class CSalamanderBuildMenuAbstract
 public:
     // icons are specified using the CSalamanderBuildMenuAbstract::SetIconListForMenu method, for the rest
     // of the description see CSalamanderConnectAbstract::AddMenuItem
-    virtual void WINAPI AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
+    virtual void WINAPI AddMenuItem(int iconIndex, const wchar_t* name, DWORD hotKey, int id, BOOL callGetState, // wide name; DEBT, see CSalamanderConnectAbstract::AddMenuItem's note
                                     DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
     // icons are specified using the CSalamanderBuildMenuAbstract::SetIconListForMenu method, for the rest
     // of the description see CSalamanderConnectAbstract::AddSubmenuStart
-    virtual void WINAPI AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
+    virtual void WINAPI AddSubmenuStart(int iconIndex, const wchar_t* name, int id, BOOL callGetState, // wide name; DEBT, see AddMenuItem above
                                         DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
     // for description see CSalamanderConnectAbstract::AddSubmenuEnd

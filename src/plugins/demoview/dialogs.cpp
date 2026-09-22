@@ -157,7 +157,7 @@ int CALLBACK CenterCallback(HWND HWindow, UINT uMsg, LPARAM lParam)
 }
 
 CConfigDialog::CConfigDialog(HWND parent)
-    : CPropertyDialog(parent, HLanguage, LoadStr(IDS_CFG_TITLE),
+    : CPropertyDialog(parent, HLanguage, LoadStr(IDS_CFG_TITLE).c_str(),
                       LastCfgPage, PSH_USECALLBACK | PSH_NOAPPLYNOW | PSH_HASHELP,
                       NULL, &LastCfgPage, CenterCallback)
 {

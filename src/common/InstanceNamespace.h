@@ -14,5 +14,9 @@ std::string SanitizeInstanceIdForObjectName(const std::string& instanceId);
 std::string GetInstanceIdFromEnvironment(IEnvironment* environment = nullptr);
 std::string BuildSharedObjectName(const char* baseName, const std::string& instanceId);
 std::string BuildSharedObjectNameForCurrentInstance(const char* baseName);
+// Named Win32 object identifiers are an ASCII compatibility protocol shared with helper
+// processes and shell components. This adapter validates that domain and produces dynamic UTF-16
+// for W APIs without consulting a process code page.
+bool WidenSharedObjectName(const std::string& name, std::wstring& wideName) noexcept;
 bool IsInstanceIsolationEnabled(IEnvironment* environment = nullptr);
 }

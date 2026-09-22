@@ -17,6 +17,9 @@
 #include "globals.h"
 #include "fx.h"
 
+#include <string>
+#include <vector>
+
 extern "C" CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(_In_::CSalamanderPluginEntryAbstract* salamander);
 
 namespace Fx
@@ -52,11 +55,20 @@ namespace Fx
 
         virtual bool WINAPI IsRooted() const = 0;
 
-        virtual bool WINAPI CutLastComponent(PTSTR lastComponent, int lastComponentMaxSize) = 0;
+        virtual bool WINAPI CutLastComponent(wchar_t* lastComponent, int lastComponentMaxSize) = 0;
 
         bool WINAPI CutLastComponent()
         {
             return CutLastComponent(nullptr, 0);
+        }
+
+        bool WINAPI CutLastComponent(std::wstring& lastComponent)
+        {
+            std::vector<wchar_t> buffer(static_cast<size_t>(GetLength()) + 1, L'\0');
+            if (!CutLastComponent(buffer.data(), static_cast<int>(buffer.size())))
+                return false;
+            lastComponent.assign(buffer.data());
+            return true;
         }
 
         virtual bool WINAPI GetNextPathComponent(_Inout_ CFxPathComponentToken& token) = 0;
@@ -109,7 +121,7 @@ namespace Fx
 
             if (m_path->EqualsLen(component, m_path->GetString() + m_tokenStart, m_tokenLength))
             {
-                return component[m_tokenLength] == TEXT('\0');
+                return component[m_tokenLength] == L'\0';
             }
 
             return false;
@@ -219,8 +231,11 @@ namespace Fx
                 // SalRemovePointsFromPath removes . and .. components.
                 // The method wants pointer *after* the root.
                 int skip = startsWithRoot ? TTraits::RootPathLen : 0;
-                BOOL removedOk = SalamanderGeneral->SalRemovePointsFromPath(GetBuffer() + skip);
-                ReleaseBuffer();
+                std::wstring path(GetString(), GetLength());
+                BOOL removedOk = SPLSalRemovePointsFromPathOwned(
+                    SalamanderGeneral, path, static_cast<size_t>(skip));
+                if (removedOk)
+                    SetString(path.c_str());
                 if (!removedOk)
                 {
                     return FX_E_BAD_PATHNAME;
@@ -283,7 +298,7 @@ namespace Fx
             }
         }
 
-        virtual bool WINAPI CutLastComponent(PTSTR lastComponent, int lastComponentMaxSize) override
+        virtual bool WINAPI CutLastComponent(wchar_t* lastComponent, int lastComponentMaxSize) override
         {
             ExcludeTrailingSeparator();
 
@@ -302,7 +317,7 @@ namespace Fx
 
             if (lastComponent != nullptr)
             {
-                StringCchCopy(lastComponent, lastComponentMaxSize, GetString() + lastSep + 1);
+                StringCchCopyW(lastComponent, lastComponentMaxSize, GetString() + lastSep + 1);
             }
 
             if (lastSep == 0)
@@ -374,11 +389,11 @@ namespace Fx
 
             if (TTraits::CaseSensitive)
             {
-                res = StrCmpN(path1, path2, len);
+                res = StrCmpNW(path1, path2, len);
             }
             else
             {
-                res = StrCmpNI(path1, path2, len);
+                res = StrCmpNIW(path1, path2, len);
             }
 
             return res == 0;
@@ -421,9 +436,9 @@ namespace Fx
     public:
         virtual ~CFxPluginInterfaceForFS();
 
-        virtual PCTSTR WINAPI GetSuggestedFSName() const = 0;
+        virtual PCWSTR WINAPI GetSuggestedFSName() const = 0;
 
-        virtual PCTSTR WINAPI GetAssignedFSName() const = 0;
+        virtual PCWSTR WINAPI GetAssignedFSName() const = 0;
 
         CFxPluginInterface& GetOwner()
         {
@@ -440,7 +455,7 @@ namespace Fx
             int x,
             int y,
             CPluginFSInterfaceAbstract* pluginFS,
-            const char* pluginFSName,
+            const wchar_t* pluginFSName,
             int pluginFSNameIndex,
             BOOL isDetachedFS,
             BOOL& refreshMenu,
@@ -453,7 +468,7 @@ namespace Fx
         virtual void WINAPI ExecuteOnFS(
             int panel,
             CPluginFSInterfaceAbstract* pluginFS,
-            const char* pluginFSName,
+            const wchar_t* pluginFSName,
             int pluginFSNameIndex,
             CFileData& file,
             int isDir) override;
@@ -463,20 +478,20 @@ namespace Fx
             BOOL isInPanel,
             int panel,
             CPluginFSInterfaceAbstract* pluginFS,
-            const char* pluginFSName,
+            const wchar_t* pluginFSName,
             int pluginFSNameIndex) override;
 
-        virtual void WINAPI ConvertPathToInternal(
-            const char* fsName,
+        virtual BOOL WINAPI ConvertPathToInternal(
+            const wchar_t* fsName,
             int fsNameIndex,
-            char* fsUserPart) override;
+            CSalamanderStringBuffer* fsUserPart) override;
 
-        virtual void WINAPI ConvertPathToExternal(
-            const char* fsName,
+        virtual BOOL WINAPI ConvertPathToExternal(
+            const wchar_t* fsName,
             int fsNameIndex,
-            char* fsUserPart) override;
+            CSalamanderStringBuffer* fsUserPart) override;
 
-        virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server, const char* share) override;
+        virtual void WINAPI EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share) override;
     };
 
     template <class TFS>
@@ -500,7 +515,7 @@ namespace Fx
             TPluginFSInterface::RetrieveAssignedName();
         }
 
-        virtual CPluginFSInterfaceAbstract* WINAPI CreateFS(const char* fsName, int fsNameIndex)
+        virtual CPluginFSInterfaceAbstract* WINAPI CreateFS(const wchar_t* fsName, int fsNameIndex)
         {
             UNREFERENCED_PARAMETER(fsName);
             UNREFERENCED_PARAMETER(fsNameIndex);
@@ -513,19 +528,19 @@ namespace Fx
             _ASSERTE(m_cActiveFS == 0);
         }
 
-        virtual PCTSTR WINAPI GetSuggestedFSName() const override
+        virtual PCWSTR WINAPI GetSuggestedFSName() const override
         {
             return TPluginFSInterface::SUGGESTED_NAME;
         }
 
-        virtual PCTSTR WINAPI GetAssignedFSName() const override
+        virtual PCWSTR WINAPI GetAssignedFSName() const override
         {
             return TPluginFSInterface::GetAssignedName();
         }
 
         /* CPluginInterfaceForFSAbstract */
 
-        virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const char* fsName, int fsNameIndex) override
+        virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(const wchar_t* fsName, int fsNameIndex) override
         {
             auto tfs = CreateFS(fsName, fsNameIndex);
             ++m_cActiveFS;
@@ -564,8 +579,8 @@ namespace Fx
 
         CFxPluginFSInterface(CFxPluginInterfaceForFS& owner);
 
-        void WINAPI ShowChangePathError(PCTSTR path, HRESULT hr);
-        void WINAPI ShowChangePathError(PCTSTR path, PCTSTR error);
+        void WINAPI ShowChangePathError(PCWSTR path, HRESULT hr);
+        void WINAPI ShowChangePathError(PCWSTR path, PCWSTR error);
 
         void WINAPI SetCurrentPath(CFxPath* path);
         void WINAPI SetCurrentPathEnumerator(CFxItemEnumerator* enumerator);
@@ -586,7 +601,7 @@ namespace Fx
             return m_calledFromDisconnectDialog;
         }
 
-        void WINAPI ChangeDirectory(PCTSTR newPath, PCTSTR focusedName = nullptr);
+        void WINAPI ChangeDirectory(PCWSTR newPath, PCWSTR focusedName = nullptr);
 
         /* Overridables */
 
@@ -626,20 +641,22 @@ namespace Fx
 
         /* CPluginFSInterfaceAbstract */
 
-        virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart) override;
+        virtual BOOL WINAPI IsCurrentPath(int currentFSNameIndex, int fsNameIndex,
+                                          const wchar_t* userPart) override;
 
-        virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart) override;
+        virtual BOOL WINAPI IsOurPath(int currentFSNameIndex, int fsNameIndex,
+                                      const wchar_t* userPart) override;
 
-        virtual BOOL WINAPI GetRootPath(char* userPart) override;
+        virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart) override;
 
-        virtual BOOL WINAPI GetCurrentPath(char* userPart) override;
+        virtual BOOL WINAPI GetCurrentPath(CSalamanderStringBuffer* userPart) override;
 
         virtual BOOL WINAPI ChangePath(
             int currentFSNameIndex,
-            char* fsName,
+            CSalamanderStringBuffer* fsName,
             int fsNameIndex,
-            const char* userPart,
-            char* cutFileName,
+            const wchar_t* userPart,
+            CSalamanderStringBuffer* cutFileName,
             BOOL* pathWasCut,
             BOOL forceRefresh,
             int mode) override;
@@ -652,13 +669,13 @@ namespace Fx
 
         virtual HICON WINAPI GetFSIcon(BOOL& destroyIcon) override;
 
-        virtual BOOL WINAPI GetFullName(CFileData& file, int isDir, char* buf, int bufSize) override;
+        virtual BOOL WINAPI GetFullName(CFileData& file, int isDir,
+                                        CSalamanderStringBuffer* fullName) override;
 
         virtual BOOL WINAPI GetFullFSPath(
             HWND parent,
-            const char* fsName,
-            char* path,
-            int pathSize,
+            const wchar_t* fsName,
+            CSalamanderStringBuffer* path,
             BOOL& success) override;
 
         virtual BOOL WINAPI TryCloseOrDetach(BOOL forceClose, BOOL canDetach, BOOL& detach, int reason) override;
@@ -668,59 +685,59 @@ namespace Fx
         virtual void WINAPI ReleaseObject(HWND parent) override;
 
         virtual BOOL WINAPI GetChangeDriveOrDisconnectItem(
-            const char* fsName,
-            char*& title,
+            const wchar_t* fsName,
+            wchar_t*& title,
             HICON& icon,
             BOOL& destroyIcon) override;
 
         virtual void WINAPI GetDropEffect(
-            const char* srcFSPath,
-            const char* tgtFSPath,
+            const wchar_t* srcFSPath,
+            const wchar_t* tgtFSPath,
             DWORD allowedEffects,
             DWORD keyState,
             DWORD* dropEffect) override;
 
         virtual void WINAPI GetFSFreeSpace(CQuadWord* retValue) override;
 
-        virtual BOOL WINAPI GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset) override;
+        virtual BOOL WINAPI GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset) override;
 
-        virtual void WINAPI CompleteDirectoryLineHotPath(char* path, int pathBufSize) override;
+        virtual BOOL WINAPI CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path) override;
 
-        virtual BOOL WINAPI GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize) override;
+        virtual BOOL WINAPI GetPathForMainWindowTitle(const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf) override;
 
-        virtual void WINAPI ShowInfoDialog(const char* fsName, HWND parent) override;
+        virtual void WINAPI ShowInfoDialog(const wchar_t* fsName, HWND parent) override;
 
-        virtual BOOL WINAPI ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo) override;
+        virtual BOOL WINAPI ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo) override;
 
         virtual BOOL WINAPI QuickRename(
-            const char* fsName,
+            const wchar_t* fsName,
             int mode,
             HWND parent,
             CFileData& file,
             BOOL isDir,
-            char* newName,
+            CSalamanderStringBuffer* newName,
             BOOL& cancel) override;
 
         virtual void WINAPI AcceptChangeOnPathNotification(
-            const char* fsName,
-            const char* path,
+            const wchar_t* fsName,
+            const wchar_t* path,
             BOOL includingSubdirs) override;
 
         virtual BOOL WINAPI CreateDir(
-            const char* fsName,
+            const wchar_t* fsName,
             int mode,
             HWND parent,
-            char* newName,
+            CSalamanderStringBuffer* newName,
             BOOL& cancel) override;
 
         virtual void WINAPI ViewFile(
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
             CSalamanderForViewFileOnFSAbstract* salamander,
             CFileData& file) override;
 
         virtual BOOL WINAPI Delete(
-            const char* fsName,
+            const wchar_t* fsName,
             int mode,
             HWND parent,
             int panel,
@@ -731,12 +748,12 @@ namespace Fx
         virtual BOOL WINAPI CopyOrMoveFromFS(
             BOOL copy,
             int mode,
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
             int panel,
             int selectedFiles,
             int selectedDirs,
-            char* targetPath,
+            CSalamanderStringBuffer* targetPath,
             BOOL& operationMask,
             BOOL& cancelOrHandlePath,
             HWND dropTarget) override;
@@ -744,32 +761,32 @@ namespace Fx
         virtual BOOL WINAPI CopyOrMoveFromDiskToFS(
             BOOL copy,
             int mode,
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
-            const char* sourcePath,
+            const wchar_t* sourcePath,
             SalEnumSelection2 next,
             void* nextParam,
             int sourceFiles,
             int sourceDirs,
-            char* targetPath,
+            CSalamanderStringBuffer* targetPath,
             BOOL* invalidPathOrCancel) override;
 
         virtual BOOL WINAPI ChangeAttributes(
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
             int panel,
             int selectedFiles,
             int selectedDirs) override;
 
         virtual void WINAPI ShowProperties(
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
             int panel,
             int selectedFiles,
             int selectedDirs) override;
 
         virtual void WINAPI ContextMenu(
-            const char* fsName,
+            const wchar_t* fsName,
             HWND parent,
             int menuX,
             int menuY,
@@ -784,13 +801,13 @@ namespace Fx
             LPARAM lParam,
             LRESULT* plResult) override;
 
-        virtual BOOL WINAPI OpenFindDialog(const char* fsName, int panel) override;
+        virtual BOOL WINAPI OpenFindDialog(const wchar_t* fsName, int panel) override;
 
-        virtual void WINAPI OpenActiveFolder(const char* fsName, HWND parent) override;
+        virtual void WINAPI OpenActiveFolder(const wchar_t* fsName, HWND parent) override;
 
-        virtual void WINAPI GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects) override;
+        virtual void WINAPI GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects) override;
 
-        virtual BOOL WINAPI GetNoItemsInPanelText(char* textBuf, int textBufSize) override;
+        virtual BOOL WINAPI GetNoItemsInPanelText(CSalamanderStringBuffer* textBuf) override;
 
         virtual void WINAPI ShowSecurityInfo(HWND parent) override;
     };
@@ -813,7 +830,7 @@ namespace Fx
         virtual void WINAPI SetupView(
             BOOL leftPanel,
             CSalamanderViewAbstract* view,
-            const char* archivePath,
+            const wchar_t* archivePath,
             const CFileData* upperDir) override;
     };
 
@@ -825,14 +842,12 @@ namespace Fx
 		Name of the filesystem assigned to us by Salamander
 		(need not to be the same as suggested name).
 	*/
-        static TCHAR s_szAssignedFSName[MAX_PATH];
-        static unsigned s_cchAssignedFSName;
+        static std::wstring s_assignedFSName;
 
         static void RetrieveAssignedName()
         {
             _ASSERTE(SalamanderGeneral != nullptr);
-            SalamanderGeneral->GetPluginFSName(s_szAssignedFSName, 0);
-            s_cchAssignedFSName = static_cast<unsigned>(_tcslen(s_szAssignedFSName));
+            s_assignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
         }
 
         friend class TFxPluginInterfaceForFS<TFS>;
@@ -855,9 +870,9 @@ namespace Fx
         {
         }
 
-        static PCSTR GetAssignedName()
+        static PCWSTR GetAssignedName()
         {
-            return s_szAssignedFSName;
+            return s_assignedFSName.c_str();
         }
 
         /* CPluginFSInterfaceAbstract */
@@ -868,17 +883,15 @@ namespace Fx
                    FS_SERVICE_GETFSICON; // GetFSIcon provided by the framework
         }
 
-        virtual BOOL WINAPI GetRootPath(char* userPart) override
+        virtual BOOL WINAPI GetRootPath(CSalamanderStringBuffer* userPart) override
         {
-            StringCchCopy(userPart, MAX_PATH, TPath::TTraits::RootPath);
-            return TRUE;
+            return userPart != nullptr &&
+                   sally::plugin_abi::WriteStringBuffer(
+                       *userPart, std::wstring(TPath::TTraits::RootPath));
         }
     };
 
     template <typename TFS, typename TPath = CFxStandardPath>
-    TCHAR TFxPluginFSInterface<TFS, TPath>::s_szAssignedFSName[MAX_PATH];
-
-    template <typename TFS, typename TPath = CFxStandardPath>
-    unsigned TFxPluginFSInterface<TFS, TPath>::s_cchAssignedFSName;
+    std::wstring TFxPluginFSInterface<TFS, TPath>::s_assignedFSName;
 
 }; // namespace Fx

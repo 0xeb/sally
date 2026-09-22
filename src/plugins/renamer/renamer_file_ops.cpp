@@ -4,16 +4,16 @@
 
 #include "precomp.h"
 
-BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
+BOOL CRenamerDialog::MoveFile(const wchar_t* sourceName, const wchar_t* targetName, const wchar_t* newPart,
                               BOOL overwrite, BOOL isDir, BOOL& skip)
 {
     CALL_STACK_MESSAGE4("CRenamerDialog::MoveFile(, , , %d, %d, %d)", overwrite,
                         isDir, skip);
     // create the path
-    CPathBuffer dir; // Heap-allocated for long path support
-    lstrcpyn(dir, targetName, dir.Size());
-    SG->CutDirectory(dir);
-    if (!CheckAndCreateDirectory(dir, dir + (newPart - targetName), skip))
+    std::wstring dir = targetName;
+    CutRenamerPath(dir);
+    const size_t newPartOffset = (std::min)(static_cast<size_t>(newPart - targetName), dir.size());
+    if (!CheckAndCreateDirectory(std::move(dir), newPartOffset, skip))
         return FALSE;
 
     // perform the move
@@ -23,9 +23,8 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
         {
             DWORD err = 0;
             if (SG->StrICmp(sourceName, targetName) == 0 &&
-                    strcmp(
-                        SG->SalPathFindFileName(sourceName),
-                        SG->SalPathFindFileName(targetName)) == 0 ||
+                    wcscmp(SG->SalPathFindFileName(sourceName),
+                           SG->SalPathFindFileName(targetName)) == 0 ||
                 SG->SalMoveFile(sourceName, targetName, &err))
                 return TRUE; // success
 
@@ -48,7 +47,7 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
                 SG->ClearReadOnlyAttr(targetName); // so it can be deleted ...
                 while (1)
                 {
-                    if (DeleteFile(targetName))
+                    if (DeleteFileW(targetName))
                         break;
 
                     if (!FileError(HWindow, targetName, IDS_OVERWRITEERROR,
@@ -77,7 +76,7 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
         SG->ClearReadOnlyAttr(sourceName); // so it can be deleted ...
         while (1)
         {
-            if (DeleteFile(sourceName))
+            if (DeleteFileW(sourceName))
                 break;
 
             if (!FileError(HWindow, sourceName, IDS_DELETEERROR,
@@ -88,58 +87,46 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
     }
 }
 
-BOOL CRenamerDialog::CheckAndCreateDirectory(char* directory, char* newPart, BOOL& skip)
+BOOL CRenamerDialog::CheckAndCreateDirectory(std::wstring directory, size_t newPartOffset, BOOL& skip)
 {
     CALL_STACK_MESSAGE2("CRenamerDialog::CheckAndCreateDirectory(, , %d)", skip);
-    WIN32_FIND_DATA fd;
+    WIN32_FIND_DATAW fd;
     HANDLE f;
-    char* directoryEnd = directory + strlen(directory);
+    wchar_t* const directoryBegin = directory.data();
+    wchar_t* directoryEnd = directoryBegin + directory.size();
 
-    // skip drives
-    char *start = directory, *end;
-    if (start[0] == '\\' && start[1] == '\\') // UNC
-    {
-        start += 2;
-        while (*start != 0 && *start != '\\')
-            start++;
-        if (*start != 0)
-            start++; // '\\'
-        while (*start != 0 && *start != '\\')
-            start++;
-        start++;
-    }
-    else
-        start += 3;
-
-    start = max(start, newPart);
+    // Skip the immutable drive/UNC root without ever indexing or forming a pointer past a
+    // short, empty, or relative path.
+    const size_t startOffset = (std::max)(RenamerPathRootLength(directory),
+                                          (std::min)(newPartOffset, directory.size()));
+    wchar_t *start = directoryBegin + startOffset, *end;
 
     // existing part
     while (start < directoryEnd)
     {
-        end = (char*)GetNextPathComponent(start);
+        end = const_cast<wchar_t*>(GetNextPathComponent(start));
         *end = 0;
-        f = FindFirstFile(directory, &fd);
+        f = FindFirstFileW(directoryBegin, &fd);
         if (f == INVALID_HANDLE_VALUE)
             goto CREATE_PATH;
         else
         {
             FindClose(f);
             // adjust the case of the name
-            if (strcmp(start, fd.cFileName))
+            if (wcscmp(start, fd.cFileName))
             {
-                CPathBuffer old; // Heap-allocated for long path support
-                memcpy(old.Get(), directory, start - directory);
-                lstrcpyn(old.Get() + (start - directory), fd.cFileName, old.Size() - (int)(start - directory));
+                std::wstring old(directoryBegin, start);
+                old.append(fd.cFileName);
                 while (1)
                 {
-                    if (SG->SalMoveFile(old, directory, NULL))
+                    if (SG->SalMoveFile(old.c_str(), directoryBegin, NULL))
                     {
                         if (!Undoing)
-                            UndoStack.Add(new CUndoStackEntry(directory, old, NULL, FALSE, FALSE));
+                            UndoStack.Add(new CUndoStackEntry(directoryBegin, old.data(), NULL, FALSE, FALSE));
                         break;
                     }
 
-                    if (!FileError(HWindow, old, IDS_DIRCASEERROR,
+                    if (!FileError(HWindow, old.c_str(), IDS_DIRCASEERROR,
                                    TRUE, &skip, &SkipAllDirChangeCase, IDS_ERROR))
                     {
                         if (!skip)
@@ -149,36 +136,36 @@ BOOL CRenamerDialog::CheckAndCreateDirectory(char* directory, char* newPart, BOO
                 }
             }
         }
-        *end = '\\';
+        *end = L'\\';
         start = end + 1;
     }
     // non-existing part
     while (start < directoryEnd)
     {
-        end = (char*)GetNextPathComponent(start);
+        end = const_cast<wchar_t*>(GetNextPathComponent(start));
         *end = 0;
     CREATE_PATH:
 
         while (1)
         {
-            if (CreateDirectory(directory, NULL))
+            if (CreateDirectoryW(directoryBegin, NULL))
             {
                 if (!Undoing)
-                    UndoStack.Add(new CUndoStackEntry(directory, NULL, NULL, FALSE, FALSE));
+                    UndoStack.Add(new CUndoStackEntry(directoryBegin, NULL, NULL, FALSE, FALSE));
                 break;
             }
 
-            if (!FileError(HWindow, directory, IDS_CREATEDIR,
+            if (!FileError(HWindow, directoryBegin, IDS_CREATEDIR,
                            TRUE, &skip, &SkipAllCreateDir, IDS_ERROR))
                 return FALSE;
         }
-        *end = '\\';
+        *end = L'\\';
         start = end + 1;
     }
     return TRUE;
 }
 
-BOOL CRenamerDialog::CopyFile(char* sourceName, char* targetName, BOOL overwrite,
+BOOL CRenamerDialog::CopyFile(const wchar_t* sourceName, const wchar_t* targetName, BOOL overwrite,
                               BOOL& skip)
 {
     CALL_STACK_MESSAGE3("CRenamerDialog::CopyFile(, , %d, %d)", overwrite, skip);
@@ -193,7 +180,7 @@ COPY_AGAIN:
 
     while (1)
     {
-        in = CreateFile(sourceName, GENERIC_READ,
+        in = CreateFileW(sourceName, GENERIC_READ,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (in != INVALID_HANDLE_VALUE)
@@ -201,7 +188,7 @@ COPY_AGAIN:
             HANDLE out;
             while (1)
             {
-                out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                out = CreateFileW(targetName, GENERIC_WRITE, 0, NULL,
                                  CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                 if (out != INVALID_HANDLE_VALUE)
                 {
@@ -231,14 +218,14 @@ COPY_AGAIN:
                                             CloseHandle(in);
                                         if (out != NULL)
                                             CloseHandle(out);
-                                        DeleteFile(targetName);
+                                        DeleteFileW(targetName);
                                         return FALSE;
                                     }
 
                                     // retry
                                     if (out != NULL)
                                         CloseHandle(out); // close the invalid handle
-                                    out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                                    out = CreateFileW(targetName, GENERIC_WRITE, 0, NULL,
                                                      OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                     if (out != INVALID_HANDLE_VALUE) // opened, now set the offset
                                     {
@@ -249,7 +236,7 @@ COPY_AGAIN:
                                         { // cannot get the size or the file is too small, start over
                                             CloseHandle(in);
                                             CloseHandle(out);
-                                            DeleteFile(targetName);
+                                            DeleteFileW(targetName);
                                             goto COPY_AGAIN;
                                         }
                                         else // success (the file is large enough), set the offset
@@ -264,7 +251,7 @@ COPY_AGAIN:
                                             { // cannot set the offset, start over
                                                 CloseHandle(in);
                                                 CloseHandle(out);
-                                                DeleteFile(targetName);
+                                                DeleteFileW(targetName);
                                                 goto COPY_AGAIN;
                                             }
                                             break;
@@ -290,13 +277,13 @@ COPY_AGAIN:
                                         CloseHandle(in);
                                     if (out != NULL)
                                         CloseHandle(out);
-                                    DeleteFile(targetName);
+                                    DeleteFileW(targetName);
                                     return FALSE;
                                 }
 
                                 if (in != NULL)
                                     CloseHandle(in); // close the invalid handle
-                                in = CreateFile(sourceName, GENERIC_READ,
+                                in = CreateFileW(sourceName, GENERIC_READ,
                                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                 if (in != INVALID_HANDLE_VALUE) // opened, now set the offset
@@ -308,7 +295,7 @@ COPY_AGAIN:
                                     { // cannot get the size or the file is too small, start over
                                         CloseHandle(in);
                                         CloseHandle(out);
-                                        DeleteFile(targetName);
+                                        DeleteFileW(targetName);
                                         goto COPY_AGAIN;
                                     }
                                     else // success (the file is large enough), set the offset
@@ -323,7 +310,7 @@ COPY_AGAIN:
                                         { // cannot set the offset, start over
                                             CloseHandle(in);
                                             CloseHandle(out);
-                                            DeleteFile(targetName);
+                                        DeleteFileW(targetName);
                                             goto COPY_AGAIN;
                                         }
                                         break;
@@ -347,7 +334,7 @@ COPY_AGAIN:
                     DWORD attr;
                     attr = SG->SalGetFileAttributes(sourceName);
                     if (attr != -1)
-                        SetFileAttributes(targetName, attr | FILE_ATTRIBUTE_ARCHIVE);
+                        SetFileAttributesW(targetName, attr | FILE_ATTRIBUTE_ARCHIVE);
                     return TRUE;
                 }
                 else
@@ -370,10 +357,10 @@ COPY_AGAIN:
                         if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
                         {
                             readonly = TRUE;
-                            SetFileAttributes(targetName, attr & (~FILE_ATTRIBUTE_READONLY));
+                            SetFileAttributesW(targetName, attr & (~FILE_ATTRIBUTE_READONLY));
                         }
 
-                        out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                        out = CreateFileW(targetName, GENERIC_WRITE, 0, NULL,
                                          OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 
                         if (out != INVALID_HANDLE_VALUE)
@@ -388,7 +375,7 @@ COPY_AGAIN:
                         {
                             err = GetLastError();
                             if (readonly)
-                                SetFileAttributes(targetName, attr);
+                                SetFileAttributesW(targetName, attr);
                             goto NORMAL_ERROR;
                         }
                     }

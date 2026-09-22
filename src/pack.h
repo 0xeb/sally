@@ -14,13 +14,12 @@
 // we have to do it ourselves
 #define DOS_MAX_PATH 80
 // maximum possible command line length
-#define PACK_CMDLINE_MAXLEN (MAX_PATH * 4)
 // at what value do custom errors of salspawn.exe start
 #define SPAWN_ERR_BASE 10000
 // program for running 16-bit archivers (the -c parameter must match SPAWN_ERR_BASE)
-extern const char* SPAWN_EXE_PARAMS;
+extern const wchar_t* SPAWN_EXE_PARAMS;
 // name of the salspawn program
-extern const char* SPAWN_EXE_NAME;
+extern const wchar_t* SPAWN_EXE_NAME;
 
 // indexes of individual packers in the ArchiverConfig array
 #define PACKJAR32INDEX 0
@@ -52,10 +51,10 @@ enum EPackExeType
 // structure for holding the path to the packer
 struct SPackLocation
 {
-    const char* Variable;
-    const char* Executable;
+    const wchar_t* Variable;
+    const wchar_t* Executable;
     EPackExeType Type;
-    const char* Value;
+    const wchar_t* Value;
     BOOL Valid;
 };
 
@@ -63,7 +62,7 @@ struct SPackLocation
 class CPackACFound
 {
 public:
-    std::string FullName; // name of the found program including the path
+    std::wstring FullName; // name of the found program including the path
     CQuadWord Size;       // size
     FILETIME LastWrite;   // date
     BOOL Selected;
@@ -75,11 +74,11 @@ public:
     ~CPackACFound()
     {
     }
-    BOOL Set(const char* fullName, const CQuadWord& size, FILETIME lastWrite);
+    BOOL Set(const wchar_t* fullName, const CQuadWord& size, FILETIME lastWrite);
     void InvertSelect() { Selected = !Selected; }
     void Select(BOOL newSelect) { Selected = newSelect; }
     BOOL IsSelected() { return Selected; }
-    const char* GetText(int column);
+    const wchar_t* GetText(int column);
 };
 
 // array of found packers
@@ -89,7 +88,7 @@ public:
     CPackACArray(int base, int delta, CDeleteType dt = dtDelete) : TIndirectArray<CPackACFound>(base, delta, dt) {}
     int AddAndCheck(CPackACFound* member);
     void InvertSelect(int index);
-    const char* GetSelectedFullName();
+    const wchar_t* GetSelectedFullName();
 };
 
 enum EPackPackerType
@@ -106,17 +105,17 @@ protected:
     // source of data
     int Index;                // index into the ArchiversConfig array
     EPackPackerType Unpacker; // is it a packer, an unpacker or both?
-    const char* Title;        // title describing the packer
+    const wchar_t* Title;        // title describing the packer
     // what we want to find
-    const char* Name;  // program name to search for
+    const wchar_t* Name;  // program name to search for
     EPackExeType Type; // should it be a 16 or 32 bit exe?
     // array of what we found
     CPackACArray Found;                        // the items we found
     CRITICAL_SECTION FoundDataCriticalSection; // critical section for accessing data
 
 public:
-    CPackACPacker(int index, EPackPackerType unpacker, const char* title,
-                  const char* name, EPackExeType type) : Found(20, 10)
+    CPackACPacker(int index, EPackPackerType unpacker, const wchar_t* title,
+                  const wchar_t* name, EPackExeType type) : Found(20, 10)
     {
         Index = index;
         Unpacker = unpacker;
@@ -129,14 +128,14 @@ public:
     {
         HANDLES(DeleteCriticalSection(&FoundDataCriticalSection));
     }
-    int CheckAndInsert(const char* path, const char* fileName, FILETIME lastWriteTime,
+    int CheckAndInsert(const wchar_t* path, const wchar_t* fileName, FILETIME lastWriteTime,
                        const CQuadWord& size, EPackExeType type);
     int GetCount();
-    const char* GetText(int index, int column);
+    const wchar_t* GetText(int index, int column);
     BOOL IsTitle(int index) { return index < 0 ? TRUE : FALSE; }
     void InvertSelect(int index);
     int GetSelectState(int index);
-    const char* GetSelectedFullName() { return Found.GetSelectedFullName(); }
+    const wchar_t* GetSelectedFullName() { return Found.GetSelectedFullName(); }
     int GetArchiverIndex() { return Index; }
     EPackPackerType GetPackerType() { return Unpacker; }
     EPackExeType GetExeType() { return Type; }
@@ -174,7 +173,7 @@ public:
     void Initialize(APackACPackersTable* table);
     BOOL FindArchiver(unsigned int listViewIndex,
                       unsigned int* archiver, unsigned int* arcIndex);
-    BOOL ConsiderItem(const char* path, const char* fileName, FILETIME lastWriteTime,
+    BOOL ConsiderItem(const wchar_t* path, const wchar_t* fileName, FILETIME lastWriteTime,
                       const CQuadWord& size, EPackExeType type);
     BOOL InitColumns();
     void SetColumnWidth();
@@ -198,7 +197,7 @@ class CPackACDialog : public CCommonDialog
 {
 public:
     CPackACDialog(HINSTANCE modul, int resID, UINT helpID, HWND parent, CArchiverConfig* archiverConfig,
-                  char** drivesList, CObjectOrigin origin = ooStandard)
+                  wchar_t** drivesList, CObjectOrigin origin = ooStandard)
         : CCommonDialog(modul, resID, helpID, parent, origin)
     {
         ArchiverConfig = archiverConfig;
@@ -212,7 +211,7 @@ public:
     static DWORD WINAPI PackACDiskSearchThread(LPVOID instance);
     static unsigned int PackACDiskSearchThreadEH(LPVOID instance);
     DWORD DiskSearch();
-    BOOL DirectorySearch(char* path);
+    BOOL DirectorySearch(const std::wstring& path);
 
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
     virtual void Transfer(CTransferInfo& ti);
@@ -223,12 +222,16 @@ public:
     void RemoveFromExtensions(int foundIndex, int packerIndex, CPackACPacker* foundPacker);
     void AddToCustom(int foundIndex, int packerIndex, CPackACPacker* foundPacker);
     void RemoveFromCustom(int foundIndex, int packerIndex);
-    BOOL MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType);
+    // An earlier pass split this into a narrow 'filename' (for the .COM/.PIF extension
+    // fallback) plus a wide 'filenameW' (to actually open the file), because DirectorySearch had no
+    // wide name to give. It does now - 'path' is wchar_t* - so the narrow half is gone and the
+    // extension fallback reads the same wide name CreateFileW was handed.
+    BOOL MyGetBinaryType(LPCWSTR filename, LPDWORD lpBinaryType);
 
 protected:
     CArchiverConfig* ArchiverConfig;
     CPackACListView* ListView;
-    char** DrivesList;
+    wchar_t** DrivesList;
     HANDLE HSearchThread;
     HWND HStatusBar;
     BOOL SearchRunning;
@@ -260,7 +263,7 @@ protected:
 class CPackACDrives : public CCommonDialog
 {
 public:
-    CPackACDrives(HINSTANCE modul, int resID, UINT helpID, HWND parent, char** drivesList,
+    CPackACDrives(HINSTANCE modul, int resID, UINT helpID, HWND parent, wchar_t** drivesList,
                   CObjectOrigin origin = ooStandard)
         : CCommonDialog(modul, resID, helpID, parent, origin)
     {
@@ -275,7 +278,7 @@ public:
 protected:
     CEditListBox* EditLB;
     BOOL Dirty;
-    char** DrivesList;
+    wchar_t** DrivesList;
 };
 
 //*********************************************************************************
@@ -289,8 +292,8 @@ typedef int TPackErrorTable[][2];
 // Structure of the supported formats table
 struct SPackFormat
 {
-    const char* FileExtension;  // archive file extension
-    const char* MultiExtension; // extension format when using a split archive
+    const wchar_t* FileExtension;  // archive file extension
+    const wchar_t* MultiExtension; // extension format when using a split archive
                                 // (the '?' character stands for any digit)
     int ArchiveBrowseIndex;     // format number; negative value is the index of a format
                                 // processed internally (DLL), positive value is
@@ -322,7 +325,7 @@ protected:
 typedef TPackIndirectArray<char> CPackLineArray;
 
 // general function for parsing an archive listing
-typedef BOOL (*FPackList)(const char* archiveFileName, CPackLineArray& lineArray,
+typedef BOOL (*FPackList)(const wchar_t* archiveFileName, CPackLineArray& lineArray,
                           CSalamanderDirectory& dir);
 
 // constants used for SPackModifyTable::DelEmptyDir
@@ -344,22 +347,22 @@ struct SPackModifyTable
     //
     // items for compression
     //
-    const char* CompressInitDir; // directory in which the pack command will run
-    const char* CompressCommand; // command used to pack the archive
+    const wchar_t* CompressInitDir; // directory in which the pack command will run
+    const wchar_t* CompressCommand; // command used to pack the archive
     BOOL CanPackToDir;           // TRUE if the archiver program supports packing to a directory
 
     //
     // items for deletion from the archive
     //
-    const char* DeleteInitDir; // directory in which the delete command will be executed
-    const char* DeleteCommand; // command for deleting a file from the archive
+    const wchar_t* DeleteInitDir; // directory in which the delete command will be executed
+    const wchar_t* DeleteCommand; // command for deleting a file from the archive
     int DelEmptyDir;           // see constants PMT_EMPDIRS_XXX
 
     //
     // items for moving to the archive
     //
-    const char* MoveInitDir; // directory in which the move command will be executed; NULL if unsupported
-    const char* MoveCommand; // command for moving files into the archive; NULL if the program does not support move
+    const wchar_t* MoveInitDir; // directory in which the move command will be executed; NULL if unsupported
+    const wchar_t* MoveCommand; // command for moving files into the archive; NULL if the program does not support move
 
     BOOL NeedANSIListFile; // should the list of files remain in ANSI (no conversion to OEM)
 };
@@ -376,15 +379,15 @@ struct SPackBrowseTable
     //
     // items for listing archive contents
     //
-    const char* ListInitDir; // directory where the listing command is executed
-    const char* ListCommand; // command for listing archive contents
+    const wchar_t* ListInitDir; // directory where the listing command is executed
+    const wchar_t* ListCommand; // command for listing archive contents
     FPackList SpecialList;   // if it is not NULL, it is a function for parsing the listing
                              // in that case, the following items may be meaningless
-    const char* StartString; // how the last header line begins
+    const char* StartString; // how the last header line begins in the archiver's byte output
     int LinesToSkip;         // number of lines to ignore after StartString
     int AlwaysSkip;          // number of lines to always ignore after StartString (stop string not checked)
     int LinesPerFile;        // number of data lines in the listing for one file
-    const char* StopString;  // how the first footer line begins
+    const char* StopString;  // how the first footer line begins in the archiver's byte output
     unsigned char Separator; // if the archiver uses a special separator, it is stored here (otherwise e.g. a space)
     // indices of items in the listing; the number is the item's order on the line
     // (the first is 1); zero means the item does not exist
@@ -399,14 +402,14 @@ struct SPackBrowseTable
     //
     // items for decompression
     //
-    const char* UncompressInitDir; // directory where unpacking the archive begins
-    const char* UncompressCommand; // command for unpacking the archive
+    const wchar_t* UncompressInitDir; // directory where unpacking the archive begins
+    const wchar_t* UncompressCommand; // command for unpacking the archive
 
     //
     // items for extracting a single file without its path
     //
-    const char* ExtractInitDir; // directory used when extracting a single file
-    const char* ExtractCommand; // command for extracting a single file without path
+    const wchar_t* ExtractInitDir; // directory used when extracting a single file
+    const wchar_t* ExtractCommand; // command for extracting a single file without path
 
     BOOL NeedANSIListFile; // should the list of files remain in ANSI (no conversion to OEM)
 };
@@ -433,15 +436,15 @@ class CArchiverConfigData
 {
 public:
     DWORD UID;                      // unique identifier of the archiver (see ARC_UID_XXX)
-    std::string Title;                  // name under which it appears in the configuration
-    const char* PackerVariable;     // name of the variable expanded as the packer
-    const char* UnpackerVariable;   // name of the variable expanded as the unpacker (NULL when it's a packer)
-    const char* PackerExecutable;   // packer program name for searching on disk
-    const char* UnpackerExecutable; // unpacker program name or NULL
+    std::wstring Title;                  // name under which it appears in the configuration
+    const wchar_t* PackerVariable;     // name of the variable expanded as the packer
+    const wchar_t* UnpackerVariable;   // name of the variable expanded as the unpacker (NULL when it's a packer)
+    const wchar_t* PackerExecutable;   // packer program name for searching on disk
+    const wchar_t* UnpackerExecutable; // unpacker program name or NULL
     EPackExeType Type;              // archiver type (16bit, 32bit)
     BOOL ExesAreSame;               // true if PackExeFile is used for both pack and unpack
-    std::string PackExeFile;        // path to the pack program
-    std::string UnpackExeFile;      // path to the unpack program or empty
+    std::wstring PackExeFile;        // path to the pack program
+    std::wstring UnpackExeFile;      // path to the unpack program or empty
 
 public:
     CArchiverConfigData()
@@ -504,24 +507,24 @@ public:
     void AddDefault(int SalamVersion); // adds archivers introduced since SalamVersion; when SalamVersion = -1 adds all of them (default configuration)
 
     // sets attributes; if something goes wrong, the item is removed from the array, destroyed and FALSE is returned
-    BOOL SetArchiver(int index, DWORD uid, const char* title, EPackExeType type, BOOL exesAreSame,
-                     const char* packerVariable, const char* unpackerVariable,
-                     const char* packerExecutable, const char* unpackerExecutable,
-                     const char* packExeFile, const char* unpackExeFile);
+    BOOL SetArchiver(int index, DWORD uid, const wchar_t* title, EPackExeType type, BOOL exesAreSame,
+                     const wchar_t* packerVariable, const wchar_t* unpackerVariable,
+                     const wchar_t* packerExecutable, const wchar_t* unpackerExecutable,
+                     const wchar_t* packExeFile, const wchar_t* unpackExeFile);
 
     int GetArchiversCount() { return Archivers.Count; } // returns the number of items in the array
 
     DWORD GetArchiverUID(int index) { return Archivers[index]->UID; }
-    const char* GetArchiverTitle(int index) { return Archivers[index]->Title.c_str(); }
-    const char* GetPackerVariable(int index) { return Archivers[index]->PackerVariable; }
-    const char* GetUnpackerVariable(int index) { return Archivers[index]->UnpackerVariable; }
-    const char* GetPackerExecutable(int index) { return Archivers[index]->PackerExecutable; }
-    const char* GetUnpackerExecutable(int index) { return Archivers[index]->UnpackerExecutable; }
+    const wchar_t* GetArchiverTitle(int index) { return Archivers[index]->Title.c_str(); }
+    const wchar_t* GetPackerVariable(int index) { return Archivers[index]->PackerVariable; }
+    const wchar_t* GetUnpackerVariable(int index) { return Archivers[index]->UnpackerVariable; }
+    const wchar_t* GetPackerExecutable(int index) { return Archivers[index]->PackerExecutable; }
+    const wchar_t* GetUnpackerExecutable(int index) { return Archivers[index]->UnpackerExecutable; }
     EPackExeType GetArchiverType(int index) { return Archivers[index]->Type; }
-    void SetPackerExeFile(int index, const char* filename);
-    void SetUnpackerExeFile(int index, const char* filename);
-    const char* GetPackerExeFile(int index) { return Archivers[index]->PackExeFile.c_str(); }
-    const char* GetUnpackerExeFile(int index) { return Archivers[index]->UnpackExeFile.c_str(); }
+    void SetPackerExeFile(int index, const wchar_t* filename);
+    void SetUnpackerExeFile(int index, const wchar_t* filename);
+    const wchar_t* GetPackerExeFile(int index) { return Archivers[index]->PackExeFile.c_str(); }
+    const wchar_t* GetUnpackerExeFile(int index) { return Archivers[index]->UnpackExeFile.c_str(); }
     const SPackModifyTable* GetPackerConfigTable(int index) { return &PackModifyTable[index]; }
     const SPackBrowseTable* GetUnpackerConfigTable(int index) { return &PackBrowseTable[index]; }
     BOOL ArchiverExesAreSame(int index) { return Archivers[index]->ExesAreSame; }
@@ -540,16 +543,16 @@ public:
         if (Ext != NULL)
             free(Ext);
     }
-    char* GetExt() { return Ext; }
+    wchar_t* GetExt() { return Ext; }
     int GetIndex() { return Index; }
-    void Set(char* ext, int index)
+    void Set(wchar_t* ext, int index)
     {
         Ext = ext;
         Index = index;
     }
 
 protected:
-    char* Ext;
+    wchar_t* Ext;
     int Index;
 };
 
@@ -566,11 +569,11 @@ public:
             return TRUE;
         }
         int i = 0;
-        while (i < Count && strcmp(At(i).GetExt(), item.GetExt()) > 0)
+        while (i < Count && wcscmp(At(i).GetExt(), item.GetExt()) > 0)
             i++;
         if (i == Count)
             Add(item);
-        else if (!strcmp(At(i).GetExt(), item.GetExt()))
+        else if (!wcscmp(At(i).GetExt(), item.GetExt()))
             return FALSE;
         else
             Insert(i, item);
@@ -582,7 +585,7 @@ public:
 class CPackerFormatConfigData
 {
 public:
-    std::string Ext;   // list of extensions the archive can have
+    std::wstring Ext;  // list of extensions the archive can have
     BOOL UsePacker;    // true if PackerIndex is valid (we can also pack)
     int PackerIndex;   // reference to the packer table
     int UnpackerIndex; // reference to the unpacker table
@@ -641,7 +644,7 @@ public:
     void AddDefault(int SalamVersion); // adds archivers introduced since SalamVersion; when SalamVersion = -1 adds all of them (default configuration)
 
     // sets attributes; if something goes wrong, the item is removed from the array, destroyed and FALSE is returned
-    BOOL SetFormat(int index, const char* ext, BOOL usePacker,
+    BOOL SetFormat(int index, const wchar_t* ext, BOOL usePacker,
                    const int packerIndex, const int unpackerIndex, BOOL old);
     void SetOldType(int index, BOOL old) { Formats[index]->OldType = old; }
     void SetUnpackerIndex(int index, int unpackerIndex) { Formats[index]->UnpackerIndex = unpackerIndex; }
@@ -652,7 +655,7 @@ public:
     BOOL BuildArray(int* line = NULL, int* column = NULL);
 
     // archiveNameLen serves only as an optimization; if it is -1, the function measures the string itself
-    int PackIsArchive(const char* archiveName, int archiveNameLen = -1);
+    int PackIsArchive(const wchar_t* archiveName, int archiveNameLen = -1);
 
     int GetFormatsCount() { return Formats.Count; } // returns the number of items in the array
 
@@ -663,7 +666,7 @@ public:
     int GetUnpackerIndex(int index) { return Formats[index]->UnpackerIndex; }
     BOOL GetUsePacker(int index) { return Formats[index]->UsePacker; }
     int GetPackerIndex(int index) { return Formats[index]->PackerIndex; }
-    const char* GetExt(int index) { return Formats[index]->Ext.c_str(); }
+    const wchar_t* GetExt(int index) { return Formats[index]->Ext.c_str(); }
     BOOL GetOldType(int index) { return Formats[index]->OldType; }
 
     BOOL Save(int index, HKEY hKey);
@@ -674,7 +677,7 @@ public:
 // Variables
 //
 
-extern char SpawnExe[MAX_PATH * 2];
+extern std::wstring SpawnExe;
 extern BOOL SpawnExeInitialised;
 
 struct CExecuteItem;
@@ -706,68 +709,75 @@ BOOL InitSpawnName(HWND parent);
 void PackSetErrorHandler(BOOL (*handler)(HWND parent, const WORD errNum, ...));
 
 // determine the contents of the archive
-BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
+BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDirectory& dir,
               CPluginDataInterfaceAbstract*& pluginData, CPluginData*& plugin);
 
 // extract the selected files from the archive (calls UniversalUncompress)
-BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
+BOOL PackUncompress(HWND parent, CFilesWindow* panel, const wchar_t* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
-                    const char* targetDir, const char* archiveRoot,
+                    const wchar_t* targetDir, const wchar_t* archiveRoot,
                     SalEnumSelection nextName, void* param);
 
 // universal archive extraction (for unpacking the entire archive)
-BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* const errorTable,
-                             const char* initDir, BOOL expandInitDir, CFilesWindow* panel,
-                             const BOOL supportLongNames, const char* archiveFileName,
-                             const char* targetDir, const char* archiveRoot,
+BOOL PackUniversalUncompress(HWND parent, const wchar_t* command, TPackErrorTable* const errorTable,
+                             const wchar_t* initDir, BOOL expandInitDir, CFilesWindow* panel,
+                             const BOOL supportLongNames, const wchar_t* archiveFileName,
+                             const wchar_t* targetDir, const wchar_t* archiveRoot,
                              SalEnumSelection nextName, void* param, BOOL needANSIListFile);
 
 // extract a single file from the archive (for viewer)
-BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
-                       CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                       CFileData* fileData, const char* targetPath, const char* newFileName,
+BOOL PackUnpackOneFile(CFilesWindow* panel, const wchar_t* archiveFileName,
+                       CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                       CFileData* fileData, const wchar_t* targetPath, const wchar_t* newFileName,
                        BOOL* renamingNotSupported);
 
 // pack the selected files into the archive (calls UniversalCompress)
-BOOL PackCompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
-                  const char* archiveRoot, BOOL move, const char* sourceDir,
+BOOL PackCompress(HWND parent, CFilesWindow* panel, const wchar_t* archiveFileName,
+                  const wchar_t* archiveRoot, BOOL move, const wchar_t* sourceDir,
                   SalEnumSelection2 nextName, void* param);
 
 // universal archive packing (for creating a new archive)
-BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* const errorTable,
-                           const char* initDir, BOOL expandInitDir, const BOOL supportLongNames,
-                           const char* archiveFileName, const char* sourceDir,
-                           const char* archiveRoot, SalEnumSelection2 nextName,
-                           void* param, BOOL needANSIListFile);
+// Transitional accessor retained by the custom-packer route while its panel enumerator
+// is completed. Current SalEnumSelection2 already returns const wchar_t*; PackUniversalCompress
+// consumes that result directly and does not use this side channel.
+typedef const wchar_t*(WINAPI* SalEnumLastNameW)(void* param);
+
+BOOL PackUniversalCompress(HWND parent, const wchar_t* command, TPackErrorTable* const errorTable,
+                           const wchar_t* initDir, BOOL expandInitDir, const BOOL supportLongNames,
+                           const wchar_t* archiveFileName, const wchar_t* sourceDir,
+                           const wchar_t* archiveRoot, SalEnumSelection2 nextName,
+                           void* param, BOOL needANSIListFile,
+                           SalEnumLastNameW lastNameW = NULL);
 
 // delete the selected files from the archive
-BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileName,
+BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const wchar_t* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
-                    const char* archiveRoot, SalEnumSelection nextName,
+                    const wchar_t* archiveRoot, SalEnumSelection nextName,
                     void* param);
 
 // automatic configuration of packers
 void PackAutoconfig(HWND parent);
 
 // runs the external program cmdLine and interprets the return code according to errorTable
-BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorTable* const errorTable);
+BOOL PackExecute(HWND parent, const std::wstring& cmdLine, const std::wstring& currentDir,
+                 TPackErrorTable* const errorTable);
 
 // callback for enumeration by mask (used to extract all files matching the mask)
-const char* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
+const wchar_t* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
                                 const CFileData** fileData, void* param, int* errorOccured);
 
 // performs variable substitution in the command line string
-BOOL PackExpandCmdLine(const char* archiveName, const char* tgtDir, const char* lstName,
-                       const char* extName, const char* varText, char* buffer,
-                       const int bufferLen, char* DOSTmpName);
+BOOL PackExpandCmdLine(const wchar_t* archiveName, const wchar_t* tgtDir, const wchar_t* lstName,
+                       const wchar_t* extName, const wchar_t* varText, std::wstring& output,
+                       std::wstring* DOSTmpName);
 
 // performs variable substitution in the current directory string
-BOOL PackExpandInitDir(const char* archiveName, const char* srcDir, const char* tgtDir,
-                       const char* varText, char* buffer, const int bufferLen);
+BOOL PackExpandInitDir(const wchar_t* archiveName, const wchar_t* srcDir, const wchar_t* tgtDir,
+                       const wchar_t* varText, std::wstring& output);
 
 // default error handling function - only does TRACE_E
 BOOL EmptyErrorHandler(HWND parent, const WORD err, ...);
 
 // function for parsing the output from the UC2 packer
-BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
+BOOL PackUC2List(const wchar_t* archiveFileName, CPackLineArray& lineArray,
                  CSalamanderDirectory& dir);

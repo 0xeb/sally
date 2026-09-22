@@ -11,7 +11,9 @@
 #include "filesbox.h"
 #include "shiconov.h"
 #include "common/PanelTextPainter.h"
+#include "common/text/CaseFolding.h"
 #include "common/unicode/NameRenderPolicy.h"
+#include "common/unicode/helpers.h" // FoldCharW
 #include "darkmode.h"
 #include "sal_colors.h"
 
@@ -192,7 +194,7 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
     BOOL drawSimpleSymbol = FALSE;
     int symbolIndex;                   // index in the Symbols bitmap...
     DWORD iconState = 0;               // flags for drawing the icon
-    CPathBuffer lowerExtension; // extension in lowercase
+    std::wstring lowerExtension; // extension in lowercase
 
     if (!(drawFlags & DRAWFLAG_NO_STATE))
     {
@@ -225,18 +227,28 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
     if (!isDir)
     {
         // convert extension characters to lowercase
-        char *dstExt = lowerExtension, *srcExt = f->Ext;
-        while (*srcExt != 0)
-            *dstExt++ = LowerCase[*srcExt++];
-        *((DWORD*)dstExt) = 0;
+        // FoldCharW, not LowerCase[]: that is a 256-entry BYTE table
+        // (common/str.h:23) and a wchar_t index read out of bounds above U+00FF. This buffer
+        // is the LOOKUP key for Associations.GetIndex, whose STORED keys are folded by the
+        // same table at icncache.cpp - so both folds move in this one commit, and the array
+        // is rebuilt in memory by ReadAssociations() on every start, which is why no
+        // migration or re-sort is needed. NOT towlower(): see the note on FoldCharW itself.
+        // ⚠ The *(DWORD*)dstExt = 0 below is load-bearing - CompareDWORDS reads past
+        // lengthBytes in DWORD steps, so the two-wide-NUL pad keeps that read defined.
+        lowerExtension = sally::text::Fold(f->Ext);
+        lowerExtension.append(2, L'\0'); // CompareDWORDS reads through DWORD alignment.
 
-        if (*(DWORD*)lowerExtension.Get() == *(DWORD*)"exe" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"bat" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"com" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"scf" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" ||
-            *(DWORD*)lowerExtension.Get() == *(DWORD*)"cmd")
+        // _wcsicmp: a DWORD spans four narrow characters but only TWO
+        // wide ones, so *(DWORD*)lowerExtension == *(DWORD*)"exe" could never match once
+        // the extension went wide - every executable drew the wrong icon. The compiler
+        // never complained, because both sides are still DWORDs.
+        if (_wcsicmp(lowerExtension.c_str(), L"exe") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"bat") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"pif") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"com") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"scf") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"scr") == 0 ||
+            _wcsicmp(lowerExtension.c_str(), L"cmd") == 0)
             symbolIndex = symbolsExecutable;
         else
             symbolIndex = (f->Association) ? (f->Archive ? symbolsArchive : symbolsAssociated) : symbolsNonAssociated;
@@ -276,17 +288,16 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
         {
             CIconList* iconList = NULL;
             int iconListIndex = -1; // close it if not set
-            CPathBuffer fileName;
+            std::wstring fileName;
 
             if (GetPluginIconsType() != pitFromPlugin || !Is(ptPluginFS))
             {
                 if (isDir) // it's a directory
                 {
                     int icon;
-                    memmove(fileName, f->Name, f->NameLen);
-                    *(DWORD*)(fileName.Get() + f->NameLen) = 0;
+                    fileName.assign(f->Name, f->NameLen);
 
-                    if (!IconCache->GetIndex(fileName, icon, NULL, NULL) ||                             // the icon-thread isn't loading it
+                    if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                     // the icon-thread isn't loading it
                         IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 ||     // neither new nor old icon is loaded
                         !IconCache->GetIcon(IconCache->At(icon).GetIndex(), &iconList, &iconListIndex)) // failed to obtain its icon
                     {                                                                                   // we will display a simple symbol
@@ -300,31 +311,32 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                 else // it's a file
                 {
                     int index;
-                    BOOL exceptions = *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" || // icons in the file,
-                                      *(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" || // even though it isn't visible
-                                      *(DWORD*)lowerExtension.Get() == *(DWORD*)"lnk";   // in the Registry
+                    // _wcsicmp - see the note at the top of this function.
+                    BOOL exceptions = _wcsicmp(lowerExtension.c_str(), L"scr") == 0 || // icons in the file,
+                                      _wcsicmp(lowerExtension.c_str(), L"pif") == 0 || // even though it isn't visible
+                                      _wcsicmp(lowerExtension.c_str(), L"lnk") == 0;   // in the Registry
 
-                    if (exceptions || Associations.GetIndex(lowerExtension, index)) // the extension has an icon (association)
+                    if (exceptions || Associations.GetIndex(lowerExtension.c_str(), index)) // the extension has an icon (association)
                     {
                         if (!exceptions)
                             TransferAssocIndex = index;                               // remember the valid index in Associations
                         if (exceptions || Associations[index].GetIndex(iconSize) < 0) // dynamic icon (from the file) or a loaded static icon
                         {                                                             // icon in the file
                             int icon;
-                            memmove(fileName, f->Name, f->NameLen);
-                            *(DWORD*)(fileName.Get() + f->NameLen) = 0;
-                            if (!IconCache->GetIndex(fileName, icon, NULL, NULL) ||                         // the icon-thread isn't loading it
+                            fileName.assign(f->Name, f->NameLen);
+                            if (!IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL) ||                 // the icon-thread isn't loading it
                                 IconCache->At(icon).GetFlag() != 1 && IconCache->At(icon).GetFlag() != 2 || // neither new nor old icon is loaded
                                 !IconCache->GetIcon(IconCache->At(icon).GetIndex(),
                                                     &iconList, &iconListIndex)) // failed to obtain loaded icon
                             {                                                   // we will display a simple symbol
-                                if (*(DWORD*)lowerExtension.Get() == *(DWORD*)"pif" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"exe" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"com" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"bat" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"scf" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"scr" ||
-                                    *(DWORD*)lowerExtension.Get() == *(DWORD*)"cmd")
+                                // _wcsicmp - same defect as above.
+                                if (_wcsicmp(lowerExtension.c_str(), L"pif") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"exe") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"com") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"bat") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"scf") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"scr") == 0 ||
+                                    _wcsicmp(lowerExtension.c_str(), L"cmd") == 0)
                                     icon = ASSOC_ICON_SOME_EXE;
                                 else
                                     icon = (exceptions || Associations[index].GetFlag() != 0) ? ASSOC_ICON_SOME_FILE : ASSOC_ICON_NO_ASSOC;
@@ -379,6 +391,12 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                     // the simple icon index will be obtained via the GetPluginIconIndex callback
                     TransferFileData = f;
                     TransferIsDir = isDir ? (isItemUpDir ? 2 : 1) : 0;
+                    // The v107 View adapter selects the stable transfer
+                    // scratch through this reverse identity. Column drawing already
+                    // initializes it below; the simple-icon callback needs the same
+                    // current-panel identity even though native callbacks historically
+                    // consumed only TransferFileData and TransferIsDir.
+                    TransferPluginDataIface = PluginData.GetInterface();
 
                     iconList = SimplePluginIcons;
                     iconListIndex = GetPluginIconIndex();
@@ -520,7 +538,7 @@ void DrawFocusRect(HDC hDC, const RECT* r, BOOL selected, BOOL editMode)
 // CFilesMap::CreateMap()
 //
 
-char DrawItemBuff[1024];     // destination buffer for strings
+wchar_t DrawItemBuff[1024];     // destination buffer for strings
 wchar_t DrawItemBuffW[1024]; // destination buffer for wide strings (Unicode filenames)
 int DrawItemAlpDx[1024];     // for width calculations of columns with FixedWidth bit + elastic columns with smart mode
 
@@ -642,7 +660,12 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
     BOOL showCaret = FALSE;
     if (!(drawFlags & DRAWFLAG_ICON_ONLY))
     {
-        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(f->Name, isDir ? NULL : f->Ext, f->Attr);
+        // Wide name/extension, not the narrow f->Name/f->Ext mirror - see
+        // CHighlightMasks::AgreeMasks uses the exact wide name and extension
+        // (or mis-match) a file whose true name isn't representable in the code page.
+        std::wstring highlightNameW(f->Name);
+        const wchar_t* highlightExtW = isDir ? NULL : sally::unicode::GetWideExtensionStart(highlightNameW.c_str());
+        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(highlightNameW.c_str(), highlightExtW, f->Attr);
 
         sally::unicode::NameColumnViewMode nameColumnMode =
             GetViewMode() == vmBrief ? sally::unicode::NameColumnViewMode::Brief : sally::unicode::NameColumnViewMode::Detailed;
@@ -651,12 +674,22 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 f->Name,
                 f->NameLen,
                 f->Ext,
-                f->NameW,
                 isDir != FALSE,
                 Configuration.SortDirsByExt != FALSE,
                 IsExtensionInSeparateColumn() != FALSE,
                 nameColumnMode);
         int nameLen = namePlan.NameLength;
+
+        // Apply the user's configured name-display format. Computed here (not
+        // gated on the name column's own RectVisible check) because the extension column -
+        // drawn separately below, with its own independent visibility check - also needs it.
+        // AlterFileNameW's per-character case mapping is length-preserving, so
+        // namePlan.NameLength (the dot position found in the original f->Name) stays a valid
+        // name/extension split point against this altered copy.
+        // Was gated on namePlan.UseWide over f->NameW. That member is gone, so
+        // the guard was permanently false and every row silently got an EMPTY alteredNameW;
+        // only the narrow arms below were doing any work. Unconditional over f->Name now.
+        std::wstring alteredNameW = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir);
 
         // set the the applied font, background color and text color
         SetFontAndColors(hDC, highlightMasksItem, f, isItemFocusedOrEditMode, itemIndex);
@@ -665,7 +698,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
         int x = r.left;
         int y = (r.top + r.bottom - FontCharHeight) / 2;
 
-        BOOL fileNameFormated = FALSE;
         SIZE textSize;
         SetTextAlign(hDC, TA_TOP | TA_LEFT | TA_NOUPDATECP);
 
@@ -741,17 +773,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     focusFrameRight = r.right;
                 }
             }
-            else
-            {
-                AlterFileName(TransferBuffer, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-                fileNameFormated = TRUE;
-            }
-
-            // For Unicode names, we don't apply AlterFileName transformation yet
-            // (TODO: add AlterFileNameW for proper uppercase/lowercase handling)
-            BOOL useWideDisplay = namePlan.UseWide;
-            int nameLenW = useWideDisplay ? namePlan.NameLength : 0;
-
             CColumn* column = &Columns[0];
             SIZE fnSZ;
             int fitChars;
@@ -762,14 +783,8 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 if (GetViewMode() == vmDetailed && (column->FixedWidth == 1 || NarrowedNameColumn))
                 {
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
-                    if (useWideDisplay)
-                    {
-                        GetTextExtentExPointW(hDC, f->NameW, nameLenW, textWidth,
-                                              &fitChars, DrawItemAlpDx, &fnSZ);
-                    }
-                    else
-                        GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
-                                             &fitChars, DrawItemAlpDx, &fnSZ);
+                    GetTextExtentExPointW(hDC, alteredNameW.c_str(), nameLen, textWidth,
+                                          &fitChars, DrawItemAlpDx, &fnSZ);
                     int newWidth = 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
                     if (newWidth > nameWidth)
                         newWidth = nameWidth;
@@ -777,10 +792,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 }
                 else
                 {
-                    if (useWideDisplay)
-                        GetTextExtentPoint32W(hDC, f->NameW, nameLenW, &fnSZ);
-                    else
-                        GetTextExtentPoint32(hDC, TransferBuffer, nameLen, &fnSZ);
+                    GetTextExtentPoint32W(hDC, alteredNameW.c_str(), nameLen, &fnSZ);
                     adjR.right = r.right = rect.left + 1 + IconSizes[ICONSIZE_16] + 1 + 2 + fnSZ.cx + 3;
                 }
 
@@ -790,72 +802,49 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             }
             if (!isItemUpDir && GetViewMode() == vmDetailed && (column->FixedWidth == 1 || NarrowedNameColumn))
             {
-                int effectiveNameLen = useWideDisplay ? nameLenW : nameLen;
                 if (Configuration.FullRowSelect)
                 {
                     // no width measured yet - let's measure it now
                     // the string may be longer than the available space and must end with "..."
                     textWidth = nameWidth - 1 - IconSizes[ICONSIZE_16] - 1 - 2 - SPACE_WIDTH;
-                    if (useWideDisplay)
-                    {
-                        GetTextExtentExPointW(hDC, f->NameW, nameLenW, textWidth,
-                                              &fitChars, DrawItemAlpDx, &fnSZ);
-                    }
-                    else
-                        GetTextExtentExPoint(hDC, TransferBuffer, nameLen, textWidth,
-                                             &fitChars, DrawItemAlpDx, &fnSZ);
+                    GetTextExtentExPointW(hDC, alteredNameW.c_str(), nameLen, textWidth,
+                                          &fitChars, DrawItemAlpDx, &fnSZ);
                 }
-                if (fitChars < effectiveNameLen)
+                if (fitChars < nameLen)
                 {
                     // search from the end for the character after which we can copy "..." and it fits in the column
                     while (fitChars > 0 && DrawItemAlpDx[fitChars - 1] + TextEllipsisWidth > textWidth)
                         fitChars--;
                     // copy a part of the original string to another buffer
+                    // The deleted narrow arm carried the SplitText defect:
+                    // memmove(DrawItemBuff, TransferBuffer, fitChars) counted BYTES over two
+                    // wchar_t[1024] buffers, and memmove(..., "...", 3) wrote three narrow
+                    // bytes into a wide buffer. It compiled clean. The wide arm below is the
+                    // correct one, and is now the only one.
                     int totalCount;
-                    if (useWideDisplay)
+                    if (fitChars > 0)
                     {
-                        if (fitChars > 0)
-                        {
-                            wmemmove(DrawItemBuffW, f->NameW, fitChars);
-                            // and append "..."
-                            wmemmove(DrawItemBuffW + fitChars, L"...", 3);
-                            totalCount = fitChars + 3;
-                        }
-                        else
-                        {
-                            DrawItemBuffW[0] = f->NameW[0];
-                            DrawItemBuffW[1] = L'.';
-                            totalCount = 2;
-                        }
-                        // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-                        sally::ui::DrawPanelTextW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuffW, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
+                        wmemmove(DrawItemBuffW, alteredNameW.c_str(), fitChars);
+                        // and append "..."
+                        wmemmove(DrawItemBuffW + fitChars, L"...", 3);
+                        totalCount = fitChars + 3;
                     }
                     else
                     {
-                        if (fitChars > 0)
-                        {
-                            memmove(DrawItemBuff, TransferBuffer, fitChars);
-                            // and append "..."
-                            memmove(DrawItemBuff + fitChars, "...", 3);
-                            totalCount = fitChars + 3;
-                        }
-                        else
-                        {
-                            DrawItemBuff[0] = TransferBuffer[0];
-                            DrawItemBuff[1] = '.';
-                            totalCount = 2;
-                        }
-                        // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-                        sally::ui::DrawPanelTextA(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
+                        DrawItemBuffW[0] = alteredNameW[0];
+                        DrawItemBuffW[1] = L'.';
+                        totalCount = 2;
                     }
+                    // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
+                    sally::ui::DrawPanelTextW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuffW, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     goto SKIP1;
                 }
             }
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            if (useWideDisplay)
-                sally::ui::DrawPanelTextW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, f->NameW, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLenW, NULL);
-            else
-                sally::ui::DrawPanelTextA(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, TransferBuffer, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
+            // nameLen, not the old nameLenW: isItemUpDir sets nameLen = 0
+            // above but never touched nameLenW, so the wide arm would have started painting
+            // ".." text where the arm that actually ships paints only the background.
+            sally::ui::DrawPanelTextW(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, alteredNameW.c_str(), (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
         SKIP1:
             if (!Configuration.FullRowSelect || GetViewMode() == vmBrief)
             {
@@ -883,7 +872,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     SetBkColor(hDC, bkClr);
                     if (drawFlags & DRAWFLAG_MASK) // mask is b&w; we must not paint a colored background into it
                         SetBkColor(hDC, RGB(255, 255, 255));
-                    sally::ui::DrawPanelTextA(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+                    sally::ui::DrawPanelTextW(hDC, 0, 0, ETO_OPAQUE, &r, L"", 0, NULL);
                 }
             }
         }
@@ -965,9 +954,11 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                         {
                             TransferLen = 0;
                         }
-                        else if (f->UseWideName())
+                        else
                         {
-                            const wchar_t* extPosW = sally::unicode::GetWideExtensionStart(f->NameW);
+                            // Slice the extension from the same format-altered wide copy as the
+                            // name column, so a "lowercase extension" style applies consistently.
+                            const wchar_t* extPosW = sally::unicode::GetWideExtensionStart(alteredNameW.c_str());
                             if (extPosW != NULL)
                             {
                                 TransferLen = (int)wcslen(extPosW);
@@ -977,24 +968,13 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             else
                                 TransferLen = 0;
                         }
-                        else
-                        {
-                            if (!fileNameFormated)
-                                AlterFileName(TransferBuffer, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-                            TransferLen = (int)(f->NameLen - (f->Ext - f->Name));
-                            if (TransferLen > 0)
-                            {
-                                MoveMemory(TransferBuffer, TransferBuffer + (f->Ext - f->Name), TransferLen); // buffer overlap may occur
-                                TransferBuffer[TransferLen] = 0;
-                            }
-                        }
                     }
 
                     if (TransferLen == 0)
-                        sally::ui::DrawPanelTextA(hDC, r.left, y, ETO_OPAQUE, &adjR, "", 0, NULL); // just clearing
-                    else if (f->UseWideName() && column->ID == COLUMN_ID_EXTENSION)
+                        sally::ui::DrawPanelTextW(hDC, r.left, y, ETO_OPAQUE, &adjR, L"", 0, NULL); // just clearing
+                    else if (column->ID == COLUMN_ID_EXTENSION)
                     {
-                        // Unicode extension drawing - use DrawItemBuffW which was populated above
+                        // Draw the formatted wide extension extracted above.
                         if (column->FixedWidth == 1)
                         {
                             int fitChars;
@@ -1052,8 +1032,8 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             int fitChars;
                             // for fixed-width columns we must check whether the entire text fits
                             int textWidth = r.right - r.left - SPACE_WIDTH;
-                            GetTextExtentExPoint(hDC, TransferBuffer, TransferLen, textWidth,
-                                                 &fitChars, DrawItemAlpDx, &textSize);
+                            GetTextExtentExPointW(hDC, TransferBuffer, TransferLen, textWidth,
+                                                  &fitChars, DrawItemAlpDx, &textSize);
                             if (fitChars < TransferLen)
                             {
                                 // search from the end for the character after which we can copy "..." and it fits in the column
@@ -1063,9 +1043,13 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                 int totalCount;
                                 if (fitChars > 0)
                                 {
-                                    memmove(DrawItemBuff, TransferBuffer, fitChars);
+                                    // wmemmove, not memmove: DrawItemBuff and
+                                    // TransferBuffer are both wchar_t, so the byte count copied
+                                    // half the characters, and "..." wrote three narrow bytes
+                                    // where three WCHARs were meant.
+                                    wmemmove(DrawItemBuff, TransferBuffer, fitChars);
                                     // and append "..."
-                                    memmove(DrawItemBuff + fitChars, "...", 3);
+                                    wmemmove(DrawItemBuff + fitChars, L"...", 3);
                                     totalCount = fitChars + 3;
                                 }
                                 else
@@ -1074,7 +1058,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                     DrawItemBuff[1] = '.';
                                     totalCount = 2;
                                 }
-                                sally::ui::DrawPanelTextA(hDC, r.left + SPACE_WIDTH / 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, totalCount, NULL);
+                                sally::ui::DrawPanelTextW(hDC, r.left + SPACE_WIDTH / 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, totalCount, NULL);
                             }
                             else
                             {
@@ -1086,7 +1070,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                 }
                                 else
                                     deltaX = SPACE_WIDTH / 2;
-                                sally::ui::DrawPanelTextA(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
+                                sally::ui::DrawPanelTextW(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
                             }
                         }
                         else
@@ -1095,7 +1079,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             if (column->LeftAlignment == 0)
                             {
                                 // if the column is right-aligned, measure the text width
-                                GetTextExtentPoint32(hDC, TransferBuffer, TransferLen, &textSize);
+                                GetTextExtentPoint32W(hDC, TransferBuffer, TransferLen, &textSize);
                                 deltaX = r.right - r.left - SPACE_WIDTH / 2 - textSize.cx;
                                 if (deltaX < SPACE_WIDTH / 2)
                                     deltaX = SPACE_WIDTH / 2;
@@ -1103,7 +1087,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             else
                                 deltaX = SPACE_WIDTH / 2;
 
-                            sally::ui::DrawPanelTextA(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
+                            sally::ui::DrawPanelTextW(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
                         }
                     }
                 }
@@ -1129,7 +1113,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 SetBkColor(hDC, GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]));
                 if (drawFlags & DRAWFLAG_MASK) // mask is b&w; we must not paint a colored background into it
                     SetBkColor(hDC, RGB(255, 255, 255));
-                sally::ui::DrawPanelTextA(hDC, r.left, r.top, ETO_OPAQUE, &adjR, "", 0, NULL);
+                sally::ui::DrawPanelTextW(hDC, r.left, r.top, ETO_OPAQUE, &adjR, L"", 0, NULL);
             }
         }
 
@@ -1177,7 +1161,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
 //****************************************************************************
 //
-// SplitText
+// SplitTextW
 //
 // Uses the 'DrawItemAlpDx' array
 //
@@ -1194,142 +1178,6 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 // out2Width
 //
 
-void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
-               char* out1, int* out1Len, int* out1Width,
-               char* out2, int* out2Len, int* out2Width)
-{
-    SIZE sz;
-    // measure the width of every character
-    GetTextExtentExPoint(hDC, text, textLen, 0, NULL, DrawItemAlpDx, &sz);
-
-    if (sz.cx > *maxWidth)
-    {
-        // if the text length exceeds the maximum width,
-        // try to split it into two lines at a space
-        // anything that still exceeds is replaced with "..."
-
-        // find the last character that still fits on the first line
-        // while also tracking the index of the last space
-        int lastSpaceIndex = -1;
-        int maxW = *maxWidth;
-        int w = 0;
-        int index = 0;
-        while (index < maxW) // this condition should not be applied
-        {
-            if (text[index] == ' ')
-                lastSpaceIndex = index;
-            if (DrawItemAlpDx[index] <= maxW)
-                index++;
-            else
-                break;
-        }
-
-        if (lastSpaceIndex != -1)
-        {
-            // if we found a space, break the first line there
-            // (the space is omitted to save room)
-            if (lastSpaceIndex > 0)
-            {
-                *out1Len = min(*out1Len, lastSpaceIndex);
-                *out1Width = DrawItemAlpDx[lastSpaceIndex - 1];
-                memmove(out1, text, *out1Len);
-            }
-            else
-            {
-                *out1Len = 0;
-                *out1Width = 0;
-            }
-
-            // move the pointer past the space
-            index = lastSpaceIndex + 1;
-        }
-        else
-        {
-            // no space encountered yet, so we must break with an ellipsis
-
-            // append "..." at the end of the string
-            int backTrackIndex = index - 1;
-            while (DrawItemAlpDx[backTrackIndex] + TextEllipsisWidth > maxW && backTrackIndex > 0)
-                backTrackIndex--;
-
-            *out1Len = min(*out1Len, backTrackIndex + 3);
-            *out1Width = DrawItemAlpDx[backTrackIndex - 1] + TextEllipsisWidth;
-            memmove(out1, text, *out1Len - 3);
-            if (*out1Len >= 3)
-                memmove(out1 + *out1Len - 3, "...", 3);
-
-            // look for a space where we can continue to the next line
-            while (index < textLen)
-            {
-                if (text[index++] == ' ')
-                    break;
-            }
-        }
-
-        if (index < textLen)
-        {
-            // process the second line
-            int oldIndex = index;
-            int offsetX;
-
-            if (index > 0)
-                offsetX = DrawItemAlpDx[index - 1]; // width of the first line including the separating space
-            else
-                offsetX = 0;
-
-            while (index < textLen)
-            {
-                if (DrawItemAlpDx[index] - offsetX < maxW)
-                    index++;
-                else
-                    break;
-            }
-
-            if (index < textLen)
-            {
-                // the second line didn't fit completely; append an ellipsis
-                int backTrackIndex = index - 1;
-                while (DrawItemAlpDx[backTrackIndex] - offsetX + TextEllipsisWidth > maxW &&
-                       backTrackIndex > oldIndex)
-                    backTrackIndex--;
-
-                *out2Len = min(*out2Len, backTrackIndex - oldIndex + 3);
-                *out2Width = DrawItemAlpDx[backTrackIndex - 1] - offsetX + TextEllipsisWidth;
-                memmove(out2, text + oldIndex, *out2Len - 3);
-                if (*out2Len >= 3)
-                    memmove(out2 + *out2Len - 3, "...", 3);
-            }
-            else
-            {
-                // the second line fit completely
-                memmove(out2, text + oldIndex, index - oldIndex);
-                *out2Len = index - oldIndex;
-                *out2Width = DrawItemAlpDx[index - 1] - offsetX;
-            }
-        }
-        else
-        {
-            // nothing to put on the second line
-            *out2Len = 0;
-            *out2Width = 0;
-        }
-    }
-    else
-    {
-        // the first line will contain everything
-        *out1Len = min(*out1Len, textLen);
-        *out1Width = sz.cx;
-        memmove(out1, text, *out1Len);
-
-        // the second line will be empty
-        *out2Len = 0;
-        *out2Width = 0;
-    }
-    // maximum width
-    *maxWidth = max(*out1Width, *out2Width);
-}
-
-// Wide version of SplitText for Unicode filenames
 void SplitTextW(HDC hDC, const wchar_t* text, int textLen, int* maxWidth,
                 wchar_t* out1, int* out1Len, int* out1Width,
                 wchar_t* out2, int* out2Len, int* out2Width)
@@ -1571,11 +1419,9 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             if (Is(ptDisk) && !isDir)
             {
                 int icon;
-                CPathBuffer fileName;
-                memmove(fileName, f->Name, f->NameLen);
-                *(DWORD*)(fileName.Get() + f->NameLen) = 0;
+                const std::wstring fileName(f->Name, f->NameLen);
 
-                if (IconCache->GetIndex(fileName, icon, NULL, NULL))
+                if (IconCache->GetIndex(fileName.c_str(), icon, NULL, NULL))
                 {
                     DWORD flag = IconCache->At(icon).GetFlag();
                     if (flag == 5 || flag == 6) // o.k. || old version
@@ -1760,7 +1606,10 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                               (drawFlags & DRAWFLAG_NO_FRAME) == 0;
 
         // color detection
-        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(f->Name, isDir ? NULL : f->Ext, f->Attr);
+        // Wide name/extension.
+        std::wstring highlightNameW(f->Name);
+        const wchar_t* highlightExtW = isDir ? NULL : sally::unicode::GetWideExtensionStart(highlightNameW.c_str());
+        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(highlightNameW.c_str(), highlightExtW, f->Attr);
 
         // set the applied font, background color and text color
         SetFontAndColors(hDC, highlightMasksItem, f, isItemFocusedOrEditMode, itemIndex);
@@ -1776,14 +1625,7 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
             SetBkColor(hDC, ResolveDarkBaseColor(ITEM_BK_FOCUSED, GetCOLORREF(CurrentColors[ITEM_BK_FOCUSED]), DarkMode_ShouldUseDark()));
         }
 
-        int nameLen = f->NameLen;
         int itemWidth = rect.right - rect.left; // item width
-
-        // Check if we need wide string display for Unicode filenames
-        BOOL useWideDisplay = f->UseWideName();
-        int nameLenW = 0;
-        if (useWideDisplay)
-            nameLenW = (int)wcslen(f->NameW);
 
         // maximum width available for the text
         int maxWidth = itemWidth - 4 - 1; // -1 so they don't touch
@@ -1792,30 +1634,17 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
         int out2Len = 512;
         int out2Width;
 
-        // Wide string buffers for Unicode display
+        // One arm. DrawItemBuff and DrawItemBuffW are BOTH wchar_t[1024]
+        // (see their definitions), so out1/out2 were never the "ANSI buffers" the old comment
+        // claimed - the pair differed only in which wide buffer it wrote to. The earlier
+        // format fix lived in the wide arm only, so that is the arm that survives.
         wchar_t* out1W = DrawItemBuffW;
         wchar_t* out2W = DrawItemBuffW + 512;
 
-        // ANSI string buffers for regular display
-        char* out1 = DrawItemBuff;
-        char* out2 = DrawItemBuff + 512;
-
-        if (useWideDisplay)
-        {
-            // Use wide string processing for Unicode filenames
-            SplitTextW(hDC, f->NameW, nameLenW, &maxWidth,
-                       out1W, &out1Len, &out1Width,
-                       out2W, &out2Len, &out2Width);
-        }
-        else
-        {
-            // format the name to the user-defined form
-            AlterFileName(TransferBuffer, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-
-            SplitText(hDC, TransferBuffer, nameLen, &maxWidth,
-                      out1, &out1Len, &out1Width,
-                      out2, &out2Len, &out2Width);
-        }
+        std::wstring alteredNameW = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir);
+        SplitTextW(hDC, alteredNameW.c_str(), (int)alteredNameW.length(), &maxWidth,
+                   out1W, &out1Len, &out1Width,
+                   out2W, &out2Len, &out2Width);
 
         if (isItemUpDir)
         {
@@ -1861,31 +1690,15 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
         // display the centered first line; also clear background of the second line
         // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-        if (useWideDisplay)
-        {
-            sally::ui::DrawPanelTextW(hDC, rect.left + (itemWidth - out1Width) / 2, y,
-                                      ETO_OPAQUE, &r, out1W, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
-        }
-        else
-        {
-            sally::ui::DrawPanelTextA(hDC, rect.left + (itemWidth - out1Width) / 2, y,
-                                      ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
-        }
+        sally::ui::DrawPanelTextW(hDC, rect.left + (itemWidth - out1Width) / 2, y,
+                                  ETO_OPAQUE, &r, out1W, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
 
         // display the centered second line
         if (out2Len > 0)
         {
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            if (useWideDisplay)
-            {
-                sally::ui::DrawPanelTextW(hDC, rect.left + (itemWidth - out2Width) / 2, y += FontCharHeight,
-                                          0, &r, out2W, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
-            }
-            else
-            {
-                sally::ui::DrawPanelTextA(hDC, rect.left + (itemWidth - out2Width) / 2, y += FontCharHeight,
-                                          0, &r, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
-            }
+            sally::ui::DrawPanelTextW(hDC, rect.left + (itemWidth - out2Width) / 2, y += FontCharHeight,
+                                      0, &r, out2W, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
         }
 
         //*****************************************
@@ -1912,43 +1725,6 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 // Draws an item in Tiles mode
 //
 
-void TruncateSringToFitWidth(HDC hDC, char* buffer, int* bufferLen, int maxTextWidth, int* widthNeeded)
-{
-    if (*bufferLen == 0)
-        return;
-
-    SIZE fnSZ;
-    int fitChars;
-    GetTextExtentExPoint(hDC, buffer, *bufferLen, maxTextWidth,
-                         &fitChars, DrawItemAlpDx, &fnSZ);
-    if (fitChars < *bufferLen)
-    {
-        if (*widthNeeded < maxTextWidth)
-            *widthNeeded = maxTextWidth;
-        // search from the end for the character after which we can copy "..." and it fits in the column
-        while (fitChars > 0 && DrawItemAlpDx[fitChars - 1] + TextEllipsisWidth > maxTextWidth)
-            fitChars--;
-        // copy part of the original string to another buffer
-        if (fitChars > 0)
-        {
-            // and append "..."
-            memmove(buffer + fitChars, "...", 3);
-            *bufferLen = fitChars + 3;
-        }
-        else
-        {
-            buffer[1] = '.';
-            *bufferLen = 2;
-        }
-    }
-    else
-    {
-        if (*widthNeeded < fnSZ.cx)
-            *widthNeeded = fnSZ.cx;
-    }
-}
-
-// Wide version for Unicode filenames
 void TruncateSringToFitWidthW(HDC hDC, wchar_t* buffer, int* bufferLen, int maxTextWidth, int* widthNeeded)
 {
     if (*bufferLen == 0)
@@ -1987,19 +1763,24 @@ void TruncateSringToFitWidthW(HDC hDC, wchar_t* buffer, int* bufferLen, int maxT
 
 void GetTileTexts(CFileData* f, int isDir,
                   HDC hDC, int maxTextWidth, int* widthNeeded,
-                  char* out0, int* out0Len,
-                  char* out1, int* out1Len,
-                  char* out2, int* out2Len, DWORD validFileData,
+                  wchar_t* out0, int* out0Len,
+                  wchar_t* out1, int* out1Len,
+                  wchar_t* out2, int* out2Len, DWORD validFileData,
                   CPluginDataInterfaceEncapsulation* pluginData,
                   BOOL isDisk)
 {
     // format the name to the user-defined form
-    AlterFileName(out0, f->Name, -1, Configuration.FileNameFormat, 0, isDir != 0);
+    // AlterFileNameW returns a std::wstring and drops both the out-buffer
+    // and filenameLen, so this is a reshape rather than a suffix swap. The copy is unbounded
+    // exactly as the AlterFileName it replaces was - GetTileTexts is never told out0's
+    // capacity - so the pre-existing risk is unchanged, not newly introduced.
+    std::wstring alteredName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir != 0);
     // 1st line: NAME
-    *out0Len = f->NameLen;
+    *out0Len = (int)alteredName.length();
+    wmemcpy(out0, alteredName.c_str(), *out0Len + 1);
     // the string may be longer than available space and may need to be shortened with "..."
     *widthNeeded = 0;
-    TruncateSringToFitWidth(hDC, out0, out0Len, maxTextWidth, widthNeeded);
+    TruncateSringToFitWidthW(hDC, out0, out0Len, maxTextWidth, widthNeeded);
 
     // 2nd line: SIZE (if known)
     CQuadWord plSize;
@@ -2013,10 +1794,15 @@ void GetTileTexts(CFileData* f, int isDir,
     if (!plSizeValid && ((validFileData & VALID_DATA_SIZE) == 0 || isDir && !f->SizeValid))
         *out1 = 0;
     else
-        PrintDiskSize(out1, plSizeValid ? plSize : f->Size, 0);
-    *out1Len = (int)strlen(out1);
+    {
+        const std::wstring sizeText = PrintDiskSize(plSizeValid ? plSize : f->Size, 0);
+        const size_t copyLength = (std::min<size_t>)(sizeText.size(), 511);
+        wmemcpy(out1, sizeText.data(), copyLength);
+        out1[copyLength] = L'\0';
+    }
+    *out1Len = (int)wcslen(out1);
     // the string may be longer than available space and may need to be shortened with "..."
-    TruncateSringToFitWidth(hDC, out1, out1Len, maxTextWidth, widthNeeded);
+    TruncateSringToFitWidthW(hDC, out1, out1Len, maxTextWidth, widthNeeded);
 
     // 3rd line DATE TIME (if known)
     SYSTEMTIME st;
@@ -2081,15 +1867,15 @@ void GetTileTexts(CFileData* f, int isDir,
     {
         if (validDate)
         {
-            out2LenA = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, out2, 500) - 1;
+            out2LenA = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, out2, 500) - 1;
             if (out2LenA < 0)
-                out2LenA = sprintf(out2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                out2LenA = _snwprintf_s(out2, 500, _TRUNCATE, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         }
         else
-            out2LenA = sprintf(out2, LoadStr(IDS_INVALID_DATEORTIME));
+            out2LenA = _snwprintf_s(out2, 500, _TRUNCATE, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
         if (validTime || invalidTime)
         {
-            out2[out2LenA] = ' ';
+            out2[out2LenA] = L' ';
             out2LenA++;
         }
     }
@@ -2097,16 +1883,16 @@ void GetTileTexts(CFileData* f, int isDir,
     {
         if (validTime)
         {
-            out2LenB = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, out2 + out2LenA, 500 - out2LenA) - 1;
+            out2LenB = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, out2 + out2LenA, 500 - out2LenA) - 1;
             if (out2LenB < 0)
-                out2LenB = sprintf(out2 + out2LenA, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                out2LenB = _snwprintf_s(out2 + out2LenA, 500 - out2LenA, _TRUNCATE, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         }
         else
-            out2LenB = sprintf(out2 + out2LenA, LoadStr(IDS_INVALID_DATEORTIME));
+            out2LenB = _snwprintf_s(out2 + out2LenA, 500 - out2LenA, _TRUNCATE, L"%s", LoadStrW(IDS_INVALID_DATEORTIME));
     }
     *out2Len = out2LenA + out2LenB;
     // the string may be longer than available space and may need to be shortened with "..."
-    TruncateSringToFitWidth(hDC, out2, out2Len, maxTextWidth, widthNeeded);
+    TruncateSringToFitWidthW(hDC, out2, out2Len, maxTextWidth, widthNeeded);
 }
 
 void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD drawFlags,
@@ -2215,7 +2001,10 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                               (drawFlags & DRAWFLAG_NO_FRAME) == 0;
 
         // colors detection
-        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(f->Name, isDir ? NULL : f->Ext, f->Attr);
+        // Wide name/extension.
+        std::wstring highlightNameW(f->Name);
+        const wchar_t* highlightExtW = isDir ? NULL : sally::unicode::GetWideExtensionStart(highlightNameW.c_str());
+        CHighlightMasksItem* highlightMasksItem = MainWindow->HighlightMasks->AgreeMasks(highlightNameW.c_str(), highlightExtW, f->Attr);
 
         // set the applied font, background color and text color
         SetFontAndColors(hDC, highlightMasksItem, f, isItemFocusedOrEditMode, itemIndex);
@@ -2234,45 +2023,29 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
         int nameLen = f->NameLen;
         int itemWidth = rect.right - rect.left; // item width
 
-        // Check if we need wide string display for Unicode filenames
-        BOOL useWideDisplay = f->UseWideName();
-
         // texts must not exceed this length in pixels
         int maxTextWidth = itemWidth - TILE_LEFT_MARGIN - IconSizes[iconSize] - TILE_LEFT_MARGIN - 4;
         int widthNeeded = 0;
 
-        char* out0 = TransferBuffer;
+        wchar_t* out0 = TransferBuffer;
         int out0Len;
-        wchar_t* out0W = DrawItemBuffW; // Wide buffer for Unicode filename
-        int out0LenW = 0;
-        char* out1 = DrawItemBuff;
+        wchar_t* out1 = DrawItemBuff;
         int out1Len;
-        char* out2 = DrawItemBuff + 512;
+        wchar_t* out2 = DrawItemBuff + 512;
         int out2Len;
 
-        if (useWideDisplay)
-        {
-            // Handle Unicode filename separately
-            out0LenW = (int)wcslen(f->NameW);
-            wmemcpy(out0W, f->NameW, out0LenW + 1);
-            TruncateSringToFitWidthW(hDC, out0W, &out0LenW, maxTextWidth, &widthNeeded);
-
-            // Still call GetTileTexts for size and date/time (out1, out2), but skip filename
-            GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0, hDC, maxTextWidth, &widthNeeded,
-                         out0, &out0Len, out1, &out1Len, out2, &out2Len,
-                         ValidFileData, &PluginData, Is(ptDisk));
-        }
-        else
-        {
-            GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0, hDC, maxTextWidth, &widthNeeded,
-                         out0, &out0Len, out1, &out1Len, out2, &out2Len,
-                         ValidFileData, &PluginData, Is(ptDisk));
-        }
+        // One call. This used to fork on f->UseWideName() and, in the wide
+        // arm, build a SECOND wide copy of the name in out0W before calling GetTileTexts
+        // anyway and discarding its out0. The predicate died with CFileData::NameW, so only
+        // the arm below has ever run - and GetTileTexts now applies AlterFileNameW itself,
+        // so that format fix lives there instead of being duplicated here.
+        GetTileTexts(f, isDir ? (isItemUpDir ? 2 /* UP-DIR */ : 1) : 0, hDC, maxTextWidth, &widthNeeded,
+                     out0, &out0Len, out1, &out1Len, out2, &out2Len,
+                     ValidFileData, &PluginData, Is(ptDisk));
 
         if (isItemUpDir)
         {
             out0Len = 0;
-            out0LenW = 0;
         }
 
         // outer rectangle from which I clear towards the inner one
@@ -2324,14 +2097,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                 r.bottom--;
         }
         // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-        if (useWideDisplay)
-        {
-            sally::ui::DrawPanelTextW(hDC, textX, textY, ETO_OPAQUE, &r, out0W, (drawFlags & DRAWFLAG_MASK) ? 0 : out0LenW, NULL);
-        }
-        else
-        {
-            sally::ui::DrawPanelTextA(hDC, textX, textY, ETO_OPAQUE, &r, out0, (drawFlags & DRAWFLAG_MASK) ? 0 : out0Len, NULL);
-        }
+        sally::ui::DrawPanelTextW(hDC, textX, textY, ETO_OPAQUE, &r, out0, (drawFlags & DRAWFLAG_MASK) ? 0 : out0Len, NULL);
 
         // display the second line
         if (out1[0] != 0)
@@ -2346,7 +2112,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                     r.bottom--;
             }
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            sally::ui::DrawPanelTextA(hDC, textX, textY, ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
+            sally::ui::DrawPanelTextW(hDC, textX, textY, ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
         }
         // display the third line and clear the background of the area below it
         if (out2[0] != 0)
@@ -2357,7 +2123,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                 r.bottom--;
             textY += FontCharHeight;
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            sally::ui::DrawPanelTextA(hDC, textX, textY, ETO_OPAQUE, &r, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
+            sally::ui::DrawPanelTextW(hDC, textX, textY, ETO_OPAQUE, &r, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
         }
 
         //*****************************************

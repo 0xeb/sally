@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 enum CDialogTaskEnum
 {
     dteCompress,
@@ -23,7 +25,7 @@ protected:
     CCompressParams CompressParams;
     CUploadParams UploadParams;
     CMinidumpParams MinidumpParams;
-    char CurrentProgressText[200];
+    std::wstring CurrentProgressText;
     BOOL MinidumpOnOpen; // should minidump generation start after opening the window?
 
 public:

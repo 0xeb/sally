@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_narrow_compat.h"
 
 // ****************************************************************************
 
@@ -61,14 +62,17 @@ BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginN
     // this plugin targets the current Salamander version and newer - perform the check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // cannot call Error here because it uses SG->SalMessageBox (SG not initialized + incompatible interface)
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   pluginName, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // and pluginName is a caller-supplied narrow string - no SalamanderGeneral yet, so widen
+        // via MessageBoxW+ToWideArg (plugin_narrow_compat.h, already included above).
+        MessageBoxW(salamander->GetParentWindow(),
+                    ToWideArg(REQUIRE_LAST_VERSION_OF_SALAMANDER).c_str(),
+                    ToWideArg(pluginName).c_str(), MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
     // load language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), pluginName);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), ToWideArg(pluginName).c_str());
     if (HLanguage == NULL)
         return FALSE;
 
@@ -90,34 +94,40 @@ void ReleaseLCUtils()
     CALL_STACK_MESSAGE_NONE
 }
 
-char* LoadStr(int resID)
+std::wstring LangStr(int resID)
 {
-    return SG->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SG, HLanguage, resID);
 }
 
-BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglist)
+BOOL ErrorHelper(HWND parent, const wchar_t* message, int lastError, va_list arglist)
 {
-    CALL_STACK_MESSAGE3("ErrorHelper(, %s, %d, )", message, lastError);
-    char buf[1024];
+    CALL_STACK_MESSAGE3("ErrorHelper(, %S, %d, )", message, lastError);
+    // Wide throughout. `message` is a resource string used as a printf FORMAT, so
+    // widening LangStr without widening the buffer and the vprintf would have handed a wchar_t*
+    // format to the narrow vprintf - which compiles and prints garbage. The FormatMessage that appends the
+    // system error text follows for the same reason.
+    wchar_t buf[1024];
     *buf = 0;
-    vsprintf(buf, message, arglist);
+    _vsnwprintf_s(buf, _countof(buf), _TRUNCATE, message, arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        int l = lstrlenW(buf);
+        FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, _countof(buf) - l, NULL);
     }
     if (SG)
     {
         if (parent == HWND(-1))
             parent = GetCurrentThreadId() == MainThreadID ? SG->GetMsgBoxParent() : NULL;
-        SG->SalMessageBox(parent, buf, LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR | (parent == NULL && AlwaysOnTop ? MB_TOPMOST : 0));
+        SG->SalMessageBox(parent, buf, SPLLoadStrOwned(SG, HLanguage, IDS_SPLERROR).c_str(), MB_OK | MB_ICONERROR | (parent == NULL && AlwaysOnTop ? MB_TOPMOST : 0));
     }
     else
     {
+        // Reachable before InitLCUtils has a SalamanderGeneral - the plugin's own resource
+        // module is loaded by then, but nothing else is.
         if (parent == HWND(-1))
             parent = 0;
-        MessageBox(parent, buf, LoadStr(IDS_SPLERROR), MB_OK | MB_ICONERROR | (parent == NULL && AlwaysOnTop ? MB_TOPMOST : 0));
+        MessageBoxW(parent, buf, LangStr(IDS_SPLERROR).c_str(), MB_OK | MB_ICONERROR | (parent == NULL && AlwaysOnTop ? MB_TOPMOST : 0));
     }
     return FALSE;
 }
@@ -129,16 +139,16 @@ BOOL Error(HWND parent, int error, ...)
     CALL_STACK_MESSAGE2("Error(, %d, )", error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(parent, LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(parent, LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
 
-BOOL Error(HWND parent, const char* error, ...)
+BOOL Error(HWND parent, const wchar_t* error, ...)
 {
     CALL_STACK_MESSAGE_NONE
     int lastError = GetLastError();
-    CALL_STACK_MESSAGE2("Error(, %s, )", error);
+    CALL_STACK_MESSAGE2("Error(, %ls, )", error);
     va_list arglist;
     va_start(arglist, error);
     BOOL ret = ErrorHelper(parent, error, lastError, arglist);
@@ -153,7 +163,7 @@ BOOL Error(int error, ...)
     CALL_STACK_MESSAGE2("Error(%d, )", error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(DialogStack.Peek(), LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(DialogStack.Peek(), LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
@@ -163,7 +173,7 @@ BOOL ErrorL(int lastError, HWND parent, int error, ...)
     CALL_STACK_MESSAGE3("ErrorL(%d, , %d, )", lastError, error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(parent, LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(parent, LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
@@ -173,7 +183,7 @@ BOOL ErrorL(int lastError, int error, ...)
     CALL_STACK_MESSAGE3("ErrorL(%d, %d, )", lastError, error);
     va_list arglist;
     va_start(arglist, error);
-    BOOL ret = ErrorHelper(DialogStack.Peek(), LoadStr(error), lastError, arglist);
+    BOOL ret = ErrorHelper(DialogStack.Peek(), LangStr(error).c_str(), lastError, arglist);
     va_end(arglist);
     return ret;
 }
@@ -217,8 +227,8 @@ Concatenate(const char* string1, const char* string2)
     static char buffer[5120];
     static int iterator = 0;
 
-    int len1 = lstrlen(string1);
-    int len2 = lstrlen(string2);
+    int len1 = lstrlenA(string1);
+    int len2 = lstrlenA(string2);
 
     if (len1 + len2 >= 5120)
         return "STRING TOO LONG";

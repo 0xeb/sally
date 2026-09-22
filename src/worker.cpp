@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -11,6 +11,7 @@
 #include "common/CopyStrategy.h"
 #include "common/widepath.h"
 #include "common/IFileSystem.h"
+#include "common/IShell.h"
 #include "common/IWorkerObserver.h"
 #include "common/WorkerDirectHeadless.h"
 #include "DialogWorkerObserver.h"
@@ -22,10 +23,18 @@
 #include <ntsecapi.h>
 
 // these functions have no header, we must load them dynamically
-NTQUERYINFORMATIONFILE DynNtQueryInformationFile = NULL;
 NTFSCONTROLFILE DynNtFsControlFile = NULL;
 
 COperationsQueue OperationsQueue; // queue of disk operations
+
+// The local shim that used to live here narrowed its own wide argument and
+// called the ANSI IsLantasticDrive - a *W function that threw away the W. Its comment
+// claimed "LANTASTIC detection needs the ANSI network APIs"; it does not. WNetOpenEnumW /
+// WNetEnumResourceW / WNetGetNetworkInformationW all exist, and the enumeration is the
+// authority the path is compared against, so narrowing it corrupted both sides at once.
+// The refusal it fell back to (TryWideToAnsiRoundTripExact) was safe but wrong: it answered
+// "not LANTASTIC" for every share the code page cannot spell. IsLantasticDriveW in
+// sally_path_validation.cpp is now the real implementation.
 
 static IFileSystem* GetWorkerFileSystem()
 {
@@ -462,24 +471,18 @@ void CProgressSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacket
 //
 
 // Opens source file for reading - uses SourceNameW if available
-// P2-b: the COperation file helpers are wide-only through gFileSystem. Every
-// producer supplies wide names (PopulateWidePathsFromAnsi guarantees it on Add);
-// the rare ANSI-mirror-only case is converted here so there is ONE interface
-// path and no SalLP*/SalCreateFile* ANSI branch. Hot paths stay zero-alloc: the
-// scratch wstring is only touched when a real wide name is absent.
-static const wchar_t* EffWide(bool hasWide, const std::wstring& w, const char* a,
-                              std::wstring& scratch)
+
+static FileResult CloseWorkerTrackedFile(HANDLE file)
 {
-    if (hasWide)
-        return w.c_str();
-    scratch = AnsiToWide(a);
-    return scratch.c_str();
+    if (file == NULL || file == INVALID_HANDLE_VALUE)
+        return FileResult::Error(ERROR_INVALID_HANDLE);
+    HANDLES_REMOVE(file, __htFile, "IFileSystem::CloseFileHandle");
+    return GetWorkerFileSystem()->CloseFileHandle(file);
 }
 
 HANDLE COperation::OpenSourceFile(DWORD flags) const
 {
-    std::wstring scratch;
-    const wchar_t* nameW = EffWide(HasWideSource(), SourceNameW, SourceName, scratch);
+    const wchar_t* nameW = SourceNameW.c_str();
     HANDLE h = GetWorkerFileSystem()->CreateFile(
         nameW, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
         OPEN_EXISTING, flags, NULL);
@@ -491,8 +494,7 @@ HANDLE COperation::OpenSourceFile(DWORD flags) const
 // Opens target file for writing.
 HANDLE COperation::OpenTargetFile(DWORD access, DWORD shareMode, DWORD disposition, DWORD flags) const
 {
-    std::wstring scratch;
-    const wchar_t* nameW = EffWide(HasWideTarget(), TargetNameW, TargetName, scratch);
+    const wchar_t* nameW = TargetNameW.c_str();
     HANDLE h = GetWorkerFileSystem()->CreateFile(
         nameW, access, shareMode, NULL, disposition, flags, NULL);
     DWORD err = GetLastError();
@@ -504,8 +506,7 @@ HANDLE COperation::OpenTargetFile(DWORD access, DWORD shareMode, DWORD dispositi
 // NOTE: Does NOT add handle tracking - caller is responsible for HANDLES_ADD_EX
 HANDLE COperation::CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported) const
 {
-    std::wstring scratch;
-    const wchar_t* nameW = EffWide(HasWideTarget(), TargetNameW, TargetName, scratch);
+    const wchar_t* nameW = TargetNameW.c_str();
     IFileSystem* fileSystem = GetWorkerFileSystem();
     HANDLE out = fileSystem->CreateFile(nameW, desiredAccess, shareMode, NULL,
                                         CREATE_NEW, flagsAndAttributes, NULL);
@@ -518,7 +519,7 @@ HANDLE COperation::CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWOR
         if (testOut != INVALID_HANDLE_VALUE)
         {
             *encryptionNotSupported = TRUE;
-            fileSystem->CloseHandle(testOut);
+            fileSystem->CloseFileHandle(testOut);
             fileSystem->DeleteFile(nameW);
         }
     }
@@ -528,79 +529,69 @@ HANDLE COperation::CreateTargetFileEx(DWORD desiredAccess, DWORD shareMode, DWOR
 // Deletes target file.
 BOOL COperation::DeleteTargetFile() const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->DeleteFile(
-        EffWide(HasWideTarget(), TargetNameW, TargetName, scratch)).success;
+        TargetNameW.c_str()).success;
 }
 
 // Sets target file attributes.
 BOOL COperation::SetTargetAttributes(DWORD attrs) const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->SetFileAttributes(
-        EffWide(HasWideTarget(), TargetNameW, TargetName, scratch), attrs).success;
+        TargetNameW.c_str(), attrs).success;
 }
 
 // Gets target file attributes.
 DWORD COperation::GetTargetAttributes() const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->GetFileAttributes(
-        EffWide(HasWideTarget(), TargetNameW, TargetName, scratch));
+        TargetNameW.c_str());
 }
 
 // Deletes source file.
 BOOL COperation::DeleteSourceFile() const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->DeleteFile(
-        EffWide(HasWideSource(), SourceNameW, SourceName, scratch)).success;
+        SourceNameW.c_str()).success;
 }
 
 // Sets source file attributes.
 BOOL COperation::SetSourceAttributes(DWORD attrs) const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->SetFileAttributes(
-        EffWide(HasWideSource(), SourceNameW, SourceName, scratch), attrs).success;
+        SourceNameW.c_str(), attrs).success;
 }
 
 // Gets source file attributes.
 DWORD COperation::GetSourceAttributes() const
 {
-    std::wstring scratch;
     return GetWorkerFileSystem()->GetFileAttributes(
-        EffWide(HasWideSource(), SourceNameW, SourceName, scratch));
+        SourceNameW.c_str());
 }
 
-// Clears read-only attribute on target file. ClearReadOnlyAttrW is a pure wide
+// Clears read-only attribute on target file. ClearReadOnlyAttr is a pure wide
 // helper (get+clear attrs); no interface method needed.
 BOOL COperation::ClearTargetReadOnly(DWORD attr) const
 {
-    std::wstring scratch;
-    return ClearReadOnlyAttrW(EffWide(HasWideTarget(), TargetNameW, TargetName, scratch), attr);
+    return ClearReadOnlyAttr(TargetNameW.c_str(), attr);
 }
 
 // Clears read-only attribute on source file.
 BOOL COperation::ClearSourceReadOnly(DWORD attr) const
 {
-    std::wstring scratch;
-    return ClearReadOnlyAttrW(EffWide(HasWideSource(), SourceNameW, SourceName, scratch), attr);
+    return ClearReadOnlyAttr(SourceNameW.c_str(), attr);
 }
 
 // Checks if source file name is invalid (ends with space/dot).
 BOOL COperation::IsSourceNameInvalid(BOOL ignInvalidName) const
 {
-    std::wstring scratch;
-    return FileNameIsInvalidW(EffWide(HasWideSource(), SourceNameW, SourceName, scratch),
+    return FileNameIsInvalidW(SourceNameW.c_str(),
                               TRUE, ignInvalidName);
 }
 
 // Checks if target file name is invalid (ends with space/dot).
 BOOL COperation::IsTargetNameInvalid(BOOL ignInvalidName) const
 {
-    std::wstring scratch;
-    return FileNameIsInvalidW(EffWide(HasWideTarget(), TargetNameW, TargetName, scratch),
+    return FileNameIsInvalidW(TargetNameW.c_str(),
                               TRUE, ignInvalidName);
 }
 
@@ -610,9 +601,8 @@ HANDLE COperation::FindFirstTarget(WIN32_FIND_DATAW* findData) const
     IFileSystem* fileSystem = GetWorkerFileSystem();
     if (fileSystem == NULL)
         return INVALID_HANDLE_VALUE;
-    std::wstring scratch;
     return fileSystem->FindFirstFile(
-        EffWide(HasWideTarget(), TargetNameW, TargetName, scratch), findData);
+        TargetNameW.c_str(), findData);
 }
 
 // FindFirstFile for source path - always returns wide find data.
@@ -621,26 +611,22 @@ HANDLE COperation::FindFirstSource(WIN32_FIND_DATAW* findData) const
     IFileSystem* fileSystem = GetWorkerFileSystem();
     if (fileSystem == NULL)
         return INVALID_HANDLE_VALUE;
-    std::wstring scratch;
     return fileSystem->FindFirstFile(
-        EffWide(HasWideSource(), SourceNameW, SourceName, scratch), findData);
+        SourceNameW.c_str(), findData);
 }
 
-// Wraps CreateFileW + DeviceIoControl(FSCTL_SET_COMPRESSION) for platform abstraction.
 DWORD COperation::SetCompressionW(const wchar_t* path, USHORT compressionFormat)
 {
-    HANDLE file = CreateFileW(path, FILE_READ_DATA | FILE_WRITE_DATA,
+    HANDLE file = GetWorkerFileSystem()->CreateFile(path, FILE_READ_DATA | FILE_WRITE_DATA,
                               FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                               OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return GetLastError();
 
-    DWORD ret = ERROR_SUCCESS;
-    ULONG length;
-    if (!DeviceIoControl(file, FSCTL_SET_COMPRESSION, &compressionFormat,
-                         sizeof(USHORT), NULL, 0, &length, FALSE))
-        ret = GetLastError();
-    HANDLES(CloseHandle(file));
+    const FileResult compressionResult = GetWorkerFileSystem()->SetHandleCompression(
+        file, compressionFormat != COMPRESSION_FORMAT_NONE);
+    DWORD ret = compressionResult.success ? ERROR_SUCCESS : compressionResult.errorCode;
+    (void)GetWorkerFileSystem()->CloseFileHandle(file);
     return ret;
 }
 
@@ -650,26 +636,30 @@ DWORD COperation::WithPreservedFileTimeW(const wchar_t* path, DWORD attrs,
 {
     DWORD flags = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0;
 
-    HANDLE file = CreateFileW(path, GENERIC_READ,
+    HANDLE file = GetWorkerFileSystem()->CreateFile(path, GENERIC_READ,
                               FILE_SHARE_READ | FILE_SHARE_WRITE,
                               NULL, OPEN_EXISTING, flags, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return GetLastError();
 
-    FILETIME ftCreated, ftModified;
-    GetFileTime(file, &ftCreated, NULL, &ftModified);
-    HANDLES(CloseHandle(file));
+    FILETIME ftCreated = {};
+    FILETIME ftModified = {};
+    const FileResult savedTimeResult = GetWorkerFileSystem()->GetHandleFileTime(
+        file, &ftCreated, NULL, &ftModified);
+    (void)GetWorkerFileSystem()->CloseFileHandle(file);
 
     DWORD ret = operationFn(path);
 
     // Restore file times regardless of operationFn result
-    file = CreateFileW(path, GENERIC_WRITE,
+    file = GetWorkerFileSystem()->CreateFile(path, GENERIC_WRITE,
                        FILE_SHARE_READ | FILE_SHARE_WRITE,
                        NULL, OPEN_EXISTING, flags, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
-        SetFileTime(file, &ftCreated, NULL, &ftModified);
-        HANDLES(CloseHandle(file));
+        if (savedTimeResult.success)
+            (void)GetWorkerFileSystem()->SetHandleFileTime(
+                file, &ftCreated, NULL, &ftModified);
+        (void)GetWorkerFileSystem()->CloseFileHandle(file);
     }
     return ret;
 }
@@ -1027,7 +1017,7 @@ void CAsyncCopyParams::Init(BOOL useAsyncAlg)
             if (Overlapped[i].hEvent == NULL)
             {
                 DWORD err = GetLastError();
-                TRACE_E("Unable to create synchronization object for Copy rutine: " << GetErrorText(err));
+                TRACE_EW(L"Unable to create synchronization object for Copy rutine: " << GetErrorTextOwned(err).c_str());
                 HasFailed = TRUE;
             }
         }
@@ -1085,20 +1075,16 @@ void CAsyncCopyParams::SetOverlappedToEOF(int i, const CQuadWord& offset)
 
 // **********************************************************************************
 
-BOOL HaveWriteOwnerRight = FALSE; // does the process have the WRITE_OWNER right?
-
 void InitWorker()
 {
     if (NtDLL != NULL) // "always true"
     {
-        DynNtQueryInformationFile = (NTQUERYINFORMATIONFILE)GetProcAddress(NtDLL, "NtQueryInformationFile"); // has no header
         DynNtFsControlFile = (NTFSCONTROLFILE)GetProcAddress(NtDLL, "NtFsControlFile");                      // has no header
     }
 }
 
 void ReleaseWorker()
 {
-    DynNtQueryInformationFile = NULL;
     DynNtFsControlFile = NULL;
 }
 
@@ -1159,14 +1145,14 @@ struct CWorkerState
     BOOL IgnoreAllCopyPermErr;
     BOOL IgnoreAllCopyDirTimeErr;
 
-    char OpStrCopying[50];
-    char OpStrCopyingPrep[50];
-    char OpStrMoving[50];
-    char OpStrMovingPrep[50];
-    char OpStrCreatingDir[50];
-    char OpStrDeleting[50];
-    char OpStrConverting[50];
-    char OpStrChangingAttrs[50];
+    wchar_t OpStrCopying[50];
+    wchar_t OpStrCopyingPrep[50];
+    wchar_t OpStrMoving[50];
+    wchar_t OpStrMovingPrep[50];
+    wchar_t OpStrCreatingDir[50];
+    wchar_t OpStrDeleting[50];
+    wchar_t OpStrConverting[50];
+    wchar_t OpStrChangingAttrs[50];
 
     int CnfrmFileOver; // local copy of the Salamander configuration
     int CnfrmDirOver;
@@ -1175,6 +1161,15 @@ struct CWorkerState
     int UseRecycleBin;
     BOOL UseAsyncCopyAlg;
     CMaskGroup RecycleMasks;
+
+    // Source of the most recent ocCreateDirLink the user skipped.
+    //
+    // A MOVE of a directory link is two operations: clone the reparse buffer at the
+    // target, then delete the source link. Skipping the clone is not a refusal to do
+    // anything - the delete still follows it in the script - so without this the link
+    // vanished from the source and was never made at the target. Records the source
+    // name so DoDeleteDirLink can recognise its own half of the pair and skip too.
+    std::wstring SkippedDirLinkSourceW;
 
     // Initialize all skip/confirm flags to FALSE and copy config values
     void Init()
@@ -1197,26 +1192,30 @@ struct CWorkerState
                                                                     DirCrLossEncrAll = IgnoreAllGetFileTimeErr =
                                                                         IgnoreAllSetFileTimeErr = SkipAllGetFileTime =
                                                                             SkipAllSetFileTime = FALSE;
+        SkippedDirLinkSourceW.clear();
         CnfrmFileOver = Configuration.CnfrmFileOver;
         CnfrmDirOver = Configuration.CnfrmDirOver;
         CnfrmSHFileOver = Configuration.CnfrmSHFileOver;
         CnfrmSHFileDel = Configuration.CnfrmSHFileDel;
         UseRecycleBin = Configuration.UseRecycleBin;
         UseAsyncCopyAlg = Windows7AndLater && Configuration.UseAsyncCopyAlg;
+        // wide - Configuration.RecycleMasks is a real CMaskGroup with wide
+        // storage; the narrow round trip mangled a non-ASCII recycle-bin mask for the
+        // duration of the whole copy/move/delete operation.
         RecycleMasks.SetMasksString(Configuration.RecycleMasks.GetMasksString(),
-                                    Configuration.RecycleMasks.GetExtendedMode());
+                                     Configuration.RecycleMasks.GetExtendedMode());
         int errorPos;
         if (UseRecycleBin == 2 && !PrepareRecycleMasks(errorPos))
             TRACE_E("Error in recycle-bin group mask.");
 
-        lstrcpyn(OpStrCopying, LoadStr(IDS_COPYING), 50);
-        lstrcpyn(OpStrCopyingPrep, LoadStr(IDS_COPYINGPREP), 50);
-        lstrcpyn(OpStrMoving, LoadStr(IDS_MOVING), 50);
-        lstrcpyn(OpStrMovingPrep, LoadStr(IDS_MOVINGPREP), 50);
-        lstrcpyn(OpStrCreatingDir, LoadStr(IDS_CREATINGDIR), 50);
-        lstrcpyn(OpStrDeleting, LoadStr(IDS_DELETING), 50);
-        lstrcpyn(OpStrConverting, LoadStr(IDS_CONVERTING), 50);
-        lstrcpyn(OpStrChangingAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
+        lstrcpynW(OpStrCopying, LoadStrW(IDS_COPYING), 50);
+        lstrcpynW(OpStrCopyingPrep, LoadStrW(IDS_COPYINGPREP), 50);
+        lstrcpynW(OpStrMoving, LoadStrW(IDS_MOVING), 50);
+        lstrcpynW(OpStrMovingPrep, LoadStrW(IDS_MOVINGPREP), 50);
+        lstrcpynW(OpStrCreatingDir, LoadStrW(IDS_CREATINGDIR), 50);
+        lstrcpynW(OpStrDeleting, LoadStrW(IDS_DELETING), 50);
+        lstrcpynW(OpStrConverting, LoadStrW(IDS_CONVERTING), 50);
+        lstrcpynW(OpStrChangingAttrs, LoadStrW(IDS_CHANGINGATTRS), 50);
     }
 
     // Headless initialization — no LoadStr(), no Configuration global.
@@ -1242,6 +1241,7 @@ struct CWorkerState
                                                                     DirCrLossEncrAll = IgnoreAllGetFileTimeErr =
                                                                         IgnoreAllSetFileTimeErr = SkipAllGetFileTime =
                                                                             SkipAllSetFileTime = FALSE;
+        SkippedDirLinkSourceW.clear();
 
         // Always consult observer for confirmation decisions (1 = ask)
         CnfrmFileOver = 1;
@@ -1252,14 +1252,14 @@ struct CWorkerState
         UseAsyncCopyAlg = FALSE;
 
         // Hardcoded English operation strings (no resource DLL needed)
-        lstrcpynA(OpStrCopying, "Copying", 50);
-        lstrcpynA(OpStrCopyingPrep, "to", 50);
-        lstrcpynA(OpStrMoving, "Moving", 50);
-        lstrcpynA(OpStrMovingPrep, "to", 50);
-        lstrcpynA(OpStrCreatingDir, "Creating directory", 50);
-        lstrcpynA(OpStrDeleting, "Deleting", 50);
-        lstrcpynA(OpStrConverting, "Converting", 50);
-        lstrcpynA(OpStrChangingAttrs, "Changing attributes", 50);
+        lstrcpynW(OpStrCopying, L"Copying", 50);
+        lstrcpynW(OpStrCopyingPrep, L"to", 50);
+        lstrcpynW(OpStrMoving, L"Moving", 50);
+        lstrcpynW(OpStrMovingPrep, L"to", 50);
+        lstrcpynW(OpStrCreatingDir, L"Creating directory", 50);
+        lstrcpynW(OpStrDeleting, L"Deleting", 50);
+        lstrcpynW(OpStrConverting, L"Converting", 50);
+        lstrcpynW(OpStrChangingAttrs, L"Changing attributes", 50);
     }
 
     BOOL PrepareRecycleMasks(int& errorPos)
@@ -1267,7 +1267,11 @@ struct CWorkerState
         return RecycleMasks.PrepareMasks(errorPos);
     }
 
-    BOOL AgreeRecycleMasks(const char* fileName, const char* fileExt)
+    // The narrow AgreeRecycleMasks wrapper was removed - its sole caller
+    // already uses AgreeRecycleMasksW directly, and RecycleMasks.AgreeMasks itself now
+    // takes wchar_t* (see masks.cpp), so the narrow wrapper had no valid body
+    // left to give it.
+    BOOL AgreeRecycleMasksW(const wchar_t* fileName, const wchar_t* fileExt)
     {
         return RecycleMasks.AgreeMasks(fileName, fileExt);
     }
@@ -1278,18 +1282,20 @@ int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal)
     return progressCurrent >= progressTotal ? (progressTotal.Value == 0 ? 0 : 1000) : (int)((progressCurrent * CQuadWord(1000, 0)) / progressTotal).Value;
 }
 
-BOOL GetDirTime(const char* dirName, FILETIME* ftModified);
 BOOL GetDirTimeW(const wchar_t* dirName, FILETIME* ftModified);
-BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& workerState, BOOL quiet,
-                   const std::wstring& targetNameW = std::wstring());
+BOOL DoCopyDirTime(IWorkerObserver& observer, FILETIME* modified, CWorkerState& workerState, BOOL quiet,
+                   const std::wstring& targetNameW);
 
-void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
+// Wide info line for the overwrite prompt: "size, date, time[, attrs]".
+
+void GetFileOverwriteInfoW(wchar_t* buff, int buffLen, HANDLE file, const wchar_t* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
 {
     FILETIME lastWrite;
     SYSTEMTIME st;
     FILETIME ft;
-    char date[50], time[50];
-    if (!GetFileTime(file, NULL, NULL, &lastWrite) ||
+    wchar_t date[50], time[50];
+    if (!GetWorkerFileSystem()->GetHandleFileTime(
+            file, NULL, NULL, &lastWrite).success ||
         !FileTimeToLocalFileTime(&lastWrite, &ft) ||
         !FileTimeToSystemTime(&ft, &st))
     {
@@ -1302,33 +1308,33 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
     {
         if (fileTime != NULL)
             *fileTime = ft;
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-            sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-            sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+            swprintf_s(time, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+            swprintf_s(date, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     }
 
-    char attr[30];
-    lstrcpy(attr, ", ");
-    DWORD attrs = GetFileAttributesW(AnsiToWide(fileName).c_str());
+    wchar_t attr[30];
+    wcscpy_s(attr, L", ");
+    DWORD attrs = GetWorkerFileSystem()->GetFileAttributes(fileName);
     if (attrs != 0xFFFFFFFF)
-        GetAttrsString(attr + 2, attrs);
-    if (strlen(attr) == 2)
+    {
+        GetAttrsStringW(attr + 2, attrs);
+    }
+    if (wcslen(attr) == 2)
         attr[0] = 0;
 
-    char number[50];
+    std::wstring number;
     CQuadWord size;
     DWORD err;
     if (SalGetFileSize(file, size, err))
-        NumberToStr(number, size);
-    else
-        number[0] = 0; // error - size unknown
+        number = NumberToStr(size);
 
-    _snprintf_s(buff, buffLen, _TRUNCATE, "%s, %s, %s%s", number, date, time, attr);
+    _snwprintf_s(buff, buffLen, _TRUNCATE, L"%s, %s, %s%s", number.c_str(), date, time, attr);
 }
 
 // Wide version of GetDirInfo — uses native wide APIs
-void GetDirInfoW(char* buffer, const wchar_t* dir)
+void GetDirInfoW(wchar_t* buffer, const wchar_t* dir)
 {
     std::wstring dirPath = MakeCopyWithBackslashIfNeededW(dir);
 
@@ -1336,13 +1342,14 @@ void GetDirInfoW(char* buffer, const wchar_t* dir)
     FILETIME lastWrite;
     if (NameEndsWithBackslashW(dirPath.c_str()))
     {
-        HANDLE file = CreateFileW(dirPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        HANDLE file = GetWorkerFileSystem()->CreateFile(dirPath.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                   NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
         if (file != INVALID_HANDLE_VALUE)
         {
-            if (GetFileTime(file, NULL, NULL, &lastWrite))
+            if (GetWorkerFileSystem()->GetHandleFileTime(
+                    file, NULL, NULL, &lastWrite).success)
                 ok = TRUE;
-            HANDLES(CloseHandle(file));
+            (void)CloseWorkerTrackedFile(file);
         }
     }
     else
@@ -1353,7 +1360,7 @@ void GetDirInfoW(char* buffer, const wchar_t* dir)
                                          : INVALID_HANDLE_VALUE;
         if (find != INVALID_HANDLE_VALUE)
         {
-            HANDLES(FindClose(find));
+            SalLPFindClose(find);
             lastWrite = data.ftLastWriteTime;
             ok = TRUE;
         }
@@ -1365,26 +1372,21 @@ void GetDirInfoW(char* buffer, const wchar_t* dir)
         if (FileTimeToLocalFileTime(&lastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            char date[50], time[50];
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-                sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-                sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+            wchar_t date[50], time[50];
+            if (GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+                swprintf_s(time, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+                swprintf_s(date, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
-            sprintf(buffer, "%s, %s", date, time);
+            swprintf(buffer, 101, L"%s, %s", date, time);
         }
         else
-            sprintf(buffer, "%s, %s", LoadStr(IDS_INVALID_DATEORTIME), LoadStr(IDS_INVALID_DATEORTIME));
+            swprintf(buffer, 101, L"%s, %s", LoadStrW(IDS_INVALID_DATEORTIME), LoadStrW(IDS_INVALID_DATEORTIME));
     }
     else
         buffer[0] = 0;
 }
 
-// ANSI wrapper — delegates to wide version
-void GetDirInfo(char* buffer, const char* dir)
-{
-    GetDirInfoW(buffer, AnsiToWide(dir).c_str());
-}
 
 BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contain no files
 {
@@ -1411,30 +1413,23 @@ BOOL IsDirectoryEmptyW(const wchar_t* name) // directories/subdirectories contai
                 std::wstring subDir = dir + fileData.cFileName;
                 if (!IsDirectoryEmptyW(subDir.c_str())) // the subdirectory is not empty
                 {
-                    HANDLES(FindClose(search));
+                    SalLPFindClose(search);
                     return FALSE;
                 }
             }
             else
             {
-                HANDLES(FindClose(search)); // a file exists here
+                SalLPFindClose(search); // a file exists here
                 return FALSE;
             }
         } while (fileSystem != NULL && fileSystem->FindNextFile(search, &fileData));
-        HANDLES(FindClose(search));
+        SalLPFindClose(search);
     }
     return TRUE;
 }
 
-// ANSI wrapper — delegates to wide version
-BOOL IsDirectoryEmpty(const char* name)
-{
-    return IsDirectoryEmptyW(AnsiToWide(name).c_str());
-}
-
-BOOL CurrentProcessTokenUserValid = FALSE;
-char CurrentProcessTokenUserBuf[200];
-TOKEN_USER* CurrentProcessTokenUser = (TOKEN_USER*)CurrentProcessTokenUserBuf;
+// 2026-08-25: the narrow IsDirectoryEmpty(char*) thin adapter was deleted -
+// confirmed-dead (zero callers anywhere; a pure core-internal helper, no ABI entry at all).
 
 void GainWriteOwnerAccess()
 {
@@ -1450,29 +1445,30 @@ void GainWriteOwnerAccess()
             return;
         }
 
-        DWORD reqSize;
-        if (GetTokenInformation(tokenHandle, TokenUser, CurrentProcessTokenUser, 200, &reqSize))
-            CurrentProcessTokenUserValid = TRUE;
-
         int i;
         for (i = 0; i < 3; i++)
         {
-            const char* privName = NULL;
+            // Privilege names are permanently-ASCII Windows constants (never localized/widened);
+            // the SDK only exposes them via the TCHAR-generic SE_*_NAME macros, so this uses the
+            // exact literal each expands to instead, staying explicitly narrow rather than
+            // picking up LPCTSTR (this codebase's own TcharVocabulary ratchet tracks and rejects
+            // new LPCTSTR usage).
+            const wchar_t* privName = NULL;
             switch (i)
             {
             case 0:
-                privName = SE_RESTORE_NAME;
+                privName = L"SeRestorePrivilege"; // SE_RESTORE_NAME
                 break;
             case 1:
-                privName = SE_TAKE_OWNERSHIP_NAME;
+                privName = L"SeTakeOwnershipPrivilege"; // SE_TAKE_OWNERSHIP_NAME
                 break;
             case 2:
-                privName = SE_SECURITY_NAME;
+                privName = L"SeSecurityPrivilege"; // SE_SECURITY_NAME
                 break;
             }
 
             LUID value;
-            if (privName != NULL && LookupPrivilegeValue(NULL, privName, &value))
+            if (privName != NULL && LookupPrivilegeValueW(NULL, privName, &value))
             {
                 TOKEN_PRIVILEGES tokenPrivileges;
                 tokenPrivileges.PrivilegeCount = 1;
@@ -1483,18 +1479,15 @@ void GainWriteOwnerAccess()
                 if (GetLastError() != NO_ERROR)
                 {
                     DWORD err = GetLastError();
-                    TRACE_E("GainWriteOwnerAccess(): AdjustTokenPrivileges(" << privName << ") failed! error: " << GetErrorText(err));
+                    TRACE_EW(L"GainWriteOwnerAccess(): AdjustTokenPrivileges(" << privName << L") failed! error: " << GetErrorTextOwned(err).c_str());
                 }
-                else
-                {
-                    if (i == 0)
-                        HaveWriteOwnerRight = TRUE; // successfully obtained SE_RESTORE_NAME, WRITE_OWNER is guaranteed
-                }
+                // The filesystem security adapter attempts ownership changes
+                // only when needed; enabling the privilege here is sufficient.
             }
             else
             {
                 DWORD err = GetLastError();
-                TRACE_E("GainWriteOwnerAccess(): LookupPrivilegeValue(" << (privName != NULL ? privName : "null") << ") failed! error: " << GetErrorText(err));
+                TRACE_EW(L"GainWriteOwnerAccess(): LookupPrivilegeValue(" << (privName != NULL ? privName : L"null") << L") failed! error: " << GetErrorTextOwned(err).c_str());
             }
         }
         CloseHandle(tokenHandle);
@@ -1627,14 +1620,13 @@ BOOL IsUserAdmin()
 */
 
 /* according to http://vcfaq.mvps.org/sdk/21.htm */
-#define BUFF_SIZE 1024
 BOOL IsUserAdmin()
 {
     HANDLE hToken = NULL;
     PSID pAdminSid = NULL;
-    BYTE buffer[BUFF_SIZE];
-    PTOKEN_GROUPS pGroups = (PTOKEN_GROUPS)buffer;
-    DWORD dwSize; // buffer size
+    std::vector<BYTE> tokenGroups;
+    PTOKEN_GROUPS pGroups = NULL;
+    DWORD dwSize = 0;
     DWORD i;
     BOOL bSuccess;
     SID_IDENTIFIER_AUTHORITY siaNtAuth = SECURITY_NT_AUTHORITY;
@@ -1643,7 +1635,23 @@ BOOL IsUserAdmin()
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
         return FALSE;
 
-    bSuccess = GetTokenInformation(hToken, TokenGroups, (LPVOID)pGroups, BUFF_SIZE, &dwSize);
+    bSuccess = FALSE;
+    while (1)
+    {
+        const DWORD capacity = (DWORD)tokenGroups.size();
+        pGroups = tokenGroups.empty() ? NULL :
+                                         (PTOKEN_GROUPS)tokenGroups.data();
+        if (GetTokenInformation(hToken, TokenGroups, pGroups, capacity,
+                                &dwSize))
+        {
+            bSuccess = TRUE;
+            break;
+        }
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || dwSize == 0 ||
+            dwSize <= capacity)
+            break;
+        tokenGroups.assign(dwSize, 0);
+    }
     CloseHandle(hToken);
     if (!bSuccess)
         return FALSE;
@@ -1667,229 +1675,64 @@ BOOL IsUserAdmin()
 
 struct CSrcSecurity // helper structure for keeping security info for MoveFile (the source disappears after the operation, its security info must be stored beforehand)
 {
-    PSID SrcOwner;
-    PSID SrcGroup;
-    PACL SrcDACL;
-    PSECURITY_DESCRIPTOR SrcSD;
+    std::vector<BYTE> Descriptor;
     DWORD SrcError;
 
     CSrcSecurity() { Clear(); }
-    ~CSrcSecurity()
-    {
-        if (SrcSD != NULL)
-            LocalFree(SrcSD);
-    }
     void Clear()
     {
-        SrcOwner = NULL;
-        SrcGroup = NULL;
-        SrcDACL = NULL;
-        SrcSD = NULL;
+        Descriptor.clear();
         SrcError = NO_ERROR;
     }
 };
 
-BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, CSrcSecurity* srcSecurity,
-                    const std::wstring& sourceNameW = std::wstring(),
-                    const std::wstring& targetNameW = std::wstring())
+BOOL DoCopySecurity(DWORD* err, CSrcSecurity* srcSecurity,
+                    const std::wstring& sourceNameW,
+                    const std::wstring& targetNameW)
 {
     // if the path ends with a space or dot, we must append '\\', otherwise
     // GetNamedSecurityInfo (and others) trim the spaces/dots and then work
     // with a different path
-    std::wstring sourceNameSecW = MakeCopyWithBackslashIfNeededW(
-        (!sourceNameW.empty() ? sourceNameW : AnsiToWide(sourceName)).c_str());
-    std::wstring targetNameSecW = MakeCopyWithBackslashIfNeededW(
-        (!targetNameW.empty() ? targetNameW : AnsiToWide(targetName)).c_str());
+    std::wstring sourceNameSecW = MakeCopyWithBackslashIfNeededW(sourceNameW.c_str());
+    std::wstring targetNameSecW = MakeCopyWithBackslashIfNeededW(targetNameW.c_str());
 
-    // Helpers to call Get/SetNamedSecurityInfo with wide paths
-    auto GetSecSource = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
-        return GetNamedSecurityInfoW((LPWSTR)sourceNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
-    };
-    auto GetSecTarget = [&](SECURITY_INFORMATION si, PSID* owner, PSID* group, PACL* dacl, PACL* sacl, PSECURITY_DESCRIPTOR* sd) -> DWORD {
-        return GetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl, sd);
-    };
-    auto SetSecTarget = [&](SECURITY_INFORMATION si, PSID owner, PSID group, PACL dacl, PACL sacl) -> DWORD {
-        return SetNamedSecurityInfoW((LPWSTR)targetNameSecW.c_str(), SE_FILE_OBJECT, si, owner, group, dacl, sacl);
-    };
-
-    PSID srcOwner = NULL;
-    PSID srcGroup = NULL;
-    PACL srcDACL = NULL;
-    PSECURITY_DESCRIPTOR srcSD = NULL;
+    std::vector<BYTE> descriptor;
     if (srcSecurity != NULL) // MoveFile: simply take over the security info
     {
-        srcOwner = srcSecurity->SrcOwner;
-        srcGroup = srcSecurity->SrcGroup;
-        srcDACL = srcSecurity->SrcDACL;
-        srcSD = srcSecurity->SrcSD;
+        descriptor.swap(srcSecurity->Descriptor);
         *err = srcSecurity->SrcError;
         srcSecurity->Clear();
     }
     else // obtain the security info from the source
     {
-        *err = GetSecSource(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                            &srcOwner, &srcGroup, &srcDACL, NULL, &srcSD);
+        const FileResult readResult = GetWorkerFileSystem()->GetPathSecurity(
+            sourceNameSecW.c_str(), descriptor);
+        *err = readResult.success ? ERROR_SUCCESS : readResult.errorCode;
     }
-    BOOL ret = *err == ERROR_SUCCESS;
+    if (*err != ERROR_SUCCESS)
+        return FALSE;
 
-    if (ret)
-    {
-        SECURITY_DESCRIPTOR_CONTROL srcSDControl;
-        DWORD srcSDRevision;
-        if (!GetSecurityDescriptorControl(srcSD, &srcSDControl, &srcSDRevision))
-        {
-            *err = GetLastError();
-            ret = FALSE;
-        }
-        else
-        {
-            BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-            DWORD attr = GetFileAttributesW(targetNameSecW.c_str());
-            *err = SetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
-                                    (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                srcOwner, srcGroup, srcDACL, NULL);
-            ret = *err == ERROR_SUCCESS;
-
-            if (!ret)
-            {
-                // if the owner and group cannot be changed (we do not have the rights in the directory - for example we only have "change" rights),
-                // check whether the owner and group are already set (that would not be an error)
-                PSID tgtOwner = NULL;
-                PSID tgtGroup = NULL;
-                PACL tgtDACL = NULL;
-                PSECURITY_DESCRIPTOR tgtSD = NULL;
-                BOOL tgtRead = GetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                            &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
-                // if the owner of the target file is not the current user, try to set it ("take ownership") - only
-                // provided we have the right to write the owner so that we can write back the original owner afterwards
-                BOOL ownerOfFile = FALSE;
-                if (!tgtRead ||         // if the security info cannot be read from the target, the owner is most likely not the current user (the owner has unblocked read rights)
-                    tgtOwner == NULL || // probably nonsense, the file must have some owner; if it happens, try to set the owner to the current user
-                    CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        !EqualSid(tgtOwner, CurrentProcessTokenUser->User.Sid))
-                {
-                    if (HaveWriteOwnerRight &&
-                        CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        SetSecTarget(OWNER_SECURITY_INFORMATION,
-                                     CurrentProcessTokenUser->User.Sid, NULL, NULL, NULL) == ERROR_SUCCESS)
-                    { // setting succeeded; we must retrieve 'tgtSD' again
-                        ownerOfFile = TRUE;
-                        if (tgtSD != NULL)
-                            LocalFree(tgtSD);
-                        tgtOwner = NULL;
-                        tgtGroup = NULL;
-                        tgtDACL = NULL;
-                        tgtSD = NULL;
-                        tgtRead = GetSecTarget(DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                               &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
-                    }
-                }
-                else
-                {
-                    ownerOfFile = tgtRead && tgtOwner != NULL && CurrentProcessTokenUserValid &&
-                                  CurrentProcessTokenUser->User.Sid != NULL;
-                }
-                BOOL daclOK = FALSE;
-                BOOL ownerOK = FALSE;
-                BOOL groupOK = FALSE;
-                if (ownerOfFile && CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL)
-                { // we are the file owner -> the DACL can be written; try to allow owner/group/DACL write and set the required values
-                    int allowChPermDACLSize = sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE) - sizeof(ACCESS_ALLOWED_ACE().SidStart) +
-                                              GetLengthSid(CurrentProcessTokenUser->User.Sid) + 200 /* +200 bytes is just paranoia */;
-                    char buff3[500];
-                    PACL allowChPermDACL;
-                    if (allowChPermDACLSize > 500)
-                        allowChPermDACL = (PACL)malloc(allowChPermDACLSize);
-                    else
-                        allowChPermDACL = (PACL)buff3;
-                    if (allowChPermDACL != NULL && InitializeAcl(allowChPermDACL, allowChPermDACLSize, ACL_REVISION) &&
-                        AddAccessAllowedAce(allowChPermDACL, ACL_REVISION, READ_CONTROL | WRITE_DAC | WRITE_OWNER,
-                                            CurrentProcessTokenUser->User.Sid) &&
-                        SetSecTarget(DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                                     NULL, NULL, allowChPermDACL, NULL) == ERROR_SUCCESS)
-                    {
-                        ownerOK = SetSecTarget(OWNER_SECURITY_INFORMATION,
-                                               srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS;
-                        groupOK = SetSecTarget(GROUP_SECURITY_INFORMATION,
-                                               NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS;
-                        daclOK = SetSecTarget(DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                              NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS;
-                    }
-                    if (allowChPermDACL != (PACL)buff3 && allowChPermDACL != NULL)
-                        free(allowChPermDACL);
-                }
-                if (!ownerOK &&
-                    (SetSecTarget(OWNER_SECURITY_INFORMATION,
-                                  srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS ||
-                     tgtRead && (srcOwner == NULL && tgtOwner == NULL || // if the owner is already set, ignore a potential error while setting
-                                 srcOwner != NULL && tgtOwner != NULL && EqualSid(srcOwner, tgtOwner))))
-                {
-                    ownerOK = TRUE;
-                }
-                if (!groupOK &&
-                    (SetSecTarget(GROUP_SECURITY_INFORMATION,
-                                  NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS ||
-                     tgtRead && (srcGroup == NULL && tgtGroup == NULL || // if the group is already set, ignore a potential error while setting
-                                 srcGroup != NULL && tgtGroup != NULL && EqualSid(srcGroup, tgtGroup))))
-                {
-                    groupOK = TRUE;
-                }
-                if (!daclOK && // the DACL must be set last because it depends on the owner (CREATOR OWNER is replaced with the real owner, etc.)
-                    SetSecTarget(DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                 NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS)
-                {
-                    daclOK = TRUE;
-                }
-                if (ownerOK && groupOK && daclOK)
-                {
-                    ret = TRUE; // all three components are OK -> the whole thing is OK
-                    *err = NO_ERROR;
-                }
-                if (tgtSD != NULL)
-                    LocalFree(tgtSD);
-            }
-            if (attr != INVALID_FILE_ATTRIBUTES)
-                SetFileAttributesW(targetNameSecW.c_str(), attr);
-        }
-    }
-    if (srcSD != NULL)
-        LocalFree(srcSD);
-    return ret;
+    const DWORD attr = GetWorkerFileSystem()->GetFileAttributes(targetNameSecW.c_str());
+    const FileResult writeResult = GetWorkerFileSystem()->SetPathSecurity(
+        targetNameSecW.c_str(), descriptor.data(), descriptor.size());
+    *err = writeResult.success ? ERROR_SUCCESS : writeResult.errorCode;
+    if (attr != INVALID_FILE_ATTRIBUTES)
+        GetWorkerFileSystem()->SetFileAttributes(targetNameSecW.c_str(), attr);
+    return writeResult.success;
 }
 
 // Forward declarations for wide versions (defined below)
 DWORD CompressFileW(const wchar_t* fileName, DWORD attrs);
 DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs);
-DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
+DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName,
                      DWORD attrs, DWORD finalAttrs, CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate);
 DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate);
 BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err);
 
-// ANSI wrapper — delegates to wide version
-DWORD CompressFile(char* fileName, DWORD attrs)
-{
-    return CompressFileW(AnsiToWide(fileName).c_str(), attrs);
-}
-
-// ANSI wrapper — delegates to wide version
-DWORD UncompressFile(char* fileName, DWORD attrs)
-{
-    return UncompressFileW(AnsiToWide(fileName).c_str(), attrs);
-}
-
-// ANSI wrapper — delegates to wide version
-DWORD MyEncryptFile(IWorkerObserver& observer, char* fileName, DWORD attrs, DWORD finalAttrs,
-                    CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate)
-{
-    return MyEncryptFileW(observer, AnsiToWide(fileName).c_str(), fileName, attrs, finalAttrs,
-                          workerState, cancelOper, preserveDate);
-}
-
-// ANSI wrapper — delegates to wide version
-DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
-{
-    return MyDecryptFileW(AnsiToWide(fileName).c_str(), attrs, preserveDate);
-}
+// 2026-08-25: the narrow CompressFile/UncompressFile/MyEncryptFile/
+// MyDecryptFile(char*, ...) thin adapters were deleted - confirmed-dead (zero callers anywhere;
+// pure core-internal helpers, no ABI entry at all). Their wide siblings below are the sole
+// surviving implementations.
 
 // --- Wide versions of compression/encryption helpers ---
 // These are the real implementations; the ANSI versions above are thin wrappers.
@@ -1906,11 +1749,11 @@ DWORD CompressFileW(const wchar_t* fileName, DWORD attrs)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     ret = COperation::SetCompressionW(fileNameCrFile.c_str(), COMPRESSION_FORMAT_DEFAULT);
     if (attrsChange)
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs);
     return ret;
 }
 
@@ -1926,23 +1769,25 @@ DWORD UncompressFileW(const wchar_t* fileName, DWORD attrs)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     ret = COperation::SetCompressionW(fileNameCrFile.c_str(), COMPRESSION_FORMAT_NONE);
     if (attrsChange)
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs);
     return ret;
 }
 
 // Wrappers for use with COperation::WithPreservedFileTimeW
 static DWORD DecryptFileOp(const wchar_t* path)
 {
-    return DecryptFileW(path, 0) ? ERROR_SUCCESS : GetLastError();
+    const FileResult result = GetWorkerFileSystem()->DecryptPath(path);
+    return result.success ? ERROR_SUCCESS : result.errorCode;
 }
 
 static DWORD EncryptFileOp(const wchar_t* path)
 {
-    return EncryptFileW(path) ? ERROR_SUCCESS : GetLastError();
+    const FileResult result = GetWorkerFileSystem()->EncryptPath(path);
+    return result.success ? ERROR_SUCCESS : result.errorCode;
 }
 
 DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
@@ -1957,7 +1802,7 @@ DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     if (preserveDate)
     {
@@ -1965,15 +1810,16 @@ DWORD MyDecryptFileW(const wchar_t* fileName, DWORD attrs, BOOL preserveDate)
     }
     else
     {
-        if (!DecryptFileW(fileNameCrFile.c_str(), 0))
-            ret = GetLastError();
+        const FileResult result = GetWorkerFileSystem()->DecryptPath(fileNameCrFile.c_str());
+        if (!result.success)
+            ret = result.errorCode;
     }
     if (attrsChange)
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs);
     return ret;
 }
 
-DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const char* fileNameA,
+DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName,
                      DWORD attrs, DWORD finalAttrs,
                      CWorkerState& workerState, BOOL& cancelOper, BOOL preserveDate)
 {
@@ -1997,7 +1843,7 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
                 return retEnc;
 
             int ret = IDCANCEL;
-            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSFILEENCRYPT, fileNameA, IDS_ENCRYPTSFILE);
+            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSFILEENCRYPT, fileName, IDS_ENCRYPTSFILE);
             switch (ret)
             {
             case IDB_ALL:
@@ -2023,7 +1869,7 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
     if (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY))
     {
         attrsChange = TRUE;
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
     }
     if (preserveDate)
     {
@@ -2031,28 +1877,28 @@ DWORD MyEncryptFileW(IWorkerObserver& observer, const wchar_t* fileName, const c
     }
     else
     {
-        if (!EncryptFileW(fileNameCrFile.c_str()))
-            retEnc = GetLastError();
+        const FileResult result = GetWorkerFileSystem()->EncryptPath(fileNameCrFile.c_str());
+        if (!result.success)
+            retEnc = result.errorCode;
     }
     if (attrsChange)
-        SetFileAttributesW(fileNameCrFile.c_str(), attrs);
+        GetWorkerFileSystem()->SetFileAttributes(fileNameCrFile.c_str(), attrs);
     return retEnc;
 }
 
-BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wchar_t*** streamNames,
-                       int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
+BOOL CheckFileOrDirADS(const std::wstring& fileNameW, BOOL isDir,
+                       CQuadWord* adsSize,
+                       std::vector<std::wstring>* streamNames,
+                       BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
-                       BOOL* onlyDiscardableStreams,
-                       const std::wstring& fileNameW)
+                       BOOL* onlyDiscardableStreams)
 {
     if (adsSize != NULL)
         adsSize->SetUI64(0);
     if (adsOccupiedSpace != NULL)
         adsOccupiedSpace->SetUI64(0);
     if (streamNames != NULL)
-        *streamNames = NULL;
-    if (streamNamesCount != NULL)
-        *streamNamesCount = 0;
+        streamNames->clear();
     if (lowMemory != NULL)
         *lowMemory = FALSE;
     if (winError != NULL)
@@ -2060,268 +1906,162 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
     if (onlyDiscardableStreams != NULL)
         *onlyDiscardableStreams = TRUE;
 
-    if (DynNtQueryInformationFile != NULL) // "always true"
+    // If the path ends with a space or dot, append '\\'; otherwise the
+    // filesystem API would trim it and inspect a different object.
+    const std::wstring path = MakeCopyWithBackslashIfNeededW(fileNameW.c_str());
+    HANDLE file = GetWorkerFileSystem()->CreateFile(
+        path.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+        OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
+    const DWORD openError = GetLastError();
+    HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile,
+                   __hoCreateFile, file, openError, TRUE);
+    if (file == INVALID_HANDLE_VALUE)
     {
-        // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-        // trims the spaces/dots and works with a different path
-        std::wstring fileNameCrFileW = MakeCopyWithBackslashIfNeededW(
-            (!fileNameW.empty() ? fileNameW : AnsiToWide(fileName)).c_str());
-        HANDLE file = CreateFileW(fileNameCrFileW.c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                  NULL, OPEN_EXISTING,
-                                  isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
-        DWORD openErr = GetLastError();
-        HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, openErr, TRUE);
-        if (file == INVALID_HANDLE_VALUE)
-        {
-            if (winError != NULL)
-                *winError = GetLastError();
-            return FALSE;
-        }
-
-        // get stream info
-        NTSTATUS uStatus;
-        IO_STATUS_BLOCK ioStatus;
-        BYTE buffer[65535]; // Windows XP cannot handle more than 65535 (no idea why)
-        uStatus = DynNtQueryInformationFile(file, &ioStatus, buffer, sizeof(buffer), FileStreamInformation);
-        HANDLES(CloseHandle(file));
-        if (uStatus != 0 /* anything other than success is an error (including warnings) */)
-        {
-            if (winError != NULL)
-            {
-                if (uStatus == STATUS_BUFFER_OVERFLOW)
-                    *winError = ERROR_INSUFFICIENT_BUFFER;
-                else
-                    *winError = LsaNtStatusToWinError(uStatus);
-            }
-            return FALSE;
-        }
-
-        TDirectArray<wchar_t*>* streamNamesAux = NULL;
-        if (streamNames != NULL)
-        {
-            streamNamesAux = new TDirectArray<wchar_t*>(10, 100);
-            if (streamNamesAux == NULL)
-            {
-                if (lowMemory != NULL)
-                    *lowMemory = TRUE;
-                TRACE_E(LOW_MEMORY);
-                return FALSE;
-            }
-        }
-
-        // iterate through the streams
-        PFILE_STREAM_INFORMATION psi = (PFILE_STREAM_INFORMATION)buffer;
-        BOOL ret = FALSE;
-        BOOL lowMem = FALSE;
-        if (ioStatus.Information > 0) // check whether we obtained any data at all
-        {
-            while (1)
-            {
-                if (psi->NameLength != 7 * 2 || _memicmp(psi->Name, L"::$DATA", 7 * 2)) // ignore default stream
-                {
-                    ret = TRUE;
-                    if (adsSize != NULL)
-                        *adsSize += CQuadWord(psi->Size.LowPart, psi->Size.HighPart); // sum of the total size of all alternate data streams
-                    if (adsOccupiedSpace != NULL && bytesPerCluster != 0)
-                    {
-                        CQuadWord fileSize(psi->Size.LowPart, psi->Size.HighPart);
-                        *adsOccupiedSpace += fileSize - ((fileSize - CQuadWord(1, 0)) % CQuadWord(bytesPerCluster, 0)) +
-                                             CQuadWord(bytesPerCluster - 1, 0);
-                    }
-
-                    if (onlyDiscardableStreams != NULL)
-                    {                                                                                                                      // if an ADS appears that is unknown or indispensable, switch 'onlyDiscardableStreams' to FALSE
-                        if ((psi->NameLength < 29 * 2 || _memicmp(psi->Name, L":\x05Q30lsldxJoudresxAaaqpcawXc:", 29 * 2) != 0) &&         // Win2K thumbnail in an ADS: 5952 bytes (depends on JPEG compression)
-                            (psi->NameLength < 40 * 2 || _memicmp(psi->Name, L":{4c8cc155-6c1e-11d1-8e41-00c04fb9386d}:", 40 * 2) != 0) && // Win2K thumbnail in an ADS: 0 bytes
-                            (psi->NameLength < 9 * 2 || _memicmp(psi->Name, L":KAVICHS:", 9 * 2) != 0))                                    // Kaspersky antivirus: 36/68 bytes
-                        {
-                            *onlyDiscardableStreams = FALSE;
-                        }
-                    }
-
-                    if (streamNamesAux != NULL) // collecting Unicode names of alternate data streams
-                    {
-                        wchar_t* str = (wchar_t*)malloc(psi->NameLength + 2);
-                        if (str != NULL)
-                        {
-                            memcpy(str, psi->Name, psi->NameLength);
-                            str[psi->NameLength / 2] = 0;
-                            streamNamesAux->Add(str);
-                            if (!streamNamesAux->IsGood())
-                            {
-                                free(str);
-                                streamNamesAux->ResetState();
-                                if (lowMemory != NULL)
-                                    *lowMemory = TRUE;
-                                lowMem = TRUE;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            if (lowMemory != NULL)
-                                *lowMemory = TRUE;
-                            lowMem = TRUE;
-                            TRACE_E(LOW_MEMORY);
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        if (adsSize == NULL && adsOccupiedSpace == NULL && onlyDiscardableStreams == NULL)
-                            break; // nothing else to find out (no names, stream sizes, or only-discardable-streams collected)
-                    }
-                }
-                if (psi->NextEntry == 0)
-                    break;
-                psi = (PFILE_STREAM_INFORMATION)((BYTE*)psi + psi->NextEntry); // move to next item
-            }
-        }
-        if (streamNamesAux != NULL)
-        {
-            if (lowMem || !ret) // lack of memory or no ADS, release all names
-            {
-                int i;
-                for (i = 0; i < streamNamesAux->Count; i++)
-                    free(streamNamesAux->At(i));
-            }
-            else // everything OK, pass the names to the caller
-            {
-                if (streamNamesCount != NULL)
-                    *streamNamesCount = streamNamesAux->Count;
-                *streamNames = streamNamesAux->GetData();
-                streamNamesAux->DetachArray();
-            }
-            delete streamNamesAux;
-        }
-        return ret;
+        if (winError != NULL)
+            *winError = openError;
+        return FALSE;
     }
-    return FALSE;
+
+    std::vector<FileStreamEntry> entries;
+    const FileResult streamResult =
+        GetWorkerFileSystem()->GetHandleStreams(file, entries);
+    (void)CloseWorkerTrackedFile(file);
+    if (!streamResult.success)
+    {
+        if (winError != NULL)
+            *winError = streamResult.errorCode;
+        return FALSE;
+    }
+
+    BOOL ret = FALSE;
+    try
+    {
+        for (const FileStreamEntry& entry : entries)
+        {
+            if (entry.name != L"::$DATA") // ignore the default stream
+            {
+                ret = TRUE;
+                if (adsSize != NULL)
+                    adsSize->Value += entry.size;
+                if (adsOccupiedSpace != NULL && bytesPerCluster != 0 &&
+                    entry.size != 0)
+                {
+                    const uint64_t rounded =
+                        ((entry.size - 1) / bytesPerCluster + 1) *
+                        bytesPerCluster;
+                    adsOccupiedSpace->Value += rounded;
+                }
+
+                if (onlyDiscardableStreams != NULL &&
+                    (entry.name.size() < 29 ||
+                     _wcsnicmp(entry.name.c_str(),
+                               L":\x05Q30lsldxJoudresxAaaqpcawXc:", 29) != 0) &&
+                    (entry.name.size() < 40 ||
+                     _wcsnicmp(entry.name.c_str(),
+                               L":{4c8cc155-6c1e-11d1-8e41-00c04fb9386d}:", 40) != 0) &&
+                    (entry.name.size() < 9 ||
+                     _wcsnicmp(entry.name.c_str(), L":KAVICHS:", 9) != 0))
+                {
+                    *onlyDiscardableStreams = FALSE;
+                }
+
+                if (streamNames != NULL)
+                    streamNames->push_back(entry.name);
+                else if (adsSize == NULL && adsOccupiedSpace == NULL &&
+                         onlyDiscardableStreams == NULL)
+                    break;
+            }
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        if (streamNames != NULL)
+            streamNames->clear();
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+    return ret;
 }
 
-BOOL DeleteAllADS(HANDLE file, const char* fileName,
-                  const std::wstring& fileNameW = std::wstring())
+BOOL DeleteAllADS(HANDLE file, const std::wstring& fileNameW)
 {
-    if (DynNtQueryInformationFile != NULL) // "always true"
+    std::vector<FileStreamEntry> entries;
+    const FileResult streamResult =
+        GetWorkerFileSystem()->GetHandleStreams(file, entries);
+    if (!streamResult.success)
     {
-        // get stream info
-        NTSTATUS uStatus;
-        IO_STATUS_BLOCK ioStatus;
-        BYTE buffer[65535]; // Windows XP cannot handle more than 65535 (no idea why)
-        uStatus = DynNtQueryInformationFile(file, &ioStatus, buffer, sizeof(buffer), FileStreamInformation);
-        if (uStatus != 0 /* anything other than success is an error (including warnings) */)
-        {
-            DWORD err;
-            if (uStatus == STATUS_BUFFER_OVERFLOW)
-                err = ERROR_INSUFFICIENT_BUFFER;
-            else
-                err = LsaNtStatusToWinError(uStatus);
-            TRACE_I("DeleteAllADS(" << fileName << "): NtQueryInformationFile failed: " << GetErrorText(err));
-            return FALSE;
-        }
+        TRACE_IW(L"DeleteAllADS(" << fileNameW.c_str()
+                                   << L"): stream enumeration failed: "
+                                   << GetErrorTextOwned(streamResult.errorCode).c_str());
+        return FALSE;
+    }
 
-        // iterate through the streams
-        PFILE_STREAM_INFORMATION psi = (PFILE_STREAM_INFORMATION)buffer;
-        if (ioStatus.Information > 0) // verify that we received any data at all
+    for (const FileStreamEntry& entry : entries)
+    {
+        if (entry.name == L"::$DATA")
+            continue;
+        size_t start = !entry.name.empty() && entry.name[0] == L':' ? 1 : 0;
+        const size_t end = entry.name.find(L':', start);
+        if (end != std::wstring::npos && end > start)
         {
-            CWidePathBuffer adsFullName;
-            adsFullName[0] = 0;
-            WCHAR* adsPart = NULL;
-            int adsPartSize = 0;
-            while (1)
+            std::wstring adsFullName = fileNameW;
+            adsFullName.push_back(L':');
+            adsFullName.append(entry.name, start, end - start);
+            const FileResult deleteResult =
+                GetWorkerFileSystem()->DeleteFile(adsFullName.c_str());
+            if (!deleteResult.success)
             {
-                if (psi->NameLength != 7 * 2 || _memicmp(psi->Name, L"::$DATA", 7 * 2)) // ignore default stream
-                {
-                    if (adsFullName[0] == 0) // convert the file name only when needed for the first time to save CPU time
-                    {
-                        if (!fileNameW.empty())
-                            lstrcpynW(adsFullName, fileNameW.c_str(), adsFullName.Size());
-                        else if (ConvertA2U(fileName, -1, adsFullName, adsFullName.Size()) == 0)
-                            return FALSE; // "always false"
-                        adsPart = adsFullName + wcslen(adsFullName);
-                        adsPartSize = (int)((adsFullName + adsFullName.Size()) - adsPart);
-                        if (adsPartSize > 0)
-                        {
-                            *adsPart++ = L':';
-                            adsPartSize--;
-                        }
-                        else
-                            return FALSE; // "always false"
-                    }
-                    WCHAR* start = (WCHAR*)psi->Name;
-                    WCHAR* nameEnd = (WCHAR*)((char*)psi->Name + psi->NameLength);
-                    if (start < nameEnd && *start == L':')
-                        start++;
-                    WCHAR* end = start;
-                    while (end < nameEnd && *end != L':')
-                        end++;
-                    if (end - start >= adsPartSize)
-                    {
-                        TRACE_I("DeleteAllADS(" << fileName << "): too long ADS name!");
-                        return FALSE;
-                    }
-                    if (end > start)
-                    {
-                        memcpy(adsPart, start, (end - start) * sizeof(WCHAR));
-                        adsPart[end - start] = 0;
-                        if (!DeleteFileW(adsFullName))
-                        {
-                            DWORD err = GetLastError();
-                            TRACE_IW(L"DeleteAllADS(" << adsFullName << L"): DeleteFile has failed: " << GetErrorTextW(err));
-                            return FALSE;
-                        }
-                    }
-                }
-                if (psi->NextEntry == 0)
-                    break;
-                psi = (PFILE_STREAM_INFORMATION)((BYTE*)psi + psi->NextEntry); // move to next item
+                TRACE_IW(L"DeleteAllADS(" << adsFullName.c_str()
+                                           << L"): DeleteFile has failed: "
+                                           << GetErrorTextOwned(deleteResult.errorCode).c_str());
+                return FALSE;
             }
         }
     }
     return TRUE;
 }
 
-void MyStrCpyNW(wchar_t* s1, wchar_t* s2, int maxChars)
+// 2026-08-25: the narrow CutADSNameSuffix(char*) was deleted - confirmed-dead
+// (zero callers anywhere). CutADSNameSuffixW below is the sole surviving implementation.
+void CutADSNameSuffixW(std::wstring& s)
 {
-    if (maxChars == 0)
-        return;
-    while (--maxChars && *s2 != 0)
-        *s1++ = *s2++;
-    *s1 = 0;
+    size_t pos = s.rfind(L':');
+    if (pos != std::wstring::npos && _wcsicmp(s.c_str() + pos, L":$DATA") == 0)
+        s.resize(pos);
 }
 
-void CutADSNameSuffix(char* s)
+// 2026-08-25: DoLongName (conversion to the extended-path \\?\ variant) was
+// deleted - confirmed-dead (zero callers anywhere, not even a forward declaration elsewhere).
+// Long-path support is handled by dynamically owned UTF-16 paths; no manual \\?\ prefixing is needed.
+
+static FileResult SeekWorkerHandleExact(HANDLE file, const CQuadWord& offset)
 {
-    char* end = strrchr(s, ':');
-    if (end != NULL && stricmp(end, ":$DATA") == 0)
-        *end = 0;
+    uint64_t position = 0;
+    const FileResult result = GetWorkerFileSystem()->SeekHandle(
+        file, static_cast<int64_t>(offset.Value), FILE_BEGIN, &position);
+    if (!result.success)
+        return result;
+    return position == offset.Value ? FileResult::Ok() :
+                                      FileResult::Error(ERROR_INVALID_FUNCTION);
 }
 
-// conversion to the extended-path variant, see the MSDN article "File Name Conventions"
-void DoLongName(char* buf, const char* name, int bufSize)
+static FileResult GetWorkerHandleSize(HANDLE file, CQuadWord& size)
 {
-    if (*name == '\\')
-        _snprintf_s(buf, bufSize, _TRUNCATE, "\\\\?\\UNC%s", name + 1); // UNC
-    else
-        _snprintf_s(buf, bufSize, _TRUNCATE, "\\\\?\\%s", name); // standard path
-}
-
-BOOL SalSetFilePointer(HANDLE file, const CQuadWord& offset)
-{
-    LONG lo = offset.LoDWord;
-    LONG hi = offset.HiDWord;
-    lo = SetFilePointer(file, lo, &hi, FILE_BEGIN);
-    return (lo != INVALID_SET_FILE_POINTER || GetLastError() == NO_ERROR) &&
-           lo == (LONG)offset.LoDWord && hi == (LONG)offset.HiDWord;
+    uint64_t value = 0;
+    const FileResult result = GetWorkerFileSystem()->GetHandleFileSize(file, &value);
+    if (result.success)
+        size.Value = value;
+    return result;
 }
 
 #define RETRYCOPY_TAIL_MINSIZE (32 * 1024) // at least two blocks of this size are verified at the end of the file tested in CheckTailOfOutFile(); afterwards the block size grows up to ASYNC_COPY_BUF_SIZE (if reading is fast enough); NOTE: must be <= ASYNC_COPY_BUF_SIZE
 #define RETRYCOPY_TESTINGTIME 3000         // duration of the CheckTailOfOutFile() test in [ms]
 
-void CheckTailOfOutFileShowErr(const char* txt)
+void CheckTailOfOutFileShowErr(const wchar_t* txt, DWORD err = GetLastError())
 {
-    DWORD err = GetLastError();
-    TRACE_I("CheckTailOfOutFile(): " << txt << " Error: " << GetErrorText(err));
+    TRACE_IW(L"CheckTailOfOutFile(): " << txt << L" Error: " << GetErrorTextOwned(err).c_str());
 }
 
 BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const CQuadWord& offset,
@@ -2358,14 +2098,20 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 #endif // WORKER_COPY_DEBUG_MSG
         if (asyncPar == NULL)
         {
-            if (SalSetFilePointer(in, start))
+            const FileResult seekInResult = SeekWorkerHandleExact(in, start);
+            if (seekInResult.success)
             { // set the 'start' offset in the input
-                if (SalSetFilePointer(out, start))
+                const FileResult seekOutResult = SeekWorkerHandleExact(out, start);
+                if (seekOutResult.success)
                 { // set the 'start' offset in the output
                     DWORD read;
-                    if (ReadFile(out, bufOut, size, &read, NULL) && read == size)
+                    const FileResult readOutResult = GetWorkerFileSystem()->ReadFromHandle(
+                        out, bufOut, size, &read);
+                    if (readOutResult.success && read == size)
                     { // read 'size' bytes into the output buffer (fails if opened without read access)
-                        if (ReadFile(in, bufIn, size, &read, NULL) && read == size)
+                        const FileResult readInResult = GetWorkerFileSystem()->ReadFromHandle(
+                            in, bufIn, size, &read);
+                        if (readInResult.success && read == size)
                         {                                         // read 'size' bytes into the input buffer
                             if (memcmp(bufIn, bufOut, size) == 0) // compare whether the input/output buffers match
                                 ok = TRUE;
@@ -2373,40 +2119,58 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
                                 TRACE_I("CheckTailOfOutFile(): tail of target file is different from source file, tail without differences: " << (offset.Value - lastOffset.Value));
                         }
                         else
-                            CheckTailOfOutFileShowErr("Unable to read IN file.");
+                            CheckTailOfOutFileShowErr(
+                                L"Unable to read IN file.",
+                                readInResult.success ? ERROR_HANDLE_EOF : readInResult.errorCode);
                     }
                     else
                     {
                         if (ignoreReadErrOnOut) // if the input file failed earlier, ignore that we cannot read the output (input was reopened, output has remained open)
                         {
-                            CheckTailOfOutFileShowErr("Unable to read OUT file, but it was not broken, so it's no problem.");
+                            CheckTailOfOutFileShowErr(
+                                L"Unable to read OUT file, but it was not broken, so it's no problem.",
+                                readOutResult.success ? ERROR_HANDLE_EOF : readOutResult.errorCode);
                             ok = TRUE;
                             break;
                         }
                         else
-                            CheckTailOfOutFileShowErr("Unable to read OUT file.");
+                            CheckTailOfOutFileShowErr(
+                                L"Unable to read OUT file.",
+                                readOutResult.success ? ERROR_HANDLE_EOF : readOutResult.errorCode);
                     }
                 }
                 else
-                    CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in OUT file.");
+                {
+                    CheckTailOfOutFileShowErr(
+                        L"Unable to set file pointer to start offset in OUT file.",
+                        seekOutResult.errorCode);
+                }
             }
             else
-                CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in IN file.");
+            {
+                CheckTailOfOutFileShowErr(
+                    L"Unable to set file pointer to start offset in IN file.",
+                    seekInResult.errorCode);
+            }
         }
         else
         {
             // asynchronously read the block starting at 'start' of length 'size' bytes from in and out, then compare
             DWORD readOut;
-            if ((ReadFile(out, bufOut, size, NULL,
-                          asyncPar->InitOverlappedWithOffset(0, start)) ||
-                 GetLastError() == ERROR_IO_PENDING) &&
-                GetOverlappedResult(out, asyncPar->GetOverlapped(0), &readOut, TRUE))
+            FileResult readOutResult = GetWorkerFileSystem()->ReadFromHandleOverlapped(
+                out, bufOut, size, asyncPar->InitOverlappedWithOffset(0, start));
+            if (readOutResult.success || readOutResult.errorCode == ERROR_IO_PENDING)
+                readOutResult = GetWorkerFileSystem()->CompleteHandleIo(
+                    out, asyncPar->GetOverlapped(0), &readOut, true);
+            if (readOutResult.success)
             {
                 DWORD readIn;
-                if ((ReadFile(in, bufIn, size, NULL,
-                              asyncPar->InitOverlappedWithOffset(1, start)) ||
-                     GetLastError() == ERROR_IO_PENDING) &&
-                    GetOverlappedResult(in, asyncPar->GetOverlapped(1), &readIn, TRUE))
+                FileResult readInResult = GetWorkerFileSystem()->ReadFromHandleOverlapped(
+                    in, bufIn, size, asyncPar->InitOverlappedWithOffset(1, start));
+                if (readInResult.success || readInResult.errorCode == ERROR_IO_PENDING)
+                    readInResult = GetWorkerFileSystem()->CompleteHandleIo(
+                        in, asyncPar->GetOverlapped(1), &readIn, true);
+                if (readInResult.success)
                 {
                     if (readOut != size || readIn != size ||
                         memcmp(bufIn, bufOut, size) != 0) // compare whether the input/output buffers match
@@ -2417,18 +2181,22 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
                         ok = TRUE;
                 }
                 else
-                    CheckTailOfOutFileShowErr("Unable to read IN file (async).");
+                    CheckTailOfOutFileShowErr(
+                        L"Unable to read IN file (async).", readInResult.errorCode);
             }
             else
             {
                 if (ignoreReadErrOnOut) // if the input file failed earlier, ignore that we cannot read the output (input was reopened, output has remained open)
                 {
-                    CheckTailOfOutFileShowErr("Unable to read OUT file (async), but it was not broken, so it's no problem.");
+                    CheckTailOfOutFileShowErr(
+                        L"Unable to read OUT file (async), but it was not broken, so it's no problem.",
+                        readOutResult.errorCode);
                     ok = TRUE;
                     break;
                 }
                 else
-                    CheckTailOfOutFileShowErr("Unable to read OUT file (async).");
+                    CheckTailOfOutFileShowErr(
+                        L"Unable to read OUT file (async).", readOutResult.errorCode);
             }
         }
         if (!ok)
@@ -2478,14 +2246,21 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 
     if (ok && asyncPar == NULL) // reposition input/output to required offsets
     {
-        if (!SalSetFilePointer(in, curInOffset))
+        const FileResult seekInResult = SeekWorkerHandleExact(in, curInOffset);
+        if (!seekInResult.success)
         {
-            CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in IN file.");
+            CheckTailOfOutFileShowErr(
+                L"Unable to set file pointer back to current offset in IN file.",
+                seekInResult.errorCode);
             ok = FALSE;
         }
-        if (ok && !SalSetFilePointer(out, offset))
+        const FileResult seekOutResult = ok ? SeekWorkerHandleExact(out, offset) :
+                                              FileResult::Error(ERROR_SUCCESS);
+        if (ok && !seekOutResult.success)
         {
-            CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in OUT file.");
+            CheckTailOfOutFileShowErr(
+                L"Unable to set file pointer back to current offset in OUT file.",
+                seekOutResult.errorCode);
             ok = FALSE;
         }
     }
@@ -2508,18 +2283,19 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // Direct Win32: all CreateFileW calls open ADS streams (path:streamname), not main files;
 // all ReadFile/WriteFile/GetFileSize/SetFilePointer/SetEndOfFile/CloseHandle calls operate on
 // open HANDLEs — COperation wrapping not applicable here
-BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, const char* targetName,
+BOOL DoCopyADS(IWorkerObserver& observer, BOOL isDir,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CWorkerState& workerState, COperations* script, BOOL* skip, void* buffer,
-               const std::wstring& sourceNameW = std::wstring(),
-               const std::wstring& targetNameW = std::wstring())
+               const std::wstring& sourceNameW,
+               const std::wstring& targetNameW)
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
     DWORD adsWinError;
-    wchar_t** streamNames;
-    int streamNamesCount;
+    std::vector<std::wstring> streamNames;
     BOOL skipped = FALSE;
+    DWORD pendingWriteError = ERROR_SUCCESS;
+    FileResult readIoResult = FileResult::Ok();
     CQuadWord lastTransferredFileSize, finalTransferredFileSize;
     script->GetTFSandResetTrSpeedIfNeeded(&lastTransferredFileSize);
     finalTransferredFileSize = lastTransferredFileSize;
@@ -2528,35 +2304,27 @@ BOOL DoCopyADS(IWorkerObserver& observer, const char* sourceName, BOOL isDir, co
 
 COPY_ADS_AGAIN:
 
-    if (CheckFileOrDirADS(sourceName, isDir, NULL, &streamNames, &streamNamesCount,
-                          &lowMemory, &adsWinError, 0, NULL, NULL, sourceNameW) &&
-        !lowMemory && streamNames != NULL)
+    if (CheckFileOrDirADS(sourceNameW, isDir, NULL, &streamNames,
+                          &lowMemory, &adsWinError, 0, NULL, NULL) &&
+        !lowMemory && !streamNames.empty())
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
         // Always compute wide paths — supports Unicode and long paths
-        std::wstring effectiveSourceW = !sourceNameW.empty() ? sourceNameW : AnsiToWide(sourceName);
-        std::wstring effectiveTargetW = !targetNameW.empty() ? targetNameW : AnsiToWide(targetName);
+        const std::wstring& effectiveSourceW = sourceNameW;
+        const std::wstring& effectiveTargetW = targetNameW;
 
-        CWidePathBuffer srcName;       // Heap-allocated for long path + ADS name support
-        CWidePathBuffer tgtName;
-        lstrcpynW(srcName, effectiveSourceW.c_str(), srcName.Size());
-        lstrcpynW(tgtName, effectiveTargetW.c_str(), tgtName.Size());
-        wchar_t* srcEnd = (wchar_t*)srcName + lstrlenW(srcName);
-        if (srcEnd > (wchar_t*)srcName && *(srcEnd - 1) == L'\\')
-            *--srcEnd = 0;
-        wchar_t* tgtEnd = (wchar_t*)tgtName + lstrlenW(tgtName);
-        if (tgtEnd > (wchar_t*)tgtName && *(tgtEnd - 1) == L'\\')
-            *--tgtEnd = 0;
+        std::wstring sourceBase = effectiveSourceW;
+        std::wstring targetBase = effectiveTargetW;
+        SalPathRemoveBackslashW(sourceBase);
+        SalPathRemoveBackslashW(targetBase);
 
         int bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
 
-        CPathBuffer nameBuf;
         BOOL endProcessing = FALSE;
         CQuadWord operationDone;
-        int i;
-        for (i = 0; i < streamNamesCount; i++)
+        for (size_t i = 0; i < streamNames.size(); i++)
         {
-            MyStrCpyNW(srcEnd, streamNames[i], (int)(srcName.Size() - (srcEnd - (wchar_t*)srcName)));
-            MyStrCpyNW(tgtEnd, streamNames[i], (int)(tgtName.Size() - (tgtEnd - (wchar_t*)tgtName)));
+            const std::wstring srcName = sourceBase + streamNames[i];
+            const std::wstring tgtName = targetBase + streamNames[i];
 
         COPY_AGAIN_ADS:
 
@@ -2568,27 +2336,28 @@ COPY_ADS_AGAIN:
             while (1)
             {
                 // Direct Win32: opens ADS stream (path:streamname), not the main file — COperation wrapping N/A
-                HANDLE in = CreateFileW(srcName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                HANDLE in = GetWorkerFileSystem()->CreateFile(srcName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                 HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile,
                                __hoCreateFile, in, GetLastError(), TRUE);
                 if (in != INVALID_HANDLE_VALUE)
                 {
                     CQuadWord fileSize;
-                    fileSize.LoDWord = GetFileSize(in, &fileSize.HiDWord);
-                    if (fileSize.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+                    const FileResult sizeResult = GetWorkerHandleSize(in, fileSize);
+                    if (!sizeResult.success)
                     {
-                        DWORD err = GetLastError();
-                        TRACE_E("GetFileSize(some ADS of " << sourceName << "): unexpected error: " << GetErrorText(err));
+                        DWORD err = sizeResult.errorCode;
+                        TRACE_EW(L"GetFileSize(some ADS of " << srcName.c_str() << L"): unexpected error: " << GetErrorTextOwned(err).c_str());
                         fileSize.SetUI64(0);
                     }
 
                     while (1)
                     {
                         // Direct Win32: opens ADS stream for writing — COperation wrapping N/A
-                        HANDLE out = CreateFileW(tgtName, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                        HANDLE out = GetWorkerFileSystem()->CreateFile(tgtName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                        DWORD createError = out == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
                         HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile,
-                                       __hoCreateFile, out, GetLastError(), TRUE);
+                                       __hoCreateFile, out, createError, TRUE);
 
                         BOOL canOverwriteMACADSs = TRUE;
 
@@ -2605,11 +2374,20 @@ COPY_ADS_AGAIN:
                             {
                                 BOOL fatal = TRUE;
                                 BOOL ignoreErr = FALSE;
-                                if (SalSetFilePointer(out, fileSize))
+                                DWORD allocateError = ERROR_SUCCESS;
+                                const FileResult allocateSeekResult =
+                                    SeekWorkerHandleExact(out, fileSize);
+                                if (allocateSeekResult.success)
                                 {
-                                    if (SetEndOfFile(out))
+                                    const FileResult allocateResult =
+                                        GetWorkerFileSystem()->SetHandleEnd(out);
+                                    if (allocateResult.success)
                                     {
-                                        if (SetFilePointer(out, 0, NULL, FILE_BEGIN) == 0)
+                                        uint64_t rewindPosition = 0;
+                                        const FileResult rewindResult =
+                                            GetWorkerFileSystem()->SeekHandle(
+                                                out, 0, FILE_BEGIN, &rewindPosition);
+                                        if (rewindResult.success && rewindPosition == 0)
                                         {
                                             fatal = FALSE;
                                             wholeFileAllocated = TRUE;
@@ -2617,34 +2395,44 @@ COPY_ADS_AGAIN:
                                     }
                                     else
                                     {
-                                        if (GetLastError() == ERROR_DISK_FULL)
+                                        allocateError = allocateResult.errorCode;
+                                        if (allocateError == ERROR_DISK_FULL)
                                             ignoreErr = TRUE; // low disk space
                                     }
                                 }
+                                else
+                                    allocateError = allocateSeekResult.errorCode;
                                 if (fatal)
                                 {
                                     if (!ignoreErr)
                                     {
-                                        DWORD err = GetLastError();
-                                        TRACE_E("DoCopyADS(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorText(err));
+                                        DWORD err = allocateError != ERROR_SUCCESS ?
+                                                        allocateError : GetLastError();
+                                        TRACE_EW(L"DoCopyADS(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorTextOwned(err).c_str());
                                     }
 
                                     // try truncating the file to zero so closing it does not trigger unnecessary writes
-                                    SetFilePointer(out, 0, NULL, FILE_BEGIN);
-                                    SetEndOfFile(out);
+                                    (void)GetWorkerFileSystem()->SeekHandle(
+                                        out, 0, FILE_BEGIN, NULL);
+                                    (void)GetWorkerFileSystem()->SetHandleEnd(out);
 
-                                    HANDLES(CloseHandle(out));
+                                    (void)CloseWorkerTrackedFile(out);
                                     out = INVALID_HANDLE_VALUE;
-                                    if (DeleteFileW(tgtName))
+                                    const FileResult deleteResult = GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
+                                    if (deleteResult.success)
                                     {
-                                        out = CreateFileW(tgtName, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                        out = GetWorkerFileSystem()->CreateFile(tgtName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                        createError = out == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
                                         HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile,
-                                                       __hoCreateFile, out, GetLastError(), TRUE);
+                                                       __hoCreateFile, out, createError, TRUE);
                                         if (out == INVALID_HANDLE_VALUE)
                                             goto CREATE_ERROR_ADS;
                                     }
                                     else
+                                    {
+                                        createError = deleteResult.errorCode;
                                         goto CREATE_ERROR_ADS;
+                                    }
                                 }
                             }
 
@@ -2653,7 +2441,9 @@ COPY_ADS_AGAIN:
                             // Direct Win32: performance-critical ADS copy loop (ReadFile/WriteFile on open HANDLEs)
                             while (1)
                             {
-                                if (ReadFile(in, buffer, limitBufferSize, &read, NULL))
+                                readIoResult = GetWorkerFileSystem()->ReadFromHandle(
+                                    in, buffer, limitBufferSize, &read);
+                                if (readIoResult.success)
                                 {
                                     if (read == 0)
                                         break;                                                     // EOF
@@ -2664,14 +2454,14 @@ COPY_ADS_AGAIN:
                                     COPY_ERROR_ADS:
 
                                         if (in != NULL)
-                                            HANDLES(CloseHandle(in));
+                                            (void)CloseWorkerTrackedFile(in);
                                         if (out != NULL)
                                         {
                                             if (wholeFileAllocated)
-                                                SetEndOfFile(out); // otherwise on a floppy the remaining bytes would be written
-                                            HANDLES(CloseHandle(out));
+                                                (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining bytes would be written
+                                            (void)CloseWorkerTrackedFile(out);
                                         }
-                                        DeleteFileW(tgtName);
+                                        GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
                                         doCopyADSRet = FALSE;
                                         endProcessing = TRUE;
                                         break;
@@ -2679,13 +2469,19 @@ COPY_ADS_AGAIN:
 
                                     while (1)
                                     {
-                                        if (WriteFile(out, buffer, read, &written, NULL) && read == written)
+                                        const FileResult writeIoResult =
+                                            GetWorkerFileSystem()->WriteToHandle(
+                                                out, buffer, read, &written);
+                                        if (writeIoResult.success && read == written)
                                             break;
+                                        pendingWriteError = writeIoResult.success ?
+                                                                ERROR_DISK_FULL : writeIoResult.errorCode;
 
                                     WRITE_ERROR_ADS:
 
-                                        DWORD err;
-                                        err = GetLastError();
+                                        DWORD err = pendingWriteError != ERROR_SUCCESS ?
+                                                        pendingWriteError : GetLastError();
+                                        pendingWriteError = ERROR_SUCCESS;
 
                                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                         if (observer.IsCancelled())
@@ -2696,42 +2492,44 @@ COPY_ADS_AGAIN:
 
                                         int ret;
                                         ret = IDCANCEL;
-                                        WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
-                                        nameBuf[nameBuf.Size() - 1] = 0;
-                                        CutADSNameSuffix(nameBuf);
                                         if (err == NO_ERROR && read != written)
                                             err = ERROR_DISK_FULL;
-                                        ret = observer.AskFileErrorById(IDS_ERRORWRITINGADS, nameBuf, err);
+                                        {
+                                            std::wstring nameBufW = tgtName;
+                                            CutADSNameSuffixW(nameBufW);
+                                            ret = observer.AskFileErrorById(IDS_ERRORWRITINGADS, nameBufW.c_str(), err);
+                                        }
                                         switch (ret)
                                         {
                                         case IDRETRY: // on a network we must reopen the handle; local access would not allow sharing
                                         {
                                             if (in == NULL && out == NULL)
                                             {
-                                                DeleteFileW(tgtName);
+                                                GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
                                                 goto COPY_AGAIN_ADS;
                                             }
                                             if (out != NULL)
                                             {
                                                 if (wholeFileAllocated)
-                                                    SetEndOfFile(out);     // otherwise on a floppy the remaining bytes would be written
-                                                HANDLES(CloseHandle(out)); // close the invalid handle
+                                                    (void)GetWorkerFileSystem()->SetHandleEnd(out);     // otherwise on a floppy the remaining bytes would be written
+                                                (void)CloseWorkerTrackedFile(out); // close the invalid handle
                                             }
-                                            out = CreateFileW(tgtName, GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_ALWAYS,
+                                            out = GetWorkerFileSystem()->CreateFile(tgtName.c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_ALWAYS,
                                                               FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                             HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile,
                                                            __hoCreateFile, out, GetLastError(), TRUE);
                                             if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                                             {
-                                                LONG lo, hi;
-                                                lo = GetFileSize(out, (DWORD*)&hi);
-                                                if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                                                    CQuadWord(lo, hi) < operationDone ||
+                                                CQuadWord currentSize;
+                                                const FileResult sizeResult =
+                                                    GetWorkerHandleSize(out, currentSize);
+                                                if (!sizeResult.success ||
+                                                    currentSize < operationDone ||
                                                     !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone + CQuadWord(read, 0), FALSE))
                                                 { // cannot determine the size or the file is too small; restart the entire copy
-                                                    HANDLES(CloseHandle(in));
-                                                    HANDLES(CloseHandle(out));
-                                                    DeleteFileW(tgtName);
+                                                    (void)CloseWorkerTrackedFile(in);
+                                                    (void)CloseWorkerTrackedFile(out);
+                                                    GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
                                                     goto COPY_AGAIN_ADS;
                                                 }
                                             }
@@ -2750,14 +2548,14 @@ COPY_ADS_AGAIN:
                                         SKIP_COPY_ADS:
 
                                             if (in != NULL)
-                                                HANDLES(CloseHandle(in));
+                                                (void)CloseWorkerTrackedFile(in);
                                             if (out != NULL)
                                             {
                                                 if (wholeFileAllocated)
-                                                    SetEndOfFile(out); // otherwise on a floppy the remaining bytes would be written
-                                                HANDLES(CloseHandle(out));
+                                                    (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining bytes would be written
+                                                (void)CloseWorkerTrackedFile(out);
                                             }
-                                            DeleteFileW(tgtName);
+                                            GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
                                             if (skip != NULL)
                                                 *skip = TRUE;
                                             skipped = TRUE;
@@ -2796,8 +2594,7 @@ COPY_ADS_AGAIN:
                                 {
                                 READ_ERROR_ADS:
 
-                                    DWORD err;
-                                    err = GetLastError();
+                                    DWORD err = readIoResult.errorCode;
                                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                     if (observer.IsCancelled())
                                         goto COPY_ERROR_ADS;
@@ -2806,39 +2603,42 @@ COPY_ADS_AGAIN:
                                         goto SKIP_COPY_ADS;
 
                                     int ret = IDCANCEL;
-                                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
-                                    nameBuf[nameBuf.Size() - 1] = 0;
-                                    CutADSNameSuffix(nameBuf);
-                                    ret = observer.AskFileErrorById(IDS_ERRORREADINGADS, nameBuf, err);
+                                    {
+                                        std::wstring nameBufW = srcName;
+                                        CutADSNameSuffixW(nameBufW);
+                                        ret = observer.AskFileErrorById(IDS_ERRORREADINGADS, nameBufW.c_str(), err);
+                                    }
                                     switch (ret)
                                     {
                                     case IDRETRY:
                                     {
                                         if (in != NULL)
-                                            HANDLES(CloseHandle(in)); // close the invalid handle
+                                            (void)CloseWorkerTrackedFile(in); // close the invalid handle
 
-                                        in = CreateFileW(srcName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                        in = GetWorkerFileSystem()->CreateFile(srcName.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                          OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                         HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile,
                                                        __hoCreateFile, in, GetLastError(), TRUE);
                                         if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                                         {
-                                            LONG lo, hi;
-                                            lo = GetFileSize(in, (DWORD*)&hi);
-                                            if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                                                CQuadWord(lo, hi) < operationDone ||
+                                            CQuadWord currentSize;
+                                            const FileResult sizeResult =
+                                                GetWorkerHandleSize(in, currentSize);
+                                            if (!sizeResult.success ||
+                                                currentSize < operationDone ||
                                                 !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone, TRUE))
                                             { // cannot obtain size or the file is too small; restart the entire operation
-                                                HANDLES(CloseHandle(in));
+                                                (void)CloseWorkerTrackedFile(in);
                                                 if (wholeFileAllocated)
-                                                    SetEndOfFile(out); // otherwise on a floppy the remaining bytes would be written
-                                                HANDLES(CloseHandle(out));
-                                                DeleteFileW(tgtName);
+                                                    (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining bytes would be written
+                                                (void)CloseWorkerTrackedFile(out);
+                                                GetWorkerFileSystem()->DeleteFile(tgtName.c_str());
                                                 goto COPY_AGAIN_ADS;
                                             }
                                         }
                                         else // still cannot open; problem persists
                                         {
+                                            readIoResult = FileResult::Error(GetLastError());
                                             in = NULL;
                                             goto READ_ERROR_ADS;
                                         }
@@ -2859,9 +2659,12 @@ COPY_ADS_AGAIN:
                             if (wholeFileAllocated &&     // the entire target layout was pre-allocated
                                 operationDone < fileSize) // and the source file shrank
                             {
-                                if (!SetEndOfFile(out)) // trim it here
+                                const FileResult truncateResult =
+                                    GetWorkerFileSystem()->SetHandleEnd(out);
+                                if (!truncateResult.success) // trim it here
                                 {
                                     written = read = 0;
+                                    pendingWriteError = truncateResult.errorCode;
                                     goto WRITE_ERROR_ADS;
                                 }
                             }
@@ -2871,11 +2674,14 @@ COPY_ADS_AGAIN:
                             //              GetFileTime(in, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite);
                             //              SetFileTime(out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite);
 
-                            HANDLES(CloseHandle(in));
-                            if (!HANDLES(CloseHandle(out))) // even after a failed call we assume the handle is closed,
+                            (void)CloseWorkerTrackedFile(in);
+                            const FileResult closeOutResult =
+                                CloseWorkerTrackedFile(out);
+                            if (!closeOutResult.success) // even after a failed call we assume the handle is closed,
                             {                               // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
                                 in = out = NULL;            // (reports that the target file can be deleted, so its handle was not left open)
                                 written = read = 0;
+                                pendingWriteError = closeOutResult.errorCode;
                                 goto WRITE_ERROR_ADS;
                             }
 
@@ -2891,21 +2697,22 @@ COPY_ADS_AGAIN:
                         {
                         CREATE_ERROR_ADS:
 
-                            DWORD err = GetLastError();
+                            DWORD err = createError;
 
                             // Macintosh compatibility: NTFS automatically creates ADS entries myFile:Afp_Resource and myFile:Afp_AfpInfo,
                             // overwrite them silently with the versions from the source file
                             if (canOverwriteMACADSs &&
                                 (err == ERROR_FILE_EXISTS || err == ERROR_ALREADY_EXISTS) &&
-                                (_wcsnicmp(streamNames[i], L":Afp_Resource", 13) == 0 &&
+                                (_wcsnicmp(streamNames[i].c_str(), L":Afp_Resource", 13) == 0 &&
                                      (streamNames[i][13] == 0 || streamNames[i][13] == L':') ||
-                                 _wcsnicmp(streamNames[i], L":Afp_AfpInfo", 12) == 0 &&
+                                 _wcsnicmp(streamNames[i].c_str(), L":Afp_AfpInfo", 12) == 0 &&
                                      (streamNames[i][12] == 0 || streamNames[i][12] == L':')))
                             {
-                                out = CreateFileW(tgtName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                                out = GetWorkerFileSystem()->CreateFile(tgtName.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                                                   FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+                                createError = out == INVALID_HANDLE_VALUE ? GetLastError() : ERROR_SUCCESS;
                                 HANDLES_ADD_EX(__otQuiet, out != INVALID_HANDLE_VALUE, __htFile,
-                                               __hoCreateFile, out, GetLastError(), TRUE);
+                                               __hoCreateFile, out, createError, TRUE);
 
                                 canOverwriteMACADSs = FALSE;
                                 goto COPY_OVERWRITE;
@@ -2923,10 +2730,11 @@ COPY_ADS_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            WideCharToMultiByte(CP_ACP, 0, tgtName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
-                            nameBuf[nameBuf.Size() - 1] = 0;
-                            CutADSNameSuffix(nameBuf);
-                            ret = observer.AskADSOpenErrorById(IDS_ERROROPENINGADS, nameBuf, err);
+                            {
+                                std::wstring nameBufW = tgtName;
+                                CutADSNameSuffixW(nameBufW);
+                                ret = observer.AskADSOpenErrorById(IDS_ERROROPENINGADS, nameBufW.c_str(), err);
+                            }
                             switch (ret)
                             {
                             case IDRETRY:
@@ -2938,7 +2746,7 @@ COPY_ADS_AGAIN:
                             {
                             IGNORE_OPENOUTADS:
 
-                                HANDLES(CloseHandle(in));
+                                (void)CloseWorkerTrackedFile(in);
                                 operDone += fileSize;
                                 lastTransferredFileSize += fileSize;
                                 script->SetTFSandProgressSize(lastTransferredFileSize, totalDone + operDone);
@@ -2952,7 +2760,7 @@ COPY_ADS_AGAIN:
                             {
                             SKIP_OPEN_OUT_ADS:
 
-                                HANDLES(CloseHandle(in));
+                                (void)CloseWorkerTrackedFile(in);
                                 if (skip != NULL)
                                     *skip = TRUE;
                                 skipped = TRUE;
@@ -2964,7 +2772,7 @@ COPY_ADS_AGAIN:
                             {
                             CANCEL_OPEN2_ADS:
 
-                                HANDLES(CloseHandle(in));
+                                (void)CloseWorkerTrackedFile(in);
                                 doCopyADSRet = FALSE;
                                 endProcessing = TRUE;
                                 break;
@@ -2991,10 +2799,11 @@ COPY_ADS_AGAIN:
 
                     int ret;
                     ret = IDCANCEL;
-                    WideCharToMultiByte(CP_ACP, 0, srcName, -1, nameBuf, nameBuf.Size(), NULL, NULL);
-                    nameBuf[nameBuf.Size() - 1] = 0;
-                    CutADSNameSuffix(nameBuf);
-                    ret = observer.AskFileErrorById(IDS_ERROROPENINGADS, nameBuf, err);
+                    {
+                        std::wstring nameBufW = srcName;
+                        CutADSNameSuffixW(nameBufW);
+                        ret = observer.AskFileErrorById(IDS_ERROROPENINGADS, nameBufW.c_str(), err);
+                    }
                     switch (ret)
                     {
                     case IDRETRY:
@@ -3028,9 +2837,6 @@ COPY_ADS_AGAIN:
                 break;
         }
 
-        for (i = 0; i < streamNamesCount; i++)
-            free(streamNames[i]);
-        free(streamNames);
     }
     else
     {
@@ -3045,7 +2851,7 @@ COPY_ADS_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskADSReadError((char*)sourceName, GetErrorText(adsWinError));
+            ret = observer.AskADSReadError(sourceNameW.c_str(), GetErrorTextOwned(adsWinError).c_str());
             switch (ret)
             {
             case IDRETRY:
@@ -3079,25 +2885,27 @@ COPY_ADS_AGAIN:
     return doCopyADSRet;
 }
 
-HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
+// Wide. Its only caller was the SDK forwarder, so this widened in
+// place rather than growing a narrow twin.
+HANDLE SalCreateFileEx(const wchar_t* fileName, DWORD desiredAccess,
                        DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
     HANDLE out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
-                                 CREATE_NEW, flagsAndAttributes, NULL);
+                                     CREATE_NEW, flagsAndAttributes, NULL);
     if (out == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
         if (encryptionNotSupported != NULL && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
         { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
             out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
-                                  CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
+                                      CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
             if (out != INVALID_HANDLE_VALUE)
             {
                 *encryptionNotSupported = TRUE;
-                NOHANDLES(CloseHandle(out));
+                (void)GetWorkerFileSystem()->CloseFileHandle(out);
                 out = INVALID_HANDLE_VALUE;
-                if (!DeleteFileA(gFileSystem, fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
-                    TRACE_I("Unable to delete testing target file: " << fileName);
+                if (!gFileSystem->DeleteFile(fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                    TRACE_IW(L"Unable to delete testing target file: " << fileName);
             }
         }
         if (err == ERROR_FILE_EXISTS || // check whether this is merely overwriting the DOS name
@@ -3108,81 +2916,85 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
             HANDLE find = SalFindFirstFileHW(fileName, &data);
             if (find != INVALID_HANDLE_VALUE)
             {
-                HANDLES(FindClose(find));
+                SalLPFindClose(find);
                 if (err != ERROR_ACCESS_DENIED || (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
                 {
-                    const char* tgtName = SalPathFindFileName(fileName);
-                    char cFileNameA[MAX_PATH];
-                    char cAltNameA[14];
-                    WideCharToMultiByte(CP_ACP, 0, data.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                    WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                    if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only for DOS name
-                        StrICmp(tgtName, cFileNameA) != 0)     // (full name differs)
+                    // The find data was ALREADY wide; the two
+                    // WideCharToMultiByte calls that stood here existed only so the
+                    // names could be compared against a narrow 'fileName'. With the
+                    // parameter wide they are gone, and so are the two
+                    // AnsiToWide(origFullName) calls further down - four conversions
+                    // deleted, not relocated.
+                    const wchar_t* tgtName = SalPathFindFileNameW(fileName);
+                    if (StrICmpW(tgtName, data.cAlternateFileName) == 0 && // match only for DOS name
+                        StrICmpW(tgtName, data.cFileName) != 0)            // (full name differs)
                     {
                         // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
-                        CPathBuffer tmpName;
-                        lstrcpyn(tmpName, fileName, tmpName.Size());
-                        CutDirectory(tmpName);
-                        SalPathAddBackslash(tmpName, tmpName.Size());
-                        char* tmpNamePart = tmpName + strlen(tmpName);
-                        CPathBuffer origFullName; // Heap-allocated for long path support
-                        if (SalPathAppend(tmpName, cFileNameA, tmpName.Size()))
-                        {
-                            strcpy(origFullName, tmpName);
-                            DWORD num = (GetTickCount() / 10) % 0xFFF;
-                            DWORD origFullNameAttr = GetFileAttributesW(AnsiToWide(origFullName).c_str());
-                            while (1)
-                            {
-                                sprintf(tmpNamePart, "sal%03X", num++);
-                                if (SalMoveFile(origFullName, tmpName))
-                                    break;
-                                DWORD e = GetLastError();
-                                if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
-                                {
-                                    tmpName[0] = 0;
-                                    break;
-                                }
-                            }
-                            if (tmpName[0] != 0) // if we successfully "tidied" the conflicting file, try creating
-                            {                    // the target file again, then restore the original name
-                                out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
-                                                      CREATE_NEW, flagsAndAttributes, NULL);
-                                if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
-                                    (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
-                                { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-                                    out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
-                                                          CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
-                                    if (out != INVALID_HANDLE_VALUE)
-                                    {
-                                        *encryptionNotSupported = TRUE;
-                                        NOHANDLES(CloseHandle(out));
-                                        out = INVALID_HANDLE_VALUE;
-                                        if (!DeleteFileA(gFileSystem, fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
-                                            TRACE_E("Unable to delete testing target file: " << fileName);
-                                    }
-                                }
-                                if (!SalMoveFile(tmpName, origFullName))
-                                { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of fileName (the DOS name)
-                                    TRACE_I("Unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                        std::wstring dir(fileName);
+                        CutDirectoryW(dir);
+                        SalPathAddBackslashW(dir);
 
-                                    if (out != INVALID_HANDLE_VALUE)
-                                    {
-                                        NOHANDLES(CloseHandle(out));
-                                        out = INVALID_HANDLE_VALUE;
-                                        DeleteFileA(gFileSystem, fileName);
-                                        if (!SalMoveFile(tmpName, origFullName))
-                                            TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
-                                    }
-                                }
-                                else
-                                {
-                                    if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                        SetFileAttributesW(AnsiToWide(origFullName).c_str(), origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
-                                }
+                        std::wstring origFullName = dir;
+                        SalPathAppendW(origFullName, data.cFileName);
+
+                        DWORD num = (GetTickCount() / 10) % 0xFFF;
+                        DWORD origFullNameAttr = GetWorkerFileSystem()->GetFileAttributes(origFullName.c_str());
+
+                        // The narrow original kept a raw pointer INTO its buffer and
+                        // sprintf'd through it each round. Rebuilding from 'dir' is
+                        // equivalent and cannot dangle if the string reallocates.
+                        std::wstring tmpName;
+                        while (1)
+                        {
+                            wchar_t suffix[16];
+                            swprintf(suffix, _countof(suffix), L"sal%03X", num++);
+                            tmpName = dir + suffix;
+                            if (SalMoveFile(origFullName.c_str(), tmpName.c_str()))
+                                break;
+                            DWORD e = GetLastError();
+                            if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                            {
+                                tmpName.clear();
+                                break;
                             }
                         }
-                        else
-                            TRACE_E("SalCreateFileEx(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                        if (!tmpName.empty()) // if we successfully "tidied" the conflicting file, try creating
+                        {                     // the target file again, then restore the original name
+                            out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
+                                                      CREATE_NEW, flagsAndAttributes, NULL);
+                            if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
+                                (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
+                            { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
+                                out = SalLPCreateFile(fileName, desiredAccess, shareMode, NULL,
+                                                          CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL);
+                                if (out != INVALID_HANDLE_VALUE)
+                                {
+                                    *encryptionNotSupported = TRUE;
+                                    (void)GetWorkerFileSystem()->CloseFileHandle(out);
+                                    out = INVALID_HANDLE_VALUE;
+                                    if (!gFileSystem->DeleteFile(fileName).success) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                                        TRACE_EW(L"Unable to delete testing target file: " << fileName);
+                                }
+                            }
+                            if (!SalMoveFile(tmpName.c_str(), origFullName.c_str()))
+                            { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of fileName (the DOS name)
+                                TRACE_IW(L"Unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+
+                                if (out != INVALID_HANDLE_VALUE)
+                                {
+                                    (void)GetWorkerFileSystem()->CloseFileHandle(out);
+                                    out = INVALID_HANDLE_VALUE;
+                                    gFileSystem->DeleteFile(fileName);
+                                    if (!SalMoveFile(tmpName.c_str(), origFullName.c_str()))
+                                        TRACE_EW(L"Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                }
+                            }
+                            else
+                            {
+                                if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+                                    GetWorkerFileSystem()->SetFileAttributes(origFullName.c_str(), origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
+                            }
+                        }
                     }
                 }
             }
@@ -3193,92 +3005,83 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
     return out;
 }
 
-// Direct Win32: handle-based DeviceIoControl for compression/decompression — wrapping not needed
-BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWORD dwIoControlCode,
-                                LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer,
-                                DWORD nOutBufferSize, LPDWORD lpBytesReturned, DWORD* err)
+static FileResult SetWorkerHandleCompression(CAsyncCopyParams* asyncPar,
+                                              HANDLE file, bool compress)
 {
-    if (asyncPar->UseAsyncAlg) // asynchronous variant
-    {
-        if (!DeviceIoControl(hDevice, dwIoControlCode, lpInBuffer, nInBufferSize, lpOutBuffer,
-                             nOutBufferSize, NULL, asyncPar->InitOverlapped(0)) &&
-                GetLastError() != ERROR_IO_PENDING ||
-            !GetOverlappedResult(hDevice, asyncPar->GetOverlapped(0), lpBytesReturned, TRUE))
-        { // error, return FALSE
-            *err = GetLastError();
-            return FALSE;
-        }
-    }
-    else // synchronous variant
-    {
-        if (!DeviceIoControl(hDevice, dwIoControlCode, lpInBuffer, nInBufferSize, lpOutBuffer,
-                             nOutBufferSize, lpBytesReturned, NULL))
-        { // error, return FALSE
-            *err = GetLastError();
-            return FALSE;
-        }
-    }
-    *err = NO_ERROR;
-    return TRUE;
+    IFileSystem* fileSystem = GetWorkerFileSystem();
+    if (!asyncPar->UseAsyncAlg)
+        return fileSystem->SetHandleCompression(file, compress);
+
+    FileResult result = fileSystem->SetHandleCompressionOverlapped(
+        file, compress, asyncPar->InitOverlapped(0));
+    if (!result.success && result.errorCode != ERROR_IO_PENDING)
+        return result;
+
+    DWORD transferred = 0;
+    return fileSystem->CompleteHandleIo(
+        file, asyncPar->GetOverlapped(0), &transferred, true);
 }
 
 // Sets compression/encryption attributes on the target file.
 // DeviceIoControl (FSCTL_SET_COMPRESSION) operates on open HANDLE — handle-based, wrapping not needed.
 // Uses wide APIs (GetFileAttributesW, EncryptFileW, DecryptFileW, CreateFileW) when nameW is available.
-void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOOL openAlsoForRead,
+void SetCompressAndEncryptedAttrs(DWORD attr, HANDLE* out, BOOL openAlsoForRead,
                                   BOOL* encryptionNotSupported, CAsyncCopyParams* asyncPar,
-                                  const std::wstring& nameW = std::wstring())
+                                  const std::wstring& nameW)
 {
     if (*out != INVALID_HANDLE_VALUE)
     {
-        // Always have a wide path available
-        const std::wstring& effectiveNameW = !nameW.empty() ? nameW : (const std::wstring&)AnsiToWide(name);
+        const std::wstring& effectiveNameW = nameW;
 
         DWORD err = NO_ERROR;
-        DWORD curAttr = GetFileAttributesW(effectiveNameW.c_str());
+        DWORD curAttr = GetWorkerFileSystem()->GetFileAttributes(effectiveNameW.c_str());
         if ((curAttr == INVALID_FILE_ATTRIBUTES ||
              (attr & FILE_ATTRIBUTE_COMPRESSED) != (curAttr & FILE_ATTRIBUTE_COMPRESSED)) &&
             (attr & FILE_ATTRIBUTE_COMPRESSED) == 0)
         {
-            USHORT state = COMPRESSION_FORMAT_NONE;
-            ULONG length;
-            if (!SyncOrAsyncDeviceIoControl(asyncPar, *out, FSCTL_SET_COMPRESSION, &state,
-                                            sizeof(USHORT), NULL, 0, &length, &err))
+            const FileResult compressionResult =
+                SetWorkerHandleCompression(asyncPar, *out, false);
+            if (!compressionResult.success)
             {
-                TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Compressed attribute for " << name << "! error=" << GetErrorText(err));
+                err = compressionResult.errorCode;
+                TRACE_IW(L"SetCompressAndEncryptedAttrs(): Unable to set Compressed attribute for " << effectiveNameW.c_str() << L"! error=" << GetErrorTextOwned(err).c_str());
             }
         }
         if (curAttr == INVALID_FILE_ATTRIBUTES ||
             (attr & FILE_ATTRIBUTE_ENCRYPTED) != (curAttr & FILE_ATTRIBUTE_ENCRYPTED))
         { // SalCreateFileEx above likely failed
             err = NO_ERROR;
-            HANDLES(CloseHandle(*out)); // close the file; otherwise we cannot change its encrypted attribute
+            (void)GetWorkerFileSystem()->CloseFileHandle(*out); // close the file; otherwise we cannot change its encrypted attribute
             if (attr & FILE_ATTRIBUTE_ENCRYPTED)
             {
-                if (!EncryptFileW(effectiveNameW.c_str()))
+                const FileResult encryptResult =
+                    GetWorkerFileSystem()->EncryptPath(effectiveNameW.c_str());
+                if (!encryptResult.success)
                 {
-                    err = GetLastError();
+                    err = encryptResult.errorCode;
                     if (encryptionNotSupported != NULL)
                         *encryptionNotSupported = TRUE;
                 }
             }
             else
             {
-                if (!DecryptFileW(effectiveNameW.c_str(), 0))
-                    err = GetLastError();
+                const FileResult decryptResult =
+                    GetWorkerFileSystem()->DecryptPath(effectiveNameW.c_str());
+                if (!decryptResult.success)
+                    err = decryptResult.errorCode;
             }
             if (err != NO_ERROR)
-                TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << name << "! error=" << GetErrorText(err));
+                TRACE_IW(L"SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << effectiveNameW.c_str() << L"! error=" << GetErrorTextOwned(err).c_str());
             // reopen the existing file to continue writing
-            *out = CreateFileW(effectiveNameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+            *out = GetWorkerFileSystem()->CreateFile(effectiveNameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
                                asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
             if (openAlsoForRead && *out == INVALID_HANDLE_VALUE)
-                *out = CreateFileW(effectiveNameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                *out = GetWorkerFileSystem()->CreateFile(effectiveNameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
                                    asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
             {
                 err = GetLastError();
-                DeleteFileW(effectiveNameW.c_str());
+                GetWorkerFileSystem()->DeleteFile(effectiveNameW.c_str());
                 SetLastError(err);
             }
         }
@@ -3287,34 +3090,31 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
              (attr & FILE_ATTRIBUTE_COMPRESSED) != (curAttr & FILE_ATTRIBUTE_COMPRESSED)) &&
             (attr & FILE_ATTRIBUTE_COMPRESSED) != 0)
         {
-            USHORT state = COMPRESSION_FORMAT_DEFAULT;
-            ULONG length;
-            if (!SyncOrAsyncDeviceIoControl(asyncPar, *out, FSCTL_SET_COMPRESSION, &state,
-                                            sizeof(USHORT), NULL, 0, &length, &err))
+            const FileResult compressionResult =
+                SetWorkerHandleCompression(asyncPar, *out, true);
+            if (!compressionResult.success)
             {
-                TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Compressed attribute for " << name << "! error=" << GetErrorText(err));
+                err = compressionResult.errorCode;
+                TRACE_IW(L"SetCompressAndEncryptedAttrs(): Unable to set Compressed attribute for " << effectiveNameW.c_str() << L"! error=" << GetErrorTextOwned(err).c_str());
             }
         }
     }
 }
 
-void CorrectCaseOfTgtName(char* tgtName, BOOL dataRead, WIN32_FIND_DATAW* data)
+void CorrectCaseOfTgtNameW(std::wstring& tgtName, BOOL dataRead, WIN32_FIND_DATAW* data)
 {
     if (!dataRead)
     {
-        HANDLE find = SalFindFirstFileHW(tgtName, data);
+        HANDLE find = GetWorkerFileSystem()->FindFirstFile(tgtName.c_str(), data);
         if (find != INVALID_HANDLE_VALUE)
-            HANDLES(FindClose(find));
+            SalLPFindClose(find);
         else
             return; // failed to read data for the target file; abort
     }
-    // data->cFileName is wchar_t[] — convert to ANSI for the tgtName buffer
-    char ansiFileName[MAX_PATH];
-    WideCharToMultiByte(CP_ACP, 0, data->cFileName, -1, ansiFileName, MAX_PATH, NULL, NULL);
-    int len = (int)strlen(ansiFileName);
-    int tgtNameLen = (int)strlen(tgtName);
-    if (tgtNameLen >= len && StrICmp(tgtName + tgtNameLen - len, ansiFileName) == 0)
-        memcpy(tgtName + tgtNameLen - len, ansiFileName, len);
+    const size_t len = wcslen(data->cFileName);
+    if (tgtName.size() >= len &&
+        _wcsicmp(tgtName.c_str() + tgtName.size() - len, data->cFileName) == 0)
+        tgtName.replace(tgtName.size() - len, len, data->cFileName);
 }
 
 void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSize,
@@ -3331,8 +3131,8 @@ void SetTFSandPSforSkippedFile(COperation* op, CQuadWord& lastTransferredFileSiz
     script->SetTFSandProgressSize(lastTransferredFileSize, pSize);
 }
 
-// Synchronous copy loop. All Win32 calls (ReadFile, WriteFile, GetFileSize, SetFilePointer,
-// SetEndOfFile, CloseHandle) operate on open HANDLEs — handle-based, no path wrapping needed.
+// Synchronous copy loop. Handle I/O is routed through IFileSystem so injected
+// failures carry their error value with the operation.
 void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                         COperations* script, CWorkerState& workerState, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
@@ -3342,10 +3142,13 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
     int autoRetryAttemptsSNAP = 0;
     DWORD read;
     DWORD written;
-    // Direct Win32: performance-critical synchronous copy loop (ReadFile/WriteFile on open HANDLEs)
+    DWORD pendingWriteError = ERROR_SUCCESS;
+    FileResult readIoResult = FileResult::Ok();
     while (1)
     {
-        if (ReadFile(in, buffer, limitBufferSize, &read, NULL))
+        readIoResult = GetWorkerFileSystem()->ReadFromHandle(
+            in, buffer, limitBufferSize, &read);
+        if (readIoResult.success)
         {
             autoRetryAttemptsSNAP = 0;
             if (read == 0)
@@ -3360,16 +3163,20 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             while (1)
             {
-                if (WriteFile(out, buffer, read, &written, NULL) &&
-                    read == written)
+                const FileResult writeIoResult = GetWorkerFileSystem()->WriteToHandle(
+                    out, buffer, read, &written);
+                if (writeIoResult.success && read == written)
                 {
                     break;
                 }
+                pendingWriteError = writeIoResult.success ?
+                                        ERROR_DISK_FULL : writeIoResult.errorCode;
 
             WRITE_ERROR:
 
-                DWORD err;
-                err = GetLastError();
+                DWORD err = pendingWriteError != ERROR_SUCCESS ?
+                                pendingWriteError : GetLastError();
+                pendingWriteError = ERROR_SUCCESS;
 
                 observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                 if (observer.IsCancelled())
@@ -3388,8 +3195,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 ret = IDCANCEL;
                 if (err == NO_ERROR && read != written)
                     err = ERROR_DISK_FULL;
-                ret = observer.AskFileErrorByIdW(IDS_ERRORWRITINGFILE, op->TargetName,
-                                                 op->HasWideTarget() ? op->TargetNameW.c_str() : NULL, err);
+                ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetNameW.c_str(), err);
                 switch (ret)
                 {
                 case IDRETRY: // on a network we must reopen the handle; local access forbids it due to sharing
@@ -3397,22 +3203,23 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                     if (out != NULL)
                     {
                         if (wholeFileAllocated)
-                            SetEndOfFile(out);     // otherwise on a floppy the remaining bytes would be written
-                        HANDLES(CloseHandle(out)); // close the invalid handle
+                            (void)GetWorkerFileSystem()->SetHandleEnd(out);     // otherwise on a floppy the remaining bytes would be written
+                        (void)CloseWorkerTrackedFile(out); // close the invalid handle
                     }
                     out = op->OpenTargetFile(GENERIC_WRITE | GENERIC_READ, 0, OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN);
                     if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                     {
-                        LONG lo, hi;
-                        lo = GetFileSize(out, (DWORD*)&hi);
-                        if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR || // cannot obtain the size
-                            CQuadWord(lo, hi) < operationDone ||                     // file is too small
-                            wholeFileAllocated && CQuadWord(lo, hi) > fileSize &&
-                                CQuadWord(lo, hi) > operationDone + CQuadWord(read, 0) || // pre-allocated file is too large (beyond the reserved size and beyond the written portion including the current block) = extra bytes were appended (allocWholeFileOnStart should be 0 /* need-test */)
+                        CQuadWord currentSize;
+                        const FileResult sizeResult =
+                            GetWorkerHandleSize(out, currentSize);
+                        if (!sizeResult.success ||                   // cannot obtain the size
+                            currentSize < operationDone ||           // file is too small
+                            wholeFileAllocated && currentSize > fileSize &&
+                                currentSize > operationDone + CQuadWord(read, 0) || // pre-allocated file is too large (beyond the reserved size and beyond the written portion including the current block) = extra bytes were appended (allocWholeFileOnStart should be 0 /* need-test */)
                             !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone + CQuadWord(read, 0), FALSE))
                         { // restart the whole operation
-                            HANDLES(CloseHandle(in));
-                            HANDLES(CloseHandle(out));
+                            (void)CloseWorkerTrackedFile(in);
+                            (void)CloseWorkerTrackedFile(out);
                             op->DeleteTargetFile();
                             copyAgain = TRUE; // goto COPY_AGAIN;
                             return;
@@ -3467,8 +3274,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
         {
         READ_ERROR:
 
-            DWORD err;
-            err = GetLastError();
+            DWORD err = readIoResult.errorCode;
             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
             if (observer.IsCancelled())
             {
@@ -3490,8 +3296,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERRORREADINGFILE, op->SourceName,
-                                             op->SourceNameW.c_str(), err);
+            ret = observer.AskFileErrorById(IDS_ERRORREADINGFILE, op->SourceNameW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -3499,20 +3304,20 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             RETRY_COPY:
 
                 if (in != NULL)
-                    HANDLES(CloseHandle(in)); // close the invalid handle
+                    (void)CloseWorkerTrackedFile(in); // close the invalid handle
                 in = op->OpenSourceFile(FILE_FLAG_SEQUENTIAL_SCAN);
                 if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                 {
-                    LONG lo, hi;
-                    lo = GetFileSize(in, (DWORD*)&hi);
-                    if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                        CQuadWord(lo, hi) < operationDone ||
+                    CQuadWord currentSize;
+                    const FileResult sizeResult = GetWorkerHandleSize(in, currentSize);
+                    if (!sizeResult.success ||
+                        currentSize < operationDone ||
                         !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone, TRUE))
                     { // cannot obtain the size or the file is too small; restart the whole operation
-                        HANDLES(CloseHandle(in));
+                        (void)CloseWorkerTrackedFile(in);
                         if (wholeFileAllocated)
-                            SetEndOfFile(out); // otherwise on a floppy the remaining bytes would be written
-                        HANDLES(CloseHandle(out));
+                            (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining bytes would be written
+                        (void)CloseWorkerTrackedFile(out);
                         op->DeleteTargetFile();
                         copyAgain = TRUE; // goto COPY_AGAIN;
                         return;
@@ -3520,6 +3325,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 }
                 else // still cannot open; problem persists
                 {
+                    readIoResult = FileResult::Error(GetLastError());
                     in = NULL;
                     goto READ_ERROR;
                 }
@@ -3547,9 +3353,12 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
     {
         if (operationDone < fileSize) // and the source file shrank
         {
-            if (!SetEndOfFile(out)) // trim it here
+            const FileResult truncateResult =
+                GetWorkerFileSystem()->SetHandleEnd(out);
+            if (!truncateResult.success) // trim it here
             {
                 written = read = 0;
+                pendingWriteError = truncateResult.errorCode;
                 goto WRITE_ERROR;
             }
         }
@@ -3557,8 +3366,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
         if (allocWholeFileOnStart == 0 /* need-test */)
         {
             CQuadWord curFileSize;
-            curFileSize.LoDWord = GetFileSize(out, &curFileSize.HiDWord);
-            BOOL getFileSizeSuccess = (curFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR);
+            const FileResult sizeResult = GetWorkerHandleSize(out, curFileSize);
+            BOOL getFileSizeSuccess = sizeResult.success;
             if (getFileSizeSuccess && curFileSize == operationDone)
             { // verify that no extra bytes were appended at the end and that truncation works
                 allocWholeFileOnStart = 1 /* yes */;
@@ -3568,28 +3377,26 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 #ifdef _DEBUG
                 if (getFileSizeSuccess)
                 {
-                    char num1[50];
-                    char num2[50];
-                    TRACE_E("DoCopyFileLoopOrig(): unable to allocate whole file size before copy operation, please report "
-                            "under what conditions this occurs! Error: different file sizes: target="
-                            << NumberToStr(num1, curFileSize) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
+                    TRACE_EW(L"DoCopyFileLoopOrig(): unable to allocate whole file size before copy operation, please report "
+                             L"under what conditions this occurs! Error: different file sizes: target="
+                             << NumberToStr(curFileSize) << L" bytes, source=" << NumberToStr(operationDone) << L" bytes");
                 }
                 else
                 {
-                    DWORD err = GetLastError();
-                    TRACE_E("DoCopyFileLoopOrig(): unable to test result of allocation of whole file size before copy operation, please report "
-                            "under what conditions this occurs! GetFileSize("
-                            << op->TargetName << ") error: " << GetErrorText(err));
+                    DWORD err = sizeResult.errorCode;
+                    TRACE_EW(L"DoCopyFileLoopOrig(): unable to test result of allocation of whole file size before copy operation, please report "
+                            L"under what conditions this occurs! GetFileSize("
+                            << op->TargetNameW.c_str() << L") error: " << GetErrorTextOwned(err).c_str());
                 }
 #endif
                 allocWholeFileOnStart = 2 /* no */; // skip further attempts on this target disk
 
-                HANDLES(CloseHandle(out));
+                (void)CloseWorkerTrackedFile(out);
                 out = NULL;
                 op->ClearTargetReadOnly(); // if it somehow became read-only (should never happen), so we know how to handle it
                 if (op->DeleteTargetFile())
                 {
-                    HANDLES(CloseHandle(in));
+                    (void)CloseWorkerTrackedFile(in);
                     copyAgain = TRUE; // goto COPY_AGAIN;
                     return;
                 }
@@ -3698,7 +3505,7 @@ struct CCopy_Context
     int FindBlock(CCopy_BlkState state);
     void FreeBlock(int blkIndex);
     void DiscardBlocksBehindEOF(const CQuadWord& fileSize, int excludeIndex);
-    void GetNewFileSize(const char* fileName, HANDLE file, CQuadWord* fileSize, const CQuadWord& minFileSize);
+    void GetNewFileSize(const wchar_t* fileName, HANDLE file, CQuadWord* fileSize, const CQuadWord& minFileSize);
 
     BOOL HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, BOOL* skipCopy, BOOL* copyAgain);
     BOOL HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, BOOL* skipCopy, BOOL* copyAgain,
@@ -3751,12 +3558,12 @@ BOOL CCopy_Context::StartReading(int blkIndex, DWORD readSize, DWORD* err, BOOL 
     TRACE_I(sss);
 #endif // ASYNC_COPY_DEBUG_MSG
 
-    // Direct Win32: performance-critical async copy loop (overlapped ReadFile on open HANDLE)
-    if (!ReadFile(*In, AsyncPar->Buffers[blkIndex], readSize, NULL,
-                  AsyncPar->InitOverlappedWithOffset(blkIndex, ReadOffset)) &&
-        GetLastError() != ERROR_IO_PENDING)
+    const FileResult readResult = GetWorkerFileSystem()->ReadFromHandleOverlapped(
+        *In, AsyncPar->Buffers[blkIndex], readSize,
+        AsyncPar->InitOverlappedWithOffset(blkIndex, ReadOffset));
+    if (!readResult.success && readResult.errorCode != ERROR_IO_PENDING)
     { // a read error occurred; handle it
-        *err = GetLastError();
+        *err = readResult.errorCode;
         if (*err == ERROR_HANDLE_EOF) // synchronously reported EOF; convert it to an asynchronously reported EOF
             AsyncPar->SetOverlappedToEOF(blkIndex, ReadOffset);
         else
@@ -3802,12 +3609,12 @@ BOOL CCopy_Context::StartWriting(int blkIndex, DWORD* err)
     TRACE_I(sss);
 #endif // ASYNC_COPY_DEBUG_MSG
 
-    // Direct Win32: performance-critical async copy loop (overlapped WriteFile on open HANDLE)
-    if (!WriteFile(*Out, AsyncPar->Buffers[blkIndex], BlockDataLen[blkIndex], NULL,
-                   AsyncPar->InitOverlappedWithOffset(blkIndex, WriteOffset)) &&
-        GetLastError() != ERROR_IO_PENDING)
+    const FileResult writeResult = GetWorkerFileSystem()->WriteToHandleOverlapped(
+        *Out, AsyncPar->Buffers[blkIndex], BlockDataLen[blkIndex],
+        AsyncPar->InitOverlappedWithOffset(blkIndex, WriteOffset));
+    if (!writeResult.success && writeResult.errorCode != ERROR_IO_PENDING)
     { // a write error occurred; handle it
-        *err = GetLastError();
+        *err = writeResult.errorCode;
         return FALSE;
     }
     // if the write was completed synchronously (or via cache, which we cannot detect),
@@ -3874,13 +3681,13 @@ void CCopy_Context::DiscardBlocksBehindEOF(const CQuadWord& fileSize, int exclud
     }
 }
 
-void CCopy_Context::GetNewFileSize(const char* fileName, HANDLE file, CQuadWord* fileSize, const CQuadWord& minFileSize)
+void CCopy_Context::GetNewFileSize(const wchar_t* fileName, HANDLE file, CQuadWord* fileSize, const CQuadWord& minFileSize)
 {
-    fileSize->LoDWord = GetFileSize(file, &fileSize->HiDWord);
-    if (fileSize->LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+    const FileResult sizeResult = GetWorkerHandleSize(file, *fileSize);
+    if (!sizeResult.success)
     {
-        DWORD err = GetLastError();
-        TRACE_E("CCopy_Context::GetNewFileSize(): GetFileSize(" << fileName << "): unexpected error: " << GetErrorText(err));
+        DWORD err = sizeResult.errorCode;
+        TRACE_EW(L"CCopy_Context::GetNewFileSize(): GetFileSize(" << fileName << L"): unexpected error: " << GetErrorTextOwned(err).c_str());
         *fileSize = minFileSize;
     }
     else
@@ -3892,15 +3699,18 @@ void CCopy_Context::GetNewFileSize(const char* fileName, HANDLE file, CQuadWord*
 
 void CCopy_Context::CancelOpPhase1()
 {
-    if (!CancelIo(*In))
+    const FileResult cancelInResult = GetWorkerFileSystem()->CancelHandleIo(*In);
+    if (!cancelInResult.success)
     {
-        DWORD err = GetLastError();
-        TRACE_E("CCopy_Context::CancelOpPhase1(): CancelIo(IN) failed, error: " << GetErrorText(err));
+        DWORD err = cancelInResult.errorCode;
+        TRACE_EW(L"CCopy_Context::CancelOpPhase1(): CancelIo(IN) failed, error: " << GetErrorTextOwned(err).c_str());
     }
-    if (*Out != NULL && !CancelIo(*Out))
+    const FileResult cancelOutResult = *Out != NULL ?
+        GetWorkerFileSystem()->CancelHandleIo(*Out) : FileResult::Ok();
+    if (!cancelOutResult.success)
     {
-        DWORD err = GetLastError();
-        TRACE_E("CCopy_Context::CancelOpPhase1(): CancelIo(OUT) failed, error: " << GetErrorText(err));
+        DWORD err = cancelOutResult.errorCode;
+        TRACE_EW(L"CCopy_Context::CancelOpPhase1(): CancelIo(OUT) failed, error: " << GetErrorTextOwned(err).c_str());
     }
 }
 
@@ -3915,7 +3725,10 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
     {
         if (BlockState[i] > cbsInProgress)
         { // GetOverlappedResult should return results immediately because CancelIo() was called for both files
-            if (GetOverlappedResult(BlockState[i] == cbsWriting ? *Out : *In, AsyncPar->GetOverlapped(i), &bytes, TRUE))
+            const FileResult completionResult = GetWorkerFileSystem()->CompleteHandleIo(
+                BlockState[i] == cbsWriting ? *Out : *In,
+                AsyncPar->GetOverlapped(i), &bytes, true);
+            if (completionResult.success)
             {
                 if (BlockState[i] == cbsReading && BlockDataLen[i] == bytes) // fully read -> convert to cbsRead block
                 {
@@ -3933,11 +3746,11 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
             }
             else
             {
-                DWORD err = GetLastError();
+                DWORD err = completionResult.errorCode;
                 if (i != errBlkIndex &&             // already reporting the error for this block; no need to repeat it in TRACE
                     err != ERROR_OPERATION_ABORTED) // not an error, merely reports cancellation (CancelIo() call)
                 {                                   // log issues in other blocks, usually harmless and best ignored
-                    TRACE_I("CCopy_Context::CancelOpPhase2(): GetOverlappedResult(" << (BlockState[i] == cbsWriting ? "OUT" : "IN") << ", " << i << ") returned error: " << GetErrorText(err));
+                    TRACE_IW(L"CCopy_Context::CancelOpPhase2(): GetOverlappedResult(" << (BlockState[i] == cbsWriting ? L"OUT" : L"IN") << L", " << i << L") returned error: " << GetErrorTextOwned(err).c_str());
                 }
             }
             switch (BlockState[i])
@@ -3980,10 +3793,11 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
     // used to prevent fragmentation)
     if (*Out != NULL) // only if the target file was not closed meanwhile
     {
-        if (!SalSetFilePointer(*Out, WriteOffset))
+        const FileResult seekResult = SeekWorkerHandleExact(*Out, WriteOffset);
+        if (!seekResult.success)
         {
-            DWORD err = GetLastError();
-            TRACE_E("CCopy_Context::CancelOpPhase2(): unable to set file pointer in OUT file, error: " << GetErrorText(err));
+            DWORD err = seekResult.errorCode;
+            TRACE_EW(L"CCopy_Context::CancelOpPhase2(): unable to set file pointer in OUT file, error: " << GetErrorTextOwned(err).c_str());
         }
     }
 }
@@ -3991,13 +3805,13 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
 BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain)
 {
     if (*In != NULL)
-        HANDLES(CloseHandle(*In)); // close the invalid handle
+        (void)CloseWorkerTrackedFile(*In); // close the invalid handle
     *In = Op->OpenSourceFile(AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
     if (*In != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
     {
         CQuadWord size;
-        size.LoDWord = GetFileSize(*In, (DWORD*)&size.HiDWord);
-        if ((size.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) && size >= ReadOffset)
+        const FileResult sizeResult = GetWorkerHandleSize(*In, size);
+        if (sizeResult.success && size >= ReadOffset)
         { // size obtained and the file is large enough
             // if the source is on a network: disable local client-side in-memory caching
             // http://msdn.microsoft.com/en-us/library/ee210753%28v=vs.85%29.aspx
@@ -4005,7 +3819,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
             // using Overlapped[0].hEvent from AsyncPar is OK; nothing is "in-progress" now, the event is unused
             // (but WARNING: for example Buffers[0] from AsyncPar may still be in use)
             if (DisableNetworkLocalBuffering && (Op->OpFlags & OPFL_SRCPATH_IS_NET) && !DisableLocalBuffering(AsyncPar, *In, err))
-                TRACE_E("CCopy_Context::RetryCopyReadErr(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network source file: " << Op->SourceName << ", error: " << GetErrorText(*err));
+                TRACE_EW(L"CCopy_Context::RetryCopyReadErr(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network source file: " << Op->SourceNameW.c_str() << L", error: " << GetErrorTextOwned(*err).c_str());
             // using Overlapped[0 and 1].hEvent and Overlapped[0 and 1] from AsyncPar is OK; nothing is
             // "in-progress", the event nor the overlapped structures are used (but WARNING: for example Buffers[0]
             // from AsyncPar may still be in use)
@@ -4020,10 +3834,10 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
             }
         }
         // cannot obtain the size, the file is too small, or the last written part differs from the source -> restart from scratch
-        HANDLES(CloseHandle(*In));
+        (void)CloseWorkerTrackedFile(*In);
         if (WholeFileAllocated)
-            SetEndOfFile(*Out); // otherwise on a floppy the remaining bytes would be written
-        HANDLES(CloseHandle(*Out));
+            (void)GetWorkerFileSystem()->SetHandleEnd(*Out); // otherwise on a floppy the remaining bytes would be written
+        (void)CloseWorkerTrackedFile(*Out);
         Op->DeleteTargetFile();
         *copyAgain = TRUE; // goto COPY_AGAIN;
         return FALSE;
@@ -4068,8 +3882,7 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
         else
         {
-            ret = Observer->AskFileErrorByIdW(IDS_ERRORREADINGFILE, Op->SourceName,
-                                              Op->SourceNameW.c_str(), err);
+            ret = Observer->AskFileErrorById(IDS_ERRORREADINGFILE, Op->SourceNameW.c_str(), err);
         }
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
@@ -4114,8 +3927,8 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
     if (*Out != NULL)
     {
         if (WholeFileAllocated)
-            SetEndOfFile(*Out);     // otherwise on a floppy the remaining bytes would be written
-        HANDLES(CloseHandle(*Out)); // close the invalid handle
+            (void)GetWorkerFileSystem()->SetHandleEnd(*Out);     // otherwise on a floppy the remaining bytes would be written
+        (void)CloseWorkerTrackedFile(*Out); // close the invalid handle
     }
     *Out = Op->OpenTargetFile(GENERIC_WRITE | GENERIC_READ, 0, OPEN_ALWAYS,
                               AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
@@ -4123,8 +3936,8 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
     {
         BOOL ok = TRUE;
         CQuadWord size;
-        size.LoDWord = GetFileSize(*Out, (DWORD*)&size.HiDWord);
-        if (size.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||   // cannot obtain the size
+        const FileResult sizeResult = GetWorkerHandleSize(*Out, size);
+        if (!sizeResult.success ||                                                // cannot obtain the size
             size < WriteOffset ||                                                // file is too small
             WholeFileAllocated && size > allocFileSize && size > maxWriteOffset) // pre-allocated file is too large (greater than the pre-allocated size and the written portion including the current block) = extra bytes appended (allocWholeFileOnStart should be 0 /* need-test */)
         {                                                                        // restart the entire thing
@@ -4137,14 +3950,14 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
         // using Overlapped[0].hEvent from AsyncPar is OK; nothing is "in-progress" now, the event is unused
         // (but WARNING: for example Buffers[0] from AsyncPar may still be in use)
         if (ok && DisableNetworkLocalBuffering && (Op->OpFlags & OPFL_TGTPATH_IS_NET) && !DisableLocalBuffering(AsyncPar, *Out, err))
-            TRACE_E("CCopy_Context::RetryCopyWriteErr(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network target file: " << Op->TargetName << ", error: " << GetErrorText(*err));
+            TRACE_EW(L"CCopy_Context::RetryCopyWriteErr(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network target file: " << Op->TargetNameW.c_str() << L", error: " << GetErrorTextOwned(*err).c_str());
         // using Overlapped[0 and 1].hEvent and Overlapped[0 and 1] from AsyncPar is OK; nothing is
         // "in-progress", the event nor the overlapped structures are used (but WARNING: for example Buffers[0]
         // from AsyncPar may still be in use)
         if (!ok || !CheckTailOfOutFile(AsyncPar, *In, *Out, WriteOffset, WriteOffset, FALSE))
         {
-            HANDLES(CloseHandle(*In));
-            HANDLES(CloseHandle(*Out));
+            (void)CloseWorkerTrackedFile(*In);
+            (void)CloseWorkerTrackedFile(*Out);
             Op->DeleteTargetFile();
             *copyAgain = TRUE; // goto COPY_AGAIN;
             return FALSE;
@@ -4190,8 +4003,7 @@ BOOL CCopy_Context::HandleWritingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
 
         int ret = IDCANCEL;
-        ret = Observer->AskFileErrorByIdW(IDS_ERRORWRITINGFILE, Op->TargetName,
-                                          Op->TargetNameW.c_str(), err);
+        ret = Observer->AskFileErrorById(IDS_ERRORWRITINGFILE, Op->TargetNameW.c_str(), err);
         CancelOpPhase2(blkIndex);
         BOOL errAgain = FALSE;
         switch (ret)
@@ -4259,9 +4071,9 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     // if the source/target is on the network: disable local client-side in-memory caching
     // http://msdn.microsoft.com/en-us/library/ee210753%28v=vs.85%29.aspx
     if (disableNetworkLocalBuffering && (op->OpFlags & OPFL_SRCPATH_IS_NET) && !DisableLocalBuffering(asyncPar, in, &err))
-        TRACE_E("DoCopyFileLoopAsync(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network source file: " << op->SourceName << ", error: " << GetErrorText(err));
+        TRACE_EW(L"DoCopyFileLoopAsync(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network source file: " << op->SourceNameW.c_str() << L", error: " << GetErrorTextOwned(err).c_str());
     if (disableNetworkLocalBuffering && (op->OpFlags & OPFL_TGTPATH_IS_NET) && !DisableLocalBuffering(asyncPar, out, &err))
-        TRACE_E("DoCopyFileLoopAsync(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network target file: " << op->TargetName << ", error: " << GetErrorText(err));
+        TRACE_EW(L"DoCopyFileLoopAsync(): IOCTL_LMR_DISABLE_LOCAL_BUFFERING failed for network target file: " << op->TargetNameW.c_str() << L", error: " << GetErrorTextOwned(err).c_str());
 
     // copy loop parameters
     int numOfBlocks = 8;
@@ -4314,13 +4126,16 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                         TRACE_I("READ done: " << i);
 #endif // ASYNC_COPY_DEBUG_MSG
 
-                        BOOL res = GetOverlappedResult(in, asyncPar->GetOverlapped(i), &bytes, TRUE);
+                        FileResult completionResult = GetWorkerFileSystem()->CompleteHandleIo(
+                            in, asyncPar->GetOverlapped(i), &bytes, true);
+                        BOOL res = completionResult.success;
+                        DWORD completionError = completionResult.errorCode;
                         if (testingEOF && res && bytes == 0)
                         {
                             res = FALSE; // MSDN says it should return FALSE and ERROR_HANDLE_EOF at EOF, so enforce that (Novell Netware 6.5 disk returns TRUE)
-                            SetLastError(ERROR_HANDLE_EOF);
+                            completionError = ERROR_HANDLE_EOF;
                         }
-                        if (res || GetLastError() == ERROR_HANDLE_EOF)
+                        if (res || completionError == ERROR_HANDLE_EOF)
                         {
                             ctx.AutoRetryAttemptsSNAP = 0;
                             if (!res) // EOF at the beginning of the block (for cbsReading only: EOF can also be before this block and will be handled later in a block with a lower offset)
@@ -4354,7 +4169,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                                 if (testingEOF) // we were looking for EOF and read a full block; the file probably grew significantly, determine the new size
                                 {
                                     ctx.ReadOffset = ctx.BlockOffset[i] + CQuadWord(bytes, 0);
-                                    ctx.GetNewFileSize(op->SourceName, in, &fileSize, ctx.ReadOffset);
+                                    ctx.GetNewFileSize(op->SourceNameW.c_str(), in, &fileSize, ctx.ReadOffset);
                                 }
                             }
                             if (ctx.BlockState[i] == cbsReading || ctx.BlockState[i] == cbsTestingEOF)
@@ -4365,7 +4180,7 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                         }
                         else // error
                         {
-                            if (!ctx.HandleReadingErr(i, GetLastError(), &copyError, &skipCopy, &copyAgain))
+                            if (!ctx.HandleReadingErr(i, completionError, &copyError, &skipCopy, &copyAgain))
                                 return;       // cancel/skip(skip-all)/retry-complete
                             retryCopy = TRUE; // retry-resume
                         }
@@ -4378,10 +4193,12 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                         TRACE_I("WRITE done: " << i);
 #endif // ASYNC_COPY_DEBUG_MSG
 
-                        BOOL res = GetOverlappedResult(out, asyncPar->GetOverlapped(i), &bytes, TRUE);
+                        const FileResult completionResult = GetWorkerFileSystem()->CompleteHandleIo(
+                            out, asyncPar->GetOverlapped(i), &bytes, true);
+                        BOOL res = completionResult.success;
                         if (!res || bytes != ctx.BlockDataLen[i]) // error
                         {
-                            err = GetLastError();
+                            err = completionResult.errorCode;
                             if (err == NO_ERROR && bytes != ctx.BlockDataLen[i])
                                 err = ERROR_DISK_FULL;
                             CQuadWord maxWriteOffset = ctx.WriteOffset;
@@ -4487,8 +4304,9 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
             // wait for the oldest pending asynchronous operation to complete here
             // for the source file ('in') this covers: cbsReading, cbsTestingEOF, and cbsDiscarded
             // for the target file ('out') this covers only cbsWriting
-            GetOverlappedResult(ctx.BlockState[oldestBlockIndex] == cbsWriting ? out : in,
-                                asyncPar->GetOverlapped(oldestBlockIndex), &bytes, TRUE);
+            (void)GetWorkerFileSystem()->CompleteHandleIo(
+                ctx.BlockState[oldestBlockIndex] == cbsWriting ? out : in,
+                asyncPar->GetOverlapped(oldestBlockIndex), &bytes, true);
 
 #ifdef ASYNC_COPY_DEBUG_MSG
             char sss[1000];
@@ -4509,15 +4327,34 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
         {
             while (1)
             {
-                CQuadWord off = ctx.WriteOffset;
-                off.LoDWord = SetFilePointer(out, off.LoDWord, (LONG*)&(off.HiDWord), FILE_BEGIN);
-                if (off.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                    off != ctx.WriteOffset ||
-                    !SetEndOfFile(out))
+                uint64_t position = 0;
+                const FileResult seekResult = GetWorkerFileSystem()->SeekHandle(
+                    out, static_cast<int64_t>(ctx.WriteOffset.Value), FILE_BEGIN,
+                    &position);
+                DWORD err2 = ERROR_SUCCESS;
+                bool failed = false;
+                if (!seekResult.success)
                 {
-                    DWORD err2 = GetLastError();
-                    if ((off.LoDWord != INVALID_SET_FILE_POINTER || err2 == NO_ERROR) && off != ctx.WriteOffset)
-                        err2 = ERROR_INVALID_FUNCTION; // successful SetFilePointer, but off != ctx.WriteOffset: will probably never happen, included for completeness
+                    failed = true;
+                    err2 = seekResult.errorCode;
+                }
+                else if (position != ctx.WriteOffset.Value)
+                {
+                    failed = true;
+                    err2 = ERROR_INVALID_FUNCTION;
+                }
+                else
+                {
+                    const FileResult truncateResult =
+                        GetWorkerFileSystem()->SetHandleEnd(out);
+                    if (!truncateResult.success)
+                    {
+                        failed = true;
+                        err2 = truncateResult.errorCode;
+                    }
+                }
+                if (failed)
+                {
                     if (!ctx.HandleWritingErr(-1, err2, &copyError, &skipCopy, &copyAgain, allocFileSize, CQuadWord(0, 0)))
                         return; // cancel/skip(skip-all)/retry-complete
                                 // retry-resume
@@ -4530,8 +4367,8 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
         if (allocWholeFileOnStart == 0 /* need-test */)
         {
             CQuadWord curFileSize;
-            curFileSize.LoDWord = GetFileSize(out, &curFileSize.HiDWord);
-            BOOL getFileSizeSuccess = (curFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR);
+            const FileResult sizeResult = GetWorkerHandleSize(out, curFileSize);
+            BOOL getFileSizeSuccess = sizeResult.success;
             if (getFileSizeSuccess && curFileSize == operationDone)
             { // verify that no extra bytes were appended to the end of the file + that we can truncate the file
                 allocWholeFileOnStart = 1 /* yes */;
@@ -4541,30 +4378,28 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
 #ifdef _DEBUG
                 if (getFileSizeSuccess)
                 {
-                    char num1[50];
-                    char num2[50];
-                    TRACE_E("DoCopyFileLoopAsync(): unable to allocate whole file size before copy operation, please report "
-                            "under what conditions this occurs! Error: different file sizes: target="
-                            << NumberToStr(num1, curFileSize) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
+                    TRACE_EW(L"DoCopyFileLoopAsync(): unable to allocate whole file size before copy operation, please report "
+                             L"under what conditions this occurs! Error: different file sizes: target="
+                             << NumberToStr(curFileSize) << L" bytes, source=" << NumberToStr(operationDone) << L" bytes");
                 }
                 else
                 {
-                    DWORD err2 = GetLastError();
-                    TRACE_E("DoCopyFileLoopAsync(): unable to test result of allocation of whole file size before copy operation, please report "
-                            "under what conditions this occurs! GetFileSize("
-                            << op->TargetName << ") error: " << GetErrorText(err2));
+                    DWORD err2 = sizeResult.errorCode;
+                    TRACE_EW(L"DoCopyFileLoopAsync(): unable to test result of allocation of whole file size before copy operation, please report "
+                            L"under what conditions this occurs! GetFileSize("
+                            << op->TargetNameW.c_str() << L") error: " << GetErrorTextOwned(err2).c_str());
                 }
 #endif
                 allocWholeFileOnStart = 2 /* no */; // skip further attempts on this target disk
 
                 while (1)
                 {
-                    HANDLES(CloseHandle(out));
+                    (void)CloseWorkerTrackedFile(out);
                     out = NULL;
                     op->ClearTargetReadOnly(); // in case it was created as read-only (should never happen) so we can handle it
                     if (op->DeleteTargetFile())
                     {
-                        HANDLES(CloseHandle(in));
+                        (void)CloseWorkerTrackedFile(in);
                         copyAgain = TRUE; // goto COPY_AGAIN;
                         return;
                     }
@@ -4617,21 +4452,20 @@ BOOL DoCopyFile(COperation* op, IWorkerObserver& observer, void* buffer,
         find = op->FindFirstTarget(&dataOut);
         if (find != INVALID_HANDLE_VALUE)
         {
-            HANDLES(FindClose(find));
+            SalLPFindClose(find);
 
-            CorrectCaseOfTgtName(op->TargetName, TRUE, &dataOut);
+            CorrectCaseOfTgtNameW(op->TargetNameW, TRUE, &dataOut);
             tgtNameCaseCorrected = TRUE;
 
-            const char* tgtName = SalPathFindFileName(op->TargetName);
-            char cFileNameA[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, dataOut.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-            if (StrICmp(tgtName, cFileNameA) == 0 &&                        // ensure it is not just a DOS-name match (that would change the DOS-name instead of overwriting)
+            const wchar_t* tgtLeaf = wcsrchr(op->TargetNameW.c_str(), L'\\');
+            tgtLeaf = tgtLeaf != NULL ? tgtLeaf + 1 : op->TargetNameW.c_str();
+            if (_wcsicmp(tgtLeaf, dataOut.cFileName) == 0 &&                // ensure it is not just a DOS-name match (that would change the DOS-name instead of overwriting)
                 (dataOut.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // ensure it is not a directory (overwrite-older cannot help there)
             {
                 find = op->FindFirstSource(&dataIn);
                 if (find != INVALID_HANDLE_VALUE)
                 {
-                    HANDLES(FindClose(find));
+                    SalLPFindClose(find);
 
                     // truncate times to seconds (different file systems store timestamps with different precision, leading to "differences" even between "identical" times)
                     *(unsigned __int64*)&dataIn.ftLastWriteTime = *(unsigned __int64*)&dataIn.ftLastWriteTime - (*(unsigned __int64*)&dataIn.ftLastWriteTime % 10000000);
@@ -4776,7 +4610,7 @@ COPY_AGAIN:
                     if (script->CopyAttrs)
                     {
                         fileAttrs = lossEncryptionAttr ? (op->Attr & ~FILE_ATTRIBUTE_ENCRYPTED) : op->Attr;
-                        SetCompressAndEncryptedAttrs(op->TargetName, fileAttrs, &out, TRUE, NULL, asyncPar, op->TargetNameW);
+                        SetCompressAndEncryptedAttrs(fileAttrs, &out, TRUE, NULL, asyncPar, op->TargetNameW);
                     }
 
                     if (out != INVALID_HANDLE_VALUE && (fileAttrs & FILE_ATTRIBUTE_ENCRYPTED))
@@ -4798,7 +4632,7 @@ COPY_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
+                                ret = observer.AskEncryptionLoss(true, op->TargetNameW.c_str(), isMove != 0);
                                 switch (ret)
                                 {
                                 case IDB_ALL:
@@ -4813,7 +4647,7 @@ COPY_AGAIN:
                                 {
                                 SKIP_ENCNOTSUP:
 
-                                    HANDLES(CloseHandle(out));
+                                    (void)CloseWorkerTrackedFile(out);
                                     op->DeleteTargetFile();
                                     goto SKIP_OPEN_OUT;
                                 }
@@ -4822,7 +4656,7 @@ COPY_AGAIN:
                                 {
                                 CANCEL_ENCNOTSUP:
 
-                                    HANDLES(CloseHandle(out));
+                                    (void)CloseWorkerTrackedFile(out);
                                     op->DeleteTargetFile();
                                     goto CANCEL_OPEN2;
                                 }
@@ -4850,11 +4684,20 @@ COPY_AGAIN:
                     {
                         BOOL fatal = TRUE;
                         BOOL ignoreErr = FALSE;
-                        if (SalSetFilePointer(out, fileSize))
+                        DWORD allocateError = ERROR_SUCCESS;
+                        const FileResult allocateSeekResult =
+                            SeekWorkerHandleExact(out, fileSize);
+                        if (allocateSeekResult.success)
                         {
-                            if (SetEndOfFile(out))
+                            const FileResult allocateResult =
+                                GetWorkerFileSystem()->SetHandleEnd(out);
+                            if (allocateResult.success)
                             {
-                                if (SetFilePointer(out, 0, NULL, FILE_BEGIN) == 0)
+                                uint64_t rewindPosition = 0;
+                                const FileResult rewindResult =
+                                    GetWorkerFileSystem()->SeekHandle(
+                                        out, 0, FILE_BEGIN, &rewindPosition);
+                                if (rewindResult.success && rewindPosition == 0)
                                 {
                                     fatal = FALSE;
                                     wholeFileAllocated = TRUE;
@@ -4862,24 +4705,29 @@ COPY_AGAIN:
                             }
                             else
                             {
-                                if (GetLastError() == ERROR_DISK_FULL)
+                                allocateError = allocateResult.errorCode;
+                                if (allocateError == ERROR_DISK_FULL)
                                     ignoreErr = TRUE; // not enough space on the disk
                             }
                         }
+                        else
+                            allocateError = allocateSeekResult.errorCode;
                         if (fatal)
                         {
                             if (!ignoreErr)
                             {
-                                DWORD err = GetLastError();
-                                TRACE_E("DoCopyFile(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorText(err));
+                                DWORD err = allocateError != ERROR_SUCCESS ?
+                                                allocateError : GetLastError();
+                                TRACE_EW(L"DoCopyFile(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorTextOwned(err).c_str());
                                 allocWholeFileOnStart = 2 /* no */; // we will forego further attempts on this target disk
                             }
 
                             // try truncating the file to zero so closing it does not trigger any unnecessary writes
-                            SetFilePointer(out, 0, NULL, FILE_BEGIN);
-                            SetEndOfFile(out);
+                            (void)GetWorkerFileSystem()->SeekHandle(
+                                out, 0, FILE_BEGIN, NULL);
+                            (void)GetWorkerFileSystem()->SetHandleEnd(out);
 
-                            HANDLES(CloseHandle(out));
+                            (void)CloseWorkerTrackedFile(out);
                             out = INVALID_HANDLE_VALUE;
                             op->ClearTargetReadOnly(); // in case it was created as read-only (should never happen) so we can handle it
                             if (op->DeleteTargetFile())
@@ -4918,12 +4766,12 @@ COPY_AGAIN:
                     COPY_ERROR:
 
                         if (in != NULL)
-                            HANDLES(CloseHandle(in));
+                            (void)CloseWorkerTrackedFile(in);
                         if (out != NULL)
                         {
                             if (wholeFileAllocated)
-                                SetEndOfFile(out); // otherwise on a floppy the remaining part of the file would be written
-                            HANDLES(CloseHandle(out));
+                                (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining part of the file would be written
+                            (void)CloseWorkerTrackedFile(out);
                         }
                         op->DeleteTargetFile();
                         return FALSE;
@@ -4936,12 +4784,12 @@ COPY_AGAIN:
                         SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
                         if (in != NULL)
-                            HANDLES(CloseHandle(in));
+                            (void)CloseWorkerTrackedFile(in);
                         if (out != NULL)
                         {
                             if (wholeFileAllocated)
-                                SetEndOfFile(out); // otherwise on a floppy the remaining part of the file would be written
-                            HANDLES(CloseHandle(out));
+                                (void)GetWorkerFileSystem()->SetHandleEnd(out); // otherwise on a floppy the remaining part of the file would be written
+                            (void)CloseWorkerTrackedFile(out);
                         }
                         op->DeleteTargetFile();
                         observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
@@ -4955,9 +4803,10 @@ COPY_AGAIN:
                     if (lantasticCheck)
                     {
                         CQuadWord inSize, outSize;
-                        inSize.LoDWord = GetFileSize(in, &inSize.HiDWord);
-                        outSize.LoDWord = GetFileSize(out, &outSize.HiDWord);
-                        if (inSize != outSize)
+                        const FileResult inSizeResult = GetWorkerHandleSize(in, inSize);
+                        const FileResult outSizeResult = GetWorkerHandleSize(out, outSize);
+                        if (!inSizeResult.success || !outSizeResult.success ||
+                            inSize != outSize)
                         {                                                              // Lantastic 7.0: everything seems fine, but the result is wrong
                             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                             if (observer.IsCancelled())
@@ -4967,9 +4816,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskFileErrorByIdW(IDS_ERRORWRITINGFILE, op->TargetName,
-                                                             op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                             ERROR_DISK_FULL);
+                            ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetNameW.c_str(), ERROR_DISK_FULL);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -4977,9 +4824,11 @@ COPY_AGAIN:
                                 operationDone = CQuadWord(0, 0);
                                 script->SetTFSandProgressSize(lastTransferredFileSize, totalDone);
                                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
-                                SetFilePointer(in, 0, NULL, FILE_BEGIN);  // read again
-                                SetFilePointer(out, 0, NULL, FILE_BEGIN); // write again
-                                SetEndOfFile(out);                        // truncate the output file
+                                (void)GetWorkerFileSystem()->SeekHandle(
+                                    in, 0, FILE_BEGIN, NULL); // read again
+                                (void)GetWorkerFileSystem()->SeekHandle(
+                                    out, 0, FILE_BEGIN, NULL); // write again
+                                (void)GetWorkerFileSystem()->SetHandleEnd(out);                        // truncate the output file
                                 goto COPY;
                             }
 
@@ -4996,11 +4845,13 @@ COPY_AGAIN:
 
                     FILETIME /*creation, lastAccess,*/ lastWrite;
                     BOOL ignoreGetFileTimeErr = FALSE;
-                    // Direct Win32: handle-based GetFileTime — no path involved, wrapping not needed
-                    while (!ignoreGetFileTimeErr &&
-                           !GetFileTime(in, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
+                    while (!ignoreGetFileTimeErr)
                     {
-                        DWORD err = GetLastError();
+                        const FileResult timeResult = GetWorkerFileSystem()->GetHandleFileTime(
+                            in, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite);
+                        if (timeResult.success)
+                            break;
+                        DWORD err = timeResult.errorCode;
 
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
@@ -5014,7 +4865,7 @@ COPY_AGAIN:
 
                         int ret;
                         ret = IDCANCEL;
-                        ret = observer.AskADSOpenErrorById(IDS_ERRORGETTINGFILETIME, op->SourceName, err);
+                        ret = observer.AskADSOpenErrorById(IDS_ERRORGETTINGFILETIME, op->SourceNameW.c_str(), err);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -5040,7 +4891,7 @@ COPY_AGAIN:
                         }
                     }
 
-                    HANDLES(CloseHandle(in));
+                    (void)CloseWorkerTrackedFile(in);
                     in = NULL;
 
                     if (operationDone < COPY_MIN_FILE_SIZE) // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
@@ -5054,18 +4905,18 @@ COPY_AGAIN:
                         if (operDone < COPY_MIN_FILE_SIZE)
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
-                        if (!DoCopyADS(observer, op->SourceName, FALSE, op->TargetName, totalDone,
+                        if (!DoCopyADS(observer, FALSE, totalDone,
                                        operDone, op->Size, workerState, script, &adsSkip, buffer,
                                        op->SourceNameW, op->TargetNameW) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
-                                HANDLES(CloseHandle(out));
+                                (void)CloseWorkerTrackedFile(out);
                             out = NULL;
                             if (op->DeleteTargetFile() == 0)
                             {
                                 DWORD err = GetLastError();
-                                TRACE_E("DoCopyFile(): Unable to remove newly created file: " << op->TargetName << ", error: " << GetErrorText(err));
+                                TRACE_EW(L"DoCopyFile(): Unable to remove newly created file: " << op->TargetNameW.c_str() << L", error: " << GetErrorTextOwned(err).c_str());
                             }
                             if (!adsSkip)
                                 return FALSE; // cancel the entire operation
@@ -5079,11 +4930,13 @@ COPY_AGAIN:
                         if (!ignoreGetFileTimeErr) // only if we did not ignore the error while reading the file time (nothing to set otherwise)
                         {
                             BOOL ignoreSetFileTimeErr = FALSE;
-                            // Direct Win32: handle-based SetFileTime — no path involved, wrapping not needed
-                            while (!ignoreSetFileTimeErr &&
-                                   !SetFileTime(out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
+                            while (!ignoreSetFileTimeErr)
                             {
-                                DWORD err = GetLastError();
+                                const FileResult timeResult = GetWorkerFileSystem()->SetHandleFileTime(
+                                    out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite);
+                                if (timeResult.success)
+                                    break;
+                                DWORD err = timeResult.errorCode;
 
                                 observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                 if (observer.IsCancelled())
@@ -5097,7 +4950,7 @@ COPY_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                ret = observer.AskADSOpenErrorById(IDS_ERRORSETTINGFILETIME, op->TargetName, err);
+                                ret = observer.AskADSOpenErrorById(IDS_ERRORSETTINGFILETIME, op->TargetNameW.c_str(), err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -5123,10 +4976,12 @@ COPY_AGAIN:
                                 }
                             }
                         }
-                        if (!HANDLES(CloseHandle(out)))
+                        const FileResult closeOutResult =
+                            CloseWorkerTrackedFile(out);
+                        if (!closeOutResult.success)
                         {
                             out = NULL;
-                            DWORD err = GetLastError();
+                            DWORD err = closeOutResult.errorCode;
                             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                             if (observer.IsCancelled())
                                 goto COPY_ERROR;
@@ -5135,8 +4990,7 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskFileErrorByIdW(IDS_ERRORWRITINGFILE, op->TargetName,
-                                                             op->HasWideTarget() ? op->TargetNameW.c_str() : NULL, err);
+                            ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, op->TargetNameW.c_str(), err);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5144,7 +4998,7 @@ COPY_AGAIN:
                                 if (op->DeleteTargetFile() == 0)
                                 {
                                     DWORD err2 = GetLastError();
-                                    TRACE_E("DoCopyFile(): Unable to remove newly created file: " << op->TargetName << ", error: " << GetErrorText(err2));
+                                    TRACE_EW(L"DoCopyFile(): Unable to remove newly created file: " << op->TargetNameW.c_str() << L", error: " << GetErrorTextOwned(err2).c_str());
                                 }
                                 goto COPY_AGAIN;
                             }
@@ -5178,7 +5032,7 @@ COPY_AGAIN:
                                 ret = IDB_IGNORE;
                             else
                             {
-                                ret = observer.AskSetAttrsError(op->TargetName, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(attr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
+                                ret = observer.AskSetAttrsError(op->TargetNameW.c_str(), (attr & DISPLAYED_ATTRIBUTES), (curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                             }
                             switch (ret)
                             {
@@ -5202,7 +5056,7 @@ COPY_AGAIN:
                     if (script->CopySecurity) // should we copy NTFS security permissions?
                     {
                         DWORD err;
-                        if (!DoCopySecurity(op->SourceName, op->TargetName, &err, NULL,
+                        if (!DoCopySecurity(&err, NULL,
                                            op->SourceNameW, op->TargetNameW))
                         {
                             observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -5215,11 +5069,7 @@ COPY_AGAIN:
                                 ret = IDB_IGNORE;
                             else
                             {
-                                ret = observer.AskCopyPermErrorW(op->SourceName,
-                                                                 op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                                 op->TargetName,
-                                                                 op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                                 (char*)(DWORD_PTR)err);
+                                ret = observer.AskCopyPermError(op->SourceNameW.c_str(), op->TargetNameW.c_str(), err);
                             }
                             switch (ret)
                             {
@@ -5251,7 +5101,7 @@ COPY_AGAIN:
 
                         int ret;
                         ret = IDCANCEL;
-                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
+                        ret = observer.AskEncryptionLoss(true, op->TargetNameW.c_str(), isMove != 0);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -5269,7 +5119,7 @@ COPY_AGAIN:
                             totalDone += op->Size;
                             SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
-                            HANDLES(CloseHandle(in));
+                            (void)CloseWorkerTrackedFile(in);
                             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                             if (skip != NULL)
                                 *skip = TRUE;
@@ -5280,7 +5130,7 @@ COPY_AGAIN:
                         {
                         CANCEL_OPEN2:
 
-                            HANDLES(CloseHandle(in));
+                            (void)CloseWorkerTrackedFile(in);
                             return FALSE;
                         }
                         }
@@ -5298,23 +5148,23 @@ COPY_AGAIN:
                         {
                             if (!workerState.OverwriteAll && (workerState.CnfrmFileOver || script->OverwriteOlder))
                             {
-                                char sAttr[101], tAttr[101];
+                                wchar_t sAttr[101], tAttr[101];
                                 BOOL getTimeFailed;
                                 getTimeFailed = FALSE;
                                 FILETIME sFileTime, tFileTime;
-                                GetFileOverwriteInfo(sAttr, _countof(sAttr), in, op->SourceName, &sFileTime, &getTimeFailed);
-                                HANDLES(CloseHandle(in));
+                                GetFileOverwriteInfoW(sAttr, _countof(sAttr), in, op->SourceNameW.c_str(), &sFileTime, &getTimeFailed);
+                                (void)CloseWorkerTrackedFile(in);
                                 in = NULL;
                                 out = op->OpenTargetFile(0, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0);
                                 if (out != INVALID_HANDLE_VALUE)
                                 {
-                                    GetFileOverwriteInfo(tAttr, _countof(tAttr), out, op->TargetName, &tFileTime, &getTimeFailed);
-                                    HANDLES(CloseHandle(out));
+                                    GetFileOverwriteInfoW(tAttr, _countof(tAttr), out, op->TargetNameW.c_str(), &tFileTime, &getTimeFailed);
+                                    (void)CloseWorkerTrackedFile(out);
                                 }
                                 else
                                 {
                                     getTimeFailed = TRUE;
-                                    strcpy(tAttr, LoadStr(IDS_ERR_FILEOPEN));
+                                    lstrcpynW(tAttr, LoadStrW(IDS_ERR_FILEOPEN), _countof(tAttr));
                                 }
                                 out = NULL;
 
@@ -5342,11 +5192,7 @@ COPY_AGAIN:
                                 else
                                 {
                                     // show the prompt
-                                    ret = observer.AskOverwriteW(op->TargetName,
-                                                                 op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                                 tAttr, op->SourceName,
-                                                                 op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                                 sAttr);
+                                    ret = observer.AskOverwrite(op->TargetNameW.c_str(), tAttr, op->SourceNameW.c_str(), sAttr);
                                 }
                                 switch (ret)
                                 {
@@ -5390,7 +5236,7 @@ COPY_AGAIN:
                             {
                                 if (!workerState.OverwriteHiddenAll && workerState.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
                                 {
-                                    HANDLES(CloseHandle(in));
+                                    (void)CloseWorkerTrackedFile(in);
                                     in = NULL;
 
                                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -5401,7 +5247,7 @@ COPY_AGAIN:
                                         goto SKIP_OPEN;
 
                                     int ret = IDCANCEL;
-                                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetName, IDS_WANTOVERWRITESHFILE);
+                                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetNameW.c_str(), IDS_WANTOVERWRITESHFILE);
                                     switch (ret)
                                     {
                                     case IDB_ALL:
@@ -5436,7 +5282,7 @@ COPY_AGAIN:
 
                                     if (!tgtNameCaseCorrected)
                                     {
-                                        CorrectCaseOfTgtName(op->TargetName, FALSE, &dataOut);
+                                        CorrectCaseOfTgtNameW(op->TargetNameW, FALSE, &dataOut);
                                         tgtNameCaseCorrected = TRUE;
                                     }
 
@@ -5460,10 +5306,9 @@ COPY_AGAIN:
                                         out = op->OpenTargetFile(0, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING, 0);
                                         if (out != INVALID_HANDLE_VALUE)
                                         {
-                                            origFileSize.LoDWord = GetFileSize(out, &origFileSize.HiDWord);
-                                            if (origFileSize.LoDWord == INVALID_FILE_SIZE && GetLastError() == NO_ERROR)
+                                            if (!GetWorkerHandleSize(out, origFileSize).success)
                                                 origFileSize.Set(0, 0); // error => set the size to zero and test it on another file
-                                            HANDLES(CloseHandle(out));
+                                            (void)CloseWorkerTrackedFile(out);
                                         }
                                     }
 
@@ -5506,9 +5351,9 @@ COPY_AGAIN:
                                     }
 
                                     // on target paths that support ADS also delete ADS on the target file (CREATE_ALWAYS should remove them, but on home W2K and XP they simply stay; no idea why, W2K and XP in VMWare delete ADS normally)
-                                    if (script->TargetPathSupADS && !DeleteAllADS(out, op->TargetName, op->TargetNameW))
+                                    if (script->TargetPathSupADS && !DeleteAllADS(out, op->TargetNameW))
                                     {
-                                        HANDLES(CloseHandle(out));
+                                        (void)CloseWorkerTrackedFile(out);
                                         out = INVALID_HANDLE_VALUE;
                                         if (chAttr)
                                             op->SetTargetAttributes(attr);
@@ -5519,7 +5364,7 @@ COPY_AGAIN:
                                     // if we have not yet tested truncating the file to zero, obtain the new file size
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
-                                        HANDLES(CloseHandle(out));
+                                        (void)CloseWorkerTrackedFile(out);
                                         out = op->OpenTargetFile(access, 0, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                         if (out == INVALID_HANDLE_VALUE) // cannot reopen the target file we just opened, unlikely, try deleting and recreating it
                                         {
@@ -5527,8 +5372,8 @@ COPY_AGAIN:
                                             continue;
                                         }
                                         CQuadWord newFileSize(0, 0); // file size after truncation
-                                        newFileSize.LoDWord = GetFileSize(out, &newFileSize.HiDWord);
-                                        if ((newFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) && // we have the new size
+                                        const FileResult sizeResult = GetWorkerHandleSize(out, newFileSize);
+                                        if (sizeResult.success && // we have the new size
                                             newFileSize == CQuadWord(0, 0))                                             // file really has 0 bytes
                                         {
                                             if (origFileSize != CQuadWord(0, 0))            // truncation can only be tested on a non-zero file
@@ -5536,7 +5381,7 @@ COPY_AGAIN:
                                         }
                                         else
                                         {
-                                            HANDLES(CloseHandle(out));
+                                            (void)CloseWorkerTrackedFile(out);
                                             out = INVALID_HANDLE_VALUE;
                                             mustDeleteFileBeforeOverwrite = 1 /* yes */; // on error or when the size is non-zero, play it safe...
                                             continue;
@@ -5546,7 +5391,7 @@ COPY_AGAIN:
                                     if (script->CopyAttrs || !lossEncryptionAttr && copyAsEncrypted)
                                     {
                                         encryptionNotSupported = FALSE;
-                                        SetCompressAndEncryptedAttrs(op->TargetName, (!lossEncryptionAttr && copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0) | (script->CopyAttrs ? (op->Attr & (FILE_ATTRIBUTE_COMPRESSED | (lossEncryptionAttr ? 0 : FILE_ATTRIBUTE_ENCRYPTED))) : 0),
+                                        SetCompressAndEncryptedAttrs((!lossEncryptionAttr && copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0) | (script->CopyAttrs ? (op->Attr & (FILE_ATTRIBUTE_COMPRESSED | (lossEncryptionAttr ? 0 : FILE_ATTRIBUTE_ENCRYPTED))) : 0),
                                                                      &out, script->CopyAttrs, &encryptionNotSupported, asyncPar, op->TargetNameW);
                                         if (encryptionNotSupported) // unable to apply the Encrypted attribute, ask the user what to do...
                                         {
@@ -5563,7 +5408,7 @@ COPY_AGAIN:
 
                                                 int ret;
                                                 ret = IDCANCEL;
-                                                ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)TRUE != 0, op->TargetName, (DWORD)(DWORD_PTR)(char*)(INT_PTR)isMove != 0);
+                                                ret = observer.AskEncryptionLoss(true, op->TargetNameW.c_str(), isMove != 0);
                                                 switch (ret)
                                                 {
                                                 case IDB_ALL:
@@ -5602,10 +5447,7 @@ COPY_AGAIN:
 
                             int ret;
                             ret = IDCANCEL;
-                            ret = observer.AskFileErrorByIdW(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE,
-                                                             op->TargetName,
-                                                             op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                             err);
+                            ret = observer.AskFileErrorById(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE, op->TargetNameW.c_str(), err);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -5642,8 +5484,7 @@ COPY_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERROROPENINGFILE, op->SourceName,
-                                             op->HasWideSource() ? op->SourceNameW.c_str() : NULL, err);
+            ret = observer.AskFileErrorById(IDS_ERROROPENINGFILE, op->SourceNameW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -5694,8 +5535,8 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     {
         // if the path ends with a space or dot, we must append '\\', otherwise GetNamedSecurityInfo,
         // GetDirTime, SetFileAttributes, and MoveFile trim the spaces/dots and operate on a different path
-        std::wstring effectiveSourceW = op->HasWideSource() ? op->SourceNameW : AnsiToWide(op->SourceName);
-        std::wstring effectiveTargetW = op->HasWideTarget() ? op->TargetNameW : AnsiToWide(op->TargetName);
+        std::wstring effectiveSourceW = op->SourceNameW;
+        std::wstring effectiveTargetW = op->TargetNameW;
         std::wstring sourceNameMvDirW = MakeCopyWithBackslashIfNeededW(effectiveSourceW.c_str());
         std::wstring targetNameMvDirW = MakeCopyWithBackslashIfNeededW(effectiveTargetW.c_str());
         // true when path was NOT modified (no trailing space/dot) — replaces old pointer-equality check
@@ -5707,10 +5548,9 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
         BOOL srcSecurityErr = FALSE;
         if (!invalidName && script->CopySecurity) // should we copy NTFS security permissions?
         {
-            srcSecurity.SrcError = GetNamedSecurityInfoW((LPWSTR)sourceNameMvDirW.c_str(), SE_FILE_OBJECT,
-                                                          DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                          &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
-                                                          NULL, &srcSecurity.SrcSD);
+            const FileResult securityResult = GetWorkerFileSystem()->GetPathSecurity(
+                sourceNameMvDirW.c_str(), srcSecurity.Descriptor);
+            srcSecurity.SrcError = securityResult.success ? ERROR_SUCCESS : securityResult.errorCode;
             if (srcSecurity.SrcError != ERROR_SUCCESS) // failed to read security info from the source file -> nothing to apply on the target
             {
                 srcSecurityErr = TRUE;
@@ -5724,11 +5564,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     ret = IDB_IGNORE;
                 else
                 {
-                    ret = observer.AskCopyPermErrorW(op->SourceName,
-                                                     op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                     op->TargetName,
-                                                     op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                     (char*)(DWORD_PTR)srcSecurity.SrcError);
+                    ret = observer.AskCopyPermError(op->SourceNameW.c_str(), op->TargetNameW.c_str(), srcSecurity.SrcError);
                 }
                 switch (ret)
                 {
@@ -5751,14 +5587,14 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
             if (!invalidName && !*novellRenamePatch && gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success)
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
-                    SetFileAttributesW(targetNameMvDirW.c_str(), op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
+                    GetWorkerFileSystem()->SetFileAttributes(targetNameMvDirW.c_str(), op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
 
             OPERATION_DONE:
 
                 DWORD curAttrs = INVALID_FILE_ATTRIBUTES;
                 if (script->CopyAttrs) // check whether the source file attributes were preserved
                 {
-                    curAttrs = GetFileAttributesW(targetNameMvDirW.c_str());
+                    curAttrs = GetWorkerFileSystem()->GetFileAttributes(targetNameMvDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (op->Attr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably were not preserved, warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -5771,7 +5607,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             ret = IDB_IGNORE;
                         else
                         {
-                            ret = observer.AskSetAttrsError(op->TargetName, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(op->Attr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
+                            ret = observer.AskSetAttrsError(op->TargetNameW.c_str(), (op->Attr & DISPLAYED_ATTRIBUTES), (curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                         }
                         switch (ret)
                         {
@@ -5793,7 +5629,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 if (script->CopySecurity && !srcSecurityErr) // should we copy NTFS security permissions?
                 {
                     DWORD err;
-                    if (!DoCopySecurity(op->SourceName, op->TargetName, &err, &srcSecurity,
+                    if (!DoCopySecurity(&err, &srcSecurity,
                                        sourceNameMvDirW, targetNameMvDirW))
                     {
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -5806,11 +5642,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             ret = IDB_IGNORE;
                         else
                         {
-                            ret = observer.AskCopyPermErrorW(op->SourceName,
-                                                             op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                             op->TargetName,
-                                                             op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                             (char*)(DWORD_PTR)err);
+                            ret = observer.AskCopyPermError(op->SourceNameW.c_str(), op->TargetNameW.c_str(), err);
                         }
                         switch (ret)
                         {
@@ -5840,7 +5672,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         {
                             if (*setDirTimeAfterMove == 0 /* need test */)
                                 *setDirTimeAfterMove = 1 /* yes */;
-                            DoCopyDirTime(observer, op->TargetName, &dirTimeModified, workerState, TRUE, targetNameMvDirW); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
+                            DoCopyDirTime(observer, &dirTimeModified, workerState, TRUE, targetNameMvDirW); // ignore any failure, this is just a hack (we already ignore time read errors from the directory); MoveFile should not change times
                         }
                     }
                 }
@@ -5859,20 +5691,20 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                 // Novell patch - before calling MoveFile we need to drop the read-only attribute
                 if (!invalidName && *novellRenamePatch || err == ERROR_ACCESS_DENIED)
                 {
-                    DWORD attr = GetFileAttributesW(sourceNameMvDirW.c_str());
-                    BOOL setAttr = ClearReadOnlyAttrW(sourceNameMvDirW.c_str(), attr);
+                    DWORD attr = GetWorkerFileSystem()->GetFileAttributes(sourceNameMvDirW.c_str());
+                    BOOL setAttr = ClearReadOnlyAttr(sourceNameMvDirW.c_str(), attr);
                     if (gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success)
                     {
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
                         if (setAttr || script->CopyAttrs && (attr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                            SetFileAttributesW(targetNameMvDirW.c_str(), attr);
+                            GetWorkerFileSystem()->SetFileAttributes(targetNameMvDirW.c_str(), attr);
 
                         goto OPERATION_DONE;
                     }
                     err = GetLastError();
                     if (setAttr)
-                        SetFileAttributesW(sourceNameMvDirW.c_str(), attr);
+                        GetWorkerFileSystem()->SetFileAttributes(sourceNameMvDirW.c_str(), attr);
                 }
 
                 if (!op->AreSourceAndTargetSamePath() &&            // provided this is not just a change of case
@@ -5884,15 +5716,11 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     HANDLE find = op->FindFirstTarget(&findData);
                     if (find != INVALID_HANDLE_VALUE)
                     {
-                        HANDLES(FindClose(find));
-                        const char* tgtName = SalPathFindFileName(op->TargetName);
-                        char cAltNameA[14];
-                        WideCharToMultiByte(CP_ACP, 0, findData.cAlternateFileName, -1, cAltNameA, 14, NULL, NULL);
-                        // Compare tgtName against the ANSI alternate (DOS) name; use wide cFileName directly
-                        char cFileNameA[MAX_PATH];
-                        WideCharToMultiByte(CP_ACP, 0, findData.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                        if (StrICmp(tgtName, cAltNameA) == 0 &&    // match only on the DOS name
-                            StrICmp(tgtName, cFileNameA) != 0)     // (the full name is different)
+                        SalLPFindClose(find);
+                        const wchar_t* tgtLeaf = wcsrchr(op->TargetNameW.c_str(), L'\\');
+                        tgtLeaf = tgtLeaf != NULL ? tgtLeaf + 1 : op->TargetNameW.c_str();
+                        if (_wcsicmp(tgtLeaf, findData.cAlternateFileName) == 0 && // match only on the DOS name
+                            _wcsicmp(tgtLeaf, findData.cFileName) != 0)     // (the full name is different)
                         {
                             // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (does not need an extra DOS name)
                             std::wstring tmpNameW = effectiveTargetW;
@@ -5904,16 +5732,18 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                             tmpNameW = origFullNameW; // start with the original full name path as base for the temp name
                             {
                                 DWORD num = (GetTickCount() / 10) % 0xFFF;
-                                DWORD origFullNameAttr = GetFileAttributesW(origFullNameW.c_str());
+                                DWORD origFullNameAttr = GetWorkerFileSystem()->GetFileAttributes(origFullNameW.c_str());
                                 while (1)
                                 {
                                     wchar_t tmpSuffix[8];
                                     swprintf(tmpSuffix, _countof(tmpSuffix), L"sal%03X", num++);
                                     tmpNameW.resize(tmpNamePartPos);
                                     tmpNameW += tmpSuffix;
-                                    if (MoveFileW(origFullNameW.c_str(), tmpNameW.c_str()))
+                                    const FileResult tidyResult = GetWorkerFileSystem()->MoveFile(
+                                        origFullNameW.c_str(), tmpNameW.c_str());
+                                    if (tidyResult.success)
                                         break;
-                                    DWORD e = GetLastError();
+                                    DWORD e = tidyResult.errorCode;
                                     if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                                     {
                                         tmpNameW.clear();
@@ -5925,21 +5755,23 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                     BOOL moveDone = gFileSystem->MoveFile(sourceNameMvDirW.c_str(), targetNameMvDirW.c_str()).success;
                                     if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // the Archive attribute was not set; MoveFile turned it on, clear it again
                                         op->SetTargetAttributes(op->Attr);                   // leave without handling or retry, not important (it normally toggles chaotically)
-                                    if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                                    if (!GetWorkerFileSystem()->MoveFile(
+                                             tmpNameW.c_str(), origFullNameW.c_str()).success)
                                     { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of op->TargetName (the DOS name)
                                         TRACE_I("DoMoveFile(): Unexpected situation: unable to rename file/dir from tmp-name to original long file name!");
                                         if (moveDone)
                                         {
                                             if (gFileSystem->MoveFile(targetNameMvDirW.c_str(), sourceNameMvDirW.c_str()).success)
                                                 moveDone = FALSE;
-                                            if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                                            if (!GetWorkerFileSystem()->MoveFile(
+                                                     tmpNameW.c_str(), origFullNameW.c_str()).success)
                                                 TRACE_E("DoMoveFile(): Fatal unexpected situation: unable to rename file/dir from tmp-name to original long file name!");
                                         }
                                     }
                                     else
                                     {
                                         if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                            SetFileAttributesW(origFullNameW.c_str(), origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
+                                            GetWorkerFileSystem()->SetFileAttributes(origFullNameW.c_str(), origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
                                     }
 
                                     if (moveDone)
@@ -5966,20 +5798,20 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     if (out == INVALID_HANDLE_VALUE)
                     {
                         err = GetLastError();
-                        HANDLES(CloseHandle(in));
+                        (void)CloseWorkerTrackedFile(in);
                         goto NORMAL_ERROR;
                     }
 
                     if (!workerState.OverwriteAll && (workerState.CnfrmFileOver || script->OverwriteOlder))
                     {
-                        char sAttr[101], tAttr[101];
+                        wchar_t sAttr[101], tAttr[101];
                         BOOL getTimeFailed;
                         getTimeFailed = FALSE;
                         FILETIME sFileTime, tFileTime;
-                        GetFileOverwriteInfo(sAttr, _countof(sAttr), in, op->SourceName, &sFileTime, &getTimeFailed);
-                        GetFileOverwriteInfo(tAttr, _countof(tAttr), out, op->TargetName, &tFileTime, &getTimeFailed);
-                        HANDLES(CloseHandle(in));
-                        HANDLES(CloseHandle(out));
+                        GetFileOverwriteInfoW(sAttr, _countof(sAttr), in, op->SourceNameW.c_str(), &sFileTime, &getTimeFailed);
+                        GetFileOverwriteInfoW(tAttr, _countof(tAttr), out, op->TargetNameW.c_str(), &tFileTime, &getTimeFailed);
+                        (void)CloseWorkerTrackedFile(in);
+                        (void)CloseWorkerTrackedFile(out);
 
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
@@ -6008,11 +5840,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         else
                         {
                             // display the prompt
-                            ret = observer.AskOverwriteW(op->TargetName,
-                                                         op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                         tAttr, op->SourceName,
-                                                         op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                         sAttr);
+                            ret = observer.AskOverwrite(op->TargetNameW.c_str(), tAttr, op->SourceNameW.c_str(), sAttr);
                         }
                         switch (ret)
                         {
@@ -6043,8 +5871,8 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     }
                     else
                     {
-                        HANDLES(CloseHandle(in));
-                        HANDLES(CloseHandle(out));
+                        (void)CloseWorkerTrackedFile(in);
+                        (void)CloseWorkerTrackedFile(out);
                     }
 
                     DWORD attr = op->GetTargetAttributes();
@@ -6063,7 +5891,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                                 goto SKIP_OPEN;
 
                             int ret = IDCANCEL;
-                            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetName, IDS_WANTOVERWRITESHFILE);
+                            ret = observer.AskHiddenOrSystemById(IDS_CONFIRMFILEOVERWRITING, op->TargetNameW.c_str(), IDS_WANTOVERWRITESHFILE);
                             switch (ret)
                             {
                             case IDB_ALL:
@@ -6106,8 +5934,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
 
                             int ret;
                             ret = IDCANCEL;
-                            ret = observer.AskFileErrorByIdW(IDS_ERROROVERWRITINGFILE, op->TargetName,
-                                                             op->HasWideTarget() ? op->TargetNameW.c_str() : NULL, err2);
+                            ret = observer.AskFileErrorById(IDS_ERROROVERWRITINGFILE, op->TargetNameW.c_str(), err2);
                             switch (ret)
                             {
                             case IDRETRY:
@@ -6150,11 +5977,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                     {
                         int ret;
                         ret = IDCANCEL;
-                        ret = observer.AskCannotMoveErrW(op->SourceName,
-                                                         op->HasWideSource() ? op->SourceNameW.c_str() : NULL,
-                                                         op->TargetName,
-                                                         op->HasWideTarget() ? op->TargetNameW.c_str() : NULL,
-                                                         err, dir != FALSE);
+                        ret = observer.AskCannotMoveErr(op->SourceNameW.c_str(), op->TargetNameW.c_str(), err, dir != FALSE);
                         switch (ret)
                         {
                         case IDRETRY:
@@ -6211,8 +6034,7 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
                         return TRUE;
 
                     int ret = IDCANCEL;
-                    ret = observer.AskFileErrorByIdW(IDS_ERRORDELETINGFILE, op->SourceName,
-                                                     op->SourceNameW.c_str(), err);
+                    ret = observer.AskFileErrorById(IDS_ERRORDELETINGFILE, op->SourceNameW.c_str(), err);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -6231,13 +6053,13 @@ BOOL DoMoveFile(COperation* op, IWorkerObserver& observer, void* buffer,
     }
 }
 
-BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteFile(IWorkerObserver& observer, const CQuadWord& size, COperations* script,
                   CQuadWord& totalDone, DWORD attr, CWorkerState& workerState,
-                  const std::wstring& nameW = std::wstring())
+                  const std::wstring& nameW)
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
-    std::wstring effectiveDeleteNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    std::wstring effectiveDeleteNameW = nameW;
     BOOL deleteNameIsNul = ShouldBypassRecycleBinForDeleteW(effectiveDeleteNameW.c_str());
     BOOL invalidName = FileNameIsInvalidW(effectiveDeleteNameW.c_str(), TRUE) && !deleteNameIsNul;
 
@@ -6258,7 +6080,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                         goto SKIP_DELETE;
 
                     int ret = IDCANCEL;
-                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSHFILEDELETE, name, IDS_DELETESHFILE);
+                    ret = observer.AskHiddenOrSystemById(IDS_CONFIRMSHFILEDELETE, nameW.c_str(), IDS_DELETESHFILE);
                     switch (ret)
                     {
                     case IDB_ALL:
@@ -6277,8 +6099,8 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                 }
             }
             {
-                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
-                ClearReadOnlyAttrW(effectiveNameW.c_str(), attr); // ensure it can be deleted
+                std::wstring effectiveNameW = nameW;
+                ClearReadOnlyAttr(effectiveNameW.c_str(), attr); // ensure it can be deleted
             }
 
             err = ERROR_SUCCESS;
@@ -6297,27 +6119,16 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                     useRecycleBin = FALSE;
                 else
                 {
-                    const char* fileName = strrchr(name, '\\');
-                    if (fileName != NULL) // "always true"
-                    {
-                        fileName++;
-                        int tmpLen = lstrlen(fileName);
-                        const char* ext = fileName + tmpLen;
-                        //            while (ext > fileName && *ext != '.') ext--;
-                        while (--ext >= fileName && *ext != '.')
-                            ;
-                        //            if (ext == fileName)   // ".cvspass" is treated as an extension in Windows ...
-                        if (ext < fileName)
-                            ext = fileName + tmpLen;
-                        else
-                            ext++;
-                        useRecycleBin = workerState.AgreeRecycleMasks(fileName, ext);
-                    }
-                    else
-                    {
-                        useRecycleBin = TRUE; // choose the safe option on error and delete via the Recycle Bin
-                        TRACE_E("DoDeleteFile(): unexpected situation: filename does not contain backslash: " << name);
-                    }
+                    // leafW is already the exact wide leaf name - use it
+                    // directly against AgreeRecycleMasksW instead of round-tripping to
+                    // ANSI (only to feed a narrow API that itself re-widens internally)
+                    // and, for names that don't survive that round-trip exactly,
+                    // unconditionally recycling instead of actually running the mask
+                    // check. AgreeMasks self-computes the extension when passed NULL,
+                    // the same algorithm the removed manual scan implemented by hand.
+                    const wchar_t* leafW = wcsrchr(nameW.c_str(), L'\\');
+                    leafW = leafW != NULL ? leafW + 1 : nameW.c_str();
+                    useRecycleBin = workerState.AgreeRecycleMasksW(leafW, NULL);
                 }
                 break;
             }
@@ -6327,32 +6138,29 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 
             if (useRecycleBin)
             {
-                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+                std::wstring effectiveNameW = nameW;
                 // SHFileOperationW needs double-null terminated wide path
                 std::wstring nameList = effectiveNameW;
                 nameList.push_back(L'\0'); // double-null termination
-                if (!PathContainsValidComponentsW(nameList.c_str()))
+                if (!PathContainsValidComponents(nameList.c_str()))
                 {
                     err = ERROR_INVALID_NAME;
                 }
                 else
                 {
+                    // via IShell; the interface adds FOF_NOERRORUI
+                    // (the worker owns error display - no double dialog) and maps
+                    // a user abort to ERROR_CANCELLED. err may be a shell DE_*
+                    // code, as before.
                     CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCTW opCode;
-                    memset(&opCode, 0, sizeof(opCode));
-
-                    opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteFile");
-
-                    opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList.c_str();
-                    opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = L"";
-                    err = SHFileOperationW(&opCode);
+                    HWND parentWnd = shellExecuteWnd.Create(observer.GetParentWindow(), L"SEW: DoDeleteFile");
+                    ShellResult recycleRes = gShell->MoveToRecycleBin({effectiveNameW}, parentWnd);
+                    err = recycleRes.success ? ERROR_SUCCESS : recycleRes.errorCode;
                 }
             }
             else
             {
-                std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+                std::wstring effectiveNameW = nameW;
                 if (deleteNameIsNul)
                 {
                     IFileSystem* fileSystem = GetWorkerFileSystem();
@@ -6367,8 +6175,9 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
                 }
                 else
                 {
-                    if (!DeleteFileW(effectiveNameW.c_str()))
-                        err = GetLastError();
+                    const FileResult deleteResult = GetWorkerFileSystem()->DeleteFile(effectiveNameW.c_str());
+                    if (!deleteResult.success)
+                        err = deleteResult.errorCode;
                 }
             }
         }
@@ -6393,8 +6202,7 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERRORDELETINGFILE, name,
-                                             effectiveDeleteNameW.c_str(), err);
+            ret = observer.AskFileErrorById(IDS_ERRORDELETINGFILE, effectiveDeleteNameW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -6417,74 +6225,70 @@ BOOL DoDeleteFile(IWorkerObserver& observer, char* name, const CQuadWord& size, 
         }
         if (!invalidName)
         {
-            std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
-            DWORD attr2 = GetFileAttributesW(effectiveNameW.c_str()); // get the current attribute state
+            std::wstring effectiveNameW = nameW;
+            DWORD attr2 = GetWorkerFileSystem()->GetFileAttributes(effectiveNameW.c_str()); // get the current attribute state
             if (attr2 != INVALID_FILE_ATTRIBUTES)
                 attr = attr2;
         }
     }
 }
 
-BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
-{
-    return SalCreateDirectoryExW(AnsiToWide(name).c_str(), err);
-}
-
-// ANSI wrapper — delegates to wide version
-BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
-{
-    return GetDirTimeW(AnsiToWide(dirName).c_str(), ftModified);
-}
-
+// 2026-08-25: the narrow SalCreateDirectoryEx(char*, ...) and GetDirTime(char*,
+// ...) thin adapters were deleted - confirmed-dead (zero callers anywhere; SalCreateDirectoryEx's
+// legacy v107 ABI shim forwards to WideGeneral.SalCreateDirectoryEx, never to this free function;
+// GetDirTime has no ABI entry at all, a pure core-internal orphan). Their wide siblings below are
+// the sole surviving implementations.
 BOOL GetDirTimeW(const wchar_t* dirName, FILETIME* ftModified)
 {
     HANDLE dir;
-    dir = CreateFileW(dirName, GENERIC_READ,
+    dir = GetWorkerFileSystem()->CreateFile(dirName, GENERIC_READ,
                       FILE_SHARE_READ | FILE_SHARE_WRITE,
                       NULL, OPEN_EXISTING,
                       FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (dir != INVALID_HANDLE_VALUE)
     {
-        BOOL ret = GetFileTime(dir, NULL /*ftCreated*/, NULL /*ftAccessed*/, ftModified);
-        HANDLES(CloseHandle(dir));
+        BOOL ret = GetWorkerFileSystem()->GetHandleFileTime(
+                       dir, NULL /*ftCreated*/, NULL /*ftAccessed*/, ftModified).success;
+        (void)CloseWorkerTrackedFile(dir);
         return ret;
     }
     return FALSE;
 }
 
-BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* modified, CWorkerState& workerState, BOOL quiet,
+BOOL DoCopyDirTime(IWorkerObserver& observer, FILETIME* modified, CWorkerState& workerState, BOOL quiet,
                    const std::wstring& targetNameW)
 {
     // if the path ends with a space/dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    std::wstring targetNameCrFileW = MakeCopyWithBackslashIfNeededW(
-        !targetNameW.empty() ? targetNameW.c_str() : AnsiToWide(targetName).c_str());
+    std::wstring targetNameCrFileW = MakeCopyWithBackslashIfNeededW(targetNameW.c_str());
 
     BOOL showError = !quiet;
     DWORD error = NO_ERROR;
-    DWORD attr = GetFileAttributesW(targetNameCrFileW.c_str());
+    DWORD attr = GetWorkerFileSystem()->GetFileAttributes(targetNameCrFileW.c_str());
     BOOL setAttr = FALSE;
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
     {
-        SetFileAttributesW(targetNameCrFileW.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
+        GetWorkerFileSystem()->SetFileAttributes(targetNameCrFileW.c_str(), attr & ~FILE_ATTRIBUTE_READONLY);
         setAttr = TRUE;
     }
-    HANDLE file = CreateFileW(targetNameCrFileW.c_str(), GENERIC_WRITE,
+    HANDLE file = GetWorkerFileSystem()->CreateFile(targetNameCrFileW.c_str(), GENERIC_WRITE,
                               FILE_SHARE_READ | FILE_SHARE_WRITE,
                               NULL, OPEN_EXISTING,
                               FILE_FLAG_BACKUP_SEMANTICS, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
-        if (SetFileTime(file, NULL /*&ftCreated*/, NULL /*&ftAccessed*/, modified))
+        const FileResult timeResult = GetWorkerFileSystem()->SetHandleFileTime(
+            file, NULL /*&ftCreated*/, NULL /*&ftAccessed*/, modified);
+        if (timeResult.success)
             showError = FALSE; // success!
         else
-            error = GetLastError();
-        HANDLES(CloseHandle(file));
+            error = timeResult.errorCode;
+        (void)CloseWorkerTrackedFile(file);
     }
     else
         error = GetLastError();
     if (setAttr)
-        SetFileAttributesW(targetNameCrFileW.c_str(), attr);
+        GetWorkerFileSystem()->SetFileAttributes(targetNameCrFileW.c_str(), attr);
 
     if (showError)
     {
@@ -6498,7 +6302,7 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
             ret = IDB_IGNORE;
         else
         {
-            ret = observer.AskCopyDirTimeErrorW(targetName, targetNameW.empty() ? NULL : targetNameW.c_str(), error);
+            ret = observer.AskCopyDirTimeError(targetNameW.empty() ? NULL : targetNameW.c_str(), error);
         }
         switch (ret)
         {
@@ -6514,34 +6318,35 @@ BOOL DoCopyDirTime(IWorkerObserver& observer, const char* targetName, FILETIME* 
     return TRUE;
 }
 
-BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
+BOOL DoCreateDir(IWorkerObserver& observer, DWORD attr,
                  DWORD clearReadonlyMask, CWorkerState& workerState,
                  CQuadWord& totalDone, CQuadWord& operTotal,
-                 const char* sourceDir, BOOL adsCopy, COperations* script,
+                 BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
                  BOOL createAsEncrypted, BOOL ignInvalidName,
-                 const std::wstring& nameW = std::wstring())
+                 const std::wstring& nameW,
+                 const std::wstring& sourceDirW)
 {
     if (script->CopyAttrs && createAsEncrypted)
         TRACE_E("DoCreateDir(): unexpected parameter value: createAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
 
     skip = FALSE;
     alreadyExisted = FALSE;
-    // Wide name for user-facing error reporting (P1): real wide when supplied,
+    // Wide name for user-facing error reporting: real wide when supplied,
     // else the ANSI mirror widened.
-    const std::wstring effectiveCreateNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    const std::wstring effectiveCreateNameW = nameW;
     CQuadWord lastTransferredFileSize;
     script->GetTFS(&lastTransferredFileSize);
 
-    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    std::wstring effectiveNameW = nameW;
     BOOL invalidName = FileNameIsInvalidW(effectiveNameW.c_str(), TRUE, ignInvalidName);
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     std::wstring nameCrDirW = MakeCopyWithBackslashIfNeededW(effectiveNameW.c_str());
     std::wstring sourceDirCrDirW;
-    if (sourceDir != NULL)
-        sourceDirCrDirW = MakeCopyWithBackslashIfNeededW(AnsiToWide(sourceDir).c_str());
+    if (!sourceDirW.empty())
+        sourceDirCrDirW = MakeCopyWithBackslashIfNeededW(sourceDirW.c_str());
 
     while (1)
     {
@@ -6549,9 +6354,10 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
         BOOL createOk;
         if (!invalidName)
         {
-            createOk = CreateDirectoryW(nameCrDirW.c_str(), NULL);
+            const FileResult createResult = GetWorkerFileSystem()->CreateDirectory(nameCrDirW.c_str());
+            createOk = createResult.success ? TRUE : FALSE;
             if (!createOk)
-                err = GetLastError();
+                err = createResult.errorCode;
         }
         else
             createOk = FALSE;
@@ -6560,19 +6366,20 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)CREATE_DIR_SIZE.Value, TRUE, 0, NULL, MAX_OP_FILESIZE); // directory already created
 
             DWORD newAttr = attr & clearReadonlyMask;
-            if (sourceDir != NULL && adsCopy) // copy ADS when required
+            if (!sourceDirW.empty() && adsCopy) // copy ADS when required
             {
                 CQuadWord operDone = CREATE_DIR_SIZE; // directory already created
                 BOOL adsSkip = FALSE;
-                if (!DoCopyADS(observer, sourceDir, TRUE, name, totalDone,
+                if (!DoCopyADS(observer, TRUE, totalDone,
                                operDone, operTotal, workerState, script, &adsSkip, buffer,
-                               std::wstring(), nameW) ||
+                               sourceDirW, nameW) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
-                    if (!RemoveDirectoryW(nameCrDirW.c_str()))
+                    const FileResult removeResult = GetWorkerFileSystem()->RemoveDirectory(nameCrDirW.c_str());
+                    if (!removeResult.success)
                     {
-                        DWORD err2 = GetLastError();
-                        TRACE_E("Unable to remove newly created directory: " << name << ", error: " << GetErrorText(err2));
+                        DWORD err2 = removeResult.errorCode;
+                        TRACE_EW(L"Unable to remove newly created directory: " << nameW.c_str() << L", error: " << GetErrorTextOwned(err2).c_str());
                     }
                     if (!adsSkip)
                         return FALSE; // cancel the entire operation (Skip must return TRUE)
@@ -6591,7 +6398,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         newAttr |= FILE_ATTRIBUTE_ENCRYPTED;
                     }
                     DWORD changeAttrErr = NO_ERROR;
-                    DWORD currentAttrs = GetFileAttributesW(nameCrDirW.c_str());
+                    DWORD currentAttrs = GetWorkerFileSystem()->GetFileAttributes(nameCrDirW.c_str());
                     if (currentAttrs != INVALID_FILE_ATTRIBUTES)
                     {
                         if ((newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
@@ -6605,7 +6412,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             BOOL dummyCancelOper = FALSE;
                             if (newAttr & FILE_ATTRIBUTE_ENCRYPTED)
                             {
-                                changeAttrErr = MyEncryptFileW(observer, nameCrDirW.c_str(), name, currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
+                                changeAttrErr = MyEncryptFileW(observer, nameCrDirW.c_str(), currentAttrs, 0 /* allow encrypting directories with the SYSTEM attribute */,
                                                                                      workerState, dummyCancelOper, FALSE);
 
                                 if ( //(WindowsVistaAndLater || script->TargetPathSupEFS) &&  // complain regardless of OS version and EFS support; originally directories on FAT could not be encrypted before Vista, we behave the same (to match Explorer, the Encrypted attribute is not that important)
@@ -6621,7 +6428,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                     else
                                     {
                                         ret = IDCANCEL;
-                                        ret = observer.AskEncryptionLoss((DWORD)(DWORD_PTR)(char*)FALSE != 0, name, (DWORD)(DWORD_PTR)(char*)(!script->IsCopyOperation) != 0);
+                                        ret = observer.AskEncryptionLoss(false, nameW.c_str(), !script->IsCopyOperation);
                                     }
                                     switch (ret)
                                     {
@@ -6634,8 +6441,8 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                                         workerState.SkipAllDirCrLossEncr = TRUE;
                                     case IDB_SKIP:
                                     {
-                                        ClearReadOnlyAttrW(nameCrDirW.c_str());
-                                        RemoveDirectoryW(nameCrDirW.c_str());
+                                        ClearReadOnlyAttr(nameCrDirW.c_str());
+                                        GetWorkerFileSystem()->RemoveDirectory(nameCrDirW.c_str());
                                         script->SetTFS(lastTransferredFileSize); // add TFS only after the directory is fully outside; ProgressSize will be synced outside (no point in adjusting it here)
                                         skip = TRUE;
                                         return TRUE;
@@ -6660,14 +6467,14 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         changeAttrErr = GetLastError();
                     if (changeAttrErr != NO_ERROR)
                     {
-                        TRACE_I("DoCreateDir(): Unable to set Encrypted or Compressed attributes for " << name << "! error=" << GetErrorText(changeAttrErr));
+                        TRACE_IW(L"DoCreateDir(): Unable to set Encrypted or Compressed attributes for " << nameW.c_str() << L"! error=" << GetErrorTextOwned(changeAttrErr).c_str());
                     }
                 }
-                SetFileAttributesW(nameCrDirW.c_str(), newAttr);
+                GetWorkerFileSystem()->SetFileAttributes(nameCrDirW.c_str(), newAttr);
 
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
-                    curAttrs = GetFileAttributesW(nameCrDirW.c_str());
+                    curAttrs = GetWorkerFileSystem()->GetFileAttributes(nameCrDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -6680,7 +6487,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             ret = IDB_IGNORE;
                         else
                         {
-                            ret = observer.AskSetAttrsError(name, (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(newAttr & DISPLAYED_ATTRIBUTES), (DWORD)(DWORD_PTR)(char*)(DWORD_PTR)(curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
+                            ret = observer.AskSetAttrsError(nameW.c_str(), (newAttr & DISPLAYED_ATTRIBUTES), (curAttrs == INVALID_FILE_ATTRIBUTES ? 0 : (curAttrs & DISPLAYED_ATTRIBUTES)));
                         }
                         switch (ret)
                         {
@@ -6693,18 +6500,18 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                         {
                         CANCEL_CRDIR:
 
-                            ClearReadOnlyAttrW(nameCrDirW.c_str());
-                            RemoveDirectoryW(nameCrDirW.c_str());
+                            ClearReadOnlyAttr(nameCrDirW.c_str());
+                            GetWorkerFileSystem()->RemoveDirectory(nameCrDirW.c_str());
                             return FALSE;
                         }
                         }
                     }
                 }
 
-                if (sourceDir != NULL && script->CopySecurity) // should NTFS security permissions be copied?
+                if (!sourceDirW.empty() && script->CopySecurity) // should NTFS security permissions be copied?
                 {
                     DWORD err2;
-                    if (!DoCopySecurity(sourceDir, name, &err2, NULL, std::wstring(), nameW))
+                    if (!DoCopySecurity(&err2, NULL, sourceDirW, nameW))
                     {
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                         if (observer.IsCancelled())
@@ -6716,7 +6523,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             ret = IDB_IGNORE;
                         else
                         {
-                            ret = observer.AskCopyPermError((char*)sourceDir, name, (char*)(DWORD_PTR)err2);
+                            ret = observer.AskCopyPermError(sourceDirW.c_str(), nameW.c_str(), err2);
                         }
                         switch (ret)
                         {
@@ -6740,13 +6547,13 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
             if (err == ERROR_ALREADY_EXISTS ||
                 err == ERROR_FILE_EXISTS)
             {
-                DWORD attr2 = GetFileAttributesW(nameCrDirW.c_str());
+                DWORD attr2 = GetWorkerFileSystem()->GetFileAttributes(nameCrDirW.c_str());
                 if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
                 {
                     if (workerState.CnfrmDirOver && !workerState.DirOverwriteAll) // should we ask the user about overwriting the directory?
                     {
-                        char sAttr[101], tAttr[101];
-                        GetDirInfo(sAttr, sourceDir);
+                        wchar_t sAttr[101], tAttr[101];
+                        GetDirInfoW(sAttr, sourceDirW.c_str());
                         GetDirInfoW(tAttr, effectiveNameW.c_str());
 
                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -6757,7 +6564,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                             goto SKIP_CREATE_ERROR;
 
                         int ret = IDCANCEL;
-                        ret = observer.AskADSOverwrite(name, tAttr, (char*)sourceDir, sAttr);
+                        ret = observer.AskADSOverwrite(nameW.c_str(), tAttr, sourceDirW.c_str(), sAttr);
                         switch (ret)
                         {
                         case IDB_ALL:
@@ -6786,8 +6593,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
                     goto SKIP_CREATE_ERROR;
 
                 int ret = IDCANCEL;
-                ret = observer.AskFileErrorByIdsW(IDS_ERRORCREATINGDIR, name,
-                                                  effectiveCreateNameW.c_str(), IDS_NAMEALREADYUSED);
+                ret = observer.AskFileErrorByIds(IDS_ERRORCREATINGDIR, effectiveCreateNameW.c_str(), IDS_NAMEALREADYUSED);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -6813,8 +6619,7 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERRORCREATINGDIR, name,
-                                             effectiveCreateNameW.c_str(), err);
+            ret = observer.AskFileErrorById(IDS_ERRORCREATINGDIR, effectiveCreateNameW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -6836,9 +6641,9 @@ BOOL DoCreateDir(IWorkerObserver& observer, char* name, DWORD attr,
     }
 }
 
-BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDir(IWorkerObserver& observer, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CWorkerState& workerState,
-                 const std::wstring& nameW = std::wstring())
+                 const std::wstring& nameW)
 {
     DWORD err;
     int AutoRetryCounter = 0;
@@ -6847,14 +6652,14 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     std::wstring nameRmDirW = MakeCopyWithBackslashIfNeededW(
-        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
+        nameW.c_str());
 
-    // Wide name for user-facing error reporting (P1).
-    const std::wstring effectiveDeleteDirW = !nameW.empty() ? nameW : AnsiToWide(name);
+    // Wide name for user-facing error reporting.
+    const std::wstring effectiveDeleteDirW = nameW;
 
     while (1)
     {
-        ClearReadOnlyAttrW(nameRmDirW.c_str(), attr); // ensure it can be deleted
+        ClearReadOnlyAttr(nameRmDirW.c_str(), attr); // ensure it can be deleted
 
         err = ERROR_SUCCESS;
         if (script->CanUseRecycleBin && !dontUseRecycleBin &&
@@ -6865,29 +6670,24 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             // SHFileOperation needs double-null terminated wide path
             std::wstring nameList = nameRmDirW;
             nameList.push_back(L'\0'); // double-null termination
-            if (!PathContainsValidComponentsW(nameList.c_str()))
+            if (!PathContainsValidComponents(nameList.c_str()))
             {
                 err = ERROR_INVALID_NAME;
             }
             else
             {
+                // via IShell (see DoDeleteFile note).
                 CShellExecuteWnd shellExecuteWnd;
-                SHFILEOPSTRUCTW opCode;
-                memset(&opCode, 0, sizeof(opCode));
-
-                opCode.hwnd = shellExecuteWnd.Create(observer.GetParentWindow(), "SEW: DoDeleteDir");
-
-                opCode.wFunc = FO_DELETE;
-                opCode.pFrom = nameList.c_str();
-                opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                opCode.lpszProgressTitle = L"";
-                err = SHFileOperationW(&opCode);
+                HWND parentWnd = shellExecuteWnd.Create(observer.GetParentWindow(), L"SEW: DoDeleteDir");
+                ShellResult recycleRes = gShell->MoveToRecycleBin({nameRmDirW}, parentWnd);
+                err = recycleRes.success ? ERROR_SUCCESS : recycleRes.errorCode;
             }
         }
         else
         {
-            if (!RemoveDirectoryW(nameRmDirW.c_str()))
-                err = GetLastError();
+            const FileResult removeResult = GetWorkerFileSystem()->RemoveDirectory(nameRmDirW.c_str());
+            if (!removeResult.success)
+                err = removeResult.errorCode;
         }
 
         if (err == ERROR_SUCCESS)
@@ -6910,7 +6710,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             if (AutoRetryCounter < 4 && GetTickCount() - startTime + (AutoRetryCounter + 1) * 100 <= 2000 &&
                 (err == ERROR_DIR_NOT_EMPTY || err == ERROR_SHARING_VIOLATION))
             { // add auto-retry to handle this case: I have directories 1\2\3, deleting 1 including subdirectories while 3 is shown in a panel (watching for changes) -> removing 2 reports "directory not empty" because 3 stays in a transitional state due to change notifications (it is deleted, so it cannot be listed, but it still exists on disk briefly; quite a mess)
-                //        TRACE_I("DoDeleteDir(): err: " << GetErrorText(err));
+                //        TRACE_IW(L"DoDeleteDir(): err: " << GetErrorTextOwned(err).c_str());
                 AutoRetryCounter++;
                 Sleep(AutoRetryCounter * 100);
                 //        TRACE_I("DoDeleteDir(): " << AutoRetryCounter << ". retry, delay is " << AutoRetryCounter * 100 << "ms");
@@ -6919,8 +6719,7 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             {
                 int ret;
                 ret = IDCANCEL;
-                ret = observer.AskFileErrorByIdW(IDS_ERRORDELETINGDIR, name,
-                                                 effectiveDeleteDirW.c_str(), err);
+                ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIR, effectiveDeleteDirW.c_str(), err);
                 switch (ret)
                 {
                 case IDRETRY:
@@ -6944,82 +6743,10 @@ BOOL DoDeleteDir(IWorkerObserver& observer, char* name, const CQuadWord& size, C
             }
         }
 
-        DWORD attr2 = GetFileAttributesW(nameRmDirW.c_str()); // get the current attribute state
+        DWORD attr2 = GetWorkerFileSystem()->GetFileAttributes(nameRmDirW.c_str()); // get the current attribute state
         if (attr2 != INVALID_FILE_ATTRIBUTES)
             attr = attr2;
     }
-}
-
-#define FSCTL_GET_REPARSE_POINT CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS)        // REPARSE_DATA_BUFFER
-#define FSCTL_DELETE_REPARSE_POINT CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 43, METHOD_BUFFERED, FILE_SPECIAL_ACCESS) // REPARSE_DATA_BUFFER,
-
-#define IO_REPARSE_TAG_SYMLINK (0xA000000CL)
-
-/*  This code copies a junction point into an empty directory (the directory must be created in
-    advance – to keep it simple we always use "D:\\ZUMPA\\link" here).
-
-  People sometimes want to copy the contents of the junction, sometimes they want to copy only the junction as a link,
-  and sometimes they want to skip it (unclear whether that should create an empty junction directory)...
-  if we ever implement it properly, the script builder will need a comprehensive dialog asking what to do.
-
-#define FSCTL_SET_REPARSE_POINT     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 41, METHOD_BUFFERED, FILE_SPECIAL_ACCESS) // REPARSE_DATA_BUFFER,
-#define FSCTL_GET_REPARSE_POINT     CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 42, METHOD_BUFFERED, FILE_ANY_ACCESS) // REPARSE_DATA_BUFFER
-
-// Structure for FSCTL_SET_REPARSE_POINT, FSCTL_GET_REPARSE_POINT, and
-// FSCTL_DELETE_REPARSE_POINT.
-// This version of the reparse data buffer is only for Microsoft tags.
-
-struct TMN_REPARSE_DATA_BUFFER
-{
-  DWORD ReparseTag;
-  WORD  ReparseDataLength;
-  WORD  Reserved;
-  WORD  SubstituteNameOffset;
-  WORD  SubstituteNameLength;
-  WORD  PrintNameOffset;
-  WORD  PrintNameLength;
-  WCHAR PathBuffer[1];
-};
-
-#define IO_REPARSE_TAG_VALID_VALUES 0xE000FFFF
-#define IsReparseTagValid(x) (!((x)&~IO_REPARSE_TAG_VALID_VALUES)&&((x)>IO_REPARSE_TAG_RESERVED_RANGE))
-#define MAXIMUM_REPARSE_DATA_BUFFER_SIZE      ( 16 * 1024 )
-
-
-  HANDLE srcDir = SalCreateFileH(name, GENERIC_READ, 0, 0, OPEN_EXISTING,
-                                       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
-  if (srcDir != INVALID_HANDLE_VALUE)
-  {
-    HANDLE tgtDir = SalCreateFileH("D:\\ZUMPA\\link", GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
-                                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
-    if (tgtDir != INVALID_HANDLE_VALUE)
-    {
-      char szBuff[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-      TMN_REPARSE_DATA_BUFFER& rdb = *(TMN_REPARSE_DATA_BUFFER*)szBuff;
-
-      DWORD dwBytesReturned;
-      if (DeviceIoControl(srcDir, FSCTL_GET_REPARSE_POINT, NULL, 0, (LPVOID)&rdb,
-                          MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dwBytesReturned, 0) &&
-          IsReparseTagValid(rdb.ReparseTag))
-      {
-        DWORD dwBytesReturnedDummy;
-        if (DeviceIoControl(tgtDir, FSCTL_SET_REPARSE_POINT, (LPVOID)&rdb, dwBytesReturned,
-                            NULL, 0, &dwBytesReturnedDummy, 0))
-        {
-          TRACE_I("eureka?");
-        }
-      }
-      HANDLES(CloseHandle(tgtDir));
-    }
-    HANDLES(CloseHandle(srcDir));
-  }
-  return FALSE;
-*/
-
-// ANSI wrapper — delegates to wide version
-BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
-{
-    return DoDeleteDirLinkAuxW(AnsiToWide(nameDelLink).c_str(), err);
 }
 
 BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err)
@@ -7028,89 +6755,64 @@ BOOL DoDeleteDirLinkAuxW(const wchar_t* nameDelLink, DWORD* err)
     if (err != NULL)
         *err = ERROR_SUCCESS;
     BOOL ok = FALSE;
-    DWORD attr = GetFileAttributesW(nameDelLink);
+    DWORD attr = GetWorkerFileSystem()->GetFileAttributes(nameDelLink);
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
     {
-        HANDLE dir = CreateFileW(nameDelLink, GENERIC_WRITE /* | GENERIC_READ */, 0, 0, OPEN_EXISTING,
-                                 FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
-        if (dir != INVALID_HANDLE_VALUE)
-        {
-            DWORD dummy;
-            char buf[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
-            REPARSE_GUID_DATA_BUFFER* juncData = (REPARSE_GUID_DATA_BUFFER*)buf;
-            if (DeviceIoControl(dir, FSCTL_GET_REPARSE_POINT, NULL, 0, juncData,
-                                MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dummy, NULL) == 0)
-            {
-                if (err != NULL)
-                    *err = GetLastError();
-            }
-            else
-            {
-                if (juncData->ReparseTag != IO_REPARSE_TAG_MOUNT_POINT &&
-                    juncData->ReparseTag != IO_REPARSE_TAG_SYMLINK)
-                {
-                    TRACE_EW(L"DoDeleteDirLinkAuxW(): Unknown type of reparse point (tag is 0x" << std::hex << juncData->ReparseTag << std::dec << L"): " << nameDelLink);
-                    if (err != NULL)
-                        *err = 4394 /* ERROR_REPARSE_TAG_MISMATCH */;
-                }
-                else
-                {
-                    REPARSE_GUID_DATA_BUFFER rgdb = {0};
-                    rgdb.ReparseTag = juncData->ReparseTag;
-
-                    DWORD dwBytes;
-                    if (DeviceIoControl(dir, FSCTL_DELETE_REPARSE_POINT, &rgdb, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,
-                                        NULL, 0, &dwBytes, 0) != 0)
-                    {
-                        ok = TRUE;
-                    }
-                    else
-                    {
-                        if (err != NULL)
-                            *err = GetLastError();
-                    }
-                }
-            }
-            HANDLES(CloseHandle(dir));
-        }
-        else
-        {
-            if (err != NULL)
-                *err = GetLastError();
-        }
+        const FileResult deleteResult =
+            GetWorkerFileSystem()->DeleteDirectoryReparseData(nameDelLink);
+        ok = deleteResult.success;
+        if (!ok && err != NULL)
+            *err = deleteResult.errorCode;
     }
     else
         ok = TRUE; // the reparse point is apparently gone; all that remains is to delete the empty directory...
     // remove the empty directory (that remained after deleting the reparse point)
     if (ok)
-        ClearReadOnlyAttrW(nameDelLink, attr); // ensure it can be deleted even with the read-only attribute
-    if (ok && !RemoveDirectoryW(nameDelLink))
+        ClearReadOnlyAttr(nameDelLink, attr); // ensure it can be deleted even with the read-only attribute
+    FileResult removeResult = ok ? GetWorkerFileSystem()->RemoveDirectory(nameDelLink)
+                                 : FileResult::Error(ERROR_SUCCESS);
+    if (ok && !removeResult.success)
     {
         ok = FALSE;
         if (err != NULL)
-            *err = GetLastError();
+            *err = removeResult.errorCode;
     }
     return ok;
 }
 
-BOOL DeleteDirLink(const char* name, DWORD* err)
+BOOL DeleteDirLink(const wchar_t* name, DWORD* err)
 {
     // Go through wide path — handles trailing space/dot fixup natively
-    std::wstring nameW = MakeCopyWithBackslashIfNeededW(AnsiToWide(name).c_str());
+    std::wstring nameW = MakeCopyWithBackslashIfNeededW(name);
     return DoDeleteDirLinkAuxW(nameW.c_str(), err);
 }
 
-BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDirLink(IWorkerObserver& observer, const CQuadWord& size, COperations* script,
                      CQuadWord& totalDone, CWorkerState& workerState,
-                     const std::wstring& nameW = std::wstring())
+                     const std::wstring& nameW)
 {
+    // The clone half of a move that the user skipped: the link was never made at the
+    // target, so deleting it here would simply lose it. Consume the marker and count
+    // the operation as done so the progress bar still reaches the end.
+    if (!workerState.SkippedDirLinkSourceW.empty() &&
+        CompareStringOrdinal(workerState.SkippedDirLinkSourceW.c_str(), -1, nameW.c_str(), -1,
+                             TRUE) == CSTR_EQUAL)
+    {
+        workerState.SkippedDirLinkSourceW.clear();
+        totalDone += size;
+        script->SetProgressSize(totalDone);
+        observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+        return TRUE;
+    }
+    workerState.SkippedDirLinkSourceW.clear();
+
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     std::wstring nameDelLinkW = MakeCopyWithBackslashIfNeededW(
-        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
+        nameW.c_str());
 
-    // Wide name for user-facing error reporting (P1).
-    const std::wstring effectiveDeleteDirW = !nameW.empty() ? nameW : AnsiToWide(name);
+    // Wide name for user-facing error reporting.
+    const std::wstring effectiveDeleteDirW = nameW;
 
     while (1)
     {
@@ -7136,8 +6838,7 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERRORDELETINGDIRLINK, name,
-                                             effectiveDeleteDirW.c_str(), err);
+            ret = observer.AskFileErrorById(IDS_ERRORDELETINGDIRLINK, effectiveDeleteDirW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -7162,6 +6863,99 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
     }
 }
 
+// Copy-the-link: create the target directory and clone the raw
+// reparse buffer from the source link. Never opens or enumerates the link
+// TARGET - the operation is on the link object itself. Same retry/skip
+// protocol as the other link op.
+BOOL DoCreateDirLink(IWorkerObserver& observer, COperation* op, COperations* script,
+                     CQuadWord& totalDone, CWorkerState& workerState)
+{
+    // Link ops come only from the snapshot builder, which always sets explicit
+    // wide names - no ANSI fallback here (the ratchet holds the line).
+    const std::wstring& sourceW = op->SourceNameW;
+    const std::wstring& targetW = op->TargetNameW;
+    IFileSystem* fs = GetWorkerFileSystem();
+
+    // Start clean: the marker means "the clone that was supposed to precede the NEXT
+    // delete did not happen", so a stale one from an earlier link must not survive
+    // into this pair.
+    workerState.SkippedDirLinkSourceW.clear();
+
+    while (1)
+    {
+        DWORD err = NO_ERROR;
+        BOOL createdTargetDir = FALSE;
+        std::vector<BYTE> blob;
+        FileResult r = fs->GetReparseData(sourceW.c_str(), blob);
+        if (!r.success)
+            err = r.errorCode;
+        if (err == NO_ERROR)
+        {
+            r = fs->CreateDirectory(targetW.c_str());
+            // Remember whether the directory is ours. If it was already there we did
+            // not make it, and must not unmake it below.
+            createdTargetDir = r.success;
+            if (!r.success && r.errorCode != ERROR_ALREADY_EXISTS)
+                err = r.errorCode;
+        }
+        if (err == NO_ERROR)
+        {
+            r = fs->SetReparseData(targetW.c_str(), blob.data(), blob.size());
+            if (!r.success)
+            {
+                err = r.errorCode;
+                // Clean up only what this attempt created. An ERROR_ALREADY_EXISTS
+                // target is a directory the user already had; removing it on our way
+                // out of a failed clone would destroy it on their behalf.
+                if (createdTargetDir)
+                    fs->RemoveDirectory(targetW.c_str()); // do not leave a plain dir behind
+            }
+        }
+
+        if (err == NO_ERROR)
+        {
+            script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL,
+                                                     MAX_OP_FILESIZE);
+            totalDone += op->Size;
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+            return TRUE;
+        }
+
+        observer.WaitIfSuspended();
+        if (observer.IsCancelled())
+            return FALSE;
+
+        // This is a directory-CREATE failure, so it answers to the directory-create
+        // Skip All, not the delete one. Sharing SkipAllDeleteErr meant a Skip All
+        // given to an unrelated delete error silently suppressed every later link
+        // clone - and, on a move, silently deleted those source links.
+        if (workerState.SkipAllDirCreateErr)
+            goto SKIP_CREATE_LINK;
+
+        switch (observer.AskFileErrorById(IDS_ERRORCREATINGDIR, sourceW.c_str(), err))
+        {
+        case IDRETRY:
+            break;
+
+        case IDB_SKIPALL:
+            workerState.SkipAllDirCreateErr = TRUE;
+        case IDB_SKIP:
+        {
+        SKIP_CREATE_LINK:
+            // Tell the paired ocDeleteDirLink that this half of a move did not happen.
+            workerState.SkippedDirLinkSourceW = sourceW;
+            totalDone += op->Size;
+            script->SetProgressSize(totalDone);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+            return TRUE;
+        }
+
+        case IDCANCEL:
+            return FALSE;
+        }
+    }
+}
+
 // a) create a temporary file in the same directory as file 'name'
 // b) transfer the contents of 'name' into the temporary file while applying the
 //    conversions specified by convertData.CodeType and convertData.EOFType
@@ -7173,13 +6967,13 @@ BOOL DoDeleteDirLink(IWorkerObserver& observer, char* name, const CQuadWord& siz
 //            1: replace line endings with CRLF (DOS, Windows, OS/2)
 //            2: replace line endings with LF (UNIX)
 //            3: replace line endings with CR (MAC)
-BOOL DoConvert(IWorkerObserver& observer, char* name, char* sourceBuffer, char* targetBuffer,
+BOOL DoConvert(IWorkerObserver& observer, char* sourceBuffer, char* targetBuffer,
                const CQuadWord& size, COperations* script, CQuadWord& totalDone,
                CConvertData& convertData, CWorkerState& workerState,
-               const std::wstring& nameW = std::wstring())
+               const std::wstring& nameW)
 {
     // Always have a wide path available
-    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    std::wstring effectiveNameW = nameW;
 
     // if the path ends with a space/dot it is invalid and we must not run the conversion,
     // CreateFile would trim the spaces/dots and convert a different file
@@ -7195,7 +6989,7 @@ CONVERT_AGAIN:
         HANDLE hSource;
         if (!invalidName)
         {
-            hSource = CreateFileW(effectiveNameW.c_str(), GENERIC_READ,
+            hSource = GetWorkerFileSystem()->CreateFile(effectiveNameW.c_str(), GENERIC_READ,
                                   FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                   OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
             DWORD openErr = GetLastError();
@@ -7213,20 +7007,13 @@ CONVERT_AGAIN:
             if (lastSlash == std::wstring::npos)
             {
                 TRACE_E("Parameter 'name' must be full path to file (including path)");
-                HANDLES(CloseHandle(hSource));
+                (void)CloseWorkerTrackedFile(hSource);
                 return FALSE;
             }
             tmpPathW = effectiveNameW.substr(0, lastSlash + 1);
 
-            // ANSI version for legacy temp file generation
-            CPathBuffer tmpPath; // Heap-allocated for long path support
-            strcpy(tmpPath, name);
-            char* terminator = strrchr(tmpPath, '\\');
-            if (terminator != NULL)
-                *(terminator + 1) = 0;
 
             // find a name for the temporary file and let the system create it
-            CPathBuffer tmpFileName; // ANSI copy for error messages
             std::wstring tmpFileNameW;
             BOOL tmpFileExists = FALSE;
             while (1)
@@ -7236,15 +7023,14 @@ CONVERT_AGAIN:
                 if (tmpOk)
                 {
                     // keep ANSI buffer in sync for error messages
-                    WideCharToMultiByte(CP_ACP, 0, tmpFileNameW.c_str(), -1, tmpFileName, tmpFileName.Size(), NULL, NULL);
                 }
                 if (tmpOk)
                 {
                     tmpFileExists = TRUE;
 
                     // align the temp file attributes with the source file
-                    DWORD srcAttrs = GetFileAttributesW(effectiveNameW.c_str());
-                    DWORD tgtAttrs = GetFileAttributesW(tmpFileNameW.c_str());
+                    DWORD srcAttrs = GetWorkerFileSystem()->GetFileAttributes(effectiveNameW.c_str());
+                    DWORD tgtAttrs = GetWorkerFileSystem()->GetFileAttributes(tmpFileNameW.c_str());
                     BOOL changeAttrs = FALSE;
                     if (srcAttrs != INVALID_FILE_ATTRIBUTES && tgtAttrs != INVALID_FILE_ATTRIBUTES && srcAttrs != tgtAttrs)
                     {
@@ -7259,13 +7045,13 @@ CONVERT_AGAIN:
                         {
                             BOOL cancelOper = FALSE;
                             if (srcAttrs & FILE_ATTRIBUTE_ENCRYPTED)
-                                MyEncryptFileW(observer, tmpFileNameW.c_str(), tmpFileName, tgtAttrs, 0, workerState, cancelOper, FALSE);
+                                MyEncryptFileW(observer, tmpFileNameW.c_str(), tgtAttrs, 0, workerState, cancelOper, FALSE);
                             else
                                 MyDecryptFileW(tmpFileNameW.c_str(), tgtAttrs, FALSE);
                             if (observer.IsCancelled() || cancelOper)
                             {
-                                HANDLES(CloseHandle(hSource));
-                                ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                (void)CloseWorkerTrackedFile(hSource);
+                                ClearReadOnlyAttr(tmpFileNameW.c_str());
                                 gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                 return FALSE;
                             }
@@ -7278,7 +7064,7 @@ CONVERT_AGAIN:
                     }
 
                     // open the empty temporary file
-                    HANDLE hTarget = CreateFileW(tmpFileNameW.c_str(), GENERIC_WRITE, 0, NULL,
+                    HANDLE hTarget = GetWorkerFileSystem()->CreateFile(tmpFileNameW.c_str(), GENERIC_WRITE, 0, NULL,
                                                  OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     {
                         DWORD openErr2 = GetLastError();
@@ -7288,9 +7074,13 @@ CONVERT_AGAIN:
                     {
                         DWORD read;
                         BOOL crlfBreak = FALSE;
+                        FileResult readIoResult = FileResult::Ok();
+                        DWORD pendingWriteError = ERROR_SUCCESS;
                         while (1)
                         {
-                            if (ReadFile(hSource, sourceBuffer, OPERATION_BUFFER, &read, NULL))
+                            readIoResult = GetWorkerFileSystem()->ReadFromHandle(
+                                hSource, sourceBuffer, OPERATION_BUFFER, &read);
+                            if (readIoResult.success)
                             {
                                 DWORD written;
                                 if (read == 0)
@@ -7301,10 +7091,10 @@ CONVERT_AGAIN:
                                 CONVERT_ERROR:
 
                                     if (hSource != NULL)
-                                        HANDLES(CloseHandle(hSource));
+                                        (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
                                     if (hTarget != NULL)
-                                        HANDLES(CloseHandle(hTarget));
-                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                        (void)GetWorkerFileSystem()->CloseFileHandle(hTarget);
+                                    ClearReadOnlyAttr(tmpFileNameW.c_str());
                                     gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return FALSE;
                                 }
@@ -7355,14 +7145,14 @@ CONVERT_AGAIN:
                                             }
                                             else
                                             {
-                                                *targetIterator = convertData.CodeTable[*sourceIterator];
+                                                *targetIterator = convertData.CodeTable[static_cast<BYTE>(*sourceIterator)];
                                                 targetIterator++;
                                             }
                                         }
                                     }
                                     else
                                     {
-                                        *targetIterator = convertData.CodeTable[*sourceIterator];
+                                        *targetIterator = convertData.CodeTable[static_cast<BYTE>(*sourceIterator)];
                                         targetIterator++;
                                     }
                                     sourceIterator++;
@@ -7371,14 +7161,21 @@ CONVERT_AGAIN:
                                 // write the data to the temp file
                                 while (1)
                                 {
-                                    if (WriteFile(hTarget, targetBuffer, (DWORD)(targetIterator - targetBuffer), &written, NULL) &&
+                                    const FileResult writeIoResult =
+                                        GetWorkerFileSystem()->WriteToHandle(
+                                            hTarget, targetBuffer,
+                                            (DWORD)(targetIterator - targetBuffer), &written);
+                                    if (writeIoResult.success &&
                                         targetIterator - targetBuffer == (int)written)
                                         break;
+                                    pendingWriteError = writeIoResult.success ?
+                                                            ERROR_DISK_FULL : writeIoResult.errorCode;
 
                                 WRITE_ERROR_CONVERT:
 
-                                    DWORD err;
-                                    err = GetLastError();
+                                    DWORD err = pendingWriteError != ERROR_SUCCESS ?
+                                                    pendingWriteError : GetLastError();
+                                    pendingWriteError = ERROR_SUCCESS;
 
                                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                     if (observer.IsCancelled())
@@ -7391,14 +7188,14 @@ CONVERT_AGAIN:
                                     ret = IDCANCEL;
                                     if (hTarget != NULL && err == NO_ERROR && targetIterator - targetBuffer != (int)written)
                                         err = ERROR_DISK_FULL;
-                                    ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, tmpFileName, err);
+                                    ret = observer.AskFileErrorById(IDS_ERRORWRITINGFILE, tmpFileNameW.c_str(), err);
                                     switch (ret)
                                     {
                                     case IDRETRY:
                                     {
                                         if (hSource == NULL && hTarget == NULL)
                                         {
-                                            ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                            ClearReadOnlyAttr(tmpFileNameW.c_str());
                                             gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                             goto CONVERT_AGAIN;
@@ -7414,10 +7211,10 @@ CONVERT_AGAIN:
 
                                         totalDone += size;
                                         if (hSource != NULL)
-                                            HANDLES(CloseHandle(hSource));
+                                            (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
                                         if (hTarget != NULL)
-                                            HANDLES(CloseHandle(hTarget));
-                                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                            (void)GetWorkerFileSystem()->CloseFileHandle(hTarget);
+                                        ClearReadOnlyAttr(tmpFileNameW.c_str());
                                         gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                         observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                                         return TRUE;
@@ -7438,7 +7235,7 @@ CONVERT_AGAIN:
                             }
                             else
                             {
-                                DWORD err = GetLastError();
+                                DWORD err = readIoResult.errorCode;
                                 observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                 if (observer.IsCancelled())
                                     goto CONVERT_ERROR;
@@ -7447,8 +7244,7 @@ CONVERT_AGAIN:
                                     goto SKIP_CONVERT;
 
                                 int ret = IDCANCEL;
-                                ret = observer.AskFileErrorByIdW(IDS_ERRORREADINGFILE, name,
-                                                                 effectiveNameW.c_str(), err);
+                                ret = observer.AskFileErrorById(IDS_ERRORREADINGFILE, effectiveNameW.c_str(), err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7464,31 +7260,35 @@ CONVERT_AGAIN:
                         }
                         // close the files and update the global progress
                         // do not reuse operationDone so the progress stays correct even if the file changes "under our feet"
-                        HANDLES(CloseHandle(hSource));
-                        if (!HANDLES(CloseHandle(hTarget))) // even after a failed call we assume the handle is closed,
+                        (void)GetWorkerFileSystem()->CloseFileHandle(hSource);
+                        const FileResult closeTargetResult =
+                            GetWorkerFileSystem()->CloseFileHandle(hTarget);
+                        if (!closeTargetResult.success) // even after a failed call we assume the handle is closed,
                         {                                   // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
+                            pendingWriteError = closeTargetResult.errorCode;
                             hSource = hTarget = NULL;       // (it states that the target file can be deleted, so the handle was not left open)
                             goto WRITE_ERROR_CONVERT;
                         }
                         totalDone += size;
                         // restore attributes (write operations have trouble with read-only)
                         if (changeAttrs)
-                            SetFileAttributesW(tmpFileNameW.c_str(), srcAttrs);
+                            GetWorkerFileSystem()->SetFileAttributes(tmpFileNameW.c_str(), srcAttrs);
                         // overwrite the original file with the temp file
                         while (1)
                         {
-                            ClearReadOnlyAttrW(effectiveNameW.c_str());
+                            ClearReadOnlyAttr(effectiveNameW.c_str());
                             BOOL deleteOk = gFileSystem->DeleteFile(effectiveNameW.c_str()).success;
                             if (deleteOk)
                             {
                                 while (1)
                                 {
-                                    BOOL moveOk = MoveFileW(tmpFileNameW.c_str(), effectiveNameW.c_str());
-                                    if (moveOk)
+                                    const FileResult moveResult = GetWorkerFileSystem()->MoveFile(
+                                        tmpFileNameW.c_str(), effectiveNameW.c_str());
+                                    if (moveResult.success)
                                         return TRUE; // success
                                     else
                                     {
-                                        DWORD err = GetLastError();
+                                        DWORD err = moveResult.errorCode;
 
                                         observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
                                         if (observer.IsCancelled())
@@ -7498,7 +7298,7 @@ CONVERT_AGAIN:
                                             return TRUE;
 
                                         int ret = IDCANCEL;
-                                        ret = observer.AskCannotMoveErr(tmpFileName, name, err, false);
+                                        ret = observer.AskCannotMoveErr(tmpFileNameW.c_str(), nameW.c_str(), err, false);
                                         switch (ret)
                                         {
                                         case IDRETRY:
@@ -7524,7 +7324,7 @@ CONVERT_AGAIN:
                                 {
                                 CANCEL_CONVERT:
 
-                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                    ClearReadOnlyAttr(tmpFileNameW.c_str());
                                     gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return FALSE;
                                 }
@@ -7534,8 +7334,7 @@ CONVERT_AGAIN:
 
                                 int ret;
                                 ret = IDCANCEL;
-                                ret = observer.AskFileErrorByIdW(IDS_ERROROVERWRITINGFILE, name,
-                                                                 effectiveNameW.c_str(), err);
+                                ret = observer.AskFileErrorById(IDS_ERROROVERWRITINGFILE, effectiveNameW.c_str(), err);
                                 switch (ret)
                                 {
                                 case IDRETRY:
@@ -7547,7 +7346,7 @@ CONVERT_AGAIN:
                                 {
                                 SKIP_OVERWRITE_ERROR:
 
-                                    ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                                    ClearReadOnlyAttr(tmpFileNameW.c_str());
                                     gFileSystem->DeleteFile(tmpFileNameW.c_str());
                                     return TRUE;
                                 }
@@ -7567,22 +7366,21 @@ CONVERT_AGAIN:
 
                     DWORD err = GetLastError();
 
-                    CPathBuffer fakeName; // Heap-allocated for long path support; name of the temp file that cannot be created/opened
+                    std::wstring fakeNameW; // name of the temp file that cannot be created/opened
                     if (tmpFileExists)
                     {
-                        strcpy(fakeName, tmpFileName);
-                        ClearReadOnlyAttrW(tmpFileNameW.c_str());
+                        fakeNameW = tmpFileNameW;
+                        ClearReadOnlyAttr(tmpFileNameW.c_str());
                         gFileSystem->DeleteFile(tmpFileNameW.c_str());
                         tmpFileExists = FALSE;
                     }
                     else
                     {
                         // assemble a fictitious temp-file name for the failed creation attempt
-                        char* s = tmpPath + strlen(tmpPath);
-                        if (s > tmpPath && *(s - 1) == '\\')
-                            s--;
-                        memcpy(fakeName, tmpPath, s - tmpPath);
-                        strcpy(fakeName + (s - tmpPath), "\\cnv0000.tmp");
+                        fakeNameW = tmpPathW;
+                        if (!fakeNameW.empty() && fakeNameW.back() == L'\\')
+                            fakeNameW.pop_back();
+                        fakeNameW += L"\\cnv0000.tmp";
                     }
 
                     observer.WaitIfSuspended(); // if we should be in suspend mode, wait ...
@@ -7594,7 +7392,7 @@ CONVERT_AGAIN:
 
                     int ret;
                     ret = IDCANCEL;
-                    ret = observer.AskFileErrorById(IDS_ERRORCREATINGTMPFILE, fakeName, err);
+                    ret = observer.AskFileErrorById(IDS_ERRORCREATINGTMPFILE, fakeNameW.c_str(), err);
                     switch (ret)
                     {
                     case IDRETRY:
@@ -7606,7 +7404,7 @@ CONVERT_AGAIN:
                     {
                     SKIP_OPEN_OUT:
 
-                        HANDLES(CloseHandle(hSource));
+                        (void)CloseWorkerTrackedFile(hSource);
                         totalDone += size;
                         observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
                         return TRUE;
@@ -7616,7 +7414,7 @@ CONVERT_AGAIN:
                     {
                     CANCEL_OPEN2:
 
-                        HANDLES(CloseHandle(hSource));
+                        (void)CloseWorkerTrackedFile(hSource);
                         return FALSE;
                     }
                     }
@@ -7637,8 +7435,7 @@ CONVERT_AGAIN:
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(IDS_ERROROPENINGFILE, name,
-                                             effectiveNameW.c_str(), err);
+            ret = observer.AskFileErrorById(IDS_ERROROPENINGFILE, effectiveNameW.c_str(), err);
             switch (ret)
             {
             case IDRETRY:
@@ -7662,23 +7459,23 @@ CONVERT_AGAIN:
     }
 }
 
-BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size, DWORD attrs,
+BOOL DoChangeAttrs(IWorkerObserver& observer, const CQuadWord& size, DWORD attrs,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
                    CWorkerState& workerState,
-                   const std::wstring& nameW = std::wstring())
+                   const std::wstring& nameW)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise
     // SetFileAttributes (and others) trims the spaces/dots and operates
     // on a different path
     std::wstring nameSetAttrsW = MakeCopyWithBackslashIfNeededW(
-        !nameW.empty() ? nameW.c_str() : AnsiToWide(name).c_str());
-    // Wide name for user-facing error reporting (P1).
-    const std::wstring effectiveAttrsNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+        nameW.c_str());
+    // Wide name for user-facing error reporting.
+    const std::wstring effectiveAttrsNameW = nameW;
     // Compute wide path for compress/encrypt/decrypt operations (use original nameW,
     // not the backslash-fixed version, since those functions do their own fixup)
-    std::wstring effectiveNameW = !nameW.empty() ? nameW : AnsiToWide(name);
+    std::wstring effectiveNameW = nameW;
 
     while (1)
     {
@@ -7719,7 +7516,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         if (error == ERROR_SUCCESS && changeEncryption && (attrs & FILE_ATTRIBUTE_ENCRYPTED))
         {
             BOOL cancelOper = FALSE;
-            error = MyEncryptFileW(observer, effectiveNameW.c_str(), name, fileAttr, attrs, workerState, cancelOper, TRUE);
+            error = MyEncryptFileW(observer, effectiveNameW.c_str(), fileAttr, attrs, workerState, cancelOper, TRUE);
             if (observer.IsCancelled() || cancelOper)
                 return FALSE;
             if (error != ERROR_SUCCESS)
@@ -7741,11 +7538,13 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
                 changeEncryption = FALSE;
             int notifyTitleId = (showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_ERRORCOMPRESSING : IDS_ERRORENCRYPTING;
             int notifyDetailId = (showCompressErr && (attrs & FILE_ATTRIBUTE_COMPRESSED) || !showEncryptErr) ? IDS_COMPRNOTSUPPORTED : IDS_ENCRYPNOTSUPPORTED;
-            observer.NotifyErrorById(notifyTitleId, name, notifyDetailId);
+            observer.NotifyErrorById(notifyTitleId, nameW.c_str(), notifyDetailId);
             error = ERROR_SUCCESS;
         }
-        if (error == ERROR_SUCCESS &&
-            SetFileAttributesW(nameSetAttrsW.c_str(), attrs))
+        FileResult setAttrsResult = FileResult::Error(error);
+        if (error == ERROR_SUCCESS)
+            setAttrsResult = GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
+        if (error == ERROR_SUCCESS && setAttrsResult.success)
         {
             BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
@@ -7753,29 +7552,32 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
             {
                 HANDLE file;
                 if (attrs & FILE_ATTRIBUTE_READONLY)
-                    SetFileAttributesW(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
-                file = CreateFileW(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
+                    GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
+                file = GetWorkerFileSystem()->CreateFile(nameSetAttrsW.c_str(), GENERIC_READ | GENERIC_WRITE,
                                    FILE_SHARE_READ | FILE_SHARE_WRITE,
                                    NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     FILETIME ftCreated, ftAccessed, ftModified;
-                    GetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
+                    (void)GetWorkerFileSystem()->GetHandleFileTime(
+                        file, &ftCreated, &ftAccessed, &ftModified);
                     if (timeCreated != NULL)
                         ftCreated = *timeCreated;
                     if (timeAccessed != NULL)
                         ftAccessed = *timeAccessed;
                     if (timeModified != NULL)
                         ftModified = *timeModified;
-                    SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
-                    HANDLES(CloseHandle(file));
+                    (void)GetWorkerFileSystem()->SetHandleFileTime(
+                        file, &ftCreated, &ftAccessed, &ftModified);
+                    (void)CloseWorkerTrackedFile(file);
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
+                        GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
                 }
                 else
                 {
+                    error = GetLastError();
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributesW(nameSetAttrsW.c_str(), attrs);
+                        GetWorkerFileSystem()->SetFileAttributes(nameSetAttrsW.c_str(), attrs);
                     goto SHOW_ERROR;
                 }
             }
@@ -7788,7 +7590,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
         SHOW_ERROR:
 
             if (error == ERROR_SUCCESS)
-                error = GetLastError();
+                error = setAttrsResult.errorCode;
             if (errTitleId == 0)
                 errTitleId = IDS_ERRORCHANGINGATTRS;
 
@@ -7801,7 +7603,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
 
             int ret;
             ret = IDCANCEL;
-            ret = observer.AskFileErrorByIdW(errTitleId, name, effectiveAttrsNameW.c_str(), error);
+            ret = observer.AskFileErrorById(errTitleId, effectiveAttrsNameW.c_str(), error);
             switch (ret)
             {
             case IDRETRY:
@@ -7828,7 +7630,7 @@ BOOL DoChangeAttrs(IWorkerObserver& observer, char* name, const CQuadWord& size,
 unsigned ThreadWorkerBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("ThreadWorkerBody()");
-    SetThreadNameInVCAndTrace("Worker");
+    SetThreadNameInVCAndTrace(L"Worker");
     TRACE_I("Begin");
 
     CWorkerData* data = (CWorkerData*)parameter;
@@ -7864,8 +7666,7 @@ unsigned ThreadWorkerBody(void* parameter)
     observer.SetProgress(0, 0);
     script->InitSpeedMeters(FALSE);
 
-    CPathBuffer lastLantasticCheckRoot; // Heap-allocated for long path support; last path root checked for Lantastic ("" = nothing checked yet)
-    lastLantasticCheckRoot[0] = 0;
+    std::wstring lastLantasticCheckRoot; // last path root checked for Lantastic ("" = nothing checked yet)
     BOOL lastIsLantasticPath = FALSE;                                                                                  // result of checking root lastLantasticCheckRoot
     int mustDeleteFileBeforeOverwrite = 0; /* need test */                                                             // (added for SNAP server - NSA drive - SetEndOfFile fails - 0/1/2 = need-test/yes/no
     int allocWholeFileOnStart = 0; /* need test */                                                                     // safety measure (e.g. SNAP servers - NSA drives - may fail); cannot risk a broken Copy - 0/1/2 = need-test/yes/no
@@ -7893,16 +7694,14 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocCopyFile:
             {
                 pd.Operation = workerState.OpStrCopying;
-                pd.Source = op->SourceName;
+                pd.Source = op->SourceNameW.c_str();
                 pd.Preposition = workerState.OpStrCopyingPrep;
-                pd.Target = op->TargetName;
-                pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-                pd.TargetW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
+                pd.Target = op->TargetNameW.c_str();
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+                BOOL lantasticCheck = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
 
                 Error = !DoCopyFile(op, observer, buffer, script, totalDone,
                                     clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
@@ -7917,16 +7716,14 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocMoveFile:
             {
                 pd.Operation = workerState.OpStrMoving;
-                pd.Source = op->SourceName;
+                pd.Source = op->SourceNameW.c_str();
                 pd.Preposition = workerState.OpStrMovingPrep;
-                pd.Target = op->TargetName;
-                pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-                pd.TargetW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
+                pd.Target = op->TargetNameW.c_str();
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+                BOOL lantasticCheck = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
                 BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
 
                 Error = !DoMoveFile(op, observer, buffer, script, totalDone,
@@ -7945,20 +7742,19 @@ unsigned ThreadWorkerBody(void* parameter)
                 BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
                 BOOL ignInvalidName = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
                 pd.Operation = workerState.OpStrCreatingDir;
-                pd.Source = op->TargetName;
-                pd.Preposition = "";
-                pd.Target = "";
-                pd.SourceW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
-                pd.TargetW = NULL;
+                pd.Source = op->TargetNameW.c_str();
+                pd.Preposition = L"";
+                pd.Target = L"";
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 BOOL skip, alreadyExisted;
-                Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, workerState,
-                                     totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
+                Error = !DoCreateDir(observer, op->Attr, clearReadonlyMask, workerState,
+                                     totalDone, op->Size, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName,
-                                     op->TargetNameW);
+                                     op->TargetNameW,
+                                 op->SourceNameW);
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -7971,7 +7767,7 @@ unsigned ThreadWorkerBody(void* parameter)
                             COperation* oper = &script->At(i);
                             if (oper->Opcode == ocLabelForSkipOfCreateDir && (int)oper->Attr == createDirIndex)
                             {
-                                script->AddBytesToTFS(CQuadWord((DWORD)(DWORD_PTR)oper->SourceName, (DWORD)(DWORD_PTR)oper->TargetName));
+                                script->AddBytesToTFS(oper->SkippedDirSize);
                                 break;
                             }
                             skipTotal += oper->Size;
@@ -8039,19 +7835,15 @@ unsigned ThreadWorkerBody(void* parameter)
                 if (!skipSetDirTime)
                 {
                     pd.Operation = workerState.OpStrChangingAttrs;
-                    pd.Source = op->TargetName;
-                    pd.Preposition = "";
-                    pd.Target = "";
-                    pd.SourceW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
-                    pd.TargetW = NULL;
+                    pd.Source = op->TargetNameW.c_str();
+                    pd.Preposition = L"";
+                    pd.Target = L"";
                     observer.SetOperationInfo(&pd);
 
                     observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                    FILETIME modified;
-                    modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
-                    modified.dwHighDateTime = op->Attr;
-                    Error = !DoCopyDirTime(observer, op->TargetName, &modified, workerState, FALSE,
+                    FILETIME modified = op->DirTime;
+                    Error = !DoCopyDirTime(observer, &modified, workerState, FALSE,
                                            op->TargetNameW);
                 }
                 if (!Error)
@@ -8068,20 +7860,18 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDir:
             case ocDeleteDirLink:
             {
-                TRACE_I("Worker: delete op=" << op->Opcode << " src=" << (op->SourceName ? op->SourceName : "(null)"));
+                TRACE_IW(L"Worker: delete op=" << op->Opcode << L" src=" << (op->SourceNameW.empty() ? L"(null)" : op->SourceNameW.c_str()));
                 pd.Operation = workerState.OpStrDeleting;
-                pd.Source = op->SourceName;
-                pd.Preposition = "";
-                pd.Target = "";
-                pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-                pd.TargetW = NULL;
+                pd.Source = op->SourceNameW.c_str();
+                pd.Preposition = L"";
+                pd.Target = L"";
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
                 if (op->Opcode == ocDeleteFile)
                 {
-                    Error = !DoDeleteFile(observer, op->SourceName, op->Size,
+                    Error = !DoDeleteFile(observer, op->Size,
                                           script, totalDone, op->Attr, workerState,
                                           op->SourceNameW);
                 }
@@ -8089,18 +7879,30 @@ unsigned ThreadWorkerBody(void* parameter)
                 {
                     if (op->Opcode == ocDeleteDir)
                     {
-                        Error = !DoDeleteDir(observer, op->SourceName, op->Size,
-                                             script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
+                        Error = !DoDeleteDir(observer, op->Size,
+                                             script, totalDone, op->Attr, !op->DeleteDirToRecycleBin,
                                              workerState,
                                              op->SourceNameW);
                     }
                     else
                     {
-                        Error = !DoDeleteDirLink(observer, op->SourceName, op->Size,
+                        Error = !DoDeleteDirLink(observer, op->Size,
                                                  script, totalDone, workerState,
                                                  op->SourceNameW);
                     }
                 }
+                break;
+            }
+
+            case ocCreateDirLink:
+            {
+                pd.Operation = workerState.OpStrCopying;
+                pd.Source = op->SourceNameW.c_str();
+                pd.Preposition = workerState.OpStrCopyingPrep;
+                pd.Target = op->TargetNameW.c_str();
+                observer.SetOperationInfo(&pd);
+                observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+                Error = !DoCreateDirLink(observer, op, script, totalDone, workerState);
                 break;
             }
 
@@ -8121,16 +7923,14 @@ unsigned ThreadWorkerBody(void* parameter)
                     }
                 }
                 pd.Operation = workerState.OpStrConverting;
-                pd.Source = op->SourceName;
-                pd.Preposition = "";
-                pd.Target = "";
-                pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-                pd.TargetW = NULL;
+                pd.Source = op->SourceNameW.c_str();
+                pd.Preposition = L"";
+                pd.Target = L"";
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoConvert(observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
+                Error = !DoConvert(observer, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, workerState,
                                    op->SourceNameW);
                 break;
@@ -8139,16 +7939,14 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocChangeAttrs:
             {
                 pd.Operation = workerState.OpStrChangingAttrs;
-                pd.Source = op->SourceName;
-                pd.Preposition = "";
-                pd.Target = "";
-                pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-                pd.TargetW = NULL;
+                pd.Source = op->SourceNameW.c_str();
+                pd.Preposition = L"";
+                pd.Target = L"";
                 observer.SetOperationInfo(&pd);
 
                 observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-                Error = !DoChangeAttrs(observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
+                Error = !DoChangeAttrs(observer, op->Size, op->NewAttrs,
                                        script, totalDone,
                                        attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
@@ -8249,8 +8047,7 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
     observer.SetProgress(0, 0);
     script->InitSpeedMeters(FALSE);
 
-    CPathBuffer lastLantasticCheckRoot;
-    lastLantasticCheckRoot[0] = 0;
+    std::wstring lastLantasticCheckRoot;
     BOOL lastIsLantasticPath = FALSE;
     int mustDeleteFileBeforeOverwrite = 0;
     int allocWholeFileOnStart = 0;
@@ -8277,15 +8074,13 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocCopyFile:
         {
             pd.Operation = workerState.OpStrCopying;
-            pd.Source = op->SourceName;
+            pd.Source = op->SourceNameW.c_str();
             pd.Preposition = workerState.OpStrCopyingPrep;
-            pd.Target = op->TargetName;
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
+            pd.Target = op->TargetNameW.c_str();
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-            BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+            BOOL lantasticCheck = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
             Error = !DoCopyFile(op, observer, buffer, script, totalDone,
                                 clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
                                 allocWholeFileOnStart, workerState,
@@ -8298,15 +8093,13 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocMoveDir:
         {
             pd.Operation = workerState.OpStrMoving;
-            pd.Source = op->SourceName;
+            pd.Source = op->SourceNameW.c_str();
             pd.Preposition = workerState.OpStrMovingPrep;
-            pd.Target = op->TargetName;
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
+            pd.Target = op->TargetNameW.c_str();
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-            BOOL lantasticCheck2 = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+            BOOL lantasticCheck2 = IsLantasticDriveW(op->TargetNameW.c_str(), lastLantasticCheckRoot, lastIsLantasticPath);
             BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
             Error = !DoMoveFile(op, observer, buffer, script, totalDone,
                                 op->Opcode == ocMoveDir, clearReadonlyMask, &novellRenamePatch,
@@ -8320,15 +8113,13 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocDeleteFile:
         {
             pd.Operation = workerState.OpStrDeleting;
-            pd.Source = op->SourceName;
-            pd.Preposition = "";
-            pd.Target = "";
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = NULL;
+            pd.Source = op->SourceNameW.c_str();
+            pd.Preposition = L"";
+            pd.Target = L"";
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-            Error = !DoDeleteFile(observer, op->SourceName, op->Size,
+            Error = !DoDeleteFile(observer, op->Size,
                                   script, totalDone, op->Attr, workerState,
                                   op->SourceNameW);
             break;
@@ -8339,19 +8130,18 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
             BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
             BOOL ignInvalidName2 = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
             pd.Operation = workerState.OpStrCreatingDir;
-            pd.Source = op->TargetName;
-            pd.Preposition = "";
-            pd.Target = "";
-            pd.SourceW = op->HasWideTarget() ? op->TargetNameW.c_str() : NULL;
-            pd.TargetW = NULL;
+            pd.Source = op->TargetNameW.c_str();
+            pd.Preposition = L"";
+            pd.Target = L"";
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
             BOOL skip, alreadyExisted;
-            Error = !DoCreateDir(observer, op->TargetName, op->Attr, clearReadonlyMask, workerState,
-                                 totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
+            Error = !DoCreateDir(observer, op->Attr, clearReadonlyMask, workerState,
+                                 totalDone, op->Size, copyADS, script, buffer, skip,
                                  alreadyExisted, crAsEncrypted, ignInvalidName2,
-                                 op->TargetNameW);
+                                 op->TargetNameW,
+                                 op->SourceNameW);
             if (!Error)
             {
                 if (skip)
@@ -8363,7 +8153,7 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
                         COperation* oper = &script->At(i);
                         if (oper->Opcode == ocLabelForSkipOfCreateDir && (int)oper->Attr == createDirIndex)
                         {
-                            script->AddBytesToTFS(CQuadWord((DWORD)(DWORD_PTR)oper->SourceName, (DWORD)(DWORD_PTR)oper->TargetName));
+                            script->AddBytesToTFS(oper->SkippedDirSize);
                             break;
                         }
                         skipTotal += oper->Size;
@@ -8390,35 +8180,43 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocDeleteDirLink:
         {
             pd.Operation = workerState.OpStrDeleting;
-            pd.Source = op->SourceName;
-            pd.Preposition = "";
-            pd.Target = "";
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = NULL;
+            pd.Source = op->SourceNameW.c_str();
+            pd.Preposition = L"";
+            pd.Target = L"";
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
             if (op->Opcode == ocDeleteDir)
             {
-                Error = !DoDeleteDir(observer, op->SourceName, op->Size,
-                                     script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
+                Error = !DoDeleteDir(observer, op->Size,
+                                     script, totalDone, op->Attr, !op->DeleteDirToRecycleBin,
                                      workerState,
                                      op->SourceNameW);
             }
             else
             {
-                Error = !DoDeleteDirLink(observer, op->SourceName, op->Size,
+                Error = !DoDeleteDirLink(observer, op->Size,
                                          script, totalDone, workerState,
                                          op->SourceNameW);
             }
             break;
         }
+
+        case ocCreateDirLink:
+        {
+            pd.Operation = workerState.OpStrCopying;
+            pd.Source = op->SourceNameW.c_str();
+            pd.Preposition = workerState.OpStrCopyingPrep;
+            pd.Target = op->TargetNameW.c_str();
+            observer.SetOperationInfo(&pd);
+            observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
+            Error = !DoCreateDirLink(observer, op, script, totalDone, workerState);
+            break;
+        }
         case ocCopyDirTime:
         {
-            FILETIME modified;
-            modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
-            modified.dwHighDateTime = op->Attr;
-            Error = !DoCopyDirTime(observer, op->TargetName, &modified, workerState, FALSE,
+            FILETIME modified = op->DirTime;
+            Error = !DoCopyDirTime(observer, &modified, workerState, FALSE,
                                    op->TargetNameW);
             if (!Error)
             {
@@ -8443,15 +8241,13 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
                 }
             }
             pd.Operation = workerState.OpStrConverting;
-            pd.Source = op->SourceName;
-            pd.Preposition = "";
-            pd.Target = "";
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = NULL;
+            pd.Source = op->SourceNameW.c_str();
+            pd.Preposition = L"";
+            pd.Target = L"";
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
-            Error = !DoConvert(observer, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
+            Error = !DoConvert(observer, (char*)buffer, tgtBuffer, op->Size, script,
                                totalDone, convertDataLocal, workerState,
                                op->SourceNameW);
             break;
@@ -8459,17 +8255,15 @@ BOOL RunWorkerDirect(COperations* script, IWorkerObserver& observer,
         case ocChangeAttrs:
         {
             pd.Operation = workerState.OpStrChangingAttrs;
-            pd.Source = op->SourceName;
-            pd.Preposition = "";
-            pd.Target = "";
-            pd.SourceW = op->HasWideSource() ? op->SourceNameW.c_str() : NULL;
-            pd.TargetW = NULL;
+            pd.Source = op->SourceNameW.c_str();
+            pd.Preposition = L"";
+            pd.Target = L"";
             observer.SetOperationInfo(&pd);
             observer.SetProgress(0, CaclProg(totalDone, script->TotalSize));
 
             BOOL changeCompr = attrsData != NULL ? attrsData->ChangeCompression : FALSE;
             BOOL changeEncr = attrsData != NULL ? attrsData->ChangeEncryption : FALSE;
-            Error = !DoChangeAttrs(observer, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
+            Error = !DoChangeAttrs(observer, op->Size, op->NewAttrs,
                                    script, totalDone,
                                    attrsData != NULL && attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
                                    attrsData != NULL && attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,

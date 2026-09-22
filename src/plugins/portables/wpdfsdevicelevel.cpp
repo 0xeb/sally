@@ -239,38 +239,41 @@ BOOL WINAPI CWpdDevicePluginDataInterface::GetInfoLineContent(
     int selectedDirs,
     BOOL displaySize,
     const CQuadWord& selectedSize,
-    char* buffer,
-    DWORD* hotTexts,
-    int& hotTextsCount)
+    CSalamanderStringBuffer* buffer,
+    CSalamanderTextRangeBuffer* hotTexts)
 {
+    if (buffer == nullptr || hotTexts == nullptr)
+        return FALSE;
+
     // On the device level we have no 'files'.
     _ASSERTE(selectedFiles == 0);
-
-    hotTextsCount = 0;
 
     if (selectedDirs > 0)
     {
         CQuadWord selectedDirsQWord;
         selectedDirsQWord.Set(selectedDirs, 0);
-        TCHAR buf[200];
-        SalamanderGeneral->ExpandPluralString(
-            buf,
-            _countof(buf),
-            SalamanderGeneral->LoadStr(FxGetLangInstance(), IDS_SELECTEDDEVICEFMT),
+        const std::wstring format = SPLExpandPluralStringOwned(
+            SalamanderGeneral,
+            SPLLoadStrOwned(SalamanderGeneral, FxGetLangInstance(), IDS_SELECTEDDEVICEFMT).c_str(),
             1,
             &selectedDirsQWord);
-        StringCchPrintf(buffer, 1000, buf, selectedDirs);
-        return TRUE;
+        const std::wstring text = SPLFormatStringOwned(format.c_str(), selectedDirs);
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, nullptr, 0)
+                   ? TRUE
+                   : FALSE;
     }
     else if (file != nullptr)
     {
-        *buffer = TEXT('\0');
+        std::wstring text;
+        std::vector<CSalamanderTextRange> ranges;
         CFxString s;
         auto* item = reinterpret_cast<CWpdDeviceItem*>(file->PluginData);
         auto* device = item->GetDeviceNoAddRef();
 
         device->GetManufacturer(s);
-        AppendInfoLineContentPart(s, buffer, hotTexts, hotTextsCount);
+        if (!AppendInfoLineContentPart(s, text, ranges))
+            return FALSE;
 
         device->GetModel(s);
         if (s.IsEmpty())
@@ -278,12 +281,20 @@ BOOL WINAPI CWpdDevicePluginDataInterface::GetInfoLineContent(
             device->GetName(s);
         }
 
-        AppendInfoLineContentPart(s, buffer, hotTexts, hotTextsCount);
-        return TRUE;
+        if (!AppendInfoLineContentPart(s, text, ranges))
+            return FALSE;
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, ranges)
+                   ? TRUE
+                   : FALSE;
     }
     else
     {
-        ::LoadString(FxGetLangInstance(), IDS_NODEVICEINFOLINE, buffer, 1000);
-        return TRUE;
+        const std::wstring text = SPLLoadStrOwned(
+            SalamanderGeneral, FxGetLangInstance(), IDS_NODEVICEINFOLINE);
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text.c_str(), nullptr, 0)
+                   ? TRUE
+                   : FALSE;
     }
 }

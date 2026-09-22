@@ -26,7 +26,7 @@ public:
     bool SkipAllDataErr;
     bool SkipAllBadMathods;
     DWORD Silent;
-    char* FileNameDisp; //file name displayed on the screen
+    std::wstring FileNameDisp; //file name displayed on the screen
     HANDLE Heap;        //on this heap is allocated memory in inflate.cpp
     char* InputBuffer;
     unsigned InBufSize;
@@ -65,8 +65,8 @@ public:
     unsigned OutBufSize;
     bool Unshrinking;
 
-    CZipUnpack(const char* zipName, const char* zipRoot, CSalamanderForOperationsAbstract* salamander,
-               TIndirectArray2<char>* archiveVolumes);
+    CZipUnpack(const wchar_t* zipName, const char* zipRoot, CSalamanderForOperationsAbstract* salamander,
+               std::vector<std::wstring>* archiveVolumes);
 
     ~CZipUnpack()
     {
@@ -76,15 +76,15 @@ public:
             HeapDestroy(Heap);
     }
 
-    int UnpackArchive(const char* targetDir, SalEnumSelection next, void* param);
-    int UnpackOneFile(const char* nameInZip, const CFileData* fileData, const char* targetPath, const char* newFileName);
-    int UnpackWholeArchive(const char* mask, const char* targetDir);
+    int UnpackArchive(const wchar_t* targetDir, SalEnumSelection next, void* param);
+    int UnpackOneFile(const char* nameInZip, const CFileData* fileData, const wchar_t* targetPath, const wchar_t* newFileName);
+    int UnpackWholeArchive(const char* mask, const wchar_t* targetDir);
 
     //int EnumFiles(CDynamicArray * namesArray, SalEnumSelection next, void * param);
     //int MatchFiles(CDynamicArray *namesArray);
-    int FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem);
-    int PrepareMaskArray(TIndirectArray2<char>& maskArray, const char* masks);
-    int MatchFilesToMask(TIndirectArray2<char>& maskArray);
+    int FindFile(const char* name, CFileInfo* fileInfo, int nItem);
+    int PrepareMaskArray(TIndirectArray2<std::string>& maskArray, const char* masks);
+    int MatchFilesToMask(TIndirectArray2<std::string>& maskArray);
     int InflateFile(CFileInfo* fileInfo, BOOL deflate64, int* errorID);
     void InflateFreeFixedHufman();
     int UnStoreFile(CFileInfo* fileInfo, int* errorID);
@@ -92,14 +92,14 @@ public:
     int UnShrinkFile(CFileInfo* fileInfo, int* errorID);
     int UnReduceFile(CFileInfo* fileInfo, int* errorID);
     int UnBZIP2File(CFileInfo* fileInfo, int* errorID);
-    int ExtractFiles(const char* targetDir);
-    int ExtractSingleFile(char* targetDir, int targetDirLen,
-                          CFileInfo* fileInfo, BOOL* success, const char* newFileName = NULL);
+    int ExtractFiles(const wchar_t* targetDir);
+    int ExtractSingleFile(const wchar_t* targetDir, CFileInfo* fileInfo, BOOL* success,
+                          const wchar_t* newFileName = NULL);
     int SafeRead(void* buffer, unsigned bytesToRead, bool* skipAll);
     // int SafeRead(void * buffer, unsigned bytesToRead,
     //              unsigned * bytesRead, bool * skipAll);
-    int SafeCreateCFile(CFile** file, const char* fileName, const char* arcName,
-                        const char* fileData, unsigned int access, unsigned int share,
+    int SafeCreateCFile(CFile** file, const wchar_t* fileName, const wchar_t* arcName,
+                        const wchar_t* fileData, unsigned int access, unsigned int share,
                         unsigned int attributes, int flags, DWORD* silent,
                         bool* skipAll, QWORD size);
     void QuickSortHeaders2(int left, int right, TIndirectArray2<CFileInfo>& headers);

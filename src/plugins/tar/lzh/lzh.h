@@ -9,7 +9,7 @@
 class CLZH : public CZippedFile
 {
 public:
-    CLZH(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read);
+    CLZH(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read);
     virtual ~CLZH();
 
     virtual BOOL IsCompressed() { return TRUE; }

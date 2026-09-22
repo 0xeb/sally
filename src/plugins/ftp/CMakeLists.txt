@@ -28,6 +28,11 @@ sal_add_plugin(NAME ftp
     "${SAL_PLUGINS}/ftp/ftp3.cpp"
     "${SAL_PLUGINS}/ftp/ftp4.cpp"
     "${SAL_PLUGINS}/ftp/ftp_diskwork_core.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_owned_path.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_command_builder.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_persisted_text_codec.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_reply_parser.cpp"
+    "${SAL_PLUGINS}/ftp/ftp_text_codec.cpp"
     "${SAL_PLUGINS}/ftp/ftputils.cpp"
     "${SAL_PLUGINS}/ftp/menu.cpp"
     "${SAL_PLUGINS}/ftp/operats1.cpp"
@@ -50,5 +55,5 @@ sal_add_plugin(NAME ftp
   RC "${SAL_PLUGINS}/ftp/ftp.rc"
   DEF "${SAL_PLUGINS}/ftp/ftp.def"
   DEFINES ENABLE_PROPERTYDIALOG
-  LIBS ws2_32 secur32 crypt32 cryptui
+  LIBS ws2_32 secur32 crypt32 cryptui normaliz
 )

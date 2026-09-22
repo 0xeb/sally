@@ -63,9 +63,11 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     return TRUE; // DLL can be loaded
 }
 
-char* LoadStr(int resID)
+// Wide. SalamanderGeneral->LoadStr has returned WCHAR* since the v108
+// ABI break; this went through LoadStrNarrow and was widened again at every call site.
+std::wstring LangStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
 }
 
 int WINAPI SalamanderPluginGetReqVer()
@@ -85,14 +87,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is built for the current Salamander version and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "UnCHM" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape used throughout this backlog
+        // (205-221).
+        MessageBoxW(salamander->GetParentWindow(),
+                    _CRT_WIDE(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"UnCHM" /* do not translate! */, MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     // let it load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "UnCHM" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"UnCHM" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -103,19 +107,19 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!InterfaceForArchiver.Init())
         return NULL;
 
-    if (!InitializeWinLib("UnCHM" /* do not translate! */, DLLInstance))
+    if (!InitializeWinLib(L"UnCHM" /* do not translate! */, DLLInstance))
         return NULL;
-    SetWinLibStrings(LoadStr(IDS_INVALIDNUMBER), LoadStr(IDS_PLUGINNAME));
+    SetWinLibStrings(LangStr(IDS_INVALIDNUMBER).c_str(), LangStr(IDS_PLUGINNAME).c_str());
 
     // set the basic information about the plugin
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_PANELARCHIVERVIEW | FUNCTION_CUSTOMARCHIVERUNPACK,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "UnCHM" /* do not translate! */, "chm");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"UnCHM" /* do not translate! */, L"chm");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &PluginInterface;
 }
@@ -124,14 +128,13 @@ BOOL Warning(int resID, BOOL quiet, ...)
 {
     if (!quiet)
     {
-        char buf[1024];
-        buf[0] = 0;
         va_list arglist;
         va_start(arglist, quiet);
-        vsprintf(buf, LoadStr(resID), arglist);
+        const std::wstring message = SPLFormatStringOwnedV(
+            SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID).c_str(), arglist);
         va_end(arglist);
 
-        SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_WARNING);
+        SalamanderGeneral->ShowMessageBox(message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MSGBOX_WARNING);
     }
     return FALSE;
 }
@@ -140,26 +143,25 @@ BOOL Error(int resID, BOOL quiet, ...)
 {
     if (!quiet)
     {
-        char buf[1024];
-        buf[0] = 0;
         va_list arglist;
         va_start(arglist, quiet);
-        vsprintf(buf, LoadStr(resID), arglist);
+        const std::wstring message = SPLFormatStringOwnedV(
+            SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID).c_str(), arglist);
         va_end(arglist);
 
-        SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        SalamanderGeneral->ShowMessageBox(message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
     }
     return FALSE;
 }
 
-BOOL Error(char* msg, DWORD err, BOOL quiet)
+BOOL Error(const wchar_t* msg, DWORD err, BOOL quiet)
 {
     if (!quiet)
         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_NO_MORE_FILES) // this is an error
         {
-            char buf[1024];
-            sprintf(buf, "%s\n\n%s", msg, SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+            const std::wstring message = SPLFormatStringOwned(
+                L"%ls\n\n%ls", msg, SPLGetErrorTextOwned(SalamanderGeneral, err).c_str());
+            SalamanderGeneral->ShowMessageBox(message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
         }
 
     return FALSE;
@@ -169,20 +171,17 @@ BOOL SysError(int title, int error, ...)
 {
     int lastErr = GetLastError();
     CALL_STACK_MESSAGE3("SysError(%d, %d, ...)", title, error);
-    char buf[1024];
-    *buf = 0;
     va_list arglist;
     va_start(arglist, error);
-    vsprintf(buf, LoadStr(error), arglist);
+    std::wstring message = SPLFormatStringOwnedV(
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, error).c_str(), arglist);
     va_end(arglist);
     if (lastErr != ERROR_SUCCESS)
     {
-        strcat(buf, " ");
-        int l = (int)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        message.push_back(L' ');
+        message.append(SPLGetErrorTextOwned(SalamanderGeneral, lastErr));
     }
-    SalamanderGeneral->ShowMessageBox(buf, LoadStr(title), MSGBOX_ERROR);
+    SalamanderGeneral->ShowMessageBox(message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, title).c_str(), MSGBOX_ERROR);
     return FALSE;
 }
 
@@ -193,14 +192,15 @@ BOOL SysError(int title, int error, ...)
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n%s\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_CHMLIBCOPYRIGHT),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    const std::wstring text = SPLFormatStringOwned(
+        L"%ls %ls\n\n%ls\n%ls\n\n%ls",
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
+        _CRT_WIDE(VERSINFO_VERSION), _CRT_WIDE(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CHMLIBCOPYRIGHT).c_str(),
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGIN_DESCRIPTION).c_str());
+    SalamanderGeneral->SalMessageBox(parent, text.c_str(),
+                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ABOUT).c_str(),
+                                     MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -216,7 +216,7 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
 
-    salamander->AddCustomUnpacker("UnCHM (Plugin)", "*.chm", FALSE);
+    salamander->AddCustomUnpacker(L"UnCHM (Plugin)", L"*.chm", FALSE);
 }
 
 void CPluginInterface::ReleasePluginDataInterface(CPluginDataInterfaceAbstract* pluginData)
@@ -247,11 +247,20 @@ BOOL CPluginInterfaceForArchiver::Init()
 }
 
 BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* salamander,
-                                              const char* fileName,
+                                              const wchar_t* fileName,
                                               CSalamanderDirectoryAbstract* dir,
                                               CPluginDataInterfaceAbstract*& pluginData)
 {
-    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
+    CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %ls, ,)", fileName);
+
+    return ListArchiveWide(salamander, fileName, dir, pluginData);
+}
+
+BOOL CPluginInterfaceForArchiver::ListArchiveWide(CSalamanderForOperationsAbstract* salamander,
+                                                   const wchar_t* fileName,
+                                                   CSalamanderDirectoryAbstract* dir,
+                                                   CPluginDataInterfaceAbstract*& pluginData)
+{
 
     pluginData = new CPluginDataInterface();
     if (pluginData == NULL)
@@ -283,11 +292,11 @@ void FreeString(void* strig)
     free(strig);
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                                CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
-                                                const char* archiveRoot, SalEnumSelection next, void* nextParam)
+BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                                CPluginDataInterfaceAbstract* pluginData, const wchar_t* targetDir,
+                                                const wchar_t* archiveRoot, SalEnumSelection next, void* nextParam)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, , %s, %s, ,)", fileName, targetDir, archiveRoot);
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %ls, , %ls, %ls, ,)", fileName, targetDir, archiveRoot);
 
     if (pluginData == NULL)
     {
@@ -306,7 +315,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     CQuadWord size;
     CQuadWord totalSize(0, 0);
     CQuadWord fileCount(0, 0);
-    const char* name;
+    const wchar_t* name;
     const CFileData* fileData;
     int errorOccured;
     while ((name = next(SalamanderGeneral->GetMsgBoxParent(), 1, &isDir, &size, &fileData, nextParam, &errorOccured)) != NULL)
@@ -326,31 +335,31 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     chm.ButtonFlags = BUTTONS_SKIPCANCEL;
     // unpack
     BOOL delTempDir = TRUE;
+    const std::wstring unpackingTitle =
+        SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNPACKING_ARCHIVE);
     if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                         targetDir, totalSize, LoadStr(IDS_UNPACKING_ARCHIVE)))
+                                         targetDir, totalSize, unpackingTitle.c_str()))
     {
-        salamander->OpenProgressDialog(LoadStr(IDS_UNPACKING_ARCHIVE), TRUE, NULL, FALSE);
+        salamander->OpenProgressDialog(unpackingTitle.c_str(), TRUE, NULL, FALSE);
         salamander->ProgressSetTotalSize(CQuadWord(0, 0), totalSize);
 
         DWORD silent = 0;
         BOOL toSkip = FALSE;
 
-        CPathBuffer currentPath; // Heap-allocated for long path support
-        lstrcpyn(currentPath, archiveRoot, currentPath.Size());
+        std::wstring currentPath(archiveRoot);
 
         ret = TRUE;
         next(NULL, -1, NULL, NULL, NULL, nextParam, NULL);
         while ((name = next(NULL /* do not report errors the second time */, 1, &isDir, &size, &fileData, nextParam, NULL)) != NULL)
         {
             // directories do not concern us; they are created when unpacking files
-            CPathBuffer destPath; // Heap-allocated for long path support
-            lstrcpyn(destPath, targetDir, destPath.Size());
+            std::wstring destPath(targetDir);
 
-            if (SalamanderGeneral->SalPathAppend(destPath, name, destPath.Size()))
+            SPLSalPathAppendOwned(destPath, name);
             {
                 if (isDir)
                 {
-                    if (chm.UnpackDir(destPath, fileData) == UNPACK_CANCEL ||
+                    if (chm.UnpackDir(destPath.c_str(), fileData) == UNPACK_CANCEL ||
                         !salamander->ProgressAddSize(1, TRUE))
                     {
                         ret = FALSE;
@@ -362,17 +371,17 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     salamander->ProgressDialogAddText(name, TRUE); // delayedPaint==TRUE so we do not slow down
 
                     //  if the path we are unpacking to does not exist -> create it
-                    char* lastComp = strrchr(destPath.Get(), '\\');
-                    if (lastComp != NULL)
+                    const size_t lastComp = destPath.find_last_of(L'\\');
+                    if (lastComp != std::wstring::npos)
                     {
-                        *lastComp = '\0';
-                        SalamanderGeneral->CheckAndCreateDirectory(destPath);
+                        destPath.resize(lastComp);
+                        SalamanderGeneral->CheckAndCreateDirectory(destPath.c_str());
                     } // if
 
                     salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE);
                     salamander->ProgressSetTotalSize(fileData->Size + CQuadWord(1, 0), CQuadWord(-1, -1));
 
-                    if (chm.ExtractObject(salamander, currentPath, destPath, fileData, silent, toSkip) == UNPACK_CANCEL ||
+                    if (chm.ExtractObject(salamander, currentPath.c_str(), destPath.c_str(), fileData, silent, toSkip) == UNPACK_CANCEL ||
                         !salamander->ProgressAddSize(1, TRUE)) // correction for zero-sized files
                     {
                         ret = FALSE;
@@ -389,12 +398,12 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
 }
 
 BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* salamander,
-                                                const char* fileName, CPluginDataInterfaceAbstract* pluginData,
-                                                const char* nameInArchive, const CFileData* fileData,
-                                                const char* targetDir, const char* newFileName,
+                                                const wchar_t* fileName, CPluginDataInterfaceAbstract* pluginData,
+                                                const wchar_t* nameInArchive, const CFileData* fileData,
+                                                const wchar_t* targetDir, const wchar_t* newFileName,
                                                 BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, , %s, , %s, ,)", fileName,
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %ls, , %ls, , %ls, ,)", fileName,
                         nameInArchive, targetDir);
 
     if (newFileName != NULL)
@@ -416,32 +425,30 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 
     BOOL ret = TRUE;
 
-    salamander->OpenProgressDialog(LoadStr(IDS_UNPACKING_ARCHIVE), FALSE, NULL, FALSE);
+    salamander->OpenProgressDialog(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNPACKING_ARCHIVE).c_str(), FALSE, NULL, FALSE);
     salamander->ProgressSetTotalSize(fileData->Size + CQuadWord(1, 0), CQuadWord(-1, -1));
 
-    CPathBuffer name; // Heap-allocated for long path support
-    lstrcpyn(name, targetDir, name.Size());
-    const char* lastComp = strrchr(nameInArchive, '\\');
+    std::wstring name(targetDir);
+    const wchar_t* lastComp = wcsrchr(nameInArchive, L'\\');
     if (lastComp != NULL)
         lastComp++;
     else
         lastComp = nameInArchive;
 
-    if (SalamanderGeneral->SalPathAppend(name, lastComp, name.Size()))
+    SPLSalPathAppendOwned(name, lastComp);
     {
         DWORD silent = 0;
         BOOL toSkip = FALSE;
 
-        salamander->ProgressDialogAddText(name, TRUE); // delayedPaint==TRUE so we do not slow down
+        salamander->ProgressDialogAddText(name.c_str(), TRUE); // delayedPaint==TRUE so we do not slow down
 
-        CPathBuffer srcPath; // Heap-allocated for long path support
-        lstrcpyn(srcPath, nameInArchive, srcPath.Size());
-        char* lComp = strrchr(srcPath.Get(), '\\');
-        if (lComp != NULL)
-            *lComp = '\0';
+        std::wstring srcPath(nameInArchive);
+        const size_t lComp = srcPath.find_last_of(L'\\');
+        if (lComp != std::wstring::npos)
+            srcPath.resize(lComp);
 
         chm.ButtonFlags = BUTTONS_OK;
-        ret = chm.ExtractObject(salamander, srcPath, targetDir, fileData, silent, toSkip);
+        ret = chm.ExtractObject(salamander, srcPath.c_str(), targetDir, fileData, silent, toSkip);
     } // if
 
     salamander->CloseProgressDialog();
@@ -449,7 +456,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     return ret == UNPACK_OK;
 }
 
-void CalcSize(CSalamanderDirectoryAbstract const* dir, const char* mask, char* path, int pathBufSize,
+void CalcSize(CSalamanderDirectoryAbstract const* dir, const wchar_t* mask, std::wstring& path,
               CQuadWord& size, CQuadWord& fileCount)
 {
     int count = dir->GetFilesCount();
@@ -467,23 +474,23 @@ void CalcSize(CSalamanderDirectoryAbstract const* dir, const char* mask, char* p
     }
 
     count = dir->GetDirsCount();
-    int pathLen = (int)strlen(path);
+    const size_t pathLen = path.size();
     for (i = 0; i < count; i++)
     {
         CFileData const* file = dir->GetDir(i);
         //    TRACE_I("CalcSize(): directory: " << path << (path[0] != 0 ? "\\" : "") << file->Name);
-        SalamanderGeneral->SalPathAppend(path, file->Name, pathBufSize);
+        SPLSalPathAppendOwned(path, file->Name);
         CSalamanderDirectoryAbstract const* subDir = dir->GetSalDir(i);
-        CalcSize(subDir, mask, path, pathBufSize, size, fileCount);
-        path[pathLen] = 0;
+        CalcSize(subDir, mask, path, size, fileCount);
+        path.resize(pathLen);
     }
 }
 
-BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
-                                                     const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
+BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const wchar_t* fileName,
+                                                     const wchar_t* mask, const wchar_t* targetDir, BOOL delArchiveWhenDone,
                                                      CDynamicString* archiveVolumes)
 {
-    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
+    CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %ls, %ls, %ls, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
     CSalamanderDirectoryAbstract* dir = SalamanderGeneral->AllocSalamanderDirectory(FALSE);
@@ -492,27 +499,28 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 
     BOOL ret = FALSE;
     CPluginDataInterfaceAbstract* pluginData = NULL;
-    if (ListArchive(salamander, fileName, dir, pluginData))
+    if (ListArchiveWide(salamander, fileName, dir, pluginData))
     {
-        CPathBuffer path; // Heap-allocated for long path support
-
         CQuadWord totalSize(0, 0);
         CQuadWord fileCount(0, 0);
-        CalcSize(dir, mask, path, path.Size(), totalSize, fileCount);
+        std::wstring sizePathW;
+        CalcSize(dir, mask, sizePathW, totalSize, fileCount);
 
         if (delArchiveWhenDone)
             archiveVolumes->Add(fileName, -2);
 
         //
         BOOL delTempDir = TRUE;
+        const std::wstring unpackingTitle =
+            SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_UNPACKING_ARCHIVE);
         if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                             targetDir, totalSize, LoadStr(IDS_UNPACKING_ARCHIVE)))
+                                             targetDir, totalSize, unpackingTitle.c_str()))
         {
-            salamander->OpenProgressDialog(LoadStr(IDS_UNPACKING_ARCHIVE), TRUE, NULL, FALSE);
+            salamander->OpenProgressDialog(unpackingTitle.c_str(), TRUE, NULL, FALSE);
             salamander->ProgressSetTotalSize(CQuadWord(0, 0), totalSize);
 
-            char modmask[256];
-            SalamanderGeneral->PrepareMask(modmask, mask);
+            const std::wstring modmask =
+                SPLPrepareMaskOwned(SalamanderGeneral, mask);
 
             // try to open the CHM image
             CCHMFile chm; // destructor calls Close
@@ -520,13 +528,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
             {
                 DWORD silent = 0;
                 BOOL toSkip = FALSE;
-                CPathBuffer strTarget; // Heap-allocated for long path support
-                lstrcpyn(strTarget, targetDir, strTarget.Size());
-                CPathBuffer srcPath; // Heap-allocated for long path support
-                srcPath[0] = '\0';
+                std::wstring strTargetW(targetDir);
+                std::wstring srcPathW;
 
                 chm.ButtonFlags = BUTTONS_SKIPCANCEL;
-                ret = chm.ExtractAllObjects(salamander, srcPath, dir, modmask, strTarget, strTarget.Size(), silent, toSkip) != UNPACK_CANCEL;
+                ret = chm.ExtractAllObjects(salamander, srcPathW, dir, modmask.c_str(), strTargetW, silent, toSkip) != UNPACK_CANCEL;
             }
 
             salamander->CloseProgressDialog();
@@ -548,10 +554,10 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 }
 
 BOOL CPluginInterfaceForArchiver::CanCloseArchive(CSalamanderForOperationsAbstract* salamander,
-                                                  const char* fileName,
+                                                  const wchar_t* fileName,
                                                   BOOL force, int panel)
 {
-    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::CanCloseArchive(, %s, %d, %d)", fileName, force, panel);
+    CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::CanCloseArchive(, %ls, %d, %d)", fileName, force, panel);
 
     return TRUE;
 }

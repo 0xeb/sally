@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -7,9 +7,11 @@
 #include <lm.h>
 
 #include "ui/IPrompter.h"
+#include "common/IFileEnumerator.h"
 #include "common/TipOfDayResource.h"
 #include "common/unicode/helpers.h"
 #include "common/widepath.h"
+#include "common/fsutil.h" // GetRootPathW - the FREE function, not the CPluginFSInterfaceAbstract method
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -20,6 +22,17 @@
 #include "drivelst.h"
 #include "shiconov.h"
 #include "darkmode.h"
+
+// this build doesn't define _UNICODE, so <commctrl.h>'s ListView_SetItemText
+// macro resolves to the A form only; mirrors the same local macro already used by
+// dialogs_viewer_editor_masks.cpp and the dbviewer/pictview plugins for the identical need.
+#define ListView_SetItemTextW(hwndLV, i, iSubItem_, pszText_) \
+    {                                                         \
+        LV_ITEMW _ms_lvi;                                     \
+        _ms_lvi.iSubItem = iSubItem_;                         \
+        _ms_lvi.pszText = pszText_;                           \
+        SNDMSG((hwndLV), LVM_SETITEMTEXTW, (WPARAM)(i), (LPARAM)(LV_ITEM*)&_ms_lvi); \
+    }
 
 /*
 //****************************************************************************
@@ -209,7 +222,13 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
 {
   CALL_STACK_MESSAGE2("CTipOfTheDayDialog::LoadTips(%d)", quiet);
   std::wstring fileNameW;
-  HANDLE hFile = HANDLES_Q(sally::tip_of_day::OpenTipsFileForReadW(HInstance, fileNameW));
+  HANDLE hFile = sally::tip_of_day::OpenTipsFileForReadW(
+      HInstance, fileNameW,
+      [](const wchar_t* path)
+      {
+          return gFileSystem->CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+      });
   if (hFile == INVALID_HANDLE_VALUE)
   {
     if (!quiet)
@@ -220,15 +239,16 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
     return FALSE;
   }
 
-  DWORD size = GetFileSize(hFile, NULL);
-  if (size == 0xFFFFFFFF || size == 0)
+  uint64_t size64 = 0;
+  FileResult sizeResult = gFileSystem->GetHandleFileSize(hFile, &size64);
+  if (!sizeResult.success || size64 == 0 || size64 > MAXDWORD)
   {
     if (!quiet)
     {
       std::wstring msg = FormatStrW(LoadStrW(IDS_FILEREADERROR), fileNameW.c_str());
       gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
-    HANDLES(CloseHandle(hFile));
+    gFileSystem->CloseFileHandle(hFile);
     return FALSE;
   }
 
@@ -236,12 +256,13 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   if (data == NULL)
   {
     TRACE_E(LOW_MEMORY);
-    HANDLES(CloseHandle(hFile));
+    gFileSystem->CloseFileHandle(hFile);
     return FALSE;
   }
 
-  DWORD read;
-  if (!ReadFile(hFile, data, size, &read, NULL) || read != size)
+  DWORD size = (DWORD)size64;
+  DWORD read = 0;
+  if (!gFileSystem->ReadFromHandle(hFile, data, size, &read).success || read != size)
   {
     if (!quiet)
     {
@@ -249,7 +270,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
       gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), msg.c_str());
     }
     free(data);
-    HANDLES(CloseHandle(hFile));
+    gFileSystem->CloseFileHandle(hFile);
     return FALSE;
   }
 
@@ -272,7 +293,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
       {
         TRACE_E(LOW_MEMORY);
         free(data);
-        HANDLES(CloseHandle(hFile));
+        gFileSystem->CloseFileHandle(hFile);
         return FALSE;
       }
       memmove(line, lineStart, lineLen);
@@ -283,7 +304,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
         Tips.ResetState();
         free(line);
         free(data);
-        HANDLES(CloseHandle(hFile));
+        gFileSystem->CloseFileHandle(hFile);
         return FALSE;
       }
     }
@@ -297,7 +318,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
 
   free(data);
 
-  HANDLES(CloseHandle(hFile));
+  gFileSystem->CloseFileHandle(hFile);
 
   return TRUE;
 }
@@ -410,7 +431,7 @@ CSharesDialog::CreateImageList()
 void CSharesDialog::InitColumns()
 {
     CALL_STACK_MESSAGE1("CSharesDialog::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[3] = {IDS_SHARES_NAME, IDS_SHARES_PATH, IDS_SHARES_COMMENT};
 
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
@@ -418,9 +439,10 @@ void CSharesDialog::InitColumns()
     int i;
     for (i = 0; i < 3; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        std::wstring headerText = LoadStrOwned(header[i]);
+        lvc.pszText = headerText.data();
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc);
     }
     ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
     int width = ListView_GetColumnWidth(HListView, 0);
@@ -438,35 +460,38 @@ CSharesDialog::SortFunc(LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort)
 
     CSharesDialog* dlg = (CSharesDialog*)lParamSort;
 
+    // wide: sort by the genuine wide values (GetItemW) instead of their narrow
+    // mirrors - a signed comparator can't bolt a confirmation onto a narrow tie, so use the wide
+    // sibling outright.
     int index1 = (int)lParam1;
-    const char* localPath1;
-    const char* remoteName1;
-    const char* comment1;
-    dlg->SharedDirs.GetItem(index1, &localPath1, &remoteName1, &comment1);
+    const wchar_t* localPath1;
+    const wchar_t* remoteName1;
+    const wchar_t* comment1;
+    dlg->SharedDirs.GetItemW(index1, &localPath1, &remoteName1, &comment1);
 
     int index2 = (int)lParam2;
-    const char* localPath2;
-    const char* remoteName2;
-    const char* comment2;
-    dlg->SharedDirs.GetItem(index2, &localPath2, &remoteName2, &comment2);
+    const wchar_t* localPath2;
+    const wchar_t* remoteName2;
+    const wchar_t* comment2;
+    dlg->SharedDirs.GetItemW(index2, &localPath2, &remoteName2, &comment2);
 
     switch (dlg->SortBy)
     {
     case 1: // shared path
     {
-        nRetVal = StrICmp(localPath1, localPath2);
+        nRetVal = StrICmpW(localPath1, localPath2);
         break;
     }
 
     case 2: // comment
     {
-        nRetVal = StrICmp(comment1, comment2);
+        nRetVal = StrICmpW(comment1, comment2);
         break;
     }
 
     default: // share name
     {
-        nRetVal = StrICmp(remoteName1, remoteName2);
+        nRetVal = StrICmpW(remoteName1, remoteName2);
         break;
     }
     }
@@ -486,25 +511,30 @@ void CSharesDialog::Refresh()
 
     SendMessage(HListView, WM_SETREDRAW, FALSE, 0);
     ListView_DeleteAllItems(HListView);
-    const char* localPath;
-    const char* remoteName;
-    const char* comment;
+    // wide: SharedDirs.GetItemW is already the correct source (CShares was fully
+    // wide-fixed earlier, and SortFunc/GetFocusedPathW/DeleteShare in this same class
+    // already use it) - this function, which actually populates what the user sees, was the one
+    // consumer still reading the narrow GetItem, so a share name/path/comment outside the current
+    // code page rendered '?'-mangled while sorting and deleting already operated on the real text.
+    const wchar_t* localPath;
+    const wchar_t* remoteName;
+    const wchar_t* comment;
     int i;
     for (i = 0; i < SharedDirs.GetCount(); i++)
     {
-        if (SharedDirs.GetItem(i, &localPath, &remoteName, &comment))
+        if (SharedDirs.GetItemW(i, &localPath, &remoteName, &comment))
         {
             LVITEM lvi;
-            lvi.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE | LVIF_PARAM;
+            lvi.mask = LVIF_IMAGE | LVIF_STATE | LVIF_PARAM;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.iImage = 0;
             lvi.state = INDEXTOOVERLAYMASK(1);
-            lvi.pszText = (char*)remoteName;
             lvi.lParam = i; // for later sorting
             int index = ListView_InsertItem(HListView, &lvi);
-            ListView_SetItemText(HListView, index, 1, (char*)localPath);
-            ListView_SetItemText(HListView, index, 2, (char*)comment);
+            ListView_SetItemTextW(HListView, index, 0, (LPWSTR)remoteName);
+            ListView_SetItemTextW(HListView, index, 1, (LPWSTR)localPath);
+            ListView_SetItemTextW(HListView, index, 2, (LPWSTR)comment);
         }
     }
     SortItems();
@@ -519,14 +549,14 @@ void CSharesDialog::SortItems()
     ListView_SortItems(HListView, SortFunc, (LPARAM)this);
 }
 
-const char*
-CSharesDialog::GetFocusedPath()
+const wchar_t*
+CSharesDialog::GetFocusedPathW()
 {
     if (FocusedIndex == -1)
         return NULL;
-    const char* localPath;
-    SharedDirs.GetItem(FocusedIndex, &localPath, NULL, NULL);
-    return localPath;
+    const wchar_t* localPathW;
+    SharedDirs.GetItemW(FocusedIndex, &localPathW, NULL, NULL);
+    return localPathW;
 }
 
 int CSharesDialog::GetFocusedIndex()
@@ -544,12 +574,12 @@ int CSharesDialog::GetFocusedIndex()
     return index;
 }
 
-void CSharesDialog::DeleteShare(const char* shareName)
+void CSharesDialog::DeleteShare(const wchar_t* shareName)
 {
-    CWidePathBuffer oleShareName;
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, shareName, -1, oleShareName, oleShareName.Size());
-    oleShareName[oleShareName.Size() - 1] = 0;
-    NetShareDel(NULL, oleShareName, 0);
+    // shareName is the exact wide name from NetShareEnum now - no ANSI
+    // round trip before NetShareDel (a Unicode-only API to begin with), so a share
+    // name CP_ACP cannot spell no longer gets narrowed, mangled, and rewidened wrong.
+    NetShareDel(NULL, const_cast<LPWSTR>(shareName), 0);
 }
 
 void CSharesDialog::OnContextMenu(int x, int y)
@@ -634,13 +664,13 @@ CSharesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int index = GetFocusedIndex();
             if (index != -1)
             {
-                const char* remoteName;
-                if (SharedDirs.GetItem(index, NULL, &remoteName, NULL))
+                const wchar_t* remoteNameW;
+                if (SharedDirs.GetItemW(index, NULL, &remoteNameW, NULL))
                 {
-                    std::wstring msg = FormatStrW(LoadStrW(IDS_CONFIRM_STOPSHARE), AnsiToWide(remoteName).c_str());
+                    std::wstring msg = FormatStrW(LoadStrW(IDS_CONFIRM_STOPSHARE), remoteNameW);
                     if (gPrompter->ConfirmError(LoadStrW(IDS_QUESTION), msg.c_str()).type == PromptResult::kOk)
                     {
-                        DeleteShare(remoteName);
+                        DeleteShare(remoteNameW);
                         Refresh();
                     }
                 }
@@ -758,10 +788,13 @@ BOOL CDisconnectDialog::OnDisconnect()
         if (Connections[index].Type == citNetwork)
         {
             // NETWORK
-            DISCDLGSTRUCT conn;
+            // DISCDLGSTRUCT/WNetDisconnectDialog1 are TCHAR-generic and would
+            // resolve to the ANSI form until the UNICODE define flips; use the
+            // explicit wide forms now since Name/Path are already wchar_t*.
+            DISCDLGSTRUCTW conn;
             conn.cbStructure = sizeof(conn);
             conn.hwndOwner = HWindow;
-            if (stricmp(Connections[index].Name, LoadStr(IDS_NETWORK_NONE)) == 0)
+            if (_wcsicmp(Connections[index].Name, LoadStrW(IDS_NETWORK_NONE)) == 0)
             {
                 conn.lpLocalName = Connections[index].Path;
                 conn.lpRemoteName = NULL;
@@ -772,7 +805,7 @@ BOOL CDisconnectDialog::OnDisconnect()
                 conn.lpRemoteName = Connections[index].Path;
             }
             conn.dwFlags = DISC_UPDATE_PROFILE;
-            if (WNetDisconnectDialog1(&conn) != NO_ERROR)
+            if (WNetDisconnectDialog1W(&conn) != NO_ERROR)
             {
                 Refresh(); // we must rebuild the array and list view to remove already disconnected items
                 // without invalidating and updating the main window, the area under the Disconnect dialog isn't redrawn after closing
@@ -907,7 +940,7 @@ CDisconnectDialog::CreateImageList()
 void CDisconnectDialog::InitColumns()
 {
     CALL_STACK_MESSAGE1("CDisconnectDialog::InitColumns()");
-    LV_COLUMN lvc;
+    LVCOLUMNW lvc;
     int header[2] = {IDS_DISCONNECT_NAME, IDS_DISCONNECT_PATH};
 
     lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
@@ -915,9 +948,10 @@ void CDisconnectDialog::InitColumns()
     int i;
     for (i = 0; i < 2; i++) // create columns
     {
-        lvc.pszText = LoadStr(header[i]);
+        std::wstring headerText = LoadStrOwned(header[i]);
+        lvc.pszText = headerText.data();
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc);
     }
     ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
     int width = ListView_GetColumnWidth(HListView, 0);
@@ -927,10 +961,10 @@ void CDisconnectDialog::InitColumns()
     ListView_SetColumnWidth(HListView, 0, width + 15);               // space for the scrollbar
 }
 
-char* CreateIndexedPluginPathText(const char* pathText, int index)
+wchar_t* CreateIndexedPluginPathText(const wchar_t* pathText, int index)
 {
-    std::string newText = std::string(pathText) + " [" + std::to_string(index) + "]";
-    return _strdup(newText.c_str());
+    std::wstring newText = std::wstring(pathText) + L" [" + std::to_wstring(index) + L"]";
+    return _wcsdup(newText.c_str());
 }
 
 void CDisconnectDialog::EnumConnections()
@@ -939,35 +973,42 @@ void CDisconnectDialog::EnumConnections()
 
     // Network: CONNECTED resources
 
-    char noneText[50]; // (none)
-    lstrcpyn(noneText, LoadStr(IDS_NETWORK_NONE), sizeof(noneText));
+    wchar_t noneText[50]; // (none)
+    lstrcpynW(noneText, LoadStrW(IDS_NETWORK_NONE), _countof(noneText));
     HANDLE hEnumNet;
-    DWORD err = WNetOpenEnum(RESOURCE_CONNECTED, RESOURCETYPE_DISK, 0, NULL, &hEnumNet);
+    // WNetEnumResourceW, not a courtesy sibling: the enumeration is the
+    // authority HasTheSameRootPath compares the panel path against (same defect
+    // class as IsNetworkProviderDriveW, sally_path_validation.cpp) - narrowing it
+    // would corrupt both sides of the comparison at once, so a mapped drive or share
+    // whose name the code page cannot spell was never recognised as the panel's
+    // current one and never shown pre-selected. Display stays narrow (unchanged
+    // behavior for spellable names, best-effort otherwise) - only the
+    // bold/default-item DECISION needs to be honest.
+    DWORD err = WNetOpenEnumW(RESOURCE_CONNECTED, RESOURCETYPE_DISK, 0, NULL, &hEnumNet);
     if (err == ERROR_SUCCESS)
     {
         DWORD bufSize;
         DWORD entries = 0;
-        char buffer[10000];
-        NETRESOURCE* netSources = (NETRESOURCE*)buffer;
+        BYTE buffer[10000];
+        NETRESOURCEW* netSources = (NETRESOURCEW*)buffer;
         while (1)
         {
             DWORD e = 0xFFFFFFFF; // as many as possible
-            bufSize = 10000;
-            err = WNetEnumResource(hEnumNet, &e, netSources, &bufSize);
+            bufSize = sizeof(buffer);
+            err = WNetEnumResourceW(hEnumNet, &e, netSources, &bufSize);
             if (err == ERROR_SUCCESS && e > 0)
             {
                 int i;
                 for (i = 0; i < (int)e; i++) // process new data
                 {
-                    const char* name = netSources[i].lpLocalName;
-                    if (name == NULL)
-                        name = noneText;
-                    const char* path = netSources[i].lpRemoteName;
-                    if (path == NULL)
-                        path = "";
-
-                    BOOL defaultItem = Panel->Is(ptDisk) && HasTheSameRootPath(Panel->GetPath(), name == noneText ? path : name);
-                    InsertItem(-2, FALSE, citNetwork, CONNECTION_ICON_ACCESSIBLE, name, path, defaultItem, NULL); // -2 -> insert alphabetically
+                    const wchar_t* nameW = netSources[i].lpLocalName;
+                    BOOL isNone = (nameW == NULL);
+                    const wchar_t* pathW = netSources[i].lpRemoteName;
+                    if (pathW == NULL)
+                        pathW = L"";
+                    BOOL defaultItem = Panel->Is(ptDisk) &&
+                                       HasTheSameRootPath(Panel->GetPathW(), isNone ? pathW : nameW);
+                    InsertItem(-2, FALSE, citNetwork, CONNECTION_ICON_ACCESSIBLE, isNone ? noneText : nameW, pathW, defaultItem, NULL); // -2 -> insert alphabetically
                 }
                 entries += e;
             }
@@ -979,7 +1020,7 @@ void CDisconnectDialog::EnumConnections()
     else
     {
         if (err != ERROR_NO_NETWORK)
-            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextOwned(err).c_str());
     }
 
     // Network: REMEMBERED resources
@@ -987,37 +1028,39 @@ void CDisconnectDialog::EnumConnections()
     // available drives
     DWORD mask = GetLogicalDrives();
 
-    err = WNetOpenEnum(RESOURCE_REMEMBERED, RESOURCETYPE_DISK, 0, NULL, &hEnumNet);
+    err = WNetOpenEnumW(RESOURCE_REMEMBERED, RESOURCETYPE_DISK, 0, NULL, &hEnumNet);
     if (err == ERROR_SUCCESS)
     {
         DWORD bufSize;
         DWORD entries = 0;
-        char buffer[10000];
-        NETRESOURCE* netSources = (NETRESOURCE*)buffer;
+        BYTE buffer[10000];
+        NETRESOURCEW* netSources = (NETRESOURCEW*)buffer;
         while (1)
         {
             DWORD e = 0xFFFFFFFF; // as many as possible
-            bufSize = 10000;
-            err = WNetEnumResource(hEnumNet, &e, netSources, &bufSize);
+            bufSize = sizeof(buffer);
+            err = WNetEnumResourceW(hEnumNet, &e, netSources, &bufSize);
             if (err == ERROR_SUCCESS && e > 0)
             {
                 int i;
                 for (i = 0; i < (int)e; i++) // process new data
                 {
-                    const char* name = netSources[i].lpLocalName;
-                    if (name != NULL)
+                    const wchar_t* nameW = netSources[i].lpLocalName;
+                    if (nameW != NULL)
                     {
                         BOOL iconIndex = CONNECTION_ICON_ACCESSIBLE;
-                        char drv = LowerCase[name[0]];
+                        // a remembered drive-letter mapping's letter is always ASCII
+                        // by construction; only the remote share name can be Unicode.
+                        char drv = LowerCase[(char)nameW[0]];
                         if (drv >= 'a' && drv <= 'z' && (mask & (0x00000001 << (drv - 'a'))) == 0)
                             iconIndex = CONNECTION_ICON_INACCESSIBLE;
 
-                        const char* path = netSources[i].lpRemoteName;
-                        if (path == NULL)
-                            path = "";
-
-                        BOOL defaultItem = Panel->Is(ptDisk) && HasTheSameRootPath(Panel->GetPath(), *name == 0 ? path : name);
-                        InsertItem(-2, TRUE, citNetwork, iconIndex, name, path, defaultItem, NULL); // -2 -> insert alphabetically
+                        const wchar_t* pathW = netSources[i].lpRemoteName;
+                        if (pathW == NULL)
+                            pathW = L"";
+                        BOOL defaultItem = Panel->Is(ptDisk) &&
+                                           HasTheSameRootPath(Panel->GetPathW(), *nameW == 0 ? pathW : nameW);
+                        InsertItem(-2, TRUE, citNetwork, iconIndex, nameW, pathW, defaultItem, NULL); // -2 -> insert alphabetically
                     }
                 }
                 entries += e;
@@ -1030,12 +1073,12 @@ void CDisconnectDialog::EnumConnections()
     else
     {
         if (err != ERROR_NO_NETWORK)
-            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextW(err));
+            gPrompter->ShowError(LoadStrW(IDS_NETWORKERROR), GetErrorTextOwned(err).c_str());
     }
 
     // if at least one network drive was inserted, add it in front of the first network group
     if (Connections.Count > 0)
-        InsertItem(0, FALSE, citGroup, CONNECTION_ICON_NETWORK, LoadStr(IDS_NETWORK_NETWORK), "", FALSE, NULL);
+        InsertItem(0, FALSE, citGroup, CONNECTION_ICON_NETWORK, LoadStrW(IDS_NETWORK_NETWORK), L"", FALSE, NULL);
 
     int pluginGroupIndex = Connections.Count;
 
@@ -1076,7 +1119,7 @@ void CDisconnectDialog::EnumConnections()
             for (i = 0; i < count; i++)
             {
                 CPluginFSInterfaceEncapsulation* fs = fsList[i];
-                char* txt = NULL;
+                wchar_t* txt = NULL;
                 HICON icon = NULL;
                 BOOL destroyIcon = FALSE;
                 if (fs->GetChangeDriveOrDisconnectItem(fs->GetPluginFSName(), txt, icon, destroyIcon))
@@ -1086,17 +1129,17 @@ void CDisconnectDialog::EnumConnections()
                         iconIndex = ImageList_ReplaceIcon(HImageList, -1, icon);
                     if (destroyIcon && icon != NULL)
                         HANDLES(DestroyIcon(icon));
-                    char* text = txt;
-                    while (*text != 0 && *text != '\t')
+                    wchar_t* text = txt;
+                    while (*text != 0 && *text != L'\t')
                         text++;
-                    if (*text == '\t')
+                    if (*text == L'\t')
                         text++;
-                    char* s = text;
-                    while (*s != 0 && *s != '\t')
+                    wchar_t* s = text;
+                    while (*s != 0 && *s != L'\t')
                         s++;
                     *s = 0;
                     InsertItem(-1, FALSE, citPlugin, iconIndex != -1 ? iconIndex : CONNECTION_ICON_PLUGIN,
-                               "", text, fs == activePanelFS, fs->GetInterface());
+                               L"", text, fs == activePanelFS, fs->GetInterface());
                     free(txt);
                 }
                 else // FS does not want to add any item
@@ -1112,13 +1155,13 @@ void CDisconnectDialog::EnumConnections()
             for (i = pluginGroupIndex; i < Connections.Count; i++)
             {
                 BOOL freePluginPath = FALSE;
-                char* pluginPath = Connections[i].Path;
+                wchar_t* pluginPath = Connections[i].Path;
                 int currentIndex = 1;
                 int x;
                 for (x = i + 1; x < Connections.Count; x++)
                 {
-                    char* testedPath = Connections[x].Path;
-                    if (StrICmp(pluginPath, testedPath) == 0) // match -> the item must be indexed
+                    wchar_t* testedPath = Connections[x].Path;
+                    if (StrICmpW(pluginPath, testedPath) == 0) // match -> the item must be indexed
                     {
                         if (!freePluginPath) // the first match found, index also the first duplicate item
                         {
@@ -1152,11 +1195,9 @@ void CDisconnectDialog::EnumConnections()
                         i2 == 1 && addFSItemForNonactivePanelFS)
                     {
                         CPluginFSInterfaceEncapsulation* fs = i2 == 0 ? activePanelFS : nonactivePanelFS;
-                        CPathBuffer path;
-                        sprintf(path, "%s:", fs->GetPluginFSName());
-                        char* userPart = path + strlen(path);
-                        if (!fs->GetRootPath(userPart))
-                            *userPart = 0;
+                        std::wstring userPart;
+                        fs->GetRootPathW(userPart);
+                        const std::wstring path = std::wstring(fs->GetPluginFSName()) + L":" + userPart;
 
                         BOOL destroyIcon = FALSE;
                         HICON icon = fs->GetFSIcon(destroyIcon);
@@ -1166,7 +1207,7 @@ void CDisconnectDialog::EnumConnections()
                         if (destroyIcon && icon != NULL)
                             HANDLES(DestroyIcon(icon));
                         InsertItem(-1, FALSE, citPlugin, iconIndex != -1 ? iconIndex : CONNECTION_ICON_PLUGIN,
-                                   "", path, fs == activePanelFS, fs->GetInterface());
+                                   L"", path.c_str(), fs == activePanelFS, fs->GetInterface());
                     }
                 }
             }
@@ -1178,11 +1219,11 @@ void CDisconnectDialog::EnumConnections()
 
     // if at least one file system was inserted, add in front of the the first plugin group
     if (pluginGroupIndex < Connections.Count)
-        InsertItem(pluginGroupIndex, FALSE, citGroup, CONNECTION_ICON_PLUGIN, LoadStr(IDS_NETWORK_PLUGINS), "", FALSE, NULL);
+        InsertItem(pluginGroupIndex, FALSE, citGroup, CONNECTION_ICON_PLUGIN, LoadStrW(IDS_NETWORK_PLUGINS), L"", FALSE, NULL);
 }
 
-BOOL CDisconnectDialog::InsertItem(int index, BOOL ignoreDuplicate, CConnectionItemType type, int iconIndex, const char* name,
-                                   const char* path, BOOL defaultItem, CPluginFSInterfaceAbstract* pluginFS)
+BOOL CDisconnectDialog::InsertItem(int index, BOOL ignoreDuplicate, CConnectionItemType type, int iconIndex, const wchar_t* name,
+                                   const wchar_t* path, BOOL defaultItem, CPluginFSInterfaceAbstract* pluginFS)
 {
     if (ignoreDuplicate)
     {
@@ -1190,8 +1231,8 @@ BOOL CDisconnectDialog::InsertItem(int index, BOOL ignoreDuplicate, CConnectionI
         for (i = 0; i < Connections.Count; i++)
         {
             if (Connections[i].Type == type &&
-                stricmp(Connections[i].Name, name) == 0 &&
-                stricmp(Connections[i].Path, path) == 0)
+                _wcsicmp(Connections[i].Name, name) == 0 &&
+                _wcsicmp(Connections[i].Path, path) == 0)
             {
                 return TRUE;
             }
@@ -1228,7 +1269,7 @@ BOOL CDisconnectDialog::InsertItem(int index, BOOL ignoreDuplicate, CConnectionI
         for (i = 0; i < Connections.Count; i++)
         {
             if (Connections[i].Type == type &&
-                stricmp(Connections[i].Name, name) > 0)
+                _wcsicmp(Connections[i].Name, name) > 0)
             {
                 index = i;
                 break;
@@ -1252,7 +1293,7 @@ BOOL CDisconnectDialog::InsertItem(int index, BOOL ignoreDuplicate, CConnectionI
         return FALSE;
     }
 
-    TRACE_I("ADDED: " << name << "    " << path);
+    TRACE_IW(L"ADDED: " << name << L"    " << path);
     return TRUE;
 }
 
@@ -1279,7 +1320,11 @@ void CDisconnectDialog::Refresh()
     int i;
     for (i = 0; i < Connections.Count; i++)
     {
-        LVITEM lvi;
+        // LVITEMW + LVM_INSERTITEMW explicitly: this build does not define _UNICODE, so
+        // the ListView_InsertItem macro resolves to the A form, which would narrow
+        // CConnectionItem::Name through the code page. Same reason as the local
+        // ListView_SetItemTextW macro at the top of this file.
+        LVITEMW lvi;
         lvi.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM | LVIF_INDENT;
         lvi.iItem = i;
         lvi.iSubItem = 0;
@@ -1287,8 +1332,8 @@ void CDisconnectDialog::Refresh()
         lvi.pszText = Connections[i].Name;
         lvi.lParam = i; // for later sorting
         lvi.iIndent = (Connections[i].Type == citGroup) ? 0 : 1;
-        int index = ListView_InsertItem(HListView, &lvi);
-        ListView_SetItemText(HListView, index, 1, Connections[i].Path);
+        int index = (int)SendMessageW(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
+        ListView_SetItemTextW(HListView, index, 1, Connections[i].Path);
         if (Connections[i].Default)
         {
             if (defaultIndex == -1)
@@ -1466,9 +1511,8 @@ BOOL ValidateMask(HWND parent, CTransferInfo& ti, int checkbox, int editline)
     ti.CheckBox(checkbox, ignore);
     if (ignore)
     {
-        CPathBuffer buf; // Heap-allocated for long path support
-        ti.EditLine(editline, buf, buf.Size());
-        CMaskGroup masks(buf);
+        const std::wstring buf = GetWindowTextStringW(GetDlgItem(parent, editline));
+        CMaskGroup masks(buf.c_str());
         int errorPos;
         if (!masks.PrepareMasks(errorPos))
         {
@@ -1515,10 +1559,22 @@ void CCompareDirsDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow || EnableSubdirs || Configuration.CompareOnePanelDirs)
         ti.CheckBox(IDC_COMPARE_IGNORE_DIRS, Configuration.CompareIgnoreDirs);
 
-    // provide MasksString; there's range validation, nothing serious
-    ti.EditLine(IDE_COMPARE_IGNORE_FILES, (char*)Configuration.CompareIgnoreFilesMasks.GetWritableMasksString(), MAX_PATH);
-    // provide MasksString; there's range validation, nothing serious
-    ti.EditLine(IDE_COMPARE_IGNORE_DIRS, (char*)Configuration.CompareIgnoreDirsMasks.GetWritableMasksString(), MAX_PATH);
+    if (ti.Type == ttDataToWindow)
+    {
+        SetDlgItemTextW(HWindow, IDE_COMPARE_IGNORE_FILES,
+                        Configuration.CompareIgnoreFilesMasks.GetMasksString());
+        SetDlgItemTextW(HWindow, IDE_COMPARE_IGNORE_DIRS,
+                        Configuration.CompareIgnoreDirsMasks.GetMasksString());
+    }
+    else
+    {
+        const std::wstring fileMasks =
+            GetWindowTextStringW(GetDlgItem(HWindow, IDE_COMPARE_IGNORE_FILES));
+        const std::wstring dirMasks =
+            GetWindowTextStringW(GetDlgItem(HWindow, IDE_COMPARE_IGNORE_DIRS));
+        Configuration.CompareIgnoreFilesMasks.SetMasksString(fileMasks.c_str());
+        Configuration.CompareIgnoreDirsMasks.SetMasksString(dirMasks.c_str());
+    }
 
     if (ti.Type == ttDataToWindow)
     {
@@ -1644,7 +1700,7 @@ CCompareDirsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SpacerHeight = r.bottom - r.top;
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
-        hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
+        hl->SetActionShowHint(LoadStrW(IDS_MASKS_HINT));
 
         if (!Configuration.CompareMoreOptions)
             DisplayMore(FALSE);
@@ -1704,8 +1760,8 @@ CCmpDirProgressDialog::CCmpDirProgressDialog(HWND hParent, BOOL hasProgress, CIT
     : CCommonDialog(HLanguage, hasProgress ? IDD_CMPDIR_PROGRESS : IDD_CMPDIR_PROGRESS2, hParent, ooStatic)
 {
     HasProgress = hasProgress;
-    DelayedSource[0] = 0;
-    DelayedTarget[0] = 0;
+    DelayedSource.clear();
+    DelayedTarget.clear();
     DelayedSourceDirty = FALSE;
     DelayedTargetDirty = FALSE;
     Source = NULL;
@@ -1721,15 +1777,15 @@ CCmpDirProgressDialog::CCmpDirProgressDialog(HWND hParent, BOOL hasProgress, CIT
     TaskBarList3 = taskBarList3;
 }
 
-void CCmpDirProgressDialog::SetSource(const char* text)
+void CCmpDirProgressDialog::SetSource(const wchar_t* text)
 {
-    lstrcpyn(DelayedSource, text, DelayedSource.Size());
+    DelayedSource = text != NULL ? text : L"";
     DelayedSourceDirty = TRUE;
 }
 
-void CCmpDirProgressDialog::SetTarget(const char* text)
+void CCmpDirProgressDialog::SetTarget(const wchar_t* text)
 {
-    lstrcpyn(DelayedTarget, text, DelayedTarget.Size());
+    DelayedTarget = text != NULL ? text : L"";
     DelayedTargetDirty = TRUE;
 }
 
@@ -1774,12 +1830,12 @@ void CCmpDirProgressDialog::AddSize(const CQuadWord& size)
 BOOL CCmpDirProgressDialog::Continue()
 {
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) // give the user a moment ...
     {
         if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -1799,14 +1855,14 @@ void CCmpDirProgressDialog::FlushDataToControls()
     // text
     if (DelayedSourceDirty && Source != NULL)
     {
-        Source->SetText(DelayedSource);
+        Source->SetText(DelayedSource.c_str());
         DelayedSourceDirty = FALSE;
     }
 
     // text
     if (DelayedTargetDirty && Target != NULL)
     {
-        Target->SetText(DelayedTarget);
+        Target->SetText(DelayedTarget.c_str());
         DelayedTargetDirty = FALSE;
     }
 
@@ -1914,13 +1970,17 @@ CExitingOpenSal::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EndDialog(HWindow, IDOK); // ending Salamander is possible
             else
             {
-                char num[50];
-                itoa(c, num, 10);
-                char buf[50];
-                GetDlgItemText(HWindow, IDT_RUNNINGOPERS, buf, 50);
+                // Entirely narrow and internally consistent, so it compiles
+                // today and does not appear in the error list - and the UNICODE flip would turn
+                // both SetDlgItemText/GetDlgItemText wide over char buffers. All local to this
+                // dialog, so it is ours to widen. The 50 is a CHARACTER count in both forms.
+                wchar_t num[50];
+                _itow(c, num, 10);
+                wchar_t buf[50];
+                GetDlgItemTextW(HWindow, IDT_RUNNINGOPERS, buf, 50);
                 buf[49] = 0;
-                if (strcmp(buf, num) != 0)
-                    SetDlgItemText(HWindow, IDT_RUNNINGOPERS, num);
+                if (wcscmp(buf, num) != 0)
+                    SetDlgItemTextW(HWindow, IDT_RUNNINGOPERS, num);
             }
             return TRUE;
         }
@@ -1962,14 +2022,12 @@ CExitingOpenSal::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CConfirmADSLossDlg
 //
 
-CConfirmADSLossDlg::CConfirmADSLossDlg(HWND parent, BOOL isFile, const char* name,
-                                       const char* streams, BOOL isMove,
-                                       const wchar_t* nameW) : CCommonDialog(HLanguage, IDD_CONFIRMADSLOSS, parent)
+CConfirmADSLossDlg::CConfirmADSLossDlg(HWND parent, BOOL isFile, const wchar_t* name,
+                                       const wchar_t* streams, BOOL isMove) : CCommonDialog(HLanguage, IDD_CONFIRMADSLOSS, parent)
 {
     IsFile = isFile;
     IsMove = isMove;
     Name = name;
-    NameW = nameW;
     Streams = streams;
 }
 
@@ -1984,25 +2042,22 @@ CConfirmADSLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (NameW != NULL)
-                name->SetTextToDblQuotesIfNeededW(NameW);
-            else
-                name->SetTextToDblQuotesIfNeeded(Name);
+            name->SetTextToDblQuotesIfNeeded(Name);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetDlgItemText(HWindow, IDE_ALTSTREAMS, Streams);
+        SetDlgItemTextW(HWindow, IDE_ALTSTREAMS, Streams);
 
         if (IsFile)
-            SetWindowText(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStrW(IDS_FILETITLE));
 
         int resId;
         if (IsMove)
             resId = IsFile ? IDS_CONFADSLOSS_WARNING_MOVE_FILE : IDS_CONFADSLOSS_WARNING_MOVE_DIR;
         else
             resId = IsFile ? IDS_CONFADSLOSS_WARNING_COPY_FILE : IDS_CONFADSLOSS_WARNING_COPY_DIR;
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), LoadStrW(resId));
         break;
     }
 
@@ -2029,7 +2084,7 @@ CConfirmADSLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CConfirmLinkTgtCopyDlg
 //
 
-CConfirmLinkTgtCopyDlg::CConfirmLinkTgtCopyDlg(HWND parent, const char* name, const char* details) : CCommonDialog(HLanguage, IDD_CONFIRMLINKTGTCOPY, parent)
+CConfirmLinkTgtCopyDlg::CConfirmLinkTgtCopyDlg(HWND parent, const wchar_t* name, const wchar_t* details) : CCommonDialog(HLanguage, IDD_CONFIRMLINKTGTCOPY, parent)
 {
     Name = name;
     Details = details;
@@ -2045,7 +2100,7 @@ CConfirmLinkTgtCopyDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CStaticText* name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS);
         name->SetTextToDblQuotesIfNeeded(Name);
-        SetDlgItemText(HWindow, IDS_DETAILS, Details);
+        SetDlgItemTextW(HWindow, IDS_DETAILS, Details);
         break;
     }
 
@@ -2072,7 +2127,7 @@ CConfirmLinkTgtCopyDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CConfirmEncryptionLossDlg
 //
 
-CConfirmEncryptionLossDlg::CConfirmEncryptionLossDlg(HWND parent, BOOL isFile, const char* name,
+CConfirmEncryptionLossDlg::CConfirmEncryptionLossDlg(HWND parent, BOOL isFile, const wchar_t* name,
                                                      BOOL isMove) : CCommonDialog(HLanguage, IDD_CONFIRMENCRYPTLOSS, parent)
 {
     IsFile = isFile;
@@ -2090,19 +2145,21 @@ CConfirmEncryptionLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
+        {
             name->SetTextToDblQuotesIfNeeded(Name);
+        }
         else
             TRACE_E(LOW_MEMORY);
 
         if (IsFile)
-            SetWindowText(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
+            SetWindowTextW(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStrW(IDS_FILETITLE));
 
         int resId;
         if (IsMove)
             resId = IsFile ? IDS_CONFENCLOSS_WARNING_MOVE_FILE : IDS_CONFENCLOSS_WARNING_MOVE_DIR;
         else
             resId = IsFile ? IDS_CONFENCLOSS_WARNING_COPY_FILE : IDS_CONFENCLOSS_WARNING_COPY_DIR;
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), LoadStrW(resId));
         break;
     }
 
@@ -2129,13 +2186,17 @@ CConfirmEncryptionLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CErrorReadingADSDlg
 //
 
-CErrorReadingADSDlg::CErrorReadingADSDlg(HWND parent, const char* file, const char* error,
-                                         const char* title, const wchar_t* fileW) : CCommonDialog(HLanguage, IDD_CANNOTGETADSINFO, parent)
+// unicodeWnd=TRUE is REQUIRED, not decorative: the title can now be wchar_t*
+// (titleW), but SetWindowTextW on an ANSI-class dialog is re-narrowed by USER32. The opt-in
+// creates it with DialogBoxParamW so the wide title actually reaches the screen. Same
+// mechanism as CFileErrorDlg.
+CErrorReadingADSDlg::CErrorReadingADSDlg(HWND parent, const wchar_t* file, const wchar_t* error,
+                                         const wchar_t* title)
+    : CCommonDialog(HLanguage, IDD_CANNOTGETADSINFO, parent, ooStandard, NULL)
 {
     File = file;
     Error = error;
     Title = title;
-    FileW = fileW;
 }
 
 INT_PTR
@@ -2148,22 +2209,19 @@ CErrorReadingADSDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (Title != NULL)
         {
-            SetWindowText(HWindow, Title);
-            Title = NULL; // comes from LoadStr; its lifetime ends soon (it will be overwritten), so we null it out
+            SetWindowTextW(HWindow, Title);
+            Title = NULL; // comes from LoadStrW; its lifetime ends soon (it will be overwritten), so we null it out
         }
 
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (FileW != NULL)
-                name->SetTextToDblQuotesIfNeededW(FileW);
-            else
-                name->SetTextToDblQuotesIfNeeded(File);
+            name->SetTextToDblQuotesIfNeeded(File);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), Error);
 
         break;
     }
@@ -2191,7 +2249,7 @@ CErrorReadingADSDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CErrorSettingAttrsDlg
 //
 
-CErrorSettingAttrsDlg::CErrorSettingAttrsDlg(HWND parent, const char* file, DWORD neededAttrs,
+CErrorSettingAttrsDlg::CErrorSettingAttrsDlg(HWND parent, const wchar_t* file, DWORD neededAttrs,
                                              DWORD currentAttrs) : CCommonDialog(HLanguage, IDD_CANNOTSETATTRSINFO, parent)
 {
     File = file;
@@ -2199,27 +2257,27 @@ CErrorSettingAttrsDlg::CErrorSettingAttrsDlg(HWND parent, const char* file, DWOR
     CurrentAttrs = currentAttrs;
 }
 
-void GetAttrsString(char* text, DWORD attrs)
+void GetAttrsStringW(wchar_t* text, DWORD attrs)
 {
     // if we support showing another attribute,
     // InternalGetAttr() and DISPLAYED_ATTRIBUTES mask need to be extended
     int l = 0;
     if (attrs & FILE_ATTRIBUTE_READONLY)
-        text[l++] = 'R';
+        text[l++] = L'R';
     if (attrs & FILE_ATTRIBUTE_HIDDEN)
-        text[l++] = 'H';
+        text[l++] = L'H';
     if (attrs & FILE_ATTRIBUTE_SYSTEM)
-        text[l++] = 'S';
+        text[l++] = L'S';
     if (attrs & FILE_ATTRIBUTE_ARCHIVE)
-        text[l++] = 'A';
+        text[l++] = L'A';
     if (attrs & FILE_ATTRIBUTE_TEMPORARY)
-        text[l++] = 'T';
+        text[l++] = L'T';
     if (attrs & FILE_ATTRIBUTE_COMPRESSED)
-        text[l++] = 'C';
+        text[l++] = L'C';
     if (attrs & FILE_ATTRIBUTE_ENCRYPTED)
-        text[l++] = 'E';
+        text[l++] = L'E';
     if (attrs & FILE_ATTRIBUTE_OFFLINE)
-        text[l++] = 'O';
+        text[l++] = L'O';
     text[l] = 0;
 }
 
@@ -2233,15 +2291,17 @@ CErrorSettingAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
+        {
             name->SetTextToDblQuotesIfNeeded(File);
+        }
         else
             TRACE_E(LOW_MEMORY);
 
-        char text[20];
-        GetAttrsString(text, NeededAttrs);
-        SetWindowText(GetDlgItem(HWindow, IDS_NEEDEDATTRS), text);
-        GetAttrsString(text, CurrentAttrs);
-        SetWindowText(GetDlgItem(HWindow, IDS_CURRENTATTRS), text);
+        wchar_t text[20];
+        GetAttrsStringW(text, NeededAttrs);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_NEEDEDATTRS), text);
+        GetAttrsStringW(text, CurrentAttrs);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_CURRENTATTRS), text);
         break;
     }
 
@@ -2267,15 +2327,11 @@ CErrorSettingAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CErrorCopyingPermissionsDlg
 //
 
-CErrorCopyingPermissionsDlg::CErrorCopyingPermissionsDlg(HWND parent, const char* sourceFile,
-                                                         const char* targetFile, DWORD error,
-                                                         const wchar_t* sourceFileW,
-                                                         const wchar_t* targetFileW) : CCommonDialog(HLanguage, IDD_CANNOTCOPYPERMISSIONS, parent)
+CErrorCopyingPermissionsDlg::CErrorCopyingPermissionsDlg(HWND parent, const wchar_t* sourceFile,
+                                                         const wchar_t* targetFile, DWORD error) : CCommonDialog(HLanguage, IDD_CANNOTCOPYPERMISSIONS, parent)
 {
     SourceFile = sourceFile;
     TargetFile = targetFile;
-    SourceFileW = sourceFileW;
-    TargetFileW = targetFileW;
     Error = error;
 }
 
@@ -2290,26 +2346,20 @@ CErrorCopyingPermissionsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_SOURCENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (SourceFileW != NULL)
-                name->SetTextToDblQuotesIfNeededW(SourceFileW);
-            else
-                name->SetTextToDblQuotesIfNeeded(SourceFile);
+            name->SetTextToDblQuotesIfNeeded(SourceFile);
         }
         else
             TRACE_E(LOW_MEMORY);
 
         if ((name = new CStaticText(HWindow, IDS_TARGETNAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (TargetFileW != NULL)
-                name->SetTextToDblQuotesIfNeededW(TargetFileW);
-            else
-                name->SetTextToDblQuotesIfNeeded(TargetFile);
+            name->SetTextToDblQuotesIfNeeded(TargetFile);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR),
-                      Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR),
+                       Error != NO_ERROR ? GetErrorTextOwned(Error).c_str() : LoadStrW(IDS_VIEWER_UNKNOWNERR));
         break;
     }
 
@@ -2335,11 +2385,9 @@ CErrorCopyingPermissionsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CErrorCopyingDirTimeDlg
 //
 
-CErrorCopyingDirTimeDlg::CErrorCopyingDirTimeDlg(HWND parent, const char* targetFile, DWORD error,
-                                                 const wchar_t* targetFileW) : CCommonDialog(HLanguage, IDD_CANNOTCOPYDIRTIME, parent)
+CErrorCopyingDirTimeDlg::CErrorCopyingDirTimeDlg(HWND parent, const wchar_t* targetFile, DWORD error) : CCommonDialog(HLanguage, IDD_CANNOTCOPYDIRTIME, parent)
 {
     TargetFile = targetFile;
-    TargetFileW = targetFileW;
     Error = error;
 }
 
@@ -2354,16 +2402,13 @@ CErrorCopyingDirTimeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_TARGETNAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (TargetFileW != NULL)
-                name->SetTextToDblQuotesIfNeededW(TargetFileW);
-            else
-                name->SetTextToDblQuotesIfNeeded(TargetFile);
+            name->SetTextToDblQuotesIfNeeded(TargetFile);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR),
-                      Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR),
+                       Error != NO_ERROR ? GetErrorTextOwned(Error).c_str() : LoadStrW(IDS_VIEWER_UNKNOWNERR));
         break;
     }
 
@@ -2389,10 +2434,10 @@ CErrorCopyingDirTimeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CDriveSelectErrDlg
 //
 
-CDriveSelectErrDlg::CDriveSelectErrDlg(HWND parent, const char* errText, const char* drvPath) : CCommonDialog(HLanguage, IDD_DRIVESELECTERR, parent)
+CDriveSelectErrDlg::CDriveSelectErrDlg(HWND parent, const wchar_t* errText, const wchar_t* drvPath) : CCommonDialog(HLanguage, IDD_DRIVESELECTERR, parent)
 {
     ErrText = errText;
-    lstrcpyn(DrvPath, drvPath, DrvPath.Size());
+    DrvPath = drvPath != nullptr ? drvPath : L"";
     CounterForAllowedUseOfTimer = 5 * 60; // try for at most 5 minutes, then let the user press Retry (prevents drive hammering)
 }
 
@@ -2407,19 +2452,18 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         LastDriveSelectErrDlgHWnd = HWindow;
         HICON hIcon = HANDLES(LoadIcon(NULL, IDI_EXCLAMATION));
         SendDlgItemMessage(HWindow, IDI_EXCLAMATIONICON, STM_SETICON, (WPARAM)hIcon, 0);
-        SetDlgItemText(HWindow, IDT_ERRTEXT, ErrText);
+        SetDlgItemTextW(HWindow, IDT_ERRTEXT, ErrText);
         MessageBeep(MB_ICONEXCLAMATION);
 
         // check whether periodic drive readiness tests make sense (except for noisy floppies and network drives which may be slow)
         BOOL setTimer = TRUE;
-        UINT drvType = MyGetDriveType(DrvPath);
+        UINT drvType = MyGetDriveTypeW(DrvPath.c_str());
         // WARNING: unfortunately mountpoints return DRIVE_NO_ROOT_DIR when no media is inserted, unbelievable ... so
         // I had to keep periodic tests even when drvType == DRIVE_NO_ROOT_DIR
         if (drvType == DRIVE_REMOVABLE || drvType == DRIVE_CDROM || drvType == DRIVE_NO_ROOT_DIR)
         {
-            CPathBuffer root;  // Heap-allocated for long path support
-            GetRootPath(root, DrvPath);
-            switch (GetDriveType(root))
+            std::wstring root = GetRootPath(DrvPath.c_str());
+            switch (GetDriveTypeW(root.c_str()))
             {
             case DRIVE_REMOVABLE: // check whether it's a floppy disk (probably can't be in a mount point, so this is enough)
             {
@@ -2442,8 +2486,12 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case DRIVE_FIXED: // mount-point, determine the root of removable drive
             {
-                if (!GetCurrentLocalReparsePoint(DrvPath, root))
+                std::wstring reparsePoint;
+                if (!GetCurrentLocalReparsePointW(DrvPath.c_str(), reparsePoint))
                     setTimer = FALSE; // can't be a mount-point, no periodic tests
+                // written on both paths: the wide form yields the plain root on failure,
+                // exactly as the narrow one did, and 'root' is read either way below
+                root = reparsePoint;
                 break;
             }
 
@@ -2451,7 +2499,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 setTimer = FALSE;
                 break; // no idea what's going on, we better skip periodic tests
             }
-            lstrcpyn(DrvPath, root, DrvPath.Size());
+            DrvPath = root;
         }
         else
             setTimer = FALSE; // most likely a network connection
@@ -2471,24 +2519,18 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // drive accessibility is tested using FindFirstFile because SalGetFileAttributes
             // always succeeds on junction-points (directory attributes are unrelated to content)
             BOOL ok = FALSE;
-            CPathBuffer fileName;
-            lstrcpyn(fileName, DrvPath, fileName.Size());
-            if (SalPathAppend(fileName, "*", fileName.Size()))
+            IFileEnumerator* enumerator = gFileEnumerator != nullptr ? gFileEnumerator : GetWin32FileEnumerator();
+            HENUM search = enumerator->StartEnum(DrvPath.c_str(), L"*");
+            if (search == INVALID_HENUM)
             {
-                WIN32_FIND_DATAW fileData;
-                HANDLE search;
-                search = SalFindFirstFileHW(fileName, &fileData);
-                if (search == INVALID_HANDLE_VALUE)
-                {
-                    DWORD err = GetLastError();
-                    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_NO_MORE_FILES)
-                        ok = TRUE;
-                }
-                else
-                {
+                DWORD err = GetLastError();
+                if (err == ERROR_FILE_NOT_FOUND || err == ERROR_NO_MORE_FILES)
                     ok = TRUE;
-                    HANDLES(FindClose(search));
-                }
+            }
+            else
+            {
+                ok = TRUE;
+                enumerator->EndEnum(search);
             }
 
             if (ok)
@@ -2546,16 +2588,18 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
         for (i = 0; i < ListOfShellIconOverlays.Count; i++)
         {
             CShellIconOverlayItem2* item = ListOfShellIconOverlays[i];
-            LVITEM lvi;
+            // LVITEMW + LVM_INSERTITEMW explicitly, same reason as the Connections list above:
+            // this build does not define _UNICODE, so the plain macros resolve to the A form.
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT;
             lvi.iItem = i;
             lvi.iSubItem = 0;
-            lvi.pszText = item->IconOverlayName;
-            ListView_InsertItem(HListView, &lvi);
+            lvi.pszText = const_cast<wchar_t*>(item->IconOverlayName.c_str());
+            SendMessageW(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
 
-            ListView_SetItemText(HListView, i, 1, item->IconOverlayDescr);
+            ListView_SetItemTextW(HListView, i, 1, const_cast<wchar_t*>(item->IconOverlayDescr.c_str()));
 
-            UINT state = INDEXTOSTATEIMAGEMASK((!IsNameInListOfDisabledCustomIconOverlays(item->IconOverlayName) ? 2 : 1));
+            UINT state = INDEXTOSTATEIMAGEMASK((!IsNameInListOfDisabledCustomIconOverlays(item->IconOverlayName.c_str()) ? 2 : 1));
             ListView_SetItemState(HListView, i, state, LVIS_STATEIMAGEMASK);
         }
         // set column widths
@@ -2569,19 +2613,19 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
     }
     else
     {
-        char* oldDisabledCustomIconOverlays = Configuration.DisabledCustomIconOverlays;
+        wchar_t* oldDisabledCustomIconOverlays = Configuration.DisabledCustomIconOverlays;
         Configuration.DisabledCustomIconOverlays = NULL;
         int i;
         for (i = 0; i < ListOfShellIconOverlays.Count; i++)
         {
             if (ListView_GetItemState(HListView, i, LVIS_STATEIMAGEMASK) == INDEXTOSTATEIMAGEMASK(1))
             { // unchecked checkbox -> add the name to the list of disabled icon overlay handlers
-                AddToListOfDisabledCustomIconOverlays(ListOfShellIconOverlays[i]->IconOverlayName);
+                AddToListOfDisabledCustomIconOverlays(ListOfShellIconOverlays[i]->IconOverlayName.c_str());
             }
         }
         if (oldEnableCustomIconOverlays != Configuration.EnableCustomIconOverlays ||
-            strcmp(oldDisabledCustomIconOverlays != NULL ? oldDisabledCustomIconOverlays : "",
-                   Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : "") != 0)
+            wcscmp(oldDisabledCustomIconOverlays != NULL ? oldDisabledCustomIconOverlays : L"",
+                   Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : L"") != 0)
         { // configuration change -> notify that it takes effect after Salamander restarts
             gPrompter->ShowInfo(LoadStrW(IDS_INFOTITLE), LoadStrW(IDS_ICONOVRLS_CHANGE));
         }
@@ -2612,17 +2656,19 @@ CCfgPageIconOvrls::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         DWORD origFlags = ListView_GetExtendedListViewStyle(HListView);
         ListView_SetExtendedListViewStyle(HListView, origFlags | exFlags); // 4.71
 
-        // fill listview with Name and Description columns
-        LVCOLUMN lvc;
+        // Fill the list view with dynamically owned UTF-16 resource text.
+        LVCOLUMNW lvc;
         lvc.mask = LVCF_TEXT | LVCF_FMT;
-        lvc.pszText = LoadStr(IDS_ICONOVRLS_NAME);
+        std::wstring columnText = LoadStrOwned(IDS_ICONOVRLS_NAME);
+        lvc.pszText = columnText.data();
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
 
         lvc.mask |= LVCF_SUBITEM;
-        lvc.pszText = LoadStr(IDS_ICONOVRLS_DESCR);
+        columnText = LoadStrOwned(IDS_ICONOVRLS_DESCR);
+        lvc.pszText = columnText.data();
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        SendMessageW(HListView, LVM_INSERTCOLUMNW, 1, (LPARAM)&lvc);
 
         // dialog elements should stretch depending on its size, set split controls
         ElasticVerticalLayout(1, IDC_ICONOVRLS_LIST);

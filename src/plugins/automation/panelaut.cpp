@@ -89,23 +89,16 @@ HRESULT CSalamanderPanelAutomation::RaiseChPPErr(int nErr)
 /* [propget][id] */ HRESULT STDMETHODCALLTYPE CSalamanderPanelAutomation::get_Path(
     /* [retval][out] */ BSTR* path)
 {
-    CPathBuffer szPath;
-    int type;
-    TCHAR* pszArchiveOrFs;
+    std::wstring panelPath;
     _bstr_t pathT;
 
-    if (!SalamanderGeneral->GetPanelPath(
-            m_nPanel,
-            szPath,
-            szPath.Size(),
-            &type,
-            &pszArchiveOrFs))
+    if (!SPLGetPanelPathOwned(SalamanderGeneral, m_nPanel, panelPath))
     {
         _ASSERTE(0);
         return E_FAIL;
     }
 
-    pathT = szPath;
+    pathT = panelPath.c_str();
     *path = pathT.Detach();
 
     return S_OK;
@@ -182,7 +175,7 @@ HRESULT CSalamanderPanelAutomation::RaiseChPPErr(int nErr)
 /* [propget][id] */ HRESULT STDMETHODCALLTYPE CSalamanderPanelAutomation::get_PathType(
     /* [retval][out] */ int* type)
 {
-    if (SalamanderGeneral->GetPanelPath(m_nPanel, NULL, 0, type, NULL) &&
+    if (SalamanderGeneral->GetPanelPath(m_nPanel, NULL, type, NULL) &&
             *type == PATH_TYPE_WINDOWS ||
         *type == PATH_TYPE_ARCHIVE || *type == PATH_TYPE_FS)
     {

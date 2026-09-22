@@ -4,6 +4,10 @@
 
 #include "precomp.h"
 
+#include <list>
+#include "reg_sz_narrow_bridge.h"
+#include "ftp_persisted_text_codec.h"
+
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
 // other parts of the CPluginInterface interface
@@ -55,137 +59,137 @@ int ConfigVersion = 0;
 #define RELOAD_PARSERS_BEFORE_CONFIG_VERSION 37 // parsers are not read from configurations before this version; defaults are used (primitive parser update for users)
 
 // names of values in the configuration (in the registry)
-const char* CONFIG_VERSION = "Version";
-const char* CONFIG_LASTCFGPAGE = "Last Config Page";
+const wchar_t* CONFIG_VERSION = L"Version";
+const wchar_t* CONFIG_LASTCFGPAGE = L"Last Config Page";
 
-const char* CONFIG_SHOWWELCOMEMESSAGE = "Show Welcome Message";
-const char* CONFIG_PRIORITYTOPANELCON = "Priority to Panel Connections";
-const char* CONFIG_ENABLETOTALSPEEDLIM = "Enable Total Speed Limit";
-const char* CONFIG_TOTALSPEEDLIMIT = "Total Speed Limit";
-const char* CONFIG_ANONYMOUSPASSWD = "Anonymous Password";
-const char* CONFIG_OPERDLGPOSITION = "OperDlg Position";
-const char* CONFIG_OPERDLGSPLITPOS = "OperDlg Split Pos.";
-const char* CONFIG_OPERDLGCLOSEIFSUCCESS = "Close OperDlg If Successfully Finished";
-const char* CONFIG_OPERDLGCLOSEWHENFINISHES = "Close OperDlg When Oper Finishes";
-const char* CONFIG_OPENSOLVEERRIFIDLE = "Open SolveErrDlg If Idle";
-const char* CONFIG_SIMPLELSTCOLFIXEDWIDTH = "Simple Listing Fixed Column Width";
-const char* CONFIG_SIMPLELSTCOLWIDTH = "Simple Listing Column Width";
+const wchar_t* CONFIG_SHOWWELCOMEMESSAGE = L"Show Welcome Message";
+const wchar_t* CONFIG_PRIORITYTOPANELCON = L"Priority to Panel Connections";
+const wchar_t* CONFIG_ENABLETOTALSPEEDLIM = L"Enable Total Speed Limit";
+const wchar_t* CONFIG_TOTALSPEEDLIMIT = L"Total Speed Limit";
+const wchar_t* CONFIG_ANONYMOUSPASSWD = L"Anonymous Password";
+const wchar_t* CONFIG_OPERDLGPOSITION = L"OperDlg Position";
+const wchar_t* CONFIG_OPERDLGSPLITPOS = L"OperDlg Split Pos.";
+const wchar_t* CONFIG_OPERDLGCLOSEIFSUCCESS = L"Close OperDlg If Successfully Finished";
+const wchar_t* CONFIG_OPERDLGCLOSEWHENFINISHES = L"Close OperDlg When Oper Finishes";
+const wchar_t* CONFIG_OPENSOLVEERRIFIDLE = L"Open SolveErrDlg If Idle";
+const wchar_t* CONFIG_SIMPLELSTCOLFIXEDWIDTH = L"Simple Listing Fixed Column Width";
+const wchar_t* CONFIG_SIMPLELSTCOLWIDTH = L"Simple Listing Column Width";
 
-const char* CONFIG_PASSIVEMODE = "Passive Mode";
-const char* CONFIG_KEEPALIVE = "Keep Alive";
-const char* CONFIG_USEMAXCON = "Max. Connections";
-const char* CONFIG_SPEEDLIM = "Speed Limit";
-const char* CONFIG_TRANSFERMODE = "Transfer Mode";
-const char* CONFIG_USELISTINGSCACHE = "Use Listings Cache";
-const char* CONFIG_ASCIIMASKS = "ASCII File Masks";
-const char* CONFIG_COMPRESSDATA = "Compress Data";
+const wchar_t* CONFIG_PASSIVEMODE = L"Passive Mode";
+const wchar_t* CONFIG_KEEPALIVE = L"Keep Alive";
+const wchar_t* CONFIG_USEMAXCON = L"Max. Connections";
+const wchar_t* CONFIG_SPEEDLIM = L"Speed Limit";
+const wchar_t* CONFIG_TRANSFERMODE = L"Transfer Mode";
+const wchar_t* CONFIG_USELISTINGSCACHE = L"Use Listings Cache";
+const wchar_t* CONFIG_ASCIIMASKS = L"ASCII File Masks";
+const wchar_t* CONFIG_COMPRESSDATA = L"Compress Data";
 
-const char* CONFIG_SRVREPTIMEOUT = "Server Replies Timeout";
-const char* CONFIG_NODATATRTIMEOUT = "No Data Transfer Timeout";
-const char* CONFIG_DELBETWCONRETR = "Delay Connect Retries";
-const char* CONFIG_CONATTEMPTS = "Connect Attempts";
-const char* CONFIG_RESUMEOVERLAP = "Resume Overlap";
-const char* CONFIG_RESUMEMINFILESIZE = "Resume Min File Size";
-const char* CONFIG_KASENDEVERY = "Keep Alive - Every";
-const char* CONFIG_KASTOPAFTER = "Keep Alive - Stop After";
-const char* CONFIG_KACOMMAND = "Keep Alive - Command";
-const char* CONFIG_CACHEMAXSIZE = "Mem Cache Max Size";
+const wchar_t* CONFIG_SRVREPTIMEOUT = L"Server Replies Timeout";
+const wchar_t* CONFIG_NODATATRTIMEOUT = L"No Data Transfer Timeout";
+const wchar_t* CONFIG_DELBETWCONRETR = L"Delay Connect Retries";
+const wchar_t* CONFIG_CONATTEMPTS = L"Connect Attempts";
+const wchar_t* CONFIG_RESUMEOVERLAP = L"Resume Overlap";
+const wchar_t* CONFIG_RESUMEMINFILESIZE = L"Resume Min File Size";
+const wchar_t* CONFIG_KASENDEVERY = L"Keep Alive - Every";
+const wchar_t* CONFIG_KASTOPAFTER = L"Keep Alive - Stop After";
+const wchar_t* CONFIG_KACOMMAND = L"Keep Alive - Command";
+const wchar_t* CONFIG_CACHEMAXSIZE = L"Mem Cache Max Size";
 
-const char* CONFIG_LASTBOOKMARK = "Last Bookmark";
+const wchar_t* CONFIG_LASTBOOKMARK = L"Last Bookmark";
 
-const char* CONFIG_DOWNLOADADDTOQUEUE = "Download Add To Queue";
-const char* CONFIG_DELETEADDTOQUEUE = "Delete Add To Queue";
-const char* CONFIG_CHATTRADDTOQUEUE = "ChngAttr Add To Queue";
+const wchar_t* CONFIG_DOWNLOADADDTOQUEUE = L"Download Add To Queue";
+const wchar_t* CONFIG_DELETEADDTOQUEUE = L"Delete Add To Queue";
+const wchar_t* CONFIG_CHATTRADDTOQUEUE = L"ChngAttr Add To Queue";
 
-const char* CONFIG_OPERCANNOTCREATEFILE = "If Cannot Create File";
-const char* CONFIG_OPERCANNOTCREATEDIR = "If Cannot Create Dir";
-const char* CONFIG_OPERFILEALREADYEXISTS = "If File Already Exists";
-const char* CONFIG_OPERDIRALREADYEXISTS = "If Dir Already Exists";
-const char* CONFIG_OPERRETRYONCREATFILE = "If Retry On Created";
-const char* CONFIG_OPERRETRYONRESUMFILE = "If Retry On Resumed";
-const char* CONFIG_OPERASCIITRMODEFORBIN = "If Ascii Mode For Binary File";
-const char* CONFIG_OPERUNKNOWNATTRS = "If Unknown Attrs";
-const char* CONFIG_OPERNONEMPTYDIRDEL = "If Directory Is Not Empty";
-const char* CONFIG_OPERHIDDENFILEDEL = "If File Is Hidden";
-const char* CONFIG_OPERHIDDENDIRDEL = "If Dir Is Hidden";
+const wchar_t* CONFIG_OPERCANNOTCREATEFILE = L"If Cannot Create File";
+const wchar_t* CONFIG_OPERCANNOTCREATEDIR = L"If Cannot Create Dir";
+const wchar_t* CONFIG_OPERFILEALREADYEXISTS = L"If File Already Exists";
+const wchar_t* CONFIG_OPERDIRALREADYEXISTS = L"If Dir Already Exists";
+const wchar_t* CONFIG_OPERRETRYONCREATFILE = L"If Retry On Created";
+const wchar_t* CONFIG_OPERRETRYONRESUMFILE = L"If Retry On Resumed";
+const wchar_t* CONFIG_OPERASCIITRMODEFORBIN = L"If Ascii Mode For Binary File";
+const wchar_t* CONFIG_OPERUNKNOWNATTRS = L"If Unknown Attrs";
+const wchar_t* CONFIG_OPERNONEMPTYDIRDEL = L"If Directory Is Not Empty";
+const wchar_t* CONFIG_OPERHIDDENFILEDEL = L"If File Is Hidden";
+const wchar_t* CONFIG_OPERHIDDENDIRDEL = L"If Dir Is Hidden";
 
-const char* CONFIG_UPLOADCANNOTCREATEFILE = "Upload - If Cannot Create File";
-const char* CONFIG_UPLOADCANNOTCREATEDIR = "Upload - If Cannot Create Dir";
-const char* CONFIG_UPLOADFILEALREADYEXISTS = "Upload - If File Already Exists";
-const char* CONFIG_UPLOADDIRALREADYEXISTS = "Upload - If Dir Already Exists";
-const char* CONFIG_UPLOADRETRYONCREATFILE = "Upload - If Retry On Created";
-const char* CONFIG_UPLOADRETRYONRESUMFILE = "Upload - If Retry On Resumed";
-const char* CONFIG_UPLOADASCIITRMODEFORBIN = "Upload - If Ascii Mode For Binary File";
+const wchar_t* CONFIG_UPLOADCANNOTCREATEFILE = L"Upload - If Cannot Create File";
+const wchar_t* CONFIG_UPLOADCANNOTCREATEDIR = L"Upload - If Cannot Create Dir";
+const wchar_t* CONFIG_UPLOADFILEALREADYEXISTS = L"Upload - If File Already Exists";
+const wchar_t* CONFIG_UPLOADDIRALREADYEXISTS = L"Upload - If Dir Already Exists";
+const wchar_t* CONFIG_UPLOADRETRYONCREATFILE = L"Upload - If Retry On Created";
+const wchar_t* CONFIG_UPLOADRETRYONRESUMFILE = L"Upload - If Retry On Resumed";
+const wchar_t* CONFIG_UPLOADASCIITRMODEFORBIN = L"Upload - If Ascii Mode For Binary File";
 
-const char* CONFIG_SERVERTYPES = "Server Types";
-const char* CONFIG_STNAME = "Name";
-const char* CONFIG_STADCOND = "Autodetect Condition";
-const char* CONFIG_STCOLUMNS = "Columns";
-const char* CONFIG_STRULESFORPARS = "Rules For Parsing";
+const wchar_t* CONFIG_SERVERTYPES = L"Server Types";
+const wchar_t* CONFIG_STNAME = L"Name";
+const wchar_t* CONFIG_STADCOND = L"Autodetect Condition";
+const wchar_t* CONFIG_STCOLUMNS = L"Columns";
+const wchar_t* CONFIG_STRULESFORPARS = L"Rules For Parsing";
 
-const char* CONFIG_FTPSERVERLIST = "Bookmarks";
-const char* CONFIG_FTPSRVNAME = "Name";
-const char* CONFIG_FTPSRVADDRESS = "Address";
-const char* CONFIG_FTPSRVPATH = "Initial Path";
-const char* CONFIG_FTPSRVANONYM = "Anonymous";
-const char* CONFIG_FTPSRVUSER = "User";
-const char* CONFIG_FTPSRVPASSWD_OLD = "Password"; // import only, scrambled by FTP plugin
-const char* CONFIG_FTPSRVPASSWD_SCRAMBLED = "PasswordS";
-const char* CONFIG_FTPSRVPASSWD_ENCRYPTED = "PasswordE";
-const char* CONFIG_FTPSRVSAVEPASSWD = "Save Password";
-const char* CONFIG_FTPSRVPROXYSRVUID = "Proxy Server UID";
-const char* CONFIG_FTPSRVTGTPATH = "Target Path";
-const char* CONFIG_FTPSRVTYPE = "Server Type";
-const char* CONFIG_FTPSRVTRANSFMODE = "Transfer Mode";
-const char* CONFIG_FTPSRVPORT = "Port";
-const char* CONFIG_FTPSRVPASV = "Passive Mode";
-const char* CONFIG_FTPSRVKALIVE = "Keep Alive";
-const char* CONFIG_FTPSRVKASENDEVERY = "Keep Alive - Every";
-const char* CONFIG_FTPSRVKASTOPAFTER = "Keep Alive - Stop After";
-const char* CONFIG_FTPSRVKACOMMAND = "Keep Alive - Command";
-const char* CONFIG_FTPSRVUSEMAXCON = "Max. Connections";
-const char* CONFIG_FTPSRVSPDLIM = "Speed Limit";
-const char* CONFIG_FTPSRVUSELISTINGSCACHE = "Use Listings Cache";
-const char* CONFIG_FTPSRVINITFTPCMDS = "Initial FTP Commands";
-const char* CONFIG_FTPSRVLISTCMD = "List Command";
-const char* CONFIG_FTPSRVENCRYPTCONTROLCONNECTION = "Encrypt Control Connection";
-const char* CONFIG_FTPSRVENCRYPTDATACONNECTION = "Encrypt Data Connection";
-const char* CONFIG_FTPSRVCOMPRESSDATA = "Compress Data";
+const wchar_t* CONFIG_FTPSERVERLIST = L"Bookmarks";
+const wchar_t* CONFIG_FTPSRVNAME = L"Name";
+const wchar_t* CONFIG_FTPSRVADDRESS = L"Address";
+const wchar_t* CONFIG_FTPSRVPATH = L"Initial Path";
+const wchar_t* CONFIG_FTPSRVANONYM = L"Anonymous";
+const wchar_t* CONFIG_FTPSRVUSER = L"User";
+const wchar_t* CONFIG_FTPSRVPASSWD_OLD = L"Password"; // import only, scrambled by FTP plugin
+const wchar_t* CONFIG_FTPSRVPASSWD_SCRAMBLED = L"PasswordS";
+const wchar_t* CONFIG_FTPSRVPASSWD_ENCRYPTED = L"PasswordE";
+const wchar_t* CONFIG_FTPSRVSAVEPASSWD = L"Save Password";
+const wchar_t* CONFIG_FTPSRVPROXYSRVUID = L"Proxy Server UID";
+const wchar_t* CONFIG_FTPSRVTGTPATH = L"Target Path";
+const wchar_t* CONFIG_FTPSRVTYPE = L"Server Type";
+const wchar_t* CONFIG_FTPSRVTRANSFMODE = L"Transfer Mode";
+const wchar_t* CONFIG_FTPSRVPORT = L"Port";
+const wchar_t* CONFIG_FTPSRVPASV = L"Passive Mode";
+const wchar_t* CONFIG_FTPSRVKALIVE = L"Keep Alive";
+const wchar_t* CONFIG_FTPSRVKASENDEVERY = L"Keep Alive - Every";
+const wchar_t* CONFIG_FTPSRVKASTOPAFTER = L"Keep Alive - Stop After";
+const wchar_t* CONFIG_FTPSRVKACOMMAND = L"Keep Alive - Command";
+const wchar_t* CONFIG_FTPSRVUSEMAXCON = L"Max. Connections";
+const wchar_t* CONFIG_FTPSRVSPDLIM = L"Speed Limit";
+const wchar_t* CONFIG_FTPSRVUSELISTINGSCACHE = L"Use Listings Cache";
+const wchar_t* CONFIG_FTPSRVINITFTPCMDS = L"Initial FTP Commands";
+const wchar_t* CONFIG_FTPSRVLISTCMD = L"List Command";
+const wchar_t* CONFIG_FTPSRVENCRYPTCONTROLCONNECTION = L"Encrypt Control Connection";
+const wchar_t* CONFIG_FTPSRVENCRYPTDATACONNECTION = L"Encrypt Data Connection";
+const wchar_t* CONFIG_FTPSRVCOMPRESSDATA = L"Compress Data";
 
-const char* CONFIG_FTPPROXYLIST = "Proxy Servers";
-const char* CONFIG_FTPPRXUID = "Unique ID";
-const char* CONFIG_FTPPRXNAME = "Name";
-const char* CONFIG_FTPPRXTYPE = "Type";
-const char* CONFIG_FTPPRXHOST = "Host";
-const char* CONFIG_FTPPRXPORT = "Port";
-const char* CONFIG_FTPPRXUSER = "User";
-const char* CONFIG_FTPPRXPASSWD_OLD = "Password"; // import only, scrambled by FTP plugin
-const char* CONFIG_FTPPRXPASSWD_SCRAMBLED = "PasswordS";
-const char* CONFIG_FTPPRXPASSWD_ENCRYPTED = "PasswordE";
-const char* CONFIG_FTPPRXSCRIPT = "Script";
+const wchar_t* CONFIG_FTPPROXYLIST = L"Proxy Servers";
+const wchar_t* CONFIG_FTPPRXUID = L"Unique ID";
+const wchar_t* CONFIG_FTPPRXNAME = L"Name";
+const wchar_t* CONFIG_FTPPRXTYPE = L"Type";
+const wchar_t* CONFIG_FTPPRXHOST = L"Host";
+const wchar_t* CONFIG_FTPPRXPORT = L"Port";
+const wchar_t* CONFIG_FTPPRXUSER = L"User";
+const wchar_t* CONFIG_FTPPRXPASSWD_OLD = L"Password"; // import only, scrambled by FTP plugin
+const wchar_t* CONFIG_FTPPRXPASSWD_SCRAMBLED = L"PasswordS";
+const wchar_t* CONFIG_FTPPRXPASSWD_ENCRYPTED = L"PasswordE";
+const wchar_t* CONFIG_FTPPRXSCRIPT = L"Script";
 
-const char* CONFIG_DEFAULTFTPPRXUID = "Default Proxy UID";
+const wchar_t* CONFIG_DEFAULTFTPPRXUID = L"Default Proxy UID";
 
-const char* CONFIG_ALWAYSNOTCLOSECON = "Always Detach";
-const char* CONFIG_ALWAYSDISCONNECT = "Always Disconnect";
-const char* CONFIG_ALWAYSRECONNECT = "Always Reconnect";
-const char* CONFIG_ALWAYSOVEWRITE = "Always Overwrite";
-const char* CONFIG_CONVERTHEXESCSEQ = "Convert Hex-esc-sequences";
-const char* CONFIG_WARNWHENCONLOST = "Connection Lost Message";
-const char* CONFIG_HINTLISTHIDDENFILES = "List Hidden Files Hint";
+const wchar_t* CONFIG_ALWAYSNOTCLOSECON = L"Always Detach";
+const wchar_t* CONFIG_ALWAYSDISCONNECT = L"Always Disconnect";
+const wchar_t* CONFIG_ALWAYSRECONNECT = L"Always Reconnect";
+const wchar_t* CONFIG_ALWAYSOVEWRITE = L"Always Overwrite";
+const wchar_t* CONFIG_CONVERTHEXESCSEQ = L"Convert Hex-esc-sequences";
+const wchar_t* CONFIG_WARNWHENCONLOST = L"Connection Lost Message";
+const wchar_t* CONFIG_HINTLISTHIDDENFILES = L"List Hidden Files Hint";
 
-const char* CONFIG_ENABLELOGGING = "Enable Logging";
-const char* CONFIG_LOGMAXSIZE = "Log Max. Size";
-const char* CONFIG_MAXCLOSEDCONLOGS = "Max. Closed Connections Logs";
-const char* CONFIG_LOGSDLGPOSITION = "Logs Position";
-const char* CONFIG_ALWAYSSHOWLOGFORACTPAN = "Always Show Panel Log";
-const char* CONFIG_DISABLELOGWORKERS = "Disable Log for Operations";
+const wchar_t* CONFIG_ENABLELOGGING = L"Enable Logging";
+const wchar_t* CONFIG_LOGMAXSIZE = L"Log Max. Size";
+const wchar_t* CONFIG_MAXCLOSEDCONLOGS = L"Max. Closed Connections Logs";
+const wchar_t* CONFIG_LOGSDLGPOSITION = L"Logs Position";
+const wchar_t* CONFIG_ALWAYSSHOWLOGFORACTPAN = L"Always Show Panel Log";
+const wchar_t* CONFIG_DISABLELOGWORKERS = L"Disable Log for Operations";
 
-const char* CONFIG_COMMANDHISTORY = "Command History";
-const char* CONFIG_SENDSECRETCOMMAND = "Send Secret Command";
+const wchar_t* CONFIG_COMMANDHISTORY = L"Command History";
+const wchar_t* CONFIG_SENDSECRETCOMMAND = L"Send Secret Command";
 
-const char* CONFIG_HOSTADDRESSHISTORY = "Host Address History";
-const char* CONFIG_INITPATHHISTORY = "Init Path History";
+const wchar_t* CONFIG_HOSTADDRESSHISTORY = L"Host Address History";
+const wchar_t* CONFIG_INITPATHHISTORY = L"Init Path History";
 
 // frequently used error message
 const char* LOW_MEMORY = "Low memory";
@@ -228,9 +232,9 @@ BOOL WindowsVistaAndLater = FALSE; // Windows Vista or later from the NT family
 
 // global variables for the FTPCMD_CHANGETGTPANELPATH command
 int TargetPanelPathPanel = PANEL_LEFT;
-CPathBuffer TargetPanelPath; // Heap-allocated for long path support
+std::wstring TargetPanelPath;
 
-char UserDefinedSuffix[100] = ""; // preloaded string for marking user-defined "server type"
+std::wstring UserDefinedSuffix; // preloaded suffix for user-defined server types
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
@@ -243,7 +247,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         initCtrls.dwICC = ICC_BAR_CLASSES | ICC_LISTVIEW_CLASSES;
         if (!InitCommonControlsEx(&initCtrls))
         {
-            MessageBox(NULL, "InitCommonControlsEx failed!", "Error", MB_OK | MB_ICONERROR);
+            MessageBoxW(NULL, L"InitCommonControlsEx failed!", L"Error", MB_OK | MB_ICONERROR);
             return FALSE; // DLL won't start
         }
 
@@ -258,9 +262,56 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 // LoadStr
 //
 
+// LangStr is the real one: it is what the SDK already returns, with no conversion
+// at all. Prefer it everywhere a string reaches USER32, the SDK, or a dialog.
+std::wstring LangStr(int resID)
+{
+    return SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID);
+}
+
+// Temporary adapter for narrow formatting and protocol buffers that have not yet moved to the
+// explicit FTP codec. CLogs itself is UTF-16 and direct localized log messages use LangStr.
+//
+// The returned pointer must stay valid after the call, so each projection is retained - but the
+// retention is BOUNDED, because that is the whole contract this replaced. SalamanderGeneral->LoadStr
+// promised a 10000-character buffer "used cyclically" (spl_gen.h), so a pointer stayed good until
+// that much later text had been loaded and the storage cost was flat forever. A list that only ever
+// grows keeps the stability half of that promise and silently drops the bounded half: LoadStr is
+// reached once per queue row per repaint (LVN_GETDISPINFO -> GetListViewDataForW ->
+// GetProblemDescr, every arm of which is FTPFormatString(msg, LoadStr(...))), so scrolling a large
+// queue on a long transfer grew the plugin heap without limit for the life of the dialog thread.
+//
+// std::list is what makes the trim safe: popping the front never relocates an element that is still
+// retained, so every pointer still inside the budget stays valid.
 char* LoadStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    static char failed[] = "ERROR LOADING STRING";
+    if (SalamanderGeneral == NULL)
+        return failed;
+
+    std::wstring wide;
+    std::string encoded;
+    if (!SPLLoadStrOwned(SalamanderGeneral, HLanguage, resID, wide) ||
+        !FtpEncodeLocalText(wide.c_str(), encoded))
+        return failed;
+
+    static thread_local std::list<std::string> values;
+    static thread_local size_t retainedBytes = 0;
+    retainedBytes += encoded.size() + 1;
+    values.emplace_back(std::move(encoded));
+
+    // The same budget the frozen buffer had, so a caller keeps the same guarantee it could already
+    // rely on. The floor keeps one expression that passes several LoadStr results as arguments safe
+    // even when the individual strings are enormous - the one case the fixed buffer could not
+    // survive and this can.
+    const size_t retentionBudget = 10000;
+    const size_t minRetained = 16;
+    while (retainedBytes > retentionBudget && values.size() > minRetained)
+    {
+        retainedBytes -= values.front().size() + 1;
+        values.pop_front();
+    }
+    return values.back().data();
 }
 
 //
@@ -290,13 +341,19 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plug-in is made for the current version of Salamander and higher - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(), REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "FTP Client" /* neprekladat! */, MB_OK | MB_ICONERROR);
+        // wide: same call-site-local widen shape as checksum/unlha/undelete/zip/
+        // splitcbn/pak (205-211).
+#define FTP_WIDEN2(x) L##x
+#define FTP_WIDEN(x) FTP_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(), FTP_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"FTP Client" /* neprekladat! */, MB_OK | MB_ICONERROR);
+#undef FTP_WIDEN
+#undef FTP_WIDEN2
         return NULL;
     }
 
     // let the language module (.slg) load
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "FTP Client" /* neprekladat! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"FTP Client" /* neprekladat! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -305,14 +362,21 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalZLIB = SalamanderGeneral->GetSalamanderZLIB();
 
     // set the help file name
-    SalamanderGeneral->SetHelpFileName("ftp.chm");
+    SalamanderGeneral->SetHelpFileName(L"ftp.chm");
 
     SalamanderGeneral->GetConfigParameter(SALCFG_SORTBYEXTDIRSASFILES, &SortByExtDirsAsFiles,
                                           sizeof(SortByExtDirsAsFiles), NULL);
     SalamanderGeneral->GetConfigParameter(SALCFG_MINBEEPWHENDONE, &InactiveBeepWhenDone,
                                           sizeof(InactiveBeepWhenDone), NULL);
     SalamanderGeneral->GetLowerAndUpperCase(&LowerCase, &UpperCase);
-    lstrcpyn(UserDefinedSuffix, LoadStr(IDS_SRVTYPEUSERDEF), 100);
+    try
+    {
+        UserDefinedSuffix = LangStr(IDS_SRVTYPEUSERDEF);
+    }
+    catch (...)
+    {
+        return NULL;
+    }
     if (!Config.InitWithSalamanderGeneral())
         return NULL; // error
 
@@ -333,29 +397,44 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     }
 
     // set the basic information about the plug-in
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    std::wstring versionText;
+    std::wstring copyrightText;
+    if (!FtpDecodeLocalText(VERSINFO_VERSION_NO_PLATFORM, versionText) ||
+        !FtpDecodeLocalText(VERSINFO_COPYRIGHT, copyrightText))
+    {
+        ReleaseSockets();
+        Config.ReleaseDataFromSalamanderGeneral();
+        return NULL;
+    }
+    salamander->SetBasicPluginData(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINNAME).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION |
                                        FUNCTION_FILESYSTEM,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGINDESCR),
-                                   "FTP", NULL, "ftp");
+                                   versionText.c_str(), copyrightText.c_str(),
+                                   SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PLUGINDESCR).c_str(),
+                                   L"FTP", NULL, L"ftp");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // we want to receive messages about creation/change/removal of the master password
     SalamanderGeneral->SetPluginUsesPasswordManager();
 
-    // obtain our FS-name (it does not have to be "FTP", Salamander may adjust it)
-    SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);
-    AssignedFSNameLen = (int)strlen(AssignedFSName);
+    // Keep the host-assigned semantic FS names natively wide.
+    AssignedFSName = SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
+    if (AssignedFSName.empty())
+        return FALSE;
 
     // also add a name for FTPS (FTP over SSL)
-    if (salamander->AddFSName("ftps", &AssignedFSNameIndexFTPS))
-        SalamanderGeneral->GetPluginFSName(AssignedFSNameFTPS, AssignedFSNameIndexFTPS);
+    if (salamander->AddFSName(L"ftps", &AssignedFSNameIndexFTPS))
+    {
+        AssignedFSNameFTPS = SPLGetPluginFSNameOwned(
+            SalamanderGeneral, AssignedFSNameIndexFTPS);
+        if (AssignedFSNameFTPS.empty())
+            return FALSE;
+    }
     else
-        strcpy(AssignedFSNameFTPS, AssignedFSName); // probably "dead code"
-    AssignedFSNameLenFTPS = (int)strlen(AssignedFSNameFTPS);
+    {
+        AssignedFSNameFTPS = AssignedFSName; // probably "dead code"
+    }
 
     return &PluginInterface;
 }
@@ -367,13 +446,31 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_FTPPLUGINTITLE),
-                LoadStr(IDS_PLUGINDESCR));
-    SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUTPLUGINTITLE), MB_OK | MB_ICONINFORMATION);
+    try
+    {
+        std::wstring version;
+        std::wstring copyright;
+        if (!FtpDecodeLocalText(VERSINFO_VERSION, version) ||
+            !FtpDecodeLocalText(VERSINFO_COPYRIGHT, copyright))
+        {
+            SalamanderGeneral->SalMessageBox(
+                parent, LangStr(IDS_PLUGINDESCR).c_str(),
+                LangStr(IDS_ABOUTPLUGINTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
+            return;
+        }
+        const std::wstring text = SPLFormatStringOwned(
+            L"%ls %ls\n\n%ls\n\n%ls", LangStr(IDS_FTPPLUGINTITLE).c_str(),
+            version.c_str(), copyright.c_str(), LangStr(IDS_PLUGINDESCR).c_str());
+        SalamanderGeneral->SalMessageBox(
+            parent, text.c_str(), LangStr(IDS_ABOUTPLUGINTITLE).c_str(),
+            MB_OK | MB_ICONINFORMATION);
+    }
+    catch (...)
+    {
+        SalamanderGeneral->SalMessageBox(
+            parent, LangStr(IDS_PLUGINDESCR).c_str(),
+            LangStr(IDS_ABOUTPLUGINTITLE).c_str(), MB_OK | MB_ICONINFORMATION);
+    }
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -383,8 +480,8 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
     BOOL ret = FALSE;
     if (force ||
         FTPOperationsList.IsEmpty() ||
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_CANCELEXISTINGOPER),
-                                         LoadStr(IDS_FTPPLUGINTITLE),
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANCELEXISTINGOPER).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                          MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES)
     { // any cancellation of all operations is performed in ReleaseFS()
         ret = TRUE;
@@ -400,13 +497,10 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
         }
 
         // remove all copies of files from FTP in the disk cache (they exist because they survive connection close and are unnecessary)
-        CPathBuffer uniqueFileName; // Heap-allocated for long path support
-        lstrcpyn(uniqueFileName, AssignedFSName, uniqueFileName.Size());
-        lstrcat(uniqueFileName, ":");
-        SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
-        lstrcpyn(uniqueFileName, AssignedFSNameFTPS, uniqueFileName.Size());
-        lstrcat(uniqueFileName, ":");
-        SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
+        SalamanderGeneral->RemoveFilesFromCache(
+            (AssignedFSName + L':').c_str());
+        SalamanderGeneral->RemoveFilesFromCache(
+            (AssignedFSNameFTPS + L':').c_str());
 
         ReleaseSockets();
         FreeSSL();
@@ -415,68 +509,102 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
     return ret;
 }
 
-BOOL LoadHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
+// Several of this plugin's REG_SZ fields (this history mechanism;
+// CFTPServer's bookmark identity fields; CConfiguration's speed-limit/
+// anonymous-password/mask/dialog-position text) stay narrow in memory by
+// design - they are byte-owned bookmark/protocol/UI text, not something this
+// tick widens - but the shared registry facade's REG_SZ path (SetValueW/
+// GetValueW) is wide-only: on write it derives the byte count from wcslen()
+// over 'data' (now bounded/refused rather than OOB-reading past a narrow
+// buffer's real end, see reg_sz_safe_length.h), and on read it blits the
+// stored UTF-16LE bytes into 'buffer' with zero conversion. A narrow char*
+// therefore does not round-trip through this facade AT ALL: writes are
+// refused outright (a narrow C-string almost never contains an aligned wide
+// NUL within the scan bound) and reads of an existing wide value corrupt a
+// narrow destination. That is a live bug, not a hypothetical one - as of the
+// facade's OOB-read fix, every field using these helpers previously silently
+// failed to save.
+//
+// Bridge here, at each Load()/Save() boundary, converting to/from wide right
+// at the registry call. This does not widen any in-memory field or touch any
+// consumer (dialogs, connection code) - it only makes the already-narrow
+// representation actually reach the registry and come back again.
+static BOOL SetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const char* narrowValue)
 {
-    HKEY historyKey;
-    if (registry->OpenKey(hKey, name, historyKey))
-    {
-        int j;
-        for (j = 0; j < maxCount; j++)
-            if (history[j] != NULL)
-            {
-                free(history[j]);
-                history[j] = NULL;
-            }
+    std::wstring wide;
+    if (!EncodeRegSzFromNarrowOwned(narrowValue, wide))
+        return FALSE;
+    return SPLRegistrySetString(registry, regKey, name, wide);
+}
 
-        char buf[10];
-        int i;
-        for (i = 0; i < maxCount; i++)
-        {
-            _itoa(i + 1, buf, 10);
-            DWORD bufferSize;
-            if (registry->GetSize(historyKey, buf, REG_SZ, bufferSize))
-            {
-                history[i] = (char*)malloc(bufferSize);
-                if (history[i] == NULL)
-                {
-                    TRACE_E(LOW_MEMORY);
-                    break;
-                }
-                if (!registry->GetValue(historyKey, buf, REG_SZ, history[i], bufferSize))
-                    break;
-            }
-        }
-        registry->CloseKey(historyKey);
-    }
+static BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, std::string& value)
+{
+    std::wstring wideValue;
+    std::string staged;
+    if (!SPLRegistryGetStringOwned(registry, regKey, name, wideValue) ||
+        !DecodeRegSzToNarrowOwned(wideValue.c_str(), staged))
+        return FALSE;
+    value.swap(staged);
     return TRUE;
 }
 
-BOOL SaveHistory(CSalamanderRegistryAbstract* registry, HKEY hKey, const char* name, char* history[], int maxCount)
+static BOOL GetValueStringW(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, std::wstring& value)
+{
+    return SPLRegistryGetStringOwned(registry, regKey, name, value);
+}
+
+static BOOL SetValueStringW(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const std::wstring& value)
+{
+    return SPLRegistrySetString(registry, regKey, name, value);
+}
+
+static BOOL LoadWideHistory(CSalamanderRegistryAbstract* registry, HKEY hKey,
+                            const wchar_t* name, std::wstring history[], int maxCount)
 {
     HKEY historyKey;
-    if (registry->CreateKey(hKey, name, historyKey))
+    if (!registry->OpenKey(hKey, name, historyKey))
+        return TRUE;
+    for (int i = 0; i < maxCount; i++)
+        history[i].clear();
+    for (int i = 0; i < maxCount; i++)
     {
-        registry->ClearKey(historyKey);
-
-        BOOL saveHistory;
-        if (SalamanderGeneral->GetConfigParameter(SALCFG_SAVEHISTORY, &saveHistory, sizeof(saveHistory), NULL) &&
-            saveHistory)
+        std::wstring valueName;
+        if (!FTPFormatDecimalIndex(valueName, i + 1))
         {
-            char buf[10];
-            int i;
-            for (i = 0; i < maxCount; i++)
-            {
-                if (history[i] != NULL)
-                {
-                    _itoa(i + 1, buf, 10);
-                    registry->SetValue(historyKey, buf, REG_SZ, history[i], (DWORD)strlen(history[i]) + 1);
-                }
-                else
-                    break;
-            }
+            registry->CloseKey(historyKey);
+            return FALSE;
         }
-        registry->CloseKey(historyKey);
+        if (!SPLRegistryGetStringOwned(registry, historyKey, valueName.c_str(), history[i]))
+            break;
     }
+    registry->CloseKey(historyKey);
+    return TRUE;
+}
+
+static BOOL SaveWideHistory(CSalamanderRegistryAbstract* registry, HKEY hKey,
+                            const wchar_t* name, const std::wstring history[], int maxCount)
+{
+    HKEY historyKey;
+    if (!registry->CreateKey(hKey, name, historyKey))
+        return TRUE;
+    registry->ClearKey(historyKey);
+    BOOL saveHistory = FALSE;
+    if (SalamanderGeneral->GetConfigParameter(SALCFG_SAVEHISTORY, &saveHistory,
+                                               sizeof(saveHistory), NULL) &&
+        saveHistory)
+    {
+        for (int i = 0; i < maxCount && !history[i].empty(); i++)
+        {
+            std::wstring valueName;
+            if (!FTPFormatDecimalIndex(valueName, i + 1))
+            {
+                registry->CloseKey(historyKey);
+                return FALSE;
+            }
+            SPLRegistrySetString(registry, historyKey, valueName.c_str(), history[i]);
+        }
+    }
+    registry->CloseKey(historyKey);
     return TRUE;
 }
 
@@ -492,14 +620,17 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         registry->GetValue(regKey, CONFIG_SHOWWELCOMEMESSAGE, REG_DWORD, &Config.ShowWelcomeMessage, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_PRIORITYTOPANELCON, REG_DWORD, &Config.PriorityToPanelConnections, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_ENABLETOTALSPEEDLIM, REG_DWORD, &Config.EnableTotalSpeedLimit, sizeof(DWORD));
-        char num[30];
-        if (registry->GetValue(regKey, CONFIG_TOTALSPEEDLIMIT, REG_SZ, num, 30))
+        std::string numberText;
+        if (GetValueSZ(registry, regKey, CONFIG_TOTALSPEEDLIMIT, numberText))
         {
-            Config.TotalSpeedLimit = atof(num);
+            Config.TotalSpeedLimit = atof(numberText.c_str());
         }
-        char anonymousPasswd[PASSWORD_MAX_SIZE];
-        if (registry->GetValue(regKey, CONFIG_ANONYMOUSPASSWD, REG_SZ, anonymousPasswd, PASSWORD_MAX_SIZE))
-            Config.SetAnonymousPasswd(anonymousPasswd);
+        std::wstring anonymousPassword;
+        if (GetValueStringW(registry, regKey, CONFIG_ANONYMOUSPASSWD, anonymousPassword))
+        {
+            Config.SetAnonymousPasswd(anonymousPassword.c_str());
+            FTPSecureWipe(anonymousPassword);
+        }
 
         registry->GetValue(regKey, CONFIG_PASSIVEMODE, REG_DWORD, &Config.PassiveMode, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_KEEPALIVE, REG_DWORD, &Config.KeepAlive, sizeof(DWORD));
@@ -514,19 +645,22 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         }
         else
             Config.UseMaxConcurrentConnections = FALSE;
-        if (registry->GetValue(regKey, CONFIG_SPEEDLIM, REG_SZ, num, 30) &&
-            atof(num) != -1)
+        if (GetValueSZ(registry, regKey, CONFIG_SPEEDLIM, numberText) &&
+            atof(numberText.c_str()) != -1)
         {
-            Config.ServerSpeedLimit = atof(num);
+            Config.ServerSpeedLimit = atof(numberText.c_str());
             Config.UseServerSpeedLimit = TRUE;
         }
         else
             Config.UseServerSpeedLimit = FALSE;
         registry->GetValue(regKey, CONFIG_USELISTINGSCACHE, REG_DWORD, &Config.UseListingsCache, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_TRANSFERMODE, REG_DWORD, &Config.TransferMode, sizeof(DWORD));
-        char masks[MAX_GROUPMASK];
-        if (registry->GetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, MAX_GROUPMASK))
-            Config.ASCIIFileMasks->SetMasksString(masks, FALSE);
+        // Read the masks as the UTF-16 REG_SZ already holds - see the write side. An older build
+        // wrote the same value through an ACP round trip, so anything it managed to store reads
+        // back identically here.
+        std::wstring masksText;
+        if (GetValueStringW(registry, regKey, CONFIG_ASCIIMASKS, masksText))
+            Config.ASCIIFileMasks->SetMasksString(masksText.c_str(), FALSE);
 
         if (registry->GetValue(regKey, CONFIG_SRVREPTIMEOUT, REG_DWORD, &dw, sizeof(DWORD)))
             Config.SetServerRepliesTimeout(dw);
@@ -646,33 +780,39 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         if (ConfigVersion < 29 && Config.DisableLoggingOfWorkers)
             Config.DisableLoggingOfWorkers = FALSE;
 
-        char buf[100];
-        if (registry->GetValue(regKey, CONFIG_LOGSDLGPOSITION, REG_SZ, buf, 100) &&
-            buf[0] != 0)
+        std::string placementText;
+        if (GetValueSZ(registry, regKey, CONFIG_LOGSDLGPOSITION, placementText) &&
+            !placementText.empty())
         {
-            Config.LogsDlgPlacement.length = sizeof(WINDOWPLACEMENT);
-            RECT rect;
-            sscanf(buf, "%d, %d, %d, %d, %u", &rect.left, &rect.top, &rect.right, &rect.bottom, &Config.LogsDlgPlacement.showCmd);
-
-            // ensure the window does not exceed the working area of the monitor where its major part lies
-            RECT clipRect;
-            SalamanderGeneral->MultiMonGetClipRectByRect(&rect, &clipRect, NULL);
-            IntersectRect(&Config.LogsDlgPlacement.rcNormalPosition, &rect, &clipRect);
+            RECT rect{};
+            UINT showCmd = 0;
+            if (sscanf(placementText.c_str(), "%d, %d, %d, %d, %u",
+                       &rect.left, &rect.top, &rect.right, &rect.bottom, &showCmd) == 5)
+            {
+                Config.LogsDlgPlacement.length = sizeof(WINDOWPLACEMENT);
+                Config.LogsDlgPlacement.showCmd = showCmd;
+                // ensure the window does not exceed the working area of the monitor where its major part lies
+                RECT clipRect;
+                SalamanderGeneral->MultiMonGetClipRectByRect(&rect, &clipRect, NULL);
+                IntersectRect(&Config.LogsDlgPlacement.rcNormalPosition, &rect, &clipRect);
+            }
         }
 
-        if (registry->GetValue(regKey, CONFIG_OPERDLGPOSITION, REG_SZ, buf, 100) &&
-            buf[0] != 0)
+        if (GetValueSZ(registry, regKey, CONFIG_OPERDLGPOSITION, placementText) &&
+            !placementText.empty())
         {
-            Config.OperDlgPlacement.length = sizeof(WINDOWPLACEMENT);
-            RECT rect;
-            sscanf(buf, "%d, %d, %u", &rect.right, &rect.bottom, &Config.OperDlgPlacement.showCmd);
-            rect.left = 0;
-            rect.top = 0;
-
-            // ensure the window does not exceed the working area of the monitor where its major part lies
-            RECT clipRect;
-            SalamanderGeneral->MultiMonGetClipRectByRect(&rect, &clipRect, NULL);
-            IntersectRect(&Config.OperDlgPlacement.rcNormalPosition, &rect, &clipRect);
+            RECT rect{};
+            UINT showCmd = 0;
+            if (sscanf(placementText.c_str(), "%d, %d, %u",
+                       &rect.right, &rect.bottom, &showCmd) == 3)
+            {
+                Config.OperDlgPlacement.length = sizeof(WINDOWPLACEMENT);
+                Config.OperDlgPlacement.showCmd = showCmd;
+                // ensure the window does not exceed the working area of the monitor where its major part lies
+                RECT clipRect;
+                SalamanderGeneral->MultiMonGetClipRectByRect(&rect, &clipRect, NULL);
+                IntersectRect(&Config.OperDlgPlacement.rcNormalPosition, &rect, &clipRect);
+            }
         }
 
         if (registry->GetValue(regKey, CONFIG_OPERDLGSPLITPOS, REG_DWORD, &dw, sizeof(DWORD)))
@@ -682,11 +822,11 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
                 Config.OperDlgSplitPos = 0.5;
         }
 
-        LoadHistory(registry, regKey, CONFIG_COMMANDHISTORY, Config.CommandHistory, COMMAND_HISTORY_SIZE);
+        LoadWideHistory(registry, regKey, CONFIG_COMMANDHISTORY, Config.CommandHistory, COMMAND_HISTORY_SIZE);
         registry->GetValue(regKey, CONFIG_SENDSECRETCOMMAND, REG_DWORD, &Config.SendSecretCommand, sizeof(DWORD));
 
-        LoadHistory(registry, regKey, CONFIG_HOSTADDRESSHISTORY, Config.HostAddressHistory, HOSTADDRESS_HISTORY_SIZE);
-        LoadHistory(registry, regKey, CONFIG_INITPATHHISTORY, Config.InitPathHistory, INITIALPATH_HISTORY_SIZE);
+        LoadWideHistory(registry, regKey, CONFIG_HOSTADDRESSHISTORY, Config.HostAddressHistory, HOSTADDRESS_HISTORY_SIZE);
+        LoadWideHistory(registry, regKey, CONFIG_INITPATHHISTORY, Config.InitPathHistory, INITIALPATH_HISTORY_SIZE);
 
         registry->GetValue(regKey, CONFIG_ALWAYSRECONNECT, REG_DWORD, &Config.AlwaysReconnect, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_WARNWHENCONLOST, REG_DWORD, &Config.WarnWhenConLost, sizeof(DWORD));
@@ -720,16 +860,19 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     DWORD v = CURRENT_CONFIG_VERSION;
     registry->SetValue(regKey, CONFIG_VERSION, REG_DWORD, &v, sizeof(DWORD));
 
-    char num[30];
     registry->SetValue(regKey, CONFIG_LASTCFGPAGE, REG_DWORD, &Config.LastCfgPage, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_SHOWWELCOMEMESSAGE, REG_DWORD, &Config.ShowWelcomeMessage, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_PRIORITYTOPANELCON, REG_DWORD, &Config.PriorityToPanelConnections, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_ENABLETOTALSPEEDLIM, REG_DWORD, &Config.EnableTotalSpeedLimit, sizeof(DWORD));
-    sprintf(num, "%g", Config.TotalSpeedLimit);
-    registry->SetValue(regKey, CONFIG_TOTALSPEEDLIMIT, REG_SZ, num, -1);
-    char anonymousPasswd[PASSWORD_MAX_SIZE];
-    Config.GetAnonymousPasswd(anonymousPasswd, PASSWORD_MAX_SIZE);
-    registry->SetValue(regKey, CONFIG_ANONYMOUSPASSWD, REG_SZ, anonymousPasswd, -1);
+    std::string totalSpeedText;
+    if (FTPFormatString(totalSpeedText, "%g", Config.TotalSpeedLimit))
+        SetValueSZ(registry, regKey, CONFIG_TOTALSPEEDLIMIT, totalSpeedText.c_str());
+    std::wstring anonymousPassword;
+    if (Config.GetAnonymousPasswd(anonymousPassword))
+    {
+        SetValueStringW(registry, regKey, CONFIG_ANONYMOUSPASSWD, anonymousPassword);
+        FTPSecureWipe(anonymousPassword);
+    }
 
     registry->SetValue(regKey, CONFIG_PASSIVEMODE, REG_DWORD, &Config.PassiveMode, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_KEEPALIVE, REG_DWORD, &Config.KeepAlive, sizeof(DWORD));
@@ -737,13 +880,23 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 
     DWORD dw = Config.UseMaxConcurrentConnections ? Config.MaxConcurrentConnections : -1;
     registry->SetValue(regKey, CONFIG_USEMAXCON, REG_DWORD, &dw, sizeof(DWORD));
-    sprintf(num, "%g", (Config.UseServerSpeedLimit ? Config.ServerSpeedLimit : -1.0));
-    registry->SetValue(regKey, CONFIG_SPEEDLIM, REG_SZ, num, -1);
+    std::string serverSpeedText;
+    if (FTPFormatString(serverSpeedText, "%g",
+                        Config.UseServerSpeedLimit ? Config.ServerSpeedLimit : -1.0))
+        SetValueSZ(registry, regKey, CONFIG_SPEEDLIM, serverSpeedText.c_str());
     registry->SetValue(regKey, CONFIG_USELISTINGSCACHE, REG_DWORD, &Config.UseListingsCache, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_TRANSFERMODE, REG_DWORD, &Config.TransferMode, sizeof(DWORD));
-    char masks[MAX_GROUPMASK];
-    Config.ASCIIFileMasks->GetMasksString(masks);
-    registry->SetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, -1);
+    // ASCII file masks are matched against LOCAL file names, so they are semantic text, not protocol
+    // bytes - and both endpoints are already wide (SPLGetMasksStringOwned returns a std::wstring,
+    // SetMasksString takes a const wchar_t*). Only the registry bridge narrowed them, and the
+    // failure arm CLEARED the accumulated string rather than leaving the stored value alone: one
+    // mask containing a character with no exact ACP mapping - reachable now that the masks dialog is
+    // Unicode - wrote "" and destroyed the user's whole list, defaults included, with no error.
+    //
+    // REG_SZ is UTF-16 in the registry either way, so writing the wide string directly produces
+    // byte-identical values for everything that was previously storable and correct values for the
+    // rest. The on-disk format does not change; only the lossy hop in the middle is gone.
+    SetValueStringW(registry, regKey, CONFIG_ASCIIMASKS, SPLGetMasksStringOwned(Config.ASCIIFileMasks));
 
     dw = Config.GetServerRepliesTimeout();
     registry->SetValue(regKey, CONFIG_SRVREPTIMEOUT, REG_DWORD, &dw, sizeof(DWORD));
@@ -801,7 +954,7 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             if (!passwordManager->IsMasterPasswordSet())
             {
                 // we do not know the master password, ask the user
-                SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_PASSWORD_UNSECURED), LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONEXCLAMATION);
+                SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PASSWORD_UNSECURED).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
                 passwordManager->AskForMasterPassword(parent);
             }
             if (passwordManager->IsMasterPasswordSet()) // if we already know the master password, we can encrypt
@@ -827,42 +980,45 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_ALWAYSSHOWLOGFORACTPAN, REG_DWORD, &Config.AlwaysShowLogForActPan, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_DISABLELOGWORKERS, REG_DWORD, &Config.DisableLoggingOfWorkers, sizeof(DWORD));
 
-    char buf[100];
     Logs.SaveLogsDlgPos(); // also store the position of the currently opened window
+    std::string logsPlacementText;
+    BOOL logsPlacementReady = TRUE;
     if (Config.LogsDlgPlacement.length != 0)
     {
-        sprintf(buf, "%d, %d, %d, %d, %u",
-                Config.LogsDlgPlacement.rcNormalPosition.left,
-                Config.LogsDlgPlacement.rcNormalPosition.top,
-                Config.LogsDlgPlacement.rcNormalPosition.right,
-                Config.LogsDlgPlacement.rcNormalPosition.bottom,
-                Config.LogsDlgPlacement.showCmd);
+        logsPlacementReady = FTPFormatString(
+            logsPlacementText, "%d, %d, %d, %d, %u",
+            Config.LogsDlgPlacement.rcNormalPosition.left,
+            Config.LogsDlgPlacement.rcNormalPosition.top,
+            Config.LogsDlgPlacement.rcNormalPosition.right,
+            Config.LogsDlgPlacement.rcNormalPosition.bottom,
+            Config.LogsDlgPlacement.showCmd);
     }
-    else
-        buf[0] = 0;
-    registry->SetValue(regKey, CONFIG_LOGSDLGPOSITION, REG_SZ, buf, -1);
+    if (logsPlacementReady)
+        SetValueSZ(registry, regKey, CONFIG_LOGSDLGPOSITION, logsPlacementText.c_str());
 
+    std::string operationPlacementText;
+    BOOL operationPlacementReady = TRUE;
     if (Config.OperDlgPlacement.length != 0)
     {
-        sprintf(buf, "%d, %d, %u",
-                Config.OperDlgPlacement.rcNormalPosition.right -
-                    Config.OperDlgPlacement.rcNormalPosition.left,
-                Config.OperDlgPlacement.rcNormalPosition.bottom -
-                    Config.OperDlgPlacement.rcNormalPosition.top,
-                Config.OperDlgPlacement.showCmd);
+        operationPlacementReady = FTPFormatString(
+            operationPlacementText, "%d, %d, %u",
+            Config.OperDlgPlacement.rcNormalPosition.right -
+                Config.OperDlgPlacement.rcNormalPosition.left,
+            Config.OperDlgPlacement.rcNormalPosition.bottom -
+                Config.OperDlgPlacement.rcNormalPosition.top,
+            Config.OperDlgPlacement.showCmd);
     }
-    else
-        buf[0] = 0;
-    registry->SetValue(regKey, CONFIG_OPERDLGPOSITION, REG_SZ, buf, -1);
+    if (operationPlacementReady)
+        SetValueSZ(registry, regKey, CONFIG_OPERDLGPOSITION, operationPlacementText.c_str());
 
     dw = (DWORD)(Config.OperDlgSplitPos * 100000);
     registry->SetValue(regKey, CONFIG_OPERDLGSPLITPOS, REG_DWORD, &dw, sizeof(DWORD));
 
-    SaveHistory(registry, regKey, CONFIG_COMMANDHISTORY, Config.CommandHistory, COMMAND_HISTORY_SIZE);
+    SaveWideHistory(registry, regKey, CONFIG_COMMANDHISTORY, Config.CommandHistory, COMMAND_HISTORY_SIZE);
     registry->SetValue(regKey, CONFIG_SENDSECRETCOMMAND, REG_DWORD, &Config.SendSecretCommand, sizeof(DWORD));
 
-    SaveHistory(registry, regKey, CONFIG_HOSTADDRESSHISTORY, Config.HostAddressHistory, HOSTADDRESS_HISTORY_SIZE);
-    SaveHistory(registry, regKey, CONFIG_INITPATHHISTORY, Config.InitPathHistory, INITIALPATH_HISTORY_SIZE);
+    SaveWideHistory(registry, regKey, CONFIG_HOSTADDRESSHISTORY, Config.HostAddressHistory, HOSTADDRESS_HISTORY_SIZE);
+    SaveWideHistory(registry, regKey, CONFIG_INITPATHHISTORY, Config.InitPathHistory, INITIALPATH_HISTORY_SIZE);
 
     registry->SetValue(regKey, CONFIG_ALWAYSRECONNECT, REG_DWORD, &Config.AlwaysReconnect, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_WARNWHENCONLOST, REG_DWORD, &Config.WarnWhenConLost, sizeof(DWORD));
@@ -901,7 +1057,7 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
                                               IMAGE_BITMAP, 16, 16, LR_DEFAULTCOLOR));
     salamander->SetBitmapWithIcons(hBmp);
     HANDLES(DeleteObject(hBmp));
-    salamander->SetChangeDriveMenuItem(LoadStr(IDS_FTPCHNGDRVITEM), 0);
+    salamander->SetChangeDriveMenuItem(SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPCHNGDRVITEM).c_str(), 0);
     salamander->SetPluginIcon(0);
     salamander->SetPluginMenuAndToolbarIcon(0);
 
@@ -929,41 +1085,41 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
 };
 */
 
-    salamander->AddMenuItem(-1, LoadStr(IDS_CONNECTFTPSERVER), SALHOTKEY('F', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CONNECTFTPSERVER).c_str(), SALHOTKEY('F', HOTKEYF_CONTROL | HOTKEYF_SHIFT),
                             FTPCMD_CONNECTFTPSERVER, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_ORGBOOKMARKSCMD), 0, FTPCMD_ORGANIZEBOOKMARKS, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ORGBOOKMARKSCMD).c_str(), 0, FTPCMD_ORGANIZEBOOKMARKS, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_SHOWLOGS), 0, FTPCMD_SHOWLOGS, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SHOWLOGS).c_str(), 0, FTPCMD_SHOWLOGS, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, LoadStr(IDS_DISCONNECT), SALHOTKEY_HINT,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_DISCONNECT).c_str(), SALHOTKEY_HINT,
                             FTPCMD_DISCONNECT_F12, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_SHOWCERT), 0, FTPCMD_SHOWCERT, TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SHOWCERT).c_str(), 0, FTPCMD_SHOWCERT, TRUE,
                             0, 0, MENU_SKILLLEVEL_ALL);
     // start of the Transfer Mode submenu
-    salamander->AddSubmenuStart(-1, LoadStr(IDS_MENUTRANSFERMODE), FTPCMD_TRMODESUBMENU, FALSE,
+    salamander->AddSubmenuStart(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENUTRANSFERMODE).c_str(), FTPCMD_TRMODESUBMENU, FALSE,
                                 MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENUTRMODEAUTO), 0, FTPCMD_TRMODEAUTO, TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENUTRMODEAUTO).c_str(), 0, FTPCMD_TRMODEAUTO, TRUE,
                             0, 0, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENUTRMODEASCII), 0, FTPCMD_TRMODEASCII, TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENUTRMODEASCII).c_str(), 0, FTPCMD_TRMODEASCII, TRUE,
                             0, 0, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_MENUTRMODEBINARY), 0, FTPCMD_TRMODEBINARY, TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MENUTRMODEBINARY).c_str(), 0, FTPCMD_TRMODEBINARY, TRUE,
                             0, 0, MENU_SKILLLEVEL_ALL);
     salamander->AddSubmenuEnd();
     // end of the Transfer Mode submenu
-    salamander->AddMenuItem(-1, LoadStr(IDS_REFRESHPATH), 0, FTPCMD_REFRESHPATH, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_REFRESHPATH).c_str(), 0, FTPCMD_REFRESHPATH, FALSE,
                             MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, LoadStr(IDS_ADDBOOKMARK), 0, FTPCMD_ADDBOOKMARK, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ADDBOOKMARK).c_str(), 0, FTPCMD_ADDBOOKMARK, FALSE,
                             MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-    salamander->AddMenuItem(-1, LoadStr(IDS_SENDFTPCOMMAND), 0, FTPCMD_SENDFTPCOMMAND, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SENDFTPCOMMAND).c_str(), 0, FTPCMD_SENDFTPCOMMAND, FALSE,
                             MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddMenuItem(-1, LoadStr(IDS_SHOWRAWLISTING), 0, FTPCMD_SHOWRAWLISTING, FALSE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SHOWRAWLISTING).c_str(), 0, FTPCMD_SHOWRAWLISTING, FALSE,
                             MENU_EVENT_THIS_PLUGIN_FS, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_ADVANCED);
-    salamander->AddMenuItem(-1, LoadStr(IDS_LISTHIDDENFILES), 0, FTPCMD_LISTHIDDENFILES, TRUE,
+    salamander->AddMenuItem(-1, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_LISTHIDDENFILES).c_str(), 0, FTPCMD_LISTHIDDENFILES, TRUE,
                             0, 0, MENU_SKILLLEVEL_ALL);
 }
 
@@ -1022,47 +1178,36 @@ void CPluginInterface::ClearHistory(HWND parent)
 {
     int i;
     for (i = 0; i < COMMAND_HISTORY_SIZE; i++)
-        if (Config.CommandHistory[i] != NULL)
-        {
-            free(Config.CommandHistory[i]);
-            Config.CommandHistory[i] = NULL;
-        }
+        FTPSecureWipe(Config.CommandHistory[i]);
     for (i = 0; i < HOSTADDRESS_HISTORY_SIZE; i++)
-        if (Config.HostAddressHistory[i] != NULL)
-        {
-            free(Config.HostAddressHistory[i]);
-            Config.HostAddressHistory[i] = NULL;
-        }
+        Config.HostAddressHistory[i].clear();
     for (i = 0; i < INITIALPATH_HISTORY_SIZE; i++)
-        if (Config.InitPathHistory[i] != NULL)
-        {
-            free(Config.InitPathHistory[i]);
-            Config.InitPathHistory[i] = NULL;
-        }
+        Config.InitPathHistory[i].clear();
 }
 
-void CPluginInterface::AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
+void CPluginInterface::AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs)
 {
     // WARNING: in 'includingSubdirs' for FTP paths the value is ORed with 0x02 if it is a "soft refresh"
 
-    BOOL isFTP = SalamanderGeneral->StrNICmp(path, AssignedFSName, AssignedFSNameLen) == 0 &&          // this is our FS-name for FTP
-                 path[AssignedFSNameLen] == ':';                                                       // our FS-name is not just a prefix
-    BOOL isFTPS = SalamanderGeneral->StrNICmp(path, AssignedFSNameFTPS, AssignedFSNameLenFTPS) == 0 && // this is our FS-name for FTPS
-                  path[AssignedFSNameLenFTPS] == ':';                                                  // our FS-name is not just a prefix
+    const size_t pathLength = wcslen(path);
+    BOOL isFTP = pathLength > AssignedFSName.size() &&
+                 SalamanderGeneral->StrNICmp(path, AssignedFSName.c_str(), (int)AssignedFSName.size()) == 0 &&
+                 path[AssignedFSName.size()] == L':';
+    BOOL isFTPS = pathLength > AssignedFSNameFTPS.size() &&
+                  SalamanderGeneral->StrNICmp(path, AssignedFSNameFTPS.c_str(), (int)AssignedFSNameFTPS.size()) == 0 &&
+                  path[AssignedFSNameFTPS.size()] == L':';
 
     if (isFTP || isFTPS)
     {
-        ListingCache.AcceptChangeOnPathNotification(path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1,
+        const size_t assignedFSNameLength = isFTP ? AssignedFSName.size() : AssignedFSNameFTPS.size();
+        ListingCache.AcceptChangeOnPathNotification(path + assignedFSNameLength + 1,
                                                     (includingSubdirs & 0x01)); // drop listings for both FTP and FTPS paths
 
         SalamanderGeneral->RemoveFilesFromCache(path);
 
-        CPathBuffer path2; // build the name for the second FS-name (remove the same name from cache on the other FS-name as a precaution)
-        strcpy(path2, isFTPS ? AssignedFSName : AssignedFSNameFTPS);
-        lstrcpyn(path2 + (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS),
-                 path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS),
-                 path2.Size() - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS));
-        SalamanderGeneral->RemoveFilesFromCache(path2);
+        std::wstring alternatePath = isFTPS ? AssignedFSName : AssignedFSNameFTPS;
+        alternatePath.append(path + assignedFSNameLength);
+        SalamanderGeneral->RemoveFilesFromCache(alternatePath.c_str());
     }
 }
 
@@ -1101,8 +1246,8 @@ void CPluginInterface::PasswordManagerEvent(HWND parent, int event)
     if (!allPasswordsDecrypted)
     {
         // if at least one password could not be decrypted, inform the user about it
-        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_CANNOT_DECRYPT_SOMEPASSWORDS),
-                                         LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANNOT_DECRYPT_SOMEPASSWORDS).c_str(),
+                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
     }
 }
 
@@ -1113,17 +1258,17 @@ void CPluginInterface::PasswordManagerEvent(HWND parent, int event)
 
 void CFTPServer::Init()
 {
-    ItemName = NULL;
-    Address = NULL;
-    InitialPath = NULL;
+    ItemName.clear();
+    Address.clear();
+    InitialPath.clear();
     AnonymousConnection = TRUE;
-    UserName = NULL;
+    UserName.clear();
     EncryptedPassword = NULL;
     EncryptedPasswordSize = 0;
     SavePassword = FALSE;
     ProxyServerUID = -2;
-    TargetPanelPath = NULL;
-    ServerType = NULL;
+    TargetPanelPath.clear();
+    ServerType.clear();
     TransferMode = 0;
     Port = IPPORT_FTP;
     UsePassiveMode = 2;
@@ -1145,68 +1290,46 @@ void CFTPServer::Init()
 
 void CFTPServer::Release()
 {
-    if (ItemName != NULL)
-        SalamanderGeneral->Free(ItemName);
-    if (Address != NULL)
-        SalamanderGeneral->Free(Address);
-    if (InitialPath != NULL)
-        SalamanderGeneral->Free(InitialPath);
-    if (UserName != NULL)
-        SalamanderGeneral->Free(UserName);
     if (EncryptedPassword != NULL)
     {
         memset(EncryptedPassword, 0, EncryptedPasswordSize); // clean memory containing the password
         SalamanderGeneral->Free(EncryptedPassword);
     }
-    if (TargetPanelPath != NULL)
-        SalamanderGeneral->Free(TargetPanelPath);
-    // std::string members (InitFTPCommands, ListCommand) are automatically freed
-    if (ServerType != NULL)
-        SalamanderGeneral->Free(ServerType);
-    // ListCommand is std::string, automatically freed
     Init();
 }
 
-CFTPServer*
-CFTPServer::MakeCopy()
+// Some parser/configuration records remain explicitly encoded byte structures.
+// Duplicate those byte fields directly instead of routing them through the wide SDK.
+static char* DupStrA(const char* s)
 {
-    CFTPServer* n = new CFTPServer;
-    if (n != NULL)
+    if (s == NULL)
+        return NULL;
+    size_t len = strlen(s) + 1;
+    char* p = (char*)SalamanderGeneral->Alloc((int)len);
+    if (p != NULL)
+        memcpy(p, s, len);
+    return p;
+}
+
+CFTPServer*
+CFTPServer::MakeCopy() noexcept
+{
+    CFTPServer* n = NULL;
+    try
     {
-        n->ItemName = SalamanderGeneral->DupStr(ItemName);
-        n->Address = SalamanderGeneral->DupStr(Address);
-        n->InitialPath = SalamanderGeneral->DupStr(InitialPath);
-        n->AnonymousConnection = AnonymousConnection;
-        if (!AnonymousConnection)
+        n = new CFTPServer;
+        if (n != NULL && !n->Set(*this))
         {
-            n->UserName = SalamanderGeneral->DupStr(UserName);
-            n->EncryptedPassword = DupEncryptedPassword(EncryptedPassword, EncryptedPasswordSize);
-            n->EncryptedPasswordSize = EncryptedPasswordSize;
-            n->SavePassword = SavePassword;
+            delete n;
+            n = NULL;
         }
-        n->ProxyServerUID = ProxyServerUID;
-        n->TargetPanelPath = SalamanderGeneral->DupStr(TargetPanelPath);
-        n->ServerType = SalamanderGeneral->DupStr(ServerType);
-        n->TransferMode = TransferMode;
-        n->Port = Port;
-        n->UsePassiveMode = UsePassiveMode;
-        n->KeepConnectionAlive = KeepConnectionAlive;
-        n->KeepAliveSendEvery = KeepAliveSendEvery;
-        n->KeepAliveStopAfter = KeepAliveStopAfter;
-        n->KeepAliveCommand = KeepAliveCommand;
-        n->UseMaxConcurrentConnections = UseMaxConcurrentConnections;
-        n->MaxConcurrentConnections = MaxConcurrentConnections;
-        n->UseServerSpeedLimit = UseServerSpeedLimit;
-        n->ServerSpeedLimit = ServerSpeedLimit;
-        n->InitFTPCommands = InitFTPCommands;
-        n->UseListingsCache = UseListingsCache;
-        n->ListCommand = ListCommand;
-        n->EncryptControlConnection = EncryptControlConnection;
-        n->EncryptDataConnection = EncryptDataConnection;
-        n->CompressData = CompressData;
     }
-    else
+    catch (...)
+    {
+        delete n;
+        n = NULL;
         TRACE_E(LOW_MEMORY);
+    }
     return n;
 }
 
@@ -1214,7 +1337,9 @@ void UpdateStr(char*& str, const char* newStr, BOOL* err, BOOL clearMem)
 {
     if (str == NULL) // there is no previous version of the string
     {
-        str = SalamanderGeneral->DupStr(newStr);
+        str = DupStrA(newStr);
+        if (newStr != NULL && str == NULL && err != NULL)
+            *err = TRUE;
     }
     else // an older version of the string exists
     {
@@ -1225,7 +1350,7 @@ void UpdateStr(char*& str, const char* newStr, BOOL* err, BOOL clearMem)
                 if (strlen(str) < strlen(newStr)) // the new string is longer (not enough space, reallocation needed)
                 {
                     char* old = str;
-                    str = SalamanderGeneral->DupStr(newStr);
+                    str = DupStrA(newStr);
                     if (str != NULL)
                     {
                         if (clearMem)
@@ -1233,7 +1358,11 @@ void UpdateStr(char*& str, const char* newStr, BOOL* err, BOOL clearMem)
                         SalamanderGeneral->Free(old);
                     }
                     else
+                    {
                         str = old; // allocation failed, keep the older version of the string
+                        if (err != NULL)
+                            *err = TRUE;
+                    }
                 }
                 else
                 {
@@ -1253,16 +1382,113 @@ void UpdateStr(char*& str, const char* newStr, BOOL* err, BOOL clearMem)
     }
 }
 
-BOOL CFTPServer::Set(const char* itemName,
-                     const char* address,
-                     const char* initialPath,
+void FTPSecureWipe(std::wstring& password) noexcept
+{
+    if (!password.empty())
+        SecureZeroMemory(password.data(), password.size() * sizeof(wchar_t));
+    password.clear();
+}
+
+void FTPSecureWipe(std::string& password) noexcept
+{
+    if (!password.empty())
+        SecureZeroMemory(password.data(), password.size());
+    password.clear();
+}
+
+BOOL FTPEncryptPasswordW(CSalamanderPasswordManagerAbstract* passwordManager,
+                         const wchar_t* plainPassword, BYTE** encryptedPassword,
+                         int* encryptedPasswordSize, BOOL encrypt) noexcept
+{
+    if (passwordManager == NULL || plainPassword == NULL ||
+        encryptedPassword == NULL || encryptedPasswordSize == NULL)
+        return FALSE;
+    BYTE* stagedPassword = NULL;
+    int stagedPasswordSize = 0;
+    try
+    {
+        if (!passwordManager->EncryptPassword(plainPassword, &stagedPassword,
+                                              &stagedPasswordSize, encrypt))
+        {
+            if (stagedPassword != NULL)
+            {
+                if (stagedPasswordSize > 0)
+                    SecureZeroMemory(stagedPassword, stagedPasswordSize);
+                SalamanderGeneral->Free(stagedPassword);
+            }
+            return FALSE;
+        }
+        *encryptedPassword = stagedPassword;
+        *encryptedPasswordSize = stagedPasswordSize;
+        return TRUE;
+    }
+    catch (...)
+    {
+        if (stagedPassword != NULL)
+        {
+            if (stagedPasswordSize > 0)
+                SecureZeroMemory(stagedPassword, stagedPasswordSize);
+            SalamanderGeneral->Free(stagedPassword);
+        }
+        return FALSE;
+    }
+}
+
+BOOL FTPDecryptPasswordW(CSalamanderPasswordManagerAbstract* passwordManager,
+                         const BYTE* encryptedPassword, int encryptedPasswordSize,
+                         std::wstring* plainPassword) noexcept
+{
+    if (passwordManager == NULL)
+        return FALSE;
+    CSalamanderStringBufferOwner owner;
+    auto wipeOwner = [&owner]() noexcept
+    {
+        CSalamanderStringBuffer* buffer = owner.Buffer();
+        if (buffer != NULL && buffer->Data != NULL)
+            SecureZeroMemory(buffer->Data, buffer->Capacity * sizeof(wchar_t));
+    };
+    try
+    {
+        if (plainPassword == NULL)
+            return passwordManager->DecryptPassword(encryptedPassword, encryptedPasswordSize, NULL);
+
+        if (!owner.IsValid() ||
+            !passwordManager->DecryptPassword(encryptedPassword, encryptedPasswordSize,
+                                              owner.Buffer()))
+        {
+            wipeOwner();
+            return FALSE;
+        }
+
+        std::wstring staged;
+        const BOOL result = owner.GetValue(staged);
+        wipeOwner();
+        if (!result)
+        {
+            FTPSecureWipe(staged);
+            return FALSE;
+        }
+        plainPassword->swap(staged);
+        FTPSecureWipe(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        wipeOwner();
+        return FALSE;
+    }
+}
+
+BOOL CFTPServer::Set(const wchar_t* itemName,
+                     const wchar_t* address,
+                     const wchar_t* initialPath,
                      int anonymousConnection,
-                     const char* userName,
+                     const wchar_t* userName,
                      const BYTE* encryptedPassword,
                      int encryptedPasswordSize,
                      int savePassword,
                      int proxyServerUID,
-                     const char* targetPanelPath,
+                     const wchar_t* targetPanelPath,
                      const char* serverType,
                      int transferMode,
                      int port,
@@ -1280,19 +1506,51 @@ BOOL CFTPServer::Set(const char* itemName,
                      int keepAliveCommand,
                      int encryptControlConnection,
                      int encryptDataConnection,
-                     int compressData)
+                     int compressData) noexcept
 {
-    BOOL err = FALSE;
-    UpdateStr(ItemName, itemName, &err);
-    UpdateStr(Address, address, &err);
-    UpdateStr(InitialPath, initialPath, &err);
+    if (encryptedPassword != NULL && encryptedPasswordSize <= 0)
+        return FALSE;
+    std::wstring stagedItemName;
+    std::wstring stagedAddress;
+    std::wstring stagedUserName;
+    std::wstring stagedTargetPanelPath;
+    std::wstring stagedInitialPath;
+    std::string stagedServerType;
+    std::string stagedInitFTPCommands;
+    std::string stagedListCommand;
+    if (!FtpStoreWideText(itemName != NULL ? itemName : L"", stagedItemName) ||
+        !FtpStoreWideText(address != NULL ? address : L"", stagedAddress) ||
+        !FtpStoreWideText(!anonymousConnection && userName != NULL ? userName : L"", stagedUserName) ||
+        !FtpStoreWideText(targetPanelPath != NULL ? targetPanelPath : L"", stagedTargetPanelPath) ||
+        !FtpStoreWideText(initialPath != NULL ? initialPath : L"", stagedInitialPath) ||
+        !FtpStoreLocalTextBytes(serverType != NULL ? serverType : "", stagedServerType) ||
+        !FtpStoreProtocolBytes(initFTPCommands != NULL ? initFTPCommands : "", stagedInitFTPCommands) ||
+        !FtpStoreProtocolBytes(listCommand != NULL ? listCommand : "", stagedListCommand))
+        return FALSE;
+
+    BYTE* stagedEncryptedPassword = NULL;
+    int stagedEncryptedPasswordSize = 0;
+    if (!anonymousConnection && encryptedPassword != NULL && encryptedPasswordSize > 0)
+    {
+        stagedEncryptedPassword = DupEncryptedPassword(encryptedPassword, encryptedPasswordSize);
+        if (stagedEncryptedPassword == NULL)
+            return FALSE;
+        stagedEncryptedPasswordSize = encryptedPasswordSize;
+    }
+
+    BYTE* oldEncryptedPassword = EncryptedPassword;
+    int oldEncryptedPasswordSize = EncryptedPasswordSize;
+    ItemName.swap(stagedItemName);
+    Address.swap(stagedAddress);
+    InitialPath.swap(stagedInitialPath);
     AnonymousConnection = anonymousConnection;
-    UpdateStr(UserName, userName, &err);
-    UpdateEncryptedPassword(&EncryptedPassword, &EncryptedPasswordSize, encryptedPassword, encryptedPasswordSize);
-    SavePassword = savePassword;
+    UserName.swap(stagedUserName);
+    EncryptedPassword = stagedEncryptedPassword;
+    EncryptedPasswordSize = stagedEncryptedPasswordSize;
+    SavePassword = anonymousConnection ? FALSE : savePassword;
     ProxyServerUID = proxyServerUID;
-    UpdateStr(TargetPanelPath, targetPanelPath, &err);
-    UpdateStr(ServerType, serverType, &err);
+    TargetPanelPath.swap(stagedTargetPanelPath);
+    ServerType.swap(stagedServerType);
     TransferMode = transferMode;
     Port = port;
     UsePassiveMode = usePassiveMode;
@@ -1304,13 +1562,19 @@ BOOL CFTPServer::Set(const char* itemName,
     MaxConcurrentConnections = maxConcurrentConnections;
     UseServerSpeedLimit = useServerSpeedLimit;
     ServerSpeedLimit = serverSpeedLimit;
-    InitFTPCommands = initFTPCommands != NULL ? initFTPCommands : "";
+    InitFTPCommands.swap(stagedInitFTPCommands);
     UseListingsCache = useListingsCache;
-    ListCommand = listCommand != NULL ? listCommand : "";
+    ListCommand.swap(stagedListCommand);
     EncryptControlConnection = encryptControlConnection;
     EncryptDataConnection = encryptDataConnection;
     CompressData = compressData;
-    return !err;
+
+    if (oldEncryptedPassword != NULL)
+    {
+        SecureZeroMemory(oldEncryptedPassword, oldEncryptedPasswordSize);
+        SalamanderGeneral->Free(oldEncryptedPassword);
+    }
+    return TRUE;
 }
 
 const char* GetStrOrNULL(const char* s)
@@ -1338,45 +1602,9 @@ unsigned char ScrambleTable[256] =
         206, 222, 188, 152, 210, 243, 96, 41, 86, 180, 101, 177, 166, 141, 212, 116};
 
 BOOL InitUnscrambleTable = TRUE;
-BOOL InitSRand = TRUE;
 unsigned char UnscrambleTable[256];
 
-void ScramblePassword(char* password)
-{
-    // padding + units of length + tens of length + hundreds of length + password
-    char buf[PASSWORD_MAX_SIZE + 50];
-    int len = (int)strlen(password);
-    if (InitSRand)
-    {
-        srand((unsigned)time(NULL));
-        InitSRand = FALSE;
-    }
-    int padding = (((len + 3) / 17) * 17 + 17) - 3 - len;
-    int i;
-    for (i = 0; i < padding; i++)
-    {
-        int p = 0;
-        while (p <= 0 || p > 255 || p >= '0' && p <= '9')
-            p = (int)((double)rand() / ((double)RAND_MAX / 256.0));
-        buf[i] = (unsigned char)p;
-    }
-    buf[padding] = '0' + (len % 10);
-    buf[padding + 1] = '0' + ((len / 10) % 10);
-    buf[padding + 2] = '0' + ((len / 100) % 10);
-    strcpy(buf + padding + 3, password);
-    char* s = buf;
-    int last = 31;
-    while (*s != 0)
-    {
-        last = (last + (unsigned char)*s) % 255 + 1;
-        *s = ScrambleTable[last];
-        s++;
-    }
-    strcpy(password, buf);
-    memset(buf, 0, PASSWORD_MAX_SIZE + 50); // clean memory containing the password
-}
-
-void UnscramblePassword(char* password)
+static BOOL UnscramblePassword(std::string& password) noexcept
 {
     if (InitUnscrambleTable)
     {
@@ -1388,10 +1616,10 @@ void UnscramblePassword(char* password)
         InitUnscrambleTable = FALSE;
     }
 
-    char backup[PASSWORD_MAX_SIZE + 50]; // backup for TRACE_E
-    lstrcpyn(backup, password, PASSWORD_MAX_SIZE + 50);
-
-    char* s = password;
+    std::string staged;
+    if (!FtpStoreProtocolBytes(password.c_str(), staged))
+        return FALSE;
+    char* s = staged.data();
     int last = 31;
     while (*s != 0)
     {
@@ -1403,7 +1631,7 @@ void UnscramblePassword(char* password)
         s++;
     }
 
-    s = password;
+    s = staged.data();
     while (*s != 0 && (*s < '0' || *s > '9'))
         s++; // find the length of the password
     BOOL ok = FALSE;
@@ -1411,22 +1639,26 @@ void UnscramblePassword(char* password)
     {
         int len = (s[0] - '0') + 10 * (s[1] - '0') + 100 * (s[2] - '0');
         int total = (((len + 3) / 17) * 17 + 17);
-        int passwordLen = (int)strlen(password);
-        if (len >= 0 && total == passwordLen && total - (s - password) - 3 == len)
+        int passwordLen = (int)staged.size();
+        if (len >= 0 && total == passwordLen && total - (s - staged.data()) - 3 == len)
         {
-            memmove(password, password + passwordLen - len, len + 1);
+            staged.erase(0, passwordLen - len);
             ok = TRUE;
         }
     }
     if (!ok)
     {
-        password[0] = 0; // some error occurred, discard the password
-        TRACE_E("Unable to unscramble password! scrambled=" << backup);
+        FTPSecureWipe(staged);
+        TRACE_E("Unable to unscramble legacy password");
+        return FALSE;
     }
-    memset(backup, 0, PASSWORD_MAX_SIZE + 50); // clean memory containing the password
+    FTPSecureWipe(password);
+    password.swap(staged);
+    FTPSecureWipe(staged);
+    return TRUE;
 }
 
-void LoadPassword(HKEY regKey, CSalamanderRegistryAbstract* registry, const char* oldPwdName, const char* scrambledPwdName, const char* encryptedPwdName, BYTE** encryptedPassword, int* encryptedPasswordSize)
+void LoadPassword(HKEY regKey, CSalamanderRegistryAbstract* registry, const wchar_t* oldPwdName, const wchar_t* scrambledPwdName, const wchar_t* encryptedPwdName, BYTE** encryptedPassword, int* encryptedPasswordSize)
 {
     *encryptedPassword = NULL;
     *encryptedPasswordSize = 0;
@@ -1435,62 +1667,72 @@ void LoadPassword(HKEY regKey, CSalamanderRegistryAbstract* registry, const char
     // in the first step try to fetch the AES-encrypted or scrambled version of the password
     DWORD gotType;
     DWORD bufferSize;
-    const char* keyName = encryptedPwdName;
+    const wchar_t* keyName = encryptedPwdName;
     LONG res = SalamanderGeneral->SalRegQueryValueEx(regKey, keyName, 0, &gotType, NULL, &bufferSize);
     if (res != ERROR_SUCCESS || gotType != REG_BINARY || bufferSize == 0)
     {
         keyName = scrambledPwdName;
         res = SalamanderGeneral->SalRegQueryValueEx(regKey, keyName, 0, &gotType, NULL, &bufferSize);
     }
-    if (res == ERROR_SUCCESS && gotType == REG_BINARY && bufferSize != 0)
+    if (res == ERROR_SUCCESS && gotType == REG_BINARY && bufferSize != 0 && bufferSize <= INT_MAX)
     {
         BYTE* passwordReg = (BYTE*)SalamanderGeneral->Alloc(bufferSize);
-        if (registry->GetValue(regKey, keyName, REG_BINARY, passwordReg, bufferSize))
+        if (passwordReg != NULL && registry->GetValue(regKey, keyName, REG_BINARY, passwordReg, bufferSize))
         {
             *encryptedPassword = passwordReg;
-            *encryptedPasswordSize = bufferSize;
+            *encryptedPasswordSize = static_cast<int>(bufferSize);
             passwordFound = TRUE;
         }
-        else
+        else if (passwordReg != NULL)
             SalamanderGeneral->Free(passwordReg);
     }
 
     // this may be the original FTP-scrambled version of the password
     if (!passwordFound)
     {
-        char passwordReg[PASSWORD_MAX_SIZE + 50];
-        if (registry->GetValue(regKey, oldPwdName, REG_SZ, passwordReg, PASSWORD_MAX_SIZE + 50))
+        std::wstring passwordRegW;
+        std::string passwordReg;
+        if (SPLRegistryGetStringOwned(registry, regKey, oldPwdName, passwordRegW) &&
+            DecodeRegSzToNarrowOwned(passwordRegW.c_str(), passwordReg))
         {
-            char password[PASSWORD_MAX_SIZE + 50]; // 50 is a reserve for scrambling (the password gets longer)
-
             // obtain the plain password using the original FTP-scrambled method
-            ConvertStringRegToTxt(password, PASSWORD_MAX_SIZE, passwordReg);
-            UnscramblePassword(password);
+            std::string password;
+            const BOOL decoded = FtpDecodePersistedText(passwordReg.c_str(), password) &&
+                                 UnscramblePassword(password);
 
-            if (password[0] != 0)
+            if (decoded && !password.empty())
             {
                 // at this moment it is possible that the master password usage is enabled and MP is entered, so we could
                 // keep the password encrypted in that case, but we will not complicate matters and postpone possible AES
                 // encryption until saving the plug-in configuration; for now we keep the password only scrambled
-                passwordManager->EncryptPassword(password, encryptedPassword, encryptedPasswordSize, FALSE);
+                std::wstring passwordW;
+                if (FtpDecodeLocalText(password.c_str(), passwordW))
+                {
+                    FTPEncryptPasswordW(passwordManager, passwordW.c_str(), encryptedPassword,
+                                        encryptedPasswordSize, FALSE);
+                    FTPSecureWipe(passwordW);
+                }
             }
+            FTPSecureWipe(password);
         }
+        FTPSecureWipe(passwordRegW);
+        FTPSecureWipe(passwordReg);
     }
 }
 
 BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
-    char itemName[BOOKMARKNAME_MAX_SIZE];
-    char address[HOST_MAX_SIZE];
-    CPathBuffer initialPath;
+    std::wstring itemName = ItemName;
+    std::wstring address = Address;
+    std::wstring initialPath = InitialPath;
     int anonymousConnection;
-    char userName[USER_MAX_SIZE];
+    std::wstring userName = UserName;
     BYTE* encryptedPassword;
     int encryptedPasswordSize;
     int savePassword;
     int proxyServerUID;
-    CPathBuffer targetPanelPath; // Heap-allocated for long path support
-    char serverType[SERVERTYPE_MAX_SIZE];
+    std::wstring targetPanelPath = TargetPanelPath;
+    std::string serverType = ServerType;
     int transferMode;
     int port;
     int usePassiveMode;
@@ -1503,23 +1745,17 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     int useServerSpeedLimit;
     double serverSpeedLimit;
     int useListingsCache;
-    CPathBuffer initFTPCommands;
-    char listCommand[FTPCOMMAND_MAX_SIZE];
+    std::string initFTPCommands = InitFTPCommands;
+    std::string listCommand = ListCommand;
     int encryptControlConnection, encryptDataConnection;
     int compressData;
 
     // take over default values (the object is clean, just initialized)
-    strcpy(itemName, HandleNULLStr(ItemName));
-    strcpy(address, HandleNULLStr(Address));
-    strcpy(initialPath, HandleNULLStr(InitialPath));
     anonymousConnection = AnonymousConnection;
-    strcpy(userName, HandleNULLStr(UserName));
     encryptedPassword = NULL;
     encryptedPasswordSize = 0;
     savePassword = SavePassword;
     proxyServerUID = ProxyServerUID;
-    lstrcpyn(targetPanelPath, HandleNULLStr(TargetPanelPath), targetPanelPath.Size());
-    strcpy(serverType, HandleNULLStr(ServerType));
     transferMode = TransferMode;
     port = Port;
     usePassiveMode = UsePassiveMode;
@@ -1532,18 +1768,16 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     useServerSpeedLimit = UseServerSpeedLimit;
     serverSpeedLimit = ServerSpeedLimit;
     useListingsCache = UseListingsCache;
-    strcpy(initFTPCommands, InitFTPCommands.c_str());
-    strcpy(listCommand, ListCommand.c_str());
     encryptControlConnection = EncryptControlConnection;
     encryptDataConnection = EncryptDataConnection;
     compressData = CompressData;
 
-    if (!registry->GetValue(regKey, CONFIG_FTPSRVNAME, REG_SZ, itemName, BOOKMARKNAME_MAX_SIZE))
+    if (!GetValueStringW(registry, regKey, CONFIG_FTPSRVNAME, itemName))
         return FALSE; // the name is mandatory
-    registry->GetValue(regKey, CONFIG_FTPSRVADDRESS, REG_SZ, address, HOST_MAX_SIZE);
-    registry->GetValue(regKey, CONFIG_FTPSRVPATH, REG_SZ, initialPath, initialPath.Size());
+    GetValueStringW(registry, regKey, CONFIG_FTPSRVADDRESS, address);
+    GetValueStringW(registry, regKey, CONFIG_FTPSRVPATH, initialPath);
     registry->GetValue(regKey, CONFIG_FTPSRVANONYM, REG_DWORD, &anonymousConnection, sizeof(DWORD));
-    registry->GetValue(regKey, CONFIG_FTPSRVUSER, REG_SZ, userName, USER_MAX_SIZE);
+    GetValueStringW(registry, regKey, CONFIG_FTPSRVUSER, userName);
 
     LoadPassword(regKey, registry, CONFIG_FTPSRVPASSWD_OLD, CONFIG_FTPSRVPASSWD_SCRAMBLED, CONFIG_FTPSRVPASSWD_ENCRYPTED, &encryptedPassword, &encryptedPasswordSize);
 
@@ -1556,8 +1790,8 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     {
         proxyServerUID = -2; // "default"
     }
-    registry->GetValue(regKey, CONFIG_FTPSRVTGTPATH, REG_SZ, targetPanelPath, targetPanelPath.Size());
-    registry->GetValue(regKey, CONFIG_FTPSRVTYPE, REG_SZ, serverType, SERVERTYPE_MAX_SIZE);
+    GetValueStringW(registry, regKey, CONFIG_FTPSRVTGTPATH, targetPanelPath);
+    GetValueSZ(registry, regKey, CONFIG_FTPSRVTYPE, serverType);
     registry->GetValue(regKey, CONFIG_FTPSRVTRANSFMODE, REG_DWORD, &transferMode, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVPORT, REG_DWORD, &port, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVPASV, REG_DWORD, &usePassiveMode, sizeof(DWORD));
@@ -1571,33 +1805,33 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
         if (maxConcurrentConnections == -1)
             maxConcurrentConnections = MaxConcurrentConnections; // do not leave -1 there -> use the default value
     }
-    char num[30];
-    if (registry->GetValue(regKey, CONFIG_FTPSRVSPDLIM, REG_SZ, num, 30))
+    std::string speedLimitText;
+    if (GetValueSZ(registry, regKey, CONFIG_FTPSRVSPDLIM, speedLimitText))
     {
-        serverSpeedLimit = atof(num);
+        serverSpeedLimit = atof(speedLimitText.c_str());
         useServerSpeedLimit = (serverSpeedLimit == -1 ? 0 : 1);
         if (serverSpeedLimit == -1)
             serverSpeedLimit = ServerSpeedLimit; // do not leave -1 there -> use the default value
     }
     registry->GetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &useListingsCache, sizeof(DWORD));
-    registry->GetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, initFTPCommands, initFTPCommands.Size());
-    registry->GetValue(regKey, CONFIG_FTPSRVLISTCMD, REG_SZ, listCommand, FTPCOMMAND_MAX_SIZE);
-    if (strcmp(listCommand, LIST_CMD_TEXT) == 0)
-        listCommand[0] = 0;
+    GetValueSZ(registry, regKey, CONFIG_FTPSRVINITFTPCMDS, initFTPCommands);
+    GetValueSZ(registry, regKey, CONFIG_FTPSRVLISTCMD, listCommand);
+    if (listCommand == LIST_CMD_TEXT)
+        listCommand.clear();
     registry->GetValue(regKey, CONFIG_FTPSRVENCRYPTCONTROLCONNECTION, REG_DWORD, &encryptControlConnection, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVENCRYPTDATACONNECTION, REG_DWORD, &encryptDataConnection, sizeof(DWORD));
     registry->GetValue(regKey, CONFIG_FTPSRVCOMPRESSDATA, REG_DWORD, &compressData, sizeof(DWORD));
 
-    BOOL ret = Set(itemName,
-                   GetStrOrNULL(address),
-                   GetStrOrNULL(initialPath),
+    BOOL ret = Set(itemName.c_str(),
+                   address.c_str(),
+                   initialPath.empty() ? NULL : initialPath.c_str(),
                    anonymousConnection,
-                   GetStrOrNULL(userName),
+                   userName.c_str(),
                    encryptedPassword, encryptedPasswordSize,
                    savePassword,
                    proxyServerUID,
-                   GetStrOrNULL(targetPanelPath),
-                   GetStrOrNULL(serverType),
+                   targetPanelPath.c_str(),
+                   GetStrOrNULL(serverType.c_str()),
                    transferMode,
                    port,
                    usePassiveMode,
@@ -1607,8 +1841,8 @@ BOOL CFTPServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
                    useServerSpeedLimit,
                    serverSpeedLimit,
                    useListingsCache,
-                   GetStrOrNULL(initFTPCommands),
-                   GetStrOrNULL(listCommand),
+                   GetStrOrNULL(initFTPCommands.c_str()),
+                   GetStrOrNULL(listCommand.c_str()),
                    keepAliveSendEvery,
                    keepAliveStopAfter,
                    keepAliveCommand,
@@ -1628,47 +1862,53 @@ BOOL IsNotEmptyStr(const char* s)
     return s != NULL && *s != 0;
 }
 
-BYTE* DupEncryptedPassword(const BYTE* password, int size)
+BYTE* DupEncryptedPassword(const BYTE* password, int size) noexcept
 {
-    if (password == NULL || size == 0)
+    if (password == NULL || size <= 0)
         return NULL;
 
     BYTE* buf = (BYTE*)SalamanderGeneral->Alloc(size);
-    memcpy(buf, password, size);
+    if (buf != NULL)
+        memcpy(buf, password, size);
     return buf;
 }
 
-void UpdateEncryptedPassword(BYTE** password, int* passwordSize, const BYTE* newPassword, int newPasswordSize)
+BOOL UpdateEncryptedPassword(BYTE** password, int* passwordSize, const BYTE* newPassword, int newPasswordSize) noexcept
 {
-    if (*password != NULL)
+    if (password == NULL || passwordSize == NULL ||
+        (newPassword != NULL && newPasswordSize <= 0))
+        return FALSE;
+    if (newPassword == *password)
+        return TRUE;
+
+    BYTE* stagedPassword = DupEncryptedPassword(newPassword, newPasswordSize);
+    if (newPassword != NULL && newPasswordSize > 0 && stagedPassword == NULL)
+        return FALSE;
+
+    BYTE* oldPassword = *password;
+    int oldPasswordSize = *passwordSize;
+    *password = stagedPassword;
+    *passwordSize = stagedPassword != NULL ? newPasswordSize : 0;
+    if (oldPassword != NULL)
     {
-        if (newPassword == *password)
-            return; // assigning the same password (no change should occur)
-        memset(*password, 0, *passwordSize);
-        SalamanderGeneral->Free(*password);
-        *password = NULL;
+        SecureZeroMemory(oldPassword, oldPasswordSize);
+        SalamanderGeneral->Free(oldPassword);
     }
-    *passwordSize = 0;
-    if (newPassword != NULL)
-    {
-        *password = (BYTE*)SalamanderGeneral->Alloc(newPasswordSize);
-        memcpy(*password, newPassword, newPasswordSize);
-        *passwordSize = newPasswordSize;
-    }
+    return TRUE;
 }
 
 void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
-    registry->SetValue(regKey, CONFIG_FTPSRVNAME, REG_SZ, HandleNULLStr(ItemName), -1);
-    if (IsNotEmptyStr(Address))
-        registry->SetValue(regKey, CONFIG_FTPSRVADDRESS, REG_SZ, Address, -1);
-    if (IsNotEmptyStr(InitialPath))
-        registry->SetValue(regKey, CONFIG_FTPSRVPATH, REG_SZ, InitialPath, -1);
+    SetValueStringW(registry, regKey, CONFIG_FTPSRVNAME, ItemName);
+    if (!Address.empty())
+        SetValueStringW(registry, regKey, CONFIG_FTPSRVADDRESS, Address);
+    if (!InitialPath.empty())
+        SetValueStringW(registry, regKey, CONFIG_FTPSRVPATH, InitialPath);
     registry->SetValue(regKey, CONFIG_FTPSRVANONYM, REG_DWORD, &AnonymousConnection, sizeof(DWORD));
     if (!AnonymousConnection)
     {
-        if (IsNotEmptyStr(UserName))
-            registry->SetValue(regKey, CONFIG_FTPSRVUSER, REG_SZ, UserName, -1);
+        if (!UserName.empty())
+            SetValueStringW(registry, regKey, CONFIG_FTPSRVUSER, UserName);
 
         if (SavePassword)
         {
@@ -1684,10 +1924,10 @@ void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
 
     if (ProxyServerUID != -2)
         registry->SetValue(regKey, CONFIG_FTPSRVPROXYSRVUID, REG_DWORD, &ProxyServerUID, sizeof(DWORD));
-    if (IsNotEmptyStr(TargetPanelPath))
-        registry->SetValue(regKey, CONFIG_FTPSRVTGTPATH, REG_SZ, TargetPanelPath, -1);
-    if (IsNotEmptyStr(ServerType))
-        registry->SetValue(regKey, CONFIG_FTPSRVTYPE, REG_SZ, ServerType, -1);
+    if (!TargetPanelPath.empty())
+        SetValueStringW(registry, regKey, CONFIG_FTPSRVTGTPATH, TargetPanelPath);
+    if (!ServerType.empty())
+        SetValueSZ(registry, regKey, CONFIG_FTPSRVTYPE, ServerType.c_str());
     if (TransferMode != 0)
         registry->SetValue(regKey, CONFIG_FTPSRVTRANSFMODE, REG_DWORD, &TransferMode, sizeof(DWORD));
     if (Port != IPPORT_FTP)
@@ -1713,16 +1953,17 @@ void CFTPServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* reg
     }
     if (UseServerSpeedLimit != 2)
     {
-        char num[30];
-        sprintf(num, "%g", (UseServerSpeedLimit == 1 ? ServerSpeedLimit : -1.0));
-        registry->SetValue(regKey, CONFIG_FTPSRVSPDLIM, REG_SZ, num, -1);
+        std::string speedLimitText;
+        if (FTPFormatString(speedLimitText, "%g",
+                            UseServerSpeedLimit == 1 ? ServerSpeedLimit : -1.0))
+            SetValueSZ(registry, regKey, CONFIG_FTPSRVSPDLIM, speedLimitText.c_str());
     }
     if (UseListingsCache != 2)
         registry->SetValue(regKey, CONFIG_FTPSRVUSELISTINGSCACHE, REG_DWORD, &UseListingsCache, sizeof(DWORD));
     if (!InitFTPCommands.empty())
-        registry->SetValue(regKey, CONFIG_FTPSRVINITFTPCMDS, REG_SZ, InitFTPCommands.c_str(), -1);
+        SetValueSZ(registry, regKey, CONFIG_FTPSRVINITFTPCMDS, InitFTPCommands.c_str());
     if (!ListCommand.empty())
-        registry->SetValue(regKey, CONFIG_FTPSRVLISTCMD, REG_SZ, ListCommand.c_str(), -1);
+        SetValueSZ(registry, regKey, CONFIG_FTPSRVLISTCMD, ListCommand.c_str());
 
     if (EncryptControlConnection != 0)
         registry->SetValue(regKey, CONFIG_FTPSRVENCRYPTCONTROLCONNECTION, REG_DWORD, &EncryptControlConnection, sizeof(DWORD));
@@ -1745,10 +1986,11 @@ BOOL CFTPServer::EnsurePasswordCanBeDecrypted(HWND hParent)
                 return FALSE; // the user did not enter the correct master password
         }
         // verify that this is the correct master password for this password
-        if (!passwordManager->DecryptPassword(EncryptedPassword, EncryptedPasswordSize, NULL))
+        if (!FTPDecryptPasswordW(passwordManager, EncryptedPassword,
+                                 EncryptedPasswordSize, NULL))
         {
-            int ret = SalamanderGeneral->SalMessageBox(hParent, LoadStr(IDS_CANNOT_DECRYPT_PASSWORD_DELETE),
-                                                       LoadStr(IDS_FTPERRORTITLE), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
+            int ret = SalamanderGeneral->SalMessageBox(hParent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANNOT_DECRYPT_PASSWORD_DELETE).c_str(),
+                                                       SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
             if (ret == IDNO)
                 return FALSE; // failed to decrypt the password
 

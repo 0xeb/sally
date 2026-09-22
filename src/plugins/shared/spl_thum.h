@@ -134,7 +134,7 @@ public:
     //     - if it returns FALSE, cleanup and exit (interruption due to path change)
     //     - continue in the LOOP until the entire image is passed
     //   - cleanup and exit
-    virtual BOOL WINAPI LoadThumbnail(const char* filename, int thumbWidth, int thumbHeight,
+    virtual BOOL WINAPI LoadThumbnail(const wchar_t* filename, int thumbWidth, int thumbHeight,
                                       CSalamanderThumbnailMakerAbstract* thumbMaker,
                                       BOOL fastThumbnail) = 0;
 };

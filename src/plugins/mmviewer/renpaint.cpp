@@ -50,9 +50,13 @@ int CRendererWindow::ComputeExtents(HDC hDC, SIZE& s, BOOL value, BOOL computeHe
 
         if (item->Name && item->Value) // if this is not a header
         {
-            const char* str = value ? item->Value : item->Name;
             SelectObject(hDC, value ? HBoldFont : HNormalFont);
-            DrawText(hDC, str, (int)strlen(str), &r, DT_CALCRECT | DT_SINGLELINE | DT_WORDBREAK | DT_LEFT);
+            if (value)
+                DrawTextW(hDC, item->DisplayValue, (int)wcslen(item->DisplayValue), &r,
+                          DT_CALCRECT | DT_SINGLELINE | DT_WORDBREAK | DT_LEFT);
+            else
+                DrawTextW(hDC, item->Name, (int)wcslen(item->Name), &r,
+                          DT_CALCRECT | DT_SINGLELINE | DT_WORDBREAK | DT_LEFT);
 
             if (s.cx < r.right)
                 s.cx = r.right;
@@ -64,7 +68,7 @@ int CRendererWindow::ComputeExtents(HDC hDC, SIZE& s, BOOL value, BOOL computeHe
         else if (item->Name && computeHeaderWidth) // compute the required header width (sometimes it can be wider than name+value together)
         {
             SelectObject(hDC, HBoldFont);
-            DrawText(hDC, item->Name, (int)strlen(item->Name), &r, DT_CALCRECT | DT_SINGLELINE | DT_LEFT);
+            DrawTextW(hDC, item->Name, (int)wcslen(item->Name), &r, DT_CALCRECT | DT_SINGLELINE | DT_LEFT);
 
             if (headerWidth < r.right)
                 headerWidth = r.right;
@@ -153,7 +157,7 @@ void CRendererWindow::Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg)
                 SetTextColor(hDC, ((item->Flags & OIF_HEADER) == 0) ? valueText : headerText);
                 SetBkColor(hDC, ((item->Flags & OIF_HEADER) == 0) ? valueBk : headerBk);
                 SelectObject(hDC, ((item->Flags & OIF_HEADER) == 0) ? HNormalFont : HBoldFont);
-                ExtTextOut(hDC, startH + 5, y + 1, ETO_CLIPPED | ETO_OPAQUE, &rct, item->Name, lstrlen(item->Name), NULL);
+                ExtTextOutW(hDC, startH + 5, y + 1, ETO_CLIPPED | ETO_OPAQUE, &rct, item->Name, lstrlenW(item->Name), NULL);
 
                 ExcludeClipRect(hDC, rct.left, rct.top, rct.right, rct.bottom);
             }
@@ -165,7 +169,7 @@ void CRendererWindow::Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg)
 
                     if (deferFlg == 0xFFFFFFFF)
                     {
-                        LRESULT lines = SendMessage(item->hwnd, (UINT)EM_GETLINECOUNT, 0, 0);
+                        LRESULT lines = SendMessageW(item->hwnd, (UINT)EM_GETLINECOUNT, 0, 0);
 
                         if (lines > 1) // add a tiny scrollbar ;-)
                         {
@@ -188,7 +192,7 @@ void CRendererWindow::Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg)
     if (!moveEditBoxes)
     {
         SetBkColor(hDC, colors.InputBackground);
-        ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, NULL, 0, NULL);
+        ExtTextOutW(hDC, 0, 0, ETO_OPAQUE, &r, NULL, 0, NULL);
 
         SelectObject(hDC, hOldFont);
         SetBkMode(hDC, oldBkMode);

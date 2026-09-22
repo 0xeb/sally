@@ -34,15 +34,21 @@ struct CFileItem
 
     BOOL CanDelete; // TRUE if Overwrite was chosen when updating the archive, otherwise FALSE
 
-    CFileItem(const char* sourcePath, const char* archiveRoot, const char* name, DWORD attr, UINT64 size, FILETIME lastWrite, bool isDir)
+    CFileItem(const wchar_t* sourcePath, const wchar_t* archiveRoot, const wchar_t* name, DWORD attr, UINT64 size, FILETIME lastWrite, bool isDir)
     {
         // if archiveRoot is empty, the name must not start with a backslash '\'
-        if (strlen(archiveRoot) > 0)
-            Name = GetUnicodeString(archiveRoot) + GetUnicodeString("\\") + GetUnicodeString(name);
+        if (wcslen(archiveRoot) > 0)
+        {
+            Name = archiveRoot;
+            Name += L"\\";
+            Name += name;
+        }
         else
-            Name = GetUnicodeString(name);
+            Name = name;
 
-        FullPath = GetUnicodeString(sourcePath) + GetUnicodeString("\\") + GetUnicodeString(name);
+        FullPath = sourcePath;
+        FullPath += L"\\";
+        FullPath += name;
         Attributes = attr;
         Size = size;
         LastWriteTime = CreationTime = LastAccessTime = lastWrite;

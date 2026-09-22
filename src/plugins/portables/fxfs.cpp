@@ -15,6 +15,7 @@
 #include "precomp.h"
 #include "fxfs.h"
 #include "fx_lang.rh"
+#include "unicode/helpers.h" // WideToAnsi
 
 namespace Fx
 {
@@ -27,7 +28,7 @@ namespace Fx
         CFxPath::XCHAR altSep)
     {
         CFxPath::XCHAR* s = path;
-        while (*s != TEXT('\0'))
+        while (*s != L'\0')
         {
             if (*s == altSep)
             {
@@ -36,7 +37,7 @@ namespace Fx
 
             if (*s == sep && s > path && *(s - 1) == sep)
             {
-                memmove(s, s + 1, _tcslen(s + 1) + 1);
+                memmove(s, s + 1, (wcslen(s + 1) + 1) * sizeof(wchar_t));
                 --s;
             }
 
@@ -66,7 +67,7 @@ namespace Fx
         changeRes = SalamanderGeneral->ChangePanelPathToPluginFS(
             panel,
             GetAssignedFSName(),
-            TEXT(""),
+            L"",
             &failReason);
     }
 
@@ -76,7 +77,7 @@ namespace Fx
         int x,
         int y,
         CPluginFSInterfaceAbstract* pluginFS,
-        const char* pluginFSName,
+        const wchar_t* pluginFSName,
         int pluginFSNameIndex,
         BOOL isDetachedFS,
         BOOL& refreshMenu,
@@ -94,7 +95,7 @@ namespace Fx
     void WINAPI CFxPluginInterfaceForFS::ExecuteOnFS(
         int panel,
         CPluginFSInterfaceAbstract* pluginFS,
-        const char* pluginFSName,
+        const wchar_t* pluginFSName,
         int pluginFSNameIndex,
         CFileData& file,
         int isDir)
@@ -109,12 +110,12 @@ namespace Fx
         BOOL isInPanel,
         int panel,
         CPluginFSInterfaceAbstract* pluginFS,
-        const char* pluginFSName,
+        const wchar_t* pluginFSName,
         int pluginFSNameIndex)
     {
         BOOL ret = FALSE;
 
-        CALL_STACK_MESSAGE5("CFxPluginInterfaceForFS::DisconnectFS(, %d, %d, , %s, %d)",
+        CALL_STACK_MESSAGE5("CFxPluginInterfaceForFS::DisconnectFS(, %d, %d, , %ls, %d)",
                             isInPanel, panel, pluginFSName, pluginFSNameIndex);
 
         auto* fxPluginFS = static_cast<CFxPluginFSInterface*>(pluginFS);
@@ -138,21 +139,25 @@ namespace Fx
         return ret;
     }
 
-    void WINAPI CFxPluginInterfaceForFS::ConvertPathToInternal(
-        const char* fsName,
+    BOOL WINAPI CFxPluginInterfaceForFS::ConvertPathToInternal(
+        const wchar_t* fsName,
         int fsNameIndex,
-        char* fsUserPart)
+        CSalamanderStringBuffer* fsUserPart)
     {
+        return fsUserPart != NULL &&
+               sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
     }
 
-    void WINAPI CFxPluginInterfaceForFS::ConvertPathToExternal(
-        const char* fsName,
+    BOOL WINAPI CFxPluginInterfaceForFS::ConvertPathToExternal(
+        const wchar_t* fsName,
         int fsNameIndex,
-        char* fsUserPart)
+        CSalamanderStringBuffer* fsUserPart)
     {
+        return fsUserPart != NULL &&
+               sally::plugin_abi::IsValidStringBuffer(*fsUserPart);
     }
 
-    void WINAPI CFxPluginInterfaceForFS::EnsureShareExistsOnServer(int panel, const char* server, const char* share)
+    void WINAPI CFxPluginInterfaceForFS::EnsureShareExistsOnServer(int panel, const wchar_t* server, const wchar_t* share)
     {
     }
 
@@ -178,16 +183,15 @@ namespace Fx
         }
     }
 
-    BOOL WINAPI CFxPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+    BOOL WINAPI CFxPluginFSInterface::IsCurrentPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
     {
-        CPathBuffer currentPath;
-        BOOL ok = GetCurrentPath(currentPath);
-        _ASSERTE(ok);
-        return (currentFSNameIndex == fsNameIndex) &&
-               SalamanderGeneral->IsTheSamePath(currentPath, userPart);
+        BOOL result = (currentFSNameIndex == fsNameIndex) &&
+                      SalamanderGeneral->IsTheSamePath(
+                          m_currentPath != nullptr ? m_currentPath->GetString() : L"", userPart);
+        return result;
     }
 
-    BOOL WINAPI CFxPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const char* userPart)
+    BOOL WINAPI CFxPluginFSInterface::IsOurPath(int currentFSNameIndex, int fsNameIndex, const wchar_t* userPart)
     {
         UNREFERENCED_PARAMETER(currentFSNameIndex);
         UNREFERENCED_PARAMETER(fsNameIndex);
@@ -197,36 +201,33 @@ namespace Fx
         return TRUE;
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetRootPath(char* userPart)
+    BOOL WINAPI CFxPluginFSInterface::GetRootPath(CSalamanderStringBuffer* userPart)
     {
         // Ineffective default implementation, if possible override in your descendant.
-        CFxPath* root = CreatePath(TEXT(""));
+        CFxPath* root = CreatePath(L"");
         root->SetRoot();
-        StringCchCopy(userPart, MAX_PATH, root->GetString());
+        const BOOL copied = userPart != nullptr &&
+                            sally::plugin_abi::WriteStringBuffer(
+                                *userPart, std::wstring(root->GetString()));
         delete root;
-        return TRUE;
+        return copied;
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetCurrentPath(char* userPart)
+    BOOL WINAPI CFxPluginFSInterface::GetCurrentPath(CSalamanderStringBuffer* userPart)
     {
-        if (m_currentPath == nullptr)
-        {
-            *userPart = TEXT('\0');
-        }
-        else
-        {
-            StringCchCopy(userPart, MAX_PATH, m_currentPath->GetString());
-        }
-
-        return TRUE;
+        return userPart != nullptr &&
+               sally::plugin_abi::WriteStringBuffer(
+                   *userPart, std::wstring(m_currentPath != nullptr ?
+                                               m_currentPath->GetString() :
+                                               L""));
     }
 
     BOOL WINAPI CFxPluginFSInterface::ChangePath(
         int currentFSNameIndex,
-        char* fsName,
+        CSalamanderStringBuffer* fsName,
         int fsNameIndex,
-        const char* userPart,
-        char* cutFileName,
+        const wchar_t* userPart,
+        CSalamanderStringBuffer* cutFileName,
         BOOL* pathWasCut,
         BOOL forceRefresh,
         int mode)
@@ -236,10 +237,10 @@ namespace Fx
         // 'mode'). If the path is shortened because it points to a file (it is enough to suspect
         // that it might be a file—the file existence is verified after listing the path and a
         // message is shown to the user if the file is missing) and 'cutFileName' is not NULL (only
-        // possible in 'mode' 3), the buffer 'cutFileName' (MAX_PATH characters long) receives the
+        // possible in 'mode' 3), the buffer 'cutFileName' receives the
         // name of that file (without the path). Otherwise, the buffer 'cutFileName' receives an
-        // empty string. 'currentFSNameIndex' is the index of the current FS name; 'fsName' is a
-        // MAX_PATH-sized buffer that contains, on input, the FS name from the path that belongs to
+        // empty string. 'currentFSNameIndex' is the index of the current FS name; 'fsName' contains,
+        // on input, the FS name from the path that belongs to
         // this plugin (it does not have to match the current FS name of this object as long as
         // IsOurPath() returns TRUE for it) and, on output, the current FS name of this object (it
         // must belong to this plugin). 'fsNameIndex' is the index of the FS name 'fsName' inside the
@@ -268,16 +269,20 @@ namespace Fx
         // only when no path is accessible on the FS; error reporting remains unchanged.
 
         HRESULT hr;
+        std::wstring fsNameValue;
+        if (fsName == nullptr ||
+            !sally::plugin_abi::ReadStringBuffer(*fsName, fsNameValue))
+            return FALSE;
+        (void)fsNameValue;
 
         if (pathWasCut != nullptr)
         {
             *pathWasCut = FALSE;
         }
 
-        if (cutFileName != nullptr)
-        {
-            *cutFileName = TEXT('\0');
-        }
+        if (cutFileName != nullptr &&
+            !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+            return FALSE;
 
         CFxPath* newPath = CreatePath(userPart);
         hr = newPath->Canonicalize();
@@ -299,8 +304,15 @@ namespace Fx
             {
                 // The last path component is a file and we are in Shift+F7
                 // mode. Trim the file specification.
-                if (newPath->CutLastComponent(cutFileName, MAX_PATH))
+                std::wstring cutComponent;
+                if (newPath->CutLastComponent(cutComponent))
                 {
+                    if (cutFileName != nullptr &&
+                        !sally::plugin_abi::WriteStringBuffer(*cutFileName, cutComponent))
+                    {
+                        delete newPath;
+                        return FALSE;
+                    }
                     *pathWasCut = TRUE;
                     hr = hrShowError = S_OK;
                 }
@@ -476,18 +488,19 @@ namespace Fx
         return m_owner.GetOwner().GetPluginIcon();
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
+    BOOL WINAPI CFxPluginFSInterface::GetFullName(
+        CFileData& file, int isDir, CSalamanderStringBuffer* fullName)
     {
         return FALSE;
     }
 
     BOOL WINAPI CFxPluginFSInterface::GetFullFSPath(
         HWND parent,
-        const char* fsName,
-        char* path,
-        int pathSize,
+        const wchar_t* fsName,
+        CSalamanderStringBuffer* path,
         BOOL& success)
     {
+        success = FALSE;
         return FALSE;
     }
 
@@ -505,8 +518,8 @@ namespace Fx
     }
 
     BOOL WINAPI CFxPluginFSInterface::GetChangeDriveOrDisconnectItem(
-        const char* fsName,
-        char*& title,
+        const wchar_t* fsName,
+        wchar_t*& title,
         HICON& icon,
         BOOL& destroyIcon)
     {
@@ -518,8 +531,8 @@ namespace Fx
     }
 
     void WINAPI CFxPluginFSInterface::GetDropEffect(
-        const char* srcFSPath,
-        const char* tgtFSPath,
+        const wchar_t* srcFSPath,
+        const wchar_t* tgtFSPath,
         DWORD allowedEffects,
         DWORD keyState,
         DWORD* dropEffect)
@@ -533,7 +546,7 @@ namespace Fx
         _ASSERTE(0);
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathLen, int& offset)
+    BOOL WINAPI CFxPluginFSInterface::GetNextDirectoryLineHotPath(const wchar_t* text, int pathLen, int& offset)
     {
         // If you support FS_SERVICE_GETNEXTDIRLINEHOTPATH service, then you must override this
         // method in your descendant class and provide your own implementation.
@@ -541,14 +554,15 @@ namespace Fx
         return FALSE;
     }
 
-    void WINAPI CFxPluginFSInterface::CompleteDirectoryLineHotPath(char* path, int pathBufSize)
+    BOOL WINAPI CFxPluginFSInterface::CompleteDirectoryLineHotPath(CSalamanderStringBuffer* path)
     {
         // If you support FS_SERVICE_GETNEXTDIRLINEHOTPATH service, then you must override this
         // method in your descendant class and provide your own implementation.
         _ASSERTE(0);
+        return FALSE;
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode, char* buf, int bufSize)
+    BOOL WINAPI CFxPluginFSInterface::GetPathForMainWindowTitle(const wchar_t* fsName, int mode, CSalamanderStringBuffer* buf)
     {
         // If you support FS_SERVICE_GETPATHFORMAINWNDTITLE service, then you
         // must override this method in your descendant class and provide your
@@ -557,14 +571,14 @@ namespace Fx
         return FALSE;
     }
 
-    void WINAPI CFxPluginFSInterface::ShowInfoDialog(const char* fsName, HWND parent)
+    void WINAPI CFxPluginFSInterface::ShowInfoDialog(const wchar_t* fsName, HWND parent)
     {
         // If you support FS_SERVICE_SHOWINFO service, then you must override this
         // method in your descendant class and provide your own implementation.
         _ASSERTE(0);
     }
 
-    BOOL WINAPI CFxPluginFSInterface::ExecuteCommandLine(HWND parent, char* command, int& selFrom, int& selTo)
+    BOOL WINAPI CFxPluginFSInterface::ExecuteCommandLine(HWND parent, CSalamanderStringBuffer* command, int& selFrom, int& selTo)
     {
         // If you support FS_SERVICE_COMMANDLINE service, then you must override this
         // method in your descendant class and provide your own implementation.
@@ -573,12 +587,12 @@ namespace Fx
     }
 
     BOOL WINAPI CFxPluginFSInterface::QuickRename(
-        const char* fsName,
+        const wchar_t* fsName,
         int mode,
         HWND parent,
         CFileData& file,
         BOOL isDir,
-        char* newName,
+        CSalamanderStringBuffer* newName,
         BOOL& cancel)
     {
         // If you support FS_SERVICE_QUICKRENAME service, then you must override this
@@ -588,8 +602,8 @@ namespace Fx
     }
 
     void WINAPI CFxPluginFSInterface::AcceptChangeOnPathNotification(
-        const char* fsName,
-        const char* path,
+        const wchar_t* fsName,
+        const wchar_t* path,
         BOOL includingSubdirs)
     {
         // If you support FS_SERVICE_ACCEPTSCHANGENOTIF service, then you must
@@ -599,10 +613,10 @@ namespace Fx
     }
 
     BOOL WINAPI CFxPluginFSInterface::CreateDir(
-        const char* fsName,
+        const wchar_t* fsName,
         int mode,
         HWND parent,
-        char* newName,
+        CSalamanderStringBuffer* newName,
         BOOL& cancel)
     {
         // If you support FS_SERVICE_CREATEDIR service, then you must override this
@@ -612,7 +626,7 @@ namespace Fx
     }
 
     void WINAPI CFxPluginFSInterface::ViewFile(
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
         CSalamanderForViewFileOnFSAbstract* salamander,
         CFileData& file)
@@ -623,7 +637,7 @@ namespace Fx
     }
 
     BOOL WINAPI CFxPluginFSInterface::Delete(
-        const char* fsName,
+        const wchar_t* fsName,
         int mode,
         HWND parent,
         int panel,
@@ -640,12 +654,12 @@ namespace Fx
     BOOL WINAPI CFxPluginFSInterface::CopyOrMoveFromFS(
         BOOL copy,
         int mode,
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
         int panel,
         int selectedFiles,
         int selectedDirs,
-        char* targetPath,
+        CSalamanderStringBuffer* targetPath,
         BOOL& operationMask,
         BOOL& cancelOrHandlePath,
         HWND dropTarget)
@@ -660,14 +674,14 @@ namespace Fx
     BOOL WINAPI CFxPluginFSInterface::CopyOrMoveFromDiskToFS(
         BOOL copy,
         int mode,
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
-        const char* sourcePath,
+        const wchar_t* sourcePath,
         SalEnumSelection2 next,
         void* nextParam,
         int sourceFiles,
         int sourceDirs,
-        char* targetPath,
+        CSalamanderStringBuffer* targetPath,
         BOOL* invalidPathOrCancel)
     {
         // If you support FS_SERVICE_COPYFROMDISKTOFS/MOVEFROMDISKTOFS service,
@@ -678,7 +692,7 @@ namespace Fx
     }
 
     BOOL WINAPI CFxPluginFSInterface::ChangeAttributes(
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
         int panel,
         int selectedFiles,
@@ -691,7 +705,7 @@ namespace Fx
     }
 
     void WINAPI CFxPluginFSInterface::ShowProperties(
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
         int panel,
         int selectedFiles,
@@ -703,7 +717,7 @@ namespace Fx
     }
 
     void WINAPI CFxPluginFSInterface::ContextMenu(
-        const char* fsName,
+        const wchar_t* fsName,
         HWND parent,
         int menuX,
         int menuY,
@@ -726,7 +740,7 @@ namespace Fx
         return FALSE;
     }
 
-    BOOL WINAPI CFxPluginFSInterface::OpenFindDialog(const char* fsName, int panel)
+    BOOL WINAPI CFxPluginFSInterface::OpenFindDialog(const wchar_t* fsName, int panel)
     {
         // If you support FS_SERVICE_OPENFINDDLG service, then you must override this
         // method in your descendant class and provide your own implementation.
@@ -734,18 +748,18 @@ namespace Fx
         return FALSE;
     }
 
-    void WINAPI CFxPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
+    void WINAPI CFxPluginFSInterface::OpenActiveFolder(const wchar_t* fsName, HWND parent)
     {
         // If you support FS_SERVICE_OPENACTIVEFOLDER service, then you must override this
         // method in your descendant class and provide your own implementation.
         _ASSERTE(0);
     }
 
-    void WINAPI CFxPluginFSInterface::GetAllowedDropEffects(int mode, const char* tgtFSPath, DWORD* allowedEffects)
+    void WINAPI CFxPluginFSInterface::GetAllowedDropEffects(int mode, const wchar_t* tgtFSPath, DWORD* allowedEffects)
     {
     }
 
-    BOOL WINAPI CFxPluginFSInterface::GetNoItemsInPanelText(char* textBuf, int textBufSize)
+    BOOL WINAPI CFxPluginFSInterface::GetNoItemsInPanelText(CSalamanderStringBuffer* textBuf)
     {
         return FALSE;
     }
@@ -757,22 +771,22 @@ namespace Fx
         _ASSERTE(0);
     }
 
-    void WINAPI CFxPluginFSInterface::ShowChangePathError(PCTSTR path, HRESULT hr)
+    void WINAPI CFxPluginFSInterface::ShowChangePathError(PCWSTR path, HRESULT hr)
     {
         CFxString s;
         FxGetErrorDescription(hr, s);
         ShowChangePathError(path, s);
     }
 
-    void WINAPI CFxPluginFSInterface::ShowChangePathError(PCTSTR path, PCTSTR error)
+    void WINAPI CFxPluginFSInterface::ShowChangePathError(PCWSTR path, PCWSTR error)
     {
         CFxString title, message;
         title.LoadString(IDS_FX_CHANGEPATHERRORTITLE);
         CFxString fullPath;
-        PTSTR fullPathBuffer = fullPath.GetBuffer(MAX_PATH);
-        SalamanderGeneral->GetPluginFSName(fullPathBuffer, 0);
-        fullPath.ReleaseBuffer();
-        fullPath.AppendChar(TEXT(':'));
+        const std::wstring fsName =
+            SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
+        fullPath = fsName.c_str();
+        fullPath.AppendChar(L':');
         fullPath.Append(path);
         message.Format(IDS_FX_CHANGEPATHERRORFMT, fullPath, error);
         SalamanderGeneral->ShowMessageBox(message, title, MSGBOX_ERROR);
@@ -945,12 +959,11 @@ namespace Fx
     bool WINAPI CFxPluginFSInterface::IsUpDirNeededForCurrentPath()
     {
         // We only want up dirs for non-root paths.
-        bool isRoot = false;
-        CPathBuffer rootPath;
-        if (GetRootPath(rootPath) && m_currentPath != nullptr)
-        {
-            isRoot = m_currentPath->Equals(rootPath);
-        }
+        CFxPath* rootPath = CreatePath(L"");
+        rootPath->SetRoot();
+        const bool isRoot = m_currentPath != nullptr &&
+                            m_currentPath->Equals(rootPath->GetString());
+        delete rootPath;
         return !isRoot;
     }
 
@@ -972,9 +985,9 @@ namespace Fx
     {
         _ASSERTE(m_currentPath != nullptr);
         CFxPath* newPath = CreatePath(m_currentPath->GetString());
-        CPathBuffer cutComponent;
-        newPath->CutLastComponent(cutComponent, cutComponent.Size());
-        ChangeDirectory(newPath->GetString(), cutComponent);
+        std::wstring cutComponent;
+        newPath->CutLastComponent(cutComponent);
+        ChangeDirectory(newPath->GetString(), cutComponent.c_str());
         delete newPath;
     }
 
@@ -1000,18 +1013,18 @@ namespace Fx
         }
     }
 
-    void WINAPI CFxPluginFSInterface::ChangeDirectory(PCTSTR newPath, PCTSTR focusedName)
+    void WINAPI CFxPluginFSInterface::ChangeDirectory(PCWSTR newPath, PCWSTR focusedName)
     {
         int panel;
         bool gotFSOk = !!SalamanderGeneral->GetPanelWithPluginFS(this, panel);
         _ASSERTE(gotFSOk);
 
-        CPathBuffer fsName;
-        SalamanderGeneral->GetPluginFSName(fsName, 0);
+        const std::wstring fsName =
+            SPLGetPluginFSNameOwned(SalamanderGeneral, 0);
 
         SalamanderGeneral->ChangePanelPathToPluginFS(
             panel,
-            fsName,
+            fsName.c_str(),
             newPath,
             nullptr,
             -1,
@@ -1020,7 +1033,7 @@ namespace Fx
 
     bool WINAPI CFxPluginFSInterface::GetFileDataForUpDir(_Out_ CFileData& upDirFileData)
     {
-        upDirFileData.Name = SalamanderGeneral->DupStr(TEXT(".."));
+        upDirFileData.Name = SalamanderGeneral->DupStr(L"..");
         upDirFileData.NameLen = 2;
         upDirFileData.Ext = upDirFileData.Name + upDirFileData.NameLen;
         upDirFileData.Attr = FILE_ATTRIBUTE_DIRECTORY;
@@ -1054,7 +1067,7 @@ namespace Fx
     void WINAPI CFxPluginFSDataInterface::SetupView(
         BOOL leftPanel,
         CSalamanderViewAbstract* view,
-        const char* archivePath,
+        const wchar_t* archivePath,
         const CFileData* upperDir)
     {
         __super::SetupView(leftPanel, view, archivePath, upperDir);

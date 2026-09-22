@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 /// Name of the CTabList window class.
 #define WC_TABLIST L"TabList32"
 
@@ -20,6 +22,7 @@ public:
     int LastItem;
     int LastSubItem;
     int LastWidth;
+    std::wstring ToolTipText;
 
 public:
     CListView();
@@ -60,6 +63,7 @@ public:
     void GetHeaderWidths();
 
     void GetText(int iItem, int iSubItem, WCHAR* buff, int buffMax, BOOL preferEndOfText = FALSE);
+    std::wstring GetTextOwned(int iItem, int iSubItem, BOOL applyDelta = TRUE);
 
     int GetSelectedIndex(); // returns -1 if no item is selected; otherwise the zero-based index of the item
 

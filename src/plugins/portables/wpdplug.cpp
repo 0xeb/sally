@@ -21,7 +21,7 @@
 #include "lang/lang.rh"
 #include "wpd.rh"
 
-const TCHAR CWpdPluginInterface::c_szEnglishName[] = TEXT("Portable Devices");
+const wchar_t CWpdPluginInterface::c_szEnglishName[] = L"Portable Devices";
 
 CWpdNotifier* g_pNotifier;
 extern CWpdDeviceIcons g_oDeviceIcons;

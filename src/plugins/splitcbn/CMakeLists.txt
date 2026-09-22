@@ -8,6 +8,7 @@ sal_add_plugin(NAME splitcbn
     "${SAL_PLUGINS}/splitcbn/precomp.cpp"
     "${SAL_PLUGINS}/splitcbn/split.cpp"
     "${SAL_PLUGINS}/splitcbn/splitcbn.cpp"
+    "${SAL_PLUGINS}/splitcbn/splitcbn_text.cpp"
   RC "${SAL_PLUGINS}/splitcbn/splitcbn.rc"
   DEF "${SAL_PLUGINS}/splitcbn/splitcbn.def"
 )

@@ -7,6 +7,7 @@
 #include <uxtheme.h>
 
 #include <shlwapi.h>
+#include "common/PathDisplayUtils.h" // MakeCompactPathBuffer
 #include "plugindarkmode.h"
 
 //#pragma comment(lib, "Shlwapi.lib")  // Petr: this does not work for me in VC2008, so I add it to the project
@@ -20,11 +21,11 @@ HBRUSH HDitheredBrush = NULL;
 // CFileHeaderWindow
 //
 
-CFileHeaderWindow::CFileHeaderWindow(const char* text)
+CFileHeaderWindow::CFileHeaderWindow(const wchar_t* text)
 {
-    CALL_STACK_MESSAGE2("CFileHeaderWindow::CFileHeaderWindow(%s)", text);
-    strcpy(Text, text);
-    TextLen = int(strlen(text));
+    CALL_STACK_MESSAGE2("CFileHeaderWindow::CFileHeaderWindow(%ls)", text);
+    Text = text ? text : L"";
+    TextLen = static_cast<int>(Text.size());
     BkgndBrush = NULL;
 }
 
@@ -35,11 +36,11 @@ CFileHeaderWindow::~CFileHeaderWindow()
         DeleteObject(BkgndBrush);
 }
 
-void CFileHeaderWindow::SetText(const char* text)
+void CFileHeaderWindow::SetText(const wchar_t* text)
 {
-    CALL_STACK_MESSAGE2("CFileHeaderWindow::SetText(%s)", text);
-    strcpy(Text, text);
-    TextLen = int(strlen(text));
+    CALL_STACK_MESSAGE2("CFileHeaderWindow::SetText(%ls)", text);
+    Text = text ? text : L"";
+    TextLen = static_cast<int>(Text.size());
     InvalidateRect(HWindow, NULL, FALSE);
     UpdateWindow(HWindow);
 }
@@ -87,11 +88,10 @@ CFileHeaderWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         // DT_PATH_ELLIPSIS does not work on some strings, which prints clipped text
         // PathCompactPath() needs a copy in a local buffer, but it does not clip the text
-        CPathBuffer buff; // Heap-allocated for long path support
-        strncpy_s(buff, buff.Size(), Text, _TRUNCATE);
-        PathCompactPath(dc, buff, r.right - r.left);
+        std::vector<wchar_t> buff = MakeCompactPathBuffer(Text);
+        PathCompactPathW(dc, buff.data(), r.right - r.left);
 
-        DrawText(dc, buff, -1, &r, /*DT_PATH_ELLIPSIS | */ DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextW(dc, buff.data(), -1, &r, /*DT_PATH_ELLIPSIS | */ DT_SINGLELINE | DT_NOPREFIX);
         SetBkColor(dc, oldBkColor);
         SetTextColor(dc, oldTexColor);
         SelectObject(dc, oldFont);
@@ -110,7 +110,7 @@ CFileHeaderWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CSplitBarWindow
 //
 
-const char* SPLITBARWINDOW_CLASSNAME = "SFC Split Bar Class";
+LPCWSTR SPLITBARWINDOW_CLASSNAME = L"SFC Split Bar Class";
 
 CSplitBarWindow::CSplitBarWindow(CSplitBarType type)
 {
@@ -133,7 +133,7 @@ CSplitBarWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (!ToolTip)
             return Error(HWND(NULL), IDS_LOWMEM);
         if (!ToolTip->Create(CWINDOW_CLASSNAME,
-                             "",
+                             L"",
                              WS_POPUP | WS_BORDER,
                              0, 0, 0, 0,
                              GetParent(HWindow), // parent
@@ -160,10 +160,9 @@ CSplitBarWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         InvalidateRect(HWindow, NULL, FALSE);
         UpdateWindow(HWindow);
 
-        char buf[20];
-        sprintf(buf, "%.1f %%", SplitProp * 100);
-        SG->PointToLocalDecimalSeparator(buf, _countof(buf));
-        SetWindowText(ToolTip->HWindow, buf);
+        std::wstring text = SPLFormatStringOwned(L"%.1f %%", SplitProp * 100);
+        SPLPointToLocalDecimalSeparatorOwned(SG, text);
+        SetWindowTextW(ToolTip->HWindow, text.c_str());
 
         POINT p;
         if (sbVertical == Type)
@@ -229,11 +228,11 @@ CSplitBarWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         mii.ImageIndex = -1;
         mii.SubMenu = NULL;
 
-        char buff[20];
+        wchar_t buff[20];
         int i;
         for (i = 2; i < 9; i++)
         {
-            sprintf(buff, "&%d0 / %d0", i, 10 - i);
+            _snwprintf_s(buff, _countof(buff), _TRUNCATE, L"&%d0 / %d0", i, 10 - i);
             mii.ID = i;
             mii.State = i == 5 ? MENU_STATE_DEFAULT : 0;
             mii.String = buff;
@@ -296,10 +295,9 @@ CSplitBarWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 SendMessage(parent, WM_USER_SLITPOSCHANGED, (WPARAM)&SplitProp, 0);
 
-                char buf[20];
-                sprintf(buf, "%.1f %%", SplitProp * 100);
-                SG->PointToLocalDecimalSeparator(buf, _countof(buf));
-                SetWindowText(ToolTip->HWindow, buf);
+                std::wstring text = SPLFormatStringOwned(L"%.1f %%", SplitProp * 100);
+                SPLPointToLocalDecimalSeparatorOwned(SG, text);
+                SetWindowTextW(ToolTip->HWindow, text.c_str());
             }
 
             if (sbVertical == Type)
@@ -312,9 +310,9 @@ CSplitBarWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 pt.x = (SHORT)LOWORD(lParam);
                 pt.y = 0;
             }
-            char s[21];
-            sprintf(s, "%d, %d\n", pt.x, pt.y);
-            OutputDebugString(s);
+            wchar_t s[32];
+            _snwprintf_s(s, _countof(s), _TRUNCATE, L"%d, %d\n", pt.x, pt.y);
+            OutputDebugStringW(s);
             ClientToScreen(HWindow, &pt);
             SetWindowPos(ToolTip->HWindow, HWND_TOPMOST, pt.x + 5, pt.y + 10, 0, 0,
                          SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
@@ -373,13 +371,14 @@ CToolTipWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
     {
-        GetWindowText(HWindow, Text, 10);
+        Text = SPLGetWindowTextOwned(HWindow);
+        TextLen = static_cast<int>(Text.size());
 
         // measure the string length
         HDC hdc = GetDC(NULL);
         HFONT oldFont = (HFONT)SelectObject(hdc, EnvFont);
         SIZE s;
-        GetTextExtentPoint32(hdc, Text, int(strlen(Text)), &s);
+        GetTextExtentPoint32W(hdc, Text.c_str(), TextLen, &s);
         SelectObject(hdc, oldFont);
         ReleaseDC(NULL, hdc);
 
@@ -401,7 +400,7 @@ CToolTipWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HFONT hOldFont = (HFONT)SelectObject(hDC, EnvFont);
         COLORREF oldTextColor = SetTextColor(hDC, colors.ToolTipText);
         COLORREF oldBkColor = SetBkColor(hDC, colors.ToolTipBackground);
-        ExtTextOut(hDC, 2, 1, ETO_OPAQUE, &r, Text, TextLen, NULL);
+        ExtTextOutW(hDC, 2, 1, ETO_OPAQUE, &r, Text.c_str(), TextLen, NULL);
         SetBkColor(hDC, oldBkColor);
         SetTextColor(hDC, oldTextColor);
         SelectObject(hDC, hOldFont);
@@ -419,14 +418,14 @@ CToolTipWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SETTEXT:
     {
-        lstrcpyn(Text, (char*)lParam, 10);
-        TextLen = int(strlen(Text));
+        Text = lParam != 0 ? reinterpret_cast<const wchar_t*>(lParam) : L"";
+        TextLen = static_cast<int>(Text.size());
 
         // find out the text length
         HDC hdc = GetDC(NULL);
         HFONT oldFont = (HFONT)SelectObject(hdc, EnvFont);
         SIZE s;
-        GetTextExtentPoint32(hdc, Text, int(strlen(Text)), &s);
+        GetTextExtentPoint32W(hdc, Text.c_str(), TextLen, &s);
         SelectObject(hdc, oldFont);
         ReleaseDC(NULL, hdc);
 
@@ -710,24 +709,68 @@ CComboBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CRebar
 //
 
+static bool GetRebarBandTextOwned(HWND rebar, int index, REBARBANDINFO& info,
+                                  std::wstring& text) noexcept
+{
+    try
+    {
+        size_t capacity = 64;
+        for (;;)
+        {
+            std::vector<wchar_t> buffer(capacity, L'\0');
+            info.lpText = buffer.data();
+            info.cch = static_cast<UINT>(capacity);
+            if (!SendMessageW(rebar, RB_GETBANDINFO, index,
+                              reinterpret_cast<LPARAM>(&info)))
+                return false;
+
+            const size_t length = wcsnlen_s(buffer.data(), buffer.size());
+            if (length < buffer.size() - 1)
+            {
+                if (length > static_cast<size_t>(INT_MAX))
+                    return false;
+                std::wstring staged(buffer.data(), length);
+                text.swap(staged);
+                info.lpText = nullptr;
+                info.cch = 0;
+                return true;
+            }
+            if (capacity > static_cast<size_t>(UINT_MAX) / 2)
+                return false;
+            capacity *= 2;
+        }
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
 BOOL CRebar::InsertBand(UINT uIndex, LPREBARBANDINFO lprbbi)
 {
     CALL_STACK_MESSAGE2("CRebar::InsertBand(0x%X, )", uIndex);
 
     if (lprbbi->fMask & RBBIM_TEXT)
     {
-        // drop the prefix
-        char buffer[512];
-        strcpy(buffer, lprbbi->lpText);
-        char* prefix = strchr(buffer, '&');
-        if (prefix)
-            strcpy(prefix, prefix + 1);
+        std::wstring text;
+        try
+        {
+            text = lprbbi->lpText != nullptr ? lprbbi->lpText : L"";
+            const size_t prefix = text.find(L'&');
+            if (prefix != std::wstring::npos)
+                text.erase(prefix, 1);
+        }
+        catch (...)
+        {
+            return FALSE;
+        }
+        if (text.size() > static_cast<size_t>(INT_MAX))
+            return FALSE;
 
-        // measure the string length
         HDC hdc = GetDC(NULL);
         HFONT oldFont = (HFONT)SelectObject(hdc, EnvFont);
         SIZE s;
-        GetTextExtentPoint32(hdc, buffer, int(strlen(buffer)), &s);
+        GetTextExtentPoint32W(hdc, text.c_str(), static_cast<int>(text.size()), &s);
         SelectObject(hdc, oldFont);
         ReleaseDC(NULL, hdc);
 
@@ -811,16 +854,14 @@ CRebar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int i;
         for (i = 0; i < bandCount; i++)
         {
-            char text[512];
-            *text = 0;
-            REBARBANDINFO rbbi;
+            REBARBANDINFO rbbi = {};
             rbbi.cbSize = sizeof(REBARBANDINFO);
             rbbi.fMask = RBBIM_TEXT | RBBIM_HEADERSIZE;
-            rbbi.lpText = text;
-            rbbi.cch = 512;
-            SendMessage(HWindow, RB_GETBANDINFO, i, (LPARAM)&rbbi);
+            std::wstring text;
+            if (!GetRebarBandTextOwned(HWindow, i, rbbi, text))
+                continue;
 
-            if (*text)
+            if (!text.empty())
             {
                 RECT r;
                 SendMessage(HWindow, RB_GETRECT, i, (LPARAM)&r);
@@ -842,7 +883,8 @@ CRebar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 PluginDarkMode_GetColors(&colors);
                 SetBkColor(hdc, colors.DialogBackground);
                 SetTextColor(hdc, colors.DialogText);
-                DrawText(hdc, text, -1, &r, DT_SINGLELINE | DT_TOP);
+                DrawTextW(hdc, text.c_str(), static_cast<int>(text.size()), &r,
+                          DT_SINGLELINE | DT_TOP);
 
                 // line under the text
                 r.top += EnvFontHeight;

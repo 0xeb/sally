@@ -697,7 +697,7 @@ DWORD WINAPI EFIC_CONTEXT<CHAR>::EncryptedFileImportCallback(PBYTE data, PVOID c
         if (c->SubState == 0)
         {
             DATA_STREAM_I<CHAR>* s = c->FirstStream;
-            WCHAR sname[MAX_PATH];
+            std::vector<WCHAR> sname(1, L'\0');
             int nlen;
             int blen;
 
@@ -729,9 +729,14 @@ DWORD WINAPI EFIC_CONTEXT<CHAR>::EncryptedFileImportCallback(PBYTE data, PVOID c
 
                 if (s->DSName != NULL)
                 {
-                    if (!String<CHAR>::CopyToUnicode(sname, s->DSName, (unsigned int)String<CHAR>::StrLen(s->DSName), MAX_PATH))
+                    const unsigned int sourceLength =
+                        (unsigned int)String<CHAR>::StrLen(s->DSName);
+                    sname.assign(static_cast<size_t>(sourceLength) + 1, L'\0');
+                    if (!String<CHAR>::CopyToUnicode(sname.data(), s->DSName,
+                                                     sourceLength,
+                                                     (unsigned long)sname.size()))
                         return ERROR_INVALID_DATA;
-                    nlen = (int)wcslen(sname);
+                    nlen = (int)wcslen(sname.data());
                 }
                 else
                 {
@@ -747,7 +752,7 @@ DWORD WINAPI EFIC_CONTEXT<CHAR>::EncryptedFileImportCallback(PBYTE data, PVOID c
             OUTPUT_INT(blen);
             if (!efs)
                 OUTPUT_WCHAR(L':');
-            OUTPUT_WSTR(sname, nlen);
+            OUTPUT_WSTR(sname.data(), nlen);
             if (!efs)
                 OUTPUT_WSTR(L":$DATA", 6);
             *length = pos;

@@ -20,7 +20,7 @@ class CSalamanderGuiForm : public CSalamanderGuiContainerImpl<CSalamanderGuiForm
 {
 private:
     static LONG s_nClass;
-    static const TCHAR s_szClassName[];
+    static const wchar_t s_szClassName[];
 
     static bool ClassNeeded();
     static void ClassRelease();

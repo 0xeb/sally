@@ -31,15 +31,15 @@ private:
     CArchive* dataArchive;
 
 public:
-    CDEBArchive(LPCTSTR fileName, CSalamanderForOperationsAbstract* salamander);
+    CDEBArchive(const wchar_t* fileName, CSalamanderForOperationsAbstract* salamander);
     ~CDEBArchive(void);
 
-    BOOL ListArchive(const char* prefix, CSalamanderDirectoryAbstract* dir);
-    BOOL UnpackOneFile(const char* nameInArchive, const CFileData* fileData,
-                       const char* targetPath, const char* newFileName);
-    BOOL UnpackArchive(const char* targetPath, const char* archiveRoot,
+    BOOL ListArchive(const wchar_t* prefix, CSalamanderDirectoryAbstract* dir);
+    BOOL UnpackOneFile(const wchar_t* nameInArchive, const CFileData* fileData,
+                       const wchar_t* targetPath, const wchar_t* newFileName);
+    BOOL UnpackArchive(const wchar_t* targetPath, const wchar_t* archiveRoot,
                        SalEnumSelection nextName, void* param);
-    BOOL UnpackWholeArchive(const char* mask, const char* targetPath);
+    BOOL UnpackWholeArchive(const wchar_t* mask, const wchar_t* targetPath);
 
     BOOL IsOk() { return bOK; };
 };

@@ -562,8 +562,22 @@ BOOL CFATSnapshot<CHAR>::DecodeDirectoryClusters(BYTE* buffer, DWORD len, DIR_IT
                         while (i < 5 && (firstchar = ((WCHAR*)l->Name1)[i]) == '.')
                             i++;
                         // first letter reconstruction to get original checksum
-                        WideCharToMultiByte(CP_ACP, 0, &firstchar, 1, temp2, 1, NULL, NULL);
-                        temp2[0] = (char)(UINT_PTR)CharUpper((LPTSTR)temp2[0]);
+                        // [narrow-ok: byte-format] This is not text. `temp2` is the 11-byte 8.3
+                        // name field exactly as it sits on the FAT volume, and the byte written
+                        // here only feeds ChkSum() below to match the checksum the filesystem
+                        // itself computed over those bytes. A deleted entry has its first byte
+                        // overwritten with 0xE5, so it is reconstructed from the long name to
+                        // recover the original checksum. Widening it would compute a checksum
+                        // over something the volume never contained.
+                        //
+                        firstchar = towupper(firstchar);
+                        char encoded[2];
+                        BOOL usedDefault = FALSE;
+                        const int encodedSize = WideCharToMultiByte(
+                            CP_OEMCP, WC_NO_BEST_FIT_CHARS, &firstchar, 1,
+                            encoded, _countof(encoded), NULL, &usedDefault);
+                        if (encodedSize > 0 && !usedDefault)
+                            temp2[0] = encoded[0];
                     }
                     BYTE sum = ChkSum((BYTE*)temp2);
                     int ord;
@@ -1533,7 +1547,7 @@ BOOL CFATSnapshot<CHAR>::ProcessScannedClusters()
         if (!(c->flags & DC_REFERENCED))
         {
             CHAR name[100];
-            String<CHAR>::SPrintF(name, String<CHAR>::LoadStr(IDS_VDIRECTORY), c->cluster);
+            String<CHAR>::SPrintF(name, String<CHAR>::LangStr(IDS_VDIRECTORY).c_str(), c->cluster);
             FILE_RECORD_I<CHAR>* r;
             if (!AddFileOrDir(this->Root, name, TRUE, FR_FLAGS_DELETED, &r))
                 return FALSE;
@@ -2236,12 +2250,14 @@ BOOL CFATSnapshot<CHAR>::AddVirtualDirs()
     FILE_RECORD_I<CHAR>* metafiles;
 
     // add virtual directories {All Deleted Files} and {Metafiles} into root
-    if (!AddFileOrDir(this->Root, String<CHAR>::LoadStr(IDS_ALLDELETEDFILES), TRUE, FR_FLAGS_VIRTUALDIR, &deletedfiles))
+    std::wstring deletedFilesName = String<CHAR>::LangStr(IDS_ALLDELETEDFILES);
+    if (!AddFileOrDir(this->Root, deletedFilesName.data(), TRUE, FR_FLAGS_VIRTUALDIR, &deletedfiles))
         return FALSE;
     VirtualDirsCount++;
     if (this->UdFlags & UF_SHOWMETAFILES)
     {
-        if (!AddFileOrDir(this->Root, String<CHAR>::LoadStr(IDS_METAFILES), TRUE, FR_FLAGS_VIRTUALDIR, &metafiles))
+        std::wstring metafilesName = String<CHAR>::LangStr(IDS_METAFILES);
+        if (!AddFileOrDir(this->Root, metafilesName.data(), TRUE, FR_FLAGS_VIRTUALDIR, &metafiles))
             return FALSE;
         VirtualDirsCount++;
     }
@@ -2415,15 +2431,19 @@ BOOL CFATSnapshot<CHAR>::Update(CSnapshotProgressDlg* progress, DWORD udFlags, C
     {
         this->Progress->SetProgressText(IDS_SCANNINGVACANTCLUSTERS);
 
+        // UI text is owned UTF-16 even though the disk parser remains byte-oriented.
+        const std::wstring message = String<wchar_t>::LangStr(IDS_REUSESCANNEDINFO);
+        const std::wstring caption = String<wchar_t>::LangStr(IDS_UNDELETE);
+        const std::wstring checkBox = String<wchar_t>::LangStr(IDS_ALWAYSCHOOSEYES);
         MSGBOXEX_PARAMS mbep;
         memset(&mbep, 0, sizeof(mbep));
         mbep.HParent = this->Progress->HWindow;
-        mbep.Text = String<char>::LoadStr(IDS_REUSESCANNEDINFO);
-        mbep.Caption = String<char>::LoadStr(IDS_UNDELETE);
+        mbep.Text = message.c_str();
+        mbep.Caption = caption.c_str();
         mbep.Flags = MSGBOXEX_YESNO | MSGBOXEX_ICONQUESTION | MSGBOXEX_ESCAPEENABLED;
         mbep.HIcon = NULL;
         mbep.HelpCallback = NULL;
-        mbep.CheckBoxText = String<char>::LoadStr(IDS_ALWAYSCHOOSEYES);
+        mbep.CheckBoxText = checkBox.c_str();
         mbep.CheckBoxValue = &ConfigAlwaysReuseScanInfo;
         mbep.AliasBtnNames = NULL;
 

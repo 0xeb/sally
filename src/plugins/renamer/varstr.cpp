@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include <limits>
+#include <vector>
+
 BOOL CVarString::CVariable::SetArguments(const char* argStart, const char* argEnd,
                                          int& error, const char*& errorPos1, const char*& errorPos2)
 {
@@ -135,7 +138,7 @@ BOOL CVarString::Compile(const char* varText, int& error, int& errorPos1,
                 // find the variable in the list
                 CVariableEntry* entry = variables;
                 for (; entry->Name; entry++)
-                    if (SG->StrICmpEx(entry->Name, (int)strlen(entry->Name), src, (int)(colon - src)) == 0)
+                    if (SG->StrICmpEx(RenamerTextToWide(entry->Name, (int)strlen(entry->Name)).c_str(), -1, RenamerTextToWide(src, (int)(colon - src)).c_str(), -1) == 0)
                         break;
 
                 if (!entry->Name)
@@ -202,4 +205,24 @@ int CVarString::Execute(char* buffer, int max, LPVOID param)
     *string = 0;
 
     return (int)(string - buffer);
+}
+
+BOOL CVarString::ExecuteOwned(std::string& value, LPVOID param)
+{
+    size_t capacity = 256;
+    while (capacity <= RenamerEngineBufferCeiling)
+    {
+        std::vector<char> buffer(capacity, '\0');
+        const int length = Execute(buffer.data(), static_cast<int>(buffer.size()), param);
+        if (length >= 0)
+        {
+            value.assign(buffer.data(), static_cast<size_t>(length));
+            return TRUE;
+        }
+        if (capacity > RenamerEngineBufferCeiling / 2)
+            break;
+        capacity *= 2;
+    }
+    value.clear();
+    return FALSE;
 }

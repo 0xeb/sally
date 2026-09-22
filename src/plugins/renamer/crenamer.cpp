@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <limits>
+#include <vector>
 
 // ****************************************************************************
 //
@@ -10,24 +12,35 @@
 //
 
 CSourceFile::CSourceFile(const CFileData* fileData,
-                         const char* path, int pathLen, BOOL isDir)
+                         const wchar_t* path, size_t pathLen, BOOL isDir)
 {
     CALL_STACK_MESSAGE_NONE
-    NameLen = pathLen + fileData->NameLen;
-    if (path[pathLen - 1] != '\\')
+    const size_t nameLen = wcslen(fileData->Name);
+    NameLen = pathLen + nameLen;
+    if (pathLen == 0 || path[pathLen - 1] != L'\\')
     {
-        FullName = (char*)malloc(++NameLen + 1);
-        memcpy(FullName, path, pathLen);
-        FullName[pathLen++] = '\\';
+        FullName = (wchar_t*)malloc((++NameLen + 1) * sizeof(wchar_t));
+        if (pathLen > 0)
+            memcpy(FullName, path, pathLen * sizeof(wchar_t));
+        FullName[pathLen++] = L'\\';
     }
     else
     {
-        FullName = (char*)malloc(NameLen + 1);
-        memcpy(FullName, path, pathLen);
+        FullName = (wchar_t*)malloc((NameLen + 1) * sizeof(wchar_t));
+        memcpy(FullName, path, pathLen * sizeof(wchar_t));
     }
     Name = FullName + pathLen;
-    memcpy(Name, fileData->Name, fileData->NameLen + 1);
-    Ext = Name + (isDir ? fileData->NameLen : fileData->Ext - fileData->Name);
+    memcpy(Name, fileData->Name, (nameLen + 1) * sizeof(wchar_t));
+    if (isDir)
+        Ext = Name + nameLen;
+    else
+    {
+        Ext = FullName + NameLen;
+        while (Ext > Name && Ext[-1] != L'.')
+            --Ext;
+        if (Ext == Name)
+            Ext = FullName + NameLen; // ".cvspass" is an extension in Windows
+    }
     Size = fileData->Size;
     Attr = fileData->Attr;
     FileTimeToLocalFileTime(&fileData->LastWrite, &LastWrite);
@@ -38,7 +51,7 @@ CSourceFile::CSourceFile(const CFileData* fileData,
 CSourceFile::CSourceFile(CSourceFile* orig)
 {
     CALL_STACK_MESSAGE_NONE
-    FullName = SG->DupStr(orig->FullName);
+    FullName = _wcsdup(orig->FullName);
     Name = FullName + (orig->Name - orig->FullName);
     Ext = FullName + (orig->Ext - orig->FullName);
     Size = orig->Size;
@@ -49,20 +62,20 @@ CSourceFile::CSourceFile(CSourceFile* orig)
     State = 0;
 }
 
-CSourceFile::CSourceFile(CSourceFile* orig, const char* newName)
+CSourceFile::CSourceFile(CSourceFile* orig, const wchar_t* newName)
 {
     CALL_STACK_MESSAGE_NONE
-    FullName = Name = SG->DupStr(newName);
+    FullName = Name = _wcsdup(newName);
     Ext = NULL;
-    char* iterator = FullName;
+    wchar_t* iterator = FullName;
     while (*iterator != 0)
     {
-        if (*iterator == '\\')
+        if (*iterator == L'\\')
         {
             Name = iterator + 1;
             Ext = NULL;
         }
-        if (*iterator == '.' /*&& iterator > Name*/) // ".cvspass" is an extension in Windows
+        if (*iterator == L'.' /*&& iterator > Name*/) // ".cvspass" is an extension in Windows
             Ext = iterator + 1;
         iterator++;
     }
@@ -76,22 +89,21 @@ CSourceFile::CSourceFile(CSourceFile* orig, const char* newName)
     State = 0;
 }
 
-CSourceFile::CSourceFile(WIN32_FIND_DATA& fd, const char* path, int pathLen)
+CSourceFile::CSourceFile(WIN32_FIND_DATAW& fd, const wchar_t* path, size_t pathLen)
 {
     CALL_STACK_MESSAGE_NONE
-    NameLen = pathLen + strlen(fd.cFileName) + 1;
-    FullName = (char*)malloc(NameLen + 1);
-    memcpy(FullName, path, pathLen);
-    FullName[pathLen++] = '\\';
-    strcpy(FullName + pathLen, fd.cFileName);
+    const size_t fileNameLen = wcslen(fd.cFileName);
+    NameLen = pathLen + fileNameLen + 1;
+    FullName = (wchar_t*)malloc((NameLen + 1) * sizeof(wchar_t));
+    memcpy(FullName, path, pathLen * sizeof(wchar_t));
+    FullName[pathLen++] = L'\\';
+    wcscpy(FullName + pathLen, fd.cFileName);
     Name = FullName + pathLen;
     Ext = FullName + NameLen;
-    while (--Ext >= Name && *Ext != '.')
-        ;
-    if (Ext < Name)
+    while (Ext > Name && Ext[-1] != L'.')
+        --Ext;
+    if (Ext == Name)
         Ext = FullName + NameLen; // ".cvspass" is an extension in Windows
-    else
-        Ext++;
     Size = CQuadWord(fd.nFileSizeLow, fd.nFileSizeHigh);
     Attr = fd.dwFileAttributes;
     FileTimeToLocalFileTime(&fd.ftLastWriteTime, &LastWrite);
@@ -107,22 +119,22 @@ CSourceFile::~CSourceFile()
 }
 
 CSourceFile*
-CSourceFile::SetName(const char* name)
+CSourceFile::SetName(const wchar_t* name)
 {
     CALL_STACK_MESSAGE_NONE
     if (FullName)
         free(FullName);
-    FullName = Name = SG->DupStr(name);
+    FullName = Name = _wcsdup(name);
     Ext = NULL;
-    char* iterator = FullName;
+    wchar_t* iterator = FullName;
     while (*iterator != 0)
     {
-        if (*iterator == '\\')
+        if (*iterator == L'\\')
         {
             Name = iterator + 1;
             Ext = NULL;
         }
-        if (*iterator == '.' /*&& iterator > Name*/) // ".cvspass" is an extension in Windows
+        if (*iterator == L'.' /*&& iterator > Name*/) // ".cvspass" is an extension in Windows
             Ext = iterator + 1;
         iterator++;
     }
@@ -137,25 +149,25 @@ CSourceFile::SetName(const char* name)
 // CRenamerOptions
 //
 
-const char* CONFIG_NEWNAME = "NewName";
-const char* CONFIG_SEARCHFOR = "SearchFor";
-const char* CONFIG_REPLACEWITH = "ReplaceWith";
-const char* CONFIG_CASESENSITIVE = "CaseSensitive";
-const char* CONFIG_WHOLEWORDS = "WholeWords";
-const char* CONFIG_GLOBAL = "Global";
-const char* CONFIG_REGEXP = "RegExp";
-const char* CONFIG_EXCLUDEEXT = "ExcludeExt";
-const char* CONFIG_FILECASE = "FileCase";
-const char* CONFIG_EXTCASE = "ExtCase";
-const char* CONFIG_INCLUDEPATH = "IncludePath";
-const char* CONFIG_SPEC = "Spec";
+const wchar_t* CONFIG_NEWNAME = L"NewName";
+const wchar_t* CONFIG_SEARCHFOR = L"SearchFor";
+const wchar_t* CONFIG_REPLACEWITH = L"ReplaceWith";
+const wchar_t* CONFIG_CASESENSITIVE = L"CaseSensitive";
+const wchar_t* CONFIG_WHOLEWORDS = L"WholeWords";
+const wchar_t* CONFIG_GLOBAL = L"Global";
+const wchar_t* CONFIG_REGEXP = L"RegExp";
+const wchar_t* CONFIG_EXCLUDEEXT = L"ExcludeExt";
+const wchar_t* CONFIG_FILECASE = L"FileCase";
+const wchar_t* CONFIG_EXTCASE = L"ExtCase";
+const wchar_t* CONFIG_INCLUDEPATH = L"IncludePath";
+const wchar_t* CONFIG_SPEC = L"Spec";
 
 void CRenamerOptions::Reset(BOOL soft)
 {
     CALL_STACK_MESSAGE_NONE
-    strcpy(NewName, "$(OriginalName)");
-    SearchFor[0] = 0;
-    ReplaceWith[0] = 0;
+    NewName = "$(OriginalName)";
+    SearchFor.clear();
+    ReplaceWith.clear();
     CaseSensitive = TRUE;
     WholeWords = FALSE;
     Global = FALSE;
@@ -172,9 +184,12 @@ BOOL CRenamerOptions::Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE1("CRenamerOptions::Load(, )");
     Reset(FALSE);
-    registry->GetValue(regKey, CONFIG_NEWNAME, REG_SZ, NewName.Get(), NewName.Size());
-    registry->GetValue(regKey, CONFIG_SEARCHFOR, REG_SZ, SearchFor.Get(), SearchFor.Size());
-    registry->GetValue(regKey, CONFIG_REPLACEWITH, REG_SZ, ReplaceWith.Get(), ReplaceWith.Size());
+    // NewName/SearchFor/ReplaceWith stay narrow (feed the still-narrow
+    // dialog EDIT controls), but the shared registry facade's REG_SZ path is
+    // wide-only - bridge here, same pattern as renamer.cpp's LastMask fix.
+    GetValueSZ(registry, regKey, CONFIG_NEWNAME, NewName);
+    GetValueSZ(registry, regKey, CONFIG_SEARCHFOR, SearchFor);
+    GetValueSZ(registry, regKey, CONFIG_REPLACEWITH, ReplaceWith);
     registry->GetValue(regKey, CONFIG_CASESENSITIVE, REG_DWORD, &CaseSensitive, sizeof(BOOL));
     registry->GetValue(regKey, CONFIG_WHOLEWORDS, REG_DWORD, &WholeWords, sizeof(BOOL));
     registry->GetValue(regKey, CONFIG_GLOBAL, REG_DWORD, &Global, sizeof(BOOL));
@@ -190,9 +205,9 @@ BOOL CRenamerOptions::Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
 BOOL CRenamerOptions::Save(HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     CALL_STACK_MESSAGE1("CRenamerOptions::Save(, )");
-    registry->SetValue(regKey, CONFIG_NEWNAME, REG_SZ, NewName, -1);
-    registry->SetValue(regKey, CONFIG_SEARCHFOR, REG_SZ, SearchFor, -1);
-    registry->SetValue(regKey, CONFIG_REPLACEWITH, REG_SZ, ReplaceWith, -1);
+    SetValueSZ(registry, regKey, CONFIG_NEWNAME, NewName.c_str());
+    SetValueSZ(registry, regKey, CONFIG_SEARCHFOR, SearchFor.c_str());
+    SetValueSZ(registry, regKey, CONFIG_REPLACEWITH, ReplaceWith.c_str());
     registry->SetValue(regKey, CONFIG_CASESENSITIVE, REG_DWORD, &CaseSensitive, sizeof(BOOL));
     registry->SetValue(regKey, CONFIG_WHOLEWORDS, REG_DWORD, &WholeWords, sizeof(BOOL));
     registry->SetValue(regKey, CONFIG_GLOBAL, REG_DWORD, &Global, sizeof(BOOL));
@@ -210,12 +225,19 @@ BOOL CRenamerOptions::Save(HKEY regKey, CSalamanderRegistryAbstract* registry)
 // CRenamer
 //
 
-CRenamer::CRenamer(CPathBuffer& root, int& rootLen)
-    : Root(root), RootLen(rootLen)
+CRenamer::CRenamer(std::wstring& root)
+    : Root(root), EngineRootLen(0), EngineRootValid(false)
 {
-    CALL_STACK_MESSAGE2("CRenamer::CRenamer(, %d)", rootLen);
+    CALL_STACK_MESSAGE1("CRenamer::CRenamer()");
+    EngineRootValid = TryWideToRenamerText(Root.c_str(), EngineRoot);
+    if (EngineRootValid)
+        EngineRootLen = EngineRoot.size();
     BMSearch = SG->AllocSalamanderBMSearchData();
     RegExp = CreateRegExp();
+    Substitute = FALSE;
+    FoldSubject = FALSE;
+    SubjectFoldScope = renamer::FoldScope::NonAsciiOnly;
+    SubjectRebase = 0;
 }
 
 CRenamer::~CRenamer()
@@ -233,17 +255,17 @@ BOOL CRenamer::SetOptions(CRenamerOptions* options)
     ExtCase = options->ExtCase;
     IncludePath = options->IncludePath;
 
-    if (!NewName.Compile(options->NewName, Error, ErrorPos1, ErrorPos2, NewNameVariables))
+    if (!NewName.Compile(options->NewName.c_str(), Error, ErrorPos1, ErrorPos2, NewNameVariables))
     {
         ErrorType = retNewName;
         return FALSE;
     }
 
-    if (options->SearchFor[0] != '\0')
+    if (!options->SearchFor.empty())
     {
         Substitute = TRUE;
-        strcpy(ReplaceWith, options->ReplaceWith);
-        ReplaceWithLen = (int)strlen(ReplaceWith);
+        ReplaceWith = options->ReplaceWith;
+        ReplaceWithLen = static_cast<int>(ReplaceWith.size());
         WholeWords = options->WholeWords;
         Global = options->Global;
         ExcludeExt = options->ExcludeExt;
@@ -254,7 +276,18 @@ BOOL CRenamer::SetOptions(CRenamerOptions* options)
             if (!options->CaseSensitive)
                 opts |= RE_CASELES;
 
-            if (!RegExp->RegComp(options->SearchFor, opts))
+            // The engine's own table only folds ASCII (see RegexpLowerCase in regexp.cpp),
+            // which is all it may safely do to UTF-8 bytes. Non-ASCII case insensitivity
+            // comes from folding both pattern and subject up front. Regex syntax is pure
+            // ASCII, so leaving ASCII alone here keeps \W, \S and friends intact.
+            FoldSubject = !options->CaseSensitive;
+            SubjectFoldScope = renamer::FoldScope::NonAsciiOnly;
+            std::string pattern =
+                FoldSubject ? renamer::FoldUtf8Preserving(options->SearchFor,
+                                                          SubjectFoldScope)
+                            : options->SearchFor;
+
+            if (!RegExp->RegComp(pattern.data(), opts))
             {
                 Error = GetRegExpErrorID(RegExp->GetState());
                 ErrorPos1 = 0;
@@ -268,11 +301,20 @@ BOOL CRenamer::SetOptions(CRenamerOptions* options)
         }
         else
         {
-            WORD flags = SASF_FORWARD;
-            if (options->CaseSensitive)
-                flags |= SASF_CASESENSITIVE;
+            // BMSearch's case-insensitive mode folds through an ACP 256-entry table, which
+            // mangles UTF-8 lead and continuation bytes. Fold both sides completely instead
+            // and search case-sensitively; BMSubst works purely from offsets, and the fold
+            // preserves length, so the replacement still reads the original bytes.
+            FoldSubject = !options->CaseSensitive;
+            SubjectFoldScope = renamer::FoldScope::All;
 
-            BMSearch->Set(options->SearchFor, flags);
+            WORD flags = SASF_FORWARD | SASF_CASESENSITIVE;
+            const std::string pattern =
+                FoldSubject ? renamer::FoldUtf8Preserving(options->SearchFor,
+                                                          SubjectFoldScope)
+                            : options->SearchFor;
+
+            BMSearch->Set(pattern.c_str(), flags);
             if (!BMSearch->IsGood())
             {
                 Error = IDS_LOWMEM;
@@ -286,14 +328,29 @@ BOOL CRenamer::SetOptions(CRenamerOptions* options)
     else
         Substitute = FALSE;
 
+    if (!Substitute)
+        FoldSubject = FALSE;
+
     Error = 0;
     return TRUE;
 }
 
-int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPart)
+int CRenamer::Rename(CSourceFile* file, int counter, char* newName, int newNameSize, char** newPart)
 {
     CALL_STACK_MESSAGE_NONE
     if (!IsGood())
+        return -1;
+    if (Spec == rsRelativePath && !EngineRootValid)
+        return -1;
+
+    std::string engineFullName;
+    std::string engineNamePrefix;
+    std::string engineExtPrefix;
+    if (!TryWideToRenamerText(file->FullName, engineFullName) ||
+        !TryWideToRenamerText(file->FullName, engineNamePrefix,
+                              static_cast<int>(file->Name - file->FullName)) ||
+        !TryWideToRenamerText(file->FullName, engineExtPrefix,
+                              static_cast<int>(file->Ext - file->FullName)))
         return -1;
 
     int pathLen = 0;
@@ -303,16 +360,24 @@ int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPa
         {
         case rsFileName:
         {
-            pathLen = (int)(file->Name - file->FullName);
-            memcpy(newName, file->FullName, pathLen);
+            pathLen = static_cast<int>(engineNamePrefix.size());
+            if (pathLen < 0 || pathLen >= newNameSize)
+                return -1;
+            memcpy(newName, engineFullName.data(), pathLen);
             break;
         }
         case rsRelativePath:
         {
-            pathLen = RootLen;
-            memcpy(newName, Root, pathLen);
-            if (newName[pathLen - 1] != '\\')
+            pathLen = static_cast<int>(EngineRootLen);
+            if (pathLen < 0 || pathLen >= newNameSize)
+                return -1;
+            memcpy(newName, EngineRoot.data(), pathLen);
+            if (pathLen > 0 && newName[pathLen - 1] != '\\')
+            {
+                if (pathLen + 1 >= newNameSize)
+                    return -1;
                 newName[pathLen++] = '\\';
+            }
             break;
         }
         case rsFullPath:
@@ -327,24 +392,31 @@ int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPa
     param.Spec = Spec;
     param.File = file;
     param.Counter = counter;
-    param.RootLen = RootLen;
+    param.EngineFullName = std::move(engineFullName);
+    param.EngineNameOffset = engineNamePrefix.size();
+    param.EngineExtOffset = engineExtPrefix.size();
+    param.EngineRootLen = EngineRootLen;
+    if (param.EngineRootLen > 0 &&
+        param.EngineRootLen < param.EngineFullName.size() &&
+        param.EngineFullName[param.EngineRootLen] == '\\')
+        ++param.EngineRootLen;
 
     int l;
     if (Substitute)
     {
-        CPathBuffer tmp; // Heap-allocated for long path support
+        std::string tmp;
 
-        // expand the New Name into a temporary buffer
-        l = NewName.Execute(tmp, tmp.Size(), &param);
-        if (l < 0)
+        // Expand the New Name into dynamically owned UTF-8 engine text.
+        if (!NewName.ExecuteOwned(tmp, &param))
             return -1;
+        l = static_cast<int>(tmp.size());
         // l is strlen(tmp)
         if (ExcludeExt && !file->IsDir) // extensions are searched only for files
         {
             int i = l, namel = l;
-            while (--i >= 0 && tmp[i] != '\\')
+            while (--i >= 0 && tmp[static_cast<size_t>(i)] != '\\')
             {
-                if (tmp[i] == '.') // ".cvspass" is an extension in Windows
+                if (tmp[static_cast<size_t>(i)] == '.') // ".cvspass" is an extension in Windows
                 {
                     namel = i;
                     break;
@@ -352,25 +424,25 @@ int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPa
             }
 
             // perform the requested substitution in the name
-            int substl = UseRegExp ? RESubst(tmp, namel, newName, MAX_PATH - pathLen) : BMSubst(tmp, namel, newName, MAX_PATH - pathLen);
+            int substl = UseRegExp ? RESubst(tmp.c_str(), namel, newName, newNameSize - pathLen) : BMSubst(tmp.c_str(), namel, newName, newNameSize - pathLen);
 
             // dokopirujeme extension
-            if (substl < 0 || substl + (l - namel) >= MAX_PATH - pathLen)
+            if (substl < 0 || substl + (l - namel) >= newNameSize - pathLen)
                 return -1;
-            memcpy(newName + substl, tmp + namel, l - namel + 1);
+            memcpy(newName + substl, tmp.c_str() + namel, l - namel + 1);
             // calculate new name length : substed name len + appended ext len - '\0'
             l = substl + l - namel;
         }
         else
         {
             // perform the requested substitution
-            l = UseRegExp ? RESubst(tmp, l, newName, MAX_PATH - pathLen) : BMSubst(tmp, l, newName, MAX_PATH - pathLen);
+            l = UseRegExp ? RESubst(tmp.c_str(), l, newName, newNameSize - pathLen) : BMSubst(tmp.c_str(), l, newName, newNameSize - pathLen);
         }
     }
     else
     {
         // expand the New Name
-        l = NewName.Execute(newName, MAX_PATH - pathLen, &param);
+        l = NewName.Execute(newName, newNameSize - pathLen, &param);
     }
 
     if (l < 0)
@@ -378,28 +450,75 @@ int CRenamer::Rename(CSourceFile* file, int counter, char* newName, char** newPa
 
     if (FileCase != ccDontChange || ExtCase != ccDontChange)
     {
-        char* filePart = newName + l - 1;
-        char* ext = NULL;
-        while (filePart >= newName && *filePart != '\\')
-        {
-            if (ext == NULL && *filePart == '.')
-                ext = filePart; // ".cvspass" is an extension in Windows
-            filePart--;
-        }
-        filePart++;
-        if (file->IsDir || ext == NULL)
-            ext = newName + l; // extensions are searched only for files
-
+        const CRenamerNamePartOffsets parts =
+            FindRenamerNamePartOffsets(newName, static_cast<size_t>(l), file->IsDir != 0);
+        const size_t fileOffset = IncludePath ? 0 : parts.File;
+        size_t extOffset = parts.Extension;
+        std::string result(newName, l);
         if (FileCase != ccDontChange)
         {
-            char* s = IncludePath ? newName : filePart;
-            ChangeCase(FileCase, s, s, s, ext);
+            const std::string changed = ChangeCase(FileCase, newName + fileOffset, newName + extOffset);
+            result.replace(fileOffset, extOffset - fileOffset, changed);
+            extOffset = fileOffset + changed.size();
         }
         if (ExtCase != ccDontChange)
-            ChangeCase(ExtCase, ext, ext, ext, newName + l);
+        {
+            const std::string changed = ChangeCase(ExtCase, newName + parts.Extension, newName + l);
+            result.replace(extOffset, result.size() - extOffset, changed);
+        }
+        if (result.size() >= (size_t)(newNameSize - pathLen))
+            return -1;
+        memcpy(newName, result.c_str(), result.size() + 1);
+        l = (int)result.size();
     }
 
     return l;
+}
+
+BOOL CRenamer::RenameOwned(CSourceFile* file, int counter, std::wstring& newName,
+                           size_t* newPartOffset)
+{
+    size_t capacity = (std::max)(static_cast<size_t>(256),
+                                 static_cast<size_t>(file->NameLen) * 3 + 1);
+    while (capacity <= RenamerEngineBufferCeiling)
+    {
+        std::vector<char> buffer(capacity, '\0');
+        char* newPart = NULL;
+        const int length = Rename(file, counter, buffer.data(), static_cast<int>(buffer.size()),
+                                  newPartOffset != NULL ? &newPart : NULL);
+        if (length >= 0)
+        {
+            // Rename() writes the path prefix (if any) at the start of the
+            // buffer, then advances ITS OWN 'newName' pointer past it before
+            // generating the file name, so 'length' - Rename's return value -
+            // is the name portion's length only. Decoding just 'length' bytes
+            // from buffer.data() (offset 0) silently dropped the prefix,
+            // truncating every rsFileName/rsRelativePath result to whatever
+            // fit within the name's own length - which for a short prefix and
+            // long name could even be mostly-correct-looking wrong output.
+            // 'newPart' (when requested) is where Rename()'s prefix write
+            // ended, so newPart - buffer.data() is exactly that prefix length.
+            const int fullLength = newPartOffset != NULL
+                                       ? static_cast<int>((newPart - buffer.data()) + length)
+                                       : length;
+            if (!TryRenamerTextToWide(buffer.data(), newName, fullLength))
+                return FALSE;
+            if (newPartOffset != NULL)
+            {
+                std::wstring prefix;
+                if (!TryRenamerTextToWide(buffer.data(), prefix,
+                                          static_cast<int>(newPart - buffer.data())))
+                    return FALSE;
+                *newPartOffset = prefix.size();
+            }
+            return TRUE;
+        }
+        if (capacity > RenamerEngineBufferCeiling / 2)
+            break;
+        capacity *= 2;
+    }
+    newName.clear();
+    return FALSE;
 }
 
 int CRenamer::BMSearchForward(const char* string, int length, int offset)
@@ -443,13 +562,21 @@ BOOL SafeCopy(char* dest, int max, int& pos, const char* source, int count,
               CChangeCase changeCase)
 {
     CALL_STACK_MESSAGE_NONE
-    if (count + pos > max)
-        return FALSE;
     if (changeCase == ccDontChange)
+    {
+        if (count + pos > max)
+            return FALSE;
         memcpy(dest + pos, source, count);
+        pos += count;
+    }
     else
-        ChangeCase(changeCase, dest + pos, source, source, source + count);
-    pos += count;
+    {
+        const std::string changed = ChangeCase(changeCase, source, source + count);
+        if ((int)changed.size() + pos > max)
+            return FALSE;
+        memcpy(dest + pos, changed.data(), changed.size());
+        pos += (int)changed.size();
+    }
     return TRUE;
 }
 
@@ -460,14 +587,24 @@ int CRenamer::BMSubst(const char* source, int len, char* dest, int max)
     int pos = 0;
     int offset = 0;
 
-    while ((start = BMSearchForward(source, len, offset)) >= 0)
+    // Search the folded copy, but always copy from 'source'. The fold preserves length, so
+    // the offsets below index either buffer interchangeably.
+    const char* subject = source;
+    if (FoldSubject)
+    {
+        FoldedSubject = renamer::FoldUtf8Preserving(
+            std::string_view(source, static_cast<std::size_t>(len)), SubjectFoldScope);
+        subject = FoldedSubject.c_str();
+    }
+
+    while ((start = BMSearchForward(subject, len, offset)) >= 0)
     {
         // copy the part before the found pattern
         if (!SafeCopy(dest, max, pos, source + offset, start - offset))
             return -1;
 
         // replace the found pattern with the requested substitution
-        if (!SafeCopy(dest, max, pos, ReplaceWith, ReplaceWithLen))
+        if (!SafeCopy(dest, max, pos, ReplaceWith.c_str(), ReplaceWithLen))
             return -1;
 
         // move the offset forward
@@ -487,7 +624,8 @@ BOOL CRenamer::ValidetaReplacePattern()
 {
     CALL_STACK_MESSAGE_NONE
     ErrorType = retReplacePattern;
-    const char* replace = ReplaceWith;
+    const char* const replaceBegin = ReplaceWith.c_str();
+    const char* replace = replaceBegin;
     BOOL bs = FALSE;
     char paren;
     const char* numberStart;
@@ -520,26 +658,26 @@ BOOL CRenamer::ValidetaReplacePattern()
                     if (*replace == ':')
                     {
                         replace++;
-                        if (SG->StrNICmp(replace, "lower", sizeof("lower") - 1) == 0)
+                        if (SG->StrNICmp(RenamerTextToWide(replace).c_str(), RenamerTextToWide("lower").c_str(), (int)RenamerTextToWide(replace, sizeof("lower") - 1).size()) == 0)
                             replace += sizeof("lower") - 1;
-                        else if (SG->StrNICmp(replace, "upper", sizeof("upper") - 1) == 0)
+                        else if (SG->StrNICmp(RenamerTextToWide(replace).c_str(), RenamerTextToWide("upper").c_str(), (int)RenamerTextToWide(replace, sizeof("upper") - 1).size()) == 0)
                             replace += sizeof("upper") - 1;
-                        else if (SG->StrNICmp(replace, "mixed", sizeof("mixed") - 1) == 0)
+                        else if (SG->StrNICmp(RenamerTextToWide(replace).c_str(), RenamerTextToWide("mixed").c_str(), (int)RenamerTextToWide(replace, sizeof("mixed") - 1).size()) == 0)
                             replace += sizeof("mixed") - 1;
-                        else if (SG->StrNICmp(replace, "stripdia", sizeof("stripdia") - 1) == 0)
+                        else if (SG->StrNICmp(RenamerTextToWide(replace).c_str(), RenamerTextToWide("stripdia").c_str(), (int)RenamerTextToWide(replace, sizeof("stripdia") - 1).size()) == 0)
                             replace += sizeof("stripdia") - 1;
                         else if (*replace != paren)
                         {
                             // expecting a closing bracket or a size definition
                             Error = IDS_REP_EXPCLOSEPAR1;
-                            ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                            ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                             return FALSE;
                         }
                         if (*replace != paren)
                         {
                             // expecting a closing bracket
                             Error = IDS_REP_EXPCLOSEPAR2;
-                            ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                            ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                             return FALSE;
                         }
                     }
@@ -549,7 +687,7 @@ BOOL CRenamer::ValidetaReplacePattern()
                         {
                             // expecting a closing bracket or a colon and size definition
                             Error = IDS_REP_EXPCLOSEPAR3;
-                            ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                            ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                             return FALSE;
                         }
                     }
@@ -559,8 +697,8 @@ BOOL CRenamer::ValidetaReplacePattern()
                 {
                     // reference to an undefined subpattern
                     Error = IDS_REP_BADREF;
-                    ErrorPos1 = (int)(numberStart - ReplaceWith);
-                    ErrorPos2 = (int)(numberEnd - ReplaceWith);
+                    ErrorPos1 = (int)(numberStart - replaceBegin);
+                    ErrorPos2 = (int)(numberEnd - replaceBegin);
                     return FALSE;
                 }
             }
@@ -569,19 +707,19 @@ BOOL CRenamer::ValidetaReplacePattern()
                 if (paren)
                 {
                     Error = IDS_EXP_EXPECTSUBNUM1;
-                    ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                    ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                     return FALSE;
                 }
                 if (!bs && *replace != '$')
                 {
                     Error = IDS_EXP_EXPECTSUBNUM2;
-                    ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                    ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                     return FALSE;
                 }
                 if (*replace == 0)
                 {
                     Error = IDS_EXP_EXPECTSUBNUM2;
-                    ErrorPos1 = ErrorPos2 = (int)(replace - ReplaceWith);
+                    ErrorPos1 = ErrorPos2 = (int)(replace - replaceBegin);
                     return FALSE;
                 }
                 replace++;
@@ -598,7 +736,7 @@ BOOL CRenamer::SafeSubst(char* dest, int max, int& pos)
     CALL_STACK_MESSAGE_NONE
     // the ReplaceWith string must be validated; this is optimized code
     // without syntax checking
-    const char* replace = ReplaceWith;
+    const char* replace = ReplaceWith.c_str();
     BOOL paren;
     while (*replace)
     {
@@ -651,7 +789,7 @@ BOOL CRenamer::SafeSubst(char* dest, int max, int& pos)
                     }
                 }
                 if (i < RegExp->SubExpCount &&
-                    !SafeCopy(dest, max, pos, RegExp->Startp[i],
+                    !SafeCopy(dest, max, pos, RegExp->Startp[i] + SubjectRebase,
                               (int)(RegExp->Endp[i] - RegExp->Startp[i]), changeCase))
                     return FALSE;
             }
@@ -671,11 +809,21 @@ int CRenamer::RESubst(const char* source, int len, char* dest, int max)
     int offset = 0;
     int skipChar = 0;
 
-    while (RegExp->RegExec((char*)source, len, offset + skipChar))
+    // As in BMSubst: match against the folded copy, produce output from 'source'.
+    const char* subject = source;
+    if (FoldSubject)
+    {
+        FoldedSubject = renamer::FoldUtf8Preserving(
+            std::string_view(source, static_cast<std::size_t>(len)), SubjectFoldScope);
+        subject = FoldedSubject.c_str();
+    }
+    SubjectRebase = source - subject;
+
+    while (RegExp->RegExec((char*)subject, len, offset + skipChar))
     {
         // copy the part before the found pattern
         if (!SafeCopy(dest, max, pos, source + offset,
-                      (int)(RegExp->Startp[0] - source - offset)))
+                      (int)(RegExp->Startp[0] - subject - offset)))
             return -1;
 
         // replace the found pattern with the requested substitution
@@ -683,7 +831,7 @@ int CRenamer::RESubst(const char* source, int len, char* dest, int max)
             return -1;
 
         // move the offset forward
-        offset = (int)(RegExp->Endp[0] - source);
+        offset = (int)(RegExp->Endp[0] - subject);
         skipChar = RegExp->Endp[0] - RegExp->Startp[0] == 0 ? 1 : 0;
         if (!Global)
             break;
@@ -698,76 +846,75 @@ int CRenamer::RESubst(const char* source, int len, char* dest, int max)
 
 // ****************************************************************************
 
-void ChangeCase(CChangeCase change, char* dst, const char* src,
-                const char* start, const char* end)
+static std::wstring MapCase(const std::wstring& text, DWORD flags)
 {
-    CALL_STACK_MESSAGE_NONE
+    const int chars = LCMapStringEx(LOCALE_NAME_USER_DEFAULT, flags, text.data(), (int)text.size(),
+                                    NULL, 0, NULL, NULL, 0);
+    if (chars <= 0)
+        return text;
+    std::wstring mapped((size_t)chars, L'\0');
+    if (!LCMapStringEx(LOCALE_NAME_USER_DEFAULT, flags, text.data(), (int)text.size(),
+                       mapped.data(), chars, NULL, NULL, 0))
+        return text;
+    return mapped;
+}
+
+std::string ChangeCase(CChangeCase change, const char* start, const char* end)
+{
+    const std::wstring original = RenamerTextToWide(start, (int)(end - start));
+    std::wstring changed = original;
     switch (change)
     {
     case ccLower:
-        while (start < end)
-            *dst++ = LowerCase[*start++];
-        return;
+        changed = MapCase(original, LCMAP_LOWERCASE);
+        break;
 
     case ccUpper:
-        while (start < end)
-            *dst++ = UpperCase[*start++];
-        return;
+        changed = MapCase(original, LCMAP_UPPERCASE);
+        break;
 
     case ccMixed:
     {
-        char prev = start > src ? start[-1] : ' ';
-        while (start < end)
+        changed = MapCase(original, LCMAP_LOWERCASE);
+        bool wordStart = true;
+        for (size_t i = 0; i < changed.size(); i++)
         {
-            //if (IsCType(prev, C1_SPACE | C1_PUNCT))
-            if (!IsAlnum(prev))
+            WORD type = 0;
+            GetStringTypeW(CT_CTYPE1, &changed[i], 1, &type);
+            const bool alnum = (type & (C1_ALPHA | C1_DIGIT)) != 0;
+            if (wordStart && alnum)
             {
-                prev = *start;
-                *dst++ = UpperCase[*start++];
+                CharUpperBuffW(&changed[i], 1);
+                wordStart = false;
             }
-            else
-            {
-                prev = *start;
-                *dst++ = LowerCase[*start++];
-            }
+            else if (!alnum)
+                wordStart = true;
         }
-        return;
+        break;
     }
 
     case ccStripDia:
     {
-        int l = MultiByteToWideChar(CP_ACP, MB_COMPOSITE, start, (int)(end - start), NULL, 0);
-        if (l >= 0)
+        const int chars = FoldStringW(MAP_COMPOSITE, original.data(), (int)original.size(), NULL, 0);
+        if (chars > 0)
         {
-            LPWSTR wstr = (LPWSTR)malloc(l * sizeof(WCHAR));
-            if (wstr)
+            std::wstring decomposed((size_t)chars, L'\0');
+            if (FoldStringW(MAP_COMPOSITE, original.data(), (int)original.size(), decomposed.data(), chars))
             {
-                LPWSTR s, d;
-                // Convert to composite form
-                MultiByteToWideChar(CP_ACP, MB_COMPOSITE, start, (int)(end - start), wstr, l);
-                s = d = wstr;
-                // Remove combining diacritics marks
-                int i;
-                for (i = 0; i < l; i++)
+                changed.clear();
+                for (wchar_t c : decomposed)
                 {
-                    if (!((*s >= 0x300) && (*s <= 0x36f)))
-                        *d++ = *s;
-                    s++;
+                    WORD type = 0;
+                    GetStringTypeW(CT_CTYPE3, &c, 1, &type);
+                    if ((type & (C3_NONSPACING | C3_DIACRITIC)) == 0)
+                        changed.push_back(c);
                 }
-                // Convert back to MBCS, check for orther composite characters
-                WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, wstr, (int)(d - wstr), dst, (int)(end - start), NULL, NULL);
-                free(wstr);
-            }
-            else
-            { // Out of memory???
-                memcpy(dst, start, end - start);
             }
         }
-        else
-        { // Empty string? Or what's wrong??
-            memcpy(dst, start, end - start);
-        }
-        return;
+        break;
     }
+    default:
+        break;
     }
+    return WideToRenamerText(changed.c_str(), (int)changed.size());
 }

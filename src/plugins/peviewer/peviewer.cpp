@@ -13,6 +13,7 @@
 #include "pefile.h"
 #include "cfgdlg.h"
 #include "cfg.h"
+#include "unicode/helpers.h"
 
 // Plugin interface object; its methods are called from Salamander.
 CPluginInterface PluginInterface;
@@ -34,8 +35,8 @@ CSalamanderDebugAbstract* SalamanderDebug = NULL;
 //                3 - AS 3.07: allows configuring the visibility of individual dump sections
 int ConfigVersion = 0;
 #define CURRENT_CONFIG_VERSION 3
-LPCTSTR CONFIG_VERSION = _T("Version");
-LPCTSTR CONFIG_DUMPERS = _T("Dumpers");
+const wchar_t* CONFIG_VERSION = L"Version";
+const wchar_t* CONFIG_DUMPERS = L"Dumpers";
 
 struct CFG_LOAD_ITEM
 {
@@ -57,12 +58,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 
 //
 // ****************************************************************************
-// LoadStr
+// LangStr
 //
 
-LPTSTR LoadStr(int resID)
+// Wide - SalGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+std::wstring LangStr(int resID)
 {
-    return SalGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalGeneral, HLanguage, resID);
 }
 
 //
@@ -90,18 +92,28 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // This plugin is built for the current Salamander version and newer - perform a check.
     if (salamander->GetVersion() < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   _T("Portable Executable Viewer") /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // (spl_vers.h) used by ~35 plugins - widen only at this call site via the same
+        // two-macro token-paste idiom already used for __WFILE__ in common/trace.h, rather
+        // than touching the shared macro itself. (The note that used to follow - "_T() does not
+        // help, this plugin does not define UNICODE" - stopped being true at P4.2, but the
+        // token-paste is still the right answer: it does not depend on a define at all.)
+#define PEVIEWER_WIDEN2(x) L##x
+#define PEVIEWER_WIDEN(x) PEVIEWER_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    PEVIEWER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Portable Executable Viewer" /* do not translate! */, MB_OK | MB_ICONERROR);
+#undef PEVIEWER_WIDEN
+#undef PEVIEWER_WIDEN2
         return NULL;
     }
 
     // Load the language module (.slg).
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), _T("Portable Executable Viewer") /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Portable Executable Viewer" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
-    if (!InitializeWinLib(_T("PEVIEWER") /* do not translate! */, DLLInstance))
+    if (!InitializeWinLib(L"PEVIEWER" /* do not translate! */, DLLInstance))
     {
         return NULL;
     }
@@ -110,14 +122,14 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalGeneral = salamander->GetSalamanderGeneral();
 
     // Set the basic plugin information.
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGIN_NAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGIN_NAME).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION | FUNCTION_VIEWER,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "PEVIEWER");
+                                   _CRT_WIDE(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CRT_WIDE(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"PEVIEWER");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // Default configuration.
     BuildDefaultDumperChain();
@@ -132,14 +144,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
 void CPluginInterface::About(HWND parent)
 {
-    TCHAR buf[1000];
-    _sntprintf(buf, 1000,
-               _T("%s ") VERSINFO_VERSION _T("\n\n") VERSINFO_COPYRIGHT _T("\n\n")
-               _T("%s"),
-               LoadStr(IDS_PLUGIN_NAME),
-               LoadStr(IDS_PLUGIN_DESCRIPTION));
-    buf[999] = 0;
-    SalGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    try
+    {
+        const std::wstring message = SPLFormatStringOwned(
+            L"%s " _CRT_WIDE(VERSINFO_VERSION) L"\n\n" _CRT_WIDE(VERSINFO_COPYRIGHT) L"\n\n%s",
+            LangStr(IDS_PLUGIN_NAME).c_str(), LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+        SalGeneral->SalMessageBox(parent, message.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
+    }
+    catch (...)
+    {
+        SalGeneral->SalMessageBox(parent, LangStr(IDS_PLUGIN_NAME).c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
+    }
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -260,11 +275,11 @@ void CPluginInterface::Configuration(HWND parent)
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Connect(,)");
-    salamander->AddViewer("*.cpl;*.dll;*.drv;*.exe;*.ocx;*.spl;*.sys;*.scr", FALSE); // default (plugin installation); otherwise Salamander ignores it
+    salamander->AddViewer(L"*.cpl;*.dll;*.drv;*.exe;*.ocx;*.spl;*.sys;*.scr", FALSE); // default (plugin installation); otherwise Salamander ignores it
 
     if (ConfigVersion == 1) // in this development version before SS 2.5 beta 1 we removed *.SCR (this is a fix)
     {
-        salamander->AddViewer("*.scr", TRUE); // re-add the "*.scr" extension (we already have CPluginInterfaceForViewerAbstract::CanViewFile)
+        salamander->AddViewer(L"*.scr", TRUE); // re-add the "*.scr" extension (we already have CPluginInterfaceForViewerAbstract::CanViewFile)
     }
 }
 
@@ -279,20 +294,31 @@ CPluginInterface::GetInterfaceForViewer()
 // CPluginInterfaceForViewer
 //
 
-BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
+BOOL MapFileToMemory(const wchar_t* name, HANDLE& hFile, HANDLE& hFileMapping,
                      LPVOID& lpFileBase, DWORD& fileSize, BOOL quietMode)
 {
-    hFile = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
-                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+    const auto showOpenError = [name]() {
+        try
+        {
+            const std::wstring message = SPLFormatStringOwned(LangStr(IDS_ERR_OPEN_FILE).c_str(), name);
+            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), message.c_str(),
+                                      LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+        }
+        catch (...)
+        {
+            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), LangStr(IDS_ERR_OPEN_FILE).c_str(),
+                                      LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+        }
+    };
+
+    hFile = CreateFileW(name, GENERIC_READ, FILE_SHARE_READ, NULL,
+                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 
     if (hFile == INVALID_HANDLE_VALUE)
     {
         if (!quietMode)
         {
-            TCHAR buff[2000];
-            _stprintf(buff, LoadStr(IDS_ERR_OPEN_FILE), name);
-            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+            showOpenError();
         }
         return FALSE;
     }
@@ -302,10 +328,7 @@ BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
     {
         if (!quietMode)
         {
-            TCHAR buff[2000];
-            _stprintf(buff, LoadStr(IDS_ERR_OPEN_FILE), name);
-            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+            showOpenError();
         }
         CloseHandle(hFile);
         return FALSE;
@@ -316,10 +339,7 @@ BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
     {
         if (!quietMode)
         {
-            TCHAR buff[2000];
-            _stprintf(buff, LoadStr(IDS_ERR_OPEN_FILE), name);
-            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+            showOpenError();
         }
         CloseHandle(hFile);
         return FALSE;
@@ -330,10 +350,7 @@ BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
     {
         if (!quietMode)
         {
-            TCHAR buff[2000];
-            _stprintf(buff, LoadStr(IDS_ERR_OPEN_FILE), name);
-            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+            showOpenError();
         }
         CloseHandle(hFileMapping);
         CloseHandle(hFile);
@@ -349,13 +366,31 @@ void UnmapFileFromMemory(HANDLE& hFile, HANDLE& hFileMapping, LPVOID& lpFileBase
     CloseHandle(hFile);
 }
 
-BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int width,
+namespace
+{
+void ShowPeviewerFileMessage(int messageId, const wchar_t* name) noexcept
+{
+    try
+    {
+        const std::wstring message = SPLFormatStringOwned(LangStr(messageId).c_str(), name);
+        SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), message.c_str(),
+                                  LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+    }
+    catch (...)
+    {
+        SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), LangStr(messageId).c_str(),
+                                  LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+    }
+}
+} // namespace
+
+BOOL CPluginInterfaceForViewer::ViewFile(const wchar_t* name, int left, int top, int width,
                                          int height, UINT showCmd, BOOL alwaysOnTop,
                                          BOOL returnLock, HANDLE* lock, BOOL* lockOwner,
                                          CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
 {
-    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%s, %d, %d, %d, %d, "
+    CALL_STACK_MESSAGE11("CPluginInterfaceForViewer::ViewFile(%ls, %d, %d, %d, %d, "
                          "0x%X, %d, %d, , , , %d, %d)",
                          name, left, top, width, height,
                          showCmd, alwaysOnTop, returnLock, enumFilesSourceUID, enumFilesCurrentIndex);
@@ -377,44 +412,73 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
         return FALSE;
     }
 
-    CPathBuffer tempFileName;
-    if (SalGeneral->SalGetTempFileName(NULL, _T("PEV"), tempFileName, TRUE, NULL))
+    std::wstring tempFileName;
+    if (SPLSalGetTempFileNameOwned(SalGeneral, NULL, L"PEV", tempFileName, TRUE, NULL))
     {
-        TCHAR caption[2000];
         int err;
         CSalamanderPluginInternalViewerData vData;
 
         // Create a temporary file and pour the module dump into it.
-        FILE* outStream = _tfopen(tempFileName, _T("w"));
-        if (!DumpFileInfo(lpFileBase, fileSize, outStream))
+        FILE* outStream = NULL;
+        _wfopen_s(&outStream, tempFileName.c_str(), L"w");
+        if (outStream == NULL)
         {
-            TCHAR buff[2000];
+            DeleteFileW(tempFileName.c_str());
             SetCursor(hOldCur);
-            _stprintf(buff, LoadStr(IDS_EXCEPTION), name);
-            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
-                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
-            SetCursor(LoadCursor(NULL, IDC_WAIT));
+            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), LangStr(IDS_ERR_TMP).c_str(),
+                                      LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
+            UnmapFileFromMemory(hFile, hFileMapping, lpFileBase);
+            return FALSE;
         }
-        fclose(outStream);
+        BOOL dumpSucceeded = FALSE;
+        try
+        {
+            dumpSucceeded = DumpFileInfo(lpFileBase, fileSize, outStream);
+        }
+        catch (...)
+        {
+            dumpSucceeded = FALSE;
+        }
+        const int closeResult = fclose(outStream);
+        if (!dumpSucceeded || closeResult != 0)
+        {
+            SetCursor(hOldCur);
+            ShowPeviewerFileMessage(IDS_EXCEPTION, name);
+            DeleteFileW(tempFileName.c_str());
+            UnmapFileFromMemory(hFile, hFileMapping, lpFileBase);
+            return FALSE;
+        }
 
         // Hand the file over to Salamander - it moves it into the cache and deletes it once
         // it is no longer needed.
         vData.Size = sizeof(vData);
-        vData.FileName = tempFileName;
+        vData.FileName = tempFileName.c_str();
         vData.Mode = 0; // text mode
-        _stprintf(caption, _T("%s - %s"), name, LoadStr(IDS_PLUGIN_NAME));
-        vData.Caption = caption;
+        std::wstring caption;
+        try
+        {
+            caption = name;
+            caption += L" - ";
+            caption += LangStr(IDS_PLUGIN_NAME);
+            vData.Caption = caption.c_str();
+        }
+        catch (...)
+        {
+            vData.Caption = name;
+        }
         vData.WholeCaption = TRUE;
-        if (!SalGeneral->ViewFileInPluginViewer(NULL, &vData, TRUE, NULL, _T("pe_dump.txt"), err))
+        if (!SalGeneral->ViewFileInPluginViewer(NULL, &vData, TRUE, NULL, L"pe_dump.txt", err))
         {
             // The file is deleted even in case of failure.
         }
     }
     else
     {
+        if (!tempFileName.empty())
+            DeleteFileW(tempFileName.c_str());
         SetCursor(hOldCur);
-        SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), LoadStr(IDS_ERR_TMP),
-                                  LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+        SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), LangStr(IDS_ERR_TMP).c_str(),
+                                  LangStr(IDS_PLUGIN_NAME).c_str(), MB_OK | MB_ICONEXCLAMATION);
     }
 
     // Unmap the file from memory.
@@ -424,7 +488,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
     return TRUE;
 }
 
-BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
+BOOL CPluginInterfaceForViewer::CanViewFile(const wchar_t* name)
 {
     HANDLE hFile;
     HANDLE hFileMapping;

@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 class CPasswordManager;
 
 //****************************************************************************
@@ -89,15 +92,33 @@ struct CMasterPasswordVerifier
     BYTE Dummy[16]; // random encrypted data
     BYTE MAC[10];   // verification record used to check the correctness of the master password
 };
+
+#define PWDMNGR_MASTER_VERIFIER_UTF8_MAGIC 0x3256504Du /* MPV2 */
+#define PWDMNGR_MASTER_VERIFIER_UTF8_VERSION 2u
+
+struct CMasterPasswordVerifierUtf8
+{
+    DWORD Magic;
+    DWORD Version;
+    BYTE Salt[16];
+    BYTE Dummy[16];
+    BYTE MAC[10];
+};
 #pragma pack(pop)
+
+static_assert(sizeof(CMasterPasswordVerifier) == 42,
+              "legacy master-password verifier layout drift");
+static_assert(sizeof(CMasterPasswordVerifierUtf8) == 50,
+              "UTF-8 master-password verifier layout drift");
 
 class CPasswordManager
 {
 private:
     BOOL UseMasterPassword;                          // the user has (at some point) provided the master password used for data encryption; the plaintext value may later be NULL and must be requested again
-    std::string PlainMasterPassword;                 // password (in plaintext); empty if the user has not entered it during this session; not stored into the registry
-    std::string OldPlainMasterPassword;              // temporarily holds the previous PlainMasterPassword during the call to Plugins.PasswordManagerEvent(), allowing the plug-in to request decryption of its passwords
-    CMasterPasswordVerifier* MasterPasswordVerifier; // used to verify the correctness of the master password; stored in the registry; may be NULL
+    std::wstring PlainMasterPassword;    // plaintext session owner; never persisted
+    std::wstring OldPlainMasterPassword; // previous password during plug-in re-encryption callbacks
+    std::vector<BYTE> MasterPasswordVerifier; // frozen legacy or versioned UTF-8 record
+    BOOL MasterPasswordVerifierIsLegacy;
 
     CSalamanderCryptAbstract* SalamanderCrypt; // interface for the work with cryptographic library
 
@@ -105,13 +126,13 @@ public:
     CPasswordManager();
     ~CPasswordManager();
 
-    BOOL IsPasswordSecure(const char* password); // returns TRUE when the password meets strength requirements, otherwise FALSE
+    BOOL IsPasswordSecure(const wchar_t* password); // returns TRUE when the password meets strength requirements, otherwise FALSE
 
     // sets the master password; if 'password' is NULL or an empty string, master password is turned off
-    void SetMasterPassword(HWND hParent, const char* password);
+    BOOL SetMasterPassword(HWND hParent, const wchar_t* password);
 
     // used to provide the master password when it is not currently known in plaintext form
-    BOOL EnterMasterPassword(const char* password);
+    BOOL EnterMasterPassword(const wchar_t* password);
 
     BOOL ChangeMasterPassword(HWND hParent);
     BOOL IsUsingMasterPassword() { return UseMasterPassword; }         // are the passwords protected using AES/Master Password?
@@ -129,8 +150,6 @@ public:
     BOOL Save(HKEY hKey); // saves stored passwords to the Registry
     BOOL Load(HKEY hKey); // loads data from the registry
 
-    // 'encryptedPasswordSize' specifies the buffer size for the encrypted password to be stored; the size must be 50 characters greater than the 'plainPassword' length
-
     // encrypts the plaintext password into the binary form using strong encryption (AES)
     // before AES encryption, it performs an additional scramble that adds padding (hardening short passwords)
     // if the caller requires AES password encryption ('encrypt' == TRUE), before calling the method he must call AskForMasterPassword() that must return TRUE
@@ -138,10 +157,10 @@ public:
     // 'encryptedPassword' returns a pointer to a binary buffer allocated by Salamander with the encrypted password; this buffer must be deallocated using CSalamanderGeneralAbstract::Free
     // 'encryptedPasswordSize' returns the size of the 'encryptedPassword' buffer in bytes
     // if 'encrypt' is TRUE, the function encrypts the password using AES (safe, protected by the master password); if FALSE, the password is only scrambled
-    BOOL EncryptPassword(const char* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt);
-    // 'plainPassword' must be deallocated using CSalamanderGeneralAbstract::Free
-    // if 'plainPassword' is NULL, only checks whether the password can be decrypted
-    BOOL DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, char** plainPassword);
+    BOOL EncryptPassword(const wchar_t* plainPassword, BYTE** encryptedPassword, int* encryptedPasswordSize, BOOL encrypt);
+    // If 'plainPassword' is NULL, only checks whether the password can be decrypted.
+    // The returned value is dynamically owned UTF-16 and changes only on success.
+    BOOL DecryptPassword(const BYTE* encryptedPassword, int encryptedPasswordSize, std::wstring* plainPassword);
     // returns TRUE for an AES-encrypted password, otherwise returns FALSE; the signature in the first byte of the password determines it
     BOOL IsPasswordEncrypted(const BYTE* encyptedPassword, int encyptedPasswordSize);
 
@@ -154,11 +173,11 @@ public:
     //BOOL DeletePassword(const char *pluginDLLName, DWORD passwordID);
 
     // verifies that 'password' matches the password stored in MasterPasswordVerifier; returns TRUE on success, otherwise FALSE
-    BOOL VerifyMasterPassword(const char* password);
+    BOOL VerifyMasterPassword(const wchar_t* password);
 
 protected:
-    // allocates and computes MasterPasswordVerifier, which is stored into the registry for subsequent verification
-    void CreateMasterPasswordVerifier(const char* password);
+    BOOL CreateMasterPasswordVerifier(const wchar_t* password,
+                                      std::vector<BYTE>& verifier);
 };
 
 extern CPasswordManager PasswordManager;

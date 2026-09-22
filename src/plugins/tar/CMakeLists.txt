@@ -4,6 +4,7 @@
 sal_add_plugin(NAME tar
   SOURCES
     "${SAL_SHARED}/dbg.cpp"
+    "${SAL_PLUGINS}/tar/archive_name.cpp"
     "${SAL_PLUGINS}/tar/bzip/bunzip.cpp"
     "${SAL_PLUGINS}/tar/bzip/bzlib.c"
     "${SAL_PLUGINS}/tar/bzip/crctable.c"
@@ -20,6 +21,7 @@ sal_add_plugin(NAME tar
     "${SAL_PLUGINS}/tar/rpm/rpm.cpp"
     "${SAL_PLUGINS}/tar/rpm/rpmview.cpp"
     "${SAL_PLUGINS}/tar/tardll.cpp"
+    "${SAL_PLUGINS}/tar/tar_text.cpp"
     "${SAL_PLUGINS}/tar/untar.cpp"
   RC "${SAL_PLUGINS}/tar/tar.rc"
   DEF "${SAL_PLUGINS}/tar/tar.def"

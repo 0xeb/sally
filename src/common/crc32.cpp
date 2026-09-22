@@ -94,7 +94,7 @@ void MakeCrcTable(DWORD* crcTab)
     }
 }
 
-DWORD UpdateCrc(char* buffer, unsigned length, DWORD crcVal, const DWORD* crcTab)
+DWORD UpdateCrc(wchar_t* buffer, unsigned length, DWORD crcVal, const DWORD* crcTab)
 {
     register DWORD c; /* temporary variable */
 

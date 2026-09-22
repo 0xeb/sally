@@ -5,7 +5,7 @@
 // Wide display/validation name helpers. Extracted from sally_path_validation.cpp,
 // files_window_delete_email.cpp, and sally_strings_waitwindow.cpp so production
 // and the private tests compile the same translation unit
-// (kb/unicode/test-map.md).
+//.
 
 #ifdef SALLY_WORKER_CORE_STANDALONE
 #include "common/WorkerCoreStandalone.h"
@@ -47,7 +47,7 @@ BOOL NameEndsWithBackslashW(const wchar_t* name)
 
 // Wide version - checks if path contains components ending with space or dot
 // Returns FALSE if invalid component found (and optionally truncates at that point)
-BOOL PathContainsValidComponentsW(const wchar_t* path)
+BOOL PathContainsValidComponents(const wchar_t* path)
 {
     const wchar_t* s = path;
     while (*s != 0)

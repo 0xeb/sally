@@ -5,12 +5,16 @@
 // vim: et:sw=2:ts=2
 
 #include "precomp.h"
+
+#include <algorithm>
+#include <vector>
 #include "peviewer.rh2"
 #include "peviewer.h"
 #include "pefile.h"
 #include "dump_res.h"
 #include "dump_dbg.h"
 #include "cfg.h"
+#include "peviewer_text.h"
 
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
@@ -222,47 +226,6 @@ static const WORD_FLAG_DESCRIPTIONS ImageFileHeaderCharacteristics[] =
 
 #define NUMBER_IMAGE_HEADER_FLAGS _countof(ImageFileHeaderCharacteristics)
 
-// Convert a TimeDateStamp (i.e., # of seconds since 1/1/1970) into a FILETIME
-
-BOOL TimeDateStampToString(DWORD timeDateStamp, char* buffer)
-{
-    SYSTEMTIME st;
-    FILETIME lft;
-
-    *buffer = 0;
-
-    if (timeDateStamp == 0 || timeDateStamp == 0xFFFFFFFF)
-        return FALSE;
-
-    __int64 t1970 = 0x019DB1DED53E8000; // Magic... GMT...  Don't ask....
-
-    __int64 timeStampIn100nsIncr = (__int64)timeDateStamp * 10000000;
-
-    __int64 finalValue = t1970 + timeStampIn100nsIncr;
-
-    if (!FileTimeToLocalFileTime((FILETIME*)&finalValue, &lft))
-        return FALSE;
-
-    if (!FileTimeToSystemTime(&lft, &st))
-        return FALSE;
-
-    strcpy(buffer, " (");
-    if (GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buffer + 2, 50) == 0)
-    {
-        *buffer = 0;
-        return FALSE;
-    }
-    strcat(buffer, " ");
-    if (GetTimeFormatA(LOCALE_USER_DEFAULT, 0, &st, NULL, buffer + strlen(buffer), 50) == 0)
-    {
-        *buffer = 0;
-        return FALSE;
-    }
-    strcat(buffer, ")");
-
-    return TRUE;
-}
-
 CPEFile::CPEFile(LPVOID File, DWORD FileSize)
 {
     lpFile = (LPBYTE)File;
@@ -288,7 +251,7 @@ void CFileHeaderDumper::DumpCore(CFileStream* outStream)
     PIMAGE_FILE_HEADER pPEFileHeader = m_peFile.GetPEFileHeader();
     if (pPEFileHeader != NULL)
     {
-        char buff[100];
+        std::string timestamp;
         UINT headerFieldWidth = 31;
         const char* szMachine;
 
@@ -392,9 +355,9 @@ void CFileHeaderDumper::DumpCore(CFileStream* outStream)
                            pPEFileHeader->Machine, szMachine);
         outStream->fprintf("  %-*s%u\n", headerFieldWidth, "Number of Sections:",
                            pPEFileHeader->NumberOfSections);
-        TimeDateStampToString(pPEFileHeader->TimeDateStamp, buff);
+        FormatPeviewerTimestamp(pPEFileHeader->TimeDateStamp, timestamp);
         outStream->fprintf("  %-*s0x%08X%s\n", headerFieldWidth, "Time Date Stamp:",
-                           pPEFileHeader->TimeDateStamp, buff);
+                           pPEFileHeader->TimeDateStamp, timestamp.c_str());
         outStream->fprintf("  %-*s0x%08X\n", headerFieldWidth, "Pointer to Symbol Table:",
                            pPEFileHeader->PointerToSymbolTable);
         outStream->fprintf("  %-*s%u\n", headerFieldWidth, "Number of Symbols:",
@@ -412,9 +375,9 @@ void CFileHeaderDumper::DumpCore(CFileStream* outStream)
     }
 }
 
-const char* CFileHeaderDumper::GetExceptionMessage()
+const _TCHAR* CFileHeaderDumper::GetExceptionMessage()
 {
-    return "File Header is corrupted.";
+    return L"File Header is corrupted."; // match the declared virtual's _TCHAR return (pefile.h) - was a pre-existing narrow/wchar_t mismatch harmless only because wchar_t==char in the real build
 }
 
 //j.r.
@@ -612,7 +575,7 @@ void COptionalFileHeaderDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* COptionalFileHeaderDumper::GetExceptionMessage()
 {
-    return _T("Optional File Header is corrupted.");
+    return L"Optional File Header is corrupted.";
 }
 
 void CExportTableDumper::DumpCore(CFileStream* outStream)
@@ -628,7 +591,7 @@ void CExportTableDumper::DumpCore(CFileStream* outStream)
         DWORD* pNames;
         int i;
         char* sectionName;
-        char buff[100];
+        std::string timestamp;
         BOOL* eaIndexDone;
 
         DWORD exportSectionBegin = 0;
@@ -675,8 +638,8 @@ void CExportTableDumper::DumpCore(CFileStream* outStream)
         outStream->fprintf("Export Table:\n");
 
         outStream->fprintf("  %-*s%s\n", width, "Name:", sectionName);
-        TimeDateStampToString(ped->TimeDateStamp, buff);
-        outStream->fprintf("  %-*s0x%08X%s\n", width, "Time Date Stamp:", ped->TimeDateStamp, buff);
+        FormatPeviewerTimestamp(ped->TimeDateStamp, timestamp);
+        outStream->fprintf("  %-*s0x%08X%s\n", width, "Time Date Stamp:", ped->TimeDateStamp, timestamp.c_str());
 
         outStream->fprintf("  %-*s%u.%02u\n", width, "Version:", ped->MajorVersion, ped->MinorVersion);
         outStream->fprintf("  %-*s%u\n", width, "Ordinal Base:", ped->Base);
@@ -752,7 +715,7 @@ void CExportTableDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CExportTableDumper::GetExceptionMessage()
 {
-    return _T("Export Table is corrupted.");
+    return L"Export Table is corrupted.";
 }
 
 void CImportTableDumper::DumpCore(CFileStream* outStream)
@@ -778,7 +741,7 @@ void CImportTableDumper::DumpCore(CFileStream* outStream)
     /* extract all import modules */
     while (pid->Name != 0)
     {
-        char buff[100];
+        std::string timestamp;
         DWORD dwFunction;
         DWORD dwFunction2;
         char* moduleName = (char*)(pBase + pid->Name);
@@ -791,8 +754,8 @@ void CImportTableDumper::DumpCore(CFileStream* outStream)
         outStream->fprintf("    %-*s0x%08X\n", width, "Import Name Table:", pid->OriginalFirstThunk);
         // About "Bogus" values of TimeDateStamp: according to http://en.wikibooks.org/wiki/X86_Disassembly/Windows_Executable_Files,
         // it must match TimeDateStamp in the bound module's FileHeader
-        TimeDateStampToString(pid->TimeDateStamp, buff);
-        outStream->fprintf("    %-*s0x%08X%s\n", width, "Time Date Stamp:", pid->TimeDateStamp, buff);
+        FormatPeviewerTimestamp(pid->TimeDateStamp, timestamp);
+        outStream->fprintf("    %-*s0x%08X%s\n", width, "Time Date Stamp:", pid->TimeDateStamp, timestamp.c_str());
         outStream->fprintf("    %-*s0x%08X\n", width, "Index of first forwarder reference:", pid->ForwarderChain);
         outStream->fprintf("\n");
 
@@ -868,7 +831,7 @@ void CImportTableDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CImportTableDumper::GetExceptionMessage()
 {
-    return _T("Import Table is corrupted.");
+    return L"Import Table is corrupted.";
 }
 
 //
@@ -943,7 +906,7 @@ void CSectionTableDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CSectionTableDumper::GetExceptionMessage()
 {
-    return _T("Section Table is corrupted.");
+    return L"Section Table is corrupted.";
 }
 
 static const char* const SzDebugFormats[] =
@@ -1122,16 +1085,27 @@ void CDebugDirectoryDumper::DumpMisc(CFileStream* outStream, const void* data, D
 
 const _TCHAR* CDebugDirectoryDumper::GetExceptionMessage()
 {
-    return _T("Debug Directory is corrupted.");
+    return L"Debug Directory is corrupted.";
 }
 
 static void BuildPEDumperChain(CPEFile& peFile, CPEDumper** chain, DWORD maxLength, DWORD* actualLength)
 {
-    *actualLength = min(maxLength, g_cfgChainLength);
-
-    for (DWORD i = 0; i < *actualLength; i++)
+    const DWORD requestedLength = min(maxLength, g_cfgChainLength);
+    *actualLength = 0;
+    try
     {
-        chain[i] = g_cfgChain[i].pDumperCfg->pfnFactory(&peFile);
+        for (DWORD i = 0; i < requestedLength; i++)
+        {
+            chain[i] = g_cfgChain[i].pDumperCfg->pfnFactory(&peFile);
+            ++*actualLength;
+        }
+    }
+    catch (...)
+    {
+        for (DWORD i = 0; i < *actualLength; i++)
+            delete chain[i];
+        *actualLength = 0;
+        throw;
     }
 }
 
@@ -1141,6 +1115,11 @@ static void FreePEDumperChain(CPEDumper** chain, DWORD actualLength)
     {
         delete chain[i];
     }
+}
+
+static void WriteHiddenSectionsMessage(CFileStream& stream)
+{
+    stream.WriteWide(SPLLoadStrOwned(SalGeneral, HLanguage, IDS_HIDDEN_SECTIONS));
 }
 
 BOOL DumpFileInfo(LPVOID lpFile, DWORD fileSize, FILE* outStream)
@@ -1175,7 +1154,7 @@ BOOL DumpFileInfo(LPVOID lpFile, DWORD fileSize, FILE* outStream)
             }
         }
         if (peDumperChainLength == 0 || stream.IsEmpty())
-            stream.fprintf("%s", SalGeneral->LoadStr(HLanguage, IDS_HIDDEN_SECTIONS));
+            WriteHiddenSectionsMessage(stream);
     }
     __except (HandleFileException(GetExceptionInformation(), lpFile, fileSize))
     {
@@ -1186,8 +1165,9 @@ BOOL DumpFileInfo(LPVOID lpFile, DWORD fileSize, FILE* outStream)
 
     FreePEDumperChain(peDumperChain, peDumperChainLength);
 
-    //  return exceptionCount == 0; // the viewer seems stable; we will no longer ask for bug reports
-    return TRUE;
+    // Parser exceptions still produce a useful diagnostic report, but a byte-stream encoding or
+    // write failure must not publish a truncated temporary file.
+    return !stream.HasFailed();
 }
 
 void CNTDumperWithExceptionHandler::Dump(CFileStream* outStream)
@@ -1201,7 +1181,10 @@ void CNTDumperWithExceptionHandler::Dump(CFileStream* outStream)
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        outStream->fprintf("\n---- EXCEPTION: %s\n\n", GetExceptionMessage());
+        outStream->fprintf("\n---- EXCEPTION: ");
+        if (!outStream->WriteWide(GetExceptionMessage()))
+            outStream->fprintf("Unable to encode error text.");
+        outStream->fprintf("\n\n");
         SetException();
     }
 }
@@ -1289,10 +1272,9 @@ void CLoadConfigDumper::DumpCore(CFileStream* outStream)
             break;
         }
 
-        char buff[100];
-        buff[0] = '\0';
-        TimeDateStampToString(pLoadConfig32->TimeDateStamp, buff);
-        outStream->fprintf("  %-*s0x%08X%s\n", width, "Time Date Stamp:", pLoadConfig32->TimeDateStamp, buff);
+        std::string timestamp;
+        FormatPeviewerTimestamp(pLoadConfig32->TimeDateStamp, timestamp);
+        outStream->fprintf("  %-*s0x%08X%s\n", width, "Time Date Stamp:", pLoadConfig32->TimeDateStamp, timestamp.c_str());
 
         if (m_peFile.Is64Bit())
         {
@@ -1315,7 +1297,7 @@ void CLoadConfigDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CLoadConfigDumper::GetExceptionMessage()
 {
-    return _T("Load Configuration Directory is corrupted.");
+    return L"Load Configuration Directory is corrupted.";
 }
 
 //
@@ -1657,10 +1639,10 @@ bool CFileVersionResourceDumper::ReadStringTable(CFileStream* outStream, BinaryR
         int width = 31;
         outStream->fprintf("  %-*s%u", width, "String File Information:", language);
 
-        char langName[128];
-        if (language != 0 && GetLocaleInfoA(MAKELCID(MAKELANGID(language, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, sizeof(langName)))
+        std::string languageName;
+        if (GetPeviewerLocaleLanguageText(language, languageName) && !languageName.empty())
         {
-            outStream->fprintf(" (%s)", langName);
+            outStream->fprintf(" (%s)", languageName.c_str());
         }
         outStream->fprintf("\n");
 
@@ -1687,67 +1669,6 @@ bool CFileVersionResourceDumper::ReadStringTable(CFileStream* outStream, BinaryR
     }
 
     return readOk;
-}
-
-#define STRCONV_STATIC_BUFFER_SIZE 64
-
-class W2A
-{
-private:
-    LPCWSTR m_pstrWString;
-    char m_szStaticBuffer[STRCONV_STATIC_BUFFER_SIZE];
-    char* m_pszDynamicBuffer;
-
-public:
-    W2A(LPCWSTR s);
-    ~W2A();
-
-    operator const char*();
-};
-
-W2A::W2A(LPCWSTR s)
-{
-    m_pstrWString = s;
-    m_pszDynamicBuffer = NULL;
-}
-
-W2A::~W2A()
-{
-    delete[] m_pszDynamicBuffer;
-}
-
-W2A::operator const char*()
-{
-    if (m_pstrWString == NULL)
-    {
-        return NULL;
-    }
-
-    if (*m_pstrWString == L'\0')
-    {
-        return "";
-    }
-
-    if (m_pszDynamicBuffer != NULL)
-    {
-        return m_pszDynamicBuffer;
-    }
-
-    int len = WideCharToMultiByte(CP_ACP, 0, m_pstrWString, -1,
-                                  m_szStaticBuffer, sizeof(m_szStaticBuffer), NULL, NULL);
-    if (len > 0)
-    {
-        return m_szStaticBuffer;
-    }
-
-    len = WideCharToMultiByte(CP_ACP, 0, m_pstrWString, -1,
-                              NULL, 0, NULL, NULL);
-
-    m_pszDynamicBuffer = new char[len];
-    WideCharToMultiByte(CP_ACP, 0, m_pstrWString, -1,
-                        m_pszDynamicBuffer, len, NULL, NULL);
-
-    return m_pszDynamicBuffer;
 }
 
 bool CFileVersionResourceDumper::ReadString(CFileStream* outStream, BinaryReader& reader)
@@ -1817,7 +1738,12 @@ bool CFileVersionResourceDumper::ReadString(CFileStream* outStream, BinaryReader
         }
 
         DWORD width = 28;
-        outStream->fprintf("    %ls", szKey);
+        outStream->fprintf("    ");
+        if (!outStream->WriteWide(std::wstring_view(szKey, cchKey)))
+        {
+            readOk = false;
+            break;
+        }
         if (cchValue > 0)
         {
             outStream->fprintf(":");
@@ -1828,7 +1754,11 @@ bool CFileVersionResourceDumper::ReadString(CFileStream* outStream, BinaryReader
                 spacing[width - cchKey] = '\0';
                 outStream->fprintf(spacing);
             }
-            outStream->fprintf("%s", (const char*)W2A(szValue));
+            if (!outStream->WriteWide(std::wstring_view(szValue, cchValue)))
+            {
+                readOk = false;
+                break;
+            }
         }
         outStream->fprintf("\n");
     } while (FALSE);
@@ -1965,7 +1895,7 @@ int CFileVersionResourceDumper::Bcd(WORD w)
 
 const _TCHAR* CFileVersionResourceDumper::GetExceptionMessage()
 {
-    return _T("File Version Resources are corrupted.");
+    return L"File Version Resources are corrupted.";
 }
 
 //
@@ -2051,7 +1981,7 @@ void CManifestResourceDumper::DumpResources(CFileStream* outStream)
 
 const _TCHAR* CManifestResourceDumper::GetExceptionMessage()
 {
-    return _T("Manifest Resource is corrupted.");
+    return L"Manifest Resource is corrupted.";
 }
 
 //
@@ -2203,7 +2133,7 @@ void CCorHeaderDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CCorHeaderDumper::GetExceptionMessage()
 {
-    return _T("CLR header is corrupted.");
+    return L"CLR header is corrupted.";
 }
 
 #if WITH_COR_METADATA_DUMPER
@@ -2293,7 +2223,7 @@ void CCorMetadataDumper::DumpCore(CFileStream* outStream)
 
 const _TCHAR* CCorMetadataDumper::GetExceptionMessage()
 {
-    return _T("CLR metadata is corrupted.");
+    return L"CLR metadata is corrupted.";
 }
 
 void CCorMetadataDumper::DumpMetadata(CFileStream* outStream, IMetaDataImport* pMetaDataImport, mdAssembly assembly)
@@ -2310,12 +2240,20 @@ void CCorMetadataDumper::DumpRuntimeVersion(CFileStream* outStream, IMetaDataImp
     hr = pMetaDataImport->QueryInterface(IID_IMetaDataImport2, (void**)&pMetaDataImport2);
     if (SUCCEEDED(hr))
     {
-        WCHAR wzVersion[100];
-        DWORD cchWritten;
-        hr = pMetaDataImport2->GetVersionString(wzVersion, _countof(wzVersion), &cchWritten);
-        if (SUCCEEDED(hr))
+        DWORD required = 0;
+        hr = pMetaDataImport2->GetVersionString(nullptr, 0, &required);
+        if (required > 0)
         {
-            outStream->fprintf("  %-*s%ls\n", 31, "Runtime Version:", wzVersion);
+            std::wstring version(static_cast<size_t>(required), L'\0');
+            DWORD written = 0;
+            hr = pMetaDataImport2->GetVersionString(version.data(), required, &written);
+            if (SUCCEEDED(hr) && written > 0 && written <= required)
+            {
+                version.resize(static_cast<size_t>(written - 1));
+                outStream->fprintf("  %-*s", 31, "Runtime Version:");
+                if (outStream->WriteWide(version))
+                    outStream->fprintf("\n");
+            }
         }
         pMetaDataImport2->Release();
     }
@@ -2359,7 +2297,7 @@ void CCorMetadataDumper::DumpCustomAttribute(CFileStream* outStream, IMetaDataIm
     hr = pMetaDataImport->GetCustomAttributeProps(customAttribute, NULL, &methodDefOrMemberRef, &pBlob, &cbBlob);
     if (SUCCEEDED(hr))
     {
-        WCHAR wzTypeName[100];
+        std::wstring typeName;
 
         if (TypeFromToken(methodDefOrMemberRef) == mdtMethodDef)
         {
@@ -2369,7 +2307,7 @@ void CCorMetadataDumper::DumpCustomAttribute(CFileStream* outStream, IMetaDataIm
         }
         else if (TypeFromToken(methodDefOrMemberRef) == mdtMemberRef)
         {
-            hr = GetCustomAttributeTypeNameFromMemberRef(pMetaDataImport, methodDefOrMemberRef, wzTypeName, _countof(wzTypeName));
+            hr = GetCustomAttributeTypeNameFromMemberRef(pMetaDataImport, methodDefOrMemberRef, typeName);
         }
         else
         {
@@ -2380,7 +2318,7 @@ void CCorMetadataDumper::DumpCustomAttribute(CFileStream* outStream, IMetaDataIm
 
         if (SUCCEEDED(hr))
         {
-            if (wcscmp(wzTypeName, L"System.Runtime.Versioning.TargetFrameworkAttribute") == 0)
+            if (typeName == L"System.Runtime.Versioning.TargetFrameworkAttribute")
             {
                 DumpTargetFrameworkVersion(outStream, (const BYTE*)pBlob, cbBlob);
             }
@@ -2444,7 +2382,7 @@ void CCorMetadataDumper::DumpTargetFrameworkVersion(CFileStream* outStream, cons
     outStream->fprintf("  %-*s%.*s\n", 31, "Target Framework:", packedLen, pUtf8String);
 }
 
-HRESULT CCorMetadataDumper::GetCustomAttributeTypeNameFromMemberRef(IMetaDataImport* pMetaDataImport, mdMemberRef memberRef, PWSTR wzTypeName, DWORD cchTypeName)
+HRESULT CCorMetadataDumper::GetCustomAttributeTypeNameFromMemberRef(IMetaDataImport* pMetaDataImport, mdMemberRef memberRef, std::wstring& typeName)
 {
     HRESULT hr;
     mdToken type;
@@ -2454,7 +2392,19 @@ HRESULT CCorMetadataDumper::GetCustomAttributeTypeNameFromMemberRef(IMetaDataImp
     {
         if (TypeFromToken(type) == mdtTypeRef)
         {
-            hr = pMetaDataImport->GetTypeRefProps(type, NULL, wzTypeName, cchTypeName, NULL);
+            ULONG required = 0;
+            hr = pMetaDataImport->GetTypeRefProps(type, NULL, nullptr, 0, &required);
+            if (required > 0)
+            {
+                std::wstring staged(static_cast<size_t>(required), L'\0');
+                ULONG written = 0;
+                hr = pMetaDataImport->GetTypeRefProps(type, NULL, staged.data(), required, &written);
+                if (SUCCEEDED(hr) && written > 0 && written <= required)
+                {
+                    staged.resize(static_cast<size_t>(written - 1));
+                    typeName.swap(staged);
+                }
+            }
         }
         else
         {
@@ -2497,7 +2447,9 @@ void CCorMetadataDumper::DumpReferencedAssemblies(CFileStream* outStream, IMetaD
     while (list.Next(hItem))
     {
         PCWSTR pszName = list.GetBuffer(hItem);
-        outStream->fprintf("    %ls\n", pszName);
+        outStream->fprintf("    ");
+        if (outStream->WriteWide(pszName))
+            outStream->fprintf("\n");
     }
 }
 
@@ -2564,84 +2516,128 @@ static HRESULT CreateAssemblyNameObjectHelper(IAssemblyName** ppAssemblyName, LP
 
 void CCorMetadataDumper::DumpAssemblyReference(CStringList& list, IMetaDataAssemblyImport* pMetaDataAssemblyImport, mdAssemblyRef assemblyRef)
 {
-    HRESULT hr;
-    IAssemblyName* pAssemblyName;
-    WCHAR wzName[MAX_PATH];
-    ULONG cchName;
-    ASSEMBLYMETADATA metaData = {
-        0,
-    };
-    WCHAR wzLocale[100];
-    DWORD adwProcessor[10];
-    OSINFO aOSInfo[10];
-    DWORD dwCorAssemblyFlags;
-    const void* pPublicKey;
-    ULONG cbPublicKey;
+    ULONG requiredName = 0;
+    ASSEMBLYMETADATA requiredMetaData{};
+    const void* pPublicKey = nullptr;
+    ULONG cbPublicKey = 0;
+    DWORD dwCorAssemblyFlags = 0;
+    HRESULT hr = pMetaDataAssemblyImport->GetAssemblyRefProps(
+        assemblyRef, &pPublicKey, &cbPublicKey, nullptr, 0, &requiredName,
+        &requiredMetaData, nullptr, nullptr, &dwCorAssemblyFlags);
+    if (requiredName == 0)
+        return;
 
-    metaData.szLocale = wzLocale;
-    metaData.cbLocale = _countof(wzLocale);
-    metaData.rProcessor = adwProcessor;
-    metaData.ulProcessor = _countof(adwProcessor);
-    metaData.rOS = aOSInfo;
-    metaData.ulOS = _countof(aOSInfo);
+    std::vector<wchar_t> name(requiredName);
+    std::vector<wchar_t> locale(requiredMetaData.cbLocale);
+    std::vector<DWORD> processors(requiredMetaData.ulProcessor);
+    std::vector<OSINFO> operatingSystems(requiredMetaData.ulOS);
+    ASSEMBLYMETADATA metaData{};
 
-    hr = pMetaDataAssemblyImport->GetAssemblyRefProps(
-        assemblyRef,
-        &pPublicKey,
-        &cbPublicKey,
-        wzName,
-        _countof(wzName),
-        &cchName,
-        &metaData,
-        NULL,
-        NULL,
-        &dwCorAssemblyFlags);
+    for (;;)
+    {
+        metaData.szLocale = locale.empty() ? nullptr : locale.data();
+        metaData.cbLocale = static_cast<ULONG>(locale.size());
+        metaData.rProcessor = processors.empty() ? nullptr : processors.data();
+        metaData.ulProcessor = static_cast<ULONG>(processors.size());
+        metaData.rOS = operatingSystems.empty() ? nullptr : operatingSystems.data();
+        metaData.ulOS = static_cast<ULONG>(operatingSystems.size());
 
-    hr = CreateAssemblyNameObjectHelper(&pAssemblyName, wzName, CANOF_PARSE_DISPLAY_NAME);
+        ULONG returnedName = 0;
+        hr = pMetaDataAssemblyImport->GetAssemblyRefProps(
+            assemblyRef, &pPublicKey, &cbPublicKey, name.data(), static_cast<ULONG>(name.size()),
+            &returnedName, &metaData, nullptr, nullptr, &dwCorAssemblyFlags);
+
+        const bool nameGrew = returnedName > name.size();
+        const bool localeGrew = metaData.cbLocale > locale.size();
+        const bool processorsGrew = metaData.ulProcessor > processors.size();
+        const bool osGrew = metaData.ulOS > operatingSystems.size();
+        if (!nameGrew && !localeGrew && !processorsGrew && !osGrew)
+            break;
+
+        if (nameGrew)
+            name.resize(returnedName);
+        if (localeGrew)
+            locale.resize(metaData.cbLocale);
+        if (processorsGrew)
+            processors.resize(metaData.ulProcessor);
+        if (osGrew)
+            operatingSystems.resize(metaData.ulOS);
+    }
+    if (FAILED(hr))
+        return;
+
+    const size_t nameLength = std::find(name.begin(), name.end(), L'\0') - name.begin();
+    const std::wstring assemblyName(name.data(), nameLength);
+    if (assemblyName.empty())
+        return;
+
+    IAssemblyName* pAssemblyName = nullptr;
+    hr = CreateAssemblyNameObjectHelper(&pAssemblyName, assemblyName.c_str(), CANOF_PARSE_DISPLAY_NAME);
     if (SUCCEEDED(hr))
     {
         AsmNameSetMetaData(pAssemblyName, &metaData);
         AsmNameSetPublicKey(pAssemblyName, pPublicKey, cbPublicKey, IsAfPublicKey(dwCorAssemblyFlags));
         AsmNameSetFlags(pAssemblyName, dwCorAssemblyFlags);
-        hr = pAssemblyName->SetProperty(ASM_NAME_PROCESSOR_ID_ARRAY, metaData.rProcessor, metaData.ulProcessor);
+        if (metaData.ulProcessor <= MAXDWORD / sizeof(DWORD))
+            hr = pAssemblyName->SetProperty(ASM_NAME_PROCESSOR_ID_ARRAY, metaData.rProcessor,
+                                            metaData.ulProcessor * sizeof(DWORD));
         DumpAssemblyFullyQualifiedName(list, pAssemblyName);
         pAssemblyName->Release();
     }
     else
     {
-        DumpAssemblyFullyQualifiedName(list, wzName, &metaData);
+        DumpAssemblyFullyQualifiedName(list, assemblyName.c_str(), &metaData);
     }
 }
 
 void CCorMetadataDumper::DumpAssemblyFullyQualifiedName(CStringList& list, LPCWSTR pwzName, const ASSEMBLYMETADATA* pMetaData)
 {
-    CStringList::HITEM hItem = list.Alloc(MAX_ASSEMBLY_NAME);
+    std::wstring name(pwzName);
+    name += L", Version=";
+    name += std::to_wstring(pMetaData->usMajorVersion);
+    name += L".";
+    name += std::to_wstring(pMetaData->usMinorVersion);
+    name += L".";
+    name += std::to_wstring(pMetaData->usBuildNumber);
+    name += L".";
+    name += std::to_wstring(pMetaData->usRevisionNumber);
+    if (name.size() >= MAXDWORD)
+        return;
+
+    CStringList::HITEM hItem = list.Alloc(static_cast<DWORD>(name.size() + 1));
+    if (hItem == nullptr)
+        return;
     DWORD cchMax;
     CStringList::XCHAR* buffer = list.GetBuffer(hItem, cchMax);
-    StringCchPrintfW(buffer, cchMax, L"%ls, Version=%hu.%hu.%hu.%hu",
-                     pwzName,
-                     pMetaData->usMajorVersion,
-                     pMetaData->usMinorVersion,
-                     pMetaData->usBuildNumber,
-                     pMetaData->usRevisionNumber);
+    memcpy(buffer, name.c_str(), (name.size() + 1) * sizeof(wchar_t));
     list.Insert(hItem);
 }
 
 void CCorMetadataDumper::DumpAssemblyFullyQualifiedName(CStringList& list, IAssemblyName* pAssemblyName)
 {
-    HRESULT hr;
-    CStringList::HITEM hItem = list.Alloc(MAX_ASSEMBLY_NAME);
-    DWORD cchMax;
-    CStringList::XCHAR* buffer = list.GetBuffer(hItem, cchMax);
+    DWORD required = 0;
+    pAssemblyName->GetDisplayName(nullptr, &required, ASM_DISPLAYF_FULL);
+    if (required == 0)
+        return;
 
-    hr = pAssemblyName->GetDisplayName(buffer, &cchMax, ASM_DISPLAYF_FULL);
-    if (SUCCEEDED(hr))
+    for (;;)
     {
-        list.Insert(hItem);
-    }
-    else
-    {
+        CStringList::HITEM hItem = list.Alloc(required);
+        if (hItem == nullptr)
+            return;
+        DWORD capacity;
+        CStringList::XCHAR* buffer = list.GetBuffer(hItem, capacity);
+        DWORD written = capacity;
+        const HRESULT hr = pAssemblyName->GetDisplayName(buffer, &written, ASM_DISPLAYF_FULL);
+        if (SUCCEEDED(hr))
+        {
+            list.Insert(hItem);
+            return;
+        }
         list.Free(hItem);
+        if (written <= capacity)
+            return;
+        required = written;
     }
 }
 
@@ -2654,25 +2650,19 @@ void CCorMetadataDumper::AsmNameSetMetaData(IAssemblyName* pAssemblyName, const 
     hr = pAssemblyName->SetProperty(ASM_NAME_BUILD_NUMBER, (LPVOID)&pMetaData->usBuildNumber, sizeof(pMetaData->usBuildNumber));
     hr = pAssemblyName->SetProperty(ASM_NAME_REVISION_NUMBER, (LPVOID)&pMetaData->usRevisionNumber, sizeof(pMetaData->usRevisionNumber));
 
-    WCHAR wzCulture[20];
-    if (pMetaData->cbLocale == 0)
+    std::wstring culture;
+    if (pMetaData->szLocale != nullptr && pMetaData->cbLocale != 0)
     {
-        wzCulture[0] = L'\0';
-    }
-    else
-    {
-        LPCWSTR pwzDelim = wcschr(pMetaData->szLocale, L';');
-        if (pwzDelim != NULL)
-        {
-            StringCchCopyNW(wzCulture, _countof(wzCulture), pMetaData->szLocale, pwzDelim - pMetaData->szLocale);
-        }
-        else
-        {
-            StringCbCopyNW(wzCulture, sizeof(wzCulture), pMetaData->szLocale, pMetaData->cbLocale);
-        }
+        size_t length = 0;
+        while (length < pMetaData->cbLocale && pMetaData->szLocale[length] != L'\0' &&
+               pMetaData->szLocale[length] != L';')
+            ++length;
+        culture.assign(pMetaData->szLocale, length);
     }
 
-    hr = pAssemblyName->SetProperty(ASM_NAME_CULTURE, wzCulture, (lstrlenW(wzCulture) + 1) * sizeof(TCHAR));
+    if (culture.size() < MAXDWORD / sizeof(wchar_t))
+        hr = pAssemblyName->SetProperty(ASM_NAME_CULTURE, culture.data(),
+                                        static_cast<DWORD>((culture.size() + 1) * sizeof(wchar_t)));
 }
 
 void CCorMetadataDumper::AsmNameSetPublicKey(IAssemblyName* pAssemblyName, const void* pPublicKey, DWORD cbPublicKey, BOOL bIsFullKey)

@@ -24,11 +24,11 @@
 class CCertificate
 {
 public:
-    CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, LPCSTR host);
+    CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, const wchar_t* host);
     LONG AddRef();
     LONG Release();
     void ShowCertificate(HWND hParent);
-    bool CheckCertificate(LPTSTR buf, int maxlen);
+    bool CheckCertificate(std::wstring& errorText);
 
     // NOTE: the method modifies certificate data, the caller must ensure the data are not used
     //        simultaneously in another thread (ideally call it while this is the only reference to the object)
@@ -36,7 +36,7 @@ public:
 
     bool IsSame(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen);
     bool IsVerified() { return bVerified; };
-    LPCWSTR GetHostName() { return Host; };
+    LPCWSTR GetHostName() { return Host.c_str(); };
 
 private:
     ~CCertificate();
@@ -45,16 +45,16 @@ private:
     BYTE *pDERData, *pPKCS7Data;
     int nDERDataLen, nPKCS7DataLen;
     bool bVerified; // false when accepted once, true if verified and valid
-    LPWSTR Host;
+    std::wstring Host;
 };
 
 class CCertificateErrDialog : public CCenteredDialog
 {
 protected:
-    const char* ErrorStr;
+    const wchar_t* ErrorStr;
 
 public:
-    CCertificateErrDialog(HWND hParent, const char* errorStr);
+    CCertificateErrDialog(HWND hParent, const wchar_t* errorStr);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

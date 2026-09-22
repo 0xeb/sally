@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -7,6 +7,7 @@
 #include "checkver.h"
 #include "checkver.rh"
 #include "checkver.rh2"
+#include "checkver_text.h"
 #include "lang\lang.rh"
 
 // plugin interface object, its methods are called from Salamander
@@ -46,14 +47,20 @@ CSalamanderDebugAbstract* SalamanderDebug = NULL;
 // variable definition for "spl_com.h"
 int SalamanderVersion = 0;
 
-// running Salamander version text (for example, "2.52 beta 3 (PB 32)")
-CPathBuffer SalamanderTextVersion; // Heap-allocated for long path support
+// Running Salamander version text (for example, "2.52 beta 3 (PB 32)"). The release
+// metadata parser is byte-oriented, so its internal Unicode encoding is explicitly UTF-8.
+std::string SalamanderTextVersion;
 
 // ****************************************************************************
 
-char* LoadStr(int resID)
+// Wide - SalGeneral->LoadStr has returned WCHAR* since the v108 ABI break.
+// Two-step so the ARGUMENT is expanded before the L prefix is pasted on;
+// a single-step macro would widen the macro NAME instead of its value.
+#define _CV_W2(x) L##x
+#define _CV_W(x) _CV_W2(x)
+std::wstring LangStr(int resID)
 {
-    return SalGeneral->LoadStr(HLanguage, resID);
+    return SPLLoadStrOwned(SalGeneral, HLanguage, resID);
 }
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
@@ -63,10 +70,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
         DLLInstance = hinstDLL;
         InitializeCriticalSection(&MainDialogIDSection);
         HModulesEnumDone = CreateEvent(NULL, TRUE, FALSE, NULL); // "non-signaled" state, manual
-        LoadedScriptSize = 0;
+        LoadedScript.clear();
         ZeroMemory(&LastCheckTime, sizeof(LastCheckTime));             // we have not run any checks yet
         ZeroMemory(&NextOpenOrCheckTime, sizeof(NextOpenOrCheckTime)); // opening the dialog (optionally with a check) should happen at the first load-on-start (ASAP)
-        SalamanderTextVersion[0] = 0;
+        SalamanderTextVersion.clear();
 
         if (HModulesEnumDone == NULL)
             return FALSE;
@@ -120,14 +127,22 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // this plugin is intended for the current version of Salamander and newer - perform a check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // reject older versions
-        MessageBox(salamander->GetParentWindow(),
-                   REQUIRE_LAST_VERSION_OF_SALAMANDER,
-                   "Check Version" /* do not translate! */, MB_OK | MB_ICONERROR);
+        // wide: REQUIRE_LAST_VERSION_OF_SALAMANDER is a shared narrow SDK macro
+        // (spl_vers.h) used by ~35 plugins - widen only at this call site via the same
+        // two-macro token-paste idiom already used for __WFILE__ in common/trace.h, rather
+        // than touching the shared macro itself.
+#define CHECKVER_WIDEN2(x) L##x
+#define CHECKVER_WIDEN(x) CHECKVER_WIDEN2(x)
+        MessageBoxW(salamander->GetParentWindow(),
+                    CHECKVER_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+                    L"Check Version" /* do not translate! */, MB_OK | MB_ICONERROR);
+#undef CHECKVER_WIDEN
+#undef CHECKVER_WIDEN2
         return NULL;
     }
 
     // load the language module (.slg)
-    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), "Check Version" /* do not translate! */);
+    HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), L"Check Version" /* do not translate! */);
     if (HLanguage == NULL)
         return NULL;
 
@@ -135,17 +150,17 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalGeneral = salamander->GetSalamanderGeneral();
 
     // set the help file name
-    SalGeneral->SetHelpFileName("checkver.chm");
+    SalGeneral->SetHelpFileName(L"checkver.chm");
 
     // set the basic plugin information
-    salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
+    salamander->SetBasicPluginData(LangStr(IDS_PLUGINNAME).c_str(),
                                    FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION,
-                                   VERSINFO_VERSION_NO_PLATFORM,
-                                   VERSINFO_COPYRIGHT,
-                                   LoadStr(IDS_PLUGIN_DESCRIPTION),
-                                   "CHECKVER");
+                                   _CV_W(VERSINFO_VERSION_NO_PLATFORM),
+                                   _CV_W(VERSINFO_COPYRIGHT),
+                                   LangStr(IDS_PLUGIN_DESCRIPTION).c_str(),
+                                   L"CHECKVER");
 
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     // load-on-start
     SalGeneral->SetFlagLoadOnSalamanderStart(TRUE);
@@ -164,8 +179,11 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 
     // obtain the Salamander version
     int index = 0;
-    CPathBuffer salModule; // Heap-allocated for long path support
-    SalGeneral->EnumInstalledModules(&index, salModule, SalamanderTextVersion);
+    std::wstring salModule;
+    std::wstring salVersion;
+    SPLEnumInstalledModulesOwned(SalGeneral, &index, salModule, salVersion);
+    if (!checkver::WideToUtf8(salVersion, SalamanderTextVersion))
+        SalamanderTextVersion.clear();
 
     // find out whether the user disabled saving the configuration on exit, in that case
     // the behaviour must differ in several places
@@ -179,15 +197,16 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 // CPluginInterface
 //
 
+
 void CPluginInterface::About(HWND parent)
 {
-    char buf[1000];
-    _snprintf_s(buf, _TRUNCATE,
-                "%s " VERSINFO_VERSION "\n\n" VERSINFO_COPYRIGHT "\n\n"
-                "%s",
-                LoadStr(IDS_PLUGINNAME),
-                LoadStr(IDS_PLUGIN_DESCRIPTION));
-    SalGeneral->SalMessageBox(parent, buf, LoadStr(IDS_ABOUT), MB_OK | MB_ICONINFORMATION);
+    // Composed wide. VERSINFO_VERSION and VERSINFO_COPYRIGHT are narrow
+    // literal macros, so they are pasted into a literal that carries an L prefix - widened
+    // at compile time, not converted at run time.
+    const std::wstring message = SPLFormatStringOwned(
+        L"%s " _CV_W(VERSINFO_VERSION) L"\n\n" _CV_W(VERSINFO_COPYRIGHT) L"\n\n%s",
+        LangStr(IDS_PLUGINNAME).c_str(), LangStr(IDS_PLUGIN_DESCRIPTION).c_str());
+    SalGeneral->SalMessageBox(parent, message.c_str(), LangStr(IDS_ABOUT).c_str(), MB_OK | MB_ICONINFORMATION);
 }
 
 BOOL CPluginInterface::Release(HWND parent, BOOL force)
@@ -207,8 +226,8 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
         if (HDownloadThread == NULL && (HMainDialog != NULL || HConfigurationDialog != NULL))
         {
             // if any windows are open, ask the user whether we should close them
-            ret = SalGeneral->SalMessageBox(parent, LoadStr(IDS_OPENED_WINDOWS),
-                                            LoadStr(IDS_PLUGINNAME),
+            ret = SalGeneral->SalMessageBox(parent, LangStr(IDS_OPENED_WINDOWS).c_str(),
+                                            LangStr(IDS_PLUGINNAME).c_str(),
                                             MB_YESNO | MB_ICONQUESTION) == IDYES;
         }
     }
@@ -216,8 +235,8 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
     if (HDownloadThread != NULL)
     {
         // the download thread is running right now - should we let it finish on its own?
-        if (!force && SalGeneral->SalMessageBox(parent, LoadStr(IDS_ABORT_DOWNLOAD),
-                                                LoadStr(IDS_PLUGINNAME),
+        if (!force && SalGeneral->SalMessageBox(parent, LangStr(IDS_ABORT_DOWNLOAD).c_str(),
+                                                LangStr(IDS_PLUGINNAME).c_str(),
                                                 MB_ICONQUESTION | MB_YESNO) == IDNO)
         {
             ret = FALSE; // the user does not want to shut it down
@@ -233,7 +252,7 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
                 ModulesCleanup();
                 MainEnableControls(FALSE);
                 ClearLogWindow();
-                AddLogLine(LoadStr(IDS_INET_ABORTED), TRUE);
+                AddLogLine(LangStr(IDS_INET_ABORTED).c_str(), TRUE);
             }
         }
     }
@@ -258,7 +277,6 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
             HMessageLoopThread = NULL;
         }
 
-        DestroyFilters();
         UnregisterLogClass();
     }
     PluginIsReleased = FALSE;
@@ -296,7 +314,7 @@ MENU_TEMPLATE_ITEM PluginMenu[] =
         {MNTT_PE, 0
 };
 */
-    salamander->AddMenuItem(-1, LoadStr(IDS_CHECK_FOR_NEW_VER), 0, CM_CHECK_VERSION, FALSE,
+    salamander->AddMenuItem(-1, LangStr(IDS_CHECK_FOR_NEW_VER).c_str(), 0, CM_CHECK_VERSION, FALSE,
                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 
     // set the plugin icon
@@ -349,7 +367,7 @@ CPluginInterface::GetInterfaceForThumbLoader()
 unsigned WINAPI ThreadMessageLoopBody(void* param)
 {
     CALL_STACK_MESSAGE1("ThreadMessageLoopBody");
-    SetThreadNameInVCAndTrace("CheckVerLoop");
+    SetThreadNameInVCAndTrace(L"CheckVerLoop");
     TRACE_I("Begin");
 
     CTVData* data = (CTVData*)param;
@@ -374,7 +392,7 @@ unsigned WINAPI ThreadMessageLoopBody(void* param)
     data = NULL;
 
     MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0))
+    while (GetMessageW(&msg, NULL, 0, 0))
     {
         if (msg.message == WM_KEYDOWN)
         {
@@ -393,7 +411,7 @@ unsigned WINAPI ThreadMessageLoopBody(void* param)
         if (HMainDialog == NULL || !IsWindow(HMainDialog) || !IsDialogMessage(HMainDialog, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 

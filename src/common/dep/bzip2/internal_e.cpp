@@ -4,5 +4,5 @@
 
 extern "C" void bz_internal_error(int errcode)
 {
-  SalMessageBox(NULL, "Internal error", "libbzip2 encountered an error", MB_OK | MB_ICONEXCLAMATION);
+  SalMessageBoxW(NULL, L"Internal error", L"libbzip2 encountered an error", MB_OK | MB_ICONEXCLAMATION);
 }

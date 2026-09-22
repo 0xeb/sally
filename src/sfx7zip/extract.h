@@ -4,6 +4,8 @@
 
 #pragma once
 
+// This unwired legacy self-extractor consumes the narrow executable path and archive-header bytes
+// used by its ANSI entry point. Keep the declaration byte-exact with the implementation.
 extern int InitExtraction(const char* name, struct SCabinet* cabinet);
 extern DWORD WINAPI ExtractArchive(LPVOID cabinet);
 extern int HandleError(int titleID, int messageID, unsigned long err, const char* fileName);

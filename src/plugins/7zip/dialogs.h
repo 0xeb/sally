@@ -86,14 +86,18 @@ protected:
 class CExtOptionsDialog : public CCommonDialog
 {
 private:
-    CPathBuffer Archive;
+    std::wstring Archive;
 
     char Password[PASSWORD_LEN];
     char ConfirmedPassword[PASSWORD_LEN];
     BOOL NotAgain;
     BOOL Encrypt;
 
-    const char* Title;
+    // Owning, like Archive above. It was a raw non-owning pointer whose only
+    // two callers fed it LangStr(...).c_str() - a temporary destroyed at the
+    // end of that statement, long before Execute() ran and WM_INITDIALOG read
+    // it, so the dialog caption came from freed memory.
+    std::wstring Title;
 
     CCompressParamsDlg CompressParamsDlg;
 
@@ -107,8 +111,8 @@ public:
     BOOL IsPasswordDefined() { return Encrypt; }
     char* GetPassword() { return Password; }
     BOOL GetNotAgain() { return NotAgain; }
-    void SetArchiveName(const char* archiveName) { lstrcpyn(Archive, archiveName, Archive.Size()); }
-    void SetTitle(const char* title) { Title = title; }
+    void SetArchiveName(const wchar_t* archiveName) { Archive = archiveName != NULL ? archiveName : L""; }
+    void SetTitle(const wchar_t* title) { Title = title != NULL ? title : L""; }
 
 protected:
     INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

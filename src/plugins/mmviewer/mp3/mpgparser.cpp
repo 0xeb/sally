@@ -17,26 +17,19 @@
 
 struct MPEG_INFO : public MPEGHEAD_DECODED
 {
-public:
-    char str_emphasis[64];
-    char str_mode[64];
-    char str_time[64];
 };
 
-char* LoadStr(int resID);
-char* FStr(const char* format, ...);
-void FormatSize2(__int64 size, char* str_size, BOOL nozero = FALSE);
+std::wstring LangStr(int resID);
 void chkstrcpy(char* out, const char* in, size_t maxoutsize)
 {
     strncpy_s(out, maxoutsize, in, _TRUNCATE);
 }
-
 CParserResultEnum
-CParserMPG::OpenFile(const char* fileName)
+CParserMPG::OpenFile(const wchar_t* fileName)
 {
     CloseFile();
 
-    f = fopen(fileName, "rb");
+    _wfopen_s(&f, fileName, L"rb");
 
     if (!f)
         return preOpenError;
@@ -71,6 +64,9 @@ CParserMPG::GetFileInfo(COutputInterface* output)
 
         BOOL id3tagv1found = FALSE;
         BOOL id3tagv2found = FALSE;
+        std::wstring emphasis;
+        std::wstring mode;
+        std::wstring duration;
 
         int usetag = 0; // the program decides which tag to use (1 or 2)
 
@@ -99,40 +95,41 @@ CParserMPG::GetFileInfo(COutputInterface* output)
                 switch (mpeginfo.emphasis)
                 {
                 case 0:
-                    chkstrcpy(mpeginfo.str_emphasis, LoadStr(IDS_MP3_DASH), sizeof(mpeginfo.str_emphasis));
+                    emphasis = LangStr(IDS_MP3_DASH);
                     break;
                 case 1:
-                    chkstrcpy(mpeginfo.str_emphasis, LoadStr(IDS_MP3_5015MS), sizeof(mpeginfo.str_emphasis));
+                    emphasis = LangStr(IDS_MP3_5015MS);
                     break;
                 case 3:
-                    chkstrcpy(mpeginfo.str_emphasis, LoadStr(IDS_MP3_CCITTJ17), sizeof(mpeginfo.str_emphasis));
+                    emphasis = LangStr(IDS_MP3_CCITTJ17);
                     break;
                 default:
-                    chkstrcpy(mpeginfo.str_emphasis, LoadStr(IDS_MP3_QUESTIONMARK), sizeof(mpeginfo.str_emphasis));
+                    emphasis = LangStr(IDS_MP3_QUESTIONMARK);
                     break;
                 }
 
                 switch (mpeginfo.mode)
                 {
                 case 0:
-                    chkstrcpy(mpeginfo.str_mode, LoadStr(IDS_MP3_STEREO), sizeof(mpeginfo.str_mode));
+                    mode = LangStr(IDS_MP3_STEREO);
                     break;
                 case 1:
-                    chkstrcpy(mpeginfo.str_mode, LoadStr(IDS_MP3_JSTEREO), sizeof(mpeginfo.str_mode));
+                    mode = LangStr(IDS_MP3_JSTEREO);
                     break;
                 case 2:
-                    chkstrcpy(mpeginfo.str_mode, LoadStr(IDS_MP3_DCHANNEL), sizeof(mpeginfo.str_mode));
+                    mode = LangStr(IDS_MP3_DCHANNEL);
                     break;
                 case 3:
-                    chkstrcpy(mpeginfo.str_mode, LoadStr(IDS_MP3_SCHANNEL), sizeof(mpeginfo.str_mode));
+                    mode = LangStr(IDS_MP3_SCHANNEL);
                     break;
                 }
 
                 DWORD length_sec = mpeginfo.length_msec / 1000;
-                if (length_sec / 3600)
-                    lstrcpy(mpeginfo.str_time, FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60));
-                else
-                    lstrcpy(mpeginfo.str_time, FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60));
+                duration = length_sec / 3600
+                               ? FStrW(L"%02lu:%02lu:%02lu", length_sec / 3600,
+                                       length_sec / 60 % 60, length_sec % 60)
+                               : FStrW(L"%02lu:%02lu", length_sec / 60 % 60,
+                                       length_sec % 60);
             }
         }
         else
@@ -154,24 +151,27 @@ CParserMPG::GetFileInfo(COutputInterface* output)
         }
 
         //dump
-        char tmp[32], size[64];
-        ZeroMemory(tmp, sizeof(tmp));
-        int l;
-        for (l = 0; l < mpeginfo.layer; l++)
-            tmp[l] = 'I';
+        const std::wstring layer(static_cast<size_t>(mpeginfo.layer), L'I');
 
-        output->AddHeader(LoadStr(IDS_MP3_MP3INFO));
-        output->AddItem(LoadStr(IDS_MP3_MP3VERSION), FStr(LoadStr(IDS_MP3_MP3VERSIONFMT), HIBYTE(mpeginfo.mpeg), LOBYTE(mpeginfo.mpeg), tmp));
-        output->AddItem(LoadStr(IDS_MP3_BITRATE), FStr("%s%u", mpeginfo.variable_bitrate ? LoadStr(IDS_MP3_AVERAGE) : "", mpeginfo.kbps));
-        FormatSize2(mpeginfo.hz, size);
-        output->AddItem(LoadStr(IDS_MP3_FREQUENCY), size);
-        FormatSize2(mpeginfo.frames, size);
-        output->AddItem(LoadStr(IDS_MP3_FRAMES), size);
-        output->AddItem(LoadStr(IDS_MP3_LENGTH), mpeginfo.str_time);
-        output->AddItem(LoadStr(IDS_MP3_MODE), mpeginfo.str_mode);
-        output->AddItem(LoadStr(IDS_MP3_EMPHASIS), mpeginfo.str_emphasis);
-        output->AddItem(LoadStr(IDS_MP3_COPYRIGHT), mpeginfo.copyright ? LoadStr(IDS_YES) : LoadStr(IDS_NO));
-        output->AddItem(LoadStr(IDS_MP3_ORIGINAL), mpeginfo.original ? LoadStr(IDS_YES) : LoadStr(IDS_NO));
+        output->AddHeader(LangStr(IDS_MP3_MP3INFO).c_str());
+        output->AddItem(LangStr(IDS_MP3_MP3VERSION).c_str(),
+                        FStrW(LangStr(IDS_MP3_MP3VERSIONFMT).c_str(), HIBYTE(mpeginfo.mpeg),
+                              LOBYTE(mpeginfo.mpeg), layer.c_str()).c_str());
+        output->AddItem(LangStr(IDS_MP3_BITRATE).c_str(),
+                        FStrW(L"%ls%u",
+                              mpeginfo.variable_bitrate ? LangStr(IDS_MP3_AVERAGE).c_str() : L"",
+                              mpeginfo.kbps).c_str());
+        output->AddItem(LangStr(IDS_MP3_FREQUENCY).c_str(),
+                        FormatSize2W(mpeginfo.hz).c_str());
+        output->AddItem(LangStr(IDS_MP3_FRAMES).c_str(),
+                        FormatSize2W(mpeginfo.frames).c_str());
+        output->AddItem(LangStr(IDS_MP3_LENGTH).c_str(), duration.c_str());
+        output->AddItem(LangStr(IDS_MP3_MODE).c_str(), mode.c_str());
+        output->AddItem(LangStr(IDS_MP3_EMPHASIS).c_str(), emphasis.c_str());
+        output->AddItem(LangStr(IDS_MP3_COPYRIGHT).c_str(),
+                        mpeginfo.copyright ? LangStr(IDS_YES).c_str() : LangStr(IDS_NO).c_str());
+        output->AddItem(LangStr(IDS_MP3_ORIGINAL).c_str(),
+                        mpeginfo.original ? LangStr(IDS_YES).c_str() : LangStr(IDS_NO).c_str());
 
 #define TAGITEM_AVAIL(tagitem) (tagitem && tagitem[0])
 
@@ -179,77 +179,77 @@ CParserMPG::GetFileInfo(COutputInterface* output)
         {
             output->AddSeparator();
 
-            output->AddHeader(FStr(LoadStr(IDS_MP3_ID3TAGV), HIBYTE(id3v1dec.version), LOBYTE(id3v1dec.version)));
+            output->AddHeader(FStrW(LangStr(IDS_MP3_ID3TAGV).c_str(), HIBYTE(id3v1dec.version), LOBYTE(id3v1dec.version)).c_str());
 
             if (TAGITEM_AVAIL(id3v1dec.title))
-                output->AddItem(LoadStr(IDS_MP3_TITLE), id3v1dec.title);
+                output->AddItem(LangStr(IDS_MP3_TITLE).c_str(), id3v1dec.title);
             if (TAGITEM_AVAIL(id3v1dec.artist))
-                output->AddItem(LoadStr(IDS_MP3_AUTHOR), id3v1dec.artist);
+                output->AddItem(LangStr(IDS_MP3_AUTHOR).c_str(), id3v1dec.artist);
             if (TAGITEM_AVAIL(id3v1dec.album))
-                output->AddItem(LoadStr(IDS_MP3_ALBUM), id3v1dec.album);
+                output->AddItem(LangStr(IDS_MP3_ALBUM).c_str(), id3v1dec.album);
             if (TAGITEM_AVAIL(id3v1dec.year))
-                output->AddItem(LoadStr(IDS_MP3_YEAR), id3v1dec.year);
+                output->AddItem(LangStr(IDS_MP3_YEAR).c_str(), id3v1dec.year);
             if (TAGITEM_AVAIL(id3v1dec.genre))
-                output->AddItem(LoadStr(IDS_MP3_GENRE), id3v1dec.genre);
+                output->AddItem(LangStr(IDS_MP3_GENRE).c_str(), id3v1dec.genre);
             if (LOBYTE(id3v1dec.version) == 1)
-                output->AddItem(LoadStr(IDS_MP3_TRACK), FStr("%u", id3v1dec.track));
+                output->AddItem(LangStr(IDS_MP3_TRACK).c_str(), FStrW(L"%u", id3v1dec.track).c_str());
             if (TAGITEM_AVAIL(id3v1dec.comments))
-                output->AddItem(LoadStr(IDS_MP3_COMMENTS), id3v1dec.comments);
+                output->AddItem(LangStr(IDS_MP3_COMMENTS).c_str(), id3v1dec.comments);
         }
 
         if (id3tagv2found)
         {
             output->AddSeparator();
 
-            output->AddHeader(FStr(LoadStr(IDS_MP3_ID3TAGV), HIBYTE(id3v2dec.version), LOBYTE(id3v2dec.version)));
+            output->AddHeader(FStrW(LangStr(IDS_MP3_ID3TAGV).c_str(), HIBYTE(id3v2dec.version), LOBYTE(id3v2dec.version)).c_str());
 
             if (TAGITEM_AVAIL(id3v2dec.title))
-                output->AddItem(LoadStr(IDS_MP3_TITLE), id3v2dec.title);
+                output->AddItem(LangStr(IDS_MP3_TITLE).c_str(), id3v2dec.title);
             if (TAGITEM_AVAIL(id3v2dec.artist))
-                output->AddItem(LoadStr(IDS_MP3_AUTHOR), id3v2dec.artist);
+                output->AddItem(LangStr(IDS_MP3_AUTHOR).c_str(), id3v2dec.artist);
             if (TAGITEM_AVAIL(id3v2dec.album))
-                output->AddItem(LoadStr(IDS_MP3_ALBUM), id3v2dec.album);
+                output->AddItem(LangStr(IDS_MP3_ALBUM).c_str(), id3v2dec.album);
             if (TAGITEM_AVAIL(id3v2dec.year))
-                output->AddItem(LoadStr(IDS_MP3_YEAR), id3v2dec.year);
+                output->AddItem(LangStr(IDS_MP3_YEAR).c_str(), id3v2dec.year);
             if (TAGITEM_AVAIL(id3v2dec.genre))
-                output->AddItem(LoadStr(IDS_MP3_GENRE), id3v2dec.genre);
+                output->AddItem(LangStr(IDS_MP3_GENRE).c_str(), id3v2dec.genre);
             if (TAGITEM_AVAIL(id3v2dec.track))
-                output->AddItem(LoadStr(IDS_MP3_TRACK), id3v2dec.track);
+                output->AddItem(LangStr(IDS_MP3_TRACK).c_str(), id3v2dec.track);
             if (TAGITEM_AVAIL(id3v2dec.comments))
-                output->AddItem(LoadStr(IDS_MP3_COMMENTS), id3v2dec.comments);
+                output->AddItem(LangStr(IDS_MP3_COMMENTS).c_str(), id3v2dec.comments);
 
             if (TAGITEM_AVAIL(id3v2dec.composer))
-                output->AddItem(LoadStr(IDS_MP3_COMPOSER), id3v2dec.composer);
+                output->AddItem(LangStr(IDS_MP3_COMPOSER).c_str(), id3v2dec.composer);
             if (TAGITEM_AVAIL(id3v2dec.original_artist))
-                output->AddItem(LoadStr(IDS_MP3_ORIGARTIST), id3v2dec.original_artist);
+                output->AddItem(LangStr(IDS_MP3_ORIGARTIST).c_str(), id3v2dec.original_artist);
             if (TAGITEM_AVAIL(id3v2dec.publisher))
-                output->AddItem(LoadStr(IDS_MP3_PUBLISHER), id3v2dec.publisher);
+                output->AddItem(LangStr(IDS_MP3_PUBLISHER).c_str(), id3v2dec.publisher);
             if (TAGITEM_AVAIL(id3v2dec.copyright))
-                output->AddItem(LoadStr(IDS_MP3_COPYRIGHT), id3v2dec.copyright);
+                output->AddItem(LangStr(IDS_MP3_COPYRIGHT).c_str(), id3v2dec.copyright);
             if (TAGITEM_AVAIL(id3v2dec.encodedby))
-                output->AddItem(LoadStr(IDS_MP3_ENCODEDBY), id3v2dec.encodedby);
+                output->AddItem(LangStr(IDS_MP3_ENCODEDBY).c_str(), id3v2dec.encodedby);
 
             if (TAGITEM_AVAIL(id3v2dec.text_userdefined))
-                output->AddItem(LoadStr(IDS_MP3_USERTEXT), id3v2dec.text_userdefined);
+                output->AddItem(LangStr(IDS_MP3_USERTEXT).c_str(), id3v2dec.text_userdefined);
 
             if (TAGITEM_AVAIL(id3v2dec.url_cominfo))
-                output->AddItem(LoadStr(IDS_MP3_URL_COMINFO), id3v2dec.url_cominfo);
+                output->AddItem(LangStr(IDS_MP3_URL_COMINFO).c_str(), id3v2dec.url_cominfo);
             if (TAGITEM_AVAIL(id3v2dec.url_copyright))
-                output->AddItem(LoadStr(IDS_MP3_URL_COPYRIGHT), id3v2dec.url_copyright);
+                output->AddItem(LangStr(IDS_MP3_URL_COPYRIGHT).c_str(), id3v2dec.url_copyright);
             if (TAGITEM_AVAIL(id3v2dec.url_official))
-                output->AddItem(LoadStr(IDS_MP3_URL_OFFICIAL), id3v2dec.url_official);
+                output->AddItem(LangStr(IDS_MP3_URL_OFFICIAL).c_str(), id3v2dec.url_official);
             if (TAGITEM_AVAIL(id3v2dec.url_artist))
-                output->AddItem(LoadStr(IDS_MP3_URL_ARTIST), id3v2dec.url_artist);
+                output->AddItem(LangStr(IDS_MP3_URL_ARTIST).c_str(), id3v2dec.url_artist);
             if (TAGITEM_AVAIL(id3v2dec.url_audiosource))
-                output->AddItem(LoadStr(IDS_MP3_URL_ASOURCE), id3v2dec.url_audiosource);
+                output->AddItem(LangStr(IDS_MP3_URL_ASOURCE).c_str(), id3v2dec.url_audiosource);
             if (TAGITEM_AVAIL(id3v2dec.url_iradio))
-                output->AddItem(LoadStr(IDS_MP3_URL_IRADIO), id3v2dec.url_iradio);
+                output->AddItem(LangStr(IDS_MP3_URL_IRADIO).c_str(), id3v2dec.url_iradio);
             if (TAGITEM_AVAIL(id3v2dec.url_payment))
-                output->AddItem(LoadStr(IDS_MP3_URL_PAYMENT), id3v2dec.url_payment);
+                output->AddItem(LangStr(IDS_MP3_URL_PAYMENT).c_str(), id3v2dec.url_payment);
             if (TAGITEM_AVAIL(id3v2dec.url_publisher))
-                output->AddItem(LoadStr(IDS_MP3_URL_PUBLISHER), id3v2dec.url_publisher);
+                output->AddItem(LangStr(IDS_MP3_URL_PUBLISHER).c_str(), id3v2dec.url_publisher);
             if (TAGITEM_AVAIL(id3v2dec.url_userdefined))
-                output->AddItem(LoadStr(IDS_MP3_USERURL), id3v2dec.url_userdefined);
+                output->AddItem(LangStr(IDS_MP3_USERURL).c_str(), id3v2dec.url_userdefined);
 
             ID3TAGV2_Free(&id3v2dec);
         }

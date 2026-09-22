@@ -7,7 +7,7 @@
 class CZipList : public CZipCommon
 {
 public:
-    CZipList(const char* zipName, CSalamanderForOperationsAbstract* salamander) : CZipCommon(zipName, "", salamander, NULL)
+    CZipList(const wchar_t* zipName, CSalamanderForOperationsAbstract* salamander) : CZipCommon(zipName, "", salamander, NULL)
     {
         Extract = true;
     }

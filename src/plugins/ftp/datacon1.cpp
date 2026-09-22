@@ -115,19 +115,17 @@ BOOL CDataConnectionBaseSocket::PassiveConnect(DWORD* error)
         if (ProxyServer != NULL && IsSOCKSOrHTTPProxy(ProxyServer->ProxyType))
         {
             connectToProxy = TRUE;
-            in_addr srvAddr;
-            srvAddr.s_addr = auxServerIP;
+            std::wstring srvAddress;
+            const wchar_t* numericHost = FTPFormatIPv4Address(auxServerIP, srvAddress)
+                                             ? srvAddress.c_str()
+                                             : NULL;
             conRes = ConnectWithProxy(ProxyServer->ProxyHostIP, ProxyServer->ProxyPort,
-                                      ProxyServer->ProxyType, &err, inet_ntoa(srvAddr),
-                                      auxServerPort, ProxyServer->ProxyUser,
-                                      ProxyServer->ProxyPassword, auxServerIP);
+                                      ProxyServer->ProxyType, &err, numericHost,
+                                      auxServerPort, ProxyServer->ProxyUser.c_str(),
+                                      ProxyServer->ProxyPassword.c_str(), auxServerIP);
         }
         else
         {
-            if (!HostAddress)
-            {
-                //         HostAddress = SalamanderGeneral->DupStr();// FIXME!!
-            }
             conRes = Connect(auxServerIP, auxServerPort, &err);
         }
         BOOL ret = TRUE;
@@ -137,26 +135,25 @@ BOOL CDataConnectionBaseSocket::PassiveConnect(DWORD* error)
             NetEventLastError = err; // record the error (except fatal errors such as insufficient memory, etc.)
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-            char buf[500];
-            char errBuf[300];
+            std::string logMessage;
+            std::string errorText;
             in_addr srvAddr;
             srvAddr.s_addr = connectToProxy ? ProxyServer->ProxyHostIP : auxServerIP;
             if (err != 0)
             {
-                FTPGetErrorText(err, errBuf, 300);
-                char* s = errBuf + strlen(errBuf);
-                while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                *s = 0; // trim newline characters from the error text
-                _snprintf_s(buf, _TRUNCATE, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX2 : IDS_LOGMSGUNABLETOOPEN2), inet_ntoa(srvAddr),
-                            (connectToProxy ? ProxyServer->ProxyPort : auxServerPort), errBuf);
+                FTPGetErrorText(err, errorText);
+                while (!errorText.empty() && (errorText.back() == '\n' || errorText.back() == '\r'))
+                    errorText.pop_back();
+                FTPFormatString(logMessage, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX2 : IDS_LOGMSGUNABLETOOPEN2), inet_ntoa(srvAddr),
+                                (connectToProxy ? ProxyServer->ProxyPort : auxServerPort), errorText.c_str());
             }
             else
             {
-                _snprintf_s(buf, _TRUNCATE, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX : IDS_LOGMSGUNABLETOOPEN), inet_ntoa(srvAddr),
-                            (connectToProxy ? ProxyServer->ProxyPort : auxServerPort));
+                FTPFormatString(logMessage, LoadStr(connectToProxy ? IDS_LOGMSGUNABLETOCONPRX : IDS_LOGMSGUNABLETOOPEN), inet_ntoa(srvAddr),
+                                (connectToProxy ? ProxyServer->ProxyPort : auxServerPort));
             }
-            Logs.LogMessage(logUID, buf, -1, TRUE);
+            if (!logMessage.empty())
+                Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             ret = FALSE;
         }
         if (error != NULL)
@@ -236,7 +233,7 @@ void CDataConnectionBaseSocket::ActivateConnection()
     if (passiveModeRetry) // in passive mode the first connection attempt was rejected, perform a second attempt
     {
         // CloseSocketEx(NULL);           // there is no point in closing the socket of the old "data connection" (it must already be closed)
-        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGDATACONRECON), -1, TRUE);
+        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGDATACONRECON).c_str(), -1, TRUE);
         PassiveConnect(NULL);
     }
 }
@@ -301,14 +298,14 @@ BOOL CDataConnectionBaseSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsi
     else
     {
         return CSocket::OpenForListeningWithProxy(listenOnIP, listenOnPort,
-                                                  ProxyServer->Host,
+                                                  ProxyServer->Host.c_str(),
                                                   ProxyServer->HostIP,
                                                   ProxyServer->HostPort,
                                                   ProxyServer->ProxyType,
                                                   ProxyServer->ProxyHostIP,
                                                   ProxyServer->ProxyPort,
-                                                  ProxyServer->ProxyUser,
-                                                  ProxyServer->ProxyPassword,
+                                                  ProxyServer->ProxyUser.c_str(),
+                                                  ProxyServer->ProxyPassword.c_str(),
                                                   listenError, err);
     }
 }
@@ -366,16 +363,15 @@ void CDataConnectionBaseSocket::LogNetEventLastError(BOOL canBeProxyError)
     HANDLES(EnterCriticalSection(&SocketCritSect));
     if (NetEventLastError != NO_ERROR)
     {
-        char buf[500];
-        char errBuf[300];
-        if (!canBeProxyError || !GetProxyError(errBuf, 300, NULL, 0, TRUE))
-            FTPGetErrorText(NetEventLastError, errBuf, 300);
-        char* s = errBuf + strlen(errBuf);
-        while (s > errBuf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-            s--;
-        *s = 0; // trim newline characters from the error text
-        _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
-        Logs.LogMessage(LogUID, buf, -1, TRUE);
+        std::string errorText;
+        if ((!canBeProxyError || !GetProxyError(errorText, NULL, TRUE)) &&
+            !FTPGetErrorText(NetEventLastError, errorText))
+            errorText = LoadStr(IDS_UNKNOWNERROR);
+        while (!errorText.empty() && (errorText.back() == '\n' || errorText.back() == '\r'))
+            errorText.pop_back();
+        std::string logMessage;
+        if (FTPFormatString(logMessage, LoadStr(IDS_LOGMSGDATCONERROR), errorText.c_str()))
+            Logs.LogMessage(LogUID, logMessage.c_str(), -1, TRUE);
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
@@ -420,7 +416,7 @@ CDataConnectionSocket::CDataConnectionSocket(BOOL flushData, CFTPProxyForDataCon
 
     DataTotalSize.Set(-1, -1);
 
-    TgtDiskFileName[0] = 0;
+    TgtDiskFileName.clear();
     TgtDiskFile = NULL;
     TgtDiskFileCreated = FALSE;
     TgtFileLastError = NO_ERROR;
@@ -459,14 +455,17 @@ CDataConnectionSocket::~CDataConnectionSocket()
         SalZLIB->InflateEnd(&ZLIBInfo);
 }
 
-char* CDataConnectionSocket::GiveData(int* length, BOOL* decomprErr)
+BOOL CDataConnectionSocket::GiveData(std::string& data, BOOL* decomprErr) noexcept
 {
-    char* ret = NULL;
-    *length = 0;
+    std::string staged;
+    BOOL success = TRUE;
     *decomprErr = FALSE;
     HANDLES(EnterCriticalSection(&SocketCritSect));
     if (FlushData)
+    {
         TRACE_E("Incorrect call to CDataConnectionSocket::GiveData(): data are flushed (not collected in memory)!");
+        success = FALSE;
+    }
     else
     {
         if (ValidBytesInReadBytesBuf > 0)
@@ -474,77 +473,106 @@ char* CDataConnectionSocket::GiveData(int* length, BOOL* decomprErr)
             if (CompressData)
             {
                 CSalZLIB zi;
-                size_t size = 2 * DATACON_FLUSHBUFFERSIZE; // Assume 50% compression ratio
-
                 int ignErr = SalZLIB->InflateInit(&zi);
                 if (ignErr < 0)
-                    TRACE_E("SalZLIB->InflateInit returns unexpected error: " << ignErr);
-                ret = (char*)malloc(size);
-                zi.avail_in = ValidBytesInReadBytesBuf;
-                zi.next_in = (BYTE*)ReadBytes;
-                zi.next_out = (BYTE*)ret;
-                zi.avail_out = (UINT)size;
-                *length = 0;
-                for (;;)
                 {
-                    BYTE* prev = zi.next_out;
-                    int err = SalZLIB->Inflate(&zi, SAL_Z_NO_FLUSH);
-                    *length += (int)(zi.next_out - prev);
-                    if (err == SAL_Z_STREAM_END)
-                    {
-                        if (zi.avail_in > 0)
-                            TRACE_E("CDataConnectionSocket::GiveData(): ignoring data (" << zi.avail_in << " bytes) received after end of compressed stream");
-                        break;
-                    }
-                    if (err < 0) // decompression error: we expect SAL_Z_DATA_ERROR and SAL_Z_BUF_ERROR, the others are unexpected; BTW, SAL_Z_DATA_ERROR theoretically should never occur, it would have to be an internal server error (the data was compressed incorrectly), TCP is reliable; SAL_Z_BUF_ERROR occurs when the stream is not terminated (data transfer interrupted early)
-                    {
-                        if (err != SAL_Z_DATA_ERROR && (err != SAL_Z_BUF_ERROR || zi.avail_in != 0))
-                            TRACE_E("CDataConnectionSocket::GiveData(): SalZLIB->Inflate returns unexpected error: " << err);
-                        if (err != SAL_Z_BUF_ERROR || zi.avail_in != 0) // with incomplete data we assume the stream is otherwise OK and the decompressed data are OK as well
-                        {
-                            Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGDECOMPRERROR), -1, TRUE);
-                            *decomprErr = TRUE;
-                            *length = 0; // when decompression fails the data may be completely garbage (CRC failed), so we discard them entirely
-                        }
-                        // else;  // we ignore the missing end-of-stream error; for example Serv-U 7 and 8 do not terminate it (6 still does); probably not a big deal because we check the server reply and the successful closing of the TCP connection (the transfer of all data from the server should therefore be ensured)
-                        break;
-                    }
-                    if (zi.avail_out == 0)
-                    {
-                        zi.avail_out = DATACON_FLUSHBUFFERSIZE;
-                        size += zi.avail_out;
-                        ret = (char*)realloc(ret, size);
-                        zi.next_out = (BYTE*)ret + *length;
-                    }
+                    TRACE_E("SalZLIB->InflateInit returns unexpected error: " << ignErr);
+                    success = FALSE;
                 }
-                // try to shrink the buffer so it does not occupy memory unnecessarily
-                // NOTE: realloc(x, 0) frees x and returns NULL!
-                ret = (char*)realloc(ret, max(1, *length));
-                ignErr = SalZLIB->InflateEnd(&zi);
-                if (ignErr < 0)
-                    TRACE_E("SalZLIB->InflateEnd returns unexpected error: " << ignErr);
-                free(ReadBytes);
+                else
+                {
+                    size_t length = 0;
+                    try
+                    {
+                        staged.resize(2 * DATACON_FLUSHBUFFERSIZE); // initial 50% compression-ratio estimate
+                    }
+                    catch (...)
+                    {
+                        success = FALSE;
+                    }
+
+                    zi.avail_in = ValidBytesInReadBytesBuf;
+                    zi.next_in = (BYTE*)ReadBytes;
+                    while (success)
+                    {
+                        zi.next_out = (BYTE*)staged.data() + length;
+                        zi.avail_out = static_cast<UINT>(staged.size() - length);
+                        BYTE* prev = zi.next_out;
+                        int err = SalZLIB->Inflate(&zi, SAL_Z_NO_FLUSH);
+                        length += static_cast<size_t>(zi.next_out - prev);
+                        if (err == SAL_Z_STREAM_END)
+                        {
+                            if (zi.avail_in > 0)
+                                TRACE_E("CDataConnectionSocket::GiveData(): ignoring data (" << zi.avail_in << " bytes) received after end of compressed stream");
+                            break;
+                        }
+                        if (err < 0) // SAL_Z_BUF_ERROR with no remaining input means an unterminated but usable stream
+                        {
+                            if (err != SAL_Z_DATA_ERROR && (err != SAL_Z_BUF_ERROR || zi.avail_in != 0))
+                                TRACE_E("CDataConnectionSocket::GiveData(): SalZLIB->Inflate returns unexpected error: " << err);
+                            if (err != SAL_Z_BUF_ERROR || zi.avail_in != 0)
+                            {
+                                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGDECOMPRERROR).c_str(), -1, TRUE);
+                                *decomprErr = TRUE;
+                                FTPSecureWipe(staged);
+                                length = 0;
+                            }
+                            break;
+                        }
+                        if (zi.avail_out == 0)
+                        {
+                            if (staged.size() > static_cast<size_t>(INT_MAX) - DATACON_FLUSHBUFFERSIZE)
+                            {
+                                success = FALSE;
+                                break;
+                            }
+                            try
+                            {
+                                staged.resize(staged.size() + DATACON_FLUSHBUFFERSIZE);
+                            }
+                            catch (...)
+                            {
+                                success = FALSE;
+                            }
+                        }
+                    }
+                    if (success)
+                        staged.resize(length);
+                    else
+                        FTPSecureWipe(staged);
+
+                    ignErr = SalZLIB->InflateEnd(&zi);
+                    if (ignErr < 0)
+                        TRACE_E("SalZLIB->InflateEnd returns unexpected error: " << ignErr);
+                }
             }
             else
             {
-                if (ValidBytesInReadBytesBuf < ReadBytesAllocatedSize) // try to shrink the buffer so it does not occupy memory unnecessarily
-                    ret = (char*)realloc(ReadBytes, ValidBytesInReadBytesBuf);
-                if (ret == NULL)
-                    ret = ReadBytes;
-                *length = ValidBytesInReadBytesBuf;
+                try
+                {
+                    staged.assign(ReadBytes, static_cast<size_t>(ValidBytesInReadBytesBuf));
+                }
+                catch (...)
+                {
+                    success = FALSE;
+                }
             }
+            free(ReadBytes);
             ReadBytes = NULL;
             ValidBytesInReadBytesBuf = 0;
             ReadBytesAllocatedSize = 0;
             TotalReadBytesCount.Set(0, 0);
         }
-        else // we return an empty buffer
-        {
-            ret = (char*)malloc(1); // if the allocation fails we are supposed to return NULL, period...
-        }
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
-    return ret;
+    if (!success)
+    {
+        FTPSecureWipe(staged);
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+    data.swap(staged);
+    return TRUE;
 }
 
 void CDataConnectionSocket::ClearBeforeConnect()
@@ -587,7 +615,7 @@ void CDataConnectionBaseSocket::EncryptPassiveDataCon()
     HANDLES(EnterCriticalSection(&SocketCritSect));
     int err;
     if (UsePassiveMode && EncryptConnection &&
-        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, SSLConForReuse))
     {
         SSLErrorOccured = err;
         if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -637,7 +665,7 @@ BOOL CDataConnectionSocket::CloseSocketEx(DWORD* error)
     HANDLES(EnterCriticalSection(&SocketCritSect));
 
     SocketCloseTime = GetTickCount();
-    if (TgtDiskFileName[0] == 0 ||                                     // if this is not a direct flush of data to a file
+    if (TgtDiskFileName.empty() ||                                     // if this is not a direct flush of data to a file
         ValidBytesInFlushBuffer == 0 && ValidBytesInReadBytesBuf == 0) // or all data have already been flushed
     {
         SetEvent(TransferFinished); // TransferFinished cannot be NULL (IsGood() would return FALSE)
@@ -655,7 +683,7 @@ void CDataConnectionSocket::DirectFlushData()
         TRACE_E("Incorrect call to CDataConnectionSocket::DirectFlushData(): must be entered in section SocketCritSect!");
 #endif
 
-    if (TgtDiskFileName[0] != 0) // only when directly flushing data to a file from the data connection
+    if (!TgtDiskFileName.empty()) // only when directly flushing data to a file from the data connection
     {
         if (TgtDiskFileClosed)
             TRACE_E("Unexpected situation in CDataConnectionSocket::DirectFlushData(): TgtDiskFileClosed is TRUE!");
@@ -670,7 +698,7 @@ void CDataConnectionSocket::DirectFlushData()
             {
                 if (TgtDiskFile != NULL)
                 {
-                    FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
+                    FTPDiskThread->AddFileToClose(L"", TgtDiskFileName.c_str(), TgtDiskFile, FALSE, FALSE, NULL, NULL,
                                                   TRUE, NULL, &TgtDiskFileCloseIndex);
                     TgtDiskFile = NULL; // the closing + deletion is only scheduled, but we will no longer work with the file
                     TgtDiskFileCreated = FALSE;
@@ -695,10 +723,10 @@ void CDataConnectionSocket::DirectFlushData()
                         TRACE_E("CDataConnectionSocket::DirectFlushData(): DiskWork.OpenedFile is not NULL!");
                     if (DiskWork.FlushDataBuffer != NULL)
                         TRACE_E("CDataConnectionSocket::DirectFlushData(): DiskWork.FlushDataBuffer must be NULL!");
-                    FTPPrepareCreateAndWriteFileDiskWork(DiskWork, Msg, UID, DATACON_DISKWORKWRITEFINISHED,
-                                                         TgtDiskFileName, TgtDiskFile, flushBuffer,
-                                                         validBytesInFlushBuffer);
-                    if (FTPDiskThread->AddWork(&DiskWork))
+                    if (FTPPrepareCreateAndWriteFileDiskWork(DiskWork, Msg, UID, DATACON_DISKWORKWRITEFINISHED,
+                                                             TgtDiskFileName.c_str(), TgtDiskFile, flushBuffer,
+                                                             validBytesInFlushBuffer) &&
+                        FTPDiskThread->AddWork(&DiskWork))
                         DiskWorkIsUsed = TRUE;
                     else // unable to flush the data, cannot continue with the download
                     {
@@ -729,7 +757,7 @@ void CDataConnectionSocket::CancelConnectionAndFlushing()
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
     CloseSocketEx(NULL);
-    if (TgtDiskFileName[0] != 0) // only when directly flushing data to a file from the data connection
+    if (!TgtDiskFileName.empty()) // only when directly flushing data to a file from the data connection
     {
         CloseTgtFile();
         FreeFlushData();
@@ -743,7 +771,7 @@ BOOL CDataConnectionSocket::IsFlushingDataToDisk()
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
     BOOL ret = FALSE;
-    if (TgtDiskFileName[0] != 0)                                             // only when directly flushing data to a file from the data connection
+    if (!TgtDiskFileName.empty())                                             // only when directly flushing data to a file from the data connection
         ret = ValidBytesInFlushBuffer != 0 || ValidBytesInReadBytesBuf != 0; // is data flushing in progress? (in other words: is there anything to flush?)
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
@@ -857,7 +885,7 @@ void CDataConnectionSocket::ConnectionAccepted(BOOL success, DWORD winError, BOO
     if (success && EncryptConnection)
     {
         int err;
-        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, SSLConForReuse))
         {
             SSLErrorOccured = err;
             if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -1270,7 +1298,7 @@ void CDataConnectionSocket::SocketWasClosed(DWORD error)
     HANDLES(EnterCriticalSection(&SocketCritSect));
 
     SocketCloseTime = GetTickCount();
-    if (TgtDiskFileName[0] == 0 ||                                     // if this is not a direct flush of data to a file
+    if (TgtDiskFileName.empty() ||                                     // if this is not a direct flush of data to a file
         ValidBytesInFlushBuffer == 0 && ValidBytesInReadBytesBuf == 0) // or all data have already been flushed
     {
         SetEvent(TransferFinished); // TransferFinished cannot be NULL (IsGood() would return FALSE)
@@ -1341,14 +1369,19 @@ void CDataConnectionSocket::SetPostMessagesToWorker(BOOL post, int msg, int uid,
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
-void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode)
+BOOL CDataConnectionSocket::SetDirectFlushParams(const wchar_t* tgtFileName,
+                                                 CCurrentTransferMode currentTransferMode) noexcept
 {
     CALL_STACK_MESSAGE1("CDataConnectionSocket::SetDirectFlushParams()");
 
+    std::wstring staged;
+    if (!FtpStoreWideText(tgtFileName != NULL ? std::wstring_view(tgtFileName) : std::wstring_view(), staged))
+        return FALSE;
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(TgtDiskFileName, tgtFileName, TgtDiskFileName.Size());
+    TgtDiskFileName.swap(staged);
     CurrentTransferMode = currentTransferMode;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+    return TRUE;
 }
 
 void CDataConnectionSocket::GetTgtFileState(BOOL* fileCreated, CQuadWord* fileSize)
@@ -1366,7 +1399,7 @@ void CDataConnectionSocket::CloseTgtFile()
     CALL_STACK_MESSAGE1("CDataConnectionSocket::CloseTgtFile()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    if (TgtDiskFileName[0] != 0)
+    if (!TgtDiskFileName.empty())
     {
         if (DiskWorkIsUsed) // if some disk flush is in progress, cancel it
         {
@@ -1416,7 +1449,7 @@ void CDataConnectionSocket::CloseTgtFile()
         }
         if (TgtDiskFile != NULL)
         {
-            FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
+            FTPDiskThread->AddFileToClose(L"", TgtDiskFileName.c_str(), TgtDiskFile, FALSE, FALSE, NULL, NULL,
                                           FALSE, NULL, &TgtDiskFileCloseIndex);
             TgtDiskFile = NULL; // the closing is only scheduled, but we will no longer work with the file
         }
@@ -1533,7 +1566,7 @@ BOOL CDataConnectionSocket::GiveFlushData(char** flushBuffer, int* validBytesInF
                     TRACE_E("CDataConnectionSocket::GiveFlushData(): SalZLIB->Inflate returns unexpected error: " << err);
 
                 DecomprErrorOccured = TRUE;
-                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGDECOMPRERROR), -1, TRUE);
+                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGDECOMPRERROR).c_str(), -1, TRUE);
                 if (Socket != INVALID_SOCKET)
                     CloseSocketEx(NULL); // close the "data connection", there is no point in continuing
                 FreeFlushData();
@@ -1802,7 +1835,7 @@ void CDataConnectionSocket::ReceiveTimer(DWORD id, void* param)
                 (GetTickCount() - LastActivityTime) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
             { // timeout occurred, close the data connection - simulate that the server did it
                 NoDataTransTimeout = TRUE;
-                Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGNODATATRTIMEOUT), -1, TRUE);
+                Logs.LogMessage(LogUID, LangStr(IDS_LOGMSGNODATATRTIMEOUT).c_str(), -1, TRUE);
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
                 CSocket::ReceiveNetEvent(MAKELPARAM(FD_CLOSE, WSAECONNRESET), GetMsgIndex()); // call the base method
                 HANDLES(EnterCriticalSection(&SocketCritSect));

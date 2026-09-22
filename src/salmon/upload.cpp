@@ -7,7 +7,12 @@
 #include <iostream>
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
+#include <charconv>
+#include <limits>
 #include <string>
+#include <string_view>
+
+#include "salmon_unicode.h"
 
 using namespace std;
 
@@ -15,75 +20,87 @@ const char* SERVER_NAME = ""; // Dead server — bug report upload disabled
 
 BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSize)
 {
-    BOOL ret = FALSE;
-    char fileNameOnly[MAX_PATH];
-    const char* p = strrchr(uploadParams->FileName, '\\');
+    *buffer = NULL;
+    *bufferSize = 0;
+    uploadParams->ErrorMessage.clear();
+
+    const wchar_t* p = wcsrchr(uploadParams->FileName.c_str(), L'\\');
     if (p == NULL)
-        p = uploadParams->FileName;
+        p = uploadParams->FileName.c_str();
     else
         p++;
-    lstrcpy(fileNameOnly, p);
+    std::string fileNameOnly;
+    if (!sally::salmon::EncodeUtf8(p, fileNameOnly))
+    {
+        uploadParams->ErrorMessage = L"The archive name is not valid Unicode.";
+        return FALSE;
+    }
 
-    HANDLE hFile = CreateFile(uploadParams->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE hFile = CreateFileW(uploadParams->FileName.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        DWORD fileSize = GetFileSize(hFile, NULL);
-        if (fileSize != INVALID_FILE_SIZE)
+        LARGE_INTEGER fileSize = {};
+        if (GetFileSizeEx(hFile, &fileSize) && fileSize.QuadPart >= 0 &&
+            static_cast<unsigned long long>(fileSize.QuadPart) <= (std::numeric_limits<DWORD>::max)())
         {
-            int allocatedSize = (int)(fileSize + 2000); // reserve for HTTP strings
-            char* header = (char*)malloc(allocatedSize);
-            ZeroMemory(header, allocatedSize);
-            if (header != NULL)
+            std::string fileBytes(static_cast<size_t>(fileSize.QuadPart), '\0');
+            size_t readOffset = 0;
+            while (readOffset < fileBytes.size())
             {
-                char* s = header;
-                sprintf(s, "POST /upload.php HTTP/1.1\r\n");
-                s += strlen(s);
-                sprintf(s, "Host: %s\r\n", SERVER_NAME);
-                s += strlen(s);
-                sprintf(s, "Connection: Keep-Alive\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Type: multipart/form-data; boundary=---------------------------90721038027008\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Length: %d\r\n", allocatedSize);
-                s += strlen(s); // hopefully this imprecision will not cause trouble; we will see
-                sprintf(s, "\r\n");
-                s += strlen(s);
-                sprintf(s, "-----------------------------90721038027008\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Disposition: form-data; name=\"altapfile\"; filename=\"%s\"\r\n", fileNameOnly);
-                s += strlen(s); // "protechfile"
-                sprintf(s, "Content-Type: application/octet-stream\r\n");
-                s += strlen(s);
-                sprintf(s, "\r\n");
-                s += strlen(s);
-                int headerSize = (int)strlen(header);
-                DWORD dwBytesRead;
-                if (ReadFile(hFile, s, fileSize, &dwBytesRead, NULL) && dwBytesRead == fileSize)
-                {
-                    s += fileSize;
-                    sprintf(s, "\r\n");
-                    s += strlen(s);
-                    sprintf(s, "-----------------------------90721038027008--\r\n");
-                    s += strlen(s);
+                DWORD bytesRead = 0;
+                const DWORD remaining = static_cast<DWORD>(fileBytes.size() - readOffset);
+                if (!ReadFile(hFile, fileBytes.data() + readOffset, remaining, &bytesRead, NULL) || bytesRead == 0)
+                    break;
+                readOffset += bytesRead;
+            }
+            if (readOffset == fileBytes.size())
+            {
+                static constexpr char boundary[] = "---------------------------90721038027008";
+                std::string body = "--";
+                body += boundary;
+                body += "\r\nContent-Disposition: form-data; name=\"altapfile\"; filename=\"";
+                body += fileNameOnly;
+                body += "\"\r\nContent-Type: application/octet-stream\r\n\r\n";
+                body += fileBytes;
+                body += "\r\n--";
+                body += boundary;
+                body += "--\r\n";
 
-                    *buffer = header;
-                    *bufferSize = (int)(s - header) - 1;
-                    ret = TRUE;
+                std::string request = "POST /upload.php HTTP/1.1\r\nHost: ";
+                request += SERVER_NAME;
+                request += "\r\nConnection: Keep-Alive\r\nContent-Type: multipart/form-data; boundary=";
+                request += boundary;
+                request += "\r\nContent-Length: ";
+                request += std::to_string(body.size());
+                request += "\r\n\r\n";
+                request += body;
+                if (request.size() <= INT_MAX)
+                {
+                    char* result = (char*)malloc(request.size());
+                    if (result != NULL)
+                    {
+                        memcpy(result, request.data(), request.size());
+                        *buffer = result;
+                        *bufferSize = static_cast<int>(request.size());
+                        CloseHandle(hFile);
+                        return TRUE;
+                    }
+                    uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_OUT_OF_MEMORY, HLanguage).c_str());
                 }
                 else
-                    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_READING_FILE, HLanguage), uploadParams->FileName);
+                    uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_FILE_SIZE, HLanguage).c_str(), uploadParams->FileName.c_str());
             }
             else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_OUT_OF_MEMORY, HLanguage));
+                uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_READING_FILE, HLanguage).c_str(), uploadParams->FileName.c_str());
         }
         else
-            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_SIZE, HLanguage), uploadParams->FileName);
+            uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_FILE_SIZE, HLanguage).c_str(), uploadParams->FileName.c_str());
 
         CloseHandle(hFile);
     }
     else
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_OPEN, HLanguage), uploadParams->FileName);
-    return ret;
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_FILE_OPEN, HLanguage).c_str(), uploadParams->FileName.c_str());
+    return FALSE;
 }
 
 // taken from PHP at http://php.net/manual/en/features.file-upload.errors.php
@@ -98,7 +115,7 @@ BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSiz
 
 BOOL GetFilesError(int err, CUploadParams* uploadParams)
 {
-    uploadParams->ErrorMessage[0] = 0;
+    uploadParams->ErrorMessage.clear();
     switch (err)
     {
     case UPLOAD_ERR_OK:
@@ -109,80 +126,83 @@ BOOL GetFilesError(int err, CUploadParams* uploadParams)
     case UPLOAD_ERR_INI_SIZE:
     case UPLOAD_ERR_FORM_SIZE:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_INI_SIZE, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_INI_SIZE, HLanguage).c_str(), err);
         break;
     }
 
     case UPLOAD_ERR_PARTIAL:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_PARTIAL, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_PARTIAL, HLanguage).c_str(), err);
         break;
     }
 
     case UPLOAD_ERR_NO_FILE:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_NO_FILE, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_NO_FILE, HLanguage).c_str(), err);
         break;
     }
 
     case UPLOAD_ERR_NO_TMP_DIR:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_NO_TMP_DIR, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_NO_TMP_DIR, HLanguage).c_str(), err);
         break;
     }
 
     case UPLOAD_ERR_CANT_WRITE:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_CANT_WRITE, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_CANT_WRITE, HLanguage).c_str(), err);
         break;
     }
 
     case UPLOAD_ERR_EXTENSION:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_EXTENSION, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_EXTENSION, HLanguage).c_str(), err);
         break;
     }
 
     default:
     {
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_UNKNOWN, HLanguage), err);
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_ERR_UNKNOWN, HLanguage).c_str(), err);
         break;
     }
     }
     return FALSE;
 }
 
-BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams)
+BOOL AnalyzeResponse(const char* str, size_t strLen, CUploadParams* uploadParams)
 {
     // find our response from the PHP script in the form <response>X</response>, where X is
     // an error from http://php.net/manual/en/features.file-upload.errors.php
-    const char* TAG_OPEN = "<response>";
-    const char* TAG_CLOSE = "</response>";
-    const char* tagOpen = strstr(str, TAG_OPEN);
-    if (tagOpen != NULL)
+    const std::string_view response(str, strLen);
+    static constexpr std::string_view TAG_OPEN = "<response>";
+    static constexpr std::string_view TAG_CLOSE = "</response>";
+    const size_t tagOpen = response.find(TAG_OPEN);
+    if (tagOpen != std::string_view::npos)
     {
-        const char* numBegin = tagOpen + strlen(TAG_OPEN);
-        const char* num = numBegin;
-        while (*num >= '0' && *num <= '9' && num - numBegin < 10 && *num != 0)
-            num++;
-        if (num > numBegin)
+        const size_t numBegin = tagOpen + TAG_OPEN.size();
+        size_t numEnd = numBegin;
+        while (numEnd < response.size() && response[numEnd] >= '0' && response[numEnd] <= '9' &&
+               numEnd - numBegin < 10)
+            ++numEnd;
+        if (numEnd > numBegin)
         {
-            const char* tagClose = strstr(num, TAG_CLOSE);
-            if (tagClose == num)
+            if (response.substr(numEnd, TAG_CLOSE.size()) == TAG_CLOSE)
             {
-                char buff[10];
-                lstrcpyn(buff, numBegin, (int)(num - numBegin + 1));
-                int number = atoi(buff);
-                return GetFilesError(number, uploadParams);
+                int number = 0;
+                const auto result = std::from_chars(response.data() + numBegin,
+                                                    response.data() + numEnd, number);
+                if (result.ec == std::errc())
+                    return GetFilesError(number, uploadParams);
+                uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SYNTAX_ERROR_VALUE, HLanguage).c_str());
             }
             else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_CLOSE, HLanguage));
+                uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SYNTAX_ERROR_CLOSE, HLanguage).c_str());
         }
         else
-            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_VALUE, HLanguage));
+            uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SYNTAX_ERROR_VALUE, HLanguage).c_str());
     }
     else
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_OPEN, HLanguage));
+        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SYNTAX_ERROR_OPEN, HLanguage).c_str());
     return FALSE;
 }
 
@@ -190,80 +210,95 @@ DWORD WINAPI UploadThreadF(void* param)
 {
     CUploadParams* uploadParams = (CUploadParams*)param;
     uploadParams->Result = FALSE;
+    char* buffer = NULL;
 
-    char* buffer;
-    int bufferSize;
-    if (CreateHTTPOutput(uploadParams, &buffer, &bufferSize))
+    try
     {
-        // initialize Winsock
-        WSADATA wsaData = {0};
-        int iResult = 0;
-        iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (iResult == 0)
+        int bufferSize;
+        if (CreateHTTPOutput(uploadParams, &buffer, &bufferSize))
         {
-            // resolve host name
-            struct hostent* remoteHost;
-            remoteHost = gethostbyname(SERVER_NAME);
-            if (remoteHost != NULL)
+            // initialize Winsock
+            WSADATA wsaData = {0};
+            int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+            if (iResult == 0)
             {
-                struct sockaddr_in addr;
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(80);
-                addr.sin_addr.s_addr = *(unsigned long*)remoteHost->h_addr;
-
-                SOCKET connectSocket;
-                connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-                if (connectSocket != INVALID_SOCKET)
+                // resolve host name
+                struct hostent* remoteHost = gethostbyname(SERVER_NAME);
+                if (remoteHost != NULL)
                 {
-                    iResult = connect(connectSocket, (SOCKADDR*)&addr, sizeof(addr));
-                    if (iResult != SOCKET_ERROR)
+                    struct sockaddr_in addr;
+                    addr.sin_family = AF_INET;
+                    addr.sin_port = htons(80);
+                    addr.sin_addr.s_addr = *(unsigned long*)remoteHost->h_addr;
+
+                    SOCKET connectSocket = socket(AF_INET, SOCK_STREAM, 0);
+                    if (connectSocket != INVALID_SOCKET)
                     {
-                        iResult = send(connectSocket, buffer, bufferSize, 0);
+                        iResult = connect(connectSocket, (SOCKADDR*)&addr, sizeof(addr));
                         if (iResult != SOCKET_ERROR)
                         {
-                            // shutdown the connection since no more data will be sent
-                            iResult = shutdown(connectSocket, SD_SEND);
-                            if (iResult != SOCKET_ERROR)
+                            int bytesSent = 0;
+                            while (bytesSent < bufferSize)
                             {
-                                // Receive until the peer closes the connection
-                                char recvbuf[4096];
-                                ZeroMemory(recvbuf, sizeof(recvbuf));
-                                char* recvptr = recvbuf;
-                                do
+                                iResult = send(connectSocket, buffer + bytesSent, bufferSize - bytesSent, 0);
+                                if (iResult == SOCKET_ERROR || iResult == 0)
+                                    break;
+                                bytesSent += iResult;
+                            }
+                            if (bytesSent == bufferSize)
+                            {
+                                // shutdown the connection since no more data will be sent
+                                iResult = shutdown(connectSocket, SD_SEND);
+                                if (iResult != SOCKET_ERROR)
                                 {
-                                    iResult = recv(connectSocket, recvptr, sizeof(recvbuf) - (int)(recvptr - recvbuf) - 1, 0);
-                                    if (iResult > 0)
-                                        recvptr += iResult;
-                                    else if (iResult == 0)
-                                        uploadParams->Result = AnalyzeResponse(recvbuf, (int)(recvptr - recvbuf), uploadParams);
-                                    else
-                                        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_RECV, HLanguage), WSAGetLastError());
-                                } while (iResult > 0);
+                                    // Receive until the peer closes the connection.
+                                    std::string response;
+                                    char recvbuf[4096];
+                                    do
+                                    {
+                                        iResult = recv(connectSocket, recvbuf, sizeof(recvbuf), 0);
+                                        if (iResult > 0)
+                                            response.append(recvbuf, iResult);
+                                        else if (iResult == 0)
+                                            uploadParams->Result = AnalyzeResponse(response.data(), response.size(), uploadParams);
+                                        else
+                                            uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_RECV, HLanguage).c_str(), WSAGetLastError());
+                                    } while (iResult > 0);
+                                }
+                                else
+                                    uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_SHUTDOWN, HLanguage).c_str(), WSAGetLastError());
                             }
                             else
-                                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SHUTDOWN, HLanguage), WSAGetLastError());
+                                uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_SEND, HLanguage).c_str(), WSAGetLastError());
                         }
                         else
-                            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SEND, HLanguage), WSAGetLastError());
+                            uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_CONNECT, HLanguage).c_str(), WSAGetLastError());
+
+                        closesocket(connectSocket);
                     }
                     else
-                        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_CONNECT, HLanguage), WSAGetLastError());
-
-                    closesocket(connectSocket);
+                        uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_SOCKET, HLanguage).c_str(), WSAGetLastError());
                 }
                 else
-                    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SOCKET, HLanguage), WSAGetLastError());
+                    uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_HOST, HLanguage).c_str(), WSAGetLastError());
+
+                WSACleanup();
             }
             else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_HOST, HLanguage), WSAGetLastError());
-
-            WSACleanup();
+                uploadParams->ErrorMessage = FormatText(LoadStr(IDS_SALMON_SOCK_ERR_INIT, HLanguage).c_str(), iResult);
         }
-        else
-            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_INIT, HLanguage), iResult);
-
-        free(buffer);
     }
+    catch (const std::bad_alloc&)
+    {
+        try { uploadParams->ErrorMessage = L"Not enough memory to prepare or receive the bug report upload."; }
+        catch (...) {}
+    }
+    catch (...)
+    {
+        try { uploadParams->ErrorMessage = L"Unexpected failure while preparing or sending the bug report upload."; }
+        catch (...) {}
+    }
+    free(buffer);
     return EXIT_SUCCESS;
 }
 

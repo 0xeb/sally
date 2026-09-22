@@ -59,6 +59,12 @@ UINT_PTR CALLBACK ComDlgHookProc(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lP
 
 void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
                      int historySize, char** history);
+void HistoryComboBox(CTransferInfo& ti, int id, std::string& text,
+                     int historySize, char** history);
+BOOL RenamerEditLine(CTransferInfo& ti, int id, char* text, int textMax, BOOL select = FALSE);
+BOOL RenamerEditLine(CTransferInfo& ti, int id, std::string& text, BOOL select = FALSE);
+int GetRenamerEditLine(HWND edit, int line, char* text, int textMax);
+int GetRenamerEditLine(HWND edit, int line, std::string& text);
 
 void TransferCombo(CTransferInfo& ti, int id, int* comboContent, int& value);
 
@@ -261,7 +267,7 @@ public:
 
     BOOL Update(DWORD current, BOOL force = FALSE);
     void CancelOperation();
-    void SetText(const char* text);
+    void SetText(const wchar_t* text);
     void EmptyMessageLoop();
 
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

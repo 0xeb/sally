@@ -13,6 +13,7 @@
 
 #include "id3tagv2.h"
 #include "id3tagv1.h"
+#include "../mmviewer_text_codec.h"
 #include <assert.h>
 
 extern CSalamanderGeneralAbstract* SalGeneral;
@@ -249,19 +250,6 @@ static void WipeOutNewLines(char* str, int len)
     }
 }
 
-// NOTE: converts to UTF8 on NT-class OS's
-// NOTE: NULL lpStr & new_len -> get needed buffer size
-int Unicode16ToAnsi(char* lpStr, LPCWSTR wstr, int len, int new_len)
-{
-    int ret;
-
-    // The last two arguments must be NULL for CP_UTF8
-    ret = WideCharToMultiByte(CP_UTF8, 0, wstr, len, lpStr, new_len, NULL, NULL);
-    if (lpStr)
-        lpStr[new_len - 1] = 0;
-    return ret;
-}
-
 BOOL SwitchUnicodeString(LPWSTR wstr, int len)
 {
     if ((len % 2) != 0)
@@ -340,30 +328,43 @@ BOOL ConvertStr(char** out_str, long& size, int encoding = 0)
             if (((*out_str)[0] == 0xFE) && ((*out_str)[1] == 0xFF)) // reversed BOM, swap it
                 SwitchUnicodeString(((WCHAR*)(*out_str)) + 1, size - 2);
 
-            assert((size % 2) == 0);
-
-            if ((size % 2) != 0) // that's some glitch, try it like this
-                size++;
-
-            // and now we have the ANSI size
-            size = (size - 2 /*-BOM*/) / 2;
-
-            int new_size = Unicode16ToAnsi(NULL, ((WCHAR*)(*out_str)) + 1, size, 0);
-
-            char* new_out_str = (char*)malloc(new_size);
-
-            if (!new_out_str)
+            if ((size % 2) != 0)
             {
                 free(*out_str);
                 *out_str = NULL;
+                size = 0;
                 return FALSE;
             }
 
-            Unicode16ToAnsi(new_out_str, ((WCHAR*)(*out_str)) + 1, size, new_size); // convert (skip the BOM)
-            size = new_size;
+            const size_t wideCount = static_cast<size_t>((size - 2 /* BOM */) / 2);
+            const wchar_t* wideText = reinterpret_cast<const wchar_t*>(*out_str) + 1;
+            const size_t textLength = wideCount > 0 && wideText[wideCount - 1] == L'\0'
+                                          ? wideCount - 1
+                                          : wideCount;
+            std::string encoded;
+            if (!mmviewer::EncodeUtf16TagAsUtf8(
+                    std::wstring_view(wideText, textLength), encoded) ||
+                encoded.size() >= static_cast<size_t>(LONG_MAX))
+            {
+                free(*out_str);
+                *out_str = NULL;
+                size = 0;
+                return FALSE;
+            }
 
-            //free(*out_str);
+            char* new_out_str = static_cast<char*>(malloc(encoded.size() + 1));
+            if (new_out_str == NULL)
+            {
+                free(*out_str);
+                *out_str = NULL;
+                size = 0;
+                return FALSE;
+            }
+            memcpy(new_out_str, encoded.data(), encoded.size());
+            new_out_str[encoded.size()] = '\0';
+            free(*out_str);
             *out_str = new_out_str;
+            size = static_cast<long>(encoded.size() + 1);
         }
         else if (encoding == 3 /*UTF8 w/o BOM*/)
         {
@@ -397,6 +398,17 @@ BOOL BreakStr(char** out_str, int size, int encoding, char** pp1, int& sizep1, c
 
     part1 = *out_str;
     part2 = *out_str;
+    // From here, 'part1' is BreakStr's own copy of the pointer, and ConvertStr
+    // below unconditionally consumes whatever it is handed - on success it
+    // frees the original and replaces it with a new buffer; on failure it frees
+    // the original and nulls its copy. Either way the block *out_str pointed to
+    // is gone once ConvertStr(&part1, ...) runs, but the caller's own *out_str
+    // variable was never told, so ReadBreakStr's later
+    // `if (*out_str && p1 != *out_str) free(*out_str)` freed it a second time
+    // for any UTF-16-encoded frame (encoding 1/2, the only ConvertStr path that
+    // actually frees). NULL it here, the moment ownership passes to part1/part2,
+    // so that cleanup correctly sees nothing left to free.
+    *out_str = NULL;
 
     if (encoding == 0)
     {

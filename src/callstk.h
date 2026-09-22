@@ -60,10 +60,10 @@ protected:
     char* Enum;                      // pointer to the last printed text
     BOOL FirstCallstack;             // are we the first instance?
 
-    const char* PluginDLLName; // plug-in DLL currently running in the thread
-                               // (NULL if it is sally.exe)
-    int PluginDLLNameUses;     // the Pop() operation count at which PluginDLLName should be set to NULL
-                               // (nesting level)
+    const wchar_t* PluginDLLName; // plug-in DLL currently running in the thread
+                                  // (NULL if it is sally.exe)
+    int PluginDLLNameUses;        // the Pop() operation count at which PluginDLLName should be set to NULL
+                                  // (nesting level)
 
     static DWORD TlsIndex;                        // TLS index always storing 'this'
     static BOOL SectionOK;                        // is the critical section initialized?
@@ -100,6 +100,7 @@ public:
     }
 
     void Push(const char* format, va_list args);
+    void Push(const wchar_t* format, va_list args);
 
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
     void Pop(BOOL printCallStackTop);
@@ -109,7 +110,7 @@ public:
 #endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
 
     // called only when storing a call-stack message from a plug-in
-    void PushPluginDLLName(const char* dllName)
+    void PushPluginDLLName(const wchar_t* dllName)
     {
         if (PluginDLLName == NULL)
         {
@@ -132,7 +133,7 @@ public:
             PluginDLLNameUses--;
     }
 
-    const char* GetPluginDLLName() { return PluginDLLName; }
+    const wchar_t* GetPluginDLLName() { return PluginDLLName; }
 
     void Reset() // start enumerating lines
     {
@@ -145,10 +146,10 @@ public:
     void ReleaseBeforeExitThreadBody();    // called from ReleaseBeforeExitThread() after locating the call-stack object in TLS
 
     static int HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID = -1,
-                               const char* iconOvrlsHanName = NULL); // called from the exception handler
+                               const wchar_t* iconOvrlsHanName = NULL); // called from the exception handler
     static DWORD WINAPI ThreadBugReportF(void* exitProcess);         // thread that opens the bug report dialog
     // calls PrintBugReport into the bug report
-    static BOOL CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD ThreadID, DWORD ShellExtCrashID, const char* bugReportFileName);
+    static BOOL CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD ThreadID, DWORD ShellExtCrashID, const wchar_t* bugReportFileName);
 
     // function for printing exception information (used both to a file and to a window)
     // when Exception==NULL, it's not an exception (user manually opened the Bug Report dialog)

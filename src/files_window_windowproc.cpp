@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/IChangeNotifier.h"
 
 #include "cfgdlg.h"
 #include "menu.h"
@@ -20,7 +21,9 @@ extern "C"
 }
 #include "salshlib.h"
 #include "zip.h"
+#include "common/text/CaseFolding.h"
 #include "common/unicode/PanelPathPolicy.h"
+#include "common/fsutil.h" // IsTheSamePath
 
 //****************************************************************************
 
@@ -169,10 +172,10 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case DBT_DEVICEQUERYREMOVEFAILED:
         {
             //          TRACE_I("WM_DEVICECHANGE: DBT_DEVICEQUERYREMOVEFAILED");
-            if (sally::unicode::HasWidePathW(GetPathW()))
-                ChangeDirectoryW(this, GetPathW(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
-            else
-                ChangeDirectory(this, GetPath(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
+            // Through IChangeNotifier, unconditionally wide; the removable-media
+            // flag now asks the wide path too instead of the CP_ACP mirror.
+            gChangeNotifier->ChangeWatch(this, GetPathW(),
+                                         MyGetDriveTypeW(GetPathW()) == DRIVE_REMOVABLE);
             return TRUE;
         }
 
@@ -203,7 +206,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_DROPUNPACK:
     {
         // TRACE_I("WM_USER_DROPUNPACK received!");
-        char* tgtPath = (char*)wParam;
+        wchar_t* tgtPath = (wchar_t*)wParam;
         int operation = (int)lParam;
         if (operation == SALSHEXT_COPY) // unpack
         {
@@ -219,7 +222,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_DROPFROMFS:
     {
         TRACE_I("WM_USER_DROPFROMFS received: " << (lParam == SALSHEXT_COPY ? "Copy" : (lParam == SALSHEXT_MOVE ? "Move" : "Unknown")));
-        char* tgtPath = (char*)wParam;
+        wchar_t* tgtPath = (wchar_t*)wParam;
         int operation = (int)lParam;
         if (Is(ptPluginFS) && GetPluginFS()->NotEmpty() &&
             (operation == SALSHEXT_COPY && GetPluginFS()->IsServiceSupported(FS_SERVICE_COPYFROMFS) ||
@@ -228,7 +231,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             int count = GetSelCount();
             if (count > 0 || GetCaretIndex() != 0 ||
-                Dirs->Count == 0 || strcmp(Dirs->At(0).Name, "..") != 0) // check if we are not working only with ".."
+                Dirs->Count == 0 || wcscmp(Dirs->At(0).Name, L"..") != 0) // check if we are not working only with ".."
             {
                 BeginSuspendMode(); // the snooper takes a break
                 BeginStopRefresh(); // just to prevent path change notifications from being distributed
@@ -256,16 +259,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL copy = (operation == SALSHEXT_COPY);
                 BOOL operationMask = FALSE;
                 BOOL cancelOrHandlePath = FALSE;
-                CPathBuffer targetPath; // Heap-allocated for long path support
-                lstrcpyn(targetPath, tgtPath, targetPath.Size() - 1);
+                std::wstring targetPath = tgtPath;
                 if (tgtPath[0] == '\\' && tgtPath[1] == '\\' || // UNC path
                     tgtPath[0] != 0 && tgtPath[1] == ':')       // classic disk path (C:\path)
                 {
-                    int l = (int)strlen(targetPath);
-                    if (l > 3 && targetPath[l - 1] == '\\')
-                        targetPath[l - 1] = 0; // krom "c:\" zrusime koncovy backslash
+                    if (targetPath.length() > 3 && targetPath.back() == L'\\')
+                        targetPath.pop_back(); // krom "c:\" zrusime koncovy backslash
                 }
-                targetPath[strlen(targetPath) + 1] = 0; // ensure two zeros at the end of the string
 
                 // lower the thread priority to "normal" (so operations do not overload the machine too much)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -273,7 +273,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL ret = GetPluginFS()->CopyOrMoveFromFS(copy, 5, GetPluginFS()->GetPluginFSName(),
                                                            HWindow, panel,
                                                            count - selectedDirs, selectedDirs,
-                                                           targetPath, operationMask,
+                                                           targetPath, NULL, operationMask,
                                                            cancelOrHandlePath,
                                                            ProgressDialogActivateDrop);
 
@@ -282,9 +282,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (ret && !cancelOrHandlePath)
                 {
-                    if (targetPath[0] != 0) // change focus to 'targetPath'
+                    if (!targetPath.empty()) // change focus to 'targetPath'
                     {
-                        lstrcpyn(NextFocusName, targetPath, NextFocusName.Size());
+                        NextFocusNameW = targetPath.c_str();
                         // RefreshDirectory may not run - source may not have changed - to be safe we post a message
                         PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
                     }
@@ -481,10 +481,10 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (GetMonitorChanges()) // snooper might have removed it from the list
                 {
-                    if (sally::unicode::HasWidePathW(GetPathW()))
-                        ChangeDirectoryW(this, GetPathW(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
-                    else
-                        ChangeDirectory(this, GetPath(), MyGetDriveType(GetPath()) == DRIVE_REMOVABLE);
+                    // Through IChangeNotifier, unconditionally wide; the
+                    // removable-media flag now asks the wide path too instead of the CP_ACP mirror.
+                    gChangeNotifier->ChangeWatch(this, GetPathW(),
+                                                 MyGetDriveTypeW(GetPathW()) == DRIVE_REMOVABLE);
                 }
             }
             else
@@ -633,11 +633,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                         }
-                        CPathBuffer pathBackup; // Heap-allocated for long path support
+                        std::wstring pathBackup;
                         CPanelType typeBackup;
                         if (isInactiveRefresh)
                         {
-                            lstrcpyn(pathBackup, GetPath(), pathBackup.Size()); // we're only interested in disk paths and paths to archives (for plugin-FS the snooper doesn't inform us about changes)
+                            pathBackup = GetPathW(); // we're only interested in disk paths and paths to archives (for plugin-FS the snooper doesn't inform us about changes)
                             typeBackup = GetPanelType();
                             LastInactiveRefreshStart = GetTickCount();
                         }
@@ -650,7 +650,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                         if (isInactiveRefresh)
                         {
-                            if (typeBackup != GetPanelType() || StrICmp(pathBackup, GetPath()) != 0)
+                            if (typeBackup != GetPanelType() || StrICmpW(pathBackup.c_str(), GetPathW()) != 0)
                             { // if the path has changed (probably someone just deleted the directory displayed in the panel), we perform any other refresh without waiting (it can be expected that they will also delete the newly displayed directory, so we can quickly "back out" from it)
                                 LastInactiveRefreshEnd = LastInactiveRefreshStart;
                             }
@@ -709,23 +709,27 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (file != NULL && !isDir &&                                   // it's a file
                 (!Is(ptPluginFS) || GetPluginIconsType() != pitFromPlugin)) // it's not an icon from plug-in
             {
-                CPathBuffer buf; // extension in lowercase
-                char *s1 = buf, *s2 = file->Ext;
-                while (*s2 != 0)
-                    *s1++ = LowerCase[*s2++];
-                *((DWORD*)s1) = 0;
+                std::wstring key = sally::text::Fold(file->Ext); // extension in lowercase
+                // CompareDWORDS (icncache.cpp), which CAssociations::GetIndex and
+                // CIconCache::GetIndex both use, walks in DWORD steps with
+                // `s1 <= end` - it reads a full DWORD AT the end offset, i.e. up
+                // to 4 bytes past the length. c_str() guarantees only one wide
+                // NUL, so an even-length key left that read straddling the end of
+                // the buffer. Same two-wide-NUL pad the paint path documents as
+                // load-bearing (files_window_paint.cpp).
+                key.append(2, L'\0');
                 int index;
                 CIconSizeEnum iconSize = IconCache->GetIconSize();
-                if (Associations.GetIndex(buf, index) &&             // extension has an icon (association)
+                if (Associations.GetIndex(key.c_str(), index) &&     // extension has an icon (association)
                     (Associations[index].GetIndex(iconSize) == -1 || // it's an icon that is being loaded
                      Associations[index].GetIndex(iconSize) == -3))
                 {
                     int icon;
                     CIconList* srcIconList;
                     int srcIconListIndex;
-                    memmove(buf, file->Name, file->NameLen);
-                    *(DWORD*)(buf + file->NameLen) = 0;
-                    if (IconCache->GetIndex(buf, icon, NULL, NULL) &&                                 // icon-thread is loading it
+                    key.assign(file->Name, file->NameLen);
+                    key.append(2, L'\0'); // same CompareDWORDS pad as above
+                    if (IconCache->GetIndex(key.c_str(), icon, NULL, NULL) &&                         // icon-thread is loading it
                         (IconCache->At(icon).GetFlag() == 1 || IconCache->At(icon).GetFlag() == 2) && // icon is loaded new or old
                         IconCache->GetIcon(IconCache->At(icon).GetIndex(),
                                            &srcIconList, &srcIconListIndex)) // will we get the loaded icon
@@ -788,7 +792,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (data != NULL)
         {
             FocusFirstNewItem = TRUE;
-            DropCopyMove(data->Copy, data->TargetPath, data->TargetPathW.c_str(), data->Data);
+            DropCopyMove(data->Copy, data->TargetPath.c_str(), data->Data);
             DestroyCopyMoveData(data->Data);
             delete data;
         }
@@ -808,13 +812,14 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         return 0;
     }
 
-    case WM_USER_CHANGEDIR:
+    case WM_USER_CHANGEDIRW:
     {
-        // perform post-processing only for paths we obtained as text (not directly by dropping a directory)
-        CPathBuffer buff;  // Heap-allocated for long path support
-        lstrcpyn(buff, (char*)lParam, buff.Size());
-        if (!(BOOL)wParam || PostProcessPathFromUser(HWindow, buff))
-            ChangeDir(buff, -1, NULL, 3 /*change-dir*/, NULL, (BOOL)wParam);
+        std::unique_ptr<std::wstring> path(static_cast<std::wstring*>(reinterpret_cast<void*>(lParam)));
+        if (path != NULL && !path->empty() &&
+            (!(BOOL)wParam || PostProcessPathFromUserW(HWindow, *path)))
+        {
+            ChangeDir(path->c_str(), -1, NULL, 3 /*change-dir*/, NULL, (BOOL)wParam);
+        }
         return 0;
     }
 
@@ -827,12 +832,39 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             ShowWindow(MainWindow->HWindow, SW_RESTORE);
         }
-        if (Is(ptDisk) && IsTheSamePath(GetPath(), (char*)lParam) ||
-            ChangeDir((char*)lParam))
+        if (Is(ptDisk) && IsTheSamePath(GetPathW(), (wchar_t*)lParam) ||
+            ChangeDir((wchar_t*)lParam))
         {
-            strcpy(NextFocusName, (char*)wParam);
+            NextFocusNameW = (wchar_t*)wParam;
             SendMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
             //        SetForegroundWindow(MainWindow->HWindow);  // it's already too late here - moved above
+            UpdateWindow(MainWindow->HWindow);
+        }
+        return 0;
+    }
+
+    case WM_USER_FOCUSFILEW:
+    {
+        // Wide twin of WM_USER_FOCUSFILE. Same sequence, but the path compare,
+        // the directory change and the focus target all stay in UTF-16, so a caller holding
+        // wide names no longer has to narrow them (or, as Find results did, refuse).
+        CFocusFileDataW* focus = (CFocusFileDataW*)wParam;
+        if (focus == NULL || focus->Path == NULL || focus->Name == NULL)
+            return 0;
+
+        SetForegroundWindow(MainWindow->HWindow);
+        if (IsIconic(MainWindow->HWindow))
+        {
+            ShowWindow(MainWindow->HWindow, SW_RESTORE);
+        }
+        if (Is(ptDisk) && IsTheSamePath(GetPathW(), focus->Path) ||
+            ChangePathToDisk(HWindow, focus->Path))
+        {
+            // Only the wide target is set. DONEXTFOCUS below guards on either field and
+            // prefers this one, the same way RefreshDirectory already does - so there is no
+            // mirror to keep in step, and no conversion that could disagree with it.
+            NextFocusNameW = focus->Name;
+            SendMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
             UpdateWindow(MainWindow->HWindow);
         }
         return 0;
@@ -848,7 +880,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_EDITFILE:
     {
-        EditFile((char*)wParam);
+        CEditFileData* data = (CEditFileData*)wParam;
+        EditFile(data->FileName, 0xFFFFFFFF);
         return 0;
     }
 
@@ -862,7 +895,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_EDITFILEWITH:
     {
-        EditFile((char*)wParam, (DWORD)lParam); // FIXME_X64 - verify casting to (DWORD)
+        CEditFileData* data = (CEditFileData*)wParam;
+        EditFile(data->FileName, (DWORD)lParam); // FIXME_X64 - verify casting to (DWORD)
         return 0;
     }
 
@@ -876,7 +910,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_DONEXTFOCUS: // if RefreshDirectory didn't manage it, we do it here
     {
         DontClearNextFocusName = FALSE;
-        if (NextFocusName[0] != 0) // if there is something to focus
+        if (!NextFocusNameW.empty()) // if there is something to focus
         {
             int total = Files->Count + Dirs->Count;
             int found = -1;
@@ -884,11 +918,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             for (i = 0; i < total; i++)
             {
                 CFileData* f = (i < Dirs->Count) ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-                if (StrICmp(f->Name, NextFocusName) == 0)
+                const std::wstring nameW = f->Name;
+                if (StrICmpW(nameW.c_str(), NextFocusNameW.c_str()) == 0)
                 {
-                    if (strcmp(f->Name, NextFocusName) == 0) // file found exactly
+                    if (nameW == NextFocusNameW) // file found exactly
                     {
-                        NextFocusName[0] = 0;
                         NextFocusNameW.clear();
                         SetCaretIndex(i, FALSE);
                         break;
@@ -897,11 +931,18 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         found = i; // file found (ignore-case)
                 }
             }
-            if (i == total && found != -1)
+            // Clear unconditionally once the loop completes without an
+            // early break, not only on a case-insensitive match - RefreshDirectory's own
+            // handling of this exact same "restore focus after refresh" concept already
+            // does this (files_window_navigation.cpp).
+            // Without it, a target that matches nothing at all (filtered out, hidden-file
+            // setting, refresh race) left the focus request dangling, so the next handler
+            // invocation could search for a stale target.
+            if (i == total)
             {
-                NextFocusName[0] = 0;
+                if (found != -1)
+                    SetCaretIndex(found, FALSE);
                 NextFocusNameW.clear();
-                SetCaretIndex(found, FALSE);
             }
         }
         return 0;
@@ -927,7 +968,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 BOOL isDir = i < Dirs->Count;
                 CFileData* f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-                if (i == 0 && isDir && strcmp(Dirs->At(0).Name, "..") == 0)
+                if (i == 0 && isDir && wcscmp(Dirs->At(0).Name, L"..") == 0)
                     continue;
                 if (f->Selected == 1)
                 {
@@ -944,9 +985,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             if (files > 0 || dirs > 0)
             {
-                char buff[1000];
-                DWORD varPlacements[100];
-                int varPlacementsCount = 100;
+                std::wstring buff;
+                std::vector<sally::unicode::WideTextRange> varPlacements;
                 BOOL done = FALSE;
                 if (Is(ptZIPArchive) || Is(ptPluginFS))
                 {
@@ -955,29 +995,36 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (PluginData.GetInfoLineContent(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
                                                           NULL, FALSE, files, dirs,
                                                           displaySize, selectedSize, buff,
-                                                          varPlacements, varPlacementsCount))
+                                                          varPlacements))
                         {
                             done = TRUE;
-                            if (StatusLine->SetText(buff))
-                                StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
+                            if (StatusLine->SetText(buff.c_str()))
+                                StatusLine->SetSubTexts(varPlacements.data(), varPlacements.size());
                         }
-                        else
-                            varPlacementsCount = 100; // may have been corrupted
                     }
                 }
                 if (!done)
                 {
-                    char text[200];
                     if (displaySize)
                     {
-                        ExpandPluralBytesFilesDirs(text, 200, selectedSize, files, dirs, TRUE);
-                        LookForSubTexts(text, varPlacements, &varPlacementsCount);
+                        // The live marker parser reports offsets in the same UTF-16 units as
+                        // this text and StatusLine::SetText, so the highlight ranges stay
+                        // aligned with the rendered localized string.
+                        std::wstring text = ExpandPluralBytesFilesDirsTextW(selectedSize, files, dirs, TRUE);
+                        LookForSubTexts(text, varPlacements);
+                        if (StatusLine->SetText(text.c_str()))
+                            StatusLine->SetSubTexts(varPlacements.data(), varPlacements.size());
                     }
                     else
-                        ExpandPluralFilesDirs(text, 200, files, dirs, epfdmSelected, FALSE);
-                    if (StatusLine->SetText(text) && displaySize)
-                        StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
-                    varPlacementsCount = 100; // may have been corrupted
+                    {
+                        // wide - ExpandPluralFilesDirsW/StatusLine::SetText
+                        // already exist and are used for the identical purpose elsewhere
+                        // (stswnd.cpp, files_window_pack_unpack.cpp); a localized plural-form
+                        // string containing characters outside CP_ACP was corrupted on every
+                        // selection change before reaching the status bar.
+                        const std::wstring textW = ExpandPluralFilesDirsTextW(files, dirs, epfdmSelected, FALSE);
+                        StatusLine->SetText(textW.c_str());
+                    }
                 }
             }
             else
@@ -1027,7 +1074,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SetThumbnailSize(Configuration.ThumbnailSize); // ListBox must exist
         if (!ListBox->CreateEx(WS_EX_WINDOWEDGE,
                                CFILESBOX_CLASSNAME,
-                               "",
+                               L"",
                                WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                0, 0, 0, 0, // dummy
                                HWindow,
@@ -1133,23 +1180,23 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    if (FileNamesEnumData.LastFileName[0] != 0) // we know the full filename at 'index', check if array was scattered/squeezed + if necessary find the new index
+                    if (!FileNamesEnumData.LastFileName.empty()) // we know the full filename at 'index', check if array was scattered/squeezed + if necessary find the new index
                     {
-                        int pathLen = (int)strlen(GetPath());
-                        if (StrNICmp(GetPath(), FileNamesEnumData.LastFileName, pathLen) == 0)
+                        int pathLen = (int)wcslen(GetPathW());
+                        if (StrNICmpW(GetPathW(), FileNamesEnumData.LastFileName.c_str(), pathLen) == 0)
                         { // path to file must match path in panel ("always true")
-                            const char* name = FileNamesEnumData.LastFileName + pathLen;
+                            const wchar_t* name = FileNamesEnumData.LastFileName.c_str() + pathLen;
                             if (*name == '\\' || *name == '/')
                                 name++;
 
                             CFileData* f = (index >= 0 && index < count) ? &Files->At(index) : NULL;
-                            BOOL nameIsSame = f != NULL && StrICmp(name, f->Name) == 0;
+                            BOOL nameIsSame = f != NULL && StrICmpW(name, f->Name) == 0;
                             if (nameIsSame)
                                 indexNotFound = FALSE;
                             if (f == NULL || !nameIsSame)
                             { // name at index 'index' is not FileNamesEnumData.LastFileName, try to find new index of this name
                                 int i;
-                                for (i = 0; i < count && StrICmp(name, Files->At(i).Name) != 0; i++)
+                                for (i = 0; i < count && StrICmpW(name, Files->At(i).Name) != 0; i++)
                                     ;
                                 if (i != count) // new index found
                                 {
@@ -1210,7 +1257,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 CFileData* f = &(Files->At(index));
                                 if (f->Selected || !preferSelected)
                                 {
-                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(f->Name, f->Ext))
+                                    // f->Name is the true wide name (NameW retired,
+                                    // see spl_com.h) - matched directly against the mask.
+                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(f->Name, NULL))
                                     {
                                         FileNamesEnumData.Found = TRUE;
                                         break;
@@ -1239,7 +1288,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 CFileData* f = &(Files->At(index));
                                 if (f->Selected || !preferSelected)
                                 {
-                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(f->Name, f->Ext))
+                                    // f->Name is the true wide name (NameW retired,
+                                    // see spl_com.h) - matched directly against the mask.
+                                    if (!onlyAssociatedExtensions || masks.AgreeMasks(f->Name, NULL))
                                     {
                                         FileNamesEnumData.Found = TRUE;
                                         break;
@@ -1276,8 +1327,12 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 if (FileNamesEnumData.Found)
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, GetPath(), MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, Files->At(index).Name, MAX_PATH);
+                    // FileNameW is the authority - the mask match that just
+                    // selected 'index' already consulted the true wide name; build
+                    // the result from it. FileName is a narrow ANSI compatibility mirror
+                    // (lossy for non-codepage names), matching COpenViewerData's convention.
+                    FileNamesEnumData.FileNameW = GetPathW();
+                    SalPathAppendW(FileNamesEnumData.FileNameW, Files->At(index).Name);
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else
@@ -1361,7 +1416,7 @@ void CFilesWindow::OpenDirHistory()
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STATE | MENU_MASK_STRING;
         mii.Type = MENU_TYPE_STRING;
         mii.State = MENU_STATE_GRAYED;
-        mii.String = LoadStr(IDS_EMPTYUSERMENU);
+        mii.String = LoadStrW(IDS_EMPTYUSERMENU);
         menu.InsertItem(0xFFFFFFFF, TRUE, &mii);
     }
     DWORD cmd = menu.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_VERTICAL, r.left, y, HWindow, exludeRect ? &r : NULL);
@@ -1407,17 +1462,17 @@ MENU_TEMPLATE_ITEM StopFilterMenu[] =
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_STATE;
     mii.Type = MENU_TYPE_STRING;
 
-    mii.String = LoadStr(IDS_HIDDEN_ATTRIBUTE);
+    mii.String = LoadStrW(IDS_HIDDEN_ATTRIBUTE);
     mii.ID = 1;
     mii.State = (HiddenDirsFilesReason & HIDDEN_REASON_ATTRIBUTE) ? 0 : MENU_STATE_GRAYED;
     menu.InsertItem(-1, TRUE, &mii);
 
-    mii.String = LoadStr(IDS_HIDDEN_FILTER);
+    mii.String = LoadStrW(IDS_HIDDEN_FILTER);
     mii.ID = 2;
     mii.State = (HiddenDirsFilesReason & HIDDEN_REASON_FILTER) ? 0 : MENU_STATE_GRAYED;
     menu.InsertItem(-1, TRUE, &mii);
 
-    mii.String = LoadStr(IDS_HIDDEN_HIDECMD);
+    mii.String = LoadStrW(IDS_HIDDEN_HIDECMD);
     mii.ID = 3;
     mii.State = (HiddenDirsFilesReason & HIDDEN_REASON_HIDECMD) ? 0 : MENU_STATE_GRAYED;
     menu.InsertItem(-1, TRUE, &mii);
@@ -1484,7 +1539,7 @@ MENU_TEMPLATE_ITEM SortByMenu[] =
     {
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_IMAGEINDEX | MENU_MASK_ID | MENU_MASK_STATE;
         mii.Type = MENU_TYPE_STRING;
-        mii.String = LoadStr(textResID[i]);
+        mii.String = LoadStrW(textResID[i]);
         mii.ImageIndex = imgIndex[i];
         mii.ID = cmdID[i];
         mii.State = 0;
@@ -1499,7 +1554,7 @@ MENU_TEMPLATE_ITEM SortByMenu[] =
     // options
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
     mii.Type = MENU_TYPE_STRING;
-    mii.String = LoadStr(IDS_MENU_LEFT_SORTOPTIONS);
+    mii.String = LoadStrW(IDS_MENU_LEFT_SORTOPTIONS);
     mii.ID = CM_SORTOPTIONS;
     popup->InsertItem(-1, TRUE, &mii);
 

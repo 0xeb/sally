@@ -10,7 +10,7 @@ class CThemes
 {
 protected:
 public:
-    CThemes(HWND hWnd, TCHAR*)
+    CThemes(HWND hWnd, wchar_t*)
     {
     }
     ~CThemes()

@@ -25,7 +25,7 @@
 
 extern CWpdDeviceList g_oDeviceList;
 
-PCSTR CWpdFS::SUGGESTED_NAME = SuggestedFSName;
+PCWSTR CWpdFS::SUGGESTED_NAME = SuggestedFSName;
 
 CWpdFS::CWpdFS(CFxPluginInterfaceForFS& owner)
     : TFxPluginFSInterface(owner)

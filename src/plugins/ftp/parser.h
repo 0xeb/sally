@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -158,18 +158,13 @@ struct CFTPParserParameter
         return ColumnIndex;
     }
 
-    // returns the value of a parameter or state variable of type pptString; used
-    // during listing parsing; (obtaining the function parameter value); can also return
-    // NULL (out of memory (TRUE assigned to 'lowMemErr') or 'String' is NULL)
-    const char* GetString(const char* listing, const char* listingEnd, BOOL* needDealloc,
-                          BOOL* lowMemErr);
-
     // returns the value of a parameter, expression, column, or state variable of type
     // pptBoolean and potBoolean; used during listing parsing;
     // (obtaining the value of a function parameter or operand)
     BOOL GetBoolean(CFileData* file, BOOL* isDir, CFTPListingPluginDataInterface* dataIface,
-                    TIndirectArray<CSrvTypeColumn>* columns, const char* listing,
-                    const char* listingEnd, CFTPParser* actualParser);
+                     TIndirectArray<CSrvTypeColumn>* columns, const char* listing,
+                     const char* listingEnd, CFTPParser* actualParser,
+                     const CFtpTextCodec& textCodec);
 
     // returns the value of a parameter or a value from a column of type potNumber; used during
     // listing parsing (obtaining the value of an operand); returns TRUE in 'minus' (must not be NULL)
@@ -189,12 +184,14 @@ struct CFTPParserParameter
                         CFTPListingPluginDataInterface* dataIface,
                         TIndirectArray<CSrvTypeColumn>* columns);
 
-    // returns the value of a parameter, state variable, or value from a column of type potTime;
-    // used during listing parsing (obtaining the value of an operand)
-    void GetStringOperand(const char** beg, const char** end, CFileData* file,
+    // Resolves a semantic string operand to UTF-16 according to its provenance:
+    // local parser literals use ACP, listing/general-column bytes use textCodec,
+    // and the name column is already UTF-16.
+    BOOL GetStringOperand(std::wstring& value, CFileData* file,
                           CFTPListingPluginDataInterface* dataIface,
                           TIndirectArray<CSrvTypeColumn>* columns,
-                          const char* listing, const char* listingEnd);
+                          const char* listing, const char* listingEnd,
+                          const CFtpTextCodec& textCodec) noexcept;
 };
 
 //
@@ -299,7 +296,7 @@ public:
     BOOL UseFunction(CFileData* file, BOOL* isDir, CFTPListingPluginDataInterface* dataIface,
                      TIndirectArray<CSrvTypeColumn>* columns, const char** listing,
                      const char* listingEnd, CFTPParser* actualParser, BOOL* lowMemErr,
-                     DWORD* emptyCol);
+                     DWORD* emptyCol, const CFtpTextCodec& textCodec);
 
 protected:
     // adds a newly allocated parameter (without initialization) and returns it in 'newPar';
@@ -343,7 +340,7 @@ public:
     BOOL UseRule(CFileData* file, BOOL* isDir, CFTPListingPluginDataInterface* dataIface,
                  TIndirectArray<CSrvTypeColumn>* columns, const char** listing,
                  const char* listingEnd, CFTPParser* actualParser, BOOL* lowMemErr,
-                 DWORD* emptyCol);
+                 DWORD* emptyCol, const CFtpTextCodec& textCodec);
 };
 
 //
@@ -429,7 +426,8 @@ public:
                                 CFTPListingPluginDataInterface* dataIface,
                                 TIndirectArray<CSrvTypeColumn>* columns,
                                 const char** listing, const char* listingEnd,
-                                const char** itemStart, BOOL* lowMem, DWORD* emptyCol);
+                                const char** itemStart, BOOL* lowMem, DWORD* emptyCol,
+                                const CFtpTextCodec& textCodec);
 };
 
 //
@@ -505,9 +503,10 @@ CFTPParser* CompileParsingRules(const char* rules, TIndirectArray<CSrvTypeColumn
 // was caused by lack of memory; returns the offset of a syntactic error inside 'cond' (-1=unknown error position)
 // in 'errorPos' (if not NULL); simultaneously returns the number of the string describing the error in 'errorResID'
 // (if not NULL) (stored in resources; -1=no error description) and returns a textual error description in the
-// 'errBuf'+'errBufSize' buffer (has higher priority than 'errorResID')
+// 'errorText' receives a dynamically owned local/configuration-byte diagnostic
+// (it has higher priority than 'errorResID').
 CFTPAutodetCondNode* CompileAutodetectCond(const char* cond, int* errorPos, int* errorResID,
-                                           BOOL* lowMem, char* errBuf, int errBufSize);
+                                           BOOL* lowMem, std::string* errorText);
 
 // fills empty values into empty columns; on error returns TRUE in 'err';
 // 'file'+'isDir'+'dataIface' are the data of the processed item (file/directory);

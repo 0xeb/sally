@@ -278,7 +278,7 @@ public:
         this->_outBmp = NULL;
     }
 
-    BOOL LoadGraphicsFromResource(HINSTANCE hInst, TCHAR const* name)
+    BOOL LoadGraphicsFromResource(HINSTANCE hInst, wchar_t const* name)
     {
         if (this->_graphics == NULL)
             return FALSE;
@@ -295,9 +295,9 @@ public:
     }
     //FIXME: clustersize hack
 #ifdef SALAMANDER
-    void PopulateAsync(TCHAR const* name, size_t namelen, int clustersize, int sortorder = FILESIZE_DISK)
+    void PopulateAsync(wchar_t const* name, size_t namelen, int clustersize, int sortorder = FILESIZE_DISK)
 #else
-    void PopulateAsync(TCHAR const* name, size_t namelen = 0, int sortorder = FILESIZE_DISK)
+    void PopulateAsync(wchar_t const* name, size_t namelen = 0, int sortorder = FILESIZE_DISK)
 #endif
 
     {
@@ -417,7 +417,12 @@ public:
 #endif
 
             CCushionDirectory* cshr = this->_map->GetRoot();
-            BYTE* pix = this->_mapPix->AllocatePixMap(width, height);
+            // Clear: the cushions cover only the area the tree map actually fills. A directory
+            // with no sized entries (empty, or every child unreadable) produces no rows at all,
+            // and any pixel no cushion writes is shown verbatim by RenderView/StretchBlt. Without
+            // this the view blits uninitialized heap - 0xCD gray under the debug CRT, arbitrary
+            // garbage in Release - instead of an empty map.
+            BYTE* pix = this->_mapPix->AllocatePixMap(width, height, TRUE);
             if (pix != NULL)
             {
 #ifdef TIMINGTEST
@@ -445,6 +450,18 @@ public:
         if (this->_map)
             return this->_map->GetCushionByLocation(x, y);
         return NULL;
+    }
+
+    // TRUE when the view is prepared but the layout produced nothing to draw: the directory has no
+    // entries with a size, either because it is genuinely empty or because every child was
+    // unreadable. Paint() still succeeds in that state - the pixmap is simply all background - so
+    // the caller needs this to tell "nothing to show" apart from "no map at all".
+    BOOL IsViewEmpty()
+    {
+        if (this->_mapReady == FALSE || this->_map == NULL)
+            return FALSE;
+        CCushionDirectory* root = this->_map->GetRoot();
+        return (root == NULL || root->GetFirstRow() == NULL);
     }
 
     /*void Dim()
@@ -522,15 +539,15 @@ public:
     CZDirectory* GetRootDir() { return this->_rootdir; }
     CZDirectory* GetViewDir() { return this->_viewdir; }
 
-    size_t GetSubDirName(TCHAR* buff, size_t bufflen)
+    size_t GetSubDirName(std::wstring& path)
     {
-        buff[0] = TEXT('\0');
+        path.clear();
         if (this->_viewdir == NULL)
             return 0;
         if (this->_viewdir == this->_rootdir)
             return 0;
 
-        return this->_viewdir->GetRelativeName(this->_rootdir, buff, bufflen);
+        return this->_viewdir->GetRelativeName(this->_rootdir, path);
         //return 0;
     }
 
@@ -672,18 +689,18 @@ public:
             this->RenderView(hdc);
             this->_outBmp->Paint(hdc, rct.left, rct.top, xw, xh);
 #ifdef TIMINGTEST
-            TCHAR buff[200];
+            wchar_t buff[200];
             int c;
-            //c = _stprintf(buff, TEXT("Cushions: %d -> %d...  Calctime: t=%1.8lf   Drawtime: t=%1.8lf"), this->_cushionCount, this->_drawcount, this->_calctime, this->_drawtime);
+            //c = swprintf(buff, 200, L"Cushions: %d -> %d...  Calctime: t=%1.8lf   Drawtime: t=%1.8lf", this->_cushionCount, this->_drawcount, this->_calctime, this->_drawtime);
             //WM_PAINT - 1: t1=%1.8lg   t2=%1.8f   f=%I64d"), tf, tf, lf.QuadPart
-            c = _stprintf(buff, TEXT("Cushions: %d -> %d...  "), this->_cushionCount, this->_drawcount);
-            TextOut(hdc, 8, xh / 2 - 4, buff, c);
-            c = _stprintf(buff, TEXT("Calctime: t=%1.8lf"), this->_calctime);
-            TextOut(hdc, 8, xh / 2 - 4 + 20, buff, c);
-            c = _stprintf(buff, TEXT("Drawtime: t=%1.8lf"), this->_drawtime);
-            TextOut(hdc, 8, xh / 2 - 4 + 40, buff, c);
-            c = _stprintf(buff, TEXT("HBMPtime: t=%1.8lf"), this->_hbmptime);
-            TextOut(hdc, 8, xh / 2 - 4 + 60, buff, c);
+            c = swprintf(buff, 200, L"Cushions: %d -> %d...  ", this->_cushionCount, this->_drawcount);
+            TextOutW(hdc, 8, xh / 2 - 4, buff, c);
+            c = swprintf(buff, 200, L"Calctime: t=%1.8lf", this->_calctime);
+            TextOutW(hdc, 8, xh / 2 - 4 + 20, buff, c);
+            c = swprintf(buff, 200, L"Drawtime: t=%1.8lf", this->_drawtime);
+            TextOutW(hdc, 8, xh / 2 - 4 + 40, buff, c);
+            c = swprintf(buff, 200, L"HBMPtime: t=%1.8lf", this->_hbmptime);
+            TextOutW(hdc, 8, xh / 2 - 4 + 60, buff, c);
 #endif
             return TRUE;
         }
@@ -694,9 +711,9 @@ public:
 			//TODO: Display something!
 			BitBlt(hdc, rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top, NULL, 0, 0, BLACKNESS);
 
-			TCHAR buff[200];
+			wchar_t buff[200];
 			int c; 
-			c = _stprintf(buff, TEXT("No DiskMap"));
+			c = swprintf(buff, TEXT("No DiskMap"));
 			//TextOut(hdc, 0, xh/2-5, buff, c);
 		}*/
     }

@@ -246,8 +246,8 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
         HFONT hOldFont = (HFONT)SelectObject(ItemBitmap.HMemDC, hot1 && Configuration.SingleClick ? FontUL : Font);
         int oldMode = SetBkMode(ItemBitmap.HMemDC, TRANSPARENT);
         COLORREF oldColor = SetTextColor(ItemBitmap.HMemDC, hot1 ? GetCOLORREF(CurrentColors[HOT_PANEL]) : headerTextColor);
-        int nameLen = lstrlen(column->Name);
-        TextOut(ItemBitmap.HMemDC, r.left + 3, (r.bottom - FontCharHeight) / 2, column->Name, nameLen);
+        int nameLen = lstrlenW(column->Name);
+        TextOutW(ItemBitmap.HMemDC, r.left + 3, (r.bottom - FontCharHeight) / 2, column->Name, nameLen);
 
         SIZE sz;
         sz.cx = 0;
@@ -266,7 +266,7 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
             sort = TRUE;
 
         // arrow indicating sort direction
-        GetTextExtentPoint32(ItemBitmap.HMemDC, column->Name, nameLen, &sz);
+        GetTextExtentPoint32W(ItemBitmap.HMemDC, column->Name, nameLen, &sz);
         hMemDC = HANDLES(CreateCompatibleDC(hDC));
         SelectObject(hMemDC, HHeaderSort);
         if (sort)
@@ -282,17 +282,17 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
         {
             int textLeft = r.left + 3 + sz.cx + 3 * SORT_BITMAP_W;
             if (sz.cx == 0) // measure now if we have no size yet
-                GetTextExtentPoint32(ItemBitmap.HMemDC, column->Name, nameLen, &sz);
+                GetTextExtentPoint32W(ItemBitmap.HMemDC, column->Name, nameLen, &sz);
             SelectObject(ItemBitmap.HMemDC, hot2 && Configuration.SingleClick ? FontUL : Font);
             SetTextColor(ItemBitmap.HMemDC, hot2 ? GetCOLORREF(CurrentColors[HOT_PANEL]) : headerTextColor);
-            char* colExtStr = column->Name + nameLen + 1; // the text "Ext" is stored after the name (in the same buffer)
-            int colExtStrLen = (int)strlen(colExtStr);
-            TextOut(ItemBitmap.HMemDC, textLeft, (r.bottom - FontCharHeight) / 2,
+            wchar_t* colExtStr = column->Name + nameLen + 1; // the text "Ext" is stored after the name (in the same buffer)
+            int colExtStrLen = (int)wcslen(colExtStr);
+            TextOutW(ItemBitmap.HMemDC, textLeft, (r.bottom - FontCharHeight) / 2,
                     colExtStr, colExtStrLen);
             if (panel->SortType == stExtension)
             {
                 // arrow indicating sort direction
-                GetTextExtentPoint32(ItemBitmap.HMemDC, colExtStr, colExtStrLen, &sz);
+                GetTextExtentPoint32W(ItemBitmap.HMemDC, colExtStr, colExtStrLen, &sz);
 
                 BitBlt(ItemBitmap.HMemDC,
                        textLeft + sz.cx + SORT_BITMAP_W,
@@ -390,7 +390,7 @@ void CHeaderLine::SetMinWidths()
     for (i = 0; i < columnsCount; i++)
     {
         CColumn* column = &Columns->At(i);
-        GetTextExtentPoint32(hDC, column->Name, lstrlen(column->Name), &sz);
+        GetTextExtentPoint32W(hDC, column->Name, lstrlenW(column->Name), &sz);
         column->MinWidth = 1 + 3 + sz.cx + 3 + 1;
 
         // if the column is sortable, add width of the bitmap and the spacing around it
@@ -402,9 +402,9 @@ void CHeaderLine::SetMinWidths()
         if (i == 0 && !Parent->Parent->IsExtensionInSeparateColumn() &&
             (Parent->Parent->ValidFileData & VALID_DATA_EXTENSION))
         {
-            char* colExtStr = column->Name + strlen(column->Name) + 1; // the text "Ext" is stored after the name (in the same buffer)
-            int colExtStrLen = (int)strlen(colExtStr);
-            GetTextExtentPoint32(hDC, colExtStr, colExtStrLen, &sz);
+            wchar_t* colExtStr = column->Name + wcslen(column->Name) + 1; // the text "Ext" is stored after the name (in the same buffer)
+            int colExtStrLen = (int)wcslen(colExtStr);
+            GetTextExtentPoint32W(hDC, colExtStr, colExtStrLen, &sz);
             // the "Ext" column supports sorting
             column->MinWidth += SORT_BITMAP_W + sz.cx + 2 * SORT_BITMAP_W;
         }
@@ -447,7 +447,7 @@ CHeaderLine::HitTest(int xPos, int yPos, int& index, BOOL& extInName)
                 // measure the base text
                 SIZE sz;
                 HFONT hOldFont = (HFONT)SelectObject(ItemBitmap.HMemDC, Font);
-                GetTextExtentPoint32(ItemBitmap.HMemDC, column->Name, lstrlen(column->Name), &sz);
+                GetTextExtentPoint32W(ItemBitmap.HMemDC, column->Name, lstrlenW(column->Name), &sz);
                 SelectObject(ItemBitmap.HMemDC, hOldFont);
                 if (xPos - left >= 1 + 3 + sz.cx + 3 * SORT_BITMAP_W)
                     extInName = TRUE;
@@ -547,19 +547,23 @@ CHeaderLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
     }
 
-    case WM_USER_TTGETTEXT:
+    case WM_USER_TTGETTEXTW:
     {
+        // Answers the wide form, like every other core tooltip provider; the
+        // narrow WM_USER_TTGETTEXT fallback in CToolTip::GetText exists for v107 plugins.
+        // The body has been commented out since long before this program - the header's
+        // per-column tooltips are not wired up - so this only returns "no text".
         /*
       DWORD id = wParam;
-      char *text = (char *)lParam;
+      wchar_t *text = (wchar_t *)lParam;
       if (id != 0xFFFF)  // divider
       {
         WORD index = id & 0x0000FFFF;
         BOOL ext = id & 0xFFFF0000;
         if (!ext && index < Columns->Count)
-          lstrcpy(text, Columns->At(i).Description);
+          lstrcpynW(text, Columns->At(i).Description, TOOLTIP_TEXT_MAX);
         if (ext && Columns->Count >= 2)
-          lstrcpy(text, Columns->At(1).Description); // get the description for a detached extension
+          lstrcpynW(text, Columns->At(1).Description, TOOLTIP_TEXT_MAX); // get the description for a detached extension
       }
 */
         return 0;

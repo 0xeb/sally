@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "unicode/helpers.h"
+#include "IFileSystem.h"
 
 #include <string>
 #include <windows.h>
@@ -12,39 +12,27 @@ namespace sally
 {
 namespace safe_file
 {
+inline IFileSystem* ActiveFileSystem()
+{
+    return gFileSystem != nullptr ? gFileSystem : GetWin32FileSystem();
+}
+
 class PathContext
 {
 public:
-    static PathContext FromAnsi(const char* fileName)
+    explicit PathContext(const wchar_t* fileName, const wchar_t* displayName = nullptr)
+        : Name(fileName != nullptr ? fileName : L""),
+          DisplayName(displayName != nullptr && displayName[0] != L'\0' ? displayName : Name)
     {
-        PathContext context;
-        context.DisplayName = fileName != NULL ? fileName : "";
-        context.WideName = AnsiToWide(fileName);
-        context.ExactWide = false;
-        return context;
     }
 
-    static PathContext FromWide(const wchar_t* fileNameW, const char* displayName)
-    {
-        PathContext context;
-        context.WideName = fileNameW != NULL ? fileNameW : L"";
-        context.ExactWide = true;
-        if (displayName != NULL && displayName[0] != 0)
-            context.DisplayName = displayName;
-        else
-            context.DisplayName = WideToAnsi(context.WideName);
-        return context;
-    }
-
-    const char* DisplayNameA() const { return DisplayName.c_str(); }
-    const wchar_t* WideNameW() const { return WideName.c_str(); }
-    const std::wstring& WideNameRef() const { return WideName; }
-    bool HasExactWideName() const { return ExactWide; }
+    const wchar_t* DisplayNameW() const { return DisplayName.c_str(); }
+    const wchar_t* WideNameW() const { return Name.c_str(); }
+    const std::wstring& WideNameRef() const { return Name; }
 
 private:
-    std::string DisplayName;
-    std::wstring WideName;
-    bool ExactWide = false;
+    std::wstring Name;
+    std::wstring DisplayName;
 };
 
 inline HANDLE CreateFileExact(const PathContext& path,
@@ -55,23 +43,30 @@ inline HANDLE CreateFileExact(const PathContext& path,
                               DWORD flagsAndAttributes,
                               HANDLE templateFile)
 {
-    return CreateFileW(path.WideNameW(), desiredAccess, shareMode, securityAttributes,
-                       creationDisposition, flagsAndAttributes, templateFile);
+    return ActiveFileSystem()->CreateFile(path.WideNameW(), desiredAccess, shareMode,
+                                          securityAttributes, creationDisposition,
+                                          flagsAndAttributes, templateFile);
 }
 
 inline DWORD GetFileAttributesExact(const PathContext& path)
 {
-    return GetFileAttributesW(path.WideNameW());
+    return ActiveFileSystem()->GetFileAttributes(path.WideNameW());
 }
 
 inline BOOL SetFileAttributesExact(const PathContext& path, DWORD fileAttributes)
 {
-    return SetFileAttributesW(path.WideNameW(), fileAttributes);
+    FileResult result = ActiveFileSystem()->SetFileAttributes(path.WideNameW(), fileAttributes);
+    if (!result.success)
+        SetLastError(result.errorCode);
+    return result.success ? TRUE : FALSE;
 }
 
 inline BOOL DeleteFileExact(const PathContext& path)
 {
-    return DeleteFileW(path.WideNameW());
+    FileResult result = ActiveFileSystem()->DeleteFile(path.WideNameW());
+    if (!result.success)
+        SetLastError(result.errorCode);
+    return result.success ? TRUE : FALSE;
 }
 } // namespace safe_file
 } // namespace sally

@@ -1,8 +1,19 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+static char* DupControlConnectionText(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
 
 CClosedCtrlConChecker ClosedCtrlConChecker; // handles informing the user about "control connection" closure outside of operations
 CListingCache ListingCache;                 // cache of directory listings on servers (used when changing and listing directories)
@@ -22,7 +33,7 @@ CRITICAL_SECTION PanelCtrlConSect; // critical section for access to LeftPanelCt
 // CControlConnectionSocket
 //
 
-CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
+CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5), TextPolicy(FtpLocalTextCodePage())
 {
     HANDLES(InitializeCriticalSection(&EventCritSect));
     EventsUsedCount = 0;
@@ -32,11 +43,11 @@ CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
     RewritableEvent = FALSE;
 
     ProxyServer = NULL;
-    Host[0] = 0;
+    Host.clear();
     Port = 0;
-    User[0] = 0;
-    Password[0] = 0;
-    Account[0] = 0;
+    User.clear();
+    Password.clear();
+    Account.clear();
     UseListingsCache = TRUE;
     InitFTPCommands.clear();
     UsePassiveMode = TRUE;
@@ -48,7 +59,7 @@ CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
     ServerSystem.clear();
     ServerFirstReply.clear();
     HaveWorkingPath = FALSE;
-    WorkingPath[0] = 0;
+    WorkingPath.clear();
     CurrentTransferMode = ctrmUnknown;
 
     EventConnectSent = FALSE;
@@ -103,7 +114,8 @@ CControlConnectionSocket::~CControlConnectionSocket()
     if (ProxyServer != NULL)
         delete ProxyServer;
 
-    memset(Password, 0, PASSWORD_MAX_SIZE); // wipe the memory where the password appeared
+    FTPSecureWipe(Password);
+    FTPSecureWipe(Account);
     if (NewEvent != NULL)
         HANDLES(CloseHandle(NewEvent));
     HANDLES(DeleteCriticalSection(&EventCritSect));
@@ -263,7 +275,7 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
                 SetEvent(NewEvent);
 
             MSG msg; // discard buffered ESC
-            while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                 ;
             *event = ccsevESC;
             *data1 = 0;
@@ -290,10 +302,10 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
             if (waitRes == WAIT_OBJECT_0 + 1) // process Windows messages
             {
                 MSG msg;
-                while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                 {
                     TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    DispatchMessageW(&msg);
                 }
             }
             else
@@ -319,61 +331,84 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
     }
 }
 
-void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigned short port, const char* user,
-                                                       const char* password, BOOL useListingsCache,
+BOOL CControlConnectionSocket::SetConnectionParameters(const wchar_t* host, unsigned short port, const wchar_t* user,
+                                                       const wchar_t* password, BOOL useListingsCache,
                                                        const char* initFTPCommands, BOOL usePassiveMode,
                                                        const char* listCommand, BOOL keepAliveEnabled,
                                                        int keepAliveSendEvery, int keepAliveStopAfter,
                                                        int keepAliveCommand, int proxyServerUID,
                                                        int encryptControlConnection, int encryptDataConnection,
-                                                       int compressData)
+                                                       int compressData) noexcept
 {
-    CALL_STACK_MESSAGE14("CControlConnectionSocket::SetConnectionParameters(%s, %u, %s, %s, %d, %s, %d, %s, %d, %d, %d, %d, %d)",
-                         host, (unsigned)port, user, password, useListingsCache, initFTPCommands,
+    CALL_STACK_MESSAGE12("CControlConnectionSocket::SetConnectionParameters(%ls, %u, %d, %s, %d, %s, %d, %d, %d, %d, %d)",
+                         host, (unsigned)port, useListingsCache, initFTPCommands,
                          usePassiveMode, listCommand, keepAliveEnabled, keepAliveSendEvery,
                          keepAliveStopAfter, keepAliveCommand, proxyServerUID);
-    HANDLES(EnterCriticalSection(&SocketCritSect));
-    if (ProxyServer != NULL)
-        delete ProxyServer;
+    std::wstring stagedHost;
+    std::wstring stagedUser;
+    std::wstring stagedPassword;
+    std::string stagedInitFTPCommands;
+    std::string stagedListCommand;
+    if (!FtpStoreWideText(host != NULL ? host : L"", stagedHost) ||
+        !FtpStoreWideText(user != NULL ? user : L"", stagedUser) ||
+        !FtpStoreWideText(password != NULL ? password : L"", stagedPassword) ||
+        !FtpStoreProtocolBytes(initFTPCommands != NULL ? initFTPCommands : "", stagedInitFTPCommands) ||
+        !FtpStoreProtocolBytes(listCommand != NULL ? listCommand : "", stagedListCommand))
+        return FALSE;
+
     if (proxyServerUID == -2)
         proxyServerUID = Config.DefaultProxySrvUID;
-    if (proxyServerUID == -1)
-        ProxyServer = NULL;
-    else
+    CFTPProxyServer* stagedProxyServer = NULL;
+    if (proxyServerUID != -1)
     {
-        ProxyServer = Config.FTPProxyServerList.MakeCopyOfProxyServer(proxyServerUID, NULL); // ignore lack of memory (automatically "not used (direct connection)")
-        if (ProxyServer != NULL)
+        BOOL lowMemory = FALSE;
+        stagedProxyServer = Config.FTPProxyServerList.MakeCopyOfProxyServer(proxyServerUID, &lowMemory);
+        if (stagedProxyServer == NULL && lowMemory)
         {
-            if (ProxyServer->ProxyEncryptedPassword != NULL)
+            FTPSecureWipe(stagedPassword);
+            return FALSE;
+        }
+        if (stagedProxyServer != NULL)
+        {
+            if (stagedProxyServer->ProxyEncryptedPassword != NULL)
             {
                 // decrypt the password into ProxyPlainPassword
                 CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
-                char* plainPassword = NULL;
-                if (!passwordManager->DecryptPassword(ProxyServer->ProxyEncryptedPassword, ProxyServer->ProxyEncryptedPasswordSize, &plainPassword))
+                std::wstring plainPassword;
+                if (!FTPDecryptPasswordW(passwordManager,
+                                         stagedProxyServer->ProxyEncryptedPassword,
+                                         stagedProxyServer->ProxyEncryptedPasswordSize,
+                                         &plainPassword))
                 {
-                    // at this point it should be verified that the password can be decrypted (in all branches calling SetConnectionParameters()
                     TRACE_E("CControlConnectionSocket::SetConnectionParameters(): internal error, cannot decrypt password!");
-                    ProxyServer->SetProxyPassword(NULL);
+                    delete stagedProxyServer;
+                    FTPSecureWipe(stagedPassword);
+                    return FALSE;
                 }
-                else
+                if (!stagedProxyServer->SetProxyPassword(plainPassword.c_str()))
                 {
-                    ProxyServer->SetProxyPassword(plainPassword[0] == 0 ? NULL : plainPassword);
-                    memset(plainPassword, 0, lstrlen(plainPassword));
-                    SalamanderGeneral->Free(plainPassword);
+                    FTPSecureWipe(plainPassword);
+                    delete stagedProxyServer;
+                    FTPSecureWipe(stagedPassword);
+                    return FALSE;
                 }
+                FTPSecureWipe(plainPassword);
             }
-            else
-                ProxyServer->SetProxyPassword(NULL);
         }
     }
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
+
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    CFTPProxyServer* oldProxyServer = ProxyServer;
+    ProxyServer = stagedProxyServer;
+    stagedProxyServer = NULL;
+    Host.swap(stagedHost);
     Port = port;
-    lstrcpyn(User, user, USER_MAX_SIZE);
-    lstrcpyn(Password, password, PASSWORD_MAX_SIZE);
+    User.swap(stagedUser);
+    Password.swap(stagedPassword);
     UseListingsCache = useListingsCache;
-    InitFTPCommands = initFTPCommands != NULL ? initFTPCommands : "";
+    InitFTPCommands.swap(stagedInitFTPCommands);
     UsePassiveMode = usePassiveMode;
-    ListCommand = listCommand != NULL ? listCommand : "";
+    ListCommand.swap(stagedListCommand);
     UseLIST_aCommand = FALSE;
     KeepAliveEnabled = keepAliveEnabled;
     KeepAliveSendEvery = keepAliveSendEvery;
@@ -383,6 +418,29 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
     EncryptDataConnection = encryptDataConnection;
     CompressData = compressData;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+    delete oldProxyServer;
+    FTPSecureWipe(stagedPassword);
+    return TRUE;
+}
+
+CFtpTextCodec CControlConnectionSocket::GetTextCodec()
+{
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    const CFtpTextCodec codec = TextPolicy.GetCodec();
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+    return codec;
+}
+
+BOOL CControlConnectionSocket::EncodeText(const wchar_t* text, std::string& bytes)
+{
+    const CFtpTextCodec codec = GetTextCodec();
+    return codec.Encode(text, wcslen(text), bytes);
+}
+
+BOOL CControlConnectionSocket::DecodeText(const char* bytes, size_t length, std::wstring& text)
+{
+    const CFtpTextCodec codec = GetTextCodec();
+    return codec.Decode(bytes, length, text);
 }
 
 enum CStartCtrlConStates // states of the automaton for CControlConnectionSocket::StartControlConnection
@@ -390,12 +448,12 @@ enum CStartCtrlConStates // states of the automaton for CControlConnectionSocket
     // obtain an IP address from the textual address of the FTP server
     sccsGetIP,
 
-    // fatal error (resource ID of the text is in 'fatalErrorTextID' + if 'fatalErrorTextID' is -1, the string is directly in 'errBuf')
+    // fatal error (resource ID of the text is in 'fatalErrorTextID'; -1 uses 'directErrorText')
     sccsFatalError,
 
     // fatal operation error (resource ID of the text is in 'opFatalErrorTextID' and the Windows error number in
-    // 'opFatalError' + if 'opFatalError' is -1, the string is directly in 'errBuf' + if
-    // 'opFatalErrorTextID' is -1, the string is directly in 'formatBuf')
+    // 'opFatalError'; -1 uses 'directErrorText'; if 'opFatalErrorTextID' is -1,
+    // 'operationFormatText' contains the presentation format)
     sccsOperationFatalError,
 
     // connect to the FTP server (retrieved IP is in 'auxServerIP')
@@ -422,24 +480,61 @@ enum CStartCtrlConStates // states of the automaton for CControlConnectionSocket
     sccsDone
 };
 
-const char* GetFatalErrorTxt(int fatalErrorTextID, char* errBuf)
+BOOL GetFatalErrorText(int fatalErrorTextID, const std::string& directErrorText,
+                       std::string& errorText) noexcept
 {
-    return fatalErrorTextID == -1 ? errBuf : LoadStr(fatalErrorTextID);
+    return FtpStoreProtocolBytes(
+        fatalErrorTextID == -1 ? std::string_view(directErrorText)
+                               : std::string_view(LoadStr(fatalErrorTextID)),
+        errorText);
 }
 
-const char* GetOperationFatalErrorTxt(int opFatalError, char* errBuf)
+BOOL GetOperationFatalErrorText(int opFatalError, const std::string& directErrorText,
+                                std::string& errorText) noexcept
 {
-    char* e;
+    if (opFatalError == -1)
+        return FtpStoreProtocolBytes(directErrorText, errorText);
     if (opFatalError != NO_ERROR)
+        return FTPGetErrorText(opFatalError, errorText);
+    return FtpStoreProtocolBytes(LoadStr(IDS_UNKNOWNERROR), errorText);
+}
+
+void TrimLineEnds(std::string& text) noexcept
+{
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r'))
+        text.pop_back();
+}
+
+BOOL GetLocaleDateTimePart(const SYSTEMTIME& time, BOOL date,
+                           std::string& text) noexcept
+{
+    try
     {
-        if (opFatalError != -1)
-            e = FTPGetErrorText(opFatalError, errBuf, 300);
-        else
-            e = errBuf;
+        const int length = date ? GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
+                                                  NULL, NULL, 0)
+                                : GetTimeFormatA(LOCALE_USER_DEFAULT, 0, &time,
+                                                  NULL, NULL, 0);
+        if (length > 0)
+        {
+            std::string staged(static_cast<size_t>(length), '\0');
+            const int written = date ? GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
+                                                        NULL, staged.data(), length)
+                                     : GetTimeFormatA(LOCALE_USER_DEFAULT, 0, &time,
+                                                        NULL, staged.data(), length);
+            if (written == length)
+            {
+                staged.resize(static_cast<size_t>(length - 1));
+                text.swap(staged);
+                return TRUE;
+            }
+        }
     }
-    else
-        e = LoadStr(IDS_UNKNOWNERROR);
-    return e;
+    catch (...)
+    {
+        return FALSE;
+    }
+    return date ? FTPFormatString(text, "%u.%u.%u", time.wDay, time.wMonth, time.wYear)
+                : FTPFormatString(text, "%u:%02u:%02u", time.wHour, time.wMinute, time.wSecond);
 }
 
 BOOL GetToken(char** s, char** next)
@@ -500,19 +595,20 @@ HWND FindPopupParent(HWND wnd)
     return win;
 }
 
-BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, int userSize, BOOL reconnect,
-                                                      char* workDir, int workDirBufSize, int* totalAttemptNum,
-                                                      const char* retryMsg, BOOL canShowWelcomeDlg,
+BOOL CControlConnectionSocket::StartControlConnection(HWND parent, std::wstring& user, BOOL reconnect,
+                                                      std::string* workDir, int* totalAttemptNum,
+                                                      const std::string* retryMessage, BOOL canShowWelcomeDlg,
                                                       int reconnectErrResID, BOOL useFastReconnect)
 {
-    CALL_STACK_MESSAGE8("CControlConnectionSocket::StartControlConnection(, , %d, %d, , %d, , %s, %d, %d, %d)",
-                        userSize, reconnect, workDirBufSize, retryMsg, canShowWelcomeDlg, reconnectErrResID,
+    CALL_STACK_MESSAGE6("CControlConnectionSocket::StartControlConnection(, , %d, , , %s, %d, %d, %d)",
+                        reconnect, retryMessage != NULL ? retryMessage->c_str() : NULL,
+                        canShowWelcomeDlg, reconnectErrResID,
                         useFastReconnect);
 
     parent = FindPopupParent(parent);
-    if (workDirBufSize > 0)
-        workDir[0] = 0;
-    if (retryMsg != NULL)
+    if (workDir != NULL)
+        workDir->clear();
+    if (retryMessage != NULL)
         reconnect = TRUE; // in this case it certainly is a reconnect
 
     BOOL ret = FALSE;
@@ -535,13 +631,16 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
     in_addr srvAddr;
     int logUID = -1; // UID of the log for this connection: currently "invalid log"
 
-    char proxyScriptText[PROXYSCRIPT_MAX_SIZE];
-    char host[HOST_MAX_SIZE];
-    char buf[1000];
-    char errBuf[300];
-    char errBuf2[300];
-    char formatBuf[300];
-    char retryBuf[700];
+    std::string proxyScriptText;
+    std::wstring host;
+    std::string hostBytes;
+    std::string nextRetryMessage;
+    std::string proxyErrorText;
+    std::string proxyErrorFormat;
+    std::string proxyScriptError;
+    std::string directErrorText;
+    std::string operationFormatText;
+    std::wstring waitText;
 
     const DWORD showWaitWndTime = WAITWND_STARTCON; // show time of the wait window
     int serverTimeout = Config.GetServerRepliesTimeout() * 1000;
@@ -568,89 +667,154 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
 
     CWaitWindow waitWnd(parent, TRUE);
 
+    BOOL commandAllocationFailed = FALSE;
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(user, User, userSize);
-    CProxyScriptParams proxyScriptParams(ProxyServer, Host, Port, User, Password, Account, Password[0] == 0 && reconnect);
+    const CFtpTextCodec loginTextCodec(FALSE, TextPolicy.GetLegacyCodePage());
+    std::wstring initialUser;
+    commandAllocationFailed = !FtpStoreWideText(User, initialUser);
+    CProxyScriptParams proxyScriptParams(ProxyServer, Host.c_str(), Port, User.c_str(), Password.c_str(),
+                                         Account.c_str(), Password.empty() && reconnect);
+    commandAllocationFailed = commandAllocationFailed || !proxyScriptParams.IsGood();
     CFTPProxyServerType proxyType = fpstNotUsed;
     if (ProxyServer != NULL)
         proxyType = ProxyServer->ProxyType;
     if (proxyType == fpstOwnScript)
-        lstrcpyn(proxyScriptText, HandleNULLStr(ProxyServer->ProxyScript), PROXYSCRIPT_MAX_SIZE);
+        commandAllocationFailed = !FtpStoreLocalTextBytes(ProxyServer->ProxyScript, proxyScriptText);
     else
     {
         const char* txt = GetProxyScriptText(proxyType, FALSE);
         if (txt[0] == 0)
             txt = GetProxyScriptText(fpstNotUsed, FALSE); // undefined script = "not used (direct connection)" script - SOCKS 4/4A/5, HTTP 1.1
-        lstrcpyn(proxyScriptText, txt, PROXYSCRIPT_MAX_SIZE);
+        commandAllocationFailed = !FTPFormatString(proxyScriptText, "%s", txt);
     }
     DWORD auxServerIP = ServerIP;
     srvAddr.s_addr = auxServerIP;
     ResetWorkingPathCache();         // after connecting to the server it is necessary to determine the working dir
     ResetCurrentTransferModeCache(); // after connecting to the server it is necessary to set the transfer mode (it should be ASCII, but we do not trust it)
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+    if (!commandAllocationFailed)
+        user.swap(initialUser);
 
     const char* proxyScriptExecPoint = NULL;
     const char* proxyScriptStartExecPoint = NULL; // first script command (line following "connect to:")
     int proxyLastCmdReply = -1;
-    char proxyLastCmdReplyText[300];
-    proxyLastCmdReplyText[0] = 0;
-    char proxySendCmdBuf[FTPCOMMAND_MAX_SIZE];
-    proxySendCmdBuf[0] = 0;
+    std::string proxyLastCmdReplyText;
+    std::string proxySendCmdBuf;
+    CFTPSecureByteStringGuard proxySendCmdGuard(proxySendCmdBuf);
     eSSLInit SSLInitSequence = EncryptControlConnection ? sslisAUTH : sslisNone;
-    char proxyLogCmdBuf[FTPCOMMAND_MAX_SIZE];
-    proxyLogCmdBuf[0] = 0;
-    char tmpCmdBuf[FTPCOMMAND_MAX_SIZE];
-    tmpCmdBuf[0] = 0;
-    char connectingToAs[200];
+    std::string proxyLogCmdBuf;
+    std::wstring connectingToAs;
     bool bModeZSent = false;
-
-    if (sslisAUTH == SSLInitSequence)
-    {
-        strcpy(proxySendCmdBuf, "AUTH TLS\r\n");
-        strcpy(proxyLogCmdBuf, proxySendCmdBuf);
-    }
 
     // prepare keep-alive for further use + set keep-alive to 'kamForbidden' (a normal command is in progress)
     ReleaseKeepAlive();
     WaitForEndOfKeepAlive(parent, 0); // cannot open the wait window (it is in the 'kamNone' state)
 
     CStartCtrlConStates state = (auxServerIP == INADDR_NONE ? sccsGetIP : sccsConnect);
-
-    if (retryMsg != NULL) // simulate the state when the connection was interrupted directly in this method - "retry" connection
+    // Guards the RETRY_LABEL wipe below against erasing the AUTH TLS command
+    // this function just staged, two statements above, before the state machine
+    // has even started. False only for that one interval; every later pass
+    // through the label (the retry goto) is a genuinely stale buffer from a
+    // previous attempt and must be wiped.
+    bool haveEnteredStateMachine = false;
+    auto setCommandPair = [&](const char* command) noexcept
     {
-        lstrcpyn(errBuf, retryMsg, 300); // store the retry message in errBuf (for sccsOperationFatalError)
-        opFatalErrorTextID = reconnectErrResID != -1 ? reconnectErrResID : IDS_SENDCOMMANDERROR;
-        opFatalError = -1;                      // the "error" (reply) is directly in errBuf
-        noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
-        retryLogError = FALSE;                  // the error is already in the log, do not add it again
-        state = sccsRetry;
+        FTPSecureWipe(proxySendCmdBuf);
+        return FTPFormatString(proxySendCmdBuf, "%s", command) &&
+               FTPFormatString(proxyLogCmdBuf, "%s", proxySendCmdBuf.c_str());
+    };
+    if (commandAllocationFailed || sslisAUTH == SSLInitSequence && !setCommandPair("AUTH TLS\r\n"))
+    {
+        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+        state = sccsFatalError;
+    }
+
+    if (retryMessage != NULL) // simulate the state when the connection was interrupted directly in this method - "retry" connection
+    {
+        if (FtpStoreProtocolBytes(*retryMessage, directErrorText))
+        {
+            opFatalErrorTextID = reconnectErrResID != -1 ? reconnectErrResID : IDS_SENDCOMMANDERROR;
+            opFatalError = -1;                      // the error is directly in directErrorText
+            noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
+            retryLogError = FALSE;                  // the error is already in the log, do not add it again
+            state = sccsRetry;
+        }
+        else
+        {
+            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+            state = sccsFatalError;
+        }
         // useWelcomeMessage = FALSE;  // we already printed it, repeating it makes no sense  -- "always FALSE"
         fastRetry = useFastReconnect;
     }
 
-    if (ProcessProxyScript(proxyScriptText, &proxyScriptExecPoint, proxyLastCmdReply,
-                           &proxyScriptParams, host, &port, NULL, NULL, errBuf2, NULL))
+    BOOL proxyScriptLowMemory = FALSE;
+    if (state != sccsFatalError &&
+        ProcessProxyScript(loginTextCodec, proxyScriptText.c_str(), &proxyScriptExecPoint, proxyLastCmdReply,
+                           &proxyScriptParams, &host, &port, NULL, NULL, &proxyScriptError, NULL,
+                           &proxyScriptLowMemory))
     {
         if (proxyScriptParams.NeedUserInput()) // theoretically should not happen
         {                                      // only proxyScriptParams->NeedProxyHost can be TRUE (otherwise ProcessProxyScript would return an error)
-            strcpy(errBuf, LoadStr(IDS_PROXYSRVADREMPTY));
-            lstrcpyn(errBuf, errBuf2, 300);
-            opFatalError = -1; // error is directly in errBuf
-            opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
-            state = sccsOperationFatalError;
+            if (FtpStoreProtocolBytes(proxyScriptError, directErrorText))
+            {
+                opFatalError = -1; // error is directly in directErrorText
+                opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
+                state = sccsOperationFatalError;
+            }
+            else
+            {
+                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                state = sccsFatalError;
+            }
         }
         else
             proxyScriptStartExecPoint = proxyScriptExecPoint;
     }
-    else // theoretically should never happen (saved scripts are validated)
+    else if (state != sccsFatalError) // theoretically should never happen (saved scripts are validated)
     {
-        lstrcpyn(errBuf, errBuf2, 300);
-        opFatalError = -1; // error is directly in errBuf
-        opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
-        state = sccsOperationFatalError;
+        if (proxyScriptLowMemory)
+        {
+            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+            state = sccsFatalError;
+        }
+        else
+        {
+            if (FtpStoreProtocolBytes(proxyScriptError, directErrorText))
+            {
+                opFatalError = -1; // error is directly in directErrorText
+                opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
+                state = sccsOperationFatalError;
+            }
+            else
+            {
+                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                state = sccsFatalError;
+            }
+        }
+    }
+
+    if (state != sccsFatalError && state != sccsOperationFatalError &&
+        !host.empty() && !FtpEncodeNetworkHost(host.c_str(), hostBytes))
+    {
+        fatalErrorTextID = IDS_PRXSCRERR_INVHOSTORPORT;
+        state = sccsFatalError;
     }
 
 RETRY_LABEL:
+
+    // On the very first pass this would wipe the "AUTH TLS\r\n" command staged
+    // above before the state machine ever runs, and nothing refills it: for an
+    // FTPS bookmark on a fresh connect, sccsProcessLoginScript short-circuits
+    // ProcessProxyScript while an SSL sub-sequence is pending, so the handshake
+    // was never sent - the connection died with a bogus "incomplete proxy
+    // script" error, or (compression enabled) sent MODE Z on a still-plaintext
+    // socket. On every later pass (the retry goto), the buffer genuinely is
+    // stale from the previous attempt and this wipe is exactly the hygiene it
+    // was added for.
+    if (haveEnteredStateMachine)
+        FTPSecureWipe(proxySendCmdBuf);
+    haveEnteredStateMachine = true;
 
     while (state != sccsDone)
     {
@@ -659,17 +823,32 @@ RETRY_LABEL:
         {
         case sccsGetIP: // obtain an IP address from the textual address of the FTP server
         {
-            if (!GetHostByAddress(host, 0)) // must be outside the SocketCritSect section
+            if (!GetHostByAddress(host.c_str(), 0)) // must be outside the SocketCritSect section
             {                               // no chance of success -> report an error
-                sprintf(formatBuf, LoadStr(IDS_GETIPERROR), host);
-                opFatalErrorTextID = -1; // the text is in 'formatBuf'
-                opFatalError = NO_ERROR; // unknown error
-                state = sccsOperationFatalError;
+                if (FTPFormatString(operationFormatText, LoadStr(IDS_GETIPERROR), hostBytes.c_str()))
+                {
+                    opFatalErrorTextID = -1; // the text is in operationFormatText
+                    opFatalError = NO_ERROR; // unknown error
+                    state = sccsOperationFatalError;
+                }
+                else
+                {
+                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                    state = sccsFatalError;
+                }
             }
             else
             {
-                sprintf(buf, LoadStr(IDS_GETTINGIPOFSERVER), host);
-                waitWnd.SetText(buf);
+                try
+                {
+                    waitText = SPLFormatStringOwned(LangStr(IDS_GETTINGIPOFSERVER).c_str(),
+                                                    host.c_str());
+                }
+                catch (...)
+                {
+                    waitText = LangStr(IDS_OPERDOPPR_LOWMEM).c_str();
+                }
+                waitWnd.SetText(waitText.c_str());
                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
                 DWORD start = GetTickCount();
@@ -688,8 +867,8 @@ RETRY_LABEL:
                     case ccsevESC:
                     {
                         waitWnd.Show(FALSE);
-                        if (SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_GETIPESC),
-                                                             LoadStr(IDS_FTPPLUGINTITLE),
+                        if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_GETIPESC).c_str(),
+                                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                              MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                  MB_ICONQUESTION) == IDYES)
                         { // cancel
@@ -723,10 +902,17 @@ RETRY_LABEL:
                         }
                         else // error
                         {
-                            sprintf(formatBuf, LoadStr(IDS_GETIPERROR), host);
-                            opFatalErrorTextID = -1; // the text is in 'formatBuf'
-                            opFatalError = data2;
-                            state = sccsOperationFatalError;
+                            if (FTPFormatString(operationFormatText, LoadStr(IDS_GETIPERROR), hostBytes.c_str()))
+                            {
+                                opFatalErrorTextID = -1; // the text is in operationFormatText
+                                opFatalError = data2;
+                                state = sccsOperationFatalError;
+                            }
+                            else
+                            {
+                                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                state = sccsFatalError;
+                            }
                         }
                         break;
                     }
@@ -745,31 +931,60 @@ RETRY_LABEL:
         {
             srvAddr.s_addr = auxServerIP;
 
+            // A new socket starts in the explicit legacy fallback. UTF-8 is
+            // enabled only after this session accepts OPTS UTF8 ON.
+            HANDLES(EnterCriticalSection(&SocketCritSect));
+            TextPolicy.ResetForConnection();
+            HANDLES(LeaveCriticalSection(&SocketCritSect));
+
             SYSTEMTIME st;
             GetLocalTime(&st);
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, errBuf, 50) == 0)
-                sprintf(errBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-            strcat(errBuf, " - ");
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, errBuf + strlen(errBuf), 50) == 0)
-                sprintf(errBuf + strlen(errBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            std::string dateText;
+            std::string timeText;
+            std::string timestamp;
+            if (!GetLocaleDateTimePart(st, TRUE, dateText) ||
+                !GetLocaleDateTimePart(st, FALSE, timeText) ||
+                !FTPFormatString(timestamp, "%s - %s", dateText.c_str(), timeText.c_str()))
+            {
+                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                state = sccsFatalError;
+                break;
+            }
 
             HANDLES(EnterCriticalSection(&SocketCritSect));
+            std::string connectionLogHeader;
+            std::string logUser;
+            std::string logProxyUser;
+            std::string configuredHostForLog;
+            std::string proxyHostForLog;
+            BOOL headerReady = FtpEncodeNetworkHost(Host.c_str(), configuredHostForLog) &&
+                               (proxyScriptParams.ProxyHost.empty() ||
+                                FtpEncodeNetworkHost(proxyScriptParams.ProxyHost.c_str(), proxyHostForLog)) &&
+                               TextPolicy.GetCodec().Encode(User.c_str(), User.size(), logUser) &&
+                               TextPolicy.GetCodec().Encode(proxyScriptParams.ProxyUser.c_str(),
+                                                           proxyScriptParams.ProxyUser.size(), logProxyUser);
 
             // create a log and insert the header into the log
             if (!reconnect && LogUID == -1) // we do not have a log yet
             {
                 if (Config.EnableLogging)
-                    Logs.CreateLog(&LogUID, Host, Port, User, this, FALSE, FALSE);
+                    Logs.CreateLog(&LogUID, Host.c_str(), Port, User.c_str(), this, FALSE, FALSE);
                 if (ProxyServer != NULL)
                 {
-                    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_PRXSRVLOGHEADER), Host, Port, User,
-                                ProxyServer->ProxyName, GetProxyTypeName(ProxyServer->ProxyType),
-                                proxyScriptParams.ProxyHost, proxyScriptParams.ProxyPort,
-                                proxyScriptParams.ProxyUser, host, inet_ntoa(srvAddr), port, LogUID, errBuf);
+                    std::string proxyNameForLog;
+                    std::string proxyTypeName;
+                    headerReady = headerReady &&
+                                  FtpEncodeLocalTextForByteLog(ProxyServer->ProxyName.c_str(),
+                                                               "<Unicode proxy profile>", proxyNameForLog) &&
+                                  GetProxyTypeName(ProxyServer->ProxyType, proxyTypeName) &&
+                                  FTPFormatString(connectionLogHeader, LoadStr(IDS_PRXSRVLOGHEADER), configuredHostForLog.c_str(), Port, logUser.c_str(),
+                                                   proxyNameForLog.c_str(), proxyTypeName.c_str(),
+                                                   proxyHostForLog.c_str(), proxyScriptParams.ProxyPort,
+                                                   logProxyUser.c_str(), hostBytes.c_str(), inet_ntoa(srvAddr), port, LogUID, timestamp.c_str());
                 }
                 else
                 {
-                    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_LOGHEADER), Host, inet_ntoa(srvAddr), Port, LogUID, errBuf);
+                    headerReady = headerReady && FTPFormatString(connectionLogHeader, LoadStr(IDS_LOGHEADER), configuredHostForLog.c_str(), inet_ntoa(srvAddr), Port, LogUID, timestamp.c_str());
                 }
                 if (Config.AlwaysShowLogForActPan &&
                     (!Config.UseConnectionDataFromConfig || !Config.ChangingPathInInactivePanel))
@@ -781,58 +996,100 @@ RETRY_LABEL:
             {
                 if (ProxyServer != NULL)
                 {
-                    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_PRXSRVRECONLOGHEADER), Host, Port, User,
-                                ProxyServer->ProxyName, GetProxyTypeName(ProxyServer->ProxyType),
-                                proxyScriptParams.ProxyHost, proxyScriptParams.ProxyPort,
-                                proxyScriptParams.ProxyUser, host, inet_ntoa(srvAddr), port, attemptNum, errBuf);
+                    std::string proxyNameForLog;
+                    std::string proxyTypeName;
+                    headerReady = headerReady &&
+                                  FtpEncodeLocalTextForByteLog(ProxyServer->ProxyName.c_str(),
+                                                               "<Unicode proxy profile>", proxyNameForLog) &&
+                                  GetProxyTypeName(ProxyServer->ProxyType, proxyTypeName) &&
+                                  FTPFormatString(connectionLogHeader, LoadStr(IDS_PRXSRVRECONLOGHEADER), configuredHostForLog.c_str(), Port, logUser.c_str(),
+                                                   proxyNameForLog.c_str(), proxyTypeName.c_str(),
+                                                   proxyHostForLog.c_str(), proxyScriptParams.ProxyPort,
+                                                  logProxyUser.c_str(), hostBytes.c_str(), inet_ntoa(srvAddr), port, attemptNum, timestamp.c_str());
                 }
                 else
                 {
-                    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_RECONLOGHEADER), Host, inet_ntoa(srvAddr), Port, attemptNum, errBuf);
+                    headerReady = headerReady && FTPFormatString(connectionLogHeader, LoadStr(IDS_RECONLOGHEADER), configuredHostForLog.c_str(), inet_ntoa(srvAddr), Port, attemptNum, timestamp.c_str());
                 }
             }
             logUID = LogUID;
 
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
+            if (!headerReady)
+            {
+                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                state = sccsFatalError;
+                break;
+            }
+
             // add the header - Host + Port + IP + User
-            Logs.LogMessage(logUID, buf, -1);
+            Logs.LogMessage(logUID, connectionLogHeader.c_str(), -1);
 
             ResetBuffersAndEvents(); // empty the buffers (discard old data) and discard old events
             if (useWelcomeMessage)
                 welcomeMessage.Clear(); // clear the previous attempt (only makes sense after a "retry")
 
             if ((proxyType == fpstSocks5 || proxyType == fpstHTTP1_1) &&
-                proxyScriptParams.ProxyUser[0] != 0 && proxyScriptParams.ProxyPassword[0] == 0)
+                !proxyScriptParams.ProxyUser.empty() && proxyScriptParams.ProxyPassword.empty())
             { // the user should enter the proxy password
-                _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS2),
-                            proxyScriptParams.ProxyHost, proxyScriptParams.ProxyUser);
-                if (CEnterStrDlg(parent, LoadStr(IDS_ENTERPRXPASSTITLE), LoadStr(IDS_ENTERPRXPASSTEXT),
-                                 proxyScriptParams.ProxyPassword, PASSWORD_MAX_SIZE, TRUE,
-                                 connectingToAs, FALSE)
+                try
+                {
+                    connectingToAs = SPLFormatStringOwned(
+                        LangStr(IDS_CONNECTINGTOAS2).c_str(),
+                        proxyScriptParams.ProxyHost.c_str(),
+                        proxyScriptParams.ProxyUser.c_str());
+                }
+                catch (...)
+                {
+                    connectingToAs.clear();
+                }
+                if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTITLE).c_str(),
+                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTEXT).c_str(),
+                                 proxyScriptParams.ProxyPassword, TRUE,
+                                 connectingToAs.c_str(), FALSE)
                         .Execute() != IDCANCEL)
                 { // value change -> we must update the originals as well
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    if (ProxyServer != NULL)
-                        ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword);
+                    BOOL stored = ProxyServer == NULL ||
+                                  ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword.c_str());
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
+                    if (!stored)
+                    {
+                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                        state = sccsFatalError;
+                        break;
+                    }
                 }
             }
 
-            DWORD error;
+            DWORD error = ERROR_NO_UNICODE_TRANSLATION;
             BOOL conRes = ConnectWithProxy(auxServerIP, port, proxyType,
-                                           &error, proxyScriptParams.Host, proxyScriptParams.Port,
-                                           proxyScriptParams.ProxyUser, proxyScriptParams.ProxyPassword,
-                                           INADDR_NONE);
+                                           &error, proxyScriptParams.Host.c_str(), proxyScriptParams.Port,
+                                           proxyScriptParams.ProxyUser.c_str(),
+                                           proxyScriptParams.ProxyPassword.c_str(), INADDR_NONE);
             Logs.SetIsConnected(logUID, IsConnected());
             Logs.RefreshListOfLogsInLogsDlg();
             if (conRes)
             {
-                if (proxyType == fpstNotUsed)
-                    sprintf(buf, LoadStr(IDS_OPENINGCONTOSERVER), host, inet_ntoa(srvAddr), port);
-                else
-                    sprintf(buf, LoadStr(IDS_OPENINGCONTOSERVER2), proxyScriptParams.Host, proxyScriptParams.Port);
-                waitWnd.SetText(buf);
+                std::wstring srvAddress;
+                FTPFormatIPv4Address(srvAddr.s_addr, srvAddress);
+                try
+                {
+                    if (proxyType == fpstNotUsed)
+                        waitText = SPLFormatStringOwned(
+                            LangStr(IDS_OPENINGCONTOSERVER).c_str(), host.c_str(),
+                            srvAddress.empty() ? L"?" : srvAddress.c_str(), port);
+                    else
+                        waitText = SPLFormatStringOwned(
+                            LangStr(IDS_OPENINGCONTOSERVER2).c_str(),
+                            proxyScriptParams.Host.c_str(), proxyScriptParams.Port);
+                }
+                catch (...)
+                {
+                    waitText = LangStr(IDS_OPERDOPPR_LOWMEM).c_str();
+                }
+                waitWnd.SetText(waitText.c_str());
                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
                 DWORD start = GetTickCount();
@@ -851,8 +1108,8 @@ RETRY_LABEL:
                     case ccsevESC:
                     {
                         waitWnd.Show(FALSE);
-                        if (SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_OPENCONESC),
-                                                             LoadStr(IDS_FTPPLUGINTITLE),
+                        if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_OPENCONESC).c_str(),
+                                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                              MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                  MB_ICONQUESTION) == IDYES)
                         { // cancel
@@ -869,8 +1126,14 @@ RETRY_LABEL:
 
                     case ccsevTimeout:
                     {
-                        if (GetProxyTimeoutDescr(errBuf, 300))
-                            fatalErrorTextID = -1; // the description is directly in 'errBuf'
+                        std::string timeoutText;
+                        if (GetProxyTimeoutDescr(timeoutText))
+                        {
+                            if (FtpStoreProtocolBytes(timeoutText, directErrorText))
+                                fatalErrorTextID = -1;
+                            else
+                                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                        }
                         else
                             fatalErrorTextID = IDS_OPENCONTIMEOUT;
                         noRetryState = sccsFatalError; // if retry is not performed, execute sccsFatalError
@@ -884,19 +1147,29 @@ RETRY_LABEL:
                             state = sccsServerReady; // we are connected
                         else                         // error
                         {
-                            if (GetProxyError(errBuf, 300, formatBuf, 300, FALSE))
-                                opFatalError = -1; // error while connecting through the proxy server: the error text is directly in 'errBuf'+'formatBuf'
+                            if (GetProxyError(proxyErrorText, &proxyErrorFormat, FALSE))
+                            {
+                                directErrorText.swap(proxyErrorText);
+                                operationFormatText.swap(proxyErrorFormat);
+                                opFatalError = -1; // error detail is directly in directErrorText
+                            }
                             else
                             {
                                 opFatalError = data1;
-                                sprintf(formatBuf, LoadStr(IDS_OPENCONERROR), host, inet_ntoa(srvAddr), port);
+                                if (!FTPFormatString(operationFormatText, LoadStr(IDS_OPENCONERROR),
+                                                     hostBytes.c_str(), inet_ntoa(srvAddr), port))
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                    break;
+                                }
                             }
-                            opFatalErrorTextID = -1;                  // the text is in 'formatBuf'
+                            opFatalErrorTextID = -1;                  // the text is in operationFormatText
                             noRetryState = sccsOperationFatalError;   // if retry is not performed, execute sccsOperationFatalError
-                            if (opFatalError == -1 && errBuf[0] == 0) // simple error -> convert it to sccsFatalError
+                            if (opFatalError == -1 && directErrorText.empty()) // simple error -> convert it to sccsFatalError
                             {
                                 fatalErrorTextID = -1;
-                                lstrcpyn(errBuf, formatBuf, 300);
+                                directErrorText.swap(operationFormatText);
                                 noRetryState = sccsFatalError; // if retry is not performed, execute sccsFatalError
                             }
                             state = sccsRetry;
@@ -915,10 +1188,18 @@ RETRY_LABEL:
             else
             {
                 opFatalError = error;
-                sprintf(formatBuf, LoadStr(IDS_OPENCONERROR), host, inet_ntoa(srvAddr), port);
-                opFatalErrorTextID = -1;                // the text is in 'formatBuf'
-                noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
-                state = sccsRetry;
+                if (FTPFormatString(operationFormatText, LoadStr(IDS_OPENCONERROR),
+                                    hostBytes.c_str(), inet_ntoa(srvAddr), port))
+                {
+                    opFatalErrorTextID = -1;                // the text is in operationFormatText
+                    noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
+                    state = sccsRetry;
+                }
+                else
+                {
+                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                    state = sccsFatalError;
+                }
             }
             break;
         }
@@ -930,44 +1211,49 @@ RETRY_LABEL:
             if (EncryptControlConnection)
             {
                 SSLInitSequence = sslisAUTH;
-                strcpy(proxySendCmdBuf, "AUTH TLS\r\n");
-                strcpy(proxyLogCmdBuf, proxySendCmdBuf);
+                if (!setCommandPair("AUTH TLS\r\n"))
+                {
+                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                    state = sccsFatalError;
+                    break;
+                }
             }
             bModeZSent = false;
 
+            std::string retryErrorText;
             switch (noRetryState) // text of the last error for the log
             {
             case sccsFatalError:
             {
-                lstrcpyn(buf, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000);
+                if (!GetFatalErrorText(fatalErrorTextID, directErrorText, retryErrorText))
+                    retryErrorText = LoadStr(IDS_OPERDOPPR_LOWMEM);
                 break;
             }
 
             case sccsOperationFatalError:
             {
-                lstrcpyn(buf, GetOperationFatalErrorTxt(opFatalError, errBuf), 1000);
+                if (!GetOperationFatalErrorText(opFatalError, directErrorText, retryErrorText))
+                    retryErrorText = LoadStr(IDS_OPERDOPPR_LOWMEM);
                 break;
             }
 
             default:
             {
-                buf[0] = 0;
+                retryErrorText.clear();
                 TRACE_E("CControlConnectionSocket::StartControlConnection(): Unexpected value "
                         "of 'noRetryState': "
                         << noRetryState);
                 break;
             }
             }
-            char* s1 = buf + strlen(buf);
-            while (s1 > buf && (*(s1 - 1) == '\n' || *(s1 - 1) == '\r'))
-                s1--;
+            TrimLineEnds(retryErrorText);
             if (retryLogError)
             {
-                strcpy(s1, "\r\n");                     // CRLF at the end of the last error text
-                Logs.LogMessage(logUID, buf, -1, TRUE); // add the last error text to the log
+                std::string logMessage;
+                if (FTPFormatString(logMessage, "%s\r\n", retryErrorText.c_str()))
+                    Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             }
             retryLogError = TRUE;
-            *s1 = 0; // trim end-of-line characters from the last error text
 
             // when the server closes the control connection, keep-alive changes to 'kamNone', therefore:
             // prepare keep-alive for further use + set keep-alive to 'kamForbidden' (a normal command is in progress)
@@ -998,56 +1284,53 @@ RETRY_LABEL:
                     Logs.SetIsConnected(logUID, IsConnected());
                     Logs.RefreshListOfLogsInLogsDlg(); // display "connection inactive"
 
-                    switch (noRetryState) // text of the last error for the wait window
+                    std::wstring srvAddress;
+                    FTPFormatIPv4Address(srvAddr.s_addr, srvAddress);
+                    std::wstring retryErrorTextW;
+                    if (!FtpDecodeLocalText(retryErrorText, retryErrorTextW))
+                        retryErrorTextW = L"<invalid local error text>";
+                    std::wstring waitText;
+                    const int delayBetweenConRetries = Config.GetDelayBetweenConRetries();
+                    try
                     {
-                    case sccsFatalError:
-                    {
-                        if (proxyType == fpstNotUsed)
+                        if (noRetryState == sccsFatalError)
                         {
-                            _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_WAITINGTORETRY), host, inet_ntoa(srvAddr),
-                                        port, GetFatalErrorTxt(fatalErrorTextID, errBuf));
+                            if (proxyType == fpstNotUsed)
+                                waitText = SPLFormatStringOwned(
+                                    LangStr(IDS_WAITINGTORETRY).c_str(), host.c_str(),
+                                    srvAddress.empty() ? L"?" : srvAddress.c_str(), port, retryErrorTextW.c_str());
+                            else
+                                waitText = SPLFormatStringOwned(
+                                    LangStr(IDS_WAITINGTORETRY2).c_str(),
+                                    proxyScriptParams.Host.c_str(),
+                                    proxyScriptParams.Port, retryErrorTextW.c_str());
                         }
                         else
                         {
-                            _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_WAITINGTORETRY2), proxyScriptParams.Host,
-                                        proxyScriptParams.Port, GetFatalErrorTxt(fatalErrorTextID, errBuf));
+                            std::wstring format;
+                            if (opFatalErrorTextID != -1)
+                                format = LangStr(opFatalErrorTextID);
+                            else if (!FtpDecodeLocalText(operationFormatText, format))
+                                format = LangStr(IDS_OPERDOPPR_LOWMEM);
+                            waitText = SPLFormatStringOwned(format.c_str(), retryErrorTextW.c_str());
+                            const size_t firstLine = waitText.find(L'\n');
+                            if (firstLine != std::wstring::npos && firstLine + 1 < waitText.size() &&
+                                waitText[firstLine + 1] == L'\n')
+                                waitText.erase(firstLine, 1);
+                            while (!waitText.empty() &&
+                                   (waitText.back() == L'\n' || waitText.back() == L'\r'))
+                                waitText.pop_back();
                         }
-                        break;
-                    }
 
-                    case sccsOperationFatalError:
+                        const std::wstring retryText = SPLFormatStringOwned(
+                            LangStr(IDS_WAITINGTORETRYSUF).c_str(), waitText.c_str(),
+                            delayBetweenConRetries, attemptNum, Config.GetConnectRetries() + 1);
+                        waitWnd.SetText(retryText.c_str());
+                    }
+                    catch (...)
                     {
-                        const char* e = GetOperationFatalErrorTxt(opFatalError, errBuf);
-                        char* f;
-                        if (opFatalErrorTextID != -1)
-                            f = LoadStr(opFatalErrorTextID);
-                        else
-                            f = formatBuf;
-                        _snprintf_s(buf, _TRUNCATE, f, e);
-
-                        char* s = buf;
-                        while (*s != 0 && *s != '\n')
-                            s++;
-                        if (*s == '\n')
-                        {
-                            if (*(s + 1) == '\n') // remove an empty line in the text
-                                memmove(s, s + 1, strlen(s + 1) + 1);
-                            s++;
-                        }
-                        s = s + strlen(s);
-                        while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                            s--;
-                        *s = 0; // trim the EOL at the end of the message
-                        break;
+                        waitWnd.SetText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str());
                     }
-                    }
-
-                    // show a window with the waiting message
-                    int delayBetweenConRetries = Config.GetDelayBetweenConRetries();
-                    _snprintf_s(retryBuf, _TRUNCATE, LoadStr(IDS_WAITINGTORETRYSUF), buf, delayBetweenConRetries,
-                                attemptNum, Config.GetConnectRetries() + 1);
-
-                    waitWnd.SetText(retryBuf);
                     waitWnd.Create(0);
 
                     // wait for ESC or the waiting timeout
@@ -1063,9 +1346,18 @@ RETRY_LABEL:
                             DWORD wait = delayBetweenConRetries * 1000 - (now - start);
                             if (now != start) // it makes no sense the first time
                             {
-                                _snprintf_s(retryBuf, _TRUNCATE, LoadStr(IDS_WAITINGTORETRYSUF), buf, (1 + (wait - 1) / 1000),
-                                            attemptNum, Config.GetConnectRetries() + 1);
-                                waitWnd.SetText(retryBuf);
+                                try
+                                {
+                                    const std::wstring retryText = SPLFormatStringOwned(
+                                        LangStr(IDS_WAITINGTORETRYSUF).c_str(), waitText.c_str(),
+                                        (1 + (wait - 1) / 1000), attemptNum,
+                                        Config.GetConnectRetries() + 1);
+                                    waitWnd.SetText(retryText.c_str());
+                                }
+                                catch (...)
+                                {
+                                    waitWnd.SetText(LangStr(IDS_OPERDOPPR_LOWMEM).c_str());
+                                }
                             }
                             BOOL notTimeout = FALSE; // TRUE = it cannot be a timeout
                             if (wait > 1500)
@@ -1081,12 +1373,13 @@ RETRY_LABEL:
                             {
                                 waitWnd.Show(FALSE);
                                 MSGBOXEX_PARAMS params;
+                                const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE);
+                                const std::wstring text = LangStr(IDS_WAITRETRESC);
                                 memset(&params, 0, sizeof(params));
                                 params.HParent = parent;
                                 params.Flags = MB_YESNOCANCEL | MB_ICONQUESTION;
-                                params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                                params.Text = LoadStr(IDS_WAITRETRESC);
-                                char aliasBtnNames[300];
+                                params.Caption = caption.c_str();
+                                params.Text = text.c_str();
                                 /* used by the script export_mnu.py, which generates salmenu.mnu for Translator
    we let the message box buttons resolve hotkey collisions by simulating that this is a menu
 MENU_TEMPLATE_ITEM MsgBoxButtons[] =
@@ -1098,11 +1391,12 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-                                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                                        DIALOG_YES, LoadStr(IDS_WAITRETRESCABORTBTN),
-                                        DIALOG_NO, LoadStr(IDS_WAITRETRESCRETRYBTN),
-                                        DIALOG_CANCEL, LoadStr(IDS_WAITRETRESCWAITBTN));
-                                params.AliasBtnNames = aliasBtnNames;
+                                const std::wstring aliasBtnNames = SPLFormatStringOwned(
+                                    L"%d\t%s\t%d\t%s\t%d\t%s",
+                                    DIALOG_YES, LangStr(IDS_WAITRETRESCABORTBTN).c_str(),
+                                    DIALOG_NO, LangStr(IDS_WAITRETRESCRETRYBTN).c_str(),
+                                    DIALOG_CANCEL, LangStr(IDS_WAITRETRESCWAITBTN).c_str());
+                                params.AliasBtnNames = aliasBtnNames.c_str();
                                 int msgRes = SalamanderGeneral->SalMessageBoxEx(&params);
                                 if (msgRes == IDYES)
                                 { // gives up further login attempts
@@ -1156,7 +1450,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
         case sccsServerReady: // now connected, read the message from the server (expect "220 Service ready for new user")
         {
-            waitWnd.SetText(LoadStr(IDS_WAITINGFORLOGIN));
+            waitWnd.SetText(LangStr(IDS_WAITINGFORLOGIN).c_str());
             waitWnd.Create(GetWaitTime(showWaitWndTime));
 
             DWORD start = GetTickCount();
@@ -1175,8 +1469,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 case ccsevESC:
                 {
                     waitWnd.Show(FALSE);
-                    if (SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_WAITFORLOGESC),
-                                                         LoadStr(IDS_FTPPLUGINTITLE),
+                    if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_WAITFORLOGESC).c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                          MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                              MB_ICONQUESTION) == IDYES)
                     { // cancel
@@ -1211,7 +1505,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     {
                         if (useWelcomeMessage)
                             welcomeMessage.Append(reply, replySize);
-                        Logs.LogMessage(logUID, reply, replySize);
+                        Logs.LogServerMessage(logUID, reply, replySize, TextPolicy);
 
                         if (replyCode != -1)
                         {
@@ -1220,10 +1514,19 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             {
                                 if (event != ccsevClosed) // if the connection is not closed yet
                                 {
-                                    state = sccsStartLoginScript; // send the login command sequence
-
-                                    CopyStr(retryBuf, 700, reply, replySize); // store the first server reply (source of server version info)
-                                    ServerFirstReply = retryBuf != NULL ? retryBuf : "";
+                                    std::string stagedFirstReply;
+                                    if (FtpStoreProtocolBytes(
+                                            std::string_view(reply, static_cast<size_t>(replySize)),
+                                            stagedFirstReply))
+                                    {
+                                        ServerFirstReply.swap(stagedFirstReply); // source of server version info
+                                        state = sccsStartLoginScript;            // send the login command sequence
+                                    }
+                                    else
+                                    {
+                                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                        state = sccsFatalError;
+                                    }
 
                                     SkipFTPReply(replySize);
                                     break;
@@ -1242,16 +1545,29 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     {
                                         if (state == sccsServerReady) // if we are not reporting another error yet
                                         {
-                                            CopyStr(errBuf, 300, reply, replySize);
-                                            fatalErrorTextID = -1;         // the error text is in 'errBuf'
-                                            noRetryState = sccsFatalError; // if retry is not performed, execute sccsFatalError
-                                            retryLogError = FALSE;         // the error is already in the log, do not add it again
-                                            state = sccsRetry;
+                                            if (FtpStoreProtocolBytes(
+                                                    std::string_view(reply, static_cast<size_t>(replySize)),
+                                                    directErrorText))
+                                            {
+                                                fatalErrorTextID = -1;         // the error text is in directErrorText
+                                                noRetryState = sccsFatalError; // if retry is not performed, execute sccsFatalError
+                                                retryLogError = FALSE;         // the error is already in the log, do not add it again
+                                                state = sccsRetry;
+                                            }
+                                            else
+                                            {
+                                                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                state = sccsFatalError;
+                                            }
                                         }
                                     }
                                     else // unexpected response, ignore it
                                     {
-                                        TRACE_E("Unexpected reply: " << CopyStr(errBuf, 300, reply, replySize));
+                                        std::string unexpectedReply;
+                                        if (FtpStoreProtocolBytes(
+                                                std::string_view(reply, static_cast<size_t>(replySize)),
+                                                unexpectedReply))
+                                            TRACE_E("Unexpected reply: " << unexpectedReply.c_str());
                                     }
                                 }
                             }
@@ -1261,9 +1577,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             if (state == sccsServerReady) // if we are not reporting another error yet
                             {
                                 opFatalErrorTextID = IDS_NOTFTPSERVERERROR;
-                                CopyStr(errBuf, 300, reply, replySize);
-                                opFatalError = -1; // the "error" (reply) is directly in errBuf
-                                state = sccsOperationFatalError;
+                                if (FtpStoreProtocolBytes(
+                                        std::string_view(reply, static_cast<size_t>(replySize)),
+                                        directErrorText))
+                                {
+                                    opFatalError = -1; // the error is directly in directErrorText
+                                    state = sccsOperationFatalError;
+                                }
+                                else
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                }
                                 fatalErrLogMsg = FALSE; // already in the log, no point adding it again
                             }
                         }
@@ -1281,12 +1606,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         }
                         if (data1 != NO_ERROR)
                         {
-                            FTPGetErrorText(data1, buf, 1000 - 2); // (1000-2) so there is room for our CRLF
-                            char* s = buf + strlen(buf);
-                            while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                                s--;
-                            strcpy(s, "\r\n"); // append our CRLF to the end of the error text line
-                            Logs.LogMessage(logUID, buf, -1);
+                            std::string errorText;
+                            if (FTPGetErrorTextForLog(data1, errorText))
+                                Logs.LogMessage(logUID, errorText.c_str(), -1);
                         }
                     }
                     break;
@@ -1314,7 +1636,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 TRACE_E("CControlConnectionSocket::StartControlConnection(): proxyScriptStartExecPoint cannot be NULL here!");
             proxyScriptExecPoint = proxyScriptStartExecPoint;
             proxyLastCmdReply = -1;
-            proxyLastCmdReplyText[0] = 0;
+            proxyLastCmdReplyText.clear();
             state = sccsProcessLoginScript;
             break;
         }
@@ -1323,18 +1645,21 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             while (1)
             {
+                proxyScriptLowMemory = FALSE;
                 if (sslisNone != SSLInitSequence ||
-                    ProcessProxyScript(proxyScriptText, &proxyScriptExecPoint, proxyLastCmdReply,
-                                       &proxyScriptParams, NULL, NULL, proxySendCmdBuf,
-                                       proxyLogCmdBuf, errBuf, NULL))
+                    ProcessProxyScript(TextPolicy.GetCodec(), proxyScriptText.c_str(), &proxyScriptExecPoint, proxyLastCmdReply,
+                                       &proxyScriptParams, NULL, NULL, &proxySendCmdBuf,
+                                       &proxyLogCmdBuf, &proxyScriptError, NULL, &proxyScriptLowMemory))
                 {
                     if (sslisNone == SSLInitSequence && proxyScriptParams.NeedUserInput()) // it is necessary to enter some data (user, password, etc.)
                     {
                         if (proxyScriptParams.NeedProxyHost)
                         {
                         ENTER_PROXYHOST_AGAIN:
-                            if (CEnterStrDlg(parent, LoadStr(IDS_ENTERPRXHOSTTITLE), LoadStr(IDS_ENTERPRXHOSTTEXT),
-                                             proxyScriptParams.ProxyHost, HOST_MAX_SIZE, FALSE, NULL, FALSE)
+                            std::wstring proxyHostW = proxyScriptParams.ProxyHost;
+                            if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXHOSTTITLE).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXHOSTTEXT).c_str(),
+                                             proxyHostW, FALSE, NULL, FALSE)
                                     .Execute() == IDCANCEL)
                             {
                                 state = sccsDone; // user canceled -> finish
@@ -1343,30 +1668,38 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             }
                             else // we have entered "proxyhost:port"
                             {
-                                char* s = strchr(proxyScriptParams.ProxyHost, ':');
+                                wchar_t* s = wcschr(proxyHostW.data(), L':');
                                 int portNum = 0;
                                 if (s != NULL) // the port is also specified
                                 {
-                                    char* hostEnd = s++;
-                                    while (*s != 0 && *s >= '0' && *s <= '9')
+                                    wchar_t* hostEnd = s++;
+                                    while (*s != 0 && *s >= L'0' && *s <= L'9')
                                     {
-                                        portNum = 10 * portNum + (*s - '0');
+                                        portNum = 10 * portNum + (*s - L'0');
                                         s++;
                                     }
                                     if (*s != 0 || portNum < 1 || portNum > 65535)
                                     {
-                                        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_PORTISUSHORT), LoadStr(IDS_FTPERRORTITLE),
+                                        SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_PORTISUSHORT).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                                          MB_OK | MB_ICONEXCLAMATION);
                                         goto ENTER_PROXYHOST_AGAIN;
                                     }
                                     *hostEnd = 0;
                                     proxyScriptParams.ProxyPort = portNum;
                                 }
+                                if (proxyHostW[0] == 0 ||
+                                    !FtpStoreWideText(proxyHostW.c_str(), proxyScriptParams.ProxyHost))
+                                {
+                                    SalamanderGeneral->SalMessageBox(
+                                        parent, LangStr(IDS_PRXSCRERR_HOSTEMPTY).c_str(),
+                                        LangStr(IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
+                                    goto ENTER_PROXYHOST_AGAIN;
+                                }
 
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
                                 if (ProxyServer != NULL)
                                 {
-                                    ProxyServer->SetProxyHost(proxyScriptParams.ProxyHost);
+                                    ProxyServer->SetProxyHost(proxyScriptParams.ProxyHost.c_str());
                                     if (portNum != 0)
                                         ProxyServer->SetProxyPort(portNum);
                                 }
@@ -1375,11 +1708,21 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         }
                         if (proxyScriptParams.NeedProxyPassword)
                         {
-                            _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS2),
-                                        proxyScriptParams.ProxyHost, proxyScriptParams.ProxyUser);
-                            if (CEnterStrDlg(parent, LoadStr(IDS_ENTERPRXPASSTITLE), LoadStr(IDS_ENTERPRXPASSTEXT),
-                                             proxyScriptParams.ProxyPassword, PASSWORD_MAX_SIZE, TRUE,
-                                             connectingToAs, FALSE)
+                            try
+                            {
+                                connectingToAs = SPLFormatStringOwned(
+                                    LangStr(IDS_CONNECTINGTOAS2).c_str(),
+                                    proxyScriptParams.ProxyHost.c_str(),
+                                    proxyScriptParams.ProxyUser.c_str());
+                            }
+                            catch (...)
+                            {
+                                connectingToAs.clear();
+                            }
+                            if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTITLE).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPRXPASSTEXT).c_str(),
+                                             proxyScriptParams.ProxyPassword, TRUE,
+                                             connectingToAs.c_str(), FALSE)
                                     .Execute() == IDCANCEL)
                             {
                                 state = sccsDone; // user canceled -> finish
@@ -1389,16 +1732,31 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             else // values changed -> we must update the originals
                             {
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                if (ProxyServer != NULL)
-                                    ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword);
+                                BOOL stored = ProxyServer == NULL ||
+                                              ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword.c_str());
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                if (!stored)
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                    break;
+                                }
                             }
                         }
                         if (proxyScriptParams.NeedUser)
                         {
-                            _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS1), proxyScriptParams.Host);
-                            if (CEnterStrDlg(parent, NULL, NULL, proxyScriptParams.User, USER_MAX_SIZE, FALSE,
-                                             connectingToAs, FALSE)
+                            try
+                            {
+                                connectingToAs = SPLFormatStringOwned(
+                                    LangStr(IDS_CONNECTINGTOAS1).c_str(),
+                                    proxyScriptParams.Host.c_str());
+                            }
+                            catch (...)
+                            {
+                                connectingToAs.clear();
+                            }
+                            if (CEnterStrDlg(parent, NULL, NULL, proxyScriptParams.User, FALSE,
+                                           connectingToAs.c_str(), FALSE)
                                     .Execute() == IDCANCEL)
                             {
                                 state = sccsDone; // user canceled -> finish
@@ -1407,20 +1765,39 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             }
                             else // values changed -> we must update the originals
                             {
+                                std::wstring stagedUser;
+                                std::wstring returnedUser;
+                                if (!FtpStoreWideText(proxyScriptParams.User, stagedUser) ||
+                                    !FtpStoreWideText(proxyScriptParams.User, returnedUser))
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                    break;
+                                }
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(User, proxyScriptParams.User, USER_MAX_SIZE);
-                                lstrcpyn(user, proxyScriptParams.User, userSize);
-                                Logs.ChangeUser(logUID, User);
+                                User.swap(stagedUser);
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                user.swap(returnedUser);
+                                Logs.ChangeUser(logUID, proxyScriptParams.User.c_str());
                             }
                         }
                         if (proxyScriptParams.NeedPassword)
                         {
-                            _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS2), proxyScriptParams.Host,
-                                        proxyScriptParams.User);
-                            if (CEnterStrDlg(parent, LoadStr(IDS_ENTERPASSTITLE), LoadStr(IDS_ENTERPASSTEXT),
-                                             proxyScriptParams.Password, PASSWORD_MAX_SIZE, TRUE,
-                                             connectingToAs, TRUE)
+                            try
+                            {
+                                connectingToAs = SPLFormatStringOwned(
+                                    LangStr(IDS_CONNECTINGTOAS2).c_str(),
+                                    proxyScriptParams.Host.c_str(),
+                                    proxyScriptParams.User.c_str());
+                            }
+                            catch (...)
+                            {
+                                connectingToAs.clear();
+                            }
+                            if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPASSTITLE).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERPASSTEXT).c_str(),
+                                             proxyScriptParams.Password, TRUE,
+                                             connectingToAs.c_str(), TRUE)
                                     .Execute() == IDCANCEL)
                             {
                                 state = sccsDone; // user canceled -> finish
@@ -1429,20 +1806,38 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             }
                             else // values changed -> we must update the originals
                             {
-                                if (proxyScriptParams.Password[0] == 0)
+                                if (proxyScriptParams.Password.empty())
                                     proxyScriptParams.AllowEmptyPassword = TRUE; // empty password at the user's request (we will not ask again)
+                                std::wstring stagedPassword;
+                                if (!FtpStoreWideText(proxyScriptParams.Password, stagedPassword))
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                    break;
+                                }
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(Password, proxyScriptParams.Password, PASSWORD_MAX_SIZE);
+                                Password.swap(stagedPassword);
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                FTPSecureWipe(stagedPassword);
                             }
                         }
                         if (proxyScriptParams.NeedAccount)
                         {
-                            _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS2), proxyScriptParams.Host,
-                                        proxyScriptParams.User);
-                            if (CEnterStrDlg(parent, LoadStr(IDS_ENTERACCTTITLE), LoadStr(IDS_ENTERACCTTEXT),
-                                             proxyScriptParams.Account, ACCOUNT_MAX_SIZE, TRUE,
-                                             connectingToAs, FALSE)
+                            try
+                            {
+                                connectingToAs = SPLFormatStringOwned(
+                                    LangStr(IDS_CONNECTINGTOAS2).c_str(),
+                                    proxyScriptParams.Host.c_str(),
+                                    proxyScriptParams.User.c_str());
+                            }
+                            catch (...)
+                            {
+                                connectingToAs.clear();
+                            }
+                            if (CEnterStrDlg(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERACCTTITLE).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_ENTERACCTTEXT).c_str(),
+                                             proxyScriptParams.Account, TRUE,
+                                             connectingToAs.c_str(), FALSE)
                                     .Execute() == IDCANCEL)
                             {
                                 state = sccsDone; // user canceled -> finish
@@ -1451,9 +1846,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             }
                             else // values changed -> we must update the originals
                             {
+                                std::wstring stagedAccount;
+                                if (!FtpStoreWideText(proxyScriptParams.Account, stagedAccount))
+                                {
+                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                    state = sccsFatalError;
+                                    break;
+                                }
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(Account, proxyScriptParams.Account, ACCOUNT_MAX_SIZE);
+                                Account.swap(stagedAccount);
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                FTPSecureWipe(stagedAccount);
                             }
                         }
                         // repaint the main window (so the user does not stare at the remainder after the dialog during the whole connect)
@@ -1461,13 +1864,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     }
                     else
                     {
-                        if (proxySendCmdBuf[0] == 0 && CompressData && !bModeZSent)
+                        if (proxySendCmdBuf.empty() && CompressData && !bModeZSent)
                         {
-                            strcpy(proxySendCmdBuf, "MODE Z\r\n");
-                            strcpy(proxyLogCmdBuf, proxySendCmdBuf);
+                            if (!setCommandPair("MODE Z\r\n"))
+                            {
+                                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                state = sccsFatalError;
+                                break;
+                            }
                             bModeZSent = true;
                         }
-                        if (proxySendCmdBuf[0] == 0) // end of the login script
+                        if (proxySendCmdBuf.empty()) // end of the login script
                         {
                             if (proxyLastCmdReply == -1) // the script contains no command sent to the server - e.g. commands skipped because they contain optional variables
                             {
@@ -1483,10 +1890,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 }
                                 else // FTP_DIGIT_1(proxyLastCmdReply) == FTP_D1_PARTIALSUCCESS  // e.g. 331 User name okay, need password
                                 {
-                                    lstrcpyn(errBuf, proxyLastCmdReplyText, 300);
-                                    opFatalError = -1; // error is directly in errBuf
-                                    opFatalErrorTextID = IDS_INCOMPLETEPRXSCR;
-                                    state = sccsOperationFatalError;
+                                    if (FtpStoreProtocolBytes(proxyLastCmdReplyText, directErrorText))
+                                    {
+                                        opFatalError = -1; // error is directly in directErrorText
+                                        opFatalErrorTextID = IDS_INCOMPLETEPRXSCR;
+                                        state = sccsOperationFatalError;
+                                    }
+                                    else
+                                    {
+                                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                        state = sccsFatalError;
+                                    }
                                 }
                             }
                         }
@@ -1494,18 +1908,27 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         {
                             DWORD error;
                             BOOL allBytesWritten;
-                            if (Write(proxySendCmdBuf, -1, &error, &allBytesWritten))
+                            if (Write(proxySendCmdBuf.c_str(), static_cast<int>(proxySendCmdBuf.size()), &error, &allBytesWritten))
                             {
                                 if (useWelcomeMessage)
-                                    welcomeMessage.Append(proxyLogCmdBuf, -1);
-                                Logs.LogMessage(logUID, proxyLogCmdBuf, -1);
+                                    welcomeMessage.Append(proxyLogCmdBuf.c_str(), static_cast<int>(proxyLogCmdBuf.size()));
+                                Logs.LogMessage(logUID, proxyLogCmdBuf.c_str(), static_cast<int>(proxyLogCmdBuf.size()));
 
-                                lstrcpyn(tmpCmdBuf, proxyLogCmdBuf, FTPCOMMAND_MAX_SIZE);
-                                char* s = strchr(tmpCmdBuf, '\r');
-                                if (s != NULL)
-                                    *s = 0;
-                                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_SENDINGLOGINCMD), tmpCmdBuf);
-                                waitWnd.SetText(buf);
+                                const size_t firstLineLength = proxyLogCmdBuf.find('\r');
+                                const size_t commandTextLength = firstLineLength == std::string::npos ? proxyLogCmdBuf.size() : firstLineLength;
+                                std::wstring commandText;
+                                if (!TextPolicy.GetCodec().Decode(proxyLogCmdBuf.data(), commandTextLength, commandText))
+                                    commandText = L"<invalid command text>";
+                                try
+                                {
+                                    waitText = SPLFormatStringOwned(
+                                        LangStr(IDS_SENDINGLOGINCMD).c_str(), commandText.c_str());
+                                }
+                                catch (...)
+                                {
+                                    waitText = LangStr(IDS_OPERDOPPR_LOWMEM).c_str();
+                                }
+                                waitWnd.SetText(waitText.c_str());
                                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
                                 DWORD start = GetTickCount();
@@ -1525,8 +1948,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     case ccsevESC:
                                     {
                                         waitWnd.Show(FALSE);
-                                        if (SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_SENDCOMMANDESC2),
-                                                                             LoadStr(IDS_FTPPLUGINTITLE),
+                                        if (SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_SENDCOMMANDESC2).c_str(),
+                                                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                                              MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                                                  MB_ICONQUESTION) == IDYES)
                                         { // cancel
@@ -1566,16 +1989,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                         {
                                             if (useWelcomeMessage)
                                                 welcomeMessage.Append(reply, replySize);
-                                            Logs.LogMessage(logUID, reply, replySize);
+                                            Logs.LogServerMessage(logUID, reply, replySize, TextPolicy);
 
                                             if (replyCode != -1)
                                             {
-                                                if ((FTP_DIGIT_1(replyCode) == FTP_D1_ERROR) && CompressData && !_strnicmp(proxySendCmdBuf, "MODE Z", sizeof("MODE Z") - 1))
+                                                if ((FTP_DIGIT_1(replyCode) == FTP_D1_ERROR) && CompressData &&
+                                                    proxySendCmdBuf.compare(0, sizeof("MODE Z") - 1, "MODE Z") == 0)
                                                 {
                                                     // Server does not support compression -> swallow the error, disable compression and go on
                                                     replyCode = 200; // Emulate Full success
                                                     CompressData = FALSE;
-                                                    Logs.LogMessage(logUID, LoadStr(IDS_MODEZ_LOG_UNSUPBYSERVER), -1);
+                                                    Logs.LogMessage(logUID, LangStr(IDS_MODEZ_LOG_UNSUPBYSERVER).c_str(), -1);
                                                 }
                                                 if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS ||      // e.g. 230 User logged in, proceed
                                                     FTP_DIGIT_1(replyCode) == FTP_D1_PARTIALSUCCESS) // e.g. 331 User name okay, need password
@@ -1587,7 +2011,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                     {
                                                         replyReceived = TRUE; // take only the first server reply to the command (another reply probably relates to the control connection state, e.g. "timeout")
                                                         proxyLastCmdReply = replyCode;
-                                                        CopyStr(proxyLastCmdReplyText, 300, reply, replySize);
+                                                        if (!FtpStoreProtocolBytes(
+                                                                std::string_view(reply, static_cast<size_t>(replySize)),
+                                                                proxyLastCmdReplyText))
+                                                        {
+                                                            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                            state = sccsFatalError;
+                                                        }
                                                     }
                                                     if (event == ccsevClosed)
                                                         state = sccsProcessLoginScript; // ensure an error is reported later
@@ -1603,7 +2033,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                             retryLoginWithoutAsking = TRUE;
                                                         }
 
-                                                        CopyStr(errBuf, 300, reply, replySize);
+                                                        if (!FtpStoreProtocolBytes(
+                                                                std::string_view(reply, static_cast<size_t>(replySize)),
+                                                                directErrorText))
+                                                        {
+                                                            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                            state = sccsFatalError;
+                                                            SkipFTPReply(replySize);
+                                                            break;
+                                                        }
                                                         SkipFTPReply(replySize);
                                                         if (!retryLoginWithoutAsking)
                                                         {
@@ -1619,34 +2057,79 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                             {
                                                                 // 534 comes after PROT when data connection encryption is requested but not supported
                                                                 // 530 comes after AUTH when AUTH is not recognized
-                                                                SalamanderGeneral->SalMessageBox(parent, LoadStr((SSLInitSequence == sslisAUTH) ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP),
-                                                                                                 LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONSTOP);
+                                                                SalamanderGeneral->SalMessageBox(parent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, (SSLInitSequence == sslisAUTH) ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP).c_str(),
+                                                                                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(), MB_OK | MB_ICONSTOP);
                                                                 state = sccsDone;
                                                                 allBytesWritten = TRUE;      // no longer important, the socket is going to be closed
                                                                 SSLInitSequence = sslisNone; // do not attempt to load OpenSSL libs
                                                             }
                                                             else
                                                             {
-                                                                _snprintf_s(connectingToAs, _TRUNCATE, LoadStr(IDS_CONNECTINGTOAS1), proxyScriptParams.Host);
-                                                                CLoginErrorDlg dlg(parent, errBuf, &proxyScriptParams, connectingToAs,
+                                                                try
+                                                                {
+                                                                    connectingToAs = SPLFormatStringOwned(
+                                                                        LangStr(IDS_CONNECTINGTOAS1).c_str(),
+                                                                        proxyScriptParams.Host.c_str());
+                                                                }
+                                                                catch (...)
+                                                                {
+                                                                    connectingToAs.clear();
+                                                                }
+                                                                // 'dlg' outlives this statement (Execute() runs below), so the wide
+                                                                // strings it borrows must too - named locals, not inline temporaries.
+                                                                std::wstring errBufW;
+                                                                if (!TextPolicy.GetCodec().Decode(
+                                                                        directErrorText.data(), directErrorText.size(), errBufW))
+                                                                    errBufW = L"<invalid server text>";
+                                                                CLoginErrorDlg dlg(parent, errBufW.c_str(), &proxyScriptParams,
+                                                                                   connectingToAs.c_str(),
                                                                                    NULL, NULL, NULL, FALSE, TRUE, proxyUsed);
                                                                 if (dlg.Execute() == IDOK)
                                                                 {
-                                                                    if (proxyScriptParams.Password[0] == 0)
+                                                                    if (proxyScriptParams.Password.empty())
                                                                         proxyScriptParams.AllowEmptyPassword = TRUE; // empty password at the user's request (we will not ask again)
-                                                                    // update the originals (overwriting possible changes in another thread) + the copy in 'value'
-                                                                    HANDLES(EnterCriticalSection(&SocketCritSect));
-                                                                    if (ProxyServer != NULL)
+                                                                    std::wstring stagedProxyUser;
+                                                                    std::wstring stagedProxyPassword;
+                                                                    std::wstring stagedUser;
+                                                                    std::wstring stagedPassword;
+                                                                    std::wstring stagedAccount;
+                                                                    std::wstring returnedUser;
+                                                                    std::string encodedUser;
+                                                                    BOOL stored = FtpStoreWideText(proxyScriptParams.ProxyUser, stagedProxyUser) &&
+                                                                                  FtpStoreWideText(proxyScriptParams.ProxyPassword, stagedProxyPassword) &&
+                                                                                  FtpStoreWideText(proxyScriptParams.User, stagedUser) &&
+                                                                                  FtpStoreWideText(proxyScriptParams.Password, stagedPassword) &&
+                                                                                  FtpStoreWideText(proxyScriptParams.Account, stagedAccount) &&
+                                                                                  FtpStoreWideText(proxyScriptParams.User, returnedUser);
+                                                                    if (!stored)
                                                                     {
-                                                                        ProxyServer->SetProxyUser(proxyScriptParams.ProxyUser);
-                                                                        ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword);
+                                                                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                                        state = sccsFatalError;
                                                                     }
-                                                                    lstrcpyn(User, proxyScriptParams.User, USER_MAX_SIZE);
-                                                                    lstrcpyn(user, proxyScriptParams.User, userSize);
-                                                                    Logs.ChangeUser(logUID, User);
-                                                                    lstrcpyn(Password, proxyScriptParams.Password, PASSWORD_MAX_SIZE);
-                                                                    lstrcpyn(Account, proxyScriptParams.Account, ACCOUNT_MAX_SIZE);
-                                                                    HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                                                    else if (!TextPolicy.GetCodec().Encode(stagedUser.c_str(), stagedUser.size(), encodedUser))
+                                                                    {
+                                                                        fatalErrorTextID = IDS_PRXSCRERR_CANNOTENCODE;
+                                                                        state = sccsFatalError;
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        // Publish only no-throw swaps while holding the socket lock.
+                                                                        HANDLES(EnterCriticalSection(&SocketCritSect));
+                                                                        if (ProxyServer != NULL)
+                                                                        {
+                                                                            ProxyServer->ProxyUser.swap(stagedProxyUser);
+                                                                            ProxyServer->ProxyPlainPassword.swap(stagedProxyPassword);
+                                                                        }
+                                                                        User.swap(stagedUser);
+                                                                        Password.swap(stagedPassword);
+                                                                        Account.swap(stagedAccount);
+                                                                        HANDLES(LeaveCriticalSection(&SocketCritSect));
+                                                                        user.swap(returnedUser);
+                                                                        Logs.ChangeUser(logUID, proxyScriptParams.User.c_str());
+                                                                    }
+                                                                    FTPSecureWipe(stagedProxyPassword);
+                                                                    FTPSecureWipe(stagedPassword);
+                                                                    FTPSecureWipe(stagedAccount);
 
                                                                     retryLoginWithoutAsking = dlg.RetryWithoutAsking;
                                                                     if (dlg.LoginChanged && event != ccsevClosed && !proxyUsed)
@@ -1669,8 +2152,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                         if (state == sccsProcessLoginScript)
                                                         { // standard retry (connection closure + waiting) - handles responses like "too many users"
                                                             opFatalErrorTextID = IDS_LOGINERROR;
-                                                            // CopyStr(errBuf, 300, reply, replySize);   // done earlier - before leaving the critical section
-                                                            opFatalError = -1;                      // the error text is in 'errBuf'
+                                                            opFatalError = -1;                      // the error text is in directErrorText
                                                             noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
                                                             retryLogError = FALSE;                  // the error is already in the log, do not add it again
                                                             state = sccsRetry;
@@ -1680,7 +2162,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                         break;
                                                     }
                                                     else // unexpected response, ignore it
-                                                        TRACE_E("Unexpected reply: " << CopyStr(errBuf, 300, reply, replySize));
+                                                    {
+                                                        std::string unexpectedReply;
+                                                        if (FtpStoreProtocolBytes(
+                                                                std::string_view(reply, static_cast<size_t>(replySize)),
+                                                                unexpectedReply))
+                                                            TRACE_E("Unexpected reply: " << unexpectedReply.c_str());
+                                                    }
                                                 }
                                             }
                                             else // not an FTP server
@@ -1688,9 +2176,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                 if (state == sccsProcessLoginScript) // if we are not reporting another error yet
                                                 {
                                                     opFatalErrorTextID = IDS_NOTFTPSERVERERROR;
-                                                    CopyStr(errBuf, 300, reply, replySize);
-                                                    opFatalError = -1; // the "error" (reply) is directly in errBuf
-                                                    state = sccsOperationFatalError;
+                                                    if (FtpStoreProtocolBytes(
+                                                            std::string_view(reply, static_cast<size_t>(replySize)),
+                                                            directErrorText))
+                                                    {
+                                                        opFatalError = -1; // the error is directly in directErrorText
+                                                        state = sccsOperationFatalError;
+                                                    }
+                                                    else
+                                                    {
+                                                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                        state = sccsFatalError;
+                                                    }
                                                     fatalErrLogMsg = FALSE; // already in the log, no point adding it again
                                                     allBytesWritten = TRUE; // no longer important, the socket will be closed
                                                 }
@@ -1711,12 +2208,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             }
                                             if (data1 != NO_ERROR)
                                             {
-                                                FTPGetErrorText(data1, buf, 1000 - 2); // (1000-2) so there is room for our CRLF
-                                                char* s2 = buf + strlen(buf);
-                                                while (s2 > buf && (*(s2 - 1) == '\n' || *(s2 - 1) == '\r'))
-                                                    s2--;
-                                                strcpy(s2, "\r\n"); // append our CRLF to the end of the error text line
-                                                Logs.LogMessage(logUID, buf, -1);
+                                                std::string errorText;
+                                                if (FTPGetErrorTextForLog(data1, errorText))
+                                                    Logs.LogMessage(logUID, errorText.c_str(), -1);
                                             }
                                         }
                                         else
@@ -1730,20 +2224,29 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                 {
                                                     int err;
                                                     CCertificate* unverifiedCert;
-                                                    if (!EncryptSocket(logUID, &err, &unverifiedCert, &errID, errBuf, 300,
+                                                    std::string sslErrorText;
+                                                    if (!EncryptSocket(logUID, &err, &unverifiedCert, &errID, &sslErrorText,
                                                                        NULL /* it's always NULL for the control connection */))
                                                     {
                                                         allBytesWritten = TRUE; // no longer important, the socket will be closed
-                                                        if (errBuf[0] == 0)
+                                                        if (sslErrorText.empty())
                                                         {
                                                             state = sccsFatalError;
                                                             fatalErrorTextID = errID;
                                                         }
                                                         else
                                                         {
-                                                            state = sccsOperationFatalError;
-                                                            opFatalErrorTextID = errID;
-                                                            opFatalError = -1;
+                                                            if (FtpStoreProtocolBytes(sslErrorText, directErrorText))
+                                                            {
+                                                                state = sccsOperationFatalError;
+                                                                opFatalErrorTextID = errID;
+                                                                opFatalError = -1;
+                                                            }
+                                                            else
+                                                            {
+                                                                state = sccsFatalError;
+                                                                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                            }
                                                         }
                                                         if (err == SSLCONERR_CANRETRY)
                                                         {
@@ -1762,21 +2265,23 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                             waitWnd.Show(FALSE);
 
                                                             INT_PTR dlgRes;
+                                                            std::wstring certificateError;
+                                                            unverifiedCert->CheckCertificate(certificateError);
                                                             do
                                                             {
-                                                                dlgRes = CCertificateErrDialog(parent, errBuf).Execute();
+                                                                dlgRes = CCertificateErrDialog(parent, certificateError.c_str()).Execute();
                                                                 switch (dlgRes)
                                                                 {
                                                                 case IDOK: // accept once
                                                                 {
-                                                                    Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTACCEPTED), -1, TRUE);
+                                                                    Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTACCEPTED).c_str(), -1, TRUE);
                                                                     SetCertificate(unverifiedCert);
                                                                     break;
                                                                 }
 
                                                                 case IDCANCEL:
                                                                 {
-                                                                    Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTREJECTED), -1, TRUE);
+                                                                    Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTREJECTED).c_str(), -1, TRUE);
                                                                     allBytesWritten = TRUE; // no longer important, the socket will be closed
                                                                     state = sccsDone;
                                                                     break;
@@ -1785,9 +2290,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                                 case IDB_CERTIFICATE_VIEW:
                                                                 {
                                                                     unverifiedCert->ShowCertificate(parent);
-                                                                    if (unverifiedCert->CheckCertificate(errBuf, 300))
+                                                                    if (unverifiedCert->CheckCertificate(certificateError))
                                                                     { // the server certificate is already trusted (the user probably imported it manually)
-                                                                        Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTVERIFIED), -1, TRUE);
+                                                                        Logs.LogMessage(logUID, LangStr(IDS_SSL_LOG_CERTVERIFIED).c_str(), -1, TRUE);
                                                                         dlgRes = -1; // only to terminate the loop
                                                                         unverifiedCert->SetVerified(true);
                                                                         SetCertificate(unverifiedCert);
@@ -1809,30 +2314,44 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                 }
                                                 if (EncryptDataConnection)
                                                 {
-                                                    strcpy(proxySendCmdBuf, "PBSZ 0\r\n");
+                                                    if (!setCommandPair("PBSZ 0\r\n"))
+                                                    {
+                                                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                        state = sccsFatalError;
+                                                    }
                                                     SSLInitSequence = sslisPBSZ;
                                                 }
                                                 else
                                                 {
-                                                    proxySendCmdBuf[0] = 0;
+                                                    FTPSecureWipe(proxySendCmdBuf);
+                                                    proxyLogCmdBuf.clear();
                                                     SSLInitSequence = sslisNone;
                                                 }
                                                 break;
                                             }
                                             case sslisPBSZ:
-                                                strcpy(proxySendCmdBuf, "PROT P\r\n");
+                                                if (!setCommandPair("PROT P\r\n"))
+                                                {
+                                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                    state = sccsFatalError;
+                                                }
                                                 SSLInitSequence = sslisPROT;
                                                 break;
                                             case sslisPROT:
-                                                proxySendCmdBuf[0] = 0;
+                                                FTPSecureWipe(proxySendCmdBuf);
+                                                proxyLogCmdBuf.clear();
                                                 SSLInitSequence = sslisNone;
                                                 break;
                                             case sslisNone:
                                                 break;
                                             }
                                         }
-                                        if (sslisNone != SSLInitSequence)
-                                            strcpy(proxyLogCmdBuf, proxySendCmdBuf);
+                                        if (sslisNone != SSLInitSequence && state != sccsFatalError &&
+                                            !FTPFormatString(proxyLogCmdBuf, "%s", proxySendCmdBuf.c_str()))
+                                        {
+                                            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                            state = sccsFatalError;
+                                        }
                                         break;
                                     }
 
@@ -1874,19 +2393,29 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                         HANDLES(EnterCriticalSection(&SocketCritSect));
                                         while (ReadFTPReply(&reply, &replySize, &replyCode)) // while we have some server response
                                         {
-                                            Logs.LogMessage(logUID, reply, replySize);
+                                            Logs.LogServerMessage(logUID, reply, replySize, TextPolicy);
 
                                             if (replyCode == -1 ||                                 // not an FTP reply
                                                 FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR || // description of a temporary error
                                                 FTP_DIGIT_1(replyCode) == FTP_D1_ERROR)            // description of an error
                                             {
                                                 opFatalErrorTextID = IDS_SENDCOMMANDERROR;
-                                                CopyStr(errBuf, 300, reply, replySize);
+                                                const BOOL storedReply = FtpStoreProtocolBytes(
+                                                    std::string_view(reply, static_cast<size_t>(replySize)),
+                                                    directErrorText);
                                                 SkipFTPReply(replySize);
-                                                opFatalError = -1;                      // the "error" (reply) is directly in errBuf
-                                                noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
-                                                retryLogError = FALSE;                  // the error is already in the log, do not add it again
-                                                state = sccsRetry;
+                                                if (storedReply)
+                                                {
+                                                    opFatalError = -1;                      // the error is directly in directErrorText
+                                                    noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
+                                                    retryLogError = FALSE;                  // the error is already in the log, do not add it again
+                                                    state = sccsRetry;
+                                                }
+                                                else
+                                                {
+                                                    fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                                                    state = sccsFatalError;
+                                                }
                                                 break; // no need to read another message
                                             }
                                             SkipFTPReply(replySize);
@@ -1903,8 +2432,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             }
                                             if (data1 != NO_ERROR)
                                             {
-                                                FTPGetErrorTextForLog(data1, buf, 1000);
-                                                Logs.LogMessage(logUID, buf, -1);
+                                                std::string errorText;
+                                                if (FTPGetErrorTextForLog(data1, errorText))
+                                                    Logs.LogMessage(logUID, errorText.c_str(), -1);
                                             }
                                         }
                                         break;
@@ -1918,56 +2448,85 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 }
                 else // theoretically should never happen (saved scripts are validated)
                 {
-                    opFatalError = -1; // error is directly in errBuf
-                    opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
-                    state = sccsOperationFatalError;
+                    if (proxyScriptLowMemory)
+                    {
+                        fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                        state = sccsFatalError;
+                    }
+                    else
+                    {
+                        if (FtpStoreProtocolBytes(proxyScriptError, directErrorText))
+                        {
+                            opFatalError = -1; // error is directly in directErrorText
+                            opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
+                            state = sccsOperationFatalError;
+                        }
+                        else
+                        {
+                            fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                            state = sccsFatalError;
+                        }
+                    }
                     break;
                 }
             }
             break;
         }
 
-        case sccsFatalError: // fatal error (resource ID of the text is in 'fatalErrorTextID' + if 'fatalErrorTextID' is -1, the string is directly in 'errBuf')
+        case sccsFatalError: // fatal error (resource ID of the text is in 'fatalErrorTextID'; -1 uses 'directErrorText')
         {
-            lstrcpyn(buf, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000);
-            char* s = buf + strlen(buf);
-            while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                s--;
+            std::string errorText;
+            if (!GetFatalErrorText(fatalErrorTextID, directErrorText, errorText))
+                errorText = LoadStr(IDS_OPERDOPPR_LOWMEM);
+            TrimLineEnds(errorText);
             if (fatalErrLogMsg)
             {
-                strcpy(s, "\r\n");                      // CRLF at the end of the last error text
-                Logs.LogMessage(logUID, buf, -1, TRUE); // add the last error text to the log
+                std::string logMessage;
+                if (FTPFormatString(logMessage, "%s\r\n", errorText.c_str()))
+                    Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             }
             fatalErrLogMsg = TRUE;
-            *s = 0;
-            SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            std::wstring errorTextW;
+            if (!FtpDecodeLocalText(errorText, errorTextW))
+                errorTextW = L"<invalid local error text>";
+            SalamanderGeneral->SalMessageBox(parent, errorTextW.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_OK | MB_ICONEXCLAMATION);
             state = sccsDone;
             break;
         }
 
         case sccsOperationFatalError: // fatal operation error (resource ID of the text is in 'opFatalErrorTextID' and
-        {                             // the Windows error number in 'opFatalError' + if 'opFatalError' is -1,
-                                      // the string is directly in 'errBuf' + if 'opFatalErrorTextID' is -1, the
-                                      // string is directly in 'formatBuf')
-            const char* e = GetOperationFatalErrorTxt(opFatalError, errBuf);
+        {                             // the Windows error number in 'opFatalError'; -1 uses 'directErrorText'; if
+                                      // 'opFatalErrorTextID' is -1, the format is in 'operationFormatText')
+            std::string errorText;
+            if (!GetOperationFatalErrorText(opFatalError, directErrorText, errorText))
+                errorText = LoadStr(IDS_OPERDOPPR_LOWMEM);
+            TrimLineEnds(errorText);
             if (fatalErrLogMsg)
             {
-                lstrcpyn(buf, e, 1000);
-                char* s = buf + strlen(buf);
-                while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
-                    s--;
-                strcpy(s, "\r\n");                      // CRLF at the end of the last error text
-                Logs.LogMessage(logUID, buf, -1, TRUE); // add the last error text to the log
+                std::string logMessage;
+                if (FTPFormatString(logMessage, "%s\r\n", errorText.c_str()))
+                    Logs.LogMessage(logUID, logMessage.c_str(), -1, TRUE);
             }
             fatalErrLogMsg = TRUE;
-            char* f;
-            if (opFatalErrorTextID != -1)
-                f = LoadStr(opFatalErrorTextID);
-            else
-                f = formatBuf;
-            sprintf(buf, f, e);
-            SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_FTPERRORTITLE),
-                                             MB_OK | MB_ICONEXCLAMATION);
+            std::wstring errorTextW;
+            if (!FtpDecodeLocalText(errorText, errorTextW))
+                errorTextW = L"<invalid local error text>";
+            try
+            {
+                std::wstring format;
+                if (opFatalErrorTextID != -1)
+                    format = LangStr(opFatalErrorTextID);
+                else if (!FtpDecodeLocalText(operationFormatText, format))
+                    format = LangStr(IDS_OPERDOPPR_LOWMEM);
+                const std::wstring message = SPLFormatStringOwned(format.c_str(), errorTextW.c_str());
+                SalamanderGeneral->SalMessageBox(parent, message.c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                 MB_OK | MB_ICONEXCLAMATION);
+            }
+            catch (...)
+            {
+                SalamanderGeneral->SalMessageBox(parent, LangStr(IDS_OPERDOPPR_LOWMEM).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                 MB_OK | MB_ICONEXCLAMATION);
+            }
             state = sccsDone;
             break;
         }
@@ -1982,7 +2541,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     }
 
     if (actionCanceled)
-        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGACTIONCANCELED), -1, TRUE); // ESC (cancel) to the log
+        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGACTIONCANCELED).c_str(), -1, TRUE); // ESC (cancel) to the log
 
     // drop the wait cursor over the parent
     if (winParent != NULL)
@@ -2007,12 +2566,28 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
     if (ret) // we are successfully connected to the FTP server
     {
-        Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGLOGINSUCCESS), -1, TRUE);
+        Logs.LogMessage(logUID, LangStr(IDS_LOGMSGLOGINSUCCESS).c_str(), -1, TRUE);
 
-        if (useWelcomeMessage && welcomeMessage.Length > 0)
+        BOOL canRetry = TRUE;
+        int utf8ReplyCode = -1;
+        if (SendFTPCommand(parent, "OPTS UTF8 ON\r\n", "OPTS UTF8 ON\r\n", NULL,
+                           GetWaitTime(showWaitWndTime), NULL, &utf8ReplyCode, NULL,
+                           FALSE, FALSE, FALSE, &canRetry, &nextRetryMessage, NULL))
+        {
+            HANDLES(EnterCriticalSection(&SocketCritSect));
+            TextPolicy.ApplyUtf8OptionsReply(utf8ReplyCode);
+            HANDLES(LeaveCriticalSection(&SocketCritSect));
+        }
+        else
+            ret = FALSE;
+
+        if (ret && useWelcomeMessage && welcomeMessage.Length > 0)
         { // display the "welcome message"
+            std::wstring welcomeText;
+            if (!DecodeText(welcomeMessage.GetString(), welcomeMessage.Length, welcomeText))
+                welcomeText = L"";
             CWelcomeMsgDlg* w = new CWelcomeMsgDlg(SalamanderGeneral->GetMainWindowHWND(),
-                                                   welcomeMessage.GetString());
+                                                   welcomeText.c_str());
             if (w != NULL)
             {
                 if (w->Create() == NULL)
@@ -2038,18 +2613,27 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
 
         // send the initial FTP commands
+        std::string cmdBuf;
         HANDLES(EnterCriticalSection(&SocketCritSect));
-        CPathBuffer cmdBuf;
-        if (!InitFTPCommands.empty())
-            lstrcpyn(cmdBuf, InitFTPCommands.c_str(), cmdBuf.Size());
-        else
-            cmdBuf[0] = 0;
+        try
+        {
+            cmdBuf = InitFTPCommands;
+        }
+        catch (const std::bad_alloc&)
+        {
+            ret = FALSE;
+            TRACE_E(LOW_MEMORY);
+        }
+        catch (const std::length_error&)
+        {
+            ret = FALSE;
+            TRACE_E(LOW_MEMORY);
+        }
         HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-        BOOL canRetry = TRUE;
-        if (cmdBuf[0] != 0)
+        if (ret && !cmdBuf.empty())
         {
-            char* next = cmdBuf;
+            char* next = cmdBuf.data();
             char* s;
             while (GetToken(&s, &next))
             {
@@ -2057,11 +2641,28 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     s++;     // strip only the first space (so the command can start with spaces)
                 if (*s != 0) // if there is anything, send it to the server
                 {
-                    _snprintf_s(retryBuf, _TRUNCATE, "%s\r\n", s);
+                    std::string initialCommand;
+                    try
+                    {
+                        initialCommand.assign(s);
+                        initialCommand.append("\r\n");
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        ret = FALSE;
+                        TRACE_E(LOW_MEMORY);
+                        break;
+                    }
+                    catch (const std::length_error&)
+                    {
+                        ret = FALSE;
+                        TRACE_E(LOW_MEMORY);
+                        break;
+                    }
                     int ftpReplyCode;
-                    if (!SendFTPCommand(parent, retryBuf, retryBuf, NULL, GetWaitTime(showWaitWndTime),
-                                        NULL, &ftpReplyCode, NULL, 0, FALSE, TRUE, TRUE, &canRetry,
-                                        errBuf, 300, NULL))
+                    if (!SendFTPCommand(parent, initialCommand.c_str(), initialCommand.c_str(), NULL, GetWaitTime(showWaitWndTime),
+                                        NULL, &ftpReplyCode, NULL, FALSE, TRUE, TRUE, &canRetry,
+                                        &nextRetryMessage, NULL))
                     {
                         ret = FALSE; // we are no longer connected
                         break;       // go perform the "retry"
@@ -2071,15 +2672,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
 
         // find out the server operating system
-        if (ret && PrepareFTPCommand(buf, 1000, formatBuf, 300, ftpcmdSystem, NULL))
+        std::string systemCommand;
+        std::string systemLogCommand;
+        if (ret && PrepareFTPCommand(systemCommand, &systemLogCommand, ftpcmdSystem, NULL))
         {
             int ftpReplyCode;
-            if (SendFTPCommand(parent, buf, formatBuf, NULL, GetWaitTime(showWaitWndTime), NULL,
-                               &ftpReplyCode, retryBuf, 700, FALSE, FALSE, FALSE, &canRetry,
-                               errBuf, 300, NULL))
+            std::string systemReply;
+            if (SendFTPCommand(parent, systemCommand.c_str(), systemLogCommand.c_str(), NULL, GetWaitTime(showWaitWndTime), NULL,
+                               &ftpReplyCode, &systemReply, FALSE, FALSE, FALSE, &canRetry,
+                               &nextRetryMessage, NULL))
             {
                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                ServerSystem = retryBuf != NULL ? retryBuf : "";
+                ServerSystem.swap(systemReply);
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
             }
             else
@@ -2087,18 +2691,26 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
 
         if (ret && workDir != NULL &&
-            !GetCurrentWorkingPath(parent, workDir, workDirBufSize, FALSE, &canRetry, errBuf, 300))
+            !GetCurrentWorkingPath(parent, *workDir, FALSE, &canRetry, &nextRetryMessage))
         {
             ret = FALSE; // error -> connection closed - go perform the "retry"
         }
 
-        if (canRetry && !ret) // assumes 'errBuf' has been set
+        if (canRetry && !ret) // assumes 'nextRetryMessage' has been set
         {
-            opFatalErrorTextID = IDS_SENDCOMMANDERROR;
-            opFatalError = -1;                      // the "error" (reply) is directly in errBuf
-            noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
-            retryLogError = FALSE;                  // the error is already in the log, do not add it again
-            state = sccsRetry;
+            if (FtpStoreProtocolBytes(nextRetryMessage, directErrorText))
+            {
+                opFatalErrorTextID = IDS_SENDCOMMANDERROR;
+                opFatalError = -1;                      // the error is directly in directErrorText
+                noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
+                retryLogError = FALSE;                  // the error is already in the log, do not add it again
+                state = sccsRetry;
+            }
+            else
+            {
+                fatalErrorTextID = IDS_OPERDOPPR_LOWMEM;
+                state = sccsFatalError;
+            }
             useWelcomeMessage = FALSE; // we already printed it, repeating it makes no sense
 
             // disable 'parent' again, restore the focus when re-enabling
@@ -2126,19 +2738,20 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 }
 
 BOOL CControlConnectionSocket::ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel, HWND parent,
-                                                 char* userBuf, int userBufSize, BOOL* reconnected,
+                                                 std::wstring& user, BOOL* reconnected,
                                                  BOOL setStartTimeIfConnected, int* totalAttemptNum,
-                                                 const char* retryMsg, BOOL* userRejectsReconnect,
+                                                 const std::string* retryMessage, BOOL* userRejectsReconnect,
                                                  int reconnectErrResID, BOOL useFastReconnect)
 {
-    CALL_STACK_MESSAGE8("CControlConnectionSocket::ReconnectIfNeeded(%d, %d, , , %d, , %d, , %s, , %d, %d)",
-                        notInPanel, leftPanel, userBufSize, setStartTimeIfConnected, retryMsg,
+    CALL_STACK_MESSAGE7("CControlConnectionSocket::ReconnectIfNeeded(%d, %d, , , , %d, , %s, , %d, %d)",
+                        notInPanel, leftPanel, setStartTimeIfConnected,
+                        retryMessage != NULL ? retryMessage->c_str() : NULL,
                         reconnectErrResID, useFastReconnect);
     if (reconnected != NULL)
         *reconnected = FALSE;
     if (userRejectsReconnect != NULL)
         *userRejectsReconnect = FALSE;
-    if (retryMsg == NULL && IsConnected()) // unknown reason for disconnect + the connection is not interrupted
+    if (retryMessage == NULL && IsConnected()) // unknown reason for disconnect + the connection is not interrupted
     {
         if (setStartTimeIfConnected)
             SetStartTime();
@@ -2146,7 +2759,7 @@ BOOL CControlConnectionSocket::ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel
     }
     else
     {
-        if (retryMsg == NULL) // connection interrupted for an unknown reason - display it and ask about reconnecting
+        if (retryMessage == NULL) // connection interrupted for an unknown reason - display it and ask about reconnecting
         {
             // if we have not yet displayed what led to the connection closing, do it now
             CheckCtrlConClose(notInPanel, leftPanel, parent, FALSE);
@@ -2155,12 +2768,15 @@ BOOL CControlConnectionSocket::ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel
             if (!Config.AlwaysReconnect)
             {
                 MSGBOXEX_PARAMS params;
+                const std::wstring caption = LangStr(IDS_FTPPLUGINTITLE).c_str();
+                const std::wstring text = LangStr(IDS_RECONNECTTOSRV).c_str();
+                const std::wstring checkBoxText = LangStr(IDS_ALWAYSRECONNECT).c_str();
                 memset(&params, 0, sizeof(params));
                 params.HParent = parent;
                 params.Flags = MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_HINT;
-                params.Caption = LoadStr(IDS_FTPPLUGINTITLE);
-                params.Text = LoadStr(IDS_RECONNECTTOSRV);
-                params.CheckBoxText = LoadStr(IDS_ALWAYSRECONNECT);
+                params.Caption = caption.c_str();
+                params.Text = text.c_str();
+                params.CheckBoxText = checkBoxText.c_str();
                 params.CheckBoxValue = &Config.AlwaysReconnect;
                 reconnectToSrv = SalamanderGeneral->SalMessageBoxEx(&params) == IDYES;
                 if (userRejectsReconnect != NULL)
@@ -2170,8 +2786,8 @@ BOOL CControlConnectionSocket::ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel
             if (Config.AlwaysReconnect || reconnectToSrv)
             {
                 SetStartTime();
-                BOOL ret = StartControlConnection(parent, userBuf, userBufSize, TRUE, NULL, 0,
-                                                  totalAttemptNum, retryMsg, FALSE,
+                BOOL ret = StartControlConnection(parent, user, TRUE, NULL,
+                                                  totalAttemptNum, retryMessage, FALSE,
                                                   reconnectErrResID, useFastReconnect);
                 if (ret && reconnected != NULL)
                     *reconnected = TRUE;
@@ -2182,8 +2798,8 @@ BOOL CControlConnectionSocket::ReconnectIfNeeded(BOOL notInPanel, BOOL leftPanel
         }
         else // connection interrupted for a known reason - run "retry" inside StartControlConnection()
         {
-            BOOL ret = StartControlConnection(parent, userBuf, userBufSize, TRUE, NULL, 0,
-                                              totalAttemptNum, retryMsg, FALSE,
+            BOOL ret = StartControlConnection(parent, user, TRUE, NULL,
+                                              totalAttemptNum, retryMessage, FALSE,
                                               reconnectErrResID, useFastReconnect);
             if (ret && reconnected != NULL)
                 *reconnected = TRUE;
@@ -2211,7 +2827,7 @@ void CControlConnectionSocket::ActivateWelcomeMsg()
 char* CControlConnectionSocket::AllocServerSystemReply()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    char* ret = SalamanderGeneral->DupStr(ServerSystem.c_str());
+    char* ret = DupControlConnectionText(ServerSystem.c_str());
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
 }
@@ -2219,7 +2835,7 @@ char* CControlConnectionSocket::AllocServerSystemReply()
 char* CControlConnectionSocket::AllocServerFirstReply()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    char* ret = SalamanderGeneral->DupStr(ServerFirstReply.c_str());
+    char* ret = DupControlConnectionText(ServerFirstReply.c_str());
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return ret;
 }

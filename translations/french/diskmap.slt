@@ -76,3 +76,7 @@ COMMENT,"Version française"
 78,1,"octet"
 79,1,"octets"
 
+[STRINGTABLE 3]
+80,1,"Rien à afficher..."
+81,1,"...ce dossier ne contient aucun fichier à cartographier"
+

@@ -112,7 +112,6 @@ function(sal_add_plugin)
     list(APPEND ALL_SOURCES
       "${SAL_SHARED}/auxtools.cpp"
       "${SAL_SHARED}/dbg.cpp"
-      "${SAL_SHARED}/mhandles.cpp"
       "${SAL_SHARED}/plugindarkmode.cpp"
       "${SAL_SRC}/combo_dark_paint.cpp"
       "${SAL_SHARED}/winliblt.cpp"

@@ -8,6 +8,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
+#include <vector>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -32,14 +33,10 @@
 #include "add_del.h"
 #include "dialogs.h"
 
-// Used in CZipUnpack::ExtractFiles & CZipUnpack::ExtractSingleFile when testing archive. For simplicity reasons we assume this is enough ;-)
-
-#define ZIP_MAX_PATH 1024
-
-CZipUnpack::CZipUnpack(const char* zipName, const char* zipRoot, CSalamanderForOperationsAbstract* salamander,
-                       TIndirectArray2<char>* archiveVolumes) : CZipCommon(zipName, zipRoot, salamander, archiveVolumes), Passwords(8)
+CZipUnpack::CZipUnpack(const wchar_t* zipName, const char* zipRoot, CSalamanderForOperationsAbstract* salamander,
+                       std::vector<std::wstring>* archiveVolumes) : CZipCommon(zipName, zipRoot, salamander, archiveVolumes), Passwords(8)
 {
-    CALL_STACK_MESSAGE3("CZipUnpack::CZipUnpack(%s, %s, )", zipName, zipRoot);
+    CALL_STACK_MESSAGE3("CZipUnpack::CZipUnpack(%ls, %s, )", zipName, zipRoot);
     Heap = HeapCreate(HEAP_NO_SERIALIZE, INITIAL_HEAP_SIZE, MAXIMUM_HEAP_SIZE);
     if (!Heap)
         ErrorID = IDS_LOWMEM;
@@ -52,14 +49,14 @@ CZipUnpack::CZipUnpack(const char* zipName, const char* zipRoot, CSalamanderForO
     TestAllocateWholeFile = true;
 }
 
-int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void* param)
+int CZipUnpack::UnpackArchive(const wchar_t* targetDir, SalEnumSelection next, void* param)
 {
-    CALL_STACK_MESSAGE2("CZipUnpack::UnpackArchive(%s, , )", targetDir);
+    CALL_STACK_MESSAGE2("CZipUnpack::UnpackArchive(%ls, , )", targetDir);
     TIndirectArray2<CExtInfo> extrNames(256);  //file names to be extracted
     TIndirectArray2<CFileInfo> extrFiles(256); //file header of files to be extracted
     int dirs;
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           true, false);
     if (ret)
@@ -67,10 +64,11 @@ int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void
             return ErrorID = IDS_LOWMEM;
         else
             return ErrorID = IDS_NODISPLAY;
-    char title[1024];
-    sprintf(title, LoadStr(IDS_EXTRPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(IDS_EXTRPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     ErrorID = CheckZip();
     if (!ErrorID && !ZeroZip)
     {
@@ -83,7 +81,7 @@ int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void
             if (ErrorID && extrFiles.Count)
             {
                 if (ErrorID != IDS_NODISPLAY)
-                    SalamanderGeneral->ShowMessageBox(LoadStr(ErrorID), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LangStr(ErrorID).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                 ErrorID = 0;
             }
             ProgressTotalSize = MatchedTotalSize;
@@ -110,8 +108,6 @@ int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void
                 {
                     QuickSortHeaders(0, extrFiles.Count - 1, extrFiles);
                 }
-                if (*OriginalCurrentDir)
-                    SetCurrentDirectory(targetDir);
                 ErrorID = ExtractFiles(targetDir);
             }
         }
@@ -120,18 +116,16 @@ int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void
     return ErrorID;
 }
 
-int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, const char* targetPath, const char* newFileName)
+int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, const wchar_t* targetPath, const wchar_t* newFileName)
 {
-    CALL_STACK_MESSAGE3("CZipUnpack::UnpackOneFile(%s, , %s)", nameInZip, targetPath);
+    CALL_STACK_MESSAGE3("CZipUnpack::UnpackOneFile(%s, , %ls)", nameInZip, targetPath);
     CFileInfo fileInfo;
-    TCHAR targetDir[32768];
-    int targetDirLen;
     char* sour;
     CZIPFileData* zipFileData = (CZIPFileData*)fileData->PluginData;
 
     Unix = zipFileData->Unix;
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL, true, false);
     if (ret)
     {
@@ -146,13 +140,9 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
         ErrorID = FindFile(nameInZip, &fileInfo, zipFileData->ItemNumber);
         if (!ErrorID)
         {
-            lstrcpy(targetDir, targetPath);
-            targetDirLen = lstrlen(targetDir);
-            if (targetDirLen && targetDir[targetDirLen - 1] == '\\')
-            {
-                targetDir[targetDirLen - 1] = 0;
-                targetDirLen--;
-            }
+            std::wstring targetDir(targetPath != NULL ? targetPath : L"");
+            while (targetDir.size() > 1 && targetDir.back() == L'\\')
+                targetDir.pop_back();
             fixed_tl64 = NULL;
             fixed_td64 = NULL;
             fixed_tl32 = NULL;
@@ -182,7 +172,7 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
             WinSize = SLIDE_WINDOW_SIZE;
             if (InputBuffer && SlideWindow)
             {
-                ErrorID = ExtractSingleFile(targetDir, targetDirLen, &fileInfo, NULL, newFileName);
+                ErrorID = ExtractSingleFile(targetDir.c_str(), &fileInfo, NULL, newFileName);
                 InflateFreeFixedHufman();
                 free(InputBuffer);
                 free(SlideWindow);
@@ -201,13 +191,13 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
     return ErrorID;
 }
 
-int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
+int CZipUnpack::UnpackWholeArchive(const char* mask, const wchar_t* targetDir)
 {
-    CALL_STACK_MESSAGE3("CZipUnpack::UnpackWholeArchive(%s, %s)", mask, targetDir);
-    TIndirectArray2<char> maskArray(16);
+    CALL_STACK_MESSAGE3("CZipUnpack::UnpackWholeArchive(%s, %ls)", mask, targetDir);
+    TIndirectArray2<std::string> maskArray(16);
     TIndirectArray2<CFileInfo> extrFiles(256); //file header of files to be extracted
 
-    int ret = CreateCFile(&ZipFile, ZipName, GENERIC_READ, FILE_SHARE_READ,
+    int ret = CreateCFile(&ZipFile, ZipName.c_str(), GENERIC_READ, FILE_SHARE_READ,
                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
                           true, false);
     if (ret)
@@ -215,13 +205,14 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
             return ErrorID = IDS_LOWMEM;
         else
             return ErrorID = IDS_NODISPLAY;
-    char title[1024];
-    sprintf(title, LoadStr(Test ? IDS_TESTPROGTITLE : IDS_EXTRPROGTITLE), SalamanderGeneral->SalPathFindFileName(ZipName));
-    Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
-    Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
+    const std::wstring title = SPLFormatStringOwned(
+        LoadStrW(Test ? IDS_TESTPROGTITLE : IDS_EXTRPROGTITLE).c_str(),
+        SalamanderGeneral->SalPathFindFileName(ZipName.c_str()));
+    Salamander->OpenProgressDialog(title.c_str(), TRUE, NULL, FALSE);
+    Salamander->ProgressDialogAddText(LoadStrW(IDS_PREPAREDATA).c_str(), FALSE);
     ErrorID = CheckZip();
     if (!ErrorID && ArchiveVolumes != NULL)
-        ArchiveVolumes->Add(_strdup(ZipName));
+        ArchiveVolumes->push_back(ZipName);
     if (!ErrorID && !ZeroZip)
     {
         MatchedTotalSize = CQuadWord(0, 0);
@@ -234,7 +225,7 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
             if (ErrorID && extrFiles.Count)
             {
                 if (ErrorID != IDS_NODISPLAY)
-                    SalamanderGeneral->ShowMessageBox(LoadStr(ErrorID), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LangStr(ErrorID).c_str(), LangStr(IDS_PLUGINNAME).c_str(), MSGBOX_ERROR);
                 ErrorID = 0;
             }
             ProgressTotalSize = MatchedTotalSize;
@@ -263,8 +254,6 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
                 {
                     QuickSortHeaders(0, extrFiles.Count - 1, extrFiles);
                 }
-                if (*OriginalCurrentDir && !Test)
-                    SetCurrentDirectory(targetDir);
                 ErrorID = ExtractFiles(targetDir);
             }
         }
@@ -273,7 +262,7 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
     return ErrorID;
 }
 
-int CZipUnpack::FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem)
+int CZipUnpack::FindFile(const char* name, CFileInfo* fileInfo, int nItem)
 {
     CALL_STACK_MESSAGE2("CZipUnpack::FindFile(%s, )", name);
     CFileHeader* centralHeader;
@@ -312,26 +301,31 @@ int CZipUnpack::FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem)
         readSize += s;
         if (i == nItem)
         {
-            unsigned int tempNameLen = ProcessName(centralHeader, tempName);
-            unsigned int nameLen = lstrlen(name);
+            // ProcessName returns -1 (a name that can't round-trip the system
+            // codepage) rather than a corrupted name. This is the exact item index being
+            // looked up by name - if we can't determine its real name, we can't confirm the
+            // match; skip it explicitly (falls through to IDS_FILENOTFOUND below) rather than
+            // comparing against tempName's now-empty buffer.
+            int tempNameLenSigned = ProcessName(centralHeader, tempName);
+            if (tempNameLenSigned < 0)
+                continue;
+            unsigned int tempNameLen = (unsigned)tempNameLenSigned;
+            unsigned int nameLen = lstrlenA(name);
 
             if (tempNameLen == nameLen)
             {
-                LPCTSTR str = _tcsrchr(name, '\\');
+                const char* str = strrchr(name, '\\');
                 int pathLen;
                 pathLen = str ? (int)(str - name + 1) : 0;
-                if ((CompareString(LOCALE_USER_DEFAULT, pathFlag,
-                                   name, pathLen,
-                                   tempName, pathLen) == CSTR_EQUAL) &&
-                    (CompareString(LOCALE_USER_DEFAULT, 0,
-                                   name + pathLen, nameLen - pathLen,
-                                   tempName + pathLen, nameLen - pathLen) == CSTR_EQUAL))
+                if ((CompareZipText(name, pathLen, tempName, pathLen, pathFlag) == CSTR_EQUAL) &&
+                    (CompareZipText(name + pathLen, nameLen - pathLen,
+                                    tempName + pathLen, nameLen - pathLen, 0) == CSTR_EQUAL))
                 {
                     ProcessHeader(centralHeader, fileInfo);
                     if (!fileInfo->IsDir)
                     {
                         fileInfo->NameLen = tempNameLen;
-                        fileInfo->Name = _tcsdup(tempName);
+                        fileInfo->Name = _strdup(tempName);
                         if (!fileInfo->Name)
                         {
                             errorID = IDS_LOWMEM;
@@ -351,58 +345,30 @@ int CZipUnpack::FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem)
     return errorID;
 }
 
-int CZipUnpack::PrepareMaskArray(TIndirectArray2<char>& maskArray, const char* masks)
+int CZipUnpack::PrepareMaskArray(TIndirectArray2<std::string>& maskArray, const char* masks)
 {
     CALL_STACK_MESSAGE2("CZipUnpack::PrepareMaskArray(, %s)", masks);
-    const char* sour;
-    char* dest;
-    char* newMask;
-    int newMaskLen;
-    CPathBuffer buffer;
-
-    sour = masks;
-    while (*sour)
+    for (const std::string& mask : SplitZipMaskList(masks))
     {
-        dest = buffer;
-        while (*sour)
+        const std::wstring sourceMask = ZipTextToWide(mask.c_str());
+        const std::wstring preparedWide =
+            SPLPrepareMaskOwned(SalamanderGeneral, sourceMask.c_str());
+        std::string preparedMask;
+        if (!TryWideToZipText(preparedWide.c_str(), preparedMask))
+            return IDS_TOOLONGMASK;
+        std::string* newMask = new std::string(std::move(preparedMask));
+        if (!newMask)
+            return IDS_LOWMEM;
+        if (!maskArray.Add(newMask))
         {
-            if (*sour == ';')
-            {
-                if (*(sour + 1) == ';')
-                    sour++;
-                else
-                    break;
-            }
-            if (dest == buffer + MAX_PATH)
-                return IDS_TOOLONGMASK;
-            *dest++ = *sour++;
+            delete newMask;
+            return IDS_LOWMEM;
         }
-        while (--dest >= buffer && *dest <= ' ')
-            ;
-        *(dest + 1) = 0;
-        dest = buffer;
-        while (*dest != 0 && *dest <= ' ')
-            dest++;
-        newMaskLen = (int)strlen(dest);
-        if (newMaskLen)
-        {
-            newMask = new char[newMaskLen + 1];
-            if (!newMask)
-                return IDS_LOWMEM;
-            SalamanderGeneral->PrepareMask(newMask, dest);
-            if (!maskArray.Add(newMask))
-            {
-                delete newMask;
-                return IDS_LOWMEM;
-            }
-        }
-        if (*sour)
-            sour++;
     }
     return 0;
 }
 
-int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
+int CZipUnpack::MatchFilesToMask(TIndirectArray2<std::string>& maskArray)
 {
     CALL_STACK_MESSAGE1("CZipUnpack::MatchFilesToMask()");
     CFileHeader* centralHeader;
@@ -440,7 +406,16 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
         if (errorID)
             break;
         readSize += s;
-        tempNameLen = ProcessName(centralHeader, tempName);
+        // ProcessName returns -1 (a name that can't round-trip the system
+        // codepage) rather than a corrupted name. tempNameLen is unsigned and used as a
+        // pointer offset two lines below (sour = tempName + tempNameLen) - storing -1 there
+        // directly would wrap to a huge offset and walk sour far outside tempName's allocation.
+        // Skip this one entry (it can't be mask-matched without a real name) rather than risk
+        // that.
+        int tempNameLenSigned = ProcessName(centralHeader, tempName);
+        if (tempNameLenSigned < 0)
+            continue;
+        tempNameLen = (unsigned)tempNameLenSigned;
         sour = tempName + tempNameLen;
         hasExtension = false;
         while (sour >= tempName && *sour != '\\')
@@ -449,7 +424,7 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
         sour++;
         for (j = 0; j < maskArray.Count; j++)
         {
-            if (SalamanderGeneral->AgreeMask(sour, maskArray[j], hasExtension))
+            if (SalamanderGeneral->AgreeMask(ZipTextToWide(sour).c_str(), ZipTextToWide(maskArray[j]->c_str()).c_str(), hasExtension))
             {
                 fileInfo = new CFileInfo;
                 if (!fileInfo)
@@ -466,7 +441,7 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
                     errorID = IDS_LOWMEM;
                     break;
                 }
-                lstrcpy(fileInfo->Name, tempName);
+                lstrcpyA(fileInfo->Name, tempName);
                 if (!ExtrFiles->Add(fileInfo))
                 {
                     delete fileInfo;
@@ -615,7 +590,7 @@ int CZipUnpack::InflateFile(CFileInfo* fileInfo, BOOL deflate64, int* errorID)
     case 2:
     {
     BadData:
-        switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp,
+        switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp.c_str(),
                              PE_NORETRY | DialogFlags, &SkipAllDataErr))
         {
         case ERR_SKIP:
@@ -638,7 +613,7 @@ int CZipUnpack::InflateFile(CFileInfo* fileInfo, BOOL deflate64, int* errorID)
             goto BadData;
         if (decompress.Input->Error == IDS_MACERROR)
         {
-            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp,
+            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp.c_str(),
                                  PE_NORETRY | DialogFlags, &SkipAllDataErr))
             {
             case ERR_SKIP:
@@ -715,7 +690,7 @@ int CZipUnpack::UnStoreFile(CFileInfo* fileInfo, int* errorID)
         {
             if (*errorID == IDS_EOF)
             {
-                switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp,
+                switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp.c_str(),
                                      PE_NORETRY | DialogFlags, &SkipAllDataErr))
                 {
                 case ERR_SKIP:
@@ -753,7 +728,7 @@ int CZipUnpack::UnStoreFile(CFileInfo* fileInfo, int* errorID)
                         {
                             if (*errorID == IDS_EOF)
                             {
-                                switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp,
+                                switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp.c_str(),
                                                      PE_NORETRY | DialogFlags, &SkipAllDataErr))
                                 {
                                 case ERR_SKIP:
@@ -778,7 +753,7 @@ int CZipUnpack::UnStoreFile(CFileInfo* fileInfo, int* errorID)
 
                         if (memcmp(mac, macFile, macLen) != 0)
                         {
-                            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp,
+                            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp.c_str(),
                                                  PE_NORETRY | DialogFlags, &SkipAllDataErr))
                             {
                             case ERR_SKIP:
@@ -854,7 +829,7 @@ int CZipUnpack::ExplodeFile(CFileInfo* fileInfo, int* errorID)
     case 2:
     {
     BadData:
-        switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp,
+        switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp.c_str(),
                              PE_NORETRY | DialogFlags, &SkipAllDataErr))
         {
         case ERR_SKIP:
@@ -878,7 +853,7 @@ int CZipUnpack::ExplodeFile(CFileInfo* fileInfo, int* errorID)
             goto BadData;
         if (decompress.Input->Error == IDS_MACERROR)
         {
-            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp,
+            switch (ProcessError(IDS_MACERROR, 0, FileNameDisp.c_str(),
                                  PE_NORETRY | DialogFlags, &SkipAllDataErr))
             {
             case ERR_SKIP:
@@ -961,7 +936,7 @@ int CZipUnpack::UnShrinkFile(CFileInfo* fileInfo, int* errorID)
         {
             switch (ProcessError(
                 decompress.Input->Error == IDS_MACERROR ? IDS_MACERROR : IDS_ERRCOMPDATA,
-                0, FileNameDisp,
+                0, FileNameDisp.c_str(),
                 PE_NORETRY | DialogFlags, &SkipAllDataErr))
             {
             case ERR_SKIP:
@@ -1033,7 +1008,7 @@ int CZipUnpack::UnReduceFile(CFileInfo* fileInfo, int* errorID)
         {
             switch (ProcessError(
                 decompress.Input->Error == IDS_MACERROR ? IDS_MACERROR : IDS_ERRCOMPDATA,
-                0, FileNameDisp,
+                0, FileNameDisp.c_str(),
                 PE_NORETRY | DialogFlags, &SkipAllDataErr))
             {
             case ERR_SKIP:
@@ -1103,7 +1078,7 @@ int CZipUnpack::UnBZIP2File(CFileInfo* fileInfo, int* errorID)
         {
             switch (ProcessError(
                 decompress.Input->Error == IDS_MACERROR ? IDS_MACERROR : IDS_ERRCOMPDATA,
-                0, FileNameDisp,
+                0, FileNameDisp.c_str(),
                 PE_NORETRY | DialogFlags, &SkipAllDataErr))
             {
             case ERR_SKIP:
@@ -1140,7 +1115,7 @@ int CZipUnpack::UnBZIP2File(CFileInfo* fileInfo, int* errorID)
     case 4: // Error uncompressing BZIP2 stream
         switch (ProcessError(
             ret == 3 ? IDS_LOWMEM : IDS_ERRBZIP2,
-            0, FileNameDisp,
+            0, FileNameDisp.c_str(),
             PE_NORETRY | DialogFlags, &SkipAllDataErr))
         {
         case ERR_SKIP:
@@ -1156,22 +1131,16 @@ int CZipUnpack::UnBZIP2File(CFileInfo* fileInfo, int* errorID)
     return exitCode;
 }
 
-int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
-                                  CFileInfo* fileInfo, BOOL* success, const char* newFileName)
+int CZipUnpack::ExtractSingleFile(const wchar_t* targetDir, CFileInfo* fileInfo, BOOL* success,
+                                  const wchar_t* newFileName)
 {
-    CALL_STACK_MESSAGE2("CZipUnpack::ExtractSingleFile(, %d, , )", targetDirLen);
+    CALL_STACK_MESSAGE1("CZipUnpack::ExtractSingleFile(, , , )");
     CLocalFileHeader* localHeader;
-    LPTSTR pathBuf;
-    LPTSTR path;
-    LPTSTR name;
-    LPCTSTR sour;
-    LPTSTR dest;
     int errorID = 0;
     //bool                retry;
     //bool                reopenZipFile;
     int result;
     bool skip, bCheckCRC = true;
-    char errBuf[128];
     CAESExtraField aesExtraField;
     /*
   TRACE_I("Unpacking file: " << fileInfo->Name <<
@@ -1184,16 +1153,10 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
     if (success)
         *success = FALSE;
     localHeader = (CLocalFileHeader*)malloc(MAX_HEADER_SIZE);
-    pathBuf = (LPTSTR)malloc(sizeof(TCHAR) * (ZIP_MAX_PATH + 1));
-    if (!localHeader || !pathBuf)
+    if (!localHeader)
     {
-        if (localHeader)
-            free(localHeader);
-        if (pathBuf)
-            free(pathBuf);
         return IDS_LOWMEM;
     }
-    *(targetDir + targetDirLen++) = '\\';
     if (DiskNum != fileInfo->StartDisk && MultiVol)
     {
         DiskNum = fileInfo->StartDisk;
@@ -1205,35 +1168,28 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
         if (!errorID)
         {
             ProcessLocalHeader(localHeader, fileInfo, &aesExtraField);
-            path = pathBuf;
-            SplitPath(&path, &name, fileInfo->Name + RootLen + (RootLen ? 1 : 0));
-            if (newFileName)
-                name = (LPTSTR)newFileName;
-            sour = path;
-            dest = targetDir + targetDirLen;
-            if (*sour)
-            {
-                while (*sour)
-                    *dest++ = *sour++;
-                *dest++ = '\\';
-            }
+            const char* relativeNameBytes = fileInfo->Name + RootLen + (RootLen ? 1 : 0);
+            const std::wstring relativeName = ZipTextToWide(relativeNameBytes);
+            const ZipExtractionPaths paths =
+                MakeZipExtractionPaths(targetDir, relativeName, newFileName);
+            const std::wstring& directoryPath = paths.Directory;
+            const std::wstring& outputPath = paths.Output;
             if (fileInfo->IsDir)
             {
                 if (!Test)
                 {
-                    //*dest++ = '\\';
-                    sour = name;
-                    while (*sour)
-                        *dest++ = *sour++;
-                    *dest = 0;
                     bool retry;
                     do
                     {
                         retry = false;
-                        if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
+                        std::wstring directoryError;
+                        if (!SPLCheckAndCreateDirectoryOwned(
+                                SalamanderGeneral,
+                                outputPath.c_str(),
+                                NULL, TRUE, &directoryError))
                         {
-                            switch (ProcessError(IDS_ERRCREATEDIR, 0, targetDir, DialogFlags,
-                                                 &SkipAllIOErrors, errBuf))
+                            switch (ProcessError(IDS_ERRCREATEDIR, 0, outputPath.c_str(), DialogFlags,
+                                                 &SkipAllIOErrors, directoryError.c_str()))
                             {
                             case ERR_RETRY:
                                 retry = true;
@@ -1245,7 +1201,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     } while (retry);
                     if (!errorID)
                     {
-                        SetFileAttributes(targetDir, fileInfo->FileAttr & FILE_ATTTRIBUTE_MASK);
+                        SetFileAttributesW(outputPath.c_str(), fileInfo->FileAttr & FILE_ATTTRIBUTE_MASK);
                         if (success)
                         {
                             *success = TRUE;
@@ -1259,7 +1215,6 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
             }
             else
             {
-                *dest = 0;
                 skip = false;
                 bool retry;
                 if (!Test)
@@ -1267,10 +1222,14 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     do
                     {
                         retry = false;
-                        if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
+                        std::wstring directoryError;
+                        if (!SPLCheckAndCreateDirectoryOwned(
+                                SalamanderGeneral,
+                                directoryPath.c_str(),
+                                NULL, TRUE, &directoryError))
                         {
-                            switch (ProcessError(IDS_ERRCREATEDIR, 0, targetDir, DialogFlags,
-                                                 &SkipAllIOErrors, errBuf))
+                            switch (ProcessError(IDS_ERRCREATEDIR, 0, directoryPath.c_str(), DialogFlags,
+                                                 &SkipAllIOErrors, directoryError.c_str()))
                             {
                             case ERR_RETRY:
                                 retry = true;
@@ -1283,11 +1242,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                 }
                 if (!errorID)
                 {
-                    sour = name;
-                    while (*sour)
-                        *dest++ = *sour++;
-                    *dest = 0;
-                    FileNameDisp = fileInfo->Name + RootLen + (RootLen ? 1 : 0);
+                    FileNameDisp = relativeName;
                     skip = false;
                     if (fileInfo->Flag & GPF_ENCRYPTED)
                     {
@@ -1302,7 +1257,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                     aesExtraField.Strength < 1 ||
                                     aesExtraField.Strength > 3)
                                 {
-                                    switch (ProcessError(IDS_BADAES, 0, FileNameDisp,
+                                    switch (ProcessError(IDS_BADAES, 0, FileNameDisp.c_str(),
                                                          PE_NORETRY | DialogFlags, &SkipAllEncrypted))
                                     {
                                     case ERR_SKIP:
@@ -1317,7 +1272,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                 {
                                     if (aesExtraField.VendorID != AES_NONVENDOR_ID ||
                                         ((AES_VERSION_1 != aesExtraField.Version) && (AES_VERSION_2 != aesExtraField.Version)))
-                                        TRACE_E("POZOR: soubor '" << FileNameDisp << "' je zakryptovan neznamou verzi AES, mozne komplikace");
+                                        TRACE_E("POZOR: soubor '" << WideToZipText(FileNameDisp.c_str()) << "' je zakryptovan neznamou verzi AES, mozne komplikace");
 
                                     char pwd[MAX_PASSWORD];
                                     unsigned char salt[SAL_AES_MAX_SALT_LENGTH];
@@ -1363,7 +1318,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                             {
                                                 repeat = false;
                                                 switch (PasswordDialog(SalamanderGeneral->GetMsgBoxParent(),
-                                                                       FileNameDisp, pwd))
+                                                                       FileNameDisp.c_str(), pwd))
                                                 {
                                                 case IDOK:
                                                 {
@@ -1398,8 +1353,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
 
                                                     if (err)
                                                     {
-                                                        SalamanderGeneral->ShowMessageBox(LoadStr(err),
-                                                                                          LoadStr(IDS_BADPWDTITLE), MSGBOX_ERROR);
+                                                        SalamanderGeneral->ShowMessageBox(LangStr(err).c_str(), LangStr(IDS_BADPWDTITLE).c_str(), MSGBOX_ERROR);
                                                         repeat = true;
                                                     }
                                                     break;
@@ -1445,12 +1399,12 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                         do
                                         {
                                             repeat = false;
-                                            switch (PasswordDialog(SalamanderGeneral->GetMsgBoxParent(), FileNameDisp, pwd))
+                                            switch (PasswordDialog(SalamanderGeneral->GetMsgBoxParent(), FileNameDisp.c_str(), pwd))
                                             {
                                             case IDOK:
                                                 if (InitKeys(pwd, header, check, Keys))
                                                 {
-                                                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_BADPWD), LoadStr(IDS_BADPWDTITLE), MSGBOX_ERROR);
+                                                    SalamanderGeneral->ShowMessageBox(LangStr(IDS_BADPWD).c_str(), LangStr(IDS_BADPWDTITLE).c_str(), MSGBOX_ERROR);
                                                     repeat = true;
                                                 }
                                                 else
@@ -1483,15 +1437,11 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     {
                         if (!Test)
                         {
-                            char attr[101];
-                            CPathBuffer buf; // Heap-allocated for long path support
-                            int len = lstrlen(ZipName);
-
-                            lstrcpy(buf, ZipName);
-                            *(buf.Get() + len++) = '\\';
-                            lstrcpyn(buf.Get() + len, fileInfo->Name, buf.Size() - len);
-                            GetInfo(attr, &fileInfo->LastWrite, fileInfo->Size);
-                            result = SafeCreateCFile(&OutputFile, targetDir, buf, attr, GENERIC_WRITE,
+                            std::wstring sourceName = ZipName;
+                            sourceName.push_back(L'\\');
+                            sourceName += ZipTextToWide(fileInfo->Name);
+                            const std::wstring attr = GetInfo(&fileInfo->LastWrite, fileInfo->Size);
+                            result = SafeCreateCFile(&OutputFile, outputPath.c_str(), sourceName.c_str(), attr.c_str(), GENERIC_WRITE,
                                                      FILE_SHARE_READ, fileInfo->FileAttr & ~FILE_ATTRIBUTE_READONLY | FILE_FLAG_SEQUENTIAL_SCAN,
                                                      DialogFlags, &Silent, &SkipAllIOErrors, fileInfo->Size);
                         }
@@ -1544,7 +1494,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                 break;
                             default:
                             {
-                                switch (ProcessError(IDS_BADMETHOD, 0, FileNameDisp,
+                                switch (ProcessError(IDS_BADMETHOD, 0, FileNameDisp.c_str(),
                                                      PE_NORETRY | DialogFlags, &SkipAllBadMathods))
                                 {
                                 case ERR_SKIP:
@@ -1579,9 +1529,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                             NULL, &fileInfo->LastWrite);
                                 CloseCFile(OutputFile);
                                 if (result || UserBreak)
-                                    DeleteFile(targetDir);
+                                    DeleteFileW(outputPath.c_str());
                                 else
-                                    SetFileAttributes(targetDir, fileInfo->FileAttr & FILE_ATTTRIBUTE_MASK);
+                                    SetFileAttributesW(outputPath.c_str(), fileInfo->FileAttr & FILE_ATTTRIBUTE_MASK);
                             }
                             else
                                 remain = fileInfo->Size - ExtractedBytes;
@@ -1596,7 +1546,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                     if (bCheckCRC && ((Crc != fileInfo->Crc) &&
                                                       ((fileInfo->Flag & GPF_DATADESCR) || Crc != localHeader->Crc)))
                                     {
-                                        if (ProcessError(IDS_ERRCRC, 0, FileNameDisp, PE_NORETRY | DialogFlags,
+                                        if (ProcessError(IDS_ERRCRC, 0, FileNameDisp.c_str(), PE_NORETRY | DialogFlags,
                                                          &SkipAllDataErr) == ERR_CANCEL)
                                         {
                                             result = DEC_CANCEL;
@@ -1604,8 +1554,8 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                         }
                                         if (!Test)
                                         {
-                                            SalamanderGeneral->ClearReadOnlyAttr(targetDir);
-                                            DeleteFile(targetDir);
+                                            SalamanderGeneral->ClearReadOnlyAttr(outputPath.c_str());
+                                            DeleteFileW(outputPath.c_str());
                                         }
                                     }
                                     else
@@ -1628,15 +1578,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     }
                 }
             }
-#ifdef TRACE_ENABLE
-            if (dest - targetDir >= ZIP_MAX_PATH)
-                TRACE_E("Max path length exceeded");
-#endif
         }
     }
-    *(targetDir + --targetDirLen) = 0;
     free(localHeader);
-    free(pathBuf);
     if (AESContextValid)
     {
         unsigned char dummy[AES_MAXHMAC];
@@ -1645,16 +1589,11 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
     return errorID;
 } /* CZipUnpack::ExtractSingleFile */
 
-int CZipUnpack::ExtractFiles(const char* targetDir)
+int CZipUnpack::ExtractFiles(const wchar_t* targetDir)
 {
-    CALL_STACK_MESSAGE2("CZipUnpack::ExtractFiles(%s)", targetDir);
+    CALL_STACK_MESSAGE2("CZipUnpack::ExtractFiles(%ls)", targetDir);
     CLocalFileHeader* localHeader;
     CFileInfo* fileInfo;
-    char* tempDir;
-    int tempDirLen;
-    LPTSTR progrTextBuf;
-    LPTSTR progrText;
-    const char* sour;
     //int                 rootLen = lstrlen(ZipRoot);
     int errorID = 0;
     int i;
@@ -1664,17 +1603,10 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
     SlideWindow = (char*)malloc(SLIDE_WINDOW_SIZE);
     WinSize = SLIDE_WINDOW_SIZE;
     localHeader = (CLocalFileHeader*)malloc(MAX_HEADER_SIZE);
-    tempDir = (char*)malloc(sizeof(TCHAR) * (ZIP_MAX_PATH + 1));
-    progrTextBuf = (LPTSTR)malloc(sizeof(TCHAR) * (ZIP_MAX_PATH + 32));
-    if (!localHeader || !tempDir || !progrTextBuf ||
-        !InputBuffer || !SlideWindow)
+    if (!localHeader || !InputBuffer || !SlideWindow)
     {
         if (localHeader)
             free(localHeader);
-        if (tempDir)
-            free(tempDir);
-        if (progrTextBuf)
-            free(progrTextBuf);
         if (InputBuffer)
             free(InputBuffer);
         if (SlideWindow)
@@ -1687,21 +1619,14 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
   else
   {
   */
-    lstrcpy(tempDir, targetDir);
-    tempDirLen = lstrlen(tempDir);
-    if (tempDirLen && tempDir[tempDirLen - 1] == '\\')
-    {
-        tempDir[tempDirLen - 1] = 0;
-        tempDirLen--;
-    }
+    std::wstring tempDir(targetDir != NULL ? targetDir : L"");
+    while (tempDir.size() > 1 && tempDir.back() == L'\\')
+        tempDir.pop_back();
     if (!Test && !SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
-                                                   targetDir, ProgressTotalSize, LoadStr(IDS_PLUGINNAME)))
+                                                   targetDir, ProgressTotalSize, LangStr(IDS_PLUGINNAME).c_str()))
         errorID = IDS_NODISPLAY;
     {
-        progrText = progrTextBuf;
-        sour = LoadStr(Test ? IDS_TESTING : IDS_EXTRACTING);
-        while (*sour)
-            *progrText++ = *sour++;
+        const std::wstring progressPrefix = LoadStrW(Test ? IDS_TESTING : IDS_EXTRACTING).c_str();
         fixed_tl64 = NULL; //for
         fixed_td64 = NULL;
         fixed_tl32 = NULL; //for
@@ -1714,31 +1639,18 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
         SkipAllBadMathods = 0;
         Silent = 0;
         ProgressTotalSize += CQuadWord(ExtrFiles->Count, 0);
-        Salamander->ProgressDialogAddText(LoadStr(Test ? IDS_TESTFILES : IDS_EXTRACTFILES), FALSE);
+        Salamander->ProgressDialogAddText(LoadStrW(Test ? IDS_TESTFILES : IDS_EXTRACTFILES).c_str(), FALSE);
         for (i = 0; i < ExtrFiles->Count && !errorID && !UserBreak; i++)
         {
             fileInfo = (*ExtrFiles)[i];
-            if (tempDirLen + 1 + fileInfo->NameLen - RootLen - (RootLen ? 1 : 0) >=
-                (DWORD)(Test ? ZIP_MAX_PATH : MAX_PATH - (fileInfo->IsDir ? 12 : 0)))
-            {
-                switch (ProcessError(IDS_TOOLONGNAME3, 0, fileInfo->Name + RootLen + (RootLen ? 1 : 0),
-                                     PE_NORETRY | DialogFlags, &SkipAllLongNames))
-                {
-                case ERR_SKIP:
-                    UserBreak = !ProgressAddSize(fileInfo->Size + 1);
-                    continue;
-                case ERR_CANCEL:
-                    errorID = IDS_NODISPLAY;
-                }
-                break;
-            }
-            lstrcpy(progrText, fileInfo->Name + RootLen + (RootLen ? 1 : 0));
-            Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
+            const std::wstring progressText = progressPrefix +
+                ZipTextToWide(fileInfo->Name + RootLen + (RootLen ? 1 : 0));
+            Salamander->ProgressDialogAddText(progressText.c_str(), TRUE);
             if (Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
             {
                 Salamander->ProgressSetTotalSize(CQuadWord().SetUI64(fileInfo->Size), ProgressTotalSize);
                 BOOL ok;
-                errorID = ExtractSingleFile(tempDir, tempDirLen, fileInfo, &ok);
+                errorID = ExtractSingleFile(tempDir.c_str(), fileInfo, &ok);
                 if (!ok)
                     AllFilesOK = FALSE; // for archive testing
                 UserBreak = !Salamander->ProgressAddSize(1, TRUE);
@@ -1748,29 +1660,7 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
         }
         InflateFreeFixedHufman();
     }
-    /*
-    Salamander->CloseProgressDialog();
-    if (!errorID && !UserBreak)
-    {
-      char  buf[MAX_PATH + 1];
-      int   len;
-
-      lstrcpyn(buf, ZipName, MAX_PATH + 1);
-      len = lstrlen(buf);
-      if (RootLen)
-      {
-        *(buf + len) = '\\';
-        len++;
-      }
-      lstrcpyn(buf + len, ZipRoot, MAX_PATH + 1 - lstrlen(buf));
-      Salamander->MoveFiles(tempDir, targetDir, tempDir, buf);
-    }
-    SalamanderGeneral->RemoveTemporaryDir(tempDir);
-  }
-  */
     free(localHeader);
-    free(tempDir);
-    free(progrTextBuf);
     free(InputBuffer);
     free(SlideWindow);
     return errorID;
@@ -1853,34 +1743,31 @@ int CZipUnpack::SafeRead(void * buffer, unsigned bytesToRead,
 }
 */
 
-int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* arcName,
-                                const char* fileData, unsigned int access, unsigned int share,
+int CZipUnpack::SafeCreateCFile(CFile** file, const wchar_t* fileName, const wchar_t* arcName,
+                                const wchar_t* fileData, unsigned int access, unsigned int share,
                                 unsigned int attributes, int flags, DWORD* silent,
                                 bool* skipAll, QWORD size)
 {
-    CALL_STACK_MESSAGE8("CZipUnpack::SafeCreateCFile(, %s, %s, %s, 0x%X, 0x%X, "
+    CALL_STACK_MESSAGE8("CZipUnpack::SafeCreateCFile(, %ls, %ls, %ls, 0x%X, 0x%X, "
                         "0x%X, %d, , )",
                         fileName, arcName, fileData, access,
                         share, attributes, flags);
     int result; //temp variable
     int errorID = 0;
     int lastError; //value returned by GetLastError()
-    int len = lstrlen(fileName);
     BOOL toSkip = FALSE;
     int flagsNoRetry;
 
-    if ((*file = (CFile*)malloc(sizeof(CFile))) == NULL ||
-        ((*file)->FileName = (char*)malloc(len + 1)) == NULL)
+    *file = NULL;
+    try
     {
-        if ((*file)->FileName)
-        {
-            free((*file)->FileName);
-        }
-        if (*file)
-        {
-            free(*file);
-            *file = NULL;
-        }
+        *file = new CFile;
+        (*file)->FileName = fileName != NULL ? fileName : L"";
+    }
+    catch (...)
+    {
+        delete *file;
+        *file = NULL;
         return ERR_LOWMEM;
     }
     (*file)->OutputBuffer = NULL;
@@ -1888,8 +1775,7 @@ int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* 
     if (access & GENERIC_WRITE &&
         ((*file)->OutputBuffer = (char*)malloc(OUTPUT_BUFFER_SIZE)) == NULL)
     {
-        free((*file)->FileName);
-        free(*file);
+        delete *file;
         *file = NULL;
         return ERR_LOWMEM;
     }
@@ -1905,11 +1791,11 @@ int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* 
                 q += CQuadWord(0, 0x80000000);
 
             (*file)->File = SalamanderSafeFile->SafeFileCreate(fileName, access, share, attributes,
-                                                               FALSE, SalamanderGeneral->GetMsgBoxParent(), arcName, fileData,
+                                                               FALSE, SalamanderGeneral->GetMsgBoxParent(), arcName,
+                                                               fileData,
                                                                silent, TRUE, &toSkip, NULL, 0, allocate ? &q : NULL, NULL);
             if ((*file)->File != INVALID_HANDLE_VALUE)
             {
-                lstrcpy((*file)->FileName, fileName);
                 (*file)->FilePointer = 0;
                 (*file)->RealFilePointer = 0;
                 (*file)->Flags = flags;
@@ -1968,10 +1854,9 @@ int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* 
             {
 
             SCF_ABORT:
-                free((*file)->FileName);
                 if (access & GENERIC_WRITE)
                     free((*file)->OutputBuffer);
-                free(*file);
+                delete *file;
                 *file = NULL;
                 return result;
             }

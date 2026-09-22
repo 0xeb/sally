@@ -6,6 +6,7 @@
 
 #include "mainwnd.h"
 #include "ui/IPrompter.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 #include "usermenu.h"
 #include "snooper.h"
@@ -84,7 +85,7 @@ BOOL PreventSetUnhandledExceptionFilterAux()
     // ARM64: patching not implemented, just return FALSE
     return FALSE;
 #else
-    HMODULE hKernel32 = LoadLibrary(_T("kernel32.dll"));
+    HMODULE hKernel32 = LoadLibrary(L"kernel32.dll");
     if (hKernel32 == NULL)
         return FALSE;
     void* pOrgEntry = GetProcAddress(hKernel32, "SetUnhandledExceptionFilter");
@@ -166,8 +167,8 @@ struct CTBRData
     BOOL EventProcessedRet;
     DWORD CurrentThreadID;
     DWORD ShellExtCrashID; // if not equal to -1, it indicates an exception during shell execute
-    const char* IconOvrlsHanName;
-    const char* BugReportPath;
+    const wchar_t* IconOvrlsHanName;
+    const wchar_t* BugReportPath;
 };
 
 CTBRData TBRData = {0};
@@ -513,7 +514,7 @@ void CCallStack::Push(const char* format, va_list args)
             {
                 strcpy(backup, "vsprintf error in: ");
                 int len = (int)strlen(backup);
-                lstrcpyn(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
+                lstrcpynA(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
                 ret = (int)strlen(backup);
                 End = backup + ret + 1;
             }
@@ -522,8 +523,94 @@ void CCallStack::Push(const char* format, va_list args)
         {
             strcpy(backup, "exception in: ");
             int len = (int)strlen(backup);
-            lstrcpyn(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
+            lstrcpynA(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
             ret = (int)strlen(backup);
+            End = backup + ret + 1;
+        }
+        *(short*)End = (short)ret;
+        End += 2;
+        *End = 0; // double null terminated
+    }
+    else
+    {
+        Skipped++;
+    }
+}
+
+static int EncodeWideCallStackText(BYTE* destination, int destinationSize,
+                                   const wchar_t* text, int textLength)
+{
+    if (destinationSize <= 0)
+        return -1;
+    destination[0] = 0;
+    if (text == NULL || textLength <= 0)
+        return 0;
+    if (destinationSize <= 1)
+        return -1;
+
+    std::string encoded;
+    if (!sally::diagnostic::EncodeAcpLossyPrefix(
+            text, static_cast<size_t>(textLength),
+            static_cast<size_t>(destinationSize - 1), encoded))
+        return -1;
+    if (!encoded.empty())
+        memcpy(destination, encoded.data(), encoded.size());
+    destination[encoded.size()] = 0;
+    return static_cast<int>(encoded.size());
+}
+
+static int StoreWideCallStackFailure(BYTE* destination, int destinationSize,
+                                     const BYTE* prefix, const wchar_t* format)
+{
+    lstrcpynA(reinterpret_cast<PCHAR>(destination),
+              reinterpret_cast<PCSTR>(prefix), destinationSize);
+    int length = lstrlenA(reinterpret_cast<PCSTR>(destination));
+    if (format != NULL && length < destinationSize - 1)
+    {
+        const int appended = EncodeWideCallStackText(destination + length,
+                                                     destinationSize - length,
+                                                     format, lstrlenW(format));
+        if (appended > 0)
+            length += appended;
+    }
+    return length;
+}
+
+void CCallStack::Push(const wchar_t* format, va_list args)
+{
+#if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
+    PushesCounter++;
+#endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
+    while (!DontSuspend && CCallStack::ExceptionExists)
+        Sleep(1000); // instead of SuspendThread in the exception handler
+    if (STACK_CALLS_BUF_SIZE - (End - Text) >= STACK_CALLS_MAX_MESSAGE_LEN + 4)
+    {
+        auto* backup = End;
+        int ret;
+        __try
+        {
+            wchar_t formatted[STACK_CALLS_MAX_MESSAGE_LEN + 1];
+            const int formattedLength = _vsnwprintf_s(formatted, _countof(formatted),
+                                                       _TRUNCATE, format, args);
+            ret = formattedLength >= 0 ? EncodeWideCallStackText(reinterpret_cast<BYTE*>(End),
+                                                                  STACK_CALLS_MAX_MESSAGE_LEN + 1,
+                                                                  formatted, formattedLength)
+                                       : -1;
+            if (ret >= 0)
+                End += ret + 1;
+            else
+            {
+                ret = StoreWideCallStackFailure(reinterpret_cast<BYTE*>(backup),
+                                                STACK_CALLS_MAX_MESSAGE_LEN + 1,
+                                                reinterpret_cast<const BYTE*>("vswprintf error in: "), format);
+                End = backup + ret + 1;
+            }
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            ret = StoreWideCallStackFailure(reinterpret_cast<BYTE*>(backup),
+                                            STACK_CALLS_MAX_MESSAGE_LEN + 1,
+                                            reinterpret_cast<const BYTE*>("exception in: "), format);
             End = backup + ret + 1;
         }
         *(short*)End = (short)ret;
@@ -583,23 +670,23 @@ CCallStack::GetNextLine()
     }
 }
 
-void InformAboutIconOvrlsHanCrash(const char* iconOvrlsHanName)
+void InformAboutIconOvrlsHanCrash(const wchar_t* iconOvrlsHanName)
 {
     __try
     {
-        static char buf[900];
-        _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_ICONOVRLS_CRASH), iconOvrlsHanName);
+        static wchar_t buf[900];
+        _snwprintf_s(buf, _TRUNCATE, LoadStrW(IDS_ICONOVRLS_CRASH), iconOvrlsHanName);
 
         MSGBOXEX_PARAMS params;
         memset(&params, 0, sizeof(params));
         params.HParent = NULL;
         params.Flags = MB_ABORTRETRYIGNORE | MB_ICONERROR | MB_SETFOREGROUND;
-        params.Caption = SALAMANDER_TEXT_VERSION;
+        params.Caption = SALAMANDER_TEXT_VERSIONW();
         params.Text = buf;
-        static char aliasBtnNames[200];
+        static wchar_t aliasBtnNames[200];
         /* used by the export_mnu.py script which generates salmenu.mnu for the Translator
    we let message box buttons handle hotkey collisions by simulating that they belong to a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_ICONOVRLS_DISTHIS
@@ -607,9 +694,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-        sprintf(aliasBtnNames, "%d\t%s\t%d\t%s",
-                DIALOG_ABORT, LoadStr(IDS_ICONOVRLS_DISTHIS),
-                DIALOG_RETRY, LoadStr(IDS_ICONOVRLS_DISALL));
+        swprintf_s(aliasBtnNames, L"%d\t%s\t%d\t%s",
+                   DIALOG_ABORT, LoadStrW(IDS_ICONOVRLS_DISTHIS),
+                   DIALOG_RETRY, LoadStrW(IDS_ICONOVRLS_DISALL));
         params.AliasBtnNames = aliasBtnNames;
         int res = SalMessageBoxEx(&params);
         switch (res)
@@ -630,19 +717,21 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (res != DIALOG_IGNORE)
         {
             HKEY hSalamander;
-            if (OpenKey(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], hSalamander)) // write data only if a configuration exists in the registry (hich should almost always be the cas)
+            if (OpenKeyW(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], hSalamander)) // write data only if a configuration exists in the registry (hich should almost always be the cas)
             {
                 HKEY actKey;
-                if (OpenKey(hSalamander, SALAMANDER_CONFIG_REG, actKey)) // write data only if a configuration exists in the registry (hich should almost always be the cas)
+                if (OpenKeyW(hSalamander, SALAMANDER_CONFIG_REG, actKey)) // write data only if a configuration exists in the registry (hich should almost always be the cas)
                 {
                     CloseKey(actKey);
-                    if (CreateKey(hSalamander, SALAMANDER_CONFIG_REG, actKey))
+                    if (CreateKeyW(hSalamander, SALAMANDER_CONFIG_REG, actKey))
                     {
                         // NOTE: normally, these values are written in CMainWindow::SaveConfig()
-                        SetValue(actKey, CONFIG_ENABLECUSTICOVRLS_REG, REG_DWORD,
-                                 &Configuration.EnableCustomIconOverlays, sizeof(DWORD));
-                        SetValue(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
-                                 Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : "", -1);
+                        SetValueW(actKey, CONFIG_ENABLECUSTICOVRLS_REG, REG_DWORD,
+                                  &Configuration.EnableCustomIconOverlays, sizeof(DWORD));
+                        // L"" matters: the -1 sentinel makes SetValueAux run wcslen over this
+                        // pointer, and a narrow "" is a ONE-byte object to read a WORD from.
+                        SetValueW(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
+                                  Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : L"", -1);
 
                         CloseKey(actKey);
                     }
@@ -662,7 +751,7 @@ CCallStack::ThreadBugReportF(void* param)
     CCallStack stack(TRUE); // so there is somewhere to store texts from called functions
     CALL_STACK_MESSAGE1("ThreadBugReportF()");
 
-    SetThreadNameInVC("ThreadBugReport");
+    SetThreadNameInVC(L"ThreadBugReport");
 
     CTBRData* data = (CTBRData*)param;
 
@@ -698,7 +787,7 @@ CCallStack::ThreadBugReportF(void* param)
                 if (data->ShellExtCrashID != -1)
                 {
                     // crash shell extension
-                    gPrompter->ShowInfo(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_SHELLEXTCRASH));
+                    gPrompter->ShowInfo(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_SHELLEXTCRASH));
                 }
             }
             data->ExitProcess = TRUE; // terminate the thread
@@ -725,13 +814,13 @@ void PrintBugReportLine(void* param, const char* txt, BOOL tab)
     static DWORD d;
     if (tab)
         WriteFile((HANDLE)param, "  ", 2, &d, NULL);
-    WriteFile((HANDLE)param, txt, lstrlen(txt), &d, NULL);
+    WriteFile((HANDLE)param, txt, lstrlenA(txt), &d, NULL);
     WriteFile((HANDLE)param, "\r\n", 2, &d, NULL);
     if (++called % 5 == 0)
         FlushFileBuffers((HANDLE)param);
 }
 
-BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD threadID, DWORD ShellExtCrashID, const char* bugReportFileName)
+BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD threadID, DWORD ShellExtCrashID, const wchar_t* bugReportFileName)
 {
     // try to create the bug report file; the fewer library functions we call,
     // the lower the chance this routine crashes (the libraries might be corrupted
@@ -743,8 +832,8 @@ BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD thread
         {
             // create the file
             static HANDLE file;
-            file = NOHANDLES(CreateFile(bugReportFileName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                        FILE_ATTRIBUTE_NORMAL, NULL));
+            file = NOHANDLES(CreateFileW(bugReportFileName, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                         FILE_ATTRIBUTE_NORMAL, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {
                 __try
@@ -786,7 +875,7 @@ BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD thread
     return ret;
 }
 
-int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, const char* iconOvrlsHanName)
+int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, const wchar_t* iconOvrlsHanName)
 {
     // WARNING - an exception occurred and before signaling salmon.exe (to generate
     // the minidump), we should call only the absolute minimum API (the system may be
@@ -798,10 +887,8 @@ int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, co
         return EXCEPTION_CONTINUE_SEARCH; // pass the exception on ... the debugger will catch it
 #endif
 
-    static CPathBuffer bugReportPath;
-
     // request salmon to generate the minidump
-    SalmonFireAndWait(e, bugReportPath);
+    const wchar_t* bugReportPath = SalmonFireAndWait(e);
 
     // Although delayed after the minidump, it is more reliable, it increases the chance of having a valid dump
     SalamanderExceptionTime = GetTickCount();

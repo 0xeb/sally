@@ -20,13 +20,13 @@
 CScriptEngineAssociations g_oScriptAssociations;
 
 bool CScriptEngineAssociations::FindEngineByExt(
-    PCTSTR pszExt,
+    PCWSTR pszExt,
     __out_opt CLSID* clsidEngine)
 {
     SCRIPT_ENGINE_ASSOCIATION* pExistingAssoc;
     bool bFound = false;
 
-    _ASSERTE(*pszExt == _T('.'));
+    _ASSERTE(*pszExt == L'.');
 
     pExistingAssoc = FindAssoc(pszExt);
     if (pExistingAssoc)
@@ -49,15 +49,15 @@ bool CScriptEngineAssociations::FindEngineByExt(
         HKEY hkScriptEngine;
         WCHAR szEngineProgId[128];
 
-        StringCchCopy(sNewAssoc.szExt, _countof(sNewAssoc.szExt), pszExt);
+        StringCchCopyW(sNewAssoc.szExt, _countof(sNewAssoc.szExt), pszExt);
         sNewAssoc.clsidEngine = CLSID_NULL;
 
-        hr = AssocQueryKey(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCKEY_CLASS,
-                           pszExt, NULL, &hkFileType);
+        hr = AssocQueryKeyW(ASSOCF_INIT_IGNOREUNKNOWN, ASSOCKEY_CLASS,
+                            pszExt, NULL, &hkFileType);
         if (SUCCEEDED(hr))
         {
-            hr = HRESULT_FROM_WIN32(RegOpenKeyEx(hkFileType,
-                                                 _T("ScriptEngine"), 0, KEY_READ, &hkScriptEngine));
+            hr = HRESULT_FROM_WIN32(RegOpenKeyExW(hkFileType,
+                                                  L"ScriptEngine", 0, KEY_READ, &hkScriptEngine));
             if (SUCCEEDED(hr))
             {
                 DWORD dwType;
@@ -70,7 +70,7 @@ bool CScriptEngineAssociations::FindEngineByExt(
                     if (dwType == REG_SZ)
                     {
                         // ensure nul-terminator
-                        szEngineProgId[cbData / sizeof(szEngineProgId[0])] = _T('\0');
+                        szEngineProgId[cbData / sizeof(szEngineProgId[0])] = L'\0';
                         hr = CLSIDFromProgID(szEngineProgId, &sNewAssoc.clsidEngine);
                     }
                     else
@@ -105,12 +105,12 @@ bool CScriptEngineAssociations::FindEngineByExt(
     return bFound;
 }
 
-SCRIPT_ENGINE_ASSOCIATION* CScriptEngineAssociations::FindAssoc(PCTSTR pszExt)
+SCRIPT_ENGINE_ASSOCIATION* CScriptEngineAssociations::FindAssoc(PCWSTR pszExt)
 {
     for (int i = 0; i < Count; i++)
     {
         SCRIPT_ENGINE_ASSOCIATION& assoc = At(i);
-        if (_tcsicmp(pszExt, assoc.szExt) == 0)
+        if (_wcsicmp(pszExt, assoc.szExt) == 0)
         {
             return &assoc;
         }
@@ -120,13 +120,13 @@ SCRIPT_ENGINE_ASSOCIATION* CScriptEngineAssociations::FindAssoc(PCTSTR pszExt)
 }
 
 HRESULT CScriptEngineAssociations::QueryHardcodedScriptEngineAssociation(
-    PCTSTR pszExt,
+    PCWSTR pszExt,
     __out CLSID* clsidEngine)
 {
     // Windows really makes hard time for us to use the JScript engine.
     // Use hardcoded association for .js files if everything else fails.
 
-    if (_tcsicmp(pszExt, _T(".js")) == 0)
+    if (_wcsicmp(pszExt, L".js") == 0)
     {
         *clsidEngine = CLSID_JScript;
         return S_OK;

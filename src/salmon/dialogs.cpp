@@ -193,9 +193,6 @@ CMainDialog::CMainDialog(HINSTANCE hInstance, int resID, BOOL minidumpOnOpen)
     Compressing = FALSE;
     Uploading = FALSE;
     Minidumping = FALSE;
-    ZeroMemory(&CompressParams, sizeof(CompressParams));
-    ZeroMemory(&UploadParams, sizeof(UploadParams));
-    CurrentProgressText[0] = 0;
     MinidumpOnOpen = minidumpOnOpen;
 }
 
@@ -229,7 +226,7 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
     {
         // set the size of the child window according to the content
         HWND hChild = GetDlgItem(HWindow, IDC_SALMON_UPLOADING);
-        char buff[200];
+        std::wstring text;
         int resID = 0;
         switch (task)
         {
@@ -245,9 +242,9 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
         }
         if (resID != 0)
         {
-            strcpy(buff, LoadStr(resID, HLanguage));
-            strcpy(CurrentProgressText, buff);
-            SetWindowText(hChild, buff);
+            text = LoadStr(resID, HLanguage);
+            CurrentProgressText = text;
+            SetWindowTextW(hChild, text.c_str());
         }
         HFONT hFont = (HFONT)SendMessage(hChild, WM_GETFONT, 0, 0);
         HDC hDC = HANDLES(GetDC(HWindow));
@@ -257,7 +254,7 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(hDC, buff, -1, &tR, DT_CALCRECT | DT_CENTER | DT_NOPREFIX);
+        DrawTextW(hDC, text.c_str(), -1, &tR, DT_CALCRECT | DT_CENTER | DT_NOPREFIX);
         SelectObject(hDC, hOldFont);
         HANDLES(ReleaseDC(HWindow, hDC));
         SIZE sz = {tR.right - tR.left, tR.bottom - tR.top};
@@ -278,25 +275,22 @@ void CMainDialog::CenterControl(int resID)
     SetWindowPos(GetDlgItem(HWindow, resID), NULL, (wR.right - cR.right) / 2, (wR.bottom - cR.bottom) / 2, 0, 0, SWP_NOZORDER | SWP_NOSIZE);
 }
 
-void StripWhiteSpaces(char* buff)
+void StripWhiteSpaces(std::wstring& text)
 {
-    char* s = buff;
-    while (*s == ' ' || *s == '\t')
-        s++;
-    if (s > buff)
-        memmove(buff, s, strlen(s) + 1);
-
-    s = buff + strlen(buff);
-    while (*s == ' ' || *s == '\t' || *s == 0)
-        s--;
-    s++;
-    *s = 0;
+    const size_t begin = text.find_first_not_of(L" \t");
+    if (begin == std::wstring::npos)
+    {
+        text.clear();
+        return;
+    }
+    const size_t end = text.find_last_not_of(L" \t");
+    text = text.substr(begin, end - begin + 1);
 }
 
-BOOL ValidateEmail(const char* buff) // primitive check of the email's syntactic validity
+BOOL ValidateEmail(const wchar_t* buff) // primitive check of the email's syntactic validity
 {
     // assumes leading/trailing whitespace is trimmed
-    const char* s = buff;
+    const wchar_t* s = buff;
     // the string must not be empty
     if (*s == 0)
         return FALSE;
@@ -323,28 +317,30 @@ BOOL ValidateEmail(const char* buff) // primitive check of the email's syntactic
 
 void CMainDialog::Validate(CTransferInfo& ti)
 {
-    char buff[EMAIL_SIZE];
-    ti.EditLine(IDC_SALMON_EMAIL, buff, EMAIL_SIZE);
-    StripWhiteSpaces(buff);
-    if (*buff != 0 && !ValidateEmail(buff))
+    std::wstring email;
+    ti.EditLineW(IDC_SALMON_EMAIL, email);
+    StripWhiteSpaces(email);
+    if (!email.empty() && !ValidateEmail(email.c_str()))
     {
-        MessageBox(HWindow, LoadStr(IDS_SALMON_INVALIDEMAIL, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        // wide: LoadStrW() is a new sibling of this module's LoadStr(), same
+        // rotating-buffer pattern with LoadStringW.
+        MessageBoxW(HWindow, LoadStrW(IDS_SALMON_INVALIDEMAIL, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
         ti.ErrorOn(IDC_SALMON_EMAIL);
     }
 }
 
 void CMainDialog::Transfer(CTransferInfo& ti)
 {
-    ti.EditLine(IDC_SALMON_ACTION, Config.Description, DESCRIPTION_SIZE);
-    ti.EditLine(IDC_SALMON_EMAIL, Config.Email, EMAIL_SIZE);
+    ti.EditLineW(IDC_SALMON_ACTION, Config.Description);
+    ti.EditLineW(IDC_SALMON_EMAIL, Config.Email);
 }
 
 BOOL CMainDialog::StartUploadIndex(int index)
 {
-    ZeroMemory(&UploadParams, sizeof(UploadParams));
-    strcpy(UploadParams.FileName, BugReportPath);
-    strcat(UploadParams.FileName, BugReports[index].Name);
-    strcat(UploadParams.FileName, ".7Z");
+    UploadParams = {};
+    UploadParams.FileName = BugReportPath;
+    UploadParams.FileName += BugReports[index].Name;
+    UploadParams.FileName += L".7Z";
     BOOL ret = StartUploadThread(&UploadParams);
     ShowChilds(dteUpload, FALSE);
     return ret;
@@ -386,7 +382,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (MinidumpOnOpen)
         {
-            ZeroMemory(&MinidumpParams, sizeof(MinidumpParams));
+            MinidumpParams = {};
             Minidumping = StartMinidumpThread(&MinidumpParams);
             ShowChilds(dteMinidump, FALSE);
         }
@@ -418,12 +414,11 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 static DWORD counter = 0;
                 counter++;
-                char buff[200];
-                strcpy(buff, CurrentProgressText);
-                if (strlen(buff) > 3 && strcmp(buff + strlen(buff) - 3, "...") == 0)
-                    buff[strlen(CurrentProgressText) - 3 + (counter % 4)] = 0;
+                std::wstring text = CurrentProgressText;
+                if (text.size() > 3 && text.compare(text.size() - 3, 3, L"...") == 0)
+                    text.resize(text.size() - 3 + (counter % 4));
                 HWND hChild = GetDlgItem(HWindow, IDC_SALMON_UPLOADING);
-                SetWindowText(hChild, buff);
+                SetWindowTextW(hChild, text.c_str());
             }
 
             if (Minidumping && !IsMinidumpThreadRunning())
@@ -433,15 +428,15 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 // if minidump generation failed, just report the error but continue (some data may have been saved)
                 if (!MinidumpParams.Result)
                 {
-                    char msg[2 * MAX_PATH];
-                    sprintf(msg, LoadStr(IDS_SALMON_BUGREPORT_PROBLEM, HLanguage), MinidumpParams.ErrorMessage);
-                    MessageBox(HWindow, msg, LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_BUGREPORT_PROBLEM, HLanguage).c_str(), MinidumpParams.ErrorMessage.c_str());
+                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
                 }
 
                 if (GetBugReportNames() && GetUniqueBugReportCount() > 1)
                 {
                     // if multiple reports exist, ask whether to send them all
-                    int res = MessageBox(HWindow, LoadStr(IDS_SALMON_MORE_REPORTS, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND);
+                    // wide: same LoadStrW infra added for this file (233).
+                    int res = MessageBoxW(HWindow, LoadStrW(IDS_SALMON_MORE_REPORTS, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND);
                     ReportOldBugs = (res == IDYES);
                 }
                 // bring back the main dialog along with the question prompt
@@ -460,10 +455,9 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    char msg[2 * MAX_PATH];
-                    sprintf(msg, LoadStr(IDS_SALMON_COMPRESSFAILED, HLanguage), CompressParams.ErrorMessage);
-                    MessageBox(HWindow, msg, LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
-                    OpenFolder(NULL, BugReportPath);
+                    const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_COMPRESSFAILED, HLanguage).c_str(), CompressParams.ErrorMessage.c_str());
+                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    OpenFolder(NULL, BugReportPath.c_str());
                     PostQuitMessage(0);
                 }
             }
@@ -475,7 +469,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 if (UploadParams.Result)
                 {
-                    if (UploadingIndex + 1 < BugReports.Count && ReportOldBugs)
+                    if (static_cast<size_t>(UploadingIndex + 1) < BugReports.size() && ReportOldBugs)
                     {
                         // start uploading the next file
                         UploadingIndex++;
@@ -483,7 +477,9 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     else
                     {
-                        MessageBox(HWindow, LoadStr(IDS_SALMON_UPLOADSUCCESS, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+                        // wide: same LoadStrW infra added for this file's other
+                        // site (233).
+                        MessageBoxW(HWindow, LoadStrW(IDS_SALMON_UPLOADSUCCESS, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
                         CleanBugReportsDirectory(FALSE); // clean first so Salamander does not complain when it starts
                         if (IsDlgButtonChecked(HWindow, IDC_SALMON_RESTART) == BST_CHECKED)
                             RestartSalamander(HWindow);
@@ -492,11 +488,10 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    char msg[2 * MAX_PATH];
-                    sprintf(msg, LoadStr(IDS_SALMON_UPLOADFAILED, HLanguage), UploadParams.ErrorMessage);
-                    MessageBox(HWindow, msg, LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    const std::wstring msg = FormatText(LoadStrW(IDS_SALMON_UPLOADFAILED, HLanguage).c_str(), UploadParams.ErrorMessage.c_str());
+                    MessageBoxW(HWindow, msg.c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
                     CleanBugReportsDirectory(TRUE); // delete the reports, keep only the archives
-                    OpenFolder(NULL, BugReportPath);
+                    OpenFolder(NULL, BugReportPath.c_str());
                     PostQuitMessage(0);
                 }
             }
@@ -514,7 +509,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 return TRUE;
             SaveDescriptionAndEmail();
 
-            ZeroMemory(&CompressParams, sizeof(CompressParams));
+            CompressParams = {};
             Compressing = StartCompressThread(&CompressParams);
             ShowChilds(dteCompress, FALSE);
             return 0;
@@ -524,10 +519,12 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (Compressing || Uploading)
             {
-                MessageBox(HWindow, LoadStr(IDS_SALMON_WAITFORUPLOAD, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
+                // wide: same LoadStrW infra added for this file (233).
+                MessageBoxW(HWindow, LoadStrW(IDS_SALMON_WAITFORUPLOAD, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
                 return 0;
             }
-            int ret = MessageBox(HWindow, LoadStr(IDS_SALMON_CONFIRMEXIT, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OKCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
+            // wide: same LoadStrW infra added for this file (233).
+            int ret = MessageBoxW(HWindow, LoadStrW(IDS_SALMON_CONFIRMEXIT, HLanguage).c_str(), LoadStrW(IDS_SALMON_TITLE, HLanguage).c_str(), MB_OKCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND);
             if (ret == IDCANCEL)
                 return 0;
 
@@ -542,7 +539,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDC_SALMON_VIEW:
         {
-            OpenFolder(HWindow, BugReportPath);
+            OpenFolder(HWindow, BugReportPath.c_str());
             break;
         }
         }

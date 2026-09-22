@@ -10,7 +10,7 @@ CFTPDiskWork::CFTPDiskWork()
     Reset();
 }
 
-void CFTPDiskWork::Reset()
+void CFTPDiskWork::Reset() noexcept
 {
     SocketMsg = 0;
     SocketUID = 0;
@@ -18,8 +18,9 @@ void CFTPDiskWork::Reset()
 
     Type = fdwtNone;
 
-    Path.Clear();
-    Name.Clear();
+    Path.clear();
+    Name.clear();
+    DirectFileName.clear();
 
     ForceAction = fqiaNone;
     AlreadyRenamedName = FALSE;
@@ -49,63 +50,97 @@ void CFTPDiskWork::Reset()
     DiskListing = NULL;
 }
 
-void CFTPDiskWork::CopyFrom(CFTPDiskWork* work)
+void CFTPDiskWork::CopyScalarStateFrom(const CFTPDiskWork& work) noexcept
 {
-    if (this == work)
-        return;
-
-    SocketMsg = work->SocketMsg;
-    SocketUID = work->SocketUID;
-    MsgID = work->MsgID;
-
-    Type = work->Type;
-
-    Path.Clear();
-    Path.Assign(work->Path.CStr());
-    Name.Clear();
-    Name.Assign(work->Name.CStr());
-
-    ForceAction = work->ForceAction;
-    AlreadyRenamedName = work->AlreadyRenamedName;
-
-    CannotCreateDir = work->CannotCreateDir;
-    DirAlreadyExists = work->DirAlreadyExists;
-    CannotCreateFile = work->CannotCreateFile;
-    FileAlreadyExists = work->FileAlreadyExists;
-    RetryOnCreatedFile = work->RetryOnCreatedFile;
-    RetryOnResumedFile = work->RetryOnResumedFile;
-
-    CheckFromOffset = work->CheckFromOffset;
-    WriteOrReadFromOffset = work->WriteOrReadFromOffset;
-    FlushDataBuffer = work->FlushDataBuffer;
-    ValidBytesInFlushDataBuffer = work->ValidBytesInFlushDataBuffer;
-    EOLsInFlushDataBuffer = work->EOLsInFlushDataBuffer;
-    WorkFile = work->WorkFile;
-
-    ProblemID = work->ProblemID;
-    WinError = work->WinError;
-    State = work->State;
-    NewTgtName = work->NewTgtName;
-    OpenedFile = work->OpenedFile;
-    FileSize = work->FileSize;
-    CanOverwrite = work->CanOverwrite;
-    CanDeleteEmptyFile = work->CanDeleteEmptyFile;
-    DiskListing = work->DiskListing;
+    SocketMsg = work.SocketMsg;
+    SocketUID = work.SocketUID;
+    MsgID = work.MsgID;
+    Type = work.Type;
+    ForceAction = work.ForceAction;
+    AlreadyRenamedName = work.AlreadyRenamedName;
+    CannotCreateDir = work.CannotCreateDir;
+    DirAlreadyExists = work.DirAlreadyExists;
+    CannotCreateFile = work.CannotCreateFile;
+    FileAlreadyExists = work.FileAlreadyExists;
+    RetryOnCreatedFile = work.RetryOnCreatedFile;
+    RetryOnResumedFile = work.RetryOnResumedFile;
+    CheckFromOffset = work.CheckFromOffset;
+    WriteOrReadFromOffset = work.WriteOrReadFromOffset;
+    FlushDataBuffer = work.FlushDataBuffer;
+    ValidBytesInFlushDataBuffer = work.ValidBytesInFlushDataBuffer;
+    EOLsInFlushDataBuffer = work.EOLsInFlushDataBuffer;
+    WorkFile = work.WorkFile;
+    ProblemID = work.ProblemID;
+    WinError = work.WinError;
+    State = work.State;
+    NewTgtName = work.NewTgtName;
+    OpenedFile = work.OpenedFile;
+    FileSize = work.FileSize;
+    CanOverwrite = work.CanOverwrite;
+    CanDeleteEmptyFile = work.CanDeleteEmptyFile;
+    DiskListing = work.DiskListing;
 }
 
-void FTPPrepareCreateAndWriteFileDiskWork(CFTPDiskWork& work, int socketMsg, int socketUID,
-                                          DWORD msgID, const char* targetFileName,
-                                          HANDLE workFile, char* flushDataBuffer,
-                                          int validBytesInFlushDataBuffer)
+BOOL CFTPDiskWork::CopyFrom(const CFTPDiskWork& work) noexcept
 {
+    if (this == &work)
+        return TRUE;
+    try
+    {
+        std::wstring stagedPath(work.Path);
+        std::wstring stagedName(work.Name);
+        std::wstring stagedDirectFileName(work.DirectFileName);
+        CopyScalarStateFrom(work);
+        Path.swap(stagedPath);
+        Name.swap(stagedName);
+        DirectFileName.swap(stagedDirectFileName);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
+
+void CFTPDiskWork::MoveFrom(CFTPDiskWork& work) noexcept
+{
+    if (this == &work)
+        return;
+    CopyScalarStateFrom(work);
+    Path.swap(work.Path);
+    Name.swap(work.Name);
+    DirectFileName.swap(work.DirectFileName);
+    work.NewTgtName = NULL;
+    work.OpenedFile = NULL;
+    work.DiskListing = NULL;
+}
+
+BOOL FTPPrepareCreateAndWriteFileDiskWork(CFTPDiskWork& work, int socketMsg, int socketUID,
+                                          DWORD msgID, const wchar_t* targetFileName,
+                                          HANDLE workFile, char* flushDataBuffer,
+                                          int validBytesInFlushDataBuffer) noexcept
+{
+    std::wstring stagedFileName;
+    try
+    {
+        stagedFileName = targetFileName != NULL ? targetFileName : L"";
+    }
+    catch (...)
+    {
+        // The caller has already detached this buffer from the data connection.
+        // Publish it even when path staging fails so the existing failure cleanup
+        // remains its sole owner.
+        work.FlushDataBuffer = flushDataBuffer;
+        return FALSE;
+    }
     work.SocketMsg = socketMsg;
     work.SocketUID = socketUID;
     work.MsgID = msgID;
     work.Type = fdwtCreateAndWriteFile;
 
-    work.Path.Clear();
-    work.Name.Clear();
-    work.Name.Assign(targetFileName != NULL ? targetFileName : "");
+    work.Path.clear();
+    work.Name.clear();
+    work.DirectFileName.swap(stagedFileName);
 
     work.ForceAction = fqiaNone;
     work.AlreadyRenamedName = FALSE;
@@ -132,6 +167,7 @@ void FTPPrepareCreateAndWriteFileDiskWork(CFTPDiskWork& work, int socketMsg, int
     work.CanOverwrite = FALSE;
     work.CanDeleteEmptyFile = FALSE;
     work.DiskListing = NULL;
+    return TRUE;
 }
 
 void FTPExecuteCreateAndWriteFileDiskWork(CFTPDiskWork& localWork, BOOL& needCopyBack,
@@ -140,8 +176,8 @@ void FTPExecuteCreateAndWriteFileDiskWork(CFTPDiskWork& localWork, BOOL& needCop
     HANDLE file = NULL;
     if (localWork.WorkFile == NULL) // the file has not been created yet
     {
-        SetFileAttributes(localWork.Name, FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
-        HANDLE f = CreateFile(localWork.Name, GENERIC_WRITE,
+        SetFileAttributesW(localWork.DirectFileName.c_str(), FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
+        HANDLE f = CreateFileW(localWork.DirectFileName.c_str(), GENERIC_WRITE,
                               FILE_SHARE_READ, NULL,
                               CREATE_ALWAYS,
                               FILE_FLAG_SEQUENTIAL_SCAN,

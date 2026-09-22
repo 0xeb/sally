@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "IProcess.h"
-#include <stdlib.h>
+#include <cstdlib>
 #include <string.h>
+#include <new>
+#include <vector>
 
 // Internal state for process handles
 struct ProcessState
@@ -23,7 +25,9 @@ public:
 
         memset(&si, 0, sizeof(si));
         si.cb = sizeof(si);
-        si.lpTitle = const_cast<LPWSTR>(startInfo.windowTitle);
+        si.lpTitle = startInfo.windowTitle.empty()
+                         ? nullptr
+                         : const_cast<LPWSTR>(startInfo.windowTitle.c_str());
 
         // Set window visibility
         if (startInfo.hideWindow)
@@ -65,33 +69,48 @@ public:
         if (startInfo.createNewConsole)
             flags |= CREATE_NEW_CONSOLE;
 
-        // CreateProcessW modifies the command line buffer, so we need a copy
-        wchar_t* cmdLineCopy = nullptr;
-        if (startInfo.commandLine)
+        LPVOID environment = nullptr;
+        if (startInfo.useEnvironment)
         {
-            size_t len = wcslen(startInfo.commandLine) + 1;
-            cmdLineCopy = (wchar_t*)malloc(len * sizeof(wchar_t));
-            if (!cmdLineCopy)
+            if (startInfo.environmentBlock.size() < 2 ||
+                startInfo.environmentBlock[startInfo.environmentBlock.size() - 1] != L'\0' ||
+                startInfo.environmentBlock[startInfo.environmentBlock.size() - 2] != L'\0')
             {
-                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+                SetLastError(ERROR_INVALID_PARAMETER);
                 return INVALID_HPROCESS;
             }
-            wcscpy(cmdLineCopy, startInfo.commandLine);
+            environment = const_cast<wchar_t*>(startInfo.environmentBlock.data());
+            flags |= CREATE_UNICODE_ENVIRONMENT;
+        }
+
+        // CreateProcessW modifies the command line buffer, so we need a copy
+        std::vector<wchar_t> commandLine;
+        try
+        {
+            if (!startInfo.commandLine.empty())
+            {
+                commandLine.assign(startInfo.commandLine.begin(),
+                                   startInfo.commandLine.end());
+                commandLine.push_back(L'\0');
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return INVALID_HPROCESS;
         }
 
         BOOL result = ::CreateProcessW(
-            startInfo.applicationName,
-            cmdLineCopy,
+            startInfo.applicationName.empty() ? nullptr : startInfo.applicationName.c_str(),
+            commandLine.empty() ? nullptr : commandLine.data(),
             nullptr,  // process security attributes
             nullptr,  // thread security attributes
             startInfo.inheritHandles ? TRUE : FALSE,
             flags,
-            nullptr,  // environment (inherit)
-            startInfo.workingDirectory,
+            environment,
+            startInfo.workingDirectory.empty() ? nullptr : startInfo.workingDirectory.c_str(),
             &si,
             &pi);
-
-        free(cmdLineCopy);
 
         if (!result)
             return INVALID_HPROCESS;

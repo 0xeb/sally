@@ -20,7 +20,7 @@
 #include "config.h"
 #include "../registry_names.h"
 
-#define PATH_SOFTWARE_TSERVER SAL_REG_KEY_TRACE_SERVER_T
+#define PATH_SOFTWARE_TSERVER SAL_REG_KEY_TRACE_SERVER_W
 
 CRegistry Registry;
 CConfigData ConfigData;

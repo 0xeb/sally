@@ -15,8 +15,10 @@
 #define VERSINFO_MINORA      VERSINFO_SALAMANDER_MINORA
 #define VERSINFO_MINORB      VERSINFO_SALAMANDER_MINORB
 #define VERSINFO_VERSION     VERSINFO_SALAMANDER_VERSION
+#define VERSINFO_VERSION_W   VERSINFO_SALAMANDER_VERSION_W
 
 #define VERSINFO_COPYRIGHT   "Copyright © 1997-2023 Open Salamander Authors; Sally modifications © 2025-2026 Elias Bachaalany"
+#define VERSINFO_COPYRIGHT_W L"Copyright © 1997-2023 Open Salamander Authors; Sally modifications © 2025-2026 Elias Bachaalany"
 #define VERSINFO_COMPANY     "Sally"
 
 #define VERSINFO_DESCRIPTION "Sally, File Manager"

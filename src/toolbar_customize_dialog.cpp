@@ -58,8 +58,8 @@ BOOL CTBCustomizeDialog::EnumButtons()
     // clear the array
     DestroyItems();
 
-    char textBuffer[1024]; // temporary buffers for receiving strings
-    char nameBuffer[1024];
+    wchar_t textBuffer[1024]; // temporary buffers for receiving strings
+    wchar_t nameBuffer[1024];
 
     HWND hNotifyWnd = ToolBar->HNotifyWindow;
     TLBI_ITEM_INFO2 tii;
@@ -84,15 +84,18 @@ BOOL CTBCustomizeDialog::EnumButtons()
         if (sent)
         {
             // allocate copies of text and name strings
-            tii.TextLen = lstrlen(tii.Text);
-            tii.NameLen = lstrlen(tii.Name);
-            char* text = (char*)malloc(tii.TextLen + 1);
-            char* name = (char*)malloc(tii.NameLen + 1);
+            // lstrlenW yields CHARACTERS; these buffers are wchar_t. The
+            // byte-sized malloc/memmove pair is the same defect as CToolBarItem::SetText,
+            // one level up, and it compiles clean in both halves.
+            tii.TextLen = lstrlenW(tii.Text);
+            tii.NameLen = lstrlenW(tii.Name);
+            wchar_t* text = (wchar_t*)malloc((tii.TextLen + 1) * sizeof(wchar_t));
+            wchar_t* name = (wchar_t*)malloc((tii.NameLen + 1) * sizeof(wchar_t));
             if (tii.TextLen > 0)
-                memmove(text, tii.Text, tii.TextLen);
+                memmove(text, tii.Text, tii.TextLen * sizeof(wchar_t));
             text[tii.TextLen] = 0;
             if (tii.NameLen > 0)
-                memmove(name, tii.Name, tii.NameLen);
+                memmove(name, tii.Name, tii.NameLen * sizeof(wchar_t));
             name[tii.NameLen] = 0;
             tii.Text = text;
             tii.Name = name;
@@ -481,9 +484,9 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HANDLES(DeleteObject(hBkBrush));
         }
 
-        const char* text;
+        const wchar_t* text;
         if (separator)
-            text = LoadStr(IDS_SEPARATOR);
+            text = LoadStrW(IDS_SEPARATOR);
         else
             text = AllItems[index].Name;
 
@@ -502,7 +505,7 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         COLORREF normalColor = index == -1 ? colors.DisabledText : colors.InputText;
         SetTextColor(hDC, selected && (focused || !useDark) ? colors.HighlightText : normalColor);
         SetBkMode(hDC, TRANSPARENT);
-        DrawText(hDC, text, -1, &r, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
+        DrawTextW(hDC, text, -1, &r, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
         r.left -= imageWidth;
         if (selected && !focused)
         {

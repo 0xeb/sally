@@ -26,7 +26,7 @@ public:
     CParserOGG() : f(NULL) {}
     ~CParserOGG() { CloseFile(); }
 
-    virtual CParserResultEnum OpenFile(const char* fileName);
+    virtual CParserResultEnum OpenFile(const wchar_t* fileName);
     virtual CParserResultEnum CloseFile();
     virtual CParserResultEnum GetFileInfo(COutputInterface* output);
 };

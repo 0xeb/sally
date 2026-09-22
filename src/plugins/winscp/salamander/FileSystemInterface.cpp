@@ -289,8 +289,12 @@ void __fastcall CPluginInterfaceForFS::ConnectFileSystem(int Panel)
             SetForceNewSession(true);
             try
             {
-                SalamanderGeneral()->ChangePanelPathToPluginFS(Panel,
-                                                               FPlugin->GetFSName(FSessionToOpen->FSProtocol, false), "", NULL);
+                // ChangePanelPathToPluginFS's fsName/fsUserPart are wide now; this
+                // TU is not part of the CMake build (Borland/VCL), so widen with plain Win32
+                // API rather than depend on plugin_narrow_compat.h's include path.
+                wchar_t fsNameW[MAX_PATH];
+                MultiByteToWideChar(CP_ACP, 0, FPlugin->GetFSName(FSessionToOpen->FSProtocol, false), -1, fsNameW, MAX_PATH);
+                SalamanderGeneral()->ChangePanelPathToPluginFS(Panel, fsNameW, L"", NULL);
             }
             __finally
             {
@@ -511,8 +515,13 @@ void WINAPI CPluginInterfaceForFS::ExecuteOnFS(int Panel,
                 SuggestedFocusName = NULL;
             }
             AnsiString NewFullPath = FSInterface->FullPath(NewPath);
+            // wide fsName/fsUserPart; see the widening note above.
+            wchar_t pluginFSNameW[MAX_PATH];
+            MultiByteToWideChar(CP_ACP, 0, PluginFSName, -1, pluginFSNameW, MAX_PATH);
+            wchar_t newFullPathW[MAX_PATH];
+            MultiByteToWideChar(CP_ACP, 0, NewFullPath.c_str(), -1, newFullPathW, MAX_PATH);
             SalamanderGeneral()->ChangePanelPathToPluginFS(Panel,
-                                                           PluginFSName, NewFullPath.c_str(), NULL, -1,
+                                                           pluginFSNameW, newFullPathW, NULL, -1,
                                                            SuggestedFocusName);
         }
     }

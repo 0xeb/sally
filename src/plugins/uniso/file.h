@@ -8,9 +8,9 @@ class CFile
 {
 public:
     virtual ~CFile() {};
-    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent) = 0;
-    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent) = 0;
-    virtual BOOL Close(LPCTSTR fileName, HWND parent) = 0;
+    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent) = 0;
+    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent) = 0;
+    virtual BOOL Close(const wchar_t* fileName, HWND parent) = 0;
     virtual __int64 Seek(__int64 lDistanceToMove, DWORD dwMoveMethod) = 0;
 
     virtual DWORD GetFileSize(LPDWORD lpFileSizeHigh) = 0;
@@ -38,11 +38,11 @@ public:
     CBufferedFile(HANDLE hFile, DWORD dwDesiredAccess, DWORD bufferSize = 32768);
     virtual ~CBufferedFile();
 
-    BOOL Create(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDispostion, DWORD dwFlagsAndAttributes);
+    BOOL Create(const wchar_t* lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDispostion, DWORD dwFlagsAndAttributes);
 
-    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent);
-    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent);
-    virtual BOOL Close(LPCTSTR fileName, HWND parent);
+    virtual BOOL Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent);
+    virtual BOOL Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent);
+    virtual BOOL Close(const wchar_t* fileName, HWND parent);
     virtual __int64 Seek(__int64 lDistanceToMove, DWORD dwMoveMethod);
 
     virtual DWORD GetFileSize(LPDWORD lpFileSizeHigh);
@@ -65,7 +65,7 @@ protected:
 };
 
 // file helpers
-BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent);
-BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const char* fileName, HWND parent);
+BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent);
+BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent);
 
 __int64 FileSeek(HANDLE hf, __int64 distance, DWORD moveMethod);

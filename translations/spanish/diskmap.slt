@@ -76,3 +76,7 @@ COMMENT,"Versión en español"
 78,1,"byte"
 79,1,"bytes"
 
+[STRINGTABLE 3]
+80,1,"Nada que mostrar..."
+81,1,"...esta carpeta no contiene ficheros que mapear"
+

@@ -46,6 +46,13 @@ public:
     // Opens existing key for read/write
     virtual RegistryResult OpenKeyReadWrite(HKEY root, const wchar_t* subKey, HKEY& outKey) = 0;
 
+    // Opens a key for change notifications and arms an optional asynchronous event.
+    virtual RegistryResult OpenKeyNotify(HKEY root, const wchar_t* subKey, HKEY& outKey)
+    { (void)root; (void)subKey; outKey = NULL; return RegistryResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+    virtual RegistryResult NotifyChange(HKEY key, bool watchSubtree, DWORD notifyFilter,
+                                        HANDLE eventHandle, bool asynchronous)
+    { (void)key; (void)watchSubtree; (void)notifyFilter; (void)eventHandle; (void)asynchronous; return RegistryResult::Error(ERROR_CALL_NOT_IMPLEMENTED); }
+
     // Creates key (or opens if exists)
     virtual RegistryResult CreateKey(HKEY root, const wchar_t* subKey, HKEY& outKey) = 0;
 
@@ -68,12 +75,19 @@ public:
     virtual RegistryResult GetValue(HKEY key, const wchar_t* valueName,
                                     RegValueType& type, std::vector<uint8_t>& data) = 0;
 
+    // Raw Win32-shaped value transfer for the configuration worker. `dataSize`
+    // is input capacity/output byte count and `data` may be null for a size query.
+    virtual RegistryResult ReadValue(HKEY key, const wchar_t* valueName,
+                                     RegValueType& type, void* data, DWORD& dataSize) = 0;
+
     // Value operations - Write
     virtual RegistryResult SetString(HKEY key, const wchar_t* valueName, const wchar_t* value) = 0;
     virtual RegistryResult SetDWord(HKEY key, const wchar_t* valueName, DWORD value) = 0;
     virtual RegistryResult SetQWord(HKEY key, const wchar_t* valueName, uint64_t value) = 0;
     virtual RegistryResult SetBinary(HKEY key, const wchar_t* valueName,
                                      const void* data, size_t size) = 0;
+    virtual RegistryResult WriteValue(HKEY key, const wchar_t* valueName,
+                                      RegValueType type, const void* data, DWORD dataSize) = 0;
 
     // Delete value
     virtual RegistryResult DeleteValue(HKEY key, const wchar_t* valueName) = 0;
@@ -92,84 +106,3 @@ extern IRegistry* gRegistry;
 
 // Returns the default Win32 implementation
 IRegistry* GetWin32Registry();
-
-// ANSI helpers for migrating existing code
-inline std::wstring AnsiToWideReg(const char* str)
-{
-    if (!str || !*str) return L"";
-    int len = MultiByteToWideChar(CP_ACP, 0, str, -1, nullptr, 0);
-    if (len == 0) return L"";
-    std::wstring wide;
-    wide.resize(len);
-    MultiByteToWideChar(CP_ACP, 0, str, -1, &wide[0], len);
-    wide.resize(len - 1);
-    return wide;
-}
-
-// ANSI helper: Open key for reading
-inline RegistryResult OpenKeyReadA(IRegistry* reg, HKEY root, const char* subKey, HKEY& outKey)
-{
-    return reg->OpenKeyRead(root, AnsiToWideReg(subKey).c_str(), outKey);
-}
-
-// ANSI helper: Open key for read/write
-inline RegistryResult OpenKeyReadWriteA(IRegistry* reg, HKEY root, const char* subKey, HKEY& outKey)
-{
-    return reg->OpenKeyReadWrite(root, AnsiToWideReg(subKey).c_str(), outKey);
-}
-
-// ANSI helper: Create key
-inline RegistryResult CreateKeyA(IRegistry* reg, HKEY root, const char* subKey, HKEY& outKey)
-{
-    return reg->CreateKey(root, AnsiToWideReg(subKey).c_str(), outKey);
-}
-
-// ANSI helper: Get string value (returns ANSI string)
-inline RegistryResult GetStringA(IRegistry* reg, HKEY key, const char* valueName,
-                                 char* buffer, DWORD bufferSize)
-{
-    std::wstring wideValue;
-    auto result = reg->GetString(key, AnsiToWideReg(valueName).c_str(), wideValue);
-    if (result.success && buffer && bufferSize > 0)
-    {
-        int written = WideCharToMultiByte(CP_ACP, 0, wideValue.c_str(), -1,
-                                          buffer, bufferSize, nullptr, nullptr);
-        if (written == 0 && !wideValue.empty())
-            return RegistryResult::Error(GetLastError());
-    }
-    return result;
-}
-
-// ANSI helper: Get DWORD value
-inline RegistryResult GetDWordA(IRegistry* reg, HKEY key, const char* valueName, DWORD& value)
-{
-    return reg->GetDWord(key, AnsiToWideReg(valueName).c_str(), value);
-}
-
-// ANSI helper: Set string value
-inline RegistryResult SetStringA(IRegistry* reg, HKEY key, const char* valueName, const char* value)
-{
-    return reg->SetString(key, AnsiToWideReg(valueName).c_str(),
-                          AnsiToWideReg(value).c_str());
-}
-
-// ANSI helper: Set DWORD value
-inline RegistryResult SetDWordA(IRegistry* reg, HKEY key, const char* valueName, DWORD value)
-{
-    return reg->SetDWord(key, AnsiToWideReg(valueName).c_str(), value);
-}
-
-inline RegistryResult DeleteKeyA(IRegistry* reg, HKEY root, const char* subKey)
-{
-    return reg->DeleteKey(root, AnsiToWideReg(subKey).c_str());
-}
-
-inline RegistryResult DeleteKeyRecursiveA(IRegistry* reg, HKEY root, const char* subKey)
-{
-    return reg->DeleteKeyRecursive(root, AnsiToWideReg(subKey).c_str());
-}
-
-inline RegistryResult DeleteValueA(IRegistry* reg, HKEY key, const char* valueName)
-{
-    return reg->DeleteValue(key, AnsiToWideReg(valueName).c_str());
-}

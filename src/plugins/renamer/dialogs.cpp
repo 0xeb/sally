@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "plugin_window_text.h"
+
+#include <vector>
 
 TDirectArray<DWORD_PTR> DialogStack(4, 4);
 CCS DialogStackCS;
@@ -18,25 +21,37 @@ int LastCounterMinWidth = 0;
 int LastCounterFill = ' ';
 BOOL LastCounterLeft = FALSE;
 
+static std::wstring GetSystemDirectoryOwned()
+{
+    UINT capacity = GetSystemDirectoryW(NULL, 0);
+    if (capacity == 0)
+        return std::wstring();
+    std::vector<wchar_t> buffer(static_cast<size_t>(capacity) + 1, L'\0');
+    const UINT length = GetSystemDirectoryW(buffer.data(), static_cast<UINT>(buffer.size()));
+    return length > 0 && length < buffer.size() ? std::wstring(buffer.data(), length) : std::wstring();
+}
+
+static void TryGetDirectoryIcon(const wchar_t* systemDirectory, SHFILEINFOW* info)
+{
+    __try
+    {
+        SHGetFileInfoW(systemDirectory, 0, info, sizeof(*info),
+                       SHGFI_SMALLICON | SHGFI_ICON | SHGFI_SHELLICONSIZE);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        info->hIcon = NULL;
+    }
+}
+
 HICON
 GetSH32DirIcon()
 {
     CALL_STACK_MESSAGE_NONE
-    SHFILEINFO shi;
+    SHFILEINFOW shi;
     shi.hIcon = NULL;
-    char systemDir[MAX_PATH];
-    GetSystemDirectory(systemDir, MAX_PATH);
-    __try
-    {
-        SHGetFileInfo(systemDir, 0, &shi, sizeof(shi),
-                      SHGFI_SMALLICON |
-                          SHGFI_ICON | /*SHGFI_SYSICONINDEX |*/
-                          SHGFI_SHELLICONSIZE);
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        shi.hIcon = NULL;
-    }
+    const std::wstring systemDir = GetSystemDirectoryOwned();
+    TryGetDirectoryIcon(systemDir.c_str(), &shi);
 
     return shi.hIcon;
 }
@@ -60,14 +75,14 @@ BOOL InitDialogs()
         CommandHistory[i] = NULL;
     }
 
-    if (!InitializeWinLib("Renamer" /* do not translate! */, DLLInstance))
+    if (!InitializeWinLib(L"Renamer" /* do not translate! */, DLLInstance))
         return FALSE;
     SetupWinLibHelp(HTMLHelpCallback);
 
     MinBeepWhenDone = TRUE;
     SG->GetConfigParameter(SALCFG_MINBEEPWHENDONE, &MinBeepWhenDone, sizeof(BOOL), NULL);
 
-    HINSTANCE shell32DLL = LoadLibraryEx("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
+    HINSTANCE shell32DLL = LoadLibraryExA("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
     if (shell32DLL == NULL) // this really should not happen (core Win 4.0)
     {
         TRACE_E("Cannot open shell32.dll");
@@ -126,7 +141,7 @@ BOOL InitDialogs()
         DestroyIcon(hIcon);
     }
 
-    strcpy(DirText, LoadStr(IDS_DIRTEXT));
+    DirText = LangStr(IDS_DIRTEXT);
 
     HAccels = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELS));
 
@@ -240,6 +255,83 @@ ComDlgHookProc(HWND hdlg, UINT uiMsg, WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+BOOL RenamerEditLine(CTransferInfo& ti, int id, char* text, int textMax, BOOL select)
+{
+    std::vector<wchar_t> wide((size_t)textMax, L'\0');
+    if (ti.Type == ttDataToWindow)
+    {
+        const std::wstring value = RenamerTextToWide(text);
+        if (value.size() >= wide.size())
+            return FALSE;
+        memcpy(wide.data(), value.c_str(), (value.size() + 1) * sizeof(wchar_t));
+    }
+    ti.EditLine(id, wide.data(), (DWORD)wide.size(), select);
+    if (ti.Type == ttDataFromWindow)
+    {
+        const std::string value = WideToRenamerText(wide.data());
+        if ((int)value.size() >= textMax)
+            return FALSE;
+        memcpy(text, value.c_str(), value.size() + 1);
+    }
+    return TRUE;
+}
+
+BOOL RenamerEditLine(CTransferInfo& ti, int id, std::string& text, BOOL select)
+{
+    HWND control;
+    if (!ti.GetControl(control, id))
+        return FALSE;
+
+    if (ti.Type == ttDataToWindow)
+    {
+        const std::wstring wide = RenamerTextToWide(text.c_str());
+        SetWindowTextW(control, wide.c_str());
+        if (select)
+            SendMessageW(control, EM_SETSEL, 0, -1);
+    }
+    else
+    {
+        const std::wstring wide = SPLGetWindowTextOwned(control);
+        text = WideToRenamerText(wide.c_str());
+    }
+    return TRUE;
+}
+
+int GetRenamerEditLine(HWND edit, int line, char* text, int textMax)
+{
+    const LRESULT index = SendMessageW(edit, EM_LINEINDEX, line, 0);
+    if (index < 0)
+        return -1;
+    const LRESULT chars = SendMessageW(edit, EM_LINELENGTH, index, 0);
+    if (chars < 0 || chars > 0xFFFE)
+        return -1;
+    std::vector<wchar_t> wide((size_t)chars + 1, L'\0');
+    *reinterpret_cast<WORD*>(wide.data()) = (WORD)(wide.size() - 1);
+    const LRESULT copied = SendMessageW(edit, EM_GETLINE, line, (LPARAM)wide.data());
+    wide[(size_t)copied] = L'\0';
+    const std::string value = WideToRenamerText(wide.data(), (int)copied);
+    if ((int)value.size() >= textMax)
+        return -1;
+    memcpy(text, value.c_str(), value.size() + 1);
+    return (int)value.size();
+}
+
+int GetRenamerEditLine(HWND edit, int line, std::string& text)
+{
+    const LRESULT index = SendMessageW(edit, EM_LINEINDEX, line, 0);
+    if (index < 0)
+        return -1;
+    const LRESULT chars = SendMessageW(edit, EM_LINELENGTH, index, 0);
+    if (chars < 0 || chars > 0xFFFE)
+        return -1;
+    std::vector<wchar_t> wide(static_cast<size_t>(chars) + 1, L'\0');
+    *reinterpret_cast<WORD*>(wide.data()) = static_cast<WORD>(wide.size() - 1);
+    const LRESULT copied = SendMessageW(edit, EM_GETLINE, line, reinterpret_cast<LPARAM>(wide.data()));
+    wide[static_cast<size_t>(copied)] = L'\0';
+    text = WideToRenamerText(wide.data(), static_cast<int>(copied));
+    return static_cast<int>(text.size());
+}
+
 void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
                      int historySize, char** history)
 {
@@ -252,7 +344,8 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
 
     if (ti.Type == ttDataFromWindow)
     {
-        ti.EditLine(id, text, textMax);
+        if (!RenamerEditLine(ti, id, text, textMax))
+            text[0] = 0;
 
         int toMove = historySize - 1;
 
@@ -262,14 +355,14 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
         {
             if (history[j] == NULL)
                 break;
-            if (SG->StrICmp(history[j], text) == 0)
+            if (SG->StrICmp(RenamerTextToWide(history[j]).c_str(), RenamerTextToWide(text).c_str()) == 0)
             {
                 toMove = j;
                 break;
             }
         }
         // allocate memory for the new item
-        LPTSTR ptr = _tcsdup(text);
+        char* ptr = _strdup(text); // history/text (HistoryComboBox's params) are genuinely narrow
         if (ptr)
         {
             // free the memory of the item being removed
@@ -283,22 +376,63 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
             history[0] = ptr;
         }
     }
-    SendMessage(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
     int i;
     for (i = 0; i < historySize; i++)
     {
         if (history[i] == NULL)
             break;
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)history[i]);
+        const std::wstring item = RenamerTextToWide(history[i]);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)item.c_str());
     }
     if (ti.Type == ttDataFromWindow)
-        SendMessage(combo, CB_SETCURSEL, 0, 0);
+        SendMessageW(combo, CB_SETCURSEL, 0, 0);
     else
     {
-        SendMessage(combo, CB_LIMITTEXT, textMax - 1, 0);
-        SendMessage(combo, WM_SETTEXT, 0, (LPARAM)text);
-        SendMessage(combo, CB_SETEDITSEL, 0, -1);
+        SendMessageW(combo, CB_LIMITTEXT, textMax - 1, 0);
+        const std::wstring value = RenamerTextToWide(text);
+        SendMessageW(combo, WM_SETTEXT, 0, (LPARAM)value.c_str());
+        SendMessageW(combo, CB_SETEDITSEL, 0, -1);
     }
+}
+
+void HistoryComboBox(CTransferInfo& ti, int id, std::string& text,
+                     int historySize, char** history)
+{
+    HWND combo;
+    if (!ti.GetControl(combo, id))
+        return;
+
+    if (ti.Type == ttDataFromWindow)
+    {
+        RenamerEditLine(ti, id, text);
+        int toMove = historySize - 1;
+        for (int index = 0; index < historySize; ++index)
+        {
+            if (history[index] == NULL)
+                break;
+            if (SG->StrICmp(RenamerTextToWide(history[index]).c_str(),
+                            RenamerTextToWide(text.c_str()).c_str()) == 0)
+            {
+                toMove = index;
+                break;
+            }
+        }
+        char* item = _strdup(text.c_str());
+        if (item != NULL)
+        {
+            free(history[toMove]);
+            for (int index = toMove; index > 0; --index)
+                history[index] = history[index - 1];
+            history[0] = item;
+        }
+    }
+
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    for (int index = 0; index < historySize && history[index] != NULL; ++index)
+        SendMessageW(combo, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(RenamerTextToWide(history[index]).c_str()));
+    RenamerEditLine(ti, id, text);
 }
 
 void TransferCombo(CTransferInfo& ti, int id, int* comboContent, int& value)
@@ -315,7 +449,7 @@ void TransferCombo(CTransferInfo& ti, int id, int* comboContent, int& value)
         int i;
         for (i = 0; comboContent[i + 1] != -1; i += 2)
         {
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(comboContent[i + 1]));
+            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(comboContent[i + 1]).c_str());
             if (value == comboContent[i])
                 SendMessage(combo, CB_SETCURSEL, i / 2, 0);
         }
@@ -373,10 +507,10 @@ CComboboxEdit::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             BOOL nextIsButton;
             if (next != NULL)
             {
-                char className[30];
+                std::wstring className;
                 WORD wl = LOWORD(GetWindowLong(next, GWL_STYLE)); // only BS_...
-                nextIsButton = GetClassName(next, className, 30) != 0 &&
-                               SG->StrICmp(className, "BUTTON") == 0; // &&
+                nextIsButton = ReadWindowClassOwnedW(next, className) &&
+                               _wcsicmp(className.c_str(), L"BUTTON") == 0; // &&
                                                                       // (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON ||
                                                                       // wl == BS_ICON));
             }
@@ -470,7 +604,8 @@ void CComboboxEdit::ReplaceText(const char* text)
     CALL_STACK_MESSAGE_NONE
     // we must refresh the selection because the dumb combobox forgot it
     SendMessage(HWindow, EM_SETSEL, SelStart, SelEnd);
-    SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM)text);
+    const std::wstring value = RenamerTextToWide(text);
+    SendMessageW(HWindow, EM_REPLACESEL, TRUE, (LPARAM)value.c_str());
 }
 
 //******************************************************************************
@@ -551,7 +686,7 @@ void CAddCutDialog::Validate(CTransferInfo& ti)
     ti.EditLine(IDE_START, i);
     if (i < 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_BADCUTOFFSET), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_BADCUTOFFSET).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_START);
         return;
@@ -559,7 +694,7 @@ void CAddCutDialog::Validate(CTransferInfo& ti)
     ti.EditLine(IDE_END, i);
     if (i < 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_BADCUTOFFSET), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_BADCUTOFFSET).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_END);
         return;
@@ -625,12 +760,12 @@ void CAddCounterDialog::Validate(CTransferInfo& ti)
     int i;
     double f;
     ti.EditLine(IDE_START, i);
-    char buff[] = "%.f";
+    const wchar_t buff[] = L"%.f";
     ti.EditLine(IDE_STEP, f, buff);
     ti.EditLine(IDE_MINWIDTH, i);
     if (i < 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_BADCUTOFFSET), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_BADCUTOFFSET).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_MINWIDTH);
         return;
@@ -650,7 +785,7 @@ void CAddCounterDialog::Transfer(CTransferInfo& ti)
     char stepStr[100];
 
     ti.EditLine(IDE_START, start);
-    char buff[] = "%.f";
+    const wchar_t buff[] = L"%.f";
     ti.EditLine(IDE_STEP, step, buff);
     if (ti.Type == ttDataFromWindow)
     {
@@ -716,10 +851,10 @@ void CDefineClassDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CDefineClassDialog::Validate()");
     char buffer[512];
-    ti.EditLine(IDE_SET, buffer, 512);
+    RenamerEditLine(ti, IDE_SET, buffer, 512);
     if (strlen(buffer) == 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_EMPTYSTR), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_EMPTYSTR).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_SET);
         return;
@@ -732,7 +867,7 @@ void CDefineClassDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
         SG->MultiMonCenterWindow(HWindow, Parent, FALSE);
 
-    ti.EditLine(IDE_SET, Buffer, 512);
+    RenamerEditLine(ti, IDE_SET, Buffer, 512);
 }
 
 //******************************************************************************
@@ -747,7 +882,7 @@ void CSubexpressionDialog::Validate(CTransferInfo& ti)
     ti.EditLine(IDC_NUMBER, i);
     if (i < 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_BADCUTOFFSET), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_BADCUTOFFSET).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_NUMBER);
         return;
@@ -761,12 +896,12 @@ void CSubexpressionDialog::Transfer(CTransferInfo& ti)
     {
         SG->MultiMonCenterWindow(HWindow, Parent, FALSE);
 
-        char buf[4];
+            wchar_t buf[4];
         int i;
         for (i = 0; i < 256; i++)
         {
-            sprintf(buf, "%d", i);
-            SendDlgItemMessage(HWindow, IDC_NUMBER, CB_ADDSTRING, 0, LPARAM(buf));
+            swprintf_s(buf, L"%d", i);
+            SendDlgItemMessageW(HWindow, IDC_NUMBER, CB_ADDSTRING, 0, LPARAM(buf));
         }
         SendDlgItemMessage(HWindow, IDC_NUMBER, CB_SETCURSEL, 0, 0);
         SendDlgItemMessage(HWindow, IDC_NUMBER, CB_LIMITTEXT, 3, 0);
@@ -795,10 +930,10 @@ void CCommandDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCommandDialog::Validate()");
     char buffer[4096];
-    ti.EditLine(IDC_COMMAND, buffer, 4096);
+    RenamerEditLine(ti, IDC_COMMAND, buffer, 4096);
     if (strlen(buffer) <= 0)
     {
-        SG->SalMessageBox(HWindow, LoadStr(IDS_EXP_EMPTYSTR), LoadStr(IDS_ERROR),
+        SG->SalMessageBox(HWindow, LangStr(IDS_EXP_EMPTYSTR).c_str(), LangStr(IDS_ERROR).c_str(),
                           MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_COMMAND);
         return;
@@ -824,11 +959,13 @@ void CCommandErrorDialog::Transfer(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CCommandErrorDialog::Transfer()");
     if (ti.Type == ttDataToWindow)
     {
-        SetDlgItemText(HWindow, IDE_COMMAND, Command);
-        char buf[100];
-        sprintf(buf, "%u (0x%x)", ExitCode, ExitCode);
-        SetDlgItemText(HWindow, IDS_EXITCODE, buf);
-        SetDlgItemText(HWindow, IDE_STDERR, StdError);
+        const std::wstring command = RenamerTextToWide(Command);
+        const std::wstring stdError = RenamerTextToWide(StdError);
+        SetDlgItemTextW(HWindow, IDE_COMMAND, command.c_str());
+        wchar_t buf[100];
+        swprintf_s(buf, L"%u (0x%x)", ExitCode, ExitCode);
+        SetDlgItemTextW(HWindow, IDS_EXITCODE, buf);
+        SetDlgItemTextW(HWindow, IDE_STDERR, stdError.c_str());
         SG->MultiMonCenterWindow(HWindow, Parent, FALSE);
     }
 }
@@ -859,11 +996,11 @@ void CProgressDialog::CancelOperation()
     CALL_STACK_MESSAGE_NONE
     if (!Cancel)
     {
-        Cancel = SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELCNFRM), LoadStr(IDS_QUESTION),
+        Cancel = SG->SalMessageBox(HWindow, LangStr(IDS_CANCELCNFRM).c_str(), LangStr(IDS_QUESTION).c_str(),
                                    MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND) == IDYES;
         if (Cancel)
         {
-            SetDlgItemText(HWindow, IDS_MESSAGE, LoadStr(IDS_CANCELING));
+            SetDlgItemTextW(HWindow, IDS_MESSAGE, LangStr(IDS_CANCELING).c_str());
             // disable the close button
             LONG l = GetWindowLong(HWindow, GWL_STYLE);
             l &= ~WS_SYSMENU;
@@ -875,10 +1012,10 @@ void CProgressDialog::CancelOperation()
     }
 }
 
-void CProgressDialog::SetText(const char* text)
+void CProgressDialog::SetText(const wchar_t* text)
 {
     CALL_STACK_MESSAGE_NONE
-    SetDlgItemText(HWindow, IDS_MESSAGE, text);
+    SetDlgItemTextW(HWindow, IDS_MESSAGE, text);
 }
 
 void CProgressDialog::EmptyMessageLoop()
@@ -886,12 +1023,12 @@ void CProgressDialog::EmptyMessageLoop()
     CALL_STACK_MESSAGE_NONE
     // drain the message loop
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
     {
         if (!IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 }
@@ -948,10 +1085,8 @@ void CConfigDialog::Validate(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Validate()");
     int e1, e2;
-    CPathBuffer buffer; // Heap-allocated for long path support
-
-    ti.EditLine(IDE_COMMAND, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpCommandVariables))
+    std::wstring buffer = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+    if (!SG->ValidateVarString(HWindow, buffer.c_str(), e1, e2, ExpCommandVariables))
     {
         ti.ErrorOn(IDE_COMMAND);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_COMMAND), TRUE);
@@ -959,8 +1094,8 @@ void CConfigDialog::Validate(CTransferInfo& ti)
         return;
     }
 
-    ti.EditLine(IDE_ARGUMENTS, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpArgumentsVariables))
+    buffer = SPLGetDlgItemTextOwned(HWindow, IDE_ARGUMENTS);
+    if (!SG->ValidateVarString(HWindow, buffer.c_str(), e1, e2, ExpArgumentsVariables))
     {
         ti.ErrorOn(IDE_ARGUMENTS);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_ARGUMENTS), TRUE);
@@ -968,8 +1103,8 @@ void CConfigDialog::Validate(CTransferInfo& ti)
         return;
     }
 
-    ti.EditLine(IDE_INITDIR, buffer, buffer.Size());
-    if (!SG->ValidateVarString(HWindow, buffer, e1, e2, ExpInitDirVariables))
+    buffer = SPLGetDlgItemTextOwned(HWindow, IDE_INITDIR);
+    if (!SG->ValidateVarString(HWindow, buffer.c_str(), e1, e2, ExpInitDirVariables))
     {
         ti.ErrorOn(IDE_INITDIR);
         SendMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDE_INITDIR), TRUE);
@@ -981,9 +1116,18 @@ void CConfigDialog::Validate(CTransferInfo& ti)
 void CConfigDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDE_COMMAND, Command, Command.Size());
-    ti.EditLine(IDE_ARGUMENTS, Arguments, Arguments.Size());
-    ti.EditLine(IDE_INITDIR, InitDir, InitDir.Size());
+    if (ti.Type == ttDataToWindow)
+    {
+        SetDlgItemTextW(HWindow, IDE_COMMAND, Command.c_str());
+        SetDlgItemTextW(HWindow, IDE_ARGUMENTS, Arguments.c_str());
+        SetDlgItemTextW(HWindow, IDE_INITDIR, InitDir.c_str());
+    }
+    else
+    {
+        Command = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+        Arguments = SPLGetDlgItemTextOwned(HWindow, IDE_ARGUMENTS);
+        InitDir = SPLGetDlgItemTextOwned(HWindow, IDE_INITDIR);
+    }
     ti.CheckBox(IDC_CONFIRMESCCLOSE, ConfirmESCClose);
 }
 
@@ -1046,24 +1190,21 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 1)
                 {
-                    CPathBuffer path; // Heap-allocated for long path support
-                    path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, path.Size());
-                    if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path, path.Size()))
-                        SetDlgItemText(HWindow, IDE_COMMAND, path);
+                    std::wstring path = SPLGetDlgItemTextOwned(HWindow, IDE_COMMAND);
+                    if (ShowOpenFileDialog(HWindow, NULL, LangStr(IDS_EXEFILES).c_str(), path))
+                        SetDlgItemTextW(HWindow, IDE_COMMAND, path.c_str());
                 }
                 else if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 30)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpCommandVariables[cmd - 2].Name);
-                        SendDlgItemMessage(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpCommandVariables[cmd - 2].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_COMMAND, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }
@@ -1131,16 +1272,15 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 19)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpArgumentsVariables[cmd - 1].Name);
-                        SendDlgItemMessage(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpArgumentsVariables[cmd - 1].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_ARGUMENTS, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }
@@ -1183,16 +1323,15 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (cmd == 30)
                 {
-                    SendDlgItemMessage(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM) "$[]");
+                    SendDlgItemMessageW(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)L"$[]");
                 }
                 else
                 {
                     // double-check just to be sure
                     if (cmd < 6)
                     {
-                        char var[100];
-                        sprintf(var, "$(%s)", ExpInitDirVariables[cmd - 1].Name);
-                        SendDlgItemMessage(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)var);
+                        std::wstring var = L"$(" + std::wstring(ExpInitDirVariables[cmd - 1].Name) + L")";
+                        SendDlgItemMessageW(HWindow, IDE_INITDIR, EM_REPLACESEL, TRUE, (LPARAM)var.c_str());
                     }
                 }
             }

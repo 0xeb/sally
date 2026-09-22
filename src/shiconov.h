@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "common/widepath.h"
-
 void InitShellIconOverlays();
 void ReleaseShellIconOverlays();
 
@@ -28,7 +26,7 @@ struct CSQLite3DynLoadBase
 
 struct CShellIconOverlayItem
 {
-    CPathBuffer IconOverlayName;             // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    std::wstring IconOverlayName;            // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
     IShellIconOverlayIdentifier* Identifier; // IShellIconOverlayIdentifier object, WARNING: usable only in the main thread
     CLSID IconOverlayIdCLSID;                // CLSID of the corresponding IShellIconOverlayIdentifier object
     int Priority;                            // priority of this icon overlay (0-100, highest priority is zero)
@@ -47,7 +45,7 @@ protected:
     TIndirectArray<CShellIconOverlayItem> Overlays; // priority-sorted list of icon overlays
     CRITICAL_SECTION GD_CS;                         // for GoogleDrive we must mutually exclude IsMemberOf calls from both icon readers (otherwise it crashes, corrupts heap)
     BOOL GetGDAlreadyCalled;                        // TRUE = Google Drive folder location already checked
-    CPathBuffer GoogleDrivePath;                    // Google Drive folder (we do not call their handler elsewhere, it is very slow and crashes without extra synchronization)
+    std::wstring GoogleDrivePath;                       // Google Drive folder (we do not call their handler elsewhere, it is very slow and crashes without extra synchronization)
     BOOL GoogleDrivePathIsFromCfg;                  // Google Drive folder read from config (FALSE = may be default only + Google Drive may not be installed)
     BOOL GoogleDrivePathExists;                     // does the Google Drive folder exist on disk?
 
@@ -55,7 +53,6 @@ public:
     CShellIconOverlays() : Overlays(1, 5)
     {
         HANDLES(InitializeCriticalSection(&GD_CS));
-        GoogleDrivePath[0] = 0;
         GetGDAlreadyCalled = FALSE;
         GoogleDrivePathIsFromCfg = FALSE;
         GoogleDrivePathExists = FALSE;
@@ -80,8 +77,9 @@ public:
     // releases array of IShellIconOverlayIdentifier objects
     void ReleaseIconReadersIconOverlayIds(IShellIconOverlayIdentifier** iconReadersIconOverlayIds);
 
-    // returns icon overlay index for file/dir "wPath+name"
-    DWORD GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath, char* aName, char* name,
+    // Returns the icon-overlay index for path + name. Both are UTF-16 owners;
+    // the method builds its own full path without a MAX_PATH-sized scratch buffer.
+    DWORD GetIconOverlayIndex(const wchar_t* path, const wchar_t* name,
                               DWORD fileAttrs, int minPriority,
                               IShellIconOverlayIdentifier** iconReadersIconOverlayIds,
                               BOOL isGoogleDrivePath);
@@ -102,26 +100,28 @@ public:
 
     BOOL HasGoogleDrivePath();
 
-    BOOL GetPathForGoogleDrive(char* path, int pathLen)
+    BOOL GetPathForGoogleDrive(std::wstring& path)
     {
-        strcpy_s(path, pathLen, GoogleDrivePath);
-        return GoogleDrivePath[0] != 0;
+        if (GoogleDrivePath.empty())
+            return FALSE;
+        path = GoogleDrivePath;
+        return TRUE;
     }
 
-    void SetGoogleDrivePath(const char* path, BOOL pathIsFromConfig)
+    void SetGoogleDrivePath(const std::wstring& path, BOOL pathIsFromConfig)
     {
-        strcpy_s(GoogleDrivePath, GoogleDrivePath.Size(), path);
+        GoogleDrivePath = path;
         GoogleDrivePathIsFromCfg = pathIsFromConfig;
         GoogleDrivePathExists = FALSE;
     }
 
-    BOOL IsGoogleDrivePath(const char* path) { return GoogleDrivePath[0] != 0 && SalPathIsPrefix(GoogleDrivePath, path); }
+    BOOL IsGoogleDrivePath(const wchar_t* path) { return !GoogleDrivePath.empty() && SalPathIsPrefix(GoogleDrivePath.c_str(), path); }
 };
 
 struct CShellIconOverlayItem2 // only list of icon overlay handlers (for configuration dialog, Icon Overlays page)
 {
-    CPathBuffer IconOverlayName;  // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
-    CPathBuffer IconOverlayDescr; // description of COM object icon overlay handler
+    std::wstring IconOverlayName;  // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    std::wstring IconOverlayDescr; // description of COM object icon overlay handler
 };
 
 extern CShellIconOverlays ShellIconOverlays;                           // array of all available icon overlays

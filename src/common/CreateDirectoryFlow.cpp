@@ -70,18 +70,6 @@ bool PrepareCreateDirectoryTargetW(const std::wstring& inputPath,
         return false;
     }
 
-    if (normalized.size() >= SAL_MAX_LONG_PATH)
-    {
-        if (failure != NULL)
-        {
-            failure->stage = CreateDirectoryFailure::kResolve;
-            failure->path = normalized;
-            failure->errorTextId = IDS_TOOLONGPATH;
-            failure->errorCode = ERROR_FILENAME_EXCED_RANGE;
-        }
-        return false;
-    }
-
     std::wstring parentPath = normalized;
     if (!CutDirectoryW(parentPath))
     {
@@ -152,7 +140,7 @@ bool EnsureDirectoryTreeExistsW(const std::wstring& dirPath,
         return false;
     }
 
-    std::wstring rootPath = GetRootPathW(dirPath.c_str());
+    std::wstring rootPath = GetRootPath(dirPath.c_str());
     if (rootPath.empty() || dirPath.size() <= rootPath.size())
     {
         if (failure != NULL)
@@ -275,10 +263,11 @@ BOOL SalCreateDirectoryExW(const wchar_t* name, DWORD* err)
     std::wstring createNameW = MakeCopyWithBackslashIfNeededW(name);
     bool nameUnmodified = (createNameW == nameW);
 
-    if (::CreateDirectoryW(createNameW.c_str(), NULL))
+    FileResult initialCreate = fileSystem->CreateDirectory(createNameW.c_str());
+    if (initialCreate.success)
         return TRUE;
 
-    DWORD errLoc = GetLastError();
+    DWORD errLoc = initialCreate.errorCode;
     if (nameUnmodified &&
         (errLoc == ERROR_FILE_EXISTS || errLoc == ERROR_ALREADY_EXISTS))
     {
@@ -287,16 +276,19 @@ BOOL SalCreateDirectoryExW(const wchar_t* name, DWORD* err)
                                          : INVALID_HANDLE_VALUE;
         if (find != INVALID_HANDLE_VALUE)
         {
-            HANDLES(FindClose(find));
+            fileSystem->CloseFind(find);
 
             const wchar_t* targetNameW = SalPathFindFileNameW(name);
-            char altNameA[14] = {};
-            WideCharToMultiByte(CP_ACP, 0, data.cAlternateFileName, -1, altNameA, _countof(altNameA), NULL, NULL);
 
-            std::string targetNameA = WideToAnsi(targetNameW);
-            std::string fileNameA = WideToAnsi(data.cFileName);
-            if (StrICmp(targetNameA.c_str(), altNameA) == 0 &&
-                StrICmp(targetNameA.c_str(), fileNameA.c_str()) != 0)
+            // "The name we asked for matches an existing file's 8.3 ALIAS but
+            // not its real name" - the collision this whole block works around. All three
+            // operands were narrowed to CP_ACP first, which breaks the second test in the
+            // direction that matters: two different long names that mangle to the same
+            // '?'-string compare EQUAL, so the condition reads "the alias IS the real name",
+            // the workaround is skipped, and creating the directory just fails. All three
+            // have a wide form right here, so nothing needs the mirror.
+            if (StrICmpW(targetNameW, data.cAlternateFileName) == 0 &&
+                StrICmpW(targetNameW, data.cFileName) != 0)
             {
                 std::wstring tmpNameW = nameW;
                 CutDirectoryW(tmpNameW);
@@ -307,17 +299,18 @@ BOOL SalCreateDirectoryExW(const wchar_t* name, DWORD* err)
                 tmpNameW = origFullNameW;
 
                 DWORD num = (GetTickCount() / 10) % 0xFFF;
-                DWORD origFullNameAttr = GetFileAttributesW(origFullNameW.c_str());
+                DWORD origFullNameAttr = fileSystem->GetFileAttributes(origFullNameW.c_str());
                 while (1)
                 {
                     wchar_t tmpSuffix[8];
                     swprintf(tmpSuffix, _countof(tmpSuffix), L"sal%03X", num++);
                     tmpNameW.resize(tmpNamePartPos);
                     tmpNameW += tmpSuffix;
-                    if (MoveFileW(origFullNameW.c_str(), tmpNameW.c_str()))
+                    FileResult tempMove = fileSystem->MoveFile(origFullNameW.c_str(), tmpNameW.c_str());
+                    if (tempMove.success)
                         break;
 
-                    DWORD moveErr = GetLastError();
+                    DWORD moveErr = tempMove.errorCode;
                     if (moveErr != ERROR_FILE_EXISTS && moveErr != ERROR_ALREADY_EXISTS)
                     {
                         tmpNameW.clear();
@@ -327,21 +320,21 @@ BOOL SalCreateDirectoryExW(const wchar_t* name, DWORD* err)
 
                 if (!tmpNameW.empty())
                 {
-                    BOOL createDirDone = ::CreateDirectoryW(nameW.c_str(), NULL);
-                    if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                    BOOL createDirDone = fileSystem->CreateDirectory(nameW.c_str()).success;
+                    if (!fileSystem->MoveFile(tmpNameW.c_str(), origFullNameW.c_str()).success)
                     {
                         TRACE_I("Unexpected situation: unable to rename file from tmp-name to original long file name!");
                         if (createDirDone)
                         {
-                            if (RemoveDirectoryW(nameW.c_str()))
+                            if (fileSystem->RemoveDirectory(nameW.c_str()).success)
                                 createDirDone = FALSE;
-                            if (!MoveFileW(tmpNameW.c_str(), origFullNameW.c_str()))
+                            if (!fileSystem->MoveFile(tmpNameW.c_str(), origFullNameW.c_str()).success)
                                 TRACE_E("Fatal unexpected situation: unable to rename file from tmp-name to original long file name!");
                         }
                     }
                     else if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
                     {
-                        SetFileAttributesW(origFullNameW.c_str(), origFullNameAttr);
+                        fileSystem->SetFileAttributes(origFullNameW.c_str(), origFullNameAttr);
                     }
 
                     if (createDirDone)

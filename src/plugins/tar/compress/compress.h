@@ -27,7 +27,7 @@
 class CCompress : public CZippedFile
 {
 public:
-    CCompress(const char* filename, HANDLE file, unsigned char* buffer, unsigned long read, CQuadWord inputSize);
+    CCompress(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long read, CQuadWord inputSize);
     virtual ~CCompress();
 
     virtual BOOL IsCompressed() { return TRUE; }

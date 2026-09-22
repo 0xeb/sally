@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -26,7 +26,7 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
         case WM_7ZIP_PROGRESS:
             if (!Salamander->ProgressSetSize(*(CQuadWord*)lParam, CQuadWord(-1, -1), TRUE))
             { // Canceled by the user
-                Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
+                Salamander->ProgressDialogAddText(LangStr(IDS_CANCELING_OPERATION).c_str(), FALSE);
                 Salamander->ProgressEnableCancel(FALSE);
                 return E_ABORT;
             }
@@ -37,7 +37,7 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             return S_OK;
 
         case WM_7ZIP_ADDTEXT:
-            Salamander->ProgressDialogAddText((char*)lParam, TRUE); // delayed paint, to avoid slow down by frequent refresh
+            Salamander->ProgressDialogAddText((wchar_t*)lParam, TRUE); // delayed paint, to avoid slow down by frequent refresh
             return S_OK;
 
         case WM_7ZIP_CREATEFILE:
@@ -58,6 +58,8 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
         }
 
         case WM_7ZIP_SHOWMBOXEX:
+            // Wide slot. WM_7ZIP_SHOWMBOXEX is this plugin's own private
+            // message, so both ends move together and no other component sees the change.
             return SalamanderGeneral->SalMessageBoxEx((MSGBOXEX_PARAMS*)lParam);
 
         case WM_7ZIP_DIALOGERROR:
@@ -65,7 +67,7 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
             CDialogErrorParams* dep = (CDialogErrorParams*)lParam;
 
             return SalamanderGeneral->DialogError(hWnd, dep->Flags, dep->FileName,
-                                                  dep->Error, LoadStr(IDS_PACK_UPDATE_ERROR));
+                                                  dep->Error, LangStr(IDS_PACK_UPDATE_ERROR).c_str());
         }
 
         case WM_7ZIP_PASSWORD:
@@ -131,10 +133,10 @@ HRESULT LaunchAndDo7ZipTask(LPTHREAD_START_ROUTINE threadProc, LPVOID args)
         }
 
         MSG msg;
-        while (PeekMessage(&msg, SalamanderGeneral->GetMainWindowHWND(), 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, SalamanderGeneral->GetMainWindowHWND(), 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 

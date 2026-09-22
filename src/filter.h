@@ -96,10 +96,9 @@ public:
     // 'modified' is UTC and will be converted to local time
     BOOL Test(DWORD attributes, const CQuadWord* size, const FILETIME* modified);
 
-    // fills 'buffer' with a description of the set values if they differ from the default ones
-    // (after calling the Reset method). 'maxLen' specifies the maximum length of the 'buffer' string.
-    // the function returns TRUE if any value differs from the default
-    BOOL GetAdvancedDescription(char* buffer, int maxLen, BOOL& dirty);
+    // Returns a description of the set values after preparing derived criteria state.
+    // 'dirty' reports whether any value differs from the defaults.
+    std::wstring GetAdvancedDescription(BOOL& dirty);
 
     // save/load to/from the Windows Registry
     // !!! WARNING: saving is optimized-only changed values are stored; before saving into a key, this key must be cleared first

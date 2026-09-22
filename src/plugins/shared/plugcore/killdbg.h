@@ -54,4 +54,4 @@ inline void __TraceEmptyFunction() {}
 //
 
 // eliminates calls to SetThreadNameInVCAndTrace
-inline void SetThreadNameInVCAndTrace(const char* name) {}
+inline void SetThreadNameInVCAndTrace(const wchar_t* name) {}

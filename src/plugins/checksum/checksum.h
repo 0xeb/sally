@@ -6,6 +6,8 @@
 
 #include "wrappers.h"
 
+#include <string>
+
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
 
 typedef enum eHASH_TYPE
@@ -26,8 +28,8 @@ typedef struct SHashInfo
     int idContextMenu;  // Line in context menu in Calculate window
     int idSaveAsFilter; // Filter to SaveAs dialog in Calculate window
     int idVerifyTitle;  // Title of Verify window
-    LPCTSTR sSaveAsExt;
-    const char* sRegID; // Key in registry
+    const wchar_t* sSaveAsExt;
+    const wchar_t* sRegID; // Key in registry
     THashFactory Factory;
 } SHashInfo;
 
@@ -42,6 +44,7 @@ typedef struct SConfig
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 extern CSalamanderCryptAbstract* SalamanderCrypt;
+extern CSalamanderSafeFileAbstract* SalamanderSafeFile;
 
 class CPluginInterface : public CPluginInterfaceAbstract
 {
@@ -66,7 +69,7 @@ public:
 
     virtual void WINAPI Event(int event, DWORD param) {}
     virtual void WINAPI ClearHistory(HWND parent) {}
-    virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) {}
+    virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) {}
 
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
@@ -85,7 +88,6 @@ extern SConfig Config;
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
 
-char* LoadStr(int resID);
 INT_PTR OnConfiguration(HWND hParent);
 
 #define CMD_CALCULATE 1
@@ -93,7 +95,7 @@ INT_PTR OnConfiguration(HWND hParent);
 
 // focus handling from the Verify dialog
 #define CMD_FOCUSFILE 99
-extern CPathBuffer Focus_Path;
+extern std::wstring Focus_Path;
 
 #define DUMP_MEM_OBJECTS
 

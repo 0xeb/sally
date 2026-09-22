@@ -1,7 +1,7 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\hungarian\renamer.atp"
-TEXTVERSION,"1.13 (x86)"
-VERSION,"1,1,3,180"
+TEXTVERSION,"1.13 (x64)"
+VERSION,"1,1,3,188"
 
 [TRANSLATION]
 LANGID,1038
@@ -455,4 +455,5 @@ COMMENT,"Magyar változat"
 1284,1,"Tallóz..."
 1285,1,"Sally mappa"
 1286,1,"&Kötegelt átnevező kérdés nélküli bezárása"
-
+1287,0,"Environment variable "%s" was not found."
+1288,0,"Value of environment variable "%s" is too large."

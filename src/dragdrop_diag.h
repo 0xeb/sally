@@ -32,4 +32,4 @@ void DragDropDiagRecord(const char* branch, DWORD keyState, DWORD effectIn, DWOR
 // Issue #87 already taught this codebase that the shell shortcut path wants richer formats than
 // CF_HDROP (it was fixed there with a PIDL-backed data object); this checks whether the DRAG
 // data object has the same gap.
-void DragDropDiagDataObject(IDataObject* dataObject, const char* curDir);
+void DragDropDiagDataObject(IDataObject* dataObject, const wchar_t* curDir);

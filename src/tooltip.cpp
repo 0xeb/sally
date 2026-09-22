@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -7,8 +7,11 @@
 #include "tooltip.h"
 #include "mainwnd.h"
 #include "darkmode.h"
+#include "common/text/LegacyTooltipTextEncoding.h"
 
-#define WC_TOOLTIP "SalamanderToolTip"
+// wchar_t-generic - registered/created through CWindow::RegisterUniversalClass/
+// CreateEx's own LPCWSTR parameters, which resolve wide under _UNICODE.
+#define WC_TOOLTIP L"SalamanderToolTip"
 
 static void FillRectWithColor(HDC hDC, const RECT* rect, COLORREF color)
 {
@@ -108,7 +111,7 @@ BOOL CToolTip::Create(HWND hParent)
         TRACE_E("CToolTip::Create hParent==NULL!");
     CreateEx(WS_EX_TOPMOST | WS_EX_TOOLWINDOW, // extended window style
              WC_TOOLTIP,                       // address of registered class name
-             "",                               // address of window name
+             L"",                           // address of window name
              WS_POPUP | WS_BORDER,             // window style
              0, 0, 0, 0,
              hParent,   // handle of parent or owner window
@@ -194,7 +197,7 @@ void CToolTip::MessageLoop()
     IsModal = TRUE;
     ExitASAP = FALSE;
     MSG msg;
-    while (!ExitASAP && GetMessage(&msg, NULL, 0, 0))
+    while (!ExitASAP && GetMessageW(&msg, NULL, 0, 0))
     {
         switch (msg.message)
         {
@@ -225,7 +228,7 @@ void CToolTip::MessageLoop()
         if (!ExitASAP)
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -284,7 +287,7 @@ void CToolTip::MessageLoop()
                     if (hDialog == NULL || !IsDialogMessage(hDialog, &msg))
                     {
                         TranslateMessage(&msg);
-                        DispatchMessage(&msg);
+                        DispatchMessageW(&msg);
                     }
                 }
             }
@@ -300,7 +303,7 @@ void CToolTip::MessageLoop()
         if (hDialog == NULL || !IsDialogMessage(hDialog, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 }
@@ -310,8 +313,26 @@ BOOL CToolTip::GetText()
     if (HNotifyWindow != NULL)
     {
         Text[0] = 0;
-        SendMessage(HNotifyWindow, WM_USER_TTGETTEXT, LastID, (LPARAM)Text);
-        TextLen = lstrlen(Text);
+        SendMessage(HNotifyWindow, WM_USER_TTGETTEXTW, LastID, (LPARAM)Text);
+        TextLen = (int)wcslen(Text);
+
+        if (TextLen == 0)
+        {
+            // The window did not answer the wide message. Retry only through the frozen v107
+            // message adapter; live senders use WM_USER_TTGETTEXTW.
+            char narrow[TOOLTIP_TEXT_MAX];
+            narrow[0] = 0;
+            SendMessage(HNotifyWindow, WM_USER_TTGETTEXT, LastID, (LPARAM)narrow);
+            if (narrow[0] != 0)
+            {
+                std::wstring wide;
+                if (sally::legacy_tooltip::DecodeV107Payload(narrow, _countof(narrow), wide))
+                {
+                    lstrcpynW(Text, wide.c_str(), TOOLTIP_TEXT_MAX);
+                    TextLen = (int)wcslen(Text);
+                }
+            }
+        }
     }
     if (TextLen == 0)
     {
@@ -332,7 +353,7 @@ void CToolTip::GetNeededWindowSize(SIZE* sz)
     tR.top = 0;
     tR.right = 0;
     tR.bottom = 0;
-    DrawText(hDC, Text, TextLen, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EXPANDTABS);
+    DrawTextW(hDC, Text, TextLen, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EXPANDTABS);
     HANDLES(ReleaseDC(HWindow, hDC));
     sz->cx = tR.right - tR.left;
     sz->cy = tR.bottom - tR.top;
@@ -654,7 +675,7 @@ CToolTip::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int oldBkMode = SetBkMode(hDC, TRANSPARENT);
         r.left += 2;
         r.top += 1;
-        DrawText(hDC, Text, TextLen, &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | DT_EXPANDTABS);
+        DrawTextW(hDC, Text, TextLen, &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | DT_EXPANDTABS);
         SetBkMode(hDC, oldBkMode);
         SetTextColor(hDC, oldTextColor);
         SelectObject(hDC, hOldFont);

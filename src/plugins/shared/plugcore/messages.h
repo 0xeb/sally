@@ -52,7 +52,7 @@ private:
 public:
     enum
     {
-        BufferSize = 4094
+        BufferSize = 256 * 1024
     };
     enum
     {

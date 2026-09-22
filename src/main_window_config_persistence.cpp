@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
@@ -7,10 +7,13 @@
 
 #include "ui/IPrompter.h"
 #include "ui/UnicodeHistoryUtils.h"
+#include "menu_item_text.h"
 #include "window_placement_policy.h"
+#include "common/DiagnosticTextEncoding.h"
 #include "common/unicode/helpers.h"
 #include "common/IEnvironment.h"
 #include "common/IRegistry.h"
+#include "common/fsutil.h"
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
 
@@ -161,16 +164,16 @@ const DWORD THIS_CONFIG_VERSION = 106; // 106 = plugins renamed from .spl to .dl
 // simply insert the path at index 0.
 
 // !!! Keep the corresponding lines in SalamanderConfigurationVersions up to date
-const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
+const wchar_t* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
     {
         SAL_REG_CONFIGURATION_ROOTS
 };
-const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
+const wchar_t* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
     {
         SAL_REG_CONFIGURATION_VERSIONS
 };
 
-const char* SALAMANDER_ROOT_REG = NULL; // will be set in salamander_entry_lifecycle.cpp
+const wchar_t* SALAMANDER_ROOT_REG = NULL; // will be set in salamander_entry_lifecycle.cpp
 
 // Publishes the configuration root Sally actually resolved into this process's environment,
 // so in-process plugins can read the SAME key the core reads.
@@ -189,26 +192,30 @@ void PublishConfigRootToEnvironment()
 {
     // NULL is meaningful (UPGRADE abort: "do not write configuration"), so clear it rather
     // than leaving a stale value that would outlive the reason it was set.
-    SetEnvironmentVariableA(SAL_ENV_CONFIG_ROOT_A, SALAMANDER_ROOT_REG);
+    //
+    // [merge:main->unicode] W, not A: SALAMANDER_ROOT_REG is const wchar_t* on this branch, so
+    // main's SetEnvironmentVariableA would not compile. The A-form macro deliberately survives
+    // in registry_names.h because plugins/shared/plugindarkmode.cpp still READS it via
+    // GetEnvironmentVariableA - see the comment there for why that round-trip is exact.
+    SetEnvironmentVariableW(SAL_ENV_CONFIG_ROOT_W, SALAMANDER_ROOT_REG);
 }
 
-const char* SALAMANDER_SAVE_IN_PROGRESS = "Save In Progress"; // value exists only during configuration save (detects interrupted saves -> corrupted configuration)
+const wchar_t* SALAMANDER_SAVE_IN_PROGRESS = L"Save In Progress"; // value exists only during configuration save (detects interrupted saves -> corrupted configuration)
 BOOL IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;                // TRUE = the registry contains SALAMANDER_SAVE_IN_PROGRESS (detect interrupted configuration saving)
 
-const char* SALAMANDER_COPY_IS_OK = "Copy Is OK"; // backup key only: value exists only if the key was copied completely
+const wchar_t* FINDDIALOG_WINDOW_REG = L"Find Dialog Window";
+const wchar_t* SALAMANDER_WINDOW_REG = L"Window";
+const wchar_t* WINDOW_LEFT_REG = L"Left";
+const wchar_t* WINDOW_RIGHT_REG = L"Right";
+const wchar_t* WINDOW_TOP_REG = L"Top";
+const wchar_t* WINDOW_BOTTOM_REG = L"Bottom";
+const wchar_t* WINDOW_SPLIT_REG = L"Split Position";
+const wchar_t* WINDOW_BEFOREZOOMSPLIT_REG = L"Before Zoom Split Position";
+const wchar_t* WINDOW_SHOW_REG = L"Show";
+const wchar_t* FINDDIALOG_NAMEWIDTH_REG = L"Name Width";
 
-const char* SALAMANDER_AUTO_IMPORT_CONFIG = SAL_REG_VALUE_AUTO_IMPORT_CONFIG_A; // value exists only during upgrade: installer overwrites the old version with the new and stores this value pointing to the old configuration key from which the configuration should be imported
-
-const char* FINDDIALOG_WINDOW_REG = "Find Dialog Window";
-const char* SALAMANDER_WINDOW_REG = "Window";
-const char* WINDOW_LEFT_REG = "Left";
-const char* WINDOW_RIGHT_REG = "Right";
-const char* WINDOW_TOP_REG = "Top";
-const char* WINDOW_BOTTOM_REG = "Bottom";
-const char* WINDOW_SPLIT_REG = "Split Position";
-const char* WINDOW_BEFOREZOOMSPLIT_REG = "Before Zoom Split Position";
-const char* WINDOW_SHOW_REG = "Show";
-const char* FINDDIALOG_NAMEWIDTH_REG = "Name Width";
+const wchar_t* SALAMANDER_LEFTP_REG = L"Left Panel";
+const wchar_t* SALAMANDER_RIGHTP_REG = L"Right Panel";
 
 // #97: collect monitor work areas and clamp a normal-window rect to a sane, visible size
 // before it is applied - so a stale/off-screen saved rect (e.g. after resume-from-sleep
@@ -230,449 +237,654 @@ RECT SanitizeMainWindowNormalRect(RECT rect)
     return SanitizeWindowRect(rect, mons.data(), (int)mons.size(), 400, 300);
 }
 
-const char* SALAMANDER_LEFTP_REG = "Left Panel";
-const char* SALAMANDER_RIGHTP_REG = "Right Panel";
-const char* PANEL_PATH_REG = "Path";
-const char* PANEL_VIEW_REG = "View Type";
-const char* PANEL_SORT_REG = "Sort Type";
-const char* PANEL_REVERSE_REG = "Reverse Sort";
-const char* PANEL_DIRLINE_REG = "Directory Line";
-const char* PANEL_STATUS_REG = "Status Line";
-const char* PANEL_HEADER_REG = "Header Line";
-const char* PANEL_FILTER_ENABLE = "Enable Filter";
-const char* PANEL_FILTER_INVERSE = "Inverse Filter";
-const char* PANEL_FILTERHISTORY_REG = "Filter History";
-const char* PANEL_FILTER = "Filter";
+// Wide twins for every value name used in a REG_DWORD call.
+// Emitted beside the ANSI constants rather than replacing them, so any other
+// use of the narrow name still compiles - that is the check that this pass
+// reached only where it was meant to. The ANSI set is retired later.
+const wchar_t* CONFIG_ALWAYSONTOP_REG_W = L"Always On Top";
+const wchar_t* CONFIG_ASYNCCOPYALG_REG_W = L"Async Copy Alg On Network";
+const wchar_t* CONFIG_BOTTOMTOOLBARVISIBLE_REG_W = L"Show Bottom ToolBar";
+const wchar_t* CONFIG_CHD_SHOWANOTHER_W = L"Change Drive Show Another";
+const wchar_t* CONFIG_CHD_SHOWCLOUDSTOR_W = L"Change Drive Show Cloud Storages";
+const wchar_t* CONFIG_CHD_SHOWMYDOC_W = L"Change Drive Show My Documents";
+const wchar_t* CONFIG_CHD_SHOWNET_W = L"Change Drive Network";
+const wchar_t* CONFIG_CLEARREADONLY_REG_W = L"Clear Readonly Attribute";
+const wchar_t* CONFIG_CLICKQUICKRENAME_REG_W = L"Click to Quick Rename";
+const wchar_t* CONFIG_CLOSESHELL_REG_W = L"Close Shell Window";
+const wchar_t* CONFIG_CMDLFOCUS_REG_W = L"Command Line Focused";
+const wchar_t* CONFIG_CMDLINE_REG_W = L"Command Line";
+const wchar_t* CONFIG_COMMANDSHELL_KIND_REG_W = L"Command Shell Kind";
+const wchar_t* CONFIG_COMPAREBYATTR_REG_W = L"Compare By Attr";
+const wchar_t* CONFIG_COMPAREBYCONTENT_REG_W = L"Compare By Content";
+const wchar_t* CONFIG_COMPAREBYSIZE_REG_W = L"Compare By Size";
+const wchar_t* CONFIG_COMPAREBYSUBDIRSATTR_REG_W = L"Compare By Subdirs Attr";
+const wchar_t* CONFIG_COMPAREBYSUBDIRS_REG_W = L"Compare By Subdirs";
+const wchar_t* CONFIG_COMPAREBYTIME_REG_W = L"Compare By Time";
+const wchar_t* CONFIG_COMPAREIGNOREDIRS_REG_W = L"Compare Ignore Dirs";
+const wchar_t* CONFIG_COMPAREIGNOREFILES_REG_W = L"Compare Ignore Files";
+const wchar_t* CONFIG_COMPAREMOREOPTIONS_REG_W = L"Compare More Options";
+const wchar_t* CONFIG_COMPAREONEPANELDIRS_REG_W = L"Compare One Panel Dirs";
+const wchar_t* CONFIG_CONFIGURATION_HEIGHT_W = L"Configuration Height";
+const wchar_t* CONFIG_COPYFINDTEXT_REG_W = L"Copy Find Text";
+const wchar_t* CONFIG_DRAGDROPMINTIME_W = L"DragDrop Min Time";
+const wchar_t* CONFIG_DRIVEBAR2VISIBLE_REG_W = L"Show Drive Bar2";
+const wchar_t* CONFIG_DRIVEBARBREAK_REG_W = L"Drive Bar Break";
+const wchar_t* CONFIG_DRIVEBARINDEX_REG_W = L"Drive Bar Index";
+const wchar_t* CONFIG_DRIVEBARVISIBLE_REG_W = L"Show Drive Bar";
+const wchar_t* CONFIG_DRIVEBARWIDTH_REG_W = L"Drive Bar Width";
+const wchar_t* CONFIG_EDITNEWFILE_USEDEFAULT_REG_W = L"Edit New File Use Default";
+const wchar_t* CONFIG_EDITNEW_SELALL_REG_W = L"Edit New File Select All";
+const wchar_t* CONFIG_ENABLECMDLINEHISTORY_REG_W = L"Enable CmdLine History";
+const wchar_t* CONFIG_ENABLECUSTICOVRLS_REG_W = L"Enable Custom Icon Overlays";
+const wchar_t* CONFIG_EXPLORERLOOK_REG_W = L"Explorer Look";
+const wchar_t* CONFIG_FILELISTAPPEND_REG_W = L"Make File List Append";
+const wchar_t* CONFIG_FILELISTDESTINATION_REG_W = L"Make File List Destination";
+const wchar_t* CONFIG_FILENAMEFORMAT_REG_W = L"File Name Format";
+const wchar_t* CONFIG_FINDFILETYPEMODE_REG_W = L"Find Files Type Filter";
+const wchar_t* CONFIG_FINDFULLROW_REG_W = L"Show Full Row In Find Files";
+const wchar_t* CONFIG_FULLROWHIGHLIGHT_REG_W = L"Full Row Highlight";
+const wchar_t* CONFIG_FULLROWSELECT_REG_W = L"Full Row Select";
+const wchar_t* CONFIG_GRIPSVISIBLE_REG_W = L"Grips Visible";
+const wchar_t* CONFIG_HOTPATHSBARVISIBLE_REG_W = L"Hot Paths Bar";
+const wchar_t* CONFIG_HOTPATHSBREAK_REG_W = L"Hot Paths Break";
+const wchar_t* CONFIG_HOTPATHSINDEX_REG_W = L"Hot Paths Index";
+const wchar_t* CONFIG_HOTPATHSWIDTH_REG_W = L"Hot Paths Width";
+const wchar_t* CONFIG_HOTPATH_AUTOCONFIG_W = L"Auto Configurate Hot Paths";
+const wchar_t* CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG_W = L"If Path Is Inaccessible Go To My Docs";
+const wchar_t* CONFIG_IGNOREDSTSHIFTS_W = L"Ignore DST Shifts";
+const wchar_t* CONFIG_KEEPPLUGINSSORTED_REG_W = L"Keep Plugins Sorted";
+const wchar_t* CONFIG_LANGUAGECHANGED_REG_W = L"Language Changed";
+const wchar_t* CONFIG_LASTFOCUSEDPAGE_W = L"Last Focused Page";
+const wchar_t* CONFIG_LASTPLUGINVER_W = L"Plugins.ver Version (x64)";
+const wchar_t* CONFIG_LASTPLUGINVER_OP_W = L"Plugins.ver Version (x86)";
+const wchar_t* CONFIG_LASTUSEDSPEEDLIM_REG_W = L"Speed Limit";
+const wchar_t* CONFIG_MAINWINDOWICONINDEX_REG_W = L"Main window icon index";
+const wchar_t* CONFIG_MENUBREAK_REG_W = L"Menu Break";
+const wchar_t* CONFIG_MENUINDEX_REG_W = L"Menu Index";
+const wchar_t* CONFIG_MENUWIDTH_REG_W = L"Menu Width";
+const wchar_t* CONFIG_MIDDLETOOLBARVISIBLE_REG_W = L"Show Middle ToolBar";
+const wchar_t* CONFIG_MINBEEPWHENDONE_REG_W = L"Use Speeker Beep";
+const wchar_t* CONFIG_NETWAREFASTDIRMOVE_REG_W = L"Netware Fast Dir Move";
+const wchar_t* CONFIG_NOTHIDDENSYSTEM_REG_W = L"Hide Hidden and System Files and Directories";
+const wchar_t* CONFIG_ONLYONEINSTANCE_REG_W = L"Only One Instance";
+const wchar_t* CONFIG_PACKEPAND_W = L"Packers And Unpackers Expanded";
+const wchar_t* CONFIG_PLGTOOLBARVISIBLE_REG_W = L"Show Plugins Bar";
+const wchar_t* CONFIG_PLUGINSBARBREAK_REG_W = L"PluginsBar Break";
+const wchar_t* CONFIG_PLUGINSBARINDEX_REG_W = L"PluginsBar Index";
+const wchar_t* CONFIG_PLUGINSBARWIDTH_REG_W = L"PluginsBar Width";
+const wchar_t* CONFIG_PRIMARYCONTEXTMENU_REG_W = L"Primary Context Menu";
+const wchar_t* CONFIG_QUICKRENAME_SELALL_REG_W = L"Quick Rename Select All";
+const wchar_t* CONFIG_QUICKSEARCHENTER_REG_W = L"Quick Search Enter Alt";
+const wchar_t* CONFIG_RECYCLEBIN_REG_W = L"Use Recycle Bin";
+const wchar_t* CONFIG_RELOAD_ENV_VARS_REG_W = L"Reload Environment Variables";
+const wchar_t* CONFIG_RIGHT_FOCUS_REG_W = L"Right Panel Focused";
+const wchar_t* CONFIG_SAVECMDLINEHISTORY_REG_W = L"Save CmdLine History";
+const wchar_t* CONFIG_SAVEHISTORY_REG_W = L"Save History";
+const wchar_t* CONFIG_SAVEONEXIT_REG_W = L"Save Configuration On Exit";
+const wchar_t* CONFIG_SAVEWORKDIRS_REG_W = L"Save Working Dirs";
+const wchar_t* CONFIG_SEARCHFILECONTENT_W = L"Search File Content";
+const wchar_t* CONFIG_SELECTION_REG_W = L"Select/Deselect Directories";
+const wchar_t* CONFIG_SEPARATEDDRIVES_REG_W = L"Separated Drives";
+const wchar_t* CONFIG_SHIFTFORHOTPATHS_REG_W = L"Use Shift For GoTo HotPath";
+const wchar_t* CONFIG_SHOWGREPERRORS_REG_W = L"Show Errors In Find Files";
+const wchar_t* CONFIG_SHOWPANELCAPTION_REG_W = L"Show Panel Caption";
+const wchar_t* CONFIG_SHOWPANELZOOM_REG_W = L"Show Panel Zoom";
+const wchar_t* CONFIG_SHOWSLGINCOMPLETE_REG_W = L"Show Translation Is Incomplete";
+const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG_W = L"Show Splash Screen";
+const wchar_t* CONFIG_SINGLECLICK_REG_W = L"Single Click";
+const wchar_t* CONFIG_SIZEFORMAT_REG_W = L"Size Format";
+const wchar_t* CONFIG_SKILLLEVEL_REG_W = L"Skill Level";
+const wchar_t* CONFIG_SORTDETECTNUMBERS_REG_W = L"Sort Detects Numbers";
+const wchar_t* CONFIG_SORTDIRSBYEXT_REG_W = L"Sort Dirs By Ext";
+const wchar_t* CONFIG_SORTDIRSBYNAME_REG_W = L"Sort Dirs By Name";
+const wchar_t* CONFIG_SORTNEWERONTOP_REG_W = L"Sort Newer On Top";
+const wchar_t* CONFIG_SORTUSESLOCALE_REG_W = L"Sort Uses Locale";
+const wchar_t* CONFIG_STATUSAREA_REG_W = L"Status Area";
+const wchar_t* CONFIG_THEME_MODE_REG_W = L"Theme mode";
+const wchar_t* CONFIG_THUMBNAILSIZE_REG_W = L"Thumbnail Size";
+const wchar_t* CONFIG_TIMERESOLUTION_W = L"Time Resolution";
+const wchar_t* CONFIG_TITLEBARMODE_REG_W = L"Title bar mode";
+const wchar_t* CONFIG_TITLEBARPREFIX_REG_W = L"Title bar prefix";
+const wchar_t* CONFIG_TITLEBARSHOWPATH_REG_W = L"Title bar show path";
+const wchar_t* CONFIG_TOOLBARBREAK_REG_W = L"ToolBar Break";
+const wchar_t* CONFIG_TOOLBARINDEX_REG_W = L"ToolBar Index";
+const wchar_t* CONFIG_TOOLBARWIDTH_REG_W = L"ToolBar Width";
+const wchar_t* CONFIG_TOPTOOLBARVISIBLE_REG_W = L"Show Top ToolBar";
+const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG_W = L"Use Alternate Language for Plugins";
+const wchar_t* CONFIG_USECUSTOMPANELFONT_REG_W = L"Use Custom Panel Font";
+const wchar_t* CONFIG_USEDRAGDROPMINTIME_W = L"Use DragDrop Min Time";
+const wchar_t* CONFIG_USEICONTINCTURE_REG_W = L"Use Icon Tincture";
+const wchar_t* CONFIG_USERMENUBREAK_REG_W = L"User Menu Break";
+const wchar_t* CONFIG_USERMENUINDEX_REG_W = L"User Menu Index";
+const wchar_t* CONFIG_USERMENULABELS_REG_W = L"User Menu Labels";
+const wchar_t* CONFIG_USERMENUTOOLBARVISIBLE_REG_W = L"Show User Menu ToolBar";
+const wchar_t* CONFIG_USERMENUWIDTH_REG_W = L"User Menu Width";
+const wchar_t* CONFIG_USETIMERESOLUTION_W = L"Use Time Resolution";
+const wchar_t* CONFIG_VIEWANDEDITEXPAND_W = L"Viewers And Editors Expanded";
+const wchar_t* CONFIG_VISIBLEDRIVES_REG_W = L"Visible Drives";
+const wchar_t* FINDDIALOG_NAMEWIDTH_REG_W = L"Name Width";
+const wchar_t* PANEL_FILTER_INVERSE_W = L"Inverse Filter";
+const wchar_t* SALAMANDER_CLRSCHEME_REG_W = L"Color Scheme";
+const wchar_t* SALAMANDER_SIMPLEICONSINARCHIVES_W = L"Simple Icons In Archives";
+const wchar_t* SALAMANDER_VERSIONREG_REG_W = SAL_REG_SUBKEY_CONFIGURATION_W;
+const wchar_t* VIEWER_AUTOCOPYSELECTION_REG_W = L"Auto-Copy Selection";
+const wchar_t* VIEWER_CONFIGCRLF_REG_W = L"EOL CRLF";
+const wchar_t* VIEWER_CONFIGCR_REG_W = L"EOL CR";
+const wchar_t* VIEWER_CONFIGDEFMODE_REG_W = L"Default Mode";
+const wchar_t* VIEWER_CONFIGLF_REG_W = L"EOL LF";
+const wchar_t* VIEWER_CONFIGNULL_REG_W = L"EOL NULL";
+const wchar_t* VIEWER_CONFIGSAVEWINPOS_REG_W = L"Save Window Position";
+const wchar_t* VIEWER_CONFIGTABSIZE_REG_W = L"Tabelator Size";
+const wchar_t* VIEWER_CONFIGUSECUSTOMFONT_REG_W = L"Viewer Use Custom Font";
+const wchar_t* VIEWER_CONFIGWNDBOTTOM_REG_W = L"Bottom";
+const wchar_t* VIEWER_CONFIGWNDLEFT_REG_W = L"Left";
+const wchar_t* VIEWER_CONFIGWNDRIGHT_REG_W = L"Right";
+const wchar_t* VIEWER_CONFIGWNDSHOW_REG_W = L"Show";
+const wchar_t* VIEWER_CONFIGWNDTOP_REG_W = L"Top";
+const wchar_t* VIEWER_CPAUTOSELECT_REG_W = L"Auto-Select";
+const wchar_t* VIEWER_FINDCASESENSITIVE_REG_W = L"Case Sensitive";
+const wchar_t* VIEWER_FINDFORWARD_REG_W = L"Forward Direction";
+const wchar_t* VIEWER_FINDHEXMODE_REG_W = L"HEX-mode";
+const wchar_t* VIEWER_FINDREGEXP_REG_W = L"Regular Expression";
+const wchar_t* VIEWER_FINDWHOLEWORDS_REG_W = L"Whole Words";
+const wchar_t* VIEWER_GOTOOFFSETISHEX_REG_W = L"Go to Offset Is Hex";
+const wchar_t* VIEWER_WRAPTEXT_REG_W = L"Wrap Text";
+const wchar_t* WINDOW_BOTTOM_REG_W = L"Bottom";
+const wchar_t* WINDOW_LEFT_REG_W = L"Left";
+const wchar_t* WINDOW_RIGHT_REG_W = L"Right";
+const wchar_t* WINDOW_SHOW_REG_W = L"Show";
+const wchar_t* WINDOW_TOP_REG_W = L"Top";
 
-const char* SALAMANDER_DEFDIRS_REG = "Default Directories";
+// Wide twins for the panel region. The names are ASCII, so the twin
+// is not about the NAME's content - it is about reaching the wide facades without
+// an AnsiToWideReg at every call, which is what lets a later pass delete the ANSI
+// facades entirely. Converted region by region; the ANSI constants stay until the
+// last region moves.
+const wchar_t* SALAMANDER_LEFTP_REG_W = L"Left Panel";
+const wchar_t* SALAMANDER_RIGHTP_REG_W = L"Right Panel";
+const wchar_t* PANEL_PATH_REG_W = L"Path";
+const wchar_t* PANEL_VIEW_REG_W = L"View Type";
+const wchar_t* PANEL_SORT_REG_W = L"Sort Type";
+const wchar_t* PANEL_REVERSE_REG_W = L"Reverse Sort";
+const wchar_t* PANEL_DIRLINE_REG_W = L"Directory Line";
+const wchar_t* PANEL_STATUS_REG_W = L"Status Line";
+const wchar_t* PANEL_HEADER_REG_W = L"Header Line";
+const wchar_t* PANEL_FILTER_ENABLE_W = L"Enable Filter";
+const wchar_t* PANEL_FILTER_W = L"Filter";
+const wchar_t* PANEL_PATH_REG = L"Path";
+const wchar_t* PANEL_VIEW_REG = L"View Type";
+const wchar_t* PANEL_SORT_REG = L"Sort Type";
+const wchar_t* PANEL_REVERSE_REG = L"Reverse Sort";
+const wchar_t* PANEL_DIRLINE_REG = L"Directory Line";
+const wchar_t* PANEL_STATUS_REG = L"Status Line";
+const wchar_t* PANEL_HEADER_REG = L"Header Line";
+const wchar_t* PANEL_FILTER_ENABLE = L"Enable Filter";
+const wchar_t* PANEL_FILTER_INVERSE = L"Inverse Filter";
+const wchar_t* PANEL_FILTERHISTORY_REG = L"Filter History";
+const wchar_t* PANEL_FILTER = L"Filter";
 
-const char* SALAMANDER_CONFIG_REG = SAL_REG_SUBKEY_CONFIGURATION_A;
-const char* CONFIG_SKILLLEVEL_REG = "Skill Level";
-const char* CONFIG_FILENAMEFORMAT_REG = "File Name Format";
-const char* CONFIG_SIZEFORMAT_REG = "Size Format";
-const char* CONFIG_SELECTION_REG = "Select/Deselect Directories";
-const char* CONFIG_LONGNAMES_REG = "Use Long File Names";
-const char* CONFIG_RECYCLEBIN_REG = "Use Recycle Bin";
-const char* CONFIG_RECYCLEMASKS_REG = "Use Recycle Bin For";
-const char* CONFIG_SAVEONEXIT_REG = "Save Configuration On Exit";
-const char* CONFIG_SHOWGREPERRORS_REG = "Show Errors In Find Files";
-const char* CONFIG_FINDFULLROW_REG = "Show Full Row In Find Files";
-const char* CONFIG_FINDFILETYPEMODE_REG = "Find Files Type Filter";
-const char* CONFIG_MINBEEPWHENDONE_REG = "Use Speeker Beep";
-const char* CONFIG_INTRN_VIEWER_REG = "Internal Viewer";
-const char* CONFIG_VIEWER_REG = "External Viewer";
-const char* CONFIG_EDITOR_REG = "External Editor";
-const char* CONFIG_CMDLINE_REG = "Command Line";
-const char* CONFIG_CMDLFOCUS_REG = "Command Line Focused";
-const char* CONFIG_CLOSESHELL_REG = "Close Shell Window";
-const char* CONFIG_USECUSTOMPANELFONT_REG = "Use Custom Panel Font";
-const char* CONFIG_PANELFONT_REG = "Panel Font";
-const char* CONFIG_NAMEDHISTORY_REG = "Named History";
-const char* CONFIG_LOOKINHISTORY_REG = "Look In History";
-const char* CONFIG_GREPHISTORY_REG = "Grep History";
-const char* CONFIG_VIEWERHISTORY_REG = "Viewer History";
-const char* CONFIG_COMMANDHISTORY_REG = "Command History";
-const char* CONFIG_SELECTHISTORY_REG = "Select History";
-const char* CONFIG_COPYHISTORY_REG = "Copy History";
-const char* CONFIG_COPYHISTORYW_REG = "Copy History W";
-const char* CONFIG_CHANGEDIRHISTORY_REG = "ChangeDir History";
-const char* CONFIG_FILELISTHISTORY_REG = "File List History";
-const char* CONFIG_CREATEDIRHISTORY_REG = "Create Directory History";
-const char* CONFIG_QUICKRENAMEHISTORY_REG = "Quick Rename History";
-const char* CONFIG_EDITNEWHISTORY_REG = "Edit New History";
-const char* CONFIG_CREATEDIRHISTORYW_REG = "Create Directory History W";
-const char* CONFIG_QUICKRENAMEHISTORYW_REG = "Quick Rename History W";
-const char* CONFIG_EDITNEWHISTORYW_REG = "Edit New History W";
-const char* CONFIG_CONVERTHISTORY_REG = "Convert History";
-const char* CONFIG_FILTERHISTORY_REG = "Filter History";
-const char* CONFIG_WORKDIRSHISTORY_REG = "Working Directories";
-const char* CONFIG_FILELISTNAME_REG = "Make File List Name";
-const char* CONFIG_FILELISTAPPEND_REG = "Make File List Append";
-const char* CONFIG_FILELISTDESTINATION_REG = "Make File List Destination";
-const char* CONFIG_COPYFINDTEXT_REG = "Copy Find Text";
-const char* CONFIG_CLEARREADONLY_REG = "Clear Readonly Attribute";
-const char* CONFIG_PRIMARYCONTEXTMENU_REG = "Primary Context Menu";
-const char* CONFIG_NOTHIDDENSYSTEM_REG = "Hide Hidden and System Files and Directories";
-const char* CONFIG_RIGHT_FOCUS_REG = "Right Panel Focused";
-const char* CONFIG_SHOWCHDBUTTON_REG = "Show Change Drive Button";
-const char* CONFIG_ALWAYSONTOP_REG = "Always On Top";
-const char* CONFIG_COMMANDSHELL_KIND_REG = "Command Shell Kind";
-const char* CONFIG_COMMANDSHELL_PROFILE_GUID_REG = "Command Shell Profile GUID";
-const char* CONFIG_COMMANDSHELL_PROFILE_NAME_REG = "Command Shell Profile Name";
+const wchar_t* SALAMANDER_DEFDIRS_REG = L"Default Directories";
+
+const wchar_t* SALAMANDER_CONFIG_REG = SAL_REG_SUBKEY_CONFIGURATION_W;
+const wchar_t* SALAMANDER_CONFIG_REG_W = SAL_REG_SUBKEY_CONFIGURATION_W;
+const wchar_t* CONFIG_SKILLLEVEL_REG = L"Skill Level";
+const wchar_t* CONFIG_FILENAMEFORMAT_REG = L"File Name Format";
+const wchar_t* CONFIG_SIZEFORMAT_REG = L"Size Format";
+const wchar_t* CONFIG_SELECTION_REG = L"Select/Deselect Directories";
+const wchar_t* CONFIG_LONGNAMES_REG = L"Use Long File Names";
+const wchar_t* CONFIG_RECYCLEBIN_REG = L"Use Recycle Bin";
+const wchar_t* CONFIG_RECYCLEMASKS_REG = L"Use Recycle Bin For";
+const wchar_t* CONFIG_SAVEONEXIT_REG = L"Save Configuration On Exit";
+const wchar_t* CONFIG_SHOWGREPERRORS_REG = L"Show Errors In Find Files";
+const wchar_t* CONFIG_FINDFULLROW_REG = L"Show Full Row In Find Files";
+const wchar_t* CONFIG_FINDFILETYPEMODE_REG = L"Find Files Type Filter";
+const wchar_t* CONFIG_MINBEEPWHENDONE_REG = L"Use Speeker Beep";
+const wchar_t* CONFIG_INTRN_VIEWER_REG = L"Internal Viewer";
+const wchar_t* CONFIG_VIEWER_REG = L"External Viewer";
+const wchar_t* CONFIG_EDITOR_REG = L"External Editor";
+const wchar_t* CONFIG_CMDLINE_REG = L"Command Line";
+const wchar_t* CONFIG_CMDLFOCUS_REG = L"Command Line Focused";
+const wchar_t* CONFIG_CLOSESHELL_REG = L"Close Shell Window";
+const wchar_t* CONFIG_USECUSTOMPANELFONT_REG = L"Use Custom Panel Font";
+const wchar_t* CONFIG_PANELFONT_REG = L"Panel Font";
+// Registry names are native UTF-16 even where the corresponding legacy value
+// payload is imported as ACP bytes. The ...W names select the canonical UTF-16
+// history values; the unsuffixed names are read-only legacy import locations.
+const wchar_t* CONFIG_NAMEDHISTORY_REG = L"Named History";
+const wchar_t* CONFIG_LOOKINHISTORY_REG = L"Look In History";
+const wchar_t* CONFIG_GREPHISTORY_REG = L"Grep History";
+const wchar_t* CONFIG_VIEWERHISTORY_REG = L"Viewer History";
+const wchar_t* CONFIG_NAMEDHISTORYW_REG = L"Named History W";
+const wchar_t* CONFIG_LOOKINHISTORYW_REG = L"Look In History W";
+const wchar_t* CONFIG_GREPHISTORYW_REG = L"Grep History W";
+const wchar_t* CONFIG_VIEWERHISTORYW_REG = L"Viewer History W";
+const wchar_t* CONFIG_COMMANDHISTORY_REG = L"Command History";
+const wchar_t* CONFIG_SELECTHISTORY_REG = L"Select History";
+const wchar_t* CONFIG_COPYHISTORY_REG = L"Copy History";
+const wchar_t* CONFIG_COPYHISTORYW_REG = L"Copy History W";
+const wchar_t* CONFIG_CHANGEDIRHISTORY_REG = L"ChangeDir History";
+const wchar_t* CONFIG_FILELISTHISTORY_REG = L"File List History";
+const wchar_t* CONFIG_CREATEDIRHISTORY_REG = L"Create Directory History";
+const wchar_t* CONFIG_QUICKRENAMEHISTORY_REG = L"Quick Rename History";
+const wchar_t* CONFIG_EDITNEWHISTORY_REG = L"Edit New History";
+const wchar_t* CONFIG_CREATEDIRHISTORYW_REG = L"Create Directory History W";
+const wchar_t* CONFIG_QUICKRENAMEHISTORYW_REG = L"Quick Rename History W";
+const wchar_t* CONFIG_EDITNEWHISTORYW_REG = L"Edit New History W";
+const wchar_t* CONFIG_CONVERTHISTORY_REG = L"Convert History";
+const wchar_t* CONFIG_FILTERHISTORY_REG = L"Filter History";
+
+// Delete an unsuffixed ACP history key once its UTF-16 successor has been written.
+//
+// The import path reads these keys whenever the wide history is EMPTY, which is
+// exactly the state "Clear history" and "Save history = off" produce - so a
+// surviving narrow key is not inert legacy data, it is a copy of the entries the
+// user asked Sally to forget, waiting to be read back on the next launch.
+static void RetireLegacyHistoryKey(HKEY parent, const wchar_t* name)
+{
+    HKEY legacy;
+    if (!OpenKey(parent, name, legacy)) // nothing to retire: already migrated, or never existed
+        return;
+    CloseKey(legacy);
+    DeleteKey(parent, name);
+}
+const wchar_t* CONFIG_SELECTHISTORYW_REG = L"Select History W";
+const wchar_t* CONFIG_COMMANDHISTORYW_REG = L"Command History W";
+const wchar_t* CONFIG_CHANGEDIRHISTORYW_REG = L"ChangeDir History W";
+const wchar_t* CONFIG_FILELISTHISTORYW_REG = L"File List History W";
+const wchar_t* CONFIG_CONVERTHISTORYW_REG = L"Convert History W";
+const wchar_t* CONFIG_FILTERHISTORYW_REG = L"Filter History W";
+const wchar_t* CONFIG_WORKDIRSHISTORY_REG = L"Working Directories";
+const wchar_t* CONFIG_FILELISTNAME_REG = L"Make File List Name";
+const wchar_t* CONFIG_FILELISTAPPEND_REG = L"Make File List Append";
+const wchar_t* CONFIG_FILELISTDESTINATION_REG = L"Make File List Destination";
+const wchar_t* CONFIG_COPYFINDTEXT_REG = L"Copy Find Text";
+const wchar_t* CONFIG_CLEARREADONLY_REG = L"Clear Readonly Attribute";
+const wchar_t* CONFIG_PRIMARYCONTEXTMENU_REG = L"Primary Context Menu";
+const wchar_t* CONFIG_NOTHIDDENSYSTEM_REG = L"Hide Hidden and System Files and Directories";
+const wchar_t* CONFIG_RIGHT_FOCUS_REG = L"Right Panel Focused";
+const wchar_t* CONFIG_SHOWCHDBUTTON_REG = L"Show Change Drive Button";
+const wchar_t* CONFIG_ALWAYSONTOP_REG = L"Always On Top";
+const wchar_t* CONFIG_COMMANDSHELL_KIND_REG = L"Command Shell Kind";
+const wchar_t* CONFIG_COMMANDSHELL_PROFILE_GUID_REG = L"Command Shell Profile GUID";
+const wchar_t* CONFIG_COMMANDSHELL_PROFILE_NAME_REG = L"Command Shell Profile Name";
+// wide twins - these values are read and written through gRegistry,
+// which is wide, so the name no longer detours through AnsiToWideReg.
+const wchar_t* CONFIG_COMMANDSHELL_PROFILE_GUID_REG_W = L"Command Shell Profile GUID";
+const wchar_t* CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W = L"Command Shell Profile Name";
 //const char *CONFIG_FASTDIRMOVE_REG = "Fast Directory Move";
-const char* CONFIG_SORTUSESLOCALE_REG = "Sort Uses Locale";
-const char* CONFIG_SORTDETECTNUMBERS_REG = "Sort Detects Numbers";
-const char* CONFIG_SORTNEWERONTOP_REG = "Sort Newer On Top";
-const char* CONFIG_SORTDIRSBYNAME_REG = "Sort Dirs By Name";
-const char* CONFIG_SORTDIRSBYEXT_REG = "Sort Dirs By Ext";
-const char* CONFIG_SAVEHISTORY_REG = "Save History";
-const char* CONFIG_SAVEWORKDIRS_REG = "Save Working Dirs";
-const char* CONFIG_ENABLECMDLINEHISTORY_REG = "Enable CmdLine History";
-const char* CONFIG_SAVECMDLINEHISTORY_REG = "Save CmdLine History";
+const wchar_t* CONFIG_SORTUSESLOCALE_REG = L"Sort Uses Locale";
+const wchar_t* CONFIG_SORTDETECTNUMBERS_REG = L"Sort Detects Numbers";
+const wchar_t* CONFIG_SORTNEWERONTOP_REG = L"Sort Newer On Top";
+const wchar_t* CONFIG_SORTDIRSBYNAME_REG = L"Sort Dirs By Name";
+const wchar_t* CONFIG_SORTDIRSBYEXT_REG = L"Sort Dirs By Ext";
+const wchar_t* CONFIG_SAVEHISTORY_REG = L"Save History";
+const wchar_t* CONFIG_SAVEWORKDIRS_REG = L"Save Working Dirs";
+const wchar_t* CONFIG_ENABLECMDLINEHISTORY_REG = L"Enable CmdLine History";
+const wchar_t* CONFIG_SAVECMDLINEHISTORY_REG = L"Save CmdLine History";
 //const char *CONFIG_LANTASTICCHECK_REG = "Lantastic Check";
-const char* CONFIG_USESALOPEN_REG = "Use salopen.exe";
-const char* CONFIG_NETWAREFASTDIRMOVE_REG = "Netware Fast Dir Move";
-const char* CONFIG_ASYNCCOPYALG_REG = "Async Copy Alg On Network";
-const char* CONFIG_RELOAD_ENV_VARS_REG = "Reload Environment Variables";
-const char* CONFIG_QUICKRENAME_SELALL_REG = "Quick Rename Select All";
-const char* CONFIG_EDITNEW_SELALL_REG = "Edit New File Select All";
-const char* CONFIG_SHIFTFORHOTPATHS_REG = "Use Shift For GoTo HotPath";
-const char* CONFIG_ONLYONEINSTANCE_REG = "Only One Instance";
-const char* CONFIG_STATUSAREA_REG = "Status Area";
-const char* CONFIG_SINGLECLICK_REG = "Single Click";
+const wchar_t* CONFIG_NETWAREFASTDIRMOVE_REG = L"Netware Fast Dir Move";
+const wchar_t* CONFIG_ASYNCCOPYALG_REG = L"Async Copy Alg On Network";
+const wchar_t* CONFIG_RELOAD_ENV_VARS_REG = L"Reload Environment Variables";
+const wchar_t* CONFIG_QUICKRENAME_SELALL_REG = L"Quick Rename Select All";
+const wchar_t* CONFIG_EDITNEW_SELALL_REG = L"Edit New File Select All";
+const wchar_t* CONFIG_SHIFTFORHOTPATHS_REG = L"Use Shift For GoTo HotPath";
+const wchar_t* CONFIG_ONLYONEINSTANCE_REG = L"Only One Instance";
+const wchar_t* CONFIG_STATUSAREA_REG = L"Status Area";
+const wchar_t* CONFIG_SINGLECLICK_REG = L"Single Click";
 //const char *CONFIG_SHOWTIPOFTHEDAY_REG = "Show tip of the Day";
 //const char *CONFIG_LASTTIPOFTHEDAY_REG = "Last tip of the Day";
-const char* CONFIG_TOPTOOLBAR_REG = "Top ToolBar";
-const char* CONFIG_MIDDLETOOLBAR_REG = "Middle ToolBar";
-const char* CONFIG_LEFTTOOLBAR_REG = "Left ToolBar";
-const char* CONFIG_RIGHTTOOLBAR_REG = "Right ToolBar";
-const char* CONFIG_TOPTOOLBARVISIBLE_REG = "Show Top ToolBar";
-const char* CONFIG_PLGTOOLBARVISIBLE_REG = "Show Plugins Bar";
-const char* CONFIG_MIDDLETOOLBARVISIBLE_REG = "Show Middle ToolBar";
-const char* CONFIG_USERMENUTOOLBARVISIBLE_REG = "Show User Menu ToolBar";
-const char* CONFIG_HOTPATHSBARVISIBLE_REG = "Hot Paths Bar";
-const char* CONFIG_DRIVEBARVISIBLE_REG = "Show Drive Bar";
-const char* CONFIG_DRIVEBAR2VISIBLE_REG = "Show Drive Bar2";
-const char* CONFIG_BOTTOMTOOLBARVISIBLE_REG = "Show Bottom ToolBar";
+const wchar_t* CONFIG_TOPTOOLBAR_REG = L"Top ToolBar";
+const wchar_t* CONFIG_MIDDLETOOLBAR_REG = L"Middle ToolBar";
+const wchar_t* CONFIG_LEFTTOOLBAR_REG = L"Left ToolBar";
+const wchar_t* CONFIG_RIGHTTOOLBAR_REG = L"Right ToolBar";
+const wchar_t* CONFIG_TOPTOOLBARVISIBLE_REG = L"Show Top ToolBar";
+const wchar_t* CONFIG_PLGTOOLBARVISIBLE_REG = L"Show Plugins Bar";
+const wchar_t* CONFIG_MIDDLETOOLBARVISIBLE_REG = L"Show Middle ToolBar";
+const wchar_t* CONFIG_USERMENUTOOLBARVISIBLE_REG = L"Show User Menu ToolBar";
+const wchar_t* CONFIG_HOTPATHSBARVISIBLE_REG = L"Hot Paths Bar";
+const wchar_t* CONFIG_DRIVEBARVISIBLE_REG = L"Show Drive Bar";
+const wchar_t* CONFIG_DRIVEBAR2VISIBLE_REG = L"Show Drive Bar2";
+const wchar_t* CONFIG_BOTTOMTOOLBARVISIBLE_REG = L"Show Bottom ToolBar";
 
-const char* CONFIG_EXPLORERLOOK_REG = "Explorer Look";
-const char* CONFIG_FULLROWSELECT_REG = "Full Row Select";
-const char* CONFIG_FULLROWHIGHLIGHT_REG = "Full Row Highlight";
-const char* CONFIG_USEICONTINCTURE_REG = "Use Icon Tincture";
-const char* CONFIG_SHOWPANELCAPTION_REG = "Show Panel Caption";
-const char* CONFIG_SHOWPANELZOOM_REG = "Show Panel Zoom";
-const char* CONFIG_INFOLINECONTENT_REG = "Information Line Content";
-const char* CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG = "If Path Is Inaccessible Go To My Docs";
-const char* CONFIG_IFPATHISINACCESSIBLEGOTO_REG = "If Path Is Inaccessible Go To";
-const char* CONFIG_HOTPATH_AUTOCONFIG = "Auto Configurate Hot Paths";
-const char* CONFIG_LASTUSEDSPEEDLIM_REG = "Speed Limit";
-const char* CONFIG_QUICKSEARCHENTER_REG = "Quick Search Enter Alt";
-const char* CONFIG_CHD_SHOWMYDOC = "Change Drive Show My Documents";
-const char* CONFIG_CHD_SHOWANOTHER = "Change Drive Show Another";
-const char* CONFIG_CHD_SHOWCLOUDSTOR = "Change Drive Show Cloud Storages";
-const char* CONFIG_CHD_SHOWNET = "Change Drive Network";
-const char* CONFIG_CURRRENTTIPINDEX = "Current Tip Index";
-const char* CONFIG_SEARCHFILECONTENT = "Search File Content";
-const char* CONFIG_FINDOPTIONS_REG = "Find Options";
-const char* CONFIG_FINDIGNORE_REG = "Find Ignore";
+const wchar_t* CONFIG_EXPLORERLOOK_REG = L"Explorer Look";
+const wchar_t* CONFIG_FULLROWSELECT_REG = L"Full Row Select";
+const wchar_t* CONFIG_FULLROWHIGHLIGHT_REG = L"Full Row Highlight";
+const wchar_t* CONFIG_USEICONTINCTURE_REG = L"Use Icon Tincture";
+const wchar_t* CONFIG_SHOWPANELCAPTION_REG = L"Show Panel Caption";
+const wchar_t* CONFIG_SHOWPANELZOOM_REG = L"Show Panel Zoom";
+const wchar_t* CONFIG_INFOLINECONTENT_REG = L"Information Line Content";
+const wchar_t* CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG = L"If Path Is Inaccessible Go To My Docs";
+const wchar_t* CONFIG_IFPATHISINACCESSIBLEGOTO_REG = L"If Path Is Inaccessible Go To";
+const wchar_t* CONFIG_HOTPATH_AUTOCONFIG = L"Auto Configurate Hot Paths";
+const wchar_t* CONFIG_LASTUSEDSPEEDLIM_REG = L"Speed Limit";
+const wchar_t* CONFIG_QUICKSEARCHENTER_REG = L"Quick Search Enter Alt";
+const wchar_t* CONFIG_CHD_SHOWMYDOC = L"Change Drive Show My Documents";
+const wchar_t* CONFIG_CHD_SHOWANOTHER = L"Change Drive Show Another";
+const wchar_t* CONFIG_CHD_SHOWCLOUDSTOR = L"Change Drive Show Cloud Storages";
+const wchar_t* CONFIG_CHD_SHOWNET = L"Change Drive Network";
+const wchar_t* CONFIG_CURRRENTTIPINDEX = L"Current Tip Index";
+const wchar_t* CONFIG_SEARCHFILECONTENT = L"Search File Content";
+const wchar_t* CONFIG_FINDOPTIONS_REG = L"Find Options";
+const wchar_t* CONFIG_FINDIGNORE_REG = L"Find Ignore";
 #ifdef _WIN64
-const char* CONFIG_LASTPLUGINVER = "Plugins.ver Version (x64)";
-const char* CONFIG_LASTPLUGINVER_OP = "Plugins.ver Version (x86)";
+const wchar_t* CONFIG_LASTPLUGINVER = L"Plugins.ver Version (x64)";
+const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x86)";
 #else  // _WIN64
-const char* CONFIG_LASTPLUGINVER = "Plugins.ver Version (x86)";
-const char* CONFIG_LASTPLUGINVER_OP = "Plugins.ver Version (x64)";
+const wchar_t* CONFIG_LASTPLUGINVER = L"Plugins.ver Version (x86)";
+const wchar_t* CONFIG_LASTPLUGINVER_OP = L"Plugins.ver Version (x64)";
 #endif // _WIN64
-const char* CONFIG_LANGUAGE_REG = "Language";
-const char* CONFIG_SHOWSPLASHSCREEN_REG = "Show Splash Screen";
-const char* CONFIG_CONVERSIONTABLE_REG = "Conversion Table";
-const char* CONFIG_TITLEBARSHOWPATH_REG = "Title bar show path";
-const char* CONFIG_TITLEBARMODE_REG = "Title bar mode";
-const char* CONFIG_THEME_MODE_REG = "Theme mode";
-const char* CONFIG_TITLEBARPREFIX_REG = "Title bar prefix";
-const char* CONFIG_TITLEBARPREFIXTEXT_REG = "Title bar prefix text";
-const char* CONFIG_MAINWINDOWICONINDEX_REG = "Main window icon index";
-const char* CONFIG_CLICKQUICKRENAME_REG = "Click to Quick Rename";
-const char* CONFIG_VISIBLEDRIVES_REG = "Visible Drives";
-const char* CONFIG_SEPARATEDDRIVES_REG = "Separated Drives";
+const wchar_t* CONFIG_LANGUAGE_REG = L"Language";
+const wchar_t* CONFIG_SHOWSPLASHSCREEN_REG = L"Show Splash Screen";
+const wchar_t* CONFIG_CONVERSIONTABLE_REG = L"Conversion Table";
+const wchar_t* CONFIG_TITLEBARSHOWPATH_REG = L"Title bar show path";
+const wchar_t* CONFIG_TITLEBARMODE_REG = L"Title bar mode";
+const wchar_t* CONFIG_THEME_MODE_REG = L"Theme mode";
+const wchar_t* CONFIG_TITLEBARPREFIX_REG = L"Title bar prefix";
+const wchar_t* CONFIG_TITLEBARPREFIXTEXT_REG = L"Title bar prefix text";
+const wchar_t* CONFIG_MAINWINDOWICONINDEX_REG = L"Main window icon index";
+const wchar_t* CONFIG_CLICKQUICKRENAME_REG = L"Click to Quick Rename";
+const wchar_t* CONFIG_VISIBLEDRIVES_REG = L"Visible Drives";
+const wchar_t* CONFIG_SEPARATEDDRIVES_REG = L"Separated Drives";
 
-const char* CONFIG_COMPAREBYTIME_REG = "Compare By Time";
-const char* CONFIG_COMPAREBYSIZE_REG = "Compare By Size";
-const char* CONFIG_COMPAREBYCONTENT_REG = "Compare By Content";
-const char* CONFIG_COMPAREBYATTR_REG = "Compare By Attr";
-const char* CONFIG_COMPAREBYSUBDIRS_REG = "Compare By Subdirs";
-const char* CONFIG_COMPAREBYSUBDIRSATTR_REG = "Compare By Subdirs Attr";
-const char* CONFIG_COMPAREONEPANELDIRS_REG = "Compare One Panel Dirs";
-const char* CONFIG_COMPAREMOREOPTIONS_REG = "Compare More Options";
-const char* CONFIG_COMPAREIGNOREFILES_REG = "Compare Ignore Files";
-const char* CONFIG_COMPAREIGNOREDIRS_REG = "Compare Ignore Dirs";
-const char* CONFIG_CONFIGTIGNOREFILESMASKS_REG = "Compare Ignore Files Masks";
-const char* CONFIG_CONFIGTIGNOREDIRSMASKS_REG = "Compare Ignore Dirs Masks";
-const char* CONFIG_THUMBNAILSIZE_REG = "Thumbnail Size";
-const char* CONFIG_ALTLANGFORPLUGINS_REG = "Alternate Language for Plugins";
-const char* CONFIG_USEALTLANGFORPLUGINS_REG = "Use Alternate Language for Plugins";
-const char* CONFIG_LANGUAGECHANGED_REG = "Language Changed";
-const char* CONFIG_ENABLECUSTICOVRLS_REG = "Enable Custom Icon Overlays";
-const char* CONFIG_DISABLEDCUSTICOVRLS_REG = "Disabled Custom Icon Overlays";
-const char* CONFIG_COPYMOVEOPTIONS_REG = "Copy Move Options";
-const char* CONFIG_KEEPPLUGINSSORTED_REG = "Keep Plugins Sorted";
-const char* CONFIG_SHOWSLGINCOMPLETE_REG = "Show Translation Is Incomplete";
+const wchar_t* CONFIG_COMPAREBYTIME_REG = L"Compare By Time";
+const wchar_t* CONFIG_COMPAREBYSIZE_REG = L"Compare By Size";
+const wchar_t* CONFIG_COMPAREBYCONTENT_REG = L"Compare By Content";
+const wchar_t* CONFIG_COMPAREBYATTR_REG = L"Compare By Attr";
+const wchar_t* CONFIG_COMPAREBYSUBDIRS_REG = L"Compare By Subdirs";
+const wchar_t* CONFIG_COMPAREBYSUBDIRSATTR_REG = L"Compare By Subdirs Attr";
+const wchar_t* CONFIG_COMPAREONEPANELDIRS_REG = L"Compare One Panel Dirs";
+const wchar_t* CONFIG_COMPAREMOREOPTIONS_REG = L"Compare More Options";
+const wchar_t* CONFIG_COMPAREIGNOREFILES_REG = L"Compare Ignore Files";
+const wchar_t* CONFIG_COMPAREIGNOREDIRS_REG = L"Compare Ignore Dirs";
+const wchar_t* CONFIG_CONFIGTIGNOREFILESMASKS_REG = L"Compare Ignore Files Masks";
+const wchar_t* CONFIG_CONFIGTIGNOREDIRSMASKS_REG = L"Compare Ignore Dirs Masks";
+const wchar_t* CONFIG_THUMBNAILSIZE_REG = L"Thumbnail Size";
+const wchar_t* CONFIG_ALTLANGFORPLUGINS_REG = L"Alternate Language for Plugins";
+const wchar_t* CONFIG_USEALTLANGFORPLUGINS_REG = L"Use Alternate Language for Plugins";
+const wchar_t* CONFIG_LANGUAGECHANGED_REG = L"Language Changed";
+const wchar_t* CONFIG_ENABLECUSTICOVRLS_REG = L"Enable Custom Icon Overlays";
+const wchar_t* CONFIG_DISABLEDCUSTICOVRLS_REG = L"Disabled Custom Icon Overlays";
+const wchar_t* CONFIG_COPYMOVEOPTIONS_REG = L"Copy Move Options";
+const wchar_t* CONFIG_KEEPPLUGINSSORTED_REG = L"Keep Plugins Sorted";
+const wchar_t* CONFIG_SHOWSLGINCOMPLETE_REG = L"Show Translation Is Incomplete";
 
-const char* CONFIG_EDITNEWFILE_USEDEFAULT_REG = "Edit New File Use Default";
-const char* CONFIG_EDITNEWFILE_DEFAULT_REG = "Edit New File Default";
+const wchar_t* CONFIG_EDITNEWFILE_USEDEFAULT_REG = L"Edit New File Use Default";
+const wchar_t* CONFIG_EDITNEWFILE_DEFAULT_REG = L"Edit New File Default";
 
 //const char *CONFIG_SPACESELCALCSPACE = "Space Selecting";
-const char* CONFIG_USETIMERESOLUTION = "Use Time Resolution";
-const char* CONFIG_TIMERESOLUTION = "Time Resolution";
-const char* CONFIG_IGNOREDSTSHIFTS = "Ignore DST Shifts";
+const wchar_t* CONFIG_USETIMERESOLUTION = L"Use Time Resolution";
+const wchar_t* CONFIG_TIMERESOLUTION = L"Time Resolution";
+const wchar_t* CONFIG_IGNOREDSTSHIFTS = L"Ignore DST Shifts";
 
-const char* CONFIG_USEDRAGDROPMINTIME = "Use DragDrop Min Time";
-const char* CONFIG_DRAGDROPMINTIME = "DragDrop Min Time";
+const wchar_t* CONFIG_USEDRAGDROPMINTIME = L"Use DragDrop Min Time";
+const wchar_t* CONFIG_DRAGDROPMINTIME = L"DragDrop Min Time";
 
 // configuration dialog pages
-const char* CONFIG_LASTFOCUSEDPAGE = "Last Focused Page";
-const char* CONFIG_VIEWANDEDITEXPAND = "Viewers And Editors Expanded";
-const char* CONFIG_PACKEPAND = "Packers And Unpackers Expanded";
-const char* CONFIG_CONFIGURATION_HEIGHT = "Configuration Height";
+const wchar_t* CONFIG_LASTFOCUSEDPAGE = L"Last Focused Page";
+const wchar_t* CONFIG_VIEWANDEDITEXPAND = L"Viewers And Editors Expanded";
+const wchar_t* CONFIG_PACKEPAND = L"Packers And Unpackers Expanded";
+const wchar_t* CONFIG_CONFIGURATION_HEIGHT = L"Configuration Height";
 
-const char* CONFIG_MENUINDEX_REG = "Menu Index";
-const char* CONFIG_MENUBREAK_REG = "Menu Break";
-const char* CONFIG_MENUWIDTH_REG = "Menu Width";
-const char* CONFIG_TOOLBARINDEX_REG = "ToolBar Index";
-const char* CONFIG_TOOLBARBREAK_REG = "ToolBar Break";
-const char* CONFIG_TOOLBARWIDTH_REG = "ToolBar Width";
-const char* CONFIG_PLUGINSBARINDEX_REG = "PluginsBar Index";
-const char* CONFIG_PLUGINSBARBREAK_REG = "PluginsBar Break";
-const char* CONFIG_PLUGINSBARWIDTH_REG = "PluginsBar Width";
-const char* CONFIG_USERMENUINDEX_REG = "User Menu Index";
-const char* CONFIG_USERMENUBREAK_REG = "User Menu Break";
-const char* CONFIG_USERMENUWIDTH_REG = "User Menu Width";
-const char* CONFIG_USERMENULABELS_REG = "User Menu Labels";
-const char* CONFIG_HOTPATHSINDEX_REG = "Hot Paths Index";
-const char* CONFIG_HOTPATHSBREAK_REG = "Hot Paths Break";
-const char* CONFIG_HOTPATHSWIDTH_REG = "Hot Paths Width";
-const char* CONFIG_DRIVEBARINDEX_REG = "Drive Bar Index";
-const char* CONFIG_DRIVEBARBREAK_REG = "Drive Bar Break";
-const char* CONFIG_DRIVEBARWIDTH_REG = "Drive Bar Width";
-const char* CONFIG_GRIPSVISIBLE_REG = "Grips Visible";
+const wchar_t* CONFIG_MENUINDEX_REG = L"Menu Index";
+const wchar_t* CONFIG_MENUBREAK_REG = L"Menu Break";
+const wchar_t* CONFIG_MENUWIDTH_REG = L"Menu Width";
+const wchar_t* CONFIG_TOOLBARINDEX_REG = L"ToolBar Index";
+const wchar_t* CONFIG_TOOLBARBREAK_REG = L"ToolBar Break";
+const wchar_t* CONFIG_TOOLBARWIDTH_REG = L"ToolBar Width";
+const wchar_t* CONFIG_PLUGINSBARINDEX_REG = L"PluginsBar Index";
+const wchar_t* CONFIG_PLUGINSBARBREAK_REG = L"PluginsBar Break";
+const wchar_t* CONFIG_PLUGINSBARWIDTH_REG = L"PluginsBar Width";
+const wchar_t* CONFIG_USERMENUINDEX_REG = L"User Menu Index";
+const wchar_t* CONFIG_USERMENUBREAK_REG = L"User Menu Break";
+const wchar_t* CONFIG_USERMENUWIDTH_REG = L"User Menu Width";
+const wchar_t* CONFIG_USERMENULABELS_REG = L"User Menu Labels";
+const wchar_t* CONFIG_HOTPATHSINDEX_REG = L"Hot Paths Index";
+const wchar_t* CONFIG_HOTPATHSBREAK_REG = L"Hot Paths Break";
+const wchar_t* CONFIG_HOTPATHSWIDTH_REG = L"Hot Paths Width";
+const wchar_t* CONFIG_DRIVEBARINDEX_REG = L"Drive Bar Index";
+const wchar_t* CONFIG_DRIVEBARBREAK_REG = L"Drive Bar Break";
+const wchar_t* CONFIG_DRIVEBARWIDTH_REG = L"Drive Bar Width";
+const wchar_t* CONFIG_GRIPSVISIBLE_REG = L"Grips Visible";
 
-const char* SALAMANDER_CONFIRMATION_REG = "Confirmation";
-const char* CONFIG_CNFRM_FILEDIRDEL = "Files or Dirs Del";
-const char* CONFIG_CNFRM_NEDIRDEL = "Non-empty Dir Del";
-const char* CONFIG_CNFRM_FILEOVER = "File Overwrite";
-const char* CONFIG_CNFRM_DIROVER = "Directory Overwrite";
-const char* CONFIG_CNFRM_SHFILEDEL = "SH File Del";
-const char* CONFIG_CNFRM_SHDIRDEL = "SH Dir Del";
-const char* CONFIG_CNFRM_SHFILEOVER = "SH File Overwrite";
-const char* CONFIG_CNFRM_NTFSPRESS = "NTFS Compress and Uncompress";
-const char* CONFIG_CNFRM_NTFSCRYPT = "NTFS Encrypt and Decrypt";
-const char* CONFIG_CNFRM_DAD = "Drag and Drop";
-const char* CONFIG_CNFRM_CLOSEARCHIVE = "Close Archive";
-const char* CONFIG_CNFRM_CLOSEFIND = "Close Find";
-const char* CONFIG_CNFRM_STOPFIND = "Stop Find";
-const char* CONFIG_CNFRM_CREATETARGETPATH = "Create Target Path";
-const char* CONFIG_CNFRM_ALWAYSONTOP = "Always on Top";
-const char* CONFIG_CNFRM_ONSALCLOSE = "Close Salamander";
-const char* CONFIG_CNFRM_SENDEMAIL = "Send Email";
-const char* CONFIG_CNFRM_ADDTOARCHIVE = "Add To Archive";
-const char* CONFIG_CNFRM_CREATEDIR = "Create Dir";
-const char* CONFIG_CNFRM_CHANGEDIRTC = "Change Dir TC";
-const char* CONFIG_CNFRM_SHOWNAMETOCOMP = "Show Names To Compare";
-const char* CONFIG_CNFRM_DSTSHIFTSIGNORED = "DST Shifts Ignored";
-const char* CONFIG_CNFRM_DSTSHIFTSOCCURED = "DST Shifts Occured";
-const char* CONFIG_CNFRM_COPYMOVEOPTIONSNS = "Copy Move Options Not Supported";
+const wchar_t* SALAMANDER_CONFIRMATION_REG = L"Confirmation";
+const wchar_t* CONFIG_CNFRM_FILEDIRDEL = L"Files or Dirs Del";
+const wchar_t* CONFIG_CNFRM_NEDIRDEL = L"Non-empty Dir Del";
+const wchar_t* CONFIG_CNFRM_FILEOVER = L"File Overwrite";
+const wchar_t* CONFIG_CNFRM_DIROVER = L"Directory Overwrite";
+const wchar_t* CONFIG_CNFRM_SHFILEDEL = L"SH File Del";
+const wchar_t* CONFIG_CNFRM_SHDIRDEL = L"SH Dir Del";
+const wchar_t* CONFIG_CNFRM_SHFILEOVER = L"SH File Overwrite";
+const wchar_t* CONFIG_CNFRM_NTFSPRESS = L"NTFS Compress and Uncompress";
+const wchar_t* CONFIG_CNFRM_NTFSCRYPT = L"NTFS Encrypt and Decrypt";
+const wchar_t* CONFIG_CNFRM_DAD = L"Drag and Drop";
+const wchar_t* CONFIG_CNFRM_CLOSEARCHIVE = L"Close Archive";
+const wchar_t* CONFIG_CNFRM_CLOSEFIND = L"Close Find";
+const wchar_t* CONFIG_CNFRM_STOPFIND = L"Stop Find";
+const wchar_t* CONFIG_CNFRM_CREATETARGETPATH = L"Create Target Path";
+const wchar_t* CONFIG_CNFRM_ALWAYSONTOP = L"Always on Top";
+const wchar_t* CONFIG_CNFRM_ONSALCLOSE = L"Close Salamander";
+const wchar_t* CONFIG_CNFRM_SENDEMAIL = L"Send Email";
+const wchar_t* CONFIG_CNFRM_ADDTOARCHIVE = L"Add To Archive";
+const wchar_t* CONFIG_CNFRM_CREATEDIR = L"Create Dir";
+const wchar_t* CONFIG_CNFRM_CHANGEDIRTC = L"Change Dir TC";
+const wchar_t* CONFIG_CNFRM_SHOWNAMETOCOMP = L"Show Names To Compare";
+const wchar_t* CONFIG_CNFRM_DSTSHIFTSIGNORED = L"DST Shifts Ignored";
+const wchar_t* CONFIG_CNFRM_DSTSHIFTSOCCURED = L"DST Shifts Occured";
+const wchar_t* CONFIG_CNFRM_COPYMOVEOPTIONSNS = L"Copy Move Options Not Supported";
 
-const char* SALAMANDER_DRVSPEC_REG = "Drive Special Settings";
-const char* CONFIG_DRVSPEC_FLOPPY_MON = "Floppy Automatic Refresh";
-const char* CONFIG_DRVSPEC_FLOPPY_SIMPLE = "Floppy Simple Icons";
-const char* CONFIG_DRVSPEC_REMOVABLE_MON = "Removable Automatic Refresh";
-const char* CONFIG_DRVSPEC_REMOVABLE_SIMPLE = "Removable Simple Icons";
-const char* CONFIG_DRVSPEC_FIXED_MON = "Fixed Automatic Refresh";
-const char* CONFIG_DRVSPEC_FIXED_SIMPLE = "Fixed Simple Icons";
-const char* CONFIG_DRVSPEC_REMOTE_MON = "Remote Automatic Refresh";
-const char* CONFIG_DRVSPEC_REMOTE_SIMPLE = "Remote Simple Icons";
-const char* CONFIG_DRVSPEC_REMOTE_ACT = "Remote Do Not Refresh on Activation";
-const char* CONFIG_DRVSPEC_CDROM_MON = "CDROM Automatic Refresh";
-const char* CONFIG_DRVSPEC_CDROM_SIMPLE = "CDROM Simple Icons";
+const wchar_t* SALAMANDER_DRVSPEC_REG = L"Drive Special Settings";
+const wchar_t* CONFIG_DRVSPEC_FLOPPY_MON = L"Floppy Automatic Refresh";
+const wchar_t* CONFIG_DRVSPEC_FLOPPY_SIMPLE = L"Floppy Simple Icons";
+const wchar_t* CONFIG_DRVSPEC_REMOVABLE_MON = L"Removable Automatic Refresh";
+const wchar_t* CONFIG_DRVSPEC_REMOVABLE_SIMPLE = L"Removable Simple Icons";
+const wchar_t* CONFIG_DRVSPEC_FIXED_MON = L"Fixed Automatic Refresh";
+const wchar_t* CONFIG_DRVSPEC_FIXED_SIMPLE = L"Fixed Simple Icons";
+const wchar_t* CONFIG_DRVSPEC_REMOTE_MON = L"Remote Automatic Refresh";
+const wchar_t* CONFIG_DRVSPEC_REMOTE_SIMPLE = L"Remote Simple Icons";
+const wchar_t* CONFIG_DRVSPEC_REMOTE_ACT = L"Remote Do Not Refresh on Activation";
+const wchar_t* CONFIG_DRVSPEC_CDROM_MON = L"CDROM Automatic Refresh";
+const wchar_t* CONFIG_DRVSPEC_CDROM_SIMPLE = L"CDROM Simple Icons";
 
-const char* SALAMANDER_HOTPATHS_REG = "Hot Paths";
+const wchar_t* SALAMANDER_HOTPATHS_REG = L"Hot Paths";
 
-const char* SALAMANDER_VIEWTEMPLATES_REG = "View Templates";
+const wchar_t* SALAMANDER_VIEWTEMPLATES_REG = L"View Templates";
 
-const char* SALAMANDER_VIEWER_REG = "Viewer";
-const char* VIEWER_FINDFORWARD_REG = "Forward Direction";
-const char* VIEWER_FINDWHOLEWORDS_REG = "Whole Words";
-const char* VIEWER_FINDCASESENSITIVE_REG = "Case Sensitive";
-const char* VIEWER_FINDTEXT_REG = "Find Text";
-const char* VIEWER_FINDHEXMODE_REG = "HEX-mode";
-const char* VIEWER_FINDREGEXP_REG = "Regular Expression";
-const char* VIEWER_CONFIGCRLF_REG = "EOL CRLF";
-const char* VIEWER_CONFIGCR_REG = "EOL CR";
-const char* VIEWER_CONFIGLF_REG = "EOL LF";
-const char* VIEWER_CONFIGNULL_REG = "EOL NULL";
-const char* VIEWER_CONFIGTABSIZE_REG = "Tabelator Size";
-const char* VIEWER_CONFIGDEFMODE_REG = "Default Mode";
-const char* VIEWER_CONFIGTEXTMASK_REG = "Text Masks";
-const char* VIEWER_CONFIGHEXMASK_REG = "Hex Masks";
-const char* VIEWER_CONFIGUSECUSTOMFONT_REG = "Viewer Use Custom Font";
-const char* VIEWER_CONFIGFONT_REG = "Viewer Font";
-const char* VIEWER_WRAPTEXT_REG = "Wrap Text";
-const char* VIEWER_CPAUTOSELECT_REG = "Auto-Select";
-const char* VIEWER_DEFAULTCONVERT_REG = "Default Convert";
-const char* VIEWER_AUTOCOPYSELECTION_REG = "Auto-Copy Selection";
-const char* VIEWER_GOTOOFFSETISHEX_REG = "Go to Offset Is Hex";
+const wchar_t* SALAMANDER_VIEWER_REG = L"Viewer";
+const wchar_t* VIEWER_FINDFORWARD_REG = L"Forward Direction";
+const wchar_t* VIEWER_FINDWHOLEWORDS_REG = L"Whole Words";
+const wchar_t* VIEWER_FINDCASESENSITIVE_REG = L"Case Sensitive";
+const wchar_t* VIEWER_FINDTEXT_REG = L"Find Text";
+const wchar_t* VIEWER_FINDHEXMODE_REG = L"HEX-mode";
+const wchar_t* VIEWER_FINDREGEXP_REG = L"Regular Expression";
+const wchar_t* VIEWER_CONFIGCRLF_REG = L"EOL CRLF";
+const wchar_t* VIEWER_CONFIGCR_REG = L"EOL CR";
+const wchar_t* VIEWER_CONFIGLF_REG = L"EOL LF";
+const wchar_t* VIEWER_CONFIGNULL_REG = L"EOL NULL";
+const wchar_t* VIEWER_CONFIGTABSIZE_REG = L"Tabelator Size";
+const wchar_t* VIEWER_CONFIGDEFMODE_REG = L"Default Mode";
+const wchar_t* VIEWER_CONFIGTEXTMASK_REG = L"Text Masks";
+const wchar_t* VIEWER_CONFIGHEXMASK_REG = L"Hex Masks";
+const wchar_t* VIEWER_CONFIGUSECUSTOMFONT_REG = L"Viewer Use Custom Font";
+const wchar_t* VIEWER_CONFIGFONT_REG = L"Viewer Font";
+const wchar_t* VIEWER_WRAPTEXT_REG = L"Wrap Text";
+const wchar_t* VIEWER_CPAUTOSELECT_REG = L"Auto-Select";
+const wchar_t* VIEWER_DEFAULTCONVERT_REG = L"Default Convert";
+const wchar_t* VIEWER_AUTOCOPYSELECTION_REG = L"Auto-Copy Selection";
+const wchar_t* VIEWER_GOTOOFFSETISHEX_REG = L"Go to Offset Is Hex";
 
-const char* VIEWER_CONFIGSAVEWINPOS_REG = "Save Window Position";
-const char* VIEWER_CONFIGWNDLEFT_REG = "Left";
-const char* VIEWER_CONFIGWNDRIGHT_REG = "Right";
-const char* VIEWER_CONFIGWNDTOP_REG = "Top";
-const char* VIEWER_CONFIGWNDBOTTOM_REG = "Bottom";
-const char* VIEWER_CONFIGWNDSHOW_REG = "Show";
+const wchar_t* VIEWER_CONFIGSAVEWINPOS_REG = L"Save Window Position";
+const wchar_t* VIEWER_CONFIGWNDLEFT_REG = L"Left";
+const wchar_t* VIEWER_CONFIGWNDRIGHT_REG = L"Right";
+const wchar_t* VIEWER_CONFIGWNDTOP_REG = L"Top";
+const wchar_t* VIEWER_CONFIGWNDBOTTOM_REG = L"Bottom";
+const wchar_t* VIEWER_CONFIGWNDSHOW_REG = L"Show";
 
-const char* SALAMANDER_USERMENU_REG = "User Menu";
-const char* USERMENU_ITEMNAME_REG = "Item Name";
-const char* USERMENU_COMMAND_REG = "Command";
-const char* USERMENU_ARGUMENTS_REG = "Arguments";
-const char* USERMENU_INITDIR_REG = "Initial Directory";
-const char* USERMENU_SHELL_REG = "Execute Through Shell";
-const char* USERMENU_USEWINDOW_REG = "Open Shell Window";
-const char* USERMENU_CLOSE_REG = "Close Shell Window";
-const char* USERMENU_SEPARATOR_REG = "Separator";
-const char* USERMENU_SHOWINTOOLBAR_REG = "Show In Toolbar";
-const char* USERMENU_TYPE_REG = "Type";
-const char* USERMENU_ICON_REG = "Icon";
+const wchar_t* SALAMANDER_USERMENU_REG = L"User Menu";
+const wchar_t* USERMENU_ITEMNAME_REG = L"Item Name";
+const wchar_t* USERMENU_COMMAND_REG = L"Command";
+const wchar_t* USERMENU_ARGUMENTS_REG = L"Arguments";
+const wchar_t* USERMENU_INITDIR_REG = L"Initial Directory";
+const wchar_t* USERMENU_SHELL_REG = L"Execute Through Shell";
+const wchar_t* USERMENU_USEWINDOW_REG = L"Open Shell Window";
+const wchar_t* USERMENU_CLOSE_REG = L"Close Shell Window";
+const wchar_t* USERMENU_SEPARATOR_REG = L"Separator";
+const wchar_t* USERMENU_SHOWINTOOLBAR_REG = L"Show In Toolbar";
+const wchar_t* USERMENU_TYPE_REG = L"Type";
+const wchar_t* USERMENU_ICON_REG = L"Icon";
 
-const char* SALAMANDER_VIEWERS_REG = "Viewers";
-const char* SALAMANDER_ALTVIEWERS_REG = "Alternative Viewers";
-const char* VIEWERS_MASKS_REG = "Masks";
-const char* VIEWERS_COMMAND_REG = USERMENU_COMMAND_REG;
-const char* VIEWERS_ARGUMENTS_REG = USERMENU_ARGUMENTS_REG;
-const char* VIEWERS_INITDIR_REG = USERMENU_INITDIR_REG;
-const char* VIEWERS_TYPE_REG = "Type";
+const wchar_t* SALAMANDER_VIEWERS_REG = L"Viewers";
+const wchar_t* SALAMANDER_ALTVIEWERS_REG = L"Alternative Viewers";
+const wchar_t* VIEWERS_MASKS_REG = L"Masks";
+const wchar_t* VIEWERS_COMMAND_REG = USERMENU_COMMAND_REG;
+const wchar_t* VIEWERS_ARGUMENTS_REG = USERMENU_ARGUMENTS_REG;
+const wchar_t* VIEWERS_INITDIR_REG = USERMENU_INITDIR_REG;
+const wchar_t* VIEWERS_TYPE_REG = L"Type";
 
-const char* SALAMANDER_IZIP_REG = "Internal ZIP Packer";
+const wchar_t* SALAMANDER_IZIP_REG = L"Internal ZIP Packer";
 
-const char* SALAMANDER_EDITORS_REG = "Editors";
-const char* EDITORS_MASKS_REG = VIEWERS_MASKS_REG;
-const char* EDITORS_COMMAND_REG = USERMENU_COMMAND_REG;
-const char* EDITORS_ARGUMENTS_REG = USERMENU_ARGUMENTS_REG;
-const char* EDITORS_INITDIR_REG = USERMENU_INITDIR_REG;
+const wchar_t* SALAMANDER_EDITORS_REG = L"Editors";
+const wchar_t* EDITORS_MASKS_REG = VIEWERS_MASKS_REG;
+const wchar_t* EDITORS_COMMAND_REG = USERMENU_COMMAND_REG;
+const wchar_t* EDITORS_ARGUMENTS_REG = USERMENU_ARGUMENTS_REG;
+const wchar_t* EDITORS_INITDIR_REG = USERMENU_INITDIR_REG;
 
-const char* SALAMANDER_VERSION_REG = SAL_REG_VALUE_VERSION_A;
-const char* SALAMANDER_VERSIONREG_REG = SAL_REG_SUBKEY_CONFIGURATION_A;
+const wchar_t* SALAMANDER_VERSION_REG = SAL_REG_VALUE_VERSION_W;
+const wchar_t* SALAMANDER_VERSION_REG_W = SAL_REG_VALUE_VERSION_W;
+const wchar_t* SALAMANDER_VERSIONREG_REG = SAL_REG_SUBKEY_CONFIGURATION_W;
 
-const char* SALAMANDER_CUSTOMCOLORS_REG = "Custom Colors";
+const wchar_t* SALAMANDER_CUSTOMCOLORS_REG = L"Custom Colors";
 
 // colors
-const char* SALAMANDER_COLORS_REG = "Colors";
-const char* SALAMANDER_CLR_FOCUS_ACTIVE_NORMAL_REG = "Focus Active Normal";
-const char* SALAMANDER_CLR_FOCUS_ACTIVE_SELECTED_REG = "Focus Active Selected";
-const char* SALAMANDER_CLR_FOCUS_INACTIVE_NORMAL_REG = "Focus Inactive Normal";
-const char* SALAMANDER_CLR_FOCUS_INACTIVE_SELECTED_REG = "Focus Inactive Selected";
-const char* SALAMANDER_CLR_FOCUS_BK_INACTIVE_NORMAL_REG = "Focus Bk Inactive Normal";
-const char* SALAMANDER_CLR_FOCUS_BK_INACTIVE_SELECTED_REG = "Focus Bk Inactive Selected";
+const wchar_t* SALAMANDER_COLORS_REG = L"Colors";
+const wchar_t* SALAMANDER_CLR_FOCUS_ACTIVE_NORMAL_REG = L"Focus Active Normal";
+const wchar_t* SALAMANDER_CLR_FOCUS_ACTIVE_SELECTED_REG = L"Focus Active Selected";
+const wchar_t* SALAMANDER_CLR_FOCUS_INACTIVE_NORMAL_REG = L"Focus Inactive Normal";
+const wchar_t* SALAMANDER_CLR_FOCUS_INACTIVE_SELECTED_REG = L"Focus Inactive Selected";
+const wchar_t* SALAMANDER_CLR_FOCUS_BK_INACTIVE_NORMAL_REG = L"Focus Bk Inactive Normal";
+const wchar_t* SALAMANDER_CLR_FOCUS_BK_INACTIVE_SELECTED_REG = L"Focus Bk Inactive Selected";
 
-const char* SALAMANDER_CLR_ITEM_FG_NORMAL_REG = "Item Fg Normal";
-const char* SALAMANDER_CLR_ITEM_FG_SELECTED_REG = "Item Fg Selected";
-const char* SALAMANDER_CLR_ITEM_FG_FOCUSED_REG = "Item Fg Focused";
-const char* SALAMANDER_CLR_ITEM_FG_FOCSEL_REG = "Item Fg Focused and Selected";
-const char* SALAMANDER_CLR_ITEM_FG_HIGHLIGHT_REG = "Item Fg Highlight";
+const wchar_t* SALAMANDER_CLR_ITEM_FG_NORMAL_REG = L"Item Fg Normal";
+const wchar_t* SALAMANDER_CLR_ITEM_FG_SELECTED_REG = L"Item Fg Selected";
+const wchar_t* SALAMANDER_CLR_ITEM_FG_FOCUSED_REG = L"Item Fg Focused";
+const wchar_t* SALAMANDER_CLR_ITEM_FG_FOCSEL_REG = L"Item Fg Focused and Selected";
+const wchar_t* SALAMANDER_CLR_ITEM_FG_HIGHLIGHT_REG = L"Item Fg Highlight";
 
-const char* SALAMANDER_CLR_ITEM_BK_NORMAL_REG = "Item Bk Normal";
-const char* SALAMANDER_CLR_ITEM_BK_SELECTED_REG = "Item Bk Selected";
-const char* SALAMANDER_CLR_ITEM_BK_FOCUSED_REG = "Item Bk Focused";
-const char* SALAMANDER_CLR_ITEM_BK_FOCSEL_REG = "Item Bk Focused and Selected";
-const char* SALAMANDER_CLR_ITEM_BK_HIGHLIGHT_REG = "Item Bk Highlight";
+const wchar_t* SALAMANDER_CLR_ITEM_BK_NORMAL_REG = L"Item Bk Normal";
+const wchar_t* SALAMANDER_CLR_ITEM_BK_SELECTED_REG = L"Item Bk Selected";
+const wchar_t* SALAMANDER_CLR_ITEM_BK_FOCUSED_REG = L"Item Bk Focused";
+const wchar_t* SALAMANDER_CLR_ITEM_BK_FOCSEL_REG = L"Item Bk Focused and Selected";
+const wchar_t* SALAMANDER_CLR_ITEM_BK_HIGHLIGHT_REG = L"Item Bk Highlight";
 
-const char* SALAMANDER_CLR_ICON_BLEND_SELECTED_REG = "Icon Blend Selected";
-const char* SALAMANDER_CLR_ICON_BLEND_FOCUSED_REG = "Icon Blend Focused";
-const char* SALAMANDER_CLR_ICON_BLEND_FOCSEL_REG = "Icon Blend Focused and Selected";
+const wchar_t* SALAMANDER_CLR_ICON_BLEND_SELECTED_REG = L"Icon Blend Selected";
+const wchar_t* SALAMANDER_CLR_ICON_BLEND_FOCUSED_REG = L"Icon Blend Focused";
+const wchar_t* SALAMANDER_CLR_ICON_BLEND_FOCSEL_REG = L"Icon Blend Focused and Selected";
 
-const char* SALAMANDER_CLR_PROGRESS_FG_NORMAL_REG = "Progress Fg Normal";
-const char* SALAMANDER_CLR_PROGRESS_FG_SELECTED_REG = "Progress Fg Selected";
-const char* SALAMANDER_CLR_PROGRESS_BK_NORMAL_REG = "Progress Bk Normal";
-const char* SALAMANDER_CLR_PROGRESS_BK_SELECTED_REG = "Progress Bk Selected";
+const wchar_t* SALAMANDER_CLR_PROGRESS_FG_NORMAL_REG = L"Progress Fg Normal";
+const wchar_t* SALAMANDER_CLR_PROGRESS_FG_SELECTED_REG = L"Progress Fg Selected";
+const wchar_t* SALAMANDER_CLR_PROGRESS_BK_NORMAL_REG = L"Progress Bk Normal";
+const wchar_t* SALAMANDER_CLR_PROGRESS_BK_SELECTED_REG = L"Progress Bk Selected";
 
-const char* SALAMANDER_CLR_VIEWER_FG_NORMAL_REG = "Viewer Fg Normal";
-const char* SALAMANDER_CLR_VIEWER_BK_NORMAL_REG = "Viewer Bk Normal";
-const char* SALAMANDER_CLR_VIEWER_FG_SELECTED_REG = "Viewer Fg Selected";
-const char* SALAMANDER_CLR_VIEWER_BK_SELECTED_REG = "Viewer Bk Selected";
+const wchar_t* SALAMANDER_CLR_VIEWER_FG_NORMAL_REG = L"Viewer Fg Normal";
+const wchar_t* SALAMANDER_CLR_VIEWER_BK_NORMAL_REG = L"Viewer Bk Normal";
+const wchar_t* SALAMANDER_CLR_VIEWER_FG_SELECTED_REG = L"Viewer Fg Selected";
+const wchar_t* SALAMANDER_CLR_VIEWER_BK_SELECTED_REG = L"Viewer Bk Selected";
 
-const char* SALAMANDER_CLR_HOT_PANEL_REG = "Hot Panel";
-const char* SALAMANDER_CLR_HOT_ACTIVE_REG = "Hot Active";
-const char* SALAMANDER_CLR_HOT_INACTIVE_REG = "Hot Inactive";
+const wchar_t* SALAMANDER_CLR_HOT_PANEL_REG = L"Hot Panel";
+const wchar_t* SALAMANDER_CLR_HOT_ACTIVE_REG = L"Hot Active";
+const wchar_t* SALAMANDER_CLR_HOT_INACTIVE_REG = L"Hot Inactive";
 
-const char* SALAMANDER_CLR_ACTIVE_CAPTION_FG_REG = "Active Caption Fg";
-const char* SALAMANDER_CLR_ACTIVE_CAPTION_BK_REG = "Active Caption Bk";
-const char* SALAMANDER_CLR_INACTIVE_CAPTION_FG_REG = "Inactive Caption Fg";
-const char* SALAMANDER_CLR_INACTIVE_CAPTION_BK_REG = "Inactive Caption Bk";
+const wchar_t* SALAMANDER_CLR_ACTIVE_CAPTION_FG_REG = L"Active Caption Fg";
+const wchar_t* SALAMANDER_CLR_ACTIVE_CAPTION_BK_REG = L"Active Caption Bk";
+const wchar_t* SALAMANDER_CLR_INACTIVE_CAPTION_FG_REG = L"Inactive Caption Fg";
+const wchar_t* SALAMANDER_CLR_INACTIVE_CAPTION_BK_REG = L"Inactive Caption Bk";
 
-const char* SALAMANDER_CLR_THUMBNAIL_FRAME_NORMAL_REG = "Thumbnail Frame Normal";
-const char* SALAMANDER_CLR_THUMBNAIL_FRAME_SELECTED_REG = "Thumbnail Frame Selected";
-const char* SALAMANDER_CLR_THUMBNAIL_FRAME_FOCUSED_REG = "Thumbnail Frame Focused";
-const char* SALAMANDER_CLR_THUMBNAIL_FRAME_FOCSEL_REG = "Thumbnail Frame Focused and Selected";
+const wchar_t* SALAMANDER_CLR_THUMBNAIL_FRAME_NORMAL_REG = L"Thumbnail Frame Normal";
+const wchar_t* SALAMANDER_CLR_THUMBNAIL_FRAME_SELECTED_REG = L"Thumbnail Frame Selected";
+const wchar_t* SALAMANDER_CLR_THUMBNAIL_FRAME_FOCUSED_REG = L"Thumbnail Frame Focused";
+const wchar_t* SALAMANDER_CLR_THUMBNAIL_FRAME_FOCSEL_REG = L"Thumbnail Frame Focused and Selected";
 
-const char* SALAMANDER_HLT = "Panel Items Hilighting";
-const char* SALAMANDER_HLT_ITEM_MASKS = "Masks";
-const char* SALAMANDER_HLT_ITEM_ATTR = "Attributes";
-const char* SALAMANDER_HLT_ITEM_VALIDATTR = "Valid Attributes";
-const char* SALAMANDER_HLT_ITEM_FG_NORMAL_REG = "Item Fg Normal";
-const char* SALAMANDER_HLT_ITEM_FG_SELECTED_REG = "Item Fg Selected";
-const char* SALAMANDER_HLT_ITEM_FG_FOCUSED_REG = "Item Fg Focused";
-const char* SALAMANDER_HLT_ITEM_FG_FOCSEL_REG = "Item Fg Focused and Selected";
-const char* SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG = "Item Fg Highlight";
-const char* SALAMANDER_HLT_ITEM_BK_NORMAL_REG = "Item Bk Normal";
-const char* SALAMANDER_HLT_ITEM_BK_SELECTED_REG = "Item Bk Selected";
-const char* SALAMANDER_HLT_ITEM_BK_FOCUSED_REG = "Item Bk Focused";
-const char* SALAMANDER_HLT_ITEM_BK_FOCSEL_REG = "Item Bk Focused and Selected";
-const char* SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG = "Item Bk Highlight";
+const wchar_t* SALAMANDER_HLT = L"Panel Items Hilighting";
+const wchar_t* SALAMANDER_HLT_ITEM_MASKS = L"Masks";
+const wchar_t* SALAMANDER_HLT_ITEM_ATTR = L"Attributes";
+const wchar_t* SALAMANDER_HLT_ITEM_VALIDATTR = L"Valid Attributes";
+const wchar_t* SALAMANDER_HLT_ITEM_FG_NORMAL_REG = L"Item Fg Normal";
+const wchar_t* SALAMANDER_HLT_ITEM_FG_SELECTED_REG = L"Item Fg Selected";
+const wchar_t* SALAMANDER_HLT_ITEM_FG_FOCUSED_REG = L"Item Fg Focused";
+const wchar_t* SALAMANDER_HLT_ITEM_FG_FOCSEL_REG = L"Item Fg Focused and Selected";
+const wchar_t* SALAMANDER_HLT_ITEM_FG_HIGHLIGHT_REG = L"Item Fg Highlight";
+const wchar_t* SALAMANDER_HLT_ITEM_BK_NORMAL_REG = L"Item Bk Normal";
+const wchar_t* SALAMANDER_HLT_ITEM_BK_SELECTED_REG = L"Item Bk Selected";
+const wchar_t* SALAMANDER_HLT_ITEM_BK_FOCUSED_REG = L"Item Bk Focused";
+const wchar_t* SALAMANDER_HLT_ITEM_BK_FOCSEL_REG = L"Item Bk Focused and Selected";
+const wchar_t* SALAMANDER_HLT_ITEM_BK_HIGHLIGHT_REG = L"Item Bk Highlight";
 
-const char* SALAMANDER_CLRSCHEME_REG = "Color Scheme";
+const wchar_t* SALAMANDER_CLRSCHEME_REG = L"Color Scheme";
 
 // Plugins
-const char* SALAMANDER_PLUGINS = "Plugins";
-const char* SALAMANDER_PLUGINS_NAME = "Name";
-const char* SALAMANDER_PLUGINS_DLLNAME = "DLL";
-const char* SALAMANDER_PLUGINS_VERSION = "Version";
-const char* SALAMANDER_PLUGINS_COPYRIGHT = "Copyright";
-const char* SALAMANDER_PLUGINS_EXTENSIONS = "Extensions";
-const char* SALAMANDER_PLUGINS_DESCRIPTION = "Description";
-const char* SALAMANDER_PLUGINS_LASTSLGNAME = "LastSLGName";
-const char* SALAMANDER_PLUGINS_HOMEPAGE = "HomePage";
+const wchar_t* SALAMANDER_PLUGINS = L"Plugins";
+const wchar_t* SALAMANDER_PLUGINS_NAME = L"Name";
+const wchar_t* SALAMANDER_PLUGINS_DLLNAME = L"DLL";
+const wchar_t* SALAMANDER_PLUGINS_VERSION = L"Version";
+const wchar_t* SALAMANDER_PLUGINS_COPYRIGHT = L"Copyright";
+const wchar_t* SALAMANDER_PLUGINS_EXTENSIONS = L"Extensions";
+const wchar_t* SALAMANDER_PLUGINS_DESCRIPTION = L"Description";
+const wchar_t* SALAMANDER_PLUGINS_LASTSLGNAME = L"LastSLGName";
+const wchar_t* SALAMANDER_PLUGINS_HOMEPAGE = L"HomePage";
 //const char *SALAMANDER_PLUGINS_PLGICONS = "PluginIcons";
-const char* SALAMANDER_PLUGINS_PLGICONLIST = "PluginIconList";
-const char* SALAMANDER_PLUGINS_PLGICONINDEX = "PluginIconIndex";
-const char* SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX = "SubmenuIconIndex";
-const char* SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR = "SubmenuInPluginsBar";
-const char* SALAMANDER_PLUGINS_THUMBMASKS = "ThumbnailMasks";
-const char* SALAMANDER_PLUGINS_REGKEYNAME = "Configuration Key";
-const char* SALAMANDER_PLUGINS_FSNAME = "FS Name";
-const char* SALAMANDER_PLUGINS_FUNCTIONS = "Functions";
-const char* SALAMANDER_PLUGINS_LOADONSTART = "Load On Start";
-const char* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED = "Legacy Compat Approved";
-const char* SALAMANDER_PLUGINS_MENU = "Menu";
-const char* SALAMANDER_PLUGINS_MENUITEMNAME = "Name";
-const char* SALAMANDER_PLUGINS_MENUITEMSTATE = "State";
-const char* SALAMANDER_PLUGINS_MENUITEMID = "ID";
-const char* SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL = "Skill";
-const char* SALAMANDER_PLUGINS_MENUITEMICONINDEX = "Icon";
-const char* SALAMANDER_PLUGINS_MENUITEMTYPE = "Type";
-const char* SALAMANDER_PLUGINS_MENUITEMHOTKEY = "HotKey";
-const char* SALAMANDER_PLUGINS_FSCMDNAME = "FS Cmd Name";
-const char* SALAMANDER_PLUGINS_FSCMDICON = "FS Cmd Icon";
-const char* SALAMANDER_PLUGINS_FSCMDVISIBLE = "FS Cmd Visible";
-const char* SALAMANDER_PLUGINS_ISNETHOOD = "Is Nethood";
-const char* SALAMANDER_PLUGINS_USESPASSWDMAN = "Uses Password Manager";
+const wchar_t* SALAMANDER_PLUGINS_PLGICONLIST = L"PluginIconList";
+const wchar_t* SALAMANDER_PLUGINS_PLGICONINDEX = L"PluginIconIndex";
+const wchar_t* SALAMANDER_PLUGINS_PLGSUBMENUICONINDEX = L"SubmenuIconIndex";
+const wchar_t* SALAMANDER_PLUGINS_SUBMENUINPLUGINSBAR = L"SubmenuInPluginsBar";
+const wchar_t* SALAMANDER_PLUGINS_THUMBMASKS = L"ThumbnailMasks";
+const wchar_t* SALAMANDER_PLUGINS_REGKEYNAME = L"Configuration Key";
+const wchar_t* SALAMANDER_PLUGINS_FSNAME = L"FS Name";
+const wchar_t* SALAMANDER_PLUGINS_FUNCTIONS = L"Functions";
+const wchar_t* SALAMANDER_PLUGINS_LOADONSTART = L"Load On Start";
+const wchar_t* SALAMANDER_PLUGINS_LEGACYCOMPATAPPROVED = L"Legacy Compat Approved";
+const wchar_t* SALAMANDER_PLUGINS_MENU = L"Menu";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMNAME = L"Name";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMSTATE = L"State";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMID = L"ID";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMSKILLLEVEL = L"Skill";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMICONINDEX = L"Icon";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMTYPE = L"Type";
+const wchar_t* SALAMANDER_PLUGINS_MENUITEMHOTKEY = L"HotKey";
+const wchar_t* SALAMANDER_PLUGINS_FSCMDNAME = L"FS Cmd Name";
+const wchar_t* SALAMANDER_PLUGINS_FSCMDICON = L"FS Cmd Icon";
+const wchar_t* SALAMANDER_PLUGINS_FSCMDVISIBLE = L"FS Cmd Visible";
+const wchar_t* SALAMANDER_PLUGINS_ISNETHOOD = L"Is Nethood";
+const wchar_t* SALAMANDER_PLUGINS_USESPASSWDMAN = L"Uses Password Manager";
 
 // Plugins: the following eight strings are only for converting configuration from version 6 and older
-const char* SALAMANDER_PLUGINS_PANELVIEW = "Panel List";
-const char* SALAMANDER_PLUGINS_PANELEDIT = "Panel Pack";
-const char* SALAMANDER_PLUGINS_CUSTPACK = "Custom Pack";
-const char* SALAMANDER_PLUGINS_CUSTUNPACK = "Custom Unpack";
-const char* SALAMANDER_PLUGINS_CONFIG = "Configuration";
-const char* SALAMANDER_PLUGINS_LOADSAVE = "Persistent";
-const char* SALAMANDER_PLUGINS_VIEWER = "File Viewer";
-const char* SALAMANDER_PLUGINS_FS = "File System";
+const wchar_t* SALAMANDER_PLUGINS_PANELVIEW = L"Panel List";
+const wchar_t* SALAMANDER_PLUGINS_PANELEDIT = L"Panel Pack";
+const wchar_t* SALAMANDER_PLUGINS_CUSTPACK = L"Custom Pack";
+const wchar_t* SALAMANDER_PLUGINS_CUSTUNPACK = L"Custom Unpack";
+const wchar_t* SALAMANDER_PLUGINS_CONFIG = L"Configuration";
+const wchar_t* SALAMANDER_PLUGINS_LOADSAVE = L"Persistent";
+const wchar_t* SALAMANDER_PLUGINS_VIEWER = L"File Viewer";
+const wchar_t* SALAMANDER_PLUGINS_FS = L"File System";
 
 // Plugins Configuration
-const char* SALAMANDER_PLUGINSCONFIG = "Plugins Configuration";
+const wchar_t* SALAMANDER_PLUGINSCONFIG = L"Plugins Configuration";
 
 // Plugins Order
-const char* SALAMANDER_PLUGINSORDER = "Plugins Order";
-const char* SALAMANDER_PLUGINSORDER_SHOW = "ShowInBar";
+const wchar_t* SALAMANDER_PLUGINSORDER = L"Plugins Order";
+const wchar_t* SALAMANDER_PLUGINSORDER_SHOW = L"ShowInBar";
 
 // Packers & Unpackers
-const char* SALAMANDER_PACKANDUNPACK = "Packers & Unpackers";
-const char* SALAMANDER_CUSTOMPACKERS = "Custom Packers";
-const char* SALAMANDER_CUSTOMUNPACKERS = "Custom Unpackers";
-const char* SALAMANDER_PREDPACKERS = "Predefined Packers";
-const char* SALAMANDER_ARCHIVEASSOC = "Archive Association";
+const wchar_t* SALAMANDER_PACKANDUNPACK = L"Packers & Unpackers";
+const wchar_t* SALAMANDER_CUSTOMPACKERS = L"Custom Packers";
+const wchar_t* SALAMANDER_CUSTOMUNPACKERS = L"Custom Unpackers";
+const wchar_t* SALAMANDER_PREDPACKERS = L"Predefined Packers";
+const wchar_t* SALAMANDER_ARCHIVEASSOC = L"Archive Association";
 // for SALAMANDER_CUSTOMPACKERS and SALAMANDER_CUSTOMUNPACKERS
-const char* SALAMANDER_ANOTHERPANEL = "Use Another Panel";
-const char* SALAMANDER_PREFFERED = "Preffered";
-const char* SALAMANDER_NAMEBYARCHIVE = "Use Subdir Name By Archive";
-const char* SALAMANDER_SIMPLEICONSINARCHIVES = "Simple Icons In Archives";
+const wchar_t* SALAMANDER_ANOTHERPANEL = L"Use Another Panel";
+const wchar_t* SALAMANDER_PREFFERED = L"Preffered";
+const wchar_t* SALAMANDER_NAMEBYARCHIVE = L"Use Subdir Name By Archive";
+const wchar_t* SALAMANDER_SIMPLEICONSINARCHIVES = L"Simple Icons In Archives";
 
-const char* SALAMANDER_PWDMNGR_REG = "Password Manager";
+const wchar_t* SALAMANDER_PWDMNGR_REG = L"Password Manager";
 
 static IRegistry* GetMainWindowRegistry()
 {
@@ -680,17 +892,6 @@ static IRegistry* GetMainWindowRegistry()
     if (registry == NULL)
         registry = GetWin32Registry();
     return registry;
-}
-
-static BOOL GetRegistryDWordA(IRegistry* registry, HKEY key, const char* valueName, DWORD& value)
-{
-    return registry != NULL && GetDWordA(registry, key, valueName, value).success;
-}
-
-static BOOL GetRegistryStringA(IRegistry* registry, HKEY key, const char* valueName,
-                               char* buffer, DWORD bufferSize)
-{
-    return registry != NULL && GetStringA(registry, key, valueName, buffer, bufferSize).success;
 }
 
 static BOOL ClearRegistryKeyTree(IRegistry* registry, HKEY key)
@@ -753,59 +954,63 @@ static BOOL ClearRegistryKeyTree(IRegistry* registry, HKEY key)
 //   - Delete the current configuration and import the old version. In this case remove everything except AutoImportConfig.
 //   - Exit the application - simply return FALSE.
 
-BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize)
+BOOL GetUpgradeInfo(BOOL* autoImportConfig, std::wstring& autoImportConfigFromKey)
 {
     HKEY rootKey = NULL;
     DWORD saveInProgress; // dummy
     BOOL doNotExit = TRUE;
     IRegistry* registry = GetMainWindowRegistry();
-    if (autoImportConfigFromKeySize > 0)
-        *autoImportConfigFromKey = 0;
+    autoImportConfigFromKey.clear();
     LoadSaveToRegistryMutex.Enter();
     int rounds = 0; // prevent infinite loops
     *autoImportConfig = FALSE;
     if (registry != NULL &&
-        OpenKeyReadA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
+        registry->OpenKeyRead(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
     {
         HKEY oldCfgKey;
-        char oldKeyName[200];
+        std::wstring oldKeyName;
 
-        if (GetValue(rootKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, oldKeyName, 200))
+        // AutoImportConfig's value NAME stays narrow-literal (bridged inside GetValue),
+        // its data is already the natively-wide REG_SZ payload - oldKeyName being wide is correct here
+        if (registry->GetString(rootKey, SAL_REG_VALUE_AUTO_IMPORT_CONFIG_W, oldKeyName).success)
         { // we found "AutoImportConfig"
         OPEN_AUTO_IMPORT_CONFIG_KEY:
-            lstrcpyn(autoImportConfigFromKey, SalamanderConfigurationRoots[0], autoImportConfigFromKeySize);
-            if (CutDirectory(autoImportConfigFromKey) &&
-                SalPathAppend(autoImportConfigFromKey, oldKeyName, autoImportConfigFromKeySize) &&
-                !IsTheSamePath(autoImportConfigFromKey, SalamanderConfigurationRoots[0]) &&     // the key stored in AutoImportConfig does not point to this version's key
-                OpenKeyReadA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey, oldCfgKey).success) // the key stored in AutoImportConfig can be opened (otherwise it doesn't exist?)
+            autoImportConfigFromKey = SalamanderConfigurationRoots[0];
+            if (CutDirectoryW(autoImportConfigFromKey))
             {
+                SalPathAppendW(autoImportConfigFromKey, oldKeyName.c_str());
+                if (IsTheSamePath(autoImportConfigFromKey.c_str(), SalamanderConfigurationRoots[0]) ||
+                    !registry->OpenKeyRead(HKEY_CURRENT_USER, autoImportConfigFromKey.c_str(), oldCfgKey).success)
+                    goto AUTO_IMPORT_CONFIG_NOT_FOUND;
+
                 // if the current "target" key also contains AutoImportConfig, follow it...
-                if (GetValue(oldCfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, oldKeyName, 200) && ++rounds <= 50)
+                if (registry->GetString(oldCfgKey, SAL_REG_VALUE_AUTO_IMPORT_CONFIG_W, oldKeyName).success && ++rounds <= 50)
                 {
                     registry->CloseKey(oldCfgKey);
                     goto OPEN_AUTO_IMPORT_CONFIG_KEY;
                 }
                 HKEY cfgKey;
                 if (rounds <= 50 &&
-                    !GetValue(oldCfgKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)) &&
-                    registry->OpenKeyRead(oldCfgKey, AnsiToWideReg(SALAMANDER_CONFIG_REG).c_str(), cfgKey).success)
+                    !registry->GetDWord(oldCfgKey, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success &&
+                    registry->OpenKeyRead(oldCfgKey, SALAMANDER_CONFIG_REG_W, cfgKey).success)
                 {
                     registry->CloseKey(cfgKey);
                     *autoImportConfig = TRUE; // configuration is valid and not empty
                 }
                 registry->CloseKey(oldCfgKey);
             }
+        AUTO_IMPORT_CONFIG_NOT_FOUND:;
         }
         if (*autoImportConfig) // check whether this version's key also contains configuration (besides "AutoImportConfig")
         {
             HKEY cfgKey;
-            lstrcpyn(oldKeyName, SalamanderConfigurationRoots[0], 200);
-            if (SalPathAppend(oldKeyName, SALAMANDER_CONFIG_REG, 200) &&
-                OpenKeyReadA(registry, HKEY_CURRENT_USER, oldKeyName, cfgKey).success)
+            std::wstring currentConfigKey = SalamanderConfigurationRoots[0];
+            SalPathAppendW(currentConfigKey, SALAMANDER_CONFIG_REG);
+            if (registry->OpenKeyRead(HKEY_CURRENT_USER, currentConfigKey.c_str(), cfgKey).success)
             {
                 registry->CloseKey(cfgKey);
                 BOOL clearCfg = FALSE;
-                if (!GetValue(rootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
+                if (!registry->GetDWord(rootKey, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
                 { // this key contains a valid configuration; ask the user what to do
                     registry->CloseKey(rootKey);
                     rootKey = NULL;
@@ -815,26 +1020,24 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                     memset(&params, 0, sizeof(params));
                     params.HParent = NULL;
                     params.Flags = MB_ABORTRETRYIGNORE | MB_ICONQUESTION | MB_SETFOREGROUND;
-                    params.Caption = SALAMANDER_TEXT_VERSION;
-                    lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
-                    char* keyName;
-                    if (!CutDirectory(oldKeyName, &keyName))
-                        keyName = oldKeyName; // theoretically cannot happen
-                    char buf[1000];
-                    sprintf(buf, "You have upgraded from %s (old version) to %s (new version). The configuration of the old "
-                                 "version should be imported to the new version now, but there is already existing "
-                                 "configuration for the new version. You can use this existing configuration (the configuration of "
-                                 "the old version remains in registry, so you can import it later). Or you can overwrite "
-                                 "this existing configuration (it would be lost) with the configuration of the old version. "
-                                 "Or you can exit Open Salamander and solve this problem later.",
-                            keyName, SALAMANDER_TEXT_VERSION);
-                    params.Text = buf;
-                    char aliasBtnNames[200];
-                    sprintf(aliasBtnNames, "%d\t%s\t%d\t%s\t%d\t%s",
-                            DIALOG_ABORT, "&Use Existing Configuration",
-                            DIALOG_RETRY, "&Overwrite Existing Configuration",
-                            DIALOG_IGNORE, "&Exit");
-                    params.AliasBtnNames = aliasBtnNames;
+                    params.Caption = SALAMANDER_TEXT_VERSIONW();
+                    std::wstring oldKeyPath = autoImportConfigFromKey;
+                    std::wstring keyName;
+                    if (!CutDirectoryW(oldKeyPath, &keyName))
+                        keyName = oldKeyPath; // theoretically cannot happen
+                    const std::wstring message = FormatStrW(L"You have upgraded from %ls (old version) to %ls (new version). The configuration of the old "
+                                  L"version should be imported to the new version now, but there is already existing "
+                                  L"configuration for the new version. You can use this existing configuration (the configuration of "
+                                  L"the old version remains in registry, so you can import it later). Or you can overwrite "
+                                  L"this existing configuration (it would be lost) with the configuration of the old version. "
+                                  L"Or you can exit Open Salamander and solve this problem later.",
+                             keyName.c_str(), SALAMANDER_TEXT_VERSIONW());
+                    params.Text = message.c_str();
+                    const std::wstring aliasBtnNames = FormatStrW(L"%d\t%ls\t%d\t%ls\t%d\t%ls",
+                             DIALOG_ABORT, L"&Use Existing Configuration",
+                             DIALOG_RETRY, L"&Overwrite Existing Configuration",
+                             DIALOG_IGNORE, L"&Exit");
+                    params.AliasBtnNames = aliasBtnNames.c_str();
                     int res = SalMessageBoxEx(&params);
                     switch (res)
                     {
@@ -856,14 +1059,14 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                 else
                     clearCfg = TRUE; // configuration is corrupted, delete it
                 if (clearCfg &&
-                    OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
+                    registry->OpenKeyReadWrite(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
                 { // delete the configuration and leave only "AutoImportConfig" (recreate it)
                     ClearRegistryKeyTree(registry, cfgKey);
-                    lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
-                    char* keyName;
-                    if (!CutDirectory(oldKeyName, &keyName))
-                        keyName = oldKeyName; // theoretically cannot happen
-                    SetStringA(registry, cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG, keyName);
+                    std::wstring oldKeyPath = autoImportConfigFromKey;
+                    std::wstring keyName;
+                    if (!CutDirectoryW(oldKeyPath, &keyName))
+                        keyName = oldKeyPath; // theoretically cannot happen
+                    registry->SetString(cfgKey, SAL_REG_VALUE_AUTO_IMPORT_CONFIG_W, keyName.c_str());
                     registry->CloseKey(cfgKey);
                 }
             }
@@ -873,9 +1076,9 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
     }
     if (!*autoImportConfig && // this version's key lacks "AutoImportConfig" or does not point to a valid old configuration
         registry != NULL &&
-        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
+        registry->OpenKeyReadWrite(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], rootKey).success)
     { // remove "AutoImportConfig" from this version's key (if it exists it makes no sense here)
-        DeleteValueA(registry, rootKey, SALAMANDER_AUTO_IMPORT_CONFIG);
+        registry->DeleteValue(rootKey, SAL_REG_VALUE_AUTO_IMPORT_CONFIG_W);
         registry->CloseKey(rootKey);
     }
     LoadSaveToRegistryMutex.Leave();
@@ -889,18 +1092,18 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
 // Retrieves the language (the .slg module used) from an older version of Salamander.
 // The oldest version from which we obtain this information is 2.53 beta 2 (the first version shipped with multiple languages: CZ+DE+EN).
 // If a configuration for the current version exists or such a language is not found, returns FALSE.
-// Otherwise returns the language in 'slgName' (MAX_PATH buffer).
+// Otherwise returns the language in 'slgName'.
 
-BOOL FindLanguageFromPrevVerOfSal(char* slgName)
+BOOL FindLanguageFromPrevVerOfSal(std::wstring& slgName)
 {
     HKEY hCfgKey = NULL;
     HKEY hRootKey = NULL;
     int rootIndex = 0;
-    const char* root;
+    const wchar_t* root;
     DWORD saveInProgress; // dummy
     IRegistry* registry = GetMainWindowRegistry();
 
-    slgName[0] = 0;
+    slgName.clear();
     LoadSaveToRegistryMutex.Enter();
     if (registry == NULL)
     {
@@ -911,10 +1114,10 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
     {
         // check if the key exists and if a configuration is stored under it
         root = SalamanderConfigurationRoots[rootIndex];
-        BOOL rootFound = OpenKeyReadA(registry, HKEY_CURRENT_USER, root, hRootKey).success;
+        BOOL rootFound = registry->OpenKeyRead(HKEY_CURRENT_USER, root, hRootKey).success;
         BOOL cfgFound = rootFound &&
-                        registry->OpenKeyRead(hRootKey, AnsiToWideReg(SALAMANDER_CONFIG_REG).c_str(), hCfgKey).success;
-        if (cfgFound && GetValue(hRootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
+                        registry->OpenKeyRead(hRootKey, SALAMANDER_CONFIG_REG_W, hCfgKey).success;
+        if (cfgFound && GetValueW(hRootKey, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
         { // the configuration is corrupted
             cfgFound = FALSE;
             registry->CloseKey(hCfgKey);
@@ -923,10 +1126,10 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
         if (cfgFound)
         {
             HKEY actKey;
-            if (registry->OpenKeyRead(hRootKey, AnsiToWideReg(SALAMANDER_VERSION_REG).c_str(), actKey).success)
+            if (registry->OpenKeyRead(hRootKey, SALAMANDER_VERSION_REG_W, actKey).success)
             {
                 configVersion = 2; // configuration from 1.6b1
-                GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD, &configVersion, sizeof(DWORD));
+                GetValueW(actKey, SALAMANDER_VERSIONREG_REG_W, REG_DWORD, &configVersion, sizeof(DWORD));
                 registry->CloseKey(actKey);
             }
         }
@@ -938,8 +1141,8 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
             if (rootIndex != 0 &&                      // only for one of the older keys
                 configVersion >= 59 /* 2.53 beta 2 */) // before 2.53 beta 2 there was only English, so reading makes no sense; offer system default language or manual selection of the language
             {
-                GetValue(hCfgKey, CONFIG_LANGUAGE_REG, REG_SZ, slgName, MAX_PATH);
-                found = slgName[0] != 0;
+                GetStringValueW(hCfgKey, CONFIG_LANGUAGE_REG, slgName);
+                found = !slgName.empty();
             }
             registry->CloseKey(hCfgKey);
             LoadSaveToRegistryMutex.Leave();
@@ -954,7 +1157,7 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
 
 // obtains a number from a string (unsigned decimal format); returns TRUE, if a number was found
 // ignores white spaces before and after the number
-BOOL GetNumFromStr(const char* s, DWORD* retNum)
+BOOL GetNumFromStr(const wchar_t* s, DWORD* retNum)
 {
     DWORD n = 0;
     while (*s != 0 && *s <= ' ')
@@ -978,30 +1181,30 @@ void CheckShutdownParams()
     IRegistry* registry = GetMainWindowRegistry();
     HKEY key;
     if (registry != NULL &&
-        OpenKeyReadA(registry, HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_A, key).success)
+        registry->OpenKeyRead(HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_W, key).success)
     {
-        char num[100];
+        std::wstring num;
         DWORD value;
-        if (GetRegistryStringA(registry, key, "WaitToKillAppTimeout", num, _countof(num)) &&
-            GetNumFromStr(num, &value) && value < 20000)
+        if (registry->GetString(key, SAL_REG_VALUE_WAIT_TO_KILL_APP_TIMEOUT_W, num).success &&
+            GetNumFromStr(num.c_str(), &value) && value < 20000)
         {
-            TRACE_E("CheckShutdownParams(): WaitToKillAppTimeout is '" << num << "' (" << value << ")");
+            TRACE_E("CheckShutdownParams(): WaitToKillAppTimeout is '" << sally::diagnostic::EncodeAcpLossy(num) << "' (" << value << ")");
             showWarning = TRUE;
         }
-        if (GetRegistryStringA(registry, key, "AutoEndTasks", num, _countof(num)) &&
-            GetNumFromStr(num, &value) && value != 0)
+        if (registry->GetString(key, SAL_REG_VALUE_AUTO_END_TASKS_W, num).success &&
+            GetNumFromStr(num.c_str(), &value) && value != 0)
         {
-            TRACE_E("CheckShutdownParams(): AutoEndTasks is '" << num << "' (" << value << ")");
+            TRACE_E("CheckShutdownParams(): AutoEndTasks is '" << sally::diagnostic::EncodeAcpLossy(num) << "' (" << value << ")");
             showWarning = TRUE;
         }
         registry->CloseKey(key);
     }
 
     if (showWarning)
-        gPrompter->ShowError(AnsiToWide(SALAMANDER_TEXT_VERSION).c_str(), LoadStrW(IDS_CHANGEDSHUTDOWNPARS));
+        gPrompter->ShowError(SALAMANDER_TEXT_VERSIONW(), LoadStrW(IDS_CHANGEDSHUTDOWNPARS));
 }
 
-BOOL MyRegRenameKey(HKEY key, const char* name, const char* newName)
+BOOL MyRegRenameKey(HKEY key, const wchar_t* name, const wchar_t* newName)
 {
     BOOL ret = FALSE;
     IRegistry* registry = GetMainWindowRegistry();
@@ -1015,27 +1218,27 @@ BOOL MyRegRenameKey(HKEY key, const char* name, const char* newName)
     // InitializeObjectAttributes). It's overly complicated and not frequently used code,
     // so we'll do it the slow but simple way... copy the key to a new one and then delete the original
     HKEY newKey;
-    if (!OpenKeyReadA(registry, key, newName, newKey).success) // verify if the target key does not already exist
+    if (!registry->OpenKeyRead(key, newName, newKey).success) // verify if the target key does not already exist
     {
-        if (CreateKeyA(registry, key, newName, newKey).success) // create the target key
+        if (registry->CreateKey(key, newName, newKey).success) // create the target key
         {
             // I also tried RegCopyTree (didn't work without KEY_ALL_ACCESS) and the speed was the same as SHCopyKey
-            if (SHCopyKey(key, name, newKey, 0) == ERROR_SUCCESS) // copy into the target key
+            if (SHCopyKeyW(key, name, newKey, 0) == ERROR_SUCCESS) // copy into the target key
                 ret = TRUE;
             registry->CloseKey(newKey);
             if (ret &&
-                !registry->DeleteKeyRecursive(key, AnsiToWideReg(name).c_str()).success)
+                !registry->DeleteKeyRecursive(key, name).success)
             {
-                TRACE_E("MyRegRenameKey(): unable to delete source key after copy: " << name);
+                TRACE_E("MyRegRenameKey(): unable to delete source key after copy: " << sally::diagnostic::EncodeAcpLossy(name));
             }
         }
         else
-            TRACE_E("MyRegRenameKey(): unable to create target key: " << newName);
+            TRACE_E("MyRegRenameKey(): unable to create target key: " << sally::diagnostic::EncodeAcpLossy(newName));
     }
     else
     {
         registry->CloseKey(newKey);
-        TRACE_E("MyRegRenameKey(): target key already exists: " << newName);
+        TRACE_E("MyRegRenameKey(): target key already exists: " << sally::diagnostic::EncodeAcpLossy(newName));
     }
     return ret;
 }
@@ -1054,12 +1257,12 @@ BOOL MyRegRenameKey(HKEY key, const char* name, const char* newName)
 // If the user chooses to exit the application, the function returns FALSE.
 //
 
-BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration)
+BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const wchar_t*& loadConfiguration)
 {
     HKEY hRootKey;
     loadConfiguration = NULL; // we don't want to load any configuration - default values will be used
     int rootIndex = 0;
-    const char* root;
+    const wchar_t* root;
     DWORD saveInProgress; // dummy
     HKEY hCfgKey;
     IRegistry* registry = GetMainWindowRegistry();
@@ -1073,28 +1276,27 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
 
     LoadSaveToRegistryMutex.Enter();
 
-    char backup[200];
-    sprintf_s(backup, "%s.backup.63A7CD13", SalamanderConfigurationRoots[0]); // "63A7CD13" prevents the key name from matching the user name
+    const std::wstring backup = FormatStrW(L"%ls.backup.63A7CD13", SalamanderConfigurationRoots[0]); // "63A7CD13" prevents the key name from matching the user name
     HKEY backupKey;
     BOOL backupFound = registry != NULL &&
-                       OpenKeyReadA(registry, HKEY_CURRENT_USER, backup, backupKey).success;
+                       registry->OpenKeyRead(HKEY_CURRENT_USER, backup.c_str(), backupKey).success;
     if (backupFound)
     {
         DWORD copyIsOK;
-        if (GetRegistryDWordA(registry, backupKey, SALAMANDER_COPY_IS_OK, copyIsOK))
+        if (registry->GetDWord(backupKey, SAL_REG_VALUE_COPY_IS_OK_W, copyIsOK).success)
             copyIsOK = 1; // backup is valid
         else
             copyIsOK = 0; // backup is corrupted
         registry->CloseKey(backupKey);
         if (!copyIsOK) // delete the corrupted backup and pretend it never existed (it probably wasn't fully created)
         {
-            TRACE_I("Configuration backup is incomplete, removing... " << backup);
-            if (!DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup).success)
-                TRACE_E("FindLatestConfiguration(): unable to delete corrupted backup: " << backup);
+            TRACE_I("Configuration backup is incomplete, removing... " << sally::diagnostic::EncodeAcpLossy(backup));
+            if (!registry->DeleteKeyRecursive(HKEY_CURRENT_USER, backup.c_str()).success)
+                TRACE_E("FindLatestConfiguration(): unable to delete corrupted backup: " << sally::diagnostic::EncodeAcpLossy(backup));
             backupFound = FALSE;
         }
         else
-            TRACE_I("Configuration backup is OK: " << backup);
+            TRACE_I("Configuration backup is OK: " << sally::diagnostic::EncodeAcpLossy(backup));
     }
 
     do
@@ -1102,28 +1304,27 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
         root = SalamanderConfigurationRoots[rootIndex];
         // check whether the key exists
         BOOL rootFound = registry != NULL &&
-                         OpenKeyReadA(registry, HKEY_CURRENT_USER, root, hRootKey).success;
+                         registry->OpenKeyRead(HKEY_CURRENT_USER, root, hRootKey).success;
         if (rootFound &&
-            GetRegistryDWordA(registry, hRootKey, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress))
+            registry->GetDWord(hRootKey, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
         { // this configuration is corrupted
             TRACE_E("Configuration is corrupted!");
             rootFound = FALSE;
             registry->CloseKey(hRootKey);
             if (rootIndex == 0 && backupFound) // use the backup, if available and don't bother the user
             {
-                char corrupted[200];
-                sprintf_s(corrupted, "%s.corrupted.63A7CD13", root); // "63A7CD13" prevents the key name from matching the user name
-                DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, corrupted); // if we already have a corrupted configuration, remove it-one is enough
-                if (MyRegRenameKey(HKEY_CURRENT_USER, root, corrupted) &&
-                    MyRegRenameKey(HKEY_CURRENT_USER, backup, root))
+                const std::wstring corrupted = FormatStrW(L"%ls.corrupted.63A7CD13", root); // "63A7CD13" prevents the key name from matching the user name
+                registry->DeleteKeyRecursive(HKEY_CURRENT_USER, corrupted.c_str()); // if we already have a corrupted configuration, remove it-one is enough
+                if (MyRegRenameKey(HKEY_CURRENT_USER, root, corrupted.c_str()) &&
+                    MyRegRenameKey(HKEY_CURRENT_USER, backup.c_str(), root))
                 {
                     backupFound = FALSE;
-                    if (CreateKeyA(registry, HKEY_CURRENT_USER, root, hRootKey).success)
+                    if (registry->CreateKey(HKEY_CURRENT_USER, root, hRootKey).success)
                     {
-                        DeleteValueA(registry, hRootKey, SALAMANDER_COPY_IS_OK);
+                        registry->DeleteValue(hRootKey, SAL_REG_VALUE_COPY_IS_OK_W);
                         registry->CloseKey(hRootKey);
                     }
-                    TRACE_I("Corrupted configuration was moved to: " << corrupted);
+                    TRACE_I("Corrupted configuration was moved to: " << sally::diagnostic::EncodeAcpLossy(corrupted));
                     TRACE_I("Using configuration backup instead ...");
                     continue; // in the second pass load configuration from the backup created during "critical shutdown"
                 }
@@ -1133,20 +1334,18 @@ BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfig
 
             if (rootIndex == 0) // for the active version inform the user about the corrupted configuration and let them back up the key, then try to delete it (older versions - simply ignore the corrupted configuration)
             {
-                char buf[1500];
-                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_CORRUPTEDCONFIGFOUND), root);
+                const std::wstring message = FormatStrW(LoadStrW(IDS_CORRUPTEDCONFIGFOUND), root);
                 LoadSaveToRegistryMutex.Leave();
 
                 MSGBOXEX_PARAMS params;
                 memset(&params, 0, sizeof(params));
                 params.HParent = NULL;
                 params.Flags = MB_OKCANCEL | MB_ICONERROR | MB_DEFBUTTON2;
-                params.Caption = SALAMANDER_TEXT_VERSION;
-                params.Text = buf;
-                char aliasBtnNames[200];
+                params.Caption = SALAMANDER_TEXT_VERSIONW();
+                params.Text = message.c_str();
                 /* used by the export_mnu.py script that generates salmenu.mnu for the Translator
    we let the message box buttons handle hotkey collisions by simulating it as a menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_CORRUPTEDCONFIGREMOVEBTN
@@ -1154,9 +1353,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
   {MNTT_PE, 0
 };
 */
-                sprintf(aliasBtnNames, "%d\t%s\t%d\t%s", DIALOG_OK, LoadStr(IDS_CORRUPTEDCONFIGREMOVEBTN),
-                        DIALOG_CANCEL, LoadStr(IDS_SELLANGEXITBUTTON));
-                params.AliasBtnNames = aliasBtnNames;
+                const std::wstring aliasBtnNames = FormatStrW(L"%d\t%ls\t%d\t%ls", DIALOG_OK, LoadStrW(IDS_CORRUPTEDCONFIGREMOVEBTN),
+                                                             DIALOG_CANCEL, LoadStrW(IDS_SELLANGEXITBUTTON));
+                params.AliasBtnNames = aliasBtnNames.c_str();
                 if (SalMessageBoxEx(&params) == IDCANCEL)
                 {
                     CheckShutdownParams(); // optionally show this warning; if they rename the key in the registry they might never see it
@@ -1166,25 +1365,25 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 CheckShutdownParams();
                 LoadSaveToRegistryMutex.Enter();
                 if (registry != NULL &&
-                    OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, root, hRootKey).success)
+                    registry->OpenKeyReadWrite(HKEY_CURRENT_USER, root, hRootKey).success)
                 { // delete the corrupted configuration (if it's still there - user might have renamed it for backup)
-                    TRACE_I("Deleting corrupted configuration on user demand: " << root);
+                    TRACE_I("Deleting corrupted configuration on user demand: " << sally::diagnostic::EncodeAcpLossy(root));
                     ClearRegistryKeyTree(registry, hRootKey);
                     registry->CloseKey(hRootKey);
-                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, root);
+                    registry->DeleteKeyRecursive(HKEY_CURRENT_USER, root);
                 }
             }
         }
         BOOL cfgFound = rootFound &&
-                        OpenKeyReadA(registry, hRootKey, SALAMANDER_CONFIG_REG, hCfgKey).success;
+                        registry->OpenKeyRead(hRootKey, SALAMANDER_CONFIG_REG, hCfgKey).success;
         if (rootFound)
             registry->CloseKey(hRootKey);
 
         if (rootIndex == 0 && backupFound) // backup not needed, remove it
         {
-            TRACE_I("Removing unnecessary configuration backup: " << backup);
-            if (!DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, backup).success)
-                TRACE_E("FindLatestConfiguration(): unable to remove unnecessary backup: " << backup);
+            TRACE_I("Removing unnecessary configuration backup: " << sally::diagnostic::EncodeAcpLossy(backup));
+            if (!registry->DeleteKeyRecursive(HKEY_CURRENT_USER, backup.c_str()).success)
+                TRACE_E("FindLatestConfiguration(): unable to remove unnecessary backup: " << sally::diagnostic::EncodeAcpLossy(backup));
             backupFound = FALSE;
         }
 
@@ -1236,7 +1435,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 // deletes keys according to the array returned by FindLatestConfiguration
 
 void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoImportConfig,
-                                          const char* autoImportConfigFromKey,
+                                          const wchar_t* autoImportConfigFromKey,
                                           BOOL doNotDeleteImportedCfg)
 {
     // anything to delete?
@@ -1270,13 +1469,13 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
             if (deleteConfigurations[rootIndex])
             {
                 HKEY hKey;
-                const char* key = SalamanderConfigurationRoots[rootIndex];
+                const wchar_t* key = SalamanderConfigurationRoots[rootIndex];
                 if (registry != NULL &&
-                    CreateKeyA(registry, HKEY_CURRENT_USER, key, hKey).success)
+                    registry->CreateKey(HKEY_CURRENT_USER, key, hKey).success)
                 {
                     ClearRegistryKeyTree(registry, hKey);
                     registry->CloseKey(hKey);
-                    DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, key);
+                    registry->DeleteKeyRecursive(HKEY_CURRENT_USER, key);
                 }
             }
         }
@@ -1285,9 +1484,9 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
             BOOL ok = FALSE;
             HKEY cfgKey;
             if (registry != NULL &&
-                OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
+                registry->OpenKeyReadWrite(HKEY_CURRENT_USER, SalamanderConfigurationRoots[0], cfgKey).success)
             { // remove "AutoImportConfig" value from the new key
-                if (DeleteValueA(registry, cfgKey, SALAMANDER_AUTO_IMPORT_CONFIG).success)
+                if (registry->DeleteValue(cfgKey, SAL_REG_VALUE_AUTO_IMPORT_CONFIG_W).success)
                     ok = TRUE;
                 registry->CloseKey(cfgKey);
             }
@@ -1295,18 +1494,18 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
                      // write Salamander's configuration either (it goes to the
                      // same key) and the whole upgrade will need to be run again
             {
-                TRACE_E("CMainWindow::DeleteOldConfigurations(): unable to delete " << SALAMANDER_AUTO_IMPORT_CONFIG << " value from HKCU\\" << SalamanderConfigurationRoots[0]);
+                TRACE_E("CMainWindow::DeleteOldConfigurations(): unable to delete AutoImportConfig value from HKCU\\" << sally::diagnostic::EncodeAcpLossy(SalamanderConfigurationRoots[0]));
             }
             else // clean the old configuration (already saved to the new key)
             {
                 if (!doNotDeleteImportedCfg)
                 {
                     if (registry != NULL &&
-                        OpenKeyReadWriteA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey, cfgKey).success)
+                        registry->OpenKeyReadWrite(HKEY_CURRENT_USER, autoImportConfigFromKey, cfgKey).success)
                     {
                         ClearRegistryKeyTree(registry, cfgKey);
                         registry->CloseKey(cfgKey);
-                        DeleteKeyRecursiveA(registry, HKEY_CURRENT_USER, autoImportConfigFromKey);
+                        registry->DeleteKeyRecursive(HKEY_CURRENT_USER, autoImportConfigFromKey);
                     }
                 }
             }
@@ -1323,42 +1522,50 @@ void CMainWindow::DeleteOldConfigurations(BOOL* deleteConfigurations, BOOL autoI
 // CMainWindow
 //
 
-void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const char* reg)
+void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg)
 {
+    // FIRST REGION ON THE WIDE FACADES. Every registry call here goes
+    // through the *W entry points, so nothing in this function narrows a key or
+    // value name. The pattern established here is what the remaining regions of
+    // this file follow.
     HKEY actKey;
-    if (CreateKey(hSalamander, reg, actKey))
+    if (CreateKeyW(hSalamander, reg, actKey))
     {
         DWORD value;
         value = panel->HeaderLineVisible;
-        SetValue(actKey, PANEL_HEADER_REG, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_HEADER_REG_W, REG_DWORD, &value, sizeof(DWORD));
         // Wide-only persistence: write the panel path as REG_SZ Unicode so Unicode-only
         // disk roots (e.g. C:\Temp\zz中文) survive across restart. Older Sally builds
         // reading this config will not find a usable PANEL_PATH and fall back to the
         // rescue path on first launch (then resave). User-approved clean break.
+        //
+        // The AnsiToWideReg that used to wrap the value name here is GONE: the name
+        // is a wide constant now, so there is no conversion left to get wrong.
         if (gRegistry != NULL)
         {
-            gRegistry->SetString(actKey, AnsiToWideReg(PANEL_PATH_REG).c_str(),
-                                 panel->GetPathW());
+            gRegistry->SetString(actKey, PANEL_PATH_REG_W, panel->GetPathW());
         }
         else
         {
             // gRegistry should always be set in the running app; this is a defensive
             // fallback so a misconfigured test harness still records something.
-            SetValue(actKey, PANEL_PATH_REG, REG_SZ, panel->GetPath(), -1);
+            SetValueW(actKey, PANEL_PATH_REG_W, REG_SZ, panel->GetPathW(), -1);
         }
         value = panel->GetViewTemplateIndex();
-        SetValue(actKey, PANEL_VIEW_REG, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_VIEW_REG_W, REG_DWORD, &value, sizeof(DWORD));
         value = panel->SortType;
-        SetValue(actKey, PANEL_SORT_REG, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_SORT_REG_W, REG_DWORD, &value, sizeof(DWORD));
         value = panel->ReverseSort;
-        SetValue(actKey, PANEL_REVERSE_REG, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_REVERSE_REG_W, REG_DWORD, &value, sizeof(DWORD));
         value = (panel->DirectoryLine->HWindow != NULL);
-        SetValue(actKey, PANEL_DIRLINE_REG, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_DIRLINE_REG_W, REG_DWORD, &value, sizeof(DWORD));
         value = (panel->StatusLine->HWindow != NULL);
-        SetValue(actKey, PANEL_STATUS_REG, REG_DWORD, &value, sizeof(DWORD));
-        SetValue(actKey, PANEL_FILTER_ENABLE, REG_DWORD, &panel->FilterEnabled,
-                 sizeof(DWORD));
-        SetValue(actKey, PANEL_FILTER, REG_SZ, panel->Filter.GetMasksString(), -1);
+        SetValueW(actKey, PANEL_STATUS_REG_W, REG_DWORD, &value, sizeof(DWORD));
+        SetValueW(actKey, PANEL_FILTER_ENABLE_W, REG_DWORD, &panel->FilterEnabled,
+                  sizeof(DWORD));
+        // CMaskGroup::GetMasksString() has returned the wide storage directly since
+        // - no ANSI rendering left to bridge.
+        SetValueW(actKey, PANEL_FILTER_W, REG_SZ, panel->Filter.GetMasksString(), -1);
 
         CloseKey(actKey);
     }
@@ -1408,7 +1615,7 @@ void CMainWindow::SaveConfig(HWND parent)
             IRegistry* registry = GetMainWindowRegistry();
             DWORD saveInProgress = 1;
             if (registry != NULL &&
-                GetRegistryDWordA(registry, salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress))
+                registry->GetDWord(salamander, SALAMANDER_SAVE_IN_PROGRESS, saveInProgress).success)
             {
                 cfgIsOK = FALSE; // the configuration is corrupted; saving won't fix it (it wasn't stored completely)
                 TRACE_E("CMainWindow::SaveConfig(): unable to save configuration, configuration key in registry is corrupted");
@@ -1427,7 +1634,7 @@ void CMainWindow::SaveConfig(HWND parent)
             if (CreateKey(salamander, SALAMANDER_VERSION_REG, actKey))
             {
                 DWORD newConfigVersion = THIS_CONFIG_VERSION;
-                SetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
+                SetValueW(actKey, SALAMANDER_VERSIONREG_REG_W, REG_DWORD,
                          &newConfigVersion, sizeof(DWORD));
                 CloseKey(actKey);
             }
@@ -1439,21 +1646,34 @@ void CMainWindow::SaveConfig(HWND parent)
                 WINDOWPLACEMENT place;
                 place.length = sizeof(WINDOWPLACEMENT);
                 GetWindowPlacement(HWindow, &place);
-                SetValue(actKey, WINDOW_LEFT_REG, REG_DWORD,
+                SetValueW(actKey, WINDOW_LEFT_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.left), sizeof(DWORD));
-                SetValue(actKey, WINDOW_RIGHT_REG, REG_DWORD,
+                SetValueW(actKey, WINDOW_RIGHT_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.right), sizeof(DWORD));
-                SetValue(actKey, WINDOW_TOP_REG, REG_DWORD,
+                SetValueW(actKey, WINDOW_TOP_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.top), sizeof(DWORD));
-                SetValue(actKey, WINDOW_BOTTOM_REG, REG_DWORD,
+                SetValueW(actKey, WINDOW_BOTTOM_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.bottom), sizeof(DWORD));
-                SetValue(actKey, WINDOW_SHOW_REG, REG_DWORD,
+                SetValueW(actKey, WINDOW_SHOW_REG_W, REG_DWORD,
                          &(place.showCmd), sizeof(DWORD));
-                char buf[20];
-                sprintf(buf, "%.1lf", SplitPosition * 100);
-                SetValue(actKey, WINDOW_SPLIT_REG, REG_SZ, buf, -1);
-                sprintf(buf, "%.1lf", BeforeZoomSplitPosition * 100);
-                SetValue(actKey, WINDOW_BEFOREZOOMSPLIT_REG, REG_SZ, buf, -1);
+                // WIDE, not narrow. WINDOW_SPLIT_REG is a const wchar_t*, so
+                // this resolved to the WIDE-name SetValue overload, which forwards dataSize==-1
+                // to SetValueAux's wcslen()-based auto-length - correct only for wide data. The
+                // buffer here used to be char[20], so wcslen() scanned narrow bytes ("50.0\0",
+                // a single trailing zero BYTE, not the two consecutive zero bytes wcslen looks
+                // for) straight past the end into uninitialized stack fill until it happened to
+                // hit a wide NUL, then wrote that garbage length. Observed live as a 515-char
+                // REG_SZ of "50.0" followed by 0xCC debug-fill, surfacing on the next startup as
+                // "Error Loading Configuration (234) More data is available" - twice, once per
+                // value. Note the payload also has to be genuinely wide, not merely correctly
+                // measured: RegSetValueExW tags REG_SZ as UTF-16, so narrow bytes stored here
+                // would round-trip only because the matching read was equally narrow, and would
+                // render as mojibake in regedit and to any correct future reader.
+                wchar_t buf[20];
+                swprintf_s(buf, _countof(buf), L"%.1lf", SplitPosition * 100);
+                SetValueW(actKey, WINDOW_SPLIT_REG, REG_SZ, buf, -1);
+                swprintf_s(buf, _countof(buf), L"%.1lf", BeforeZoomSplitPosition * 100);
+                SetValueW(actKey, WINDOW_BEFOREZOOMSPLIT_REG, REG_SZ, buf, -1);
 
                 CloseKey(actKey);
             }
@@ -1462,18 +1682,18 @@ void CMainWindow::SaveConfig(HWND parent)
             {
                 if (CreateKey(salamander, FINDDIALOG_WINDOW_REG, actKey))
                 {
-                    SetValue(actKey, WINDOW_LEFT_REG, REG_DWORD,
+                    SetValueW(actKey, WINDOW_LEFT_REG_W, REG_DWORD,
                              &(Configuration.FindDialogWindowPlacement.rcNormalPosition.left), sizeof(DWORD));
-                    SetValue(actKey, WINDOW_RIGHT_REG, REG_DWORD,
+                    SetValueW(actKey, WINDOW_RIGHT_REG_W, REG_DWORD,
                              &(Configuration.FindDialogWindowPlacement.rcNormalPosition.right), sizeof(DWORD));
-                    SetValue(actKey, WINDOW_TOP_REG, REG_DWORD,
+                    SetValueW(actKey, WINDOW_TOP_REG_W, REG_DWORD,
                              &(Configuration.FindDialogWindowPlacement.rcNormalPosition.top), sizeof(DWORD));
-                    SetValue(actKey, WINDOW_BOTTOM_REG, REG_DWORD,
+                    SetValueW(actKey, WINDOW_BOTTOM_REG_W, REG_DWORD,
                              &(Configuration.FindDialogWindowPlacement.rcNormalPosition.bottom), sizeof(DWORD));
-                    SetValue(actKey, WINDOW_SHOW_REG, REG_DWORD,
+                    SetValueW(actKey, WINDOW_SHOW_REG_W, REG_DWORD,
                              &(Configuration.FindDialogWindowPlacement.showCmd), sizeof(DWORD));
 
-                    SetValue(actKey, FINDDIALOG_NAMEWIDTH_REG, REG_DWORD,
+                    SetValueW(actKey, FINDDIALOG_NAMEWIDTH_REG_W, REG_DWORD,
                              &(Configuration.FindColNameWidth), sizeof(DWORD));
                     CloseKey(actKey);
                 }
@@ -1481,24 +1701,26 @@ void CMainWindow::SaveConfig(HWND parent)
 
             //---  left and right panel
 
-            SavePanelConfig(LeftPanel, salamander, SALAMANDER_LEFTP_REG);
-            SavePanelConfig(RightPanel, salamander, SALAMANDER_RIGHTP_REG);
+            SavePanelConfig(LeftPanel, salamander, SALAMANDER_LEFTP_REG_W);
+            SavePanelConfig(RightPanel, salamander, SALAMANDER_RIGHTP_REG_W);
 
             //---  default directories
 
             if (CreateKey(salamander, SALAMANDER_DEFDIRS_REG, actKey))
             {
-                char name[2];
+                wchar_t name[2];
                 name[1] = 0;
-                char d;
+                wchar_t d;
                 for (d = 'A'; d <= 'Z'; d++)
                 {
                     name[0] = d;
-                    char* path = DefaultDir[d - 'A'];
-                    if (path[1] == ':' && path[2] == '\\' && path[3] != 0) // not "C:\"
-                        SetValue(actKey, name, REG_SZ, path, -1);
+                    const wchar_t* path = DefaultDir[d - 'A'].c_str();
+                    if (path[1] == L':' && path[2] == L'\\' && path[3] != 0) // not "C:\"
+                        // SetValueW, not SetValue: the narrow one takes const void* and turns
+                        // dataSize -1 into strlen(), which on a wide path measures ONE character.
+                        SetValueW(actKey, name, REG_SZ, path, -1);
                     else
-                        DeleteValue(actKey, name);
+                        DeleteValueW(actKey, name);
                 }
                 CloseKey(actKey);
             }
@@ -1549,7 +1771,7 @@ void CMainWindow::SaveConfig(HWND parent)
             //---  Packers & Unpackers
             if (CreateKey(salamander, SALAMANDER_PACKANDUNPACK, actKey))
             {
-                SetValue(actKey, SALAMANDER_SIMPLEICONSINARCHIVES, REG_DWORD,
+                SetValueW(actKey, SALAMANDER_SIMPLEICONSINARCHIVES_W, REG_DWORD,
                          &(Configuration.UseSimpleIconsInArchives), sizeof(DWORD));
 
                 //---  Custom Packers
@@ -1558,11 +1780,11 @@ void CMainWindow::SaveConfig(HWND parent)
                 {
                     ClearKey(actSubKey);
                     HKEY itemKey;
-                    char buf[30];
+                    wchar_t buf[30];
                     int i;
                     for (i = 0; i < PackerConfig.GetPackersCount(); i++)
                     {
-                        itoa(i + 1, buf, 10);
+                        _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
                             PackerConfig.Save(i, itemKey);
@@ -1589,11 +1811,11 @@ void CMainWindow::SaveConfig(HWND parent)
                 {
                     ClearKey(actSubKey);
                     HKEY itemKey;
-                    char buf[30];
+                    wchar_t buf[30];
                     int i;
                     for (i = 0; i < UnpackerConfig.GetUnpackersCount(); i++)
                     {
-                        itoa(i + 1, buf, 10);
+                        _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
                             UnpackerConfig.Save(i, itemKey);
@@ -1622,11 +1844,11 @@ void CMainWindow::SaveConfig(HWND parent)
                 {
                     ClearKey(actSubKey);
                     HKEY itemKey;
-                    char buf[30];
+                    wchar_t buf[30];
                     int i;
                     for (i = 0; i < ArchiverConfig.GetArchiversCount(); i++)
                     {
-                        itoa(i + 1, buf, 10);
+                        _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
                             ArchiverConfig.Save(i, itemKey);
@@ -1643,11 +1865,11 @@ void CMainWindow::SaveConfig(HWND parent)
                 {
                     ClearKey(actSubKey);
                     HKEY itemKey;
-                    char buf[30];
+                    wchar_t buf[30];
                     int i;
                     for (i = 0; i < PackerFormatConfig.GetFormatsCount(); i++)
                     {
-                        itoa(i + 1, buf, 10);
+                        _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(actSubKey, buf, itemKey))
                         {
                             PackerFormatConfig.Save(i, itemKey);
@@ -1667,253 +1889,251 @@ void CMainWindow::SaveConfig(HWND parent)
             if (CreateKey(salamander, SALAMANDER_CONFIG_REG, actKey))
             {
                 //---  top rebar begin
-                SetValue(actKey, CONFIG_MENUINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_MENUINDEX_REG_W, REG_DWORD,
                          &Configuration.MenuIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_MENUBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_MENUBREAK_REG_W, REG_DWORD,
                          &Configuration.MenuBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_MENUWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_MENUWIDTH_REG_W, REG_DWORD,
                          &Configuration.MenuWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TOOLBARINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TOOLBARINDEX_REG_W, REG_DWORD,
                          &Configuration.TopToolbarIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TOOLBARBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TOOLBARBREAK_REG_W, REG_DWORD,
                          &Configuration.TopToolbarBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TOOLBARWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TOOLBARWIDTH_REG_W, REG_DWORD,
                          &Configuration.TopToolbarWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PLUGINSBARINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_PLUGINSBARINDEX_REG_W, REG_DWORD,
                          &Configuration.PluginsBarIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PLUGINSBARBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_PLUGINSBARBREAK_REG_W, REG_DWORD,
                          &Configuration.PluginsBarBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PLUGINSBARWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_PLUGINSBARWIDTH_REG_W, REG_DWORD,
                          &Configuration.PluginsBarWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USERMENUINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USERMENUINDEX_REG_W, REG_DWORD,
                          &Configuration.UserMenuToolbarIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USERMENUBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USERMENUBREAK_REG_W, REG_DWORD,
                          &Configuration.UserMenuToolbarBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USERMENUWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USERMENUWIDTH_REG_W, REG_DWORD,
                          &Configuration.UserMenuToolbarWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USERMENULABELS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USERMENULABELS_REG_W, REG_DWORD,
                          &Configuration.UserMenuToolbarLabels, sizeof(DWORD));
-                SetValue(actKey, CONFIG_HOTPATHSINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_HOTPATHSINDEX_REG_W, REG_DWORD,
                          &Configuration.HotPathsBarIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_HOTPATHSBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_HOTPATHSBREAK_REG_W, REG_DWORD,
                          &Configuration.HotPathsBarBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_HOTPATHSWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_HOTPATHSWIDTH_REG_W, REG_DWORD,
                          &Configuration.HotPathsBarWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DRIVEBARINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRIVEBARINDEX_REG_W, REG_DWORD,
                          &Configuration.DriveBarIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DRIVEBARBREAK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRIVEBARBREAK_REG_W, REG_DWORD,
                          &Configuration.DriveBarBreak, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DRIVEBARWIDTH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRIVEBARWIDTH_REG_W, REG_DWORD,
                          &Configuration.DriveBarWidth, sizeof(DWORD));
-                SetValue(actKey, CONFIG_GRIPSVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_GRIPSVISIBLE_REG_W, REG_DWORD,
                          &Configuration.GripsVisible, sizeof(DWORD));
 
                 //---  top rebar end
-                SetValue(actKey, CONFIG_FILENAMEFORMAT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_FILENAMEFORMAT_REG_W, REG_DWORD,
                          &Configuration.FileNameFormat, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SIZEFORMAT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SIZEFORMAT_REG_W, REG_DWORD,
                          &Configuration.SizeFormat, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SELECTION_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SELECTION_REG_W, REG_DWORD,
                          &Configuration.IncludeDirs, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COPYFINDTEXT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COPYFINDTEXT_REG_W, REG_DWORD,
                          &Configuration.CopyFindText, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CLEARREADONLY_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_CLEARREADONLY_REG_W, REG_DWORD,
                          &Configuration.ClearReadOnly, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PRIMARYCONTEXTMENU_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_PRIMARYCONTEXTMENU_REG_W, REG_DWORD,
                          &Configuration.PrimaryContextMenu, sizeof(DWORD));
-                SetValue(actKey, CONFIG_NOTHIDDENSYSTEM_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_NOTHIDDENSYSTEM_REG_W, REG_DWORD,
                          &Configuration.NotHiddenSystemFiles, sizeof(DWORD));
-                SetValue(actKey, CONFIG_RECYCLEBIN_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_RECYCLEBIN_REG_W, REG_DWORD,
                          &Configuration.UseRecycleBin, sizeof(DWORD));
                 SetValue(actKey, CONFIG_RECYCLEMASKS_REG, REG_SZ,
                          Configuration.RecycleMasks.GetMasksString(), -1);
-                SetValue(actKey, CONFIG_SAVEONEXIT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SAVEONEXIT_REG_W, REG_DWORD,
                          &Configuration.AutoSave, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHOWGREPERRORS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SHOWGREPERRORS_REG_W, REG_DWORD,
                          &Configuration.ShowGrepErrors, sizeof(DWORD));
-                SetValue(actKey, CONFIG_FINDFULLROW_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_FINDFULLROW_REG_W, REG_DWORD,
                          &Configuration.FindFullRowSelect, sizeof(DWORD));
-                SetValue(actKey, CONFIG_FINDFILETYPEMODE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_FINDFILETYPEMODE_REG_W, REG_DWORD,
                          &Configuration.FindFileTypeMode, sizeof(DWORD));
-                SetValue(actKey, CONFIG_MINBEEPWHENDONE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_MINBEEPWHENDONE_REG_W, REG_DWORD,
                          &Configuration.MinBeepWhenDone, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CLOSESHELL_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_CLOSESHELL_REG_W, REG_DWORD,
                          &Configuration.CloseShell, sizeof(DWORD));
                 DWORD rightPanelFocused = (GetActivePanel() == RightPanel);
-                SetValue(actKey, CONFIG_RIGHT_FOCUS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_RIGHT_FOCUS_REG_W, REG_DWORD,
                          &rightPanelFocused, sizeof(DWORD));
-                SetValue(actKey, CONFIG_ALWAYSONTOP_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_ALWAYSONTOP_REG_W, REG_DWORD,
                          &Configuration.AlwaysOnTop, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMMANDSHELL_KIND_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMMANDSHELL_KIND_REG_W, REG_DWORD,
                          &Configuration.CommandShellTargetKind, sizeof(DWORD));
                 if (gRegistry != NULL)
                 {
-                    gRegistry->SetString(actKey, AnsiToWideReg(CONFIG_COMMANDSHELL_PROFILE_GUID_REG).c_str(),
-                                         Configuration.CommandShellProfileGuid);
-                    gRegistry->SetString(actKey, AnsiToWideReg(CONFIG_COMMANDSHELL_PROFILE_NAME_REG).c_str(),
-                                         Configuration.CommandShellProfileName);
+                    gRegistry->SetString(actKey, CONFIG_COMMANDSHELL_PROFILE_GUID_REG_W,
+                                         Configuration.CommandShellProfileGuid.c_str());
+                    gRegistry->SetString(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W,
+                                         Configuration.CommandShellProfileName.c_str());
                 }
                 //      SetValue(actKey, CONFIG_FASTDIRMOVE_REG, REG_DWORD,
                 //               &Configuration.FastDirectoryMove, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SORTUSESLOCALE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SORTUSESLOCALE_REG_W, REG_DWORD,
                          &Configuration.SortUsesLocale, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SORTDETECTNUMBERS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SORTDETECTNUMBERS_REG_W, REG_DWORD,
                          &Configuration.SortDetectNumbers, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SORTNEWERONTOP_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SORTNEWERONTOP_REG_W, REG_DWORD,
                          &Configuration.SortNewerOnTop, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SORTDIRSBYNAME_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SORTDIRSBYNAME_REG_W, REG_DWORD,
                          &Configuration.SortDirsByName, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SORTDIRSBYEXT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SORTDIRSBYEXT_REG_W, REG_DWORD,
                          &Configuration.SortDirsByExt, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SAVEHISTORY_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SAVEHISTORY_REG_W, REG_DWORD,
                          &Configuration.SaveHistory, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SAVEWORKDIRS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SAVEWORKDIRS_REG_W, REG_DWORD,
                          &Configuration.SaveWorkDirs, sizeof(DWORD));
-                SetValue(actKey, CONFIG_ENABLECMDLINEHISTORY_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_ENABLECMDLINEHISTORY_REG_W, REG_DWORD,
                          &Configuration.EnableCmdLineHistory, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SAVECMDLINEHISTORY_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SAVECMDLINEHISTORY_REG_W, REG_DWORD,
                          &Configuration.SaveCmdLineHistory, sizeof(DWORD));
                 //      SetValue(actKey, CONFIG_LANTASTICCHECK_REG, REG_DWORD,
                 //               &Configuration.LantasticCheck, sizeof(DWORD));
-                SetValue(actKey, CONFIG_ONLYONEINSTANCE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_ONLYONEINSTANCE_REG_W, REG_DWORD,
                          &Configuration.OnlyOneInstance, sizeof(DWORD));
-                SetValue(actKey, CONFIG_STATUSAREA_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_STATUSAREA_REG_W, REG_DWORD,
                          &Configuration.StatusArea, sizeof(DWORD));
-                SetValue(actKey, CONFIG_FULLROWSELECT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_FULLROWSELECT_REG_W, REG_DWORD,
                          &Configuration.FullRowSelect, sizeof(DWORD));
-                SetValue(actKey, CONFIG_FULLROWHIGHLIGHT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_FULLROWHIGHLIGHT_REG_W, REG_DWORD,
                          &Configuration.FullRowHighlight, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USEICONTINCTURE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USEICONTINCTURE_REG_W, REG_DWORD,
                          &Configuration.UseIconTincture, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHOWPANELCAPTION_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SHOWPANELCAPTION_REG_W, REG_DWORD,
                          &Configuration.ShowPanelCaption, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHOWPANELZOOM_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SHOWPANELZOOM_REG_W, REG_DWORD,
                          &Configuration.ShowPanelZoom, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SINGLECLICK_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SINGLECLICK_REG_W, REG_DWORD,
                          &Configuration.SingleClick, sizeof(DWORD));
                 //      SetValue(actKey, CONFIG_SHOWTIPOFTHEDAY_REG, REG_DWORD,
                 //               &Configuration.ShowTipOfTheDay, sizeof(DWORD));
                 //      SetValue(actKey, CONFIG_LASTTIPOFTHEDAY_REG, REG_DWORD,
                 //               &Configuration.LastTipOfTheDay, sizeof(DWORD));
-                SetValue(actKey, CONFIG_INFOLINECONTENT_REG, REG_SZ,
-                         Configuration.InfoLineContent, -1);
-                SetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_INFOLINECONTENT_REG, REG_SZ,
+                          Configuration.InfoLineContent.c_str(), -1);
+                SetValueW(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG_W, REG_DWORD,
                          &Configuration.IfPathIsInaccessibleGoToIsMyDocs, sizeof(DWORD));
-                SetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTO_REG, REG_SZ,
-                         Configuration.IfPathIsInaccessibleGoTo, -1);
-                SetValue(actKey, CONFIG_HOTPATH_AUTOCONFIG, REG_DWORD,
+                SetValueW(actKey, CONFIG_IFPATHISINACCESSIBLEGOTO_REG, REG_SZ,
+                          Configuration.IfPathIsInaccessibleGoTo.c_str(), -1);
+                SetValueW(actKey, CONFIG_HOTPATH_AUTOCONFIG_W, REG_DWORD,
                          &Configuration.HotPathAutoConfig, sizeof(DWORD));
-                SetValue(actKey, CONFIG_LASTUSEDSPEEDLIM_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_LASTUSEDSPEEDLIM_REG_W, REG_DWORD,
                          &Configuration.LastUsedSpeedLimit, sizeof(DWORD));
-                SetValue(actKey, CONFIG_QUICKSEARCHENTER_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_QUICKSEARCHENTER_REG_W, REG_DWORD,
                          &Configuration.QuickSearchEnterAlt, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CHD_SHOWMYDOC, REG_DWORD,
+                SetValueW(actKey, CONFIG_CHD_SHOWMYDOC_W, REG_DWORD,
                          &Configuration.ChangeDriveShowMyDoc, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CHD_SHOWCLOUDSTOR, REG_DWORD,
+                SetValueW(actKey, CONFIG_CHD_SHOWCLOUDSTOR_W, REG_DWORD,
                          &Configuration.ChangeDriveCloudStorage, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CHD_SHOWANOTHER, REG_DWORD,
+                SetValueW(actKey, CONFIG_CHD_SHOWANOTHER_W, REG_DWORD,
                          &Configuration.ChangeDriveShowAnother, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CHD_SHOWNET, REG_DWORD,
+                SetValueW(actKey, CONFIG_CHD_SHOWNET_W, REG_DWORD,
                          &Configuration.ChangeDriveShowNet, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SEARCHFILECONTENT, REG_DWORD,
+                SetValueW(actKey, CONFIG_SEARCHFILECONTENT_W, REG_DWORD,
                          &Configuration.SearchFileContent, sizeof(DWORD));
-                SetValue(actKey, CONFIG_LASTPLUGINVER, REG_DWORD,
+                SetValueW(actKey, CONFIG_LASTPLUGINVER_W, REG_DWORD,
                          &Configuration.LastPluginVer, sizeof(DWORD));
-                SetValue(actKey, CONFIG_LASTPLUGINVER_OP, REG_DWORD,
+                SetValueW(actKey, CONFIG_LASTPLUGINVER_OP_W, REG_DWORD,
                          &Configuration.LastPluginVerOP, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USESALOPEN_REG, REG_DWORD,
-                         &Configuration.UseSalOpen, sizeof(DWORD));
-                SetValue(actKey, CONFIG_NETWAREFASTDIRMOVE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_NETWAREFASTDIRMOVE_REG_W, REG_DWORD,
                          &Configuration.NetwareFastDirMove, sizeof(DWORD));
                 if (Windows7AndLater)
-                    SetValue(actKey, CONFIG_ASYNCCOPYALG_REG, REG_DWORD,
+                    SetValueW(actKey, CONFIG_ASYNCCOPYALG_REG_W, REG_DWORD,
                              &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
-                SetValue(actKey, CONFIG_RELOAD_ENV_VARS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_RELOAD_ENV_VARS_REG_W, REG_DWORD,
                          &Configuration.ReloadEnvVariables, sizeof(DWORD));
-                SetValue(actKey, CONFIG_QUICKRENAME_SELALL_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_QUICKRENAME_SELALL_REG_W, REG_DWORD,
                          &Configuration.QuickRenameSelectAll, sizeof(DWORD));
-                SetValue(actKey, CONFIG_EDITNEW_SELALL_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_EDITNEW_SELALL_REG_W, REG_DWORD,
                          &Configuration.EditNewSelectAll, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHIFTFORHOTPATHS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                          &Configuration.ShiftForHotPaths, sizeof(DWORD));
                 SetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
-                         Configuration.SLGName, -1);
-                SetValue(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
+                         Configuration.SLGName.c_str(), -1);
+                SetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG_W, REG_DWORD,
                          &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
                 SetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
-                         Configuration.AltPluginSLGName, -1);
-                DWORD langChanged = (StrICmp(Configuration.SLGName, Configuration.LoadedSLGName) != 0); // TRUE if user changed Salamander language
-                SetValue(actKey, CONFIG_LANGUAGECHANGED_REG, REG_DWORD, &langChanged, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHOWSPLASHSCREEN_REG, REG_DWORD,
+                         Configuration.AltPluginSLGName.c_str(), -1);
+                DWORD langChanged = (StrICmpW(Configuration.SLGName.c_str(), Configuration.LoadedSLGName.c_str()) != 0); // TRUE if user changed Salamander language
+                SetValueW(actKey, CONFIG_LANGUAGECHANGED_REG_W, REG_DWORD, &langChanged, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_SHOWSPLASHSCREEN_REG_W, REG_DWORD,
                          &Configuration.ShowSplashScreen, sizeof(DWORD));
                 SetValue(actKey, CONFIG_CONVERSIONTABLE_REG, REG_SZ,
-                         Configuration.ConversionTable, -1);
-                SetValue(actKey, CONFIG_SKILLLEVEL_REG, REG_DWORD,
+                         Configuration.ConversionTable.c_str(), -1);
+                SetValueW(actKey, CONFIG_SKILLLEVEL_REG_W, REG_DWORD,
                          &Configuration.SkillLevel, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TITLEBARSHOWPATH_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TITLEBARSHOWPATH_REG_W, REG_DWORD,
                          &Configuration.TitleBarShowPath, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TITLEBARMODE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TITLEBARMODE_REG_W, REG_DWORD,
                          &Configuration.TitleBarMode, sizeof(DWORD));
-                SetValue(actKey, CONFIG_THEME_MODE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_THEME_MODE_REG_W, REG_DWORD,
                          &Configuration.ThemeMode, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TITLEBARPREFIX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TITLEBARPREFIX_REG_W, REG_DWORD,
                          &Configuration.UseTitleBarPrefix, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, REG_SZ,
-                         &Configuration.TitleBarPrefix, -1);
-                SetValue(actKey, CONFIG_MAINWINDOWICONINDEX_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, REG_SZ,
+                          Configuration.TitleBarPrefix.c_str(), -1);
+                SetValueW(actKey, CONFIG_MAINWINDOWICONINDEX_REG_W, REG_DWORD,
                          &Configuration.MainWindowIconIndex, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CLICKQUICKRENAME_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_CLICKQUICKRENAME_REG_W, REG_DWORD,
                          &Configuration.ClickQuickRename, sizeof(DWORD));
-                SetValue(actKey, CONFIG_VISIBLEDRIVES_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_VISIBLEDRIVES_REG_W, REG_DWORD,
                          &Configuration.VisibleDrives, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SEPARATEDDRIVES_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SEPARATEDDRIVES_REG_W, REG_DWORD,
                          &Configuration.SeparatedDrives, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYTIME_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYTIME_REG_W, REG_DWORD,
                          &Configuration.CompareByTime, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYSIZE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYSIZE_REG_W, REG_DWORD,
                          &Configuration.CompareBySize, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYCONTENT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYCONTENT_REG_W, REG_DWORD,
                          &Configuration.CompareByContent, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYATTR_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYATTR_REG_W, REG_DWORD,
                          &Configuration.CompareByAttr, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYSUBDIRS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYSUBDIRS_REG_W, REG_DWORD,
                          &Configuration.CompareSubdirs, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREBYSUBDIRSATTR_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREBYSUBDIRSATTR_REG_W, REG_DWORD,
                          &Configuration.CompareSubdirsAttr, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREONEPANELDIRS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREONEPANELDIRS_REG_W, REG_DWORD,
                          &Configuration.CompareOnePanelDirs, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREMOREOPTIONS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREMOREOPTIONS_REG_W, REG_DWORD,
                          &Configuration.CompareMoreOptions, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREIGNOREFILES_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREIGNOREFILES_REG_W, REG_DWORD,
                          &Configuration.CompareIgnoreFiles, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COMPAREIGNOREDIRS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_COMPAREIGNOREDIRS_REG_W, REG_DWORD,
                          &Configuration.CompareIgnoreDirs, sizeof(DWORD));
                 SetValue(actKey, CONFIG_CONFIGTIGNOREFILESMASKS_REG, REG_SZ,
                          Configuration.CompareIgnoreFilesMasks.GetMasksString(), -1);
                 SetValue(actKey, CONFIG_CONFIGTIGNOREDIRSMASKS_REG, REG_SZ,
                          Configuration.CompareIgnoreDirsMasks.GetMasksString(), -1);
 
-                SetValue(actKey, CONFIG_THUMBNAILSIZE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_THUMBNAILSIZE_REG_W, REG_DWORD,
                          &Configuration.ThumbnailSize, sizeof(DWORD));
-                SetValue(actKey, CONFIG_KEEPPLUGINSSORTED_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_KEEPPLUGINSSORTED_REG_W, REG_DWORD,
                          &Configuration.KeepPluginsSorted, sizeof(DWORD));
-                SetValue(actKey, CONFIG_SHOWSLGINCOMPLETE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_SHOWSLGINCOMPLETE_REG_W, REG_DWORD,
                          &Configuration.ShowSLGIncomplete, sizeof(DWORD));
 
                 // WARNING: when an icon overlay handler crashes, these values are written directly into the registry
                 //         (prevents Salamander from becoming "unstartable"), see InformAboutIconOvrlsHanCrash()
-                SetValue(actKey, CONFIG_ENABLECUSTICOVRLS_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_ENABLECUSTICOVRLS_REG_W, REG_DWORD,
                          &Configuration.EnableCustomIconOverlays, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
-                         Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : "", -1);
+                SetValueW(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
+                          Configuration.DisabledCustomIconOverlays != NULL ? Configuration.DisabledCustomIconOverlays : L"", -1);
 
-                SetValue(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG_W, REG_DWORD,
                          &Configuration.UseEditNewFileDefault, sizeof(DWORD));
                 SetValue(actKey, CONFIG_EDITNEWFILE_DEFAULT_REG, REG_SZ,
-                         Configuration.EditNewFileDefault, -1);
+                         Configuration.EditNewFileDefault.c_str(), -1);
 
 #ifndef _WIN64 // FIXME_X64_WINSCP
-                SetValue(actKey, "Add x86-Only Plugins", REG_DWORD,
+                SetValue(actKey, L"Add x86-Only Plugins", REG_DWORD,
                          &Configuration.AddX86OnlyPlugins, sizeof(DWORD));
 #endif // _WIN64
 
@@ -1999,58 +2219,58 @@ void CMainWindow::SaveConfig(HWND parent)
                     CloseKey(actSubKey);
                 }
 
-                SetValue(actKey, CONFIG_TOPTOOLBAR_REG, REG_SZ, Configuration.TopToolBar, -1);
-                SetValue(actKey, CONFIG_MIDDLETOOLBAR_REG, REG_SZ, Configuration.MiddleToolBar, -1);
+                SetValue(actKey, CONFIG_TOPTOOLBAR_REG, REG_SZ, Configuration.TopToolBar.c_str(), -1);
+                SetValue(actKey, CONFIG_MIDDLETOOLBAR_REG, REG_SZ, Configuration.MiddleToolBar.c_str(), -1);
 
-                SetValue(actKey, CONFIG_LEFTTOOLBAR_REG, REG_SZ, Configuration.LeftToolBar, -1);
-                SetValue(actKey, CONFIG_RIGHTTOOLBAR_REG, REG_SZ, Configuration.RightToolBar, -1);
+                SetValue(actKey, CONFIG_LEFTTOOLBAR_REG, REG_SZ, Configuration.LeftToolBar.c_str(), -1);
+                SetValue(actKey, CONFIG_RIGHTTOOLBAR_REG, REG_SZ, Configuration.RightToolBar.c_str(), -1);
 
-                SetValue(actKey, CONFIG_TOPTOOLBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_TOPTOOLBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.TopToolBarVisible, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PLGTOOLBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_PLGTOOLBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.PluginsBarVisible, sizeof(DWORD));
-                SetValue(actKey, CONFIG_MIDDLETOOLBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_MIDDLETOOLBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.MiddleToolBarVisible, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_USERMENUTOOLBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_USERMENUTOOLBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.UserMenuToolBarVisible, sizeof(DWORD));
-                SetValue(actKey, CONFIG_HOTPATHSBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_HOTPATHSBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.HotPathsBarVisible, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_DRIVEBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRIVEBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.DriveBarVisible, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DRIVEBAR2VISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRIVEBAR2VISIBLE_REG_W, REG_DWORD,
                          &Configuration.DriveBar2Visible, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_BOTTOMTOOLBARVISIBLE_REG, REG_DWORD,
+                SetValueW(actKey, CONFIG_BOTTOMTOOLBARVISIBLE_REG_W, REG_DWORD,
                          &Configuration.BottomToolBarVisible, sizeof(DWORD));
 
                 //      SetValue(actKey, CONFIG_SPACESELCALCSPACE, REG_DWORD,
                 //               &Configuration.SpaceSelCalcSpace, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USETIMERESOLUTION, REG_DWORD,
+                SetValueW(actKey, CONFIG_USETIMERESOLUTION_W, REG_DWORD,
                          &Configuration.UseTimeResolution, sizeof(DWORD));
-                SetValue(actKey, CONFIG_TIMERESOLUTION, REG_DWORD,
+                SetValueW(actKey, CONFIG_TIMERESOLUTION_W, REG_DWORD,
                          &Configuration.TimeResolution, sizeof(DWORD));
-                SetValue(actKey, CONFIG_IGNOREDSTSHIFTS, REG_DWORD,
+                SetValueW(actKey, CONFIG_IGNOREDSTSHIFTS_W, REG_DWORD,
                          &Configuration.IgnoreDSTShifts, sizeof(DWORD));
-                SetValue(actKey, CONFIG_USEDRAGDROPMINTIME, REG_DWORD,
+                SetValueW(actKey, CONFIG_USEDRAGDROPMINTIME_W, REG_DWORD,
                          &Configuration.UseDragDropMinTime, sizeof(DWORD));
-                SetValue(actKey, CONFIG_DRAGDROPMINTIME, REG_DWORD,
+                SetValueW(actKey, CONFIG_DRAGDROPMINTIME_W, REG_DWORD,
                          &Configuration.DragDropMinTime, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_LASTFOCUSEDPAGE, REG_DWORD,
+                SetValueW(actKey, CONFIG_LASTFOCUSEDPAGE_W, REG_DWORD,
                          &Configuration.LastFocusedPage, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CONFIGURATION_HEIGHT, REG_DWORD,
+                SetValueW(actKey, CONFIG_CONFIGURATION_HEIGHT_W, REG_DWORD,
                          &Configuration.ConfigurationHeight, sizeof(DWORD));
-                SetValue(actKey, CONFIG_VIEWANDEDITEXPAND, REG_DWORD,
+                SetValueW(actKey, CONFIG_VIEWANDEDITEXPAND_W, REG_DWORD,
                          &Configuration.ViewersAndEditorsExpanded, sizeof(DWORD));
-                SetValue(actKey, CONFIG_PACKEPAND, REG_DWORD,
+                SetValueW(actKey, CONFIG_PACKEPAND_W, REG_DWORD,
                          &Configuration.PackersAndUnpackersExpanded, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_CMDLINE_REG, REG_DWORD, &EditPermanentVisible, sizeof(DWORD));
-                SetValue(actKey, CONFIG_CMDLFOCUS_REG, REG_DWORD, &EditMode, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_CMDLINE_REG_W, REG_DWORD, &EditPermanentVisible, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_CMDLFOCUS_REG_W, REG_DWORD, &EditMode, sizeof(DWORD));
 
-                SetValue(actKey, CONFIG_USECUSTOMPANELFONT_REG, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
                 SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont);
 
                 if (GlobalSaveWaitWindow == NULL)
@@ -2059,20 +2279,20 @@ void CMainWindow::SaveConfig(HWND parent)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 4
                 //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
-                SaveHistory(actKey, CONFIG_NAMEDHISTORY_REG, FindNamedHistory,
-                            FIND_NAMED_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_LOOKINHISTORY_REG, FindLookInHistory,
-                            FIND_LOOKIN_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_GREPHISTORY_REG, FindGrepHistory,
-                            FIND_GREP_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_SELECTHISTORY_REG, Configuration.SelectHistory,
-                            SELECT_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_COPYHISTORY_REG, Configuration.CopyHistory,
-                            COPY_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistoryW(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistoryW,
+                SaveHistory(actKey, CONFIG_NAMEDHISTORYW_REG, FindNamedHistory,
+                             FIND_NAMED_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_LOOKINHISTORYW_REG, FindLookInHistory,
+                             FIND_LOOKIN_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_GREPHISTORYW_REG, FindGrepHistory,
+                             FIND_GREP_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_SELECTHISTORYW_REG, Configuration.SelectHistory,
+                             SELECT_HISTORY_SIZE, !Configuration.SaveHistory);
+                // Standard histories have one UTF-16 owner. Keep writing the wide keys;
+                // the old narrow keys below are read only when importing old settings.
+                SaveHistory(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistory,
                              COPY_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CHANGEDIRHISTORY_REG, Configuration.ChangeDirHistory,
-                            CHANGEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_CHANGEDIRHISTORYW_REG, Configuration.ChangeDirHistory,
+                             CHANGEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
 
                 if (GlobalSaveWaitWindow == NULL)
                     analysing.SetProgressPos(++savingProgress); // 5
@@ -2080,28 +2300,49 @@ void CMainWindow::SaveConfig(HWND parent)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 5
                 //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
-                SaveHistory(actKey, CONFIG_VIEWERHISTORY_REG, ViewerHistory,
-                            VIEWER_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_COMMANDHISTORY_REG, Configuration.EditHistory,
-                            EDIT_HISTORY_SIZE, !(Configuration.SaveHistory && Configuration.EnableCmdLineHistory && Configuration.SaveCmdLineHistory));
-                SaveHistory(actKey, CONFIG_FILELISTHISTORY_REG, Configuration.FileListHistory,
-                            FILELIST_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CREATEDIRHISTORY_REG, Configuration.CreateDirHistory,
-                            CREATEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistoryW(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistoryW,
+                SaveHistory(actKey, CONFIG_VIEWERHISTORYW_REG, ViewerHistory,
+                             VIEWER_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_COMMANDHISTORYW_REG, Configuration.EditHistory,
+                             EDIT_HISTORY_SIZE, !(Configuration.SaveHistory && Configuration.EnableCmdLineHistory && Configuration.SaveCmdLineHistory));
+                // FileListHistory: same shape, sole consumer is
+                // ExpandMakeFileListW's wide param (files_window_copy_move.cpp).
+                SaveHistory(actKey, CONFIG_FILELISTHISTORYW_REG, Configuration.FileListHistory,
+                             FILELIST_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistory,
                              CREATEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_QUICKRENAMEHISTORY_REG, Configuration.QuickRenameHistory,
-                            QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_EDITNEWHISTORY_REG, Configuration.EditNewHistory,
-                            EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistoryW(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistoryW,
+                SaveHistory(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistory,
                              QUICKRENAME_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistoryW(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistoryW,
+                SaveHistory(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistory,
                              EDITNEW_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_CONVERTHISTORY_REG, Configuration.ConvertHistory,
-                            CONVERT_HISTORY_SIZE, !Configuration.SaveHistory);
-                SaveHistory(actKey, CONFIG_FILTERHISTORY_REG, Configuration.FilterHistory,
-                            FILTER_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_CONVERTHISTORYW_REG, Configuration.ConvertHistory,
+                             CONVERT_HISTORY_SIZE, !Configuration.SaveHistory);
+                SaveHistory(actKey, CONFIG_FILTERHISTORYW_REG, Configuration.FilterHistory,
+                             FILTER_HISTORY_SIZE, !Configuration.SaveHistory);
+
+                // Retire the unsuffixed ACP keys now that the wide ones have been written.
+                //
+                // They are not merely stale. The loader falls back to them when the WIDE
+                // history reads back EMPTY (IsWideHistoryEmpty), not when the wide key is
+                // absent - so leaving them in place meant "Clear history", and switching
+                // "Save history" off, cleared the wide key and then had the old entries
+                // RESURRECTED from the narrow key on the next launch. Pre-unicode had only
+                // the one key per history and cleared it, so this is a privacy promise the
+                // widening quietly broke. Clearing here also completes the ACP->UTF-16
+                // migration: after one save the import path has nothing left to import.
+                RetireLegacyHistoryKey(actKey, CONFIG_NAMEDHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_LOOKINHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_GREPHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_SELECTHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_COPYHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_CHANGEDIRHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_VIEWERHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_COMMANDHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_FILELISTHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_CREATEDIRHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_QUICKRENAMEHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_EDITNEWHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_CONVERTHISTORY_REG);
+                RetireLegacyHistoryKey(actKey, CONFIG_FILTERHISTORY_REG);
 
                 if (DirHistory != NULL)
                     DirHistory->SaveToRegistry(actKey, CONFIG_WORKDIRSHISTORY_REG, !Configuration.SaveWorkDirs);
@@ -2130,9 +2371,9 @@ void CMainWindow::SaveConfig(HWND parent)
                     CloseKey(actSubKey);
                 }
 
-                SetValue(actKey, CONFIG_FILELISTNAME_REG, REG_SZ, Configuration.FileListName, -1);
-                SetValue(actKey, CONFIG_FILELISTAPPEND_REG, REG_DWORD, &Configuration.FileListAppend, sizeof(DWORD));
-                SetValue(actKey, CONFIG_FILELISTDESTINATION_REG, REG_DWORD, &Configuration.FileListDestination, sizeof(DWORD));
+                SetValue(actKey, CONFIG_FILELISTNAME_REG, REG_SZ, Configuration.FileListName.c_str(), -1);
+                SetValueW(actKey, CONFIG_FILELISTAPPEND_REG_W, REG_DWORD, &Configuration.FileListAppend, sizeof(DWORD));
+                SetValueW(actKey, CONFIG_FILELISTDESTINATION_REG_W, REG_DWORD, &Configuration.FileListDestination, sizeof(DWORD));
 
                 CloseKey(actKey);
             }
@@ -2141,60 +2382,60 @@ void CMainWindow::SaveConfig(HWND parent)
 
             if (CreateKey(salamander, SALAMANDER_VIEWER_REG, actKey))
             {
-                SetValue(actKey, VIEWER_FINDFORWARD_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_FINDFORWARD_REG_W, REG_DWORD,
                          &GlobalFindDialog.Forward, sizeof(DWORD));
-                SetValue(actKey, VIEWER_FINDWHOLEWORDS_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_FINDWHOLEWORDS_REG_W, REG_DWORD,
                          &GlobalFindDialog.WholeWords, sizeof(DWORD));
-                SetValue(actKey, VIEWER_FINDCASESENSITIVE_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_FINDCASESENSITIVE_REG_W, REG_DWORD,
                          &GlobalFindDialog.CaseSensitive, sizeof(DWORD));
-                SetValue(actKey, VIEWER_FINDREGEXP_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_FINDREGEXP_REG_W, REG_DWORD,
                          &GlobalFindDialog.Regular, sizeof(DWORD));
-                SetValue(actKey, VIEWER_FINDTEXT_REG, REG_SZ, GlobalFindDialog.Text, -1);
-                SetValue(actKey, VIEWER_FINDHEXMODE_REG, REG_DWORD,
+                SetValue(actKey, VIEWER_FINDTEXT_REG, REG_SZ, GlobalFindDialog.Text.c_str(), -1);
+                SetValueW(actKey, VIEWER_FINDHEXMODE_REG_W, REG_DWORD,
                          &GlobalFindDialog.HexMode, sizeof(DWORD));
 
-                SetValue(actKey, VIEWER_CONFIGCRLF_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGCRLF_REG_W, REG_DWORD,
                          &Configuration.EOL_CRLF, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CONFIGCR_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGCR_REG_W, REG_DWORD,
                          &Configuration.EOL_CR, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CONFIGLF_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGLF_REG_W, REG_DWORD,
                          &Configuration.EOL_LF, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CONFIGNULL_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGNULL_REG_W, REG_DWORD,
                          &Configuration.EOL_NULL, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CONFIGTABSIZE_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGTABSIZE_REG_W, REG_DWORD,
                          &Configuration.TabSize, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CONFIGDEFMODE_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGDEFMODE_REG_W, REG_DWORD,
                          &Configuration.DefViewMode, sizeof(DWORD));
                 SetValue(actKey, VIEWER_CONFIGTEXTMASK_REG, REG_SZ,
                          Configuration.TextModeMasks.GetMasksString(), -1);
                 SetValue(actKey, VIEWER_CONFIGHEXMASK_REG, REG_SZ,
                          Configuration.HexModeMasks.GetMasksString(), -1);
-                SetValue(actKey, VIEWER_CONFIGUSECUSTOMFONT_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGUSECUSTOMFONT_REG_W, REG_DWORD,
                          &UseCustomViewerFont, sizeof(DWORD));
                 SaveLogFont(actKey, VIEWER_CONFIGFONT_REG, &ViewerLogFont);
-                SetValue(actKey, VIEWER_WRAPTEXT_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_WRAPTEXT_REG_W, REG_DWORD,
                          &Configuration.WrapText, sizeof(DWORD));
-                SetValue(actKey, VIEWER_CPAUTOSELECT_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CPAUTOSELECT_REG_W, REG_DWORD,
                          &Configuration.CodePageAutoSelect, sizeof(DWORD));
-                SetValue(actKey, VIEWER_DEFAULTCONVERT_REG, REG_SZ, Configuration.DefaultConvert, -1);
-                SetValue(actKey, VIEWER_AUTOCOPYSELECTION_REG, REG_DWORD,
+                SetValue(actKey, VIEWER_DEFAULTCONVERT_REG, REG_SZ, Configuration.DefaultConvert.c_str(), -1);
+                SetValueW(actKey, VIEWER_AUTOCOPYSELECTION_REG_W, REG_DWORD,
                          &Configuration.AutoCopySelection, sizeof(DWORD));
-                SetValue(actKey, VIEWER_GOTOOFFSETISHEX_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_GOTOOFFSETISHEX_REG_W, REG_DWORD,
                          &Configuration.GoToOffsetIsHex, sizeof(DWORD));
 
-                SetValue(actKey, VIEWER_CONFIGSAVEWINPOS_REG, REG_DWORD,
+                SetValueW(actKey, VIEWER_CONFIGSAVEWINPOS_REG_W, REG_DWORD,
                          &Configuration.SavePosition, sizeof(DWORD));
                 if (Configuration.WindowPlacement.length != 0)
                 {
-                    SetValue(actKey, VIEWER_CONFIGWNDLEFT_REG, REG_DWORD,
+                    SetValueW(actKey, VIEWER_CONFIGWNDLEFT_REG_W, REG_DWORD,
                              &Configuration.WindowPlacement.rcNormalPosition.left, sizeof(DWORD));
-                    SetValue(actKey, VIEWER_CONFIGWNDRIGHT_REG, REG_DWORD,
+                    SetValueW(actKey, VIEWER_CONFIGWNDRIGHT_REG_W, REG_DWORD,
                              &Configuration.WindowPlacement.rcNormalPosition.right, sizeof(DWORD));
-                    SetValue(actKey, VIEWER_CONFIGWNDTOP_REG, REG_DWORD,
+                    SetValueW(actKey, VIEWER_CONFIGWNDTOP_REG_W, REG_DWORD,
                              &Configuration.WindowPlacement.rcNormalPosition.top, sizeof(DWORD));
-                    SetValue(actKey, VIEWER_CONFIGWNDBOTTOM_REG, REG_DWORD,
+                    SetValueW(actKey, VIEWER_CONFIGWNDBOTTOM_REG_W, REG_DWORD,
                              &Configuration.WindowPlacement.rcNormalPosition.bottom, sizeof(DWORD));
-                    SetValue(actKey, VIEWER_CONFIGWNDSHOW_REG, REG_DWORD,
+                    SetValueW(actKey, VIEWER_CONFIGWNDSHOW_REG_W, REG_DWORD,
                              &Configuration.WindowPlacement.showCmd, sizeof(DWORD));
                 }
 
@@ -2208,17 +2449,17 @@ void CMainWindow::SaveConfig(HWND parent)
                 ClearKey(actKey);
 
                 HKEY subKey;
-                char buf[30];
+                wchar_t buf[30];
                 int i;
                 for (i = 0; i < UserMenuItems->Count; i++)
                 {
-                    itoa(i + 1, buf, 10);
+                    _itow_s(i + 1, buf, _countof(buf), 10);
                     if (CreateKey(actKey, buf, subKey))
                     {
-                        SetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, UserMenuItems->At(i)->ItemName.c_str(), -1);
-                        SetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, UserMenuItems->At(i)->UMCommand.c_str(), -1);
-                        SetValue(subKey, USERMENU_ARGUMENTS_REG, REG_SZ, UserMenuItems->At(i)->Arguments.c_str(), -1);
-                        SetValue(subKey, USERMENU_INITDIR_REG, REG_SZ, UserMenuItems->At(i)->InitDir.c_str(), -1);
+                        SetValueW(subKey, USERMENU_ITEMNAME_REG, REG_SZ, UserMenuItems->At(i)->ItemName.c_str(), -1);
+                        SetValueW(subKey, USERMENU_COMMAND_REG, REG_SZ, UserMenuItems->At(i)->UMCommand.c_str(), -1);
+                        SetValueW(subKey, USERMENU_ARGUMENTS_REG, REG_SZ, UserMenuItems->At(i)->Arguments.c_str(), -1);
+                        SetValueW(subKey, USERMENU_INITDIR_REG, REG_SZ, UserMenuItems->At(i)->InitDir.c_str(), -1);
                         SetValue(subKey, USERMENU_SHELL_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->ThroughShell, sizeof(DWORD));
                         SetValue(subKey, USERMENU_CLOSE_REG, REG_DWORD,
@@ -2226,7 +2467,7 @@ void CMainWindow::SaveConfig(HWND parent)
                         SetValue(subKey, USERMENU_USEWINDOW_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->UseWindow, sizeof(DWORD));
 
-                        SetValue(subKey, USERMENU_ICON_REG, REG_SZ, UserMenuItems->At(i)->Icon.c_str(), -1);
+                        SetValueW(subKey, USERMENU_ICON_REG, REG_SZ, UserMenuItems->At(i)->Icon.c_str(), -1);
                         SetValue(subKey, USERMENU_TYPE_REG, REG_DWORD,
                                  &UserMenuItems->At(i)->Type, sizeof(DWORD));
                         SetValue(subKey, USERMENU_SHOWINTOOLBAR_REG, REG_DWORD,
@@ -2270,11 +2511,11 @@ void CMainWindow::SaveConfig(HWND parent)
             //---  colors
             if (CreateKey(salamander, SALAMANDER_CUSTOMCOLORS_REG, actKey))
             {
-                char buff[10];
+                wchar_t buff[10];
                 int i;
                 for (i = 0; i < NUMBER_OF_CUSTOMCOLORS; i++)
                 {
-                    itoa(i + 1, buff, 10);
+                    _itow_s(i + 1, buff, _countof(buff), 10);
                     SaveRGB(actKey, buff, CustomColors[i]);
                 }
 
@@ -2292,7 +2533,7 @@ void CMainWindow::SaveConfig(HWND parent)
                     scheme = 2;
                 else if (CurrentColors == NavigatorColors)
                     scheme = 3;
-                SetValue(actKey, SALAMANDER_CLRSCHEME_REG, REG_DWORD, &scheme, sizeof(DWORD));
+                SetValueW(actKey, SALAMANDER_CLRSCHEME_REG_W, REG_DWORD, &scheme, sizeof(DWORD));
 
                 SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_NORMAL_REG, UserColors[FOCUS_ACTIVE_NORMAL]);
                 SaveRGBF(actKey, SALAMANDER_CLR_FOCUS_ACTIVE_SELECTED_REG, UserColors[FOCUS_ACTIVE_SELECTED]);
@@ -2347,11 +2588,11 @@ void CMainWindow::SaveConfig(HWND parent)
                 {
                     ClearKey(hHltKey);
                     HKEY hSubKey;
-                    char buf[30];
+                    wchar_t buf[30];
                     int i;
                     for (i = 0; i < HighlightMasks->Count; i++)
                     {
-                        itoa(i + 1, buf, 10);
+                        _itow_s(i + 1, buf, _countof(buf), 10);
                         if (CreateKey(hHltKey, buf, hSubKey))
                         {
                             CHighlightMasksItem* item = HighlightMasks->At(i);
@@ -2404,92 +2645,84 @@ void CMainWindow::SaveConfig(HWND parent)
     }
 }
 
-void CMainWindow::LoadPanelConfig(CPathBuffer& panelPath, std::wstring& panelPathW, CFilesWindow* panel, HKEY hSalamander, const char* reg)
+void CMainWindow::LoadPanelConfig(std::wstring& panelPath, CFilesWindow* panel, HKEY hSalamander, const wchar_t* reg)
 {
+    // On the wide facades, symmetric with SavePanelConfig — the pair
+    // reads and writes through the same entry points, so a value written wide
+    // cannot be looked up narrow.
     HKEY actKey;
-    if (OpenKey(hSalamander, reg, actKey))
+    if (OpenKeyW(hSalamander, reg, actKey))
     {
         DWORD value;
         BOOL panelPathLoaded = FALSE;
         // Read the panel path as REG_SZ Unicode (matches the wide-only save in
-        // SavePanelConfig). Keep panelPathW as the source-of-truth for the apply
-        // path; populate the legacy ANSI panelPath via WideToAnsi for any caller
-        // that still consumes it (only the rescue-path log paths today). Older
-        // Sally configs that wrote ANSI PANEL_PATH will now miss on the wide read
-        // and fall through to the rescue path on first launch — user-approved
-        // clean break.
+        // SavePanelConfig). Older Sally configs that wrote ANSI PANEL_PATH miss
+        // on the wide read and fall through to the rescue path on first launch.
         if (gRegistry != NULL)
         {
-            RegistryResult result = gRegistry->GetString(actKey, AnsiToWideReg(PANEL_PATH_REG).c_str(), panelPathW);
-            if (result.success)
-            {
-                panelPathLoaded = TRUE;
-                std::string panelPathA = WideToAnsi(panelPathW);
-                if (!panelPath.Assign(panelPathA.c_str()))
-                    panelPath.Clear();
-            }
+            RegistryResult result = gRegistry->GetString(actKey, PANEL_PATH_REG_W, panelPath);
+            panelPathLoaded = result.success;
         }
 
         if (panelPathLoaded)
         {
-            if (GetValue(actKey, PANEL_HEADER_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_HEADER_REG_W, REG_DWORD, &value, sizeof(DWORD)))
                 panel->HeaderLineVisible = value;
-            if (GetValue(actKey, PANEL_VIEW_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_VIEW_REG_W, REG_DWORD, &value, sizeof(DWORD)))
             {
                 if (Configuration.ConfigVersion < 13 && !value) // conversion: the Detailed view was stored as FALSE
                     value = 2;
                 panel->SelectViewTemplate(value, FALSE, FALSE, VALID_DATA_ALL, FALSE, TRUE);
             }
-            if (GetValue(actKey, PANEL_REVERSE_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_REVERSE_REG_W, REG_DWORD, &value, sizeof(DWORD)))
                 panel->ReverseSort = value;
-            if (GetValue(actKey, PANEL_SORT_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_SORT_REG_W, REG_DWORD, &value, sizeof(DWORD)))
             {
                 if (value > stAttr)
                     value = stName;
                 panel->SortType = (CSortType)value;
             }
-            if (GetValue(actKey, PANEL_DIRLINE_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_DIRLINE_REG_W, REG_DWORD, &value, sizeof(DWORD)))
                 if ((BOOL)value != (panel->DirectoryLine->HWindow != NULL))
                     panel->ToggleDirectoryLine();
-            if (GetValue(actKey, PANEL_STATUS_REG, REG_DWORD, &value, sizeof(DWORD)))
+            if (GetValueW(actKey, PANEL_STATUS_REG_W, REG_DWORD, &value, sizeof(DWORD)))
                 if ((BOOL)value != (panel->StatusLine->HWindow != NULL))
                     panel->ToggleStatusLine();
-            GetValue(actKey, PANEL_FILTER_ENABLE, REG_DWORD, &panel->FilterEnabled,
+            GetValueW(actKey, PANEL_FILTER_ENABLE_W, REG_DWORD, &panel->FilterEnabled,
                      sizeof(DWORD));
 
-            CPathBuffer filter; // Heap-allocated for long path support
-            if (!GetValue(actKey, PANEL_FILTER, REG_SZ, filter, filter.Size()))
+            std::wstring filter;
+            if (!GetStringValueW(actKey, PANEL_FILTER, filter))
             {
-                filter[0] = 0;
+                filter.clear();
                 if (Configuration.ConfigVersion < 22)
                 {
-                    char* filterHistory[1];
-                    filterHistory[0] = NULL;
-                    LoadHistory(actKey, PANEL_FILTERHISTORY_REG, filterHistory, 1);
+                    wchar_t* filterHistory[1] = {};
+                    LoadLegacyHistory(actKey, PANEL_FILTERHISTORY_REG, filterHistory, 1);
                     if (filterHistory[0] != NULL) // load the initial filter state as well
                     {
                         DWORD filterInverse = FALSE;
                         if (panel->FilterEnabled && Configuration.ConfigVersion < 14) // conversion: the inverse filter checkbox was removed
-                            GetValue(actKey, PANEL_FILTER_INVERSE, REG_DWORD, &filterInverse, sizeof(DWORD));
+                            GetValueW(actKey, PANEL_FILTER_INVERSE_W, REG_DWORD, &filterInverse, sizeof(DWORD));
                         if (filterInverse)
-                            strcpy(filter, "|");
+                            filter = L"|";
                         else
-                            filter[0] = 0;
-                        strcat(filter, filterHistory[0]);
+                            filter.clear();
+                        filter += filterHistory[0];
                         free(filterHistory[0]);
                     }
                 }
                 else
                     panel->FilterEnabled = FALSE;
             }
-            if (filter[0] != 0)
-                panel->Filter.SetMasksString(filter);
+            if (!filter.empty())
+                panel->Filter.SetMasksString(filter.c_str());
 
             panel->UpdateFilterSymbol();
             int errPos;
             if (!panel->Filter.PrepareMasks(errPos))
             {
-                panel->Filter.SetMasksString("*.*");
+                panel->Filter.SetMasksString(L"*.*");
                 panel->Filter.PrepareMasks(errPos);
             }
         }
@@ -2498,7 +2731,7 @@ void CMainWindow::LoadPanelConfig(CPathBuffer& panelPath, std::wstring& panelPat
     }
 }
 
-void LoadIconOvrlsInfo(const char* root)
+void LoadIconOvrlsInfo(const wchar_t* root)
 {
     HKEY hSalamander;
     if (OpenKey(HKEY_CURRENT_USER, root, hSalamander))
@@ -2508,7 +2741,7 @@ void LoadIconOvrlsInfo(const char* root)
         if (OpenKey(hSalamander, SALAMANDER_VERSION_REG, actKey))
         {
             configVersion = 2; // this configuration is from version 1.6b1
-            GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
+            GetValueW(actKey, SALAMANDER_VERSIONREG_REG_W, REG_DWORD,
                      &configVersion, sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -2516,13 +2749,13 @@ void LoadIconOvrlsInfo(const char* root)
         {
             ClearListOfDisabledCustomIconOverlays();
             DWORD disabledCustomIconOverlaysBufSize;
-            if (GetValue(actKey, CONFIG_ENABLECUSTICOVRLS_REG, REG_DWORD,
+            if (GetValueW(actKey, CONFIG_ENABLECUSTICOVRLS_REG_W, REG_DWORD,
                          &Configuration.EnableCustomIconOverlays, sizeof(DWORD)) &&
-                GetSize(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ, disabledCustomIconOverlaysBufSize))
+                GetSizeW(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ, disabledCustomIconOverlaysBufSize))
             {
                 if (disabledCustomIconOverlaysBufSize > 1) // <= 1 means an empty string, NULL is enough in that case
                 {
-                    Configuration.DisabledCustomIconOverlays = (char*)malloc(disabledCustomIconOverlaysBufSize);
+                    Configuration.DisabledCustomIconOverlays = (wchar_t*)malloc(disabledCustomIconOverlaysBufSize);
                     if (Configuration.DisabledCustomIconOverlays == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
@@ -2530,8 +2763,8 @@ void LoadIconOvrlsInfo(const char* root)
                     }
                     else
                     {
-                        if (!GetValue(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
-                                      Configuration.DisabledCustomIconOverlays, disabledCustomIconOverlaysBufSize))
+                        if (!GetValueW(actKey, CONFIG_DISABLEDCUSTICOVRLS_REG, REG_SZ,
+                                       Configuration.DisabledCustomIconOverlays, disabledCustomIconOverlaysBufSize))
                         {
                             free(Configuration.DisabledCustomIconOverlays);
                             Configuration.DisabledCustomIconOverlays = NULL;
@@ -2569,7 +2802,9 @@ static void ApplyStartupThemeToMainWindow(HWND hWindow)
     DarkMode_ApplyToThreadTopLevelWindows(GetCurrentThreadId());
 }
 
-BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* cmdLineParams)
+BOOL CMainWindow::LoadConfig(
+    BOOL importingOldConfig,
+    const sally::cmdline::CommandLineRequest* cmdLineParams)
 {
     CALL_STACK_MESSAGE2("CMainWindow::LoadConfig(%d)", importingOldConfig);
     if (SALAMANDER_ROOT_REG == NULL)
@@ -2585,14 +2820,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         HKEY actKey;
         BOOL ret = TRUE;
 
-        IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_CONFIG));
+        IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_CONFIG));
 
         Configuration.ConfigVersion = 1; // this configuration is from version 1.52 or older
                                          //--- version
         if (OpenKey(salamander, SALAMANDER_VERSION_REG, actKey))
         {
             Configuration.ConfigVersion = 2; // this configuration is from version 1.6b1
-            GetValue(actKey, SALAMANDER_VERSIONREG_REG, REG_DWORD,
+            GetValueW(actKey, SALAMANDER_VERSIONREG_REG_W, REG_DWORD,
                      &Configuration.ConfigVersion, sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -2611,11 +2846,11 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         //---  colors
         if (OpenKey(salamander, SALAMANDER_CUSTOMCOLORS_REG, actKey))
         {
-            char buff[10];
+            wchar_t buff[10];
             int i;
             for (i = 0; i < NUMBER_OF_CUSTOMCOLORS; i++)
             {
-                itoa(i + 1, buff, 10);
+                _itow_s(i + 1, buff, _countof(buff), 10);
                 LoadRGB(actKey, buff, CustomColors[i]);
             }
 
@@ -2626,7 +2861,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         {
             DWORD scheme;
             CurrentColors = UserColors;
-            if (GetValue(actKey, SALAMANDER_CLRSCHEME_REG, REG_DWORD, &scheme, sizeof(DWORD)))
+            if (GetValueW(actKey, SALAMANDER_CLRSCHEME_REG_W, REG_DWORD, &scheme, sizeof(DWORD)))
             {
                 // we added a new scheme (DOS Navigator) at position 3
                 if (Configuration.ConfigVersion < 28 && scheme == 3)
@@ -2696,17 +2931,17 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             if (OpenKey(actKey, SALAMANDER_HLT, hHltKey))
             {
                 HKEY hSubKey;
-                char buf[30];
-                strcpy(buf, "1");
+                wchar_t buf[30];
+                wcscpy_s(buf, L"1");
                 int i = 1;
                 HighlightMasks->DestroyMembers();
                 while (OpenKey(hHltKey, buf, hSubKey))
                 {
-                    CPathBuffer masks; // Heap-allocated for long path support
-                    if (GetValue(hSubKey, SALAMANDER_HLT_ITEM_MASKS, REG_SZ, masks, masks.Size()))
+                    std::wstring masks;
+                    if (GetStringValueW(hSubKey, SALAMANDER_HLT_ITEM_MASKS, masks))
                     {
                         CHighlightMasksItem* item = new CHighlightMasksItem();
-                        if (item == NULL || !item->Set(masks))
+                        if (item == NULL || !item->Set(masks.c_str()))
                         {
                             TRACE_E(LOW_MEMORY);
                             if (item != NULL)
@@ -2736,7 +2971,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                             HighlightMasks->ResetState();
                             delete item;
                         }
-                        itoa(++i, buf, 10);
+                        _itow_s(++i, buf, _countof(buf), 10);
                         CloseKey(hSubKey);
                     }
                 }
@@ -2746,7 +2981,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                     if (hItem != NULL)
                     {
                         HighlightMasks->Add(hItem);
-                        hItem->Set("*.*");
+                        hItem->Set(L"*.*");
                         int errPos;
                         hItem->Masks->PrepareMasks(errPos);
                         hItem->NormalFg = RGBF(19, 143, 13, 0); // color taken from Windows XP
@@ -2771,35 +3006,50 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         {
             place.length = sizeof(WINDOWPLACEMENT);
             GetWindowPlacement(HWindow, &place);
-            if (GetValue(actKey, WINDOW_LEFT_REG, REG_DWORD,
+            if (GetValueW(actKey, WINDOW_LEFT_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.left), sizeof(DWORD)) &&
-                GetValue(actKey, WINDOW_RIGHT_REG, REG_DWORD,
+                GetValueW(actKey, WINDOW_RIGHT_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.right), sizeof(DWORD)) &&
-                GetValue(actKey, WINDOW_TOP_REG, REG_DWORD,
+                GetValueW(actKey, WINDOW_TOP_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.top), sizeof(DWORD)) &&
-                GetValue(actKey, WINDOW_BOTTOM_REG, REG_DWORD,
+                GetValueW(actKey, WINDOW_BOTTOM_REG_W, REG_DWORD,
                          &(place.rcNormalPosition.bottom), sizeof(DWORD)) &&
-                GetValue(actKey, WINDOW_SHOW_REG, REG_DWORD,
+                GetValueW(actKey, WINDOW_SHOW_REG_W, REG_DWORD,
                          &(place.showCmd), sizeof(DWORD)))
             {
-                char buf[20];
-                if (GetValue(actKey, WINDOW_SPLIT_REG, REG_SZ, buf, 20))
+                // WIDE, matching the write side (see the comment there): these
+                // are REG_SZ values read back through RegQueryValueExW, so the payload is UTF-16.
+                // The buffer-size argument is BYTES (it goes straight to RegQueryValueExW's
+                // lpcbData), hence sizeof(buf) rather than the old literal 20 that matched a
+                // char[20]. swscanf_s's return value is checked so a value left over from the
+                // old narrow format - or one corrupted by the length bug this fixes - cleanly
+                // falls back to the existing default instead of yielding an arbitrary number.
+                // Zero-initialized and deliberately sized one wchar_t short: RegQueryValueExW does
+                // not guarantee a terminator when the stored data lacks one, so reserving the last
+                // slot keeps swscanf_s from running off the end of a malformed value.
+                wchar_t buf[20] = {0};
+                if (GetValueW(actKey, WINDOW_SPLIT_REG, REG_SZ, buf, sizeof(buf) - sizeof(wchar_t)))
                 {
-                    sscanf(buf, "%lf", &SplitPosition);
-                    SplitPosition /= 100;
-                    if (SplitPosition < 0)
-                        SplitPosition = 0;
-                    if (SplitPosition > 1)
-                        SplitPosition = 1;
+                    if (swscanf_s(buf, L"%lf", &SplitPosition) == 1)
+                    {
+                        SplitPosition /= 100;
+                        if (SplitPosition < 0)
+                            SplitPosition = 0;
+                        if (SplitPosition > 1)
+                            SplitPosition = 1;
+                    }
                 }
-                if (GetValue(actKey, WINDOW_BEFOREZOOMSPLIT_REG, REG_SZ, buf, 20))
+                buf[0] = L'\0';
+                if (GetValueW(actKey, WINDOW_BEFOREZOOMSPLIT_REG, REG_SZ, buf, sizeof(buf) - sizeof(wchar_t)))
                 {
-                    sscanf(buf, "%lf", &BeforeZoomSplitPosition);
-                    BeforeZoomSplitPosition /= 100;
-                    if (BeforeZoomSplitPosition < 0)
-                        BeforeZoomSplitPosition = 0;
-                    if (BeforeZoomSplitPosition > 1)
-                        BeforeZoomSplitPosition = 1;
+                    if (swscanf_s(buf, L"%lf", &BeforeZoomSplitPosition) == 1)
+                    {
+                        BeforeZoomSplitPosition /= 100;
+                        if (BeforeZoomSplitPosition < 0)
+                            BeforeZoomSplitPosition = 0;
+                        if (BeforeZoomSplitPosition > 1)
+                            BeforeZoomSplitPosition = 1;
+                    }
                 }
                 useWinPlacement = TRUE;
             }
@@ -2815,18 +3065,18 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         {
             Configuration.FindDialogWindowPlacement.length = sizeof(WINDOWPLACEMENT);
 
-            GetValue(actKey, WINDOW_LEFT_REG, REG_DWORD,
+            GetValueW(actKey, WINDOW_LEFT_REG_W, REG_DWORD,
                      &(Configuration.FindDialogWindowPlacement.rcNormalPosition.left), sizeof(DWORD));
-            GetValue(actKey, WINDOW_RIGHT_REG, REG_DWORD,
+            GetValueW(actKey, WINDOW_RIGHT_REG_W, REG_DWORD,
                      &(Configuration.FindDialogWindowPlacement.rcNormalPosition.right), sizeof(DWORD));
-            GetValue(actKey, WINDOW_TOP_REG, REG_DWORD,
+            GetValueW(actKey, WINDOW_TOP_REG_W, REG_DWORD,
                      &(Configuration.FindDialogWindowPlacement.rcNormalPosition.top), sizeof(DWORD));
-            GetValue(actKey, WINDOW_BOTTOM_REG, REG_DWORD,
+            GetValueW(actKey, WINDOW_BOTTOM_REG_W, REG_DWORD,
                      &(Configuration.FindDialogWindowPlacement.rcNormalPosition.bottom), sizeof(DWORD));
-            GetValue(actKey, WINDOW_SHOW_REG, REG_DWORD,
+            GetValueW(actKey, WINDOW_SHOW_REG_W, REG_DWORD,
                      &(Configuration.FindDialogWindowPlacement.showCmd), sizeof(DWORD));
 
-            GetValue(actKey, FINDDIALOG_NAMEWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, FINDDIALOG_NAMEWIDTH_REG_W, REG_DWORD,
                      &(Configuration.FindColNameWidth), sizeof(DWORD));
             CloseKey(actKey);
         }
@@ -2841,36 +3091,41 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                                                          : RegistryResult::Error(ERROR_INVALID_FUNCTION);
             if (enumResult.success)
             {
-                char dir[4] = " :\\"; // reset DefaultDir
-                char d;
-                for (d = 'A'; d <= 'Z'; d++)
+                wchar_t dir[4] = L" :\\"; // reset DefaultDir
+                wchar_t d;
+                for (d = L'A'; d <= L'Z'; d++)
                 {
                     dir[0] = d;
-                    strcpy(DefaultDir[d - 'A'], dir);
+                    DefaultDir[d - L'A'] = dir;
                 }
 
                 for (size_t i = 0; i < valueNames.size(); i++)
                 {
-                    char nameA[8] = {0};
-                    int nameLen = WideCharToMultiByte(CP_ACP, 0, valueNames[i].c_str(), -1,
-                                                      nameA, _countof(nameA), NULL, NULL);
-                    if (nameLen <= 1 || nameA[1] != 0)
+                    // The value name is a single drive letter. It used to be rendered down to
+                    // ANSI with WideCharToMultiByte into a buffer the sweep had widened to
+                    // wchar_t - that API counts and writes BYTES, so the widened buffer was a
+                    // byte buffer wearing the wrong type. Read the letter from the wide name.
+                    const std::wstring& valueName = valueNames[i];
+                    if (valueName.length() != 1)
                     {
                         gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
                         continue;
                     }
 
-                    char path[SAL_MAX_LONG_PATH] = {0};
-                    RegistryResult valueResult = GetStringA(registry, actKey, nameA, path, _countof(path));
+                    // IRegistry::GetString is the wide primitive; GetStringA is only an ANSI
+                    // wrapper around it that adds a WideCharToMultiByte on the way out.
+                    std::wstring pathValue;
+                    RegistryResult valueResult = registry->GetString(actKey, valueName.c_str(), pathValue);
                     if (valueResult.success)
                     {
-                        char d2 = LowerCase[(unsigned char)nameA[0]];
-                        if (d2 >= 'a' && d2 <= 'z')
+                        const wchar_t* path = pathValue.c_str();
+                        wchar_t d2 = (wchar_t)towlower(valueName[0]);
+                        if (d2 >= L'a' && d2 <= L'z')
                         {
-                            size_t dataLen = strlen(path) + 1;
-                            if (dataLen > 2 && LowerCase[(unsigned char)path[0]] == d2 &&
-                                path[1] == ':' && path[2] == '\\')
-                                lstrcpyn(DefaultDir[d2 - 'a'], path, MAX_PATH);
+                            size_t dataLen = pathValue.length() + 1;
+                            if (dataLen > 2 && (wchar_t)towlower(path[0]) == d2 &&
+                                path[1] == L':' && path[2] == L'\\')
+                                DefaultDir[d2 - L'a'] = path;
                             else
                                 gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUE));
                         }
@@ -2880,11 +3135,11 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                     else if (valueResult.errorCode == ERROR_INVALID_DATATYPE)
                         gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), LoadStrW(IDS_UNEXPECTEDVALUETYPE));
                     else
-                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(valueResult.errorCode));
+                        gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(valueResult.errorCode).c_str());
                 }
             }
             else if (enumResult.errorCode != ERROR_FILE_NOT_FOUND)
-                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextW(enumResult.errorCode));
+                gPrompter->ShowError(LoadStrW(IDS_ERRORLOADCONFIG), GetErrorTextOwned(enumResult.errorCode).c_str());
             CloseKey(actKey);
         }
 
@@ -2938,7 +3193,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         //---  Packers & Unpackers
         if (OpenKey(salamander, SALAMANDER_PACKANDUNPACK, actKey))
         {
-            GetValue(actKey, SALAMANDER_SIMPLEICONSINARCHIVES, REG_DWORD,
+            GetValueW(actKey, SALAMANDER_SIMPLEICONSINARCHIVES_W, REG_DWORD,
                      &(Configuration.UseSimpleIconsInArchives), sizeof(DWORD));
             //---  Custom Packers
             HKEY actSubKey;
@@ -2946,14 +3201,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             {
                 PackerConfig.DeleteAllPackers();
                 HKEY itemKey;
-                char buf[30];
+                wchar_t buf[30];
                 int i = 1;
-                strcpy(buf, "1");
+                wcscpy_s(buf, L"1");
                 while (OpenKey(actSubKey, buf, itemKey))
                 {
                     PackerConfig.Load(itemKey);
                     CloseKey(itemKey);
-                    itoa(++i, buf, 10);
+                    _itow_s(++i, buf, _countof(buf), 10);
                 }
                 GetValue(actSubKey, SALAMANDER_ANOTHERPANEL, REG_DWORD,
                          &(Configuration.UseAnotherPanelForPack), sizeof(DWORD));
@@ -2971,14 +3226,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             {
                 UnpackerConfig.DeleteAllUnpackers();
                 HKEY itemKey;
-                char buf[30];
+                wchar_t buf[30];
                 int i = 1;
-                strcpy(buf, "1");
+                wcscpy_s(buf, L"1");
                 while (OpenKey(actSubKey, buf, itemKey))
                 {
                     UnpackerConfig.Load(itemKey);
                     CloseKey(itemKey);
-                    itoa(++i, buf, 10);
+                    _itow_s(++i, buf, _countof(buf), 10);
                 }
                 GetValue(actSubKey, SALAMANDER_ANOTHERPANEL, REG_DWORD,
                          &(Configuration.UseAnotherPanelForUnpack), sizeof(DWORD));
@@ -3002,14 +3257,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 // it is ignored. Only when the Title matches one of the default values are its paths used.
                 // ArchiverConfig.DeleteAllArchivers();
                 HKEY itemKey;
-                char buf[30];
+                wchar_t buf[30];
                 int i = 1;
-                strcpy(buf, "1");
+                wcscpy_s(buf, L"1");
                 while (OpenKey(actSubKey, buf, itemKey))
                 {
                     ArchiverConfig.Load(itemKey);
                     CloseKey(itemKey);
-                    itoa(++i, buf, 10);
+                    _itow_s(++i, buf, _countof(buf), 10);
                 }
                 CloseKey(actSubKey);
                 // add new items introduced since the previous version
@@ -3020,14 +3275,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             {
                 PackerFormatConfig.DeleteAllFormats();
                 HKEY itemKey;
-                char buf[30];
+                wchar_t buf[30];
                 int i = 1;
-                strcpy(buf, "1");
+                wcscpy_s(buf, L"1");
                 while (OpenKey(actSubKey, buf, itemKey))
                 {
                     PackerFormatConfig.Load(itemKey);
                     CloseKey(itemKey);
-                    itoa(++i, buf, 10);
+                    _itow_s(++i, buf, _countof(buf), 10);
                 }
                 CloseKey(actSubKey);
                 // add new items introduced since the previous version
@@ -3041,21 +3296,21 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         //---  user menu
 
-        IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_USERMENU));
+        IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_USERMENU));
 
         if (OpenKey(salamander, SALAMANDER_USERMENU_REG, actKey))
         {
             HKEY subKey;
-            char buf[30];
-            strcpy(buf, "1");
-            CPathBuffer name; // Heap-allocated for long path support
-            CPathBuffer command; // Heap-allocated for long path support
-            char arguments[USRMNUARGS_MAXLEN];
-            CPathBuffer initDir; // Heap-allocated for long path support
+            wchar_t buf[30];
+            wcscpy_s(buf, L"1");
+            std::wstring name;
+            std::wstring command;
+            std::wstring arguments;
+            std::wstring initDir;
             int throughShell, closeShell, useWindow;
             int showInToolbar, separator;
             CUserMenuItemType type;
-            CPathBuffer icon; // Heap-allocated for long path support
+            std::wstring icon;
             int i = 1;
             UserMenuItems->DestroyMembers();
 
@@ -3063,84 +3318,80 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
             while (OpenKey(actKey, buf, subKey))
             {
-                if (GetValue(subKey, USERMENU_ITEMNAME_REG, REG_SZ, name, name.Size()) &&
-                    GetValue(subKey, USERMENU_COMMAND_REG, REG_SZ, command, command.Size()) &&
+                if (gRegistry->GetString(subKey, USERMENU_ITEMNAME_REG, name).success &&
+                    gRegistry->GetString(subKey, USERMENU_COMMAND_REG, command).success &&
                     GetValue(subKey, USERMENU_SHELL_REG, REG_DWORD,
                              &throughShell, sizeof(DWORD)) &&
                     GetValue(subKey, USERMENU_CLOSE_REG, REG_DWORD,
                              &closeShell, sizeof(DWORD)))
                 {
                     if (Configuration.ConfigVersion == 1 ||
-                        !GetValue(subKey, USERMENU_ARGUMENTS_REG, REG_SZ, arguments, USRMNUARGS_MAXLEN))
+                        !gRegistry->GetString(subKey, USERMENU_ARGUMENTS_REG, arguments).success)
                     {
                         // convert from user-menu version 1.52 to the current version
-                        char* s = command;
-                        while (*s != 0)
+                        size_t variable = std::wstring::npos;
+                        for (size_t pos = 0; pos < command.length(); ++pos)
                         {
-                            if (*s == '%' && *++s != '%')
-                                break;
-                            s++;
-                        }
-                        if (*s == 0)
-                            *arguments = 0; // no parameters
-                        else
-                        {
-                            s--;
-                            while (--s >= command && *s != ' ')
-                                ;
-                            if (s < command)
-                                *arguments = 0; // syntax error
+                            if (command[pos] != L'%')
+                                continue;
+                            if (pos + 1 < command.length() && command[pos + 1] == L'%')
+                                ++pos;
                             else
                             {
-                                *s++ = 0; // terminate the command, set s to the first argument character
-                                char* st = arguments;
-                                char* stEnd = arguments + sizeof(arguments) - 1;
-                                while (*s != 0 && st < stEnd)
+                                variable = pos;
+                                break;
+                            }
+                        }
+                        arguments.clear();
+                        if (variable == std::wstring::npos)
+                        {
+                            // no parameters
+                        }
+                        else
+                        {
+                            const size_t separatorPos = command.rfind(L' ', variable);
+                            if (separatorPos != std::wstring::npos)
+                            {
+                                const std::wstring legacyArguments = command.substr(separatorPos + 1);
+                                command.resize(separatorPos);
+                                for (size_t pos = 0; pos < legacyArguments.length(); ++pos)
                                 {
-                                    if (*s == '%')
+                                    if (legacyArguments[pos] == L'%' && pos + 1 < legacyArguments.length())
                                     {
-                                        const char* add = "";
-                                        switch (LowerCase[*++s])
+                                        const wchar_t* add = L"";
+                                        switch (towlower(legacyArguments[++pos]))
                                         {
                                         case '%':
-                                            add = "%";
+                                            add = L"%";
                                             break;
                                         case 'd':
-                                            add = "$(Drive)";
+                                            add = L"$(Drive)";
                                             break;
                                         case 'p':
-                                            add = "$(Path)";
+                                            add = L"$(Path)";
                                             break;
                                         case 'h':
-                                            add = "$(DOSPath)";
+                                            add = L"$(DOSPath)";
                                             break;
                                         case 'f':
-                                            add = "$(Name)";
+                                            add = L"$(Name)";
                                             break;
                                         case 's':
-                                            add = "$(DOSName)";
+                                            add = L"$(DOSName)";
                                             break;
                                         }
-                                        if (st + strlen(add) > stEnd)
-                                            break;
-                                        else
-                                        {
-                                            strcpy(st, add);
-                                            st += strlen(add);
-                                        }
+                                        arguments.append(add);
                                     }
                                     else
-                                        *st++ = *s;
-                                    s++;
+                                        arguments.push_back(legacyArguments[pos]);
                                 }
-                                *st = 0;
                             }
                         }
                     }
                     if (Configuration.ConfigVersion == 1 ||
-                        !GetValue(subKey, USERMENU_INITDIR_REG, REG_SZ, initDir, MAX_PATH))
+                        !gRegistry->GetString(subKey, USERMENU_INITDIR_REG, initDir).success)
                     {
-                        strcpy(initDir, "$(Drive)$(Path)");
+                        initDir = L"$(Drive)$(Path)";
                     }
                     if (Configuration.ConfigVersion == 1 ||
                         !GetValue(subKey, USERMENU_USEWINDOW_REG, REG_DWORD, &useWindow, sizeof(DWORD)))
@@ -3149,9 +3400,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                     }
 
                     if (Configuration.ConfigVersion == 1 ||
-                        !GetValue(subKey, USERMENU_ICON_REG, REG_SZ, icon, MAX_PATH))
+                        !gRegistry->GetString(subKey, USERMENU_ICON_REG, icon).success)
                     {
-                        icon[0] = 0;
+                        icon.clear();
                     }
 
                     if (Configuration.ConfigVersion == 1 ||
@@ -3171,7 +3422,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                         showInToolbar = TRUE;
                     }
 
-                    CUserMenuItem* item = new CUserMenuItem(name, command, arguments, initDir, icon,
+                    CUserMenuItem* item = new CUserMenuItem(name.c_str(), command.c_str(), arguments.c_str(), initDir.c_str(), icon.c_str(),
                                                             throughShell, closeShell, useWindow,
                                                             showInToolbar, type, bkgndReaderData);
                     if (item != NULL && item->IsGood())
@@ -3194,7 +3445,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 }
                 else
                     break;
-                itoa(++i, buf, 10);
+                _itow_s(++i, buf, _countof(buf), 10);
                 CloseKey(subKey);
             }
 
@@ -3203,7 +3454,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             CloseKey(actKey);
         }
 
-        IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_CONFIG));
+        IfExistSetSplashScreenText(LoadStrW(IDS_STARTUP_CONFIG));
 
         //---  configuration
 
@@ -3214,304 +3465,300 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         {
             if (importingOldConfig)
             {
-                GetValue(actKey, CONFIG_ONLYONEINSTANCE_REG, REG_DWORD,
+                GetValueW(actKey, CONFIG_ONLYONEINSTANCE_REG_W, REG_DWORD,
                          &Configuration.OnlyOneInstance, sizeof(DWORD));
             }
             //---  top rebar begin
-            GetValue(actKey, CONFIG_MENUINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_MENUINDEX_REG_W, REG_DWORD,
                      &Configuration.MenuIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_MENUBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_MENUBREAK_REG_W, REG_DWORD,
                      &Configuration.MenuBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_MENUWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_MENUWIDTH_REG_W, REG_DWORD,
                      &Configuration.MenuWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TOOLBARINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TOOLBARINDEX_REG_W, REG_DWORD,
                      &Configuration.TopToolbarIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TOOLBARBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TOOLBARBREAK_REG_W, REG_DWORD,
                      &Configuration.TopToolbarBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TOOLBARWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TOOLBARWIDTH_REG_W, REG_DWORD,
                      &Configuration.TopToolbarWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PLUGINSBARINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_PLUGINSBARINDEX_REG_W, REG_DWORD,
                      &Configuration.PluginsBarIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PLUGINSBARBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_PLUGINSBARBREAK_REG_W, REG_DWORD,
                      &Configuration.PluginsBarBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PLUGINSBARWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_PLUGINSBARWIDTH_REG_W, REG_DWORD,
                      &Configuration.PluginsBarWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USERMENUINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USERMENUINDEX_REG_W, REG_DWORD,
                      &Configuration.UserMenuToolbarIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USERMENUBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USERMENUBREAK_REG_W, REG_DWORD,
                      &Configuration.UserMenuToolbarBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USERMENUWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USERMENUWIDTH_REG_W, REG_DWORD,
                      &Configuration.UserMenuToolbarWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USERMENULABELS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USERMENULABELS_REG_W, REG_DWORD,
                      &Configuration.UserMenuToolbarLabels, sizeof(DWORD));
-            GetValue(actKey, CONFIG_HOTPATHSINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_HOTPATHSINDEX_REG_W, REG_DWORD,
                      &Configuration.HotPathsBarIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_HOTPATHSBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_HOTPATHSBREAK_REG_W, REG_DWORD,
                      &Configuration.HotPathsBarBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_HOTPATHSWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_HOTPATHSWIDTH_REG_W, REG_DWORD,
                      &Configuration.HotPathsBarWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_DRIVEBARINDEX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRIVEBARINDEX_REG_W, REG_DWORD,
                      &Configuration.DriveBarIndex, sizeof(DWORD));
-            GetValue(actKey, CONFIG_DRIVEBARBREAK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRIVEBARBREAK_REG_W, REG_DWORD,
                      &Configuration.DriveBarBreak, sizeof(DWORD));
-            GetValue(actKey, CONFIG_DRIVEBARWIDTH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRIVEBARWIDTH_REG_W, REG_DWORD,
                      &Configuration.DriveBarWidth, sizeof(DWORD));
-            GetValue(actKey, CONFIG_GRIPSVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_GRIPSVISIBLE_REG_W, REG_DWORD,
                      &Configuration.GripsVisible, sizeof(DWORD));
             //---  top rebar end
-            GetValue(actKey, CONFIG_FILENAMEFORMAT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_FILENAMEFORMAT_REG_W, REG_DWORD,
                      &Configuration.FileNameFormat, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SIZEFORMAT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SIZEFORMAT_REG_W, REG_DWORD,
                      &Configuration.SizeFormat, sizeof(DWORD));
             // automatic conversion from "mixed-case" to "partially-mixed-case"
             if (Configuration.FileNameFormat == 1)
                 Configuration.FileNameFormat = 7;
 
-            GetValue(actKey, CONFIG_SELECTION_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SELECTION_REG_W, REG_DWORD,
                      &Configuration.IncludeDirs, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COPYFINDTEXT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COPYFINDTEXT_REG_W, REG_DWORD,
                      &Configuration.CopyFindText, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CLEARREADONLY_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_CLEARREADONLY_REG_W, REG_DWORD,
                      &Configuration.ClearReadOnly, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PRIMARYCONTEXTMENU_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_PRIMARYCONTEXTMENU_REG_W, REG_DWORD,
                      &Configuration.PrimaryContextMenu, sizeof(DWORD));
-            GetValue(actKey, CONFIG_NOTHIDDENSYSTEM_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_NOTHIDDENSYSTEM_REG_W, REG_DWORD,
                      &Configuration.NotHiddenSystemFiles, sizeof(DWORD));
-            GetValue(actKey, CONFIG_RECYCLEBIN_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_RECYCLEBIN_REG_W, REG_DWORD,
                      &Configuration.UseRecycleBin, sizeof(DWORD));
-            // a bit ugly: we provide MasksString, but the range is checked so it's fine
-            GetValue(actKey, CONFIG_RECYCLEMASKS_REG, REG_SZ,
-                     Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
-            GetValue(actKey, CONFIG_SAVEONEXIT_REG, REG_DWORD,
+            // Adopt only a value that was really there. Pre-unicode read straight into the
+            // live mask buffer (GetWritableMasksString), and GetValue leaves that buffer
+            // untouched when the value is missing - so an absent key left the built-in mask
+            // standing. Reading into a fresh std::wstring and assigning it unconditionally
+            // replaced that default with an empty mask group, which matches nothing.
+            std::wstring recycleMasks;
+            if (GetStringValueW(actKey, CONFIG_RECYCLEMASKS_REG, recycleMasks))
+                Configuration.RecycleMasks.SetMasksString(recycleMasks.c_str());
+            GetValueW(actKey, CONFIG_SAVEONEXIT_REG_W, REG_DWORD,
                      &Configuration.AutoSave, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SHOWGREPERRORS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SHOWGREPERRORS_REG_W, REG_DWORD,
                      &Configuration.ShowGrepErrors, sizeof(DWORD));
-            GetValue(actKey, CONFIG_FINDFULLROW_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_FINDFULLROW_REG_W, REG_DWORD,
                      &Configuration.FindFullRowSelect, sizeof(DWORD));
-            GetValue(actKey, CONFIG_FINDFILETYPEMODE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_FINDFILETYPEMODE_REG_W, REG_DWORD,
                      &Configuration.FindFileTypeMode, sizeof(DWORD));
             if (Configuration.FindFileTypeMode < 0 || Configuration.FindFileTypeMode > 2)
                 Configuration.FindFileTypeMode = 0;
             if (Configuration.ConfigVersion <= 6)
                 Configuration.ShowGrepErrors = FALSE; // force FALSE so we don't annoy users unnecessarily (others do it this way too)
-            GetValue(actKey, CONFIG_MINBEEPWHENDONE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_MINBEEPWHENDONE_REG_W, REG_DWORD,
                      &Configuration.MinBeepWhenDone, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CLOSESHELL_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_CLOSESHELL_REG_W, REG_DWORD,
                      &Configuration.CloseShell, sizeof(DWORD));
-            GetValue(actKey, CONFIG_RIGHT_FOCUS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_RIGHT_FOCUS_REG_W, REG_DWORD,
                      &rightPanelFocused, sizeof(DWORD));
-            GetValue(actKey, CONFIG_ALWAYSONTOP_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_ALWAYSONTOP_REG_W, REG_DWORD,
                      &Configuration.AlwaysOnTop, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMMANDSHELL_KIND_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMMANDSHELL_KIND_REG_W, REG_DWORD,
                      &Configuration.CommandShellTargetKind, sizeof(DWORD));
             if (Configuration.CommandShellTargetKind < 0 || Configuration.CommandShellTargetKind > 2)
                 Configuration.CommandShellTargetKind = 0;
             if (gRegistry != NULL)
             {
                 std::wstring profileValue;
-                if (gRegistry->GetString(actKey, AnsiToWideReg(CONFIG_COMMANDSHELL_PROFILE_GUID_REG).c_str(), profileValue).success)
-                    wcsncpy_s(Configuration.CommandShellProfileGuid, profileValue.c_str(), _TRUNCATE);
-                if (gRegistry->GetString(actKey, AnsiToWideReg(CONFIG_COMMANDSHELL_PROFILE_NAME_REG).c_str(), profileValue).success)
-                    wcsncpy_s(Configuration.CommandShellProfileName, profileValue.c_str(), _TRUNCATE);
+                if (gRegistry->GetString(actKey, CONFIG_COMMANDSHELL_PROFILE_GUID_REG_W, profileValue).success)
+                    Configuration.CommandShellProfileGuid = profileValue;
+                if (gRegistry->GetString(actKey, CONFIG_COMMANDSHELL_PROFILE_NAME_REG_W, profileValue).success)
+                    Configuration.CommandShellProfileName = profileValue;
             }
             //      GetValue(actKey, CONFIG_FASTDIRMOVE_REG, REG_DWORD,
             //               &Configuration.FastDirectoryMove, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SORTUSESLOCALE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SORTUSESLOCALE_REG_W, REG_DWORD,
                      &Configuration.SortUsesLocale, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SORTDETECTNUMBERS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SORTDETECTNUMBERS_REG_W, REG_DWORD,
                      &Configuration.SortDetectNumbers, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SORTNEWERONTOP_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SORTNEWERONTOP_REG_W, REG_DWORD,
                      &Configuration.SortNewerOnTop, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SORTDIRSBYNAME_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SORTDIRSBYNAME_REG_W, REG_DWORD,
                      &Configuration.SortDirsByName, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SORTDIRSBYEXT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SORTDIRSBYEXT_REG_W, REG_DWORD,
                      &Configuration.SortDirsByExt, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SAVEHISTORY_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SAVEHISTORY_REG_W, REG_DWORD,
                      &Configuration.SaveHistory, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SAVEWORKDIRS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SAVEWORKDIRS_REG_W, REG_DWORD,
                      &Configuration.SaveWorkDirs, sizeof(DWORD));
-            GetValue(actKey, CONFIG_ENABLECMDLINEHISTORY_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_ENABLECMDLINEHISTORY_REG_W, REG_DWORD,
                      &Configuration.EnableCmdLineHistory, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SAVECMDLINEHISTORY_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SAVECMDLINEHISTORY_REG_W, REG_DWORD,
                      &Configuration.SaveCmdLineHistory, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_LANTASTICCHECK_REG, REG_DWORD,
             //               &Configuration.LantasticCheck, sizeof(DWORD));
-            GetValue(actKey, CONFIG_STATUSAREA_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_STATUSAREA_REG_W, REG_DWORD,
                      &Configuration.StatusArea, sizeof(DWORD));
-            if (!GetValue(actKey, CONFIG_FULLROWSELECT_REG, REG_DWORD,
+            if (!GetValueW(actKey, CONFIG_FULLROWSELECT_REG_W, REG_DWORD,
                           &Configuration.FullRowSelect, sizeof(DWORD)))
             {
                 // we don't want conversion - force TRUE
-                //        if (GetValue(actKey, CONFIG_EXPLORERLOOK_REG, REG_DWORD,
+                //        if (GetValueW(actKey, CONFIG_EXPLORERLOOK_REG_W, REG_DWORD,
                 //                     &Configuration.FullRowSelect, sizeof(DWORD)))
                 //        {
                 DeleteValue(actKey, CONFIG_EXPLORERLOOK_REG);
                 //          Configuration.FullRowSelect = !Configuration.FullRowSelect;
                 //        }
             }
-            GetValue(actKey, CONFIG_FULLROWHIGHLIGHT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_FULLROWHIGHLIGHT_REG_W, REG_DWORD,
                      &Configuration.FullRowHighlight, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USEICONTINCTURE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USEICONTINCTURE_REG_W, REG_DWORD,
                      &Configuration.UseIconTincture, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SHOWPANELCAPTION_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SHOWPANELCAPTION_REG_W, REG_DWORD,
                      &Configuration.ShowPanelCaption, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SHOWPANELZOOM_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SHOWPANELZOOM_REG_W, REG_DWORD,
                      &Configuration.ShowPanelZoom, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SINGLECLICK_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SINGLECLICK_REG_W, REG_DWORD,
                      &Configuration.SingleClick, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_SHOWTIPOFTHEDAY_REG, REG_DWORD,
             //               &Configuration.ShowTipOfTheDay, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_LASTTIPOFTHEDAY_REG, REG_DWORD,
             //               &Configuration.LastTipOfTheDay, sizeof(DWORD));
-            GetValue(actKey, CONFIG_INFOLINECONTENT_REG, REG_SZ,
-                     Configuration.InfoLineContent, 200);
-            GetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTO_REG, REG_SZ,
-                     Configuration.IfPathIsInaccessibleGoTo, Configuration.IfPathIsInaccessibleGoTo.Size());
-            if (!GetValue(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG, REG_DWORD,
+            GetStringValueW(actKey, CONFIG_INFOLINECONTENT_REG, Configuration.InfoLineContent);
+            GetStringValueW(actKey, CONFIG_IFPATHISINACCESSIBLEGOTO_REG,
+                            Configuration.IfPathIsInaccessibleGoTo);
+            if (!GetValueW(actKey, CONFIG_IFPATHISINACCESSIBLEGOTOISMYDOCS_REG_W, REG_DWORD,
                           &Configuration.IfPathIsInaccessibleGoToIsMyDocs, sizeof(DWORD)))
             {
-                CPathBuffer path; // Heap-allocated for long path support
-                GetIfPathIsInaccessibleGoTo(path, TRUE);
-                if (IsTheSamePath(path, Configuration.IfPathIsInaccessibleGoTo)) // user wants to go to My Documents
+                std::wstring path;
+                GetIfPathIsInaccessibleGoToW(path, TRUE);
+                if (IsTheSamePath(path.c_str(), Configuration.IfPathIsInaccessibleGoTo.c_str())) // user wants to go to My Documents
                 {
                     Configuration.IfPathIsInaccessibleGoToIsMyDocs = TRUE;
-                    Configuration.IfPathIsInaccessibleGoTo[0] = 0;
+                    Configuration.IfPathIsInaccessibleGoTo.clear();
                 }
                 else
                     Configuration.IfPathIsInaccessibleGoToIsMyDocs = FALSE;
             }
-            GetValue(actKey, CONFIG_HOTPATH_AUTOCONFIG, REG_DWORD,
+            GetValueW(actKey, CONFIG_HOTPATH_AUTOCONFIG_W, REG_DWORD,
                      &Configuration.HotPathAutoConfig, sizeof(DWORD));
-            GetValue(actKey, CONFIG_LASTUSEDSPEEDLIM_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_LASTUSEDSPEEDLIM_REG_W, REG_DWORD,
                      &Configuration.LastUsedSpeedLimit, sizeof(DWORD));
-            GetValue(actKey, CONFIG_QUICKSEARCHENTER_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_QUICKSEARCHENTER_REG_W, REG_DWORD,
                      &Configuration.QuickSearchEnterAlt, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CHD_SHOWMYDOC, REG_DWORD,
+            GetValueW(actKey, CONFIG_CHD_SHOWMYDOC_W, REG_DWORD,
                      &Configuration.ChangeDriveShowMyDoc, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CHD_SHOWCLOUDSTOR, REG_DWORD,
+            GetValueW(actKey, CONFIG_CHD_SHOWCLOUDSTOR_W, REG_DWORD,
                      &Configuration.ChangeDriveCloudStorage, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CHD_SHOWANOTHER, REG_DWORD,
+            GetValueW(actKey, CONFIG_CHD_SHOWANOTHER_W, REG_DWORD,
                      &Configuration.ChangeDriveShowAnother, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CHD_SHOWNET, REG_DWORD,
+            GetValueW(actKey, CONFIG_CHD_SHOWNET_W, REG_DWORD,
                      &Configuration.ChangeDriveShowNet, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SEARCHFILECONTENT, REG_DWORD,
+            GetValueW(actKey, CONFIG_SEARCHFILECONTENT_W, REG_DWORD,
                      &Configuration.SearchFileContent, sizeof(DWORD));
-            GetValue(actKey, CONFIG_LASTPLUGINVER, REG_DWORD,
+            GetValueW(actKey, CONFIG_LASTPLUGINVER_W, REG_DWORD,
                      &Configuration.LastPluginVer, sizeof(DWORD));
-            GetValue(actKey, CONFIG_LASTPLUGINVER_OP, REG_DWORD,
+            GetValueW(actKey, CONFIG_LASTPLUGINVER_OP_W, REG_DWORD,
                      &Configuration.LastPluginVerOP, sizeof(DWORD));
-            GetValue(actKey, CONFIG_QUICKRENAME_SELALL_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_QUICKRENAME_SELALL_REG_W, REG_DWORD,
                      &Configuration.QuickRenameSelectAll, sizeof(DWORD));
-            GetValue(actKey, CONFIG_EDITNEW_SELALL_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_EDITNEW_SELALL_REG_W, REG_DWORD,
                      &Configuration.EditNewSelectAll, sizeof(DWORD));
-            if (!GetValue(actKey, CONFIG_USESALOPEN_REG, REG_DWORD,
-                          &Configuration.UseSalOpen, sizeof(DWORD)))
-            {
-                Configuration.UseSalOpen = FALSE; // default is not to use it
-            }
-            else
-            {
-                if (Configuration.ConfigVersion == 11) // in 1.6 beta 7 it was enabled ... turn it off
-                {
-                    Configuration.UseSalOpen = FALSE; // default is not to use it
-                }
-            }
-            GetValue(actKey, CONFIG_NETWAREFASTDIRMOVE_REG, REG_DWORD,
+            // "Use salopen.exe" is no longer read: salopen.exe was retired along with the
+            // Configuration.UseSalOpen setting. The value is left in the registry rather than
+            // deleted, so downgrading to an older build finds its own setting intact.
+            GetValueW(actKey, CONFIG_NETWAREFASTDIRMOVE_REG_W, REG_DWORD,
                      &Configuration.NetwareFastDirMove, sizeof(DWORD));
             if (Windows7AndLater)
-                GetValue(actKey, CONFIG_ASYNCCOPYALG_REG, REG_DWORD,
+                GetValueW(actKey, CONFIG_ASYNCCOPYALG_REG_W, REG_DWORD,
                          &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
-            GetValue(actKey, CONFIG_RELOAD_ENV_VARS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_RELOAD_ENV_VARS_REG_W, REG_DWORD,
                      &Configuration.ReloadEnvVariables, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SHIFTFORHOTPATHS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SHIFTFORHOTPATHS_REG_W, REG_DWORD,
                      &Configuration.ShiftForHotPaths, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_LANGUAGE_REG, REG_SZ,
             //               Configuration.SLGName, MAX_PATH);
-            //      GetValue(actKey, CONFIG_USEALTLANGFORPLUGINS_REG, REG_DWORD,
+            //      GetValueW(actKey, CONFIG_USEALTLANGFORPLUGINS_REG_W, REG_DWORD,
             //               &Configuration.UseAsAltSLGInOtherPlugins, sizeof(DWORD));
             //      GetValue(actKey, CONFIG_ALTLANGFORPLUGINS_REG, REG_SZ,
             //               Configuration.AltPluginSLGName, MAX_PATH);
-            GetValue(actKey, CONFIG_CONVERSIONTABLE_REG, REG_SZ,
-                     Configuration.ConversionTable, Configuration.ConversionTable.Size());
-            GetValue(actKey, CONFIG_SKILLLEVEL_REG, REG_DWORD,
+            GetStringValueW(actKey, CONFIG_CONVERSIONTABLE_REG,
+                            Configuration.ConversionTable);
+            GetValueW(actKey, CONFIG_SKILLLEVEL_REG_W, REG_DWORD,
                      &Configuration.SkillLevel, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TITLEBARSHOWPATH_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TITLEBARSHOWPATH_REG_W, REG_DWORD,
                      &Configuration.TitleBarShowPath, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TITLEBARMODE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TITLEBARMODE_REG_W, REG_DWORD,
                      &Configuration.TitleBarMode, sizeof(DWORD));
-            GetValue(actKey, CONFIG_THEME_MODE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_THEME_MODE_REG_W, REG_DWORD,
                      &Configuration.ThemeMode, sizeof(DWORD));
             if (Configuration.ThemeMode < THEME_MODE_LIGHT || Configuration.ThemeMode > THEME_MODE_SYSTEM)
                 Configuration.ThemeMode = THEME_MODE_LIGHT;
-            GetValue(actKey, CONFIG_TITLEBARPREFIX_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TITLEBARPREFIX_REG_W, REG_DWORD,
                      &Configuration.UseTitleBarPrefix, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, REG_SZ,
-                     &Configuration.TitleBarPrefix, TITLE_PREFIX_MAX);
-            GetValue(actKey, CONFIG_MAINWINDOWICONINDEX_REG, REG_DWORD,
+            GetStringValueW(actKey, CONFIG_TITLEBARPREFIXTEXT_REG, Configuration.TitleBarPrefix);
+            GetValueW(actKey, CONFIG_MAINWINDOWICONINDEX_REG_W, REG_DWORD,
                      &Configuration.MainWindowIconIndex, sizeof(DWORD));
             if (Configuration.MainWindowIconIndex < 0 || Configuration.MainWindowIconIndex > MAINWINDOWICONS_COUNT)
                 Configuration.MainWindowIconIndex = 0;
-            GetValue(actKey, CONFIG_CLICKQUICKRENAME_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_CLICKQUICKRENAME_REG_W, REG_DWORD,
                      &Configuration.ClickQuickRename, sizeof(DWORD));
-            GetValue(actKey, CONFIG_VISIBLEDRIVES_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_VISIBLEDRIVES_REG_W, REG_DWORD,
                      &Configuration.VisibleDrives, sizeof(DWORD));
-            GetValue(actKey, CONFIG_SEPARATEDDRIVES_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_SEPARATEDDRIVES_REG_W, REG_DWORD,
                      &Configuration.SeparatedDrives, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREBYTIME_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREBYTIME_REG_W, REG_DWORD,
                      &Configuration.CompareByTime, sizeof(DWORD));
-            if (!GetValue(actKey, CONFIG_COMPAREBYSIZE_REG, REG_DWORD,
+            if (!GetValueW(actKey, CONFIG_COMPAREBYSIZE_REG_W, REG_DWORD,
                           &Configuration.CompareBySize, sizeof(DWORD)))
             { // conversion from older configuration - BySize used to be part of ByTime, so copy that setting
                 Configuration.CompareBySize = Configuration.CompareByTime;
             }
-            GetValue(actKey, CONFIG_COMPAREBYCONTENT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREBYCONTENT_REG_W, REG_DWORD,
                      &Configuration.CompareByContent, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREBYATTR_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREBYATTR_REG_W, REG_DWORD,
                      &Configuration.CompareByAttr, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREBYSUBDIRS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREBYSUBDIRS_REG_W, REG_DWORD,
                      &Configuration.CompareSubdirs, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREBYSUBDIRSATTR_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREBYSUBDIRSATTR_REG_W, REG_DWORD,
                      &Configuration.CompareSubdirsAttr, sizeof(DWORD));
 
-            GetValue(actKey, CONFIG_COMPAREONEPANELDIRS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREONEPANELDIRS_REG_W, REG_DWORD,
                      &Configuration.CompareOnePanelDirs, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREMOREOPTIONS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREMOREOPTIONS_REG_W, REG_DWORD,
                      &Configuration.CompareMoreOptions, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREIGNOREFILES_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREIGNOREFILES_REG_W, REG_DWORD,
                      &Configuration.CompareIgnoreFiles, sizeof(DWORD));
-            GetValue(actKey, CONFIG_COMPAREIGNOREDIRS_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_COMPAREIGNOREDIRS_REG_W, REG_DWORD,
                      &Configuration.CompareIgnoreDirs, sizeof(DWORD));
-            // a bit ugly: we provide MasksString, but the range is checked so it's fine
-            GetValue(actKey, CONFIG_CONFIGTIGNOREFILESMASKS_REG, REG_SZ,
-                     Configuration.CompareIgnoreFilesMasks.GetWritableMasksString(), MAX_PATH);
-            GetValue(actKey, CONFIG_CONFIGTIGNOREDIRSMASKS_REG, REG_SZ,
-                     Configuration.CompareIgnoreDirsMasks.GetWritableMasksString(), MAX_PATH);
+            // Same as the recycle masks above: a missing value must leave the default alone.
+            std::wstring compareIgnoreFiles;
+            if (GetStringValueW(actKey, CONFIG_CONFIGTIGNOREFILESMASKS_REG, compareIgnoreFiles))
+                Configuration.CompareIgnoreFilesMasks.SetMasksString(compareIgnoreFiles.c_str());
+            std::wstring compareIgnoreDirs;
+            if (GetStringValueW(actKey, CONFIG_CONFIGTIGNOREDIRSMASKS_REG, compareIgnoreDirs))
+                Configuration.CompareIgnoreDirsMasks.SetMasksString(compareIgnoreDirs.c_str());
             int errPos;
             Configuration.CompareIgnoreFilesMasks.PrepareMasks(errPos);
             Configuration.CompareIgnoreDirsMasks.PrepareMasks(errPos);
 
-            GetValue(actKey, CONFIG_THUMBNAILSIZE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_THUMBNAILSIZE_REG_W, REG_DWORD,
                      &Configuration.ThumbnailSize, sizeof(DWORD));
             LeftPanel->SetThumbnailSize(Configuration.ThumbnailSize);
             RightPanel->SetThumbnailSize(Configuration.ThumbnailSize);
 
-            GetValue(actKey, CONFIG_KEEPPLUGINSSORTED_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_KEEPPLUGINSSORTED_REG_W, REG_DWORD,
                      &Configuration.KeepPluginsSorted, sizeof(DWORD));
 
             Configuration.ShowSLGIncomplete = TRUE;
             if (Configuration.ConfigVersion == THIS_CONFIG_VERSION)
             {
-                GetValue(actKey, CONFIG_SHOWSLGINCOMPLETE_REG, REG_DWORD,
+                GetValueW(actKey, CONFIG_SHOWSLGINCOMPLETE_REG_W, REG_DWORD,
                          &Configuration.ShowSLGIncomplete, sizeof(DWORD));
             }
 
-            GetValue(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_EDITNEWFILE_USEDEFAULT_REG_W, REG_DWORD,
                      &Configuration.UseEditNewFileDefault, sizeof(DWORD));
-            GetValue(actKey, CONFIG_EDITNEWFILE_DEFAULT_REG, REG_SZ,
-                     Configuration.EditNewFileDefault, Configuration.EditNewFileDefault.Size());
+            GetStringValueW(actKey, CONFIG_EDITNEWFILE_DEFAULT_REG,
+                            Configuration.EditNewFileDefault);
 
 #ifndef _WIN64 // FIXME_X64_WINSCP
-            if (!GetValue(actKey, "Add x86-Only Plugins", REG_DWORD,
+            if (!GetValue(actKey, L"Add x86-Only Plugins", REG_DWORD,
                           &Configuration.AddX86OnlyPlugins, sizeof(DWORD)))
             {
                 Configuration.AddX86OnlyPlugins = TRUE;
@@ -3543,7 +3790,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                     GetValue(actSubKey, CONFIG_CNFRM_DAD, REG_DWORD,
                              &Configuration.CnfrmDragDrop, sizeof(DWORD));
                 else // for old configs we read it one level up
-                    GetValue(actKey, "Confirm Drop Operations", REG_DWORD,
+                    GetValue(actKey, L"Confirm Drop Operations", REG_DWORD,
                              &Configuration.CnfrmDragDrop, sizeof(DWORD));
                 GetValue(actSubKey, CONFIG_CNFRM_CLOSEARCHIVE, REG_DWORD,
                          &Configuration.CnfrmCloseArchive, sizeof(DWORD));
@@ -3610,30 +3857,24 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             }
 
             if (Configuration.ConfigVersion >= 8) // force the new toolbar for old versions
-                GetValue(actKey, CONFIG_TOPTOOLBAR_REG, REG_SZ,
-                         Configuration.TopToolBar, 400);
-            GetValue(actKey, CONFIG_MIDDLETOOLBAR_REG, REG_SZ,
-                     Configuration.MiddleToolBar, 400);
-            GetValue(actKey, CONFIG_LEFTTOOLBAR_REG, REG_SZ,
-                     Configuration.LeftToolBar, 100);
-            GetValue(actKey, CONFIG_RIGHTTOOLBAR_REG, REG_SZ,
-                     Configuration.RightToolBar, 100);
+                GetStringValueW(actKey, CONFIG_TOPTOOLBAR_REG, Configuration.TopToolBar);
+            GetStringValueW(actKey, CONFIG_MIDDLETOOLBAR_REG, Configuration.MiddleToolBar);
+            GetStringValueW(actKey, CONFIG_LEFTTOOLBAR_REG, Configuration.LeftToolBar);
+            GetStringValueW(actKey, CONFIG_RIGHTTOOLBAR_REG, Configuration.RightToolBar);
             // there used to be only one change drive button - now we introduce two buttons
             // and merge all bitmaps into one
 
-            if (Configuration.ConfigVersion <= 3 && Configuration.RightToolBar[0] != 0)
+            if (Configuration.ConfigVersion <= 3 && !Configuration.RightToolBar.empty())
             {
-                char tmp[5000];
-                lstrcpyn(tmp, Configuration.RightToolBar, 5000);
-                char num[50];
-
-                Configuration.RightToolBar[0] = 0;
+                std::wstring tmp = Configuration.RightToolBar;
+                Configuration.RightToolBar.clear();
 
                 BOOL first = TRUE;
-                char* p = strtok(tmp, ",");
+                wchar_t* context = NULL;
+                wchar_t* p = wcstok_s(tmp.data(), L",", &context);
                 while (p != NULL)
                 {
-                    int i = atoi(p);
+                    int i = _wtoi(p);
 
                     // replace the old tbbeChangeDrive with tbbeChangeDriveR
                     //#define TBBE_CHANGE_DRIVE_R     51
@@ -3641,33 +3882,32 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                         i = 51;
 
                     if (!first)
-                        strcat(Configuration.RightToolBar, ",");
-                    sprintf(num, "%d", i);
-                    strcat(Configuration.RightToolBar, num);
+                        Configuration.RightToolBar.push_back(L',');
+                    Configuration.RightToolBar += std::to_wstring(i);
                     first = FALSE;
-                    p = strtok(NULL, ",");
+                    p = wcstok_s(NULL, L",", &context);
                 }
             }
 
             if (TopToolBar != NULL)
-                TopToolBar->Load(Configuration.TopToolBar);
+                TopToolBar->Load(Configuration.TopToolBar.c_str());
             if (MiddleToolBar != NULL)
-                MiddleToolBar->Load(Configuration.MiddleToolBar);
+                MiddleToolBar->Load(Configuration.MiddleToolBar.c_str());
             if (LeftPanel->DirectoryLine->ToolBar != NULL)
-                LeftPanel->DirectoryLine->ToolBar->Load(Configuration.LeftToolBar);
+                LeftPanel->DirectoryLine->ToolBar->Load(Configuration.LeftToolBar.c_str());
             if (RightPanel->DirectoryLine->ToolBar != NULL)
-                RightPanel->DirectoryLine->ToolBar->Load(Configuration.RightToolBar);
+                RightPanel->DirectoryLine->ToolBar->Load(Configuration.RightToolBar.c_str());
 
-            GetValue(actKey, CONFIG_TOPTOOLBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_TOPTOOLBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.TopToolBarVisible, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PLGTOOLBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_PLGTOOLBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.PluginsBarVisible, sizeof(DWORD));
-            GetValue(actKey, CONFIG_MIDDLETOOLBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_MIDDLETOOLBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.MiddleToolBarVisible, sizeof(DWORD));
 
-            GetValue(actKey, CONFIG_USERMENUTOOLBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_USERMENUTOOLBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.UserMenuToolBarVisible, sizeof(DWORD));
-            GetValue(actKey, CONFIG_HOTPATHSBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_HOTPATHSBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.HotPathsBarVisible, sizeof(DWORD));
 
             // if this is an old version of configuration and the user menu contains items,
@@ -3675,9 +3915,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             if (Configuration.ConfigVersion <= 3 && UserMenuItems->Count > 0)
                 Configuration.UserMenuToolBarVisible = TRUE;
 
-            GetValue(actKey, CONFIG_DRIVEBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRIVEBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.DriveBarVisible, sizeof(DWORD));
-            GetValue(actKey, CONFIG_DRIVEBAR2VISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRIVEBAR2VISIBLE_REG_W, REG_DWORD,
                      &Configuration.DriveBar2Visible, sizeof(DWORD));
 
             if (ret) // if we return FALSE, everything will be inserted later
@@ -3715,79 +3955,109 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 CreateAndInsertWorkerBand(); // insert the worker band at the end
             }
 
-            GetValue(actKey, CONFIG_BOTTOMTOOLBARVISIBLE_REG, REG_DWORD,
+            GetValueW(actKey, CONFIG_BOTTOMTOOLBARVISIBLE_REG_W, REG_DWORD,
                      &Configuration.BottomToolBarVisible, sizeof(DWORD));
             if (Configuration.BottomToolBarVisible)
                 ToggleBottomToolBar();
 
             //      GetValue(actKey, CONFIG_SPACESELCALCSPACE, REG_DWORD,
             //               &Configuration.SpaceSelCalcSpace, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USETIMERESOLUTION, REG_DWORD,
+            GetValueW(actKey, CONFIG_USETIMERESOLUTION_W, REG_DWORD,
                      &Configuration.UseTimeResolution, sizeof(DWORD));
-            GetValue(actKey, CONFIG_TIMERESOLUTION, REG_DWORD,
+            GetValueW(actKey, CONFIG_TIMERESOLUTION_W, REG_DWORD,
                      &Configuration.TimeResolution, sizeof(DWORD));
-            GetValue(actKey, CONFIG_IGNOREDSTSHIFTS, REG_DWORD,
+            GetValueW(actKey, CONFIG_IGNOREDSTSHIFTS_W, REG_DWORD,
                      &Configuration.IgnoreDSTShifts, sizeof(DWORD));
-            GetValue(actKey, CONFIG_USEDRAGDROPMINTIME, REG_DWORD,
+            GetValueW(actKey, CONFIG_USEDRAGDROPMINTIME_W, REG_DWORD,
                      &Configuration.UseDragDropMinTime, sizeof(DWORD));
-            GetValue(actKey, CONFIG_DRAGDROPMINTIME, REG_DWORD,
+            GetValueW(actKey, CONFIG_DRAGDROPMINTIME_W, REG_DWORD,
                      &Configuration.DragDropMinTime, sizeof(DWORD));
 
-            GetValue(actKey, CONFIG_LASTFOCUSEDPAGE, REG_DWORD,
+            GetValueW(actKey, CONFIG_LASTFOCUSEDPAGE_W, REG_DWORD,
                      &Configuration.LastFocusedPage, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CONFIGURATION_HEIGHT, REG_DWORD,
+            GetValueW(actKey, CONFIG_CONFIGURATION_HEIGHT_W, REG_DWORD,
                      &Configuration.ConfigurationHeight, sizeof(DWORD));
-            GetValue(actKey, CONFIG_VIEWANDEDITEXPAND, REG_DWORD,
+            GetValueW(actKey, CONFIG_VIEWANDEDITEXPAND_W, REG_DWORD,
                      &Configuration.ViewersAndEditorsExpanded, sizeof(DWORD));
-            GetValue(actKey, CONFIG_PACKEPAND, REG_DWORD,
+            GetValueW(actKey, CONFIG_PACKEPAND_W, REG_DWORD,
                      &Configuration.PackersAndUnpackersExpanded, sizeof(DWORD));
 
-            GetValue(actKey, CONFIG_CMDLINE_REG, REG_DWORD, &cmdLine, sizeof(DWORD));
-            GetValue(actKey, CONFIG_CMDLFOCUS_REG, REG_DWORD, &cmdLineFocus, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_CMDLINE_REG_W, REG_DWORD, &cmdLine, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_CMDLFOCUS_REG_W, REG_DWORD, &cmdLineFocus, sizeof(DWORD));
 
-            GetValue(actKey, CONFIG_USECUSTOMPANELFONT_REG, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_USECUSTOMPANELFONT_REG_W, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
             if (LoadLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont) && UseCustomPanelFont)
             {
                 // if the user uses a custom font, propagate it now
                 SetFont();
             }
 
-            LoadHistory(actKey, CONFIG_NAMEDHISTORY_REG, FindNamedHistory, FIND_NAMED_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_LOOKINHISTORY_REG, FindLookInHistory, FIND_LOOKIN_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_GREPHISTORY_REG, FindGrepHistory, FIND_GREP_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_SELECTHISTORY_REG, Configuration.SelectHistory, SELECT_HISTORY_SIZE);
+            LoadHistory(actKey, CONFIG_NAMEDHISTORYW_REG, FindNamedHistory, FIND_NAMED_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(FindNamedHistory, FIND_NAMED_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_NAMEDHISTORY_REG, FindNamedHistory, FIND_NAMED_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_LOOKINHISTORYW_REG, FindLookInHistory, FIND_LOOKIN_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(FindLookInHistory, FIND_LOOKIN_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_LOOKINHISTORY_REG, FindLookInHistory, FIND_LOOKIN_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_GREPHISTORYW_REG, FindGrepHistory, FIND_GREP_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(FindGrepHistory, FIND_GREP_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_GREPHISTORY_REG, FindGrepHistory, FIND_GREP_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_SELECTHISTORYW_REG, Configuration.SelectHistory, SELECT_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.SelectHistory, SELECT_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_SELECTHISTORY_REG, Configuration.SelectHistory, SELECT_HISTORY_SIZE);
             //      Guys (Honza Patera, Tomas Jelinek) didn't like this because when they
             //      launch a new instance, they don't remember the previous mask. They hit (Un)Select
             //      and the last mask is still there. FAR, VC, NC start with *.* when launched,
             //      we will behave the same way.
             //      if (Configuration.SelectHistory[0] != NULL)  // load the initial state of +/- selection as well
             //        strcpy(SelectionMask, Configuration.SelectHistory[0]);
-            LoadHistory(actKey, CONFIG_COPYHISTORY_REG, Configuration.CopyHistory, COPY_HISTORY_SIZE);
-            LoadHistoryW(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistoryW, COPY_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_CHANGEDIRHISTORY_REG, Configuration.ChangeDirHistory, CHANGEDIR_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_VIEWERHISTORY_REG, ViewerHistory, VIEWER_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_COMMANDHISTORY_REG, Configuration.EditHistory, EDIT_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_FILELISTHISTORY_REG, Configuration.FileListHistory, FILELIST_HISTORY_SIZE);
-            if (IsWideHistoryEmpty(Configuration.CopyHistoryW, COPY_HISTORY_SIZE))
-                SeedWideHistoryFromAnsi(Configuration.CopyHistoryW, COPY_HISTORY_SIZE,
-                                        Configuration.CopyHistory, COPY_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_CREATEDIRHISTORY_REG, Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE);
-            LoadHistoryW(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistoryW, CREATEDIR_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_QUICKRENAMEHISTORY_REG, Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_EDITNEWHISTORY_REG, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
-            LoadHistoryW(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE);
-            LoadHistoryW(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE);
-            if (IsWideHistoryEmpty(Configuration.CreateDirHistoryW, CREATEDIR_HISTORY_SIZE))
-                SeedWideHistoryFromAnsi(Configuration.CreateDirHistoryW, CREATEDIR_HISTORY_SIZE,
-                                        Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE);
-            if (IsWideHistoryEmpty(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE))
-                SeedWideHistoryFromAnsi(Configuration.QuickRenameHistoryW, QUICKRENAME_HISTORY_SIZE,
-                                        Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
-            if (IsWideHistoryEmpty(Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE))
-                SeedWideHistoryFromAnsi(Configuration.EditNewHistoryW, EDITNEW_HISTORY_SIZE,
-                                        Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_CONVERTHISTORY_REG, Configuration.ConvertHistory, CONVERT_HISTORY_SIZE);
-            LoadHistory(actKey, CONFIG_FILTERHISTORY_REG, Configuration.FilterHistory, FILTER_HISTORY_SIZE);
+            // Unsuffixed registry values are read-only legacy ACP imports. Decode each directly
+            // into its final wide owner only when no current UTF-16 history exists.
+            LoadHistory(actKey, CONFIG_COPYHISTORYW_REG, Configuration.CopyHistory, COPY_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.CopyHistory, COPY_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_COPYHISTORY_REG, Configuration.CopyHistory, COPY_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_CHANGEDIRHISTORYW_REG, Configuration.ChangeDirHistory, CHANGEDIR_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.ChangeDirHistory, CHANGEDIR_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_CHANGEDIRHISTORY_REG, Configuration.ChangeDirHistory, CHANGEDIR_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_VIEWERHISTORYW_REG, ViewerHistory, VIEWER_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(ViewerHistory, VIEWER_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_VIEWERHISTORY_REG, ViewerHistory, VIEWER_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_COMMANDHISTORYW_REG, Configuration.EditHistory, EDIT_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.EditHistory, EDIT_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_COMMANDHISTORY_REG, Configuration.EditHistory, EDIT_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_FILELISTHISTORYW_REG, Configuration.FileListHistory, FILELIST_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.FileListHistory, FILELIST_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_FILELISTHISTORY_REG, Configuration.FileListHistory, FILELIST_HISTORY_SIZE);
+            // dialogs_highlight_registry.cpp's ClearHistory default runs before this load; re-apply
+            // it only if the registry genuinely had nothing at all.
+            if (IsWideHistoryEmpty(Configuration.FileListHistory, FILELIST_HISTORY_SIZE))
+                Configuration.FileListHistory[0] = DupStr(L"$(FileName)$(CRLF)");
+
+            LoadHistory(actKey, CONFIG_CREATEDIRHISTORYW_REG, Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_CREATEDIRHISTORY_REG, Configuration.CreateDirHistory, CREATEDIR_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_QUICKRENAMEHISTORYW_REG, Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_QUICKRENAMEHISTORY_REG, Configuration.QuickRenameHistory, QUICKRENAME_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_EDITNEWHISTORYW_REG, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_EDITNEWHISTORY_REG, Configuration.EditNewHistory, EDITNEW_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_CONVERTHISTORYW_REG, Configuration.ConvertHistory, CONVERT_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.ConvertHistory, CONVERT_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_CONVERTHISTORY_REG, Configuration.ConvertHistory, CONVERT_HISTORY_SIZE);
+
+            LoadHistory(actKey, CONFIG_FILTERHISTORYW_REG, Configuration.FilterHistory, FILTER_HISTORY_SIZE);
+            if (IsWideHistoryEmpty(Configuration.FilterHistory, FILTER_HISTORY_SIZE))
+                LoadLegacyHistory(actKey, CONFIG_FILTERHISTORY_REG, Configuration.FilterHistory, FILTER_HISTORY_SIZE);
             if (DirHistory != NULL)
             {
                 DirHistory->LoadFromRegistry(actKey, CONFIG_WORKDIRSHISTORY_REG);
@@ -3815,9 +4085,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 CloseKey(actSubKey);
             }
 
-            GetValue(actKey, CONFIG_FILELISTNAME_REG, REG_SZ, Configuration.FileListName, Configuration.FileListName.Size());
-            GetValue(actKey, CONFIG_FILELISTAPPEND_REG, REG_DWORD, &Configuration.FileListAppend, sizeof(DWORD));
-            GetValue(actKey, CONFIG_FILELISTDESTINATION_REG, REG_DWORD, &Configuration.FileListDestination, sizeof(DWORD));
+            GetStringValueW(actKey, CONFIG_FILELISTNAME_REG, Configuration.FileListName);
+            GetValueW(actKey, CONFIG_FILELISTAPPEND_REG_W, REG_DWORD, &Configuration.FileListAppend, sizeof(DWORD));
+            GetValueW(actKey, CONFIG_FILELISTDESTINATION_REG_W, REG_DWORD, &Configuration.FileListDestination, sizeof(DWORD));
 
             CloseKey(actKey);
         }
@@ -3826,71 +4096,72 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         if (OpenKey(salamander, SALAMANDER_VIEWER_REG, actKey))
         {
-            GetValue(actKey, VIEWER_FINDFORWARD_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_FINDFORWARD_REG_W, REG_DWORD,
                      &GlobalFindDialog.Forward, sizeof(DWORD));
-            GetValue(actKey, VIEWER_FINDWHOLEWORDS_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_FINDWHOLEWORDS_REG_W, REG_DWORD,
                      &GlobalFindDialog.WholeWords, sizeof(DWORD));
-            GetValue(actKey, VIEWER_FINDCASESENSITIVE_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_FINDCASESENSITIVE_REG_W, REG_DWORD,
                      &GlobalFindDialog.CaseSensitive, sizeof(DWORD));
-            GetValue(actKey, VIEWER_FINDREGEXP_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_FINDREGEXP_REG_W, REG_DWORD,
                      &GlobalFindDialog.Regular, sizeof(DWORD));
-            GetValue(actKey, VIEWER_FINDTEXT_REG, REG_SZ,
-                     GlobalFindDialog.Text, FIND_TEXT_LEN);
-            GetValue(actKey, VIEWER_FINDHEXMODE_REG, REG_DWORD,
+            GetStringValueW(actKey, VIEWER_FINDTEXT_REG, GlobalFindDialog.Text);
+            GetValueW(actKey, VIEWER_FINDHEXMODE_REG_W, REG_DWORD,
                      &GlobalFindDialog.HexMode, sizeof(DWORD));
 
-            GetValue(actKey, VIEWER_CONFIGCRLF_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGCRLF_REG_W, REG_DWORD,
                      &Configuration.EOL_CRLF, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CONFIGCR_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGCR_REG_W, REG_DWORD,
                      &Configuration.EOL_CR, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CONFIGLF_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGLF_REG_W, REG_DWORD,
                      &Configuration.EOL_LF, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CONFIGNULL_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGNULL_REG_W, REG_DWORD,
                      &Configuration.EOL_NULL, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CONFIGTABSIZE_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGTABSIZE_REG_W, REG_DWORD,
                      &Configuration.TabSize, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CONFIGDEFMODE_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGDEFMODE_REG_W, REG_DWORD,
                      &Configuration.DefViewMode, sizeof(DWORD));
-            // a bit ugly: we provide MasksString, but the range is checked so it's fine
-            GetValue(actKey, VIEWER_CONFIGTEXTMASK_REG, REG_SZ,
-                     Configuration.TextModeMasks.GetWritableMasksString(), MAX_PATH);
+            // Same as the recycle masks above. The version-17 upgrade then tests the
+            // EFFECTIVE mask group rather than the temporary, because pre-unicode compared
+            // the live buffer - which, for a fresh profile with no stored value, holds the
+            // very default the upgrade is meant to extend.
+            std::wstring textMasks;
+            if (GetStringValueW(actKey, VIEWER_CONFIGTEXTMASK_REG, textMasks))
+                Configuration.TextModeMasks.SetMasksString(textMasks.c_str());
             if (Configuration.ConfigVersion < 17 &&
-                strcmp(Configuration.TextModeMasks.GetWritableMasksString(), "*.txt;*.602") == 0)
-            {
-                strcpy(Configuration.TextModeMasks.GetWritableMasksString(), "*.txt;*.602;*.xml");
-            }
+                wcscmp(Configuration.TextModeMasks.GetMasksString(), L"*.txt;*.602") == 0)
+                Configuration.TextModeMasks.SetMasksString(L"*.txt;*.602;*.xml");
             int errPos;
             Configuration.TextModeMasks.PrepareMasks(errPos);
-            // a bit ugly: we provide MasksString, but the range is checked so it's fine
-            GetValue(actKey, VIEWER_CONFIGHEXMASK_REG, REG_SZ,
-                     Configuration.HexModeMasks.GetWritableMasksString(), MAX_PATH);
+            std::wstring hexMasks;
+            if (GetStringValueW(actKey, VIEWER_CONFIGHEXMASK_REG, hexMasks))
+                Configuration.HexModeMasks.SetMasksString(hexMasks.c_str());
             Configuration.HexModeMasks.PrepareMasks(errPos);
 
-            GetValue(actKey, VIEWER_CONFIGUSECUSTOMFONT_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGUSECUSTOMFONT_REG_W, REG_DWORD,
                      &UseCustomViewerFont, sizeof(DWORD));
             LoadLogFont(actKey, VIEWER_CONFIGFONT_REG, &ViewerLogFont); // no viewer can be open yet, so no need to call SetViewerFont()
-            GetValue(actKey, VIEWER_WRAPTEXT_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_WRAPTEXT_REG_W, REG_DWORD,
                      &Configuration.WrapText, sizeof(DWORD));
-            GetValue(actKey, VIEWER_CPAUTOSELECT_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CPAUTOSELECT_REG_W, REG_DWORD,
                      &Configuration.CodePageAutoSelect, sizeof(DWORD));
-            GetValue(actKey, VIEWER_DEFAULTCONVERT_REG, REG_SZ, Configuration.DefaultConvert, 200);
-            GetValue(actKey, VIEWER_AUTOCOPYSELECTION_REG, REG_DWORD,
+            GetStringValueW(actKey, VIEWER_DEFAULTCONVERT_REG, Configuration.DefaultConvert);
+            GetValueW(actKey, VIEWER_AUTOCOPYSELECTION_REG_W, REG_DWORD,
                      &Configuration.AutoCopySelection, sizeof(DWORD));
-            GetValue(actKey, VIEWER_GOTOOFFSETISHEX_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_GOTOOFFSETISHEX_REG_W, REG_DWORD,
                      &Configuration.GoToOffsetIsHex, sizeof(DWORD));
 
-            GetValue(actKey, VIEWER_CONFIGSAVEWINPOS_REG, REG_DWORD,
+            GetValueW(actKey, VIEWER_CONFIGSAVEWINPOS_REG_W, REG_DWORD,
                      &Configuration.SavePosition, sizeof(DWORD));
             BOOL plcmntExist = TRUE;
-            plcmntExist &= GetValue(actKey, VIEWER_CONFIGWNDLEFT_REG, REG_DWORD,
+            plcmntExist &= GetValueW(actKey, VIEWER_CONFIGWNDLEFT_REG_W, REG_DWORD,
                                     &Configuration.WindowPlacement.rcNormalPosition.left, sizeof(DWORD));
-            plcmntExist &= GetValue(actKey, VIEWER_CONFIGWNDRIGHT_REG, REG_DWORD,
+            plcmntExist &= GetValueW(actKey, VIEWER_CONFIGWNDRIGHT_REG_W, REG_DWORD,
                                     &Configuration.WindowPlacement.rcNormalPosition.right, sizeof(DWORD));
-            plcmntExist &= GetValue(actKey, VIEWER_CONFIGWNDTOP_REG, REG_DWORD,
+            plcmntExist &= GetValueW(actKey, VIEWER_CONFIGWNDTOP_REG_W, REG_DWORD,
                                     &Configuration.WindowPlacement.rcNormalPosition.top, sizeof(DWORD));
-            plcmntExist &= GetValue(actKey, VIEWER_CONFIGWNDBOTTOM_REG, REG_DWORD,
+            plcmntExist &= GetValueW(actKey, VIEWER_CONFIGWNDBOTTOM_REG_W, REG_DWORD,
                                     &Configuration.WindowPlacement.rcNormalPosition.bottom, sizeof(DWORD));
-            plcmntExist &= GetValue(actKey, VIEWER_CONFIGWNDSHOW_REG, REG_DWORD,
+            plcmntExist &= GetValueW(actKey, VIEWER_CONFIGWNDSHOW_REG_W, REG_DWORD,
                                     &Configuration.WindowPlacement.showCmd, sizeof(DWORD));
             if (plcmntExist)
                 Configuration.WindowPlacement.length = sizeof(Configuration.WindowPlacement);
@@ -3900,20 +4171,16 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
 
         //---  left and right panel
 
-        CPathBuffer leftPanelPath;
-        CPathBuffer rightPanelPath;
-        EnvGetSystemDirectoryA(gEnvironment, leftPanelPath, leftPanelPath.Size());
-        strcpy(rightPanelPath, leftPanelPath);
-        // Wide source-of-truth for the panel path; populated by LoadPanelConfig from the
-        // REG_SZ Unicode value SavePanelConfig wrote. The ANSI mirror above remains for
-        // rescue-path bookkeeping only. The system directory is OS-supplied and ASCII,
-        // so AnsiToWide is safe as the seed value.
-        std::wstring leftPanelPathW = AnsiToWide(leftPanelPath);
-        std::wstring rightPanelPathW = AnsiToWide(rightPanelPath);
-        CPathBuffer sysDefDir;
-        lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], sysDefDir.Size());
-        LoadPanelConfig(leftPanelPath, leftPanelPathW, LeftPanel, salamander, SALAMANDER_LEFTP_REG);
-        LoadPanelConfig(rightPanelPath, rightPanelPathW, RightPanel, salamander, SALAMANDER_RIGHTP_REG);
+        std::wstring leftPanelPath;
+        if (gEnvironment == NULL || !gEnvironment->GetSystemDirectory(leftPanelPath).success || leftPanelPath.empty())
+            leftPanelPath = L"C:\\";
+        std::wstring rightPanelPath = leftPanelPath;
+        const wchar_t systemDrive = (wchar_t)towlower(leftPanelPath[0]);
+        std::wstring sysDefDir;
+        if (systemDrive >= L'a' && systemDrive <= L'z')
+            sysDefDir = DefaultDir[systemDrive - L'a'];
+        LoadPanelConfig(leftPanelPath, LeftPanel, salamander, SALAMANDER_LEFTP_REG_W);
+        LoadPanelConfig(rightPanelPath, RightPanel, salamander, SALAMANDER_RIGHTP_REG_W);
 
         CloseKey(salamander);
         salamander = NULL;
@@ -3926,17 +4193,17 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             PostMessage(HWindow, WM_COMMAND, CM_TOGGLEEDITLINE, TRUE);
 
         MSG msg; // process all pending messages
-        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
 
         // set the active panel according to command line parameters
         if (ret && cmdLineParams != NULL)
         {
-            if (cmdLineParams->ActivatePanel == 1 && rightPanelFocused ||
-                cmdLineParams->ActivatePanel == 2 && !rightPanelFocused)
+            if (cmdLineParams->activatePanel == 1 && rightPanelFocused ||
+                cmdLineParams->activatePanel == 2 && !rightPanelFocused)
             {
                 rightPanelFocused = !rightPanelFocused;
             }
@@ -3959,21 +4226,25 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         {
             CheckMenuItem(h, CM_ALWAYSONTOP, MF_BYCOMMAND | (Configuration.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED));
 
-            char buff[200];
-            MENUITEMINFO mii;
-            mii.cbSize = sizeof(MENUITEMINFO);
-            mii.fMask = MIIM_TYPE;
-            mii.dwTypeData = buff;
-            mii.cch = 199;
+            MENUITEMINFOW mii;
+            ZeroMemory(&mii, sizeof(mii));
+            mii.cbSize = sizeof(mii);
+            mii.fMask = MIIM_STRING;
 
-            GetMenuItemInfo(h, SC_MINIMIZE, FALSE, &mii);
-            wsprintf(buff + strlen(buff), "\t%s+%s", LoadStr(IDS_SHIFT), LoadStr(IDS_ESCAPE));
-            SetMenuItemInfo(h, SC_MINIMIZE, FALSE, &mii);
+            std::wstring text;
+            if (ReadMenuItemTextW(h, SC_MINIMIZE, text, FALSE))
+            {
+                text += FormatStrW(L"\t%ls+%ls", LoadStrW(IDS_SHIFT), LoadStrW(IDS_ESCAPE));
+                mii.dwTypeData = text.data();
+                SetMenuItemInfoW(h, SC_MINIMIZE, FALSE, &mii);
+            }
 
-            mii.cch = 199;
-            GetMenuItemInfo(h, SC_MAXIMIZE, FALSE, &mii);
-            wsprintf(buff + strlen(buff), "\t%s+%s+%s", LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), LoadStr(IDS_F11));
-            SetMenuItemInfo(h, SC_MAXIMIZE, FALSE, &mii);
+            if (ReadMenuItemTextW(h, SC_MAXIMIZE, text, FALSE))
+            {
+                text += FormatStrW(L"\t%ls+%ls+%ls", LoadStrW(IDS_CTRL), LoadStrW(IDS_SHIFT), LoadStrW(IDS_F11));
+                mii.dwTypeData = text.data();
+                SetMenuItemInfoW(h, SC_MAXIMIZE, FALSE, &mii);
+            }
         }
 
         SplashScreenCloseIfExist();
@@ -4069,9 +4340,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         BOOL rightPanelPathSet = FALSE;
         if (ret && cmdLineParams != NULL)
         {
-            if (cmdLineParams->LeftPath[0] == 0 && cmdLineParams->RightPath[0] == 0 && cmdLineParams->ActivePath[0] != 0)
+            if (cmdLineParams->leftPath.empty() && cmdLineParams->rightPath.empty() && !cmdLineParams->activePath.empty())
             {
-                if (GetActivePanel()->ChangeDirLite(cmdLineParams->ActivePath)) // no point in combining this with left/right panel settings
+                if (GetActivePanel()->ChangeDirLite(cmdLineParams->activePath.c_str())) // no point in combining this with left/right panel settings
                 {
                     if (rightPanelFocused)
                         rightPanelPathSet = TRUE;
@@ -4084,17 +4355,17 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             }
             else
             {
-                if (cmdLineParams->LeftPath[0] != 0)
+                if (!cmdLineParams->leftPath.empty())
                 {
-                    if (LeftPanel->ChangeDirLite(cmdLineParams->LeftPath))
+                    if (LeftPanel->ChangeDirLite(cmdLineParams->leftPath.c_str()))
                     {
                         leftPanelPathSet = TRUE;
                         LeftPanel->RefreshVisibleItemsArray(); // see "RefreshVisibleItemsArray" comment below
                     }
                 }
-                if (cmdLineParams->RightPath[0] != 0)
+                if (!cmdLineParams->rightPath.empty())
                 {
-                    if (RightPanel->ChangeDirLite(cmdLineParams->RightPath))
+                    if (RightPanel->ChangeDirLite(cmdLineParams->rightPath.c_str()))
                         rightPanelPathSet = TRUE;
                 }
             }
@@ -4114,10 +4385,10 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         BOOL tryNet = TRUE;
         if (!leftPanelPathSet)
         {
-            if (SalCheckAndRestorePathWithCutW(LeftPanel->HWindow, leftPanelPathW, tryNet,
+            if (SalCheckAndRestorePathWithCutW(LeftPanel->HWindow, leftPanelPath, tryNet,
                                                err, lastErr, pathInvalid, cut, TRUE))
             {
-                LeftPanel->ChangePathToDiskW(LeftPanel->HWindow, leftPanelPathW.c_str());
+                LeftPanel->ChangePathToDisk(LeftPanel->HWindow, leftPanelPath.c_str());
             }
             else
                 LeftPanel->ChangeToRescuePathOrFixedDrive(LeftPanel->HWindow);
@@ -4128,10 +4399,10 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         tryNet = TRUE;
         if (!rightPanelPathSet)
         {
-            if (SalCheckAndRestorePathWithCutW(RightPanel->HWindow, rightPanelPathW, tryNet,
+            if (SalCheckAndRestorePathWithCutW(RightPanel->HWindow, rightPanelPath, tryNet,
                                                err, lastErr, pathInvalid, cut, TRUE))
             {
-                RightPanel->ChangePathToDiskW(RightPanel->HWindow, rightPanelPathW.c_str());
+                RightPanel->ChangePathToDisk(RightPanel->HWindow, rightPanelPath.c_str());
             }
             else
                 RightPanel->ChangeToRescuePathOrFixedDrive(RightPanel->HWindow);
@@ -4140,7 +4411,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         UpdateWindow(RightPanel->HWindow); // ensures dir/info line is drawn immediately after the panel content
 
         // restore default-dir on the system drive (damaged - system root was in both panels)
-        lstrcpyn(DefaultDir[LowerCase[sysDefDir[0]] - 'a'], sysDefDir, MAX_PATH);
+        if (!sysDefDir.empty() && systemDrive >= L'a' && systemDrive <= L'z')
+            DefaultDir[systemDrive - L'a'] = sysDefDir;
         // restore DefaultDir
         MainWindow->UpdateDefaultDir(TRUE);
 

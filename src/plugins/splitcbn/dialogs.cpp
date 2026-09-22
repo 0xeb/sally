@@ -22,9 +22,9 @@
 namespace split
 {
 
-    static LPTSTR pszFileName;
+    static const wchar_t* pszFileName;
     static CQuadWord qwFileSize;
-    static LPTSTR pszTargetDir;
+    static std::wstring* pszTargetDir;
     static CQuadWord* pqwPartialSize;
 
     static HWND hDialog;
@@ -50,19 +50,20 @@ namespace split
         *pqwPartialSize = size;
         if (size != SIZE_AUTODETECT)
         {
-            char text[100];
-            SalamanderGeneral->PrintDiskSize(text, GetSizeOfLastPart(qwFileSize, size), 1);
-            SetDlgItemText(hDialog, IDC_EDIT_LASTPART, text);
+            const std::wstring lastPart = SPLPrintDiskSizeOwned(
+                SalamanderGeneral, GetSizeOfLastPart(qwFileSize, size), 1);
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, lastPart.c_str());
             if (size.Value)
             {
-                sprintf(text, "%I64u", ((qwFileSize - CQuadWord(1, 0)) / size + CQuadWord(1, 0)).Value);
-                SetDlgItemText(hDialog, IDC_EDIT_NUMBER, text);
+                const std::wstring count = std::to_wstring(
+                    ((qwFileSize - CQuadWord(1, 0)) / size + CQuadWord(1, 0)).Value);
+                SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, count.c_str());
             }
         }
         else
         {
-            SetDlgItemText(hDialog, IDC_EDIT_LASTPART, "");
-            SetDlgItemText(hDialog, IDC_EDIT_NUMBER, "");
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, L"");
+            SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, L"");
         }
         bDontHandleEdit = FALSE;
     }
@@ -112,40 +113,44 @@ namespace split
     static void OnComboEditChange()
     {
         CALL_STACK_MESSAGE1("OnComboEditChange()");
-        char text[100], number[100];
-        GetDlgItemText(hDialog, IDC_COMBO_SIZE, text, 100);
+        const std::wstring text = SPLGetDlgItemTextOwned(hDialog, IDC_COMBO_SIZE);
+        std::wstring number;
+        number.reserve(text.size());
 
         // remove spaces and tabs and replace commas with dots
-        int i = 0, j = 0;
-        while (text[i] && (strchr(" \t0123456789.,", text[i]) != NULL || (BYTE)text[i] == 0xA0))
+        size_t i = 0;
+        while (i < text.size() &&
+               (wcschr(L" \t0123456789.,", text[i]) != NULL || text[i] == 0xA0))
         {
-            if (text[i] != ' ' && text[i] != '\t' && (BYTE)text[i] != 0xA0)
-                number[j++] = (text[i] == ',') ? '.' : text[i];
-            i++;
+            if (text[i] != L' ' && text[i] != L'\t' && text[i] != 0xA0)
+                number.push_back((text[i] == L',') ? L'.' : text[i]);
+            ++i;
         }
-        number[j] = 0;
 
-        j = i;
-        while (text[j] && strchr(" \t()[]{}.;,", text[j]) == NULL)
-            j++;
-        text[j] = 0;
+        size_t suffixEnd = i;
+        while (suffixEnd < text.size() && wcschr(L" \t()[]{}.;,", text[suffixEnd]) == NULL)
+            ++suffixEnd;
+        const std::wstring suffix = text.substr(i, suffixEnd - i);
 
         // determine the multiplier
         DWORD multiplier = 1;
         BOOL ok = TRUE;
-        if (!lstrcmpi(text + i, LoadStr(IDS_SIZE_KB)) || !lstrcmpi(text + i, LoadStr(IDS_SIZE_K)))
+        if (!lstrcmpiW(suffix.c_str(), LangStr(IDS_SIZE_KB).c_str()) || !lstrcmpiW(suffix.c_str(), LangStr(IDS_SIZE_K).c_str()))
             multiplier = 1024;
-        else if (!lstrcmpi(text + i, LoadStr(IDS_SIZE_MB)))
+        else if (!lstrcmpiW(suffix.c_str(), LangStr(IDS_SIZE_MB).c_str()))
             multiplier = 1024 * 1024;
-        else if (!lstrcmpi(text + i, LoadStr(IDS_SIZE_GB)))
+        else if (!lstrcmpiW(suffix.c_str(), LangStr(IDS_SIZE_GB).c_str()))
             multiplier = 1024 * 1024 * 1024;
 #ifdef STRICT_SYNTAX
-        else if (text[i] && lstrcmpi(text + i, LoadStr(IDS_SIZE_B)) && lstrcmpi(text + i, LoadStr(IDS_BYTES)) && lstrcmpi(text + i, LoadStr(IDS_BYTE)))
+        else if (!suffix.empty() && lstrcmpiW(suffix.c_str(), LangStr(IDS_SIZE_B).c_str()) && lstrcmpiW(suffix.c_str(), LangStr(IDS_BYTES).c_str()) && lstrcmpiW(suffix.c_str(), LangStr(IDS_BYTE).c_str()))
             ok = FALSE;
 #endif
 
         double size;
-        if (ok && sscanf(number, "%lf", &size) == 1 && size > 0 && (size * multiplier < (double)0xffffffffffffffff))
+        wchar_t* numberEnd = NULL;
+        size = wcstod(number.c_str(), &numberEnd);
+        if (ok && numberEnd != number.c_str() && *numberEnd == 0 && size > 0 &&
+            (size * multiplier < (double)0xffffffffffffffff))
         {
             OnSizeChange(CQuadWord().SetDouble(size * multiplier));
             EnableWindow(GetDlgItem(hDialog, IDOK), TRUE);
@@ -153,8 +158,8 @@ namespace split
         else
         {
             bDontHandleEdit = TRUE;
-            SetDlgItemText(hDialog, IDC_EDIT_NUMBER, "?");
-            SetDlgItemText(hDialog, IDC_EDIT_LASTPART, "?");
+            SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, L"?");
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, L"?");
             EnableWindow(GetDlgItem(hDialog, IDOK), FALSE);
             bDontHandleEdit = FALSE;
         }
@@ -165,31 +170,31 @@ namespace split
         CALL_STACK_MESSAGE1("OnEditChange()");
         if (bDontHandleEdit)
             return;
-        char text[100];
-        GetDlgItemText(hDialog, IDC_EDIT_NUMBER, text, _countof(text));
-        int parts = atol(text);
+        std::wstring text = SPLGetDlgItemTextOwned(hDialog, IDC_EDIT_NUMBER);
+        int parts = _wtol(text.c_str());
         if (CQuadWord(2 * parts, 0) > qwFileSize)
         {
             parts = (int)(qwFileSize.Value / 2);
             bDontHandleEdit = TRUE;
-            SetDlgItemText(hDialog, IDC_EDIT_NUMBER, _ltoa(parts, text, 10));
+            text = std::to_wstring(parts);
+            SetDlgItemTextW(hDialog, IDC_EDIT_NUMBER, text.c_str());
             bDontHandleEdit = FALSE;
         }
         if (parts > 0)
         {
             CQuadWord size = (qwFileSize + CQuadWord(parts - 1, 0)) / CQuadWord(parts, 0); // round up
             *pqwPartialSize = size;
-            SalamanderGeneral->NumberToStr(text, size);
-            //SalamanderGeneral->PrintDiskSize(text, size, 1);
-            SetDlgItemText(hDialog, IDC_COMBO_SIZE, text);
-            SalamanderGeneral->PrintDiskSize(text, GetSizeOfLastPart(qwFileSize, size), 1);
-            SetDlgItemText(hDialog, IDC_EDIT_LASTPART, text);
+            const std::wstring sizeText = SPLNumberToStrOwned(SalamanderGeneral, size);
+            SetDlgItemTextW(hDialog, IDC_COMBO_SIZE, sizeText.c_str());
+            const std::wstring lastPart = SPLPrintDiskSizeOwned(
+                SalamanderGeneral, GetSizeOfLastPart(qwFileSize, size), 1);
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, lastPart.c_str());
             EnableWindow(GetDlgItem(hDialog, IDOK), TRUE);
         }
         else
         {
-            SetDlgItemText(hDialog, IDC_COMBO_SIZE, "");
-            SetDlgItemText(hDialog, IDC_EDIT_LASTPART, "?");
+            SetDlgItemTextW(hDialog, IDC_COMBO_SIZE, L"");
+            SetDlgItemTextW(hDialog, IDC_EDIT_LASTPART, L"?");
             EnableWindow(GetDlgItem(hDialog, IDOK), FALSE);
         }
     }
@@ -197,8 +202,6 @@ namespace split
     static INT_PTR CALLBACK SplitDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CALL_STACK_MESSAGE4("SplitDlgProc( , 0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-        CPathBuffer text; // Heap-allocated for long path support
-
         switch (uMsg)
         {
         case WM_INITDIALOG:
@@ -210,27 +213,30 @@ namespace split
             SendDlgItemMessage(hWnd, IDC_SPLIT_ICON, STM_SETIMAGE, IMAGE_ICON,
                                (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_SPLIT)));
 
-            char number[50];
-            sprintf(text, LoadStr(IDS_SPLITTITLE), SalamanderGeneral->NumberToStr(number, qwFileSize));
-            SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(hWnd, IDC_STATIC_TITLE), text,
+            // composed WIDE throughout. This produced a wide number, narrowed
+            // it, formatted into a narrow buffer, then widened the result again for a wide
+            // API - two lossy hops in a path that is wide at both ends.
+            const std::wstring numberW = SPLNumberToStrOwned(SalamanderGeneral, qwFileSize);
+            const std::wstring titleW = SPLFormatStringOwned(LangStr(IDS_SPLITTITLE).c_str(), numberW.c_str());
+            SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(hWnd, IDC_STATIC_TITLE), titleW.c_str(),
                                                    pszFileName, FALSE, FALSE);
 
-            SetDlgItemText(hWnd, IDC_EDIT_DIR, pszTargetDir);
+            SetDlgItemTextW(hWnd, IDC_EDIT_DIR, pszTargetDir->c_str());
             CheckDlgButton(hWnd, IDC_RADIO_SIZE, BST_CHECKED);
             SendMessage(hWnd, WM_COMMAND, IDC_RADIO_SIZE, 0);
             SendMessage(GetDlgItem(hWnd, IDC_EDIT_NUMBER), EM_SETLIMITTEXT, 3, 0);
 
             HWND h = GetDlgItem(hWnd, IDC_COMBO_SIZE);
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_144FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_720FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_12FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_360FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_100MB_ZIP));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_250MB_ZIP));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_120MB_LS120));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_650MB_CDR));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_700MB_CDR));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_AUTODETECT));
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_144FLOPPY).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_720FLOPPY).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_12FLOPPY).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_360FLOPPY).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_100MB_ZIP).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_250MB_ZIP).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_120MB_LS120).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_650MB_CDR).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_700MB_CDR).c_str());
+            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LangStr(IDS_AUTODETECT).c_str());
             SendMessage(h, CB_SETCURSEL, 0, 0);
             OnComboSelChange();
             SetFocus(h);
@@ -259,9 +265,11 @@ namespace split
             }
 
             case IDOK:
-                GetDlgItemText(hWnd, IDC_EDIT_DIR, pszTargetDir, SAL_MAX_LONG_PATH);
+            {
+                *pszTargetDir = SPLGetDlgItemTextOwned(hWnd, IDC_EDIT_DIR);
                 EndDialog(hWnd, TRUE);
                 break;
+            }
 
             case IDCANCEL:
                 EndDialog(hWnd, FALSE);
@@ -275,7 +283,7 @@ namespace split
                 EnableWindow(GetDlgItem(hWnd, IDC_EDIT_NUMBER), !bSize);
                 if (!bSize)
                     if (*pqwPartialSize == SIZE_AUTODETECT)
-                        SetDlgItemText(hWnd, IDC_EDIT_NUMBER, "1");
+                        SetDlgItemTextW(hWnd, IDC_EDIT_NUMBER, L"1");
                     else
                         OnEditChange();
                 break;
@@ -301,10 +309,13 @@ namespace split
             case IDC_BUTTON_BROWSE:
             {
                 HWND parent = SalamanderGeneral->GetMsgBoxParent();
-                GetDlgItemText(hWnd, IDC_EDIT_DIR, text, text.Size());
-                if (SalamanderGeneral->GetTargetDirectory(hWnd, parent, LoadStr(IDS_SPLIT),
-                                                          LoadStr(IDS_SELECTDIR), text, FALSE, text))
-                    SetDlgItemText(hWnd, IDC_EDIT_DIR, text);
+                std::wstring text = SPLGetDlgItemTextOwned(hWnd, IDC_EDIT_DIR);
+                const std::wstring initialDirectory = text;
+                if (SPLGetTargetDirectoryOwned(
+                        SalamanderGeneral, hWnd, parent, LangStr(IDS_SPLIT).c_str(),
+                        LangStr(IDS_SELECTDIR).c_str(), text, FALSE,
+                        initialDirectory.c_str()))
+                    SetDlgItemTextW(hWnd, IDC_EDIT_DIR, text.c_str());
                 break;
             }
 
@@ -315,8 +326,9 @@ namespace split
                 ConfigDialog(hWnd);
                 if (oldSplitToOther != configSplitToOther || oldSplitToSubdir != configSplitToSubdir)
                 {
-                    GetTargetDir(text, pszFileName, TRUE);
-                    SetDlgItemText(hWnd, IDC_EDIT_DIR, text);
+                    std::wstring targetDirW;
+                    if (GetTargetDir(targetDirW, pszFileName, TRUE))
+                        SetDlgItemTextW(hWnd, IDC_EDIT_DIR, targetDirW.c_str());
                 }
                 break;
             }
@@ -331,13 +343,15 @@ namespace split
 } // namespace split
 using namespace split;
 
-BOOL SplitDialog(LPTSTR fileName, CQuadWord& fileSize, LPTSTR targetDir,
+BOOL SplitDialog(const wchar_t* fileName, CQuadWord& fileSize,
+                 std::wstring& targetDir,
                  CQuadWord* partialSize, HWND hParent)
 {
-    CALL_STACK_MESSAGE4("SplitDialog(%s, %I64u, %s, , )", fileName, fileSize.Value, targetDir);
+    CALL_STACK_MESSAGE4("SplitDialog(%ls, %I64u, %ls, , )", fileName,
+                        fileSize.Value, targetDir.c_str());
     pszFileName = fileName;
     qwFileSize = fileSize;
-    pszTargetDir = targetDir;
+    pszTargetDir = &targetDir;
     pqwPartialSize = partialSize;
     return (BOOL)DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_SPLIT), hParent, SplitDlgProc, 0);
 }
@@ -350,8 +364,8 @@ BOOL SplitDialog(LPTSTR fileName, CQuadWord& fileSize, LPTSTR targetDir,
 namespace combine
 {
 
-    static TIndirectArray<char>* files;
-    static LPTSTR targetName;
+    static TIndirectArray<wchar_t>* files;
+    static std::wstring* targetName;
     static BOOL bOrigCrcFound;
     static UINT32 origCrc;
     static UINT uDragMsg;
@@ -365,33 +379,34 @@ namespace combine
     {
         int index;
         //HICON hIcon;
-        CPathBuffer text; // Heap-allocated for long path support
+        std::wstring text;
     };
 
-    static BOOL AddFile(LPTSTR fullName, BOOL bUpdateArray = TRUE)
+    static BOOL AddFile(const wchar_t* fullName, BOOL bUpdateArray = TRUE)
     {
-        CALL_STACK_MESSAGE3("AddFile(%s, %ld)", fullName, bUpdateArray);
+        CALL_STACK_MESSAGE3("AddFile(%ls, %ld)", fullName, bUpdateArray);
 
         if (bUpdateArray)
         {
-            char* dup = _strdup(fullName);
+            wchar_t* dup = _wcsdup(fullName);
             if (dup == NULL)
             {
-                SalamanderGeneral->SalMessageBox(hDialog, LoadStr(IDS_OUTOFMEM), LoadStr(IDS_COMBINE),
+                SalamanderGeneral->SalMessageBox(hDialog, LangStr(IDS_OUTOFMEM).c_str(), LangStr(IDS_COMBINE).c_str(),
                                                  MB_OK | MB_ICONEXCLAMATION);
                 return FALSE;
             }
             files->Add(dup);
         }
 
-        CPathBuffer dir; // Heap-allocated for long path support
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, dir, dir.Size(), NULL, NULL);
-        const char* name = SalamanderGeneral->SalPathFindFileName(fullName);
+        std::wstring dir;
+        SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, dir);
+        const wchar_t* name = SalamanderGeneral->SalPathFindFileName(fullName);
         ITEMDATA* pid = new ITEMDATA;
-        if ((name - fullName - 1) == (int)strlen(dir) && !_memicmp(dir, fullName, name - fullName - 1))
-            strcpy(pid->text, name);
+        if ((name - fullName - 1) == static_cast<int>(dir.size()) &&
+            !_wcsnicmp(dir.c_str(), fullName, name - fullName - 1))
+            pid->text = name;
         else
-            strcpy(pid->text, fullName);
+            pid->text = fullName;
         pid->index = (int)SendMessage(hLB, LB_GETCOUNT, 0, 0) - 1;
         SendMessage(hLB, LB_INSERTSTRING, pid->index, 1);
         /*SHFILEINFO sfi;
@@ -411,12 +426,12 @@ namespace combine
         if (oldindex == newindex)
             return;
 
-        char* olditem = (*files)[oldindex];
-        char** data = (char**)files->GetData();
+        wchar_t* olditem = (*files)[oldindex];
+        wchar_t** data = (wchar_t**)files->GetData();
         if (oldindex > newindex)
-            memmove(data + newindex + 1, data + newindex, (oldindex - newindex) * sizeof(char*));
+            memmove(data + newindex + 1, data + newindex, (oldindex - newindex) * sizeof(wchar_t*));
         else
-            memmove(data + oldindex, data + oldindex + 1, (newindex - oldindex) * sizeof(char*));
+            memmove(data + oldindex, data + oldindex + 1, (newindex - oldindex) * sizeof(wchar_t*));
         (*files)[newindex] = olditem;
 
         SendMessage(hLB, WM_SETREDRAW, FALSE, 0);
@@ -468,87 +483,63 @@ namespace combine
     {
         CALL_STACK_MESSAGE1("OnAdd()");
         OPENFILENAME ofn;
-        char* filenames = new char[SAL_MAX_LONG_PATH];
-        if (filenames == NULL)
-        {
-            SalamanderGeneral->SalMessageBox(hDialog, LoadStr(IDS_OUTOFMEM), LoadStr(IDS_COMBINE),
-                                             MB_OK | MB_ICONEXCLAMATION);
-            return;
-        }
-        filenames[0] = 0;
         ZeroMemory(&ofn, sizeof(ofn));
         ofn.lStructSize = sizeof(ofn);
         ofn.hwndOwner = hDialog;
         ofn.hInstance = HLanguage;
-        char filter[100];
-        strcpy(filter, LoadStr(IDS_ADDFILTER));
-        memcpy(filter + strlen(filter) + 1, "*.*\0\0", 5);
-        ofn.lpstrFilter = filter;
         ofn.lpstrCustomFilter = NULL;
-        ofn.lpstrFile = filenames;
-        ofn.nMaxFile = SAL_MAX_LONG_PATH;
-        ofn.lpstrTitle = LoadStr(IDS_ADDTITLE);
-        CPathBuffer initdir; // Heap-allocated for long path support
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, initdir, initdir.Size(), NULL, NULL);
-        ofn.lpstrInitialDir = initdir;
         ofn.Flags = OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_READONLY | OFN_NOCHANGEDIR;
 
-        if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+        std::wstring initdirW;
+        SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, initdirW);
+        std::wstring filterW = LangStr(IDS_ADDFILTER).c_str();
+        filterW.push_back(L'\0');
+        filterW += L"*.*";
+        filterW.push_back(L'\0');
+        filterW.push_back(L'\0');
+        ofn.lpstrFilter = filterW.c_str();
+        std::wstring titleW = LangStr(IDS_ADDTITLE).c_str();
+        ofn.lpstrTitle = titleW.c_str();
+        ofn.lpstrInitialDir = initdirW.c_str();
+
+        std::vector<std::wstring> selectedFiles;
+        if (SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &ofn,
+                                         selectedFiles))
         {
             SendMessage(hLB, WM_SETREDRAW, FALSE, 0);
-            int i = ofn.nFileOffset;
-            if (i > 0)
-                filenames[i - 1] = 0;
-            while (filenames[i])
+            for (const std::wstring& fullName : selectedFiles)
             {
-                CPathBuffer fullname; // Heap-allocated for long path support
-                strcpy(fullname, filenames);
-                if (!SalamanderGeneral->SalPathAppend(fullname, filenames + i, fullname.Size()))
-                {
-                    SalamanderGeneral->SalMessageBox(hDialog, LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_COMBINE),
-                                                     MB_OK | MB_ICONEXCLAMATION);
-                    delete[] filenames;
+                if (!AddFile(fullName.c_str()))
                     return;
-                }
-                if (!AddFile(fullname))
-                {
-                    delete[] filenames;
-                    return;
-                }
-                while (filenames[i])
-                    i++;
-                i++;
             }
             SendMessage(hLB, WM_SETREDRAW, TRUE, 0);
         }
-
-        delete[] filenames;
     }
 
     static void OnBrowse()
     {
         CALL_STACK_MESSAGE1("OnBrowse()");
         OPENFILENAME ofn;
-        CPathBuffer filename; // Heap-allocated for long path support
-        filename[0] = 0;
         ZeroMemory(&ofn, sizeof(ofn));
         ofn.lStructSize = sizeof(ofn);
         ofn.hwndOwner = hDialog;
         ofn.hInstance = HLanguage;
-        char filter[100];
-        strcpy(filter, LoadStr(IDS_ADDFILTER));
-        memcpy(filter + strlen(filter) + 1, "*.*\0\0", 5);
-        ofn.lpstrFilter = filter;
         ofn.lpstrCustomFilter = NULL;
-        ofn.lpstrFile = filename;
-        ofn.nMaxFile = filename.Size();
-        ofn.lpstrTitle = LoadStr(IDS_BROWSETITLE);
-        CPathBuffer initdir; // Heap-allocated for long path support
-        SalamanderGeneral->GetPanelPath(PANEL_SOURCE, initdir, initdir.Size(), NULL, NULL);
-        ofn.lpstrInitialDir = initdir;
         ofn.Flags = OFN_PATHMUSTEXIST | OFN_EXPLORER | OFN_OVERWRITEPROMPT | OFN_NOCHANGEDIR;
-        if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
-            SetDlgItemText(hDialog, IDC_EDIT_TARGET, filename);
+        std::wstring initdirW;
+        SPLGetPanelPathOwned(SalamanderGeneral, PANEL_SOURCE, initdirW);
+        std::wstring fileW;
+        std::wstring filterW = LangStr(IDS_ADDFILTER).c_str();
+        filterW.push_back(L'\0');
+        filterW += L"*.*";
+        filterW.push_back(L'\0');
+        filterW.push_back(L'\0');
+        ofn.lpstrFilter = filterW.c_str();
+        std::wstring titleW = LangStr(IDS_BROWSETITLE).c_str();
+        ofn.lpstrTitle = titleW.c_str();
+        ofn.lpstrInitialDir = initdirW.c_str();
+        if (SPLSafeGetSaveFileNameOwned(SalamanderGeneral, &ofn, fileW))
+            SetDlgItemTextW(hDialog, IDC_EDIT_TARGET, fileW.c_str());
     }
 
     static void OnCRC(HWND parent)
@@ -573,7 +564,8 @@ namespace combine
 
             if (pid && (pid->index >= 0))
             {
-                GetTextExtentPoint32(hDC, pid->text, (int)strlen(pid->text), &sz);
+                GetTextExtentPoint32W(hDC, pid->text.c_str(),
+                                      static_cast<int>(pid->text.size()), &sz);
                 if (sz.cx > minWidth)
                     minWidth = sz.cx;
             }
@@ -624,7 +616,7 @@ namespace combine
             UpdateHorizontalScrollbar(hLB);
 
             HWND hEdit = GetDlgItem(hWnd, IDC_EDIT_TARGET);
-            SetWindowText(hEdit, targetName);
+            SetWindowTextW(hEdit, targetName->c_str());
             SetFocus(GetDlgItem(hWnd, IDC_EDIT_TARGET));
             SendMessage(hEdit, EM_SETSEL, 0, -1);
 
@@ -662,9 +654,11 @@ namespace combine
                 break;
 
             case IDOK:
-                GetDlgItemText(hWnd, IDC_EDIT_TARGET, targetName, SAL_MAX_LONG_PATH);
+            {
+                *targetName = SPLGetDlgItemTextOwned(hWnd, IDC_EDIT_TARGET);
                 EndDialog(hWnd, TRUE);
                 break;
+            }
 
             case IDCANCEL:
                 EndDialog(hWnd, FALSE);
@@ -744,7 +738,8 @@ namespace combine
                 r.left += 21;
                 SetTextColor(hDC, PluginDarkMode_GetOwnerDrawTextColor(selected, TRUE));
                 SetBkMode(hDC, TRANSPARENT);
-                DrawText(hDC, pid->text, -1, &r, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
+                DrawTextW(hDC, pid->text.c_str(), -1, &r,
+                          DT_SINGLELINE | DT_LEFT | DT_VCENTER);
                 r.left -= 21;
             }
             if (focused)
@@ -814,12 +809,13 @@ namespace combine
 } // namespace combine
 using namespace combine;
 
-BOOL CombineDialog(TIndirectArray<char>& f, LPTSTR t, BOOL b, UINT32 c, HWND hParent,
+BOOL CombineDialog(TIndirectArray<wchar_t>& f, std::wstring& t, BOOL b,
+                   UINT32 c, HWND hParent,
                    CSalamanderForOperationsAbstract* sal)
 {
-    CALL_STACK_MESSAGE4("CombineDialog( , %s, %ld, %X, , )", t, b, c);
+    CALL_STACK_MESSAGE4("CombineDialog( , %ls, %ld, %X, , )", t.c_str(), b, c);
     files = &f;
-    targetName = t;
+    targetName = &t;
     bOrigCrcFound = b;
     origCrc = c;
     salamander = sal;
@@ -910,11 +906,10 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     {
         SalamanderGUI->ArrangeHorizontalLines(hWnd);
         CenterWindow(hWnd);
-        char text[100];
-        sprintf(text, LoadStr(IDS_CRCHEX), calcCrc);
-        SetDlgItemText(hWnd, IDC_EDIT_CRC1, text);
-        sprintf(text, LoadStr(IDS_CRCDEC), calcCrc);
-        SetDlgItemText(hWnd, IDC_EDIT_CRC2, text);
+        std::wstring text = SPLFormatStringOwned(LangStr(IDS_CRCHEX).c_str(), calcCrc);
+        SetDlgItemTextW(hWnd, IDC_EDIT_CRC1, text.c_str());
+        text = SPLFormatStringOwned(LangStr(IDS_CRCDEC).c_str(), calcCrc);
+        SetDlgItemTextW(hWnd, IDC_EDIT_CRC2, text.c_str());
 
         // WARNING! the obtained icon must be destroyed in WM_DESTROY
         HICON icon = (HICON)LoadImage(DLLInstance, MAKEINTRESOURCE(IDI_WARN), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
@@ -924,14 +919,14 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
         if (bCrcFound)
         {
-            sprintf(text, LoadStr(IDS_CRCHEX), originalCrc);
-            SetDlgItemText(hWnd, IDC_EDIT_CRC3, text);
-            sprintf(text, LoadStr(IDS_CRCDEC), originalCrc);
-            SetDlgItemText(hWnd, IDC_EDIT_CRC4, text);
+            text = SPLFormatStringOwned(LangStr(IDS_CRCHEX).c_str(), originalCrc);
+            SetDlgItemTextW(hWnd, IDC_EDIT_CRC3, text.c_str());
+            text = SPLFormatStringOwned(LangStr(IDS_CRCDEC).c_str(), originalCrc);
+            SetDlgItemTextW(hWnd, IDC_EDIT_CRC4, text.c_str());
             ShowWindow(GetDlgItem(hWnd, calcCrc == originalCrc ? IDC_ICON_OK : IDC_ICON_WARN), SW_SHOW);
         }
         else
-            SetDlgItemText(hWnd, IDC_EDIT_CRC3, LoadStr(IDS_CRCNOTFOUND));
+            SetDlgItemTextW(hWnd, IDC_EDIT_CRC3, LangStr(IDS_CRCNOTFOUND).c_str());
 
         return TRUE;
     }
@@ -960,7 +955,7 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     }
 }
 
-void CRCDialog(TIndirectArray<char>& files, BOOL bf, UINT32 oc, HWND parent,
+void CRCDialog(TIndirectArray<wchar_t>& files, BOOL bf, UINT32 oc, HWND parent,
                CSalamanderForOperationsAbstract* salamander)
 {
     CALL_STACK_MESSAGE3("CRCDialog( , %ld, %X, , )", bf, oc);
@@ -990,14 +985,14 @@ void CRCDialog(TIndirectArray<char>& files, BOOL bf, UINT32 oc, HWND parent,
     {
       SalamanderGUI->ArrangeHorizontalLines(hWnd);
       CenterWindow(hWnd);
-      CPathBuffer text; // Heap-allocated for long path support
-      sprintf(text.Get(), LoadStr(IDS_FILECRCTITLE), 
-        SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL)->Name);
-      SetDlgItemText(hWnd, IDC_STATIC_CRCTITLE, text);
-      sprintf(text.Get(), LoadStr(IDS_CRCHEX), lParam);
-      SetDlgItemText(hWnd, IDC_EDIT_CRC1, text);
-      sprintf(text.Get(), LoadStr(IDS_CRCDEC), lParam);
-      SetDlgItemText(hWnd, IDC_EDIT_CRC2, text);
+      std::wstring text = SPLFormatStringOwned(
+          LangStr(IDS_FILECRCTITLE).c_str(),
+          SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL)->Name);
+      SetDlgItemTextW(hWnd, IDC_STATIC_CRCTITLE, text.c_str());
+      text = SPLFormatStringOwned(LangStr(IDS_CRCHEX).c_str(), lParam);
+      SetDlgItemTextW(hWnd, IDC_EDIT_CRC1, text.c_str());
+      text = SPLFormatStringOwned(LangStr(IDS_CRCDEC).c_str(), lParam);
+      SetDlgItemTextW(hWnd, IDC_EDIT_CRC2, text.c_str());
 
       SendDlgItemMessage(hWnd, IDC_ICON_OK, STM_SETIMAGE, IMAGE_ICON,
                          (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_OK)));

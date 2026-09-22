@@ -27,7 +27,7 @@ public:
     ~CNethoodPluginInterfaceForFS();
 
     virtual CPluginFSInterfaceAbstract* WINAPI OpenFS(
-        __in const char* fsName,
+        __in const wchar_t* fsName,
         __in int fsNameIndex);
 
     virtual void WINAPI CloseFS(
@@ -36,7 +36,7 @@ public:
     virtual void WINAPI ExecuteOnFS(
         __in int panel,
         __in CPluginFSInterfaceAbstract* pluginFS,
-        __in const char* pluginFSName,
+        __in const wchar_t* pluginFSName,
         __in int pluginFSNameIndex,
         __in CFileData& file,
         __in int isDir);
@@ -46,23 +46,23 @@ public:
         __in BOOL isInPanel,
         __in int panel,
         __in CPluginFSInterfaceAbstract* pluginFS,
-        __in const char* pluginFSName,
+        __in const wchar_t* pluginFSName,
         __in int pluginFSNameIndex);
 
-    virtual void WINAPI ConvertPathToInternal(
-        __in const char* fsName,
+    virtual BOOL WINAPI ConvertPathToInternal(
+        __in const wchar_t* fsName,
         __in int fsNameIndex,
-        __inout char* fsUserPart);
+        __inout CSalamanderStringBuffer* fsUserPart);
 
-    virtual void WINAPI ConvertPathToExternal(
-        __in const char* fsName,
+    virtual BOOL WINAPI ConvertPathToExternal(
+        __in const wchar_t* fsName,
         __in int fsNameIndex,
-        __inout char* fsUserPart);
+        __inout CSalamanderStringBuffer* fsUserPart);
 
     virtual void WINAPI EnsureShareExistsOnServer(
         __in int panel,
-        __in const char* server,
-        __in const char* share);
+        __in const wchar_t* server,
+        __in const wchar_t* share);
 
     virtual void WINAPI ExecuteChangeDriveMenuItem(
         __in int panel);
@@ -73,7 +73,7 @@ public:
         __in int x,
         __in int y,
         __in CPluginFSInterfaceAbstract* pluginFS,
-        __in const char* pluginFSName,
+        __in const wchar_t* pluginFSName,
         __in int pluginFSNameIndex,
         __in BOOL isDetachedFS,
         __out BOOL& refreshMenu,

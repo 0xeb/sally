@@ -14,10 +14,12 @@ sal_add_plugin(NAME dbviewer
     "${SAL_PLUGINS}/dbviewer/data.cpp"
     "${SAL_PLUGINS}/dbviewer/dbviewer.cpp"
     "${SAL_PLUGINS}/dbviewer/dialogs.cpp"
+    "${SAL_PLUGINS}/dbviewer/find_history.cpp"
     "${SAL_PLUGINS}/dbviewer/parser.cpp"
     "${SAL_PLUGINS}/dbviewer/precomp.cpp"
     "${SAL_PLUGINS}/dbviewer/renmain.cpp"
     "${SAL_PLUGINS}/dbviewer/renpaint.cpp"
+    "${SAL_PLUGINS}/dbviewer/widefind.cpp"
   RC "${SAL_PLUGINS}/dbviewer/dbviewer.rc"
   DEF "${SAL_PLUGINS}/dbviewer/dbviewer.def"
   NO_SHARED

@@ -1,10 +1,13 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
 
+#include <algorithm>
+
 #include "ui/IPrompter.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
 
 #include "mainwnd.h"
@@ -292,7 +295,7 @@ CChangeAttrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 unsigned ThreadProgressDlgBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("ThreadProgressDlgBody()");
-    SetThreadNameInVCAndTrace("ProgrDlg");
+    SetThreadNameInVCAndTrace(L"ProgrDlg");
     TRACE_I("Begin");
     CStartProgressDialogData* data = (CStartProgressDialogData*)parameter;
     CChangeAttrsData attrsDataCopy;
@@ -303,12 +306,8 @@ unsigned ThreadProgressDlgBody(void* parameter)
     if (data->ConvertData != NULL)
         convertDataCopy = *data->ConvertData;
     CConvertData* convertData = (data->ConvertData != NULL ? &convertDataCopy : NULL);
-    CPathBuffer workPath1; // Heap-allocated for long path support
-    lstrcpyn(workPath1, data->Script->WorkPath1, workPath1.Size());
     std::wstring workPath1W = data->Script->WorkPath1W;
     BOOL workPath1InclSubDirs = data->Script->WorkPath1InclSubDirs;
-    CPathBuffer workPath2; // Heap-allocated for long path support
-    lstrcpyn(workPath2, data->Script->WorkPath2, workPath2.Size());
     std::wstring workPath2W = data->Script->WorkPath2W;
     BOOL workPath2InclSubDirs = data->Script->WorkPath2InclSubDirs;
 
@@ -319,12 +318,8 @@ unsigned ThreadProgressDlgBody(void* parameter)
 
     if (!workPath1W.empty())
         MainWindow->PostChangeOnPathNotificationW(workPath1W.c_str(), workPath1InclSubDirs);
-    else if (workPath1[0] != 0)
-        MainWindow->PostChangeOnPathNotification(workPath1, workPath1InclSubDirs);
     if (!workPath2W.empty())
         MainWindow->PostChangeOnPathNotificationW(workPath2W.c_str(), workPath2InclSubDirs);
-    else if (workPath2[0] != 0)
-        MainWindow->PostChangeOnPathNotification(workPath2, workPath2InclSubDirs);
     TRACE_I("End");
     return 0;
 }
@@ -354,7 +349,7 @@ DWORD WINAPI ThreadProgressDlg(void* param)
     return ThreadProgressDlgEH(param);
 }
 
-BOOL StartProgressDialog(COperations* script, const char* caption,
+BOOL StartProgressDialog(COperations* script, const wchar_t* caption,
                          CChangeAttrsData* attrsData, CConvertData* convertData)
 {
     BOOL ret = FALSE;
@@ -402,7 +397,7 @@ BOOL StartProgressDialog(COperations* script, const char* caption,
     return ret;
 }
 
-CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* caption,
+CProgressDialog::CProgressDialog(HWND parent, COperations* script, const wchar_t* caption,
                                  CChangeAttrsData* attrsData, CConvertData* convertData,
                                  BOOL runningInOwnThread, CStartProgressDialogData* progrDlgData)
     : CCommonDialog(HLanguage, IDD_PROGRESSDLG, parent)
@@ -415,7 +410,7 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     CancelWorker = FALSE;
     OperationProgress = 0;
     SummaryProgress = 0;
-    strcpy(Caption, caption);
+    Caption = caption != NULL ? caption : L"";
     Script = script;
     AttrsData = attrsData;
     AcceptCommands = TRUE;
@@ -425,10 +420,10 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     FirstUserSetDialog = TRUE;
     NextForegroundWindow = NULL;
     CacheIsDirty = FALSE;
-    OperationCache[0] = 0;
-    PrepositionCache[0] = 0;
-    SourceCache[0] = 0;
-    TargetCache[0] = 0;
+    OperationCache.clear();
+    PrepositionCache.clear();
+    SourceCacheW.clear();
+    TargetCacheW.clear();
     OperationProgressCacheIsDirty = FALSE;
     OperationProgressCache = 0;
     SummaryProgressCacheIsDirty = FALSE;
@@ -448,27 +443,22 @@ CProgressDialog::~CProgressDialog()
         TRACE_E("Unexpected situation in CProgressDialog::~CProgressDialog(): worker thread is still alive!");
 }
 
-char* RemapNames(char* name, int bufLen, char* source, COperations* script)
+// COperations::RemapNameFrom/To are const wchar_t* (worker.h:384/386) and
+// this function was already declared wide. Return an owned string so remapping cannot silently
+// fall back to the unmodified source merely because a legacy scratch buffer was too small.
+std::wstring RemapNames(const wchar_t* source, COperations* script)
 {
-    CALL_STACK_MESSAGE3("RemapNames(, %d, %s,)", bufLen, source);
-    char* s = strstr(source, script->RemapNameFrom);
-    if (s != NULL)
-    {
-        int len = (int)strlen(source);
-        if (len - script->RemapNameFromLen + script->RemapNameToLen < bufLen)
-        {
-            memcpy(name, source, s - source);
-            char* st = name + (s - source);
-            memcpy(st + script->RemapNameToLen, s + script->RemapNameFromLen,
-                   len - ((s + script->RemapNameFromLen) - source) + 1);
-            memcpy(st, script->RemapNameTo, script->RemapNameToLen);
-            return name;
-        }
-        else
-            return source;
-    }
-    else
+    CALL_STACK_MESSAGE2("RemapNames(%ls,)", source);
+    const wchar_t* s = wcsstr(source, script->RemapNameFrom);
+    if (s == NULL)
         return source;
+
+    std::wstring result(source);
+    result.replace(static_cast<size_t>(s - source),
+                   static_cast<size_t>(script->RemapNameFromLen),
+                   script->RemapNameTo,
+                   static_cast<size_t>(script->RemapNameToLen));
+    return result;
 }
 
 BOOL CProgressDialog::FlushCachedData()
@@ -478,27 +468,24 @@ BOOL CProgressDialog::FlushCachedData()
     if (CacheIsDirty)
     {
         if (OperationText != NULL)
-            OperationText->SetText(OperationCache);
+            OperationText->SetText(OperationCache.c_str());
         if (Source != NULL && Script != NULL)
         {
-            if (!SourceCacheW.empty() && Script->RemapNameFrom == NULL)
-                Source->SetTextToDblQuotesIfNeededW(SourceCacheW.c_str());
-            else if (Script->RemapNameFrom != NULL)
+            if (Script->RemapNameFrom != NULL)
             {
-                CPathBuffer name; // Heap-allocated for long path support
-                Source->SetTextToDblQuotesIfNeeded(RemapNames(name, name.Size(), SourceCache, Script));
+                // An earlier note that stood here said the remap table
+                // was still ANSI and narrowed SourceCacheW for it. The table has been
+                // const wchar_t* since P1.4 - the narrowing was a CP_ACP round trip serving a
+                // premise that had already expired. Straight through, no conversion.
+                const std::wstring name = RemapNames(SourceCacheW.c_str(), Script);
+                Source->SetTextToDblQuotesIfNeeded(name.c_str());
             }
             else
-                Source->SetTextToDblQuotesIfNeeded(SourceCache);
+                Source->SetTextToDblQuotesIfNeeded(SourceCacheW.c_str());
         }
-        SetWindowText(HPreposition, PrepositionCache);
+        SetWindowTextW(HPreposition, PrepositionCache.c_str());
         if (Target != NULL)
-        {
-            if (!TargetCacheW.empty())
-                Target->SetTextToDblQuotesIfNeededW(TargetCacheW.c_str());
-            else
-                Target->SetTextToDblQuotesIfNeeded(TargetCache);
-        }
+            Target->SetTextToDblQuotesIfNeeded(TargetCacheW.c_str());
         CacheIsDirty = FALSE;
     }
 
@@ -525,31 +512,29 @@ BOOL CProgressDialog::FlushCachedData()
 
 void CProgressDialog::SetDlgTitle(BOOL minimized)
 {
-    char buf[200];
     TaskBarList3.SetProgressState(ShowPause ? TBPF_NORMAL : TBPF_PAUSED);
     if (RunningInOwnThread)
     {
+        std::wstring title;
         if (ShowPause)
-            sprintf(buf, "(%d %%) %s", (int)((min(1000, SummaryProgress) /*+ 5*/) / 10), Caption); // no rounding (100% must appear only at 100% and not at 99.5%)
+            title = FormatStrW(L"(%d %%) %s", (int)((min(1000, SummaryProgress) /*+ 5*/) / 10), Caption.c_str()); // no rounding (100% must appear only at 100% and not at 99.5%)
         else
-            sprintf(buf, "(%s) %s", LoadStr(AutoPaused ? IDS_PROGDLGQUEUEPAUSED : IDS_PROGDLGPAUSED),
-                    AutoPaused && Script != NULL && !Script->WaitInQueueSubject.empty() ? Script->WaitInQueueSubject.c_str() : Caption);
-        char oldCaption[200];
-        ::GetWindowText(HWindow, oldCaption, 200);
-        oldCaption[199] = 0;
-        if (strcmp(oldCaption, buf) != 0)
-            SetWindowText(HWindow, buf);
+            title = FormatStrW(L"(%s) %s", LoadStrW(AutoPaused ? IDS_PROGDLGQUEUEPAUSED : IDS_PROGDLGPAUSED),
+                               AutoPaused && Script != NULL && !Script->WaitInQueueSubject.empty() ? Script->WaitInQueueSubject.c_str() : Caption.c_str());
+        if (GetWindowTextStringW(HWindow) != title)
+            SetWindowTextW(HWindow, title.c_str());
     }
     else
     {
         if (minimized)
         {
+            std::wstring title;
             if (ShowPause)
-                sprintf(buf, "(%d %%) %s: %s", (int)((min(1000, SummaryProgress) /*+ 5*/) / 10), MAINWINDOW_NAME, Caption); // no rounding (100% must appear only at 100% and not at 99.5%)
+                title = FormatStrW(L"(%d %%) %s: %s", (int)((min(1000, SummaryProgress) /*+ 5*/) / 10), MAINWINDOW_NAME, Caption.c_str()); // no rounding (100% must appear only at 100% and not at 99.5%)
             else
-                sprintf(buf, "(%s) %s: %s", LoadStr(IDS_PROGDLGPAUSED), MAINWINDOW_NAME, Caption);
+                title = FormatStrW(L"(%s) %s: %s", LoadStrW(IDS_PROGDLGPAUSED), MAINWINDOW_NAME, Caption.c_str());
 
-            MainWindow->SetWindowTitle(buf);
+            MainWindow->SetWindowTitle(title.c_str());
         }
         else
             MainWindow->SetWindowTitle();
@@ -577,10 +562,10 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGPAUSE));
+        SetDlgItemTextW(HWindow, IDB_PAUSERESUME, LoadStrW(IDS_PROGDLGPAUSE));
 
         if (!RunningInOwnThread)
-            SetWindowText(HWindow, Caption); // in the modal version of the dialog this is the only title setup
+            SetWindowTextW(HWindow, Caption.c_str()); // in the modal version of the dialog this is the only title setup
 
         SetWindowIcon();
 
@@ -670,16 +655,16 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 AutoPaused = TRUE;
                 ResetEvent(WorkerNotSuspended);
                 ShowPause = FALSE;
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
+                SetDlgItemTextW(HWindow, IDB_PAUSERESUME, LoadStrW(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
                 SetDlgTitle(IsIconic(RunningInOwnThread ? HWindow : MainWindow->HWindow));
 
                 if (!Script->WaitInQueueFrom.empty() && !Script->WaitInQueueTo.empty())
                 {
                     if (OperationText != NULL)
-                        OperationText->SetText(LoadStr(IDS_COPYINGFROM));
+                        OperationText->SetText(LoadStrW(IDS_COPYINGFROM));
                     if (Source != NULL)
                         Source->SetTextToDblQuotesIfNeeded(Script->WaitInQueueFrom.c_str());
-                    SetWindowText(HPreposition, LoadStr(IDS_COPYINGTO));
+                    SetWindowTextW(HPreposition, LoadStrW(IDS_COPYINGTO));
                     if (Target != NULL)
                         Target->SetTextToDblQuotesIfNeeded(Script->WaitInQueueTo.c_str());
                 }
@@ -734,12 +719,10 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (data != NULL)
         {
             // do not draw data immediately, only on the timer
-            lstrcpyn(OperationCache, data->Operation, 100);
-            lstrcpyn(PrepositionCache, data->Preposition, 100);
-            lstrcpyn(SourceCache, data->Source, SourceCache.Size());
-            lstrcpyn(TargetCache, data->Target, TargetCache.Size());
-            SourceCacheW = data->SourceW != NULL ? data->SourceW : L"";
-            TargetCacheW = data->TargetW != NULL ? data->TargetW : L"";
+            OperationCache = data->Operation != NULL ? data->Operation : L"";
+            PrepositionCache = data->Preposition != NULL ? data->Preposition : L"";
+            SourceCacheW = data->Source != NULL ? data->Source : L"";
+            TargetCacheW = data->Target != NULL ? data->Target : L"";
             CacheIsDirty = TRUE;
         }
 
@@ -805,185 +788,152 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             PostMessage(HWindow, WM_TIMER, IDT_UPDATESTATUS, 0); // send one more timer so that the "paused" status is displayed
         }
 
-        char** data = (char**)lParam;
+        // One message-id space; every payload slot is UTF-16.
+        // WideToAnsi below feeds dialog ctor args that are still char* until
+        // the winlib flip — display-only narrowing at the boundary.
+        void** dataW = (void**)lParam;
         switch (wParam)
         {
-        case 100:
-        {
-            void** dataW = (void**)lParam;
-            CFileErrorDlg dlg(HWindow, (const char*)dataW[1], (const char*)dataW[2], (const char*)dataW[4],
-                              FALSE, 0, (const wchar_t*)dataW[3]);
-            *(int*)dataW[0] = (int)dlg.Execute();
-            break;
-        }
-
         case 0:
         {
-            CFileErrorDlg dlg(HWindow, data[1], data[2], data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 101:
-        {
-            void** dataW = (void**)lParam;
-            COverwriteDlg dlg(HWindow, (const char*)dataW[1], (const char*)dataW[3],
-                              (const char*)dataW[4], (const char*)dataW[6], FALSE, FALSE,
-                              (const wchar_t*)dataW[2], (const wchar_t*)dataW[5]);
-            *(int*)dataW[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 107:
-        {
-            void** dataW = (void**)lParam;
-            COverwriteDlg dlg(HWindow, (const char*)dataW[1], (const char*)dataW[3],
-                              (const char*)dataW[4], (const char*)dataW[6], FALSE, TRUE,
-                              (const wchar_t*)dataW[2], (const wchar_t*)dataW[5]);
+            // The caller already HAS wide strings; these used to be
+            // narrowed here purely because the dialog took char*. Three WideToAnsi
+            // calls disappear, and the error text stops being lossy on a dialog
+            // that was already showing the file name correctly.
+            CFileErrorDlg dlg(HWindow, (const wchar_t*)dataW[1], (const wchar_t*)dataW[2],
+                              (const wchar_t*)dataW[3], FALSE, 0);
             *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 1:
         {
-            CPathBuffer tmpName; // Heap-allocated for long path support
-            CPathBuffer tmpName2; // Heap-allocated for long path support
-            char *filename1, *filename2;
+            const wchar_t* srcW = (const wchar_t*)dataW[1];
+            const wchar_t* tgtW = (const wchar_t*)dataW[3];
+            // Two more WideToAnsi gone: the attr strings are wide now.
+            const wchar_t* srcInfoW = (const wchar_t*)dataW[2];
+            const wchar_t* tgtInfoW = (const wchar_t*)dataW[4];
+            BOOL dirOverwrite = (BOOL)(DWORD_PTR)dataW[5];
             if (Script != NULL && Script->RemapNameFrom != NULL)
             {
-                filename1 = RemapNames(tmpName, tmpName.Size(), data[1], Script);
-                filename2 = RemapNames(tmpName2, tmpName2.Size(), data[3], Script);
+                // The remap table is const wchar_t* (worker.h:384/386); the
+                // two WideToAnsi round trips here served a premise that expired at P1.4.
+                const std::wstring filename1 = RemapNames(srcW, Script);
+                const std::wstring filename2 = RemapNames(tgtW, Script);
+                COverwriteDlg dlg(HWindow, filename1.c_str(), srcInfoW, filename2.c_str(), tgtInfoW,
+                                  FALSE, dirOverwrite);
+                *(int*)dataW[0] = (int)dlg.Execute();
             }
             else
             {
-                filename1 = data[1];
-                filename2 = data[3];
+                COverwriteDlg dlg(HWindow, srcW, srcInfoW, tgtW, tgtInfoW,
+                                  FALSE, dirOverwrite);
+                *(int*)dataW[0] = (int)dlg.Execute();
             }
-            COverwriteDlg dlg(HWindow, filename1, data[2], filename2, data[4]);
-            *(int*)data[0] = (int)dlg.Execute();
             break;
         }
 
         case 2:
         {
-            CHiddenOrSystemDlg dlg(HWindow, data[1], data[2], data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 3:
-        {
-            CCannotMoveDlg dlg(HWindow, IDD_CANNOTMOVE, data[1], data[2], data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 103:
-        {
-            void** dataW = (void**)lParam;
-            CCannotMoveDlg dlg(HWindow, IDD_CANNOTMOVE, (char*)dataW[1], (char*)dataW[3], (char*)dataW[5],
-                               (const wchar_t*)dataW[2], (const wchar_t*)dataW[4]);
+            // Two more WideToAnsi calls gone: the caller already holds
+            // wide strings and only narrowed them because the dialog took char*.
+            // And now the THIRD one - the file name. This caller has
+            // held a wide name all along; the dialog's char* was the only reason
+            // it was being narrowed.
+            CHiddenOrSystemDlg dlg(HWindow, (const wchar_t*)dataW[1], (const wchar_t*)dataW[2],
+                                   (const wchar_t*)dataW[3]);
             *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
+        case 3:
         case 4:
         {
-            CCannotMoveDlg dlg(HWindow, IDD_RENAMEDIR, data[1], data[2], data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 104:
-        {
-            void** dataW = (void**)lParam;
-            CCannotMoveDlg dlg(HWindow, IDD_RENAMEDIR, (char*)dataW[1], (char*)dataW[3], (char*)dataW[5],
-                               (const wchar_t*)dataW[2], (const wchar_t*)dataW[4]);
+            CCannotMoveDlg dlg(HWindow, wParam == 4 ? IDD_RENAMEDIR : IDD_CANNOTMOVE,
+                               (wchar_t*)dataW[1], (wchar_t*)dataW[2], (wchar_t*)dataW[3]);
             *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 5:
         {
-            CFileErrorDlg dlg(HWindow, data[0], data[1], data[2], FALSE, IDD_ERROR3);
-            dlg.Execute();
-            break;
-        }
-
-        case 105:
-        {
-            void** dataW = (void**)lParam;
-            CFileErrorDlg dlg(HWindow, (const char*)dataW[0], (const char*)dataW[1], (const char*)dataW[3],
-                              FALSE, IDD_ERROR3, (const wchar_t*)dataW[2]);
+            CFileErrorDlg dlg(HWindow, (const wchar_t*)dataW[0], (const wchar_t*)dataW[1],
+                              (const wchar_t*)dataW[2], FALSE, IDD_ERROR3);
             dlg.Execute();
             break;
         }
 
         case 6:
         {
-            CErrorReadingADSDlg dlg(HWindow, data[1], data[2]);
-            *(int*)data[0] = (int)dlg.Execute();
+            CErrorReadingADSDlg dlg(HWindow, (const wchar_t*)dataW[1],
+                                    (const wchar_t*)dataW[2], NULL);
+            *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 7:
         {
-            COverwriteDlg dlg(HWindow, data[1], data[2], data[3], data[4], FALSE, TRUE);
-            *(int*)data[0] = (int)dlg.Execute();
+            // The names are wide now too - the comment above described a
+            // constraint that the duplicate parameters no longer impose. Two more
+            // WideToAnsi calls gone.
+            COverwriteDlg dlg(HWindow, (const wchar_t*)dataW[1], (const wchar_t*)dataW[2],
+                              (const wchar_t*)dataW[3], (const wchar_t*)dataW[4],
+                              FALSE, TRUE);
+            *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 8:
         {
-            CFileErrorDlg dlg(HWindow, data[1], data[2], data[3], FALSE, IDD_CANNOTOPENADS);
-            *(int*)data[0] = (int)dlg.Execute();
+            // Three distinct slots, as pre-unicode had (caption, file, error).
+            // An earlier collapse passed dataW[1] twice and dropped dataW[2],
+            // reasoning from AskADSOpenError's declared parameter names
+            // (fileName, adsName, errorText). But every production caller
+            // reaches this through AskADSOpenErrorById(titleId, fileName,
+            // win32Error), which fills the slots title / file / error - so the
+            // collapse put the TITLE in the file-name field and the dialog
+            // never named the file that actually failed.
+            CFileErrorDlg dlg(HWindow, (const wchar_t*)dataW[1], (const wchar_t*)dataW[2],
+                              (const wchar_t*)dataW[3], FALSE, IDD_CANNOTOPENADS);
+            *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 9:
         {
-            CErrorSettingAttrsDlg dlg(HWindow, data[1], (DWORD)(DWORD_PTR)data[2], (DWORD)(DWORD_PTR)data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
+            // The worker already holds the wide name (IWorkerObserver's
+            // AskSetAttrsError takes const wchar_t*); pass it through, same idiom as
+            // CErrorCopyingPermissionsDlg/CErrorCopyingDirTimeDlg above.
+            CErrorSettingAttrsDlg dlg(HWindow, (const wchar_t*)dataW[1],
+                                      (DWORD)(DWORD_PTR)dataW[2], (DWORD)(DWORD_PTR)dataW[3]);
+            *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 10:
         {
-            CErrorCopyingPermissionsDlg dlg(HWindow, data[1], data[2], (DWORD)(DWORD_PTR)data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 110:
-        {
-            void** dataW = (void**)lParam;
-            CErrorCopyingPermissionsDlg dlg(HWindow, (const char*)dataW[1], (const char*)dataW[3],
-                                            (DWORD)(DWORD_PTR)dataW[5],
-                                            (const wchar_t*)dataW[2], (const wchar_t*)dataW[4]);
+            CErrorCopyingPermissionsDlg dlg(HWindow, (const wchar_t*)dataW[1],
+                                            (const wchar_t*)dataW[2], (DWORD)(DWORD_PTR)dataW[3]);
             *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 11:
         {
-            CErrorCopyingDirTimeDlg dlg(HWindow, data[1], (DWORD)(DWORD_PTR)data[2]);
-            *(int*)data[0] = (int)dlg.Execute();
-            break;
-        }
-
-        case 111:
-        {
-            void** dataW = (void**)lParam;
-            CErrorCopyingDirTimeDlg dlg(HWindow, (const char*)dataW[1], (DWORD)(DWORD_PTR)dataW[3],
-                                        (const wchar_t*)dataW[2]);
+            CErrorCopyingDirTimeDlg dlg(HWindow, (const wchar_t*)dataW[1],
+                                        (DWORD)(DWORD_PTR)dataW[2]);
             *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
 
         case 12:
         {
-            CConfirmEncryptionLossDlg dlg(HWindow, (BOOL)(INT_PTR)data[1], data[2], (BOOL)(INT_PTR)data[3]);
-            *(int*)data[0] = (int)dlg.Execute();
+            // The worker already holds the wide name (IWorkerObserver's
+            // AskEncryptionLoss takes const wchar_t*); pass it through, same idiom as
+            // CErrorCopyingPermissionsDlg/CErrorCopyingDirTimeDlg above.
+            CConfirmEncryptionLossDlg dlg(HWindow, (BOOL)(INT_PTR)dataW[1],
+                                          (const wchar_t*)dataW[2], (BOOL)(INT_PTR)dataW[3]);
+            *(int*)dataW[0] = (int)dlg.Execute();
             break;
         }
         }
@@ -1022,10 +972,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // text operation status (transfer speed, etc.)
             if (Status != NULL)
             {
-                char buf[300];
-                buf[0] = 0;
-                char num1[100];
-                char num2[100];
+                std::wstring statusText;
                 if (Script != NULL)
                 {
                     CQuadWord transferredFileSize, transferSpeed, progressSize, progressSpeed;
@@ -1036,44 +983,36 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                     if (!Script->FastMoveUsed)
                     {
-                        PrintDiskSize(num1, transferredFileSize, 4);
+                        const std::wstring num1 = PrintDiskSize(transferredFileSize, 4);
                         if (transferredFileSize <= Script->TotalFileSize)
                         {
-                            PrintDiskSize(num2, Script->TotalFileSize, 4);
-                            sprintf(buf, LoadStr(Script->IsCopyOperation ? IDS_PROGDLGSTATUSCOPY : IDS_PROGDLGSTATUSMOVE),
-                                    num1, num2);
+                            const std::wstring num2 = PrintDiskSize(Script->TotalFileSize, 4);
+                            statusText = FormatStrW(LoadStrW(Script->IsCopyOperation ? IDS_PROGDLGSTATUSCOPY : IDS_PROGDLGSTATUSMOVE),
+                                                    num1.c_str(), num2.c_str());
                         }
                         else
-                            strcpy(buf, num1);
+                            statusText = num1;
                     }
-                    int len = (int)strlen(buf);
 
                     if (!StatusPaused && ShowPause && transferSpeed.Value > 0)
                     {
-                        if (len > 0)
-                        {
-                            buf[len++] = ',';
-                            buf[len++] = ' ';
-                        }
-                        PrintDiskSize(num1, transferSpeed, 4);
+                        if (!statusText.empty())
+                            statusText += L", ";
+                        const std::wstring num1 = PrintDiskSize(transferSpeed, 4);
                         if (useSpeedLimit)
                         {
-                            PrintDiskSize(num2, CQuadWord(speedLimit, 0), 4);
-                            sprintf(buf + len, LoadStr(IDS_PROGDLGTRRATELIM), num1, num2);
+                            const std::wstring num2 = PrintDiskSize(CQuadWord(speedLimit, 0), 4);
+                            statusText += FormatStrW(LoadStrW(IDS_PROGDLGTRRATELIM), num1.c_str(), num2.c_str());
                         }
                         else
-                            sprintf(buf + len, LoadStr(IDS_PROGDLGTRRATE), num1);
-                        len = (int)strlen(buf);
+                            statusText += FormatStrW(LoadStrW(IDS_PROGDLGTRRATE), num1.c_str());
                     }
 
                     DWORD ti = GetTickCount();
                     if (!StatusPaused && ShowPause && progressSpeed.Value > 0 && Script->TotalSize > progressSize)
                     {
-                        if (len > 0)
-                        {
-                            buf[len++] = ',';
-                            buf[len++] = ' ';
-                        }
+                        if (!statusText.empty())
+                            statusText += L", ";
 
                         CQuadWord secs = (Script->TotalSize - progressSize) / progressSpeed; // estimate of remaining seconds
                                                                                              /*
@@ -1130,8 +1069,8 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         else
                             secs = TimeLeftLastValue; // otherwise show the old value (to keep the time-left estimate from changing too often)
 
-                        PrintTimeLeft(num1, secs);
-                        sprintf(buf + len, LoadStr(IDS_PROGDLGTIMELEFT), num1);
+                        const std::wstring num1 = PrintTimeLeft(secs);
+                        statusText += FormatStrW(LoadStrW(IDS_PROGDLGTIMELEFT), num1.c_str());
 
                         /*
               len = strlen(buf);
@@ -1145,7 +1084,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         NextTimeLeftUpdateTime = ti;
                     }
                 }
-                Status->SetText(buf);
+                Status->SetText(statusText.c_str());
             }
             return 0;
         }
@@ -1201,11 +1140,11 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
             MENU_ITEM_INFO mii;
             mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID;
             mii.Type = MENU_TYPE_STRING;
-            mii.String = LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME);
+            mii.String = LoadStrW(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME);
             mii.ID = 1;
             popup->InsertItem(-1, TRUE, &mii);
 
-            mii.String = LoadStr(IDS_PROGDLGSETSPLIM);
+            mii.String = LoadStrW(IDS_PROGDLGSETSPLIM);
             mii.ID = 2;
             popup->InsertItem(-1, TRUE, &mii);
 
@@ -1213,7 +1152,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
             {
                 mii.Mask |= MENU_MASK_STATE;
                 mii.State = OperationsQueue.GetNumOfOperations() > 1 ? 0 : MENU_STATE_GRAYED;
-                mii.String = LoadStr(IDS_PROGDLGAUTOPAUSE);
+                mii.String = LoadStrW(IDS_PROGDLGAUTOPAUSE);
                 mii.ID = 3;
                 popup->InsertItem(-1, TRUE, &mii);
                 mii.Mask &= ~MENU_MASK_STATE;
@@ -1241,7 +1180,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 OperationsQueue.AutoPauseOperation(HWindow, &activateOperDlg);
                 AutoPaused = TRUE;
                 ShowPause = FALSE;
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGRESUME));
+                SetDlgItemTextW(HWindow, IDB_PAUSERESUME, LoadStrW(IDS_PROGDLGRESUME));
                 PostMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDB_MINIMIZE), TRUE);
                 PostMessage(HWindow, WM_COMMAND, IDB_MINIMIZE, 0); // minimize the "waiting" operation immediately (nothing to watch, saves one step for the user)
                 if (activateOperDlg != NULL)
@@ -1499,7 +1438,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 }
                 if (IsInQueue)
                     OperationsQueue.SetPaused(HWindow, !ShowPause ? 2 /* manually paused */ : 0 /* running */);
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
+                SetDlgItemTextW(HWindow, IDB_PAUSERESUME, LoadStrW(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
                 SetDlgTitle(IsIconic(RunningInOwnThread ? HWindow : MainWindow->HWindow));
 
                 if (Status != NULL)
@@ -1533,10 +1472,10 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
             MSG msg; // cannot be called recursively (AcceptCommands == FALSE) -> ok
             BOOL oldCanClose = CanClose;
             CanClose = FALSE; // do not allow closing, we are inside a method
-            while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
             {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageW(&msg);
             }
             CanClose = oldCanClose;
 
@@ -1628,12 +1567,18 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 // CFileErrorDlg
 //
 
-CFileErrorDlg::CFileErrorDlg(HWND parent, const char* caption, const char* file, const char* error,
-                             BOOL noSkip, int altRes, const wchar_t* fileW) : CCommonDialog(HLanguage, altRes == 0 ? (noSkip ? IDD_CREATEDIRERR : IDD_CANNOTOPEN) : altRes, parent)
+CFileErrorDlg::CFileErrorDlg(HWND parent, const wchar_t* caption, const wchar_t* file, const wchar_t* error,
+                             BOOL noSkip, int altRes)
+    // unicodeWnd=TRUE is REQUIRED, not decorative: this dialog's
+    // caption and error are wchar_t* now, but SetWindowTextW on an ANSI-class
+    // dialog is re-narrowed by USER32 through CP_ACP. The opt-in creates it with
+    // DialogBoxParamW so the wide text actually reaches the screen. Same
+    // mechanism already proven on message boxes.
+    : CCommonDialog(HLanguage, altRes == 0 ? (noSkip ? IDD_CREATEDIRERR : IDD_CANNOTOPEN) : altRes,
+                    parent, ooStandard, NULL)
 {
     Caption = caption;
     File = file;
-    FileW = fileW;
     Error = error;
 }
 
@@ -1645,15 +1590,12 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, Caption);
+        SetWindowTextW(HWindow, Caption); // Caption is wide now
 
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (FileW != NULL)
-                name->SetTextToDblQuotesIfNeededW(FileW);
-            else
-                name->SetTextToDblQuotesIfNeeded(File);
+            name->SetTextToDblQuotesIfNeeded(File);
         }
         else
             TRACE_E(LOW_MEMORY);
@@ -1661,7 +1603,7 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ResID == IDD_CANNOTOPENADS)
             new CButton(HWindow, IDB_IGNORE, BTF_DROPDOWN);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -1679,8 +1621,8 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             mii.Type = MENU_TYPE_STRING;
             mii.State = 0;
 
-            char buf[100];
-            if (GetDlgItemText(HWindow, IDB_IGNORE, buf, 100))
+            wchar_t buf[100];
+            if (GetDlgItemTextW(HWindow, IDB_IGNORE, buf, 100))
             {
                 /* used by the export_mnu.py script that generates salmenu.mnu for the Translator
    keep synchronized with the InsertItem() calls below...
@@ -1696,7 +1638,7 @@ MENU_TEMPLATE_ITEM FileErrorDlgMenu[] =
                 mii.ID = 1;
                 menu.InsertItem(-1, TRUE, &mii);
 
-                mii.String = LoadStr(IDS_ERROPENADS_IGNOREALL);
+                mii.String = LoadStrW(IDS_ERROPENADS_IGNOREALL);
                 mii.ID = 2;
                 menu.InsertItem(-1, TRUE, &mii);
 
@@ -1745,19 +1687,21 @@ MENU_TEMPLATE_ITEM FileErrorDlgMenu[] =
 // COverwriteDlg
 //
 
-COverwriteDlg::COverwriteDlg(HWND parent, const char* sourceName, const char* sourceAttr,
-                             const char* targetName, const char* targetAttr, BOOL yesnocancel,
-                             BOOL dirOverwrite, const wchar_t* sourceNameW,
-                             const wchar_t* targetNameW) : CCommonDialog(HLanguage,
-                                                                dirOverwrite ? IDD_DIROVERWRITE : (yesnocancel ? IDD_OVERWRITE2 : IDD_OVERWRITE),
-                                                                parent)
+COverwriteDlg::COverwriteDlg(HWND parent, const wchar_t* sourceName, const wchar_t* sourceAttr,
+                             const wchar_t* targetName, const wchar_t* targetAttr, BOOL yesnocancel,
+                             BOOL dirOverwrite)
+    // unicodeWnd=TRUE: this dialog already took wide NAMES
+    // (sourceNameW/targetNameW) and now takes wide attr strings too, but on an
+    // ANSI-class dialog USER32 re-narrows everything it is given. The opt-in is
+    // what makes those wide parameters mean anything on screen.
+    : CCommonDialog(HLanguage,
+                    dirOverwrite ? IDD_DIROVERWRITE : (yesnocancel ? IDD_OVERWRITE2 : IDD_OVERWRITE),
+                    parent, ooStandard, NULL)
 {
     SourceName = sourceName;
     SourceAttr = sourceAttr;
     TargetName = targetName;
     TargetAttr = targetAttr;
-    SourceNameW = sourceNameW;
-    TargetNameW = targetNameW;
 }
 
 INT_PTR
@@ -1771,25 +1715,19 @@ COverwriteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CStaticText *source, *target;
         if ((source = new CStaticText(HWindow, IDS_SOURCENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (SourceNameW != NULL)
-                source->SetTextToDblQuotesIfNeededW(SourceNameW);
-            else
-                source->SetTextToDblQuotesIfNeeded(SourceName);
+            source->SetTextToDblQuotesIfNeeded(SourceName);
         }
         else
             TRACE_E(LOW_MEMORY);
         if ((target = new CStaticText(HWindow, IDS_TARGETNAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (TargetNameW != NULL)
-                target->SetTextToDblQuotesIfNeededW(TargetNameW);
-            else
-                target->SetTextToDblQuotesIfNeeded(TargetName);
+            target->SetTextToDblQuotesIfNeeded(TargetName);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_SOURCEATTR), SourceAttr);
-        SetWindowText(GetDlgItem(HWindow, IDS_TARGETATTR), TargetAttr);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_SOURCEATTR), SourceAttr);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_TARGETATTR), TargetAttr);
         break;
     }
 
@@ -1817,8 +1755,10 @@ COverwriteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CHiddenOrSystemDlg
 //
 
-CHiddenOrSystemDlg::CHiddenOrSystemDlg(HWND parent, const char* caption, const char* name,
-                                       const char* error, BOOL yesnocancel, BOOL yesallcancel) : CCommonDialog(HLanguage, yesnocancel ? (yesallcancel ? IDD_QUESTION3 : IDD_QUESTION2) : IDD_SYSTEMORHIDDEN, parent)
+CHiddenOrSystemDlg::CHiddenOrSystemDlg(HWND parent, const wchar_t* caption, const wchar_t* name,
+                                       const wchar_t* error, BOOL yesnocancel, BOOL yesallcancel)
+    // unicodeWnd=TRUE for the same reason as CFileErrorDlg above.
+    : CCommonDialog(HLanguage, yesnocancel ? (yesallcancel ? IDD_QUESTION3 : IDD_QUESTION2) : IDD_SYSTEMORHIDDEN, parent, ooStandard, NULL)
 {
     Caption = caption;
     Name = name;
@@ -1833,7 +1773,7 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, Caption);
+        SetWindowTextW(HWindow, Caption);
 
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
@@ -1841,7 +1781,7 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -1868,16 +1808,12 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CCannotMoveDlg
 //
 
-CCannotMoveDlg::CCannotMoveDlg(HWND parent, int resID, char* sourceName,
-                               char* targetName, char* error,
-                               const wchar_t* sourceNameW,
-                               const wchar_t* targetNameW) : CCommonDialog(HLanguage, resID, parent)
+CCannotMoveDlg::CCannotMoveDlg(HWND parent, int resID, wchar_t* sourceName,
+                               wchar_t* targetName, wchar_t* error) : CCommonDialog(HLanguage, resID, parent)
 {
     SourceName = sourceName;
     TargetName = targetName;
     Error = error;
-    SourceNameW = sourceNameW;
-    TargetNameW = targetNameW;
 }
 
 INT_PTR
@@ -1891,24 +1827,18 @@ CCannotMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CStaticText *source, *target;
         if ((source = new CStaticText(HWindow, IDS_SOURCENAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (SourceNameW != NULL)
-                source->SetTextToDblQuotesIfNeededW(SourceNameW);
-            else
-                source->SetTextToDblQuotesIfNeeded(SourceName);
+            source->SetTextToDblQuotesIfNeeded(SourceName);
         }
         else
             TRACE_E(LOW_MEMORY);
         if ((target = new CStaticText(HWindow, IDS_TARGETNAME, STF_PATH_ELLIPSIS)) != NULL)
         {
-            if (TargetNameW != NULL)
-                target->SetTextToDblQuotesIfNeededW(TargetNameW);
-            else
-                target->SetTextToDblQuotesIfNeeded(TargetName);
+            target->SetTextToDblQuotesIfNeeded(TargetName);
         }
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowTextW(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -1935,35 +1865,27 @@ CCannotMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CFileListDialog
 //
 
-void BrowseFileName(HWND hParent, int editlineResID, const char* name)
+void BrowseFileName(HWND hParent, int editlineResID, const wchar_t* name)
 {
-    CALL_STACK_MESSAGE3("BrowseFileName(, %d, %s)", editlineResID, name);
-    CPathBuffer file; // Heap-allocated for long path support
-    strcpy(file, name);
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
+    CALL_STACK_MESSAGE3("BrowseFileName(, %d, %ls)", editlineResID, name);
+    std::wstring file = name;
+    OPENFILENAMEW ofn;
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
     ofn.hwndOwner = hParent;
-    char* s = LoadStr(IDS_ALLFILTER);
-    ofn.lpstrFilter = s;
-    while (*s != 0) // creating a double-null terminated list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = file.Size();
+    std::wstring filter = LoadStrW(IDS_ALLFILTER);
+    std::replace(filter.begin(), filter.end(), L'|', L'\0');
+    filter.push_back(L'\0');
+    ofn.lpstrFilter = filter.c_str();
     ofn.nFilterIndex = 1;
-    //  ofn.lpstrFileTitle = file;
-    //  ofn.nMaxFileTitle = MAX_PATH;
     ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY;
 
-    if (SafeGetSaveFileName(&ofn))
+    if (SafeGetSaveFileNameOwnedW(&ofn, file))
     {
-        if (SalGetFullName(file, NULL, NULL, NULL, NULL, file.Size()))
+        std::wstring fullName = file;
+        if (SalGetFullNameW(fullName))
         {
-            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file.Get());
+            SendMessageW(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)fullName.c_str());
         }
     }
 }
@@ -1984,27 +1906,32 @@ void CFileListDialog::Transfer(CTransferInfo& ti)
     ti.RadioButton(IDC_FL_CLIPBOARD, 0, Configuration.FileListDestination);
     ti.RadioButton(IDC_FL_VIEWER, 1, Configuration.FileListDestination);
     ti.RadioButton(IDC_FL_FILE, 2, Configuration.FileListDestination);
-    ti.EditLine(IDC_FL_FILENAME, Configuration.FileListName, Configuration.FileListName.Size());
+    HWND fileNameWindow;
+    if (ti.GetControl(fileNameWindow, IDC_FL_FILENAME))
+    {
+        if (ti.Type == ttDataToWindow)
+            SetWindowTextW(fileNameWindow, Configuration.FileListName.c_str());
+        else
+            Configuration.FileListName = GetWindowTextStringW(fileNameWindow);
+    }
     ti.CheckBox(IDC_FL_APPEND, Configuration.FileListAppend);
 
-    char** history = Configuration.FileListHistory;
+    wchar_t** history = Configuration.FileListHistory;
     HWND hWnd;
     if (ti.GetControl(hWnd, IDC_FL_LINE))
     {
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, FILELIST_HISTORY_SIZE);
-            SendMessage(hWnd, CB_LIMITTEXT, MAX_PATH - 1, 0);
-            const char* text = "";
+            const wchar_t* text = L"";
             if (history[0] != NULL)
                 text = history[0];
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)text);
+            SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)text);
         }
         else
         {
-            CPathBuffer buff; // Heap-allocated for long path support
-            SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
-            AddValueToStdHistoryValues(history, FILELIST_HISTORY_SIZE, buff, FALSE);
+            const std::wstring text = GetWindowTextStringW(hWnd);
+            AddValueToStdHistoryValues(history, FILELIST_HISTORY_SIZE, text.c_str(), FALSE);
         }
     }
 
@@ -2019,13 +1946,12 @@ void CFileListDialog::Validate(CTransferInfo& ti)
 
     if (ti.GetControl(hWnd, IDC_FL_LINE))
     {
-        CPathBuffer buff; // Heap-allocated for long path support
-        SendMessage(hWnd, WM_GETTEXT, buff.Size(), (LPARAM)buff.Get());
+        const std::wstring buff = GetWindowTextStringW(hWnd);
         int errorPos1, errorPos2;
-        if (!ValidateMakeFileList(HWindow, buff, errorPos1, errorPos2))
+        if (!ValidateMakeFileList(HWindow, buff.c_str(), errorPos1, errorPos2))
         {
             ti.ErrorOn(IDC_FL_LINE);
-            PostMessage(EditLine->HWindow, EM_SETSEL, errorPos1, errorPos2);
+            PostMessageW(EditLine->HWindow, EM_SETSEL, errorPos1, errorPos2);
             return;
         }
     }
@@ -2038,16 +1964,15 @@ void CFileListDialog::Validate(CTransferInfo& ti)
             // DefaultDir restoration
             MainWindow->UpdateDefaultDir(TRUE);
 
-            CPathBuffer buffFile; // Heap-allocated for long path support
-            SendMessage(hWnd, WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
             int errTextID;
-            if (!SalGetFullName(buffFile, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL, NULL, NULL, buffFile.Size()))
+            std::wstring fullName = GetWindowTextStringW(hWnd);
+            if (!SalGetFullNameW(fullName, &errTextID, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPathW() : NULL))
             {
                 gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(errTextID));
                 ti.ErrorOn(IDC_FL_FILENAME);
                 return;
             }
-            if (!ValidatePathIsNotEmpty(HWindow, buffFile))
+            if (!ValidatePathIsNotEmpty(HWindow, fullName.c_str()))
             {
                 ti.ErrorOn(IDC_FL_FILENAME);
                 return;
@@ -2058,7 +1983,7 @@ void CFileListDialog::Validate(CTransferInfo& ti)
 
             // must not be a directory
             DWORD attr;
-            attr = GetFileAttributesW(AnsiToWide(buffFile).c_str());
+            attr = gFileSystem->GetFileAttributes(fullName.c_str());
 
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
             {
@@ -2069,7 +1994,7 @@ void CFileListDialog::Validate(CTransferInfo& ti)
             // if not appending, ask whether to overwrite
             if (!append && attr != 0xFFFFFFFF)
             {
-                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), AnsiToWide(buffFile).c_str());
+                std::wstring msg = FormatStrW(LoadStrW(IDS_FILEALREADYEXIST), fullName.c_str());
                 if (gPrompter->AskYesNo(LoadStrW(IDS_QUESTION), msg.c_str()).type != PromptResult::kYes)
                 {
                     ti.ErrorOn(IDC_FL_FILENAME);
@@ -2098,7 +2023,7 @@ CFileListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FL_LINE_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
-            hl->SetActionShowHint(LoadStr(IDS_FILELISTLINE_HINT));
+            hl->SetActionShowHint(LoadStrW(IDS_FILELISTLINE_HINT));
 
         InstallWordBreakProc(GetDlgItem(HWindow, IDC_FL_FILENAME)); // install WordBreakProc into the editline
 
@@ -2118,17 +2043,14 @@ CFileListDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_FL_FNBROWSE:
         {
-            CPathBuffer buffFile; // Heap-allocated for long path support
             // DefaultDir restoration
             MainWindow->UpdateDefaultDir(TRUE);
 
-            SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
-            if (!SalGetFullName(buffFile, NULL, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPath() : NULL, NULL, NULL, buffFile.Size()))
-            { // we cannot do it, so let Windows Browse handle it however it wants...
-                SendMessage(GetDlgItem(HWindow, IDC_FL_FILENAME), WM_GETTEXT, buffFile.Size(), (LPARAM)buffFile.Get());
-            }
+            std::wstring fullName = GetWindowTextStringW(GetDlgItem(HWindow, IDC_FL_FILENAME));
+            if (!SalGetFullNameW(fullName, NULL, MainWindow->GetActivePanel()->Is(ptDisk) ? MainWindow->GetActivePanel()->GetPathW() : NULL))
+                fullName = GetWindowTextStringW(GetDlgItem(HWindow, IDC_FL_FILENAME));
 
-            BrowseFileName(HWindow, IDC_FL_FILENAME, buffFile);
+            BrowseFileName(HWindow, IDC_FL_FILENAME, fullName.c_str());
             return 0;
         }
 
@@ -2172,7 +2094,7 @@ CBetaExpiredDialog::CBetaExpiredDialog(HWND parent)
 
 void CBetaExpiredDialog::OnTimer()
 {
-    char buff[20];
+    wchar_t buff[20];
     sprintf(buff, "%d", Count);
     SetDlgItemText(HWindow, IDOK, buff);
     Count--;
@@ -2203,15 +2125,15 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetDlgItemText(HWindow, IDC_BETAEXPIREDURL, url + 8);
             hl->SetActionOpen(url);
         }
-        char orig[200];
+        wchar_t orig[200];
         GetDlgItemText(HWindow, IDC_BETAEXPIREDDATE, orig, 200);
 
         SYSTEMTIME st;
         GetLocalTime(&st);
 
-        char buff[400];
-        char today[100];
-        char expired[100];
+        wchar_t buff[400];
+        wchar_t today[100];
+        wchar_t expired[100];
         if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, today, 100) == 0)
             sprintf(today, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expired, 100) == 0)
@@ -2221,7 +2143,7 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SetDlgItemText(HWindow, IDC_BETAEXPIREDDATE, buff);
 
         // the OK button will show numbers counting down, store the original text
-        GetDlgItemText(HWindow, IDOK, OldOK, 100);
+        OldOK = GetWindowTextStringW(GetDlgItem(HWindow, IDOK));
 
         EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
         OnTimer();
@@ -2236,7 +2158,7 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Count == 0)
         {
             KillTimer(HWindow, 1);
-            SetDlgItemText(HWindow, IDOK, OldOK);
+            SetDlgItemTextW(HWindow, IDOK, OldOK.c_str());
             EnableWindow(GetDlgItem(HWindow, IDOK), TRUE);
         }
         else
@@ -2263,7 +2185,7 @@ CSetSpeedLimDialog::CSetSpeedLimDialog(HWND parent, BOOL* useSpeedLim, DWORD* sp
     SpeedLimit = speedLimit;
 }
 
-BOOL GetSpeedLimit(int sel, char* speedLimitText, DWORD* returnSpeedLimit); // is implemented in dialogs3.cpp
+BOOL GetSpeedLimit(int sel, wchar_t* speedLimitText, DWORD* returnSpeedLimit); // is implemented in dialogs3.cpp
 
 void CSetSpeedLimDialog::Validate(CTransferInfo& ti)
 {
@@ -2274,8 +2196,8 @@ void CSetSpeedLimDialog::Validate(CTransferInfo& ti)
     if (useSpeedLim)
     {
         int sel = (int)SendDlgItemMessage(HWindow, IDC_SETSPLIMUNITS, CB_GETCURSEL, 0, 0);
-        char speedLimitText[20];
-        GetDlgItemText(HWindow, IDE_SETSPLIMNUMBER, speedLimitText, 20);
+        wchar_t speedLimitText[20];
+        GetDlgItemTextW(HWindow, IDE_SETSPLIMNUMBER, speedLimitText, _countof(speedLimitText));
         if (!GetSpeedLimit(sel, speedLimitText, NULL))
         {
             gPrompter->ShowError(LoadStrW(IDS_ERRORTITLE), LoadStrW(IDS_SPEEDLIMITSIZE));
@@ -2316,17 +2238,17 @@ void CSetSpeedLimDialog::Transfer(CTransferInfo& ti)
         }
 
         HWND speedLimitUnits = GetDlgItem(HWindow, IDC_SETSPLIMUNITS);
-        SendMessage(speedLimitUnits, CB_RESETCONTENT, 0, 0);
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_B_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_KB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_MB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_GB_per_s));
-        SendMessage(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
+        SendMessageW(speedLimitUnits, CB_RESETCONTENT, 0, 0);
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_SPEED_B_per_s));
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_SPEED_KB_per_s));
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_SPEED_MB_per_s));
+        SendMessageW(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStrW(IDS_SPEED_GB_per_s));
+        SendMessageW(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
 
         HWND speedLimit = GetDlgItem(HWindow, IDE_SETSPLIMNUMBER);
-        char num[20];
-        sprintf(num, "%u", speedLimNum);
-        SetWindowText(speedLimit, num);
+        wchar_t num[20];
+        swprintf_s(num, _countof(num), L"%u", speedLimNum);
+        SetWindowTextW(speedLimit, num);
         SendMessage(speedLimit, EM_LIMITTEXT, 19, 0);
 
         EnableControls();
@@ -2336,8 +2258,8 @@ void CSetSpeedLimDialog::Transfer(CTransferInfo& ti)
         if (*UseSpeedLim)
         {
             int sel = (int)SendDlgItemMessage(HWindow, IDC_SETSPLIMUNITS, CB_GETCURSEL, 0, 0);
-            char speedLimitText[20];
-            GetDlgItemText(HWindow, IDE_SETSPLIMNUMBER, speedLimitText, 20);
+            wchar_t speedLimitText[20];
+            GetDlgItemTextW(HWindow, IDE_SETSPLIMNUMBER, speedLimitText, _countof(speedLimitText));
             if (!GetSpeedLimit(sel, speedLimitText, SpeedLimit))
                 *UseSpeedLim = FALSE;
         }

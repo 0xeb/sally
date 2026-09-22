@@ -13,8 +13,13 @@
 #include "shellib.h"
 #include "svg.h"
 #include "darkmode.h"
+#include "common/Win32TextCodec.h"
+#include "common/clipboard/ClipboardTextPayload.h"
+#include "common/clipboard/HDropSelection.h"
 #include "common/fsutil.h"
+#include "common/IFileSystem.h"
 #include "common/unicode/helpers.h"
+#include "salshlib.h"
 
 static COLORREF GetStatusBkColor(BOOL activeCaption, BOOL showPanelCaption)
 {
@@ -67,15 +72,11 @@ static void FillRectSolid(HDC hDC, const RECT* rect, COLORREF color)
 CStatusWindow::CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigin origin) : CWindow(origin), HotTrackItems(10, 5)
 {
     CALL_STACK_MESSAGE_NONE
-    Text = NULL;
-    UseWideText = FALSE;
-    AlpDX = NULL;
-    Allocated = 0;
-    AlpDXAllocated = 0;
+    TextAssigned = FALSE;
     PathLen = -1;
     TextLen = 0;
     Border = border;
-    Size = NULL;
+    SizeAssigned = FALSE;
     Hidden = FALSE;
     History = FALSE;
     ShowThrobber = FALSE;
@@ -107,23 +108,13 @@ CStatusWindow::CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigi
     FilesWindow = filesWindow;
     LButtonDown = FALSE;
     RButtonDown = FALSE;
-    SubTexts = NULL;
-    SubTextsCount = 0;
     IDropTargetPtr = NULL;
 }
 
 CStatusWindow::~CStatusWindow()
 {
     CALL_STACK_MESSAGE1("CStatusWindow::~CStatusWindow()");
-    if (SubTexts != NULL)
-        free(SubTexts);
-    if (Text != NULL)
-        free(Text);
-    if (AlpDX != NULL)
-        free(AlpDX);
-    if (Size != NULL)
-        free(Size);
-    // ThrobberTooltip and SecurityTooltip are std::string, auto-destroyed
+    // UTF-16 text and measurement storage are dynamically owned containers.
     if (ToolBar != NULL)
     {
         if (ToolBar->HWindow != NULL)
@@ -132,28 +123,37 @@ CStatusWindow::~CStatusWindow()
     }
 }
 
-BOOL CStatusWindow::SetSubTexts(DWORD* subTexts, DWORD subTextsCount)
+BOOL CStatusWindow::SetSubTexts(const sally::unicode::WideTextRange* subTexts,
+                                size_t subTextsCount)
 {
-    CALL_STACK_MESSAGE2("CStatusWindow::SetSubTexts(, %u)", subTextsCount);
+    CALL_STACK_MESSAGE2("CStatusWindow::SetSubTexts(, %Iu)", subTextsCount);
     HotItem = NULL;
     LastHotItem = NULL;
-    if (SubTexts != NULL)
+
+    if (subTextsCount != 0 && subTexts == NULL)
+        return FALSE;
+    if (subTextsCount == 0)
     {
-        SubTextsCount = 0;
-        free(SubTexts);
+        SubTexts.clear();
+        return TRUE;
     }
 
-    if (subTexts == NULL || subTextsCount == 0)
-        return TRUE;
-
-    SubTexts = (DWORD*)malloc(subTextsCount * sizeof(DWORD));
-    if (SubTexts == NULL)
+    try
+    {
+        std::vector<sally::unicode::WideTextRange> staged(
+            subTexts, subTexts + subTextsCount);
+        SubTexts.swap(staged);
+    }
+    catch (const std::bad_alloc&)
     {
         TRACE_E(LOW_MEMORY);
         return FALSE;
     }
-    memmove(SubTexts, subTexts, subTextsCount * sizeof(DWORD));
-    SubTextsCount = subTextsCount;
+    catch (const std::length_error&)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
 
     // build array for cursor tracking
     BuildHotTrackItems();
@@ -161,120 +161,47 @@ BOOL CStatusWindow::SetSubTexts(DWORD* subTexts, DWORD subTextsCount)
     return TRUE;
 }
 
-BOOL CStatusWindow::SetText(const char* txt, int pathLen)
-{
-    const char* newTextValue = txt != NULL ? txt : "";
-    CALL_STACK_MESSAGE3("CStatusWindow::SetText(%s, %d)", newTextValue, pathLen);
-    if (!UseWideText && Text != NULL && strcmp(Text, newTextValue) == 0)
-    {
-        PathLen = pathLen;
-        return TRUE;
-    }
-    HotTrackItemsMeasured = FALSE;
-    HotItem = NULL;
-    LastHotItem = NULL;
-
-    int l = (int)strlen(newTextValue) + 1;
-    if (Allocated < l)
-    {
-        char* newText = (char*)realloc(Text, l);
-        if (newText == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-        Text = newText;
-        Allocated = l;
-    }
-    if (AlpDXAllocated < l)
-    {
-        int* newAlpDX = (int*)realloc(AlpDX, l * sizeof(int));
-        if (newAlpDX == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-        AlpDX = newAlpDX;
-        AlpDXAllocated = l;
-    }
-    UseWideText = FALSE;
-    TextW.clear();
-    memmove(Text, newTextValue, l);
-    PathLen = pathLen;
-    TextLen = l - 1;
-
-    if (SubTexts != NULL)
-    {
-        SubTextsCount = 0;
-        free(SubTexts);
-        SubTexts = NULL;
-    }
-
-    // build array for cursor tracking
-    BuildHotTrackItems();
-
-    if (MouseCaptured)
-        WindowProc(WM_MOUSELEAVE, 0, 0);
-
-    if (HWindow != NULL)
-        InvalidateRect(HWindow, NULL, FALSE);
-    return TRUE;
-}
-
-BOOL CStatusWindow::SetTextW(const wchar_t* txt, int pathLen)
+BOOL CStatusWindow::SetText(const wchar_t* txt, int pathLen)
 {
     std::wstring newText = txt != NULL ? txt : L"";
-    CALL_STACK_MESSAGE3("CStatusWindow::SetTextW(%s, %d)", WideToAnsi(newText).c_str(), pathLen);
-    if (UseWideText && TextW == newText)
+    CALL_STACK_MESSAGE2("CStatusWindow::SetText(, %d)", pathLen);
+    if (newText.size() >= static_cast<size_t>((std::numeric_limits<int>::max)()))
+    {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return FALSE;
+    }
+    if (TextAssigned && TextW == newText)
     {
         PathLen = pathLen;
         return TRUE;
     }
 
-    std::string fallbackText = WideToAnsi(newText);
-    int l = (int)fallbackText.size() + 1;
-    if (Allocated < l)
+    try
     {
-        char* newAnsiText = (char*)realloc(Text, l);
-        if (newAnsiText == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-        Text = newAnsiText;
-        Allocated = l;
+        AlpDX.resize(newText.empty() ? 1 : newText.size() + 1);
     }
-
-    int requiredDx = max(1, (int)newText.size() + 1);
-    if (AlpDXAllocated < requiredDx)
+    catch (const std::bad_alloc&)
     {
-        int* newAlpDX = (int*)realloc(AlpDX, requiredDx * sizeof(int));
-        if (newAlpDX == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-        AlpDX = newAlpDX;
-        AlpDXAllocated = requiredDx;
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
+    }
+    catch (const std::length_error&)
+    {
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
     }
 
     HotTrackItemsMeasured = FALSE;
     HotItem = NULL;
     LastHotItem = NULL;
 
-    TextW = newText;
-    UseWideText = TRUE;
-    memmove(Text, fallbackText.c_str(), l);
+    TextW.swap(newText);
+    TextAssigned = TRUE;
 
     PathLen = pathLen;
     TextLen = (int)TextW.size();
 
-    if (SubTexts != NULL)
-    {
-        SubTextsCount = 0;
-        free(SubTexts);
-        SubTexts = NULL;
-    }
+    SubTexts.clear();
 
     BuildHotTrackItems();
 
@@ -300,11 +227,10 @@ void CStatusWindow::BuildHotTrackItems()
         // populate HotTrackItems
         CHotTrackItem item;
         HotTrackItems.DestroyMembers();
-        if (UseWideText)
         {
             int pathLen = (PathLen != -1) ? PathLen : (int)TextW.size();
             SIZE s;
-            GetTextExtentExPointW(dc, TextW.c_str(), TextLen, 0, NULL, AlpDX, &s);
+            GetTextExtentExPointW(dc, TextW.c_str(), TextLen, 0, NULL, AlpDX.data(), &s);
 
             if (FilesWindow->Is(ptDisk) || FilesWindow->Is(ptZIPArchive))
             {
@@ -317,7 +243,7 @@ void CStatusWindow::BuildHotTrackItems()
                 }
                 else
                 {
-                    std::wstring rootPathW = GetRootPathW(TextW.c_str());
+                    std::wstring rootPathW = GetRootPath(TextW.c_str());
                     chars = (int)rootPathW.size();
 
                     BOOL isDotDriveFormat = TextW.size() >= 6 && TextW[0] == L'\\' && TextW[1] == L'\\' &&
@@ -332,7 +258,7 @@ void CStatusWindow::BuildHotTrackItems()
                     item.Offset = 0;
                     item.PixelsOffset = 0;
                     item.Chars = chars;
-                    item.Pixels = chars != 0 ? (WORD)AlpDX[chars - 1] : 0;
+                    item.Pixels = TextWidthBefore(chars);
                     HotTrackItems.Add(item);
 
                     if (chars < pathLen && TextW[chars] == L'\\')
@@ -348,154 +274,84 @@ void CStatusWindow::BuildHotTrackItems()
                     }
                 } while (!exit);
             }
-            HotTrackItemsMeasured = TRUE;
-        }
-        else if (Text != NULL)
-        {
-            // this crashed in SS2.0: execution address = 0x7800D9B0
-            // strlen was called when Text was still NULL
-            int pathLen = (PathLen != -1) ? PathLen : (int)strlen(Text);
-            // get positions of all characters
-            SIZE s;
-            GetTextExtentExPoint(dc, Text, TextLen, 0, NULL, AlpDX, &s);
-
-            if (FilesWindow->Is(ptDisk) || FilesWindow->Is(ptZIPArchive))
+            else if (FilesWindow->Is(ptPluginFS))
             {
-                int chars;
-                if (Text[0] == '\\' && Text[1] == '\\' &&
-                    (Text[2] != '.' || Text[3] != '\\' || Text[4] == 0 || Text[5] != ':') &&
-                    Plugins.GetFirstNethoodPluginFSName())
+                // RESTORED, not preserved. This branch existed only in the narrow
+                // arm below, which has been unreachable since the wide SetText began forcing
+                // UseWideText - so directory-line hot-path tracking on a plugin FS (FTP and
+                // friends) has been DEAD in shipping builds. The wide arm handled ptDisk and
+                // ptZIPArchive and had no else at all.
+                //
+                // GetNextDirectoryLineHotPath is wide in the SDK (plugins/shared/spl_fs.h), so
+                // the AnsiToWide(Text) hop the old code needed is gone with the mirror.
+                int chars = 0;
+                while (1)
                 {
-                    chars = 2;
-                }
-                else
-                {
-                    CPathBuffer rootPath; // Heap-allocated for long path support
-                    GetRootPath(rootPath, Text);
-                    chars = (int)strlen(rootPath);
+                    int lastChars = chars;
+                    if (!FilesWindow->GetPluginFS()->GetNextDirectoryLineHotPath(TextW.c_str(), pathLen, chars))
+                    {
+                        chars = pathLen;
+                    }
+                    if (chars == lastChars)
+                        chars++; // would be an infinite loop, better to handle it...
+                    if (chars > pathLen)
+                        chars = pathLen;
 
-                    // for UNC paths, trim the last backslash
-                    BOOL isDotDriveFormat = Text[0] == '\\' && Text[1] == '\\' && Text[2] == '.' &&
-                                            Text[3] == '\\' && Text[4] != 0 && Text[5] == ':';
-                    if (chars > pathLen || !isDotDriveFormat && chars > 3)
-                        chars--;
-                }
-
-                BOOL exit;
-                do
-                {
                     item.Offset = 0;
                     item.PixelsOffset = 0;
                     item.Chars = chars;
-                    item.Pixels = chars != 0 ? (WORD)AlpDX[chars - 1] : 0;
+                    item.Pixels = TextWidthBefore(chars);
                     HotTrackItems.Add(item);
 
-                    if (Text[chars] == '\\')
-                        chars++;
-
-                    exit = TRUE;
-                    while (chars < pathLen)
-                    {
-                        exit = FALSE;
-                        if (Text[chars] == '\\')
-                            break;
-                        chars++;
-                    }
-                } while (!exit);
-            }
-            else
-            {
-                if (FilesWindow->Is(ptPluginFS))
-                {
-                    int chars = 0;
-                    while (1)
-                    {
-                        int lastChars = chars;
-                        if (!FilesWindow->GetPluginFS()->GetNextDirectoryLineHotPath(Text, pathLen, chars))
-                        {
-                            chars = pathLen;
-                        }
-                        if (chars == lastChars)
-                            chars++; // would be an infinite loop, better to handle it...
-                        if (chars > pathLen)
-                            chars = pathLen;
-
-                        item.Offset = 0;
-                        item.PixelsOffset = 0;
-                        item.Chars = chars;
-                        item.Pixels = chars != 0 ? (WORD)AlpDX[chars - 1] : 0;
-                        HotTrackItems.Add(item);
-
-                        if (chars == pathLen)
-                            break;
-                    }
+                    if (chars == pathLen)
+                        break;
                 }
             }
             HotTrackItemsMeasured = TRUE;
         }
+        // The `else if (Text != NULL)` arm that stood here is deleted. It was
+        // unreachable - Text was written only by SetText, which set UseWideText = TRUE in
+        // the same breath - and it was LONGER than the wide arm because it held work the
+        // wide side never got. That work is ported above, not dropped.
     }
     if (Border == blBottom)
     {
         // populate HotTrackItems
         CHotTrackItem item;
         HotTrackItems.DestroyMembers();
-        if (UseWideText)
         {
             SIZE s;
-            GetTextExtentExPointW(dc, TextW.c_str(), TextLen, 0, NULL, AlpDX, &s);
+            GetTextExtentExPointW(dc, TextW.c_str(), TextLen, 0, NULL, AlpDX.data(), &s);
 
             DWORD len = TextLen;
             SIZE sOffset;
             SIZE sSub;
-            DWORD i;
-            for (i = 0; i < (DWORD)SubTextsCount; i++)
+            for (size_t i = 0; i < SubTexts.size(); ++i)
             {
-                WORD charOffset = LOWORD(SubTexts[i]);
-                WORD charLen = HIWORD(SubTexts[i]);
-                if (charOffset + charLen > (WORD)len)
+                const size_t rangeOffset = SubTexts[i].Offset;
+                const size_t rangeLength = SubTexts[i].Length;
+                if (rangeOffset > static_cast<size_t>(len) ||
+                    rangeLength > static_cast<size_t>(len) - rangeOffset)
                 {
                     TRACE_E("charOffset + charLen >= len");
                     continue;
                 }
+                const int charOffset = static_cast<int>(rangeOffset);
+                const int charLen = static_cast<int>(rangeLength);
                 GetTextExtentPoint32W(dc, TextW.c_str(), charOffset, &sOffset);
                 GetTextExtentPoint32W(dc, TextW.c_str() + charOffset, charLen, &sSub);
-                item.PixelsOffset = (WORD)sOffset.cx;
-                item.Pixels = (WORD)sSub.cx;
+                item.PixelsOffset = sOffset.cx;
+                item.Pixels = sSub.cx;
                 item.Offset = charOffset;
                 item.Chars = charLen;
                 HotTrackItems.Add(item);
                 HotTrackItemsMeasured = TRUE;
             }
         }
-        else if (Text != NULL)
-        {
-            // get positions of all characters
-            SIZE s;
-            GetTextExtentExPoint(dc, Text, TextLen, 0, NULL, AlpDX, &s);
-
-            DWORD len = TextLen;
-            SIZE sOffset;
-            SIZE sSub;
-            DWORD i;
-            for (i = 0; i < (DWORD)SubTextsCount; i++)
-            {
-                WORD charOffset = LOWORD(SubTexts[i]);
-                WORD charLen = HIWORD(SubTexts[i]);
-                if (charOffset + charLen > (WORD)len)
-                {
-                    TRACE_E("charOffset + charLen >= len");
-                    continue;
-                }
-                GetTextExtentPoint32(dc, Text, charOffset, &sOffset);
-                GetTextExtentPoint32(dc, Text + charOffset, charLen, &sSub);
-                item.PixelsOffset = (WORD)sOffset.cx;
-                item.Pixels = (WORD)sSub.cx;
-                item.Offset = charOffset;
-                item.Chars = charLen;
-                HotTrackItems.Add(item);
-                HotTrackItemsMeasured = TRUE;
-            }
-        }
+        // The `else if (Text != NULL)` arm that stood here is deleted. It was
+        // unreachable - Text was written only by SetText, which set UseWideText = TRUE in
+        // the same breath - and it was LONGER than the wide arm because it held work the
+        // wide side never got. That work is ported above, not dropped.
     }
     SelectObject(dc, oldFont);
     HANDLES(ReleaseDC(HWindow, dc));
@@ -630,9 +486,9 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
     }
 }
 
-void CStatusWindow::SetThrobberTooltip(const char* throbberTooltip)
+void CStatusWindow::SetThrobberTooltipW(const wchar_t* throbberTooltip)
 {
-    ThrobberTooltip = throbberTooltip ? throbberTooltip : "";
+    ThrobberTooltip = throbberTooltip ? throbberTooltip : L"";
 }
 
 void CStatusWindow::SetSecurity(CSecurityIconState iconState)
@@ -649,9 +505,9 @@ void CStatusWindow::SetSecurity(CSecurityIconState iconState)
     }
 }
 
-void CStatusWindow::SetSecurityTooltip(const char* tooltip)
+void CStatusWindow::SetSecurityTooltipW(const wchar_t* tooltip)
 {
-    SecurityTooltip = tooltip ? tooltip : "";
+    SecurityTooltip = tooltip ? tooltip : L"";
 }
 
 int CStatusWindow::ChangeThrobberID()
@@ -666,9 +522,9 @@ int CStatusWindow::ChangeThrobberID()
 void CStatusWindow::HideThrobberAndSecurityIcon()
 {
     SetThrobber(FALSE);
-    SetThrobberTooltip(NULL);
+    SetThrobberTooltipW(NULL);
     SetSecurity(sisNone);
-    SetSecurityTooltip(NULL);
+    SetSecurityTooltipW(NULL);
 }
 
 void CStatusWindow::InvalidateIfNeeded()
@@ -702,24 +558,25 @@ int CStatusWindow::GetNeededHeight()
 void CStatusWindow::SetSize(const CQuadWord& size)
 {
     CALL_STACK_MESSAGE_NONE
-    if (Size == NULL)
+    try
     {
-        Size = (char*)malloc(30);
-        Size[0] = 0;
+        std::wstring newSize;
+        if (size != CQuadWord(-1, -1))
+            newSize = PrintDiskSize(size, 0);
+        if (SizeAssigned && Size == newSize)
+            return;
+        Size.swap(newSize);
+        SizeAssigned = TRUE;
     }
-    if (Size != NULL)
+    catch (const std::bad_alloc&)
     {
-        if (size == CQuadWord(-1, -1))
-            Size[0] = 0;
-        else
-        {
-            char buf[100];
-            PrintDiskSize(buf, size, 0);
-            if (strcmp(buf, Size) == 0)
-                return;
-            else
-                strcpy(Size, buf);
-        }
+        TRACE_E(LOW_MEMORY);
+        return;
+    }
+    catch (const std::length_error&)
+    {
+        TRACE_E(LOW_MEMORY);
+        return;
     }
     if (HWindow != NULL)
         InvalidateRect(HWindow, NULL, FALSE);
@@ -732,7 +589,7 @@ void CStatusWindow::SetLeftPanel(BOOL left)
     if (ToolBar != NULL)
     {
         ToolBar->SetType(Left ? mtbtLeft : mtbtRight);
-        ToolBar->Load(Left ? Configuration.LeftToolBar : Configuration.RightToolBar);
+        ToolBar->Load((Left ? Configuration.LeftToolBar : Configuration.RightToolBar).c_str());
     }
 }
 
@@ -753,7 +610,7 @@ BOOL CStatusWindow::ToggleToolBar()
         ToolBar->SetImageList(HGrayToolBarImageList);
         ToolBar->SetHotImageList(HHotToolBarImageList);
         ToolBar->SetStyle(TLB_STYLE_IMAGE | TLB_STYLE_ADJUSTABLE);
-        ToolBar->Load(Left ? Configuration.LeftToolBar : Configuration.RightToolBar);
+        ToolBar->Load((Left ? Configuration.LeftToolBar : Configuration.RightToolBar).c_str());
         SendMessage(ToolBar->HWindow, TB_SETPARENT, (WPARAM)MainWindow->HWindow, 0);
         ShowWindow(ToolBar->HWindow, SW_SHOW);
         return TRUE;
@@ -790,24 +647,17 @@ void CStatusWindow::LayoutWindow()
     UpdateWindow(HWindow);
 }
 
-void CStatusWindow::GetHotText(char* buffer, int bufSize)
+void CStatusWindow::GetHotTextW(std::wstring& buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    if (HotItem != NULL && UseWideText)
+    if (HotItem != NULL)
     {
-        std::wstring hotText = TextW.substr(HotItem->Offset, HotItem->Chars);
-        std::string hotTextA = WideToAnsi(hotText);
-        lstrcpyn(buffer, hotTextA.c_str(), bufSize);
-    }
-    else if (HotItem != NULL && Text != NULL)
-    {
-        lstrcpyn(buffer, Text + HotItem->Offset, min(HotItem->Chars + 1, bufSize));
-        // for Directory Line with plugin FS, allow plugin to make final path adjustments (adding ']' for VMS paths in FTP)
+        buffer = TextW.substr(HotItem->Offset, HotItem->Chars);
         if ((Border & blTop) && FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
-            FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(buffer, bufSize);
+            FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPathW(buffer);
     }
     else
-        buffer[0] = 0;
+        buffer.clear();
 }
 
 BOOL CStatusWindow::FindHotTrackItem(int xPos, int& index)
@@ -951,7 +801,14 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
     // text
     EllipsedChars = -1;
     EllipsedWidth = -1;
-    if (Text != NULL)
+    // Was `if (Text != NULL)`. Read carefully before changing this: the pointer
+    // meant "SetText has been called at least once", NOT "the text is non-empty" - SetText(L"")
+    // allocated a 1-byte buffer, so the guard passed. `!TextW.empty()` is NOT the same test, and
+    // the difference is visible: this block paints the throbber, zoom, hidden and security
+    // chrome as well as the text, and files_window_directory_read.cpp:350 really does set the
+    // status line to L"". Swapping in the empty test would make that chrome disappear whenever
+    // the text is blank. TextAssigned carries the bit the pointer used to carry implicitly.
+    if (TextAssigned)
     {
         BOOL truncateEnd = TRUE; // truncating end (TRUE) or after root folder (FALSE)
         int visibleChars = 0;
@@ -962,10 +819,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
         {
             if (count <= 0)
                 return;
-            if (UseWideText)
-                ExtTextOutW(dc, x, y, 0, NULL, TextW.c_str() + start, count, NULL);
-            else
-                ExtTextOut(dc, x, y, 0, NULL, Text + start, count, NULL);
+            ExtTextOutW(dc, x, y, 0, NULL, TextW.c_str() + start, count, NULL);
         };
 
         SIZE s;
@@ -1011,9 +865,9 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                 tmpR.right -= 6 + ZOOM_WIDTH;
             }
 
-            if (Size != NULL)
+            if (SizeAssigned)
             {
-                GetTextExtentPoint32(dc, Size, (int)strlen(Size), &s);
+                GetTextExtentPoint32W(dc, Size.c_str(), (int)Size.size(), &s);
                 if (tmpR.right - tmpR.left < s.cx)
                     goto SKIP_MEASURING; // even size doesn't fit - skip measuring
 
@@ -1064,7 +918,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
         {
             visibleChars = TextLen;
             int textWidth = tmpR.right - tmpR.left;
-            if (textWidth < AlpDX[TextLen - 1])
+            if (textWidth < TextWidthBefore(TextLen))
             {
                 // text doesn't fit in requested width completely -> we must truncate
                 if (isDirectoryLine && HotTrackItems.Count > 1 &&
@@ -1074,11 +928,11 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     EllipsedChars = 0;
                     EllipsedWidth = 0;
 
-                    int len = AlpDX[TextLen - 1];
+                    int len = TextWidthBefore(TextLen);
                     int iter = HotTrackItems[0].Chars;
                     while (len > textWidth - TextEllipsisWidthEnv && iter < TextLen)
                     {
-                        int charWidth = AlpDX[iter] - AlpDX[iter - 1];
+                        int charWidth = AlpDX[iter] - TextWidthBefore(iter);
                         len -= charWidth;
                         iter++;
 
@@ -1093,20 +947,18 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     // for bottom infoline, search backwards for character
                     // after which we can insert "..."
                     while (visibleChars > 0 &&
-                           AlpDX[visibleChars - 1] + TextEllipsisWidthEnv > textWidth)
+                           TextWidthBefore(visibleChars) + TextEllipsisWidthEnv > textWidth)
                         visibleChars--;
                 }
             }
             else
                 WholeTextVisible = TRUE;
 
-            int realWidth = 0;
-            if (TextLen > 1)
-            {
-                realWidth = AlpDX[TextLen - 1];
-                if (EllipsedWidth != -1)
-                    realWidth = realWidth - EllipsedWidth + TextEllipsisWidthEnv;
-            }
+            // `TextLen > 1` here also zeroed the width of a legitimate single-character text,
+            // collapsing TextRect so nothing was drawn. TextWidthBefore handles 0 correctly.
+            int realWidth = TextWidthBefore(TextLen);
+            if (realWidth != 0 && EllipsedWidth != -1)
+                realWidth = realWidth - EllipsedWidth + TextEllipsisWidthEnv;
             TextRect.left = tmpR.left;
             TextRect.right = TextRect.left + realWidth;
             if (TextRect.right > tmpR.right)
@@ -1184,8 +1036,8 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     drawTextAt(TextRect.left, textY, 0, min(visibleChars, firstClipChar));
                     if (visibleChars < min(TextLen, firstClipChar)) // if end was truncated -> append "..."
                     {
-                        int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
-                        ExtTextOut(dc, TextRect.left + offset, textY, 0, NULL, "...", 3, NULL);
+                        int offset = TextWidthBefore(visibleChars);
+                        ExtTextOutW(dc, TextRect.left + offset, textY, 0, NULL, L"...", 3, NULL);
                     }
                 }
                 else
@@ -1194,9 +1046,9 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     int rootChars = HotTrackItems[0].Chars;
                     drawTextAt(TextRect.left, textY, 0, rootChars);
                     // "..."
-                    ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1], textY, 0, NULL, "...", 3, NULL);
+                    ExtTextOutW(dc, TextRect.left + TextWidthBefore(rootChars), textY, 0, NULL, L"...", 3, NULL);
                     // remainder
-                    drawTextAt(TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
+                    drawTextAt(TextRect.left + TextWidthBefore(rootChars) + TextEllipsisWidthEnv,
                                textY, TextLen - visibleChars, visibleChars);
                 }
             }
@@ -1206,11 +1058,11 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
             {
                 // without truncation or truncated end
                 int visibleChars2 = visibleChars - lastClipChar;
-                drawTextAt(TextRect.left + AlpDX[lastClipChar - 1], textY, lastClipChar, visibleChars2);
+                drawTextAt(TextRect.left + TextWidthBefore(lastClipChar), textY, lastClipChar, visibleChars2);
                 if (visibleChars < TextLen) // if end was truncated -> append "..."
                 {
-                    int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
-                    ExtTextOut(dc, TextRect.left + offset, textY, 0, NULL, "...", 3, NULL);
+                    int offset = TextWidthBefore(visibleChars);
+                    ExtTextOutW(dc, TextRect.left + offset, textY, 0, NULL, L"...", 3, NULL);
                 }
             }
             // draw second part of text (after hotItem onwards) -- truncation in middle
@@ -1222,7 +1074,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
 
                 if (lastClipChar <= rootChars)
                 {
-                    ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1], textY, 0, NULL, "...", 3, NULL); // "..."
+                    ExtTextOutW(dc, TextRect.left + TextWidthBefore(rootChars), textY, 0, NULL, L"...", 3, NULL); // "..."
                     firstChar += EllipsedChars;                                                           // move forward over elided characters
                 }
                 else
@@ -1230,7 +1082,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     if (firstChar < rootChars + EllipsedChars) // need to skip possible backslash that would fall into ellipsis
                         firstChar = rootChars + EllipsedChars;
                 }
-                drawTextAt(TextRect.left + AlpDX[firstChar - 1] - EllipsedWidth + TextEllipsisWidthEnv,
+                drawTextAt(TextRect.left + TextWidthBefore(firstChar) - EllipsedWidth + TextEllipsisWidthEnv,
                            textY, firstChar, TextLen - firstChar);
             }
 
@@ -1259,8 +1111,8 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     if (hotItem->Offset + showChars > visibleChars)
                     {
                         showChars = visibleChars - hotItem->Offset;
-                        int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
-                        ExtTextOut(dc, TextRect.left + offset, textY, 0, NULL, "...", 3, NULL);
+                        int offset = TextWidthBefore(visibleChars);
+                        ExtTextOutW(dc, TextRect.left + offset, textY, 0, NULL, L"...", 3, NULL);
                     }
                     if (showChars > 0)
                     {
@@ -1276,11 +1128,11 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     if (showChars > rootChars)
                     {
                         // "..."
-                        ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1], textY, 0, NULL, "...", 3, NULL);
+                        ExtTextOutW(dc, TextRect.left + TextWidthBefore(rootChars), textY, 0, NULL, L"...", 3, NULL);
                         if (showChars - rootChars - EllipsedChars > 0)
                         {
                             // remainder
-                            drawTextAt(TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
+                            drawTextAt(TextRect.left + TextWidthBefore(rootChars) + TextEllipsisWidthEnv,
                                        textY, rootChars + EllipsedChars, showChars - rootChars - EllipsedChars);
                         }
                     }
@@ -1326,7 +1178,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
             HFONT hOldFont = NULL;
             if (Configuration.SingleClick && HotSize)
                 hOldFont = (HFONT)SelectObject(dc, EnvFontUL);
-            ExtTextOut(dc, SizeRect.left, textY, 0, NULL, Size, (UINT)strlen(Size), NULL);
+            ExtTextOutW(dc, SizeRect.left, textY, 0, NULL, Size.c_str(), (UINT)Size.size(), NULL);
             if (hOldFont != NULL)
                 SelectObject(dc, hOldFont);
         }
@@ -1407,7 +1259,42 @@ private:
     IDataObject* ForbiddenDataObject; // IDataObject we don't accept (we are its source)
     BOOL UseUnicode;                  // is there unicode text in DataObject? (otherwise try ANSI text)
     CFilesWindow* FilesWindow;        // panel we are associated with
-    char Buffer[2 * MAX_PATH];
+
+    static void NormalizeDroppedDirectory(std::wstring& path)
+    {
+        if (IsPluginFSPath(path.c_str()))
+            return;
+
+        const size_t length = path.length();
+        if ((length != 2 || path[0] != L'\\' || path[1] != L'\\') &&
+            length > 0 && path.back() == L'\\')
+        {
+            path.pop_back();
+        }
+        if (path.length() == 2 && path[0] != L'\\')
+            path.push_back(L'\\');
+        if (path.length() == 6 && path[0] == L'\\' && path[1] == L'\\' &&
+            path[2] == L'.' && path[3] == L'\\' && path[5] == L':')
+        {
+            path.push_back(L'\\');
+        }
+    }
+
+    void PostChangeDirectory(std::wstring path, BOOL postProcessUserText)
+    {
+        NormalizeDroppedDirectory(path);
+        std::unique_ptr<std::wstring> payload(new std::wstring(std::move(path)));
+        if (payload == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            return;
+        }
+        if (PostMessage(FilesWindow->HWindow, WM_USER_CHANGEDIRW,
+                        postProcessUserText, reinterpret_cast<LPARAM>(payload.get())))
+        {
+            payload.release();
+        }
+    }
 
 public:
     CTextDropTarget(CFilesWindow* filesWindow)
@@ -1430,78 +1317,40 @@ public:
         ForbiddenDataObject = forbiddenDataObject;
     }
 
-    // returns directory (must be exactly one)
-    BOOL GetDirFromDataObject(IDataObject* pDataObject, char* path)
+    // Returns the exact directory from a single-item data object.
+    BOOL GetDirFromDataObject(IDataObject* pDataObject, std::wstring* path = NULL)
     {
-        FORMATETC formatEtc;
-        formatEtc.cfFormat = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
-        formatEtc.ptd = NULL;
-        formatEtc.dwAspect = DVASPECT_CONTENT;
-        formatEtc.lindex = -1;
-        formatEtc.tymed = TYMED_HGLOBAL;
-
-        STGMEDIUM stgMedium;
-        stgMedium.tymed = TYMED_HGLOBAL;
-        stgMedium.hGlobal = NULL;
-        stgMedium.pUnkForRelease = NULL;
-
-        if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
+        std::wstring exactPath;
+        wchar_t itemKind = L'\0';
+        BOOL fakeFormatPresent = FALSE;
+        if (GetFakeDataObjectRealPath(pDataObject, exactPath, &itemKind, &fakeFormatPresent))
         {
-            path[0] = 0;
-            if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
-            {
-                char* data = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
-                if (data != NULL)
-                {
-                    if (data[0] == 'D')
-                        lstrcpyn(path, data + 1, MAX_PATH);
-                    HANDLES(GlobalUnlock(stgMedium.hGlobal));
-                }
-            }
-            ReleaseStgMedium(&stgMedium);
-            return path[0] != 0;
+            if (itemKind != L'D')
+                return FALSE;
+            if (path != NULL)
+                *path = std::move(exactPath);
+            return TRUE;
         }
+        if (fakeFormatPresent)
+            return FALSE; // ours, but no real path - see GetFakeDataObjectRealPath's contract
 
+        FORMATETC formatEtc = {};
         formatEtc.cfFormat = CF_HDROP;
-        formatEtc.ptd = NULL;
         formatEtc.dwAspect = DVASPECT_CONTENT;
         formatEtc.lindex = -1;
         formatEtc.tymed = TYMED_HGLOBAL;
 
-        stgMedium.tymed = TYMED_HGLOBAL;
-        stgMedium.hGlobal = NULL;
-        stgMedium.pUnkForRelease = NULL;
-
+        STGMEDIUM stgMedium = {};
         BOOL ret = FALSE;
         if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
         {
             if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
             {
-                DROPFILES* data = (DROPFILES*)HANDLES(GlobalLock(stgMedium.hGlobal));
+                const SIZE_T dataSize = GlobalSize(stgMedium.hGlobal);
+                const DROPFILES* data = static_cast<const DROPFILES*>(HANDLES(GlobalLock(stgMedium.hGlobal)));
                 if (data != NULL)
                 {
-                    if (data->fWide)
-                    {
-                        const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
-                        if (*(fileW + l + 1) == 0)
-                        {
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            ret = TRUE;
-                        }
-                    }
-                    else
-                    {
-                        const char* fileA = ((char*)data) + data->pFiles;
-                        int l = (int)strlen(fileA);
-                        if (*(fileA + l + 1) == 0)
-                        {
-                            strcpy(path, fileA);
-                            ret = TRUE;
-                        }
-                    }
-
+                    ret = sally::clipboard::TryGetSingleHDropPath(data, dataSize, exactPath);
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
             }
@@ -1509,12 +1358,12 @@ public:
         }
         if (ret)
         {
-            DWORD attrs = GetFileAttributesW(AnsiToWide(path).c_str());
-            if (attrs == 0xFFFFFFFF)
-                ret = FALSE;
-            else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) // not a directory
-                ret = FALSE;
+            IFileSystem* fs = gFileSystem != NULL ? gFileSystem : GetWin32FileSystem();
+            const DWORD attrs = fs->GetFileAttributes(exactPath.c_str());
+            ret = attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
         }
+        if (ret && path != NULL)
+            *path = std::move(exactPath);
         return ret;
     }
 
@@ -1585,8 +1434,7 @@ public:
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
         }
-        CPathBuffer dummy; // Heap-allocated for long path support
-        if (GetDirFromDataObject(DataObject, dummy))
+        if (GetDirFromDataObject(DataObject))
         {
             *pdwEffect = DROPEFFECT_COPY;
             return S_OK;
@@ -1621,8 +1469,7 @@ public:
                 *pdwEffect = DROPEFFECT_COPY;
                 return S_OK;
             }
-            CPathBuffer dummy; // Heap-allocated for long path support
-            if (GetDirFromDataObject(DataObject, dummy))
+            if (GetDirFromDataObject(DataObject))
             {
                 *pdwEffect = DROPEFFECT_COPY;
                 return S_OK;
@@ -1651,78 +1498,55 @@ public:
     {
         if (ImageDragging)
             ImageDragLeave();
+
         // try to extract text from DataObject
-        FORMATETC formatEtc;
-        ZeroMemory(&formatEtc, sizeof(formatEtc));
+        FORMATETC formatEtc = {};
         formatEtc.cfFormat = UseUnicode ? CF_UNICODETEXT : CF_TEXT;
         formatEtc.dwAspect = DVASPECT_CONTENT;
         formatEtc.lindex = -1;
         formatEtc.tymed = TYMED_HGLOBAL;
 
-        STGMEDIUM stgMedium;
-        ZeroMemory(&stgMedium, sizeof(stgMedium));
-        stgMedium.tymed = TYMED_HGLOBAL;
-
+        STGMEDIUM stgMedium = {};
         if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
         {
-            char* path = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
-            if (path != NULL)
+            if (stgMedium.tymed == TYMED_HGLOBAL && stgMedium.hGlobal != NULL)
             {
-                if (UseUnicode)
-                    path = ConvertAllocU2A((const WCHAR*)path, -1);
-                if (path != NULL)
+                const SIZE_T byteSize = GlobalSize(stgMedium.hGlobal);
+                const void* payload = HANDLES(GlobalLock(stgMedium.hGlobal));
+                if (payload != NULL)
                 {
-                    // change path
-                    lstrcpyn(Buffer, path, _countof(Buffer));
-
-                    if (!IsPluginFSPath(Buffer))
+                    std::wstring path;
+                    bool decoded = false;
+                    if (UseUnicode)
                     {
-                        int l = (int)strlen(Buffer);
-                        if ((l != 2 || Buffer[0] != '\\' || Buffer[1] != '\\') && // not path "\\\\" (Nethood root)
-                            l > 0 && Buffer[l - 1] == '\\')
-                            Buffer[--l] = 0;             // '\\' at end is not welcome
-                        if (l == 2 && Buffer[0] != '\\') // after non-UNC root path must be '\\'
+                        const size_t capacity = byteSize / sizeof(wchar_t);
+                        const wchar_t* text = static_cast<const wchar_t*>(payload);
+                        const wchar_t* terminator = byteSize % sizeof(wchar_t) == 0 && capacity != 0
+                                                        ? static_cast<const wchar_t*>(wmemchr(text, L'\0', capacity))
+                                                        : NULL;
+                        if (terminator != NULL)
                         {
-                            Buffer[l++] = '\\';
-                            Buffer[l] = 0;
-                        }
-                        if (l == 6 && Buffer[0] == '\\' && Buffer[1] == '\\' && Buffer[2] == '.' && Buffer[3] == '\\' &&
-                            Buffer[4] != 0 && Buffer[5] == ':') // after "\\.\C:\" root path must be '\\'
-                        {
-                            Buffer[l++] = '\\';
-                            Buffer[l] = 0;
+                            path.assign(text, terminator);
+                            decoded = true;
                         }
                     }
-
-                    PostMessage(FilesWindow->HWindow, WM_USER_CHANGEDIR, TRUE, (LPARAM)Buffer);
-                    if (UseUnicode)
-                        free(path);
+                    else
+                    {
+                        decoded = sally::clipboard::DecodeAnsiClipboardPayload(
+                                      payload, byteSize, GetACP(), path) == ERROR_SUCCESS;
+                    }
+                    if (decoded && !path.empty())
+                        PostChangeDirectory(std::move(path), TRUE);
+                    HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
-                HANDLES(GlobalUnlock(stgMedium.hGlobal));
             }
+            ReleaseStgMedium(&stgMedium);
         }
         else
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            if (GetDirFromDataObject(pDataObject, path))
-            {
-                // change path
-                strcpy(Buffer, path);
-
-                if (!IsPluginFSPath(Buffer))
-                {
-                    int l = (int)strlen(Buffer);
-                    if (l > 0 && Buffer[l - 1] == '\\')
-                        Buffer[--l] = 0;             // '\\' at end is not welcome
-                    if (l == 2 && Buffer[0] != '\\') // after non-UNC root path must be '\\'
-                    {
-                        Buffer[l++] = '\\';
-                        Buffer[l] = 0;
-                    }
-                }
-
-                PostMessage(FilesWindow->HWindow, WM_USER_CHANGEDIR, FALSE, (LPARAM)Buffer);
-            }
+            std::wstring path;
+            if (GetDirFromDataObject(pDataObject, &path))
+                PostChangeDirectory(std::move(path), FALSE);
         }
 
         if (DataObject != NULL)
@@ -1835,10 +1659,10 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         break;
     }
 
-    case WM_USER_TTGETTEXT:
+    case WM_USER_TTGETTEXTW:
     {
         DWORD id = (DWORD)wParam; // FIXME_X64 - overit pretypovani na (DWORD)
-        char* text = (char*)lParam;
+        wchar_t* text = (wchar_t*)lParam;
         switch (id)
         {
         case 0:
@@ -1848,64 +1672,64 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case 2:
         {
-            lstrcpy(text, LoadStr(IDS_PANELFILTER));
+            lstrcpyW(text, LoadStrW(IDS_PANELFILTER));
             break;
         }
 
         case 3:
         {
-            text[0] = 0;
-            ExpandPluralFilesDirs(text, 200, HiddenFilesCount, HiddenDirsCount, epfdmHidden, FALSE);
-            //          lstrcat(text, " ");
-            //          CQuadWord qwHidden(HiddenFilesCount + HiddenDirsCount, 0);
-            //          ExpandPluralString(text + strlen(text), 100, LoadStr(IDS_PLURAL_SWITCH_HIDDEN),
-            //                             1, &qwHidden);
+            const std::wstring tooltip = ExpandPluralFilesDirsTextW(
+                HiddenFilesCount, HiddenDirsCount, epfdmHidden, FALSE);
+            lstrcpynW(text, tooltip.c_str(), TOOLTIP_TEXT_MAX);
             break;
         }
 
         case 4:
         {
-            char* str;
+            // TextW is the authoritative copy of the status text; the narrow Text member is
+            // its CP_ACP rendering. This is the drag path, so taking it from TextW is what
+            // stops a non-ANSI directory from reaching the tooltip as '?'.
+            const wchar_t* str;
             if (Border == blTop && WholeTextVisible)
-                str = LoadStr(IDS_TRIM_DRAG_PATH);
+                str = LoadStrW(IDS_TRIM_DRAG_PATH);
             else if (Border == blBottom && WholeTextVisible)
-                str = LoadStr(IDS_COPY_DRAG_TEXT);
+                str = LoadStrW(IDS_COPY_DRAG_TEXT);
             else
-                str = Text;
+                str = TextW.empty() ? NULL : TextW.c_str();
             if (str == NULL)
                 text[0] = 0;
             else
-                lstrcpy(text, str);
+                lstrcpynW(text, str, TOOLTIP_TEXT_MAX);
             break;
         }
 
         case 5:
         {
-            lstrcpy(text, LoadStr(IDS_DIRHISTORY));
+            lstrcpyW(text, LoadStrW(IDS_DIRHISTORY));
             break;
         }
 
         case 6:
         {
-            lstrcpy(text, LoadStr(IDS_FREESPACE));
+            lstrcpyW(text, LoadStrW(IDS_FREESPACE));
             break;
         }
 
         case 7:
         {
-            lstrcpy(text, LoadStr(IDS_ZOOMPANEL));
+            lstrcpyW(text, LoadStrW(IDS_ZOOMPANEL));
             break;
         }
 
         case 8:
         {
-            lstrcpyn(text, ThrobberTooltip.c_str(), TOOLTIP_TEXT_MAX);
+            lstrcpynW(text, ThrobberTooltip.c_str(), TOOLTIP_TEXT_MAX);
             break;
         }
 
         case 9:
         {
-            lstrcpyn(text, SecurityTooltip.c_str(), TOOLTIP_TEXT_MAX);
+            lstrcpynW(text, SecurityTooltip.c_str(), TOOLTIP_TEXT_MAX);
             break;
         }
 
@@ -1975,60 +1799,64 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 int index;
                 if (FindHotTrackItem(LButtonDownPoint.x - TextRect.left, index))
                 {
-                    CPathBuffer buffer; // Heap-allocated for long path support
+                    // BUG FIX. This read `UseWideText && FilesWindow->Is(ptDisk)`,
+                    // so ARCHIVE and PLUGIN-FS panels took the narrow arm below and tore off a
+                    // path built from the lossy ANSI mirror - a non-ANSI archive or FTP path
+                    // dragged out as '?'. Only disk panels ever got the wide text.
+                    //
+                    // Consequence worth stating because it leaves the process: the drag payload
+                    // for those panels changes from CF_TEXT to CF_UNICODETEXT (see
+                    // CTextDataObject below). That is the point - an external drop target now
+                    // receives the real path instead of a degraded one.
+                    //
+                    // The separate `bufferW` is gone too. It was a second copy that the
+                    // plugin-FS adjustment below did NOT update - it rewrites 'buffer' - so
+                    // taking the wide arm for a plugin FS would have silently dropped
+                    // CompleteDirectoryLineHotPath's work from the payload. One buffer cannot
+                    // disagree with itself.
+                    std::wstring buffer;
                     int hotChars = HotTrackItems[index].Chars;
-                    BOOL useWideDragText = UseWideText && FilesWindow->Is(ptDisk);
-                    std::wstring bufferW;
-                    if (useWideDragText)
+                    int hotOffset = HotTrackItems[index].Offset;
+                    if (hotOffset >= 0 && hotOffset < (int)TextW.length())
                     {
-                        int hotOffset = HotTrackItems[index].Offset;
-                        if (hotOffset >= 0 && hotOffset < (int)TextW.length())
-                        {
-                            if (hotOffset + hotChars > (int)TextW.length())
-                                hotChars = (int)TextW.length() - hotOffset;
-                            bufferW = TextW.substr(hotOffset, hotChars);
-                        }
-                        std::string bufferA = WideToAnsi(bufferW);
-                        lstrcpyn(buffer, bufferA.c_str(), buffer.Size());
-                        hotChars = (int)strlen(buffer);
-                    }
-                    else
-                    {
-                        if (hotChars + 1 > buffer.Size())
-                            hotChars = buffer.Size() - 1;
-                        lstrcpyn(buffer, Text + HotTrackItems[index].Offset, hotChars + 1);
+                        if (hotOffset + hotChars > (int)TextW.length())
+                            hotChars = (int)TextW.length() - hotOffset;
+                        buffer.assign(TextW, static_cast<size_t>(hotOffset), static_cast<size_t>(hotChars));
                     }
                     // for Directory Line with plugin FS, allow plugin to make final path adjustments (adding ']' for VMS paths in FTP)
                     if ((Border & blTop) && FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
                     {
-                        FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(buffer, buffer.Size());
-                        FilesWindow->GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternal(FilesWindow->GetPluginFS()->GetPluginFSName(),
-                                                                                                     FilesWindow->GetPluginFS()->GetPluginFSNameIndex(),
-                                                                                                     strchr(buffer, ':') + 1);
-                        hotChars = (int)strlen(buffer);
+                        FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPathW(buffer);
+                        const size_t colon = buffer.find(L':');
+                        if (colon != std::wstring::npos)
+                        {
+                            std::wstring userPart = buffer.substr(colon + 1);
+                            FilesWindow->GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternalW(
+                                FilesWindow->GetPluginFS()->GetPluginFSName(),
+                                FilesWindow->GetPluginFS()->GetPluginFSNameIndex(), userPart);
+                            buffer.replace(colon + 1, std::wstring::npos, userPart);
+                        }
                     }
+                    hotChars = static_cast<int>(buffer.size());
 
                     WindowProc(WM_MOUSELEAVE, 0, 0);
                     MouseCaptured = FALSE;
                     LButtonDown = FALSE;
                     RButtonDown = FALSE;
 
-                    SIZE_T dataSize = useWideDragText ? (bufferW.length() + 1) * sizeof(wchar_t) : (SIZE_T)hotChars + 1;
+                    SIZE_T dataSize = ((SIZE_T)hotChars + 1) * sizeof(wchar_t);
                     HGLOBAL h = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, dataSize));
                     if (h != NULL)
                     {
                         void* s = HANDLES(GlobalLock(h));
                         if (s != NULL)
                         {
-                            if (useWideDragText)
-                                memcpy(s, bufferW.c_str(), dataSize);
-                            else
-                                memcpy(s, buffer, dataSize);
+                            memcpy(s, buffer.c_str(), dataSize);
                             HANDLES(GlobalUnlock(h));
                         }
 
                         CImpIDropSource* dropSource = new CImpIDropSource(FALSE);
-                        IDataObject* dataObject = new CTextDataObject(h, useWideDragText);
+                        IDataObject* dataObject = new CTextDataObject(h, TRUE /* wide */);
                         if (IDropTargetPtr != NULL)
                             ((CTextDropTarget*)IDropTargetPtr)->SetForbiddenDataObject(dataObject);
                         if (dataObject != NULL && dropSource != NULL)
@@ -2038,7 +1866,9 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             HIMAGELIST hDragIL = NULL;
                             int dxHotspot, dyHotspot;
                             int imgWidth, imgHeight;
-                            hDragIL = CreateDragImage(buffer, dxHotspot, dyHotspot, imgWidth, imgHeight);
+                            // the payload is exact wide text; the preview is built
+                            // from the same buffer so image and payload cannot diverge.
+                            hDragIL = CreateDragImage(buffer.c_str(), dxHotspot, dyHotspot, imgWidth, imgHeight);
                             ImageList_BeginDrag(hDragIL, 0, dxHotspot, dyHotspot);
                             ImageDragBegin(imgWidth, imgHeight, dxHotspot, dyHotspot);
 
@@ -2279,10 +2109,10 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         //if (HotItem->Chars != (int)TextLen) // this condition failed when filter was attached
                         if (HotItem != lastItem)
                         {
-                            if (UseWideText && FilesWindow->Is(ptDisk))
+                            if (FilesWindow->Is(ptDisk))
                             {
                                 std::wstring pathW = TextW.substr(0, HotItem->Chars);
-                                if (FilesWindow->ChangePathToDiskW(FilesWindow->HWindow, pathW.c_str(), -1, NULL, NULL, TRUE))
+                                if (FilesWindow->ChangePathToDisk(FilesWindow->HWindow, pathW.c_str(), -1, NULL, NULL, TRUE))
                                 {
                                     FilesWindow->DirectoryLine->InvalidateAndUpdate(TRUE);
                                     UpdateWindow(MainWindow->HWindow);
@@ -2291,14 +2121,26 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             else
                             {
                                 // path truncation
-                                CPathBuffer path; // Heap-allocated for long path support
-                                strncpy(path, Text, HotItem->Chars);
-                                path[HotItem->Chars] = 0;
+                                // GetHotTextW already implements the correct
+                                // narrow/wide-aware slicing (fixed for the sibling blBottom/
+                                // context-menu callers earlier/184): Offset is always 0
+                                // for blTop (directory-line breadcrumb) items, so this is an
+                                // exact drop-in for the old strncpy(path, Text, HotItem->Chars)
+                                // truncation, minus the buffer/units mismatch that made Text
+                                // (a narrow, potentially lossy mirror) wrong once UseWideText
+                                // items land here (Offset/Chars are wide-character indices
+                                // computed against TextW in BuildHotTrackItems).
+                                //
+                                // CORRECTED. This used to claim
+                                // CompleteDirectoryLineHotPath was "still applied via
+                                // GetHotTextW's narrow branch" - it was not: that branch was
+                                // unreachable, so the plugin-FS path adjustment never ran.
+                                // GetHotTextW forwards to GetHotText now, which applies it
+                                // unconditionally, so the claim is true by construction.
+                                std::wstring pathW;
+                                GetHotTextW(pathW);
 
-                                if (FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
-                                    FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(path, path.Size());
-
-                                if (FilesWindow->ChangeDir(path, -1, NULL, 2 /* as back/forward in history*/, NULL, FALSE))
+                                if (FilesWindow->ChangeDir(pathW.c_str(), -1, NULL, 2 /* as back/forward in history*/, NULL, FALSE))
                                 {
                                     FilesWindow->DirectoryLine->InvalidateAndUpdate(TRUE);
                                     UpdateWindow(MainWindow->HWindow);
@@ -2313,7 +2155,12 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                     if (Border & blBottom)
                     {
-                        if (CopyTextToClipboard(Text + HotItem->Offset, HotItem->Chars))
+                        // HotItem->Offset/Chars are wide-character indices
+                        // computed against TextW (BuildHotTrackItems). GetHotTextW does the
+                        // slicing; there is no narrow mirror left to slice by mistake.
+                        std::wstring hotTextW;
+                        GetHotTextW(hotTextW);
+                        if (CopyTextToClipboardW(hotTextW.c_str()))
                             FlashText(TRUE);
                     }
                 }
@@ -2428,15 +2275,15 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 HIMAGELIST
-CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
+CStatusWindow::CreateDragImage(const wchar_t* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
 {
-    CALL_STACK_MESSAGE6("CStatusWindow::CreateDragImage(%s, %d, %d, %d, %d)",
+    CALL_STACK_MESSAGE6("CStatusWindow::CreateDragImage(%S, %d, %d, %d, %d)",
                         text, dxHotspot, dyHotspot, imgWidth, imgHeight);
-    int textLen = lstrlen(text);
+    int textLen = (int)wcslen(text);
     HDC hDC = ItemBitmap.HMemDC;
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;
-    GetTextExtentPoint32(hDC, text, textLen, &sz);
+    GetTextExtentPoint32W(hDC, text, textLen, &sz);
     ItemBitmap.Enlarge(sz.cx, sz.cy); // alokace bitmapy v ItemBitmap.HMemDC
     // podmazu pozadi
     RECT r;
@@ -2447,7 +2294,7 @@ CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot,
     FillRect(hDC, &r, HNormalBkBrush);
     int oldBkMode = SetBkMode(hDC, TRANSPARENT);
     int oldTextColor = SetTextColor(hDC, GetCOLORREF(CurrentColors[ITEM_FG_NORMAL]));
-    DrawText(hDC, text, textLen, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    DrawTextW(hDC, text, textLen, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     SetTextColor(hDC, oldTextColor);
     SetBkMode(hDC, oldBkMode);
     SelectObject(hDC, hOldFont);

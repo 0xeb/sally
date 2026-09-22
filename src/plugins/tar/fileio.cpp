@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "tar_text.h"
 
 #include "dlldefs.h"
 #include "fileio.h"
@@ -17,6 +18,7 @@
 #include "tar.rh"
 #include "tar.rh2"
 #include "lang\lang.rh"
+#include "../shared/plugin_local_path.h"
 
 //********************************************************
 //
@@ -24,31 +26,32 @@
 //
 
 CDecompressFile*
-CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord inputSize)
+CDecompressFile::CreateInstance(const wchar_t* fileName, DWORD inputOffset, CQuadWord inputSize)
 {
-    CALL_STACK_MESSAGE2("CDecompressFile::CreateInstance(%s)", fileName);
+    CALL_STACK_MESSAGE2("CDecompressFile::CreateInstance(%ls)", fileName);
     // open the input file
-    HANDLE file = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                             FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+    std::wstring ioPath;
+    HANDLE file = PreparePluginLocalPathForIo(fileName, ioPath)
+                      ? CreateFileW(ioPath.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                    FILE_FLAG_SEQUENTIAL_SCAN, NULL)
+                      : INVALID_HANDLE_VALUE;
     if (file == INVALID_HANDLE_VALUE)
     {
-        char txtbuf[1000];
         int err = GetLastError();
-        strcpy(txtbuf, LoadStr(IDS_GZERR_FOPEN));
-        strcat(txtbuf, SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(txtbuf, LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        std::wstring txtbuf = LangStr(IDS_GZERR_FOPEN).c_str();
+        txtbuf += SPLGetErrorTextOwned(SalamanderGeneral, err);
+        SalamanderGeneral->ShowMessageBox(txtbuf.c_str(), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         return NULL;
     }
     if (inputOffset != 0)
     {
         if (SetFilePointer(file, inputOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
         {
-            char txtbuf[1000];
             int err = GetLastError();
             CloseHandle(file);
-            strcpy(txtbuf, LoadStr(IDS_GZERR_SEEK));
-            strcat(txtbuf, SalamanderGeneral->GetErrorText(err));
-            SalamanderGeneral->ShowMessageBox(txtbuf, LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+            std::wstring txtbuf = LangStr(IDS_GZERR_SEEK).c_str();
+            txtbuf += SPLGetErrorTextOwned(SalamanderGeneral, err);
+            SalamanderGeneral->ShowMessageBox(txtbuf.c_str(), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
             return NULL;
         }
     }
@@ -56,7 +59,7 @@ CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord i
     unsigned char* buffer = (unsigned char*)malloc(BUFSIZE);
     if (buffer == NULL)
     {
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
         CloseHandle(file);
         return NULL;
@@ -66,11 +69,10 @@ CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord i
     if (!ReadFile(file, buffer, BUFSIZE, &read, NULL))
     {
         // read error
-        char txtbuf[1000];
         int err = GetLastError();
-        strcpy(txtbuf, LoadStr(IDS_ERR_FREAD));
-        strcat(txtbuf, SalamanderGeneral->GetErrorText(err));
-        SalamanderGeneral->ShowMessageBox(txtbuf, LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+        std::wstring txtbuf = LangStr(IDS_ERR_FREAD).c_str();
+        txtbuf += SPLGetErrorTextOwned(SalamanderGeneral, err);
+        SalamanderGeneral->ShowMessageBox(txtbuf.c_str(), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
         free(buffer);
         CloseHandle(file);
         return NULL;
@@ -114,12 +116,11 @@ CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord i
     if (archive == NULL || !archive->IsOk())
     {
         if (archive == NULL)
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
         else
         {
-            SalamanderGeneral->ShowMessageBox(LoadErr(archive->GetErrorCode(), archive->GetLastErr()),
-                                              LoadStr(IDS_GZERR_TITLE), MSGBOX_ERROR);
+            SalamanderGeneral->ShowMessageBox(LoadErr(archive->GetErrorCode(), archive->GetLastErr()), LangStr(IDS_GZERR_TITLE).c_str(), MSGBOX_ERROR);
             delete archive;
         }
         CloseHandle(file);
@@ -130,10 +131,10 @@ CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord i
 }
 
 // class constructor
-CDecompressFile::CDecompressFile(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : FileName(filename), File(file), Buffer(buffer), DataStart(buffer), DataEnd(buffer + read),
+CDecompressFile::CDecompressFile(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : FileName(filename), File(file), Buffer(buffer), DataStart(buffer), DataEnd(buffer + read),
                                                                                                                                                            OldName(NULL), Ok(TRUE), StreamPos(start, 0), ErrorCode(0), LastError(0), FreeBufAndFile(TRUE)
 {
-    CALL_STACK_MESSAGE3("CDecompressFile::CDecompressFile(%s, , %u)", filename, read);
+    CALL_STACK_MESSAGE3("CDecompressFile::CDecompressFile(%ls, , %u)", filename, read);
 
     if (CQuadWord(0, 0) == inputSize)
     {
@@ -162,7 +163,7 @@ CDecompressFile::~CDecompressFile()
         free(OldName);
 }
 
-void CDecompressFile::SetOldName(char* oldName)
+void CDecompressFile::SetOldName(const char* oldName)
 {
     if (OldName != NULL)
         free(OldName);
@@ -283,26 +284,38 @@ CDecompressFile::GetOldName()
 {
     if (OldName == NULL)
     {
-        // create the original file name - use only the name without the path
-        const char* begin = FileName + strlen(FileName);
-        while (begin >= FileName && *begin != '\\' && *begin != '/')
-            begin--;
-        begin++;
-        // cut off the extension
-        const char* end = strrchr(begin, '.');
-        if (end == NULL) // ".cvspass" counts as an extension in Windows
-            end = begin + strlen(begin);
-        OldName = (char*)malloc(end - begin + 1);
+        const std::wstring oldName = GetOldNameW();
+        std::string encoded;
+        if (!EncodeTarUtf8Name(oldName, encoded))
+            encoded.clear();
+        OldName = (char*)malloc(encoded.size() + 1);
         if (OldName == NULL)
         {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_GZERR_TITLE),
+            SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_MEMORY).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                               MSGBOX_ERROR);
             return NULL;
         }
-        memcpy(OldName, begin, end - begin);
-        OldName[end - begin] = '\0';
+        memcpy(OldName, encoded.c_str(), encoded.size() + 1);
     }
     return OldName;
+}
+
+std::wstring CDecompressFile::GetOldNameW() const
+{
+    if (OldName != NULL)
+    {
+        std::wstring decoded;
+        if (DecodeTarLegacyName(OldName, decoded))
+            return decoded;
+        return std::wstring();
+    }
+
+    size_t begin = FileName.find_last_of(L"\\/");
+    begin = begin == std::wstring::npos ? 0 : begin + 1;
+    size_t end = FileName.find_last_of(L'.');
+    if (end == std::wstring::npos || end < begin)
+        end = FileName.size();
+    return FileName.substr(begin, end - begin);
 }
 
 // returns the last read data for reuse with the compressed stream
@@ -318,7 +331,7 @@ void CDecompressFile::Rewind(unsigned short size)
     else
     {
         TRACE_E("Rewind - requested rewind by too large a portion.");
-        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_INTERNAL), LoadStr(IDS_GZERR_TITLE),
+        SalamanderGeneral->ShowMessageBox(LangStr(IDS_ERR_INTERNAL).c_str(), LangStr(IDS_GZERR_TITLE).c_str(),
                                           MSGBOX_ERROR);
         Ok = FALSE;
         ErrorCode = IDS_ERR_INTERNAL;
@@ -348,7 +361,7 @@ void CDecompressFile::GetFileInfo(FILETIME& lastWrite, CQuadWord& fileSize, DWOR
 //  CZippedFile
 //
 
-CZippedFile::CZippedFile(const char* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : CDecompressFile(filename, file, buffer, start, read, inputSize), Window(NULL), ExtrStart(NULL), ExtrEnd(NULL)
+CZippedFile::CZippedFile(const wchar_t* filename, HANDLE file, unsigned char* buffer, unsigned long start, unsigned long read, CQuadWord inputSize) : CDecompressFile(filename, file, buffer, start, read, inputSize), Window(NULL), ExtrStart(NULL), ExtrEnd(NULL)
 {
     // if the parent constructor failed, bail out immediately
     if (!Ok)

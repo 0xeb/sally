@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "common/CommandShellService.h"
-#include "common/unicode/helpers.h"
+
+#include <new>
 
 namespace
 {
@@ -61,7 +62,7 @@ IEnvironment* CCommandShellService::ResolveEnvironment() const
 bool CCommandShellService::ResolveComspec(const CommandShellRequest& request,
                                           std::wstring& comspec, DWORD& errorCode) const
 {
-    if (request.comspec != nullptr && request.comspec[0] != L'\0')
+    if (!request.comspec.empty())
     {
         comspec = request.comspec;
         return true;
@@ -95,10 +96,10 @@ CommandShellResult CCommandShellService::LaunchBuiltCommand(const CommandShellRe
         return CommandShellResult::Error(ERROR_INVALID_PARAMETER);
 
     ProcessStartInfo info;
-    info.commandLine = commandLine.c_str();
-    info.workingDirectory = (request.workingDirectory != nullptr && request.workingDirectory[0] != L'\0')
-                                ? request.workingDirectory
-                                : nullptr;
+    info.commandLine = commandLine;
+    info.workingDirectory = request.workingDirectory;
+    info.environmentBlock = request.environmentBlock;
+    info.useEnvironment = request.useEnvironment;
     info.inheritHandles = request.inheritHandles;
     info.createNewConsole = request.createNewConsole;
     info.hideWindow = request.hideWindow;
@@ -121,6 +122,7 @@ CommandShellResult CCommandShellService::LaunchBuiltCommand(const CommandShellRe
 }
 
 CommandShellResult CCommandShellService::LaunchShell(const CommandShellRequest& request)
+try
 {
     std::wstring comspec;
     DWORD errorCode = ERROR_SUCCESS;
@@ -129,8 +131,13 @@ CommandShellResult CCommandShellService::LaunchShell(const CommandShellRequest& 
 
     return LaunchBuiltCommand(request, QuoteExecutableForCommandLine(comspec));
 }
+catch (const std::bad_alloc&)
+{
+    return CommandShellResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+}
 
 CommandShellResult CCommandShellService::LaunchCommand(const CommandShellRequest& request)
+try
 {
     std::wstring comspec;
     DWORD errorCode = ERROR_SUCCESS;
@@ -142,7 +149,7 @@ CommandShellResult CCommandShellService::LaunchCommand(const CommandShellRequest
         commandLine.append(L" /U");
     commandLine.append(request.keepOpen ? L" /K" : L" /C");
 
-    if (request.command != nullptr && request.command[0] != L'\0')
+    if (!request.command.empty())
     {
         commandLine.push_back(L' ');
         commandLine.push_back(L'"');
@@ -152,8 +159,13 @@ CommandShellResult CCommandShellService::LaunchCommand(const CommandShellRequest
 
     return LaunchBuiltCommand(request, commandLine);
 }
+catch (const std::bad_alloc&)
+{
+    return CommandShellResult::Error(ERROR_NOT_ENOUGH_MEMORY);
+}
 
 CommandShellPolicyResult CCommandShellService::GetPolicyInfo(const CommandShellRequest& request)
+try
 {
     std::wstring comspec;
     DWORD errorCode = ERROR_SUCCESS;
@@ -163,11 +175,13 @@ CommandShellPolicyResult CCommandShellService::GetPolicyInfo(const CommandShellR
     CommandShellPolicyInfo info;
     info.quotedComspec = QuoteExecutableForCommandLine(comspec);
 
-    std::wstring executableName = ExtractExecutableName(comspec);
-    if (!sally::unicode::TryWideToAnsiRoundTripExact(executableName, info.executableNameForPolicy))
-        info.executableNameForPolicy.clear();
+    info.executableNameForPolicy = ExtractExecutableName(comspec);
 
     return CommandShellPolicyResult::Ok(std::move(info));
+}
+catch (const std::bad_alloc&)
+{
+    return CommandShellPolicyResult::Error(ERROR_NOT_ENOUGH_MEMORY);
 }
 
 static CCommandShellService g_defaultCommandShellService;

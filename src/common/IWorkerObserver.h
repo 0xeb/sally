@@ -9,6 +9,11 @@
 // dialog via WM_USER_DIALOG / WM_USER_SETDIALOG. Future implementations can provide
 // headless, mock, or alternative-UI observers.
 //
+// Wide-only surface: every string crossing this interface is
+// UTF-16. The former ANSI virtuals and their silently-discarding W-sibling
+// default bodies are gone — each method is a single pure virtual, so the
+// compiler enumerates every implementor on any change.
+//
 // Each Ask* method blocks until the user responds. Return values match the existing
 // dialog button IDs (IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL, IDYES, etc.) so the
 // worker logic doesn't change.
@@ -17,13 +22,7 @@
 
 #include <windows.h>
 
-// Forward declarations for data types used by overwrite dialogs
 struct CProgressData;
-struct CWorkerFileErrorDialogData;
-struct CWorkerOverwriteDialogData;
-struct CWorkerCannotMoveDialogData;
-struct CWorkerCopyPermErrorDialogData;
-struct CWorkerCopyDirTimeErrorDialogData;
 
 // Standard dialog return values (matching resource IDs from worker.cpp)
 // IDRETRY, IDYES, IDNO, IDCANCEL are from windows.h
@@ -68,148 +67,83 @@ public:
     // --- Error dialogs (WM_USER_DIALOG message ID 0) ---
     // Generic file error with retry/skip/cancel options.
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL, or IDB_IGNORE.
-    virtual int AskFileError(const char* title, const char* fileName, const char* errorText) = 0;
-    virtual int AskFileErrorW(const char* title, const char* fileName, const wchar_t* fileNameW,
-                              const char* errorText)
-    {
-        (void)fileNameW;
-        return AskFileError(title, fileName, errorText);
-    }
+    virtual int AskFileError(const wchar_t* title, const wchar_t* fileName,
+                             const wchar_t* errorText) = 0;
 
     // ID-based variant — worker passes IDS_* constant + Win32 error code,
-    // observer handles localization (LoadStr / GetErrorText).
-    virtual int AskFileErrorById(int titleId, const char* fileName, DWORD win32Error) = 0;
-    virtual int AskFileErrorByIdW(int titleId, const char* fileName, const wchar_t* fileNameW,
-                                  DWORD win32Error)
-    {
-        (void)fileNameW;
-        return AskFileErrorById(titleId, fileName, win32Error);
-    }
+    // observer handles localization (LoadStrW / GetErrorTextOwned).
+    virtual int AskFileErrorById(int titleId, const wchar_t* fileName, DWORD win32Error) = 0;
 
     // Variant where both title and error text are string resource IDs.
-    virtual int AskFileErrorByIds(int titleId, const char* fileName, int errorTextId) = 0;
-    virtual int AskFileErrorByIdsW(int titleId, const char* fileName, const wchar_t* fileNameW,
-                                   int errorTextId)
-    {
-        (void)fileNameW;
-        return AskFileErrorByIds(titleId, fileName, errorTextId);
-    }
+    virtual int AskFileErrorByIds(int titleId, const wchar_t* fileName, int errorTextId) = 0;
 
     // --- Overwrite confirmation (message ID 1) ---
-    // Ask whether to overwrite a file. Shows source and target info.
+    // Ask whether to overwrite a file (or, with dirOverwrite, join a directory).
     // Returns IDYES, IDB_ALL (yes to all), IDB_SKIP, IDB_SKIPALL, IDCANCEL.
-    virtual int AskOverwrite(const char* sourceName, const char* sourceInfo,
-                             const char* targetName, const char* targetInfo) = 0;
-    virtual int AskOverwriteW(const char* sourceName, const wchar_t* sourceNameW,
-                              const char* sourceInfo, const char* targetName,
-                              const wchar_t* targetNameW, const char* targetInfo,
-                              bool dirOverwrite = false)
-    {
-        (void)sourceNameW;
-        (void)targetNameW;
-        (void)dirOverwrite;
-        return AskOverwrite(sourceName, sourceInfo, targetName, targetInfo);
-    }
+    virtual int AskOverwrite(const wchar_t* sourceName, const wchar_t* sourceInfo,
+                             const wchar_t* targetName, const wchar_t* targetInfo,
+                             bool dirOverwrite = false) = 0;
 
     // --- Hidden/system file confirmation (message ID 2) ---
     // Returns IDYES, IDB_ALL, IDB_SKIP, IDB_SKIPALL, IDCANCEL.
-    virtual int AskHiddenOrSystem(const char* title, const char* fileName,
-                                  const char* actionText) = 0;
+    virtual int AskHiddenOrSystem(const wchar_t* title, const wchar_t* fileName,
+                                  const wchar_t* actionText) = 0;
 
     // ID-based variant — worker passes IDS_* constants, observer handles localization.
-    virtual int AskHiddenOrSystemById(int titleId, const char* fileName, int actionId) = 0;
+    virtual int AskHiddenOrSystemById(int titleId, const wchar_t* fileName, int actionId) = 0;
 
     // --- Cannot move/rename (message IDs 3, 4) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDCANCEL.
-    virtual int AskCannotMove(const char* errorText, const char* fileName,
-                              const char* destPath, bool isDirectory) = 0;
-    virtual int AskCannotMoveW(const char* errorText, const char* fileName,
-                               const wchar_t* fileNameW, const char* destPath,
-                               const wchar_t* destPathW, bool isDirectory)
-    {
-        (void)fileNameW;
-        (void)destPathW;
-        return AskCannotMove(errorText, fileName, destPath, isDirectory);
-    }
+    virtual int AskCannotMove(const wchar_t* errorText, const wchar_t* fileName,
+                              const wchar_t* destPath, bool isDirectory) = 0;
 
     // Variant with Win32 error code — observer formats error text.
-    virtual int AskCannotMoveErr(const char* sourceName, const char* targetName,
+    virtual int AskCannotMoveErr(const wchar_t* sourceName, const wchar_t* targetName,
                                  DWORD win32Error, bool isDirectory) = 0;
-    virtual int AskCannotMoveErrW(const char* sourceName, const wchar_t* sourceNameW,
-                                  const char* targetName, const wchar_t* targetNameW,
-                                  DWORD win32Error, bool isDirectory)
-    {
-        (void)sourceNameW;
-        (void)targetNameW;
-        return AskCannotMoveErr(sourceName, targetName, win32Error, isDirectory);
-    }
 
     // --- Simple error notification (message ID 5) ---
     // Informational only — no return value expected.
-    virtual void NotifyError(const char* title, const char* fileName,
-                             const char* errorText) = 0;
-    virtual void NotifyErrorW(const char* title, const char* fileName, const wchar_t* fileNameW,
-                              const char* errorText)
-    {
-        (void)fileNameW;
-        NotifyError(title, fileName, errorText);
-    }
+    virtual void NotifyError(const wchar_t* title, const wchar_t* fileName,
+                             const wchar_t* errorText) = 0;
 
     // ID-based variant — worker passes IDS_* constants, observer handles localization.
-    virtual void NotifyErrorById(int titleId, const char* fileName, int detailId) = 0;
-    virtual void NotifyErrorByIdW(int titleId, const char* fileName, const wchar_t* fileNameW,
-                                  int detailId)
-    {
-        (void)fileNameW;
-        NotifyErrorById(titleId, fileName, detailId);
-    }
+    virtual void NotifyErrorById(int titleId, const wchar_t* fileName, int detailId) = 0;
 
     // --- ADS read error (message ID 6) ---
     // Returns IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskADSReadError(const char* fileName, const char* adsName) = 0;
+    virtual int AskADSReadError(const wchar_t* fileName, const wchar_t* adsName) = 0;
 
     // --- ADS overwrite (message ID 7) ---
     // Same semantics as AskOverwrite but for alternate data streams.
-    virtual int AskADSOverwrite(const char* sourceName, const char* sourceInfo,
-                                const char* targetName, const char* targetInfo) = 0;
+    virtual int AskADSOverwrite(const wchar_t* sourceName, const wchar_t* sourceInfo,
+                                const wchar_t* targetName, const wchar_t* targetInfo) = 0;
 
     // --- Cannot open ADS (message ID 8) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskADSOpenError(const char* fileName, const char* adsName,
-                                const char* errorText) = 0;
+    virtual int AskADSOpenError(const wchar_t* fileName, const wchar_t* adsName,
+                                const wchar_t* errorText) = 0;
 
     // ID-based variant — worker passes IDS_* constant + Win32 error code.
-    virtual int AskADSOpenErrorById(int titleId, const char* fileName, DWORD win32Error) = 0;
+    virtual int AskADSOpenErrorById(int titleId, const wchar_t* fileName, DWORD win32Error) = 0;
 
     // --- Error setting attributes (message ID 9) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskSetAttrsError(const char* fileName, DWORD failedAttrs,
+    virtual int AskSetAttrsError(const wchar_t* fileName, DWORD failedAttrs,
                                  DWORD currentAttrs) = 0;
 
     // --- Error copying permissions (message ID 10) ---
     // Returns IDRETRY, IDB_SKIP, IDB_SKIPALL, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskCopyPermError(const char* sourceFile, const char* targetFile,
-                                 const char* errorText) = 0;
-    virtual int AskCopyPermErrorW(const char* sourceFile, const wchar_t* sourceFileW,
-                                  const char* targetFile, const wchar_t* targetFileW,
-                                  const char* errorText)
-    {
-        (void)sourceFileW;
-        (void)targetFileW;
-        return AskCopyPermError(sourceFile, targetFile, errorText);
-    }
+    // Takes the Win32 error code directly — the legacy path laundered it
+    // through a char* "errorText" parameter and truncated it back at the
+    // marshaling boundary.
+    virtual int AskCopyPermError(const wchar_t* sourceFile, const wchar_t* targetFile,
+                                 DWORD win32Error) = 0;
 
     // --- Error copying directory time (message ID 11) ---
     // Returns IDRETRY, IDB_IGNORE, IDB_ALL (ignore all), IDCANCEL.
-    virtual int AskCopyDirTimeError(const char* dirName, DWORD errorCode) = 0;
-    virtual int AskCopyDirTimeErrorW(const char* dirName, const wchar_t* dirNameW,
-                                     DWORD errorCode)
-    {
-        (void)dirNameW;
-        return AskCopyDirTimeError(dirName, errorCode);
-    }
+    virtual int AskCopyDirTimeError(const wchar_t* dirName, DWORD errorCode) = 0;
 
     // --- Confirm encryption loss (message ID 12) ---
     // Returns IDYES, IDB_ALL (yes to all), IDB_SKIP, IDB_SKIPALL, IDCANCEL.
-    virtual int AskEncryptionLoss(bool isEncrypted, const char* fileName, bool isDir) = 0;
+    virtual int AskEncryptionLoss(bool isEncrypted, const wchar_t* fileName, bool isDir) = 0;
 };

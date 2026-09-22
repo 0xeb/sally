@@ -204,7 +204,7 @@ int main(int argc, char* argv[])
         printf("shrinking executables...\n");
         // remove the resources first
         CResEdit re;
-        if (!re.BeginUpdateResource("Release\\sfxsmall.exe", FALSE))
+        if (!re.BeginUpdateResource(L"Release\\sfxsmall.exe", FALSE))
             return Error("BeginUpdateResource failed.");
         CResDir* dir = re.GetResourceDirectory();
         if (!dir)
@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
         if (!GetExitCodeProcess(pi.hProcess, &exitCode) || exitCode != 0)
             Error("bad exit code");
         // restore the resources
-        if (!re.BeginUpdateResource("Release\\sfxsmall.exe", FALSE))
+        if (!re.BeginUpdateResource(L"Release\\sfxsmall.exe", FALSE))
             return Error("BeginUpdateResource failed.");
         if (!re.SetResourceDirectory(dir))
             return Error("Low memory.");
@@ -234,7 +234,7 @@ int main(int argc, char* argv[])
             return Error("EndUpdateResource failed.");
 
         // handle the second executable as well
-        if (!re.BeginUpdateResource("ReleaseEx\\sfxbig.exe", FALSE))
+        if (!re.BeginUpdateResource(L"ReleaseEx\\sfxbig.exe", FALSE))
             return Error("BeginUpdateResource failed.");
         dir = re.GetResourceDirectory();
         if (!dir)
@@ -252,7 +252,7 @@ int main(int argc, char* argv[])
         if (!GetExitCodeProcess(pi.hProcess, &exitCode) || exitCode != 0)
             Error("bad exit code");
         // restore the resources
-        if (!re.BeginUpdateResource("ReleaseEx\\sfxbig.exe", FALSE))
+        if (!re.BeginUpdateResource(L"ReleaseEx\\sfxbig.exe", FALSE))
             return Error("BeginUpdateResource failed.");
         if (!re.SetResourceDirectory(dir))
             return Error("Low memory.");

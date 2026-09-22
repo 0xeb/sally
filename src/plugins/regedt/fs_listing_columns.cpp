@@ -4,11 +4,13 @@
 
 #include "precomp.h"
 
+#include <array>
+
 // global variables that store pointers to Salamander's global variables
 // used by both the archive and FS plug-ins - the variables are shared
 const CFileData** TransferFileData = NULL;
 int* TransferIsDir = NULL;
-char* TransferBuffer = NULL;
+wchar_t* TransferBuffer = NULL;
 int* TransferLen = NULL;
 DWORD* TransferRowData = NULL;
 CPluginDataInterfaceAbstract** TransferPluginDataIface = NULL;
@@ -39,9 +41,9 @@ void WINAPI GetTypeText()
             (*TransferFileData)->LastWrite.dwLowDateTime != 0)
         {
             FileTimeToSystemTime(&(*TransferFileData)->LastWrite, &st);
-            len = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, TransferBuffer, 50) - 1;
+            len = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, TransferBuffer, 50) - 1;
             if (len < 0)
-                len = sprintf(TransferBuffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                len = SalPrintfW(TransferBuffer, 50, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
             *TransferLen = len;
         }
         else
@@ -55,59 +57,59 @@ void WINAPI GetTypeText()
         switch (((CPluginData*)(*TransferFileData)->PluginData)->Type)
         {
         case REG_BINARY:
-            memcpy(TransferBuffer, Str_REG_BINARY, Len_REG_BINARY);
+            wmemcpy(TransferBuffer, Str_REG_BINARY, Len_REG_BINARY);
             *TransferLen = Len_REG_BINARY;
             break;
         case REG_DWORD:
-            memcpy(TransferBuffer, Str_REG_DWORD, Len_REG_DWORD);
+            wmemcpy(TransferBuffer, Str_REG_DWORD, Len_REG_DWORD);
             *TransferLen = Len_REG_DWORD;
             break;
         case REG_DWORD_BIG_ENDIAN:
-            memcpy(TransferBuffer, Str_REG_DWORD_BIG_ENDIAN, Len_REG_DWORD_BIG_ENDIAN);
+            wmemcpy(TransferBuffer, Str_REG_DWORD_BIG_ENDIAN, Len_REG_DWORD_BIG_ENDIAN);
             *TransferLen = Len_REG_DWORD_BIG_ENDIAN;
             break;
         case REG_EXPAND_SZ:
-            memcpy(TransferBuffer, Str_REG_EXPAND_SZ, Len_REG_EXPAND_SZ);
+            wmemcpy(TransferBuffer, Str_REG_EXPAND_SZ, Len_REG_EXPAND_SZ);
             *TransferLen = Len_REG_EXPAND_SZ;
             break;
         case REG_LINK:
-            memcpy(TransferBuffer, Str_REG_LINK, Len_REG_LINK);
+            wmemcpy(TransferBuffer, Str_REG_LINK, Len_REG_LINK);
             *TransferLen = Len_REG_LINK;
             break;
         case REG_MULTI_SZ:
-            memcpy(TransferBuffer, Str_REG_MULTI_SZ, Len_REG_MULTI_SZ);
+            wmemcpy(TransferBuffer, Str_REG_MULTI_SZ, Len_REG_MULTI_SZ);
             *TransferLen = Len_REG_MULTI_SZ;
             break;
         case REG_NONE:
-            memcpy(TransferBuffer, Str_REG_NONE, Len_REG_NONE);
+            wmemcpy(TransferBuffer, Str_REG_NONE, Len_REG_NONE);
             *TransferLen = Len_REG_NONE;
             break;
         case REG_QWORD:
-            memcpy(TransferBuffer, Str_REG_QWORD, Len_REG_QWORD);
+            wmemcpy(TransferBuffer, Str_REG_QWORD, Len_REG_QWORD);
             *TransferLen = Len_REG_QWORD;
             break;
         case REG_RESOURCE_LIST:
-            memcpy(TransferBuffer, Str_REG_RESOURCE_LIST, Len_REG_RESOURCE_LIST);
+            wmemcpy(TransferBuffer, Str_REG_RESOURCE_LIST, Len_REG_RESOURCE_LIST);
             *TransferLen = Len_REG_RESOURCE_LIST;
             break;
         case REG_SZ:
-            memcpy(TransferBuffer, Str_REG_SZ, Len_REG_SZ);
+            wmemcpy(TransferBuffer, Str_REG_SZ, Len_REG_SZ);
             *TransferLen = Len_REG_SZ;
             break;
 
         case REG_FULL_RESOURCE_DESCRIPTOR:
-            memcpy(TransferBuffer, Str_REG_FULL_RESOURCE_DESCRIPTOR, Len_REG_FULL_RESOURCE_DESCRIPTOR);
+            wmemcpy(TransferBuffer, Str_REG_FULL_RESOURCE_DESCRIPTOR, Len_REG_FULL_RESOURCE_DESCRIPTOR);
             *TransferLen = Len_REG_FULL_RESOURCE_DESCRIPTOR;
             break;
 
         case REG_RESOURCE_REQUIREMENTS_LIST:
-            memcpy(TransferBuffer, Str_REG_RESOURCE_REQUIREMENTS_LIST, Len_REG_RESOURCE_REQUIREMENTS_LIST);
+            wmemcpy(TransferBuffer, Str_REG_RESOURCE_REQUIREMENTS_LIST, Len_REG_RESOURCE_REQUIREMENTS_LIST);
             *TransferLen = Len_REG_RESOURCE_REQUIREMENTS_LIST;
             break;
 
         default:
             TRACE_E("unknown value type");
-            TransferBuffer[0] = '?';
+            TransferBuffer[0] = L'?';
             *TransferLen = 1;
         }
     }
@@ -125,9 +127,9 @@ void WINAPI GetDataText()
             (*TransferFileData)->LastWrite.dwLowDateTime != 0)
         {
             FileTimeToSystemTime(&(*TransferFileData)->LastWrite, &st);
-            len = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, TransferBuffer, 50) - 1;
+            len = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, TransferBuffer, 50) - 1;
             if (len < 0)
-                len = sprintf(TransferBuffer, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                len = SalPrintfW(TransferBuffer, 50, L"%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
             *TransferLen = len;
         }
         else
@@ -150,7 +152,7 @@ void WINAPI GetDataText()
             case REG_SZ:
                 if (pluginData->Data && pluginData->DataSize)
                 {
-                    memcpy(TransferBuffer, (void*)pluginData->Data, pluginData->DataSize);
+                    wmemcpy(TransferBuffer, (const WCHAR*)pluginData->Data, pluginData->DataSize);
                     *TransferLen = pluginData->DataSize - 1;
                 }
                 else
@@ -160,7 +162,7 @@ void WINAPI GetDataText()
             case REG_DWORD_BIG_ENDIAN:
             case REG_DWORD:
                 if ((*TransferFileData)->Size == CQuadWord(4, 0))
-                    *TransferLen = sprintf(TransferBuffer, "0x%08x (%u)", (DWORD)pluginData->Data, (DWORD)pluginData->Data); // FIXME_X64 - verify the cast to (DWORD)
+                    *TransferLen = SalPrintfW(TransferBuffer, TRANSFER_BUFFER_MAX, L"0x%08x (%u)", (DWORD)pluginData->Data, (DWORD)pluginData->Data); // FIXME_X64 - verify the cast to (DWORD)
                 else
                     *TransferLen = 0;
                 break;
@@ -169,7 +171,7 @@ void WINAPI GetDataText()
                 if ((*TransferFileData)->Size == CQuadWord(8, 0))
                 {
                     QWORD q = *(LPQWORD)pluginData->Data;
-                    *TransferLen = sprintf(TransferBuffer, "0x%016I64x (%I64u)", q, q);
+                    *TransferLen = SalPrintfW(TransferBuffer, TRANSFER_BUFFER_MAX, L"0x%016I64x (%I64u)", q, q);
                 }
                 else
                     *TransferLen = 0;
@@ -177,7 +179,7 @@ void WINAPI GetDataText()
 
             default:
                 if (pluginData->Data)
-                    memcpy(TransferBuffer, (void*)pluginData->Data, pluginData->DataSize);
+                    wmemcpy(TransferBuffer, (const WCHAR*)pluginData->Data, pluginData->DataSize);
                 *TransferLen = pluginData->DataSize;
             }
         }
@@ -194,14 +196,16 @@ void WINAPI GetSizeText()
     if (*TransferIsDir > 0)
     {
         // it's a key, print "KEY"
-        memcpy(TransferBuffer, KeyText, KeyTextLen);
-        *TransferLen = KeyTextLen;
+        *TransferLen = static_cast<int>((std::min<size_t>)(
+            KeyText.size(), TRANSFER_BUFFER_MAX));
+        wmemcpy(TransferBuffer, KeyText.data(), static_cast<size_t>(*TransferLen));
     }
     else
     {
         // it's a value, print its size
-        SG->NumberToStr(TransferBuffer, (*TransferFileData)->Size);
-        *TransferLen = (int)strlen(TransferBuffer);
+        const std::wstring number = SPLNumberToStrOwned(SG, (*TransferFileData)->Size);
+        *TransferLen = static_cast<int>((std::min<size_t>)(number.size(), TRANSFER_BUFFER_MAX));
+        wmemcpy(TransferBuffer, number.data(), static_cast<size_t>(*TransferLen));
     }
 }
 
@@ -246,10 +250,10 @@ CPluginDataInterface::GetSimplePluginIcons(int iconSize)
     return ImageList;
 }
 
-void CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const char* archivePath,
+void CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, const wchar_t* archivePath,
                                      const CFileData* upperDir)
 {
-    CALL_STACK_MESSAGE2("CPluginDataInterface::SetupView(, , %s,)", archivePath);
+    CALL_STACK_MESSAGE2("CPluginDataInterface::SetupView(, , %ls,)", archivePath);
     view->GetTransferVariables(TransferFileData, TransferIsDir, TransferBuffer, TransferLen, TransferRowData,
                                TransferPluginDataIface, TransferActCustomData);
 
@@ -263,8 +267,8 @@ void CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* vi
         CColumn column;
 
         // add the Type/Date column
-        strcpy(column.Name, LoadStr(IDS_TYPE));
-        strcpy(column.Description, LoadStr(IDS_TYPE));
+        lstrcpynW(column.Name, LoadStrW(IDS_TYPE).c_str(), _countof(column.Name));
+        lstrcpynW(column.Description, LoadStrW(IDS_TYPE).c_str(), _countof(column.Description));
         column.GetText = GetTypeText;
         column.SupportSorting = 0;
         column.LeftAlignment = 1;
@@ -275,8 +279,8 @@ void CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* vi
         view->InsertColumn(i++, &column);
 
         // add the Data/Time column
-        strcpy(column.Name, LoadStr(IDS_DATA));
-        strcpy(column.Description, LoadStr(IDS_DATA));
+        lstrcpynW(column.Name, LoadStrW(IDS_DATA).c_str(), _countof(column.Name));
+        lstrcpynW(column.Description, LoadStrW(IDS_DATA).c_str(), _countof(column.Description));
         column.GetText = GetDataText;
         column.SupportSorting = 0;
         column.LeftAlignment = 1;
@@ -287,8 +291,8 @@ void CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* vi
         view->InsertColumn(i++, &column);
 
         // add the Size column
-        strcpy(column.Name, LoadStr(IDS_SIZE));
-        strcpy(column.Description, LoadStr(IDS_SIZE));
+        lstrcpynW(column.Name, LoadStrW(IDS_SIZE).c_str(), _countof(column.Name));
+        lstrcpynW(column.Description, LoadStrW(IDS_SIZE).c_str(), _countof(column.Description));
         column.GetText = GetSizeText;
         column.SupportSorting = 1;
         column.LeftAlignment = 0;
@@ -370,94 +374,100 @@ void CPluginDataInterface::ColumnWidthWasChanged(BOOL leftPanel, const CColumn* 
     }
 }
 
-const char* WINAPI FSInfoLineName(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineName(HWND parent, void* param)
 {
     CALL_STACK_MESSAGE1("FSInfoLineName(, )");
-    return (const char*)param;
+    return (const WCHAR*)param;
 }
 
-const char* WINAPI FSInfoLineSize(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineSize(HWND parent, void* param)
 {
     CALL_STACK_MESSAGE1("FSInfoLineSize(, )");
     GetSizeText();
-    TransferBuffer[*TransferLen] = 0;
+    TransferBuffer[*TransferLen] = L'\0';
     return TransferBuffer;
 }
 
-const char* WINAPI FSInfoLineDate(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineDate(HWND parent, void* param)
 {
     CALL_STACK_MESSAGE1("FSInfoLineDate(, )");
     GetTypeText();
-    TransferBuffer[*TransferLen] = 0;
+    TransferBuffer[*TransferLen] = L'\0';
     return TransferBuffer;
 }
 
-const char* WINAPI FSInfoLineTime(HWND parent, void* param)
+const wchar_t* WINAPI FSInfoLineTime(HWND parent, void* param)
 {
     CALL_STACK_MESSAGE1("FSInfoLineTime(, )");
     GetDataText();
-    TransferBuffer[*TransferLen] = 0;
+    TransferBuffer[*TransferLen] = L'\0';
     return TransferBuffer;
 }
 
 CSalamanderVarStrEntry FSInfoLine[] =
     {
-        {"Name", FSInfoLineName},
-        {"Size", FSInfoLineSize},
-        {"Date", FSInfoLineDate},
-        {"Time", FSInfoLineTime},
+        {L"Name", FSInfoLineName},
+        {L"Size", FSInfoLineSize},
+        {L"Date", FSInfoLineDate},
+        {L"Time", FSInfoLineTime},
         {NULL, NULL}};
 
-int ExpandPluralSelection(char* buffer, int bufferSize, int files, int dirs)
+std::wstring ExpandPluralSelection(int files, int dirs)
 {
-    CALL_STACK_MESSAGE4("ExpandPluralSelection(, %d, %d, %d)", bufferSize, files,
-                        dirs);
-    char formatA[200];
+    CALL_STACK_MESSAGE3("ExpandPluralSelection(%d, %d)", files, dirs);
 
     if (files > 0 && dirs > 0)
     {
         CQuadWord parametersArray[] = {CQuadWord(files, 0), CQuadWord(dirs, 0)};
-        SG->ExpandPluralString(formatA, 200, LoadStr(IDS_SELECTED3), 2, parametersArray);
-        return SalPrintf(buffer, bufferSize, formatA, files, dirs);
+        const std::wstring format = SPLExpandPluralStringOwned(
+            SG, LoadStrW(IDS_SELECTED3).c_str(), 2, parametersArray);
+        return SPLFormatStringOwned(format.c_str(), files, dirs);
     }
     CQuadWord param = CQuadWord(files + dirs, 0);
-    SG->ExpandPluralString(formatA, 200, LoadStr(files ? IDS_SELECTED1 : IDS_SELECTED2), 1, &param);
-    return SalPrintf(buffer, bufferSize, formatA, files + dirs);
+    const std::wstring format = SPLExpandPluralStringOwned(
+        SG, LoadStrW(files ? IDS_SELECTED1 : IDS_SELECTED2).c_str(), 1, &param);
+    return SPLFormatStringOwned(format.c_str(), files + dirs);
 }
 
 BOOL CPluginDataInterface::GetInfoLineContent(
     int panel, const CFileData* file, BOOL isDir, int selectedFiles,
     int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
-    char* buffer, DWORD* hotTexts, int& hotTextsCount)
+    CSalamanderStringBuffer* buffer, CSalamanderTextRangeBuffer* hotTexts)
 {
-    CALL_STACK_MESSAGE8("CPluginDataInterface::GetInfoLineContent(%d, , %d, %d, "
-                        "%d, %d, %g, , , %d)",
+    CALL_STACK_MESSAGE7("CPluginDataInterface::GetInfoLineContent(%d, , %d, %d, "
+                        "%d, %d, %g, , )",
                         panel, isDir, selectedFiles,
-                        selectedDirs, displaySize, selectedSize.GetDouble(),
-                        hotTextsCount);
+                        selectedDirs, displaySize, selectedSize.GetDouble());
+    if (buffer == NULL || hotTexts == NULL)
+        return FALSE;
     if (file != NULL)
     {
-        char localTransferBuffer[TRANSFER_BUFFER_MAX + 1];
+        // ExpandVarString's callback transfer area is an exact live-SDK
+        // contract, call-scoped here rather than retained as text ownership.
+        std::array<wchar_t, TRANSFER_BUFFER_MAX + 1> liveVarTransferBuffer{};
         const CFileData** oldTransferFileData = TransferFileData;
         int* oldTransferIsDir = TransferIsDir;
-        char* oldTransferBuffer = TransferBuffer;
+        wchar_t* oldTransferBuffer = TransferBuffer;
         int* oldTransferLen = TransferLen;
         //DWORD            *TransferRowData = NULL;
         //CPluginDataInterfaceAbstract **TransferPluginDataIface = NULL;
         //DWORD            *TransferActCustomData = NULL;
         TransferFileData = &file;
         TransferIsDir = &isDir;
-        TransferBuffer = localTransferBuffer;
+        TransferBuffer = liveVarTransferBuffer.data();
         int localTransferLen;
         TransferLen = &localTransferLen;
 
-        hotTextsCount = 100;
-        if (!SG->ExpandVarString(SG->GetMsgBoxParent(), "$(Name): $(Size), $(Date), $(Time)",
-                                 buffer, 1000, FSInfoLine, file->Name, FALSE, hotTexts,
-                                 &hotTextsCount))
+        BOOL published = SG->ExpandVarString(
+            SG->GetMsgBoxParent(), L"$(Name): $(Size), $(Date), $(Time)",
+            buffer, FSInfoLine, file->Name, FALSE, hotTexts);
+        if (!published)
         {
-            strcpy(buffer, "Error!");
-            hotTextsCount = 0;
+            const std::vector<CSalamanderTextRange> noRanges;
+            published = sally::plugin_abi::WriteTextAndRanges(
+                            *buffer, *hotTexts, L"Error!", noRanges)
+                            ? TRUE
+                            : FALSE;
         }
 
         TransferFileData = oldTransferFileData;
@@ -465,27 +475,33 @@ BOOL CPluginDataInterface::GetInfoLineContent(
         TransferBuffer = oldTransferBuffer;
         TransferLen = oldTransferLen;
 
-        return TRUE;
+        return published;
     }
     else
     {
         if (selectedFiles == 0 && selectedDirs == 0) // information line for an empty panel
             return FALSE;                            // let Salamander print the text
 
-        int prefix = 0;
+        std::wstring text;
         if (displaySize)
         {
             // for simplicity we do not use "plural" strings (see SalamanderGeneral->ExpandPluralString())
-            char formatA[200];
-            SG->ExpandPluralString(formatA, 200, LoadStr(IDS_SELECTEDSIZE), 1, (CQuadWord*)&selectedSize);
-            prefix = SalPrintf(buffer, 1000, formatA, selectedSize.Value);
+            const std::wstring format = SPLExpandPluralStringOwned(
+                SG, LoadStrW(IDS_SELECTEDSIZE).c_str(), 1, &selectedSize);
+            text = SPLFormatStringOwned(format.c_str(), selectedSize.Value);
 
             /*    // example of using the standard string
       SalamanderGeneral->ExpandPluralBytesFilesDirs(buffer, 1000, selectedSize, selectedFiles,
                                                     selectedDirs, TRUE);
 */
         }
-        ExpandPluralSelection(buffer + prefix, 1000 - prefix, selectedFiles, selectedDirs);
-        return SG->LookForSubTexts(buffer, hotTexts, &hotTextsCount);
+        text += ExpandPluralSelection(selectedFiles, selectedDirs);
+        std::vector<CSalamanderTextRange> ranges;
+        if (!SPLLookForSubTextsOwned(SG, text, ranges))
+            return FALSE;
+        return sally::plugin_abi::WriteTextAndRanges(
+                   *buffer, *hotTexts, text, ranges)
+                   ? TRUE
+                   : FALSE;
     }
 }

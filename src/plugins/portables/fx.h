@@ -41,7 +41,15 @@ namespace Fx
 
     extern const FILETIME FILETIME_Nul;
 
-    typedef ATL::CStringA CFxString;
+    // Widened from ATL::CStringA: CFxItem::GetName() feeds
+    // this straight into CFileData::Name (already wchar_t* in the live SDK) via
+    // wpdhelpers.h's WpdGetStringValue, which reads real device object names from
+    // WPD's genuinely wide COM API (IPortableDeviceValues::GetStringValue). The
+    // narrow typedef silently corrupted any device filename outside the system
+    // ANSI codepage (see tests/sally/portables/gtest_portables_fxstring_narrowing_bug.cpp
+    // for the proof this was live). CFxPath derives from CFxString, so this single
+    // change also widens all path handling consistently.
+    typedef ATL::CStringW CFxString;
 
 #else
 
@@ -81,7 +89,8 @@ namespace Fx
         }
     };
 
-    typedef ATL::CStringT<char, StrTraitFx<char>> CFxString;
+    // Widened alongside the _FX_ATL_INTERWORK branch above.
+    typedef ATL::CStringT<wchar_t, StrTraitFx<wchar_t>> CFxString;
 
 #endif // _FX_ATL_INTERWORK
 
@@ -278,7 +287,7 @@ namespace Fx
 
         virtual void WINAPI ClearHistory(HWND parent) override;
 
-        virtual void WINAPI AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs) override;
+        virtual void WINAPI AcceptChangeOnPathNotification(const wchar_t* path, BOOL includingSubdirs) override;
 
         virtual void WINAPI PasswordManagerEvent(HWND parent, int event) override;
     };
@@ -291,17 +300,16 @@ namespace Fx
     protected:
         static const CFileData** s_transferFileData;
         static int* s_transferIsDir;
-        static char* s_transferBuffer;
+        static wchar_t* s_transferBuffer;
         static int* s_transferLen;
         static DWORD* s_transferRowData;
         static CPluginDataInterfaceAbstract** s_transferPluginDataInterface;
         static DWORD* s_transferActCustomData;
 
-        void WINAPI AppendInfoLineContentPart(
-            PCTSTR partText,
-            char* buffer,
-            DWORD* hotTexts,
-            int& hotTextsCount);
+        bool WINAPI AppendInfoLineContentPart(
+            PCWSTR partText,
+            std::wstring& buffer,
+            std::vector<CSalamanderTextRange>& hotTexts);
 
     public:
         CFxPluginDataInterface();
@@ -319,9 +327,9 @@ namespace Fx
 
         virtual void WINAPI ReleasePluginData(CFileData& file, BOOL isDir) override;
 
-        virtual void WINAPI GetFileDataForUpDir(const char* archivePath, CFileData& upDir) override;
+        virtual void WINAPI GetFileDataForUpDir(const wchar_t* archivePath, CFileData& upDir) override;
 
-        virtual BOOL WINAPI GetFileDataForNewDir(const char* dirName, CFileData& dir) override;
+        virtual BOOL WINAPI GetFileDataForNewDir(const wchar_t* dirName, CFileData& dir) override;
 
         virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize) override;
 
@@ -334,7 +342,7 @@ namespace Fx
         virtual void WINAPI SetupView(
             BOOL leftPanel,
             CSalamanderViewAbstract* view,
-            const char* archivePath,
+            const wchar_t* archivePath,
             const CFileData* upperDir) override;
 
         virtual void WINAPI ColumnFixedWidthShouldChange(
@@ -355,9 +363,8 @@ namespace Fx
             int selectedDirs,
             BOOL displaySize,
             const CQuadWord& selectedSize,
-            char* buffer,
-            DWORD* hotTexts,
-            int& hotTextsCount) override;
+            CSalamanderStringBuffer* buffer,
+            CSalamanderTextRangeBuffer* hotTexts) override;
 
         virtual BOOL WINAPI CanBeCopiedToClipboard() override;
 

@@ -12,20 +12,20 @@
 template <typename CHAR>
 struct VolumeDetails
 {
-    CHAR MountPoint[MAX_PATH];    // Path the volume is mounted on, e.g "C:\"
-    CHAR GUIDPath[MAX_PATH];      // Unique identifier of the volume (valid only on W2k and higher)
-    CHAR FSName[MAX_FSNAME];      // The name of the volume file system, e.g. NTFS, FAT32, FAT
-    CHAR VolumeName[MAX_VOLNAME]; // The name (label) assigned to the volume by the user
+    std::basic_string<CHAR> MountPoint; // Path the volume is mounted on, e.g "C:\"
+    std::basic_string<CHAR> GUIDPath;   // Unique identifier of the volume (valid only on W2k and higher)
+    std::basic_string<CHAR> FSName;     // The name of the volume file system, e.g. NTFS, FAT32, FAT
+    std::basic_string<CHAR> VolumeName; // The name (label) assigned to the volume by the user
     VolumeType Type;              // Type of the volume (fixed, removable etc.)
     CQuadWord BytesTotal;         // The total size of the volume (may not be accurate if quota is in effect)
     CQuadWord BytesFree;          // The total free space on the volume
 };
 
 template <typename CHAR>
-class VolumeListing : public TDirectArray<VolumeDetails<CHAR>>
+class VolumeListing : public TIndirectArray<VolumeDetails<CHAR>>
 {
 public:
-    VolumeListing() : TDirectArray<VolumeDetails<CHAR>>(5, 5) {}
+    VolumeListing() : TIndirectArray<VolumeDetails<CHAR>>(5, 5) {}
 };
 
 template <typename CHAR>
@@ -87,7 +87,7 @@ BOOL GetLocalDiskDrives(DiskRecArray<CHAR>& disks)
         OS<CHAR>::OS_GetVolumeNameForVolumeMountPointExists())
     {
         // create initial list of disks in the system
-        size_t bufsize = MAX_PATH / 2;
+        size_t bufsize = 64;
         CHAR* buffer = NULL;
         DWORD len;
         do
@@ -104,7 +104,7 @@ BOOL GetLocalDiskDrives(DiskRecArray<CHAR>& disks)
                 ret = FALSE;
                 break;
             }
-        } while (len > bufsize);
+        } while (len >= bufsize);
 
         if (ret)
         {
@@ -149,72 +149,64 @@ BOOL GetLocalDiskDrives(DiskRecArray<CHAR>& disks)
 }
 
 template <typename CHAR>
-BOOL GetVolumePathForVolumeName(const CHAR* volumeName, const VolumeRecArray<CHAR>& volumes, CHAR* pathName)
+BOOL GetVolumePathForVolumeName(const CHAR* volumeName, const VolumeRecArray<CHAR>& volumes,
+                                std::basic_string<CHAR>& pathName)
 {
-    BOOL ret = FALSE;
-    pathName[0] = 0;
+    pathName.clear();
     if (OS<CHAR>::OS_GetVolumePathNamesForVolumeNameExists())
     {
-        DWORD not_working;
-        // this function should return size of required buffer, but it doesn't.
-        if (!OS<CHAR>::OS_GetVolumePathNamesForVolumeName(volumeName, pathName, MAX_PATH, &not_working) &&
-            ERROR_MORE_DATA != GetLastError())
+        size_t capacity = 64;
+        const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+        for (;;)
         {
-            pathName[0] = 0;
-        }
-        else
-        {
-            ret = TRUE;
-            pathName[MAX_PATH - 1] = 0;
-        }
-    }
-    else
-    {
-        for (int i = 0; i < volumes.Count; ++i)
-        {
-            if (!String<CHAR>::StrCmp(volumeName, const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->VolumeName))
+            std::vector<CHAR> buffer(capacity, 0);
+            DWORD required = 0;
+            if (OS<CHAR>::OS_GetVolumePathNamesForVolumeName(
+                    volumeName, buffer.data(), static_cast<DWORD>(buffer.size()), &required))
             {
-                if (const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->Root != 0)
-                {
-                    if (String<CHAR>::StrLen(const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->Root) < MAX_PATH)
-                    {
-                        String<CHAR>::StrCpy(pathName, const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->Root);
-                        pathName[MAX_PATH - 1] = 0;
-                    }
-                    ret = TRUE;
-                }
-                break;
+                pathName.assign(buffer.data());
+                return TRUE;
             }
+            if (GetLastError() != ERROR_MORE_DATA)
+                return FALSE;
+            size_t next = required > capacity ? static_cast<size_t>(required) : capacity * 2;
+            if (next <= capacity || next > limit)
+                return FALSE;
+            capacity = next;
         }
     }
-    return ret;
+
+    for (int i = 0; i < volumes.Count; ++i)
+    {
+        if (!String<CHAR>::StrCmp(volumeName, const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->VolumeName))
+        {
+            const CHAR* root = const_cast<VolumeRecArray<CHAR>&>(volumes)[i]->Root;
+            if (root != NULL)
+                pathName.assign(root);
+            return root != NULL;
+        }
+    }
+    return FALSE;
 }
 
-BOOL GetDiskFreeSpace95(const char* path, LPDWORD lpSectorsPerCluster,
-                        LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
-                        LPDWORD lpTotalNumberOfClusters);
 BOOL GetDiskFreeSpace95(const wchar_t* path, LPDWORD lpSectorsPerCluster,
                         LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
                         LPDWORD lpTotalNumberOfClusters);
-BOOL GetDiskFreeSpace95Aux(const char* path, LPDWORD lpSectorsPerCluster,
-                           LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
-                           LPDWORD lpTotalNumberOfClusters);
 BOOL GetDiskFreeSpace95Aux(const wchar_t* path, LPDWORD lpSectorsPerCluster,
                            LPDWORD lpBytesPerSector, LPDWORD lpNumberOfFreeClusters,
                            LPDWORD lpTotalNumberOfClusters);
 
 template <typename CHAR>
 void GetVolumeDetails(const CHAR* rootPath, int volumeType, const VolumeRecArray<CHAR>& volumes,
-                      DiskRecArray<CHAR>& disks, CHAR* volumeName, size_t volumeNameLen,
-                      CHAR* volumeFSName, size_t volumeFSLen, CQuadWord& bytesTotal, CQuadWord& bytesFree,
-                      CHAR* pathName = NULL)
+                      DiskRecArray<CHAR>& disks, std::basic_string<CHAR>& volumeName,
+                      std::basic_string<CHAR>& volumeFSName, CQuadWord& bytesTotal,
+                      CQuadWord& bytesFree, std::basic_string<CHAR>* pathName = NULL)
 {
     CALL_STACK_MESSAGE1("CConnectDialog::GetVolumeDetails()");
 
     if (pathName)
     {
-        if (!GetVolumePathForVolumeName(rootPath, volumes, pathName))
-            pathName[0] = 0;
+        GetVolumePathForVolumeName(rootPath, volumes, *pathName);
     }
 
     // For floppies, skip check of FS type and free space, it's annoying as it access the medium
@@ -228,12 +220,29 @@ void GetVolumeDetails(const CHAR* rootPath, int volumeType, const VolumeRecArray
     if (!skipCheck)
     {
         DWORD volumeSerial, volumeComponentLen, volumeFlags;
-        if (!OS<CHAR>::OS_GetVolumeInfo(rootPath, volumeName, (DWORD)volumeNameLen,
-                                        &volumeSerial, &volumeComponentLen,
-                                        &volumeFlags, volumeFSName, (DWORD)volumeFSLen))
+        size_t capacity = 64;
+        const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+        for (;;)
         {
-            volumeName[0] = 0;
-            volumeFSName[0] = 0;
+            std::vector<CHAR> volumeBuffer(capacity, 0);
+            std::vector<CHAR> fsBuffer(capacity, 0);
+            if (OS<CHAR>::OS_GetVolumeInfo(rootPath, volumeBuffer.data(),
+                                           static_cast<DWORD>(volumeBuffer.size()),
+                                           &volumeSerial, &volumeComponentLen, &volumeFlags,
+                                           fsBuffer.data(), static_cast<DWORD>(fsBuffer.size())))
+            {
+                volumeName.assign(volumeBuffer.data());
+                volumeFSName.assign(fsBuffer.data());
+                break;
+            }
+            if ((GetLastError() != ERROR_MORE_DATA && GetLastError() != ERROR_FILENAME_EXCED_RANGE) ||
+                capacity > limit / 2)
+            {
+                volumeName.clear();
+                volumeFSName.clear();
+                break;
+            }
+            capacity *= 2;
         }
         if (OS<CHAR>::OS_GetDiskFreeSpaceExExists())
         {
@@ -252,7 +261,7 @@ void GetVolumeDetails(const CHAR* rootPath, int volumeType, const VolumeRecArray
             DWORD d;
             BOOL ret;
 
-            if (!String<CHAR>::StrICmp(volumeFSName, CVolume<CHAR>::STRING_FAT32))
+            if (!String<CHAR>::StrICmp(volumeFSName.c_str(), CVolume<CHAR>::STRING_FAT32))
                 ret = GetDiskFreeSpace95(rootPath, &a, &b, &c, &d);
             else
                 ret = GetDiskFreeSpace95Aux(rootPath, &a, &b, &c, &d);
@@ -266,16 +275,16 @@ void GetVolumeDetails(const CHAR* rootPath, int volumeType, const VolumeRecArray
     }
     else
     {
-        volumeName[0] = 0;
-        volumeFSName[0] = 0;
+        volumeName.clear();
+        volumeFSName.clear();
     }
 
     // strip trailing slash from mount points
     size_t l;
-    if (pathName && (l = String<CHAR>::StrLen(pathName)) > 3)
+    if (pathName && (l = pathName->size()) > 3)
     {
-        if (l > 0 && pathName[l - 1] == (CHAR)'\\')
-            pathName[l - 1] = 0;
+        if ((*pathName)[l - 1] == (CHAR)'\\')
+            pathName->resize(l - 1);
     }
 }
 
@@ -320,6 +329,89 @@ BOOL IsVolumeFloppy(DiskRecArray<CHAR>& disks, const CHAR* volumeName)
 }
 
 template <typename CHAR>
+HANDLE FindFirstVolumeOwned(std::basic_string<CHAR>& volumeName)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+    for (;;)
+    {
+        std::vector<CHAR> buffer(capacity, 0);
+        HANDLE handle = OS<CHAR>::OS_FindFirstVolume(
+            buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (handle != INVALID_HANDLE_VALUE)
+        {
+            volumeName.assign(buffer.data());
+            return handle;
+        }
+        if (GetLastError() != ERROR_FILENAME_EXCED_RANGE || capacity > limit / 2)
+            return INVALID_HANDLE_VALUE;
+        capacity *= 2;
+    }
+}
+
+template <typename CHAR>
+BOOL FindNextVolumeOwned(HANDLE handle, std::basic_string<CHAR>& volumeName)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+    for (;;)
+    {
+        std::vector<CHAR> buffer(capacity, 0);
+        if (OS<CHAR>::OS_FindNextVolume(handle, buffer.data(),
+                                        static_cast<DWORD>(buffer.size())))
+        {
+            volumeName.assign(buffer.data());
+            return TRUE;
+        }
+        if (GetLastError() != ERROR_FILENAME_EXCED_RANGE || capacity > limit / 2)
+            return FALSE;
+        capacity *= 2;
+    }
+}
+
+template <typename CHAR>
+HANDLE FindFirstVolumeMountPointOwned(const CHAR* volumeName,
+                                      std::basic_string<CHAR>& mountPoint)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+    for (;;)
+    {
+        std::vector<CHAR> buffer(capacity, 0);
+        HANDLE handle = OS<CHAR>::OS_FindFirstVolumeMountPoint(
+            volumeName, buffer.data(), static_cast<DWORD>(buffer.size()));
+        if (handle != INVALID_HANDLE_VALUE)
+        {
+            mountPoint.assign(buffer.data());
+            return handle;
+        }
+        if (GetLastError() != ERROR_FILENAME_EXCED_RANGE || capacity > limit / 2)
+            return INVALID_HANDLE_VALUE;
+        capacity *= 2;
+    }
+}
+
+template <typename CHAR>
+BOOL FindNextVolumeMountPointOwned(HANDLE handle, std::basic_string<CHAR>& mountPoint)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<DWORD>::max)());
+    for (;;)
+    {
+        std::vector<CHAR> buffer(capacity, 0);
+        if (OS<CHAR>::OS_FindNextVolumeMountPoint(handle, buffer.data(),
+                                                  static_cast<DWORD>(buffer.size())))
+        {
+            mountPoint.assign(buffer.data());
+            return TRUE;
+        }
+        if (GetLastError() != ERROR_FILENAME_EXCED_RANGE || capacity > limit / 2)
+            return FALSE;
+        capacity *= 2;
+    }
+}
+
+template <typename CHAR>
 void EnumerateAllVolumes(VolumeRecArray<CHAR>& volumes, DiskRecArray<CHAR>& disks)
 {
     if (OS<CHAR>::OS_VolumeEnumExists() &&
@@ -345,13 +437,13 @@ void EnumerateAllVolumes(VolumeRecArray<CHAR>& volumes, DiskRecArray<CHAR>& disk
                     String<CHAR>::StrCpy(record->VolumeName, volumeName);
                     if (!skipCheck)
                     {
-                        CHAR mntPoint[MAX_PATH];
-                        HANDLE hMntPt = OS<CHAR>::OS_FindFirstVolumeMountPoint(volumeName, mntPoint, MAX_PATH);
+                        std::basic_string<CHAR> mntPoint;
+                        HANDLE hMntPt = FindFirstVolumeMountPointOwned(volumeName, mntPoint);
                         if (hMntPt != INVALID_HANDLE_VALUE)
                         {
                             do
                             {
-                                CHAR* newStr = String<CHAR>::NewStr(mntPoint);
+                                CHAR* newStr = String<CHAR>::NewStr(mntPoint.c_str());
                                 if (newStr != NULL)
                                 {
                                     record->MountPoints.Add(newStr);
@@ -362,7 +454,7 @@ void EnumerateAllVolumes(VolumeRecArray<CHAR>& volumes, DiskRecArray<CHAR>& disk
                                         delete[] newStr;
                                     }
                                 }
-                            } while (OS<CHAR>::OS_FindNextVolumeMountPoint(hMntPt, mntPoint, MAX_PATH));
+                            } while (FindNextVolumeMountPointOwned(hMntPt, mntPoint));
                             OS<CHAR>::OS_FindVolumeMountPointClose(hMntPt);
                         }
                     }
@@ -465,37 +557,43 @@ DWORD GetVolumeListing(VolumeListing<CHAR>& listing)
 
     // enumerate all available volumes
     DWORD err = ERROR_NO_MORE_FILES;
-    VolumeDetails<CHAR> volumeDetails;
     if (OS<CHAR>::OS_VolumeEnumExists())
     {
-        int selLen = 0;
-        int serial = 0;
-        CHAR guidPath[MAX_PATH];
+        std::basic_string<CHAR> guidPath;
 
-        HANDLE volEnum = OS<CHAR>::OS_FindFirstVolume(guidPath, MAX_PATH);
+        HANDLE volEnum = FindFirstVolumeOwned(guidPath);
         while (volEnum != INVALID_HANDLE_VALUE)
         {
-            memset(&volumeDetails, 0, sizeof(volumeDetails));
-            volumeDetails.Type = OS<CHAR>::OS_GetVolumeType(guidPath);
+            VolumeDetails<CHAR>* volumeDetails = new VolumeDetails<CHAR>;
+            if (volumeDetails == NULL)
+            {
+                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+                break;
+            }
+            volumeDetails->Type = OS<CHAR>::OS_GetVolumeType(guidPath.c_str());
 
             // consider only fixed and removable drives
-            if (volumeDetails.Type == VT_DRIVE_FIXED ||
-                volumeDetails.Type == VT_DRIVE_REMOVABLE)
+            if (volumeDetails->Type == VT_DRIVE_FIXED ||
+                volumeDetails->Type == VT_DRIVE_REMOVABLE)
             {
-                String<CHAR>::StrCpy(volumeDetails.GUIDPath, guidPath);
-                GetVolumeDetails(guidPath, volumeDetails.Type, volumes, disks, volumeDetails.VolumeName, MAX_VOLNAME,
-                                 volumeDetails.FSName, MAX_FSNAME, volumeDetails.BytesTotal, volumeDetails.BytesFree,
-                                 volumeDetails.MountPoint);
+                volumeDetails->GUIDPath = guidPath;
+                GetVolumeDetails(guidPath.c_str(), volumeDetails->Type, volumes, disks,
+                                 volumeDetails->VolumeName, volumeDetails->FSName,
+                                 volumeDetails->BytesTotal, volumeDetails->BytesFree,
+                                 &volumeDetails->MountPoint);
                 listing.Add(volumeDetails);
                 if (!listing.IsGood())
                 {
                     listing.ResetState();
+                    delete volumeDetails;
                     SetLastError(ERROR_NOT_ENOUGH_MEMORY);
                     break;
                 }
             }
+            else
+                delete volumeDetails;
 
-            if (!OS<CHAR>::OS_FindNextVolume(volEnum, guidPath, MAX_PATH))
+            if (!FindNextVolumeOwned(volEnum, guidPath))
                 break;
         }
         err = GetLastError();
@@ -517,22 +615,31 @@ DWORD GetVolumeListing(VolumeListing<CHAR>& listing)
             if (drives & mask)
             {
                 root[0] = i;
-                memset(&volumeDetails, 0, sizeof(volumeDetails));
-                volumeDetails.Type = OS<CHAR>::OS_GetVolumeType(root);
-                if (volumeDetails.Type == VT_DRIVE_FIXED ||
-                    volumeDetails.Type == VT_DRIVE_REMOVABLE)
+                VolumeDetails<CHAR>* volumeDetails = new VolumeDetails<CHAR>;
+                if (volumeDetails == NULL)
                 {
-                    String<CHAR>::StrCpy(volumeDetails.MountPoint, root);
-                    GetVolumeDetails<CHAR>(root, volumeDetails.Type, volumes, disks, volumeDetails.VolumeName, MAX_VOLNAME,
-                                           volumeDetails.FSName, MAX_FSNAME, volumeDetails.BytesTotal, volumeDetails.BytesFree);
+                    err = ERROR_NOT_ENOUGH_MEMORY;
+                    break;
+                }
+                volumeDetails->Type = OS<CHAR>::OS_GetVolumeType(root);
+                if (volumeDetails->Type == VT_DRIVE_FIXED ||
+                    volumeDetails->Type == VT_DRIVE_REMOVABLE)
+                {
+                    volumeDetails->MountPoint.assign(root);
+                    GetVolumeDetails<CHAR>(root, volumeDetails->Type, volumes, disks,
+                                           volumeDetails->VolumeName, volumeDetails->FSName,
+                                           volumeDetails->BytesTotal, volumeDetails->BytesFree);
                     listing.Add(volumeDetails);
                     if (!listing.IsGood())
                     {
                         listing.ResetState();
+                        delete volumeDetails;
                         err = ERROR_NOT_ENOUGH_MEMORY;
                         break;
                     }
                 }
+                else
+                    delete volumeDetails;
             }
         }
         if (ERROR_NO_MORE_FILES == err)

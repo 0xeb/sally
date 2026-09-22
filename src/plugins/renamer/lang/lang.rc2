@@ -298,4 +298,6 @@ STRINGTABLE
   IDS_EXP_BROWSE, "Browse..."
   IDS_EXP_SALDIR, "Salamander Directory"
   IDS_CFG_CONFLICT, "The configuration is already opened."
+  IDS_EXP_ENVVARNOTFOUND, "Environment variable ""%s"" was not found."
+  IDS_EXP_ENVVARTOOLARGE, "Value of environment variable ""%s"" is too large."
 }

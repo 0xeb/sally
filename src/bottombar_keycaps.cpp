@@ -30,7 +30,7 @@ SIZE CalcBottomBarKeyCapSize(HDC hDC, HFONT hFont)
     HFONT hOldFont = hFont != NULL ? (HFONT)SelectObject(hDC, hFont) : NULL;
     RECT r = {0, 0, 0, 0};
     // "F12" is the widest label, so every cap is one uniform width - the bar stays aligned.
-    DrawText(hDC, "F12", 3, &r, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextW(hDC, L"F12", 3, &r, DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
     if (hOldFont != NULL)
         SelectObject(hDC, hOldFont);
 
@@ -43,7 +43,7 @@ SIZE CalcBottomBarKeyCapSize(HDC hDC, HFONT hFont)
     return size;
 }
 
-void DrawBottomBarKeyCap(HDC hDC, const RECT* rect, const char* keyText,
+void DrawBottomBarKeyCap(HDC hDC, const RECT* rect, const wchar_t* keyText,
                          COLORREF fill, COLORREF textColor, COLORREF outline)
 {
     if (hDC == NULL || rect == NULL || keyText == NULL)
@@ -65,8 +65,8 @@ void DrawBottomBarKeyCap(HDC hDC, const RECT* rect, const char* keyText,
     const int oldBkMode = SetBkMode(hDC, TRANSPARENT);
     const COLORREF oldText = SetTextColor(hDC, textColor);
     RECT textRect = *rect;
-    DrawText(hDC, keyText, -1, &textRect,
-             DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
+    DrawTextW(hDC, keyText, -1, &textRect,
+              DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_NOCLIP);
     SetTextColor(hDC, oldText);
     SetBkMode(hDC, oldBkMode);
 }

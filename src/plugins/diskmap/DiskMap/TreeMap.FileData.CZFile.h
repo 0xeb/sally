@@ -15,7 +15,7 @@
 #define FILESIZE_REAL 1
 #define FILESIZE_DISK 2
 
-#define MYNULL ((TCHAR*)-1)
+#define MYNULL ((wchar_t*)-1)
 
 class CZFile;
 class CZDirectory;
@@ -23,24 +23,27 @@ class CZDirectory;
 class CZFile
 {
 protected:
-    TCHAR* _name;
-    TCHAR* _ext; //points to the dot or NULL
+    wchar_t* _name;
+    wchar_t* _ext; //points to the dot or NULL
     size_t _namelen;
     INT64 _datasize;
     INT64 _realsize;
     INT64 _disksize;
     CZDirectory* _parent;
 
-    FILETIME _createtime;
-    FILETIME _modifytime;
+    // Value-initialized: the constructor assigns these only when the caller supplies them, and
+    // CZRoot passes NULL for both. Without this the root directory's timestamps are indeterminate,
+    // and reading them - which the folder tooltip is one row-layout entry away from doing - is UB.
+    FILETIME _createtime{};
+    FILETIME _modifytime{};
 
 public:
-    CZFile(CZDirectory* parent, TCHAR const* name, INT64 datasize, INT64 realsize, INT64 disksize, FILETIME* createtime, FILETIME* modifytime)
+    CZFile(CZDirectory* parent, wchar_t const* name, INT64 datasize, INT64 realsize, INT64 disksize, FILETIME* createtime, FILETIME* modifytime)
     {
         this->_parent = parent;
-        this->_namelen = _tcslen(name);
-        this->_name = (TCHAR*)malloc((this->_namelen + 1) * sizeof(TCHAR));
-        _tcscpy(this->_name, name);
+        this->_namelen = wcslen(name);
+        this->_name = (wchar_t*)malloc((this->_namelen + 1) * sizeof(wchar_t));
+        wcscpy(this->_name, name);
 
         this->_datasize = datasize;
         this->_realsize = realsize;
@@ -57,29 +60,29 @@ public:
     {
         free(this->_name);
     }
-    TCHAR const* GetName() { return this->_name; }
+    wchar_t const* GetName() { return this->_name; }
     size_t GetNameLen() { return this->_namelen; }
-    TCHAR* GetExt()
+    wchar_t* GetExt()
     {
         if (this->_ext != MYNULL)
             return this->_ext;
         else
             return CalcExt();
     }
-    virtual TCHAR* CalcExt()
+    virtual wchar_t* CalcExt()
     {
-        //this->_ext = _tcsrchr(this->_name, '.');
+        //this->_ext = wcsrchr(this->_name, L'.');
         this->_ext = this->_name + this->_namelen; //points to the null terminator
-        while (--this->_ext != this->_name && *this->_ext != '.')
+        while (--this->_ext != this->_name && *this->_ext != L'.')
             ;
-        if (*this->_ext != '.')
+        if (*this->_ext != L'.')
             this->_ext = NULL;
         return this->_ext;
     }
     FILETIME* GetCreateTime() { return &this->_createtime; }
     FILETIME* GetModifyTime() { return &this->_modifytime; }
-    size_t GetFullName(TCHAR* buff, size_t size);
-    size_t GetRelativeName(CZDirectory* root, TCHAR* buff, size_t size);
+    size_t GetFullName(std::wstring& path);
+    size_t GetRelativeName(CZDirectory* root, std::wstring& path);
     CZDirectory* GetParent() { return this->_parent; }
 
     /*CWorkerThread *BeginAsyncIconLoad(HWND owner, UINT msg)
@@ -95,41 +98,36 @@ public:
 		return mythread;
 	}*/
 
-    void LoadFileInfo(TCHAR* displayName, TCHAR* typeName)
+    void LoadFileInfo(wchar_t* displayName, wchar_t* typeName)
     {
-        SHFILEINFO shfi;
-        CPathBuffer path;
-        //SHGetFileInfo(buff, 0, &shfi, sizeof(shfi), SHGFI_ICON | SHGFI_SHELLICONSIZE | SHGFI_DISPLAYNAME | SHGFI_TYPENAME);
+        SHFILEINFOW shfi;
+        std::wstring path;
+        //SHGetFileInfoW(buff, 0, &shfi, sizeof(shfi), SHGFI_ICON | SHGFI_SHELLICONSIZE | SHGFI_DISPLAYNAME | SHGFI_TYPENAME);
         UINT flags = 0;
         if (displayName)
         {
             flags |= SHGFI_DISPLAYNAME;
-            displayName[0] = TEXT('\0');
+            displayName[0] = L'\0';
         }
         if (typeName)
         {
             flags |= SHGFI_TYPENAME;
-            typeName[0] = TEXT('\0');
+            typeName[0] = L'\0';
         }
         if (flags)
         {
-            int len = (int)this->GetFullName(path, path.Size());
+            this->GetFullName(path);
             DWORD_PTR result = 0;
-            if (len <= MAX_PATH)
-            {
-                result = SHGetFileInfo(path, 0, &shfi, sizeof(shfi), flags);
-            }
-            else
-            {
-                result = SHGetFileInfo(this->_name, 0, &shfi, sizeof(shfi), flags | SHGFI_USEFILEATTRIBUTES);
-            }
+            result = SHGetFileInfoW(path.c_str(), 0, &shfi, sizeof(shfi), flags);
+            if (result == 0)
+                result = SHGetFileInfoW(this->_name, 0, &shfi, sizeof(shfi), flags | SHGFI_USEFILEATTRIBUTES);
 
             if (result != 0)
             {
                 if (displayName)
-                    _tcscpy(displayName, shfi.szDisplayName);
+                    wcscpy(displayName, shfi.szDisplayName);
                 if (typeName)
-                    _tcscpy(typeName, shfi.szTypeName);
+                    wcscpy(typeName, shfi.szTypeName);
             }
         }
     }

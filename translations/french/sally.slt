@@ -1,7 +1,7 @@
 ﻿[EXPORTINFO]
 PROJECTNAME,"translator\sally 4.0\projects\french\sally.atp"
-TEXTVERSION,"1.0 (x64)"
-VERSION,"1,0,0,188"
+TEXTVERSION,"1.0.27 (x64)"
+VERSION,"1,0,27,188"
 
 [TRANSLATION]
 LANGID,1036
@@ -317,12 +317,11 @@ SLGINCOMPLETE,""
 313,184,68,28,12,1,""
 1151,216,70,6,8,1,"s"
 316,1,81,256,12,1,"Com&parer répertoires : ignorer des différences d'heure d'exactement une ou deux heures"
-597,1,94,238,12,1,"&Ouvrir des fichiers avec salopen.exe (les erreurs d'extension sont alors ignorées)"
-603,1,107,243,12,1,"&Sélectionner aussi l'extension dans Renommage rapide et Commandes d'empaquetage"
-623,1,120,202,12,1,"Sélectionner aussi l'extension de f&ichier  dans la commander Éditer fichier"
-622,1,133,156,12,1,"Utiliser le dépla&cement rapide de répertoire dans Novell NetWare"
-624,1,146,282,12,1,"Copie des fichiers: &utiliser l'algorythme asynchrone plus rapide en réseau (Windows 7 et ultérieur)"
-625,1,159,193,12,1,"&Garder les variables d'environnement à jour suivant les valeurs système"
+603,1,94,243,12,1,"&Sélectionner aussi l'extension dans Renommage rapide et Commandes d'empaquetage"
+623,1,107,202,12,1,"Sélectionner aussi l'extension de f&ichier  dans la commander Éditer fichier"
+622,1,120,156,12,1,"Utiliser le dépla&cement rapide de répertoire dans Novell NetWare"
+624,1,133,282,12,1,"Copie des fichiers: &utiliser l'algorythme asynchrone plus rapide en réseau (Windows 7 et ultérieur)"
+625,1,146,193,12,1,"&Garder les variables d'environnement à jour suivant les valeurs système"
 
 [DIALOG 320]
 299,231,1,"Vues"
@@ -3495,3 +3494,6 @@ SLGINCOMPLETE,""
 14224,1,"Interpréteur de commandes système (%COMSPEC%)"
 14225,1,"Profil par défaut de Windows Terminal"
 14226,1,"L'interpréteur de commandes préféré n'est plus disponible. Choisir un autre interpréteur par défaut."
+14227,1,"Le nom "%s" ne peut pas être représenté dans la page de codes système, et ce volume n'offre aucune solution de repli courte (8.3).\n\nLe décompresseur sélectionné n'accepte que ce type de noms, l'opération a donc été annulée. Poursuivre aurait pu décompresser une autre archive."
+14228,0,"The UTF-8 encoded master password exceeds the encryption limit.\nPlease use a shorter password."
+14229,0,"The text '%s' is not a valid hexadecimal pattern.\nUse pairs of hexadecimal digits, and enclose literal text in double quotes."

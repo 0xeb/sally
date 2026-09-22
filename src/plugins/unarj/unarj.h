@@ -44,6 +44,7 @@
 
 #include <stdio.h>
 #include <limits.h>
+#include <vector>
 
 typedef unsigned char uchar;   /*  8 bits or more */
 typedef unsigned int uint;     /* 16 - 32 bits or more */
@@ -186,8 +187,6 @@ extern uchar text[];
 #define HEADER_ID_LO 0x60
 #define FIRST_HDR_SIZE 30
 #define FIRST_HDR_SIZE_V 34
-#define COMMENT_MAX 2048
-#define HEADERSIZE_MAX (FIRST_HDR_SIZE + 10 + ARJ_MAX_PATH + COMMENT_MAX)
 #define BINARY_TYPE 0 /* This must line up with binary/text strings */
 #define TEXT_TYPE 1
 #define COMMENT_TYPE 2
@@ -214,7 +213,7 @@ extern long compsize;
 extern ushort bitbuf;
 
 extern uchar subbitbuf;
-extern uchar header[HEADERSIZE_MAX];
+extern std::vector<uchar> header;
 
 extern int bitcount;
 

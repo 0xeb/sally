@@ -22,8 +22,14 @@ class IPathService
 public:
     virtual ~IPathService() {}
 
-    // Converts path to a Win32-long-path-safe variant (adds \\?\ or \\?\UNC\ when needed).
-    virtual PathResult ToLongPath(const wchar_t* path, std::wstring& outPath) = 0;
+    // Converts a logical filesystem path to its literal Win32 I/O form. Relative/dot paths are
+    // resolved before adding \\?\ or \\?\UNC\; device and existing extended paths are preserved.
+    virtual PathResult PrepareForIo(const wchar_t* path, std::wstring& outPath) = 0;
+
+    // Builds and prepares a FindFirstFile pattern. Wildcards are kept outside full-path
+    // resolution so a '?' in the extended prefix is never mistaken for a search wildcard.
+    virtual PathResult PrepareEnumerationPattern(const wchar_t* path, const wchar_t* pattern,
+                                                 std::wstring& outPath) = 0;
 
     // Retrieves process current directory.
     virtual PathResult GetCurrentDirectory(std::wstring& outPath) = 0;

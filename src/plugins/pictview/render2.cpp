@@ -447,7 +447,7 @@ void CRendererWindow::SetAsWallpaper(WORD command)
     if (FileName != NULL)
     {
         HKEY hKey;
-        if (RegOpenKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_T, 0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS)
+        if (RegOpenKeyEx(HKEY_CURRENT_USER, SAL_REG_KEY_CONTROL_PANEL_DESKTOP_W, 0, KEY_READ | KEY_WRITE, &hKey) == ERROR_SUCCESS)
         {
             switch (command)
             {
@@ -459,10 +459,15 @@ void CRendererWindow::SetAsWallpaper(WORD command)
 
                 // save the image into a BMP file in the Windows directory
                 // (where it is then left on its own); a cleaner solution is unknown
-                CPathBuffer fileName;
-                GetWindowsDirectory(fileName, fileName.Size());
-                SalamanderGeneral->SalPathAppend(fileName, PICTVIEW_WALLPAPER, fileName.Size());
-                if (SaveWallpaper(fileName))
+                std::wstring fileNameW;
+                std::string fileName;
+                const bool pathReady =
+                    SPLGetWindowsDirectoryOwned(fileNameW) &&
+                    SPLSalPathAppendOwned(
+                        fileNameW, ToWideArg(PICTVIEW_WALLPAPER).c_str()) &&
+                    WideToLegacyTextExact(fileNameW.c_str(), fileName);
+                if (pathReady &&
+                    SaveWallpaper(fileName.c_str()))
                 {
                     CWallpaper cur;
                     GetWallpaper(hKey, FALSE, &cur);
@@ -476,7 +481,7 @@ void CRendererWindow::SetAsWallpaper(WORD command)
                     if (_tcsicmp(s, PICTVIEW_WALLPAPER) != 0)
                         SetWallpaper(hKey, TRUE, &cur);
 
-                    _tcscpy(cur.Wallpaper, fileName);
+                    _tcscpy(cur.Wallpaper, fileName.c_str());
                     _tcscpy(cur.WallpaperStyle, command == CMD_WALLPAPER_STRETCH ? _T("2") : _T("0"));
                     _tcscpy(cur.TileWallpaper, command == CMD_WALLPAPER_TILE ? _T("1") : _T("0"));
                     SetWallpaper(hKey, FALSE, &cur);

@@ -47,13 +47,13 @@ BOOL CSalamanderGUI::CheckControlAndDeleteOnError(CWindow* control)
 // CGUIProgressBar
 //
 
-void CGUIProgressBar::SetProgress(DWORD progress, const char* text)
+void CGUIProgressBar::SetProgress(DWORD progress, const wchar_t* text)
 {
     Control->SetProgress(progress, text);
 }
 
 void CGUIProgressBar::SetProgress2(const CQuadWord& progressCurrent, const CQuadWord& progressTotal,
-                                   const char* text)
+                                   const wchar_t* text)
 {
     Control->SetProgress2(progressCurrent, progressTotal, text);
 }
@@ -109,23 +109,23 @@ CSalamanderGUI::AttachProgressBar(HWND hParent, int ctrlID)
 // CGUIStaticText
 //
 
-BOOL CGUIStaticText::SetText(const char* text)
+BOOL CGUIStaticText::SetText(const wchar_t* text)
 {
     return Control->SetText(text);
 }
 
-const char*
+const wchar_t*
 CGUIStaticText::GetText()
 {
     return Control->GetText();
 }
 
-void CGUIStaticText::SetPathSeparator(char separator)
+void CGUIStaticText::SetPathSeparator(wchar_t separator)
 {
     Control->SetPathSeparator(separator);
 }
 
-BOOL CGUIStaticText::SetToolTipText(const char* text)
+BOOL CGUIStaticText::SetToolTipText(const wchar_t* text)
 {
     return Control->SetToolTipText(text);
 }
@@ -171,18 +171,18 @@ CSalamanderGUI::AttachStaticText(HWND hParent, int ctrlID, DWORD flags)
 // CGUIHyperLink
 //
 
-BOOL CGUIHyperLink::SetText(const char* text)
+BOOL CGUIHyperLink::SetText(const wchar_t* text)
 {
     return Control->SetText(text);
 }
 
-const char*
+const wchar_t*
 CGUIHyperLink::GetText()
 {
     return Control->GetText();
 }
 
-void CGUIHyperLink::SetActionOpen(const char* file)
+void CGUIHyperLink::SetActionOpen(const wchar_t* file)
 {
     Control->SetActionOpen(file);
 }
@@ -192,12 +192,12 @@ void CGUIHyperLink::SetActionPostCommand(WORD command)
     Control->SetActionPostCommand(command);
 }
 
-BOOL CGUIHyperLink::SetActionShowHint(const char* text)
+BOOL CGUIHyperLink::SetActionShowHint(const wchar_t* text)
 {
     return Control->SetActionShowHint(text);
 }
 
-BOOL CGUIHyperLink::SetToolTipText(const char* text)
+BOOL CGUIHyperLink::SetToolTipText(const wchar_t* text)
 {
     return Control->SetToolTipText(text);
 }
@@ -239,7 +239,7 @@ CSalamanderGUI::AttachHyperLink(HWND hParent, int ctrlID, DWORD flags)
 // Button
 //
 
-BOOL CGUIButton::SetToolTipText(const char* text)
+BOOL CGUIButton::SetToolTipText(const wchar_t* text)
 {
     return Control->SetToolTipText(text);
 }
@@ -495,24 +495,16 @@ BOOL CSalamanderGUI::DestroyIconList(CGUIIconListAbstract* iconList)
 // ToolTip support
 //
 
-void CSalamanderGUI::PrepareToolTipText(char* buf, BOOL stripHotKey)
+BOOL CSalamanderGUI::PrepareToolTipText(CSalamanderStringBuffer* text,
+                                       BOOL stripHotKey)
 {
-    char* p = buf;
-    while (*p != '\t' && *p != 0)
-        p++;
-    if (*p == '\t')
-    {
-        if (!stripHotKey && *(p + 1) != 0)
-        {
-            *p = ' ';
-            p++;
-            memmove(p + 1, p, lstrlen(p) + 1);
-            *p = '(';
-            lstrcat(p, ")");
-        }
-        else
-            *p = 0;
-    }
+    if (text == NULL)
+        return FALSE;
+    std::wstring value;
+    if (!sally::plugin_abi::ReadStringBuffer(*text, value) ||
+        !::PrepareToolTipText(value, stripHotKey))
+        return FALSE;
+    return sally::plugin_abi::WriteStringBuffer(*text, value);
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -520,7 +512,7 @@ void CSalamanderGUI::PrepareToolTipText(char* buf, BOOL stripHotKey)
 // Subject with file/dir name truncated if needed
 //
 
-void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjectFormatString, const char* fileName,
+void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const wchar_t* subjectFormatString, const wchar_t* fileName,
                                              BOOL isDir, BOOL duplicateAmpersands)
 {
     if (subjectFormatString == NULL || fileName == NULL)
@@ -529,25 +521,25 @@ void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjec
         return;
     }
 
-    CPathBuffer formatedFileName;  // Heap-allocated for long path support
-    CPathBuffer tmpFileName;        // Heap-allocated for long path support
-    lstrcpyn(tmpFileName, fileName, tmpFileName.Size());
-    AlterFileName(formatedFileName, tmpFileName, -1, Configuration.FileNameFormat, 0, isDir);
+    // Both parameters are already wide, so the narrow AlterFileName() into a fixed
+    // buffer (and the scratch copy feeding it) were the wrong-width half. AlterFileNameW
+    // returns the formatted leaf directly, which also retires both buffers.
+    std::wstring formatedFileName = AlterFileNameW(fileName, Configuration.FileNameFormat, 0, isDir != 0);
 
     CTruncatedString subject;
-    subject.Set(subjectFormatString, formatedFileName);
+    subject.SetW(subjectFormatString, formatedFileName.c_str());
 
     if (subject.TruncateText(subjectWnd))
     {
         if (duplicateAmpersands)
         {
-            char buff[1000];
-            lstrcpyn(buff, subject.Get(), 1000);
+            wchar_t buff[1000];
+            lstrcpynW(buff, subject.Get(), 1000);
             DuplicateAmpersands(buff, 1000, TRUE);
-            SetWindowText(subjectWnd, buff);
+            SetWindowTextW(subjectWnd, buff);
         }
         else
-            SetWindowText(subjectWnd, subject.Get());
+            SetWindowTextW(subjectWnd, subject.Get());
     }
 }
 

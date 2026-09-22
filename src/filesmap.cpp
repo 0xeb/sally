@@ -103,7 +103,6 @@ BOOL CFilesMap::CreateMap()
     {
         // Brief || Detailed
         // items are stored top to bottom and then left to right (Brief view)
-        CPathBuffer formatedFileName;  // Heap-allocated for long path support
         HDC dc = HANDLES(GetDC(Panel->GetListBoxHWND()));
         HFONT hOldFont = (HFONT)SelectObject(dc, Font);
         int width = Panel->ListBox->GetItemWidth();
@@ -115,9 +114,11 @@ BOOL CFilesMap::CreateMap()
             {
                 if (!Configuration.FullRowSelect)
                 {
-                    AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
+                    // AlterFileNameW returns by value (std::wstring), unlike the
+                    // narrow AlterFileName's out-buffer shape.
+                    std::wstring formattedFileName = AlterFileNameW(f->Name, Configuration.FileNameFormat, 0, isDir);
 
-                    const char* s = formatedFileName;
+                    const wchar_t* s = formattedFileName.c_str();
                     // skip the ".."
                     if (*s == '.' && *(s + 1) == '.' && *(s + 2) == 0)
                         s = NULL;
@@ -142,7 +143,7 @@ BOOL CFilesMap::CreateMap()
 
                     // measure the actual text length
                     SIZE sz;
-                    GetTextExtentPoint32(dc, s, len, &sz);
+                    GetTextExtentPoint32W(dc, s, len, &sz);
                     width += sz.cx + 4;
 
                     if (Panel->GetViewMode() == vmDetailed && width > (int)Panel->Columns[0].Width - 1)
@@ -595,7 +596,7 @@ void CFilesMap::UpdatePanel()
     int dirsCount = Panel->Dirs->Count;
     int count = dirsCount + Panel->Files->Count;
     int start; // starting index for determining selection (skip the "..")
-    if (Panel->Dirs->Count > 0 && strcmp(Panel->Dirs->At(0).Name, "..") == 0)
+    if (Panel->Dirs->Count > 0 && wcscmp(Panel->Dirs->At(0).Name, L"..") == 0)
         start = 1;
     else
         start = 0;

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -29,9 +29,14 @@ extern int OperDefAsciiTrModeForBinFile[];
 extern int OperDefUnknownAttrs[];
 extern int OperDefDeleteArr[];
 
+// Thin UI adapter for inherited local-code-page text. Protocol/session bytes must
+// use their negotiated codec instead.
+BOOL SetWindowLocalText(HWND window, const char* bytes) noexcept;
+BOOL ReadWindowLocalText(HWND window, std::string& bytes) noexcept;
+
 // support for combo boxes with history
-void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* text,
-                     int textLen, int historySize, char* history[], BOOL secretValue);
+void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, std::wstring& text,
+                     int historySize, std::wstring history[], BOOL secretValue);
 
 // support for filling combo boxes with default behavior on errors during operations
 void HandleOperationsCombo(int* value, CTransferInfo& ti, int resID, int arrValuesResID[]);
@@ -41,20 +46,20 @@ void ProxyComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, int& proxyUID, B
                    CFTPProxyServerList* proxyServerList);
 
 // 'lastCheck' (in/out) stores the last state of the checkbox, 'lastCheck' initializes to -1;
-// 'valueBuf' is a buffer for the value in the "checked" state with size of at least 31 characters,
-// 'valueBuf' initializes to an empty string;
+// 'valueText' owns the remembered text for the "checked" state and initializes empty;
 // 'checkedVal' is the initial value in the "checked" state;
 // 'globValUsed'+'globVal' - value for the third state of the checkbox (is it used? + value)
-void CheckboxEditLineInteger(HWND dlg, int checkboxID, int editID, int* lastCheck, char* valueBuf,
-                             int checkedVal, BOOL globValUsed, int globVal);
+void CheckboxEditLineInteger(HWND dlg, int checkboxID, int editID, int* lastCheck,
+                             std::wstring& valueText, int checkedVal,
+                             BOOL globValUsed, int globVal) noexcept;
 
 // 'lastCheck' (in/out) stores the last state of the checkbox, 'lastCheck' initializes to -1;
-// 'valueBuf' is a buffer for the value in the "checked" state with size of at least 31 characters,
-// 'valueBuf' initializes to an empty string;
+// 'valueText' owns the remembered text for the "checked" state and initializes empty;
 // 'checkedVal' is the initial value in the "checked" state;
 // 'globValUsed'+'globVal' - value for the third state of the checkbox (is it used? + value)
-void CheckboxEditLineDouble(HWND dlg, int checkboxID, int editID, int* lastCheck, char* valueBuf,
-                            double checkedVal, BOOL globValUsed, double globVal);
+void CheckboxEditLineDouble(HWND dlg, int checkboxID, int editID, int* lastCheck,
+                            std::wstring& valueText, double checkedVal,
+                            BOOL globValUsed, double globVal) noexcept;
 
 // 'lastCheck' (in/out) stores the last state of the checkbox, 'lastCheck' initializes to -1;
 // 'valueBuf' is a buffer for the value in the "checked" state (index in the combo box),
@@ -94,11 +99,11 @@ protected:
 class CCommonPropSheetPage : public CPropSheetPage
 {
 public:
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, flags, icon, origin) {}
-    CCommonPropSheetPage(TCHAR* title, HINSTANCE modul, int resID, UINT helpID,
+    CCommonPropSheetPage(const wchar_t* title, HINSTANCE modul, int resID, UINT helpID,
                          DWORD flags /* = PSP_USETITLE*/, HICON icon,
                          CObjectOrigin origin = ooStatic)
         : CPropSheetPage(title, modul, resID, helpID, flags, icon, origin) {}
@@ -115,8 +120,8 @@ protected:
 class CConfigPageGeneral : public CCommonPropSheetPage
 {
 protected:
-    int LastTotSpeed;     // last value of the "total speed limit" checkbox
-    char TotSpeedBuf[31]; // buffer to keep the contents of the "total speed limit" line
+    int LastTotSpeed;             // last value of the "total speed limit" checkbox
+    std::wstring TotalSpeedText; // remembered contents of the "total speed limit" line
 
 public:
     CConfigPageGeneral();
@@ -138,10 +143,10 @@ protected:
 class CConfigPageDefaults : public CCommonPropSheetPage
 {
 protected:
-    int LastMaxCon;                             // last value of the "max concurrent connections" checkbox
-    char MaxConBuf[31];                         // buffer to keep the contents of the "max concurrent connections" line
-    int LastSrvSpeed;                           // last value of the "server speed limit" checkbox
-    char SrvSpeedBuf[31];                       // buffer to keep the contents of the "server speed limit" line
+    int LastMaxCon;                                  // last value of the "max concurrent connections" checkbox
+    std::wstring MaxConnectionsText;                // remembered contents of the "max concurrent connections" line
+    int LastSrvSpeed;                                // last value of the "server speed limit" checkbox
+    std::wstring ServerSpeedText;                    // remembered contents of the "server speed limit" line
     CFTPProxyServerList* TmpFTPProxyServerList; // temporary copy of the list of user-defined proxy servers
 
 public:
@@ -192,10 +197,10 @@ public:
 class CConfigPageLogs : public CCommonPropSheetPage
 {
 protected:
-    int LastLogMaxSize;           // last value of the "log max size" checkbox
-    char LogMaxSizeBuf[31];       // buffer to keep the contents of the "log max size" line
-    int LastMaxClosedConLogs;     // last value of the "max disconnected connection logs" checkbox
-    char MaxClosedConLogsBuf[31]; // buffer to keep the contents of the "max disconnected connection logs" line
+    int LastLogMaxSize;                        // last value of the "log max size" checkbox
+    std::wstring LogMaxSizeText;              // remembered contents of the "log max size" line
+    int LastMaxClosedConLogs;                  // last value of the "max disconnected connection logs" checkbox
+    std::wstring MaxClosedConnectionLogsText; // remembered contents of the "max disconnected connection logs" line
 
 public:
     CConfigPageLogs();
@@ -339,13 +344,13 @@ protected:
     BOOL ExtraDragDropItemAdded;               // TRUE if an empty listbox item is added (for drag&drop to the end of the list)
     int AddBookmarkMode;                       // 0 - connect, 1 - organize bookmarks, 2 - organize bookmarks + focus last bookmark
 
-    char LastRawHostAddress[HOST_MAX_SIZE]; // last value entered into the "Address" edit box (after leaving the edit box it is split, so we keep it in this buffer)
+    std::wstring LastRawHostAddress; // raw address text before URL decomposition
 
 public:
     CConnectDlg(HWND parent, int addBookmarkMode = 0);
     ~CConnectDlg()
     {
-        memset(LastRawHostAddress, 0, HOST_MAX_SIZE); // wipe memory where the password appeared
+        FTPSecureWipe(LastRawHostAddress); // may contain an inline password
     }
 
     virtual void Validate(CTransferInfo& ti);
@@ -379,14 +384,14 @@ protected:
     CFTPServer* Server;
     CFTPProxyServerList* SourceTmpFTPProxyServerList; // source for TmpFTPProxyServerList (after OK in the dialog we write the modified data back into it)
     CFTPProxyServerList* TmpFTPProxyServerList;       // temporary copy of the proxy server list (to allow cancel)
-    int LastUseMaxCon;                                // last value of the "max. concurrent connections" checkbox
-    char MaxConBuf[31];                               // buffer to keep the contents of the "max. concurrent connections" line
-    int LastUseTotSpeed;                              // last value of the "total speed limit for this server" checkbox
-    char TotSpeedBuf[31];                             // buffer to keep the contents of the "total speed limit for this server" line
-    int LastKeepConnectionAlive;                      // last value of the "keep connection alive" checkbox
-    int KASendCmd;                                    // value to keep the state of the "keep-alive send command" combo
-    char KASendEveryBuf[31];                          // buffer to keep the contents of the "keep-alive send every" line
-    char KAStopAfterBuf[31];                          // buffer to keep the contents of the "keep-alive stop after" line
+    int LastUseMaxCon;                               // last value of the "max. concurrent connections" checkbox
+    std::wstring MaxConnectionsText;                // remembered contents of the "max. concurrent connections" line
+    int LastUseTotSpeed;                             // last value of the "total speed limit for this server" checkbox
+    std::wstring TotalSpeedText;                    // remembered contents of the "total speed limit for this server" line
+    int LastKeepConnectionAlive;                    // last value of the "keep connection alive" checkbox
+    int KASendCmd;                                   // value to keep the state of the "keep-alive send command" combo
+    std::wstring KeepAliveEveryText;                // remembered contents of the "keep-alive send every" line
+    std::wstring KeepAliveStopAfterText;            // remembered contents of the "keep-alive stop after" line
 
 public:
     CConnectAdvancedDlg(HWND parent, CFTPServer* server,
@@ -415,15 +420,16 @@ public:
     BOOL CopyDataFromFocusedServer;
 
 protected:
-    char* Name;         // listbox item name (for edit line + checkbox)
-    BOOL NewServer;     // TRUE/FALSE: dialog New/Rename
-    BOOL AddBookmark;   // TRUE/FALSE: Connect:Add Bookmark dialog / applies to NewServer
-    BOOL ServerTypes;   // FALSE/TRUE: Connect/Configuration:Servers dialog
-    char* CopyFromName; // only if ServerTypes==TRUE: name for the checkbox (differs from the name for the edit line)
+    std::wstring* NameText; // dynamically owned semantic bookmark/server-type name
+    BOOL NewServer;         // TRUE/FALSE: dialog New/Rename
+    BOOL AddBookmark;       // TRUE/FALSE: Connect:Add Bookmark dialog / applies to NewServer
+    BOOL ServerTypes;       // FALSE/TRUE: Connect/Configuration:Servers dialog
+    std::wstring CopyFromName; // server-type name used by the copy-data checkbox
 
 public:
-    CRenameDlg(HWND parent, char* name, BOOL newServer, BOOL addBookmark = FALSE,
-               BOOL serverTypes = FALSE, char* copyFromName = NULL);
+    CRenameDlg(HWND parent, std::wstring& name, BOOL newServer,
+               const wchar_t* copyFromName = NULL);
+    CRenameDlg(HWND parent, std::wstring& name, BOOL newServer, BOOL addBookmark);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -464,8 +470,8 @@ public:
 class CWaitWindow : public CWindow
 {
 protected:
-    std::string Caption;
-    std::string Text;
+    std::wstring Caption;
+    std::wstring Text;
     SIZE TextSize;
     HWND HParent;
     BOOL ShowCloseButton;
@@ -489,11 +495,11 @@ public:
     }
 
     // set caption; if not called, the caption will be LoadStr(IDS_FTPPLUGINTITLE)
-    void SetCaption(const char* text);
+    void SetCaption(const wchar_t* text);
 
     // set text (possible even while displayed - note: the window size does not change,
     // only minor changes are possible - e.g. countdown: 60s -> 50s -> 40s)
-    void SetText(const char* text);
+    void SetText(const wchar_t* text);
 
     // create the window, show it after 'showTime' milliseconds
     HWND Create(DWORD showTime);
@@ -535,11 +541,11 @@ protected:
     CGUIStaticTextAbstract* OperStatusText;
     CGUIProgressBarAbstract* OperProgressBar;
 
-    std::string Path;
+    std::wstring Path;
     CFTPServerPathType PathType;
-    char Status[100];
-    char TimeLeft[20];
-    char TimeElapsed[20];
+    std::wstring Status;
+    std::wstring TimeLeft;
+    std::wstring TimeElapsed;
     BOOL HasRefreshStatusTimer; // TRUE = timer LISTWAITWND_AUTOUPDATETIMER is running
     BOOL HasDelayedUpdateTimer; // TRUE = timer LISTWAITWND_DELAYEDUPDATETIMER is running
     BOOL NeedDelayedUpdate;     // TRUE = a delayed update is needed
@@ -555,10 +561,10 @@ public:
     ~CListWaitWindow();
 
     // set the text in the first line of the window (possible even while displayed)
-    void SetText(const char* text);
+    void SetText(const wchar_t* text);
 
     // set the path (after the "path:" text) in the window (second line; possible even while displayed)
-    void SetPath(const char* path, CFTPServerPathType pathType);
+    void SetPath(const wchar_t* path, CFTPServerPathType pathType);
 
     // create the window, show it after 'showTime' milliseconds
     HWND Create(DWORD showTime);
@@ -582,17 +588,16 @@ protected:
 class CEnterStrDlg : public CCenteredDialog
 {
 public:
-    const char* Title;
-    const char* Text;
-    char* Data;
-    int DataSize;
+    const wchar_t* Title;
+    const wchar_t* Text;
+    std::wstring* Data;
     BOOL HideChars;
-    const char* ConnectingToAs;
+    const wchar_t* ConnectingToAs;
     BOOL AllowEmpty;
 
 public:
-    CEnterStrDlg(HWND parent, const char* title, const char* text, char* data, int dataSize,
-                 BOOL hideChars, const char* connectingToAs, BOOL allowEmpty);
+    CEnterStrDlg(HWND parent, const wchar_t* title, const wchar_t* text, std::wstring& data,
+                 BOOL hideChars, const wchar_t* connectingToAs, BOOL allowEmpty);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -609,24 +614,29 @@ protected:
 class CLoginErrorDlg : public CCenteredDialog
 {
 public:
-    const char* ServerReply;
+    // ServerReply/ConnectingTo/Title/RetryWithoutAskingText/ErrorTitle are
+    // display-only (SetWindowTextW/SetDlgItemTextW at WM_INITDIALOG, never re-parsed or sent
+    // back over the wire), so they widen - same safe slice CEnterStrDlg already established.
+    // ProxyScriptParams owns native-wide credentials. Encoding happens only when
+    // the proxy/login script emits protocol bytes.
+    const wchar_t* ServerReply;
     CProxyScriptParams* ProxyScriptParams;
     BOOL RetryWithoutAsking;
     BOOL LoginChanged;
 
-    const char* ConnectingTo;
-    const char* Title;
-    const char* RetryWithoutAskingText;
-    const char* ErrorTitle;
+    const wchar_t* ConnectingTo;
+    const wchar_t* Title;
+    const wchar_t* RetryWithoutAskingText;
+    const wchar_t* ErrorTitle;
     BOOL DisableUser;
     BOOL HideApplyToAll;
     BOOL ApplyToAll;
     BOOL ProxyUsed; // TRUE = a proxy server is used (editing proxy host/port/user/password)
 
 public:
-    CLoginErrorDlg(HWND parent, const char* serverReply, CProxyScriptParams* proxyScriptParams,
-                   const char* connectingTo, const char* title, const char* retryWithoutAskingText,
-                   const char* errorTitle, BOOL disableUser, BOOL hideApplyToAll,
+    CLoginErrorDlg(HWND parent, const wchar_t* serverReply, CProxyScriptParams* proxyScriptParams,
+                   const wchar_t* connectingTo, const wchar_t* title, const wchar_t* retryWithoutAskingText,
+                   const wchar_t* errorTitle, BOOL disableUser, BOOL hideApplyToAll,
                    BOOL proxyUsed);
 
     virtual void Validate(CTransferInfo& ti);
@@ -660,10 +670,10 @@ protected:
 class CWelcomeMsgDlg : public CCenteredDialog
 {
 public:
-    const char* Text;
-    int TextSize;            // -1 = null-terminated string
-    const char* SentCommand; // which command this is a response to (only if ServerReply==TRUE)
-    HWND SizeBox;            // size-box window
+    std::wstring Text;
+    std::wstring SentCommand; // which command this is a response to (only if ServerReply==TRUE)
+    std::string RawText;      // exact server bytes, retained only for raw-listing export
+    HWND SizeBox;             // size-box window
 
     BOOL ServerReply; // TRUE => this is the "FTP Server Reply" dialog (response to a sent FTP command)
     BOOL RawListing;  // TRUE => this is the "Raw Listing" dialog (uses the Show Raw Listing command)
@@ -681,9 +691,9 @@ public:
     int SaveAsButtonOffset;
 
 public:
-    CWelcomeMsgDlg(HWND parent, const char* text, BOOL serverReply = FALSE,
-                   const char* sentCommand = NULL, BOOL rawListing = FALSE,
-                   int textSize = -1); // if 'textSize' is -1, 'text' is a null-terminated string
+    CWelcomeMsgDlg(HWND parent, const wchar_t* text, BOOL serverReply = FALSE,
+                   const wchar_t* sentCommand = NULL, BOOL rawListing = FALSE,
+                   const char* rawText = NULL, int rawTextSize = -1);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -749,12 +759,13 @@ protected:
 class CSendFTPCommandDlg : public CCenteredDialog
 {
 public:
-    char Command[FTPCOMMAND_MAX_SIZE];
+    std::wstring Command;
     BOOL ChangePathInPanel;
     BOOL RefreshWorkingPath;
 
 public:
     CSendFTPCommandDlg(HWND parent);
+    ~CSendFTPCommandDlg() override;
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -888,6 +899,7 @@ protected:
     void InitColumns();            // add columns to the listview
     void SetColumnWidths();        // set optimal column widths
     void ParseListingToListView(); // parse *RawListing and put the results directly into the listview
+    bool PublishRawListing(const std::string& listing, size_t headroom = 0);
 
     void LoadTextFromFile();
 
@@ -904,16 +916,15 @@ protected:
 class CCopyMoveDlg : public CCenteredDialog
 {
 protected:
-    const char* Title;
-    const char* Subject;
-    char* Path;
-    int PathBufSize;
-    char** History;
+    const wchar_t* Title;
+    const wchar_t* Subject;
+    std::wstring& Path;
+    wchar_t** History;
     int HistoryCount;
 
 public:
-    CCopyMoveDlg(HWND parent, char* path, int pathBufSize, const char* title,
-                 const char* subject, char* history[], int historyCount, int helpID);
+    CCopyMoveDlg(HWND parent, std::wstring& path, const wchar_t* title,
+                 const wchar_t* subject, wchar_t* history[], int historyCount, int helpID);
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -929,11 +940,11 @@ protected:
 class CConfirmDeleteDlg : public CCenteredDialog
 {
 protected:
-    const char* Subject;
+    const wchar_t* Subject;
     HICON Icon;
 
 public:
-    CConfirmDeleteDlg(HWND parent, const char* subject, HICON icon);
+    CConfirmDeleteDlg(HWND parent, const wchar_t* subject, HICON icon);
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -949,7 +960,7 @@ protected:
 class CChangeAttrsDlg : public CCenteredDialog
 {
 protected:
-    const char* Subject;
+    const wchar_t* Subject;
     DWORD Attr;
     DWORD AttrDiff;
     BOOL EnableNotification;
@@ -962,7 +973,7 @@ public:
     DWORD AttrOrMask;    // resulting attribute OR mask (enabling attributes)
 
 public:
-    CChangeAttrsDlg(HWND parent, const char* subject, DWORD attr, DWORD attrDiff,
+    CChangeAttrsDlg(HWND parent, const wchar_t* subject, DWORD attr, DWORD attrDiff,
                     BOOL selDirs);
 
     void RefreshNumValue(); // set the number according to the checkbox
@@ -1003,9 +1014,6 @@ protected:
 #define WM_APP_HAVEDISKFREESPACE WM_APP + 6 // [0, 0] - the thread checking disk free space reports that it has a result
 #define WM_APP_CLOSEDLG WM_APP + 7          // [0, 0] - the progress dialog should close (uses auto-close)
 
-#define OPERDLG_CONSTEXTBUFSIZE 1000  // max text length in the Connections listview column
-#define OPERDLG_ITEMSTEXTBUFSIZE 1000 // max text length in the Operations listview column
-
 class CFTPQueue;
 class CFTPWorkersList;
 class COperationDlg;
@@ -1016,7 +1024,8 @@ protected:
     // critical section for accessing object data
     CRITICAL_SECTION GetFreeSpaceCritSect;
 
-    CPathBuffer Path; // path where we check free space
+    std::wstring Path; // dynamically owned UTF-16 path where we check free space
+    BOOL PathValid;
     CQuadWord FreeSpace; // detected free space; -1 = free space unknown
     HWND Dialog;         // handle of the operation dialog that should receive it
 
@@ -1024,11 +1033,11 @@ protected:
     BOOL TerminateThread;   // TRUE = the thread should terminate
 
 public:
-    CGetDiskFreeSpaceThread(const char* path, HWND dialog);
+    CGetDiskFreeSpaceThread(const std::wstring& path, HWND dialog) noexcept;
     ~CGetDiskFreeSpaceThread();
 
     // call after the constructor; if it returns FALSE the object cannot be used further
-    BOOL IsGood() { return WorkOrTerminate != NULL; }
+    BOOL IsGood() { return PathValid && WorkOrTerminate != NULL; }
 
     // the dialog schedules thread termination via this method
     void ScheduleTerminate();
@@ -1053,6 +1062,7 @@ public:
     int LastItem;
     int LastSubItem;
     int LastWidth;
+    std::wstring ToolTipText; // stable dynamic owner used by the tooltip control
 
     BOOL Scrolling; // TRUE/FALSE = the user is currently using/not using the scrollbar
 
@@ -1097,14 +1107,14 @@ protected:
     COperDlgListView ItemsListViewObj;   // Operations listview object (provides tooltip)
     HIMAGELIST ItemsImageList;           // image list for the Operations listview
 
-    char ConsTextBuf[3][OPERDLG_CONSTEXTBUFSIZE];   // buffers for LVN_GETDISPINFO text in the Connections listview
-    int ConsActTextBuf;                             // which of the three buffers is currently free for LVN_GETDISPINFO in the Connections listview
-    char ItemsTextBuf[3][OPERDLG_ITEMSTEXTBUFSIZE]; // buffers for LVN_GETDISPINFO text in the Operations listview
-    int ItemsActTextBuf;                            // which of the three buffers is currently free for LVN_GETDISPINFO in the Operations listview
+    std::wstring ConsTextBuf[3]; // rotating LVN_GETDISPINFO text owners for Connections
+    int ConsActTextBuf;          // which of the three strings is currently free for LVN_GETDISPINFO in the Connections listview
+    std::wstring ItemsTextBuf[3]; // rotating LVN_GETDISPINFO text owners for Operations
+    int ItemsActTextBuf;          // which of the three strings is currently free for LVN_GETDISPINFO in the Operations listview
 
     BOOL SimpleLook; // TRUE/FALSE = simple (after the split bar) / detailed (complete) dialog look
 
-    char* TitleText; // text for the dialog title (without the initial "(XX%) ")
+    std::wstring TitleText; // dialog title without the initial "(XX%) "
 
     BOOL IsDirtyStatus;                 // TRUE = status/progress of the operation needs update (the dialog must redraw status/progress)
     BOOL IsDirtyProgress;               // TRUE = a worker changed; maybe (if the worker changed due to progress) status/progress needs update (the dialog must redraw status/progress)
@@ -1132,7 +1142,7 @@ protected:
 
     DWORD LastTimeEstimation; // -1==invalid, otherwise rounded number of seconds until the operation finishes
 
-    std::string OperationsTextOrig;  // original text of the "Operations:" listview title
+    std::wstring OperationsTextOrig; // original text of the "Operations:" listview title
     int DisplayedDoneOrSkippedCount; // number of skipped+done items displayed after "Operations:" in the listview title (-1 = unknown)
     int DisplayedTotalCount;         // total number of items displayed after "Operations:" in the listview title (-1 = unknown)
 
@@ -1207,9 +1217,9 @@ protected:
 
     BOOL PauseButtonIsEnabled;        // Pause/Resume button above the Connections listview: TRUE = enabled, FALSE = disabled
     BOOL PauseButtonIsResume;         // current text of the Pause/Resume button above the Connections listview: TRUE = Resume, FALSE = Pause
-    char PauseButtonPauseText[50];    // buffer for the "Pause" text from dialog resources (the "Resume" text is IDS_OPERDLGRESUMEBUTTON)
+    std::wstring PauseButtonPauseText; // "Pause" text from dialog resources
     BOOL ConPauseButtonIsResume;      // current text of the Pause/Resume button below the Connections listview: TRUE = Resume, FALSE = Pause
-    char ConPauseButtonPauseText[50]; // buffer for the "Pause" text from dialog resources (the "Resume" text is IDS_OPERDLGRESUMECONBUTTON)
+    std::wstring ConPauseButtonPauseText; // connection "Pause" text from dialog resources
 
 public:
     COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper, CFTPQueue* queue,
@@ -1227,7 +1237,7 @@ protected:
     void ToggleSimpleLook();
     void ShowControlsAndChangeSize(BOOL simple);
 
-    void SetDlgTitle(int progressValue, const char* state);
+    void SetDlgTitle(int progressValue, const wchar_t* state);
 
     void CorrectLookOfPrevFocusedDisabledButton(HWND prevFocus);
 
@@ -1295,13 +1305,13 @@ class CSolveItemErrorDlg : public CCenteredDialog
 protected:
     CFTPOperation* Oper;
     DWORD WinError;
-    const char* ErrDescription;
-    const char* FtpPath;
-    const char* FtpName;
-    const char* DiskPath;
-    const char* DiskName;
+    const wchar_t* ErrDescription;
+    const wchar_t* FtpPath;
+    const wchar_t* FtpName;
+    const wchar_t* DiskPath;
+    const wchar_t* DiskName;
     BOOL* ApplyToAll;
-    char** NewName;
+    wchar_t** NewName;
 
     BOOL DontTransferName; // TRUE = the name should not be obtained from the dialog (no validation or transfer)
 
@@ -1311,10 +1321,10 @@ protected:
 
 public:
     CSolveItemErrorDlg(HWND parent, CFTPOperation* oper, DWORD winError,
-                       const char* errDescription,
-                       const char* ftpPath, const char* ftpName,
-                       const char* diskPath, const char* diskName,
-                       BOOL* applyToAll, char** newName, CSolveItemErrorDlgType dlgType);
+                       const wchar_t* errDescription,
+                       const wchar_t* ftpPath, const wchar_t* ftpName,
+                       const wchar_t* diskPath, const wchar_t* diskName,
+                       BOOL* applyToAll, wchar_t** newName, CSolveItemErrorDlgType dlgType);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -1332,15 +1342,15 @@ class CSolveItemErrUnkAttrDlg : public CCenteredDialog
 {
 protected:
     CFTPOperation* Oper;
-    const char* Path;
-    const char* Name;
+    const wchar_t* Path;
+    const wchar_t* Name;
     const char* OrigRights;
     WORD NewAttr;
     BOOL* ApplyToAll;
     int UsedButtonID; // ID of the button the user used to close the dialog (used in Transfer())
 
 public:
-    CSolveItemErrUnkAttrDlg(HWND parent, CFTPOperation* oper, const char* path, const char* name,
+    CSolveItemErrUnkAttrDlg(HWND parent, CFTPOperation* oper, const wchar_t* path, const wchar_t* name,
                             const char* origRights, WORD newAttr, BOOL* applyToAll);
 
     virtual void Transfer(CTransferInfo& ti);
@@ -1358,8 +1368,8 @@ class CSolveItemSetNewAttrDlg : public CCenteredDialog
 {
 protected:
     CFTPOperation* Oper;
-    const char* Path;
-    const char* Name;
+    const wchar_t* Path;
+    const wchar_t* Name;
     const char* OrigRights;
     WORD* Attr;
     BOOL* ApplyToAll;
@@ -1367,7 +1377,7 @@ protected:
     BOOL EnableNotification;
 
 public:
-    CSolveItemSetNewAttrDlg(HWND parent, CFTPOperation* oper, const char* path, const char* name,
+    CSolveItemSetNewAttrDlg(HWND parent, CFTPOperation* oper, const wchar_t* path, const wchar_t* name,
                             const char* origRights, WORD* attr, BOOL* applyToAll);
 
     virtual void Validate(CTransferInfo& ti);
@@ -1386,13 +1396,13 @@ protected:
 class CSolveLowMemoryErr : public CCenteredDialog
 {
 protected:
-    const char* FtpPath;
-    const char* FtpName;
+    const wchar_t* FtpPath;
+    const wchar_t* FtpName;
     BOOL* ApplyToAll;
     int TitleID; // if not equal to -1, resource ID of the dialog title
 
 public:
-    CSolveLowMemoryErr(HWND parent, const char* ftpPath, const char* ftpName, BOOL* applyToAll,
+    CSolveLowMemoryErr(HWND parent, const wchar_t* ftpPath, const wchar_t* ftpName, BOOL* applyToAll,
                        int titleID = -1);
 
     virtual void Transfer(CTransferInfo& ti);
@@ -1418,8 +1428,8 @@ class CSolveItemErrorSimpleDlg : public CCenteredDialog
 {
 protected:
     CFTPOperation* Oper;
-    const char* FtpPath;
-    const char* FtpName;
+    const wchar_t* FtpPath;
+    const wchar_t* FtpName;
     BOOL* ApplyToAll;
     int UsedButtonID; // ID of the button the user used to close the dialog (used in Transfer())
 
@@ -1427,7 +1437,7 @@ protected:
 
 public:
     CSolveItemErrorSimpleDlg(HWND parent, CFTPOperation* oper,
-                             const char* ftpPath, const char* ftpName,
+                             const wchar_t* ftpPath, const wchar_t* ftpName,
                              BOOL* applyToAll, CSolveItemErrorSimpleDlgType dlgType);
 
     virtual void Transfer(CTransferInfo& ti);
@@ -1452,16 +1462,16 @@ class CSolveServerCmdErr : public CCenteredDialog
 {
 protected:
     int TitleID;
-    const char* FtpPath;
-    const char* FtpName;
-    const char* ErrorDescr;
+    const wchar_t* FtpPath;
+    const wchar_t* FtpName;
+    const wchar_t* ErrorDescr;
     BOOL* ApplyToAll;
 
     CSolveItemErrorSrvCmdDlgType DlgType; // type of dialog being shown
 
 public:
-    CSolveServerCmdErr(HWND parent, int titleID, const char* ftpPath,
-                       const char* ftpName, const char* errorDescr,
+    CSolveServerCmdErr(HWND parent, int titleID, const wchar_t* ftpPath,
+                       const wchar_t* ftpName, const wchar_t* errorDescr,
                        BOOL* applyToAll, CSolveItemErrorSrvCmdDlgType dlgType);
 
     virtual void Transfer(CTransferInfo& ti);
@@ -1488,19 +1498,19 @@ class CSolveServerCmdErr2 : public CCenteredDialog
 {
 protected:
     int TitleID;
-    const char* FtpPath;
-    const char* FtpName;
-    const char* DiskPath;
-    const char* DiskName;
-    const char* ErrorDescr;
+    const wchar_t* FtpPath;
+    const wchar_t* FtpName;
+    const wchar_t* DiskPath;
+    const wchar_t* DiskName;
+    const wchar_t* ErrorDescr;
     BOOL* ApplyToAll;
 
     CSolveItemErrorSrvCmdDlgType2 DlgType; // type of dialog being shown
 
 public:
-    CSolveServerCmdErr2(HWND parent, int titleID, const char* ftpPath,
-                        const char* ftpName, const char* diskPath,
-                        const char* diskName, const char* errorDescr,
+    CSolveServerCmdErr2(HWND parent, int titleID, const wchar_t* ftpPath,
+                        const wchar_t* ftpName, const wchar_t* diskPath,
+                        const wchar_t* diskName, const wchar_t* errorDescr,
                         BOOL* applyToAll, CSolveItemErrorSrvCmdDlgType2 dlgType);
 
     virtual void Transfer(CTransferInfo& ti);

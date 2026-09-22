@@ -18,6 +18,9 @@
 #include "lang\lang.rh"
 #include "versinfo.rh2"
 
+#define AUTOMATION_WIDEN_IMPL(value) L##value
+#define AUTOMATION_WIDEN(value) AUTOMATION_WIDEN_IMPL(value)
+
 /// Plugin module instance handle.
 HINSTANCE g_hInstance;
 
@@ -40,7 +43,7 @@ CSalamanderGUIAbstract* SalamanderGUI;
 CAutomationPluginInterface g_oAutomationPlugin;
 
 /// Caption for the dialog boxes before we load the language module.
-_TCHAR MSGBOX_CAPTION[] = _T("Automation");
+const wchar_t MSGBOX_CAPTION_W[] = L"Automation";
 
 /// Entry point of the SPL module.
 /// \param hModule A handle to the DLL module.
@@ -92,42 +95,42 @@ CPluginInterfaceAbstract*
         // reject older versions
         SalamanderGeneral->SalMessageBox(
             salamander->GetParentWindow(),
-            REQUIRE_LAST_VERSION_OF_SALAMANDER,
-            MSGBOX_CAPTION,
+            AUTOMATION_WIDEN(REQUIRE_LAST_VERSION_OF_SALAMANDER),
+            MSGBOX_CAPTION_W,
             MB_OK | MB_ICONERROR);
         return NULL;
     }
 
     g_hLangInst = salamander->LoadLanguageModule(
         salamander->GetParentWindow(),
-        MSGBOX_CAPTION);
+        MSGBOX_CAPTION_W);
     if (!g_hLangInst)
         return NULL;
 
-    if (!InitializeWinLib(MSGBOX_CAPTION, g_hInstance))
+    if (!InitializeWinLib(MSGBOX_CAPTION_W, g_hInstance))
     {
         return NULL;
     }
     SetupWinLibHelp(HTMLHelpCallback);
 
     // setup help file name
-    SalamanderGeneral->SetHelpFileName("automation.chm");
+    SalamanderGeneral->SetHelpFileName(L"automation.chm");
 
     // set the basic information about the plugin
     salamander->SetBasicPluginData(
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_PLUGINNAME),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_PLUGINNAME).c_str(),
         FUNCTION_CONFIGURATION |
             FUNCTION_LOADSAVECONFIGURATION |
             FUNCTION_DYNAMICMENUEXT,
-        VERSINFO_VERSION_NO_PLATFORM,
-        VERSINFO_COPYRIGHT,
-        SalamanderGeneral->LoadStr(g_hLangInst, IDS_DESCRIPTION),
-        MSGBOX_CAPTION,
+        AUTOMATION_WIDEN(VERSINFO_VERSION_NO_PLATFORM),
+        AUTOMATION_WIDEN(VERSINFO_COPYRIGHT),
+        SPLLoadStrOwned(SalamanderGeneral, g_hLangInst, IDS_DESCRIPTION).c_str(),
+        MSGBOX_CAPTION_W,
         NULL,
         NULL);
 
     // Setup plugin home page.
-    salamander->SetPluginHomePageURL("https://github.com/0xeb/sally");
+    salamander->SetPluginHomePageURL(L"https://github.com/0xeb/sally");
 
     return &g_oAutomationPlugin;
 }

@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "unicode/helpers.h" // WideToAnsi
 
 #include "undelete.rh"
 #include "undelete.rh2"
@@ -19,6 +20,32 @@
 
 #pragma comment(lib, "uxtheme.lib")
 
+namespace
+{
+std::wstring GetListViewItemTextOwned(HWND list, int item, int subItem)
+{
+    size_t capacity = 64;
+    const size_t limit = static_cast<size_t>((std::numeric_limits<int>::max)());
+    for (;;)
+    {
+        std::vector<wchar_t> buffer(capacity, L'\0');
+        LVITEMW entry = {};
+        entry.iSubItem = subItem;
+        entry.pszText = buffer.data();
+        entry.cchTextMax = static_cast<int>(buffer.size());
+        const LRESULT copied = SendMessageW(
+            list, LVM_GETITEMTEXTW, item, reinterpret_cast<LPARAM>(&entry));
+        if (copied <= 0)
+            return std::wstring();
+        if (copied < static_cast<LRESULT>(buffer.size() - 1))
+            return std::wstring(buffer.data(), static_cast<size_t>(copied));
+        if (capacity > limit / 2)
+            return std::wstring();
+        capacity *= 2;
+    }
+}
+}
+
 // ****************************************************************************
 //
 //  CSnapshotProgressDlg
@@ -34,18 +61,17 @@ CSnapshotProgressDlg::CSnapshotProgressDlg(HWND parent, CObjectOrigin origin)
 void CSnapshotProgressDlg::SetProgressText(int resID)
 {
     CALL_STACK_MESSAGE2("CSnapshotProgressDlg::SetProgressText(%d)", resID);
-    SetDlgItemText(HWindow, IDC_LABEL_FILENAME, String<char>::LoadStr(resID));
+    SetDlgItemTextW(HWindow, IDC_LABEL_FILENAME, String<wchar_t>::LangStr(resID).c_str());
 }
 
 void CSnapshotProgressDlg::SetProgressText(int resID, int number)
 {
     CALL_STACK_MESSAGE3("CSnapshotProgressDlg::SetProgressText(%d, %d)", resID, number);
-    char plural[200];
     CQuadWord qwnumber = CQuadWord(number, 0);
-    SalamanderGeneral->ExpandPluralString(plural, _countof(plural), String<char>::LoadStr(resID), 1, &qwnumber);
-    char text[200];
-    _snprintf_s(text, _TRUNCATE, plural, number);
-    SetDlgItemText(HWindow, IDC_LABEL_FILENAME, text);
+    const std::wstring plural = SPLExpandPluralStringOwned(
+        SalamanderGeneral, String<wchar_t>::LangStr(resID).c_str(), 1, &qwnumber);
+    const std::wstring text = SPLFormatStringOwned(plural.c_str(), number);
+    SetDlgItemTextW(HWindow, IDC_LABEL_FILENAME, text.c_str());
 }
 
 void CSnapshotProgressDlg::SetProgress(DWORD progress)
@@ -59,12 +85,12 @@ BOOL CSnapshotProgressDlg::GetWantCancel()
     CALL_STACK_MESSAGE_NONE
     //CALL_STACK_MESSAGE1("CSnapshotProgressDlg::GetWantCancel()");
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) // we want responsive GUI
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) // we want responsive GUI
     {
         if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -114,23 +140,22 @@ CCopyProgressDlg::CCopyProgressDlg(HWND parent, CObjectOrigin origin)
     ProgressBar1 = ProgressBar2 = NULL;
     WantCancel = FALSE;
     FileProgress = TotalProgress = 0;
-    SrcName[0] = DestName[0] = 0;
     Changed[0] = Changed[1] = Changed[2] = Changed[3] = 0;
     LastTick = 0;
 }
 
-void CCopyProgressDlg::SetSourceFileName(const char* fileName)
+void CCopyProgressDlg::SetSourceFileName(const wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("CCopyProgressDlg::SetSourceFileName(%s)", fileName);
-    strcpy(SrcName, fileName);
+    CALL_STACK_MESSAGE2("CCopyProgressDlg::SetSourceFileName(%ls)", fileName);
+    SrcName = fileName != NULL ? fileName : L"";
     Changed[0] = TRUE;
     UpdateControls();
 }
 
-void CCopyProgressDlg::SetDestFileName(const char* fileName)
+void CCopyProgressDlg::SetDestFileName(const wchar_t* fileName)
 {
-    CALL_STACK_MESSAGE2("CCopyProgressDlg::SetDestFileName(%s)", fileName);
-    strcpy(DestName, fileName);
+    CALL_STACK_MESSAGE2("CCopyProgressDlg::SetDestFileName(%ls)", fileName);
+    DestName = fileName != NULL ? fileName : L"";
     Changed[1] = TRUE;
     UpdateControls();
 }
@@ -162,12 +187,12 @@ void CCopyProgressDlg::UpdateControls(BOOL now)
     {
         if (Changed[0])
         {
-            Label1->SetText(SrcName);
+            Label1->SetText(SrcName.c_str());
             Changed[0] = FALSE;
         }
         if (Changed[1])
         {
-            Label2->SetText(DestName);
+            Label2->SetText(DestName.c_str());
             Changed[1] = FALSE;
         }
         if (Changed[2])
@@ -190,12 +215,12 @@ BOOL CCopyProgressDlg::GetWantCancel()
     //  CALL_STACK_MESSAGE1("CCopyProgressDlg::GetWantCancel()");
 
     MSG msg;
-    while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) // we want responsive GUI
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) // we want responsive GUI
     {
         if (!IsWindow(HWindow) || !IsDialogMessage(HWindow, &msg))
         {
             TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            DispatchMessageW(&msg);
         }
     }
 
@@ -231,8 +256,8 @@ INT_PTR CCopyProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (!WantCancel)
             {
                 UpdateControls(TRUE);
-                if (SalamanderGeneral->SalMessageBox(HWindow, String<char>::LoadStr(IDS_WANTCANCEL),
-                                                     String<char>::LoadStr(IDS_QUESTION),
+                if (SalamanderGeneral->SalMessageBox(HWindow, String<wchar_t>::LangStr(IDS_WANTCANCEL).c_str(),
+                                                     String<wchar_t>::LangStr(IDS_QUESTION).c_str(),
                                                      MB_YESNO | MB_ICONQUESTION) == IDYES)
                 {
                     WantCancel = TRUE;
@@ -254,7 +279,6 @@ INT_PTR CCopyProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CConnectDialog::CConnectDialog(HWND parent, int panel)
     : CDialog(HLanguage, IDD_CONNECT, IDD_CONNECT, parent)
 {
-    Volume[0] = 0;
     hDrivesImg = NULL;
     Panel = panel;
 }
@@ -270,60 +294,73 @@ void CConnectDialog::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_CHECK_ESTIMATEDAMAGE, ConfigEstimateDamage);
 }
 
-void CConnectDialog::AddVolumeDetails(const char* root, const char* volumeName, const char* volumeFS,
+void CConnectDialog::AddVolumeDetails(const wchar_t* root, const wchar_t* volumeName, const wchar_t* volumeFS,
                                       const CQuadWord& bytesTotal, const CQuadWord& bytesFree,
-                                      const char* volumeGUIDPath, int serial, BOOL selected)
+                                      const wchar_t* volumeGUIDPath, int serial, BOOL selected)
 {
-    LVITEM itemInfo;
+    LVITEMW itemInfo = {};
     itemInfo.iItem = serial;
 
     itemInfo.mask = LVIF_TEXT | LVIF_IMAGE | LVIF_STATE;
     itemInfo.iSubItem = 0;
-    itemInfo.pszText = const_cast<char*>(root);
+    itemInfo.pszText = const_cast<wchar_t*>(root);
     itemInfo.iImage = serial;
     itemInfo.stateMask = LVIS_FOCUSED; // using LVIS_FOCUSED instead of LVIS_SELECTED (we can switch to multi-select ListView)
     if (selected)
         itemInfo.state = LVIS_FOCUSED;
     else
         itemInfo.state = 0;
-    itemInfo.iItem = (int)SendMessage(hList, LVM_INSERTITEM, 0, (LPARAM)&itemInfo);
+    itemInfo.iItem = (int)SendMessageW(hList, LVM_INSERTITEMW, 0, (LPARAM)&itemInfo);
 
     itemInfo.mask = LVIF_TEXT;
 
     itemInfo.iSubItem = 1;
-    itemInfo.pszText = const_cast<char*>(volumeName);
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
+    itemInfo.pszText = const_cast<wchar_t*>(volumeName);
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
 
     itemInfo.iSubItem = 2;
-    itemInfo.pszText = const_cast<char*>(volumeFS);
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
+    itemInfo.pszText = const_cast<wchar_t*>(volumeFS);
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
 
     itemInfo.iSubItem = 3;
-    char buf[150];
-    static char emptyBuff[] = "";
-    itemInfo.pszText = (bytesTotal != CQuadWord(-1, -1) ? SalamanderGeneral->PrintDiskSize(buf, bytesTotal, 0) : emptyBuff);
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
-
-    itemInfo.iSubItem = 4;
-    itemInfo.pszText = (bytesFree != CQuadWord(-1, -1) ? SalamanderGeneral->PrintDiskSize(buf, bytesFree, 0) : emptyBuff);
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
-
-    itemInfo.iSubItem = 5;
+    static wchar_t emptyBuff[] = L"";
+    std::wstring sizeText;
     if (bytesTotal != CQuadWord(-1, -1))
     {
-        double pct = (CQuadWord(1000, 0) * bytesFree / bytesTotal).GetDouble() / 10;
-        char buf2[15];
-        sprintf(buf2, "%5.1f %%", pct);
-        SalamanderGeneral->PointToLocalDecimalSeparator(buf2, _countof(buf2));
-        itemInfo.pszText = buf2;
+        sizeText = SPLPrintDiskSizeOwned(SalamanderGeneral, bytesTotal, 0);
+        itemInfo.pszText = const_cast<wchar_t*>(sizeText.c_str());
     }
     else
         itemInfo.pszText = emptyBuff;
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
+
+    itemInfo.iSubItem = 4;
+    if (bytesFree != CQuadWord(-1, -1))
+    {
+        sizeText = SPLPrintDiskSizeOwned(SalamanderGeneral, bytesFree, 0);
+        itemInfo.pszText = const_cast<wchar_t*>(sizeText.c_str());
+    }
+    else
+        itemInfo.pszText = emptyBuff;
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
+
+    itemInfo.iSubItem = 5;
+    std::wstring freePercentText;
+    if (bytesTotal != CQuadWord(-1, -1))
+    {
+        double pct = (CQuadWord(1000, 0) * bytesFree / bytesTotal).GetDouble() / 10;
+        std::wstring freePercent = SPLFormatStringOwned(L"%5.1f %%", pct);
+        SPLPointToLocalDecimalSeparatorOwned(SalamanderGeneral, freePercent);
+        freePercentText = freePercent;
+        itemInfo.pszText = const_cast<wchar_t*>(freePercentText.c_str());
+    }
+    else
+        itemInfo.pszText = emptyBuff;
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
 
     itemInfo.iSubItem = 6;
-    itemInfo.pszText = const_cast<char*>(volumeGUIDPath);
-    SendMessage(hList, LVM_SETITEM, 0, (LPARAM)&itemInfo);
+    itemInfo.pszText = const_cast<wchar_t*>(volumeGUIDPath);
+    SendMessageW(hList, LVM_SETITEMW, 0, (LPARAM)&itemInfo);
 }
 
 void CConnectDialog::InitDrives()
@@ -341,17 +378,18 @@ void CConnectDialog::InitDrives()
     // insert columns (column widths will be set at the end using autosize)
     const int columnsCount = 7;
     int headerResId[columnsCount] = {IDS_VOLUME_MOUNT, IDS_VOLUME_NAME, IDS_VOLUME_FORMAT, IDS_VOLUME_SIZE, IDS_VOLUME_FREE, IDS_VOLUME_FREEPROC, IDS_VOLUME_VOLID};
-    LVCOLUMN columnInfo;
+    LVCOLUMNW columnInfo;
     columnInfo.mask = LVCF_TEXT | LVCF_FMT;
     int i;
     for (i = 0; i < columnsCount; i++)
     {
-        columnInfo.pszText = String<char>::LoadStr(headerResId[i]);
+        const std::wstring headerText = String<wchar_t>::LangStr(headerResId[i]);
+        columnInfo.pszText = const_cast<wchar_t*>(headerText.c_str());
         if (i >= 3 && i <= 5)
             columnInfo.fmt = LVCFMT_RIGHT;
         else
             columnInfo.fmt = LVCFMT_LEFT;
-        SendMessage(hList, LVM_INSERTCOLUMN, i, (LPARAM)&columnInfo);
+        SendMessage(hList, LVM_INSERTCOLUMNW, i, (LPARAM)&columnInfo);
     }
 
     // prepare the image list and fill in the list view
@@ -359,11 +397,10 @@ void CConnectDialog::InitDrives()
 
     // get info about current panel and focused item
     int sourcePanelType;
-    CPathBuffer sourcePanelPath; // Heap-allocated for long path support
-    char* archiveOrFS = NULL;
-    *sourcePanelPath = 0;
-    sourcePanelPath[1] = 0;
-    BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, sourcePanelPath.Size(), &sourcePanelType, &archiveOrFS);
+    std::wstring sourcePanelPath;
+    size_t archiveOrFSOffset = std::wstring::npos;
+    BOOL ret = SPLGetPanelPathOwned(SalamanderGeneral, Panel, sourcePanelPath,
+                                    &sourcePanelType, &archiveOrFSOffset);
     if (ret)
     {
         switch (sourcePanelType)
@@ -376,14 +413,8 @@ void CConnectDialog::InitDrives()
             const CFileData* data = SalamanderGeneral->GetPanelFocusedItem(Panel, &isDir);
             if (data && !isDir)
             {
-                size_t len = MAX_PATH - strlen(sourcePanelPath);
-                if (len - 1 > data->NameLen)
-                {
-                    strcat(sourcePanelPath, "\\");
-                    strncat(sourcePanelPath, data->Name, len - 1);
-                    sourcePanelPath[sourcePanelPath.Size() - 1] = 0;
-                    SetDlgItemText(HWindow, IDC_EDIT_IMAGE, sourcePanelPath);
-                }
+                SPLSalPathAppendOwned(sourcePanelPath, data->Name);
+                SetDlgItemTextW(HWindow, IDC_EDIT_IMAGE, sourcePanelPath.c_str());
             }
             break;
         }
@@ -391,8 +422,8 @@ void CConnectDialog::InitDrives()
         case PATH_TYPE_FS:
         {
             // remove the "del:" prefix so correct path will be selected when opening this dialog box on Undelete path
-            if (archiveOrFS != NULL)
-                memmove(sourcePanelPath, archiveOrFS + 1, strlen(archiveOrFS + 1) + 1);
+            if (archiveOrFSOffset != std::wstring::npos)
+                sourcePanelPath.erase(0, archiveOrFSOffset + 1);
             break;
         }
 
@@ -402,28 +433,23 @@ void CConnectDialog::InitDrives()
         }
     }
 
-    CPathBuffer sourcePanelGUIDPath; // Heap-allocated for long path support
-    *sourcePanelGUIDPath = 0;
-    if (!SalamanderGeneral->GetResolvedPathMountPointAndGUID(sourcePanelPath, NULL, sourcePanelGUIDPath))
-        *sourcePanelGUIDPath = 0;
+    std::wstring sourcePanelGUIDPath;
+    SPLGetResolvedPathMountPointAndGUIDOwned(
+        SalamanderGeneral, sourcePanelPath.c_str(), NULL, &sourcePanelGUIDPath);
 
     SendMessage(hList, LVM_SETIMAGELIST, LVSIL_SMALL, (LPARAM)hDrivesImg);
 
-    VolumeListing<char> volumeListing;
+    VolumeListing<wchar_t> volumeListing;
     DWORD err = GetVolumeListing(volumeListing);
     if (err != 0)
     {
-        char buf[1024];
-        buf[0] = 0;
-        strcpy(buf, String<char>::LoadStr(IDS_VOLENUMERATE));
+        std::wstring message = String<wchar_t>::LangStr(IDS_VOLENUMERATE);
         if (err != ERROR_SUCCESS)
         {
-            strcat(buf, " ");
-            int l = (int)strlen(buf);
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+            message += L" ";
+            message += SPLGetErrorTextOwned(SalamanderGeneral, err);
         }
-        SalamanderGeneral->SalMessageBox(HWindow, buf, String<char>::LoadStr(IDS_UNDELETE), MSGBOXEX_OK);
+        SalamanderGeneral->SalMessageBox(HWindow, message.c_str(), String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MSGBOXEX_OK);
     }
     else
     {
@@ -433,35 +459,34 @@ void CConnectDialog::InitDrives()
             // for simple disks get the icon from system, for mount points or unmounted disks get just plain HDD icon
             // (passing MountPoints instead of volumeName is much faster for some disks)
             HICON icn;
-            if (volumeListing[i].MountPoint && (3 == strlen(volumeListing[i].MountPoint)))
-                icn = OS<char>::OS_GetDriveIcon(volumeListing[i].MountPoint, volumeListing[i].Type, TRUE, FALSE);
+            if (volumeListing[i]->MountPoint.size() == 3)
+                icn = OS<wchar_t>::OS_GetDriveIcon(volumeListing[i]->MountPoint.c_str(), volumeListing[i]->Type, TRUE, FALSE);
             else
-                icn = OS<char>::OS_GetDriveIcon("", DRIVE_FIXED, TRUE, FALSE);
+                icn = OS<wchar_t>::OS_GetDriveIcon(L"", DRIVE_FIXED, TRUE, FALSE);
 
             ImageList_AddIcon(hDrivesImg, icn);
             DestroyIcon(icn);
 
             // add volume details to the list view
             BOOL selected = FALSE;
-            if (sourcePanelGUIDPath[0] != 0)
+            if (!sourcePanelGUIDPath.empty())
             {
-                selected = (strcmp(volumeListing[i].GUIDPath, sourcePanelGUIDPath) == 0);
+                selected = (sourcePanelGUIDPath == volumeListing[i]->GUIDPath);
             }
             else
             {
-                if (volumeListing[i].MountPoint && volumeListing[i].MountPoint[0] != 0 &&
-                    SalamanderGeneral->PathIsPrefix(volumeListing[i].MountPoint, sourcePanelPath))
+                if (!volumeListing[i]->MountPoint.empty() &&
+                    SalamanderGeneral->PathIsPrefix(volumeListing[i]->MountPoint.c_str(), sourcePanelPath.c_str()))
                 {
                     selected = true;
                 }
             }
 
-            // strip trailing slash from mount points
-            if (volumeListing[i].MountPoint && strlen(volumeListing[i].MountPoint) > 3)
-                SalamanderGeneral->SalPathRemoveBackslash(volumeListing[i].MountPoint);
+            if (volumeListing[i]->MountPoint.size() > 3)
+                SPLSalPathRemoveBackslashOwned(SalamanderGeneral, volumeListing[i]->MountPoint);
 
-            AddVolumeDetails(volumeListing[i].MountPoint, volumeListing[i].VolumeName, volumeListing[i].FSName,
-                             volumeListing[i].BytesTotal, volumeListing[i].BytesFree, volumeListing[i].GUIDPath,
+            AddVolumeDetails(volumeListing[i]->MountPoint.c_str(), volumeListing[i]->VolumeName.c_str(), volumeListing[i]->FSName.c_str(),
+                             volumeListing[i]->BytesTotal, volumeListing[i]->BytesFree, volumeListing[i]->GUIDPath.c_str(),
                              serial, selected);
 
             serial++;
@@ -488,15 +513,15 @@ BOOL CConnectDialog::OnDialogOK()
     if (BST_CHECKED == SendMessage(GetDlgItem(HWindow, IDC_CHECK_IMAGE), BM_GETCHECK, 0, 0))
     {
         // disk image
-        GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, Volume.Size());
+        Volume = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_IMAGE);
 
         // reset the volume if the image file does not exist
-        DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume);
+        DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume.c_str());
         if (attr == INVALID_FILE_ATTRIBUTES ||
             attr & FILE_ATTRIBUTE_DIRECTORY)
         {
-            SalamanderGeneral->SalMessageBox(HWindow, String<char>::LoadStr(IDS_IMAGENOTFOUND),
-                                             String<char>::LoadStr(IDS_UNDELETE), MSGBOXEX_ICONEXCLAMATION | MSGBOXEX_OK);
+            SalamanderGeneral->SalMessageBox(HWindow, String<wchar_t>::LangStr(IDS_IMAGENOTFOUND).c_str(),
+                                             String<wchar_t>::LangStr(IDS_UNDELETE).c_str(), MSGBOXEX_ICONEXCLAMATION | MSGBOXEX_OK);
             return FALSE;
         }
     }
@@ -504,33 +529,24 @@ BOOL CConnectDialog::OnDialogOK()
     {
         // physical disk
         HWND hList2 = GetDlgItem(HWindow, IDC_LIST_VOLUMES);
-        LVITEM item;
-        item.iItem = (int)SendMessage(hList2, LVM_GETNEXTITEM, -1, LVNI_ALL | LVNI_SELECTED);
-        // get the unique volume name
-        item.iSubItem = 0;
-        item.mask = LVIF_TEXT;
-        item.pszText = Volume;
-        item.cchTextMax = Volume.Size();
-        SendMessage(hList2, LVM_GETITEM, 0, (LPARAM)&item);
-        if (Volume[0] == 0)
-        {
-            // get GUID Path
-            item.iSubItem = 6;
-            SendMessage(hList2, LVM_GETITEM, 0, (LPARAM)&item);
-        }
+        const int item = (int)SendMessageW(hList2, LVM_GETNEXTITEM, -1,
+                                           LVNI_ALL | LVNI_SELECTED);
+        Volume = GetListViewItemTextOwned(hList2, item, 0);
+        if (Volume.empty())
+            Volume = GetListViewItemTextOwned(hList2, item, 6);
 
-        // append current path, if current drive is selected
+        // Append the current path if the selected volume owns it.
         int sourcePanelType;
-        CPathBuffer sourcePanelPath; // Heap-allocated for long path support
-        BOOL ret = SalamanderGeneral->GetPanelPath(Panel, sourcePanelPath, sourcePanelPath.Size(), &sourcePanelType, NULL);
+        std::wstring sourcePanelPathW;
+        BOOL ret = SPLGetPanelPathOwned(SalamanderGeneral, Panel,
+                                        sourcePanelPathW, &sourcePanelType);
         if (ret && sourcePanelType == PATH_TYPE_WINDOWS)
         {
             // if mount points are supported, check if we are on the correct volume
-            CPathBuffer vol1, vol2; // Heap-allocated for long path support
-            if (GetVolumePathName(sourcePanelPath, vol1, vol1.Size()) &&
-                GetVolumePathName(Volume, vol2, vol2.Size()) &&
-                !strcmp(vol1, vol2))
-                strcpy(Volume, sourcePanelPath);
+            std::wstring vol1, vol2;
+            if (SPLGetVolumePathNameOwned(sourcePanelPathW.c_str(), vol1) &&
+                SPLGetVolumePathNameOwned(Volume.c_str(), vol2) && vol1 == vol2)
+                Volume = sourcePanelPathW;
         }
     }
     return TRUE;
@@ -538,27 +554,33 @@ BOOL CConnectDialog::OnDialogOK()
 
 void CConnectDialog::OnImageBrowse()
 {
-    GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, Volume.Size());
+    Volume = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_IMAGE);
 
-    OPENFILENAME openInfo;
-    memset(&openInfo, 0, sizeof(OPENFILENAME));
-    openInfo.lStructSize = sizeof(OPENFILENAME);
+    OPENFILENAMEW openInfo;
+    memset(&openInfo, 0, sizeof(OPENFILENAMEW));
+    openInfo.lStructSize = sizeof(OPENFILENAMEW);
     openInfo.hwndOwner = HWindow;
-    openInfo.lpstrFilter = "Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
-    openInfo.lpstrFile = Volume;
-    // TODO: this still feels wrong; when the volume is e.g. C:\Work\Altap\, the initial dir becomes garbage because of lpstrFile
-    openInfo.lpstrInitialDir = Volume;
-    openInfo.nMaxFile = MAX_PATH;
+    openInfo.lpstrFilter = L"Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
+    openInfo.lpstrFile = NULL;
+    openInfo.nMaxFile = 0;
     openInfo.Flags = OFN_FILEMUSTEXIST | OFN_READONLY;
-    BOOL ret = GetOpenFileName(&openInfo);
+    std::vector<std::wstring> selectedFiles;
+    if (!Volume.empty())
+        selectedFiles.push_back(Volume);
+    BOOL ret = SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &openInfo, selectedFiles) &&
+               selectedFiles.size() == 1;
     if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
     {
         // Windows refuse to open dialog with initial path e.g. C:\. Oh well...
-        strcpy(Volume, "");
-        ret = GetOpenFileName(&openInfo);
+        selectedFiles.clear();
+        ret = SPLSafeGetOpenFileNamesOwned(SalamanderGeneral, &openInfo, selectedFiles) &&
+              selectedFiles.size() == 1;
     }
     if (ret)
-        SetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume);
+    {
+        Volume.swap(selectedFiles[0]);
+        SetDlgItemTextW(HWindow, IDC_EDIT_IMAGE, Volume.c_str());
+    }
 }
 
 INT_PTR CConnectDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -619,17 +641,16 @@ INT_PTR CConnectDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //  CFileNameDialog
 //
 
-CFileNameDialog::CFileNameDialog(HWND parent, char* filename)
-    : CDialog(HLanguage, IDD_FILENAME, parent)
+CFileNameDialog::CFileNameDialog(HWND parent, std::wstring& filename)
+    : CDialog(HLanguage, IDD_FILENAME, parent), FileName(filename)
 {
-    FileName = filename;
     AllPressed = FALSE;
 }
 
 void CFileNameDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CFileNameDialog::Transfer()");
-    ti.EditLine(IDC_EDIT_FILENAME, FileName, MAX_PATH, FALSE);
+    ti.EditLine(IDC_EDIT_FILENAME, FileName);
 }
 
 INT_PTR CFileNameDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -679,7 +700,10 @@ CConfigDialog::CConfigDialog(HWND parent)
 void CConfigDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CConfigDialog::Transfer()");
-    ti.EditLine(IDC_EDIT_TEMPPATH, ConfigTempPath, ConfigTempPath.Size(), FALSE);
+    if (ti.Type == ttDataToWindow)
+        SetDlgItemTextW(HWindow, IDC_EDIT_TEMPPATH, ConfigTempPath.c_str());
+    else if (ti.Type == ttDataFromWindow)
+        ConfigTempPath = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TEMPPATH);
     ti.CheckBox(IDC_CHECK_ALWAYSREUSE, ConfigAlwaysReuseScanInfo);
     ti.CheckBox(IDC_CHECK_SAMEPARTITION, ConfigDontShowSamePartitionWarning);
     ti.CheckBox(IDC_CHECK_EFS, ConfigDontShowEncryptedWarning);
@@ -703,12 +727,15 @@ INT_PTR CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_BUTTON_BROWSE:
         {
-            CPathBuffer path; // Heap-allocated for long path support
-            GetDlgItemText(HWindow, IDC_EDIT_TEMPPATH, path, path.Size());
-            SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, String<char>::LoadStr(IDS_UNDELETE),
-                                                  String<char>::LoadStr(IDS_CHOOSETEMPDIR),
-                                                  path, FALSE, path);
-            SetDlgItemText(HWindow, IDC_EDIT_TEMPPATH, path);
+            const std::wstring initial = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TEMPPATH);
+            std::wstring selected;
+            if (SPLGetTargetDirectoryOwned(SalamanderGeneral, HWindow, HWindow,
+                                           String<wchar_t>::LangStr(IDS_UNDELETE).c_str(),
+                                           String<wchar_t>::LangStr(IDS_CHOOSETEMPDIR).c_str(),
+                                           selected, FALSE, initial.c_str()))
+            {
+                SetDlgItemTextW(HWindow, IDC_EDIT_TEMPPATH, selected.c_str());
+            }
             return TRUE;
         }
         }
@@ -731,7 +758,7 @@ CRestoreDialog::CRestoreDialog(HWND parent)
 INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CRestoreDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-    CPathBuffer path; // Heap-allocated for long path support
+    std::wstring path;
     switch (uMsg)
     {
     case WM_INITDIALOG:
@@ -739,42 +766,43 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Parent != NULL)
             SalamanderGeneral->MultiMonCenterWindow(HWindow, Parent, TRUE);
 
-        SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, path.Size(), NULL, NULL);
-        SetDlgItemText(HWindow, IDC_EDIT_TARGET, path);
+        std::wstring targetPathW;
+        SPLGetPanelPathOwned(SalamanderGeneral, PANEL_TARGET, targetPathW);
+        SetDlgItemTextW(HWindow, IDC_EDIT_TARGET, targetPathW.c_str());
 
         int files, dirs;
-        char text1[200];
-        CPathBuffer text2; // Heap-allocated for long path support
+        wchar_t text1[200];
+        std::wstring text2;
         SalamanderGeneral->GetPanelSelection(PANEL_SOURCE, &files, &dirs);
-        SalamanderGeneral->GetCommonFSOperSourceDescr(text2, text2.Size(), PANEL_SOURCE, files, dirs, NULL, FALSE, FALSE);
-        GetDlgItemText(HWindow, IDC_LABEL_SOURCE, text1, 200);
+        SPLGetCommonFSOperSourceDescrOwned(
+            SalamanderGeneral, PANEL_SOURCE, files, dirs, NULL, FALSE, FALSE,
+            text2);
+        GetDlgItemTextW(HWindow, IDC_LABEL_SOURCE, text1, _countof(text1));
         BOOL labelSet = FALSE;
         // if it is "file \"name.txt\"" or "directory \"name\"" we find the name and the remaining text
         // we add the strings to text1 so that CSalamanderGUI::SetSubjectTruncatedText can be used
         if (files + dirs <= 1)
         {
-            char* beg = strchr(text2, '"');
-            char* end = strrchr(text2, '"');
-            if (beg != NULL && end != NULL && beg < end && end - (beg + 1) < MAX_PATH)
+            const size_t beg = text2.find(L'"');
+            const size_t end = text2.rfind(L'"');
+            if (beg != std::wstring::npos && end != std::wstring::npos && beg < end)
             {
-                CPathBuffer fileName; // Heap-allocated for long path support
-                lstrcpyn(fileName, beg + 1, (int)(end - (beg + 1) + 1));
-                memmove(beg + 1 + 2, end, strlen(end) + 1);
-                memcpy(beg + 1, "%s", 2);
-                _snprintf_s((char*)path, path.Size(), _TRUNCATE, text1, text2.Get());
+                const std::wstring fileName = text2.substr(beg + 1, end - beg - 1);
+                text2.replace(beg + 1, end - beg - 1, L"%s");
+                path = SPLFormatStringOwned(text1, text2.c_str());
 
                 BOOL isDir = dirs == 1;
                 if (files + dirs == 0)
                     SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-                SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(HWindow, IDC_LABEL_SOURCE), path,
-                                                       fileName, isDir, TRUE);
+                SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(HWindow, IDC_LABEL_SOURCE), path.c_str(),
+                                                       fileName.c_str(), isDir, TRUE);
                 labelSet = TRUE;
             }
         }
         if (!labelSet)
         {
-            _snprintf_s((char*)path, path.Size(), _TRUNCATE, text1, text2.Get());
-            SetDlgItemText(HWindow, IDC_LABEL_SOURCE, path);
+            path = SPLFormatStringOwned(text1, text2.c_str());
+            SetDlgItemTextW(HWindow, IDC_LABEL_SOURCE, path.c_str());
         }
         break;
     }
@@ -785,18 +813,22 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_BUTTON_BROWSE:
         {
-            char title[100];
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, path, path.Size());
-            GetWindowText(HWindow, title, 100);
-            SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, title, String<char>::LoadStr(IDS_CHOOSETARGET),
-                                                  path, FALSE, path);
-            SetDlgItemText(HWindow, IDC_EDIT_TARGET, path);
+            const std::wstring initial = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TARGET);
+            const std::wstring title = SPLGetWindowTextOwned(HWindow);
+            std::wstring selected;
+            if (SPLGetTargetDirectoryOwned(SalamanderGeneral, HWindow, HWindow,
+                                           title.c_str(),
+                                           String<wchar_t>::LangStr(IDS_CHOOSETARGET).c_str(),
+                                           selected, FALSE, initial.c_str()))
+            {
+                SetDlgItemTextW(HWindow, IDC_EDIT_TARGET, selected.c_str());
+            }
             return TRUE;
         }
 
         case IDOK:
         {
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, TargetPath, TargetPath.Size());
+            TargetPath = SPLGetDlgItemTextOwned(HWindow, IDC_EDIT_TARGET);
             break;
         }
         }
@@ -816,8 +848,8 @@ INT_PTR CRestoreProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CRestoreProgressDlg::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     if (uMsg == WM_INITDIALOG)
     {
-        SetDlgItemText(HWindow, IDC_LABEL_UNDELETING, String<char>::LoadStr(IDS_RESTORING));
-        SetWindowText(HWindow, String<char>::LoadStr(IDS_RESTORE));
+        SetDlgItemTextW(HWindow, IDC_LABEL_UNDELETING, String<wchar_t>::LangStr(IDS_RESTORING).c_str());
+        SetWindowTextW(HWindow, String<wchar_t>::LangStr(IDS_RESTORE).c_str());
         /*HWND hLabel = GetDlgItem(HWindow, IDC_LABEL_UNDELETING);
     SetWindowLong(hLabel, GWL_STYLE, GetWindowLong(hLabel, GWL_STYLE) | SS_RIGHT);*/
     }

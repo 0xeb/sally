@@ -13,7 +13,7 @@ CChangeMonitor ChangeMonitor;
 //
 
 CChangeMonitorThread::CChangeMonitorThread(CChangeMonitor& monitor)
-    : ConnectedFS(4, 4, dtNoDelete), CThread("Registry Change Monitor"),
+    : ConnectedFS(4, 4, dtNoDelete), CThread(L"Registry Change Monitor"),
       Monitor(monitor)
 {
     CALL_STACK_MESSAGE1("CChangeMonitorThread::CChangeMonitorThread()");
@@ -59,7 +59,7 @@ CChangeMonitorThread::Body()
                 hKey = NULL;
             }
             ResetEvent(RegistryEvent);
-            LONG ret = RegOpenKeyExW(PredefinedHKeys[Root].HKey, Key, 0, KEY_NOTIFY, &hKey);
+            LONG ret = RegOpenKeyExW(PredefinedHKeys[Root].HKey, Key.c_str(), 0, KEY_NOTIFY, &hKey);
             if (ret == ERROR_SUCCESS)
             {
                 ret = RegNotifyChangeKeyValue(hKey, FALSE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_ATTRIBUTES | REG_NOTIFY_CHANGE_LAST_SET | REG_NOTIFY_CHANGE_SECURITY,
@@ -150,9 +150,18 @@ CChangeMonitor::CChangeMonitor() : Threads(4, 4, dtNoDelete){
     CALL_STACK_MESSAGE_NONE
 }
 
-void CChangeMonitor::AddPath(int root, LPWSTR key, CPluginFSInterface* fs)
+void CChangeMonitor::AddPath(int root, const wchar_t* key, CPluginFSInterface* fs)
 {
     CALL_STACK_MESSAGE2("CChangeMonitor::AddPath(%d, , )", root);
+    std::wstring ownedKey;
+    try
+    {
+        ownedKey = key != nullptr ? key : L"";
+    }
+    catch (...)
+    {
+        return;
+    }
     CS.Enter();
     int idle = -1;
     // check whether this path is already monitored
@@ -166,7 +175,7 @@ void CChangeMonitor::AddPath(int root, LPWSTR key, CPluginFSInterface* fs)
         }
         if (Threads[i]->Root == root &&
             CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
-                           Threads[i]->Key, -1,
+                           Threads[i]->Key.c_str(), -1,
                            key, -1) == CSTR_EQUAL)
             break;
     }
@@ -201,7 +210,7 @@ void CChangeMonitor::AddPath(int root, LPWSTR key, CPluginFSInterface* fs)
     {
         Threads[i]->IgnoreChanges = 0;
         Threads[i]->Root = root;
-        wcscpy(Threads[i]->Key, key);
+        Threads[i]->Key.swap(ownedKey);
         Threads[i]->Action = aeSetPath;
         SetEvent(Threads[i]->ActionEvent);
     }

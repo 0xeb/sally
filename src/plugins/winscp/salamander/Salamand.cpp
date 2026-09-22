@@ -24,6 +24,7 @@
 #include <Terminal.h>
 #include <VCLCommon.h>
 #include "winliblt.h"
+#include "plugin_narrow_compat.h"
 //---------------------------------------------------------------------------
 CPluginInterface PluginInterface;
 HINSTANCE DLLInstance = NULL;
@@ -32,6 +33,33 @@ CSalamanderDebugAbstract* SalamanderDebug = NULL;
 int SalamanderVersion = 0;
 // required by checkkey.cpp
 CSalamanderGeneralAbstract* SalamanderGeneral = NULL;
+//---------------------------------------------------------------------------
+namespace
+{
+bool WideToWinScpNameBytes(const wchar_t* Value, AnsiString& Result)
+{
+    Result = "";
+    if (Value == NULL)
+        return true;
+
+    BOOL UsedDefault = FALSE;
+    const int Required = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS,
+                                              Value, -1, NULL, 0, NULL,
+                                              &UsedDefault);
+    if (Required <= 0 || UsedDefault)
+        return false;
+
+    std::string Storage(static_cast<size_t>(Required), '\0');
+    UsedDefault = FALSE;
+    if (WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, Value, -1,
+                            Storage.data(), Required, NULL, &UsedDefault) != Required ||
+        UsedDefault)
+        return false;
+
+    Result = Storage.c_str();
+    return true;
+}
+} // namespace
 //---------------------------------------------------------------------------
 int WINAPI DllEntryPoint(HINSTANCE HInst, unsigned long Reason,
                          void* /*Reserved*/)
@@ -62,7 +90,7 @@ int WINAPI DllEntryPoint(HINSTANCE HInst, unsigned long Reason,
 //---------------------------------------------------------------------------
 char* SalLoadStr(int resID)
 {
-    return SalamanderGeneral->LoadStr(HLanguage, resID);
+    return LoadStrNarrow(SalamanderGeneral, HLanguage, resID);
 }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -211,22 +239,27 @@ int CSalamanderGeneralLocal::SalamanderMessageDialog(HWND Parent,
 
     BOOL CheckBoxValue = FALSE;
     AnsiString CheckBoxText;
+    const std::wstring CaptionW = ToWideArg(Caption.c_str());
+    const std::wstring TextW = ToWideArg(Text.c_str());
+    const std::wstring AliasBtnNamesW = ToWideArg(AliasBtnNames.c_str());
+    std::wstring CheckBoxTextW;
     MSGBOXEX_PARAMS MsgParams;
     memset(&MsgParams, 0, sizeof(MsgParams));
     MsgParams.HParent = Parent;
-    MsgParams.Caption = Caption.c_str();
-    MsgParams.Text = Text.c_str();
+    MsgParams.Caption = CaptionW.c_str();
+    MsgParams.Text = TextW.c_str();
     MsgParams.Flags = Flags;
     if (!AliasBtnNames.IsEmpty())
     {
-        MsgParams.AliasBtnNames = AliasBtnNames.c_str();
+        MsgParams.AliasBtnNames = AliasBtnNamesW.c_str();
     }
     bool NeverAskAgainCheck = ((Params != NULL) && FLAGSET(Params->Params, mpNeverAskAgainCheck));
     if (NeverAskAgainCheck)
     {
         MsgParams.CheckBoxValue = &CheckBoxValue;
         CheckBoxText = LoadStr(Answers == qaOK ? NEVER_SHOW_AGAIN : NEVER_ASK_AGAIN);
-        MsgParams.CheckBoxText = CheckBoxText.c_str();
+        CheckBoxTextW = ToWideArg(CheckBoxText.c_str());
+        MsgParams.CheckBoxText = CheckBoxTextW.c_str();
     }
     // TODO: map TMessageParams::Aliases to MSGBOXEX_PARAMS::AliasBtnNames
     // (currently only qaAll is mapped and qaRetry for yes/no/cancel/retry=append/...,
@@ -388,7 +421,7 @@ bool CPluginInterface::Init(CSalamanderPluginEntryAbstract* Salamander)
             assert(Application);
             SetParentWindow(SalamanderGeneral()->GetMainWindowHWND());
 
-            InitializeWinLib("WinSCP" /* neprekladat! */, DLLInstance);
+            InitializeWinLib(L"WinSCP" /* neprekladat! */, DLLInstance);
 
 #ifndef IDE
             HLanguage = Salamander->LoadLanguageModule(Salamander->GetParentWindow(),
@@ -417,21 +450,26 @@ bool CPluginInterface::Init(CSalamanderPluginEntryAbstract* Salamander)
 
             Salamander->SetPluginHomePageURL(SalLoadStr(SAL_HOMEPAGE));
 
-            CPathBuffer FSName;
-            SalamanderGeneral()->GetPluginFSName(FSName, 0);
-            FFSNames[0] = FSName;
+            const std::wstring FSName0 = SPLGetPluginFSNameOwned(
+                SalamanderGeneral(), 0);
+            if (!WideToWinScpNameBytes(FSName0.c_str(), FFSNames[0]))
+                Abort();
             assert(!FFSNames[0].IsEmpty());
             int FSIndex;
             if (Salamander->AddFSName("scp", &FSIndex))
             {
                 assert(FSIndex == 1);
-                SalamanderGeneral()->GetPluginFSName(FSName, FSIndex);
-                FFSNames[1] = FSName;
+                const std::wstring FSName1 = SPLGetPluginFSNameOwned(
+                    SalamanderGeneral(), FSIndex);
+                if (!WideToWinScpNameBytes(FSName1.c_str(), FFSNames[1]))
+                    Abort();
                 if (Salamander->AddFSName("sftp", &FSIndex))
                 {
                     assert(FSIndex == 2);
-                    SalamanderGeneral()->GetPluginFSName(FSName, FSIndex);
-                    FFSNames[2] = FSName;
+                    const std::wstring FSName2 = SPLGetPluginFSNameOwned(
+                        SalamanderGeneral(), FSIndex);
+                    if (!WideToWinScpNameBytes(FSName2.c_str(), FFSNames[2]))
+                        Abort();
                 }
                 else
                 {
@@ -587,16 +625,16 @@ void WINAPI CPluginInterface::Connect(HWND Parent,
     {
         SetParentWindow(Parent);
 
-        Salamander->AddMenuItem(-1, SalLoadStr(SAL_CONNECT),
+        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_CONNECT)).c_str(),
                                 SALHOTKEY('W', HOTKEYF_CONTROL | HOTKEYF_SHIFT), pmConnect,
                                 FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, SalLoadStr(SAL_DISCONNECT_F12), SALHOTKEY_HINT, pmDisconnectF12,
+        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_DISCONNECT_F12)).c_str(), SALHOTKEY_HINT, pmDisconnectF12,
                                 FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
         Salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, SalLoadStr(SAL_FULL_SYNCHRONIZE), 0, pmFullSynchronize,
+        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_FULL_SYNCHRONIZE)).c_str(), 0, pmFullSynchronize,
                                 FALSE, MENU_EVENT_THIS_PLUGIN_FS | MENU_EVENT_TARGET_THIS_PLUGIN_FS,
                                 MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
-        Salamander->AddMenuItem(-1, SalLoadStr(SAL_SYNCHRONIZE), 0, pmSynchronize,
+        Salamander->AddMenuItem(-1, ToWideArg(SalLoadStr(SAL_SYNCHRONIZE)).c_str(), 0, pmSynchronize,
                                 FALSE, MENU_EVENT_THIS_PLUGIN_FS | MENU_EVENT_TARGET_THIS_PLUGIN_FS,
                                 MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
 

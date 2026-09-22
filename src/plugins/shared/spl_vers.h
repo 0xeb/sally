@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -21,6 +21,9 @@
 // conversion macros num->str
 #define VERSINFO_xstr(s) VERSINFO_str(s)
 #define VERSINFO_str(s) #s
+#define VERSINFO_widen_literal(s) VERSINFO_widen_literal_impl(s)
+#define VERSINFO_widen_literal_impl(s) L##s
+#define VERSINFO_wstr(s) VERSINFO_widen_literal(VERSINFO_xstr(s))
 
 // SINGLE SOURCE OF TRUTH for the Sally application version.
 //
@@ -34,7 +37,7 @@
 // absent in a fresh clone before configure. A plain header it can always read.
 #define VERSINFO_SALAMANDER_MAJOR 1
 #define VERSINFO_SALAMANDER_MINORA 0
-#define VERSINFO_SALAMANDER_MINORB 26
+#define VERSINFO_SALAMANDER_MINORB 27
 
 // Sally versions are three dotted parts (1.0.25). Open Salamander used "hundredths",
 // concatenating MINORB with no separator - 2,5,1 read as "2.51" - and suppressing a zero
@@ -47,6 +50,7 @@
 // each plugin still numbers itself in hundredths, and 7zip at 1,3,1 must keep reading
 // "1.31" rather than turning into "1.3.1".
 #define VERSINFO_SALAMANDER_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) "." VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) "." VERSINFO_xstr(VERSINFO_SALAMANDER_MINORB) VERSINFO_BETAVERSION_TXT
+#define VERSINFO_SALAMANDER_VERSION_W VERSINFO_wstr(VERSINFO_SALAMANDER_MAJOR) L"." VERSINFO_wstr(VERSINFO_SALAMANDER_MINORA) L"." VERSINFO_wstr(VERSINFO_SALAMANDER_MINORB) VERSINFO_BETAVERSION_TXT_W
 #define VERSINFO_SAL_SHORT_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORB) VERSINFO_BETAVERSIONSHORT_TXT
 
 #ifdef VERSINFO_MAJOR      // defined only if used from plugin
@@ -62,11 +66,14 @@
 #ifdef _WIN64
 #ifdef _M_ARM64
 #define SAL_VER_PLATFORM "ARM64"
+#define SAL_VER_PLATFORM_W L"ARM64"
 #else
 #define SAL_VER_PLATFORM "x64"
+#define SAL_VER_PLATFORM_W L"x64"
 #endif
 #else // _WIN64
 #define SAL_VER_PLATFORM "x86"
+#define SAL_VER_PLATFORM_W L"x86"
 #endif // _WIN64
 
 // VERSINFO_BUILDNUMBER:
@@ -138,6 +145,7 @@
 // x86/x64 are interchangeable): " (x86)" (for release versions), " beta 2 (x64)", " beta 2 (SDK x86)",
 // " RC1 (x64)", " beta 2 (IB21 x86)", " beta 2 (DB21 x64)", " beta 2 (PB21 x86)"
 #define VERSINFO_BETAVERSION_TXT " (" SAL_VER_PLATFORM ")"
+#define VERSINFO_BETAVERSION_TXT_W L" (" SAL_VER_PLATFORM_W L")"
 #define VERSINFO_BETAVERSION_TXT_NO_PLATFORM "" // copy of line above + delete SAL_VER_PLATFORM + if parenthesis is empty, delete it + delete extra spaces
 
 // examples (x86/x64 see previous paragraph): "x86" (for release versions), "B2x64", "B2SDKx86",
@@ -220,11 +228,27 @@
 //   104 - 5.0 + broken transitional wide plugin FS ABI (must not be used for FS plugins)
 //   105 - 5.0 + fixed optional wide plugin FS path ABI
 //   106 - 5.0 + plugin theme info API
+//   107 - 5.0 + plugin may set CFileData::NameW when listing an archive
+//   108 - Sally wide (Unicode) plugin ABI - plugins built for this
+//         version or later speak the native wide interfaces directly; anything
+//         reporting 107 or earlier is routed through the legacy ANSI adapter
+//         (see compat/plugin_abi_routing.h's kFirstWideAbiVersion). This was
+//         never bumped when the break landed, so every in-tree plugin using this
+//         shared header (all of which are wide-ABI-native) was silently
+//         misrouted through the adapter - never caught because nothing had
+//         actually loaded a plugin under this exact runtime path until now.
 
-#define LAST_VERSION_OF_SALAMANDER 106
+#define LAST_VERSION_OF_SALAMANDER 108
+#define SALLY_PLUGIN_WIDE_ABI_VERSION 108
 #define SALLY_PLUGIN_BROKEN_WIDE_FS_VERSION 104
 #define SALLY_PLUGIN_WIDE_FS_VERSION 105
 #define SALLY_PLUGIN_THEME_INFO_VERSION 106
+// A plugin built against this version or later is known to initialize
+// CFileData::NameW, so Salamander may read it from a CFileData the plugin filled in.
+// Older plugins were compiled against a struct that had no such field, or had it and
+// never wrote to it, so the core has to keep clearing it for them - see
+// CSalamanderDirectory::AddFile.
+#define SALLY_PLUGIN_ARCHIVE_NAMEW_VERSION 107
 #define REQUIRE_LAST_VERSION_OF_SALAMANDER "This plugin requires Sally 1.0 (" SAL_VER_PLATFORM ") or later."
 
 #endif // __SPL_VERS_H

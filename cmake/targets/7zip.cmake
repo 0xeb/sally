@@ -97,6 +97,7 @@ target_compile_definitions(7zwrapper PRIVATE
   WIN32
   _WINDOWS
   _USRDLL
+  USE_UNICODE_FSTRING
   ${SAL_COMMON_DEFINES}
 )
 
@@ -148,6 +149,8 @@ sal_add_plugin(NAME 7zip
   DEF "${SEVENZIP_DIR}/7zip.def"
   INCLUDES
     "${SEVENZIP_7ZA}/cpp"
+  DEFINES
+    USE_UNICODE_FSTRING
 )
 
 # Rename to sal7zip.dll to avoid clash with 7-Zip library DLLs

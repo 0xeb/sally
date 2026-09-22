@@ -11,6 +11,7 @@
 #include <commdlg.h>
 #include <crtdbg.h>
 #include <ostream>
+#include <vector>
 #include <commctrl.h>
 #include <shlobj.h>
 #include <stdio.h>

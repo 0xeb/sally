@@ -10,50 +10,50 @@
 #include <uxtheme.h>
 
 // Attributes
-const char* FILTERCRITERIA_ATTRIBUTESMASK_REG = "Attributes Mask";
-const char* FILTERCRITERIA_ATTRIBUTESVALUE_REG = "Attributes Value";
+const wchar_t* FILTERCRITERIA_ATTRIBUTESMASK_REG = L"Attributes Mask";
+const wchar_t* FILTERCRITERIA_ATTRIBUTESVALUE_REG = L"Attributes Value";
 // Size Min/Max
-const char* FILTERCRITERIA_USEMINSIZE_REG = "UseMinSize";
-const char* FILTERCRITERIA_MINSIZELO_REG = "MinSizeLo";
-const char* FILTERCRITERIA_MINSIZEHI_REG = "MinSizeHi";
-const char* FILTERCRITERIA_MINSIZEUNITS_REG = "MinSizeUnits";
-const char* FILTERCRITERIA_USEMAXSIZE_REG = "UseMaxSize";
-const char* FILTERCRITERIA_MAXSIZELO_REG = "MaxSizeLo";
-const char* FILTERCRITERIA_MAXSIZEHI_REG = "MaxSizeHi";
-const char* FILTERCRITERIA_MAXSIZEUNITS_REG = "MaxSizeUnits";
+const wchar_t* FILTERCRITERIA_USEMINSIZE_REG = L"UseMinSize";
+const wchar_t* FILTERCRITERIA_MINSIZELO_REG = L"MinSizeLo";
+const wchar_t* FILTERCRITERIA_MINSIZEHI_REG = L"MinSizeHi";
+const wchar_t* FILTERCRITERIA_MINSIZEUNITS_REG = L"MinSizeUnits";
+const wchar_t* FILTERCRITERIA_USEMAXSIZE_REG = L"UseMaxSize";
+const wchar_t* FILTERCRITERIA_MAXSIZELO_REG = L"MaxSizeLo";
+const wchar_t* FILTERCRITERIA_MAXSIZEHI_REG = L"MaxSizeHi";
+const wchar_t* FILTERCRITERIA_MAXSIZEUNITS_REG = L"MaxSizeUnits";
 // Date & Time
-const char* FILTERCRITERIA_TIMEMODE_REG = "TimeMode";
-const char* FILTERCRITERIA_DURINGTIMELO_REG = "DuringTimeLo";
-const char* FILTERCRITERIA_DURINGTIMEHI_REG = "DuringTimeHi";
-const char* FILTERCRITERIA_DURINGUNITS_REG = "DuringUnits";
-const char* FILTERCRITERIA_USEFROMDATE_REG = "UseFromDate";
-const char* FILTERCRITERIA_USEFROMTIME_REG = "UseFromTime";
-const char* FILTERCRITERIA_FROMLO_REG = "FromLo";
-const char* FILTERCRITERIA_FROMHI_REG = "FromHi";
-const char* FILTERCRITERIA_USETODATE_REG = "UseToDate";
-const char* FILTERCRITERIA_USETOTIME_REG = "UseToTime";
-const char* FILTERCRITERIA_TOLO_REG = "ToLo";
-const char* FILTERCRITERIA_TOHI_REG = "ToHi";
+const wchar_t* FILTERCRITERIA_TIMEMODE_REG = L"TimeMode";
+const wchar_t* FILTERCRITERIA_DURINGTIMELO_REG = L"DuringTimeLo";
+const wchar_t* FILTERCRITERIA_DURINGTIMEHI_REG = L"DuringTimeHi";
+const wchar_t* FILTERCRITERIA_DURINGUNITS_REG = L"DuringUnits";
+const wchar_t* FILTERCRITERIA_USEFROMDATE_REG = L"UseFromDate";
+const wchar_t* FILTERCRITERIA_USEFROMTIME_REG = L"UseFromTime";
+const wchar_t* FILTERCRITERIA_FROMLO_REG = L"FromLo";
+const wchar_t* FILTERCRITERIA_FROMHI_REG = L"FromHi";
+const wchar_t* FILTERCRITERIA_USETODATE_REG = L"UseToDate";
+const wchar_t* FILTERCRITERIA_USETOTIME_REG = L"UseToTime";
+const wchar_t* FILTERCRITERIA_TOLO_REG = L"ToLo";
+const wchar_t* FILTERCRITERIA_TOHI_REG = L"ToHi";
 
 // we used the following variables in Altap Salamander 2.5,
 // where we switched to CFilterCriteria and its Save/Load
-const char* OLD_FINDOPTIONSITEM_ARCHIVE_REG = "Archive";
-const char* OLD_FINDOPTIONSITEM_READONLY_REG = "ReadOnly";
-const char* OLD_FINDOPTIONSITEM_HIDDEN_REG = "Hidden";
-const char* OLD_FINDOPTIONSITEM_SYSTEM_REG = "System";
-const char* OLD_FINDOPTIONSITEM_COMPRESSED_REG = "Compressed";
-const char* OLD_FINDOPTIONSITEM_DIRECTORY_REG = "Directory";
-const char* OLD_FINDOPTIONSITEM_SIZEACTION_REG = "SizeAction";
-const char* OLD_FINDOPTIONSITEM_SIZELO_REG = "SizeLo";
-const char* OLD_FINDOPTIONSITEM_SIZEHI_REG = "SizeHi";
-const char* OLD_FINDOPTIONSITEM_DATEACTION_REG = "DateAction";
-const char* OLD_FINDOPTIONSITEM_DAY_REG = "Day";
-const char* OLD_FINDOPTIONSITEM_MONTH_REG = "Month";
-const char* OLD_FINDOPTIONSITEM_YEAR_REG = "Year";
-const char* OLD_FINDOPTIONSITEM_TIMEACTION_REG = "TimeAction";
-const char* OLD_FINDOPTIONSITEM_HOUR_REG = "Hour";
-const char* OLD_FINDOPTIONSITEM_MINUTE_REG = "Minute";
-const char* OLD_FINDOPTIONSITEM_SECOND_REG = "Second";
+const wchar_t* OLD_FINDOPTIONSITEM_ARCHIVE_REG = L"Archive";
+const wchar_t* OLD_FINDOPTIONSITEM_READONLY_REG = L"ReadOnly";
+const wchar_t* OLD_FINDOPTIONSITEM_HIDDEN_REG = L"Hidden";
+const wchar_t* OLD_FINDOPTIONSITEM_SYSTEM_REG = L"System";
+const wchar_t* OLD_FINDOPTIONSITEM_COMPRESSED_REG = L"Compressed";
+const wchar_t* OLD_FINDOPTIONSITEM_DIRECTORY_REG = L"Directory";
+const wchar_t* OLD_FINDOPTIONSITEM_SIZEACTION_REG = L"SizeAction";
+const wchar_t* OLD_FINDOPTIONSITEM_SIZELO_REG = L"SizeLo";
+const wchar_t* OLD_FINDOPTIONSITEM_SIZEHI_REG = L"SizeHi";
+const wchar_t* OLD_FINDOPTIONSITEM_DATEACTION_REG = L"DateAction";
+const wchar_t* OLD_FINDOPTIONSITEM_DAY_REG = L"Day";
+const wchar_t* OLD_FINDOPTIONSITEM_MONTH_REG = L"Month";
+const wchar_t* OLD_FINDOPTIONSITEM_YEAR_REG = L"Year";
+const wchar_t* OLD_FINDOPTIONSITEM_TIMEACTION_REG = L"TimeAction";
+const wchar_t* OLD_FINDOPTIONSITEM_HOUR_REG = L"Hour";
+const wchar_t* OLD_FINDOPTIONSITEM_MINUTE_REG = L"Minute";
+const wchar_t* OLD_FINDOPTIONSITEM_SECOND_REG = L"Second";
 
 static const UINT_PTR FILTER_DARK_SKIN_SUBCLASS_ID = 1;
 static const COLORREF FILTER_DARK_LINE = RGB(55, 55, 58);
@@ -255,7 +255,7 @@ static BOOL PaintFilterDarkStaticLine(HWND hwnd, HDC paintDC)
     return TRUE;
 }
 
-static BOOL GetFilterComboText(HWND hwnd, LPTSTR text, int textLen)
+static BOOL GetFilterComboText(HWND hwnd, LPWSTR text, int textLen)
 {
     if (text == NULL || textLen <= 0)
         return FALSE;
@@ -269,7 +269,7 @@ static BOOL GetFilterComboText(HWND hwnd, LPTSTR text, int textLen)
         return text[0] != 0;
     }
 
-    GetWindowText(hwnd, text, textLen);
+    GetWindowTextW(hwnd, text, textLen);
     text[textLen - 1] = 0;
     return text[0] != 0;
 }
@@ -307,12 +307,12 @@ static BOOL PaintFilterDarkCombo(HWND hwnd, HDC paintDC)
     if (hFont != NULL)
         hOldFont = (HFONT)SelectObject(hdc, hFont);
 
-    TCHAR text[256];
+    wchar_t text[256];
     GetFilterComboText(hwnd, text, _countof(text));
 
     int oldBkMode = SetBkMode(hdc, TRANSPARENT);
     COLORREF oldTextColor = SetTextColor(hdc, IsWindowEnabled(hwnd) ? colors.InputText : colors.DisabledText);
-    DrawText(hdc, text, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    DrawTextW(hdc, text, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     SetTextColor(hdc, oldTextColor);
     SetBkMode(hdc, oldBkMode);
     if (hOldFont != NULL)
@@ -376,7 +376,7 @@ static BOOL PaintFilterDarkUpDown(HWND hwnd, HDC paintDC)
     return TRUE;
 }
 
-static BOOL GetFilterDateTimeText(HWND hwnd, LPTSTR text, int textLen, BOOL* hasValue)
+static BOOL GetFilterDateTimeText(HWND hwnd, LPWSTR text, int textLen, BOOL* hasValue)
 {
     if (text == NULL || textLen <= 0)
         return FALSE;
@@ -396,9 +396,9 @@ static BOOL GetFilterDateTimeText(HWND hwnd, LPTSTR text, int textLen, BOOL* has
     LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
     BOOL ok;
     if ((style & DTS_UPDOWN) != 0)
-        ok = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, textLen) != 0;
+        ok = GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, text, textLen) != 0;
     else
-        ok = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, textLen) != 0;
+        ok = GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, textLen) != 0;
     if (!ok)
         text[0] = 0;
     text[textLen - 1] = 0;
@@ -446,14 +446,14 @@ static BOOL PaintFilterDarkDateTime(HWND hwnd, HDC paintDC)
         FilterFillRectSolid(hdc, &check, colors.InputBackground);
         FilterDrawRectOutline(hdc, &check, FILTER_DARK_FRAME);
 
-        TCHAR probe[8];
+        wchar_t probe[8];
         GetFilterDateTimeText(hwnd, probe, _countof(probe), &hasValue);
         if (hasValue)
             FilterDrawCheckMark(hdc, &check, IsWindowEnabled(hwnd) ? colors.InputText : colors.DisabledText);
         textRect.left = check.right + 4;
     }
 
-    TCHAR text[128];
+    wchar_t text[128];
     GetFilterDateTimeText(hwnd, text, _countof(text), &hasValue);
 
     HFONT hFont = (HFONT)SendMessage(hwnd, WM_GETFONT, 0, 0);
@@ -463,7 +463,7 @@ static BOOL PaintFilterDarkDateTime(HWND hwnd, HDC paintDC)
 
     int oldBkMode = SetBkMode(hdc, TRANSPARENT);
     COLORREF oldTextColor = SetTextColor(hdc, IsWindowEnabled(hwnd) ? colors.InputText : colors.DisabledText);
-    DrawText(hdc, text, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    DrawTextW(hdc, text, -1, &textRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
     SetTextColor(hdc, oldTextColor);
     SetBkMode(hdc, oldBkMode);
     if (hOldFont != NULL)
@@ -1189,53 +1189,51 @@ BOOL CFilterCriteria::Test(DWORD attributes, const CQuadWord* size, const FILETI
     return ok;
 }
 
-BOOL CFilterCriteria::GetAdvancedDescription(char* buffer, int maxLen, BOOL& dirty)
+std::wstring CFilterCriteria::GetAdvancedDescription(BOOL& dirty)
 {
-    char buff[300];
-
     int count = 1;
 
     PrepareForTest();
 
-    lstrcpy(buff, LoadStr(IDS_FFA_OPTIONS));
+    std::wstring description = LoadStrW(IDS_FFA_OPTIONS);
 
     if (AttributesMask != 0)
     {
-        lstrcat(buff, LoadStr(IDS_FFA_ATTRIBUTES));
-        lstrcat(buff, ": ");
+        description += LoadStrW(IDS_FFA_ATTRIBUTES);
+        description += L": ";
         if (AttributesMask & FILE_ATTRIBUTE_ARCHIVE)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_ARCHIVE ? "+A" : "-A");
+            description += AttributesValue & FILE_ATTRIBUTE_ARCHIVE ? L"+A" : L"-A";
         if (AttributesMask & FILE_ATTRIBUTE_READONLY)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_READONLY ? "+R" : "-R");
+            description += AttributesValue & FILE_ATTRIBUTE_READONLY ? L"+R" : L"-R";
         if (AttributesMask & FILE_ATTRIBUTE_HIDDEN)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_HIDDEN ? "+H" : "-H");
+            description += AttributesValue & FILE_ATTRIBUTE_HIDDEN ? L"+H" : L"-H";
         if (AttributesMask & FILE_ATTRIBUTE_SYSTEM)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_SYSTEM ? "+S" : "-S");
+            description += AttributesValue & FILE_ATTRIBUTE_SYSTEM ? L"+S" : L"-S";
         if (AttributesMask & FILE_ATTRIBUTE_COMPRESSED)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_COMPRESSED ? "+C" : "-C");
+            description += AttributesValue & FILE_ATTRIBUTE_COMPRESSED ? L"+C" : L"-C";
         if (AttributesMask & FILE_ATTRIBUTE_ENCRYPTED)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_ENCRYPTED ? "+E" : "-E");
+            description += AttributesValue & FILE_ATTRIBUTE_ENCRYPTED ? L"+E" : L"-E";
         if (AttributesMask & FILE_ATTRIBUTE_DIRECTORY)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_DIRECTORY ? "+D" : "-D");
+            description += AttributesValue & FILE_ATTRIBUTE_DIRECTORY ? L"+D" : L"-D";
         count++;
     }
 
     if (UseMinSize || UseMaxSize)
     {
         if (count > 1)
-            lstrcat(buff, ", ");
-        lstrcat(buff, LoadStr(IDS_FFA_SIZE));
+            description += L", ";
+        description += LoadStrW(IDS_FFA_SIZE);
         count++;
     }
 
     if (TimeMode != fctmIgnore)
     {
         if (count > 1)
-            lstrcat(buff, ", ");
+            description += L", ";
         if (TimeMode == fctmFromTo || DuringTimeUnits >= fctuDays)
-            lstrcat(buff, LoadStr(IDS_FFA_DATE));
+            description += LoadStrW(IDS_FFA_DATE);
         else
-            lstrcat(buff, LoadStr(IDS_FFA_TIME));
+            description += LoadStrW(IDS_FFA_TIME);
         count++;
     }
 
@@ -1243,17 +1241,16 @@ BOOL CFilterCriteria::GetAdvancedDescription(char* buffer, int maxLen, BOOL& dir
         (UseFromTime || UseToTime))
     {
         if (count > 1)
-            lstrcat(buff, ", ");
-        lstrcat(buff, LoadStr(IDS_FFA_TIME));
+            description += L", ";
+        description += LoadStrW(IDS_FFA_TIME);
         count++;
     }
 
     if (count == 1)
-        lstrcpy(buff, LoadStr(IDS_FFA_NONE));
+        description = LoadStrW(IDS_FFA_NONE);
 
-    lstrcpyn(buffer, buff, maxLen);
     dirty = count > 1;
-    return maxLen > lstrlen(buff) + 1;
+    return description;
 }
 
 BOOL CFilterCriteria::Save(HKEY hKey)
@@ -1264,61 +1261,61 @@ BOOL CFilterCriteria::Save(HKEY hKey)
 
     // Attributes
     if (AttributesMask != def.AttributesMask)
-        SetValue(hKey, FILTERCRITERIA_ATTRIBUTESMASK_REG, REG_DWORD, &AttributesMask, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_ATTRIBUTESMASK_REG, REG_DWORD, &AttributesMask, sizeof(DWORD));
     if (AttributesValue != def.AttributesValue)
-        SetValue(hKey, FILTERCRITERIA_ATTRIBUTESVALUE_REG, REG_DWORD, &AttributesValue, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_ATTRIBUTESVALUE_REG, REG_DWORD, &AttributesValue, sizeof(DWORD));
 
     // Size Min/Max
     if (UseMinSize != def.UseMinSize)
-        SetValue(hKey, FILTERCRITERIA_USEMINSIZE_REG, REG_DWORD, &UseMinSize, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USEMINSIZE_REG, REG_DWORD, &UseMinSize, sizeof(DWORD));
     if (MinSize != def.MinSize)
     {
-        SetValue(hKey, FILTERCRITERIA_MINSIZELO_REG, REG_DWORD, &MinSize.LoDWord, sizeof(DWORD));
-        SetValue(hKey, FILTERCRITERIA_MINSIZEHI_REG, REG_DWORD, &MinSize.HiDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MINSIZELO_REG, REG_DWORD, &MinSize.LoDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MINSIZEHI_REG, REG_DWORD, &MinSize.HiDWord, sizeof(DWORD));
     }
     if (MinSizeUnits != def.MinSizeUnits)
-        SetValue(hKey, FILTERCRITERIA_MINSIZEUNITS_REG, REG_DWORD, &MinSizeUnits, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MINSIZEUNITS_REG, REG_DWORD, &MinSizeUnits, sizeof(DWORD));
     if (UseMaxSize != def.UseMaxSize)
-        SetValue(hKey, FILTERCRITERIA_USEMAXSIZE_REG, REG_DWORD, &UseMaxSize, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USEMAXSIZE_REG, REG_DWORD, &UseMaxSize, sizeof(DWORD));
     if (MaxSize != def.MaxSize)
     {
-        SetValue(hKey, FILTERCRITERIA_MAXSIZELO_REG, REG_DWORD, &MaxSize.LoDWord, sizeof(DWORD));
-        SetValue(hKey, FILTERCRITERIA_MAXSIZEHI_REG, REG_DWORD, &MaxSize.HiDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MAXSIZELO_REG, REG_DWORD, &MaxSize.LoDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MAXSIZEHI_REG, REG_DWORD, &MaxSize.HiDWord, sizeof(DWORD));
     }
     if (MaxSizeUnits != def.MaxSizeUnits)
-        SetValue(hKey, FILTERCRITERIA_MAXSIZEUNITS_REG, REG_DWORD, &MaxSizeUnits, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_MAXSIZEUNITS_REG, REG_DWORD, &MaxSizeUnits, sizeof(DWORD));
 
     // Date & Time
     if (TimeMode != def.TimeMode)
-        SetValue(hKey, FILTERCRITERIA_TIMEMODE_REG, REG_DWORD, &TimeMode, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_TIMEMODE_REG, REG_DWORD, &TimeMode, sizeof(DWORD));
     if (DuringTime != def.DuringTime)
     {
-        SetValue(hKey, FILTERCRITERIA_DURINGTIMELO_REG, REG_DWORD, &DuringTime.LoDWord, sizeof(DWORD));
-        SetValue(hKey, FILTERCRITERIA_DURINGTIMEHI_REG, REG_DWORD, &DuringTime.HiDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_DURINGTIMELO_REG, REG_DWORD, &DuringTime.LoDWord, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_DURINGTIMEHI_REG, REG_DWORD, &DuringTime.HiDWord, sizeof(DWORD));
     }
     if (DuringTimeUnits != def.DuringTimeUnits)
-        SetValue(hKey, FILTERCRITERIA_DURINGUNITS_REG, REG_DWORD, &DuringTimeUnits, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_DURINGUNITS_REG, REG_DWORD, &DuringTimeUnits, sizeof(DWORD));
     if (UseFromDate != def.UseFromDate)
-        SetValue(hKey, FILTERCRITERIA_USEFROMDATE_REG, REG_DWORD, &UseFromDate, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USEFROMDATE_REG, REG_DWORD, &UseFromDate, sizeof(DWORD));
     if (UseFromTime != def.UseFromTime)
-        SetValue(hKey, FILTERCRITERIA_USEFROMTIME_REG, REG_DWORD, &UseFromTime, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USEFROMTIME_REG, REG_DWORD, &UseFromTime, sizeof(DWORD));
 
     // note: starting with 2.53 we'll "forget" the times in disabled FROM/TO controls (see TimeMode == fctmFromTo condition)
     // if users request a return to the old behavior, we could by default disable the checkboxes in the Date controls,
     // which would not meet the UseFromDate/UseToDate condition; we would enable the checkbox only when the user enables the control via radio buttons
     if (From != def.From && TimeMode == fctmFromTo && (UseFromDate || UseFromTime)) // there's no point in storing times when they are not used (controls would insert the current time)
     {
-        SetValue(hKey, FILTERCRITERIA_FROMLO_REG, REG_DWORD, &(((FILETIME*)&From)->dwLowDateTime), sizeof(DWORD));
-        SetValue(hKey, FILTERCRITERIA_FROMHI_REG, REG_DWORD, &(((FILETIME*)&From)->dwHighDateTime), sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_FROMLO_REG, REG_DWORD, &(((FILETIME*)&From)->dwLowDateTime), sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_FROMHI_REG, REG_DWORD, &(((FILETIME*)&From)->dwHighDateTime), sizeof(DWORD));
     }
     if (UseToDate != def.UseToDate)
-        SetValue(hKey, FILTERCRITERIA_USETODATE_REG, REG_DWORD, &UseToDate, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USETODATE_REG, REG_DWORD, &UseToDate, sizeof(DWORD));
     if (UseToTime != def.UseToTime)
-        SetValue(hKey, FILTERCRITERIA_USETOTIME_REG, REG_DWORD, &UseToTime, sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_USETOTIME_REG, REG_DWORD, &UseToTime, sizeof(DWORD));
     if (To != def.To && TimeMode == fctmFromTo && (UseToDate || UseToTime)) // there's no point in storing times when they are not used (controls would insert the current time)
     {
-        SetValue(hKey, FILTERCRITERIA_TOLO_REG, REG_DWORD, &(((FILETIME*)&To)->dwLowDateTime), sizeof(DWORD));
-        SetValue(hKey, FILTERCRITERIA_TOHI_REG, REG_DWORD, &(((FILETIME*)&To)->dwHighDateTime), sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_TOLO_REG, REG_DWORD, &(((FILETIME*)&To)->dwLowDateTime), sizeof(DWORD));
+        SetValueW(hKey, FILTERCRITERIA_TOHI_REG, REG_DWORD, &(((FILETIME*)&To)->dwHighDateTime), sizeof(DWORD));
     }
     return TRUE;
 }
@@ -1326,31 +1323,31 @@ BOOL CFilterCriteria::Save(HKEY hKey)
 BOOL CFilterCriteria::Load(HKEY hKey)
 {
     // Attributes
-    GetValue(hKey, FILTERCRITERIA_ATTRIBUTESMASK_REG, REG_DWORD, &AttributesMask, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_ATTRIBUTESVALUE_REG, REG_DWORD, &AttributesValue, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_ATTRIBUTESMASK_REG, REG_DWORD, &AttributesMask, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_ATTRIBUTESVALUE_REG, REG_DWORD, &AttributesValue, sizeof(DWORD));
 
     // Size Min/Max
-    GetValue(hKey, FILTERCRITERIA_USEMINSIZE_REG, REG_DWORD, &UseMinSize, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MINSIZELO_REG, REG_DWORD, &MinSize.LoDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MINSIZEHI_REG, REG_DWORD, &MinSize.HiDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MINSIZEUNITS_REG, REG_DWORD, &MinSizeUnits, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_USEMAXSIZE_REG, REG_DWORD, &UseMaxSize, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MAXSIZELO_REG, REG_DWORD, &MaxSize.LoDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MAXSIZEHI_REG, REG_DWORD, &MaxSize.HiDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_MAXSIZEUNITS_REG, REG_DWORD, &MaxSizeUnits, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USEMINSIZE_REG, REG_DWORD, &UseMinSize, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MINSIZELO_REG, REG_DWORD, &MinSize.LoDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MINSIZEHI_REG, REG_DWORD, &MinSize.HiDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MINSIZEUNITS_REG, REG_DWORD, &MinSizeUnits, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USEMAXSIZE_REG, REG_DWORD, &UseMaxSize, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MAXSIZELO_REG, REG_DWORD, &MaxSize.LoDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MAXSIZEHI_REG, REG_DWORD, &MaxSize.HiDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_MAXSIZEUNITS_REG, REG_DWORD, &MaxSizeUnits, sizeof(DWORD));
     // Date & Time
-    GetValue(hKey, FILTERCRITERIA_TIMEMODE_REG, REG_DWORD, &TimeMode, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_DURINGTIMELO_REG, REG_DWORD, &DuringTime.LoDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_DURINGTIMEHI_REG, REG_DWORD, &DuringTime.HiDWord, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_DURINGUNITS_REG, REG_DWORD, &DuringTimeUnits, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_USEFROMDATE_REG, REG_DWORD, &UseFromDate, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_USEFROMTIME_REG, REG_DWORD, &UseFromTime, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_FROMLO_REG, REG_DWORD, &(((FILETIME*)&From)->dwLowDateTime), sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_FROMHI_REG, REG_DWORD, &(((FILETIME*)&From)->dwHighDateTime), sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_USETODATE_REG, REG_DWORD, &UseToDate, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_USETOTIME_REG, REG_DWORD, &UseToTime, sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_TOLO_REG, REG_DWORD, &(((FILETIME*)&To)->dwLowDateTime), sizeof(DWORD));
-    GetValue(hKey, FILTERCRITERIA_TOHI_REG, REG_DWORD, &(((FILETIME*)&To)->dwHighDateTime), sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_TIMEMODE_REG, REG_DWORD, &TimeMode, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_DURINGTIMELO_REG, REG_DWORD, &DuringTime.LoDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_DURINGTIMEHI_REG, REG_DWORD, &DuringTime.HiDWord, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_DURINGUNITS_REG, REG_DWORD, &DuringTimeUnits, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USEFROMDATE_REG, REG_DWORD, &UseFromDate, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USEFROMTIME_REG, REG_DWORD, &UseFromTime, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_FROMLO_REG, REG_DWORD, &(((FILETIME*)&From)->dwLowDateTime), sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_FROMHI_REG, REG_DWORD, &(((FILETIME*)&From)->dwHighDateTime), sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USETODATE_REG, REG_DWORD, &UseToDate, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_USETOTIME_REG, REG_DWORD, &UseToTime, sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_TOLO_REG, REG_DWORD, &(((FILETIME*)&To)->dwLowDateTime), sizeof(DWORD));
+    GetValueW(hKey, FILTERCRITERIA_TOHI_REG, REG_DWORD, &(((FILETIME*)&To)->dwHighDateTime), sizeof(DWORD));
 
     NeedPrepare = TRUE;
 
@@ -1367,12 +1364,12 @@ BOOL CFilterCriteria::LoadOld(HKEY hKey)
     int compressed = 2;
     int directory = 2;
 
-    GetValue(hKey, OLD_FINDOPTIONSITEM_ARCHIVE_REG, REG_DWORD, &archive, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_READONLY_REG, REG_DWORD, &readOnly, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_HIDDEN_REG, REG_DWORD, &hidden, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_SYSTEM_REG, REG_DWORD, &system, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_COMPRESSED_REG, REG_DWORD, &compressed, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_DIRECTORY_REG, REG_DWORD, &directory, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_ARCHIVE_REG, REG_DWORD, &archive, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_READONLY_REG, REG_DWORD, &readOnly, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_HIDDEN_REG, REG_DWORD, &hidden, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_SYSTEM_REG, REG_DWORD, &system, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_COMPRESSED_REG, REG_DWORD, &compressed, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_DIRECTORY_REG, REG_DWORD, &directory, sizeof(DWORD));
 
     AttributesMask = 0;
     AttributesValue = 0;
@@ -1425,9 +1422,9 @@ BOOL CFilterCriteria::LoadOld(HKEY hKey)
 
     int sizeAction = 0;
     CQuadWord size = CQuadWord(0, 0);
-    GetValue(hKey, OLD_FINDOPTIONSITEM_SIZEACTION_REG, REG_DWORD, &sizeAction, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_SIZELO_REG, REG_DWORD, &size.LoDWord, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_SIZEHI_REG, REG_DWORD, &size.HiDWord, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_SIZEACTION_REG, REG_DWORD, &sizeAction, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_SIZELO_REG, REG_DWORD, &size.LoDWord, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_SIZEHI_REG, REG_DWORD, &size.HiDWord, sizeof(DWORD));
 
     switch (sizeAction) // size:
     {
@@ -1487,14 +1484,14 @@ BOOL CFilterCriteria::LoadOld(HKEY hKey)
     int hour;
     int minute;
     int second;
-    GetValue(hKey, OLD_FINDOPTIONSITEM_DATEACTION_REG, REG_DWORD, &dateAction, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_DAY_REG, REG_DWORD, &day, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_MONTH_REG, REG_DWORD, &month, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_YEAR_REG, REG_DWORD, &year, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_TIMEACTION_REG, REG_DWORD, &timeAction, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_HOUR_REG, REG_DWORD, &hour, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_MINUTE_REG, REG_DWORD, &minute, sizeof(DWORD));
-    GetValue(hKey, OLD_FINDOPTIONSITEM_SECOND_REG, REG_DWORD, &second, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_DATEACTION_REG, REG_DWORD, &dateAction, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_DAY_REG, REG_DWORD, &day, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_MONTH_REG, REG_DWORD, &month, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_YEAR_REG, REG_DWORD, &year, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_TIMEACTION_REG, REG_DWORD, &timeAction, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_HOUR_REG, REG_DWORD, &hour, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_MINUTE_REG, REG_DWORD, &minute, sizeof(DWORD));
+    GetValueW(hKey, OLD_FINDOPTIONSITEM_SECOND_REG, REG_DWORD, &second, sizeof(DWORD));
 
     SYSTEMTIME st;
     ZeroMemory(&st, sizeof(st));
@@ -1604,7 +1601,7 @@ BOOL QuadWordEditLineTransfer(CTransferInfo* ti, int ctrlID, CQuadWord& value)
 {
     BOOL ret = TRUE;
     HWND HWindow;
-    char buff[50];
+    wchar_t buff[50];
     if (ti->GetControl(HWindow, ctrlID))
     {
         switch (ti->Type)
@@ -1612,14 +1609,14 @@ BOOL QuadWordEditLineTransfer(CTransferInfo* ti, int ctrlID, CQuadWord& value)
         case ttDataToWindow:
         {
             SendMessage(HWindow, EM_LIMITTEXT, 21, 0);
-            SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)_ui64toa(value.Value, buff, 10));
+            SendMessage(HWindow, WM_SETTEXT, 0, (LPARAM)_ui64tow(value.Value, buff, 10));
             break;
         }
 
         case ttDataFromWindow:
         {
             SendMessage(HWindow, WM_GETTEXT, 22, (LPARAM)buff);
-            value.Value = StrToUInt64(buff, (int)strlen(buff));
+            value.Value = _wcstoui64(buff, NULL, 10);
             break;
         }
         }
@@ -1679,12 +1676,12 @@ void CFilterCriteriaDialog::FillUnits(int editID, int comboID, int* units, BOOL 
     HWND hCombo = GetDlgItem(HWindow, comboID);
 
     // extract the control value from the edit line
-    char buff[100];
-    char buff2[100];
-    SendMessage(hEdit, WM_GETTEXT, 22, (LPARAM)buff);
+    wchar_t buff[100];
+    wchar_t buff2[100];
+    SendMessageW(hEdit, WM_GETTEXT, 22, (LPARAM)buff);
     buff[21] = 0;
     CQuadWord editValue;
-    editValue.Value = StrToUInt64(buff, (int)strlen(buff));
+    editValue.Value = StrToUInt64W(buff, (int)wcslen(buff));
 
     BOOL dirty = FALSE; // if we keep it clean
     SendMessage(hCombo, WM_SETREDRAW, FALSE, 0);
@@ -1695,16 +1692,16 @@ void CFilterCriteriaDialog::FillUnits(int editID, int comboID, int* units, BOOL 
     int i;
     for (i = 0; units[i] != -1; i++)
     {
-        ExpandPluralString(buff, 100, LoadStr(units[i]), 1, &editValue);
+        ExpandPluralStringW(buff, 100, LoadStrW(units[i]), 1, &editValue);
 
         if (curSel >= 0 && !dirty && i == curSel)
         {
-            SendMessage(hCombo, CB_GETLBTEXT, i, (LPARAM)buff2);
-            if (strcmp(buff, buff2) != 0)
+            SendMessageW(hCombo, CB_GETLBTEXT, i, (LPARAM)buff2);
+            if (wcscmp(buff, buff2) != 0)
                 dirty = TRUE;
         }
 
-        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buff);
+        SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)buff);
     }
 
     for (i = 0; i < origCount; i++)
@@ -1714,7 +1711,7 @@ void CFilterCriteriaDialog::FillUnits(int editID, int comboID, int* units, BOOL 
     {
         int sizes[] = {IDS_SIZE_KB, IDS_SIZE_MB, IDS_SIZE_GB, IDS_SIZE_TB, IDS_SIZE_PB, IDS_SIZE_EB, 0};
         for (i = 0; sizes[i] != 0; i++)
-            SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(sizes[i]));
+            SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStrW(sizes[i]));
     }
 
     SendMessage(hCombo, CB_SETCURSEL, curSel, 0);

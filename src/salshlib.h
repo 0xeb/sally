@@ -4,6 +4,8 @@
 
 #pragma once
 
+struct CSalShExtSharedMem;
+
 // mutex for access to shared memory
 extern HANDLE SalShExtSharedMemMutex;
 // shared memory - see CSalShExtSharedMem structure
@@ -34,10 +36,30 @@ void InitSalShLib();
 // call to release the library
 void ReleaseSalShLib();
 
+// The caller holds SalShExtSharedMemMutex for all Locked functions. Payload mappings are exact
+// serialized UTF-16 records; only their fixed-width metadata enters the shared control block.
+BOOL SalShExtBeginDragRequestLocked(const std::wstring& fakeDirectory);
+BOOL SalShExtBeginPasteRequestLocked(const std::wstring& fakeDirectory,
+                                     const std::wstring& sameThreadMessage,
+                                     const std::wstring& busyMessage);
+void SalShExtEndRequestLocked(DWORD stateFlag);
+BOOL SalShExtReadResponseLocked(std::wstring& targetPath);
+BOOL SalShExtPublishLocalResponseLocked(const std::wstring& targetPath);
+void SalShExtCaptureResponse();
+
 // returns TRUE if the data object contains only a "fake" directory; in 'fakeType' (if not NULL) it returns
-// 1 if the source is an archive and 2 if the source is an FS; if the source is FS and 'srcFSPathBuf' is not NULL,
-// it returns the source FS path ('srcFSPathBufSize' is the size of the 'srcFSPathBuf' buffer)
-BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBuf, int srcFSPathBufSize);
+// 1 if the source is an archive and 2 if the source is an FS; if the source is FS and 'srcFSPath' is not NULL,
+// it returns the complete source FS path
+BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, std::wstring* srcFSPath);
+// Returns the path portion of SALCF_FAKE_REALPATH. The first payload wchar_t is
+// the item-kind marker ('D' directory or 'F' file), not part of the path.
+// 'formatPresent' (if not NULL) reports whether the data object carried the format AT ALL, which
+// is a different question from whether a usable path came out of it: Sally publishes the format
+// with an EMPTY path whenever the drag holds more than one item (shellsup.cpp). A caller must not
+// read a FALSE return as "not one of ours" and fall back to CF_HDROP - the HDROP of a fake object
+// names Sally's internal DROPFAKE temp directory, not the items being dragged.
+BOOL GetFakeDataObjectRealPath(IDataObject* pDataObject, std::wstring& realPath,
+                               wchar_t* itemKind = NULL, BOOL* formatPresent = NULL);
 
 //
 //*****************************************************************************
@@ -55,30 +77,30 @@ class CFakeDragDropDataObject : public IDataObject
 {
 private:
     long RefCount;
-    IDataObject* WinDataObject;   // wrapped data object
-    char RealPath[2 * MAX_PATH];  // path for drop into directory and command line
-    int SrcType;                  // source type (1=archive, 2=FS)
-    char SrcFSPath[2 * MAX_PATH]; // only for FS source: source FS path
-    UINT CFSalFakeRealPath;       // clipboard format for sal-fake-real-path
-    UINT CFSalFakeSrcType;        // clipboard format for sal-fake-src-type
-    UINT CFSalFakeSrcFSPath;      // clipboard format for sal-fake-src-fs-path
+    IDataObject* WinDataObject; // wrapped data object
+    std::wstring RealPath;      // path for drop into directory and command line
+    int SrcType;                // source type (1=archive, 2=FS)
+    std::wstring SrcFSPath;     // only for FS source: source FS path
+    UINT CFSalFakeRealPath;     // clipboard format for sal-fake-real-path
+    UINT CFSalFakeSrcType;      // clipboard format for sal-fake-src-type
+    UINT CFSalFakeSrcFSPath;    // clipboard format for sal-fake-src-fs-path
 
 public:
-    CFakeDragDropDataObject(IDataObject* winDataObject, const char* realPath, int srcType,
-                            const char* srcFSPath)
+    CFakeDragDropDataObject(IDataObject* winDataObject, const wchar_t* realPath, int srcType,
+                            const wchar_t* srcFSPath)
     {
         RefCount = 1;
         WinDataObject = winDataObject;
         WinDataObject->AddRef();
-        lstrcpyn(RealPath, realPath, 2 * MAX_PATH);
+        RealPath = realPath != NULL ? realPath : L"";
         if (srcFSPath != NULL && srcType == 2 /* FS */)
-            lstrcpyn(SrcFSPath, srcFSPath, 2 * MAX_PATH);
+            SrcFSPath = srcFSPath;
         else
-            SrcFSPath[0] = 0;
+            SrcFSPath.clear();
         SrcType = srcType;
-        CFSalFakeRealPath = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
-        CFSalFakeSrcType = RegisterClipboardFormat(SALCF_FAKE_SRCTYPE);
-        CFSalFakeSrcFSPath = RegisterClipboardFormat(SALCF_FAKE_SRCFSPATH);
+        CFSalFakeRealPath = RegisterClipboardFormatA(SALCF_FAKE_REALPATH);
+        CFSalFakeSrcType = RegisterClipboardFormatA(SALCF_FAKE_SRCTYPE);
+        CFSalFakeSrcFSPath = RegisterClipboardFormatA(SALCF_FAKE_SRCFSPATH);
     }
 
     virtual ~CFakeDragDropDataObject()
@@ -173,8 +195,8 @@ protected:
 
     BOOL Lock; // TRUE = locked against deletion, FALSE = not locked
 
-    char ArchiveFileName[MAX_PATH]; // full path to the archive
-    char PathInArchive[MAX_PATH];   // path inside the archive where Copy to clipboard occurred
+    std::wstring ArchiveFileNameW; // full path to the archive
+    std::wstring PathInArchive;    // path inside the archive where Copy to clipboard occurred
     CNames SelFilesAndDirs;         // names of files and directories from PathInArchive that will be unpacked
 
     CSalamanderDirectory* StoredArchiveDir;             // stored archive structure (used if the archive is not open in the panel)
@@ -194,7 +216,7 @@ public:
 
     // sets object data, returns TRUE on success; on failure leaves the object empty
     // and returns FALSE
-    BOOL SetData(const char* archiveFileName, const char* pathInArchive, CFilesArray* files,
+    BOOL SetData(const wchar_t* archiveFileName, const wchar_t* pathInArchive, CFilesArray* files,
                  CFilesArray* dirs, BOOL namesAreCaseSensitive, int* selIndexes,
                  int selIndexesCount);
 
@@ -205,12 +227,12 @@ public:
     void Clear();
 
     // performs paste operation with current data; 'copy' is TRUE when data should be copied,
-    // FALSE when data should be moved; 'tgtPath' is the target disk path of the operation
-    void DoPasteOperation(BOOL copy, const char* tgtPath);
+    // FALSE when data should be moved; 'tgtPath' is the UTF-16 target disk path of the operation.
+    void DoPasteOperation(BOOL copy, const wchar_t* tgtPath);
 
     // if the object can use the provided data, it keeps them and returns TRUE; otherwise returns
     // FALSE (the provided data will then be released)
-    BOOL WantData(const char* archiveFileName, CSalamanderDirectory* archiveDir,
+    BOOL WantData(const wchar_t* archiveFileName, CSalamanderDirectory* archiveDir,
                   CPluginDataInterfaceEncapsulation pluginData,
                   FILETIME archiveDate, CQuadWord archiveSize);
 
@@ -236,7 +258,7 @@ class CFakeCopyPasteDataObject : public IDataObject
 private:
     long RefCount;
     IDataObject* WinDataObject; // wrapped data object
-    char FakeDir[MAX_PATH];     // "fake" dir
+    std::wstring FakeDir;       // "fake" dir
     UINT CFSalFakeRealPath;     // clipboard format for sal-fake-real-path
     UINT CFIdList;              // clipboard format for shell id list (Explorer uses instead of simpler CF_HDROP)
 
@@ -244,13 +266,13 @@ private:
     BOOL CutOrCopyDone;        // FALSE = object is still being put on the clipboard, Release does nothing until CutOrCopyDone is TRUE
 
 public:
-    CFakeCopyPasteDataObject(IDataObject* winDataObject, const char* fakeDir)
+    CFakeCopyPasteDataObject(IDataObject* winDataObject, const wchar_t* fakeDir)
     {
         RefCount = 1;
         WinDataObject = winDataObject;
         WinDataObject->AddRef();
-        lstrcpyn(FakeDir, fakeDir, MAX_PATH);
-        CFSalFakeRealPath = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
+        FakeDir = fakeDir != NULL ? fakeDir : L"";
+        CFSalFakeRealPath = RegisterClipboardFormatA(SALCF_FAKE_REALPATH);
         CFIdList = RegisterClipboardFormat(CFSTR_SHELLIDLIST);
         LastGetDataCallTime = GetTickCount() - 60000; // initialize to 1 minute before object creation
         CutOrCopyDone = FALSE;

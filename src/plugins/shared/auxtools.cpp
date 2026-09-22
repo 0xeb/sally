@@ -364,12 +364,10 @@ CThreadQueue::StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned s
 // CThread
 //
 
-CThread::CThread(const char* name)
+CThread::CThread(const wchar_t* name)
 {
     if (name != NULL)
-        lstrcpyn(Name, name, 101);
-    else
-        Name[0] = 0;
+        Name = name;
     Thread = NULL;
 }
 
@@ -377,8 +375,8 @@ unsigned WINAPI
 CThread::UniversalBody(void* param)
 {
     CThread* thread = (CThread*)param;
-    CALL_STACK_MESSAGE2("CThread::UniversalBody(thread name = \"%s\")", thread->Name);
-    SalamanderDebug->SetThreadNameInVCAndTrace(thread->Name);
+    CALL_STACK_MESSAGE2("CThread::UniversalBody(thread name = \"%ls\")", thread->Name.c_str());
+    SalamanderDebug->SetThreadNameInVCAndTrace(thread->Name.c_str());
 
     unsigned ret = thread->Body(); // start of the thread body
 

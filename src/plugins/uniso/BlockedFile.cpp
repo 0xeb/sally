@@ -240,7 +240,7 @@ BOOL CBlockedFile::IsOK()
     return pBlocks ? TRUE : FALSE;
 }
 
-BOOL CBlockedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent)
+BOOL CBlockedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const wchar_t* fileName, HWND parent)
 {
     char* buf = (char*)lpBuffer;
 
@@ -273,7 +273,7 @@ BOOL CBlockedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead,
     return TRUE;
 }
 
-BOOL CBlockedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent)
+BOOL CBlockedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, const wchar_t* fileName, HWND parent)
 {
     // Not implemented
     return FALSE;
@@ -399,7 +399,7 @@ CBlockedFile::CCachedBlock* CBlockedFile::LoadBlock(UInt64 pos)
     return NULL;
 }
 
-BOOL CBlockedFile::Close(LPCTSTR fileName, HWND parent)
+BOOL CBlockedFile::Close(const wchar_t* fileName, HWND parent)
 {
     BOOL ret = TRUE;
 

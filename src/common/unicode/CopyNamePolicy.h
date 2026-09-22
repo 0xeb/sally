@@ -5,6 +5,7 @@
 
 #include <windows.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 #include <wchar.h>
@@ -54,25 +55,30 @@ inline std::wstring BuildCopyCandidateName(const std::wstring& originalName, con
     return candidate;
 }
 
-inline bool IsOccupiedPathW(const std::wstring& directoryWithBackslash, const std::wstring& fileName)
+using AttributeReader = std::function<DWORD(const wchar_t*)>;
+
+inline bool IsOccupiedPathW(const std::wstring& directoryWithBackslash,
+                            const std::wstring& fileName,
+                            const AttributeReader& getAttributes)
 {
     std::wstring fullPath = directoryWithBackslash;
     fullPath += fileName;
-    return GetFileAttributesW(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES;
+    return getAttributes(fullPath.c_str()) != INVALID_FILE_ATTRIBUTES;
 }
 
 inline bool TryGenerateUniqueCopyName(const std::wstring& directoryWithBackslash,
                                       const std::wstring& originalName,
                                       const std::wstring& copyToken,
                                       const std::vector<std::wstring>& reservedNames,
-                                      std::wstring& outName)
+                                      std::wstring& outName,
+                                      const AttributeReader& getAttributes)
 {
     if (directoryWithBackslash.empty() || originalName.empty() || copyToken.empty())
         return false;
     if (directoryWithBackslash.back() != L'\\' && directoryWithBackslash.back() != L'/')
         return false;
 
-    DWORD dirAttrs = GetFileAttributesW(directoryWithBackslash.c_str());
+    DWORD dirAttrs = getAttributes(directoryWithBackslash.c_str());
     if (dirAttrs == INVALID_FILE_ATTRIBUTES || (dirAttrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
         return false;
 
@@ -81,7 +87,7 @@ inline bool TryGenerateUniqueCopyName(const std::wstring& directoryWithBackslash
         std::wstring candidate = BuildCopyCandidateName(originalName, copyToken, copyIndex);
         if (ContainsNameIgnoreCase(reservedNames, candidate))
             continue;
-        if (!IsOccupiedPathW(directoryWithBackslash, candidate))
+        if (!IsOccupiedPathW(directoryWithBackslash, candidate, getAttributes))
         {
             outName = candidate;
             return true;

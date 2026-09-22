@@ -5,210 +5,77 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "common/text/WideCollation.h"
 
-//
-//*****************************************************************************
-
-// Since Windows XP, there is StrCmpLogicalW in the system, which Explorer uses for this comparison
-int StrCmpLogicalEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual, BOOL ignoreCase)
+// The collation core takes its switches as parameters; this is the
+// one place that reads them out of Configuration.
+static CWideCollationOptions CurrentCollationOptions()
 {
-    const char* strEnd1 = s1 + l1; // end of string 's1'
-    const char* beg1 = s1;         // beginning of segment (text or number)
-    const char* end1 = s1;         // end of segment (text or number)
-    const char* strEnd2 = s2 + l2; // end of string 's2'
-    const char* beg2 = s2;         // beginning of segment (text or number)
-    const char* end2 = s2;         // end of segment (text or number)
-    int suggestion = 0;            // "suggestion" for result (0 / -1 / 1 = nothing / s1<s2 / s1>s2) - e.g. "001" < "01"
-
-    BOOL findDots = WindowsVistaAndLater && !SystemPolicies.GetNoDotBreakInLogicalCompare(); // TRUE = names are split also by dots (not only by numbers)
-
-    while (1)
-    {
-        const char* numBeg1 = NULL; // position of first non-zero digit
-        BOOL isStr1 = (end1 >= strEnd1 || *end1 < '0' || *end1 > '9');
-        if (isStr1) // text (even empty) or dot
-        {
-            if (findDots && end1 < strEnd1 && *end1 == '.')
-                end1++; // dot: if we are looking for them, take one at a time
-            else        // text (even empty)
-            {
-                while (end1 < strEnd1 && (*end1 < '0' || *end1 > '9') && (!findDots || *end1 != '.'))
-                    end1++;
-            }
-        }
-        else // number
-        {
-            while (end1 < strEnd1 && *end1 >= '0' && *end1 <= '9')
-            {
-                if (numBeg1 == NULL && *end1 != '0')
-                    numBeg1 = end1;
-                end1++;
-            }
-        }
-        const char* numBeg2 = NULL; // position of first non-zero digit
-        BOOL isStr2 = (end2 >= strEnd2 || *end2 < '0' || *end2 > '9');
-        if (isStr2) // text (even empty) or dot
-        {
-            if (findDots && end2 < strEnd2 && *end2 == '.')
-                end2++; // dot: if we are looking for them, take one at a time
-            else        // text (even empty)
-            {
-                while (end2 < strEnd2 && (*end2 < '0' || *end2 > '9') && (!findDots || *end2 != '.'))
-                    end2++;
-            }
-        }
-        else // number
-        {
-            while (end2 < strEnd2 && *end2 >= '0' && *end2 <= '9')
-            {
-                if (numBeg2 == NULL && *end2 != '0')
-                    numBeg2 = end2;
-                end2++;
-            }
-        }
-
-        if (isStr1 || isStr2) // comparison of text, dots or combined pairs of text, dots or numbers (everything except two numbers is compared as strings)
-        {
-            int ret;
-            if (Configuration.SortUsesLocale)
-            {
-                ret = CompareString(LOCALE_USER_DEFAULT, ignoreCase ? NORM_IGNORECASE : 0,
-                                    beg1, (int)(end1 - beg1), beg2, (int)(end2 - beg2)) -
-                      CSTR_EQUAL;
-            }
-            else
-            {
-                if (ignoreCase)
-                    ret = StrICmpEx(beg1, (int)(end1 - beg1), beg2, (int)(end2 - beg2));
-                else
-                    ret = StrCmpEx(beg1, (int)(end1 - beg1), beg2, (int)(end2 - beg2));
-            }
-            if (ret != 0)
-            {
-                if (numericalyEqual != NULL)
-                    *numericalyEqual = FALSE;
-                return ret;
-            }
-        }
-        else // comparison of two numbers
-        {
-            if (numBeg1 == NULL)
-            {
-                if (numBeg2 == NULL) // both numbers are zero
-                {
-                    if (suggestion == 0) // we are only interested in the first "suggestion" for result
-                    {
-                        if (end1 - beg1 > end2 - beg2)
-                            suggestion = -1; // "000" < "00"
-                        else if (end1 - beg1 < end2 - beg2)
-                            suggestion = 1; // "00" > "000"
-                    }
-                }
-                else // first number is zero, second number is not zero
-                {
-                    if (numericalyEqual != NULL)
-                        *numericalyEqual = FALSE;
-                    return -1; // "00" < "1"
-                }
-            }
-            else
-            {
-                if (numBeg2 == NULL) // first number is not zero, second number is zero
-                {
-                    if (numericalyEqual != NULL)
-                        *numericalyEqual = FALSE;
-                    return 1; // "1" > "00"
-                }
-                else // both numbers are non-zero
-                {
-                    if (end1 - numBeg1 > end2 - numBeg2) // first number has more digits than second
-                    {
-                        if (numericalyEqual != NULL)
-                            *numericalyEqual = FALSE;
-                        return 1; // "100" > "99"
-                    }
-                    else
-                    {
-                        if (end1 - numBeg1 < end2 - numBeg2) // second number has more digits than first
-                        {
-                            if (numericalyEqual != NULL)
-                                *numericalyEqual = FALSE;
-                            return -1; // "99" < "100"
-                        }
-                        else // numbers have the same number of digits, compare them by value (equivalent to string comparison)
-                        {
-                            int ret = StrCmpEx(numBeg1, (int)(end1 - numBeg1), numBeg2, (int)(end2 - numBeg2));
-                            if (ret != 0) // values are not equal
-                            {
-                                if (numericalyEqual != NULL)
-                                    *numericalyEqual = FALSE;
-                                return ret;
-                            }
-                            else // number values are the same, if they differ in the number of zeros in prefix, adopt this into "suggestion" for result
-                            {
-                                if (suggestion == 0) // we are only interested in the first "suggestion" for result
-                                {
-                                    if (end1 - beg1 > end2 - beg2)
-                                        suggestion = -1; // "0001" < "001"
-                                    else if (end1 - beg1 < end2 - beg2)
-                                        suggestion = 1; // "001" > "0001"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if (end1 >= strEnd1 && end2 >= strEnd2)
-            break; // end of comparison
-        beg1 = end1;
-        beg2 = end2;
-    }
-
-    if (numericalyEqual != NULL)
-        *numericalyEqual = TRUE; // s1 and s2 are equal or numerically equal
-    return suggestion;           // on equality or numerical equality we return the "suggested" result
+    CWideCollationOptions o;
+    o.UsesLocale = Configuration.SortUsesLocale;
+    o.DetectNumbers = Configuration.SortDetectNumbers;
+    o.BreakOnDots = WindowsVistaAndLater && !SystemPolicies.GetNoDotBreakInLogicalCompare();
+    return o;
 }
 
 //
 //*****************************************************************************
 
-int RegSetStrICmp(const char* s1, const char* s2)
+// The narrow StrCmpLogicalEx/RegSetStrICmp/RegSetStrICmpEx/RegSetStrCmp/
+// RegSetStrCmpEx quintet that used to live here is gone - deleted, not widened. Confirmed
+// zero live callers anywhere in the tree (core or plugins): every real caller already goes
+// through the ...W twins below (RegSetStrICmpW/RegSetStrICmpExW/RegSetStrCmpW/RegSetStrCmpExW,
+// which call StrCmpLogicalExW in common/text/WideCollation.cpp/.h, a separate, more complete
+// implementation with its own collation-options parameter - not a width-retyped copy of the
+// function removed here). The freefn-width-scan flagged StrCmpLogicalEx's header declaration
+// (already wide, unlike its narrow definition) as a possible link-time-masked mismatch, but
+// tracing every caller found the narrow definition itself was orphaned, not lagging - the same
+// "deletion is cheaper than choosing a width for something nobody calls" call this codebase
+// already made for AddDoubleQuotesIfNeeded/DupStrEx at P1.7f. This section's only survivors
+// (RegSetStrICmpW and its Ex/RegSetStrCmpW/Ex siblings, and StrCmpLogicalExW itself) are
+// unchanged below.
+
+int RegSetStrICmpW(const wchar_t* s1, const wchar_t* s2)
 {
     if (Configuration.SortDetectNumbers)
     {
-        return StrCmpLogicalEx(s1, (int)strlen(s1), s2, (int)strlen(s2), NULL, TRUE);
+        return StrCmpLogicalExW(s1, (int)wcslen(s1), s2, (int)wcslen(s2), NULL, TRUE, CurrentCollationOptions());
     }
     else
     {
         if (Configuration.SortUsesLocale)
         {
-            return CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, s1, -1, s2, -1) - CSTR_EQUAL;
+            return CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, s1, -1, s2, -1) - CSTR_EQUAL;
         }
         else
         {
-            return StrICmp(s1, s2);
+            return WideICmpEx(s1, (int)wcslen(s1), s2, (int)wcslen(s2));
         }
     }
 }
 
-int RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual)
+// l1/l2 accept -1 = wcslen, so a caller that converted a narrow
+// string with ToWideArg(s, len) can pass the temporary without measuring it.
+int RegSetStrICmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual)
 {
+    if (l1 < 0)
+        l1 = s1 != NULL ? (int)wcslen(s1) : 0;
+    if (l2 < 0)
+        l2 = s2 != NULL ? (int)wcslen(s2) : 0;
     if (Configuration.SortDetectNumbers)
     {
-        return StrCmpLogicalEx(s1, l1, s2, l2, numericalyEqual, TRUE);
+        return StrCmpLogicalExW(s1, l1, s2, l2, numericalyEqual, TRUE, CurrentCollationOptions());
     }
     else
     {
         int ret;
         if (Configuration.SortUsesLocale)
         {
-            ret = CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, s1, l1, s2, l2) - CSTR_EQUAL;
+            ret = CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, s1, l1, s2, l2) - CSTR_EQUAL;
         }
         else
         {
-            ret = StrICmpEx(s1, l1, s2, l2);
+            ret = WideICmpEx(s1, l1, s2, l2);
         }
         if (numericalyEqual != NULL)
             *numericalyEqual = ret == 0;
@@ -216,41 +83,47 @@ int RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeri
     }
 }
 
-int RegSetStrCmp(const char* s1, const char* s2)
+int RegSetStrCmpW(const wchar_t* s1, const wchar_t* s2)
 {
     if (Configuration.SortDetectNumbers)
     {
-        return StrCmpLogicalEx(s1, (int)strlen(s1), s2, (int)strlen(s2), NULL, FALSE);
+        return StrCmpLogicalExW(s1, (int)wcslen(s1), s2, (int)wcslen(s2), NULL, FALSE, CurrentCollationOptions());
     }
     else
     {
         if (Configuration.SortUsesLocale)
         {
-            return CompareString(LOCALE_USER_DEFAULT, 0, s1, -1, s2, -1) - CSTR_EQUAL;
+            return CompareStringW(LOCALE_USER_DEFAULT, 0, s1, -1, s2, -1) - CSTR_EQUAL;
         }
         else
         {
-            return strcmp(s1, s2);
+            return WideCmpEx(s1, (int)wcslen(s1), s2, (int)wcslen(s2));
         }
     }
 }
 
-int RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual)
+// l1/l2 accept -1 = wcslen, so a caller that converted a narrow
+// string with ToWideArg(s, len) can pass the temporary without measuring it.
+int RegSetStrCmpExW(const wchar_t* s1, int l1, const wchar_t* s2, int l2, BOOL* numericalyEqual)
 {
+    if (l1 < 0)
+        l1 = s1 != NULL ? (int)wcslen(s1) : 0;
+    if (l2 < 0)
+        l2 = s2 != NULL ? (int)wcslen(s2) : 0;
     if (Configuration.SortDetectNumbers)
     {
-        return StrCmpLogicalEx(s1, l1, s2, l2, numericalyEqual, FALSE);
+        return StrCmpLogicalExW(s1, l1, s2, l2, numericalyEqual, FALSE, CurrentCollationOptions());
     }
     else
     {
         int ret;
         if (Configuration.SortUsesLocale)
         {
-            ret = CompareString(LOCALE_USER_DEFAULT, 0, s1, l1, s2, l2) - CSTR_EQUAL;
+            ret = CompareStringW(LOCALE_USER_DEFAULT, 0, s1, l1, s2, l2) - CSTR_EQUAL;
         }
         else
         {
-            ret = StrCmpEx(s1, l1, s2, l2);
+            ret = WideCmpEx(s1, l1, s2, l2);
         }
         if (numericalyEqual != NULL)
             *numericalyEqual = ret == 0;
@@ -258,8 +131,7 @@ int RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numeric
     }
 }
 
-//
-//*****************************************************************************
+
 // QuickSort   1.key Name, 2.key Ext
 //
 
@@ -281,11 +153,20 @@ int CmpNameExtIgnCase(const CFileData& f1, const CFileData& f2)
   else return res2;
 */
     //--- we compare the whole Name (including Ext), like Explorer
-    return RegSetStrICmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
+    return RegSetStrICmpExW(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
 }
 
 int CmpNameExt(const CFileData& f1, const CFileData& f2)
 {
+    // The comparison below is WIDE, and that is the point.
+    //
+    // Comparing CP_ACP mirrors made two files with different non-representable names
+    // compare EQUAL - both mirrors were the same run of '?'. The panel sort is a
+    // quicksort, so "equal" left their order to whatever partitioning did: the listing
+    // was nondeterministic and could differ between two reads of an unchanged directory.
+    // CFileData::Name is now wchar_t* and NameLen counts WCHARs, so the
+    // fallback below IS the wide comparison; the separate NameW branch that used to sit
+    // here computed the identical result and is gone.
     /*  // old variant: we compare name and extension separately
 //--- first by Name
   BOOL numericalyEqual1;
@@ -316,11 +197,11 @@ int CmpNameExt(const CFileData& f1, const CFileData& f2)
   else return res2;
 */
     //--- we compare the whole Name (including Ext), like Explorer
-    int res = RegSetStrICmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
+    int res = RegSetStrICmpExW(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
     if (res != 0 || f1.Name == f2.Name)
         return res; // if addresses are the same, they must be equal
                     //--- equal names (archives or FS) - try if they differ at least in letter case
-    return RegSetStrCmpEx(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
+    return RegSetStrCmpExW(f1.Name, f1.NameLen, f2.Name, f2.NameLen, NULL);
 }
 
 BOOL LessNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse)
@@ -411,14 +292,14 @@ BOOL LessExtName(const CFileData& f1, const CFileData& f2, BOOL reverse)
 {
     //--- first by Ext
     BOOL numericalyEqual1;
-    int res1 = RegSetStrICmpEx(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
+    int res1 = RegSetStrICmpExW(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
                                f2.Ext, f2.NameLen - (int)(f2.Ext - f2.Name),
                                &numericalyEqual1);
     if (!numericalyEqual1)
         return reverse ? res1 > 0 : res1 < 0; // extensions differ (are not equal nor numerically equal)
                                               //--- by Ext they are equal, Name decides
     BOOL numericalyEqual2;
-    int res2 = RegSetStrICmpEx(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
+    int res2 = RegSetStrICmpExW(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
                                f2.Name, (*f2.Ext != 0) ? (int)(f2.Ext - 1 - f2.Name) : f2.NameLen,
                                &numericalyEqual2);
     if (numericalyEqual2 && res1 != 0)
@@ -427,13 +308,13 @@ BOOL LessExtName(const CFileData& f1, const CFileData& f2, BOOL reverse)
     {
         if (res2 == 0 && f1.Name != f2.Name) // equal names (archives or FS) - try if they differ at least in letter case
         {
-            res1 = RegSetStrCmpEx(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
+            res1 = RegSetStrCmpExW(f1.Ext, f1.NameLen - (int)(f1.Ext - f1.Name),
                                   f2.Ext, f2.NameLen - (int)(f2.Ext - f2.Name),
                                   &numericalyEqual1);
             if (!numericalyEqual1)
                 return reverse ? res1 > 0 : res1 < 0; // extensions differ (are not equal nor numerically equal)
             //--- by Ext they are again equal, Name decides
-            res2 = RegSetStrCmpEx(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
+            res2 = RegSetStrCmpExW(f1.Name, (*f1.Ext != 0) ? (int)(f1.Ext - 1 - f1.Name) : f1.NameLen,
                                   f2.Name, (*f2.Ext != 0) ? (int)(f2.Ext - 1 - f2.Name) : f2.NameLen,
                                   &numericalyEqual2);
             if (numericalyEqual2 && res1 != 0)

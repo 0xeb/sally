@@ -10,6 +10,7 @@
 #include "Salamand.h"
 #include "SalamandConfiguration.h"
 #include "Salamander.rh"
+#include "plugin_narrow_compat.h"
 
 #include <Common.h>
 #include <Security.h>
@@ -22,6 +23,28 @@ const int ColumnNames[] =
 const int ColumnDescs[] =
     {SAL_RIGHTS_DESC, SAL_OWNER_DESC, SAL_GROUP_DESC, SAL_LINK_TO_DESC};
 #define PWDMNGR_SIGNATURE_ENCRYPTED '\x02'
+#define PWDMNGR_SIGNATURE_UTF8_ENCRYPTED '\x04'
+
+static bool WidePasswordToAnsi(const wchar_t* Value, AnsiString& Result)
+{
+    if (Value == NULL)
+        return false;
+    BOOL UsedDefault = FALSE;
+    const int Required = WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS,
+                                             Value, -1, NULL, 0, NULL,
+                                             &UsedDefault);
+    if (Required <= 0 || UsedDefault)
+        return false;
+    std::vector<char> Bytes(static_cast<size_t>(Required));
+    UsedDefault = FALSE;
+    if (WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, Value, -1,
+                            Bytes.data(), Required, NULL, &UsedDefault) != Required ||
+        UsedDefault)
+        return false;
+    Result = AnsiString(Bytes.data());
+    SecureZeroMemory(Bytes.data(), Bytes.size());
+    return true;
+}
 //---------------------------------------------------------------------------
 __fastcall TSalamandConfiguration::TSalamandConfiguration(
     CPluginInterface* APlugin) : TCustomWinConfiguration()
@@ -160,12 +183,19 @@ bool TSalamandConfiguration::IteratePanelColumns(int& Column, bool& Show,
 //---------------------------------------------------------------------------
 AnsiString __fastcall TSalamandConfiguration::ModuleFileName()
 {
-    CPathBuffer FileName;
-    if (GetModuleFileName(FPlugin->GetDLLInstance(), FileName, FileName.Size()) == 0)
+    std::wstring FileName;
+    if (!SPLGetModuleFileNameOwned(FPlugin->GetDLLInstance(), FileName))
     {
         assert(false);
+        return AnsiString();
     }
-    return AnsiString(FileName);
+    std::string EncodedFileName;
+    if (!WideToLegacyTextExact(FileName.c_str(), EncodedFileName))
+    {
+        assert(false);
+        return AnsiString();
+    }
+    return AnsiString(EncodedFileName.c_str());
 }
 //---------------------------------------------------------------------------
 int __fastcall TSalamandConfiguration::GetColumnWidth(int Index, int Group)
@@ -233,17 +263,17 @@ AnsiString __fastcall TSalamandConfiguration::StronglyRecryptPassword(AnsiString
         {
             BYTE* Encrypted;
             int EncryptedSize;
-            if (!PasswordManager->EncryptPassword(Password.c_str(), &Encrypted, &EncryptedSize, TRUE))
+            if (!PasswordManager->EncryptPassword(ToWideArg(Password.c_str()).c_str(),
+                                                  &Encrypted, &EncryptedSize, TRUE))
             {
                 assert(false);
                 Abort();
             }
             Result = AnsiString(reinterpret_cast<char*>(Encrypted), EncryptedSize);
             assert(Result.Length() > 1);
-            assert(Result[1] == PWDMNGR_SIGNATURE_ENCRYPTED);
-            Result.Delete(1, 1);
+            assert(Result[1] == PWDMNGR_SIGNATURE_UTF8_ENCRYPTED);
             FPlugin->GetSalamanderGeneral()->Free(Encrypted);
-            Result = SetExternalEncryptedPassword(Result);
+            Result = SetExternalEncryptedPassword(Result, true);
         }
     }
     return Result;
@@ -252,7 +282,9 @@ AnsiString __fastcall TSalamandConfiguration::StronglyRecryptPassword(AnsiString
 AnsiString __fastcall TSalamandConfiguration::DecryptPassword(AnsiString Password, AnsiString Key)
 {
     AnsiString Result;
-    if (GetExternalEncryptedPassword(Password, Result))
+    bool HasPasswordManagerSignature = false;
+    if (GetExternalEncryptedPassword(Password, Result,
+                                     &HasPasswordManagerSignature))
     {
         CSalamanderPasswordManagerAbstract* PasswordManager = FPlugin->GetSalamanderGeneral()->GetSalamanderPasswordManager();
         bool HaveMasterPassword = true;
@@ -267,10 +299,12 @@ AnsiString __fastcall TSalamandConfiguration::DecryptPassword(AnsiString Passwor
                 HaveMasterPassword = false;
             }
         }
-        Result.Insert(PWDMNGR_SIGNATURE_ENCRYPTED, 1);
-        char* Decrypted;
+        if (!HasPasswordManagerSignature)
+            Result.Insert(PWDMNGR_SIGNATURE_ENCRYPTED, 1);
+        CSalamanderStringBufferOwner Decrypted;
         if (!PasswordManager->DecryptPassword(
-                reinterpret_cast<unsigned char*>(Result.c_str()), Result.Length(), &Decrypted))
+                reinterpret_cast<unsigned char*>(Result.c_str()), Result.Length(),
+                Decrypted.Buffer()))
         {
             if (HaveMasterPassword)
             {
@@ -281,8 +315,10 @@ AnsiString __fastcall TSalamandConfiguration::DecryptPassword(AnsiString Passwor
                 Abort();
             }
         }
-        Result = reinterpret_cast<char*>(Decrypted);
-        FPlugin->GetSalamanderGeneral()->Free(Decrypted);
+        if (!WidePasswordToAnsi(Decrypted.Buffer()->Data, Result))
+            throw Exception(LoadStr(DECRYPT_PASSWORD_ERROR));
+        SecureZeroMemory(Decrypted.Buffer()->Data,
+                         Decrypted.Buffer()->Capacity * sizeof(wchar_t));
     }
     else
     {

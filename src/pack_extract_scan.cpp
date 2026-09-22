@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -16,6 +16,8 @@
 #include "common/PackerCommandLinePolicy.h"
 #include "common/widepath.h"
 #include "common/unicode/helpers.h"
+#include "common/Win32TextCodec.h"
+#include "common/fsutil.h"
 
 //
 // ****************************************************************************
@@ -26,15 +28,38 @@
 // Pointer to the error handling function
 BOOL (*PackErrorHandlerPtr)(HWND parent, const WORD errNum, ...) = EmptyErrorHandler;
 
-const char* SPAWN_EXE_NAME = "salspawn.exe";
-const char* SPAWN_EXE_PARAMS = "-c10000";
+const wchar_t* SPAWN_EXE_NAME = L"salspawn.exe";
+const wchar_t* SPAWN_EXE_PARAMS = L"-c10000";
 
 // Path to the salspawn program
-char SpawnExe[MAX_PATH * 2] = {0};
+std::wstring SpawnExe;
 BOOL SpawnExeInitialised = FALSE;
 
 // so that the date error is reported only once
 BOOL FirstError;
+
+// PackErrorHandler's varargs transport is byte-based. UTF-8 is the explicit internal
+// encoding so Unicode paths and localized diagnostics survive the trip to the UI sink.
+static std::string PackErrorPresentation(const wchar_t* text)
+{
+    const wchar_t* value = text != NULL ? text : L"";
+    std::string utf8;
+    if (!Win32EncodeText(CP_UTF8, value, wcslen(value), utf8))
+        return "Unable to encode packer diagnostic.";
+    return utf8;
+}
+
+static std::string PackApiErrorPresentation(const char* api, DWORD error)
+{
+    const std::wstring errorText = GetErrorTextOwned(error);
+    return std::string(api != NULL ? api : "") + PackErrorPresentation(errorText.c_str());
+}
+
+static std::string FormatPackNumericError(int resourceId, DWORD value)
+{
+    const std::wstring formatted = FormatStrW(LoadStrOwned(resourceId).c_str(), value);
+    return PackErrorPresentation(formatted.c_str());
+}
 
 // Table of archive definitions and handling - non-modifying operations
 // !!! WARNING: when changing the order of external archivers you must also change
@@ -44,87 +69,87 @@ const SPackBrowseTable PackBrowseTable[] =
         // JAR 1.02 Win32
         {
             (TPackErrorTable*)&JARErrors, TRUE,
-            "$(ArchivePath)", "$(Jar32bitExecutable) v -ju- \"$(ArchiveFileName)\"",
+            L"$(ArchivePath)", L"$(Jar32bitExecutable) v -ju- \"$(ArchiveFileName)\"",
             NULL, "Analyzing", 4, 0, 3, "Total files listed:", ' ', 2, 3, 9, 8, 4, 1, 2,
-            "$(TargetPath)", "$(Jar32bitExecutable) x -r- -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"",
-            "$(TargetPath)", "$(Jar32bitExecutable) e -r- \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
+            L"$(TargetPath)", L"$(Jar32bitExecutable) x -r- -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"",
+            L"$(TargetPath)", L"$(Jar32bitExecutable) e -r- \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
         // RAR 4.20 & 5.0 Win x86/x64
         {
             (TPackErrorTable*)&RARErrors, TRUE,
-            "$(ArchivePath)", "$(Rar32bitExecutable) v -c- \"$(ArchiveFileName)\"",
+            L"$(ArchivePath)", L"$(Rar32bitExecutable) v -c- \"$(ArchiveFileName)\"",
             NULL, "--------", 0, 0, 2, "--------", ' ', 1, 2, 6, 5, 7, 3, 2,                              // after RAR 5.0 we patch the indices at runtime; see variable 'RAR5AndLater'
-            "$(TargetPath)", "$(Rar32bitExecutable) x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", // since version 5.0 we must enforce the -scol switch; version 4.20 is fine; appears elsewhere and in the registry
-            "$(TargetPath)", "$(Rar32bitExecutable) e \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
+            L"$(TargetPath)", L"$(Rar32bitExecutable) x -scol \"$(ArchiveFullName)\" @\"$(ListFullName)\"", // since version 5.0 we must enforce the -scol switch; version 4.20 is fine; appears elsewhere and in the registry
+            L"$(TargetPath)", L"$(Rar32bitExecutable) e \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
         // ARJ 2.60 MS-DOS
         {
             (TPackErrorTable*)&ARJErrors, FALSE,
-            ".", "$(Arj16bitExecutable) v -ja1 $(ArchiveDOSFullName)",
+            L".", L"$(Arj16bitExecutable) v -ja1 $(ArchiveDOSFullName)",
             NULL, "--------", 0, 0, 2, "--------", ' ', 2, 5, 9, -8, 11, 1, 2,
-            ".", "$(Arj16bitExecutable) x -p -va -hl -jyc $(ArchiveDOSFullName) $(TargetDOSPath)\\ !$(ListDOSFullName)",
-            "$(TargetPath)", "$(Arj16bitExecutable) e -p -va -hl $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
+            L".", L"$(Arj16bitExecutable) x -p -va -hl -jyc $(ArchiveDOSFullName) $(TargetDOSPath)\\ !$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Arj16bitExecutable) e -p -va -hl $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
         // LHA 2.55 MS-DOS
         {
             (TPackErrorTable*)&LHAErrors, FALSE,
-            ".", "$(Lha16bitExecutable) v $(ArchiveDOSFullName)",
+            L".", L"$(Lha16bitExecutable) v $(ArchiveDOSFullName)",
             NULL, "--------------", 0, 0, 2, "--------------", ' ', 1, 2, 6, 5, 7, 1, 2,
-            ".", "$(Lha16bitExecutable) x -p -a -l1 -x1 -c $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
-            "$(TargetPath)", "$(Lha16bitExecutable) e -p -a -l1 -c $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
+            L".", L"$(Lha16bitExecutable) x -p -a -l1 -x1 -c $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Lha16bitExecutable) e -p -a -l1 -c $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
         // UC2 2r3 PRO MS-DOS
         {
             (TPackErrorTable*)&UC2Errors, FALSE,
-            ".", "$(UC216bitExecutable) ~D $(ArchiveDOSFullName)",
+            L".", L"$(UC216bitExecutable) ~D $(ArchiveDOSFullName)",
             PackUC2List, "", 0, 0, 0, "", ' ', 0, 0, 0, 0, 0, 0, 0,
-            ".", "$(UC216bitExecutable) EF $(ArchiveDOSFullName) ##$(TargetDOSPath) @$(ListDOSFullName)",
-            "$(TargetPath)", "$(UC216bitExecutable) E $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
+            L".", L"$(UC216bitExecutable) EF $(ArchiveDOSFullName) ##$(TargetDOSPath) @$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(UC216bitExecutable) E $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
         // JAR 1.02 MS-DOS
         {
             (TPackErrorTable*)&JARErrors, FALSE,
-            ".", "$(Jar16bitExecutable) v -ju- $(ArchiveDOSFullName)",
+            L".", L"$(Jar16bitExecutable) v -ju- $(ArchiveDOSFullName)",
             NULL, "Analyzing", 4, 0, 3, "Total files listed:", ' ', 2, 3, 9, 8, 4, 1, 2,
-            ".", "$(Jar16bitExecutable) x -r- -jyc $(ArchiveDOSFullName) -o$(TargetDOSPath) !$(ListDOSFullName)",
-            "$(TargetPath)", "$(Jar16bitExecutable) e -r- $(ArchiveDOSFullName) \"$(ExtractFullName)\"", FALSE},
+            L".", L"$(Jar16bitExecutable) x -r- -jyc $(ArchiveDOSFullName) -o$(TargetDOSPath) !$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Jar16bitExecutable) e -r- $(ArchiveDOSFullName) \"$(ExtractFullName)\"", FALSE},
         // RAR 2.05 MS-DOS
         {
             (TPackErrorTable*)&RARErrors, FALSE,
-            ".", "$(Rar16bitExecutable) v -c- $(ArchiveDOSFullName)",
+            L".", L"$(Rar16bitExecutable) v -c- $(ArchiveDOSFullName)",
             NULL, "--------", 0, 0, 2, "--------", ' ', 1, 2, 6, 5, 7, 3, 1,
-            ".", "$(Rar16bitExecutable) x $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
-            "$(TargetPath)", "$(Rar16bitExecutable) e $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
+            L".", L"$(Rar16bitExecutable) x $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Rar16bitExecutable) e $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
         // PKZIP 2.50 Win32
         {
             NULL, TRUE,
-            "$(ArchivePath)", "$(Zip32bitExecutable) -com=none -nozipextension \"$(ArchiveFileName)\"",
+            L"$(ArchivePath)", L"$(Zip32bitExecutable) -com=none -nozipextension \"$(ArchiveFileName)\"",
             NULL, "  ------  ------    -----", 0, 0, 1, "  ------           ------", ' ', 9, 1, 6, 5, 8, 3, 1,
-            "$(TargetPath)", "$(Zip32bitExecutable) -ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"",
-            "$(TargetPath)", "$(Zip32bitExecutable) -ext -nozipextension \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", TRUE},
+            L"$(TargetPath)", L"$(Zip32bitExecutable) -ext -nozipextension -directories -path \"$(ArchiveFullName)\" @\"$(ListFullName)\"",
+            L"$(TargetPath)", L"$(Zip32bitExecutable) -ext -nozipextension \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", TRUE},
         // PKUNZIP 2.04g MS-DOS
         {
             (TPackErrorTable*)&UNZIP204Errors, FALSE,
-            ".", "$(Unzip16bitExecutable) -v $(ArchiveDOSFullName)",
+            L".", L"$(Unzip16bitExecutable) -v $(ArchiveDOSFullName)",
             NULL, " ------  ------   -----", 0, 0, 1, " ------          ------", ' ', 9, 1, 6, 5, 8, 3, 1,
-            ".", "$(Unzip16bitExecutable) -d $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
-            "$(TargetPath)", "$(Unzip16bitExecutable) $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
+            L".", L"$(Unzip16bitExecutable) -d $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Unzip16bitExecutable) $(ArchiveDOSFullName) $(ExtractFullName)", FALSE},
         // ARJ 3.00c Win32
         {
             (TPackErrorTable*)&ARJErrors, TRUE,
-            "$(ArchivePath)", "$(Arj32bitExecutable) v -ja1 \"$(ArchiveFileName)\"",
+            L"$(ArchivePath)", L"$(Arj32bitExecutable) v -ja1 \"$(ArchiveFileName)\"",
             NULL, "--------", 0, 0, 0, "--------", ' ', 2, 5, 9, 8, 11, 1, 2,
-            "$(TargetPath)", "$(Arj32bitExecutable) x -p -va -hl -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"",
-            "$(TargetPath)", "$(Arj32bitExecutable) e -p -va -hl \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
+            L"$(TargetPath)", L"$(Arj32bitExecutable) x -p -va -hl -jyc \"$(ArchiveFullName)\" !\"$(ListFullName)\"",
+            L"$(TargetPath)", L"$(Arj32bitExecutable) e -p -va -hl \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", FALSE},
         // ACE 1.2b Win32
         {
             (TPackErrorTable*)&ACEErrors, TRUE,
-            "$(ArchivePath)", "$(Ace32bitExecutable) v \"$(ArchiveFileName)\"",
+            L"$(ArchivePath)", L"$(Ace32bitExecutable) v \"$(ArchiveFileName)\"",
             NULL, "Date    ", 0, 1, 1, "        ", 0xB3, 6, 4, 2, 1, 0, 3, 2,
-            "$(TargetPath)", "$(Ace32bitExecutable) x -f \"$(ArchiveFullName)\" @\"$(ListFullName)\"",
-            "$(TargetPath)", "$(Ace32bitExecutable) e -f \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", TRUE},
+            L"$(TargetPath)", L"$(Ace32bitExecutable) x -f \"$(ArchiveFullName)\" @\"$(ListFullName)\"",
+            L"$(TargetPath)", L"$(Ace32bitExecutable) e -f \"$(ArchiveFullName)\" \"$(ExtractFullName)\"", TRUE},
         // ACE 1.2b MS-DOS
         {
             (TPackErrorTable*)&ACEErrors, FALSE,
-            ".", "$(Ace16bitExecutable) v $(ArchiveDOSFullName)",
+            L".", L"$(Ace16bitExecutable) v $(ArchiveDOSFullName)",
             NULL, "Date    ", 0, 1, 1, "        ", 0xB3, 6, 4, 2, 1, 0, 3, 2,
-            ".", "$(Ace16bitExecutable) x -f $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
-            "$(TargetPath)", "$(Ace16bitExecutable) e -f $(ArchiveDOSFullName) $(ExtractFullName)", FALSE}};
+            L".", L"$(Ace16bitExecutable) x -f $(ArchiveDOSFullName) $(TargetDOSPath)\\ @$(ListDOSFullName)",
+            L"$(TargetPath)", L"$(Ace16bitExecutable) e -f $(ArchiveDOSFullName) $(ExtractFullName)", FALSE}};
 
 //
 // ****************************************************************************
@@ -219,9 +244,9 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
     CFileData newfile;
     int idx;
 
-    // buffer for the file name
-    CPathBuffer filename; // Heap-allocated for long path support
-    char* tmpfname = filename;
+    // The redirected listing is an OEM byte protocol. Parse separators and fields as
+    // bytes, then decode the finished path/name spans exactly once below.
+    std::string filename;
 
     // locate the name in the line
     char* tmpbuf = PackGetField(buffer, configTable->NameIdx,
@@ -241,21 +266,26 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
         if (*tmpbuf == '/')
         {
             tmpbuf++;
-            *tmpfname++ = '\\';
+            filename.push_back('\\');
         }
         else
-            *tmpfname++ = *tmpbuf++;
+            filename.push_back(*tmpbuf++);
     }
 
     // remove any trailing separators from the name
-    while (*(tmpfname - 1) == ' ' || *(tmpfname - 1) == '\t' ||
-           *(tmpfname - 1) == configTable->Separator)
-        tmpfname--;
+    while (!filename.empty() &&
+           (filename.back() == ' ' || filename.back() == '\t' ||
+            filename.back() == configTable->Separator))
+    {
+        filename.pop_back();
+    }
+    if (filename.empty())
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_ARCCFG);
 
     // if the processed object is not a directory according to the trailing slash,
     // find the attributes in the line and if any of them is D or d,
     // it is also a directory so append a backslash at the end
-    if (*(tmpfname - 1) != '\\')
+    if (filename.back() != '\\')
     {
         idx = configTable->AttrIdx;
         if (ARJHack)
@@ -269,54 +299,46 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
                    *tmpbuf != ' ' && *tmpbuf != 'D' && *tmpbuf != 'd')
                 tmpbuf++;
             if (*tmpbuf == 'D' || *tmpbuf == 'd')
-                *tmpfname++ = '\\';
+                filename.push_back('\\');
         }
     }
-    // terminate and prepare a pointer to the last non-backslash character
-    *tmpfname-- = '\0';
-    if (*tmpfname == '\\')
-        tmpfname--;
+    const bool isDir = filename.back() == '\\';
+    const std::size_t nameEnd = filename.length() - (isDir ? 1 : 0);
+    if (nameEnd == 0)
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_ARCCFG);
 
-    char* pomptr = tmpfname; // points to the end of the name
-    // separate it from the path
-    while (pomptr > filename && *pomptr != '\\')
-        pomptr--;
+    const std::size_t separator = filename.rfind('\\', nameEnd - 1);
+    const std::size_t nameBegin = separator == std::string::npos ? 0 : separator + 1;
 
-    char* pomptr2;
-    if (*pomptr == '\\')
+    std::wstring name;
+    if (!sally::pack::DecodeOemListingText(filename.data() + nameBegin,
+                                           nameEnd - nameBegin, name) ||
+        name.empty() || name.length() > 511)
     {
-        // there is both a name and a path
-        *pomptr++ = '\0';
-        pomptr2 = filename;
-    }
-    else
-    {
-        // only the name is present
-        pomptr2 = NULL;
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_ARCCFG);
     }
 
-    // pomptr now holds the name of the added directory or file
-    // and pomptr2 possibly holds the path to it
-    newfile.NameLen = tmpfname - pomptr + 1;
+    std::wstring path;
+    const wchar_t* parentPath = NULL;
+    if (separator != std::string::npos)
+    {
+        if (!sally::pack::DecodeOemListingText(filename.data(), separator, path))
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_ARCCFG);
+        parentPath = path.c_str();
+    }
 
-    // set the name of the new file or directory
-    newfile.Name = (char*)malloc(newfile.NameLen + 1);
+    // CFileData owns this allocation after AddFile/AddDir succeeds.
+    newfile.NameLen = static_cast<unsigned>(name.length());
+    newfile.Name = (wchar_t*)malloc((newfile.NameLen + 1) * sizeof(wchar_t));
     if (!newfile.Name)
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_NOMEM);
-    OemToCharBuff(pomptr, newfile.Name, newfile.NameLen); // copy with conversion from OEM to ANSI
-    newfile.Name[newfile.NameLen] = '\0';
-
-    // convert the path from OEM to ANSI as well
-    if (pomptr2 != NULL)
-        OemToChar(pomptr2, pomptr2);
+    wmemcpy(newfile.Name, name.c_str(), newfile.NameLen + 1);
 
     // set the extension
-    char* s = tmpfname - 1;
-    while (s >= pomptr && *s != '.')
-        s--;
-    if (s >= pomptr)
-        //  if (s > pomptr)  // ".cvspass" is an extension in Windows...
-        newfile.Ext = newfile.Name + (s - pomptr) + 1;
+    newfile.Ext = wcsrchr(newfile.Name, L'.');
+    if (newfile.Ext != NULL)
+        //  if (newfile.Ext != newfile.Name)  // ".cvspass" is an extension in Windows...
+        newfile.Ext++;
     else
         newfile.Ext = newfile.Name + newfile.NameLen;
 
@@ -440,11 +462,9 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
         DWORD ret = GetLastError();
         if (ret != ERROR_INVALID_PARAMETER && ret != ERROR_SUCCESS)
         {
-            char buff[1000];
-            strcpy(buff, "SystemTimeToFileTime: ");
-            strcat(buff, GetErrorText(ret));
+            const std::string message = PackApiErrorPresentation("SystemTimeToFileTime: ", ret);
             free(newfile.Name);
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buff);
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
         }
         if (FirstError)
         {
@@ -466,11 +486,9 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
     }
     if (!LocalFileTimeToFileTime(&lt, &newfile.LastWrite))
     {
-        char buff[1000];
-        strcpy(buff, "LocalFileTimeToFileTime: ");
-        strcat(buff, GetErrorText(GetLastError()));
+        const std::string message = PackApiErrorPresentation("LocalFileTimeToFileTime: ", GetLastError());
         free(newfile.Name);
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buff);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     // now read the file size
@@ -540,12 +558,12 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
     newfile.PluginData = -1; // -1 just for now, ignored
 
     // and add either a new file or a directory
-    if (*(tmpfname + 1) != '\\')
+    if (!isDir)
     {
         newfile.IsLink = IsFileLink(newfile.Ext);
 
         // it is a file, add a file
-        if (!dir.AddFile(pomptr2, newfile, NULL))
+        if (!dir.AddFile(parentPath, newfile, NULL))
         {
             free(newfile.Name);
             return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_FDATA);
@@ -558,7 +576,7 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
         newfile.IsLink = 0;
         if (!Configuration.SortDirsByExt)
             newfile.Ext = newfile.Name + newfile.NameLen; // directories have no extension
-        if (!dir.AddDir(pomptr2, newfile, NULL))
+        if (!dir.AddDir(parentPath, newfile, NULL))
         {
             free(newfile.Name);
             return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_FDATA);
@@ -569,7 +587,7 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
 
 //
 // ****************************************************************************
-// BOOL PackList(CFilesWindow *panel, const char *archiveFileName, CSalamanderDirectory &dir,
+// BOOL PackList(CFilesWindow *panel, const wchar_t *archiveFileName, CSalamanderDirectory &dir,
 //               CPluginDataInterfaceAbstract *&pluginData, CPluginData *&plugin)
 //
 //   Function to obtain the contents of an archive.
@@ -582,10 +600,10 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
 //        pluginData is the interface to column data defined by the archiver plug-in
 //        plugin is the plug-in record that performed ListArchive
 
-BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
+BOOL PackList(CFilesWindow* panel, const wchar_t* archiveFileName, CSalamanderDirectory& dir,
               CPluginDataInterfaceAbstract*& pluginData, CPluginData*& plugin)
 {
-    CALL_STACK_MESSAGE2("PackList(, %s, , ,)", archiveFileName);
+    CALL_STACK_MESSAGE2("PackList(, %ls, , ,)", archiveFileName);
     // clean up just in case
     dir.Clear(NULL);
     pluginData = NULL;
@@ -623,53 +641,47 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
     const SPackBrowseTable* browseTable = ArchiverConfig.GetUnpackerConfigTable(index);
 
     // build the current directory
-    CPathBuffer currentDir; // Heap-allocated for long path support
+    std::wstring currentDir;
     if (!PackExpandInitDir(archiveFileName, NULL, NULL, browseTable->ListInitDir,
-                           currentDir, currentDir.Size()))
+                           currentDir))
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_IDIRERR);
 
-    // build the command line
-    char cmdLine[PACK_CMDLINE_MAXLEN];
-    sprintf(cmdLine, "\"%s\" %s ", SpawnExe, SPAWN_EXE_PARAMS);
-    int cmdIndex = (int)strlen(cmdLine);
+    // Build the external archiver command, then wrap it for salspawn without leaving UTF-16.
+    std::wstring packerCommand;
     if (!PackExpandCmdLine(archiveFileName, NULL, NULL, NULL, browseTable->ListCommand,
-                           cmdLine + cmdIndex, PACK_CMDLINE_MAXLEN - cmdIndex, NULL))
+                           packerCommand, NULL))
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNERR);
 
-    CPathBuffer cmdForErrors; // path and name of executed exe if an error occurs
-    if (PackExpandCmdLine(archiveFileName, NULL, NULL, NULL, browseTable->ListCommand,
-                          cmdForErrors, cmdForErrors.Size(), NULL))
+    const wchar_t* commandBegin = packerCommand.c_str();
+    while (*commandBegin == L' ' || *commandBegin == L'\t')
+        commandBegin++;
+    const wchar_t* commandEnd = commandBegin;
+    if (*commandBegin == L'"')
     {
-        char* begin;
-        char* p = cmdForErrors;
-        while (*p == ' ')
-            p++;
-        begin = p;
-        if (*p == '\"')
-        {
-            p++;
-            begin = p;
-            while (*p != '\"' && *p != 0)
-                p++;
-        }
-        else
-        {
-            while (*p != ' ' && *p != 0)
-                p++;
-        }
-        *p = 0;
-        if (begin > cmdForErrors)
-            memmove(cmdForErrors, begin, strlen(begin) + 1);
+        commandBegin++;
+        commandEnd = commandBegin;
+        while (*commandEnd != L'\0' && *commandEnd != L'"')
+            commandEnd++;
     }
     else
-        cmdForErrors[0] = 0;
+    {
+        while (*commandEnd != L'\0' && *commandEnd != L' ' && *commandEnd != L'\t' && *commandEnd != L'"')
+            commandEnd++;
+    }
+    const std::wstring cmdForErrors(commandBegin, commandEnd);
+
+    std::wstring cmdLine = L"\"";
+    cmdLine += SpawnExe;
+    cmdLine += L"\" ";
+    cmdLine += SPAWN_EXE_PARAMS;
+    cmdLine += L" ";
+    cmdLine += packerCommand;
 
     // check whether the command line is too long
-    if (sally::pack::ShouldRejectLegacyCommandLine(browseTable->SupportLongNames, strlen(cmdLine), false))
+    if (sally::pack::ShouldRejectLegacyCommandLine(browseTable->SupportLongNames, cmdLine.length(), false))
     {
-        char buffer[1000];
-        strcpy(buffer, cmdLine);
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNLEN, buffer);
+        const std::string commandPresentation = PackErrorPresentation(cmdLine.c_str());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNLEN, commandPresentation.c_str());
     }
 
     // we must inherit handles
@@ -682,31 +694,23 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
     HANDLE StdOutRd, StdOutWr, StdErrWr;
     if (!HANDLES(CreatePipe(&StdOutRd, &StdOutWr, &sa, 0)))
     {
-        char buffer[1000];
-        strcpy(buffer, "CreatePipe: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        const std::string message = PackApiErrorPresentation("CreatePipe: ", GetLastError());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
     // so that we can use it as stderr as well
     if (!HANDLES(DuplicateHandle(GetCurrentProcess(), StdOutWr, GetCurrentProcess(), &StdErrWr,
                                  0, TRUE, DUPLICATE_SAME_ACCESS)))
     {
-        char buffer[1000];
-        strcpy(buffer, "DuplicateHandle: ");
-        strcat(buffer, GetErrorText(GetLastError()));
+        const std::string message = PackApiErrorPresentation("DuplicateHandle: ", GetLastError());
         HANDLES(CloseHandle(StdOutRd));
         HANDLES(CloseHandle(StdOutWr));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     // create structures for the new process
-    std::wstring cmdLineW = AnsiToWide(cmdLine);
-    std::wstring currentDirW;
-    if (currentDir[0] != 0)
-        currentDirW = AnsiToWide(currentDir);
     ExternalToolRequest request;
-    request.commandLine = cmdLineW.c_str();
-    request.workingDirectory = currentDirW.empty() ? NULL : currentDirW.c_str();
+    request.commandLine = cmdLine;
+    request.workingDirectory = currentDir;
     request.inheritHandles = true;
     request.createNewConsole = true;
     request.hideWindow = true;
@@ -725,7 +729,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
         HANDLES(CloseHandle(StdOutRd));
         HANDLES(CloseHandle(StdOutWr));
         HANDLES(CloseHandle(StdErrWr));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS, SpawnExe, GetErrorText(err));
+        const std::string errorText = PackApiErrorPresentation("", err);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS,
+                                      PackErrorPresentation(SpawnExe.c_str()).c_str(), errorText.c_str());
     }
     HANDLE processHandle = launchResult.DetachNativeProcessHandle();
     if (processHandle == NULL)
@@ -735,7 +741,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
         HANDLES(CloseHandle(StdOutRd));
         HANDLES(CloseHandle(StdOutWr));
         HANDLES(CloseHandle(StdErrWr));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS, SpawnExe, GetErrorText(err));
+        const std::string errorText = PackApiErrorPresentation("", err);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS,
+                                      PackErrorPresentation(SpawnExe.c_str()).c_str(), errorText.c_str());
     }
     HANDLES_ADD(__htProcess, __hoCreateProcess, processHandle);
 
@@ -797,11 +805,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
     // Wait for the external program to finish (it should be done already but better be sure)
     if (WaitForSingleObject(processHandle, INFINITE) == WAIT_FAILED)
     {
-        char buffer[1000];
-        strcpy(buffer, "WaitForSingleObject: ");
-        strcat(buffer, GetErrorText(GetLastError()));
+        const std::string message = PackApiErrorPresentation("WaitForSingleObject: ", GetLastError());
         HANDLES(CloseHandle(processHandle));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     // Restore focus back to us
@@ -811,11 +817,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
     DWORD exitCode;
     if (!GetExitCodeProcess(processHandle, &exitCode))
     {
-        char buffer[1000];
-        strcpy(buffer, "GetExitCodeProcess: ");
-        strcat(buffer, GetErrorText(GetLastError()));
+        const std::string message = PackApiErrorPresentation("GetExitCodeProcess: ", GetLastError());
         HANDLES(CloseHandle(processHandle));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     // release the process handles
@@ -830,25 +834,26 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
         {
             // salspawn.exe error - wrong parameters or such
             if (exitCode >= SPAWN_ERR_BASE && exitCode < SPAWN_ERR_BASE * 2)
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, SPAWN_EXE_NAME, LoadStr(IDS_PACKRET_SPAWN));
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN,
+                                              PackErrorPresentation(SPAWN_EXE_NAME).c_str(), PackErrorPresentation(LoadStrOwned(IDS_PACKRET_SPAWN).c_str()).c_str());
             // CreateProcess error
             if (exitCode >= SPAWN_ERR_BASE * 2 && exitCode < SPAWN_ERR_BASE * 3)
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS, cmdForErrors.Get(), GetErrorText(exitCode - SPAWN_ERR_BASE * 2));
+            {
+                const std::string errorText = PackApiErrorPresentation("", exitCode - SPAWN_ERR_BASE * 2);
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PROCESS,
+                                              PackErrorPresentation(cmdForErrors.c_str()).c_str(), errorText.c_str());
+            }
             // WaitForSingleObject error
             if (exitCode >= SPAWN_ERR_BASE * 3 && exitCode < SPAWN_ERR_BASE * 4)
             {
-                char buffer[1000];
-                strcpy(buffer, "WaitForSingleObject: ");
-                strcat(buffer, GetErrorText(exitCode - SPAWN_ERR_BASE * 3));
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+                const std::string message = PackApiErrorPresentation("WaitForSingleObject: ", exitCode - SPAWN_ERR_BASE * 3);
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
             }
             // GetExitCodeProcess error
             if (exitCode >= SPAWN_ERR_BASE * 4)
             {
-                char buffer[1000];
-                strcpy(buffer, "GetExitCodeProcess: ");
-                strcat(buffer, GetErrorText(exitCode - SPAWN_ERR_BASE * 4));
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+                const std::string message = PackApiErrorPresentation("GetExitCodeProcess: ", exitCode - SPAWN_ERR_BASE * 4);
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
             }
         }
         //
@@ -857,9 +862,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
         // if errorTable == NULL, do not translate (no table exists)
         if (!browseTable->ErrorTable)
         {
-            char buffer[1000];
-            sprintf(buffer, LoadStr(IDS_PACKRET_GENERAL), exitCode);
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(), buffer);
+            const std::string errorText = FormatPackNumericError(IDS_PACKRET_GENERAL, exitCode);
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN,
+                                          PackErrorPresentation(cmdForErrors.c_str()).c_str(), errorText.c_str());
         }
         // find the appropriate text in the table
         int i;
@@ -869,10 +874,12 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
             ;
         // did we find it?
         if ((*browseTable->ErrorTable)[i][0] == -1)
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(), LoadStr(IDS_PACKRET_UNKNOWN));
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN,
+                                          PackErrorPresentation(cmdForErrors.c_str()).c_str(), PackErrorPresentation(LoadStrOwned(IDS_PACKRET_UNKNOWN).c_str()).c_str());
         else
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN, cmdForErrors.Get(),
-                                          LoadStr((*browseTable->ErrorTable)[i][1]));
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_RETURN,
+                                          PackErrorPresentation(cmdForErrors.c_str()).c_str(),
+                                          PackErrorPresentation(LoadStrOwned((*browseTable->ErrorTable)[i][1]).c_str()).c_str());
     }
 
     //
@@ -1010,7 +1017,7 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
 
 //
 // ****************************************************************************
-// BOOL PackUC2List(const char *archiveFileName, CPackLineArray &lineArray,
+// BOOL PackUC2List(const wchar_t *archiveFileName, CPackLineArray &lineArray,
 //                  CSalamanderDirectory &dir)
 //
 //   Function for retrieving archive contents for the UC2 format (parser only)
@@ -1021,21 +1028,23 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
 //        lineArray is the array of lines from the archiver output
 //   OUT: dir is created and filled with archive data
 
-BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
+BOOL PackUC2List(const wchar_t* archiveFileName, CPackLineArray& lineArray,
                  CSalamanderDirectory& dir)
 {
-    CALL_STACK_MESSAGE2("PackUC2List(%s, ,)", archiveFileName);
+    CALL_STACK_MESSAGE2("PackUC2List(%ls, ,)", archiveFileName);
     // First delete the helper file that UC2 creates when using the ~D flag
-    CPathBuffer arcPath; // Heap-allocated for long path support
-    const char* arcName = strrchr(archiveFileName, '\\') + 1;
-    strncpy(arcPath, archiveFileName, arcName - archiveFileName);
-    arcPath[arcName - archiveFileName] = '\0';
-    strcat(arcPath, "U$~RESLT.OK");
-    DeleteFileA(gFileSystem, arcPath);
+    std::wstring resultFile = archiveFileName != NULL ? archiveFileName : L"";
+    const std::size_t arcName = resultFile.find_last_of(L"\\/");
+    if (arcName == std::wstring::npos)
+        resultFile.clear();
+    else
+        resultFile.erase(arcName + 1);
+    resultFile += L"U$~RESLT.OK";
+    gFileSystem->DeleteFile(resultFile.c_str());
 
-    char* txtPtr;         // pointer to the current position in the read line
-    char currentDir[256]; // current directory we are exploring
-    int line = 0;         // index into the line array
+    char* txtPtr;            // pointer to the current position in the read line
+    std::wstring currentDir; // decoded directory we are exploring
+    int line = 0;            // index into the line array
     // a bit redundant check but better be safe
     if (lineArray.Count < 1)
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
@@ -1044,7 +1053,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
     while (1)
     {
         // added file or directory
-        CFileData newfile;
+        CFileData newfile = {};
 
         // skip leading spaces
         for (txtPtr = lineArray[line]; *txtPtr == ' '; txtPtr++)
@@ -1065,16 +1074,19 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
                 return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
             // and to the first letter of the name
             txtPtr++;
-            int i = 0;
             // skip leading backslashes
             while (*txtPtr == '\\')
                 txtPtr++;
-            // copy the name into the variable
+            // Decode only the directory span; the surrounding UC2 grammar stays bytes.
+            const char* directoryBegin = txtPtr;
             while (*txtPtr != '\0' && *txtPtr != ']')
-                currentDir[i++] = *txtPtr++;
-            // terminate the string
-            currentDir[i] = '\0';
-            OemToChar(currentDir, currentDir);
+                txtPtr++;
+            if (!sally::pack::DecodeOemListingText(directoryBegin,
+                                                   static_cast<std::size_t>(txtPtr - directoryBegin),
+                                                   currentDir))
+            {
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
+            }
             // one more check
             if (*txtPtr == '\0')
                 return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
@@ -1129,21 +1141,28 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
                     if (*txtPtr == '\0')
                         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
                     txtPtr++;
-                    int i = 0;
-                    // copy the name to the newName variable
-                    char newName[15];
+                    const char* nameBegin = txtPtr;
                     while (*txtPtr != '\0' && *txtPtr != ']')
-                        newName[i++] = *txtPtr++;
-                    newName[i] = '\0';
+                        txtPtr++;
                     if (*txtPtr == '\0')
                         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
-                    // and store it in the structure
-                    newfile.NameLen = strlen(newName);
-                    newfile.Name = (char*)malloc(newfile.NameLen + 1);
+
+                    std::wstring name;
+                    if (!sally::pack::DecodeOemListingText(nameBegin,
+                                                           static_cast<std::size_t>(txtPtr - nameBegin),
+                                                           name) ||
+                        name.empty() || name.length() > 511)
+                    {
+                        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
+                    }
+
+                    // Store the decoded UTF-16 name in CFileData's single name owner.
+                    newfile.NameLen = static_cast<unsigned>(name.length());
+                    newfile.Name = (wchar_t*)malloc((newfile.NameLen + 1) * sizeof(wchar_t));
                     if (!newfile.Name)
                         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
-                    OemToChar(newName, newfile.Name);
-                    newfile.Ext = strrchr(newfile.Name, '.');
+                    wmemcpy(newfile.Name, name.c_str(), newfile.NameLen + 1);
+                    newfile.Ext = wcsrchr(newfile.Name, L'.');
                     if (newfile.Ext != NULL) // ".cvspass" is an extension in Windows ...
                                              //          if (newfile.Ext != NULL && newfile.Name != newfile.Ext)
                         newfile.Ext++;
@@ -1295,22 +1314,21 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
             //
 
             // store in the structure what is not there yet
+            if (newfile.Name == NULL)
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_PARSE);
+
             FILETIME lt;
             if (!SystemTimeToFileTime(&t, &lt))
             {
-                char buffer[1000];
-                strcpy(buffer, "SystemTimeToFileTime: ");
-                strcat(buffer, GetErrorText(GetLastError()));
+                const std::string message = PackApiErrorPresentation("SystemTimeToFileTime: ", GetLastError());
                 free(newfile.Name);
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
             }
             if (!LocalFileTimeToFileTime(&lt, &newfile.LastWrite))
             {
-                char buffer[1000];
-                strcpy(buffer, "LocalFileTimeToFileTime: ");
-                strcat(buffer, GetErrorText(GetLastError()));
+                const std::string message = PackApiErrorPresentation("LocalFileTimeToFileTime: ", GetLastError());
                 free(newfile.Name);
-                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+                return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
             }
             // and finally just create a new object
             newfile.IsOffline = 0;
@@ -1321,7 +1339,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
                 if (!Configuration.SortDirsByExt)
                     newfile.Ext = newfile.Name + newfile.NameLen; // directories have no extensions
                 newfile.IsLink = 0;
-                if (!dir.AddDir(currentDir, newfile, NULL))
+                if (!dir.AddDir(currentDir.empty() ? NULL : currentDir.c_str(), newfile, NULL))
                 {
                     free(newfile.Name);
                     return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_FDATA);
@@ -1332,7 +1350,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
                 newfile.IsLink = IsFileLink(newfile.Ext);
 
                 // if it is a file, go this way
-                if (!dir.AddFile(currentDir, newfile, NULL))
+                if (!dir.AddFile(currentDir.empty() ? NULL : currentDir.c_str(), newfile, NULL))
                 {
                     free(newfile.Name);
                     return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_FDATA);
@@ -1352,9 +1370,9 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
 
 //
 // ****************************************************************************
-// BOOL PackUncompress(HWND parent, CFilesWindow *panel, const char *archiveFileName,
+// BOOL PackUncompress(HWND parent, CFilesWindow *panel, const wchar_t *archiveFileName,
 //                     CPluginDataInterfaceAbstract *pluginData,
-//                     const char *targetDir, const char *archiveRoot,
+//                     const wchar_t *targetDir, const wchar_t *archiveRoot,
 //                     SalEnumSelection nextName, void *param)
 //
 //   Function for extracting requested files from an archive.
@@ -1371,12 +1389,12 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
 //        pluginData is the interface for working with file/directory data specific to the plugin
 //   OUT:
 
-BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
+BOOL PackUncompress(HWND parent, CFilesWindow* panel, const wchar_t* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
-                    const char* targetDir, const char* archiveRoot,
+                    const wchar_t* targetDir, const wchar_t* archiveRoot,
                     SalEnumSelection nextName, void* param)
 {
-    CALL_STACK_MESSAGE4("PackUncompress(, , %s, , %s, %s, ,)", archiveFileName, targetDir, archiveRoot);
+    CALL_STACK_MESSAGE4("PackUncompress(, , %ls, , %ls, %ls, ,)", archiveFileName, targetDir, archiveRoot);
     // find the correct one according to the table
     int format = PackerFormatConfig.PackIsArchive(archiveFileName);
     // Supported archive not found - error
@@ -1406,10 +1424,10 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
 
 //
 // ****************************************************************************
-// BOOL PackUniversalUncompress(HWND parent, const char *command, TPackErrorTable *const errorTable,
-//                              const char *initDir, BOOL expandInitDir, CFilesWindow *panel,
-//                              const BOOL supportLongNames, const char *archiveFileName,
-//                              const char *targetDir, const char *archiveRoot,
+// BOOL PackUniversalUncompress(HWND parent, const wchar_t *command, TPackErrorTable *const errorTable,
+//                              const wchar_t *initDir, BOOL expandInitDir, CFilesWindow *panel,
+//                              const BOOL supportLongNames, const wchar_t *archiveFileName,
+//                              const wchar_t *targetDir, const wchar_t *archiveRoot,
 //                              SalEnumSelection nextName, void *param, BOOL needANSIListFile)
 //
 //   Function for extracting requested files from an archive. Unlike the previous
@@ -1432,246 +1450,218 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
 //        needANSIListFile is TRUE if the file list must be in ANSI (not OEM)
 //   OUT:
 
-BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* const errorTable,
-                             const char* initDir, BOOL expandInitDir, CFilesWindow* panel,
-                             const BOOL supportLongNames, const char* archiveFileName,
-                             const char* targetDir, const char* archiveRoot,
+BOOL PackUniversalUncompress(HWND parent, const wchar_t* command, TPackErrorTable* const errorTable,
+                             const wchar_t* initDir, BOOL expandInitDir, CFilesWindow* panel,
+                             const BOOL supportLongNames, const wchar_t* archiveFileName,
+                             const wchar_t* targetDir, const wchar_t* archiveRoot,
                              SalEnumSelection nextName, void* param, BOOL needANSIListFile)
 {
-    CALL_STACK_MESSAGE9("PackUniversalUncompress(, %s, , %s, %d, , %d, %s, %s, %s, , , %d)",
+    CALL_STACK_MESSAGE9("PackUniversalUncompress(, %ls, , %ls, %d, , %d, %ls, %ls, %ls, , , %d)",
                         command, initDir, expandInitDir, supportLongNames, archiveFileName,
                         targetDir, archiveRoot, needANSIListFile);
 
-    //
-    // We must adjust the directory in the archive to the required format
-    //
-    CPathBuffer rootPath; // Heap-allocated for long path support
-    if (archiveRoot != NULL && *archiveRoot != '\0')
+    // Adjust the directory in the archive to the list-file format.
+    std::wstring rootPath;
+    if (archiveRoot != NULL && *archiveRoot != L'\0')
     {
-        if (*archiveRoot == '\\')
+        if (*archiveRoot == L'\\')
             archiveRoot++;
-        if (*archiveRoot == '\0')
-            rootPath[0] = '\0';
-        else
+        if (*archiveRoot != L'\0')
         {
-            strcpy(rootPath, archiveRoot);
-            strcat(rootPath, "\\");
+            rootPath = archiveRoot;
+            rootPath += L'\\';
         }
     }
-    else
+
+    const std::wstring tmpDirName = SalGetTempFileNameW(targetDir, L"PACK", false);
+    if (tmpDirName.empty())
     {
-        rootPath[0] = '\0';
+        const std::string message = PackApiErrorPresentation("SalGetTempFileName: ", GetLastError());
+        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, message.c_str());
     }
 
-    //
-    // Now it's time for the temporary extraction directory
-
-    // Create the name of the temporary directory
-    CPathBuffer tmpDirNameBuf; // Heap-allocated for long path support
-    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
+    const std::wstring tmpListName = SalGetTempFileNameW(NULL, L"PACK", true);
+    if (tmpListName.empty())
     {
-        char buffer[1000];
-        strcpy(buffer, "SalGetTempFileName: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, "Unable to create a temporary list file for the packer.");
     }
 
-    //
-    // Now prepare a helper file with a list of files to extract in the %TEMP% directory
-    //
-
-    // Create the name of the temporary file
-    CPathBuffer tmpListNameBuf; // Heap-allocated for long path support
-    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
+    // The list file is an external byte protocol. Its encoding follows the packer's
+    // own command line, with the historical OEM/ANSI setting as fallback.
+    const sally::pack::EListFileEncoding listEncoding =
+        sally::pack::ListFileEncodingFromCommandLine(
+            command, needANSIListFile ? sally::pack::EListFileEncoding::Ansi
+                                      : sally::pack::EListFileEncoding::Oem);
+    FILE* listFile = _wfopen(tmpListName.c_str(), L"wb");
+    if (listFile == NULL)
     {
-        char buffer[1000];
-        strcpy(buffer, "SalGetTempFileName: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
-    }
-
-    // we have the file, now open it
-    FILE* listFile;
-    if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
-    {
-        SalLPRemoveDirectory(tmpDirNameBuf);
-        DeleteFileA(gFileSystem, tmpListNameBuf);
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        gFileSystem->DeleteFile(tmpListName.c_str());
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
 
-    // and we can fill it
+    const std::string listBom = sally::pack::ListFileBom(listEncoding);
+    if (!listBom.empty() &&
+        fwrite(listBom.data(), 1, listBom.length(), listFile) != listBom.length())
+    {
+        fclose(listFile);
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
+    }
+
     BOOL isDir;
     CQuadWord size;
-    const char* name;
-    CPathBuffer namecnv; // Heap-allocated for long path support
+    const wchar_t* name;
     CQuadWord totalSize(0, 0);
-    int errorOccured;
+    int errorOccured = SALENUM_SUCCESS;
 
-    if (!needANSIListFile)
-        CharToOem(rootPath, rootPath);
-    // pick the name
     while ((name = nextName(parent, 1, &isDir, &size, NULL, param, &errorOccured)) != NULL)
     {
-        if (!needANSIListFile)
-            CharToOem(name, namecnv);
-        else
-            strcpy(namecnv, name);
-        // sum the total size
         totalSize += size;
-        // put the name into the list
         if (!isDir)
         {
-            if (fprintf(listFile, "%s%s\n", rootPath.Get(), namecnv.Get()) <= 0)
+            std::string listEntry;
+            if (!sally::pack::TryEncodeListFileEntry(listEncoding, rootPath + name, listEntry))
             {
                 fclose(listFile);
-                DeleteFileA(gFileSystem, tmpListNameBuf);
-                SalLPRemoveDirectory(tmpDirNameBuf);
+                gFileSystem->DeleteFile(tmpListName.c_str());
+                RemoveTemporaryDirW(tmpDirName.c_str());
+                return (*PackErrorHandlerPtr)(
+                    parent, IDS_PACKERR_GENERAL,
+                    "A selected archive name cannot be represented exactly in the configured "
+                    "list-file encoding. Extraction was stopped to avoid treating a replacement "
+                    "character as a wildcard.");
+            }
+            if (fwrite(listEntry.data(), 1, listEntry.length(), listFile) != listEntry.length())
+            {
+                fclose(listFile);
+                gFileSystem->DeleteFile(tmpListName.c_str());
+                RemoveTemporaryDirW(tmpDirName.c_str());
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
         }
     }
-    // and that is it
-    fclose(listFile);
-
-    // if an error occurred and the user chose to cancel the operation, end the it +
-    // also test for enough free disk space
-    if (errorOccured == SALENUM_CANCEL ||
-        !TestFreeSpace(parent, tmpDirNameBuf, totalSize, LoadStr(IDS_PACKERR_TITLE)))
+    if (fclose(listFile) != 0)
     {
-        DeleteFileA(gFileSystem, tmpListNameBuf);
-        SalLPRemoveDirectory(tmpDirNameBuf);
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
+    }
+
+    if (errorOccured == SALENUM_CANCEL ||
+        !TestFreeSpace(parent, tmpDirName.c_str(), totalSize, LoadStrW(IDS_PACKERR_TITLE)))
+    {
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return FALSE;
     }
 
-    //
-    // Now we will run an external program to unpack
-    //
-    // build the command line
-    char cmdLine[PACK_CMDLINE_MAXLEN];
-    if (!PackExpandCmdLine(archiveFileName, tmpDirNameBuf, tmpListNameBuf, NULL,
-                           command, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
+    std::wstring cmdLine;
+    if (!PackExpandCmdLine(archiveFileName, tmpDirName.c_str(), tmpListName.c_str(), NULL,
+                           command, cmdLine, NULL))
     {
-        DeleteFileA(gFileSystem, tmpListNameBuf);
-        SalLPRemoveDirectory(tmpDirNameBuf);
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
 
-    // check if the command line is too long
-    if (sally::pack::ShouldRejectLegacyCommandLine(supportLongNames, strlen(cmdLine), true))
+    if (sally::pack::ShouldRejectLegacyCommandLine(supportLongNames, cmdLine.length(), true))
     {
-        char buffer[1000];
-        DeleteFileA(gFileSystem, tmpListNameBuf);
-        SalLPRemoveDirectory(tmpDirNameBuf);
-        strcpy(buffer, cmdLine);
-        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        const std::string commandPresentation = PackErrorPresentation(cmdLine.c_str());
+        return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, commandPresentation.c_str());
     }
 
-    // build the current directory
-    CPathBuffer currentDir; // Heap-allocated for long path support
+    std::wstring currentDir;
     if (!expandInitDir)
-    {
-        if (strlen(initDir) < currentDir.Size())
-            strcpy(currentDir, initDir);
-        else
-        {
-            DeleteFileA(gFileSystem, tmpListNameBuf);
-            SalLPRemoveDirectory(tmpDirNameBuf);
-            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
-        }
-    }
+        currentDir = initDir != NULL ? initDir : L"";
     else
     {
-        if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, currentDir.Size()))
+        if (!PackExpandInitDir(archiveFileName, NULL, tmpDirName.c_str(), initDir,
+                               currentDir))
         {
-            DeleteFileA(gFileSystem, tmpListNameBuf);
-            SalLPRemoveDirectory(tmpDirNameBuf);
+            gFileSystem->DeleteFile(tmpListName.c_str());
+            RemoveTemporaryDirW(tmpDirName.c_str());
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
 
-    // and run the external program
     if (!PackExecute(NULL, cmdLine, currentDir, errorTable))
     {
-        DeleteFileA(gFileSystem, tmpListNameBuf);
-        RemoveTemporaryDir(tmpDirNameBuf);
+        gFileSystem->DeleteFile(tmpListName.c_str());
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return FALSE; // the error message has already been shown
     }
-    // the file list is no longer needed
-    DeleteFileA(gFileSystem, tmpListNameBuf);
+    gFileSystem->DeleteFile(tmpListName.c_str());
 
-    // and now finally move the files where they belong
-    CPathBuffer srcDir; // Heap-allocated for long path support
-    strcpy(srcDir, tmpDirNameBuf);
-    if (*rootPath != '\0')
+    std::wstring srcDir = tmpDirName;
+    if (!rootPath.empty())
     {
         // locate the extracted subdirectory path - names of subdirectories may not match
         // because of the Czech characters and long names :-(
-        char* r = rootPath;
+        const wchar_t* r = rootPath.c_str();
         WIN32_FIND_DATAW foundFile;
-        char buffer[1000];
+        auto reportFindError = [&](const char* api, DWORD error) -> BOOL
+        {
+            const std::string message = PackApiErrorPresentation(api, error);
+            RemoveTemporaryDirW(tmpDirName.c_str());
+            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, message.c_str());
+        };
         while (1)
         {
             if (*r == 0)
                 break;
-            while (*r != 0 && *r != '\\')
+            while (*r != L'\0' && *r != L'\\')
                 r++; // skip one level in the original rootPath
-            while (*r == '\\')
+            while (*r == L'\\')
                 r++; // skip the backslash in the original rootPath
-            strcat(srcDir, "\\*");
 
-            HANDLE found = SalFindFirstFileHW(srcDir, &foundFile);
+            HANDLE found = SalFindFirstFileHW((srcDir + L"\\*").c_str(), &foundFile);
             if (found == INVALID_HANDLE_VALUE)
-            {
-                strcpy(buffer, "FindFirstFile: ");
-
-            _ERR:
-
-                strcat(buffer, GetErrorText(GetLastError()));
-                RemoveTemporaryDir(tmpDirNameBuf);
-                return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
-            }
+                return reportFindError("FindFirstFile: ", GetLastError());
             while (foundFile.cFileName[0] == 0 ||
                    wcscmp(foundFile.cFileName, L".") == 0 || // we ignore "." and ".."
                    wcscmp(foundFile.cFileName, L"..") == 0)
             {
                 if (!SalLPFindNextFile(found, &foundFile))
                 {
-                    HANDLES(FindClose(found));
-                    strcpy(buffer, "FindNextFile: ");
-                    goto _ERR;
+                    const DWORD error = GetLastError();
+                    SalLPFindClose(found);
+                    return reportFindError("FindNextFile: ", error);
                 }
             }
-            HANDLES(FindClose(found));
+            SalLPFindClose(found);
 
             if (foundFile.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            { // attach another subdirectory on the path
-                char cFileNameA[MAX_PATH];
-                WideCharToMultiByte(CP_ACP, 0, foundFile.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-                srcDir[strlen(srcDir) - 1] = 0;
-                strcat(srcDir, cFileNameA);
+            {
+                srcDir += L"\\";
+                srcDir += foundFile.cFileName;
             }
             else
             {
                 TRACE_E("Unexpected error in PackUniversalUncompress().");
-                RemoveTemporaryDir(tmpDirNameBuf);
+                RemoveTemporaryDirW(tmpDirName.c_str());
                 return FALSE;
             }
         }
     }
-    if (!panel->MoveFiles(srcDir, targetDir, tmpDirNameBuf, archiveFileName))
+    if (!panel->MoveFiles(srcDir.c_str(), targetDir, tmpDirName.c_str(), archiveFileName))
     {
-        RemoveTemporaryDir(tmpDirNameBuf);
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_MOVE);
     }
 
-    RemoveTemporaryDir(tmpDirNameBuf);
+    RemoveTemporaryDirW(tmpDirName.c_str());
     return TRUE;
 }
 
 //
 // ****************************************************************************
-// const char * WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL *isDir, CQuadWord *size,
-//                                  const CFileData **fileData, void *param, int *errorOccured)
+// const wchar_t * WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL *isDir, CQuadWord *size,
+//                                     const CFileData **fileData, void *param, int *errorOccured)
 //
 //   Callback function for enumerating given masks
 //
@@ -1683,8 +1673,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
 //        size is always 0
 //        the string of masks separated by semicolon is modified (";"->"\0" when separating masks, ";;"->";" with the trailing ";" removed)
 
-const char* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
-                                const CFileData** fileData, void* param, int* errorOccured)
+const wchar_t* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWord* size,
+                                   const CFileData** fileData, void* param, int* errorOccured)
 {
     CALL_STACK_MESSAGE2("PackEnumMask(%d, , ,)", enumFiles);
     if (errorOccured != NULL)
@@ -1698,79 +1688,16 @@ const char* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWo
         *fileData = NULL;
 
     // if there are no more masks return NULL - finished
-    if (param == NULL || *(char**)param == NULL)
+    if (param == NULL)
         return NULL;
-
-    // drop a possible semicolon at the end of the string (shorten the string)
-    char* ptr = *(char**)param + strlen(*(char**)param) - 1;
-    char* endPtr = ptr;
-    while (1)
-    {
-        while (ptr >= *(char**)param && *ptr == ';')
-            ptr--;
-        if (((endPtr - ptr) & 1) == 1)
-            *endPtr-- = 0; // ignore ';' only if odd (even count will later be converted ";;"->";")
-        if (endPtr >= *(char**)param && *endPtr <= ' ')
-        {
-            endPtr--;
-            while (endPtr >= *(char**)param && *endPtr <= ' ')
-                endPtr--; // ignore trailing white - spaces
-            *(endPtr + 1) = 0;
-            ptr = endPtr; // must try again to see if an odd ';' has to be skipped
-        }
-        else
-            break;
-    }
-    // no mask left, there are only semicolons and white spaces (or nothing :-))
-    if (endPtr < *(char**)param)
-        return NULL;
-
-    // otherwise find the last semicolon (only if their count is odd, otherwise ";;" will be replaced with ";") - before the last mask
-    while (ptr >= *(char**)param)
-    {
-        if (*ptr == ';')
-        {
-            char* p = ptr - 1;
-            while (p >= *(char**)param && *p == ';')
-                p--;
-            if (((ptr - p) & 1) == 1)
-                break;
-            else
-                ptr = p;
-        }
-        else
-            ptr--;
-    }
-
-    if (ptr < *(char**)param)
-    {
-        // if there is no semicolon left we have only one
-        *(char**)param = NULL;
-    }
-    else
-    {
-        // cut off the last mask from the rest by placing zero instead of the found semicolon
-        *ptr = '\0';
-    }
-
-    while (*(ptr + 1) != 0 && *(ptr + 1) <= ' ')
-        ptr++; // skip white - spaces at the beginning of the mask
-    char* s = ptr + 1;
-    while (*s != 0)
-    {
-        if (*s == ';' && *(s + 1) == ';')
-            memmove(s, s + 1, strlen(s + 1) + 1);
-        s++;
-    }
-    // and return it
-    return ptr + 1;
+    return sally::pack::NextMaskFromEnd(*static_cast<wchar_t**>(param));
 }
 
 //
 // ****************************************************************************
-// BOOL PackUnpackOneFile(CFilesWindow *panel, const char *archiveFileName,
-//                        CPluginDataInterfaceAbstract *pluginData, const char *nameInArchive,
-//                        CFileData *fileData, const char *targetDir, const char *newFileName,
+// BOOL PackUnpackOneFile(CFilesWindow *panel, const wchar_t *archiveFileName,
+//                        CPluginDataInterfaceAbstract *pluginData, const wchar_t *nameInArchive,
+//                        CFileData *fileData, const wchar_t *targetDir, const wchar_t *newFileName,
 //                        BOOL *renamingNotSupported)
 //
 //   Function for extracting a single file from an archive (for the viewer).
@@ -1788,12 +1715,12 @@ const char* WINAPI PackEnumMask(HWND parent, int enumFiles, BOOL* isDir, CQuadWo
 //          does not support renaming during extraction, Salamander will show an error
 //   OUT:
 
-BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
-                       CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
-                       CFileData* fileData, const char* targetDir, const char* newFileName,
+BOOL PackUnpackOneFile(CFilesWindow* panel, const wchar_t* archiveFileName,
+                       CPluginDataInterfaceAbstract* pluginData, const wchar_t* nameInArchive,
+                       CFileData* fileData, const wchar_t* targetDir, const wchar_t* newFileName,
                        BOOL* renamingNotSupported)
 {
-    CALL_STACK_MESSAGE5("PackUnpackOneFile(, %s, , %s, , %s, %s, )",
+    CALL_STACK_MESSAGE5("PackUnpackOneFile(, %ls, , %ls, , %ls, %ls, )",
                         archiveFileName, nameInArchive, targetDir, newFileName);
 
     // find the correct one according to the table
@@ -1826,14 +1753,11 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     // Create a temporary directory into which we unpack the file
     //
 
-    // buffer for the full name of the temporary directory
-    CPathBuffer tmpDirNameBuf; // Heap-allocated for long path support
-    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
+    const std::wstring tmpDirName = SalGetTempFileNameW(targetDir, L"PACK", false);
+    if (tmpDirName.empty())
     {
-        char buffer[1000];
-        strcpy(buffer, "SalGetTempFileName: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        const std::string message = PackApiErrorPresentation("SalGetTempFileName: ", GetLastError());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     //
@@ -1842,84 +1766,75 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
     const SPackBrowseTable* browseTable = ArchiverConfig.GetUnpackerConfigTable(index);
 
     // build the command line
-    char cmdLine[PACK_CMDLINE_MAXLEN];
-    if (!PackExpandCmdLine(archiveFileName, tmpDirNameBuf, NULL, nameInArchive,
-                           browseTable->ExtractCommand, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
+    std::wstring cmdLine;
+    if (!PackExpandCmdLine(archiveFileName, tmpDirName.c_str(), NULL, nameInArchive,
+                           browseTable->ExtractCommand, cmdLine, NULL))
     {
-        RemoveTemporaryDir(tmpDirNameBuf);
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNERR);
     }
 
     // check whether the command line is too long
-    if (sally::pack::ShouldRejectLegacyCommandLine(browseTable->SupportLongNames, strlen(cmdLine), false))
+    if (sally::pack::ShouldRejectLegacyCommandLine(browseTable->SupportLongNames, cmdLine.length(), false))
     {
-        char buffer[1000];
-        RemoveTemporaryDir(tmpDirNameBuf);
-        strcpy(buffer, cmdLine);
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNLEN, buffer);
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        const std::string commandPresentation = PackErrorPresentation(cmdLine.c_str());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_CMDLNLEN, commandPresentation.c_str());
     }
 
     // build the current directory
-    CPathBuffer currentDir; // Heap-allocated for long path support
-    if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, browseTable->ExtractInitDir,
-                           currentDir, currentDir.Size()))
+    std::wstring currentDir;
+    if (!PackExpandInitDir(archiveFileName, NULL, tmpDirName.c_str(), browseTable->ExtractInitDir,
+                           currentDir))
     {
-        RemoveTemporaryDir(tmpDirNameBuf);
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_IDIRERR);
     }
 
     // and run the external program
     if (!PackExecute(NULL, cmdLine, currentDir, browseTable->ErrorTable))
     {
-        RemoveTemporaryDir(tmpDirNameBuf);
+        RemoveTemporaryDirW(tmpDirName.c_str());
         return FALSE; // the error message has already been shown
     }
 
     // find the extracted file - the name may not match due to the Czech characters and long names :-(
-    std::string extractedFile = std::string(tmpDirNameBuf) + "\\*";
+    const std::wstring extractedFile = tmpDirName + L"\\*";
     WIN32_FIND_DATAW foundFile;
     HANDLE found = SalFindFirstFileHW(extractedFile.c_str(), &foundFile);
     if (found == INVALID_HANDLE_VALUE)
     {
-        char buffer[1000];
-        strcpy(buffer, "FindFirstFile: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        RemoveTemporaryDir(tmpDirNameBuf);
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        const std::string message = PackApiErrorPresentation("FindFirstFile: ", GetLastError());
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
     while (foundFile.cFileName[0] == 0 ||
            wcscmp(foundFile.cFileName, L".") == 0 || wcscmp(foundFile.cFileName, L"..") == 0)
     {
         if (!SalLPFindNextFile(found, &foundFile))
         {
-            char buffer[1000];
-            strcpy(buffer, "FindNextFile: ");
-            strcat(buffer, GetErrorText(GetLastError()));
-            HANDLES(FindClose(found));
-            RemoveTemporaryDir(tmpDirNameBuf);
-            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+            const std::string message = PackApiErrorPresentation("FindNextFile: ", GetLastError());
+            SalLPFindClose(found);
+            RemoveTemporaryDirW(tmpDirName.c_str());
+            return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
         }
     }
-    HANDLES(FindClose(found));
+    SalLPFindClose(found);
 
     // and finally move it where it belongs
-    char cFileNameA[MAX_PATH];
-    WideCharToMultiByte(CP_ACP, 0, foundFile.cFileName, -1, cFileNameA, MAX_PATH, NULL, NULL);
-    std::string srcName = std::string(tmpDirNameBuf) + "\\" + cFileNameA;
-    const char* onlyName = strrchr(nameInArchive, '\\');
+    const std::wstring srcName = tmpDirName + L"\\" + foundFile.cFileName;
+    const wchar_t* onlyName = wcsrchr(nameInArchive, L'\\');
     if (onlyName == NULL)
         onlyName = nameInArchive;
-    std::string destName = std::string(targetDir) + "\\" + onlyName;
+    const std::wstring destName = std::wstring(targetDir) + L"\\" + onlyName;
     if (!SalMoveFile(srcName.c_str(), destName.c_str()))
     {
-        char buffer[1000];
-        strcpy(buffer, "MoveFile: ");
-        strcat(buffer, GetErrorText(GetLastError()));
-        RemoveTemporaryDir(tmpDirNameBuf);
-        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
+        const std::string message = PackApiErrorPresentation("MoveFile: ", GetLastError());
+        RemoveTemporaryDirW(tmpDirName.c_str());
+        return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, message.c_str());
     }
 
     // and clean up
-    RemoveTemporaryDir(tmpDirNameBuf);
+    RemoveTemporaryDirW(tmpDirName.c_str());
     return TRUE;
 }

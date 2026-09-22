@@ -401,7 +401,7 @@ CIconList::DumpToTrace(int index, BOOL dumpMask)
   int row;
   for (row = 0; row < ImageHeight; row++)
   {
-    char buff[1000];
+    wchar_t buff[1000];
     buff[0] = 0;
     DWORD *ptr = ImageRaw + iX + (iY + row) * BitmapWidth;
     int col;
@@ -417,7 +417,7 @@ CIconList::DumpToTrace(int index, BOOL dumpMask)
     TRACE_E("MASK BITMAP");
     for (row = 0; row < ImageHeight; row++)
     {
-      char buff[1000];
+      wchar_t buff[1000];
       buff[0] = 0;
       DWORD *maskPtr = TmpImageRaw + row * TmpImageWidth;
       int col;
@@ -429,7 +429,7 @@ CIconList::DumpToTrace(int index, BOOL dumpMask)
       TRACE_I(buff);
     }
   }
-  char buff[100];
+  wchar_t buff[100];
   sprintf(buff, "%d", ImageFlags[index]);
   TRACE_I("ImageFlags["<<index<<"]="<<buff);
   HANDLES(LeaveCriticalSection(&CriticalSection));
@@ -1766,10 +1766,10 @@ HBITMAP LoadRawPNGBitmap(const void* rawPNG, DWORD rawPNGSize, DWORD flags)
     return NULL;
 }
 
-HBITMAP LoadPNGBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName, DWORD flags)
+HBITMAP LoadPNGBitmap(HINSTANCE hInstance, LPCWSTR lpBitmapName, DWORD flags)
 {
     int count = 0;
-    HRSRC hRsrc = FindResource(hInstance, lpBitmapName, RT_RCDATA);
+    HRSRC hRsrc = FindResourceW(hInstance, lpBitmapName, (LPCWSTR)RT_RCDATA);
     if (hRsrc != NULL)
     {
         BYTE* rawPNG = (BYTE*)LoadResource(hInstance, hRsrc);
@@ -1792,10 +1792,10 @@ HBITMAP LoadPNGBitmap(HINSTANCE hInstance, LPCTSTR lpBitmapName, DWORD flags)
     return NULL;
 }
 
-BOOL CIconList::CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth)
+BOOL CIconList::CreateFromPNG(HINSTANCE hInstance, LPCWSTR lpBitmapName, int imageWidth)
 {
     int count = 0;
-    HRSRC hRsrc = FindResource(hInstance, lpBitmapName, RT_RCDATA);
+    HRSRC hRsrc = FindResourceW(hInstance, lpBitmapName, (LPCWSTR)RT_RCDATA);
     if (hRsrc != NULL)
     {
         BYTE* rawPNG = (BYTE*)LoadResource(hInstance, hRsrc);

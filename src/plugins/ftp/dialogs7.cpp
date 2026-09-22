@@ -1,8 +1,69 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+static char* DupDialogString(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
+
+static wchar_t* DupDialogWideString(const wchar_t* text)
+{
+    if (text == NULL)
+        return NULL;
+    const size_t length = wcslen(text) + 1;
+    if (length > INT_MAX / sizeof(wchar_t))
+        return NULL;
+    wchar_t* copy = (wchar_t*)SalamanderGeneral->Alloc((int)(length * sizeof(wchar_t)));
+    if (copy != NULL)
+        memcpy(copy, text, length * sizeof(wchar_t));
+    return copy;
+}
+
+static BOOL FormatUNIXRightsForDisplay(DWORD attrs, BOOL includeNumeric,
+                                       std::wstring& output) noexcept
+{
+    try
+    {
+        static const DWORD bits[] = {0400, 0200, 0100, 0040, 0020,
+                                     0010, 0004, 0002, 0001};
+        static const wchar_t granted[] = L"rwxrwxrwx";
+        std::wstring staged;
+        for (size_t i = 0; i < _countof(bits); ++i)
+            staged.push_back((attrs & bits[i]) != 0 ? granted[i] : L'-');
+
+        if (includeNumeric)
+        {
+            std::wstring octal;
+            DWORD value = attrs;
+            do
+            {
+                octal.push_back(static_cast<wchar_t>(L'0' + (value & 7)));
+                value >>= 3;
+            } while (value != 0);
+            while (octal.size() < 3)
+                octal.push_back(L'0');
+            std::reverse(octal.begin(), octal.end());
+            staged.append(L" (");
+            staged.append(octal);
+            staged.push_back(L')');
+        }
+
+        output.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+}
 
 // ****************************************************************************
 // support for filling the combobox with default behavior when errors occur during operations
@@ -35,7 +96,7 @@ void HandleOperationsCombo(int* value, CTransferInfo& ti, int resID, int arrValu
             int i = 0;
             while (arrValuesResID[i] != -1)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(arrValuesResID[i]));
+                SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)LangStr(arrValuesResID[i]).c_str());
                 i++;
             }
             if (*value < 0 || *value >= i)
@@ -97,10 +158,10 @@ int SolveItemErrorGetDlgResId(CSolveItemErrorDlgType dlgType)
 }
 
 CSolveItemErrorDlg::CSolveItemErrorDlg(HWND parent, CFTPOperation* oper, DWORD winError,
-                                       const char* errDescription,
-                                       const char* ftpPath, const char* ftpName,
-                                       const char* diskPath, const char* diskName,
-                                       BOOL* applyToAll, char** newName, CSolveItemErrorDlgType dlgType)
+                                       const wchar_t* errDescription,
+                                       const wchar_t* ftpPath, const wchar_t* ftpName,
+                                       const wchar_t* diskPath, const wchar_t* diskName,
+                                       BOOL* applyToAll, wchar_t** newName, CSolveItemErrorDlgType dlgType)
     : CCenteredDialog(HLanguage, SolveItemErrorGetDlgResId(dlgType), IDH_SOLVEERROR, parent)
 {
     Oper = oper;
@@ -119,14 +180,22 @@ CSolveItemErrorDlg::CSolveItemErrorDlg(HWND parent, CFTPOperation* oper, DWORD w
 
 void CSolveItemErrorDlg::Validate(CTransferInfo& ti)
 {
-    CPathBuffer buf; // Heap-allocated for long path support
     if (!DontTransferName)
     {
-        ti.EditLine(IDE_SCRD_TGTNAME, buf, buf.Size());
-        if (buf[0] == 0)
+        std::wstring name;
+        try
         {
-            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MAYNOTBEEMPTY),
-                                             LoadStr(IDS_FTPERRORTITLE),
+            name = SPLGetDlgItemTextOwned(HWindow, IDE_SCRD_TGTNAME);
+        }
+        catch (...)
+        {
+            ti.ErrorOn(IDE_SCRD_TGTNAME);
+            return;
+        }
+        if (name.empty())
+        {
+            SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_MAYNOTBEEMPTY).c_str(),
+                                             SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                              MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDE_SCRD_TGTNAME);
             return;
@@ -155,7 +224,6 @@ int ButtonActionsTbl[][8] = {
 
 void CSolveItemErrorDlg::Transfer(CTransferInfo& ti)
 {
-    char buf[500];
     ti.CheckBox(IDC_SCRD_APPLYTOALL, *ApplyToAll);
     int value = 0;
     BOOL upload = DlgType == sidtUploadCannotCreateTgtDir || DlgType == sidtUploadTgtDirAlreadyExists ||
@@ -170,52 +238,54 @@ void CSolveItemErrorDlg::Transfer(CTransferInfo& ti)
             dlgResID == IDD_SOLVEITEMERRDETAILED3 || dlgResID == IDD_SOLVEITEMERRDETAILEDEX ||
             dlgResID == IDD_SOLVEITEMERRDETAILED3EX)
         {
-            buf[0] = 0;
+            std::wstring detailsText;
             switch (DlgType)
             {
             case sidtTransferFailedOnCreatedFile:
             case sidtUploadTransferFailedOnCreatedFile:
-                lstrcpyn(buf, LoadStr(IDS_SIED_DETAIL1), 500);
+                detailsText = LangStr(IDS_SIED_DETAIL1).c_str();
                 break;
 
             case sidtTransferFailedOnResumedFile:
             case sidtUploadTransferFailedOnResumedFile:
-                lstrcpyn(buf, LoadStr(IDS_SIED_DETAIL2), 500);
+                detailsText = LangStr(IDS_SIED_DETAIL2).c_str();
                 break;
 
             default:
             {
                 if (WinError != NO_ERROR)
-                    FTPGetErrorText(WinError, buf, 500);
+                {
+                    std::string errorText;
+                    if (FTPGetErrorText(WinError, errorText))
+                        FtpDecodeLocalText(errorText, detailsText);
+                }
                 else
                 {
                     if (ErrDescription != NULL)
-                        lstrcpyn(buf, ErrDescription, 500);
+                        detailsText = ErrDescription;
                 }
-                char* s = buf + strlen(buf);
-                while (--s >= buf && (*s == '\r' || *s == '\n'))
-                    ;
-                *(s + 1) = 0;
+                while (!detailsText.empty() && (detailsText.back() == L'\r' || detailsText.back() == L'\n'))
+                    detailsText.pop_back();
                 break;
             }
             }
-            ti.EditLine(IDE_SCRD_DETAILS, buf, 500);
+            SetDlgItemTextW(HWindow, IDE_SCRD_DETAILS, detailsText.c_str());
             SendDlgItemMessage(HWindow, IDE_SCRD_DETAILS, EM_SETSEL, 0, 0);
         }
 
         if (!upload)
         {
-            ti.EditLine(IDE_SCRD_SRCPATH, (char*)FtpPath, FTP_MAX_PATH);
-            ti.EditLine(IDE_SCRD_SRCNAME, (char*)FtpName, FTP_MAX_PATH);
-            ti.EditLine(IDE_SCRD_TGTPATH, (char*)DiskPath, MAX_PATH);
-            ti.EditLine(IDE_SCRD_TGTNAME, (char*)DiskName, MAX_PATH);
+            SetDlgItemTextW(HWindow, IDE_SCRD_SRCPATH, FtpPath);
+            SetDlgItemTextW(HWindow, IDE_SCRD_SRCNAME, FtpName);
+            SetDlgItemTextW(HWindow, IDE_SCRD_TGTPATH, DiskPath);
+            SetDlgItemTextW(HWindow, IDE_SCRD_TGTNAME, DiskName);
         }
         else
         {
-            ti.EditLine(IDE_SCRD_SRCPATH, (char*)DiskPath, MAX_PATH);
-            ti.EditLine(IDE_SCRD_SRCNAME, (char*)DiskName, MAX_PATH);
-            ti.EditLine(IDE_SCRD_TGTPATH, (char*)FtpPath, FTP_MAX_PATH);
-            ti.EditLine(IDE_SCRD_TGTNAME, (char*)FtpName, FTP_MAX_PATH);
+            SetDlgItemTextW(HWindow, IDE_SCRD_SRCPATH, DiskPath);
+            SetDlgItemTextW(HWindow, IDE_SCRD_SRCNAME, DiskName);
+            SetDlgItemTextW(HWindow, IDE_SCRD_TGTPATH, FtpPath);
+            SetDlgItemTextW(HWindow, IDE_SCRD_TGTNAME, FtpName);
         }
     }
     else
@@ -229,15 +299,30 @@ void CSolveItemErrorDlg::Transfer(CTransferInfo& ti)
         }
         if (!DontTransferName && NewName != NULL)
         {
-            ti.EditLine(IDE_SCRD_TGTNAME, buf, MAX_PATH);
-            if (!upload && strcmp(buf, DiskName) != 0 ||
-                upload && strcmp(buf, FtpName) != 0)
+            std::wstring name;
+            try
             {
-                *NewName = SalamanderGeneral->DupStr(buf);
+                name = SPLGetDlgItemTextOwned(HWindow, IDE_SCRD_TGTNAME);
+            }
+            catch (...)
+            {
+                name.clear();
+            }
+            if (name.empty())
+            {
+                SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_OPERDOPPR_LOWMEM).c_str(),
+                                                 SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
+                                                 MB_OK | MB_ICONEXCLAMATION);
+                ti.ErrorOn(IDE_SCRD_TGTNAME);
+                return;
+            }
+            if (!upload && name != DiskName || upload && name != FtpName)
+            {
+                *NewName = DupDialogWideString(name.c_str());
                 if (*NewName == NULL)
                 {
-                    SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_OPERDOPPR_LOWMEM),
-                                                     LoadStr(IDS_FTPERRORTITLE),
+                    SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_OPERDOPPR_LOWMEM).c_str(),
+                                                     SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                                      MB_OK | MB_ICONEXCLAMATION);
                     ti.ErrorOn(IDE_SCRD_TGTNAME);
                     return;
@@ -449,7 +534,7 @@ CSolveItemErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         if (titleID != -1)
-            SetWindowText(HWindow, LoadStr(titleID));
+            SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, titleID).c_str());
         SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
 
         if (DlgType == sidtTgtFileAlreadyExists ||
@@ -570,7 +655,7 @@ CSolveItemErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //
 
 CSolveItemErrUnkAttrDlg::CSolveItemErrUnkAttrDlg(HWND parent, CFTPOperation* oper,
-                                                 const char* path, const char* name,
+                                                 const wchar_t* path, const wchar_t* name,
                                                  const char* origRights, WORD newAttr,
                                                  BOOL* applyToAll)
     : CCenteredDialog(HLanguage, IDD_SOLVEITEMERRUNKATTR, IDH_SOLVEERROR, parent)
@@ -589,16 +674,23 @@ void CSolveItemErrUnkAttrDlg::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_SCRD_APPLYTOALL, *ApplyToAll);
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDE_SCRD_SRCPATH, (char*)Path, FTP_MAX_PATH);
-        ti.EditLine(IDE_SCRD_SRCNAME, (char*)Name, FTP_MAX_PATH);
-        char* attrs = (char*)OrigRights;
-        if (attrs == NULL)
-            attrs = LoadStr(IDS_OPERDOPPR_UNKEXISTATTR);
-        ti.EditLine(IDE_SCRD_CURATTR, attrs, 100);
-        char buf[100];
-        GetUNIXRightsStr(buf, 20, NewAttr);
-        sprintf(buf + strlen(buf), " (%03o)", NewAttr);
-        ti.EditLine(IDE_SCRD_NEWATTR, buf, MAX_PATH);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCPATH, Path);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCNAME, Name);
+        if (OrigRights == NULL)
+            SetDlgItemTextW(HWindow, IDE_SCRD_CURATTR, LangStr(IDS_OPERDOPPR_UNKEXISTATTR).c_str());
+        else
+        {
+            std::wstring rights;
+            if (FtpDecodeLocalText(OrigRights, rights))
+                SetDlgItemTextW(HWindow, IDE_SCRD_CURATTR, rights.c_str());
+            else
+                ti.ErrorOn(IDE_SCRD_CURATTR);
+        }
+        std::wstring newRights;
+        if (FormatUNIXRightsForDisplay(NewAttr, TRUE, newRights))
+            SetDlgItemTextW(HWindow, IDE_SCRD_NEWATTR, newRights.c_str());
+        else
+            ti.ErrorOn(IDE_SCRD_NEWATTR);
     }
     else
     {
@@ -707,7 +799,7 @@ CSolveItemErrUnkAttrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 extern void UpdateCheckBox(HWND hWindow, int checkID, int value); // function defined in CChangeAttrsDlg
 
 CSolveItemSetNewAttrDlg::CSolveItemSetNewAttrDlg(HWND parent, CFTPOperation* oper,
-                                                 const char* path, const char* name,
+                                                 const wchar_t* path, const wchar_t* name,
                                                  const char* origRights, WORD* attr,
                                                  BOOL* applyToAll)
     : CCenteredDialog(HLanguage, IDD_SOLVEITEMSETNEWATTR, IDD_SOLVEITEMSETNEWATTR, parent)
@@ -734,27 +826,26 @@ void CSolveItemSetNewAttrDlg::RefreshNumValue()
     UINT groupExec = IsDlgButtonChecked(HWindow, IDC_EXECUTEGROUP);
     UINT othersExec = IsDlgButtonChecked(HWindow, IDC_EXECUTEOTHERS);
 
-    char text[4];
-    text[3] = 0;
-    text[0] = '0' + (userRead << 2) + (userWrite << 1) + userExec;
-    text[1] = '0' + (groupRead << 2) + (groupWrite << 1) + groupExec;
-    text[2] = '0' + (othersRead << 2) + (othersWrite << 1) + othersExec;
+    std::wstring text(3, L'0');
+    text[0] = L'0' + (userRead << 2) + (userWrite << 1) + userExec;
+    text[1] = L'0' + (groupRead << 2) + (groupWrite << 1) + groupExec;
+    text[2] = L'0' + (othersRead << 2) + (othersWrite << 1) + othersExec;
     EnableNotification = FALSE;
     HWND edit = GetDlgItem(HWindow, IDE_NUMATTRVALUE);
     DWORD start = 0;
     DWORD end = 0;
     SendMessage(edit, EM_GETSEL, (WPARAM)(&start), (LPARAM)(&end));
-    SetWindowText(edit, text);
+    SetWindowTextW(edit, text.c_str());
     SendMessage(edit, EM_SETSEL, start, end);
     EnableNotification = TRUE;
 }
 
 void CSolveItemSetNewAttrDlg::Validate(CTransferInfo& ti)
 {
-    char text[5];
-    if (GetDlgItemText(HWindow, IDE_NUMATTRVALUE, text, 5) != 3)
+    const std::wstring text = SPLGetDlgItemTextOwned(HWindow, IDE_NUMATTRVALUE);
+    if (text.size() != 3)
     {
-        SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_CHATTRNUMVAL3DIGITS), LoadStr(IDS_FTPERRORTITLE),
+        SalamanderGeneral->SalMessageBox(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CHATTRNUMVAL3DIGITS).c_str(), SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(),
                                          MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDE_NUMATTRVALUE);
         return;
@@ -787,12 +878,18 @@ void CSolveItemSetNewAttrDlg::Transfer(CTransferInfo& ti)
         RefreshNumValue();
 
         EnableNotification = FALSE;
-        ti.EditLine(IDE_SCRD_SRCPATH, (char*)Path, FTP_MAX_PATH);
-        ti.EditLine(IDE_SCRD_SRCNAME, (char*)Name, FTP_MAX_PATH);
-        char* origRights = (char*)OrigRights;
-        if (origRights == NULL)
-            origRights = LoadStr(IDS_OPERDOPPR_UNKEXISTATTR);
-        ti.EditLine(IDE_SCRD_CURATTR, origRights, 100);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCPATH, Path);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCNAME, Name);
+        if (OrigRights == NULL)
+            SetDlgItemTextW(HWindow, IDE_SCRD_CURATTR, LangStr(IDS_OPERDOPPR_UNKEXISTATTR).c_str());
+        else
+        {
+            std::wstring rights;
+            if (FtpDecodeLocalText(OrigRights, rights))
+                SetDlgItemTextW(HWindow, IDE_SCRD_CURATTR, rights.c_str());
+            else
+                ti.ErrorOn(IDE_SCRD_CURATTR);
+        }
         EnableNotification = TRUE;
     }
     else
@@ -847,16 +944,16 @@ CSolveItemSetNewAttrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == EN_CHANGE)
                 {
-                    char text[5];
-                    if (GetDlgItemText(HWindow, IDE_NUMATTRVALUE, text, 5) == 3)
+                    const std::wstring text = SPLGetDlgItemTextOwned(HWindow, IDE_NUMATTRVALUE);
+                    if (text.size() == 3)
                     {
                         DWORD attr = 0;
-                        if (text[0] >= '0' && text[0] <= '7')
-                            attr |= (text[0] - '0') << 6;
-                        if (text[1] >= '0' && text[1] <= '7')
-                            attr |= (text[1] - '0') << 3;
-                        if (text[2] >= '0' && text[2] <= '7')
-                            attr |= text[2] - '0';
+                        if (text[0] >= L'0' && text[0] <= L'7')
+                            attr |= (text[0] - L'0') << 6;
+                        if (text[1] >= L'0' && text[1] <= L'7')
+                            attr |= (text[1] - L'0') << 3;
+                        if (text[2] >= L'0' && text[2] <= L'7')
+                            attr |= text[2] - L'0';
 
                         int userRead = ((attr & 0400) != 0);
                         int groupRead = ((attr & 0040) != 0);
@@ -893,8 +990,8 @@ CSolveItemSetNewAttrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CSolveLowMemoryErr
 //
 
-CSolveLowMemoryErr::CSolveLowMemoryErr(HWND parent, const char* ftpPath,
-                                       const char* ftpName, BOOL* applyToAll,
+CSolveLowMemoryErr::CSolveLowMemoryErr(HWND parent, const wchar_t* ftpPath,
+                                       const wchar_t* ftpName, BOOL* applyToAll,
                                        int titleID)
     : CCenteredDialog(HLanguage, IDD_SOLVELOWMEMORYERR, IDH_SOLVEERROR, parent)
 {
@@ -908,8 +1005,8 @@ void CSolveLowMemoryErr::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDE_SCRD_SRCPATH, (char*)FtpPath, FTP_MAX_PATH);
-        ti.EditLine(IDE_SCRD_SRCNAME, (char*)FtpName, FTP_MAX_PATH);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCPATH, FtpPath);
+        SetDlgItemTextW(HWindow, IDE_SCRD_SRCNAME, FtpName);
     }
     ti.CheckBox(IDC_SCRD_APPLYTOALL, *ApplyToAll);
 }
@@ -923,7 +1020,7 @@ CSolveLowMemoryErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (TitleID != -1)
-            SetWindowText(HWindow, LoadStr(TitleID));
+            SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         break;
     }
 
@@ -1055,7 +1152,7 @@ void COperDlgListView::Attach(HWND hListView, COperationDlg* operDlg, BOOL consO
     ConsOrItems = consOrItems;
     AttachToWindow(hListView);
 
-    HToolTip = CreateWindow(TOOLTIPS_CLASS, (LPSTR)NULL, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE,
+    HToolTip = CreateWindow(TOOLTIPS_CLASS, (LPWSTR)NULL, TTS_ALWAYSTIP | TTS_NOPREFIX | TTS_NOANIMATE,
                             CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
                             HWindow, (HMENU)NULL, DLLInstance, NULL);
     // we take the default font from the dialog
@@ -1074,7 +1171,7 @@ void COperDlgListView::Attach(HWND hListView, COperationDlg* operDlg, BOOL consO
 
     if (HToolTip != NULL)
     {
-        static char emptyBuff[] = "";
+        static wchar_t emptyBuff[] = L"";
         TOOLINFO ti;
         ti.cbSize = sizeof(ti);
         ti.hwnd = HWindow;
@@ -1135,21 +1232,19 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 hti.iItem >= ListView_GetTopIndex(HWindow))
             {
                 // extract the text from the appropriate column and row of the list view
-                char buff[1000];
-                buff[0] = 0;
                 int index = hti.iItem;
                 if (OperDlg->ShowOnlyErrors && index >= 0 && index < OperDlg->ErrorsIndexes.Count)
                     index = OperDlg->ErrorsIndexes[index];
                 NMLVDISPINFO lvdi;
                 lvdi.item.mask = LVIF_TEXT;
                 lvdi.item.iSubItem = hti.iSubItem;
-                lvdi.item.pszText = buff;
-                lvdi.item.cchTextMax = 1000;
+                // pszText is overwritten unconditionally by GetListViewData because LVIF_TEXT is set.
+                lvdi.item.cchTextMax = 0;
                 if (ConsOrItems)
-                    OperDlg->WorkersList->GetListViewDataFor(index, &lvdi, buff, 1000);
+                    OperDlg->WorkersList->GetListViewDataFor(index, &lvdi, ToolTipText);
                 else
-                    OperDlg->Queue->GetListViewDataFor(index, &lvdi, buff, 1000);
-                LastWidth = ListView_GetStringWidth(HWindow, buff);
+                    OperDlg->Queue->GetListViewDataForW(index, &lvdi, ToolTipText);
+                LastWidth = ListView_GetStringWidth(HWindow, ToolTipText.c_str());
 
                 LastItem = hti.iItem;
                 LastSubItem = hti.iSubItem;
@@ -1174,17 +1269,19 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     rect.right = cr.right;
 
                 if (LastWidth > rect.right - rect.left - (hti.iSubItem == 0 ? 4 : 12))
-                    ti.lpszText = buff;
+                {
+                    ti.lpszText = const_cast<LPWSTR>(ToolTipText.c_str());
+                }
                 else
                 {
-                    static char emptyBuff[] = "";
+                    static wchar_t emptyBuff[] = L"";
                     ti.lpszText = emptyBuff;
                     LastItem = -1;
                 }
                 ::SendMessage(HToolTip, TTM_SETTOOLINFO, 0, (LPARAM)(LPTOOLINFO)&ti);
 
                 // proportionally set the display duration of the tooltip (longer text = longer display)
-                int len = (int)strlen(buff);
+                int len = (int)ToolTipText.size();
                 len = max(100, (len * 10) / 4) * 80; // I used Honza's recipe ;-)
                 ::SendMessage(HToolTip, TTM_SETDELAYTIME, TTDT_AUTOPOP, len);
             }
@@ -1271,7 +1368,7 @@ void COperDlgListView::HideToolTip(int onlyIfOnIndex)
 {
     if (HToolTip != NULL && (onlyIfOnIndex == -1 || onlyIfOnIndex == LastItem))
     {
-        static char emptyBuff[] = "";
+        static wchar_t emptyBuff[] = L"";
         TOOLINFO ti;
         ti.cbSize = sizeof(ti);
         ti.hwnd = HWindow;
@@ -1289,10 +1386,18 @@ void COperDlgListView::HideToolTip(int onlyIfOnIndex)
 // CGetDiskFreeSpaceThread
 //
 
-CGetDiskFreeSpaceThread::CGetDiskFreeSpaceThread(const char* path, HWND dialog) : CThread("GetDiskFreeSpaceThread")
+CGetDiskFreeSpaceThread::CGetDiskFreeSpaceThread(const std::wstring& path, HWND dialog) noexcept : CThread(L"GetDiskFreeSpaceThread")
 {
     HANDLES(InitializeCriticalSection(&GetFreeSpaceCritSect));
-    lstrcpyn(Path, path, MAX_PATH);
+    PathValid = FALSE;
+    try
+    {
+        Path = path;
+        PathValid = TRUE;
+    }
+    catch (...)
+    {
+    }
     FreeSpace.Set(-1, -1);
     Dialog = dialog;
     WorkOrTerminate = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL)); // auto, non-signaled
@@ -1347,18 +1452,30 @@ CGetDiskFreeSpaceThread::Body()
 
         // determine what we should do
         HANDLES(EnterCriticalSection(&GetFreeSpaceCritSect));
-        CPathBuffer path; // Heap-allocated for long path support
+        std::wstring path;
+        BOOL pathValid = FALSE;
         BOOL terminate = TerminateThread;
-        lstrcpyn(path, Path, path.Size());
+        try
+        {
+            path = Path;
+            pathValid = TRUE;
+        }
+        catch (...)
+        {
+        }
         HANDLES(LeaveCriticalSection(&GetFreeSpaceCritSect));
         if (terminate)
             break; // we are done...
 
         CQuadWord freeSpace;
-        DWORD ti = GetTickCount();
-        SalamanderGeneral->GetDiskFreeSpace(&freeSpace, path, NULL);
-        if (GetTickCount() - ti > 10000)
-            freeSpace.Set(-1, -1); // discard results older than ten seconds (the situation is completely different anyway)
+        freeSpace.Set(-1, -1);
+        if (pathValid)
+        {
+            DWORD ti = GetTickCount();
+            SalamanderGeneral->GetDiskFreeSpace(&freeSpace, path.c_str(), NULL);
+            if (GetTickCount() - ti > 10000)
+                freeSpace.Set(-1, -1); // discard results older than ten seconds (the situation is completely different anyway)
+        }
 
         HANDLES(EnterCriticalSection(&GetFreeSpaceCritSect));
         FreeSpace = freeSpace;
@@ -1380,7 +1497,7 @@ CGetDiskFreeSpaceThread::Body()
 //
 
 CSolveItemErrorSimpleDlg::CSolveItemErrorSimpleDlg(HWND parent, CFTPOperation* oper,
-                                                   const char* ftpPath, const char* ftpName,
+                                                   const wchar_t* ftpPath, const wchar_t* ftpName,
                                                    BOOL* applyToAll, CSolveItemErrorSimpleDlgType dlgType)
     : CCenteredDialog(HLanguage, IDD_SOLVEITEMSIMPLEERR, IDH_SOLVEERROR, parent)
 {
@@ -1397,8 +1514,8 @@ void CSolveItemErrorSimpleDlg::Transfer(CTransferInfo& ti)
     ti.CheckBox(IDC_SISE_APPLYTOALL, *ApplyToAll);
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDE_SISE_PATH, (char*)FtpPath, FTP_MAX_PATH);
-        ti.EditLine(IDE_SISE_NAME, (char*)FtpName, FTP_MAX_PATH);
+        SetDlgItemTextW(HWindow, IDE_SISE_PATH, FtpPath);
+        SetDlgItemTextW(HWindow, IDE_SISE_NAME, FtpName);
     }
     else
     {
@@ -1497,7 +1614,7 @@ CSolveItemErrorSimpleDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             TRACE_E("Unexpected situation in CSolveItemErrorSimpleDlg::DialogProc(): unknown DlgType!");
             break;
         }
-        SetWindowText(HWindow, LoadStr(titleID));
+        SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, titleID).c_str());
         SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;
     }
@@ -1573,8 +1690,8 @@ CSolveItemErrorSimpleDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CSolveServerCmdErr
 //
 
-CSolveServerCmdErr::CSolveServerCmdErr(HWND parent, int titleID, const char* ftpPath,
-                                       const char* ftpName, const char* errorDescr,
+CSolveServerCmdErr::CSolveServerCmdErr(HWND parent, int titleID, const wchar_t* ftpPath,
+                                       const wchar_t* ftpName, const wchar_t* errorDescr,
                                        BOOL* applyToAll, CSolveItemErrorSrvCmdDlgType dlgType)
     : CCenteredDialog(HLanguage, ftpName[0] == 0 ? IDD_SOLVESERVERCMDERR3 : IDD_SOLVESERVERCMDERR, IDH_SOLVEERROR, parent)
 {
@@ -1590,10 +1707,10 @@ void CSolveServerCmdErr::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
-        ti.EditLine(IDE_SSCD_PATH, (char*)FtpPath, FTP_MAX_PATH);
+        SetDlgItemTextW(HWindow, IDE_SSCD_PATH, FtpPath);
         if (FtpName[0] != 0)
-            ti.EditLine(IDE_SSCD_NAME, (char*)FtpName, FTP_MAX_PATH);
-        ti.EditLine(IDE_SSCD_ERRDSCR, (char*)ErrorDescr, FTP_MAX_PATH);
+            SetDlgItemTextW(HWindow, IDE_SSCD_NAME, FtpName);
+        SetDlgItemTextW(HWindow, IDE_SSCD_ERRDSCR, ErrorDescr);
     }
     ti.CheckBox(IDC_SSCD_APPLYTOALL, *ApplyToAll);
 }
@@ -1606,7 +1723,7 @@ CSolveServerCmdErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, LoadStr(TitleID));
+        SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         if (DlgType != siscdtSimple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;
@@ -1678,9 +1795,9 @@ CSolveServerCmdErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CSolveServerCmdErr2
 //
 
-CSolveServerCmdErr2::CSolveServerCmdErr2(HWND parent, int titleID, const char* ftpPath,
-                                         const char* ftpName, const char* diskPath,
-                                         const char* diskName, const char* errorDescr,
+CSolveServerCmdErr2::CSolveServerCmdErr2(HWND parent, int titleID, const wchar_t* ftpPath,
+                                         const wchar_t* ftpName, const wchar_t* diskPath,
+                                         const wchar_t* diskName, const wchar_t* errorDescr,
                                          BOOL* applyToAll, CSolveItemErrorSrvCmdDlgType2 dlgType)
     : CCenteredDialog(HLanguage, dlgType == siscdt2Simple ? IDD_SOLVESERVERCMDERR2 : IDD_SOLVESERVERCMDERR2EX,
                       IDH_SOLVEERROR, parent)
@@ -1701,19 +1818,19 @@ void CSolveServerCmdErr2::Transfer(CTransferInfo& ti)
     {
         if (DlgType == siscdt2UploadUnableToStore || DlgType == siscdt2UploadTestIfFinished)
         {
-            ti.EditLine(IDE_SSCD_TGTPATH, (char*)FtpPath, FTP_MAX_PATH);
-            ti.EditLine(IDE_SSCD_TGTNAME, (char*)FtpName, FTP_MAX_PATH);
-            ti.EditLine(IDE_SSCD_SRCPATH, (char*)DiskPath, MAX_PATH);
-            ti.EditLine(IDE_SSCD_SRCNAME, (char*)DiskName, MAX_PATH);
+            SetDlgItemTextW(HWindow, IDE_SSCD_TGTPATH, FtpPath);
+            SetDlgItemTextW(HWindow, IDE_SSCD_TGTNAME, FtpName);
+            SetDlgItemTextW(HWindow, IDE_SSCD_SRCPATH, DiskPath);
+            SetDlgItemTextW(HWindow, IDE_SSCD_SRCNAME, DiskName);
         }
         else
         {
-            ti.EditLine(IDE_SSCD_SRCPATH, (char*)FtpPath, FTP_MAX_PATH);
-            ti.EditLine(IDE_SSCD_SRCNAME, (char*)FtpName, FTP_MAX_PATH);
-            ti.EditLine(IDE_SSCD_TGTPATH, (char*)DiskPath, MAX_PATH);
-            ti.EditLine(IDE_SSCD_TGTNAME, (char*)DiskName, MAX_PATH);
+            SetDlgItemTextW(HWindow, IDE_SSCD_SRCPATH, FtpPath);
+            SetDlgItemTextW(HWindow, IDE_SSCD_SRCNAME, FtpName);
+            SetDlgItemTextW(HWindow, IDE_SSCD_TGTPATH, DiskPath);
+            SetDlgItemTextW(HWindow, IDE_SSCD_TGTNAME, DiskName);
         }
-        ti.EditLine(IDE_SSCD_ERRDSCR, (char*)ErrorDescr, FTP_MAX_PATH);
+        SetDlgItemTextW(HWindow, IDE_SSCD_ERRDSCR, ErrorDescr);
     }
     ti.CheckBox(IDC_SSCD_APPLYTOALL, *ApplyToAll);
 }
@@ -1726,7 +1843,7 @@ CSolveServerCmdErr2::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, LoadStr(TitleID));
+        SetWindowTextW(HWindow, SPLLoadStrOwned(SalamanderGeneral, HLanguage, TitleID).c_str());
         if (DlgType != siscdt2Simple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;

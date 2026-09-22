@@ -10,15 +10,9 @@
 #include "array2.h"
 #include "pakiface.h"
 #include "pak_dll.h"
+#include "../spl/pak_text.h"
 
-/*
-void FreeRegion(void * region)
-{
-  free(((CDelRegion *)region)->Description);
-  if (((CDelRegion *)region)->FileName) free(((CDelRegion *)region)->FileName);
-  free(region);
-}
-*/
+#include <cstring>
 
 // ****************************************************************************
 //
@@ -26,33 +20,12 @@ void FreeRegion(void * region)
 //
 
 CDelRegion::CDelRegion(const char* descript, DWORD offset, DWORD size, const char* fileName)
+    : Description(descript != nullptr ? descript : ""),
+      Offset(offset),
+      Size(size),
+      FileName(fileName != nullptr ? fileName : ""),
+      HasFileName(fileName != nullptr)
 {
-    if (descript)
-    {
-        Description = (char*)malloc(lstrlen(descript) + 1);
-        if (Description)
-            lstrcpy(Description, descript);
-    }
-    else
-        Description = NULL;
-    Offset = offset;
-    Size = size;
-    if (fileName)
-    {
-        FileName = (char*)malloc(lstrlen(fileName) + 1);
-        if (FileName)
-            lstrcpy(FileName, fileName);
-    }
-    else
-        FileName = NULL;
-}
-
-CDelRegion::~CDelRegion()
-{
-    if (Description)
-        free(Description);
-    if (FileName)
-        free(FileName);
 }
 
 // ****************************************************************************
@@ -62,19 +35,25 @@ CDelRegion::~CDelRegion()
 
 BOOL CPakIface::MarkForDelete()
 {
-    char descr[PAK_MAXPATH];
+    std::string descr;
     if (!GetName(PakDir[DirPos].FileName, descr))
         return FALSE;
 
-    CDelRegion* region = new CDelRegion(descr, PakDir[DirPos].Offset, PakDir[DirPos].Size,
-                                        PakDir[DirPos].FileName);
-    if (!region)
-        return HandleError(0, IDS_PAK_LOWMEMORY);
-    if (!region->Description || !region->FileName)
+    CDelRegion* region = nullptr;
+    try
     {
-        delete region;
+        const std::string rawFileName(
+            PakDir[DirPos].FileName,
+            strnlen(PakDir[DirPos].FileName, sizeof(PakDir[DirPos].FileName)));
+        region = new CDelRegion(descr.c_str(), PakDir[DirPos].Offset, PakDir[DirPos].Size,
+                                rawFileName.c_str());
+    }
+    catch (...)
+    {
         return HandleError(0, IDS_PAK_LOWMEMORY);
     }
+    if (!region)
+        return HandleError(0, IDS_PAK_LOWMEMORY);
 
     if (region->Size && DelRegions.Add(region) ||
         !region->Size && ZeroSizedFiles.Add(region))
@@ -139,26 +118,22 @@ void Sort(int left, int right, TIndirectArray2<CDelRegion>& regions)
         Sort(i, right, regions);
 }
 
-BOOL StrEqual(const char* string1, const char* string2)
+static bool RawPakNameEquals(const std::string& name, const char* rawName, size_t capacity)
 {
-    const char* sour1 = string1;
-    const char* sour2 = string2;
-    while (*sour1 && *sour1 == *sour2)
-    {
-        sour1++;
-        sour2++;
-    }
-    return *sour1 == *sour2;
+    const size_t rawLength = strnlen(rawName, capacity);
+    return name.size() == rawLength &&
+           std::memcmp(name.data(), rawName, rawLength) == 0;
 }
 
 void CPakIface::UpdateDir(CDelRegion* region, DWORD topOffset, DWORD delta)
 {
-    if (region->FileName)
+    if (region->HasFileName)
     {
         unsigned i;
         for (i = 0; i < DirSize; i++)
         {
-            if (StrEqual(region->FileName, PakDir[i].FileName))
+            if (RawPakNameEquals(region->FileName, PakDir[i].FileName,
+                                 sizeof(PakDir[i].FileName)))
             {
                 memmove(&PakDir[i], &PakDir[i + 1],
                         (DirSize - i - 1) * sizeof(CPackEntry));
@@ -183,12 +158,13 @@ BOOL CPakIface::DeleteZeroSized()
     for (i = 0; i < ZeroSizedFiles.Count; i++)
     {
         region = ZeroSizedFiles[i];
-        if (!Callbacks->DelNotify(region->Description, 1))
+        if (!Callbacks->DelNotify(region->Description.c_str(), 1))
             return FALSE;
         unsigned j;
         for (j = 0; j < DirSize; j++)
         {
-            if (StrEqual(region->FileName, PakDir[j].FileName))
+            if (RawPakNameEquals(region->FileName, PakDir[j].FileName,
+                                 sizeof(PakDir[j].FileName)))
             {
                 memmove(&PakDir[j], &PakDir[j + 1], (DirSize - j - 1) * sizeof(CPackEntry));
                 --DirSize;
@@ -203,7 +179,7 @@ BOOL CPakIface::DeleteZeroSized()
 
 BOOL CPakIface::MoveData(DWORD writePos, DWORD readPos, DWORD size, BOOL* userBreak)
 {
-    char* buffer[IOBUFSIZE];
+    char buffer[IOBUFSIZE];
     DWORD read;
 
     while (size)
@@ -238,19 +214,29 @@ BOOL CPakIface::DeleteFiles(BOOL* needOptim)
             return FALSE;
     }
 
-    CDelRegion* region = new CDelRegion(LoadStr(IDS_PAK_CENTRDIR), Header.DirOffset, Header.DirSize, NULL);
+    // DelNotify is the legacy byte callback used for progress labels. Encode this one
+    // localized label explicitly and transactionally at that boundary.
+    std::string centralDirName;
+    if (EncodePakText(LangStr(IDS_PAK_CENTRDIR), centralDirName) != PakTextStatus::Success)
+    {
+        DelRegions.Destroy();
+        return HandleError(0, IDS_PAK_LOWMEMORY);
+    }
+    CDelRegion* region = nullptr;
+    try
+    {
+        region = new CDelRegion(centralDirName.c_str(), Header.DirOffset, Header.DirSize, NULL);
+    }
+    catch (...)
+    {
+        DelRegions.Destroy();
+        return HandleError(0, IDS_PAK_LOWMEMORY);
+    }
     if (!region)
     {
         DelRegions.Destroy();
         return HandleError(0, IDS_PAK_LOWMEMORY);
     }
-    if (!region->Description)
-    {
-        delete region;
-        DelRegions.Destroy();
-        return HandleError(0, IDS_PAK_LOWMEMORY);
-    }
-
     if (!DelRegions.Add(region))
     {
         delete region;
@@ -274,7 +260,7 @@ BOOL CPakIface::DeleteFiles(BOOL* needOptim)
             size = DelRegions[i + 1]->Offset - rpos;
         else
             size = PakSize - rpos;
-        if (!Callbacks->DelNotify(region->Description, size + 1))
+        if (!Callbacks->DelNotify(region->Description.c_str(), size + 1))
             break;
         if (!MoveData(wpos, rpos, size, &ub))
             break;
@@ -334,30 +320,37 @@ BOOL CPakIface::StartAdding(unsigned count)
 
 BOOL CPakIface::AddFile(const char* fileName, DWORD size)
 {
+    if (fileName == nullptr)
+        return HandleError(0, IDS_PAK_INVLAIDDATA);
     char buffer[IOBUFSIZE];
-    const char* sour = fileName;
-    char* dest = PakDir[DirSize].FileName;
-
-    while (*sour)
+    std::string storedName;
+    try
     {
-        if (dest > PakDir[DirSize].FileName + 0x38)
-            return HandleError(0, IDS_PAK_TOOLONGNAME);
-        if (*sour == '\\')
+        for (const char* source = fileName; *source != '\0'; ++source)
         {
-            *dest++ = '/';
-            sour++;
-            continue;
+            if (*source == '\\')
+            {
+                storedName.push_back('/');
+                continue;
+            }
+            if (strncmp(source, PAK_UPDIR, lstrlenA(PAK_UPDIR)) == 0)
+            {
+                storedName += "..";
+                source += lstrlenA(PAK_UPDIR) - 1;
+                continue;
+            }
+            storedName.push_back(*source);
         }
-        if (strncmp(sour, PAK_UPDIR, lstrlen(PAK_UPDIR)) == 0)
-        {
-            sour = sour + lstrlen(PAK_UPDIR);
-            *dest++ = '.';
-            *dest++ = '.';
-            continue;
-        }
-        *dest++ = *sour++;
     }
-    *dest = 0;
+    catch (...)
+    {
+        return HandleError(0, IDS_PAK_LOWMEMORY);
+    }
+    if (storedName.size() >= sizeof(PakDir[DirSize].FileName))
+        return HandleError(0, IDS_PAK_TOOLONGNAME);
+
+    std::memset(PakDir[DirSize].FileName, 0, sizeof(PakDir[DirSize].FileName));
+    std::memcpy(PakDir[DirSize].FileName, storedName.data(), storedName.size());
     PakDir[DirSize].Offset = AddPos;
     PakDir[DirSize].Size = size;
 

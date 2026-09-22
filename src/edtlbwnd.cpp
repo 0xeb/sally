@@ -479,8 +479,8 @@ void CEditListBox::OnBeginEdit(int start, int end)
     if (Flags & ELB_SHOWICON)
         iconWidth = IconSizes[ICONSIZE_16] + 2;
 
-    EditLine->Create("edit",
-                     "",
+    EditLine->Create(L"edit",
+                     L"",
                      WS_BORDER | WS_CHILDWINDOW | ES_AUTOHSCROLL | ES_LEFT,
                      r.left + iconWidth,
                      r.top,
@@ -498,15 +498,13 @@ void CEditListBox::OnBeginEdit(int start, int end)
     {
         DispInfo.ToDo = edtlbGetData;
         DispInfo.ItemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, index, 0);
-        DispInfo.Buffer = Buffer;
+        DispInfo.Text = &Buffer;
         DispInfo.Index = index;
-        DispInfo.BufferLen = Buffer.Size() - 1;
-        DispInfo.Buffer[0] = 0;
+        Buffer.clear();
         NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
-        DispInfo.Buffer[Buffer.Size() - 1] = 0;
-        SetWindowText(EditLine->HWindow, Buffer);
+        SetWindowTextW(EditLine->HWindow, Buffer.c_str());
     }
-    SendMessage(EditLine->HWindow, EM_SETLIMITTEXT, Buffer.Size(), 0);
+    SendMessage(EditLine->HWindow, EM_SETLIMITTEXT, 0, 0);
     SendMessage(EditLine->HWindow, EM_SETSEL, start, end);
     ShowWindow(EditLine->HWindow, SW_SHOW);
     if (Flags & ELB_RIGHTARROW)
@@ -536,16 +534,15 @@ BOOL CEditListBox::OnSaveEdit()
     SaveDisabled = TRUE;
     if (EditLine != NULL)
     {
-        char buff[2];
-        GetWindowText(EditLine->HWindow, buff, 2);
+        wchar_t buff[2];
+        GetWindowTextW(EditLine->HWindow, buff, _countof(buff));
         if (buff[0] != 0)
         {
             DispInfo.ToDo = edtlbSetData;
             DispInfo.ItemID = (INT_PTR)SendMessage(HWindow, LB_GETITEMDATA, index, 0);
             DispInfo.Index = index;
-            DispInfo.Buffer = Buffer;
-            DispInfo.BufferLen = Buffer.Size() - 1;
-            GetWindowText(EditLine->HWindow, DispInfo.Buffer, Buffer.Size());
+            Buffer = GetWindowTextStringW(EditLine->HWindow);
+            DispInfo.Text = &Buffer;
             BOOL ret = !NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
             SaveDisabled = oldSD;
             return ret;
@@ -668,12 +665,10 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                 DispInfo.ToDo = edtlbGetData;
                 DispInfo.ItemID = itemID;
                 DispInfo.Index = lpdis->itemID;
-                DispInfo.Buffer = Buffer;
-                DispInfo.BufferLen = Buffer.Size() - 1;
-                DispInfo.Buffer[0] = 0;
+                DispInfo.Text = &Buffer;
+                Buffer.clear();
                 DispInfo.Bold = FALSE;
                 NotifyParent(&DispInfo, EDTLBN_GETDISPINFO);
-                DispInfo.Buffer[Buffer.Size() - 1] = 0;
 
                 if (Flags & ELB_SHOWICON)
                 {
@@ -702,10 +697,10 @@ void CEditListBox::OnDrawItem(LPARAM lParam)
                     hOldFont = (HFONT)SelectObject(lpdis->hDC, HBoldFont);
                 else
                     hOldFont = (HFONT)SelectObject(lpdis->hDC, HNormalFont);
-                DrawTextEx(lpdis->hDC, Buffer,
-                           -1, &itemRect,
-                           DT_NOPREFIX | DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS,
-                           &dtp);
+                DrawTextExW(lpdis->hDC, Buffer.data(),
+                            -1, &itemRect,
+                            DT_NOPREFIX | DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS,
+                            &dtp);
                 SelectObject(lpdis->hDC, hOldFont);
                 SetTextColor(lpdis->hDC, oldColor);
                 SetBkMode(lpdis->hDC, oldBkMode);

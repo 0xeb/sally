@@ -8,6 +8,7 @@ sal_add_plugin(NAME peviewer
     "${SAL_PLUGINS}/peviewer/dump_res.cpp"
     "${SAL_PLUGINS}/peviewer/pefile.cpp"
     "${SAL_PLUGINS}/peviewer/peviewer.cpp"
+    "${SAL_PLUGINS}/peviewer/peviewer_text.cpp"
     "${SAL_PLUGINS}/peviewer/precomp.cpp"
   RC "${SAL_PLUGINS}/peviewer/peviewer.rc"
   DEF "${SAL_PLUGINS}/peviewer/peviewer.def"

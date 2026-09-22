@@ -7,44 +7,28 @@
 
 #include <string>
 #include <utility>
+#include <vector>
 #include <windows.h>
 
 struct CommandShellRequest
 {
-    const wchar_t* comspec;
-    const wchar_t* workingDirectory;
-    const wchar_t* command;
-    const wchar_t* windowTitle;
-    bool keepOpen;
-    bool unicodeOutput;
-    bool inheritHandles;
-    bool createNewConsole;
-    bool hideWindow;
-    DWORD creationFlags;
-    bool useShowWindow;
-    WORD showWindow;
-    bool usePosition;
-    DWORD x;
-    DWORD y;
-
-    CommandShellRequest()
-        : comspec(nullptr)
-        , workingDirectory(nullptr)
-        , command(nullptr)
-        , windowTitle(nullptr)
-        , keepOpen(true)
-        , unicodeOutput(false)
-        , inheritHandles(false)
-        , createNewConsole(false)
-        , hideWindow(false)
-        , creationFlags(CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS)
-        , useShowWindow(false)
-        , showWindow(SW_SHOWNORMAL)
-        , usePosition(false)
-        , x(0)
-        , y(0)
-    {
-    }
+    std::wstring comspec;
+    std::wstring workingDirectory;
+    std::wstring command;
+    std::wstring windowTitle;
+    std::vector<wchar_t> environmentBlock;
+    bool useEnvironment = false;
+    bool keepOpen = true;
+    bool unicodeOutput = false;
+    bool inheritHandles = false;
+    bool createNewConsole = false;
+    bool hideWindow = false;
+    DWORD creationFlags = CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS;
+    bool useShowWindow = false;
+    WORD showWindow = SW_SHOWNORMAL;
+    bool usePosition = false;
+    DWORD x = 0;
+    DWORD y = 0;
 };
 
 struct CommandShellResult
@@ -92,7 +76,10 @@ struct CommandShellResult
 struct CommandShellPolicyInfo
 {
     std::wstring quotedComspec;
-    std::string executableNameForPolicy;
+    // wide: CSystemPolicies::GetMyCanRun takes wchar_t*, so there is
+    // nothing to narrow for. This used to be narrowed with TryWideToAnsiRoundTripExact
+    // and CLEARED on failure, which fed the DisallowRun blocklist an empty name.
+    std::wstring executableNameForPolicy;
 };
 
 struct CommandShellPolicyResult

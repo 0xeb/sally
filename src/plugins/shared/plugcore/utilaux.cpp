@@ -3,73 +3,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-
-char* Replace(char* string, char s, char d)
-{
-    CALL_STACK_MESSAGE3("Replace(, %u, %u)", s, d);
-    char* iterator = string;
-    while (*iterator)
-    {
-        if (*iterator == s)
-            *iterator = d;
-        iterator++;
-    }
-    return string;
-}
-
-BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
-                     char* buffer, BOOL save)
-{
-    CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
-    OPENFILENAME ofn;
-    char buf[200];
-    CPathBuffer fileName; // Heap-allocated for long path support
-    lstrcpyn(buf, filter, 200);
-    Replace(buf, '\t', '\0');
-
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = parent;
-    ofn.lpstrFilter = buf;
-    DWORD attr = SG->SalGetFileAttributes(buffer);
-    if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_DIRECTORY))
-    {
-        *fileName = 0;
-        ofn.lpstrInitialDir = buffer;
-    }
-    else
-        strcpy(fileName, buffer);
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = fileName.Size();
-    ofn.lpstrTitle = title;
-    //ofn.lpfnHook = OFNHookProc;
-    ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
-
-    BOOL ret;
-    if (save)
-        ret = SG->SafeGetSaveFileName(&ofn);
-    else
-    {
-        ofn.Flags |= OFN_FILEMUSTEXIST;
-        ret = SG->SafeGetOpenFileName(&ofn);
-    }
-
-    if (ret)
-        strcpy(buffer, fileName);
-
-    return ret;
-}
+#include "plugin_narrow_compat.h" // ToWideArg
 
 BOOL FileErrorL(int lastError, HWND parent, const char* fileName, int error,
                 BOOL retry, BOOL* skip, BOOL* skipAll, int title)
 {
     CALL_STACK_MESSAGE1("FileError()");
 
-    char buffer[1024];
-    strcpy(buffer, LoadStr(error));
-    int len = int(strlen(buffer));
+    std::wstring buffer = SPLLoadStrOwned(SG, HLanguage, error).c_str();
     if (lastError != NO_ERROR)
-        SG->GetErrorText(lastError, buffer + len, 1024 - len);
+        buffer += SPLGetErrorTextOwned(SG, lastError);
 
     if (title == -1)
         title = IDS_SPLERROR;
@@ -81,20 +24,23 @@ BOOL FileErrorL(int lastError, HWND parent, const char* fileName, int error,
         return FALSE;
     }
 
+    const std::wstring fileNameW = ToWideArg(fileName);
+    const std::wstring titleText = SPLLoadStrOwned(SG, HLanguage, title);
+
     int ret;
     if (retry)
     {
         if (skip)
-            ret = SG->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileName, buffer, LoadStr(title));
+            ret = SG->DialogError(parent, BUTTONS_RETRYSKIPCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
         else
-            ret = SG->DialogError(parent, BUTTONS_RETRYCANCEL, fileName, buffer, LoadStr(title));
+            ret = SG->DialogError(parent, BUTTONS_RETRYCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
     }
     else
     {
         if (skip)
-            ret = SG->DialogError(parent, BUTTONS_SKIPCANCEL, fileName, buffer, LoadStr(title));
+            ret = SG->DialogError(parent, BUTTONS_SKIPCANCEL, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
         else
-            ret = SG->DialogError(parent, BUTTONS_OK, fileName, buffer, LoadStr(title));
+            ret = SG->DialogError(parent, BUTTONS_OK, fileNameW.c_str(), buffer.c_str(), titleText.c_str());
     }
 
     switch (ret)
@@ -237,179 +183,4 @@ int RemoveCharacters(char* dest, const char* source, const char* charSet)
     }
     dest[d] = 0;
     return d;
-}
-
-BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
-{
-    CALL_STACK_MESSAGE3("SalGetFullName(%s, , %s)", name, curDir);
-    int err = 0;
-
-    size_t rootOffset = 3; // offset of start of the directory part of the path (3 for "c:\path")
-    char* s = name;
-    while (*s == ' ')
-        s++;
-    if (*s == '\\' && *(s + 1) == '\\') // UNC (\\server\share\...)
-    {                                   // remove leading spaces from path
-        if (s != name)
-            memmove(name, s, strlen(s) + 1);
-        s = name + 2;
-        if (*s == 0 || *s == '\\')
-            err = GFN_SERVERNAMEMISSING;
-        else
-        {
-            while (*s != 0 && *s != '\\')
-                s++; // skip server name
-            if (*s == '\\')
-                s++;
-            if (*s == 0 || *s == '\\')
-                err = GFN_SHARENAMEMISSING;
-            else
-            {
-                while (*s != 0 && *s != '\\')
-                    s++; // skip share name
-                if (*s == '\\')
-                    s++;
-            }
-        }
-    }
-    else // path specified by drive (c:\...)
-    {
-        if (*s != 0)
-        {
-            if (*(s + 1) == ':') // "c:..."
-            {
-                if (*(s + 2) == '\\') // "c:\..."
-                {                     // remove leading spaces from path
-                    if (s != name)
-                        memmove(name, s, strlen(s) + 1);
-                }
-                else // "c:path..."
-                {
-                    /*
-          int l1 = strlen(s + 2);  // length of the remainder ("path...")
-          if (SalamanderGeneral->CharToLowerCase(*s) >= 'a' && SalamanderGeneral->CharToLowerCase(*s) <= 'z')
-          {
-            const char *head;
-            if (curDir != NULL && SalamanderGeneral->CharToLowerCase(curDir[0]) == SalamanderGeneral->CharToLowerCase(*s)) head = curDir;
-            else head = DefaultDir[LowerCase[*s] - 'a'];
-            int l2 = strlen(head);
-            if (head[l2 - 1] != '\\') l2++;  // space for '\\'
-            if (l1 + l2 >= MAX_PATH) err = GFN_TOOLONGPATH;
-            else  // build full path
-            {
-              memmove(name + l2, s + 2, l1 + 1);
-              *(name + l2 - 1) = '\\';
-              memmove(name, head, l2 - 1);
-            }
-          }
-          else err = GFN_INVALIDDRIVE;
-          */
-                    err = GFN_INVALIDDRIVE;
-                }
-            }
-            else
-            {
-                size_t l1 = strlen(s);
-                if (curDir != NULL)
-                {
-                    if (*s == '\\') // "\path...."
-                    {
-                        if (curDir[0] == '\\' && curDir[1] == '\\') // UNC
-                        {
-                            const char* root = curDir + 2;
-                            while (*root != 0 && *root != '\\')
-                                root++;
-                            root++; // '\\'
-                            while (*root != 0 && *root != '\\')
-                                root++;
-                            if (l1 + (root - curDir) >= MAX_PATH)
-                                err = GFN_TOOLONGPATH;
-                            else // build path from current drive root
-                            {
-                                memmove(name + (root - curDir), s, l1 + 1);
-                                memmove(name, curDir, root - curDir);
-                            }
-                            rootOffset = (root - curDir) + 1;
-                        }
-                        else
-                        {
-                            if (l1 + 2 >= MAX_PATH)
-                                err = GFN_TOOLONGPATH;
-                            else
-                            {
-                                memmove(name + 2, s, l1 + 1);
-                                name[0] = curDir[0];
-                                name[1] = ':';
-                            }
-                        }
-                    }
-                    else // "path..."
-                    {
-                        /*
-            if (nextFocus != NULL)
-            {
-              char *test = name;
-              while (*test != 0 && *test != '\\') test++;
-              if (*test == 0) strcpy(nextFocus, name);
-            }
-            */
-
-                        size_t l2 = strlen(curDir);
-                        if (curDir[l2 - 1] != '\\')
-                            l2++;
-                        if (l1 + l2 >= MAX_PATH)
-                            err = GFN_TOOLONGPATH;
-                        else
-                        {
-                            memmove(name + l2, s, l1 + 1);
-                            name[l2 - 1] = '\\';
-                            memmove(name, curDir, l2 - 1);
-                        }
-                    }
-                }
-                else
-                    err = GFN_INCOMLETEFILENAME;
-            }
-            s = name + rootOffset;
-        }
-        else
-        {
-            name[0] = 0;
-            err = GFN_EMPTYNAMENOTALLOWED;
-        }
-    }
-
-    if (err == 0) // remove '.' and '..' in the path
-    {
-        if (!SG->SalRemovePointsFromPath(s))
-            err = GFN_PATHISINVALID;
-    }
-
-    if (err == 0) // remove any unwanted trailing backslash from the end of the string
-    {
-        size_t l = strlen(name);
-        if (l > 1 && name[1] == ':') // path type "c:\path"
-        {
-            if (l > 3) // not a root path
-            {
-                if (name[l - 1] == '\\')
-                    name[l - 1] = 0; // trim backslash
-            }
-            else
-            {
-                name[2] = '\\'; // root path, backslash required ("c:\")
-                name[3] = 0;
-            }
-        }
-        else // UNC path
-        {
-            if (l > 0 && name[l - 1] == '\\')
-                name[l - 1] = 0; // trim backslash
-        }
-    }
-
-    if (errTextID != NULL)
-        *errTextID = err;
-
-    return err == 0;
 }

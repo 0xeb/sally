@@ -4,15 +4,20 @@
 
 #include "precomp.h"
 #include "plugindarkmode.h"
+#include "spl_fs.h"
 
 HIMAGELIST HSymbolsImageList = NULL;
-char DirText[100];
+std::wstring DirText;
+
+static std::wstring NumberToWide(const CQuadWord& number)
+{
+    return SPLNumberToStrOwned(SG, number);
+}
 
 CPreviewWindow::CPreviewWindow(CRenamerDialog* renamerDialog)
     : RenamerOptions(renamerDialog->RenamerOptions),
-      Renamer(renamerDialog->Root, renamerDialog->RootLen),
+      Renamer(renamerDialog->Root),
       Root(renamerDialog->Root),
-      RootLen(renamerDialog->RootLen),
       SourceFiles(renamerDialog->SourceFiles),
       SourceFilesValid(renamerDialog->SourceFilesValid)
 {
@@ -45,7 +50,16 @@ BOOL CPreviewWindow::InitColumns()
     int i;
     for (i = 0; header[i] != -1; i++) // create the columns
     {
-        lvc.pszText = (LPSTR)LoadStr(header[i]);
+        // LangStr is wide, so the fork and its conversion are both gone.
+        //
+        // It also returns BY VALUE, where the LoadStr it replaced returned a
+        // pointer into a static cyclic buffer. Assigning .c_str() of the
+        // temporary leaves lvc.pszText dangling the moment the statement ends,
+        // and ListView_InsertColumn below then reads freed memory - so the
+        // column headers were whatever happened to be in that allocation. The
+        // named local keeps the text alive across the insert.
+        std::wstring columnText = LangStr(header[i]);
+        lvc.pszText = const_cast<LPWSTR>(columnText.c_str());
         lvc.iSubItem = i;
         if (i == 2)
             lvc.fmt = LVCFMT_RIGHT;
@@ -58,9 +72,14 @@ BOOL CPreviewWindow::InitColumns()
     RECT r;
     GetClientRect(HWindow, &r);
     DWORD cx = r.right - r.left + (1 ? -1 : 1);
-    ListView_SetColumnWidth(HWindow, CI_TIME, ListView_GetStringWidth(HWindow, "00:00:00") + 20);
-    ListView_SetColumnWidth(HWindow, CI_DATE, ListView_GetStringWidth(HWindow, "00.00.0000") + 20);
-    ListView_SetColumnWidth(HWindow, CI_SIZE, ListView_GetStringWidth(HWindow, "000000") + 20);
+    // Wide literals: ListView_GetStringWidth is a TCHAR macro, and UNICODE is now
+    // defined for the whole build, so it sends LVM_GETSTRINGWIDTHW. A narrow
+    // literal handed to it is measured as UTF-16 - "00:00:00" becomes the two
+    // characters U+3030 U+3A30 and then whatever follows the terminator - so the
+    // time, date and size columns were sized from garbage.
+    ListView_SetColumnWidth(HWindow, CI_TIME, ListView_GetStringWidth(HWindow, L"00:00:00") + 20);
+    ListView_SetColumnWidth(HWindow, CI_DATE, ListView_GetStringWidth(HWindow, L"00.00.0000") + 20);
+    ListView_SetColumnWidth(HWindow, CI_SIZE, ListView_GetStringWidth(HWindow, L"000000") + 20);
 
     cx -= ListView_GetColumnWidth(HWindow, CI_TIME) + ListView_GetColumnWidth(HWindow, CI_DATE) +
           ListView_GetColumnWidth(HWindow, CI_SIZE) + GetSystemMetrics(SM_CXHSCROLL) - 1;
@@ -116,7 +135,7 @@ void CPreviewWindow::Update(BOOL force)
     Dirty = FALSE;
 }
 
-void CPreviewWindow::GetDispInfo(LV_DISPINFO* info)
+void CPreviewWindow::GetDispInfo(NMLVDISPINFOW* info)
 {
     CALL_STACK_MESSAGE1("CPreviewWindow::GetDispInfo()");
     // TRACE_I("get-disp-info item=" << info->item.iItem <<
@@ -134,24 +153,25 @@ void CPreviewWindow::GetDispInfo(LV_DISPINFO* info)
                 NewNameValid ? (SourceFiles[info->item.iItem]->IsDir ? ILS_DIRECTORY : ILS_FILE) : ILS_WARNING;
         }
         if (info->item.mask & LVIF_TEXT)
-            info->item.pszText = GetItemText(info->item.iItem, info->item.iSubItem);
+        {
+            info->item.pszText = const_cast<wchar_t*>(GetItemText(info->item.iItem, info->item.iSubItem));
+        }
     }
     else
     {
-        static char emptyBuffer[] = "";
         if (info->item.mask & LVIF_IMAGE)
             info->item.iImage = ILS_FILE;
         if (info->item.mask & LVIF_TEXT)
-            info->item.pszText = emptyBuffer;
+            info->item.pszText = L"";
     }
 }
 
-char* CPreviewWindow::GetItemText(int index, int subItem)
+const wchar_t* CPreviewWindow::GetItemText(int index, int subItem)
 {
     CALL_STACK_MESSAGE3("CPreviewWindow::GetItemText(%d, %d)", index, subItem);
     CSourceFile* item = SourceFiles[index];
-    static char emptyBuffer[] = "";
-    char* ret = emptyBuffer;
+    static wchar_t emptyBuffer[] = L"";
+    const wchar_t* ret = emptyBuffer;
     switch (subItem)
     {
     case CI_OLDNAME:
@@ -161,7 +181,7 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
             ret = item->Name;
             break;
         case rsRelativePath:
-            ret = StripRoot(item->FullName, RootLen);
+            ret = StripRoot(item->FullName, Root.size());
             break;
         case rsFullPath:
             ret = item->FullName;
@@ -175,47 +195,41 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
             NewNameValid = FALSE;
             if (RenamerDialog->ManualMode)
             {
-                // optimization
-                // int pos = SendDlgItemMessage(RenamerDialog->HWindow, IDE_MANUAL, EM_LINEINDEX, index, 0);
-                // if (pos < 0)
-                // {
-                //   SalPrintf(NewNameCache, MAX_PATH, LoadStr(IDS_GENERICERR), LoadStr(IDS_MISLINES));
-                // }
-                // else
-                // {
-                //   int l = SendDlgItemMessage(RenamerDialog->HWindow, IDE_MANUAL, EM_LINELENGTH, pos, 0);
+                std::string encodedLine;
+                int l = GetRenamerEditLine(RenamerDialog->ManualEdit->HWindow, index,
+                                           encodedLine);
+                if (l < 0)
+                {
+                    NewNameCache.clear();
+                    l = 0;
+                }
+                else if (!TryRenamerTextToWide(encodedLine.c_str(), NewNameCache,
+                                               static_cast<int>(encodedLine.size())))
+                {
+                    NewNameCache.clear();
+                    l = -1;
+                }
 
-                //   if (l >= MAX_PATH)
-                //   {
-                //     SalPrintf(NewNameCache, MAX_PATH, LoadStr(IDS_GENERICERR), LoadStr(IDS_EXP_SMALLBUFFER));
-                //   }
-                //   else
-                //   {
-                *LPWORD(NewNameCache.Get()) = (WORD)NewNameCache.Size();
-                int l = (int)SendMessage(RenamerDialog->ManualEdit->HWindow, EM_GETLINE,
-                                         index, (LPARAM)(char*)NewNameCache);
-                NewNameCache[l] = 0; // just to be sure
-
-                NewNameValid = ValidateFileName(NewNameCache, l, RenamerOptions.Spec, NULL, NULL);
-                //  }
-                // }
+                NewNameValid = l >= 0 && ValidateFileName(NewNameCache.c_str(),
+                                                          static_cast<int>(NewNameCache.size()),
+                                                          RenamerOptions.Spec, NULL, NULL);
             }
             else
             {
                 if (TransferError)
-                    strcpy(NewNameCache, LoadStr(IDS_TRANSFERERROR));
+                    NewNameCache = LangStr(IDS_TRANSFERERROR);
                 else
                 {
                     if (Renamer.IsGood())
                     {
-                        int l = Renamer.Rename(item, index, NewNameCache, FALSE);
-                        if (l < 0)
+                        if (!Renamer.RenameOwned(item, index, NewNameCache))
                         {
-                            SalPrintf(NewNameCache, NewNameCache.Size(), LoadStr(IDS_GENERICERR), LoadStr(IDS_EXP_SMALLBUFFER));
+                            NewNameCache = SPLFormatStringOwned(LangStr(IDS_GENERICERR).c_str(),
+                                                               LangStr(IDS_EXP_SMALLBUFFER).c_str());
                         }
                         else
                         {
-                            NewNameValid = ValidateFileName(NewNameCache, l, RenamerOptions.Spec, NULL, NULL);
+                            NewNameValid = ValidateFileName(NewNameCache.c_str(), static_cast<int>(NewNameCache.size()), RenamerOptions.Spec, NULL, NULL);
                         }
                     }
                     else
@@ -242,13 +256,14 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
                             et = IDS_GENERICERR;
                             break;
                         }
-                        SalPrintf(NewNameCache, NewNameCache.Size(), LoadStr(et), LoadStr(error));
+                        NewNameCache = SPLFormatStringOwned(LangStr(et).c_str(),
+                                                           LangStr(error).c_str());
                     }
                 }
             }
             CachedItem = index;
         }
-        ret = NewNameCache;
+        ret = NewNameCache.c_str();
         break;
 
     case CI_PATH:
@@ -256,17 +271,13 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
         {
         case rsFileName:
         {
-            lstrcpyn(TextBuffer, item->FullName, TextBuffer.Size());
-            if ((int)item->NameLen < TextBuffer.Size() ||
-                strchr(item->FullName + TextBuffer.Size() - 1, '\\') == NULL)
-            {
-                SG->CutDirectory(TextBuffer);
-            }
-            ret = TextBuffer;
+            TextBuffer = item->FullName;
+            CutRenamerPath(TextBuffer);
+            ret = TextBuffer.c_str();
             break;
         }
         case rsRelativePath:
-            ret = Root;
+            ret = Root.c_str();
             break;
         case rsFullPath:
             break;
@@ -277,12 +288,12 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
     {
         if (item->IsDir)
         {
-            ret = DirText;
+            ret = DirText.c_str();
         }
         else
         {
-            SG->NumberToStr(TextBuffer, item->Size);
-            ret = TextBuffer;
+            TextBuffer = NumberToWide(item->Size);
+            ret = TextBuffer.c_str();
         }
         break;
     }
@@ -292,9 +303,11 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
         // TODO: what time do we get from Salamander? what time do we get from FindXXFile?
         SYSTEMTIME st;
         FileTimeToSystemTime(&item->LastWrite, &st);
-        if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, TextBuffer, 100))
-            SalPrintf(TextBuffer, 100, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        ret = TextBuffer;
+        wchar_t formatted[100] = {};
+        if (!GetDateFormatW(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, formatted, _countof(formatted)))
+            _snwprintf_s(formatted, _TRUNCATE, L"%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        TextBuffer = formatted;
+        ret = TextBuffer.c_str();
         break;
     }
 
@@ -302,9 +315,11 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
     {
         SYSTEMTIME st;
         FileTimeToSystemTime(&item->LastWrite, &st);
-        if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, TextBuffer, 100))
-            SalPrintf(TextBuffer, 100, "%d:%d:%d", st.wHour, st.wMinute, st.wSecond);
-        ret = TextBuffer;
+        wchar_t formatted[100] = {};
+        if (!GetTimeFormatW(LOCALE_USER_DEFAULT, 0, &st, NULL, formatted, _countof(formatted)))
+            _snwprintf_s(formatted, _TRUNCATE, L"%d:%d:%d", st.wHour, st.wMinute, st.wSecond);
+        TextBuffer = formatted;
+        ret = TextBuffer.c_str();
         break;
     }
     }
@@ -353,7 +368,7 @@ BOOL CPreviewWindow::CustomDraw(LPNMLVCUSTOMDRAW cd, LRESULT& result)
         cd->clrTextBk = selected ? (focused ? colors.Highlight : colors.InactiveSelection) : colors.InputBackground;
 
         if (subItem == CI_NEWNAME &&
-            strcmp(GetItemText(item, CI_OLDNAME), GetItemText(item, CI_NEWNAME)) == 0)
+            wcscmp(GetItemText(item, CI_OLDNAME), GetItemText(item, CI_NEWNAME)) == 0)
             cd->clrText = selected ? colors.HighlightText : colors.DisabledText;
         else
             cd->clrText = selected ? colors.HighlightText : colors.InputText;
@@ -428,11 +443,11 @@ int CPreviewWindow::CompareFunc(CSourceFile* f1, CSourceFile* f2, int sortBy)
             {
             case rsFileName:
             {
-                res = SG->RegSetStrICmpEx(f1->FullName, (int)(f1->FullName - f1->Name),
-                                          f2->FullName, (int)(f2->FullName - f2->Name), NULL);
+                res = SG->RegSetStrICmpEx(f1->FullName, static_cast<int>(f1->Name - f1->FullName),
+                                          f2->FullName, static_cast<int>(f2->Name - f2->FullName), NULL);
                 if (!res)
-                    res = SG->RegSetStrCmpEx(f1->FullName, (int)(f1->FullName - f1->Name),
-                                             f2->FullName, (int)(f2->FullName - f2->Name), NULL);
+                    res = SG->RegSetStrCmpEx(f1->FullName, static_cast<int>(f1->Name - f1->FullName),
+                                             f2->FullName, static_cast<int>(f2->Name - f2->FullName), NULL);
                 break;
             }
             case rsRelativePath:
@@ -650,9 +665,9 @@ void CPreviewWindow::SetItemCount(int count, DWORD flags, int state)
             RECT cl;
             GetClientRect(HWindow, &cl);
 
-            Static = ::CreateWindow(
-                "Static",
-                LoadStr(message),
+            Static = ::CreateWindowW(
+                L"Static",
+                LangStr(message).c_str(),
                 SS_LEFT | WS_VISIBLE | WS_CHILD, // style
                 4, 4 + hr.bottom - hr.top, cl.right - 4, cl.bottom - (hr.bottom - hr.top) - 4,
                 HWindow,
@@ -666,7 +681,7 @@ void CPreviewWindow::SetItemCount(int count, DWORD flags, int state)
         else
         {
             if (State != state)
-                SetWindowText(Static, LoadStr(message));
+                SetWindowTextW(Static, LangStr(message).c_str());
         }
     }
     else

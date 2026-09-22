@@ -80,9 +80,14 @@ public:
     HITEM Alloc(DWORD cchCapacity)
     {
         _ASSERTE(cchCapacity > 0);
+        if (cchCapacity == 0 || static_cast<size_t>(cchCapacity) >
+                                    (static_cast<size_t>(-1) - offsetof(LIST_ENTRY, sz)) / sizeof(XCHAR))
+            return nullptr;
         LIST_ENTRY* pEntry;
-        size_t cb = sizeof(LIST_ENTRY) + (cchCapacity - ANYSIZE_ARRAY) * sizeof(XCHAR);
+        const size_t cb = offsetof(LIST_ENTRY, sz) + static_cast<size_t>(cchCapacity) * sizeof(XCHAR);
         pEntry = reinterpret_cast<LIST_ENTRY*>(malloc(cb));
+        if (pEntry == nullptr)
+            return nullptr;
         pEntry->pNext = nullptr;
         pEntry->cch = cchCapacity;
         return reinterpret_cast<HITEM>(pEntry);

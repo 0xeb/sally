@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Sally Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
@@ -30,6 +30,7 @@
 #include "registry.h"
 #include "config.h"
 #include "allochan.h"
+#include "common/DiagnosticTextEncoding.h"
 
 #include "tserver.rh"
 #include "tserver.rh2"
@@ -222,6 +223,18 @@ BOOL ReadPipe(HANDLE pipeSemaphore, DWORD& readBytesFromPipe, HANDLE hFile,
     return FALSE;
 }
 
+static bool TryGetPipePayloadSize(DWORD codeUnits, BOOL unicode, DWORD& byteSize)
+{
+    if (codeUnits == 0 ||
+        (unicode && codeUnits > MAXDWORD / static_cast<DWORD>(sizeof(WCHAR))))
+    {
+        byteSize = 0;
+        return false;
+    }
+    byteSize = codeUnits * (unicode ? static_cast<DWORD>(sizeof(WCHAR)) : 1);
+    return true;
+}
+
 struct CReadPipeData
 {
     static DWORD StaticUniqueProcessID;
@@ -273,14 +286,35 @@ unsigned __stdcall ReadPipeThreadF(void* dataPtr)
             case __mtSetThreadNameW:
             {
                 BOOL unicode = (pipeData.Type == __mtSetProcessNameW || pipeData.Type == __mtSetThreadNameW);
-                char* name = (char*)malloc((unicode ? sizeof(WCHAR) : 1) * pipeData.MessageSize);
+                DWORD payloadSize = 0;
+                if (!TryGetPipePayloadSize(pipeData.MessageSize, unicode, payloadSize))
+                {
+                    error = TRUE;
+                    SetLastError(ERROR_BROKEN_PIPE);
+                    break;
+                }
+                char* name = (char*)malloc(payloadSize);
                 if (name != NULL)
                 {
                     if (ReadPipe(pipeSemaphore, readBytesFromPipe, readPipe, name,
-                                 (unicode ? sizeof(WCHAR) : 1) * pipeData.MessageSize, showSemaphoreErr))
+                                 payloadSize, showSemaphoreErr))
                     {
-                        WCHAR* nameW = unicode ? (WCHAR*)name : ConvertAllocA2U(name, pipeData.MessageSize - 1);
-                        if (!unicode)
+                        WCHAR* nameW = NULL;
+                        if (pipeData.MessageSize > 0)
+                        {
+                            if (unicode)
+                            {
+                                WCHAR* received = reinterpret_cast<WCHAR*>(name);
+                                if (received[pipeData.MessageSize - 1] == L'\0')
+                                    nameW = received;
+                            }
+                            else if (name[pipeData.MessageSize - 1] == '\0')
+                            {
+                                nameW = sally::diagnostic::DuplicateDecodedAcp(
+                                    name, pipeData.MessageSize - 1);
+                            }
+                        }
+                        if (!unicode || nameW == NULL)
                             free(name);
                         name = NULL;
 
@@ -371,14 +405,39 @@ unsigned __stdcall ReadPipeThreadF(void* dataPtr)
                 message.UniqueProcessID = uniqueProcessID;
                 message.UniqueThreadID = pipeData.UniqueThreadID;
 
-                char* file = (char*)malloc((unicode ? sizeof(WCHAR) : 1) * pipeData.MessageSize);
+                DWORD payloadSize = 0;
+                if (!TryGetPipePayloadSize(pipeData.MessageSize, unicode, payloadSize))
+                {
+                    error = TRUE;
+                    SetLastError(ERROR_BROKEN_PIPE);
+                    break;
+                }
+                char* file = (char*)malloc(payloadSize);
                 if (file != NULL)
                 {
                     if (ReadPipe(pipeSemaphore, readBytesFromPipe, readPipe, file,
-                                 (unicode ? sizeof(WCHAR) : 1) * pipeData.MessageSize, showSemaphoreErr))
+                                 payloadSize, showSemaphoreErr))
                     {
-                        message.File = unicode ? (WCHAR*)file : ConvertAllocA2U(file, pipeData.MessageSize - 1);
-                        if (!unicode)
+                        message.File = NULL;
+                        if (pipeData.MessageSize > 0)
+                        {
+                            if (unicode)
+                            {
+                                WCHAR* received = reinterpret_cast<WCHAR*>(file);
+                                if (received[pipeData.MessageSize - 1] == L'\0' &&
+                                    pipeData.MessageTextOffset > 0 &&
+                                    pipeData.MessageTextOffset < pipeData.MessageSize &&
+                                    received[pipeData.MessageTextOffset - 1] == L'\0')
+                                    message.File = received;
+                            }
+                            else if (file[pipeData.MessageSize - 1] == '\0' &&
+                                     memchr(file, '\0', pipeData.MessageSize - 1) != NULL)
+                            {
+                                message.File = sally::diagnostic::DuplicateDecodedAcp(
+                                    file, pipeData.MessageSize - 1);
+                            }
+                        }
+                        if (!unicode || message.File == NULL)
                             free(file);
                         file = NULL;
                         if (message.File != NULL)
@@ -839,21 +898,41 @@ int CGlobalData::FindThreadNameIndex(DWORD uniqueProcessID, DWORD uniqueThreadID
     return -1;
 }
 
-void CGlobalData::GetProcessName(DWORD uniqueProcessID, WCHAR* buff, int buffLen)
+std::wstring CGlobalData::GetProcessNameOwned(DWORD uniqueProcessID)
 {
     Processes.BlockArray();
     int index = FindProcessNameIndex(uniqueProcessID);
-    wcsncpy_s(buff, buffLen, index != -1 ? Processes[index].Name : L"Unknown", buffLen - 1);
+    std::wstring result;
+    try
+    {
+        result = index != -1 ? Processes[index].Name : L"Unknown";
+    }
+    catch (...)
+    {
+        Processes.UnBlockArray();
+        return {};
+    }
     Processes.UnBlockArray();
+    return result;
 }
 
-void CGlobalData::GetThreadName(DWORD uniqueProcessID,
-                                DWORD uniqueThreadID, WCHAR* buff, int buffLen)
+std::wstring CGlobalData::GetThreadNameOwned(DWORD uniqueProcessID,
+                                             DWORD uniqueThreadID)
 {
     Threads.BlockArray();
     int index = FindThreadNameIndex(uniqueProcessID, uniqueThreadID);
-    wcsncpy_s(buff, buffLen, index != -1 ? Threads[index].Name : L"Unknown", buffLen - 1);
+    std::wstring result;
+    try
+    {
+        result = index != -1 ? Threads[index].Name : L"Unknown";
+    }
+    catch (...)
+    {
+        Threads.UnBlockArray();
+        return {};
+    }
     Threads.UnBlockArray();
+    return result;
 }
 
 void CGlobalData::GotoEditor(int index)
@@ -1020,7 +1099,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
                 MainWindow = new CMainWindow;
                 if (MainWindow != NULL)
                 {
-                    HMENU hMainMenu = LoadMenu(HInstance, MAKEINTRESOURCE(IDM_MAIN));
+                    HMENU hMainMenu = LoadMenuW(HInstance, MAKEINTRESOURCEW(IDM_MAIN));
                     DWORD exStyle;
                     exStyle = ConfigData.UseToolbarCaption ? WS_EX_TOOLWINDOW : 0;
                     if (MainWindow->CreateEx(exStyle,
@@ -1072,7 +1151,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
 
                                 // Application loop
                                 MSG msg;
-                                while (GetMessage(&msg, NULL, 0, 0))
+                                while (GetMessageW(&msg, NULL, 0, 0))
                                 {
                                     CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
                                     if (wnd == NULL || !wnd->Is(otDialog) || !IsDialogMessage(wnd->HWindow, &msg))
@@ -1080,7 +1159,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
                                         if (!TranslateAccelerator(MainWindow->HWindow, hAccel, &msg))
                                         {
                                             TranslateMessage(&msg);
-                                            DispatchMessage(&msg);
+                                            DispatchMessageW(&msg);
                                         }
                                     }
                                 }

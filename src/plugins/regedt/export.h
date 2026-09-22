@@ -4,6 +4,6 @@
 
 #pragma once
 
-extern CPathBuffer LastExportPath;
+extern std::wstring LastExportPath;
 
-BOOL ExportKey(LPWSTR fullName);
+BOOL ExportKey(const wchar_t* fullName);

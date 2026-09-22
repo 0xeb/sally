@@ -23,6 +23,19 @@
 #include "nethood.rh2"
 #include "lang\lang.rh"
 
+#include <algorithm>
+#include <vector>
+
+// CNethoodFSInterface's own current/redirect/accessible paths
+// are dynamically owned UTF-16 (this file's own wide-FS-interface-ABI conversion),
+// so cache.h's path accessors (GetFullPath/FindAccessiblePath/GetUncPath/GetPathStatus/
+// EnsurePathExists) are called directly - no narrow bridge needed for them any more.
+// The *W methods below (GetCurrentPathW/GetFullNameW/GetRootPathW/IsCurrentPathW/
+// IsOurPathW/ChangePathW) are the real implementation; the narrow forms required by
+// CPluginFSInterfaceAbstract's mandatory ABI are now thin best-effort ANSI wrappers
+// around them - same pattern as portables' CFxPluginFSInterface and undelete's
+// CPluginFSInterface.
+
 /// Cache of network.
 extern CNethoodCache g_oNethoodCache;
 
@@ -34,14 +47,12 @@ bool CNethoodFSInterface::s_bHideServersInRoot;
 CNethoodFSInterface::CNethoodFSInterface()
 {
     // Initial path is root path ("net:\")
-    GetRootPath(m_szCurrentPath);
+    m_currentPath = L"\\";
 
     m_pathNode = NULL;
     m_pPathNodeEventConsumer = NULL;
     m_state = FSStateNormal;
     m_bIgnoreForceRefresh = false;
-    m_szRedirectPath[0] = TEXT('\0');
-    m_szAccessiblePath[0] = TEXT('\0');
     m_dwEnumerationResult = ERROR_SUCCESS;
     m_bManualEntry = false;
 
@@ -62,20 +73,27 @@ CNethoodFSInterface::~CNethoodFSInterface()
 }
 
 BOOL WINAPI
-CNethoodFSInterface::GetCurrentPath(__out_ecount(MAX_PATH) char* userPart)
+CNethoodFSInterface::GetCurrentPath(CSalamanderStringBuffer* userPart)
+{
+    std::wstring currentPath;
+    if (!GetCurrentPathOwned(currentPath))
+        return FALSE;
+    return userPart != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*userPart, currentPath);
+}
+
+BOOL CNethoodFSInterface::GetCurrentPathOwned(std::wstring& userPart)
 {
     if (m_state == FSStateImmediateRefresh)
     {
         // The panel is about to be refreshed immediately.
         // That means the cache node was updated and the path may have changed.
         g_oNethoodCache.LockCache();
-        g_oNethoodCache.GetFullPath(m_pathNode, m_szCurrentPath,
-                                    COUNTOF(m_szCurrentPath));
+        g_oNethoodCache.GetFullPath(m_pathNode, m_currentPath);
         g_oNethoodCache.UnlockCache();
     }
 
-    StringCchCopy(userPart, MAX_PATH, m_szCurrentPath);
-
+    userPart = m_currentPath;
     return TRUE;
 }
 
@@ -83,83 +101,79 @@ BOOL WINAPI
 CNethoodFSInterface::GetFullName(
     __in CFileData& file,
     __in int isDir,
-    __out_ecount(bufSize) char* buf,
-    __in int bufSize)
+    CSalamanderStringBuffer* fullNameBuffer)
 {
-    StringCchCopy(buf, bufSize, m_szCurrentPath);
+    std::wstring result = m_currentPath;
 
     if (isDir == 2)
     {
         // up-dir
 
-        if (buf[0] == TEXT('\\') && buf[1] == TEXT('\\'))
+        if (result.size() >= 2 && result[0] == L'\\' && result[1] == L'\\')
         {
             // UNC path, go to root
-            GetRootPath(buf);
+            result = L"\\";
         }
         else
         {
-            SalamanderGeneral->CutDirectory(buf, NULL);
+            const size_t slash = result.find_last_of(L'\\');
+            if (slash == std::wstring::npos)
+                return FALSE;
+            result.erase(slash);
         }
     }
     else
     {
-        if (_tcscmp(m_szCurrentPath, TEXT("\\")) == 0)
+        if (m_currentPath == L"\\")
         {
             if (GetNodeTypeFromFileData(file) == CNethoodCacheNode::TypeServer)
-            {
-                StringCchCopy(buf, bufSize, TEXT("\\\\"));
-                SalamanderGeneral->SalPathAppend(buf + 2, file.Name, bufSize - 2);
-            }
+                result = L"\\\\";
             else
-            {
-                SalamanderGeneral->SalPathAppend(buf + 1, file.Name, bufSize - 1);
-            }
+                result = L"\\";
         }
-        else
-        {
-            SalamanderGeneral->SalPathAppend(buf, file.Name, bufSize);
-        }
+        else if (!result.empty() && result.back() != L'\\')
+            result.push_back(L'\\');
+        result.append(file.Name);
     }
 
-    return TRUE;
+    return fullNameBuffer != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*fullNameBuffer, result);
 }
 
 BOOL WINAPI
 CNethoodFSInterface::GetFullFSPath(
     HWND parent,
-    const char* fsName,
-    char* path,
-    int pathSize,
+    const wchar_t* fsName,
+    CSalamanderStringBuffer* path,
     BOOL& success)
 {
     // FIXME
+    success = FALSE;
     return FALSE;
 }
 
 BOOL WINAPI
-CNethoodFSInterface::GetRootPath(__out_ecount(MAX_PATH) char* userPart)
+CNethoodFSInterface::GetRootPath(CSalamanderStringBuffer* userPart)
 {
-    userPart[0] = TEXT('\\');
-    userPart[1] = TEXT('\0');
-    return TRUE;
+    return userPart != NULL &&
+           sally::plugin_abi::WriteStringBuffer(*userPart, std::wstring(L"\\"));
 }
 
 BOOL WINAPI
 CNethoodFSInterface::IsCurrentPath(
     int currentFSNameIndex,
     int fsNameIndex,
-    const char* userPart)
+    const wchar_t* userPart)
 {
     return (currentFSNameIndex == fsNameIndex) &&
-           SalamanderGeneral->IsTheSamePath(m_szCurrentPath, userPart);
+           SalamanderGeneral->IsTheSamePath(m_currentPath.c_str(), userPart);
 }
 
 BOOL WINAPI
 CNethoodFSInterface::IsOurPath(
     int currentFSNameIndex,
     int fsNameIndex,
-    const char* userPart)
+    const wchar_t* userPart)
 {
     // It's always our path.
     return TRUE;
@@ -168,19 +182,21 @@ CNethoodFSInterface::IsOurPath(
 BOOL WINAPI
 CNethoodFSInterface::ChangePath(
     int currentFSNameIndex,
-    char* fsName,
+    CSalamanderStringBuffer* fsName,
     int fsNameIndex,
-    const char* userPart,
-    char* cutFileName,
+    const wchar_t* userPart,
+    CSalamanderStringBuffer* cutFileName,
     BOOL* pathWasCut,
     BOOL forceRefresh,
     int mode)
 {
     UINT uError;
-    CPathBuffer szPath;
-    CPathBuffer szCorrectedUserPart;
-    const TCHAR* pSrc;
-    TCHAR* pDst;
+    std::wstring path;
+    std::wstring correctedUserPart(userPart != NULL ? userPart : L"");
+    std::wstring fsNameValue;
+    if (fsName == NULL || !sally::plugin_abi::ReadStringBuffer(*fsName, fsNameValue))
+        return FALSE;
+    (void)fsNameValue;
 
     // mode parameter semantics:
     //   1 (refresh path) - shorten the path when necessary without reporting that it disappeared.
@@ -200,17 +216,11 @@ CNethoodFSInterface::ChangePath(
     // is 3, treat it like an archive: shorten the path when necessary and return FALSE only when no path
     // on the file system is accessible; error reporting stays the same.
 
-    CALL_STACK_MESSAGE4("CNethoodFSInterface::ChangePath(, , , %s, , , %d, %d)", userPart, forceRefresh, mode);
+    CALL_STACK_MESSAGE4("CNethoodFSInterface::ChangePath(, , , %ls, , , %d, %d)", userPart, forceRefresh, mode);
 
     // Replace forward slashes with backslashes.
-    pSrc = userPart;
-    pDst = szCorrectedUserPart;
-    do
-    {
-        *pDst = (*pSrc == TEXT('/')) ? TEXT('\\') : *pSrc;
-        ++pDst;
-    } while (*pSrc++ != TEXT('\0'));
-    userPart = szCorrectedUserPart;
+    std::replace(correctedUserPart.begin(), correctedUserPart.end(), L'/', L'\\');
+    userPart = correctedUserPart.c_str();
 
     if (mode != 3 && (pathWasCut != NULL || cutFileName != NULL))
     {
@@ -221,69 +231,64 @@ CNethoodFSInterface::ChangePath(
     if (pathWasCut != NULL)
         *pathWasCut = FALSE;
 
-    if (cutFileName != NULL)
-        *cutFileName = TEXT('\0');
+    if (cutFileName != NULL &&
+        !sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+        return FALSE;
 
-    szPath[0] = TEXT('\0');
-    if (userPart[0] == TEXT('\0'))
+    if (userPart[0] == L'\0')
     {
-        GetRootPath(m_szCurrentPath);
+        m_currentPath = L"\\";
         return TRUE;
     }
-    else if (userPart[0] == TEXT('\\') && userPart[1] == TEXT('\\') && userPart[2] == TEXT('\0'))
+    else if (userPart[0] == L'\\' && userPart[1] == L'\\' && userPart[2] == L'\0')
     {
-        GetRootPath(m_szCurrentPath);
+        m_currentPath = L"\\";
         return TRUE;
     }
     else
     {
-        if (userPart[0] != TEXT('\\'))
-        {
-            szPath[0] = TEXT('\\');
-            szPath[1] = TEXT('\0');
-        }
-        StringCchCat(szPath, szPath.Size(), userPart);
+        if (userPart[0] != L'\\')
+            path.push_back(L'\\');
+        path.append(userPart);
     }
 
     if (m_state == FSStateDisplayError)
     {
         assert(m_dwEnumerationResult != ERROR_SUCCESS);
-        assert(m_szAccessiblePath[0] != TEXT('\0'));
+        assert(!m_accessiblePath.empty());
 
-        StringCchCopy(szPath, szPath.Size(), m_szAccessiblePath);
-        m_szAccessiblePath[0] = TEXT('\0');
+        path = m_accessiblePath;
+        m_accessiblePath.clear();
         DisplayError(m_dwEnumerationResult);
         m_dwEnumerationResult = ERROR_SUCCESS;
         m_state = FSStateNormal;
     }
     else if (m_state == FSStateAsyncRedirect)
     {
-        if (!PostRedirectPathToSalamander(m_szAccessiblePath))
+        if (!PostRedirectPathToSalamander(m_accessiblePath.c_str()))
         {
             // The asynchronous redirect to the accessible path found by
             // the enumeration thread failed. Try to shorten
             // the path. Note that we cannot use FindAccessiblePath()
             // because the cache node is NULL!
 
-            StringCchCopy(szPath, szPath.Size(), m_szAccessiblePath);
-            TCHAR* pszLastSlash = _tcsrchr(szPath, TEXT('\\'));
-            assert(pszLastSlash != NULL && pszLastSlash > szPath + 2);
-            if (pszLastSlash != NULL)
-            {
-                *pszLastSlash = TEXT('\0');
-            }
+            path = m_accessiblePath;
+            const size_t lastSlash = path.find_last_of(L'\\');
+            assert(lastSlash != std::wstring::npos && lastSlash > 2);
+            if (lastSlash != std::wstring::npos)
+                path.erase(lastSlash);
 
             m_state = FSStateNormal;
         }
 
-        m_szAccessiblePath[0] = TEXT('\0');
+        m_accessiblePath.clear();
     }
     else
     {
-        uError = CUncPathParser::Validate(szPath);
+        uError = CUncPathParser::Validate(path.c_str());
         if (uError == ERROR_NETHOODCACHE_FULL_UNC_PATH)
         {
-            if (!PostRedirectPathToSalamander(szPath))
+            if (!PostRedirectPathToSalamander(path.c_str()))
             {
                 return FALSE;
             }
@@ -304,15 +309,15 @@ CNethoodFSInterface::ChangePath(
 
     if (m_state == FSStateFindAccessible)
     {
-        if (m_pathNode != NULL && !IsRootPath(m_szCurrentPath))
+        if (m_pathNode != NULL && !IsRootPath(m_currentPath.c_str()))
         {
             g_oNethoodCache.LockCache();
-            g_oNethoodCache.FindAccessiblePath(m_pathNode, m_szCurrentPath, COUNTOF(m_szCurrentPath));
+            g_oNethoodCache.FindAccessiblePath(m_pathNode, m_currentPath);
             g_oNethoodCache.UnlockCache();
         }
         else
         {
-            GetRootPath(m_szCurrentPath);
+            m_currentPath = L"\\";
         }
 
         if (pathWasCut != NULL)
@@ -321,33 +326,36 @@ CNethoodFSInterface::ChangePath(
         }
         if (cutFileName != NULL)
         {
-            if (IsRootPath(m_szCurrentPath))
+            if (IsRootPath(m_currentPath.c_str()))
             {
-                *cutFileName = TEXT('\0');
+                if (!sally::plugin_abi::WriteStringBuffer(*cutFileName, std::wstring()))
+                    return FALSE;
             }
             else
             {
-                StringCchCopy(cutFileName, MAX_PATH, m_szCurrentPath);
+                if (!sally::plugin_abi::WriteStringBuffer(*cutFileName, m_currentPath))
+                    return FALSE;
             }
         }
 
         m_state = FSStateNormal;
 
-        TRACE_I("Nethood: ChangePath: Found accessible path " << m_szCurrentPath);
+        TRACE_IW(L"Nethood: ChangePath: Found accessible path " << m_currentPath);
 
         return TRUE;
     }
 
-    if (!IsRootPath(szPath))
+    if (!IsRootPath(path.c_str()))
     {
         // Trim the backslash at the end of the path, but only
         // if it's not the root.
-        SalamanderGeneral->SalPathRemoveBackslash(szPath);
+        if (!path.empty() && path.back() == L'\\')
+            path.pop_back();
     }
 
-    StringCchCopy(m_szCurrentPath, COUNTOF(m_szCurrentPath), szPath);
+    m_currentPath = std::move(path);
 
-    TRACE_I("Nethood: ChangePath: Path changed to " << m_szCurrentPath);
+    TRACE_IW(L"Nethood: ChangePath: Path changed to " << m_currentPath);
 
     if (mode != 1 && m_state == FSStateImmediateRefresh)
     {
@@ -372,14 +380,16 @@ bool CNethoodFSInterface::NethoodNodeToFileData(
 
     if (nodeData.GetType() == CNethoodCacheNode::TypeServer &&
         s_bHideServersInRoot &&
-        IsRootPath(m_szCurrentPath))
+        IsRootPath(m_currentPath.c_str()))
     {
         return false;
     }
 
     memset(&file, 0, sizeof(CFileData));
+    // GetDisplayName() is wide now (cache.h widened) - the narrow-bridge
+    // this comment used to describe is obsolete.
     file.Name = SalamanderGeneral->DupStr(nodeData.GetDisplayName());
-    file.NameLen = static_cast<unsigned>(_tcslen(file.Name));
+    file.NameLen = static_cast<unsigned>(wcslen(file.Name));
     file.Ext = file.Name + file.NameLen;
     g_oNethoodCache.AddRefNode(node);
     file.PluginData = reinterpret_cast<DWORD_PTR>(node);
@@ -441,9 +451,9 @@ CNethoodFSInterface::ListCurrentPath(
     bool bAddUpDir = false;
     CFileData fileData;
     CNethoodPluginDataInterface* pDataInterface;
-    CPathBuffer szTargetPath;
+    std::wstring targetPath;
 
-    TRACE_I("Nethood: ListCurrentPath (path=" << m_szCurrentPath << ", state=" << m_state << ")");
+    TRACE_IW(L"Nethood: ListCurrentPath (path=" << m_currentPath << L", state=" << m_state << L")");
 
     pDataInterface = new CNethoodPluginDataInterface();
     TRACE_I("dataInterface = " << pDataInterface);
@@ -465,8 +475,12 @@ CNethoodFSInterface::ListCurrentPath(
     {
         m_state = FSStateNormal;
 
-        pDataInterface->SetRedirectPath(m_szRedirectPath);
-        m_szRedirectPath[0] = TEXT('\0');
+        // SetRedirectPath is wide now - the narrow-then-rewiden
+        // round-trip this comment used to describe is obsolete (the current-path family
+        // and the redirect-path consumer in nethoodmenu.cpp were already wide/bridging
+        // back to wide, so this was pure unmigrated debt, not narrow-by-design).
+        pDataInterface->SetRedirectPath(m_redirectPath);
+        m_redirectPath.clear();
 
         g_oNethoodCache.UnlockCache();
 
@@ -510,19 +524,18 @@ CNethoodFSInterface::ListCurrentPath(
 
         m_pPathNodeEventConsumer = new CNethoodFSCacheConsumer(this);
         uError = g_oNethoodCache.GetPathStatus(
-            m_szCurrentPath,
+            m_currentPath.c_str(),
             m_pPathNodeEventConsumer,
             &m_pathNode,
             uFlags,
-            szTargetPath,
-            szTargetPath.Size());
+            &targetPath);
 
         if (uError == ERROR_NETHOODCACHE_FULL_UNC_PATH)
         {
             delete m_pPathNodeEventConsumer;
             m_pPathNodeEventConsumer = NULL;
 
-            if (!PostRedirectPathToSalamander(szTargetPath))
+            if (!PostRedirectPathToSalamander(targetPath.c_str()))
             {
                 m_state = FSStateFindAccessible;
                 g_oNethoodCache.UnlockCache();
@@ -533,8 +546,10 @@ CNethoodFSInterface::ListCurrentPath(
             {
                 m_state = FSStateNormal;
 
-                pDataInterface->SetRedirectPath(szTargetPath);
-                m_szRedirectPath[0] = TEXT('\0');
+                // SetRedirectPath is wide now - targetPath is
+                // already wide, pass it straight through.
+                pDataInterface->SetRedirectPath(targetPath);
+                m_redirectPath.clear();
             }
 
             g_oNethoodCache.UnlockCache();
@@ -548,8 +563,7 @@ CNethoodFSInterface::ListCurrentPath(
 
             m_state = FSStateSymLink;
 
-            StringCchCopy(m_szCurrentPath, COUNTOF(m_szCurrentPath),
-                          szTargetPath);
+            m_currentPath = targetPath;
 
             g_oNethoodCache.UnlockCache();
 
@@ -571,8 +585,7 @@ CNethoodFSInterface::ListCurrentPath(
 
         g_oNethoodCache.AddRefNode(m_pathNode);
 
-        g_oNethoodCache.GetFullPath(m_pathNode, m_szCurrentPath,
-                                    COUNTOF(m_szCurrentPath));
+        g_oNethoodCache.GetFullPath(m_pathNode, m_currentPath);
 
         assert(m_pathNode != NULL);
         nodeItem = g_oNethoodCache.GetFirstItem(m_pathNode);
@@ -628,10 +641,10 @@ CNethoodFSInterface::ListCurrentPath(
 
     g_oNethoodCache.UnlockCache();
 
-    if (bAddUpDir && !IsRootPath(m_szCurrentPath))
+    if (bAddUpDir && !IsRootPath(m_currentPath.c_str()))
     {
         memset(&fileData, 0, sizeof(CFileData));
-        fileData.Name = SalamanderGeneral->DupStr("..");
+        fileData.Name = SalamanderGeneral->DupStr(L"..");
         fileData.NameLen = 2;
         fileData.Ext = fileData.Name + fileData.NameLen;
         fileData.Attr |= FILE_ATTRIBUTE_DIRECTORY;
@@ -663,8 +676,8 @@ CNethoodFSInterface::Event(
         {
             m_iThrobberID = SalamanderGeneral->StartThrobber(
                 dwParam,
-                SalamanderGeneral->LoadStr(
-                    GetLangInstance(), IDS_REFRESHING),
+                SPLLoadStrOwned(SalamanderGeneral,
+                    GetLangInstance(), IDS_REFRESHING).c_str(),
                 THROBBER_GRACE_PERIOD_IMMEDIATE);
         }
     }
@@ -688,8 +701,8 @@ CNethoodFSInterface::GetSupportedServices()
 
 BOOL WINAPI
 CNethoodFSInterface::GetChangeDriveOrDisconnectItem(
-    __in const char* fsName,
-    __out_opt char*& title,
+    __in const wchar_t* fsName,
+    __out_opt wchar_t*& title,
     __out_opt HICON& icon,
     __out BOOL& destroyIcon)
 {
@@ -710,8 +723,8 @@ CNethoodFSInterface::GetFSIcon(__out BOOL& destroyIcon)
 
 void WINAPI
 CNethoodFSInterface::GetDropEffect(
-    __in const char* srcFSPath,
-    __in const char* tgtFSPath,
+    __in const wchar_t* srcFSPath,
+    __in const wchar_t* tgtFSPath,
     __in DWORD allowedEffects,
     __in DWORD keyState,
     __out DWORD* dropEffect)
@@ -732,27 +745,27 @@ CNethoodFSInterface::GetFSFreeSpace(
 
 BOOL WINAPI
 CNethoodFSInterface::GetNextDirectoryLineHotPath(
-    __in const char* text,
+    __in const wchar_t* text,
     __in int pathLen,
     __inout int& offset)
 {
-    PCTSTR psz;
-    PCTSTR pszEnd;
-    PCTSTR pszRoot;
+    const wchar_t* psz;
+    const wchar_t* pszEnd;
+    const wchar_t* pszRoot;
 
     pszRoot = text;
 
-    while (*pszRoot != TEXT('\0') && *pszRoot != TEXT(':'))
+    while (*pszRoot != L'\0' && *pszRoot != L':')
     {
         ++pszRoot;
     }
 
-    if (*pszRoot == TEXT(':'))
+    if (*pszRoot == L':')
     {
         ++pszRoot;
 
         // Skip root backslashes (net:\ or net:\\)
-        while (*pszRoot == TEXT('\\'))
+        while (*pszRoot == L'\\')
         {
             ++pszRoot;
         }
@@ -772,12 +785,12 @@ CNethoodFSInterface::GetNextDirectoryLineHotPath(
     }
     else
     {
-        if (*psz == TEXT('\\'))
+        if (*psz == L'\\')
         {
             ++psz;
         }
 
-        while (psz < pszEnd && *psz != TEXT('\\'))
+        while (psz < pszEnd && *psz != L'\\')
         {
             ++psz;
         }
@@ -788,25 +801,25 @@ CNethoodFSInterface::GetNextDirectoryLineHotPath(
     return psz < pszEnd;
 }
 
-void WINAPI
+BOOL WINAPI
 CNethoodFSInterface::CompleteDirectoryLineHotPath(
-    __inout_ecount(pathBufSize) char* path,
-    __in int pathBufSize)
+    CSalamanderStringBuffer* path)
 {
     // FIXME
+    return path != NULL && sally::plugin_abi::IsValidStringBuffer(*path)
+               ? TRUE
+               : FALSE;
 }
 
 BOOL WINAPI
 CNethoodFSInterface::GetPathForMainWindowTitle(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int mode,
-    __out_ecount(bufSize) char* buf,
-    __in int bufSize)
+    CSalamanderStringBuffer* buf)
 {
     UNREFERENCED_PARAMETER(fsName);
     UNREFERENCED_PARAMETER(mode);
     UNREFERENCED_PARAMETER(buf);
-    UNREFERENCED_PARAMETER(bufSize);
 
     // We return FALSE and Salamander will create the title for the main
     // window automatically through the GetNextDirectoryLineHotPath method.
@@ -815,7 +828,7 @@ CNethoodFSInterface::GetPathForMainWindowTitle(
 
 void WINAPI
 CNethoodFSInterface::ShowInfoDialog(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -825,7 +838,7 @@ CNethoodFSInterface::ShowInfoDialog(
 BOOL WINAPI
 CNethoodFSInterface::ExecuteCommandLine(
     __in HWND parent,
-    __inout_ecount(SALCMDLINE_MAXLEN + 1) char* command,
+    CSalamanderStringBuffer* command,
     __out int& selFrom,
     __out int& selTo)
 {
@@ -839,12 +852,12 @@ CNethoodFSInterface::ExecuteCommandLine(
 
 BOOL WINAPI
 CNethoodFSInterface::QuickRename(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int mode,
     __in HWND parent,
     __in CFileData& file,
     __in BOOL isDir,
-    __out_ecount(MAX_PATH) char* newName,
+    CSalamanderStringBuffer* newName,
     __out BOOL& cancel)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -860,8 +873,8 @@ CNethoodFSInterface::QuickRename(
 
 void WINAPI
 CNethoodFSInterface::AcceptChangeOnPathNotification(
-    __in const char* fsName,
-    __in const char* path,
+    __in const wchar_t* fsName,
+    __in const wchar_t* path,
     __in BOOL includingSubdirs)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -871,10 +884,10 @@ CNethoodFSInterface::AcceptChangeOnPathNotification(
 
 BOOL WINAPI
 CNethoodFSInterface::CreateDir(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int mode,
     __in HWND parent,
-    __inout_ecount(2 * MAX_PATH) char* newName,
+    CSalamanderStringBuffer* newName,
     __out BOOL& cancel)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -888,7 +901,7 @@ CNethoodFSInterface::CreateDir(
 
 void WINAPI
 CNethoodFSInterface::ViewFile(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
     __in CSalamanderForViewFileOnFSAbstract* salamander,
     __in CFileData& file)
@@ -901,7 +914,7 @@ CNethoodFSInterface::ViewFile(
 
 BOOL WINAPI
 CNethoodFSInterface::Delete(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int mode,
     __in HWND parent,
     __in int panel,
@@ -924,12 +937,12 @@ BOOL WINAPI
 CNethoodFSInterface::CopyOrMoveFromFS(
     __in BOOL copy,
     __in int mode,
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
     __in int panel,
     __in int selectedFiles,
     __in int selectedDirs,
-    __inout_ecount(2 * MAX_PATH) char* targetPath,
+    CSalamanderStringBuffer* targetPath,
     __out BOOL& operationMask,
     __out BOOL& cancelOrHandlePath,
     __in HWND dropTarget)
@@ -953,14 +966,14 @@ BOOL WINAPI
 CNethoodFSInterface::CopyOrMoveFromDiskToFS(
     __in BOOL copy,
     __in int mode,
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
-    __in const char* sourcePath,
+    __in const wchar_t* sourcePath,
     __in SalEnumSelection2 next,
     __in void* nextParam,
     __in int sourceFiles,
     __in int sourceDirs,
-    __inout_ecount(2 * MAX_PATH) char* targetPath,
+    CSalamanderStringBuffer* targetPath,
     __out_opt BOOL* invalidPathOrCancel)
 {
     UNREFERENCED_PARAMETER(copy);
@@ -980,7 +993,7 @@ CNethoodFSInterface::CopyOrMoveFromDiskToFS(
 
 BOOL WINAPI
 CNethoodFSInterface::ChangeAttributes(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
     __in int panel,
     __in int selectedFiles,
@@ -997,7 +1010,7 @@ CNethoodFSInterface::ChangeAttributes(
 
 void WINAPI
 CNethoodFSInterface::ShowProperties(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
     __in int panel,
     __in int selectedFiles,
@@ -1012,7 +1025,7 @@ CNethoodFSInterface::ShowProperties(
 
 void WINAPI
 CNethoodFSInterface::ContextMenu(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent,
     __in int menuX,
     __in int menuY,
@@ -1021,8 +1034,12 @@ CNethoodFSInterface::ContextMenu(
     __in int selectedFiles,
     __in int selectedDirs)
 {
-    CPathBuffer szPath;
-    TCHAR szMappedRoot[4] = TEXT("\0:\\");
+    // Only ever fed by GetUncPath (wide now) and consumed by the
+    // already-wide OpenNetworkContextMenu, so this local is wide directly - no round-trip.
+    std::wstring path;
+    // OpenNetworkContextMenu is wide; the mapped-drive letter comes back as a
+    // wchar_t. This buffer only ever holds a drive root, so it is ASCII either way.
+    wchar_t szMappedRootW[4] = L"\0:\\";
     bool bOk = false;
 
     if (type == fscmItemsInPanel)
@@ -1038,21 +1055,20 @@ CNethoodFSInterface::ContextMenu(
         {
             SalamanderGeneral->OpenNetworkContextMenu(
                 parent, panel, TRUE,
-                menuX, menuY, TEXT("\\\\"),
-                &szMappedRoot[0]);
+                menuX, menuY, L"\\\\",
+                &szMappedRootW[0]);
         }
         else
         {
             g_oNethoodCache.LockCache();
-            bOk = (m_pathNode != NULL) && g_oNethoodCache.GetUncPath(
-                                              m_pathNode, szPath, szPath.Size());
+            bOk = (m_pathNode != NULL) && g_oNethoodCache.GetUncPath(m_pathNode, path);
             g_oNethoodCache.UnlockCache();
             if (bOk)
             {
                 SalamanderGeneral->OpenNetworkContextMenu(
                     parent, panel, TRUE,
-                    menuX, menuY, szPath,
-                    &szMappedRoot[0]);
+                    menuX, menuY, path.c_str(),
+                    &szMappedRootW[0]);
             }
         }
     }
@@ -1062,12 +1078,12 @@ CNethoodFSInterface::ContextMenu(
 
         assert(type == fscmPathInPanel || type == fscmPanel);
 
-        if (IsRootPath(m_szCurrentPath))
+        if (IsRootPath(m_currentPath.c_str()))
         {
             SalamanderGeneral->OpenNetworkContextMenu(
                 parent, panel, FALSE,
-                menuX, menuY, TEXT("\\\\"),
-                &szMappedRoot[0]);
+                menuX, menuY, L"\\\\",
+                &szMappedRootW[0]);
         }
         else
         {
@@ -1081,9 +1097,7 @@ CNethoodFSInterface::ContextMenu(
                     nodeType == CNethoodCacheNode::TypeShare ||
                     nodeType == CNethoodCacheNode::TypeTSCVolume)
                 {
-                    bOk = g_oNethoodCache.GetUncPath(
-                        m_pathNode, szPath,
-                        szPath.Size());
+                    bOk = g_oNethoodCache.GetUncPath(m_pathNode, path);
                 }
             }
             g_oNethoodCache.UnlockCache();
@@ -1092,19 +1106,21 @@ CNethoodFSInterface::ContextMenu(
             {
                 SalamanderGeneral->OpenNetworkContextMenu(
                     parent, panel, FALSE,
-                    menuX, menuY, szPath,
-                    &szMappedRoot[0]);
+                    menuX, menuY, path.c_str(),
+                    &szMappedRootW[0]);
             }
         }
     }
 
-    if (szMappedRoot[0] != TEXT('\0'))
+    if (szMappedRootW[0] != L'\0')
     {
         // New drive was mapped using Map Network Drive command,
         // let's open it in panel.
 
-        // Store the path to redirect...
-        PostRedirectPathToSalamander(szMappedRoot);
+        // Store the path to redirect... PostRedirectPathToSalamander is wide now
+        // (this file's own wide-FS-interface-ABI conversion), so szMappedRootW - already a
+        // complete drive-root path - is passed straight through.
+        PostRedirectPathToSalamander(szMappedRootW);
         // ...and refresh the panel that will perform the
         // actual redirection.
         SalamanderGeneral->PostRefreshPanelFS2(this);
@@ -1113,7 +1129,7 @@ CNethoodFSInterface::ContextMenu(
 
 BOOL WINAPI
 CNethoodFSInterface::OpenFindDialog(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in int panel)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -1124,7 +1140,7 @@ CNethoodFSInterface::OpenFindDialog(
 
 void WINAPI
 CNethoodFSInterface::OpenActiveFolder(
-    __in const char* fsName,
+    __in const wchar_t* fsName,
     __in HWND parent)
 {
     UNREFERENCED_PARAMETER(fsName);
@@ -1134,7 +1150,7 @@ CNethoodFSInterface::OpenActiveFolder(
 void WINAPI
 CNethoodFSInterface::GetAllowedDropEffects(
     __in int mode,
-    __in const char* tgtFSPath,
+    __in const wchar_t* tgtFSPath,
     __out DWORD* allowedEffects)
 {
     UNREFERENCED_PARAMETER(mode);
@@ -1159,9 +1175,11 @@ CNethoodFSInterface::HandleMenuMsg(
 
 BOOL WINAPI
 CNethoodFSInterface::GetNoItemsInPanelText(
-    __out char* textBuf,
-    __in int textBufSize)
+    CSalamanderStringBuffer* textBuf)
 {
+    if (textBuf == NULL ||
+        !sally::plugin_abi::IsValidStringBuffer(*textBuf))
+        return FALSE;
     bool bPending = false;
 
     g_oNethoodCache.LockCache();
@@ -1177,8 +1195,11 @@ CNethoodFSInterface::GetNoItemsInPanelText(
     if (bPending)
     {
         // Enumeration pending...
-        LoadString(GetLangInstance(), IDS_REFRESHING, textBuf, textBufSize);
-        return TRUE;
+        return sally::plugin_abi::WriteStringBuffer(
+                   *textBuf,
+                   SPLLoadStrOwned(SalamanderGeneral, GetLangInstance(), IDS_REFRESHING).c_str())
+                   ? TRUE
+                   : FALSE;
     }
 #if 0
 	else
@@ -1211,7 +1232,7 @@ void CNethoodFSInterface::NotifyPathUpdated(__in CNethoodCache::Node node)
 
             if (dwEnumerationResult == ERROR_NETHOODCACHE_FULL_UNC_PATH)
             {
-                g_oNethoodCache.GetUncPath(node, m_szAccessiblePath, COUNTOF(m_szAccessiblePath));
+                g_oNethoodCache.GetUncPath(node, m_accessiblePath);
                 m_state = FSStateAsyncRedirect;
 
                 g_oNethoodCache.UnregisterConsumer(node, m_pPathNodeEventConsumer);
@@ -1233,7 +1254,7 @@ void CNethoodFSInterface::NotifyPathUpdated(__in CNethoodCache::Node node)
         else if (nodeData.GetStatus() == CNethoodCacheNode::StatusOk)
         {
             m_state = FSStateImmediateRefresh;
-            TRACE_I("Path " << m_szCurrentPath << " is valid. Will do immediate refresh.");
+            TRACE_IW(L"Path " << m_currentPath << L" is valid. Will do immediate refresh.");
         }
         else if (nodeData.GetStatus() == CNethoodCacheNode::StatusPending)
         {
@@ -1259,12 +1280,12 @@ void CNethoodFSInterface::NotifyPathUpdated(__in CNethoodCache::Node node)
             g_oNethoodCache.ReleaseNode(node);
             delete m_pPathNodeEventConsumer;
             m_pPathNodeEventConsumer = NULL;
-            g_oNethoodCache.FindAccessiblePath(m_pathNode, m_szAccessiblePath, COUNTOF(m_szAccessiblePath));
+            g_oNethoodCache.FindAccessiblePath(m_pathNode, m_accessiblePath);
             m_pathNode = NULL;
             m_state = FSStateDisplayError;
             m_dwEnumerationResult = dwEnumerationResult;
 
-            TRACE_I("Path was invalid, new accessible path is " << m_szAccessiblePath << ". Will do full refresh.");
+            TRACE_IW(L"Path was invalid, new accessible path is " << m_accessiblePath << L". Will do full refresh.");
         }
 
         bRefresh = true;
@@ -1284,14 +1305,18 @@ void CNethoodFSInterface::NotifyPathUpdated(__in CNethoodCache::Node node)
     }
 }
 
-bool CNethoodFSInterface::IsRootPath(__in PCTSTR pszPath)
+bool CNethoodFSInterface::IsRootPath(__in PCWSTR pszPath)
 {
-    return (pszPath[0] == TEXT('\\')) && (pszPath[1] == TEXT('\0'));
+    return (pszPath[0] == L'\\') && (pszPath[1] == L'\0');
 }
 
 void CNethoodFSInterface::DisplayError(DWORD dwError)
 {
-    TCHAR szErrorMessage[512];
+    // FormatMessage/szErrorMessage narrowed a genuinely wide system
+    // error string only to re-widen it via ToWideArg right before ShowMessageBox (wide-
+    // native) - the same double-round-trip shape already fixed for SetRedirectPath and
+    // ExecuteMenuItem's tooltip. FormatMessageW throughout instead.
+    wchar_t szErrorMessage[512];
     void* pAllocatedErrorDescription;
 
     if (m_bShowThrobber)
@@ -1307,36 +1332,38 @@ void CNethoodFSInterface::DisplayError(DWORD dwError)
         return;
     }
 
-    if (FormatMessage(
+    if (FormatMessageW(
             FORMAT_MESSAGE_ALLOCATE_BUFFER |
                 FORMAT_MESSAGE_FROM_SYSTEM |
                 FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             dwError,
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            reinterpret_cast<PTSTR>(&pAllocatedErrorDescription),
+            reinterpret_cast<PWSTR>(&pAllocatedErrorDescription),
             0, NULL) > 0)
     {
-        StringCchPrintf(szErrorMessage, COUNTOF(szErrorMessage),
-                        TEXT("(%lu) "), dwError);
-        StringCchCat(szErrorMessage, COUNTOF(szErrorMessage),
-                     static_cast<PTSTR>(pAllocatedErrorDescription));
+        StringCchPrintfW(szErrorMessage, COUNTOF(szErrorMessage),
+                         L"(%lu) ", dwError);
+        StringCchCatW(szErrorMessage, COUNTOF(szErrorMessage),
+                      static_cast<PWSTR>(pAllocatedErrorDescription));
         LocalFree(pAllocatedErrorDescription);
     }
     else
     {
-        StringCchPrintf(szErrorMessage, COUNTOF(szErrorMessage),
-                        TEXT("(%lu)"), dwError);
+        StringCchPrintfW(szErrorMessage, COUNTOF(szErrorMessage),
+                         L"(%lu)", dwError);
     }
 
-    SalamanderGeneral->ShowMessageBox(szErrorMessage, NULL, MSGBOX_WARNING);
+    // Preserve the prior behavior exactly: ToWideArg(NULL) returned an empty string, not
+    // NULL, and MessageBox's caption defaults differently for NULL vs "" - use L"" here.
+    SalamanderGeneral->ShowMessageBox(szErrorMessage, L"", MSGBOX_WARNING);
 }
 
 bool CNethoodFSInterface::PostRedirectPathToSalamander(
-    __in PCTSTR pszPath)
+    __in PCWSTR pszPath)
 {
     assert(m_state != FSStateRedirect);
-    assert(pszPath != m_szRedirectPath); // We REALLY want to compare the pointers!
+    assert(pszPath != m_redirectPath.c_str()); // We REALLY want to compare the pointers!
 
     if (!SalamanderGeneral->SalCheckAndRestorePath(
             SalamanderGeneral->GetMainWindowHWND(),
@@ -1348,7 +1375,7 @@ bool CNethoodFSInterface::PostRedirectPathToSalamander(
 
     // TODO: Exclude current path from the history.
 
-    StringCchCopy(m_szRedirectPath, COUNTOF(m_szRedirectPath), pszPath);
+    m_redirectPath.assign(pszPath);
     m_state = FSStateRedirect;
 
     return true;
@@ -1383,7 +1410,7 @@ bool CNethoodFSInterface::IsRootForContextMenu()
 {
     bool bRoot;
 
-    bRoot = IsRootPath(m_szCurrentPath);
+    bRoot = IsRootPath(m_currentPath.c_str());
     if (!bRoot)
     {
         g_oNethoodCache.LockCache();

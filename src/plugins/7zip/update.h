@@ -138,7 +138,7 @@ public:
     STDMETHOD(CryptoGetTextPassword2)
     (Int32* passwordIsDefined, BSTR* password);
 
-    AString GetProcessedFile() const { return ProcessedFileName; }
+    const UString& GetProcessedFile() const { return ProcessedFileName; }
     CQuadWord& GetTotalSize() { return Total; }
     CQuadWord& GetCompletedSize() { return Completed; }
 
@@ -146,7 +146,7 @@ public:
     ~CArchiveUpdateCallback();
 
 public:
-    AString ProcessedFileName;
+    UString ProcessedFileName;
 
     // synchronization for calls
     CRITICAL_SECTION CSUpdate;

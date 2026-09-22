@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include <cstddef>
+
+#include "common/ActivationIpcProtocol.h"
+
 //
 // ****************************************************************************
 
@@ -60,39 +64,15 @@ struct CProcessListItem
     }
 };
 
-// WARNING, you can only add items to this structure because older versions of Salamander use it too
-// WARNING, x64 and x86 processes communicate via this structure, beware of types (e.g. HANDLE) with different sizes
-// WARNING, it probably makes no sense to bump the version and extend the structure, because added data
-//          will not always be available (older Salamander version started first = new items will not
-//          be present in shared memory) => the correct solution is probably changing AS_PROCESSLIST_NAME etc. +
-//          reshaping data as needed (increase size, prune, reorder, etc.)
-struct CCommandLineParams
-{
-    DWORD Version;               // newer Salamander versions may increase 'Version' and start using ReservedX variables
-    DWORD RequestUID;            // unique (incrementing) ID of activation request
-    DWORD RequestTimestamp;      // GetTickCount() value when activation request was created
-    char LeftPath[2 * MAX_PATH]; // panel paths (left, right, or active); if empty, they should not be set
-    char RightPath[2 * MAX_PATH];
-    char ActivePath[2 * MAX_PATH];
-    DWORD ActivatePanel;         // which panel to activate 0-none, 1-left, 2-right
-    BOOL SetTitlePrefix;         // if TRUE, set title prefix according to TitlePrefix
-    char TitlePrefix[MAX_PATH];  // title prefix, if empty do not change; keep length at MAX_PATH instead of TITLE_PREFIX_MAX which could change
-    BOOL SetMainWindowIconIndex; // if TRUE, set main window icon according to MainWindowIconIndex
-    DWORD MainWindowIconIndex;   // 0: first icon, 1: second icon, ...
-    // WARNING, the structure can be extended only if it is still declared as the last member in CProcessList,
-    // otherwise it is too late and must not be touched
-
-    CCommandLineParams()
-    {
-        ZeroMemory(this, sizeof(CCommandLineParams));
-    }
-};
-
-// Open Salamander Process List
-// !!! WARNING: only add items to the structure, because older versions of Salamander also use it
+// Sally v2 process discovery/control record. The mapping names changed with
+// this layout, so older peers are never interpreted as this structure. The
+// fixed list remains pointer-free; variable activation text lives in a
+// request-sized mapping referenced by ActivationRequest.
 struct CProcessList
 {
-    DWORD Version; // newer Salamander versions may increase 'Version' and start using ReservedX variables
+    DWORD Magic;
+    DWORD Version;
+    DWORD StructSize;
 
     DWORD ItemsCount;    // number of valid items in Items array
     DWORD ItemsStateUID; // "version" of Items list; increases with each change; used by Tasks dialog as a refresh signal
@@ -102,10 +82,19 @@ struct CProcessList
     DWORD TodoUID;                        // order of sent request, increases for each next request
     DWORD TodoTimestamp;                  // GetTickCount() value when Todo request was created
     DWORD PID;                            // PID for which to perform Todo action
-    CCommandLineParams CommandLineParams; // panel paths and other activation parameters
-                                          // WARNING, if this structure needs expanding, it would be reasonable to extend CCommandLineParams first, e.g.
-                                          // reserve some MAX_PATH buffers and a few DWORDs if we want to pass new command line parameters
+    CActivationRequestRef ActivationRequest;
 };
+
+static_assert(sizeof(CProcessListItem) == 56,
+              "process-list item must be identical in x86 and x64");
+static_assert(offsetof(CProcessListItem, HMainWindow) == 44,
+              "process-list handle offset drift");
+static_assert(offsetof(CProcessList, Items) == 20,
+              "process-list item-array offset drift");
+static_assert(offsetof(CProcessList, ActivationRequest) == 28036,
+              "activation-reference offset drift");
+static_assert(sizeof(CProcessList) == 28068,
+              "process-list control ABI drift");
 
 #pragma pack(pop, enter_include_tasklist)
 
@@ -119,6 +108,7 @@ protected:
                                // whether they should perform the Todo action
     HANDLE EventProcessed;     // if one process performs the Todo action, it sets this
                                // event to signaled to tell the controlling process it's done
+    HANDLE ActivationDispatchMutex; // serializes complete activation exchanges
     HANDLE TerminateEvent;     // event to terminate break-thread
     HANDLE ControlThread;      // control-thread (waits for events and handles them immediately)
     BOOL OK;                   // did construction succeed?
@@ -141,11 +131,24 @@ public:
     BOOL FireEvent(DWORD todo, DWORD pid, BOOL* timeouted = NULL);
 
     // if 'timeouted' is not NULL, sets whether failure was caused by timeout waiting for shared memory
-    BOOL ActivateRunningInstance(const CCommandLineParams* cmdLineParams, BOOL* timeouted = NULL);
+    BOOL ActivateRunningInstance(const sally::cmdline::CommandLineRequest* request,
+                                 BOOL* timeouted = NULL);
+
+    // Main-thread handoff from the control thread. Copies dynamic owners while
+    // holding the private lock, acknowledges only a fresh, unexpired request.
+    BOOL TakePendingActivationRequest(DWORD lastRequestUID,
+                                      sally::cmdline::CommandLineRequest& request);
 
     // finds us in process list and sets 'ProcessState' and 'HMainWindow'; returns TRUE on success, otherwise FALSE
     // if 'timeouted' is not NULL, sets whether failure was caused by timeout waiting for shared memory
     BOOL SetProcessState(DWORD processState, HWND hMainWindow, BOOL* timeouted = NULL);
+
+    // Releases the dynamic activation-request owner while the main thread is still running.
+    // ~CTaskList also does this, but 'TaskList' is a compiler-group global and is therefore
+    // destroyed AFTER the heap leak checker in common/heap.cpp has taken its final checkpoint,
+    // so the request and the debug container proxies of its std::wstring/std::vector members are
+    // reported as leaks on every debug exit. Same reason as Plugins.ReleaseData(). Idempotent.
+    void ReleasePendingRequest();
 
 protected:
     // walks process list and removes non-existing items
@@ -157,10 +160,3 @@ protected:
 };
 
 extern CTaskList TaskList;
-
-// protection for access to CommandLineParams
-extern CRITICAL_SECTION CommandLineParamsCS;
-// used to pass activation parameters from Control thread to main thread
-extern CCommandLineParams CommandLineParams;
-// event is signaled as soon as the main thread takes the parameters
-extern HANDLE CommandLineParamsProcessed;

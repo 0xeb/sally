@@ -3,98 +3,29 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "reg_sz_narrow_bridge.h"
+#include "ftp_persisted_text_codec.h"
 
-// ****************************************************************************
-
-BOOL ConvertStringRegToTxt(char* buf, int bufSize, const char* regStr)
-{
-    if (bufSize == 0)
-        return FALSE;
-    const char* s = regStr;
-    char* d = buf;
-    char* end = buf + bufSize - 2;
-    if (bufSize > 2)
-    {
-        while (*s != 0 && d < end)
-        {
-            if (*s == '\\') // escape sequence
-            {
-                s++;
-                if (*s != 0)
-                    *d++ = *s;
-            }
-            else
-            {
-                if (*s == '|') // CRLF
-                {
-                    *d++ = '\r';
-                    *d++ = '\n';
-                }
-                else
-                {
-                    if (*s == '!')
-                        *d++ = '\n'; // LF
-                    else
-                    {
-                        if (*s == '$')
-                            *d++ = '\r'; // CR
-                        else
-                            *d++ = *s; // normal character
-                    }
-                }
-            }
-            s++;
-        }
-    }
-    *d = 0;
-    return *s == 0;
-}
-
-// ****************************************************************************
-
-BOOL ConvertStringTxtToReg(char* buf, int bufSize, const char* txtStr)
-{
-    if (bufSize == 0)
-        return FALSE;
-    const char* s = txtStr;
-    char* d = buf;
-    char* end = buf + bufSize - 2;
-    if (bufSize > 2)
-    {
-        while (*s != 0 && d < end)
-        {
-            if (*s == '\r')
-            {
-                if (*(s + 1) == '\n')
-                {
-                    s++;
-                    *d++ = '|'; // CRLF
-                }
-                else
-                    *d++ = '$'; // CR
-            }
-            else
-            {
-                if (*s == '\n')
-                    *d++ = '!'; // LF
-                else
-                {
-                    if (*s == '|' || *s == '!' || *s == '$' || *s == '\\')
-                        *d++ = '\\'; // escape sequence
-                    *d++ = *s;
-                }
-            }
-            s++;
-        }
-    }
-    *d = 0;
-    return *s == 0;
-}
+#include <algorithm>
+#include <limits>
+#include <utility>
+#include <vector>
 
 //
 // ****************************************************************************
 // CSrvTypeColumn
 //
+
+static char* DupSallyText(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    const int length = (int)strlen(text) + 1;
+    char* copy = (char*)SalamanderGeneral->Alloc(length);
+    if (copy != NULL)
+        memcpy(copy, text, length);
+    return copy;
+}
 
 CSrvTypeColumn::CSrvTypeColumn(CSrvTypeColWidths* colWidths)
 {
@@ -130,61 +61,61 @@ CSrvTypeColumn::~CSrvTypeColumn()
 void CSrvTypeColumn::LoadFromObj(CSrvTypeColumn* copyFrom)
 {
     Visible = copyFrom->Visible;
-    ID = SalamanderGeneral->DupStr(copyFrom->ID);
+    ID = DupSallyText(copyFrom->ID);
     NameID = copyFrom->NameID;
-    NameStr = SalamanderGeneral->DupStr(copyFrom->NameStr);
+    NameStr = DupSallyText(copyFrom->NameStr);
     DescrID = copyFrom->DescrID;
-    DescrStr = SalamanderGeneral->DupStr(copyFrom->DescrStr);
+    DescrStr = DupSallyText(copyFrom->DescrStr);
     Type = copyFrom->Type;
-    EmptyValue = SalamanderGeneral->DupStr(copyFrom->EmptyValue);
+    EmptyValue = DupSallyText(copyFrom->EmptyValue);
     LeftAlignment = copyFrom->LeftAlignment;
     ColWidths->FixedWidth = copyFrom->ColWidths->FixedWidth;
     ColWidths->Width = copyFrom->ColWidths->Width;
 }
 
-BOOL CSrvTypeColumn::LoadStr(const char** str, char** result, int limit)
+BOOL CSrvTypeColumn::LoadStr(const char** str, char** result)
 {
-    const char* s = *str;
-    int esc = 0;
+    const char* field = *str;
+    const char* s = field;
+    size_t decodedLength = 0;
     while (*s != 0 && *s != ',')
     {
         if (*s == '\\')
         {
-            esc++;
             s++;
+            if (*s == 0)
+                return FALSE;
         }
         s++;
+        decodedLength++;
     }
-    BOOL ret = TRUE;
-    if (esc == 1 && s - *str == 2 && (*str)[1] == '0')
+    if (s - field == 2 && field[0] == '\\' && field[1] == '0')
         *result = NULL; // "\\0" is the escape sequence for NULL
     else
     {
-        *result = (char*)SalamanderGeneral->Alloc((int)(s - *str) - esc + 1);
-        if (*result != NULL)
-        {
-            s = *str;
-            char* d = *result;
-            while (*s != 0 && *s != ',')
-            {
-                if (*s == '\\')
-                    s++;
-                *d++ = *s++;
-            }
-            *d = 0;
-            if (limit != -1 && d - *result > limit)
-                (*result)[limit] = 0; // truncate the string to the limit
-        }
-        else
+        if (decodedLength >= static_cast<size_t>((std::numeric_limits<int>::max)()))
+            return FALSE;
+        char* staged = (char*)SalamanderGeneral->Alloc((int)decodedLength + 1);
+        if (staged == NULL)
         {
             TRACE_E(LOW_MEMORY);
-            ret = FALSE;
+            return FALSE;
         }
+        const char* source = field;
+        char* destination = staged;
+        while (source < s)
+        {
+            if (*source == '\\')
+                source++;
+            *destination++ = *source++;
+        }
+        *destination = 0;
+        *result = staged;
     }
     if (*s == ',')
         s++;
     *str = s;
-    return ret;
+    return TRUE;
 }
 
 BOOL CSrvTypeColumn::LoadFromStr(const char* str)
@@ -193,30 +124,30 @@ BOOL CSrvTypeColumn::LoadFromStr(const char* str)
     if (*str++ != ',')
         return FALSE;
     BOOL err = FALSE;
-    if (!LoadStr(&str, &ID, STC_ID_MAX_SIZE - 1))
+    if (!LoadStr(&str, &ID))
         return FALSE;
     char* strNameID;
-    if (!LoadStr(&str, &strNameID, -1) || strNameID == NULL)
+    if (!LoadStr(&str, &strNameID) || strNameID == NULL)
         return FALSE;
     NameID = atoi(strNameID);
     SalamanderGeneral->Free(strNameID);
-    if (!LoadStr(&str, &NameStr, STC_NAME_MAX_SIZE - 1))
+    if (!LoadStr(&str, &NameStr))
         return FALSE;
     char* strDescrID;
-    if (!LoadStr(&str, &strDescrID, -1) || strDescrID == NULL)
+    if (!LoadStr(&str, &strDescrID) || strDescrID == NULL)
         return FALSE;
     DescrID = atoi(strDescrID);
     SalamanderGeneral->Free(strDescrID);
-    if (!LoadStr(&str, &DescrStr, STC_DESCR_MAX_SIZE - 1))
+    if (!LoadStr(&str, &DescrStr))
         return FALSE;
     char* strType;
-    if (!LoadStr(&str, &strType, -1) || strType == NULL)
+    if (!LoadStr(&str, &strType) || strType == NULL)
         return FALSE;
     Type = (CSrvTypeColumnTypes)atoi(strType);
     SalamanderGeneral->Free(strType);
     if (Type <= stctNone || Type >= stctLastItem)
         return FALSE;
-    if (!LoadStr(&str, &EmptyValue, STC_EMPTYVAL_MAX_SIZE - 1))
+    if (!LoadStr(&str, &EmptyValue))
         return FALSE;
     if (*str == 0)
         LeftAlignment = TRUE; // older versions did not have alignment yet = align to the left
@@ -253,7 +184,7 @@ BOOL CSrvTypeColumn::LoadFromStr(const char* str)
     else
     {
         char* strWidth;
-        if (!LoadStr(&str, &strWidth, -1) || strWidth == NULL)
+        if (!LoadStr(&str, &strWidth) || strWidth == NULL)
             return FALSE;
         ColWidths->Width = atoi(strWidth);
         SalamanderGeneral->Free(strWidth);
@@ -261,98 +192,17 @@ BOOL CSrvTypeColumn::LoadFromStr(const char* str)
     return TRUE;
 }
 
-int CSrvTypeColumn::SaveStrLen(const char* str)
+BOOL CSrvTypeColumn::SaveToStr(std::string& text, BOOL ignoreColWidths) noexcept
 {
-    if (str == NULL)
-        return 2; // for NULL we have the escape sequence "\\0"
-    const char* s = str;
-    int size = 0;
-    while (*s != 0)
+    if (!FtpSerializeServerTypeColumnRecord(Visible, ID, NameID, NameStr, DescrID,
+                                            DescrStr, (int)Type, EmptyValue,
+                                            LeftAlignment, ColWidths->FixedWidth,
+                                            ColWidths->Width, ignoreColWidths, text))
     {
-        if (*s == ',')
-            size++; // for ',' we have the escape sequence "\\,"
-        else if (*s == '\\')
-            size++; // for '\\' we have the escape sequence "\\\\"
-        s++;
-    }
-    return size + (int)(s - str);
-}
-
-void CSrvTypeColumn::SaveStr(char** s, const char* str, BOOL addComma)
-{
-    char* dest = *s;
-    if (str == NULL)
-    {
-        *dest++ = '\\';
-        *dest++ = '0';
-    }
-    else
-    {
-        while (*str != 0)
-        {
-            if (*str == ',' || *str == '\\')
-                *dest++ = '\\'; // for ',' and '\\' we have the escape sequence
-            *dest++ = *str++;
-        }
-    }
-    if (addComma)
-        *dest++ = ',';
-    *s = dest;
-}
-
-BOOL CSrvTypeColumn::SaveToStr(char* buf, int bufSize, BOOL ignoreColWidths)
-{
-    char strNameID[20];
-    sprintf(strNameID, "%d", NameID);
-    char strDescrID[20];
-    sprintf(strDescrID, "%d", DescrID);
-    char strWidth[20];
-    sprintf(strWidth, "%d", ColWidths->Width);
-    int size = 2 +                           // Visible
-               SaveStrLen(ID) + 1 +          // ID
-               (int)strlen(strNameID) + 1 +  // NameID
-               SaveStrLen(NameStr) + 1 +     // NameStr
-               (int)strlen(strDescrID) + 1 + // DescrID
-               SaveStrLen(DescrStr) + 1 +    // DescrStr
-               3 +                           // Type
-               SaveStrLen(EmptyValue) + 1 +  // EmptyValue
-               2 +                           // LeftAlignment
-               2 +                           // FixedWidth
-               (int)strlen(strWidth);        // Width
-    if (bufSize >= size + 1)
-    {
-        char* s = buf;
-        *s++ = Visible ? '1' : '0';
-        *s++ = ',';
-        SaveStr(&s, ID, TRUE);
-        SaveStr(&s, strNameID, TRUE);
-        SaveStr(&s, NameStr, TRUE);
-        SaveStr(&s, strDescrID, TRUE);
-        SaveStr(&s, DescrStr, TRUE);
-        char num[20];
-        sprintf(num, "%d", (int)Type);
-        *s++ = num[0];
-        if (num[1] != 0)
-            *s++ = num[1]; // Type has at most two digits
-        *s++ = ',';
-        SaveStr(&s, EmptyValue, FALSE);
-        *s++ = ',';
-        *s++ = LeftAlignment ? '1' : '0';
-        if (!ignoreColWidths)
-        {
-            *s++ = ',';
-            *s++ = '0' + (LOWORD(ColWidths->FixedWidth) != 0 ? 1 : 0) + (HIWORD(ColWidths->FixedWidth) != 0 ? 2 : 0);
-            *s++ = ',';
-            SaveStr(&s, strWidth, FALSE);
-        }
-        *s = 0;
-        return TRUE;
-    }
-    else
-    {
-        TRACE_E("CSrvTypeColumn::SaveToStr(): Small buffer for saving column!");
+        TRACE_E(LOW_MEMORY);
         return FALSE;
     }
+    return TRUE;
 }
 
 CSrvTypeColumn*
@@ -362,13 +212,13 @@ CSrvTypeColumn::MakeCopy()
     if (n != NULL && n->IsGood())
     {
         n->Visible = Visible;
-        n->ID = SalamanderGeneral->DupStr(ID);
+        n->ID = DupSallyText(ID);
         n->NameID = NameID;
-        n->NameStr = SalamanderGeneral->DupStr(NameStr);
+        n->NameStr = DupSallyText(NameStr);
         n->DescrID = DescrID;
-        n->DescrStr = SalamanderGeneral->DupStr(DescrStr);
+        n->DescrStr = DupSallyText(DescrStr);
         n->Type = Type;
-        n->EmptyValue = SalamanderGeneral->DupStr(EmptyValue);
+        n->EmptyValue = DupSallyText(EmptyValue);
         n->LeftAlignment = LeftAlignment;
     }
     else
@@ -380,18 +230,18 @@ CSrvTypeColumn::MakeCopy()
     return n;
 }
 
-void CSrvTypeColumn::Set(BOOL visible, char* id, int nameID, char* nameStr, int descrID,
-                         char* descrStr, CSrvTypeColumnTypes type, char* emptyValue,
+void CSrvTypeColumn::Set(BOOL visible, const char* id, int nameID, const char* nameStr, int descrID,
+                         const char* descrStr, CSrvTypeColumnTypes type, const char* emptyValue,
                          BOOL leftAlignment, int fixedWidth, int width)
 {
     Visible = visible;
-    ID = SalamanderGeneral->DupStr(id);
+    ID = DupSallyText(id);
     NameID = nameID;
-    NameStr = SalamanderGeneral->DupStr(nameStr);
+    NameStr = DupSallyText(nameStr);
     DescrID = descrID;
-    DescrStr = SalamanderGeneral->DupStr(descrStr);
+    DescrStr = DupSallyText(descrStr);
     Type = type;
-    EmptyValue = SalamanderGeneral->DupStr(emptyValue);
+    EmptyValue = DupSallyText(emptyValue);
     LeftAlignment = leftAlignment;
     ColWidths->FixedWidth = fixedWidth;
     ColWidths->Width = width;
@@ -474,7 +324,7 @@ BOOL ValidateSrvTypeColumns(TIndirectArray<CSrvTypeColumn>* columns, int* errRes
             int j;
             for (j = i + 1; j < columns->Count; j++)
             {
-                if (SalamanderGeneral->StrICmp(id, columns->At(j)->ID) == 0)
+                if (FtpEqualLocalTextNoCase(id, columns->At(j)->ID))
                 {
                     if (errResID != NULL)
                         *errResID = IDS_STC_ERR_IDNOTUNIQUE;
@@ -642,56 +492,105 @@ BOOL CServerType::Set(const char* typeName, CServerType* copyFrom)
     return !err;
 }
 
+// Registry-corruption bug family (see reg_sz_narrow_bridge.h):
+// this file's TypeName/AutodetectCond/parser-column strings/RulesForParsing
+// and CFTPProxyServer's encoded proxy script stays narrow
+// char* by design (protocol/parser text, not something a widening tick
+// converts), but the shared registry facade's REG_SZ path is wide-only.
+// Bridge here, at each Load()/Save() boundary, converting to/from wide right
+// at the registry call - same idiom as plugins/ftp/ftp.cpp's SetValueSZ/
+// GetValueSZ (which are file-local static, hence this file needs its own).
+static BOOL SetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const char* narrowValue)
+{
+    std::wstring wide;
+    if (!EncodeRegSzFromNarrowOwned(narrowValue, wide))
+        return FALSE;
+    return SPLRegistrySetString(registry, regKey, name, wide);
+}
+
+static BOOL GetValueSZ(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, std::string& value)
+{
+    std::wstring wideValue;
+    std::string staged;
+    if (!SPLRegistryGetStringOwned(registry, regKey, name, wideValue) ||
+        !DecodeRegSzToNarrowOwned(wideValue.c_str(), staged))
+        return FALSE;
+    value.swap(staged);
+    return TRUE;
+}
+
+static BOOL GetValueStringW(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, std::wstring& value)
+{
+    return SPLRegistryGetStringOwned(registry, regKey, name, value);
+}
+
+static BOOL SetValueStringW(CSalamanderRegistryAbstract* registry, HKEY regKey, const wchar_t* name, const std::wstring& value)
+{
+    return SPLRegistrySetString(registry, regKey, name, value);
+}
+
 BOOL CServerType::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
-    char name[SERVERTYPE_MAX_SIZE];
-    if (!registry->GetValue(regKey, CONFIG_STNAME, REG_SZ, name, SERVERTYPE_MAX_SIZE))
+    std::string name;
+    if (!GetValueSZ(registry, regKey, CONFIG_STNAME, name))
         return FALSE; // name is mandatory
-    char autodetectCond[AUTODETCOND_MAX_SIZE];
-    autodetectCond[0] = 0;
-    registry->GetValue(regKey, CONFIG_STADCOND, REG_SZ, autodetectCond, AUTODETCOND_MAX_SIZE); // optional
+    std::string autodetectCond;
+    GetValueSZ(registry, regKey, CONFIG_STADCOND, autodetectCond); // optional
 
-    TIndirectArray<char> columnStrings(5, 5);
-    if (!columnStrings.IsGood())
-        return FALSE; // low memory, aborting
+    std::vector<std::string> columnStrings;
     HKEY columnsKey;
     if (registry->OpenKey(regKey, CONFIG_STCOLUMNS, columnsKey))
     {
-        char colStr[STC_MAXCOLUMNSTR];
-        char num[20] = "1";
+        std::string colStr;
+        std::wstring num;
         int i = 1;
-        while (registry->GetValue(columnsKey, num, REG_SZ, colStr, STC_MAXCOLUMNSTR))
+        if (!FTPFormatDecimalIndex(num, i))
         {
-            char* s = _strdup(colStr);
-            if (s != NULL)
+            registry->CloseKey(columnsKey);
+            return FALSE;
+        }
+        while (GetValueSZ(registry, columnsKey, num.c_str(), colStr))
+        {
+            try
             {
-                columnStrings.Add(s);
-                if (!columnStrings.IsGood())
-                {
-                    columnStrings.ResetState();
-                    return FALSE; // probably low memory, aborting
-                }
+                columnStrings.push_back(colStr);
             }
-            else
-                return FALSE; // all columns must be loaded, terminating
-            sprintf(num, "%d", ++i);
+            catch (...)
+            {
+                registry->CloseKey(columnsKey);
+                return FALSE;
+            }
+            if (!FTPFormatDecimalIndex(num, ++i))
+            {
+                registry->CloseKey(columnsKey);
+                return FALSE;
+            }
         }
         registry->CloseKey(columnsKey);
     }
     else
         return FALSE; // columns are mandatory
 
-    char rulesForParsingReg[PARSER_MAX_SIZE + 1000];
-    rulesForParsingReg[0] = 0;
-    char rulesForParsing[PARSER_MAX_SIZE];
-    rulesForParsing[0] = 0;
-    if (!registry->GetValue(regKey, CONFIG_STRULESFORPARS, REG_SZ, rulesForParsingReg, PARSER_MAX_SIZE + 1000))
+    std::string rulesForParsingReg;
+    std::string rulesForParsing;
+    if (!GetValueSZ(registry, regKey, CONFIG_STRULESFORPARS, rulesForParsingReg))
         return FALSE; // parsing rules are mandatory as well
-    if (!ConvertStringRegToTxt(rulesForParsing, PARSER_MAX_SIZE, rulesForParsingReg))
-        TRACE_E("Unexpected error in CServerType::Load(): small buffer for rules for parsing!");
-    BOOL ret = Set(name, autodetectCond[0] != 0 ? autodetectCond : NULL,
-                   columnStrings.Count, (const char**)columnStrings.GetData(),
-                   rulesForParsing[0] != 0 ? rulesForParsing : NULL);
+    if (!FtpDecodePersistedText(rulesForParsingReg.c_str(), rulesForParsing))
+        return FALSE;
+    std::vector<const char*> columnPointers;
+    try
+    {
+        columnPointers.reserve(columnStrings.size());
+        for (const std::string& column : columnStrings)
+            columnPointers.push_back(column.c_str());
+    }
+    catch (...)
+    {
+        return FALSE;
+    }
+    BOOL ret = Set(name.c_str(), autodetectCond.empty() ? NULL : autodetectCond.c_str(),
+                   (int)columnPointers.size(), columnPointers.data(),
+                   rulesForParsing.empty() ? NULL : rulesForParsing.c_str());
 
     // verify that the list of columns is valid
     if (ret)
@@ -710,7 +609,8 @@ BOOL CServerType::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* re
     // verify that the autodetect condition is valid
     if (ret)
     {
-        CFTPAutodetCondNode* node = CompileAutodetectCond(HandleNULLStr(AutodetectCond), NULL, NULL, NULL, NULL, 0);
+        CFTPAutodetCondNode* node = CompileAutodetectCond(
+            HandleNULLStr(AutodetectCond), NULL, NULL, NULL, NULL);
         if (node != NULL)
             delete node; // condition is OK, discard it again
         else
@@ -722,28 +622,44 @@ BOOL CServerType::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* re
 
 void CServerType::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
-    registry->SetValue(regKey, CONFIG_STNAME, REG_SZ, TypeName, -1);
-    registry->SetValue(regKey, CONFIG_STADCOND, REG_SZ, HandleNULLStr(AutodetectCond), -1);
+    std::vector<std::string> columnRecords;
+    try
+    {
+        columnRecords.reserve(Columns.Count);
+        for (int i = 0; i < Columns.Count; i++)
+        {
+            std::string record;
+            if (!Columns[i]->SaveToStr(record))
+                return;
+            columnRecords.push_back(std::move(record));
+        }
+    }
+    catch (...)
+    {
+        TRACE_E(LOW_MEMORY);
+        return;
+    }
+    std::string rulesForParsingReg;
+    if (!FtpEncodePersistedText(HandleNULLStr(RulesForParsing), rulesForParsingReg))
+        return;
+
+    SetValueSZ(registry, regKey, CONFIG_STNAME, TypeName);
+    SetValueSZ(registry, regKey, CONFIG_STADCOND, HandleNULLStr(AutodetectCond));
     HKEY columnsKey;
     if (registry->CreateKey(regKey, CONFIG_STCOLUMNS, columnsKey))
     {
         registry->ClearKey(columnsKey);
-        char num[20];
-        char colStr[STC_MAXCOLUMNSTR];
+        std::wstring num;
         int i;
-        for (i = 0; i < Columns.Count; i++)
+        for (i = 0; i < (int)columnRecords.size(); i++)
         {
-            sprintf(num, "%d", i + 1);
-            Columns[i]->SaveToStr(colStr, STC_MAXCOLUMNSTR);
-            registry->SetValue(columnsKey, num, REG_SZ, colStr, -1);
+            if (!FTPFormatDecimalIndex(num, i + 1))
+                break;
+            SetValueSZ(registry, columnsKey, num.c_str(), columnRecords[i].c_str());
         }
         registry->CloseKey(columnsKey);
     }
-    char rulesForParsingReg[PARSER_MAX_SIZE + 1000];
-    rulesForParsingReg[0] = 0;
-    if (!ConvertStringTxtToReg(rulesForParsingReg, PARSER_MAX_SIZE + 1000, HandleNULLStr(RulesForParsing)))
-        TRACE_E("Unexpected error in CServerType::Save(): small buffer for rules for parsing!");
-    registry->SetValue(regKey, CONFIG_STRULESFORPARS, REG_SZ, rulesForParsingReg, -1);
+    SetValueSZ(registry, regKey, CONFIG_STRULESFORPARS, rulesForParsingReg.c_str());
 }
 
 CServerType*
@@ -753,9 +669,9 @@ CServerType::MakeCopy()
     if (n != NULL)
     {
         BOOL err = FALSE;
-        n->TypeName = SalamanderGeneral->DupStr(TypeName);
-        n->AutodetectCond = SalamanderGeneral->DupStr(AutodetectCond);
-        n->RulesForParsing = SalamanderGeneral->DupStr(RulesForParsing);
+        n->TypeName = DupSallyText(TypeName);
+        n->AutodetectCond = DupSallyText(AutodetectCond);
+        n->RulesForParsing = DupSallyText(RulesForParsing);
         int i;
         for (i = 0; i < Columns.Count; i++)
         {
@@ -791,18 +707,36 @@ CServerType::MakeCopy()
     return n;
 }
 
-char* GetTypeNameForUser(char* typeName, char* buf, int bufSize)
+BOOL GetTypeNameForUser(const char* typeName, std::wstring& text) noexcept
 {
-    char* txt = typeName;
-    if (*txt == '*' && bufSize > 0) // a name starting with '*' means "user defined server type" - strip the character and append the suffix
-    {
-        _snprintf_s(buf, bufSize, _TRUNCATE, "%s %s", txt + 1, UserDefinedSuffix);
-        txt = buf;
-    }
-    return txt;
+    if (typeName == NULL)
+        return FALSE;
+    return FtpFormatLocalTypeName(typeName, UserDefinedSuffix, text);
 }
 
-#define WSTF_MAX_LINE_LEN 80 // used when writing and reading a string to a file
+constexpr size_t WSTF_LINE_WRAP = 80; // persisted .STR formatting width, not an ownership ceiling
+
+static BOOL WriteEncodedFileBytes(HANDLE file, std::string_view bytes, DWORD* err) noexcept
+{
+    while (!bytes.empty())
+    {
+        const DWORD requested = static_cast<DWORD>((std::min)(bytes.size(),
+                                                              static_cast<size_t>(MAXDWORD)));
+        DWORD written = 0;
+        if (!WriteFile(file, bytes.data(), requested, &written, NULL))
+        {
+            *err = GetLastError();
+            return FALSE;
+        }
+        if (written == 0)
+        {
+            *err = ERROR_DISK_FULL;
+            return FALSE;
+        }
+        bytes.remove_prefix(written);
+    }
+    return TRUE;
+}
 
 // writes string 'str' to file 'file', returns any error in 'err' (must not be NULL);
 // format (apart from "// " at the beginning of the line exactly as it will be in the file - '"', '\', etc. have no C++ meaning):
@@ -816,61 +750,43 @@ char* GetTypeNameForUser(char* typeName, char* buf, int bufSize)
 // lastline ends with double quotes"
 void WriteStrToFile(HANDLE file, const char* str, DWORD* err)
 {
-    char line[WSTF_MAX_LINE_LEN + 3]; // 3 characters are overhead for easy writing
-    ULONG written;
-    BOOL success;
     if (str == NULL)
     {
-        strcpy(line, "\"\\0\"\r\n"); // string for a NULL value
-        int len = (int)strlen(line);
-        if ((success = WriteFile(file, line, len, &written, NULL)) == 0 ||
-            written != (DWORD)len)
-        {
-            if (!success)
-                *err = GetLastError();
-            else
-                *err = ERROR_DISK_FULL;
-        }
+        WriteEncodedFileBytes(file, "\"\\0\"\r\n", err);
+        return;
     }
-    else
+
+    try
     {
+        std::string line;
+        line.reserve(WSTF_LINE_WRAP + 3);
         const char* s = str;
-        char* end = line + WSTF_MAX_LINE_LEN + 3;
         BOOL firstLine = TRUE;
         while (1)
         {
-            char* d = line;
+            line.clear();
             if (firstLine)
             {
-                *d++ = '"';
+                line.push_back('"');
                 firstLine = FALSE;
             }
             while (*s != 0 && *s != '\r' && *s != '\n')
             {
-                if (d > end - 5) // for simplicity we check that we can fit: '\\'+'X'+'"'+'\r'+'\n'
+                if (line.size() > WSTF_LINE_WRAP - 2)
                 {
-                    *d++ = '\\';
+                    line.push_back('\\');
                     break; // finish this part of the line, continue on the next line in the file
                 }
                 if (*s == '"' || *s == '\\')
-                    *d++ = '\\';
-                *d++ = *s++;
+                    line.push_back('\\');
+                line.push_back(*s++);
             }
             if (*s == 0)
-                *d++ = '"';
-            *d++ = '\r';
-            *d++ = '\n';
+                line.push_back('"');
+            line.append("\r\n");
 
-            // write to the file
-            if ((success = WriteFile(file, line, (DWORD)(d - line), &written, NULL)) == 0 ||
-                written != (DWORD)(d - line))
-            {
-                if (!success)
-                    *err = GetLastError();
-                else
-                    *err = ERROR_DISK_FULL;
+            if (!WriteEncodedFileBytes(file, line, err))
                 break; // write error, abort with error
-            }
 
             if (*s == 0)
                 break; // finished writing the string
@@ -880,6 +796,10 @@ void WriteStrToFile(HANDLE file, const char* str, DWORD* err)
             if (*s == '\n')
                 s++;
         }
+    }
+    catch (...)
+    {
+        *err = ERROR_NOT_ENOUGH_MEMORY;
     }
 }
 
@@ -894,56 +814,65 @@ DWORD
 CServerType::ExportToFile(HANDLE file)
 {
     DWORD err = NO_ERROR;
-    char line[500];
+    std::string line;
     int i = 0;
     while (1)
     {
         switch (i)
         {
         case 0:
-            _snprintf_s(line, _TRUNCATE, "%s\r\n\r\n", STR_FILE_HEADER);
+            if (!FTPFormatString(line, "%s\r\n\r\n", STR_FILE_HEADER))
+                err = ERROR_NOT_ENOUGH_MEMORY;
             break;
         case 1:
-            _snprintf_s(line, _TRUNCATE, "%s %s\r\n", STR_FILE_TYPENAME, TypeName);
+            if (!FTPFormatString(line, "%s %s\r\n", STR_FILE_TYPENAME, TypeName))
+                err = ERROR_NOT_ENOUGH_MEMORY;
             break;
         case 2:
-            _snprintf_s(line, _TRUNCATE, "%s ", STR_FILE_ADCOND);
+            if (!FTPFormatString(line, "%s ", STR_FILE_ADCOND))
+                err = ERROR_NOT_ENOUGH_MEMORY;
             break; // header for AutodetectCond
 
         case 3: // write the AutodetectCond string
         {
             WriteStrToFile(file, AutodetectCond, &err);
-            line[0] = 0; // we will not write it this way
+            line.clear(); // already written by the encoded-string formatter
             break;
         }
 
         case 4:
-            _snprintf_s(line, _TRUNCATE, "\r\n%s\r\n", STR_FILE_COLUMNS);
+            if (!FTPFormatString(line, "\r\n%s\r\n", STR_FILE_COLUMNS))
+                err = ERROR_NOT_ENOUGH_MEMORY;
             break; // header for columns
 
         case 5: // write all columns
         {
-            char colStr[STC_MAXCOLUMNSTR];
+            std::string colStr;
             int j;
             for (j = 0; j < Columns.Count; j++)
             {
-                Columns[j]->SaveToStr(colStr, STC_MAXCOLUMNSTR, TRUE);
-                WriteStrToFile(file, colStr, &err);
+                if (!Columns[j]->SaveToStr(colStr, TRUE))
+                {
+                    err = ERROR_NOT_ENOUGH_MEMORY;
+                    break;
+                }
+                WriteStrToFile(file, colStr.c_str(), &err);
                 if (err != NO_ERROR)
                     break; // file error, aborting
             }
-            line[0] = 0; // we will not write it this way
+            line.clear(); // column strings were written individually
             break;
         }
 
         case 6:
-            _snprintf_s(line, _TRUNCATE, "\r\n%s\r\n", STR_FILE_RULES);
+            if (!FTPFormatString(line, "\r\n%s\r\n", STR_FILE_RULES))
+                err = ERROR_NOT_ENOUGH_MEMORY;
             break; // header for RulesForParsing
 
         case 7: // write the RulesForParsing string
         {
             WriteStrToFile(file, RulesForParsing, &err);
-            line[0] = 0; // we will not write it this way
+            line.clear(); // already written by the encoded-string formatter
             break;
         }
 
@@ -959,17 +888,8 @@ CServerType::ExportToFile(HANDLE file)
             i++; // move to the next line
 
         // write the data line to the file
-        ULONG written;
-        BOOL success;
-        int len = (int)strlen(line);
-        if (len > 0 && // there is something to write
-            ((success = WriteFile(file, line, len, &written, NULL)) == 0 ||
-             written != (DWORD)len))
+        if (!line.empty() && !WriteEncodedFileBytes(file, line, &err))
         {
-            if (!success)
-                err = GetLastError();
-            else
-                err = ERROR_DISK_FULL;
             break; // aborting with an error
         }
     }
@@ -1042,46 +962,46 @@ BOOL ReadStrFromLines(const char* line, const char* lineEnd, BOOL* firstLine,
             return TRUE;
         }
     }
-    char buf[WSTF_MAX_LINE_LEN + 2]; // 2 characters of overhead for "\r\n"
-    char* d = buf;
-    char* end = buf + WSTF_MAX_LINE_LEN + 2;
     BOOL eol = TRUE;
     BOOL foundEnd = FALSE;
-    while (s < lineEnd)
+    std::string decoded;
+    try
     {
-        if (*s == '\\')
+        decoded.reserve(static_cast<size_t>(lineEnd - s) + 2);
+        while (s < lineEnd)
         {
-            if (s + 1 < lineEnd)
-                s++;
+            if (*s == '\\')
+            {
+                if (s + 1 < lineEnd)
+                    s++;
+                else
+                {
+                    eol = FALSE;
+                    break; // the string continues directly on the next line (without an EOL)
+                }
+            }
             else
             {
-                eol = FALSE;
-                break; // the string continues directly on the next line (without an EOL)
+                if (*s == '"')
+                {
+                    foundEnd = TRUE;
+                    eol = FALSE;
+                    break; // end of the string found (+ no more EOL)
+                }
             }
+            decoded.push_back(*s++);
         }
-        else
-        {
-            if (*s == '"')
-            {
-                foundEnd = TRUE;
-                eol = FALSE;
-                break; // end of the string found (+ no more EOL)
-            }
-        }
-        if (d + 2 >= end) // need to "flush" the local buffer to 'dynStr' (no space left for a character + EOL)
-        {
-            if (!dynStr->Append(buf, (int)(d - buf)))
-                *success = FALSE; // allocation error
-            d = buf;
-        }
-        *d++ = *s++;
+        if (eol)
+            decoded.append("\r\n");
     }
-    if (eol)
+    catch (...)
     {
-        *d++ = '\r';
-        *d++ = '\n';
+        *success = FALSE;
+        return TRUE;
     }
-    if (d - buf > 0 && !dynStr->Append(buf, (int)(d - buf)))
+    if (!decoded.empty() &&
+        (decoded.size() > static_cast<size_t>((std::numeric_limits<int>::max)()) ||
+         !dynStr->Append(decoded.data(), static_cast<int>(decoded.size()))))
         *success = FALSE; // allocation error
     return foundEnd;
 }
@@ -1100,14 +1020,12 @@ void GetStrResult(char** str, BOOL* success, CDynString* dynStr, BOOL isNULLStr)
             const char* s = dynStr->GetString();
             if (s == NULL)
                 s = ""; // this is not NULL, we must duplicate an empty string
-            *str = SalamanderGeneral->DupStr(s);
+            *str = DupSallyText(s);
             if (*str == NULL)
                 *success = FALSE; // out of memory, aborting
         }
     }
 }
-
-#define IMPORT_FILE_BUF_SIZE 1024 // buffer size for reading from a file
 
 BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
 {
@@ -1126,8 +1044,17 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
         CompiledParser = NULL;
     }
 
-    char buffer[IMPORT_FILE_BUF_SIZE];
-    int readBytes = 0; // how many bytes have been read
+    std::vector<char> buffer;
+    try
+    {
+        buffer.resize(4096); // transport chunk; grows when a logical line spans it
+    }
+    catch (...)
+    {
+        *err = ERROR_NOT_ENOUGH_MEMORY;
+        return FALSE;
+    }
+    size_t readBytes = 0; // how many bytes have been read
     int i = 0;
     BOOL skipNextEOLN = FALSE; // TRUE = '\r' was already processed, if '\n' is at the start of the buffer it is the remainder of the EOL and should be skipped
     CDynString dynStr;         // shared dynamic string for reading strings of unknown length from the file
@@ -1135,7 +1062,9 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
     while (ret)
     {
         DWORD read;
-        if (!ReadFile(file, buffer + readBytes, IMPORT_FILE_BUF_SIZE - readBytes, &read, NULL))
+        const DWORD available = (DWORD)(std::min)(buffer.size() - readBytes,
+                                                  static_cast<size_t>(MAXDWORD));
+        if (!ReadFile(file, buffer.data() + readBytes, available, &read, NULL))
         {
             *err = GetLastError();
             ret = FALSE;
@@ -1146,8 +1075,8 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
             break; // end of file
 
         // process the read buffer
-        char* end = buffer + readBytes; // end of data in the buffer
-        char* s = buffer;               // searching for the end of the line
+        char* end = buffer.data() + readBytes; // end of data in the buffer
+        char* s = buffer.data();               // searching for the end of the line
         char* lineBeg = s;              // start of the line
         while (1)
         {
@@ -1160,18 +1089,31 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
                 s++;
             if (s == end)
             {
-                if (readBytes == IMPORT_FILE_BUF_SIZE)
+                if (readBytes == buffer.size())
                 {
-                    if (lineBeg == buffer) // line too long
+                    if (lineBeg == buffer.data()) // grow rather than rejecting a long logical line
                     {
-                        *errResID = IDS_SRVTYPEIMPMOREDATA;
-                        ret = FALSE;
+                        try
+                        {
+                            if (buffer.size() > (std::numeric_limits<size_t>::max)() / 2)
+                            {
+                                *err = ERROR_NOT_ENOUGH_MEMORY;
+                                ret = FALSE;
+                                break;
+                            }
+                            buffer.resize(buffer.size() * 2);
+                        }
+                        catch (...)
+                        {
+                            *err = ERROR_NOT_ENOUGH_MEMORY;
+                            ret = FALSE;
+                        }
                         break;
                     }
                     else // the rest of the line is no longer in the buffer, read it
                     {
-                        memmove(buffer, lineBeg, end - lineBeg);
-                        readBytes = (int)(end - lineBeg);
+                        memmove(buffer.data(), lineBeg, end - lineBeg);
+                        readBytes = (size_t)(end - lineBeg);
                         break;
                     }
                 }
@@ -1413,7 +1355,8 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
     // verify that the autodetect condition is valid
     if (ret)
     {
-        CFTPAutodetCondNode* node = CompileAutodetectCond(HandleNULLStr(AutodetectCond), NULL, NULL, NULL, NULL, 0);
+        CFTPAutodetCondNode* node = CompileAutodetectCond(
+            HandleNULLStr(AutodetectCond), NULL, NULL, NULL, NULL);
         if (node != NULL)
             delete node; // condition is OK, discard it again
         else
@@ -1432,39 +1375,49 @@ BOOL CServerType::ImportFromFile(HANDLE file, DWORD* err, int* errResID)
 // ***********************************************************************************
 //
 
-CProxyScriptParams::CProxyScriptParams(CFTPProxyServer* proxyServer, const char* host,
-                                       int port, const char* user, const char* password,
-                                       const char* account, BOOL allowEmptyPassword)
+struct CEncodedProxyScriptCredentials
 {
+    std::string ProxyHost;
+    std::string ProxyUser;
+    std::string ProxyPassword;
+    std::string Host;
+    std::string User;
+    std::string Password;
+    std::string Account;
+
+    ~CEncodedProxyScriptCredentials()
+    {
+        FTPSecureWipe(ProxyPassword);
+        FTPSecureWipe(Password);
+        FTPSecureWipe(Account);
+    }
+};
+
+CProxyScriptParams::CProxyScriptParams(CFTPProxyServer* proxyServer, const wchar_t* host,
+                                       int port, const wchar_t* user, const wchar_t* password,
+                                       const wchar_t* account, BOOL allowEmptyPassword) noexcept
+{
+    Valid = TRUE;
     if (proxyServer == NULL)
     {
-        ProxyHost[0] = 0;
+        ProxyHost.clear();
         ProxyPort = 21;
-        ProxyUser[0] = 0;
-        ProxyPassword[0] = 0;
+        ProxyUser.clear();
+        ProxyPassword.clear();
     }
     else
     {
-        lstrcpyn(ProxyHost, HandleNULLStr(proxyServer->ProxyHost), HOST_MAX_SIZE);
+        Valid = FtpStoreWideText(proxyServer->ProxyHost, ProxyHost);
         ProxyPort = proxyServer->ProxyPort;
-        lstrcpyn(ProxyUser, HandleNULLStr(proxyServer->ProxyUser), USER_MAX_SIZE);
-        lstrcpyn(ProxyPassword, HandleNULLStr(proxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE);
+        Valid = Valid && FtpStoreWideText(proxyServer->ProxyUser, ProxyUser) &&
+                FtpStoreWideText(proxyServer->ProxyPlainPassword, ProxyPassword);
     }
 
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
+    Valid = Valid && FtpStoreWideText(host != NULL ? host : L"", Host);
     Port = port;
-    if (user == NULL)
-        User[0] = 0;
-    else
-        lstrcpyn(User, user, USER_MAX_SIZE);
-    if (password == NULL)
-        Password[0] = 0;
-    else
-        lstrcpyn(Password, password, PASSWORD_MAX_SIZE);
-    if (account == NULL)
-        Account[0] = 0;
-    else
-        lstrcpyn(Account, account, ACCOUNT_MAX_SIZE);
+    Valid = Valid && FtpStoreWideText(user != NULL ? user : L"", User) &&
+            FtpStoreWideText(password != NULL ? password : L"", Password) &&
+            FtpStoreWideText(account != NULL ? account : L"", Account);
 
     NeedProxyHost = FALSE;
     NeedProxyPassword = FALSE;
@@ -1477,15 +1430,16 @@ CProxyScriptParams::CProxyScriptParams(CFTPProxyServer* proxyServer, const char*
 
 CProxyScriptParams::CProxyScriptParams()
 {
-    ProxyHost[0] = 0;
+    Valid = TRUE;
+    ProxyHost.clear();
     ProxyPort = 21;
-    ProxyUser[0] = 0;
-    ProxyPassword[0] = 0;
-    Host[0] = 0;
+    ProxyUser.clear();
+    ProxyPassword.clear();
+    Host.clear();
     Port = 21;
-    User[0] = 0;
-    Password[0] = 0;
-    Account[0] = 0;
+    User.clear();
+    Password.clear();
+    Account.clear();
 
     NeedProxyHost = FALSE;
     NeedProxyPassword = FALSE;
@@ -1496,49 +1450,51 @@ CProxyScriptParams::CProxyScriptParams()
     AllowEmptyPassword = FALSE;
 }
 
-// 'buf' with size 'bufSize' is the buffer for the resulting text (host or command);
-// 'logBuf' with size 'logBufSize' is the buffer for the resulting text that can be published in the log
-// (commands only - passwords are not published, they are replaced with the word "hidden"); 'strBeg' to 'strEnd'
+CProxyScriptParams::~CProxyScriptParams()
+{
+    FTPSecureWipe(ProxyPassword);
+    FTPSecureWipe(Password);
+    FTPSecureWipe(Account);
+}
+
+// 'text' owns the resulting host or command; 'logText' owns the result that can
+// be published in the log (passwords are replaced with the word "hidden").
+// 'strBeg' to 'strEnd'
 // is the script text to be expanded; 'hostVarsOnly' is TRUE when expanding
 // the host (only the Host and ProxyHost variables are allowed, and CRLF is not appended at the end as it is for commands);
 // 'proxyHostNeeded' (if not NULL) returns TRUE when the $(ProxyHost) variable is used during the expansion
 // return values:
 // - error: returns FALSE, the error code is returned in 'errCode' and '*errorPos' gives the error position
-// - the line should be skipped: returns TRUE with 'skipThisLine'==TRUE
+// - the line should be skipped: returns TRUE with 'skipThisLine'==TRUE and with
+//   'text' and 'logText' emptied (a skipped line is not a command)
 // - missing variable values: returns FALSE, but 'errCode' is 0
-// - everything OK: returns TRUE with text in 'buf'
-BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char* strBeg, const char* strEnd,
-                CProxyScriptParams* scriptParams, const char** errorPos, int* errCode,
-                BOOL hostVarsOnly, BOOL* skipThisLine, BOOL* proxyHostNeeded)
+// - everything OK: returns TRUE with transactionally published owned strings
+static BOOL ExpandEncodedText(std::string* text, std::string* logText,
+                              const char* strBeg, const char* strEnd,
+                              CProxyScriptParams* scriptParams,
+                              const CEncodedProxyScriptCredentials* credentials,
+                              const char** errorPos, int* errCode,
+                              BOOL hostVarsOnly, BOOL* skipThisLine, BOOL* proxyHostNeeded)
 {
     BOOL ret = TRUE;
     DWORD needUserInput = 0; // != 0 - the user should enter the values of the marked variables (bitwise ORed in this DWORD)
     BOOL localSkipThisLine = FALSE;
     if (skipThisLine != NULL)
         *skipThisLine = FALSE;
-    char* bufEnd;
-    if (bufSize > 0)
-        bufEnd = buf + bufSize - 1;
-    else
-        bufEnd = NULL;
-    char* logBufEnd;
-    if (logBufSize > 0)
-        logBufEnd = logBuf + logBufSize - 1;
-    else
-        logBufEnd = NULL;
+    std::string stagedText;
+    CFTPSecureByteStringGuard stagedTextGuard(stagedText);
+    std::string stagedLog;
     const char* s = strBeg;
-    char* txt = buf;
-    char* logTxt = logBuf;
     while (s < strEnd)
     {
         if (*s == '$')
         {
             if (s + 1 < strEnd && *(s + 1) == '$') // escape sequence for '$'
             {
-                if (txt < bufEnd)
-                    *txt++ = '$';
-                if (logTxt < logBufEnd)
-                    *logTxt++ = '$';
+                if (text != NULL)
+                    stagedText.push_back('$');
+                if (logText != NULL)
+                    stagedLog.push_back('$');
                 s += 2;
             }
             else
@@ -1582,7 +1538,9 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                         }
                         int varNameLen = (int)strlen(varName);
                         if (s + varNameLen < strEnd && *(s + varNameLen) == ')' &&
-                            SalamanderGeneral->StrNICmp(s, varName, varNameLen) == 0) // variable found
+                            FtpEqualAsciiTokenNoCase(
+                                std::string_view(s, static_cast<size_t>(varNameLen)),
+                                varName)) // variable found
                         {
                             if (i == 0 && proxyHostNeeded != NULL)
                                 *proxyHostNeeded = TRUE;
@@ -1595,15 +1553,15 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                             }
                             if (scriptParams != NULL) // if we have variable values, insert the variable value
                             {
-                                char portBuf[20];
+                                std::string portText;
                                 const char* value = "";
                                 BOOL hidden = FALSE;
                                 switch (i)
                                 {
                                 case 0:
                                 {
-                                    if (scriptParams->ProxyHost[0] != 0)
-                                        value = scriptParams->ProxyHost;
+                                    if (!scriptParams->ProxyHost.empty())
+                                        value = credentials->ProxyHost.c_str();
                                     else
                                         needUserInput |= 1;
                                     break;
@@ -1611,15 +1569,15 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
 
                                 case 1:
                                 {
-                                    _itoa(scriptParams->ProxyPort, portBuf, 10);
-                                    value = portBuf;
+                                    portText = std::to_string(scriptParams->ProxyPort);
+                                    value = portText.c_str();
                                     break;
                                 }
 
                                 case 2:
                                 {
-                                    if (scriptParams->ProxyUser[0] != 0)
-                                        value = scriptParams->ProxyUser;
+                                    if (!scriptParams->ProxyUser.empty())
+                                        value = credentials->ProxyUser.c_str();
                                     else
                                         localSkipThisLine = TRUE;
                                     break;
@@ -1628,28 +1586,28 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                                 case 3:
                                 {
                                     hidden = TRUE;
-                                    if (scriptParams->ProxyPassword[0] != 0)
-                                        value = scriptParams->ProxyPassword;
+                                    if (!scriptParams->ProxyPassword.empty())
+                                        value = credentials->ProxyPassword.c_str();
                                     else
                                         needUserInput |= 1 << 3;
                                     break;
                                 }
 
                                 case 4:
-                                    value = scriptParams->Host;
+                                    value = credentials->Host.c_str();
                                     break;
 
                                 case 5:
                                 {
-                                    _itoa(scriptParams->Port, portBuf, 10);
-                                    value = portBuf;
+                                    portText = std::to_string(scriptParams->Port);
+                                    value = portText.c_str();
                                     break;
                                 }
 
                                 case 6:
                                 {
-                                    if (scriptParams->User[0] != 0)
-                                        value = scriptParams->User;
+                                    if (!scriptParams->User.empty())
+                                        value = credentials->User.c_str();
                                     else
                                         needUserInput |= 1 << 6;
                                     break;
@@ -1658,10 +1616,10 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                                 case 7:
                                 {
                                     hidden = TRUE;
-                                    if (scriptParams->Password[0] != 0 || scriptParams->AllowEmptyPassword)
+                                    if (!scriptParams->Password.empty() || scriptParams->AllowEmptyPassword)
                                     {
                                         scriptParams->AllowEmptyPassword = FALSE;
-                                        value = scriptParams->Password;
+                                        value = credentials->Password.c_str();
                                     }
                                     else
                                         needUserInput |= 1 << 7;
@@ -1671,35 +1629,25 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                                 case 8:
                                 {
                                     hidden = TRUE;
-                                    if (scriptParams->Account[0] != 0)
-                                        value = scriptParams->Account;
+                                    if (!scriptParams->Account.empty())
+                                        value = credentials->Account.c_str();
                                     else
                                         needUserInput |= 1 << 8;
                                     break;
                                 }
                                 }
-                                int valLen = (int)strlen(value);
-                                if (txt < bufEnd)
-                                {
-                                    if (valLen > bufEnd - txt)
-                                        valLen = (int)(bufEnd - txt); // trim text, destination buffer is too small
-                                    memmove(txt, value, valLen);
-                                    txt += valLen;
-                                }
+                                if (text != NULL)
+                                    stagedText.append(value);
                                 if (hidden)
                                     value = LoadStr(IDS_HIDDENPASSWORD);
-                                valLen = (int)strlen(value);
-                                if (hidden && logTxt < logBufEnd)
-                                    *logTxt++ = '(';
-                                if (logTxt < logBufEnd)
+                                if (logText != NULL)
                                 {
-                                    if (valLen > logBufEnd - logTxt)
-                                        valLen = (int)(logBufEnd - logTxt); // trim text, destination buffer is too small
-                                    memmove(logTxt, value, valLen);
-                                    logTxt += valLen;
+                                    if (hidden)
+                                        stagedLog.push_back('(');
+                                    stagedLog.append(value);
+                                    if (hidden)
+                                        stagedLog.push_back(')');
                                 }
-                                if (hidden && logTxt < logBufEnd)
-                                    *logTxt++ = ')';
                             }
                             s += varNameLen + 1; // skip the variable
                             break;
@@ -1716,20 +1664,20 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
                 }
                 else // something other than '(' and '$' follows '$' - copy 1:1
                 {
-                    if (txt < bufEnd)
-                        *txt++ = *s;
-                    if (logTxt < logBufEnd)
-                        *logTxt++ = *s;
+                    if (text != NULL)
+                        stagedText.push_back(*s);
+                    if (logText != NULL)
+                        stagedLog.push_back(*s);
                     s++;
                 }
             }
         }
         else
         {
-            if (txt < bufEnd)
-                *txt++ = *s;
-            if (logTxt < logBufEnd)
-                *logTxt++ = *s;
+            if (text != NULL)
+                stagedText.push_back(*s);
+            if (logText != NULL)
+                stagedLog.push_back(*s);
             s++;
         }
     }
@@ -1767,38 +1715,211 @@ BOOL ExpandText(char* buf, int bufSize, char* logBuf, int logBufSize, const char
             }
         }
     }
-    if (localSkipThisLine || !ret)
+    if (ret)
     {
-        if (bufSize > 0)
-            buf[0] = 0; // just to be safe
-        if (logBufSize > 0)
-            logBuf[0] = 0; // just to be safe
-    }
-    else
-    {
-        if (!hostVarsOnly) // append CRLF for FTP commands
+        if (localSkipThisLine)
         {
-            if (txt < bufEnd)
-                *txt++ = '\r';
-            if (txt < bufEnd)
-                *txt++ = '\n';
-            if (logTxt < logBufEnd)
-                *logTxt++ = '\r';
-            if (logTxt < logBufEnd)
-                *logTxt++ = '\n';
+            // A skipped line produces no command at all, so nothing may be
+            // published: the half-expanded text never got its CRLF (that append
+            // lives in the other arm), and ProcessProxyScript's caller reads a
+            // non-empty command as "send this to the server". A skipped last
+            // line would otherwise write a line with no terminator and hang the
+            // login on the reply timeout instead of reporting
+            // IDS_INCOMPLETEPRXSCR2. The wipe also keeps any credential that was
+            // expanded before the optional variable out of the caller's string.
+            if (text != NULL)
+                FTPSecureWipe(*text);
+            if (logText != NULL)
+                FTPSecureWipe(*logText);
         }
-        if (bufSize > 0)
-            *txt = 0;
-        if (logBufSize > 0)
-            *logTxt = 0;
+        else
+        {
+            if (!hostVarsOnly) // append CRLF for FTP commands
+            {
+                if (text != NULL)
+                    stagedText.append("\r\n");
+                if (logText != NULL)
+                    stagedLog.append("\r\n");
+            }
+            if (text != NULL)
+                text->swap(stagedText);
+            if (logText != NULL)
+                logText->swap(stagedLog);
+        }
     }
     return ret;
 }
 
-BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdReply,
-                        CProxyScriptParams* scriptParams, char* hostBuf, unsigned short* port,
-                        char* sendCmdBuf, char* logCmdBuf, char* errDescrBuf,
-                        BOOL* proxyHostNeeded)
+static BOOL ExpandTextDynamic(std::string* text, std::string* logText,
+                              const char* strBeg, const char* strEnd,
+                              const CFtpTextCodec& textCodec, CProxyScriptParams* scriptParams,
+                              const char** errorPos, int* errCode,
+                              BOOL hostVarsOnly, BOOL* skipThisLine, BOOL* proxyHostNeeded,
+                              BOOL* lowMemory) noexcept
+{
+    if (lowMemory != NULL)
+        *lowMemory = FALSE;
+    if (scriptParams != NULL && !scriptParams->IsGood())
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
+    if (strBeg == NULL || strEnd == NULL || strEnd < strBeg)
+        return FALSE;
+
+    try
+    {
+        CEncodedProxyScriptCredentials credentials;
+        if (scriptParams != NULL)
+        {
+            if (!textCodec.Encode(scriptParams->ProxyHost.data(), scriptParams->ProxyHost.size(), credentials.ProxyHost) ||
+                !textCodec.Encode(scriptParams->ProxyUser.data(), scriptParams->ProxyUser.size(), credentials.ProxyUser) ||
+                !textCodec.Encode(scriptParams->ProxyPassword.data(), scriptParams->ProxyPassword.size(), credentials.ProxyPassword) ||
+                !textCodec.Encode(scriptParams->Host.data(), scriptParams->Host.size(), credentials.Host) ||
+                !textCodec.Encode(scriptParams->User.data(), scriptParams->User.size(), credentials.User) ||
+                !textCodec.Encode(scriptParams->Password.data(), scriptParams->Password.size(), credentials.Password) ||
+                !textCodec.Encode(scriptParams->Account.data(), scriptParams->Account.size(), credentials.Account))
+            {
+                *errCode = IDS_PRXSCRERR_CANNOTENCODE;
+                return FALSE;
+            }
+        }
+        return ExpandEncodedText(text, logText, strBeg, strEnd, scriptParams,
+                                 scriptParams != NULL ? &credentials : NULL,
+                                 errorPos, errCode, hostVarsOnly, skipThisLine,
+                                 proxyHostNeeded);
+    }
+    catch (...)
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
+}
+
+static BOOL ExpandHostTextDynamic(std::wstring* text, const char* strBeg, const char* strEnd,
+                                  CProxyScriptParams* scriptParams, const char** errorPos,
+                                  int* errCode, BOOL* proxyHostNeeded,
+                                  BOOL* lowMemory) noexcept
+{
+    if (lowMemory != NULL)
+        *lowMemory = FALSE;
+    if (scriptParams != NULL && !scriptParams->IsGood())
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
+    if (strBeg == NULL || strEnd == NULL || strEnd < strBeg)
+        return FALSE;
+
+    static const char* const variableNames[] = {
+        "ProxyHost", "ProxyPort", "ProxyUser", "ProxyPassword", "Host",
+        "Port", "User", "Password", "Account",
+    };
+    try
+    {
+        std::wstring staged;
+        const char* current = strBeg;
+        while (current < strEnd)
+        {
+            if (*current != '$')
+            {
+                const char* literalEnd = current + 1;
+                while (literalEnd < strEnd && *literalEnd != '$')
+                    literalEnd++;
+                std::wstring literal;
+                if (!FtpDecodeLocalText(
+                        std::string_view(current, static_cast<size_t>(literalEnd - current)),
+                        literal))
+                {
+                    if (lowMemory != NULL)
+                        *lowMemory = TRUE;
+                    return FALSE;
+                }
+                if (text != NULL)
+                    staged.append(literal);
+                current = literalEnd;
+                continue;
+            }
+
+            if (current + 1 < strEnd && current[1] == '$')
+            {
+                if (text != NULL)
+                    staged.push_back(L'$');
+                current += 2;
+                continue;
+            }
+            if (current + 1 >= strEnd || current[1] != '(')
+            {
+                if (text != NULL)
+                    staged.push_back(L'$');
+                current++;
+                continue;
+            }
+
+            const char* name = current + 2;
+            int variable = -1;
+            for (int i = 0; i < static_cast<int>(_countof(variableNames)); i++)
+            {
+                const size_t length = strlen(variableNames[i]);
+                if (name + length < strEnd && name[length] == ')' &&
+                    _strnicmp(name, variableNames[i], length) == 0)
+                {
+                    variable = i;
+                    current = name + length + 1;
+                    break;
+                }
+            }
+            if (variable < 0)
+            {
+                *errorPos = name;
+                *errCode = IDS_PRXSCRERR_UNKNOWNVAR;
+                return FALSE;
+            }
+            if (variable != 0 && variable != 4)
+            {
+                *errorPos = name;
+                *errCode = IDS_PRXSCRERR_HOSTVARSONLY;
+                return FALSE;
+            }
+            if (variable == 0)
+            {
+                if (proxyHostNeeded != NULL)
+                    *proxyHostNeeded = TRUE;
+                if (scriptParams != NULL)
+                {
+                    if (scriptParams->ProxyHost.empty())
+                    {
+                        scriptParams->NeedProxyHost = TRUE;
+                        return FALSE;
+                    }
+                    if (text != NULL)
+                        staged.append(scriptParams->ProxyHost);
+                }
+            }
+            else if (scriptParams != NULL && text != NULL)
+                staged.append(scriptParams->Host);
+        }
+        if (text != NULL)
+            text->swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
+}
+
+BOOL ProcessProxyScript(const CFtpTextCodec& textCodec,
+                        const char* script, const char** execPoint, int lastCmdReply,
+                        CProxyScriptParams* scriptParams, std::wstring* connectionHost, unsigned short* port,
+                        std::string* sendCommand, std::string* logCommand,
+                        std::string* errorDescription,
+                        BOOL* proxyHostNeeded, BOOL* lowMemory) noexcept
 {
     CALL_STACK_MESSAGE2("ProcessProxyScript(, , %d, , , , , , ,)", lastCmdReply);
 
@@ -1807,6 +1928,10 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
         TRACE_E("ProcessProxyScript(): script and execPoint may not be NULL!");
         return FALSE;
     }
+    if (lowMemory != NULL)
+        *lowMemory = FALSE;
+    try
+    {
     if (scriptParams != NULL)
     {
         scriptParams->NeedProxyHost = FALSE;
@@ -1815,18 +1940,18 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
         scriptParams->NeedPassword = FALSE;
         scriptParams->NeedAccount = FALSE;
     }
-    if (hostBuf != NULL)
-        *hostBuf = 0;
+    if (connectionHost != NULL)
+        connectionHost->clear();
     if (port != NULL)
         *port = 21;
-    if (sendCmdBuf != NULL)
-        *sendCmdBuf = 0;
-    if (logCmdBuf != NULL)
-        *logCmdBuf = 0;
-    if (errDescrBuf != NULL)
-        *errDescrBuf = 0;
+    std::string stagedSendCommand;
+    CFTPSecureByteStringGuard stagedSendCommandGuard(stagedSendCommand);
+    std::string stagedLogCommand;
+    if (errorDescription != NULL)
+        errorDescription->clear();
     if (proxyHostNeeded != NULL)
         *proxyHostNeeded = FALSE;
+    BOOL allocationFailure = FALSE;
     int errCode = 0;
     const char* s = *execPoint == NULL ? script : *execPoint;
     BOOL validateScript = scriptParams == NULL;
@@ -1835,7 +1960,9 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
     {
         while (*s != 0 && *s <= ' ')
             s++; // skip white-spaces
-        if (SalamanderGeneral->StrNICmp(s, "Connect to:", 11) == 0)
+        const std::string_view scriptTail(s);
+        if (scriptTail.size() >= 11 &&
+            FtpEqualAsciiTokenNoCase(scriptTail.substr(0, 11), "Connect to:"))
         {
             s += 11;
             while (*s != 0 && *s <= ' ' && *s != '\r' && *s != '\n')
@@ -1868,14 +1995,18 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
                     // 'host' to 'hostEnd' is the host; 'portStr' to 'portEnd' is the port ('portStr'==NULL -> port 21)
                     if (portStr != NULL)
                     {
-                        if (portEnd - portStr == 12 && SalamanderGeneral->StrNICmp(portStr, "$(ProxyPort)", 12) == 0)
+                        if (portEnd - portStr == 12 &&
+                            FtpEqualAsciiTokenNoCase(std::string_view(portStr, 12),
+                                                     "$(ProxyPort)"))
                         {
                             if (scriptParams != NULL && port != NULL)
                                 *port = (unsigned short)scriptParams->ProxyPort;
                         }
                         else
                         {
-                            if (portEnd - portStr == 7 && SalamanderGeneral->StrNICmp(portStr, "$(Port)", 7) == 0)
+                            if (portEnd - portStr == 7 &&
+                                FtpEqualAsciiTokenNoCase(std::string_view(portStr, 7),
+                                                         "$(Port)"))
                             {
                                 if (scriptParams != NULL && port != NULL)
                                     *port = (unsigned short)scriptParams->Port;
@@ -1912,10 +2043,13 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
                     }
                     if (errCode == 0) // port is OK, continue with the host
                     {
-                        if (ExpandText(hostBuf, hostBuf == NULL ? 0 : HOST_MAX_SIZE, NULL, 0,
-                                       host, hostEnd, scriptParams, &s, &errCode, TRUE, NULL,
-                                       proxyHostNeeded))
+                        std::wstring expandedHost;
+                        if (ExpandHostTextDynamic(connectionHost != NULL ? &expandedHost : NULL,
+                                                  host, hostEnd, scriptParams, &s, &errCode,
+                                                  proxyHostNeeded, &allocationFailure))
                         {
+                            if (connectionHost != NULL)
+                                connectionHost->swap(expandedHost);
                             if (*s == '\r')
                                 s++;
                             if (*s == '\n')
@@ -1942,7 +2076,10 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
         processNextLine = FALSE;
         while (*s != 0 && *s <= ' ')
             s++; // skip white-spaces (including EOL)
-        BOOL sendOnlyIf3xxReply = SalamanderGeneral->StrNICmp(s, "3xx:", 4) == 0;
+        const std::string_view commandTail(s);
+        BOOL sendOnlyIf3xxReply = commandTail.size() >= 4 &&
+                                  FtpEqualAsciiTokenNoCase(commandTail.substr(0, 4),
+                                                           "3xx:");
         if (sendOnlyIf3xxReply)
         {
             if (testIfFirstCmdLineIs3xx) // on the first line, "3xx:" makes no sense (no previous command, therefore no reply)
@@ -1967,9 +2104,11 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
              lastCmdReply != -1 && FTP_DIGIT_1(lastCmdReply) == FTP_D1_PARTIALSUCCESS /* 3xx */))
         {
             BOOL skipThisLine;
-            if (ExpandText(sendCmdBuf, sendCmdBuf == NULL ? 0 : FTPCOMMAND_MAX_SIZE,
-                           logCmdBuf, logCmdBuf == NULL ? 0 : FTPCOMMAND_MAX_SIZE,
-                           lineBeg, s, scriptParams, &s, &errCode, FALSE, &skipThisLine, NULL))
+            if (ExpandTextDynamic(sendCommand != NULL ? &stagedSendCommand : NULL,
+                                  logCommand != NULL ? &stagedLogCommand : NULL,
+                                  lineBeg, s, textCodec, scriptParams,
+                                  &s, &errCode, FALSE, &skipThisLine, NULL,
+                                  &allocationFailure))
             {
                 if (skipThisLine) // the line should be skipped (contains an optional variable)
                 {
@@ -1998,11 +2137,33 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
 
     if (errCode == 0 && errorNoCommandsInScript)
         errCode = IDS_PRXSCRERR_NONECMDS;
-    if (errCode != 0 || scriptParams == NULL || !scriptParams->NeedUserInput())
+    if (!allocationFailure && (errCode != 0 || scriptParams == NULL || !scriptParams->NeedUserInput()))
         *execPoint = s;
-    if (errCode != 0 && errDescrBuf != NULL) // error text not yet in the buffer, text resource ID stored in errCode
-        lstrcpyn(errDescrBuf, LoadStr(errCode), 300);
-    return errCode == 0;
+    if (errCode != 0 && errorDescription != NULL &&
+        !FtpStoreProtocolBytes(LoadStr(errCode), *errorDescription))
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
+    if (lowMemory != NULL)
+        *lowMemory = allocationFailure;
+    const BOOL result = !allocationFailure && errCode == 0;
+    if (result)
+    {
+        if (sendCommand != NULL)
+            sendCommand->swap(stagedSendCommand);
+        if (logCommand != NULL)
+            logCommand->swap(stagedLogCommand);
+    }
+    return result;
+    }
+    catch (...)
+    {
+        if (lowMemory != NULL)
+            *lowMemory = TRUE;
+        return FALSE;
+    }
 }
 
 const char* GetProxyScriptText(CFTPProxyServerType type, BOOL textForDialog)
@@ -2159,45 +2320,68 @@ BOOL HaveHostAndPort(CFTPProxyServerType type)
     return type != fpstFTP_transparent;
 }
 
-const char* GetProxyTypeName(CFTPProxyServerType type)
+static int GetProxyTypeNameResourceID(CFTPProxyServerType type)
 {
     switch (type)
     {
     case fpstSocks4:
-        return LoadStr(IDS_PROXYSERVER_SOCKS4);
+        return IDS_PROXYSERVER_SOCKS4;
     case fpstSocks4A:
-        return LoadStr(IDS_PROXYSERVER_SOCKS4A);
+        return IDS_PROXYSERVER_SOCKS4A;
     case fpstSocks5:
-        return LoadStr(IDS_PROXYSERVER_SOCKS5);
+        return IDS_PROXYSERVER_SOCKS5;
     case fpstHTTP1_1:
-        return LoadStr(IDS_PROXYSERVER_HTTP11);
+        return IDS_PROXYSERVER_HTTP11;
     case fpstFTP_SITE_host_colon_port:
-        return LoadStr(IDS_PROXYSERVER_SITE1);
+        return IDS_PROXYSERVER_SITE1;
     case fpstFTP_SITE_host_space_port:
-        return LoadStr(IDS_PROXYSERVER_SITE2);
+        return IDS_PROXYSERVER_SITE2;
     case fpstFTP_SITE_user_host_colon_port:
-        return LoadStr(IDS_PROXYSERVER_SITE3);
+        return IDS_PROXYSERVER_SITE3;
     case fpstFTP_SITE_user_host_space_port:
-        return LoadStr(IDS_PROXYSERVER_SITE4);
+        return IDS_PROXYSERVER_SITE4;
     case fpstFTP_OPEN_host_port:
-        return LoadStr(IDS_PROXYSERVER_OPEN);
+        return IDS_PROXYSERVER_OPEN;
     case fpstFTP_transparent:
-        return LoadStr(IDS_PROXYSERVER_TRANSPAR);
+        return IDS_PROXYSERVER_TRANSPAR;
     case fpstFTP_USER_user_host_colon_port:
-        return LoadStr(IDS_PROXYSERVER_USER1);
+        return IDS_PROXYSERVER_USER1;
     case fpstFTP_USER_user_host_space_port:
-        return LoadStr(IDS_PROXYSERVER_USER2);
+        return IDS_PROXYSERVER_USER2;
     case fpstFTP_USER_fireuser_host:
-        return LoadStr(IDS_PROXYSERVER_USER3);
+        return IDS_PROXYSERVER_USER3;
     case fpstFTP_USER_user_host_fireuser:
-        return LoadStr(IDS_PROXYSERVER_USER4);
+        return IDS_PROXYSERVER_USER4;
     case fpstFTP_USER_user_fireuser_host:
-        return LoadStr(IDS_PROXYSERVER_USER5);
+        return IDS_PROXYSERVER_USER5;
     case fpstOwnScript:
-        return LoadStr(IDS_PROXYSERVER_USERDEF);
+        return IDS_PROXYSERVER_USERDEF;
     default:
-        TRACE_E("GetProxyTypeName(): unknown proxy server type!");
-        return "";
+        TRACE_E("GetProxyTypeNameResourceID(): unknown proxy server type!");
+        return 0;
+    }
+}
+
+BOOL GetProxyTypeName(CFTPProxyServerType type, std::string& name) noexcept
+{
+    const int resourceID = GetProxyTypeNameResourceID(type);
+    return resourceID != 0 && FtpStoreLocalTextBytes(LoadStr(resourceID), name);
+}
+
+BOOL GetProxyTypeNameW(CFTPProxyServerType type, std::wstring& name) noexcept
+{
+    const int resourceID = GetProxyTypeNameResourceID(type);
+    if (resourceID == 0)
+        return FALSE;
+    try
+    {
+        std::wstring staged = LangStr(resourceID);
+        name.swap(staged);
+        return TRUE;
+    }
+    catch (...)
+    {
+        return FALSE;
     }
 }
 
@@ -2222,28 +2406,23 @@ BOOL IsSOCKSOrHTTPProxy(CFTPProxyServerType type)
 //
 
 CFTPProxyForDataCon::CFTPProxyForDataCon(CFTPProxyServerType proxyType, DWORD proxyHostIP,
-                                         unsigned short proxyPort, const char* proxyUser,
-                                         const char* proxyPassword, const char* host,
-                                         DWORD hostIP, unsigned short hostPort)
+                                         unsigned short proxyPort, const wchar_t* proxyUser,
+                                         const wchar_t* proxyPassword, const wchar_t* host,
+                                         DWORD hostIP, unsigned short hostPort) noexcept
 {
     ProxyType = proxyType;
     ProxyHostIP = proxyHostIP;
     ProxyPort = proxyPort;
-    ProxyUser = SalamanderGeneral->DupStr(proxyUser);
-    ProxyPassword = SalamanderGeneral->DupStr(proxyPassword);
-    Host = SalamanderGeneral->DupStr(host);
+    Valid = FtpStoreWideText(proxyUser != NULL ? proxyUser : L"", ProxyUser) &&
+            FtpStoreWideText(proxyPassword != NULL ? proxyPassword : L"", ProxyPassword) &&
+            FtpStoreWideText(host != NULL ? host : L"", Host);
     HostIP = hostIP;
     HostPort = hostPort;
 }
 
 CFTPProxyForDataCon::~CFTPProxyForDataCon()
 {
-    if (ProxyUser != NULL)
-        free(ProxyUser);
-    if (ProxyPassword != NULL)
-        free(ProxyPassword);
-    if (Host != NULL)
-        free(Host);
+    FTPSecureWipe(ProxyPassword);
 }
 
 //
@@ -2254,83 +2433,116 @@ CFTPProxyForDataCon::~CFTPProxyForDataCon()
 void CFTPProxyServer::Init(int proxyUID)
 {
     ProxyUID = proxyUID;
-    ProxyName = NULL;
+    ProxyName.clear();
     ProxyType = fpstFTP_USER_user_host_colon_port;
-    ProxyHost = NULL;
+    ProxyHost.clear();
     ProxyPort = 21;
-    ProxyUser = NULL;
+    ProxyUser.clear();
     ProxyEncryptedPassword = NULL;
     ProxyEncryptedPasswordSize = 0;
-    ProxyPlainPassword = NULL;
+    ProxyPlainPassword.clear();
     SaveProxyPassword = FALSE;
-    ProxyScript = NULL;
+    ProxyScript.clear();
 
     // NOTE: the default values here must match the default values used in the Save() method
 }
 
 void CFTPProxyServer::Release()
 {
-    if (ProxyName != NULL)
-        free(ProxyName);
-    if (ProxyHost != NULL)
-        free(ProxyHost);
-    if (ProxyUser != NULL)
-        free(ProxyUser);
     if (ProxyEncryptedPassword != NULL)
     {
         memset(ProxyEncryptedPassword, 0, ProxyEncryptedPasswordSize); // cleaning memory containing the password
         SalamanderGeneral->Free(ProxyEncryptedPassword);
     }
-    if (ProxyPlainPassword != NULL)
-    {
-        memset(ProxyPlainPassword, 0, strlen(ProxyPlainPassword)); // cleaning memory containing the password
-        SalamanderGeneral->Free(ProxyPlainPassword);
-    }
-    if (ProxyScript != NULL)
-        free(ProxyScript);
+    FTPSecureWipe(ProxyPlainPassword);
     Init(ProxyUID);
 }
 
 CFTPProxyServer*
-CFTPProxyServer::MakeCopy()
+CFTPProxyServer::MakeCopy() noexcept
 {
-    CFTPProxyServer* n = new CFTPProxyServer(0);
-    if (n != NULL)
+    CFTPProxyServer* n = NULL;
+    try
     {
+        n = new CFTPProxyServer(0);
+        if (n == NULL)
+            return NULL;
         n->ProxyUID = ProxyUID;
-        n->ProxyName = SalamanderGeneral->DupStr(ProxyName);
+        if (!FtpStoreWideText(ProxyName, n->ProxyName))
+        {
+            delete n;
+            return NULL;
+        }
         n->ProxyType = ProxyType;
-        n->ProxyHost = SalamanderGeneral->DupStr(ProxyHost);
+        if (!FtpStoreWideText(ProxyHost, n->ProxyHost))
+        {
+            delete n;
+            return NULL;
+        }
         n->ProxyPort = ProxyPort;
-        n->ProxyUser = SalamanderGeneral->DupStr(ProxyUser);
+        if (!FtpStoreWideText(ProxyUser, n->ProxyUser))
+        {
+            delete n;
+            return NULL;
+        }
         n->ProxyEncryptedPassword = DupEncryptedPassword(ProxyEncryptedPassword, ProxyEncryptedPasswordSize);
-        n->ProxyEncryptedPasswordSize = ProxyEncryptedPasswordSize;
-        n->ProxyPlainPassword = SalamanderGeneral->DupStr(ProxyPlainPassword);
+        if (ProxyEncryptedPassword != NULL && ProxyEncryptedPasswordSize > 0 &&
+            n->ProxyEncryptedPassword == NULL)
+        {
+            delete n;
+            return NULL;
+        }
+        n->ProxyEncryptedPasswordSize = n->ProxyEncryptedPassword != NULL ? ProxyEncryptedPasswordSize : 0;
+        if (!FtpStoreWideText(ProxyPlainPassword, n->ProxyPlainPassword))
+        {
+            delete n;
+            return NULL;
+        }
         n->SaveProxyPassword = SaveProxyPassword;
-        n->ProxyScript = SalamanderGeneral->DupStr(ProxyScript);
+        if (!FtpStoreLocalTextBytes(ProxyScript, n->ProxyScript))
+        {
+            delete n;
+            return NULL;
+        }
     }
-    else
+    catch (...)
+    {
+        delete n;
+        n = NULL;
         TRACE_E(LOW_MEMORY);
+    }
     return n;
 }
 
 CFTPProxyForDataCon*
-CFTPProxyServer::AllocProxyForDataCon(DWORD proxyHostIP, const char* host,
+CFTPProxyServer::AllocProxyForDataCon(DWORD proxyHostIP, const wchar_t* host,
                                       DWORD hostIP, unsigned short hostPort)
 {
-    CFTPProxyForDataCon* n = new CFTPProxyForDataCon(ProxyType, proxyHostIP, ProxyPort,
-                                                     ProxyUser, ProxyPlainPassword, host,
-                                                     hostIP, hostPort);
+    CFTPProxyForDataCon* n = NULL;
+    try
+    {
+        n = new CFTPProxyForDataCon(ProxyType, proxyHostIP, ProxyPort,
+                                    ProxyUser.c_str(), ProxyPlainPassword.c_str(),
+                                    host, hostIP, hostPort);
+    }
+    catch (...)
+    {
+        delete n;
+        n = NULL;
+    }
+    if (n != NULL && !n->IsGood())
+    {
+        delete n;
+        n = NULL;
+    }
     if (n == NULL)
         TRACE_E(LOW_MEMORY);
     return n;
 }
 
-BOOL CFTPProxyServer::SetProxyHost(const char* proxyHost)
+BOOL CFTPProxyServer::SetProxyHost(const wchar_t* proxyHost) noexcept
 {
-    BOOL err = FALSE;
-    UpdateStr(ProxyHost, proxyHost, &err);
-    return !err;
+    return FtpStoreWideText(proxyHost != NULL ? proxyHost : L"", ProxyHost);
 }
 
 void CFTPProxyServer::SetProxyPort(int proxyPort)
@@ -2338,75 +2550,98 @@ void CFTPProxyServer::SetProxyPort(int proxyPort)
     ProxyPort = proxyPort;
 }
 
-BOOL CFTPProxyServer::SetProxyPassword(const char* proxyPassword)
+BOOL CFTPProxyServer::SetProxyPassword(const wchar_t* proxyPassword) noexcept
 {
-    BOOL err = FALSE;
-    UpdateStr(ProxyPlainPassword, proxyPassword, &err, TRUE);
-    return !err;
+    std::wstring staged;
+    if (!FtpStoreWideText(proxyPassword != NULL ? proxyPassword : L"", staged))
+        return FALSE;
+    ProxyPlainPassword.swap(staged);
+    FTPSecureWipe(staged);
+    return TRUE;
 }
 
-BOOL CFTPProxyServer::SetProxyUser(const char* proxyUser)
+BOOL CFTPProxyServer::SetProxyUser(const wchar_t* proxyUser) noexcept
 {
-    BOOL err = FALSE;
-    UpdateStr(ProxyUser, proxyUser, &err);
-    return !err;
+    return FtpStoreWideText(proxyUser != NULL ? proxyUser : L"", ProxyUser);
 }
 
 BOOL CFTPProxyServer::Set(int proxyUID,
-                          const char* proxyName,
+                          const wchar_t* proxyName,
                           CFTPProxyServerType proxyType,
-                          const char* proxyHost,
+                          const wchar_t* proxyHost,
                           int proxyPort,
-                          const char* proxyUser,
+                          const wchar_t* proxyUser,
                           const BYTE* proxyEncryptedPassword,
                           int proxyEncryptedPasswordSize,
                           int saveProxyPassword,
-                          const char* proxyScript)
+                          const char* proxyScript) noexcept
 {
-    BOOL err = FALSE;
+    if (proxyEncryptedPassword != NULL && proxyEncryptedPasswordSize <= 0)
+        return FALSE;
+    std::wstring stagedName;
+    std::wstring stagedHost;
+    std::wstring stagedUser;
+    std::string stagedScript;
+    if (!FtpStoreWideText(proxyName != NULL ? proxyName : L"", stagedName) ||
+        !FtpStoreWideText(proxyHost != NULL ? proxyHost : L"", stagedHost) ||
+        !FtpStoreWideText(proxyUser != NULL ? proxyUser : L"", stagedUser) ||
+        !FtpStoreLocalTextBytes(proxyScript != NULL ? proxyScript : "", stagedScript))
+        return FALSE;
+    BYTE* stagedEncryptedPassword = DupEncryptedPassword(proxyEncryptedPassword, proxyEncryptedPasswordSize);
+    if (proxyEncryptedPassword != NULL && proxyEncryptedPasswordSize > 0 && stagedEncryptedPassword == NULL)
+    {
+        return FALSE;
+    }
+    BYTE* oldEncryptedPassword = ProxyEncryptedPassword;
+    int oldEncryptedPasswordSize = ProxyEncryptedPasswordSize;
     ProxyUID = proxyUID;
-    UpdateStr(ProxyName, proxyName, &err);
+    ProxyName.swap(stagedName);
     ProxyType = proxyType;
-    UpdateStr(ProxyHost, proxyHost, &err);
+    ProxyHost.swap(stagedHost);
     ProxyPort = proxyPort;
-    UpdateStr(ProxyUser, proxyUser, &err);
-    UpdateEncryptedPassword(&ProxyEncryptedPassword, &ProxyEncryptedPasswordSize, proxyEncryptedPassword, proxyEncryptedPasswordSize);
-    UpdateStr(ProxyPlainPassword, NULL, &err, TRUE);
+    ProxyUser.swap(stagedUser);
+    ProxyEncryptedPassword = stagedEncryptedPassword;
+    ProxyEncryptedPasswordSize = stagedEncryptedPassword != NULL ? proxyEncryptedPasswordSize : 0;
+    FTPSecureWipe(ProxyPlainPassword);
     SaveProxyPassword = saveProxyPassword;
-    UpdateStr(ProxyScript, proxyScript, &err);
-    return !err;
+    ProxyScript.swap(stagedScript);
+
+    if (oldEncryptedPassword != NULL)
+    {
+        SecureZeroMemory(oldEncryptedPassword, oldEncryptedPasswordSize);
+        SalamanderGeneral->Free(oldEncryptedPassword);
+    }
+    return TRUE;
 }
 
 BOOL CFTPProxyServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     int proxyUID;
-    char proxyName[PROXYSRVNAME_MAX_SIZE];
+    std::wstring proxyName = ProxyName;
     DWORD proxyType;
-    char proxyHost[HOST_MAX_SIZE];
+    std::wstring proxyHost = ProxyHost;
     int proxyPort;
-    char proxyUser[USER_MAX_SIZE];
+    std::wstring proxyUser = ProxyUser;
     BYTE* proxyEncryptedPassword;
     int proxyEncryptedPasswordSize;
     int saveProxyPassword;
-    char proxyScript[PROXYSCRIPT_MAX_SIZE];
+    std::string proxyScript;
 
     // take over default values (the object is clean, just initialized)
     proxyType = ProxyType;
-    strcpy(proxyHost, HandleNULLStr(ProxyHost));
     proxyPort = ProxyPort;
-    strcpy(proxyUser, HandleNULLStr(ProxyUser));
     proxyEncryptedPassword = NULL;
     proxyEncryptedPasswordSize = 0;
     saveProxyPassword = FALSE;
-    strcpy(proxyScript, HandleNULLStr(ProxyScript));
+    if (!FtpStoreLocalTextBytes(ProxyScript, proxyScript))
+        return FALSE;
 
     if (!registry->GetValue(regKey, CONFIG_FTPPRXUID, REG_DWORD, &proxyUID, sizeof(DWORD)))
     {
         TRACE_E("Unexpected error in CFTPProxyServer::Load(): UID of proxy server was not found!");
         return FALSE; // UID is mandatory
     }
-    if (!registry->GetValue(regKey, CONFIG_FTPPRXNAME, REG_SZ, proxyName, PROXYSRVNAME_MAX_SIZE) ||
-        proxyName[0] == 0)
+    if (!GetValueStringW(registry, regKey, CONFIG_FTPPRXNAME, proxyName) || proxyName.empty())
     {
         TRACE_E("Unexpected error in CFTPProxyServer::Load(): empty name of proxy server is not allowed!");
         return FALSE; // name is mandatory
@@ -2417,9 +2652,9 @@ BOOL CFTPProxyServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
         TRACE_E("Unexpected error in CFTPProxyServer::Load(): unknown type of proxy server!");
         return FALSE; // unknown proxy server type
     }
-    registry->GetValue(regKey, CONFIG_FTPPRXHOST, REG_SZ, proxyHost, HOST_MAX_SIZE);
+    GetValueStringW(registry, regKey, CONFIG_FTPPRXHOST, proxyHost);
     registry->GetValue(regKey, CONFIG_FTPPRXPORT, REG_DWORD, &proxyPort, sizeof(DWORD));
-    registry->GetValue(regKey, CONFIG_FTPPRXUSER, REG_SZ, proxyUser, USER_MAX_SIZE);
+    GetValueStringW(registry, regKey, CONFIG_FTPPRXUSER, proxyUser);
 
     LoadPassword(regKey, registry, CONFIG_FTPPRXPASSWD_OLD, CONFIG_FTPPRXPASSWD_SCRAMBLED, CONFIG_FTPPRXPASSWD_ENCRYPTED,
                  &proxyEncryptedPassword, &proxyEncryptedPasswordSize);
@@ -2431,52 +2666,75 @@ BOOL CFTPProxyServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
         CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
         if (!passwordManager->IsPasswordEncrypted(proxyEncryptedPassword, proxyEncryptedPasswordSize))
         {
-            char* plainPassword;
-            if (passwordManager->DecryptPassword(proxyEncryptedPassword, proxyEncryptedPasswordSize, &plainPassword))
+            std::wstring plainPassword;
+            if (FTPDecryptPasswordW(passwordManager, proxyEncryptedPassword,
+                                    proxyEncryptedPasswordSize, &plainPassword))
             {
-                if (plainPassword[0] == 0)
+                if (plainPassword.empty())
                 {
                     memset(proxyEncryptedPassword, 0, proxyEncryptedPasswordSize);
                     SalamanderGeneral->Free(proxyEncryptedPassword);
                     proxyEncryptedPassword = NULL;
                     proxyEncryptedPasswordSize = 0;
                 }
-                memset(plainPassword, 0, lstrlen(plainPassword));
-                SalamanderGeneral->Free(plainPassword);
+                FTPSecureWipe(plainPassword);
             }
         }
     }
 
-    char proxyScriptReg[PROXYSCRIPT_MAX_SIZE + 300];
-    if (registry->GetValue(regKey, CONFIG_FTPPRXSCRIPT, REG_SZ, proxyScriptReg, PROXYSCRIPT_MAX_SIZE + 300))
+    std::string proxyScriptReg;
+    if (GetValueSZ(registry, regKey, CONFIG_FTPPRXSCRIPT, proxyScriptReg))
     {
-        if (!ConvertStringRegToTxt(proxyScript, PROXYSCRIPT_MAX_SIZE, proxyScriptReg))
-            TRACE_E("Unexpected error in CFTPProxyServer::Load(): small buffer for proxy script!");
+        if (!FtpDecodePersistedText(proxyScriptReg.c_str(), proxyScript))
+        {
+            if (proxyEncryptedPassword != NULL)
+            {
+                SecureZeroMemory(proxyEncryptedPassword, proxyEncryptedPasswordSize);
+                SalamanderGeneral->Free(proxyEncryptedPassword);
+            }
+            TRACE_E(LOW_MEMORY);
+            return FALSE;
+        }
     }
     const char* errPos = NULL;
-    char errDescr[300];
+    std::string errorDescription;
     BOOL proxyHostNeeded = proxyType != fpstFTP_transparent;
+    BOOL lowMemory = FALSE;
     if (proxyType == fpstOwnScript &&
-        !ProcessProxyScript(proxyScript, &errPos, -1, NULL, NULL, NULL, NULL, NULL, errDescr, &proxyHostNeeded))
+        !ProcessProxyScript(FtpLocalTextCodec(), proxyScript.c_str(), &errPos, -1, NULL, NULL, NULL, NULL, NULL,
+                            &errorDescription, &proxyHostNeeded, &lowMemory))
     {
-        TRACE_E("Unexpected error in CFTPProxyServer::Load(): syntax error in proxy script! err-pos: " << (errPos - proxyScript) << ", error: " << errDescr);
+        if (proxyEncryptedPassword != NULL)
+        {
+            SecureZeroMemory(proxyEncryptedPassword, proxyEncryptedPasswordSize);
+            SalamanderGeneral->Free(proxyEncryptedPassword);
+        }
+        if (lowMemory)
+            TRACE_E(LOW_MEMORY);
+        else
+            TRACE_E("Unexpected error in CFTPProxyServer::Load(): syntax error in proxy script! err-pos: " << (errPos != NULL ? errPos - proxyScript.c_str() : 0) << ", error: " << errorDescription.c_str());
         return FALSE;
     }
-    if (proxyHostNeeded && proxyHost[0] == 0)
+    if (proxyHostNeeded && proxyHost.empty())
     {
+        if (proxyEncryptedPassword != NULL)
+        {
+            SecureZeroMemory(proxyEncryptedPassword, proxyEncryptedPasswordSize);
+            SalamanderGeneral->Free(proxyEncryptedPassword);
+        }
         TRACE_E("Unexpected error in CFTPProxyServer::Load(): ProxyHost is empty but it may not be!");
         return FALSE;
     }
 
     BOOL ret = Set(proxyUID,
-                   proxyName,
+                   proxyName.c_str(),
                    (CFTPProxyServerType)proxyType,
-                   GetStrOrNULL(proxyHost),
+                   proxyHost.empty() ? NULL : proxyHost.c_str(),
                    proxyPort,
-                   GetStrOrNULL(proxyUser),
+                   proxyUser.c_str(),
                    proxyEncryptedPassword, proxyEncryptedPasswordSize,
                    saveProxyPassword,
-                   GetStrOrNULL(proxyScript));
+                   GetStrOrNULL(proxyScript.c_str()));
     if (proxyEncryptedPassword != NULL)
     {
         memset(proxyEncryptedPassword, 0, proxyEncryptedPasswordSize);
@@ -2485,21 +2743,22 @@ BOOL CFTPProxyServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
     return ret;
 }
 
-void CFTPProxyServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
+void CFTPProxyServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry,
+                           const std::string& persistedProxyScript)
 {
     registry->SetValue(regKey, CONFIG_FTPPRXUID, REG_DWORD, &ProxyUID, sizeof(DWORD));
-    registry->SetValue(regKey, CONFIG_FTPPRXNAME, REG_SZ, HandleNULLStr(ProxyName), -1);
+    SetValueStringW(registry, regKey, CONFIG_FTPPRXNAME, ProxyName);
     if (ProxyType != fpstFTP_USER_user_host_colon_port)
     {
         DWORD dw = ProxyType;
         registry->SetValue(regKey, CONFIG_FTPPRXTYPE, REG_DWORD, &dw, sizeof(DWORD));
     }
-    if (IsNotEmptyStr(ProxyHost))
-        registry->SetValue(regKey, CONFIG_FTPPRXHOST, REG_SZ, ProxyHost, -1);
+    if (!ProxyHost.empty())
+        SetValueStringW(registry, regKey, CONFIG_FTPPRXHOST, ProxyHost);
     if (ProxyPort != 21)
         registry->SetValue(regKey, CONFIG_FTPPRXPORT, REG_DWORD, &ProxyPort, sizeof(DWORD));
-    if (IsNotEmptyStr(ProxyUser))
-        registry->SetValue(regKey, CONFIG_FTPPRXUSER, REG_SZ, ProxyUser, -1);
+    if (!ProxyUser.empty())
+        SetValueStringW(registry, regKey, CONFIG_FTPPRXUSER, ProxyUser);
     if (SaveProxyPassword) // "save password" is not stored (if a password is saved, it means "save password" is TRUE - so we must also store an empty password)
     {
         CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
@@ -2513,7 +2772,8 @@ void CFTPProxyServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
         {
             BYTE* scrambledPassword;
             int scrambledPasswordSize;
-            if (passwordManager->EncryptPassword("", &scrambledPassword, &scrambledPasswordSize, FALSE))
+            if (FTPEncryptPasswordW(passwordManager, L"", &scrambledPassword,
+                                    &scrambledPasswordSize, FALSE))
             {
                 registry->SetValue(regKey, CONFIG_FTPPRXPASSWD_SCRAMBLED, REG_BINARY, scrambledPassword, scrambledPasswordSize);
                 // free the buffer allocated in EncryptPassword()
@@ -2521,12 +2781,8 @@ void CFTPProxyServer::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
             }
         }
     }
-    if (IsNotEmptyStr(ProxyScript))
-    {
-        char proxyScriptReg[PROXYSCRIPT_MAX_SIZE + 300];
-        ConvertStringTxtToReg(proxyScriptReg, PROXYSCRIPT_MAX_SIZE + 300, ProxyScript);
-        registry->SetValue(regKey, CONFIG_FTPPRXSCRIPT, REG_SZ, proxyScriptReg, -1);
-    }
+    if (!persistedProxyScript.empty())
+        SetValueSZ(registry, regKey, CONFIG_FTPPRXSCRIPT, persistedProxyScript.c_str());
 }
 
 //
@@ -2583,11 +2839,12 @@ void CFTPProxyServerList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbst
     if (registry->OpenKey(regKey, CONFIG_FTPPROXYLIST, actKey))
     {
         HKEY subKey;
-        char buf[30];
+        std::wstring keyName;
         int i = 0;
         DestroyMembers();
         NextFreeProxyUID = 1;
-        while (registry->OpenKey(actKey, _itoa(++i, buf, 10), subKey))
+        while (FTPFormatDecimalIndex(keyName, ++i) &&
+               registry->OpenKey(actKey, keyName.c_str(), subKey))
         {
             CFTPProxyServer* item = new CFTPProxyServer(0);
             if (item == NULL)
@@ -2614,7 +2871,7 @@ void CFTPProxyServerList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbst
                     {
                         CFTPProxyServer* proxy = At(x);
                         if (proxy->ProxyUID == item->ProxyUID ||
-                            SalamanderGeneral->StrICmp(proxy->ProxyName, item->ProxyName) == 0)
+                            SalamanderGeneral->StrICmp(proxy->ProxyName.c_str(), item->ProxyName.c_str()) == 0)
                         {
                             TRACE_E("Unexpected situation in CFTPProxyServerList::Load(): not unique proxy server - skipping it...");
                             notUnique = TRUE;
@@ -2647,18 +2904,40 @@ void CFTPProxyServerList::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbst
 void CFTPProxyServerList::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
 {
     HANDLES(EnterCriticalSection(&ProxyServerListCS));
+    std::vector<std::string> persistedProxyScripts;
+    try
+    {
+        persistedProxyScripts.resize(Count);
+    }
+    catch (...)
+    {
+        TRACE_E(LOW_MEMORY);
+        HANDLES(LeaveCriticalSection(&ProxyServerListCS));
+        return;
+    }
+    for (int i = 0; i < Count; i++)
+    {
+        if (!At(i)->ProxyScript.empty() &&
+            !FtpEncodePersistedText(At(i)->ProxyScript.c_str(), persistedProxyScripts[i]))
+        {
+            TRACE_E(LOW_MEMORY);
+            HANDLES(LeaveCriticalSection(&ProxyServerListCS));
+            return;
+        }
+    }
     HKEY actKey;
     if (registry->CreateKey(regKey, CONFIG_FTPPROXYLIST, actKey))
     {
         registry->ClearKey(actKey);
         HKEY subKey;
-        char buf[30];
+        std::wstring keyName;
         int i;
         for (i = 0; i < Count; i++)
         {
-            if (registry->CreateKey(actKey, _itoa(i + 1, buf, 10), subKey))
+            if (FTPFormatDecimalIndex(keyName, i + 1) &&
+                registry->CreateKey(actKey, keyName.c_str(), subKey))
             {
-                At(i)->Save(parent, subKey, registry);
+                At(i)->Save(parent, subKey, registry, persistedProxyScripts[i]);
                 registry->CloseKey(subKey);
             }
             else
@@ -2671,11 +2950,24 @@ void CFTPProxyServerList::Save(HWND parent, HKEY regKey, CSalamanderRegistryAbst
 
 void CFTPProxyServerList::InitCombo(HWND combo, int focusProxyUID, BOOL addDefault)
 {
+    std::wstring notUsed;
+    std::wstring defaultProxy;
+    try
+    {
+        notUsed = LangStr(IDS_PROXYSERVER_NOTUSED);
+        if (addDefault)
+            defaultProxy = LangStr(IDS_PROXYSERVER_DEFAULT);
+    }
+    catch (...)
+    {
+        TRACE_E(LOW_MEMORY);
+        return;
+    }
     HANDLES(EnterCriticalSection(&ProxyServerListCS));
-    SendMessage(combo, CB_RESETCONTENT, 0, 0);
-    SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_PROXYSERVER_NOTUSED));
+    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(notUsed.c_str()));
     if (addDefault)
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_PROXYSERVER_DEFAULT));
+        SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(defaultProxy.c_str()));
     int focusIndex = addDefault ? 1 : 0;
     if (focusProxyUID == -1 && addDefault)
         focusIndex = 0;
@@ -2683,11 +2975,11 @@ void CFTPProxyServerList::InitCombo(HWND combo, int focusProxyUID, BOOL addDefau
     for (i = 0; i < Count; i++) // fill the combo-box list
     {
         CFTPProxyServer* proxy = At(i);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)proxy->ProxyName);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)proxy->ProxyName.c_str());
         if (focusProxyUID >= 0 && proxy->ProxyUID == focusProxyUID)
             focusIndex = i + (addDefault ? 2 : 1);
     }
-    SendMessage(combo, CB_SETCURSEL, focusIndex, 0);
+    SendMessageW(combo, CB_SETCURSEL, focusIndex, 0);
     HANDLES(LeaveCriticalSection(&ProxyServerListCS));
 }
 
@@ -2724,7 +3016,7 @@ BOOL CFTPProxyServerList::IsValidUID(int proxyServerUID)
     return found;
 }
 
-BOOL CFTPProxyServerList::IsProxyNameOK(CFTPProxyServer* proxyServer, const char* proxyName)
+BOOL CFTPProxyServerList::IsProxyNameOK(CFTPProxyServer* proxyServer, const wchar_t* proxyName)
 {
     BOOL ok = FALSE;
     if (proxyName[0] != 0)
@@ -2734,7 +3026,7 @@ BOOL CFTPProxyServerList::IsProxyNameOK(CFTPProxyServer* proxyServer, const char
         for (i = 0; i < Count; i++) // check whether the name has already been used elsewhere
         {
             CFTPProxyServer* proxy = At(i);
-            if (proxy != proxyServer && SalamanderGeneral->StrICmp(proxy->ProxyName, proxyName) == 0)
+            if (proxy != proxyServer && SalamanderGeneral->StrICmp(proxy->ProxyName.c_str(), proxyName) == 0)
                 break;
         }
         ok = (i == Count);
@@ -2745,15 +3037,15 @@ BOOL CFTPProxyServerList::IsProxyNameOK(CFTPProxyServer* proxyServer, const char
 
 BOOL CFTPProxyServerList::SetProxyServer(CFTPProxyServer* proxyServer,
                                          int proxyUID,
-                                         const char* proxyName,
+                                         const wchar_t* proxyName,
                                          CFTPProxyServerType proxyType,
-                                         const char* proxyHost,
+                                         const wchar_t* proxyHost,
                                          int proxyPort,
-                                         const char* proxyUser,
+                                         const wchar_t* proxyUser,
                                          const BYTE* proxyEncryptedPassword,
                                          int proxyEncryptedPasswordSize,
                                          int saveProxyPassword,
-                                         const char* proxyScript)
+                                         const char* proxyScript) noexcept
 {
     HANDLES(EnterCriticalSection(&ProxyServerListCS));
     BOOL ret = proxyServer->Set(proxyUID,
@@ -2771,7 +3063,7 @@ BOOL CFTPProxyServerList::SetProxyServer(CFTPProxyServer* proxyServer,
 }
 
 CFTPProxyServer*
-CFTPProxyServerList::MakeCopyOfProxyServer(int proxyServerUID, BOOL* lowMem)
+CFTPProxyServerList::MakeCopyOfProxyServer(int proxyServerUID, BOOL* lowMem) noexcept
 {
     if (lowMem != NULL)
         *lowMem = FALSE;
@@ -2806,7 +3098,7 @@ void CFTPProxyServerList::AddProxyServer(HWND parent, HWND combo)
             {
                 n->ProxyUID = NextFreeProxyUID++; // initialization of ProxyUID
                 // add to the combo box and focus the added item
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)n->ProxyName);
+                SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)n->ProxyName.c_str());
                 int count = (int)SendMessage(combo, CB_GETCOUNT, 0, 0);
                 if (count != CB_ERR && count > 0)
                     PostMessage(combo, CB_SETCURSEL, count - 1, 0);
@@ -2838,7 +3130,7 @@ void CFTPProxyServerList::EditProxyServer(HWND parent, HWND combo, BOOL addDefau
             BOOL edited = (CProxyServerDlg(parent, this, e, TRUE).Execute() == IDOK);
             if (edited)
             { // just refresh the combo box
-                if (SendMessage(combo, CB_INSERTSTRING, sel, (LPARAM)e->ProxyName) == sel)
+                if (SendMessageW(combo, CB_INSERTSTRING, sel, (LPARAM)e->ProxyName.c_str()) == sel)
                 {
                     SendMessage(combo, CB_DELETESTRING, sel + 1, 0);
                     SendMessage(combo, CB_SETCURSEL, sel, 0);
@@ -2856,10 +3148,19 @@ void CFTPProxyServerList::DeleteProxyServer(HWND parent, HWND combo, BOOL addDef
         int index = sel - (addDefault ? 2 : 1);
         if (index >= 0 && index < Count) // reading values in the main thread does not need a critical section
         {
-            char buf[500];
-            sprintf(buf, LoadStr(IDS_WANTDELPRXSRV), At(index)->ProxyName);
-            BOOL del = (SalamanderGeneral->SalMessageBox(parent, buf,
-                                                         LoadStr(IDS_FTPPLUGINTITLE),
+            std::wstring prompt;
+            try
+            {
+                prompt = SPLFormatStringOwned(LangStr(IDS_WANTDELPRXSRV).c_str(),
+                                              At(index)->ProxyName.c_str());
+            }
+            catch (...)
+            {
+                TRACE_E(LOW_MEMORY);
+                return;
+            }
+            BOOL del = (SalamanderGeneral->SalMessageBox(parent, prompt.c_str(),
+                                                         SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPPLUGINTITLE).c_str(),
                                                          MB_YESNO | MSGBOXEX_ESCAPEENABLED |
                                                              MB_ICONQUESTION) == IDYES);
             if (del && index >= 0 && index < Count)
@@ -2889,7 +3190,7 @@ void CFTPProxyServerList::MoveUpProxyServer(HWND combo, BOOL addDefault)
         int index = sel - (addDefault ? 2 : 1);
         if (index > 0 && index < Count) // reading values in the main thread does not need a critical section
         {
-            if (SendMessage(combo, CB_INSERTSTRING, sel - 1, (LPARAM)At(index)->ProxyName) == sel - 1)
+            if (SendMessageW(combo, CB_INSERTSTRING, sel - 1, (LPARAM)At(index)->ProxyName.c_str()) == sel - 1)
             {
                 SendMessage(combo, CB_DELETESTRING, sel + 1, 0);
                 SendMessage(combo, CB_SETCURSEL, sel - 1, 0);
@@ -2912,7 +3213,7 @@ void CFTPProxyServerList::MoveDownProxyServer(HWND combo, BOOL addDefault)
         int index = sel - (addDefault ? 2 : 1);
         if (index >= 0 && index + 1 < Count) // reading values in the main thread does not need a critical section
         {
-            if (SendMessage(combo, CB_INSERTSTRING, sel, (LPARAM)At(index + 1)->ProxyName) == sel)
+            if (SendMessageW(combo, CB_INSERTSTRING, sel, (LPARAM)At(index + 1)->ProxyName.c_str()) == sel)
             {
                 SendMessage(combo, CB_DELETESTRING, sel + 2, 0);
                 SendMessage(combo, CB_SETCURSEL, sel + 1, 0);
@@ -2926,24 +3227,36 @@ void CFTPProxyServerList::MoveDownProxyServer(HWND combo, BOOL addDefault)
     }
 }
 
-BOOL CFTPProxyServerList::GetProxyName(char* buf, int bufSize, int proxyServerUID)
+BOOL CFTPProxyServerList::GetProxyName(std::wstring& name, int proxyServerUID)
 {
-    if (proxyServerUID == -1)
+    try
     {
-        lstrcpyn(buf, LoadStr(IDS_ADVSTRPROXYNOTUSED), bufSize);
+        std::wstring staged;
+        if (proxyServerUID == -1)
+            staged = LangStr(IDS_ADVSTRPROXYNOTUSED);
+        else
+        {
+            int i;
+            for (i = 0; i < Count; i++) // reading values in the main thread does not need a critical section
+            {
+                CFTPProxyServer* s = At(i);
+                if (s->ProxyUID == proxyServerUID)
+                {
+                    if (!FtpStoreWideText(s->ProxyName, staged))
+                        return FALSE;
+                    break;
+                }
+            }
+            if (i == Count)
+                return FALSE;
+        }
+        name.swap(staged);
         return TRUE;
     }
-    int i;
-    for (i = 0; i < Count; i++) // reading values in the main thread does not need a critical section
+    catch (...)
     {
-        CFTPProxyServer* s = At(i);
-        if (s->ProxyUID == proxyServerUID)
-        {
-            lstrcpyn(buf, HandleNULLStr(s->ProxyName), bufSize);
-            return TRUE;
-        }
+        return FALSE;
     }
-    return FALSE;
 }
 
 CFTPProxyServerType
@@ -3024,10 +3337,11 @@ BOOL CFTPProxyServerList::EnsurePasswordCanBeDecrypted(HWND hParent, int proxySe
                 return FALSE; // the user did not enter the correct master password
         }
         // verify that this is the correct master password for this password
-        if (!passwordManager->DecryptPassword(s->ProxyEncryptedPassword, s->ProxyEncryptedPasswordSize, NULL))
+        if (!FTPDecryptPasswordW(passwordManager, s->ProxyEncryptedPassword,
+                                 s->ProxyEncryptedPasswordSize, NULL))
         {
-            int ret = SalamanderGeneral->SalMessageBox(hParent, LoadStr(IDS_CANNOT_DECRYPT_PASSWORD_DELETE),
-                                                       LoadStr(IDS_FTPERRORTITLE), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
+            int ret = SalamanderGeneral->SalMessageBox(hParent, SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_CANNOT_DECRYPT_PASSWORD_DELETE).c_str(),
+                                                       SPLLoadStrOwned(SalamanderGeneral, HLanguage, IDS_FTPERRORTITLE).c_str(), MB_YESNO | MSGBOXEX_ESCAPEENABLED | MB_DEFBUTTON2 | MB_ICONEXCLAMATION);
             if (ret == IDNO)
                 return FALSE; // failed to decrypt the password
 
